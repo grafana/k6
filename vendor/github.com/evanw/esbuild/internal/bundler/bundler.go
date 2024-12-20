@@ -120,11 +120,29 @@ type tlaCheck struct {
 }
 
 func parseFile(args parseArgs) {
+	pathForIdentifierName := args.keyPath.Text
+
+	// Identifier name generation may use the name of the parent folder if the
+	// file name starts with "index". However, this is problematic when the
+	// parent folder includes the parent directory of what the developer
+	// considers to be the root of the source tree. If that happens, strip the
+	// parent folder to avoid including it in the generated name.
+	if relative, ok := args.fs.Rel(args.options.AbsOutputBase, pathForIdentifierName); ok {
+		for {
+			next := strings.TrimPrefix(strings.TrimPrefix(relative, "../"), "..\\")
+			if relative == next {
+				break
+			}
+			relative = next
+		}
+		pathForIdentifierName = relative
+	}
+
 	source := logger.Source{
 		Index:          args.sourceIndex,
 		KeyPath:        args.keyPath,
 		PrettyPath:     args.prettyPath,
-		IdentifierName: js_ast.GenerateNonUniqueNameFromPath(args.keyPath.Text),
+		IdentifierName: js_ast.GenerateNonUniqueNameFromPath(pathForIdentifierName),
 	}
 
 	var loader config.Loader
@@ -149,7 +167,6 @@ func parseFile(args parseArgs) {
 			&source,
 			args.importSource,
 			args.importPathRange,
-			args.importWith,
 			args.pluginData,
 			args.options.WatchMode,
 		)
@@ -173,6 +190,44 @@ func parseFile(args parseArgs) {
 	// The special "default" loader determines the loader from the file path
 	if loader == config.LoaderDefault {
 		loader = loaderFromFileExtension(args.options.ExtensionToLoader, base+ext)
+	}
+
+	// Reject unsupported import attributes when the loader isn't "copy" (since
+	// "copy" is kind of like "external"). But only do this if this file was not
+	// loaded by a plugin. Plugins are allowed to assign whatever semantics they
+	// want to import attributes.
+	if loader != config.LoaderCopy && pluginName == "" {
+		for _, attr := range source.KeyPath.ImportAttributes.DecodeIntoArray() {
+			var errorText string
+			var errorRange js_lexer.KeyOrValue
+
+			// We only currently handle "type: json"
+			if attr.Key != "type" {
+				errorText = fmt.Sprintf("Importing with the %q attribute is not supported", attr.Key)
+				errorRange = js_lexer.KeyRange
+			} else if attr.Value == "json" {
+				loader = config.LoaderWithTypeJSON
+				continue
+			} else {
+				errorText = fmt.Sprintf("Importing with a type attribute of %q is not supported", attr.Value)
+				errorRange = js_lexer.ValueRange
+			}
+
+			// Everything else is an error
+			r := args.importPathRange
+			if args.importWith != nil {
+				r = js_lexer.RangeOfImportAssertOrWith(*args.importSource, *ast.FindAssertOrWithEntry(args.importWith.Entries, attr.Key), errorRange)
+			}
+			tracker := logger.MakeLineColumnTracker(args.importSource)
+			args.log.AddError(&tracker, r, errorText)
+			if args.inject != nil {
+				args.inject <- config.InjectedFile{
+					Source: source,
+				}
+			}
+			args.results <- parseResult{}
+			return
+		}
 	}
 
 	if loader == config.LoaderEmpty {
@@ -398,6 +453,16 @@ func parseFile(args parseArgs) {
 						continue
 					}
 
+					// Encode the import attributes
+					var attrs logger.ImportAttributes
+					if record.AssertOrWith != nil && record.AssertOrWith.Keyword == ast.WithKeyword {
+						data := make(map[string]string, len(record.AssertOrWith.Entries))
+						for _, entry := range record.AssertOrWith.Entries {
+							data[helpers.UTF16ToString(entry.Key)] = helpers.UTF16ToString(entry.Value)
+						}
+						attrs = logger.EncodeImportAttributes(data)
+					}
+
 					// Special-case glob pattern imports
 					if record.GlobPattern != nil {
 						prettyPath := helpers.GlobPatternToString(record.GlobPattern.Parts)
@@ -413,6 +478,13 @@ func parseFile(args parseArgs) {
 							}
 							if result.globResolveResults == nil {
 								result.globResolveResults = make(map[uint32]globResolveResult)
+							}
+							for key, result := range results {
+								result.PathPair.Primary.ImportAttributes = attrs
+								if result.PathPair.HasSecondary() {
+									result.PathPair.Secondary.ImportAttributes = attrs
+								}
+								results[key] = result
 							}
 							result.globResolveResults[uint32(importRecordIndex)] = globResolveResult{
 								resolveResults: results,
@@ -430,16 +502,6 @@ func parseFile(args parseArgs) {
 					// type-only imports in TypeScript files.
 					if record.Flags.Has(ast.IsUnused) {
 						continue
-					}
-
-					// Encode the import attributes
-					var attrs logger.ImportAttributes
-					if record.AssertOrWith != nil && record.AssertOrWith.Keyword == ast.WithKeyword {
-						data := make(map[string]string, len(record.AssertOrWith.Entries))
-						for _, entry := range record.AssertOrWith.Entries {
-							data[helpers.UTF16ToString(entry.Key)] = helpers.UTF16ToString(entry.Value)
-						}
-						attrs = logger.EncodeImportAttributes(data)
 					}
 
 					// Cache the path in case it's imported multiple times in this file
@@ -463,6 +525,7 @@ func parseFile(args parseArgs) {
 							record.Range,
 							source.KeyPath,
 							record.Path.Text,
+							attrs,
 							record.Kind,
 							absResolveDir,
 							pluginData,
@@ -865,6 +928,7 @@ func RunOnResolvePlugins(
 	importPathRange logger.Range,
 	importer logger.Path,
 	path string,
+	importAttributes logger.ImportAttributes,
 	kind ast.ImportKind,
 	absResolveDir string,
 	pluginData interface{},
@@ -875,6 +939,7 @@ func RunOnResolvePlugins(
 		Kind:       kind,
 		PluginData: pluginData,
 		Importer:   importer,
+		With:       importAttributes,
 	}
 	applyPath := logger.Path{
 		Text:      path,
@@ -988,7 +1053,6 @@ func runOnLoadPlugins(
 	source *logger.Source,
 	importSource *logger.Source,
 	importPathRange logger.Range,
-	importWith *ast.ImportAssertOrWith,
 	pluginData interface{},
 	isWatchMode bool,
 ) (loaderPluginResult, bool) {
@@ -1055,30 +1119,6 @@ func runOnLoadPlugins(
 		}
 	}
 
-	// Reject unsupported import attributes
-	loader := config.LoaderDefault
-	for _, attr := range source.KeyPath.ImportAttributes.Decode() {
-		if attr.Key == "type" {
-			if attr.Value == "json" {
-				loader = config.LoaderWithTypeJSON
-			} else {
-				r := importPathRange
-				if importWith != nil {
-					r = js_lexer.RangeOfImportAssertOrWith(*importSource, *ast.FindAssertOrWithEntry(importWith.Entries, attr.Key), js_lexer.ValueRange)
-				}
-				log.AddError(&tracker, r, fmt.Sprintf("Importing with a type attribute of %q is not supported", attr.Value))
-				return loaderPluginResult{}, false
-			}
-		} else {
-			r := importPathRange
-			if importWith != nil {
-				r = js_lexer.RangeOfImportAssertOrWith(*importSource, *ast.FindAssertOrWithEntry(importWith.Entries, attr.Key), js_lexer.KeyRange)
-			}
-			log.AddError(&tracker, r, fmt.Sprintf("Importing with the %q attribute is not supported", attr.Key))
-			return loaderPluginResult{}, false
-		}
-	}
-
 	// Force disabled modules to be empty
 	if source.KeyPath.IsDisabled() {
 		return loaderPluginResult{loader: config.LoaderEmpty}, true
@@ -1089,7 +1129,7 @@ func runOnLoadPlugins(
 		if contents, err, originalError := fsCache.ReadFile(fs, source.KeyPath.Text); err == nil {
 			source.Contents = contents
 			return loaderPluginResult{
-				loader:        loader,
+				loader:        config.LoaderDefault,
 				absResolveDir: fs.Dir(source.KeyPath.Text),
 			}, true
 		} else {
@@ -1118,9 +1158,6 @@ func runOnLoadPlugins(
 				return loaderPluginResult{loader: config.LoaderNone}, true
 			} else {
 				source.Contents = contents
-				if loader != config.LoaderDefault {
-					return loaderPluginResult{loader: loader}, true
-				}
 				if mimeType := parsed.DecodeMIMEType(); mimeType != resolver.MIMETypeUnsupported {
 					switch mimeType {
 					case resolver.MIMETypeTextCSS:
@@ -1625,6 +1662,7 @@ func (s *scanner) preprocessInjectedFiles() {
 				logger.Range{},
 				importer,
 				importPath,
+				logger.ImportAttributes{},
 				ast.ImportEntryPoint,
 				injectAbsResolveDir,
 				nil,
@@ -1804,6 +1842,7 @@ func (s *scanner) addEntryPoints(entryPoints []EntryPoint) []graph.EntryPoint {
 				logger.Range{},
 				importer,
 				entryPoint.InputPath,
+				logger.ImportAttributes{},
 				ast.ImportEntryPoint,
 				entryPointAbsResolveDir,
 				nil,
@@ -1836,15 +1875,20 @@ func (s *scanner) addEntryPoints(entryPoints []EntryPoint) []graph.EntryPoint {
 		return nil
 	}
 
-	// Parse all entry points that were resolved successfully
+	// Determine output paths for all entry points that were resolved successfully
+	type entryPointToParse struct {
+		index int
+		parse func() uint32
+	}
+	var entryPointsToParse []entryPointToParse
 	for i, info := range entryPointInfos {
 		if info.results == nil {
 			continue
 		}
 
 		for _, resolveResult := range info.results {
+			resolveResult := resolveResult
 			prettyPath := resolver.PrettyPath(s.fs, resolveResult.PathPair.Primary)
-			sourceIndex := s.maybeParseFile(resolveResult, prettyPath, nil, logger.Range{}, nil, inputKindEntryPoint, nil)
 			outputPath := entryPoints[i].OutputPath
 			outputPathWasAutoGenerated := false
 
@@ -1879,9 +1923,17 @@ func (s *scanner) addEntryPoints(entryPoints []EntryPoint) []graph.EntryPoint {
 				outputPathWasAutoGenerated = true
 			}
 
+			// Defer parsing for this entry point until later
+			entryPointsToParse = append(entryPointsToParse, entryPointToParse{
+				index: len(entryMetas),
+				parse: func() uint32 {
+					return s.maybeParseFile(resolveResult, prettyPath, nil, logger.Range{}, nil, inputKindEntryPoint, nil)
+				},
+			})
+
 			entryMetas = append(entryMetas, graph.EntryPoint{
 				OutputPath:                 outputPath,
-				SourceIndex:                sourceIndex,
+				SourceIndex:                ast.InvalidRef.SourceIndex,
 				OutputPathWasAutoGenerated: outputPathWasAutoGenerated,
 			})
 		}
@@ -1901,6 +1953,11 @@ func (s *scanner) addEntryPoints(entryPoints []EntryPoint) []graph.EntryPoint {
 		if s.options.AbsOutputBase == "" {
 			s.options.AbsOutputBase = entryPointAbsResolveDir
 		}
+	}
+
+	// Only parse entry points after "AbsOutputBase" has been determined
+	for _, toParse := range entryPointsToParse {
+		entryMetas[toParse.index].SourceIndex = toParse.parse()
 	}
 
 	// Turn all output paths back into relative paths, but this time relative to
@@ -2203,7 +2260,7 @@ func (s *scanner) processScannedFiles(entryPointMeta []graph.EntryPoint) []scann
 
 		for _, sourceIndex := range sourceIndices {
 			source := &s.results[sourceIndex].file.inputFile.Source
-			attrs := source.KeyPath.ImportAttributes.Decode()
+			attrs := source.KeyPath.ImportAttributes.DecodeIntoArray()
 			if len(attrs) == 0 {
 				continue
 			}
@@ -2491,7 +2548,7 @@ func (s *scanner) processScannedFiles(entryPointMeta []graph.EntryPoint) []scann
 			} else {
 				sb.WriteString("]")
 			}
-			if attrs := result.file.inputFile.Source.KeyPath.ImportAttributes.Decode(); len(attrs) > 0 {
+			if attrs := result.file.inputFile.Source.KeyPath.ImportAttributes.DecodeIntoArray(); len(attrs) > 0 {
 				sb.WriteString(",\n      \"with\": {")
 				for i, attr := range attrs {
 					if i > 0 {
@@ -2520,11 +2577,13 @@ func (s *scanner) processScannedFiles(entryPointMeta []graph.EntryPoint) []scann
 			// the entry point itself.
 			customFilePath := ""
 			useOutputFile := false
+			isEntryPoint := false
 			if result.file.inputFile.Loader == config.LoaderCopy {
 				if metaIndex, ok := entryPointSourceIndexToMetaIndex[uint32(sourceIndex)]; ok {
 					template = s.options.EntryPathTemplate
 					customFilePath = entryPointMeta[metaIndex].OutputPath
 					useOutputFile = s.options.AbsOutputFile != ""
+					isEntryPoint = true
 				}
 			}
 
@@ -2575,8 +2634,14 @@ func (s *scanner) processScannedFiles(entryPointMeta []graph.EntryPoint) []scann
 					helpers.QuoteForJSON(result.file.inputFile.Source.PrettyPath, s.options.ASCIIOnly),
 					len(bytes),
 				)
+				entryPointJSON := ""
+				if isEntryPoint {
+					entryPointJSON = fmt.Sprintf("\"entryPoint\": %s,\n      ",
+						helpers.QuoteForJSON(result.file.inputFile.Source.PrettyPath, s.options.ASCIIOnly))
+				}
 				jsonMetadataChunk = fmt.Sprintf(
-					"{\n      \"imports\": [],\n      \"exports\": [],\n      \"inputs\": %s,\n      \"bytes\": %d\n    }",
+					"{\n      \"imports\": [],\n      \"exports\": [],\n      %s\"inputs\": %s,\n      \"bytes\": %d\n    }",
+					entryPointJSON,
 					inputs,
 					len(bytes),
 				)

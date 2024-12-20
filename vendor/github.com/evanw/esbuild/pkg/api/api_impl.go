@@ -216,6 +216,17 @@ func validateASCIIOnly(value Charset) bool {
 	}
 }
 
+func validateExternalPackages(value Packages) bool {
+	switch value {
+	case PackagesDefault, PackagesBundle:
+		return false
+	case PackagesExternal:
+		return true
+	default:
+		panic("Invalid packages")
+	}
+}
+
 func validateTreeShaking(value TreeShaking, bundle bool, format Format) bool {
 	switch value {
 	case TreeShakingDefault:
@@ -307,6 +318,8 @@ func validateFeatures(log logger.Log, target Target, engines []Engine) (compat.J
 		constraints[compat.ES] = compat.Semver{Parts: []int{2022}}
 	case ES2023:
 		constraints[compat.ES] = compat.Semver{Parts: []int{2023}}
+	case ES2024:
+		constraints[compat.ES] = compat.Semver{Parts: []int{2024}}
 	case ESNext, DefaultTarget:
 	default:
 		panic("Invalid target")
@@ -373,11 +386,11 @@ func validateSupported(log logger.Log, supported map[string]bool) (
 	return
 }
 
-func validateGlobalName(log logger.Log, text string) []string {
+func validateGlobalName(log logger.Log, text string, path string) []string {
 	if text != "" {
 		source := logger.Source{
-			KeyPath:    logger.Path{Text: "(global path)"},
-			PrettyPath: "(global name)",
+			KeyPath:    logger.Path{Text: path},
+			PrettyPath: path,
 			Contents:   text,
 		}
 
@@ -511,6 +524,18 @@ func validateJSXExpr(log logger.Log, text string, name string) config.DefineExpr
 	return config.DefineExpr{}
 }
 
+// This returns an arbitrary but unique key for each unique array of strings
+func mapKeyForDefine(parts []string) string {
+	var sb strings.Builder
+	var n [4]byte
+	for _, part := range parts {
+		binary.LittleEndian.PutUint32(n[:], uint32(len(part)))
+		sb.Write(n[:])
+		sb.WriteString(part)
+	}
+	return sb.String()
+}
+
 func validateDefines(
 	log logger.Log,
 	defines map[string]string,
@@ -520,32 +545,36 @@ func validateDefines(
 	minify bool,
 	drop Drop,
 ) (*config.ProcessedDefines, []config.InjectedDefine) {
-	rawDefines := make(map[string]config.DefineData)
-	var valueToInject map[string]config.InjectedDefine
-	var definesToInject []string
+	// Sort injected defines for determinism, since the imports will be injected
+	// into every file in the order that we return them from this function
+	sortedKeys := make([]string, 0, len(defines))
+	for key := range defines {
+		sortedKeys = append(sortedKeys, key)
+	}
+	sort.Strings(sortedKeys)
 
-	for key, value := range defines {
-		// The key must be a dot-separated identifier list
-		for _, part := range strings.Split(key, ".") {
-			if !js_ast.IsIdentifier(part) {
-				if part == key {
-					log.AddError(nil, logger.Range{}, fmt.Sprintf("The define key %q must be a valid identifier", key))
-				} else {
-					log.AddError(nil, logger.Range{}, fmt.Sprintf("The define key %q contains invalid identifier %q", key, part))
-				}
-				continue
-			}
+	rawDefines := make(map[string]config.DefineData)
+	nodeEnvParts := []string{"process", "env", "NODE_ENV"}
+	nodeEnvMapKey := mapKeyForDefine(nodeEnvParts)
+	var injectedDefines []config.InjectedDefine
+
+	for _, key := range sortedKeys {
+		value := defines[key]
+		keyParts := validateGlobalName(log, key, "(define name)")
+		if keyParts == nil {
+			continue
 		}
+		mapKey := mapKeyForDefine(keyParts)
 
 		// Parse the value
 		defineExpr, injectExpr := js_parser.ParseDefineExprOrJSON(value)
 
 		// Define simple expressions
 		if defineExpr.Constant != nil || len(defineExpr.Parts) > 0 {
-			rawDefines[key] = config.DefineData{DefineExpr: &defineExpr}
+			rawDefines[mapKey] = config.DefineData{KeyParts: keyParts, DefineExpr: &defineExpr}
 
 			// Try to be helpful for common mistakes
-			if len(defineExpr.Parts) == 1 && key == "process.env.NODE_ENV" {
+			if len(defineExpr.Parts) == 1 && mapKey == nodeEnvMapKey {
 				data := logger.MsgData{
 					Text: fmt.Sprintf("%q is defined as an identifier instead of a string (surround %q with quotes to get a string)", key, value),
 				}
@@ -593,32 +622,18 @@ func validateDefines(
 
 		// Inject complex expressions
 		if injectExpr != nil {
-			definesToInject = append(definesToInject, key)
-			if valueToInject == nil {
-				valueToInject = make(map[string]config.InjectedDefine)
-			}
-			valueToInject[key] = config.InjectedDefine{
+			index := ast.MakeIndex32(uint32(len(injectedDefines)))
+			injectedDefines = append(injectedDefines, config.InjectedDefine{
 				Source: logger.Source{Contents: value},
 				Data:   injectExpr,
 				Name:   key,
-			}
+			})
+			rawDefines[mapKey] = config.DefineData{KeyParts: keyParts, DefineExpr: &config.DefineExpr{InjectedDefineIndex: index}}
 			continue
 		}
 
 		// Anything else is unsupported
 		log.AddError(nil, logger.Range{}, fmt.Sprintf("Invalid define value (must be an entity name or valid JSON syntax): %s", value))
-	}
-
-	// Sort injected defines for determinism, since the imports will be injected
-	// into every file in the order that we return them from this function
-	var injectedDefines []config.InjectedDefine
-	if len(definesToInject) > 0 {
-		injectedDefines = make([]config.InjectedDefine, len(definesToInject))
-		sort.Strings(definesToInject)
-		for i, key := range definesToInject {
-			injectedDefines[i] = valueToInject[key]
-			rawDefines[key] = config.DefineData{DefineExpr: &config.DefineExpr{InjectedDefineIndex: ast.MakeIndex32(uint32(i))}}
-		}
 	}
 
 	// If we're bundling for the browser, add a special-cased define for
@@ -628,16 +643,16 @@ func validateDefines(
 	// is only done if it's not already defined so that you can override it if
 	// necessary.
 	if isBuildAPI && platform == config.PlatformBrowser {
-		if _, process := rawDefines["process"]; !process {
-			if _, processEnv := rawDefines["process.env"]; !processEnv {
-				if _, processEnvNodeEnv := rawDefines["process.env.NODE_ENV"]; !processEnvNodeEnv {
+		if _, process := rawDefines[mapKeyForDefine([]string{"process"})]; !process {
+			if _, processEnv := rawDefines[mapKeyForDefine([]string{"process.env"})]; !processEnv {
+				if _, processEnvNodeEnv := rawDefines[nodeEnvMapKey]; !processEnvNodeEnv {
 					var value []uint16
 					if minify {
 						value = helpers.StringToUTF16("production")
 					} else {
 						value = helpers.StringToUTF16("development")
 					}
-					rawDefines["process.env.NODE_ENV"] = config.DefineData{DefineExpr: &config.DefineExpr{Constant: &js_ast.EString{Value: value}}}
+					rawDefines[nodeEnvMapKey] = config.DefineData{KeyParts: nodeEnvParts, DefineExpr: &config.DefineExpr{Constant: &js_ast.EString{Value: value}}}
 				}
 			}
 		}
@@ -645,29 +660,35 @@ func validateDefines(
 
 	// If we're dropping all console API calls, replace each one with undefined
 	if (drop & DropConsole) != 0 {
-		define := rawDefines["console"]
+		consoleParts := []string{"console"}
+		consoleMapKey := mapKeyForDefine(consoleParts)
+		define := rawDefines[consoleMapKey]
+		define.KeyParts = consoleParts
 		define.Flags |= config.MethodCallsMustBeReplacedWithUndefined
-		rawDefines["console"] = define
+		rawDefines[consoleMapKey] = define
 	}
 
 	for _, key := range pureFns {
-		// The key must be a dot-separated identifier list
-		for _, part := range strings.Split(key, ".") {
-			if !js_ast.IsIdentifier(part) {
-				log.AddError(nil, logger.Range{}, fmt.Sprintf("Invalid pure function: %q", key))
-				continue
-			}
+		keyParts := validateGlobalName(log, key, "(pure name)")
+		if keyParts == nil {
+			continue
 		}
+		mapKey := mapKeyForDefine(keyParts)
 
 		// Merge with any previously-specified defines
-		define := rawDefines[key]
+		define := rawDefines[mapKey]
+		define.KeyParts = keyParts
 		define.Flags |= config.CallCanBeUnwrappedIfUnused
-		rawDefines[key] = define
+		rawDefines[mapKey] = define
 	}
 
 	// Processing defines is expensive. Process them once here so the same object
 	// can be shared between all parsers we create using these arguments.
-	processed := config.ProcessDefines(rawDefines)
+	definesArray := make([]config.DefineData, 0, len(rawDefines))
+	for _, define := range rawDefines {
+		definesArray = append(definesArray, define)
+	}
+	processed := config.ProcessDefines(definesArray)
 	return &processed, injectedDefines
 }
 
@@ -1250,7 +1271,7 @@ func validateBuildOptions(
 		ASCIIOnly:             validateASCIIOnly(buildOpts.Charset),
 		IgnoreDCEAnnotations:  buildOpts.IgnoreAnnotations,
 		TreeShaking:           validateTreeShaking(buildOpts.TreeShaking, buildOpts.Bundle, buildOpts.Format),
-		GlobalName:            validateGlobalName(log, buildOpts.GlobalName),
+		GlobalName:            validateGlobalName(log, buildOpts.GlobalName, "(global name)"),
 		CodeSplitting:         buildOpts.Splitting,
 		OutputFormat:          validateFormat(buildOpts.Format),
 		AbsOutputFile:         validatePath(log, realFS, buildOpts.Outfile, "outfile path"),
@@ -1265,7 +1286,7 @@ func validateBuildOptions(
 		ExtensionToLoader:     validateLoaders(log, buildOpts.Loader),
 		ExtensionOrder:        validateResolveExtensions(log, buildOpts.ResolveExtensions),
 		ExternalSettings:      validateExternals(log, realFS, buildOpts.External),
-		ExternalPackages:      buildOpts.Packages == PackagesExternal,
+		ExternalPackages:      validateExternalPackages(buildOpts.Packages),
 		PackageAliases:        validateAlias(log, realFS, buildOpts.Alias),
 		TSConfigPath:          validatePath(log, realFS, buildOpts.Tsconfig, "tsconfig path"),
 		TSConfigRaw:           buildOpts.TsconfigRaw,
@@ -1694,7 +1715,7 @@ func transformImpl(input string, transformOpts TransformOptions) TransformResult
 		SourceRoot:            transformOpts.SourceRoot,
 		ExcludeSourcesContent: transformOpts.SourcesContent == SourcesContentExclude,
 		OutputFormat:          validateFormat(transformOpts.Format),
-		GlobalName:            validateGlobalName(log, transformOpts.GlobalName),
+		GlobalName:            validateGlobalName(log, transformOpts.GlobalName, "(global name)"),
 		MinifySyntax:          transformOpts.MinifySyntax,
 		MinifyWhitespace:      transformOpts.MinifyWhitespace,
 		MinifyIdentifiers:     transformOpts.MinifyIdentifiers,
@@ -1898,6 +1919,7 @@ func (impl *pluginImpl) onResolve(options OnResolveOptions, callback func(OnReso
 				ResolveDir: args.ResolveDir,
 				Kind:       importKindToResolveKind(args.Kind),
 				PluginData: args.PluginData,
+				With:       args.With.DecodeIntoMap(),
 			})
 			result.PluginName = response.PluginName
 			result.AbsWatchFiles = impl.validatePathsArray(response.WatchFiles, "watch file")
@@ -1924,6 +1946,33 @@ func (impl *pluginImpl) onResolve(options OnResolveOptions, callback func(OnReso
 
 			// Convert log messages
 			result.Msgs = convertErrorsAndWarningsToInternal(response.Errors, response.Warnings)
+
+			// Warn if the plugin returned things without resolving the path
+			if response.Path == "" && !response.External {
+				var what string
+				if response.Namespace != "" {
+					what = "namespace"
+				} else if response.Suffix != "" {
+					what = "suffix"
+				} else if response.PluginData != nil {
+					what = "pluginData"
+				} else if response.WatchFiles != nil {
+					what = "watchFiles"
+				} else if response.WatchDirs != nil {
+					what = "watchDirs"
+				}
+				if what != "" {
+					path := "path"
+					if logger.API == logger.GoAPI {
+						what = strings.Title(what)
+						path = strings.Title(path)
+					}
+					result.Msgs = append(result.Msgs, logger.Msg{
+						Kind: logger.Warning,
+						Data: logger.MsgData{Text: fmt.Sprintf("Returning %q doesn't do anything when %q is empty", what, path)},
+					})
+				}
+			}
 			return
 		},
 	})
@@ -1940,16 +1989,12 @@ func (impl *pluginImpl) onLoad(options OnLoadOptions, callback func(OnLoadArgs) 
 		Filter:    filter,
 		Namespace: options.Namespace,
 		Callback: func(args config.OnLoadArgs) (result config.OnLoadResult) {
-			with := make(map[string]string)
-			for _, attr := range args.Path.ImportAttributes.Decode() {
-				with[attr.Key] = attr.Value
-			}
 			response, err := callback(OnLoadArgs{
 				Path:       args.Path.Text,
 				Namespace:  args.Path.Namespace,
 				PluginData: args.PluginData,
 				Suffix:     args.Path.IgnoredSuffix,
-				With:       with,
+				With:       args.Path.ImportAttributes.DecodeIntoMap(),
 			})
 			result.PluginName = response.PluginName
 			result.AbsWatchFiles = impl.validatePathsArray(response.WatchFiles, "watch file")
@@ -2054,6 +2099,7 @@ func loadPlugins(initialOptions *BuildOptions, fs fs.FS, log logger.Log, caches 
 				logger.Range{}, // importPathRange
 				logger.Path{Text: options.Importer, Namespace: options.Namespace},
 				path,
+				logger.EncodeImportAttributes(options.With),
 				kind,
 				absResolveDir,
 				options.PluginData,
@@ -2323,11 +2369,11 @@ func analyzeMetafileImpl(metafile string, opts AnalyzeMetafileOptions) string {
 				third := "100.0%"
 
 				table = append(table, tableEntry{
-					first:      fmt.Sprintf("%s%s%s", colors.Bold, entry.name, colors.Reset),
+					first:      entry.name,
 					firstLen:   utf8.RuneCountInString(entry.name),
-					second:     fmt.Sprintf("%s%s%s", colors.Bold, second, colors.Reset),
+					second:     second,
 					secondLen:  len(second),
-					third:      fmt.Sprintf("%s%s%s", colors.Bold, third, colors.Reset),
+					third:      third,
 					thirdLen:   len(third),
 					isTopLevel: true,
 				})
@@ -2404,8 +2450,10 @@ func analyzeMetafileImpl(metafile string, opts AnalyzeMetafileOptions) string {
 			// Render the columns now that we know the widths
 			for _, entry := range table {
 				prefix := "\n"
+				color := colors.Bold
 				if !entry.isTopLevel {
 					prefix = ""
+					color = ""
 				}
 
 				// Import paths don't have second and third columns
@@ -2427,17 +2475,23 @@ func analyzeMetafileImpl(metafile string, opts AnalyzeMetafileOptions) string {
 					extraSpace = 1
 				}
 
-				sb.WriteString(fmt.Sprintf("%s  %s %s%s%s %s %s%s%s %s\n",
+				sb.WriteString(fmt.Sprintf("%s  %s%s%s %s%s%s %s%s%s %s%s%s %s%s%s\n",
 					prefix,
+					color,
 					entry.first,
+					colors.Reset,
 					colors.Dim,
 					strings.Repeat(lineChar, extraSpace+maxFirstLen-entry.firstLen+maxSecondLen-entry.secondLen),
 					colors.Reset,
+					color,
 					secondTrimmed,
+					colors.Reset,
 					colors.Dim,
 					strings.Repeat(lineChar, extraSpace+maxThirdLen-entry.thirdLen+len(second)-len(secondTrimmed)),
 					colors.Reset,
+					color,
 					entry.third,
+					colors.Reset,
 				))
 			}
 
