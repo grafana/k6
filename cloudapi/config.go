@@ -32,10 +32,10 @@ type Config struct {
 	StopOnError    null.Bool   `json:"stopOnError" envconfig:"K6_CLOUD_STOP_ON_ERROR"`
 	APIVersion     null.Int    `json:"apiVersion" envconfig:"K6_CLOUD_API_VERSION"`
 
-	// PushRefID represents the test run id.
-	// Note: It is a legacy name used by the backend, the code in k6 open-source
-	// references it as test run id.
-	// Currently, a renaming is not planned.
+	// PushRefID is the identifier used by k6 Cloud to correlate all the things that
+	// belong to the same test run/execution. Currently, it is equivalent to the test run id.
+	// But, in the future, or in future solutions (e.g. Synthetic Monitoring), there might be
+	// no test run id, and we may still need an identifier to correlate all the things.
 	PushRefID null.String `json:"pushRefID" envconfig:"K6_CLOUD_PUSH_REF_ID"`
 
 	// Defines the max allowed number of time series in a single batch.
