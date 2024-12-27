@@ -55,7 +55,7 @@ func TestNewScriptCmd(t *testing.T) {
 
 			jsData := string(data)
 			assert.Contains(t, jsData, "export const options = {")
-			assert.Contains(t, jsData, "export default function () {")
+			assert.Contains(t, jsData, "export default function() {")
 		})
 	}
 }
@@ -91,5 +91,5 @@ func TestNewScriptCmd_FileExists_Overwrite(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Contains(t, string(data), "export const options = {")
-	assert.Contains(t, string(data), "export default function () {")
+	assert.Contains(t, string(data), "export default function() {")
 }

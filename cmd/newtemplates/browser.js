@@ -1,5 +1,6 @@
 import { browser } from "k6/browser";
-import { check } from "k6";
+import http from "k6/http";
+import { sleep, check } from 'k6';
 
 const BASE_URL = __ENV.BASE_URL || "https://quickpizza.grafana.com";
 
@@ -21,7 +22,16 @@ export const options = {
   }, {{ end }}
 };
 
-export default async function () {
+export function setup() {
+  let res = http.get(BASE_URL);
+  if (res.status !== 200) {
+    throw new Error(
+      `Got unexpected status code ${res.status} when trying to setup. Exiting.`
+    );
+  }
+}
+
+export default async function() {
   let checkData;
   const page = await browser.newPage();
   try {
@@ -40,4 +50,5 @@ export default async function () {
   } finally {
     await page.close();
   }
+  sleep(1);
 }

@@ -1,5 +1,5 @@
 import http from 'k6/http';
-import { sleep } from 'k6';
+import { sleep, check } from 'k6';
 
 export const options = {
   vus: 10,
@@ -11,7 +11,8 @@ export const options = {
   }, {{ end }}
 };
 
-export default function () {
-  http.get('https://quickpizza.grafana.com');
+export default function() {
+  let res = http.get('https://quickpizza.grafana.com');
+  check(res, { "status is 200": (res) => res.status === 200 });
   sleep(1);
 }
