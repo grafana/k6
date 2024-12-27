@@ -6,7 +6,7 @@ export const options = {
   duration: '30s',{{ if .EnableCloud }}
   cloud: { {{ if .ProjectID }}
     projectID: {{ .ProjectID }}, {{ else }}
-    // projectID: 12345, // Change this {{ end }}
+    // projectID: 12345, // Replace this with your own projectID {{ end }}
     name: "{{ .ScriptName }}",
   }, {{ end }}
 };
