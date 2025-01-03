@@ -105,6 +105,7 @@ func TestNewScriptCmd_InvalidTemplateType(t *testing.T) {
 	newRootCommand(ts.GlobalState).execute()
 	assert.Contains(t, ts.Stderr.String(), "invalid template type")
 }
+
 func TestNewScriptCmd_ProjectID(t *testing.T) {
 	t.Parallel()
 

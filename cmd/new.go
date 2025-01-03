@@ -28,7 +28,7 @@ func (c *newScriptCmd) flagSet() *pflag.FlagSet {
 	return flags
 }
 
-func (c *newScriptCmd) run(cmd *cobra.Command, args []string) error {
+func (c *newScriptCmd) run(_ *cobra.Command, args []string) error {
 	target := defaultNewScriptName
 	if len(args) > 0 {
 		target = args[0]
@@ -46,9 +46,20 @@ func (c *newScriptCmd) run(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	defer fd.Close()
+	defer func() {
+		if cerr := fd.Close(); cerr != nil {
+			if _, err := fmt.Fprintf(c.gs.Stderr, "error closing file: %v\n", cerr); err != nil {
+				panic(fmt.Sprintf("error writing error message to stderr: %v", err))
+			}
+		}
+	}()
 
-	tmpl, err := templates.GetTemplate(c.templateType)
+	tm, err := templates.NewTemplateManager()
+	if err != nil {
+		return err
+	}
+
+	tmpl, err := tm.GetTemplate(c.templateType)
 	if err != nil {
 		return err
 	}
@@ -62,7 +73,10 @@ func (c *newScriptCmd) run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Fprintf(c.gs.Stdout, "New script created: %s (%s template).\n", target, c.templateType)
+	if _, err := fmt.Fprintf(c.gs.Stdout, "New script created: %s (%s template).\n", target, c.templateType); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -72,10 +86,10 @@ func getCmdNewScript(gs *state.GlobalState) *cobra.Command {
 	exampleText := getExampleText(c.gs, `
 	# Create a minimal k6 script
 	$ {{.}} new --template minimal
-  
+
 	# Overwrite an existing file with a protocol-based script
 	$ {{.}} new -f --template protocol test.js
-	
+
 	# Create a cloud-ready script with a specific project ID
 	$ {{.}} new --project-id 12315`[1:])
 
