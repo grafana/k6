@@ -3,12 +3,11 @@ import { sleep, check } from 'k6';
 
 export const options = {
   vus: 10,
-  duration: '30s',{{ if .EnableCloud }}
-  cloud: { {{ if .ProjectID }}
-    projectID: {{ .ProjectID }}, {{ else }}
-    // projectID: 12345, // Replace this with your own projectID {{ end }}
+  duration: '30s',{{ if .ProjectID }}
+  cloud: {
+    projectID: {{ .ProjectID }},
     name: "{{ .ScriptName }}",
-  }, {{ end }}
+  },{{ end }}
 };
 
 export default function() {

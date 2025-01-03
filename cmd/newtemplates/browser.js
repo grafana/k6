@@ -14,12 +14,11 @@ export const options = {
         },
       },
     },
-  }, {{ if .EnableCloud }}
-  cloud: { {{ if .ProjectID }}
-    projectID: {{ .ProjectID }}, {{ else }}
-    // projectID: 12345, // Replace this with your own projectID {{ end }}
+  },{{ if .ProjectID }}
+  cloud: {
+    projectID: {{ .ProjectID }},
     name: "{{ .ScriptName }}",
-  }, {{ end }}
+  },{{ end }}
 };
 
 export function setup() {

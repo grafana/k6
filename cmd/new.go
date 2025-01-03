@@ -54,9 +54,8 @@ func (c *newScriptCmd) run(cmd *cobra.Command, args []string) error {
 	}
 
 	argsStruct := templates.TemplateArgs{
-		ScriptName:  target,
-		EnableCloud: c.projectID != "",
-		ProjectID:   c.projectID,
+		ScriptName: target,
+		ProjectID:  c.projectID,
 	}
 
 	if err := templates.ExecuteTemplate(fd, tmpl, argsStruct); err != nil {

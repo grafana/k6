@@ -9,15 +9,15 @@ export const options = {
     { duration: "10s", target: 5 },
     { duration: "20s", target: 10 },
     { duration: "1s", target: 0 },
-  ], thresholds: {
+  ], 
+  thresholds: {
     http_req_failed: ["rate<0.01"],
     http_req_duration: ["p(95)<500", "p(99)<1000"],
-  },{{ if .EnableCloud }}
-  cloud: { {{ if .ProjectID }}
-    projectID: {{ .ProjectID }}, {{ else }}
-    // projectID: 12345, // Replace this with your own projectID {{ end }}
+  },{{ if .ProjectID }}
+  cloud: {
+    projectID: {{ .ProjectID }},
     name: "{{ .ScriptName }}",
-  }, {{ end }}
+  },{{ end }}
 };
 
 export function setup() {

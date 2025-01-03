@@ -28,9 +28,8 @@ var (
 
 // TemplateArgs represents arguments passed to templates
 type TemplateArgs struct {
-	ScriptName  string
-	EnableCloud bool
-	ProjectID   string
+	ScriptName string
+	ProjectID  string
 }
 
 // GetTemplate selects the appropriate template based on the type
