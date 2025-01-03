@@ -1,4 +1,5 @@
-package cmd
+// Package templates provides the templates for the k6 new command
+package templates
 
 import (
 	_ "embed"
