@@ -16,6 +16,7 @@ type newScriptCmd struct {
 	gs             *state.GlobalState
 	overwriteFiles bool
 	templateType   string
+	projectID      string
 }
 
 func (c *newScriptCmd) flagSet() *pflag.FlagSet {
@@ -23,6 +24,7 @@ func (c *newScriptCmd) flagSet() *pflag.FlagSet {
 	flags.SortFlags = false
 	flags.BoolVarP(&c.overwriteFiles, "force", "f", false, "overwrite existing files")
 	flags.StringVar(&c.templateType, "template", "minimal", "template type (choices: minimal, protocol, browser)")
+	flags.StringVar(&c.projectID, "project-id", "", "specify the Grafana Cloud project ID for the test")
 	return flags
 }
 
@@ -52,7 +54,9 @@ func (c *newScriptCmd) run(cmd *cobra.Command, args []string) error {
 	}
 
 	argsStruct := templates.TemplateArgs{
-		ScriptName: target,
+		ScriptName:  target,
+		EnableCloud: c.projectID != "",
+		ProjectID:   c.projectID,
 	}
 
 	if err := templates.ExecuteTemplate(fd, tmpl, argsStruct); err != nil {
@@ -71,7 +75,10 @@ func getCmdNewScript(gs *state.GlobalState) *cobra.Command {
 	$ {{.}} new --template minimal
   
 	# Overwrite an existing file with a protocol-based script
-	$ {{.}} new -f --template protocol test.js`[1:])
+	$ {{.}} new -f --template protocol test.js
+	
+	# Create a cloud-ready script with a specific project ID
+	$ {{.}} new --project-id 12315`[1:])
 
 	initCmd := &cobra.Command{
 		Use:   "new [file]",

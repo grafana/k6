@@ -93,3 +93,28 @@ func TestNewScriptCmd_FileExists_Overwrite(t *testing.T) {
 	assert.Contains(t, string(data), "export const options = {")
 	assert.Contains(t, string(data), "export default function() {")
 }
+
+func TestNewScriptCmd_InvalidTemplateType(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+	ts.CmdArgs = []string{"k6", "new", "--template", "invalid-template"}
+
+	ts.ExpectedExitCode = -1
+
+	newRootCommand(ts.GlobalState).execute()
+	assert.Contains(t, ts.Stderr.String(), "invalid template type")
+}
+func TestNewScriptCmd_ProjectID(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+	ts.CmdArgs = []string{"k6", "new", "--project-id", "1422"}
+
+	newRootCommand(ts.GlobalState).execute()
+
+	data, err := fsext.ReadFile(ts.FS, defaultNewScriptName)
+	require.NoError(t, err)
+
+	assert.Contains(t, string(data), "projectID: 1422")
+}
