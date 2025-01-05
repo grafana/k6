@@ -42,7 +42,7 @@ func newMetricsClient(c *cloudapi.Client, testRunID string) (*metricsClient, err
 	}
 	return &metricsClient{
 		httpClient: c,
-		url:        strings.TrimSuffix(u, "/v1") + "/v2/metrics/" + testRunID,
+		url:        strings.TrimSuffix(u, "/v1") + "/metrics/api/v1/test_runs/" + testRunID,
 	}, nil
 }
 
