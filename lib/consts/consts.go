@@ -6,7 +6,7 @@ import (
 )
 
 // Version contains the current semantic version of k6.
-const Version = "0.55.0"
+const Version = "0.56.0"
 
 // Banner returns the ASCII-art banner with the k6 logo
 func Banner() string {
