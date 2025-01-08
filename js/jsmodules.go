@@ -49,10 +49,10 @@ func getInternalJSModules() map[string]interface{} {
 			"k6/experimental/tracing has been removed. All of it functionality is available as pure javascript module." +
 				" More info available at the docs:" +
 				" https://grafana.com/docs/k6/latest/javascript-api/jslib/http-instrumentation-tempo"),
-		"k6/experimental/browser": newWarnExperimentalModule(browser.NewSync(),
-			"Please update your imports to use k6/browser instead of k6/experimental/browser,"+
-				" which will be removed after September 23rd, 2024 (v0.54.0). Ensure your scripts are migrated by then."+
-				" For more information, see the migration guide at the link:"+
+		"k6/experimental/browser": newRemovedModule(
+			"k6/experimental/browser has been graduated, please use k6/browser instead." +
+				"Please update your imports to use k6/browser instead of k6/experimental/browser," +
+				" For more information, see the migration guide at the link:" +
 				" https://grafana.com/docs/k6/latest/using-k6-browser/migrating-to-k6-v0-52/"),
 		"k6/browser":         browser.New(),
 		"k6/experimental/fs": fs.New(),
@@ -80,12 +80,14 @@ func getJSModules() map[string]interface{} {
 	return result
 }
 
+//nolint:unused // this is likely going to be used again even if isn't currently used
 type warnExperimentalModule struct {
 	once *sync.Once
 	msg  string
 	base modules.Module
 }
 
+//nolint:unused // this is likely going to be used again even if isn't currently used
 func newWarnExperimentalModule(base modules.Module, msg string) modules.Module {
 	return &warnExperimentalModule{
 		msg:  msg,
@@ -94,6 +96,7 @@ func newWarnExperimentalModule(base modules.Module, msg string) modules.Module {
 	}
 }
 
+//nolint:unused // this is likely going to be used again even if isn't currently used
 func (w *warnExperimentalModule) NewModuleInstance(vu modules.VU) modules.Instance {
 	w.once.Do(func() { vu.InitEnv().Logger.Warn(w.msg) })
 	return w.base.NewModuleInstance(vu)
