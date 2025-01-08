@@ -39,7 +39,6 @@ type (
 		tracesMetadata map[string]string
 		filePersister  filePersister
 		testRunID      string
-		isSync         bool // remove later
 	}
 
 	// JSModule exposes the properties available to the JS script.
@@ -68,17 +67,6 @@ func New() *RootModule {
 	}
 }
 
-// NewSync returns a pointer to a new RootModule instance that maps the
-// browser's business logic to the synchronous version of the module's
-// JS API.
-func NewSync() *RootModule {
-	return &RootModule{
-		PidRegistry: &pidRegistry{},
-		initOnce:    &sync.Once{},
-		isSync:      true,
-	}
-}
-
 // NewModuleInstance implements the k6modules.Module interface to return
 // a new instance for each VU.
 func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
@@ -91,16 +79,9 @@ func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 		m.initialize(vu)
 	})
 
-	// decide whether to map the browser module to the async JS API or
-	// the sync one.
-	mapper := mapBrowserToSobek
-	if m.isSync {
-		mapper = syncMapBrowserToSobek
-	}
-
 	return &ModuleInstance{
 		mod: &JSModule{
-			Browser: mapper(moduleVU{
+			Browser: mapBrowserToSobek(moduleVU{
 				VU:          vu,
 				pidRegistry: m.PidRegistry,
 				browserRegistry: newBrowserRegistry(
