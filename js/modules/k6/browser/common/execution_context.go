@@ -113,6 +113,10 @@ func (e *ExecutionContext) adoptBackendNodeID(backendNodeID cdp.BackendNodeID) (
 		return nil, fmt.Errorf("resolving DOM node: %w", err)
 	}
 
+	if remoteObj == nil {
+		return nil, fmt.Errorf("the page may have navigated away or the element is now missing: %w", err)
+	}
+
 	return NewJSHandle(e.ctx, e.session, e, e.frame, remoteObj, e.logger).AsElement(), nil
 }
 
