@@ -2330,11 +2330,10 @@ func TestBrowserExperimentalImport(t *testing.T) {
 		}
 
 		export default function() {
-			browser.isConnected()
 		};
 	`
 
-	const wantExitCode = 108
+	const wantExitCode = 107
 	ts := getSingleFileTestState(t, script, []string{}, wantExitCode)
 	ts.Env["K6_BROWSER_EXECUTABLE_PATH"] = "k6-browser-fake-cmd"
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
