@@ -7,7 +7,7 @@ labels: ["release"]
 
 **Release Date**:
 
-25th May 2024 **<- WRITE HERE THE UPDATED RELEASE DATE**
+25th May 2025 **<- WRITE HERE THE UPDATED RELEASE DATE**
 
 ## Release Activities
 
