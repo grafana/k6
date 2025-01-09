@@ -33,15 +33,20 @@ export function setup() {
 export default async function() {
   let checkData;
   const page = await browser.newPage();
+
   try {
     await page.goto(BASE_URL);
+
     checkData = await page.locator("h1").textContent();
     check(page, {
       header: checkData === "Looking to break out of your pizza routine?",
     });
+
     await page.locator('//button[. = "Pizza, Please!"]').click();
     await page.waitForTimeout(500);
+
     await page.screenshot({ path: "screenshot.png" });
+
     checkData = await page.locator("div#recommendations").textContent();
     check(page, {
       recommendation: checkData !== "",
@@ -49,5 +54,7 @@ export default async function() {
   } finally {
     await page.close();
   }
+
   sleep(1);
 }
+
