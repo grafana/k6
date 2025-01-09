@@ -84,14 +84,20 @@ func getCmdNewScript(gs *state.GlobalState) *cobra.Command {
 	c := &newScriptCmd{gs: gs}
 
 	exampleText := getExampleText(c.gs, `
-	# Create a minimal k6 script
-	$ {{.}} new --template minimal
+    # Create a new k6 script with the default template
+    $ {{.}} new
 
-	# Overwrite an existing file with a protocol-based script
-	$ {{.}} new -f --template protocol test.js
+    # Specify a file name when creating a script
+    $ {{.}} new test.js
 
-	# Create a cloud-ready script with a specific project ID
-	$ {{.}} new --project-id 12315`[1:])
+    # Overwrite an existing file
+    $ {{.}} new -f test.js
+
+    # Create a script using a specific template
+    $ {{.}} new --template protocol
+
+    # Create a cloud-ready script with a specific project ID
+    $ {{.}} new --project-id 12315`[1:])
 
 	initCmd := &cobra.Command{
 		Use:   "new [file]",
