@@ -4,7 +4,6 @@ import { check, sleep } from "k6";
 const BASE_URL = __ENV.BASE_URL || 'https://quickpizza.grafana.com';
 
 export const options = {
-  vus: 10,
   stages: [
     { duration: "10s", target: 5 },
     { duration: "20s", target: 10 },
