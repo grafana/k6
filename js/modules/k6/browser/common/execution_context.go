@@ -113,6 +113,8 @@ func (e *ExecutionContext) adoptBackendNodeID(backendNodeID cdp.BackendNodeID) (
 		return nil, fmt.Errorf("resolving DOM node: %w", err)
 	}
 
+	// This can occur due to race conditions between trying to click on an element
+	// and chrome moving on (e.g. navigating).
 	if remoteObj == nil {
 		return nil, fmt.Errorf("the page may have navigated away or the element is now missing: %w", err)
 	}
