@@ -116,7 +116,9 @@ func (e *ExecutionContext) adoptBackendNodeID(backendNodeID cdp.BackendNodeID) (
 	// This can occur due to race conditions between trying to click on an element
 	// and chrome moving on (e.g. navigating).
 	if remoteObj == nil {
-		return nil, fmt.Errorf("the page may have navigated away or the element is now missing: %w", err)
+		return nil, fmt.Errorf(`the page may have navigated away or the element is
+			now missing. It might happen when k6 and/or Chrome are overloaded. You
+			might need to increase the compute resources: %w`, err)
 	}
 
 	return NewJSHandle(e.ctx, e.session, e, e.frame, remoteObj, e.logger).AsElement(), nil
