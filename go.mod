@@ -48,7 +48,7 @@ require (
 	golang.org/x/crypto/x509roots/fallback v0.0.0-20250106144430-8929309228b4
 	golang.org/x/net v0.34.0
 	golang.org/x/term v0.28.0
-	golang.org/x/time v0.8.0
+	golang.org/x/time v0.9.0
 	google.golang.org/grpc v1.67.1
 	google.golang.org/protobuf v1.35.1
 	gopkg.in/guregu/null.v3 v3.3.0
