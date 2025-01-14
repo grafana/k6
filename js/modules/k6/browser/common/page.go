@@ -682,11 +682,18 @@ func (p *Page) getOwnerFrame(apiCtx context.Context, h *ElementHandle) (cdp.Fram
 	return frameID, nil
 }
 
-func (p *Page) attachFrameSession(fid cdp.FrameID, fs *FrameSession) {
+func (p *Page) attachFrameSession(fid cdp.FrameID, fs *FrameSession) error {
 	p.logger.Debugf("Page:attachFrameSession", "sid:%v fid=%v", p.session.ID(), fid)
+
+	if fs == nil {
+		return errors.New("internal error: FrameSession is nil")
+	}
+
 	p.frameSessionsMu.Lock()
 	defer p.frameSessionsMu.Unlock()
 	fs.page.frameSessions[fid] = fs
+
+	return nil
 }
 
 func (p *Page) getFrameSession(frameID cdp.FrameID) (*FrameSession, bool) {
