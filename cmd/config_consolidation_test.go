@@ -293,7 +293,9 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 				env: []string{"K6_ITERATIONS=25"},
 				cli: []string{"--vus", "12"},
 			},
-			exp{},
+			exp{
+				logWarning: true,
+			},
 			verifySharedIters(I(12), I(25)),
 		},
 		{
