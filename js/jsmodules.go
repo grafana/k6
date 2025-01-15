@@ -17,6 +17,7 @@ import (
 	"go.k6.io/k6/js/modules/k6/experimental/csv"
 	"go.k6.io/k6/js/modules/k6/experimental/fs"
 	"go.k6.io/k6/js/modules/k6/experimental/streams"
+	expws "go.k6.io/k6/js/modules/k6/experimental/websockets"
 	"go.k6.io/k6/js/modules/k6/grpc"
 	"go.k6.io/k6/js/modules/k6/html"
 	"go.k6.io/k6/js/modules/k6/http"
@@ -26,7 +27,6 @@ import (
 
 	"github.com/grafana/xk6-redis/redis"
 	"github.com/grafana/xk6-webcrypto/webcrypto"
-	expws "github.com/grafana/xk6-websockets/websockets"
 )
 
 func getInternalJSModules() map[string]interface{} {
@@ -42,7 +42,7 @@ func getInternalJSModules() map[string]interface{} {
 		"k6/experimental/redis":      redis.New(),
 		"k6/experimental/streams":    streams.New(),
 		"k6/experimental/webcrypto":  webcrypto.New(),
-		"k6/experimental/websockets": &expws.RootModule{},
+		"k6/experimental/websockets": expws.New(),
 		"k6/experimental/timers": newRemovedModule(
 			"k6/experimental/timers has been graduated, please use k6/timers instead."),
 		"k6/experimental/tracing": newRemovedModule(

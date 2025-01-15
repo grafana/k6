@@ -15,8 +15,8 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/grafana/sobek"
-	"github.com/grafana/xk6-websockets/websockets/events"
 	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
+	"go.k6.io/k6/js/modules/k6/experimental/websockets/events"
 
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
@@ -33,6 +33,11 @@ type WebSocketsAPI struct { //nolint:revive
 }
 
 var _ modules.Module = &RootModule{}
+
+// New websockets root module
+func New() *RootModule {
+	return &RootModule{}
+}
 
 // NewModuleInstance returns a new instance of the module
 func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
