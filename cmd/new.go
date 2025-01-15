@@ -5,8 +5,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	templates "go.k6.io/k6/cmd/newtemplates"
 	"go.k6.io/k6/cmd/state"
+	"go.k6.io/k6/cmd/templates"
 	"go.k6.io/k6/lib/fsext"
 )
 
