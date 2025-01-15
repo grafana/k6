@@ -1,10 +1,27 @@
 package lib
 
 import (
-	"go.k6.io/k6/metrics"
-
 	"time"
+
+	"go.k6.io/k6/metrics"
 )
+
+type Report struct {
+	ReportThresholds `js:"thresholds"`
+	ReportGroup
+	Scenarios map[string]ReportGroup
+}
+
+func NewReport() Report {
+	return Report{
+		ReportThresholds: NewReportThresholds(),
+		ReportGroup: ReportGroup{
+			Metrics: NewReportMetrics(),
+			Groups:  make(map[string]ReportGroup),
+		},
+		Scenarios: make(map[string]ReportGroup),
+	}
+}
 
 type ReportMetricInfo struct {
 	Name     string
@@ -115,6 +132,7 @@ func NewReportThresholds() ReportThresholds {
 	return thresholds
 }
 
+// FIXME (@oleiade): While writing JSDOC I found the name ambiguous, should we rename it?
 type ReportGroup struct {
 	Checks  *ReportChecks // Not always present, thus we use a pointer.
 	Metrics ReportMetrics
@@ -125,23 +143,6 @@ func NewReportGroup() ReportGroup {
 	return ReportGroup{
 		Metrics: NewReportMetrics(),
 		Groups:  make(map[string]ReportGroup),
-	}
-}
-
-type Report struct {
-	ReportThresholds `js:"thresholds"`
-	ReportGroup
-	Scenarios map[string]ReportGroup
-}
-
-func NewReport() Report {
-	return Report{
-		ReportThresholds: NewReportThresholds(),
-		ReportGroup: ReportGroup{
-			Metrics: NewReportMetrics(),
-			Groups:  make(map[string]ReportGroup),
-		},
-		Scenarios: make(map[string]ReportGroup),
 	}
 }
 
