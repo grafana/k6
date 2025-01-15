@@ -1,4 +1,5 @@
 import http from "k6/http";
+import exec from 'k6/execution';
 import { check, sleep } from "k6";
 
 const BASE_URL = __ENV.BASE_URL || 'https://quickpizza.grafana.com';
@@ -22,9 +23,7 @@ export const options = {
 export function setup() {
   let res = http.get(BASE_URL);
   if (res.status !== 200) {
-    throw new Error(
-      `Got unexpected status code ${res.status} when trying to setup. Exiting.`
-    );
+    exec.test.abort(`Got unexpected status code ${res.status} when trying to setup. Exiting.`);
   }
 }
 
