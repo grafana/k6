@@ -39,7 +39,7 @@ func (c *newScriptCmd) run(_ *cobra.Command, args []string) error {
 		return err
 	}
 	if fileExists && !c.overwriteFiles {
-		return fmt.Errorf("%s already exists. Use the `--force` flag to overwrite", target)
+		return fmt.Errorf("%s already exists. Use the `--force` flag to overwrite it", target)
 	}
 
 	fd, err := c.gs.FS.Create(target)
