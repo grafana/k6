@@ -46,12 +46,14 @@ func (c *newScriptCmd) run(_ *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	defer func() {
+	defer func() error {
 		if cerr := fd.Close(); cerr != nil {
 			if _, err := fmt.Fprintf(c.gs.Stderr, "error closing file: %v\n", cerr); err != nil {
-				panic(fmt.Sprintf("error writing error message to stderr: %v", err))
+				return fmt.Errorf("error writing error message to stderr: %v", err)
 			}
+			return cerr
 		}
+		return nil
 	}()
 
 	tm, err := templates.NewTemplateManager()
