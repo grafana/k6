@@ -695,9 +695,8 @@ func TestPageScreenshotFullpage(t *testing.T) {
 	// different platforms and browsers. The goal is to ensure that the
 	// screenshot is mostly red at the top and mostly blue at the bottom.
 	r, _, b, _ := img.At(0, 0).RGBA()
-	assert.Truef(t, r > b*2, "want: the top pixel to be dominantly red, got R: %d, B: %d", r, b)
-	r, _, b, _ = img.At(0, 799).RGBA()
-	assert.Truef(t, b > r*2, "want: the bottom pixel to be dominantly blue, got R: %d, B: %d", r, b)
+	r2, _, b2, _ := img.At(0, 799).RGBA()
+	assert.Failf(t, "check", "top: r: %d, b: %d; bottom: r: %d, b: %d", r, b, r2, b2)
 }
 
 func TestPageTitle(t *testing.T) {
