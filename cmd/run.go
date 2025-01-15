@@ -195,7 +195,12 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		summaryOutput, err := summary.New(output.Params{
 			Logger: c.gs.Logger,
 		})
-		if err != nil {
+		if err == nil {
+			isSummaryExtended := testRunState.RuntimeOptions.SummaryExtended
+			if isSummaryExtended.Valid && isSummaryExtended.Bool {
+				summaryOutput.EnableExtendedMode()
+			}
+		} else {
 			logger.WithError(err).Error("failed to initialize the end-of-test summary output")
 		}
 		outputs = append(outputs, summaryOutput)

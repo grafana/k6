@@ -32,6 +32,7 @@ experimental_enhanced: esbuild-based transpiling for TypeScript and ES6+ support
 	flags.StringArrayP("env", "e", nil, "add/override environment variable with `VAR=value`")
 	flags.Bool("no-thresholds", false, "don't run thresholds")
 	flags.Bool("no-summary", false, "don't show the summary at the end of the test")
+	flags.Bool("summary-extended", false, "show an extended summary at the end of the test")
 	flags.String(
 		"summary-export",
 		"",
@@ -67,6 +68,7 @@ func getRuntimeOptions(flags *pflag.FlagSet, environment map[string]string) (lib
 		CompatibilityMode:    getNullString(flags, "compatibility-mode"),
 		NoThresholds:         getNullBool(flags, "no-thresholds"),
 		NoSummary:            getNullBool(flags, "no-summary"),
+		SummaryExtended:      getNullBool(flags, "summary-extended"),
 		SummaryExport:        getNullString(flags, "summary-export"),
 		TracesOutput:         getNullString(flags, "traces-output"),
 		Env:                  make(map[string]string),

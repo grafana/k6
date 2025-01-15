@@ -23,7 +23,8 @@ type Output struct {
 	periodicFlusher *output.PeriodicFlusher
 	logger          logrus.FieldLogger
 
-	dataModel dataModel
+	dataModel           dataModel
+	extendedModeEnabled bool
 }
 
 // New returns a new JSON output.
@@ -32,7 +33,8 @@ func New(params output.Params) (*Output, error) {
 		logger: params.Logger.WithFields(logrus.Fields{
 			"output": "summary",
 		}),
-		dataModel: newDataModel(),
+		dataModel:           newDataModel(),
+		extendedModeEnabled: false,
 	}, nil
 }
 
@@ -55,6 +57,10 @@ func (o *Output) Stop() error {
 	return nil
 }
 
+func (o *Output) EnableExtendedMode() {
+	o.extendedModeEnabled = true
+}
+
 func (o *Output) flushMetrics() {
 	samples := o.GetBufferedSamples()
 	for _, sc := range samples {
@@ -66,12 +72,14 @@ func (o *Output) flushMetrics() {
 }
 
 func (o *Output) flushSample(sample metrics.Sample) {
-	// First, we store the sample data into the metrics stored at the k6 metrics registry level.
+	// First, the sample data is stored into the metrics stored at the k6 metrics registry level.
 	o.storeSample(sample)
+	if !o.extendedModeEnabled {
+		return
+	}
 
-	// Then, we'll proceed to store the sample data into each group
-	// metrics. However, we need to determine whether the groups tree
-	// is within a scenario or not.
+	// Then, if the extended mode is enabled, the sample data is stored into each group metrics.
+	// However, we need to determine whether the groups tree is within a scenario or not.
 	groupData := o.dataModel.aggregatedGroupData
 	if scenarioName, hasScenario := sample.Tags.Get("scenario"); hasScenario {
 		groupData = o.dataModel.groupDataFor(scenarioName)
