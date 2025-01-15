@@ -1,4 +1,3 @@
-// Package templates provides the templates for the k6 new command
 package templates
 
 import (
@@ -17,6 +16,13 @@ var protocolTemplateContent string
 //go:embed browser.js
 var browserTemplateContent string
 
+// Constants for template types
+const (
+	MinimalTemplate  = "minimal"
+	ProtocolTemplate = "protocol"
+	BrowserTemplate  = "browser"
+)
+
 // TemplateManager manages the pre-parsed templates
 type TemplateManager struct {
 	minimalTemplate  *template.Template
@@ -26,17 +32,17 @@ type TemplateManager struct {
 
 // NewTemplateManager initializes a new TemplateManager with parsed templates
 func NewTemplateManager() (*TemplateManager, error) {
-	minimalTmpl, err := template.New("minimal").Parse(minimalTemplateContent)
+	minimalTmpl, err := template.New(MinimalTemplate).Parse(minimalTemplateContent)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse minimal template: %w", err)
 	}
 
-	protocolTmpl, err := template.New("protocol").Parse(protocolTemplateContent)
+	protocolTmpl, err := template.New(ProtocolTemplate).Parse(protocolTemplateContent)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse protocol template: %w", err)
 	}
 
-	browserTmpl, err := template.New("browser").Parse(browserTemplateContent)
+	browserTmpl, err := template.New(BrowserTemplate).Parse(browserTemplateContent)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse browser template: %w", err)
 	}
@@ -51,11 +57,11 @@ func NewTemplateManager() (*TemplateManager, error) {
 // GetTemplate selects the appropriate template based on the type
 func (tm *TemplateManager) GetTemplate(templateType string) (*template.Template, error) {
 	switch templateType {
-	case "minimal":
+	case MinimalTemplate:
 		return tm.minimalTemplate, nil
-	case "protocol":
+	case ProtocolTemplate:
 		return tm.protocolTemplate, nil
-	case "browser":
+	case BrowserTemplate:
 		return tm.browserTemplate, nil
 	default:
 		return nil, fmt.Errorf("invalid template type: %s", templateType)
