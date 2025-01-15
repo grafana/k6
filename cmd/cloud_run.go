@@ -131,6 +131,18 @@ func (c *cmdCloudRun) preRun(cmd *cobra.Command, args []string) error {
 
 func (c *cmdCloudRun) run(cmd *cobra.Command, args []string) error {
 	if c.localExecution {
+		c.runCmd.loadConfiguredTest = func(*cobra.Command, []string) (*loadedAndConfiguredTest, execution.Controller, error) {
+			test, err := loadAndConfigureLocalTest(c.runCmd.gs, cmd, args, getCloudRunLocalExecutionConfig)
+			if err != nil {
+				return nil, nil, fmt.Errorf("could not load and configure the test: %w", err)
+			}
+
+			if err := createCloudTest(c.runCmd.gs, test); err != nil {
+				return nil, nil, fmt.Errorf("could not create the cloud test run: %w", err)
+			}
+
+			return test, local.NewController(), nil
+		}
 		return c.runCmd.run(cmd, args)
 	}
 

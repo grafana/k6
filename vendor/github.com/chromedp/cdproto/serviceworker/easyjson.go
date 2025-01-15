@@ -76,6 +76,8 @@ func easyjsonC5a4559bDecodeGithubComChromedpCdprotoServiceworker(in *jlexer.Lexe
 			}
 		case "targetId":
 			out.TargetID = target.ID(in.String())
+		case "routerRules":
+			out.RouterRules = string(in.String())
 		default:
 			in.SkipRecursive()
 		}
@@ -143,6 +145,11 @@ func easyjsonC5a4559bEncodeGithubComChromedpCdprotoServiceworker(out *jwriter.Wr
 		const prefix string = ",\"targetId\":"
 		out.RawString(prefix)
 		out.String(string(in.TargetID))
+	}
+	if in.RouterRules != "" {
+		const prefix string = ",\"routerRules\":"
+		out.RawString(prefix)
+		out.String(string(in.RouterRules))
 	}
 	out.RawByte('}')
 }

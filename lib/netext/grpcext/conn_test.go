@@ -7,7 +7,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/jhump/protoreflect/desc/protoparse"
+	"github.com/jhump/protoreflect/desc/protoparse" //nolint:staticcheck // FIXME: #4035
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"

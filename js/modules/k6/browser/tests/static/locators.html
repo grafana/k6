@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Clickable link test</title>
+</head>
+
+<body>
+    <a id="link" href="#" onclick="event.preventDefault()">Click</a>
+    <a id="linkdbl" href="#" ondblclick="event.preventDefault()">Dblclick</a>
+    <a href="#" onclick="event.preventDefault()">Click</a>
+    <input id="inputCheckbox" type="checkbox" />
+    <input type="checkbox" />
+    <input id="inputText" type="text" value="something" />
+    <input id="inputHiddenText" type="text" hidden="true">
+    <div id="divHello"><span>hello</span></div>
+    <div><span>bye</span></div>
+    <textarea>text area</textarea>
+    <p id="firstParagraph" contenteditable="true">original text</p>
+    <p id="secondParagraph">original text</p>
+    <select id="selectElement"><option value="option text"></option><option value="option text 2"></option></select>
+    <select></select>
+    <script>
+        window.result = false;
+        window.dblclick = false;
+        window.check = false;
+
+        document.querySelector('#link').addEventListener(
+            'click', e => { window.result = true; }, false
+        );
+        document.querySelector('#linkdbl').addEventListener(
+            'dblclick', e => { window.dblclick = true; }, false
+        );
+        document.querySelector('#inputCheckbox').addEventListener(
+            'change', e => { window.check = e.currentTarget.checked; }, false
+        );
+        document.querySelector('#inputText').addEventListener(
+            'mousemove', e => { window.result = true; }, false
+        );
+        document.querySelector('#inputText').addEventListener(
+            'touchstart', e => { window.result = true; }, false
+        );
+    </script>
+</body>
+
+</html>

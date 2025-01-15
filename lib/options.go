@@ -180,7 +180,7 @@ func decryptPrivateKey(privKey, password string) ([]byte, error) {
 	   being used here because it is deprecated due to it not supporting *good* crypography
 	   ultimately though we want to support something so we will be using it for now.
 	*/
-	decryptedKey, err := x509.DecryptPEMBlock(block, []byte(password))
+	decryptedKey, err := x509.DecryptPEMBlock(block, []byte(password)) //nolint:staticcheck
 	if err != nil {
 		return nil, err
 	}
@@ -308,8 +308,7 @@ type Options struct {
 	// iteration is shorter than the specified value.
 	MinIterationDuration types.NullDuration `json:"minIterationDuration" envconfig:"K6_MIN_ITERATION_DURATION"`
 
-	// Cloud is the config for the cloud
-	// formally known as ext.loadimpact
+	// Cloud is the configuration for the k6 Cloud, formerly known as ext.loadimpact.
 	Cloud json.RawMessage `json:"cloud,omitempty"`
 
 	// These values are for third party collectors' benefit.

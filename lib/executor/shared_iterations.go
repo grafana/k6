@@ -114,7 +114,7 @@ func (sic SharedIterationsConfig) GetExecutionRequirements(et *lib.ExecutionTupl
 	return []lib.ExecutionStep{
 		{
 			TimeOffset: 0,
-			PlannedVUs: uint64(vus),
+			PlannedVUs: uint64(vus), //nolint:gosec
 		},
 		{
 			TimeOffset: sic.MaxDuration.TimeDuration() + sic.GracefulStop.TimeDuration(),
@@ -182,10 +182,10 @@ func (si SharedIterations) Run(parentCtx context.Context, out chan<- metrics.Sam
 		"vus": numVUs, "iterations": iterations, "maxDuration": duration, "type": si.config.GetType(),
 	}).Debug("Starting executor run...")
 
-	totalIters := uint64(iterations)
+	totalIters := uint64(iterations) //nolint:gosec
 	doneIters := new(uint64)
 	vusFmt := pb.GetFixedLengthIntFormat(numVUs)
-	itersFmt := pb.GetFixedLengthIntFormat(int64(totalIters))
+	itersFmt := pb.GetFixedLengthIntFormat(iterations)
 	progressFn := func() (float64, []string) {
 		spent := time.Since(startTime)
 		progVUs := fmt.Sprintf(vusFmt+" VUs", numVUs)

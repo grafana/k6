@@ -214,7 +214,7 @@ jobs:
           fi
 
   package-windows:
-    runs-on: windows-2019
+    runs-on: windows-latest
     defaults:
       run:
         shell: pwsh
@@ -244,7 +244,7 @@ jobs:
           move .\packaging\k6-$env:VERSION-windows-amd64\k6.exe .\packaging\
           rmdir .\packaging\k6-$env:VERSION-windows-amd64\
       - name: Add signtool to PATH
-        run: echo "${env:ProgramFiles(x86)}\Windows Kits\10\bin\x64" | Out-File -FilePath $env:GITHUB_PATH -Append
+        run: echo "${env:ProgramFiles(x86)}\Windows Kits\10\bin\10.0.17763.0\x64" | Out-File -FilePath $env:GITHUB_PATH -Append
 
       - name: Create the MSI package
         run: |

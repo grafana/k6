@@ -88,7 +88,7 @@ func (clvc ConstantVUsConfig) GetExecutionRequirements(et *lib.ExecutionTuple) [
 	return []lib.ExecutionStep{
 		{
 			TimeOffset: 0,
-			PlannedVUs: uint64(clvc.GetVUs(et)),
+			PlannedVUs: uint64(clvc.GetVUs(et)), //nolint:gosec
 		},
 		{
 			TimeOffset: clvc.Duration.TimeDuration() + clvc.GracefulStop.TimeDuration(),

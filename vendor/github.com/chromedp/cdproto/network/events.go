@@ -14,6 +14,7 @@ type EventDataReceived struct {
 	Timestamp         *cdp.MonotonicTime `json:"timestamp"`         // Timestamp.
 	DataLength        int64              `json:"dataLength"`        // Data chunk length.
 	EncodedDataLength int64              `json:"encodedDataLength"` // Actual bytes received (might be less than dataLength for compressed encodings).
+	Data              string             `json:"data,omitempty"`    // Data that was received.
 }
 
 // EventEventSourceMessageReceived fired when EventSource message is
@@ -35,7 +36,7 @@ type EventLoadingFailed struct {
 	RequestID       RequestID          `json:"requestId"`                 // Request identifier.
 	Timestamp       *cdp.MonotonicTime `json:"timestamp"`                 // Timestamp.
 	Type            ResourceType       `json:"type"`                      // Resource type.
-	ErrorText       string             `json:"errorText"`                 // User friendly error message.
+	ErrorText       string             `json:"errorText"`                 // Error message. List of network errors: https://cs.chromium.org/chromium/src/net/base/net_error_list.h
 	Canceled        bool               `json:"canceled,omitempty"`        // True if loading was canceled.
 	BlockedReason   BlockedReason      `json:"blockedReason,omitempty"`   // The reason why loading was blocked, if any.
 	CorsErrorStatus *CorsErrorStatus   `json:"corsErrorStatus,omitempty"` // The reason why loading was blocked by CORS, if any.
@@ -45,10 +46,9 @@ type EventLoadingFailed struct {
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Network#event-loadingFinished
 type EventLoadingFinished struct {
-	RequestID                RequestID          `json:"requestId"`                          // Request identifier.
-	Timestamp                *cdp.MonotonicTime `json:"timestamp"`                          // Timestamp.
-	EncodedDataLength        float64            `json:"encodedDataLength"`                  // Total number of bytes received for this request.
-	ShouldReportCorbBlocking bool               `json:"shouldReportCorbBlocking,omitempty"` // Set when 1) response was blocked by Cross-Origin Read Blocking and also 2) this needs to be reported to the DevTools console.
+	RequestID         RequestID          `json:"requestId"`         // Request identifier.
+	Timestamp         *cdp.MonotonicTime `json:"timestamp"`         // Timestamp.
+	EncodedDataLength float64            `json:"encodedDataLength"` // Total number of bytes received for this request.
 }
 
 // EventRequestServedFromCache fired if request ended up loading from cache.
@@ -208,11 +208,12 @@ type EventWebTransportClosed struct {
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Network#event-requestWillBeSentExtraInfo
 type EventRequestWillBeSentExtraInfo struct {
-	RequestID           RequestID                  `json:"requestId"`                     // Request identifier. Used to match this information to an existing requestWillBeSent event.
-	AssociatedCookies   []*BlockedCookieWithReason `json:"associatedCookies"`             // A list of cookies potentially associated to the requested URL. This includes both cookies sent with the request and the ones not sent; the latter are distinguished by having blockedReason field set.
-	Headers             Headers                    `json:"headers"`                       // Raw request headers as they will be sent over the wire.
-	ConnectTiming       *ConnectTiming             `json:"connectTiming"`                 // Connection timing information for the request.
-	ClientSecurityState *ClientSecurityState       `json:"clientSecurityState,omitempty"` // The client security state set for the request.
+	RequestID                     RequestID            `json:"requestId"`                               // Request identifier. Used to match this information to an existing requestWillBeSent event.
+	AssociatedCookies             []*AssociatedCookie  `json:"associatedCookies"`                       // A list of cookies potentially associated to the requested URL. This includes both cookies sent with the request and the ones not sent; the latter are distinguished by having blockedReasons field set.
+	Headers                       Headers              `json:"headers"`                                 // Raw request headers as they will be sent over the wire.
+	ConnectTiming                 *ConnectTiming       `json:"connectTiming"`                           // Connection timing information for the request.
+	ClientSecurityState           *ClientSecurityState `json:"clientSecurityState,omitempty"`           // The client security state set for the request.
+	SiteHasCookieInOtherPartition bool                 `json:"siteHasCookieInOtherPartition,omitempty"` // Whether the site has partitioned cookies stored in a partition different than the current one.
 }
 
 // EventResponseReceivedExtraInfo fired when additional information about a
@@ -223,12 +224,26 @@ type EventRequestWillBeSentExtraInfo struct {
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Network#event-responseReceivedExtraInfo
 type EventResponseReceivedExtraInfo struct {
-	RequestID              RequestID                     `json:"requestId"`              // Request identifier. Used to match this information to another responseReceived event.
-	BlockedCookies         []*BlockedSetCookieWithReason `json:"blockedCookies"`         // A list of cookies which were not stored from the response along with the corresponding reasons for blocking. The cookies here may not be valid due to syntax errors, which are represented by the invalid cookie line string instead of a proper cookie.
-	Headers                Headers                       `json:"headers"`                // Raw response headers as they were received over the wire.
-	ResourceIPAddressSpace IPAddressSpace                `json:"resourceIPAddressSpace"` // The IP address space of the resource. The address space can only be determined once the transport established the connection, so we can't send it in requestWillBeSentExtraInfo.
-	StatusCode             int64                         `json:"statusCode"`             // The status code of the response. This is useful in cases the request failed and no responseReceived event is triggered, which is the case for, e.g., CORS errors. This is also the correct status code for cached requests, where the status in responseReceived is a 200 and this will be 304.
-	HeadersText            string                        `json:"headersText,omitempty"`  // Raw response header text as it was received over the wire. The raw text may not always be available, such as in the case of HTTP/2 or QUIC.
+	RequestID                RequestID                      `json:"requestId"`                          // Request identifier. Used to match this information to another responseReceived event.
+	BlockedCookies           []*BlockedSetCookieWithReason  `json:"blockedCookies"`                     // A list of cookies which were not stored from the response along with the corresponding reasons for blocking. The cookies here may not be valid due to syntax errors, which are represented by the invalid cookie line string instead of a proper cookie.
+	Headers                  Headers                        `json:"headers"`                            // Raw response headers as they were received over the wire.
+	ResourceIPAddressSpace   IPAddressSpace                 `json:"resourceIPAddressSpace"`             // The IP address space of the resource. The address space can only be determined once the transport established the connection, so we can't send it in requestWillBeSentExtraInfo.
+	StatusCode               int64                          `json:"statusCode"`                         // The status code of the response. This is useful in cases the request failed and no responseReceived event is triggered, which is the case for, e.g., CORS errors. This is also the correct status code for cached requests, where the status in responseReceived is a 200 and this will be 304.
+	HeadersText              string                         `json:"headersText,omitempty"`              // Raw response header text as it was received over the wire. The raw text may not always be available, such as in the case of HTTP/2 or QUIC.
+	CookiePartitionKey       *CookiePartitionKey            `json:"cookiePartitionKey,omitempty"`       // The cookie partition key that will be used to store partitioned cookies set in this response. Only sent when partitioned cookies are enabled.
+	CookiePartitionKeyOpaque bool                           `json:"cookiePartitionKeyOpaque,omitempty"` // True if partitioned cookies are enabled, but the partition key is not serializable to string.
+	ExemptedCookies          []*ExemptedSetCookieWithReason `json:"exemptedCookies,omitempty"`          // A list of cookies which should have been blocked by 3PCD but are exempted and stored from the response with the corresponding reason.
+}
+
+// EventResponseReceivedEarlyHints fired when 103 Early Hints headers is
+// received in addition to the common response. Not every responseReceived event
+// will have an responseReceivedEarlyHints fired. Only one
+// responseReceivedEarlyHints may be fired for eached responseReceived event.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Network#event-responseReceivedEarlyHints
+type EventResponseReceivedEarlyHints struct {
+	RequestID RequestID `json:"requestId"` // Request identifier. Used to match this information to another responseReceived event.
+	Headers   Headers   `json:"headers"`   // Raw response headers as they were received over the wire.
 }
 
 // EventTrustTokenOperationDone fired exactly once for each Trust Token
@@ -245,6 +260,11 @@ type EventTrustTokenOperationDone struct {
 	IssuerOrigin     string                        `json:"issuerOrigin,omitempty"`     // Origin of the issuer in case of a "Issuance" or "Redemption" operation.
 	IssuedTokenCount int64                         `json:"issuedTokenCount,omitempty"` // The number of obtained Trust Tokens on a successful "Issuance" operation.
 }
+
+// EventPolicyUpdated fired once security policy has been updated.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Network#event-policyUpdated
+type EventPolicyUpdated struct{}
 
 // EventSubresourceWebBundleMetadataReceived fired once when parsing the .wbn
 // file has succeeded. The event contains the information about the web bundle

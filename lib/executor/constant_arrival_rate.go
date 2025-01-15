@@ -133,8 +133,8 @@ func (carc ConstantArrivalRateConfig) GetExecutionRequirements(et *lib.Execution
 	return []lib.ExecutionStep{
 		{
 			TimeOffset:      0,
-			PlannedVUs:      uint64(et.ScaleInt64(carc.PreAllocatedVUs.Int64)),
-			MaxUnplannedVUs: uint64(et.ScaleInt64(carc.MaxVUs.Int64) - et.ScaleInt64(carc.PreAllocatedVUs.Int64)),
+			PlannedVUs:      uint64(et.ScaleInt64(carc.PreAllocatedVUs.Int64)),                                    //nolint:gosec
+			MaxUnplannedVUs: uint64(et.ScaleInt64(carc.MaxVUs.Int64) - et.ScaleInt64(carc.PreAllocatedVUs.Int64)), //nolint:gosec
 		}, {
 			TimeOffset:      carc.Duration.TimeDuration() + carc.GracefulStop.TimeDuration(),
 			PlannedVUs:      0,

@@ -172,8 +172,8 @@ func (r *Runner) newVU(
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: r.Bundle.Options.InsecureSkipTLSVerify.Bool, //nolint:gosec
 		CipherSuites:       cipherSuites,
-		MinVersion:         uint16(tlsVersions.Min),
-		MaxVersion:         uint16(tlsVersions.Max),
+		MinVersion:         uint16(tlsVersions.Min), //nolint:gosec
+		MaxVersion:         uint16(tlsVersions.Max), //nolint:gosec
 		Certificates:       certs,
 		Renegotiation:      tls.RenegotiateFreelyAsClient,
 		KeyLogWriter:       r.preInitState.KeyLogger,
@@ -188,7 +188,7 @@ func (r *Runner) newVU(
 					"deprecation - https://pkg.go.dev/crypto/tls@go1.17#Config.",
 			)
 		})
-		tlsConfig.NameToCertificate = nameToCert
+		tlsConfig.NameToCertificate = nameToCert //nolint:staticcheck
 	}
 	transport := &http.Transport{
 		Proxy:               http.ProxyFromEnvironment,
@@ -368,10 +368,9 @@ func (r *Runner) HandleSummary(ctx context.Context, summary *lib.Summary, report
 		return nil, err
 	}
 
-	go func() {
-		<-summaryCtx.Done()
+	_ = context.AfterFunc(summaryCtx, func() {
 		vu.Runtime.Interrupt(context.Canceled)
-	}()
+	})
 	vu.moduleVUImpl.ctx = summaryCtx
 
 	callbackResult := sobek.Undefined()
@@ -541,10 +540,9 @@ func (r *Runner) runPart(
 		return sobek.Undefined(), nil
 	}
 
-	go func() {
-		<-ctx.Done()
+	_ = context.AfterFunc(ctx, func() {
 		vu.Runtime.Interrupt(context.Canceled)
-	}()
+	})
 	vu.moduleVUImpl.ctx = ctx
 
 	groupPath, err := lib.NewGroupPath(lib.RootGroupPath, name)
@@ -707,9 +705,8 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 		return avu.scIterGlobal
 	}
 
-	go func() {
-		// Wait for the run context to be over
-		<-ctx.Done()
+	// Wait for the run context to be over
+	context.AfterFunc(ctx, func() {
 		// Interrupt the JS runtime
 		u.Runtime.Interrupt(context.Canceled)
 		// Wait for the VU to stop running, if it was, and prevent it from
@@ -719,7 +716,7 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 		if params.DeactivateCallback != nil {
 			params.DeactivateCallback(u)
 		}
-	}()
+	})
 
 	return avu
 }

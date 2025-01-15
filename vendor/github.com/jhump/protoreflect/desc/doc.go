@@ -59,4 +59,12 @@
 //
 // Also see the desc/builder sub-package, for another API that makes it easier
 // to synthesize descriptors programmatically.
+//
+// Deprecated: This module was created for use with the older "v1" Protobuf API
+// in github.com/golang/protobuf. However, much of this module is no longer
+// necessary as the newer "v2" API in google.golang.org/protobuf provides similar
+// capabilities. Instead of using this github.com/jhump/protoreflect/desc package,
+// see [google.golang.org/protobuf/reflect/protoreflect].
+//
+// [google.golang.org/protobuf/reflect/protoreflect]: https://pkg.go.dev/google.golang.org/protobuf/reflect/protoreflect
 package desc

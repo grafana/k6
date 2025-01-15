@@ -8,6 +8,7 @@ import (
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/js/modules/k6"
+	"go.k6.io/k6/js/modules/k6/browser/browser"
 	"go.k6.io/k6/js/modules/k6/crypto"
 	"go.k6.io/k6/js/modules/k6/crypto/x509"
 	"go.k6.io/k6/js/modules/k6/data"
@@ -16,7 +17,6 @@ import (
 	"go.k6.io/k6/js/modules/k6/experimental/csv"
 	"go.k6.io/k6/js/modules/k6/experimental/fs"
 	"go.k6.io/k6/js/modules/k6/experimental/streams"
-	"go.k6.io/k6/js/modules/k6/experimental/tracing"
 	"go.k6.io/k6/js/modules/k6/grpc"
 	"go.k6.io/k6/js/modules/k6/html"
 	"go.k6.io/k6/js/modules/k6/http"
@@ -24,7 +24,6 @@ import (
 	"go.k6.io/k6/js/modules/k6/timers"
 	"go.k6.io/k6/js/modules/k6/ws"
 
-	"github.com/grafana/xk6-browser/browser"
 	"github.com/grafana/xk6-redis/redis"
 	"github.com/grafana/xk6-webcrypto/webcrypto"
 	expws "github.com/grafana/xk6-websockets/websockets"
@@ -46,11 +45,10 @@ func getInternalJSModules() map[string]interface{} {
 		"k6/experimental/websockets": &expws.RootModule{},
 		"k6/experimental/timers": newRemovedModule(
 			"k6/experimental/timers has been graduated, please use k6/timers instead."),
-		"k6/experimental/tracing": newWarnExperimentalModule(tracing.New(),
-			"k6/experimental/tracing is now deprecated. All of its functionality is available as pure javascript module."+
-				" More info available at the docs:"+
-				" https://grafana.com/docs/k6/latest/javascript-api/jslib/http-instrumentation-tempo"+
-				" The module will be removed after November 11th, 2024 (v0.55.0). Ensure your scripts are migrated by then."),
+		"k6/experimental/tracing": newRemovedModule(
+			"k6/experimental/tracing has been removed. All of it functionality is available as pure javascript module." +
+				" More info available at the docs:" +
+				" https://grafana.com/docs/k6/latest/javascript-api/jslib/http-instrumentation-tempo"),
 		"k6/experimental/browser": newWarnExperimentalModule(browser.NewSync(),
 			"Please update your imports to use k6/browser instead of k6/experimental/browser,"+
 				" which will be removed after September 23rd, 2024 (v0.54.0). Ensure your scripts are migrated by then."+

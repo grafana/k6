@@ -12,10 +12,10 @@ import (
 	"github.com/chromedp/cdproto/cdp"
 )
 
-// GetDOMCountersParams [no description].
+// GetDOMCountersParams retruns current DOM object counters.
 type GetDOMCountersParams struct{}
 
-// GetDOMCounters [no description].
+// GetDOMCounters retruns current DOM object counters.
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Memory#method-getDOMCounters
 func GetDOMCounters() *GetDOMCountersParams {
@@ -47,10 +47,47 @@ func (p *GetDOMCountersParams) Do(ctx context.Context) (documents int64, nodes i
 	return res.Documents, res.Nodes, res.JsEventListeners, nil
 }
 
-// PrepareForLeakDetectionParams [no description].
+// GetDOMCountersForLeakDetectionParams retruns DOM object counters after
+// preparing renderer for leak detection.
+type GetDOMCountersForLeakDetectionParams struct{}
+
+// GetDOMCountersForLeakDetection retruns DOM object counters after preparing
+// renderer for leak detection.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Memory#method-getDOMCountersForLeakDetection
+func GetDOMCountersForLeakDetection() *GetDOMCountersForLeakDetectionParams {
+	return &GetDOMCountersForLeakDetectionParams{}
+}
+
+// GetDOMCountersForLeakDetectionReturns return values.
+type GetDOMCountersForLeakDetectionReturns struct {
+	Counters []*DOMCounter `json:"counters,omitempty"` // DOM object counters.
+}
+
+// Do executes Memory.getDOMCountersForLeakDetection against the provided context.
+//
+// returns:
+//
+//	counters - DOM object counters.
+func (p *GetDOMCountersForLeakDetectionParams) Do(ctx context.Context) (counters []*DOMCounter, err error) {
+	// execute
+	var res GetDOMCountersForLeakDetectionReturns
+	err = cdp.Execute(ctx, CommandGetDOMCountersForLeakDetection, nil, &res)
+	if err != nil {
+		return nil, err
+	}
+
+	return res.Counters, nil
+}
+
+// PrepareForLeakDetectionParams prepares for leak detection by terminating
+// workers, stopping spellcheckers, dropping non-essential internal caches,
+// running garbage collections, etc.
 type PrepareForLeakDetectionParams struct{}
 
-// PrepareForLeakDetection [no description].
+// PrepareForLeakDetection prepares for leak detection by terminating
+// workers, stopping spellcheckers, dropping non-essential internal caches,
+// running garbage collections, etc.
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Memory#method-prepareForLeakDetection
 func PrepareForLeakDetection() *PrepareForLeakDetectionParams {
@@ -278,6 +315,7 @@ func (p *GetSamplingProfileParams) Do(ctx context.Context) (profile *SamplingPro
 // Command names.
 const (
 	CommandGetDOMCounters                     = "Memory.getDOMCounters"
+	CommandGetDOMCountersForLeakDetection     = "Memory.getDOMCountersForLeakDetection"
 	CommandPrepareForLeakDetection            = "Memory.prepareForLeakDetection"
 	CommandForciblyPurgeJavaScriptMemory      = "Memory.forciblyPurgeJavaScriptMemory"
 	CommandSetPressureNotificationsSuppressed = "Memory.setPressureNotificationsSuppressed"

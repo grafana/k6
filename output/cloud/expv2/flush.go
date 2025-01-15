@@ -162,7 +162,7 @@ type metricSetBuilder struct {
 	// metrics[XYZ].<pbcloud.Metric>.TimeSeries.
 	// It supports the iterative process for appending
 	// the aggregated measurements for each time series.
-	seriesIndex map[metrics.TimeSeries]uint
+	seriesIndex map[metrics.TimeSeries]int
 
 	// discardedLabels tracks the labels that have been discarded
 	// since they are reserved for internal usage by the Cloud service.
@@ -175,7 +175,7 @@ func newMetricSetBuilder(testRunID string, aggrPeriodSec uint32) metricSetBuilde
 		// TODO: evaluate if removing the pointer from pbcloud.Metric
 		// is a better trade-off
 		metrics:         make(map[*metrics.Metric]*pbcloud.Metric),
-		seriesIndex:     make(map[metrics.TimeSeries]uint),
+		seriesIndex:     make(map[metrics.TimeSeries]int),
 		discardedLabels: nil,
 	}
 	builder.MetricSet.TestRunId = testRunID
@@ -203,7 +203,7 @@ func (msb *metricSetBuilder) addTimeSeries(timestamp int64, timeSeries metrics.T
 			Labels: labels,
 		}
 		pbmetric.TimeSeries = append(pbmetric.TimeSeries, pbTimeSeries)
-		msb.seriesIndex[timeSeries] = uint(len(pbmetric.TimeSeries) - 1)
+		msb.seriesIndex[timeSeries] = len(pbmetric.TimeSeries) - 1
 	} else {
 		pbTimeSeries = pbmetric.TimeSeries[ix]
 	}

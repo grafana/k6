@@ -41,6 +41,14 @@ type EventFrameDetached struct {
 	Reason  FrameDetachedReason `json:"reason"`
 }
 
+// EventFrameSubtreeWillBeDetached fired before frame subtree is detached.
+// Emitted before any frame of the subtree is actually detached.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Page#event-frameSubtreeWillBeDetached
+type EventFrameSubtreeWillBeDetached struct {
+	FrameID cdp.FrameID `json:"frameId"` // Id of the frame that is the root of the subtree that will be detached.
+}
+
 // EventFrameNavigated fired once navigation of the frame has completed.
 // Frame is now associated with the new loader.
 //
@@ -137,21 +145,10 @@ type EventLifecycleEvent struct {
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Page#event-backForwardCacheNotUsed
 type EventBackForwardCacheNotUsed struct {
-	LoaderID                    cdp.LoaderID                                `json:"loaderId"`                              // The loader id for the associated navgation.
+	LoaderID                    cdp.LoaderID                                `json:"loaderId"`                              // The loader id for the associated navigation.
 	FrameID                     cdp.FrameID                                 `json:"frameId"`                               // The frame id of the associated frame.
 	NotRestoredExplanations     []*BackForwardCacheNotRestoredExplanation   `json:"notRestoredExplanations"`               // Array of reasons why the page could not be cached. This must not be empty.
 	NotRestoredExplanationsTree *BackForwardCacheNotRestoredExplanationTree `json:"notRestoredExplanationsTree,omitempty"` // Tree structure of reasons why the page could not be cached for each frame.
-}
-
-// EventPrerenderAttemptCompleted fired when a prerender attempt is
-// completed.
-//
-// See: https://chromedevtools.github.io/devtools-protocol/tot/Page#event-prerenderAttemptCompleted
-type EventPrerenderAttemptCompleted struct {
-	InitiatingFrameID   cdp.FrameID          `json:"initiatingFrameId"` // The frame id of the frame initiating prerendering.
-	PrerenderingURL     string               `json:"prerenderingUrl"`
-	FinalStatus         PrerenderFinalStatus `json:"finalStatus"`
-	DisallowedAPIMethod string               `json:"disallowedApiMethod,omitempty"` // This is used to give users more information about the name of the API call that is incompatible with prerender and has caused the cancellation of the attempt
 }
 
 // EventLoadEventFired [no description].
@@ -166,8 +163,9 @@ type EventLoadEventFired struct {
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Page#event-navigatedWithinDocument
 type EventNavigatedWithinDocument struct {
-	FrameID cdp.FrameID `json:"frameId"` // Id of the frame.
-	URL     string      `json:"url"`     // Frame's new url.
+	FrameID        cdp.FrameID                           `json:"frameId"`        // Id of the frame.
+	URL            string                                `json:"url"`            // Frame's new url.
+	NavigationType NavigatedWithinDocumentNavigationType `json:"navigationType"` // Navigation type
 }
 
 // EventScreencastFrame compressed image data requested by the

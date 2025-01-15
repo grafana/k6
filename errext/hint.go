@@ -18,19 +18,19 @@ func WithHint(err error, hint string) error {
 	if err == nil {
 		return nil // No error, do nothing
 	}
-	return withHint{err, hint}
+	return withHintError{err, hint}
 }
 
-type withHint struct {
+type withHintError struct {
 	error
 	hint string
 }
 
-func (wh withHint) Unwrap() error {
+func (wh withHintError) Unwrap() error {
 	return wh.error
 }
 
-func (wh withHint) Hint() string {
+func (wh withHintError) Hint() string {
 	hint := wh.hint
 	var oldhint HasHint
 	if errors.As(wh.error, &oldhint) {
@@ -41,4 +41,4 @@ func (wh withHint) Hint() string {
 	return hint
 }
 
-var _ HasHint = withHint{}
+var _ HasHint = withHintError{}

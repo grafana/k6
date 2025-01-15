@@ -92,16 +92,17 @@ func (p *ClearBrowserCookiesParams) Do(ctx context.Context) (err error) {
 }
 
 // DeleteCookiesParams deletes browser cookies with matching name and url or
-// domain/path pair.
+// domain/path/partitionKey pair.
 type DeleteCookiesParams struct {
-	Name   string `json:"name"`             // Name of the cookies to remove.
-	URL    string `json:"url,omitempty"`    // If specified, deletes all the cookies with the given name where domain and path match provided URL.
-	Domain string `json:"domain,omitempty"` // If specified, deletes only cookies with the exact domain.
-	Path   string `json:"path,omitempty"`   // If specified, deletes only cookies with the exact path.
+	Name         string              `json:"name"`                   // Name of the cookies to remove.
+	URL          string              `json:"url,omitempty"`          // If specified, deletes all the cookies with the given name where domain and path match provided URL.
+	Domain       string              `json:"domain,omitempty"`       // If specified, deletes only cookies with the exact domain.
+	Path         string              `json:"path,omitempty"`         // If specified, deletes only cookies with the exact path.
+	PartitionKey *CookiePartitionKey `json:"partitionKey,omitempty"` // If specified, deletes only cookies with the the given name and partitionKey where all partition key attributes match the cookie partition key attribute.
 }
 
 // DeleteCookies deletes browser cookies with matching name and url or
-// domain/path pair.
+// domain/path/partitionKey pair.
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Network#method-deleteCookies
 //
@@ -133,6 +134,14 @@ func (p DeleteCookiesParams) WithPath(path string) *DeleteCookiesParams {
 	return &p
 }
 
+// WithPartitionKey if specified, deletes only cookies with the the given
+// name and partitionKey where all partition key attributes match the cookie
+// partition key attribute.
+func (p DeleteCookiesParams) WithPartitionKey(partitionKey *CookiePartitionKey) *DeleteCookiesParams {
+	p.PartitionKey = partitionKey
+	return &p
+}
+
 // Do executes Network.deleteCookies against the provided context.
 func (p *DeleteCookiesParams) Do(ctx context.Context) (err error) {
 	return cdp.Execute(ctx, CommandDeleteCookies, p, nil)
@@ -157,11 +166,14 @@ func (p *DisableParams) Do(ctx context.Context) (err error) {
 
 // EmulateNetworkConditionsParams activates emulation of network conditions.
 type EmulateNetworkConditionsParams struct {
-	Offline            bool           `json:"offline"`                  // True to emulate internet disconnection.
-	Latency            float64        `json:"latency"`                  // Minimum latency from request sent to response headers received (ms).
-	DownloadThroughput float64        `json:"downloadThroughput"`       // Maximal aggregated download throughput (bytes/sec). -1 disables download throttling.
-	UploadThroughput   float64        `json:"uploadThroughput"`         // Maximal aggregated upload throughput (bytes/sec).  -1 disables upload throttling.
-	ConnectionType     ConnectionType `json:"connectionType,omitempty"` // Connection type if known.
+	Offline            bool           `json:"offline"`                     // True to emulate internet disconnection.
+	Latency            float64        `json:"latency"`                     // Minimum latency from request sent to response headers received (ms).
+	DownloadThroughput float64        `json:"downloadThroughput"`          // Maximal aggregated download throughput (bytes/sec). -1 disables download throttling.
+	UploadThroughput   float64        `json:"uploadThroughput"`            // Maximal aggregated upload throughput (bytes/sec).  -1 disables upload throttling.
+	ConnectionType     ConnectionType `json:"connectionType,omitempty"`    // Connection type if known.
+	PacketLoss         float64        `json:"packetLoss,omitempty"`        // WebRTC packet loss (percent, 0-100). 0 disables packet loss emulation, 100 drops all the packets.
+	PacketQueueLength  int64          `json:"packetQueueLength,omitempty"` // WebRTC packet queue length (packet). 0 removes any queue length limitations.
+	PacketReordering   bool           `json:"packetReordering,omitempty"`  // WebRTC packetReordering feature.
 }
 
 // EmulateNetworkConditions activates emulation of network conditions.
@@ -186,6 +198,26 @@ func EmulateNetworkConditions(offline bool, latency float64, downloadThroughput 
 // WithConnectionType connection type if known.
 func (p EmulateNetworkConditionsParams) WithConnectionType(connectionType ConnectionType) *EmulateNetworkConditionsParams {
 	p.ConnectionType = connectionType
+	return &p
+}
+
+// WithPacketLoss webRTC packet loss (percent, 0-100). 0 disables packet loss
+// emulation, 100 drops all the packets.
+func (p EmulateNetworkConditionsParams) WithPacketLoss(packetLoss float64) *EmulateNetworkConditionsParams {
+	p.PacketLoss = packetLoss
+	return &p
+}
+
+// WithPacketQueueLength webRTC packet queue length (packet). 0 removes any
+// queue length limitations.
+func (p EmulateNetworkConditionsParams) WithPacketQueueLength(packetQueueLength int64) *EmulateNetworkConditionsParams {
+	p.PacketQueueLength = packetQueueLength
+	return &p
+}
+
+// WithPacketReordering webRTC packetReordering feature.
+func (p EmulateNetworkConditionsParams) WithPacketReordering(packetReordering bool) *EmulateNetworkConditionsParams {
+	p.PacketReordering = packetReordering
 	return &p
 }
 
@@ -236,39 +268,6 @@ func (p EnableParams) WithMaxPostDataSize(maxPostDataSize int64) *EnableParams {
 // Do executes Network.enable against the provided context.
 func (p *EnableParams) Do(ctx context.Context) (err error) {
 	return cdp.Execute(ctx, CommandEnable, p, nil)
-}
-
-// GetAllCookiesParams returns all browser cookies. Depending on the backend
-// support, will return detailed cookie information in the cookies field.
-type GetAllCookiesParams struct{}
-
-// GetAllCookies returns all browser cookies. Depending on the backend
-// support, will return detailed cookie information in the cookies field.
-//
-// See: https://chromedevtools.github.io/devtools-protocol/tot/Network#method-getAllCookies
-func GetAllCookies() *GetAllCookiesParams {
-	return &GetAllCookiesParams{}
-}
-
-// GetAllCookiesReturns return values.
-type GetAllCookiesReturns struct {
-	Cookies []*Cookie `json:"cookies,omitempty"` // Array of cookie objects.
-}
-
-// Do executes Network.getAllCookies against the provided context.
-//
-// returns:
-//
-//	cookies - Array of cookie objects.
-func (p *GetAllCookiesParams) Do(ctx context.Context) (cookies []*Cookie, err error) {
-	// execute
-	var res GetAllCookiesReturns
-	err = cdp.Execute(ctx, CommandGetAllCookies, nil, &res)
-	if err != nil {
-		return nil, err
-	}
-
-	return res.Cookies, nil
 }
 
 // GetCertificateParams returns the DER-encoded certificate.
@@ -721,7 +720,7 @@ type SetCookieParams struct {
 	SameParty    bool                `json:"sameParty,omitempty"`    // True if cookie is SameParty.
 	SourceScheme CookieSourceScheme  `json:"sourceScheme,omitempty"` // Cookie source scheme type.
 	SourcePort   int64               `json:"sourcePort,omitempty"`   // Cookie source port. Valid values are {-1, [1, 65535]}, -1 indicates an unspecified port. An unspecified port value allows protocol clients to emulate legacy cookie scope for the port. This is a temporary ability and it will be removed in the future.
-	PartitionKey string              `json:"partitionKey,omitempty"` // Cookie partition key. The site of the top-level URL the browser was visiting at the start of the request to the endpoint that set the cookie. If not set, the cookie will be set as not partitioned.
+	PartitionKey *CookiePartitionKey `json:"partitionKey,omitempty"` // Cookie partition key. If not set, the cookie will be set as not partitioned.
 }
 
 // SetCookie sets a cookie with the given cookie data; may overwrite
@@ -811,10 +810,9 @@ func (p SetCookieParams) WithSourcePort(sourcePort int64) *SetCookieParams {
 	return &p
 }
 
-// WithPartitionKey cookie partition key. The site of the top-level URL the
-// browser was visiting at the start of the request to the endpoint that set the
-// cookie. If not set, the cookie will be set as not partitioned.
-func (p SetCookieParams) WithPartitionKey(partitionKey string) *SetCookieParams {
+// WithPartitionKey cookie partition key. If not set, the cookie will be set
+// as not partitioned.
+func (p SetCookieParams) WithPartitionKey(partitionKey *CookiePartitionKey) *SetCookieParams {
 	p.PartitionKey = partitionKey
 	return &p
 }
@@ -895,6 +893,55 @@ func SetAttachDebugStack(enabled bool) *SetAttachDebugStackParams {
 // Do executes Network.setAttachDebugStack against the provided context.
 func (p *SetAttachDebugStackParams) Do(ctx context.Context) (err error) {
 	return cdp.Execute(ctx, CommandSetAttachDebugStack, p, nil)
+}
+
+// StreamResourceContentParams enables streaming of the response for the
+// given requestId. If enabled, the dataReceived event contains the data that
+// was received during streaming.
+type StreamResourceContentParams struct {
+	RequestID RequestID `json:"requestId"` // Identifier of the request to stream.
+}
+
+// StreamResourceContent enables streaming of the response for the given
+// requestId. If enabled, the dataReceived event contains the data that was
+// received during streaming.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Network#method-streamResourceContent
+//
+// parameters:
+//
+//	requestID - Identifier of the request to stream.
+func StreamResourceContent(requestID RequestID) *StreamResourceContentParams {
+	return &StreamResourceContentParams{
+		RequestID: requestID,
+	}
+}
+
+// StreamResourceContentReturns return values.
+type StreamResourceContentReturns struct {
+	BufferedData string `json:"bufferedData,omitempty"` // Data that has been buffered until streaming is enabled.
+}
+
+// Do executes Network.streamResourceContent against the provided context.
+//
+// returns:
+//
+//	bufferedData - Data that has been buffered until streaming is enabled.
+func (p *StreamResourceContentParams) Do(ctx context.Context) (bufferedData []byte, err error) {
+	// execute
+	var res StreamResourceContentReturns
+	err = cdp.Execute(ctx, CommandStreamResourceContent, p, &res)
+	if err != nil {
+		return nil, err
+	}
+
+	// decode
+	var dec []byte
+	dec, err = base64.StdEncoding.DecodeString(res.BufferedData)
+	if err != nil {
+		return nil, err
+	}
+	return dec, nil
 }
 
 // GetSecurityIsolationStatusParams returns information about the COEP/COOP
@@ -1028,7 +1075,6 @@ const (
 	CommandDisable                                 = "Network.disable"
 	CommandEmulateNetworkConditions                = "Network.emulateNetworkConditions"
 	CommandEnable                                  = "Network.enable"
-	CommandGetAllCookies                           = "Network.getAllCookies"
 	CommandGetCertificate                          = "Network.getCertificate"
 	CommandGetCookies                              = "Network.getCookies"
 	CommandGetResponseBody                         = "Network.getResponseBody"
@@ -1044,6 +1090,7 @@ const (
 	CommandSetCookies                              = "Network.setCookies"
 	CommandSetExtraHTTPHeaders                     = "Network.setExtraHTTPHeaders"
 	CommandSetAttachDebugStack                     = "Network.setAttachDebugStack"
+	CommandStreamResourceContent                   = "Network.streamResourceContent"
 	CommandGetSecurityIsolationStatus              = "Network.getSecurityIsolationStatus"
 	CommandEnableReportingAPI                      = "Network.enableReportingApi"
 	CommandLoadNetworkResource                     = "Network.loadNetworkResource"

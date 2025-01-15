@@ -10,6 +10,7 @@ import (
 	"context"
 
 	"github.com/chromedp/cdproto/cdp"
+	"github.com/chromedp/cdproto/storage"
 )
 
 // DeleteCacheParams deletes a cache.
@@ -63,7 +64,9 @@ func (p *DeleteEntryParams) Do(ctx context.Context) (err error) {
 
 // RequestCacheNamesParams requests cache names.
 type RequestCacheNamesParams struct {
-	SecurityOrigin string `json:"securityOrigin"` // Security origin.
+	SecurityOrigin string          `json:"securityOrigin,omitempty"` // At least and at most one of securityOrigin, storageKey, storageBucket must be specified. Security origin.
+	StorageKey     string          `json:"storageKey,omitempty"`     // Storage key.
+	StorageBucket  *storage.Bucket `json:"storageBucket,omitempty"`  // Storage bucket. If not specified, it uses the default bucket.
 }
 
 // RequestCacheNames requests cache names.
@@ -71,12 +74,28 @@ type RequestCacheNamesParams struct {
 // See: https://chromedevtools.github.io/devtools-protocol/tot/CacheStorage#method-requestCacheNames
 //
 // parameters:
-//
-//	securityOrigin - Security origin.
-func RequestCacheNames(securityOrigin string) *RequestCacheNamesParams {
-	return &RequestCacheNamesParams{
-		SecurityOrigin: securityOrigin,
-	}
+func RequestCacheNames() *RequestCacheNamesParams {
+	return &RequestCacheNamesParams{}
+}
+
+// WithSecurityOrigin at least and at most one of securityOrigin, storageKey,
+// storageBucket must be specified. Security origin.
+func (p RequestCacheNamesParams) WithSecurityOrigin(securityOrigin string) *RequestCacheNamesParams {
+	p.SecurityOrigin = securityOrigin
+	return &p
+}
+
+// WithStorageKey storage key.
+func (p RequestCacheNamesParams) WithStorageKey(storageKey string) *RequestCacheNamesParams {
+	p.StorageKey = storageKey
+	return &p
+}
+
+// WithStorageBucket storage bucket. If not specified, it uses the default
+// bucket.
+func (p RequestCacheNamesParams) WithStorageBucket(storageBucket *storage.Bucket) *RequestCacheNamesParams {
+	p.StorageBucket = storageBucket
+	return &p
 }
 
 // RequestCacheNamesReturns return values.

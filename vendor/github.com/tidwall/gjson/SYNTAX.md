@@ -1,6 +1,6 @@
 # GJSON Path Syntax
 
-A GJSON Path is a text string syntax that describes a search pattern for quickly retreiving values from a JSON payload.
+A GJSON Path is a text string syntax that describes a search pattern for quickly retrieving values from a JSON payload.
 
 This document is designed to explain the structure of a GJSON Path through examples.
 
@@ -15,12 +15,12 @@ This document is designed to explain the structure of a GJSON Path through examp
 - [Multipaths](#multipaths)
 - [Literals](#literals)
 
-The definitive implemenation is [github.com/tidwall/gjson](https://github.com/tidwall/gjson).  
+The definitive implementation is [github.com/tidwall/gjson](https://github.com/tidwall/gjson).  
 Use the [GJSON Playground](https://gjson.dev) to experiment with the syntax online.
 
 ## Path structure
 
-A GJSON Path is intended to be easily expressed as a series of components seperated by a `.` character. 
+A GJSON Path is intended to be easily expressed as a series of components separated by a `.` character. 
 
 Along with `.` character, there are a few more that have special meaning, including `|`, `#`, `@`, `\`, `*`, `!`, and `?`.
 
@@ -46,7 +46,7 @@ The following GJSON Paths evaluate to the accompanying values.
 
 ### Basic 
 
-In many cases you'll just want to retreive values by object name or array index.
+In many cases you'll just want to retrieve values by object name or array index.
 
 ```go
 name.last              "Anderson"

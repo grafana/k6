@@ -14,11 +14,12 @@
 
 // Package protoutil contains useful functions for interacting with descriptors.
 // For now these include only functions for efficiently converting descriptors
-// produced by the compiler to descriptor protos.
+// produced by the compiler to descriptor protos and functions for resolving
+// "features" (a core concept of Protobuf Editions).
 //
 // Despite the fact that descriptor protos are mutable, calling code should NOT
 // mutate any of the protos returned from this package. For efficiency, some
-// protos returned from this package may be part of internal state of a compiler
+// values returned from this package may reference internal state of a compiler
 // result, and mutating the proto could corrupt or invalidate parts of that
 // result.
 package protoutil

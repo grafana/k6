@@ -697,31 +697,6 @@ func (p *SetShowScrollBottleneckRectsParams) Do(ctx context.Context) (err error)
 	return cdp.Execute(ctx, CommandSetShowScrollBottleneckRects, p, nil)
 }
 
-// SetShowWebVitalsParams request that backend shows an overlay with web
-// vital metrics.
-type SetShowWebVitalsParams struct {
-	Show bool `json:"show"`
-}
-
-// SetShowWebVitals request that backend shows an overlay with web vital
-// metrics.
-//
-// See: https://chromedevtools.github.io/devtools-protocol/tot/Overlay#method-setShowWebVitals
-//
-// parameters:
-//
-//	show
-func SetShowWebVitals(show bool) *SetShowWebVitalsParams {
-	return &SetShowWebVitalsParams{
-		Show: show,
-	}
-}
-
-// Do executes Overlay.setShowWebVitals against the provided context.
-func (p *SetShowWebVitalsParams) Do(ctx context.Context) (err error) {
-	return cdp.Execute(ctx, CommandSetShowWebVitals, p, nil)
-}
-
 // SetShowViewportSizeOnResizeParams paints viewport size upon main frame
 // resize.
 type SetShowViewportSizeOnResizeParams struct {
@@ -795,6 +770,32 @@ func (p *SetShowIsolatedElementsParams) Do(ctx context.Context) (err error) {
 	return cdp.Execute(ctx, CommandSetShowIsolatedElements, p, nil)
 }
 
+// SetShowWindowControlsOverlayParams show Window Controls Overlay for PWA.
+type SetShowWindowControlsOverlayParams struct {
+	WindowControlsOverlayConfig *WindowControlsOverlayConfig `json:"windowControlsOverlayConfig,omitempty"` // Window Controls Overlay data, null means hide Window Controls Overlay
+}
+
+// SetShowWindowControlsOverlay show Window Controls Overlay for PWA.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Overlay#method-setShowWindowControlsOverlay
+//
+// parameters:
+func SetShowWindowControlsOverlay() *SetShowWindowControlsOverlayParams {
+	return &SetShowWindowControlsOverlayParams{}
+}
+
+// WithWindowControlsOverlayConfig window Controls Overlay data, null means
+// hide Window Controls Overlay.
+func (p SetShowWindowControlsOverlayParams) WithWindowControlsOverlayConfig(windowControlsOverlayConfig *WindowControlsOverlayConfig) *SetShowWindowControlsOverlayParams {
+	p.WindowControlsOverlayConfig = windowControlsOverlayConfig
+	return &p
+}
+
+// Do executes Overlay.setShowWindowControlsOverlay against the provided context.
+func (p *SetShowWindowControlsOverlayParams) Do(ctx context.Context) (err error) {
+	return cdp.Execute(ctx, CommandSetShowWindowControlsOverlay, p, nil)
+}
+
 // Command names.
 const (
 	CommandDisable                              = "Overlay.disable"
@@ -819,8 +820,8 @@ const (
 	CommandSetShowPaintRects                    = "Overlay.setShowPaintRects"
 	CommandSetShowLayoutShiftRegions            = "Overlay.setShowLayoutShiftRegions"
 	CommandSetShowScrollBottleneckRects         = "Overlay.setShowScrollBottleneckRects"
-	CommandSetShowWebVitals                     = "Overlay.setShowWebVitals"
 	CommandSetShowViewportSizeOnResize          = "Overlay.setShowViewportSizeOnResize"
 	CommandSetShowHinge                         = "Overlay.setShowHinge"
 	CommandSetShowIsolatedElements              = "Overlay.setShowIsolatedElements"
+	CommandSetShowWindowControlsOverlay         = "Overlay.setShowWindowControlsOverlay"
 )

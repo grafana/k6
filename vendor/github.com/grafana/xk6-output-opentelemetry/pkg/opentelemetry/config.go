@@ -266,6 +266,10 @@ func parseJSON(data json.RawMessage) (Config, error) {
 func parseEnvs(env map[string]string) (Config, error) {
 	cfg := Config{}
 
+	if serviceName, ok := env["OTEL_SERVICE_NAME"]; ok {
+		cfg.ServiceName = null.StringFrom(serviceName)
+	}
+
 	err := envconfig.Process("K6_OTEL_", &cfg, func(key string) (string, bool) {
 		v, ok := env[key]
 		return v, ok

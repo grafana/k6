@@ -316,7 +316,10 @@ func (ecgp *ECKeyGenParams) GenerateKey(
 		Type:        PublicCryptoKeyType,
 		Extractable: true,
 		Algorithm:   alg,
-		Usages:      publicKeyUsages,
+		Usages: UsageIntersection(
+			publicKeyUsages,
+			keyUsages,
+		),
 	}
 
 	var err error

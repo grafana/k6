@@ -35,7 +35,7 @@ const (
 var compileNameRegex = regexp.MustCompile(nameRegexString)
 
 func checkName(name string) bool {
-	return compileNameRegex.Match([]byte(name))
+	return compileNameRegex.MatchString(name)
 }
 
 // NewMetric returns new metric registered to this registry

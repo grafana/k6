@@ -39,14 +39,14 @@ func TestVUHandleRace(t *testing.T) {
 		return nil
 	}
 
-	var getVUCount int64
-	var returnVUCount int64
+	var getVUCount uint64
+	var returnVUCount uint64
 	getVU := func() (lib.InitializedVU, error) {
-		return runner.NewVU(ctx, uint64(atomic.AddInt64(&getVUCount, 1)), 0, nil)
+		return runner.NewVU(ctx, atomic.AddUint64(&getVUCount, 1), 0, nil)
 	}
 
 	returnVU := func(_ lib.InitializedVU) {
-		atomic.AddInt64(&returnVUCount, 1)
+		atomic.AddUint64(&returnVUCount, 1)
 		// do something
 	}
 	var interruptedIter int64
@@ -107,7 +107,7 @@ func TestVUHandleRace(t *testing.T) {
 		"too big of a difference %d >= %d - 1", interruptedBefore, interruptedAfter)
 	assert.True(t, fullBefore+1 <= fullAfter,
 		"too small of a difference %d + 1 <= %d", fullBefore, fullAfter)
-	require.Equal(t, atomic.LoadInt64(&getVUCount), atomic.LoadInt64(&returnVUCount))
+	require.Equal(t, atomic.LoadUint64(&getVUCount), atomic.LoadUint64(&returnVUCount))
 }
 
 // this test is mostly interesting when -race is enabled

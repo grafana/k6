@@ -47,7 +47,7 @@ func (bs *BaseExecutor) nextIterationCounters() (uint64, uint64) {
 	bs.iterSegIndexMx.Lock()
 	defer bs.iterSegIndexMx.Unlock()
 	scaled, unscaled := bs.iterSegIndex.Next()
-	return uint64(scaled - 1), uint64(unscaled - 1)
+	return uint64(scaled - 1), uint64(unscaled - 1) //nolint:gosec
 }
 
 // Init doesn't do anything for most executors, since initialization of all

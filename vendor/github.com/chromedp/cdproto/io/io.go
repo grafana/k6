@@ -41,7 +41,7 @@ func (p *CloseParams) Do(ctx context.Context) (err error) {
 // ReadParams read a chunk of the stream.
 type ReadParams struct {
 	Handle StreamHandle `json:"handle"`           // Handle of the stream to read.
-	Offset int64        `json:"offset,omitempty"` // Seek to the specified offset before reading (if not specificed, proceed with offset following the last read). Some types of streams may only support sequential reads.
+	Offset int64        `json:"offset,omitempty"` // Seek to the specified offset before reading (if not specified, proceed with offset following the last read). Some types of streams may only support sequential reads.
 	Size   int64        `json:"size,omitempty"`   // Maximum number of bytes to read (left upon the agent discretion if not specified).
 }
 
@@ -58,7 +58,7 @@ func Read(handle StreamHandle) *ReadParams {
 	}
 }
 
-// WithOffset seek to the specified offset before reading (if not specificed,
+// WithOffset seek to the specified offset before reading (if not specified,
 // proceed with offset following the last read). Some types of streams may only
 // support sequential reads.
 func (p ReadParams) WithOffset(offset int64) *ReadParams {

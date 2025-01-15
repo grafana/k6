@@ -175,9 +175,9 @@ func tracerProviderParamsFromConfigLine(line string) (tracerProviderParams, erro
 		return params, nil
 	}
 
-	parts := strings.SplitN(line, "=", 2)
-	if parts[0] != "otel" {
-		return params, fmt.Errorf("%w %q", ErrInvalidTracesOutput, parts[0])
+	traceOutput, _, _ := strings.Cut(line, "=")
+	if traceOutput != "otel" {
+		return params, fmt.Errorf("%w %q", ErrInvalidTracesOutput, traceOutput)
 	}
 
 	tokens, err := strvals.Parse(line)

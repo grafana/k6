@@ -221,6 +221,9 @@ func (o *objectGoReflect) _getMethod(jsName string) reflect.Value {
 
 func (o *objectGoReflect) elemToValue(ev reflect.Value) (Value, reflectValueWrapper) {
 	if isContainer(ev.Kind()) {
+		if ev.CanAddr() {
+			ev = ev.Addr()
+		}
 		ret := o.val.runtime.toValue(ev.Interface(), ev)
 		if obj, ok := ret.(*Object); ok {
 			if w, ok := obj.self.(reflectValueWrapper); ok {

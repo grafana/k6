@@ -25,10 +25,20 @@ func (gm *goModule) Instantiate(rt *sobek.Runtime) (sobek.CyclicModuleInstance, 
 	if gm.exportedNames == nil {
 		named := mi.Exports().Named
 
-		gm.exportedNames = make([]string, len(named))
-		for name := range named {
-			gm.exportedNames = append(gm.exportedNames, name)
+		if named == nil && mi.Exports().Default != nil {
+			// If named is nil but default is defined, then try to work with
+			// default and extract the names of the object's properties. This
+			// behavior isn't ESM compatible, but we do want to allow defaults to
+			// be imported as namespaced object, which is also how node works.
+			obj := rt.ToValue(mi.Exports().Default).ToObject(rt)
+			gm.exportedNames = obj.GetOwnPropertyNames()
+		} else {
+			gm.exportedNames = make([]string, 0, len(named))
+			for name := range named {
+				gm.exportedNames = append(gm.exportedNames, name)
+			}
 		}
+
 		for _, callback := range gm.exportedNamesCallbacks {
 			callback(gm.exportedNames)
 		}
@@ -60,7 +70,7 @@ type goModuleInstance struct {
 	defaultExport sobek.Value
 }
 
-func (gmi *goModuleInstance) ExecuteModule(_ *sobek.Runtime, _, _ func(any)) (sobek.CyclicModuleInstance, error) {
+func (gmi *goModuleInstance) ExecuteModule(_ *sobek.Runtime, _, _ func(any) error) (sobek.CyclicModuleInstance, error) {
 	return gmi, nil
 }
 func (gmi *goModuleInstance) HasTLA() bool { return false }

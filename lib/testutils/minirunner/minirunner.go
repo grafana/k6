@@ -172,9 +172,7 @@ func (vu *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 		return avu.scIterGlobal
 	}
 
-	go func() {
-		<-ctx.Done()
-
+	context.AfterFunc(ctx, func() {
 		// Wait for the VU to stop running, if it was, and prevent it from
 		// running again for this activation
 		avu.busy <- struct{}{}
@@ -182,7 +180,7 @@ func (vu *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 		if params.DeactivateCallback != nil {
 			params.DeactivateCallback(vu)
 		}
-	}()
+	})
 
 	return avu
 }

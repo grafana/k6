@@ -265,9 +265,17 @@ func loadSystemCertPool(logger logrus.FieldLogger) {
 func (lct *loadedAndConfiguredTest) buildTestRunState(
 	configToReinject lib.Options,
 ) (*lib.TestRunState, error) {
-	// This might be the full derived or just the consodlidated options
+	// This might be the full derived or just the consolidated options
 	if err := lct.initRunner.SetOptions(configToReinject); err != nil {
 		return nil, err
+	}
+
+	// Here, where we get the consolidated options, is where we check if any
+	// of the deprecated options is being used, and we report it.
+	if _, isPresent := configToReinject.External["loadimpact"]; isPresent {
+		if err := lct.preInitState.Usage.Uint64("deprecations/options.ext.loadimpact", 1); err != nil {
+			return nil, err
+		}
 	}
 
 	// it pre-loads system certificates to avoid doing it on the first TLS request.

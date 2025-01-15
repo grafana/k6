@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/grafana/sobek"
 	"github.com/sirupsen/logrus"
@@ -295,7 +296,7 @@ func (b *Bundle) newCompiler(logger logrus.FieldLogger) *compiler.Compiler {
 
 func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*BundleInstance, error) {
 	rt := vuImpl.runtime
-	err := b.setupJSRuntime(rt, int64(vuID), b.preInitState.Logger)
+	err := b.setupJSRuntime(rt, vuID, b.preInitState.Logger)
 	if err != nil {
 		return nil, err
 	}
@@ -331,9 +332,10 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*BundleInstance
 		env:          b.preInitState.RuntimeOptions.Env,
 		moduleVUImpl: vuImpl,
 	}
+	var result *modules.RunSourceDataResult
 	callback := func() error { // this exists so that Sobek catches uncatchable panics such as Interrupt
 		var err error
-		bi.mainModule, err = modSys.RunSourceData(b.sourceData)
+		result, err = modSys.RunSourceData(b.sourceData)
 		return err
 	}
 
@@ -345,6 +347,14 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*BundleInstance
 	})
 
 	<-initDone
+
+	if err == nil {
+		var finished bool
+		bi.mainModule, finished, err = result.Result()
+		if !finished {
+			return nil, errors.New("initializing the main module hasn't finished, this is a bug in k6 please report it")
+		}
+	}
 
 	if err != nil {
 		var exception *sobek.Exception
@@ -365,7 +375,7 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*BundleInstance
 	return bi, nil
 }
 
-func (b *Bundle) setupJSRuntime(rt *sobek.Runtime, vuID int64, logger logrus.FieldLogger) error {
+func (b *Bundle) setupJSRuntime(rt *sobek.Runtime, vuID uint64, logger logrus.FieldLogger) error {
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 	rt.SetRandSource(common.NewRandSource())
 
@@ -446,6 +456,22 @@ func (b *Bundle) setInitGlobals(rt *sobek.Runtime, vu *moduleVUImpl, modSys *mod
 		if err != nil {
 			return nil, err
 		}
+		if !(strings.HasPrefix(filename, "file://") || filepath.IsAbs(filename)) {
+			otherPath, shouldWarn := modSys.ShouldWarnOnParentDirNotMatchingCurrentModuleParentDir(vu, pwd)
+			logger := b.preInitState.Logger
+			if shouldWarn {
+				logger.Warningf("open() was used and is currently relative to '%s', but in the future "+
+					"it will be aligned with how `require` and imports work and will be relative to '%s'. This means "+
+					"that in the future open will open relative path relative to the module/file it is written in. "+
+					"You can future proof this by using `import.meta.resolve()` to get relative paths to the file it "+
+					"is written in the current k6 version.", pwd, otherPath)
+				err = b.preInitState.Usage.Uint64("deprecations/openRelativity", 1)
+				if err != nil {
+					logger.WithError(err).Warn("failed reporting usage of deprecated relativity of open()")
+				}
+			}
+		}
+
 		return openImpl(rt, b.filesystems["file"], pwd, filename, args...)
 	})
 	warnAboutModuleMixing := func(name string) {

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/grafana/sobek"
+
 	"go.k6.io/k6/ext"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
@@ -27,8 +28,8 @@ func Register(name string, mod interface{}) {
 
 // Module is the interface js modules should implement in order to get access to the VU
 type Module interface {
-	// NewModuleInstance will get modules.VU that should provide the module with a way to interact with the VU
-	// This method will be called for *each* require/import and should return an unique instance for each call
+	// NewModuleInstance will get modules.VU that should provide the module with a way to interact with the VU.
+	// This method will be called for *each* VU that imports the module *once* per that VU.
 	NewModuleInstance(VU) Instance
 }
 

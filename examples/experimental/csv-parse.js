@@ -7,16 +7,10 @@ export const options = {
 }
 
 // Open the csv file, and parse it ahead of time.
-let file;
-let csvRecords;
-(async function () {
-	file = await open('data.csv');
-
-	// The `csv.parse` function consumes the entire file at once, and returns
-	// the parsed records as a SharedArray object.
-	csvRecords = await csv.parse(file, {delimiter: ','})
-})();
-
+const file = await open('data.csv');
+// The `csv.parse` function consumes the entire file at once, and returns
+// the parsed records as a SharedArray object.
+const csvRecords = await csv.parse(file, { delimiter: ',' })
 
 export default async function() {
 	// The csvRecords a SharedArray. Each element is a record from the CSV file, represented as an array

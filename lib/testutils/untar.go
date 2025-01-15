@@ -55,7 +55,7 @@ func Untar(t *testing.T, fileSystem fsext.Fs, fileName string, destination strin
 				return err
 			}
 		case tar.TypeReg:
-			f, err := fileSystem.OpenFile(target, syscall.O_CREAT|syscall.O_RDWR, fs.FileMode(header.Mode))
+			f, err := fileSystem.OpenFile(target, syscall.O_CREAT|syscall.O_RDWR, fs.FileMode(header.Mode)) //nolint:gosec
 			if err != nil {
 				return err
 			}

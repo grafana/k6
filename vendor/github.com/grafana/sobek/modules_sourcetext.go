@@ -22,7 +22,7 @@ type SourceTextModuleInstance struct {
 	asyncPromise  *Promise
 }
 
-func (s *SourceTextModuleInstance) ExecuteModule(rt *Runtime, res, rej func(interface{})) (CyclicModuleInstance, error) {
+func (s *SourceTextModuleInstance) ExecuteModule(rt *Runtime, res, rej func(interface{}) error) (CyclicModuleInstance, error) {
 	promiseP := s.pcap.promise.self.(*Promise)
 	if len(promiseP.fulfillReactions) == 1 {
 		ar := promiseP.fulfillReactions[0].asyncRunner
@@ -34,6 +34,9 @@ func (s *SourceTextModuleInstance) ExecuteModule(rt *Runtime, res, rej func(inte
 		if res != nil {
 			panic("sobek bug where a not async module was executed as async on")
 		}
+		// we handle the failure below so we need to mark this as promise as handled so it doesn't
+		// trigger the PromiseRejectionTracker
+		rt.performPromiseThen(s.asyncPromise, rt.ToValue(func() {}), rt.ToValue(func() {}), nil)
 		switch s.asyncPromise.state {
 		case PromiseStateFulfilled:
 			return s, nil
@@ -49,12 +52,17 @@ func (s *SourceTextModuleInstance) ExecuteModule(rt *Runtime, res, rej func(inte
 		panic("sobek bug where an async module was not executed as async")
 	}
 	rt.performPromiseThen(s.asyncPromise, rt.ToValue(func(call FunctionCall) Value {
-		// fmt.Println("!!!!res")
-		res(call.Argument(0))
+		err := res(call.Argument(0))
+		if err != nil {
+			panic(err)
+		}
 		return nil
 	}), rt.ToValue(func(call FunctionCall) Value {
 		v := call.Argument(0)
-		rej(rt.vm.exceptionFromValue(v))
+		err := rej(rt.vm.exceptionFromValue(v))
+		if err != nil {
+			panic(err)
+		}
 		return nil
 	}), nil)
 	return nil, nil

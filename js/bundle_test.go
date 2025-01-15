@@ -126,7 +126,7 @@ func TestNewBundle(t *testing.T) {
 	t.Run("InvalidExports", func(t *testing.T) {
 		t.Parallel()
 		_, err := getSimpleBundle(t, "/script.js", `module.exports = null`)
-		require.EqualError(t, err, "GoError: CommonJS's exports must not be null\n") // TODO: try to remove the GoError from herer
+		require.EqualError(t, err, "CommonJS's exports must not be null")
 	})
 	t.Run("DefaultUndefined", func(t *testing.T) {
 		t.Parallel()
@@ -870,15 +870,15 @@ func TestBundleNotSharable(t *testing.T) {
 	require.NoError(t, err)
 
 	bundles := map[string]*Bundle{"Source": b1, "Archive": b2}
-	vus, iters := 10, 1000
+	var vus, iters uint64 = 10, 1000
 	for name, b := range bundles {
 		b := b
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			for i := 0; i < vus; i++ {
-				bi, err := b.Instantiate(context.Background(), uint64(i))
+			for i := uint64(0); i < vus; i++ {
+				bi, err := b.Instantiate(context.Background(), i)
 				require.NoError(t, err)
-				for j := 0; j < iters; j++ {
+				for j := uint64(0); j < iters; j++ {
 					require.NoError(t, bi.Runtime.Set("__ITER", j))
 					_, err := bi.getCallableExport(consts.DefaultFn)(sobek.Undefined())
 					require.NoError(t, err)
@@ -982,4 +982,19 @@ func TestGlobalTimers(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+func TestTopLevelAwaitErrors(t *testing.T) {
+	t.Parallel()
+	data := `
+		const delay = (delayInms) => {
+			return new Promise(resolve => setTimeout(resolve, delayInms));
+		}
+
+		await delay(10).then(() => {something});
+		export default () => {}
+	`
+
+	_, err := getSimpleBundle(t, "/script.js", data)
+	require.ErrorContains(t, err, "ReferenceError: something is not defined")
 }
