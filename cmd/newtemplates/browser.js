@@ -1,6 +1,6 @@
 import { browser } from "k6/browser";
 import http from "k6/http";
-import { sleep, check } from 'k6';
+import { sleep, check, fail } from 'k6';
 
 const BASE_URL = __ENV.BASE_URL || "https://quickpizza.grafana.com";
 
@@ -53,6 +53,8 @@ export default async function() {
     check(page, {
       recommendation: checkData !== "",
     });
+  } catch (error) {
+    fail(`Browser iteration failed: ${error.message}`);
   } finally {
     await page.close();
   }
