@@ -46,24 +46,30 @@ func (c *newScriptCmd) run(_ *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	defer func() error {
+
+	var closeErr error
+	defer func() {
 		if cerr := fd.Close(); cerr != nil {
 			if _, err := fmt.Fprintf(c.gs.Stderr, "error closing file: %v\n", cerr); err != nil {
-				return fmt.Errorf("error writing error message to stderr: %v", err)
+				closeErr = fmt.Errorf("error writing error message to stderr: %w", err)
+			} else {
+				closeErr = cerr
 			}
-			return cerr
 		}
-		return nil
 	}()
+
+	if closeErr != nil {
+		return closeErr
+	}
 
 	tm, err := templates.NewTemplateManager()
 	if err != nil {
-		return err
+		return fmt.Errorf("error initializing template manager: %w", err)
 	}
 
 	tmpl, err := tm.GetTemplate(c.templateType)
 	if err != nil {
-		return err
+		return fmt.Errorf("error retrieving template: %w", err)
 	}
 
 	argsStruct := templates.TemplateArgs{
