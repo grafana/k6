@@ -8,8 +8,6 @@ import (
 	"image/png"
 	"io"
 	"net/http"
-	"net/http/httptest"
-	"os"
 	"runtime"
 	"strconv"
 	"sync/atomic"
@@ -1757,17 +1755,7 @@ func TestShadowDOMAndDocumentFragment(t *testing.T) {
 		t.Skip() // timeouts
 	}
 
-	// Start a server that will return static html files.
-	mux := http.NewServeMux()
-	s := httptest.NewServer(mux)
-	t.Cleanup(s.Close)
-
-	const (
-		slash = string(os.PathSeparator) //nolint:forbidigo
-		path  = slash + testBrowserStaticDir + slash
-	)
-	fs := http.FileServer(http.Dir(testBrowserStaticDir))
-	mux.Handle(path, http.StripPrefix(path, fs))
+	tb := newTestBrowser(t, withFileServer())
 
 	tests := []struct {
 		name     string
@@ -1805,7 +1793,7 @@ func TestShadowDOMAndDocumentFragment(t *testing.T) {
 
 			got := vu.RunPromise(t, `
 				const p = await browser.newPage()
-				await p.goto("%s/%s/shadow_and_doc_frag.html")
+				await p.goto("%s")
 
 				const s = p.locator('%s')
 				await s.waitFor({
@@ -1815,7 +1803,7 @@ func TestShadowDOMAndDocumentFragment(t *testing.T) {
 
 				const text = await s.innerText();
 				return text;
- 			`, s.URL, testBrowserStaticDir, tt.selector)
+ 			`, tb.staticURL("shadow_and_doc_frag.html"), tt.selector)
 			assert.Equal(t, tt.want, got.Result().String())
 		})
 	}
