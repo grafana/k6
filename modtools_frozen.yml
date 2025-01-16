@@ -1,6 +1,3 @@
-- path: github.com/DataDog/datadog-go
-  minVersion: v0.0.0-20180330214955-e67964b4021a
-  validUntil: 2029-08-04T16:27:45+03:00
 - path: github.com/spf13/afero
   minVersion: v1.1.2
   validUntil: 2029-08-04T16:29:18+03:00
