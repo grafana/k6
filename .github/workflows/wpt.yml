@@ -8,7 +8,7 @@ defaults:
     shell: bash
 
 jobs:
-  streams:
+  test:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -30,4 +30,4 @@ jobs:
           set -x
           cd js/modules/k6/webcrypto/tests
           sh checkout.sh
-          go test ../... -tags=wpt
+          go test ./... -tags=wpt

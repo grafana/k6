@@ -51,19 +51,21 @@ func TestExamplesInputOutput(t *testing.T) {
 		"level=error", // no error messages
 	}
 
+	const examplesDir = "../../../../examples/webcrypto"
+
 	// List of the directories containing the examples
 	// that we should run and check that they produce the expected output
 	// and not the unexpected one
 	// it could be a file (ending with .js) or a directory
 	examples := []string{
-		"../../../../examples/webcrypto/digest.js",
-		"../../../../examples/webcrypto/getRandomValues.js",
-		"../../../../examples/webcrypto/randomUUID.js",
-		"../../../../examples/webcrypto/generateKey",
-		"../../../../examples/webcrypto/derive_bits",
-		"../../../../examples/webcrypto/encrypt_decrypt",
-		"../../../../examples/webcrypto/sign_verify",
-		"../../../../examples/webcrypto/import_export",
+		examplesDir + "/digest.js",
+		examplesDir + "/getRandomValues.js",
+		examplesDir + "/randomUUID.js",
+		examplesDir + "/generateKey",
+		examplesDir + "/derive_bits",
+		examplesDir + "/encrypt_decrypt",
+		examplesDir + "/sign_verify",
+		examplesDir + "/import_export",
 	}
 
 	for _, path := range examples {
