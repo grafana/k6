@@ -1,0 +1,192 @@
+diff --git a/.github/workflows/tc39.yml b/.github/workflows/tc39.yml
+index bd223f97a..e82421110 100644
+--- a/.github/workflows/tc39.yml
++++ b/.github/workflows/tc39.yml
+@@ -27,6 +27,6 @@ jobs:
+       - name: Run tests
+         run: |
+           set -x
+-          cd js/tc39
++          cd internal/js/tc39
+           sh checkout.sh
+           go test -timeout 1h
+diff --git a/.github/workflows/wpt.yml b/.github/workflows/wpt.yml
+index 1cd84215e..e2f14adbd 100644
+--- a/.github/workflows/wpt.yml
++++ b/.github/workflows/wpt.yml
+@@ -21,6 +21,6 @@ jobs:
+       - name: Run tests
+         run: |
+           set -x
+-          cd js/modules/k6/experimental/streams/tests
++          cd internal/js/modules/k6/experimental/streams/tests
+           sh checkout.sh
+           go test ../... -tags=wpt
+diff --git a/.gitignore b/.gitignore
+index 3a37d8837..bdce1071f 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -2,8 +2,8 @@
+ /k6.exe
+ /dist
+ /pkg-build
+-/js/tc39/TestTC39
+-/js/modules/k6/experimental/streams/tests/wpt
++/internal/js/tc39/TestTC39
++/internal/js/modules/k6/experimental/streams/tests/wpt
+
+ .vscode
+ *.sublime-workspace
+diff --git a/cmd/execute.go b/cmd/execute.go
+new file mode 100644
+index 000000000..e84f839ba
+--- /dev/null
++++ b/cmd/execute.go
+@@ -0,0 +1,10 @@
++// Package cmd is here to provide a way for xk6 to build a binary with added extensions
++package cmd
++
++import "go.k6.io/k6/internal/cmd"
++
++// Execute exectues the k6 command
++// It only is exported here for backwards compatibility and the ability to use xk6 to build extended k6
++func Execute() {
++	cmd.Execute()
++}
+diff --git a/cmd/tests/global_state.go b/cmd/tests/global_state.go
+new file mode 100644
+index 000000000..2b06bbf11
+--- /dev/null
++++ b/cmd/tests/global_state.go
+@@ -0,0 +1,17 @@
++// Package tests contains types needed for running integration tests that run k6 commands.
++package tests
++
++import (
++	"testing"
++
++	"go.k6.io/k6/internal/cmd/tests"
++)
++
++// GlobalTestState is a wrapper around GlobalState for use in tests.
++type GlobalTestState = tests.GlobalTestState
++
++// NewGlobalTestState returns an initialized GlobalTestState, mocking all
++// GlobalState fields for use in tests.
++func NewGlobalTestState(tb testing.TB) *GlobalTestState {
++	return tests.NewGlobalTestState(tb)
++}
+diff --git a/internal/cmd/tests/cmd_run_grpc_test.go b/internal/cmd/tests/cmd_run_grpc_test.go
+index 6783f4e11..a7399db44 100644
+--- a/internal/cmd/tests/cmd_run_grpc_test.go
++++ b/internal/cmd/tests/cmd_run_grpc_test.go
+@@ -12,7 +12,7 @@ import (
+ 	"github.com/stretchr/testify/require"
+ )
+
+-const projectRootPath = "../../"
++const projectRootPath = "../../../"
+
+ // TestGRPCInputOutput runs same k6's scripts that we have in example folder
+ // it check that output contains/not contains cetane things
+@@ -90,7 +90,7 @@ func TestGRPCInputOutput(t *testing.T) {
+
+ 	// Read the proto file from the testutils package
+ 	// it's same that we use in the examples
+-	proto, err := os.ReadFile(projectRootPath + "lib/testutils/grpcservice/route_guide.proto") //nolint:forbidigo
++	proto, err := os.ReadFile(projectRootPath + "internal/lib/testutils/grpcservice/route_guide.proto") //nolint:forbidigo
+ 	require.NoError(t, err)
+
+ 	for name, test := range tc {
+diff --git a/internal/js/eventloop/eventloop_test.go b/internal/js/eventloop/eventloop_test.go
+index 459960d7e..ed4f87877 100644
+--- a/internal/js/eventloop/eventloop_test.go
++++ b/internal/js/eventloop/eventloop_test.go
+@@ -199,7 +199,7 @@ func TestEventLoopRejectGoError(t *testing.T) {
+ 		return err
+ 	})
+ 	loop.WaitOnRegistered()
+-	require.EqualError(t, err, "Uncaught (in promise) GoError: some error\n\tat go.k6.io/k6/js/eventloop_test.TestEventLoopRejectGoError.func1 (native)\n\tat <eval>:1:31(2)\n")
++	require.EqualError(t, err, "Uncaught (in promise) GoError: some error\n\tat go.k6.io/k6/internal/js/eventloop_test.TestEventLoopRejectGoError.func1 (native)\n\tat <eval>:1:31(2)\n")
+ }
+
+ func TestEventLoopRejectThrow(t *testing.T) {
+@@ -216,7 +216,7 @@ func TestEventLoopRejectThrow(t *testing.T) {
+ 		return err
+ 	})
+ 	loop.WaitOnRegistered()
+-	require.EqualError(t, err, "Uncaught (in promise) GoError: throw error\n\tat go.k6.io/k6/js/eventloop_test.TestEventLoopRejectThrow.func1 (native)\n\tat <eval>:1:31(2)\n")
++	require.EqualError(t, err, "Uncaught (in promise) GoError: throw error\n\tat go.k6.io/k6/internal/js/eventloop_test.TestEventLoopRejectThrow.func1 (native)\n\tat <eval>:1:31(2)\n")
+ }
+
+ func TestEventLoopAsyncAwait(t *testing.T) {
+diff --git a/js/modules/k6/experimental/streams/tests/README.md b/internal/js/modules/k6/experimental/streams/tests/README.md
+similarity index 100%
+rename from js/modules/k6/experimental/streams/tests/README.md
+rename to internal/js/modules/k6/experimental/streams/tests/README.md
+diff --git a/js/modules/k6/experimental/streams/tests/checkout.sh b/internal/js/modules/k6/experimental/streams/tests/checkout.sh
+similarity index 100%
+rename from js/modules/k6/experimental/streams/tests/checkout.sh
+rename to internal/js/modules/k6/experimental/streams/tests/checkout.sh
+diff --git a/js/modules/k6/experimental/streams/tests/reentrant-strategies.any.js.patch b/internal/js/modules/k6/experimental/streams/tests/reentrant-strategies.any.js.patch
+similarity index 100%
+rename from js/modules/k6/experimental/streams/tests/reentrant-strategies.any.js.patch
+rename to internal/js/modules/k6/experimental/streams/tests/reentrant-strategies.any.js.patch
+diff --git a/js/modules/k6/experimental/streams/tests/rs-test-templates.js.patch b/internal/js/modules/k6/experimental/streams/tests/rs-test-templates.js.patch
+similarity index 100%
+rename from js/modules/k6/experimental/streams/tests/rs-test-templates.js.patch
+rename to internal/js/modules/k6/experimental/streams/tests/rs-test-templates.js.patch
+diff --git a/js/modules/k6/experimental/streams/tests/testharness.js.patch b/internal/js/modules/k6/experimental/streams/tests/testharness.js.patch
+similarity index 100%
+rename from js/modules/k6/experimental/streams/tests/testharness.js.patch
+rename to internal/js/modules/k6/experimental/streams/tests/testharness.js.patch
+diff --git a/js/modules/k6/experimental/websockets/autobahn_tests/README.md b/internal/js/modules/k6/experimental/websockets/autobahn_tests/README.md
+similarity index 100%
+rename from js/modules/k6/experimental/websockets/autobahn_tests/README.md
+rename to internal/js/modules/k6/experimental/websockets/autobahn_tests/README.md
+diff --git a/js/modules/k6/experimental/websockets/autobahn_tests/config/fuzzingserver.json b/internal/js/modules/k6/experimental/websockets/autobahn_tests/config/fuzzingserver.json
+similarity index 100%
+rename from js/modules/k6/experimental/websockets/autobahn_tests/config/fuzzingserver.json
+rename to internal/js/modules/k6/experimental/websockets/autobahn_tests/config/fuzzingserver.json
+diff --git a/js/modules/k6/experimental/websockets/autobahn_tests/reports/.gitkeep b/internal/js/modules/k6/experimental/websockets/autobahn_tests/reports/.gitkeep
+similarity index 100%
+rename from js/modules/k6/experimental/websockets/autobahn_tests/reports/.gitkeep
+rename to internal/js/modules/k6/experimental/websockets/autobahn_tests/reports/.gitkeep
+diff --git a/js/modules/k6/experimental/websockets/autobahn_tests/script.js b/internal/js/modules/k6/experimental/websockets/autobahn_tests/script.js
+similarity index 100%
+rename from js/modules/k6/experimental/websockets/autobahn_tests/script.js
+rename to internal/js/modules/k6/experimental/websockets/autobahn_tests/script.js
+diff --git a/lib/testutils/httpmultibin/nested_types/nested_types.proto b/internal/lib/testutils/httpmultibin/nested_types/nested_types.proto
+similarity index 100%
+rename from lib/testutils/httpmultibin/nested_types/nested_types.proto
+rename to internal/lib/testutils/httpmultibin/nested_types/nested_types.proto
+diff --git a/output/cloud/expv2/integration/testdata/metricset.json b/internal/output/cloud/expv2/integration/testdata/metricset.json
+similarity index 100%
+rename from output/cloud/expv2/integration/testdata/metricset.json
+rename to internal/output/cloud/expv2/integration/testdata/metricset.json
+diff --git a/js/modules/require_impl.go b/js/modules/require_impl.go
+index 5d10dd515..71098ec37 100644
+--- a/js/modules/require_impl.go
++++ b/js/modules/require_impl.go
+@@ -202,7 +202,7 @@ func getPreviousRequiringFile(vu VU) (string, error) {
+
+ 	for i, frame := range frames[1:] { // first one should be the current require
+ 		// TODO have this precalculated automatically
+-		if frame.FuncName() == "go.k6.io/k6/js.(*requireImpl).require-fm" {
++		if frame.FuncName() == "go.k6.io/k6/internal/js.(*requireImpl).require-fm" {
+ 			// we need to get the one *before* but as we skip the first one the index matches ;)
+ 			result := frames[i].SrcName()
+ 			if result == "file:///-" {
+diff --git a/main.go b/main.go
+index d2b2a33f8..84212739b 100644
+--- a/main.go
++++ b/main.go
+@@ -2,7 +2,7 @@
+ package main
+
+ import (
+-	"go.k6.io/k6/internal/cmd"
++	"go.k6.io/k6/cmd"
+ )
+
+ func main() {
