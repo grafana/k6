@@ -18,7 +18,6 @@ require (
 	github.com/grafana/xk6-output-opentelemetry v0.3.0
 	github.com/grafana/xk6-output-prometheus-remote v0.5.0
 	github.com/grafana/xk6-redis v0.3.1
-	github.com/grafana/xk6-webcrypto v0.5.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
 	github.com/jhump/protoreflect v1.17.0
@@ -72,7 +71,7 @@ require (
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/pprof v0.0.0-20230728192033-2ba5b33183c6 // indirect
-	github.com/google/uuid v1.6.0 // indirect
+	github.com/google/uuid v1.6.0
 	github.com/grafana/sobek v0.0.0-20241024150027-d91f02b05e9b
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.22.0 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect

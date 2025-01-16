@@ -95,8 +95,6 @@ github.com/grafana/xk6-output-prometheus-remote v0.5.0 h1:vRCj0a4sxKRP5IVWqZuMaE
 github.com/grafana/xk6-output-prometheus-remote v0.5.0/go.mod h1:esXXthLoVp9JUdGkECRthESVYu0TQTR24wrx2nRM9ak=
 github.com/grafana/xk6-redis v0.3.1 h1:RqfmMLNx7vekBxwuTrFP9ErxeY/0H07a3HpQJYXYDjc=
 github.com/grafana/xk6-redis v0.3.1/go.mod h1:3e/U9i1Nm3WEaMy4nZSGMjVf8ZsFau+aXurYJhJ7MfQ=
-github.com/grafana/xk6-webcrypto v0.5.0 h1:a5NMG/4itLDWprn5XbGaARwUdGPy9wO9z35Z7bDjG1k=
-github.com/grafana/xk6-webcrypto v0.5.0/go.mod h1:yZMp9ZjcxLZML2ljcK6CxTI+XTP59vivtKszaH5xIE4=
 github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 h1:UH//fgunKIs4JdUbpDl1VZCDaL56wXCB/5+wF6uHfaI=
 github.com/grpc-ecosystem/go-grpc-middleware v1.4.0/go.mod h1:g5qyo/la0ALbONm6Vbp88Yd8NsDy6rZz+RcrMPxvld8=
 github.com/grpc-ecosystem/grpc-gateway/v2 v2.22.0 h1:asbCHRVmodnJTuQ3qamDwqVOIjwqUPTYmYuemVOx+Ys=

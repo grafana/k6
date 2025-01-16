@@ -6,11 +6,11 @@ import (
 	"testing"
 
 	"go.k6.io/k6/js/compiler"
-
-	"github.com/grafana/xk6-webcrypto/webcrypto"
-	"github.com/stretchr/testify/require"
 	k6encoding "go.k6.io/k6/js/modules/k6/encoding"
+	"go.k6.io/k6/js/modules/k6/webcrypto"
 	"go.k6.io/k6/js/modulestest"
+
+	"github.com/stretchr/testify/require"
 )
 
 const initGlobals = `

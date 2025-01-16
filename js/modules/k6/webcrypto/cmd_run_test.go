@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	_ "github.com/grafana/xk6-webcrypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/cmd"
