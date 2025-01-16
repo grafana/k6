@@ -56,14 +56,14 @@ func TestExamplesInputOutput(t *testing.T) {
 	// and not the unexpected one
 	// it could be a file (ending with .js) or a directory
 	examples := []string{
-		"../examples/digest.js",
-		"../examples/getRandomValues.js",
-		"../examples/randomUUID.js",
-		"../examples/generateKey",
-		"../examples/derive_bits",
-		"../examples/encrypt_decrypt",
-		"../examples/sign_verify",
-		"../examples/import_export",
+		"../../../../examples/webcrypto/digest.js",
+		"../../../../examples/webcrypto/getRandomValues.js",
+		"../../../../examples/webcrypto/randomUUID.js",
+		"../../../../examples/webcrypto/generateKey",
+		"../../../../examples/webcrypto/derive_bits",
+		"../../../../examples/webcrypto/encrypt_decrypt",
+		"../../../../examples/webcrypto/sign_verify",
+		"../../../../examples/webcrypto/import_export",
 	}
 
 	for _, path := range examples {
