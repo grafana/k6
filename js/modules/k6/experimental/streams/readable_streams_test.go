@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"go.k6.io/k6/js/modules"
-	"go.k6.io/k6/js/modules/k6/timers"
 	"go.k6.io/k6/js/modulestest"
 
 	"github.com/stretchr/testify/assert"
@@ -45,14 +44,11 @@ func TestReadableStream(t *testing.T) {
 func newConfiguredRuntime(t testing.TB) *modulestest.Runtime {
 	rt := modulestest.NewRuntime(t)
 
+	require.NoError(t, rt.SetupModuleSystem(nil, nil, nil))
+
 	// We want to make the [self] available for Web Platform Tests, as it is used in test harness.
 	_, err := rt.VU.Runtime().RunString("var self = this;")
 	require.NoError(t, err)
-
-	// We also want to make [timers.Timers] available for Web Platform Tests.
-	for k, v := range timers.New().NewModuleInstance(rt.VU).Exports().Named {
-		require.NoError(t, rt.VU.RuntimeField.Set(k, v))
-	}
 
 	// We also want the streams module exports to be globally available.
 	m := new(RootModule).NewModuleInstance(rt.VU)
