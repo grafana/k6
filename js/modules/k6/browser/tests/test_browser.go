@@ -184,7 +184,7 @@ func (b *testBrowser) withFileServer() *testBrowser {
 
 	fs := http.FileServer(http.Dir(testBrowserStaticDir))
 
-	return b.withHandler(path, http.StripPrefix(path, fs).ServeHTTP)
+	return b.withHandler("/"+testBrowserStaticDir+"/", http.StripPrefix(path, fs).ServeHTTP)
 }
 
 // withHandler adds the given handler to the HTTP test server and makes it
