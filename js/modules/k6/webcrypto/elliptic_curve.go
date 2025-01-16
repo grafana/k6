@@ -224,7 +224,7 @@ func importECDSAPublicKey(curve EllipticCurveKind, keyData []byte) (any, CryptoK
 		return nil, UnknownCryptoKeyType, NewError(NotSupportedError, "invalid elliptic curve "+string(curve))
 	}
 
-	x, y := elliptic.Unmarshal(c, keyData)
+	x, y := elliptic.Unmarshal(c, keyData) //nolint:staticcheck // we need to use the Unmarshal function
 	if x == nil {
 		return nil, UnknownCryptoKeyType, NewError(DataError, "unable to import ECDSA public key data")
 	}
@@ -479,7 +479,7 @@ func extractPublicKeyBytes(alg string, handle any) ([]byte, error) {
 			return nil, NewError(OperationError, "key data isn't a valid elliptic curve public key")
 		}
 
-		return elliptic.Marshal(k.Curve, k.X, k.Y), nil
+		return elliptic.Marshal(k.Curve, k.X, k.Y), nil //nolint:staticcheck // we need to use the Marshal function
 	}
 
 	return nil, errors.New("unsupported algorithm " + alg)
@@ -632,7 +632,7 @@ func convertPublicECDHtoECDSA(k *ecdh.PublicKey) (*ecdsa.PublicKey, error) {
 		return nil, errors.New("curve not supported for converting to ECDSA key")
 	}
 
-	x, y := elliptic.Unmarshal(crv, k.Bytes())
+	x, y := elliptic.Unmarshal(crv, k.Bytes()) //nolint:staticcheck // we need to use the Unmarshal function
 	if x == nil {
 		return nil, fmt.Errorf("unable to convert ECDH public key to ECDSA public key, curve: %s", crv.Params().Name)
 	}
