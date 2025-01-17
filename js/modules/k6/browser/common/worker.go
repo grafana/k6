@@ -12,8 +12,6 @@ import (
 )
 
 type Worker struct {
-	BaseEventEmitter
-
 	ctx     context.Context
 	session session
 
@@ -24,21 +22,16 @@ type Worker struct {
 // NewWorker creates a new page viewport.
 func NewWorker(ctx context.Context, s session, id target.ID, url string) (*Worker, error) {
 	w := Worker{
-		BaseEventEmitter: NewBaseEventEmitter(ctx),
-		ctx:              ctx,
-		session:          s,
-		targetID:         id,
-		url:              url,
+		ctx:      ctx,
+		session:  s,
+		targetID: id,
+		url:      url,
 	}
 	if err := w.initEvents(); err != nil {
 		return nil, err
 	}
 
 	return &w, nil
-}
-
-func (w *Worker) didClose() {
-	w.emit(EventWorkerClose, w)
 }
 
 func (w *Worker) initEvents() error {
