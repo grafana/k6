@@ -426,7 +426,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		backgroundProcesses.Add(1)
 		go func() {
 			defer backgroundProcesses.Done()
-			reportCtx, reportCancel := context.WithTimeout(globalCtx, 60*time.Second)
+			reportCtx, reportCancel := context.WithTimeout(globalCtx, 3*time.Second)
 			defer reportCancel()
 			logger.Debug("Sending usage report...")
 

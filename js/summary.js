@@ -1,12 +1,12 @@
 /**
  * This file contains code used to generate a textual summary of tests results, as displayed
- * in the user's terminal at the end of a k6 test run, also know as "end of test summary".
+ * in the user's terminal at the end of a k6 test run, also known as "end of test summary".
  *
  * The main entry point is the `generateTextSummary` function, which takes the test data as well as a report
  * object containing results for checks, metrics, thresholds, groups, and scenarios, and returns a formatted
  * string summarizing the test results, ready to be written to the terminal.
  *
- * For convinience, the file also exports the `humanizeValue` function.
+ * For convenience, the file also exports the `humanizeValue` function.
  */
 exports.humanizeValue = humanizeValue;
 exports.textSummary = generateTextSummary;
@@ -14,14 +14,12 @@ exports.textSummary = generateTextSummary;
 /**
  * Generates a textual summary of test results, including checks, metrics, thresholds, groups, and scenarios.
  *
- * @param {Object} data - The data input for the summary (includes options, metrics, etc.).
+ * @param {Report} report - The report object containing thresholds, checks, metrics, groups, and scenarios.
  * @param {Object} options - Additional options that override defaults.
- * @param {Object} report - The report object containing thresholds, checks, metrics, groups, and scenarios.
  * @returns {string} A formatted summary of the test results.
  */
-//FIXME (@oleiade): because options is... optional, it should, if possible, be the last argument here.
-function generateTextSummary(data, options, report) {
-	const mergedOpts = Object.assign({}, defaultOptions, data.options, options);
+function generateTextSummary(report, options) {
+	const mergedOpts = Object.assign({}, defaultOptions, options);
 
 	// Create a render context holding information such as indentation level to apply
 	const context = new RenderContext(0);
@@ -35,7 +33,7 @@ function generateTextSummary(data, options, report) {
 		mergedOpts,
 	);
 
-	return reportGenerator.generate(data, report);
+	return reportGenerator.generate(report);
 }
 
 /**
@@ -1111,6 +1109,7 @@ const subtitlePrefix = '↳';
 const successMark = '✓';
 const failMark = '✗';
 const defaultOptions = {
+	indent: ' ',
 	enableColors: true, // FIXME (@oleiade): we should ensure we respect this flag
 	summaryTimeUnit: null,
 	summaryTrendStats: null,

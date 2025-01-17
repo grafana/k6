@@ -350,12 +350,10 @@ func (r *Runner) IsExecutable(name string) bool {
 
 // HandleSummary calls the specified summary callback, if supplied.
 func (r *Runner) HandleSummary(ctx context.Context, summary *lib.Summary, report lib.Report) (map[string]io.Reader, error) {
-	summaryDataForJS := summarizeMetricsToObject(summary, r.Bundle.Options, r.setupData)
-
 	out := make(chan metrics.SampleContainer, 100)
 	defer close(out)
 
-	go func() {         // discard all metrics
+	go func() { // discard all metrics
 		for range out { //nolint:revive
 		}
 	}()
@@ -381,6 +379,8 @@ func (r *Runner) HandleSummary(ctx context.Context, summary *lib.Summary, report
 			return nil, fmt.Errorf("exported identifier %s must be a function", consts.HandleSummaryFn)
 		}
 
+		// TODO: Do we want to keep it compatible with the old format? Or do we want to break it?
+		summaryDataForJS := summarizeMetricsToObject(summary, r.Bundle.Options, r.setupData)
 		callbackResult, _, _, err = vu.runFn(summaryCtx, false, handleSummaryFn, nil, vu.Runtime.ToValue(summaryDataForJS))
 		if err != nil {
 			errText, fields := errext.Format(err)
@@ -398,11 +398,19 @@ func (r *Runner) HandleSummary(ctx context.Context, summary *lib.Summary, report
 		return nil, fmt.Errorf("unexpected error did not get a callable summary wrapper")
 	}
 
+	options := map[string]interface{}{
+		// TODO: improve when we can easily export all option values, including defaults?
+		"summaryTrendStats": r.Bundle.Options.SummaryTrendStats,
+		"summaryTimeUnit":   r.Bundle.Options.SummaryTimeUnit.String,
+		"noColor":           summary.NoColor, // TODO: move to the (runtime) options
+		"enableColors":      !summary.NoColor && summary.UIState.IsStdOutTTY,
+	}
+
 	wrapperArgs := []sobek.Value{
 		callbackResult,
 		vu.Runtime.ToValue(r.Bundle.preInitState.RuntimeOptions.SummaryExport.String),
-		vu.Runtime.ToValue(summaryDataForJS),
 		vu.Runtime.ToValue(report),
+		vu.Runtime.ToValue(options),
 	}
 	rawResult, _, _, err := vu.runFn(summaryCtx, false, handleSummaryWrapper, nil, wrapperArgs...)
 
