@@ -546,10 +546,7 @@ func (p *Page) consoleMsgFromConsoleEvent(e *runtime.EventConsoleAPICalled) (*Co
 func (p *Page) closeWorker(sessionID target.SessionID) {
 	p.logger.Debugf("Page:closeWorker", "sid:%v", sessionID)
 
-	if worker, ok := p.workers[sessionID]; ok {
-		worker.didClose()
-		delete(p.workers, sessionID)
-	}
+	delete(p.workers, sessionID)
 }
 
 func (p *Page) defaultTimeout() time.Duration {
