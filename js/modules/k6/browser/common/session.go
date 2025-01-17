@@ -68,8 +68,6 @@ func (s *Session) close() {
 	// Stop the read loop
 	close(s.done)
 	s.closed = true
-
-	s.emit(EventSessionClosed, nil)
 }
 
 func (s *Session) markAsCrashed() {
