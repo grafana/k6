@@ -23,7 +23,7 @@ require (
 	github.com/jhump/protoreflect v1.17.0
 	github.com/klauspost/compress v1.17.11
 	github.com/mailru/easyjson v0.9.0
-	github.com/mattn/go-colorable v0.1.13
+	github.com/mattn/go-colorable v0.1.14
 	github.com/mattn/go-isatty v0.0.20
 	github.com/mccutchen/go-httpbin v1.1.2-0.20190116014521-c5cb2f4802fa
 	github.com/mstoykov/atlas v0.0.0-20220811071828-388f114305dd
