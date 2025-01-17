@@ -186,8 +186,6 @@ type PageOnHandler func(PageOnEvent) error
 
 // Page stores Page/tab related context.
 type Page struct {
-	BaseEventEmitter
-
 	Keyboard    *Keyboard
 	Mouse       *Mouse
 	Touchscreen *Touchscreen
@@ -246,7 +244,6 @@ func NewPage(
 	logger *log.Logger,
 ) (*Page, error) {
 	p := Page{
-		BaseEventEmitter: NewBaseEventEmitter(ctx),
 		ctx:              ctx,
 		session:          s,
 		browserCtx:       bctx,
@@ -561,14 +558,6 @@ func (p *Page) didClose() {
 		p.closed = true
 	}
 	p.closedMu.Unlock()
-
-	p.emit(EventPageClose, p)
-}
-
-func (p *Page) didCrash() {
-	p.logger.Debugf("Page:didCrash", "sid:%v", p.sessionID())
-
-	p.emit(EventPageCrash, p)
 }
 
 func (p *Page) evaluateOnNewDocument(source string) error {

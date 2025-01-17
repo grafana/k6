@@ -661,7 +661,7 @@ func (fs *FrameSession) onConsoleAPICalled(event *cdpruntime.EventConsoleAPICall
 }
 
 func (fs *FrameSession) onExceptionThrown(event *cdpruntime.EventExceptionThrown) {
-	fs.page.emit(EventPageError, event.ExceptionDetails)
+	// TODO: Test and handle this
 }
 
 func (fs *FrameSession) onExecutionContextCreated(event *cdpruntime.EventExecutionContextCreated) {
@@ -1061,7 +1061,6 @@ func (fs *FrameSession) onTargetCrashed() {
 		k6ext.Panic(fs.ctx, "unexpected type %T", fs.session)
 	}
 	s.markAsCrashed()
-	fs.page.didCrash()
 }
 
 func (fs *FrameSession) updateEmulateMedia() error {
