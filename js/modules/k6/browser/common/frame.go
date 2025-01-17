@@ -314,7 +314,6 @@ func (f *Frame) navigated(name string, url string, loaderID string) {
 	f.name = name
 	f.url = url
 	f.loaderID = loaderID
-	f.page.emit(EventPageFrameNavigated, f)
 }
 
 func (f *Frame) nullContext(execCtxID runtime.ExecutionContextID) {

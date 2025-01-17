@@ -157,8 +157,6 @@ func (m *FrameManager) frameAttached(frameID cdp.FrameID, parentFrameID cdp.Fram
 
 		m.logger.Debugf("FrameManager:frameAttached:emit:EventPageFrameAttached",
 			"fmid:%d fid:%v pfid:%v", m.ID(), frameID, parentFrameID)
-
-		m.page.emit(EventPageFrameAttached, frame)
 	}
 }
 
@@ -476,8 +474,6 @@ func (m *FrameManager) removeFramesRecursively(frame *Frame) error {
 		m.logger.Debugf("FrameManager:removeFramesRecursively:emit:EventPageFrameDetached",
 			"fmid:%d fid:%v fname:%s furl:%s",
 			m.ID(), frame.ID(), frame.Name(), frame.URL())
-
-		m.page.emit(EventPageFrameDetached, frame)
 	}
 
 	return nil
@@ -485,8 +481,6 @@ func (m *FrameManager) removeFramesRecursively(frame *Frame) error {
 
 func (m *FrameManager) requestFailed(req *Request, canceled bool) {
 	m.logger.Debugf("FrameManager:requestFailed", "fmid:%d rurl:%s", m.ID(), req.URL())
-
-	defer m.page.emit(EventPageRequestFailed, req)
 
 	frame := req.getFrame()
 	if frame == nil {
@@ -517,8 +511,6 @@ func (m *FrameManager) requestFinished(req *Request) {
 	m.logger.Debugf("FrameManager:requestFinished", "fmid:%d rurl:%s",
 		m.ID(), req.URL())
 
-	defer m.page.emit(EventPageRequestFinished, req)
-
 	frame := req.getFrame()
 	if frame == nil {
 		m.logger.Debugf("FrameManager:requestFinished:return",
@@ -537,8 +529,6 @@ func (m *FrameManager) requestFinished(req *Request) {
 
 func (m *FrameManager) requestReceivedResponse(res *Response) {
 	m.logger.Debugf("FrameManager:requestReceivedResponse", "fmid:%d rurl:%s", m.ID(), res.URL())
-
-	m.page.emit(EventPageResponse, res)
 }
 
 func (m *FrameManager) requestStarted(req *Request) {
@@ -546,7 +536,6 @@ func (m *FrameManager) requestStarted(req *Request) {
 
 	m.framesMu.Lock()
 	defer m.framesMu.Unlock()
-	defer m.page.emit(EventPageRequest, req)
 
 	frame := req.getFrame()
 	if frame == nil {
