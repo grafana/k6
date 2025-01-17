@@ -10,8 +10,6 @@ import (
 
 // Touchscreen represents a touchscreen.
 type Touchscreen struct {
-	BaseEventEmitter
-
 	ctx      context.Context
 	session  session
 	keyboard *Keyboard
