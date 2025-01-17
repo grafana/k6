@@ -1,4 +1,4 @@
-# easyjson [![Build Status](https://travis-ci.org/mailru/easyjson.svg?branch=master)](https://travis-ci.org/mailru/easyjson) [![Go Report Card](https://goreportcard.com/badge/github.com/mailru/easyjson)](https://goreportcard.com/report/github.com/mailru/easyjson)
+# easyjson [![Build Status](https://github.com/mailru/easyjson/actions/workflows/easyjson.yml/badge.svg)](https://github.com/mailru/easyjson/actions/workflows/easyjson.yml) [![Go Report Card](https://goreportcard.com/badge/github.com/mailru/easyjson)](https://goreportcard.com/report/github.com/mailru/easyjson)
 
 Package easyjson provides a fast and easy way to marshal/unmarshal Go structs
 to/from JSON without the use of reflection. In performance tests, easyjson
@@ -12,11 +12,18 @@ standard `encoding/json` package, such as generating "snake_case" names or
 enabling `omitempty` behavior by default.
 
 ## Usage
+### Install: 
 ```sh
-# install
+# for Go < 1.17
 go get -u github.com/mailru/easyjson/...
-
-# run
+```
+#### or
+```sh
+# for Go >= 1.17
+go get github.com/mailru/easyjson && go install github.com/mailru/easyjson/...@latest
+```
+### Run:
+```sh
 easyjson -all <file>.go
 ```
 
@@ -28,6 +35,20 @@ environment variable to be set. This is because easyjson code generation
 invokes `go run` on a temporary file (an approach to code generation borrowed
 from [ffjson](https://github.com/pquerna/ffjson)).
 
+### Serialize
+```go
+someStruct := &SomeStruct{Field1: "val1", Field2: "val2"}
+rawBytes, err := easyjson.Marshal(someStruct)
+```
+
+### Deserialize
+```go
+someStruct := &SomeStruct{}
+err := easyjson.Unmarshal(rawBytes, someStruct)
+```
+
+Please see the [GoDoc](https://godoc.org/github.com/mailru/easyjson)
+for more information and features.
 ## Options
 ```txt
 Usage of easyjson:
@@ -96,7 +117,7 @@ Additional option notes:
 
 ## Structure json tag options
 
-Besides standart json tag options like 'omitempty' the following are supported:
+Besides standard json tag options like 'omitempty' the following are supported:
 
 * 'nocopy' - disables allocation and copying of string values, making them
   refer to original json buffer memory. This works great for short lived
