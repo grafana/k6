@@ -2,7 +2,7 @@ module go.k6.io/k6
 
 go 1.22
 
-toolchain go1.23.2
+toolchain go1.22.10
 
 require (
 	github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358
