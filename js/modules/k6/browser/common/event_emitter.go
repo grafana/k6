@@ -22,34 +22,6 @@ const (
 
 	EventFrameNavigation   string = "navigation"
 	EventFrameAddLifecycle string = "addlifecycle"
-
-	// Page
-
-	EventPageClose           string = "close"
-	EventPageConsole         string = "console"
-	EventPageCrash           string = "crash"
-	EventPageDialog          string = "dialog"
-	EventPageDownload        string = "download"
-	EventPageFilechooser     string = "filechooser"
-	EventPageFrameAttached   string = "frameattached"
-	EventPageFrameDetached   string = "framedetached"
-	EventPageFrameNavigated  string = "framenavigated"
-	EventPageError           string = "pageerror"
-	EventPagePopup           string = "popup"
-	EventPageRequest         string = "request"
-	EventPageRequestFailed   string = "requestfailed"
-	EventPageRequestFinished string = "requestfinished"
-	EventPageResponse        string = "response"
-	EventPageWebSocket       string = "websocket"
-	EventPageWorker          string = "worker"
-
-	// Session
-
-	EventSessionClosed string = "close"
-
-	// Worker
-
-	EventWorkerClose string = "close"
 )
 
 // Event as emitted by an EventEmiter.
