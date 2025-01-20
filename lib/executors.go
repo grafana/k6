@@ -11,8 +11,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"go.k6.io/k6/internal/ui/pb"
 	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/ui/pb"
 )
 
 // TODO: remove globals and use some type of explicit dependency injection?

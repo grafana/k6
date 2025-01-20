@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"github.com/mstoykov/atlas"
+	"go.k6.io/k6/internal/output/cloud/expv2/pbcloud"
 	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/output/cloud/expv2/pbcloud"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 

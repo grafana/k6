@@ -8,7 +8,7 @@ import (
 
 	"github.com/grafana/sobek"
 
-	"go.k6.io/k6/loader"
+	"go.k6.io/k6/internal/loader"
 )
 
 // Require is the actual call that implements require
@@ -202,7 +202,7 @@ func getPreviousRequiringFile(vu VU) (string, error) {
 
 	for i, frame := range frames[1:] { // first one should be the current require
 		// TODO have this precalculated automatically
-		if frame.FuncName() == "go.k6.io/k6/js.(*requireImpl).require-fm" {
+		if frame.FuncName() == "go.k6.io/k6/internal/js.(*requireImpl).require-fm" {
 			// we need to get the one *before* but as we skip the first one the index matches ;)
 			result := frames[i].SrcName()
 			if result == "file:///-" {

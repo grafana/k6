@@ -5,7 +5,7 @@ import (
 	"math/bits"
 	"sort"
 
-	"go.k6.io/k6/output/cloud/expv2/pbcloud"
+	"go.k6.io/k6/internal/output/cloud/expv2/pbcloud"
 )
 
 const (

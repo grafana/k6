@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/cloudapi"
-	"go.k6.io/k6/output/cloud/expv2/pbcloud"
+	"go.k6.io/k6/internal/output/cloud/expv2/pbcloud"
 )
 
 func TestMetricsClientPush(t *testing.T) {

@@ -20,8 +20,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/lib/testutils"
-	"go.k6.io/k6/lib/testutils/httpmultibin"
+	"go.k6.io/k6/internal/lib/testutils"
+	"go.k6.io/k6/internal/lib/testutils/httpmultibin"
 )
 
 func TestMsgParsing(t *testing.T) {

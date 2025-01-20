@@ -12,13 +12,13 @@ import (
 	"time"
 
 	"go.k6.io/k6/cloudapi"
-	"go.k6.io/k6/cloudapi/insights"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
+	"go.k6.io/k6/internal/cloudapi/insights"
+	insightsOutput "go.k6.io/k6/internal/output/cloud/insights"
 	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
-	insightsOutput "go.k6.io/k6/output/cloud/insights"
 
 	"github.com/sirupsen/logrus"
 )

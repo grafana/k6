@@ -7,15 +7,15 @@ import (
 	"testing"
 
 	"github.com/grafana/sobek"
+	"go.k6.io/k6/internal/js/compiler"
+	"go.k6.io/k6/internal/js/eventloop"
+	"go.k6.io/k6/internal/js/modules/k6/timers"
+	"go.k6.io/k6/internal/lib/testutils"
+	"go.k6.io/k6/internal/usage"
 	"go.k6.io/k6/js/common"
-	"go.k6.io/k6/js/compiler"
-	"go.k6.io/k6/js/eventloop"
 	"go.k6.io/k6/js/modules"
-	"go.k6.io/k6/js/modules/k6/timers"
 	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/usage"
 )
 
 // Runtime is a helper struct that contains what is needed to run a (simple) module test
