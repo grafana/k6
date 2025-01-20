@@ -30,6 +30,7 @@ import (
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/metrics/engine"
 	"go.k6.io/k6/output"
+	"go.k6.io/k6/output/summary"
 	"go.k6.io/k6/ui/pb"
 )
 
@@ -190,9 +191,25 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 
 	executionState := execScheduler.GetState()
 	if !testRunState.RuntimeOptions.NoSummary.Bool {
+		// Instantiates the summary output
+		summaryOutput, err := summary.New(output.Params{
+			Logger: c.gs.Logger,
+		})
+		if err == nil {
+			isSummaryExtended := testRunState.RuntimeOptions.SummaryExtended
+			if isSummaryExtended.Valid && isSummaryExtended.Bool {
+				summaryOutput.EnableExtendedMode()
+			}
+		} else {
+			logger.WithError(err).Error("failed to initialize the end-of-test summary output")
+		}
+		outputs = append(outputs, summaryOutput)
+
+		// At the end of the test run
 		defer func() {
 			logger.Debug("Generating the end-of-test summary...")
-			summaryResult, hsErr := test.initRunner.HandleSummary(globalCtx, &lib.Summary{
+
+			testSummary := &lib.Summary{
 				Metrics:         metricsEngine.ObservedMetrics,
 				RootGroup:       testRunState.GroupSummary.Group(),
 				TestRunDuration: executionState.GetCurrentTestRunDuration(),
@@ -201,7 +218,11 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 					IsStdOutTTY: c.gs.Stdout.IsTTY,
 					IsStdErrTTY: c.gs.Stderr.IsTTY,
 				},
-			})
+			}
+
+			report := summaryOutput.MetricsReport(testSummary, test.initRunner.GetOptions())
+
+			summaryResult, hsErr := test.initRunner.HandleSummary(globalCtx, testSummary, report)
 			if hsErr == nil {
 				hsErr = handleSummaryResult(c.gs.FS, c.gs.Stdout, c.gs.Stderr, summaryResult)
 			}

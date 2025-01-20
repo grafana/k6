@@ -1,0 +1,5 @@
+# Ignore everything in this folder
+*
+
+# But the end-of-test summary file
+!summary.js

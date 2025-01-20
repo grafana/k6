@@ -1,413 +1,1324 @@
-var forEach = function (obj, callback) {
-  for (var key in obj) {
-    if (obj.hasOwnProperty(key)) {
-      if (callback(key, obj[key])) {
-        break
-      }
-    }
-  }
+/**
+ * This file contains code used to generate a textual summary of tests results, as displayed
+ * in the user's terminal at the end of a k6 test run, also known as "end of test summary".
+ *
+ * The main entry point is the `generateTextSummary` function, which takes the test data as well as a report
+ * object containing results for checks, metrics, thresholds, groups, and scenarios, and returns a formatted
+ * string summarizing the test results, ready to be written to the terminal.
+ *
+ * For convenience, the file also exports the `humanizeValue` function.
+ */
+exports.humanizeValue = humanizeValue;
+exports.textSummary = generateTextSummary;
+
+/**
+ * Generates a textual summary of test results, including checks, metrics, thresholds, groups, and scenarios.
+ *
+ * @param {Report} report - The report object containing thresholds, checks, metrics, groups, and scenarios.
+ * @param {Object} options - Additional options that override defaults.
+ * @returns {string} A formatted summary of the test results.
+ */
+function generateTextSummary(report, options) {
+	const mergedOpts = Object.assign({}, defaultOptions, options);
+
+	// Create a render context holding information such as indentation level to apply
+	const context = new RenderContext(0);
+
+	// Create a formatter with default settings (colors enabled)
+	const formatter = new ANSIFormatter();
+
+	const reportGenerator = new TestReportGenerator(
+		formatter,
+		context,
+		mergedOpts,
+	);
+
+	return reportGenerator.generate(report);
 }
 
-var palette = {
-  bold: 1,
-  faint: 2,
-  red: 31,
-  green: 32,
-  cyan: 36,
-  //TODO: add others?
-}
-
-var groupPrefix = '█'
-var detailsPrefix = '↳'
-var succMark = '✓'
-var failMark = '✗'
-var defaultOptions = {
-  indent: ' ',
-  enableColors: true,
-  summaryTimeUnit: null,
-  summaryTrendStats: null,
-}
-
-// strWidth tries to return the actual width the string will take up on the
-// screen, without any terminal formatting, unicode ligatures, etc.
-function strWidth(s) {
-  // TODO: determine if NFC or NFKD are not more appropriate? or just give up? https://hsivonen.fi/string-length/
-  var data = s.normalize('NFKC') // This used to be NFKD in Go, but this should be better
-  var inEscSeq = false
-  var inLongEscSeq = false
-  var width = 0
-  for (var char of data) {
-    if (char.done) {
-      break
-    }
-
-    // Skip over ANSI escape codes.
-    if (char == '\x1b') {
-      inEscSeq = true
-      continue
-    }
-    if (inEscSeq && char == '[') {
-      inLongEscSeq = true
-      continue
-    }
-    if (inEscSeq && inLongEscSeq && char.charCodeAt(0) >= 0x40 && char.charCodeAt(0) <= 0x7e) {
-      inEscSeq = false
-      inLongEscSeq = false
-      continue
-    }
-    if (inEscSeq && !inLongEscSeq && char.charCodeAt(0) >= 0x40 && char.charCodeAt(0) <= 0x5f) {
-      inEscSeq = false
-      continue
-    }
-
-    if (!inEscSeq && !inLongEscSeq) {
-      width++
-    }
-  }
-  return width
-}
-
-function summarizeCheck(indent, check, decorate) {
-  if (check.fails == 0) {
-    return decorate(indent + succMark + ' ' + check.name, palette.green)
-  }
-
-  var succPercent = Math.floor((100 * check.passes) / (check.passes + check.fails))
-  return decorate(
-    indent +
-    failMark +
-    ' ' +
-    check.name +
-    '\n' +
-    indent +
-    ' ' +
-    detailsPrefix +
-    '  ' +
-    succPercent +
-    '% — ' +
-    succMark +
-    ' ' +
-    check.passes +
-    ' / ' +
-    failMark +
-    ' ' +
-    check.fails,
-    palette.red
-  )
-}
-
-function summarizeGroup(indent, group, decorate) {
-  var result = []
-  if (group.name != '') {
-    result.push(indent + groupPrefix + ' ' + group.name + '\n')
-    indent = indent + '  '
-  }
-
-  for (var i = 0; i < group.checks.length; i++) {
-    result.push(summarizeCheck(indent, group.checks[i], decorate))
-  }
-  if (group.checks.length > 0) {
-    result.push('')
-  }
-  for (var i = 0; i < group.groups.length; i++) {
-    Array.prototype.push.apply(result, summarizeGroup(indent, group.groups[i], decorate))
-  }
-
-  return result
-}
-
-function displayNameForMetric(name) {
-  var subMetricPos = name.indexOf('{')
-  if (subMetricPos >= 0) {
-    return '{ ' + name.substring(subMetricPos + 1, name.length - 1) + ' }'
-  }
-  return name
-}
-
-function indentForMetric(name) {
-  if (name.indexOf('{') >= 0) {
-    return '  '
-  }
-  return ''
-}
-
-function humanizeBytes(bytes) {
-  var units = ['B', 'kB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']
-  var base = 1000
-  if (bytes < 10) {
-    return bytes + ' B'
-  }
-
-  var e = Math.floor(Math.log(bytes) / Math.log(base))
-  var suffix = units[e | 0]
-  var val = Math.floor((bytes / Math.pow(base, e)) * 10 + 0.5) / 10
-  return val.toFixed(val < 10 ? 1 : 0) + ' ' + suffix
-}
-
-var unitMap = {
-  s: { unit: 's', coef: 0.001 },
-  ms: { unit: 'ms', coef: 1 },
-  us: { unit: 'µs', coef: 1000 },
-}
-
-function toFixedNoTrailingZeros(val, prec) {
-  // TODO: figure out something better?
-  return parseFloat(val.toFixed(prec)).toString()
-}
-
-function toFixedNoTrailingZerosTrunc(val, prec) {
-  var mult = Math.pow(10, prec)
-  return toFixedNoTrailingZeros(Math.trunc(mult * val) / mult, prec)
-}
-
-function humanizeGenericDuration(dur) {
-  if (dur === 0) {
-    return '0s'
-  }
-
-  if (dur < 0.001) {
-    // smaller than a microsecond, print nanoseconds
-    return Math.trunc(dur * 1000000) + 'ns'
-  }
-  if (dur < 1) {
-    // smaller than a millisecond, print microseconds
-    return toFixedNoTrailingZerosTrunc(dur * 1000, 2) + 'µs'
-  }
-  if (dur < 1000) {
-    // duration is smaller than a second
-    return toFixedNoTrailingZerosTrunc(dur, 2) + 'ms'
-  }
-
-  var result = toFixedNoTrailingZerosTrunc((dur % 60000) / 1000, dur > 60000 ? 0 : 2) + 's'
-  var rem = Math.trunc(dur / 60000)
-  if (rem < 1) {
-    // less than a minute
-    return result
-  }
-  result = (rem % 60) + 'm' + result
-  rem = Math.trunc(rem / 60)
-  if (rem < 1) {
-    // less than an hour
-    return result
-  }
-  return rem + 'h' + result
-}
-
-function humanizeDuration(dur, timeUnit) {
-  if (timeUnit !== '' && unitMap.hasOwnProperty(timeUnit)) {
-    return (dur * unitMap[timeUnit].coef).toFixed(2) + unitMap[timeUnit].unit
-  }
-
-  return humanizeGenericDuration(dur)
-}
-
+/**
+ * Formats a metric value into a human-readable form, depending on the metric type and content.
+ *
+ * @param {number} val - The metric value.
+ * @param {ReportMetric} metric - The metric object.
+ * @param {string|null} timeUnit - The time unit for duration metrics.
+ * @returns {string} The humanized metric value.
+ */
 function humanizeValue(val, metric, timeUnit) {
-  if (metric.type == 'rate') {
-    // Truncate instead of round when decreasing precision to 2 decimal places
-    return (Math.trunc(val * 100 * 100) / 100).toFixed(2) + '%'
-  }
+	if (metric.type === 'rate') {
+		// Truncate instead of round when decreasing precision to 2 decimal places
+		return (Math.trunc(val * 100 * 100) / 100).toFixed(2) + '%';
+	}
 
-  switch (metric.contains) {
-    case 'data':
-      return humanizeBytes(val)
-    case 'time':
-      return humanizeDuration(val, timeUnit)
-    default:
-      return toFixedNoTrailingZeros(val, 6)
-  }
+	switch (metric.contains) {
+		case 'data':
+			return humanizeBytes(val);
+		case 'time':
+			return humanizeDuration(val, timeUnit);
+		default:
+			return toFixedNoTrailingZeros(val, 6);
+	}
 }
 
+/**
+ * @typedef {Object} Report
+ * @property {Record<string, ReportThreshold>} thresholds - The thresholds report.
+ * @property {ReportMetrics} metrics - The metrics report.
+ * @property {Record<string, ReportGroup>} groups - The groups report.
+ * @property {Record<string, ReportGroup>} scenarios - The scenarios report.
+ */
+
+/**
+ * @typedef {Object} ReportThreshold
+ * @property {string} source - The threshold expression source.
+ * @property {boolean} ok - Whether the threshold was satisfied or not.
+ */
+
+// FIXME (@oleiade): Could use a better name as it's not really a group in the k6 sense?
+/**
+ * @typedef {Object} ReportGroup
+ * @property {ReportChecks} checks - The checks report.
+ * @property {ReportMetrics} metrics - The metrics report.
+ * @property {Record<string, ReportGroup>} groups - The nested groups report.
+ */
+
+/**
+ * @typedef {Object} ReportMetric
+ * @property {string} name - The name of the reported metric.
+ * @property {"counter"|"gauge"|"rate"|"trend"} type - The type of the metric.
+ * @property {"time"|"data"|"default"} contains - The type of data contained in the metric
+ * @property {Record<string, number>} values - Key-value pairs of metric statistics (e.g. min, max, avg).
+ * @property {EngineThreshold[]} [thresholds] - Optional array of thresholds associated with this metric.
+ */
+
+/**
+ * @typedef {Object} ReportMetrics
+ * @property {Record<string, ReportMetric>} http - The HTTP metrics.
+ * @property {Record<string, ReportMetric>} execution - The execution-related metrics.
+ * @property {Record<string, ReportMetric>} network - The network-related metrics.
+ * @property {Record<string, ReportMetric>} browser - The browser-related metrics.
+ * @property {Record<string, ReportMetric>} webvitals - The web vitals metrics.
+ * @property {Record<string, ReportMetric>} grpc - The grpc-related metrics.
+ * @property {Record<string, ReportMetric>} websocket - The websocket-related metrics.
+ * @property {Record<string, ReportMetric>} miscelaneous - The custom metrics.
+ */
+
+/**
+ * @typedef {Object} ReportChecksMetrics
+ * @property {ReportMetric[]} total - The total metrics.
+ * @property {ReportMetric} success - The successful metrics.
+ * @property {ReportMetric} fail - The failed metrics.
+ */
+
+/**
+ * @typedef {Object} ReportChecks
+ * @property {ReportChecksMetrics} metrics - The metrics for checks.
+ * @property {EngineCheck[]} ordered_checks - The ordered checks.
+ */
+
+/**
+ * @typedef {Object} ReportMetricThresholds
+ * @property {ReportMetric} metric - The metric object.
+ * @property {ReportThreshold[]} thresholds - The thresholds for the metric.
+ */
+
+/**
+ * @typedef {Object} ReportData
+ * @property {Record<string, ReportMetric>} metrics - Collection of metrics keyed by their names.
+ */
+
+/**
+ * @typedef {Object} EngineCheck
+ * @property {string} id - The check ID.
+ * @property {string} name - The check name.
+ * @property {string} path - The check path.
+ * @property {number} passes - The number of successful checks.
+ * @property {number} fails - The number of failed checks.
+ */
+
+/**
+ * @typedef {Object} EngineThreshold
+ * @property {string} source - The threshold expression source.
+ * @property {boolean} ok - Whether the threshold was satisfied or not.
+ */
+
+/**
+ * @typedef {Object} Options
+ * @property {boolean} [enableColors = true] - Whether to enable ANSI colors.
+ * @property {string | null} [summaryTimeUnit = null] - The time unit for duration metrics.
+ * @property {string[] | null} [summaryTrendStats = null] - The trend statistics to summarize.
+ * @property {boolean} [sortByName = true] - Whether to sort metrics by name.
+ */
+
+/**
+ * Generates a textual summary of test results, including checks, metrics, thresholds, groups, and scenarios.
+ */
+class TestReportGenerator {
+	/**
+	 * Constructs a TestReportGenerator with a specified formatter
+	 *
+	 * @param {ANSIFormatter} formatter - The ANSI formatter to use for text decoration.
+	 * @param {RenderContext} renderContext - The render context to use for text rendering.
+	 * @param {Options} [options = {}]
+	 */
+	constructor(formatter, renderContext, options = {}) {
+		this.formatter = formatter;
+		this.renderContext = renderContext;
+		this.options = options;
+	}
+
+	/**
+	 * Generates a textual summary of test results, including checks, metrics, thresholds, groups, and scenarios.
+	 *
+	 * @param {Report} report - The report object containing thresholds, checks, metrics, groups, and scenarios as provided by k6.
+	 * @returns {string} - A formatted summary of the test results.
+	 */
+	generate(report) {
+		const reportBuilder = new ReportBuilder(
+			this.formatter,
+			this.renderContext,
+			this.options,
+		);
+		return reportBuilder
+			.addThresholds(report.thresholds)
+			.addTotalResults(report)
+			.addGroups(report.groups)
+			.addScenarios(report.scenarios)
+			.build();
+	}
+}
+
+/**
+ * Exposes methods for generating a textual summary of test results.
+ */
+class ReportBuilder {
+	/**
+	 * Creates a new ReportBuilder with a specified formatter and options.
+	 *
+	 * @param {ANSIFormatter} formatter - The ANSI formatter to use for text decoration.
+	 * @param {RenderContext} renderContext - The render context to use for text rendering.
+	 * @param options
+	 */
+	constructor(formatter, renderContext, options) {
+		this.formatter = formatter;
+		this.renderContext = renderContext;
+		this.options = options;
+		this.sections = [];
+	}
+
+	/**
+	 * Adds a thresholds section to the report.
+	 *
+	 * @param {Record<string, ReportThreshold>} thresholds - The thresholds to add to the report.
+	 * @returns {ReportBuilder}
+	 */
+	addThresholds(thresholds) {
+		if (!thresholds) return this;
+
+		this.sections.push({
+			title: 'THRESHOLDS',
+			content: this._renderThresholds(thresholds),
+		});
+		return this;
+	}
+
+	/**
+	 * Adds a total results section to the report.
+	 *
+	 * @param {Report} report - The report object containing thresholds, checks, metrics, groups, and scenarios as provided by k6.
+	 * @returns {ReportBuilder}
+	 */
+	addTotalResults(report) {
+		this.sections.push({
+			title: 'TOTAL RESULTS',
+			content: [
+				...this._renderChecks(report.checks),
+				...'\n',
+				...this._renderMetrics(report.metrics),
+			],
+		});
+		return this;
+	}
+
+	/**
+	 * Adds groups sections to the report.
+	 *
+	 * @param {Record<string, ReportGroup>} groups
+	 * @returns {ReportBuilder}
+	 */
+	addGroups(groups) {
+		if (!groups) return this;
+
+		Object.entries(groups).forEach(([groupName, groupData]) => {
+			this.sections.push({
+				title: `GROUP: ${groupName}`,
+				content: this._renderGroupContent(groupData),
+			});
+		});
+		return this;
+	}
+
+	/**
+	 * Adds scenarios sections to the report.
+	 *
+	 * @param {Record<string, ReportGroup>} scenarios - The scenarios to add to the report.
+	 * @returns {ReportBuilder}
+	 */
+	addScenarios(scenarios) {
+		if (!scenarios) return this;
+
+		Object.entries(scenarios).forEach(([scenarioName, scenarioData]) => {
+			this.sections.push({
+				title: `SCENARIO: ${scenarioName}`,
+				content: this._renderScenarioContent(scenarioData),
+			});
+		});
+		return this;
+	}
+
+	/**
+	 * Builds the final report by concatenating all sections together, resulting
+	 * in a formatted string ready to be printed to the terminal.
+	 *
+	 * @returns {string}
+	 */
+	build() {
+		return this.sections
+			.map((section) => [
+				renderTitle(section.title, this.formatter, this.renderContext),
+				...section.content,
+				'\n',
+			])
+			.flat()
+			.join('\n');
+	}
+
+	/**
+	 * @param {Record<string, ReportThreshold>} thresholds
+	 * @param {RenderContext} [renderContext]
+	 * @returns {string[]}
+	 * @private
+	 */
+	_renderThresholds(thresholds, renderContext) {
+		// The thresholds list should be indent one level higher than the title
+		renderContext = renderContext || this.renderContext;
+		renderContext = renderContext.indentedContext(1);
+
+		// Implement threshold rendering logic
+		return renderThresholds(
+			{ metrics: this._processThresholds(thresholds) },
+			this.formatter,
+			renderContext,
+			this.options,
+		);
+	}
+
+	/**
+	 * @param checks
+	 * @param {RenderContext} [renderContext] - The render context to use for text rendering.
+	 * @returns {string[]}
+	 * @private
+	 */
+	_renderChecks(checks, renderContext) {
+		renderContext = renderContext || this.renderContext;
+		renderContext = renderContext.indentedContext(1);
+
+		return checks
+			? renderChecks(checks, this.formatter, renderContext, this.options)
+			: [];
+	}
+
+	/**
+	 * @param {ReportMetrics} metrics
+	 * @param {RenderContext} [renderContext]
+	 * @returns {string[]}
+	 * @private
+	 */
+	_renderMetrics(metrics, renderContext) {
+		renderContext = renderContext || this.renderContext;
+		renderContext = renderContext.indentedContext(1);
+
+		// Implement metrics rendering logic
+		return Object.entries(metrics)
+			.filter(
+				([_, sectionMetrics]) => Object.keys(sectionMetrics).length > 0,
+			)
+			.flatMap(([sectionName, sectionMetrics]) => [
+				renderContext.indent(
+					this.formatter.boldify(sectionName.toUpperCase()),
+				),
+				...renderMetrics(
+					{ metrics: sectionMetrics },
+					this.formatter,
+					renderContext,
+					this.options,
+				),
+			]);
+	}
+
+	/**
+	 * @param {ReportGroup} group - The group data to render.
+	 * @param {RenderContext} [renderContext]
+	 * @returns {string[]}
+	 * @private
+	 */
+	_renderGroupContent(group, renderContext) {
+		renderContext = renderContext || this.renderContext;
+
+		// Implement group content rendering
+		return [
+			...this._renderChecks(group.checks, renderContext),
+			...this._renderMetrics(group.metrics, renderContext),
+			...(group.groups ? this._renderNestedGroups(group.groups) : []),
+		];
+	}
+
+	/**
+	 * @param {ReportGroup} scenarioData
+	 * @param {RenderContext} [renderContext]
+	 * @returns {string[]}
+	 * @private
+	 */
+	_renderScenarioContent(scenarioData, renderContext) {
+		renderContext = renderContext || this.renderContext;
+
+		// Similar to group content rendering
+		return [
+			...this._renderChecks(scenarioData.checks, renderContext),
+			...this._renderMetrics(scenarioData.metrics, renderContext),
+			...(scenarioData.groups
+				? this._renderNestedGroups(scenarioData.groups)
+				: []),
+		];
+	}
+
+	/**
+	 * @param {Record<string, ReportGroup>} groups
+	 * @param {RenderContext} [renderContext]
+	 * @returns {string[]}
+	 * @private
+	 */
+	_renderNestedGroups(groups, renderContext) {
+		renderContext = renderContext || this.renderContext;
+		renderContext = renderContext.indentedContext(1);
+
+		// Render nested groups recursively
+		return Object.entries(groups).flatMap(([groupName, groupData]) => [
+			renderTitle(`GROUP: ${groupName}`, this.formatter, renderContext, {
+				prefix: subtitlePrefix,
+			}),
+			...this._renderGroupContent(groupData),
+		]);
+	}
+
+	// Private rendering methods
+	/**
+	 *
+	 * @param {ReportMetricThresholds} thresholds
+	 * @returns {{}}
+	 * @private
+	 */
+	_processThresholds(thresholds) {
+		// Transform thresholds into a format suitable for rendering
+		const metrics = {};
+		Object.values(thresholds).forEach((threshold) => {
+			metrics[threshold.metric.name] = {
+				...threshold.metric,
+				thresholds: threshold.thresholds,
+			};
+		});
+		return metrics;
+	}
+}
+
+/**
+ * RenderContext is a helper class that provides methods for rendering text
+ * with indentation.
+ *
+ * It is used to keep track of the current indentation level and provide
+ * methods for rendering text with the correct indentation.
+ *
+ * It also facilitates the creation of new RenderContext instances with
+ * different indentation levels. That way the indentation level can be
+ * easily adjusted relatively to a parent indentation level without having
+ * to manage some dedicated state manually.
+ */
+class RenderContext {
+	constructor(baseIndentationLevel = 0) {
+		this.baseIndentationLevel = baseIndentationLevel;
+	}
+
+	/**
+	 * Returns a string of spaces for a given indentation level.
+	 *
+	 * @param {number} [level]
+	 * @returns {string}
+	 */
+	indentLevel(level = 1) {
+		return ' '.repeat((this.baseIndentationLevel + level) * 2);
+	}
+
+	/**
+	 * @param {string} text - The text to indent.
+	 * @param {number} [level]
+	 * @returns {string}
+	 */
+	indent(text, level = 1) {
+		return this.indentLevel(level) + text;
+	}
+
+	/**
+	 * indentedContext returns a new RenderContext with an incremented base indentation level.
+	 *
+	 * This allows to easily obtain a new RenderContext from a parent one with an
+	 * increased indentation level.
+	 *
+	 * @param {number} increment - The increment to apply to the base indentation level.
+	 * @returns {RenderContext}
+	 */
+	indentedContext(increment = 1) {
+		return new RenderContext(this.baseIndentationLevel + increment);
+	}
+}
+
+/**
+ * ANSIFormatter provides methods for decorating text with ANSI color and style codes.
+ */
+class ANSIFormatter {
+	/**
+	 * Constructs an ANSIFormatter with configurable color and styling options
+	 * @param {Object} options - Configuration options for formatting
+	 * @param {boolean} [options.enableColors=true] - Whether to enable color output
+	 */
+	constructor(options = {}) {
+		this.options = {
+			enableColors: true,
+			...options,
+		};
+	}
+
+	/**
+	 * Decorates text with ANSI color and style.
+	 * @param {string} text - The text to decorate.
+	 * @param {ANSIColor} color - The ANSI color to apply.
+	 * @param {...ANSIStyle} styles - optional additional styles to apply.
+	 * @returns {string} - Decorated text, or plain text if colors are disabled.
+	 */
+	decorate(text, color, ...styles) {
+		if (!this.options.enableColors) {
+			return text;
+		}
+
+		const colorCode = ANSIColors[color] || ANSIColors.white;
+		const styleCodes = styles
+			.map((style) => ANSIStyles[style])
+			.filter(Boolean);
+
+		const fullCodes = styleCodes.length
+			? [...styleCodes, colorCode].join(';')
+			: colorCode;
+
+		const fullSequence = `\x1b[${fullCodes}m`;
+
+		return `${fullSequence}${text}\x1b[0m`;
+	}
+
+	/**
+	 * Applies bold styling to text
+	 * @param {string} text - Text to make bold
+	 * @returns {string} Bold text
+	 */
+	boldify(text) {
+		return this.decorate(text, 'white', 'bold');
+	}
+}
+
+/**
+ * ANSIColor maps ANSI color names to their respective escape codes.
+ *
+ * @typedef {'reset'|'black'|'red'|'green'|'yellow'|'blue'|'magenta'|'cyan'|
+ *           'white'|'brightRed'|'brightGreen'|'brightYellow'} ANSIColor
+ *
+ * @typedef {Record<ANSIColor, string>} ANSIColors
+ */
+const ANSIColors = {
+	reset: '\x1b[0m',
+
+	// Standard Colors
+	black: '30',
+	red: '31',
+	green: '32',
+	yellow: '33',
+	blue: '34',
+	magenta: '35',
+	cyan: '36',
+	white: '37',
+
+	// Bright Colors
+	brightRed: '91',
+	brightGreen: '92',
+	brightYellow: '93',
+};
+
+/**
+ * ANSIStyle maps ANSI style names to their respective escape codes.
+ *
+ * @typedef {'bold' | 'faint' | 'underline' | 'reversed'} ANSIStyle
+ *
+ * @typedef {Record<ANSIStyle, string>} ANSIStyles
+ */
+const ANSIStyles = {
+	bold: '1',
+	faint: '2',
+	underline: '4',
+	reversed: '7',
+};
+
+/**
+ * Renders a section title with a specified formatter, indentation level, and options.
+ *
+ * For example, a bold section title at first indentation level with a block prefix and newline suffix:
+ *  █ THRESHOLDS
+ *
+ * @param {string} title - The section title to render.
+ * @param {ANSIFormatter} formatter - The ANSI formatter to use for text decoration.
+ * @param {RenderContext} renderContext - The render context to use for text rendering.
+ * @param {Options & Object} options - Additional options for rendering the section title.
+ * @param {string} [options.prefix=titlePrefix] - The prefix to use for the section title.
+ * @param {string} [options.suffix='\n'] - The suffix to use for the section title.
+ * @returns {string} - The formatted section title.
+ */
+function renderTitle(
+	title,
+	formatter,
+	renderContext,
+	options = { prefix: titlePrefix, suffix: '\n' },
+) {
+	return renderContext.indent(
+		`${options.prefix} ${formatter.boldify(title)} ${options.suffix}`,
+	);
+}
+
+/**
+ * Renders a single check into a formatted line ready for output.
+ *
+ * @param {EngineCheck} check - The check object with name, passes and fails
+ * @param {ANSIFormatter} formatter - ANSI formatter used for decorating text.
+ * @param {RenderContext} renderContext - The render context to use for text rendering.
+ * @returns {string} - A formatted line summarizing the check.
+ */
+function renderCheck(check, formatter, renderContext) {
+	// If the check was successful, immediately render a green line indicating success
+	if (check.fails === 0) {
+		return renderContext.indent(
+			formatter.decorate(successMark + ' ' + check.name, 'green'),
+		);
+	}
+
+	// Other we want to display both the check name and the percentage of successful checks
+	// in red, along with the number of passes and fails.
+	const successfulPct = Math.floor(
+		(100 * check.passes) / (check.passes + check.fails),
+	);
+
+	const checkName = formatter.decorate(failMark + ' ' + check.name, 'red');
+	const results = formatter.decorate(
+		subtitlePrefix +
+			'  ' +
+			successfulPct +
+			'% — ' +
+			successMark +
+			' ' +
+			check.passes +
+			' / ' +
+			failMark +
+			' ' +
+			check.fails,
+		'red',
+	);
+
+	return (
+		renderContext.indent(checkName) +
+		'\n' +
+		renderContext.indent(results, renderContext.baseIndentationLevel + 1)
+	);
+}
+
+/**
+ * Renders checks into a formatted set of lines ready for display in the terminal.
+ *
+ * @param {ReportChecks} checks
+ * @param formatter
+ * @param {RenderContext} renderContext
+ * @param options
+ * @returns {*[]}
+ */
+function renderChecks(checks, formatter, renderContext, options = {}) {
+	// If no checks exist, return empty array
+	if (!checks || !checks.ordered_checks) {
+		return [];
+	}
+
+	// Add indentation to the render context for checks
+	renderContext = renderContext.indentedContext(1);
+
+	const { showPassedChecks = true, showFailedChecks = true } = options;
+
+	// Process each check and filter based on options
+	const renderedChecks = checks.ordered_checks
+		.filter((check) => {
+			// Filter logic for passed/failed checks
+			if (check.fails === 0 && !showPassedChecks) return false;
+			return !(check.fails > 0 && !showFailedChecks);
+		})
+		.map((check) => renderCheck(check, formatter, renderContext));
+
+	// Render metrics for checks if they exist
+	const checkMetrics = checks.metrics
+		? renderMetrics({ metrics: checks.metrics }, formatter, renderContext, {
+				...options,
+				sortByName: false,
+			})
+		: [];
+
+	// Combine metrics and checks
+	return [...checkMetrics, ...renderedChecks];
+}
+
+//FIXME (@oleiade): We should clarify the data argument's type and give it a better name and typedef
+/**
+ * Summarizes metrics into an array of formatted lines ready to be printed to stdout.
+ *
+ * @param {ReportChecks} data - The data object containing metrics.
+ * @param {ANSIFormatter} formatter - An ANSIFormatter function for ANSI colors.
+ * @param {RenderContext} renderContext - The render context to use for text rendering.
+ * @param {Options} options - Display options merged with defaultOptions.
+ * @returns {string[]}
+ */
+function renderMetrics(data, formatter, renderContext, options) {
+	// Extract all metric names
+	let metricNames = Object.keys(data.metrics);
+
+	// If sorting by name is required, do it now
+	if (options.sortByName) {
+		metricNames = sortMetricsByName(metricNames);
+	}
+
+	// Precompute all formatting information
+	const summaryInfo = computeSummaryInfo(
+		metricNames,
+		data,
+		renderContext,
+		options,
+	);
+
+	// Format each metric line
+	return metricNames.map((name) => {
+		const metric = data.metrics[name];
+		return renderMetricLine(
+			name,
+			metric,
+			summaryInfo,
+			options,
+			formatter,
+			renderContext,
+		);
+	});
+}
+
+/**
+ * Renders each thresholds results into a formatted set of lines ready for display in the terminal.
+ *
+ * Thresholds are rendered in the format:
+ * {metric/submetric}...: {value} {extra}
+ *  {SATISFIED|UNSATISFIED} {source}
+ *  //... additional threshold lines
+ *
+ * @param {ReportData} data - The data containing metrics.
+ * @param {ANSIFormatter} formatter - ANSI formatter used for decorating text.
+ * @param {RenderContext} renderContext - The render context to use for text rendering.
+ * @param {Object} options - Options merged with defaults.
+ * @returns {string[]} - Array of formatted lines including threshold statuses.
+ */
+function renderThresholds(data, formatter, renderContext, options) {
+	// Extract and optionally sort metric names
+	let metricNames = Object.keys(data.metrics);
+	if (options.sortByName) {
+		metricNames = sortMetricsByName(metricNames);
+	}
+
+	// Precompute all formatting information
+	const summaryInfo = computeSummaryInfo(
+		metricNames,
+		data,
+		renderContext,
+		options,
+	);
+
+	// Format each threshold line by preparing each metric affected by a threshold, as
+	// well as the thresholds results for each expression.
+	const result = [];
+	for (const name of metricNames) {
+		const metric = data.metrics[name];
+		const line = renderSubmetricLine(
+			name,
+			metric,
+			summaryInfo,
+			options,
+			formatter,
+			renderContext,
+		);
+		result.push(line);
+
+		if (metric.thresholds) {
+			// TODO (@oleiade): make sure the arguments are always ordered consistently across functions (indent, decorate, etc.)
+			const thresholdLines = renderThresholdResults(
+				metric.thresholds,
+				formatter,
+				renderContext.indentedContext(1),
+			);
+			result.push(...thresholdLines);
+		}
+	}
+
+	return result;
+}
+
+/**
+ * Renders each threshold result into a formatted set of lines ready for display in the terminal.
+ *
+ * @param {Object} thresholds - The thresholds to render.
+ * @param {ANSIFormatter} formatter - ANSIFormatter used for decorating text.
+ * @param {RenderContext} renderContext - The render context to use for text rendering.
+ * @returns {string[]} - An array of formatted lines including threshold statuses.
+ */
+function renderThresholdResults(thresholds, formatter, renderContext) {
+	const lines = [];
+
+	forEach(thresholds, (_, threshold) => {
+		const isSatisfied = threshold.ok;
+		const statusText = isSatisfied
+			? formatter.decorate('SATISFIED', 'green')
+			: formatter.decorate('UNSATISFIED', 'red');
+
+		// Extra indentation for threshold lines
+		// Adjusting spacing so that it aligns nicely under the metric line
+		const additionalIndent = isSatisfied ? '    ' : '  ';
+		const sourceText = formatter.decorate(
+			`'${threshold.source}'`,
+			'white',
+			'faint',
+		);
+
+		// Here we push a line describing the threshold's result
+		lines.push(
+			renderContext.indent(statusText + additionalIndent + sourceText),
+		);
+	});
+
+	return lines;
+}
+
+/**
+ * Renders a metric line into a formatted string for display.
+ *
+ * @param {string} name - The name of the metric.
+ * @param {ReportMetric} metric - The metric object containing details about the metric.
+ * @param {SummaryInfo} info - An object containing summary information such as maximum name width and trend columns.
+ * @param {Options} options - Configuration options for summarizing metrics.
+ * @param {ANSIFormatter} formatter - A function to apply ANSI colors to text.
+ * @param {RenderContext} renderContext - The render context to use for text rendering.
+ * @returns {string} - The formatted metric line.
+ */
+function renderMetricLine(
+	name,
+	metric,
+	info,
+	options,
+	formatter,
+	renderContext,
+) {
+	const { maxNameWidth } = info;
+
+	const displayedName = renderMetricDisplayName(name);
+	const fmtIndent = renderContext.indentLevel();
+
+	// Compute the trailing dots:
+	// Use `3` as a spacing offset as per original code.
+	const dotsCount =
+		maxNameWidth - strWidth(displayedName) - strWidth(fmtIndent) + 3;
+	const dottedName =
+		displayedName +
+		formatter.decorate('.'.repeat(dotsCount) + ':', 'white', 'faint');
+
+	const dataPart =
+		metric.type === 'trend'
+			? renderTrendData(name, info, formatter)
+			: renderNonTrendData(name, info, formatter);
+
+	return renderContext.indent(dottedName + ' ' + dataPart);
+}
+
+// FIXME (@oleiade): summarizeMetricsOptions needs a better name "DisplayConfig"?
+/**
+ * Formats a submetric (metric+tags key/value pairs) line for output.
+ *
+ * @param {string} name - name of the submetric
+ * @param {ReportMetric} metric - submetric object (submetric really are just a specialized metric with a tags set and a pointer to their parent)
+ * @param {SummaryInfo} info - summary information object
+ * @param {Options} options - display options
+ * @param {ANSIFormatter}  formatter - ANSI formatter
+ * @param {RenderContext} renderContext - render context
+ * @returns {string} submetric report line in the form: `{submetric name}...: {value} {extra}`
+ */
+function renderSubmetricLine(
+	name,
+	metric,
+	info,
+	options,
+	formatter,
+	renderContext,
+) {
+	const { maxNameWidth } = info;
+
+	// Compute the trailing dots:
+	// Use `3` as a spacing offset as per original code.
+	let dotsCount =
+		maxNameWidth -
+		strWidth(name) -
+		strWidth(renderContext.indentLevel()) +
+		3;
+	dotsCount = Math.max(1, dotsCount);
+	const dottedName =
+		name +
+		formatter.decorate('.'.repeat(dotsCount) + ':', 'white', 'faint');
+
+	const dataPart =
+		metric.type === 'trend'
+			? renderTrendData(name, info, formatter)
+			: renderNonTrendData(name, info, formatter);
+
+	return renderContext.indent(dottedName + ' ' + dataPart);
+}
+
+/**
+ * Format data for trend metrics.
+ */
+function renderTrendData(name, info, formatter) {
+	const { trendStats, trendCols, trendColMaxLens } = info;
+	const cols = trendCols[name];
+
+	return cols
+		.map((col, i) => {
+			const statName = trendStats[i];
+			const padding = ' '.repeat(trendColMaxLens[i] - strWidth(col));
+			return statName + '=' + formatter.decorate(col, 'cyan') + padding;
+		})
+		.join(' ');
+}
+
+/**
+ * Format data for non-trend metrics.
+ *
+ * @param {string} name - The metric name.
+ * @param {SummaryInfo} info - The summary information object.
+ * @param {ANSIFormatter} formatter - A decoration function for ANSI colors.
+ */
+function renderNonTrendData(name, info, formatter) {
+	const {
+		nonTrendValues,
+		nonTrendExtras,
+		maxNonTrendValueLen,
+		nonTrendExtraMaxLens,
+	} = info;
+
+	const value = nonTrendValues[name];
+	const extras = nonTrendExtras[name] || [];
+
+	let result = formatter.decorate(value, 'cyan');
+	result += ' '.repeat(maxNonTrendValueLen - strWidth(value));
+
+	if (extras.length === 1) {
+		// Single extra value
+		result += ' ' + formatter.decorate(extras[0], 'cyan', 'faint');
+	} else if (extras.length > 1) {
+		// Multiple extras need their own spacing
+		const parts = extras.map((val, i) => {
+			const extraSpace = ' '.repeat(
+				nonTrendExtraMaxLens[i] - strWidth(val),
+			);
+			return formatter.decorate(val, 'cyan', 'faint') + extraSpace;
+		});
+		result += ' ' + parts.join(' ');
+	}
+
+	return result;
+}
+
+/**
+ *
+ * @param {number} value
+ * @param {string} stat
+ * @param {ReportMetric} metric
+ * @param {Options} options
+ * @returns {string}
+ */
+function renderTrendValue(value, stat, metric, options) {
+	if (stat === 'count') {
+		return value.toString();
+	}
+	return humanizeValue(value, metric, options.summaryTimeUnit);
+}
+
+/**
+ * Compute all necessary formatting information such as maximum lengths, trend columns and non-trend values for each
+ * metric.
+ *
+ * @typedef {Object} SummaryInfo
+ * @property {number} maxNameWidth - The maximum width of the metric names.
+ * @property {Object} nonTrendValues - The non-trend metric values.
+ * @property {Object} nonTrendExtras - The non-trend metric extras.
+ * @property {Object} trendCols - The trend columns.
+ * @property {number[]} trendColMaxLens - The trend column maximum lengths.
+ * @property {number} numTrendColumns - The number of trend columns.
+ * @property {string[]} trendStats - The trend statistics.
+ * @property {number} maxNonTrendValueLen - The maximum non-trend value length.
+ * @property {number[]} nonTrendExtraMaxLens - The non-trend extra maximum lengths.
+ *
+ * @param {string[]} metricNames
+ * @param {ReportData} data - The data object containing metrics.
+ * @param {RenderContext} renderContext - The render context to use for text rendering.
+ * @param {Options} options
+ * @returns {SummaryInfo}
+ */
+function computeSummaryInfo(metricNames, data, renderContext, options) {
+	const trendStats = options.summaryTrendStats;
+	const numTrendColumns = trendStats.length;
+
+	const nonTrendValues = {};
+	const nonTrendExtras = {};
+	const trendCols = {};
+
+	let maxNameWidth = 0;
+	let maxNonTrendValueLen = 0;
+	let nonTrendExtraMaxLens = []; // FIXME: "lens"?
+
+	// Initialize tracking arrays for trend widths
+	const trendColMaxLens = new Array(numTrendColumns).fill(0);
+
+	for (const name of metricNames) {
+		const metric = data.metrics[name];
+		const displayName = renderContext.indent(
+			name + renderMetricDisplayName(name),
+		);
+		maxNameWidth = Math.max(maxNameWidth, strWidth(displayName));
+
+		if (metric.type === 'trend') {
+			const cols = trendStats.map((stat) =>
+				renderTrendValue(metric.values[stat], stat, metric, options),
+			);
+
+			// Compute max column widths
+			cols.forEach((col, index) => {
+				trendColMaxLens[index] = Math.max(
+					trendColMaxLens[index],
+					strWidth(col),
+				);
+			});
+			trendCols[name] = cols;
+		} else {
+			const values = nonTrendMetricValueForSum(
+				metric,
+				options.summaryTimeUnit,
+			);
+			const mainValue = values[0]; // FIXME (@oleiade) we should assert that the index exists here
+			nonTrendValues[name] = mainValue;
+			maxNonTrendValueLen = Math.max(
+				maxNonTrendValueLen,
+				strWidth(mainValue),
+			);
+
+			// FIXME (@oleiade): what the fuck is an extra, really?
+			const extras = values.slice(1);
+			nonTrendExtras[name] = extras;
+			extras.forEach((value, index) => {
+				const width = strWidth(value);
+				if (
+					nonTrendExtraMaxLens[index] === undefined ||
+					width > nonTrendExtraMaxLens[index]
+				) {
+					nonTrendExtraMaxLens[index] = width;
+				}
+			});
+		}
+	}
+
+	return {
+		maxNameWidth,
+		nonTrendValues,
+		nonTrendExtras,
+		trendCols,
+		trendColMaxLens,
+		numTrendColumns,
+		trendStats,
+		maxNonTrendValueLen,
+		nonTrendExtraMaxLens,
+	};
+}
+
+/**
+ * Sorts metrics by name, keeping submetrics grouped with their parent metrics.
+ *
+ * @param {string[]} metricNames - The metric names to sort.
+ * @returns {string[]} - The sorted metric names.
+ */
+function sortMetricsByName(metricNames) {
+	metricNames.sort(function (lhsMetricName, rhsMetricName) {
+		const lhsParent = lhsMetricName.split('{', 1)[0];
+		const rhsParent = rhsMetricName.split('{', 1)[0];
+		const result = lhsParent.localeCompare(rhsParent);
+		if (result !== 0) {
+			return result;
+		}
+		const lhsSub = lhsMetricName.substring(lhsParent.length);
+		const rhsSub = rhsMetricName.substring(rhsParent.length);
+		return lhsSub.localeCompare(rhsSub);
+	});
+
+	return metricNames;
+}
+
+/**
+ * A simple iteration utility function for objects.
+ *
+ * @param {Object} obj - the object to iterate over
+ * @param {(key: string, value: any) => (boolean|void)} callback - Callback invoked with (key, value)
+ */
+function forEach(obj, callback) {
+	for (const key in obj) {
+		if (obj.hasOwnProperty(key)) {
+			if (callback(key, obj[key])) {
+				break;
+			}
+		}
+	}
+}
+
+const titlePrefix = '█';
+const subtitlePrefix = '↳';
+const successMark = '✓';
+const failMark = '✗';
+const defaultOptions = {
+	indent: ' ',
+	enableColors: true, // FIXME (@oleiade): we should ensure we respect this flag
+	summaryTimeUnit: null,
+	summaryTrendStats: null,
+	sortByName: true,
+};
+
+/**
+ * Compute the width of a string as displayed in a terminal, excluding ANSI codes, terminal
+ * formatting, Unicode ligatures, etc.
+ *
+ * @param {string} s - The string to measure
+ * @returns {number} The display width of the string
+ */
+function strWidth(s) {
+	// TODO: determine if NFC or NFKD are not more appropriate? or just give up? https://hsivonen.fi/string-length/
+	const data = s.normalize('NFKC'); // This used to be NFKD in Go, but this should be better
+	let inEscSeq = false;
+	let inLongEscSeq = false;
+	let width = 0;
+	for (const char of data) {
+		if (char.done) {
+			break;
+		}
+
+		// Skip over ANSI escape codes.
+		if (char === '\x1b') {
+			inEscSeq = true;
+			continue;
+		}
+		if (inEscSeq && char === '[') {
+			inLongEscSeq = true;
+			continue;
+		}
+		if (
+			inEscSeq &&
+			inLongEscSeq &&
+			char.charCodeAt(0) >= 0x40 &&
+			char.charCodeAt(0) <= 0x7e
+		) {
+			inEscSeq = false;
+			inLongEscSeq = false;
+			continue;
+		}
+		if (
+			inEscSeq &&
+			!inLongEscSeq &&
+			char.charCodeAt(0) >= 0x40 &&
+			char.charCodeAt(0) <= 0x5f
+		) {
+			inEscSeq = false;
+			continue;
+		}
+
+		if (!inEscSeq && !inLongEscSeq) {
+			width++;
+		}
+	}
+	return width;
+}
+
+/**
+ * Extracts a display name for a metric, handling sub-metrics (e.g. "metric{sub}" -> "{ sub }").
+ *
+ * @param {string} name - The metric name.
+ * @returns {string} - The display name
+ */
+function renderMetricDisplayName(name) {
+	const subMetricPos = name.indexOf('{');
+	if (subMetricPos >= 0) {
+		return '{ ' + name.substring(subMetricPos + 1, name.length - 1) + ' }';
+	}
+	return name;
+}
+
+/**
+ * Converts a number of bytes into a human-readable string with units.
+ *
+ * @param {number} bytes - The number of bytes.
+ * @returns {string} A human-readable string (e.g. "10 kB").
+ */
+function humanizeBytes(bytes) {
+	const units = ['B', 'kB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+	const base = 1000;
+	if (bytes < 10) {
+		return bytes + ' B';
+	}
+
+	const e = Math.floor(Math.log(bytes) / Math.log(base));
+	const suffix = units[e | 0];
+	const val = Math.floor((bytes / Math.pow(base, e)) * 10 + 0.5) / 10;
+	return val.toFixed(val < 10 ? 1 : 0) + ' ' + suffix;
+}
+
+const unitMap = {
+	s: { unit: 's', coef: 0.001 },
+	ms: { unit: 'ms', coef: 1 },
+	us: { unit: 'µs', coef: 1000 },
+};
+
+/**
+ * Converts a number to a fixed decimal string, removing trailing zeros.
+ *
+ * @param {number} val - The number to convert.
+ * @param {number} prec - Decimal precision.
+ * @returns {string} A string representation of the number without trailing zeros.
+ */
+function toFixedNoTrailingZeros(val, prec) {
+	return parseFloat(val.toFixed(prec)).toString();
+}
+
+/**
+ * Truncates a number to a certain precision without rounding, then removes trailing zeros.
+ *
+ * @param {number} val - The number to truncate.
+ * @param {number} prec - Decimal precision.
+ * @returns {string} A truncated, not rounded string representation.
+ */
+function toFixedNoTrailingZerosTrunc(val, prec) {
+	const mult = Math.pow(10, prec);
+	return toFixedNoTrailingZeros(Math.trunc(mult * val) / mult, prec);
+}
+
+/**
+ * Humanizes a duration (in milliseconds) to a human-readable string,
+ * choosing appropriate units (ns, µs, ms, s, m, h).
+ *
+ * @param {number} duration - The duration in milliseconds.
+ * @returns {string} Human-readable duration (e.g. "2.5ms", "3s", "1m30s").
+ */
+function humanizeGenericDuration(duration) {
+	if (duration === 0) {
+		return '0s';
+	}
+
+	if (duration < 0.001) {
+		// smaller than a microsecond, print nanoseconds
+		return Math.trunc(duration * 1000000) + 'ns';
+	}
+	if (duration < 1) {
+		// smaller than a millisecond, print microseconds
+		return toFixedNoTrailingZerosTrunc(duration * 1000, 2) + 'µs';
+	}
+	if (duration < 1000) {
+		// duration is smaller than a second
+		return toFixedNoTrailingZerosTrunc(duration, 2) + 'ms';
+	}
+
+	let fixedDuration =
+		toFixedNoTrailingZerosTrunc(
+			(duration % 60000) / 1000,
+			duration > 60000 ? 0 : 2,
+		) + 's';
+	let rem = Math.trunc(duration / 60000);
+	if (rem < 1) {
+		// less than a minute
+		return fixedDuration;
+	}
+	fixedDuration = (rem % 60) + 'm' + fixedDuration;
+	rem = Math.trunc(rem / 60);
+	if (rem < 1) {
+		// less than an hour
+		return fixedDuration;
+	}
+	return rem + 'h' + fixedDuration;
+}
+
+/**
+ * Humanizes a duration according to a specified time unit or uses a generic formatting.
+ *
+ * @param {number} dur - The duration in milliseconds.
+ * @param {string|null} timeUnit - Optional time unit (e.g. "ms", "s").
+ * @returns {string} A human-readable duration string.
+ */
+function humanizeDuration(dur, timeUnit) {
+	if (timeUnit !== '' && unitMap.hasOwnProperty(timeUnit)) {
+		return (
+			(dur * unitMap[timeUnit].coef).toFixed(2) + unitMap[timeUnit].unit
+		);
+	}
+
+	return humanizeGenericDuration(dur);
+}
+
+/**
+ * Returns the summary values for non-trend metrics (counter, gauge, rate).
+ *
+ * @param {ReportMetric} metric - The metric to summarize.
+ * @param {string|null} timeUnit - The time unit for durations.
+ * @returns {string[]} - An array of summary values.
+ */
 function nonTrendMetricValueForSum(metric, timeUnit) {
-  switch (metric.type) {
-    case 'counter':
-      return [
-        humanizeValue(metric.values.count, metric, timeUnit),
-        humanizeValue(metric.values.rate, metric, timeUnit) + '/s',
-      ]
-    case 'gauge':
-      return [
-        humanizeValue(metric.values.value, metric, timeUnit),
-        'min=' + humanizeValue(metric.values.min, metric, timeUnit),
-        'max=' + humanizeValue(metric.values.max, metric, timeUnit),
-      ]
-    case 'rate':
-      return [
-        humanizeValue(metric.values.rate, metric, timeUnit),
-	      `${metric.values.passes} out of ${metric.values.passes + metric.values.fails}`,
-      ]
-    default:
-      return ['[no data]']
-  }
+	switch (metric.type) {
+		case 'counter':
+			return [
+				humanizeValue(metric.values.count, metric, timeUnit),
+				humanizeValue(metric.values.rate, metric, timeUnit) + '/s',
+			];
+		case 'gauge':
+			return [
+				humanizeValue(metric.values.value, metric, timeUnit),
+				'min=' + humanizeValue(metric.values.min, metric, timeUnit),
+				'max=' + humanizeValue(metric.values.max, metric, timeUnit),
+			];
+		case 'rate':
+			return [
+				humanizeValue(metric.values.rate, metric, timeUnit),
+				`${metric.values.passes} out of ${metric.values.passes + metric.values.fails}`,
+			];
+		default:
+			return ['[no data]'];
+	}
 }
-
-function summarizeMetrics(options, data, decorate) {
-  var indent = options.indent + '  '
-  var result = []
-
-  var names = []
-  var nameLenMax = 0
-
-  var nonTrendValues = {}
-  var nonTrendValueMaxLen = 0
-  var nonTrendExtras = {}
-  var nonTrendExtraMaxLens = [0, 0]
-
-  var trendCols = {}
-  var numTrendColumns = options.summaryTrendStats.length
-  var trendColMaxLens = new Array(numTrendColumns).fill(0)
-  forEach(data.metrics, function (name, metric) {
-    names.push(name)
-    // When calculating widths for metrics, account for the indentation on submetrics.
-    var displayName = indentForMetric(name) + displayNameForMetric(name)
-    var displayNameWidth = strWidth(displayName)
-    if (displayNameWidth > nameLenMax) {
-      nameLenMax = displayNameWidth
-    }
-
-    if (metric.type == 'trend') {
-      var cols = []
-      for (var i = 0; i < numTrendColumns; i++) {
-        var tc = options.summaryTrendStats[i]
-        var value = metric.values[tc]
-        if (tc === 'count') {
-          value = value.toString()
-        } else {
-          value = humanizeValue(value, metric, options.summaryTimeUnit)
-        }
-        var valLen = strWidth(value)
-        if (valLen > trendColMaxLens[i]) {
-          trendColMaxLens[i] = valLen
-        }
-        cols[i] = value
-      }
-      trendCols[name] = cols
-      return
-    }
-    var values = nonTrendMetricValueForSum(metric, options.summaryTimeUnit)
-    nonTrendValues[name] = values[0]
-    var valueLen = strWidth(values[0])
-    if (valueLen > nonTrendValueMaxLen) {
-      nonTrendValueMaxLen = valueLen
-    }
-    nonTrendExtras[name] = values.slice(1)
-    for (var i = 1; i < values.length; i++) {
-      var extraLen = strWidth(values[i])
-      if (extraLen > nonTrendExtraMaxLens[i - 1]) {
-        nonTrendExtraMaxLens[i - 1] = extraLen
-      }
-    }
-  })
-
-  // sort all metrics but keep sub metrics grouped with their parent metrics
-  names.sort(function (metric1, metric2) {
-    var parent1 = metric1.split('{', 1)[0]
-    var parent2 = metric2.split('{', 1)[0]
-    var result = parent1.localeCompare(parent2)
-    if (result !== 0) {
-      return result
-    }
-    var sub1 = metric1.substring(parent1.length)
-    var sub2 = metric2.substring(parent2.length)
-    return sub1.localeCompare(sub2)
-  })
-
-  var getData = function (name) {
-    if (trendCols.hasOwnProperty(name)) {
-      var cols = trendCols[name]
-      var tmpCols = new Array(numTrendColumns)
-      for (var i = 0; i < cols.length; i++) {
-        tmpCols[i] =
-          options.summaryTrendStats[i] +
-          '=' +
-          decorate(cols[i], palette.cyan) +
-          ' '.repeat(trendColMaxLens[i] - strWidth(cols[i]))
-      }
-      return tmpCols.join(' ')
-    }
-
-    var value = nonTrendValues[name]
-    var fmtData = decorate(value, palette.cyan) + ' '.repeat(nonTrendValueMaxLen - strWidth(value))
-
-    var extras = nonTrendExtras[name]
-    if (extras.length == 1) {
-      fmtData = fmtData + ' ' + decorate(extras[0], palette.cyan, palette.faint)
-    } else if (extras.length > 1) {
-      var parts = new Array(extras.length)
-      for (var i = 0; i < extras.length; i++) {
-        parts[i] =
-          decorate(extras[i], palette.cyan, palette.faint) +
-          ' '.repeat(nonTrendExtraMaxLens[i] - strWidth(extras[i]))
-      }
-      fmtData = fmtData + ' ' + parts.join(' ')
-    }
-
-    return fmtData
-  }
-
-  for (var name of names) {
-    var metric = data.metrics[name]
-    var mark = ' '
-    var markColor = function (text) {
-      return text
-    } // noop
-
-    if (metric.thresholds) {
-      mark = succMark
-      markColor = function (text) {
-        return decorate(text, palette.green)
-      }
-      forEach(metric.thresholds, function (name, threshold) {
-        if (!threshold.ok) {
-          mark = failMark
-          markColor = function (text) {
-            return decorate(text, palette.red)
-          }
-          return true // break
-        }
-      })
-    }
-    var fmtIndent = indentForMetric(name)
-    var fmtName = displayNameForMetric(name)
-    fmtName =
-      fmtName +
-      decorate(
-        '.'.repeat(nameLenMax - strWidth(fmtName) - strWidth(fmtIndent) + 3) + ':',
-        palette.faint
-      )
-
-    result.push(indent + fmtIndent + markColor(mark) + ' ' + fmtName + ' ' + getData(name))
-  }
-
-  return result
-}
-
-function generateTextSummary(data, options) {
-  var mergedOpts = Object.assign({}, defaultOptions, data.options, options)
-  var lines = []
-
-  // TODO: move all of these functions into an object with methods?
-  var decorate = function (text) {
-    return text
-  }
-  if (mergedOpts.enableColors) {
-    decorate = function (text, color /*, ...rest*/) {
-      var result = '\x1b[' + color
-      for (var i = 2; i < arguments.length; i++) {
-        result += ';' + arguments[i]
-      }
-      return result + 'm' + text + '\x1b[0m'
-    }
-  }
-
-  Array.prototype.push.apply(
-    lines,
-    summarizeGroup(mergedOpts.indent + '    ', data.root_group, decorate)
-  )
-
-  Array.prototype.push.apply(lines, summarizeMetrics(mergedOpts, data, decorate))
-
-  return lines.join('\n')
-}
-
-exports.humanizeValue = humanizeValue
-exports.textSummary = generateTextSummary

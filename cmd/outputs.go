@@ -37,6 +37,7 @@ const (
 	builtinOutputKafka
 	builtinOutputStatsd
 	builtinOutputExperimentalOpentelemetry
+	builtinOutputSummary
 )
 
 // TODO: move this to an output sub-module after we get rid of the old collectors?
