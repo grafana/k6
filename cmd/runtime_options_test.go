@@ -109,7 +109,7 @@ func testRuntimeOptionsCase(t *testing.T, tc runtimeOptionsTestCase) {
 func TestRuntimeOptions(t *testing.T) {
 	t.Parallel()
 	var (
-		defaultCompatMode   = null.NewString("extended", false)
+		defaultCompatMode   = null.NewString("enhanced", false)
 		baseCompatMode      = null.NewString("base", true)
 		extendedCompatMode  = null.NewString("extended", true)
 		enhancedCompatMode  = null.NewString("enhanced", true)
