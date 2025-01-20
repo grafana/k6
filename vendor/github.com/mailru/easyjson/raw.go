@@ -25,7 +25,8 @@ func (v *RawMessage) UnmarshalEasyJSON(l *jlexer.Lexer) {
 
 // UnmarshalJSON implements encoding/json.Unmarshaler interface.
 func (v *RawMessage) UnmarshalJSON(data []byte) error {
-	*v = data
+	*v = make([]byte, len(data))
+	copy(*v, data)
 	return nil
 }
 

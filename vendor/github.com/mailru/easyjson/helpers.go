@@ -17,7 +17,7 @@ type Marshaler interface {
 	MarshalEasyJSON(w *jwriter.Writer)
 }
 
-// Marshaler is an easyjson-compatible unmarshaler interface.
+// Unmarshaler is an easyjson-compatible unmarshaler interface.
 type Unmarshaler interface {
 	UnmarshalEasyJSON(w *jlexer.Lexer)
 }
