@@ -470,12 +470,6 @@ func (m *FrameManager) removeFramesRecursively(frame *Frame) error {
 	delete(m.frames, cdp.FrameID(frame.ID()))
 	m.framesMu.Unlock()
 
-	if !m.page.IsClosed() {
-		m.logger.Debugf("FrameManager:removeFramesRecursively:emit:EventPageFrameDetached",
-			"fmid:%d fid:%v fname:%s furl:%s",
-			m.ID(), frame.ID(), frame.Name(), frame.URL())
-	}
-
 	return nil
 }
 
