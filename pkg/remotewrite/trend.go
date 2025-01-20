@@ -114,7 +114,7 @@ func (tg *trendAsGauges) CacheNameIndex() {
 	})
 
 	if i < len(tg.labels) && tg.labels[i].Name == namelbl {
-		tg.ixname = uint16(i)
+		tg.ixname = uint16(i) //nolint:gosec
 	}
 }
 
