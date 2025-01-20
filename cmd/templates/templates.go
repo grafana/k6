@@ -1,3 +1,4 @@
+// Package templates provides the templates used by the `k6 new` command
 package templates
 
 import (
