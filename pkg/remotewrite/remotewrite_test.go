@@ -1,8 +1,8 @@
 package remotewrite
 
 import (
+	"bytes"
 	"fmt"
-	"io"
 	"math"
 	"testing"
 	"time"
@@ -11,7 +11,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/metrics"
 	"gopkg.in/guregu/null.v3"
@@ -352,11 +351,10 @@ func TestOutputStopWithStaleMarkers(t *testing.T) {
 	t.Parallel()
 
 	for _, tc := range []bool{true, false} {
-		logHook := &testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.DebugLevel}}
+		buf := bytes.NewBuffer(nil)
 		logger := logrus.New()
 		logger.SetLevel(logrus.DebugLevel)
-		logger.AddHook(logHook)
-		logger.SetOutput(io.Discard)
+		logger.SetOutput(buf)
 
 		o := Output{
 			logger: logger,
@@ -380,17 +378,7 @@ func TestOutputStopWithStaleMarkers(t *testing.T) {
 		// then this test will break
 		// A mock of the client and check if Store is invoked
 		// should be a more stable method.
-		entries := logHook.Drain()
-		require.NotEmpty(t, entries)
-
-		messages := func() []string {
-			s := make([]string, 0, len(entries))
-			for _, e := range entries {
-				s = append(s, e.Message)
-			}
-			return s
-		}()
-
+		messages := buf.String()
 		msg := "No time series to mark as stale"
 		assertfn := assert.Contains
 		if !tc {
