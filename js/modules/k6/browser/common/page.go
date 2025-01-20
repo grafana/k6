@@ -540,8 +540,8 @@ func (p *Page) consoleMsgFromConsoleEvent(e *runtime.EventConsoleAPICalled) (*Co
 	}, nil
 }
 
-func (p *Page) closeWorker(sessionID target.SessionID) {
-	p.logger.Debugf("Page:closeWorker", "sid:%v", sessionID)
+func (p *Page) removeWorker(sessionID target.SessionID) {
+	p.logger.Debugf("Page:removeWorker", "sid:%v", sessionID)
 
 	delete(p.workers, sessionID)
 }
