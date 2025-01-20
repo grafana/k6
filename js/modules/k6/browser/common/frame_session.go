@@ -1049,7 +1049,7 @@ func (fs *FrameSession) onDetachedFromTarget(event *target.EventDetachedFromTarg
 		"sid:%v tid:%v esid:%v",
 		fs.session.ID(), fs.targetID, event.SessionID)
 
-	fs.page.closeWorker(event.SessionID)
+	fs.page.removeWorker(event.SessionID)
 }
 
 func (fs *FrameSession) onTargetCrashed() {
