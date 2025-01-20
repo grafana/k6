@@ -9,6 +9,10 @@ import (
 
 // CompatibilityMode specifies the JS compatibility mode
 //
+// There are several CLIs called enumer, and several versions of them.
+// The generated code can be produced exactly as follows:
+// go run github.com/alvaroloes/enumer@v1.0.0 -type=CompatibilityMode -transform=snake -trimprefix CompatibilityMode -output compatibility_mode_gen.go
+//
 //go:generate enumer -type=CompatibilityMode -transform=snake -trimprefix CompatibilityMode -output compatibility_mode_gen.go
 type CompatibilityMode uint8
 
