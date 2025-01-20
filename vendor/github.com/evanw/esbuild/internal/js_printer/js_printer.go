@@ -1749,7 +1749,7 @@ func (p *printer) guardAgainstBehaviorChangeDueToSubstitution(expr js_ast.Expr, 
 // module numeric constants and bitwise operations. This is not an general-
 // purpose/optimal approach and never will be. For example, we can't affect
 // tree shaking at this stage because it has already happened.
-func (p *printer) lateConstantFoldUnaryOrBinaryExpr(expr js_ast.Expr) js_ast.Expr {
+func (p *printer) lateConstantFoldUnaryOrBinaryOrIfExpr(expr js_ast.Expr) js_ast.Expr {
 	switch e := expr.Data.(type) {
 	case *js_ast.EImportIdentifier:
 		ref := ast.FollowSymbols(p.symbols, e.Ref)
@@ -1758,23 +1758,28 @@ func (p *printer) lateConstantFoldUnaryOrBinaryExpr(expr js_ast.Expr) js_ast.Exp
 		}
 
 	case *js_ast.EDot:
-		if value, ok := p.tryToGetImportedEnumValue(e.Target, e.Name); ok && value.String == nil {
-			value := js_ast.Expr{Loc: expr.Loc, Data: &js_ast.ENumber{Value: value.Number}}
+		if value, ok := p.tryToGetImportedEnumValue(e.Target, e.Name); ok {
+			var inlinedValue js_ast.Expr
+			if value.String != nil {
+				inlinedValue = js_ast.Expr{Loc: expr.Loc, Data: &js_ast.EString{Value: value.String}}
+			} else {
+				inlinedValue = js_ast.Expr{Loc: expr.Loc, Data: &js_ast.ENumber{Value: value.Number}}
+			}
 
 			if strings.Contains(e.Name, "*/") {
 				// Don't wrap with a comment
-				return value
+				return inlinedValue
 			}
 
 			// Wrap with a comment
-			return js_ast.Expr{Loc: value.Loc, Data: &js_ast.EInlinedEnum{
-				Value:   value,
+			return js_ast.Expr{Loc: inlinedValue.Loc, Data: &js_ast.EInlinedEnum{
+				Value:   inlinedValue,
 				Comment: e.Name,
 			}}
 		}
 
 	case *js_ast.EUnary:
-		value := p.lateConstantFoldUnaryOrBinaryExpr(e.Value)
+		value := p.lateConstantFoldUnaryOrBinaryOrIfExpr(e.Value)
 
 		// Only fold again if something chained
 		if value.Data != e.Value.Data {
@@ -1797,22 +1802,39 @@ func (p *printer) lateConstantFoldUnaryOrBinaryExpr(expr js_ast.Expr) js_ast.Exp
 		}
 
 	case *js_ast.EBinary:
-		left := p.lateConstantFoldUnaryOrBinaryExpr(e.Left)
-		right := p.lateConstantFoldUnaryOrBinaryExpr(e.Right)
+		left := p.lateConstantFoldUnaryOrBinaryOrIfExpr(e.Left)
+		right := p.lateConstantFoldUnaryOrBinaryOrIfExpr(e.Right)
 
 		// Only fold again if something changed
 		if left.Data != e.Left.Data || right.Data != e.Right.Data {
 			binary := &js_ast.EBinary{Op: e.Op, Left: left, Right: right}
 
 			// Only fold certain operations (just like the parser)
-			if js_ast.ShouldFoldBinaryArithmeticWhenMinifying(binary) {
-				if result := js_ast.FoldBinaryArithmetic(expr.Loc, binary); result.Data != nil {
+			if js_ast.ShouldFoldBinaryOperatorWhenMinifying(binary) {
+				if result := js_ast.FoldBinaryOperator(expr.Loc, binary); result.Data != nil {
 					return result
 				}
 			}
 
 			// Don't mutate the original AST
 			expr.Data = binary
+		}
+
+	case *js_ast.EIf:
+		test := p.lateConstantFoldUnaryOrBinaryOrIfExpr(e.Test)
+
+		// Only fold again if something changed
+		if test.Data != e.Test.Data {
+			if boolean, sideEffects, ok := js_ast.ToBooleanWithSideEffects(test.Data); ok && sideEffects == js_ast.NoSideEffects {
+				if boolean {
+					return p.lateConstantFoldUnaryOrBinaryOrIfExpr(e.Yes)
+				} else {
+					return p.lateConstantFoldUnaryOrBinaryOrIfExpr(e.No)
+				}
+			}
+
+			// Don't mutate the original AST
+			expr.Data = &js_ast.EIf{Test: test, Yes: e.Yes, No: e.No}
 		}
 	}
 
@@ -1964,7 +1986,7 @@ const (
 	isDeleteTarget
 	isCallTargetOrTemplateTag
 	isPropertyAccessTarget
-	parentWasUnaryOrBinary
+	parentWasUnaryOrBinaryOrIfTest
 )
 
 func (p *printer) printExpr(expr js_ast.Expr, level js_ast.L, flags printExprFlags) {
@@ -1978,10 +2000,10 @@ func (p *printer) printExpr(expr js_ast.Expr, level js_ast.L, flags printExprFla
 	// This sets a flag to avoid doing this when the parent is a unary or binary
 	// operator so that we don't trigger O(n^2) behavior when traversing over a
 	// large expression tree.
-	if p.options.MinifySyntax && (flags&parentWasUnaryOrBinary) == 0 {
+	if p.options.MinifySyntax && (flags&parentWasUnaryOrBinaryOrIfTest) == 0 {
 		switch expr.Data.(type) {
-		case *js_ast.EUnary, *js_ast.EBinary:
-			expr = p.lateConstantFoldUnaryOrBinaryExpr(expr)
+		case *js_ast.EUnary, *js_ast.EBinary, *js_ast.EIf:
+			expr = p.lateConstantFoldUnaryOrBinaryOrIfExpr(expr)
 		}
 	}
 
@@ -2650,7 +2672,7 @@ func (p *printer) printExpr(expr js_ast.Expr, level js_ast.L, flags printExprFla
 			p.print("(")
 			flags &= ^forbidIn
 		}
-		p.printExpr(e.Test, js_ast.LConditional, flags&forbidIn)
+		p.printExpr(e.Test, js_ast.LConditional, (flags&forbidIn)|parentWasUnaryOrBinaryOrIfTest)
 		p.printSpace()
 		p.print("?")
 		if p.options.LineLimit <= 0 || !p.printNewlinePastLineLimit() {
@@ -3136,7 +3158,7 @@ func (p *printer) printExpr(expr js_ast.Expr, level js_ast.L, flags printExprFla
 		}
 
 		if !e.Op.IsPrefix() {
-			p.printExpr(e.Value, js_ast.LPostfix-1, parentWasUnaryOrBinary)
+			p.printExpr(e.Value, js_ast.LPostfix-1, parentWasUnaryOrBinaryOrIfTest)
 		}
 
 		if entry.IsKeyword {
@@ -3157,7 +3179,7 @@ func (p *printer) printExpr(expr js_ast.Expr, level js_ast.L, flags printExprFla
 		}
 
 		if e.Op.IsPrefix() {
-			valueFlags := parentWasUnaryOrBinary
+			valueFlags := parentWasUnaryOrBinaryOrIfTest
 			if e.Op == js_ast.UnOpDelete {
 				valueFlags |= isDeleteTarget
 			}
@@ -3347,9 +3369,9 @@ func (v *binaryExprVisitor) checkAndPrepare(p *printer) bool {
 
 	if e.Op == js_ast.BinOpComma {
 		// The result of the left operand of the comma operator is unused
-		v.leftFlags = (v.flags & forbidIn) | exprResultIsUnused | parentWasUnaryOrBinary
+		v.leftFlags = (v.flags & forbidIn) | exprResultIsUnused | parentWasUnaryOrBinaryOrIfTest
 	} else {
-		v.leftFlags = (v.flags & forbidIn) | parentWasUnaryOrBinary
+		v.leftFlags = (v.flags & forbidIn) | parentWasUnaryOrBinaryOrIfTest
 	}
 	return true
 }
@@ -3377,9 +3399,9 @@ func (v *binaryExprVisitor) visitRightAndFinish(p *printer) {
 
 	if e.Op == js_ast.BinOpComma {
 		// The result of the right operand of the comma operator is unused if the caller doesn't use it
-		p.printExpr(e.Right, v.rightLevel, (v.flags&(forbidIn|exprResultIsUnused))|parentWasUnaryOrBinary)
+		p.printExpr(e.Right, v.rightLevel, (v.flags&(forbidIn|exprResultIsUnused))|parentWasUnaryOrBinaryOrIfTest)
 	} else {
-		p.printExpr(e.Right, v.rightLevel, (v.flags&forbidIn)|parentWasUnaryOrBinary)
+		p.printExpr(e.Right, v.rightLevel, (v.flags&forbidIn)|parentWasUnaryOrBinaryOrIfTest)
 	}
 
 	if v.wrap {
@@ -4555,6 +4577,7 @@ func (p *printer) printStmt(stmt js_ast.Stmt, flags printStmtFlags) {
 		for _, c := range s.Cases {
 			p.printSemicolonIfNeeded()
 			p.printIndent()
+			p.printExprCommentsAtLoc(c.Loc)
 			p.addSourceMapping(c.Loc)
 
 			if c.ValueOrNil.Data != nil {
