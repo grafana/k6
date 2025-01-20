@@ -527,10 +527,6 @@ func (m *FrameManager) requestFinished(req *Request) {
 	*/
 }
 
-func (m *FrameManager) requestReceivedResponse(res *Response) {
-	m.logger.Debugf("FrameManager:requestReceivedResponse", "fmid:%d rurl:%s", m.ID(), res.URL())
-}
-
 func (m *FrameManager) requestStarted(req *Request) {
 	m.logger.Debugf("FrameManager:requestStarted", "fmid:%d rurl:%s", m.ID(), req.URL())
 
