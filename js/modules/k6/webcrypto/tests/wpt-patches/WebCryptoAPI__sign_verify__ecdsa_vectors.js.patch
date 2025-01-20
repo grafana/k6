@@ -1,0 +1,43 @@
+diff --git a/WebCryptoAPI/sign_verify/ecdsa_vectors.js b/WebCryptoAPI/sign_verify/ecdsa_vectors.js
+index aa9b81ba8..185c82622 100644
+--- a/WebCryptoAPI/sign_verify/ecdsa_vectors.js
++++ b/WebCryptoAPI/sign_verify/ecdsa_vectors.js
+@@ -90,7 +90,9 @@ function getInvalidTestVectors() {
+         {
+             const vector = structuredClone(validVector);
+             vector.name = `${vector.name} - The signature was truncated by 1 byte`;
+-            vector.signature = vector.signature.subarray(0, vector.signature.byteLength - 1);
++            // this copyUint8Array is a workaround, since we have to modify the way how we read ArrayBuffers
++            // https://github.com/grafana/xk6-webcrypto/issues/72
++            vector.signature = copyUint8Array(vector.signature.subarray(0, vector.signature.byteLength - 1));
+             vectors.push(vector);
+         }
+ 
+@@ -137,3 +139,26 @@ function getInvalidTestVectors() {
+ 
+     return vectors;
+ }
++
++// k6 has no structuredClone
++// we implement a naive version here
++function structuredClone(origin) {
++    return {
++        name: origin.name,
++        publicKeyBuffer: copyUint8Array(origin.publicKeyBuffer), // Uint8Array
++        publicKeyFormat: origin.publicKeyFormat,
++        publicKey: origin.publicKey,
++        privateKeyBuffer: copyUint8Array(origin.privateKeyBuffer), // Uint8Array
++        privateKeyFormat: origin.privateKeyFormat,
++        privateKey: origin.privateKey,
++        algorithmName: origin.algorithmName,
++        namedCurve: origin.namedCurve,
++        hashName: origin.hashName,
++        plaintext: copyUint8Array(origin.plaintext), // Uint8Array
++        signature: copyUint8Array(origin.signature), // Uint8Array
++    }
++}
++
++function copyUint8Array(a) {
++    return new Uint8Array(a);
++}
+\ No newline at end of file

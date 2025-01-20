@@ -23,10 +23,10 @@ import (
 	"go.k6.io/k6/js/modules/k6/http"
 	"go.k6.io/k6/js/modules/k6/metrics"
 	"go.k6.io/k6/js/modules/k6/timers"
+	"go.k6.io/k6/js/modules/k6/webcrypto"
 	"go.k6.io/k6/js/modules/k6/ws"
 
 	"github.com/grafana/xk6-redis/redis"
-	"github.com/grafana/xk6-webcrypto/webcrypto"
 )
 
 func getInternalJSModules() map[string]interface{} {

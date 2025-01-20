@@ -34,3 +34,6 @@ script.js
 
 /packaging/.env
 /packaging/*.gpg
+
+# web platform tests
+js/modules/k6/webcrypto/tests/wpt/

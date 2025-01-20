@@ -52,10 +52,7 @@ import (
 // this message itself. See https://cloud.google.com/apis/design/glossary for
 // detailed terminology.
 type Api struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
+	state protoimpl.MessageState `protogen:"open.v1"`
 	// The fully qualified name of this interface, including package name
 	// followed by the interface's simple name.
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
@@ -89,7 +86,9 @@ type Api struct {
 	// Included interfaces. See [Mixin][].
 	Mixins []*Mixin `protobuf:"bytes,6,rep,name=mixins,proto3" json:"mixins,omitempty"`
 	// The source syntax of the service.
-	Syntax typepb.Syntax `protobuf:"varint,7,opt,name=syntax,proto3,enum=google.protobuf.Syntax" json:"syntax,omitempty"`
+	Syntax        typepb.Syntax `protobuf:"varint,7,opt,name=syntax,proto3,enum=google.protobuf.Syntax" json:"syntax,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Api) Reset() {
@@ -173,10 +172,7 @@ func (x *Api) GetSyntax() typepb.Syntax {
 
 // Method represents a method of an API interface.
 type Method struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
+	state protoimpl.MessageState `protogen:"open.v1"`
 	// The simple name of this method.
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// A URL of the input message type.
@@ -190,7 +186,9 @@ type Method struct {
 	// Any metadata attached to the method.
 	Options []*typepb.Option `protobuf:"bytes,6,rep,name=options,proto3" json:"options,omitempty"`
 	// The source syntax of this method.
-	Syntax typepb.Syntax `protobuf:"varint,7,opt,name=syntax,proto3,enum=google.protobuf.Syntax" json:"syntax,omitempty"`
+	Syntax        typepb.Syntax `protobuf:"varint,7,opt,name=syntax,proto3,enum=google.protobuf.Syntax" json:"syntax,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Method) Reset() {
@@ -319,7 +317,7 @@ func (x *Method) GetSyntax() typepb.Syntax {
 // The mixin construct implies that all methods in `AccessControl` are
 // also declared with same name and request/response types in
 // `Storage`. A documentation generator or annotation processor will
-// see the effective `Storage.GetAcl` method after inherting
+// see the effective `Storage.GetAcl` method after inheriting
 // documentation and annotations as follows:
 //
 //	service Storage {
@@ -351,15 +349,14 @@ func (x *Method) GetSyntax() typepb.Syntax {
 //	  ...
 //	}
 type Mixin struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
+	state protoimpl.MessageState `protogen:"open.v1"`
 	// The fully qualified name of the interface which is included.
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// If non-empty specifies a path under which inherited HTTP paths
 	// are rooted.
-	Root string `protobuf:"bytes,2,opt,name=root,proto3" json:"root,omitempty"`
+	Root          string `protobuf:"bytes,2,opt,name=root,proto3" json:"root,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Mixin) Reset() {

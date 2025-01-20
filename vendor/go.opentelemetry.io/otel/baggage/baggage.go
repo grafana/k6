@@ -50,7 +50,7 @@ type Property struct {
 // component boundaries may impose their own restrictions on Property key.
 // For example, the W3C Baggage specification restricts the Property keys to strings that
 // satisfy the token definition from RFC7230, Section 3.2.6.
-// For maximum compatibility, alpha-numeric value are strongly recommended to be used as Property key.
+// For maximum compatibility, alphanumeric value are strongly recommended to be used as Property key.
 func NewKeyProperty(key string) (Property, error) {
 	if !validateBaggageName(key) {
 		return newInvalidProperty(), fmt.Errorf("%w: %q", errInvalidKey, key)
@@ -90,7 +90,7 @@ func NewKeyValueProperty(key, value string) (Property, error) {
 // component boundaries may impose their own restrictions on Property key.
 // For example, the W3C Baggage specification restricts the Property keys to strings that
 // satisfy the token definition from RFC7230, Section 3.2.6.
-// For maximum compatibility, alpha-numeric value are strongly recommended to be used as Property key.
+// For maximum compatibility, alphanumeric value are strongly recommended to be used as Property key.
 func NewKeyValuePropertyRaw(key, value string) (Property, error) {
 	if !validateBaggageName(key) {
 		return newInvalidProperty(), fmt.Errorf("%w: %q", errInvalidKey, key)
@@ -287,7 +287,7 @@ func NewMember(key, value string, props ...Property) (Member, error) {
 // component boundaries may impose their own restrictions on baggage key.
 // For example, the W3C Baggage specification restricts the baggage keys to strings that
 // satisfy the token definition from RFC7230, Section 3.2.6.
-// For maximum compatibility, alpha-numeric value are strongly recommended to be used as baggage key.
+// For maximum compatibility, alphanumeric value are strongly recommended to be used as baggage key.
 func NewMemberRaw(key, value string, props ...Property) (Member, error) {
 	m := Member{
 		key:        key,

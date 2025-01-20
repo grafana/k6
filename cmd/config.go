@@ -198,9 +198,15 @@ func getConsolidatedConfig(gs *state.GlobalState, cliConf Config, runnerOpts lib
 
 	conf = cliConf.Apply(fileConf)
 
+	warnOnShortHandOverride(conf.Options, runnerOpts, "script", gs.Logger)
 	conf = conf.Apply(Config{Options: runnerOpts})
 
-	conf = conf.Apply(envConf).Apply(cliConf)
+	warnOnShortHandOverride(conf.Options, envConf.Options, "env", gs.Logger)
+	conf = conf.Apply(envConf)
+
+	warnOnShortHandOverride(conf.Options, cliConf.Options, "cli", gs.Logger)
+	conf = conf.Apply(cliConf)
+
 	conf = applyDefault(conf)
 
 	// TODO(imiric): Move this validation where it makes sense in the configuration
@@ -213,6 +219,15 @@ func getConsolidatedConfig(gs *state.GlobalState, cliConf Config, runnerOpts lib
 	}
 
 	return conf, nil
+}
+
+func warnOnShortHandOverride(a, b lib.Options, bName string, logger logrus.FieldLogger) {
+	if a.Scenarios != nil &&
+		(b.Duration.Valid || b.Iterations.Valid || b.Stages != nil || b.Scenarios != nil) {
+		logger.Warnf(
+			"%q level configuration overrode scenarios configuration entirely",
+			bName)
+	}
 }
 
 // applyDefault applies the default options value if it is not specified.
