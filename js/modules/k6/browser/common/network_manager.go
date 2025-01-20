@@ -660,7 +660,8 @@ func (m *NetworkManager) onResponseReceived(event *network.EventResponseReceived
 	req.responseMu.Lock()
 	req.response = resp
 	req.responseMu.Unlock()
-	m.frameManager.requestReceivedResponse(resp)
+
+	m.logger.Debugf("FrameManager:onResponseReceived", "rid:%s rurl:%s", event.RequestID, resp.URL())
 }
 
 func (m *NetworkManager) requestFromID(reqID network.RequestID) (*Request, bool) {
