@@ -660,8 +660,14 @@ func (fs *FrameSession) onConsoleAPICalled(event *cdpruntime.EventConsoleAPICall
 	l.Debug(msg)
 }
 
+// We should consider building an API around this as it could be useful
+// information about the user's website not handling exceptions.
 func (fs *FrameSession) onExceptionThrown(event *cdpruntime.EventExceptionThrown) {
-	fs.page.emit(EventPageError, event.ExceptionDetails)
+	fs.logger.Debugf("FrameSession:onExceptionThrown",
+		"sid:%v tid:%v url:%s line:%d col:%d text:%s",
+		fs.session.ID(), fs.targetID, event.ExceptionDetails.URL,
+		event.ExceptionDetails.LineNumber, event.ExceptionDetails.ColumnNumber,
+		event.ExceptionDetails.Text)
 }
 
 func (fs *FrameSession) onExecutionContextCreated(event *cdpruntime.EventExecutionContextCreated) {
@@ -1049,7 +1055,7 @@ func (fs *FrameSession) onDetachedFromTarget(event *target.EventDetachedFromTarg
 		"sid:%v tid:%v esid:%v",
 		fs.session.ID(), fs.targetID, event.SessionID)
 
-	fs.page.closeWorker(event.SessionID)
+	fs.page.removeWorker(event.SessionID)
 }
 
 func (fs *FrameSession) onTargetCrashed() {
@@ -1061,7 +1067,6 @@ func (fs *FrameSession) onTargetCrashed() {
 		k6ext.Panic(fs.ctx, "unexpected type %T", fs.session)
 	}
 	s.markAsCrashed()
-	fs.page.didCrash()
 }
 
 func (fs *FrameSession) updateEmulateMedia() error {
