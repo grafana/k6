@@ -26,7 +26,7 @@ index 1cd84215e..e2f14adbd 100644
          run: |
            set -x
 -          cd js/modules/k6/webcrypto/tests
-+          cd internal/js/modules/k6/webcrypto/tests
++          cd internal/js/modules/k6/experimental/webcrypto/tests
            sh checkout.sh
            go test ./... -tags=wpt
 diff --git a/.gitignore b/.gitignore
