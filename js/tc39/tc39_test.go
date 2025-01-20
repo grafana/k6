@@ -644,7 +644,7 @@ func (ctx *tc39TestCtx) runFile(base, name string, vm *sobek.Runtime) error {
 
 func (ctx *tc39TestCtx) compileOnly(src, name string, compatibilityMode lib.CompatibilityMode) (*sobek.Program, error) {
 	comp := ctx.compiler()
-	if compatibilityMode == lib.CompatibilityModeExperimentalEnhanced {
+	if compatibilityMode == lib.CompatibilityModeEnhanced {
 		code, _, err := compiler.StripTypes(src, name)
 		if err != nil {
 			return nil, err
@@ -722,7 +722,7 @@ func (ctx *tc39TestCtx) runTC39Module(name, src string, includes []string, vm *s
 		func(specifier *url.URL, _ string) ([]byte, error) {
 			b, err := fs.ReadFile(os.DirFS("."), specifier.Path[1:])
 
-			if ctx.compatibilityMode == lib.CompatibilityModeExperimentalEnhanced {
+			if ctx.compatibilityMode == lib.CompatibilityModeEnhanced {
 				code, _, err := compiler.StripTypes(string(b), name)
 				if err != nil {
 					return nil, err
@@ -797,7 +797,7 @@ func TestTC39(t *testing.T) {
 	}
 
 	runTestTC39(t, lib.CompatibilityModeExtended)
-	runTestTC39(t, lib.CompatibilityModeExperimentalEnhanced)
+	runTestTC39(t, lib.CompatibilityModeEnhanced)
 }
 
 func runTestTC39(t *testing.T, compatibilityMode lib.CompatibilityMode) {

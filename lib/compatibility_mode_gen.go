@@ -6,9 +6,9 @@ import (
 	"fmt"
 )
 
-const _CompatibilityModeName = "extendedbaseexperimental_enhanced"
+const _CompatibilityModeName = "extendedbaseenhanced"
 
-var _CompatibilityModeIndex = [...]uint8{0, 8, 12, 33}
+var _CompatibilityModeIndex = [...]uint8{0, 8, 12, 20}
 
 func (i CompatibilityMode) String() string {
 	i -= 1
@@ -23,7 +23,7 @@ var _CompatibilityModeValues = []CompatibilityMode{1, 2, 3}
 var _CompatibilityModeNameToValueMap = map[string]CompatibilityMode{
 	_CompatibilityModeName[0:8]:   1,
 	_CompatibilityModeName[8:12]:  2,
-	_CompatibilityModeName[12:33]: 3,
+	_CompatibilityModeName[12:20]: 3,
 }
 
 // CompatibilityModeString retrieves an enum value from the enum constants string name.

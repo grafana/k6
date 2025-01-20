@@ -34,22 +34,22 @@ func Test_esbuildTransform_ts(t *testing.T) {
 	require.NotEmpty(t, code)
 }
 
-func TestCompile_experimental_enhanced(t *testing.T) {
+func TestCompile_enhanced(t *testing.T) {
 	t.Parallel()
 
-	t.Run("experimental_enhanced Invalid", func(t *testing.T) {
+	t.Run("enhanced Invalid", func(t *testing.T) {
 		t.Parallel()
 		c := New(testutils.NewLogger(t))
 		src := `1+(function() { return 2; )()`
-		c.Options.CompatibilityMode = lib.CompatibilityModeExperimentalEnhanced
+		c.Options.CompatibilityMode = lib.CompatibilityModeEnhanced
 		_, _, err := c.Parse(src, "script.ts", false, false)
 		assert.IsType(t, &parser.Error{}, err)
 		assert.Contains(t, err.Error(), `script.ts: Line 1:26 Unexpected ")"`)
 	})
-	t.Run("experimental_enhanced", func(t *testing.T) {
+	t.Run("enhanced", func(t *testing.T) {
 		t.Parallel()
 		c := New(testutils.NewLogger(t))
-		c.Options.CompatibilityMode = lib.CompatibilityModeExperimentalEnhanced
+		c.Options.CompatibilityMode = lib.CompatibilityModeEnhanced
 		prg, code, err := c.Parse(`let t :string = "something"; require(t);`, "script.ts", false, false)
 		require.NoError(t, err)
 		assert.Equal(t, `let t = "something";
@@ -67,10 +67,10 @@ require(t);
 		require.NoError(t, err)
 		require.True(t, requireCalled)
 	})
-	t.Run("experimental_enhanced sourcemap", func(t *testing.T) {
+	t.Run("enhanced sourcemap", func(t *testing.T) {
 		t.Parallel()
 		c := New(testutils.NewLogger(t))
-		c.Options.CompatibilityMode = lib.CompatibilityModeExperimentalEnhanced
+		c.Options.CompatibilityMode = lib.CompatibilityModeEnhanced
 		c.Options.SourceMapLoader = func(_ string) ([]byte, error) { return nil, nil }
 		_, code, err := c.Parse(`let t :string = "something"; require(t);`, "script.ts", false, false)
 		require.NoError(t, err)

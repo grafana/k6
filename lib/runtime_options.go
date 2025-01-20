@@ -21,8 +21,8 @@ const (
 	CompatibilityModeExtended CompatibilityMode = iota + 1
 	// CompatibilityModeBase is standard Sobek, which means pure vanilla JS following ECMAScript standards.
 	CompatibilityModeBase
-	// CompatibilityModeExperimentalEnhanced achieves TypeScript and ES6+ compatibility with esbuild
-	CompatibilityModeExperimentalEnhanced
+	// CompatibilityModeEnhanced achieves TypeScript and ES6+ compatibility with esbuild
+	CompatibilityModeEnhanced
 )
 
 // RuntimeOptions are settings passed onto the Sobek JS runtime
