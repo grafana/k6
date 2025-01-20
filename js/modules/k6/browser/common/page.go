@@ -603,7 +603,11 @@ func (p *Page) getFrameElement(f *Frame) (handle *ElementHandle, _ error) {
 	for ; rootFrame.parentFrame != nil; rootFrame = rootFrame.parentFrame {
 	}
 
-	parentSession := p.getFrameSession(cdp.FrameID(rootFrame.ID()))
+	parentSession, ok := p.getFrameSession(cdp.FrameID(rootFrame.ID()))
+	if !ok {
+		return nil, errors.New("parent frame has been detached")
+	}
+
 	action := dom.GetFrameOwner(cdp.FrameID(f.ID()))
 	backendNodeID, _, err := action.Do(cdp.WithExecutor(p.ctx, parentSession.session))
 	if err != nil {
@@ -678,18 +682,28 @@ func (p *Page) getOwnerFrame(apiCtx context.Context, h *ElementHandle) (cdp.Fram
 	return frameID, nil
 }
 
-func (p *Page) attachFrameSession(fid cdp.FrameID, fs *FrameSession) {
+func (p *Page) attachFrameSession(fid cdp.FrameID, fs *FrameSession) error {
 	p.logger.Debugf("Page:attachFrameSession", "sid:%v fid=%v", p.session.ID(), fid)
+
+	if fs == nil {
+		return errors.New("internal error: FrameSession is nil")
+	}
+
 	p.frameSessionsMu.Lock()
 	defer p.frameSessionsMu.Unlock()
 	fs.page.frameSessions[fid] = fs
+
+	return nil
 }
 
-func (p *Page) getFrameSession(frameID cdp.FrameID) *FrameSession {
+func (p *Page) getFrameSession(frameID cdp.FrameID) (*FrameSession, bool) {
 	p.logger.Debugf("Page:getFrameSession", "sid:%v fid:%v", p.sessionID(), frameID)
 	p.frameSessionsMu.RLock()
 	defer p.frameSessionsMu.RUnlock()
-	return p.frameSessions[frameID]
+
+	v, ok := p.frameSessions[frameID]
+
+	return v, ok
 }
 
 func (p *Page) hasRoutes() bool {

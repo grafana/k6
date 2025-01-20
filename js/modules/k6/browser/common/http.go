@@ -20,6 +20,30 @@ import (
 	k6modules "go.k6.io/k6/js/modules"
 )
 
+// These ResourceTypes are duplicates of CDP's network.ResourceType. We want to work
+// with our version of ResourceType to catch any breaking changes early.
+const (
+	ResourceTypeDocument           string = "Document"
+	ResourceTypeStylesheet         string = "Stylesheet"
+	ResourceTypeImage              string = "Image"
+	ResourceTypeMedia              string = "Media"
+	ResourceTypeFont               string = "Font"
+	ResourceTypeScript             string = "Script"
+	ResourceTypeTextTrack          string = "TextTrack"
+	ResourceTypeXHR                string = "XHR"
+	ResourceTypeFetch              string = "Fetch"
+	ResourceTypePrefetch           string = "Prefetch"
+	ResourceTypeEventSource        string = "EventSource"
+	ResourceTypeWebSocket          string = "WebSocket"
+	ResourceTypeManifest           string = "Manifest"
+	ResourceTypeSignedExchange     string = "SignedExchange"
+	ResourceTypePing               string = "Ping"
+	ResourceTypeCSPViolationReport string = "CSPViolationReport"
+	ResourceTypePreflight          string = "Preflight"
+	ResourceTypeOther              string = "Other"
+	ResourceTypeUnknown            string = "Unknown"
+)
+
 // HTTPHeader is a single HTTP header.
 type HTTPHeader struct {
 	Name  string `json:"name"`
@@ -88,7 +112,7 @@ type NewRequestParams struct {
 }
 
 // NewRequest creates a new HTTP request.
-func NewRequest(ctx context.Context, rp NewRequestParams) (*Request, error) {
+func NewRequest(ctx context.Context, logger *log.Logger, rp NewRequestParams) (*Request, error) {
 	ev := rp.event
 
 	documentID := cdp.LoaderID("")
@@ -129,7 +153,7 @@ func NewRequest(ctx context.Context, rp NewRequestParams) (*Request, error) {
 		requestID:           ev.RequestID,
 		method:              ev.Request.Method,
 		postDataEntries:     pd,
-		resourceType:        ev.Type.String(),
+		resourceType:        validateResourceType(logger, ev.Type.String()),
 		isNavigationRequest: isNavigationRequest,
 		allowInterception:   rp.allowInterception,
 		interceptionID:      rp.interceptionID,
@@ -148,6 +172,41 @@ func NewRequest(ctx context.Context, rp NewRequestParams) (*Request, error) {
 	}
 
 	return &r, nil
+}
+
+// validateResourceType will validate network.ResourceType string values against our own
+// ResourceType string values.
+//   - If a new network.ResourceType is added, this will log a warn and return
+//     ResourceTypeUnknown.
+//   - If an existing network.ResourceType is amended, this will log a warn and return
+//     ResourceTypeUnknown.
+//   - If a network.ResourceType is deleted then we will get a compilation error.
+func validateResourceType(logger *log.Logger, t string) string {
+	switch t {
+	case ResourceTypeDocument:
+	case ResourceTypeStylesheet:
+	case ResourceTypeImage:
+	case ResourceTypeMedia:
+	case ResourceTypeFont:
+	case ResourceTypeScript:
+	case ResourceTypeTextTrack:
+	case ResourceTypeXHR:
+	case ResourceTypeFetch:
+	case ResourceTypePrefetch:
+	case ResourceTypeEventSource:
+	case ResourceTypeWebSocket:
+	case ResourceTypeManifest:
+	case ResourceTypeSignedExchange:
+	case ResourceTypePing:
+	case ResourceTypeCSPViolationReport:
+	case ResourceTypePreflight:
+	case ResourceTypeOther:
+	default:
+		t = ResourceTypeUnknown
+		logger.Warnf("http:resourceType", "unknown network.ResourceType %q detected", t)
+	}
+
+	return t
 }
 
 func (r *Request) getFrame() *Frame {

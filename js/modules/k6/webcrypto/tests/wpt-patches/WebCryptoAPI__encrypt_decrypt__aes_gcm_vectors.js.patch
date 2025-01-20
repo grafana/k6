@@ -1,0 +1,16 @@
+diff --git a/WebCryptoAPI/encrypt_decrypt/aes_gcm_vectors.js b/WebCryptoAPI/encrypt_decrypt/aes_gcm_vectors.js
+index 965fe9564..0364b93cd 100644
+--- a/WebCryptoAPI/encrypt_decrypt/aes_gcm_vectors.js
++++ b/WebCryptoAPI/encrypt_decrypt/aes_gcm_vectors.js
+@@ -22,7 +22,10 @@ function getTestVectors() {
+     } = getFixtures();
+ 
+     var keyLengths = [128, 192, 256];
+-    var tagLengths = [32, 64, 96, 104, 112, 120, 128];
++    // NOTE @oleiade: The following tag lengths are not supported by the
++    // current implementation of the AES-GCM algorithm in the Go standard
++    // library: 32, 64
++    var tagLengths = [96, 104, 112, 120, 128];
+ 
+     // All the scenarios that should succeed, if the key has "encrypt" usage
+     var passing = [];

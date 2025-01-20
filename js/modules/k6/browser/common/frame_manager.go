@@ -177,8 +177,8 @@ func (m *FrameManager) frameDetached(frameID cdp.FrameID, reason cdppage.FrameDe
 	// when the type of detach is a swap. After this detach event usually
 	// the iframe navigates, which requires the frames to be present for the
 	// navigate to work.
-	fs := m.page.getFrameSession(frameID)
-	if fs != nil {
+	fs, ok := m.page.getFrameSession(frameID)
+	if ok {
 		m.logger.Debugf("FrameManager:frameDetached:sessionFound",
 			"fmid:%d fid:%v fsID1:%v fsID2:%v found session for frame",
 			m.ID(), frameID, fs.session.ID(), m.session.ID())
@@ -657,8 +657,8 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *Frame
 		})
 	defer lifecycleEvtCancel()
 
-	fs := frame.page.getFrameSession(cdp.FrameID(frame.ID()))
-	if fs == nil {
+	fs, ok := frame.page.getFrameSession(cdp.FrameID(frame.ID()))
+	if !ok {
 		m.logger.Debugf("FrameManager:NavigateFrame",
 			"fmid:%d fid:%v furl:%s url:%s fs:nil",
 			fmid, fid, furl, url)

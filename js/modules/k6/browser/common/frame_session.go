@@ -1024,7 +1024,10 @@ func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, sid target.Session
 		return fmt.Errorf("attaching iframe target ID %v to session ID %v: %w",
 			ti.TargetID, sid, err)
 	}
-	fs.page.attachFrameSession(cdp.FrameID(ti.TargetID), nfs)
+
+	if err := fs.page.attachFrameSession(cdp.FrameID(ti.TargetID), nfs); err != nil {
+		return err
+	}
 
 	return nil
 }

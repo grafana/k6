@@ -1,6 +1,7 @@
 package common
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/js/modules/k6/browser/k6ext/k6test"
+	"go.k6.io/k6/js/modules/k6/browser/log"
 )
 
 func TestRequest(t *testing.T) {
@@ -30,7 +32,7 @@ func TestRequest(t *testing.T) {
 		WallTime:  &wt,
 	}
 	vu := k6test.NewVU(t)
-	req, err := NewRequest(vu.Context(), NewRequestParams{
+	req, err := NewRequest(vu.Context(), log.NewNullLogger(), NewRequestParams{
 		event:          evt,
 		interceptionID: "intercept",
 	})
@@ -51,7 +53,7 @@ func TestRequest(t *testing.T) {
 			WallTime:  &wt,
 		}
 		vu := k6test.NewVU(t)
-		req, err := NewRequest(vu.Context(), NewRequestParams{
+		req, err := NewRequest(vu.Context(), log.NewNullLogger(), NewRequestParams{
 			event:          evt,
 			interceptionID: "intercept",
 		})
@@ -123,4 +125,45 @@ func TestResponse(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, "value", got)
 	})
+}
+
+func TestValidateResourceType(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{name: ResourceTypeDocument, input: network.ResourceTypeDocument.String(), want: ResourceTypeDocument},
+		{name: ResourceTypeStylesheet, input: network.ResourceTypeStylesheet.String(), want: ResourceTypeStylesheet},
+		{name: ResourceTypeImage, input: network.ResourceTypeImage.String(), want: ResourceTypeImage},
+		{name: ResourceTypeMedia, input: network.ResourceTypeMedia.String(), want: ResourceTypeMedia},
+		{name: ResourceTypeFont, input: network.ResourceTypeFont.String(), want: ResourceTypeFont},
+		{name: ResourceTypeScript, input: network.ResourceTypeScript.String(), want: ResourceTypeScript},
+		{name: ResourceTypeTextTrack, input: network.ResourceTypeTextTrack.String(), want: ResourceTypeTextTrack},
+		{name: ResourceTypeXHR, input: network.ResourceTypeXHR.String(), want: ResourceTypeXHR},
+		{name: ResourceTypeFetch, input: network.ResourceTypeFetch.String(), want: ResourceTypeFetch},
+		{name: ResourceTypePrefetch, input: network.ResourceTypePrefetch.String(), want: ResourceTypePrefetch},
+		{name: ResourceTypeEventSource, input: network.ResourceTypeEventSource.String(), want: ResourceTypeEventSource},
+		{name: ResourceTypeWebSocket, input: network.ResourceTypeWebSocket.String(), want: ResourceTypeWebSocket},
+		{name: ResourceTypeManifest, input: network.ResourceTypeManifest.String(), want: ResourceTypeManifest},
+		{name: ResourceTypeSignedExchange, input: network.ResourceTypeSignedExchange.String(), want: ResourceTypeSignedExchange},
+		{name: ResourceTypePing, input: network.ResourceTypePing.String(), want: ResourceTypePing},
+		{name: ResourceTypeCSPViolationReport, input: network.ResourceTypeCSPViolationReport.String(), want: ResourceTypeCSPViolationReport},
+		{name: ResourceTypePreflight, input: network.ResourceTypePreflight.String(), want: ResourceTypePreflight},
+		{name: ResourceTypeOther, input: network.ResourceTypeOther.String(), want: ResourceTypeOther},
+		{name: "fake", input: "fake", want: ResourceTypeUnknown},
+		{name: "amended_existing", input: strings.ToLower(network.ResourceTypeOther.String()), want: ResourceTypeUnknown},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := validateResourceType(log.NewNullLogger(), tt.input)
+			assert.Equal(t, got, tt.want)
+		})
+	}
 }

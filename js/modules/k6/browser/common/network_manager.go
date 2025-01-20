@@ -180,6 +180,7 @@ func (m *NetworkManager) emitRequestMetrics(req *Request) {
 	if state.Options.SystemTags.Has(k6metrics.TagURL) {
 		tags = handleURLTag(m.mi, req.URL(), req.method, tags)
 	}
+	tags = tags.With("resource_type", req.ResourceType())
 
 	k6metrics.PushIfNotDone(m.vu.Context(), state.Samples, k6metrics.ConnectedSamples{
 		Samples: []k6metrics.Sample{
@@ -192,6 +193,7 @@ func (m *NetworkManager) emitRequestMetrics(req *Request) {
 	})
 }
 
+//nolint:funlen
 func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 	state := m.vu.State()
 
@@ -246,6 +248,7 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 	tags = tags.With("from_cache", strconv.FormatBool(fromCache))
 	tags = tags.With("from_prefetch_cache", strconv.FormatBool(fromPreCache))
 	tags = tags.With("from_service_worker", strconv.FormatBool(fromSvcWrk))
+	tags = tags.With("resource_type", req.ResourceType())
 
 	k6metrics.PushIfNotDone(m.vu.Context(), state.Samples, k6metrics.ConnectedSamples{
 		Samples: []k6metrics.Sample{
@@ -488,7 +491,7 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, interc
 			event.Request.URL, event.Request.Method, event.Initiator.Type, event.FrameID)
 	}
 
-	req, err := NewRequest(m.ctx, NewRequestParams{
+	req, err := NewRequest(m.ctx, m.logger, NewRequestParams{
 		event:             event,
 		frame:             frame,
 		redirectChain:     redirectChain,

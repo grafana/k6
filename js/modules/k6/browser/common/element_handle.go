@@ -71,7 +71,7 @@ func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, point Position)
 		return false, fmt.Errorf("checking hit target at %v: %w", point, err)
 	}
 	if frame != nil && frame.parentFrame != nil {
-		el, err := h.frame.FrameElement()
+		el, err := frame.FrameElement()
 		if err != nil {
 			return false, err
 		}
