@@ -1623,6 +1623,10 @@ func (c *linkerContext) scanImportsAndExports() {
 					continue
 				}
 
+				if c.options.OutputFormat == config.FormatESModule && c.options.UnsupportedJSFeatures.Has(compat.ArbitraryModuleNamespaceNames) && c.graph.Files[sourceIndex].IsEntryPoint() {
+					c.maybeForbidArbitraryModuleNamespaceIdentifier("export", export.SourceIndex, export.NameLoc, alias)
+				}
+
 				aliases = append(aliases, alias)
 			}
 			sort.Strings(aliases)
@@ -2835,6 +2839,15 @@ loop:
 	}
 
 	return
+}
+
+func (c *linkerContext) maybeForbidArbitraryModuleNamespaceIdentifier(kind string, sourceIndex uint32, loc logger.Loc, alias string) {
+	if !js_ast.IsIdentifier(alias) {
+		file := &c.graph.Files[sourceIndex]
+		where := config.PrettyPrintTargetEnvironment(c.options.OriginalTargetEnv, c.options.UnsupportedJSFeatureOverridesMask)
+		c.log.AddError(file.LineColumnTracker(), file.InputFile.Source.RangeOfString(loc), fmt.Sprintf(
+			"Using the string %q as an %s name is not supported in %s", alias, kind, where))
+	}
 }
 
 // Attempt to correct an import name with a typo
@@ -4307,6 +4320,12 @@ func (c *linkerContext) convertStmtsForChunk(sourceIndex uint32, stmtList *stmtL
 				continue
 			}
 
+			if c.options.UnsupportedJSFeatures.Has(compat.ArbitraryModuleNamespaceNames) && s.Items != nil {
+				for _, item := range *s.Items {
+					c.maybeForbidArbitraryModuleNamespaceIdentifier("import", sourceIndex, item.AliasLoc, item.Alias)
+				}
+			}
+
 			// Make sure these don't end up in the wrapper closure
 			if shouldExtractESMStmtsForWrap {
 				stmtList.outsideWrapperPrefix = append(stmtList.outsideWrapperPrefix, stmt)
@@ -4318,6 +4337,10 @@ func (c *linkerContext) convertStmtsForChunk(sourceIndex uint32, stmtList *stmtL
 			if s.Alias != nil {
 				if c.shouldRemoveImportExportStmt(sourceIndex, stmtList, stmt.Loc, s.NamespaceRef, s.ImportRecordIndex) {
 					continue
+				}
+
+				if c.options.UnsupportedJSFeatures.Has(compat.ArbitraryModuleNamespaceNames) {
+					c.maybeForbidArbitraryModuleNamespaceIdentifier("export", sourceIndex, s.Alias.Loc, s.Alias.OriginalName)
 				}
 
 				if shouldStripExports {
@@ -4426,6 +4449,15 @@ func (c *linkerContext) convertStmtsForChunk(sourceIndex uint32, stmtList *stmtL
 				continue
 			}
 
+			if c.options.UnsupportedJSFeatures.Has(compat.ArbitraryModuleNamespaceNames) {
+				for _, item := range s.Items {
+					c.maybeForbidArbitraryModuleNamespaceIdentifier("export", sourceIndex, item.AliasLoc, item.Alias)
+					if item.AliasLoc != item.Name.Loc {
+						c.maybeForbidArbitraryModuleNamespaceIdentifier("import", sourceIndex, item.Name.Loc, item.OriginalName)
+					}
+				}
+			}
+
 			if shouldStripExports {
 				// Turn this statement into "import {foo} from 'path'"
 				for i, item := range s.Items {
@@ -4449,6 +4481,12 @@ func (c *linkerContext) convertStmtsForChunk(sourceIndex uint32, stmtList *stmtL
 			if shouldStripExports {
 				// Remove export statements entirely
 				continue
+			}
+
+			if c.options.UnsupportedJSFeatures.Has(compat.ArbitraryModuleNamespaceNames) {
+				for _, item := range s.Items {
+					c.maybeForbidArbitraryModuleNamespaceIdentifier("export", sourceIndex, item.AliasLoc, item.Alias)
+				}
 			}
 
 			// Make sure these don't end up in the wrapper closure
@@ -5811,6 +5849,16 @@ func (c *linkerContext) generateChunkJS(chunkIndex int, chunkWaitGroup *sync.Wai
 			// Ignore empty source map chunks
 			if compileResult.SourceMapChunk.ShouldIgnore {
 				prevOffset.AdvanceBytes(compileResult.JS)
+
+				// Include a null entry in the source map
+				if len(compileResult.JS) > 0 && c.options.SourceMap != config.SourceMapNone {
+					if n := len(compileResultsForSourceMap); n > 0 && !compileResultsForSourceMap[n-1].isNullEntry {
+						compileResultsForSourceMap = append(compileResultsForSourceMap, compileResultForSourceMap{
+							sourceIndex: compileResult.sourceIndex,
+							isNullEntry: true,
+						})
+					}
+				}
 			} else {
 				prevOffset = sourcemap.LineColumnOffset{}
 
@@ -5925,7 +5973,7 @@ func (c *linkerContext) generateChunkJS(chunkIndex int, chunkWaitGroup *sync.Wai
 func (c *linkerContext) generateGlobalNamePrefix() string {
 	var text string
 	globalName := c.options.GlobalName
-	prefix := globalName[0]
+	prefix, globalName := globalName[0], globalName[1:]
 	space := " "
 	join := ";\n"
 
@@ -5934,9 +5982,18 @@ func (c *linkerContext) generateGlobalNamePrefix() string {
 		join = ";"
 	}
 
+	// Assume the "this" and "import.meta" objects always exist
+	isExistingObject := prefix == "this"
+	if prefix == "import" && len(globalName) > 0 && globalName[0] == "meta" {
+		prefix, globalName = "import.meta", globalName[1:]
+		isExistingObject = true
+	}
+
 	// Use "||=" to make the code more compact when it's supported
-	if len(globalName) > 1 && !c.options.UnsupportedJSFeatures.Has(compat.LogicalAssignment) {
-		if js_printer.CanEscapeIdentifier(prefix, c.options.UnsupportedJSFeatures, c.options.ASCIIOnly) {
+	if len(globalName) > 0 && !c.options.UnsupportedJSFeatures.Has(compat.LogicalAssignment) {
+		if isExistingObject {
+			// Keep the prefix as it is
+		} else if js_printer.CanEscapeIdentifier(prefix, c.options.UnsupportedJSFeatures, c.options.ASCIIOnly) {
 			if c.options.ASCIIOnly {
 				prefix = string(js_printer.QuoteIdentifier(nil, prefix, c.options.UnsupportedJSFeatures))
 			}
@@ -5944,7 +6001,7 @@ func (c *linkerContext) generateGlobalNamePrefix() string {
 		} else {
 			prefix = fmt.Sprintf("this[%s]", helpers.QuoteForJSON(prefix, c.options.ASCIIOnly))
 		}
-		for _, name := range globalName[1:] {
+		for _, name := range globalName {
 			var dotOrIndex string
 			if js_printer.CanEscapeIdentifier(name, c.options.UnsupportedJSFeatures, c.options.ASCIIOnly) {
 				if c.options.ASCIIOnly {
@@ -5954,12 +6011,19 @@ func (c *linkerContext) generateGlobalNamePrefix() string {
 			} else {
 				dotOrIndex = fmt.Sprintf("[%s]", helpers.QuoteForJSON(name, c.options.ASCIIOnly))
 			}
-			prefix = fmt.Sprintf("(%s%s||=%s{})%s", prefix, space, space, dotOrIndex)
+			if isExistingObject {
+				prefix = fmt.Sprintf("%s%s", prefix, dotOrIndex)
+				isExistingObject = false
+			} else {
+				prefix = fmt.Sprintf("(%s%s||=%s{})%s", prefix, space, space, dotOrIndex)
+			}
 		}
 		return fmt.Sprintf("%s%s%s=%s", text, prefix, space, space)
 	}
 
-	if js_printer.CanEscapeIdentifier(prefix, c.options.UnsupportedJSFeatures, c.options.ASCIIOnly) {
+	if isExistingObject {
+		text = fmt.Sprintf("%s%s=%s", prefix, space, space)
+	} else if js_printer.CanEscapeIdentifier(prefix, c.options.UnsupportedJSFeatures, c.options.ASCIIOnly) {
 		if c.options.ASCIIOnly {
 			prefix = string(js_printer.QuoteIdentifier(nil, prefix, c.options.UnsupportedJSFeatures))
 		}
@@ -5969,7 +6033,7 @@ func (c *linkerContext) generateGlobalNamePrefix() string {
 		text = fmt.Sprintf("%s%s=%s", prefix, space, space)
 	}
 
-	for _, name := range globalName[1:] {
+	for _, name := range globalName {
 		oldPrefix := prefix
 		if js_printer.CanEscapeIdentifier(name, c.options.UnsupportedJSFeatures, c.options.ASCIIOnly) {
 			if c.options.ASCIIOnly {
@@ -6292,6 +6356,16 @@ func (c *linkerContext) generateChunkCSS(chunkIndex int, chunkWaitGroup *sync.Wa
 		// Ignore empty source map chunks
 		if compileResult.SourceMapChunk.ShouldIgnore {
 			prevOffset.AdvanceBytes(compileResult.CSS)
+
+			// Include a null entry in the source map
+			if len(compileResult.CSS) > 0 && c.options.SourceMap != config.SourceMapNone && compileResult.sourceIndex.IsValid() {
+				if n := len(compileResultsForSourceMap); n > 0 && !compileResultsForSourceMap[n-1].isNullEntry {
+					compileResultsForSourceMap = append(compileResultsForSourceMap, compileResultForSourceMap{
+						sourceIndex: compileResult.sourceIndex.GetIndex(),
+						isNullEntry: true,
+					})
+				}
+			}
 		} else {
 			prevOffset = sourcemap.LineColumnOffset{}
 
@@ -6864,6 +6938,7 @@ type compileResultForSourceMap struct {
 	sourceMapChunk  sourcemap.Chunk
 	generatedOffset sourcemap.LineColumnOffset
 	sourceIndex     uint32
+	isNullEntry     bool
 }
 
 func (c *linkerContext) generateSourceMapForChunk(
@@ -6891,6 +6966,9 @@ func (c *linkerContext) generateSourceMapForChunk(
 			continue
 		}
 		sourceIndexToSourcesIndex[result.sourceIndex] = nextSourcesIndex
+		if result.isNullEntry {
+			continue
+		}
 		file := &c.graph.Files[result.sourceIndex]
 
 		// Simple case: no nested source map
@@ -7006,28 +7084,38 @@ func (c *linkerContext) generateSourceMapForChunk(
 			startState.GeneratedColumn += prevColumnOffset
 		}
 
-		// Append the precomputed source map chunk
-		sourcemap.AppendSourceMapChunk(&j, prevEndState, startState, chunk.Buffer)
+		if result.isNullEntry {
+			// Emit a "null" mapping
+			chunk.Buffer.Data = []byte("A")
+			sourcemap.AppendSourceMapChunk(&j, prevEndState, startState, chunk.Buffer)
 
-		// Generate the relative offset to start from next time
-		prevOriginalName := prevEndState.OriginalName
-		prevEndState = chunk.EndState
-		prevEndState.SourceIndex += sourcesIndex
-		if chunk.Buffer.FirstNameOffset.IsValid() {
-			prevEndState.OriginalName += totalQuotedNameLen
+			// Only the generated position was advanced
+			prevEndState.GeneratedLine = startState.GeneratedLine
+			prevEndState.GeneratedColumn = startState.GeneratedColumn
 		} else {
-			// It's possible for a chunk to have mappings but for none of those
-			// mappings to have an associated name. The name is optional and is
-			// omitted when the mapping is for a non-name token or if the final
-			// and original names are the same. In that case we need to restore
-			// the previous original name end state since it wasn't modified after
-			// all. If we don't do this, then files after this will adjust their
-			// name offsets assuming that the previous generated mapping has this
-			// file's offset, which is wrong.
-			prevEndState.OriginalName = prevOriginalName
+			// Append the precomputed source map chunk
+			sourcemap.AppendSourceMapChunk(&j, prevEndState, startState, chunk.Buffer)
+
+			// Generate the relative offset to start from next time
+			prevOriginalName := prevEndState.OriginalName
+			prevEndState = chunk.EndState
+			prevEndState.SourceIndex += sourcesIndex
+			if chunk.Buffer.FirstNameOffset.IsValid() {
+				prevEndState.OriginalName += totalQuotedNameLen
+			} else {
+				// It's possible for a chunk to have mappings but for none of those
+				// mappings to have an associated name. The name is optional and is
+				// omitted when the mapping is for a non-name token or if the final
+				// and original names are the same. In that case we need to restore
+				// the previous original name end state since it wasn't modified after
+				// all. If we don't do this, then files after this will adjust their
+				// name offsets assuming that the previous generated mapping has this
+				// file's offset, which is wrong.
+				prevEndState.OriginalName = prevOriginalName
+			}
+			prevColumnOffset = chunk.FinalGeneratedColumn
+			totalQuotedNameLen += len(chunk.QuotedNames)
 		}
-		prevColumnOffset = chunk.FinalGeneratedColumn
-		totalQuotedNameLen += len(chunk.QuotedNames)
 
 		// If this was all one line, include the column offset from the start
 		if prevEndState.GeneratedLine == 0 {
