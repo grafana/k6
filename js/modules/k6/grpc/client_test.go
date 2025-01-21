@@ -1208,7 +1208,7 @@ func TestClient_TlsParameters(t *testing.T) {
 		{
 			// After https://github.com/golang/go/commit/6783377295e0878aa3ad821eefe3d7879064df6d
 			// and more accurately the test certificate upgrade, this test do not match any certificate
-			// apperantly because the signature doesn't match
+			// apparently because the signature doesn't match
 			// https://github.com/grafana/k6/issues/3549 likely needs to be implemented to fix  them
 			skip: true,
 			name: "ConnectTls",
