@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package distributed;
+
+option go_package = "go.k6.io/k6/execution/distributed";
+
+service DistributedTest {
+  rpc Register(RegisterRequest) returns (RegisterResponse) {};
+
+  rpc CommandAndControl(stream AgentMessage)
+      returns (stream ControllerMessage) {};
+}
+
+message RegisterRequest {}
+message RegisterResponse {
+  uint32 instanceID = 1;
+  bytes archive = 2; // TODO: send this with a `stream` of bytes chunks
+  bytes options = 3;
+}
+
+message AgentMessage {
+  // TODO: actually use random session IDs to prevent spoofing
+  oneof Message {
+    string error = 1;
+    uint32 initInstanceID = 2;
+    string signalAndWaitOnID = 3;
+    string getOrCreateDataWithID = 4;
+    DataPacket createdData = 5;
+  }
+}
+
+message ControllerMessage {
+  uint32 instanceID = 1;
+  oneof Message {
+    string doneWaitWithID = 2;
+    string createDataWithID = 3;
+    DataPacket dataWithID = 4;
+  }
+}
+
+message DataPacket {
+  string id = 1;
+  bytes data = 2;
+  string error = 3;
+}
