@@ -9,14 +9,14 @@ require (
 	github.com/PuerkitoBio/goquery v1.9.2
 	github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
 	github.com/andybalholm/brotli v1.1.1
-	github.com/evanw/esbuild v0.21.2
+	github.com/evanw/esbuild v0.24.2
 	github.com/fatih/color v1.18.0
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible
 	github.com/golang/protobuf v1.5.4
 	github.com/gorilla/websocket v1.5.3
 	github.com/grafana/xk6-dashboard v0.7.5
 	github.com/grafana/xk6-output-opentelemetry v0.3.0
-	github.com/grafana/xk6-output-prometheus-remote v0.5.0
+	github.com/grafana/xk6-output-prometheus-remote v0.5.1
 	github.com/grafana/xk6-redis v0.3.2
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
@@ -28,7 +28,7 @@ require (
 	github.com/mccutchen/go-httpbin v1.1.2-0.20190116014521-c5cb2f4802fa
 	github.com/mstoykov/atlas v0.0.0-20220811071828-388f114305dd
 	github.com/mstoykov/envconfig v1.5.0
-	github.com/mstoykov/k6-taskqueue-lib v0.1.2
+	github.com/mstoykov/k6-taskqueue-lib v0.1.3
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d
 	github.com/serenize/snaker v0.0.0-20201027110005-a7ad2135616e
 	github.com/sirupsen/logrus v1.9.3
