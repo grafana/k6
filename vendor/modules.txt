@@ -264,7 +264,7 @@ github.com/mstoykov/atlas
 # github.com/mstoykov/envconfig v1.5.0
 ## explicit
 github.com/mstoykov/envconfig
-# github.com/mstoykov/k6-taskqueue-lib v0.1.2
+# github.com/mstoykov/k6-taskqueue-lib v0.1.3
 ## explicit; go 1.21
 github.com/mstoykov/k6-taskqueue-lib/taskqueue
 # github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d
