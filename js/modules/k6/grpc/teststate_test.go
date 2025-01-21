@@ -38,7 +38,6 @@ type testcase struct {
 	setup      func(*httpmultibin.HTTPMultiBin)
 	initString codeBlock // runs in the init context
 	vuString   codeBlock // runs in the vu context
-	skip       bool
 }
 
 // callRecorder a helper type that records all calls
