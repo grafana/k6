@@ -9,6 +9,12 @@ import (
 
 // CompatibilityMode specifies the JS compatibility mode
 //
+// There are several CLIs called enumer, and several versions of them.
+// The generated code can be produced exactly as follows:
+//
+//	go run github.com/alvaroloes/enumer@v1.0.0 -type=CompatibilityMode -transform=snake \
+//	       -trimprefix CompatibilityMode -output compatibility_mode_gen.go
+//
 //go:generate enumer -type=CompatibilityMode -transform=snake -trimprefix CompatibilityMode -output compatibility_mode_gen.go
 type CompatibilityMode uint8
 
@@ -17,8 +23,8 @@ const (
 	CompatibilityModeExtended CompatibilityMode = iota + 1
 	// CompatibilityModeBase is standard Sobek, which means pure vanilla JS following ECMAScript standards.
 	CompatibilityModeBase
-	// CompatibilityModeExperimentalEnhanced achieves TypeScript and ES6+ compatibility with esbuild
-	CompatibilityModeExperimentalEnhanced
+	// CompatibilityModeEnhanced achieves TypeScript and ES6+ compatibility with esbuild
+	CompatibilityModeEnhanced
 )
 
 // RuntimeOptions are settings passed onto the Sobek JS runtime
