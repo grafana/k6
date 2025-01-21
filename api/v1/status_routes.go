@@ -9,7 +9,7 @@ import (
 
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
-	"go.k6.io/k6/execution"
+	"go.k6.io/k6/internal/execution"
 	"go.k6.io/k6/lib/executor"
 )
 

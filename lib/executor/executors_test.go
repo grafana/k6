@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"go.k6.io/k6/lib/testutils"
+	"go.k6.io/k6/internal/lib/testutils"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

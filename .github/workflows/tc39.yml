@@ -27,6 +27,6 @@ jobs:
       - name: Run tests
         run: |
           set -x
-          cd js/tc39
+          cd internal/js/tc39
           sh checkout.sh
           go test -timeout 1h
