@@ -134,8 +134,8 @@ github.com/mstoykov/atlas v0.0.0-20220811071828-388f114305dd h1:AC3N94irbx2kWGA8
 github.com/mstoykov/atlas v0.0.0-20220811071828-388f114305dd/go.mod h1:9vRHVuLCjoFfE3GT06X0spdOAO+Zzo4AMjdIwUHBvAk=
 github.com/mstoykov/envconfig v1.5.0 h1:E2FgWf73BQt0ddgn7aoITkQHmgwAcHup1s//MsS5/f8=
 github.com/mstoykov/envconfig v1.5.0/go.mod h1:vk/d9jpexY2Z9Bb0uB4Ndesss1Sr0Z9ZiGUrg5o9VGk=
-github.com/mstoykov/k6-taskqueue-lib v0.1.2 h1:DwIbZSDfhixTs8hq7wSSsq7uwfwbuAa6V52JMxub/MQ=
-github.com/mstoykov/k6-taskqueue-lib v0.1.2/go.mod h1:QFADWkU1D/qYgssw3jJzcpeRmtX6kmkyqikwFqh7dgw=
+github.com/mstoykov/k6-taskqueue-lib v0.1.3 h1:sdiSc5NEK/qpQkTQe505vgRYQocZevdO9ON+yMudFqo=
+github.com/mstoykov/k6-taskqueue-lib v0.1.3/go.mod h1:e9R2vtLFHCKT+CMiEjTJVMQiJAi17M1KiXXRs7FYc6w=
 github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d h1:VhgPp6v9qf9Agr/56bj7Y/xa04UccTW04VP0Qed4vnQ=
 github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d/go.mod h1:YUTz3bUH2ZwIWBy3CJBeOBEugqcmXREj14T+iG/4k4U=
 github.com/nxadm/tail v1.4.11 h1:8feyoE3OzPrcshW5/MJ4sGESc5cqmGkGCWlco4l0bqY=
