@@ -1206,11 +1206,6 @@ func TestClient_TlsParameters(t *testing.T) {
 			},
 		},
 		{
-			// After https://github.com/golang/go/commit/6783377295e0878aa3ad821eefe3d7879064df6d
-			// and more accurately the test certificate upgrade, this test do not match any certificate
-			// apparently because the signature doesn't match
-			// https://github.com/grafana/k6/issues/3549 likely needs to be implemented to fix  them
-			skip: true,
 			name: "ConnectTls",
 			setup: func(tb *httpmultibin.HTTPMultiBin) {
 				clientCAPool := x509.NewCertPool()
@@ -1222,7 +1217,6 @@ func TestClient_TlsParameters(t *testing.T) {
 			vuString:   codeBlock{code: fmt.Sprintf(`client.connect("GRPCBIN_ADDR", { tls: { cacerts: ["%s"], cert: "%s", key: "%s" }});`, localHostCert, clientAuth, clientAuthKey)},
 		},
 		{
-			skip: true, // see comment on ConnectTls
 			name: "ConnectTlsEncryptedKey",
 			setup: func(tb *httpmultibin.HTTPMultiBin) {
 				clientCAPool := x509.NewCertPool()
@@ -1246,7 +1240,6 @@ func TestClient_TlsParameters(t *testing.T) {
 			},
 		},
 		{
-			skip: true, // see comment on ConnectTls
 			name: "ConnectTlsInvokeSuccess",
 			setup: func(tb *httpmultibin.HTTPMultiBin) {
 				clientCAPool := x509.NewCertPool()
@@ -1278,9 +1271,6 @@ func TestClient_TlsParameters(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if tt.skip {
-				t.Skip()
-			}
 
 			ts := newTestState(t)
 
