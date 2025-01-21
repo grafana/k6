@@ -60,6 +60,15 @@ func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 		}
 	}
 
+	validateArgCount := func(methodName string, args ...sobek.Value) {
+		numberOfArgs := len(args)
+		if numberOfArgs > 2 {
+			vu.State().Logger.Warningf(
+				"http.%s requires two arguments, but %d were provided. Please adjust the input.",
+				methodName, numberOfArgs)
+		}
+	}
+
 	mustExport("url", mi.URL)
 	mustExport("CookieJar", mi.newCookieJar)
 	mustExport("cookieJar", mi.getVUCookieJar)
@@ -69,14 +78,24 @@ func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 	// wrappers (facades) that convert the old k6 idiosyncratic APIs to the new
 	// proper Client ones that accept Request objects and don't suck
 	mustExport("get", func(url sobek.Value, args ...sobek.Value) (*Response, error) {
+		// get method should not have more than two arguments
+
+		validateArgCount("get", args...)
+
 		// http.get(url, params) doesn't have a body argument, so we add undefined
 		// as the third argument to http.request(method, url, body, params)
+
 		args = append([]sobek.Value{sobek.Undefined()}, args...)
 		return mi.defaultClient.Request(http.MethodGet, url, args...)
 	})
 	mustExport("head", func(url sobek.Value, args ...sobek.Value) (*Response, error) {
+		// head method should not have more than two arguments
+
+		validateArgCount("head", args...)
+
 		// http.head(url, params) doesn't have a body argument, so we add undefined
 		// as the third argument to http.request(method, url, body, params)
+
 		args = append([]sobek.Value{sobek.Undefined()}, args...)
 		return mi.defaultClient.Request(http.MethodHead, url, args...)
 	})
