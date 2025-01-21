@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"strings"
 	"testing"
@@ -1151,19 +1152,24 @@ func TestClient(t *testing.T) {
 func TestClient_TlsParameters(t *testing.T) {
 	t.Parallel()
 
-	testingKey := func(s string) string {
-		t.Helper()
-		return strings.ReplaceAll(s, "TESTING KEY", "PRIVATE KEY")
-	}
-
 	clientAuthCA := []byte("-----BEGIN CERTIFICATE-----\nMIIBWzCCAQGgAwIBAgIJAIQMBgLi+DV6MAoGCCqGSM49BAMCMBAxDjAMBgNVBAMM\nBU15IENBMCAXDTIyMDEyMTEyMjkzNloYDzMwMjEwNTI0MTIyOTM2WjAQMQ4wDAYD\nVQQDDAVNeSBDQTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABHnrghULHa2hSa/C\nWimwCn42KWdlPqd6/zs3JgLIxTvBHJJlfbhWbBqtybqyovWd3QykHMIpx0NZmpYn\nG8FoWpmjQjBAMA4GA1UdDwEB/wQEAwIBBjAPBgNVHRMBAf8EBTADAQH/MB0GA1Ud\nDgQWBBSkukBA8lgFvvBJAYKsoSUR+PX71jAKBggqhkjOPQQDAgNIADBFAiEAiFF7\nY54CMNRSBSVMgd4mQgrzJInRH88KpLsQ7VeOAaQCIEa0vaLln9zxIDZQKocml4Db\nAEJr8tDzMKIds6sRTBT4\n-----END CERTIFICATE-----")
-	localHostCert := "-----BEGIN CERTIFICATE-----\\nMIIDOTCCAiGgAwIBAgIQSRJrEpBGFc7tNb1fb5pKFzANBgkqhkiG9w0BAQsFADAS\\nMRAwDgYDVQQKEwdBY21lIENvMCAXDTcwMDEwMTAwMDAwMFoYDzIwODQwMTI5MTYw\\nMDAwWjASMRAwDgYDVQQKEwdBY21lIENvMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A\\nMIIBCgKCAQEA6Gba5tHV1dAKouAaXO3/ebDUU4rvwCUg/CNaJ2PT5xLD4N1Vcb8r\\nbFSW2HXKq+MPfVdwIKR/1DczEoAGf/JWQTW7EgzlXrCd3rlajEX2D73faWJekD0U\\naUgz5vtrTXZ90BQL7WvRICd7FlEZ6FPOcPlumiyNmzUqtwGhO+9ad1W5BqJaRI6P\\nYfouNkwR6Na4TzSj5BrqUfP0FwDizKSJ0XXmh8g8G9mtwxOSN3Ru1QFc61Xyeluk\\nPOGKBV/q6RBNklTNe0gI8usUMlYyoC7ytppNMW7X2vodAelSu25jgx2anj9fDVZu\\nh7AXF5+4nJS4AAt0n1lNY7nGSsdZas8PbQIDAQABo4GIMIGFMA4GA1UdDwEB/wQE\\nAwICpDATBgNVHSUEDDAKBggrBgEFBQcDATAPBgNVHRMBAf8EBTADAQH/MB0GA1Ud\\nDgQWBBStsdjh3/JCXXYlQryOrL4Sh7BW5TAuBgNVHREEJzAlggtleGFtcGxlLmNv\\nbYcEfwAAAYcQAAAAAAAAAAAAAAAAAAAAATANBgkqhkiG9w0BAQsFAAOCAQEAxWGI\\n5NhpF3nwwy/4yB4i/CwwSpLrWUa70NyhvprUBC50PxiXav1TeDzwzLx/o5HyNwsv\\ncxv3HdkLW59i/0SlJSrNnWdfZ19oTcS+6PtLoVyISgtyN6DpkKpdG1cOkW3Cy2P2\\n+tK/tKHRP1Y/Ra0RiDpOAmqn0gCOFGz8+lqDIor/T7MTpibL3IxqWfPrvfVRHL3B\\ngrw/ZQTTIVjjh4JBSW3WyWgNo/ikC1lrVxzl4iPUGptxT36Cr7Zk2Bsg0XqwbOvK\\n5d+NTDREkSnUbie4GeutujmX3Dsx88UiV6UY/4lHJa6I5leHUNOHahRbpbWeOfs/\\nWkBKOclmOV2xlTVuPw==\\n-----END CERTIFICATE-----"
 	clientAuth := "-----BEGIN CERTIFICATE-----\\nMIIBVzCB/6ADAgECAgkAg/SeNG3XqB0wCgYIKoZIzj0EAwIwEDEOMAwGA1UEAwwF\\nTXkgQ0EwIBcNMjIwMTIxMTUxMjM0WhgPMzAyMTA1MjQxNTEyMzRaMBExDzANBgNV\\nBAMMBmNsaWVudDBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABKM7OJQMYG4KLtDA\\ngZ8zOg2PimHMmQnjD2HtI4cSwIUJJnvHWLowbFe9fk6XeP9b3dK1ImUI++/EZdVr\\nABAcngejPzA9MA4GA1UdDwEB/wQEAwIBBjAMBgNVHRMBAf8EAjAAMB0GA1UdDgQW\\nBBSttJe1mcPEnBOZ6wvKPG4zL0m1CzAKBggqhkjOPQQDAgNHADBEAiBPSLgKA/r9\\nu/FW6W+oy6Odm1kdNMGCI472iTn545GwJgIgb3UQPOUTOj0IN4JLJYfmYyXviqsy\\nzk9eWNHFXDA9U6U=\\n-----END CERTIFICATE-----"
-	clientAuthKey := testingKey("-----BEGIN EC TESTING KEY-----\\nMHcCAQEEINDaMGkOT3thu1A0LfLJr3Jd011/aEG6OArmEQaujwgpoAoGCCqGSM49\\nAwEHoUQDQgAEozs4lAxgbgou0MCBnzM6DY+KYcyZCeMPYe0jhxLAhQkme8dYujBs\\nV71+Tpd4/1vd0rUiZQj778Rl1WsAEByeBw==\\n-----END EC TESTING KEY-----")
-	clientAuthKeyEncrypted := testingKey("-----BEGIN EC TESTING KEY-----\\nProc-Type: 4,ENCRYPTED\\nDEK-Info: AES-256-CBC,3E311E9B602231BFB5C752071EE7D652\\n\\nsAKeqbacug0v4ruE1A0CACwGVEGBQVOl1CiGVp5RsxgNZKXzMS6EsTTNLw378coF\\nKXbF+he05HIuzToOz2ANLXov1iCrVpotKVB4l2obTQvg+5VET902ky99Mc9Us7jd\\nUwW8LpXlSlhcNWuUfK6wyosL42TbcIxjqZWaESW+6ww=\\n-----END EC TESTING KEY-----")
+	clientAuthKey := ("-----BEGIN EC PRIVATE KEY-----\\nMHcCAQEEINDaMGkOT3thu1A0LfLJr3Jd011/aEG6OArmEQaujwgpoAoGCCqGSM49\\nAwEHoUQDQgAEozs4lAxgbgou0MCBnzM6DY+KYcyZCeMPYe0jhxLAhQkme8dYujBs\\nV71+Tpd4/1vd0rUiZQj778Rl1WsAEByeBw==\\n-----END EC PRIVATE KEY-----")
+	clientAuthKeyEncrypted := ("-----BEGIN EC PRIVATE KEY-----\\nProc-Type: 4,ENCRYPTED\\nDEK-Info: AES-256-CBC,3E311E9B602231BFB5C752071EE7D652\\n\\nsAKeqbacug0v4ruE1A0CACwGVEGBQVOl1CiGVp5RsxgNZKXzMS6EsTTNLw378coF\\nKXbF+he05HIuzToOz2ANLXov1iCrVpotKVB4l2obTQvg+5VET902ky99Mc9Us7jd\\nUwW8LpXlSlhcNWuUfK6wyosL42TbcIxjqZWaESW+6ww=\\n-----END EC PRIVATE KEY-----")
 
 	trivialKeyPassword := "abc123"
 	trivialWrongKeyPassword := "abc321"
+
+	// We need the certificate actually used by the httpmultibin in this test
+	// as it is the same one for all tests we can get it once here
+	// This also prevents changes to this to break this test
+	// as it happened after https://github.com/golang/go/commit/6783377295e0878aa3ad821eefe3d7879064df6d
+	p := httpmultibin.NewHTTPMultiBin(t)
+	localHostCert := strings.ReplaceAll(string(pem.EncodeToMemory(
+		&pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: p.ServerHTTP2.TLS.Certificates[0].Certificate[0],
+		})), "\n", `\n`)
 
 	tests := []testcase{
 		{
