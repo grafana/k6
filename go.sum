@@ -93,8 +93,8 @@ github.com/grafana/xk6-output-opentelemetry v0.3.0 h1:dmclGBFtFVRJijqLncpu2dKVII
 github.com/grafana/xk6-output-opentelemetry v0.3.0/go.mod h1:5uUg0J2dxrw+DkC9fCsfiKv2jTpccn7nz6vGmRUr4f8=
 github.com/grafana/xk6-output-prometheus-remote v0.5.1 h1:zsB0x/1kuArqnDNh419UWdMUYZwrzqtfjTUswWPIHhI=
 github.com/grafana/xk6-output-prometheus-remote v0.5.1/go.mod h1:esXXthLoVp9JUdGkECRthESVYu0TQTR24wrx2nRM9ak=
-github.com/grafana/xk6-redis v0.3.2 h1:ZHKdyajrvdj39IqZtx/XfDpVnPzCzCCbDfWrxyKLFHg=
-github.com/grafana/xk6-redis v0.3.2/go.mod h1:3e/U9i1Nm3WEaMy4nZSGMjVf8ZsFau+aXurYJhJ7MfQ=
+github.com/grafana/xk6-redis v0.3.3 h1:9QiS4OUjYMzvriGzbqrhCn9i/kENmCkibZE+xCJSdPk=
+github.com/grafana/xk6-redis v0.3.3/go.mod h1:YL1qfBZXW4o2aAF6/gRa/N9oGoumUg7cJzzCHLxoCOw=
 github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 h1:UH//fgunKIs4JdUbpDl1VZCDaL56wXCB/5+wF6uHfaI=
 github.com/grpc-ecosystem/go-grpc-middleware v1.4.0/go.mod h1:g5qyo/la0ALbONm6Vbp88Yd8NsDy6rZz+RcrMPxvld8=
 github.com/grpc-ecosystem/grpc-gateway/v2 v2.22.0 h1:asbCHRVmodnJTuQ3qamDwqVOIjwqUPTYmYuemVOx+Ys=
