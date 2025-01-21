@@ -185,7 +185,7 @@ github.com/grafana/xk6-dashboard/dashboard
 # github.com/grafana/xk6-output-opentelemetry v0.3.0
 ## explicit; go 1.21
 github.com/grafana/xk6-output-opentelemetry/pkg/opentelemetry
-# github.com/grafana/xk6-output-prometheus-remote v0.5.0
+# github.com/grafana/xk6-output-prometheus-remote v0.5.1
 ## explicit; go 1.20
 github.com/grafana/xk6-output-prometheus-remote/pkg/remote
 github.com/grafana/xk6-output-prometheus-remote/pkg/remotewrite
