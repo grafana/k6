@@ -29,4 +29,10 @@ func TestTrimAferoPathSeparatorFs(t *testing.T) {
 	err = afero.WriteFile(f, filepath.FromSlash("path/without/separtor"), expecteData, 0o644)
 	require.Error(t, err)
 	require.True(t, errors.Is(err, fs.ErrNotExist))
+
+	err = afero.WriteFile(f, filepath.FromSlash("/path/to//otherpath"), expecteData, 0o644)
+	require.NoError(t, err)
+	data, err = afero.ReadFile(m, "path/to/otherpath")
+	require.NoError(t, err)
+	require.Equal(t, expecteData, data)
 }
