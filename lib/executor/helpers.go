@@ -10,10 +10,10 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"go.k6.io/k6/errext"
-	"go.k6.io/k6/execution"
+	"go.k6.io/k6/internal/execution"
+	"go.k6.io/k6/internal/ui/pb"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/types"
-	"go.k6.io/k6/ui/pb"
 )
 
 const (
