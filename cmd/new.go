@@ -2,99 +2,33 @@ package cmd
 
 import (
 	"fmt"
-	"path"
-	"text/template"
 
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"go.k6.io/k6/cmd/state"
+	"go.k6.io/k6/cmd/templates"
 	"go.k6.io/k6/lib/fsext"
 )
 
 const defaultNewScriptName = "script.js"
 
-//nolint:gochecknoglobals
-var defaultNewScriptTemplate = template.Must(template.New("new").Parse(`import http from 'k6/http';
-import { sleep } from 'k6';
-
-export const options = {
-  // A number specifying the number of VUs to run concurrently.
-  vus: 10,
-  // A string specifying the total duration of the test run.
-  duration: '30s',
-
-  // The following section contains configuration options for execution of this
-  // test script in Grafana Cloud.
-  //
-  // See https://grafana.com/docs/grafana-cloud/k6/get-started/run-cloud-tests-from-the-cli/
-  // to learn about authoring and running k6 test scripts in Grafana k6 Cloud.
-  //
-  // cloud: {
-  //   // The ID of the project to which the test is assigned in the k6 Cloud UI.
-  //   // By default tests are executed in default project.
-  //   projectID: "",
-  //   // The name of the test in the k6 Cloud UI.
-  //   // Test runs with the same name will be grouped.
-  //   name: "{{ .ScriptName }}"
-  // },
-
-  // Uncomment this section to enable the use of Browser API in your tests.
-  //
-  // See https://grafana.com/docs/k6/latest/using-k6-browser/running-browser-tests/ to learn more
-  // about using Browser API in your test scripts.
-  //
-  // scenarios: {
-  //   // The scenario name appears in the result summary, tags, and so on.
-  //   // You can give the scenario any name, as long as each name in the script is unique.
-  //   ui: {
-  //     // Executor is a mandatory parameter for browser-based tests.
-  //     // Shared iterations in this case tells k6 to reuse VUs to execute iterations.
-  //     //
-  //     // See https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/ for other executor types.
-  //     executor: 'shared-iterations',
-  //     options: {
-  //       browser: {
-  //         // This is a mandatory parameter that instructs k6 to launch and
-  //         // connect to a chromium-based browser, and use it to run UI-based
-  //         // tests.
-  //         type: 'chromium',
-  //       },
-  //     },
-  //   },
-  // }
-};
-
-// The function that defines VU logic.
-//
-// See https://grafana.com/docs/k6/latest/examples/get-started-with-k6/ to learn more
-// about authoring k6 scripts.
-//
-export default function() {
-  http.get('https://test.k6.io');
-  sleep(1);
-}
-`))
-
-type initScriptTemplateArgs struct {
-	ScriptName string
-}
-
-// newScriptCmd represents the `k6 new` command
 type newScriptCmd struct {
 	gs             *state.GlobalState
 	overwriteFiles bool
+	templateType   string
+	projectID      string
 }
 
 func (c *newScriptCmd) flagSet() *pflag.FlagSet {
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
 	flags.SortFlags = false
-	flags.BoolVarP(&c.overwriteFiles, "force", "f", false, "Overwrite existing files")
-
+	flags.BoolVarP(&c.overwriteFiles, "force", "f", false, "overwrite existing files")
+	flags.StringVar(&c.templateType, "template", "minimal", "template type (choices: minimal, protocol, browser)")
+	flags.StringVar(&c.projectID, "project-id", "", "specify the Grafana Cloud project ID for the test")
 	return flags
 }
 
-func (c *newScriptCmd) run(cmd *cobra.Command, args []string) error { //nolint:revive
+func (c *newScriptCmd) run(_ *cobra.Command, args []string) error {
 	target := defaultNewScriptName
 	if len(args) > 0 {
 		target = args[0]
@@ -104,32 +38,52 @@ func (c *newScriptCmd) run(cmd *cobra.Command, args []string) error { //nolint:r
 	if err != nil {
 		return err
 	}
-
 	if fileExists && !c.overwriteFiles {
-		return fmt.Errorf("%s already exists, please use the `--force` flag if you want overwrite it", target)
+		return fmt.Errorf("%s already exists. Use the `--force` flag to overwrite it", target)
 	}
 
 	fd, err := c.gs.FS.Create(target)
 	if err != nil {
 		return err
 	}
+
+	var closeErr error
 	defer func() {
-		_ = fd.Close() // we may think to check the error and log
+		if cerr := fd.Close(); cerr != nil {
+			if _, err := fmt.Fprintf(c.gs.Stderr, "error closing file: %v\n", cerr); err != nil {
+				closeErr = fmt.Errorf("error writing error message to stderr: %w", err)
+			} else {
+				closeErr = cerr
+			}
+		}
 	}()
 
-	if err := defaultNewScriptTemplate.Execute(fd, initScriptTemplateArgs{
-		ScriptName: path.Base(target),
-	}); err != nil {
+	if closeErr != nil {
+		return closeErr
+	}
+
+	tm, err := templates.NewTemplateManager()
+	if err != nil {
+		return fmt.Errorf("error initializing template manager: %w", err)
+	}
+
+	tmpl, err := tm.GetTemplate(c.templateType)
+	if err != nil {
+		return fmt.Errorf("error retrieving template: %w", err)
+	}
+
+	argsStruct := templates.TemplateArgs{
+		ScriptName: target,
+		ProjectID:  c.projectID,
+	}
+
+	if err := templates.ExecuteTemplate(fd, tmpl, argsStruct); err != nil {
 		return err
 	}
 
-	valueColor := getColor(c.gs.Flags.NoColor || !c.gs.Stdout.IsTTY, color.Bold)
-	printToStdout(c.gs, fmt.Sprintf(
-		"Initialized a new k6 test script in %s. You can now execute it by running `%s run %s`.\n",
-		valueColor.Sprint(target),
-		c.gs.BinaryName,
-		target,
-	))
+	if _, err := fmt.Fprintf(c.gs.Stdout, "New script created: %s (%s template).\n", target, c.templateType); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -137,31 +91,33 @@ func (c *newScriptCmd) run(cmd *cobra.Command, args []string) error { //nolint:r
 func getCmdNewScript(gs *state.GlobalState) *cobra.Command {
 	c := &newScriptCmd{gs: gs}
 
-	exampleText := getExampleText(gs, `
-  # Create a minimal k6 script in the current directory. By default, k6 creates script.js.
-  {{.}} new
+	exampleText := getExampleText(c.gs, `
+    # Create a new k6 script with the default template
+    $ {{.}} new
 
-  # Create a minimal k6 script in the current directory and store it in test.js
-  {{.}} new test.js
+    # Specify a file name when creating a script
+    $ {{.}} new test.js
 
-  # Overwrite existing test.js with a minimal k6 script
-  {{.}} new -f test.js`[1:])
+    # Overwrite an existing file
+    $ {{.}} new -f test.js
+
+    # Create a script using a specific template
+    $ {{.}} new --template protocol
+
+    # Create a cloud-ready script with a specific project ID
+    $ {{.}} new --project-id 12315`[1:])
 
 	initCmd := &cobra.Command{
-		Use:   "new",
+		Use:   "new [file]",
 		Short: "Create and initialize a new k6 script",
-		Long: `Create and initialize a new k6 script.
+		Long: `Create and initialize a new k6 script using one of the predefined templates.
 
-This command will create a minimal k6 script in the current directory and
-store it in the file specified by the first argument. If no argument is
-provided, the script will be stored in script.js.
-
-This command will not overwrite existing files.`,
+By default, the script will be named script.js unless a different name is specified.`,
 		Example: exampleText,
 		Args:    cobra.MaximumNArgs(1),
 		RunE:    c.run,
 	}
-	initCmd.Flags().AddFlagSet(c.flagSet())
 
+	initCmd.Flags().AddFlagSet(c.flagSet())
 	return initCmd
 }
