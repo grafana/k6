@@ -9,33 +9,33 @@ require (
 	github.com/PuerkitoBio/goquery v1.9.2
 	github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
 	github.com/andybalholm/brotli v1.1.1
-	github.com/evanw/esbuild v0.21.2
+	github.com/evanw/esbuild v0.24.2
 	github.com/fatih/color v1.18.0
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible
 	github.com/golang/protobuf v1.5.4
 	github.com/gorilla/websocket v1.5.3
 	github.com/grafana/xk6-dashboard v0.7.5
 	github.com/grafana/xk6-output-opentelemetry v0.3.0
-	github.com/grafana/xk6-output-prometheus-remote v0.5.0
-	github.com/grafana/xk6-redis v0.3.2
+	github.com/grafana/xk6-output-prometheus-remote v0.5.1
+	github.com/grafana/xk6-redis v0.3.3
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
 	github.com/jhump/protoreflect v1.17.0
 	github.com/klauspost/compress v1.17.11
-	github.com/mailru/easyjson v0.7.7
-	github.com/mattn/go-colorable v0.1.13
+	github.com/mailru/easyjson v0.9.0
+	github.com/mattn/go-colorable v0.1.14
 	github.com/mattn/go-isatty v0.0.20
 	github.com/mccutchen/go-httpbin v1.1.2-0.20190116014521-c5cb2f4802fa
 	github.com/mstoykov/atlas v0.0.0-20220811071828-388f114305dd
 	github.com/mstoykov/envconfig v1.5.0
-	github.com/mstoykov/k6-taskqueue-lib v0.1.2
+	github.com/mstoykov/k6-taskqueue-lib v0.1.3
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d
 	github.com/serenize/snaker v0.0.0-20201027110005-a7ad2135616e
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/afero v1.1.2
 	github.com/spf13/cobra v1.4.0
 	github.com/spf13/pflag v1.0.5
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	github.com/tidwall/gjson v1.18.0
 	go.opentelemetry.io/otel v1.31.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.29.0
@@ -45,7 +45,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.31.0
 	go.uber.org/goleak v1.3.0
 	golang.org/x/crypto v0.32.0
-	golang.org/x/crypto/x509roots/fallback v0.0.0-20250106144430-8929309228b4
+	golang.org/x/crypto/x509roots/fallback v0.0.0-20250116161740-71d3a4cfdb03
 	golang.org/x/net v0.34.0
 	golang.org/x/term v0.28.0
 	golang.org/x/time v0.9.0

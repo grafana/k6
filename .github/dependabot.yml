@@ -12,6 +12,9 @@ updates:
       googles:
         patterns:
           -  "google.golang.org/*"
+      otel:
+        patterns:
+          -  "go.opentelemetry.io/*"
     allow:
       # Keep the experimental modules up-to-date
       - dependency-name: "github.com/grafana/xk6-*"
@@ -31,3 +34,14 @@ updates:
       - dependency-name: "github.com/jhump/protoreflect"
       - dependency-name: "github.com/klauspost/compress"
       - dependency-name: "github.com/tidwall/gjson"
+      - dependency-name: "github.com/chromedp/cdproto"
+      - dependency-name: "github.com/mailru/easyjson"
+      - dependency-name: "github.com/mattn/go-colorable"
+      - dependency-name: "github.com/mstoykov/k6-taskqueue-lib"
+      - dependency-name: "github.com/stretchr/testify"
+      - dependency-name: "go.opentelemetry.io/otel"
+      - dependency-name: "go.opentelemetry.io/otel/exporters/otlp/otlptrace"
+      - dependency-name: "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+      - dependency-name: "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+      - dependency-name: "go.opentelemetry.io/otel/sdk"
+      - dependency-name: "go.opentelemetry.io/otel/trace"

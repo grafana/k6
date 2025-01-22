@@ -261,10 +261,12 @@ func Source(unsupportedJSFeatures compat.JSFeature) logger.Source {
 		export var __decorateParam = (index, decorator) => (target, key) => decorator(target, key, index)
 
 		// For JavaScript decorators
+		export var __decoratorStart = base => [, , , __create(base?.[__knownSymbol('metadata')] ?? null)]
 		var __decoratorStrings = ['class', 'method', 'getter', 'setter', 'accessor', 'field', 'value', 'get', 'set']
 		var __expectFn = fn => fn !== void 0 && typeof fn !== 'function' ? __typeError('Function expected') : fn
-		var __decoratorContext = (kind, name, done, fns) => ({ kind: __decoratorStrings[kind], name, addInitializer: fn =>
-			done._ ? __typeError('Already initialized') : fns.push(__expectFn(fn || null)), })
+		var __decoratorContext = (kind, name, done, metadata, fns) => ({ kind: __decoratorStrings[kind], name, metadata, addInitializer: fn =>
+			done._ ? __typeError('Already initialized') : fns.push(__expectFn(fn || null)) })
+		export var __decoratorMetadata = (array, target) => __defNormalProp(target, __knownSymbol('metadata'), array[3])
 		export var __runInitializers = (array, flags, self, value) => {
 			for (var i = 0, fns = array[flags >> 1], n = fns && fns.length; i < n; i++) flags & 1 ? fns[i].call(self) : value = fns[i].call(self, value)
 			return value
@@ -279,7 +281,7 @@ func Source(unsupportedJSFeatures compat.JSFeature) logger.Source {
 			`
 
 	// Avoid object extensions when not using ES6
-	if !unsupportedJSFeatures.Has(compat.ObjectExtensions) {
+	if !unsupportedJSFeatures.Has(compat.ObjectExtensions) && !unsupportedJSFeatures.Has(compat.ObjectAccessors) {
 		text += `__getOwnPropDesc(k < 4 ? target : { get [name]() { return __privateGet(this, extra) }, set [name](x) { return __privateSet(this, extra, x) } }, name)`
 	} else {
 		text += `(k < 4 ? __getOwnPropDesc(target, name) : { get: () => __privateGet(this, extra), set: x => __privateSet(this, extra, x) })`
@@ -290,7 +292,7 @@ func Source(unsupportedJSFeatures compat.JSFeature) logger.Source {
 			k ? p && k < 4 && __name(extra, (k > 2 ? 'set ' : k > 1 ? 'get ' : '') + name) : __name(target, name)
 
 			for (var i = decorators.length - 1; i >= 0; i--) {
-				ctx = __decoratorContext(k, name, done = {}, extraInitializers)
+				ctx = __decoratorContext(k, name, done = {}, array[3], extraInitializers)
 
 				if (k) {
 					ctx.static = s, ctx.private = p, access = ctx.access = { has: p ? x => __privateIn(target, x) : x => name in x }
@@ -305,7 +307,9 @@ func Source(unsupportedJSFeatures compat.JSFeature) logger.Source {
 				else __expectFn(fn = it.get) && (desc.get = fn), __expectFn(fn = it.set) && (desc.set = fn), __expectFn(fn = it.init) && initializers.unshift(fn)
 			}
 
-			return desc && __defProp(target, name, desc), p ? k ^ 4 ? extra : desc : target
+			return k || __decoratorMetadata(array, target),
+				desc && __defProp(target, name, desc),
+				p ? k ^ 4 ? extra : desc : target
 		}
 
 		// For class members
@@ -501,10 +505,14 @@ func Source(unsupportedJSFeatures compat.JSFeature) logger.Source {
 		export var __using = (stack, value, async) => {
 			if (value != null) {
 				if (typeof value !== 'object' && typeof value !== 'function') __typeError('Object expected')
-				var dispose
+				var dispose, inner
 				if (async) dispose = value[__knownSymbol('asyncDispose')]
-				if (dispose === void 0) dispose = value[__knownSymbol('dispose')]
+				if (dispose === void 0) {
+					dispose = value[__knownSymbol('dispose')]
+					if (async) inner = dispose
+				}
 				if (typeof dispose !== 'function') __typeError('Object not disposable')
+				if (inner) dispose = function() { try { inner.call(this) } catch (e) { return Promise.reject(e) } }
 				stack.push([async, dispose, value])
 			} else if (async) {
 				stack.push([async])

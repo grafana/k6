@@ -416,8 +416,7 @@ func (p *parser) computeClassLoweringInfo(class *js_ast.Class) (result classLowe
 	// due to the complexity of the decorator specification. The specification is
 	// also still evolving so trying to optimize it now is also potentially
 	// premature.
-	if p.options.unsupportedJSFeatures.Has(compat.Decorators) &&
-		(!p.options.ts.Parse || p.options.ts.Config.ExperimentalDecorators != config.True) {
+	if class.ShouldLowerStandardDecorators {
 		for _, prop := range class.Properties {
 			if len(prop.Decorators) > 0 {
 				for _, prop := range class.Properties {
@@ -623,14 +622,15 @@ const (
 )
 
 type lowerClassContext struct {
-	optionalNameHint string
-	kind             classKind
-	class            *js_ast.Class
-	classLoc         logger.Loc
-	classExpr        js_ast.Expr // Only for "kind == classKindExpr", may be replaced by "nameFunc()"
-	defaultName      ast.LocRef
+	nameToKeep  string
+	kind        classKind
+	class       *js_ast.Class
+	classLoc    logger.Loc
+	classExpr   js_ast.Expr // Only for "kind == classKindExpr", may be replaced by "nameFunc()"
+	defaultName ast.LocRef
 
 	ctor                   *js_ast.EFunction
+	extendsRef             ast.Ref
 	parameterFields        []js_ast.Stmt
 	instanceMembers        []js_ast.Stmt
 	instancePrivateMethods []js_ast.Stmt
@@ -679,8 +679,10 @@ type lowerClassContext struct {
 // body (e.g. the contents of initializers, methods, and static blocks). Those
 // have already been transformed by "visitClass" by this point. It's done that
 // way for performance so that we don't need to do another AST pass.
-func (p *parser) lowerClass(stmt js_ast.Stmt, expr js_ast.Expr, result visitClassResult) ([]js_ast.Stmt, js_ast.Expr) {
+func (p *parser) lowerClass(stmt js_ast.Stmt, expr js_ast.Expr, result visitClassResult, nameToKeep string) ([]js_ast.Stmt, js_ast.Expr) {
 	ctx := lowerClassContext{
+		nameToKeep:               nameToKeep,
+		extendsRef:               ast.InvalidRef,
 		decoratorContextRef:      ast.InvalidRef,
 		privateInstanceMethodRef: ast.InvalidRef,
 		privateStaticMethodRef:   ast.InvalidRef,
@@ -694,7 +696,7 @@ func (p *parser) lowerClass(stmt js_ast.Stmt, expr js_ast.Expr, result visitClas
 		ctx.kind = classKindExpr
 		if ctx.class.Name != nil {
 			symbol := &p.symbols[ctx.class.Name.Ref.InnerIndex]
-			ctx.optionalNameHint = symbol.OriginalName
+			ctx.nameToKeep = symbol.OriginalName
 
 			// The inner class name inside the class expression should be the same as
 			// the class expression name itself
@@ -708,13 +710,10 @@ func (p *parser) lowerClass(stmt js_ast.Stmt, expr js_ast.Expr, result visitClas
 				ctx.class.Name = nil
 			}
 		}
-		if p.nameToKeepIsFor == e {
-			ctx.optionalNameHint = p.nameToKeep
-		}
 	} else if s, ok := stmt.Data.(*js_ast.SClass); ok {
 		ctx.class = &s.Class
 		if ctx.class.Name != nil {
-			ctx.optionalNameHint = p.symbols[ctx.class.Name.Ref.InnerIndex].OriginalName
+			ctx.nameToKeep = p.symbols[ctx.class.Name.Ref.InnerIndex].OriginalName
 		}
 		if s.IsExport {
 			ctx.kind = classKindExportStmt
@@ -726,7 +725,7 @@ func (p *parser) lowerClass(stmt js_ast.Stmt, expr js_ast.Expr, result visitClas
 		s2, _ := s.Value.Data.(*js_ast.SClass)
 		ctx.class = &s2.Class
 		if ctx.class.Name != nil {
-			ctx.optionalNameHint = p.symbols[ctx.class.Name.Ref.InnerIndex].OriginalName
+			ctx.nameToKeep = p.symbols[ctx.class.Name.Ref.InnerIndex].OriginalName
 		}
 		ctx.defaultName = s.DefaultName
 		ctx.kind = classKindExportDefaultStmt
@@ -823,8 +822,9 @@ func (ctx *lowerClassContext) lowerField(
 	shouldOmitFieldInitializer bool,
 	staticFieldToBlockAssign bool,
 	initializerIndex int,
-) (js_ast.Property, bool) {
+) (js_ast.Property, ast.Ref, bool) {
 	mustLowerPrivate := private != nil && p.privateSymbolNeedsToBeLowered(private)
+	ref := ast.InvalidRef
 
 	// The TypeScript compiler doesn't follow the JavaScript spec for
 	// uninitialized fields. They are supposed to be set to undefined but the
@@ -858,7 +858,7 @@ func (ctx *lowerClassContext) lowerField(
 			}
 			args := []js_ast.Expr{
 				{Loc: loc, Data: &js_ast.EIdentifier{Ref: ctx.decoratorContextRef}},
-				{Loc: loc, Data: &js_ast.ENumber{Value: float64((3 + 2*initializerIndex) << 1)}},
+				{Loc: loc, Data: &js_ast.ENumber{Value: float64((4 + 2*initializerIndex) << 1)}},
 				value,
 			}
 			if _, ok := init.Data.(*js_ast.EUndefined); !ok {
@@ -872,7 +872,7 @@ func (ctx *lowerClassContext) lowerField(
 		var memberExpr js_ast.Expr
 		if mustLowerPrivate {
 			// Generate a new symbol for this private field
-			ref := p.generateTempRef(tempRefNeedsDeclare, "_"+p.symbols[private.Ref.InnerIndex].OriginalName[1:])
+			ref = p.generateTempRef(tempRefNeedsDeclare, "_"+p.symbols[private.Ref.InnerIndex].OriginalName[1:])
 			p.symbols[private.Ref.InnerIndex].Link = ref
 
 			// Initialize the private field to a new WeakMap
@@ -930,7 +930,7 @@ func (ctx *lowerClassContext) lowerField(
 			}
 			memberExpr = js_ast.JoinWithComma(memberExpr, p.callRuntime(loc, "__runInitializers", []js_ast.Expr{
 				{Loc: loc, Data: &js_ast.EIdentifier{Ref: ctx.decoratorContextRef}},
-				{Loc: loc, Data: &js_ast.ENumber{Value: float64(((4 + 2*initializerIndex) << 1) | 1)}},
+				{Loc: loc, Data: &js_ast.ENumber{Value: float64(((5 + 2*initializerIndex) << 1) | 1)}},
 				value,
 			}))
 			p.recordUsage(ctx.decoratorContextRef)
@@ -949,7 +949,7 @@ func (ctx *lowerClassContext) lowerField(
 							{Loc: loc, Data: &js_ast.SExpr{Value: memberExpr}}},
 						},
 					},
-				}, true
+				}, ref, true
 			} else {
 				// Move this property to an assignment after the class ends
 				ctx.staticMembers = append(ctx.staticMembers, memberExpr)
@@ -962,12 +962,12 @@ func (ctx *lowerClassContext) lowerField(
 
 	if private == nil || mustLowerPrivate {
 		// Remove the field from the class body
-		return js_ast.Property{}, false
+		return js_ast.Property{}, ref, false
 	}
 
 	// Keep the private field but remove the initializer
 	prop.InitializerOrNil = js_ast.Expr{}
-	return prop, true
+	return prop, ref, true
 }
 
 func (ctx *lowerClassContext) lowerPrivateMethod(p *parser, prop js_ast.Property, private *js_ast.EPrivateIdentifier) {
@@ -986,8 +986,8 @@ func (ctx *lowerClassContext) lowerPrivateMethod(p *parser, prop js_ast.Property
 		} else {
 			name = "_instances"
 		}
-		if ctx.optionalNameHint != "" {
-			name = fmt.Sprintf("_%s%s", ctx.optionalNameHint, name)
+		if ctx.nameToKeep != "" {
+			name = fmt.Sprintf("_%s%s", ctx.nameToKeep, name)
 		}
 		*ref = p.generateTempRef(tempRefNeedsDeclare, name)
 
@@ -1107,7 +1107,7 @@ func (ctx *lowerClassContext) analyzeProperty(p *parser, prop js_ast.Property, c
 	analysis.private, _ = prop.Key.Data.(*js_ast.EPrivateIdentifier)
 	mustLowerPrivate := analysis.private != nil && p.privateSymbolNeedsToBeLowered(analysis.private)
 	analysis.shouldOmitFieldInitializer = p.options.ts.Parse && !prop.Kind.IsMethodDefinition() && prop.InitializerOrNil.Data == nil &&
-		!ctx.class.UseDefineForClassFields && !mustLowerPrivate
+		!ctx.class.UseDefineForClassFields && !mustLowerPrivate && !ctx.class.ShouldLowerStandardDecorators
 
 	// Class fields must be lowered if the environment doesn't support them
 	if !prop.Kind.IsMethodDefinition() {
@@ -1139,7 +1139,7 @@ func (ctx *lowerClassContext) analyzeProperty(p *parser, prop js_ast.Property, c
 	// they will end up being lowered (if they are even being lowered at all)
 	if p.options.ts.Parse && p.options.ts.Config.ExperimentalDecorators == config.True {
 		analysis.propExperimentalDecorators = prop.Decorators
-	} else if p.options.unsupportedJSFeatures.Has(compat.Decorators) {
+	} else if ctx.class.ShouldLowerStandardDecorators {
 		analysis.propDecorators = prop.Decorators
 	}
 
@@ -1180,19 +1180,17 @@ func (ctx *lowerClassContext) analyzeProperty(p *parser, prop js_ast.Property, c
 	return
 }
 
-func (p *parser) propertyNameHint(key js_ast.Expr, suffix string) string {
-	var text string
+func (p *parser) propertyNameHint(key js_ast.Expr) string {
 	switch k := key.Data.(type) {
 	case *js_ast.EString:
-		text = helpers.UTF16ToString(k.Value)
+		return helpers.UTF16ToString(k.Value)
 	case *js_ast.EIdentifier:
-		text = p.symbols[k.Ref.InnerIndex].OriginalName
+		return p.symbols[k.Ref.InnerIndex].OriginalName
 	case *js_ast.EPrivateIdentifier:
-		text = p.symbols[k.Ref.InnerIndex].OriginalName[1:]
+		return p.symbols[k.Ref.InnerIndex].OriginalName[1:]
 	default:
-		return suffix
+		return ""
 	}
-	return fmt.Sprintf("_%s%s", text, suffix)
 }
 
 func (ctx *lowerClassContext) hoistComputedProperties(p *parser, classLoweringInfo classLoweringInfo) (
@@ -1234,7 +1232,12 @@ func (ctx *lowerClassContext) hoistComputedProperties(p *parser, classLoweringIn
 		// Evaluate the decorator expressions inline before computed property keys
 		var decorators js_ast.Expr
 		if len(analysis.propDecorators) > 0 {
-			ref := p.generateTempRef(tempRefNeedsDeclare, p.propertyNameHint(prop.Key, "_dec"))
+			name := p.propertyNameHint(prop.Key)
+			if name != "" {
+				name = "_" + name
+			}
+			name += "_dec"
+			ref := p.generateTempRef(tempRefNeedsDeclare, name)
 			values := make([]js_ast.Expr, len(analysis.propDecorators))
 			for i, decorator := range analysis.propDecorators {
 				values[i] = decorator.Value
@@ -1400,13 +1403,13 @@ func (ctx *lowerClassContext) hoistComputedProperties(p *parser, classLoweringIn
 	//   __publicField(Foo, _a);
 	//
 	if ctx.computedPropertyChain.Data != nil && ctx.class.ExtendsOrNil.Data != nil {
-		ref := p.generateTempRef(tempRefNeedsDeclare, "")
+		ctx.extendsRef = p.generateTempRef(tempRefNeedsDeclare, "")
 		ctx.class.ExtendsOrNil = js_ast.JoinWithComma(js_ast.JoinWithComma(
-			js_ast.Assign(js_ast.Expr{Loc: ctx.class.ExtendsOrNil.Loc, Data: &js_ast.EIdentifier{Ref: ref}}, ctx.class.ExtendsOrNil),
+			js_ast.Assign(js_ast.Expr{Loc: ctx.class.ExtendsOrNil.Loc, Data: &js_ast.EIdentifier{Ref: ctx.extendsRef}}, ctx.class.ExtendsOrNil),
 			ctx.computedPropertyChain),
-			js_ast.Expr{Loc: ctx.class.ExtendsOrNil.Loc, Data: &js_ast.EIdentifier{Ref: ref}})
-		p.recordUsage(ref)
-		p.recordUsage(ref)
+			js_ast.Expr{Loc: ctx.class.ExtendsOrNil.Loc, Data: &js_ast.EIdentifier{Ref: ctx.extendsRef}})
+		p.recordUsage(ctx.extendsRef)
+		p.recordUsage(ctx.extendsRef)
 		ctx.computedPropertyChain = js_ast.Expr{}
 	}
 	return
@@ -1447,7 +1450,7 @@ func (ctx *lowerClassContext) processProperties(p *parser, classLoweringInfo cla
 	propertyKeyTempRefs, decoratorTempRefs := ctx.hoistComputedProperties(p, classLoweringInfo)
 
 	// Save the initializer index for each field and accessor element
-	if p.options.unsupportedJSFeatures.Has(compat.Decorators) && (!p.options.ts.Parse || p.options.ts.Config.ExperimentalDecorators != config.True) {
+	if ctx.class.ShouldLowerStandardDecorators {
 		var counts [4]int
 
 		// Count how many initializers there are in each section
@@ -1480,9 +1483,8 @@ func (ctx *lowerClassContext) processProperties(p *parser, classLoweringInfo cla
 	}
 
 	// Evaluate the decorator expressions inline
-	if p.options.unsupportedJSFeatures.Has(compat.Decorators) && len(ctx.class.Decorators) > 0 &&
-		(!p.options.ts.Parse || p.options.ts.Config.ExperimentalDecorators != config.True) {
-		name := ctx.optionalNameHint
+	if ctx.class.ShouldLowerStandardDecorators && len(ctx.class.Decorators) > 0 {
+		name := ctx.nameToKeep
 		if name == "" {
 			name = "class"
 		}
@@ -1676,16 +1678,20 @@ func (ctx *lowerClassContext) processProperties(p *parser, classLoweringInfo cla
 				args = append(args, ctx.nameFunc())
 			}
 
-			autoAccessorWeakMapRef := ast.InvalidRef
+			// Auto-accessors will generate a private field for storage. Lower this
+			// field, which will generate a WeakMap instance, and then pass the
+			// WeakMap instance into the decorator helper so the lowered getter and
+			// setter can use it.
 			if prop.Kind == js_ast.PropertyAutoAccessor {
-				// Initialize the private field to a new WeakMap
-				if p.weakMapRef == ast.InvalidRef {
-					p.weakMapRef = p.newSymbol(ast.SymbolUnbound, "WeakMap")
-					p.moduleScope.Generated = append(p.moduleScope.Generated, p.weakMapRef)
+				var kind ast.SymbolKind
+				if prop.Flags.Has(js_ast.PropertyIsStatic) {
+					kind = ast.SymbolPrivateStaticField
+				} else {
+					kind = ast.SymbolPrivateField
 				}
-
-				// Pass the WeakMap instance into the decorator helper
-				autoAccessorWeakMapRef = p.generateTempRef(tempRefNeedsDeclare, p.propertyNameHint(prop.Key, ""))
+				ref := p.newSymbol(kind, "#"+p.propertyNameHint(prop.Key))
+				p.symbols[ref.InnerIndex].Flags |= ast.PrivateSymbolMustBeLowered
+				_, autoAccessorWeakMapRef, _ := ctx.lowerField(p, prop, &js_ast.EPrivateIdentifier{Ref: ref}, false, false, initializerIndex)
 				args = append(args, js_ast.Expr{Loc: keyLoc, Data: &js_ast.EIdentifier{Ref: autoAccessorWeakMapRef}})
 				p.recordUsage(autoAccessorWeakMapRef)
 			}
@@ -1739,80 +1745,6 @@ func (ctx *lowerClassContext) processProperties(p *parser, classLoweringInfo cla
 
 			// Omit decorated auto-accessors as they will be now generated at run-time instead
 			if prop.Kind == js_ast.PropertyAutoAccessor {
-				// Determine where to store the field
-				var target js_ast.Expr
-				if prop.Flags.Has(js_ast.PropertyIsStatic) && !analysis.staticFieldToBlockAssign {
-					target = ctx.nameFunc()
-				} else {
-					target = js_ast.Expr{Loc: loc, Data: js_ast.EThisShared}
-				}
-
-				// Generate the assignment initializer
-				var init js_ast.Expr
-				if prop.InitializerOrNil.Data != nil {
-					init = prop.InitializerOrNil
-				} else {
-					init = js_ast.Expr{Loc: loc, Data: js_ast.EUndefinedShared}
-				}
-
-				// Optionally call registered decorator initializers
-				if initializerIndex != -1 {
-					var value js_ast.Expr
-					if prop.Flags.Has(js_ast.PropertyIsStatic) {
-						value = ctx.nameFunc()
-					} else {
-						value = js_ast.Expr{Loc: loc, Data: js_ast.EThisShared}
-					}
-					args := []js_ast.Expr{
-						{Loc: loc, Data: &js_ast.EIdentifier{Ref: ctx.decoratorContextRef}},
-						{Loc: loc, Data: &js_ast.ENumber{Value: float64((3 + 2*initializerIndex) << 1)}},
-						value,
-					}
-					if _, ok := init.Data.(*js_ast.EUndefined); !ok {
-						args = append(args, init)
-					}
-					init = p.callRuntime(init.Loc, "__runInitializers", args)
-					p.recordUsage(ctx.decoratorContextRef)
-				}
-
-				// Initialize the private field to a new WeakMap
-				ctx.privateMembers = append(ctx.privateMembers, js_ast.Assign(
-					js_ast.Expr{Loc: prop.Key.Loc, Data: &js_ast.EIdentifier{Ref: autoAccessorWeakMapRef}},
-					js_ast.Expr{Loc: prop.Key.Loc, Data: &js_ast.ENew{Target: js_ast.Expr{Loc: prop.Key.Loc, Data: &js_ast.EIdentifier{Ref: p.weakMapRef}}}},
-				))
-				p.recordUsage(autoAccessorWeakMapRef)
-
-				// Add every newly-constructed instance into this map
-				key := js_ast.Expr{Loc: prop.Key.Loc, Data: &js_ast.EIdentifier{Ref: autoAccessorWeakMapRef}}
-				args := []js_ast.Expr{target, key}
-				if _, ok := init.Data.(*js_ast.EUndefined); !ok {
-					args = append(args, init)
-				}
-				memberExpr := p.callRuntime(loc, "__privateAdd", args)
-				p.recordUsage(autoAccessorWeakMapRef)
-
-				// Run extra initializers
-				if initializerIndex != -1 {
-					var value js_ast.Expr
-					if prop.Flags.Has(js_ast.PropertyIsStatic) {
-						value = ctx.nameFunc()
-					} else {
-						value = js_ast.Expr{Loc: loc, Data: js_ast.EThisShared}
-					}
-					memberExpr = js_ast.JoinWithComma(memberExpr, p.callRuntime(loc, "__runInitializers", []js_ast.Expr{
-						{Loc: loc, Data: &js_ast.EIdentifier{Ref: ctx.decoratorContextRef}},
-						{Loc: loc, Data: &js_ast.ENumber{Value: float64(((4 + 2*initializerIndex) << 1) | 1)}},
-						value,
-					}))
-					p.recordUsage(ctx.decoratorContextRef)
-				}
-
-				if prop.Flags.Has(js_ast.PropertyIsStatic) {
-					ctx.staticMembers = append(ctx.staticMembers, memberExpr)
-				} else {
-					ctx.instanceMembers = append(ctx.instanceMembers, js_ast.Stmt{Loc: loc, Data: &js_ast.SExpr{Value: memberExpr}})
-				}
-
 				if analysis.private != nil {
 					ctx.lowerPrivateMethod(p, prop, analysis.private)
 				}
@@ -1829,7 +1761,7 @@ func (ctx *lowerClassContext) processProperties(p *parser, classLoweringInfo cla
 		// Lower fields
 		if (!prop.Kind.IsMethodDefinition() && analysis.mustLowerField) || analysis.staticFieldToBlockAssign {
 			var keep bool
-			prop, keep = ctx.lowerField(p, prop, analysis.private, analysis.shouldOmitFieldInitializer, analysis.staticFieldToBlockAssign, initializerIndex)
+			prop, _, keep = ctx.lowerField(p, prop, analysis.private, analysis.shouldOmitFieldInitializer, analysis.staticFieldToBlockAssign, initializerIndex)
 			if !keep {
 				continue
 			}
@@ -1936,7 +1868,7 @@ func (ctx *lowerClassContext) rewriteAutoAccessorToGetSet(
 	}
 	if !mustLowerField {
 		properties = append(properties, storageProp)
-	} else if prop, ok := ctx.lowerField(p, storageProp, storagePrivate, false, false, -1); ok {
+	} else if prop, _, ok := ctx.lowerField(p, storageProp, storagePrivate, false, false, -1); ok {
 		properties = append(properties, prop)
 	}
 
@@ -2059,7 +1991,7 @@ func (ctx *lowerClassContext) insertInitializersIntoConstructor(p *parser, class
 	if ctx.decoratorCallInstanceMethodExtraInitializers {
 		decoratorInstanceMethodExtraInitializers = p.callRuntime(ctx.classLoc, "__runInitializers", []js_ast.Expr{
 			{Loc: ctx.classLoc, Data: &js_ast.EIdentifier{Ref: ctx.decoratorContextRef}},
-			{Loc: ctx.classLoc, Data: &js_ast.ENumber{Value: 5}},
+			{Loc: ctx.classLoc, Data: &js_ast.ENumber{Value: (2 << 1) | 1}},
 			{Loc: ctx.classLoc, Data: js_ast.EThisShared},
 		})
 		p.recordUsage(ctx.decoratorContextRef)
@@ -2145,25 +2077,31 @@ func (ctx *lowerClassContext) finishAndGenerateCode(p *parser, result visitClass
 	if p.options.ts.Parse && p.options.ts.Config.ExperimentalDecorators == config.True {
 		classExperimentalDecorators = ctx.class.Decorators
 		ctx.class.Decorators = nil
-	} else if p.options.unsupportedJSFeatures.Has(compat.Decorators) {
+	} else if ctx.class.ShouldLowerStandardDecorators {
 		classDecorators = ctx.decoratorClassDecorators
 	}
 
-	// Handle JavaScript decorators on the class itself
 	var decorateClassExpr js_ast.Expr
 	if classDecorators.Data != nil {
+		// Handle JavaScript decorators on the class itself
 		if ctx.decoratorContextRef == ast.InvalidRef {
 			ctx.decoratorContextRef = p.generateTempRef(tempRefNeedsDeclare, "_init")
 		}
 		decorateClassExpr = p.callRuntime(ctx.classLoc, "__decorateElement", []js_ast.Expr{
 			{Loc: ctx.classLoc, Data: &js_ast.EIdentifier{Ref: ctx.decoratorContextRef}},
 			{Loc: ctx.classLoc, Data: &js_ast.ENumber{Value: 0}},
-			{Loc: ctx.classLoc, Data: &js_ast.EString{Value: helpers.StringToUTF16(ctx.optionalNameHint)}},
+			{Loc: ctx.classLoc, Data: &js_ast.EString{Value: helpers.StringToUTF16(ctx.nameToKeep)}},
 			classDecorators,
 			ctx.nameFunc(),
 		})
 		p.recordUsage(ctx.decoratorContextRef)
 		decorateClassExpr = js_ast.Assign(ctx.nameFunc(), decorateClassExpr)
+	} else if ctx.decoratorContextRef != ast.InvalidRef {
+		// Decorator metadata is present if there are any decorators on the class at all
+		decorateClassExpr = p.callRuntime(ctx.classLoc, "__decoratorMetadata", []js_ast.Expr{
+			{Loc: ctx.classLoc, Data: &js_ast.EIdentifier{Ref: ctx.decoratorContextRef}},
+			ctx.nameFunc(),
+		})
 	}
 
 	// If this is true, we have removed some code from the class body that could
@@ -2176,9 +2114,14 @@ func (ctx *lowerClassContext) finishAndGenerateCode(p *parser, result visitClass
 			len(ctx.privateMembers) > 0 ||
 			len(ctx.staticPrivateMethods) > 0 ||
 			len(ctx.staticMembers) > 0 ||
+
+			// TypeScript experimental decorators
 			len(ctx.instanceExperimentalDecorators) > 0 ||
 			len(ctx.staticExperimentalDecorators) > 0 ||
-			len(classExperimentalDecorators) > 0)
+			len(classExperimentalDecorators) > 0 ||
+
+			// JavaScript decorators
+			ctx.decoratorContextRef != ast.InvalidRef)
 
 	// If we need to represent the class as an expression (even if it's a
 	// statement), then generate another symbol to use as the class name
@@ -2206,13 +2149,18 @@ func (ctx *lowerClassContext) finishAndGenerateCode(p *parser, result visitClass
 
 	// If there are JavaScript decorators, start by allocating a context object
 	if ctx.decoratorContextRef != ast.InvalidRef {
-		prefixExprs = append(prefixExprs, js_ast.Assign(
+		base := js_ast.Expr{Loc: ctx.classLoc, Data: js_ast.ENullShared}
+		if ctx.class.ExtendsOrNil.Data != nil {
+			if ctx.extendsRef == ast.InvalidRef {
+				ctx.extendsRef = p.generateTempRef(tempRefNeedsDeclare, "")
+				ctx.class.ExtendsOrNil = js_ast.Assign(js_ast.Expr{Loc: ctx.class.ExtendsOrNil.Loc, Data: &js_ast.EIdentifier{Ref: ctx.extendsRef}}, ctx.class.ExtendsOrNil)
+				p.recordUsage(ctx.extendsRef)
+			}
+			base.Data = &js_ast.EIdentifier{Ref: ctx.extendsRef}
+		}
+		suffixExprs = append(suffixExprs, js_ast.Assign(
 			js_ast.Expr{Loc: ctx.classLoc, Data: &js_ast.EIdentifier{Ref: ctx.decoratorContextRef}},
-			js_ast.Expr{Loc: ctx.classLoc, Data: &js_ast.EArray{IsSingleLine: true, Items: []js_ast.Expr{
-				{Loc: ctx.classLoc, Data: js_ast.EMissingShared}, // classExtraInitializers
-				{Loc: ctx.classLoc, Data: js_ast.EMissingShared}, // staticMethodExtraInitializers
-				{Loc: ctx.classLoc, Data: js_ast.EMissingShared}, // instanceMethodExtraInitializers
-			}}},
+			p.callRuntime(ctx.classLoc, "__decoratorStart", []js_ast.Expr{base}),
 		))
 		p.recordUsage(ctx.decoratorContextRef)
 	}
@@ -2244,7 +2192,7 @@ func (ctx *lowerClassContext) finishAndGenerateCode(p *parser, result visitClass
 	if ctx.decoratorCallStaticMethodExtraInitializers {
 		suffixExprs = append(suffixExprs, p.callRuntime(ctx.classLoc, "__runInitializers", []js_ast.Expr{
 			{Loc: ctx.classLoc, Data: &js_ast.EIdentifier{Ref: ctx.decoratorContextRef}},
-			{Loc: ctx.classLoc, Data: &js_ast.ENumber{Value: 3}},
+			{Loc: ctx.classLoc, Data: &js_ast.ENumber{Value: (1 << 1) | 1}},
 			ctx.nameFunc(),
 		}))
 		p.recordUsage(ctx.decoratorContextRef)
@@ -2259,10 +2207,10 @@ func (ctx *lowerClassContext) finishAndGenerateCode(p *parser, result visitClass
 	suffixExprs = append(suffixExprs, ctx.staticExperimentalDecorators...)
 
 	// For each element initializer of classExtraInitializers
-	if decorateClassExpr.Data != nil {
+	if classDecorators.Data != nil {
 		suffixExprs = append(suffixExprs, p.callRuntime(ctx.classLoc, "__runInitializers", []js_ast.Expr{
 			{Loc: ctx.classLoc, Data: &js_ast.EIdentifier{Ref: ctx.decoratorContextRef}},
-			{Loc: ctx.classLoc, Data: &js_ast.ENumber{Value: 1}},
+			{Loc: ctx.classLoc, Data: &js_ast.ENumber{Value: (0 << 1) | 1}},
 			ctx.nameFunc(),
 		}))
 		p.recordUsage(ctx.decoratorContextRef)
