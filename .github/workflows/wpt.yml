@@ -22,12 +22,12 @@ jobs:
       - name: Run Streams Tests
         run: |
           set -x
-          cd js/modules/k6/experimental/streams/tests
+          cd internal/js/modules/k6/experimental/streams/tests
           sh checkout.sh
           go test ../... -tags=wpt
       - name: Run Webcrypto Tests
         run: |
           set -x
-          cd js/modules/k6/webcrypto/tests
+          cd internal/js/modules/k6/webcrypto/tests
           sh checkout.sh
           go test ./... -tags=wpt

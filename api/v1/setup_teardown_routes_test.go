@@ -15,14 +15,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/execution"
-	"go.k6.io/k6/execution/local"
-	"go.k6.io/k6/js"
+	"go.k6.io/k6/internal/execution"
+	"go.k6.io/k6/internal/execution/local"
+	"go.k6.io/k6/internal/js"
+	"go.k6.io/k6/internal/loader"
+	"go.k6.io/k6/internal/metrics/engine"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/types"
-	"go.k6.io/k6/loader"
 	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/metrics/engine"
 	"go.k6.io/k6/output"
 )
 

@@ -12,8 +12,8 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/time/rate"
 
+	"go.k6.io/k6/internal/usage"
 	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/usage"
 )
 
 // DialContexter is an interface that can dial with a context

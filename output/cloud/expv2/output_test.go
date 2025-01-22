@@ -14,7 +14,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/cloudapi"
-	"go.k6.io/k6/lib/testutils"
+	"go.k6.io/k6/internal/lib/testutils"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/metrics"
 )
