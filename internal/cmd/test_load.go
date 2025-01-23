@@ -18,7 +18,6 @@ import (
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/internal/js"
 	"go.k6.io/k6/internal/loader"
-	"go.k6.io/k6/internal/usage"
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/fsext"
@@ -84,7 +83,8 @@ func loadLocalTest(gs *state.GlobalState, cmd *cobra.Command, args []string) (*l
 			val, ok := gs.Env[key]
 			return val, ok
 		},
-		Usage: usage.New(),
+		Usage:          gs.Usage,
+		SecretsManager: gs.SecretsManager,
 	}
 
 	test := &loadedTest{

@@ -14,7 +14,9 @@ import (
 
 	"go.k6.io/k6/internal/event"
 	"go.k6.io/k6/internal/ui/console"
+	"go.k6.io/k6/internal/usage"
 	"go.k6.io/k6/lib/fsext"
+	"go.k6.io/k6/secretsource"
 )
 
 const defaultConfigFileName = "config.json"
@@ -54,6 +56,9 @@ type GlobalState struct {
 
 	Logger         *logrus.Logger //nolint:forbidigo //TODO:change to FieldLogger
 	FallbackLogger logrus.FieldLogger
+
+	SecretsManager *secretsource.SecretsManager
+	Usage          *usage.Usage
 }
 
 // NewGlobalState returns a new GlobalState with the given ctx.
@@ -129,6 +134,7 @@ func NewGlobalState(ctx context.Context) *GlobalState {
 			Hooks:     make(logrus.LevelHooks),
 			Level:     logrus.InfoLevel,
 		},
+		Usage: usage.New(),
 	}
 }
 
@@ -140,6 +146,7 @@ type GlobalFlags struct {
 	Address          string
 	ProfilingEnabled bool
 	LogOutput        string
+	SecretSource     []string
 	LogFormat        string
 	Verbose          bool
 }
