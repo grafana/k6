@@ -1,5 +1,5 @@
 diff --git a/WebCryptoAPI/import_export/symmetric_importKey.https.any.js b/WebCryptoAPI/import_export/symmetric_importKey.https.any.js
-index 01b318018..7957cb204 100644
+index 01b3180189..7957cb204b 100644
 --- a/WebCryptoAPI/import_export/symmetric_importKey.https.any.js
 +++ b/WebCryptoAPI/import_export/symmetric_importKey.https.any.js
 @@ -18,16 +18,17 @@

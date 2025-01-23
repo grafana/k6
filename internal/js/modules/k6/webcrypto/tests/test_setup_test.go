@@ -13,6 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const webPlatformTestSuite = "./wpt/WebCryptoAPI/"
+
 const initGlobals = `
 	globalThis.CryptoKey = require("k6/x/webcrypto").CryptoKey;
 `
@@ -61,6 +63,7 @@ func newConfiguredRuntime(t testing.TB) *modulestest.Runtime {
 	return rt
 }
 
+// compileAndRun compiles a JavaScript file into a sobek.Program and runs it in the runtime.
 func compileAndRun(t testing.TB, runtime *modulestest.Runtime, base, file string) {
 	program, err := modulestest.CompileFile(base, file)
 	require.NoError(t, err)

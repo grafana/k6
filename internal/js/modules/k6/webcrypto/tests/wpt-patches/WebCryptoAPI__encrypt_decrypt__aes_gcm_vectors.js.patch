@@ -1,5 +1,5 @@
 diff --git a/WebCryptoAPI/encrypt_decrypt/aes_gcm_vectors.js b/WebCryptoAPI/encrypt_decrypt/aes_gcm_vectors.js
-index 965fe9564..0364b93cd 100644
+index 965fe9564d..0364b93cd9 100644
 --- a/WebCryptoAPI/encrypt_decrypt/aes_gcm_vectors.js
 +++ b/WebCryptoAPI/encrypt_decrypt/aes_gcm_vectors.js
 @@ -22,7 +22,10 @@ function getTestVectors() {

@@ -11,8 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const webPlatformTestSuite = "./wpt/WebCryptoAPI/"
-
 func TestWebPlatformTestSuite(t *testing.T) {
 	t.Parallel()
 

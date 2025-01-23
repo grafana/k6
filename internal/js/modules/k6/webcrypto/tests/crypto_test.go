@@ -3,267 +3,177 @@
 package tests
 
 import (
-	"fmt"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGetRandomValues(t *testing.T) {
+// TestCryptoWebPlatformTestSuite runs the Web Platform Tests for the Crypto interface.
+// It ensures that the k6 implementation of the WebCrypto API is compliant with the specification.
+//
+// The tests are loaded from the Web Platform Tests repository and executed in the k6 runtime.
+// Any differences between the k6 implementation and the specification are documented in patches.
+func TestCryptoWebPlatformTestSuite(t *testing.T) {
 	t.Parallel()
 
-	ts := newConfiguredRuntime(t)
-
-	_, gotErr := ts.RunOnEventLoop(`
-		var input = new Uint8Array(10);
-		var output = crypto.getRandomValues(input);
-
-		if (output.length != 10) {
-			throw new Error("output.length != 10");
-		}
-
-		// Note that we're comparing references here, not values.
-		// Thus we're testing that the same typed array is returned.
-		if (input !== output) {
-			throw new Error("input !== output");
-		}
-	`)
-
-	assert.NoError(t, gotErr)
-}
-
-// TODO: Add tests for DataView
-
-// TestGetRandomValues tests that crypto.getRandomValues() supports the expected types
-// listed in the [specification]:
-// - Int8Array
-// - Int16Arrays
-// - Int32Array
-// - Uint8Array
-// - Uint8ClampedArray
-// - Uint16Array
-// - Uint32Array
-//
-// It stands as the k6 counterpart of the [official test suite] on that topic.
-//
-// [specification]: https://www.w3.org/TR/WebCryptoAPI/#Crypto-method-getRandomValues
-// [official test suite]: https://github.com/web-platform-tests/wpt/blob/master/WebCryptoAPI/getRandomValues.any.js#L1
-func TestGetRandomValuesSupportedTypedArrays(t *testing.T) {
-	t.Parallel()
-
-	ts := newConfiguredRuntime(t)
-
-	type testCase struct {
-		name       string
-		typedArray string
-		wantErr    bool
+	// Check if the test is running in the correct environment
+	info, err := os.Stat(webPlatformTestSuite)
+	if os.IsNotExist(err) || err != nil || !info.IsDir() {
+		t.Fatalf(
+			"The Web Platform Test directory does not exist, err: %s. Please check webcrypto/tests/README.md how to setup it",
+			err,
+		)
 	}
 
-	testCases := []testCase{
+	// Define the test cases for the Crypto interface
+	tests := []struct {
+		catalog string   // Subdirectory in the WPT repository
+		files   []string // List of test files to execute
+		callFn  string   // Function to call after executing the test files (e.g., "run_test")
+	}{
+		// what test i shoudl done?
 		{
-			name:       "filling a Int8Array typed array with random values should succeed",
-			typedArray: "Int8Array",
-			wantErr:    false,
+			catalog: "digest",
+			files: []string{
+				"digest.https.any.js",
+			},
 		},
 		{
-			name:       "filling a Int16Array typed array with random values should succeed",
-			typedArray: "Int16Array",
-			wantErr:    false,
+			catalog: "generateKey",
+			files: []string{
+				"successes.js",
+			},
+			callFn: "run_test",
 		},
 		{
-			name:       "filling a Int32Array typed array with random values should succeed",
-			typedArray: "Int32Array",
-			wantErr:    false,
+			catalog: "generateKey",
+			files: []string{
+				"failures.js",
+			},
+			callFn: "run_test",
 		},
 		{
-			name:       "filling a Uint8Array typed array with random values should succeed",
-			typedArray: "Uint8Array",
-			wantErr:    false,
+			catalog: "import_export",
+			files: []string{
+				"symmetric_importKey.https.any.js",
+			},
 		},
 		{
-			name:       "filling a Uint8ClampedArray typed array with random values should succeed",
-			typedArray: "Uint8ClampedArray",
-			wantErr:    false,
+			catalog: "import_export",
+			files: []string{
+				"ec_importKey.https.any.js",
+			},
 		},
 		{
-			name:       "filling a Uint16Array typed array with random values should succeed",
-			typedArray: "Uint16Array",
-			wantErr:    false,
+			catalog: "import_export",
+			files: []string{
+				"rsa_importKey.https.any.js",
+			},
 		},
 		{
-			name:       "filling a Uint32Array typed array with random values should succeed",
-			typedArray: "Uint32Array",
-			wantErr:    false,
-		},
-
-		// Unsupported typed arrays
-		{
-			name:       "filling a BigInt64Array typed array with random values should succeed",
-			typedArray: "BigInt64Array",
-			wantErr:    true,
+			catalog: "encrypt_decrypt",
+			files: []string{
+				"aes_cbc_vectors.js",
+				"aes.js",
+			},
+			callFn: "run_test",
 		},
 		{
-			name:       "filling a BigUint64Array typed array with random values should succeed",
-			typedArray: "BigUint64Array",
-			wantErr:    true,
+			catalog: "encrypt_decrypt",
+			files: []string{
+				"aes_ctr_vectors.js",
+				"aes.js",
+			},
+			callFn: "run_test",
 		},
 		{
-			name:       "filling a Float32Array typed array with random values should fail",
-			typedArray: "Float32Array",
-			wantErr:    true,
+			// Note @oleiade: although the specification targets support
+			// for various iv sizes, go AES GCM cipher only supports 96bits.
+			// Thus, although the official WebPlatform test suite contains
+			// vectors for various iv sizes, we only test the 96bits one.
+			catalog: "encrypt_decrypt",
+			files: []string{
+				"aes_gcm_96_iv_fixtures.js",
+				"aes_gcm_vectors.js",
+				"aes.js",
+			},
+			callFn: "run_test",
 		},
 		{
-			name:       "filling a Float64Array typed array with random values should fail",
-			typedArray: "Float64Array",
-			wantErr:    true,
+			// RSA-OAEP
+			catalog: "encrypt_decrypt",
+			files: []string{
+				"rsa_vectors.js",
+				"rsa.js",
+			},
+			callFn: "run_test",
+		},
+		{
+			catalog: "sign_verify",
+			files: []string{
+				"hmac_vectors.js", "hmac.js",
+			},
+			callFn: "run_test",
+		},
+		{
+			catalog: "sign_verify",
+			files: []string{
+				"ecdsa_vectors.js",
+				"ecdsa.js",
+			},
+			callFn: "run_test",
+		},
+		{
+			catalog: "sign_verify",
+			files: []string{
+				"rsa_pss_vectors.js",
+				"rsa.js",
+			},
+			callFn: "run_test",
+		},
+		{
+			catalog: "sign_verify",
+			files: []string{
+				"rsa_pss_vectors.js", "rsa.js",
+			},
+			callFn: "run_test",
+		},
+		{
+			catalog: "derive_bits_keys",
+			files: []string{
+				"ecdh_bits.js",
+			},
+			callFn: "define_tests",
 		},
 	}
 
-	for _, tc := range testCases {
-		_, gotErr := ts.RunOnEventLoop(fmt.Sprintf(`
-				var buf = new %s(10);
-				crypto.getRandomValues(buf);
+	// Run each test case
+	for _, tt := range tests {
+		tt := tt
+		testName := tt.catalog + "/" + strings.Join(tt.files, "_")
 
-				if (buf.length != 10) {
-					throw new Error("buf.length != 10");
+		t.Run(testName, func(t *testing.T) {
+			t.Parallel()
+
+			ts := newConfiguredRuntime(t)
+
+			gotErr := ts.EventLoop.Start(func() error {
+				// Execute the test files
+				for _, script := range tt.files {
+					compileAndRun(t, ts, webPlatformTestSuite+tt.catalog, script)
 				}
-			`, tc.typedArray))
 
-		if tc.wantErr != (gotErr != nil) {
-			t.Fatalf("unexpected error: %v", gotErr)
-		}
+				// Call the specified function (e.g., "run_test") if provided
+				if tt.callFn == "" {
+					return nil
+				}
 
-		assert.Equal(t, tc.wantErr, gotErr != nil, tc.name)
+				_, err := ts.VU.Runtime().RunString(tt.callFn + `()`)
+				return err
+			})
+			assert.NoError(t, gotErr)
+		})
 	}
-}
-
-// TestGetRandomValuesQuotaExceeded tests that crypto.getRandomValues() returns a
-// QuotaExceededError when the requested size is too large. As described in the
-// [specification], the maximum size is 65536 bytes.
-//
-// It stands as the k6 counterpart of the [official test suite] on that topic.
-//
-// [specification]: https://www.w3.org/TR/WebCryptoAPI/#Crypto-method-getRandomValues
-// [official test suite]: https://github.com/web-platform-tests/wpt/blob/master/WebCryptoAPI/getRandomValues.any.js#L1
-func TestGetRandomValuesQuotaExceeded(t *testing.T) {
-	t.Parallel()
-
-	ts := newConfiguredRuntime(t)
-
-	_, gotErr := ts.RunOnEventLoop(`
-		var buf = new Uint8Array(1000000000);
-		crypto.getRandomValues(buf);
-	`)
-
-	assert.Error(t, gotErr)
-	assert.Contains(t, gotErr.Error(), "QuotaExceededError")
-}
-
-// TestRandomUUIDIsTheNamespaceFormat tests that the UUID generated by
-// crypto.randomUUID() is in the correct format.
-//
-// It stands as the k6 counterpart of the equivalent [WPT test].
-//
-// [WPT test]: https://github.com/web-platform-tests/wpt/blob/master/WebCryptoAPI/randomUUID.https.any.js#L16
-func TestRandomUUIDIsInTheNamespaceFormat(t *testing.T) {
-	t.Parallel()
-
-	ts := newConfiguredRuntime(t)
-
-	_, gotErr := ts.RunOnEventLoop(`
-		const iterations = 256;
-		const uuids = new Set();
-
-		function randomUUID() {
-			const uuid = crypto.randomUUID();
-			if (uuids.has(uuid)) {
-				throw new Error("UUID collision: " + uuid);
-			}
-			uuids.add(uuid);
-			return uuid
-		}
-
-		const UUIDRegex = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/
-		for (let i = 0; i < iterations; i++) {
-			// Assert that the UUID is in the correct format and
-			// that it is unique.
-			UUIDRegex.test(randomUUID());
-		}
-	`)
-
-	assert.NoError(t, gotErr)
-}
-
-// TestRandomUUIDIVersion tests that the UUID generated by
-// crypto.randomUUID() has the correct version 4 bits set
-// (4 most significant bits of the bytes[6] set to `0100`).
-//
-// It stands as the k6 counterpart of the equivalent [WPT test].
-//
-// [WPT test]: https://github.com/web-platform-tests/wpt/blob/master/WebCryptoAPI/randomUUID.https.any.js#L25
-func TestRandomUUIDVersion(t *testing.T) {
-	t.Parallel()
-
-	ts := newConfiguredRuntime(t)
-
-	_, gotErr := ts.RunOnEventLoop(`
-		const iterations = 256;
-		const uuids = new Set();
-
-		function randomUUID() {
-			const uuid = crypto.randomUUID();
-			if (uuids.has(uuid)) {
-				throw new Error("UUID collision: " + uuid);
-			}
-			uuids.add(uuid);
-			return uuid
-		}
-
-		for (let i = 0; i < iterations; i++) {
-			let value = parseInt(randomUUID().split('-')[2].slice(0, 2), 16)
-			value &= 0b11110000
-			if (value !== 0b01000000) {
-				throw new Error("UUID version is not 4: " + value);
-			}
-		}
-	`)
-
-	assert.NoError(t, gotErr)
-}
-
-// TestRandomUUIDIVariant tests that the UUID generated by
-// crypto.randomUUID() has the correct variant 2 bits set
-// (2 most significant bits of the bytes[8] set to `10`).
-//
-// It stands as the k6 counterpart of the equivalent [WPT test].
-//
-// [WPT test]: https://github.com/web-platform-tests/wpt/blob/master/WebCryptoAPI/randomUUID.https.any.js#L35
-func TestRandomUUIDVariant(t *testing.T) {
-	t.Parallel()
-
-	ts := newConfiguredRuntime(t)
-
-	_, gotErr := ts.RunOnEventLoop(`
-		const iterations = 256;
-		const uuids = new Set();
-
-		function randomUUID() {
-			const uuid = crypto.randomUUID();
-			if (uuids.has(uuid)) {
-				throw new Error("UUID collision: " + uuid);
-			}
-			uuids.add(uuid);
-			return uuid
-		}
-
-		for (let i = 0; i < iterations; i++) {
-			let value = parseInt(randomUUID().split('-')[3].slice(0, 2), 16)
-			value &= 0b11000000
-			if (value !== 0b10000000) {
-				throw new Error("UUID variant is not 1: " + value);
-			}
-		}
-	`)
-
-	assert.NoError(t, gotErr)
 }

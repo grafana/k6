@@ -1,5 +1,5 @@
 diff --git a/WebCryptoAPI/generateKey/failures.js b/WebCryptoAPI/generateKey/failures.js
-index e0f0279a6..61495ca75 100644
+index e0f0279a69..61495ca75e 100644
 --- a/WebCryptoAPI/generateKey/failures.js
 +++ b/WebCryptoAPI/generateKey/failures.js
 @@ -32,10 +32,10 @@ function run_test(algorithmNames) {

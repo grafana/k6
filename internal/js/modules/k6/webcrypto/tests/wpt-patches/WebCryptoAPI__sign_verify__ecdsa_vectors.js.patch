@@ -1,5 +1,5 @@
 diff --git a/WebCryptoAPI/sign_verify/ecdsa_vectors.js b/WebCryptoAPI/sign_verify/ecdsa_vectors.js
-index aa9b81ba8..185c82622 100644
+index aa9b81ba8a..185c826220 100644
 --- a/WebCryptoAPI/sign_verify/ecdsa_vectors.js
 +++ b/WebCryptoAPI/sign_verify/ecdsa_vectors.js
 @@ -90,7 +90,9 @@ function getInvalidTestVectors() {
