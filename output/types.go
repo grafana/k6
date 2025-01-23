@@ -4,6 +4,7 @@
 package output
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/url"
@@ -95,6 +96,11 @@ type WithTestRunStop interface {
 type WithStopWithTestError interface {
 	Output
 	StopWithTestError(testRunErr error) error // nil testRunErr means error-free test run
+}
+
+type WithGracefulStopper interface {
+	Output
+	GracefulStop(ctx context.Context, testRunErr error) error
 }
 
 // WithBuiltinMetrics means the output can receive the builtin metrics.

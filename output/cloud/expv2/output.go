@@ -150,6 +150,11 @@ func (o *Output) Start() error {
 
 // StopWithTestError gracefully stops all metric emission from the output.
 func (o *Output) StopWithTestError(_ error) error {
+	return o.GracefulStop(context.Background(), nil)
+}
+
+// GracefulStop gracefully stops all metric emission from the output.
+func (o *Output) GracefulStop(ctx context.Context, _ error) error {
 	o.logger.Debug("Stopping...")
 	defer o.logger.Debug("Stopped!")
 
@@ -159,31 +164,49 @@ func (o *Output) StopWithTestError(_ error) error {
 	select {
 	case <-o.abort:
 		return nil
+	case <-ctx.Done():
+		o.logger.Debug("Context expired before of completing all the shutdown operations, some metrics might miss...")
+		return nil
 	default:
 	}
 
-	// Drain the SampleBuffer and force the aggregation for flushing
-	// all the queued samples even if they haven't yet passed the
-	// wait period.
-	o.collector.DropExpiringDelay()
-	o.collectSamples()
-	o.flushMetrics()
+	lastFlushDone := make(chan struct{})
+	go func() {
+		defer close(lastFlushDone)
 
-	// Flush all the remaining request metadatas.
-	if insightsOutput.Enabled(o.config) {
-		o.flushRequestMetadatas()
-		if err := o.insightsClient.Close(); err != nil {
-			o.logger.WithError(err).Error("Failed to close the insights client")
+		// Drain the SampleBuffer and force the aggregation for flushing
+		// all the queued samples even if they haven't yet passed the
+		// wait period.
+		o.collector.DropExpiringDelay()
+		o.collectSamples()
+		o.flushMetrics()
+
+		// Flush all the remaining request metadatas.
+		if insightsOutput.Enabled(o.config) {
+			o.flushRequestMetadatas()
+			if err := o.insightsClient.Close(); err != nil {
+				o.logger.WithError(err).Error("Failed to close the insights client")
+			}
 		}
-	}
+	}()
 
-	return nil
+	select {
+	case <-ctx.Done():
+		o.logger.Debug("Context expired before of completing all the shutdown operations, some metrics might miss...")
+		return ctx.Err()
+	case <-lastFlushDone:
+		return nil
+	}
 }
 
 func (o *Output) runPeriodicFlush() {
 	t := time.NewTicker(o.config.MetricPushInterval.TimeDuration())
 
 	o.wg.Add(1)
+
+	//TODO: add a context and propagate on flush
+	//ctx, cancel := context.WithCancel(context.Background())
+	//defer cancel()
 
 	go func() {
 		defer func() {
@@ -196,6 +219,7 @@ func (o *Output) runPeriodicFlush() {
 			case <-t.C:
 				o.flushMetrics()
 			case <-o.stop:
+				// TODO: call cancel()
 				return
 			case <-o.abort:
 				return
@@ -264,10 +288,9 @@ func (o *Output) flushMetrics() {
 	err := o.flushing.flush()
 	if err != nil {
 		o.handleFlushError(err)
+		o.logger.WithError(err).WithField("t", time.Since(start)).Error("Failed to push trace samples to the cloud")
 		return
 	}
-
-	o.logger.WithField("t", time.Since(start)).Debug("Successfully flushed buffered samples to the cloud")
 }
 
 func (o *Output) runFlushRequestMetadatas() {
@@ -296,15 +319,11 @@ func (o *Output) runFlushRequestMetadatas() {
 // flushRequestMetadatas periodically flushes traces collected in RequestMetadatasCollector using flusher.
 func (o *Output) flushRequestMetadatas() {
 	start := time.Now()
-
 	err := o.requestMetadatasFlusher.Flush()
 	if err != nil {
 		o.logger.WithError(err).WithField("t", time.Since(start)).Error("Failed to push trace samples to the cloud")
-
 		return
 	}
-
-	o.logger.WithField("t", time.Since(start)).Debug("Successfully flushed buffered trace samples to the cloud")
 }
 
 // handleFlushError handles errors generated from the flushing operation.

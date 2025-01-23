@@ -1,6 +1,7 @@
 package output
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -102,12 +103,19 @@ func (om *Manager) startOutputs() error {
 }
 
 func (om *Manager) stopOutputs(testErr error, upToID int) {
+	cause := fmt.Errorf("wasn't able able to stop within the expected time-frame. "+
+		"The reason might be related to an unreliable third-party service or an high volume of generated metrics."))
+	ctx, cancel := context.WithTimeoutCause(context.Background(), 30*time.Second, cause)
+	defer cancel()
+
 	om.logger.Debugf("Stopping %d outputs...", upToID)
 	for i := 0; i < upToID; i++ {
 		out := om.outputs[i]
 		var err error
 		if sout, ok := out.(WithStopWithTestError); ok {
 			err = sout.StopWithTestError(testErr)
+		} else if sout, ok := out.(WithGracefulStopper); ok {
+			err = sout.GracefulStop(ctx, testErr)
 		} else {
 			err = out.Stop()
 		}

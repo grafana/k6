@@ -1,14 +1,17 @@
 package expv2
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
@@ -502,6 +505,110 @@ func (ff flusherFunc) Flush() error {
 func (ff flusherFunc) flush() error {
 	ff()
 	return nil
+}
+
+func TestOutputGracefulStopSuccess(t *testing.T) {
+	t.Parallel()
+
+	l := &logrus.Logger{}
+	l.SetOutput(io.Discard)
+
+	collector, err := newCollector(3*time.Second, 1*time.Second)
+	require.NoError(t, err)
+
+	var requests uint32
+	ff := flusherFunc(func() {
+		atomic.AddUint32(&requests, 1)
+	})
+
+	o := Output{
+		stop:      make(chan struct{}),
+		collector: collector,
+		logger:    l,
+		flushing:  flusherFunc(ff),
+	}
+
+	registry := metrics.NewRegistry()
+	metric1, err := registry.NewMetric("test", metrics.Counter)
+	require.NoError(t, err)
+
+	// Add a sample to guarantee at least one flush
+	s := metrics.Sample{
+		TimeSeries: metrics.TimeSeries{
+			Metric: metric1,
+			Tags:   registry.RootTagSet(),
+		},
+		Time:  time.Now(),
+		Value: 1244,
+	}
+	o.AddMetricSamples([]metrics.SampleContainer{
+		metrics.Samples([]metrics.Sample{s}),
+	})
+
+	err = o.GracefulStop(context.Background(), nil)
+	require.NoError(t, err)
+
+	assert.EqualValues(t, 1, requests)
+}
+
+func TestOutputGracefulStopWithTimeout(t *testing.T) {
+	t.Parallel()
+
+	l := &logrus.Logger{}
+	l.SetOutput(io.Discard)
+
+	collector, err := newCollector(3*time.Second, 1*time.Second)
+	require.NoError(t, err)
+
+	stopped := make(chan struct{})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var requests uint32
+	ff := flusherFunc(func() {
+		atomic.AddUint32(&requests, 1)
+		cancel()
+		<-stopped
+	})
+
+	o := Output{
+		stop:      make(chan struct{}),
+		collector: collector,
+		logger:    l,
+		flushing:  flusherFunc(ff),
+	}
+
+	registry := metrics.NewRegistry()
+	metric1, err := registry.NewMetric("test", metrics.Counter)
+	require.NoError(t, err)
+
+	// Add a sample to guarantee at least one flush
+	s := metrics.Sample{
+		TimeSeries: metrics.TimeSeries{
+			Metric: metric1,
+			Tags:   registry.RootTagSet(),
+		},
+		Time:  time.Now(),
+		Value: 1244,
+	}
+	o.AddMetricSamples([]metrics.SampleContainer{
+		metrics.Samples([]metrics.Sample{s}),
+	})
+
+	go func() {
+		err = o.GracefulStop(ctx, nil)
+		close(stopped)
+	}()
+
+	select {
+	case <-time.After(5 * time.Second):
+		t.Error("timed out")
+	case <-stopped:
+	}
+
+	assert.ErrorIs(t, err, context.Canceled)
+	assert.EqualValues(t, 1, requests)
 }
 
 func TestPrintableConfig(t *testing.T) {
