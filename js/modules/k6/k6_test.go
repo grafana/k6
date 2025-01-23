@@ -8,9 +8,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"go.k6.io/k6/internal/secretsource/mock"
 	"go.k6.io/k6/js/modulestest"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/secretsource"
 )
 
 func TestFail(t *testing.T) {
@@ -395,5 +397,130 @@ func testCaseRuntime(t testing.TB) *testCase {
 	return &testCase{
 		samples:     samples,
 		testRuntime: testRuntime,
+	}
+}
+
+func testCaseRuntimeWithSecrets(t testing.TB, secretSources map[string]secretsource.SecretSource) *testCase {
+	testRuntime := modulestest.NewRuntime(t)
+	var err error
+	testRuntime.VU.InitEnvField.SecretsManager, _, err = secretsource.NewSecretsManager(secretSources)
+	require.NoError(t, err)
+
+	m, ok := New().NewModuleInstance(testRuntime.VU).(*K6)
+	require.True(t, ok)
+	require.NoError(t, testRuntime.VU.RuntimeField.Set("k6", m.Exports().Named))
+
+	registry := metrics.NewRegistry()
+	samples := make(chan metrics.SampleContainer, 1000)
+	state := &lib.State{
+		Options: lib.Options{
+			SystemTags: &metrics.DefaultSystemTagSet,
+		},
+		Samples:        samples,
+		Tags:           lib.NewVUStateTags(registry.RootTagSet().WithTagsFromMap(map[string]string{"group": lib.RootGroupPath})),
+		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
+	}
+	testRuntime.MoveToVUContext(state)
+
+	return &testCase{
+		samples:     samples,
+		testRuntime: testRuntime,
+	}
+}
+
+func TestSecrets(t *testing.T) {
+	t.Parallel()
+
+	type secretsTest struct {
+		secretsources map[string]secretsource.SecretSource
+		script        string
+		expectedValue any
+		expectedError string
+	}
+
+	cases := map[string]secretsTest{
+		"simple": {
+			secretsources: map[string]secretsource.SecretSource{
+				"default": mock.NewMockSecretSource("some", map[string]string{
+					"secret": "value",
+				}),
+			},
+			script:        "k6.secrets.get('secret')",
+			expectedValue: "value",
+		},
+		"error": {
+			secretsources: map[string]secretsource.SecretSource{
+				"default": mock.NewMockSecretSource("some", map[string]string{
+					"secret": "value",
+				}),
+			},
+			script:        "k6.secrets.get('not_secret')",
+			expectedError: "no value",
+		},
+		"multiple": {
+			secretsources: map[string]secretsource.SecretSource{
+				"default": mock.NewMockSecretSource("some", map[string]string{
+					"secret": "value",
+				}),
+				"second": mock.NewMockSecretSource("some", map[string]string{
+					"secret2": "value2",
+				}),
+			},
+			script:        "k6.secrets.get('secret')",
+			expectedValue: "value",
+		},
+		"multiple get default": {
+			secretsources: map[string]secretsource.SecretSource{
+				"default": mock.NewMockSecretSource("some", map[string]string{
+					"secret": "value",
+				}),
+				"second": mock.NewMockSecretSource("some", map[string]string{
+					"secret2": "value2",
+				}),
+			},
+			script:        "k6.secrets.source('default').get('secret')",
+			expectedValue: "value",
+		},
+		"multiple get not default": {
+			secretsources: map[string]secretsource.SecretSource{
+				"default": mock.NewMockSecretSource("some", map[string]string{
+					"secret": "value",
+				}),
+				"second": mock.NewMockSecretSource("some", map[string]string{
+					"secret2": "value2",
+				}),
+			},
+			script:        "k6.secrets.source('second').get('secret2')",
+			expectedValue: "value2",
+		},
+		"get secret without source": {
+			secretsources: map[string]secretsource.SecretSource{},
+			script:        "k6.secrets.get('secret')",
+			expectedError: "no source with name default",
+		},
+		"get none existing source": {
+			secretsources: map[string]secretsource.SecretSource{
+				"default": mock.NewMockSecretSource("some", map[string]string{
+					"secret": "value",
+				}),
+			},
+			script:        "k6.secrets.source('second') != undefined",
+			expectedValue: true,
+		},
+	}
+
+	for name, testCase := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			tc := testCaseRuntimeWithSecrets(t, testCase.secretsources)
+
+			v, err := tc.testRuntime.RunOnEventLoop(testCase.script)
+			if testCase.expectedError != "" {
+				require.ErrorContains(t, err, testCase.expectedError)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, testCase.expectedValue, v.Export())
+		})
 	}
 }
