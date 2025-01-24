@@ -31,17 +31,20 @@ import (
 
 func getInternalJSModules() map[string]interface{} {
 	return map[string]interface{}{
-		"k6":                         k6.New(),
-		"k6/crypto":                  crypto.New(),
-		"k6/crypto/x509":             x509.New(),
-		"k6/data":                    data.New(),
-		"k6/encoding":                encoding.New(),
-		"k6/timers":                  timers.New(),
-		"k6/execution":               execution.New(),
-		"k6/experimental/csv":        csv.New(),
-		"k6/experimental/redis":      redis.New(),
-		"k6/experimental/streams":    streams.New(),
-		"k6/experimental/webcrypto":  webcrypto.New(),
+		"k6":                      k6.New(),
+		"k6/crypto":               crypto.New(),
+		"k6/crypto/x509":          x509.New(),
+		"k6/data":                 data.New(),
+		"k6/encoding":             encoding.New(),
+		"k6/timers":               timers.New(),
+		"k6/execution":            execution.New(),
+		"k6/experimental/csv":     csv.New(),
+		"k6/experimental/redis":   redis.New(),
+		"k6/experimental/streams": streams.New(),
+		"k6/webcrypto":            webcrypto.New(),
+		"k6/experimental/webcrypto": newWarnExperimentalModule(webcrypto.New(),
+			"k6/experimental/webcrypto is now part of the k6 core, and globally available. You could just remove import."+
+				" The k6/experimental/webcrypto will be removed in k6 v1.1.0"),
 		"k6/experimental/websockets": expws.New(),
 		"k6/experimental/timers": newRemovedModule(
 			"k6/experimental/timers has been graduated, please use k6/timers instead."),
