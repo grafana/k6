@@ -83,14 +83,12 @@ func getJSModules() map[string]interface{} {
 	return result
 }
 
-//nolint:unused // this is likely going to be used again even if isn't currently used
 type warnExperimentalModule struct {
 	once *sync.Once
 	msg  string
 	base modules.Module
 }
 
-//nolint:unused // this is likely going to be used again even if isn't currently used
 func newWarnExperimentalModule(base modules.Module, msg string) modules.Module {
 	return &warnExperimentalModule{
 		msg:  msg,
@@ -99,7 +97,6 @@ func newWarnExperimentalModule(base modules.Module, msg string) modules.Module {
 	}
 }
 
-//nolint:unused // this is likely going to be used again even if isn't currently used
 func (w *warnExperimentalModule) NewModuleInstance(vu modules.VU) modules.Instance {
 	w.once.Do(func() { vu.InitEnv().Logger.Warn(w.msg) })
 	return w.base.NewModuleInstance(vu)
