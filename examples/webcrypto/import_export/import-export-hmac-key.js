@@ -1,5 +1,3 @@
-import { crypto } from "k6/experimental/webcrypto";
-
 export default async function () {
   const generatedKey = await crypto.subtle.generateKey(
     {
