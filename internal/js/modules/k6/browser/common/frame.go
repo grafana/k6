@@ -500,12 +500,12 @@ func (f *Frame) waitForSelector(selector string, opts *FrameWaitForSelectorOptio
 	// an element should belong to the current execution context.
 	// otherwise, we should adopt it to this execution context.
 	if ec != handle.execCtx {
-		defer func() {
+		defer func(handle *ElementHandle) {
 			if err := handle.Dispose(); err != nil {
 				err = fmt.Errorf("disposing element handle: %w", err)
 				rerr = errors.Join(err, rerr)
 			}
-		}()
+		}(handle)
 		if handle, err = ec.adoptElementHandle(handle); err != nil {
 			return nil, fmt.Errorf("waiting for selector %q: adopting element handle: %w", selector, err)
 		}
