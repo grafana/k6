@@ -1,4 +1,3 @@
-import { crypto } from "k6/experimental/webcrypto";
 import { b64decode } from "k6/encoding";
 
 export default async function () {
