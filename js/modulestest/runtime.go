@@ -10,6 +10,7 @@ import (
 	"go.k6.io/k6/internal/js/compiler"
 	"go.k6.io/k6/internal/js/eventloop"
 	"go.k6.io/k6/internal/js/modules/k6/timers"
+	"go.k6.io/k6/internal/js/modules/k6/webcrypto"
 	"go.k6.io/k6/internal/lib/testutils"
 	"go.k6.io/k6/internal/usage"
 	"go.k6.io/k6/js/common"
@@ -75,6 +76,9 @@ func (r *Runtime) SetupModuleSystem(goModules map[string]any, loader modules.Fil
 	if _, ok := goModules["k6/timers"]; !ok {
 		goModules["k6/timers"] = timers.New()
 	}
+	if _, ok := goModules["k6/webcrypto"]; !ok {
+		goModules["k6/webcrypto"] = webcrypto.New()
+	}
 
 	r.mr = modules.NewModuleResolver(
 		goModules, loader, c, r.VU.InitEnvField.CWD, r.VU.InitEnvField.Usage, r.VU.InitEnvField.Logger)
@@ -118,5 +122,6 @@ func (r *Runtime) RunOnEventLoop(code string) (value sobek.Value, err error) {
 func (r *Runtime) innerSetupModuleSystem() error {
 	ms := modules.NewModuleSystem(r.mr, r.VU)
 	modules.ExportGloballyModule(r.VU.RuntimeField, ms, "k6/timers")
+	modules.ExportGloballyModule(r.VU.RuntimeField, ms, "k6/webcrypto")
 	return r.VU.RuntimeField.Set("require", ms.Require)
 }

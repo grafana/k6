@@ -14,7 +14,7 @@ import (
 )
 
 const initGlobals = `
-	globalThis.CryptoKey = require("k6/x/webcrypto").CryptoKey;
+	globalThis.CryptoKey = require("k6/webcrypto").CryptoKey;
 `
 
 // newConfiguredRuntime initializes a new test setup.
@@ -30,7 +30,7 @@ func newConfiguredRuntime(t testing.TB) *modulestest.Runtime {
 	require.NoError(t, err)
 
 	err = rt.SetupModuleSystem(
-		map[string]interface{}{"k6/x/webcrypto": webcrypto.New()},
+		map[string]interface{}{"k6/webcrypto": webcrypto.New()},
 		nil,
 		compiler.New(rt.VU.InitEnv().Logger),
 	)
