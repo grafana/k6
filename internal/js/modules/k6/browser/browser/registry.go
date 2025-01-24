@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 
 	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
 	"go.opentelemetry.io/otel/attribute"
@@ -181,8 +180,6 @@ type browserRegistry struct {
 	m  map[int64]*common.Browser
 
 	buildFn browserBuildFunc
-
-	stopped atomic.Bool // testing purposes
 }
 
 type browserBuildFunc func(ctx, vuCtx context.Context) (*common.Browser, error)
@@ -410,10 +407,6 @@ func (r *browserRegistry) stopTracesRegistry() {
 	if r.tr != nil {
 		r.tr.stop()
 	}
-}
-
-func (r *browserRegistry) stop() {
-	r.stopped.Store(true)
 }
 
 func isBrowserIter(vu k6modules.VU) bool {

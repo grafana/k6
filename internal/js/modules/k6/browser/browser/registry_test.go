@@ -263,7 +263,7 @@ func TestBrowserRegistry(t *testing.T) {
 		assert.Equal(t, 0, browserRegistry.browserCount())
 	})
 
-	t.Run("unsubscribe_on_non_browser_vu", func(t *testing.T) {
+	t.Run("skip_on_non_browser_vu", func(t *testing.T) {
 		t.Parallel()
 
 		var (
@@ -277,9 +277,10 @@ func TestBrowserRegistry(t *testing.T) {
 		// a browser test VU
 		delete(vu.StateField.Options.Scenarios["default"].GetScenarioOptions().Browser, "type")
 
-		vu.StartIteration(t)
+		vu.StartIteration(t, k6test.WithIteration(0))
 
-		assert.True(t, browserRegistry.stopped.Load())
+		// Verify there are no browsers
+		assert.Equal(t, 0, browserRegistry.browserCount())
 	})
 
 	// This test ensures that the chromium browser's lifecycle is not controlled
