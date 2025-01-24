@@ -9,6 +9,8 @@ import (
 	"go.k6.io/k6/js/modules"
 )
 
+const cryptoGlobalIdentifier = "crypto"
+
 type (
 	// RootModule is the global module instance that will create Client
 	// instances for each VU.
@@ -43,8 +45,17 @@ func (*RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 // the exports of the JS module.
 func (mi *ModuleInstance) Exports() modules.Exports {
 	return modules.Exports{Named: map[string]interface{}{
-		"crypto": newCryptoObject(mi.vu),
+		"crypto": mi.vu.Runtime().GlobalObject().Get(cryptoGlobalIdentifier),
 	}}
+}
+
+// SetupGlobally sets the crypto object globally.
+func SetupGlobally(vu modules.VU) error {
+	if err := vu.Runtime().Set(cryptoGlobalIdentifier, newCryptoObject(vu)); err != nil {
+		return fmt.Errorf("unable to set crypto object globally; reason: %w", err)
+	}
+
+	return nil
 }
 
 func newCryptoObject(vu modules.VU) *sobek.Object {

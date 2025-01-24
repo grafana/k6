@@ -11,6 +11,8 @@ import (
 	"go.k6.io/k6/internal/js/compiler"
 	"go.k6.io/k6/internal/js/eventloop"
 	"go.k6.io/k6/internal/js/tc55/timers"
+
+	"go.k6.io/k6/internal/js/modules/k6/webcrypto"
 	"go.k6.io/k6/internal/lib/testutils"
 	"go.k6.io/k6/internal/usage"
 	"go.k6.io/k6/js/common"
@@ -56,6 +58,7 @@ func NewRuntime(t testing.TB) *Runtime {
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(vu.InitEnvField.Registry),
 	}
 	require.NoError(t, timers.SetupGlobally(vu))
+	require.NoError(t, webcrypto.SetupGlobally(vu))
 	// let's cancel again in case it has changed
 	t.Cleanup(func() { result.CancelContext() })
 	return result
