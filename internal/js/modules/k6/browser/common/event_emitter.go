@@ -136,6 +136,8 @@ func (e *BaseEventEmitter) emit(event string, data any) {
 		// the read queue until that is again depleted.
 		if len(eh.queue.read) == 0 {
 			eh.queue.writeMutex.Lock()
+			// Clear the read slice before swapping to prevent keeping references
+			eh.queue.read = make([]Event, 0)
 			eh.queue.read, eh.queue.write = eh.queue.write, eh.queue.read
 			eh.queue.writeMutex.Unlock()
 		}
