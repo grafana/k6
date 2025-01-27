@@ -478,7 +478,7 @@ func (f *Frame) waitForSelectorRetry(
 // It will auto retry on certain errors until the retryCount is below 0. The
 // retry workaround is needed since the underlying DOM can change when the
 // wait action is performed during a navigation.
-func (f *Frame) waitForSelector(selector string, opts *FrameWaitForSelectorOptions) (_ *ElementHandle, rerr error) {
+func (f *Frame) waitForSelector(selector string, opts *FrameWaitForSelectorOptions) (*ElementHandle, error) {
 	f.log.Debugf("Frame:waitForSelector", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	handle, err := f.waitFor(selector, opts, 20)
@@ -497,21 +497,25 @@ func (f *Frame) waitForSelector(selector string, opts *FrameWaitForSelectorOptio
 	if ec == nil {
 		return nil, fmt.Errorf("waiting for selector %q: execution context %q not found", selector, mainWorld)
 	}
+
 	// an element should belong to the current execution context.
 	// otherwise, we should adopt it to this execution context.
+	adopted := handle
 	if ec != handle.execCtx {
-		defer func(handle *ElementHandle) {
-			if err := handle.Dispose(); err != nil {
-				err = fmt.Errorf("disposing element handle: %w", err)
-				rerr = errors.Join(err, rerr)
-			}
-		}(handle)
-		if handle, err = ec.adoptElementHandle(handle); err != nil {
+		if adopted, err = ec.adoptElementHandle(handle); err != nil {
 			return nil, fmt.Errorf("waiting for selector %q: adopting element handle: %w", selector, err)
+		}
+
+		if err = handle.Dispose(); err != nil {
+			f.log.Warnf(
+				"Frame:waitForSelector",
+				"fid:%s furl:%q sel:%q disposing element handle: %v",
+				f.ID(), f.URL(), selector, err,
+			)
 		}
 	}
 
-	return handle, nil
+	return adopted, nil
 }
 
 func (f *Frame) waitFor(
