@@ -45,6 +45,7 @@ func (c Credentials) IsEmpty() bool {
 
 type metricInterceptor interface {
 	urlTagName(urlTag string, method string) (string, bool)
+	onRequest(request *Request)
 }
 
 // NetworkManager manages all frames in HTML document.
@@ -511,6 +512,8 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, interc
 	m.reqsMu.Unlock()
 	m.emitRequestMetrics(req)
 	m.frameManager.requestStarted(req)
+
+	m.mi.onRequest(req)
 }
 
 func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
