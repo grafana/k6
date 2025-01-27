@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"go.k6.io/k6/internal/lib/testutils/mockresolver"
 	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/testutils/mockresolver"
 	"go.k6.io/k6/lib/types"
 )
 

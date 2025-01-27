@@ -1133,9 +1133,15 @@ func approximatePrintedIntCharCount(intValue float64) int {
 	return count
 }
 
-func ShouldFoldBinaryArithmeticWhenMinifying(binary *EBinary) bool {
+func ShouldFoldBinaryOperatorWhenMinifying(binary *EBinary) bool {
 	switch binary.Op {
 	case
+		// Equality tests should always result in smaller code when folded
+		BinOpLooseEq,
+		BinOpLooseNe,
+		BinOpStrictEq,
+		BinOpStrictNe,
+
 		// Minification always folds right signed shift operations since they are
 		// unlikely to result in larger output. Note: ">>>" could result in
 		// bigger output such as "-1 >>> 0" becoming "4294967295".
@@ -1158,6 +1164,11 @@ func ShouldFoldBinaryArithmeticWhenMinifying(binary *EBinary) bool {
 		if left, right, ok := extractNumericValues(binary.Left, binary.Right); ok &&
 			left == math.Trunc(left) && math.Abs(left) <= 0xFFFF_FFFF &&
 			right == math.Trunc(right) && math.Abs(right) <= 0xFFFF_FFFF {
+			return true
+		}
+
+		// String addition should pretty much always be more compact when folded
+		if _, _, ok := extractStringValues(binary.Left, binary.Right); ok {
 			return true
 		}
 
@@ -1197,17 +1208,25 @@ func ShouldFoldBinaryArithmeticWhenMinifying(binary *EBinary) bool {
 			resultLen := approximatePrintedIntCharCount(float64(ToUint32(left) >> (ToUint32(right) & 31)))
 			return resultLen <= leftLen+3+rightLen
 		}
+
+	case BinOpLogicalAnd, BinOpLogicalOr, BinOpNullishCoalescing:
+		if IsPrimitiveLiteral(binary.Left.Data) {
+			return true
+		}
 	}
 	return false
 }
 
 // This function intentionally avoids mutating the input AST so it can be
 // called after the AST has been frozen (i.e. after parsing ends).
-func FoldBinaryArithmetic(loc logger.Loc, e *EBinary) Expr {
+func FoldBinaryOperator(loc logger.Loc, e *EBinary) Expr {
 	switch e.Op {
 	case BinOpAdd:
 		if left, right, ok := extractNumericValues(e.Left, e.Right); ok {
 			return Expr{Loc: loc, Data: &ENumber{Value: left + right}}
+		}
+		if left, right, ok := extractStringValues(e.Left, e.Right); ok {
+			return Expr{Loc: loc, Data: &EString{Value: joinStrings(left, right)}}
 		}
 
 	case BinOpSub:
@@ -1295,6 +1314,49 @@ func FoldBinaryArithmetic(loc logger.Loc, e *EBinary) Expr {
 		}
 		if left, right, ok := extractStringValues(e.Left, e.Right); ok {
 			return Expr{Loc: loc, Data: &EBoolean{Value: stringCompareUCS2(left, right) >= 0}}
+		}
+
+	case BinOpLooseEq, BinOpStrictEq:
+		if left, right, ok := extractNumericValues(e.Left, e.Right); ok {
+			return Expr{Loc: loc, Data: &EBoolean{Value: left == right}}
+		}
+		if left, right, ok := extractStringValues(e.Left, e.Right); ok {
+			return Expr{Loc: loc, Data: &EBoolean{Value: stringCompareUCS2(left, right) == 0}}
+		}
+
+	case BinOpLooseNe, BinOpStrictNe:
+		if left, right, ok := extractNumericValues(e.Left, e.Right); ok {
+			return Expr{Loc: loc, Data: &EBoolean{Value: left != right}}
+		}
+		if left, right, ok := extractStringValues(e.Left, e.Right); ok {
+			return Expr{Loc: loc, Data: &EBoolean{Value: stringCompareUCS2(left, right) != 0}}
+		}
+
+	case BinOpLogicalAnd:
+		if boolean, sideEffects, ok := ToBooleanWithSideEffects(e.Left.Data); ok {
+			if !boolean {
+				return e.Left
+			} else if sideEffects == NoSideEffects {
+				return e.Right
+			}
+		}
+
+	case BinOpLogicalOr:
+		if boolean, sideEffects, ok := ToBooleanWithSideEffects(e.Left.Data); ok {
+			if boolean {
+				return e.Left
+			} else if sideEffects == NoSideEffects {
+				return e.Right
+			}
+		}
+
+	case BinOpNullishCoalescing:
+		if isNullOrUndefined, sideEffects, ok := ToNullOrUndefinedWithSideEffects(e.Left.Data); ok {
+			if !isNullOrUndefined {
+				return e.Left
+			} else if sideEffects == NoSideEffects {
+				return e.Right
+			}
 		}
 	}
 

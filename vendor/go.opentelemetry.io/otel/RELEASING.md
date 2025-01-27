@@ -111,17 +111,6 @@ It is critical you make sure the version you push upstream is correct.
 Finally create a Release for the new `<new tag>` on GitHub.
 The release body should include all the release notes from the Changelog for this release.
 
-## Verify Examples
-
-After releasing verify that examples build outside of the repository.
-
-```
-./verify_examples.sh
-```
-
-The script copies examples into a different directory removes any `replace` declarations in `go.mod` and builds them.
-This ensures they build with the published release, not the local copy.
-
 ## Post-Release
 
 ### Contrib Repository

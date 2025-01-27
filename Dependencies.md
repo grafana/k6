@@ -33,7 +33,6 @@ We aim to support a building of the k6 binary with the two latest versions of go
 There are some dependencies that we really don't use all that much, intend on removing and as a general note don't need anything else from them. Given that we currently have no problems that updates will fix - we prefer to not update them as not to introduce bugs. Also, for some they bring additional dependencies that we do not want, which is just one more reason not to update them.
 
 List (as of March 2022):
-- github.com/DataDog/datadog-go  - newer versions have a lot more dependencies for functionality we don't need. Also in general a different library is probably going to be better in this case as it only supports UDP and no TCP.
 - github.com/andybalholm/cascadia - a dependency of `github.com/PuerkitoBio/goquery`
 - github.com/sirupsen/logrus - it's in maintenance mode and we want to remove it - also no update for a long time, but also no bugs.
 - github.com/spf13/afero - there are plans to be [replaced by io/fs](https://github.com/grafana/k6/issues/1079) and we don't need anything from it. We have already worked around some bugs so updating might break something

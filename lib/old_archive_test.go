@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"go.k6.io/k6/lib/testutils"
+	"go.k6.io/k6/internal/lib/testutils"
 
 	"github.com/stretchr/testify/require"
 
