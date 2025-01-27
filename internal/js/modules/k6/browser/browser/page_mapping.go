@@ -585,6 +585,10 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 				init: prepK6BrowserRegExChecker(rt),
 				wait: true,
 			},
+			common.EventPageRequestCalled: {
+				mapp: mapRequestEvent,
+				wait: false,
+			},
 		}
 		pageOnEvent, ok := pageOnEvents[eventName]
 		if !ok {
