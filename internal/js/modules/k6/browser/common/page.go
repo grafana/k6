@@ -1169,6 +1169,10 @@ type PageOnEvent struct {
 
 	// Metric is the metric event event.
 	Metric *MetricEvent
+
+	// Request is the read only request that is about to be sent from the
+	// browser to the WuT.
+	Request *Request
 }
 
 // On subscribes to a page event for which the given handler will be executed
