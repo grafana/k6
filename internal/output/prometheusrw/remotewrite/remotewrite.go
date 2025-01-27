@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/grafana/xk6-output-prometheus-remote/pkg/remote"
-	"github.com/grafana/xk6-output-prometheus-remote/pkg/stale"
+	"go.k6.io/k6/internal/output/prometheusrw/remote"
+	"go.k6.io/k6/internal/output/prometheusrw/stale"
 
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
@@ -243,7 +243,7 @@ func (o *Output) convertToPbSeries(samplesContainers []metrics.SampleContainer) 
 	// with a higher precision (ns) than Prometheus (ms),
 	// so we need to aggregate all the samples in the same time bucket.
 	// More context can be found in the issue
-	// https://github.com/grafana/xk6-output-prometheus-remote/issues/11
+	// https://go.k6.io/k6/internal/output/prometheusrw/issues/11
 	seen := make(map[metrics.TimeSeries]struct{})
 
 	for _, samplesContainer := range samplesContainers {

@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/grafana/xk6-output-prometheus-remote/pkg/remote"
+	"go.k6.io/k6/internal/output/prometheusrw/remote"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/lib/types"
