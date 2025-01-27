@@ -215,6 +215,8 @@ func (m *MetricInterceptorMock) urlTagName(_ string, _ string) (string, bool) {
 	return "", false
 }
 
+func (m *MetricInterceptorMock) onRequest(request *Request) {}
+
 func TestNetworkManagerEmitRequestResponseMetricsTimingSkew(t *testing.T) {
 	t.Parallel()
 
