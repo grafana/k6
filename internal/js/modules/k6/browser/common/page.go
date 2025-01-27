@@ -488,6 +488,32 @@ func (p *Page) urlTagName(url string, method string) (string, bool) {
 	return newTagName, urlMatched
 }
 
+func (p *Page) onRequest(request *Request) {
+	if !hasPageOnHandler(p, EventPageRequestCalled) {
+		return
+	}
+
+	p.eventHandlersMu.RLock()
+	defer p.eventHandlersMu.RUnlock()
+	for _, h := range p.eventHandlers[EventPageRequestCalled] {
+		err := func() error {
+			// Handlers can register other handlers, so we need to
+			// unlock the mutex before calling the next handler.
+			p.eventHandlersMu.RUnlock()
+			defer p.eventHandlersMu.RLock()
+
+			// Call and wait for the handler to complete.
+			return h(PageOnEvent{
+				Request: request,
+			})
+		}()
+		if err != nil {
+			p.logger.Warnf("onRequest", "handler returned an error: %v", err)
+			return
+		}
+	}
+}
+
 func (p *Page) onConsoleAPICalled(event *runtime.EventConsoleAPICalled) {
 	if !hasPageOnHandler(p, EventPageConsoleAPICalled) {
 		return
