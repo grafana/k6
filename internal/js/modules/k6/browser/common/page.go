@@ -42,6 +42,9 @@ const (
 
 	// EventPageMetricCalled represents the page.on('metric') event.
 	EventPageMetricCalled PageOnEventName = "metric"
+
+	// EventPageRequestCalled represents the page.on('request') event.
+	EventPageRequestCalled PageOnEventName = "request"
 )
 
 // MediaType represents the type of media to emulate.
