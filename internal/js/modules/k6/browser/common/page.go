@@ -45,6 +45,9 @@ const (
 
 	// EventPageRequestCalled represents the page.on('request') event.
 	EventPageRequestCalled PageOnEventName = "request"
+
+	// EventPageResponseCalled represents the page.on('response') event.
+	EventPageResponseCalled PageOnEventName = "response"
 )
 
 // MediaType represents the type of media to emulate.
