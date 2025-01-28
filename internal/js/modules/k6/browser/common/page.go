@@ -1202,6 +1202,9 @@ type PageOnEvent struct {
 	// Request is the read only request that is about to be sent from the
 	// browser to the WuT.
 	Request *Request
+
+	// Response is the read only response that was received from the WuT.
+	Response *Response
 }
 
 // On subscribes to a page event for which the given handler will be executed
