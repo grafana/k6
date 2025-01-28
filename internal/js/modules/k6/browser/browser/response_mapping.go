@@ -7,6 +7,10 @@ import (
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
 )
 
+func mapResponseEvent(vu moduleVU, event common.PageOnEvent) mapping {
+	return mapResponse(vu, event.Response)
+}
+
 // mapResponse to the JS module.
 func mapResponse(vu moduleVU, r *common.Response) mapping {
 	if r == nil {
