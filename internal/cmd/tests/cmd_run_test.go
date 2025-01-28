@@ -2394,7 +2394,7 @@ func TestTypeScriptSupport(t *testing.T) {
 	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test.ts"), []byte(mainScript), 0o644))
 	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "bar.ts"), []byte(depScript), 0o644))
 
-	ts.CmdArgs = []string{"k6", "run", "--compatibility-mode", "experimental_enhanced", "--quiet", "test.ts"}
+	ts.CmdArgs = []string{"k6", "run", "--quiet", "test.ts"}
 
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
