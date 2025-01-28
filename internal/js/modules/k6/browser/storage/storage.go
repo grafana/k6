@@ -10,7 +10,9 @@ import (
 	"sync"
 )
 
-const k6BrowserDataDirPattern = "xk6-browser-data-*"
+// K6BrowserDataDirPattern is the pattern used to create the
+// temporary directory for the browser data.
+const K6BrowserDataDirPattern = "k6browser-data-*"
 
 // Dir manages data storage for the extension and user specific data
 // on the local filesystem.
@@ -42,10 +44,10 @@ func (d *Dir) Make(tmpDir string, dir any) error {
 		d.fsMkdirTemp = os.MkdirTemp //nolint:forbidigo
 	}
 	var err error
-	if d.Dir, err = d.fsMkdirTemp(tmpDir, k6BrowserDataDirPattern); err != nil {
+	if d.Dir, err = d.fsMkdirTemp(tmpDir, K6BrowserDataDirPattern); err != nil {
 		var (
 			pe   *fs.PathError
-			path = filepath.Join(tmpDir, k6BrowserDataDirPattern)
+			path = filepath.Join(tmpDir, K6BrowserDataDirPattern)
 		)
 		if errors.As(err, &pe) {
 			path = pe.Path
