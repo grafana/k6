@@ -8,6 +8,7 @@ import (
 	"image/png"
 	"io"
 	"net/http"
+	"regexp"
 	"runtime"
 	"strconv"
 	"sync/atomic"
@@ -2199,4 +2200,296 @@ func TestPageOnMetric(t *testing.T) {
 			assert.True(t, foundUnamended.Load() > 0)
 		})
 	}
+}
+
+func TestPageOnRequest(t *testing.T) {
+	t.Parallel()
+
+	// Start and setup a webserver to test the page.on('request') handler.
+	tb := newTestBrowser(t, withHTTPServer())
+	defer tb.Browser.Close()
+
+	tb.withHandler("/home", func(w http.ResponseWriter, r *http.Request) {
+		_, err := fmt.Fprintf(w, `<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <script>fetch('/api', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({name: 'tester'})
+    })</script>
+</body>
+</html>`)
+		require.NoError(t, err)
+	})
+	tb.withHandler("/api", func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		defer require.NoError(t, r.Body.Close())
+
+		var data struct {
+			Name string `json:"name"`
+		}
+		err = json.Unmarshal(body, &data)
+		require.NoError(t, err)
+
+		_, err = fmt.Fprintf(w, `{"message": "Hello %s!"}`, data.Name)
+		require.NoError(t, err)
+	})
+	tb.withHandler("/style.css", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/css")
+		_, err := fmt.Fprintf(w, `body { background-color: #f0f0f0; }`)
+		require.NoError(t, err)
+	})
+
+	// Start and setup a k6 iteration to test the page.on('request') handler.
+	vu, _, _, cleanUp := startIteration(t)
+	defer cleanUp()
+
+	// Some of the business logic is in the mapping layer unfortunately.
+	// To test everything is wried up correctly, we're required to work
+	// with RunPromise.
+	//
+	// The code below is the JavaScript code that is executed in the k6 iteration.
+	// It will wait for all requests to be captured in returnValue, before returning.
+	gv, err := vu.RunAsync(t, `
+		const context = await browser.newContext({locale: 'en-US', userAgent: 'some-user-agent'});
+		const page = await context.newPage();
+
+		var returnValue = [];
+		page.on('request', async (request) => {
+			returnValue.push({
+				allHeaders: await request.allHeaders(),
+				frameUrl: request.frame().url(),
+				acceptLanguageHeader: await request.headerValue('Accept-Language'),
+				headers: request.headers(),
+				headersArray: await request.headersArray(),
+				isNavigationRequest: request.isNavigationRequest(),
+				method: request.method(),
+				postData: request.postData(),
+				postDataBuffer: request.postDataBuffer() ? String.fromCharCode.apply(null, new Uint8Array(request.postDataBuffer())) : null,
+				resourceType: request.resourceType(),
+				// Ignoring response for now since it is not reliable as we don't explicitly wait for the request to finish.
+				// response: await request.response(),
+				size: request.size(),
+				// Ignoring timing for now since it is not reliable as we don't explicitly wait for the request to finish.
+				// timing: request.timing(),
+				url: request.url()
+			});
+		});
+
+		await page.goto('%s', {waitUntil: 'networkidle'});
+
+		await page.close();
+
+		return JSON.stringify(returnValue, null, 2);
+	`, tb.url("/home"))
+	assert.NoError(t, err)
+
+	got := k6test.ToPromise(t, gv)
+
+	// Convert the result to a string and then to a slice of requests.
+	var requests []request
+	err = json.Unmarshal([]byte(got.Result().String()), &requests)
+	require.NoError(t, err)
+
+	for i := range requests {
+		// Normalize any port numbers in the string values to :8080
+		if requests[i].URL != "" {
+			requests[i].URL = regexp.MustCompile(`:\d+`).ReplaceAllString(requests[i].URL, ":8080")
+		}
+		if requests[i].FrameURL != "" {
+			requests[i].FrameURL = regexp.MustCompile(`:\d+`).ReplaceAllString(requests[i].FrameURL, ":8080")
+		}
+		for k, v := range requests[i].AllHeaders {
+			requests[i].AllHeaders[k] = regexp.MustCompile(`:\d+`).ReplaceAllString(v, ":8080")
+		}
+		for k, v := range requests[i].Headers {
+			requests[i].Headers[k] = regexp.MustCompile(`:\d+`).ReplaceAllString(v, ":8080")
+		}
+		for k, header := range requests[i].HeadersArray {
+			if header["value"] != "" {
+				requests[i].HeadersArray[k]["value"] = regexp.MustCompile(`:\d+`).ReplaceAllString(header["value"], ":8080")
+			}
+		}
+	}
+
+	expected := []request{
+		{
+			AllHeaders: map[string]string{
+				"accept-language":           "en-US",
+				"upgrade-insecure-requests": "1",
+				"user-agent":                "some-user-agent",
+			},
+			FrameURL:             "about:blank",
+			AcceptLanguageHeader: "en-US",
+			Headers: map[string]string{
+				"Accept-Language":           "en-US",
+				"Upgrade-Insecure-Requests": "1",
+				"User-Agent":                "some-user-agent",
+			},
+			HeadersArray: []map[string]string{
+				{"name": "Upgrade-Insecure-Requests", "value": "1"},
+				{"name": "User-Agent", "value": "some-user-agent"},
+				{"name": "Accept-Language", "value": "en-US"},
+			},
+			IsNavigationRequest: true,
+			Method:              "GET",
+			PostData:            "",
+			PostDataBuffer:      "",
+			ResourceType:        "Document",
+			Size: map[string]int{
+				"body":    0,
+				"headers": 103,
+			},
+			URL: "http://127.0.0.1:8080/home",
+		},
+		{
+			AllHeaders: map[string]string{
+				"accept-language": "en-US",
+				"referer":         "http://127.0.0.1:8080/home",
+				"user-agent":      "some-user-agent",
+			},
+			FrameURL:             "http://127.0.0.1:8080/home",
+			AcceptLanguageHeader: "en-US",
+			Headers: map[string]string{
+				"Accept-Language": "en-US",
+				"Referer":         "http://127.0.0.1:8080/home",
+				"User-Agent":      "some-user-agent",
+			},
+			HeadersArray: []map[string]string{
+				{"name": "User-Agent", "value": "some-user-agent"},
+				{"name": "Accept-Language", "value": "en-US"},
+				{"name": "Referer", "value": "http://127.0.0.1:8080/home"},
+			},
+			IsNavigationRequest: false,
+			Method:              "GET",
+			PostData:            "",
+			PostDataBuffer:      "",
+			ResourceType:        "Stylesheet",
+			Size: map[string]int{
+				"body":    0,
+				"headers": 116,
+			},
+			URL: "http://127.0.0.1:8080/style.css",
+		},
+		{
+			AllHeaders: map[string]string{
+				"accept-language": "en-US",
+				"content-type":    "application/json",
+				"referer":         "http://127.0.0.1:8080/home",
+				"user-agent":      "some-user-agent",
+			},
+			FrameURL:             "http://127.0.0.1:8080/home",
+			AcceptLanguageHeader: "en-US",
+			Headers: map[string]string{
+				"Accept-Language": "en-US",
+				"Content-Type":    "application/json",
+				"Referer":         "http://127.0.0.1:8080/home",
+				"User-Agent":      "some-user-agent",
+			},
+			HeadersArray: []map[string]string{
+				{"name": "Referer", "value": "http://127.0.0.1:8080/home"},
+				{"name": "User-Agent", "value": "some-user-agent"},
+				{"name": "Accept-Language", "value": "en-US"},
+				{"name": "Content-Type", "value": "application/json"},
+			},
+			IsNavigationRequest: false,
+			Method:              "POST",
+			PostData:            `{"name":"tester"}`,
+			PostDataBuffer:      `{"name":"tester"}`,
+			ResourceType:        "Fetch",
+			Size: map[string]int{
+				"body":    17,
+				"headers": 143,
+			},
+			URL: "http://127.0.0.1:8080/api",
+		},
+		{
+			AllHeaders: map[string]string{
+				"accept-language": "en-US",
+				"referer":         "http://127.0.0.1:8080/home",
+				"user-agent":      "some-user-agent",
+			},
+			FrameURL:             "http://127.0.0.1:8080/home",
+			AcceptLanguageHeader: "en-US",
+			Headers: map[string]string{
+				"Accept-Language": "en-US",
+				"Referer":         "http://127.0.0.1:8080/home",
+				"User-Agent":      "some-user-agent",
+			},
+			HeadersArray: []map[string]string{
+				{"name": "Accept-Language", "value": "en-US"},
+				{"name": "Referer", "value": "http://127.0.0.1:8080/home"},
+				{"name": "User-Agent", "value": "some-user-agent"},
+			},
+			IsNavigationRequest: false,
+			Method:              "GET",
+			PostData:            "",
+			PostDataBuffer:      "",
+			ResourceType:        "Other",
+			Size: map[string]int{
+				"body":    0,
+				"headers": 118,
+			},
+			URL: "http://127.0.0.1:8080/favicon.ico",
+		},
+	}
+
+	// Compare each request one by one for better test failure visibility
+	for _, req := range requests {
+		i := -1
+		for j, e := range expected {
+			if req.URL == e.URL {
+				i = j
+				break
+			}
+		}
+		assert.NotEqual(t, -1, i, "failed to find expected request with URL %s", req.URL)
+
+		assert.Equal(t, expected[i].AllHeaders, req.AllHeaders, "AllHeaders mismatch")
+		assert.Equal(t, expected[i].FrameURL, req.FrameURL, "FrameUrl mismatch")
+		assert.Equal(t, expected[i].AcceptLanguageHeader, req.AcceptLanguageHeader, "AcceptLanguageHeader mismatch")
+		assert.Equal(t, expected[i].Headers, req.Headers, "Headers mismatch")
+		assert.Equal(t, expected[i].IsNavigationRequest, req.IsNavigationRequest, "IsNavigationRequest mismatch")
+		assert.Equal(t, expected[i].Method, req.Method, "Method mismatch")
+		assert.Equal(t, expected[i].PostData, req.PostData, "PostData mismatch")
+		assert.Equal(t, expected[i].PostDataBuffer, req.PostDataBuffer, "PostDataBuffer mismatch")
+		assert.Equal(t, expected[i].ResourceType, req.ResourceType, "ResourceType mismatch")
+		assert.Equal(t, expected[i].Size, req.Size, "Size mismatch")
+		assert.Equal(t, expected[i].URL, req.URL, "URL mismatch")
+
+		// Compare HeadersArray elements one by one
+		assert.Equal(t, len(expected[i].HeadersArray), len(req.HeadersArray), "HeadersArray length mismatch")
+		for _, expectedHeader := range expected[i].HeadersArray {
+			found := false
+			for _, actualHeader := range req.HeadersArray {
+				if expectedHeader["name"] == actualHeader["name"] && expectedHeader["value"] == actualHeader["value"] {
+					found = true
+					break
+				}
+			}
+			assert.True(t, found, fmt.Sprintf("Expected header {name: %s, value: %s} not found in actual headers", expectedHeader["name"], expectedHeader["value"]))
+		}
+	}
+}
+
+type request struct {
+	AllHeaders           map[string]string   `json:"allHeaders"`
+	FrameURL             string              `json:"frameUrl"`
+	AcceptLanguageHeader string              `json:"acceptLanguageHeader"`
+	Headers              map[string]string   `json:"headers"`
+	HeadersArray         []map[string]string `json:"headersArray"`
+	IsNavigationRequest  bool                `json:"isNavigationRequest"`
+	Method               string              `json:"method"`
+	PostData             string              `json:"postData"`
+	PostDataBuffer       string              `json:"postDataBuffer"`
+	ResourceType         string              `json:"resourceType"`
+	Size                 map[string]int      `json:"size"`
+	URL                  string              `json:"url"`
 }
