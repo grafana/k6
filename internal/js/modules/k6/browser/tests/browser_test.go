@@ -20,6 +20,7 @@ import (
 	"go.k6.io/k6/internal/js/modules/k6/browser/env"
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext/k6test"
+	"go.k6.io/k6/internal/js/modules/k6/browser/storage"
 )
 
 func TestBrowserNewPage(t *testing.T) {
@@ -93,9 +94,9 @@ func TestTmpDirCleanup(t *testing.T) {
 	err = p.Close(nil)
 	require.NoError(t, err)
 
-	matches, err := filepath.Glob(tmpDirPath + "/xk6-browser-data-*")
+	matches, err := filepath.Glob(filepath.Join(tmpDirPath, storage.K6BrowserDataDirPattern))
 	assert.NoError(t, err)
-	assert.NotEmpty(t, matches, "a dir should exist that matches the pattern `xk6-browser-data-*`")
+	assert.NotEmptyf(t, matches, "a dir should exist that matches the pattern %q", storage.K6BrowserDataDirPattern)
 
 	b.Close()
 
@@ -104,7 +105,7 @@ func TestTmpDirCleanup(t *testing.T) {
 	// To try to mitigate the issue, we're adding a retry which waits half a
 	// second if the dir still exits.
 	for i := 0; i < 5; i++ {
-		matches, err = filepath.Glob(tmpDirPath + "/xk6-browser-data-*")
+		matches, err = filepath.Glob(filepath.Join(tmpDirPath, storage.K6BrowserDataDirPattern))
 		assert.NoError(t, err)
 		if len(matches) == 0 {
 			break
@@ -112,7 +113,7 @@ func TestTmpDirCleanup(t *testing.T) {
 		time.Sleep(time.Millisecond * 500)
 	}
 
-	assert.Empty(t, matches, "a dir shouldn't exist which matches the pattern `xk6-browser-data-*`")
+	assert.Empty(t, matches, "a dir shouldn't exist which matches the pattern %q", storage.K6BrowserDataDirPattern)
 }
 
 func TestTmpDirCleanupOnContextClose(t *testing.T) {
@@ -133,18 +134,18 @@ func TestTmpDirCleanupOnContextClose(t *testing.T) {
 		withEnvLookup(env.ConstLookup("TMPDIR", tmpDirPath)),
 	)
 
-	matches, err := filepath.Glob(tmpDirPath + "/xk6-browser-data-*")
+	matches, err := filepath.Glob(filepath.Join(tmpDirPath, storage.K6BrowserDataDirPattern))
 	assert.NoError(t, err)
-	assert.NotEmpty(t, matches, "a dir should exist that matches the pattern `xk6-browser-data-*`")
+	assert.NotEmpty(t, matches, "a dir should exist that matches the pattern %q", storage.K6BrowserDataDirPattern)
 
 	b.cancelContext()
 	<-b.ctx.Done()
 
 	require.NotPanicsf(t, b.Close, "first call to browser.close should not panic")
 
-	matches, err = filepath.Glob(tmpDirPath + "/xk6-browser-data-*")
+	matches, err = filepath.Glob(filepath.Join(tmpDirPath, storage.K6BrowserDataDirPattern))
 	assert.NoError(t, err)
-	assert.Empty(t, matches, "a dir shouldn't exist which matches the pattern `xk6-browser-data-*`")
+	assert.Empty(t, matches, "a dir shouldn't exist which matches the pattern %q", storage.K6BrowserDataDirPattern)
 }
 
 func TestBrowserOn(t *testing.T) {
