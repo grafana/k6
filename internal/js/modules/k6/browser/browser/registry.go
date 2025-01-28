@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 
 	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
 	"go.opentelemetry.io/otel/attribute"
@@ -181,8 +180,6 @@ type browserRegistry struct {
 	m  map[int64]*common.Browser
 
 	buildFn browserBuildFunc
-
-	stopped atomic.Bool // testing purposes
 }
 
 type browserBuildFunc func(ctx, vuCtx context.Context) (*common.Browser, error)
@@ -248,13 +245,13 @@ func newBrowserRegistry(
 	}
 
 	go r.handleExitEvent(exitCh, unsubscribe)
-	go r.handleIterEvents(ctx, eventsCh, unsubscribe)
+	go r.handleIterEvents(ctx, eventsCh)
 
 	return r
 }
 
 func (r *browserRegistry) handleIterEvents(
-	ctx context.Context, eventsCh <-chan *k6event.Event, unsubscribeFn func(),
+	ctx context.Context, eventsCh <-chan *k6event.Event,
 ) {
 	var (
 		ok   bool
@@ -268,12 +265,12 @@ func (r *browserRegistry) handleIterEvents(
 		// to each VU iter events, including VUs that do not make use of the browser in their
 		// iterations.
 		// Therefore, if we get an event that does not correspond to a browser iteration, then
-		// unsubscribe for the VU events and exit the loop in order to reduce unuseful overhead.
+		// skip this iteration. We can't just unsubscribe as the VU might be reused in a later
+		// scenario that does have browser setup.
+		// TODO try to maybe do this only once per scenario
 		if !isBrowserIter(r.vu) {
-			unsubscribeFn()
-			r.stop()
 			e.Done()
-			return
+			continue
 		}
 
 		// The context in the VU is not thread safe. It can
@@ -410,10 +407,6 @@ func (r *browserRegistry) stopTracesRegistry() {
 	if r.tr != nil {
 		r.tr.stop()
 	}
-}
-
-func (r *browserRegistry) stop() {
-	r.stopped.Store(true)
 }
 
 func isBrowserIter(vu k6modules.VU) bool {
