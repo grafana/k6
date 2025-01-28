@@ -361,6 +361,10 @@ type resourceTiming struct {
 
 // Timing returns the request timing information.
 func (r *Request) Timing() *resourceTiming {
+	if r.response == nil {
+		return nil
+	}
+
 	timing := r.response.timing
 
 	return &resourceTiming{
