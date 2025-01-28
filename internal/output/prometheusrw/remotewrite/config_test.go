@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"go.k6.io/k6/internal/output/prometheusrw/remote"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.k6.io/k6/internal/output/prometheusrw/remote"
 	"go.k6.io/k6/lib/types"
 	"gopkg.in/guregu/null.v3"
 )
