@@ -67,6 +67,12 @@ func loadLocalTest(gs *state.GlobalState, cmd *cobra.Command, args []string) (*l
 		return nil, err
 	}
 
+	if runtimeOptions.CompatibilityMode.String == lib.CompatibilityModeExperimentalEnhanced.String() {
+		gs.Logger.Warnf("ComaptibilityMode %[1]q is deprecated. Types are stripped by default for `.ts` files. "+
+			"Please move to using %[2]q instead as %[1]q will be removed in the future",
+			lib.CompatibilityModeExperimentalEnhanced.String(), lib.CompatibilityModeBase.String())
+	}
+
 	registry := metrics.NewRegistry()
 	state := &lib.TestPreInitState{
 		Logger:         gs.Logger,
