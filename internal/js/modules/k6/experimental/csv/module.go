@@ -192,11 +192,13 @@ func (p *Parser) Next() *sobek.Promise {
 	promise, resolve, reject := promises.New(p.vu)
 
 	go func() {
-		var records []string
+		// var records []string
+		var record any
 		var done bool
 		var err error
 
-		records, err = p.reader.Read()
+		// records, err = p.reader.Read()
+		record, err = p.reader.Read()
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				resolve(parseResult{Done: true, Value: []string{}})
@@ -209,7 +211,8 @@ func (p *Parser) Next() *sobek.Promise {
 
 		p.currentLine.Add(1)
 
-		resolve(parseResult{Done: done, Value: records})
+		// resolve(parseResult{Done: done, Value: records})
+		resolve(parseResult{Done: done, Value: record})
 	}()
 
 	return promise
@@ -222,7 +225,7 @@ type parseResult struct {
 	Done bool `js:"done"`
 
 	// Value holds the line's records value.
-	Value []string `js:"value"`
+	Value any `js:"value"`
 }
 
 // options holds options used to configure CSV parsing when utilizing the module.

@@ -96,7 +96,8 @@ func NewReaderFrom(r io.Reader, options options) (*Reader, error) {
 	return reader, nil
 }
 
-func (r *Reader) Read() ([]string, error) {
+// func (r *Reader) Read() ([]string, error) {
+func (r *Reader) Read() (any, error) {
 	toLineSet := r.options.ToLine.Valid
 
 	// If the `toLine` option was set and we have reached it, we return EOF.
@@ -104,12 +105,12 @@ func (r *Reader) Read() ([]string, error) {
 		return nil, io.EOF
 	}
 
-	records, err := r.csv.Read()
+	record, err := r.csv.Read()
 	if err != nil {
 		return nil, err
 	}
 
 	r.currentLine.Add(1)
 
-	return records, nil
+	return record, nil
 }
