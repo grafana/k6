@@ -192,12 +192,10 @@ func (p *Parser) Next() *sobek.Promise {
 	promise, resolve, reject := promises.New(p.vu)
 
 	go func() {
-		// var records []string
 		var record any
 		var done bool
 		var err error
 
-		// records, err = p.reader.Read()
 		record, err = p.reader.Read()
 		if err != nil {
 			if errors.Is(err, io.EOF) {
@@ -211,7 +209,6 @@ func (p *Parser) Next() *sobek.Promise {
 
 		p.currentLine.Add(1)
 
-		// resolve(parseResult{Done: done, Value: records})
 		resolve(parseResult{Done: done, Value: record})
 	}()
 
@@ -246,6 +243,15 @@ type options struct {
 
 	// ToLine indicates the line at which to stop reading the CSV file (inclusive).
 	ToLine null.Int `js:"toLine"`
+
+	// Header indicates whether the first line of the CSV file should be used as the header, and whether
+	// the lines should be returned as objects with the header as keys.
+	//
+	// If the header is enabled, the first line of the CSV file will be skipped, and the option is thus
+	// equivalent to setting `skipFirstLine` to `true`.
+	//
+	// The header option is incompatible with a FromLine option value set to a value greater than 0
+	Header null.Bool `js:"header"`
 }
 
 // newDefaultParserOptions creates a new options instance with default values.
@@ -253,6 +259,7 @@ func newDefaultParserOptions() options {
 	return options{
 		Delimiter:     ',',
 		SkipFirstLine: false,
+		Header:        null.BoolFrom(false),
 	}
 }
 
@@ -285,6 +292,10 @@ func newParserOptionsFrom(obj *sobek.Object) (options, error) {
 
 	if v := obj.Get("toLine"); v != nil {
 		options.ToLine = null.IntFrom(v.ToInteger())
+	}
+
+	if v := obj.Get("header"); v != nil {
+		options.Header = null.BoolFrom(v.ToBoolean())
 	}
 
 	if options.FromLine.Valid && options.ToLine.Valid && options.FromLine.Int64 >= options.ToLine.Int64 {

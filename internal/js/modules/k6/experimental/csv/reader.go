@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"sync/atomic"
+
+	"go.k6.io/k6/internal/js/modules/k6/data"
 )
 
 // Reader is a CSV reader.
@@ -18,6 +20,9 @@ type Reader struct {
 
 	// options holds the reader's options.
 	options options
+
+	// header stores the column names when header option is enabled.
+	header []string
 }
 
 // NewReaderFrom creates a new CSV reader from the provided io.Reader.
@@ -33,7 +38,10 @@ func NewReaderFrom(r io.Reader, options options) (*Reader, error) {
 		return nil, fmt.Errorf("the reader cannot be nil")
 	}
 
-	// Ensure the default delimiter is set.
+	if err := validateOptions(options); err != nil {
+		return nil, err
+	}
+
 	if options.Delimiter == 0 {
 		options.Delimiter = ','
 	}
@@ -46,47 +54,27 @@ func NewReaderFrom(r io.Reader, options options) (*Reader, error) {
 		options: options,
 	}
 
-	var (
-		fromLineSet        = options.FromLine.Valid
-		toLineSet          = options.ToLine.Valid
-		skipFirstLineSet   = options.SkipFirstLine
-		fromLineIsPositive = fromLineSet && options.FromLine.Int64 >= 0
-		toLineIsPositive   = toLineSet && options.ToLine.Int64 >= 0
-	)
-
-	// If set, the fromLine option should either be greater than or equal to 0.
-	if fromLineSet && !fromLineIsPositive {
-		return nil, fmt.Errorf("the 'fromLine' option must be greater than or equal to 0; got %d", options.FromLine.Int64)
-	}
-
-	// If set, the toLine option should be strictly greater than or equal to 0.
-	if toLineSet && !toLineIsPositive {
-		return nil, fmt.Errorf("the 'toLine' option must be greater than or equal to 0; got %d", options.ToLine.Int64)
-	}
-
-	// if the `fromLine` and `toLine` options are set, and `fromLine` is greater or equal to `toLine`, we return an error.
-	if fromLineSet && toLineSet && options.FromLine.Int64 >= options.ToLine.Int64 {
-		return nil, fmt.Errorf(
-			"the 'fromLine' option must be less than the 'toLine' option; got 'fromLine': %d, 'toLine': %d",
-			options.FromLine.Int64, options.ToLine.Int64,
-		)
-	}
-
-	// If the user wants to skip the first line, we consume and discard it.
-	if skipFirstLineSet && (!fromLineSet || options.FromLine.Int64 == 0) {
-		_, err := csvParser.Read()
+	headerEnabled := options.Header.Valid && options.Header.Bool
+	if headerEnabled {
+		header, err := csvParser.Read()
 		if err != nil {
+			return nil, fmt.Errorf("failed to read the first line; reason: %w", err)
+		}
+		reader.header = header
+		reader.currentLine.Add(1)
+	}
+
+	if options.SkipFirstLine && (!options.FromLine.Valid || options.FromLine.Int64 == 0) {
+		if _, err := csvParser.Read(); err != nil {
 			return nil, fmt.Errorf("failed to skip the first line; reason: %w", err)
 		}
 
 		reader.currentLine.Add(1)
 	}
 
-	if fromLineSet && options.FromLine.Int64 > 0 {
-		// We skip lines until we reach the specified line.
+	if options.FromLine.Valid && options.FromLine.Int64 > 0 {
 		for reader.currentLine.Load() < options.FromLine.Int64 {
-			_, err := csvParser.Read()
-			if err != nil {
+			if _, err := csvParser.Read(); err != nil {
 				return nil, fmt.Errorf("failed to skip lines until line %d; reason: %w", options.FromLine.Int64, err)
 			}
 			reader.currentLine.Add(1)
@@ -96,7 +84,13 @@ func NewReaderFrom(r io.Reader, options options) (*Reader, error) {
 	return reader, nil
 }
 
-// func (r *Reader) Read() ([]string, error) {
+// The csv module's read must implement the RecordReader interface.
+var _ data.RecordReader = (*Reader)(nil)
+
+// Read reads a record from the CSV file.
+//
+// If the `header` option is enabled, it will return a map of the record.
+// Otherwise, it will return the record as a slice of strings.
 func (r *Reader) Read() (any, error) {
 	toLineSet := r.options.ToLine.Valid
 
@@ -112,5 +106,58 @@ func (r *Reader) Read() (any, error) {
 
 	r.currentLine.Add(1)
 
+	// If header option is enabled, return a map of the record.
+	if r.options.Header.Valid && r.options.Header.Bool {
+		if r.header == nil {
+			return nil, fmt.Errorf("the 'header' option is enabled, but no header was found")
+		}
+
+		if len(record) != len(r.header) {
+			return nil, fmt.Errorf("record length (%d) doesn't match header length (%d)", len(record), len(r.header))
+		}
+
+		recordMap := make(map[string]string)
+		for i, value := range record {
+			recordMap[r.header[i]] = value
+		}
+
+		return recordMap, nil
+	}
+
 	return record, nil
+}
+
+// validateOptions validates the reader options and returns an error if any validation fails.
+func validateOptions(options options) error {
+	var (
+		fromLineSet      = options.FromLine.Valid
+		toLineSet        = options.ToLine.Valid
+		skipFirstLineSet = options.SkipFirstLine
+		headerEnabled    = options.Header.Valid && options.Header.Bool
+	)
+
+	if headerEnabled && skipFirstLineSet {
+		return fmt.Errorf("the 'header' option cannot be enabled when 'skipFirstLine' is true")
+	}
+
+	if headerEnabled && fromLineSet && options.FromLine.Int64 > 0 {
+		return fmt.Errorf("the 'header' option cannot be enabled when 'fromLine' is set to a value greater than 0")
+	}
+
+	if fromLineSet && options.FromLine.Int64 < 0 {
+		return fmt.Errorf("the 'fromLine' option must be greater than or equal to 0; got %d", options.FromLine.Int64)
+	}
+
+	if toLineSet && options.ToLine.Int64 < 0 {
+		return fmt.Errorf("the 'toLine' option must be greater than or equal to 0; got %d", options.ToLine.Int64)
+	}
+
+	if fromLineSet && toLineSet && options.FromLine.Int64 >= options.ToLine.Int64 {
+		return fmt.Errorf(
+			"the 'fromLine' option must be less than the 'toLine' option; got 'fromLine': %d, 'toLine': %d",
+			options.FromLine.Int64, options.ToLine.Int64,
+		)
+	}
+
+	return nil
 }

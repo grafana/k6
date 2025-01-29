@@ -79,6 +79,44 @@ func TestParserConstructor(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("constructing a parser with both header and skipFirstLine options should fail", func(t *testing.T) {
+		t.Parallel()
+
+		r, err := newConfiguredRuntime(t)
+		require.NoError(t, err)
+
+		// Ensure the testdata.csv file is present on the test filesystem.
+		r.VU.InitEnvField.FileSystems["file"] = newTestFs(t, func(fs fsext.Fs) error {
+			return fsext.WriteFile(fs, testFilePath, []byte(csvTestData), 0o644)
+		})
+
+		_, err = r.RunOnEventLoop(wrapInAsyncLambda(fmt.Sprintf(`
+			  const file = await fs.open(%q);
+			  const parser = new csv.Parser(file, { delimiter: ';', skipFirstLine: true, header: true });
+		`, testFilePath)))
+
+		require.Error(t, err)
+	})
+
+	t.Run("constructing a parser with both the header option and fromLine option greater than 0 should fail", func(t *testing.T) {
+		t.Parallel()
+
+		r, err := newConfiguredRuntime(t)
+		require.NoError(t, err)
+
+		// Ensure the testdata.csv file is present on the test filesystem.
+		r.VU.InitEnvField.FileSystems["file"] = newTestFs(t, func(fs fsext.Fs) error {
+			return fsext.WriteFile(fs, testFilePath, []byte(csvTestData), 0o644)
+		})
+
+		_, err = r.RunOnEventLoop(wrapInAsyncLambda(fmt.Sprintf(`
+			  const file = await fs.open(%q);
+			  const parser = new csv.Parser(file, { delimiter: ';', fromLine: 1, header: true });
+		`, testFilePath)))
+
+		require.Error(t, err)
+	})
+
 	t.Run("constructing a parser without providing a file instance should fail", func(t *testing.T) {
 		t.Parallel()
 
@@ -354,6 +392,44 @@ func TestParserNext(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("next with header option should return records as objects and succeed", func(t *testing.T) {
+		t.Parallel()
+
+		r, err := newConfiguredRuntime(t)
+		require.NoError(t, err)
+
+		// Ensure the testdata.csv file is present on the test filesystem.
+		r.VU.InitEnvField.FileSystems["file"] = newTestFs(t, func(fs fsext.Fs) error {
+			return fsext.WriteFile(fs, testFilePath, []byte(csvTestData), 0o644)
+		})
+
+		_, err = r.RunOnEventLoop(wrapInAsyncLambda(fmt.Sprintf(`
+			const file = await fs.open(%q);
+			const parser = new csv.Parser(file, { header: true });
+			let gotParsedCount = 0;
+
+			let { done, value } = await parser.next();
+			while (!done) {
+				if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+					throw new Error("Expected record to be an object, but got " + typeof value);
+				}
+
+				if (Object.keys(value).length !== 6) {
+					throw new Error("Expected record to have 6 fields, but got " + Object.keys(value).length);
+				}
+
+				gotParsedCount++;
+				({ done, value } = await parser.next());
+			}
+
+			if (gotParsedCount !== 10) {
+				throw new Error("Expected to parse 10 records, but got " + gotParsedCount);
+			}
+
+		`, testFilePath)))
+		require.NoError(t, err)
+	})
+
 	t.Run("calling next on a parser that has reached EOF should return done=true and no value", func(t *testing.T) {
 		t.Parallel()
 
@@ -525,6 +601,38 @@ func TestParse(t *testing.T) {
 			}
 		`, testFilePath)))
 
+		require.NoError(t, err)
+	})
+
+	t.Run("parse respects the header option, returns records as objects and succeeds", func(t *testing.T) {
+		t.Parallel()
+
+		r, err := newConfiguredRuntime(t)
+		require.NoError(t, err)
+
+		// Ensure the testdata.csv file is present on the test filesystem.
+		r.VU.InitEnvField.FileSystems["file"] = newTestFs(t, func(fs fsext.Fs) error {
+			return fsext.WriteFile(fs, testFilePath, []byte(csvTestData), 0o644)
+		})
+
+		_, err = r.RunOnEventLoop(wrapInAsyncLambda(fmt.Sprintf(`
+			const file = await fs.open(%q);
+			const csvRecords = await csv.parse(file, { header: true });
+
+			if (csvRecords.length !== 10) {
+				throw new Error("Expected 11 records, but got " + csvRecords.length);
+			}
+
+			for (const record of csvRecords) {
+				if (typeof record !== 'object' || record === null || Array.isArray(record)) {
+					throw new Error("Expected record to be an object, but got " + typeof record);
+				}
+
+				if (Object.keys(record).length !== 6) {
+					throw new Error("Expected record to have 6 fields, but got " + Object.keys(record).length);
+				}
+			}
+		`, testFilePath)))
 		require.NoError(t, err)
 	})
 }
