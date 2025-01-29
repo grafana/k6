@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 	"time"
 
 	"go.k6.io/k6/internal/lib/netext/grpcext"
@@ -29,6 +30,9 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/dynamicpb"
 )
+
+// globalMutex is used to prevent race conditions during concurrent access to [protoregistry.GlobalTypes].
+var globalMutex sync.Mutex //nolint:gochecknoglobals
 
 // Client represents a gRPC client that can be used to make RPC requests
 type Client struct {
@@ -443,6 +447,7 @@ func (c *Client) convertToMethodInfo(fdset *descriptorpb.FileDescriptorSet) ([]M
 			message := stack[len(stack)-1]
 			stack = stack[:len(stack)-1]
 
+			globalMutex.Lock()
 			_, errFind := protoregistry.GlobalTypes.FindMessageByName(message.FullName())
 			if errors.Is(errFind, protoregistry.NotFound) {
 				err = protoregistry.GlobalTypes.RegisterMessage(dynamicpb.NewMessageType(message))
@@ -450,6 +455,7 @@ func (c *Client) convertToMethodInfo(fdset *descriptorpb.FileDescriptorSet) ([]M
 					return false
 				}
 			}
+			globalMutex.Unlock()
 
 			nested := message.Messages()
 			for i := 0; i < nested.Len(); i++ {
