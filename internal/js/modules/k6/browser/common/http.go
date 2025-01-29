@@ -488,7 +488,27 @@ func (r *Response) fetchBody() error {
 		return nil
 	}
 	action := network.GetResponseBody(r.request.requestID)
-	body, err := action.Do(cdp.WithExecutor(r.ctx, r.request.frame.manager.session))
+
+	// Try to fetch the response body. If the request to retrieve the response
+	// body is too "quick" then the response body is not available. After
+	// retrying we have a better chance of getting the response body.
+	var body []byte
+	var err error
+	maxRetries := 5
+	for i := 0; i <= maxRetries; i++ {
+		body, err = action.Do(cdp.WithExecutor(r.ctx, r.request.frame.manager.session))
+		if err == nil {
+			break
+		}
+		if strings.Contains(err.Error(), "No data found for resource with given identifier") {
+			if i == maxRetries {
+				break
+			}
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+		break
+	}
 	if err != nil {
 		return fmt.Errorf("fetching response body: %w", err)
 	}
