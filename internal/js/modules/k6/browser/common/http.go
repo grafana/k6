@@ -393,12 +393,12 @@ type RemoteAddress struct {
 
 // SecurityDetails contains informationa about the security details of a TLS connection.
 type SecurityDetails struct {
-	SubjectName string   `json:"subjectName"`
-	Issuer      string   `json:"issuer"`
-	ValidFrom   int64    `json:"validFrom"`
-	ValidTo     int64    `json:"validTo"`
-	Protocol    string   `json:"protocol"`
-	SANList     []string `json:"sanList"`
+	SubjectName string   `json:"subjectName" js:"subjectName"`
+	Issuer      string   `json:"issuer" js:"issuer"`
+	ValidFrom   int64    `json:"validFrom" js:"validFrom"`
+	ValidTo     int64    `json:"validTo" js:"validTo"`
+	Protocol    string   `json:"protocol" js:"protocol"`
+	SANList     []string `json:"sanList" js:"sanList"`
 }
 
 // Response represents a browser HTTP response.
