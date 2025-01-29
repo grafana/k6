@@ -2448,3 +2448,350 @@ type request struct {
 	Size                 map[string]int      `json:"size"`
 	URL                  string              `json:"url"`
 }
+
+type response struct {
+	AllHeaders            map[string]string   `json:"allHeaders"`
+	Body                  string              `json:"body"`
+	FrameURL              string              `json:"frameUrl"`
+	AcceptLanguageHeader  string              `json:"acceptLanguageHeader"`
+	AcceptLanguageHeaders []string            `json:"acceptLanguageHeaders"`
+	Headers               map[string]string   `json:"headers"`
+	HeadersArray          []map[string]string `json:"headersArray"`
+	JSON                  string              `json:"json"`
+	OK                    bool                `json:"ok"`
+	RequestURL            string              `json:"requestUrl"`
+	SecurityDetails       map[string]string   `json:"securityDetails"`
+	ServerAddr            map[string]any      `json:"serverAddr"`
+	Size                  map[string]int      `json:"size"`
+	Status                int64               `json:"status"`
+	StatusText            string              `json:"statusText"`
+	URL                   string              `json:"url"`
+	Text                  string              `json:"text"`
+}
+
+func TestPageOnResponse(t *testing.T) {
+	t.Parallel()
+
+	// Start and setup a webserver to test the page.on('request') handler.
+	tb := newTestBrowser(t, withHTTPServer())
+	defer tb.Browser.Close()
+
+	tb.withHandler("/home", func(w http.ResponseWriter, r *http.Request) {
+		_, err := fmt.Fprintf(w, `<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <script>fetch('/api', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({name: 'tester'})
+    })</script>
+</body>
+</html>`)
+		require.NoError(t, err)
+	})
+	tb.withHandler("/api", func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		defer require.NoError(t, r.Body.Close())
+
+		var data struct {
+			Name string `json:"name"`
+		}
+		err = json.Unmarshal(body, &data)
+		require.NoError(t, err)
+
+		w.Header().Set("Content-Type", "application/json")
+		_, err = fmt.Fprintf(w, `{"message": "Hello %s!"}`, data.Name)
+		require.NoError(t, err)
+	})
+	tb.withHandler("/style.css", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/css")
+		_, err := fmt.Fprintf(w, `body { background-color: #f0f0f0; }`)
+		require.NoError(t, err)
+	})
+
+	// Start and setup a k6 iteration to test the page.on('request') handler.
+	vu, _, _, cleanUp := startIteration(t)
+	defer cleanUp()
+
+	// Some of the business logic is in the mapping layer unfortunately.
+	// To test everything is wried up correctly, we're required to work
+	// with RunPromise.
+	//
+	// The code below is the JavaScript code that is executed in the k6 iteration.
+	// It will wait for all requests to be captured in returnValue, before returning.
+	gv, err := vu.RunAsync(t, `
+		const context = await browser.newContext({locale: 'en-US', userAgent: 'some-user-agent'});
+		const page = await context.newPage();
+
+		var returnValue = [];
+		page.on('response', async (response) => {
+			// We need to check if the response is JSON before calling json()
+			const allHeaders = await response.allHeaders();
+			var json = null;
+			if (allHeaders["content-type"] === "application/json") {
+				json = await response.json();
+			}
+
+			returnValue.push({
+				allHeaders: allHeaders,
+				body: await response.body() ? String.fromCharCode.apply(null, new Uint8Array(await response.body())) : null,
+				frameUrl: response.frame().url(),
+				acceptLanguageHeader: await response.headerValue('Accept-Language'),
+				acceptLanguageHeaders: await response.headerValues('Accept-Language'),
+				headers: response.headers(),
+				headersArray: await response.headersArray(),
+				json: JSON.stringify(json),
+				ok: response.ok(),
+				requestUrl: response.request().url(),
+				securityDetails: await response.securityDetails(),
+				serverAddr: await response.serverAddr(),
+				size: await response.size(),
+				status: response.status(),
+				statusText: response.statusText(),
+				url: response.url(),
+				text: await response.text()
+			});
+		})
+
+		await page.goto('%s', {waitUntil: 'networkidle'});
+
+		await page.close();
+
+		return JSON.stringify(returnValue, null, 2);
+	`, tb.url("/home"))
+	assert.NoError(t, err)
+
+	got := k6test.ToPromise(t, gv)
+
+	// Convert the result to a string and then to a slice of requests.
+	var responses []response
+	err = json.Unmarshal([]byte(got.Result().String()), &responses)
+	require.NoError(t, err)
+
+	for i := range responses {
+		// Normalize any port numbers in the string values to :8080
+		if responses[i].URL != "" {
+			responses[i].URL = regexp.MustCompile(`:\d+`).ReplaceAllString(responses[i].URL, ":8080")
+		}
+		if responses[i].FrameURL != "" {
+			responses[i].FrameURL = regexp.MustCompile(`:\d+`).ReplaceAllString(responses[i].FrameURL, ":8080")
+		}
+		for k, v := range responses[i].AllHeaders {
+			responses[i].AllHeaders[k] = regexp.MustCompile(`:\d+`).ReplaceAllString(v, ":8080")
+
+			// Normalize the date
+			if strings.Contains(strings.ToLower(k), "date") {
+				responses[i].AllHeaders[k] = "Wed, 29 Jan 2025 09:00:00 GMT"
+			}
+		}
+		for k, v := range responses[i].Headers {
+			responses[i].Headers[k] = regexp.MustCompile(`:\d+`).ReplaceAllString(v, ":8080")
+
+			// Normalize the date
+			if strings.Contains(strings.ToLower(k), "date") {
+				responses[i].Headers[k] = "Wed, 29 Jan 2025 09:00:00 GMT"
+			}
+		}
+		for k, header := range responses[i].HeadersArray {
+			if header["value"] != "" {
+				responses[i].HeadersArray[k]["value"] = regexp.MustCompile(`:\d+`).ReplaceAllString(header["value"], ":8080")
+			}
+			// Normalize the date
+			if strings.Contains(strings.ToLower(header["name"]), "date") {
+				responses[i].HeadersArray[k]["value"] = "Wed, 29 Jan 2025 09:00:00 GMT"
+			}
+		}
+		for k := range responses[i].ServerAddr {
+			if k == "port" {
+				responses[i].ServerAddr[k] = 8080
+			}
+		}
+		if responses[i].RequestURL != "" {
+			responses[i].RequestURL = regexp.MustCompile(`:\d+`).ReplaceAllString(responses[i].RequestURL, ":8080")
+		}
+	}
+
+	expected := []response{
+		{
+			AllHeaders: map[string]string{
+				"content-length": "286",
+				"content-type":   "text/html; charset=utf-8",
+				"date":           "Wed, 29 Jan 2025 09:00:00 GMT",
+			},
+			Body:                  "<!DOCTYPE html>\n<html>\n<head>\n    <link rel=\"stylesheet\" href=\"/style.css\">\n</head>\n<body>\n    <script>fetch('/api', {\n      method: 'POST',\n      headers: {\n        'Content-Type': 'application/json'\n      },\n      body: JSON.stringify({name: 'tester'})\n    })</script>\n</body>\n</html>",
+			FrameURL:              "http://127.0.0.1:8080/home",
+			AcceptLanguageHeader:  "",
+			AcceptLanguageHeaders: []string{""},
+			Headers: map[string]string{
+				"Content-Length": "286",
+				"Content-Type":   "text/html; charset=utf-8",
+				"Date":           "Wed, 29 Jan 2025 09:00:00 GMT",
+			},
+			HeadersArray: []map[string]string{
+				{"name": "Content-Length", "value": "286"},
+				{"name": "Content-Type", "value": "text/html; charset=utf-8"},
+				{"name": "Date", "value": "Wed, 29 Jan 2025 09:00:00 GMT"},
+			},
+			JSON:            "null",
+			OK:              true,
+			RequestURL:      "http://127.0.0.1:8080/home",
+			SecurityDetails: map[string]string(nil),
+			ServerAddr:      map[string]interface{}{"ip_address": "127.0.0.1", "port": 8080},
+			Size:            map[string]int{"body": 286, "headers": 117},
+			Status:          200,
+			StatusText:      "OK",
+			URL:             "http://127.0.0.1:8080/home",
+			Text:            "<!DOCTYPE html>\n<html>\n<head>\n    <link rel=\"stylesheet\" href=\"/style.css\">\n</head>\n<body>\n    <script>fetch('/api', {\n      method: 'POST',\n      headers: {\n        'Content-Type': 'application/json'\n      },\n      body: JSON.stringify({name: 'tester'})\n    })</script>\n</body>\n</html>",
+		},
+		{
+			AllHeaders: map[string]string{
+				"content-length": "35",
+				"content-type":   "text/css",
+				"date":           "Wed, 29 Jan 2025 09:00:00 GMT",
+			},
+			Body:                  "body { background-color: #f0f0f0; }",
+			FrameURL:              "http://127.0.0.1:8080/home",
+			AcceptLanguageHeader:  "",
+			AcceptLanguageHeaders: []string{""},
+			Headers: map[string]string{
+				"Content-Length": "35",
+				"Content-Type":   "text/css",
+				"Date":           "Wed, 29 Jan 2025 09:00:00 GMT",
+			},
+			HeadersArray: []map[string]string{
+				{"name": "Date", "value": "Wed, 29 Jan 2025 09:00:00 GMT"},
+				{"name": "Content-Type", "value": "text/css"},
+				{"name": "Content-Length", "value": "35"},
+			},
+			JSON:            "null",
+			OK:              true,
+			RequestURL:      "http://127.0.0.1:8080/style.css",
+			SecurityDetails: map[string]string(nil),
+			ServerAddr:      map[string]interface{}{"ip_address": "127.0.0.1", "port": 8080},
+			Size:            map[string]int{"body": 35, "headers": 100},
+			Status:          200,
+			StatusText:      "OK",
+			URL:             "http://127.0.0.1:8080/style.css",
+			Text:            "body { background-color: #f0f0f0; }",
+		},
+		{
+			AllHeaders: map[string]string{
+				"access-control-allow-credentials": "true",
+				"access-control-allow-origin":      "*",
+				"content-length":                   "10",
+				"content-type":                     "text/plain; charset=utf-8",
+				"date":                             "Wed, 29 Jan 2025 09:00:00 GMT",
+				"x-content-type-options":           "nosniff",
+			},
+			Body:                  "Not Found\n",
+			FrameURL:              "http://127.0.0.1:8080/home",
+			AcceptLanguageHeader:  "",
+			AcceptLanguageHeaders: []string{""},
+			Headers: map[string]string{
+				"Access-Control-Allow-Credentials": "true",
+				"Access-Control-Allow-Origin":      "*",
+				"Content-Length":                   "10",
+				"Content-Type":                     "text/plain; charset=utf-8",
+				"Date":                             "Wed, 29 Jan 2025 09:00:00 GMT",
+				"X-Content-Type-Options":           "nosniff",
+			},
+			HeadersArray: []map[string]string{
+				{"name": "Date", "value": "Wed, 29 Jan 2025 09:00:00 GMT"},
+				{"name": "Content-Type", "value": "text/plain; charset=utf-8"},
+				{"name": "Access-Control-Allow-Credentials", "value": "true"},
+				{"name": "X-Content-Type-Options", "value": "nosniff"},
+				{"name": "Access-Control-Allow-Origin", "value": "*"},
+				{"name": "Content-Length", "value": "10"},
+			},
+			JSON:            "null",
+			OK:              false,
+			RequestURL:      "http://127.0.0.1:8080/favicon.ico",
+			SecurityDetails: map[string]string(nil),
+			ServerAddr:      map[string]interface{}{"ip_address": "127.0.0.1", "port": 8080},
+			Size:            map[string]int{"body": 10, "headers": 229},
+			Status:          404,
+			StatusText:      "Not Found",
+			URL:             "http://127.0.0.1:8080/favicon.ico",
+			Text:            "Not Found\n",
+		},
+		{
+			AllHeaders: map[string]string{
+				"content-length": "28",
+				"content-type":   "application/json",
+				"date":           "Wed, 29 Jan 2025 09:00:00 GMT",
+			},
+			Body:                  "{\"message\": \"Hello tester!\"}",
+			FrameURL:              "http://127.0.0.1:8080/home",
+			AcceptLanguageHeader:  "",
+			AcceptLanguageHeaders: []string{""},
+			Headers: map[string]string{
+				"Content-Length": "28",
+				"Content-Type":   "application/json",
+				"Date":           "Wed, 29 Jan 2025 09:00:00 GMT",
+			},
+			HeadersArray: []map[string]string{
+				{"name": "Date", "value": "Wed, 29 Jan 2025 09:00:00 GMT"},
+				{"name": "Content-Type", "value": "application/json"},
+				{"name": "Content-Length", "value": "28"},
+			},
+			JSON:            "{\"message\":\"Hello tester!\"}",
+			OK:              true,
+			RequestURL:      "http://127.0.0.1:8080/api",
+			SecurityDetails: map[string]string(nil),
+			ServerAddr:      map[string]interface{}{"ip_address": "127.0.0.1", "port": 8080},
+			Size:            map[string]int{"body": 28, "headers": 108},
+			Status:          200,
+			StatusText:      "OK",
+			URL:             "http://127.0.0.1:8080/api",
+			Text:            "{\"message\": \"Hello tester!\"}",
+		},
+	}
+
+	// Compare each request one by one for better test failure visibility
+	for _, resp := range responses {
+		i := -1
+		for j, e := range expected {
+			if resp.RequestURL == e.RequestURL {
+				i = j
+				break
+			}
+		}
+		assert.NotEqual(t, -1, i, "failed to find expected response with request URL %s", resp.RequestURL)
+
+		assert.Equal(t, expected[i].AllHeaders, resp.AllHeaders, "AllHeaders mismatch")
+		assert.Equal(t, expected[i].Body, resp.Body, "Body mismatch")
+		assert.Equal(t, expected[i].FrameURL, resp.FrameURL, "FrameUrl mismatch")
+		assert.Equal(t, expected[i].AcceptLanguageHeader, resp.AcceptLanguageHeader, "AcceptLanguageHeader mismatch")
+		assert.Equal(t, expected[i].AcceptLanguageHeaders, resp.AcceptLanguageHeaders, "AcceptLanguageHeaders mismatch")
+		assert.Equal(t, expected[i].Headers, resp.Headers, "Headers mismatch")
+		assert.Equal(t, expected[i].JSON, resp.JSON, "JSON mismatch")
+		assert.Equal(t, expected[i].OK, resp.OK, "OK mismatch")
+		assert.Equal(t, expected[i].RequestURL, resp.RequestURL, "RequestURL mismatch")
+		assert.Equal(t, expected[i].SecurityDetails, resp.SecurityDetails, "SecurityDetails mismatch")
+		assert.Equal(t, expected[i].ServerAddr, resp.ServerAddr, "ServerAddr mismatch")
+		assert.Equal(t, expected[i].Size, resp.Size, "Size mismatch")
+		assert.Equal(t, expected[i].Status, resp.Status, "Status mismatch")
+		assert.Equal(t, expected[i].StatusText, resp.StatusText, "StatusText mismatch")
+		assert.Equal(t, expected[i].URL, resp.URL, "URL mismatch")
+		assert.Equal(t, expected[i].Text, resp.Text, "Text mismatch")
+
+		// Compare HeadersArray elements one by one
+		assert.Equal(t, len(expected[i].HeadersArray), len(resp.HeadersArray), "HeadersArray length mismatch")
+		for _, expectedHeader := range expected[i].HeadersArray {
+			found := false
+			for _, actualHeader := range resp.HeadersArray {
+				if expectedHeader["name"] == actualHeader["name"] && expectedHeader["value"] == actualHeader["value"] {
+					found = true
+					break
+				}
+			}
+			assert.True(t, found, fmt.Sprintf("Expected header {name: %s, value: %s} not found in actual headers", expectedHeader["name"], expectedHeader["value"]))
+		}
+	}
+}
