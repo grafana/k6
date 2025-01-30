@@ -124,6 +124,10 @@ func getConfig(flags *pflag.FlagSet) (Config, error) {
 	}, nil
 }
 
+func legacyConfigFilePath(gs *state.GlobalState) string {
+	return filepath.Join(gs.UserOSConfigDir, "loadimpact", "k6", "config.json")
+}
+
 // Reads the configuration file from the supplied filesystem and returns it or
 // an error. The only situation in which an error won't be returned is if the
 // user didn't explicitly specify a config file path and the default config file
@@ -147,6 +151,24 @@ func readDiskConfig(gs *state.GlobalState) (Config, error) {
 	err = json.Unmarshal(data, &conf)
 	if err != nil {
 		return Config{}, fmt.Errorf("couldn't parse the configuration from %q: %w", gs.Flags.ConfigFilePath, err)
+	}
+	return conf, nil
+}
+
+func readLegacyDiskConfig(gs *state.GlobalState) (Config, error) {
+	// Try to see if the legacy config exists in the supplied filesystem
+	legacyPath := filepath.Join(gs.UserOSConfigDir, "loadimpact", "k6", "config.json")
+	if _, err := gs.FS.Stat(legacyPath); err != nil {
+		return Config{}, err
+	}
+	data, err := fsext.ReadFile(gs.FS, legacyPath)
+	if err != nil {
+		return Config{}, fmt.Errorf("couldn't load the configuration from %q: %w", legacyPath, err)
+	}
+	var conf Config
+	err = json.Unmarshal(data, &conf)
+	if err != nil {
+		return Config{}, fmt.Errorf("couldn't parse the configuration from %q: %w", legacyPath, err)
 	}
 	return conf, nil
 }
@@ -187,10 +209,18 @@ func readEnvConfig(envMap map[string]string) (Config, error) {
 // TODO: add better validation, more explicit default values and improve consistency between formats
 // TODO: accumulate all errors and differentiate between the layers?
 func getConsolidatedConfig(gs *state.GlobalState, cliConf Config, runnerOpts lib.Options) (conf Config, err error) {
-	fileConf, err := readDiskConfig(gs)
-	if err != nil {
+	fileConf, err := readLegacyDiskConfig(gs)
+	if errors.Is(err, fs.ErrNotExist) {
+		fileConf, err = readDiskConfig(gs)
+		if err != nil {
+			return conf, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
+		}
+	} else if err != nil {
 		return conf, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
+	} else {
+		gs.Logger.Warn("The configuration file has been found on the old path. Please, run again `k6 cloud login` or `k6 login` commands to migrate it to the new path. If you migrated it manually, then remove the old config file.")
 	}
+
 	envConf, err := readEnvConfig(gs.Env)
 	if err != nil {
 		return conf, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
