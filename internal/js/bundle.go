@@ -310,6 +310,7 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*BundleInstance
 	modSys := modules.NewModuleSystem(b.ModuleResolver, vuImpl)
 	b.setInitGlobals(rt, vuImpl, modSys)
 	modules.ExportGloballyModule(rt, modSys, "k6/timers")
+	modules.ExportGloballyModule(rt, modSys, "k6/webcrypto")
 	vuImpl.initEnv = initenv
 	defer func() {
 		vuImpl.initEnv = nil

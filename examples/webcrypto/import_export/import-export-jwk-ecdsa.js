@@ -1,5 +1,3 @@
-import { crypto } from "k6/experimental/webcrypto";
-
 export default async function () {
   const jwk = {
     kty: "EC",

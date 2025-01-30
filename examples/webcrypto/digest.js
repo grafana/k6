@@ -1,5 +1,3 @@
-import { crypto } from "k6/experimental/webcrypto";
-
 export default function () {
   crypto.subtle.digest("SHA-256", stringToArrayBuffer("Hello, world!")).then(
     (hash) => {
