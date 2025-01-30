@@ -54,7 +54,7 @@ func NewReaderFrom(r io.Reader, options options) (*Reader, error) {
 		options: options,
 	}
 
-	headerEnabled := options.Header.Valid && options.Header.Bool
+	headerEnabled := options.AsObjects.Valid && options.AsObjects.Bool
 	if headerEnabled {
 		header, err := csvParser.Read()
 		if err != nil {
@@ -107,7 +107,7 @@ func (r *Reader) Read() (any, error) {
 	r.currentLine.Add(1)
 
 	// If header option is enabled, return a map of the record.
-	if r.options.Header.Valid && r.options.Header.Bool {
+	if r.options.AsObjects.Valid && r.options.AsObjects.Bool {
 		if r.header == nil {
 			return nil, fmt.Errorf("the 'header' option is enabled, but no header was found")
 		}
@@ -133,7 +133,7 @@ func validateOptions(options options) error {
 		fromLineSet      = options.FromLine.Valid
 		toLineSet        = options.ToLine.Valid
 		skipFirstLineSet = options.SkipFirstLine
-		headerEnabled    = options.Header.Valid && options.Header.Bool
+		headerEnabled    = options.AsObjects.Valid && options.AsObjects.Bool
 	)
 
 	if headerEnabled && skipFirstLineSet {

@@ -244,14 +244,19 @@ type options struct {
 	// ToLine indicates the line at which to stop reading the CSV file (inclusive).
 	ToLine null.Int `js:"toLine"`
 
-	// Header indicates whether the first line of the CSV file should be used as the header, and whether
-	// the lines should be returned as objects with the header as keys.
+	// AsObjects indicates that the CSV rows should be returned as objects, where
+	// the keys are the header column names, and values are the corresponding
+	// row values.
 	//
-	// If the header is enabled, the first line of the CSV file will be skipped, and the option is thus
-	// equivalent to setting `skipFirstLine` to `true`.
+	// When this option is enabled, the first line of the CSV file is treated as the header.
 	//
-	// The header option is incompatible with a FromLine option value set to a value greater than 0
-	Header null.Bool `js:"header"`
+	// If the option is set and no header line is present, this should be considered an error
+	// case.
+	//
+	// This option is incompatible with the [SkipFirstLine] option, and if both are set, an error
+	// should be returned. Same thing applies if the [FromLine] option is set to a value greater
+	// than 0.
+	AsObjects null.Bool `js:"asObjects"`
 }
 
 // newDefaultParserOptions creates a new options instance with default values.
@@ -259,7 +264,7 @@ func newDefaultParserOptions() options {
 	return options{
 		Delimiter:     ',',
 		SkipFirstLine: false,
-		Header:        null.BoolFrom(false),
+		AsObjects:     null.BoolFrom(false),
 	}
 }
 
@@ -294,8 +299,8 @@ func newParserOptionsFrom(obj *sobek.Object) (options, error) {
 		options.ToLine = null.IntFrom(v.ToInteger())
 	}
 
-	if v := obj.Get("header"); v != nil {
-		options.Header = null.BoolFrom(v.ToBoolean())
+	if v := obj.Get("asObjects"); v != nil {
+		options.AsObjects = null.BoolFrom(v.ToBoolean())
 	}
 
 	if options.FromLine.Valid && options.ToLine.Valid && options.FromLine.Int64 >= options.ToLine.Int64 {

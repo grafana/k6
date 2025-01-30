@@ -51,32 +51,32 @@ func TestNewReaderFrom(t *testing.T) {
 		require.Error(t, err)
 	})
 
-	t.Run("instantiating a new reader with header option enabled and skipFirstLine option enabled should fail", func(t *testing.T) {
+	t.Run("instantiating a new reader with asObjects option enabled and skipFirstLine option enabled should fail", func(t *testing.T) {
 		t.Parallel()
 
 		_, err := NewReaderFrom(
 			strings.NewReader("lastname,firstname,composer,born,died,dates\n"),
-			options{Header: null.NewBool(true, true), SkipFirstLine: true},
+			options{AsObjects: null.NewBool(true, true), SkipFirstLine: true},
 		)
 		require.Error(t, err)
 	})
 
-	t.Run("instantiating a new reader with header option enabled and fromLine option set to a value greater than 0 should fail", func(t *testing.T) {
+	t.Run("instantiating a new reader with asObjects option enabled and fromLine option set to a value greater than 0 should fail", func(t *testing.T) {
 		t.Parallel()
 
 		_, err := NewReaderFrom(
 			strings.NewReader("lastname,firstname,composer,born,died,dates\n"),
-			options{Header: null.NewBool(true, true), FromLine: null.NewInt(1, true)},
+			options{AsObjects: null.NewBool(true, true), FromLine: null.NewInt(1, true)},
 		)
 		require.Error(t, err)
 	})
 
-	t.Run("instantiating a new reader with header option enabled and compatible options should succeed", func(t *testing.T) {
+	t.Run("instantiating a new reader with asObjects option enabled and compatible options should succeed", func(t *testing.T) {
 		t.Parallel()
 
 		r, err := NewReaderFrom(
 			strings.NewReader("lastname,firstname,composer,born,died,dates\n"),
-			options{Header: null.NewBool(true, true)},
+			options{AsObjects: null.NewBool(true, true)},
 		)
 		require.NoError(t, err)
 		assert.NotNil(t, r.header)
@@ -171,7 +171,7 @@ func TestReader_Read(t *testing.T) {
 		require.ErrorIs(t, err, io.EOF)
 	})
 
-	t.Run("header option should lead to lines being returned as maps and succeed", func(t *testing.T) {
+	t.Run("asObjects option should lead to lines being returned as maps and succeed", func(t *testing.T) {
 		t.Parallel()
 
 		const csvTestData = "lastname,firstname,composer,born,died,dates\n" +
@@ -179,11 +179,11 @@ func TestReader_Read(t *testing.T) {
 
 		r, err := NewReaderFrom(
 			strings.NewReader(csvTestData),
-			options{Header: null.NewBool(true, true)},
+			options{AsObjects: null.NewBool(true, true)},
 		)
 		require.NoError(t, err)
 
-		// Header line, if present should be ignored and records should be returned as maps
+		// AsObjects line, if present should be ignored and records should be returned as maps
 		firstRecord, err := r.Read()
 		require.NoError(t, err)
 		assert.Equal(t, map[string]string{
@@ -237,17 +237,17 @@ func TestReader_Read(t *testing.T) {
 func TestValidateOptions(t *testing.T) {
 	t.Parallel()
 
-	t.Run("validateOptions with header and skipFirstLine should fail", func(t *testing.T) {
+	t.Run("validateOptions with asObjects and skipFirstLine should fail", func(t *testing.T) {
 		t.Parallel()
 
-		err := validateOptions(options{Header: null.NewBool(true, true), SkipFirstLine: true})
+		err := validateOptions(options{AsObjects: null.NewBool(true, true), SkipFirstLine: true})
 		require.Error(t, err)
 	})
 
-	t.Run("validateOptions with header and fromLine greater than 0 should fail", func(t *testing.T) {
+	t.Run("validateOptions with asObjects and fromLine greater than 0 should fail", func(t *testing.T) {
 		t.Parallel()
 
-		err := validateOptions(options{Header: null.NewBool(true, true), FromLine: null.NewInt(1, true)})
+		err := validateOptions(options{AsObjects: null.NewBool(true, true), FromLine: null.NewInt(1, true)})
 		require.Error(t, err)
 	})
 

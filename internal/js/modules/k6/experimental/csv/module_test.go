@@ -79,7 +79,7 @@ func TestParserConstructor(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("constructing a parser with both header and skipFirstLine options should fail", func(t *testing.T) {
+	t.Run("constructing a parser with both asObjects and skipFirstLine options should fail", func(t *testing.T) {
 		t.Parallel()
 
 		r, err := newConfiguredRuntime(t)
@@ -92,13 +92,13 @@ func TestParserConstructor(t *testing.T) {
 
 		_, err = r.RunOnEventLoop(wrapInAsyncLambda(fmt.Sprintf(`
 			  const file = await fs.open(%q);
-			  const parser = new csv.Parser(file, { delimiter: ';', skipFirstLine: true, header: true });
+			  const parser = new csv.Parser(file, { delimiter: ';', skipFirstLine: true, asObjects: true });
 		`, testFilePath)))
 
 		require.Error(t, err)
 	})
 
-	t.Run("constructing a parser with both the header option and fromLine option greater than 0 should fail", func(t *testing.T) {
+	t.Run("constructing a parser with both the asObjects option and fromLine option greater than 0 should fail", func(t *testing.T) {
 		t.Parallel()
 
 		r, err := newConfiguredRuntime(t)
@@ -111,7 +111,7 @@ func TestParserConstructor(t *testing.T) {
 
 		_, err = r.RunOnEventLoop(wrapInAsyncLambda(fmt.Sprintf(`
 			  const file = await fs.open(%q);
-			  const parser = new csv.Parser(file, { delimiter: ';', fromLine: 1, header: true });
+			  const parser = new csv.Parser(file, { delimiter: ';', fromLine: 1, asObjects: true });
 		`, testFilePath)))
 
 		require.Error(t, err)
@@ -405,7 +405,7 @@ func TestParserNext(t *testing.T) {
 
 		_, err = r.RunOnEventLoop(wrapInAsyncLambda(fmt.Sprintf(`
 			const file = await fs.open(%q);
-			const parser = new csv.Parser(file, { header: true });
+			const parser = new csv.Parser(file, { asObjects: true });
 			let gotParsedCount = 0;
 
 			let { done, value } = await parser.next();
@@ -617,7 +617,7 @@ func TestParse(t *testing.T) {
 
 		_, err = r.RunOnEventLoop(wrapInAsyncLambda(fmt.Sprintf(`
 			const file = await fs.open(%q);
-			const csvRecords = await csv.parse(file, { header: true });
+			const csvRecords = await csv.parse(file, { asObjects: true });
 
 			if (csvRecords.length !== 10) {
 				throw new Error("Expected 11 records, but got " + csvRecords.length);
