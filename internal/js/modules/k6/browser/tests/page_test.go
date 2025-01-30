@@ -2230,7 +2230,6 @@ func TestPageOnRequest(t *testing.T) {
 	tb.withHandler("/api", func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 		require.NoError(t, err)
-		defer require.NoError(t, r.Body.Close())
 
 		var data struct {
 			Name string `json:"name"`
