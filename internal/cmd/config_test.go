@@ -409,11 +409,12 @@ func TestWriteDiskConfigNoJSONContentError(t *testing.T) {
 }
 
 func TestMigrateLegacyConfigFileIfAny(t *testing.T) {
+	t.Parallel()
 	memfs := fsext.NewMemMapFs()
 
 	conf := []byte(`{"iterations":1028,"cloud":{"field1":"testvalue"}}`)
 	legacyConfigPath := ".config/loadimpact/k6/config.json"
-	fsext.WriteFile(memfs, legacyConfigPath, conf, 0o644)
+	require.NoError(t, fsext.WriteFile(memfs, legacyConfigPath, conf, 0o644))
 
 	logger := logrus.New()
 	logger.SetOutput(io.Discard)
@@ -439,6 +440,7 @@ func TestMigrateLegacyConfigFileIfAny(t *testing.T) {
 }
 
 func TestMigrateLegacyConfigFileIfAnyWhenFileDoesNotExist(t *testing.T) {
+	t.Parallel()
 	memfs := fsext.NewMemMapFs()
 
 	defaultFlags := state.GetDefaultFlags(".config")

@@ -210,7 +210,7 @@ func readEnvConfig(envMap map[string]string) (Config, error) {
 // TODO: accumulate all errors and differentiate between the layers?
 func getConsolidatedConfig(gs *state.GlobalState, cliConf Config, runnerOpts lib.Options) (conf Config, err error) {
 	fileConf, err := readLegacyDiskConfig(gs)
-	if errors.Is(err, fs.ErrNotExist) {
+	if errors.Is(err, fs.ErrNotExist) { //nolint:gocritic
 		fileConf, err = readDiskConfig(gs)
 		if err != nil {
 			return conf, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
@@ -218,7 +218,9 @@ func getConsolidatedConfig(gs *state.GlobalState, cliConf Config, runnerOpts lib
 	} else if err != nil {
 		return conf, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
 	} else {
-		gs.Logger.Warn("The configuration file has been found on the old path. Please, run again `k6 cloud login` or `k6 login` commands to migrate to the new path. If you already migrated it manually, then remove the file from the old path.\n\n")
+		gs.Logger.Warn("The configuration file has been found on the old path. " +
+			"Please, run again `k6 cloud login` or `k6 login` commands to migrate to the new path. " +
+			"If you already migrated it manually, then remove the file from the old path.\n\n")
 	}
 
 	envConf, err := readEnvConfig(gs.Env)
