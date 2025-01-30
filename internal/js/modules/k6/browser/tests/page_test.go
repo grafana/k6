@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"image/png"
 	"io"
+	"net"
 	"net/http"
 	"runtime"
 	"slices"
@@ -2450,23 +2451,23 @@ type request struct {
 }
 
 type response struct {
-	AllHeaders            map[string]string   `json:"allHeaders"`
-	Body                  string              `json:"body"`
-	FrameURL              string              `json:"frameUrl"`
-	AcceptLanguageHeader  string              `json:"acceptLanguageHeader"`
-	AcceptLanguageHeaders []string            `json:"acceptLanguageHeaders"`
-	Headers               map[string]string   `json:"headers"`
-	HeadersArray          []map[string]string `json:"headersArray"`
-	JSON                  string              `json:"json"`
-	OK                    bool                `json:"ok"`
-	RequestURL            string              `json:"requestUrl"`
-	SecurityDetails       map[string]string   `json:"securityDetails"`
-	ServerAddr            map[string]any      `json:"serverAddr"`
-	Size                  map[string]int      `json:"size"`
-	Status                int64               `json:"status"`
-	StatusText            string              `json:"statusText"`
-	URL                   string              `json:"url"`
-	Text                  string              `json:"text"`
+	AllHeaders            map[string]string      `json:"allHeaders"`
+	Body                  string                 `json:"body"`
+	FrameURL              string                 `json:"frameUrl"`
+	AcceptLanguageHeader  string                 `json:"acceptLanguageHeader"`
+	AcceptLanguageHeaders []string               `json:"acceptLanguageHeaders"`
+	Headers               map[string]string      `json:"headers"`
+	HeadersArray          []map[string]string    `json:"headersArray"`
+	JSON                  string                 `json:"json"`
+	OK                    bool                   `json:"ok"`
+	RequestURL            string                 `json:"requestUrl"`
+	SecurityDetails       common.SecurityDetails `json:"securityDetails"`
+	ServerAddr            common.RemoteAddress   `json:"serverAddr"`
+	Size                  map[string]int         `json:"size"`
+	Status                int64                  `json:"status"`
+	StatusText            string                 `json:"statusText"`
+	URL                   string                 `json:"url"`
+	Text                  string                 `json:"text"`
 }
 
 func TestPageOnResponse(t *testing.T) {
@@ -2574,48 +2575,31 @@ func TestPageOnResponse(t *testing.T) {
 	err = json.Unmarshal([]byte(got.Result().String()), &responses)
 	require.NoError(t, err)
 
+	// Normalize the date
 	for i := range responses {
-		// Normalize any port numbers in the string values to :8080
-		if responses[i].URL != "" {
-			responses[i].URL = regexp.MustCompile(`:\d+`).ReplaceAllString(responses[i].URL, ":8080")
-		}
-		if responses[i].FrameURL != "" {
-			responses[i].FrameURL = regexp.MustCompile(`:\d+`).ReplaceAllString(responses[i].FrameURL, ":8080")
-		}
-		for k, v := range responses[i].AllHeaders {
-			responses[i].AllHeaders[k] = regexp.MustCompile(`:\d+`).ReplaceAllString(v, ":8080")
-
-			// Normalize the date
+		for k := range responses[i].AllHeaders {
 			if strings.Contains(strings.ToLower(k), "date") {
 				responses[i].AllHeaders[k] = "Wed, 29 Jan 2025 09:00:00 GMT"
 			}
 		}
-		for k, v := range responses[i].Headers {
-			responses[i].Headers[k] = regexp.MustCompile(`:\d+`).ReplaceAllString(v, ":8080")
-
-			// Normalize the date
+		for k := range responses[i].Headers {
 			if strings.Contains(strings.ToLower(k), "date") {
 				responses[i].Headers[k] = "Wed, 29 Jan 2025 09:00:00 GMT"
 			}
 		}
 		for k, header := range responses[i].HeadersArray {
-			if header["value"] != "" {
-				responses[i].HeadersArray[k]["value"] = regexp.MustCompile(`:\d+`).ReplaceAllString(header["value"], ":8080")
-			}
-			// Normalize the date
 			if strings.Contains(strings.ToLower(header["name"]), "date") {
 				responses[i].HeadersArray[k]["value"] = "Wed, 29 Jan 2025 09:00:00 GMT"
 			}
 		}
-		for k := range responses[i].ServerAddr {
-			if k == "port" {
-				responses[i].ServerAddr[k] = 8080
-			}
-		}
-		if responses[i].RequestURL != "" {
-			responses[i].RequestURL = regexp.MustCompile(`:\d+`).ReplaceAllString(responses[i].RequestURL, ":8080")
-		}
 	}
+
+	serverURL := tb.http.ServerHTTP.URL
+	host, p, err := net.SplitHostPort(strings.TrimPrefix(serverURL, "http://"))
+	require.NoError(t, err)
+
+	port, err := strconv.ParseInt(p, 10, 64)
+	require.NoError(t, err)
 
 	expected := []response{
 		{
@@ -2625,7 +2609,7 @@ func TestPageOnResponse(t *testing.T) {
 				"date":           "Wed, 29 Jan 2025 09:00:00 GMT",
 			},
 			Body:                  "<!DOCTYPE html>\n<html>\n<head>\n    <link rel=\"stylesheet\" href=\"/style.css\">\n</head>\n<body>\n    <script>fetch('/api', {\n      method: 'POST',\n      headers: {\n        'Content-Type': 'application/json'\n      },\n      body: JSON.stringify({name: 'tester'})\n    })</script>\n</body>\n</html>",
-			FrameURL:              "http://127.0.0.1:8080/home",
+			FrameURL:              tb.url("/home"),
 			AcceptLanguageHeader:  "",
 			AcceptLanguageHeaders: []string{""},
 			Headers: map[string]string{
@@ -2640,13 +2624,13 @@ func TestPageOnResponse(t *testing.T) {
 			},
 			JSON:            "null",
 			OK:              true,
-			RequestURL:      "http://127.0.0.1:8080/home",
-			SecurityDetails: map[string]string(nil),
-			ServerAddr:      map[string]interface{}{"ip_address": "127.0.0.1", "port": 8080},
+			RequestURL:      tb.url("/home"),
+			SecurityDetails: common.SecurityDetails{},
+			ServerAddr:      common.RemoteAddress{IPAddress: host, Port: port},
 			Size:            map[string]int{"body": 286, "headers": 117},
 			Status:          200,
 			StatusText:      "OK",
-			URL:             "http://127.0.0.1:8080/home",
+			URL:             tb.url("/home"),
 			Text:            "<!DOCTYPE html>\n<html>\n<head>\n    <link rel=\"stylesheet\" href=\"/style.css\">\n</head>\n<body>\n    <script>fetch('/api', {\n      method: 'POST',\n      headers: {\n        'Content-Type': 'application/json'\n      },\n      body: JSON.stringify({name: 'tester'})\n    })</script>\n</body>\n</html>",
 		},
 		{
@@ -2656,7 +2640,7 @@ func TestPageOnResponse(t *testing.T) {
 				"date":           "Wed, 29 Jan 2025 09:00:00 GMT",
 			},
 			Body:                  "body { background-color: #f0f0f0; }",
-			FrameURL:              "http://127.0.0.1:8080/home",
+			FrameURL:              tb.url("/home"),
 			AcceptLanguageHeader:  "",
 			AcceptLanguageHeaders: []string{""},
 			Headers: map[string]string{
@@ -2671,13 +2655,13 @@ func TestPageOnResponse(t *testing.T) {
 			},
 			JSON:            "null",
 			OK:              true,
-			RequestURL:      "http://127.0.0.1:8080/style.css",
-			SecurityDetails: map[string]string(nil),
-			ServerAddr:      map[string]interface{}{"ip_address": "127.0.0.1", "port": 8080},
+			RequestURL:      tb.url("/style.css"),
+			SecurityDetails: common.SecurityDetails{},
+			ServerAddr:      common.RemoteAddress{IPAddress: host, Port: port},
 			Size:            map[string]int{"body": 35, "headers": 100},
 			Status:          200,
 			StatusText:      "OK",
-			URL:             "http://127.0.0.1:8080/style.css",
+			URL:             tb.url("/style.css"),
 			Text:            "body { background-color: #f0f0f0; }",
 		},
 		{
@@ -2690,7 +2674,7 @@ func TestPageOnResponse(t *testing.T) {
 				"x-content-type-options":           "nosniff",
 			},
 			Body:                  "Not Found\n",
-			FrameURL:              "http://127.0.0.1:8080/home",
+			FrameURL:              tb.url("/home"),
 			AcceptLanguageHeader:  "",
 			AcceptLanguageHeaders: []string{""},
 			Headers: map[string]string{
@@ -2711,13 +2695,13 @@ func TestPageOnResponse(t *testing.T) {
 			},
 			JSON:            "null",
 			OK:              false,
-			RequestURL:      "http://127.0.0.1:8080/favicon.ico",
-			SecurityDetails: map[string]string(nil),
-			ServerAddr:      map[string]interface{}{"ip_address": "127.0.0.1", "port": 8080},
+			RequestURL:      tb.url("/favicon.ico"),
+			SecurityDetails: common.SecurityDetails{},
+			ServerAddr:      common.RemoteAddress{IPAddress: host, Port: port},
 			Size:            map[string]int{"body": 10, "headers": 229},
 			Status:          404,
 			StatusText:      "Not Found",
-			URL:             "http://127.0.0.1:8080/favicon.ico",
+			URL:             tb.url("/favicon.ico"),
 			Text:            "Not Found\n",
 		},
 		{
@@ -2727,7 +2711,7 @@ func TestPageOnResponse(t *testing.T) {
 				"date":           "Wed, 29 Jan 2025 09:00:00 GMT",
 			},
 			Body:                  "{\"message\": \"Hello tester!\"}",
-			FrameURL:              "http://127.0.0.1:8080/home",
+			FrameURL:              tb.url("/home"),
 			AcceptLanguageHeader:  "",
 			AcceptLanguageHeaders: []string{""},
 			Headers: map[string]string{
@@ -2742,13 +2726,13 @@ func TestPageOnResponse(t *testing.T) {
 			},
 			JSON:            "{\"message\":\"Hello tester!\"}",
 			OK:              true,
-			RequestURL:      "http://127.0.0.1:8080/api",
-			SecurityDetails: map[string]string(nil),
-			ServerAddr:      map[string]interface{}{"ip_address": "127.0.0.1", "port": 8080},
+			RequestURL:      tb.url("/api"),
+			SecurityDetails: common.SecurityDetails{},
+			ServerAddr:      common.RemoteAddress{IPAddress: host, Port: port},
 			Size:            map[string]int{"body": 28, "headers": 108},
 			Status:          200,
 			StatusText:      "OK",
-			URL:             "http://127.0.0.1:8080/api",
+			URL:             tb.url("/api"),
 			Text:            "{\"message\": \"Hello tester!\"}",
 		},
 	}
