@@ -2,11 +2,13 @@ package cmd
 
 import (
 	"encoding/json"
+	"io"
 	"io/fs"
 	"testing"
 	"time"
 
 	"github.com/mstoykov/envconfig"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
@@ -213,7 +215,7 @@ func TestReadDiskConfigWithDefaultFlags(t *testing.T) {
 	memfs := fsext.NewMemMapFs()
 
 	conf := []byte(`{"iterations":1028,"cloud":{"field1":"testvalue"}}`)
-	defaultConfigPath := ".config/loadimpact/k6/config.json"
+	defaultConfigPath := ".config/k6/config.json"
 	require.NoError(t, fsext.WriteFile(memfs, defaultConfigPath, conf, 0o644))
 
 	defaultFlags := state.GetDefaultFlags(".config")
@@ -298,7 +300,7 @@ func TestReadDiskConfigNotJSONContentError(t *testing.T) {
 	memfs := fsext.NewMemMapFs()
 
 	conf := []byte(`bad json format`)
-	defaultConfigPath := ".config/loadimpact/k6/config.json"
+	defaultConfigPath := ".config/k6/config.json"
 	require.NoError(t, fsext.WriteFile(memfs, defaultConfigPath, conf, 0o644))
 
 	gs := &state.GlobalState{
@@ -342,7 +344,7 @@ func TestWriteDiskConfigWithDefaultFlags(t *testing.T) {
 	err := writeDiskConfig(gs, c)
 	require.NoError(t, err)
 
-	finfo, err := memfs.Stat(".config/loadimpact/k6/config.json")
+	finfo, err := memfs.Stat(".config/k6/config.json")
 	require.NoError(t, err)
 	assert.NotEmpty(t, finfo.Size())
 }
@@ -352,7 +354,7 @@ func TestWriteDiskConfigOverwrite(t *testing.T) {
 	memfs := fsext.NewMemMapFs()
 
 	conf := []byte(`{"iterations":1028,"cloud":{"field1":"testvalue"}}`)
-	defaultConfigPath := ".config/loadimpact/k6/config.json"
+	defaultConfigPath := ".config/k6/config.json"
 	require.NoError(t, fsext.WriteFile(memfs, defaultConfigPath, conf, 0o644))
 
 	defaultFlags := state.GetDefaultFlags(".config")
@@ -404,4 +406,49 @@ func TestWriteDiskConfigNoJSONContentError(t *testing.T) {
 	err := writeDiskConfig(gs, c)
 	var serr *json.SyntaxError
 	assert.ErrorAs(t, err, &serr)
+}
+
+func TestMigrateLegacyConfigFileIfAny(t *testing.T) {
+	memfs := fsext.NewMemMapFs()
+
+	conf := []byte(`{"iterations":1028,"cloud":{"field1":"testvalue"}}`)
+	legacyConfigPath := ".config/loadimpact/k6/config.json"
+	fsext.WriteFile(memfs, legacyConfigPath, conf, 0o644)
+
+	logger := logrus.New()
+	logger.SetOutput(io.Discard)
+
+	defaultFlags := state.GetDefaultFlags(".config")
+	gs := &state.GlobalState{
+		FS:              memfs,
+		Flags:           defaultFlags,
+		DefaultFlags:    defaultFlags,
+		UserOSConfigDir: ".config",
+		Logger:          logger,
+	}
+
+	err := migrateLegacyConfigFileIfAny(gs)
+	require.NoError(t, err)
+
+	f, err := fsext.ReadFile(memfs, ".config/k6/config.json")
+	require.NoError(t, err)
+	assert.Equal(t, f, conf)
+
+	_, err = memfs.Stat(legacyConfigPath)
+	assert.ErrorIs(t, err, fs.ErrNotExist)
+}
+
+func TestMigrateLegacyConfigFileIfAnyWhenFileDoesNotExist(t *testing.T) {
+	memfs := fsext.NewMemMapFs()
+
+	defaultFlags := state.GetDefaultFlags(".config")
+	gs := &state.GlobalState{
+		FS:              memfs,
+		Flags:           defaultFlags,
+		DefaultFlags:    defaultFlags,
+		UserOSConfigDir: ".config",
+	}
+
+	err := migrateLegacyConfigFileIfAny(gs)
+	require.NoError(t, err)
 }

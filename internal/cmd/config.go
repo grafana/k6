@@ -124,10 +124,6 @@ func getConfig(flags *pflag.FlagSet) (Config, error) {
 	}, nil
 }
 
-func legacyConfigFilePath(gs *state.GlobalState) string {
-	return filepath.Join(gs.UserOSConfigDir, "loadimpact", "k6", "config.json")
-}
-
 // Reads the configuration file from the supplied filesystem and returns it or
 // an error. The only situation in which an error won't be returned is if the
 // user didn't explicitly specify a config file path and the default config file
@@ -153,6 +149,10 @@ func readDiskConfig(gs *state.GlobalState) (Config, error) {
 		return Config{}, fmt.Errorf("couldn't parse the configuration from %q: %w", gs.Flags.ConfigFilePath, err)
 	}
 	return conf, nil
+}
+
+func legacyConfigFilePath(gs *state.GlobalState) string {
+	return filepath.Join(gs.UserOSConfigDir, "loadimpact", "k6", "config.json")
 }
 
 func readLegacyDiskConfig(gs *state.GlobalState) (Config, error) {
@@ -218,7 +218,7 @@ func getConsolidatedConfig(gs *state.GlobalState, cliConf Config, runnerOpts lib
 	} else if err != nil {
 		return conf, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
 	} else {
-		gs.Logger.Warn("The configuration file has been found on the old path. Please, run again `k6 cloud login` or `k6 login` commands to migrate it to the new path. If you migrated it manually, then remove the old config file.")
+		gs.Logger.Warn("The configuration file has been found on the old path. Please, run again `k6 cloud login` or `k6 login` commands to migrate to the new path. If you already migrated it manually, then remove the file from the old path.\n\n")
 	}
 
 	envConf, err := readEnvConfig(gs.Env)
@@ -330,6 +330,37 @@ func validateScenarioConfig(conf lib.ExecutorConfig, isExecutable func(string) b
 	execFn := conf.GetExec()
 	if !isExecutable(execFn) {
 		return fmt.Errorf("executor %s: function '%s' not found in exports", conf.GetName(), execFn)
+	}
+	return nil
+}
+
+// migrateLegacyConfigFileIfAny moves the configuration file from
+// the old default `~/.config/loadimpact/...` folder
+// to the new `~/.config/k6/...` default folder.
+func migrateLegacyConfigFileIfAny(gs *state.GlobalState) error {
+	fn := func() error {
+		legacyFpath := legacyConfigFilePath(gs)
+		if _, err := gs.FS.Stat(legacyFpath); errors.Is(err, fs.ErrNotExist) {
+			return nil
+		} else if err != nil {
+			return err
+		}
+
+		if err := gs.FS.MkdirAll(filepath.Dir(gs.Flags.ConfigFilePath), 0o755); err != nil {
+			return err
+		}
+
+		err := gs.FS.Rename(legacyFpath, gs.Flags.ConfigFilePath)
+		if err != nil {
+			return err
+		}
+
+		gs.Logger.Infof("Note, the configuration file has been migrated "+
+			"from old default path (%q) to the new version (%q).\n\n", legacyFpath, gs.Flags.ConfigFilePath)
+		return nil
+	}
+	if err := fn(); err != nil {
+		return fmt.Errorf("move from the old to the new configuration's filepath failed: %w", err)
 	}
 	return nil
 }
