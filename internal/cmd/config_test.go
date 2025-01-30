@@ -208,11 +208,12 @@ func TestDeriveAndValidateConfig(t *testing.T) {
 }
 
 func TestReadDiskConfigWithDefaultFlags(t *testing.T) {
+	t.Parallel()
 	memfs := fsext.NewMemMapFs()
 
 	conf := []byte(`{"iterations":1028,"cloud":{"field1":"testvalue"}}`)
 	defaultConfigPath := ".config/loadimpact/k6/config.json"
-	fsext.WriteFile(memfs, defaultConfigPath, conf, 0o644)
+	require.NoError(t, fsext.WriteFile(memfs, defaultConfigPath, conf, 0o644))
 
 	defaultFlags := state.GetDefaultFlags(".config")
 	gs := &state.GlobalState{
@@ -228,10 +229,11 @@ func TestReadDiskConfigWithDefaultFlags(t *testing.T) {
 }
 
 func TestReadDiskConfigCustomFilePath(t *testing.T) {
+	t.Parallel()
 	memfs := fsext.NewMemMapFs()
 
 	conf := []byte(`{"iterations":1028,"cloud":{"field1":"testvalue"}}`)
-	fsext.WriteFile(memfs, "custom-path/config.json", conf, 0o644)
+	require.NoError(t, fsext.WriteFile(memfs, "custom-path/config.json", conf, 0o644))
 
 	defaultFlags := state.GetDefaultFlags(".config")
 	gs := &state.GlobalState{
@@ -249,12 +251,13 @@ func TestReadDiskConfigCustomFilePath(t *testing.T) {
 }
 
 func TestReadDiskConfigNotFoundSilenced(t *testing.T) {
+	t.Parallel()
 	memfs := fsext.NewMemMapFs()
 
 	// Put the file into a different and unexpected directory
 	conf := []byte(`{"iterations":1028,"cloud":{"field1":"testvalue"}}`)
 	defaultConfigPath := ".config/unknown-folder/k6/config.json"
-	fsext.WriteFile(memfs, defaultConfigPath, conf, 0o644)
+	require.NoError(t, fsext.WriteFile(memfs, defaultConfigPath, conf, 0o644))
 
 	defaultFlags := state.GetDefaultFlags(".config")
 	gs := &state.GlobalState{
@@ -268,10 +271,11 @@ func TestReadDiskConfigNotFoundSilenced(t *testing.T) {
 }
 
 func TestReadDiskConfigNotJSONExtension(t *testing.T) {
+	t.Parallel()
 	memfs := fsext.NewMemMapFs()
 
 	conf := []byte(`{"iterations":1028,"cloud":{"field1":"testvalue"}}`)
-	fsext.WriteFile(memfs, "custom-path/config.txt", conf, 0o644)
+	require.NoError(t, fsext.WriteFile(memfs, "custom-path/config.txt", conf, 0o644))
 
 	defaultFlags := state.GetDefaultFlags(".config")
 	gs := &state.GlobalState{
@@ -289,11 +293,12 @@ func TestReadDiskConfigNotJSONExtension(t *testing.T) {
 }
 
 func TestReadDiskConfigNotJSONContentError(t *testing.T) {
+	t.Parallel()
 	memfs := fsext.NewMemMapFs()
 
 	conf := []byte(`bad json format`)
 	defaultConfigPath := ".config/loadimpact/k6/config.json"
-	fsext.WriteFile(memfs, defaultConfigPath, conf, 0o644)
+	require.NoError(t, fsext.WriteFile(memfs, defaultConfigPath, conf, 0o644))
 
 	gs := &state.GlobalState{
 		FS:    memfs,
@@ -304,6 +309,7 @@ func TestReadDiskConfigNotJSONContentError(t *testing.T) {
 }
 
 func TestReadDiskConfigNotFoundErrorWithCustomPath(t *testing.T) {
+	t.Parallel()
 	memfs := fsext.NewMemMapFs()
 
 	defaultFlags := state.GetDefaultFlags(".config")
@@ -320,6 +326,7 @@ func TestReadDiskConfigNotFoundErrorWithCustomPath(t *testing.T) {
 }
 
 func TestWriteDiskConfigWithDefaultFlags(t *testing.T) {
+	t.Parallel()
 	memfs := fsext.NewMemMapFs()
 
 	defaultFlags := state.GetDefaultFlags(".config")
@@ -339,11 +346,12 @@ func TestWriteDiskConfigWithDefaultFlags(t *testing.T) {
 }
 
 func TestWriteDiskConfigOverwrite(t *testing.T) {
+	t.Parallel()
 	memfs := fsext.NewMemMapFs()
 
 	conf := []byte(`{"iterations":1028,"cloud":{"field1":"testvalue"}}`)
 	defaultConfigPath := ".config/loadimpact/k6/config.json"
-	fsext.WriteFile(memfs, defaultConfigPath, conf, 0o644)
+	require.NoError(t, fsext.WriteFile(memfs, defaultConfigPath, conf, 0o644))
 
 	defaultFlags := state.GetDefaultFlags(".config")
 	gs := &state.GlobalState{
@@ -356,7 +364,9 @@ func TestWriteDiskConfigOverwrite(t *testing.T) {
 	err := writeDiskConfig(gs, c)
 	require.NoError(t, err)
 }
+
 func TestWriteDiskConfigCustomPath(t *testing.T) {
+	t.Parallel()
 	memfs := fsext.NewMemMapFs()
 
 	defaultFlags := state.GetDefaultFlags(".config")
@@ -373,6 +383,7 @@ func TestWriteDiskConfigCustomPath(t *testing.T) {
 }
 
 func TestWriteDiskConfigNoJSONContentError(t *testing.T) {
+	t.Parallel()
 	memfs := fsext.NewMemMapFs()
 
 	defaultFlags := state.GetDefaultFlags(".config")
