@@ -8,7 +8,6 @@ import (
 	"image/png"
 	"io"
 	"net/http"
-	"regexp"
 	"runtime"
 	"strconv"
 	"sync/atomic"
@@ -2297,27 +2296,6 @@ func TestPageOnRequest(t *testing.T) {
 	err = json.Unmarshal([]byte(got.Result().String()), &requests)
 	require.NoError(t, err)
 
-	for i := range requests {
-		// Normalize any port numbers in the string values to :8080
-		if requests[i].URL != "" {
-			requests[i].URL = regexp.MustCompile(`:\d+`).ReplaceAllString(requests[i].URL, ":8080")
-		}
-		if requests[i].FrameURL != "" {
-			requests[i].FrameURL = regexp.MustCompile(`:\d+`).ReplaceAllString(requests[i].FrameURL, ":8080")
-		}
-		for k, v := range requests[i].AllHeaders {
-			requests[i].AllHeaders[k] = regexp.MustCompile(`:\d+`).ReplaceAllString(v, ":8080")
-		}
-		for k, v := range requests[i].Headers {
-			requests[i].Headers[k] = regexp.MustCompile(`:\d+`).ReplaceAllString(v, ":8080")
-		}
-		for k, header := range requests[i].HeadersArray {
-			if header["value"] != "" {
-				requests[i].HeadersArray[k]["value"] = regexp.MustCompile(`:\d+`).ReplaceAllString(header["value"], ":8080")
-			}
-		}
-	}
-
 	expected := []request{
 		{
 			AllHeaders: map[string]string{
@@ -2346,25 +2324,25 @@ func TestPageOnRequest(t *testing.T) {
 				"body":    0,
 				"headers": 103,
 			},
-			URL: "http://127.0.0.1:8080/home",
+			URL: tb.url("/home"),
 		},
 		{
 			AllHeaders: map[string]string{
 				"accept-language": "en-US",
-				"referer":         "http://127.0.0.1:8080/home",
+				"referer":         tb.url("/home"),
 				"user-agent":      "some-user-agent",
 			},
-			FrameURL:             "http://127.0.0.1:8080/home",
+			FrameURL:             tb.url("/home"),
 			AcceptLanguageHeader: "en-US",
 			Headers: map[string]string{
 				"Accept-Language": "en-US",
-				"Referer":         "http://127.0.0.1:8080/home",
+				"Referer":         tb.url("/home"),
 				"User-Agent":      "some-user-agent",
 			},
 			HeadersArray: []map[string]string{
 				{"name": "User-Agent", "value": "some-user-agent"},
 				{"name": "Accept-Language", "value": "en-US"},
-				{"name": "Referer", "value": "http://127.0.0.1:8080/home"},
+				{"name": "Referer", "value": tb.url("/home")},
 			},
 			IsNavigationRequest: false,
 			Method:              "GET",
@@ -2375,25 +2353,25 @@ func TestPageOnRequest(t *testing.T) {
 				"body":    0,
 				"headers": 116,
 			},
-			URL: "http://127.0.0.1:8080/style.css",
+			URL: tb.url("/style.css"),
 		},
 		{
 			AllHeaders: map[string]string{
 				"accept-language": "en-US",
 				"content-type":    "application/json",
-				"referer":         "http://127.0.0.1:8080/home",
+				"referer":         tb.url("/home"),
 				"user-agent":      "some-user-agent",
 			},
-			FrameURL:             "http://127.0.0.1:8080/home",
+			FrameURL:             tb.url("/home"),
 			AcceptLanguageHeader: "en-US",
 			Headers: map[string]string{
 				"Accept-Language": "en-US",
 				"Content-Type":    "application/json",
-				"Referer":         "http://127.0.0.1:8080/home",
+				"Referer":         tb.url("/home"),
 				"User-Agent":      "some-user-agent",
 			},
 			HeadersArray: []map[string]string{
-				{"name": "Referer", "value": "http://127.0.0.1:8080/home"},
+				{"name": "Referer", "value": tb.url("/home")},
 				{"name": "User-Agent", "value": "some-user-agent"},
 				{"name": "Accept-Language", "value": "en-US"},
 				{"name": "Content-Type", "value": "application/json"},
@@ -2407,24 +2385,24 @@ func TestPageOnRequest(t *testing.T) {
 				"body":    17,
 				"headers": 143,
 			},
-			URL: "http://127.0.0.1:8080/api",
+			URL: tb.url("/api"),
 		},
 		{
 			AllHeaders: map[string]string{
 				"accept-language": "en-US",
-				"referer":         "http://127.0.0.1:8080/home",
+				"referer":         tb.url("/home"),
 				"user-agent":      "some-user-agent",
 			},
-			FrameURL:             "http://127.0.0.1:8080/home",
+			FrameURL:             tb.url("/home"),
 			AcceptLanguageHeader: "en-US",
 			Headers: map[string]string{
 				"Accept-Language": "en-US",
-				"Referer":         "http://127.0.0.1:8080/home",
+				"Referer":         tb.url("/home"),
 				"User-Agent":      "some-user-agent",
 			},
 			HeadersArray: []map[string]string{
 				{"name": "Accept-Language", "value": "en-US"},
-				{"name": "Referer", "value": "http://127.0.0.1:8080/home"},
+				{"name": "Referer", "value": tb.url("/home")},
 				{"name": "User-Agent", "value": "some-user-agent"},
 			},
 			IsNavigationRequest: false,
@@ -2436,7 +2414,7 @@ func TestPageOnRequest(t *testing.T) {
 				"body":    0,
 				"headers": 118,
 			},
-			URL: "http://127.0.0.1:8080/favicon.ico",
+			URL: tb.url("/favicon.ico"),
 		},
 	}
 
