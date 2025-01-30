@@ -207,16 +207,16 @@ func TestDeriveAndValidateConfig(t *testing.T) {
 	}
 }
 
-func TestReadDiskConfigWithDefault(t *testing.T) {
-	fs := fsext.NewMemMapFs()
+func TestReadDiskConfigWithDefaultFlags(t *testing.T) {
+	memfs := fsext.NewMemMapFs()
 
 	conf := []byte(`{"iterations":1028,"cloud":{"field1":"testvalue"}}`)
 	defaultConfigPath := ".config/loadimpact/k6/config.json"
-	fsext.WriteFile(fs, defaultConfigPath, conf, 0o644)
+	fsext.WriteFile(memfs, defaultConfigPath, conf, 0o644)
 
 	defaultFlags := state.GetDefaultFlags(".config")
 	gs := &state.GlobalState{
-		FS:           fs,
+		FS:           memfs,
 		Flags:        defaultFlags,
 		DefaultFlags: defaultFlags,
 	}
@@ -317,4 +317,77 @@ func TestReadDiskConfigNotFoundErrorWithCustomPath(t *testing.T) {
 	c, err := readDiskConfig(gs)
 	assert.ErrorIs(t, err, fs.ErrNotExist)
 	assert.Empty(t, c)
+}
+
+func TestWriteDiskConfigWithDefaultFlags(t *testing.T) {
+	memfs := fsext.NewMemMapFs()
+
+	defaultFlags := state.GetDefaultFlags(".config")
+	gs := &state.GlobalState{
+		FS:           memfs,
+		Flags:        defaultFlags,
+		DefaultFlags: defaultFlags,
+	}
+
+	c := Config{WebDashboard: null.BoolFrom(true)}
+	err := writeDiskConfig(gs, c)
+	require.NoError(t, err)
+
+	finfo, err := memfs.Stat(".config/loadimpact/k6/config.json")
+	require.NoError(t, err)
+	assert.NotEmpty(t, finfo.Size())
+}
+
+func TestWriteDiskConfigOverwrite(t *testing.T) {
+	memfs := fsext.NewMemMapFs()
+
+	conf := []byte(`{"iterations":1028,"cloud":{"field1":"testvalue"}}`)
+	defaultConfigPath := ".config/loadimpact/k6/config.json"
+	fsext.WriteFile(memfs, defaultConfigPath, conf, 0o644)
+
+	defaultFlags := state.GetDefaultFlags(".config")
+	gs := &state.GlobalState{
+		FS:           memfs,
+		Flags:        defaultFlags,
+		DefaultFlags: defaultFlags,
+	}
+
+	c := Config{WebDashboard: null.BoolFrom(true)}
+	err := writeDiskConfig(gs, c)
+	require.NoError(t, err)
+}
+func TestWriteDiskConfigCustomPath(t *testing.T) {
+	memfs := fsext.NewMemMapFs()
+
+	defaultFlags := state.GetDefaultFlags(".config")
+	gs := &state.GlobalState{
+		FS:           memfs,
+		Flags:        defaultFlags,
+		DefaultFlags: defaultFlags,
+	}
+	gs.Flags.ConfigFilePath = "my-custom-path/config.json"
+
+	c := Config{WebDashboard: null.BoolFrom(true)}
+	err := writeDiskConfig(gs, c)
+	require.NoError(t, err)
+}
+
+func TestWriteDiskConfigNoJSONContentError(t *testing.T) {
+	memfs := fsext.NewMemMapFs()
+
+	defaultFlags := state.GetDefaultFlags(".config")
+	gs := &state.GlobalState{
+		FS:           memfs,
+		Flags:        defaultFlags,
+		DefaultFlags: defaultFlags,
+	}
+
+	c := Config{
+		WebDashboard: null.BoolFrom(true),
+		Options: lib.Options{
+			Cloud: []byte(`invalid-json`),
+		},
+	}
+	err := writeDiskConfig(gs, c)
+	assert.ErrorContains(t, err, "json: error")
 }
