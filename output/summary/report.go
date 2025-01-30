@@ -185,7 +185,7 @@ func populateReportGroup(
 		case isWebVitalsMetric(info.Name):
 			dest.WebVitals[info.Name] = reportMetric
 		default:
-			dest.Miscellaneous[info.Name] = reportMetric
+			dest.Custom[info.Name] = reportMetric
 		}
 	}
 

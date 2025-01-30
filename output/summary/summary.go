@@ -81,7 +81,7 @@ func (o *Output) flushSample(sample metrics.Sample) {
 	// Then, if the extended mode is enabled, the sample data is stored into each group metrics.
 	// However, we need to determine whether the groups tree is within a scenario or not.
 	groupData := o.dataModel.aggregatedGroupData
-	if scenarioName, hasScenario := sample.Tags.Get("scenario"); hasScenario {
+	if scenarioName, hasScenario := sample.Tags.Get("scenario"); hasScenario && scenarioName != "default" {
 		groupData = o.dataModel.groupDataFor(scenarioName)
 		groupData.addSample(sample)
 	}

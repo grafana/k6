@@ -32,7 +32,6 @@ import (
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
 	"go.k6.io/k6/output/summary"
-	"go.k6.io/k6/ui/pb"
 )
 
 // cmdRun handles the `k6 run` sub-command

@@ -66,20 +66,20 @@ type ReportMetrics struct {
 
 	WebSocket map[string]ReportMetric `js:"websocket"`
 
-	// Miscellaneous contains user-defined metric results as well as extensions metrics
-	Miscellaneous map[string]ReportMetric
+	// Custom contains user-defined metric results as well as extensions metrics
+	Custom map[string]ReportMetric
 }
 
 func NewReportMetrics() ReportMetrics {
 	return ReportMetrics{
-		HTTP:          make(map[string]ReportMetric),
-		Execution:     make(map[string]ReportMetric),
-		Network:       make(map[string]ReportMetric),
-		Browser:       make(map[string]ReportMetric),
-		WebVitals:     make(map[string]ReportMetric),
-		Grpc:          make(map[string]ReportMetric),
-		WebSocket:     make(map[string]ReportMetric),
-		Miscellaneous: make(map[string]ReportMetric),
+		HTTP:      make(map[string]ReportMetric),
+		Execution: make(map[string]ReportMetric),
+		Network:   make(map[string]ReportMetric),
+		Browser:   make(map[string]ReportMetric),
+		WebVitals: make(map[string]ReportMetric),
+		Grpc:      make(map[string]ReportMetric),
+		WebSocket: make(map[string]ReportMetric),
+		Custom:    make(map[string]ReportMetric),
 	}
 }
 

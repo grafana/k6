@@ -213,7 +213,7 @@ class ReportBuilder {
 	 * @returns {ReportBuilder}
 	 */
 	addThresholds(thresholds) {
-		if (!thresholds) return this;
+		if (!thresholds || Object.keys(thresholds).length === 0) return this;
 
 		this.sections.push({
 			title: 'THRESHOLDS',
@@ -233,7 +233,6 @@ class ReportBuilder {
 			title: 'TOTAL RESULTS',
 			content: [
 				...this._renderChecks(report.checks),
-				...'\n',
 				...this._renderMetrics(report.metrics),
 			],
 		});
@@ -249,12 +248,14 @@ class ReportBuilder {
 	addGroups(groups) {
 		if (!groups) return this;
 
-		Object.entries(groups).forEach(([groupName, groupData]) => {
-			this.sections.push({
-				title: `GROUP: ${groupName}`,
-				content: this._renderGroupContent(groupData),
+		Object.entries(groups)
+			.sort(([a], [b]) => a.localeCompare(b))
+			.forEach(([groupName, groupData]) => {
+				this.sections.push({
+					title: `GROUP: ${groupName}`,
+					content: this._renderGroupContent(groupData),
+				});
 			});
-		});
 		return this;
 	}
 
@@ -267,12 +268,14 @@ class ReportBuilder {
 	addScenarios(scenarios) {
 		if (!scenarios) return this;
 
-		Object.entries(scenarios).forEach(([scenarioName, scenarioData]) => {
-			this.sections.push({
-				title: `SCENARIO: ${scenarioName}`,
-				content: this._renderScenarioContent(scenarioData),
+		Object.entries(scenarios)
+			.sort(([a], [b]) => a.localeCompare(b))
+			.forEach(([scenarioName, scenarioData]) => {
+				this.sections.push({
+					title: `SCENARIO: ${scenarioName}`,
+					content: this._renderScenarioContent(scenarioData),
+				});
 			});
-		});
 		return this;
 	}
 
@@ -290,7 +293,9 @@ class ReportBuilder {
 				'\n',
 			])
 			.flat()
-			.join('\n');
+			.reduce((acc, curr) => {
+				return (curr === '\n') ? acc + curr : acc + '\n' + curr;
+			}, '');
 	}
 
 	/**
@@ -321,10 +326,9 @@ class ReportBuilder {
 	 */
 	_renderChecks(checks, renderContext) {
 		renderContext = renderContext || this.renderContext;
-		renderContext = renderContext.indentedContext(1);
 
 		return checks
-			? renderChecks(checks, this.formatter, renderContext, this.options)
+			? [...renderChecks(checks, this.formatter, renderContext, this.options), '\n']
 			: [];
 	}
 
@@ -343,6 +347,11 @@ class ReportBuilder {
 			.filter(
 				([_, sectionMetrics]) => Object.keys(sectionMetrics).length > 0,
 			)
+			.reduce(
+				(acc, [sectionName, sectionMetrics]) => (sectionName === "custom")
+					? [[sectionName, sectionMetrics], ...acc]
+					: [...acc, [sectionName, sectionMetrics]]
+				, [])
 			.flatMap(([sectionName, sectionMetrics]) => [
 				renderContext.indent(
 					this.formatter.boldify(sectionName.toUpperCase()),
@@ -353,6 +362,7 @@ class ReportBuilder {
 					renderContext,
 					this.options,
 				),
+				'\n',
 			]);
 	}
 
@@ -403,19 +413,21 @@ class ReportBuilder {
 		renderContext = renderContext.indentedContext(1);
 
 		// Render nested groups recursively
-		return Object.entries(groups).flatMap(([groupName, groupData]) => [
-			renderTitle(`GROUP: ${groupName}`, this.formatter, renderContext, {
-				prefix: subtitlePrefix,
-			}),
-			...this._renderGroupContent(groupData),
-		]);
+		return Object.entries(groups)
+			.sort(([a], [b]) => a.localeCompare(b))
+			.flatMap(([groupName, groupData]) => [
+				renderTitle(`GROUP: ${groupName}`, this.formatter, renderContext, {
+					prefix: subtitlePrefix,
+				}),
+				...this._renderGroupContent(groupData, renderContext),
+			]);
 	}
 
 	// Private rendering methods
 	/**
 	 *
 	 * @param {ReportMetricThresholds} thresholds
-	 * @returns {{}}
+	 * @returns {Record<string, ReportMetric>}
 	 * @private
 	 */
 	_processThresholds(thresholds) {
@@ -529,7 +541,10 @@ class ANSIFormatter {
 	 * @returns {string} Bold text
 	 */
 	boldify(text) {
-		return this.decorate(text, 'white', 'bold');
+		if (!this.options.enableColors) {
+			return text;
+		}
+		return `\u001b[1m${text}\x1b[0m`;
 	}
 }
 
@@ -595,7 +610,7 @@ function renderTitle(
 	options = { prefix: titlePrefix, suffix: '\n' },
 ) {
 	return renderContext.indent(
-		`${options.prefix} ${formatter.boldify(title)} ${options.suffix}`,
+		`${options.prefix} ${formatter.boldify(title)} ${options.suffix || ''}`,
 	);
 }
 
@@ -682,7 +697,7 @@ function renderChecks(checks, formatter, renderContext, options = {}) {
 		: [];
 
 	// Combine metrics and checks
-	return [...checkMetrics, ...renderedChecks];
+	return [...checkMetrics, '\n', ...renderedChecks];
 }
 
 //FIXME (@oleiade): We should clarify the data argument's type and give it a better name and typedef
@@ -759,60 +774,76 @@ function renderThresholds(data, formatter, renderContext, options) {
 	// well as the thresholds results for each expression.
 	const result = [];
 	for (const name of metricNames) {
-		const metric = data.metrics[name];
-		const line = renderSubmetricLine(
+		const parentName = name.split('{', 1)[0];
+		const isSubmetric = name.length > parentName.length;
+		const parentMetricExists = !!data.metrics[parentName];
+
+		const innerContext = (isSubmetric && parentMetricExists)
+			? renderContext.indentedContext()
+			: renderContext;
+
+		const line = renderMetricNameForThresholds(
 			name,
-			metric,
-			summaryInfo,
-			options,
-			formatter,
-			renderContext,
+			parentName,
+			isSubmetric,
+			parentMetricExists,
+			innerContext
 		);
 		result.push(line);
 
+		const metric = data.metrics[name];
 		if (metric.thresholds) {
-			// TODO (@oleiade): make sure the arguments are always ordered consistently across functions (indent, decorate, etc.)
 			const thresholdLines = renderThresholdResults(
-				metric.thresholds,
+				metric,
+				summaryInfo,
 				formatter,
-				renderContext.indentedContext(1),
+				innerContext,
 			);
-			result.push(...thresholdLines);
+			result.push(...thresholdLines, '\n');
 		}
 	}
 
-	return result;
+	return result
 }
 
 /**
  * Renders each threshold result into a formatted set of lines ready for display in the terminal.
  *
- * @param {Object} thresholds - The thresholds to render.
+ * @param {ReportMetric} metric - The metric with the thresholds to render.
+ * @param {SummaryInfo} info - An object containing summary information such as maximum name width and trend columns.
  * @param {ANSIFormatter} formatter - ANSIFormatter used for decorating text.
  * @param {RenderContext} renderContext - The render context to use for text rendering.
  * @returns {string[]} - An array of formatted lines including threshold statuses.
  */
-function renderThresholdResults(thresholds, formatter, renderContext) {
+function renderThresholdResults(
+	metric,
+	info,
+	formatter,
+	renderContext,
+) {
 	const lines = [];
 
-	forEach(thresholds, (_, threshold) => {
+	forEach(metric.thresholds, (_, threshold) => {
 		const isSatisfied = threshold.ok;
 		const statusText = isSatisfied
-			? formatter.decorate('SATISFIED', 'green')
-			: formatter.decorate('UNSATISFIED', 'red');
+			? formatter.decorate(successMark, 'green')
+			: formatter.decorate(failMark, 'red');
 
-		// Extra indentation for threshold lines
-		// Adjusting spacing so that it aligns nicely under the metric line
-		const additionalIndent = isSatisfied ? '    ' : '  ';
 		const sourceText = formatter.decorate(
 			`'${threshold.source}'`,
 			'white',
-			'faint',
 		);
+
+		const metricValueText = renderMetricValueForThresholds(
+			metric,
+			threshold,
+			info,
+			formatter,
+		)
 
 		// Here we push a line describing the threshold's result
 		lines.push(
-			renderContext.indent(statusText + additionalIndent + sourceText),
+			renderContext.indent([statusText, sourceText, metricValueText].join(' ')),
 		);
 	});
 
@@ -859,53 +890,76 @@ function renderMetricLine(
 	return renderContext.indent(dottedName + ' ' + dataPart);
 }
 
-// FIXME (@oleiade): summarizeMetricsOptions needs a better name "DisplayConfig"?
 /**
- * Formats a submetric (metric+tags key/value pairs) line for output.
+ * Formats a metric or submetric line for the thresholds' section output.
  *
- * @param {string} name - name of the submetric
- * @param {ReportMetric} metric - submetric object (submetric really are just a specialized metric with a tags set and a pointer to their parent)
- * @param {SummaryInfo} info - summary information object
- * @param {Options} options - display options
- * @param {ANSIFormatter}  formatter - ANSI formatter
+ * @param {string} name - name of the metric
+ * @param {string} parentName - name of the parent metric
+ * @param {boolean} isSubmetric - whether the metric is a submetric
+ * @param {boolean} parentMetricExists - in case of submetric, whether the parent metric exists
  * @param {RenderContext} renderContext - render context
  * @returns {string} submetric report line in the form: `{submetric name}...: {value} {extra}`
  */
-function renderSubmetricLine(
+function renderMetricNameForThresholds(
 	name,
-	metric,
-	info,
-	options,
-	formatter,
+	parentName,
+	isSubmetric,
+	parentMetricExists,
 	renderContext,
 ) {
-	const { maxNameWidth } = info;
+	// If it's a parent metric, or it's a submetric,
+	// which parent metric is not included in results, we just print the name.
+	if (!isSubmetric || !parentMetricExists) {
+		return renderContext.indent(name);
+	}
 
-	// Compute the trailing dots:
-	// Use `3` as a spacing offset as per original code.
-	let dotsCount =
-		maxNameWidth -
-		strWidth(name) -
-		strWidth(renderContext.indentLevel()) +
-		3;
-	dotsCount = Math.max(1, dotsCount);
-	const dottedName =
-		name +
-		formatter.decorate('.'.repeat(dotsCount) + ':', 'white', 'faint');
+	// Otherwise, we only print the labels.
+	return renderContext.indent(name.substring(parentName.length));
+}
 
-	const dataPart =
-		metric.type === 'trend'
-			? renderTrendData(name, info, formatter)
-			: renderNonTrendData(name, info, formatter);
+/**
+ * Formats the metric's value for the thresholds' section output.
+ *
+ * @param {ReportMetric} metric - the metric
+ * @param {EngineThreshold} threshold - the threshold
+ * @param {SummaryInfo} info - An object containing summary information such as maximum name width and trend columns.
+ * @param {ANSIFormatter} formatter - ANSIFormatter used for decorating text.
+ * @returns {string} metric's value line in the form: `{agg}={value}`
+ */
+function renderMetricValueForThresholds(
+	metric,
+	threshold,
+	info,
+	formatter,
+) {
+	const { trendStats, trendCols, nonTrendValues, nonTrendExtras} = info;
+	const thresholdAgg = threshold.source.split(/[=><]/)[0];
 
-	return renderContext.indent(dottedName + ' ' + dataPart);
+	let value;
+	switch (metric.type) {
+		case 'trend':
+			value = trendCols[metric.name][trendStats.indexOf(thresholdAgg)]
+			break;
+		case 'counter':
+			value = (thresholdAgg === 'count')
+				? nonTrendValues[metric.name]
+				: nonTrendExtras[metric.name][0];
+			break;
+		default:
+			value = nonTrendValues[metric.name];
+	}
+
+	return [
+		formatter.decorate(thresholdAgg, 'white'),
+		formatter.decorate(value, 'cyan')
+	].join('=');
 }
 
 /**
  * Format data for trend metrics.
  */
 function renderTrendData(name, info, formatter) {
-	const { trendStats, trendCols, trendColMaxLens } = info;
+	const {trendStats, trendCols, trendColMaxLens} = info;
 	const cols = trendCols[name];
 
 	return cols
