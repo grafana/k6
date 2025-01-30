@@ -1,17 +1,21 @@
 package cmd
 
 import (
+	"io/fs"
 	"testing"
 	"time"
 
 	"github.com/mstoykov/envconfig"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
+	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/executor"
+	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/lib/types"
 )
 
@@ -201,4 +205,116 @@ func TestDeriveAndValidateConfig(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestReadDiskConfigWithDefault(t *testing.T) {
+	fs := fsext.NewMemMapFs()
+
+	conf := []byte(`{"iterations":1028,"cloud":{"field1":"testvalue"}}`)
+	defaultConfigPath := ".config/loadimpact/k6/config.json"
+	fsext.WriteFile(fs, defaultConfigPath, conf, 0o644)
+
+	defaultFlags := state.GetDefaultFlags(".config")
+	gs := &state.GlobalState{
+		FS:           fs,
+		Flags:        defaultFlags,
+		DefaultFlags: defaultFlags,
+	}
+	c, err := readDiskConfig(gs)
+	require.NoError(t, err)
+
+	assert.Equal(t, c.Iterations.Int64, int64(1028))
+	assert.JSONEq(t, `{"field1":"testvalue"}`, string(c.Cloud))
+}
+
+func TestReadDiskConfigCustomFilePath(t *testing.T) {
+	memfs := fsext.NewMemMapFs()
+
+	conf := []byte(`{"iterations":1028,"cloud":{"field1":"testvalue"}}`)
+	fsext.WriteFile(memfs, "custom-path/config.json", conf, 0o644)
+
+	defaultFlags := state.GetDefaultFlags(".config")
+	gs := &state.GlobalState{
+		FS:           memfs,
+		Flags:        defaultFlags,
+		DefaultFlags: defaultFlags,
+	}
+	gs.Flags.ConfigFilePath = "custom-path/config.json"
+
+	c, err := readDiskConfig(gs)
+	require.NoError(t, err)
+
+	assert.Equal(t, c.Iterations.Int64, int64(1028))
+	assert.JSONEq(t, `{"field1":"testvalue"}`, string(c.Cloud))
+}
+
+func TestReadDiskConfigNotFoundSilenced(t *testing.T) {
+	memfs := fsext.NewMemMapFs()
+
+	// Put the file into a different and unexpected directory
+	conf := []byte(`{"iterations":1028,"cloud":{"field1":"testvalue"}}`)
+	defaultConfigPath := ".config/unknown-folder/k6/config.json"
+	fsext.WriteFile(memfs, defaultConfigPath, conf, 0o644)
+
+	defaultFlags := state.GetDefaultFlags(".config")
+	gs := &state.GlobalState{
+		FS:           memfs,
+		Flags:        defaultFlags,
+		DefaultFlags: defaultFlags,
+	}
+	c, err := readDiskConfig(gs)
+	assert.NoError(t, err)
+	assert.Empty(t, c)
+}
+
+func TestReadDiskConfigNotJSONExtension(t *testing.T) {
+	memfs := fsext.NewMemMapFs()
+
+	conf := []byte(`{"iterations":1028,"cloud":{"field1":"testvalue"}}`)
+	fsext.WriteFile(memfs, "custom-path/config.txt", conf, 0o644)
+
+	defaultFlags := state.GetDefaultFlags(".config")
+	gs := &state.GlobalState{
+		FS:           memfs,
+		DefaultFlags: defaultFlags,
+		Flags:        defaultFlags,
+	}
+	gs.Flags.ConfigFilePath = "custom-path/config.txt"
+
+	c, err := readDiskConfig(gs)
+	require.NoError(t, err)
+
+	assert.Equal(t, c.Iterations.Int64, int64(1028))
+	assert.JSONEq(t, `{"field1":"testvalue"}`, string(c.Cloud))
+}
+
+func TestReadDiskConfigNotJSONContentError(t *testing.T) {
+	memfs := fsext.NewMemMapFs()
+
+	conf := []byte(`bad json format`)
+	defaultConfigPath := ".config/loadimpact/k6/config.json"
+	fsext.WriteFile(memfs, defaultConfigPath, conf, 0o644)
+
+	gs := &state.GlobalState{
+		FS:    memfs,
+		Flags: state.GetDefaultFlags(".config"),
+	}
+	_, err := readDiskConfig(gs)
+	require.ErrorContains(t, err, "couldn't parse")
+}
+
+func TestReadDiskConfigNotFoundErrorWithCustomPath(t *testing.T) {
+	memfs := fsext.NewMemMapFs()
+
+	defaultFlags := state.GetDefaultFlags(".config")
+	gs := &state.GlobalState{
+		FS:           memfs,
+		Flags:        defaultFlags,
+		DefaultFlags: defaultFlags,
+	}
+	gs.Flags.ConfigFilePath = ".config/my-custom-path/k6/config.json"
+
+	c, err := readDiskConfig(gs)
+	assert.ErrorIs(t, err, fs.ErrNotExist)
+	assert.Empty(t, c)
 }
