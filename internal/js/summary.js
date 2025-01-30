@@ -74,7 +74,6 @@ function humanizeValue(val, metric, timeUnit) {
  * @property {boolean} ok - Whether the threshold was satisfied or not.
  */
 
-// FIXME (@oleiade): Could use a better name as it's not really a group in the k6 sense?
 /**
  * @typedef {Object} ReportGroup
  * @property {ReportChecks} checks - The checks report.
@@ -104,15 +103,8 @@ function humanizeValue(val, metric, timeUnit) {
  */
 
 /**
- * @typedef {Object} ReportChecksMetrics
- * @property {ReportMetric[]} total - The total metrics.
- * @property {ReportMetric} success - The successful metrics.
- * @property {ReportMetric} fail - The failed metrics.
- */
-
-/**
  * @typedef {Object} ReportChecks
- * @property {ReportChecksMetrics} metrics - The metrics for checks.
+ * @property {Record<string, ReportMetric>} metrics - The metrics for checks.
  * @property {EngineCheck[]} ordered_checks - The ordered checks.
  */
 
@@ -242,7 +234,7 @@ class ReportBuilder {
 	/**
 	 * Adds groups sections to the report.
 	 *
-	 * @param {Record<string, ReportGroup>} groups
+	 * @param {Record<string, ReportGroup>} groups - The groups to add to the report.
 	 * @returns {ReportBuilder}
 	 */
 	addGroups(groups) {
@@ -311,7 +303,7 @@ class ReportBuilder {
 
 		// Implement threshold rendering logic
 		return renderThresholds(
-			{ metrics: this._processThresholds(thresholds) },
+			this._processThresholds(thresholds),
 			this.formatter,
 			renderContext,
 			this.options,
@@ -333,14 +325,27 @@ class ReportBuilder {
 	}
 
 	/**
-	 * @param {ReportMetrics} metrics
-	 * @param {RenderContext} [renderContext]
+	 * @param {ReportMetrics} metrics - The metrics to render.
+	 * @param {RenderContext} [renderContext] - The render context to use for text rendering.
 	 * @returns {string[]}
 	 * @private
 	 */
 	_renderMetrics(metrics, renderContext) {
 		renderContext = renderContext || this.renderContext;
 		renderContext = renderContext.indentedContext(1);
+
+		// Collect all metrics into a single object, so we can precompute all formatting information
+		const allMetrics = Object.entries(metrics).reduce((acc, [_, metrics]) => {
+			Object.assign(acc, metrics);
+			return acc;
+		}, {});
+
+		// Precompute all formatting information
+		const summaryInfo = computeSummaryInfo(
+			allMetrics,
+			renderContext,
+			this.options,
+		);
 
 		// Implement metrics rendering logic
 		return Object.entries(metrics)
@@ -357,7 +362,8 @@ class ReportBuilder {
 					this.formatter.boldify(sectionName.toUpperCase()),
 				),
 				...renderMetrics(
-					{ metrics: sectionMetrics },
+					sectionMetrics,
+					summaryInfo,
 					this.formatter,
 					renderContext,
 					this.options,
@@ -368,7 +374,7 @@ class ReportBuilder {
 
 	/**
 	 * @param {ReportGroup} group - The group data to render.
-	 * @param {RenderContext} [renderContext]
+	 * @param {RenderContext} [renderContext] - The render context to use for text rendering.
 	 * @returns {string[]}
 	 * @private
 	 */
@@ -384,8 +390,8 @@ class ReportBuilder {
 	}
 
 	/**
-	 * @param {ReportGroup} scenarioData
-	 * @param {RenderContext} [renderContext]
+	 * @param {ReportGroup} scenarioData - The scenario data to render.
+	 * @param {RenderContext} [renderContext] - The render context to use for text rendering.
 	 * @returns {string[]}
 	 * @private
 	 */
@@ -403,8 +409,8 @@ class ReportBuilder {
 	}
 
 	/**
-	 * @param {Record<string, ReportGroup>} groups
-	 * @param {RenderContext} [renderContext]
+	 * @param {Record<string, ReportGroup>} groups - The nested groups data to render.
+	 * @param {RenderContext} [renderContext] - The render context to use for text rendering.
 	 * @returns {string[]}
 	 * @private
 	 */
@@ -418,6 +424,7 @@ class ReportBuilder {
 			.flatMap(([groupName, groupData]) => [
 				renderTitle(`GROUP: ${groupName}`, this.formatter, renderContext, {
 					prefix: subtitlePrefix,
+					suffix: '\n',
 				}),
 				...this._renderGroupContent(groupData, renderContext),
 			]);
@@ -426,7 +433,7 @@ class ReportBuilder {
 	// Private rendering methods
 	/**
 	 *
-	 * @param {ReportMetricThresholds} thresholds
+	 * @param {ReportMetricThresholds} thresholds - The thresholds data to render.
 	 * @returns {Record<string, ReportMetric>}
 	 * @private
 	 */
@@ -499,6 +506,7 @@ class RenderContext {
 class ANSIFormatter {
 	/**
 	 * Constructs an ANSIFormatter with configurable color and styling options
+	 *
 	 * @param {Object} options - Configuration options for formatting
 	 * @param {boolean} [options.enableColors=true] - Whether to enable color output
 	 */
@@ -511,6 +519,7 @@ class ANSIFormatter {
 
 	/**
 	 * Decorates text with ANSI color and style.
+	 *
 	 * @param {string} text - The text to decorate.
 	 * @param {ANSIColor} color - The ANSI color to apply.
 	 * @param {...ANSIStyle} styles - optional additional styles to apply.
@@ -537,6 +546,7 @@ class ANSIFormatter {
 
 	/**
 	 * Applies bold styling to text
+	 *
 	 * @param {string} text - Text to make bold
 	 * @returns {string} Bold text
 	 */
@@ -688,48 +698,53 @@ function renderChecks(checks, formatter, renderContext, options = {}) {
 		})
 		.map((check) => renderCheck(check, formatter, renderContext));
 
+	// Precompute all formatting information
+	const summaryInfo = computeSummaryInfo(
+		checks.metrics,
+		renderContext,
+		options,
+	);
+
 	// Render metrics for checks if they exist
 	const checkMetrics = checks.metrics
-		? renderMetrics({ metrics: checks.metrics }, formatter, renderContext, {
-				...options,
-				sortByName: false,
-			})
+		? renderMetrics(checks.metrics, summaryInfo, formatter, renderContext, {
+			...options,
+			sortByName: false,
+		})
 		: [];
 
 	// Combine metrics and checks
 	return [...checkMetrics, '\n', ...renderedChecks];
 }
 
-//FIXME (@oleiade): We should clarify the data argument's type and give it a better name and typedef
 /**
  * Summarizes metrics into an array of formatted lines ready to be printed to stdout.
  *
- * @param {ReportChecks} data - The data object containing metrics.
+ * @param {Record<string, ReportMetric>} metrics - The data object containing metrics.
+ * @param {SummaryInfo} summaryInfo - An object containing summary information such as maximum name width and trend columns.
  * @param {ANSIFormatter} formatter - An ANSIFormatter function for ANSI colors.
  * @param {RenderContext} renderContext - The render context to use for text rendering.
  * @param {Options} options - Display options merged with defaultOptions.
  * @returns {string[]}
  */
-function renderMetrics(data, formatter, renderContext, options) {
+function renderMetrics(
+	metrics,
+	summaryInfo,
+	formatter,
+	renderContext,
+	options,
+) {
 	// Extract all metric names
-	let metricNames = Object.keys(data.metrics);
+	let metricNames = Object.keys(metrics);
 
 	// If sorting by name is required, do it now
 	if (options.sortByName) {
 		metricNames = sortMetricsByName(metricNames);
 	}
 
-	// Precompute all formatting information
-	const summaryInfo = computeSummaryInfo(
-		metricNames,
-		data,
-		renderContext,
-		options,
-	);
-
 	// Format each metric line
 	return metricNames.map((name) => {
-		const metric = data.metrics[name];
+		const metric = metrics[name];
 		return renderMetricLine(
 			name,
 			metric,
@@ -744,28 +759,22 @@ function renderMetrics(data, formatter, renderContext, options) {
 /**
  * Renders each thresholds results into a formatted set of lines ready for display in the terminal.
  *
- * Thresholds are rendered in the format:
- * {metric/submetric}...: {value} {extra}
- *  {SATISFIED|UNSATISFIED} {source}
- *  //... additional threshold lines
- *
- * @param {ReportData} data - The data containing metrics.
+ * @param {Record<string, ReportMetric>} metrics - The data object containing metrics.
  * @param {ANSIFormatter} formatter - ANSI formatter used for decorating text.
  * @param {RenderContext} renderContext - The render context to use for text rendering.
  * @param {Object} options - Options merged with defaults.
  * @returns {string[]} - Array of formatted lines including threshold statuses.
  */
-function renderThresholds(data, formatter, renderContext, options) {
+function renderThresholds(metrics, formatter, renderContext, options) {
 	// Extract and optionally sort metric names
-	let metricNames = Object.keys(data.metrics);
+	let metricNames = Object.keys(metrics);
 	if (options.sortByName) {
 		metricNames = sortMetricsByName(metricNames);
 	}
 
 	// Precompute all formatting information
 	const summaryInfo = computeSummaryInfo(
-		metricNames,
-		data,
+		metrics,
 		renderContext,
 		options,
 	);
@@ -776,7 +785,7 @@ function renderThresholds(data, formatter, renderContext, options) {
 	for (const name of metricNames) {
 		const parentName = name.split('{', 1)[0];
 		const isSubmetric = name.length > parentName.length;
-		const parentMetricExists = !!data.metrics[parentName];
+		const parentMetricExists = !!metrics[parentName];
 
 		const innerContext = (isSubmetric && parentMetricExists)
 			? renderContext.indentedContext()
@@ -791,7 +800,7 @@ function renderThresholds(data, formatter, renderContext, options) {
 		);
 		result.push(line);
 
-		const metric = data.metrics[name];
+		const metric = metrics[name];
 		if (metric.thresholds) {
 			const thresholdLines = renderThresholdResults(
 				metric,
@@ -810,14 +819,14 @@ function renderThresholds(data, formatter, renderContext, options) {
  * Renders each threshold result into a formatted set of lines ready for display in the terminal.
  *
  * @param {ReportMetric} metric - The metric with the thresholds to render.
- * @param {SummaryInfo} info - An object containing summary information such as maximum name width and trend columns.
+ * @param {SummaryInfo} summaryInfo - An object containing summary information such as maximum name width and trend columns.
  * @param {ANSIFormatter} formatter - ANSIFormatter used for decorating text.
  * @param {RenderContext} renderContext - The render context to use for text rendering.
  * @returns {string[]} - An array of formatted lines including threshold statuses.
  */
 function renderThresholdResults(
 	metric,
-	info,
+	summaryInfo,
 	formatter,
 	renderContext,
 ) {
@@ -837,7 +846,7 @@ function renderThresholdResults(
 		const metricValueText = renderMetricValueForThresholds(
 			metric,
 			threshold,
-			info,
+			summaryInfo,
 			formatter,
 		)
 
@@ -893,12 +902,12 @@ function renderMetricLine(
 /**
  * Formats a metric or submetric line for the thresholds' section output.
  *
- * @param {string} name - name of the metric
- * @param {string} parentName - name of the parent metric
- * @param {boolean} isSubmetric - whether the metric is a submetric
- * @param {boolean} parentMetricExists - in case of submetric, whether the parent metric exists
- * @param {RenderContext} renderContext - render context
- * @returns {string} submetric report line in the form: `{submetric name}...: {value} {extra}`
+ * @param {string} name - The name of the metric
+ * @param {string} parentName - The name of the parent metric
+ * @param {boolean} isSubmetric - Whether the metric is a submetric
+ * @param {boolean} parentMetricExists - In case of submetric, whether the parent metric exists
+ * @param {RenderContext} renderContext - The render context to use for text rendering.
+ * @returns {string} - The metric name report line
  */
 function renderMetricNameForThresholds(
 	name,
@@ -920,11 +929,11 @@ function renderMetricNameForThresholds(
 /**
  * Formats the metric's value for the thresholds' section output.
  *
- * @param {ReportMetric} metric - the metric
- * @param {EngineThreshold} threshold - the threshold
+ * @param {ReportMetric} metric - The metric for which value will be rendered.
+ * @param {EngineThreshold} threshold - The threshold to use for rendering.
  * @param {SummaryInfo} info - An object containing summary information such as maximum name width and trend columns.
  * @param {ANSIFormatter} formatter - ANSIFormatter used for decorating text.
- * @returns {string} metric's value line in the form: `{agg}={value}`
+ * @returns {string} - The metric's value line in the form: `{agg}={value}`
  */
 function renderMetricValueForThresholds(
 	metric,
@@ -1039,13 +1048,12 @@ function renderTrendValue(value, stat, metric, options) {
  * @property {number} maxNonTrendValueLen - The maximum non-trend value length.
  * @property {number[]} nonTrendExtraMaxLens - The non-trend extra maximum lengths.
  *
- * @param {string[]} metricNames
- * @param {ReportData} data - The data object containing metrics.
+ * @param {Record<string, ReportMetric>} metrics - The data object containing metrics.
  * @param {RenderContext} renderContext - The render context to use for text rendering.
- * @param {Options} options
+ * @param {Options} options - Display options merged with defaultOptions.
  * @returns {SummaryInfo}
  */
-function computeSummaryInfo(metricNames, data, renderContext, options) {
+function computeSummaryInfo(metrics, renderContext, options) {
 	const trendStats = options.summaryTrendStats;
 	const numTrendColumns = trendStats.length;
 
@@ -1060,8 +1068,14 @@ function computeSummaryInfo(metricNames, data, renderContext, options) {
 	// Initialize tracking arrays for trend widths
 	const trendColMaxLens = new Array(numTrendColumns).fill(0);
 
+	let metricNames = Object.keys(metrics);
+	// If sorting by name is required, do it now
+	if (options.sortByName) {
+		metricNames = sortMetricsByName(metricNames);
+	}
+
 	for (const name of metricNames) {
-		const metric = data.metrics[name];
+		const metric = metrics[name];
 		const displayName = renderContext.indent(
 			name + renderMetricDisplayName(name),
 		);
@@ -1121,7 +1135,7 @@ function computeSummaryInfo(metricNames, data, renderContext, options) {
 }
 
 /**
- * Sorts metrics by name, keeping submetrics grouped with their parent metrics.
+ * Sorts metrics by name, keeping sub-metrics grouped with their parent metrics.
  *
  * @param {string[]} metricNames - The metric names to sort.
  * @returns {string[]} - The sorted metric names.
