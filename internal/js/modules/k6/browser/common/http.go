@@ -387,8 +387,8 @@ func (r *Request) URL() string {
 
 // RemoteAddress contains informationa about a remote target.
 type RemoteAddress struct {
-	IPAddress string `json:"ipAddress"`
-	Port      int64  `json:"port"`
+	IPAddress string `json:"ipAddress" js:"ipAddress"`
+	Port      int64  `json:"port" js:"port"`
 }
 
 // SecurityDetails contains informationa about the security details of a TLS connection.
