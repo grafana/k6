@@ -305,7 +305,8 @@ func TestReadDiskConfigNotJSONContentError(t *testing.T) {
 		Flags: state.GetDefaultFlags(".config"),
 	}
 	_, err := readDiskConfig(gs)
-	require.ErrorContains(t, err, "couldn't parse")
+	var serr *json.SyntaxError
+	assert.ErrorAs(t, err, &serr)
 }
 
 func TestReadDiskConfigNotFoundErrorWithCustomPath(t *testing.T) {
@@ -400,5 +401,6 @@ func TestWriteDiskConfigNoJSONContentError(t *testing.T) {
 		},
 	}
 	err := writeDiskConfig(gs, c)
-	assert.ErrorContains(t, err, "json: error")
+	var serr *json.SyntaxError
+	assert.ErrorAs(t, err, &serr)
 }
