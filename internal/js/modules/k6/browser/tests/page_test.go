@@ -9,7 +9,9 @@ import (
 	"io"
 	"net/http"
 	"runtime"
+	"slices"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -2429,30 +2431,12 @@ func TestPageOnRequest(t *testing.T) {
 		}
 		assert.NotEqual(t, -1, i, "failed to find expected request with URL %s", req.URL)
 
-		assert.Equal(t, expected[i].AllHeaders, req.AllHeaders, "AllHeaders mismatch")
-		assert.Equal(t, expected[i].FrameURL, req.FrameURL, "FrameUrl mismatch")
-		assert.Equal(t, expected[i].AcceptLanguageHeader, req.AcceptLanguageHeader, "AcceptLanguageHeader mismatch")
-		assert.Equal(t, expected[i].Headers, req.Headers, "Headers mismatch")
-		assert.Equal(t, expected[i].IsNavigationRequest, req.IsNavigationRequest, "IsNavigationRequest mismatch")
-		assert.Equal(t, expected[i].Method, req.Method, "Method mismatch")
-		assert.Equal(t, expected[i].PostData, req.PostData, "PostData mismatch")
-		assert.Equal(t, expected[i].PostDataBuffer, req.PostDataBuffer, "PostDataBuffer mismatch")
-		assert.Equal(t, expected[i].ResourceType, req.ResourceType, "ResourceType mismatch")
-		assert.Equal(t, expected[i].Size, req.Size, "Size mismatch")
-		assert.Equal(t, expected[i].URL, req.URL, "URL mismatch")
-
-		// Compare HeadersArray elements one by one
-		assert.Equal(t, len(expected[i].HeadersArray), len(req.HeadersArray), "HeadersArray length mismatch")
-		for _, expectedHeader := range expected[i].HeadersArray {
-			found := false
-			for _, actualHeader := range req.HeadersArray {
-				if expectedHeader["name"] == actualHeader["name"] && expectedHeader["value"] == actualHeader["value"] {
-					found = true
-					break
-				}
-			}
-			assert.True(t, found, fmt.Sprintf("Expected header {name: %s, value: %s} not found in actual headers", expectedHeader["name"], expectedHeader["value"]))
+		sortByName := func(m1, m2 map[string]string) int {
+			return strings.Compare(m1["name"], m2["name"])
 		}
+		slices.SortFunc(req.HeadersArray, sortByName)
+		slices.SortFunc(expected[i].HeadersArray, sortByName)
+		assert.Equal(t, expected[i], req)
 	}
 }
 
