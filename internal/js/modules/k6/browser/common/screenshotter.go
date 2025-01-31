@@ -269,7 +269,6 @@ func getViewPortDimensions(ctx context.Context, sess session, logger *log.Logger
 	return visualViewportScale, visualViewportPageX, visualViewportPageY, nil
 }
 
-//nolint:funlen
 func (s *screenshotter) screenshotElement(h *ElementHandle, opts *ElementHandleScreenshotOptions) ([]byte, error) {
 	format := opts.Format
 	viewportSize, originalViewportSize, err := s.originalViewportSize(h.frame.page)

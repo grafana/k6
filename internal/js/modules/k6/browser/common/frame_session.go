@@ -225,7 +225,7 @@ func (fs *FrameSession) initDomains() error {
 	return nil
 }
 
-//nolint:funlen,cyclop
+//nolint:cyclop
 func (fs *FrameSession) initEvents() {
 	fs.logger.Debugf("NewFrameSession:initEvents",
 		"sid:%v tid:%v", fs.session.ID(), fs.targetID)
