@@ -55,8 +55,8 @@ func NewReaderFrom(r io.Reader, options options) (*Reader, error) {
 		options: options,
 	}
 
-	headerEnabled := options.AsObjects.Valid && options.AsObjects.Bool
-	if headerEnabled {
+	asObjectsEnabled := options.AsObjects.Valid && options.AsObjects.Bool
+	if asObjectsEnabled {
 		header, err := csvParser.Read()
 		if err != nil {
 			return nil, fmt.Errorf("failed to read the first line; reason: %w", err)
@@ -134,14 +134,14 @@ func validateOptions(options options) error {
 		fromLineSet      = options.FromLine.Valid
 		toLineSet        = options.ToLine.Valid
 		skipFirstLineSet = options.SkipFirstLine
-		headerEnabled    = options.AsObjects.Valid && options.AsObjects.Bool
+		asObjectsEnabled = options.AsObjects.Valid && options.AsObjects.Bool
 	)
 
-	if headerEnabled && skipFirstLineSet {
+	if asObjectsEnabled && skipFirstLineSet {
 		return fmt.Errorf("the 'header' option cannot be enabled when 'skipFirstLine' is true")
 	}
 
-	if headerEnabled && fromLineSet && options.FromLine.Int64 > 0 {
+	if asObjectsEnabled && fromLineSet && options.FromLine.Int64 > 0 {
 		return fmt.Errorf("the 'header' option cannot be enabled when 'fromLine' is set to a value greater than 0")
 	}
 
