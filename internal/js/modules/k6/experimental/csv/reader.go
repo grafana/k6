@@ -106,10 +106,10 @@ func (r *Reader) Read() (any, error) {
 
 	r.currentLine.Add(1)
 
-	// If header option is enabled, return a map of the record.
+	// If option is enabled, return a map of the record.
 	if r.options.AsObjects.Valid && r.options.AsObjects.Bool {
 		if r.header == nil {
-			return nil, fmt.Errorf("the 'header' option is enabled, but no header was found")
+			return nil, fmt.Errorf("the '' option is enabled, but no header was found")
 		}
 
 		if len(record) != len(r.header) {
