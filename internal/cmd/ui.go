@@ -164,7 +164,6 @@ func printExecutionDescription(
 	}
 }
 
-//nolint:funlen
 func renderMultipleBars(
 	nocolor, isTTY, goBack bool, maxLeft, termWidth, widthDelta int, pbs []*pb.ProgressBar,
 ) (string, int) {

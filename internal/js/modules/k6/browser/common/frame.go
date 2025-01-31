@@ -1888,8 +1888,6 @@ func (f *Frame) WaitForLoadState(state string, opts sobek.Value) error {
 }
 
 // WaitForNavigation waits for the given navigation lifecycle event to happen.
-//
-//nolint:funlen
 func (f *Frame) WaitForNavigation(opts *FrameWaitForNavigationOptions) (*Response, error) {
 	f.log.Debugf("Frame:WaitForNavigation",
 		"fid:%s furl:%s", f.ID(), f.URL())
