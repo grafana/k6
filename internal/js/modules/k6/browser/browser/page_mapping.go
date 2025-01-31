@@ -448,6 +448,10 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 			mapp: mapRequestEvent,
 			wait: false,
 		},
+		common.EventPageResponseCalled: {
+			mapp: mapResponseEvent,
+			wait: false,
+		},
 	}
 
 	return func(eventName common.PageOnEventName, handleEvent sobek.Callable) error {

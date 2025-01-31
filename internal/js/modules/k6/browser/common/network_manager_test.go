@@ -217,6 +217,8 @@ func (m *EventInterceptorMock) urlTagName(_ string, _ string) (string, bool) {
 
 func (m *EventInterceptorMock) onRequest(request *Request) {}
 
+func (m *EventInterceptorMock) onResponse(response *Response) {}
+
 func TestNetworkManagerEmitRequestResponseMetricsTimingSkew(t *testing.T) {
 	t.Parallel()
 
