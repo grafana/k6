@@ -151,6 +151,28 @@ func readDiskConfig(gs *state.GlobalState) (Config, error) {
 	return conf, nil
 }
 
+func legacyConfigFilePath(gs *state.GlobalState) string {
+	return filepath.Join(gs.UserOSConfigDir, "loadimpact", "k6", "config.json")
+}
+
+func readLegacyDiskConfig(gs *state.GlobalState) (Config, error) {
+	// Try to see if the legacy config exists in the supplied filesystem
+	legacyPath := filepath.Join(gs.UserOSConfigDir, "loadimpact", "k6", "config.json")
+	if _, err := gs.FS.Stat(legacyPath); err != nil {
+		return Config{}, err
+	}
+	data, err := fsext.ReadFile(gs.FS, legacyPath)
+	if err != nil {
+		return Config{}, fmt.Errorf("couldn't load the configuration from %q: %w", legacyPath, err)
+	}
+	var conf Config
+	err = json.Unmarshal(data, &conf)
+	if err != nil {
+		return Config{}, fmt.Errorf("couldn't parse the configuration from %q: %w", legacyPath, err)
+	}
+	return conf, nil
+}
+
 // Serializes the configuration to a JSON file and writes it in the supplied
 // location on the supplied filesystem
 func writeDiskConfig(gs *state.GlobalState, conf Config) error {
@@ -187,10 +209,20 @@ func readEnvConfig(envMap map[string]string) (Config, error) {
 // TODO: add better validation, more explicit default values and improve consistency between formats
 // TODO: accumulate all errors and differentiate between the layers?
 func getConsolidatedConfig(gs *state.GlobalState, cliConf Config, runnerOpts lib.Options) (conf Config, err error) {
-	fileConf, err := readDiskConfig(gs)
-	if err != nil {
+	fileConf, err := readLegacyDiskConfig(gs)
+	if errors.Is(err, fs.ErrNotExist) { //nolint:gocritic
+		fileConf, err = readDiskConfig(gs)
+		if err != nil {
+			return conf, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
+		}
+	} else if err != nil {
 		return conf, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
+	} else {
+		gs.Logger.Warn("The configuration file has been found on the old path. " +
+			"Please, run again `k6 cloud login` or `k6 login` commands to migrate to the new path. " +
+			"If you already migrated it manually, then remove the file from the old path.\n\n")
 	}
+
 	envConf, err := readEnvConfig(gs.Env)
 	if err != nil {
 		return conf, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
@@ -300,6 +332,37 @@ func validateScenarioConfig(conf lib.ExecutorConfig, isExecutable func(string) b
 	execFn := conf.GetExec()
 	if !isExecutable(execFn) {
 		return fmt.Errorf("executor %s: function '%s' not found in exports", conf.GetName(), execFn)
+	}
+	return nil
+}
+
+// migrateLegacyConfigFileIfAny moves the configuration file from
+// the old default `~/.config/loadimpact/...` folder
+// to the new `~/.config/k6/...` default folder.
+func migrateLegacyConfigFileIfAny(gs *state.GlobalState) error {
+	fn := func() error {
+		legacyFpath := legacyConfigFilePath(gs)
+		if _, err := gs.FS.Stat(legacyFpath); errors.Is(err, fs.ErrNotExist) {
+			return nil
+		} else if err != nil {
+			return err
+		}
+
+		if err := gs.FS.MkdirAll(filepath.Dir(gs.Flags.ConfigFilePath), 0o755); err != nil {
+			return err
+		}
+
+		err := gs.FS.Rename(legacyFpath, gs.Flags.ConfigFilePath)
+		if err != nil {
+			return err
+		}
+
+		gs.Logger.Infof("Note, the configuration file has been migrated "+
+			"from old default path (%q) to the new version (%q).\n\n", legacyFpath, gs.Flags.ConfigFilePath)
+		return nil
+	}
+	if err := fn(); err != nil {
+		return fmt.Errorf("move from the old to the new configuration's filepath failed: %w", err)
 	}
 	return nil
 }
