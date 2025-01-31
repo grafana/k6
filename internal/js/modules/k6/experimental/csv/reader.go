@@ -21,8 +21,9 @@ type Reader struct {
 	// options holds the reader's options.
 	options options
 
-	// header stores the column names when header option is enabled.
-	header []string
+	// columnNames stores the column names when the asObjects option is enabled
+	// in order to be able to map each row values to their corresponding column.
+	columnNames []string
 }
 
 // NewReaderFrom creates a new CSV reader from the provided io.Reader.
@@ -60,7 +61,7 @@ func NewReaderFrom(r io.Reader, options options) (*Reader, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to read the first line; reason: %w", err)
 		}
-		reader.header = header
+		reader.columnNames = header
 		reader.currentLine.Add(1)
 	}
 
@@ -106,19 +107,19 @@ func (r *Reader) Read() (any, error) {
 
 	r.currentLine.Add(1)
 
-	// If option is enabled, return a map of the record.
+	// If header option is enabled, return a map of the record.
 	if r.options.AsObjects.Valid && r.options.AsObjects.Bool {
-		if r.header == nil {
-			return nil, fmt.Errorf("the '' option is enabled, but no header was found")
+		if r.columnNames == nil {
+			return nil, fmt.Errorf("the 'asObjects' option is enabled, but no header was found")
 		}
 
-		if len(record) != len(r.header) {
-			return nil, fmt.Errorf("record length (%d) doesn't match header length (%d)", len(record), len(r.header))
+		if len(record) != len(r.columnNames) {
+			return nil, fmt.Errorf("record length (%d) doesn't match header length (%d)", len(record), len(r.columnNames))
 		}
 
 		recordMap := make(map[string]string)
 		for i, value := range record {
-			recordMap[r.header[i]] = value
+			recordMap[r.columnNames[i]] = value
 		}
 
 		return recordMap, nil

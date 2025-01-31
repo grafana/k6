@@ -79,8 +79,8 @@ func TestNewReaderFrom(t *testing.T) {
 			options{AsObjects: null.NewBool(true, true)},
 		)
 		require.NoError(t, err)
-		assert.NotNil(t, r.header)
-		assert.Equal(t, []string{"lastname", "firstname", "composer", "born", "died", "dates"}, r.header)
+		assert.NotNil(t, r.columnNames)
+		assert.Equal(t, []string{"lastname", "firstname", "composer", "born", "died", "dates"}, r.columnNames)
 		assert.Equal(t, r.currentLine.Load(), int64(1))
 	})
 

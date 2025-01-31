@@ -99,7 +99,7 @@ func (mi *ModuleInstance) Parse(file sobek.Value, options sobek.Value) *sobek.Pr
 
 	rt := mi.vu.Runtime()
 
-	// 1. Make sure the Sobek object is a fs.File (sobek operation)
+	// 1. Make sure the Sobek object is a fs.File (Sobek operation)
 	var fileObj fs.File
 	if err := mi.vu.Runtime().ExportTo(file, &fileObj); err != nil {
 		reject(fmt.Errorf("first argument expected to be a fs.File instance, got %T instead", file))
