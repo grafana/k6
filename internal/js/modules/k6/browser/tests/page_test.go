@@ -2422,13 +2422,7 @@ func TestPageOnRequest(t *testing.T) {
 
 	// Compare each request one by one for better test failure visibility
 	for _, req := range requests {
-		i := -1
-		for j, e := range expected {
-			if req.URL == e.URL {
-				i = j
-				break
-			}
-		}
+		i := slices.IndexFunc(expected, func(r request) bool { return req.URL == r.URL })
 		assert.NotEqual(t, -1, i, "failed to find expected request with URL %s", req.URL)
 
 		sortByName := func(m1, m2 map[string]string) int {
