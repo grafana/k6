@@ -2737,45 +2737,16 @@ func TestPageOnResponse(t *testing.T) {
 		},
 	}
 
-	// Compare each request one by one for better test failure visibility
+	// Compare each response one by one for better test failure visibility
 	for _, resp := range responses {
-		i := -1
-		for j, e := range expected {
-			if resp.RequestURL == e.RequestURL {
-				i = j
-				break
-			}
-		}
-		assert.NotEqual(t, -1, i, "failed to find expected response with request URL %s", resp.RequestURL)
+		i := slices.IndexFunc(expected, func(r response) bool { return resp.URL == r.URL })
+		assert.NotEqual(t, -1, i, "failed to find expected request with URL %s", resp.URL)
 
-		assert.Equal(t, expected[i].AllHeaders, resp.AllHeaders, "AllHeaders mismatch")
-		assert.Equal(t, expected[i].Body, resp.Body, "Body mismatch")
-		assert.Equal(t, expected[i].FrameURL, resp.FrameURL, "FrameUrl mismatch")
-		assert.Equal(t, expected[i].AcceptLanguageHeader, resp.AcceptLanguageHeader, "AcceptLanguageHeader mismatch")
-		assert.Equal(t, expected[i].AcceptLanguageHeaders, resp.AcceptLanguageHeaders, "AcceptLanguageHeaders mismatch")
-		assert.Equal(t, expected[i].Headers, resp.Headers, "Headers mismatch")
-		assert.Equal(t, expected[i].JSON, resp.JSON, "JSON mismatch")
-		assert.Equal(t, expected[i].OK, resp.OK, "OK mismatch")
-		assert.Equal(t, expected[i].RequestURL, resp.RequestURL, "RequestURL mismatch")
-		assert.Equal(t, expected[i].SecurityDetails, resp.SecurityDetails, "SecurityDetails mismatch")
-		assert.Equal(t, expected[i].ServerAddr, resp.ServerAddr, "ServerAddr mismatch")
-		assert.Equal(t, expected[i].Size, resp.Size, "Size mismatch")
-		assert.Equal(t, expected[i].Status, resp.Status, "Status mismatch")
-		assert.Equal(t, expected[i].StatusText, resp.StatusText, "StatusText mismatch")
-		assert.Equal(t, expected[i].URL, resp.URL, "URL mismatch")
-		assert.Equal(t, expected[i].Text, resp.Text, "Text mismatch")
-
-		// Compare HeadersArray elements one by one
-		assert.Equal(t, len(expected[i].HeadersArray), len(resp.HeadersArray), "HeadersArray length mismatch")
-		for _, expectedHeader := range expected[i].HeadersArray {
-			found := false
-			for _, actualHeader := range resp.HeadersArray {
-				if expectedHeader["name"] == actualHeader["name"] && expectedHeader["value"] == actualHeader["value"] {
-					found = true
-					break
-				}
-			}
-			assert.True(t, found, fmt.Sprintf("Expected header {name: %s, value: %s} not found in actual headers", expectedHeader["name"], expectedHeader["value"]))
+		sortByName := func(m1, m2 map[string]string) int {
+			return strings.Compare(m1["name"], m2["name"])
 		}
+		slices.SortFunc(resp.HeadersArray, sortByName)
+		slices.SortFunc(expected[i].HeadersArray, sortByName)
+		assert.Equal(t, expected[i], resp)
 	}
 }
