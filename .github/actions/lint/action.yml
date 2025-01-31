@@ -25,7 +25,10 @@ runs:
         echo "GolangCIVersion=$(head -n 1 "${{ github.action_path }}/.golangci.yml" | tr -d '# ')" >> "${GITHUB_OUTPUT}"
       id: getenv
     - name: golangci-lint
-      uses: golangci/golangci-lint-action@349d20632dbaed38f0a492cc991152e3d351e854 # latest commit at the time that uses node20
+      # Here, we play safe and use directly the hash of the version,
+      # instead of using a versioning tag that might be overwritten in the future.
+      # The hash below links to v6.2.0
+      uses: golangci/golangci-lint-action@ec5d18412c0aeab7936cb16880d708ba2a64e1ae
       with:
         version: ${{ steps.getenv.outputs.GolangCIVersion }}
         args: "--config=${{ github.action_path }}/.golangci.yml"
