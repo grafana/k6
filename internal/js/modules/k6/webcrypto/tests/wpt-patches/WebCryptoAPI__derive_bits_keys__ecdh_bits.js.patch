@@ -1,5 +1,5 @@
 diff --git a/WebCryptoAPI/derive_bits_keys/ecdh_bits.js b/WebCryptoAPI/derive_bits_keys/ecdh_bits.js
-index 36b29c20a..c9c413599 100644
+index 36b29c20a2..c9c413599f 100644
 --- a/WebCryptoAPI/derive_bits_keys/ecdh_bits.js
 +++ b/WebCryptoAPI/derive_bits_keys/ecdh_bits.js
 @@ -65,15 +65,17 @@ function define_tests() {

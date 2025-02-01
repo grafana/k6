@@ -1,5 +1,5 @@
 diff --git a/WebCryptoAPI/generateKey/successes.js b/WebCryptoAPI/generateKey/successes.js
-index a9a168e1a..88861ab87 100644
+index a9a168e1ad..88861ab87f 100644
 --- a/WebCryptoAPI/generateKey/successes.js
 +++ b/WebCryptoAPI/generateKey/successes.js
 @@ -21,17 +21,17 @@ function run_test(algorithmNames, slowTest) {
