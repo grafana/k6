@@ -40,6 +40,7 @@ import (
 	typepb "google.golang.org/protobuf/types/known/typepb"
 	reflect "reflect"
 	sync "sync"
+	unsafe "unsafe"
 )
 
 // Api is a light-weight descriptor for an API Interface.
@@ -405,7 +406,7 @@ func (x *Mixin) GetRoot() string {
 
 var File_google_protobuf_api_proto protoreflect.FileDescriptor
 
-var file_google_protobuf_api_proto_rawDesc = []byte{
+var file_google_protobuf_api_proto_rawDesc = string([]byte{
 	0x0a, 0x19, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75,
 	0x66, 0x2f, 0x61, 0x70, 0x69, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x0f, 0x67, 0x6f, 0x6f,
 	0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x1a, 0x24, 0x67, 0x6f,
@@ -464,16 +465,16 @@ var file_google_protobuf_api_proto_rawDesc = []byte{
 	0x02, 0x1e, 0x47, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x50, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75,
 	0x66, 0x2e, 0x57, 0x65, 0x6c, 0x6c, 0x4b, 0x6e, 0x6f, 0x77, 0x6e, 0x54, 0x79, 0x70, 0x65, 0x73,
 	0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
-}
+})
 
 var (
 	file_google_protobuf_api_proto_rawDescOnce sync.Once
-	file_google_protobuf_api_proto_rawDescData = file_google_protobuf_api_proto_rawDesc
+	file_google_protobuf_api_proto_rawDescData []byte
 )
 
 func file_google_protobuf_api_proto_rawDescGZIP() []byte {
 	file_google_protobuf_api_proto_rawDescOnce.Do(func() {
-		file_google_protobuf_api_proto_rawDescData = protoimpl.X.CompressGZIP(file_google_protobuf_api_proto_rawDescData)
+		file_google_protobuf_api_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_google_protobuf_api_proto_rawDesc), len(file_google_protobuf_api_proto_rawDesc)))
 	})
 	return file_google_protobuf_api_proto_rawDescData
 }
@@ -511,7 +512,7 @@ func file_google_protobuf_api_proto_init() {
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: file_google_protobuf_api_proto_rawDesc,
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_google_protobuf_api_proto_rawDesc), len(file_google_protobuf_api_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   3,
 			NumExtensions: 0,
@@ -522,7 +523,6 @@ func file_google_protobuf_api_proto_init() {
 		MessageInfos:      file_google_protobuf_api_proto_msgTypes,
 	}.Build()
 	File_google_protobuf_api_proto = out.File
-	file_google_protobuf_api_proto_rawDesc = nil
 	file_google_protobuf_api_proto_goTypes = nil
 	file_google_protobuf_api_proto_depIdxs = nil
 }

@@ -144,6 +144,12 @@ type Stream struct {
 	// Use NewAllowKeysFilter from "go.opentelemetry.io/otel/attribute" to
 	// provide an allow-list of attribute keys here.
 	AttributeFilter attribute.Filter
+	// ExemplarReservoirProvider selects the
+	// [go.opentelemetry.io/otel/sdk/metric/exemplar.ReservoirProvider] based
+	// on the [Aggregation].
+	//
+	// If unspecified, [DefaultExemplarReservoirProviderSelector] is used.
+	ExemplarReservoirProviderSelector ExemplarReservoirProviderSelector
 }
 
 // instID are the identifying properties of a instrument.
