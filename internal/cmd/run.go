@@ -205,7 +205,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		defer func() {
 			logger.Debug("Generating the end-of-test summary...")
 
-			testSummary := &lib.Summary{
+			legacySummary := &lib.LegacySummary{
 				Metrics:         metricsEngine.ObservedMetrics,
 				RootGroup:       testRunState.GroupSummary.Group(),
 				TestRunDuration: executionState.GetCurrentTestRunDuration(),
@@ -216,9 +216,9 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 				},
 			}
 
-			report := summaryOutput.MetricsReport(testSummary, test.initRunner.GetOptions())
+			summary := summaryOutput.Summary(executionState, test.initRunner.GetOptions())
 
-			summaryResult, hsErr := test.initRunner.HandleSummary(globalCtx, testSummary, report)
+			summaryResult, hsErr := test.initRunner.HandleSummary(globalCtx, legacySummary, summary)
 			if hsErr == nil {
 				hsErr = handleSummaryResult(c.gs.FS, c.gs.Stdout, c.gs.Stderr, summaryResult)
 			}

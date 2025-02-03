@@ -55,7 +55,7 @@ func metricValueGetter(summaryTrendStats []string) func(metrics.Sink, time.Durat
 
 // summarizeMetricsToObject transforms the summary objects in a way that's
 // suitable to pass to the JS runtime or export to JSON.
-func summarizeMetricsToObject(data *lib.Summary, options lib.Options, setupData []byte) map[string]interface{} {
+func summarizeMetricsToObject(data *lib.LegacySummary, options lib.Options, setupData []byte) map[string]interface{} {
 	m := make(map[string]interface{})
 	m["root_group"] = exportGroup(data.RootGroup)
 	m["options"] = map[string]interface{}{

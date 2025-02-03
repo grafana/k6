@@ -88,7 +88,7 @@ func (a aggregatedGroupData) addSample(sample metrics.Sample) {
 type aggregatedMetricData map[string]aggregatedMetric
 
 // relayMetricFrom stores the metric and the metric sink from the sample. It makes the underlying metric of our
-// report's aggregatedMetricData point directly to a metric in the k6 registry, and relies on that specific pointed
+// summary's aggregatedMetricData point directly to a metric in the k6 registry, and relies on that specific pointed
 // at metrics internal state for its computations.
 func (a aggregatedMetricData) relayMetricFrom(sample metrics.Sample) {
 	a[sample.Metric.Name] = aggregatedMetric{
@@ -154,45 +154,45 @@ func (a *aggregatedChecksData) checkFor(name string) *lib.Check {
 	return check
 }
 
-func populateReportGroup(
-	reportGroup *lib.ReportGroup,
+func populateSummaryGroup(
+	summaryGroup *lib.SummaryGroup,
 	groupData aggregatedGroupData,
 	testRunDuration time.Duration,
 	summaryTrendStats []string,
 ) {
 	// First, we populate the checks metrics, which are treated independently.
-	populateReportChecks(reportGroup, groupData, testRunDuration, summaryTrendStats)
+	populateSummaryChecks(summaryGroup, groupData, testRunDuration, summaryTrendStats)
 
 	// Then, we store the metrics.
-	storeMetric := func(dest lib.ReportMetrics, info lib.ReportMetricInfo, sink metrics.Sink, testDuration time.Duration, summaryTrendStats []string) {
-		reportMetric := lib.NewReportMetricFrom(info, sink, testDuration, summaryTrendStats)
+	storeMetric := func(dest lib.SummaryMetrics, info lib.SummaryMetricInfo, sink metrics.Sink, testDuration time.Duration, summaryTrendStats []string) {
+		summaryMetric := lib.NewSummaryMetricFrom(info, sink, testDuration, summaryTrendStats)
 
 		switch {
 		case isSkippedMetric(info.Name):
 			// Do nothing, just skip.
 		case isHTTPMetric(info.Name):
-			dest.HTTP[info.Name] = reportMetric
+			dest.HTTP[info.Name] = summaryMetric
 		case isExecutionMetric(info.Name):
-			dest.Execution[info.Name] = reportMetric
+			dest.Execution[info.Name] = summaryMetric
 		case isNetworkMetric(info.Name):
-			dest.Network[info.Name] = reportMetric
+			dest.Network[info.Name] = summaryMetric
 		case isBrowserMetric(info.Name):
-			dest.Browser[info.Name] = reportMetric
+			dest.Browser[info.Name] = summaryMetric
 		case isGrpcMetric(info.Name):
-			dest.Grpc[info.Name] = reportMetric
+			dest.Grpc[info.Name] = summaryMetric
 		case isWebSocketsMetric(info.Name):
-			dest.WebSocket[info.Name] = reportMetric
+			dest.WebSocket[info.Name] = summaryMetric
 		case isWebVitalsMetric(info.Name):
-			dest.WebVitals[info.Name] = reportMetric
+			dest.WebVitals[info.Name] = summaryMetric
 		default:
-			dest.Custom[info.Name] = reportMetric
+			dest.Custom[info.Name] = summaryMetric
 		}
 	}
 
 	for _, metricData := range groupData.aggregatedMetrics {
 		storeMetric(
-			reportGroup.Metrics,
-			lib.ReportMetricInfo{
+			summaryGroup.Metrics,
+			lib.SummaryMetricInfo{
 				Name:     metricData.Metric.Name,
 				Type:     metricData.Metric.Type.String(),
 				Contains: metricData.Metric.Contains.String(),
@@ -205,17 +205,17 @@ func populateReportGroup(
 
 	// Finally, we keep moving down the hierarchy and populate the nested groups.
 	for groupName, subGroupData := range groupData.groupsData {
-		subReportGroup := lib.NewReportGroup()
-		populateReportGroup(&subReportGroup, subGroupData, testRunDuration, summaryTrendStats)
-		reportGroup.Groups[groupName] = subReportGroup
+		summarySubGroup := lib.NewSummaryGroup()
+		populateSummaryGroup(&summarySubGroup, subGroupData, testRunDuration, summaryTrendStats)
+		summaryGroup.Groups[groupName] = summarySubGroup
 	}
 }
 
-func reportThresholds(
+func summaryThresholds(
 	thresholds thresholds,
 	testRunDuration time.Duration,
 	summaryTrendStats []string,
-) lib.ReportThresholds {
+) lib.SummaryThresholds {
 	rts := make(map[string]lib.MetricThresholds, len(thresholds))
 	for _, threshold := range thresholds {
 		metric := threshold.Metric
@@ -223,8 +223,8 @@ func reportThresholds(
 		mt, exists := rts[metric.Name]
 		if !exists {
 			mt = lib.MetricThresholds{
-				Metric: lib.NewReportMetricFrom(
-					lib.ReportMetricInfo{
+				Metric: lib.NewSummaryMetricFrom(
+					lib.SummaryMetricInfo{
 						Name:     metric.Name,
 						Type:     metric.Type.String(),
 						Contains: metric.Contains.String(),
@@ -236,7 +236,7 @@ func reportThresholds(
 			}
 		}
 
-		mt.Thresholds = append(rts[metric.Name].Thresholds, lib.ReportThreshold{
+		mt.Thresholds = append(rts[metric.Name].Thresholds, lib.SummaryThreshold{
 			Source: threshold.Source,
 			Ok:     !threshold.LastFailed,
 		})
@@ -247,8 +247,8 @@ func reportThresholds(
 
 // FIXME: This function is a bit flurry, we should consider refactoring it.
 // For instance, it would be possible to directly construct these metrics on-the-fly.
-func populateReportChecks(
-	reportGroup *lib.ReportGroup,
+func populateSummaryChecks(
+	summaryGroup *lib.SummaryGroup,
 	groupData aggregatedGroupData,
 	testRunDuration time.Duration,
 	summaryTrendStats []string,
@@ -258,16 +258,16 @@ func populateReportChecks(
 		return
 	}
 
-	reportGroup.Checks = lib.NewReportChecks()
+	summaryGroup.Checks = lib.NewSummaryChecks()
 
 	totalChecks := float64(checksMetric.Sink.(*metrics.RateSink).Total)
 	successChecks := float64(checksMetric.Sink.(*metrics.RateSink).Trues)
 
-	reportGroup.Checks.Metrics.Total.Values["count"] = totalChecks
-	reportGroup.Checks.Metrics.Total.Values["rate"] = calculateCounterRate(totalChecks, testRunDuration)
+	summaryGroup.Checks.Metrics.Total.Values["count"] = totalChecks
+	summaryGroup.Checks.Metrics.Total.Values["rate"] = calculateCounterRate(totalChecks, testRunDuration)
 
-	reportGroup.Checks.Metrics.Success = lib.NewReportMetricFrom(
-		lib.ReportMetricInfo{
+	summaryGroup.Checks.Metrics.Success = lib.NewSummaryMetricFrom(
+		lib.SummaryMetricInfo{
 			Name:     "checks_succeeded",
 			Type:     checksMetric.Metric.Type.String(),
 			Contains: checksMetric.Metric.Contains.String(),
@@ -277,11 +277,11 @@ func populateReportChecks(
 		summaryTrendStats,
 	)
 
-	reportGroup.Checks.Metrics.Fail.Values["passes"] = totalChecks - successChecks
-	reportGroup.Checks.Metrics.Fail.Values["fails"] = successChecks
-	reportGroup.Checks.Metrics.Fail.Values["rate"] = (totalChecks - successChecks) / totalChecks
+	summaryGroup.Checks.Metrics.Fail.Values["passes"] = totalChecks - successChecks
+	summaryGroup.Checks.Metrics.Fail.Values["fails"] = successChecks
+	summaryGroup.Checks.Metrics.Fail.Values["rate"] = (totalChecks - successChecks) / totalChecks
 
-	reportGroup.Checks.OrderedChecks = groupData.checks.orderedChecks
+	summaryGroup.Checks.OrderedChecks = groupData.checks.orderedChecks
 }
 
 func isHTTPMetric(metricName string) bool {

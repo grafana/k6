@@ -104,18 +104,18 @@ func (o *Output) flushSample(sample metrics.Sample) {
 	}
 }
 
-func (o *Output) MetricsReport(summary *lib.Summary, options lib.Options) lib.Report {
-	report := lib.NewReport()
+func (o *Output) Summary(executionState *lib.ExecutionState, options lib.Options) lib.Summary {
+	summary := lib.NewSummary()
 
-	testRunDuration := summary.TestRunDuration
+	testRunDuration := executionState.GetCurrentTestRunDuration()
 	summaryTrendStats := options.SummaryTrendStats
 
 	// Populate the thresholds.
-	report.ReportThresholds = reportThresholds(o.dataModel.thresholds, testRunDuration, summaryTrendStats)
+	summary.SummaryThresholds = summaryThresholds(o.dataModel.thresholds, testRunDuration, summaryTrendStats)
 
 	// Populate root group and nested groups recursively.
-	populateReportGroup(
-		&report.ReportGroup,
+	populateSummaryGroup(
+		&summary.SummaryGroup,
 		o.dataModel.aggregatedGroupData,
 		testRunDuration,
 		summaryTrendStats,
@@ -123,17 +123,17 @@ func (o *Output) MetricsReport(summary *lib.Summary, options lib.Options) lib.Re
 
 	// Populate scenario groups and nested groups recursively.
 	for scenarioName, scenarioData := range o.dataModel.scenarios {
-		scenarioReportGroup := lib.NewReportGroup()
-		populateReportGroup(
-			&scenarioReportGroup,
+		scenarioSummaryGroup := lib.NewSummaryGroup()
+		populateSummaryGroup(
+			&scenarioSummaryGroup,
 			scenarioData,
 			testRunDuration,
 			summaryTrendStats,
 		)
-		report.Scenarios[scenarioName] = scenarioReportGroup
+		summary.Scenarios[scenarioName] = scenarioSummaryGroup
 	}
 
-	return report
+	return summary
 }
 
 // storeSample relays the sample to the k6 metrics registry relevant metric.

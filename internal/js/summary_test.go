@@ -102,7 +102,7 @@ func TestTextSummaryWithSubMetrics(t *testing.T) {
 		subMetricPost.Name:    subMetricPost.Metric,
 	}
 
-	summary := &lib.Summary{
+	summary := &lib.LegacySummary{
 		Metrics:         metrics,
 		RootGroup:       &lib.Group{},
 		TestRunDuration: time.Second,
@@ -205,9 +205,9 @@ func createTestMetrics(t *testing.T) (map[string]*metrics.Metric, *lib.Group) {
 	return testMetrics, rootG
 }
 
-func createTestSummary(t *testing.T) *lib.Summary {
+func createTestSummary(t *testing.T) *lib.LegacySummary {
 	metrics, rootG := createTestMetrics(t)
-	return &lib.Summary{
+	return &lib.LegacySummary{
 		Metrics:         metrics,
 		RootGroup:       rootG,
 		TestRunDuration: time.Second,
