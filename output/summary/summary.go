@@ -23,18 +23,23 @@ type Output struct {
 	periodicFlusher *output.PeriodicFlusher
 	logger          logrus.FieldLogger
 
-	dataModel           dataModel
-	extendedModeEnabled bool
+	dataModel   dataModel
+	summaryMode lib.SummaryMode
 }
 
 // New returns a new JSON output.
 func New(params output.Params) (*Output, error) {
+	sm, err := lib.ValidateSummaryMode(params.RuntimeOptions.SummaryMode.String)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Output{
 		logger: params.Logger.WithFields(logrus.Fields{
 			"output": "summary",
 		}),
-		dataModel:           newDataModel(),
-		extendedModeEnabled: false,
+		dataModel:   newDataModel(),
+		summaryMode: sm,
 	}, nil
 }
 
@@ -57,10 +62,6 @@ func (o *Output) Stop() error {
 	return nil
 }
 
-func (o *Output) EnableExtendedMode() {
-	o.extendedModeEnabled = true
-}
-
 func (o *Output) flushMetrics() {
 	samples := o.GetBufferedSamples()
 	for _, sc := range samples {
@@ -74,7 +75,9 @@ func (o *Output) flushMetrics() {
 func (o *Output) flushSample(sample metrics.Sample) {
 	// First, the sample data is stored into the metrics stored at the k6 metrics registry level.
 	o.storeSample(sample)
-	if !o.extendedModeEnabled {
+
+	skipGroupSamples := o.summaryMode == lib.SummaryModeCompact || o.summaryMode == lib.SummaryModeLegacy
+	if skipGroupSamples {
 		return
 	}
 

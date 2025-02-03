@@ -32,7 +32,7 @@ experimental_enhanced: esbuild-based transpiling for TypeScript and ES6+ support
 	flags.StringArrayP("env", "e", nil, "add/override environment variable with `VAR=value`")
 	flags.Bool("no-thresholds", false, "don't run thresholds")
 	flags.Bool("no-summary", false, "don't show the summary at the end of the test")
-	flags.Bool("summary-extended", false, "show an extended summary at the end of the test")
+	flags.String("with-summary", lib.SummaryModeCompact.String(), "determine the summary mode, \"compact\", \"full\" or \"legacy\"")
 	flags.String(
 		"summary-export",
 		"",
@@ -68,7 +68,7 @@ func getRuntimeOptions(flags *pflag.FlagSet, environment map[string]string) (lib
 		CompatibilityMode:    getNullString(flags, "compatibility-mode"),
 		NoThresholds:         getNullBool(flags, "no-thresholds"),
 		NoSummary:            getNullBool(flags, "no-summary"),
-		SummaryExtended:      getNullBool(flags, "summary-extended"),
+		SummaryMode:          getNullString(flags, "with-summary"),
 		SummaryExport:        getNullString(flags, "summary-export"),
 		TracesOutput:         getNullString(flags, "traces-output"),
 		Env:                  make(map[string]string),
@@ -83,6 +83,14 @@ func getRuntimeOptions(flags *pflag.FlagSet, environment map[string]string) (lib
 		opts.CompatibilityMode = null.StringFrom(envVar)
 	}
 	if _, err := lib.ValidateCompatibilityMode(opts.CompatibilityMode.String); err != nil {
+		// some early validation
+		return opts, err
+	}
+
+	if envVar, ok := environment["K6_WITH_SUMMARY"]; ok && !opts.SummaryMode.Valid {
+		opts.SummaryMode = null.StringFrom(envVar)
+	}
+	if _, err := lib.ValidateSummaryMode(opts.SummaryMode.String); err != nil {
 		// some early validation
 		return opts, err
 	}
