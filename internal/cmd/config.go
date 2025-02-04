@@ -151,13 +151,15 @@ func readDiskConfig(gs *state.GlobalState) (Config, error) {
 	return conf, nil
 }
 
+// legacyConfigFilePath returns the path of the old location,
+// which is now deprecated and superseded by a new default.
 func legacyConfigFilePath(gs *state.GlobalState) string {
 	return filepath.Join(gs.UserOSConfigDir, "loadimpact", "k6", "config.json")
 }
 
 func readLegacyDiskConfig(gs *state.GlobalState) (Config, error) {
-	// Try to see if the legacy config exists in the supplied filesystem
-	legacyPath := filepath.Join(gs.UserOSConfigDir, "loadimpact", "k6", "config.json")
+	// CHeck if the legacy config exists in the supplied filesystem
+	legacyPath := legacyConfigFilePath(gs)
 	if _, err := gs.FS.Stat(legacyPath); err != nil {
 		return Config{}, err
 	}
@@ -342,9 +344,11 @@ func validateScenarioConfig(conf lib.ExecutorConfig, isExecutable func(string) b
 func migrateLegacyConfigFileIfAny(gs *state.GlobalState) error {
 	fn := func() error {
 		legacyFpath := legacyConfigFilePath(gs)
-		if _, err := gs.FS.Stat(legacyFpath); errors.Is(err, fs.ErrNotExist) {
+		_, err := gs.FS.Stat(legacyFpath)
+		if errors.Is(err, fs.ErrNotExist) {
 			return nil
-		} else if err != nil {
+		}
+		if err != nil {
 			return err
 		}
 
@@ -352,7 +356,7 @@ func migrateLegacyConfigFileIfAny(gs *state.GlobalState) error {
 			return err
 		}
 
-		err := gs.FS.Rename(legacyFpath, gs.Flags.ConfigFilePath)
+		err = gs.FS.Rename(legacyFpath, gs.Flags.ConfigFilePath)
 		if err != nil {
 			return err
 		}
