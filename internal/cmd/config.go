@@ -201,6 +201,40 @@ func readEnvConfig(envMap map[string]string) (Config, error) {
 	return conf, err
 }
 
+// loadConfigFile wraps the ordinary readDiskConfig operation.
+// It adds the capability to fallbacks on the legacy default path if required.
+//
+// Unfortunately, readDiskConfig() silences the NotFound error.
+// We don't want to change it as it is used across several places;
+// and, hopefully, this code will be available only for a single major version.
+// After we should restore to lookup only in a single location for config file (the default).
+func loadConfigFile(gs *state.GlobalState) (Config, error) {
+	// use directly the main flow if the user passed a custom path
+	if gs.Flags.ConfigFilePath != gs.DefaultFlags.ConfigFilePath {
+		return readDiskConfig(gs)
+	}
+
+	_, err := gs.FS.Stat(gs.Flags.ConfigFilePath)
+	if err != nil && errors.Is(err, fs.ErrNotExist) {
+		// if the passed path does not exist (custom one or the default)
+		// then we attempt to load the legacy path
+		legacyConf, legacyErr := readLegacyDiskConfig(gs)
+		if legacyErr != nil && !errors.Is(legacyErr, fs.ErrNotExist) {
+			return Config{}, legacyErr
+		}
+		// a legacy file has been found
+		if legacyErr == nil {
+			gs.Logger.Warn("The configuration file has been found on the old path. " +
+				"Please, run again `k6 cloud login` or `k6 login` commands to migrate to the new path. " +
+				"If you already migrated it manually, then remove the file from the old path.\n\n")
+			return legacyConf, nil
+		}
+		// the legacy file doesn't exist, then we fallback on the main flow
+		// to return the silenced error for not existing config file
+	}
+	return readDiskConfig(gs)
+}
+
 // Assemble the final consolidated configuration from all of the different sources:
 // - start with the CLI-provided options to get shadowed (non-Valid) defaults in there
 // - add the global file config options
@@ -211,18 +245,10 @@ func readEnvConfig(envMap map[string]string) (Config, error) {
 // TODO: add better validation, more explicit default values and improve consistency between formats
 // TODO: accumulate all errors and differentiate between the layers?
 func getConsolidatedConfig(gs *state.GlobalState, cliConf Config, runnerOpts lib.Options) (Config, error) {
-	fileConf, err := readLegacyDiskConfig(gs)
-	if errors.Is(err, fs.ErrNotExist) { //nolint:gocritic
-		fileConf, err = readDiskConfig(gs)
-		if err != nil {
-			return Config{}, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
-		}
-	} else if err != nil {
+	fileConf, err := loadConfigFile(gs)
+	if err != nil {
+		err = fmt.Errorf("failed to load the configuration file from the local file system: %w", err)
 		return Config{}, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
-	} else {
-		gs.Logger.Warn("The configuration file has been found on the old path. " +
-			"Please, run again `k6 cloud login` or `k6 login` commands to migrate to the new path. " +
-			"If you already migrated it manually, then remove the file from the old path.\n\n")
 	}
 
 	envConf, err := readEnvConfig(gs.Env)
