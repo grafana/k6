@@ -99,7 +99,7 @@ func (mi *ModuleInstance) Parse(file sobek.Value, options sobek.Value) *sobek.Pr
 
 	rt := mi.vu.Runtime()
 
-	// 1. Make sure the Sobek object is a fs.File (sobek operation)
+	// 1. Make sure the Sobek object is a fs.File (Sobek operation)
 	var fileObj fs.File
 	if err := mi.vu.Runtime().ExportTo(file, &fileObj); err != nil {
 		reject(fmt.Errorf("first argument expected to be a fs.File instance, got %T instead", file))
@@ -192,11 +192,11 @@ func (p *Parser) Next() *sobek.Promise {
 	promise, resolve, reject := promises.New(p.vu)
 
 	go func() {
-		var records []string
+		var record any
 		var done bool
 		var err error
 
-		records, err = p.reader.Read()
+		record, err = p.reader.Read()
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				resolve(parseResult{Done: true, Value: []string{}})
@@ -209,7 +209,7 @@ func (p *Parser) Next() *sobek.Promise {
 
 		p.currentLine.Add(1)
 
-		resolve(parseResult{Done: done, Value: records})
+		resolve(parseResult{Done: done, Value: record})
 	}()
 
 	return promise
@@ -222,7 +222,7 @@ type parseResult struct {
 	Done bool `js:"done"`
 
 	// Value holds the line's records value.
-	Value []string `js:"value"`
+	Value any `js:"value"`
 }
 
 // options holds options used to configure CSV parsing when utilizing the module.
@@ -243,6 +243,20 @@ type options struct {
 
 	// ToLine indicates the line at which to stop reading the CSV file (inclusive).
 	ToLine null.Int `js:"toLine"`
+
+	// AsObjects indicates that the CSV rows should be returned as objects, where
+	// the keys are the header column names, and values are the corresponding
+	// row values.
+	//
+	// When this option is enabled, the first line of the CSV file is treated as the header.
+	//
+	// If the option is set and no header line is present, this should be considered an error
+	// case.
+	//
+	// This option is incompatible with the [SkipFirstLine] option, and if both are set, an error
+	// should be returned. Same thing applies if the [FromLine] option is set to a value greater
+	// than 0.
+	AsObjects null.Bool `js:"asObjects"`
 }
 
 // newDefaultParserOptions creates a new options instance with default values.
@@ -250,6 +264,7 @@ func newDefaultParserOptions() options {
 	return options{
 		Delimiter:     ',',
 		SkipFirstLine: false,
+		AsObjects:     null.BoolFrom(false),
 	}
 }
 
@@ -282,6 +297,10 @@ func newParserOptionsFrom(obj *sobek.Object) (options, error) {
 
 	if v := obj.Get("toLine"); v != nil {
 		options.ToLine = null.IntFrom(v.ToInteger())
+	}
+
+	if v := obj.Get("asObjects"); v != nil {
+		options.AsObjects = null.BoolFrom(v.ToBoolean())
 	}
 
 	if options.FromLine.Valid && options.ToLine.Valid && options.FromLine.Int64 >= options.ToLine.Int64 {

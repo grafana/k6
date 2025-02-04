@@ -101,7 +101,7 @@ func (d *Data) sharedArray(call sobek.ConstructorCall) *sobek.Object {
 // The data module RecordReader interface is implemented by types that can read data that can be
 // treated as records, from data sources such as a CSV file, etc.
 type RecordReader interface {
-	Read() ([]string, error)
+	Read() (any, error)
 }
 
 // NewSharedArrayFrom creates a new shared array from the provided data.
