@@ -349,7 +349,7 @@ func (r *Runner) IsExecutable(name string) bool {
 }
 
 // HandleSummary calls the specified summary callback, if supplied.
-func (r *Runner) HandleSummary(ctx context.Context, summary *lib.LegacySummary, report lib.Summary) (map[string]io.Reader, error) {
+func (r *Runner) HandleSummary(ctx context.Context, legacy *lib.LegacySummary, summary *lib.Summary) (map[string]io.Reader, error) {
 	out := make(chan metrics.SampleContainer, 100)
 	defer close(out)
 
@@ -371,6 +371,28 @@ func (r *Runner) HandleSummary(ctx context.Context, summary *lib.LegacySummary, 
 	})
 	vu.moduleVUImpl.ctx = summaryCtx
 
+	var (
+		noColor          bool
+		enableColors     bool
+		summaryDataForJS interface{}
+		summaryCode      string
+	)
+
+	// TODO: Remove this code block once we stop supporting the legacy summary.
+	if legacy != nil {
+		noColor = legacy.NoColor
+		enableColors = !legacy.NoColor && legacy.UIState.IsStdOutTTY
+		summaryDataForJS = summarizeMetricsToObject(legacy, r.Bundle.Options, r.setupData)
+		summaryCode = jslibSummaryLegacyCode
+	}
+
+	if summary != nil {
+		noColor = summary.NoColor
+		enableColors = !summary.NoColor && summary.UIState.IsStdOutTTY
+		summaryDataForJS = summary
+		summaryCode = jslibSummaryCode
+	}
+
 	callbackResult := sobek.Undefined()
 	fn := vu.getExported(consts.HandleSummaryFn) // TODO: rename to UserDefinedHandleSummaryFn?
 	if fn != nil {
@@ -379,8 +401,6 @@ func (r *Runner) HandleSummary(ctx context.Context, summary *lib.LegacySummary, 
 			return nil, fmt.Errorf("exported identifier %s must be a function", consts.HandleSummaryFn)
 		}
 
-		// TODO: Do we want to keep it compatible with the old format? Or do we want to break it?
-		summaryDataForJS := summarizeMetricsToObject(summary, r.Bundle.Options, r.setupData)
 		callbackResult, _, _, err = vu.runFn(summaryCtx, false, handleSummaryFn, nil, vu.Runtime.ToValue(summaryDataForJS))
 		if err != nil {
 			errText, fields := errext.Format(err)
@@ -388,7 +408,7 @@ func (r *Runner) HandleSummary(ctx context.Context, summary *lib.LegacySummary, 
 		}
 	}
 
-	wrapper := strings.Replace(summaryWrapperLambdaCode, "/*JSLIB_SUMMARY_CODE*/", jslibSummaryCode, 1)
+	wrapper := strings.Replace(summaryWrapperLambdaCode, "/*JSLIB_SUMMARY_CODE*/", summaryCode, 1)
 	handleSummaryWrapperRaw, err := vu.Runtime.RunString(wrapper)
 	if err != nil {
 		return nil, fmt.Errorf("unexpected error while getting the summary wrapper: %w", err)
@@ -402,14 +422,14 @@ func (r *Runner) HandleSummary(ctx context.Context, summary *lib.LegacySummary, 
 		// TODO: improve when we can easily export all option values, including defaults?
 		"summaryTrendStats": r.Bundle.Options.SummaryTrendStats,
 		"summaryTimeUnit":   r.Bundle.Options.SummaryTimeUnit.String,
-		"noColor":           summary.NoColor, // TODO: move to the (runtime) options
-		"enableColors":      !summary.NoColor && summary.UIState.IsStdOutTTY,
+		"noColor":           noColor, // TODO: move to the (runtime) options
+		"enableColors":      enableColors,
 	}
 
 	wrapperArgs := []sobek.Value{
 		callbackResult,
 		vu.Runtime.ToValue(r.Bundle.preInitState.RuntimeOptions.SummaryExport.String),
-		vu.Runtime.ToValue(report),
+		vu.Runtime.ToValue(summaryDataForJS),
 		vu.Runtime.ToValue(options),
 	}
 	rawResult, _, _, err := vu.runFn(summaryCtx, false, handleSummaryWrapper, nil, wrapperArgs...)

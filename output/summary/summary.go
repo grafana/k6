@@ -104,7 +104,7 @@ func (o *Output) flushSample(sample metrics.Sample) {
 	}
 }
 
-func (o *Output) Summary(executionState *lib.ExecutionState, options lib.Options) lib.Summary {
+func (o *Output) Summary(executionState *lib.ExecutionState, options lib.Options) *lib.Summary {
 	summary := lib.NewSummary()
 
 	testRunDuration := executionState.GetCurrentTestRunDuration()

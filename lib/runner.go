@@ -80,7 +80,7 @@ type Runner interface {
 	// function in the script.
 	IsExecutable(string) bool
 
-	HandleSummary(context.Context, *LegacySummary, Summary) (map[string]io.Reader, error)
+	HandleSummary(context.Context, *LegacySummary, *Summary) (map[string]io.Reader, error)
 }
 
 // UIState describes the state of the UI, which might influence what

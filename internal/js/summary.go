@@ -18,6 +18,11 @@ import (
 //go:embed summary.js
 var jslibSummaryCode string
 
+// TODO: Remove me once we stop supporting the legacy summary.
+//
+//go:embed summary-legacy.js
+var jslibSummaryLegacyCode string
+
 //go:embed summary-wrapper.js
 var summaryWrapperLambdaCode string
 

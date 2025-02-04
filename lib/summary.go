@@ -94,10 +94,14 @@ type Summary struct {
 	SummaryThresholds `js:"thresholds"`
 	SummaryGroup
 	Scenarios map[string]SummaryGroup
+
+	TestRunDuration time.Duration // TODO: use lib.ExecutionState-based interface instead?
+	NoColor         bool          // TODO: drop this when noColor is part of the (runtime) options
+	UIState         UIState
 }
 
-func NewSummary() Summary {
-	return Summary{
+func NewSummary() *Summary {
+	return &Summary{
 		SummaryThresholds: NewSummaryThresholds(),
 		SummaryGroup: SummaryGroup{
 			Metrics: NewSummaryMetrics(),
