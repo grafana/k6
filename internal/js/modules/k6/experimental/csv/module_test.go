@@ -621,6 +621,7 @@ func TestParse(t *testing.T) {
 
 			if (csvRecords.length !== 10) {
 				throw new Error("Expected 10 records, but got " + csvRecords.length);
+			}
 
 			for (const record of csvRecords) {
 				if (typeof record !== 'object' || record === null || Array.isArray(record)) {
