@@ -208,15 +208,15 @@ func readEnvConfig(envMap map[string]string) (Config, error) {
 // - set some defaults if they weren't previously specified
 // TODO: add better validation, more explicit default values and improve consistency between formats
 // TODO: accumulate all errors and differentiate between the layers?
-func getConsolidatedConfig(gs *state.GlobalState, cliConf Config, runnerOpts lib.Options) (conf Config, err error) {
+func getConsolidatedConfig(gs *state.GlobalState, cliConf Config, runnerOpts lib.Options) (Config, error) {
 	fileConf, err := readLegacyDiskConfig(gs)
 	if errors.Is(err, fs.ErrNotExist) { //nolint:gocritic
 		fileConf, err = readDiskConfig(gs)
 		if err != nil {
-			return conf, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
+			return Config{}, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
 		}
 	} else if err != nil {
-		return conf, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
+		return Config{}, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
 	} else {
 		gs.Logger.Warn("The configuration file has been found on the old path. " +
 			"Please, run again `k6 cloud login` or `k6 login` commands to migrate to the new path. " +
@@ -225,10 +225,10 @@ func getConsolidatedConfig(gs *state.GlobalState, cliConf Config, runnerOpts lib
 
 	envConf, err := readEnvConfig(gs.Env)
 	if err != nil {
-		return conf, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
+		return Config{}, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
 	}
 
-	conf = cliConf.Apply(fileConf)
+	conf := cliConf.Apply(fileConf)
 
 	warnOnShortHandOverride(conf.Options, runnerOpts, "script", gs.Logger)
 	conf = conf.Apply(Config{Options: runnerOpts})
@@ -247,7 +247,7 @@ func getConsolidatedConfig(gs *state.GlobalState, cliConf Config, runnerOpts lib
 	// (e.g. env vars) overrode our default value. This is not done in
 	// lib.Options.Validate to avoid circular imports.
 	if _, err = metrics.GetResolversForTrendColumns(conf.SummaryTrendStats); err != nil {
-		return conf, err
+		return Config{}, err
 	}
 
 	return conf, nil
