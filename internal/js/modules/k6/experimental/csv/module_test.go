@@ -620,8 +620,7 @@ func TestParse(t *testing.T) {
 			const csvRecords = await csv.parse(file, { asObjects: true });
 
 			if (csvRecords.length !== 10) {
-				throw new Error("Expected 11 records, but got " + csvRecords.length);
-			}
+				throw new Error("Expected 10 records, but got " + csvRecords.length);
 
 			for (const record of csvRecords) {
 				if (typeof record !== 'object' || record === null || Array.isArray(record)) {
