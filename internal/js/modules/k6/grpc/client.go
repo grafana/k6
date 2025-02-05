@@ -54,6 +54,11 @@ func (c *Client) Load(importPaths []string, filenames ...string) ([]MethodInfo, 
 		importPaths = append(importPaths, initEnv.CWD.Path)
 	}
 
+	for i, s := range importPaths {
+		// Clean file scheme as it is the only supported scheme and the following APIs do not support them
+		importPaths[i] = strings.TrimPrefix(s, "file://")
+	}
+
 	parser := protoparse.Parser{
 		ImportPaths:      importPaths,
 		InferImportPaths: false,

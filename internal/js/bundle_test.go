@@ -641,6 +641,11 @@ func TestOpen(t *testing.T) {
 			pwd:      "/path",
 		},
 		{
+			name:     "file scheme",
+			openPath: "file:///path/to/file.txt",
+			pwd:      "/path",
+		},
+		{
 			name:     "file is dir",
 			openPath: "/path/to/",
 			pwd:      "/path/to",
@@ -687,6 +692,10 @@ func TestOpen(t *testing.T) {
 			filePath := filepath.Join(prefix, "/path/to/file.txt")
 			require.NoError(t, fs.MkdirAll(filepath.Join(prefix, "/path/to"), 0o755))
 			require.NoError(t, fsext.WriteFile(fs, filePath, []byte(`hi`), 0o644))
+			fs = fsext.NewChangePathFs(fs, func(name string) (string, error) {
+				// Drop the prefix effectively building something like https://pkg.go.dev/os#DirFS
+				return filepath.Join(prefix, name), nil
+			})
 			if isWindows {
 				fs = fsext.NewTrimFilePathSeparatorFs(fs)
 			}
@@ -705,14 +714,11 @@ func TestOpen(t *testing.T) {
 
 				testFunc := func(t *testing.T) {
 					t.Parallel()
-					fs, prefix, cleanUp := fsInit()
+					fs, _, cleanUp := fsInit()
 					defer cleanUp()
 					fs = fsext.NewReadOnlyFs(fs)
 					openPath := tCase.openPath
 					// if fullpath prepend prefix
-					if openPath != "" && (openPath[0] == '/' || openPath[0] == '\\') {
-						openPath = filepath.Join(prefix, openPath)
-					}
 					if isWindows {
 						openPath = strings.ReplaceAll(openPath, `\`, `\\`)
 					}
@@ -724,7 +730,7 @@ func TestOpen(t *testing.T) {
 						export let file = open("` + openPath + `");
 						export default function() { return file };`
 
-					sourceBundle, err := getSimpleBundle(t, filepath.ToSlash(filepath.Join(prefix, pwd, "script.js")), data, fs)
+					sourceBundle, err := getSimpleBundle(t, filepath.ToSlash(filepath.Join(pwd, "script.js")), data, fs)
 					if tCase.isError {
 						require.Error(t, err)
 						return

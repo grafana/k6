@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"strings"
 
 	"go.k6.io/k6/lib/fsext"
 
@@ -102,6 +103,8 @@ func (mi *ModuleInstance) Open(path sobek.Value) *sobek.Promise {
 
 func (mi *ModuleInstance) openImpl(path string) (*File, error) {
 	initEnv := mi.vu.InitEnv()
+	// Strip file scheme if available as we should support only this scheme
+	path = strings.TrimPrefix(path, "file://")
 
 	// We resolve the path relative to the entrypoint script, as opposed to
 	// the current working directory (the k6 command is called from).
