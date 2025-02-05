@@ -66,7 +66,7 @@ func TestSimpleTestStdin(t *testing.T) {
 	t.Parallel()
 
 	ts := NewGlobalTestState(t)
-	ts.CmdArgs = []string{"k6", "run", "-"}
+	ts.CmdArgs = []string{"k6", "run", "-", "--with-summary", "legacy"}
 	ts.Stdin = bytes.NewBufferString(`export default function() {};`)
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
@@ -241,6 +241,7 @@ func getSingleFileTestState(tb testing.TB, script string, cliFlags []string, exp
 	if cliFlags == nil {
 		cliFlags = []string{"-v", "--log-output=stdout"}
 	}
+	cliFlags = append(cliFlags, "--with-summary=legacy")
 
 	ts := NewGlobalTestState(tb)
 	require.NoError(tb, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test.js"), []byte(script), 0o644))
@@ -546,7 +547,7 @@ func getSimpleCloudOutputTestState(
 	if cliFlags == nil {
 		cliFlags = []string{"-v", "--log-output=stdout"}
 	}
-	cliFlags = append(cliFlags, "--out", "cloud")
+	cliFlags = append(cliFlags, "--out", "cloud", "--with-summary=legacy")
 
 	srv := getCloudTestEndChecker(tb, 111, nil, expRunStatus, expResultStatus)
 	ts := getSingleFileTestState(tb, script, cliFlags, expExitCode)
@@ -1890,7 +1891,7 @@ func TestUIRenderOutput(t *testing.T) {
 			t.Parallel()
 
 			ts := NewGlobalTestState(t)
-			ts.CmdArgs = []string{"k6", "run"}
+			ts.CmdArgs = []string{"k6", "run", "--with-summary=legacy"}
 			for _, o := range tc.outputs {
 				ts.CmdArgs = append(ts.CmdArgs, "-o")
 				ts.CmdArgs = append(ts.CmdArgs, o)

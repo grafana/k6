@@ -114,6 +114,7 @@ func TestRuntimeOptions(t *testing.T) {
 		extendedCompatMode  = null.NewString("extended", true)
 		enhancedCompatMode  = null.NewString("experimental_enhanced", true)
 		defaultTracesOutput = null.NewString("none", false)
+		defaultSummaryMode  = null.NewString("compact", false)
 	)
 
 	runtimeOptionsTestCases := map[string]runtimeOptionsTestCase{
@@ -125,6 +126,7 @@ func TestRuntimeOptions(t *testing.T) {
 				CompatibilityMode:    defaultCompatMode,
 				Env:                  nil,
 				TracesOutput:         defaultTracesOutput,
+				SummaryMode:          defaultSummaryMode,
 			},
 		},
 		"disabled sys env by default": {
@@ -135,6 +137,7 @@ func TestRuntimeOptions(t *testing.T) {
 				CompatibilityMode:    defaultCompatMode,
 				Env:                  map[string]string{},
 				TracesOutput:         defaultTracesOutput,
+				SummaryMode:          defaultSummaryMode,
 			},
 		},
 		"disabled sys env by default with ext compat mode": {
@@ -145,6 +148,7 @@ func TestRuntimeOptions(t *testing.T) {
 				CompatibilityMode:    extendedCompatMode,
 				Env:                  map[string]string{},
 				TracesOutput:         defaultTracesOutput,
+				SummaryMode:          defaultSummaryMode,
 			},
 		},
 		"disabled sys env by default with experimental_enhanced compat mode": {
@@ -155,6 +159,7 @@ func TestRuntimeOptions(t *testing.T) {
 				CompatibilityMode:    enhancedCompatMode,
 				Env:                  map[string]string{},
 				TracesOutput:         defaultTracesOutput,
+				SummaryMode:          defaultSummaryMode,
 			},
 		},
 		"disabled sys env by cli 1": {
@@ -166,6 +171,7 @@ func TestRuntimeOptions(t *testing.T) {
 				CompatibilityMode:    baseCompatMode,
 				Env:                  map[string]string{},
 				TracesOutput:         defaultTracesOutput,
+				SummaryMode:          defaultSummaryMode,
 			},
 		},
 		"disabled sys env by cli 2": {
@@ -177,6 +183,7 @@ func TestRuntimeOptions(t *testing.T) {
 				CompatibilityMode:    baseCompatMode,
 				Env:                  map[string]string{},
 				TracesOutput:         defaultTracesOutput,
+				SummaryMode:          defaultSummaryMode,
 			},
 		},
 		"disabled sys env by env": {
@@ -187,6 +194,7 @@ func TestRuntimeOptions(t *testing.T) {
 				CompatibilityMode:    extendedCompatMode,
 				Env:                  map[string]string{},
 				TracesOutput:         defaultTracesOutput,
+				SummaryMode:          defaultSummaryMode,
 			},
 		},
 		"enabled sys env by env": {
@@ -197,6 +205,7 @@ func TestRuntimeOptions(t *testing.T) {
 				CompatibilityMode:    extendedCompatMode,
 				Env:                  map[string]string{"K6_INCLUDE_SYSTEM_ENV_VARS": "true", "K6_COMPATIBILITY_MODE": "extended"},
 				TracesOutput:         defaultTracesOutput,
+				SummaryMode:          defaultSummaryMode,
 			},
 		},
 		"enabled sys env by default": {
@@ -208,6 +217,7 @@ func TestRuntimeOptions(t *testing.T) {
 				CompatibilityMode:    defaultCompatMode,
 				Env:                  map[string]string{"test1": "val1"},
 				TracesOutput:         defaultTracesOutput,
+				SummaryMode:          defaultSummaryMode,
 			},
 		},
 		"enabled sys env by cli 1": {
@@ -219,6 +229,7 @@ func TestRuntimeOptions(t *testing.T) {
 				CompatibilityMode:    defaultCompatMode,
 				Env:                  map[string]string{"test1": "val1"},
 				TracesOutput:         defaultTracesOutput,
+				SummaryMode:          defaultSummaryMode,
 			},
 		},
 		"enabled sys env by cli 2": {
@@ -230,6 +241,7 @@ func TestRuntimeOptions(t *testing.T) {
 				CompatibilityMode:    defaultCompatMode,
 				Env:                  map[string]string{"test1": "val1"},
 				TracesOutput:         defaultTracesOutput,
+				SummaryMode:          defaultSummaryMode,
 			},
 		},
 		"run only system env": {
@@ -241,6 +253,7 @@ func TestRuntimeOptions(t *testing.T) {
 				CompatibilityMode:    defaultCompatMode,
 				Env:                  map[string]string{"test1": "val1"},
 				TracesOutput:         defaultTracesOutput,
+				SummaryMode:          defaultSummaryMode,
 			},
 		},
 		"mixed system and cli env": {
@@ -252,6 +265,7 @@ func TestRuntimeOptions(t *testing.T) {
 				CompatibilityMode:    defaultCompatMode,
 				Env:                  map[string]string{"test1": "val1", "test2": "", "test3": "val3", "test4": "", "test5": ""},
 				TracesOutput:         defaultTracesOutput,
+				SummaryMode:          defaultSummaryMode,
 			},
 		},
 		"mixed system and cli env 2": {
@@ -263,6 +277,7 @@ func TestRuntimeOptions(t *testing.T) {
 				CompatibilityMode:    defaultCompatMode,
 				Env:                  map[string]string{"test1": "val1", "test2": "", "test3": "val3", "test4": "", "test5": ""},
 				TracesOutput:         defaultTracesOutput,
+				SummaryMode:          defaultSummaryMode,
 			},
 		},
 		"disabled system env with cli params": {
@@ -274,6 +289,7 @@ func TestRuntimeOptions(t *testing.T) {
 				CompatibilityMode:    defaultCompatMode,
 				Env:                  map[string]string{"test2": "val2"},
 				TracesOutput:         defaultTracesOutput,
+				SummaryMode:          defaultSummaryMode,
 			},
 		},
 		"overwriting system env with cli param": {
@@ -285,6 +301,7 @@ func TestRuntimeOptions(t *testing.T) {
 				CompatibilityMode:    defaultCompatMode,
 				Env:                  map[string]string{"test1": "val1cli"},
 				TracesOutput:         defaultTracesOutput,
+				SummaryMode:          defaultSummaryMode,
 			},
 		},
 		"error wrong compat mode env var value": {
@@ -327,6 +344,7 @@ func TestRuntimeOptions(t *testing.T) {
 				CompatibilityMode:    defaultCompatMode,
 				Env:                  map[string]string{"test1": "value 1", "test2": "value 2"},
 				TracesOutput:         defaultTracesOutput,
+				SummaryMode:          defaultSummaryMode,
 			},
 		},
 		"valid env vars with special chars": {
@@ -338,6 +356,7 @@ func TestRuntimeOptions(t *testing.T) {
 				CompatibilityMode:    defaultCompatMode,
 				Env:                  map[string]string{"test1": "value 1", "test2": "value,2", "test3": ` ,  ,,, value, ,, 2!'@#,"`},
 				TracesOutput:         defaultTracesOutput,
+				SummaryMode:          defaultSummaryMode,
 			},
 		},
 		"summary and thresholds from env": {
@@ -351,6 +370,7 @@ func TestRuntimeOptions(t *testing.T) {
 				NoSummary:            null.NewBool(false, true),
 				SummaryExport:        null.NewString("foo", true),
 				TracesOutput:         defaultTracesOutput,
+				SummaryMode:          defaultSummaryMode,
 			},
 		},
 		"summary and thresholds from env overwritten by CLI": {
@@ -365,6 +385,7 @@ func TestRuntimeOptions(t *testing.T) {
 				NoSummary:            null.NewBool(true, true),
 				SummaryExport:        null.NewString("bar", true),
 				TracesOutput:         defaultTracesOutput,
+				SummaryMode:          defaultSummaryMode,
 			},
 		},
 		"env var error detected even when CLI flags overwrite 1": {
@@ -386,6 +407,7 @@ func TestRuntimeOptions(t *testing.T) {
 				CompatibilityMode:    defaultCompatMode,
 				Env:                  map[string]string{},
 				TracesOutput:         null.NewString("none", false),
+				SummaryMode:          defaultSummaryMode,
 			},
 		},
 		"traces output from env": {
@@ -396,6 +418,7 @@ func TestRuntimeOptions(t *testing.T) {
 				CompatibilityMode:    defaultCompatMode,
 				Env:                  map[string]string{},
 				TracesOutput:         null.NewString("foo", true),
+				SummaryMode:          defaultSummaryMode,
 			},
 		},
 		"traces output from env overwritten by CLI": {
@@ -407,6 +430,30 @@ func TestRuntimeOptions(t *testing.T) {
 				CompatibilityMode:    defaultCompatMode,
 				Env:                  map[string]string{},
 				TracesOutput:         null.NewString("bar", true),
+				SummaryMode:          defaultSummaryMode,
+			},
+		},
+		"summary mode from env": {
+			useSysEnv: false,
+			systemEnv: map[string]string{"K6_WITH_SUMMARY": "full"},
+			expRTOpts: lib.RuntimeOptions{
+				IncludeSystemEnvVars: null.NewBool(false, false),
+				CompatibilityMode:    defaultCompatMode,
+				Env:                  map[string]string{},
+				TracesOutput:         defaultTracesOutput,
+				SummaryMode:          null.NewString("full", true),
+			},
+		},
+		"summary mode from env overwritten by CLI": {
+			useSysEnv: false,
+			systemEnv: map[string]string{"K6_WITH_SUMMARY": "full"},
+			cliFlags:  []string{"--with-summary", "legacy"},
+			expRTOpts: lib.RuntimeOptions{
+				IncludeSystemEnvVars: null.NewBool(false, false),
+				CompatibilityMode:    defaultCompatMode,
+				Env:                  map[string]string{},
+				TracesOutput:         defaultTracesOutput,
+				SummaryMode:          null.NewString("legacy", true),
 			},
 		},
 	}

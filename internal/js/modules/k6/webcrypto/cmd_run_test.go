@@ -81,7 +81,7 @@ func TestExamplesInputOutput(t *testing.T) {
 				script, err := os.ReadFile(filepath.Clean(file)) //nolint:forbidigo // we read an example directly
 				require.NoError(t, err)
 
-				ts := getSingleFileTestState(t, string(script), []string{"-v", "--log-output=stdout"}, 0)
+				ts := getSingleFileTestState(t, string(script), []string{"-v", "--log-output=stdout", "--with-summary=legacy"}, 0)
 
 				cmd.ExecuteWithGlobalState(ts.GlobalState)
 

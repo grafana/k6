@@ -354,7 +354,7 @@ func TestThresholdsRuntimeBehavior(t *testing.T) {
 			ts := tests.NewGlobalTestState(t)
 			require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, tc.testFilename), testScript, 0o644))
 
-			ts.CmdArgs = []string{"k6", "run", tc.testFilename}
+			ts.CmdArgs = []string{"k6", "run", tc.testFilename, "--with-summary", "legacy"}
 			ts.ExpectedExitCode = int(tc.expExitCode)
 			newRootCommand(ts.GlobalState).execute()
 

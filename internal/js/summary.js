@@ -942,7 +942,7 @@ function renderMetricValueForThresholds(
 	formatter,
 ) {
 	const { trendStats, trendCols, nonTrendValues, nonTrendExtras} = info;
-	const thresholdAgg = threshold.source.split(/[=><]/)[0];
+	const thresholdAgg = threshold.source.split(/[=><]/)[0].trim();
 
 	let value;
 	switch (metric.type) {

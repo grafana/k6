@@ -60,11 +60,11 @@
         return JSON.stringify(results, null, 4);
     };
 
-    return function (summaryCallbackResult, jsonSummaryPath, report, options) {
+    return function (summaryCallbackResult, jsonSummaryPath, data, options) {
         let result = summaryCallbackResult;
         if (!result) {
             result = {
-                'stdout': '\n' + jslib.textSummary(report, options) + '\n\n',
+                'stdout': '\n' + jslib.textSummary(data, options) + '\n\n',
             };
         }
 
