@@ -755,6 +755,7 @@ func TestOpen(t *testing.T) {
 
 				t.Run(tCase.name, testFunc)
 				if isWindows {
+					tCase := tCase // copy test case before making modifications
 					// windowsify the testcase
 					tCase.openPath = strings.ReplaceAll(tCase.openPath, `/`, `\`)
 					tCase.pwd = strings.ReplaceAll(tCase.pwd, `/`, `\`)
