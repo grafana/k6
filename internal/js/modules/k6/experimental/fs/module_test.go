@@ -34,6 +34,11 @@ func TestOpen(t *testing.T) {
 				wantPath: fsext.FilePathSeparator + testFileName,
 			},
 			{
+				name:     "open file absolute path",
+				openPath: "file://" + fsext.FilePathSeparator + testFileName,
+				wantPath: fsext.FilePathSeparator + testFileName,
+			},
+			{
 				name:     "open relative path",
 				openPath: filepath.Join(".", fsext.FilePathSeparator, testFileName),
 				wantPath: fsext.FilePathSeparator + testFileName,
