@@ -158,7 +158,7 @@ func legacyConfigFilePath(gs *state.GlobalState) string {
 }
 
 func readLegacyDiskConfig(gs *state.GlobalState) (Config, error) {
-	// CHeck if the legacy config exists in the supplied filesystem
+	// Check if the legacy config exists in the supplied filesystem
 	legacyPath := legacyConfigFilePath(gs)
 	if _, err := gs.FS.Stat(legacyPath); err != nil {
 		return Config{}, err
@@ -224,9 +224,8 @@ func loadConfigFile(gs *state.GlobalState) (Config, error) {
 		}
 		// a legacy file has been found
 		if legacyErr == nil {
-			gs.Logger.Warn("The configuration file has been found on the old path. " +
-				"Please, run again `k6 cloud login` or `k6 login` commands to migrate to the new path. " +
-				"If you already migrated it manually, then remove the file from the old path.\n\n")
+			gs.Logger.Warnf("The configuration file has been found on the old path (%q). "+
+				"Please, run again `k6 cloud login` or `k6 login` commands to migrate to the new path.", legacyConfigFilePath(gs))
 			return legacyConf, nil
 		}
 		// the legacy file doesn't exist, then we fallback on the main flow
@@ -377,18 +376,15 @@ func migrateLegacyConfigFileIfAny(gs *state.GlobalState) error {
 		if err != nil {
 			return err
 		}
-
 		if err := gs.FS.MkdirAll(filepath.Dir(gs.Flags.ConfigFilePath), 0o755); err != nil {
 			return err
 		}
-
 		err = gs.FS.Rename(legacyFpath, gs.Flags.ConfigFilePath)
 		if err != nil {
 			return err
 		}
-
 		gs.Logger.Infof("Note, the configuration file has been migrated "+
-			"from old default path (%q) to the new version (%q).\n\n", legacyFpath, gs.Flags.ConfigFilePath)
+			"from the old default path (%q) to the new one (%q).\n\n", legacyFpath, gs.Flags.ConfigFilePath)
 		return nil
 	}
 	if err := fn(); err != nil {
