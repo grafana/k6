@@ -216,7 +216,7 @@ func loadConfigFile(gs *state.GlobalState) (Config, error) {
 
 	_, err := gs.FS.Stat(gs.Flags.ConfigFilePath)
 	if err != nil && errors.Is(err, fs.ErrNotExist) {
-		// if the passed path does not exist (custom one or the default)
+		// if the passed path (the default) does not exist
 		// then we attempt to load the legacy path
 		legacyConf, legacyErr := readLegacyDiskConfig(gs)
 		if legacyErr != nil && !errors.Is(legacyErr, fs.ErrNotExist) {
@@ -224,8 +224,9 @@ func loadConfigFile(gs *state.GlobalState) (Config, error) {
 		}
 		// a legacy file has been found
 		if legacyErr == nil {
-			gs.Logger.Warnf("The configuration file has been found on the old path (%q). "+
-				"Please, run again `k6 cloud login` or `k6 login` commands to migrate to the new path.", legacyConfigFilePath(gs))
+			gs.Logger.Warnf("The configuration file has been found on the old default path (%q). "+
+				"Please, run again `k6 cloud login` or `k6 login` commands to migrate to the new default path.\n\n",
+				legacyConfigFilePath(gs))
 			return legacyConf, nil
 		}
 		// the legacy file doesn't exist, then we fallback on the main flow

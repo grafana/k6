@@ -417,7 +417,7 @@ func TestMigrateLegacyConfigFileIfAny(t *testing.T) {
 	require.NoError(t, fsext.WriteFile(memfs, legacyConfigPath, conf, 0o644))
 
 	l, hook := testutils.NewLoggerWithHook(t)
-	logger := l.(*logrus.Logger)
+	logger := l.(*logrus.Logger) //nolint:forbidigo // no alternative, required
 
 	defaultFlags := state.GetDefaultFlags(".config")
 	gs := &state.GlobalState{
@@ -455,4 +455,72 @@ func TestMigrateLegacyConfigFileIfAnyWhenFileDoesNotExist(t *testing.T) {
 
 	_, err = fsext.ReadFile(memfs, ".config/k6/config.json")
 	assert.ErrorIs(t, err, fs.ErrNotExist)
+}
+
+func TestLoadConfig(t *testing.T) {
+	t.Parallel()
+
+	testcases := []struct {
+		name          string
+		memfs         fsext.Fs
+		expConf       Config
+		expLegacyWarn bool
+	}{
+		{
+			name: "old and new default paths both populated",
+			memfs: testutils.MakeMemMapFs(t, map[string][]byte{
+				".config/loadimpact/k6/config.json": []byte(`{"iterations":1028}`),
+				".config/k6/config.json":            []byte(`{"iterations":1027}`), // use different conf to be sure on assertions
+			}),
+			expConf:       Config{Options: lib.Options{Iterations: null.IntFrom(1027)}},
+			expLegacyWarn: false,
+		},
+		{
+			name: "only old path",
+			memfs: testutils.MakeMemMapFs(t, map[string][]byte{
+				".config/loadimpact/k6/config.json": []byte(`{"iterations":1028}`),
+			}),
+			expConf:       Config{Options: lib.Options{Iterations: null.IntFrom(1028)}},
+			expLegacyWarn: true,
+		},
+		{
+			name: "only new path",
+			memfs: testutils.MakeMemMapFs(t, map[string][]byte{
+				".config/k6/config.json": []byte(`{"iterations":1028}`),
+			}),
+			expConf:       Config{Options: lib.Options{Iterations: null.IntFrom(1028)}},
+			expLegacyWarn: false,
+		},
+		{
+			name:          "no config files", // the startup condition
+			memfs:         fsext.NewMemMapFs(),
+			expConf:       Config{},
+			expLegacyWarn: false,
+		},
+	}
+	for _, tc := range testcases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			l, hook := testutils.NewLoggerWithHook(t)
+			logger := l.(*logrus.Logger) //nolint:forbidigo // no alternative, required
+
+			defaultFlags := state.GetDefaultFlags(".config")
+			gs := &state.GlobalState{
+				FS:              tc.memfs,
+				Flags:           defaultFlags,
+				DefaultFlags:    defaultFlags,
+				UserOSConfigDir: ".config",
+				Logger:          logger,
+			}
+
+			c, err := loadConfigFile(gs)
+			require.NoError(t, err)
+
+			assert.Equal(t, tc.expConf, c)
+
+			// it reads only the new one and it doesn't care about the old path
+			assert.Equal(t, tc.expLegacyWarn, testutils.LogContains(hook.Drain(), logrus.WarnLevel, "old default path"))
+		})
+	}
 }
