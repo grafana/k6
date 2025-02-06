@@ -70,6 +70,9 @@ type Browser struct {
 	// version caches the browser version information.
 	version browserVersion
 
+	// runOnClose is a list of functions to run when the browser is closed.
+	runOnClose []func() error
+
 	logger *log.Logger
 }
 
@@ -161,6 +164,7 @@ func (b *Browser) connect() error {
 	if err != nil {
 		return fmt.Errorf("browser connect: %w", err)
 	}
+	b.runOnClose = append(b.runOnClose, b.defaultContext.cleanup)
 
 	return b.initEvents()
 }
@@ -172,7 +176,6 @@ func (b *Browser) disposeContext(id cdp.BrowserContextID) error {
 	if err := action.Do(cdp.WithExecutor(b.vuCtx, b.conn)); err != nil {
 		return fmt.Errorf("disposing browser context ID %s: %w", id, err)
 	}
-
 	b.context = nil
 
 	return nil
@@ -532,6 +535,13 @@ func (b *Browser) Close() {
 			b.logger.Errorf("Browser:Close", "cleaning up the user data directory: %v", err)
 		}
 	}()
+	defer func() {
+		for _, fn := range b.runOnClose {
+			if err := fn(); err != nil {
+				b.logger.Errorf("Browser:Close", "running cleanup function: %v", err)
+			}
+		}
+	}()
 
 	b.logger.Debugf("Browser:Close", "")
 	atomic.CompareAndSwapInt64(&b.state, b.state, BrowserStateClosed)
@@ -629,6 +639,7 @@ func (b *Browser) NewContext(opts *BrowserContextOptions) (*BrowserContext, erro
 		spanRecordError(span, err)
 		return nil, err
 	}
+	b.runOnClose = append(b.runOnClose, browserCtx.cleanup)
 
 	b.contextMu.Lock()
 	defer b.contextMu.Unlock()

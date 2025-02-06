@@ -1618,7 +1618,7 @@ func (h *ElementHandle) newAction(
 	}
 }
 
-//nolint:funlen,gocognit
+//nolint:gocognit
 func (h *ElementHandle) newPointerAction(
 	fn elementHandlePointerActionFunc, opts *ElementHandleBasePointerOptions,
 ) func(apiCtx context.Context, resultCh chan any, errCh chan error) {

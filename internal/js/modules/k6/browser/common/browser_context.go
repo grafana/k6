@@ -110,6 +110,16 @@ func (b *BrowserContext) setDownloadsPath(path string) error {
 	return nil
 }
 
+// cleanup cleans up the resources associated with the browser context.
+func (b *BrowserContext) cleanup() error {
+	if err := os.RemoveAll(b.DownloadsPath); err != nil { //nolint:forbidigo
+		return fmt.Errorf("removing downloads path: %w", err)
+	}
+	b.DownloadsPath = ""
+
+	return nil
+}
+
 // NewBrowserContext creates a new browser context.
 func NewBrowserContext(
 	ctx context.Context, browser *Browser, id cdp.BrowserContextID, opts *BrowserContextOptions, logger *log.Logger,

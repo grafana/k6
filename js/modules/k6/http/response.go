@@ -134,8 +134,6 @@ func checkErrorInJSON(input []byte, offset int, err error) error {
 
 // SubmitForm parses the body as an html looking for a from and then submitting it
 // TODO: document the actual arguments that can be provided
-//
-//nolint:funlen
 func (res *Response) SubmitForm(args ...sobek.Value) (*Response, error) {
 	rt := res.client.moduleInstance.vu.Runtime()
 

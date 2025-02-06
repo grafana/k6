@@ -304,7 +304,7 @@ func (vlvc RampingVUsConfig) precalculateTheRequiredSteps(et *lib.ExecutionTuple
 // executorEndOffset, is not handled here. Instead GetExecutionRequirements()
 // takes care of that. But to make its job easier, this method won't add any
 // steps with an offset that's greater or equal to executorEndOffset.
-func (vlvc RampingVUsConfig) reserveVUsForGracefulRampDowns( //nolint:funlen
+func (vlvc RampingVUsConfig) reserveVUsForGracefulRampDowns(
 	rawSteps []lib.ExecutionStep, executorEndOffset time.Duration,
 ) []lib.ExecutionStep {
 	rawStepsLen := len(rawSteps)

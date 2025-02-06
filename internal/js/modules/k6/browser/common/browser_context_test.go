@@ -67,6 +67,15 @@ func TestSetDownloadsPath(t *testing.T) {
 		require.NoError(t, bc.setDownloadsPath(path))
 		assert.Equal(t, path, bc.DownloadsPath)
 	})
+	t.Run("cleanup", func(t *testing.T) {
+		t.Parallel()
+
+		var bc BrowserContext
+		require.NoError(t, bc.setDownloadsPath(""))
+		assert.DirExists(t, bc.DownloadsPath)
+		require.NoError(t, bc.cleanup())
+		assert.NoDirExists(t, bc.DownloadsPath)
+	})
 }
 
 func TestFilterCookies(t *testing.T) {

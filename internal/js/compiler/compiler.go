@@ -119,7 +119,7 @@ func (ps *parsingState) parseImpl(src, filename string, commonJSWrap bool) (*ast
 		return prg, code, nil
 	}
 
-	if ps.compatibilityMode == lib.CompatibilityModeExperimentalEnhanced && strings.HasSuffix(filename, ".ts") {
+	if strings.HasSuffix(filename, ".ts") {
 		if err := ps.compiler.usage.Uint64(usageParsedTSFilesKey, 1); err != nil {
 			ps.compiler.logger.WithError(err).Warn("couldn't report usage for " + usageParsedTSFilesKey)
 		}
