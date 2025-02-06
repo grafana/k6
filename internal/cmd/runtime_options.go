@@ -31,7 +31,8 @@ extended: base + sets "global" as alias for "globalThis"
 	flags.StringArrayP("env", "e", nil, "add/override environment variable with `VAR=value`")
 	flags.Bool("no-thresholds", false, "don't run thresholds")
 	flags.Bool("no-summary", false, "don't show the summary at the end of the test")
-	flags.String("with-summary", lib.SummaryModeCompact.String(), "determine the summary mode, \"compact\", \"full\" or \"legacy\"")
+	flags.String("with-summary", lib.SummaryModeCompact.String(), "determine the summary mode,"+
+		" \"compact\", \"full\" or \"legacy\"")
 	flags.String(
 		"summary-export",
 		"",
@@ -58,6 +59,7 @@ func saveBoolFromEnv(env map[string]string, varName string, placeholder *null.Bo
 	return nil
 }
 
+//nolint:funlen
 func getRuntimeOptions(flags *pflag.FlagSet, environment map[string]string) (lib.RuntimeOptions, error) {
 	// TODO: refactor with composable helpers as a part of #883, to reduce copy-paste
 	// TODO: get these options out of the JSON config file as well?

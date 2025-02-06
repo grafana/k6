@@ -72,7 +72,8 @@ func (a aggregatedGroupData) groupDataFor(group string) aggregatedGroupData {
 func (a aggregatedGroupData) addSample(sample metrics.Sample) {
 	a.aggregatedMetrics.addSample(sample)
 
-	if checkName, hasCheckTag := sample.Tags.Get(metrics.TagCheck.String()); hasCheckTag && sample.Metric.Name == metrics.ChecksName {
+	checkName, hasCheckTag := sample.Tags.Get(metrics.TagCheck.String())
+	if hasCheckTag && sample.Metric.Name == metrics.ChecksName {
 		check := a.checks.checkFor(checkName)
 		if sample.Value == 0 {
 			atomic.AddInt64(&check.Fails, 1)
@@ -164,7 +165,13 @@ func populateSummaryGroup(
 	populateSummaryChecks(summaryGroup, groupData, testRunDuration, summaryTrendStats)
 
 	// Then, we store the metrics.
-	storeMetric := func(dest lib.SummaryMetrics, info lib.SummaryMetricInfo, sink metrics.Sink, testDuration time.Duration, summaryTrendStats []string) {
+	storeMetric := func(
+		dest lib.SummaryMetrics,
+		info lib.SummaryMetricInfo,
+		sink metrics.Sink,
+		testDuration time.Duration,
+		summaryTrendStats []string,
+	) {
 		summaryMetric := lib.NewSummaryMetricFrom(info, sink, testDuration, summaryTrendStats)
 
 		switch {

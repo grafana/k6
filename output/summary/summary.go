@@ -156,7 +156,8 @@ func (o *Output) storeSample(sample metrics.Sample) {
 		}
 	}
 
-	if checkName, hasCheckTag := sample.Tags.Get(metrics.TagCheck.String()); hasCheckTag && sample.Metric.Name == metrics.ChecksName {
+	checkName, hasCheckTag := sample.Tags.Get(metrics.TagCheck.String())
+	if hasCheckTag && sample.Metric.Name == metrics.ChecksName {
 		check := o.dataModel.checks.checkFor(checkName)
 		if sample.Value == 0 {
 			atomic.AddInt64(&check.Fails, 1)
