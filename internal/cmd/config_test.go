@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"encoding/json"
-	"io"
 	"io/fs"
 	"testing"
 	"time"
@@ -16,6 +15,7 @@ import (
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
+	"go.k6.io/k6/internal/lib/testutils"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/executor"
 	"go.k6.io/k6/lib/fsext"
@@ -416,8 +416,8 @@ func TestMigrateLegacyConfigFileIfAny(t *testing.T) {
 	legacyConfigPath := ".config/loadimpact/k6/config.json"
 	require.NoError(t, fsext.WriteFile(memfs, legacyConfigPath, conf, 0o644))
 
-	logger := logrus.New()
-	logger.SetOutput(io.Discard)
+	l, hook := testutils.NewLoggerWithHook(t)
+	logger := l.(*logrus.Logger)
 
 	defaultFlags := state.GetDefaultFlags(".config")
 	gs := &state.GlobalState{
@@ -435,8 +435,7 @@ func TestMigrateLegacyConfigFileIfAny(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, f, conf)
 
-	_, err = memfs.Stat(legacyConfigPath)
-	assert.ErrorIs(t, err, fs.ErrNotExist)
+	testutils.LogContains(hook.Drain(), logrus.InfoLevel, "migrated")
 }
 
 func TestMigrateLegacyConfigFileIfAnyWhenFileDoesNotExist(t *testing.T) {
@@ -453,4 +452,7 @@ func TestMigrateLegacyConfigFileIfAnyWhenFileDoesNotExist(t *testing.T) {
 
 	err := migrateLegacyConfigFileIfAny(gs)
 	require.NoError(t, err)
+
+	_, err = fsext.ReadFile(memfs, ".config/k6/config.json")
+	assert.ErrorIs(t, err, fs.ErrNotExist)
 }

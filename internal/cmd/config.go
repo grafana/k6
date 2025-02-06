@@ -363,9 +363,11 @@ func validateScenarioConfig(conf lib.ExecutorConfig, isExecutable func(string) b
 	return nil
 }
 
-// migrateLegacyConfigFileIfAny moves the configuration file from
+// migrateLegacyConfigFileIfAny copies the configuration file from
 // the old default `~/.config/loadimpact/...` folder
 // to the new `~/.config/k6/...` default folder.
+// If the old file is not found no error is returned.
+// It keeps the old file as a backup.
 func migrateLegacyConfigFileIfAny(gs *state.GlobalState) error {
 	fn := func() error {
 		legacyFpath := legacyConfigFilePath(gs)
@@ -376,15 +378,23 @@ func migrateLegacyConfigFileIfAny(gs *state.GlobalState) error {
 		if err != nil {
 			return err
 		}
-		if err := gs.FS.MkdirAll(filepath.Dir(gs.DefaultFlags.ConfigFilePath), 0o755); err != nil {
+		newPath := gs.DefaultFlags.ConfigFilePath
+		if err := gs.FS.MkdirAll(filepath.Dir(newPath), 0o755); err != nil {
 			return err
 		}
-		err = gs.FS.Rename(legacyFpath, gs.Flags.ConfigFilePath)
+		// copy the config file leaving the old available as a backup
+		f, err := fsext.ReadFile(gs.FS, legacyFpath)
+		if err != nil {
+			return err
+		}
+		err = fsext.WriteFile(gs.FS, newPath, f, 0o644)
 		if err != nil {
 			return err
 		}
 		gs.Logger.Infof("Note, the configuration file has been migrated "+
-			"from the old default path (%q) to the new one (%q).\n\n", legacyFpath, gs.Flags.ConfigFilePath)
+			"from the old default path (%q) to the new one (%q). "+
+			"Clean up the old path after you verified that you can run tests by using the new configuration.\n\n",
+			legacyFpath, newPath)
 		return nil
 	}
 	if err := fn(); err != nil {
