@@ -376,7 +376,7 @@ func migrateLegacyConfigFileIfAny(gs *state.GlobalState) error {
 		if err != nil {
 			return err
 		}
-		if err := gs.FS.MkdirAll(filepath.Dir(gs.Flags.ConfigFilePath), 0o755); err != nil {
+		if err := gs.FS.MkdirAll(filepath.Dir(gs.DefaultFlags.ConfigFilePath), 0o755); err != nil {
 			return err
 		}
 		err = gs.FS.Rename(legacyFpath, gs.Flags.ConfigFilePath)
