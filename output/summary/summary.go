@@ -43,10 +43,13 @@ func New(params output.Params) (*Output, error) {
 	}, nil
 }
 
+// Description returns a human-readable description of the output.
 func (o *Output) Description() string {
-	return ""
+	return "summary"
 }
 
+// Start starts a new output.PeriodicFlusher to collect and flush metrics that will be
+// rendered in the end-of-test summary.
 func (o *Output) Start() error {
 	pf, err := output.NewPeriodicFlusher(flushPeriod, o.flushMetrics)
 	if err != nil {
@@ -57,6 +60,7 @@ func (o *Output) Start() error {
 	return nil
 }
 
+// Stop flushes any remaining metrics and stops the goroutine.
 func (o *Output) Stop() error {
 	o.periodicFlusher.Stop()
 	return nil
@@ -104,6 +108,7 @@ func (o *Output) flushSample(sample metrics.Sample) {
 	}
 }
 
+// Summary returns a lib.Summary of the test run.
 func (o *Output) Summary(executionState *lib.ExecutionState, options lib.Options) *lib.Summary {
 	summary := lib.NewSummary()
 

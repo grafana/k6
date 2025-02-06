@@ -14,7 +14,7 @@ type SummaryMode int
 // Possible values for SummaryMode.
 const (
 	SummaryModeCompact = SummaryMode(iota) // Compact mode that only displays the total results.
-	SummaryModeFull                        // Extended mode that displays the total and also partial (per-group, etc.) results.
+	SummaryModeFull                        // Extended mode that displays total and  partial results.
 	SummaryModeLegacy                      // Legacy mode, used for backwards compatibility.
 )
 
@@ -90,6 +90,8 @@ func ValidateSummaryMode(val string) (sm SummaryMode, err error) {
 	return
 }
 
+// Summary is the data structure that holds all the summary data (thresholds, metrics, checks, etc)
+// as well as some other information, like certain rendering options.
 type Summary struct {
 	SummaryThresholds `js:"thresholds"`
 	SummaryGroup
@@ -100,6 +102,7 @@ type Summary struct {
 	UIState         UIState
 }
 
+// NewSummary instantiates a new empty Summary.
 func NewSummary() *Summary {
 	return &Summary{
 		SummaryThresholds: NewSummaryThresholds(),
@@ -111,22 +114,26 @@ func NewSummary() *Summary {
 	}
 }
 
+// SummaryMetricInfo holds the definition of a metric that will be rendered in the summary,
+// including the name of the metric, its type (Counter, Trend, etc.) and what contains (data amounts, times, etc.).
 type SummaryMetricInfo struct {
 	Name     string
 	Type     string
 	Contains string
 }
 
+// SummaryMetric holds all the information needed to display a metric in the summary,
+// including its definition and its values.
 type SummaryMetric struct {
 	SummaryMetricInfo
 	Values map[string]float64
 }
 
+// NewSummaryMetricFrom instantiates a new SummaryMetric for a given metrics.Sink and the metric's info.
 func NewSummaryMetricFrom(
 	info SummaryMetricInfo, sink metrics.Sink,
 	testDuration time.Duration, summaryTrendStats []string,
 ) SummaryMetric {
-	// TODO: we obtain this from [options.SummaryTrendStats] which is a string slice
 	getMetricValues := metricValueGetter(summaryTrendStats)
 
 	return SummaryMetric{
@@ -135,6 +142,7 @@ func NewSummaryMetricFrom(
 	}
 }
 
+// SummaryMetrics is a collection of SummaryMetric grouped by section (http, network, etc).
 type SummaryMetrics struct {
 	// HTTP contains summary data specific to HTTP metrics and is used
 	// to produce the summary HTTP subsection's content.
@@ -158,6 +166,7 @@ type SummaryMetrics struct {
 	Custom map[string]SummaryMetric
 }
 
+// NewSummaryMetrics instantiates an empty collection of SummaryMetrics.
 func NewSummaryMetrics() SummaryMetrics {
 	return SummaryMetrics{
 		HTTP:      make(map[string]SummaryMetric),
@@ -171,17 +180,20 @@ func NewSummaryMetrics() SummaryMetrics {
 	}
 }
 
+// SummaryChecksMetrics is the subset of checks-specific metrics.
 type SummaryChecksMetrics struct {
 	Total   SummaryMetric `js:"checks_total"`
 	Success SummaryMetric `js:"checks_succeeded"`
 	Fail    SummaryMetric `js:"checks_failed"`
 }
 
+// SummaryChecks holds the checks information to be rendered in the summary.
 type SummaryChecks struct {
 	Metrics       SummaryChecksMetrics
 	OrderedChecks []*Check
 }
 
+// NewSummaryChecks instantiates an empty set of SummaryChecks.
 func NewSummaryChecks() *SummaryChecks {
 	initChecksMetricData := func(name string, t metrics.MetricType) SummaryMetric {
 		return SummaryMetric{
@@ -203,29 +215,35 @@ func NewSummaryChecks() *SummaryChecks {
 	}
 }
 
+// SummaryThreshold holds the information of a threshold to be rendered in the summary.
 type SummaryThreshold struct {
 	Source string `js:"source"`
 	Ok     bool   `js:"ok"`
 }
 
+// MetricThresholds is the collection of SummaryThreshold that belongs to the same metric.
 type MetricThresholds struct {
 	Metric     SummaryMetric      `js:"metric"`
 	Thresholds []SummaryThreshold `js:"thresholds"`
 }
 
+// SummaryThresholds is a collection of MetricThresholds that will be rendered in the summary.
 type SummaryThresholds map[string]MetricThresholds
 
+// NewSummaryThresholds instantiates an empty collection of SummaryThresholds.
 func NewSummaryThresholds() SummaryThresholds {
 	thresholds := make(SummaryThresholds)
 	return thresholds
 }
 
+// SummaryGroup is a group of metrics and subgroups (recursive) that will be rendered in the summary.
 type SummaryGroup struct {
 	Checks  *SummaryChecks // Not always present, thus we use a pointer.
 	Metrics SummaryMetrics
 	Groups  map[string]SummaryGroup
 }
 
+// NewSummaryGroup instantiates an empty SummaryGroup.
 func NewSummaryGroup() SummaryGroup {
 	return SummaryGroup{
 		Metrics: NewSummaryMetrics(),

@@ -190,7 +190,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	executionState := execScheduler.GetState()
-	if !testRunState.RuntimeOptions.NoSummary.Bool {
+	if !testRunState.RuntimeOptions.NoSummary.Bool { //nolint:nestif
 		sm, err := lib.ValidateSummaryMode(testRunState.RuntimeOptions.SummaryMode.String)
 		if err != nil {
 			logger.WithError(err).Error("invalid summary mode, falling back to \"compact\" (default)")

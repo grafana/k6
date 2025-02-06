@@ -236,7 +236,7 @@ func summaryThresholds(
 			}
 		}
 
-		mt.Thresholds = append(rts[metric.Name].Thresholds, lib.SummaryThreshold{
+		mt.Thresholds = append(mt.Thresholds, lib.SummaryThreshold{
 			Source: threshold.Source,
 			Ok:     !threshold.LastFailed,
 		})
@@ -260,8 +260,8 @@ func populateSummaryChecks(
 
 	summaryGroup.Checks = lib.NewSummaryChecks()
 
-	totalChecks := float64(checksMetric.Sink.(*metrics.RateSink).Total)
-	successChecks := float64(checksMetric.Sink.(*metrics.RateSink).Trues)
+	totalChecks := float64(checksMetric.Sink.(*metrics.RateSink).Total)   //nolint:forcetypeassert
+	successChecks := float64(checksMetric.Sink.(*metrics.RateSink).Trues) //nolint:forcetypeassert
 
 	summaryGroup.Checks.Metrics.Total.Values["count"] = totalChecks
 	summaryGroup.Checks.Metrics.Total.Values["rate"] = calculateCounterRate(totalChecks, testRunDuration)
