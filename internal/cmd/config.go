@@ -91,7 +91,7 @@ func (c Config) Apply(cfg Config) Config {
 	return c
 }
 
-// Returns a Config but only parses the Options inside.
+// getPartialConfig returns a Config but only parses the Options inside.
 func getPartialConfig(flags *pflag.FlagSet) (Config, error) {
 	opts, err := getOptions(flags)
 	if err != nil {
@@ -124,7 +124,7 @@ func getConfig(flags *pflag.FlagSet) (Config, error) {
 	}, nil
 }
 
-// Reads the configuration file from the supplied filesystem and returns it or
+// readDiskConfig reads the configuration file from the supplied filesystem and returns it or
 // an error. The only situation in which an error won't be returned is if the
 // user didn't explicitly specify a config file path and the default config file
 // doesn't exist.
@@ -157,6 +157,7 @@ func legacyConfigFilePath(gs *state.GlobalState) string {
 	return filepath.Join(gs.UserOSConfigDir, "loadimpact", "k6", "config.json")
 }
 
+// readLegacyDiskConfig reads the configuration file stored on the old default path.
 func readLegacyDiskConfig(gs *state.GlobalState) (Config, error) {
 	// Check if the legacy config exists in the supplied filesystem
 	legacyPath := legacyConfigFilePath(gs)
@@ -175,8 +176,8 @@ func readLegacyDiskConfig(gs *state.GlobalState) (Config, error) {
 	return conf, nil
 }
 
-// Serializes the configuration to a JSON file and writes it in the supplied
-// location on the supplied filesystem
+// writeDiskConfig serializes the configuration to a JSON file and writes it in the supplied
+// location on the supplied filesystem.
 func writeDiskConfig(gs *state.GlobalState, conf Config) error {
 	data, err := json.MarshalIndent(conf, "", "  ")
 	if err != nil {
@@ -190,7 +191,7 @@ func writeDiskConfig(gs *state.GlobalState, conf Config) error {
 	return fsext.WriteFile(gs.FS, gs.Flags.ConfigFilePath, data, 0o644)
 }
 
-// Reads configuration variables from the environment.
+// readEnvConfig reads configuration variables from the environment.
 func readEnvConfig(envMap map[string]string) (Config, error) {
 	// TODO: replace envconfig and refactor the whole configuration from the ground up :/
 	conf := Config{}
@@ -235,7 +236,7 @@ func loadConfigFile(gs *state.GlobalState) (Config, error) {
 	return readDiskConfig(gs)
 }
 
-// Assemble the final consolidated configuration from all of the different sources:
+// getConsolidatedConfig assemble the final consolidated configuration from all of the different sources:
 // - start with the CLI-provided options to get shadowed (non-Valid) defaults in there
 // - add the global file config options
 // - add the Runner-provided options (they may come from Bundle too if applicable)
