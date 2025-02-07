@@ -59,7 +59,10 @@ func saveBoolFromEnv(env map[string]string, varName string, placeholder *null.Bo
 	return nil
 }
 
-func getRuntimeOptions(flags *pflag.FlagSet, environment map[string]string) (lib.RuntimeOptions, error) { //nolint:funlen
+func getRuntimeOptions(
+	flags *pflag.FlagSet,
+	environment map[string]string,
+) (lib.RuntimeOptions, error) { //nolint:funlen
 	// TODO: refactor with composable helpers as a part of #883, to reduce copy-paste
 	// TODO: get these options out of the JSON config file as well?
 	opts := lib.RuntimeOptions{

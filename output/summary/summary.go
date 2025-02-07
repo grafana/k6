@@ -43,6 +43,7 @@ func New(params output.Params) (*Output, error) {
 	}, nil
 }
 
+// OutputName is the name of the output.
 const OutputName = "summary"
 
 // Description returns a human-readable description of the output.
@@ -114,7 +115,8 @@ func (o *Output) flushSample(sample metrics.Sample) {
 func (o *Output) Summary(
 	executionState *lib.ExecutionState,
 	observedMetrics map[string]*metrics.Metric,
-	options lib.Options) *lib.Summary {
+	options lib.Options,
+) *lib.Summary {
 	testRunDuration := executionState.GetCurrentTestRunDuration()
 
 	summary := lib.NewSummary()

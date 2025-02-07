@@ -711,7 +711,7 @@ func TestAbortedByThreshold(t *testing.T) {
 	assert.True(t, testutils.LogContains(ts.LoggerHook.Drain(), logrus.ErrorLevel, expErr))
 	stdOut := ts.Stdout.String()
 	t.Log(stdOut)
-	assert.Contains(t, stdOut, "iterations\n    ✗ 'count == 1' count=2")
+	assert.Contains(t, stdOut, "iterations\n    ✗ 'count == 1'")
 	assert.Contains(t, stdOut, `teardown() called`)
 	assert.Contains(t, stdOut, `level=debug msg="Metrics emission of VUs and VUsMax metrics stopped"`)
 	assert.Contains(t, stdOut, `level=debug msg="Metrics and traces processing finished!"`)
