@@ -326,7 +326,7 @@ func TestThresholdsRuntimeBehavior(t *testing.T) {
 			name:              "#2518: submetrics without values should be rendered under their parent metric #2518",
 			testFilename:      "thresholds/thresholds_on_submetric_without_samples.js",
 			expExitCode:       0,
-			expStdoutContains: "     one..................: 0   0/s\n       { tag:xyz }........: 0   0/s\n",
+			expStdoutContains: "    one....................................: 0   0/s\n      { tag:xyz }..........................: 0   0/s\n",
 		},
 		{
 			name:         "#2512: parsing threshold names containing parsable tokens should be valid",
@@ -337,7 +337,7 @@ func TestThresholdsRuntimeBehavior(t *testing.T) {
 			name:                 "#2520: thresholds over metrics without values should avoid division by zero and displaying NaN values",
 			testFilename:         "thresholds/empty_sink_no_nan.js",
 			expExitCode:          0,
-			expStdoutContains:    "rate.................: 0.00%",
+			expStdoutContains:    "rate...................................: 0.00%",
 			expStdoutNotContains: "NaN",
 		},
 	}
@@ -354,7 +354,7 @@ func TestThresholdsRuntimeBehavior(t *testing.T) {
 			ts := tests.NewGlobalTestState(t)
 			require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, tc.testFilename), testScript, 0o644))
 
-			ts.CmdArgs = []string{"k6", "run", tc.testFilename, "--with-summary", "legacy"}
+			ts.CmdArgs = []string{"k6", "run", tc.testFilename}
 			ts.ExpectedExitCode = int(tc.expExitCode)
 			newRootCommand(ts.GlobalState).execute()
 

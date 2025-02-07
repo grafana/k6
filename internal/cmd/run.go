@@ -237,8 +237,14 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 			defer func() {
 				logger.Debug("Generating the end-of-test summary...")
 
-				summary := summaryOutput.Summary(executionState, test.initRunner.GetOptions())
-				summary.TestRunDuration = executionState.GetCurrentTestRunDuration()
+				summary := summaryOutput.Summary(
+					executionState,
+					metricsEngine.ObservedMetrics,
+					test.initRunner.GetOptions(),
+				)
+
+				// TODO: We should probably try to move these out of the summary,
+				// likely as an additional argument like options.
 				summary.NoColor = c.gs.Flags.NoColor
 				summary.UIState = lib.UIState{
 					IsStdOutTTY: c.gs.Stdout.IsTTY,

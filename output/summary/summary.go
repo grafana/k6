@@ -43,9 +43,11 @@ func New(params output.Params) (*Output, error) {
 	}, nil
 }
 
+const OutputName = "summary"
+
 // Description returns a human-readable description of the output.
 func (o *Output) Description() string {
-	return "summary"
+	return OutputName
 }
 
 // Start starts a new output.PeriodicFlusher to collect and flush metrics that will be
@@ -109,11 +111,20 @@ func (o *Output) flushSample(sample metrics.Sample) {
 }
 
 // Summary returns a lib.Summary of the test run.
-func (o *Output) Summary(executionState *lib.ExecutionState, options lib.Options) *lib.Summary {
-	summary := lib.NewSummary()
-
+func (o *Output) Summary(
+	executionState *lib.ExecutionState,
+	observedMetrics map[string]*metrics.Metric,
+	options lib.Options) *lib.Summary {
 	testRunDuration := executionState.GetCurrentTestRunDuration()
+
+	summary := lib.NewSummary()
+	summary.TestRunDuration = testRunDuration
+
 	summaryTrendStats := options.SummaryTrendStats
+
+	// Process the observed metrics. This is necessary to ensure that we have collected
+	// all metrics, even those that have no samples, so that we can render them in the summary.
+	o.processObservedMetrics(observedMetrics)
 
 	// Populate the thresholds.
 	summary.SummaryThresholds = summaryThresholds(o.dataModel.thresholds, testRunDuration, summaryTrendStats)
@@ -163,6 +174,20 @@ func (o *Output) storeSample(sample metrics.Sample) {
 			atomic.AddInt64(&check.Fails, 1)
 		} else {
 			atomic.AddInt64(&check.Passes, 1)
+		}
+	}
+}
+
+// processObservedMetrics is responsible for ensuring that we have collected
+// all metrics, even those that have no samples, so that we can render them in the summary.
+func (o *Output) processObservedMetrics(observedMetrics map[string]*metrics.Metric) {
+	for _, m := range observedMetrics {
+		if _, exists := o.dataModel.aggregatedMetrics[m.Name]; !exists {
+			o.dataModel.aggregatedMetrics[m.Name] = aggregatedMetric{
+				Metric: m,
+				Sink:   m.Sink,
+			}
+			o.dataModel.storeThresholdsFor(m)
 		}
 	}
 }

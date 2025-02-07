@@ -357,7 +357,7 @@ func (r *Runner) HandleSummary(
 	out := make(chan metrics.SampleContainer, 100)
 	defer close(out)
 
-	go func() {         // discard all metrics
+	go func() { // discard all metrics
 		for range out { //nolint:revive
 		}
 	}()

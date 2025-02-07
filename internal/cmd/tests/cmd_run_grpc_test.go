@@ -15,7 +15,7 @@ import (
 const projectRootPath = "../../../"
 
 // TestGRPCInputOutput runs same k6's scripts that we have in example folder
-// it check that output contains/not contains cetane things
+// it checks that output contains/not contains cetane things
 func TestGRPCInputOutput(t *testing.T) {
 	t.Parallel()
 
@@ -105,7 +105,7 @@ func TestGRPCInputOutput(t *testing.T) {
 			script, err := os.ReadFile(test.script) //nolint:forbidigo
 			require.NoError(t, err)
 
-			ts := getSingleFileTestState(t, string(script), []string{"-v", "--log-output=stdout", "--no-usage-report", "--with-summary", "legacy"}, 0)
+			ts := getSingleFileTestState(t, string(script), []string{"-v", "--log-output=stdout", "--no-usage-report"}, 0)
 			ts.Env = map[string]string{
 				"GRPC_ADDR":       tb.Addr,
 				"GRPC_PROTO_PATH": "./proto.proto",
