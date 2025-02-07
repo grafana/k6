@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/grafana/sobek"
 	"github.com/sirupsen/logrus"
@@ -19,6 +20,8 @@ const cantBeUsedOutsideInitContextMsg = `the "%s" function is only available in 
 // contents of a file. If the second argument is "b" it returns an ArrayBuffer
 // instance, otherwise a string representation.
 func openImpl(rt *sobek.Runtime, fs fsext.Fs, basePWD *url.URL, filename string, args ...string) (sobek.Value, error) {
+	// Strip file scheme if available as we should support only this scheme
+	filename = strings.TrimPrefix(filename, "file://")
 	data, err := readFile(fs, fsext.Abs(basePWD.Path, filename))
 	if err != nil {
 		return nil, err

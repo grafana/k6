@@ -1374,11 +1374,44 @@ func TestClientLoadProto(t *testing.T) {
 	ts := newTestState(t)
 
 	tt := testcase{
-		name: "LoadNestedTypesProto",
 		initString: codeBlock{
 			code: `
 			var client = new grpc.Client();
 			client.load([], "../../../../lib/testutils/httpmultibin/nested_types/nested_types.proto");`,
+		},
+	}
+
+	val, err := ts.Run(tt.initString.code)
+	assertResponse(t, tt.initString, err, val, ts)
+
+	expectedTypes := []string{
+		"grpc.testdata.nested.types.Outer",
+		"grpc.testdata.nested.types.Outer.MiddleAA",
+		"grpc.testdata.nested.types.Outer.MiddleAA.Inner",
+		"grpc.testdata.nested.types.Outer.MiddleBB",
+		"grpc.testdata.nested.types.Outer.MiddleBB.Inner",
+		"grpc.testdata.nested.types.MeldOuter",
+	}
+
+	for _, expected := range expectedTypes {
+		found, err := protoregistry.GlobalTypes.FindMessageByName(protoreflect.FullName(expected))
+
+		assert.NotNil(t, found, "Expected to find the message type %s, but an error occurred", expected)
+		assert.Nil(t, err, "It was not expected that there would be an error, but it got: %v", err)
+	}
+}
+
+func TestClientLoadProtoAbsoluteRootWithFile(t *testing.T) {
+	t.Parallel()
+
+	ts := newTestState(t)
+	rootPath := ts.VU.InitEnvField.CWD.JoinPath("../..").String()
+
+	tt := testcase{
+		initString: codeBlock{
+			code: `
+			var client = new grpc.Client();
+			client.load(["` + rootPath + `"], "../../lib/testutils/httpmultibin/nested_types/nested_types.proto");`,
 		},
 	}
 

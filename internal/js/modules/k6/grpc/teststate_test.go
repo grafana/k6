@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/url"
 	"os"
+	"path/filepath"
 	"runtime"
 	"sync"
 	"testing"
@@ -108,7 +109,7 @@ func newTestState(t *testing.T) testState {
 	if isWindows {
 		fs = fsext.NewTrimFilePathSeparatorFs(fs)
 	}
-	testRuntime.VU.InitEnvField.CWD = &url.URL{Path: cwd}
+	testRuntime.VU.InitEnvField.CWD = &url.URL{Scheme: "file", Path: filepath.ToSlash(cwd)}
 	testRuntime.VU.InitEnvField.FileSystems = map[string]fsext.Fs{"file": fs}
 
 	logger := logrus.New()
