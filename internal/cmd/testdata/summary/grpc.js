@@ -2,7 +2,7 @@ import grpc from 'k6/net/grpc';
 import {check} from 'k6'
 
 const GRPC_ADDR = __ENV.GRPC_ADDR || '127.0.0.1:10000';
-const GRPC_PROTO_PATH = __ENV.GRPC_PROTO_PATH || '../../internal/lib/testutils/grpcservice/route_guide.proto';
+const GRPC_PROTO_PATH = __ENV.GRPC_PROTO_PATH || '../../../lib/testutils/grpcservice/route_guide.proto';
 
 let client = new grpc.Client();
 
