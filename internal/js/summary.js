@@ -25,7 +25,7 @@ function generateTextSummary(report, options) {
 	const context = new RenderContext(0);
 
 	// Create a formatter with default settings (colors enabled)
-	const formatter = new ANSIFormatter();
+	const formatter = new ANSIFormatter(mergedOpts);
 
 	const reportGenerator = new TestReportGenerator(
 		formatter,
@@ -617,7 +617,7 @@ function renderTitle(
 	title,
 	formatter,
 	renderContext,
-	options = { prefix: titlePrefix, suffix: '\n' },
+	options = {prefix: titlePrefix, suffix: '\n'},
 ) {
 	return renderContext.indent(
 		`${options.prefix} ${formatter.boldify(title)} ${options.suffix || ''}`,
@@ -649,16 +649,16 @@ function renderCheck(check, formatter, renderContext) {
 	const checkName = formatter.decorate(failMark + ' ' + check.name, 'red');
 	const results = formatter.decorate(
 		subtitlePrefix +
-			'  ' +
-			successfulPct +
-			'% — ' +
-			successMark +
-			' ' +
-			check.passes +
-			' / ' +
-			failMark +
-			' ' +
-			check.fails,
+		'  ' +
+		successfulPct +
+		'% — ' +
+		successMark +
+		' ' +
+		check.passes +
+		' / ' +
+		failMark +
+		' ' +
+		check.fails,
 		'red',
 	);
 
@@ -687,7 +687,7 @@ function renderChecks(checks, formatter, renderContext, options = {}) {
 	// Add indentation to the render context for checks
 	renderContext = renderContext.indentedContext(1);
 
-	const { showPassedChecks = true, showFailedChecks = true } = options;
+	const {showPassedChecks = true, showFailedChecks = true} = options;
 
 	// Process each check and filter based on options
 	const renderedChecks = checks.ordered_checks
@@ -878,7 +878,7 @@ function renderMetricLine(
 	formatter,
 	renderContext,
 ) {
-	const { maxNameWidth } = info;
+	const {maxNameWidth} = info;
 
 	const displayedName = renderMetricDisplayName(name);
 	const fmtIndent = renderContext.indentLevel();
@@ -941,7 +941,7 @@ function renderMetricValueForThresholds(
 	info,
 	formatter,
 ) {
-	const { trendStats, trendCols, nonTrendValues, nonTrendExtras} = info;
+	const {trendStats, trendCols, nonTrendValues, nonTrendExtras} = info;
 	const thresholdAgg = threshold.source.split(/[=><]/)[0].trim();
 
 	let value;
@@ -1247,7 +1247,7 @@ function strWidth(s) {
 function renderMetricDisplayName(name) {
 	const subMetricPos = name.indexOf('{');
 	if (subMetricPos >= 0) {
-		return '{ ' + name.substring(subMetricPos + 1, name.length - 1) + ' }';
+		return '  { ' + name.substring(subMetricPos + 1, name.length - 1) + ' }';
 	}
 	return name;
 }
@@ -1272,9 +1272,9 @@ function humanizeBytes(bytes) {
 }
 
 const unitMap = {
-	s: { unit: 's', coef: 0.001 },
-	ms: { unit: 'ms', coef: 1 },
-	us: { unit: 'µs', coef: 1000 },
+	s: {unit: 's', coef: 0.001},
+	ms: {unit: 'ms', coef: 1},
+	us: {unit: 'µs', coef: 1000},
 };
 
 /**
