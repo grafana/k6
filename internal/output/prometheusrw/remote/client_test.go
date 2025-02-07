@@ -10,12 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"go.k6.io/k6/internal/output/prometheusrw/stale"
-
 	prompb "buf.build/gen/go/prometheus/prometheus/protocolbuffers/go"
-	"github.com/golang/snappy"
+	"github.com/klauspost/compress/snappy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.k6.io/k6/internal/output/prometheusrw/stale"
 	"google.golang.org/protobuf/proto"
 )
 
