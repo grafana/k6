@@ -1391,14 +1391,10 @@ func (f *Frame) ParentFrame() *Frame {
 }
 
 // Press presses the given key for the first element found that matches the selector.
-func (f *Frame) Press(selector, key string, opts sobek.Value) error {
+func (f *Frame) Press(selector, key string, opts *FramePressOptions) error {
 	f.log.Debugf("Frame:Press", "fid:%s furl:%q sel:%q key:%q", f.ID(), f.URL(), selector, key)
 
-	popts := NewFramePressOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return fmt.Errorf("parsing press options: %w", err)
-	}
-	if err := f.press(selector, key, popts); err != nil {
+	if err := f.press(selector, key, opts); err != nil {
 		return fmt.Errorf("pressing %q on %q: %w", key, selector, err)
 	}
 

@@ -1192,7 +1192,7 @@ func (p *Page) Opener() *Page {
 }
 
 // Press presses the given key for the first element found that matches the selector.
-func (p *Page) Press(selector string, key string, opts sobek.Value) error {
+func (p *Page) Press(selector string, key string, opts *FramePressOptions) error {
 	p.logger.Debugf("Page:Press", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().Press(selector, key, opts)
