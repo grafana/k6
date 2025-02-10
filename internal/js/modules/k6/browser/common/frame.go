@@ -1241,14 +1241,10 @@ func (f *Frame) isEnabled(selector string, opts *FrameIsEnabledOptions) (bool, e
 
 // IsDisabled returns true if the first element that matches the selector
 // is disabled. Otherwise, returns false.
-func (f *Frame) IsDisabled(selector string, opts sobek.Value) (bool, error) {
+func (f *Frame) IsDisabled(selector string, opts *FrameIsDisabledOptions) (bool, error) {
 	f.log.Debugf("Frame:IsDisabled", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	popts := NewFrameIsDisabledOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return false, fmt.Errorf("parsing is disabled options: %w", err)
-	}
-	disabled, err := f.isDisabled(selector, popts)
+	disabled, err := f.isDisabled(selector, opts)
 	if err != nil {
 		return false, fmt.Errorf("checking is %q disabled: %w", selector, err)
 	}
