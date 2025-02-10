@@ -29,7 +29,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			})
 		},
 		"click": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
-			popts, err := parseFrameClickOptions(vu.Context(), opts, p.Timeout())
+			popts, err := parseFrameClickOptions(vu.Context(), opts, p.MainFrame().Timeout())
 			if err != nil {
 				return nil, err
 			}
@@ -40,13 +40,14 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"close": func(opts sobek.Value) *sobek.Promise {
+			// TODO when opts are implemented for this function pares them here before calling k6ext.Promise and doing it
+			// in a goroutine off the event loop. As that will race with anything running on the event loop.
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				// It's safe to close the taskqueue for this targetID (if one
 				// exists).
 				vu.taskQueueRegistry.close(p.TargetID())
 
-				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
-				return nil, p.Close(opts) //nolint:wrapcheck
+				return nil, p.Close() //nolint:wrapcheck
 			})
 		},
 		"content": func() *sobek.Promise {
@@ -57,26 +58,33 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		"context": func() mapping {
 			return mapBrowserContext(vu, p.Context())
 		},
-		"dblclick": func(selector string, opts sobek.Value) *sobek.Promise {
+		"dblclick": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewFrameDblClickOptions(p.MainFrame().Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing double click options: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
-				return nil, p.Dblclick(selector, opts) //nolint:wrapcheck
-			})
+				return nil, p.Dblclick(selector, popts) //nolint:wrapcheck
+			}), nil
 		},
 		"dispatchEvent": func(selector, typ string, eventInit, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameDispatchEventOptions(p.Timeout())
+			popts := common.NewFrameDispatchEventOptions(p.MainFrame().Timeout())
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing page dispatch event options: %w", err)
 			}
+			earg := exportArg(eventInit)
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return nil, p.DispatchEvent(selector, typ, exportArg(eventInit), popts) //nolint:wrapcheck
+				return nil, p.DispatchEvent(selector, typ, earg, popts) //nolint:wrapcheck
 			}), nil
 		},
-		"emulateMedia": func(opts sobek.Value) *sobek.Promise {
+		"emulateMedia": func(opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewPageEmulateMediaOptions(p)
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing emulateMedia options: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
-				return nil, p.EmulateMedia(opts) //nolint:wrapcheck
-			})
+				return nil, p.EmulateMedia(popts) //nolint:wrapcheck
+			}), nil
 		},
 		"emulateVisionDeficiency": func(typ string) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
@@ -108,11 +116,14 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return mapJSHandle(vu, jsh), nil
 			}), nil
 		},
-		"fill": func(selector string, value string, opts sobek.Value) *sobek.Promise {
+		"fill": func(selector string, value string, opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewFrameFillOptions(p.MainFrame().Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing fill options: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
-				return nil, p.Fill(selector, value, opts) //nolint:wrapcheck
-			})
+				return nil, p.Fill(selector, value, popts) //nolint:wrapcheck
+			}), nil
 		},
 		"focus": func(selector string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {

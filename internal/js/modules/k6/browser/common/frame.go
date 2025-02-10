@@ -753,13 +753,9 @@ func (f *Frame) Content() (string, error) {
 }
 
 // Dblclick double clicks an element matching provided selector.
-func (f *Frame) Dblclick(selector string, opts sobek.Value) error {
+func (f *Frame) Dblclick(selector string, popts *FrameDblclickOptions) error {
 	f.log.Debugf("Frame:DblClick", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	popts := NewFrameDblClickOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return fmt.Errorf("parsing double click options: %w", err)
-	}
 	if err := f.dblclick(selector, popts); err != nil {
 		return fmt.Errorf("double clicking on %q: %w", selector, err)
 	}
@@ -892,13 +888,9 @@ func (f *Frame) EvaluateHandle(pageFunc string, args ...any) (handle JSHandleAPI
 }
 
 // Fill fills out the first element found that matches the selector.
-func (f *Frame) Fill(selector, value string, opts sobek.Value) error {
+func (f *Frame) Fill(selector, value string, popts *FrameFillOptions) error {
 	f.log.Debugf("Frame:Fill", "fid:%s furl:%q sel:%q val:%q", f.ID(), f.URL(), selector, value)
 
-	popts := NewFrameFillOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return fmt.Errorf("parsing fill options: %w", err)
-	}
 	if err := f.fill(selector, value, popts); err != nil {
 		return fmt.Errorf("filling %q with %q: %w", selector, value, err)
 	}

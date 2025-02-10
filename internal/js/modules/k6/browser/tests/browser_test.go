@@ -34,7 +34,7 @@ func TestBrowserNewPage(t *testing.T) {
 	_, err := b.Browser.NewPage(nil)
 	assert.EqualError(t, err, "new page: existing browser context must be closed before creating a new one")
 
-	err = p1.Close(nil)
+	err = p1.Close()
 	require.NoError(t, err)
 	c = b.Context()
 	assert.NotNil(t, c)
@@ -91,7 +91,7 @@ func TestTmpDirCleanup(t *testing.T) {
 		withEnvLookup(env.ConstLookup("TMPDIR", tmpDirPath)),
 	)
 	p := b.NewPage(nil)
-	err = p.Close(nil)
+	err = p.Close()
 	require.NoError(t, err)
 
 	matches, err := filepath.Glob(filepath.Join(tmpDirPath, storage.K6BrowserDataDirPattern))
@@ -354,13 +354,13 @@ func TestMultiConnectToSingleBrowser(t *testing.T) {
 	bctx2, err := b2.NewContext(nil)
 	require.NoError(t, err)
 
-	err = p1.Close(nil)
+	err = p1.Close()
 	require.NoError(t, err, "failed to close page #1")
 	require.NoError(t, bctx1.Close())
 
 	p2, err := bctx2.NewPage()
 	require.NoError(t, err, "failed to create page #2")
-	err = p2.Close(nil)
+	err = p2.Close()
 	require.NoError(t, err, "failed to close page #2")
 }
 
