@@ -1332,7 +1332,7 @@ func (p *Page) SelectOption(selector string, values sobek.Value, popts *FrameSel
 }
 
 // SetContent replaces the entire HTML document content.
-func (p *Page) SetContent(html string, opts sobek.Value) error {
+func (p *Page) SetContent(html string, opts *FrameSetContentOptions) error {
 	p.logger.Debugf("Page:SetContent", "sid:%v", p.sessionID())
 
 	return p.MainFrame().SetContent(html, opts)

@@ -1474,15 +1474,8 @@ func (f *Frame) selectOption(selector string, values sobek.Value, opts *FrameSel
 }
 
 // SetContent replaces the entire HTML document content.
-func (f *Frame) SetContent(html string, opts sobek.Value) error {
+func (f *Frame) SetContent(html string, _ *FrameSetContentOptions) error {
 	f.log.Debugf("Frame:SetContent", "fid:%s furl:%q", f.ID(), f.URL())
-
-	parsedOpts := NewFrameSetContentOptions(
-		f.manager.timeoutSettings.navigationTimeout(),
-	)
-	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		return fmt.Errorf("parsing set content options: %w", err)
-	}
 
 	js := `(html) => {
 		window.stop();
