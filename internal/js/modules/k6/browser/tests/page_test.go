@@ -618,13 +618,17 @@ func TestPageIsChecked(t *testing.T) {
 
 	err := p.SetContent(`<input type="checkbox" checked>`, nil)
 	require.NoError(t, err)
-	checked, err := p.IsChecked("input", nil)
+
+	isopts := common.NewFrameIsCheckedOptions(common.DefaultTimeout)
+	checked, err := p.IsChecked("input", isopts)
 	require.NoError(t, err)
 	assert.True(t, checked, "expected checkbox to be checked")
 
 	err = p.SetContent(`<input type="checkbox">`, nil)
 	require.NoError(t, err)
-	checked, err = p.IsChecked("input", nil)
+
+	isopts = common.NewFrameIsCheckedOptions(common.DefaultTimeout)
+	checked, err = p.IsChecked("input", isopts)
 	require.NoError(t, err)
 	assert.False(t, checked, "expected checkbox to be unchecked")
 }
@@ -635,19 +639,23 @@ func TestPageSetChecked(t *testing.T) {
 	p := newTestBrowser(t).NewPage(nil)
 	err := p.SetContent(`<input id="el" type="checkbox">`, nil)
 	require.NoError(t, err)
-	checked, err := p.IsChecked("#el", nil)
+
+	isopts := common.NewFrameIsCheckedOptions(common.DefaultTimeout)
+	checked, err := p.IsChecked("#el", isopts)
 	require.NoError(t, err)
 	assert.False(t, checked)
 
 	err = p.SetChecked("#el", true, common.NewFrameCheckOptions(p.MainFrame().Timeout()))
 	require.NoError(t, err)
-	checked, err = p.IsChecked("#el", nil)
+	isopts = common.NewFrameIsCheckedOptions(common.DefaultTimeout)
+	checked, err = p.IsChecked("#el", isopts)
 	require.NoError(t, err)
 	assert.True(t, checked)
 
 	err = p.SetChecked("#el", false, common.NewFrameCheckOptions(p.MainFrame().Timeout()))
 	require.NoError(t, err)
-	checked, err = p.IsChecked("#el", nil)
+	isopts = common.NewFrameIsCheckedOptions(common.DefaultTimeout)
+	checked, err = p.IsChecked("#el", isopts)
 	require.NoError(t, err)
 	assert.False(t, checked)
 }
