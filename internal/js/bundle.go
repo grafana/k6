@@ -164,13 +164,16 @@ func NewBundleFromArchive(piState *lib.TestPreInitState, arc *lib.Archive) (*Bun
 }
 
 func (b *Bundle) makeArchive() *lib.Archive {
+	clonedSourceDataURL, _ := url.Parse(b.sourceData.URL.String())
+	clonedPwdURL, _ := url.Parse(b.pwd.String())
+
 	arc := &lib.Archive{
 		Type:              "js",
 		Filesystems:       b.filesystems,
 		Options:           b.Options,
-		FilenameURL:       b.sourceData.URL,
+		FilenameURL:       clonedSourceDataURL,
 		Data:              b.sourceData.Data,
-		PwdURL:            b.pwd,
+		PwdURL:            clonedPwdURL,
 		Env:               make(map[string]string, len(b.preInitState.RuntimeOptions.Env)),
 		CompatibilityMode: b.CompatibilityMode.String(),
 		K6Version:         consts.Version,
