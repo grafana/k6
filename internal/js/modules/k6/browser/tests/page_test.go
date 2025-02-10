@@ -57,7 +57,7 @@ func TestNestedFrames(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	frame1Handle, err := page.WaitForSelector("iframe[id='iframe1']", nil)
+	frame1Handle, err := page.WaitForSelector("iframe[id='iframe1']", common.NewFrameWaitForSelectorOptions(page.MainFrame().Timeout()))
 	assert.Nil(t, err)
 	assert.NotNil(t, frame1Handle)
 
@@ -65,7 +65,7 @@ func TestNestedFrames(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotNil(t, frame1)
 
-	frame2Handle, err := frame1.WaitForSelector("iframe[id='iframe2']", nil)
+	frame2Handle, err := frame1.WaitForSelector("iframe[id='iframe2']", common.NewFrameWaitForSelectorOptions(frame1.Timeout()))
 	assert.Nil(t, err)
 	assert.NotNil(t, frame2Handle)
 
@@ -73,7 +73,7 @@ func TestNestedFrames(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotNil(t, frame2)
 
-	button1Handle, err := frame2.WaitForSelector("button[id='button1']", nil)
+	button1Handle, err := frame2.WaitForSelector("button[id='button1']", common.NewFrameWaitForSelectorOptions(frame2.Timeout()))
 	assert.Nil(t, err)
 	assert.NotNil(t, button1Handle)
 
@@ -1376,11 +1376,12 @@ func TestPageWaitForSelector(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name      string
-		url       string
-		opts      map[string]any
-		selector  string
-		errAssert func(*testing.T, error)
+		name          string
+		url           string
+		opts          map[string]any
+		customTimeout time.Duration
+		selector      string
+		errAssert     func(*testing.T, error)
 	}{
 		{
 			name:     "should wait for selector",
@@ -1394,12 +1395,10 @@ func TestPageWaitForSelector(t *testing.T) {
 		{
 			name: "should TO waiting for selector",
 			url:  "wait_for.html",
-			opts: map[string]any{
-				// set a timeout smaller than the time
-				// it takes the element to show up
-				"timeout": "1",
-			},
-			selector: "#my-div",
+			// set a timeout smaller than the time
+			// it takes the element to show up
+			customTimeout: time.Millisecond,
+			selector:      "#my-div",
 			errAssert: func(t *testing.T, e error) {
 				t.Helper()
 				assert.ErrorContains(t, e, "timed out after")
@@ -1424,7 +1423,12 @@ func TestPageWaitForSelector(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			_, err = page.WaitForSelector(tc.selector, tb.toSobekValue(tc.opts))
+			timeout := page.MainFrame().Timeout()
+			if tc.customTimeout != 0 {
+				timeout = tc.customTimeout
+			}
+
+			_, err = page.WaitForSelector(tc.selector, common.NewFrameWaitForSelectorOptions(timeout))
 			tc.errAssert(t, err)
 		})
 	}
@@ -1525,7 +1529,7 @@ func TestPageThrottleNetwork(t *testing.T) {
 
 			// result selector only appears once the page gets a response
 			// from the async ping request.
-			_, err = page.WaitForSelector(selector, nil)
+			_, err = page.WaitForSelector(selector, common.NewFrameWaitForSelectorOptions(page.MainFrame().Timeout()))
 			require.NoError(t, err)
 
 			resp, err := page.InnerText(selector, common.NewFrameInnerTextOptions(page.MainFrame().Timeout()))
@@ -1596,7 +1600,7 @@ func performPingTest(t *testing.T, tb *testBrowser, page *common.Page, iteration
 
 		// result selector only appears once the page gets a response
 		// from the async ping request.
-		_, err = page.WaitForSelector(selector, nil)
+		_, err = page.WaitForSelector(selector, common.NewFrameWaitForSelectorOptions(page.MainFrame().Timeout()))
 		require.NoError(t, err)
 
 		ms += time.Since(start).Abs().Milliseconds()

@@ -1912,12 +1912,8 @@ func (f *Frame) WaitForNavigation(opts *FrameWaitForNavigationOptions) (*Respons
 }
 
 // WaitForSelector waits for the given selector to match the waiting criteria.
-func (f *Frame) WaitForSelector(selector string, opts sobek.Value) (*ElementHandle, error) {
-	parsedOpts := NewFrameWaitForSelectorOptions(f.defaultTimeout())
-	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		return nil, fmt.Errorf("parsing wait for selector %q options: %w", selector, err)
-	}
-	handle, err := f.waitForSelectorRetry(selector, parsedOpts, maxRetry)
+func (f *Frame) WaitForSelector(selector string, popts *FrameWaitForSelectorOptions) (*ElementHandle, error) {
+	handle, err := f.waitForSelectorRetry(selector, popts, maxRetry)
 	if err != nil {
 		return nil, fmt.Errorf("waiting for selector %q: %w", selector, err)
 	}

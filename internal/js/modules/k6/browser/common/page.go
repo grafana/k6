@@ -1529,12 +1529,12 @@ func (p *Page) WaitForNavigation(opts *FrameWaitForNavigationOptions) (*Response
 }
 
 // WaitForSelector waits for the given selector to match the waiting criteria.
-func (p *Page) WaitForSelector(selector string, opts sobek.Value) (*ElementHandle, error) {
+func (p *Page) WaitForSelector(selector string, popts *FrameWaitForSelectorOptions) (*ElementHandle, error) {
 	p.logger.Debugf("Page:WaitForSelector",
 		"sid:%v stid:%v ptid:%v selector:%s",
 		p.sessionID(), p.session.TargetID(), p.targetID, selector)
 
-	return p.frameManager.MainFrame().WaitForSelector(selector, opts)
+	return p.frameManager.MainFrame().WaitForSelector(selector, popts)
 }
 
 // WaitForTimeout waits the specified number of milliseconds.

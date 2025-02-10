@@ -460,15 +460,19 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return mapResponse(vu, resp), nil
 			}), nil
 		},
-		"waitForSelector": func(selector string, opts sobek.Value) *sobek.Promise {
+		"waitForSelector": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewFrameWaitForSelectorOptions(p.MainFrame().Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing wait for selector %q options: %w", selector, err)
+			}
+
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
-				eh, err := p.WaitForSelector(selector, opts)
+				eh, err := p.WaitForSelector(selector, popts)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
 				}
 				return mapElementHandle(vu, eh), nil
-			})
+			}), nil
 		},
 		"waitForTimeout": func(timeout int64) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
