@@ -849,7 +849,7 @@ func (p *Page) Click(selector string, opts *FrameClickOptions) error {
 }
 
 // Close closes the page.
-func (p *Page) Close(_ sobek.Value) error {
+func (p *Page) Close() error {
 	p.logger.Debugf("Page:Close", "sid:%v", p.sessionID())
 	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.close")
 	defer span.End()
@@ -907,10 +907,10 @@ func (p *Page) Context() *BrowserContext {
 }
 
 // Dblclick double clicks an element matching provided selector.
-func (p *Page) Dblclick(selector string, opts sobek.Value) error {
+func (p *Page) Dblclick(selector string, popts *FrameDblclickOptions) error {
 	p.logger.Debugf("Page:Dblclick", "sid:%v selector:%s", p.sessionID(), selector)
 
-	return p.MainFrame().Dblclick(selector, opts)
+	return p.MainFrame().Dblclick(selector, popts)
 }
 
 // DispatchEvent dispatches an event on the page to the element that matches the provided selector.
@@ -921,17 +921,12 @@ func (p *Page) DispatchEvent(selector string, typ string, eventInit any, opts *F
 }
 
 // EmulateMedia emulates the given media type.
-func (p *Page) EmulateMedia(opts sobek.Value) error {
+func (p *Page) EmulateMedia(popts *PageEmulateMediaOptions) error {
 	p.logger.Debugf("Page:EmulateMedia", "sid:%v", p.sessionID())
 
-	parsedOpts := NewPageEmulateMediaOptions(p.mediaType, p.colorScheme, p.reducedMotion)
-	if err := parsedOpts.Parse(p.ctx, opts); err != nil {
-		return fmt.Errorf("parsing emulateMedia options: %w", err)
-	}
-
-	p.mediaType = parsedOpts.Media
-	p.colorScheme = parsedOpts.ColorScheme
-	p.reducedMotion = parsedOpts.ReducedMotion
+	p.mediaType = popts.Media
+	p.colorScheme = popts.ColorScheme
+	p.reducedMotion = popts.ReducedMotion
 
 	p.frameSessionsMu.RLock()
 	for _, fs := range p.frameSessions {
@@ -993,17 +988,17 @@ func (p *Page) EvaluateHandle(pageFunc string, args ...any) (JSHandleAPI, error)
 }
 
 // Fill fills an input element with the provided value.
-func (p *Page) Fill(selector string, value string, opts sobek.Value) error {
+func (p *Page) Fill(selector string, value string, popts *FrameFillOptions) error {
 	p.logger.Debugf("Page:Fill", "sid:%v selector:%s", p.sessionID(), selector)
 
-	return p.MainFrame().Fill(selector, value, opts)
+	return p.MainFrame().Fill(selector, value, popts)
 }
 
 // Focus focuses an element matching the provided selector.
-func (p *Page) Focus(selector string, opts sobek.Value) error {
+func (p *Page) Focus(selector string, popts *FrameBaseOptions) error {
 	p.logger.Debugf("Page:Focus", "sid:%v selector:%s", p.sessionID(), selector)
 
-	return p.MainFrame().Focus(selector, opts)
+	return p.MainFrame().Focus(selector, popts)
 }
 
 // Frames returns a list of frames on the page.
@@ -1013,11 +1008,11 @@ func (p *Page) Frames() []*Frame {
 
 // GetAttribute returns the attribute value of the element matching the provided selector.
 // The second return value is true if the attribute exists, and false otherwise.
-func (p *Page) GetAttribute(selector string, name string, opts sobek.Value) (string, bool, error) {
+func (p *Page) GetAttribute(selector string, name string, popts *FrameBaseOptions) (string, bool, error) {
 	p.logger.Debugf("Page:GetAttribute", "sid:%v selector:%s name:%s",
 		p.sessionID(), selector, name)
 
-	return p.MainFrame().GetAttribute(selector, name, opts)
+	return p.MainFrame().GetAttribute(selector, name, popts)
 }
 
 // GetKeyboard returns the keyboard for the page.
@@ -1056,31 +1051,31 @@ func (p *Page) Goto(url string, opts *FrameGotoOptions) (*Response, error) {
 }
 
 // Hover hovers over an element matching the provided selector.
-func (p *Page) Hover(selector string, opts sobek.Value) error {
+func (p *Page) Hover(selector string, popts *FrameHoverOptions) error {
 	p.logger.Debugf("Page:Hover", "sid:%v selector:%s", p.sessionID(), selector)
 
-	return p.MainFrame().Hover(selector, opts)
+	return p.MainFrame().Hover(selector, popts)
 }
 
 // InnerHTML returns the inner HTML of the element matching the provided selector.
-func (p *Page) InnerHTML(selector string, opts sobek.Value) (string, error) {
+func (p *Page) InnerHTML(selector string, popts *FrameInnerHTMLOptions) (string, error) {
 	p.logger.Debugf("Page:InnerHTML", "sid:%v selector:%s", p.sessionID(), selector)
 
-	return p.MainFrame().InnerHTML(selector, opts)
+	return p.MainFrame().InnerHTML(selector, popts)
 }
 
 // InnerText returns the inner text of the element matching the provided selector.
-func (p *Page) InnerText(selector string, opts sobek.Value) (string, error) {
+func (p *Page) InnerText(selector string, popts *FrameInnerTextOptions) (string, error) {
 	p.logger.Debugf("Page:InnerText", "sid:%v selector:%s", p.sessionID(), selector)
 
-	return p.MainFrame().InnerText(selector, opts)
+	return p.MainFrame().InnerText(selector, popts)
 }
 
 // InputValue returns the value of the input element matching the provided selector.
-func (p *Page) InputValue(selector string, opts sobek.Value) (string, error) {
+func (p *Page) InputValue(selector string, popts *FrameInputValueOptions) (string, error) {
 	p.logger.Debugf("Page:InputValue", "sid:%v selector:%s", p.sessionID(), selector)
 
-	return p.MainFrame().InputValue(selector, opts)
+	return p.MainFrame().InputValue(selector, popts)
 }
 
 func (p *Page) IsClosed() bool {
