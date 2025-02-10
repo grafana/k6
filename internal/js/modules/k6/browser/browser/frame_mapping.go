@@ -153,10 +153,14 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				return nil, f.Hover(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
-		"innerHTML": func(selector string, opts sobek.Value) *sobek.Promise {
+		"innerHTML": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewFrameInnerHTMLOptions(f.Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing inner HTML options: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return f.InnerHTML(selector, opts) //nolint:wrapcheck
-			})
+				return f.InnerHTML(selector, popts) //nolint:wrapcheck
+			}), nil
 		},
 		"innerText": func(selector string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {

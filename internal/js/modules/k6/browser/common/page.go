@@ -1058,10 +1058,10 @@ func (p *Page) Hover(selector string, popts *FrameHoverOptions) error {
 }
 
 // InnerHTML returns the inner HTML of the element matching the provided selector.
-func (p *Page) InnerHTML(selector string, opts sobek.Value) (string, error) {
+func (p *Page) InnerHTML(selector string, popts *FrameInnerHTMLOptions) (string, error) {
 	p.logger.Debugf("Page:InnerHTML", "sid:%v selector:%s", p.sessionID(), selector)
 
-	return p.MainFrame().InnerHTML(selector, opts)
+	return p.MainFrame().InnerHTML(selector, popts)
 }
 
 // InnerText returns the inner text of the element matching the provided selector.

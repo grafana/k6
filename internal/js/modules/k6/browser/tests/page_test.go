@@ -397,7 +397,7 @@ func TestPageInnerHTML(t *testing.T) {
 		p := newTestBrowser(t).NewPage(nil)
 		err := p.SetContent(sampleHTML, nil)
 		require.NoError(t, err)
-		innerHTML, err := p.InnerHTML("div", nil)
+		innerHTML, err := p.InnerHTML("div", common.NewFrameInnerHTMLOptions(p.MainFrame().Timeout()))
 		require.NoError(t, err)
 		assert.Equal(t, `<b>Test</b><ol><li><i>One</i></li></ol>`, innerHTML)
 	})
@@ -410,7 +410,7 @@ func TestPageInnerHTML(t *testing.T) {
 
 		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
-		_, err := p.InnerHTML("", nil)
+		_, err := p.InnerHTML("", common.NewFrameInnerHTMLOptions(p.Context().Timeout()))
 		require.ErrorContains(t, err, "The provided selector is empty")
 	})
 
@@ -421,7 +421,9 @@ func TestPageInnerHTML(t *testing.T) {
 		p := tb.NewPage(nil)
 		err := p.SetContent(sampleHTML, nil)
 		require.NoError(t, err)
-		_, err = p.InnerHTML("p", tb.toSobekValue(jsFrameBaseOpts{Timeout: "100"}))
+		popts := common.NewFrameInnerHTMLOptions(p.MainFrame().Timeout())
+		require.NoError(t, popts.Parse(tb.vu.Context(), tb.toSobekValue(jsFrameBaseOpts{Timeout: "100"})))
+		_, err = p.InnerHTML("p", popts)
 		require.Error(t, err)
 	})
 }
@@ -1859,7 +1861,7 @@ func TestPageTargetBlank(t *testing.T) {
 	assert.Equal(t, 2, len(pp))
 
 	// Make sure the new page contains the correct page.
-	got, err := p2.InnerHTML("h1", nil)
+	got, err := p2.InnerHTML("h1", common.NewFrameInnerHTMLOptions(p.MainFrame().Timeout()))
 	require.NoError(t, err)
 	assert.Equal(t, "you clicked!", got)
 }
