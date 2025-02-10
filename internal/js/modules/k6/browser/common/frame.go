@@ -678,14 +678,10 @@ func (f *Frame) uncheck(selector string, opts *FrameUncheckOptions) error {
 
 // IsChecked returns true if the first element that matches the selector
 // is checked. Otherwise, returns false.
-func (f *Frame) IsChecked(selector string, opts sobek.Value) (bool, error) {
+func (f *Frame) IsChecked(selector string, opts *FrameIsCheckedOptions) (bool, error) {
 	f.log.Debugf("Frame:IsChecked", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	popts := NewFrameIsCheckedOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return false, fmt.Errorf("parsing is checked options: %w", err)
-	}
-	checked, err := f.isChecked(selector, popts)
+	checked, err := f.isChecked(selector, opts)
 	if err != nil {
 		return false, fmt.Errorf("checking element is checked %q: %w", selector, err)
 	}

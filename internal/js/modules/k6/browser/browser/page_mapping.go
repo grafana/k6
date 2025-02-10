@@ -214,11 +214,14 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return p.InputValue(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
-		"isChecked": func(selector string, opts sobek.Value) *sobek.Promise {
+		"isChecked": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewFrameIsCheckedOptions(p.MainFrame().Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parse isChecked options of selector %q: %w", selector, err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
-				return p.IsChecked(selector, opts) //nolint:wrapcheck
-			})
+				return p.IsChecked(selector, popts) //nolint:wrapcheck
+			}), nil
 		},
 		"isClosed": p.IsClosed,
 		"isDisabled": func(selector string, opts sobek.Value) *sobek.Promise {

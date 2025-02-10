@@ -222,19 +222,23 @@ func TestFrameSetChecked(t *testing.T) {
 	p := newTestBrowser(t).NewPage(nil)
 	err := p.SetContent(`<input id="el" type="checkbox">`, nil)
 	require.NoError(t, err)
-	checked, err := p.Frames()[0].IsChecked("#el", nil)
+
+	isopts := common.NewFrameIsCheckedOptions(p.MainFrame().Timeout())
+	checked, err := p.Frames()[0].IsChecked("#el", isopts)
 	require.NoError(t, err)
 	assert.False(t, checked)
 
 	err = p.Frames()[0].SetChecked("#el", true, common.NewFrameCheckOptions(p.Frames()[0].Timeout()))
 	require.NoError(t, err)
-	checked, err = p.Frames()[0].IsChecked("#el", nil)
+	isopts = common.NewFrameIsCheckedOptions(p.MainFrame().Timeout())
+	checked, err = p.Frames()[0].IsChecked("#el", isopts)
 	require.NoError(t, err)
 	assert.True(t, checked)
 
 	err = p.Frames()[0].SetChecked("#el", false, common.NewFrameCheckOptions(p.Frames()[0].Timeout()))
 	require.NoError(t, err)
-	checked, err = p.Frames()[0].IsChecked("#el", nil)
+	isopts = common.NewFrameIsCheckedOptions(p.MainFrame().Timeout())
+	checked, err = p.Frames()[0].IsChecked("#el", isopts)
 	require.NoError(t, err)
 	assert.False(t, checked)
 }

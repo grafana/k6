@@ -180,10 +180,14 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				return f.InputValue(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
-		"isChecked": func(selector string, opts sobek.Value) *sobek.Promise {
+		"isChecked": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewFrameIsCheckedOptions(f.Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing isChecked options of selector %q: %w", selector, err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return f.IsChecked(selector, opts) //nolint:wrapcheck
-			})
+				return f.IsChecked(selector, popts) //nolint:wrapcheck
+			}), nil
 		},
 		"isDetached": f.IsDetached,
 		"isDisabled": func(selector string, opts sobek.Value) *sobek.Promise {
