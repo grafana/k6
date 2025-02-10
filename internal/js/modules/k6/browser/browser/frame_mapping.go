@@ -190,10 +190,14 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			}), nil
 		},
 		"isDetached": f.IsDetached,
-		"isDisabled": func(selector string, opts sobek.Value) *sobek.Promise {
+		"isDisabled": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewFrameIsDisabledOptions(f.Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing isDisabled options of selector %q: %w", selector, err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return f.IsDisabled(selector, opts) //nolint:wrapcheck
-			})
+				return f.IsDisabled(selector, popts) //nolint:wrapcheck
+			}), nil
 		},
 		"isEditable": func(selector string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {

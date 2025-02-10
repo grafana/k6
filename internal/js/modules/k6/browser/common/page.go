@@ -1087,7 +1087,7 @@ func (p *Page) IsClosed() bool {
 
 // IsDisabled returns true if the first element that matches the selector
 // is disabled. Otherwise, returns false.
-func (p *Page) IsDisabled(selector string, opts sobek.Value) (bool, error) {
+func (p *Page) IsDisabled(selector string, opts *FrameIsDisabledOptions) (bool, error) {
 	p.logger.Debugf("Page:IsDisabled", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().IsDisabled(selector, opts)
