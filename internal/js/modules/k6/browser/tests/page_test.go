@@ -468,7 +468,7 @@ func TestPageTextContent(t *testing.T) {
 		p := newTestBrowser(t).NewPage(nil)
 		err := p.SetContent(sampleHTML, nil)
 		require.NoError(t, err)
-		textContent, ok, err := p.TextContent("div", nil)
+		textContent, ok, err := p.TextContent("div", common.NewFrameTextContentOptions(p.MainFrame().Timeout()))
 		require.NoError(t, err)
 		require.True(t, ok)
 		assert.Equal(t, "TestOne", textContent)
@@ -479,7 +479,7 @@ func TestPageTextContent(t *testing.T) {
 
 		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
-		_, _, err := p.TextContent("", nil)
+		_, _, err := p.TextContent("", common.NewFrameTextContentOptions(p.MainFrame().Timeout()))
 		require.ErrorContains(t, err, "The provided selector is empty")
 	})
 
@@ -490,9 +490,7 @@ func TestPageTextContent(t *testing.T) {
 		p := tb.NewPage(nil)
 		err := p.SetContent(sampleHTML, nil)
 		require.NoError(t, err)
-		_, _, err = p.TextContent("p", tb.toSobekValue(jsFrameBaseOpts{
-			Timeout: "100",
-		}))
+		_, _, err = p.TextContent("p", common.NewFrameTextContentOptions(100))
 		require.Error(t, err)
 	})
 
@@ -503,9 +501,7 @@ func TestPageTextContent(t *testing.T) {
 		p := tb.NewPage(nil)
 		err := p.SetContent(sampleHTML, nil)
 		require.NoError(t, err)
-		_, _, err = p.TextContent("p", tb.toSobekValue(jsFrameBaseOpts{
-			Timeout: "100",
-		}))
+		_, _, err = p.TextContent("p", common.NewFrameTextContentOptions(100))
 		require.Error(t, err)
 	})
 }

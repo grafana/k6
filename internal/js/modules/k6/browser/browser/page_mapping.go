@@ -335,10 +335,14 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, p.Tap(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
-		"textContent": func(selector string, opts sobek.Value) *sobek.Promise {
+		"textContent": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewFrameTextContentOptions(p.MainFrame().Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing text content options: %w", err)
+			}
+
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
-				s, ok, err := p.TextContent(selector, opts)
+				s, ok, err := p.TextContent(selector, popts)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
 				}
@@ -346,7 +350,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 					return nil, nil
 				}
 				return s, nil
-			})
+			}), nil
 		},
 		"throttleCPU": func(cpuProfile common.CPUProfile) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {

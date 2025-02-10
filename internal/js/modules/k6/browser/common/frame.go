@@ -1635,13 +1635,9 @@ func (f *Frame) setInputFiles(selector string, files *Files, opts *FrameSetInput
 // TextContent returns the textContent attribute of the first element found
 // that matches the selector. The second return value is true if the returned
 // text content is not null or empty, and false otherwise.
-func (f *Frame) TextContent(selector string, opts sobek.Value) (string, bool, error) {
+func (f *Frame) TextContent(selector string, popts *FrameTextContentOptions) (string, bool, error) {
 	f.log.Debugf("Frame:TextContent", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	popts := NewFrameTextContentOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return "", false, fmt.Errorf("parsing text content options: %w", err)
-	}
 	v, ok, err := f.textContent(selector, popts)
 	if err != nil {
 		return "", false, fmt.Errorf("getting text content of %q: %w", selector, err)
