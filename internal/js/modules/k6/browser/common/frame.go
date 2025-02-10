@@ -1159,14 +1159,10 @@ func (f *Frame) setDetached(detached bool) {
 
 // IsEditable returns true if the first element that matches the selector
 // is editable. Otherwise, returns false.
-func (f *Frame) IsEditable(selector string, opts sobek.Value) (bool, error) {
+func (f *Frame) IsEditable(selector string, opts *FrameIsEditableOptions) (bool, error) {
 	f.log.Debugf("Frame:IsEditable", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	popts := NewFrameIsEditableOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return false, fmt.Errorf("parsing is editable options: %w", err)
-	}
-	editable, err := f.isEditable(selector, popts)
+	editable, err := f.isEditable(selector, opts)
 	if err != nil {
 		return false, fmt.Errorf("checking is %q editable: %w", selector, err)
 	}

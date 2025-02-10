@@ -1095,7 +1095,7 @@ func (p *Page) IsDisabled(selector string, opts *FrameIsDisabledOptions) (bool, 
 
 // IsEditable returns true if the first element that matches the selector
 // is editable. Otherwise, returns false.
-func (p *Page) IsEditable(selector string, opts sobek.Value) (bool, error) {
+func (p *Page) IsEditable(selector string, opts *FrameIsEditableOptions) (bool, error) {
 	p.logger.Debugf("Page:IsEditable", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().IsEditable(selector, opts)
