@@ -13,6 +13,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"hash"
+	"net/url"
 	"path"
 	"sort"
 	"strconv"
@@ -687,7 +688,7 @@ func (c *linkerContext) generateChunksInParallel(additionalFiles []graph.OutputF
 				})
 
 			// Generate the optional legal comments file for this chunk
-			if chunk.externalLegalComments != nil {
+			if len(chunk.externalLegalComments) > 0 {
 				finalRelPathForLegalComments := chunk.finalRelPath + ".LEGAL.txt"
 
 				// Link the file to the legal comments
@@ -719,10 +720,11 @@ func (c *linkerContext) generateChunksInParallel(additionalFiles []graph.OutputF
 				case config.SourceMapLinkedWithComment:
 					importPath := c.pathBetweenChunks(finalRelDir, finalRelPathForSourceMap)
 					importPath = strings.TrimPrefix(importPath, "./")
+					importURL := url.URL{Path: importPath}
 					outputContentsJoiner.EnsureNewlineAtEnd()
 					outputContentsJoiner.AddString(commentPrefix)
 					outputContentsJoiner.AddString("# sourceMappingURL=")
-					outputContentsJoiner.AddString(importPath)
+					outputContentsJoiner.AddString(importURL.EscapedPath())
 					outputContentsJoiner.AddString(commentSuffix)
 					outputContentsJoiner.AddString("\n")
 
@@ -6955,8 +6957,7 @@ func (c *linkerContext) generateSourceMapForChunk(
 
 	// Generate the "sources" and "sourcesContent" arrays
 	type item struct {
-		path           logger.Path
-		prettyPath     string
+		source         string
 		quotedContents []byte
 	}
 	items := make([]item, 0, len(results))
@@ -6977,9 +6978,12 @@ func (c *linkerContext) generateSourceMapForChunk(
 			if !c.options.ExcludeSourcesContent {
 				quotedContents = dataForSourceMaps[result.sourceIndex].QuotedContents[0]
 			}
+			source := file.InputFile.Source.KeyPath.Text
+			if file.InputFile.Source.KeyPath.Namespace == "file" {
+				source = helpers.FileURLFromFilePath(source).String()
+			}
 			items = append(items, item{
-				path:           file.InputFile.Source.KeyPath,
-				prettyPath:     file.InputFile.Source.PrettyPath,
+				source:         source,
 				quotedContents: quotedContents,
 			})
 			nextSourcesIndex++
@@ -6989,24 +6993,12 @@ func (c *linkerContext) generateSourceMapForChunk(
 		// Complex case: nested source map
 		sm := file.InputFile.InputSourceMap
 		for i, source := range sm.Sources {
-			path := logger.Path{
-				Namespace: file.InputFile.Source.KeyPath.Namespace,
-				Text:      source,
-			}
-
-			// If this file is in the "file" namespace, change the relative path in
-			// the source map into an absolute path using the directory of this file
-			if path.Namespace == "file" {
-				path.Text = c.fs.Join(c.fs.Dir(file.InputFile.Source.KeyPath.Text), source)
-			}
-
 			var quotedContents []byte
 			if !c.options.ExcludeSourcesContent {
 				quotedContents = dataForSourceMaps[result.sourceIndex].QuotedContents[i]
 			}
 			items = append(items, item{
-				path:           path,
-				prettyPath:     source,
+				source:         source,
 				quotedContents: quotedContents,
 			})
 		}
@@ -7022,14 +7014,19 @@ func (c *linkerContext) generateSourceMapForChunk(
 
 		// Modify the absolute path to the original file to be relative to the
 		// directory that will contain the output file for this chunk
-		if item.path.Namespace == "file" {
-			if relPath, ok := c.fs.Rel(chunkAbsDir, item.path.Text); ok {
+		if sourceURL, err := url.Parse(item.source); err == nil && helpers.IsFileURL(sourceURL) {
+			sourcePath := helpers.FilePathFromFileURL(c.fs, sourceURL)
+			if relPath, ok := c.fs.Rel(chunkAbsDir, sourcePath); ok {
 				// Make sure to always use forward slashes, even on Windows
-				item.prettyPath = strings.ReplaceAll(relPath, "\\", "/")
+				relativeURL := url.URL{Path: strings.ReplaceAll(relPath, "\\", "/")}
+				item.source = relativeURL.String()
+
+				// Replace certain percent encodings for better readability
+				item.source = strings.ReplaceAll(item.source, "%20", " ")
 			}
 		}
 
-		j.AddBytes(helpers.QuoteForJSON(item.prettyPath, c.options.ASCIIOnly))
+		j.AddBytes(helpers.QuoteForJSON(item.source, c.options.ASCIIOnly))
 	}
 	j.AddString("]")
 

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"math"
+	"math/big"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -719,7 +720,8 @@ func (p *printer) printBinding(binding js_ast.Binding) {
 						p.addSourceMapping(property.Key.Loc)
 						p.printIdentifierUTF16(str.Value)
 					} else if mangled, ok := property.Key.Data.(*js_ast.ENameOfSymbol); ok {
-						if name := p.mangledPropName(mangled.Ref); p.canPrintIdentifier(name) {
+						name := p.mangledPropName(mangled.Ref)
+						if p.canPrintIdentifier(name) {
 							p.addSourceMappingForName(property.Key.Loc, name, mangled.Ref)
 							p.printIdentifier(name)
 
@@ -1204,7 +1206,8 @@ func (p *printer) printProperty(property js_ast.Property) {
 		p.printIdentifier(name)
 
 	case *js_ast.ENameOfSymbol:
-		if name := p.mangledPropName(key.Ref); p.canPrintIdentifier(name) {
+		name := p.mangledPropName(key.Ref)
+		if p.canPrintIdentifier(name) {
 			p.printSpaceBeforeIdentifier()
 			p.addSourceMappingForName(property.Key.Loc, name, key.Ref)
 			p.printIdentifier(name)
@@ -2933,7 +2936,10 @@ func (p *printer) printExpr(expr js_ast.Expr, level js_ast.L, flags printExprFla
 				var inlinedValue js_ast.E
 				switch e2 := part.Value.Data.(type) {
 				case *js_ast.ENameOfSymbol:
-					inlinedValue = &js_ast.EString{Value: helpers.StringToUTF16(p.mangledPropName(e2.Ref))}
+					inlinedValue = &js_ast.EString{
+						Value:                 helpers.StringToUTF16(p.mangledPropName(e2.Ref)),
+						HasPropertyKeyComment: e2.HasPropertyKeyComment,
+					}
 				case *js_ast.EDot:
 					if value, ok := p.tryToGetImportedEnumValue(e2.Target, e2.Name); ok {
 						if value.String != nil {
@@ -3043,10 +3049,72 @@ func (p *printer) printExpr(expr js_ast.Expr, level js_ast.L, flags printExprFla
 		}
 
 	case *js_ast.EBigInt:
+		if !p.options.UnsupportedFeatures.Has(compat.Bigint) {
+			p.printSpaceBeforeIdentifier()
+			p.addSourceMapping(expr.Loc)
+			p.print(e.Value)
+			p.print("n")
+			break
+		}
+
+		wrap := level >= js_ast.LNew || (flags&forbidCall) != 0
+		hasPureComment := !p.options.MinifyWhitespace
+
+		if hasPureComment && level >= js_ast.LPostfix {
+			wrap = true
+		}
+
+		if wrap {
+			p.print("(")
+		}
+
+		if hasPureComment {
+			flags := p.saveExprStartFlags()
+			p.addSourceMapping(expr.Loc)
+			p.print("/* @__PURE__ */ ")
+			p.restoreExprStartFlags(flags)
+		}
+
+		value := e.Value
+		useQuotes := true
+
+		// When minifying, try to convert to a shorter form
+		if p.options.MinifySyntax {
+			var i big.Int
+			fmt.Sscan(value, &i)
+			str := i.String()
+
+			// Print without quotes if it can be converted exactly
+			if num, err := strconv.ParseFloat(str, 64); err == nil && str == fmt.Sprintf("%.0f", num) {
+				useQuotes = false
+			}
+
+			// Print the converted form if it's shorter (long hex strings may not be shorter)
+			if len(str) < len(value) {
+				value = str
+			}
+		}
+
 		p.printSpaceBeforeIdentifier()
 		p.addSourceMapping(expr.Loc)
-		p.print(e.Value)
-		p.print("n")
+
+		if useQuotes {
+			p.print("BigInt(\"")
+		} else {
+			p.print("BigInt(")
+		}
+
+		p.print(value)
+
+		if useQuotes {
+			p.print("\")")
+		} else {
+			p.print(")")
+		}
+
+		if wrap {
+			p.print(")")
+		}
 
 	case *js_ast.ENumber:
 		p.addSourceMapping(expr.Loc)
