@@ -1488,13 +1488,9 @@ func (f *Frame) press(selector, key string, opts *FramePressOptions) error {
 
 // SelectOption selects the given options and returns the array of
 // option values of the first element found that matches the selector.
-func (f *Frame) SelectOption(selector string, values sobek.Value, opts sobek.Value) ([]string, error) {
+func (f *Frame) SelectOption(selector string, values sobek.Value, popts *FrameSelectOptionOptions) ([]string, error) {
 	f.log.Debugf("Frame:SelectOption", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	popts := NewFrameSelectOptionOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return nil, fmt.Errorf("parsing select option options: %w", err)
-	}
 	v, err := f.selectOption(selector, values, popts)
 	if err != nil {
 		return nil, fmt.Errorf("selecting option on %q: %w", selector, err)

@@ -279,11 +279,16 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return &ab, nil
 			}), nil
 		},
-		"selectOption": func(selector string, values sobek.Value, opts sobek.Value) *sobek.Promise {
+		"selectOption": func(selector string, values sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewFrameSelectOptionOptions(p.MainFrame().Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing select option options: %w", err)
+			}
+
+			// TODO: don't use sobek Values in a separate goroutine: finish migrating values
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
-				return p.SelectOption(selector, values, opts) //nolint:wrapcheck
-			})
+				return p.SelectOption(selector, values, popts) //nolint:wrapcheck
+			}), nil
 		},
 		"setChecked": func(selector string, checked bool, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
