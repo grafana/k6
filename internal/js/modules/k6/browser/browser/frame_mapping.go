@@ -251,7 +251,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 					return nil, err //nolint:wrapcheck
 				}
 				if !ok {
-					return nil, nil
+					return nil, nil //nolint:nilnil
 				}
 				return s, nil
 			}), nil
