@@ -1299,14 +1299,10 @@ func (f *Frame) isHidden(selector string, opts *FrameIsHiddenOptions) (bool, err
 
 // IsVisible returns true if the first element that matches the selector
 // is visible. Otherwise, returns false.
-func (f *Frame) IsVisible(selector string, opts sobek.Value) (bool, error) {
+func (f *Frame) IsVisible(selector string, opts *FrameIsVisibleOptions) (bool, error) {
 	f.log.Debugf("Frame:IsVisible", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	popts := NewFrameIsVisibleOptions()
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return false, fmt.Errorf("parsing is visible options: %w", err)
-	}
-	visible, err := f.isVisible(selector, popts)
+	visible, err := f.isVisible(selector, opts)
 	if err != nil {
 		return false, err
 	}

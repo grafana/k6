@@ -1120,7 +1120,7 @@ func (p *Page) IsHidden(selector string, opts *FrameIsHiddenOptions) (bool, erro
 
 // IsVisible will look for an element in the dom with given selector. It will
 // not wait for a match to occur. If no elements match `false` will be returned.
-func (p *Page) IsVisible(selector string, opts sobek.Value) (bool, error) {
+func (p *Page) IsVisible(selector string, opts *FrameIsVisibleOptions) (bool, error) {
 	p.logger.Debugf("Page:IsVisible", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().IsVisible(selector, opts)
