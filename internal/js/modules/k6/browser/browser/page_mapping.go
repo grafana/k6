@@ -196,17 +196,23 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return p.InnerHTML(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
-		"innerText": func(selector string, opts sobek.Value) *sobek.Promise {
+		"innerText": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewFrameInnerTextOptions(p.MainFrame().Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing inner text options: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
-				return p.InnerText(selector, opts) //nolint:wrapcheck
-			})
+				return p.InnerText(selector, popts) //nolint:wrapcheck
+			}), nil
 		},
-		"inputValue": func(selector string, opts sobek.Value) *sobek.Promise {
+		"inputValue": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewFrameInputValueOptions(p.MainFrame().Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing input value options: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
-				return p.InputValue(selector, opts) //nolint:wrapcheck
-			})
+				return p.InputValue(selector, popts) //nolint:wrapcheck
+			}), nil
 		},
 		"isChecked": func(selector string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {

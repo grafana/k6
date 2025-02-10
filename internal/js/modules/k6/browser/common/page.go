@@ -1065,17 +1065,17 @@ func (p *Page) InnerHTML(selector string, popts *FrameInnerHTMLOptions) (string,
 }
 
 // InnerText returns the inner text of the element matching the provided selector.
-func (p *Page) InnerText(selector string, opts sobek.Value) (string, error) {
+func (p *Page) InnerText(selector string, popts *FrameInnerTextOptions) (string, error) {
 	p.logger.Debugf("Page:InnerText", "sid:%v selector:%s", p.sessionID(), selector)
 
-	return p.MainFrame().InnerText(selector, opts)
+	return p.MainFrame().InnerText(selector, popts)
 }
 
 // InputValue returns the value of the input element matching the provided selector.
-func (p *Page) InputValue(selector string, opts sobek.Value) (string, error) {
+func (p *Page) InputValue(selector string, popts *FrameInputValueOptions) (string, error) {
 	p.logger.Debugf("Page:InputValue", "sid:%v selector:%s", p.sessionID(), selector)
 
-	return p.MainFrame().InputValue(selector, opts)
+	return p.MainFrame().InputValue(selector, popts)
 }
 
 func (p *Page) IsClosed() bool {

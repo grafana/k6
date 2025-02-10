@@ -437,7 +437,7 @@ func TestPageInnerText(t *testing.T) {
 		p := newTestBrowser(t).NewPage(nil)
 		err := p.SetContent(sampleHTML, nil)
 		require.NoError(t, err)
-		innerText, err := p.InnerText("div", nil)
+		innerText, err := p.InnerText("div", common.NewFrameInnerTextOptions(p.MainFrame().Timeout()))
 		require.NoError(t, err)
 		assert.Equal(t, "Test\nOne", innerText)
 	})
@@ -447,7 +447,7 @@ func TestPageInnerText(t *testing.T) {
 
 		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
-		_, err := p.InnerText("", nil)
+		_, err := p.InnerText("", common.NewFrameInnerTextOptions(p.MainFrame().Timeout()))
 		require.ErrorContains(t, err, "The provided selector is empty")
 	})
 
@@ -458,7 +458,10 @@ func TestPageInnerText(t *testing.T) {
 		p := tb.NewPage(nil)
 		err := p.SetContent(sampleHTML, nil)
 		require.NoError(t, err)
-		_, err = p.InnerText("p", tb.toSobekValue(jsFrameBaseOpts{Timeout: "100"}))
+
+		popts := common.NewFrameInnerTextOptions(p.MainFrame().Timeout())
+		require.NoError(t, popts.Parse(tb.vu.Context(), tb.toSobekValue(jsFrameBaseOpts{Timeout: "100"})))
+		_, err = p.InnerText("p", popts)
 		require.Error(t, err)
 	})
 }
@@ -522,17 +525,17 @@ func TestPageInputValue(t *testing.T) {
      	`, nil)
 	require.NoError(t, err)
 
-	inputValue, err := p.InputValue("input", nil)
+	inputValue, err := p.InputValue("input", common.NewFrameInputValueOptions(p.MainFrame().Timeout()))
 	require.NoError(t, err)
 	got, want := inputValue, "hello1"
 	assert.Equal(t, got, want)
 
-	inputValue, err = p.InputValue("select", nil)
+	inputValue, err = p.InputValue("select", common.NewFrameInputValueOptions(p.MainFrame().Timeout()))
 	require.NoError(t, err)
 	got, want = inputValue, "hello2"
 	assert.Equal(t, got, want)
 
-	inputValue, err = p.InputValue("textarea", nil)
+	inputValue, err = p.InputValue("textarea", common.NewFrameInputValueOptions(p.MainFrame().Timeout()))
 	require.NoError(t, err)
 	got, want = inputValue, "hello3"
 	assert.Equal(t, got, want)
@@ -595,7 +598,7 @@ func TestPageFill(t *testing.T) {
 		t.Run("happy/"+tt.name, func(t *testing.T) {
 			err := p.Fill(tt.selector, tt.value, common.NewFrameFillOptions(p.MainFrame().Timeout()))
 			require.NoError(t, err)
-			inputValue, err := p.InputValue(tt.selector, nil)
+			inputValue, err := p.InputValue(tt.selector, common.NewFrameInputValueOptions(p.MainFrame().Timeout()))
 			require.NoError(t, err)
 			require.Equal(t, tt.value, inputValue)
 		})
@@ -954,7 +957,7 @@ func TestPagePress(t *testing.T) {
 	require.NoError(t, p.Press("#text1", "KeyB", nil))
 	require.NoError(t, p.Press("#text1", "Shift+KeyC", nil))
 
-	inputValue, err := p.InputValue("#text1", nil)
+	inputValue, err := p.InputValue("#text1", common.NewFrameInputValueOptions(p.MainFrame().Timeout()))
 	require.NoError(t, err)
 	require.Equal(t, "AbC", inputValue)
 }
@@ -1525,7 +1528,7 @@ func TestPageThrottleNetwork(t *testing.T) {
 			_, err = page.WaitForSelector(selector, nil)
 			require.NoError(t, err)
 
-			resp, err := page.InnerText(selector, nil)
+			resp, err := page.InnerText(selector, common.NewFrameInnerTextOptions(page.MainFrame().Timeout()))
 			require.NoError(t, err)
 			ms, err := strconv.ParseInt(resp, 10, 64)
 			require.NoError(t, err)

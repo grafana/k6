@@ -162,15 +162,23 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				return f.InnerHTML(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
-		"innerText": func(selector string, opts sobek.Value) *sobek.Promise {
+		"innerText": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewFrameInnerTextOptions(f.Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing inner text options: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return f.InnerText(selector, opts) //nolint:wrapcheck
-			})
+				return f.InnerText(selector, popts) //nolint:wrapcheck
+			}), nil
 		},
-		"inputValue": func(selector string, opts sobek.Value) *sobek.Promise {
+		"inputValue": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewFrameInputValueOptions(f.Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing input value options: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return f.InputValue(selector, opts) //nolint:wrapcheck
-			})
+				return f.InputValue(selector, popts) //nolint:wrapcheck
+			}), nil
 		},
 		"isChecked": func(selector string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {

@@ -1083,13 +1083,9 @@ func (f *Frame) innerHTML(selector string, opts *FrameInnerHTMLOptions) (string,
 
 // InnerText returns the inner text of the first element found
 // that matches the selector.
-func (f *Frame) InnerText(selector string, opts sobek.Value) (string, error) {
+func (f *Frame) InnerText(selector string, popts *FrameInnerTextOptions) (string, error) {
 	f.log.Debugf("Frame:InnerText", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	popts := NewFrameInnerTextOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return "", fmt.Errorf("parsing inner text options: %w", err)
-	}
 	v, err := f.innerText(selector, popts)
 	if err != nil {
 		return "", fmt.Errorf("getting inner text of %q: %w", selector, err)
@@ -1122,13 +1118,9 @@ func (f *Frame) innerText(selector string, opts *FrameInnerTextOptions) (string,
 }
 
 // InputValue returns the input value of the first element found that matches the selector.
-func (f *Frame) InputValue(selector string, opts sobek.Value) (string, error) {
+func (f *Frame) InputValue(selector string, popts *FrameInputValueOptions) (string, error) {
 	f.log.Debugf("Frame:InputValue", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	popts := NewFrameInputValueOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return "", fmt.Errorf("parsing input value options: %w", err)
-	}
 	v, err := f.inputValue(selector, popts)
 	if err != nil {
 		return "", fmt.Errorf("getting input value of %q: %w", selector, err)

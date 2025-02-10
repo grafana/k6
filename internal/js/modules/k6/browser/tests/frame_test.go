@@ -32,7 +32,7 @@ func TestFramePress(t *testing.T) {
 	require.NoError(t, f.Press("#text1", "KeyB", nil))
 	require.NoError(t, f.Press("#text1", "Shift+KeyC", nil))
 
-	inputValue, err := f.InputValue("#text1", nil)
+	inputValue, err := f.InputValue("#text1", common.NewFrameInputValueOptions(p.MainFrame().Timeout()))
 	require.NoError(t, err)
 	require.Equal(t, "AbC", inputValue)
 }
