@@ -174,11 +174,14 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return mapResponse(vu, resp), nil
 			}), nil
 		},
-		"hover": func(selector string, opts sobek.Value) *sobek.Promise {
+		"hover": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
+			hopts := common.NewFrameHoverOptions(p.Timeout())
+			if err := hopts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parse hover options of selector %q: %w", selector, err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
-				return nil, p.Hover(selector, opts) //nolint:wrapcheck
-			})
+				return nil, p.Hover(selector, hopts) //nolint:wrapcheck
+			}), nil
 		},
 		"innerHTML": func(selector string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {

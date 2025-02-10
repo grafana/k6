@@ -1050,7 +1050,7 @@ func (p *Page) Goto(url string, opts *FrameGotoOptions) (*Response, error) {
 }
 
 // Hover hovers over an element matching the provided selector.
-func (p *Page) Hover(selector string, opts sobek.Value) error {
+func (p *Page) Hover(selector string, opts *FrameHoverOptions) error {
 	p.logger.Debugf("Page:Hover", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().Hover(selector, opts)

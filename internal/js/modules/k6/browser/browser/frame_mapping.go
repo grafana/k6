@@ -140,10 +140,14 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				return mapResponse(vu, resp), nil
 			}), nil
 		},
-		"hover": func(selector string, opts sobek.Value) *sobek.Promise {
+		"hover": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
+			hopts := common.NewFrameHoverOptions(f.Timeout())
+			if err := hopts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parse hover options of selector %q: %w", selector, err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return nil, f.Hover(selector, opts) //nolint:wrapcheck
-			})
+				return nil, f.Hover(selector, hopts) //nolint:wrapcheck
+			}), nil
 		},
 		"innerHTML": func(selector string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {

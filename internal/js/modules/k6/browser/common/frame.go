@@ -1025,19 +1025,12 @@ func (f *Frame) Goto(url string, opts *FrameGotoOptions) (*Response, error) {
 }
 
 // Hover moves the pointer over the first element that matches the selector.
-func (f *Frame) Hover(selector string, opts sobek.Value) error {
+func (f *Frame) Hover(selector string, opts *FrameHoverOptions) error {
 	f.log.Debugf("Frame:Hover", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
-
-	popts := NewFrameHoverOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return fmt.Errorf("parsing hover options: %w", err)
-	}
-	if err := f.hover(selector, popts); err != nil {
+	if err := f.hover(selector, opts); err != nil {
 		return fmt.Errorf("hovering %q: %w", selector, err)
 	}
-
 	applySlowMo(f.ctx)
-
 	return nil
 }
 
@@ -1051,7 +1044,6 @@ func (f *Frame) hover(selector string, opts *FrameHoverOptions) error {
 	if _, err := call(f.ctx, act, opts.Timeout); err != nil {
 		return errorFromDOMError(err)
 	}
-
 	return nil
 }
 
