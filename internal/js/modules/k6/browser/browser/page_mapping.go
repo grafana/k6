@@ -183,11 +183,14 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, p.Hover(selector, hopts) //nolint:wrapcheck
 			}), nil
 		},
-		"innerHTML": func(selector string, opts sobek.Value) *sobek.Promise {
+		"innerHTML": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
+			inopts := common.NewFrameInnerHTMLOptions(p.Timeout())
+			if err := inopts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parse innerHTML options of selector %q: %w", selector, err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
-				return p.InnerHTML(selector, opts) //nolint:wrapcheck
-			})
+				return p.InnerHTML(selector, inopts) //nolint:wrapcheck
+			}), nil
 		},
 		"innerText": func(selector string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {

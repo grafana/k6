@@ -1049,18 +1049,12 @@ func (f *Frame) hover(selector string, opts *FrameHoverOptions) error {
 
 // InnerHTML returns the innerHTML attribute of the first element found
 // that matches the selector.
-func (f *Frame) InnerHTML(selector string, opts sobek.Value) (string, error) {
+func (f *Frame) InnerHTML(selector string, opts *FrameInnerHTMLOptions) (string, error) {
 	f.log.Debugf("Frame:InnerHTML", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
-
-	popts := NewFrameInnerHTMLOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return "", fmt.Errorf("parsing inner HTML options: %w", err)
-	}
-	v, err := f.innerHTML(selector, popts)
+	v, err := f.innerHTML(selector, opts)
 	if err != nil {
 		return "", fmt.Errorf("getting inner HTML of %q: %w", selector, err)
 	}
-
 	return v, nil
 }
 
@@ -1083,7 +1077,6 @@ func (f *Frame) innerHTML(selector string, opts *FrameInnerHTMLOptions) (string,
 	if !ok {
 		return "", fmt.Errorf("unexpected type %T", v)
 	}
-
 	return gv, nil
 }
 
