@@ -11,26 +11,31 @@ func mapMouse(vu moduleVU, m *common.Mouse) mapping {
 	return mapping{
 		"click": func(x float64, y float64, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
+				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 				return nil, m.Click(x, y, opts) //nolint:wrapcheck
 			})
 		},
 		"dblClick": func(x float64, y float64, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
+				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 				return nil, m.DblClick(x, y, opts) //nolint:wrapcheck
 			})
 		},
 		"down": func(opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
+				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 				return nil, m.Down(opts) //nolint:wrapcheck
 			})
 		},
 		"up": func(opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
+				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 				return nil, m.Up(opts) //nolint:wrapcheck
 			})
 		},
 		"move": func(x float64, y float64, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
+				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 				return nil, m.Move(x, y, opts) //nolint:wrapcheck
 			})
 		},

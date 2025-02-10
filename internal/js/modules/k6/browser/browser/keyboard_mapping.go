@@ -23,6 +23,7 @@ func mapKeyboard(vu moduleVU, kb *common.Keyboard) mapping {
 		},
 		"press": func(key string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
+				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 				kbopts, err := exportTo[common.KeyboardOptions](vu.Runtime(), opts)
 				if err != nil {
 					return nil, fmt.Errorf("parsing keyboard options: %w", err)
@@ -32,6 +33,7 @@ func mapKeyboard(vu moduleVU, kb *common.Keyboard) mapping {
 		},
 		"type": func(text string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
+				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 				kbopts, err := exportTo[common.KeyboardOptions](vu.Runtime(), opts)
 				if err != nil {
 					return nil, fmt.Errorf("parsing keyboard options: %w", err)
