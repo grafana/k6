@@ -349,11 +349,14 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, p.SetChecked(selector, checked, popts) //nolint:wrapcheck
 			}), nil
 		},
-		"setContent": func(html string, opts sobek.Value) *sobek.Promise {
+		"setContent": func(html string, opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewFrameSetContentOptions(p.MainFrame().NavigationTimeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing setContent options: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
-				return nil, p.SetContent(html, opts) //nolint:wrapcheck
-			})
+				return nil, p.SetContent(html, popts) //nolint:wrapcheck
+			}), nil
 		},
 		"setDefaultNavigationTimeout": p.SetDefaultNavigationTimeout,
 		"setDefaultTimeout":           p.SetDefaultTimeout,

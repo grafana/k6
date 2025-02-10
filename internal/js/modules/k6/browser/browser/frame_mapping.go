@@ -275,10 +275,14 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				return nil, f.SetChecked(selector, checked, popts) //nolint:wrapcheck
 			}), nil
 		},
-		"setContent": func(html string, opts sobek.Value) *sobek.Promise {
+		"setContent": func(html string, opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewFrameSetContentOptions(f.Page().NavigationTimeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing setContent options: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return nil, f.SetContent(html, opts) //nolint:wrapcheck
-			})
+				return nil, f.SetContent(html, popts) //nolint:wrapcheck
+			}), nil
 		},
 		"setInputFiles": func(selector string, files sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
 			popts := common.NewFrameSetInputFilesOptions(f.Timeout())
