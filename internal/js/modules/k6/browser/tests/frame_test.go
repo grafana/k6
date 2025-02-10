@@ -184,7 +184,8 @@ func TestFrameGetAttribute(t *testing.T) {
 	err := p.SetContent(`<a id="el" href="null">Something</a>`, nil)
 	require.NoError(t, err)
 
-	got, ok, err := p.Frames()[0].GetAttribute("#el", "href", nil)
+	opts := common.NewFrameBaseOptions(p.MainFrame().Timeout())
+	got, ok, err := p.Frames()[0].GetAttribute("#el", "href", opts)
 	require.NoError(t, err)
 	require.True(t, ok)
 	assert.Equal(t, "null", got)
@@ -197,7 +198,8 @@ func TestFrameGetAttributeMissing(t *testing.T) {
 	err := p.SetContent(`<a id="el">Something</a>`, nil)
 	require.NoError(t, err)
 
-	got, ok, err := p.Frames()[0].GetAttribute("#el", "missing", nil)
+	opts := common.NewFrameBaseOptions(p.MainFrame().Timeout())
+	got, ok, err := p.Frames()[0].GetAttribute("#el", "missing", opts)
 	require.NoError(t, err)
 	require.False(t, ok)
 	assert.Equal(t, "", got)
@@ -210,7 +212,8 @@ func TestFrameGetAttributeEmpty(t *testing.T) {
 	err := p.SetContent(`<a id="el" empty>Something</a>`, nil)
 	require.NoError(t, err)
 
-	got, ok, err := p.Frames()[0].GetAttribute("#el", "empty", nil)
+	opts := common.NewFrameBaseOptions(p.MainFrame().Timeout())
+	got, ok, err := p.Frames()[0].GetAttribute("#el", "empty", opts)
 	require.NoError(t, err)
 	require.True(t, ok)
 	assert.Equal(t, "", got)

@@ -1875,7 +1875,8 @@ func TestPageGetAttribute(t *testing.T) {
 	err := p.SetContent(`<a id="el" href="null">Something</a>`, nil)
 	require.NoError(t, err)
 
-	got, ok, err := p.GetAttribute("#el", "href", nil)
+	opts := common.NewFrameBaseOptions(p.MainFrame().Timeout())
+	got, ok, err := p.GetAttribute("#el", "href", opts)
 	require.NoError(t, err)
 	require.True(t, ok)
 	assert.Equal(t, "null", got)
@@ -1888,7 +1889,8 @@ func TestPageGetAttributeMissing(t *testing.T) {
 	err := p.SetContent(`<a id="el">Something</a>`, nil)
 	require.NoError(t, err)
 
-	got, ok, err := p.GetAttribute("#el", "missing", nil)
+	opts := common.NewFrameBaseOptions(p.MainFrame().Timeout())
+	got, ok, err := p.GetAttribute("#el", "missing", opts)
 	require.NoError(t, err)
 	require.False(t, ok)
 	assert.Equal(t, "", got)
@@ -1901,7 +1903,8 @@ func TestPageGetAttributeEmpty(t *testing.T) {
 	err := p.SetContent(`<a id="el" empty>Something</a>`, nil)
 	require.NoError(t, err)
 
-	got, ok, err := p.GetAttribute("#el", "empty", nil)
+	opts := common.NewFrameBaseOptions(p.MainFrame().Timeout())
+	got, ok, err := p.GetAttribute("#el", "empty", opts)
 	require.NoError(t, err)
 	require.True(t, ok)
 	assert.Equal(t, "", got)

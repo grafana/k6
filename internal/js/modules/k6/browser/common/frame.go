@@ -961,18 +961,12 @@ func (f *Frame) FrameElement() (*ElementHandle, error) {
 
 // GetAttribute of the first element found that matches the selector.
 // The second return value is true if the attribute exists, and false otherwise.
-func (f *Frame) GetAttribute(selector, name string, opts sobek.Value) (string, bool, error) {
+func (f *Frame) GetAttribute(selector, name string, opts *FrameBaseOptions) (string, bool, error) {
 	f.log.Debugf("Frame:GetAttribute", "fid:%s furl:%q sel:%q name:%s", f.ID(), f.URL(), selector, name)
-
-	popts := NewFrameBaseOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return "", false, fmt.Errorf("parsing get attribute options: %w", err)
-	}
-	s, ok, err := f.getAttribute(selector, name, popts)
+	s, ok, err := f.getAttribute(selector, name, opts)
 	if err != nil {
 		return "", false, fmt.Errorf("getting attribute %q of %q: %w", name, selector, err)
 	}
-
 	return s, ok, nil
 }
 

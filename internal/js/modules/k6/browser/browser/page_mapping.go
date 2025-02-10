@@ -141,18 +141,21 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}
 			return rt.ToValue(mfrs).ToObject(rt)
 		},
-		"getAttribute": func(selector string, name string, opts sobek.Value) *sobek.Promise {
+		"getAttribute": func(selector string, name string, opts sobek.Value) (*sobek.Promise, error) {
+			gaopts := common.NewFrameBaseOptions(p.MainFrame().Timeout())
+			if err := gaopts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parse getAttribute options: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
-				s, ok, err := p.GetAttribute(selector, name, opts)
+				s, ok, err := p.GetAttribute(selector, name, gaopts)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
 				}
 				if !ok {
-					return nil, nil
+					return nil, nil //nolint:nilnil
 				}
 				return s, nil
-			})
+			}), nil
 		},
 		"goto": func(url string, opts sobek.Value) (*sobek.Promise, error) {
 			gopts := common.NewFrameGotoOptions(

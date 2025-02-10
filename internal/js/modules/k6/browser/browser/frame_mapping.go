@@ -11,7 +11,7 @@ import (
 
 // mapFrame to the JS module.
 //
-//nolint:funlen,gocognit
+//nolint:funlen,gocognit,cyclop
 func mapFrame(vu moduleVU, f *common.Frame) mapping {
 	maps := mapping{
 		"check": func(selector string, opts sobek.Value) *sobek.Promise {
@@ -107,17 +107,21 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				return mapElementHandle(vu, fe), nil
 			})
 		},
-		"getAttribute": func(selector, name string, opts sobek.Value) *sobek.Promise {
+		"getAttribute": func(selector, name string, opts sobek.Value) (*sobek.Promise, error) {
+			gaopts := common.NewFrameBaseOptions(f.Timeout())
+			if err := gaopts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing base frame options: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				s, ok, err := f.GetAttribute(selector, name, opts)
+				s, ok, err := f.GetAttribute(selector, name, gaopts)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
 				}
 				if !ok {
-					return nil, nil
+					return nil, nil //nolint:nilnil
 				}
 				return s, nil
-			})
+			}), nil
 		},
 		"goto": func(url string, opts sobek.Value) (*sobek.Promise, error) {
 			gopts := common.NewFrameGotoOptions(
