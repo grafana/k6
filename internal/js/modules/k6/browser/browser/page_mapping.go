@@ -112,7 +112,6 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				if err != nil {
 					return nil, err //nolint:wrapcheck
 				}
-				// TODO(@mstoykov): don't use sobek Values in a separate goroutine - this uses the runtime in a lot of the cases
 				return mapJSHandle(vu, jsh), nil
 			}), nil
 		},
@@ -286,9 +285,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 					return nil, nil
 				}
 
-				r := mapResponse(vu, resp)
-
-				return rt.ToValue(r).ToObject(rt), nil
+				return mapResponse(vu, resp), nil
 			})
 		},
 		"screenshot": func(opts sobek.Value) (*sobek.Promise, error) {
@@ -456,7 +453,6 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				if err != nil {
 					return nil, err //nolint:wrapcheck
 				}
-				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 				return mapResponse(vu, resp), nil
 			}), nil
 		},
@@ -501,7 +497,6 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			if eh == nil {
 				return nil, nil
 			}
-			// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 			ehm := mapElementHandle(vu, eh)
 
 			return ehm, nil
@@ -515,7 +510,6 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}
 			var mehs []mapping
 			for _, eh := range ehs {
-				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 				ehm := mapElementHandle(vu, eh)
 				mehs = append(mehs, ehm)
 			}
@@ -529,25 +523,24 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 // mapPageOn maps the requested page.on event to the Sobek runtime.
 // It generalizes the handling of page.on events.
 func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.Callable) error {
-	rt := vu.Runtime()
-
-	pageOnEvents := map[common.PageOnEventName]struct {
-		mapp func(vu moduleVU, event common.PageOnEvent) mapping
-		init func() error // If set, runs before the event handler.
-		wait bool         // Whether to wait for the handler to complete.
-	}{
-		common.EventPageConsoleAPICalled: {
-			mapp: mapConsoleMessage,
-			wait: false,
-		},
-		common.EventPageMetricCalled: {
-			mapp: mapMetricEvent,
-			init: prepK6BrowserRegExChecker(rt),
-			wait: true,
-		},
-	}
-
 	return func(eventName common.PageOnEventName, handleEvent sobek.Callable) error {
+		rt := vu.Runtime()
+
+		pageOnEvents := map[common.PageOnEventName]struct {
+			mapp func(vu moduleVU, event common.PageOnEvent) mapping
+			init func() error // If set, runs before the event handler.
+			wait bool         // Whether to wait for the handler to complete.
+		}{
+			common.EventPageConsoleAPICalled: {
+				mapp: mapConsoleMessage,
+				wait: false,
+			},
+			common.EventPageMetricCalled: {
+				mapp: mapMetricEvent,
+				init: prepK6BrowserRegExChecker(rt),
+				wait: true,
+			},
+		}
 		pageOnEvent, ok := pageOnEvents[eventName]
 		if !ok {
 			return fmt.Errorf("unknown page on event: %q", eventName)
