@@ -285,11 +285,14 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return p.Opener(), nil
 			})
 		},
-		"press": func(selector string, key string, opts sobek.Value) *sobek.Promise {
+		"press": func(selector string, key string, opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewFramePressOptions(p.Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing press options of selector %q: %w", selector, err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
-				return nil, p.Press(selector, key, opts) //nolint:wrapcheck
-			})
+				return nil, p.Press(selector, key, popts) //nolint:wrapcheck
+			}), nil
 		},
 		"reload": func(opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {

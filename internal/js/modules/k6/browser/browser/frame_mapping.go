@@ -245,10 +245,14 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 		"parentFrame": func() mapping {
 			return mapFrame(vu, f.ParentFrame())
 		},
-		"press": func(selector, key string, opts sobek.Value) *sobek.Promise {
+		"press": func(selector, key string, opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewFramePressOptions(f.Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parse press options of selector %q on key %q: %w", selector, key, err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return nil, f.Press(selector, key, opts) //nolint:wrapcheck
-			})
+				return nil, f.Press(selector, key, popts) //nolint:wrapcheck
+			}), nil
 		},
 		"selectOption": func(selector string, values sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
 			popts := common.NewFrameSelectOptionOptions(f.Timeout())
