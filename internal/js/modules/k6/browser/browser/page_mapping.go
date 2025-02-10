@@ -242,11 +242,14 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return p.IsEditable(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
-		"isEnabled": func(selector string, opts sobek.Value) *sobek.Promise {
+		"isEnabled": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewFrameIsEnabledOptions(p.MainFrame().Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parse isEnabled options of selector %q: %w", selector, err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
-				return p.IsEnabled(selector, opts) //nolint:wrapcheck
-			})
+				return p.IsEnabled(selector, popts) //nolint:wrapcheck
+			}), nil
 		},
 		"isHidden": func(selector string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {

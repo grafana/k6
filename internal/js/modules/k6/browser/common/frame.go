@@ -1196,14 +1196,10 @@ func (f *Frame) isEditable(selector string, opts *FrameIsEditableOptions) (bool,
 
 // IsEnabled returns true if the first element that matches the selector
 // is enabled. Otherwise, returns false.
-func (f *Frame) IsEnabled(selector string, opts sobek.Value) (bool, error) {
+func (f *Frame) IsEnabled(selector string, opts *FrameIsEnabledOptions) (bool, error) {
 	f.log.Debugf("Frame:IsEnabled", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	popts := NewFrameIsEnabledOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return false, fmt.Errorf("parsing is enabled options: %w", err)
-	}
-	enabled, err := f.isEnabled(selector, popts)
+	enabled, err := f.isEnabled(selector, opts)
 	if err != nil {
 		return false, fmt.Errorf("checking is %q enabled: %w", selector, err)
 	}
