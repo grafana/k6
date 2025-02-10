@@ -1466,10 +1466,10 @@ func (p *Page) ThrottleNetwork(networkProfile NetworkProfile) error {
 }
 
 // Type text on the first element found matches the selector.
-func (p *Page) Type(selector string, text string, opts sobek.Value) error {
+func (p *Page) Type(selector string, text string, popts *FrameTypeOptions) error {
 	p.logger.Debugf("Page:Type", "sid:%v selector:%s text:%s", p.sessionID(), selector, text)
 
-	return p.MainFrame().Type(selector, text, opts)
+	return p.MainFrame().Type(selector, text, popts)
 }
 
 // URL returns the location of the page.
