@@ -261,10 +261,15 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				return f.Title()
 			})
 		},
-		"type": func(selector, text string, opts sobek.Value) *sobek.Promise {
+		"type": func(selector, text string, opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewFrameTypeOptions(f.Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing type options: %w", err)
+			}
+
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return nil, f.Type(selector, text, opts) //nolint:wrapcheck
-			})
+				return nil, f.Type(selector, text, popts) //nolint:wrapcheck
+			}), nil
 		},
 		"uncheck": func(selector string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {

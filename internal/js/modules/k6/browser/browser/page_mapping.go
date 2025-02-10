@@ -371,11 +371,15 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			})
 		},
 		"touchscreen": mapTouchscreen(vu, p.GetTouchscreen()),
-		"type": func(selector string, text string, opts sobek.Value) *sobek.Promise {
-			// TODO(@mstoykov): don't use sobek Values in a separate goroutine
+		"type": func(selector string, text string, opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewFrameTypeOptions(p.MainFrame().Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing type options: %w", err)
+			}
+
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return nil, p.Type(selector, text, opts) //nolint:wrapcheck
-			})
+				return nil, p.Type(selector, text, popts) //nolint:wrapcheck
+			}), nil
 		},
 		"uncheck": func(selector string, opts sobek.Value) *sobek.Promise {
 			// TODO(@mstoykov): don't use sobek Values in a separate goroutine

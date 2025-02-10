@@ -1693,13 +1693,9 @@ func (f *Frame) Title() (string, error) {
 }
 
 // Type text on the first element found matches the selector.
-func (f *Frame) Type(selector, text string, opts sobek.Value) error {
+func (f *Frame) Type(selector, text string, popts *FrameTypeOptions) error {
 	f.log.Debugf("Frame:Type", "fid:%s furl:%q sel:%q text:%q", f.ID(), f.URL(), selector, text)
 
-	popts := NewFrameTypeOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return fmt.Errorf("parsing type options: %w", err)
-	}
 	if err := f.typ(selector, text, popts); err != nil {
 		return fmt.Errorf("typing %q in %q: %w", text, selector, err)
 	}
