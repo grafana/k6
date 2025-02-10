@@ -45,18 +45,23 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				return f.Content() //nolint:wrapcheck
 			})
 		},
-		"dblclick": func(selector string, opts sobek.Value) *sobek.Promise {
+		"dblclick": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewFrameDblClickOptions(f.Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing double click options: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return nil, f.Dblclick(selector, opts) //nolint:wrapcheck
-			})
+				return nil, f.Dblclick(selector, popts) //nolint:wrapcheck
+			}), nil
 		},
 		"dispatchEvent": func(selector, typ string, eventInit, opts sobek.Value) (*sobek.Promise, error) {
 			popts := common.NewFrameDispatchEventOptions(f.Timeout())
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing frame dispatch event options: %w", err)
 			}
+			earg := exportArg(eventInit)
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return nil, f.DispatchEvent(selector, typ, exportArg(eventInit), popts) //nolint:wrapcheck
+				return nil, f.DispatchEvent(selector, typ, earg, popts) //nolint:wrapcheck
 			}), nil
 		},
 		"evaluate": func(pageFunc sobek.Value, gargs ...sobek.Value) (*sobek.Promise, error) {
@@ -79,15 +84,23 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				return mapJSHandle(vu, jsh), nil
 			}), nil
 		},
-		"fill": func(selector, value string, opts sobek.Value) *sobek.Promise {
+		"fill": func(selector, value string, opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewFrameFillOptions(f.Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing fill options: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return nil, f.Fill(selector, value, opts) //nolint:wrapcheck
-			})
+				return nil, f.Fill(selector, value, popts) //nolint:wrapcheck
+			}), nil
 		},
-		"focus": func(selector string, opts sobek.Value) *sobek.Promise {
+		"focus": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewFrameBaseOptions(f.Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing focus options: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return nil, f.Focus(selector, opts) //nolint:wrapcheck
-			})
+				return nil, f.Focus(selector, popts) //nolint:wrapcheck
+			}), nil
 		},
 		"frameElement": func() *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
@@ -98,17 +111,21 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				return mapElementHandle(vu, fe), nil
 			})
 		},
-		"getAttribute": func(selector, name string, opts sobek.Value) *sobek.Promise {
+		"getAttribute": func(selector, name string, opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewFrameBaseOptions(f.Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing getAttribute options: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				s, ok, err := f.GetAttribute(selector, name, opts)
+				s, ok, err := f.GetAttribute(selector, name, popts)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
 				}
 				if !ok {
-					return nil, nil
+					return nil, nil //nolint:nilnil
 				}
 				return s, nil
-			})
+			}), nil
 		},
 		"goto": func(url string, opts sobek.Value) (*sobek.Promise, error) {
 			gopts := common.NewFrameGotoOptions(
@@ -127,10 +144,14 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				return mapResponse(vu, resp), nil
 			}), nil
 		},
-		"hover": func(selector string, opts sobek.Value) *sobek.Promise {
+		"hover": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewFrameHoverOptions(f.Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing hover options: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return nil, f.Hover(selector, opts) //nolint:wrapcheck
-			})
+				return nil, f.Hover(selector, popts) //nolint:wrapcheck
+			}), nil
 		},
 		"innerHTML": func(selector string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {

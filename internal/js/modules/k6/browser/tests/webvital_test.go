@@ -83,7 +83,7 @@ func TestWebVitalMetric(t *testing.T) {
 	require.NoError(t, err)
 
 	// prevents `err:fetching response body: context canceled` warning.`
-	require.NoError(t, page.Close(nil))
+	require.NoError(t, page.Close())
 	done <- struct{}{}
 
 	for k, v := range expected {
@@ -141,7 +141,7 @@ func TestWebVitalMetricNoInteraction(t *testing.T) {
 	require.NotNil(t, resp)
 
 	// prevents `err:fetching response body: context canceled` warning.`
-	require.NoError(t, page.Close(nil))
+	require.NoError(t, page.Close())
 	done <- struct{}{}
 
 	for k, v := range expected {

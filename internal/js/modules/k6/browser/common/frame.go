@@ -749,13 +749,9 @@ func (f *Frame) Content() (string, error) {
 }
 
 // Dblclick double clicks an element matching provided selector.
-func (f *Frame) Dblclick(selector string, opts sobek.Value) error {
+func (f *Frame) Dblclick(selector string, popts *FrameDblclickOptions) error {
 	f.log.Debugf("Frame:DblClick", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	popts := NewFrameDblClickOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return fmt.Errorf("parsing double click options: %w", err)
-	}
 	if err := f.dblclick(selector, popts); err != nil {
 		return fmt.Errorf("double clicking on %q: %w", selector, err)
 	}
@@ -888,13 +884,9 @@ func (f *Frame) EvaluateHandle(pageFunc string, args ...any) (handle JSHandleAPI
 }
 
 // Fill fills out the first element found that matches the selector.
-func (f *Frame) Fill(selector, value string, opts sobek.Value) error {
+func (f *Frame) Fill(selector, value string, popts *FrameFillOptions) error {
 	f.log.Debugf("Frame:Fill", "fid:%s furl:%q sel:%q val:%q", f.ID(), f.URL(), selector, value)
 
-	popts := NewFrameFillOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return fmt.Errorf("parsing fill options: %w", err)
-	}
 	if err := f.fill(selector, value, popts); err != nil {
 		return fmt.Errorf("filling %q with %q: %w", selector, value, err)
 	}
@@ -921,13 +913,9 @@ func (f *Frame) fill(selector, value string, opts *FrameFillOptions) error {
 }
 
 // Focus focuses on the first element that matches the selector.
-func (f *Frame) Focus(selector string, opts sobek.Value) error {
+func (f *Frame) Focus(selector string, popts *FrameBaseOptions) error {
 	f.log.Debugf("Frame:Focus", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	popts := NewFrameBaseOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return fmt.Errorf("parsing focus options: %w", err)
-	}
 	if err := f.focus(selector, popts); err != nil {
 		return fmt.Errorf("focusing %q: %w", selector, err)
 	}
@@ -965,13 +953,9 @@ func (f *Frame) FrameElement() (*ElementHandle, error) {
 
 // GetAttribute of the first element found that matches the selector.
 // The second return value is true if the attribute exists, and false otherwise.
-func (f *Frame) GetAttribute(selector, name string, opts sobek.Value) (string, bool, error) {
+func (f *Frame) GetAttribute(selector, name string, popts *FrameBaseOptions) (string, bool, error) {
 	f.log.Debugf("Frame:GetAttribute", "fid:%s furl:%q sel:%q name:%s", f.ID(), f.URL(), selector, name)
 
-	popts := NewFrameBaseOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return "", false, fmt.Errorf("parsing get attribute options: %w", err)
-	}
 	s, ok, err := f.getAttribute(selector, name, popts)
 	if err != nil {
 		return "", false, fmt.Errorf("getting attribute %q of %q: %w", name, selector, err)
@@ -1035,13 +1019,9 @@ func (f *Frame) Goto(url string, opts *FrameGotoOptions) (*Response, error) {
 }
 
 // Hover moves the pointer over the first element that matches the selector.
-func (f *Frame) Hover(selector string, opts sobek.Value) error {
+func (f *Frame) Hover(selector string, popts *FrameHoverOptions) error {
 	f.log.Debugf("Frame:Hover", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	popts := NewFrameHoverOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return fmt.Errorf("parsing hover options: %w", err)
-	}
 	if err := f.hover(selector, popts); err != nil {
 		return fmt.Errorf("hovering %q: %w", selector, err)
 	}
