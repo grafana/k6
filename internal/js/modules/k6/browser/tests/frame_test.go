@@ -32,7 +32,7 @@ func TestFramePress(t *testing.T) {
 	require.NoError(t, f.Press("#text1", "KeyB", nil))
 	require.NoError(t, f.Press("#text1", "Shift+KeyC", nil))
 
-	inputValue, err := f.InputValue("#text1", nil)
+	inputValue, err := f.InputValue("#text1", common.NewFrameInputValueOptions(p.MainFrame().Timeout()))
 	require.NoError(t, err)
 	require.Equal(t, "AbC", inputValue)
 }
@@ -184,7 +184,7 @@ func TestFrameGetAttribute(t *testing.T) {
 	err := p.SetContent(`<a id="el" href="null">Something</a>`, nil)
 	require.NoError(t, err)
 
-	got, ok, err := p.Frames()[0].GetAttribute("#el", "href", nil)
+	got, ok, err := p.Frames()[0].GetAttribute("#el", "href", common.NewFrameBaseOptions(p.MainFrame().Timeout()))
 	require.NoError(t, err)
 	require.True(t, ok)
 	assert.Equal(t, "null", got)
@@ -197,7 +197,7 @@ func TestFrameGetAttributeMissing(t *testing.T) {
 	err := p.SetContent(`<a id="el">Something</a>`, nil)
 	require.NoError(t, err)
 
-	got, ok, err := p.Frames()[0].GetAttribute("#el", "missing", nil)
+	got, ok, err := p.Frames()[0].GetAttribute("#el", "missing", common.NewFrameBaseOptions(p.MainFrame().Timeout()))
 	require.NoError(t, err)
 	require.False(t, ok)
 	assert.Equal(t, "", got)
@@ -210,7 +210,7 @@ func TestFrameGetAttributeEmpty(t *testing.T) {
 	err := p.SetContent(`<a id="el" empty>Something</a>`, nil)
 	require.NoError(t, err)
 
-	got, ok, err := p.Frames()[0].GetAttribute("#el", "empty", nil)
+	got, ok, err := p.Frames()[0].GetAttribute("#el", "empty", common.NewFrameBaseOptions(p.MainFrame().Timeout()))
 	require.NoError(t, err)
 	require.True(t, ok)
 	assert.Equal(t, "", got)
