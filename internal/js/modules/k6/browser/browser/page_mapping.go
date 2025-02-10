@@ -294,20 +294,21 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, p.Press(selector, key, popts) //nolint:wrapcheck
 			}), nil
 		},
-		"reload": func(opts sobek.Value) *sobek.Promise {
+		"reload": func(opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewPageReloadOptions(common.LifecycleEventLoad, p.NavigationTimeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing reload options: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
-				resp, err := p.Reload(opts)
+				resp, err := p.Reload(popts)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
 				}
-
 				if resp == nil {
-					return nil, nil
+					return nil, nil //nolint:nilnil
 				}
-
 				return mapResponse(vu, resp), nil
-			})
+			}), nil
 		},
 		"screenshot": func(opts sobek.Value) (*sobek.Promise, error) {
 			popts := common.NewPageScreenshotOptions()

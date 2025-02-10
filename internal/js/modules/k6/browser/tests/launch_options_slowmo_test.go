@@ -130,7 +130,8 @@ func TestBrowserOptionsSlowMo(t *testing.T) {
 			t.Parallel()
 			tb := newTestBrowser(t, withFileServer())
 			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p *common.Page) {
-				_, err := p.Reload(nil)
+				opts := common.NewPageReloadOptions(common.LifecycleEventLoad, p.MainFrame().NavigationTimeout())
+				_, err := p.Reload(opts)
 				require.NoError(t, err)
 			})
 		})

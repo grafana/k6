@@ -1213,22 +1213,12 @@ func (p *Page) QueryAll(selector string) ([]*ElementHandle, error) {
 }
 
 // Reload will reload the current page.
-func (p *Page) Reload(opts sobek.Value) (*Response, error) { //nolint:funlen
+func (p *Page) Reload(opts *PageReloadOptions) (*Response, error) { //nolint:funlen
 	p.logger.Debugf("Page:Reload", "sid:%v", p.sessionID())
 	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.reload")
 	defer span.End()
 
-	reloadOpts := NewPageReloadOptions(
-		LifecycleEventLoad,
-		p.timeoutSettings.navigationTimeout(),
-	)
-	if err := reloadOpts.Parse(p.ctx, opts); err != nil {
-		err := fmt.Errorf("parsing reload options: %w", err)
-		spanRecordError(span, err)
-		return nil, err
-	}
-
-	timeoutCtx, timeoutCancelFn := context.WithTimeout(p.ctx, reloadOpts.Timeout)
+	timeoutCtx, timeoutCancelFn := context.WithTimeout(p.ctx, opts.Timeout)
 	defer timeoutCancelFn()
 
 	waitForFrameNavigation, cancelWaitingForFrameNavigation := createWaitForEventHandler(
@@ -1245,7 +1235,7 @@ func (p *Page) Reload(opts sobek.Value) (*Response, error) { //nolint:funlen
 		[]string{EventFrameAddLifecycle},
 		func(data any) bool {
 			if le, ok := data.(FrameLifecycleEvent); ok {
-				return le.Event == reloadOpts.WaitUntil
+				return le.Event == opts.WaitUntil
 			}
 			return false
 		})
@@ -1262,7 +1252,7 @@ func (p *Page) Reload(opts sobek.Value) (*Response, error) { //nolint:funlen
 		if errors.Is(err, context.DeadlineExceeded) {
 			err = &k6ext.UserFriendlyError{
 				Err:     err,
-				Timeout: reloadOpts.Timeout,
+				Timeout: opts.Timeout,
 			}
 			return fmt.Errorf("reloading page: %w", err)
 		}

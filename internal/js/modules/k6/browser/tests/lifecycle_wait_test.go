@@ -415,10 +415,10 @@ func TestLifecycleReload(t *testing.T) {
 				}
 				tt.pingJSTextAssert(result)
 
-				opts := tb.toSobekValue(common.PageReloadOptions{
+				opts := &common.PageReloadOptions{
 					WaitUntil: tt.waitUntil,
 					Timeout:   30 * time.Second,
-				})
+				}
 				_, err = p.Reload(opts)
 				require.NoError(t, err)
 
