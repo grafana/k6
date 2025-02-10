@@ -226,13 +226,13 @@ func TestFrameSetChecked(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, checked)
 
-	err = p.Frames()[0].SetChecked("#el", true, nil)
+	err = p.Frames()[0].SetChecked("#el", true, common.NewFrameCheckOptions(p.Frames()[0].Timeout()))
 	require.NoError(t, err)
 	checked, err = p.Frames()[0].IsChecked("#el", nil)
 	require.NoError(t, err)
 	assert.True(t, checked)
 
-	err = p.Frames()[0].SetChecked("#el", false, nil)
+	err = p.Frames()[0].SetChecked("#el", false, common.NewFrameCheckOptions(p.Frames()[0].Timeout()))
 	require.NoError(t, err)
 	checked, err = p.Frames()[0].IsChecked("#el", nil)
 	require.NoError(t, err)
