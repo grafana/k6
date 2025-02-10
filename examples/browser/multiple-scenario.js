@@ -5,7 +5,7 @@ export const options = {
     messages: {
       executor: 'constant-vus',
       exec: 'messages',
-      vus: 2,
+      vus: 1,
       duration: '2s',
       options: {
         browser: {
@@ -16,8 +16,8 @@ export const options = {
     news: {
       executor: 'per-vu-iterations',
       exec: 'news',
-      vus: 2,
-      iterations: 4,
+      vus: 1,
+      iterations: 2,
       maxDuration: '5s',
       options: {
         browser: {
