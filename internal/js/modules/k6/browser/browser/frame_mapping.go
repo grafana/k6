@@ -219,10 +219,16 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				return nil, f.SetContent(html, opts) //nolint:wrapcheck
 			})
 		},
-		"setInputFiles": func(selector string, files sobek.Value, opts sobek.Value) *sobek.Promise {
+		"setInputFiles": func(selector string, files sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewFrameSetInputFilesOptions(f.Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing setInputFiles options: %w", err)
+			}
+
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return nil, f.SetInputFiles(selector, files, opts) //nolint:wrapcheck
-			})
+				// TODO: don't use sobek Values in a separate goroutine, complete files migration
+				return nil, f.SetInputFiles(selector, files, popts) //nolint:wrapcheck
+			}), nil
 		},
 		"tap": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
 			popts := common.NewFrameTapOptions(f.Timeout())
