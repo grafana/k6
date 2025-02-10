@@ -1376,7 +1376,7 @@ func (p *Page) SetExtraHTTPHeaders(headers map[string]string) error {
 }
 
 // SetInputFiles sets input files for the selected element.
-func (p *Page) SetInputFiles(selector string, files sobek.Value, opts sobek.Value) error {
+func (p *Page) SetInputFiles(selector string, files sobek.Value, opts *FrameSetInputFilesOptions) error {
 	p.logger.Debugf("Page:SetInputFiles", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().SetInputFiles(selector, files, opts)

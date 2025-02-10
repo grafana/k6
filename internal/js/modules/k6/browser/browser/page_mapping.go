@@ -313,11 +313,16 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, p.SetExtraHTTPHeaders(headers) //nolint:wrapcheck
 			})
 		},
-		"setInputFiles": func(selector string, files sobek.Value, opts sobek.Value) *sobek.Promise {
+		"setInputFiles": func(selector string, files sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewFrameSetInputFilesOptions(p.MainFrame().Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing setInputFiles options: %w", err)
+			}
+
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
-				return nil, p.SetInputFiles(selector, files, opts) //nolint:wrapcheck
-			})
+				// TODO: don't use sobek Values in a separate goroutine, complete files migration
+				return nil, p.SetInputFiles(selector, files, popts) //nolint:wrapcheck
+			}), nil
 		},
 		"setViewportSize": func(viewportSize sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
