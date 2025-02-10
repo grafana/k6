@@ -39,7 +39,7 @@ func TestSetInputFiles(t *testing.T) {
 		return page.SetInputFiles("#upload", files, common.NewFrameSetInputFilesOptions(page.MainFrame().Timeout()))
 	}
 	defaultTestElementHandle := func(tb *testBrowser, page *common.Page, files sobek.Value) error {
-		handle, err := page.WaitForSelector("#upload", tb.toSobekValue(nil))
+		handle, err := page.WaitForSelector("#upload", common.NewFrameWaitForSelectorOptions(page.MainFrame().Timeout()))
 		assert.NoError(t, err)
 		return handle.SetInputFiles(files, tb.toSobekValue(nil))
 	}
@@ -127,7 +127,7 @@ func TestSetInputFiles(t *testing.T) {
 					return page.SetInputFiles("#button1", files, common.NewFrameSetInputFilesOptions(page.MainFrame().Timeout()))
 				},
 				func(tb *testBrowser, page *common.Page, files sobek.Value) error {
-					handle, err := page.WaitForSelector("#button1", tb.toSobekValue(nil))
+					handle, err := page.WaitForSelector("#button1", common.NewFrameWaitForSelectorOptions(page.MainFrame().Timeout()))
 					assert.NoError(t, err)
 					return handle.SetInputFiles(files, tb.toSobekValue(nil))
 				},
@@ -150,7 +150,7 @@ func TestSetInputFiles(t *testing.T) {
 					return page.SetInputFiles("#textinput", files, common.NewFrameSetInputFilesOptions(page.MainFrame().Timeout()))
 				},
 				func(tb *testBrowser, page *common.Page, files sobek.Value) error {
-					handle, err := page.WaitForSelector("#textinput", tb.toSobekValue(nil))
+					handle, err := page.WaitForSelector("#textinput", common.NewFrameWaitForSelectorOptions(page.MainFrame().Timeout()))
 					assert.NoError(t, err)
 					return handle.SetInputFiles(files, tb.toSobekValue(nil))
 				},
