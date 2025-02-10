@@ -77,13 +77,17 @@ func TestLocator(t *testing.T) {
 				l := p.Locator("#inputText", nil)
 
 				require.NoError(t, l.Fill(value, nil))
-				inputValue, err := p.InputValue("#inputText", nil)
+
+				inopts := common.NewFrameInputValueOptions(common.DefaultTimeout)
+				inputValue, err := p.InputValue("#inputText", inopts)
 				require.NoError(t, err)
 				require.Equal(t, value, inputValue)
 
 				err = l.Clear(common.NewFrameFillOptions(l.Timeout()))
 				assert.NoError(t, err)
-				inputValue, err = p.InputValue("#inputText", nil)
+
+				inopts = common.NewFrameInputValueOptions(common.DefaultTimeout)
+				inputValue, err = p.InputValue("#inputText", inopts)
 				require.NoError(t, err)
 				assert.Equal(t, "", inputValue)
 			},
@@ -128,7 +132,8 @@ func TestLocator(t *testing.T) {
 				const value = "fill me up"
 				lo := p.Locator("#inputText", nil)
 				require.NoError(t, lo.Fill(value, nil))
-				inputValue, err := p.InputValue("#inputText", nil)
+				inopts := common.NewFrameInputValueOptions(common.DefaultTimeout)
+				inputValue, err := p.InputValue("#inputText", inopts)
 				require.NoError(t, err)
 				require.Equal(t, value, inputValue)
 			},
@@ -138,7 +143,8 @@ func TestLocator(t *testing.T) {
 				const value = "fill me up"
 				lo := p.Locator("textarea", nil)
 				require.NoError(t, lo.Fill(value, nil))
-				inputValue, err := p.InputValue("textarea", nil)
+				opts := common.NewFrameInputValueOptions(common.DefaultTimeout)
+				inputValue, err := p.InputValue("textarea", opts)
 				require.NoError(t, err)
 				require.Equal(t, value, inputValue)
 			},
@@ -231,7 +237,8 @@ func TestLocator(t *testing.T) {
 			"Press", func(_ *testBrowser, p *common.Page) {
 				lo := p.Locator("#inputText", nil)
 				require.NoError(t, lo.Press("x", nil))
-				inputValue, err := p.InputValue("#inputText", nil)
+				opts := common.NewFrameInputValueOptions(common.DefaultTimeout)
+				inputValue, err := p.InputValue("#inputText", opts)
 				require.NoError(t, err)
 				require.Equal(t, "xsomething", inputValue)
 			},
@@ -271,7 +278,7 @@ func TestLocator(t *testing.T) {
 			"Type", func(_ *testBrowser, p *common.Page) {
 				lo := p.Locator("#inputText", nil)
 				require.NoError(t, lo.Type("real ", nil))
-				inputValue, err := p.InputValue("#inputText", nil)
+				inputValue, err := p.InputValue("#inputText", common.NewFrameInputValueOptions(common.DefaultTimeout))
 				require.NoError(t, err)
 				require.Equal(t, "real something", inputValue)
 			},

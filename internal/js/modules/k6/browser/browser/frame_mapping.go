@@ -167,10 +167,14 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				return f.InnerText(selector, inopts) //nolint:wrapcheck
 			}), nil
 		},
-		"inputValue": func(selector string, opts sobek.Value) *sobek.Promise {
+		"inputValue": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
+			inopts := common.NewFrameInputValueOptions(f.Timeout())
+			if err := inopts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parse innerText options of selector %q: %w", selector, err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return f.InputValue(selector, opts) //nolint:wrapcheck
-			})
+				return f.InputValue(selector, inopts) //nolint:wrapcheck
+			}), nil
 		},
 		"isChecked": func(selector string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {

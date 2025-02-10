@@ -524,17 +524,17 @@ func TestPageInputValue(t *testing.T) {
      	`, nil)
 	require.NoError(t, err)
 
-	inputValue, err := p.InputValue("input", nil)
+	inputValue, err := p.InputValue("input", common.NewFrameInputValueOptions(p.Timeout()))
 	require.NoError(t, err)
 	got, want := inputValue, "hello1"
 	assert.Equal(t, got, want)
 
-	inputValue, err = p.InputValue("select", nil)
+	inputValue, err = p.InputValue("select", common.NewFrameInputValueOptions(p.Timeout()))
 	require.NoError(t, err)
 	got, want = inputValue, "hello2"
 	assert.Equal(t, got, want)
 
-	inputValue, err = p.InputValue("textarea", nil)
+	inputValue, err = p.InputValue("textarea", common.NewFrameInputValueOptions(p.Timeout()))
 	require.NoError(t, err)
 	got, want = inputValue, "hello3"
 	assert.Equal(t, got, want)
@@ -597,7 +597,7 @@ func TestPageFill(t *testing.T) {
 		t.Run("happy/"+tt.name, func(t *testing.T) {
 			err := p.Fill(tt.selector, tt.value, common.NewFrameFillOptions(p.MainFrame().Timeout()))
 			require.NoError(t, err)
-			inputValue, err := p.InputValue(tt.selector, nil)
+			inputValue, err := p.InputValue(tt.selector, common.NewFrameInputValueOptions(p.MainFrame().Timeout()))
 			require.NoError(t, err)
 			require.Equal(t, tt.value, inputValue)
 		})
@@ -956,7 +956,7 @@ func TestPagePress(t *testing.T) {
 	require.NoError(t, p.Press("#text1", "KeyB", nil))
 	require.NoError(t, p.Press("#text1", "Shift+KeyC", nil))
 
-	inputValue, err := p.InputValue("#text1", nil)
+	inputValue, err := p.InputValue("#text1", common.NewFrameInputValueOptions(p.Timeout()))
 	require.NoError(t, err)
 	require.Equal(t, "AbC", inputValue)
 }

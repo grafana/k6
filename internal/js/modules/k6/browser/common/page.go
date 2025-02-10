@@ -1071,7 +1071,7 @@ func (p *Page) InnerText(selector string, opts *FrameInnerTextOptions) (string, 
 }
 
 // InputValue returns the value of the input element matching the provided selector.
-func (p *Page) InputValue(selector string, opts sobek.Value) (string, error) {
+func (p *Page) InputValue(selector string, opts *FrameInputValueOptions) (string, error) {
 	p.logger.Debugf("Page:InputValue", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().InputValue(selector, opts)
