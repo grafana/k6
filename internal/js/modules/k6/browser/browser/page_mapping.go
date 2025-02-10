@@ -260,11 +260,14 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return p.IsHidden(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
-		"isVisible": func(selector string, opts sobek.Value) *sobek.Promise {
+		"isVisible": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewFrameIsVisibleOptions()
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing isVisible options of selector %q: %w", selector, err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
-				return p.IsVisible(selector, opts) //nolint:wrapcheck
-			})
+				return p.IsVisible(selector, popts) //nolint:wrapcheck
+			}), nil
 		},
 		"keyboard": mapKeyboard(vu, p.GetKeyboard()),
 		"locator": func(selector string, opts sobek.Value) *sobek.Object {

@@ -1678,8 +1678,7 @@ func TestPageIsVisible(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			got, err := page.IsVisible(tc.selector, tb.toSobekValue(tc.options))
-
+			got, err := page.IsVisible(tc.selector, &tc.options)
 			if tc.wantErr != "" {
 				assert.ErrorContains(t, err, tc.wantErr)
 				return

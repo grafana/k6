@@ -226,10 +226,14 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				return f.IsHidden(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
-		"isVisible": func(selector string, opts sobek.Value) *sobek.Promise {
+		"isVisible": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewFrameIsVisibleOptions()
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parse isVisible options of selector %q: %w", selector, err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return f.IsVisible(selector, opts) //nolint:wrapcheck
-			})
+				return f.IsVisible(selector, popts) //nolint:wrapcheck
+			}), nil
 		},
 		"locator": func(selector string, opts sobek.Value) mapping {
 			return mapLocator(vu, f.Locator(selector, opts))
