@@ -1700,7 +1700,7 @@ func TestPageIsHidden(t *testing.T) {
 	testCases := []struct {
 		name     string
 		selector string
-		options  common.FrameIsVisibleOptions
+		options  common.FrameIsHiddenOptions
 		want     bool
 		wantErr  string
 	}{
@@ -1727,7 +1727,7 @@ func TestPageIsHidden(t *testing.T) {
 		{
 			name:     "first_div",
 			selector: "div",
-			options: common.FrameIsVisibleOptions{
+			options: common.FrameIsHiddenOptions{
 				Strict: true,
 			},
 			wantErr: "error:strictmodeviolation",
@@ -1752,8 +1752,7 @@ func TestPageIsHidden(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			got, err := page.IsHidden(tc.selector, tb.toSobekValue(tc.options))
-
+			got, err := page.IsHidden(tc.selector, &tc.options)
 			if tc.wantErr != "" {
 				assert.ErrorContains(t, err, tc.wantErr)
 				return
