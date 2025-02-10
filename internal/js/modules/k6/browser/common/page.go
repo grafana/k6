@@ -827,10 +827,10 @@ func (p *Page) Check(selector string, opts sobek.Value) error {
 }
 
 // Uncheck unchecks an element matching the provided selector.
-func (p *Page) Uncheck(selector string, opts sobek.Value) error {
+func (p *Page) Uncheck(selector string, popts *FrameUncheckOptions) error {
 	p.logger.Debugf("Page:Uncheck", "sid:%v selector:%s", p.sessionID(), selector)
 
-	return p.MainFrame().Uncheck(selector, opts)
+	return p.MainFrame().Uncheck(selector, popts)
 }
 
 // IsChecked returns true if the first element that matches the selector

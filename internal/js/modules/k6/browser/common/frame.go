@@ -650,13 +650,9 @@ func (f *Frame) SetChecked(selector string, checked bool, popts *FrameCheckOptio
 }
 
 // Uncheck the first found element that matches the selector.
-func (f *Frame) Uncheck(selector string, opts sobek.Value) error {
+func (f *Frame) Uncheck(selector string, popts *FrameUncheckOptions) error {
 	f.log.Debugf("Frame:Uncheck", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	popts := NewFrameUncheckOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return fmt.Errorf("parsing frame uncheck options %q: %w", selector, err)
-	}
 	if err := f.uncheck(selector, popts); err != nil {
 		return fmt.Errorf("unchecking %q: %w", selector, err)
 	}

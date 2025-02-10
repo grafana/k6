@@ -304,10 +304,15 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				return nil, f.Type(selector, text, popts) //nolint:wrapcheck
 			}), nil
 		},
-		"uncheck": func(selector string, opts sobek.Value) *sobek.Promise {
+		"uncheck": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewFrameUncheckOptions(f.Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing frame uncheck options %q: %w", selector, err)
+			}
+
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return nil, f.Uncheck(selector, opts) //nolint:wrapcheck
-			})
+				return nil, f.Uncheck(selector, popts) //nolint:wrapcheck
+			}), nil
 		},
 		"url": f.URL,
 		"waitForFunction": func(pageFunc, opts sobek.Value, args ...sobek.Value) (*sobek.Promise, error) {
