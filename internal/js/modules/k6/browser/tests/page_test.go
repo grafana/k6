@@ -636,13 +636,13 @@ func TestPageSetChecked(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, checked)
 
-	err = p.SetChecked("#el", true, nil)
+	err = p.SetChecked("#el", true, common.NewFrameCheckOptions(p.MainFrame().Timeout()))
 	require.NoError(t, err)
 	checked, err = p.IsChecked("#el", nil)
 	require.NoError(t, err)
 	assert.True(t, checked)
 
-	err = p.SetChecked("#el", false, nil)
+	err = p.SetChecked("#el", false, common.NewFrameCheckOptions(p.MainFrame().Timeout()))
 	require.NoError(t, err)
 	checked, err = p.IsChecked("#el", nil)
 	require.NoError(t, err)

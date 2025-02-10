@@ -813,10 +813,10 @@ func (p *Page) BringToFront() error {
 }
 
 // SetChecked sets the checked state of the element matching the provided selector.
-func (p *Page) SetChecked(selector string, checked bool, opts sobek.Value) error {
+func (p *Page) SetChecked(selector string, checked bool, popts *FrameCheckOptions) error {
 	p.logger.Debugf("Page:SetChecked", "sid:%v selector:%s checked:%t", p.sessionID(), selector, checked)
 
-	return p.MainFrame().SetChecked(selector, checked, opts)
+	return p.MainFrame().SetChecked(selector, checked, popts)
 }
 
 // Check checks an element matching the provided selector.

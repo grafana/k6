@@ -204,10 +204,15 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				return f.SelectOption(selector, values, popts) //nolint:wrapcheck
 			}), nil
 		},
-		"setChecked": func(selector string, checked bool, opts sobek.Value) *sobek.Promise {
+		"setChecked": func(selector string, checked bool, opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewFrameCheckOptions(f.Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing frame set check options: %w", err)
+			}
+
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return nil, f.SetChecked(selector, checked, opts) //nolint:wrapcheck
-			})
+				return nil, f.SetChecked(selector, checked, popts) //nolint:wrapcheck
+			}), nil
 		},
 		"setContent": func(html string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {

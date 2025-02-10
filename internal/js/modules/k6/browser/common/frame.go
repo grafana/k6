@@ -637,13 +637,9 @@ func (f *Frame) setChecked(selector string, checked bool, opts *FrameCheckOption
 }
 
 // SetChecked sets the checked state of the first element found that matches the selector.
-func (f *Frame) SetChecked(selector string, checked bool, opts sobek.Value) error {
+func (f *Frame) SetChecked(selector string, checked bool, popts *FrameCheckOptions) error {
 	f.log.Debugf("Frame:SetChecked", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	popts := NewFrameCheckOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return fmt.Errorf("parsing frame set check options: %w", err)
-	}
 	if err := f.setChecked(selector, checked, popts); err != nil {
 		return fmt.Errorf("setting checked %q: %w", selector, err)
 	}
