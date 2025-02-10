@@ -1270,14 +1270,10 @@ func (f *Frame) isDisabled(selector string, opts *FrameIsDisabledOptions) (bool,
 
 // IsHidden returns true if the first element that matches the selector
 // is hidden. Otherwise, returns false.
-func (f *Frame) IsHidden(selector string, opts sobek.Value) (bool, error) {
+func (f *Frame) IsHidden(selector string, opts *FrameIsHiddenOptions) (bool, error) {
 	f.log.Debugf("Frame:IsHidden", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	popts := NewFrameIsHiddenOptions()
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return false, fmt.Errorf("parsing is hidden options: %w", err)
-	}
-	hidden, err := f.isHidden(selector, popts)
+	hidden, err := f.isHidden(selector, opts)
 	if err != nil {
 		return false, err
 	}
