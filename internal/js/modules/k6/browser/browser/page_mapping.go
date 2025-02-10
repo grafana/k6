@@ -45,6 +45,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				// exists).
 				vu.taskQueueRegistry.close(p.TargetID())
 
+				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 				return nil, p.Close(opts) //nolint:wrapcheck
 			})
 		},
@@ -58,6 +59,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		},
 		"dblclick": func(selector string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
+				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 				return nil, p.Dblclick(selector, opts) //nolint:wrapcheck
 			})
 		},
@@ -72,6 +74,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		},
 		"emulateMedia": func(opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
+				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 				return nil, p.EmulateMedia(opts) //nolint:wrapcheck
 			})
 		},
@@ -85,6 +88,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, fmt.Errorf("evaluate requires a page function")
 			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
+				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 				return p.Evaluate(pageFunc.String(), exportArgs(gargs)...)
 			}), nil
 		},
@@ -93,6 +97,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, fmt.Errorf("evaluateHandle requires a page function")
 			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
+				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 				jsh, err := p.EvaluateHandle(pageFunc.String(), exportArgs(gargs)...)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
@@ -102,11 +107,13 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		},
 		"fill": func(selector string, value string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
+				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 				return nil, p.Fill(selector, value, opts) //nolint:wrapcheck
 			})
 		},
 		"focus": func(selector string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
+				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 				return nil, p.Focus(selector, opts) //nolint:wrapcheck
 			})
 		},
@@ -122,6 +129,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		},
 		"getAttribute": func(selector string, name string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
+				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 				s, ok, err := p.GetAttribute(selector, name, opts)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
@@ -151,57 +159,68 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		},
 		"hover": func(selector string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
+				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 				return nil, p.Hover(selector, opts) //nolint:wrapcheck
 			})
 		},
 		"innerHTML": func(selector string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
+				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 				return p.InnerHTML(selector, opts) //nolint:wrapcheck
 			})
 		},
 		"innerText": func(selector string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
+				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 				return p.InnerText(selector, opts) //nolint:wrapcheck
 			})
 		},
 		"inputValue": func(selector string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
+				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 				return p.InputValue(selector, opts) //nolint:wrapcheck
 			})
 		},
 		"isChecked": func(selector string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
+				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 				return p.IsChecked(selector, opts) //nolint:wrapcheck
 			})
 		},
 		"isClosed": p.IsClosed,
 		"isDisabled": func(selector string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
+				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 				return p.IsDisabled(selector, opts) //nolint:wrapcheck
 			})
 		},
 		"isEditable": func(selector string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
+				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 				return p.IsEditable(selector, opts) //nolint:wrapcheck
 			})
 		},
 		"isEnabled": func(selector string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
+				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 				return p.IsEnabled(selector, opts) //nolint:wrapcheck
 			})
 		},
 		"isHidden": func(selector string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
+				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 				return p.IsHidden(selector, opts) //nolint:wrapcheck
 			})
 		},
 		"isVisible": func(selector string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
+				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 				return p.IsVisible(selector, opts) //nolint:wrapcheck
 			})
 		},
 		"keyboard": mapKeyboard(vu, p.GetKeyboard()),
 		"locator": func(selector string, opts sobek.Value) *sobek.Object {
+			// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 			ml := mapLocator(vu, p.Locator(selector, opts))
 			return rt.ToValue(ml).ToObject(rt)
 		},
@@ -218,11 +237,13 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		},
 		"press": func(selector string, key string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
+				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 				return nil, p.Press(selector, key, opts) //nolint:wrapcheck
 			})
 		},
 		"reload": func(opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
+				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 				resp, err := p.Reload(opts)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
@@ -249,6 +270,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 					return nil, err //nolint:wrapcheck
 				}
 
+				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 				ab := rt.NewArrayBuffer(bb)
 
 				return &ab, nil
@@ -256,16 +278,19 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		},
 		"selectOption": func(selector string, values sobek.Value, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
+				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 				return p.SelectOption(selector, values, opts) //nolint:wrapcheck
 			})
 		},
 		"setChecked": func(selector string, checked bool, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
+				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 				return nil, p.SetChecked(selector, checked, opts) //nolint:wrapcheck
 			})
 		},
 		"setContent": func(html string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
+				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 				return nil, p.SetContent(html, opts) //nolint:wrapcheck
 			})
 		},
@@ -278,6 +303,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		},
 		"setInputFiles": func(selector string, files sobek.Value, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
+				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 				return nil, p.SetInputFiles(selector, files, opts) //nolint:wrapcheck
 			})
 		},
@@ -297,6 +323,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		},
 		"textContent": func(selector string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
+				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 				s, ok, err := p.TextContent(selector, opts)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
@@ -324,11 +351,13 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		},
 		"touchscreen": mapTouchscreen(vu, p.GetTouchscreen()),
 		"type": func(selector string, text string, opts sobek.Value) *sobek.Promise {
+			// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return nil, p.Type(selector, text, opts) //nolint:wrapcheck
 			})
 		},
 		"uncheck": func(selector string, opts sobek.Value) *sobek.Promise {
+			// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return nil, p.Uncheck(selector, opts) //nolint:wrapcheck
 			})
@@ -349,6 +378,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		},
 		"waitForLoadState": func(state string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
+				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 				return nil, p.WaitForLoadState(state, opts) //nolint:wrapcheck
 			})
 		},
@@ -363,11 +393,13 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				if err != nil {
 					return nil, err //nolint:wrapcheck
 				}
+				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 				return mapResponse(vu, resp), nil
 			}), nil
 		},
 		"waitForSelector": func(selector string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
+				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 				eh, err := p.WaitForSelector(selector, opts)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
@@ -402,6 +434,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			if eh == nil {
 				return nil, nil
 			}
+			// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 			ehm := mapElementHandle(vu, eh)
 
 			return ehm, nil
@@ -415,6 +448,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}
 			var mehs []mapping
 			for _, eh := range ehs {
+				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 				ehm := mapElementHandle(vu, eh)
 				mehs = append(mehs, ehm)
 			}
