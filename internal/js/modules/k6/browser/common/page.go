@@ -1064,7 +1064,7 @@ func (p *Page) InnerHTML(selector string, opts *FrameInnerHTMLOptions) (string, 
 }
 
 // InnerText returns the inner text of the element matching the provided selector.
-func (p *Page) InnerText(selector string, opts sobek.Value) (string, error) {
+func (p *Page) InnerText(selector string, opts *FrameInnerTextOptions) (string, error) {
 	p.logger.Debugf("Page:InnerText", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().InnerText(selector, opts)

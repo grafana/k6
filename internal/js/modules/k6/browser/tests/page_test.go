@@ -435,7 +435,7 @@ func TestPageInnerText(t *testing.T) {
 		p := newTestBrowser(t).NewPage(nil)
 		err := p.SetContent(sampleHTML, nil)
 		require.NoError(t, err)
-		innerText, err := p.InnerText("div", nil)
+		innerText, err := p.InnerText("div", common.NewFrameInnerTextOptions(p.Timeout()))
 		require.NoError(t, err)
 		assert.Equal(t, "Test\nOne", innerText)
 	})
@@ -445,7 +445,7 @@ func TestPageInnerText(t *testing.T) {
 
 		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
-		_, err := p.InnerText("", nil)
+		_, err := p.InnerText("", common.NewFrameInnerTextOptions(p.Timeout()))
 		require.ErrorContains(t, err, "The provided selector is empty")
 	})
 
@@ -456,7 +456,7 @@ func TestPageInnerText(t *testing.T) {
 		p := tb.NewPage(nil)
 		err := p.SetContent(sampleHTML, nil)
 		require.NoError(t, err)
-		_, err = p.InnerText("p", tb.toSobekValue(jsFrameBaseOpts{Timeout: "100"}))
+		_, err = p.InnerText("p", common.NewFrameInnerTextOptions(p.Timeout()))
 		require.Error(t, err)
 	})
 }
@@ -1527,7 +1527,7 @@ func TestPageThrottleNetwork(t *testing.T) {
 			_, err = page.WaitForSelector(selector, nil)
 			require.NoError(t, err)
 
-			resp, err := page.InnerText(selector, nil)
+			resp, err := page.InnerText(selector, common.NewFrameInnerTextOptions(page.Timeout()))
 			require.NoError(t, err)
 			ms, err := strconv.ParseInt(resp, 10, 64)
 			require.NoError(t, err)
