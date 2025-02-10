@@ -239,9 +239,14 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				return nil, f.Tap(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
-		"textContent": func(selector string, opts sobek.Value) *sobek.Promise {
+		"textContent": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewFrameTextContentOptions(f.Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing text content options: %w", err)
+			}
+
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				s, ok, err := f.TextContent(selector, opts)
+				s, ok, err := f.TextContent(selector, popts)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
 				}
@@ -249,7 +254,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 					return nil, nil
 				}
 				return s, nil
-			})
+			}), nil
 		},
 		"title": func() *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {

@@ -1407,10 +1407,10 @@ func (p *Page) Tap(selector string, opts *FrameTapOptions) error {
 // TextContent returns the textContent attribute of the first element found
 // that matches the selector. The second return value is true if the returned
 // text content is not null or empty, and false otherwise.
-func (p *Page) TextContent(selector string, opts sobek.Value) (string, bool, error) {
+func (p *Page) TextContent(selector string, popts *FrameTextContentOptions) (string, bool, error) {
 	p.logger.Debugf("Page:TextContent", "sid:%v selector:%s", p.sessionID(), selector)
 
-	return p.MainFrame().TextContent(selector, opts)
+	return p.MainFrame().TextContent(selector, popts)
 }
 
 // Timeout will return the default timeout or the one set by the user.
