@@ -1786,16 +1786,11 @@ func (f *Frame) waitForFunction(
 
 // WaitForLoadState waits for the given load state to be reached.
 // This will unblock if that lifecycle event has already been received.
-func (f *Frame) WaitForLoadState(state string, opts sobek.Value) error {
+func (f *Frame) WaitForLoadState(state string, popts *FrameWaitForLoadStateOptions) error {
 	f.log.Debugf("Frame:WaitForLoadState", "fid:%s furl:%q state:%s", f.ID(), f.URL(), state)
 	defer f.log.Debugf("Frame:WaitForLoadState:return", "fid:%s furl:%q state:%s", f.ID(), f.URL(), state)
 
-	waitForLoadStateOpts := NewFrameWaitForLoadStateOptions(f.defaultTimeout())
-	if err := waitForLoadStateOpts.Parse(f.ctx, opts); err != nil {
-		return fmt.Errorf("parsing waitForLoadState %q options: %w", state, err)
-	}
-
-	timeoutCtx, timeoutCancel := context.WithTimeout(f.ctx, waitForLoadStateOpts.Timeout)
+	timeoutCtx, timeoutCancel := context.WithTimeout(f.ctx, popts.Timeout)
 	defer timeoutCancel()
 
 	waitUntil := LifecycleEventLoad

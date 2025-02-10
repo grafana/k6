@@ -435,11 +435,15 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return p.WaitForFunction(js, popts, pargs...) //nolint:wrapcheck
 			}), nil
 		},
-		"waitForLoadState": func(state string, opts sobek.Value) *sobek.Promise {
+		"waitForLoadState": func(state string, opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewFrameWaitForLoadStateOptions(p.MainFrame().Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing waitForLoadState %q options: %w", state, err)
+			}
+
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
-				return nil, p.WaitForLoadState(state, opts) //nolint:wrapcheck
-			})
+				return nil, p.WaitForLoadState(state, popts) //nolint:wrapcheck
+			}), nil
 		},
 		"waitForNavigation": func(opts sobek.Value) (*sobek.Promise, error) {
 			popts := common.NewFrameWaitForNavigationOptions(p.Timeout())

@@ -144,7 +144,7 @@ func TestKeyboardPress(t *testing.T) {
 		require.NoError(t, err)
 
 		// Wait for the new tab to complete loading.
-		assert.NoError(t, newTab.WaitForLoadState("load", nil))
+		assert.NoError(t, newTab.WaitForLoadState("load", common.NewFrameWaitForLoadStateOptions(p.MainFrame().Timeout())))
 
 		// Make sure the newTab has a different h1 heading.
 		text, err = newTab.Locator("h1", nil).InnerText(nil)

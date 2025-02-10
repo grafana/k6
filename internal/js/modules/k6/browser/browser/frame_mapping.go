@@ -327,10 +327,15 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				return f.WaitForFunction(js, popts, pargs...) //nolint:wrapcheck
 			}), nil
 		},
-		"waitForLoadState": func(state string, opts sobek.Value) *sobek.Promise {
+		"waitForLoadState": func(state string, opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewFrameWaitForLoadStateOptions(f.Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing waitForLoadState %q options: %w", state, err)
+			}
+
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return nil, f.WaitForLoadState(state, opts) //nolint:wrapcheck
-			})
+				return nil, f.WaitForLoadState(state, popts) //nolint:wrapcheck
+			}), nil
 		},
 		"waitForNavigation": func(opts sobek.Value) (*sobek.Promise, error) {
 			popts := common.NewFrameWaitForNavigationOptions(f.Timeout())

@@ -924,7 +924,7 @@ func TestPageWaitForLoadState(t *testing.T) {
 
 		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
-		err := p.WaitForLoadState("none", nil)
+		err := p.WaitForLoadState("none", common.NewFrameWaitForLoadStateOptions(p.MainFrame().Timeout()))
 		require.ErrorContains(t, err, `invalid lifecycle event: "none"; must be one of: load, domcontentloaded, networkidle`)
 	})
 }
@@ -1856,7 +1856,7 @@ func TestPageTargetBlank(t *testing.T) {
 	p2, ok := obj.(*common.Page)
 	require.True(t, ok, "return from WaitForEvent is not a Page")
 
-	err = p2.WaitForLoadState(common.LifecycleEventLoad.String(), nil)
+	err = p2.WaitForLoadState(common.LifecycleEventLoad.String(), common.NewFrameWaitForLoadStateOptions(p.MainFrame().Timeout()))
 	require.NoError(t, err)
 
 	// Now there should be 2 pages.

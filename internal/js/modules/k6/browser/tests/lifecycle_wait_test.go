@@ -281,7 +281,7 @@ func TestLifecycleWaitForLoadState(t *testing.T) {
 			pingJSSlow:   false,
 			waitUntil:    common.LifecycleEventDOMContentLoad,
 			assertFunc: func(p *common.Page) {
-				err := p.WaitForLoadState(common.LifecycleEventNetworkIdle.String(), nil)
+				err := p.WaitForLoadState(common.LifecycleEventNetworkIdle.String(), common.NewFrameWaitForLoadStateOptions(p.MainFrame().Timeout()))
 				require.NoError(t, err)
 
 				result, _, err := p.TextContent("#pingRequestText", common.NewFrameTextContentOptions(p.MainFrame().Timeout()))
@@ -325,7 +325,7 @@ func TestLifecycleWaitForLoadState(t *testing.T) {
 				tt.pingJSTextAssert(result)
 
 				// This shouldn't block and return after calling hasLifecycleEventFired.
-				return p.WaitForLoadState(tt.waitUntil.String(), nil)
+				return p.WaitForLoadState(tt.waitUntil.String(), common.NewFrameWaitForLoadStateOptions(p.MainFrame().Timeout()))
 			}, nil, "")
 		})
 	}
