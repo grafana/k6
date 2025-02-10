@@ -208,10 +208,14 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				return f.IsEditable(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
-		"isEnabled": func(selector string, opts sobek.Value) *sobek.Promise {
+		"isEnabled": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewFrameIsEnabledOptions(f.Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parse isEnabled options of selector %q: %w", selector, err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return f.IsEnabled(selector, opts) //nolint:wrapcheck
-			})
+				return f.IsEnabled(selector, popts) //nolint:wrapcheck
+			}), nil
 		},
 		"isHidden": func(selector string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
