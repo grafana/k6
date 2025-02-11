@@ -820,10 +820,10 @@ func (p *Page) SetChecked(selector string, checked bool, popts *FrameCheckOption
 }
 
 // Check checks an element matching the provided selector.
-func (p *Page) Check(selector string, opts sobek.Value) error {
+func (p *Page) Check(selector string, popts *FrameCheckOptions) error {
 	p.logger.Debugf("Page:Check", "sid:%v selector:%s", p.sessionID(), selector)
 
-	return p.MainFrame().Check(selector, opts)
+	return p.MainFrame().Check(selector, popts)
 }
 
 // Uncheck unchecks an element matching the provided selector.

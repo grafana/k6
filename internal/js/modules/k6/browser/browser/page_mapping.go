@@ -23,10 +23,14 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, p.BringToFront() //nolint:wrapcheck
 			})
 		},
-		"check": func(selector string, opts sobek.Value) *sobek.Promise {
+		"check": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewFrameCheckOptions(p.MainFrame().Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing new frame check options: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return nil, p.Check(selector, opts) //nolint:wrapcheck
-			})
+				return nil, p.Check(selector, popts) //nolint:wrapcheck
+			}), nil
 		},
 		"click": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
 			popts, err := parseFrameClickOptions(vu.Context(), opts, p.MainFrame().Timeout())
