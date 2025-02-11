@@ -666,12 +666,16 @@ func TestPageScreenshotFullpage(t *testing.T) {
 	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
-	err := p.SetViewportSize(tb.toSobekValue(struct {
+	viewportSize := tb.toSobekValue(struct {
 		Width  float64 `js:"width"`
 		Height float64 `js:"height"`
 	}{
 		Width: 1280, Height: 800,
-	}))
+	})
+	s := new(common.Size)
+	require.NoError(t, s.Parse(tb.context(), viewportSize))
+
+	err := p.SetViewportSize(s)
 	require.NoError(t, err)
 
 	_, err = p.Evaluate(`
