@@ -298,9 +298,13 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				return nil, fmt.Errorf("parsing setInputFiles options: %w", err)
 			}
 
+			pfiles := new(common.Files)
+			if err := pfiles.Parse(vu.Context(), files); err != nil {
+				return nil, fmt.Errorf("parsing setInputFiles parameter: %w", err)
+			}
+
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				// TODO: don't use sobek Values in a separate goroutine, complete files migration
-				return nil, f.SetInputFiles(selector, files, popts) //nolint:wrapcheck
+				return nil, f.SetInputFiles(selector, pfiles, popts) //nolint:wrapcheck
 			}), nil
 		},
 		"tap": func(selector string, opts sobek.Value) (*sobek.Promise, error) {

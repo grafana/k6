@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/grafana/sobek"
@@ -36,7 +37,12 @@ func TestSetInputFiles(t *testing.T) {
 	`
 
 	defaultTestPage := func(tb *testBrowser, page *common.Page, files sobek.Value) error {
-		return page.SetInputFiles("#upload", files, common.NewFrameSetInputFilesOptions(page.MainFrame().Timeout()))
+		pfiles := new(common.Files)
+		if err := pfiles.Parse(tb.vu.Context(), files); err != nil {
+			return fmt.Errorf("parsing setInputFiles parameter: %w", err)
+		}
+
+		return page.SetInputFiles("#upload", pfiles, common.NewFrameSetInputFilesOptions(page.MainFrame().Timeout()))
 	}
 	defaultTestElementHandle := func(tb *testBrowser, page *common.Page, files sobek.Value) error {
 		handle, err := page.WaitForSelector("#upload", common.NewFrameWaitForSelectorOptions(page.MainFrame().Timeout()))
@@ -124,7 +130,12 @@ func TestSetInputFiles(t *testing.T) {
 			},
 			tests: []testFn{
 				func(tb *testBrowser, page *common.Page, files sobek.Value) error {
-					return page.SetInputFiles("#button1", files, common.NewFrameSetInputFilesOptions(page.MainFrame().Timeout()))
+					pfiles := new(common.Files)
+					if err := pfiles.Parse(tb.vu.Context(), files); err != nil {
+						return fmt.Errorf("parsing setInputFiles parameter: %w", err)
+					}
+
+					return page.SetInputFiles("#button1", pfiles, common.NewFrameSetInputFilesOptions(page.MainFrame().Timeout()))
 				},
 				func(tb *testBrowser, page *common.Page, files sobek.Value) error {
 					handle, err := page.WaitForSelector("#button1", common.NewFrameWaitForSelectorOptions(page.MainFrame().Timeout()))
@@ -147,7 +158,12 @@ func TestSetInputFiles(t *testing.T) {
 			},
 			tests: []testFn{
 				func(tb *testBrowser, page *common.Page, files sobek.Value) error {
-					return page.SetInputFiles("#textinput", files, common.NewFrameSetInputFilesOptions(page.MainFrame().Timeout()))
+					pfiles := new(common.Files)
+					if err := pfiles.Parse(tb.vu.Context(), files); err != nil {
+						return fmt.Errorf("parsing setInputFiles parameter: %w", err)
+					}
+
+					return page.SetInputFiles("#textinput", pfiles, common.NewFrameSetInputFilesOptions(page.MainFrame().Timeout()))
 				},
 				func(tb *testBrowser, page *common.Page, files sobek.Value) error {
 					handle, err := page.WaitForSelector("#textinput", common.NewFrameWaitForSelectorOptions(page.MainFrame().Timeout()))

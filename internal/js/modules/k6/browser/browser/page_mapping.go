@@ -383,9 +383,13 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, fmt.Errorf("parsing setInputFiles options: %w", err)
 			}
 
+			pfiles := new(common.Files)
+			if err := pfiles.Parse(vu.Context(), files); err != nil {
+				return nil, fmt.Errorf("parsing setInputFiles parameter: %w", err)
+			}
+
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				// TODO: don't use sobek Values in a separate goroutine, complete files migration
-				return nil, p.SetInputFiles(selector, files, popts) //nolint:wrapcheck
+				return nil, p.SetInputFiles(selector, pfiles, popts) //nolint:wrapcheck
 			}), nil
 		},
 		"setViewportSize": func(viewportSize sobek.Value) (*sobek.Promise, error) {
