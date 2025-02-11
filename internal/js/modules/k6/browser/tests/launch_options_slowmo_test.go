@@ -23,7 +23,7 @@ func TestBrowserOptionsSlowMo(t *testing.T) {
 			t.Parallel()
 			tb := newTestBrowser(t, withFileServer())
 			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p *common.Page) {
-				assert.NoError(t, p.Check(".check", nil))
+				assert.NoError(t, p.Check(".check", common.NewFrameCheckOptions(p.MainFrame().Timeout())))
 			})
 		})
 		t.Run("click", func(t *testing.T) {
@@ -179,7 +179,7 @@ func TestBrowserOptionsSlowMo(t *testing.T) {
 			t.Parallel()
 			tb := newTestBrowser(t, withFileServer())
 			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f *common.Frame) {
-				assert.NoError(t, f.Check(".check", nil))
+				assert.NoError(t, f.Check(".check", common.NewFrameCheckOptions(f.Timeout())))
 			})
 		})
 		t.Run("click", func(t *testing.T) {

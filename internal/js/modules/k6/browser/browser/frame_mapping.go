@@ -14,10 +14,14 @@ import (
 //nolint:funlen,gocognit,cyclop
 func mapFrame(vu moduleVU, f *common.Frame) mapping {
 	maps := mapping{
-		"check": func(selector string, opts sobek.Value) *sobek.Promise {
+		"check": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewFrameCheckOptions(f.Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing new frame check options: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return nil, f.Check(selector, opts) //nolint:wrapcheck
-			})
+				return nil, f.Check(selector, popts) //nolint:wrapcheck
+			}), nil
 		},
 		"childFrames": func() []mapping {
 			var (

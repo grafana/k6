@@ -592,13 +592,9 @@ func (f *Frame) click(selector string, opts *FrameClickOptions) error {
 }
 
 // Check clicks the first element found that matches selector.
-func (f *Frame) Check(selector string, opts sobek.Value) error {
+func (f *Frame) Check(selector string, popts *FrameCheckOptions) error {
 	f.log.Debugf("Frame:Check", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	popts := NewFrameCheckOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return fmt.Errorf("parsing new frame check options: %w", err)
-	}
 	if err := f.check(selector, popts); err != nil {
 		return fmt.Errorf("checking %q: %w", selector, err)
 	}
