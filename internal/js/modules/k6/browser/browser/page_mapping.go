@@ -388,10 +388,14 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, p.SetInputFiles(selector, files, popts) //nolint:wrapcheck
 			}), nil
 		},
-		"setViewportSize": func(viewportSize sobek.Value) *sobek.Promise {
+		"setViewportSize": func(viewportSize sobek.Value) (*sobek.Promise, error) {
+			s := new(common.Size)
+			if err := s.Parse(vu.Context(), viewportSize); err != nil {
+				return nil, fmt.Errorf("parsing viewport size: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return nil, p.SetViewportSize(viewportSize) //nolint:wrapcheck
-			})
+				return nil, p.SetViewportSize(s) //nolint:wrapcheck
+			}), nil
 		},
 		"tap": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
 			popts := common.NewFrameTapOptions(p.Timeout())

@@ -1368,14 +1368,10 @@ func (p *Page) SetInputFiles(selector string, files sobek.Value, opts *FrameSetI
 }
 
 // SetViewportSize will update the viewport width and height.
-func (p *Page) SetViewportSize(viewportSize sobek.Value) error {
+func (p *Page) SetViewportSize(viewportSize *Size) error {
 	p.logger.Debugf("Page:SetViewportSize", "sid:%v", p.sessionID())
 
-	var s Size
-	if err := s.Parse(p.ctx, viewportSize); err != nil {
-		return fmt.Errorf("parsing viewport size: %w", err)
-	}
-	if err := p.setViewportSize(&s); err != nil {
+	if err := p.setViewportSize(viewportSize); err != nil {
 		return fmt.Errorf("setting viewport size: %w", err)
 	}
 
