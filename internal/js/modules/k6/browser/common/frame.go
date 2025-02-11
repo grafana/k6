@@ -1496,13 +1496,8 @@ func (f *Frame) SetContent(html string, _ *FrameSetContentOptions) error {
 }
 
 // SetInputFiles sets input files for the selected element.
-func (f *Frame) SetInputFiles(selector string, files sobek.Value, popts *FrameSetInputFilesOptions) error {
+func (f *Frame) SetInputFiles(selector string, pfiles *Files, popts *FrameSetInputFilesOptions) error {
 	f.log.Debugf("Frame:SetInputFiles", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
-
-	pfiles := &Files{}
-	if err := pfiles.Parse(f.ctx, files); err != nil {
-		return fmt.Errorf("parsing setInputFiles parameter: %w", err)
-	}
 
 	if err := f.setInputFiles(selector, pfiles, popts); err != nil {
 		return fmt.Errorf("setting input files on %q: %w", selector, err)
