@@ -161,10 +161,14 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 				return nil, eh.ScrollIntoViewIfNeeded(opts) //nolint:wrapcheck
 			})
 		},
-		"selectOption": func(values sobek.Value, opts sobek.Value) *sobek.Promise {
+		"selectOption": func(values sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
+			convValues, err := common.ConvertSelectOptionValues(vu.Runtime(), values)
+			if err != nil {
+				return nil, fmt.Errorf("parsing select options values: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return eh.SelectOption(values, opts) //nolint:wrapcheck
-			})
+				return eh.SelectOption(convValues, opts) //nolint:wrapcheck
+			}), nil
 		},
 		"selectText": func(opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {

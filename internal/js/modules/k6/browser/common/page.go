@@ -1325,7 +1325,7 @@ func (p *Page) Screenshot(opts *PageScreenshotOptions, sp ScreenshotPersister) (
 
 // SelectOption selects the given options and returns the array of
 // option values of the first element found that matches the selector.
-func (p *Page) SelectOption(selector string, values sobek.Value, popts *FrameSelectOptionOptions) ([]string, error) {
+func (p *Page) SelectOption(selector string, values []any, popts *FrameSelectOptionOptions) ([]string, error) {
 	p.logger.Debugf("Page:SelectOption", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().SelectOption(selector, values, popts)

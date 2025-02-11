@@ -479,88 +479,82 @@ func (h *ElementHandle) press(apiCtx context.Context, key string, opts KeyboardO
 	return nil
 }
 
-//nolint:funlen,gocognit
-func (h *ElementHandle) selectOption(apiCtx context.Context, values sobek.Value) (any, error) {
-	convertSelectOptionValues := func(values sobek.Value) ([]any, error) {
-		if k6common.IsNullish(values) {
-			return nil, nil
-		}
-
-		var (
-			opts []any
-			t    = values.Export()
-			rt   = h.execCtx.vu.Runtime()
-		)
-		switch values.ExportType().Kind() {
-		case reflect.Slice:
-			var sl []interface{}
-			if err := rt.ExportTo(values, &sl); err != nil {
-				return nil, fmt.Errorf("options: expected array, got %T", values)
-			}
-
-			for _, item := range sl {
-				switch item := item.(type) {
-				case string:
-					opt := SelectOption{Value: new(string)}
-					*opt.Value = item
-					opts = append(opts, &opt)
-				case map[string]interface{}:
-					opt, err := extractSelectOptionFromMap(item)
-					if err != nil {
-						return nil, err
-					}
-
-					opts = append(opts, opt)
-				default:
-					return nil, fmt.Errorf("options: expected string or object, got %T", item)
-				}
-			}
-		case reflect.Map:
-			var raw map[string]interface{}
-			if err := rt.ExportTo(values, &raw); err != nil {
-				return nil, fmt.Errorf("options: expected object, got %T", values)
-			}
-
-			opt, err := extractSelectOptionFromMap(raw)
-			if err != nil {
-				return nil, err
-			}
-
-			opts = append(opts, opt)
-		case reflect.TypeOf(&ElementHandle{}).Kind():
-			opts = append(opts, t.(*ElementHandle)) //nolint:forcetypeassert
-		case reflect.TypeOf(sobek.Object{}).Kind():
-			obj := values.ToObject(rt)
-			opt := SelectOption{}
-			for _, k := range obj.Keys() {
-				switch k {
-				case "value":
-					opt.Value = new(string)
-					*opt.Value = obj.Get(k).String()
-				case "label":
-					opt.Label = new(string)
-					*opt.Label = obj.Get(k).String()
-				case "index":
-					opt.Index = new(int64)
-					*opt.Index = obj.Get(k).ToInteger()
-				}
-			}
-			opts = append(opts, &opt)
-		case reflect.String:
-			opt := SelectOption{Value: new(string)}
-			*opt.Value = t.(string) //nolint:forcetypeassert
-			opts = append(opts, &opt)
-		default:
-			return nil, fmt.Errorf("options: unsupported type %T", values)
-		}
-
-		return opts, nil
-	}
-	convValues, err := convertSelectOptionValues(values)
-	if err != nil {
-		return nil, err
+func ConvertSelectOptionValues(rt *sobek.Runtime, values sobek.Value) ([]any, error) {
+	if k6common.IsNullish(values) {
+		return nil, nil
 	}
 
+	var (
+		opts []any
+		t    = values.Export()
+	)
+	switch values.ExportType().Kind() {
+	case reflect.Slice:
+		var sl []interface{}
+		if err := rt.ExportTo(values, &sl); err != nil {
+			return nil, fmt.Errorf("options: expected array, got %T", values)
+		}
+
+		for _, item := range sl {
+			switch item := item.(type) {
+			case string:
+				opt := SelectOption{Value: new(string)}
+				*opt.Value = item
+				opts = append(opts, &opt)
+			case map[string]interface{}:
+				opt, err := extractSelectOptionFromMap(item)
+				if err != nil {
+					return nil, err
+				}
+
+				opts = append(opts, opt)
+			default:
+				return nil, fmt.Errorf("options: expected string or object, got %T", item)
+			}
+		}
+	case reflect.Map:
+		var raw map[string]interface{}
+		if err := rt.ExportTo(values, &raw); err != nil {
+			return nil, fmt.Errorf("options: expected object, got %T", values)
+		}
+
+		opt, err := extractSelectOptionFromMap(raw)
+		if err != nil {
+			return nil, err
+		}
+
+		opts = append(opts, opt)
+	case reflect.TypeOf(&ElementHandle{}).Kind():
+		opts = append(opts, t.(*ElementHandle)) //nolint:forcetypeassert
+	case reflect.TypeOf(sobek.Object{}).Kind():
+		obj := values.ToObject(rt)
+		opt := SelectOption{}
+		for _, k := range obj.Keys() {
+			switch k {
+			case "value":
+				opt.Value = new(string)
+				*opt.Value = obj.Get(k).String()
+			case "label":
+				opt.Label = new(string)
+				*opt.Label = obj.Get(k).String()
+			case "index":
+				opt.Index = new(int64)
+				*opt.Index = obj.Get(k).ToInteger()
+			}
+		}
+		opts = append(opts, &opt)
+	case reflect.String:
+		opt := SelectOption{Value: new(string)}
+		*opt.Value = t.(string) //nolint:forcetypeassert
+		opts = append(opts, &opt)
+	default:
+		return nil, fmt.Errorf("options: unsupported type %T", values)
+	}
+
+	return opts, nil
+}
+
+func (h *ElementHandle) selectOption(apiCtx context.Context, values []any) (any, error) {
 	fn := `
 		(node, injected, values) => {
 			return injected.selectOptions(node, values);
@@ -570,7 +564,7 @@ func (h *ElementHandle) selectOption(apiCtx context.Context, values sobek.Value)
 		forceCallable: true,
 		returnByValue: false,
 	}
-	result, err := h.evalWithScript(apiCtx, opts, fn, convValues) //nolint:asasalint
+	result, err := h.evalWithScript(apiCtx, opts, fn, values) //nolint:asasalint
 	if err != nil {
 		return nil, err
 	}
@@ -1346,7 +1340,7 @@ func (h *ElementHandle) ScrollIntoViewIfNeeded(opts sobek.Value) error {
 }
 
 // SelectOption selects the options matching the given values.
-func (h *ElementHandle) SelectOption(values sobek.Value, opts sobek.Value) ([]string, error) {
+func (h *ElementHandle) SelectOption(values []any, opts sobek.Value) ([]string, error) {
 	aopts := NewElementHandleBaseOptions(h.defaultTimeout())
 	if err := aopts.Parse(h.ctx, opts); err != nil {
 		return nil, fmt.Errorf("parsing selectOption options: %w", err)

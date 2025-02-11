@@ -264,9 +264,13 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				return nil, fmt.Errorf("parsing select option options: %w", err)
 			}
 
-			// TODO: don't use sobek Values in a separate goroutine: finish migrating values
+			convValues, err := common.ConvertSelectOptionValues(vu.Runtime(), values)
+			if err != nil {
+				return nil, fmt.Errorf("parsing select options values: %w", err)
+			}
+
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return f.SelectOption(selector, values, popts) //nolint:wrapcheck
+				return f.SelectOption(selector, convValues, popts) //nolint:wrapcheck
 			}), nil
 		},
 		"setChecked": func(selector string, checked bool, opts sobek.Value) (*sobek.Promise, error) {
