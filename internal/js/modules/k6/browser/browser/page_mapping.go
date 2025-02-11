@@ -177,7 +177,6 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 					return nil, err //nolint:wrapcheck
 				}
 
-				// TODO(@mstoykov): don't use sobek Values in a separate goroutine - this uses the runtime in a lot of the cases
 				return mapResponse(vu, resp), nil
 			}), nil
 		},
@@ -274,7 +273,6 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		},
 		"keyboard": mapKeyboard(vu, p.GetKeyboard()),
 		"locator": func(selector string, opts sobek.Value) *sobek.Object {
-			// TODO(@mstoykov): don't use sobek Values in a separate goroutine
 			ml := mapLocator(vu, p.Locator(selector, opts))
 			return rt.ToValue(ml).ToObject(rt)
 		},
