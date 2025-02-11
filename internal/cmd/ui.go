@@ -19,9 +19,9 @@ import (
 
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/internal/metrics/engine"
+	"go.k6.io/k6/internal/ui"
 	"go.k6.io/k6/internal/ui/pb"
 	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/output"
 )
 
@@ -52,7 +52,7 @@ func getColor(noColor bool, attributes ...color.Attribute) *color.Color {
 
 func getBanner(noColor bool) string {
 	c := setColor(noColor, color.RGB(0xFF, 0x67, 0x1d).Add(color.Bold))
-	return c.Sprint(consts.Banner())
+	return c.Sprint(ui.Banner())
 }
 
 func printBanner(gs *state.GlobalState) {
