@@ -320,17 +320,24 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, fmt.Errorf("parsing page screenshot options: %w", err)
 			}
 
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			rt := vu.Runtime()
+			promise, res, rej := rt.NewPromise()
+			callback := vu.RegisterCallback()
+			go func() {
 				bb, err := p.Screenshot(popts, vu.filePersister)
 				if err != nil {
-					return nil, err //nolint:wrapcheck
+					callback(func() error {
+						return rej(err)
+					})
+					return
 				}
 
-				// TODO(@mstoykov): don't use sobek Values in a separate goroutine
-				ab := rt.NewArrayBuffer(bb)
+				callback(func() error {
+					return res(rt.NewArrayBuffer(bb))
+				})
+			}()
 
-				return &ab, nil
-			}), nil
+			return promise, nil
 		},
 		"selectOption": func(selector string, values sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
 			popts := common.NewFrameSelectOptionOptions(p.MainFrame().Timeout())
