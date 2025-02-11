@@ -12,8 +12,7 @@ import (
 	"time"
 
 	"go.k6.io/k6/lib/fsext"
-
-	"go.k6.io/k6/lib/consts"
+	"go.k6.io/k6/version"
 
 	"go.k6.io/k6/lib"
 
@@ -111,7 +110,7 @@ func TestCreateTestRun(t *testing.T) {
 
 		arc := &lib.Archive{
 			Type:        "js",
-			K6Version:   consts.Version,
+			K6Version:   version.SemVer,
 			Options:     lib.Options{},
 			FilenameURL: &url.URL{Scheme: "file", Path: "/path/to/a.js"},
 			Data:        []byte(`// a contents`),

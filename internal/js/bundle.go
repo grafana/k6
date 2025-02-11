@@ -26,6 +26,7 @@ import (
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/lib/fsext"
+	"go.k6.io/k6/version"
 )
 
 // A Bundle is a self-contained bundle of scripts and resources.
@@ -176,7 +177,7 @@ func (b *Bundle) makeArchive() *lib.Archive {
 		PwdURL:            clonedPwdURL,
 		Env:               make(map[string]string, len(b.preInitState.RuntimeOptions.Env)),
 		CompatibilityMode: b.CompatibilityMode.String(),
-		K6Version:         consts.Version,
+		K6Version:         version.SemVer,
 		Goos:              runtime.GOOS,
 	}
 	// Copy env so changes in the archive are not reflected in the source Bundle

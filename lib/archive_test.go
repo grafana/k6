@@ -11,12 +11,12 @@ import (
 	"testing"
 
 	"go.k6.io/k6/internal/lib/testutils"
+	"go.k6.io/k6/version"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/metrics"
 )
@@ -114,7 +114,7 @@ func TestArchiveReadWrite(t *testing.T) {
 		t.Parallel()
 		arc1 := &Archive{
 			Type:      "js",
-			K6Version: consts.Version,
+			K6Version: version.SemVer,
 			Options: Options{
 				VUs:        null.IntFrom(12345),
 				SystemTags: &metrics.DefaultSystemTagSet,
@@ -171,7 +171,7 @@ func TestArchiveReadWrite(t *testing.T) {
 					SystemTags: &metrics.DefaultSystemTagSet,
 				},
 				FilenameURL: &url.URL{Scheme: "file", Path: fmt.Sprintf("%s/a.js", entry.Pwd)},
-				K6Version:   consts.Version,
+				K6Version:   version.SemVer,
 				Data:        []byte(`// a contents`),
 				PwdURL:      &url.URL{Scheme: "file", Path: entry.Pwd},
 				Filesystems: map[string]fsext.Fs{
@@ -194,7 +194,7 @@ func TestArchiveReadWrite(t *testing.T) {
 					SystemTags: &metrics.DefaultSystemTagSet,
 				},
 				FilenameURL: &url.URL{Scheme: "file", Path: fmt.Sprintf("%s/a.js", entry.PwdNormAnon)},
-				K6Version:   consts.Version,
+				K6Version:   version.SemVer,
 				Data:        []byte(`// a contents`),
 				PwdURL:      &url.URL{Scheme: "file", Path: entry.PwdNormAnon},
 
@@ -253,7 +253,7 @@ func TestUsingCacheFromCacheOnReadFs(t *testing.T) {
 	arc := &Archive{
 		Type:        "js",
 		FilenameURL: &url.URL{Scheme: "file", Path: "/correct"},
-		K6Version:   consts.Version,
+		K6Version:   version.SemVer,
 		Data:        []byte(`test`),
 		PwdURL:      &url.URL{Scheme: "file", Path: "/"},
 		Filesystems: map[string]fsext.Fs{
@@ -282,7 +282,7 @@ func TestArchiveWithDataNotInFS(t *testing.T) {
 	arc := &Archive{
 		Type:        "js",
 		FilenameURL: &url.URL{Scheme: "file", Path: "/script"},
-		K6Version:   consts.Version,
+		K6Version:   version.SemVer,
 		Data:        []byte(`test`),
 		PwdURL:      &url.URL{Scheme: "file", Path: "/"},
 		Filesystems: nil,
@@ -320,7 +320,7 @@ func TestStrangePaths(t *testing.T) {
 		}
 		arc1 := &Archive{
 			Type:      "js",
-			K6Version: consts.Version,
+			K6Version: version.SemVer,
 			Options: Options{
 				VUs:        null.IntFrom(12345),
 				SystemTags: &metrics.DefaultSystemTagSet,
@@ -363,7 +363,7 @@ func TestStdinArchive(t *testing.T) {
 	arc := &Archive{
 		Type:        "js",
 		FilenameURL: &url.URL{Scheme: "file", Path: "/-"},
-		K6Version:   consts.Version,
+		K6Version:   version.SemVer,
 		Data:        []byte(`test`),
 		PwdURL:      &url.URL{Scheme: "file", Path: "/"},
 		Filesystems: map[string]fsext.Fs{

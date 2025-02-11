@@ -14,7 +14,7 @@ import (
 	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/internal/ui"
-	"go.k6.io/k6/lib/consts"
+	"go.k6.io/k6/version"
 )
 
 const cloudLoginCommandName = "login"
@@ -163,7 +163,7 @@ func validateToken(gs *state.GlobalState, jsonRawConf json.RawMessage, token str
 		gs.Logger,
 		token,
 		consolidatedCurrentConfig.Host.String,
-		consts.Version,
+		version.SemVer,
 		consolidatedCurrentConfig.Timeout.TimeDuration(),
 	)
 

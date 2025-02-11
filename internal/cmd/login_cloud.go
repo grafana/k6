@@ -14,7 +14,7 @@ import (
 	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/internal/ui"
-	"go.k6.io/k6/lib/consts"
+	"go.k6.io/k6/version"
 )
 
 //nolint:funlen,gocognit
@@ -110,7 +110,7 @@ Please use the "k6 cloud login" command instead.
 					gs.Logger,
 					"",
 					consolidatedCurrentConfig.Host.String,
-					consts.Version,
+					version.SemVer,
 					consolidatedCurrentConfig.Timeout.TimeDuration())
 
 				var res *cloudapi.LoginResponse
