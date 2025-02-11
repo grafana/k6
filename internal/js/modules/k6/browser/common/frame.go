@@ -1473,6 +1473,8 @@ func (f *Frame) selectOption(selector string, values []any, opts *FrameSelectOpt
 func (f *Frame) SetContent(html string, _ *FrameSetContentOptions) error {
 	f.log.Debugf("Frame:SetContent", "fid:%s furl:%q", f.ID(), f.URL())
 
+	// TODO(@inancgumus): Respect the FrameSetContentOptions before executing the action.
+
 	js := `(html) => {
 		window.stop();
 		document.open();
