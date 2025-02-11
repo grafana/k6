@@ -114,7 +114,7 @@ func (o *Output) flushSample(sample metrics.Sample) {
 // Summary returns a lib.Summary of the test run.
 func (o *Output) Summary(
 	executionState *lib.ExecutionState,
-	observedMetrics map[string]*metrics.Metric,
+	observedMetrics []*metrics.Metric,
 	options lib.Options,
 ) *lib.Summary {
 	testRunDuration := executionState.GetCurrentTestRunDuration()
@@ -182,7 +182,7 @@ func (o *Output) storeSample(sample metrics.Sample) {
 
 // processObservedMetrics is responsible for ensuring that we have collected
 // all metrics, even those that have no samples, so that we can render them in the summary.
-func (o *Output) processObservedMetrics(observedMetrics map[string]*metrics.Metric) {
+func (o *Output) processObservedMetrics(observedMetrics []*metrics.Metric) {
 	for _, m := range observedMetrics {
 		if _, exists := o.dataModel.aggregatedMetrics[m.Name]; !exists {
 			o.dataModel.aggregatedMetrics[m.Name] = aggregatedMetric{

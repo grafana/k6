@@ -65,8 +65,8 @@ func (oi *OutputIngester) flushMetrics() {
 		return
 	}
 
-	oi.metricsEngine.MetricsLock.Lock()
-	defer oi.metricsEngine.MetricsLock.Unlock()
+	oi.metricsEngine.metricsLock.Lock()
+	defer oi.metricsEngine.metricsLock.Unlock()
 
 	// TODO: split metric samples in buckets with a *metrics.Metric key; this will
 	// allow us to have a per-bucket lock, instead of one global one, and it

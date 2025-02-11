@@ -12,10 +12,7 @@ func handleGetMetrics(cs *ControlSurface, rw http.ResponseWriter, _ *http.Reques
 		t = cs.Scheduler.GetState().GetCurrentTestRunDuration()
 	}
 
-	cs.MetricsEngine.MetricsLock.Lock()
-	metrics := newMetricsJSONAPI(cs.MetricsEngine.ObservedMetrics, t)
-	cs.MetricsEngine.MetricsLock.Unlock()
-
+	metrics := newMetricsJSONAPI(cs.MetricsEngine.ObservedMetrics(), t)
 	data, err := json.Marshal(metrics)
 	if err != nil {
 		apiError(rw, "Encoding error", err.Error(), http.StatusInternalServerError)
@@ -30,15 +27,12 @@ func handleGetMetric(cs *ControlSurface, rw http.ResponseWriter, _ *http.Request
 		t = cs.Scheduler.GetState().GetCurrentTestRunDuration()
 	}
 
-	cs.MetricsEngine.MetricsLock.Lock()
-	metric, ok := cs.MetricsEngine.ObservedMetrics[id]
+	metric, ok := cs.MetricsEngine.ObservedMetricByName(id)
 	if !ok {
-		cs.MetricsEngine.MetricsLock.Unlock()
 		apiError(rw, "Not Found", "No metric with that ID was found", http.StatusNotFound)
 		return
 	}
 	wrappedMetric := newMetricEnvelope(metric, t)
-	cs.MetricsEngine.MetricsLock.Unlock()
 
 	data, err := json.Marshal(wrappedMetric)
 	if err != nil {

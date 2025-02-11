@@ -23,10 +23,13 @@ func TestGetMetrics(t *testing.T) {
 	require.NoError(t, err)
 	cs := getControlSurface(t, testState)
 
-	cs.MetricsEngine.ObservedMetrics = map[string]*metrics.Metric{
-		"my_metric": testMetric,
+	testMetric.Tainted = null.BoolFrom(true)
+	mem := metricsObserverMock{
+		ObsMetricsFunc: func() []*metrics.Metric {
+			return []*metrics.Metric{testMetric}
+		},
 	}
-	cs.MetricsEngine.ObservedMetrics["my_metric"].Tainted = null.BoolFrom(true)
+	cs.MetricsEngine = mem
 
 	rw := httptest.NewRecorder()
 	NewHandler(cs).ServeHTTP(rw, httptest.NewRequest(http.MethodGet, "/v1/metrics", nil))
@@ -82,10 +85,16 @@ func TestGetMetric(t *testing.T) {
 	require.NoError(t, err)
 	cs := getControlSurface(t, testState)
 
-	cs.MetricsEngine.ObservedMetrics = map[string]*metrics.Metric{
-		"my_metric": testMetric,
+	testMetric.Tainted = null.BoolFrom(true)
+	mem := metricsObserverMock{
+		ObsMetricByNameFunc: func(id string) (*metrics.Metric, bool) {
+			if id != "my_metric" {
+				return nil, false
+			}
+			return testMetric, true
+		},
 	}
-	cs.MetricsEngine.ObservedMetrics["my_metric"].Tainted = null.BoolFrom(true)
+	cs.MetricsEngine = mem
 
 	t.Run("nonexistent", func(t *testing.T) {
 		t.Parallel()
@@ -135,4 +144,21 @@ func TestGetMetric(t *testing.T) {
 			assert.True(t, metric.Tainted.Bool)
 		})
 	})
+}
+
+type metricsObserverMock struct {
+	ObsMetricByNameFunc func(string) (*metrics.Metric, bool)
+	ObsMetricsFunc      func() []*metrics.Metric
+}
+
+func (mem metricsObserverMock) ObservedMetrics() []*metrics.Metric {
+	return mem.ObsMetricsFunc()
+}
+
+func (mem metricsObserverMock) ObservedMetricByName(id string) (*metrics.Metric, bool) {
+	return mem.ObsMetricByNameFunc(id)
+}
+
+func (mem metricsObserverMock) GetMetricsWithBreachedThresholdsCount() uint32 {
+	panic("GetMetricsWithBreachedThresholdsCount is not expected to be called")
 }

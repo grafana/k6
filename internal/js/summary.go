@@ -78,7 +78,7 @@ func summarizeMetricsToObject(data *lib.LegacySummary, options lib.Options, setu
 	getMetricValues := metricValueGetter(options.SummaryTrendStats)
 
 	metricsData := make(map[string]interface{})
-	for name, m := range data.Metrics {
+	for _, m := range data.Metrics {
 		metricData := map[string]interface{}{
 			"type":     m.Type.String(),
 			"contains": m.Contains.String(),
@@ -94,7 +94,7 @@ func summarizeMetricsToObject(data *lib.LegacySummary, options lib.Options, setu
 			}
 			metricData["thresholds"] = thresholds
 		}
-		metricsData[name] = metricData
+		metricsData[m.Name] = metricData
 	}
 	m["metrics"] = metricsData
 

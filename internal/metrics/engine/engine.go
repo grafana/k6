@@ -32,12 +32,11 @@ type MetricsEngine struct {
 	breachedThresholdsCount uint32
 
 	// TODO: completely refactor:
-	//   - make these private, add a method to export the raw data
 	//   - do not use an unnecessary map for the observed metrics
 	//   - have one lock per metric instead of a a global one, when
 	//     the metrics are decoupled from their types
-	MetricsLock     sync.Mutex
-	ObservedMetrics map[string]*metrics.Metric
+	metricsLock     sync.RWMutex
+	observedMetrics map[string]*metrics.Metric
 }
 
 // NewMetricsEngine creates a new metrics Engine with the given parameters.
@@ -45,10 +44,29 @@ func NewMetricsEngine(registry *metrics.Registry, logger logrus.FieldLogger) (*M
 	me := &MetricsEngine{
 		registry:        registry,
 		logger:          logger.WithField("component", "metrics-engine"),
-		ObservedMetrics: make(map[string]*metrics.Metric),
+		observedMetrics: make(map[string]*metrics.Metric),
 	}
 
 	return me, nil
+}
+
+// ObservedMetricByName returns the requested metric if it has been previously observed.
+func (me *MetricsEngine) ObservedMetricByName(metric string) (*metrics.Metric, bool) {
+	me.metricsLock.RLock()
+	defer me.metricsLock.RUnlock()
+	om, ok := me.observedMetrics[metric]
+	return om, ok
+}
+
+// ObservedMetrics retruns all the observed metrics.
+func (me *MetricsEngine) ObservedMetrics() []*metrics.Metric {
+	me.metricsLock.RLock()
+	defer me.metricsLock.RUnlock()
+	ms := make([]*metrics.Metric, 0, len(me.observedMetrics))
+	for _, m := range me.observedMetrics {
+		ms = append(ms, m)
+	}
+	return ms
 }
 
 // CreateIngester returns a pseudo-Output that uses the given metric samples to
@@ -108,7 +126,7 @@ func (me *MetricsEngine) getThresholdMetricOrSubmetric(name string) (*metrics.Me
 func (me *MetricsEngine) markObserved(metric *metrics.Metric) {
 	if !metric.Observed {
 		metric.Observed = true
-		me.ObservedMetrics[metric.Name] = metric
+		me.observedMetrics[metric.Name] = metric
 	}
 }
 
@@ -217,8 +235,8 @@ func (me *MetricsEngine) evaluateThresholds(
 	ignoreEmptySinks bool,
 	getCurrentTestRunDuration func() time.Duration,
 ) (breachedThresholds []string, shouldAbort bool) {
-	me.MetricsLock.Lock()
-	defer me.MetricsLock.Unlock()
+	me.metricsLock.Lock()
+	defer me.metricsLock.Unlock()
 
 	t := getCurrentTestRunDuration()
 

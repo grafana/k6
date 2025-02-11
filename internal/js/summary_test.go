@@ -95,11 +95,11 @@ func TestTextSummaryWithSubMetrics(t *testing.T) {
 	require.NoError(t, err)
 	subMetricPost.Metric.Sink.Add(metrics.Sample{Value: 2})
 
-	metrics := map[string]*metrics.Metric{
-		parentMetric.Name:     parentMetric,
-		parentMetricPost.Name: parentMetricPost,
-		subMetric.Name:        subMetric.Metric,
-		subMetricPost.Name:    subMetricPost.Metric,
+	metrics := []*metrics.Metric{
+		parentMetric,
+		parentMetricPost,
+		subMetric.Metric,
+		subMetricPost.Metric,
 	}
 
 	legacySummary := &lib.LegacySummary{
@@ -133,7 +133,7 @@ func TestTextSummaryWithSubMetrics(t *testing.T) {
 	assert.Equal(t, "\n"+expected+"\n", string(summaryOut))
 }
 
-func createTestMetrics(t *testing.T) (map[string]*metrics.Metric, *lib.Group) {
+func createTestMetrics(t *testing.T) ([]*metrics.Metric, *lib.Group) {
 	registry := metrics.NewRegistry()
 	testMetrics := make(map[string]*metrics.Metric)
 
@@ -202,7 +202,11 @@ func createTestMetrics(t *testing.T) (map[string]*metrics.Metric, *lib.Group) {
 		checksMetric.Sink.Add(metrics.Sample{Value: 0})
 	}
 
-	return testMetrics, rootG
+	tmslice := make([]*metrics.Metric, 0, len(testMetrics))
+	for _, m := range testMetrics {
+		tmslice = append(tmslice, m)
+	}
+	return tmslice, rootG
 }
 
 func createTestLegacySummary(t *testing.T) *lib.LegacySummary {

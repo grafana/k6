@@ -22,7 +22,7 @@ func TestIngesterOutputFlushMetrics(t *testing.T) {
 	ingester := OutputIngester{
 		logger: piState.Logger,
 		metricsEngine: &MetricsEngine{
-			ObservedMetrics: make(map[string]*metrics.Metric),
+			observedMetrics: make(map[string]*metrics.Metric),
 		},
 		cardinality: newCardinalityControl(),
 	}
@@ -37,8 +37,8 @@ func TestIngesterOutputFlushMetrics(t *testing.T) {
 	}})
 	require.NoError(t, ingester.Stop())
 
-	require.Len(t, ingester.metricsEngine.ObservedMetrics, 1)
-	metric := ingester.metricsEngine.ObservedMetrics["test_metric"]
+	require.Len(t, ingester.metricsEngine.observedMetrics, 1)
+	metric := ingester.metricsEngine.observedMetrics["test_metric"]
 	require.NotNil(t, metric)
 	require.NotNil(t, metric.Sink)
 	assert.Equal(t, testMetric, metric)
@@ -57,13 +57,13 @@ func TestIngesterOutputFlushSubmetrics(t *testing.T) {
 	me := &MetricsEngine{
 		logger:          piState.Logger,
 		registry:        piState.Registry,
-		ObservedMetrics: make(map[string]*metrics.Metric),
+		observedMetrics: make(map[string]*metrics.Metric),
 	}
 	_, err = me.getThresholdMetricOrSubmetric("test_metric{a:1}")
 	require.NoError(t, err)
 
 	// assert that observed metrics is empty before to start
-	require.Empty(t, me.ObservedMetrics)
+	require.Empty(t, me.observedMetrics)
 
 	ingester := OutputIngester{
 		logger:        piState.Logger,
@@ -81,16 +81,16 @@ func TestIngesterOutputFlushSubmetrics(t *testing.T) {
 	}})
 	require.NoError(t, ingester.Stop())
 
-	require.Len(t, ingester.metricsEngine.ObservedMetrics, 2)
+	require.Len(t, ingester.metricsEngine.observedMetrics, 2)
 
 	// assert the parent has been observed
-	metric := ingester.metricsEngine.ObservedMetrics["test_metric"]
+	metric := ingester.metricsEngine.observedMetrics["test_metric"]
 	require.NotNil(t, metric)
 	require.NotNil(t, metric.Sink)
 	assert.IsType(t, &metrics.GaugeSink{}, metric.Sink)
 
 	// assert the submetric has been observed
-	metric = ingester.metricsEngine.ObservedMetrics["test_metric{a:1}"]
+	metric = ingester.metricsEngine.observedMetrics["test_metric{a:1}"]
 	require.NotNil(t, metric)
 	require.NotNil(t, metric.Sink)
 	require.NotNil(t, metric.Sub)
@@ -109,7 +109,7 @@ func TestOutputFlushMetricsTimeSeriesWarning(t *testing.T) {
 	ingester := OutputIngester{
 		logger: logger,
 		metricsEngine: &MetricsEngine{
-			ObservedMetrics: make(map[string]*metrics.Metric),
+			observedMetrics: make(map[string]*metrics.Metric),
 		},
 		cardinality: newCardinalityControl(),
 	}

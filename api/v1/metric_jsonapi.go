@@ -27,13 +27,11 @@ func newMetricEnvelope(m *metrics.Metric, t time.Duration) metricJSONAPI {
 	}
 }
 
-func newMetricsJSONAPI(list map[string]*metrics.Metric, t time.Duration) MetricsJSONAPI {
+func newMetricsJSONAPI(list []*metrics.Metric, t time.Duration) MetricsJSONAPI {
 	metrics := make([]metricData, 0, len(list))
-
 	for _, m := range list {
 		metrics = append(metrics, newMetricData(m, t))
 	}
-
 	return MetricsJSONAPI{
 		Data: metrics,
 	}
