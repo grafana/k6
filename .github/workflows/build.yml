@@ -243,8 +243,6 @@ jobs:
           Expand-Archive -Path ".\dist\k6-$env:VERSION-windows-amd64.zip" -DestinationPath .\packaging\
           move .\packaging\k6-$env:VERSION-windows-amd64\k6.exe .\packaging\
           rmdir .\packaging\k6-$env:VERSION-windows-amd64\
-      - name: Add signtool to PATH
-        run: echo "${env:ProgramFiles(x86)}\Windows Kits\10\bin\10.0.17763.0\x64" | Out-File -FilePath $env:GITHUB_PATH -Append
 
       - name: Create the MSI package
         run: |
@@ -254,8 +252,18 @@ jobs:
           candle.exe -arch x64 "-dVERSION=$env:VERSION" k6.wxs
           light.exe -ext WixUIExtension k6.wixobj
 
+      - name: Add signtool to PATH
+        # Searching for the signtool executable adds around 10 seconds to the
+        # job, but it avoids hardcoding the path to the signtool executable.
+        # We only run this step if we are building from master or a version tag,
+        # or if the workflow was manually triggered, to avoid the extra time.
+        if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' }}
+        run: |
+          $SignToolPath = Get-ChildItem -Path "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Recurse -Filter signtool.exe | Where-Object { $_.DirectoryName -like "*\x64" } | Sort-Object -Descending | Select-Object -First 1
+          $SignToolPath.Directory.FullName | Out-File -FilePath $env:GITHUB_PATH -Append
+
       - name: Sign Windows binary and .msi package
-        # GH secrets are unavaileble when building from project forks, so this
+        # GH secrets are unavailable when building from project forks, so this
         # will fail for external PRs, even if we wanted to do it. And we don't.
         # We are only going to sign packages that are built from master or a
         # version tag, or manually triggered dev builds, so we have enough
