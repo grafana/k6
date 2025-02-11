@@ -17,6 +17,7 @@ import (
 
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
+	"go.k6.io/k6/internal/build"
 	"go.k6.io/k6/internal/event"
 	"go.k6.io/k6/internal/js/compiler"
 	"go.k6.io/k6/internal/js/eventloop"
@@ -177,7 +178,7 @@ func (b *Bundle) makeArchive() *lib.Archive {
 		PwdURL:            clonedPwdURL,
 		Env:               make(map[string]string, len(b.preInitState.RuntimeOptions.Env)),
 		CompatibilityMode: b.CompatibilityMode.String(),
-		K6Version:         consts.Version,
+		K6Version:         build.Version,
 		Goos:              runtime.GOOS,
 	}
 	// Copy env so changes in the archive are not reflected in the source Bundle

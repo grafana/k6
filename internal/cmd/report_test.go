@@ -6,12 +6,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.k6.io/k6/internal/build"
 	"go.k6.io/k6/internal/execution"
 	"go.k6.io/k6/internal/execution/local"
 	"go.k6.io/k6/internal/lib/testutils"
 	"go.k6.io/k6/internal/usage"
 	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/lib/executor"
 	"gopkg.in/guregu/null.v3"
 )
@@ -53,7 +53,7 @@ func TestCreateReport(t *testing.T) {
 		m := createReport(usage.New(), s)
 		require.NoError(t, err)
 
-		assert.Equal(t, consts.Version, m["k6_version"])
+		assert.Equal(t, build.Version, m["k6_version"])
 		assert.EqualValues(t, map[string]int{"shared-iterations": 1}, m["executors"])
 		assert.EqualValues(t, 6, m["vus_max"])
 		assert.EqualValues(t, 170, m["iterations"])
@@ -75,7 +75,7 @@ func TestCreateReport(t *testing.T) {
 		m := createReport(usage.New(), s)
 		require.NoError(t, err)
 
-		assert.Equal(t, consts.Version, m["k6_version"])
+		assert.Equal(t, build.Version, m["k6_version"])
 		assert.EqualValues(t, map[string]int{"shared-iterations": 1}, m["executors"])
 		assert.EqualValues(t, 0, m["vus_max"])
 		assert.EqualValues(t, 0, m["iterations"])
@@ -97,7 +97,7 @@ func TestCreateReport(t *testing.T) {
 		m := createReport(usage.New(), s)
 		require.NoError(t, err)
 
-		assert.Equal(t, consts.Version, m["k6_version"])
+		assert.Equal(t, build.Version, m["k6_version"])
 		assert.EqualValues(t, map[string]int{"shared-iterations": 1}, m["executors"])
 		assert.EqualValues(t, 0, m["vus_max"])
 		assert.EqualValues(t, 0, m["iterations"])
