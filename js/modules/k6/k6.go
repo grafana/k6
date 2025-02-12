@@ -13,6 +13,7 @@ import (
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/secretsource"
 )
 
 var (
@@ -30,7 +31,8 @@ type (
 
 	// K6 represents an instance of the k6 module.
 	K6 struct {
-		vu modules.VU
+		vu             modules.VU
+		secretsManager *secretsource.SecretsManager
 	}
 )
 
@@ -47,11 +49,15 @@ func New() *RootModule {
 // NewModuleInstance implements the modules.Module interface to return
 // a new instance for each VU.
 func (*RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
-	return &K6{vu: vu}
+	return &K6{vu: vu, secretsManager: vu.InitEnv().SecretsManager}
 }
 
 // Exports returns the exports of the k6 module.
 func (mi *K6) Exports() modules.Exports {
+	s, err := mi.secrets()
+	if err != nil {
+		common.Throw(mi.vu.Runtime(), err)
+	}
 	return modules.Exports{
 		Named: map[string]interface{}{
 			"check":      mi.Check,
@@ -59,8 +65,21 @@ func (mi *K6) Exports() modules.Exports {
 			"group":      mi.Group,
 			"randomSeed": mi.RandomSeed,
 			"sleep":      mi.Sleep,
+			"secrets":    s,
 		},
 	}
+}
+
+func (mi *K6) secrets() (*sobek.Object, error) {
+	obj := mi.vu.Runtime().NewObject()
+	err := obj.Set("get", func(key string) (string, error) {
+		return mi.secretsManager.Get("default", key)
+	})
+	if err != nil {
+		return nil, err
+	}
+	// TODO add multi source support
+	return obj, nil
 }
 
 // Fail is a fancy way of saying `throw "something"`.
