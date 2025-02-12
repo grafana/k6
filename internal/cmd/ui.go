@@ -23,6 +23,7 @@ import (
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/output"
+	"go.k6.io/k6/output/summary"
 )
 
 const (
@@ -116,7 +117,7 @@ func printExecutionDescription(
 		for _, out := range outputs {
 			desc := out.Description()
 			switch desc {
-			case engine.IngesterDescription, lib.GroupSummaryDescription:
+			case engine.IngesterDescription, lib.GroupSummaryDescription, summary.OutputName:
 				continue
 			}
 			if strings.HasPrefix(desc, dashboard.OutputName) {

@@ -207,7 +207,7 @@ type Check struct {
 	Fails  int64 `json:"fails"`
 }
 
-// NewCheck creates a new check with the given name and parent group. The group may not be nil.
+// NewCheck creates a new check with the given name and parent group. The group must not be nil.
 func NewCheck(name string, group *Group) (*Check, error) {
 	if strings.Contains(name, GroupSeparator) {
 		return nil, ErrNameContainsGroupSeparator

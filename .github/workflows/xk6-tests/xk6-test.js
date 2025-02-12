@@ -11,7 +11,7 @@ export let options = {
 
 export function handleSummary(data) {
     return {
-        'summary-results.txt': data.metrics.foos.values.count.toString(),
+        'summary-results.txt': data.metrics.custom.foos.values.count.toString(),
     };
 }
 

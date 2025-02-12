@@ -49,7 +49,7 @@ func TestTextSummary(t *testing.T) {
 		i, tc := i, tc
 		t.Run(fmt.Sprintf("%d_%v", i, tc.stats), func(t *testing.T) {
 			t.Parallel()
-			summary := createTestSummary(t)
+			legacySummary := createTestLegacySummary(t)
 			trendStats, err := json.Marshal(tc.stats)
 			require.NoError(t, err)
 			runner, err := getSimpleRunner(
@@ -62,7 +62,7 @@ func TestTextSummary(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			result, err := runner.HandleSummary(context.Background(), summary)
+			result, err := runner.HandleSummary(context.Background(), legacySummary, nil)
 			require.NoError(t, err)
 
 			require.Len(t, result, 1)
@@ -102,7 +102,7 @@ func TestTextSummaryWithSubMetrics(t *testing.T) {
 		subMetricPost.Name:    subMetricPost.Metric,
 	}
 
-	summary := &lib.Summary{
+	legacySummary := &lib.LegacySummary{
 		Metrics:         metrics,
 		RootGroup:       &lib.Group{},
 		TestRunDuration: time.Second,
@@ -116,7 +116,7 @@ func TestTextSummaryWithSubMetrics(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	result, err := runner.HandleSummary(context.Background(), summary)
+	result, err := runner.HandleSummary(context.Background(), legacySummary, nil)
 	require.NoError(t, err)
 
 	require.Len(t, result, 1)
@@ -205,9 +205,9 @@ func createTestMetrics(t *testing.T) (map[string]*metrics.Metric, *lib.Group) {
 	return testMetrics, rootG
 }
 
-func createTestSummary(t *testing.T) *lib.Summary {
+func createTestLegacySummary(t *testing.T) *lib.LegacySummary {
 	metrics, rootG := createTestMetrics(t)
-	return &lib.Summary{
+	return &lib.LegacySummary{
 		Metrics:         metrics,
 		RootGroup:       rootG,
 		TestRunDuration: time.Second,
@@ -306,8 +306,8 @@ func TestOldJSONExport(t *testing.T) {
 
 	require.NoError(t, err)
 
-	summary := createTestSummary(t)
-	result, err := runner.HandleSummary(context.Background(), summary)
+	legacySummary := createTestLegacySummary(t)
+	result, err := runner.HandleSummary(context.Background(), legacySummary, nil)
 	require.NoError(t, err)
 
 	require.Len(t, result, 2)
@@ -576,8 +576,8 @@ func TestRawHandleSummaryData(t *testing.T) {
 
 	require.NoError(t, err)
 
-	summary := createTestSummary(t)
-	result, err := runner.HandleSummary(context.Background(), summary)
+	legacySummary := createTestLegacySummary(t)
+	result, err := runner.HandleSummary(context.Background(), legacySummary, nil)
 	require.NoError(t, err)
 
 	require.Len(t, result, 2)
@@ -611,8 +611,8 @@ func TestRawHandleSummaryDataWithSetupData(t *testing.T) {
 	require.NoError(t, err)
 	runner.SetSetupData([]byte("5"))
 
-	summary := createTestSummary(t)
-	result, err := runner.HandleSummary(context.Background(), summary)
+	legacySummary := createTestLegacySummary(t)
+	result, err := runner.HandleSummary(context.Background(), legacySummary, nil)
 	require.NoError(t, err)
 	dataWithSetup, err := io.ReadAll(result["dataWithSetup.json"])
 	require.NoError(t, err)
@@ -634,8 +634,8 @@ func TestRawHandleSummaryPromise(t *testing.T) {
 	require.NoError(t, err)
 	runner.SetSetupData([]byte("5"))
 
-	summary := createTestSummary(t)
-	result, err := runner.HandleSummary(context.Background(), summary)
+	legacySummary := createTestLegacySummary(t)
+	result, err := runner.HandleSummary(context.Background(), legacySummary, nil)
 	require.NoError(t, err)
 	dataWithSetup, err := io.ReadAll(result["dataWithSetup.json"])
 	require.NoError(t, err)
@@ -659,8 +659,8 @@ func TestWrongSummaryHandlerExportTypes(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			summary := createTestSummary(t)
-			_, err = runner.HandleSummary(context.Background(), summary)
+			legacySummary := createTestLegacySummary(t)
+			_, err = runner.HandleSummary(context.Background(), legacySummary, nil)
 			require.Error(t, err)
 		})
 	}
@@ -684,8 +684,8 @@ func TestExceptionInHandleSummaryFallsBackToTextSummary(t *testing.T) {
 
 	require.NoError(t, err)
 
-	summary := createTestSummary(t)
-	result, err := runner.HandleSummary(context.Background(), summary)
+	legacySummary := createTestLegacySummary(t)
+	result, err := runner.HandleSummary(context.Background(), legacySummary, nil)
 	require.NoError(t, err)
 
 	require.Len(t, result, 1)
