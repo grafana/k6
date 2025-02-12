@@ -948,15 +948,14 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 
 	switch ti.Type {
 	case "iframe":
-		err = fs.attachIFrameToTarget(ti, sid)
+		err = fs.attachIFrameToTarget(ti, session)
 	case "worker":
-		err = fs.attachWorkerToTarget(ti, sid)
+		err = fs.attachWorkerToTarget(ti, session)
 	default:
 		// Just unblock (debugger continue) these targets and detach from them.
-		s := fs.page.browserCtx.getSession(sid)
-		_ = s.ExecuteWithoutExpectationOnReply(fs.ctx, cdpruntime.CommandRunIfWaitingForDebugger, nil, nil)
-		_ = s.ExecuteWithoutExpectationOnReply(fs.ctx, target.CommandDetachFromTarget,
-			&target.DetachFromTargetParams{SessionID: s.id}, nil)
+		_ = session.ExecuteWithoutExpectationOnReply(fs.ctx, cdpruntime.CommandRunIfWaitingForDebugger, nil, nil)
+		_ = session.ExecuteWithoutExpectationOnReply(fs.ctx, target.CommandDetachFromTarget,
+			&target.DetachFromTargetParams{SessionID: session.id}, nil)
 	}
 	if err == nil {
 		return
@@ -1001,7 +1000,8 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 }
 
 // attachIFrameToTarget attaches an IFrame target to a given session.
-func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, sid target.SessionID) error {
+func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, session *Session) error {
+	sid := session.ID()
 	fr, ok := fs.manager.getFrameByID(cdp.FrameID(ti.TargetID))
 	if !ok {
 		// IFrame should be attached to fs.page with EventFrameAttached
@@ -1022,7 +1022,7 @@ func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, sid target.Session
 
 	nfs, err := NewFrameSession(
 		fs.ctx,
-		fs.page.browserCtx.getSession(sid),
+		session,
 		fs.page, fs, ti.TargetID,
 		fs.logger,
 		false)
@@ -1039,13 +1039,13 @@ func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, sid target.Session
 }
 
 // attachWorkerToTarget attaches a Worker target to a given session.
-func (fs *FrameSession) attachWorkerToTarget(ti *target.Info, sid target.SessionID) error {
-	w, err := NewWorker(fs.ctx, fs.page.browserCtx.getSession(sid), ti.TargetID, ti.URL)
+func (fs *FrameSession) attachWorkerToTarget(ti *target.Info, session *Session) error {
+	w, err := NewWorker(fs.ctx, session, ti.TargetID, ti.URL)
 	if err != nil {
 		return fmt.Errorf("attaching worker target ID %v to session ID %v: %w",
-			ti.TargetID, sid, err)
+			ti.TargetID, session.ID(), err)
 	}
-	fs.page.workers[sid] = w
+	fs.page.workers[session.ID()] = w
 
 	return nil
 }
