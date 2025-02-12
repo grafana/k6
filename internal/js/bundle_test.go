@@ -27,6 +27,7 @@ import (
 	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/version"
 )
 
 const isWindows = runtime.GOOS == "windows"
@@ -584,7 +585,7 @@ func TestNewBundleFromArchive(t *testing.T) {
 		arc := &lib.Archive{
 			Type:        "js",
 			FilenameURL: &url.URL{Scheme: "file", Path: "/script"},
-			K6Version:   consts.Version,
+			K6Version:   version.SemVer,
 			Data:        []byte(code),
 			Options:     lib.Options{VUs: null.IntFrom(999)},
 			PwdURL:      &url.URL{Scheme: "file", Path: "/"},
@@ -948,7 +949,7 @@ func TestBundleMakeArchive(t *testing.T) {
 			fileData, err := fsext.ReadFile(arc.Filesystems["file"], "/path/to/file.txt")
 			require.NoError(t, err)
 			assert.Equal(t, `hi`, string(fileData))
-			assert.Equal(t, consts.Version, arc.K6Version)
+			assert.Equal(t, version.SemVer, arc.K6Version)
 			assert.Equal(t, tc.cm.String(), arc.CompatibilityMode)
 		})
 	}

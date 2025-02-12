@@ -10,14 +10,14 @@ import (
 
 	"go.k6.io/k6/internal/execution"
 	"go.k6.io/k6/internal/usage"
-	"go.k6.io/k6/lib/consts"
+	"go.k6.io/k6/version"
 )
 
 func createReport(u *usage.Usage, execScheduler *execution.Scheduler) map[string]any {
 	execState := execScheduler.GetState()
 	m := u.Map()
 
-	m["k6_version"] = consts.Version
+	m["k6_version"] = version.SemVer
 	m["duration"] = execState.GetCurrentTestRunDuration().String()
 	m["goos"] = runtime.GOOS
 	m["goarch"] = runtime.GOARCH

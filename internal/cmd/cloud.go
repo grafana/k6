@@ -18,7 +18,7 @@ import (
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/internal/ui/pb"
 	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/consts"
+	"go.k6.io/k6/version"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -164,7 +164,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	// Start cloud test run
 	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Validating script options"))
 	client := cloudapi.NewClient(
-		logger, cloudConfig.Token.String, cloudConfig.Host.String, consts.Version, cloudConfig.Timeout.TimeDuration())
+		logger, cloudConfig.Token.String, cloudConfig.Host.String, version.SemVer, cloudConfig.Timeout.TimeDuration())
 	if err = client.ValidateOptions(arc.Options); err != nil {
 		return err
 	}

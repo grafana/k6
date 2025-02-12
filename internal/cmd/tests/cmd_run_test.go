@@ -31,8 +31,8 @@ import (
 	"go.k6.io/k6/internal/lib/testutils"
 	"go.k6.io/k6/internal/lib/testutils/httpmultibin"
 	"go.k6.io/k6/js/modules"
-	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/lib/fsext"
+	"go.k6.io/k6/version"
 )
 
 func TestVersion(t *testing.T) {
@@ -52,7 +52,7 @@ func TestVersion(t *testing.T) {
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 		stdout := ts.Stdout.String()
-		assert.Contains(t, stdout, "k6 v"+consts.Version)
+		assert.Contains(t, stdout, "k6 v"+version.SemVer)
 		assert.Contains(t, stdout, runtime.Version())
 		assert.Contains(t, stdout, runtime.GOOS)
 		assert.Contains(t, stdout, runtime.GOARCH)

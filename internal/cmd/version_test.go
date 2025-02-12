@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"go.k6.io/k6/internal/cmd/tests"
-	"go.k6.io/k6/lib/consts"
+	"go.k6.io/k6/version"
 )
 
 func TestVersionFlag(t *testing.T) {
@@ -25,7 +25,7 @@ func TestVersionFlag(t *testing.T) {
 
 	// Check that the version/format string is correct
 	assert.Contains(t, stdout, "k6 v")
-	assert.Contains(t, stdout, consts.Version)
+	assert.Contains(t, stdout, version.SemVer)
 	assert.Contains(t, stdout, runtime.Version())
 	assert.Contains(t, stdout, runtime.GOOS)
 	assert.Contains(t, stdout, runtime.GOARCH)
@@ -46,7 +46,7 @@ func TestVersionSubCommand(t *testing.T) {
 
 	// Check that the version/format string is correct
 	assert.Contains(t, stdout, "k6 v")
-	assert.Contains(t, stdout, consts.Version)
+	assert.Contains(t, stdout, version.SemVer)
 	assert.Contains(t, stdout, runtime.Version())
 	assert.Contains(t, stdout, runtime.GOOS)
 	assert.Contains(t, stdout, runtime.GOARCH)
@@ -75,7 +75,7 @@ func TestVersionJSONSubCommand(t *testing.T) {
 	assert.Contains(t, details, "go_version")
 	assert.Contains(t, details, "go_os")
 	assert.Contains(t, details, "go_arch")
-	assert.Equal(t, "v"+consts.Version, details["version"])
+	assert.Equal(t, "v"+version.SemVer, details["version"])
 	assert.Equal(t, runtime.Version(), details["go_version"])
 	assert.Equal(t, runtime.GOOS, details["go_os"])
 	assert.Equal(t, runtime.GOARCH, details["go_arch"])

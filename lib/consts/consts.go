@@ -1,22 +1,10 @@
 // Package consts houses some constants needed across k6
 package consts
 
-import (
-	"strings"
-)
+import "go.k6.io/k6/version"
 
 // Version contains the current semantic version of k6.
-const Version = "0.56.0"
-
-// Banner returns the ASCII-art banner with the k6 logo
-func Banner() string {
-	banner := strings.Join([]string{
-		`         /\      Grafana   /‾‾/  `,
-		`    /\  /  \     |\  __   /  /   `,
-		`   /  \/    \    | |/ /  /   ‾‾\ `,
-		`  /          \   |   (  |  (‾)  |`,
-		` / __________ \  |_|\_\  \_____/ `,
-	}, "\n")
-
-	return banner
-}
+//
+// Deprecated: alias to support the legacy versioning API. Use the new version package,
+// it will be removed as soon as the external services stop to depend on it.
+const Version = version.SemVer
