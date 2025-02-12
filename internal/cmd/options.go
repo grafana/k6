@@ -64,7 +64,7 @@ func optionFlagSet() *pflag.FlagSet {
 		metrics.DefaultSystemTagSet.SetString(),
 	)
 	flags.StringSlice("system-tags", nil, systemTagsCliHelpText)
-	flags.StringSlice("tag", nil, "add a `tag` to be applied to all samples, as `[name]=[value]`")
+	flags.StringArray("tag", nil, "add a `tag` to be applied to all samples, as `[name]=[value]`")
 	flags.String("console-output", "", "redirects the console logging to the provided output file")
 	flags.Bool("discard-response-bodies", false, "Read but don't process or save HTTP response bodies")
 	flags.String("local-ips", "", "Client IP Ranges and/or CIDRs from which each VU will be making requests, "+
@@ -210,7 +210,7 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		opts.SummaryTimeUnit = null.StringFrom(summaryTimeUnit)
 	}
 
-	runTags, err := flags.GetStringSlice("tag")
+	runTags, err := flags.GetStringArray("tag")
 	if err != nil {
 		return opts, err
 	}
