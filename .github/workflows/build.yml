@@ -127,91 +127,91 @@ jobs:
           path: dist/
           retention-days: 7
 
-  build-docker:
-    runs-on: ubuntu-latest
-    needs: [configure]
-    env:
-      VERSION: ${{ needs.configure.outputs.k6_version }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Build
-        run: |
-          docker buildx create \
-            --name multibuilder \
-            --platform linux/amd64,linux/arm64 \
-            --bootstrap --use
-          docker buildx build \
-            --target release \
-            --platform linux/amd64,linux/arm64 \
-            -t $DOCKER_IMAGE_ID .
-      - name: Check
-        run: |
-            docker buildx build --load -t $DOCKER_IMAGE_ID .
-            # Assert that simple cases works for the new built image
-            docker run $DOCKER_IMAGE_ID version
-            docker run $DOCKER_IMAGE_ID --help
-            docker run $DOCKER_IMAGE_ID help
-            docker run $DOCKER_IMAGE_ID run --help
-            docker run $DOCKER_IMAGE_ID inspect --help
-            docker run $DOCKER_IMAGE_ID status --help
-            docker run $DOCKER_IMAGE_ID stats --help
-            docker run $DOCKER_IMAGE_ID scale --help
-            docker run $DOCKER_IMAGE_ID pause --help
-            docker run $DOCKER_IMAGE_ID resume --help
+  # build-docker:
+  #   runs-on: ubuntu-latest
+  #   needs: [configure]
+  #   env:
+  #     VERSION: ${{ needs.configure.outputs.k6_version }}
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #       with:
+  #         fetch-depth: 0
+  #     - name: Build
+  #       run: |
+  #         docker buildx create \
+  #           --name multibuilder \
+  #           --platform linux/amd64,linux/arm64 \
+  #           --bootstrap --use
+  #         docker buildx build \
+  #           --target release \
+  #           --platform linux/amd64,linux/arm64 \
+  #           -t $DOCKER_IMAGE_ID .
+  #     - name: Check
+  #       run: |
+  #           docker buildx build --load -t $DOCKER_IMAGE_ID .
+  #           # Assert that simple cases works for the new built image
+  #           docker run $DOCKER_IMAGE_ID version
+  #           docker run $DOCKER_IMAGE_ID --help
+  #           docker run $DOCKER_IMAGE_ID help
+  #           docker run $DOCKER_IMAGE_ID run --help
+  #           docker run $DOCKER_IMAGE_ID inspect --help
+  #           docker run $DOCKER_IMAGE_ID status --help
+  #           docker run $DOCKER_IMAGE_ID stats --help
+  #           docker run $DOCKER_IMAGE_ID scale --help
+  #           docker run $DOCKER_IMAGE_ID pause --help
+  #           docker run $DOCKER_IMAGE_ID resume --help
 
-      - name: Log into registries (ghcr.io and Docker Hub)
-        if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') }}
-        run: |
-          # Log into GitHub Container Registry
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login https://ghcr.io -u ${{ github.actor }} --password-stdin
-          # Log into Docker Hub Registry
-          echo "${{ secrets.DOCKER_PASS }}" | docker login -u "${{ secrets.DOCKER_USER }}" --password-stdin
-      - name: Publish k6:master images
-        if: ${{ github.ref == 'refs/heads/master' }}
-        run: |
-          echo "Publish $GHCR_IMAGE_ID:master* images"
-          docker buildx build --push \
-            --target release \
-            --platform linux/amd64,linux/arm64 \
-            -t $DOCKER_IMAGE_ID:master \
-            -t ghcr.io/$GHCR_IMAGE_ID:master .
-          docker buildx build --push \
-            --target with-browser \
-            --platform linux/amd64,linux/arm64 \
-            -t $DOCKER_IMAGE_ID:master-with-browser \
-            -t ghcr.io/$GHCR_IMAGE_ID:master-with-browser .
-      - name: Publish tagged version images
-        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
-        run: |
-          VERSION="${VERSION#v}"
-          echo "Publish $GHCR_IMAGE_ID:$VERSION images"
-          docker buildx build --push \
-            --target release \
-            --platform linux/amd64,linux/arm64 \
-            -t $DOCKER_IMAGE_ID:$VERSION \
-            -t ghcr.io/$GHCR_IMAGE_ID:$VERSION .
-          docker buildx build --push \
-            --target with-browser \
-            --platform linux/amd64,linux/arm64 \
-            -t $DOCKER_IMAGE_ID:$VERSION-with-browser \
-            -t ghcr.io/$GHCR_IMAGE_ID:$VERSION-with-browser .
-          # We also want to tag the latest stable version as latest
-          if [[ ! "$VERSION" =~ (RC|rc) ]]; then
-            echo "Publish $GHCR_IMAGE_ID:latest"
-            docker buildx build --push \
-              --target release \
-              --platform linux/amd64,linux/arm64 \
-              -t $DOCKER_IMAGE_ID:latest \
-              -t ghcr.io/$GHCR_IMAGE_ID:latest .
-            docker buildx build --push \
-              --target with-browser \
-              --platform linux/amd64,linux/arm64 \
-              -t $DOCKER_IMAGE_ID:latest-with-browser \
-              -t ghcr.io/$GHCR_IMAGE_ID:latest-with-browser .
-          fi
+  #     - name: Log into registries (ghcr.io and Docker Hub)
+  #       if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') }}
+  #       run: |
+  #         # Log into GitHub Container Registry
+  #         echo "${{ secrets.GITHUB_TOKEN }}" | docker login https://ghcr.io -u ${{ github.actor }} --password-stdin
+  #         # Log into Docker Hub Registry
+  #         echo "${{ secrets.DOCKER_PASS }}" | docker login -u "${{ secrets.DOCKER_USER }}" --password-stdin
+  #     - name: Publish k6:master images
+  #       if: ${{ github.ref == 'refs/heads/master' }}
+  #       run: |
+  #         echo "Publish $GHCR_IMAGE_ID:master* images"
+  #         docker buildx build --push \
+  #           --target release \
+  #           --platform linux/amd64,linux/arm64 \
+  #           -t $DOCKER_IMAGE_ID:master \
+  #           -t ghcr.io/$GHCR_IMAGE_ID:master .
+  #         docker buildx build --push \
+  #           --target with-browser \
+  #           --platform linux/amd64,linux/arm64 \
+  #           -t $DOCKER_IMAGE_ID:master-with-browser \
+  #           -t ghcr.io/$GHCR_IMAGE_ID:master-with-browser .
+  #     - name: Publish tagged version images
+  #       if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+  #       run: |
+  #         VERSION="${VERSION#v}"
+  #         echo "Publish $GHCR_IMAGE_ID:$VERSION images"
+  #         docker buildx build --push \
+  #           --target release \
+  #           --platform linux/amd64,linux/arm64 \
+  #           -t $DOCKER_IMAGE_ID:$VERSION \
+  #           -t ghcr.io/$GHCR_IMAGE_ID:$VERSION .
+  #         docker buildx build --push \
+  #           --target with-browser \
+  #           --platform linux/amd64,linux/arm64 \
+  #           -t $DOCKER_IMAGE_ID:$VERSION-with-browser \
+  #           -t ghcr.io/$GHCR_IMAGE_ID:$VERSION-with-browser .
+  #         # We also want to tag the latest stable version as latest
+  #         if [[ ! "$VERSION" =~ (RC|rc) ]]; then
+  #           echo "Publish $GHCR_IMAGE_ID:latest"
+  #           docker buildx build --push \
+  #             --target release \
+  #             --platform linux/amd64,linux/arm64 \
+  #             -t $DOCKER_IMAGE_ID:latest \
+  #             -t ghcr.io/$GHCR_IMAGE_ID:latest .
+  #           docker buildx build --push \
+  #             --target with-browser \
+  #             --platform linux/amd64,linux/arm64 \
+  #             -t $DOCKER_IMAGE_ID:latest-with-browser \
+  #             -t ghcr.io/$GHCR_IMAGE_ID:latest-with-browser .
+  #         fi
 
   package-windows:
     runs-on: windows-latest
@@ -260,9 +260,9 @@ jobs:
         # assurance that package signing works, but don't sign every PR build.
         if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' }}
         run: |
-          # Convert base64 certificate to PFX
-          $bytes = [Convert]::FromBase64String("${{ secrets.WIN_SIGN_CERT }}")
-          [IO.File]::WriteAllBytes("k6.pfx", $bytes)
+          # # Convert base64 certificate to PFX
+          # $bytes = [Convert]::FromBase64String("${{ secrets.WIN_SIGN_CERT }}")
+          # [IO.File]::WriteAllBytes("k6.pfx", $bytes)
 
           # Get the latest signtool executable
           $SignTool = Get-ChildItem -Path "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Recurse -Filter signtool.exe | Where-Object { $_.DirectoryName -like "*\x64" } | Sort-Object -Descending | Select-Object -First 1
@@ -288,83 +288,83 @@ jobs:
             packaging/k6-*.msi
           retention-days: 7
 
-  publish-github:
-    runs-on: ubuntu-latest
-    needs: [configure, build, package-windows]
-    if: ${{ startsWith(github.ref, 'refs/tags/v') && github.event_name != 'workflow_dispatch' }}
-    env:
-      VERSION: ${{ needs.configure.outputs.k6_version }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Download binaries
-        uses: actions/download-artifact@v4
-        with:
-          name: binaries
-          path: dist
-      - name: Download Windows binaries
-        uses: actions/download-artifact@v4
-        with:
-          name: binaries-windows
-          path: dist
-      - name: Generate checksum file
-        run: cd dist && sha256sum * > "k6-${VERSION}-checksums.txt"
-      - name: Anchore SBOM Action
-        continue-on-error: true
-        uses: anchore/sbom-action@9fece9e20048ca9590af301449208b2b8861333b # v0.15.9
-        with:
-          artifact-name: k6-${{ env.VERSION }}-spdx.json
-          upload-release-assets: false
-          output-file: dist/k6-${{ env.VERSION }}-spdx.json
-      - name: Create release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -x
-          assets=()
-          for asset in ./dist/*; do
-            assets+=("$asset")
-          done
-          gh release create "$VERSION" "${assets[@]}" --target "$GITHUB_SHA" -F "./release notes/${VERSION}.md"
+  # publish-github:
+  #   runs-on: ubuntu-latest
+  #   needs: [configure, build, package-windows]
+  #   if: ${{ startsWith(github.ref, 'refs/tags/v') && github.event_name != 'workflow_dispatch' }}
+  #   env:
+  #     VERSION: ${{ needs.configure.outputs.k6_version }}
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #     - name: Download binaries
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: binaries
+  #         path: dist
+  #     - name: Download Windows binaries
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: binaries-windows
+  #         path: dist
+  #     - name: Generate checksum file
+  #       run: cd dist && sha256sum * > "k6-${VERSION}-checksums.txt"
+  #     - name: Anchore SBOM Action
+  #       continue-on-error: true
+  #       uses: anchore/sbom-action@9fece9e20048ca9590af301449208b2b8861333b # v0.15.9
+  #       with:
+  #         artifact-name: k6-${{ env.VERSION }}-spdx.json
+  #         upload-release-assets: false
+  #         output-file: dist/k6-${{ env.VERSION }}-spdx.json
+  #     - name: Create release
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #       run: |
+  #         set -x
+  #         assets=()
+  #         for asset in ./dist/*; do
+  #           assets+=("$asset")
+  #         done
+  #         gh release create "$VERSION" "${assets[@]}" --target "$GITHUB_SHA" -F "./release notes/${VERSION}.md"
 
-  publish-packages:
-    runs-on: ubuntu-latest
-    needs: [configure, build, package-windows]
-    if: ${{ startsWith(github.ref, 'refs/tags/v') && github.event_name != 'workflow_dispatch' }}
-    env:
-      VERSION: ${{ needs.configure.outputs.k6_version }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Download binaries
-        uses: actions/download-artifact@v4
-        with:
-          name: binaries
-          path: dist
-      - name: Download Windows binaries
-        uses: actions/download-artifact@v4
-        with:
-          name: binaries-windows
-          path: dist
-      - name: Rename binaries
-        # To be consistent with the filenames used in dl.k6.io
-        run: |
-          mv "dist/k6-$VERSION-windows-amd64.msi" "dist/k6-$VERSION-amd64.msi"
-          mv "dist/k6-$VERSION-linux-amd64.rpm" "dist/k6-$VERSION-amd64.rpm"
-          mv "dist/k6-$VERSION-linux-amd64.deb" "dist/k6-$VERSION-amd64.deb"
-      - name: Setup docker compose environment
-        run: |
-          cat > packaging/.env <<EOF
-          AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION=us-east-1
-          AWS_CF_DISTRIBUTION="${{ secrets.AWS_CF_DISTRIBUTION }}"
-          PGP_SIGN_KEY_PASSPHRASE=${{ secrets.PGP_SIGN_KEY_PASSPHRASE }}
-          EOF
-          echo "${{ secrets.PGP_SIGN_KEY }}" > packaging/sign-key.gpg
-      - name: Publish packages
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login https://ghcr.io -u ${{ github.actor }} --password-stdin
-          cd packaging
-          docker compose pull packager
-          docker compose run --rm packager
+  # publish-packages:
+  #   runs-on: ubuntu-latest
+  #   needs: [configure, build, package-windows]
+  #   if: ${{ startsWith(github.ref, 'refs/tags/v') && github.event_name != 'workflow_dispatch' }}
+  #   env:
+  #     VERSION: ${{ needs.configure.outputs.k6_version }}
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #     - name: Download binaries
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: binaries
+  #         path: dist
+  #     - name: Download Windows binaries
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: binaries-windows
+  #         path: dist
+  #     - name: Rename binaries
+  #       # To be consistent with the filenames used in dl.k6.io
+  #       run: |
+  #         mv "dist/k6-$VERSION-windows-amd64.msi" "dist/k6-$VERSION-amd64.msi"
+  #         mv "dist/k6-$VERSION-linux-amd64.rpm" "dist/k6-$VERSION-amd64.rpm"
+  #         mv "dist/k6-$VERSION-linux-amd64.deb" "dist/k6-$VERSION-amd64.deb"
+  #     - name: Setup docker compose environment
+  #       run: |
+  #         cat > packaging/.env <<EOF
+  #         AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+  #         AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  #         AWS_DEFAULT_REGION=us-east-1
+  #         AWS_CF_DISTRIBUTION="${{ secrets.AWS_CF_DISTRIBUTION }}"
+  #         PGP_SIGN_KEY_PASSPHRASE=${{ secrets.PGP_SIGN_KEY_PASSPHRASE }}
+  #         EOF
+  #         echo "${{ secrets.PGP_SIGN_KEY }}" > packaging/sign-key.gpg
+  #     - name: Publish packages
+  #       run: |
+  #         echo "${{ secrets.GITHUB_TOKEN }}" | docker login https://ghcr.io -u ${{ github.actor }} --password-stdin
+  #         cd packaging
+  #         docker compose pull packager
+  #         docker compose run --rm packager
