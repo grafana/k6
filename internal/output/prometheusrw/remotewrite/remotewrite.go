@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/grafana/xk6-output-prometheus-remote/pkg/remote"
-	"github.com/grafana/xk6-output-prometheus-remote/pkg/stale"
+	"go.k6.io/k6/internal/output/prometheusrw/remote"
+	"go.k6.io/k6/internal/output/prometheusrw/stale"
 
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
