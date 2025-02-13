@@ -88,8 +88,13 @@ func TestConstantArrivalRateRunCorrectRate(t *testing.T) {
 		// check that we got around the amount of VU iterations as we would expect
 		var totalCount int64
 
-		for i := 0; i < 5; i++ {
-			time.Sleep(time.Second)
+		i := 5
+		ticker := time.NewTicker(time.Second)
+		for range ticker.C {
+			i--
+			if i == 0 {
+				break
+			}
 			currentCount := atomic.SwapInt64(&count, 0)
 			totalCount += currentCount
 			// We have a relatively relaxed constraint here, but we also check
