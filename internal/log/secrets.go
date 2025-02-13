@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/sirupsen/logrus"
 )
@@ -65,6 +66,8 @@ func recursiveReplace(v any, replacer *strings.Replacer) any {
 		return replacer.Replace(s)
 	case int, uint, int64, int32, int16, int8, uint64, uint32, uint16, uint8:
 		// if the secret is encodable in 64 bits ... it is probably not a great secret
+		return v
+	case time.Duration:
 		return v
 	}
 	// replace this with a log after more testing
