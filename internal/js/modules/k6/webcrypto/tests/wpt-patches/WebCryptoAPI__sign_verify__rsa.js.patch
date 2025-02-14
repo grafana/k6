@@ -1,5 +1,5 @@
 diff --git a/WebCryptoAPI/sign_verify/rsa.js b/WebCryptoAPI/sign_verify/rsa.js
-index 5abadd3d4..6076bd7de 100644
+index 5abadd3d4b..6076bd7deb 100644
 --- a/WebCryptoAPI/sign_verify/rsa.js
 +++ b/WebCryptoAPI/sign_verify/rsa.js
 @@ -156,7 +156,9 @@ function run_test() {
