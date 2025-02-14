@@ -17,7 +17,7 @@
 // 	protoc        (unknown)
 // source: types.proto
 
-//go:build !protoopaque
+//go:build protoopaque
 
 package _go
 
@@ -238,15 +238,13 @@ func (x Chunk_Encoding) Number() protoreflect.EnumNumber {
 }
 
 type MetricMetadata struct {
-	state protoimpl.MessageState `protogen:"hybrid.v1"`
-	// Represents the metric type, these match the set from Prometheus.
-	// Refer to github.com/prometheus/common/model/metadata.go for details.
-	Type             MetricMetadata_MetricType `protobuf:"varint,1,opt,name=type,proto3,enum=prometheus.MetricMetadata_MetricType" json:"type,omitempty"`
-	MetricFamilyName string                    `protobuf:"bytes,2,opt,name=metric_family_name,json=metricFamilyName,proto3" json:"metric_family_name,omitempty"`
-	Help             string                    `protobuf:"bytes,4,opt,name=help,proto3" json:"help,omitempty"`
-	Unit             string                    `protobuf:"bytes,5,opt,name=unit,proto3" json:"unit,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state                       protoimpl.MessageState    `protogen:"opaque.v1"`
+	xxx_hidden_Type             MetricMetadata_MetricType `protobuf:"varint,1,opt,name=type,proto3,enum=prometheus.MetricMetadata_MetricType"`
+	xxx_hidden_MetricFamilyName string                    `protobuf:"bytes,2,opt,name=metric_family_name,json=metricFamilyName,proto3"`
+	xxx_hidden_Help             string                    `protobuf:"bytes,4,opt,name=help,proto3"`
+	xxx_hidden_Unit             string                    `protobuf:"bytes,5,opt,name=unit,proto3"`
+	unknownFields               protoimpl.UnknownFields
+	sizeCache                   protoimpl.SizeCache
 }
 
 func (x *MetricMetadata) Reset() {
@@ -276,46 +274,46 @@ func (x *MetricMetadata) ProtoReflect() protoreflect.Message {
 
 func (x *MetricMetadata) GetType() MetricMetadata_MetricType {
 	if x != nil {
-		return x.Type
+		return x.xxx_hidden_Type
 	}
 	return MetricMetadata_UNKNOWN
 }
 
 func (x *MetricMetadata) GetMetricFamilyName() string {
 	if x != nil {
-		return x.MetricFamilyName
+		return x.xxx_hidden_MetricFamilyName
 	}
 	return ""
 }
 
 func (x *MetricMetadata) GetHelp() string {
 	if x != nil {
-		return x.Help
+		return x.xxx_hidden_Help
 	}
 	return ""
 }
 
 func (x *MetricMetadata) GetUnit() string {
 	if x != nil {
-		return x.Unit
+		return x.xxx_hidden_Unit
 	}
 	return ""
 }
 
 func (x *MetricMetadata) SetType(v MetricMetadata_MetricType) {
-	x.Type = v
+	x.xxx_hidden_Type = v
 }
 
 func (x *MetricMetadata) SetMetricFamilyName(v string) {
-	x.MetricFamilyName = v
+	x.xxx_hidden_MetricFamilyName = v
 }
 
 func (x *MetricMetadata) SetHelp(v string) {
-	x.Help = v
+	x.xxx_hidden_Help = v
 }
 
 func (x *MetricMetadata) SetUnit(v string) {
-	x.Unit = v
+	x.xxx_hidden_Unit = v
 }
 
 type MetricMetadata_builder struct {
@@ -333,21 +331,19 @@ func (b0 MetricMetadata_builder) Build() *MetricMetadata {
 	m0 := &MetricMetadata{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.Type = b.Type
-	x.MetricFamilyName = b.MetricFamilyName
-	x.Help = b.Help
-	x.Unit = b.Unit
+	x.xxx_hidden_Type = b.Type
+	x.xxx_hidden_MetricFamilyName = b.MetricFamilyName
+	x.xxx_hidden_Help = b.Help
+	x.xxx_hidden_Unit = b.Unit
 	return m0
 }
 
 type Sample struct {
-	state protoimpl.MessageState `protogen:"hybrid.v1"`
-	Value float64                `protobuf:"fixed64,1,opt,name=value,proto3" json:"value,omitempty"`
-	// timestamp is in ms format, see model/timestamp/timestamp.go for
-	// conversion from time.Time to Prometheus timestamp.
-	Timestamp     int64 `protobuf:"varint,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Value     float64                `protobuf:"fixed64,1,opt,name=value,proto3"`
+	xxx_hidden_Timestamp int64                  `protobuf:"varint,2,opt,name=timestamp,proto3"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *Sample) Reset() {
@@ -377,24 +373,24 @@ func (x *Sample) ProtoReflect() protoreflect.Message {
 
 func (x *Sample) GetValue() float64 {
 	if x != nil {
-		return x.Value
+		return x.xxx_hidden_Value
 	}
 	return 0
 }
 
 func (x *Sample) GetTimestamp() int64 {
 	if x != nil {
-		return x.Timestamp
+		return x.xxx_hidden_Timestamp
 	}
 	return 0
 }
 
 func (x *Sample) SetValue(v float64) {
-	x.Value = v
+	x.xxx_hidden_Value = v
 }
 
 func (x *Sample) SetTimestamp(v int64) {
-	x.Timestamp = v
+	x.xxx_hidden_Timestamp = v
 }
 
 type Sample_builder struct {
@@ -410,21 +406,18 @@ func (b0 Sample_builder) Build() *Sample {
 	m0 := &Sample{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.Value = b.Value
-	x.Timestamp = b.Timestamp
+	x.xxx_hidden_Value = b.Value
+	x.xxx_hidden_Timestamp = b.Timestamp
 	return m0
 }
 
 type Exemplar struct {
-	state protoimpl.MessageState `protogen:"hybrid.v1"`
-	// Optional, can be empty.
-	Labels []*Label `protobuf:"bytes,1,rep,name=labels,proto3" json:"labels,omitempty"`
-	Value  float64  `protobuf:"fixed64,2,opt,name=value,proto3" json:"value,omitempty"`
-	// timestamp is in ms format, see model/timestamp/timestamp.go for
-	// conversion from time.Time to Prometheus timestamp.
-	Timestamp     int64 `protobuf:"varint,3,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Labels    *[]*Label              `protobuf:"bytes,1,rep,name=labels,proto3"`
+	xxx_hidden_Value     float64                `protobuf:"fixed64,2,opt,name=value,proto3"`
+	xxx_hidden_Timestamp int64                  `protobuf:"varint,3,opt,name=timestamp,proto3"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *Exemplar) Reset() {
@@ -454,35 +447,37 @@ func (x *Exemplar) ProtoReflect() protoreflect.Message {
 
 func (x *Exemplar) GetLabels() []*Label {
 	if x != nil {
-		return x.Labels
+		if x.xxx_hidden_Labels != nil {
+			return *x.xxx_hidden_Labels
+		}
 	}
 	return nil
 }
 
 func (x *Exemplar) GetValue() float64 {
 	if x != nil {
-		return x.Value
+		return x.xxx_hidden_Value
 	}
 	return 0
 }
 
 func (x *Exemplar) GetTimestamp() int64 {
 	if x != nil {
-		return x.Timestamp
+		return x.xxx_hidden_Timestamp
 	}
 	return 0
 }
 
 func (x *Exemplar) SetLabels(v []*Label) {
-	x.Labels = v
+	x.xxx_hidden_Labels = &v
 }
 
 func (x *Exemplar) SetValue(v float64) {
-	x.Value = v
+	x.xxx_hidden_Value = v
 }
 
 func (x *Exemplar) SetTimestamp(v int64) {
-	x.Timestamp = v
+	x.xxx_hidden_Timestamp = v
 }
 
 type Exemplar_builder struct {
@@ -500,9 +495,9 @@ func (b0 Exemplar_builder) Build() *Exemplar {
 	m0 := &Exemplar{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.Labels = b.Labels
-	x.Value = b.Value
-	x.Timestamp = b.Timestamp
+	x.xxx_hidden_Labels = &b.Labels
+	x.xxx_hidden_Value = b.Value
+	x.xxx_hidden_Timestamp = b.Timestamp
 	return m0
 }
 
@@ -513,47 +508,22 @@ func (b0 Exemplar_builder) Build() *Exemplar {
 // histograms. This Histogram message can represent both, the usual
 // integer histogram as well as a float histogram.
 type Histogram struct {
-	state protoimpl.MessageState `protogen:"hybrid.v1"`
-	// Types that are valid to be assigned to Count:
-	//
-	//	*Histogram_CountInt
-	//	*Histogram_CountFloat
-	Count isHistogram_Count `protobuf_oneof:"count"`
-	Sum   float64           `protobuf:"fixed64,3,opt,name=sum,proto3" json:"sum,omitempty"` // Sum of observations in the histogram.
-	// The schema defines the bucket schema. Currently, valid numbers
-	// are -4 <= n <= 8. They are all for base-2 bucket schemas, where 1
-	// is a bucket boundary in each case, and then each power of two is
-	// divided into 2^n logarithmic buckets. Or in other words, each
-	// bucket boundary is the previous boundary times 2^(2^-n). In the
-	// future, more bucket schemas may be added using numbers < -4 or >
-	// 8.
-	Schema        int32   `protobuf:"zigzag32,4,opt,name=schema,proto3" json:"schema,omitempty"`
-	ZeroThreshold float64 `protobuf:"fixed64,5,opt,name=zero_threshold,json=zeroThreshold,proto3" json:"zero_threshold,omitempty"` // Breadth of the zero bucket.
-	// Types that are valid to be assigned to ZeroCount:
-	//
-	//	*Histogram_ZeroCountInt
-	//	*Histogram_ZeroCountFloat
-	ZeroCount isHistogram_ZeroCount `protobuf_oneof:"zero_count"`
-	// Negative Buckets.
-	NegativeSpans []*BucketSpan `protobuf:"bytes,8,rep,name=negative_spans,json=negativeSpans,proto3" json:"negative_spans,omitempty"`
-	// Use either "negative_deltas" or "negative_counts", the former for
-	// regular histograms with integer counts, the latter for float
-	// histograms.
-	NegativeDeltas []int64   `protobuf:"zigzag64,9,rep,packed,name=negative_deltas,json=negativeDeltas,proto3" json:"negative_deltas,omitempty"` // Count delta of each bucket compared to previous one (or to zero for 1st bucket).
-	NegativeCounts []float64 `protobuf:"fixed64,10,rep,packed,name=negative_counts,json=negativeCounts,proto3" json:"negative_counts,omitempty"` // Absolute count of each bucket.
-	// Positive Buckets.
-	PositiveSpans []*BucketSpan `protobuf:"bytes,11,rep,name=positive_spans,json=positiveSpans,proto3" json:"positive_spans,omitempty"`
-	// Use either "positive_deltas" or "positive_counts", the former for
-	// regular histograms with integer counts, the latter for float
-	// histograms.
-	PositiveDeltas []int64             `protobuf:"zigzag64,12,rep,packed,name=positive_deltas,json=positiveDeltas,proto3" json:"positive_deltas,omitempty"` // Count delta of each bucket compared to previous one (or to zero for 1st bucket).
-	PositiveCounts []float64           `protobuf:"fixed64,13,rep,packed,name=positive_counts,json=positiveCounts,proto3" json:"positive_counts,omitempty"`  // Absolute count of each bucket.
-	ResetHint      Histogram_ResetHint `protobuf:"varint,14,opt,name=reset_hint,json=resetHint,proto3,enum=prometheus.Histogram_ResetHint" json:"reset_hint,omitempty"`
-	// timestamp is in ms format, see model/timestamp/timestamp.go for
-	// conversion from time.Time to Prometheus timestamp.
-	Timestamp     int64 `protobuf:"varint,15,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                     protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Count          isHistogram_Count      `protobuf_oneof:"count"`
+	xxx_hidden_Sum            float64                `protobuf:"fixed64,3,opt,name=sum,proto3"`
+	xxx_hidden_Schema         int32                  `protobuf:"zigzag32,4,opt,name=schema,proto3"`
+	xxx_hidden_ZeroThreshold  float64                `protobuf:"fixed64,5,opt,name=zero_threshold,json=zeroThreshold,proto3"`
+	xxx_hidden_ZeroCount      isHistogram_ZeroCount  `protobuf_oneof:"zero_count"`
+	xxx_hidden_NegativeSpans  *[]*BucketSpan         `protobuf:"bytes,8,rep,name=negative_spans,json=negativeSpans,proto3"`
+	xxx_hidden_NegativeDeltas []int64                `protobuf:"zigzag64,9,rep,packed,name=negative_deltas,json=negativeDeltas,proto3"`
+	xxx_hidden_NegativeCounts []float64              `protobuf:"fixed64,10,rep,packed,name=negative_counts,json=negativeCounts,proto3"`
+	xxx_hidden_PositiveSpans  *[]*BucketSpan         `protobuf:"bytes,11,rep,name=positive_spans,json=positiveSpans,proto3"`
+	xxx_hidden_PositiveDeltas []int64                `protobuf:"zigzag64,12,rep,packed,name=positive_deltas,json=positiveDeltas,proto3"`
+	xxx_hidden_PositiveCounts []float64              `protobuf:"fixed64,13,rep,packed,name=positive_counts,json=positiveCounts,proto3"`
+	xxx_hidden_ResetHint      Histogram_ResetHint    `protobuf:"varint,14,opt,name=reset_hint,json=resetHint,proto3,enum=prometheus.Histogram_ResetHint"`
+	xxx_hidden_Timestamp      int64                  `protobuf:"varint,15,opt,name=timestamp,proto3"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
 }
 
 func (x *Histogram) Reset() {
@@ -581,16 +551,9 @@ func (x *Histogram) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-func (x *Histogram) GetCount() isHistogram_Count {
-	if x != nil {
-		return x.Count
-	}
-	return nil
-}
-
 func (x *Histogram) GetCountInt() uint64 {
 	if x != nil {
-		if x, ok := x.Count.(*Histogram_CountInt); ok {
+		if x, ok := x.xxx_hidden_Count.(*histogram_CountInt); ok {
 			return x.CountInt
 		}
 	}
@@ -599,7 +562,7 @@ func (x *Histogram) GetCountInt() uint64 {
 
 func (x *Histogram) GetCountFloat() float64 {
 	if x != nil {
-		if x, ok := x.Count.(*Histogram_CountFloat); ok {
+		if x, ok := x.xxx_hidden_Count.(*histogram_CountFloat); ok {
 			return x.CountFloat
 		}
 	}
@@ -608,35 +571,28 @@ func (x *Histogram) GetCountFloat() float64 {
 
 func (x *Histogram) GetSum() float64 {
 	if x != nil {
-		return x.Sum
+		return x.xxx_hidden_Sum
 	}
 	return 0
 }
 
 func (x *Histogram) GetSchema() int32 {
 	if x != nil {
-		return x.Schema
+		return x.xxx_hidden_Schema
 	}
 	return 0
 }
 
 func (x *Histogram) GetZeroThreshold() float64 {
 	if x != nil {
-		return x.ZeroThreshold
+		return x.xxx_hidden_ZeroThreshold
 	}
 	return 0
 }
 
-func (x *Histogram) GetZeroCount() isHistogram_ZeroCount {
-	if x != nil {
-		return x.ZeroCount
-	}
-	return nil
-}
-
 func (x *Histogram) GetZeroCountInt() uint64 {
 	if x != nil {
-		if x, ok := x.ZeroCount.(*Histogram_ZeroCountInt); ok {
+		if x, ok := x.xxx_hidden_ZeroCount.(*histogram_ZeroCountInt); ok {
 			return x.ZeroCountInt
 		}
 	}
@@ -645,7 +601,7 @@ func (x *Histogram) GetZeroCountInt() uint64 {
 
 func (x *Histogram) GetZeroCountFloat() float64 {
 	if x != nil {
-		if x, ok := x.ZeroCount.(*Histogram_ZeroCountFloat); ok {
+		if x, ok := x.xxx_hidden_ZeroCount.(*histogram_ZeroCountFloat); ok {
 			return x.ZeroCountFloat
 		}
 	}
@@ -654,132 +610,136 @@ func (x *Histogram) GetZeroCountFloat() float64 {
 
 func (x *Histogram) GetNegativeSpans() []*BucketSpan {
 	if x != nil {
-		return x.NegativeSpans
+		if x.xxx_hidden_NegativeSpans != nil {
+			return *x.xxx_hidden_NegativeSpans
+		}
 	}
 	return nil
 }
 
 func (x *Histogram) GetNegativeDeltas() []int64 {
 	if x != nil {
-		return x.NegativeDeltas
+		return x.xxx_hidden_NegativeDeltas
 	}
 	return nil
 }
 
 func (x *Histogram) GetNegativeCounts() []float64 {
 	if x != nil {
-		return x.NegativeCounts
+		return x.xxx_hidden_NegativeCounts
 	}
 	return nil
 }
 
 func (x *Histogram) GetPositiveSpans() []*BucketSpan {
 	if x != nil {
-		return x.PositiveSpans
+		if x.xxx_hidden_PositiveSpans != nil {
+			return *x.xxx_hidden_PositiveSpans
+		}
 	}
 	return nil
 }
 
 func (x *Histogram) GetPositiveDeltas() []int64 {
 	if x != nil {
-		return x.PositiveDeltas
+		return x.xxx_hidden_PositiveDeltas
 	}
 	return nil
 }
 
 func (x *Histogram) GetPositiveCounts() []float64 {
 	if x != nil {
-		return x.PositiveCounts
+		return x.xxx_hidden_PositiveCounts
 	}
 	return nil
 }
 
 func (x *Histogram) GetResetHint() Histogram_ResetHint {
 	if x != nil {
-		return x.ResetHint
+		return x.xxx_hidden_ResetHint
 	}
 	return Histogram_UNKNOWN
 }
 
 func (x *Histogram) GetTimestamp() int64 {
 	if x != nil {
-		return x.Timestamp
+		return x.xxx_hidden_Timestamp
 	}
 	return 0
 }
 
 func (x *Histogram) SetCountInt(v uint64) {
-	x.Count = &Histogram_CountInt{v}
+	x.xxx_hidden_Count = &histogram_CountInt{v}
 }
 
 func (x *Histogram) SetCountFloat(v float64) {
-	x.Count = &Histogram_CountFloat{v}
+	x.xxx_hidden_Count = &histogram_CountFloat{v}
 }
 
 func (x *Histogram) SetSum(v float64) {
-	x.Sum = v
+	x.xxx_hidden_Sum = v
 }
 
 func (x *Histogram) SetSchema(v int32) {
-	x.Schema = v
+	x.xxx_hidden_Schema = v
 }
 
 func (x *Histogram) SetZeroThreshold(v float64) {
-	x.ZeroThreshold = v
+	x.xxx_hidden_ZeroThreshold = v
 }
 
 func (x *Histogram) SetZeroCountInt(v uint64) {
-	x.ZeroCount = &Histogram_ZeroCountInt{v}
+	x.xxx_hidden_ZeroCount = &histogram_ZeroCountInt{v}
 }
 
 func (x *Histogram) SetZeroCountFloat(v float64) {
-	x.ZeroCount = &Histogram_ZeroCountFloat{v}
+	x.xxx_hidden_ZeroCount = &histogram_ZeroCountFloat{v}
 }
 
 func (x *Histogram) SetNegativeSpans(v []*BucketSpan) {
-	x.NegativeSpans = v
+	x.xxx_hidden_NegativeSpans = &v
 }
 
 func (x *Histogram) SetNegativeDeltas(v []int64) {
-	x.NegativeDeltas = v
+	x.xxx_hidden_NegativeDeltas = v
 }
 
 func (x *Histogram) SetNegativeCounts(v []float64) {
-	x.NegativeCounts = v
+	x.xxx_hidden_NegativeCounts = v
 }
 
 func (x *Histogram) SetPositiveSpans(v []*BucketSpan) {
-	x.PositiveSpans = v
+	x.xxx_hidden_PositiveSpans = &v
 }
 
 func (x *Histogram) SetPositiveDeltas(v []int64) {
-	x.PositiveDeltas = v
+	x.xxx_hidden_PositiveDeltas = v
 }
 
 func (x *Histogram) SetPositiveCounts(v []float64) {
-	x.PositiveCounts = v
+	x.xxx_hidden_PositiveCounts = v
 }
 
 func (x *Histogram) SetResetHint(v Histogram_ResetHint) {
-	x.ResetHint = v
+	x.xxx_hidden_ResetHint = v
 }
 
 func (x *Histogram) SetTimestamp(v int64) {
-	x.Timestamp = v
+	x.xxx_hidden_Timestamp = v
 }
 
 func (x *Histogram) HasCount() bool {
 	if x == nil {
 		return false
 	}
-	return x.Count != nil
+	return x.xxx_hidden_Count != nil
 }
 
 func (x *Histogram) HasCountInt() bool {
 	if x == nil {
 		return false
 	}
-	_, ok := x.Count.(*Histogram_CountInt)
+	_, ok := x.xxx_hidden_Count.(*histogram_CountInt)
 	return ok
 }
 
@@ -787,7 +747,7 @@ func (x *Histogram) HasCountFloat() bool {
 	if x == nil {
 		return false
 	}
-	_, ok := x.Count.(*Histogram_CountFloat)
+	_, ok := x.xxx_hidden_Count.(*histogram_CountFloat)
 	return ok
 }
 
@@ -795,14 +755,14 @@ func (x *Histogram) HasZeroCount() bool {
 	if x == nil {
 		return false
 	}
-	return x.ZeroCount != nil
+	return x.xxx_hidden_ZeroCount != nil
 }
 
 func (x *Histogram) HasZeroCountInt() bool {
 	if x == nil {
 		return false
 	}
-	_, ok := x.ZeroCount.(*Histogram_ZeroCountInt)
+	_, ok := x.xxx_hidden_ZeroCount.(*histogram_ZeroCountInt)
 	return ok
 }
 
@@ -810,39 +770,39 @@ func (x *Histogram) HasZeroCountFloat() bool {
 	if x == nil {
 		return false
 	}
-	_, ok := x.ZeroCount.(*Histogram_ZeroCountFloat)
+	_, ok := x.xxx_hidden_ZeroCount.(*histogram_ZeroCountFloat)
 	return ok
 }
 
 func (x *Histogram) ClearCount() {
-	x.Count = nil
+	x.xxx_hidden_Count = nil
 }
 
 func (x *Histogram) ClearCountInt() {
-	if _, ok := x.Count.(*Histogram_CountInt); ok {
-		x.Count = nil
+	if _, ok := x.xxx_hidden_Count.(*histogram_CountInt); ok {
+		x.xxx_hidden_Count = nil
 	}
 }
 
 func (x *Histogram) ClearCountFloat() {
-	if _, ok := x.Count.(*Histogram_CountFloat); ok {
-		x.Count = nil
+	if _, ok := x.xxx_hidden_Count.(*histogram_CountFloat); ok {
+		x.xxx_hidden_Count = nil
 	}
 }
 
 func (x *Histogram) ClearZeroCount() {
-	x.ZeroCount = nil
+	x.xxx_hidden_ZeroCount = nil
 }
 
 func (x *Histogram) ClearZeroCountInt() {
-	if _, ok := x.ZeroCount.(*Histogram_ZeroCountInt); ok {
-		x.ZeroCount = nil
+	if _, ok := x.xxx_hidden_ZeroCount.(*histogram_ZeroCountInt); ok {
+		x.xxx_hidden_ZeroCount = nil
 	}
 }
 
 func (x *Histogram) ClearZeroCountFloat() {
-	if _, ok := x.ZeroCount.(*Histogram_ZeroCountFloat); ok {
-		x.ZeroCount = nil
+	if _, ok := x.xxx_hidden_ZeroCount.(*histogram_ZeroCountFloat); ok {
+		x.xxx_hidden_ZeroCount = nil
 	}
 }
 
@@ -854,10 +814,10 @@ func (x *Histogram) WhichCount() case_Histogram_Count {
 	if x == nil {
 		return Histogram_Count_not_set_case
 	}
-	switch x.Count.(type) {
-	case *Histogram_CountInt:
+	switch x.xxx_hidden_Count.(type) {
+	case *histogram_CountInt:
 		return Histogram_CountInt_case
-	case *Histogram_CountFloat:
+	case *histogram_CountFloat:
 		return Histogram_CountFloat_case
 	default:
 		return Histogram_Count_not_set_case
@@ -872,10 +832,10 @@ func (x *Histogram) WhichZeroCount() case_Histogram_ZeroCount {
 	if x == nil {
 		return Histogram_ZeroCount_not_set_case
 	}
-	switch x.ZeroCount.(type) {
-	case *Histogram_ZeroCountInt:
+	switch x.xxx_hidden_ZeroCount.(type) {
+	case *histogram_ZeroCountInt:
 		return Histogram_ZeroCountInt_case
-	case *Histogram_ZeroCountFloat:
+	case *histogram_ZeroCountFloat:
 		return Histogram_ZeroCountFloat_case
 	default:
 		return Histogram_ZeroCount_not_set_case
@@ -885,10 +845,10 @@ func (x *Histogram) WhichZeroCount() case_Histogram_ZeroCount {
 type Histogram_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	// Fields of oneof Count:
+	// Fields of oneof xxx_hidden_Count:
 	CountInt   *uint64
 	CountFloat *float64
-	// -- end of Count
+	// -- end of xxx_hidden_Count
 	Sum float64
 	// The schema defines the bucket schema. Currently, valid numbers
 	// are -4 <= n <= 8. They are all for base-2 bucket schemas, where 1
@@ -899,10 +859,10 @@ type Histogram_builder struct {
 	// 8.
 	Schema        int32
 	ZeroThreshold float64
-	// Fields of oneof ZeroCount:
+	// Fields of oneof xxx_hidden_ZeroCount:
 	ZeroCountInt   *uint64
 	ZeroCountFloat *float64
-	// -- end of ZeroCount
+	// -- end of xxx_hidden_ZeroCount
 	// Negative Buckets.
 	NegativeSpans []*BucketSpan
 	// Use either "negative_deltas" or "negative_counts", the former for
@@ -928,28 +888,28 @@ func (b0 Histogram_builder) Build() *Histogram {
 	b, x := &b0, m0
 	_, _ = b, x
 	if b.CountInt != nil {
-		x.Count = &Histogram_CountInt{*b.CountInt}
+		x.xxx_hidden_Count = &histogram_CountInt{*b.CountInt}
 	}
 	if b.CountFloat != nil {
-		x.Count = &Histogram_CountFloat{*b.CountFloat}
+		x.xxx_hidden_Count = &histogram_CountFloat{*b.CountFloat}
 	}
-	x.Sum = b.Sum
-	x.Schema = b.Schema
-	x.ZeroThreshold = b.ZeroThreshold
+	x.xxx_hidden_Sum = b.Sum
+	x.xxx_hidden_Schema = b.Schema
+	x.xxx_hidden_ZeroThreshold = b.ZeroThreshold
 	if b.ZeroCountInt != nil {
-		x.ZeroCount = &Histogram_ZeroCountInt{*b.ZeroCountInt}
+		x.xxx_hidden_ZeroCount = &histogram_ZeroCountInt{*b.ZeroCountInt}
 	}
 	if b.ZeroCountFloat != nil {
-		x.ZeroCount = &Histogram_ZeroCountFloat{*b.ZeroCountFloat}
+		x.xxx_hidden_ZeroCount = &histogram_ZeroCountFloat{*b.ZeroCountFloat}
 	}
-	x.NegativeSpans = b.NegativeSpans
-	x.NegativeDeltas = b.NegativeDeltas
-	x.NegativeCounts = b.NegativeCounts
-	x.PositiveSpans = b.PositiveSpans
-	x.PositiveDeltas = b.PositiveDeltas
-	x.PositiveCounts = b.PositiveCounts
-	x.ResetHint = b.ResetHint
-	x.Timestamp = b.Timestamp
+	x.xxx_hidden_NegativeSpans = &b.NegativeSpans
+	x.xxx_hidden_NegativeDeltas = b.NegativeDeltas
+	x.xxx_hidden_NegativeCounts = b.NegativeCounts
+	x.xxx_hidden_PositiveSpans = &b.PositiveSpans
+	x.xxx_hidden_PositiveDeltas = b.PositiveDeltas
+	x.xxx_hidden_PositiveCounts = b.PositiveCounts
+	x.xxx_hidden_ResetHint = b.ResetHint
+	x.xxx_hidden_Timestamp = b.Timestamp
 	return m0
 }
 
@@ -977,33 +937,33 @@ type isHistogram_Count interface {
 	isHistogram_Count()
 }
 
-type Histogram_CountInt struct {
+type histogram_CountInt struct {
 	CountInt uint64 `protobuf:"varint,1,opt,name=count_int,json=countInt,proto3,oneof"`
 }
 
-type Histogram_CountFloat struct {
+type histogram_CountFloat struct {
 	CountFloat float64 `protobuf:"fixed64,2,opt,name=count_float,json=countFloat,proto3,oneof"`
 }
 
-func (*Histogram_CountInt) isHistogram_Count() {}
+func (*histogram_CountInt) isHistogram_Count() {}
 
-func (*Histogram_CountFloat) isHistogram_Count() {}
+func (*histogram_CountFloat) isHistogram_Count() {}
 
 type isHistogram_ZeroCount interface {
 	isHistogram_ZeroCount()
 }
 
-type Histogram_ZeroCountInt struct {
+type histogram_ZeroCountInt struct {
 	ZeroCountInt uint64 `protobuf:"varint,6,opt,name=zero_count_int,json=zeroCountInt,proto3,oneof"`
 }
 
-type Histogram_ZeroCountFloat struct {
+type histogram_ZeroCountFloat struct {
 	ZeroCountFloat float64 `protobuf:"fixed64,7,opt,name=zero_count_float,json=zeroCountFloat,proto3,oneof"`
 }
 
-func (*Histogram_ZeroCountInt) isHistogram_ZeroCount() {}
+func (*histogram_ZeroCountInt) isHistogram_ZeroCount() {}
 
-func (*Histogram_ZeroCountFloat) isHistogram_ZeroCount() {}
+func (*histogram_ZeroCountFloat) isHistogram_ZeroCount() {}
 
 // A BucketSpan defines a number of consecutive buckets with their
 // offset. Logically, it would be more straightforward to include the
@@ -1011,11 +971,11 @@ func (*Histogram_ZeroCountFloat) isHistogram_ZeroCount() {}
 // more compact in the way the data is structured here (with all the
 // buckets in a single array separate from the Spans).
 type BucketSpan struct {
-	state         protoimpl.MessageState `protogen:"hybrid.v1"`
-	Offset        int32                  `protobuf:"zigzag32,1,opt,name=offset,proto3" json:"offset,omitempty"` // Gap to previous span, or starting point for 1st span (which can be negative).
-	Length        uint32                 `protobuf:"varint,2,opt,name=length,proto3" json:"length,omitempty"`   // Length of consecutive buckets.
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state             protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Offset int32                  `protobuf:"zigzag32,1,opt,name=offset,proto3"`
+	xxx_hidden_Length uint32                 `protobuf:"varint,2,opt,name=length,proto3"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *BucketSpan) Reset() {
@@ -1045,24 +1005,24 @@ func (x *BucketSpan) ProtoReflect() protoreflect.Message {
 
 func (x *BucketSpan) GetOffset() int32 {
 	if x != nil {
-		return x.Offset
+		return x.xxx_hidden_Offset
 	}
 	return 0
 }
 
 func (x *BucketSpan) GetLength() uint32 {
 	if x != nil {
-		return x.Length
+		return x.xxx_hidden_Length
 	}
 	return 0
 }
 
 func (x *BucketSpan) SetOffset(v int32) {
-	x.Offset = v
+	x.xxx_hidden_Offset = v
 }
 
 func (x *BucketSpan) SetLength(v uint32) {
-	x.Length = v
+	x.xxx_hidden_Length = v
 }
 
 type BucketSpan_builder struct {
@@ -1076,22 +1036,20 @@ func (b0 BucketSpan_builder) Build() *BucketSpan {
 	m0 := &BucketSpan{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.Offset = b.Offset
-	x.Length = b.Length
+	x.xxx_hidden_Offset = b.Offset
+	x.xxx_hidden_Length = b.Length
 	return m0
 }
 
 // TimeSeries represents samples and labels for a single time series.
 type TimeSeries struct {
-	state protoimpl.MessageState `protogen:"hybrid.v1"`
-	// For a timeseries to be valid, and for the samples and exemplars
-	// to be ingested by the remote system properly, the labels field is required.
-	Labels        []*Label     `protobuf:"bytes,1,rep,name=labels,proto3" json:"labels,omitempty"`
-	Samples       []*Sample    `protobuf:"bytes,2,rep,name=samples,proto3" json:"samples,omitempty"`
-	Exemplars     []*Exemplar  `protobuf:"bytes,3,rep,name=exemplars,proto3" json:"exemplars,omitempty"`
-	Histograms    []*Histogram `protobuf:"bytes,4,rep,name=histograms,proto3" json:"histograms,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                 protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Labels     *[]*Label              `protobuf:"bytes,1,rep,name=labels,proto3"`
+	xxx_hidden_Samples    *[]*Sample             `protobuf:"bytes,2,rep,name=samples,proto3"`
+	xxx_hidden_Exemplars  *[]*Exemplar           `protobuf:"bytes,3,rep,name=exemplars,proto3"`
+	xxx_hidden_Histograms *[]*Histogram          `protobuf:"bytes,4,rep,name=histograms,proto3"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *TimeSeries) Reset() {
@@ -1121,46 +1079,54 @@ func (x *TimeSeries) ProtoReflect() protoreflect.Message {
 
 func (x *TimeSeries) GetLabels() []*Label {
 	if x != nil {
-		return x.Labels
+		if x.xxx_hidden_Labels != nil {
+			return *x.xxx_hidden_Labels
+		}
 	}
 	return nil
 }
 
 func (x *TimeSeries) GetSamples() []*Sample {
 	if x != nil {
-		return x.Samples
+		if x.xxx_hidden_Samples != nil {
+			return *x.xxx_hidden_Samples
+		}
 	}
 	return nil
 }
 
 func (x *TimeSeries) GetExemplars() []*Exemplar {
 	if x != nil {
-		return x.Exemplars
+		if x.xxx_hidden_Exemplars != nil {
+			return *x.xxx_hidden_Exemplars
+		}
 	}
 	return nil
 }
 
 func (x *TimeSeries) GetHistograms() []*Histogram {
 	if x != nil {
-		return x.Histograms
+		if x.xxx_hidden_Histograms != nil {
+			return *x.xxx_hidden_Histograms
+		}
 	}
 	return nil
 }
 
 func (x *TimeSeries) SetLabels(v []*Label) {
-	x.Labels = v
+	x.xxx_hidden_Labels = &v
 }
 
 func (x *TimeSeries) SetSamples(v []*Sample) {
-	x.Samples = v
+	x.xxx_hidden_Samples = &v
 }
 
 func (x *TimeSeries) SetExemplars(v []*Exemplar) {
-	x.Exemplars = v
+	x.xxx_hidden_Exemplars = &v
 }
 
 func (x *TimeSeries) SetHistograms(v []*Histogram) {
-	x.Histograms = v
+	x.xxx_hidden_Histograms = &v
 }
 
 type TimeSeries_builder struct {
@@ -1178,19 +1144,19 @@ func (b0 TimeSeries_builder) Build() *TimeSeries {
 	m0 := &TimeSeries{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.Labels = b.Labels
-	x.Samples = b.Samples
-	x.Exemplars = b.Exemplars
-	x.Histograms = b.Histograms
+	x.xxx_hidden_Labels = &b.Labels
+	x.xxx_hidden_Samples = &b.Samples
+	x.xxx_hidden_Exemplars = &b.Exemplars
+	x.xxx_hidden_Histograms = &b.Histograms
 	return m0
 }
 
 type Label struct {
-	state         protoimpl.MessageState `protogen:"hybrid.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state            protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Name  string                 `protobuf:"bytes,1,opt,name=name,proto3"`
+	xxx_hidden_Value string                 `protobuf:"bytes,2,opt,name=value,proto3"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *Label) Reset() {
@@ -1220,24 +1186,24 @@ func (x *Label) ProtoReflect() protoreflect.Message {
 
 func (x *Label) GetName() string {
 	if x != nil {
-		return x.Name
+		return x.xxx_hidden_Name
 	}
 	return ""
 }
 
 func (x *Label) GetValue() string {
 	if x != nil {
-		return x.Value
+		return x.xxx_hidden_Value
 	}
 	return ""
 }
 
 func (x *Label) SetName(v string) {
-	x.Name = v
+	x.xxx_hidden_Name = v
 }
 
 func (x *Label) SetValue(v string) {
-	x.Value = v
+	x.xxx_hidden_Value = v
 }
 
 type Label_builder struct {
@@ -1251,16 +1217,16 @@ func (b0 Label_builder) Build() *Label {
 	m0 := &Label{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.Name = b.Name
-	x.Value = b.Value
+	x.xxx_hidden_Name = b.Name
+	x.xxx_hidden_Value = b.Value
 	return m0
 }
 
 type Labels struct {
-	state         protoimpl.MessageState `protogen:"hybrid.v1"`
-	Labels        []*Label               `protobuf:"bytes,1,rep,name=labels,proto3" json:"labels,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state             protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Labels *[]*Label              `protobuf:"bytes,1,rep,name=labels,proto3"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *Labels) Reset() {
@@ -1290,13 +1256,15 @@ func (x *Labels) ProtoReflect() protoreflect.Message {
 
 func (x *Labels) GetLabels() []*Label {
 	if x != nil {
-		return x.Labels
+		if x.xxx_hidden_Labels != nil {
+			return *x.xxx_hidden_Labels
+		}
 	}
 	return nil
 }
 
 func (x *Labels) SetLabels(v []*Label) {
-	x.Labels = v
+	x.xxx_hidden_Labels = &v
 }
 
 type Labels_builder struct {
@@ -1309,18 +1277,18 @@ func (b0 Labels_builder) Build() *Labels {
 	m0 := &Labels{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.Labels = b.Labels
+	x.xxx_hidden_Labels = &b.Labels
 	return m0
 }
 
 // Matcher specifies a rule, which can match or set of labels or not.
 type LabelMatcher struct {
-	state         protoimpl.MessageState `protogen:"hybrid.v1"`
-	Type          LabelMatcher_Type      `protobuf:"varint,1,opt,name=type,proto3,enum=prometheus.LabelMatcher_Type" json:"type,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Value         string                 `protobuf:"bytes,3,opt,name=value,proto3" json:"value,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state            protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Type  LabelMatcher_Type      `protobuf:"varint,1,opt,name=type,proto3,enum=prometheus.LabelMatcher_Type"`
+	xxx_hidden_Name  string                 `protobuf:"bytes,2,opt,name=name,proto3"`
+	xxx_hidden_Value string                 `protobuf:"bytes,3,opt,name=value,proto3"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *LabelMatcher) Reset() {
@@ -1350,35 +1318,35 @@ func (x *LabelMatcher) ProtoReflect() protoreflect.Message {
 
 func (x *LabelMatcher) GetType() LabelMatcher_Type {
 	if x != nil {
-		return x.Type
+		return x.xxx_hidden_Type
 	}
 	return LabelMatcher_EQ
 }
 
 func (x *LabelMatcher) GetName() string {
 	if x != nil {
-		return x.Name
+		return x.xxx_hidden_Name
 	}
 	return ""
 }
 
 func (x *LabelMatcher) GetValue() string {
 	if x != nil {
-		return x.Value
+		return x.xxx_hidden_Value
 	}
 	return ""
 }
 
 func (x *LabelMatcher) SetType(v LabelMatcher_Type) {
-	x.Type = v
+	x.xxx_hidden_Type = v
 }
 
 func (x *LabelMatcher) SetName(v string) {
-	x.Name = v
+	x.xxx_hidden_Name = v
 }
 
 func (x *LabelMatcher) SetValue(v string) {
-	x.Value = v
+	x.xxx_hidden_Value = v
 }
 
 type LabelMatcher_builder struct {
@@ -1393,23 +1361,23 @@ func (b0 LabelMatcher_builder) Build() *LabelMatcher {
 	m0 := &LabelMatcher{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.Type = b.Type
-	x.Name = b.Name
-	x.Value = b.Value
+	x.xxx_hidden_Type = b.Type
+	x.xxx_hidden_Name = b.Name
+	x.xxx_hidden_Value = b.Value
 	return m0
 }
 
 type ReadHints struct {
-	state         protoimpl.MessageState `protogen:"hybrid.v1"`
-	StepMs        int64                  `protobuf:"varint,1,opt,name=step_ms,json=stepMs,proto3" json:"step_ms,omitempty"`    // Query step size in milliseconds.
-	Func          string                 `protobuf:"bytes,2,opt,name=func,proto3" json:"func,omitempty"`                       // String representation of surrounding function or aggregation.
-	StartMs       int64                  `protobuf:"varint,3,opt,name=start_ms,json=startMs,proto3" json:"start_ms,omitempty"` // Start time in milliseconds.
-	EndMs         int64                  `protobuf:"varint,4,opt,name=end_ms,json=endMs,proto3" json:"end_ms,omitempty"`       // End time in milliseconds.
-	Grouping      []string               `protobuf:"bytes,5,rep,name=grouping,proto3" json:"grouping,omitempty"`               // List of label names used in aggregation.
-	By            bool                   `protobuf:"varint,6,opt,name=by,proto3" json:"by,omitempty"`                          // Indicate whether it is without or by.
-	RangeMs       int64                  `protobuf:"varint,7,opt,name=range_ms,json=rangeMs,proto3" json:"range_ms,omitempty"` // Range vector selector range in milliseconds.
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state               protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_StepMs   int64                  `protobuf:"varint,1,opt,name=step_ms,json=stepMs,proto3"`
+	xxx_hidden_Func     string                 `protobuf:"bytes,2,opt,name=func,proto3"`
+	xxx_hidden_StartMs  int64                  `protobuf:"varint,3,opt,name=start_ms,json=startMs,proto3"`
+	xxx_hidden_EndMs    int64                  `protobuf:"varint,4,opt,name=end_ms,json=endMs,proto3"`
+	xxx_hidden_Grouping []string               `protobuf:"bytes,5,rep,name=grouping,proto3"`
+	xxx_hidden_By       bool                   `protobuf:"varint,6,opt,name=by,proto3"`
+	xxx_hidden_RangeMs  int64                  `protobuf:"varint,7,opt,name=range_ms,json=rangeMs,proto3"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *ReadHints) Reset() {
@@ -1439,79 +1407,79 @@ func (x *ReadHints) ProtoReflect() protoreflect.Message {
 
 func (x *ReadHints) GetStepMs() int64 {
 	if x != nil {
-		return x.StepMs
+		return x.xxx_hidden_StepMs
 	}
 	return 0
 }
 
 func (x *ReadHints) GetFunc() string {
 	if x != nil {
-		return x.Func
+		return x.xxx_hidden_Func
 	}
 	return ""
 }
 
 func (x *ReadHints) GetStartMs() int64 {
 	if x != nil {
-		return x.StartMs
+		return x.xxx_hidden_StartMs
 	}
 	return 0
 }
 
 func (x *ReadHints) GetEndMs() int64 {
 	if x != nil {
-		return x.EndMs
+		return x.xxx_hidden_EndMs
 	}
 	return 0
 }
 
 func (x *ReadHints) GetGrouping() []string {
 	if x != nil {
-		return x.Grouping
+		return x.xxx_hidden_Grouping
 	}
 	return nil
 }
 
 func (x *ReadHints) GetBy() bool {
 	if x != nil {
-		return x.By
+		return x.xxx_hidden_By
 	}
 	return false
 }
 
 func (x *ReadHints) GetRangeMs() int64 {
 	if x != nil {
-		return x.RangeMs
+		return x.xxx_hidden_RangeMs
 	}
 	return 0
 }
 
 func (x *ReadHints) SetStepMs(v int64) {
-	x.StepMs = v
+	x.xxx_hidden_StepMs = v
 }
 
 func (x *ReadHints) SetFunc(v string) {
-	x.Func = v
+	x.xxx_hidden_Func = v
 }
 
 func (x *ReadHints) SetStartMs(v int64) {
-	x.StartMs = v
+	x.xxx_hidden_StartMs = v
 }
 
 func (x *ReadHints) SetEndMs(v int64) {
-	x.EndMs = v
+	x.xxx_hidden_EndMs = v
 }
 
 func (x *ReadHints) SetGrouping(v []string) {
-	x.Grouping = v
+	x.xxx_hidden_Grouping = v
 }
 
 func (x *ReadHints) SetBy(v bool) {
-	x.By = v
+	x.xxx_hidden_By = v
 }
 
 func (x *ReadHints) SetRangeMs(v int64) {
-	x.RangeMs = v
+	x.xxx_hidden_RangeMs = v
 }
 
 type ReadHints_builder struct {
@@ -1530,26 +1498,26 @@ func (b0 ReadHints_builder) Build() *ReadHints {
 	m0 := &ReadHints{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.StepMs = b.StepMs
-	x.Func = b.Func
-	x.StartMs = b.StartMs
-	x.EndMs = b.EndMs
-	x.Grouping = b.Grouping
-	x.By = b.By
-	x.RangeMs = b.RangeMs
+	x.xxx_hidden_StepMs = b.StepMs
+	x.xxx_hidden_Func = b.Func
+	x.xxx_hidden_StartMs = b.StartMs
+	x.xxx_hidden_EndMs = b.EndMs
+	x.xxx_hidden_Grouping = b.Grouping
+	x.xxx_hidden_By = b.By
+	x.xxx_hidden_RangeMs = b.RangeMs
 	return m0
 }
 
 // Chunk represents a TSDB chunk.
 // Time range [min, max] is inclusive.
 type Chunk struct {
-	state         protoimpl.MessageState `protogen:"hybrid.v1"`
-	MinTimeMs     int64                  `protobuf:"varint,1,opt,name=min_time_ms,json=minTimeMs,proto3" json:"min_time_ms,omitempty"`
-	MaxTimeMs     int64                  `protobuf:"varint,2,opt,name=max_time_ms,json=maxTimeMs,proto3" json:"max_time_ms,omitempty"`
-	Type          Chunk_Encoding         `protobuf:"varint,3,opt,name=type,proto3,enum=prometheus.Chunk_Encoding" json:"type,omitempty"`
-	Data          []byte                 `protobuf:"bytes,4,opt,name=data,proto3" json:"data,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_MinTimeMs int64                  `protobuf:"varint,1,opt,name=min_time_ms,json=minTimeMs,proto3"`
+	xxx_hidden_MaxTimeMs int64                  `protobuf:"varint,2,opt,name=max_time_ms,json=maxTimeMs,proto3"`
+	xxx_hidden_Type      Chunk_Encoding         `protobuf:"varint,3,opt,name=type,proto3,enum=prometheus.Chunk_Encoding"`
+	xxx_hidden_Data      []byte                 `protobuf:"bytes,4,opt,name=data,proto3"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *Chunk) Reset() {
@@ -1579,49 +1547,49 @@ func (x *Chunk) ProtoReflect() protoreflect.Message {
 
 func (x *Chunk) GetMinTimeMs() int64 {
 	if x != nil {
-		return x.MinTimeMs
+		return x.xxx_hidden_MinTimeMs
 	}
 	return 0
 }
 
 func (x *Chunk) GetMaxTimeMs() int64 {
 	if x != nil {
-		return x.MaxTimeMs
+		return x.xxx_hidden_MaxTimeMs
 	}
 	return 0
 }
 
 func (x *Chunk) GetType() Chunk_Encoding {
 	if x != nil {
-		return x.Type
+		return x.xxx_hidden_Type
 	}
 	return Chunk_UNKNOWN
 }
 
 func (x *Chunk) GetData() []byte {
 	if x != nil {
-		return x.Data
+		return x.xxx_hidden_Data
 	}
 	return nil
 }
 
 func (x *Chunk) SetMinTimeMs(v int64) {
-	x.MinTimeMs = v
+	x.xxx_hidden_MinTimeMs = v
 }
 
 func (x *Chunk) SetMaxTimeMs(v int64) {
-	x.MaxTimeMs = v
+	x.xxx_hidden_MaxTimeMs = v
 }
 
 func (x *Chunk) SetType(v Chunk_Encoding) {
-	x.Type = v
+	x.xxx_hidden_Type = v
 }
 
 func (x *Chunk) SetData(v []byte) {
 	if v == nil {
 		v = []byte{}
 	}
-	x.Data = v
+	x.xxx_hidden_Data = v
 }
 
 type Chunk_builder struct {
@@ -1637,22 +1605,20 @@ func (b0 Chunk_builder) Build() *Chunk {
 	m0 := &Chunk{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.MinTimeMs = b.MinTimeMs
-	x.MaxTimeMs = b.MaxTimeMs
-	x.Type = b.Type
-	x.Data = b.Data
+	x.xxx_hidden_MinTimeMs = b.MinTimeMs
+	x.xxx_hidden_MaxTimeMs = b.MaxTimeMs
+	x.xxx_hidden_Type = b.Type
+	x.xxx_hidden_Data = b.Data
 	return m0
 }
 
 // ChunkedSeries represents single, encoded time series.
 type ChunkedSeries struct {
-	state protoimpl.MessageState `protogen:"hybrid.v1"`
-	// Labels should be sorted.
-	Labels []*Label `protobuf:"bytes,1,rep,name=labels,proto3" json:"labels,omitempty"`
-	// Chunks will be in start time order and may overlap.
-	Chunks        []*Chunk `protobuf:"bytes,2,rep,name=chunks,proto3" json:"chunks,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state             protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Labels *[]*Label              `protobuf:"bytes,1,rep,name=labels,proto3"`
+	xxx_hidden_Chunks *[]*Chunk              `protobuf:"bytes,2,rep,name=chunks,proto3"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *ChunkedSeries) Reset() {
@@ -1682,24 +1648,28 @@ func (x *ChunkedSeries) ProtoReflect() protoreflect.Message {
 
 func (x *ChunkedSeries) GetLabels() []*Label {
 	if x != nil {
-		return x.Labels
+		if x.xxx_hidden_Labels != nil {
+			return *x.xxx_hidden_Labels
+		}
 	}
 	return nil
 }
 
 func (x *ChunkedSeries) GetChunks() []*Chunk {
 	if x != nil {
-		return x.Chunks
+		if x.xxx_hidden_Chunks != nil {
+			return *x.xxx_hidden_Chunks
+		}
 	}
 	return nil
 }
 
 func (x *ChunkedSeries) SetLabels(v []*Label) {
-	x.Labels = v
+	x.xxx_hidden_Labels = &v
 }
 
 func (x *ChunkedSeries) SetChunks(v []*Chunk) {
-	x.Chunks = v
+	x.xxx_hidden_Chunks = &v
 }
 
 type ChunkedSeries_builder struct {
@@ -1715,8 +1685,8 @@ func (b0 ChunkedSeries_builder) Build() *ChunkedSeries {
 	m0 := &ChunkedSeries{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.Labels = b.Labels
-	x.Chunks = b.Chunks
+	x.xxx_hidden_Labels = &b.Labels
+	x.xxx_hidden_Chunks = &b.Chunks
 	return m0
 }
 
@@ -1921,10 +1891,10 @@ func file_types_proto_init() {
 		return
 	}
 	file_types_proto_msgTypes[3].OneofWrappers = []any{
-		(*Histogram_CountInt)(nil),
-		(*Histogram_CountFloat)(nil),
-		(*Histogram_ZeroCountInt)(nil),
-		(*Histogram_ZeroCountFloat)(nil),
+		(*histogram_CountInt)(nil),
+		(*histogram_CountFloat)(nil),
+		(*histogram_ZeroCountInt)(nil),
+		(*histogram_ZeroCountFloat)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
