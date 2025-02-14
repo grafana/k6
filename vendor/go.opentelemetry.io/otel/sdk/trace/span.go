@@ -639,10 +639,7 @@ func (s *recordingSpan) dedupeAttrsFromRecord(record map[attribute.Key]int) {
 			record[a.Key] = len(unique) - 1
 		}
 	}
-	// s.attributes have element types of attribute.KeyValue. These types are
-	// not pointers and they themselves do not contain pointer fields,
-	// therefore the duplicate values do not need to be zeroed for them to be
-	// garbage collected.
+	clear(s.attributes[len(unique):]) // Erase unneeded elements to let GC collect objects.
 	s.attributes = unique
 }
 
