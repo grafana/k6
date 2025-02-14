@@ -9,11 +9,14 @@ require (
 	github.com/PuerkitoBio/goquery v1.9.2
 	github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
 	github.com/andybalholm/brotli v1.1.1
+	github.com/chromedp/cdproto v0.0.0-20240919203636-12af5e8a671f
 	github.com/evanw/esbuild v0.24.2
 	github.com/fatih/color v1.18.0
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible
 	github.com/golang/protobuf v1.5.4
+	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
+	github.com/grafana/sobek v0.0.0-20241024150027-d91f02b05e9b
 	github.com/grafana/xk6-dashboard v0.7.5
 	github.com/grafana/xk6-output-opentelemetry v0.3.0
 	github.com/grafana/xk6-redis v0.3.3
@@ -46,6 +49,7 @@ require (
 	golang.org/x/crypto v0.32.0
 	golang.org/x/crypto/x509roots/fallback v0.0.0-20250116161740-71d3a4cfdb03
 	golang.org/x/net v0.34.0
+	golang.org/x/sync v0.10.0
 	golang.org/x/term v0.28.0
 	golang.org/x/time v0.9.0
 	google.golang.org/grpc v1.69.4
@@ -62,7 +66,6 @@ require (
 	github.com/bufbuild/protocompile v0.14.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/chromedp/cdproto v0.0.0-20240919203636-12af5e8a671f
 	github.com/chromedp/sysutil v1.0.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
@@ -70,8 +73,6 @@ require (
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/pprof v0.0.0-20230728192033-2ba5b33183c6 // indirect
-	github.com/google/uuid v1.6.0
-	github.com/grafana/sobek v0.0.0-20241024150027-d91f02b05e9b
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.22.0 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
@@ -92,7 +93,6 @@ require (
 	go.opentelemetry.io/otel/metric v1.31.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.31.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.3.1 // indirect
-	golang.org/x/sync v0.10.0
 	golang.org/x/sys v0.29.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20241015192408-796eee8c2d53 // indirect
