@@ -43,7 +43,7 @@ func newRootCommand(gs *state.GlobalState) *rootCommand {
 	rootCmd := &cobra.Command{
 		Use:               gs.BinaryName,
 		Short:             "a next-generation load generator",
-		Long:              "\n" + getBanner(gs.Flags.NoColor || !gs.Stdout.IsTTY),
+		Long:              "\n" + getBanner(gs.Flags.NoColor || !gs.Stdout.IsTTY, isTrueColor(gs.Env)),
 		SilenceUsage:      true,
 		SilenceErrors:     true,
 		PersistentPreRunE: c.persistentPreRunE,

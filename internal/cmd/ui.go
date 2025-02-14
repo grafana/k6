@@ -50,9 +50,25 @@ func getColor(noColor bool, attributes ...color.Attribute) *color.Color {
 	return setColor(noColor, color.New(attributes...))
 }
 
-func getBanner(noColor bool) string {
-	c := setColor(noColor, color.RGB(0xFF, 0x67, 0x1d).Add(color.Bold))
+func getBanner(noColor bool, isTrueColor bool) string {
+	c := color.New(color.FgYellow)
+	if isTrueColor {
+		c = color.RGB(0xFF, 0x67, 0x1d).Add(color.Bold)
+	}
+	c = setColor(noColor, c)
 	return c.Sprint(consts.Banner())
+}
+
+// isTrueColor returns true if the terminal supports true color (24-bit color).
+func isTrueColor(env map[string]string) bool {
+	if v := env["COLORTERM"]; v == "truecolor" || v == "24bit" { // for most terminals
+		return true
+	}
+	if v := env["ConEmuANSI"]; v == "ON" { // for Windows
+		return true
+	}
+	// TODO: Improve this detection.
+	return false
 }
 
 func printBanner(gs *state.GlobalState) {
@@ -60,7 +76,7 @@ func printBanner(gs *state.GlobalState) {
 		return // do not print banner when --quiet is enabled
 	}
 
-	banner := getBanner(gs.Flags.NoColor || !gs.Stdout.IsTTY)
+	banner := getBanner(gs.Flags.NoColor || !gs.Stdout.IsTTY, isTrueColor(gs.Env))
 	_, err := fmt.Fprintf(gs.Stdout, "\n%s\n\n", banner)
 	if err != nil {
 		gs.Logger.Warnf("could not print k6 banner message to stdout: %s", err.Error())
