@@ -97,8 +97,8 @@ func span(sd tracesdk.ReadOnlySpan) *tracepb.Span {
 		SpanId:                 sid[:],
 		TraceState:             sd.SpanContext().TraceState().String(),
 		Status:                 status(sd.Status().Code, sd.Status().Description),
-		StartTimeUnixNano:      uint64(sd.StartTime().UnixNano()),
-		EndTimeUnixNano:        uint64(sd.EndTime().UnixNano()),
+		StartTimeUnixNano:      uint64(max(0, sd.StartTime().UnixNano())), // nolint:gosec // Overflow checked.
+		EndTimeUnixNano:        uint64(max(0, sd.EndTime().UnixNano())),   // nolint:gosec // Overflow checked.
 		Links:                  links(sd.Links()),
 		Kind:                   spanKind(sd.SpanKind()),
 		Name:                   sd.Name(),
@@ -178,7 +178,7 @@ func buildSpanFlags(sc trace.SpanContext) uint32 {
 		flags |= tracepb.SpanFlags_SPAN_FLAGS_CONTEXT_IS_REMOTE_MASK
 	}
 
-	return uint32(flags)
+	return uint32(flags) // nolint:gosec // Flags is a bitmask and can't be negative
 }
 
 // spanEvents transforms span Events to an OTLP span events.
@@ -192,7 +192,7 @@ func spanEvents(es []tracesdk.Event) []*tracepb.Span_Event {
 	for i := 0; i < len(es); i++ {
 		events[i] = &tracepb.Span_Event{
 			Name:                   es[i].Name,
-			TimeUnixNano:           uint64(es[i].Time.UnixNano()),
+			TimeUnixNano:           uint64(max(0, es[i].Time.UnixNano())), // nolint:gosec // Overflow checked.
 			Attributes:             KeyValues(es[i].Attributes),
 			DroppedAttributesCount: clampUint32(es[i].DroppedAttributeCount),
 		}
