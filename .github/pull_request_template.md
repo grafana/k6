@@ -13,7 +13,6 @@ If you haven't read the contributing guidelines https://github.com/grafana/k6/bl
 and code of conduct https://github.com/grafana/k6/blob/master/CODE_OF_CONDUCT.md yet, please do so
 -->
 
-- [ ] I have added the correct milestone to my PR.
 - [ ] I have performed a self-review of my code.
 - [ ] I have commented on my code, particularly in hard-to-understand areas.
 - [ ] I have added tests for my changes.
@@ -23,6 +22,7 @@ and code of conduct https://github.com/grafana/k6/blob/master/CODE_OF_CONDUCT.md
 
 **Please do not merge this PR until the following items are filled out.**
 
+- [ ] I have added the correct milestone to my PR.
 - [ ] I have updated the k6-documentation: _link_
 - [ ] I have updated the TypeScript definitions: _link_
 - [ ] I have updated the release notes: _link_
