@@ -32,7 +32,7 @@
 // 	protoc        (unknown)
 // source: gogoproto/gogo.proto
 
-//go:build !protoopaque
+//go:build protoopaque
 
 package gogoproto
 

@@ -17,7 +17,7 @@
 // 	protoc        (unknown)
 // source: remote.proto
 
-//go:build !protoopaque
+//go:build protoopaque
 
 package _go
 
@@ -92,11 +92,11 @@ func (x ReadRequest_ResponseType) Number() protoreflect.EnumNumber {
 }
 
 type WriteRequest struct {
-	state         protoimpl.MessageState `protogen:"hybrid.v1"`
-	Timeseries    []*TimeSeries          `protobuf:"bytes,1,rep,name=timeseries,proto3" json:"timeseries,omitempty"`
-	Metadata      []*MetricMetadata      `protobuf:"bytes,3,rep,name=metadata,proto3" json:"metadata,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                 protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Timeseries *[]*TimeSeries         `protobuf:"bytes,1,rep,name=timeseries,proto3"`
+	xxx_hidden_Metadata   *[]*MetricMetadata     `protobuf:"bytes,3,rep,name=metadata,proto3"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *WriteRequest) Reset() {
@@ -126,24 +126,28 @@ func (x *WriteRequest) ProtoReflect() protoreflect.Message {
 
 func (x *WriteRequest) GetTimeseries() []*TimeSeries {
 	if x != nil {
-		return x.Timeseries
+		if x.xxx_hidden_Timeseries != nil {
+			return *x.xxx_hidden_Timeseries
+		}
 	}
 	return nil
 }
 
 func (x *WriteRequest) GetMetadata() []*MetricMetadata {
 	if x != nil {
-		return x.Metadata
+		if x.xxx_hidden_Metadata != nil {
+			return *x.xxx_hidden_Metadata
+		}
 	}
 	return nil
 }
 
 func (x *WriteRequest) SetTimeseries(v []*TimeSeries) {
-	x.Timeseries = v
+	x.xxx_hidden_Timeseries = &v
 }
 
 func (x *WriteRequest) SetMetadata(v []*MetricMetadata) {
-	x.Metadata = v
+	x.xxx_hidden_Metadata = &v
 }
 
 type WriteRequest_builder struct {
@@ -157,23 +161,18 @@ func (b0 WriteRequest_builder) Build() *WriteRequest {
 	m0 := &WriteRequest{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.Timeseries = b.Timeseries
-	x.Metadata = b.Metadata
+	x.xxx_hidden_Timeseries = &b.Timeseries
+	x.xxx_hidden_Metadata = &b.Metadata
 	return m0
 }
 
 // ReadRequest represents a remote read request.
 type ReadRequest struct {
-	state   protoimpl.MessageState `protogen:"hybrid.v1"`
-	Queries []*Query               `protobuf:"bytes,1,rep,name=queries,proto3" json:"queries,omitempty"`
-	// accepted_response_types allows negotiating the content type of the response.
-	//
-	// Response types are taken from the list in the FIFO order. If no response type in `accepted_response_types` is
-	// implemented by server, error is returned.
-	// For request that do not contain `accepted_response_types` field the SAMPLES response type will be used.
-	AcceptedResponseTypes []ReadRequest_ResponseType `protobuf:"varint,2,rep,packed,name=accepted_response_types,json=acceptedResponseTypes,proto3,enum=prometheus.ReadRequest_ResponseType" json:"accepted_response_types,omitempty"`
-	unknownFields         protoimpl.UnknownFields
-	sizeCache             protoimpl.SizeCache
+	state                            protoimpl.MessageState     `protogen:"opaque.v1"`
+	xxx_hidden_Queries               *[]*Query                  `protobuf:"bytes,1,rep,name=queries,proto3"`
+	xxx_hidden_AcceptedResponseTypes []ReadRequest_ResponseType `protobuf:"varint,2,rep,packed,name=accepted_response_types,json=acceptedResponseTypes,proto3,enum=prometheus.ReadRequest_ResponseType"`
+	unknownFields                    protoimpl.UnknownFields
+	sizeCache                        protoimpl.SizeCache
 }
 
 func (x *ReadRequest) Reset() {
@@ -203,24 +202,26 @@ func (x *ReadRequest) ProtoReflect() protoreflect.Message {
 
 func (x *ReadRequest) GetQueries() []*Query {
 	if x != nil {
-		return x.Queries
+		if x.xxx_hidden_Queries != nil {
+			return *x.xxx_hidden_Queries
+		}
 	}
 	return nil
 }
 
 func (x *ReadRequest) GetAcceptedResponseTypes() []ReadRequest_ResponseType {
 	if x != nil {
-		return x.AcceptedResponseTypes
+		return x.xxx_hidden_AcceptedResponseTypes
 	}
 	return nil
 }
 
 func (x *ReadRequest) SetQueries(v []*Query) {
-	x.Queries = v
+	x.xxx_hidden_Queries = &v
 }
 
 func (x *ReadRequest) SetAcceptedResponseTypes(v []ReadRequest_ResponseType) {
-	x.AcceptedResponseTypes = v
+	x.xxx_hidden_AcceptedResponseTypes = v
 }
 
 type ReadRequest_builder struct {
@@ -239,18 +240,17 @@ func (b0 ReadRequest_builder) Build() *ReadRequest {
 	m0 := &ReadRequest{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.Queries = b.Queries
-	x.AcceptedResponseTypes = b.AcceptedResponseTypes
+	x.xxx_hidden_Queries = &b.Queries
+	x.xxx_hidden_AcceptedResponseTypes = b.AcceptedResponseTypes
 	return m0
 }
 
 // ReadResponse is a response when response_type equals SAMPLES.
 type ReadResponse struct {
-	state protoimpl.MessageState `protogen:"hybrid.v1"`
-	// In same order as the request's queries.
-	Results       []*QueryResult `protobuf:"bytes,1,rep,name=results,proto3" json:"results,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state              protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Results *[]*QueryResult        `protobuf:"bytes,1,rep,name=results,proto3"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *ReadResponse) Reset() {
@@ -280,13 +280,15 @@ func (x *ReadResponse) ProtoReflect() protoreflect.Message {
 
 func (x *ReadResponse) GetResults() []*QueryResult {
 	if x != nil {
-		return x.Results
+		if x.xxx_hidden_Results != nil {
+			return *x.xxx_hidden_Results
+		}
 	}
 	return nil
 }
 
 func (x *ReadResponse) SetResults(v []*QueryResult) {
-	x.Results = v
+	x.xxx_hidden_Results = &v
 }
 
 type ReadResponse_builder struct {
@@ -300,18 +302,18 @@ func (b0 ReadResponse_builder) Build() *ReadResponse {
 	m0 := &ReadResponse{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.Results = b.Results
+	x.xxx_hidden_Results = &b.Results
 	return m0
 }
 
 type Query struct {
-	state            protoimpl.MessageState `protogen:"hybrid.v1"`
-	StartTimestampMs int64                  `protobuf:"varint,1,opt,name=start_timestamp_ms,json=startTimestampMs,proto3" json:"start_timestamp_ms,omitempty"`
-	EndTimestampMs   int64                  `protobuf:"varint,2,opt,name=end_timestamp_ms,json=endTimestampMs,proto3" json:"end_timestamp_ms,omitempty"`
-	Matchers         []*LabelMatcher        `protobuf:"bytes,3,rep,name=matchers,proto3" json:"matchers,omitempty"`
-	Hints            *ReadHints             `protobuf:"bytes,4,opt,name=hints,proto3" json:"hints,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state                       protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_StartTimestampMs int64                  `protobuf:"varint,1,opt,name=start_timestamp_ms,json=startTimestampMs,proto3"`
+	xxx_hidden_EndTimestampMs   int64                  `protobuf:"varint,2,opt,name=end_timestamp_ms,json=endTimestampMs,proto3"`
+	xxx_hidden_Matchers         *[]*LabelMatcher       `protobuf:"bytes,3,rep,name=matchers,proto3"`
+	xxx_hidden_Hints            *ReadHints             `protobuf:"bytes,4,opt,name=hints,proto3"`
+	unknownFields               protoimpl.UnknownFields
+	sizeCache                   protoimpl.SizeCache
 }
 
 func (x *Query) Reset() {
@@ -341,57 +343,59 @@ func (x *Query) ProtoReflect() protoreflect.Message {
 
 func (x *Query) GetStartTimestampMs() int64 {
 	if x != nil {
-		return x.StartTimestampMs
+		return x.xxx_hidden_StartTimestampMs
 	}
 	return 0
 }
 
 func (x *Query) GetEndTimestampMs() int64 {
 	if x != nil {
-		return x.EndTimestampMs
+		return x.xxx_hidden_EndTimestampMs
 	}
 	return 0
 }
 
 func (x *Query) GetMatchers() []*LabelMatcher {
 	if x != nil {
-		return x.Matchers
+		if x.xxx_hidden_Matchers != nil {
+			return *x.xxx_hidden_Matchers
+		}
 	}
 	return nil
 }
 
 func (x *Query) GetHints() *ReadHints {
 	if x != nil {
-		return x.Hints
+		return x.xxx_hidden_Hints
 	}
 	return nil
 }
 
 func (x *Query) SetStartTimestampMs(v int64) {
-	x.StartTimestampMs = v
+	x.xxx_hidden_StartTimestampMs = v
 }
 
 func (x *Query) SetEndTimestampMs(v int64) {
-	x.EndTimestampMs = v
+	x.xxx_hidden_EndTimestampMs = v
 }
 
 func (x *Query) SetMatchers(v []*LabelMatcher) {
-	x.Matchers = v
+	x.xxx_hidden_Matchers = &v
 }
 
 func (x *Query) SetHints(v *ReadHints) {
-	x.Hints = v
+	x.xxx_hidden_Hints = v
 }
 
 func (x *Query) HasHints() bool {
 	if x == nil {
 		return false
 	}
-	return x.Hints != nil
+	return x.xxx_hidden_Hints != nil
 }
 
 func (x *Query) ClearHints() {
-	x.Hints = nil
+	x.xxx_hidden_Hints = nil
 }
 
 type Query_builder struct {
@@ -407,19 +411,18 @@ func (b0 Query_builder) Build() *Query {
 	m0 := &Query{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.StartTimestampMs = b.StartTimestampMs
-	x.EndTimestampMs = b.EndTimestampMs
-	x.Matchers = b.Matchers
-	x.Hints = b.Hints
+	x.xxx_hidden_StartTimestampMs = b.StartTimestampMs
+	x.xxx_hidden_EndTimestampMs = b.EndTimestampMs
+	x.xxx_hidden_Matchers = &b.Matchers
+	x.xxx_hidden_Hints = b.Hints
 	return m0
 }
 
 type QueryResult struct {
-	state protoimpl.MessageState `protogen:"hybrid.v1"`
-	// Samples within a time series must be ordered by time.
-	Timeseries    []*TimeSeries `protobuf:"bytes,1,rep,name=timeseries,proto3" json:"timeseries,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                 protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Timeseries *[]*TimeSeries         `protobuf:"bytes,1,rep,name=timeseries,proto3"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *QueryResult) Reset() {
@@ -449,13 +452,15 @@ func (x *QueryResult) ProtoReflect() protoreflect.Message {
 
 func (x *QueryResult) GetTimeseries() []*TimeSeries {
 	if x != nil {
-		return x.Timeseries
+		if x.xxx_hidden_Timeseries != nil {
+			return *x.xxx_hidden_Timeseries
+		}
 	}
 	return nil
 }
 
 func (x *QueryResult) SetTimeseries(v []*TimeSeries) {
-	x.Timeseries = v
+	x.xxx_hidden_Timeseries = &v
 }
 
 type QueryResult_builder struct {
@@ -469,7 +474,7 @@ func (b0 QueryResult_builder) Build() *QueryResult {
 	m0 := &QueryResult{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.Timeseries = b.Timeseries
+	x.xxx_hidden_Timeseries = &b.Timeseries
 	return m0
 }
 
@@ -478,12 +483,11 @@ func (b0 QueryResult_builder) Build() *QueryResult {
 // partition of the single series, but once a new series is started to be streamed it means that no more chunks will
 // be sent for previous one. Series are returned sorted in the same way TSDB block are internally.
 type ChunkedReadResponse struct {
-	state         protoimpl.MessageState `protogen:"hybrid.v1"`
-	ChunkedSeries []*ChunkedSeries       `protobuf:"bytes,1,rep,name=chunked_series,json=chunkedSeries,proto3" json:"chunked_series,omitempty"`
-	// query_index represents an index of the query from ReadRequest.queries these chunks relates to.
-	QueryIndex    int64 `protobuf:"varint,2,opt,name=query_index,json=queryIndex,proto3" json:"query_index,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                    protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_ChunkedSeries *[]*ChunkedSeries      `protobuf:"bytes,1,rep,name=chunked_series,json=chunkedSeries,proto3"`
+	xxx_hidden_QueryIndex    int64                  `protobuf:"varint,2,opt,name=query_index,json=queryIndex,proto3"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
 }
 
 func (x *ChunkedReadResponse) Reset() {
@@ -513,24 +517,26 @@ func (x *ChunkedReadResponse) ProtoReflect() protoreflect.Message {
 
 func (x *ChunkedReadResponse) GetChunkedSeries() []*ChunkedSeries {
 	if x != nil {
-		return x.ChunkedSeries
+		if x.xxx_hidden_ChunkedSeries != nil {
+			return *x.xxx_hidden_ChunkedSeries
+		}
 	}
 	return nil
 }
 
 func (x *ChunkedReadResponse) GetQueryIndex() int64 {
 	if x != nil {
-		return x.QueryIndex
+		return x.xxx_hidden_QueryIndex
 	}
 	return 0
 }
 
 func (x *ChunkedReadResponse) SetChunkedSeries(v []*ChunkedSeries) {
-	x.ChunkedSeries = v
+	x.xxx_hidden_ChunkedSeries = &v
 }
 
 func (x *ChunkedReadResponse) SetQueryIndex(v int64) {
-	x.QueryIndex = v
+	x.xxx_hidden_QueryIndex = v
 }
 
 type ChunkedReadResponse_builder struct {
@@ -545,8 +551,8 @@ func (b0 ChunkedReadResponse_builder) Build() *ChunkedReadResponse {
 	m0 := &ChunkedReadResponse{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.ChunkedSeries = b.ChunkedSeries
-	x.QueryIndex = b.QueryIndex
+	x.xxx_hidden_ChunkedSeries = &b.ChunkedSeries
+	x.xxx_hidden_QueryIndex = b.QueryIndex
 	return m0
 }
 
