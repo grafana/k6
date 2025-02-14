@@ -19,7 +19,7 @@ and code of conduct https://github.com/grafana/k6/blob/master/CODE_OF_CONDUCT.md
 - [ ] I have added tests for my changes.
 - [ ] I have run linter and tests locally (`make lint` and `make tests`) and all pass.
 
-## Checklist: Documentation (if relevant)
+## Checklist: Documentation (only for k6 maintainers and if relevant)
 
 **Please do not merge this PR until the following items are filled out.**
 
