@@ -25,6 +25,7 @@ type ExtensionType uint8
 const (
 	JSExtension ExtensionType = iota + 1
 	OutputExtension
+	SecretSourceExtension
 )
 
 func (e ExtensionType) String() string {
@@ -34,6 +35,8 @@ func (e ExtensionType) String() string {
 		s = "js"
 	case OutputExtension:
 		s = "output"
+	case SecretSourceExtension:
+		s = "secret-source"
 	}
 	return s
 }
@@ -157,4 +160,5 @@ func extractModuleInfo(mod interface{}) (path, version string) {
 func init() {
 	extensions[JSExtension] = make(map[string]*Extension)
 	extensions[OutputExtension] = make(map[string]*Extension)
+	extensions[SecretSourceExtension] = make(map[string]*Extension)
 }
