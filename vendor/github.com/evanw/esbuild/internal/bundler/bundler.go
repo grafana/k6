@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"sort"
 	"strings"
 	"sync"
@@ -189,7 +190,7 @@ func parseFile(args parseArgs) {
 
 	// The special "default" loader determines the loader from the file path
 	if loader == config.LoaderDefault {
-		loader = loaderFromFileExtension(args.options.ExtensionToLoader, base+ext)
+		loader = config.LoaderFromFileExtension(args.options.ExtensionToLoader, base+ext)
 	}
 
 	// Reject unsupported import attributes when the loader isn't "copy" (since
@@ -322,6 +323,7 @@ func parseFile(args parseArgs) {
 		result.ok = ok
 
 	case config.LoaderText:
+		source.Contents = strings.TrimPrefix(source.Contents, "\xEF\xBB\xBF") // Strip any UTF-8 BOM from the text
 		encoded := base64.StdEncoding.EncodeToString([]byte(source.Contents))
 		expr := js_ast.Expr{Data: &js_ast.EString{Value: helpers.StringToUTF16(source.Contents)}}
 		ast := js_parser.LazyExportAST(args.log, source, js_parser.OptionsFromConfig(&args.options), expr, "")
@@ -643,16 +645,10 @@ func parseFile(args parseArgs) {
 						// Attempt to fill in null entries using the file system
 						for i, source := range sourceMap.Sources {
 							if sourceMap.SourcesContent[i].Value == nil {
-								var absPath string
-								if args.fs.IsAbs(source) {
-									absPath = source
-								} else if path.Namespace == "file" {
-									absPath = args.fs.Join(args.fs.Dir(path.Text), source)
-								} else {
-									continue
-								}
-								if contents, err, _ := args.caches.FSCache.ReadFile(args.fs, absPath); err == nil {
-									sourceMap.SourcesContent[i].Value = helpers.StringToUTF16(contents)
+								if sourceURL, err := url.Parse(source); err == nil && helpers.IsFileURL(sourceURL) {
+									if contents, err, _ := args.caches.FSCache.ReadFile(args.fs, helpers.FilePathFromFileURL(args.fs, sourceURL)); err == nil {
+										sourceMap.SourcesContent[i].Value = helpers.StringToUTF16(contents)
+									}
 								}
 							}
 						}
@@ -814,38 +810,68 @@ func extractSourceMapFromComment(
 ) (logger.Path, *string) {
 	// Support data URLs
 	if parsed, ok := resolver.ParseDataURL(comment.Text); ok {
-		if contents, err := parsed.DecodeData(); err == nil {
-			return logger.Path{Text: source.PrettyPath, IgnoredSuffix: "#sourceMappingURL"}, &contents
-		} else {
+		contents, err := parsed.DecodeData()
+		if err != nil {
 			log.AddID(logger.MsgID_SourceMap_UnsupportedSourceMapComment, logger.Warning, tracker, comment.Range,
 				fmt.Sprintf("Unsupported source map comment: %s", err.Error()))
 			return logger.Path{}, nil
 		}
+		return logger.Path{Text: source.PrettyPath, IgnoredSuffix: "#sourceMappingURL"}, &contents
 	}
 
-	// Relative path in a file with an absolute path
-	if absResolveDir != "" {
-		absPath := fs.Join(absResolveDir, comment.Text)
-		path := logger.Path{Text: absPath, Namespace: "file"}
-		contents, err, originalError := fsCache.ReadFile(fs, absPath)
-		if log.Level <= logger.LevelDebug && originalError != nil {
-			log.AddID(logger.MsgID_None, logger.Debug, tracker, comment.Range, fmt.Sprintf("Failed to read file %q: %s", resolver.PrettyPath(fs, path), originalError.Error()))
+	// Support file URLs of two forms:
+	//
+	//   Relative: "./foo.js.map"
+	//   Absolute: "file:///Users/User/Desktop/foo.js.map"
+	//
+	var absPath string
+	if commentURL, err := url.Parse(comment.Text); err != nil {
+		// Show a warning if the comment can't be parsed as a URL
+		log.AddID(logger.MsgID_SourceMap_UnsupportedSourceMapComment, logger.Warning, tracker, comment.Range,
+			fmt.Sprintf("Unsupported source map comment: %s", err.Error()))
+		return logger.Path{}, nil
+	} else if commentURL.Scheme != "" && commentURL.Scheme != "file" {
+		// URLs with schemes other than "file" are unsupported (e.g. "https"),
+		// but don't warn the user about this because it's not a bug they can fix
+		log.AddID(logger.MsgID_SourceMap_UnsupportedSourceMapComment, logger.Debug, tracker, comment.Range,
+			fmt.Sprintf("Unsupported source map comment: Unsupported URL scheme %q", commentURL.Scheme))
+		return logger.Path{}, nil
+	} else if commentURL.Host != "" && commentURL.Host != "localhost" {
+		// File URLs with hosts are unsupported (e.g. "file://foo.js.map")
+		log.AddID(logger.MsgID_SourceMap_UnsupportedSourceMapComment, logger.Warning, tracker, comment.Range,
+			fmt.Sprintf("Unsupported source map comment: Unsupported host %q in file URL", commentURL.Host))
+		return logger.Path{}, nil
+	} else if helpers.IsFileURL(commentURL) {
+		// Handle absolute file URLs
+		absPath = helpers.FilePathFromFileURL(fs, commentURL)
+	} else if absResolveDir == "" {
+		// Fail if plugins don't set a resolve directory
+		log.AddID(logger.MsgID_SourceMap_UnsupportedSourceMapComment, logger.Debug, tracker, comment.Range,
+			"Unsupported source map comment: Cannot resolve relative URL without a resolve directory")
+		return logger.Path{}, nil
+	} else {
+		// Join the (potentially relative) URL path from the comment text
+		// to the resolve directory path to form the final absolute path
+		absResolveURL := helpers.FileURLFromFilePath(absResolveDir)
+		if !strings.HasSuffix(absResolveURL.Path, "/") {
+			absResolveURL.Path += "/"
 		}
-		if err != nil {
-			kind := logger.Warning
-			if err == syscall.ENOENT {
-				// Don't report a warning because this is likely unactionable
-				kind = logger.Debug
-			}
-			log.AddID(logger.MsgID_SourceMap_MissingSourceMap, kind, tracker, comment.Range,
-				fmt.Sprintf("Cannot read file %q: %s", resolver.PrettyPath(fs, path), err.Error()))
-			return logger.Path{}, nil
-		}
+		absPath = helpers.FilePathFromFileURL(fs, absResolveURL.ResolveReference(commentURL))
+	}
+
+	// Try to read the file contents
+	path := logger.Path{Text: absPath, Namespace: "file"}
+	if contents, err, _ := fsCache.ReadFile(fs, absPath); err == syscall.ENOENT {
+		log.AddID(logger.MsgID_SourceMap_MissingSourceMap, logger.Debug, tracker, comment.Range,
+			fmt.Sprintf("Cannot read file: %s", absPath))
+		return logger.Path{}, nil
+	} else if err != nil {
+		log.AddID(logger.MsgID_SourceMap_MissingSourceMap, logger.Warning, tracker, comment.Range,
+			fmt.Sprintf("Cannot read file %q: %s", resolver.PrettyPath(fs, path), err.Error()))
+		return logger.Path{}, nil
+	} else {
 		return path, &contents
 	}
-
-	// Anything else is unsupported
-	return logger.Path{}, nil
 }
 
 func sanitizeLocation(fs fs.FS, loc *logger.MsgLocation) {
@@ -1126,19 +1152,16 @@ func runOnLoadPlugins(
 
 	// Read normal modules from disk
 	if source.KeyPath.Namespace == "file" {
-		if contents, err, originalError := fsCache.ReadFile(fs, source.KeyPath.Text); err == nil {
+		if contents, err, _ := fsCache.ReadFile(fs, source.KeyPath.Text); err == nil {
 			source.Contents = contents
 			return loaderPluginResult{
 				loader:        config.LoaderDefault,
 				absResolveDir: fs.Dir(source.KeyPath.Text),
 			}, true
 		} else {
-			if log.Level <= logger.LevelDebug && originalError != nil {
-				log.AddID(logger.MsgID_None, logger.Debug, nil, logger.Range{}, fmt.Sprintf("Failed to read file %q: %s", source.KeyPath.Text, originalError.Error()))
-			}
 			if err == syscall.ENOENT {
 				log.AddError(&tracker, importPathRange,
-					fmt.Sprintf("Could not read from file: %s", source.KeyPath.Text))
+					fmt.Sprintf("Cannot read file: %s", source.KeyPath.Text))
 				return loaderPluginResult{}, false
 			} else {
 				log.AddError(&tracker, importPathRange,
@@ -1174,30 +1197,6 @@ func runOnLoadPlugins(
 
 	// Otherwise, fail to load the path
 	return loaderPluginResult{loader: config.LoaderNone}, true
-}
-
-func loaderFromFileExtension(extensionToLoader map[string]config.Loader, base string) config.Loader {
-	// Pick the loader with the longest matching extension. So if there's an
-	// extension for ".css" and for ".module.css", we want to match the one for
-	// ".module.css" before the one for ".css".
-	if i := strings.IndexByte(base, '.'); i != -1 {
-		for {
-			if loader, ok := extensionToLoader[base[i:]]; ok {
-				return loader
-			}
-			base = base[i+1:]
-			i = strings.IndexByte(base, '.')
-			if i == -1 {
-				break
-			}
-		}
-	} else {
-		// If there's no extension, explicitly check for an extensionless loader
-		if loader, ok := extensionToLoader[""]; ok {
-			return loader
-		}
-	}
-	return config.LoaderNone
 }
 
 // Identify the path by its lowercase absolute path name with Windows-specific

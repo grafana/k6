@@ -946,14 +946,12 @@ func ToUint32(f float64) uint32 {
 	return uint32(ToInt32(f))
 }
 
+// If this returns true, we know the result can't be NaN
 func isInt32OrUint32(data E) bool {
 	switch e := data.(type) {
-	case *EUnary:
-		return e.Op == UnOpCpl
-
 	case *EBinary:
 		switch e.Op {
-		case BinOpBitwiseAnd, BinOpBitwiseOr, BinOpBitwiseXor, BinOpShl, BinOpShr, BinOpUShr:
+		case BinOpUShr: // This is the only bitwise operator that can't return a bigint (because it throws instead)
 			return true
 
 		case BinOpLogicalOr, BinOpLogicalAnd:
@@ -1496,6 +1494,12 @@ func CheckEqualityIfNoSideEffects(left E, right E, kind EqualityKind) (equal boo
 		case *ENull, *EUndefined:
 			// "(not null or undefined) == undefined" is false
 			return false, true
+
+		default:
+			if kind == StrictEquality && IsPrimitiveLiteral(right) {
+				// "boolean === (not boolean)" is false
+				return false, true
+			}
 		}
 
 	case *ENumber:
@@ -1523,6 +1527,12 @@ func CheckEqualityIfNoSideEffects(left E, right E, kind EqualityKind) (equal boo
 		case *ENull, *EUndefined:
 			// "(not null or undefined) == undefined" is false
 			return false, true
+
+		default:
+			if kind == StrictEquality && IsPrimitiveLiteral(right) {
+				// "number === (not number)" is false
+				return false, true
+			}
 		}
 
 	case *EBigInt:
@@ -1535,6 +1545,12 @@ func CheckEqualityIfNoSideEffects(left E, right E, kind EqualityKind) (equal boo
 		case *ENull, *EUndefined:
 			// "(not null or undefined) == undefined" is false
 			return false, true
+
+		default:
+			if kind == StrictEquality && IsPrimitiveLiteral(right) {
+				// "bigint === (not bigint)" is false
+				return false, true
+			}
 		}
 
 	case *EString:
@@ -1547,6 +1563,12 @@ func CheckEqualityIfNoSideEffects(left E, right E, kind EqualityKind) (equal boo
 		case *ENull, *EUndefined:
 			// "(not null or undefined) == undefined" is false
 			return false, true
+
+		default:
+			if kind == StrictEquality && IsPrimitiveLiteral(right) {
+				// "string === (not string)" is false
+				return false, true
+			}
 		}
 	}
 
@@ -2081,10 +2103,10 @@ func (ctx HelperContext) SimplifyBooleanExpr(expr Expr) Expr {
 				// in a boolean context is unnecessary because the value is
 				// only truthy if it's not zero.
 				if e.Op == BinOpStrictNe || e.Op == BinOpLooseNe {
-					// "if ((a | b) !== 0)" => "if (a | b)"
+					// "if ((a >>> b) !== 0)" => "if (a >>> b)"
 					return left
 				} else {
-					// "if ((a | b) === 0)" => "if (!(a | b))"
+					// "if ((a >>> b) === 0)" => "if (!(a >>> b))"
 					return Not(left)
 				}
 			}
