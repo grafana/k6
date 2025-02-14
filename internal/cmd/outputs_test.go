@@ -11,6 +11,7 @@ func TestBuiltinOutputString(t *testing.T) {
 	exp := []string{
 		"cloud", "csv", "datadog", "experimental-prometheus-rw",
 		"influxdb", "json", "kafka", "statsd", "experimental-opentelemetry",
+		"summary",
 	}
 	assert.Equal(t, exp, builtinOutputStrings())
 }
