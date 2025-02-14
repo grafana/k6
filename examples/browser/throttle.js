@@ -19,6 +19,7 @@ export const options = {
         },
       },
       exec: 'networkThrottled',
+      startTime: "10s",
     },
     cpuThrottled: {
       executor: 'shared-iterations',
@@ -28,6 +29,7 @@ export const options = {
         },
       },
       exec: 'cpuThrottled',
+      startTime: "5s",
     },
   },
   thresholds: {
