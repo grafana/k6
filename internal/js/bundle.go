@@ -20,6 +20,7 @@ import (
 	"go.k6.io/k6/internal/event"
 	"go.k6.io/k6/internal/js/compiler"
 	"go.k6.io/k6/internal/js/eventloop"
+	"go.k6.io/k6/internal/js/tc55/timers"
 	"go.k6.io/k6/internal/loader"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
@@ -312,7 +313,11 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*BundleInstance
 
 	modSys := modules.NewModuleSystem(b.ModuleResolver, vuImpl)
 	b.setInitGlobals(rt, vuImpl, modSys)
-	modules.ExportGloballyModule(rt, modSys, "k6/timers")
+
+	err = timers.SetupGlobally(vuImpl)
+	if err != nil {
+		return nil, err
+	}
 	vuImpl.initEnv = initenv
 	defer func() {
 		vuImpl.initEnv = nil
