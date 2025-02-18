@@ -193,7 +193,10 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	if !testRunState.RuntimeOptions.NoSummary.Bool { //nolint:nestif
 		sm, err := lib.ValidateSummaryMode(testRunState.RuntimeOptions.SummaryMode.String)
 		if err != nil {
-			logger.WithError(err).Error("invalid summary mode, falling back to \"compact\" (default)")
+			logger.WithError(err).Warnf(
+				"invalid summary mode %q, falling back to \"compact\" (default)",
+				testRunState.RuntimeOptions.SummaryMode.String,
+			)
 		}
 
 		switch sm {
@@ -238,7 +241,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 				logger.Debug("Generating the end-of-test summary...")
 
 				summary := summaryOutput.Summary(
-					executionState,
+					executionState.GetCurrentTestRunDuration(),
 					metricsEngine.ObservedMetrics,
 					test.initRunner.GetOptions(),
 				)

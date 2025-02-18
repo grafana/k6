@@ -16,7 +16,7 @@ const flushPeriod = 200 * time.Millisecond // TODO: make this configurable
 
 var _ output.Output = &Output{}
 
-// Output ...
+// Output implements the lib.Output interface for collecting metrics' data to be displayed in the end-of-test summary.
 type Output struct {
 	output.SampleBuffer
 
@@ -27,7 +27,7 @@ type Output struct {
 	summaryMode lib.SummaryMode
 }
 
-// New returns a new JSON output.
+// New returns a new summary output.
 func New(params output.Params) (*Output, error) {
 	sm, err := lib.ValidateSummaryMode(params.RuntimeOptions.SummaryMode.String)
 	if err != nil {
@@ -113,12 +113,10 @@ func (o *Output) flushSample(sample metrics.Sample) {
 
 // Summary returns a lib.Summary of the test run.
 func (o *Output) Summary(
-	executionState *lib.ExecutionState,
+	testRunDuration time.Duration,
 	observedMetrics map[string]*metrics.Metric,
 	options lib.Options,
 ) *lib.Summary {
-	testRunDuration := executionState.GetCurrentTestRunDuration()
-
 	summary := lib.NewSummary()
 	summary.TestRunDuration = testRunDuration
 

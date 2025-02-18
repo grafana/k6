@@ -38,7 +38,7 @@ func metricValueGetter(summaryTrendStats []string) func(metrics.Sink, time.Durat
 		switch sink := sink.(type) {
 		case *metrics.CounterSink:
 			result = sink.Format(t)
-			result["rate"] = calculateCounterRate(sink.Value, t)
+			result["rate"] = sink.Rate(t)
 		case *metrics.GaugeSink:
 			result = sink.Format(t)
 			result["min"] = sink.Min
@@ -159,11 +159,4 @@ func getSummaryResult(rawResult sobek.Value) (map[string]io.Reader, error) {
 	}
 
 	return results, nil
-}
-
-func calculateCounterRate(count float64, duration time.Duration) float64 {
-	if duration == 0 {
-		return 0
-	}
-	return count / (float64(duration) / float64(time.Second))
 }

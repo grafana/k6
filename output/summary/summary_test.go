@@ -1,0 +1,294 @@
+package summary
+
+import (
+	"gopkg.in/guregu/null.v3"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"go.k6.io/k6/internal/lib/testutils"
+	"go.k6.io/k6/lib"
+	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/output"
+)
+
+func TestOutput_Summary(t *testing.T) {
+	o, err := New(output.Params{
+		Logger: testutils.NewLogger(t),
+	})
+	require.NoError(t, err)
+
+	// Metrics
+	checksMetric := &metrics.Metric{
+		Name:     "checks",
+		Type:     metrics.Rate,
+		Contains: metrics.Default,
+		Sink: &metrics.RateSink{
+			Trues: 3,
+			Total: 5,
+		},
+		Observed: true,
+	}
+
+	httpReqsMetric := &metrics.Metric{
+		Name:     "http_reqs",
+		Type:     metrics.Counter,
+		Contains: metrics.Default,
+		Sink: &metrics.CounterSink{
+			Value: 4,
+			First: time.Now(),
+		},
+		Observed: true,
+	}
+
+	authHttpReqsMetric := &metrics.Metric{
+		Name:     "http_reqs{group: ::auth}",
+		Type:     metrics.Counter,
+		Contains: metrics.Default,
+		Sink: &metrics.CounterSink{
+			Value: 1,
+			First: time.Now(),
+		},
+		Observed: true,
+	}
+
+	// Thresholds
+	thresholds := thresholds{
+		{Threshold: &metrics.Threshold{
+			Source: "count<10",
+		}, Metric: httpReqsMetric},
+		{Threshold: &metrics.Threshold{
+			Source:     "rate>2",
+			LastFailed: true,
+		}, Metric: httpReqsMetric},
+		{Threshold: &metrics.Threshold{
+			Source:     "count>1",
+			LastFailed: true,
+		}, Metric: authHttpReqsMetric},
+	}
+
+	// Checks
+	rootGroup, err := lib.NewGroup(lib.RootGroupPath, nil)
+	require.NoError(t, err)
+
+	quickPizzaIsUp := &lib.Check{
+		Name:   "quickpizza.grafana.com is up",
+		Group:  rootGroup,
+		Passes: 3,
+		Fails:  2,
+	}
+
+	checks := &aggregatedChecksData{
+		checks:        map[string]*lib.Check{quickPizzaIsUp.Name: quickPizzaIsUp},
+		orderedChecks: []*lib.Check{quickPizzaIsUp},
+	}
+
+	// Set up
+	o.dataModel = dataModel{
+		thresholds: thresholds,
+		aggregatedGroupData: aggregatedGroupData{
+			checks: checks,
+			aggregatedMetrics: map[string]aggregatedMetric{
+				checksMetric.Name: {
+					Metric: checksMetric,
+					Sink:   checksMetric.Sink,
+				},
+				httpReqsMetric.Name: {
+					Metric: httpReqsMetric,
+					Sink:   httpReqsMetric.Sink,
+				},
+				authHttpReqsMetric.Name: {
+					Metric: authHttpReqsMetric,
+					Sink:   authHttpReqsMetric.Sink,
+				},
+			},
+			groupsData: make(map[string]aggregatedGroupData),
+		},
+	}
+
+	testRunDuration := time.Second
+	observedMetrics := map[string]*metrics.Metric{
+		httpReqsMetric.Name:     httpReqsMetric,
+		authHttpReqsMetric.Name: authHttpReqsMetric,
+	}
+	options := lib.Options{
+		SummaryTrendStats: []string{"avg", "min", "max"},
+	}
+
+	summary := o.Summary(testRunDuration, observedMetrics, options)
+
+	// Assert thresholds
+	assert.Len(t, summary.SummaryThresholds, 2)
+
+	httpReqsThresholds := summary.SummaryThresholds[httpReqsMetric.Name].Thresholds
+	assert.Len(t, httpReqsThresholds, 2)
+	assert.Equal(t, "count<10", httpReqsThresholds[0].Source)
+	assert.True(t, httpReqsThresholds[0].Ok)
+	assert.Equal(t, "rate>2", httpReqsThresholds[1].Source)
+	assert.False(t, httpReqsThresholds[1].Ok)
+
+	httpReqsGroupThresholds := summary.SummaryThresholds[authHttpReqsMetric.Name].Thresholds
+	assert.Len(t, httpReqsGroupThresholds, 1)
+	assert.Equal(t, "count>1", httpReqsGroupThresholds[0].Source)
+	assert.False(t, httpReqsGroupThresholds[0].Ok)
+
+	// Assert checks
+	checksTotal := summary.Checks.Metrics.Total
+	assert.Equal(t, "checks_total", checksTotal.Name)
+	assert.Equal(t, map[string]float64{
+		"count": 5,
+		"rate":  5,
+	}, checksTotal.Values)
+
+	checksSucceeded := summary.Checks.Metrics.Success
+	assert.Equal(t, "checks_succeeded", checksSucceeded.Name)
+	assert.Equal(t, map[string]float64{
+		"rate":   0.6,
+		"passes": 3,
+		"fails":  2,
+	}, checksSucceeded.Values)
+
+	checksFailed := summary.Checks.Metrics.Fail
+	assert.Equal(t, "checks_failed", checksFailed.Name)
+	assert.Equal(t, map[string]float64{
+		"rate":   0.4,
+		"passes": 2,
+		"fails":  3,
+	}, checksFailed.Values)
+
+	assert.Len(t, summary.Checks.OrderedChecks, 1)
+	assert.Equal(t, quickPizzaIsUp, summary.Checks.OrderedChecks[0])
+
+	// Assert metrics
+	assert.Len(t, summary.Metrics.HTTP, 2)
+
+	httpReqsSummaryMetric := summary.Metrics.HTTP[httpReqsMetric.Name]
+	assert.Equal(t, "http_reqs", httpReqsSummaryMetric.Name)
+	assert.Equal(t, "counter", httpReqsSummaryMetric.Type)
+	assert.Equal(t, "default", httpReqsSummaryMetric.Contains)
+	assert.Equal(t, map[string]float64{
+		"count": 4,
+		"rate":  4,
+	}, httpReqsSummaryMetric.Values)
+
+	authHttpReqsSummaryMetric := summary.Metrics.HTTP[authHttpReqsMetric.Name]
+	assert.Equal(t, "http_reqs{group: ::auth}", authHttpReqsSummaryMetric.Name)
+	assert.Equal(t, "counter", authHttpReqsSummaryMetric.Type)
+	assert.Equal(t, "default", authHttpReqsSummaryMetric.Contains)
+	assert.Equal(t, map[string]float64{
+		"count": 1,
+		"rate":  1,
+	}, authHttpReqsSummaryMetric.Values)
+
+	// Other asserts
+	assert.Equal(t, testRunDuration, summary.TestRunDuration)
+}
+
+func TestOutput_AddMetricSamples(t *testing.T) {
+	reg := metrics.NewRegistry()
+
+	httpReqsMetric := &metrics.Metric{
+		Name:     "http_reqs",
+		Type:     metrics.Counter,
+		Contains: metrics.Default,
+		Sink: &metrics.CounterSink{
+			Value: 4,
+			First: time.Now(),
+		},
+		Observed: true,
+	}
+
+	authHttpReqsMetric := &metrics.Metric{
+		Name:     "http_reqs{group: ::auth}",
+		Type:     metrics.Counter,
+		Contains: metrics.Default,
+		Sink: &metrics.CounterSink{
+			Value: 1,
+			First: time.Now(),
+		},
+		Observed: true,
+	}
+
+	samples := []metrics.SampleContainer{
+		metrics.Samples{
+			{TimeSeries: metrics.TimeSeries{
+				Metric: httpReqsMetric,
+				Tags:   reg.RootTagSet().With("group", lib.RootGroupPath),
+			},
+				Time:  time.Now(),
+				Value: 1},
+			{TimeSeries: metrics.TimeSeries{
+				Metric: authHttpReqsMetric,
+				Tags:   reg.RootTagSet().With("group", "::auth"),
+			},
+				Time:  time.Now(),
+				Value: 1},
+		},
+		metrics.Samples{
+			{TimeSeries: metrics.TimeSeries{
+				Metric: httpReqsMetric,
+				Tags:   reg.RootTagSet().With("group", lib.RootGroupPath),
+			},
+				Time:  time.Now(),
+				Value: 3},
+		},
+	}
+
+	t.Run("compact", func(t *testing.T) {
+		o, err := New(output.Params{
+			RuntimeOptions: lib.RuntimeOptions{
+				SummaryMode: null.StringFrom("compact"),
+			},
+			Logger: testutils.NewLogger(t),
+		})
+		require.NoError(t, err)
+
+		require.NoError(t, o.Start())
+
+		o.AddMetricSamples(samples)
+
+		require.NoError(t, o.Stop())
+
+		assert.Len(t, o.dataModel.aggregatedMetrics, 2)
+
+		httpReqsSummaryMetric := o.dataModel.aggregatedMetrics[httpReqsMetric.Name]
+		assert.Equal(t, float64(4), httpReqsSummaryMetric.Metric.Sink.(*metrics.CounterSink).Value)
+
+		authHttpReqsSummaryMetric := o.dataModel.aggregatedMetrics[authHttpReqsMetric.Name]
+		assert.Equal(t, float64(1), authHttpReqsSummaryMetric.Metric.Sink.(*metrics.CounterSink).Value)
+
+		assert.Len(t, o.dataModel.groupsData, 0)
+	})
+
+	t.Run("full", func(t *testing.T) {
+		o, err := New(output.Params{
+			RuntimeOptions: lib.RuntimeOptions{
+				SummaryMode: null.StringFrom("full"),
+			},
+			Logger: testutils.NewLogger(t),
+		})
+		require.NoError(t, err)
+
+		require.NoError(t, o.Start())
+
+		o.AddMetricSamples(samples)
+
+		require.NoError(t, o.Stop())
+
+		assert.Len(t, o.dataModel.aggregatedMetrics, 2)
+
+		httpReqsSummaryMetric := o.dataModel.aggregatedMetrics[httpReqsMetric.Name]
+		assert.Equal(t, float64(4), httpReqsSummaryMetric.Metric.Sink.(*metrics.CounterSink).Value)
+
+		authHttpReqsSummaryMetric := o.dataModel.aggregatedMetrics[authHttpReqsMetric.Name]
+		assert.Equal(t, float64(1), authHttpReqsSummaryMetric.Metric.Sink.(*metrics.CounterSink).Value)
+
+		assert.Len(t, o.dataModel.groupsData, 1)
+		assert.Len(t, o.dataModel.groupsData["auth"].aggregatedMetrics, 1)
+
+		authHttpReqsSummaryMetric = o.dataModel.groupsData["auth"].aggregatedMetrics[authHttpReqsMetric.Name]
+		assert.Equal(t, float64(1), authHttpReqsSummaryMetric.Metric.Sink.(*metrics.CounterSink).Value)
+	})
+}

@@ -362,7 +362,7 @@ func (r *Runner) HandleSummary(
 		}
 	}()
 
-	summaryCtx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	summaryCtx, cancel := context.WithTimeout(ctx, r.getTimeoutFor(consts.HandleSummaryFn))
 	defer cancel()
 
 	vu, err := r.newVU(summaryCtx, 0, 0, out)

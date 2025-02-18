@@ -271,7 +271,7 @@ func populateSummaryChecks(
 	successChecks := float64(checksMetric.Sink.(*metrics.RateSink).Trues) //nolint:forcetypeassert
 
 	summaryGroup.Checks.Metrics.Total.Values["count"] = totalChecks
-	summaryGroup.Checks.Metrics.Total.Values["rate"] = calculateCounterRate(totalChecks, testRunDuration)
+	summaryGroup.Checks.Metrics.Total.Values["rate"] = calculateRate(totalChecks, testRunDuration)
 
 	summaryGroup.Checks.Metrics.Success = lib.NewSummaryMetricFrom(
 		lib.SummaryMetricInfo{
@@ -347,7 +347,7 @@ func oneOfMetrics(metricName string, values ...string) bool {
 	return false
 }
 
-func calculateCounterRate(count float64, duration time.Duration) float64 {
+func calculateRate(count float64, duration time.Duration) float64 {
 	if duration == 0 {
 		return 0
 	}
