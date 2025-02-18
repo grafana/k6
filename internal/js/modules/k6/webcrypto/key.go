@@ -191,8 +191,10 @@ func newKeyGenerator(rt *sobek.Runtime, normalized Algorithm, params sobek.Value
 		kg, err = newECKeyGenParams(rt, normalized, params)
 	case RSASsaPkcs1v15, RSAPss, RSAOaep:
 		kg, err = newRsaHashedKeyGenParams(rt, normalized, params)
+	case Ed25519:
+		kg, err = newEd25519KeyGenParams(normalized)
 	default:
-		validAlgorithms := []string{AESCbc, AESCtr, AESGcm, AESKw, HMAC, ECDH, ECDSA, RSASsaPkcs1v15, RSAPss, RSAOaep}
+		validAlgorithms := []string{AESCbc, AESCtr, AESGcm, AESKw, HMAC, ECDH, ECDSA, RSASsaPkcs1v15, RSAPss, RSAOaep, Ed25519}
 		return nil, NewError(
 			NotImplemented,
 			"unsupported key generation algorithm '"+normalized.Name+"', "+
