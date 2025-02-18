@@ -7,7 +7,6 @@ import (
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/input"
-	"github.com/grafana/sobek"
 )
 
 // Mouse represents a mouse input device.
@@ -35,12 +34,8 @@ func NewMouse(ctx context.Context, s session, f *Frame, ts *TimeoutSettings, k *
 }
 
 // Click will trigger a series of MouseMove, MouseDown and MouseUp events in the browser.
-func (m *Mouse) Click(x float64, y float64, opts sobek.Value) error {
-	mouseOpts := NewMouseClickOptions()
-	if err := mouseOpts.Parse(m.ctx, opts); err != nil {
-		return fmt.Errorf("parsing mouse click options: %w", err)
-	}
-	if err := m.click(x, y, mouseOpts); err != nil {
+func (m *Mouse) Click(x float64, y float64, opts *MouseClickOptions) error {
+	if err := m.click(x, y, opts); err != nil {
 		return fmt.Errorf("clicking on x:%f y:%f: %w", x, y, err)
 	}
 	return nil
@@ -72,24 +67,16 @@ func (m *Mouse) click(x float64, y float64, opts *MouseClickOptions) error {
 }
 
 // DblClick will trigger Click twice in quick succession.
-func (m *Mouse) DblClick(x float64, y float64, opts sobek.Value) error {
-	mouseOpts := NewMouseDblClickOptions()
-	if err := mouseOpts.Parse(m.ctx, opts); err != nil {
-		return fmt.Errorf("parsing double click options: %w", err)
-	}
-	if err := m.click(x, y, mouseOpts.ToMouseClickOptions()); err != nil {
+func (m *Mouse) DblClick(x float64, y float64, opts *MouseDblClickOptions) error {
+	if err := m.click(x, y, opts.ToMouseClickOptions()); err != nil {
 		return fmt.Errorf("double clicking on x:%f y:%f: %w", x, y, err)
 	}
 	return nil
 }
 
 // Down will trigger a MouseDown event in the browser.
-func (m *Mouse) Down(opts sobek.Value) error {
-	mouseOpts := NewMouseDownUpOptions()
-	if err := mouseOpts.Parse(m.ctx, opts); err != nil {
-		return fmt.Errorf("parsing mouse down options: %w", err)
-	}
-	if err := m.down(mouseOpts); err != nil {
+func (m *Mouse) Down(opts *MouseDownUpOptions) error {
+	if err := m.down(opts); err != nil {
 		return fmt.Errorf("pressing the mouse button on x:%f y:%f: %w", m.x, m.y, err)
 	}
 	return nil
@@ -108,12 +95,8 @@ func (m *Mouse) down(opts *MouseDownUpOptions) error {
 }
 
 // Up will trigger a MouseUp event in the browser.
-func (m *Mouse) Up(opts sobek.Value) error {
-	mouseOpts := NewMouseDownUpOptions()
-	if err := mouseOpts.Parse(m.ctx, opts); err != nil {
-		return fmt.Errorf("parsing mouse up options: %w", err)
-	}
-	if err := m.up(mouseOpts); err != nil {
+func (m *Mouse) Up(opts *MouseDownUpOptions) error {
+	if err := m.up(opts); err != nil {
 		return fmt.Errorf("releasing the mouse button on x:%f y:%f: %w", m.x, m.y, err)
 	}
 	return nil
@@ -133,12 +116,8 @@ func (m *Mouse) up(opts *MouseDownUpOptions) error {
 }
 
 // Move will trigger a MouseMoved event in the browser.
-func (m *Mouse) Move(x float64, y float64, opts sobek.Value) error {
-	mouseOpts := NewMouseMoveOptions()
-	if err := mouseOpts.Parse(m.ctx, opts); err != nil {
-		return fmt.Errorf("parsing mouse move options: %w", err)
-	}
-	if err := m.move(x, y, mouseOpts); err != nil {
+func (m *Mouse) Move(x float64, y float64, opts *MouseMoveOptions) error {
+	if err := m.move(x, y, opts); err != nil {
 		return fmt.Errorf("moving the mouse pointer to x:%f y:%f: %w", x, y, err)
 	}
 	return nil
