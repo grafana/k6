@@ -22,9 +22,9 @@ and code of conduct https://github.com/grafana/k6/blob/master/CODE_OF_CONDUCT.md
 
 **Please do not merge this PR until the following items are filled out.**
 
-- [ ] I have added the correct milestone to the PR.
-- [ ] I have updated the k6-documentation: _link_
-- [ ] I have updated the TypeScript definitions: _link_
+- [ ] I have added the correct milestone and labels to the PR.
+- [ ] I have updated the [k6-documentation](https://github.com/grafana/k6-docs): _link_
+- [ ] I have updated the [TypeScript definitions](https://github.com/grafana/k6-DefinitelyTyped/tree/master/types/k6): _link_
 - [ ] I have updated the release notes: _link_
 
 <!-- - [ ] Any other relevant item -->
