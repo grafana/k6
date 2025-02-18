@@ -1,12 +1,12 @@
 package summary
 
 import (
-	"gopkg.in/guregu/null.v3"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/internal/lib/testutils"
 	"go.k6.io/k6/lib"
@@ -15,6 +15,8 @@ import (
 )
 
 func TestOutput_Summary(t *testing.T) {
+	t.Parallel()
+
 	o, err := New(output.Params{
 		Logger: testutils.NewLogger(t),
 	})
@@ -43,7 +45,7 @@ func TestOutput_Summary(t *testing.T) {
 		Observed: true,
 	}
 
-	authHttpReqsMetric := &metrics.Metric{
+	authHTTPReqsMetric := &metrics.Metric{
 		Name:     "http_reqs{group: ::auth}",
 		Type:     metrics.Counter,
 		Contains: metrics.Default,
@@ -66,7 +68,7 @@ func TestOutput_Summary(t *testing.T) {
 		{Threshold: &metrics.Threshold{
 			Source:     "count>1",
 			LastFailed: true,
-		}, Metric: authHttpReqsMetric},
+		}, Metric: authHTTPReqsMetric},
 	}
 
 	// Checks
@@ -99,9 +101,9 @@ func TestOutput_Summary(t *testing.T) {
 					Metric: httpReqsMetric,
 					Sink:   httpReqsMetric.Sink,
 				},
-				authHttpReqsMetric.Name: {
-					Metric: authHttpReqsMetric,
-					Sink:   authHttpReqsMetric.Sink,
+				authHTTPReqsMetric.Name: {
+					Metric: authHTTPReqsMetric,
+					Sink:   authHTTPReqsMetric.Sink,
 				},
 			},
 			groupsData: make(map[string]aggregatedGroupData),
@@ -111,7 +113,7 @@ func TestOutput_Summary(t *testing.T) {
 	testRunDuration := time.Second
 	observedMetrics := map[string]*metrics.Metric{
 		httpReqsMetric.Name:     httpReqsMetric,
-		authHttpReqsMetric.Name: authHttpReqsMetric,
+		authHTTPReqsMetric.Name: authHTTPReqsMetric,
 	}
 	options := lib.Options{
 		SummaryTrendStats: []string{"avg", "min", "max"},
@@ -129,7 +131,7 @@ func TestOutput_Summary(t *testing.T) {
 	assert.Equal(t, "rate>2", httpReqsThresholds[1].Source)
 	assert.False(t, httpReqsThresholds[1].Ok)
 
-	httpReqsGroupThresholds := summary.SummaryThresholds[authHttpReqsMetric.Name].Thresholds
+	httpReqsGroupThresholds := summary.SummaryThresholds[authHTTPReqsMetric.Name].Thresholds
 	assert.Len(t, httpReqsGroupThresholds, 1)
 	assert.Equal(t, "count>1", httpReqsGroupThresholds[0].Source)
 	assert.False(t, httpReqsGroupThresholds[0].Ok)
@@ -173,20 +175,22 @@ func TestOutput_Summary(t *testing.T) {
 		"rate":  4,
 	}, httpReqsSummaryMetric.Values)
 
-	authHttpReqsSummaryMetric := summary.Metrics.HTTP[authHttpReqsMetric.Name]
-	assert.Equal(t, "http_reqs{group: ::auth}", authHttpReqsSummaryMetric.Name)
-	assert.Equal(t, "counter", authHttpReqsSummaryMetric.Type)
-	assert.Equal(t, "default", authHttpReqsSummaryMetric.Contains)
+	authHTTPReqsSummaryMetric := summary.Metrics.HTTP[authHTTPReqsMetric.Name]
+	assert.Equal(t, "http_reqs{group: ::auth}", authHTTPReqsSummaryMetric.Name)
+	assert.Equal(t, "counter", authHTTPReqsSummaryMetric.Type)
+	assert.Equal(t, "default", authHTTPReqsSummaryMetric.Contains)
 	assert.Equal(t, map[string]float64{
 		"count": 1,
 		"rate":  1,
-	}, authHttpReqsSummaryMetric.Values)
+	}, authHTTPReqsSummaryMetric.Values)
 
 	// Other asserts
 	assert.Equal(t, testRunDuration, summary.TestRunDuration)
 }
 
 func TestOutput_AddMetricSamples(t *testing.T) {
+	t.Parallel()
+
 	reg := metrics.NewRegistry()
 
 	httpReqsMetric := &metrics.Metric{
@@ -200,7 +204,7 @@ func TestOutput_AddMetricSamples(t *testing.T) {
 		Observed: true,
 	}
 
-	authHttpReqsMetric := &metrics.Metric{
+	authHTTPReqsMetric := &metrics.Metric{
 		Name:     "http_reqs{group: ::auth}",
 		Type:     metrics.Counter,
 		Contains: metrics.Default,
@@ -213,30 +217,38 @@ func TestOutput_AddMetricSamples(t *testing.T) {
 
 	samples := []metrics.SampleContainer{
 		metrics.Samples{
-			{TimeSeries: metrics.TimeSeries{
-				Metric: httpReqsMetric,
-				Tags:   reg.RootTagSet().With("group", lib.RootGroupPath),
-			},
+			{
+				TimeSeries: metrics.TimeSeries{
+					Metric: httpReqsMetric,
+					Tags:   reg.RootTagSet().With("group", lib.RootGroupPath),
+				},
 				Time:  time.Now(),
-				Value: 1},
-			{TimeSeries: metrics.TimeSeries{
-				Metric: authHttpReqsMetric,
-				Tags:   reg.RootTagSet().With("group", "::auth"),
+				Value: 1,
 			},
+			{
+				TimeSeries: metrics.TimeSeries{
+					Metric: authHTTPReqsMetric,
+					Tags:   reg.RootTagSet().With("group", "::auth"),
+				},
 				Time:  time.Now(),
-				Value: 1},
+				Value: 1,
+			},
 		},
 		metrics.Samples{
-			{TimeSeries: metrics.TimeSeries{
-				Metric: httpReqsMetric,
-				Tags:   reg.RootTagSet().With("group", lib.RootGroupPath),
-			},
+			{
+				TimeSeries: metrics.TimeSeries{
+					Metric: httpReqsMetric,
+					Tags:   reg.RootTagSet().With("group", lib.RootGroupPath),
+				},
 				Time:  time.Now(),
-				Value: 3},
+				Value: 3,
+			},
 		},
 	}
 
 	t.Run("compact", func(t *testing.T) {
+		t.Parallel()
+
 		o, err := New(output.Params{
 			RuntimeOptions: lib.RuntimeOptions{
 				SummaryMode: null.StringFrom("compact"),
@@ -256,13 +268,15 @@ func TestOutput_AddMetricSamples(t *testing.T) {
 		httpReqsSummaryMetric := o.dataModel.aggregatedMetrics[httpReqsMetric.Name]
 		assert.Equal(t, float64(4), httpReqsSummaryMetric.Metric.Sink.(*metrics.CounterSink).Value)
 
-		authHttpReqsSummaryMetric := o.dataModel.aggregatedMetrics[authHttpReqsMetric.Name]
-		assert.Equal(t, float64(1), authHttpReqsSummaryMetric.Metric.Sink.(*metrics.CounterSink).Value)
+		authHTTPReqsSummaryMetric := o.dataModel.aggregatedMetrics[authHTTPReqsMetric.Name]
+		assert.Equal(t, float64(1), authHTTPReqsSummaryMetric.Metric.Sink.(*metrics.CounterSink).Value)
 
 		assert.Len(t, o.dataModel.groupsData, 0)
 	})
 
 	t.Run("full", func(t *testing.T) {
+		t.Parallel()
+
 		o, err := New(output.Params{
 			RuntimeOptions: lib.RuntimeOptions{
 				SummaryMode: null.StringFrom("full"),
@@ -282,13 +296,13 @@ func TestOutput_AddMetricSamples(t *testing.T) {
 		httpReqsSummaryMetric := o.dataModel.aggregatedMetrics[httpReqsMetric.Name]
 		assert.Equal(t, float64(4), httpReqsSummaryMetric.Metric.Sink.(*metrics.CounterSink).Value)
 
-		authHttpReqsSummaryMetric := o.dataModel.aggregatedMetrics[authHttpReqsMetric.Name]
-		assert.Equal(t, float64(1), authHttpReqsSummaryMetric.Metric.Sink.(*metrics.CounterSink).Value)
+		authHTTPReqsSummaryMetric := o.dataModel.aggregatedMetrics[authHTTPReqsMetric.Name]
+		assert.Equal(t, float64(1), authHTTPReqsSummaryMetric.Metric.Sink.(*metrics.CounterSink).Value)
 
 		assert.Len(t, o.dataModel.groupsData, 1)
 		assert.Len(t, o.dataModel.groupsData["auth"].aggregatedMetrics, 1)
 
-		authHttpReqsSummaryMetric = o.dataModel.groupsData["auth"].aggregatedMetrics[authHttpReqsMetric.Name]
-		assert.Equal(t, float64(1), authHttpReqsSummaryMetric.Metric.Sink.(*metrics.CounterSink).Value)
+		authHTTPReqsSummaryMetric = o.dataModel.groupsData["auth"].aggregatedMetrics[authHTTPReqsMetric.Name]
+		assert.Equal(t, float64(1), authHTTPReqsSummaryMetric.Metric.Sink.(*metrics.CounterSink).Value)
 	})
 }

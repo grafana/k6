@@ -68,6 +68,8 @@ func (c *CounterSink) Format(t time.Duration) map[string]float64 {
 	}
 }
 
+// Rate calculates the rate (per second) of the counter,
+// based on the given duration.
 func (c *CounterSink) Rate(t time.Duration) float64 {
 	if t == 0 {
 		return 0
