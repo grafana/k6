@@ -562,10 +562,10 @@ func TestPageInputSpecialCharacters(t *testing.T) {
 		`¯\_(ツ)_/¯`,
 	}
 	for _, want := range wants {
-		require.NoError(t, el.Fill("", nil))
-		require.NoError(t, el.Type(want, nil))
+		require.NoError(t, el.Fill("", common.NewElementHandleBaseOptions(common.DefaultTimeout)))
+		require.NoError(t, el.Type(want, common.NewElementHandleTypeOptions(common.DefaultTimeout)))
 
-		got, err := el.InputValue(nil)
+		got, err := el.InputValue(common.NewElementHandleBaseOptions(common.DefaultTimeout))
 		require.NoError(t, err)
 		assert.Equal(t, want, got)
 	}
