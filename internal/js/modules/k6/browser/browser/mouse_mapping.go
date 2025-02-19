@@ -41,7 +41,7 @@ func mapMouse(vu moduleVU, m *common.Mouse) mapping {
 		"up": func(opts sobek.Value) (*sobek.Promise, error) {
 			popts := common.NewMouseDownUpOptions()
 			if err := popts.Parse(vu.Context(), opts); err != nil {
-				return nil, fmt.Errorf("parsing mouse down options: %w", err)
+				return nil, fmt.Errorf("parsing mouse up options: %w", err)
 			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return nil, m.Up(popts) //nolint:wrapcheck
