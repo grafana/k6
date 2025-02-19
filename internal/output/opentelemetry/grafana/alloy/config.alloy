@@ -1,0 +1,44 @@
+// expose OTEL receivers
+// https://grafana.com/docs/alloy/latest/reference/components/otelcol.receiver.otlp/
+otelcol.receiver.otlp "default" {
+	// configures the default gRPC receiver endpoint "0.0.0.0:4317"
+	// https://grafana.com/docs/alloy/latest/reference/components/otelcol.receiver.otlp/#grpc-block
+	grpc {}
+	
+	// configures the default HTTP receiver endpoint "0.0.0.0:4318"
+	// https://grafana.com/docs/alloy/latest/reference/components/otelcol.receiver.otlp/#http-block
+	http {}
+
+	output {
+		metrics = [otelcol.processor.batch.default.input]
+	}
+}
+
+otelcol.processor.batch "default" {
+	// https://grafana.com/docs/alloy/latest/reference/components/otelcol.processor.batch/
+	output {
+		metrics = [otelcol.exporter.prometheus.default.input]		
+	}
+}
+
+otelcol.exporter.prometheus "default" {
+	add_metric_suffixes = false
+	forward_to          = [prometheus.remote_write.default.receiver]
+}
+
+// Collect metrics from the local running Alloy instance and forward to
+// Prometheus.
+prometheus.exporter.self "alloy" {}
+prometheus.scrape "alloy" {
+	targets    = prometheus.exporter.self.alloy.targets
+	forward_to = [prometheus.remote_write.default.receiver]
+}
+
+prometheus.remote_write "default" {
+	endpoint {
+		url = format(
+			"http://%s/api/v1/write",
+			coalesce(env("REMOTE_WRITE_HOST"), "localhost:9090"),
+		)
+	}
+}
