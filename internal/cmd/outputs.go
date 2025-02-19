@@ -11,13 +11,13 @@ import (
 	"go.k6.io/k6/internal/output/cloud"
 	"go.k6.io/k6/internal/output/influxdb"
 	"go.k6.io/k6/internal/output/json"
+	"go.k6.io/k6/internal/output/opentelemetry"
 	"go.k6.io/k6/internal/output/prometheusrw/remotewrite"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/output"
 	"go.k6.io/k6/output/csv"
 
 	"github.com/grafana/xk6-dashboard/dashboard"
-	"github.com/grafana/xk6-output-opentelemetry/pkg/opentelemetry"
 )
 
 // builtinOutput marks the available builtin outputs.

@@ -13,7 +13,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/lib/testutils"
+	"go.k6.io/k6/internal/lib/testutils"
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
 	collectormetrics "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
