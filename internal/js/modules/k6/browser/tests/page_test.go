@@ -2477,7 +2477,7 @@ func TestPageOnResponse(t *testing.T) {
 	tb := newTestBrowser(t, withHTTPServer())
 	defer tb.Browser.Close()
 
-	tb.withHandler("/home", func(w http.ResponseWriter, r *http.Request) {
+	tb.withHandler("/home", func(w http.ResponseWriter, _ *http.Request) {
 		_, err := fmt.Fprintf(w, `<!DOCTYPE html>
 <html>
 <head>
@@ -2510,7 +2510,7 @@ func TestPageOnResponse(t *testing.T) {
 		_, err = fmt.Fprintf(w, `{"message": "Hello %s!"}`, data.Name)
 		require.NoError(t, err)
 	})
-	tb.withHandler("/style.css", func(w http.ResponseWriter, r *http.Request) {
+	tb.withHandler("/style.css", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/css")
 		_, err := fmt.Fprintf(w, `body { background-color: #f0f0f0; }`)
 		require.NoError(t, err)

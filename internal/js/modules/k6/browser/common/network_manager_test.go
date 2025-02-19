@@ -215,9 +215,9 @@ func (m *EventInterceptorMock) urlTagName(_ string, _ string) (string, bool) {
 	return "", false
 }
 
-func (m *EventInterceptorMock) onRequest(request *Request) {}
+func (m *EventInterceptorMock) onRequest(_ *Request) {}
 
-func (m *EventInterceptorMock) onResponse(response *Response) {}
+func (m *EventInterceptorMock) onResponse(_ *Response) {}
 
 func TestNetworkManagerEmitRequestResponseMetricsTimingSkew(t *testing.T) {
 	t.Parallel()
