@@ -117,7 +117,10 @@ No. An instance of sobek.Runtime can only be used by a single goroutine
 at a time. You can create as many instances of Runtime as you like but
 it's not possible to pass object values between runtimes.
 
-### Where is setTimeout()?
+### Where is setTimeout()/setInterval()?
+
+setTimeout() and setInterval() are common functions to provide concurrent execution in ECMAScript environments, but the two functions are not part of the ECMAScript standard.
+Browsers and NodeJS just happen to provide similar, but not identical, functions. The hosting application need to control the environment for concurrent execution, e.g. an event loop, and supply the functionality to script code.
 
 setTimeout() assumes concurrent execution of code which requires an execution
 environment, for example an event loop similar to nodejs or a browser.

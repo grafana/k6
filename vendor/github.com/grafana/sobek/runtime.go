@@ -2386,6 +2386,12 @@ func (r *Runtime) GlobalObject() *Object {
 	return r.globalObject
 }
 
+// SetGlobalObject sets the global object to the given object.
+// Note, any existing references to the previous global object will continue to reference that object.
+func (r *Runtime) SetGlobalObject(object *Object) {
+	r.globalObject = object
+}
+
 // Set the specified variable in the global context.
 // Equivalent to running "name = value" in non-strict mode.
 // The value is first converted using ToValue().
