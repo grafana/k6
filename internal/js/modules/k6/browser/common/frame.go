@@ -1540,7 +1540,7 @@ func (f *Frame) tap(selector string, opts *FrameTapOptions) error {
 
 func (f *Frame) setInputFiles(selector string, files *Files, opts *FrameSetInputFilesOptions) error {
 	setInputFiles := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
-		return nil, handle.setInputFiles(apiCtx, files.Payload)
+		return nil, handle.setInputFiles(apiCtx, files)
 	}
 	act := f.newAction(
 		selector, DOMElementStateAttached, opts.Strict,
