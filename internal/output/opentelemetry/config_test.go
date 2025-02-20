@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	k6Const "go.k6.io/k6/lib/consts"
+	"go.k6.io/k6/internal/build"
 	"go.k6.io/k6/lib/types"
 	"gopkg.in/guregu/null.v3"
 )
@@ -24,7 +24,7 @@ func TestConfig(t *testing.T) {
 		"default": {
 			expectedConfig: Config{
 				ServiceName:          null.StringFrom("k6"),
-				ServiceVersion:       null.StringFrom(k6Const.Version),
+				ServiceVersion:       null.StringFrom(build.Version),
 				ExporterType:         null.StringFrom(grpcExporterType),
 				HTTPExporterInsecure: null.NewBool(false, true),
 				HTTPExporterEndpoint: null.StringFrom("localhost:4318"),
@@ -40,7 +40,7 @@ func TestConfig(t *testing.T) {
 			env: map[string]string{"K6_OTEL_GRPC_EXPORTER_ENDPOINT": "else", "K6_OTEL_EXPORT_INTERVAL": "4ms"},
 			expectedConfig: Config{
 				ServiceName:          null.StringFrom("k6"),
-				ServiceVersion:       null.StringFrom(k6Const.Version),
+				ServiceVersion:       null.StringFrom(build.Version),
 				ExporterType:         null.StringFrom(grpcExporterType),
 				HTTPExporterInsecure: null.NewBool(false, true),
 				HTTPExporterEndpoint: null.StringFrom("localhost:4318"),
@@ -95,7 +95,7 @@ func TestConfig(t *testing.T) {
 			},
 			expectedConfig: Config{
 				ServiceName:          null.StringFrom("otel-service"),
-				ServiceVersion:       null.StringFrom(k6Const.Version),
+				ServiceVersion:       null.StringFrom(build.Version),
 				ExporterType:         null.StringFrom(grpcExporterType),
 				HTTPExporterInsecure: null.NewBool(false, true),
 				HTTPExporterEndpoint: null.StringFrom("localhost:4318"),
@@ -150,7 +150,7 @@ func TestConfig(t *testing.T) {
 			jsonRaw: json.RawMessage(`{"exporterType":"http","httpExporterEndpoint":"localhost:5566","httpExporterURLPath":"/lorem/ipsum", "exportInterval":"15ms"}`),
 			expectedConfig: Config{
 				ServiceName:          null.StringFrom("k6"),
-				ServiceVersion:       null.StringFrom(k6Const.Version),
+				ServiceVersion:       null.StringFrom(build.Version),
 				ExporterType:         null.StringFrom(httpExporterType),
 				HTTPExporterInsecure: null.NewBool(false, true),
 				HTTPExporterEndpoint: null.StringFrom("localhost:5566"),

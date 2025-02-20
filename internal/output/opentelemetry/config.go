@@ -10,7 +10,7 @@ import (
 	"github.com/mstoykov/envconfig"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
-	k6Const "go.k6.io/k6/lib/consts"
+	"go.k6.io/k6/internal/build"
 	"go.k6.io/k6/lib/types"
 	"gopkg.in/guregu/null.v3"
 )
@@ -106,7 +106,7 @@ func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string) (
 func newDefaultConfig() Config {
 	return Config{
 		ServiceName:    null.StringFrom("k6"),
-		ServiceVersion: null.StringFrom(k6Const.Version),
+		ServiceVersion: null.StringFrom(build.Version),
 		ExporterType:   null.StringFrom(grpcExporterType),
 
 		HTTPExporterInsecure: null.BoolFrom(false),
