@@ -288,7 +288,9 @@ func (tq *timerQueue) add(t *timer) int {
 	if i < 0 {
 		i = len(tq.queue)
 	}
-	tq.queue = slices.Insert(tq.queue, i, t)
+	tq.queue = append(tq.queue, nil)
+	copy(tq.queue[i+1:], tq.queue[i:])
+	tq.queue[i] = t
 	return i
 }
 
