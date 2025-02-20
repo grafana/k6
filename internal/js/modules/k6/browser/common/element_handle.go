@@ -1306,19 +1306,14 @@ func (h *ElementHandle) ScrollIntoViewIfNeeded(opts *ElementHandleBaseOptions) e
 }
 
 // SelectOption selects the options matching the given values.
-func (h *ElementHandle) SelectOption(values []any, opts sobek.Value) ([]string, error) {
-	aopts := NewElementHandleBaseOptions(h.DefaultTimeout())
-	if err := aopts.Parse(h.ctx, opts); err != nil {
-		return nil, fmt.Errorf("parsing selectOption options: %w", err)
-	}
-
+func (h *ElementHandle) SelectOption(values []any, opts *ElementHandleBaseOptions) ([]string, error) {
 	selectOption := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return handle.selectOption(apiCtx, values)
 	}
 	selectOptionAction := h.newAction(
-		[]string{}, selectOption, aopts.Force, aopts.NoWaitAfter, aopts.Timeout,
+		[]string{}, selectOption, opts.Force, opts.NoWaitAfter, opts.Timeout,
 	)
-	selectedOptions, err := call(h.ctx, selectOptionAction, aopts.Timeout)
+	selectedOptions, err := call(h.ctx, selectOptionAction, opts.Timeout)
 	if err != nil {
 		return nil, fmt.Errorf("selecting options: %w", err)
 	}
