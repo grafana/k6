@@ -1,3 +1,4 @@
+// Package consts houses some constants needed across k6
 package consts
 
 // JS constants

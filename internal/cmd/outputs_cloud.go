@@ -14,8 +14,8 @@ import (
 
 	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/cmd/state"
+	"go.k6.io/k6/internal/build"
 	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/metrics"
 )
 
@@ -116,7 +116,7 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 	logger := gs.Logger.WithFields(logrus.Fields{"output": builtinOutputCloud.String()})
 
 	apiClient := cloudapi.NewClient(
-		logger, conf.Token.String, conf.Host.String, consts.Version, conf.Timeout.TimeDuration())
+		logger, conf.Token.String, conf.Host.String, build.Version, conf.Timeout.TimeDuration())
 
 	response, err := apiClient.CreateTestRun(testRun)
 	if err != nil {

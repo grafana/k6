@@ -14,9 +14,9 @@ import (
 	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
+	"go.k6.io/k6/internal/build"
 	"go.k6.io/k6/internal/cloudapi/insights"
 	insightsOutput "go.k6.io/k6/internal/output/cloud/insights"
-	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
 
@@ -70,7 +70,7 @@ func New(logger logrus.FieldLogger, conf cloudapi.Config, _ *cloudapi.Client) (*
 		// It creates a new client because in the case the backend has overwritten
 		// the config we need to use the new set.
 		cloudClient: cloudapi.NewClient(
-			logger, conf.Token.String, conf.Host.String, consts.Version, conf.Timeout.TimeDuration()),
+			logger, conf.Token.String, conf.Host.String, build.Version, conf.Timeout.TimeDuration()),
 	}, nil
 }
 

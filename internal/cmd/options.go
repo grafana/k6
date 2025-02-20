@@ -8,8 +8,8 @@ import (
 	"github.com/spf13/pflag"
 	"gopkg.in/guregu/null.v3"
 
+	"go.k6.io/k6/internal/build"
 	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/metrics"
 )
@@ -37,7 +37,7 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.Int64("batch", 20, "max parallel batch reqs")
 	flags.Int64("batch-per-host", 6, "max parallel batch reqs per host")
 	flags.Int64("rps", 0, "limit requests per second")
-	flags.String("user-agent", fmt.Sprintf("k6/%s (https://k6.io/)", consts.Version), "user agent for http requests")
+	flags.String("user-agent", fmt.Sprintf("k6/%s (https://k6.io/)", build.Version), "user agent for http requests")
 	flags.String("http-debug", "", "log all HTTP requests and responses. Excludes body by default. To include body use '--http-debug=full'") //nolint:lll
 	flags.Lookup("http-debug").NoOptDefVal = "headers"
 	flags.Bool("insecure-skip-tls-verify", false, "skip verification of TLS certificates")
