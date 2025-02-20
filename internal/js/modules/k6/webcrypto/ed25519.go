@@ -7,8 +7,8 @@ import (
 )
 
 // Ed25519KeyGenParams represents the object that should be passed as the algorithm
-// paramter into `SubtleCrypto.GenerateKey`, when generating any X25519 key pair.
-// The X25519 key generation expects only the algorithm type as a parameter.
+// paramter into `SubtleCrypto.GenerateKey`, when generating an Ed25519 key pair.
+// The Ed25519 key generation expects only the algorithm type as a parameter.
 type Ed25519KeyGenParams struct {
 	Algorithm
 }
