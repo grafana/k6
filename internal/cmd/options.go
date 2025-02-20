@@ -38,7 +38,8 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.Int64("batch-per-host", 6, "max parallel batch reqs per host")
 	flags.Int64("rps", 0, "limit requests per second")
 	flags.String("user-agent", fmt.Sprintf("k6/%s (https://k6.io/)", build.Version), "user agent for http requests")
-	flags.String("http-debug", "", "log all HTTP requests and responses. Excludes body by default. To include body use '--http-debug=full'") //nolint:lll
+	flags.String("http-debug", "", "log all HTTP requests and responses. Excludes body by default.\n"+
+		"To include body use '--http-debug=full'")
 	flags.Lookup("http-debug").NoOptDefVal = "headers"
 	flags.Bool("insecure-skip-tls-verify", false, "skip verification of TLS certificates")
 	flags.Bool("no-connection-reuse", false, "disable keep-alive connections")
@@ -46,8 +47,8 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.Duration("min-iteration-duration", 0, "minimum amount of time k6 will take executing a single iteration")
 	flags.BoolP("throw", "w", false, "throw warnings (like failed http requests) as errors")
 	flags.StringSlice("blacklist-ip", nil, "blacklist an `ip range` from being called")
-	flags.StringSlice("block-hostnames", nil, "block a case-insensitive hostname `pattern`,"+
-		" with optional leading wildcard, from being called")
+	flags.StringSlice("block-hostnames", nil, "block a case-insensitive hostname `pattern`,\n"+
+		"with optional leading wildcard, from being called")
 
 	// The comment about system-tags also applies for summary-trend-stats. The default values
 	// are set in applyDefault().
@@ -56,21 +57,22 @@ func optionFlagSet() *pflag.FlagSet {
 		strings.Join(lib.DefaultSummaryTrendStats, ","),
 	)
 	flags.StringSlice("summary-trend-stats", nil, sumTrendStatsHelp)
-	flags.String("summary-time-unit", "", "define the time unit used to display the trend stats. Possible units are: 's', 'ms' and 'us'") //nolint:lll
+	flags.String("summary-time-unit", "", "define the time unit used to display the trend stats.\n"+
+		"Possible units are: 's', 'ms' and 'us'")
 	// system-tags must have a default value, but we can't specify it here, otherwiese, it will always override others.
 	// set it to nil here, and add the default in applyDefault() instead.
 	systemTagsCliHelpText := fmt.Sprintf(
-		"only include these system tags in metrics (default %q)",
+		"only include these system tags in metrics (default\n%q)",
 		metrics.DefaultSystemTagSet.SetString(),
 	)
 	flags.StringSlice("system-tags", nil, systemTagsCliHelpText)
 	flags.StringArray("tag", nil, "add a `tag` to be applied to all samples, as `[name]=[value]`")
 	flags.String("console-output", "", "redirects the console logging to the provided output file")
 	flags.Bool("discard-response-bodies", false, "Read but don't process or save HTTP response bodies")
-	flags.String("local-ips", "", "Client IP Ranges and/or CIDRs from which each VU will be making requests, "+
+	flags.String("local-ips", "", "Client IP Ranges and/or CIDRs from which each VU will be making requests,\n"+
 		"e.g. '192.168.220.1,192.168.0.10-192.168.0.25', 'fd:1::0/120', etc.")
-	flags.String("dns", types.DefaultDNSConfig().String(), "DNS resolver configuration. Possible ttl values are: 'inf' "+
-		"for a persistent cache, '0' to disable the cache,\nor a positive duration, e.g. '1s', '1m', etc. "+
+	flags.String("dns", types.DefaultDNSConfig().String(), "DNS resolver configuration. Possible ttl values are:\n"+
+		"'inf' for a persistent cache, '0' to disable the cache, or a positive duration, e.g. '1s', '1m', etc.\n"+
 		"Milliseconds are assumed if no unit is provided.\n"+
 		"Possible select values to return a single IP are: 'first', 'random' or 'roundRobin'.\n"+
 		"Possible policy values are: 'preferIPv4', 'preferIPv6', 'onlyIPv4', 'onlyIPv6' or 'any'.\n")
