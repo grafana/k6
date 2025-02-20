@@ -3,6 +3,7 @@ package timers
 
 import (
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
@@ -247,8 +248,7 @@ func (e *timers) setupTaskQueueCloserOnIterationEnd() {
 						timer.name, timer.id)
 				}
 
-				// TODO: use `clear` when we only support go 1.21 and above
-				e.timers = make(map[uint64]time.Time)
+				clear(e.timers)
 				e.queue.stopTimer()
 				e.queue = new(timerQueue)
 				e.taskQueue = nil
@@ -282,17 +282,13 @@ type timerQueue struct {
 }
 
 func (tq *timerQueue) add(t *timer) int {
-	var i int
-	// don't use range as we want to index to go over one if it needs to go to the end
-	for ; i < len(tq.queue); i++ {
-		if tq.queue[i].nextTrigger.After(t.nextTrigger) {
-			break
-		}
+	i := slices.IndexFunc(tq.queue, func(tt *timer) bool {
+		return tt.nextTrigger.After(t.nextTrigger)
+	})
+	if i < 0 {
+		i = len(tq.queue)
 	}
-
-	tq.queue = append(tq.queue, nil)
-	copy(tq.queue[i+1:], tq.queue[i:])
-	tq.queue[i] = t
+	tq.queue = slices.Insert(tq.queue, i, t)
 	return i
 }
 
@@ -306,21 +302,9 @@ func (tq *timerQueue) stopTimer() {
 }
 
 func (tq *timerQueue) remove(id uint64) {
-	i := tq.findIndex(id)
-	if i == -1 {
-		return
-	}
-
-	tq.queue = append(tq.queue[:i], tq.queue[i+1:]...)
-}
-
-func (tq *timerQueue) findIndex(id uint64) int {
-	for i, timer := range tq.queue {
-		if id == timer.id {
-			return i
-		}
-	}
-	return -1
+	tq.queue = slices.DeleteFunc(tq.queue, func(t *timer) bool {
+		return id == t.id
+	})
 }
 
 func (tq *timerQueue) pop() *timer {
@@ -329,8 +313,7 @@ func (tq *timerQueue) pop() *timer {
 		return nil
 	}
 	t := tq.queue[0]
-	copy(tq.queue, tq.queue[1:])
-	tq.queue = tq.queue[:length-1]
+	tq.queue = slices.Delete(tq.queue, 0, 1)
 	return t
 }
 
