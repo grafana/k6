@@ -1,0 +1,90 @@
+{
+	"parserOptions": {
+		"ecmaFeatures": {
+			"jsx": true
+		},
+		"ecmaVersion": 2020,
+		"sourceType": "module"
+	},
+	"extends": ["airbnb", "prettier"],
+	"plugins": ["react", "prettier"],
+	"env": {
+		"browser": true,
+		"node": true
+	},
+	"rules": {
+		"prettier/prettier": ["error"],
+		"arrow-body-style": "warn",
+		"camelcase": 0,
+		"object-curly-newline": 0,
+		"operator-linebreak": 0,
+		"no-shadow": 0,
+		"max-len": [2, 120],
+		"no-underscore-dangle": "off",
+		"react/prop-types": 0,
+		"react/function-component-definition": 0,
+		"react/no-unstable-nested-components": 0,
+		"react/jsx-curly-brace-presence": [
+			2,
+			{
+				"props": "ignore",
+				"children": "never"
+			}
+		],
+		"react/jsx-tag-spacing": [
+			2,
+			{
+				"closingSlash": "never",
+				"beforeSelfClosing": "always",
+				"afterOpening": "allow-multiline",
+				"beforeClosing": "never"
+			}
+		],
+		"react/jsx-filename-extension": [
+			2,
+			{
+				"extensions": [".js"]
+			}
+		],
+		"react/no-array-index-key": 0,
+		"react/jsx-one-expression-per-line": 0,
+		"react/jsx-props-no-spreading": 0,
+		"react/jsx-wrap-multilines": 0,
+		"import/no-extraneous-dependencies": [
+			"warn",
+			{ "devDependencies": false, "peerDependencies": true }
+		],
+		"import/order": [
+			"warn",
+			{
+				"alphabetize": {
+					"order": "asc" /* sort in ascending order. Options: ['ignore', 'asc', 'desc'] */,
+					"caseInsensitive": true /* ignore case. Options: [true, false] */
+				},
+				"newlines-between": "always"
+			}
+		],
+		"import/no-unresolved": [
+			2,
+			{
+				"ignore": [
+					"components",
+					"hooks",
+					"images",
+					"layouts",
+					"pages",
+					"styles",
+					"svg",
+					"templates",
+					"utils",
+					"contexts",
+					"i18n",
+					"data"
+				]
+			}
+		],
+		"import/prefer-default-export": 0,
+		"jsx-a11y/html-has-lang": 0,
+		"jsx-a11y/control-has-associated-label": 0
+	}
+}

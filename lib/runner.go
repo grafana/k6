@@ -3,7 +3,6 @@ package lib
 import (
 	"context"
 	"io"
-	"time"
 
 	"go.k6.io/k6/metrics"
 )
@@ -81,7 +80,7 @@ type Runner interface {
 	// function in the script.
 	IsExecutable(string) bool
 
-	HandleSummary(context.Context, *Summary) (map[string]io.Reader, error)
+	HandleSummary(context.Context, *LegacySummary, *Summary) (map[string]io.Reader, error)
 }
 
 // UIState describes the state of the UI, which might influence what
@@ -89,13 +88,4 @@ type Runner interface {
 type UIState struct {
 	IsStdOutTTY bool
 	IsStdErrTTY bool
-}
-
-// Summary contains all of the data the summary handler gets.
-type Summary struct {
-	Metrics         map[string]*metrics.Metric
-	RootGroup       *Group
-	TestRunDuration time.Duration // TODO: use lib.ExecutionState-based interface instead?
-	NoColor         bool          // TODO: drop this when noColor is part of the (runtime) options
-	UIState         UIState
 }

@@ -64,8 +64,17 @@ func (c *CounterSink) IsEmpty() bool { return c.First.IsZero() }
 func (c *CounterSink) Format(t time.Duration) map[string]float64 {
 	return map[string]float64{
 		"count": c.Value,
-		"rate":  c.Value / (float64(t) / float64(time.Second)),
+		"rate":  c.Rate(t),
 	}
+}
+
+// Rate calculates the rate (per second) of the counter,
+// based on the given duration.
+func (c *CounterSink) Rate(t time.Duration) float64 {
+	if t == 0 {
+		return 0
+	}
+	return c.Value / (float64(t) / float64(time.Second))
 }
 
 // GaugeSink is a sink represents a Gauge
