@@ -131,6 +131,7 @@ func (o *Output) Summary(
 
 	// Populate root group and nested groups recursively.
 	populateSummaryGroup(
+		o.summaryMode,
 		&summary.SummaryGroup,
 		o.dataModel.aggregatedGroupData,
 		testRunDuration,
@@ -141,6 +142,7 @@ func (o *Output) Summary(
 	for scenarioName, scenarioData := range o.dataModel.scenarios {
 		scenarioSummaryGroup := lib.NewSummaryGroup()
 		populateSummaryGroup(
+			o.summaryMode,
 			&scenarioSummaryGroup,
 			scenarioData,
 			testRunDuration,

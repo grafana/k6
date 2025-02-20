@@ -156,6 +156,7 @@ func (a *aggregatedChecksData) checkFor(name string) *lib.Check {
 }
 
 func populateSummaryGroup(
+	summaryMode lib.SummaryMode,
 	summaryGroup *lib.SummaryGroup,
 	groupData aggregatedGroupData,
 	testRunDuration time.Duration,
@@ -175,7 +176,7 @@ func populateSummaryGroup(
 		summaryMetric := lib.NewSummaryMetricFrom(info, sink, testDuration, summaryTrendStats)
 
 		switch {
-		case isSkippedMetric(info.Name):
+		case isSkippedMetric(summaryMode, info.Name):
 			// Do nothing, just skip.
 		case isHTTPMetric(info.Name):
 			dest.HTTP[info.Name] = summaryMetric
@@ -213,7 +214,7 @@ func populateSummaryGroup(
 	// Finally, we keep moving down the hierarchy and populate the nested groups.
 	for groupName, subGroupData := range groupData.groupsData {
 		summarySubGroup := lib.NewSummaryGroup()
-		populateSummaryGroup(&summarySubGroup, subGroupData, testRunDuration, summaryTrendStats)
+		populateSummaryGroup(summaryMode, &summarySubGroup, subGroupData, testRunDuration, summaryTrendStats)
 		summaryGroup.Groups[groupName] = summarySubGroup
 	}
 }
@@ -334,8 +335,19 @@ func isWebSocketsMetric(metricName string) bool {
 	return strings.HasPrefix(metricName, "ws_")
 }
 
-func isSkippedMetric(metricName string) bool {
-	return oneOfMetrics(metricName, metrics.ChecksName, metrics.GroupDurationName)
+func isSkippedMetric(summaryMode lib.SummaryMode, metricName string) bool {
+	switch summaryMode {
+	case lib.SummaryModeCompact:
+		return oneOfMetrics(metricName,
+			metrics.ChecksName, metrics.GroupDurationName,
+			metrics.HTTPReqBlockedName, metrics.HTTPReqConnectingName, metrics.HTTPReqReceivingName,
+			metrics.HTTPReqSendingName, metrics.HTTPReqTLSHandshakingName, metrics.HTTPReqWaitingName,
+		)
+	default:
+		return oneOfMetrics(metricName,
+			metrics.ChecksName, metrics.GroupDurationName,
+		)
+	}
 }
 
 func oneOfMetrics(metricName string, values ...string) bool {
