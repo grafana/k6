@@ -22,7 +22,7 @@ func newEd25519KeyGenParams(normalized Algorithm) (KeyGenerator, error) {
 }
 
 func (kgp *Ed25519KeyGenParams) GenerateKey(extractable bool, keyUsages []CryptoKeyUsage) (CryptoKeyGenerationResult, error) {
-	rawPrivateKey, rawPublicKey, err := generateEd25519KeyPair(keyUsages)
+	rawPublicKey, rawPrivateKey, err := generateEd25519KeyPair(keyUsages)
 	if err != nil {
 		return nil, err
 	}
@@ -69,4 +69,34 @@ func generateEd25519KeyPair(keyUsages []CryptoKeyUsage) (ed25519.PublicKey, ed25
 	}
 
 	return ed25519.GenerateKey(rand.Reader)
+}
+
+type ed25519SignerVerifier struct{}
+
+func (ed25519SignerVerifier) Sign(key CryptoKey, data []byte) ([]byte, error) {
+	if key.Type != PrivateCryptoKeyType {
+		return nil, NewError(InvalidAccessError, "Must use private key to sign data")
+	}
+
+	keyHandle, ok := key.handle.(ed25519.PrivateKey)
+	if !ok {
+		return nil, NewError(InvalidAccessError, "Key handle is not an Ed25519 Private Key")
+	}
+
+	return ed25519.Sign(keyHandle, data), nil
+}
+
+func (ed25519SignerVerifier) Verify(key CryptoKey, signature, data []byte) (bool, error) {
+	if key.Type != PublicCryptoKeyType {
+		return false, NewError(InvalidAccessError, "Must use public key to verify data")
+	}
+
+	keyHandle, ok := key.handle.(ed25519.PublicKey)
+	if !ok {
+		return false, NewError(InvalidAccessError, "Key handle is not an Ed25519 public key")
+	}
+
+	// TODO: verify that the ed25519 library conducts small-order checks, if not add them here
+
+	return ed25519.Verify(keyHandle, data, signature), nil
 }

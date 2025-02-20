@@ -7,6 +7,9 @@ all: clean format tests build
 build:
 	go build
 
+build-debug:
+	go build  -gcflags="all=-N -l"
+
 ## format: Applies Go formatting to code.
 format:
 	find . -name '*.go' -exec gofmt -s -w {} +
