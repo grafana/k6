@@ -592,13 +592,9 @@ func (f *Frame) click(selector string, opts *FrameClickOptions) error {
 }
 
 // Check clicks the first element found that matches selector.
-func (f *Frame) Check(selector string, opts sobek.Value) error {
+func (f *Frame) Check(selector string, popts *FrameCheckOptions) error {
 	f.log.Debugf("Frame:Check", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	popts := NewFrameCheckOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return fmt.Errorf("parsing new frame check options: %w", err)
-	}
 	if err := f.check(selector, popts); err != nil {
 		return fmt.Errorf("checking %q: %w", selector, err)
 	}
@@ -637,13 +633,9 @@ func (f *Frame) setChecked(selector string, checked bool, opts *FrameCheckOption
 }
 
 // SetChecked sets the checked state of the first element found that matches the selector.
-func (f *Frame) SetChecked(selector string, checked bool, opts sobek.Value) error {
+func (f *Frame) SetChecked(selector string, checked bool, popts *FrameCheckOptions) error {
 	f.log.Debugf("Frame:SetChecked", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	popts := NewFrameCheckOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return fmt.Errorf("parsing frame set check options: %w", err)
-	}
 	if err := f.setChecked(selector, checked, popts); err != nil {
 		return fmt.Errorf("setting checked %q: %w", selector, err)
 	}
@@ -654,13 +646,9 @@ func (f *Frame) SetChecked(selector string, checked bool, opts sobek.Value) erro
 }
 
 // Uncheck the first found element that matches the selector.
-func (f *Frame) Uncheck(selector string, opts sobek.Value) error {
+func (f *Frame) Uncheck(selector string, popts *FrameUncheckOptions) error {
 	f.log.Debugf("Frame:Uncheck", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	popts := NewFrameUncheckOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return fmt.Errorf("parsing frame uncheck options %q: %w", selector, err)
-	}
 	if err := f.uncheck(selector, popts); err != nil {
 		return fmt.Errorf("unchecking %q: %w", selector, err)
 	}
@@ -686,14 +674,10 @@ func (f *Frame) uncheck(selector string, opts *FrameUncheckOptions) error {
 
 // IsChecked returns true if the first element that matches the selector
 // is checked. Otherwise, returns false.
-func (f *Frame) IsChecked(selector string, opts sobek.Value) (bool, error) {
+func (f *Frame) IsChecked(selector string, opts *FrameIsCheckedOptions) (bool, error) {
 	f.log.Debugf("Frame:IsChecked", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	popts := NewFrameIsCheckedOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return false, fmt.Errorf("parsing is checked options: %w", err)
-	}
-	checked, err := f.isChecked(selector, popts)
+	checked, err := f.isChecked(selector, opts)
 	if err != nil {
 		return false, fmt.Errorf("checking element is checked %q: %w", selector, err)
 	}
@@ -753,13 +737,9 @@ func (f *Frame) Content() (string, error) {
 }
 
 // Dblclick double clicks an element matching provided selector.
-func (f *Frame) Dblclick(selector string, opts sobek.Value) error {
+func (f *Frame) Dblclick(selector string, popts *FrameDblclickOptions) error {
 	f.log.Debugf("Frame:DblClick", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	popts := NewFrameDblClickOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return fmt.Errorf("parsing double click options: %w", err)
-	}
 	if err := f.dblclick(selector, popts); err != nil {
 		return fmt.Errorf("double clicking on %q: %w", selector, err)
 	}
@@ -892,13 +872,9 @@ func (f *Frame) EvaluateHandle(pageFunc string, args ...any) (handle JSHandleAPI
 }
 
 // Fill fills out the first element found that matches the selector.
-func (f *Frame) Fill(selector, value string, opts sobek.Value) error {
+func (f *Frame) Fill(selector, value string, popts *FrameFillOptions) error {
 	f.log.Debugf("Frame:Fill", "fid:%s furl:%q sel:%q val:%q", f.ID(), f.URL(), selector, value)
 
-	popts := NewFrameFillOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return fmt.Errorf("parsing fill options: %w", err)
-	}
 	if err := f.fill(selector, value, popts); err != nil {
 		return fmt.Errorf("filling %q with %q: %w", selector, value, err)
 	}
@@ -925,13 +901,9 @@ func (f *Frame) fill(selector, value string, opts *FrameFillOptions) error {
 }
 
 // Focus focuses on the first element that matches the selector.
-func (f *Frame) Focus(selector string, opts sobek.Value) error {
+func (f *Frame) Focus(selector string, popts *FrameBaseOptions) error {
 	f.log.Debugf("Frame:Focus", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	popts := NewFrameBaseOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return fmt.Errorf("parsing focus options: %w", err)
-	}
 	if err := f.focus(selector, popts); err != nil {
 		return fmt.Errorf("focusing %q: %w", selector, err)
 	}
@@ -969,13 +941,9 @@ func (f *Frame) FrameElement() (*ElementHandle, error) {
 
 // GetAttribute of the first element found that matches the selector.
 // The second return value is true if the attribute exists, and false otherwise.
-func (f *Frame) GetAttribute(selector, name string, opts sobek.Value) (string, bool, error) {
+func (f *Frame) GetAttribute(selector, name string, popts *FrameBaseOptions) (string, bool, error) {
 	f.log.Debugf("Frame:GetAttribute", "fid:%s furl:%q sel:%q name:%s", f.ID(), f.URL(), selector, name)
 
-	popts := NewFrameBaseOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return "", false, fmt.Errorf("parsing get attribute options: %w", err)
-	}
 	s, ok, err := f.getAttribute(selector, name, popts)
 	if err != nil {
 		return "", false, fmt.Errorf("getting attribute %q of %q: %w", name, selector, err)
@@ -1039,13 +1007,9 @@ func (f *Frame) Goto(url string, opts *FrameGotoOptions) (*Response, error) {
 }
 
 // Hover moves the pointer over the first element that matches the selector.
-func (f *Frame) Hover(selector string, opts sobek.Value) error {
+func (f *Frame) Hover(selector string, popts *FrameHoverOptions) error {
 	f.log.Debugf("Frame:Hover", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	popts := NewFrameHoverOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return fmt.Errorf("parsing hover options: %w", err)
-	}
 	if err := f.hover(selector, popts); err != nil {
 		return fmt.Errorf("hovering %q: %w", selector, err)
 	}
@@ -1071,13 +1035,9 @@ func (f *Frame) hover(selector string, opts *FrameHoverOptions) error {
 
 // InnerHTML returns the innerHTML attribute of the first element found
 // that matches the selector.
-func (f *Frame) InnerHTML(selector string, opts sobek.Value) (string, error) {
+func (f *Frame) InnerHTML(selector string, popts *FrameInnerHTMLOptions) (string, error) {
 	f.log.Debugf("Frame:InnerHTML", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	popts := NewFrameInnerHTMLOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return "", fmt.Errorf("parsing inner HTML options: %w", err)
-	}
 	v, err := f.innerHTML(selector, popts)
 	if err != nil {
 		return "", fmt.Errorf("getting inner HTML of %q: %w", selector, err)
@@ -1111,13 +1071,9 @@ func (f *Frame) innerHTML(selector string, opts *FrameInnerHTMLOptions) (string,
 
 // InnerText returns the inner text of the first element found
 // that matches the selector.
-func (f *Frame) InnerText(selector string, opts sobek.Value) (string, error) {
+func (f *Frame) InnerText(selector string, popts *FrameInnerTextOptions) (string, error) {
 	f.log.Debugf("Frame:InnerText", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	popts := NewFrameInnerTextOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return "", fmt.Errorf("parsing inner text options: %w", err)
-	}
 	v, err := f.innerText(selector, popts)
 	if err != nil {
 		return "", fmt.Errorf("getting inner text of %q: %w", selector, err)
@@ -1150,13 +1106,9 @@ func (f *Frame) innerText(selector string, opts *FrameInnerTextOptions) (string,
 }
 
 // InputValue returns the input value of the first element found that matches the selector.
-func (f *Frame) InputValue(selector string, opts sobek.Value) (string, error) {
+func (f *Frame) InputValue(selector string, popts *FrameInputValueOptions) (string, error) {
 	f.log.Debugf("Frame:InputValue", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	popts := NewFrameInputValueOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return "", fmt.Errorf("parsing input value options: %w", err)
-	}
 	v, err := f.inputValue(selector, popts)
 	if err != nil {
 		return "", fmt.Errorf("getting input value of %q: %w", selector, err)
@@ -1203,14 +1155,10 @@ func (f *Frame) setDetached(detached bool) {
 
 // IsEditable returns true if the first element that matches the selector
 // is editable. Otherwise, returns false.
-func (f *Frame) IsEditable(selector string, opts sobek.Value) (bool, error) {
+func (f *Frame) IsEditable(selector string, opts *FrameIsEditableOptions) (bool, error) {
 	f.log.Debugf("Frame:IsEditable", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	popts := NewFrameIsEditableOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return false, fmt.Errorf("parsing is editable options: %w", err)
-	}
-	editable, err := f.isEditable(selector, popts)
+	editable, err := f.isEditable(selector, opts)
 	if err != nil {
 		return false, fmt.Errorf("checking is %q editable: %w", selector, err)
 	}
@@ -1244,14 +1192,10 @@ func (f *Frame) isEditable(selector string, opts *FrameIsEditableOptions) (bool,
 
 // IsEnabled returns true if the first element that matches the selector
 // is enabled. Otherwise, returns false.
-func (f *Frame) IsEnabled(selector string, opts sobek.Value) (bool, error) {
+func (f *Frame) IsEnabled(selector string, opts *FrameIsEnabledOptions) (bool, error) {
 	f.log.Debugf("Frame:IsEnabled", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	popts := NewFrameIsEnabledOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return false, fmt.Errorf("parsing is enabled options: %w", err)
-	}
-	enabled, err := f.isEnabled(selector, popts)
+	enabled, err := f.isEnabled(selector, opts)
 	if err != nil {
 		return false, fmt.Errorf("checking is %q enabled: %w", selector, err)
 	}
@@ -1285,14 +1229,10 @@ func (f *Frame) isEnabled(selector string, opts *FrameIsEnabledOptions) (bool, e
 
 // IsDisabled returns true if the first element that matches the selector
 // is disabled. Otherwise, returns false.
-func (f *Frame) IsDisabled(selector string, opts sobek.Value) (bool, error) {
+func (f *Frame) IsDisabled(selector string, opts *FrameIsDisabledOptions) (bool, error) {
 	f.log.Debugf("Frame:IsDisabled", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	popts := NewFrameIsDisabledOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return false, fmt.Errorf("parsing is disabled options: %w", err)
-	}
-	disabled, err := f.isDisabled(selector, popts)
+	disabled, err := f.isDisabled(selector, opts)
 	if err != nil {
 		return false, fmt.Errorf("checking is %q disabled: %w", selector, err)
 	}
@@ -1326,14 +1266,10 @@ func (f *Frame) isDisabled(selector string, opts *FrameIsDisabledOptions) (bool,
 
 // IsHidden returns true if the first element that matches the selector
 // is hidden. Otherwise, returns false.
-func (f *Frame) IsHidden(selector string, opts sobek.Value) (bool, error) {
+func (f *Frame) IsHidden(selector string, opts *FrameIsHiddenOptions) (bool, error) {
 	f.log.Debugf("Frame:IsHidden", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	popts := NewFrameIsHiddenOptions()
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return false, fmt.Errorf("parsing is hidden options: %w", err)
-	}
-	hidden, err := f.isHidden(selector, popts)
+	hidden, err := f.isHidden(selector, opts)
 	if err != nil {
 		return false, err
 	}
@@ -1359,14 +1295,10 @@ func (f *Frame) isHidden(selector string, opts *FrameIsHiddenOptions) (bool, err
 
 // IsVisible returns true if the first element that matches the selector
 // is visible. Otherwise, returns false.
-func (f *Frame) IsVisible(selector string, opts sobek.Value) (bool, error) {
+func (f *Frame) IsVisible(selector string, opts *FrameIsVisibleOptions) (bool, error) {
 	f.log.Debugf("Frame:IsVisible", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	popts := NewFrameIsVisibleOptions()
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return false, fmt.Errorf("parsing is visible options: %w", err)
-	}
-	visible, err := f.isVisible(selector, popts)
+	visible, err := f.isVisible(selector, opts)
 	if err != nil {
 		return false, err
 	}
@@ -1455,14 +1387,10 @@ func (f *Frame) ParentFrame() *Frame {
 }
 
 // Press presses the given key for the first element found that matches the selector.
-func (f *Frame) Press(selector, key string, opts sobek.Value) error {
+func (f *Frame) Press(selector, key string, opts *FramePressOptions) error {
 	f.log.Debugf("Frame:Press", "fid:%s furl:%q sel:%q key:%q", f.ID(), f.URL(), selector, key)
 
-	popts := NewFramePressOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return fmt.Errorf("parsing press options: %w", err)
-	}
-	if err := f.press(selector, key, popts); err != nil {
+	if err := f.press(selector, key, opts); err != nil {
 		return fmt.Errorf("pressing %q on %q: %w", key, selector, err)
 	}
 
@@ -1488,13 +1416,9 @@ func (f *Frame) press(selector, key string, opts *FramePressOptions) error {
 
 // SelectOption selects the given options and returns the array of
 // option values of the first element found that matches the selector.
-func (f *Frame) SelectOption(selector string, values sobek.Value, opts sobek.Value) ([]string, error) {
+func (f *Frame) SelectOption(selector string, values []any, popts *FrameSelectOptionOptions) ([]string, error) {
 	f.log.Debugf("Frame:SelectOption", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	popts := NewFrameSelectOptionOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return nil, fmt.Errorf("parsing select option options: %w", err)
-	}
 	v, err := f.selectOption(selector, values, popts)
 	if err != nil {
 		return nil, fmt.Errorf("selecting option on %q: %w", selector, err)
@@ -1505,7 +1429,7 @@ func (f *Frame) SelectOption(selector string, values sobek.Value, opts sobek.Val
 	return v, nil
 }
 
-func (f *Frame) selectOption(selector string, values sobek.Value, opts *FrameSelectOptionOptions) ([]string, error) {
+func (f *Frame) selectOption(selector string, values []any, opts *FrameSelectOptionOptions) ([]string, error) {
 	selectOption := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return handle.selectOption(apiCtx, values)
 	}
@@ -1546,15 +1470,11 @@ func (f *Frame) selectOption(selector string, values sobek.Value, opts *FrameSel
 }
 
 // SetContent replaces the entire HTML document content.
-func (f *Frame) SetContent(html string, opts sobek.Value) error {
+func (f *Frame) SetContent(html string, _ *FrameSetContentOptions) error {
 	f.log.Debugf("Frame:SetContent", "fid:%s furl:%q", f.ID(), f.URL())
 
-	parsedOpts := NewFrameSetContentOptions(
-		f.manager.timeoutSettings.navigationTimeout(),
-	)
-	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		return fmt.Errorf("parsing set content options: %w", err)
-	}
+	// TODO(@inancgumus): Respect the FrameSetContentOptions before executing the action.
+	// A solution is similar to the logic in `WaitForLoadState`.
 
 	js := `(html) => {
 		window.stop();
@@ -1579,18 +1499,8 @@ func (f *Frame) SetContent(html string, opts sobek.Value) error {
 }
 
 // SetInputFiles sets input files for the selected element.
-func (f *Frame) SetInputFiles(selector string, files sobek.Value, opts sobek.Value) error {
+func (f *Frame) SetInputFiles(selector string, pfiles *Files, popts *FrameSetInputFilesOptions) error {
 	f.log.Debugf("Frame:SetInputFiles", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
-
-	popts := NewFrameSetInputFilesOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return fmt.Errorf("parsing setInputFiles options: %w", err)
-	}
-
-	pfiles := &Files{}
-	if err := pfiles.Parse(f.ctx, files); err != nil {
-		return fmt.Errorf("parsing setInputFiles parameter: %w", err)
-	}
 
 	if err := f.setInputFiles(selector, pfiles, popts); err != nil {
 		return fmt.Errorf("setting input files on %q: %w", selector, err)
@@ -1630,7 +1540,7 @@ func (f *Frame) tap(selector string, opts *FrameTapOptions) error {
 
 func (f *Frame) setInputFiles(selector string, files *Files, opts *FrameSetInputFilesOptions) error {
 	setInputFiles := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
-		return nil, handle.setInputFiles(apiCtx, files.Payload)
+		return nil, handle.setInputFiles(apiCtx, files)
 	}
 	act := f.newAction(
 		selector, DOMElementStateAttached, opts.Strict,
@@ -1648,13 +1558,9 @@ func (f *Frame) setInputFiles(selector string, files *Files, opts *FrameSetInput
 // TextContent returns the textContent attribute of the first element found
 // that matches the selector. The second return value is true if the returned
 // text content is not null or empty, and false otherwise.
-func (f *Frame) TextContent(selector string, opts sobek.Value) (string, bool, error) {
+func (f *Frame) TextContent(selector string, popts *FrameTextContentOptions) (string, bool, error) {
 	f.log.Debugf("Frame:TextContent", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	popts := NewFrameTextContentOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return "", false, fmt.Errorf("parsing text content options: %w", err)
-	}
 	v, ok, err := f.textContent(selector, popts)
 	if err != nil {
 		return "", false, fmt.Errorf("getting text content of %q: %w", selector, err)
@@ -1710,13 +1616,9 @@ func (f *Frame) Title() (string, error) {
 }
 
 // Type text on the first element found matches the selector.
-func (f *Frame) Type(selector, text string, opts sobek.Value) error {
+func (f *Frame) Type(selector, text string, popts *FrameTypeOptions) error {
 	f.log.Debugf("Frame:Type", "fid:%s furl:%q sel:%q text:%q", f.ID(), f.URL(), selector, text)
 
-	popts := NewFrameTypeOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return fmt.Errorf("parsing type options: %w", err)
-	}
 	if err := f.typ(selector, text, popts); err != nil {
 		return fmt.Errorf("typing %q in %q: %w", text, selector, err)
 	}
@@ -1843,16 +1745,11 @@ func (f *Frame) waitForFunction(
 
 // WaitForLoadState waits for the given load state to be reached.
 // This will unblock if that lifecycle event has already been received.
-func (f *Frame) WaitForLoadState(state string, opts sobek.Value) error {
+func (f *Frame) WaitForLoadState(state string, popts *FrameWaitForLoadStateOptions) error {
 	f.log.Debugf("Frame:WaitForLoadState", "fid:%s furl:%q state:%s", f.ID(), f.URL(), state)
 	defer f.log.Debugf("Frame:WaitForLoadState:return", "fid:%s furl:%q state:%s", f.ID(), f.URL(), state)
 
-	waitForLoadStateOpts := NewFrameWaitForLoadStateOptions(f.defaultTimeout())
-	if err := waitForLoadStateOpts.Parse(f.ctx, opts); err != nil {
-		return fmt.Errorf("parsing waitForLoadState %q options: %w", state, err)
-	}
-
-	timeoutCtx, timeoutCancel := context.WithTimeout(f.ctx, waitForLoadStateOpts.Timeout)
+	timeoutCtx, timeoutCancel := context.WithTimeout(f.ctx, popts.Timeout)
 	defer timeoutCancel()
 
 	waitUntil := LifecycleEventLoad
@@ -1974,12 +1871,8 @@ func (f *Frame) WaitForNavigation(opts *FrameWaitForNavigationOptions) (*Respons
 }
 
 // WaitForSelector waits for the given selector to match the waiting criteria.
-func (f *Frame) WaitForSelector(selector string, opts sobek.Value) (*ElementHandle, error) {
-	parsedOpts := NewFrameWaitForSelectorOptions(f.defaultTimeout())
-	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		return nil, fmt.Errorf("parsing wait for selector %q options: %w", selector, err)
-	}
-	handle, err := f.waitForSelectorRetry(selector, parsedOpts, maxRetry)
+func (f *Frame) WaitForSelector(selector string, popts *FrameWaitForSelectorOptions) (*ElementHandle, error) {
+	handle, err := f.waitForSelectorRetry(selector, popts, maxRetry)
 	if err != nil {
 		return nil, fmt.Errorf("waiting for selector %q: %w", selector, err)
 	}

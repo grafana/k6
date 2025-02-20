@@ -1652,7 +1652,7 @@ func TestRunTags(t *testing.T) {
 
 	ts := getSingleFileTestState(t, script, []string{
 		"-u", "2", "--log-output=stdout", "--out", "json=results.json",
-		"--tag", "foo=bar", "--tag", "test=mest", "--tag", "over=written",
+		"--tag", "foo=bar", "--tag", "test=mest", "--tag", "over=written, something",
 	}, 0)
 	ts.Env["K6_ITERATIONS"] = "3"
 	ts.Env["K6_INSECURE_SKIP_TLS_VERIFY"] = "true"
@@ -1664,7 +1664,7 @@ func TestRunTags(t *testing.T) {
 	jsonResults, err := fsext.ReadFile(ts.FS, "results.json")
 	require.NoError(t, err)
 
-	expTags := map[string]string{"foo": "bar", "test": "mest", "over": "written", "scenario": "default"}
+	expTags := map[string]string{"foo": "bar", "test": "mest", "over": "written, something", "scenario": "default"}
 	assert.Equal(t, float64(3), sum(getSampleValues(t, jsonResults, "iterations", expTags)))
 	assert.Equal(t, 3, len(getSampleValues(t, jsonResults, "iteration_duration", expTags)))
 	assert.Less(t, float64(0), sum(getSampleValues(t, jsonResults, "data_received", expTags)))

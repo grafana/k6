@@ -7,7 +7,6 @@ import (
 
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
-	"go.k6.io/k6/js/promises"
 )
 
 // ReadableStream is a concrete instance of the general [readable stream] concept.
@@ -44,20 +43,20 @@ type ReadableStream struct {
 }
 
 // Cancel cancels the stream and returns a Promise to the user
-func (stream *ReadableStream) Cancel(reason sobek.Value) *sobek.Promise {
+func (stream *ReadableStream) Cancel(reason sobek.Value) (*sobek.Promise, error) {
 	// 1. IsReadableStreamLocked(this) is true, return a promise rejected with a TypeError exception.
 	if stream.isLocked() {
-		promise, _, reject := promises.New(stream.vu)
+		promise, _, reject := stream.vu.Runtime().NewPromise()
 
-		go func() {
-			reject(newTypeError(stream.runtime, "cannot cancel a locked stream").Err())
-		}()
+		if err := reject(newTypeError(stream.runtime, "cannot cancel a locked stream").Err()); err != nil {
+			return nil, err
+		}
 
-		return promise
+		return promise, nil
 	}
 
 	// 2. Return ! ReadableStreamCancel(reason)
-	return stream.cancel(reason)
+	return stream.cancel(reason), nil
 }
 
 // GetReader implements the [getReader] operation.

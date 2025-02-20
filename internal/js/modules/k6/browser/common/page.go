@@ -42,6 +42,9 @@ const (
 
 	// EventPageMetricCalled represents the page.on('metric') event.
 	EventPageMetricCalled PageOnEventName = "metric"
+
+	// EventPageRequestCalled represents the page.on('request') event.
+	EventPageRequestCalled PageOnEventName = "request"
 )
 
 // MediaType represents the type of media to emulate.
@@ -485,6 +488,32 @@ func (p *Page) urlTagName(url string, method string) (string, bool) {
 	return newTagName, urlMatched
 }
 
+func (p *Page) onRequest(request *Request) {
+	if !hasPageOnHandler(p, EventPageRequestCalled) {
+		return
+	}
+
+	p.eventHandlersMu.RLock()
+	defer p.eventHandlersMu.RUnlock()
+	for _, h := range p.eventHandlers[EventPageRequestCalled] {
+		err := func() error {
+			// Handlers can register other handlers, so we need to
+			// unlock the mutex before calling the next handler.
+			p.eventHandlersMu.RUnlock()
+			defer p.eventHandlersMu.RLock()
+
+			// Call and wait for the handler to complete.
+			return h(PageOnEvent{
+				Request: request,
+			})
+		}()
+		if err != nil {
+			p.logger.Warnf("onRequest", "handler returned an error: %v", err)
+			return
+		}
+	}
+}
+
 func (p *Page) onConsoleAPICalled(event *runtime.EventConsoleAPICalled) {
 	if !hasPageOnHandler(p, EventPageConsoleAPICalled) {
 		return
@@ -813,29 +842,29 @@ func (p *Page) BringToFront() error {
 }
 
 // SetChecked sets the checked state of the element matching the provided selector.
-func (p *Page) SetChecked(selector string, checked bool, opts sobek.Value) error {
+func (p *Page) SetChecked(selector string, checked bool, popts *FrameCheckOptions) error {
 	p.logger.Debugf("Page:SetChecked", "sid:%v selector:%s checked:%t", p.sessionID(), selector, checked)
 
-	return p.MainFrame().SetChecked(selector, checked, opts)
+	return p.MainFrame().SetChecked(selector, checked, popts)
 }
 
 // Check checks an element matching the provided selector.
-func (p *Page) Check(selector string, opts sobek.Value) error {
+func (p *Page) Check(selector string, popts *FrameCheckOptions) error {
 	p.logger.Debugf("Page:Check", "sid:%v selector:%s", p.sessionID(), selector)
 
-	return p.MainFrame().Check(selector, opts)
+	return p.MainFrame().Check(selector, popts)
 }
 
 // Uncheck unchecks an element matching the provided selector.
-func (p *Page) Uncheck(selector string, opts sobek.Value) error {
+func (p *Page) Uncheck(selector string, popts *FrameUncheckOptions) error {
 	p.logger.Debugf("Page:Uncheck", "sid:%v selector:%s", p.sessionID(), selector)
 
-	return p.MainFrame().Uncheck(selector, opts)
+	return p.MainFrame().Uncheck(selector, popts)
 }
 
 // IsChecked returns true if the first element that matches the selector
 // is checked. Otherwise, returns false.
-func (p *Page) IsChecked(selector string, opts sobek.Value) (bool, error) {
+func (p *Page) IsChecked(selector string, opts *FrameIsCheckedOptions) (bool, error) {
 	p.logger.Debugf("Page:IsChecked", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().IsChecked(selector, opts)
@@ -849,7 +878,7 @@ func (p *Page) Click(selector string, opts *FrameClickOptions) error {
 }
 
 // Close closes the page.
-func (p *Page) Close(_ sobek.Value) error {
+func (p *Page) Close() error {
 	p.logger.Debugf("Page:Close", "sid:%v", p.sessionID())
 	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.close")
 	defer span.End()
@@ -907,10 +936,10 @@ func (p *Page) Context() *BrowserContext {
 }
 
 // Dblclick double clicks an element matching provided selector.
-func (p *Page) Dblclick(selector string, opts sobek.Value) error {
+func (p *Page) Dblclick(selector string, popts *FrameDblclickOptions) error {
 	p.logger.Debugf("Page:Dblclick", "sid:%v selector:%s", p.sessionID(), selector)
 
-	return p.MainFrame().Dblclick(selector, opts)
+	return p.MainFrame().Dblclick(selector, popts)
 }
 
 // DispatchEvent dispatches an event on the page to the element that matches the provided selector.
@@ -921,17 +950,12 @@ func (p *Page) DispatchEvent(selector string, typ string, eventInit any, opts *F
 }
 
 // EmulateMedia emulates the given media type.
-func (p *Page) EmulateMedia(opts sobek.Value) error {
+func (p *Page) EmulateMedia(popts *PageEmulateMediaOptions) error {
 	p.logger.Debugf("Page:EmulateMedia", "sid:%v", p.sessionID())
 
-	parsedOpts := NewPageEmulateMediaOptions(p.mediaType, p.colorScheme, p.reducedMotion)
-	if err := parsedOpts.Parse(p.ctx, opts); err != nil {
-		return fmt.Errorf("parsing emulateMedia options: %w", err)
-	}
-
-	p.mediaType = parsedOpts.Media
-	p.colorScheme = parsedOpts.ColorScheme
-	p.reducedMotion = parsedOpts.ReducedMotion
+	p.mediaType = popts.Media
+	p.colorScheme = popts.ColorScheme
+	p.reducedMotion = popts.ReducedMotion
 
 	p.frameSessionsMu.RLock()
 	for _, fs := range p.frameSessions {
@@ -993,17 +1017,17 @@ func (p *Page) EvaluateHandle(pageFunc string, args ...any) (JSHandleAPI, error)
 }
 
 // Fill fills an input element with the provided value.
-func (p *Page) Fill(selector string, value string, opts sobek.Value) error {
+func (p *Page) Fill(selector string, value string, popts *FrameFillOptions) error {
 	p.logger.Debugf("Page:Fill", "sid:%v selector:%s", p.sessionID(), selector)
 
-	return p.MainFrame().Fill(selector, value, opts)
+	return p.MainFrame().Fill(selector, value, popts)
 }
 
 // Focus focuses an element matching the provided selector.
-func (p *Page) Focus(selector string, opts sobek.Value) error {
+func (p *Page) Focus(selector string, popts *FrameBaseOptions) error {
 	p.logger.Debugf("Page:Focus", "sid:%v selector:%s", p.sessionID(), selector)
 
-	return p.MainFrame().Focus(selector, opts)
+	return p.MainFrame().Focus(selector, popts)
 }
 
 // Frames returns a list of frames on the page.
@@ -1013,11 +1037,11 @@ func (p *Page) Frames() []*Frame {
 
 // GetAttribute returns the attribute value of the element matching the provided selector.
 // The second return value is true if the attribute exists, and false otherwise.
-func (p *Page) GetAttribute(selector string, name string, opts sobek.Value) (string, bool, error) {
+func (p *Page) GetAttribute(selector string, name string, popts *FrameBaseOptions) (string, bool, error) {
 	p.logger.Debugf("Page:GetAttribute", "sid:%v selector:%s name:%s",
 		p.sessionID(), selector, name)
 
-	return p.MainFrame().GetAttribute(selector, name, opts)
+	return p.MainFrame().GetAttribute(selector, name, popts)
 }
 
 // GetKeyboard returns the keyboard for the page.
@@ -1056,31 +1080,31 @@ func (p *Page) Goto(url string, opts *FrameGotoOptions) (*Response, error) {
 }
 
 // Hover hovers over an element matching the provided selector.
-func (p *Page) Hover(selector string, opts sobek.Value) error {
+func (p *Page) Hover(selector string, popts *FrameHoverOptions) error {
 	p.logger.Debugf("Page:Hover", "sid:%v selector:%s", p.sessionID(), selector)
 
-	return p.MainFrame().Hover(selector, opts)
+	return p.MainFrame().Hover(selector, popts)
 }
 
 // InnerHTML returns the inner HTML of the element matching the provided selector.
-func (p *Page) InnerHTML(selector string, opts sobek.Value) (string, error) {
+func (p *Page) InnerHTML(selector string, popts *FrameInnerHTMLOptions) (string, error) {
 	p.logger.Debugf("Page:InnerHTML", "sid:%v selector:%s", p.sessionID(), selector)
 
-	return p.MainFrame().InnerHTML(selector, opts)
+	return p.MainFrame().InnerHTML(selector, popts)
 }
 
 // InnerText returns the inner text of the element matching the provided selector.
-func (p *Page) InnerText(selector string, opts sobek.Value) (string, error) {
+func (p *Page) InnerText(selector string, popts *FrameInnerTextOptions) (string, error) {
 	p.logger.Debugf("Page:InnerText", "sid:%v selector:%s", p.sessionID(), selector)
 
-	return p.MainFrame().InnerText(selector, opts)
+	return p.MainFrame().InnerText(selector, popts)
 }
 
 // InputValue returns the value of the input element matching the provided selector.
-func (p *Page) InputValue(selector string, opts sobek.Value) (string, error) {
+func (p *Page) InputValue(selector string, popts *FrameInputValueOptions) (string, error) {
 	p.logger.Debugf("Page:InputValue", "sid:%v selector:%s", p.sessionID(), selector)
 
-	return p.MainFrame().InputValue(selector, opts)
+	return p.MainFrame().InputValue(selector, popts)
 }
 
 func (p *Page) IsClosed() bool {
@@ -1092,7 +1116,7 @@ func (p *Page) IsClosed() bool {
 
 // IsDisabled returns true if the first element that matches the selector
 // is disabled. Otherwise, returns false.
-func (p *Page) IsDisabled(selector string, opts sobek.Value) (bool, error) {
+func (p *Page) IsDisabled(selector string, opts *FrameIsDisabledOptions) (bool, error) {
 	p.logger.Debugf("Page:IsDisabled", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().IsDisabled(selector, opts)
@@ -1100,7 +1124,7 @@ func (p *Page) IsDisabled(selector string, opts sobek.Value) (bool, error) {
 
 // IsEditable returns true if the first element that matches the selector
 // is editable. Otherwise, returns false.
-func (p *Page) IsEditable(selector string, opts sobek.Value) (bool, error) {
+func (p *Page) IsEditable(selector string, opts *FrameIsEditableOptions) (bool, error) {
 	p.logger.Debugf("Page:IsEditable", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().IsEditable(selector, opts)
@@ -1108,7 +1132,7 @@ func (p *Page) IsEditable(selector string, opts sobek.Value) (bool, error) {
 
 // IsEnabled returns true if the first element that matches the selector
 // is enabled. Otherwise, returns false.
-func (p *Page) IsEnabled(selector string, opts sobek.Value) (bool, error) {
+func (p *Page) IsEnabled(selector string, opts *FrameIsEnabledOptions) (bool, error) {
 	p.logger.Debugf("Page:IsEnabled", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().IsEnabled(selector, opts)
@@ -1117,7 +1141,7 @@ func (p *Page) IsEnabled(selector string, opts sobek.Value) (bool, error) {
 // IsHidden will look for an element in the dom with given selector and see if
 // the element is hidden. It will not wait for a match to occur. If no elements
 // match `false` will be returned.
-func (p *Page) IsHidden(selector string, opts sobek.Value) (bool, error) {
+func (p *Page) IsHidden(selector string, opts *FrameIsHiddenOptions) (bool, error) {
 	p.logger.Debugf("Page:IsHidden", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().IsHidden(selector, opts)
@@ -1125,7 +1149,7 @@ func (p *Page) IsHidden(selector string, opts sobek.Value) (bool, error) {
 
 // IsVisible will look for an element in the dom with given selector. It will
 // not wait for a match to occur. If no elements match `false` will be returned.
-func (p *Page) IsVisible(selector string, opts sobek.Value) (bool, error) {
+func (p *Page) IsVisible(selector string, opts *FrameIsVisibleOptions) (bool, error) {
 	p.logger.Debugf("Page:IsVisible", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().IsVisible(selector, opts)
@@ -1174,6 +1198,10 @@ type PageOnEvent struct {
 
 	// Metric is the metric event event.
 	Metric *MetricEvent
+
+	// Request is the read only request that is about to be sent from the
+	// browser to the WuT.
+	Request *Request
 }
 
 // On subscribes to a page event for which the given handler will be executed
@@ -1197,7 +1225,7 @@ func (p *Page) Opener() *Page {
 }
 
 // Press presses the given key for the first element found that matches the selector.
-func (p *Page) Press(selector string, key string, opts sobek.Value) error {
+func (p *Page) Press(selector string, key string, opts *FramePressOptions) error {
 	p.logger.Debugf("Page:Press", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().Press(selector, key, opts)
@@ -1218,22 +1246,12 @@ func (p *Page) QueryAll(selector string) ([]*ElementHandle, error) {
 }
 
 // Reload will reload the current page.
-func (p *Page) Reload(opts sobek.Value) (*Response, error) { //nolint:funlen
+func (p *Page) Reload(opts *PageReloadOptions) (*Response, error) { //nolint:funlen
 	p.logger.Debugf("Page:Reload", "sid:%v", p.sessionID())
 	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.reload")
 	defer span.End()
 
-	reloadOpts := NewPageReloadOptions(
-		LifecycleEventLoad,
-		p.timeoutSettings.navigationTimeout(),
-	)
-	if err := reloadOpts.Parse(p.ctx, opts); err != nil {
-		err := fmt.Errorf("parsing reload options: %w", err)
-		spanRecordError(span, err)
-		return nil, err
-	}
-
-	timeoutCtx, timeoutCancelFn := context.WithTimeout(p.ctx, reloadOpts.Timeout)
+	timeoutCtx, timeoutCancelFn := context.WithTimeout(p.ctx, opts.Timeout)
 	defer timeoutCancelFn()
 
 	waitForFrameNavigation, cancelWaitingForFrameNavigation := createWaitForEventHandler(
@@ -1250,7 +1268,7 @@ func (p *Page) Reload(opts sobek.Value) (*Response, error) { //nolint:funlen
 		[]string{EventFrameAddLifecycle},
 		func(data any) bool {
 			if le, ok := data.(FrameLifecycleEvent); ok {
-				return le.Event == reloadOpts.WaitUntil
+				return le.Event == opts.WaitUntil
 			}
 			return false
 		})
@@ -1267,7 +1285,7 @@ func (p *Page) Reload(opts sobek.Value) (*Response, error) { //nolint:funlen
 		if errors.Is(err, context.DeadlineExceeded) {
 			err = &k6ext.UserFriendlyError{
 				Err:     err,
-				Timeout: reloadOpts.Timeout,
+				Timeout: opts.Timeout,
 			}
 			return fmt.Errorf("reloading page: %w", err)
 		}
@@ -1340,14 +1358,14 @@ func (p *Page) Screenshot(opts *PageScreenshotOptions, sp ScreenshotPersister) (
 
 // SelectOption selects the given options and returns the array of
 // option values of the first element found that matches the selector.
-func (p *Page) SelectOption(selector string, values sobek.Value, opts sobek.Value) ([]string, error) {
+func (p *Page) SelectOption(selector string, values []any, popts *FrameSelectOptionOptions) ([]string, error) {
 	p.logger.Debugf("Page:SelectOption", "sid:%v selector:%s", p.sessionID(), selector)
 
-	return p.MainFrame().SelectOption(selector, values, opts)
+	return p.MainFrame().SelectOption(selector, values, popts)
 }
 
 // SetContent replaces the entire HTML document content.
-func (p *Page) SetContent(html string, opts sobek.Value) error {
+func (p *Page) SetContent(html string, opts *FrameSetContentOptions) error {
 	p.logger.Debugf("Page:SetContent", "sid:%v", p.sessionID())
 
 	return p.MainFrame().SetContent(html, opts)
@@ -1376,21 +1394,17 @@ func (p *Page) SetExtraHTTPHeaders(headers map[string]string) error {
 }
 
 // SetInputFiles sets input files for the selected element.
-func (p *Page) SetInputFiles(selector string, files sobek.Value, opts sobek.Value) error {
+func (p *Page) SetInputFiles(selector string, files *Files, opts *FrameSetInputFilesOptions) error {
 	p.logger.Debugf("Page:SetInputFiles", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().SetInputFiles(selector, files, opts)
 }
 
 // SetViewportSize will update the viewport width and height.
-func (p *Page) SetViewportSize(viewportSize sobek.Value) error {
+func (p *Page) SetViewportSize(viewportSize *Size) error {
 	p.logger.Debugf("Page:SetViewportSize", "sid:%v", p.sessionID())
 
-	var s Size
-	if err := s.Parse(p.ctx, viewportSize); err != nil {
-		return fmt.Errorf("parsing viewport size: %w", err)
-	}
-	if err := p.setViewportSize(&s); err != nil {
+	if err := p.setViewportSize(viewportSize); err != nil {
 		return fmt.Errorf("setting viewport size: %w", err)
 	}
 
@@ -1407,10 +1421,10 @@ func (p *Page) Tap(selector string, opts *FrameTapOptions) error {
 // TextContent returns the textContent attribute of the first element found
 // that matches the selector. The second return value is true if the returned
 // text content is not null or empty, and false otherwise.
-func (p *Page) TextContent(selector string, opts sobek.Value) (string, bool, error) {
+func (p *Page) TextContent(selector string, popts *FrameTextContentOptions) (string, bool, error) {
 	p.logger.Debugf("Page:TextContent", "sid:%v selector:%s", p.sessionID(), selector)
 
-	return p.MainFrame().TextContent(selector, opts)
+	return p.MainFrame().TextContent(selector, popts)
 }
 
 // Timeout will return the default timeout or the one set by the user.
@@ -1471,10 +1485,10 @@ func (p *Page) ThrottleNetwork(networkProfile NetworkProfile) error {
 }
 
 // Type text on the first element found matches the selector.
-func (p *Page) Type(selector string, text string, opts sobek.Value) error {
+func (p *Page) Type(selector string, text string, popts *FrameTypeOptions) error {
 	p.logger.Debugf("Page:Type", "sid:%v selector:%s text:%s", p.sessionID(), selector, text)
 
-	return p.MainFrame().Type(selector, text, opts)
+	return p.MainFrame().Type(selector, text, popts)
 }
 
 // URL returns the location of the page.
@@ -1512,10 +1526,10 @@ func (p *Page) WaitForFunction(js string, opts *FrameWaitForFunctionOptions, jsA
 }
 
 // WaitForLoadState waits for the specified page life cycle event.
-func (p *Page) WaitForLoadState(state string, opts sobek.Value) error {
+func (p *Page) WaitForLoadState(state string, popts *FrameWaitForLoadStateOptions) error {
 	p.logger.Debugf("Page:WaitForLoadState", "sid:%v state:%q", p.sessionID(), state)
 
-	return p.frameManager.MainFrame().WaitForLoadState(state, opts)
+	return p.frameManager.MainFrame().WaitForLoadState(state, popts)
 }
 
 // WaitForNavigation waits for the given navigation lifecycle event to happen.
@@ -1534,12 +1548,12 @@ func (p *Page) WaitForNavigation(opts *FrameWaitForNavigationOptions) (*Response
 }
 
 // WaitForSelector waits for the given selector to match the waiting criteria.
-func (p *Page) WaitForSelector(selector string, opts sobek.Value) (*ElementHandle, error) {
+func (p *Page) WaitForSelector(selector string, popts *FrameWaitForSelectorOptions) (*ElementHandle, error) {
 	p.logger.Debugf("Page:WaitForSelector",
 		"sid:%v stid:%v ptid:%v selector:%s",
 		p.sessionID(), p.session.TargetID(), p.targetID, selector)
 
-	return p.frameManager.MainFrame().WaitForSelector(selector, opts)
+	return p.frameManager.MainFrame().WaitForSelector(selector, popts)
 }
 
 // WaitForTimeout waits the specified number of milliseconds.

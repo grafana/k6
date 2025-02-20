@@ -9,7 +9,9 @@ import (
 	"io"
 	"net/http"
 	"runtime"
+	"slices"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -57,7 +59,7 @@ func TestNestedFrames(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	frame1Handle, err := page.WaitForSelector("iframe[id='iframe1']", nil)
+	frame1Handle, err := page.WaitForSelector("iframe[id='iframe1']", common.NewFrameWaitForSelectorOptions(page.MainFrame().Timeout()))
 	assert.Nil(t, err)
 	assert.NotNil(t, frame1Handle)
 
@@ -65,7 +67,7 @@ func TestNestedFrames(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotNil(t, frame1)
 
-	frame2Handle, err := frame1.WaitForSelector("iframe[id='iframe2']", nil)
+	frame2Handle, err := frame1.WaitForSelector("iframe[id='iframe2']", common.NewFrameWaitForSelectorOptions(frame1.Timeout()))
 	assert.Nil(t, err)
 	assert.NotNil(t, frame2Handle)
 
@@ -73,7 +75,7 @@ func TestNestedFrames(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotNil(t, frame2)
 
-	button1Handle, err := frame2.WaitForSelector("button[id='button1']", nil)
+	button1Handle, err := frame2.WaitForSelector("button[id='button1']", common.NewFrameWaitForSelectorOptions(frame2.Timeout()))
 	assert.Nil(t, err)
 	assert.NotNil(t, button1Handle)
 
@@ -92,11 +94,13 @@ func TestPageEmulateMedia(t *testing.T) {
 	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
-	err := p.EmulateMedia(tb.toSobekValue(emulateMediaOpts{
+	popts := common.NewPageEmulateMediaOptions(p)
+	require.NoError(t, popts.Parse(tb.context(), tb.toSobekValue(emulateMediaOpts{
 		Media:         "print",
 		ColorScheme:   "dark",
 		ReducedMotion: "reduce",
-	}))
+	})))
+	err := p.EmulateMedia(popts)
 	require.NoError(t, err)
 
 	result, err := p.Evaluate(`() => matchMedia('print').matches`)
@@ -395,7 +399,7 @@ func TestPageInnerHTML(t *testing.T) {
 		p := newTestBrowser(t).NewPage(nil)
 		err := p.SetContent(sampleHTML, nil)
 		require.NoError(t, err)
-		innerHTML, err := p.InnerHTML("div", nil)
+		innerHTML, err := p.InnerHTML("div", common.NewFrameInnerHTMLOptions(p.MainFrame().Timeout()))
 		require.NoError(t, err)
 		assert.Equal(t, `<b>Test</b><ol><li><i>One</i></li></ol>`, innerHTML)
 	})
@@ -408,7 +412,7 @@ func TestPageInnerHTML(t *testing.T) {
 
 		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
-		_, err := p.InnerHTML("", nil)
+		_, err := p.InnerHTML("", common.NewFrameInnerHTMLOptions(p.Context().Timeout()))
 		require.ErrorContains(t, err, "The provided selector is empty")
 	})
 
@@ -419,7 +423,9 @@ func TestPageInnerHTML(t *testing.T) {
 		p := tb.NewPage(nil)
 		err := p.SetContent(sampleHTML, nil)
 		require.NoError(t, err)
-		_, err = p.InnerHTML("p", tb.toSobekValue(jsFrameBaseOpts{Timeout: "100"}))
+		popts := common.NewFrameInnerHTMLOptions(p.MainFrame().Timeout())
+		require.NoError(t, popts.Parse(tb.vu.Context(), tb.toSobekValue(jsFrameBaseOpts{Timeout: "100"})))
+		_, err = p.InnerHTML("p", popts)
 		require.Error(t, err)
 	})
 }
@@ -433,7 +439,7 @@ func TestPageInnerText(t *testing.T) {
 		p := newTestBrowser(t).NewPage(nil)
 		err := p.SetContent(sampleHTML, nil)
 		require.NoError(t, err)
-		innerText, err := p.InnerText("div", nil)
+		innerText, err := p.InnerText("div", common.NewFrameInnerTextOptions(p.MainFrame().Timeout()))
 		require.NoError(t, err)
 		assert.Equal(t, "Test\nOne", innerText)
 	})
@@ -443,7 +449,7 @@ func TestPageInnerText(t *testing.T) {
 
 		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
-		_, err := p.InnerText("", nil)
+		_, err := p.InnerText("", common.NewFrameInnerTextOptions(p.MainFrame().Timeout()))
 		require.ErrorContains(t, err, "The provided selector is empty")
 	})
 
@@ -454,7 +460,10 @@ func TestPageInnerText(t *testing.T) {
 		p := tb.NewPage(nil)
 		err := p.SetContent(sampleHTML, nil)
 		require.NoError(t, err)
-		_, err = p.InnerText("p", tb.toSobekValue(jsFrameBaseOpts{Timeout: "100"}))
+
+		popts := common.NewFrameInnerTextOptions(p.MainFrame().Timeout())
+		require.NoError(t, popts.Parse(tb.vu.Context(), tb.toSobekValue(jsFrameBaseOpts{Timeout: "100"})))
+		_, err = p.InnerText("p", popts)
 		require.Error(t, err)
 	})
 }
@@ -468,7 +477,7 @@ func TestPageTextContent(t *testing.T) {
 		p := newTestBrowser(t).NewPage(nil)
 		err := p.SetContent(sampleHTML, nil)
 		require.NoError(t, err)
-		textContent, ok, err := p.TextContent("div", nil)
+		textContent, ok, err := p.TextContent("div", common.NewFrameTextContentOptions(p.MainFrame().Timeout()))
 		require.NoError(t, err)
 		require.True(t, ok)
 		assert.Equal(t, "TestOne", textContent)
@@ -479,7 +488,7 @@ func TestPageTextContent(t *testing.T) {
 
 		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
-		_, _, err := p.TextContent("", nil)
+		_, _, err := p.TextContent("", common.NewFrameTextContentOptions(p.MainFrame().Timeout()))
 		require.ErrorContains(t, err, "The provided selector is empty")
 	})
 
@@ -490,9 +499,7 @@ func TestPageTextContent(t *testing.T) {
 		p := tb.NewPage(nil)
 		err := p.SetContent(sampleHTML, nil)
 		require.NoError(t, err)
-		_, _, err = p.TextContent("p", tb.toSobekValue(jsFrameBaseOpts{
-			Timeout: "100",
-		}))
+		_, _, err = p.TextContent("p", common.NewFrameTextContentOptions(100))
 		require.Error(t, err)
 	})
 
@@ -503,9 +510,7 @@ func TestPageTextContent(t *testing.T) {
 		p := tb.NewPage(nil)
 		err := p.SetContent(sampleHTML, nil)
 		require.NoError(t, err)
-		_, _, err = p.TextContent("p", tb.toSobekValue(jsFrameBaseOpts{
-			Timeout: "100",
-		}))
+		_, _, err = p.TextContent("p", common.NewFrameTextContentOptions(100))
 		require.Error(t, err)
 	})
 }
@@ -522,17 +527,17 @@ func TestPageInputValue(t *testing.T) {
      	`, nil)
 	require.NoError(t, err)
 
-	inputValue, err := p.InputValue("input", nil)
+	inputValue, err := p.InputValue("input", common.NewFrameInputValueOptions(p.MainFrame().Timeout()))
 	require.NoError(t, err)
 	got, want := inputValue, "hello1"
 	assert.Equal(t, got, want)
 
-	inputValue, err = p.InputValue("select", nil)
+	inputValue, err = p.InputValue("select", common.NewFrameInputValueOptions(p.MainFrame().Timeout()))
 	require.NoError(t, err)
 	got, want = inputValue, "hello2"
 	assert.Equal(t, got, want)
 
-	inputValue, err = p.InputValue("textarea", nil)
+	inputValue, err = p.InputValue("textarea", common.NewFrameInputValueOptions(p.MainFrame().Timeout()))
 	require.NoError(t, err)
 	got, want = inputValue, "hello3"
 	assert.Equal(t, got, want)
@@ -557,10 +562,10 @@ func TestPageInputSpecialCharacters(t *testing.T) {
 		`¯\_(ツ)_/¯`,
 	}
 	for _, want := range wants {
-		require.NoError(t, el.Fill("", nil))
-		require.NoError(t, el.Type(want, nil))
+		require.NoError(t, el.Fill("", common.NewElementHandleBaseOptions(common.DefaultTimeout)))
+		require.NoError(t, el.Type(want, common.NewElementHandleTypeOptions(common.DefaultTimeout)))
 
-		got, err := el.InputValue(nil)
+		got, err := el.InputValue(common.NewElementHandleBaseOptions(common.DefaultTimeout))
 		require.NoError(t, err)
 		assert.Equal(t, want, got)
 	}
@@ -593,16 +598,16 @@ func TestPageFill(t *testing.T) {
 	}
 	for _, tt := range happy {
 		t.Run("happy/"+tt.name, func(t *testing.T) {
-			err := p.Fill(tt.selector, tt.value, nil)
+			err := p.Fill(tt.selector, tt.value, common.NewFrameFillOptions(p.MainFrame().Timeout()))
 			require.NoError(t, err)
-			inputValue, err := p.InputValue(tt.selector, nil)
+			inputValue, err := p.InputValue(tt.selector, common.NewFrameInputValueOptions(p.MainFrame().Timeout()))
 			require.NoError(t, err)
 			require.Equal(t, tt.value, inputValue)
 		})
 	}
 	for _, tt := range sad {
 		t.Run("sad/"+tt.name, func(t *testing.T) {
-			err := p.Fill(tt.selector, tt.value, nil)
+			err := p.Fill(tt.selector, tt.value, common.NewFrameFillOptions(p.MainFrame().Timeout()))
 			require.Error(t, err)
 		})
 	}
@@ -615,13 +620,17 @@ func TestPageIsChecked(t *testing.T) {
 
 	err := p.SetContent(`<input type="checkbox" checked>`, nil)
 	require.NoError(t, err)
-	checked, err := p.IsChecked("input", nil)
+
+	isopts := common.NewFrameIsCheckedOptions(common.DefaultTimeout)
+	checked, err := p.IsChecked("input", isopts)
 	require.NoError(t, err)
 	assert.True(t, checked, "expected checkbox to be checked")
 
 	err = p.SetContent(`<input type="checkbox">`, nil)
 	require.NoError(t, err)
-	checked, err = p.IsChecked("input", nil)
+
+	isopts = common.NewFrameIsCheckedOptions(common.DefaultTimeout)
+	checked, err = p.IsChecked("input", isopts)
 	require.NoError(t, err)
 	assert.False(t, checked, "expected checkbox to be unchecked")
 }
@@ -632,19 +641,23 @@ func TestPageSetChecked(t *testing.T) {
 	p := newTestBrowser(t).NewPage(nil)
 	err := p.SetContent(`<input id="el" type="checkbox">`, nil)
 	require.NoError(t, err)
-	checked, err := p.IsChecked("#el", nil)
+
+	isopts := common.NewFrameIsCheckedOptions(common.DefaultTimeout)
+	checked, err := p.IsChecked("#el", isopts)
 	require.NoError(t, err)
 	assert.False(t, checked)
 
-	err = p.SetChecked("#el", true, nil)
+	err = p.SetChecked("#el", true, common.NewFrameCheckOptions(p.MainFrame().Timeout()))
 	require.NoError(t, err)
-	checked, err = p.IsChecked("#el", nil)
+	isopts = common.NewFrameIsCheckedOptions(common.DefaultTimeout)
+	checked, err = p.IsChecked("#el", isopts)
 	require.NoError(t, err)
 	assert.True(t, checked)
 
-	err = p.SetChecked("#el", false, nil)
+	err = p.SetChecked("#el", false, common.NewFrameCheckOptions(p.MainFrame().Timeout()))
 	require.NoError(t, err)
-	checked, err = p.IsChecked("#el", nil)
+	isopts = common.NewFrameIsCheckedOptions(common.DefaultTimeout)
+	checked, err = p.IsChecked("#el", isopts)
 	require.NoError(t, err)
 	assert.False(t, checked)
 }
@@ -655,12 +668,16 @@ func TestPageScreenshotFullpage(t *testing.T) {
 	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
-	err := p.SetViewportSize(tb.toSobekValue(struct {
+	viewportSize := tb.toSobekValue(struct {
 		Width  float64 `js:"width"`
 		Height float64 `js:"height"`
 	}{
 		Width: 1280, Height: 800,
-	}))
+	})
+	s := new(common.Size)
+	require.NoError(t, s.Parse(tb.context(), viewportSize))
+
+	err := p.SetViewportSize(s)
 	require.NoError(t, err)
 
 	_, err = p.Evaluate(`
@@ -921,7 +938,7 @@ func TestPageWaitForLoadState(t *testing.T) {
 
 		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
-		err := p.WaitForLoadState("none", nil)
+		err := p.WaitForLoadState("none", common.NewFrameWaitForLoadStateOptions(p.MainFrame().Timeout()))
 		require.ErrorContains(t, err, `invalid lifecycle event: "none"; must be one of: load, domcontentloaded, networkidle`)
 	})
 }
@@ -950,11 +967,12 @@ func TestPagePress(t *testing.T) {
 	err := p.SetContent(`<input id="text1">`, nil)
 	require.NoError(t, err)
 
-	require.NoError(t, p.Press("#text1", "Shift+KeyA", nil))
-	require.NoError(t, p.Press("#text1", "KeyB", nil))
-	require.NoError(t, p.Press("#text1", "Shift+KeyC", nil))
+	opts := common.NewFramePressOptions(p.MainFrame().Timeout())
+	require.NoError(t, p.Press("#text1", "Shift+KeyA", opts))
+	require.NoError(t, p.Press("#text1", "KeyB", opts))
+	require.NoError(t, p.Press("#text1", "Shift+KeyC", opts))
 
-	inputValue, err := p.InputValue("#text1", nil)
+	inputValue, err := p.InputValue("#text1", common.NewFrameInputValueOptions(p.MainFrame().Timeout()))
 	require.NoError(t, err)
 	require.Equal(t, "AbC", inputValue)
 }
@@ -993,7 +1011,7 @@ func TestPageClose(t *testing.T) {
 
 		p := b.NewPage(nil)
 
-		err := p.Close(nil)
+		err := p.Close()
 		assert.NoError(t, err)
 	})
 
@@ -1007,7 +1025,7 @@ func TestPageClose(t *testing.T) {
 		p, err := c.NewPage()
 		require.NoError(t, err)
 
-		err = p.Close(nil)
+		err = p.Close()
 		assert.NoError(t, err)
 	})
 }
@@ -1373,11 +1391,12 @@ func TestPageWaitForSelector(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name      string
-		url       string
-		opts      map[string]any
-		selector  string
-		errAssert func(*testing.T, error)
+		name          string
+		url           string
+		opts          map[string]any
+		customTimeout time.Duration
+		selector      string
+		errAssert     func(*testing.T, error)
 	}{
 		{
 			name:     "should wait for selector",
@@ -1391,12 +1410,10 @@ func TestPageWaitForSelector(t *testing.T) {
 		{
 			name: "should TO waiting for selector",
 			url:  "wait_for.html",
-			opts: map[string]any{
-				// set a timeout smaller than the time
-				// it takes the element to show up
-				"timeout": "1",
-			},
-			selector: "#my-div",
+			// set a timeout smaller than the time
+			// it takes the element to show up
+			customTimeout: time.Millisecond,
+			selector:      "#my-div",
 			errAssert: func(t *testing.T, e error) {
 				t.Helper()
 				assert.ErrorContains(t, e, "timed out after")
@@ -1421,7 +1438,12 @@ func TestPageWaitForSelector(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			_, err = page.WaitForSelector(tc.selector, tb.toSobekValue(tc.opts))
+			timeout := page.MainFrame().Timeout()
+			if tc.customTimeout != 0 {
+				timeout = tc.customTimeout
+			}
+
+			_, err = page.WaitForSelector(tc.selector, common.NewFrameWaitForSelectorOptions(timeout))
 			tc.errAssert(t, err)
 		})
 	}
@@ -1522,10 +1544,10 @@ func TestPageThrottleNetwork(t *testing.T) {
 
 			// result selector only appears once the page gets a response
 			// from the async ping request.
-			_, err = page.WaitForSelector(selector, nil)
+			_, err = page.WaitForSelector(selector, common.NewFrameWaitForSelectorOptions(page.MainFrame().Timeout()))
 			require.NoError(t, err)
 
-			resp, err := page.InnerText(selector, nil)
+			resp, err := page.InnerText(selector, common.NewFrameInnerTextOptions(page.MainFrame().Timeout()))
 			require.NoError(t, err)
 			ms, err := strconv.ParseInt(resp, 10, 64)
 			require.NoError(t, err)
@@ -1593,7 +1615,7 @@ func performPingTest(t *testing.T, tb *testBrowser, page *common.Page, iteration
 
 		// result selector only appears once the page gets a response
 		// from the async ping request.
-		_, err = page.WaitForSelector(selector, nil)
+		_, err = page.WaitForSelector(selector, common.NewFrameWaitForSelectorOptions(page.MainFrame().Timeout()))
 		require.NoError(t, err)
 
 		ms += time.Since(start).Abs().Milliseconds()
@@ -1663,8 +1685,7 @@ func TestPageIsVisible(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			got, err := page.IsVisible(tc.selector, tb.toSobekValue(tc.options))
-
+			got, err := page.IsVisible(tc.selector, &tc.options)
 			if tc.wantErr != "" {
 				assert.ErrorContains(t, err, tc.wantErr)
 				return
@@ -1685,7 +1706,7 @@ func TestPageIsHidden(t *testing.T) {
 	testCases := []struct {
 		name     string
 		selector string
-		options  common.FrameIsVisibleOptions
+		options  common.FrameIsHiddenOptions
 		want     bool
 		wantErr  string
 	}{
@@ -1712,7 +1733,7 @@ func TestPageIsHidden(t *testing.T) {
 		{
 			name:     "first_div",
 			selector: "div",
-			options: common.FrameIsVisibleOptions{
+			options: common.FrameIsHiddenOptions{
 				Strict: true,
 			},
 			wantErr: "error:strictmodeviolation",
@@ -1737,8 +1758,7 @@ func TestPageIsHidden(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			got, err := page.IsHidden(tc.selector, tb.toSobekValue(tc.options))
-
+			got, err := page.IsHidden(tc.selector, &tc.options)
 			if tc.wantErr != "" {
 				assert.ErrorContains(t, err, tc.wantErr)
 				return
@@ -1853,7 +1873,7 @@ func TestPageTargetBlank(t *testing.T) {
 	p2, ok := obj.(*common.Page)
 	require.True(t, ok, "return from WaitForEvent is not a Page")
 
-	err = p2.WaitForLoadState(common.LifecycleEventLoad.String(), nil)
+	err = p2.WaitForLoadState(common.LifecycleEventLoad.String(), common.NewFrameWaitForLoadStateOptions(p.MainFrame().Timeout()))
 	require.NoError(t, err)
 
 	// Now there should be 2 pages.
@@ -1861,7 +1881,7 @@ func TestPageTargetBlank(t *testing.T) {
 	assert.Equal(t, 2, len(pp))
 
 	// Make sure the new page contains the correct page.
-	got, err := p2.InnerHTML("h1", nil)
+	got, err := p2.InnerHTML("h1", common.NewFrameInnerHTMLOptions(p.MainFrame().Timeout()))
 	require.NoError(t, err)
 	assert.Equal(t, "you clicked!", got)
 }
@@ -1873,7 +1893,7 @@ func TestPageGetAttribute(t *testing.T) {
 	err := p.SetContent(`<a id="el" href="null">Something</a>`, nil)
 	require.NoError(t, err)
 
-	got, ok, err := p.GetAttribute("#el", "href", nil)
+	got, ok, err := p.GetAttribute("#el", "href", common.NewFrameBaseOptions(p.MainFrame().Timeout()))
 	require.NoError(t, err)
 	require.True(t, ok)
 	assert.Equal(t, "null", got)
@@ -1886,7 +1906,7 @@ func TestPageGetAttributeMissing(t *testing.T) {
 	err := p.SetContent(`<a id="el">Something</a>`, nil)
 	require.NoError(t, err)
 
-	got, ok, err := p.GetAttribute("#el", "missing", nil)
+	got, ok, err := p.GetAttribute("#el", "missing", common.NewFrameBaseOptions(p.MainFrame().Timeout()))
 	require.NoError(t, err)
 	require.False(t, ok)
 	assert.Equal(t, "", got)
@@ -1899,7 +1919,7 @@ func TestPageGetAttributeEmpty(t *testing.T) {
 	err := p.SetContent(`<a id="el" empty>Something</a>`, nil)
 	require.NoError(t, err)
 
-	got, ok, err := p.GetAttribute("#el", "empty", nil)
+	got, ok, err := p.GetAttribute("#el", "empty", common.NewFrameBaseOptions(p.MainFrame().Timeout()))
 	require.NoError(t, err)
 	require.True(t, ok)
 	assert.Equal(t, "", got)
@@ -2181,4 +2201,250 @@ func TestPageOnMetric(t *testing.T) {
 			assert.True(t, foundUnamended.Load() > 0)
 		})
 	}
+}
+
+func TestPageOnRequest(t *testing.T) {
+	t.Parallel()
+
+	// Start and setup a webserver to test the page.on('request') handler.
+	tb := newTestBrowser(t, withHTTPServer())
+	defer tb.Browser.Close()
+
+	tb.withHandler("/home", func(w http.ResponseWriter, r *http.Request) {
+		_, err := fmt.Fprintf(w, `<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <script>fetch('/api', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({name: 'tester'})
+    })</script>
+</body>
+</html>`)
+		require.NoError(t, err)
+	})
+	tb.withHandler("/api", func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+
+		var data struct {
+			Name string `json:"name"`
+		}
+		err = json.Unmarshal(body, &data)
+		require.NoError(t, err)
+
+		_, err = fmt.Fprintf(w, `{"message": "Hello %s!"}`, data.Name)
+		require.NoError(t, err)
+	})
+	tb.withHandler("/style.css", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/css")
+		_, err := fmt.Fprintf(w, `body { background-color: #f0f0f0; }`)
+		require.NoError(t, err)
+	})
+
+	// Start and setup a k6 iteration to test the page.on('request') handler.
+	vu, _, _, cleanUp := startIteration(t)
+	defer cleanUp()
+
+	// Some of the business logic is in the mapping layer unfortunately.
+	// To test everything is wried up correctly, we're required to work
+	// with RunPromise.
+	//
+	// The code below is the JavaScript code that is executed in the k6 iteration.
+	// It will wait for all requests to be captured in returnValue, before returning.
+	gv, err := vu.RunAsync(t, `
+		const context = await browser.newContext({locale: 'en-US', userAgent: 'some-user-agent'});
+		const page = await context.newPage();
+
+		var returnValue = [];
+		page.on('request', async (request) => {
+			returnValue.push({
+				allHeaders: await request.allHeaders(),
+				frameUrl: request.frame().url(),
+				acceptLanguageHeader: await request.headerValue('Accept-Language'),
+				headers: request.headers(),
+				headersArray: await request.headersArray(),
+				isNavigationRequest: request.isNavigationRequest(),
+				method: request.method(),
+				postData: request.postData(),
+				postDataBuffer: request.postDataBuffer() ? String.fromCharCode.apply(null, new Uint8Array(request.postDataBuffer())) : null,
+				resourceType: request.resourceType(),
+				// Ignoring response for now since it is not reliable as we don't explicitly wait for the request to finish.
+				// response: await request.response(),
+				size: request.size(),
+				// Ignoring timing for now since it is not reliable as we don't explicitly wait for the request to finish.
+				// timing: request.timing(),
+				url: request.url()
+			});
+		});
+
+		await page.goto('%s', {waitUntil: 'networkidle'});
+
+		await page.close();
+
+		return JSON.stringify(returnValue, null, 2);
+	`, tb.url("/home"))
+	assert.NoError(t, err)
+
+	got := k6test.ToPromise(t, gv)
+
+	// Convert the result to a string and then to a slice of requests.
+	var requests []request
+	err = json.Unmarshal([]byte(got.Result().String()), &requests)
+	require.NoError(t, err)
+
+	expected := []request{
+		{
+			AllHeaders: map[string]string{
+				"accept-language":           "en-US",
+				"upgrade-insecure-requests": "1",
+				"user-agent":                "some-user-agent",
+			},
+			FrameURL:             "about:blank",
+			AcceptLanguageHeader: "en-US",
+			Headers: map[string]string{
+				"Accept-Language":           "en-US",
+				"Upgrade-Insecure-Requests": "1",
+				"User-Agent":                "some-user-agent",
+			},
+			HeadersArray: []map[string]string{
+				{"name": "Upgrade-Insecure-Requests", "value": "1"},
+				{"name": "User-Agent", "value": "some-user-agent"},
+				{"name": "Accept-Language", "value": "en-US"},
+			},
+			IsNavigationRequest: true,
+			Method:              "GET",
+			PostData:            "",
+			PostDataBuffer:      "",
+			ResourceType:        "Document",
+			Size: map[string]int{
+				"body":    0,
+				"headers": 103,
+			},
+			URL: tb.url("/home"),
+		},
+		{
+			AllHeaders: map[string]string{
+				"accept-language": "en-US",
+				"referer":         tb.url("/home"),
+				"user-agent":      "some-user-agent",
+			},
+			FrameURL:             tb.url("/home"),
+			AcceptLanguageHeader: "en-US",
+			Headers: map[string]string{
+				"Accept-Language": "en-US",
+				"Referer":         tb.url("/home"),
+				"User-Agent":      "some-user-agent",
+			},
+			HeadersArray: []map[string]string{
+				{"name": "User-Agent", "value": "some-user-agent"},
+				{"name": "Accept-Language", "value": "en-US"},
+				{"name": "Referer", "value": tb.url("/home")},
+			},
+			IsNavigationRequest: false,
+			Method:              "GET",
+			PostData:            "",
+			PostDataBuffer:      "",
+			ResourceType:        "Stylesheet",
+			Size: map[string]int{
+				"body":    0,
+				"headers": 116,
+			},
+			URL: tb.url("/style.css"),
+		},
+		{
+			AllHeaders: map[string]string{
+				"accept-language": "en-US",
+				"content-type":    "application/json",
+				"referer":         tb.url("/home"),
+				"user-agent":      "some-user-agent",
+			},
+			FrameURL:             tb.url("/home"),
+			AcceptLanguageHeader: "en-US",
+			Headers: map[string]string{
+				"Accept-Language": "en-US",
+				"Content-Type":    "application/json",
+				"Referer":         tb.url("/home"),
+				"User-Agent":      "some-user-agent",
+			},
+			HeadersArray: []map[string]string{
+				{"name": "Referer", "value": tb.url("/home")},
+				{"name": "User-Agent", "value": "some-user-agent"},
+				{"name": "Accept-Language", "value": "en-US"},
+				{"name": "Content-Type", "value": "application/json"},
+			},
+			IsNavigationRequest: false,
+			Method:              "POST",
+			PostData:            `{"name":"tester"}`,
+			PostDataBuffer:      `{"name":"tester"}`,
+			ResourceType:        "Fetch",
+			Size: map[string]int{
+				"body":    17,
+				"headers": 143,
+			},
+			URL: tb.url("/api"),
+		},
+		{
+			AllHeaders: map[string]string{
+				"accept-language": "en-US",
+				"referer":         tb.url("/home"),
+				"user-agent":      "some-user-agent",
+			},
+			FrameURL:             tb.url("/home"),
+			AcceptLanguageHeader: "en-US",
+			Headers: map[string]string{
+				"Accept-Language": "en-US",
+				"Referer":         tb.url("/home"),
+				"User-Agent":      "some-user-agent",
+			},
+			HeadersArray: []map[string]string{
+				{"name": "Accept-Language", "value": "en-US"},
+				{"name": "Referer", "value": tb.url("/home")},
+				{"name": "User-Agent", "value": "some-user-agent"},
+			},
+			IsNavigationRequest: false,
+			Method:              "GET",
+			PostData:            "",
+			PostDataBuffer:      "",
+			ResourceType:        "Other",
+			Size: map[string]int{
+				"body":    0,
+				"headers": 118,
+			},
+			URL: tb.url("/favicon.ico"),
+		},
+	}
+
+	// Compare each request one by one for better test failure visibility
+	for _, req := range requests {
+		i := slices.IndexFunc(expected, func(r request) bool { return req.URL == r.URL })
+		assert.NotEqual(t, -1, i, "failed to find expected request with URL %s", req.URL)
+
+		sortByName := func(m1, m2 map[string]string) int {
+			return strings.Compare(m1["name"], m2["name"])
+		}
+		slices.SortFunc(req.HeadersArray, sortByName)
+		slices.SortFunc(expected[i].HeadersArray, sortByName)
+		assert.Equal(t, expected[i], req)
+	}
+}
+
+type request struct {
+	AllHeaders           map[string]string   `json:"allHeaders"`
+	FrameURL             string              `json:"frameUrl"`
+	AcceptLanguageHeader string              `json:"acceptLanguageHeader"`
+	Headers              map[string]string   `json:"headers"`
+	HeadersArray         []map[string]string `json:"headersArray"`
+	IsNavigationRequest  bool                `json:"isNavigationRequest"`
+	Method               string              `json:"method"`
+	PostData             string              `json:"postData"`
+	PostDataBuffer       string              `json:"postDataBuffer"`
+	ResourceType         string              `json:"resourceType"`
+	Size                 map[string]int      `json:"size"`
+	URL                  string              `json:"url"`
 }

@@ -472,7 +472,11 @@ func (l *Locator) SelectOption(values sobek.Value, opts sobek.Value) ([]string, 
 	if err := copts.Parse(l.ctx, opts); err != nil {
 		return nil, fmt.Errorf("parsing select option options: %w", err)
 	}
-	v, err := l.selectOption(values, copts)
+	convValues, err := ConvertSelectOptionValues(l.frame.vu.Runtime(), values)
+	if err != nil {
+		return nil, fmt.Errorf("parsing select option values: %w", err)
+	}
+	v, err := l.selectOption(convValues, copts)
 	if err != nil {
 		return nil, fmt.Errorf("selecting option on %q: %w", l.selector, err)
 	}
@@ -482,7 +486,7 @@ func (l *Locator) SelectOption(values sobek.Value, opts sobek.Value) ([]string, 
 	return v, nil
 }
 
-func (l *Locator) selectOption(values sobek.Value, opts *FrameSelectOptionOptions) ([]string, error) {
+func (l *Locator) selectOption(values []any, opts *FrameSelectOptionOptions) ([]string, error) {
 	opts.Strict = true
 	return l.frame.selectOption(l.selector, values, opts)
 }

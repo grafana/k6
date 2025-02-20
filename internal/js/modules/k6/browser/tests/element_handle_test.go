@@ -9,6 +9,7 @@ import (
 	"io"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -310,7 +311,7 @@ func TestElementHandleInputValue(t *testing.T) {
 	element, err := p.Query("input")
 	require.NoError(t, err)
 
-	value, err := element.InputValue(nil)
+	value, err := element.InputValue(common.NewElementHandleBaseOptions(element.Timeout()))
 	require.NoError(t, err)
 	require.NoError(t, element.Dispose())
 	assert.Equal(t, value, "hello1", `expected input value "hello1", got %q`, value)
@@ -318,7 +319,7 @@ func TestElementHandleInputValue(t *testing.T) {
 	element, err = p.Query("select")
 	require.NoError(t, err)
 
-	value, err = element.InputValue(nil)
+	value, err = element.InputValue(common.NewElementHandleBaseOptions(element.Timeout()))
 	require.NoError(t, err)
 	require.NoError(t, element.Dispose())
 	assert.Equal(t, value, "hello2", `expected input value "hello2", got %q`, value)
@@ -326,7 +327,7 @@ func TestElementHandleInputValue(t *testing.T) {
 	element, err = p.Query("textarea")
 	require.NoError(t, err)
 
-	value, err = element.InputValue(nil)
+	value, err = element.InputValue(common.NewElementHandleBaseOptions(element.Timeout()))
 	require.NoError(t, err)
 	require.NoError(t, element.Dispose())
 	assert.Equal(t, value, "hello3", `expected input value "hello3", got %q`, value)
@@ -414,10 +415,14 @@ func TestElementHandleScreenshot(t *testing.T) {
 	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
-	err := p.SetViewportSize(tb.toSobekValue(struct {
+	viewportSize := tb.toSobekValue(struct {
 		Width  float64 `js:"width"`
 		Height float64 `js:"height"`
-	}{Width: 800, Height: 600}))
+	}{Width: 800, Height: 600})
+	s := new(common.Size)
+	require.NoError(t, s.Parse(tb.context(), viewportSize))
+
+	err := p.SetViewportSize(s)
 	require.NoError(t, err)
 
 	_, err = p.Evaluate(`
@@ -488,9 +493,8 @@ func TestElementHandleWaitForSelector(t *testing.T) {
 		}
 	`)
 	require.NoError(t, err)
-	element, err := root.WaitForSelector(".element-to-appear", tb.toSobekValue(struct {
-		Timeout int64 `js:"timeout"`
-	}{Timeout: 1000}))
+
+	element, err := root.WaitForSelector(".element-to-appear", common.NewFrameWaitForSelectorOptions(time.Second))
 	require.NoError(t, err)
 	require.NotNil(t, element, "expected element to have been found after wait")
 
@@ -510,11 +514,11 @@ func TestElementHandlePress(t *testing.T) {
 	el, err := p.Query("input")
 	require.NoError(t, err)
 
-	require.NoError(t, el.Press("Shift+KeyA", nil))
-	require.NoError(t, el.Press("KeyB", nil))
-	require.NoError(t, el.Press("Shift+KeyC", nil))
+	require.NoError(t, el.Press("Shift+KeyA", common.NewElementHandlePressOptions(el.Timeout())))
+	require.NoError(t, el.Press("KeyB", common.NewElementHandlePressOptions(el.Timeout())))
+	require.NoError(t, el.Press("Shift+KeyC", common.NewElementHandlePressOptions(el.Timeout())))
 
-	v, err := el.InputValue(nil)
+	v, err := el.InputValue(common.NewElementHandleBaseOptions(el.Timeout()))
 	require.NoError(t, err)
 	require.Equal(t, "AbC", v)
 }
@@ -591,13 +595,13 @@ func TestElementHandleSetChecked(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, checked, "expected checkbox to be unchecked")
 
-	err = element.SetChecked(true, nil)
+	err = element.SetChecked(true, common.NewElementHandleSetCheckedOptions(element.Timeout()))
 	require.NoError(t, err)
 	checked, err = element.IsChecked()
 	require.NoError(t, err)
 	assert.True(t, checked, "expected checkbox to be checked")
 
-	err = element.SetChecked(false, nil)
+	err = element.SetChecked(false, common.NewElementHandleSetCheckedOptions(element.Timeout()))
 	require.NoError(t, err)
 	checked, err = element.IsChecked()
 	require.NoError(t, err)

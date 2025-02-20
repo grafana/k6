@@ -21,23 +21,23 @@ func mapKeyboard(vu moduleVU, kb *common.Keyboard) mapping {
 				return nil, kb.Up(key) //nolint:wrapcheck
 			})
 		},
-		"press": func(key string, opts sobek.Value) *sobek.Promise {
+		"press": func(key string, opts sobek.Value) (*sobek.Promise, error) {
+			kbopts, err := exportTo[common.KeyboardOptions](vu.Runtime(), opts)
+			if err != nil {
+				return nil, fmt.Errorf("parsing keyboard options: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				kbopts, err := exportTo[common.KeyboardOptions](vu.Runtime(), opts)
-				if err != nil {
-					return nil, fmt.Errorf("parsing keyboard options: %w", err)
-				}
 				return nil, kb.Press(key, kbopts)
-			})
+			}), nil
 		},
-		"type": func(text string, opts sobek.Value) *sobek.Promise {
+		"type": func(text string, opts sobek.Value) (*sobek.Promise, error) {
+			kbopts, err := exportTo[common.KeyboardOptions](vu.Runtime(), opts)
+			if err != nil {
+				return nil, fmt.Errorf("parsing keyboard options: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				kbopts, err := exportTo[common.KeyboardOptions](vu.Runtime(), opts)
-				if err != nil {
-					return nil, fmt.Errorf("parsing keyboard options: %w", err)
-				}
 				return nil, kb.Type(text, kbopts)
-			})
+			}), nil
 		},
 		"insertText": func(text string) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {

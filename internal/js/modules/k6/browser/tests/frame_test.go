@@ -28,11 +28,12 @@ func TestFramePress(t *testing.T) {
 
 	f := p.Frames()[0]
 
-	require.NoError(t, f.Press("#text1", "Shift+KeyA", nil))
-	require.NoError(t, f.Press("#text1", "KeyB", nil))
-	require.NoError(t, f.Press("#text1", "Shift+KeyC", nil))
+	opts := common.NewFramePressOptions(f.Timeout())
+	require.NoError(t, f.Press("#text1", "Shift+KeyA", opts))
+	require.NoError(t, f.Press("#text1", "KeyB", opts))
+	require.NoError(t, f.Press("#text1", "Shift+KeyC", opts))
 
-	inputValue, err := f.InputValue("#text1", nil)
+	inputValue, err := f.InputValue("#text1", common.NewFrameInputValueOptions(p.MainFrame().Timeout()))
 	require.NoError(t, err)
 	require.Equal(t, "AbC", inputValue)
 }
@@ -67,7 +68,7 @@ func TestFrameDismissDialogBox(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			result, ok, err := p.TextContent("#textField", nil)
+			result, ok, err := p.TextContent("#textField", common.NewFrameTextContentOptions(p.MainFrame().Timeout()))
 			require.NoError(t, err)
 			require.True(t, ok)
 			assert.EqualValues(t, tt+" dismissed", result)
@@ -102,7 +103,7 @@ func TestFrameNoPanicWithEmbeddedIFrame(t *testing.T) {
 	_, err := p.Goto(tb.staticURL("embedded_iframe.html"), opts)
 	require.NoError(t, err)
 
-	result, ok, err := p.TextContent("#doneDiv", nil)
+	result, ok, err := p.TextContent("#doneDiv", common.NewFrameTextContentOptions(p.MainFrame().Timeout()))
 	require.NoError(t, err)
 	require.True(t, ok)
 	assert.EqualValues(t, "Done!", result)
@@ -156,7 +157,7 @@ func TestFrameNoPanicNavigateAndClickOnPageWithIFrames(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	result, ok, err := p.TextContent("#doneDiv", nil)
+	result, ok, err := p.TextContent("#doneDiv", common.NewFrameTextContentOptions(p.MainFrame().Timeout()))
 	require.NoError(t, err)
 	require.True(t, ok)
 	assert.EqualValues(t, "Sign In Page", result)
@@ -184,7 +185,7 @@ func TestFrameGetAttribute(t *testing.T) {
 	err := p.SetContent(`<a id="el" href="null">Something</a>`, nil)
 	require.NoError(t, err)
 
-	got, ok, err := p.Frames()[0].GetAttribute("#el", "href", nil)
+	got, ok, err := p.Frames()[0].GetAttribute("#el", "href", common.NewFrameBaseOptions(p.MainFrame().Timeout()))
 	require.NoError(t, err)
 	require.True(t, ok)
 	assert.Equal(t, "null", got)
@@ -197,7 +198,7 @@ func TestFrameGetAttributeMissing(t *testing.T) {
 	err := p.SetContent(`<a id="el">Something</a>`, nil)
 	require.NoError(t, err)
 
-	got, ok, err := p.Frames()[0].GetAttribute("#el", "missing", nil)
+	got, ok, err := p.Frames()[0].GetAttribute("#el", "missing", common.NewFrameBaseOptions(p.MainFrame().Timeout()))
 	require.NoError(t, err)
 	require.False(t, ok)
 	assert.Equal(t, "", got)
@@ -210,7 +211,7 @@ func TestFrameGetAttributeEmpty(t *testing.T) {
 	err := p.SetContent(`<a id="el" empty>Something</a>`, nil)
 	require.NoError(t, err)
 
-	got, ok, err := p.Frames()[0].GetAttribute("#el", "empty", nil)
+	got, ok, err := p.Frames()[0].GetAttribute("#el", "empty", common.NewFrameBaseOptions(p.MainFrame().Timeout()))
 	require.NoError(t, err)
 	require.True(t, ok)
 	assert.Equal(t, "", got)
@@ -222,19 +223,23 @@ func TestFrameSetChecked(t *testing.T) {
 	p := newTestBrowser(t).NewPage(nil)
 	err := p.SetContent(`<input id="el" type="checkbox">`, nil)
 	require.NoError(t, err)
-	checked, err := p.Frames()[0].IsChecked("#el", nil)
+
+	isopts := common.NewFrameIsCheckedOptions(p.MainFrame().Timeout())
+	checked, err := p.Frames()[0].IsChecked("#el", isopts)
 	require.NoError(t, err)
 	assert.False(t, checked)
 
-	err = p.Frames()[0].SetChecked("#el", true, nil)
+	err = p.Frames()[0].SetChecked("#el", true, common.NewFrameCheckOptions(p.Frames()[0].Timeout()))
 	require.NoError(t, err)
-	checked, err = p.Frames()[0].IsChecked("#el", nil)
+	isopts = common.NewFrameIsCheckedOptions(p.MainFrame().Timeout())
+	checked, err = p.Frames()[0].IsChecked("#el", isopts)
 	require.NoError(t, err)
 	assert.True(t, checked)
 
-	err = p.Frames()[0].SetChecked("#el", false, nil)
+	err = p.Frames()[0].SetChecked("#el", false, common.NewFrameCheckOptions(p.Frames()[0].Timeout()))
 	require.NoError(t, err)
-	checked, err = p.Frames()[0].IsChecked("#el", nil)
+	isopts = common.NewFrameIsCheckedOptions(p.MainFrame().Timeout())
+	checked, err = p.Frames()[0].IsChecked("#el", isopts)
 	require.NoError(t, err)
 	assert.False(t, checked)
 }
