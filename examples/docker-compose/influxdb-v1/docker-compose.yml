@@ -1,14 +1,12 @@
 version: '3.4'
 
 networks:
-  k6:
   grafana:
 
 services:
   influxdb:
     image: influxdb:1.8
     networks:
-      - k6
       - grafana
     ports:
       - "8086:8086"
@@ -27,14 +25,3 @@ services:
       - GF_AUTH_BASIC_ENABLED=false
     volumes:
       - ./grafana:/etc/grafana/provisioning/
-
-  k6:
-    image: grafana/k6:latest
-    networks:
-      - k6
-    ports:
-      - "6565:6565"
-    environment:
-      - K6_OUT=influxdb=http://influxdb:8086/k6
-    volumes:
-      - ./examples:/scripts
