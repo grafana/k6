@@ -19,11 +19,11 @@ import (
 
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/internal/metrics/engine"
+	"go.k6.io/k6/internal/output/summary"
 	"go.k6.io/k6/internal/ui/pb"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/output"
-	"go.k6.io/k6/output/summary"
 )
 
 const (

@@ -25,13 +25,13 @@ import (
 	"go.k6.io/k6/internal/execution/local"
 	"go.k6.io/k6/internal/lib/trace"
 	"go.k6.io/k6/internal/metrics/engine"
+	"go.k6.io/k6/internal/output/summary"
 	"go.k6.io/k6/internal/ui/pb"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
-	"go.k6.io/k6/output/summary"
 )
 
 // cmdRun handles the `k6 run` sub-command
