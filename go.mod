@@ -2,7 +2,7 @@ module go.k6.io/k6
 
 go 1.22.0
 
-toolchain go1.24.0
+toolchain go1.22.10
 
 require (
 	buf.build/gen/go/prometheus/prometheus/protocolbuffers/go v1.36.5-20240802094132-5b212ab78fb7.1
