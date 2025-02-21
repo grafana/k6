@@ -475,7 +475,7 @@ func (m *meter) RegisterCallback(f metric.Callback, insts ...metric.Observable) 
 			validInstruments = append(validInstruments, inst)
 		default:
 			// Instrument external to the SDK.
-			return nil, fmt.Errorf("invalid observable: from different implementation")
+			return nil, errors.New("invalid observable: from different implementation")
 		}
 	}
 
