@@ -79,7 +79,7 @@ This will take ownership of the buffer until the stream is closed.
 func EncodeStream(src []byte, dst io.Writer) error {
     enc := s2.NewWriter(dst)
     // The encoder owns the buffer until Flush or Close is called.
-    err := enc.EncodeBuffer(buf)
+    err := enc.EncodeBuffer(src)
     if err != nil {
         enc.Close()
         return err
