@@ -336,8 +336,6 @@ func createSecretSources(gs *state.GlobalState) (map[string]secretsource.SecretS
 		c := found.Module.(secretsource.Constructor) //nolint:forcetypeassert
 		params := baseParams
 		params.ConfigArgument = config
-		// TODO(@mstoykov): make it not configurable just from cmd line
-		// params.JSONConfig = test.derivedConfig.Collectors[outputType]
 
 		secretSource, err := c(params)
 		if err != nil {
