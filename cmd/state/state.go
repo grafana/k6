@@ -58,7 +58,7 @@ type GlobalState struct {
 	Logger         *logrus.Logger //nolint:forbidigo //TODO:change to FieldLogger
 	FallbackLogger logrus.FieldLogger
 
-	SecretsManager *secretsource.SecretsManager
+	SecretsManager *secretsource.Manager
 	Usage          *usage.Usage
 }
 

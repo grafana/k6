@@ -17,7 +17,7 @@ type (
 	// Secrets represents an instance of the k6 module.
 	Secrets struct {
 		vu             modules.VU
-		secretsManager *secretsource.SecretsManager
+		secretsManager *secretsource.Manager
 	}
 )
 
@@ -66,7 +66,7 @@ func (mi *Secrets) secrets() (*sobek.Object, error) {
 }
 
 func secretSourceObjectForSourceName(
-	rt *sobek.Runtime, manager *secretsource.SecretsManager, sourceName string,
+	rt *sobek.Runtime, manager *secretsource.Manager, sourceName string,
 ) (*sobek.Object, error) {
 	obj := rt.NewObject()
 	err := obj.Set("get", func(key string) (string, error) {

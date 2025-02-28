@@ -10,19 +10,19 @@ import (
 // DefaultSourceName is the name for the default secret source
 const DefaultSourceName = "default"
 
-// SecretsManager manages secrets making certain for them to be redacted from logs
-type SecretsManager struct {
+// Manager manages secrets making certain for them to be redacted from logs
+type Manager struct {
 	hook    *secretsHook
-	sources map[string]SecretSource
+	sources map[string]Source
 	cache   map[string]*sync.Map
 }
 
-// NewSecretsManager returns a new NewSecretsManager with the provided secretsHook and will redact secrets from the hook
-func NewSecretsManager(sources map[string]SecretSource) (*SecretsManager, logrus.Hook, error) {
+// NewManager returns a new NewManager with the provided secretsHook and will redact secrets from the hook
+func NewManager(sources map[string]Source) (*Manager, logrus.Hook, error) {
 	cache := make(map[string]*sync.Map, len(sources)-1)
 	hook := &secretsHook{}
 	if len(sources) == 0 {
-		return &SecretsManager{
+		return &Manager{
 			hook:  hook,
 			cache: cache,
 		}, hook, nil
@@ -39,7 +39,7 @@ func NewSecretsManager(sources map[string]SecretSource) (*SecretsManager, logrus
 		}
 		cache[k] = new(sync.Map)
 	}
-	sm := &SecretsManager{
+	sm := &Manager{
 		hook:    hook,
 		sources: sources,
 		cache:   cache,
@@ -50,7 +50,7 @@ func NewSecretsManager(sources map[string]SecretSource) (*SecretsManager, logrus
 // Get is the way to get a secret for the provided source name and key of the secret.
 // It can be used with the [DefaultSourceName].
 // This automatically starts redacting the secret before returning it.
-func (sm *SecretsManager) Get(sourceName, key string) (string, error) {
+func (sm *Manager) Get(sourceName, key string) (string, error) {
 	sourceCache, ok := sm.cache[sourceName]
 	if !ok {
 		return "", fmt.Errorf("no source with name %s", sourceName)

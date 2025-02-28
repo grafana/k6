@@ -11,10 +11,10 @@ import (
 	"go.k6.io/k6/secretsource"
 )
 
-func testRuntimeWithSecrets(t testing.TB, secretSources map[string]secretsource.SecretSource) *modulestest.Runtime {
+func testRuntimeWithSecrets(t testing.TB, secretSources map[string]secretsource.Source) *modulestest.Runtime {
 	testRuntime := modulestest.NewRuntime(t)
 	var err error
-	testRuntime.VU.InitEnvField.SecretsManager, _, err = secretsource.NewSecretsManager(secretSources)
+	testRuntime.VU.InitEnvField.SecretsManager, _, err = secretsource.NewManager(secretSources)
 	require.NoError(t, err)
 
 	m, ok := New().NewModuleInstance(testRuntime.VU).(*Secrets)
@@ -28,7 +28,7 @@ func TestSecrets(t *testing.T) {
 	t.Parallel()
 
 	type secretsTest struct {
-		secretsources map[string]secretsource.SecretSource
+		secretsources map[string]secretsource.Source
 		script        string
 		expectedValue any
 		expectedError string
@@ -36,7 +36,7 @@ func TestSecrets(t *testing.T) {
 
 	cases := map[string]secretsTest{
 		"simple": {
-			secretsources: map[string]secretsource.SecretSource{
+			secretsources: map[string]secretsource.Source{
 				"default": mock.NewMockSecretSource("some", map[string]string{
 					"secret": "value",
 				}),
@@ -45,7 +45,7 @@ func TestSecrets(t *testing.T) {
 			expectedValue: "value",
 		},
 		"error": {
-			secretsources: map[string]secretsource.SecretSource{
+			secretsources: map[string]secretsource.Source{
 				"default": mock.NewMockSecretSource("some", map[string]string{
 					"secret": "value",
 				}),
@@ -54,7 +54,7 @@ func TestSecrets(t *testing.T) {
 			expectedError: "no value",
 		},
 		"multiple": {
-			secretsources: map[string]secretsource.SecretSource{
+			secretsources: map[string]secretsource.Source{
 				"default": mock.NewMockSecretSource("some", map[string]string{
 					"secret": "value",
 				}),
@@ -66,7 +66,7 @@ func TestSecrets(t *testing.T) {
 			expectedValue: "value",
 		},
 		"multiple get default": {
-			secretsources: map[string]secretsource.SecretSource{
+			secretsources: map[string]secretsource.Source{
 				"default": mock.NewMockSecretSource("some", map[string]string{
 					"secret": "value",
 				}),
@@ -78,7 +78,7 @@ func TestSecrets(t *testing.T) {
 			expectedValue: "value",
 		},
 		"multiple get not default": {
-			secretsources: map[string]secretsource.SecretSource{
+			secretsources: map[string]secretsource.Source{
 				"default": mock.NewMockSecretSource("some", map[string]string{
 					"secret": "value",
 				}),
@@ -90,12 +90,12 @@ func TestSecrets(t *testing.T) {
 			expectedValue: "value2",
 		},
 		"get secret without source": {
-			secretsources: map[string]secretsource.SecretSource{},
+			secretsources: map[string]secretsource.Source{},
 			script:        "secrets.get('secret')",
 			expectedError: "no source with name default",
 		},
 		"get none existing source": {
-			secretsources: map[string]secretsource.SecretSource{
+			secretsources: map[string]secretsource.Source{
 				"default": mock.NewMockSecretSource("some", map[string]string{
 					"secret": "value",
 				}),

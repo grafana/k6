@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	secretsource.RegisterExtension("file", func(params secretsource.Params) (secretsource.SecretSource, error) {
+	secretsource.RegisterExtension("file", func(params secretsource.Params) (secretsource.Source, error) {
 		fss := &fileSecretSource{}
 		err := fss.parseArg(params.ConfigArgument)
 		if err != nil {

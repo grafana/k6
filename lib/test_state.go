@@ -25,7 +25,7 @@ type TestPreInitState struct {
 	Logger         logrus.FieldLogger
 	TracerProvider *trace.TracerProvider
 	Usage          *usage.Usage
-	SecretsManager *secretsource.SecretsManager
+	SecretsManager *secretsource.Manager
 }
 
 // TestRunState contains the pre-init state as well as all of the state and

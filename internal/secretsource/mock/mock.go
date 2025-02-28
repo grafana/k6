@@ -10,7 +10,7 @@ import (
 )
 
 func init() {
-	secretsource.RegisterExtension("mock", func(params secretsource.Params) (secretsource.SecretSource, error) {
+	secretsource.RegisterExtension("mock", func(params secretsource.Params) (secretsource.Source, error) {
 		list := strings.Split(params.ConfigArgument, ",")
 		secrets := make(map[string]string, len(list))
 		name := "mock"
@@ -31,7 +31,7 @@ func init() {
 }
 
 // NewMockSecretSource returns a new secret source mock with the provided name and map of secrets
-func NewMockSecretSource(name string, secrets map[string]string) secretsource.SecretSource {
+func NewMockSecretSource(name string, secrets map[string]string) secretsource.Source {
 	return &mockSecretSource{
 		internal: secrets,
 		name:     name,

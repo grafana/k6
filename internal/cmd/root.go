@@ -272,7 +272,7 @@ func (c *rootCommand) setupLoggers(stop <-chan struct{}) error {
 	// it is important that we add this hook first as hooks are executed in order of addition
 	// and this means no other hook will get secrets
 	var secretsHook logrus.Hook
-	c.globalState.SecretsManager, secretsHook, err = secretsource.NewSecretsManager(secretsources)
+	c.globalState.SecretsManager, secretsHook, err = secretsource.NewManager(secretsources)
 	if err != nil {
 		return err
 	}
@@ -314,7 +314,7 @@ func (c *rootCommand) setLoggerHook(ctx context.Context, h log.AsyncHook) {
 	c.globalState.Logger.SetOutput(io.Discard) // don't output to anywhere else
 }
 
-func createSecretSources(gs *state.GlobalState) (map[string]secretsource.SecretSource, error) {
+func createSecretSources(gs *state.GlobalState) (map[string]secretsource.Source, error) {
 	baseParams := secretsource.Params{
 		Logger:      gs.Logger,
 		Environment: gs.Env,
@@ -322,7 +322,7 @@ func createSecretSources(gs *state.GlobalState) (map[string]secretsource.SecretS
 		Usage:       gs.Usage,
 	}
 
-	result := make(map[string]secretsource.SecretSource)
+	result := make(map[string]secretsource.Source)
 	for _, line := range gs.Flags.SecretSource {
 		t, config, ok := strings.Cut(line, "=")
 		if !ok {

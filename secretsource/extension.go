@@ -8,11 +8,11 @@ import (
 )
 
 // Constructor returns an instance of an output extension module.
-type Constructor func(Params) (SecretSource, error)
+type Constructor func(Params) (Source, error)
 
 // Params contains all possible constructor parameters an output may need.
 type Params struct {
-	ConfigArgument string
+	ConfigArgument string // the string on the cli
 
 	Logger      logrus.FieldLogger
 	Environment map[string]string
