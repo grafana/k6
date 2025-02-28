@@ -2447,6 +2447,7 @@ func TestMultipleSecretSources(t *testing.T) {
 			} catch {
 				console.log("trigger exception on wrong key")
 			}
+			secrets.get("else"); // testing default setting
 		}
 	`
 
@@ -2456,7 +2457,7 @@ func TestMultipleSecretSources(t *testing.T) {
 	ts.CmdArgs = []string{
 		"k6", "run",
 		"--secret-source=mock=name=first,cool=something",
-		"--secret-source=mock=name=second,else=source", "secrets.js",
+		"--secret-source=mock=name=second,else=source,default", "secrets.js",
 	}
 
 	cmd.ExecuteWithGlobalState(ts.GlobalState)

@@ -50,8 +50,6 @@ func (fss *fileSecretSource) parseArg(config string) error {
 			switch k {
 			case "filename":
 				fss.filename = v
-			case "name":
-				fss.name = v
 			default:
 				return fmt.Errorf("unknown configuration key for file secret source %q", k)
 			}
@@ -62,12 +60,7 @@ func (fss *fileSecretSource) parseArg(config string) error {
 
 type fileSecretSource struct {
 	internal map[string]string
-	name     string
 	filename string
-}
-
-func (fss *fileSecretSource) Name() string {
-	return fss.name
 }
 
 func (fss *fileSecretSource) Description() string {

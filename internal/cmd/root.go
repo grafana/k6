@@ -335,18 +335,24 @@ func createSecretSources(gs *state.GlobalState) (map[string]secretsource.Source,
 		}
 		c := found.Module.(secretsource.Constructor) //nolint:forcetypeassert
 		params := baseParams
+		name, isDefault, config := extractNameAndDefault(config)
 		params.ConfigArgument = config
 
 		secretSource, err := c(params)
 		if err != nil {
 			return nil, err
 		}
-		name := secretSource.Name()
 		_, alreadRegistered := result[name]
 		if alreadRegistered {
 			return nil, fmt.Errorf("secret source for name %q already registered before configuration %q", t, line)
 		}
 		result[name] = secretSource
+		if isDefault {
+			if _, ok := result["default"]; ok {
+				return nil, fmt.Errorf("can't have two secret sources that are default ones, second one was %q", config)
+			}
+			result["default"] = secretSource
+		}
 	}
 
 	if len(result) == 1 {
@@ -356,4 +362,22 @@ func createSecretSources(gs *state.GlobalState) (map[string]secretsource.Source,
 	}
 
 	return result, nil
+}
+
+func extractNameAndDefault(config string) (name string, isDefault bool, remaining string) {
+	list := strings.Split(config, ",")
+	remainingArray := make([]string, 0, len(list))
+	for _, kv := range list {
+		if kv == "default" {
+			isDefault = true
+			continue
+		}
+		k, v, _ := strings.Cut(kv, "=")
+		if k == "name" {
+			name = v
+			continue
+		}
+		remainingArray = append(remainingArray, kv)
+	}
+	return name, isDefault, strings.Join(remainingArray, ",")
 }

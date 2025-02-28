@@ -28,7 +28,9 @@ func NewManager(sources map[string]Source) (*Manager, logrus.Hook, error) {
 		}, hook, nil
 	}
 	defaultSource := sources["default"]
-	cache["default"] = new(sync.Map)
+	if defaultSource != nil {
+		cache["default"] = new(sync.Map)
+	}
 	for k, source := range sources {
 		if k == "default" {
 			continue

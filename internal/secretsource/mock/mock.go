@@ -19,10 +19,6 @@ func init() {
 			if !ok {
 				return nil, fmt.Errorf("parsing %q, needs =", kv)
 			}
-			if k == "name" {
-				name = v
-				continue
-			}
 
 			secrets[k] = v
 		}
