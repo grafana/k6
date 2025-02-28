@@ -6,6 +6,7 @@ import (
 
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
+	"go.k6.io/k6/js/promises"
 	"go.k6.io/k6/secretsource"
 )
 
@@ -50,13 +51,13 @@ func (mi *Secrets) Exports() modules.Exports {
 }
 
 func (mi *Secrets) secrets() (*sobek.Object, error) {
-	obj, err := secretSourceObjectForSourceName(mi.vu.Runtime(), mi.secretsManager, secretsource.DefaultSourceName)
+	obj, err := secretSourceObjectForSourceName(mi.vu, mi.secretsManager, secretsource.DefaultSourceName)
 	if err != nil {
 		return nil, err
 	}
 
 	err = obj.Set("source", func(sourceName string) (*sobek.Object, error) {
-		return secretSourceObjectForSourceName(mi.vu.Runtime(), mi.secretsManager, sourceName)
+		return secretSourceObjectForSourceName(mi.vu, mi.secretsManager, sourceName)
 	})
 	if err != nil {
 		return nil, err
@@ -66,11 +67,20 @@ func (mi *Secrets) secrets() (*sobek.Object, error) {
 }
 
 func secretSourceObjectForSourceName(
-	rt *sobek.Runtime, manager *secretsource.Manager, sourceName string,
+	vu modules.VU, manager *secretsource.Manager, sourceName string,
 ) (*sobek.Object, error) {
-	obj := rt.NewObject()
-	err := obj.Set("get", func(key string) (string, error) {
-		return manager.Get(sourceName, key)
+	obj := vu.Runtime().NewObject()
+	err := obj.Set("get", func(key string) *sobek.Promise {
+		p, resolve, reject := promises.New(vu)
+		go func() {
+			res, err := manager.Get(sourceName, key)
+			if err != nil {
+				reject(err)
+				return
+			}
+			resolve(res)
+		}()
+		return p
 	})
 	if err != nil {
 		return nil, err

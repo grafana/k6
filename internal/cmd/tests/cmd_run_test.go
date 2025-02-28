@@ -2409,10 +2409,10 @@ func TestBasicSecrets(t *testing.T) {
 	mainScript := `
 		import secrets from "k6/secrets";
 
-		export default () => {
-			const my_secret = secrets.get("cool"); // get secret from a source with the provided identifier
+		export default async () => {
+			const my_secret = await secrets.get("cool"); // get secret from a source with the provided identifier
 			console.log(my_secret);
-			secrets.get("else"); // get secret from a source with the provided identifier
+			await secrets.get("else"); // get secret from a source with the provided identifier
 			console.log(my_secret);
 		}
 	`
@@ -2437,17 +2437,17 @@ func TestMultipleSecretSources(t *testing.T) {
 	mainScript := `
 		import secrets from "k6/secrets";
 
-		export default () => {
-			const my_secret = secrets.source("first").get("cool");
+		export default async () => {
+			const my_secret = await secrets.source("first").get("cool");
 			console.log(my_secret);
-			secrets.source("second").get("else");
+			await secrets.source("second").get("else");
 			console.log(my_secret);
 			try {
-				secrets.source("second").get("unkwown");
+				await secrets.source("second").get("unkwown");
 			} catch {
 				console.log("trigger exception on wrong key")
 			}
-			secrets.get("else"); // testing default setting
+			await secrets.get("else"); // testing default setting
 		}
 	`
 

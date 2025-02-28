@@ -41,7 +41,7 @@ func TestSecrets(t *testing.T) {
 					"secret": "value",
 				}),
 			},
-			script:        "secrets.get('secret')",
+			script:        "await secrets.get('secret')",
 			expectedValue: "value",
 		},
 		"error": {
@@ -50,7 +50,7 @@ func TestSecrets(t *testing.T) {
 					"secret": "value",
 				}),
 			},
-			script:        "secrets.get('not_secret')",
+			script:        "await secrets.get('not_secret')",
 			expectedError: "no value",
 		},
 		"multiple": {
@@ -62,7 +62,7 @@ func TestSecrets(t *testing.T) {
 					"secret2": "value2",
 				}),
 			},
-			script:        "secrets.get('secret')",
+			script:        "await secrets.get('secret')",
 			expectedValue: "value",
 		},
 		"multiple get default": {
@@ -74,7 +74,7 @@ func TestSecrets(t *testing.T) {
 					"secret2": "value2",
 				}),
 			},
-			script:        "secrets.source('default').get('secret')",
+			script:        "await secrets.source('default').get('secret')",
 			expectedValue: "value",
 		},
 		"multiple get not default": {
@@ -86,12 +86,12 @@ func TestSecrets(t *testing.T) {
 					"secret2": "value2",
 				}),
 			},
-			script:        "secrets.source('second').get('secret2')",
+			script:        "await secrets.source('second').get('secret2')",
 			expectedValue: "value2",
 		},
 		"get secret without source": {
 			secretsources: map[string]secretsource.Source{},
-			script:        "secrets.get('secret')",
+			script:        "await secrets.get('secret')",
 			expectedError: "no source with name default",
 		},
 		"get none existing source": {
@@ -100,7 +100,7 @@ func TestSecrets(t *testing.T) {
 					"secret": "value",
 				}),
 			},
-			script:        "secrets.source('second') != undefined",
+			script:        "(await secrets.source('second')) != undefined",
 			expectedValue: true,
 		},
 	}
@@ -110,12 +110,13 @@ func TestSecrets(t *testing.T) {
 			t.Parallel()
 			testruntime := testRuntimeWithSecrets(t, testCase.secretsources)
 
-			v, err := testruntime.RunOnEventLoop(testCase.script)
+			_, err := testruntime.RunOnEventLoop("(async ()=>{globalThis.result = " + testCase.script + "})()")
 			if testCase.expectedError != "" {
 				require.ErrorContains(t, err, testCase.expectedError)
 				return
 			}
 			require.NoError(t, err)
+			v := testruntime.VU.Runtime().GlobalObject().Get("result")
 			assert.Equal(t, testCase.expectedValue, v.Export())
 		})
 	}
