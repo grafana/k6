@@ -20,7 +20,7 @@ func init() {
 				return nil, fmt.Errorf("parsing %q, needs =", kv)
 			}
 			if k == "name" {
-				name = k
+				name = v
 				continue
 			}
 

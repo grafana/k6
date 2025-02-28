@@ -2402,3 +2402,69 @@ func TestTypeScriptSupport(t *testing.T) {
 	t.Log(stderr)
 	assert.Contains(t, stderr, `something 42`)
 }
+
+func TestBasicSecrets(t *testing.T) {
+	// This is the example it will be nice if we can just run it ,but in this case it needs extra arguments so ... maybe not such a great idea
+	t.Parallel()
+	mainScript := `
+		import secrets from "k6/secrets";
+
+		export default () => {
+			const my_secret = secrets.get("cool"); // get secret from a source with the provided identifier
+			console.log(my_secret);
+			secrets.get("else"); // get secret from a source with the provided identifier
+			console.log(my_secret);
+		}
+	`
+
+	ts := NewGlobalTestState(t)
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "secrets.js"), []byte(mainScript), 0o644))
+
+	ts.CmdArgs = []string{"k6", "run", "--secret-source=mock=cool=something,else=source", "secrets.js"}
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stderr := ts.Stderr.String()
+	t.Log(stderr)
+
+	assert.Contains(t, stderr, `level=info msg="***SECRET_REDACTED***" source=console`)
+	assert.Contains(t, stderr, `level=info msg="***SECRET_REDACTED***" ***SECRET_REDACTED***=console`)
+}
+
+func TestMultipleSecretSources(t *testing.T) {
+	// This is the example it will be nice if we can just run it ,but in this case it needs extra arguments so ... maybe not such a great idea
+	t.Parallel()
+	mainScript := `
+		import secrets from "k6/secrets";
+
+		export default () => {
+			const my_secret = secrets.source("first").get("cool");
+			console.log(my_secret);
+			secrets.source("second").get("else");
+			console.log(my_secret);
+			try {
+				secrets.source("second").get("unkwown");
+			} catch {
+				console.log("trigger exception on wrong key")
+			}
+		}
+	`
+
+	ts := NewGlobalTestState(t)
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "secrets.js"), []byte(mainScript), 0o644))
+
+	ts.CmdArgs = []string{
+		"k6", "run",
+		"--secret-source=mock=name=first,cool=something",
+		"--secret-source=mock=name=second,else=source", "secrets.js",
+	}
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stderr := ts.Stderr.String()
+	t.Log(stderr)
+
+	assert.Contains(t, stderr, `level=info msg="***SECRET_REDACTED***" source=console`)
+	assert.Contains(t, stderr, `level=info msg="***SECRET_REDACTED***" ***SECRET_REDACTED***=console`)
+	assert.Contains(t, stderr, `level=info msg="trigger exception on wrong key" ***SECRET_REDACTED***=console`)
+}
