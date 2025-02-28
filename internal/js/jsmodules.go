@@ -17,6 +17,7 @@ import (
 	expws "go.k6.io/k6/internal/js/modules/k6/experimental/websockets"
 	"go.k6.io/k6/internal/js/modules/k6/grpc"
 	"go.k6.io/k6/internal/js/modules/k6/metrics"
+	"go.k6.io/k6/internal/js/modules/k6/secrets"
 	"go.k6.io/k6/internal/js/modules/k6/timers"
 	"go.k6.io/k6/internal/js/modules/k6/webcrypto"
 	"go.k6.io/k6/internal/js/modules/k6/ws"
@@ -62,6 +63,7 @@ func getInternalJSModules() map[string]interface{} {
 		"k6/html":            html.New(),
 		"k6/http":            http.New(),
 		"k6/metrics":         metrics.New(),
+		"k6/secrets":         secrets.New(),
 		"k6/ws":              ws.New(),
 		"k6/experimental/grpc": newRemovedModule(
 			"k6/experimental/grpc has been graduated, please use k6/net/grpc instead." +
