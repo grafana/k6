@@ -45,6 +45,7 @@ func (fss *fileSecretSource) parseArg(config string) error {
 			k, v, ok := strings.Cut(kv, "=")
 			if !ok {
 				fss.filename = kv
+				continue
 			}
 			switch k {
 			case "filename":
