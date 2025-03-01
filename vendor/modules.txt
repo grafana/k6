@@ -10,9 +10,6 @@ github.com/Azure/go-ntlmssp
 # github.com/PuerkitoBio/goquery v1.9.2
 ## explicit; go 1.18
 github.com/PuerkitoBio/goquery
-# github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
-## explicit
-github.com/Soontao/goHttpDigestClient
 # github.com/andybalholm/brotli v1.1.1
 ## explicit; go 1.13
 github.com/andybalholm/brotli
@@ -195,6 +192,10 @@ github.com/grpc-ecosystem/go-grpc-middleware/util/metautils
 github.com/grpc-ecosystem/grpc-gateway/v2/internal/httprule
 github.com/grpc-ecosystem/grpc-gateway/v2/runtime
 github.com/grpc-ecosystem/grpc-gateway/v2/utilities
+# github.com/icholy/digest v1.1.0
+## explicit; go 1.20
+github.com/icholy/digest
+github.com/icholy/digest/internal/param
 # github.com/inconshreveable/mousetrap v1.0.0
 ## explicit
 github.com/inconshreveable/mousetrap
@@ -259,9 +260,6 @@ github.com/mstoykov/envconfig
 # github.com/mstoykov/k6-taskqueue-lib v0.1.3
 ## explicit; go 1.21
 github.com/mstoykov/k6-taskqueue-lib/taskqueue
-# github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d
-## explicit
-github.com/nu7hatch/gouuid
 # github.com/nxadm/tail v1.4.11
 ## explicit; go 1.13
 # github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8
