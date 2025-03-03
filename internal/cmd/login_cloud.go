@@ -13,8 +13,8 @@ import (
 
 	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/cmd/state"
+	"go.k6.io/k6/internal/build"
 	"go.k6.io/k6/internal/ui"
-	"go.k6.io/k6/lib/consts"
 )
 
 //nolint:funlen,gocognit
@@ -42,6 +42,10 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 Please use the "k6 cloud login" command instead.
 `,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if err := migrateLegacyConfigFileIfAny(gs); err != nil {
+				return err
+			}
+
 			currentDiskConf, err := readDiskConfig(gs)
 			if err != nil {
 				return err
@@ -110,7 +114,7 @@ Please use the "k6 cloud login" command instead.
 					gs.Logger,
 					"",
 					consolidatedCurrentConfig.Host.String,
-					consts.Version,
+					build.Version,
 					consolidatedCurrentConfig.Timeout.TimeDuration())
 
 				var res *cloudapi.LoginResponse

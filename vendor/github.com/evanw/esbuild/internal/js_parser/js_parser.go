@@ -3,6 +3,7 @@ package js_parser
 import (
 	"fmt"
 	"math"
+	"math/big"
 	"regexp"
 	"sort"
 	"strings"
@@ -227,6 +228,7 @@ type parser struct {
 	importMetaRef ast.Ref
 	promiseRef    ast.Ref
 	regExpRef     ast.Ref
+	bigIntRef     ast.Ref
 	superCtorRef  ast.Ref
 
 	// Imports from "react/jsx-runtime" and "react", respectively.
@@ -385,6 +387,7 @@ type parser struct {
 	latestReturnHadSemicolon    bool
 	messageAboutThisIsUndefined bool
 	isControlFlowDead           bool
+	shouldAddKeyComment         bool
 
 	// If this is true, then all top-level statements are wrapped in a try/catch
 	willWrapModuleInTryCatchForUsing bool
@@ -742,6 +745,89 @@ type fnOnlyDataVisit struct {
 	//   };
 	//
 	silenceMessageAboutThisBeingUndefined bool
+}
+
+type livenessStatus int8
+
+const (
+	alwaysDead      livenessStatus = -1
+	livenessUnknown livenessStatus = 0
+	alwaysLive      livenessStatus = 1
+)
+
+type switchCaseLiveness struct {
+	status         livenessStatus
+	canFallThrough bool
+}
+
+func analyzeSwitchCasesForLiveness(s *js_ast.SSwitch) []switchCaseLiveness {
+	cases := make([]switchCaseLiveness, 0, len(s.Cases))
+	defaultIndex := -1
+
+	// Determine the status of the individual cases independently
+	maxStatus := alwaysDead
+	for i, c := range s.Cases {
+		if c.ValueOrNil.Data == nil {
+			defaultIndex = i
+		}
+
+		// Check the value for strict equality
+		var status livenessStatus
+		if maxStatus == alwaysLive {
+			status = alwaysDead // Everything after an always-live case is always dead
+		} else if c.ValueOrNil.Data == nil {
+			status = alwaysDead // This is the default case, and will be filled in later
+		} else if isEqualToTest, ok := js_ast.CheckEqualityIfNoSideEffects(s.Test.Data, c.ValueOrNil.Data, js_ast.StrictEquality); ok {
+			if isEqualToTest {
+				status = alwaysLive // This branch will always be matched, and will be taken unless an earlier branch was taken
+			} else {
+				status = alwaysDead // This branch will never be matched, and will not be taken unless there was fall-through
+			}
+		} else {
+			status = livenessUnknown // This branch depends on run-time values and may or may not be matched
+		}
+		if maxStatus < status {
+			maxStatus = status
+		}
+
+		// Check for potential fall-through by checking for a jump at the end of the body
+		canFallThrough := true
+		stmts := c.Body
+		for len(stmts) > 0 {
+			switch s := stmts[len(stmts)-1].Data.(type) {
+			case *js_ast.SBlock:
+				stmts = s.Stmts // If this ends with a block, check the block's body next
+				continue
+			case *js_ast.SBreak, *js_ast.SContinue, *js_ast.SReturn, *js_ast.SThrow:
+				canFallThrough = false
+			}
+			break
+		}
+
+		cases = append(cases, switchCaseLiveness{
+			status:         status,
+			canFallThrough: canFallThrough,
+		})
+	}
+
+	// Set the liveness for the default case last based on the other cases
+	if defaultIndex != -1 {
+		// The negation here transposes "always live" with "always dead"
+		cases[defaultIndex].status = -maxStatus
+	}
+
+	// Then propagate fall-through information in linear fall-through order
+	for i, c := range cases {
+		// Propagate state forward if this isn't dead. Note that the "can fall
+		// through" flag does not imply "must fall through". The body may have
+		// an embedded "break" inside an if statement, for example.
+		if c.status != alwaysDead {
+			for j := i + 1; j < len(cases) && cases[j-1].canFallThrough; j++ {
+				cases[j].status = livenessUnknown
+			}
+		}
+	}
+	return cases
 }
 
 const bloomFilterSize = 251
@@ -1765,6 +1851,14 @@ func (p *parser) makeRegExpRef() ast.Ref {
 	return p.regExpRef
 }
 
+func (p *parser) makeBigIntRef() ast.Ref {
+	if p.bigIntRef == ast.InvalidRef {
+		p.bigIntRef = p.newSymbol(ast.SymbolUnbound, "BigInt")
+		p.moduleScope.Generated = append(p.moduleScope.Generated, p.bigIntRef)
+	}
+	return p.bigIntRef
+}
+
 // The name is temporarily stored in the ref until the scope traversal pass
 // happens, at which point a symbol will be generated and the ref will point
 // to the symbol instead.
@@ -2026,6 +2120,15 @@ func (p *parser) parseStringLiteral() js_ast.Expr {
 	return value
 }
 
+func (p *parser) parseBigIntOrStringIfUnsupported() js_ast.Expr {
+	if p.options.unsupportedJSFeatures.Has(compat.Bigint) {
+		var i big.Int
+		fmt.Sscan(p.lexer.Identifier.String, &i)
+		return js_ast.Expr{Loc: p.lexer.Loc(), Data: &js_ast.EString{Value: helpers.StringToUTF16(i.String())}}
+	}
+	return js_ast.Expr{Loc: p.lexer.Loc(), Data: &js_ast.EBigInt{Value: p.lexer.Identifier.String}}
+}
+
 type propertyOpts struct {
 	decorators       []js_ast.Decorator
 	decoratorScope   *js_ast.Scope
@@ -2064,8 +2167,7 @@ func (p *parser) parseProperty(startLoc logger.Loc, kind js_ast.PropertyKind, op
 		}
 
 	case js_lexer.TBigIntegerLiteral:
-		key = js_ast.Expr{Loc: p.lexer.Loc(), Data: &js_ast.EBigInt{Value: p.lexer.Identifier.String}}
-		p.markSyntaxFeature(compat.Bigint, p.lexer.Range())
+		key = p.parseBigIntOrStringIfUnsupported()
 		p.lexer.Next()
 
 	case js_lexer.TPrivateIdentifier:
@@ -2287,7 +2389,10 @@ func (p *parser) parseProperty(startLoc logger.Loc, kind js_ast.PropertyKind, op
 		}
 
 		if p.isMangledProp(name.String) {
-			key = js_ast.Expr{Loc: nameRange.Loc, Data: &js_ast.ENameOfSymbol{Ref: p.storeNameInRef(name)}}
+			key = js_ast.Expr{Loc: nameRange.Loc, Data: &js_ast.ENameOfSymbol{
+				Ref:                   p.storeNameInRef(name),
+				HasPropertyKeyComment: true,
+			}}
 		} else {
 			key = js_ast.Expr{Loc: nameRange.Loc, Data: &js_ast.EString{Value: helpers.StringToUTF16(name.String)}}
 		}
@@ -2627,8 +2732,7 @@ func (p *parser) parsePropertyBinding() js_ast.PropertyBinding {
 		preferQuotedKey = !p.options.minifySyntax
 
 	case js_lexer.TBigIntegerLiteral:
-		key = js_ast.Expr{Loc: p.lexer.Loc(), Data: &js_ast.EBigInt{Value: p.lexer.Identifier.String}}
-		p.markSyntaxFeature(compat.Bigint, p.lexer.Range())
+		key = p.parseBigIntOrStringIfUnsupported()
 		p.lexer.Next()
 
 	case js_lexer.TOpenBracket:
@@ -2879,9 +2983,10 @@ func (p *parser) parseAsyncPrefixExpr(asyncRange logger.Range, level js_ast.L, f
 		// "async x => {}"
 		case js_lexer.TIdentifier:
 			if level <= js_ast.LAssign {
-				// See https://github.com/tc39/ecma262/issues/2034 for details
 				isArrowFn := true
 				if (flags&exprFlagForLoopInit) != 0 && p.lexer.Identifier.String == "of" {
+					// See https://github.com/tc39/ecma262/issues/2034 for details
+
 					// "for (async of" is only an arrow function if the next token is "=>"
 					isArrowFn = p.checkForArrowAfterTheCurrentToken()
 
@@ -2891,6 +2996,18 @@ func (p *parser) parseAsyncPrefixExpr(asyncRange logger.Range, level js_ast.L, f
 						p.log.AddError(&p.tracker, r, "For loop initializers cannot start with \"async of\"")
 						panic(js_lexer.LexerPanic{})
 					}
+				} else if p.options.ts.Parse && p.lexer.Token == js_lexer.TIdentifier {
+					// Make sure we can parse the following TypeScript code:
+					//
+					//   export function open(async?: boolean): void {
+					//     console.log(async as boolean)
+					//   }
+					//
+					// TypeScript solves this by using a two-token lookahead to check for
+					// "=>" after an identifier after the "async". This is done in
+					// "isUnParenthesizedAsyncArrowFunctionWorker" which was introduced
+					// here: https://github.com/microsoft/TypeScript/pull/8444
+					isArrowFn = p.checkForArrowAfterTheCurrentToken()
 				}
 
 				if isArrowFn {
@@ -3531,7 +3648,6 @@ func (p *parser) parsePrefix(level js_ast.L, errors *deferredErrors, flags exprF
 
 	case js_lexer.TBigIntegerLiteral:
 		value := p.lexer.Identifier
-		p.markSyntaxFeature(compat.Bigint, p.lexer.Range())
 		p.lexer.Next()
 		return js_ast.Expr{Loc: loc, Data: &js_ast.EBigInt{Value: value.String}}
 
@@ -10321,7 +10437,7 @@ func (p *parser) visitAndAppendStmt(stmts []js_ast.Stmt, stmt js_ast.Stmt) []js_
 		}
 
 		// Handle "for await" that has been lowered by moving this label inside the "try"
-		if try, ok := s.Stmt.Data.(*js_ast.STry); ok && len(try.Block.Stmts) > 0 {
+		if try, ok := s.Stmt.Data.(*js_ast.STry); ok && len(try.Block.Stmts) == 1 {
 			if _, ok := try.Block.Stmts[0].Data.(*js_ast.SFor); ok {
 				try.Block.Stmts[0] = js_ast.Stmt{Loc: stmt.Loc, Data: &js_ast.SLabel{
 					Stmt:             try.Block.Stmts[0],
@@ -10845,19 +10961,16 @@ func (p *parser) visitAndAppendStmt(stmts []js_ast.Stmt, stmt js_ast.Stmt) []js_
 		p.pushScopeForVisitPass(js_ast.ScopeBlock, s.BodyLoc)
 		oldIsInsideSwitch := p.fnOrArrowDataVisit.isInsideSwitch
 		p.fnOrArrowDataVisit.isInsideSwitch = true
-		for i, c := range s.Cases {
+
+		// Visit case values first
+		for i := range s.Cases {
+			c := &s.Cases[i]
 			if c.ValueOrNil.Data != nil {
 				c.ValueOrNil = p.visitExpr(c.ValueOrNil)
 				p.warnAboutEqualityCheck("case", c.ValueOrNil, c.ValueOrNil.Loc)
 				p.warnAboutTypeofAndString(s.Test, c.ValueOrNil, onlyCheckOriginalOrder)
 			}
-			c.Body = p.visitStmts(c.Body, stmtsSwitch)
-
-			// Make sure the assignment to the body above is preserved
-			s.Cases[i] = c
 		}
-		p.fnOrArrowDataVisit.isInsideSwitch = oldIsInsideSwitch
-		p.popScope()
 
 		// Check for duplicate case values
 		p.duplicateCaseChecker.reset()
@@ -10866,6 +10979,40 @@ func (p *parser) visitAndAppendStmt(stmts []js_ast.Stmt, stmt js_ast.Stmt) []js_
 				p.duplicateCaseChecker.check(p, c.ValueOrNil)
 			}
 		}
+
+		// Then analyze the cases to determine which ones are live and/or dead
+		cases := analyzeSwitchCasesForLiveness(s)
+
+		// Then visit case bodies, and potentially filter out dead cases
+		end := 0
+		for i, c := range s.Cases {
+			isAlwaysDead := cases[i].status == alwaysDead
+
+			// Potentially treat the case body as dead code
+			old := p.isControlFlowDead
+			if isAlwaysDead {
+				p.isControlFlowDead = true
+			}
+			c.Body = p.visitStmts(c.Body, stmtsSwitch)
+			p.isControlFlowDead = old
+
+			// Filter out this case when minifying if it's known to be dead. Visiting
+			// the body above should already have removed any statements that can be
+			// removed safely, so if the body isn't empty then that means it contains
+			// some statements that can't be removed safely (e.g. a hoisted "var").
+			// So don't remove this case if the body isn't empty.
+			if p.options.minifySyntax && isAlwaysDead && len(c.Body) == 0 {
+				continue
+			}
+
+			// Make sure the assignment to the body above is preserved
+			s.Cases[end] = c
+			end++
+		}
+		s.Cases = s.Cases[:end]
+
+		p.fnOrArrowDataVisit.isInsideSwitch = oldIsInsideSwitch
+		p.popScope()
 
 		// Unwrap switch statements in dead code
 		if p.options.minifySyntax && p.isControlFlowDead {
@@ -10878,6 +11025,36 @@ func (p *parser) visitAndAppendStmt(stmts []js_ast.Stmt, stmt js_ast.Stmt) []js_
 		// "using" declarations inside switch statements must be special-cased
 		if lowered := p.maybeLowerUsingDeclarationsInSwitch(stmt.Loc, s); lowered != nil {
 			return append(stmts, lowered...)
+		}
+
+		// Attempt to remove statically-determined switch statements
+		if p.options.minifySyntax {
+			if len(s.Cases) == 0 {
+				if p.astHelpers.ExprCanBeRemovedIfUnused(s.Test) {
+					// Remove everything
+					return stmts
+				} else {
+					// Just keep the test expression
+					return append(stmts, js_ast.Stmt{Loc: s.Test.Loc, Data: &js_ast.SExpr{Value: s.Test}})
+				}
+			} else if len(s.Cases) == 1 {
+				c := s.Cases[0]
+				var isTaken bool
+				var ok bool
+				if c.ValueOrNil.Data != nil {
+					// Non-default case
+					isTaken, ok = js_ast.CheckEqualityIfNoSideEffects(s.Test.Data, c.ValueOrNil.Data, js_ast.StrictEquality)
+				} else {
+					// Default case
+					isTaken, ok = true, p.astHelpers.ExprCanBeRemovedIfUnused(s.Test)
+				}
+				if ok && isTaken {
+					if body, ok := tryToInlineCaseBody(s.BodyLoc, c.Body, s.CloseBraceLoc); ok {
+						// Inline the case body
+						return append(stmts, body...)
+					}
+				}
+			}
 		}
 
 	case *js_ast.SFunction:
@@ -11171,6 +11348,51 @@ func (p *parser) visitAndAppendStmt(stmts []js_ast.Stmt, stmt js_ast.Stmt) []js_
 
 	stmts = append(stmts, stmt)
 	return stmts
+}
+
+func tryToInlineCaseBody(openBraceLoc logger.Loc, stmts []js_ast.Stmt, closeBraceLoc logger.Loc) ([]js_ast.Stmt, bool) {
+	if len(stmts) == 1 {
+		if block, ok := stmts[0].Data.(*js_ast.SBlock); ok {
+			return tryToInlineCaseBody(stmts[0].Loc, block.Stmts, block.CloseBraceLoc)
+		}
+	}
+
+	caresAboutScope := false
+
+loop:
+	for i, stmt := range stmts {
+		switch s := stmt.Data.(type) {
+		case *js_ast.SEmpty, *js_ast.SDirective, *js_ast.SComment, *js_ast.SExpr,
+			*js_ast.SDebugger, *js_ast.SContinue, *js_ast.SReturn, *js_ast.SThrow:
+			// These can all be inlined outside of the switch without problems
+			continue
+
+		case *js_ast.SLocal:
+			if s.Kind != js_ast.LocalVar {
+				caresAboutScope = true
+			}
+
+		case *js_ast.SBreak:
+			if s.Label != nil {
+				// The break label could target this switch, but we don't know whether that's the case or not here
+				return nil, false
+			}
+
+			// An unlabeled "break" inside a switch breaks out of the case
+			stmts = stmts[:i]
+			break loop
+
+		default:
+			// Assume anything else can't be inlined
+			return nil, false
+		}
+	}
+
+	// If we still need a scope, wrap the result in a block
+	if caresAboutScope {
+		return []js_ast.Stmt{{Loc: openBraceLoc, Data: &js_ast.SBlock{Stmts: stmts, CloseBraceLoc: closeBraceLoc}}}, true
+	}
+	return stmts, true
 }
 
 func isUnsightlyPrimitive(data js_ast.E) bool {
@@ -12589,6 +12811,7 @@ type exprOut struct {
 
 	// If true and this is used as a call target, the whole call expression
 	// must be replaced with undefined.
+	callMustBeReplacedWithUndefined       bool
 	methodCallMustBeReplacedWithUndefined bool
 }
 
@@ -12878,7 +13101,18 @@ func (p *parser) visitExprInOut(expr js_ast.Expr, in exprIn) (js_ast.Expr, exprO
 	// it doesn't affect these mitigations by ensuring that the mitigations are not
 	// applied in those cases (e.g. by adding an additional conditional check).
 	switch e := expr.Data.(type) {
-	case *js_ast.ENull, *js_ast.ESuper, *js_ast.EBoolean, *js_ast.EBigInt, *js_ast.EUndefined, *js_ast.EJSXText:
+	case *js_ast.ENull, *js_ast.ESuper, *js_ast.EBoolean, *js_ast.EUndefined, *js_ast.EJSXText:
+
+	case *js_ast.EBigInt:
+		if p.options.unsupportedJSFeatures.Has(compat.Bigint) {
+			// For ease of implementation, the actual reference of the "BigInt"
+			// symbol is deferred to print time. That means we don't have to
+			// special-case the "BigInt" constructor in side-effect computations
+			// and future big integer constant folding (of which there isn't any
+			// at the moment).
+			p.markSyntaxFeature(compat.Bigint, p.source.RangeOfNumber(expr.Loc))
+			p.recordUsage(p.makeBigIntRef())
+		}
 
 	case *js_ast.ENameOfSymbol:
 		e.Ref = p.symbolForMangledProp(p.loadNameFromRef(e.Ref))
@@ -12923,7 +13157,8 @@ func (p *parser) visitExprInOut(expr js_ast.Expr, in exprIn) (js_ast.Expr, exprO
 		if in.shouldMangleStringsAsProps && p.options.mangleQuoted && !e.PreferTemplate {
 			if name := helpers.UTF16ToString(e.Value); p.isMangledProp(name) {
 				return js_ast.Expr{Loc: expr.Loc, Data: &js_ast.ENameOfSymbol{
-					Ref: p.symbolForMangledProp(name),
+					Ref:                   p.symbolForMangledProp(name),
+					HasPropertyKeyComment: e.HasPropertyKeyComment,
 				}}, exprOut{}
 			}
 		}
@@ -13681,12 +13916,23 @@ func (p *parser) visitExprInOut(expr js_ast.Expr, in exprIn) (js_ast.Expr, exprO
 			return p.lowerOptionalChain(expr, in, out)
 		}
 
+		// Also erase "console.log.call(console, 123)" and "console.log.bind(console)"
+		if out.callMustBeReplacedWithUndefined {
+			if e.Name == "call" || e.Name == "apply" {
+				out.methodCallMustBeReplacedWithUndefined = true
+			} else if p.options.unsupportedJSFeatures.Has(compat.Arrow) {
+				e.Target.Data = &js_ast.EFunction{}
+			} else {
+				e.Target.Data = &js_ast.EArrow{}
+			}
+		}
+
 		// Potentially rewrite this property access
 		out = exprOut{
-			childContainsOptionalChain:            containsOptionalChain,
-			methodCallMustBeReplacedWithUndefined: out.methodCallMustBeReplacedWithUndefined,
-			thisArgFunc:                           out.thisArgFunc,
-			thisArgWrapFunc:                       out.thisArgWrapFunc,
+			childContainsOptionalChain:      containsOptionalChain,
+			callMustBeReplacedWithUndefined: out.methodCallMustBeReplacedWithUndefined,
+			thisArgFunc:                     out.thisArgFunc,
+			thisArgWrapFunc:                 out.thisArgWrapFunc,
 		}
 		if !in.hasChainParent {
 			out.thisArgFunc = nil
@@ -13845,10 +14091,10 @@ func (p *parser) visitExprInOut(expr js_ast.Expr, in exprIn) (js_ast.Expr, exprO
 
 		// Potentially rewrite this property access
 		out = exprOut{
-			childContainsOptionalChain:            containsOptionalChain,
-			methodCallMustBeReplacedWithUndefined: out.methodCallMustBeReplacedWithUndefined,
-			thisArgFunc:                           out.thisArgFunc,
-			thisArgWrapFunc:                       out.thisArgWrapFunc,
+			childContainsOptionalChain:      containsOptionalChain,
+			callMustBeReplacedWithUndefined: out.methodCallMustBeReplacedWithUndefined,
+			thisArgFunc:                     out.thisArgFunc,
+			thisArgWrapFunc:                 out.thisArgWrapFunc,
 		}
 		if !in.hasChainParent {
 			out.thisArgFunc = nil
@@ -13976,7 +14222,25 @@ func (p *parser) visitExprInOut(expr js_ast.Expr, in exprIn) (js_ast.Expr, exprO
 				}
 
 			case js_ast.UnOpVoid:
-				if p.astHelpers.ExprCanBeRemovedIfUnused(e.Value) {
+				var shouldRemove bool
+				if p.options.minifySyntax {
+					shouldRemove = p.astHelpers.ExprCanBeRemovedIfUnused(e.Value)
+				} else {
+					// This special case was added for a very obscure reason. There's a
+					// custom dialect of JavaScript called Svelte that uses JavaScript
+					// syntax with different semantics. Specifically variable accesses
+					// have side effects (!). And someone wants to use "void x" instead
+					// of just "x" to trigger the side effect for some reason.
+					//
+					// Arguably this should not be supported, because you shouldn't be
+					// running esbuild on weird kinda-JavaScript-but-not languages and
+					// expecting it to work correctly. But this one special case seems
+					// harmless enough. This is definitely not fully supported though.
+					//
+					// More info: https://github.com/evanw/esbuild/issues/4041
+					shouldRemove = isUnsightlyPrimitive(e.Value.Data)
+				}
+				if shouldRemove {
 					return js_ast.Expr{Loc: expr.Loc, Data: js_ast.EUndefinedShared}, exprOut{}
 				}
 
@@ -14568,11 +14832,11 @@ func (p *parser) visitExprInOut(expr js_ast.Expr, in exprIn) (js_ast.Expr, exprO
 		oldIsControlFlowDead := p.isControlFlowDead
 
 		// If we're removing this call, don't count any arguments as symbol uses
-		if out.methodCallMustBeReplacedWithUndefined {
+		if out.callMustBeReplacedWithUndefined {
 			if js_ast.IsPropertyAccess(e.Target) {
 				p.isControlFlowDead = true
 			} else {
-				out.methodCallMustBeReplacedWithUndefined = false
+				out.callMustBeReplacedWithUndefined = false
 			}
 		}
 
@@ -14644,7 +14908,7 @@ func (p *parser) visitExprInOut(expr js_ast.Expr, in exprIn) (js_ast.Expr, exprO
 		}
 
 		// Stop now if this call must be removed
-		if out.methodCallMustBeReplacedWithUndefined {
+		if out.callMustBeReplacedWithUndefined {
 			p.isControlFlowDead = oldIsControlFlowDead
 			return js_ast.Expr{Loc: expr.Loc, Data: js_ast.EUndefinedShared}, exprOut{}
 		}
@@ -16299,7 +16563,7 @@ func (p *parser) handleIdentifier(loc logger.Loc, e *js_ast.EIdentifier, opts id
 	ref := e.Ref
 
 	// Substitute inlined constants
-	if p.options.minifySyntax {
+	if p.options.minifySyntax && !p.currentScope.ContainsDirectEval {
 		if value, ok := p.constValues[ref]; ok {
 			p.ignoreUsage(ref)
 			return js_ast.ConstValueToExpr(loc, value)
@@ -16998,6 +17262,7 @@ func newParser(log logger.Log, source logger.Source, lexer js_lexer.Lexer, optio
 		runtimeImports:     make(map[string]ast.LocRef),
 		promiseRef:         ast.InvalidRef,
 		regExpRef:          ast.InvalidRef,
+		bigIntRef:          ast.InvalidRef,
 		afterArrowBodyLoc:  logger.Loc{Start: -1},
 		firstJSXElementLoc: logger.Loc{Start: -1},
 		importMetaRef:      ast.InvalidRef,
@@ -17024,6 +17289,12 @@ func newParser(log logger.Log, source logger.Source, lexer js_lexer.Lexer, optio
 		// For JSX runtime imports
 		jsxRuntimeImports: make(map[string]ast.LocRef),
 		jsxLegacyImports:  make(map[string]ast.LocRef),
+
+		// Add "/* @__KEY__ */" comments when mangling properties to support
+		// running esbuild (or other tools like Terser) again on the output.
+		// This checks both "--mangle-props" and "--reserve-props" so that
+		// you can turn this on with just "--reserve-props=." if you want to.
+		shouldAddKeyComment: options.mangleProps != nil || options.reserveProps != nil,
 
 		suppressWarningsAboutWeirdCode: helpers.IsInsideNodeModules(source.KeyPath.Text),
 	}
@@ -17445,7 +17716,7 @@ func GlobResolveAST(log logger.Log, source logger.Source, importRecords []ast.Im
 	return p.toAST([]js_ast.Part{nsExportPart}, []js_ast.Part{part}, nil, "", nil)
 }
 
-func ParseDefineExprOrJSON(text string) (config.DefineExpr, js_ast.E) {
+func ParseDefineExpr(text string) (config.DefineExpr, js_ast.E) {
 	if text == "" {
 		return config.DefineExpr{}, nil
 	}
@@ -17471,16 +17742,18 @@ func ParseDefineExprOrJSON(text string) (config.DefineExpr, js_ast.E) {
 		return config.DefineExpr{Parts: parts}, nil
 	}
 
-	// Try parsing a JSON value
+	// Try parsing a value
 	log := logger.NewDeferLog(logger.DeferLogNoVerboseOrDebug, nil)
-	expr, ok := ParseJSON(log, logger.Source{Contents: text}, JSONOptions{})
+	expr, ok := ParseJSON(log, logger.Source{Contents: text}, JSONOptions{
+		IsForDefine: true,
+	})
 	if !ok {
 		return config.DefineExpr{}, nil
 	}
 
 	// Only primitive literals are inlined directly
 	switch expr.Data.(type) {
-	case *js_ast.ENull, *js_ast.EBoolean, *js_ast.EString, *js_ast.ENumber:
+	case *js_ast.ENull, *js_ast.EBoolean, *js_ast.EString, *js_ast.ENumber, *js_ast.EBigInt:
 		return config.DefineExpr{Constant: expr.Data}, nil
 	}
 
@@ -17610,7 +17883,7 @@ func (p *parser) prepareForVisitPass() {
 			if p.options.jsx.AutomaticRuntime {
 				p.log.AddID(logger.MsgID_JS_UnsupportedJSXComment, logger.Warning, &p.tracker, jsxFactory.Range,
 					"The JSX factory cannot be set when using React's \"automatic\" JSX transform")
-			} else if expr, _ := ParseDefineExprOrJSON(jsxFactory.Text); len(expr.Parts) > 0 {
+			} else if expr, _ := ParseDefineExpr(jsxFactory.Text); len(expr.Parts) > 0 {
 				p.options.jsx.Factory = expr
 			} else {
 				p.log.AddID(logger.MsgID_JS_UnsupportedJSXComment, logger.Warning, &p.tracker, jsxFactory.Range,
@@ -17622,7 +17895,7 @@ func (p *parser) prepareForVisitPass() {
 			if p.options.jsx.AutomaticRuntime {
 				p.log.AddID(logger.MsgID_JS_UnsupportedJSXComment, logger.Warning, &p.tracker, jsxFragment.Range,
 					"The JSX fragment cannot be set when using React's \"automatic\" JSX transform")
-			} else if expr, _ := ParseDefineExprOrJSON(jsxFragment.Text); len(expr.Parts) > 0 || expr.Constant != nil {
+			} else if expr, _ := ParseDefineExpr(jsxFragment.Text); len(expr.Parts) > 0 || expr.Constant != nil {
 				p.options.jsx.Fragment = expr
 			} else {
 				p.log.AddID(logger.MsgID_JS_UnsupportedJSXComment, logger.Warning, &p.tracker, jsxFragment.Range,

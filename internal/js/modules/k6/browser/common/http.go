@@ -361,6 +361,10 @@ type resourceTiming struct {
 
 // Timing returns the request timing information.
 func (r *Request) Timing() *resourceTiming {
+	if r.response == nil {
+		return nil
+	}
+
 	timing := r.response.timing
 
 	return &resourceTiming{
@@ -383,18 +387,18 @@ func (r *Request) URL() string {
 
 // RemoteAddress contains informationa about a remote target.
 type RemoteAddress struct {
-	IPAddress string `json:"ipAddress"`
-	Port      int64  `json:"port"`
+	IPAddress string `json:"ipAddress" js:"ipAddress"`
+	Port      int64  `json:"port" js:"port"`
 }
 
 // SecurityDetails contains informationa about the security details of a TLS connection.
 type SecurityDetails struct {
-	SubjectName string   `json:"subjectName"`
-	Issuer      string   `json:"issuer"`
-	ValidFrom   int64    `json:"validFrom"`
-	ValidTo     int64    `json:"validTo"`
-	Protocol    string   `json:"protocol"`
-	SANList     []string `json:"sanList"`
+	SubjectName string   `json:"subjectName" js:"subjectName"`
+	Issuer      string   `json:"issuer" js:"issuer"`
+	ValidFrom   int64    `json:"validFrom" js:"validFrom"`
+	ValidTo     int64    `json:"validTo" js:"validTo"`
+	Protocol    string   `json:"protocol" js:"protocol"`
+	SANList     []string `json:"sanList" js:"sanList"`
 }
 
 // Response represents a browser HTTP response.
@@ -484,7 +488,27 @@ func (r *Response) fetchBody() error {
 		return nil
 	}
 	action := network.GetResponseBody(r.request.requestID)
-	body, err := action.Do(cdp.WithExecutor(r.ctx, r.request.frame.manager.session))
+
+	// Try to fetch the response body. If the request to retrieve the response
+	// body is too "quick" then the response body is not available. After
+	// retrying we have a better chance of getting the response body.
+	var body []byte
+	var err error
+	maxRetries := 5
+	for i := 0; i <= maxRetries; i++ {
+		body, err = action.Do(cdp.WithExecutor(r.ctx, r.request.frame.manager.session))
+		if err == nil {
+			break
+		}
+		if strings.Contains(err.Error(), "No data found for resource with given identifier") {
+			if i == maxRetries {
+				break
+			}
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+		break
+	}
 	if err != nil {
 		return fmt.Errorf("fetching response body: %w", err)
 	}

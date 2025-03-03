@@ -47,12 +47,12 @@ func TestKeyboardPress(t *testing.T) {
 		require.NoError(t, p.Focus("input", common.NewFrameBaseOptions(p.MainFrame().Timeout())))
 
 		require.NoError(t, kb.Type("Hello World!", common.KeyboardOptions{}))
-		v, err := el.InputValue(nil)
+		v, err := el.InputValue(common.NewElementHandleBaseOptions(el.Timeout()))
 		require.NoError(t, err)
 		require.Equal(t, "Hello World!", v)
 
 		require.NoError(t, kb.Press("Backspace", common.KeyboardOptions{}))
-		v, err = el.InputValue(nil)
+		v, err = el.InputValue(common.NewElementHandleBaseOptions(el.Timeout()))
 		require.NoError(t, err)
 		assert.Equal(t, "Hello World", v)
 	})
@@ -82,7 +82,7 @@ func TestKeyboardPress(t *testing.T) {
 		require.NoError(t, kb.Press("Control+J", common.KeyboardOptions{}))
 		require.NoError(t, kb.Press("Control+k", common.KeyboardOptions{}))
 
-		v, err := el.InputValue(nil)
+		v, err := el.InputValue(common.NewElementHandleBaseOptions(el.Timeout()))
 		require.NoError(t, err)
 		require.Equal(t, "+=@6AbC", v)
 	})
@@ -173,7 +173,7 @@ func TestKeyboardPress(t *testing.T) {
 		require.NoError(t, kb.Press("Shift+b", common.KeyboardOptions{}))
 		require.NoError(t, kb.Press("Shift+C", common.KeyboardOptions{}))
 
-		v, err := el.InputValue(nil)
+		v, err := el.InputValue(common.NewElementHandleBaseOptions(el.Timeout()))
 		require.NoError(t, err)
 		require.Equal(t, "AbC", v)
 
@@ -183,7 +183,7 @@ func TestKeyboardPress(t *testing.T) {
 		}
 		require.NoError(t, kb.Press(metaKey+"+A", common.KeyboardOptions{}))
 		require.NoError(t, kb.Press("Delete", common.KeyboardOptions{}))
-		v, err = el.InputValue(nil)
+		v, err = el.InputValue(common.NewElementHandleBaseOptions(el.Timeout()))
 		require.NoError(t, err)
 		assert.Equal(t, "", v)
 	})
@@ -202,7 +202,7 @@ func TestKeyboardPress(t *testing.T) {
 		require.NoError(t, p.Focus("textarea", common.NewFrameBaseOptions(p.MainFrame().Timeout())))
 
 		require.NoError(t, kb.Type("L+m+KeyN", common.KeyboardOptions{}))
-		v, err := el.InputValue(nil)
+		v, err := el.InputValue(common.NewElementHandleBaseOptions(el.Timeout()))
 		require.NoError(t, err)
 		assert.Equal(t, "L+m+KeyN", v)
 	})
@@ -233,7 +233,7 @@ func TestKeyboardPress(t *testing.T) {
 		require.NoError(t, kb.Up("KeyH"))
 		require.NoError(t, kb.Up("Shift"))
 
-		v, err := el.InputValue(nil)
+		v, err := el.InputValue(common.NewElementHandleBaseOptions(el.Timeout()))
 		require.NoError(t, err)
 		assert.Equal(t, "CdefGH", v)
 	})
@@ -255,7 +255,7 @@ func TestKeyboardPress(t *testing.T) {
 		require.NoError(t, kb.Type("oPqR", common.KeyboardOptions{}))
 		require.NoError(t, kb.Up("Shift"))
 
-		v, err := el.InputValue(nil)
+		v, err := el.InputValue(common.NewElementHandleBaseOptions(el.Timeout()))
 		require.NoError(t, err)
 		assert.Equal(t, "oPqR", v)
 	})
@@ -277,7 +277,7 @@ func TestKeyboardPress(t *testing.T) {
 		require.NoError(t, kb.Press("Enter", common.KeyboardOptions{}))
 		require.NoError(t, kb.Press("Enter", common.KeyboardOptions{}))
 		require.NoError(t, kb.Type("World!", common.KeyboardOptions{}))
-		v, err := el.InputValue(nil)
+		v, err := el.InputValue(common.NewElementHandleBaseOptions(el.Timeout()))
 		require.NoError(t, err)
 		assert.Equal(t, "Hello\n\nWorld!", v)
 	})
@@ -297,7 +297,7 @@ func TestKeyboardPress(t *testing.T) {
 		require.NoError(t, p.Focus("input", common.NewFrameBaseOptions(p.MainFrame().Timeout())))
 
 		require.NoError(t, kb.Type("Hello World!", common.KeyboardOptions{}))
-		v, err := el.InputValue(nil)
+		v, err := el.InputValue(common.NewElementHandleBaseOptions(el.Timeout()))
 		require.NoError(t, err)
 		require.Equal(t, "Hello World!", v)
 

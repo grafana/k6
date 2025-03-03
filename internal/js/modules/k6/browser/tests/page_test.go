@@ -7,9 +7,12 @@ import (
 	"fmt"
 	"image/png"
 	"io"
+	"net"
 	"net/http"
 	"runtime"
+	"slices"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -560,10 +563,10 @@ func TestPageInputSpecialCharacters(t *testing.T) {
 		`¯\_(ツ)_/¯`,
 	}
 	for _, want := range wants {
-		require.NoError(t, el.Fill("", nil))
-		require.NoError(t, el.Type(want, nil))
+		require.NoError(t, el.Fill("", common.NewElementHandleBaseOptions(common.DefaultTimeout)))
+		require.NoError(t, el.Type(want, common.NewElementHandleTypeOptions(common.DefaultTimeout)))
 
-		got, err := el.InputValue(nil)
+		got, err := el.InputValue(common.NewElementHandleBaseOptions(common.DefaultTimeout))
 		require.NoError(t, err)
 		assert.Equal(t, want, got)
 	}
@@ -2198,5 +2201,552 @@ func TestPageOnMetric(t *testing.T) {
 			// of a metric which didn't match our expectations.
 			assert.True(t, foundUnamended.Load() > 0)
 		})
+	}
+}
+
+func TestPageOnRequest(t *testing.T) {
+	t.Parallel()
+
+	// Start and setup a webserver to test the page.on('request') handler.
+	tb := newTestBrowser(t, withHTTPServer())
+	defer tb.Browser.Close()
+
+	tb.withHandler("/home", func(w http.ResponseWriter, r *http.Request) {
+		_, err := fmt.Fprintf(w, `<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <script>fetch('/api', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({name: 'tester'})
+    })</script>
+</body>
+</html>`)
+		require.NoError(t, err)
+	})
+	tb.withHandler("/api", func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+
+		var data struct {
+			Name string `json:"name"`
+		}
+		err = json.Unmarshal(body, &data)
+		require.NoError(t, err)
+
+		_, err = fmt.Fprintf(w, `{"message": "Hello %s!"}`, data.Name)
+		require.NoError(t, err)
+	})
+	tb.withHandler("/style.css", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/css")
+		_, err := fmt.Fprintf(w, `body { background-color: #f0f0f0; }`)
+		require.NoError(t, err)
+	})
+
+	// Start and setup a k6 iteration to test the page.on('request') handler.
+	vu, _, _, cleanUp := startIteration(t)
+	defer cleanUp()
+
+	// Some of the business logic is in the mapping layer unfortunately.
+	// To test everything is wried up correctly, we're required to work
+	// with RunPromise.
+	//
+	// The code below is the JavaScript code that is executed in the k6 iteration.
+	// It will wait for all requests to be captured in returnValue, before returning.
+	gv, err := vu.RunAsync(t, `
+		const context = await browser.newContext({locale: 'en-US', userAgent: 'some-user-agent'});
+		const page = await context.newPage();
+
+		var returnValue = [];
+		page.on('request', async (request) => {
+			returnValue.push({
+				allHeaders: await request.allHeaders(),
+				frameUrl: request.frame().url(),
+				acceptLanguageHeader: await request.headerValue('Accept-Language'),
+				headers: request.headers(),
+				headersArray: await request.headersArray(),
+				isNavigationRequest: request.isNavigationRequest(),
+				method: request.method(),
+				postData: request.postData(),
+				postDataBuffer: request.postDataBuffer() ? String.fromCharCode.apply(null, new Uint8Array(request.postDataBuffer())) : null,
+				resourceType: request.resourceType(),
+				// Ignoring response for now since it is not reliable as we don't explicitly wait for the request to finish.
+				// response: await request.response(),
+				size: request.size(),
+				// Ignoring timing for now since it is not reliable as we don't explicitly wait for the request to finish.
+				// timing: request.timing(),
+				url: request.url()
+			});
+		});
+
+		await page.goto('%s', {waitUntil: 'networkidle'});
+
+		await page.close();
+
+		return JSON.stringify(returnValue, null, 2);
+	`, tb.url("/home"))
+	assert.NoError(t, err)
+
+	got := k6test.ToPromise(t, gv)
+
+	// Convert the result to a string and then to a slice of requests.
+	var requests []request
+	err = json.Unmarshal([]byte(got.Result().String()), &requests)
+	require.NoError(t, err)
+
+	expected := []request{
+		{
+			AllHeaders: map[string]string{
+				"accept-language":           "en-US",
+				"upgrade-insecure-requests": "1",
+				"user-agent":                "some-user-agent",
+			},
+			FrameURL:             "about:blank",
+			AcceptLanguageHeader: "en-US",
+			Headers: map[string]string{
+				"Accept-Language":           "en-US",
+				"Upgrade-Insecure-Requests": "1",
+				"User-Agent":                "some-user-agent",
+			},
+			HeadersArray: []map[string]string{
+				{"name": "Upgrade-Insecure-Requests", "value": "1"},
+				{"name": "User-Agent", "value": "some-user-agent"},
+				{"name": "Accept-Language", "value": "en-US"},
+			},
+			IsNavigationRequest: true,
+			Method:              "GET",
+			PostData:            "",
+			PostDataBuffer:      "",
+			ResourceType:        "Document",
+			Size: map[string]int{
+				"body":    0,
+				"headers": 103,
+			},
+			URL: tb.url("/home"),
+		},
+		{
+			AllHeaders: map[string]string{
+				"accept-language": "en-US",
+				"referer":         tb.url("/home"),
+				"user-agent":      "some-user-agent",
+			},
+			FrameURL:             tb.url("/home"),
+			AcceptLanguageHeader: "en-US",
+			Headers: map[string]string{
+				"Accept-Language": "en-US",
+				"Referer":         tb.url("/home"),
+				"User-Agent":      "some-user-agent",
+			},
+			HeadersArray: []map[string]string{
+				{"name": "User-Agent", "value": "some-user-agent"},
+				{"name": "Accept-Language", "value": "en-US"},
+				{"name": "Referer", "value": tb.url("/home")},
+			},
+			IsNavigationRequest: false,
+			Method:              "GET",
+			PostData:            "",
+			PostDataBuffer:      "",
+			ResourceType:        "Stylesheet",
+			Size: map[string]int{
+				"body":    0,
+				"headers": 116,
+			},
+			URL: tb.url("/style.css"),
+		},
+		{
+			AllHeaders: map[string]string{
+				"accept-language": "en-US",
+				"content-type":    "application/json",
+				"referer":         tb.url("/home"),
+				"user-agent":      "some-user-agent",
+			},
+			FrameURL:             tb.url("/home"),
+			AcceptLanguageHeader: "en-US",
+			Headers: map[string]string{
+				"Accept-Language": "en-US",
+				"Content-Type":    "application/json",
+				"Referer":         tb.url("/home"),
+				"User-Agent":      "some-user-agent",
+			},
+			HeadersArray: []map[string]string{
+				{"name": "Referer", "value": tb.url("/home")},
+				{"name": "User-Agent", "value": "some-user-agent"},
+				{"name": "Accept-Language", "value": "en-US"},
+				{"name": "Content-Type", "value": "application/json"},
+			},
+			IsNavigationRequest: false,
+			Method:              "POST",
+			PostData:            `{"name":"tester"}`,
+			PostDataBuffer:      `{"name":"tester"}`,
+			ResourceType:        "Fetch",
+			Size: map[string]int{
+				"body":    17,
+				"headers": 143,
+			},
+			URL: tb.url("/api"),
+		},
+		{
+			AllHeaders: map[string]string{
+				"accept-language": "en-US",
+				"referer":         tb.url("/home"),
+				"user-agent":      "some-user-agent",
+			},
+			FrameURL:             tb.url("/home"),
+			AcceptLanguageHeader: "en-US",
+			Headers: map[string]string{
+				"Accept-Language": "en-US",
+				"Referer":         tb.url("/home"),
+				"User-Agent":      "some-user-agent",
+			},
+			HeadersArray: []map[string]string{
+				{"name": "Accept-Language", "value": "en-US"},
+				{"name": "Referer", "value": tb.url("/home")},
+				{"name": "User-Agent", "value": "some-user-agent"},
+			},
+			IsNavigationRequest: false,
+			Method:              "GET",
+			PostData:            "",
+			PostDataBuffer:      "",
+			ResourceType:        "Other",
+			Size: map[string]int{
+				"body":    0,
+				"headers": 118,
+			},
+			URL: tb.url("/favicon.ico"),
+		},
+	}
+
+	// Compare each request one by one for better test failure visibility
+	for _, req := range requests {
+		i := slices.IndexFunc(expected, func(r request) bool { return req.URL == r.URL })
+		assert.NotEqual(t, -1, i, "failed to find expected request with URL %s", req.URL)
+
+		sortByName := func(m1, m2 map[string]string) int {
+			return strings.Compare(m1["name"], m2["name"])
+		}
+		slices.SortFunc(req.HeadersArray, sortByName)
+		slices.SortFunc(expected[i].HeadersArray, sortByName)
+		assert.Equal(t, expected[i], req)
+	}
+}
+
+type request struct {
+	AllHeaders           map[string]string   `json:"allHeaders"`
+	FrameURL             string              `json:"frameUrl"`
+	AcceptLanguageHeader string              `json:"acceptLanguageHeader"`
+	Headers              map[string]string   `json:"headers"`
+	HeadersArray         []map[string]string `json:"headersArray"`
+	IsNavigationRequest  bool                `json:"isNavigationRequest"`
+	Method               string              `json:"method"`
+	PostData             string              `json:"postData"`
+	PostDataBuffer       string              `json:"postDataBuffer"`
+	ResourceType         string              `json:"resourceType"`
+	Size                 map[string]int      `json:"size"`
+	URL                  string              `json:"url"`
+}
+
+type response struct {
+	AllHeaders            map[string]string      `json:"allHeaders"`
+	Body                  string                 `json:"body"`
+	FrameURL              string                 `json:"frameUrl"`
+	AcceptLanguageHeader  string                 `json:"acceptLanguageHeader"`
+	AcceptLanguageHeaders []string               `json:"acceptLanguageHeaders"`
+	Headers               map[string]string      `json:"headers"`
+	HeadersArray          []map[string]string    `json:"headersArray"`
+	JSON                  string                 `json:"json"`
+	OK                    bool                   `json:"ok"`
+	RequestURL            string                 `json:"requestUrl"`
+	SecurityDetails       common.SecurityDetails `json:"securityDetails"`
+	ServerAddr            common.RemoteAddress   `json:"serverAddr"`
+	Size                  map[string]int         `json:"size"`
+	Status                int64                  `json:"status"`
+	StatusText            string                 `json:"statusText"`
+	URL                   string                 `json:"url"`
+	Text                  string                 `json:"text"`
+}
+
+func TestPageOnResponse(t *testing.T) {
+	t.Parallel()
+
+	// Start and setup a webserver to test the page.on('request') handler.
+	tb := newTestBrowser(t, withHTTPServer())
+	defer tb.Browser.Close()
+
+	tb.withHandler("/home", func(w http.ResponseWriter, _ *http.Request) {
+		_, err := fmt.Fprintf(w, `<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <script>fetch('/api', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({name: 'tester'})
+    })</script>
+</body>
+</html>`)
+		require.NoError(t, err)
+	})
+	tb.withHandler("/api", func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		defer require.NoError(t, r.Body.Close())
+
+		var data struct {
+			Name string `json:"name"`
+		}
+		err = json.Unmarshal(body, &data)
+		require.NoError(t, err)
+
+		w.Header().Set("Content-Type", "application/json")
+		_, err = fmt.Fprintf(w, `{"message": "Hello %s!"}`, data.Name)
+		require.NoError(t, err)
+	})
+	tb.withHandler("/style.css", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/css")
+		_, err := fmt.Fprintf(w, `body { background-color: #f0f0f0; }`)
+		require.NoError(t, err)
+	})
+
+	// Start and setup a k6 iteration to test the page.on('request') handler.
+	vu, _, _, cleanUp := startIteration(t)
+	defer cleanUp()
+
+	// Some of the business logic is in the mapping layer unfortunately.
+	// To test everything is wried up correctly, we're required to work
+	// with RunPromise.
+	//
+	// The code below is the JavaScript code that is executed in the k6 iteration.
+	// It will wait for all requests to be captured in returnValue, before returning.
+	gv, err := vu.RunAsync(t, `
+		const context = await browser.newContext({locale: 'en-US', userAgent: 'some-user-agent'});
+		const page = await context.newPage();
+
+		var returnValue = [];
+		page.on('response', async (response) => {
+			// We need to check if the response is JSON before calling json()
+			const allHeaders = await response.allHeaders();
+			var json = null;
+			if (allHeaders["content-type"] === "application/json") {
+				json = await response.json();
+			}
+
+			returnValue.push({
+				allHeaders: allHeaders,
+				body: await response.body() ? String.fromCharCode.apply(null, new Uint8Array(await response.body())) : null,
+				frameUrl: response.frame().url(),
+				acceptLanguageHeader: await response.headerValue('Accept-Language'),
+				acceptLanguageHeaders: await response.headerValues('Accept-Language'),
+				headers: response.headers(),
+				headersArray: await response.headersArray(),
+				json: JSON.stringify(json),
+				ok: response.ok(),
+				requestUrl: response.request().url(),
+				securityDetails: await response.securityDetails(),
+				serverAddr: await response.serverAddr(),
+				size: await response.size(),
+				status: response.status(),
+				statusText: response.statusText(),
+				url: response.url(),
+				text: await response.text()
+			});
+		})
+
+		await page.goto('%s', {waitUntil: 'networkidle'});
+
+		await page.close();
+
+		return JSON.stringify(returnValue, null, 2);
+	`, tb.url("/home"))
+	assert.NoError(t, err)
+
+	got := k6test.ToPromise(t, gv)
+
+	// Convert the result to a string and then to a slice of requests.
+	var responses []response
+	err = json.Unmarshal([]byte(got.Result().String()), &responses)
+	require.NoError(t, err)
+
+	// Normalize the date
+	for i := range responses {
+		for k := range responses[i].AllHeaders {
+			if strings.Contains(strings.ToLower(k), "date") {
+				responses[i].AllHeaders[k] = "Wed, 29 Jan 2025 09:00:00 GMT"
+			}
+		}
+		for k := range responses[i].Headers {
+			if strings.Contains(strings.ToLower(k), "date") {
+				responses[i].Headers[k] = "Wed, 29 Jan 2025 09:00:00 GMT"
+			}
+		}
+		for k, header := range responses[i].HeadersArray {
+			if strings.Contains(strings.ToLower(header["name"]), "date") {
+				responses[i].HeadersArray[k]["value"] = "Wed, 29 Jan 2025 09:00:00 GMT"
+			}
+		}
+	}
+
+	serverURL := tb.http.ServerHTTP.URL
+	host, p, err := net.SplitHostPort(strings.TrimPrefix(serverURL, "http://"))
+	require.NoError(t, err)
+
+	port, err := strconv.ParseInt(p, 10, 64)
+	require.NoError(t, err)
+
+	expected := []response{
+		{
+			AllHeaders: map[string]string{
+				"content-length": "286",
+				"content-type":   "text/html; charset=utf-8",
+				"date":           "Wed, 29 Jan 2025 09:00:00 GMT",
+			},
+			Body:                  "<!DOCTYPE html>\n<html>\n<head>\n    <link rel=\"stylesheet\" href=\"/style.css\">\n</head>\n<body>\n    <script>fetch('/api', {\n      method: 'POST',\n      headers: {\n        'Content-Type': 'application/json'\n      },\n      body: JSON.stringify({name: 'tester'})\n    })</script>\n</body>\n</html>",
+			FrameURL:              tb.url("/home"),
+			AcceptLanguageHeader:  "",
+			AcceptLanguageHeaders: []string{""},
+			Headers: map[string]string{
+				"Content-Length": "286",
+				"Content-Type":   "text/html; charset=utf-8",
+				"Date":           "Wed, 29 Jan 2025 09:00:00 GMT",
+			},
+			HeadersArray: []map[string]string{
+				{"name": "Content-Length", "value": "286"},
+				{"name": "Content-Type", "value": "text/html; charset=utf-8"},
+				{"name": "Date", "value": "Wed, 29 Jan 2025 09:00:00 GMT"},
+			},
+			JSON:            "null",
+			OK:              true,
+			RequestURL:      tb.url("/home"),
+			SecurityDetails: common.SecurityDetails{},
+			ServerAddr:      common.RemoteAddress{IPAddress: host, Port: port},
+			Size:            map[string]int{"body": 286, "headers": 117},
+			Status:          200,
+			StatusText:      "OK",
+			URL:             tb.url("/home"),
+			Text:            "<!DOCTYPE html>\n<html>\n<head>\n    <link rel=\"stylesheet\" href=\"/style.css\">\n</head>\n<body>\n    <script>fetch('/api', {\n      method: 'POST',\n      headers: {\n        'Content-Type': 'application/json'\n      },\n      body: JSON.stringify({name: 'tester'})\n    })</script>\n</body>\n</html>",
+		},
+		{
+			AllHeaders: map[string]string{
+				"content-length": "35",
+				"content-type":   "text/css",
+				"date":           "Wed, 29 Jan 2025 09:00:00 GMT",
+			},
+			Body:                  "body { background-color: #f0f0f0; }",
+			FrameURL:              tb.url("/home"),
+			AcceptLanguageHeader:  "",
+			AcceptLanguageHeaders: []string{""},
+			Headers: map[string]string{
+				"Content-Length": "35",
+				"Content-Type":   "text/css",
+				"Date":           "Wed, 29 Jan 2025 09:00:00 GMT",
+			},
+			HeadersArray: []map[string]string{
+				{"name": "Date", "value": "Wed, 29 Jan 2025 09:00:00 GMT"},
+				{"name": "Content-Type", "value": "text/css"},
+				{"name": "Content-Length", "value": "35"},
+			},
+			JSON:            "null",
+			OK:              true,
+			RequestURL:      tb.url("/style.css"),
+			SecurityDetails: common.SecurityDetails{},
+			ServerAddr:      common.RemoteAddress{IPAddress: host, Port: port},
+			Size:            map[string]int{"body": 35, "headers": 100},
+			Status:          200,
+			StatusText:      "OK",
+			URL:             tb.url("/style.css"),
+			Text:            "body { background-color: #f0f0f0; }",
+		},
+		{
+			AllHeaders: map[string]string{
+				"access-control-allow-credentials": "true",
+				"access-control-allow-origin":      "*",
+				"content-length":                   "10",
+				"content-type":                     "text/plain; charset=utf-8",
+				"date":                             "Wed, 29 Jan 2025 09:00:00 GMT",
+				"x-content-type-options":           "nosniff",
+			},
+			Body:                  "Not Found\n",
+			FrameURL:              tb.url("/home"),
+			AcceptLanguageHeader:  "",
+			AcceptLanguageHeaders: []string{""},
+			Headers: map[string]string{
+				"Access-Control-Allow-Credentials": "true",
+				"Access-Control-Allow-Origin":      "*",
+				"Content-Length":                   "10",
+				"Content-Type":                     "text/plain; charset=utf-8",
+				"Date":                             "Wed, 29 Jan 2025 09:00:00 GMT",
+				"X-Content-Type-Options":           "nosniff",
+			},
+			HeadersArray: []map[string]string{
+				{"name": "Date", "value": "Wed, 29 Jan 2025 09:00:00 GMT"},
+				{"name": "Content-Type", "value": "text/plain; charset=utf-8"},
+				{"name": "Access-Control-Allow-Credentials", "value": "true"},
+				{"name": "X-Content-Type-Options", "value": "nosniff"},
+				{"name": "Access-Control-Allow-Origin", "value": "*"},
+				{"name": "Content-Length", "value": "10"},
+			},
+			JSON:            "null",
+			OK:              false,
+			RequestURL:      tb.url("/favicon.ico"),
+			SecurityDetails: common.SecurityDetails{},
+			ServerAddr:      common.RemoteAddress{IPAddress: host, Port: port},
+			Size:            map[string]int{"body": 10, "headers": 229},
+			Status:          404,
+			StatusText:      "Not Found",
+			URL:             tb.url("/favicon.ico"),
+			Text:            "Not Found\n",
+		},
+		{
+			AllHeaders: map[string]string{
+				"content-length": "28",
+				"content-type":   "application/json",
+				"date":           "Wed, 29 Jan 2025 09:00:00 GMT",
+			},
+			Body:                  "{\"message\": \"Hello tester!\"}",
+			FrameURL:              tb.url("/home"),
+			AcceptLanguageHeader:  "",
+			AcceptLanguageHeaders: []string{""},
+			Headers: map[string]string{
+				"Content-Length": "28",
+				"Content-Type":   "application/json",
+				"Date":           "Wed, 29 Jan 2025 09:00:00 GMT",
+			},
+			HeadersArray: []map[string]string{
+				{"name": "Date", "value": "Wed, 29 Jan 2025 09:00:00 GMT"},
+				{"name": "Content-Type", "value": "application/json"},
+				{"name": "Content-Length", "value": "28"},
+			},
+			JSON:            "{\"message\":\"Hello tester!\"}",
+			OK:              true,
+			RequestURL:      tb.url("/api"),
+			SecurityDetails: common.SecurityDetails{},
+			ServerAddr:      common.RemoteAddress{IPAddress: host, Port: port},
+			Size:            map[string]int{"body": 28, "headers": 108},
+			Status:          200,
+			StatusText:      "OK",
+			URL:             tb.url("/api"),
+			Text:            "{\"message\": \"Hello tester!\"}",
+		},
+	}
+
+	// Compare each response one by one for better test failure visibility
+	for _, resp := range responses {
+		i := slices.IndexFunc(expected, func(r response) bool { return resp.URL == r.URL })
+		assert.NotEqual(t, -1, i, "failed to find expected request with URL %s", resp.URL)
+
+		sortByName := func(m1, m2 map[string]string) int {
+			return strings.Compare(m1["name"], m2["name"])
+		}
+		slices.SortFunc(resp.HeadersArray, sortByName)
+		slices.SortFunc(expected[i].HeadersArray, sortByName)
+		assert.Equal(t, expected[i], resp)
 	}
 }

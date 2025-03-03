@@ -42,6 +42,12 @@ const (
 
 	// EventPageMetricCalled represents the page.on('metric') event.
 	EventPageMetricCalled PageOnEventName = "metric"
+
+	// EventPageRequestCalled represents the page.on('request') event.
+	EventPageRequestCalled PageOnEventName = "request"
+
+	// EventPageResponseCalled represents the page.on('response') event.
+	EventPageResponseCalled PageOnEventName = "response"
 )
 
 // MediaType represents the type of media to emulate.
@@ -483,6 +489,61 @@ func (p *Page) urlTagName(url string, method string) (string, bool) {
 	p.logger.Debugf("urlTagName", "name: %q nameChanged: %v", newTagName, urlMatched)
 
 	return newTagName, urlMatched
+}
+
+func (p *Page) onRequest(request *Request) {
+	if !hasPageOnHandler(p, EventPageRequestCalled) {
+		return
+	}
+
+	p.eventHandlersMu.RLock()
+	defer p.eventHandlersMu.RUnlock()
+	for _, h := range p.eventHandlers[EventPageRequestCalled] {
+		err := func() error {
+			// Handlers can register other handlers, so we need to
+			// unlock the mutex before calling the next handler.
+			p.eventHandlersMu.RUnlock()
+			defer p.eventHandlersMu.RLock()
+
+			// Call and wait for the handler to complete.
+			return h(PageOnEvent{
+				Request: request,
+			})
+		}()
+		if err != nil {
+			p.logger.Warnf("onRequest", "handler returned an error: %v", err)
+			return
+		}
+	}
+}
+
+// onResponse will call the handlers for the page.on('response') event.
+func (p *Page) onResponse(resp *Response) {
+	p.logger.Debugf("Page:onResponse", "sid:%v url:%v", p.sessionID(), resp.URL())
+
+	if !hasPageOnHandler(p, EventPageResponseCalled) {
+		return
+	}
+
+	p.eventHandlersMu.RLock()
+	defer p.eventHandlersMu.RUnlock()
+	for _, h := range p.eventHandlers[EventPageResponseCalled] {
+		err := func() error {
+			// Handlers can register other handlers, so we need to
+			// unlock the mutex before calling the next handler.
+			p.eventHandlersMu.RUnlock()
+			defer p.eventHandlersMu.RLock()
+
+			// Call and wait for the handler to complete.
+			return h(PageOnEvent{
+				Response: resp,
+			})
+		}()
+		if err != nil {
+			p.logger.Warnf("onResponse", "handler returned an error: %v", err)
+			return
+		}
+	}
 }
 
 func (p *Page) onConsoleAPICalled(event *runtime.EventConsoleAPICalled) {
@@ -1169,6 +1230,13 @@ type PageOnEvent struct {
 
 	// Metric is the metric event event.
 	Metric *MetricEvent
+
+	// Request is the read only request that is about to be sent from the
+	// browser to the WuT.
+	Request *Request
+
+	// Response is the read only response that was received from the WuT.
+	Response *Response
 }
 
 // On subscribes to a page event for which the given handler will be executed

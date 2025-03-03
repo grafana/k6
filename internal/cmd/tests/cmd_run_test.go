@@ -25,13 +25,13 @@ import (
 	"github.com/tidwall/gjson"
 	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/errext/exitcodes"
+	"go.k6.io/k6/internal/build"
 	"go.k6.io/k6/internal/cmd"
 	"go.k6.io/k6/internal/cmd/tests/events"
 	"go.k6.io/k6/internal/event"
 	"go.k6.io/k6/internal/lib/testutils"
 	"go.k6.io/k6/internal/lib/testutils/httpmultibin"
 	"go.k6.io/k6/js/modules"
-	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/lib/fsext"
 )
 
@@ -52,7 +52,7 @@ func TestVersion(t *testing.T) {
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 		stdout := ts.Stdout.String()
-		assert.Contains(t, stdout, "k6 v"+consts.Version)
+		assert.Contains(t, stdout, "k6 v"+build.Version)
 		assert.Contains(t, stdout, runtime.Version())
 		assert.Contains(t, stdout, runtime.GOOS)
 		assert.Contains(t, stdout, runtime.GOARCH)

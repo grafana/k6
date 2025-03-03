@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.k6.io/k6/internal/js/modules/k6/browser/common"
 )
 
 func TestMouseActions(t *testing.T) {
@@ -28,7 +29,7 @@ func TestMouseActions(t *testing.T) {
 
 		// Simulate a click at the button coordinates
 		box := button.BoundingBox()
-		require.NoError(t, m.Click(box.X, box.Y, nil))
+		require.NoError(t, m.Click(box.X, box.Y, common.NewMouseClickOptions()))
 
 		// Verify the button's text changed
 		text, ok, err := button.TextContent()
@@ -61,7 +62,7 @@ func TestMouseActions(t *testing.T) {
 		box := button.BoundingBox()
 
 		// Simulate a double click at the button coordinates
-		require.NoError(t, m.DblClick(box.X, box.Y, nil))
+		require.NoError(t, m.DblClick(box.X, box.Y, common.NewMouseDblClickOptions()))
 
 		// Verify the button's text changed
 		text, ok, err := button.TextContent()
@@ -99,7 +100,7 @@ func TestMouseActions(t *testing.T) {
 
 		// Simulate mouse move within the div
 		box := area.BoundingBox()
-		require.NoError(t, m.Move(box.X+50, box.Y+50, nil)) // Move to the center of the div
+		require.NoError(t, m.Move(box.X+50, box.Y+50, common.NewMouseMoveOptions())) // Move to the center of the div
 		text, ok, err := area.TextContent()
 		require.NoError(t, err)
 		require.True(t, ok)
@@ -126,13 +127,13 @@ func TestMouseActions(t *testing.T) {
 		require.NoError(t, err)
 
 		box := button.BoundingBox()
-		require.NoError(t, m.Move(box.X, box.Y, nil))
-		require.NoError(t, m.Down(nil))
+		require.NoError(t, m.Move(box.X, box.Y, common.NewMouseMoveOptions()))
+		require.NoError(t, m.Down(common.NewMouseDownUpOptions()))
 		text, ok, err := button.TextContent()
 		require.NoError(t, err)
 		require.True(t, ok)
 		assert.Equal(t, "Mouse Down", text)
-		require.NoError(t, m.Up(nil))
+		require.NoError(t, m.Up(common.NewMouseDownUpOptions()))
 		text, ok, err = button.TextContent()
 		require.NoError(t, err)
 		require.True(t, ok)

@@ -5,7 +5,6 @@ package tests
 import (
 	"testing"
 
-	"go.k6.io/k6/internal/js/compiler"
 	k6encoding "go.k6.io/k6/internal/js/modules/k6/encoding"
 	"go.k6.io/k6/internal/js/modules/k6/webcrypto"
 	"go.k6.io/k6/js/modulestest"
@@ -14,7 +13,7 @@ import (
 )
 
 const initGlobals = `
-	globalThis.CryptoKey = require("k6/x/webcrypto").CryptoKey;
+	globalThis.CryptoKey = crypto.CryptoKey;
 `
 
 // newConfiguredRuntime initializes a new test setup.
@@ -29,12 +28,7 @@ func newConfiguredRuntime(t testing.TB) *modulestest.Runtime {
 	_, err = rt.VU.Runtime().RunString("var self = this;")
 	require.NoError(t, err)
 
-	err = rt.SetupModuleSystem(
-		map[string]interface{}{"k6/x/webcrypto": webcrypto.New()},
-		nil,
-		compiler.New(rt.VU.InitEnv().Logger),
-	)
-	require.NoError(t, err)
+	require.NoError(t, webcrypto.SetupGlobally(rt.VU))
 
 	// We compile the Web Platform testharness script into a sobek.Program
 	compileAndRun(t, rt, "./wpt/resources", "testharness.js")

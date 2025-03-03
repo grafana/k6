@@ -237,7 +237,8 @@ func (h *ElementHandle) dblclick(p *Position, opts *MouseClickOptions) error {
 	return h.frame.page.Mouse.click(p.X, p.Y, opts)
 }
 
-func (h *ElementHandle) defaultTimeout() time.Duration {
+// DefaultTimeout returns the default timeout for this element handle.
+func (h *ElementHandle) DefaultTimeout() time.Duration {
 	return h.frame.manager.timeoutSettings.timeout()
 }
 
@@ -802,17 +803,12 @@ func (h *ElementHandle) ContentFrame() (*Frame, error) {
 }
 
 // Dblclick scrolls element into view and double clicks on the element.
-func (h *ElementHandle) Dblclick(opts sobek.Value) error {
-	popts := NewElementHandleDblclickOptions(h.defaultTimeout())
-	if err := popts.Parse(h.ctx, opts); err != nil {
-		return fmt.Errorf("parsing element double click options: %w", err)
-	}
-
+func (h *ElementHandle) Dblclick(opts *ElementHandleDblclickOptions) error {
 	dblclick := func(_ context.Context, handle *ElementHandle, p *Position) (any, error) {
-		return nil, handle.dblclick(p, popts.ToMouseClickOptions())
+		return nil, handle.dblclick(p, opts.ToMouseClickOptions())
 	}
-	dblclickAction := h.newPointerAction(dblclick, &popts.ElementHandleBasePointerOptions)
-	if _, err := call(h.ctx, dblclickAction, popts.Timeout); err != nil {
+	dblclickAction := h.newPointerAction(dblclick, &opts.ElementHandleBasePointerOptions)
+	if _, err := call(h.ctx, dblclickAction, opts.Timeout); err != nil {
 		return fmt.Errorf("double clicking on element: %w", err)
 	}
 
@@ -826,7 +822,7 @@ func (h *ElementHandle) DispatchEvent(typ string, eventInit any) error {
 	dispatchEvent := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return handle.dispatchEvent(apiCtx, typ, eventInit)
 	}
-	opts := NewElementHandleBaseOptions(h.defaultTimeout())
+	opts := NewElementHandleBaseOptions(h.DefaultTimeout())
 	dispatchEventAction := h.newAction(
 		[]string{}, dispatchEvent, opts.Force, opts.NoWaitAfter, opts.Timeout,
 	)
@@ -840,20 +836,15 @@ func (h *ElementHandle) DispatchEvent(typ string, eventInit any) error {
 }
 
 // Fill types the given value into the element.
-func (h *ElementHandle) Fill(value string, opts sobek.Value) error {
-	popts := NewElementHandleBaseOptions(h.defaultTimeout())
-	if err := popts.Parse(h.ctx, opts); err != nil {
-		return fmt.Errorf("parsing element fill options: %w", err)
-	}
-
+func (h *ElementHandle) Fill(value string, opts *ElementHandleBaseOptions) error {
 	fill := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return nil, handle.fill(apiCtx, value)
 	}
 	fillAction := h.newAction(
 		[]string{"visible", "enabled", "editable"},
-		fill, popts.Force, popts.NoWaitAfter, popts.Timeout,
+		fill, opts.Force, opts.NoWaitAfter, opts.Timeout,
 	)
-	if _, err := call(h.ctx, fillAction, popts.Timeout); err != nil {
+	if _, err := call(h.ctx, fillAction, opts.Timeout); err != nil {
 		return fmt.Errorf("filling element: %w", err)
 	}
 
@@ -867,7 +858,7 @@ func (h *ElementHandle) Focus() error {
 	focus := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return nil, handle.focus(apiCtx, false)
 	}
-	opts := NewElementHandleBaseOptions(h.defaultTimeout())
+	opts := NewElementHandleBaseOptions(h.DefaultTimeout())
 	focusAction := h.newAction(
 		[]string{}, focus, opts.Force, opts.NoWaitAfter, opts.Timeout,
 	)
@@ -886,7 +877,7 @@ func (h *ElementHandle) GetAttribute(name string) (string, bool, error) {
 	getAttribute := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return handle.getAttribute(apiCtx, name)
 	}
-	opts := NewElementHandleBaseOptions(h.defaultTimeout())
+	opts := NewElementHandleBaseOptions(h.DefaultTimeout())
 	getAttributeAction := h.newAction(
 		[]string{}, getAttribute, opts.Force, opts.NoWaitAfter, opts.Timeout,
 	)
@@ -910,17 +901,12 @@ func (h *ElementHandle) GetAttribute(name string) (string, bool, error) {
 }
 
 // Hover scrolls element into view and hovers over its center point.
-func (h *ElementHandle) Hover(opts sobek.Value) error {
-	aopts := NewElementHandleHoverOptions(h.defaultTimeout())
-	if err := aopts.Parse(h.ctx, opts); err != nil {
-		return fmt.Errorf("parsing element hover options: %w", err)
-	}
-
+func (h *ElementHandle) Hover(opts *ElementHandleHoverOptions) error {
 	hover := func(apiCtx context.Context, handle *ElementHandle, p *Position) (any, error) {
 		return nil, handle.hover(apiCtx, p)
 	}
-	hoverAction := h.newPointerAction(hover, &aopts.ElementHandleBasePointerOptions)
-	if _, err := call(h.ctx, hoverAction, aopts.Timeout); err != nil {
+	hoverAction := h.newPointerAction(hover, &opts.ElementHandleBasePointerOptions)
+	if _, err := call(h.ctx, hoverAction, opts.Timeout); err != nil {
 		return fmt.Errorf("hovering on element: %w", err)
 	}
 
@@ -934,7 +920,7 @@ func (h *ElementHandle) InnerHTML() (string, error) {
 	innerHTML := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return handle.innerHTML(apiCtx)
 	}
-	opts := NewElementHandleBaseOptions(h.defaultTimeout())
+	opts := NewElementHandleBaseOptions(h.DefaultTimeout())
 	innerHTMLAction := h.newAction(
 		[]string{}, innerHTML, opts.Force, opts.NoWaitAfter, opts.Timeout,
 	)
@@ -958,7 +944,7 @@ func (h *ElementHandle) InnerText() (string, error) {
 	innerText := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return handle.innerText(apiCtx)
 	}
-	opts := NewElementHandleBaseOptions(h.defaultTimeout())
+	opts := NewElementHandleBaseOptions(h.DefaultTimeout())
 	innerTextAction := h.newAction(
 		[]string{}, innerText, opts.Force, opts.NoWaitAfter, opts.Timeout.Abs(),
 	)
@@ -978,17 +964,12 @@ func (h *ElementHandle) InnerText() (string, error) {
 }
 
 // InputValue returns the value of the input element.
-func (h *ElementHandle) InputValue(opts sobek.Value) (string, error) {
-	aopts := NewElementHandleBaseOptions(h.defaultTimeout())
-	if err := aopts.Parse(h.ctx, opts); err != nil {
-		return "", fmt.Errorf("parsing element input value options: %w", err)
-	}
-
+func (h *ElementHandle) InputValue(opts *ElementHandleBaseOptions) (string, error) {
 	inputValue := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return handle.inputValue(apiCtx)
 	}
-	inputValueAction := h.newAction([]string{}, inputValue, aopts.Force, aopts.NoWaitAfter, aopts.Timeout)
-	v, err := call(h.ctx, inputValueAction, aopts.Timeout)
+	inputValueAction := h.newAction([]string{}, inputValue, opts.Force, opts.NoWaitAfter, opts.Timeout)
+	v, err := call(h.ctx, inputValueAction, opts.Timeout)
 	if err != nil {
 		return "", fmt.Errorf("getting element's input value: %w", err)
 	}
@@ -1119,19 +1100,14 @@ func (h *ElementHandle) OwnerFrame() (_ *Frame, rerr error) {
 }
 
 // Press scrolls element into view and presses the given keys.
-func (h *ElementHandle) Press(key string, opts sobek.Value) error {
-	popts := NewElementHandlePressOptions(h.defaultTimeout())
-	if err := popts.Parse(h.ctx, opts); err != nil {
-		return fmt.Errorf("parsing press %q options: %w", key, err)
-	}
-
+func (h *ElementHandle) Press(key string, opts *ElementHandlePressOptions) error {
 	press := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return nil, handle.press(apiCtx, key, KeyboardOptions{})
 	}
 	pressAction := h.newAction(
-		[]string{}, press, false, popts.NoWaitAfter, popts.Timeout,
+		[]string{}, press, false, opts.NoWaitAfter, opts.Timeout,
 	)
-	if _, err := call(h.ctx, pressAction, popts.Timeout); err != nil {
+	if _, err := call(h.ctx, pressAction, opts.Timeout); err != nil {
 		return fmt.Errorf("pressing %q on element: %w", key, err)
 	}
 
@@ -1241,17 +1217,12 @@ func (h *ElementHandle) queryAll(selector string, eval evalFunc) (_ []*ElementHa
 }
 
 // SetChecked checks or unchecks an element.
-func (h *ElementHandle) SetChecked(checked bool, opts sobek.Value) error {
-	popts := NewElementHandleSetCheckedOptions(h.defaultTimeout())
-	if err := popts.Parse(h.ctx, opts); err != nil {
-		return fmt.Errorf("parsing setChecked options: %w", err)
-	}
-
+func (h *ElementHandle) SetChecked(checked bool, opts *ElementHandleSetCheckedOptions) error {
 	setChecked := func(apiCtx context.Context, handle *ElementHandle, p *Position) (any, error) {
 		return nil, handle.setChecked(apiCtx, checked, p)
 	}
-	setCheckedAction := h.newPointerAction(setChecked, &popts.ElementHandleBasePointerOptions)
-	if _, err := call(h.ctx, setCheckedAction, popts.Timeout); err != nil {
+	setCheckedAction := h.newPointerAction(setChecked, &opts.ElementHandleBasePointerOptions)
+	if _, err := call(h.ctx, setCheckedAction, opts.Timeout); err != nil {
 		return fmt.Errorf("checking element: %w", err)
 	}
 
@@ -1262,13 +1233,13 @@ func (h *ElementHandle) SetChecked(checked bool, opts sobek.Value) error {
 
 // Uncheck scrolls element into view, and if it's an input element of type
 // checkbox that is already checked, clicks on it to mark it as unchecked.
-func (h *ElementHandle) Uncheck(opts sobek.Value) error {
+func (h *ElementHandle) Uncheck(opts *ElementHandleSetCheckedOptions) error {
 	return h.SetChecked(false, opts)
 }
 
 // Check scrolls element into view, and if it's an input element of type
 // checkbox that is unchecked, clicks on it to mark it as checked.
-func (h *ElementHandle) Check(opts sobek.Value) error {
+func (h *ElementHandle) Check(opts *ElementHandleSetCheckedOptions) error {
 	return h.SetChecked(true, opts)
 }
 
@@ -1323,13 +1294,8 @@ func (h *ElementHandle) Screenshot(
 }
 
 // ScrollIntoViewIfNeeded scrolls element into view if needed.
-func (h *ElementHandle) ScrollIntoViewIfNeeded(opts sobek.Value) error {
-	aopts := NewElementHandleBaseOptions(h.defaultTimeout())
-	if err := aopts.Parse(h.ctx, opts); err != nil {
-		return fmt.Errorf("parsing scrollIntoViewIfNeeded options: %w", err)
-	}
-
-	err := h.waitAndScrollIntoViewIfNeeded(h.ctx, aopts.Force, aopts.NoWaitAfter, aopts.Timeout)
+func (h *ElementHandle) ScrollIntoViewIfNeeded(opts *ElementHandleBaseOptions) error {
+	err := h.waitAndScrollIntoViewIfNeeded(h.ctx, opts.Force, opts.NoWaitAfter, opts.Timeout)
 	if err != nil {
 		return fmt.Errorf("scrolling element into view: %w", err)
 	}
@@ -1340,19 +1306,14 @@ func (h *ElementHandle) ScrollIntoViewIfNeeded(opts sobek.Value) error {
 }
 
 // SelectOption selects the options matching the given values.
-func (h *ElementHandle) SelectOption(values []any, opts sobek.Value) ([]string, error) {
-	aopts := NewElementHandleBaseOptions(h.defaultTimeout())
-	if err := aopts.Parse(h.ctx, opts); err != nil {
-		return nil, fmt.Errorf("parsing selectOption options: %w", err)
-	}
-
+func (h *ElementHandle) SelectOption(values []any, opts *ElementHandleBaseOptions) ([]string, error) {
 	selectOption := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return handle.selectOption(apiCtx, values)
 	}
 	selectOptionAction := h.newAction(
-		[]string{}, selectOption, aopts.Force, aopts.NoWaitAfter, aopts.Timeout,
+		[]string{}, selectOption, opts.Force, opts.NoWaitAfter, opts.Timeout,
 	)
-	selectedOptions, err := call(h.ctx, selectOptionAction, aopts.Timeout)
+	selectedOptions, err := call(h.ctx, selectOptionAction, opts.Timeout)
 	if err != nil {
 		return nil, fmt.Errorf("selecting options: %w", err)
 	}
@@ -1367,18 +1328,14 @@ func (h *ElementHandle) SelectOption(values []any, opts sobek.Value) ([]string, 
 }
 
 // SelectText selects the text of the element.
-func (h *ElementHandle) SelectText(opts sobek.Value) error {
-	aopts := NewElementHandleBaseOptions(h.defaultTimeout())
-	if err := aopts.Parse(h.ctx, opts); err != nil {
-		return fmt.Errorf("parsing selectText options: %w", err)
-	}
+func (h *ElementHandle) SelectText(opts *ElementHandleBaseOptions) error {
 	selectText := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return nil, handle.selectText(apiCtx)
 	}
 	selectTextAction := h.newAction(
-		[]string{}, selectText, aopts.Force, aopts.NoWaitAfter, aopts.Timeout,
+		[]string{}, selectText, opts.Force, opts.NoWaitAfter, opts.Timeout,
 	)
-	if _, err := call(h.ctx, selectTextAction, aopts.Timeout); err != nil {
+	if _, err := call(h.ctx, selectTextAction, opts.Timeout); err != nil {
 		return fmt.Errorf("selecting text: %w", err)
 	}
 
@@ -1388,30 +1345,24 @@ func (h *ElementHandle) SelectText(opts sobek.Value) error {
 }
 
 // SetInputFiles sets the given files into the input file element.
-func (h *ElementHandle) SetInputFiles(files sobek.Value, opts sobek.Value) error {
-	aopts := NewElementHandleSetInputFilesOptions(h.defaultTimeout())
-	if err := aopts.Parse(h.ctx, opts); err != nil {
-		return fmt.Errorf("parsing setInputFiles options: %w", err)
-	}
-
-	actionParam := &Files{}
-
-	if err := actionParam.Parse(h.ctx, files); err != nil {
-		return fmt.Errorf("parsing setInputFiles parameter: %w", err)
-	}
-
+func (h *ElementHandle) SetInputFiles(files *Files, opts *ElementHandleSetInputFilesOptions) error {
 	setInputFiles := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
-		return nil, handle.setInputFiles(apiCtx, actionParam.Payload)
+		return nil, handle.setInputFiles(apiCtx, files)
 	}
-	setInputFilesAction := h.newAction([]string{}, setInputFiles, aopts.Force, aopts.NoWaitAfter, aopts.Timeout)
-	if _, err := call(h.ctx, setInputFilesAction, aopts.Timeout); err != nil {
+	setInputFilesAction := h.newAction([]string{}, setInputFiles, opts.Force, opts.NoWaitAfter, opts.Timeout)
+	if _, err := call(h.ctx, setInputFilesAction, opts.Timeout); err != nil {
 		return fmt.Errorf("setting input files: %w", err)
 	}
 
 	return nil
 }
 
-func (h *ElementHandle) setInputFiles(apiCtx context.Context, payload []*File) error {
+func (h *ElementHandle) setInputFiles(apiCtx context.Context, files *Files) error {
+	// allow clearing the input by passing an empty array
+	var payload []*File
+	if files != nil {
+		payload = files.Payload
+	}
 	fn := `
 		(node, injected, payload) => {
 			return injected.setInputFiles(node, payload);
@@ -1462,7 +1413,7 @@ func (h *ElementHandle) TextContent() (string, bool, error) {
 	textContent := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return handle.textContent(apiCtx)
 	}
-	opts := NewElementHandleBaseOptions(h.defaultTimeout())
+	opts := NewElementHandleBaseOptions(h.DefaultTimeout())
 	textContentAction := h.newAction(
 		[]string{}, textContent, opts.Force, opts.NoWaitAfter, opts.Timeout,
 	)
@@ -1487,23 +1438,18 @@ func (h *ElementHandle) TextContent() (string, bool, error) {
 // Timeout will return the default timeout or the one set by the user.
 // It's an internal method not to be exposed as a JS API.
 func (h *ElementHandle) Timeout() time.Duration {
-	return h.defaultTimeout()
+	return h.DefaultTimeout()
 }
 
 // Type scrolls element into view, focuses element and types text.
-func (h *ElementHandle) Type(text string, opts sobek.Value) error {
-	popts := NewElementHandleTypeOptions(h.defaultTimeout())
-	if err := popts.Parse(h.ctx, opts); err != nil {
-		return fmt.Errorf("parsing type options: %w", err)
-	}
-
+func (h *ElementHandle) Type(text string, opts *ElementHandleTypeOptions) error {
 	typ := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return nil, handle.typ(apiCtx, text, KeyboardOptions{})
 	}
 	typeAction := h.newAction(
-		[]string{}, typ, false, popts.NoWaitAfter, popts.Timeout,
+		[]string{}, typ, false, opts.NoWaitAfter, opts.Timeout,
 	)
-	if _, err := call(h.ctx, typeAction, popts.Timeout); err != nil {
+	if _, err := call(h.ctx, typeAction, opts.Timeout); err != nil {
 		return fmt.Errorf("typing text %q: %w", text, err)
 	}
 
@@ -1513,12 +1459,8 @@ func (h *ElementHandle) Type(text string, opts sobek.Value) error {
 }
 
 // WaitForElementState waits for the element to reach the given state.
-func (h *ElementHandle) WaitForElementState(state string, opts sobek.Value) error {
-	popts := NewElementHandleWaitForElementStateOptions(h.defaultTimeout())
-	if err := popts.Parse(h.ctx, opts); err != nil {
-		return fmt.Errorf("parsing waitForElementState options: %w", err)
-	}
-	_, err := h.waitForElementState(h.ctx, []string{state}, popts.Timeout)
+func (h *ElementHandle) WaitForElementState(state string, opts *ElementHandleWaitForElementStateOptions) error {
+	_, err := h.waitForElementState(h.ctx, []string{state}, opts.Timeout)
 	if err != nil {
 		return fmt.Errorf("waiting for element state %q: %w", state, err)
 	}
@@ -1527,13 +1469,8 @@ func (h *ElementHandle) WaitForElementState(state string, opts sobek.Value) erro
 }
 
 // WaitForSelector waits for the selector to appear in the DOM.
-func (h *ElementHandle) WaitForSelector(selector string, opts sobek.Value) (*ElementHandle, error) {
-	parsedOpts := NewFrameWaitForSelectorOptions(h.defaultTimeout())
-	if err := parsedOpts.Parse(h.ctx, opts); err != nil {
-		return nil, fmt.Errorf("parsing waitForSelector %q options: %w", selector, err)
-	}
-
-	handle, err := h.waitForSelector(h.ctx, selector, parsedOpts)
+func (h *ElementHandle) WaitForSelector(selector string, opts *FrameWaitForSelectorOptions) (*ElementHandle, error) {
+	handle, err := h.waitForSelector(h.ctx, selector, opts)
 	if err != nil {
 		return nil, fmt.Errorf("waiting for selector %q: %w", selector, err)
 	}

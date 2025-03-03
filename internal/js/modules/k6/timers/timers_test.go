@@ -13,7 +13,7 @@ import (
 func newRuntime(t testing.TB) *modulestest.Runtime {
 	t.Helper()
 	runtime := modulestest.NewRuntime(t)
-	err := runtime.SetupModuleSystem(map[string]any{"k6/x/timers": timers.New()}, nil, nil)
+	err := runtime.SetupModuleSystem(map[string]any{"k6/timers": timers.New()}, nil, nil)
 	require.NoError(t, err)
 	return runtime
 }
@@ -27,7 +27,7 @@ func TestSetTimeout(t *testing.T) {
 	require.NoError(t, rt.Set("print", func(s string) { log = append(log, s) }))
 
 	_, err := runtime.RunOnEventLoop(`
-		let timers = require("k6/x/timers");
+		let timers = require("k6/timers");
 		timers.setTimeout(()=> {
 			print("in setTimeout")
 		})
@@ -42,7 +42,7 @@ func TestSetUndefinedFunction(t *testing.T) {
 
 	runtime := newRuntime(t)
 	_, err := runtime.RunOnEventLoop(`
-		let timers = require("k6/x/timers");
+		let timers = require("k6/timers");
 		timers.setTimeout(undefined)
 	`)
 	require.Error(t, err, "setTimeout's callback isn't a callable function")
@@ -58,7 +58,7 @@ func TestSetInterval(t *testing.T) {
 	require.NoError(t, rt.Set("sleep10", func() { time.Sleep(10 * time.Millisecond) }))
 
 	_, err := runtime.RunOnEventLoop(`
-		let timers = require("k6/x/timers");
+		let timers = require("k6/timers");
 		var i = 0;
 		let s = timers.setInterval(()=> {
 			sleep10();
@@ -86,7 +86,7 @@ func TestSetTimeoutOrder(t *testing.T) {
 	var log []string
 	require.NoError(t, rt.Set("print", func(s string) { log = append(log, s) }))
 
-	_, err := rt.RunString(`globalThis.setTimeout = require("k6/x/timers").setTimeout;`)
+	_, err := rt.RunString(`globalThis.setTimeout = require("k6/timers").setTimeout;`)
 	require.NoError(t, err)
 
 	for i := 0; i < 100; i++ {
@@ -114,10 +114,10 @@ func TestSetIntervalOrder(t *testing.T) {
 	var log []string
 	require.NoError(t, rt.Set("print", func(s string) { log = append(log, s) }))
 
-	_, err := rt.RunString(`globalThis.setInterval = require("k6/x/timers").setInterval;`)
+	_, err := rt.RunString(`globalThis.setInterval = require("k6/timers").setInterval;`)
 	require.NoError(t, err)
 
-	_, err = rt.RunString(`globalThis.clearInterval = require("k6/x/timers").clearInterval;`)
+	_, err = rt.RunString(`globalThis.clearInterval = require("k6/timers").clearInterval;`)
 	require.NoError(t, err)
 
 	for i := 0; i < 100; i++ {
@@ -167,7 +167,7 @@ func TestSetTimeoutContextCancel(t *testing.T) {
 		}
 	}))
 
-	_, err := rt.RunString(`globalThis.setTimeout = require("k6/x/timers").setTimeout;`)
+	_, err := rt.RunString(`globalThis.setTimeout = require("k6/timers").setTimeout;`)
 	require.NoError(t, err)
 
 	for i := 0; i < 2000; i++ {

@@ -13,8 +13,8 @@ import (
 
 	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/cmd/state"
+	"go.k6.io/k6/internal/build"
 	"go.k6.io/k6/internal/ui"
-	"go.k6.io/k6/lib/consts"
 )
 
 const cloudLoginCommandName = "login"
@@ -38,7 +38,7 @@ func getCmdCloudLogin(gs *state.GlobalState) *cobra.Command {
 
   # Display the stored token
   $ {{.}} cloud login -s
-  
+
   # Reset the stored token
   $ {{.}} cloud login -r`[1:])
 
@@ -66,6 +66,11 @@ the "k6 run -o cloud" command.
 
 // run is the code that runs when the user executes `k6 cloud login`
 func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
+	err := migrateLegacyConfigFileIfAny(c.globalState)
+	if err != nil {
+		return err
+	}
+
 	currentDiskConf, err := readDiskConfig(c.globalState)
 	if err != nil {
 		return err
@@ -163,7 +168,7 @@ func validateToken(gs *state.GlobalState, jsonRawConf json.RawMessage, token str
 		gs.Logger,
 		token,
 		consolidatedCurrentConfig.Host.String,
-		consts.Version,
+		build.Version,
 		consolidatedCurrentConfig.Timeout.TimeDuration(),
 	)
 

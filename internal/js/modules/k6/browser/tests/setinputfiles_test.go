@@ -1,10 +1,8 @@
 package tests
 
 import (
-	"fmt"
 	"testing"
 
-	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -15,12 +13,11 @@ import (
 func TestSetInputFiles(t *testing.T) {
 	t.Parallel()
 
-	type file map[string]interface{}
-	type indexedFn func(idx int, propName string) interface{}
-	type testFn func(tb *testBrowser, page *common.Page, files sobek.Value) error
-	type setupFn func(tb *testBrowser) (sobek.Value, func())
+	type indexedFn func(idx int, propName string) any
+	type testFn func(page *common.Page, files *common.Files) error
+	type setupFn func() *common.Files
 	type checkFn func(t *testing.T,
-		getFileCountFn func() interface{},
+		getFileCountFn func() any,
 		getFilePropFn indexedFn,
 		err error)
 
@@ -36,18 +33,13 @@ func TestSetInputFiles(t *testing.T) {
 	  <button id="button1">Click</button>
 	`
 
-	defaultTestPage := func(tb *testBrowser, page *common.Page, files sobek.Value) error {
-		pfiles := new(common.Files)
-		if err := pfiles.Parse(tb.vu.Context(), files); err != nil {
-			return fmt.Errorf("parsing setInputFiles parameter: %w", err)
-		}
-
-		return page.SetInputFiles("#upload", pfiles, common.NewFrameSetInputFilesOptions(page.MainFrame().Timeout()))
+	defaultTestPage := func(page *common.Page, files *common.Files) error {
+		return page.SetInputFiles("#upload", files, common.NewFrameSetInputFilesOptions(common.DefaultTimeout))
 	}
-	defaultTestElementHandle := func(tb *testBrowser, page *common.Page, files sobek.Value) error {
-		handle, err := page.WaitForSelector("#upload", common.NewFrameWaitForSelectorOptions(page.MainFrame().Timeout()))
+	defaultTestElementHandle := func(page *common.Page, files *common.Files) error {
+		handle, err := page.WaitForSelector("#upload", common.NewFrameWaitForSelectorOptions(common.DefaultTimeout))
 		assert.NoError(t, err)
-		return handle.SetInputFiles(files, tb.toSobekValue(nil))
+		return handle.SetInputFiles(files, common.NewElementHandleSetInputFilesOptions(common.DefaultTimeout))
 	}
 
 	testCases := []struct {
@@ -58,11 +50,19 @@ func TestSetInputFiles(t *testing.T) {
 	}{
 		{
 			name: "set_one_file_with_object",
-			setup: func(tb *testBrowser) (sobek.Value, func()) {
-				return tb.toSobekValue(file{"name": "test.json", "mimetype": "text/json", "buffer": "MDEyMzQ1Njc4OQ=="}), nil
+			setup: func() *common.Files {
+				return &common.Files{
+					Payload: []*common.File{
+						{
+							Name:     "test.json",
+							Mimetype: "text/json",
+							Buffer:   "MDEyMzQ1Njc4OQ==",
+						},
+					},
+				}
 			},
 			tests: []testFn{defaultTestPage, defaultTestElementHandle},
-			check: func(t *testing.T, getFileCountFn func() interface{}, getFilePropFn indexedFn, err error) {
+			check: func(t *testing.T, getFileCountFn func() any, getFilePropFn indexedFn, err error) {
 				t.Helper()
 				assert.NoError(t, err)
 				// check if input has 1 file
@@ -75,15 +75,24 @@ func TestSetInputFiles(t *testing.T) {
 		},
 		{
 			name: "set_two_files_with_array_of_objects",
-			setup: func(tb *testBrowser) (sobek.Value, func()) {
-				return tb.toSobekValue(
-					[]file{
-						{"name": "test.json", "mimetype": "text/json", "buffer": "MDEyMzQ1Njc4OQ=="},
-						{"name": "test.xml", "mimetype": "text/xml", "buffer": "MDEyMzQ1Njc4OTAxMjM0"},
-					}), nil
+			setup: func() *common.Files {
+				return &common.Files{
+					Payload: []*common.File{
+						{
+							Name:     "test.json",
+							Mimetype: "text/json",
+							Buffer:   "MDEyMzQ1Njc4OQ==",
+						},
+						{
+							Name:     "test.xml",
+							Mimetype: "text/xml",
+							Buffer:   "MDEyMzQ1Njc4OTAxMjM0",
+						},
+					},
+				}
 			},
 			tests: []testFn{defaultTestPage, defaultTestElementHandle},
-			check: func(t *testing.T, getFileCountFn func() interface{}, getFilePropFn indexedFn, err error) {
+			check: func(t *testing.T, getFileCountFn func() any, getFilePropFn indexedFn, err error) {
 				t.Helper()
 				assert.NoError(t, err)
 				// check if input has 2 files
@@ -99,11 +108,11 @@ func TestSetInputFiles(t *testing.T) {
 		},
 		{
 			name: "set_nil",
-			setup: func(tb *testBrowser) (sobek.Value, func()) {
-				return tb.toSobekValue(nil), nil
+			setup: func() *common.Files {
+				return nil
 			},
 			tests: []testFn{defaultTestPage, defaultTestElementHandle},
-			check: func(t *testing.T, getFileCountFn func() interface{}, getFilePropertyFn indexedFn, err error) {
+			check: func(t *testing.T, getFileCountFn func() any, _ indexedFn, err error) {
 				t.Helper()
 				assert.NoError(t, err)
 				// check if input has 1 file
@@ -111,39 +120,29 @@ func TestSetInputFiles(t *testing.T) {
 			},
 		},
 		{
-			name: "set_invalid_parameter",
-			setup: func(tb *testBrowser) (sobek.Value, func()) {
-				return tb.toSobekValue([]int{12345}), nil
-			},
-			tests: []testFn{defaultTestPage, defaultTestElementHandle},
-			check: func(t *testing.T, getFileCountFn func() interface{}, getFilePropFn indexedFn, err error) {
-				t.Helper()
-				assert.ErrorContains(t, err, "invalid parameter type : int64")
-				// check if input has 0 file
-				assert.Equal(t, float64(0), getFileCountFn())
-			},
-		},
-		{
 			name: "test_injected_script_notinput",
-			setup: func(tb *testBrowser) (sobek.Value, func()) {
-				return tb.toSobekValue(file{"name": "test.json", "mimetype": "text/json", "buffer": "MDEyMzQ1Njc4OQ=="}), nil
+			setup: func() *common.Files {
+				return &common.Files{
+					Payload: []*common.File{
+						{
+							Name:     "test.json",
+							Mimetype: "text/json",
+							Buffer:   "MDEyMzQ1Njc4OQ==",
+						},
+					},
+				}
 			},
 			tests: []testFn{
-				func(tb *testBrowser, page *common.Page, files sobek.Value) error {
-					pfiles := new(common.Files)
-					if err := pfiles.Parse(tb.vu.Context(), files); err != nil {
-						return fmt.Errorf("parsing setInputFiles parameter: %w", err)
-					}
-
-					return page.SetInputFiles("#button1", pfiles, common.NewFrameSetInputFilesOptions(page.MainFrame().Timeout()))
+				func(page *common.Page, files *common.Files) error {
+					return page.SetInputFiles("#button1", files, common.NewFrameSetInputFilesOptions(common.DefaultTimeout))
 				},
-				func(tb *testBrowser, page *common.Page, files sobek.Value) error {
-					handle, err := page.WaitForSelector("#button1", common.NewFrameWaitForSelectorOptions(page.MainFrame().Timeout()))
+				func(page *common.Page, files *common.Files) error {
+					handle, err := page.WaitForSelector("#button1", common.NewFrameWaitForSelectorOptions(common.DefaultTimeout))
 					assert.NoError(t, err)
-					return handle.SetInputFiles(files, tb.toSobekValue(nil))
+					return handle.SetInputFiles(files, common.NewElementHandleSetInputFilesOptions(common.DefaultTimeout))
 				},
 			},
-			check: func(t *testing.T, getFileCountFn func() interface{}, getFilePropFn indexedFn, err error) {
+			check: func(t *testing.T, getFileCountFn func() any, _ indexedFn, err error) {
 				t.Helper()
 				assert.ErrorContains(t, err, "node is not an HTMLInputElement")
 				assert.ErrorContains(t, err, "setting input files")
@@ -153,25 +152,28 @@ func TestSetInputFiles(t *testing.T) {
 		},
 		{
 			name: "test_injected_script_notfile",
-			setup: func(tb *testBrowser) (sobek.Value, func()) {
-				return tb.toSobekValue(file{"name": "test.json", "mimetype": "text/json", "buffer": "MDEyMzQ1Njc4OQ=="}), nil
+			setup: func() *common.Files {
+				return &common.Files{
+					Payload: []*common.File{
+						{
+							Name:     "test.json",
+							Mimetype: "text/json",
+							Buffer:   "MDEyMzQ1Njc4OQ==",
+						},
+					},
+				}
 			},
 			tests: []testFn{
-				func(tb *testBrowser, page *common.Page, files sobek.Value) error {
-					pfiles := new(common.Files)
-					if err := pfiles.Parse(tb.vu.Context(), files); err != nil {
-						return fmt.Errorf("parsing setInputFiles parameter: %w", err)
-					}
-
-					return page.SetInputFiles("#textinput", pfiles, common.NewFrameSetInputFilesOptions(page.MainFrame().Timeout()))
+				func(page *common.Page, files *common.Files) error {
+					return page.SetInputFiles("#textinput", files, common.NewFrameSetInputFilesOptions(common.DefaultTimeout))
 				},
-				func(tb *testBrowser, page *common.Page, files sobek.Value) error {
-					handle, err := page.WaitForSelector("#textinput", common.NewFrameWaitForSelectorOptions(page.MainFrame().Timeout()))
+				func(page *common.Page, files *common.Files) error {
+					handle, err := page.WaitForSelector("#textinput", common.NewFrameWaitForSelectorOptions(common.DefaultTimeout))
 					assert.NoError(t, err)
-					return handle.SetInputFiles(files, tb.toSobekValue(nil))
+					return handle.SetInputFiles(files, common.NewElementHandleSetInputFilesOptions(common.DefaultTimeout))
 				},
 			},
-			check: func(t *testing.T, getFileCountFn func() interface{}, getFilePropFn indexedFn, err error) {
+			check: func(t *testing.T, getFileCountFn func() any, _ indexedFn, err error) {
 				t.Helper()
 				assert.ErrorContains(t, err, "node is not an input[type=file] element")
 				assert.ErrorContains(t, err, "setting input files")
@@ -182,9 +184,7 @@ func TestSetInputFiles(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		for _, test := range tc.tests {
-			test := test
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
 
@@ -195,14 +195,14 @@ func TestSetInputFiles(t *testing.T) {
 				err := page.SetContent(pageContent, nil)
 				require.NoError(t, err)
 
-				getFileCountFn := func() interface{} {
+				getFileCountFn := func() any {
 					v, err := page.Evaluate(`() => document.getElementById("upload").files.length`)
 					require.NoError(t, err)
 
 					return v
 				}
 
-				getFilePropertyFn := func(idx int, propName string) interface{} {
+				getFilePropertyFn := func(idx int, propName string) any {
 					v, err := page.Evaluate(
 						`(idx, propName) => document.getElementById("upload").files[idx][propName]`,
 						idx,
@@ -211,11 +211,7 @@ func TestSetInputFiles(t *testing.T) {
 					return v
 				}
 
-				files, cleanup := tc.setup(tb)
-				if cleanup != nil {
-					defer cleanup()
-				}
-				err = test(tb, page, files)
+				err = test(page, tc.setup())
 				tc.check(t, getFileCountFn, getFilePropertyFn, err)
 			})
 		}

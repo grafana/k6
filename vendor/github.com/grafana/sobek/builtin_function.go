@@ -90,8 +90,10 @@ func (r *Runtime) createListFromArrayLike(a Value) []Value {
 
 func (r *Runtime) functionproto_apply(call FunctionCall) Value {
 	var args []Value
-	if len(call.Arguments) >= 2 {
-		args = r.createListFromArrayLike(call.Arguments[1])
+
+	argArray := call.Argument(1)
+	if !IsUndefined(argArray) && !IsNull(argArray) {
+		args = r.createListFromArrayLike(argArray)
 	}
 
 	f := r.toCallable(call.This)

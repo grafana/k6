@@ -1,12 +1,6 @@
-// Package consts houses some constants needed across k6
-package consts
+package ui
 
-import (
-	"strings"
-)
-
-// Version contains the current semantic version of k6.
-const Version = "0.57.0"
+import "strings"
 
 // Banner returns the ASCII-art banner with the k6 logo
 func Banner() string {

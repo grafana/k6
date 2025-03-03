@@ -13,9 +13,9 @@ import (
 
 	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/errext"
+	"go.k6.io/k6/internal/build"
 	"go.k6.io/k6/internal/usage"
 	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
 	cloudv2 "go.k6.io/k6/output/cloud/expv2"
@@ -141,7 +141,7 @@ func newOutput(params output.Params) (*Output, error) {
 	}
 
 	apiClient := cloudapi.NewClient(
-		logger, conf.Token.String, conf.Host.String, consts.Version, conf.Timeout.TimeDuration())
+		logger, conf.Token.String, conf.Host.String, build.Version, conf.Timeout.TimeDuration())
 
 	return &Output{
 		config:        conf,

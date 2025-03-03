@@ -111,7 +111,7 @@ func cleanPath(urlPath string, defaultPath string) string {
 		return defaultPath
 	}
 	if !path.IsAbs(tmp) {
-		tmp = fmt.Sprintf("/%s", tmp)
+		tmp = "/" + tmp
 	}
 	return tmp
 }
@@ -139,7 +139,7 @@ func NewGRPCConfig(opts ...GRPCOption) Config {
 	if cfg.ServiceConfig != "" {
 		cfg.DialOptions = append(cfg.DialOptions, grpc.WithDefaultServiceConfig(cfg.ServiceConfig))
 	}
-	// Priroritize GRPCCredentials over Insecure (passing both is an error).
+	// Prioritize GRPCCredentials over Insecure (passing both is an error).
 	if cfg.Metrics.GRPCCredentials != nil {
 		cfg.DialOptions = append(cfg.DialOptions, grpc.WithTransportCredentials(cfg.Metrics.GRPCCredentials))
 	} else if cfg.Metrics.Insecure {
@@ -287,9 +287,7 @@ func WithEndpointURL(v string) GenericOption {
 
 		cfg.Metrics.Endpoint = u.Host
 		cfg.Metrics.URLPath = u.Path
-		if u.Scheme != "https" {
-			cfg.Metrics.Insecure = true
-		}
+		cfg.Metrics.Insecure = u.Scheme != "https"
 
 		return cfg
 	})

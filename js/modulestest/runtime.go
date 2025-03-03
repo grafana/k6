@@ -7,9 +7,12 @@ import (
 	"testing"
 
 	"github.com/grafana/sobek"
+	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/internal/js/compiler"
 	"go.k6.io/k6/internal/js/eventloop"
-	"go.k6.io/k6/internal/js/modules/k6/timers"
+	"go.k6.io/k6/internal/js/tc55/timers"
+
+	"go.k6.io/k6/internal/js/modules/k6/webcrypto"
 	"go.k6.io/k6/internal/lib/testutils"
 	"go.k6.io/k6/internal/usage"
 	"go.k6.io/k6/js/common"
@@ -54,6 +57,8 @@ func NewRuntime(t testing.TB) *Runtime {
 		CancelContext:  cancel,
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(vu.InitEnvField.Registry),
 	}
+	require.NoError(t, timers.SetupGlobally(vu))
+	require.NoError(t, webcrypto.SetupGlobally(vu))
 	// let's cancel again in case it has changed
 	t.Cleanup(func() { result.CancelContext() })
 	return result
@@ -70,10 +75,6 @@ func (r *Runtime) MoveToVUContext(state *lib.State) {
 func (r *Runtime) SetupModuleSystem(goModules map[string]any, loader modules.FileLoader, c *compiler.Compiler) error {
 	if goModules == nil {
 		goModules = make(map[string]any)
-	}
-
-	if _, ok := goModules["k6/timers"]; !ok {
-		goModules["k6/timers"] = timers.New()
 	}
 
 	r.mr = modules.NewModuleResolver(
@@ -117,6 +118,5 @@ func (r *Runtime) RunOnEventLoop(code string) (value sobek.Value, err error) {
 
 func (r *Runtime) innerSetupModuleSystem() error {
 	ms := modules.NewModuleSystem(r.mr, r.VU)
-	modules.ExportGloballyModule(r.VU.RuntimeField, ms, "k6/timers")
 	return r.VU.RuntimeField.Set("require", ms.Require)
 }

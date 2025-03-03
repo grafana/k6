@@ -21,6 +21,9 @@ func encodeBlock(dst, src []byte) (d int) {
 	if len(src) < minNonLiteralBlockSize {
 		return 0
 	}
+	if len(src) <= 64<<10 {
+		return encodeBlockGo64K(dst, src)
+	}
 	return encodeBlockGo(dst, src)
 }
 
@@ -32,6 +35,9 @@ func encodeBlock(dst, src []byte) (d int) {
 //
 //	len(dst) >= MaxEncodedLen(len(src))
 func encodeBlockBetter(dst, src []byte) (d int) {
+	if len(src) <= 64<<10 {
+		return encodeBlockBetterGo64K(dst, src)
+	}
 	return encodeBlockBetterGo(dst, src)
 }
 
@@ -43,6 +49,9 @@ func encodeBlockBetter(dst, src []byte) (d int) {
 //
 //	len(dst) >= MaxEncodedLen(len(src))
 func encodeBlockBetterSnappy(dst, src []byte) (d int) {
+	if len(src) <= 64<<10 {
+		return encodeBlockBetterSnappyGo64K(dst, src)
+	}
 	return encodeBlockBetterSnappyGo(dst, src)
 }
 
@@ -56,6 +65,9 @@ func encodeBlockBetterSnappy(dst, src []byte) (d int) {
 func encodeBlockSnappy(dst, src []byte) (d int) {
 	if len(src) < minNonLiteralBlockSize {
 		return 0
+	}
+	if len(src) <= 64<<10 {
+		return encodeBlockSnappyGo64K(dst, src)
 	}
 	return encodeBlockSnappyGo(dst, src)
 }
