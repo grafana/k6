@@ -126,6 +126,8 @@ func (eip *Ed25519ImportParams) ImportKey(format KeyFormat, keyData []byte, keyU
 		importFn = importEd25519Pkcs8
 	case JwkKeyFormat:
 		importFn = importEd25519Jwk
+	case RawKeyFormat:
+		importFn = importEd25519Raw
 	default:
 		return nil, NewError(NotSupportedError, unsupportedKeyFormatErrorMsg+" "+format+" for algorithm "+eip.Algorithm.Name)
 	}
@@ -205,8 +207,11 @@ func importEd25519Jwk(keyData []byte, keyUsages []CryptoKeyUsage) (any, CryptoKe
 			return nil, UnknownCryptoKeyType, NewError(DataError, "failed to decode public key: "+err.Error())
 		}
 
-		publicKey := ed25519.PublicKey(xBytes)
+		if len(xBytes) != ed25519.PublicKeySize {
+			return nil, UnknownCryptoKeyType, NewError(DataError, fmt.Sprintf("invalid Ed25519 public key length: got %d, want %d", len(xBytes), ed25519.PublicKeySize))
+		}
 
+		publicKey := ed25519.PublicKey(xBytes)
 		return publicKey, PublicCryptoKeyType, nil
 	}
 
@@ -215,6 +220,28 @@ func importEd25519Jwk(keyData []byte, keyUsages []CryptoKeyUsage) (any, CryptoKe
 		return nil, UnknownCryptoKeyType, NewError(DataError, "failed to decode private key: "+err.Error())
 	}
 
+	if len(dBytes) != ed25519.PrivateKeySize {
+		return nil, UnknownCryptoKeyType, NewError(DataError, fmt.Sprintf("invalid Ed25519 private key length: got %d, want %d", len(dBytes), ed25519.PrivateKeySize))
+	}
+
 	privateKey := ed25519.PrivateKey(dBytes)
 	return privateKey, PrivateCryptoKeyType, nil
+}
+
+func importEd25519Raw(keyData []byte, keyUsages []CryptoKeyUsage) (any, CryptoKeyType, error) {
+	for _, usage := range keyUsages {
+		switch usage {
+		case VerifyCryptoKeyUsage:
+			continue
+		default:
+			return nil, UnknownCryptoKeyType, NewError(SyntaxError, fmt.Sprintf("invalid key usage: %s. Only 'verify' is valid for raw Ed25519 keys", usage))
+		}
+	}
+
+	if len(keyData) != ed25519.PublicKeySize {
+		return nil, UnknownCryptoKeyType, NewError(DataError, fmt.Sprintf("invalid Ed25519 public key length: got %d, want %d", len(keyData), ed25519.PublicKeySize))
+	}
+
+	handle := ed25519.PublicKey(keyData)
+	return handle, PublicCryptoKeyType, nil
 }
