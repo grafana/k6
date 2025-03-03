@@ -766,6 +766,7 @@ func (sc *SubtleCrypto) DeriveBits( //nolint:funlen,gocognit // we have a lot of
 //     `ALGORITHM` is the name of the algorithm.
 //   - for PBKDF2: pass the string "PBKDF2"
 //   - for HKDF: pass the string "HKDF"
+//   - for Ed25519: pass the string "Ed25519"
 func (sc *SubtleCrypto) ImportKey( //nolint:funlen // we have a lot of error handling
 	format KeyFormat,
 	keyData sobek.Value,

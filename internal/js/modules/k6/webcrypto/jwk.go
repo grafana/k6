@@ -426,3 +426,155 @@ func exportRSAJWK(key *CryptoKey) (interface{}, error) {
 
 	return exported, nil
 }
+
+type ed25519JWK struct {
+	// Key type
+	Kty string `json:"kty"`
+	// Canonical Curve
+	Crv string `json:"crv"`
+	// Public Key Use
+	Use string `json:"use"`
+	// Private scalar
+	KeyOps []CryptoKeyUsage `json:"key_ops"`
+	// Public key
+	X string `json:"x"`
+	// Private key
+	D string `json:"d"`
+	// Extractable
+	Ext *bool `json:"ext"`
+}
+
+// validateKeyOps validates that the key_ops field on the JWK does not conflict
+// with the given usages according to the JWK specification
+func validateKeyOps(keyOps []CryptoKeyUsage, keyUsages []CryptoKeyUsage) error {
+	if len(keyOps) == 0 {
+		return nil
+	}
+
+	// Check for duplicates in keyOps
+	seen := make(map[CryptoKeyUsage]bool)
+	for _, op := range keyOps {
+		if seen[op] {
+			return NewError(DataError, "duplicate key operation values are not allowed in key_ops")
+		}
+		seen[op] = true
+	}
+
+	// Validate allowed operation combinations
+	hasSign := false
+	hasVerify := false
+	hasEncrypt := false
+	hasDecrypt := false
+	hasWrapKey := false
+	hasUnwrapKey := false
+	hasDerive := false // covers both deriveKey and deriveBits
+
+	for _, op := range keyOps {
+		switch op {
+		case SignCryptoKeyUsage:
+			hasSign = true
+		case VerifyCryptoKeyUsage:
+			hasVerify = true
+		case EncryptCryptoKeyUsage:
+			hasEncrypt = true
+		case DecryptCryptoKeyUsage:
+			hasDecrypt = true
+		case WrapKeyCryptoKeyUsage:
+			hasWrapKey = true
+		case UnwrapKeyCryptoKeyUsage:
+			hasUnwrapKey = true
+		case DeriveKeyCryptoKeyUsage, DeriveBitsCryptoKeyUsage:
+			hasDerive = true
+		default:
+			// Spec allows for other values, so we don't error here
+			continue
+		}
+	}
+
+	// Check for invalid combinations
+	validCombos := (hasSign && hasVerify && !hasEncrypt && !hasDecrypt && !hasWrapKey && !hasUnwrapKey && !hasDerive) ||
+		(hasEncrypt && hasDecrypt && !hasSign && !hasVerify && !hasWrapKey && !hasUnwrapKey && !hasDerive) ||
+		(hasWrapKey && hasUnwrapKey && !hasSign && !hasVerify && !hasEncrypt && !hasDecrypt && !hasDerive) ||
+		(hasDerive && !hasSign && !hasVerify && !hasEncrypt && !hasDecrypt && !hasWrapKey && !hasUnwrapKey) ||
+		// Single operation cases
+		(hasSign && !hasVerify && !hasEncrypt && !hasDecrypt && !hasWrapKey && !hasUnwrapKey && !hasDerive) ||
+		(hasVerify && !hasSign && !hasEncrypt && !hasDecrypt && !hasWrapKey && !hasUnwrapKey && !hasDerive) ||
+		(hasEncrypt && !hasDecrypt && !hasSign && !hasVerify && !hasWrapKey && !hasUnwrapKey && !hasDerive) ||
+		(hasDecrypt && !hasEncrypt && !hasSign && !hasVerify && !hasWrapKey && !hasUnwrapKey && !hasDerive) ||
+		(hasWrapKey && !hasUnwrapKey && !hasSign && !hasVerify && !hasEncrypt && !hasDecrypt && !hasDerive) ||
+		(hasUnwrapKey && !hasWrapKey && !hasSign && !hasVerify && !hasEncrypt && !hasDecrypt && !hasDerive)
+
+	if !validCombos {
+		return NewError(DataError, "invalid combination of key operations. Only sign/verify, encrypt/decrypt, or wrapKey/unwrapKey pairs are allowed, or single derive operations")
+	}
+
+	// Verify that all requested usages are present in keyOps
+	for _, usage := range keyUsages {
+		found := false
+		for _, op := range keyOps {
+			if usage == op {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return NewError(DataError, fmt.Sprintf("requested usage '%s' is not present in key_ops", usage))
+		}
+	}
+
+	return nil
+}
+
+func (jwk *ed25519JWK) validate(keyUsages []CryptoKeyUsage) error {
+	private := jwk.D == ""
+	if private {
+		for _, usage := range keyUsages {
+			switch usage {
+			case SignCryptoKeyUsage:
+				continue
+			default:
+				return NewError(SyntaxError, fmt.Sprintf("invalid key usage: %s. Only 'sign' is valid for private Ed25519 keys", usage))
+			}
+		}
+	} else {
+		for _, usage := range keyUsages {
+			switch usage {
+			case VerifyCryptoKeyUsage:
+				continue
+			default:
+				return NewError(SyntaxError, fmt.Sprintf("invalid key usage: %s. Only 'verify' is valid for public Ed25519 keys", usage))
+			}
+		}
+	}
+
+	if jwk.Kty != "OKP" {
+		return NewError(DataError, fmt.Sprintf("invalid 'kty': %s. kty value must be 'OKP' for Ed25519 keys", jwk.Kty))
+	}
+
+	if jwk.Crv != "Ed25519" {
+		return NewError(DataError, fmt.Sprintf("invalid 'crv': %s. crv value must be Ed25519", jwk.Crv))
+	}
+
+	if jwk.X == "" {
+		return NewError(DataError, "invalid 'x': x field is required for all Ed25519 keys")
+	}
+
+	if private && jwk.D == "" {
+		return NewError(DataError, "invalid 'd': d field is required for private Ed25519 keys")
+	}
+
+	if len(keyUsages) != 0 && jwk.Use != "" && jwk.Use != "sig" {
+		return NewError(DataError, fmt.Sprintf("invalid 'use': %s. use field must be 'sig' in the JWK if usages are supplied ", jwk.Use))
+	}
+
+	if err := validateKeyOps(jwk.KeyOps, keyUsages); err != nil {
+		return err
+	}
+
+	// TODO: pass extractable down from JS params and validate properly
+	if jwk.Ext != nil && *jwk.Ext == false {
+		return NewError(DataError, "invalid 'ext': false is not allowed for Ed25519 keys")
+	}
+
+	return nil
+}
