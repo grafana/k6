@@ -1,12 +1,8 @@
 package cmd
 
 import (
-	"bufio"
 	"context"
-	"fmt"
 	"net/url"
-	"os"
-	"strings"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -43,7 +39,19 @@ import http from 'k6/http';
 import { sleep } from 'k6';
 
 export default function () {
-    while (true) { sleep(1); }
+    while (true) {
+        var last = null;
+        try {
+            var result = eval(read_stdin("> "));
+            last = result;
+            if (result !== undefined && result !== null) {
+                console.log("res ", result.toString())
+                console.log("lst ", last.toString())
+            }
+        } catch (error) {
+            console.log(error.toString())
+        }
+    }
 }
 `
 
@@ -70,32 +78,13 @@ func (c *cmdRepl) repl(cmd *cobra.Command, args []string) (err error) {
 		panic(err)
 	}
 
-	vu, err := runner.NewVU(context.Background(), 1, 1, make(chan metrics.SampleContainer, 100))
+	metricsChan := make(chan metrics.SampleContainer, 100)
+	vu, err := runner.NewVU(context.Background(), 1, 1, metricsChan)
 	if err != nil {
 		panic(err)
 	}
 
-	originalVU := vu.(*js.VU)
+	// originalVU := vu.(*js.VU)
 
-	go func() {
-		err := vu.Activate(&lib.VUActivationParams{RunContext: context.Background()}).RunOnce()
-		if err != nil {
-			panic(err)
-		}
-	}()
-
-	reader := bufio.NewReader(os.Stdin)
-
-	for {
-		fmt.Print("> ")
-		input, _ := reader.ReadString('\n')
-		input = strings.TrimSpace(input)
-
-		result, err := originalVU.Runtime.RunString(input)
-		if err == nil {
-			fmt.Println(result.String())
-		} else {
-			fmt.Println(err.Error())
-		}
-	}
+	return vu.Activate(&lib.VUActivationParams{RunContext: context.Background()}).RunOnce()
 }
