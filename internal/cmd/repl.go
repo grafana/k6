@@ -39,20 +39,21 @@ import http from 'k6/http';
 import { sleep } from 'k6';
 
 export default function () {
+    var _ = undefined;
+
     while (true) {
-        var last = null;
         try {
             var result = eval(read_stdin("> "));
-            last = result;
+            _ = result;
             if (result !== undefined && result !== null) {
-                console.log("res ", result.toString())
-                console.log("lst ", last.toString())
+                console.log(result.toString())
             }
         } catch (error) {
             console.log(error.toString())
         }
     }
 }
+
 `
 
 func (c *cmdRepl) repl(cmd *cobra.Command, args []string) (err error) {
