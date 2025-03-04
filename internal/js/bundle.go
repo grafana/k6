@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"bufio"
+	"os"
 
 	"github.com/grafana/sobek"
 	"github.com/sirupsen/logrus"
@@ -463,6 +465,15 @@ func (b *Bundle) setInitGlobals(rt *sobek.Runtime, vu *moduleVUImpl, modSys *mod
 	}
 
 	mustSet("require", impl.require)
+
+	mustSet("read_stdin", func(prompt string) (sobek.Value, error) {
+		reader := bufio.NewReader(os.Stdin)
+		fmt.Print(prompt)
+		input, _ := reader.ReadString('\n')
+		input = strings.TrimSpace(input)
+
+		return rt.ToValue(input), nil
+	})
 
 	mustSet("open", func(filename string, args ...string) (sobek.Value, error) {
 		// TODO fix in stack traces
