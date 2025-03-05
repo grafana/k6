@@ -159,7 +159,7 @@ func importEd25519Spki(keyData []byte, keyUsages []CryptoKeyUsage) (any, CryptoK
 		return nil, UnknownCryptoKeyType, NewError(DataError, "Unable to import Ed25519 public key data: "+err.Error())
 	}
 
-	handle, ok := parsedKey.(*ed25519.PublicKey)
+	handle, ok := parsedKey.(ed25519.PublicKey)
 	if !ok {
 		return nil, UnknownCryptoKeyType, NewError(DataError, "given key is not an Ed25519 key")
 	}
@@ -182,7 +182,7 @@ func importEd25519Pkcs8(keyData []byte, keyUsages []CryptoKeyUsage) (any, Crypto
 		return nil, UnknownCryptoKeyType, NewError(DataError, "unable to import Ed25519 private key data: "+err.Error())
 	}
 
-	handle, ok := parsedKey.(*ed25519.PrivateKey)
+	handle, ok := parsedKey.(ed25519.PrivateKey)
 	if !ok {
 		return nil, UnknownCryptoKeyType, NewError(DataError, "given key is not an Ed25519 key")
 	}
@@ -196,7 +196,7 @@ func importEd25519Jwk(keyData []byte, keyUsages []CryptoKeyUsage) (any, CryptoKe
 		return nil, UnknownCryptoKeyType, NewError(DataError, "failed to parse input as Ed25519 JWK key: "+err.Error())
 	}
 
-	if err := jwkKey.validate(keyUsages); err != nil {
+	if err := jwkKey.validateEd25519JWK(keyUsages); err != nil {
 		return nil, UnknownCryptoKeyType, err
 	}
 
@@ -244,4 +244,76 @@ func importEd25519Raw(keyData []byte, keyUsages []CryptoKeyUsage) (any, CryptoKe
 
 	handle := ed25519.PublicKey(keyData)
 	return handle, PublicCryptoKeyType, nil
+}
+
+func exportEd25519Key(key *CryptoKey, format KeyFormat) (any, error) {
+	if !key.Extractable {
+		return nil, NewError(InvalidAccessError, "the key is not extractable")
+	}
+
+	if key.handle == nil {
+		return nil, NewError(OperationError, "the key is not valid, no data")
+	}
+
+	switch format {
+	case SpkiKeyFormat:
+		return exportEd25519Spki(key)
+	case Pkcs8KeyFormat:
+		return exportEd25519Pkcs8(key)
+	case JwkKeyFormat:
+		return exportEd25519JWK(key)
+	case RawKeyFormat:
+		return exportEd25519Raw(key)
+	default:
+		return nil, NewError(NotSupportedError, unsupportedKeyFormatErrorMsg+" "+format+" for algorithm Ed25519")
+	}
+}
+
+func exportEd25519Spki(key *CryptoKey) ([]byte, error) {
+	if key.Type != PublicCryptoKeyType {
+		return nil, NewError(InvalidAccessError, "Must use public key to export as SPKI")
+	}
+
+	handle, ok := key.handle.(ed25519.PublicKey)
+	if !ok {
+		return nil, NewError(InvalidAccessError, "Key handle is not an Ed25519 public key")
+	}
+
+	bytes, err := x509.MarshalPKIXPublicKey(handle)
+	if err != nil {
+		return nil, NewError(OperationError, "unable to marshal key to SPKI format: "+err.Error())
+	}
+
+	return bytes, nil
+}
+
+func exportEd25519Pkcs8(key *CryptoKey) ([]byte, error) {
+	if key.Type != PrivateCryptoKeyType {
+		return nil, NewError(InvalidAccessError, "Must use private key to export as PKCS8")
+	}
+
+	handle, ok := key.handle.(ed25519.PrivateKey)
+	if !ok {
+		return nil, NewError(InvalidAccessError, "Key handle is not an Ed25519 private key")
+	}
+
+	bytes, err := x509.MarshalPKCS8PrivateKey(handle)
+	if err != nil {
+		return nil, NewError(OperationError, "unable to marshal key to PKCS8 format: "+err.Error())
+	}
+
+	return bytes, nil
+}
+
+func exportEd25519Raw(key *CryptoKey) ([]byte, error) {
+	if key.Type != PublicCryptoKeyType {
+		return nil, NewError(InvalidAccessError, "Must use public key to export as raw")
+	}
+
+	handle, ok := key.handle.(ed25519.PublicKey)
+	if !ok {
+		return nil, NewError(InvalidAccessError, "Key handle is not an Ed25519 public key")
+	}
+
+	return handle, nil
 }

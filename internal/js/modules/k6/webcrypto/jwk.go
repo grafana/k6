@@ -3,12 +3,14 @@ package webcrypto
 import (
 	"crypto/ecdh"
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/rsa"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
+	"slices"
 )
 
 const (
@@ -444,6 +446,25 @@ type ed25519JWK struct {
 	Ext *bool `json:"ext"`
 }
 
+func exportEd25519JWK(key *CryptoKey) (*JsonWebKey, error) {
+	exported := &JsonWebKey{}
+	exported.Set("kty", "OKP")
+	exported.Set("crv", "Ed25519")
+	switch ed25519Key := key.handle.(type) {
+	case ed25519.PublicKey:
+		exported.Set("x", base64URLEncode([]byte(ed25519Key)))
+	case ed25519.PrivateKey:
+		exported.Set("x", base64URLEncode([]byte(ed25519Key.Public().(ed25519.PublicKey))))
+		exported.Set("d", base64URLEncode([]byte(ed25519Key)))
+	default:
+		return nil, fmt.Errorf("key's handle isn't an Ed25519 public/private key, got: %T", key.handle)
+	}
+	exported.Set("key_ops", key.Usages)
+	exported.Set("ext", key.Extractable)
+
+	return exported, nil
+}
+
 // validateKeyOps validates that the key_ops field on the JWK does not conflict
 // with the given usages according to the JWK specification
 func validateKeyOps(keyOps []CryptoKeyUsage, keyUsages []CryptoKeyUsage) error {
@@ -510,14 +531,7 @@ func validateKeyOps(keyOps []CryptoKeyUsage, keyUsages []CryptoKeyUsage) error {
 
 	// Verify that all requested usages are present in keyOps
 	for _, usage := range keyUsages {
-		found := false
-		for _, op := range keyOps {
-			if usage == op {
-				found = true
-				break
-			}
-		}
-		if !found {
+		if !slices.Contains(keyOps, usage) {
 			return NewError(DataError, fmt.Sprintf("requested usage '%s' is not present in key_ops", usage))
 		}
 	}
@@ -525,8 +539,8 @@ func validateKeyOps(keyOps []CryptoKeyUsage, keyUsages []CryptoKeyUsage) error {
 	return nil
 }
 
-func (jwk *ed25519JWK) validate(keyUsages []CryptoKeyUsage) error {
-	private := jwk.D == ""
+func (jwk *ed25519JWK) validateEd25519JWK(keyUsages []CryptoKeyUsage) error {
+	private := jwk.D != ""
 	if private {
 		for _, usage := range keyUsages {
 			switch usage {
@@ -572,9 +586,5 @@ func (jwk *ed25519JWK) validate(keyUsages []CryptoKeyUsage) error {
 	}
 
 	// TODO: pass extractable down from JS params and validate properly
-	if jwk.Ext != nil && *jwk.Ext == false {
-		return NewError(DataError, "invalid 'ext': false is not allowed for Ed25519 keys")
-	}
-
 	return nil
 }

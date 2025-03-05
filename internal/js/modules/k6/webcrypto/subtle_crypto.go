@@ -912,6 +912,8 @@ func (sc *SubtleCrypto) ExportKey( //nolint:funlen // we have a lot of error han
 			keyExporter = exportECKey
 		case RSASsaPkcs1v15, RSAOaep, RSAPss:
 			keyExporter = exportRSAKey
+		case Ed25519:
+			keyExporter = exportEd25519Key
 		default:
 			return NewError(NotSupportedError, "unsupported algorithm "+algorithm.Name)
 		}
