@@ -31,7 +31,7 @@ extended: base + sets "global" as alias for "globalThis"
 	flags.StringArrayP("env", "e", nil, "add/override environment variable with `VAR=value`")
 	flags.Bool("no-thresholds", false, "don't run thresholds")
 	flags.Bool("no-summary", false, "don't show the summary at the end of the test")
-	flags.String("with-summary", lib.SummaryModeCompact.String(), "determine the summary mode,"+
+	flags.String("summary-mode", lib.SummaryModeCompact.String(), "determine the summary mode,"+
 		" \"compact\", \"full\" or \"legacy\"")
 	flags.String(
 		"summary-export",
@@ -79,7 +79,7 @@ func runtimeOptionsFromFlags(flags *pflag.FlagSet) lib.RuntimeOptions {
 		CompatibilityMode:    getNullString(flags, "compatibility-mode"),
 		NoThresholds:         getNullBool(flags, "no-thresholds"),
 		NoSummary:            getNullBool(flags, "no-summary"),
-		SummaryMode:          getNullString(flags, "with-summary"),
+		SummaryMode:          getNullString(flags, "summary-mode"),
 		SummaryExport:        getNullString(flags, "summary-export"),
 		TracesOutput:         getNullString(flags, "traces-output"),
 		Env:                  make(map[string]string),
