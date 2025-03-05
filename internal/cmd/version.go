@@ -10,7 +10,7 @@ import (
 	"github.com/spf13/cobra"
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/ext"
-	"go.k6.io/k6/lib/consts"
+	"go.k6.io/k6/internal/build"
 )
 
 const (
@@ -45,7 +45,7 @@ func fullVersion() string {
 
 // versionDetails returns the structured details about version
 func versionDetails() map[string]interface{} {
-	v := consts.Version
+	v := build.Version
 	if !strings.HasPrefix(v, "v") {
 		v = "v" + v
 	}

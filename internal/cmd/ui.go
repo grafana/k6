@@ -20,9 +20,9 @@ import (
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/internal/metrics/engine"
 	"go.k6.io/k6/internal/output/summary"
+	"go.k6.io/k6/internal/ui"
 	"go.k6.io/k6/internal/ui/pb"
 	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/output"
 )
 
@@ -57,7 +57,7 @@ func getBanner(noColor bool, isTrueColor bool) string {
 		c = color.RGB(0xFF, 0x67, 0x1d).Add(color.Bold)
 	}
 	c = setColor(noColor, c)
-	return c.Sprint(consts.Banner())
+	return c.Sprint(ui.Banner())
 }
 
 // isTrueColor returns true if the terminal supports true color (24-bit color).

@@ -17,9 +17,11 @@ import (
 
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
+	"go.k6.io/k6/internal/build"
 	"go.k6.io/k6/internal/event"
 	"go.k6.io/k6/internal/js/compiler"
 	"go.k6.io/k6/internal/js/eventloop"
+	"go.k6.io/k6/internal/js/modules/k6/webcrypto"
 	"go.k6.io/k6/internal/js/tc55/timers"
 	"go.k6.io/k6/internal/loader"
 	"go.k6.io/k6/js/common"
@@ -177,7 +179,7 @@ func (b *Bundle) makeArchive() *lib.Archive {
 		PwdURL:            clonedPwdURL,
 		Env:               make(map[string]string, len(b.preInitState.RuntimeOptions.Env)),
 		CompatibilityMode: b.CompatibilityMode.String(),
-		K6Version:         consts.Version,
+		K6Version:         build.Version,
 		Goos:              runtime.GOOS,
 	}
 	// Copy env so changes in the archive are not reflected in the source Bundle
@@ -314,10 +316,11 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*BundleInstance
 	modSys := modules.NewModuleSystem(b.ModuleResolver, vuImpl)
 	b.setInitGlobals(rt, vuImpl, modSys)
 
-	err = timers.SetupGlobally(vuImpl)
+	err = registerGlobals(vuImpl)
 	if err != nil {
 		return nil, err
 	}
+
 	vuImpl.initEnv = initenv
 	defer func() {
 		vuImpl.initEnv = nil
@@ -381,6 +384,17 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*BundleInstance
 	rt.SetRandSource(common.NewRandSource())
 
 	return bi, nil
+}
+
+// registerGlobals registers the globals for the runtime.
+// e.g. timers and webcrypto.
+func registerGlobals(vuImpl *moduleVUImpl) error {
+	err := timers.SetupGlobally(vuImpl)
+	if err != nil {
+		return err
+	}
+
+	return webcrypto.SetupGlobally(vuImpl)
 }
 
 func (b *Bundle) setupJSRuntime(rt *sobek.Runtime, vuID uint64, logger logrus.FieldLogger) error {

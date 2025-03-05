@@ -13,13 +13,12 @@ import (
 
 	"go.k6.io/k6/lib/fsext"
 
-	"go.k6.io/k6/lib/consts"
-
 	"go.k6.io/k6/lib"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"go.k6.io/k6/internal/build"
 	"go.k6.io/k6/internal/lib/testutils"
 	"go.k6.io/k6/lib/types"
 )
@@ -111,7 +110,7 @@ func TestCreateTestRun(t *testing.T) {
 
 		arc := &lib.Archive{
 			Type:        "js",
-			K6Version:   consts.Version,
+			K6Version:   build.Version,
 			Options:     lib.Options{},
 			FilenameURL: &url.URL{Scheme: "file", Path: "/path/to/a.js"},
 			Data:        []byte(`// a contents`),

@@ -3,9 +3,9 @@
 In this directory, you will find examples of how to use the k6's `webcrypto` module in your k6 scripts.
 
 > [!IMPORTANT]
-> We do run the tests based on these examples, that's why we have a simple convention for each example:
+> We do run the tests based on these examples; that's why we have a simple convention for each example:
 >
-> * It should do any `console.log`. Since we try to detect that output (log) contain `INFO` keyword.
-> * It should NOT `try/catch` exceptions. Since we try to detect if keywords like `"Uncaught"` and `"ERRO"` should not appear in the output (logs).
+> * Success condition: Example SHOULD output an `INFO` keyword using `console.log` at least once.
+> * Failure condition: Example SHOULD NOT `try/catch` exceptions so that we can detect failures. The log output SHOULD NOT contain any keywords like `"Uncaught"` and `"ERRO"`.
 
-See [`../../js/modules/k6/webcrypto/cmd_run_test.go`](../../js/modules/k6/webcrypto/cmd_run_test.go) for more details.
+See [`../../internal/js/modules/k6/webcrypto/cmd_run_test.go`](../../internal/js/modules/k6/webcrypto/cmd_run_test.go) for more details.

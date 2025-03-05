@@ -348,12 +348,7 @@ func encodeBlockBetterSnappyGo(dst, src []byte) (d int) {
 		nextS := 0
 		for {
 			// Next src position to check
-			nextS = (s-nextEmit)>>7 + 1
-			if nextS > maxSkip {
-				nextS = s + maxSkip
-			} else {
-				nextS += s
-			}
+			nextS = min(s+(s-nextEmit)>>7+1, s+maxSkip)
 
 			if nextS > sLimit {
 				goto emitRemainder
@@ -467,6 +462,415 @@ func encodeBlockBetterSnappyGo(dst, src []byte) (d int) {
 		for index2 < index1 {
 			lTable[hash7(load64(src, index0), lTableBits)] = uint32(index0)
 			lTable[hash7(load64(src, index2), lTableBits)] = uint32(index2)
+			index0 += 2
+			index2 += 2
+		}
+	}
+
+emitRemainder:
+	if nextEmit < len(src) {
+		// Bail if we exceed the maximum size.
+		if d+len(src)-nextEmit > dstLimit {
+			return 0
+		}
+		d += emitLiteral(dst[d:], src[nextEmit:])
+	}
+	return d
+}
+
+func encodeBlockBetterGo64K(dst, src []byte) (d int) {
+	// sLimit is when to stop looking for offset/length copies. The inputMargin
+	// lets us use a fast path for emitLiteral in the main loop, while we are
+	// looking for copies.
+	sLimit := len(src) - inputMargin
+	if len(src) < minNonLiteralBlockSize {
+		return 0
+	}
+	// Initialize the hash tables.
+	// Use smaller tables for smaller blocks
+	const (
+		// Long hash matches.
+		lTableBits    = 16
+		maxLTableSize = 1 << lTableBits
+
+		// Short hash matches.
+		sTableBits    = 13
+		maxSTableSize = 1 << sTableBits
+	)
+
+	var lTable [maxLTableSize]uint16
+	var sTable [maxSTableSize]uint16
+
+	// Bail if we can't compress to at least this.
+	dstLimit := len(src) - len(src)>>5 - 6
+
+	// nextEmit is where in src the next emitLiteral should start from.
+	nextEmit := 0
+
+	// The encoded form must start with a literal, as there are no previous
+	// bytes to copy, so we start looking for hash matches at s == 1.
+	s := 1
+	cv := load64(src, s)
+
+	// We initialize repeat to 0, so we never match on first attempt
+	repeat := 0
+
+	for {
+		candidateL := 0
+		nextS := 0
+		for {
+			// Next src position to check
+			nextS = s + (s-nextEmit)>>6 + 1
+			if nextS > sLimit {
+				goto emitRemainder
+			}
+			hashL := hash7(cv, lTableBits)
+			hashS := hash4(cv, sTableBits)
+			candidateL = int(lTable[hashL])
+			candidateS := int(sTable[hashS])
+			lTable[hashL] = uint16(s)
+			sTable[hashS] = uint16(s)
+
+			valLong := load64(src, candidateL)
+			valShort := load64(src, candidateS)
+
+			// If long matches at least 8 bytes, use that.
+			if cv == valLong {
+				break
+			}
+			if cv == valShort {
+				candidateL = candidateS
+				break
+			}
+
+			// Check repeat at offset checkRep.
+			const checkRep = 1
+			// Minimum length of a repeat. Tested with various values.
+			// While 4-5 offers improvements in some, 6 reduces
+			// regressions significantly.
+			const wantRepeatBytes = 6
+			const repeatMask = ((1 << (wantRepeatBytes * 8)) - 1) << (8 * checkRep)
+			if false && repeat > 0 && cv&repeatMask == load64(src, s-repeat)&repeatMask {
+				base := s + checkRep
+				// Extend back
+				for i := base - repeat; base > nextEmit && i > 0 && src[i-1] == src[base-1]; {
+					i--
+					base--
+				}
+				d += emitLiteral(dst[d:], src[nextEmit:base])
+
+				// Extend forward
+				candidate := s - repeat + wantRepeatBytes + checkRep
+				s += wantRepeatBytes + checkRep
+				for s < len(src) {
+					if len(src)-s < 8 {
+						if src[s] == src[candidate] {
+							s++
+							candidate++
+							continue
+						}
+						break
+					}
+					if diff := load64(src, s) ^ load64(src, candidate); diff != 0 {
+						s += bits.TrailingZeros64(diff) >> 3
+						break
+					}
+					s += 8
+					candidate += 8
+				}
+				// same as `add := emitCopy(dst[d:], repeat, s-base)` but skips storing offset.
+				d += emitRepeat(dst[d:], repeat, s-base)
+				nextEmit = s
+				if s >= sLimit {
+					goto emitRemainder
+				}
+				// Index in-between
+				index0 := base + 1
+				index1 := s - 2
+
+				for index0 < index1 {
+					cv0 := load64(src, index0)
+					cv1 := load64(src, index1)
+					lTable[hash7(cv0, lTableBits)] = uint16(index0)
+					sTable[hash4(cv0>>8, sTableBits)] = uint16(index0 + 1)
+
+					lTable[hash7(cv1, lTableBits)] = uint16(index1)
+					sTable[hash4(cv1>>8, sTableBits)] = uint16(index1 + 1)
+					index0 += 2
+					index1 -= 2
+				}
+
+				cv = load64(src, s)
+				continue
+			}
+
+			// Long likely matches 7, so take that.
+			if uint32(cv) == uint32(valLong) {
+				break
+			}
+
+			// Check our short candidate
+			if uint32(cv) == uint32(valShort) {
+				// Try a long candidate at s+1
+				hashL = hash7(cv>>8, lTableBits)
+				candidateL = int(lTable[hashL])
+				lTable[hashL] = uint16(s + 1)
+				if uint32(cv>>8) == load32(src, candidateL) {
+					s++
+					break
+				}
+				// Use our short candidate.
+				candidateL = candidateS
+				break
+			}
+
+			cv = load64(src, nextS)
+			s = nextS
+		}
+
+		// Extend backwards
+		for candidateL > 0 && s > nextEmit && src[candidateL-1] == src[s-1] {
+			candidateL--
+			s--
+		}
+
+		// Bail if we exceed the maximum size.
+		if d+(s-nextEmit) > dstLimit {
+			return 0
+		}
+
+		base := s
+		offset := base - candidateL
+
+		// Extend the 4-byte match as long as possible.
+		s += 4
+		candidateL += 4
+		for s < len(src) {
+			if len(src)-s < 8 {
+				if src[s] == src[candidateL] {
+					s++
+					candidateL++
+					continue
+				}
+				break
+			}
+			if diff := load64(src, s) ^ load64(src, candidateL); diff != 0 {
+				s += bits.TrailingZeros64(diff) >> 3
+				break
+			}
+			s += 8
+			candidateL += 8
+		}
+
+		d += emitLiteral(dst[d:], src[nextEmit:base])
+		if repeat == offset {
+			d += emitRepeat(dst[d:], offset, s-base)
+		} else {
+			d += emitCopy(dst[d:], offset, s-base)
+			repeat = offset
+		}
+
+		nextEmit = s
+		if s >= sLimit {
+			goto emitRemainder
+		}
+
+		if d > dstLimit {
+			// Do we have space for more, if not bail.
+			return 0
+		}
+
+		// Index short & long
+		index0 := base + 1
+		index1 := s - 2
+
+		cv0 := load64(src, index0)
+		cv1 := load64(src, index1)
+		lTable[hash7(cv0, lTableBits)] = uint16(index0)
+		sTable[hash4(cv0>>8, sTableBits)] = uint16(index0 + 1)
+
+		// lTable could be postponed, but very minor difference.
+		lTable[hash7(cv1, lTableBits)] = uint16(index1)
+		sTable[hash4(cv1>>8, sTableBits)] = uint16(index1 + 1)
+		index0 += 1
+		index1 -= 1
+		cv = load64(src, s)
+
+		// Index large values sparsely in between.
+		// We do two starting from different offsets for speed.
+		index2 := (index0 + index1 + 1) >> 1
+		for index2 < index1 {
+			lTable[hash7(load64(src, index0), lTableBits)] = uint16(index0)
+			lTable[hash7(load64(src, index2), lTableBits)] = uint16(index2)
+			index0 += 2
+			index2 += 2
+		}
+	}
+
+emitRemainder:
+	if nextEmit < len(src) {
+		// Bail if we exceed the maximum size.
+		if d+len(src)-nextEmit > dstLimit {
+			return 0
+		}
+		d += emitLiteral(dst[d:], src[nextEmit:])
+	}
+	return d
+}
+
+// encodeBlockBetterSnappyGo encodes a non-empty src to a guaranteed-large-enough dst. It
+// assumes that the varint-encoded length of the decompressed bytes has already
+// been written.
+//
+// It also assumes that:
+//
+//	len(dst) >= MaxEncodedLen(len(src)) &&
+//	minNonLiteralBlockSize <= len(src) && len(src) <= maxBlockSize
+func encodeBlockBetterSnappyGo64K(dst, src []byte) (d int) {
+	// sLimit is when to stop looking for offset/length copies. The inputMargin
+	// lets us use a fast path for emitLiteral in the main loop, while we are
+	// looking for copies.
+	sLimit := len(src) - inputMargin
+	if len(src) < minNonLiteralBlockSize {
+		return 0
+	}
+
+	// Initialize the hash tables.
+	// Use smaller tables for smaller blocks
+	const (
+		// Long hash matches.
+		lTableBits    = 15
+		maxLTableSize = 1 << lTableBits
+
+		// Short hash matches.
+		sTableBits    = 13
+		maxSTableSize = 1 << sTableBits
+	)
+
+	var lTable [maxLTableSize]uint16
+	var sTable [maxSTableSize]uint16
+
+	// Bail if we can't compress to at least this.
+	dstLimit := len(src) - len(src)>>5 - 6
+
+	// nextEmit is where in src the next emitLiteral should start from.
+	nextEmit := 0
+
+	// The encoded form must start with a literal, as there are no previous
+	// bytes to copy, so we start looking for hash matches at s == 1.
+	s := 1
+	cv := load64(src, s)
+
+	const maxSkip = 100
+
+	for {
+		candidateL := 0
+		nextS := 0
+		for {
+			// Next src position to check
+			nextS = min(s+(s-nextEmit)>>6+1, s+maxSkip)
+
+			if nextS > sLimit {
+				goto emitRemainder
+			}
+			hashL := hash7(cv, lTableBits)
+			hashS := hash4(cv, sTableBits)
+			candidateL = int(lTable[hashL])
+			candidateS := int(sTable[hashS])
+			lTable[hashL] = uint16(s)
+			sTable[hashS] = uint16(s)
+
+			if uint32(cv) == load32(src, candidateL) {
+				break
+			}
+
+			// Check our short candidate
+			if uint32(cv) == load32(src, candidateS) {
+				// Try a long candidate at s+1
+				hashL = hash7(cv>>8, lTableBits)
+				candidateL = int(lTable[hashL])
+				lTable[hashL] = uint16(s + 1)
+				if uint32(cv>>8) == load32(src, candidateL) {
+					s++
+					break
+				}
+				// Use our short candidate.
+				candidateL = candidateS
+				break
+			}
+
+			cv = load64(src, nextS)
+			s = nextS
+		}
+
+		// Extend backwards
+		for candidateL > 0 && s > nextEmit && src[candidateL-1] == src[s-1] {
+			candidateL--
+			s--
+		}
+
+		// Bail if we exceed the maximum size.
+		if d+(s-nextEmit) > dstLimit {
+			return 0
+		}
+
+		base := s
+		offset := base - candidateL
+
+		// Extend the 4-byte match as long as possible.
+		s += 4
+		candidateL += 4
+		for s < len(src) {
+			if len(src)-s < 8 {
+				if src[s] == src[candidateL] {
+					s++
+					candidateL++
+					continue
+				}
+				break
+			}
+			if diff := load64(src, s) ^ load64(src, candidateL); diff != 0 {
+				s += bits.TrailingZeros64(diff) >> 3
+				break
+			}
+			s += 8
+			candidateL += 8
+		}
+
+		d += emitLiteral(dst[d:], src[nextEmit:base])
+		d += emitCopyNoRepeat(dst[d:], offset, s-base)
+
+		nextEmit = s
+		if s >= sLimit {
+			goto emitRemainder
+		}
+
+		if d > dstLimit {
+			// Do we have space for more, if not bail.
+			return 0
+		}
+
+		// Index short & long
+		index0 := base + 1
+		index1 := s - 2
+
+		cv0 := load64(src, index0)
+		cv1 := load64(src, index1)
+		lTable[hash7(cv0, lTableBits)] = uint16(index0)
+		sTable[hash4(cv0>>8, sTableBits)] = uint16(index0 + 1)
+
+		lTable[hash7(cv1, lTableBits)] = uint16(index1)
+		sTable[hash4(cv1>>8, sTableBits)] = uint16(index1 + 1)
+		index0 += 1
+		index1 -= 1
+		cv = load64(src, s)
+
+		// Index large values sparsely in between.
+		// We do two starting from different offsets for speed.
+		index2 := (index0 + index1 + 1) >> 1
+		for index2 < index1 {
+			lTable[hash7(load64(src, index0), lTableBits)] = uint16(index0)
+			lTable[hash7(load64(src, index2), lTableBits)] = uint16(index2)
 			index0 += 2
 			index2 += 2
 		}

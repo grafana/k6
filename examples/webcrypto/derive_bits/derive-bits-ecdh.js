@@ -1,5 +1,3 @@
-import { crypto } from "k6/experimental/webcrypto";
-
 export default async function () {
   // Generate a key pair for Alice
   const aliceKeyPair = await crypto.subtle.generateKey(

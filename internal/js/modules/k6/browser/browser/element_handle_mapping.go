@@ -194,8 +194,12 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			if err != nil {
 				return nil, fmt.Errorf("parsing select options values: %w", err)
 			}
+			popts := common.NewElementHandleBaseOptions(eh.DefaultTimeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing selectOption options: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return eh.SelectOption(convValues, opts) //nolint:wrapcheck
+				return eh.SelectOption(convValues, popts) //nolint:wrapcheck
 			}), nil
 		},
 		"selectText": func(opts sobek.Value) (*sobek.Promise, error) {

@@ -46,6 +46,7 @@ func (c Credentials) IsEmpty() bool {
 type eventInterceptor interface {
 	urlTagName(urlTag string, method string) (string, bool)
 	onRequest(request *Request)
+	onResponse(response *Response)
 }
 
 // NetworkManager manages all frames in HTML document.
@@ -664,6 +665,8 @@ func (m *NetworkManager) onResponseReceived(event *network.EventResponseReceived
 	req.responseMu.Unlock()
 
 	m.logger.Debugf("FrameManager:onResponseReceived", "rid:%s rurl:%s", event.RequestID, resp.URL())
+
+	m.eventInterceptor.onResponse(resp)
 }
 
 func (m *NetworkManager) requestFromID(reqID network.RequestID) (*Request, bool) {

@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
+	"go.k6.io/k6/internal/build"
 	"go.k6.io/k6/internal/lib/testutils"
 	"go.k6.io/k6/internal/loader"
 	"go.k6.io/k6/internal/usage"
@@ -584,7 +585,7 @@ func TestNewBundleFromArchive(t *testing.T) {
 		arc := &lib.Archive{
 			Type:        "js",
 			FilenameURL: &url.URL{Scheme: "file", Path: "/script"},
-			K6Version:   consts.Version,
+			K6Version:   build.Version,
 			Data:        []byte(code),
 			Options:     lib.Options{VUs: null.IntFrom(999)},
 			PwdURL:      &url.URL{Scheme: "file", Path: "/"},
@@ -948,7 +949,7 @@ func TestBundleMakeArchive(t *testing.T) {
 			fileData, err := fsext.ReadFile(arc.Filesystems["file"], "/path/to/file.txt")
 			require.NoError(t, err)
 			assert.Equal(t, `hi`, string(fileData))
-			assert.Equal(t, consts.Version, arc.K6Version)
+			assert.Equal(t, build.Version, arc.K6Version)
 			assert.Equal(t, tc.cm.String(), arc.CompatibilityMode)
 		})
 	}

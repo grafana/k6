@@ -35,7 +35,7 @@ labels: ["release"]
   - [ ] Ask teams that might have contributed to the release (e.g., k6-ecosystem, k6-docs, k6-devrel teams) to contribute their notes and review the existing ones.
   - [ ] Remember to mention and thank [external contributors](https://github.com/search?q=user%3Agrafana+repo%3Ak6+milestone%3A%22v0.51.0%22+-author%3Amstoykov+-author%3Aoleiade+-author%3Ana--+-author%3Acodebien+-author%3Aolegbespalov+-author%3Aandrewslotin+-author%3Ajoanlopez+-author%3Aankur22+-author%3Ainancgumus+-author%3Aszkiba+-author%3Adependabot%5Bbot%5D&type=pullrequests). (**<- Update the query with the correct milestone version**).
 - [ ] Share the release notes PR with the k6 open-source teams. Request contributions from all affected teams (k6-chaos, k6-docs, k6-devrel, etc.) and any other stakeholders involved in the new release.
-- [ ] Open a separate PR for bumping [the k6 Go project's version](https://github.com/grafana/k6/blob/master/lib/consts/consts.go#L11-L12).
+- [ ] Open a separate PR for bumping [the k6 Go project's version](https://github.com/grafana/k6/blob/master/internal/build/version.go#L6).
 - [ ] Open a PR in the `DefinitelyTyped/DefinitelyTyped` repository using the release branch created in the grafana/k6-DefinitelyTyped fork to update the k6 type definitions for the new release.
 
 #### ~ 1 day before the release date

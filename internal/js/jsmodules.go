@@ -31,17 +31,19 @@ import (
 
 func getInternalJSModules() map[string]interface{} {
 	return map[string]interface{}{
-		"k6":                         k6.New(),
-		"k6/crypto":                  crypto.New(),
-		"k6/crypto/x509":             x509.New(),
-		"k6/data":                    data.New(),
-		"k6/encoding":                encoding.New(),
-		"k6/timers":                  timers.New(),
-		"k6/execution":               execution.New(),
-		"k6/experimental/csv":        csv.New(),
-		"k6/experimental/redis":      redis.New(),
-		"k6/experimental/streams":    streams.New(),
-		"k6/experimental/webcrypto":  webcrypto.New(),
+		"k6":                      k6.New(),
+		"k6/crypto":               crypto.New(),
+		"k6/crypto/x509":          x509.New(),
+		"k6/data":                 data.New(),
+		"k6/encoding":             encoding.New(),
+		"k6/timers":               timers.New(),
+		"k6/execution":            execution.New(),
+		"k6/experimental/csv":     csv.New(),
+		"k6/experimental/redis":   redis.New(),
+		"k6/experimental/streams": streams.New(),
+		"k6/experimental/webcrypto": newWarnExperimentalModule(webcrypto.New(),
+			"k6/experimental/webcrypto is now part of the k6 core, and globally available. You could just remove import."+
+				" The k6/experimental/webcrypto will be removed in k6 v1.1.0"),
 		"k6/experimental/websockets": expws.New(),
 		"k6/experimental/timers": newRemovedModule(
 			"k6/experimental/timers has been graduated, please use k6/timers instead."),
@@ -80,14 +82,12 @@ func getJSModules() map[string]interface{} {
 	return result
 }
 
-//nolint:unused // this is likely going to be used again even if isn't currently used
 type warnExperimentalModule struct {
 	once *sync.Once
 	msg  string
 	base modules.Module
 }
 
-//nolint:unused // this is likely going to be used again even if isn't currently used
 func newWarnExperimentalModule(base modules.Module, msg string) modules.Module {
 	return &warnExperimentalModule{
 		msg:  msg,
@@ -96,7 +96,6 @@ func newWarnExperimentalModule(base modules.Module, msg string) modules.Module {
 	}
 }
 
-//nolint:unused // this is likely going to be used again even if isn't currently used
 func (w *warnExperimentalModule) NewModuleInstance(vu modules.VU) modules.Instance {
 	w.once.Do(func() { vu.InitEnv().Logger.Warn(w.msg) })
 	return w.base.NewModuleInstance(vu)
