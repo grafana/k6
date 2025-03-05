@@ -217,15 +217,7 @@ func (b *Bundle) populateExports(updateOptions bool, bi *BundleInstance) error {
 				dec.DisallowUnknownFields()
 				if err = dec.Decode(&b.Options); err != nil {
 					if uerr := json.Unmarshal(data, &b.Options); uerr != nil {
-						unmarshalTypError := new(json.UnmarshalTypeError)
-						if errors.As(uerr, &unmarshalTypError) {
-							e := unmarshalTypError
-							previousNewLineIndex := max(bytes.LastIndexByte(data[:e.Offset], '\n'), 0)
-							nextNewLineIndex := max(bytes.IndexByte(data[e.Offset:], '\n'), len(data)-1)
-
-							info := strings.TrimSpace(string(data[previousNewLineIndex:nextNewLineIndex]))
-							uerr = fmt.Errorf("parsing options from script got error while parsing %q: %w", info, e)
-						}
+						uerr = beautifyJSONUnmarshalError(data, uerr)
 						err = errext.WithAbortReasonIfNone(
 							errext.WithExitCodeIfNone(uerr, exitcodes.InvalidConfig),
 							errext.AbortedByScriptError,
@@ -254,6 +246,19 @@ func (b *Bundle) populateExports(updateOptions bool, bi *BundleInstance) error {
 	}
 
 	return nil
+}
+
+func beautifyJSONUnmarshalError(data []byte, err error) error {
+	unmarshalTypError := new(json.UnmarshalTypeError)
+	if errors.As(err, &unmarshalTypError) {
+		e := unmarshalTypError
+		previousNewLineIndex := max(bytes.LastIndexByte(data[:e.Offset], '\n'), 0)
+		nextNewLineIndex := max(bytes.IndexByte(data[e.Offset:], '\n'), len(data)-1)
+
+		info := strings.TrimSpace(string(data[previousNewLineIndex:nextNewLineIndex]))
+		err = fmt.Errorf("parsing options from script got error while parsing %q: %w", info, e)
+	}
+	return err
 }
 
 // Instantiate creates a new runtime from this bundle.
