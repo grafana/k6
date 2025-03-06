@@ -12,6 +12,8 @@ func mapResponseEvent(vu moduleVU, event common.PageOnEvent) mapping {
 }
 
 // mapResponse to the JS module.
+//
+//nolint:funlen
 func mapResponse(vu moduleVU, r *common.Response) mapping {
 	if r == nil {
 		return nil
@@ -23,14 +25,23 @@ func mapResponse(vu moduleVU, r *common.Response) mapping {
 			})
 		},
 		"body": func() *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			rt := vu.Runtime()
+			promise, res, rej := rt.NewPromise()
+			callback := vu.RegisterCallback()
+			go func() {
 				body, err := r.Body()
 				if err != nil {
-					return nil, err //nolint: wrapcheck
+					callback(func() error {
+						return rej(err)
+					})
+					return
 				}
-				buf := vu.Runtime().NewArrayBuffer(body)
-				return &buf, nil
-			})
+				callback(func() error {
+					buf := vu.Runtime().NewArrayBuffer(body)
+					return res(&buf)
+				})
+			}()
+			return promise
 		},
 		"frame": func() mapping {
 			return mapFrame(vu, r.Frame())
