@@ -375,7 +375,7 @@ func TestFileConsole(t *testing.T) {
 						msg, deleteFile := msg, deleteFile
 						t.Run(msg, func(t *testing.T) {
 							t.Parallel()
-							f, err := os.CreateTemp("", "") //nolint:forbidigo // fix with https://github.com/grafana/k6/issues/2565
+							f, err := os.CreateTemp(t.TempDir(), "") //nolint:forbidigo // fix with https://github.com/grafana/k6/issues/2565
 							require.NoError(t, err)
 							logFilename := f.Name()
 							defer os.Remove(logFilename) //nolint:errcheck,forbidigo // fix with https://github.com/grafana/k6/issues/2565

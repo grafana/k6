@@ -18,9 +18,7 @@ func TestDirMake(t *testing.T) {
 	t.Run("dir_provided", func(t *testing.T) {
 		t.Parallel()
 
-		dir, err := os.MkdirTemp("", "*") //nolint:forbidigo
-		require.NoError(t, err)
-		t.Cleanup(func() { _ = os.RemoveAll(dir) }) //nolint:forbidigo
+		dir := t.TempDir()
 
 		var s Dir
 		require.NoError(t, s.Make("", dir))

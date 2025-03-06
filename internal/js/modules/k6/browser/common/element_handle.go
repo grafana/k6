@@ -565,7 +565,7 @@ func (h *ElementHandle) selectOption(apiCtx context.Context, values []any) (any,
 		forceCallable: true,
 		returnByValue: false,
 	}
-	result, err := h.evalWithScript(apiCtx, opts, fn, values) //nolint:asasalint
+	result, err := h.evalWithScript(apiCtx, opts, fn, values)
 	if err != nil {
 		return nil, err
 	}
