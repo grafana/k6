@@ -12,15 +12,16 @@ import (
 //go:generate protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative test.proto
 
 // Register registers a test service that could be used for the testing gRPC wrappers
-func Register(r grpc.ServiceRegistrar) *service { //nolint:revive // this is a test service
-	s := &service{}
+func Register(r grpc.ServiceRegistrar) *Service {
+	s := &Service{}
 
 	RegisterServiceServer(r, s)
 
 	return s
 }
 
-type service struct {
+// Service is the test service for different grpc values and how they are handled
+type Service struct {
 	UnimplementedServiceServer
 
 	TestStringImplementation  func(context.Context, *wrappers.StringValue) (*wrappers.StringValue, error)
@@ -31,7 +32,8 @@ type service struct {
 	TestStreamImplementation  func(Service_TestStreamServer) error
 }
 
-func (s *service) TestString(ctx context.Context, in *wrappers.StringValue) (*wrappers.StringValue, error) {
+// TestString is getting and returning a string value
+func (s *Service) TestString(ctx context.Context, in *wrappers.StringValue) (*wrappers.StringValue, error) {
 	if s.TestStringImplementation != nil {
 		return s.TestStringImplementation(ctx, in)
 	}
@@ -39,7 +41,8 @@ func (s *service) TestString(ctx context.Context, in *wrappers.StringValue) (*wr
 	return s.UnimplementedServiceServer.TestString(ctx, in)
 }
 
-func (s *service) TestInteger(ctx context.Context, in *wrappers.Int64Value) (*wrappers.Int64Value, error) {
+// TestInteger is getting and returning a integer value
+func (s *Service) TestInteger(ctx context.Context, in *wrappers.Int64Value) (*wrappers.Int64Value, error) {
 	if s.TestIntegerImplementation != nil {
 		return s.TestIntegerImplementation(ctx, in)
 	}
@@ -47,7 +50,8 @@ func (s *service) TestInteger(ctx context.Context, in *wrappers.Int64Value) (*wr
 	return s.UnimplementedServiceServer.TestInteger(ctx, in)
 }
 
-func (s *service) TestBoolean(ctx context.Context, in *wrappers.BoolValue) (*wrappers.BoolValue, error) {
+// TestBoolean is getting and returning a boolean value
+func (s *Service) TestBoolean(ctx context.Context, in *wrappers.BoolValue) (*wrappers.BoolValue, error) {
 	if s.TestBooleanImplementation != nil {
 		return s.TestBooleanImplementation(ctx, in)
 	}
@@ -55,7 +59,8 @@ func (s *service) TestBoolean(ctx context.Context, in *wrappers.BoolValue) (*wra
 	return s.UnimplementedServiceServer.TestBoolean(ctx, in)
 }
 
-func (s *service) TestDouble(ctx context.Context, in *wrappers.DoubleValue) (*wrappers.DoubleValue, error) {
+// TestDouble is getting and returning a double value
+func (s *Service) TestDouble(ctx context.Context, in *wrappers.DoubleValue) (*wrappers.DoubleValue, error) {
 	if s.TestDoubleImplementation != nil {
 		return s.TestDoubleImplementation(ctx, in)
 	}
@@ -63,7 +68,8 @@ func (s *service) TestDouble(ctx context.Context, in *wrappers.DoubleValue) (*wr
 	return s.UnimplementedServiceServer.TestDouble(ctx, in)
 }
 
-func (s *service) TestValue(ctx context.Context, in *_struct.Value) (*_struct.Value, error) {
+// TestValue is getting and returning a generic value
+func (s *Service) TestValue(ctx context.Context, in *_struct.Value) (*_struct.Value, error) {
 	if s.TestValueImplementation != nil {
 		return s.TestValueImplementation(ctx, in)
 	}
@@ -71,7 +77,8 @@ func (s *service) TestValue(ctx context.Context, in *_struct.Value) (*_struct.Va
 	return s.UnimplementedServiceServer.TestValue(ctx, in)
 }
 
-func (s *service) TestStream(stream Service_TestStreamServer) error {
+// TestStream is testing a stream of values
+func (s *Service) TestStream(stream Service_TestStreamServer) error {
 	if s.TestStreamImplementation != nil {
 		return s.TestStreamImplementation(stream)
 	}

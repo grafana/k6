@@ -687,8 +687,7 @@ func TestOpen(t *testing.T) {
 			return fs, "", func() {}
 		},
 		"OsFS": func() (fsext.Fs, string, func()) {
-			prefix, err := os.MkdirTemp("", "k6_open_test") //nolint:forbidigo
-			require.NoError(t, err)
+			prefix := t.TempDir()
 			fs := fsext.NewOsFs()
 			filePath := filepath.Join(prefix, "/path/to/file.txt")
 			require.NoError(t, fs.MkdirAll(filepath.Join(prefix, "/path/to"), 0o755))
