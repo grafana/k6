@@ -378,7 +378,6 @@ func TestFileConsole(t *testing.T) {
 							f, err := os.CreateTemp(t.TempDir(), "") //nolint:forbidigo // fix with https://github.com/grafana/k6/issues/2565
 							require.NoError(t, err)
 							logFilename := f.Name()
-							defer os.Remove(logFilename) //nolint:errcheck,forbidigo // fix with https://github.com/grafana/k6/issues/2565
 							// close it as we will want to reopen it and maybe remove it
 							if deleteFile {
 								require.NoError(t, f.Close())
@@ -410,6 +409,11 @@ func TestFileConsole(t *testing.T) {
 
 							vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 							logger := extractLogger(vu)
+							t.Cleanup(func() {
+								if loggerOut, canBeClosed := logger.Out.(io.Closer); canBeClosed {
+									require.NoError(t, loggerOut.Close())
+								}
+							})
 
 							logger.Level = logrus.DebugLevel
 							hook := logtest.NewLocal(logger)
@@ -442,6 +446,7 @@ func TestFileConsole(t *testing.T) {
 
 							fileContent, err := io.ReadAll(f)
 							require.NoError(t, err)
+							require.NoError(t, f.Close())
 
 							expectedStr := entryStr
 							if !deleteFile {
