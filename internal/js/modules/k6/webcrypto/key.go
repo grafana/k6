@@ -187,7 +187,7 @@ func newKeyGenerator(rt *sobek.Runtime, normalized Algorithm, params sobek.Value
 		kg, err = newAESKeyGenParams(rt, normalized, params)
 	case HMAC:
 		kg, err = newHMACKeyGenParams(rt, normalized, params)
-	case ECDH, ECDSA:
+	case ECDH, ECDSA, X25519:
 		kg, err = newECKeyGenParams(rt, normalized, params)
 	case RSASsaPkcs1v15, RSAPss, RSAOaep:
 		kg, err = newRsaHashedKeyGenParams(rt, normalized, params)

@@ -53,7 +53,11 @@ const (
 	// ECDH represents the ECDH algorithm.
 	ECDH = "ECDH"
 
+	// Ed25519 represents the Ed25519 algorithm.
 	Ed25519 = "ED25519" // TODO: This should be "Ed25519"
+
+	// X25519 represents the X25519 algorithm.
+	X25519 = "X25519"
 )
 
 // HashAlgorithmIdentifier represents the name of a hash algorithm.
@@ -225,5 +229,5 @@ type hasAlg interface {
 }
 
 func isEllipticCurve(algorithmName string) bool {
-	return algorithmName == ECDH || algorithmName == ECDSA
+	return algorithmName == ECDH || algorithmName == ECDSA || algorithmName == X25519
 }
