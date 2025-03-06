@@ -89,10 +89,22 @@ func TestSecrets(t *testing.T) {
 			script:        "await secrets.source('second').get('secret2')",
 			expectedValue: "value2",
 		},
+		"multiple get wrong": {
+			secretsources: map[string]secretsource.Source{
+				"default": mock.NewMockSecretSource("some", map[string]string{
+					"secret": "value",
+				}),
+				"second": mock.NewMockSecretSource("some", map[string]string{
+					"secret2": "value2",
+				}),
+			},
+			script:        "await secrets.source('third').get('secret2')",
+			expectedError: "no secret source with name \"third\" is configured",
+		},
 		"get secret without source": {
 			secretsources: map[string]secretsource.Source{},
 			script:        "await secrets.get('secret')",
-			expectedError: "no source with name default",
+			expectedError: "no secret sources are configured",
 		},
 		"get none existing source": {
 			secretsources: map[string]secretsource.Source{

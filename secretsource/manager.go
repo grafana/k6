@@ -1,6 +1,7 @@
 package secretsource
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 
@@ -53,9 +54,12 @@ func NewManager(sources map[string]Source) (*Manager, logrus.Hook, error) {
 // It can be used with the [DefaultSourceName].
 // This automatically starts redacting the secret before returning it.
 func (sm *Manager) Get(sourceName, key string) (string, error) {
+	if len(sm.cache) == 0 {
+		return "", errors.New("no secret sources are configured")
+	}
 	sourceCache, ok := sm.cache[sourceName]
 	if !ok {
-		return "", fmt.Errorf("no source with name %s", sourceName)
+		return "", UnknownSourceError(sourceName)
 	}
 	v, ok := sourceCache.Load(key)
 	if ok {
@@ -69,4 +73,11 @@ func (sm *Manager) Get(sourceName, key string) (string, error) {
 	sourceCache.Store(key, value)
 	sm.hook.add(value)
 	return value, err
+}
+
+// UnknownSourceError is returned when a unknown source is requested
+type UnknownSourceError string
+
+func (u UnknownSourceError) Error() string {
+	return fmt.Sprintf("no secret source with name %q is configured", (string)(u))
 }
