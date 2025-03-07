@@ -411,7 +411,6 @@ func TestRuntimeOptions(t *testing.T) {
 		},
 	}
 	for name, tc := range runtimeOptionsTestCases {
-		tc := tc
 		t.Run(fmt.Sprintf("RuntimeOptions test '%s'", name), func(t *testing.T) {
 			t.Parallel()
 			testRuntimeOptionsCase(t, tc)

@@ -329,7 +329,6 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		var wg sync.WaitGroup
 		wg.Add(len(ww))
 		for _, w := range ww {
-			w := w
 			go func() {
 				w()
 				wg.Done()

@@ -110,7 +110,6 @@ func TestVUTagMetadatasSetSuccessAcceptedTypes(t *testing.T) {
 		"float":  {v: 3.14, exp: "3.14"},
 	}
 	for prop := range tagsAndMetricsPropertyNames {
-		prop := prop
 		t.Run(prop, func(t *testing.T) {
 			t.Parallel()
 			tenv := setupTagsExecEnv(t)

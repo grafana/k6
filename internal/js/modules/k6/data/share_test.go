@@ -232,7 +232,7 @@ func TestSharedArrayRaceInInitialization(t *testing.T) {
 		}
 		var wg sync.WaitGroup
 		for _, rt := range runtimes {
-			rt := rt
+
 			wg.Add(1)
 			go func() {
 				defer wg.Done()

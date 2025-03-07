@@ -30,7 +30,6 @@ func TestSleep(t *testing.T) {
 		"0.5": 500 * time.Millisecond,
 	}
 	for name, d := range testdata {
-		d := d
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			tc := testCaseRuntime(t)

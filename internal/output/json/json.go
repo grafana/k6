@@ -130,7 +130,7 @@ func (o *Output) flushMetrics() {
 		samples := sc.GetSamples()
 		count += len(samples)
 		for _, sample := range samples {
-			sample := sample
+
 			o.handleMetric(sample.Metric, jw)
 			wrapSample(sample).MarshalEasyJSON(jw)
 			jw.RawByte('\n')

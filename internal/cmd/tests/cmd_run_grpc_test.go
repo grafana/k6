@@ -94,9 +94,6 @@ func TestGRPCInputOutput(t *testing.T) {
 	require.NoError(t, err)
 
 	for name, test := range tc {
-		name := name
-		test := test
-
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 

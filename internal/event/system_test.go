@@ -88,7 +88,7 @@ func TestEventSystem(t *testing.T) {
 			data       int
 		)
 		for _, et := range emitEvents {
-			et := et
+
 			evt := &Event{Type: et, Data: data, Done: func() {
 				doneMx.Lock()
 				processed[et]++

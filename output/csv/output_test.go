@@ -481,7 +481,7 @@ func TestRun(t *testing.T) {
 
 	for i, data := range testData {
 		name := fmt.Sprint(i)
-		data := data
+
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			mem := fsext.NewMemMapFs()

@@ -78,6 +78,7 @@ linters:
     - canonicalheader
     - contextcheck
     - cyclop
+    - copyloopvar
     - dogsled
     - dupl
     - durationcheck

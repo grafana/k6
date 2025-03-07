@@ -43,7 +43,6 @@ func TestGetFixedLengthInt(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.expRes, func(t *testing.T) {
 			t.Parallel()
 			fmtFormat := GetFixedLengthIntFormat(tc.maxVal)
@@ -90,7 +89,6 @@ func TestGetFixedLengthFloat(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		tc := tc
 		t.Run(fmt.Sprintf("tc%d_exp_%s", i, tc.expRes), func(t *testing.T) {
 			t.Parallel()
 			fmtFormat := GetFixedLengthFloatFormat(tc.maxVal, tc.precision)
@@ -139,7 +137,6 @@ func TestGetFixedLengthDuration(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		tc := tc
 		t.Run(fmt.Sprintf("tc%d_exp_%s", i, tc.expRes), func(t *testing.T) {
 			t.Parallel()
 			res := GetFixedLengthDuration(tc.val, tc.maxVal)

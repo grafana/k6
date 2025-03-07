@@ -58,7 +58,6 @@ func TestGetResolversForTrendColumnsValidation(t *testing.T) {
 	}
 
 	for _, tc := range validateTests {
-		tc := tc
 		t.Run(fmt.Sprintf("%v", tc.stats), func(t *testing.T) {
 			t.Parallel()
 			_, err := GetResolversForTrendColumns(tc.stats)
@@ -86,7 +85,6 @@ func TestGetResolversForTrendColumnsCalculation(t *testing.T) {
 	}
 
 	for _, tc := range customResolversTests {
-		tc := tc
 		t.Run(fmt.Sprintf("%v", tc.stats), func(t *testing.T) {
 			t.Parallel()
 			sink := createTestTrendSink(100)

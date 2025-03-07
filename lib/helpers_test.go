@@ -32,7 +32,6 @@ func TestStrictJSONUnmarshal(t *testing.T) {
 		{`{"data": 123, "props": {"test": "mest"}}asdg`, true, &someElement{}, nil},
 	}
 	for i, tc := range testCases {
-		tc := tc
 		t.Run(fmt.Sprintf("TestCase#%d", i), func(t *testing.T) {
 			t.Parallel()
 			err := StrictJSONUnmarshal([]byte(tc.data), &tc.destination)

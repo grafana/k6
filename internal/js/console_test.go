@@ -192,8 +192,6 @@ func TestConsoleLogObjectsWithGoTypes(t *testing.T) {
 
 	expFields := logrus.Fields{"source": "console"}
 	for _, tt := range tests {
-		tt := tt
-
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -242,7 +240,6 @@ func TestConsoleLog(t *testing.T) {
 	}
 
 	for i, tt := range tests {
-		tt := tt
 		t.Run(fmt.Sprintf("case%d", i), func(t *testing.T) {
 			t.Parallel()
 
