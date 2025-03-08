@@ -15,7 +15,7 @@ import (
 const projectRootPath = "../../../"
 
 // TestGRPCInputOutput runs same k6's scripts that we have in example folder
-// it check that output contains/not contains cetane things
+// it checks that output contains/not contains cetane things
 func TestGRPCInputOutput(t *testing.T) {
 	t.Parallel()
 

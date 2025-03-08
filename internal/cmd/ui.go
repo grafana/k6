@@ -19,6 +19,7 @@ import (
 
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/internal/metrics/engine"
+	"go.k6.io/k6/internal/output/summary"
 	"go.k6.io/k6/internal/ui"
 	"go.k6.io/k6/internal/ui/pb"
 	"go.k6.io/k6/lib"
@@ -132,7 +133,7 @@ func printExecutionDescription(
 		for _, out := range outputs {
 			desc := out.Description()
 			switch desc {
-			case engine.IngesterDescription, lib.GroupSummaryDescription:
+			case engine.IngesterDescription, lib.GroupSummaryDescription, summary.OutputName:
 				continue
 			}
 			if strings.HasPrefix(desc, dashboard.OutputName) {
