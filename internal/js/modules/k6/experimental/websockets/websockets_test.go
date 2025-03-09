@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
+	"go.k6.io/k6/internal/js/modules/k6/experimental/websockets/events"
 	"go.k6.io/k6/internal/lib/testutils"
 	"go.k6.io/k6/internal/lib/testutils/httpmultibin"
 	httpModule "go.k6.io/k6/js/modules/k6/http"
@@ -154,6 +155,7 @@ func newTestState(t testing.TB) testState {
 
 	m := new(RootModule).NewModuleInstance(runtime.VU)
 	require.NoError(t, runtime.VU.RuntimeField.Set("WebSocket", m.Exports().Named["WebSocket"]))
+	require.NoError(t, runtime.VU.RuntimeField.Set("EventName", m.Exports().Named["EventName"]))
 	require.NoError(t, runtime.VU.RuntimeField.Set("Blob", m.Exports().Named["Blob"]))
 	require.NoError(t, runtime.VU.RuntimeField.Set("call", recorder.Call))
 
@@ -1549,4 +1551,32 @@ func TestReadyStateSwitch(t *testing.T) {
 	require.NoError(t, err)
 	logs := hook.Drain()
 	require.Len(t, logs, 0)
+}
+
+func TestEnumEvent(t *testing.T) {
+	var eventListeners strings.Builder
+	for event := range events.GetEventsName() {
+		eventListeners.WriteString(`
+			ws.addEventListener(EventName.` + event + `, () => {ws.close()})
+		`)
+	}
+	for event := range events.GetEventsName() {
+		testEnum(t, `when EventName.`+event+` is called, should add event`, `
+			var ws = new WebSocket("WSBIN_URL/ws-echo")
+			`+eventListeners.String()+`
+		`)
+	}
+}
+
+func testEnum(t *testing.T, name, script string) {
+	t.Run(name, func(t *testing.T) {
+		t.Parallel()
+		ts := newTestState(t)
+		sr := ts.tb.Replacer.Replace
+
+		_, err := ts.runtime.RunOnEventLoop(sr(script), false)
+		require.NoError(t, err)
+		samples := metrics.GetBufferedSamples(ts.samples)
+		assertSessionMetricsEmitted(t, samples, "", sr("WSBIN_URL/ws-echo"), http.StatusSwitchingProtocols, "")
+	})
 }

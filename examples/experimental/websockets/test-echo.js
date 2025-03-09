@@ -1,4 +1,4 @@
-import { WebSocket } from "k6/experimental/websockets"
+import { WebSocket, EventName } from "k6/experimental/websockets"
 
 const CLOSED_STATE = 3
 
@@ -8,6 +8,11 @@ export default function() {
 	var params = { "tags": { "my_tag": "hello" } };
 
 	let ws = new WebSocket(url, null, params)
+
+	ws.addEventListener(EventName.Open, () => {
+		console.log('Connected');
+	})
+
 	ws.binaryType = "arraybuffer";
 	ws.onopen = () => {
 		console.log('connected')
@@ -20,11 +25,11 @@ export default function() {
 	}, 1000);
 
 	let timeout1id = setTimeout(function() {
-		console.log('2 seconds passed, closing the socket')
+		console.log('3 seconds passed, closing the socket')
 		clearInterval(intervalId)
 		ws.close()
 
-	}, 2000);
+	}, 3000);
 
 	ws.onclose = () => {
 		clearTimeout(timeout1id);

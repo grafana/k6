@@ -105,8 +105,12 @@ func (r *Runtime) SetupModuleSystemFromAnother(another *Runtime) error {
 //	    `)
 //	    require.NoError(t, err)
 //	}
-func (r *Runtime) RunOnEventLoop(code string) (value sobek.Value, err error) {
-	defer r.EventLoop.WaitOnRegistered()
+func (r *Runtime) RunOnEventLoop(code string, waitAllCallbacks ...bool) (value sobek.Value, err error) {
+	defer func() {
+		if len(waitAllCallbacks) > 0 && waitAllCallbacks[0] {
+			r.EventLoop.WaitOnRegistered()
+		}
+	}()
 
 	err = r.EventLoop.Start(func() error {
 		value, err = r.VU.Runtime().RunString(code)
