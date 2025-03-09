@@ -16,3 +16,14 @@ const (
 	// PONG is the event name for the pong event
 	PONG = "pong"
 )
+
+func GetEventsName() map[string]any {
+	return map[string]any{
+		"Open":    OPEN,
+		"Close":   CLOSE,
+		"Error":   ERROR,
+		"Message": MESSAGE,
+		"Ping":    PING,
+		"Pong":    PONG,
+	}
+}

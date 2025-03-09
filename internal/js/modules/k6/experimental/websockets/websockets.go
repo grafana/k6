@@ -53,6 +53,7 @@ func (r *WebSocketsAPI) Exports() modules.Exports {
 		Named: map[string]interface{}{
 			"WebSocket": r.websocket,
 			"Blob":      r.blobConstructor,
+			"EventName": events.GetEventsName(),
 		},
 	}
 }
