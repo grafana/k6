@@ -34,7 +34,7 @@ const (
 		`local directory (-v /local/path/:/inside/docker/path) containing ` +
 		`your script and modules so that they're accessible by k6 from ` +
 		`inside of the container, see ` +
-		`https://grafana.com/docs/k6/latest/using-k6/modules/#using-local-modules-with-docker.`
+		`https://grafana.com/docs/k6/latest/using-k6/modules/#local-modules-2.`
 )
 
 type unresolvableURLError string
