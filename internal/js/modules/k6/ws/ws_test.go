@@ -394,7 +394,6 @@ func TestSessionClose(t *testing.T) {
 	}
 
 	for _, tc := range serverCloseTests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			tb := httpmultibin.NewHTTPMultiBin(t)
@@ -617,7 +616,7 @@ func TestSocketSendBinary(t *testing.T) { //nolint:tparallel
 	}
 
 	for _, tc := range errTestCases { //nolint:paralleltest
-		tc := tc
+
 		t.Run(fmt.Sprintf("err_%s", tc.expErrType), func(t *testing.T) {
 			_, err := test.VU.Runtime().RunString(fmt.Sprintf(sr(`
 			var res = ws.connect('WSBIN_URL/ws-echo', function(socket){
@@ -726,7 +725,6 @@ func TestSystemTags(t *testing.T) {
 	t.Parallel()
 	testedSystemTags := []string{"status", "subproto", "url", "ip"}
 	for _, expectedTagStr := range testedSystemTags {
-		expectedTagStr := expectedTagStr
 		t.Run("only "+expectedTagStr, func(t *testing.T) {
 			t.Parallel()
 			test := newTestState(t)
@@ -820,7 +818,6 @@ func TestReadPump(t *testing.T) {
 
 	// Ensure readPump returns the response close code sent by the server
 	for _, code := range closeCodes {
-		code := code
 		t.Run(strconv.Itoa(code), func(t *testing.T) {
 			t.Parallel()
 			closeCode := code
@@ -1005,7 +1002,6 @@ func TestCompression(t *testing.T) {
 		}
 
 		for _, testCase := range testCases {
-			testCase := testCase
 			t.Run(testCase.compression, func(t *testing.T) {
 				t.Parallel()
 				ts := newTestState(t)

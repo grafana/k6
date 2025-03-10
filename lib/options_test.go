@@ -712,7 +712,6 @@ func TestCIDRUnmarshal(t *testing.T) {
 	}
 
 	for _, data := range testData {
-		data := data
 		t.Run(data.input, func(t *testing.T) {
 			t.Parallel()
 			actualIPNet := &IPNet{}
@@ -774,7 +773,6 @@ func TestHost(t *testing.T) {
 	}
 
 	for _, data := range testData {
-		data := data
 		t.Run(data.input, func(t *testing.T) {
 			t.Parallel()
 			actualHost := &types.Host{}
@@ -814,7 +812,6 @@ func TestValidate(t *testing.T) {
 			},
 		}
 		for _, data := range testData {
-			data := data
 			t.Run(data.input, func(t *testing.T) {
 				t.Parallel()
 				sec, _ := time.ParseDuration(data.input)

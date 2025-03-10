@@ -73,7 +73,6 @@ func TestSyslogFromConfigLine(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.line, func(t *testing.T) {
 			t.Parallel()
 			// no parallel because this is way too fast and parallel will only slow it down
@@ -140,7 +139,6 @@ func TestFilterLabels(t *testing.T) {
 	}
 
 	for i, c := range cases {
-		c := c
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
 			t.Parallel()
 			h := &lokiHook{}

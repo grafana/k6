@@ -193,7 +193,7 @@ func (o *Output) flushMetrics() {
 		defer o.csvLock.Unlock()
 		for _, sc := range samples {
 			for _, sample := range sc.GetSamples() {
-				sample := sample
+
 				row := SampleToRow(&sample, o.resTags, o.ignoredTags, o.row, o.timeFormat)
 				err := o.csvWriter.Write(row)
 				if err != nil {

@@ -1884,8 +1884,6 @@ func TestUIRenderOutput(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
-
 		t.Run(tc.expRender, func(t *testing.T) {
 			t.Parallel()
 
@@ -1919,8 +1917,6 @@ func TestUIRenderWebDashboard(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
-
 		t.Run(tc.expRender, func(t *testing.T) {
 			t.Parallel()
 
@@ -1963,8 +1959,6 @@ func TestRunStaticArchives(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
-
 		t.Run("Using "+tc.archive, func(t *testing.T) {
 			t.Parallel()
 
@@ -1997,8 +1991,6 @@ func TestBadLogOutput(t *testing.T) {
 	}
 
 	for name, tc := range cases {
-		name := name
-		tc := tc
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			ts := NewGlobalTestState(t)
@@ -2141,7 +2133,6 @@ func TestEventSystemError(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			ts := NewGlobalTestState(t)
@@ -2287,7 +2278,6 @@ func TestBrowserPermissions(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			script := fmt.Sprintf(`

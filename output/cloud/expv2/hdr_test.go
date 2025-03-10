@@ -126,7 +126,6 @@ func TestHistogramAddWithSimpleValues(t *testing.T) {
 	}
 
 	for i, tc := range cases {
-		tc := tc
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			t.Parallel()
 			h := newHistogram()
@@ -482,7 +481,6 @@ func TestHistogramAsProto(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 

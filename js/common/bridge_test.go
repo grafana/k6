@@ -68,7 +68,7 @@ func TestFieldNameMapper(t *testing.T) {
 		}},
 	}
 	for _, data := range testdata {
-		data := data
+
 		for field, name := range data.Fields {
 			field, name := field, name
 			t.Run(field, func(t *testing.T) {

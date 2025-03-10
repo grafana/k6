@@ -45,7 +45,6 @@ func TestSlotLimiters(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(fmt.Sprintf("limit=%d,launches=%d", tc.limit, tc.launches), func(t *testing.T) {
 			t.Parallel()
 			l := NewSlotLimiter(tc.limit)

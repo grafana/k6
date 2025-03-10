@@ -512,7 +512,6 @@ func TestExceptionDontPanic(t *testing.T) {
 		},
 	}
 	for name, testcase := range cases {
-		testcase := testcase
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			ts := newTestState(t)
@@ -1113,7 +1112,6 @@ func TestSystemTags(t *testing.T) {
 
 	testedSystemTags := []string{"status", "subproto", "url", "ip"}
 	for _, expectedTagStr := range testedSystemTags {
-		expectedTagStr := expectedTagStr
 		t.Run("only "+expectedTagStr, func(t *testing.T) {
 			t.Parallel()
 			expectedTag, err := metrics.SystemTagString(expectedTagStr)
@@ -1311,7 +1309,6 @@ func TestCompressionParams(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		testCase := testCase
 		t.Run(testCase.compression, func(t *testing.T) {
 			t.Parallel()
 			ts := newTestState(t)
@@ -1493,7 +1490,6 @@ func TestArrayBufferViewSupport(t *testing.T) {
 		// "BigInt64Array", "BigUint64Arrays",
 		/*"Float16Array", */ "Float32Array", "Float64Array",
 	} {
-		name := name
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 

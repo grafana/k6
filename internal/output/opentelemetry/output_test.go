@@ -193,11 +193,9 @@ func TestOutput(t *testing.T) {
 	}
 
 	for _, proto := range testProtocols {
-		proto := proto
 		t.Run(fmt.Sprintf("%s collector", proto), func(t *testing.T) {
 			t.Parallel()
 			for _, tc := range testCases {
-				tc := tc
 				t.Run(tc.name, func(t *testing.T) {
 					t.Parallel()
 
