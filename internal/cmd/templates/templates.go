@@ -5,6 +5,9 @@ import (
 	_ "embed"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
+	"strings"
 	"text/template"
 )
 
@@ -57,6 +60,7 @@ func NewTemplateManager() (*TemplateManager, error) {
 
 // GetTemplate selects the appropriate template based on the type
 func (tm *TemplateManager) GetTemplate(templateType string) (*template.Template, error) {
+	// First check built-in templates
 	switch templateType {
 	case MinimalTemplate:
 		return tm.minimalTemplate, nil
@@ -64,9 +68,45 @@ func (tm *TemplateManager) GetTemplate(templateType string) (*template.Template,
 		return tm.protocolTemplate, nil
 	case BrowserTemplate:
 		return tm.browserTemplate, nil
-	default:
-		return nil, fmt.Errorf("invalid template type: %s", templateType)
 	}
+
+	// Then check if it's a file path
+	if isFilePath(templateType) {
+		content, err := os.ReadFile(templateType)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read template file %s: %w", templateType, err)
+		}
+
+		tmpl, err := template.New(filepath.Base(templateType)).Parse(string(content))
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse template file %s: %w", templateType, err)
+		}
+		return tmpl, nil
+	}
+
+	return nil, fmt.Errorf("invalid template type: %s", templateType)
+}
+
+// isFilePath checks if the given string looks like a file path
+// It handles both POSIX-style paths (./, ../, /) and Windows-style paths (C:\, \\, .\)
+func isFilePath(path string) bool {
+	// Check POSIX-style paths
+	if strings.HasPrefix(path, "./") ||
+		strings.HasPrefix(path, "../") ||
+		strings.HasPrefix(path, "/") {
+		return true
+	}
+
+	// Check Windows-style paths
+	if strings.HasPrefix(path, ".\\") ||
+		strings.HasPrefix(path, "..\\") ||
+		strings.HasPrefix(path, "\\") ||
+		strings.HasPrefix(path, "\\\\") || // UNC paths
+		(len(path) >= 2 && path[1] == ':') { // Drive letter paths like C:
+		return true
+	}
+
+	return false
 }
 
 // TemplateArgs represents arguments passed to templates

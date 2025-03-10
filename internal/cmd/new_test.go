@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -118,4 +119,84 @@ func TestNewScriptCmd_ProjectID(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Contains(t, string(data), "projectID: 1422")
+}
+
+func TestNewScriptCmd_LocalTemplate(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+
+	// Create temp file with random name in OS temp dir
+	tmpFile, err := os.CreateTemp("", "k6-template-*.js")
+	require.NoError(t, err)
+	defer os.Remove(tmpFile.Name())
+
+	templateContent := `export default function() {
+  console.log("Hello, world!");
+}`
+	_, err = tmpFile.Write([]byte(templateContent))
+	require.NoError(t, err)
+	require.NoError(t, tmpFile.Close())
+
+	ts.CmdArgs = []string{"k6", "new", "--template", tmpFile.Name()}
+
+	newRootCommand(ts.GlobalState).execute()
+
+	data, err := fsext.ReadFile(ts.FS, defaultNewScriptName)
+	require.NoError(t, err)
+
+	assert.Equal(t, templateContent, string(data), "generated file matches the template content")
+}
+
+func TestNewScriptCmd_LocalTemplateWithProjectID(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+
+	// Create temp file with random name in OS temp dir
+	tmpFile, err := os.CreateTemp("", "k6-template-*.js")
+	require.NoError(t, err)
+	defer os.Remove(tmpFile.Name())
+
+	templateContent := `export default function() {
+  // Template with {{ .ProjectID }} project ID
+  console.log("Hello from project {{ .ProjectID }}");
+}`
+	_, err = tmpFile.Write([]byte(templateContent))
+	require.NoError(t, err)
+	require.NoError(t, tmpFile.Close())
+
+	ts.CmdArgs = []string{"k6", "new", "--template", tmpFile.Name(), "--project-id", "9876"}
+
+	newRootCommand(ts.GlobalState).execute()
+
+	data, err := fsext.ReadFile(ts.FS, defaultNewScriptName)
+	require.NoError(t, err)
+
+	expectedContent := `export default function() {
+  // Template with 9876 project ID
+  console.log("Hello from project 9876");
+}`
+	assert.Equal(t, expectedContent, string(data), "generated file should have project ID interpolated")
+}
+
+func TestNewScriptCmd_NonExistentTemplate(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+	ts.ExpectedExitCode = -1
+
+	// Create a temporary file path that we ensure doesn't exist
+	tmpFile, err := os.CreateTemp("", "k6-nonexistent-*.js")
+	require.NoError(t, err)
+	nonExistentPath := tmpFile.Name()
+	require.NoError(t, tmpFile.Close())
+	require.NoError(t, os.Remove(nonExistentPath))
+
+	ts.CmdArgs = []string{"k6", "new", "--template", nonExistentPath}
+	ts.ExpectedExitCode = -1
+
+	newRootCommand(ts.GlobalState).execute()
+
+	assert.Contains(t, ts.Stderr.String(), "failed to read template file")
 }
