@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -130,19 +130,14 @@ func TestNewScriptCmd_LocalTemplate(t *testing.T) {
 
 	ts := tests.NewGlobalTestState(t)
 
-	// Create temp file with random name in OS temp dir
-	tmpFile, err := os.CreateTemp("", "k6-template-*.js")
-	require.NoError(t, err)
-	defer os.Remove(tmpFile.Name()) //nolint:errcheck
-
+	// Create template file in test temp directory
+	templatePath := filepath.Join(t.TempDir(), "template.js")
 	templateContent := `export default function() {
   console.log("Hello, world!");
 }`
-	_, err = tmpFile.Write([]byte(templateContent))
-	require.NoError(t, err)
-	require.NoError(t, tmpFile.Close())
+	require.NoError(t, fsext.WriteFile(ts.FS, templatePath, []byte(templateContent), 0o600))
 
-	ts.CmdArgs = []string{"k6", "new", "--template", tmpFile.Name()}
+	ts.CmdArgs = []string{"k6", "new", "--template", templatePath}
 
 	newRootCommand(ts.GlobalState).execute()
 
@@ -157,20 +152,15 @@ func TestNewScriptCmd_LocalTemplateWith_ProjectID(t *testing.T) {
 
 	ts := tests.NewGlobalTestState(t)
 
-	// Create temp file with random name in OS temp dir
-	tmpFile, err := os.CreateTemp("", "k6-template-*.js")
-	require.NoError(t, err)
-	defer os.Remove(tmpFile.Name()) //nolint:errcheck
-
+	// Create template file in test temp directory
+	templatePath := filepath.Join(t.TempDir(), "template.js")
 	templateContent := `export default function() {
   // Template with {{ .ProjectID }} project ID
   console.log("Hello from project {{ .ProjectID }}");
 }`
-	_, err = tmpFile.Write([]byte(templateContent))
-	require.NoError(t, err)
-	require.NoError(t, tmpFile.Close())
+	require.NoError(t, fsext.WriteFile(ts.FS, templatePath, []byte(templateContent), 0o600))
 
-	ts.CmdArgs = []string{"k6", "new", "--template", tmpFile.Name(), "--project-id", "9876"}
+	ts.CmdArgs = []string{"k6", "new", "--template", templatePath, "--project-id", "9876"}
 
 	newRootCommand(ts.GlobalState).execute()
 
@@ -190,12 +180,8 @@ func TestNewScriptCmd_LocalTemplate_NonExistentFile(t *testing.T) {
 	ts := tests.NewGlobalTestState(t)
 	ts.ExpectedExitCode = -1
 
-	// Create a temporary file path that we ensure doesn't exist
-	tmpFile, err := os.CreateTemp("", "k6-nonexistent-*.js")
-	require.NoError(t, err)
-	nonExistentPath := tmpFile.Name()
-	require.NoError(t, tmpFile.Close())
-	require.NoError(t, os.Remove(nonExistentPath))
+	// Use a path that we know doesn't exist in the temp directory
+	nonExistentPath := filepath.Join(t.TempDir(), "nonexistent.js")
 
 	ts.CmdArgs = []string{"k6", "new", "--template", nonExistentPath}
 	ts.ExpectedExitCode = -1
@@ -216,20 +202,15 @@ func TestNewScriptCmd_LocalTemplate_SyntaxError(t *testing.T) {
 	ts := tests.NewGlobalTestState(t)
 	ts.ExpectedExitCode = -1
 
-	// Create a temporary file with invalid Go template content
-	tmpFile, err := os.CreateTemp("", "k6-invalid-template-*.js")
-	require.NoError(t, err)
-	defer os.Remove(tmpFile.Name()) //nolint:errcheck
-
+	// Create template file with invalid content in test temp directory
+	templatePath := filepath.Join(t.TempDir(), "template.js")
 	invalidTemplateContent := `export default function() {
   // Invalid template with {{ .InvalidField }} field
   console.log("This will cause an error");
 }`
-	_, err = tmpFile.Write([]byte(invalidTemplateContent))
-	require.NoError(t, err)
-	require.NoError(t, tmpFile.Close())
+	require.NoError(t, fsext.WriteFile(ts.FS, templatePath, []byte(invalidTemplateContent), 0o600))
 
-	ts.CmdArgs = []string{"k6", "new", "--template", tmpFile.Name(), "--project-id", "9876"}
+	ts.CmdArgs = []string{"k6", "new", "--template", templatePath, "--project-id", "9876"}
 	ts.ExpectedExitCode = -1
 
 	newRootCommand(ts.GlobalState).execute()
