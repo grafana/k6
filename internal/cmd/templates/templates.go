@@ -5,10 +5,11 @@ import (
 	_ "embed"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"strings"
 	"text/template"
+
+	"go.k6.io/k6/lib/fsext"
 )
 
 //go:embed minimal.js
@@ -32,10 +33,11 @@ type TemplateManager struct {
 	minimalTemplate  *template.Template
 	protocolTemplate *template.Template
 	browserTemplate  *template.Template
+	fs               fsext.Fs
 }
 
 // NewTemplateManager initializes a new TemplateManager with parsed templates
-func NewTemplateManager() (*TemplateManager, error) {
+func NewTemplateManager(fs fsext.Fs) (*TemplateManager, error) {
 	minimalTmpl, err := template.New(MinimalTemplate).Parse(minimalTemplateContent)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse minimal template: %w", err)
@@ -55,6 +57,7 @@ func NewTemplateManager() (*TemplateManager, error) {
 		minimalTemplate:  minimalTmpl,
 		protocolTemplate: protocolTmpl,
 		browserTemplate:  browserTmpl,
+		fs:               fs,
 	}, nil
 }
 
@@ -72,7 +75,7 @@ func (tm *TemplateManager) GetTemplate(templateType string) (*template.Template,
 
 	// Then check if it's a file path
 	if isFilePath(templateType) {
-		content, err := os.ReadFile(templateType)
+		content, err := fsext.ReadFile(tm.fs, templateType)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read template file %s: %w", templateType, err)
 		}

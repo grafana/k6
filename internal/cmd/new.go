@@ -45,7 +45,7 @@ func (c *newScriptCmd) run(_ *cobra.Command, args []string) (err error) {
 	}
 
 	// Initialize template manager and validate template before creating any files
-	tm, err := templates.NewTemplateManager()
+	tm, err := templates.NewTemplateManager(c.gs.FS)
 	if err != nil {
 		return fmt.Errorf("error initializing template manager: %w", err)
 	}
