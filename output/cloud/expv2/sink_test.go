@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"go.k6.io/k6/internal/ds/histogram"
 	"go.k6.io/k6/metrics"
 )
 
@@ -16,7 +18,7 @@ func TestNewSink(t *testing.T) {
 		{metrics.Counter, &counter{}},
 		{metrics.Gauge, &gauge{}},
 		{metrics.Rate, &rate{}},
-		{metrics.Trend, newHistogram()},
+		{metrics.Trend, histogram.NewHdr()},
 	}
 	for _, tc := range tests {
 		assert.Equal(t, tc.exp, newMetricValue(tc.mt))
