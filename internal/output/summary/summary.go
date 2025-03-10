@@ -161,7 +161,7 @@ func (o *Output) storeSample(sample metrics.Sample) {
 	// If it's the first time we see this metric, we relay the metric from the sample
 	// and, we store the thresholds for that particular metric, and its sub-metrics.
 	if _, exists := o.dataModel.aggregatedMetrics[sample.Metric.Name]; !exists {
-		o.dataModel.aggregatedMetrics.relayMetricFrom(sample)
+		o.dataModel.aggregatedMetrics[sample.Metric.Name] = relayAggregatedMetricFrom(sample.Metric)
 
 		o.dataModel.storeThresholdsFor(sample.Metric)
 		for _, sub := range sample.Metric.Submetrics {
@@ -185,10 +185,7 @@ func (o *Output) storeSample(sample metrics.Sample) {
 func (o *Output) processObservedMetrics(observedMetrics map[string]*metrics.Metric) {
 	for _, m := range observedMetrics {
 		if _, exists := o.dataModel.aggregatedMetrics[m.Name]; !exists {
-			o.dataModel.aggregatedMetrics[m.Name] = aggregatedMetric{
-				Metric: m,
-				Sink:   m.Sink,
-			}
+			o.dataModel.aggregatedMetrics[m.Name] = relayAggregatedMetricFrom(m)
 			o.dataModel.storeThresholdsFor(m)
 		}
 	}

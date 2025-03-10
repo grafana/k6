@@ -33,15 +33,18 @@ func (d *dataModel) groupDataFor(scenario string) aggregatedGroupData {
 func (d *dataModel) storeThresholdsFor(m *metrics.Metric) {
 	for _, threshold := range m.Thresholds.Thresholds {
 		d.thresholds = append(d.thresholds, struct {
+			aggregatedMetric
 			*metrics.Threshold
-			Metric *metrics.Metric
-		}{Metric: m, Threshold: threshold})
+		}{
+			aggregatedMetric: relayAggregatedMetricFrom(m),
+			Threshold:        threshold,
+		})
 	}
 }
 
 type thresholds []struct {
+	aggregatedMetric
 	*metrics.Threshold
-	Metric *metrics.Metric
 }
 
 type aggregatedGroupData struct {
@@ -66,9 +69,9 @@ func (a aggregatedGroupData) groupDataFor(group string) aggregatedGroupData {
 	return a.groupsData[group]
 }
 
-// addSample differs from relayMetricFrom in that it updates the internally stored metric sink with the sample,
-// which differs from the original metric sink, while relayMetricFrom stores the metric and the metric sink from
-// the sample.
+// addSample differs from relayAggregatedMetricFrom in that it updates the internally stored metric sink with the
+// sample, which differs from the original metric sink, while relayAggregatedMetricFrom stores the metric and the
+// metric sink from the sample's metric.
 func (a aggregatedGroupData) addSample(sample metrics.Sample) {
 	a.aggregatedMetrics.addSample(sample)
 
@@ -88,13 +91,21 @@ func (a aggregatedGroupData) addSample(sample metrics.Sample) {
 // metric values. The latter is useful for tracking aggregated metric values specific to a group or scenario.
 type aggregatedMetricData map[string]aggregatedMetric
 
-// relayMetricFrom stores the metric and the metric sink from the sample. It makes the underlying metric of our
-// summary's aggregatedMetricData point directly to a metric in the k6 registry, and relies on that specific pointed
-// at metrics internal state for its computations.
-func (a aggregatedMetricData) relayMetricFrom(sample metrics.Sample) {
-	a[sample.Metric.Name] = aggregatedMetric{
-		Metric: sample.Metric,
-		Sink:   sample.Metric.Sink,
+// relayAggregatedMetricFrom instantiates a new aggregatedMetric by relaying the metric's Sink, so the same Sink
+// instance is shared between the original metric and the aggregatedMetric, to avoid duplicating memory allocations.
+func relayAggregatedMetricFrom(m *metrics.Metric) aggregatedMetric {
+	return aggregatedMetric{
+		SummaryMetricInfo: summaryMetricInfoFrom(m),
+		Sink:              m.Sink,
+	}
+}
+
+// summaryMetricInfoFrom creates a new lib.SummaryMetricInfo from a k6 metric.
+func summaryMetricInfoFrom(m *metrics.Metric) lib.SummaryMetricInfo {
+	return lib.SummaryMetricInfo{
+		Name:     m.Name,
+		Type:     m.Type.String(),
+		Contains: m.Contains.String(),
 	}
 }
 
@@ -108,24 +119,15 @@ func (a aggregatedMetricData) addSample(sample metrics.Sample) {
 	a[sample.Metric.Name].Sink.Add(sample)
 }
 
-// FIXME (@joan): rename this to make it explicit this is different from an actual k6 metric, and this is used
-// only to keep an aggregated view of specific metric-check-group-scenario-thresholds set of values.
 type aggregatedMetric struct {
-	// FIXME (@joan): Drop this and replace it with a concrete copy of the metric data we want to track
-	// to avoid any potential confusion.
-	Metric *metrics.Metric
-
-	// FIXME (@joan): Introduce our own way of tracking thresholds, and whether they're crossed or not.
-	// Without relying on the internal submetrics the engine maintains specifically for thresholds.
-	// Thresholds []OurThreshold // { crossed: boolean }
-
+	lib.SummaryMetricInfo
 	Sink metrics.Sink
 }
 
-func newAggregatedMetric(metric *metrics.Metric) aggregatedMetric {
+func newAggregatedMetric(m *metrics.Metric) aggregatedMetric {
 	return aggregatedMetric{
-		Metric: metric,
-		Sink:   metrics.NewSink(metric.Type),
+		SummaryMetricInfo: summaryMetricInfoFrom(m),
+		Sink:              metrics.NewSink(m.Type),
 	}
 }
 
@@ -173,7 +175,8 @@ func populateSummaryGroup(
 		testDuration time.Duration,
 		summaryTrendStats []string,
 	) {
-		summaryMetric := lib.NewSummaryMetricFrom(info, sink, testDuration, summaryTrendStats)
+		getMetricValues := metricValueGetter(summaryTrendStats)
+		summaryMetric := lib.NewSummaryMetricFrom(info, getMetricValues(sink, testDuration))
 
 		switch {
 		case isSkippedMetric(summaryMode, info.Name):
@@ -200,11 +203,7 @@ func populateSummaryGroup(
 	for _, metricData := range groupData.aggregatedMetrics {
 		storeMetric(
 			summaryGroup.Metrics,
-			lib.SummaryMetricInfo{
-				Name:     metricData.Metric.Name,
-				Type:     metricData.Metric.Type.String(),
-				Contains: metricData.Metric.Contains.String(),
-			},
+			metricData.SummaryMetricInfo,
 			metricData.Sink,
 			testRunDuration,
 			summaryTrendStats,
@@ -224,22 +223,18 @@ func summaryThresholds(
 	testRunDuration time.Duration,
 	summaryTrendStats []string,
 ) lib.SummaryThresholds {
+	getMetricValues := metricValueGetter(summaryTrendStats)
+
 	rts := make(map[string]lib.MetricThresholds, len(thresholds))
 	for _, threshold := range thresholds {
-		metric := threshold.Metric
+		metric := threshold.aggregatedMetric
 
 		mt, exists := rts[metric.Name]
 		if !exists {
 			mt = lib.MetricThresholds{
 				Metric: lib.NewSummaryMetricFrom(
-					lib.SummaryMetricInfo{
-						Name:     metric.Name,
-						Type:     metric.Type.String(),
-						Contains: metric.Contains.String(),
-					},
-					metric.Sink,
-					testRunDuration,
-					summaryTrendStats,
+					metric.SummaryMetricInfo,
+					getMetricValues(metric.Sink, testRunDuration),
 				),
 			}
 		}
@@ -253,14 +248,14 @@ func summaryThresholds(
 	return rts
 }
 
-// FIXME: This function is a bit flurry, we should consider refactoring it.
-// For instance, it would be possible to directly construct these metrics on-the-fly.
 func populateSummaryChecks(
 	summaryGroup *lib.SummaryGroup,
 	groupData aggregatedGroupData,
 	testRunDuration time.Duration,
 	summaryTrendStats []string,
 ) {
+	getMetricValues := metricValueGetter(summaryTrendStats)
+
 	checksMetric, exists := groupData.aggregatedMetrics[metrics.ChecksName]
 	if !exists {
 		return
@@ -277,12 +272,10 @@ func populateSummaryChecks(
 	summaryGroup.Checks.Metrics.Success = lib.NewSummaryMetricFrom(
 		lib.SummaryMetricInfo{
 			Name:     "checks_succeeded",
-			Type:     checksMetric.Metric.Type.String(),
-			Contains: checksMetric.Metric.Contains.String(),
+			Type:     checksMetric.Type,
+			Contains: checksMetric.Contains,
 		},
-		checksMetric.Sink,
-		testRunDuration,
-		summaryTrendStats,
+		getMetricValues(checksMetric.Sink, testRunDuration),
 	)
 
 	summaryGroup.Checks.Metrics.Fail.Values["passes"] = totalChecks - successChecks
@@ -364,4 +357,34 @@ func calculateRate(count float64, duration time.Duration) float64 {
 		return 0
 	}
 	return count / (float64(duration) / float64(time.Second))
+}
+
+func metricValueGetter(summaryTrendStats []string) func(metrics.Sink, time.Duration) map[string]float64 {
+	trendResolvers, err := metrics.GetResolversForTrendColumns(summaryTrendStats)
+	if err != nil {
+		panic(err.Error()) // this should have been validated already
+	}
+
+	return func(sink metrics.Sink, t time.Duration) (result map[string]float64) {
+		switch sink := sink.(type) {
+		case *metrics.CounterSink:
+			result = sink.Format(t)
+			result["rate"] = sink.Rate(t)
+		case *metrics.GaugeSink:
+			result = sink.Format(t)
+			result["min"] = sink.Min
+			result["max"] = sink.Max
+		case *metrics.RateSink:
+			result = sink.Format(t)
+			result["passes"] = float64(sink.Trues)
+			result["fails"] = float64(sink.Total - sink.Trues)
+		case *metrics.TrendSink:
+			result = make(map[string]float64, len(summaryTrendStats))
+			for _, col := range summaryTrendStats {
+				result[col] = trendResolvers[col](sink)
+			}
+		}
+
+		return result
+	}
 }

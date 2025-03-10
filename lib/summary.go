@@ -130,15 +130,10 @@ type SummaryMetric struct {
 }
 
 // NewSummaryMetricFrom instantiates a new SummaryMetric for a given metrics.Sink and the metric's info.
-func NewSummaryMetricFrom(
-	info SummaryMetricInfo, sink metrics.Sink,
-	testDuration time.Duration, summaryTrendStats []string,
-) SummaryMetric {
-	getMetricValues := metricValueGetter(summaryTrendStats)
-
+func NewSummaryMetricFrom(info SummaryMetricInfo, values map[string]float64) SummaryMetric {
 	return SummaryMetric{
 		SummaryMetricInfo: info,
-		Values:            getMetricValues(sink, testDuration),
+		Values:            values,
 	}
 }
 
@@ -248,36 +243,6 @@ func NewSummaryGroup() SummaryGroup {
 	return SummaryGroup{
 		Metrics: NewSummaryMetrics(),
 		Groups:  make(map[string]SummaryGroup),
-	}
-}
-
-func metricValueGetter(summaryTrendStats []string) func(metrics.Sink, time.Duration) map[string]float64 {
-	trendResolvers, err := metrics.GetResolversForTrendColumns(summaryTrendStats)
-	if err != nil {
-		panic(err.Error()) // this should have been validated already
-	}
-
-	return func(sink metrics.Sink, t time.Duration) (result map[string]float64) {
-		switch sink := sink.(type) {
-		case *metrics.CounterSink:
-			result = sink.Format(t)
-			result["rate"] = sink.Rate(t)
-		case *metrics.GaugeSink:
-			result = sink.Format(t)
-			result["min"] = sink.Min
-			result["max"] = sink.Max
-		case *metrics.RateSink:
-			result = sink.Format(t)
-			result["passes"] = float64(sink.Trues)
-			result["fails"] = float64(sink.Total - sink.Trues)
-		case *metrics.TrendSink:
-			result = make(map[string]float64, len(summaryTrendStats))
-			for _, col := range summaryTrendStats {
-				result[col] = trendResolvers[col](sink)
-			}
-		}
-
-		return result
 	}
 }
 
