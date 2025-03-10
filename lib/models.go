@@ -24,8 +24,13 @@ const GroupSeparator = "::"
 // Changing this will be a breaking change and in this way it will be more obvious.
 const RootGroupPath = ""
 
-// ErrNameContainsGroupSeparator is emitted if you attempt to instantiate a Group or Check that contains the separator.
-var ErrNameContainsGroupSeparator = errors.New("group and check names may not contain '" + GroupSeparator + "'")
+var (
+	// ErrNameContainsGroupSeparator is emitted if you attempt to instantiate a Group or Check that contains the separator.
+	ErrNameContainsGroupSeparator = errors.New("group and check names may not contain '" + GroupSeparator + "'")
+
+	// ErrCheckGroupIsNil is emitted if you attempt to instantiate a Check (see NewCheck) with a nil Group.
+	ErrCheckGroupIsNil = errors.New("check's group must not be nil")
+)
 
 // StageFields defines the fields used for a Stage; this is a dumb hack to make the JSON code
 // cleaner. pls fix.
@@ -207,8 +212,12 @@ type Check struct {
 	Fails  int64 `json:"fails"`
 }
 
-// NewCheck creates a new check with the given name and parent group. The group may not be nil.
+// NewCheck creates a new check with the given name and parent group. The group must not be nil.
 func NewCheck(name string, group *Group) (*Check, error) {
+	if group == nil {
+		return nil, ErrCheckGroupIsNil
+	}
+
 	if strings.Contains(name, GroupSeparator) {
 		return nil, ErrNameContainsGroupSeparator
 	}
