@@ -123,7 +123,7 @@ func (r *WebSocketsAPI) fillData(b *blob, blobParts []interface{}, call sobek.Co
 				obj := call.Arguments[0].ToObject(rt).Get(strconv.FormatInt(int64(n), 10)).ToObject(rt)
 				switch {
 				case isDataView(obj, rt):
-					_, err = b.data.Write(obj.Get("buffer").Export().(sobek.ArrayBuffer).Bytes())
+					_, err = b.data.Write(obj.Get("buffer").Export().(sobek.ArrayBuffer).Bytes()) //nolint:forcetypeassert
 				case isBlob(obj, r.blobConstructor):
 					_, err = b.data.Write(extractBytes(obj, rt))
 				default:

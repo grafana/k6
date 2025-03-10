@@ -290,7 +290,7 @@ func TestBrowserRegistry(t *testing.T) {
 
 		vu := k6test.NewVU(t)
 		var cancel context.CancelFunc
-		vu.CtxField, cancel = context.WithCancel(vu.CtxField) //nolint:fatcontext
+		vu.CtxField, cancel = context.WithCancel(vu.CtxField)
 		browserRegistry := newBrowserRegistry(context.Background(), vu, remoteRegistry, &pidRegistry{}, nil)
 
 		vu.ActivateVU()

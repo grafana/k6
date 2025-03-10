@@ -59,7 +59,6 @@ func getRuntimeOptions(
 	if err != nil {
 		return opts, err
 	}
-
 	for _, kv := range envVars {
 		k, v := state.ParseEnvKeyValue(kv)
 		// Allow only alphanumeric ASCII variable names for now
@@ -98,8 +97,9 @@ func populateRuntimeOptionsFromEnv(opts lib.RuntimeOptions, environment map[stri
 		opts.CompatibilityMode = null.StringFrom(envVar)
 	}
 
-	if envVar, ok := environment["K6_WITH_SUMMARY"]; !opts.SummaryMode.Valid && ok {
-		opts.SummaryMode = null.StringFrom(envVar)
+	if _, err := lib.ValidateCompatibilityMode(opts.CompatibilityMode.String); err != nil {
+		// some early validation
+		return opts, err
 	}
 
 	if err := saveBoolFromEnv(environment, "K6_INCLUDE_SYSTEM_ENV_VARS", &opts.IncludeSystemEnvVars); err != nil {
@@ -114,9 +114,8 @@ func populateRuntimeOptionsFromEnv(opts lib.RuntimeOptions, environment map[stri
 		return opts, err
 	}
 
-	if _, err := lib.ValidateCompatibilityMode(opts.CompatibilityMode.String); err != nil {
-		// some early validation
-		return opts, err
+	if envVar, ok := environment["K6_SUMMARY_MODE"]; !opts.SummaryMode.Valid && ok {
+		opts.SummaryMode = null.StringFrom(envVar)
 	}
 
 	if _, err := lib.ValidateSummaryMode(opts.SummaryMode.String); err != nil {
