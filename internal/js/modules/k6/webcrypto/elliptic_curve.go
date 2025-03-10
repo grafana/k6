@@ -14,10 +14,9 @@ import (
 )
 
 const (
-	p256Canonical   = "P-256"
-	p384Canonical   = "P-384"
-	p521Canonical   = "P-521"
-	x25519Canonical = "X25519"
+	p256Canonical = "P-256"
+	p384Canonical = "P-384"
+	p521Canonical = "P-521"
 )
 
 // EcKeyAlgorithm is the algorithm for elliptic curve keys as defined in the [specification].
@@ -163,9 +162,6 @@ const (
 
 	// EllipticCurveKindP521 represents the P-521 curve.
 	EllipticCurveKindP521 EllipticCurveKind = "P-521"
-
-	// EllipticCurveKindX25519 represents the X25519 curve.
-	EllipticCurveKindX25519 EllipticCurveKind = "X25519"
 )
 
 func (k EllipticCurveKind) String() string {
@@ -181,8 +177,6 @@ func IsEllipticCurve(name string) bool {
 	case string(EllipticCurveKindP384):
 		return true
 	case string(EllipticCurveKindP521):
-		return true
-	case string(EllipticCurveKindX25519):
 		return true
 	default:
 		return false
@@ -280,7 +274,7 @@ func (ecgp *ECKeyGenParams) GenerateKey(
 	var privateKeyUsages, publicKeyUsages []CryptoKeyUsage
 
 	switch ecgp.Algorithm.Name {
-	case ECDH, X25519:
+	case ECDH:
 		keyPairGenerator = generateECDHKeyPair
 		privateKeyUsages = []CryptoKeyUsage{DeriveKeyCryptoKeyUsage, DeriveBitsCryptoKeyUsage}
 		publicKeyUsages = []CryptoKeyUsage{}
@@ -389,7 +383,7 @@ func generateECDSAKeyPair(curve EllipticCurveKind, keyUsages []CryptoKeyUsage) (
 
 // isValidEllipticCurve returns true if the given elliptic curve is supported,
 func isValidEllipticCurve(curve EllipticCurveKind) bool {
-	return curve == EllipticCurveKindP256 || curve == EllipticCurveKindP384 || curve == EllipticCurveKindP521 || curve == EllipticCurveKindX25519
+	return curve == EllipticCurveKindP256 || curve == EllipticCurveKindP384 || curve == EllipticCurveKindP521
 }
 
 func pickECDHCurve(k string) (ecdh.Curve, error) {
@@ -400,8 +394,6 @@ func pickECDHCurve(k string) (ecdh.Curve, error) {
 		return ecdh.P384(), nil
 	case p521Canonical:
 		return ecdh.P521(), nil
-	case x25519Canonical:
-		return ecdh.X25519(), nil
 	default:
 		return nil, errors.New("invalid ECDH curve")
 	}

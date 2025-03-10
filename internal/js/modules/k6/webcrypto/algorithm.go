@@ -229,5 +229,5 @@ type hasAlg interface {
 }
 
 func isEllipticCurve(algorithmName string) bool {
-	return algorithmName == ECDH || algorithmName == ECDSA || algorithmName == X25519
+	return algorithmName == ECDH || algorithmName == ECDSA
 }
