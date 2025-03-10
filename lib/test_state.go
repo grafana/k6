@@ -10,6 +10,7 @@ import (
 	"go.k6.io/k6/internal/lib/trace"
 	"go.k6.io/k6/internal/usage"
 	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/secretsource"
 )
 
 // TestPreInitState contains all of the state that can be gathered and built
@@ -24,6 +25,7 @@ type TestPreInitState struct {
 	Logger         logrus.FieldLogger
 	TracerProvider *trace.TracerProvider
 	Usage          *usage.Usage
+	SecretsManager *secretsource.Manager
 }
 
 // TestRunState contains the pre-init state as well as all of the state and
