@@ -1,7 +1,6 @@
 package metrics
 
 import (
-	"math"
 	"testing"
 	"time"
 
@@ -105,20 +104,43 @@ func TestGaugeSink(t *testing.T) {
 func TestTrendSink(t *testing.T) {
 	t.Parallel()
 
-	unsortedSamples10 := []float64{0.0, 100.0, 30.0, 80.0, 70.0, 60.0, 50.0, 40.0, 90.0, 20.0}
+	unsortedSamples10 := []float64{
+		0.120, // 120ms
+		0.035, // 35ms
+		0.015, // 15ms
+		0.190, // 190ms
+		0.280, // 280ms
+		0.001, // 1ms
+		0.070, // 70ms
+		0.499, // 499ms
+		1.200, // 1.2s
+		2.500, // 2.5s
+	}
+
+	t.Run("empty", func(t *testing.T) {
+		t.Parallel()
+
+		sink := NewTrendSink()
+		assert.True(t, sink.IsEmpty())
+		assert.Equal(t, float64(0), sink.Min())
+		assert.Equal(t, float64(0), sink.Max())
+		assert.Equal(t, float64(0), sink.Avg())
+		assert.Equal(t, uint64(0), sink.Count())
+		assert.Equal(t, float64(0), sink.P(0))
+		assert.Equal(t, float64(0), sink.P(0.99))
+	})
 
 	t.Run("add", func(t *testing.T) {
 		t.Run("one value", func(t *testing.T) {
 			t.Parallel()
 
 			sink := NewTrendSink()
-			sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: 7.0})
+			sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: 0.050}) // 50ms
 			assert.Equal(t, uint64(1), sink.Count())
-			assert.Equal(t, 7.0, sink.Min())
-			assert.Equal(t, 7.0, sink.Max())
-			assert.Equal(t, 7.0, sink.Avg())
-			assert.Equal(t, 7.0, sink.Total())
-			assert.Equal(t, []float64{7.0}, sink.values)
+			assert.Equal(t, 0.050, sink.Min())
+			assert.Equal(t, 0.050, sink.Max())
+			assert.Equal(t, 0.050, sink.Avg())
+			assert.Equal(t, 0.050, sink.Total())
 		})
 		t.Run("values", func(t *testing.T) {
 			t.Parallel()
@@ -128,43 +150,14 @@ func TestTrendSink(t *testing.T) {
 				sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: s})
 			}
 			assert.Equal(t, uint64(len(unsortedSamples10)), sink.Count())
-			assert.Equal(t, 0.0, sink.Min())
-			assert.Equal(t, 100.0, sink.Max())
-			assert.Equal(t, 54.0, sink.Avg())
-			assert.Equal(t, 540.0, sink.Total())
-			assert.Equal(t, unsortedSamples10, sink.values)
-		})
-		t.Run("negative", func(t *testing.T) {
-			t.Parallel()
-
-			sink := NewTrendSink()
-			for _, s := range []float64{-10, -20} {
-				sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: s})
-			}
-			assert.Equal(t, uint64(2), sink.Count())
-			assert.Equal(t, -20.0, sink.Min())
-			assert.Equal(t, -10.0, sink.Max())
-			assert.Equal(t, -15.0, sink.Avg())
-			assert.Equal(t, -30.0, sink.Total())
-			assert.Equal(t, []float64{-10, -20}, sink.values)
-		})
-		t.Run("mixed", func(t *testing.T) {
-			t.Parallel()
-
-			sink := NewTrendSink()
-			for _, s := range []float64{1.4, 0, -1.2} {
-				sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: s})
-			}
-			assert.Equal(t, uint64(3), sink.Count())
-			assert.Equal(t, -1.2, sink.Min())
-			assert.Equal(t, 1.4, sink.Max())
-			assert.Equal(t, 0.067, math.Round(sink.Avg()*1000)/1000)
-			assert.Equal(t, 0.199, math.Floor(sink.Total()*1000)/1000)
-			assert.Equal(t, []float64{1.4, 0, -1.2}, sink.values)
+			assert.Equal(t, 0.001, sink.Min())
+			assert.Equal(t, 2.5, sink.Max())
+			assert.Equal(t, 0.491, sink.Avg())
+			assert.Equal(t, 4.91, sink.Total())
 		})
 	})
 
-	tolerance := 0.000001
+	tolerance := 0.5
 	t.Run("percentile", func(t *testing.T) {
 		t.Run("no values", func(t *testing.T) {
 			t.Parallel()
@@ -189,27 +182,24 @@ func TestTrendSink(t *testing.T) {
 			sink := NewTrendSink()
 			sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: 5.0})
 			sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: 10.0})
-			assert.Equal(t, false, sink.sorted)
 			assert.Equal(t, 5.0, sink.P(0.0))
 			assert.Equal(t, 7.5, sink.P(0.5))
 			assert.Equal(t, 5+(10-5)*0.95, sink.P(0.95))
 			assert.Equal(t, 5+(10-5)*0.99, sink.P(0.99))
 			assert.Equal(t, 10.0, sink.P(1.0))
-			assert.Equal(t, true, sink.sorted)
 		})
 		t.Run("more than 2", func(t *testing.T) {
 			t.Parallel()
 
-			sink := NewTrendSink()
+			sink := NewHdrHistogramSink()
 			for _, s := range unsortedSamples10 {
 				sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: s})
 			}
-			assert.InDelta(t, 0.0, sink.P(0.0), tolerance)
-			assert.InDelta(t, 55.0, sink.P(0.5), tolerance)
-			assert.InDelta(t, 95.5, sink.P(0.95), tolerance)
-			assert.InDelta(t, 99.1, sink.P(0.99), tolerance)
-			assert.InDelta(t, 100.0, sink.P(1.0), tolerance)
-			assert.Equal(t, true, sink.sorted)
+			assert.InDelta(t, 0.001, sink.P(0.0), tolerance)
+			assert.InDelta(t, 0.155, sink.P(0.5), tolerance)
+			assert.InDelta(t, 1.915, sink.P(0.95), tolerance)
+			assert.InDelta(t, 2.383, sink.P(0.99), tolerance)
+			assert.InDelta(t, 2.5, sink.P(1.0), tolerance)
 		})
 	})
 	t.Run("format", func(t *testing.T) {

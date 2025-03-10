@@ -3,6 +3,7 @@ package histogram
 import (
 	"math"
 	"math/bits"
+	"sort"
 )
 
 const (
@@ -100,6 +101,83 @@ func (h *Hdr) addToBucket(v float64) {
 	}
 
 	h.Buckets[resolveBucketIndex(v)]++
+}
+
+// Quantile adds a value to the Hdr histogram.
+func (h *Hdr) Quantile(q float64) float64 {
+	if h.Count == 0 {
+		return 0
+	}
+
+	if h.Count == 1 {
+		// With only one value, it must be Min and Max
+		return h.Min
+	}
+
+	// Calculate the target count at the requested quantile
+	targetCount := uint32(float64(h.Count) * q)
+
+	// Handle edge cases
+	if targetCount >= h.Count {
+		return h.Max
+	}
+	if targetCount == 0 {
+		return h.Min
+	}
+
+	// Get all bucket indices and sort them
+	indices := make([]uint32, 0, len(h.Buckets))
+	for idx := range h.Buckets {
+		indices = append(indices, idx)
+	}
+	sort.Slice(indices, func(i, j int) bool {
+		return indices[i] < indices[j]
+	})
+
+	// Count values until we reach the target count
+	var runningCount uint32
+	for i, idx := range indices {
+		runningCount += h.Buckets[idx]
+
+		if runningCount > targetCount {
+			// We've found the bucket containing our quantile
+
+			// For simplicity, we'll use the bucket value as our estimate
+			bucketValue := float64(idx) * h.MinimumResolution
+
+			// If this is the last bucket, return the value
+			if i == len(indices)-1 {
+				return bucketValue
+			}
+
+			// Otherwise, interpolate between this bucket and the next
+			nextBucketValue := float64(indices[i+1]) * h.MinimumResolution
+
+			// Calculate how far into this bucket our target is
+			prevCount := runningCount - h.Buckets[idx]
+			bucketPos := float64(targetCount-prevCount) / float64(h.Buckets[idx])
+
+			// Interpolate between this bucket and the next
+			return bucketValue + bucketPos*(nextBucketValue-bucketValue)
+		}
+
+		if runningCount == targetCount {
+			// We're exactly at the boundary between buckets
+			bucketValue := float64(idx) * h.MinimumResolution
+
+			// If this is the last bucket, return the value
+			if i == len(indices)-1 {
+				return bucketValue
+			}
+
+			// Otherwise, use the midpoint between this bucket and the next
+			nextBucketValue := float64(indices[i+1]) * h.MinimumResolution
+			return (bucketValue + nextBucketValue) / 2
+		}
+	}
+
+	// If we get here, something went wrong - return the max as a fallback
+	return h.Max
 }
 
 // resolveBucketIndex returns the index
