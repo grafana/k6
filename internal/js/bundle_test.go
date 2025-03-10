@@ -230,11 +230,24 @@ func TestNewBundle(t *testing.T) {
 			invalidOptions := map[string]struct {
 				Expr, Error string
 			}{
-				"Array":    {`[]`, "json: cannot unmarshal array into Go value of type lib.Options"},
-				"Function": {`function(){}`, "error parsing script options: json: unsupported type: func(sobek.FunctionCall) sobek.Value"},
+				"Array": {
+					`[]`,
+					`parsing options from script got error while parsing "[": ` +
+						`json: cannot unmarshal array into Go value of type lib.Options`,
+				},
+				"Bad value": {
+					`{"tags":["something"]}`,
+					`parsing options from script got error while parsing "{\"tags\":[\"something\"]": ` +
+						`json: cannot unmarshal array into Go struct field Options.tags of type map[string]string`,
+				},
+				"Function": {
+					`function(){}`,
+					"error parsing script options: json: unsupported type: func(sobek.FunctionCall) sobek.Value",
+				},
 			}
 			for name, data := range invalidOptions {
 				t.Run(name, func(t *testing.T) {
+					t.Parallel()
 					_, err := getSimpleBundle(t, "/script.js", fmt.Sprintf(`
 						export let options = %s;
 						export default function() {};
