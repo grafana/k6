@@ -9,6 +9,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/cmd/state"
+	"go.k6.io/k6/internal/lib/summary"
 	"go.k6.io/k6/lib"
 )
 
@@ -31,7 +32,7 @@ extended: base + sets "global" as alias for "globalThis"
 	flags.StringArrayP("env", "e", nil, "add/override environment variable with `VAR=value`")
 	flags.Bool("no-thresholds", false, "don't run thresholds")
 	flags.Bool("no-summary", false, "don't show the summary at the end of the test")
-	flags.String("summary-mode", lib.SummaryModeCompact.String(), "determine the summary mode,"+
+	flags.String("summary-mode", summary.ModeCompact.String(), "determine the summary mode,"+
 		" \"compact\", \"full\" or \"legacy\"")
 	flags.String(
 		"summary-export",
@@ -118,7 +119,7 @@ func populateRuntimeOptionsFromEnv(opts lib.RuntimeOptions, environment map[stri
 		opts.SummaryMode = null.StringFrom(envVar)
 	}
 
-	if _, err := lib.ValidateSummaryMode(opts.SummaryMode.String); err != nil {
+	if _, err := summary.ValidateMode(opts.SummaryMode.String); err != nil {
 		// some early validation
 		return opts, err
 	}

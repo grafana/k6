@@ -23,9 +23,10 @@ import (
 	"go.k6.io/k6/internal/event"
 	"go.k6.io/k6/internal/execution"
 	"go.k6.io/k6/internal/execution/local"
+	"go.k6.io/k6/internal/lib/summary"
 	"go.k6.io/k6/internal/lib/trace"
 	"go.k6.io/k6/internal/metrics/engine"
-	"go.k6.io/k6/internal/output/summary"
+	summaryoutput "go.k6.io/k6/internal/output/summary"
 	"go.k6.io/k6/internal/ui/pb"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
@@ -191,7 +192,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 
 	executionState := execScheduler.GetState()
 	if !testRunState.RuntimeOptions.NoSummary.Bool { //nolint:nestif
-		sm, err := lib.ValidateSummaryMode(testRunState.RuntimeOptions.SummaryMode.String)
+		sm, err := summary.ValidateMode(testRunState.RuntimeOptions.SummaryMode.String)
 		if err != nil {
 			logger.WithError(err).Warnf(
 				"invalid summary mode %q, falling back to \"compact\" (default)",
@@ -201,7 +202,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 
 		switch sm {
 		// TODO: Remove this code block once we stop supporting the legacy summary, and just leave the default.
-		case lib.SummaryModeLegacy:
+		case summary.ModeLegacy:
 			// At the end of the test run
 			defer func() {
 				logger.Debug("Generating the end-of-test summary...")
@@ -227,7 +228,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 			}()
 		default:
 			// Instantiates the summary output
-			summaryOutput, err := summary.New(output.Params{
+			summaryOutput, err := summaryoutput.New(output.Params{
 				RuntimeOptions: testRunState.RuntimeOptions,
 				Logger:         c.gs.Logger,
 			})
@@ -249,10 +250,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 				// TODO: We should probably try to move these out of the summary,
 				// likely as an additional argument like options.
 				summary.NoColor = c.gs.Flags.NoColor
-				summary.UIState = lib.UIState{
-					IsStdOutTTY: c.gs.Stdout.IsTTY,
-					IsStdErrTTY: c.gs.Stderr.IsTTY,
-				}
+				summary.EnableColors = !summary.NoColor && c.gs.Stdout.IsTTY
 
 				summaryResult, hsErr := test.initRunner.HandleSummary(globalCtx, nil, summary)
 				if hsErr == nil {

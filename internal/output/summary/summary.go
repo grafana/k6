@@ -5,6 +5,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"go.k6.io/k6/internal/lib/summary"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
@@ -24,12 +25,12 @@ type Output struct {
 	logger          logrus.FieldLogger
 
 	dataModel   dataModel
-	summaryMode lib.SummaryMode
+	summaryMode summary.Mode
 }
 
 // New returns a new summary output.
 func New(params output.Params) (*Output, error) {
-	sm, err := lib.ValidateSummaryMode(params.RuntimeOptions.SummaryMode.String)
+	sm, err := summary.ValidateMode(params.RuntimeOptions.SummaryMode.String)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +84,7 @@ func (o *Output) flushSample(sample metrics.Sample) {
 	// First, the sample data is stored into the metrics stored at the k6 metrics registry level.
 	o.storeSample(sample)
 
-	skipGroupSamples := o.summaryMode == lib.SummaryModeCompact || o.summaryMode == lib.SummaryModeLegacy
+	skipGroupSamples := o.summaryMode == summary.ModeCompact || o.summaryMode == summary.ModeLegacy
 	if skipGroupSamples {
 		return
 	}
@@ -116,9 +117,9 @@ func (o *Output) Summary(
 	testRunDuration time.Duration,
 	observedMetrics map[string]*metrics.Metric,
 	options lib.Options,
-) *lib.Summary {
-	summary := lib.NewSummary()
-	summary.TestRunDuration = testRunDuration
+) *summary.Summary {
+	s := summary.New()
+	s.TestRunDuration = testRunDuration
 
 	summaryTrendStats := options.SummaryTrendStats
 
@@ -127,12 +128,12 @@ func (o *Output) Summary(
 	o.processObservedMetrics(observedMetrics)
 
 	// Populate the thresholds.
-	summary.SummaryThresholds = summaryThresholds(o.dataModel.thresholds, testRunDuration, summaryTrendStats)
+	s.Thresholds = summaryThresholds(o.dataModel.thresholds, testRunDuration, summaryTrendStats)
 
 	// Populate root group and nested groups recursively.
 	populateSummaryGroup(
 		o.summaryMode,
-		&summary.SummaryGroup,
+		&s.Group,
 		o.dataModel.aggregatedGroupData,
 		testRunDuration,
 		summaryTrendStats,
@@ -140,7 +141,7 @@ func (o *Output) Summary(
 
 	// Populate scenario groups and nested groups recursively.
 	for scenarioName, scenarioData := range o.dataModel.scenarios {
-		scenarioSummaryGroup := lib.NewSummaryGroup()
+		scenarioSummaryGroup := summary.NewGroup()
 		populateSummaryGroup(
 			o.summaryMode,
 			&scenarioSummaryGroup,
@@ -148,10 +149,10 @@ func (o *Output) Summary(
 			testRunDuration,
 			summaryTrendStats,
 		)
-		summary.Scenarios[scenarioName] = scenarioSummaryGroup
+		s.Scenarios[scenarioName] = scenarioSummaryGroup
 	}
 
-	return summary
+	return s
 }
 
 // storeSample relays the sample to the k6 metrics registry relevant metric.

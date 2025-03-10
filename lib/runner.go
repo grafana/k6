@@ -2,6 +2,7 @@ package lib
 
 import (
 	"context"
+	"go.k6.io/k6/internal/lib/summary"
 	"io"
 
 	"go.k6.io/k6/metrics"
@@ -80,7 +81,7 @@ type Runner interface {
 	// function in the script.
 	IsExecutable(string) bool
 
-	HandleSummary(context.Context, *LegacySummary, *Summary) (map[string]io.Reader, error)
+	HandleSummary(context.Context, *LegacySummary, *summary.Summary) (map[string]io.Reader, error)
 }
 
 // UIState describes the state of the UI, which might influence what

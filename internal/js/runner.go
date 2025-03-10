@@ -25,6 +25,7 @@ import (
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/internal/event"
 	"go.k6.io/k6/internal/js/eventloop"
+	"go.k6.io/k6/internal/lib/summary"
 	"go.k6.io/k6/internal/loader"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
@@ -352,7 +353,7 @@ func (r *Runner) IsExecutable(name string) bool {
 func (r *Runner) HandleSummary(
 	ctx context.Context,
 	legacy *lib.LegacySummary,
-	summary *lib.Summary,
+	summary *summary.Summary,
 ) (map[string]io.Reader, error) {
 	out := make(chan metrics.SampleContainer, 100)
 	defer close(out)
@@ -410,7 +411,7 @@ func (r *Runner) HandleSummary(
 func prepareHandleSummaryCall(
 	r *Runner,
 	legacy *lib.LegacySummary,
-	summary *lib.Summary,
+	summary *summary.Summary,
 ) (bool, bool, interface{}, string) {
 	var (
 		noColor          bool
@@ -429,7 +430,7 @@ func prepareHandleSummaryCall(
 
 	if summary != nil {
 		noColor = summary.NoColor
-		enableColors = !summary.NoColor && summary.UIState.IsStdOutTTY
+		enableColors = summary.EnableColors
 		summaryDataForJS = summary
 		summaryCode = jslibSummaryCode
 	}

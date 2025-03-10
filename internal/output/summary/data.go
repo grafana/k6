@@ -5,7 +5,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"go.k6.io/k6/lib"
+	"go.k6.io/k6/internal/lib/summary"
 	"go.k6.io/k6/metrics"
 )
 
@@ -95,14 +95,14 @@ type aggregatedMetricData map[string]aggregatedMetric
 // instance is shared between the original metric and the aggregatedMetric, to avoid duplicating memory allocations.
 func relayAggregatedMetricFrom(m *metrics.Metric) aggregatedMetric {
 	return aggregatedMetric{
-		SummaryMetricInfo: summaryMetricInfoFrom(m),
-		Sink:              m.Sink,
+		MetricInfo: summaryMetricInfoFrom(m),
+		Sink:       m.Sink,
 	}
 }
 
-// summaryMetricInfoFrom creates a new lib.SummaryMetricInfo from a k6 metric.
-func summaryMetricInfoFrom(m *metrics.Metric) lib.SummaryMetricInfo {
-	return lib.SummaryMetricInfo{
+// summaryMetricInfoFrom creates a new summary.MetricInfo from a k6 metric.
+func summaryMetricInfoFrom(m *metrics.Metric) summary.MetricInfo {
+	return summary.MetricInfo{
 		Name:     m.Name,
 		Type:     m.Type.String(),
 		Contains: m.Contains.String(),
@@ -120,36 +120,34 @@ func (a aggregatedMetricData) addSample(sample metrics.Sample) {
 }
 
 type aggregatedMetric struct {
-	lib.SummaryMetricInfo
+	summary.MetricInfo
 	Sink metrics.Sink
 }
 
 func newAggregatedMetric(m *metrics.Metric) aggregatedMetric {
 	return aggregatedMetric{
-		SummaryMetricInfo: summaryMetricInfoFrom(m),
-		Sink:              metrics.NewSink(m.Type),
+		MetricInfo: summaryMetricInfoFrom(m),
+		Sink:       metrics.NewSink(m.Type),
 	}
 }
 
 type aggregatedChecksData struct {
-	checks        map[string]*lib.Check
-	orderedChecks []*lib.Check
+	checks        map[string]*summary.Check
+	orderedChecks []*summary.Check
 }
 
 func newAggregatedChecksData() *aggregatedChecksData {
 	return &aggregatedChecksData{
-		checks:        make(map[string]*lib.Check),
-		orderedChecks: make([]*lib.Check, 0),
+		checks:        make(map[string]*summary.Check),
+		orderedChecks: make([]*summary.Check, 0),
 	}
 }
 
-func (a *aggregatedChecksData) checkFor(name string) *lib.Check {
+func (a *aggregatedChecksData) checkFor(name string) *summary.Check {
 	check, ok := a.checks[name]
 	if !ok {
-		var err error
-		check, err = lib.NewCheck(name, &lib.Group{}) // FIXME: Do we really need the group?
-		if err != nil {
-			panic(err) // This should never happen
+		check = &summary.Check{
+			Name: name,
 		}
 		a.checks[name] = check
 		a.orderedChecks = append(a.orderedChecks, check)
@@ -158,8 +156,8 @@ func (a *aggregatedChecksData) checkFor(name string) *lib.Check {
 }
 
 func populateSummaryGroup(
-	summaryMode lib.SummaryMode,
-	summaryGroup *lib.SummaryGroup,
+	summaryMode summary.Mode,
+	summaryGroup *summary.Group,
 	groupData aggregatedGroupData,
 	testRunDuration time.Duration,
 	summaryTrendStats []string,
@@ -169,14 +167,14 @@ func populateSummaryGroup(
 
 	// Then, we store the metrics.
 	storeMetric := func(
-		dest lib.SummaryMetrics,
-		info lib.SummaryMetricInfo,
+		dest summary.Metrics,
+		info summary.MetricInfo,
 		sink metrics.Sink,
 		testDuration time.Duration,
 		summaryTrendStats []string,
 	) {
 		getMetricValues := metricValueGetter(summaryTrendStats)
-		summaryMetric := lib.NewSummaryMetricFrom(info, getMetricValues(sink, testDuration))
+		summaryMetric := summary.NewMetricFrom(info, getMetricValues(sink, testDuration))
 
 		switch {
 		case isSkippedMetric(summaryMode, info.Name):
@@ -203,7 +201,7 @@ func populateSummaryGroup(
 	for _, metricData := range groupData.aggregatedMetrics {
 		storeMetric(
 			summaryGroup.Metrics,
-			metricData.SummaryMetricInfo,
+			metricData.MetricInfo,
 			metricData.Sink,
 			testRunDuration,
 			summaryTrendStats,
@@ -212,7 +210,7 @@ func populateSummaryGroup(
 
 	// Finally, we keep moving down the hierarchy and populate the nested groups.
 	for groupName, subGroupData := range groupData.groupsData {
-		summarySubGroup := lib.NewSummaryGroup()
+		summarySubGroup := summary.NewGroup()
 		populateSummaryGroup(summaryMode, &summarySubGroup, subGroupData, testRunDuration, summaryTrendStats)
 		summaryGroup.Groups[groupName] = summarySubGroup
 	}
@@ -222,24 +220,24 @@ func summaryThresholds(
 	thresholds thresholds,
 	testRunDuration time.Duration,
 	summaryTrendStats []string,
-) lib.SummaryThresholds {
+) summary.Thresholds {
 	getMetricValues := metricValueGetter(summaryTrendStats)
 
-	rts := make(map[string]lib.MetricThresholds, len(thresholds))
+	rts := make(map[string]summary.MetricThresholds, len(thresholds))
 	for _, threshold := range thresholds {
 		metric := threshold.aggregatedMetric
 
 		mt, exists := rts[metric.Name]
 		if !exists {
-			mt = lib.MetricThresholds{
-				Metric: lib.NewSummaryMetricFrom(
-					metric.SummaryMetricInfo,
+			mt = summary.MetricThresholds{
+				Metric: summary.NewMetricFrom(
+					metric.MetricInfo,
 					getMetricValues(metric.Sink, testRunDuration),
 				),
 			}
 		}
 
-		mt.Thresholds = append(mt.Thresholds, lib.SummaryThreshold{
+		mt.Thresholds = append(mt.Thresholds, summary.Threshold{
 			Source: threshold.Source,
 			Ok:     !threshold.LastFailed,
 		})
@@ -249,7 +247,7 @@ func summaryThresholds(
 }
 
 func populateSummaryChecks(
-	summaryGroup *lib.SummaryGroup,
+	summaryGroup *summary.Group,
 	groupData aggregatedGroupData,
 	testRunDuration time.Duration,
 	summaryTrendStats []string,
@@ -261,7 +259,7 @@ func populateSummaryChecks(
 		return
 	}
 
-	summaryGroup.Checks = lib.NewSummaryChecks()
+	summaryGroup.Checks = summary.NewChecks()
 
 	totalChecks := float64(checksMetric.Sink.(*metrics.RateSink).Total)   //nolint:forcetypeassert
 	successChecks := float64(checksMetric.Sink.(*metrics.RateSink).Trues) //nolint:forcetypeassert
@@ -269,8 +267,8 @@ func populateSummaryChecks(
 	summaryGroup.Checks.Metrics.Total.Values["count"] = totalChecks
 	summaryGroup.Checks.Metrics.Total.Values["rate"] = calculateRate(totalChecks, testRunDuration)
 
-	summaryGroup.Checks.Metrics.Success = lib.NewSummaryMetricFrom(
-		lib.SummaryMetricInfo{
+	summaryGroup.Checks.Metrics.Success = summary.NewMetricFrom(
+		summary.MetricInfo{
 			Name:     "checks_succeeded",
 			Type:     checksMetric.Type,
 			Contains: checksMetric.Contains,
@@ -328,9 +326,9 @@ func isWebSocketsMetric(metricName string) bool {
 	return strings.HasPrefix(metricName, "ws_")
 }
 
-func isSkippedMetric(summaryMode lib.SummaryMode, metricName string) bool {
+func isSkippedMetric(summaryMode summary.Mode, metricName string) bool {
 	switch summaryMode {
-	case lib.SummaryModeCompact:
+	case summary.ModeCompact:
 		return oneOfMetrics(metricName,
 			metrics.ChecksName, metrics.GroupDurationName,
 			metrics.HTTPReqBlockedName, metrics.HTTPReqConnectingName, metrics.HTTPReqReceivingName,

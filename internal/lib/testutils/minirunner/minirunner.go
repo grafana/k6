@@ -6,6 +6,7 @@ import (
 	"context"
 	"io"
 
+	"go.k6.io/k6/internal/lib/summary"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/metrics"
 )
@@ -24,7 +25,7 @@ type MiniRunner struct {
 	Fn              func(ctx context.Context, state *lib.State, out chan<- metrics.SampleContainer) error
 	SetupFn         func(ctx context.Context, out chan<- metrics.SampleContainer) ([]byte, error)
 	TeardownFn      func(ctx context.Context, out chan<- metrics.SampleContainer) error
-	HandleSummaryFn func(context.Context, *lib.LegacySummary, *lib.Summary) (map[string]io.Reader, error)
+	HandleSummaryFn func(context.Context, *lib.LegacySummary, *summary.Summary) (map[string]io.Reader, error)
 
 	SetupData []byte
 
@@ -111,7 +112,7 @@ func (r *MiniRunner) SetOptions(opts lib.Options) error {
 func (r *MiniRunner) HandleSummary(
 	ctx context.Context,
 	legacy *lib.LegacySummary,
-	summary *lib.Summary,
+	summary *summary.Summary,
 ) (map[string]io.Reader, error) {
 	if r.HandleSummaryFn != nil {
 		return r.HandleSummaryFn(ctx, legacy, summary)
