@@ -100,11 +100,15 @@ func TestNewScriptCmd_InvalidTemplateType(t *testing.T) {
 
 	ts := tests.NewGlobalTestState(t)
 	ts.CmdArgs = []string{"k6", "new", "--template", "invalid-template"}
-
 	ts.ExpectedExitCode = -1
 
 	newRootCommand(ts.GlobalState).execute()
 	assert.Contains(t, ts.Stderr.String(), "invalid template type")
+
+	// Verify that no script file was created
+	exists, err := fsext.Exists(ts.FS, defaultNewScriptName)
+	require.NoError(t, err)
+	assert.False(t, exists, "script file should not exist")
 }
 
 func TestNewScriptCmd_ProjectID(t *testing.T) {
@@ -129,7 +133,7 @@ func TestNewScriptCmd_LocalTemplate(t *testing.T) {
 	// Create temp file with random name in OS temp dir
 	tmpFile, err := os.CreateTemp("", "k6-template-*.js")
 	require.NoError(t, err)
-	defer os.Remove(tmpFile.Name())
+	defer os.Remove(tmpFile.Name()) //nolint:errcheck
 
 	templateContent := `export default function() {
   console.log("Hello, world!");
@@ -148,7 +152,7 @@ func TestNewScriptCmd_LocalTemplate(t *testing.T) {
 	assert.Equal(t, templateContent, string(data), "generated file matches the template content")
 }
 
-func TestNewScriptCmd_LocalTemplateWithProjectID(t *testing.T) {
+func TestNewScriptCmd_LocalTemplateWith_ProjectID(t *testing.T) {
 	t.Parallel()
 
 	ts := tests.NewGlobalTestState(t)
@@ -156,7 +160,7 @@ func TestNewScriptCmd_LocalTemplateWithProjectID(t *testing.T) {
 	// Create temp file with random name in OS temp dir
 	tmpFile, err := os.CreateTemp("", "k6-template-*.js")
 	require.NoError(t, err)
-	defer os.Remove(tmpFile.Name())
+	defer os.Remove(tmpFile.Name()) //nolint:errcheck
 
 	templateContent := `export default function() {
   // Template with {{ .ProjectID }} project ID
@@ -180,7 +184,7 @@ func TestNewScriptCmd_LocalTemplateWithProjectID(t *testing.T) {
 	assert.Equal(t, expectedContent, string(data), "generated file should have project ID interpolated")
 }
 
-func TestNewScriptCmd_NonExistentTemplate(t *testing.T) {
+func TestNewScriptCmd_LocalTemplate_NonExistentFile(t *testing.T) {
 	t.Parallel()
 
 	ts := tests.NewGlobalTestState(t)
@@ -199,4 +203,41 @@ func TestNewScriptCmd_NonExistentTemplate(t *testing.T) {
 	newRootCommand(ts.GlobalState).execute()
 
 	assert.Contains(t, ts.Stderr.String(), "failed to read template file")
+
+	// Verify that no script file was created
+	exists, err := fsext.Exists(ts.FS, defaultNewScriptName)
+	require.NoError(t, err)
+	assert.False(t, exists, "script file should not exist")
+}
+
+func TestNewScriptCmd_LocalTemplate_SyntaxError(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+	ts.ExpectedExitCode = -1
+
+	// Create a temporary file with invalid Go template content
+	tmpFile, err := os.CreateTemp("", "k6-invalid-template-*.js")
+	require.NoError(t, err)
+	defer os.Remove(tmpFile.Name()) //nolint:errcheck
+
+	invalidTemplateContent := `export default function() {
+  // Invalid template with {{ .InvalidField }} field
+  console.log("This will cause an error");
+}`
+	_, err = tmpFile.Write([]byte(invalidTemplateContent))
+	require.NoError(t, err)
+	require.NoError(t, tmpFile.Close())
+
+	ts.CmdArgs = []string{"k6", "new", "--template", tmpFile.Name(), "--project-id", "9876"}
+	ts.ExpectedExitCode = -1
+
+	newRootCommand(ts.GlobalState).execute()
+
+	assert.Contains(t, ts.Stderr.String(), "failed to execute template")
+
+	// Verify that no script file was created
+	exists, err := fsext.Exists(ts.FS, defaultNewScriptName)
+	require.NoError(t, err)
+	assert.False(t, exists, "script file should not exist")
 }

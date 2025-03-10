@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"io"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -28,7 +30,7 @@ func (c *newScriptCmd) flagSet() *pflag.FlagSet {
 	return flags
 }
 
-func (c *newScriptCmd) run(_ *cobra.Command, args []string) error {
+func (c *newScriptCmd) run(_ *cobra.Command, args []string) (err error) {
 	target := defaultNewScriptName
 	if len(args) > 0 {
 		target = args[0]
@@ -42,26 +44,7 @@ func (c *newScriptCmd) run(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("%s already exists. Use the `--force` flag to overwrite it", target)
 	}
 
-	fd, err := c.gs.FS.Create(target)
-	if err != nil {
-		return err
-	}
-
-	var closeErr error
-	defer func() {
-		if cerr := fd.Close(); cerr != nil {
-			if _, err := fmt.Fprintf(c.gs.Stderr, "error closing file: %v\n", cerr); err != nil {
-				closeErr = fmt.Errorf("error writing error message to stderr: %w", err)
-			} else {
-				closeErr = cerr
-			}
-		}
-	}()
-
-	if closeErr != nil {
-		return closeErr
-	}
-
+	// Initialize template manager and validate template before creating any files
 	tm, err := templates.NewTemplateManager()
 	if err != nil {
 		return fmt.Errorf("error initializing template manager: %w", err)
@@ -72,12 +55,36 @@ func (c *newScriptCmd) run(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("error retrieving template: %w", err)
 	}
 
+	// Prepare template arguments
 	argsStruct := templates.TemplateArgs{
 		ScriptName: target,
 		ProjectID:  c.projectID,
 	}
 
-	if err := templates.ExecuteTemplate(fd, tmpl, argsStruct); err != nil {
+	// First render the template to a buffer to validate it
+	var buf strings.Builder
+	if err := templates.ExecuteTemplate(&buf, tmpl, argsStruct); err != nil {
+		return fmt.Errorf("failed to execute template %s: %w", c.templateType, err)
+	}
+
+	// Only create the file after template rendering succeeds
+	fd, err := c.gs.FS.Create(target)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if cerr := fd.Close(); cerr != nil {
+			if _, err := fmt.Fprintf(c.gs.Stderr, "error closing file: %v\n", cerr); err != nil {
+				err = fmt.Errorf("error writing error message to stderr: %w", err) //nolint:staticcheck,ineffassign,wastedassign
+			} else {
+				err = cerr //nolint:staticcheck,ineffassign,wastedassign
+			}
+		}
+	}()
+
+	// Write the rendered content to the file
+	if _, err := io.WriteString(fd, buf.String()); err != nil {
 		return err
 	}
 
