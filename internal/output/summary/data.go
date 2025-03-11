@@ -17,6 +17,7 @@ type dataModel struct {
 
 func newDataModel() dataModel {
 	return dataModel{
+		thresholds:          make(map[string]metricThresholds),
 		aggregatedGroupData: newAggregatedGroupData(),
 		scenarios:           make(map[string]aggregatedGroupData),
 	}
@@ -31,21 +32,24 @@ func (d *dataModel) groupDataFor(scenario string) aggregatedGroupData {
 }
 
 func (d *dataModel) storeThresholdsFor(m *metrics.Metric) {
-	for _, threshold := range m.Thresholds.Thresholds {
-		d.thresholds = append(d.thresholds, struct {
-			aggregatedMetric
-			*metrics.Threshold
-		}{
+	if len(m.Thresholds.Thresholds) == 0 {
+		return
+	}
+
+	if _, exists := d.thresholds[m.Name]; !exists {
+		d.thresholds[m.Name] = metricThresholds{
 			aggregatedMetric: relayAggregatedMetricFrom(m),
-			Threshold:        threshold,
-		})
+			tt:               m.Thresholds.Thresholds,
+		}
 	}
 }
 
-type thresholds []struct {
+type metricThresholds struct {
 	aggregatedMetric
-	*metrics.Threshold
+	tt []*metrics.Threshold
 }
+
+type thresholds map[string]metricThresholds
 
 type aggregatedGroupData struct {
 	checks            *aggregatedChecksData
@@ -224,25 +228,28 @@ func summaryThresholds(
 	getMetricValues := metricValueGetter(summaryTrendStats)
 
 	rts := make(map[string]summary.MetricThresholds, len(thresholds))
-	for _, threshold := range thresholds {
-		metric := threshold.aggregatedMetric
-
-		mt, exists := rts[metric.Name]
+	for mName, mThresholds := range thresholds {
+		mt, exists := rts[mName]
 		if !exists {
 			mt = summary.MetricThresholds{
 				Metric: summary.NewMetricFrom(
-					metric.MetricInfo,
-					getMetricValues(metric.Sink, testRunDuration),
+					mThresholds.MetricInfo,
+					getMetricValues(mThresholds.Sink, testRunDuration),
 				),
+				Thresholds: make([]summary.Threshold, 0, len(mThresholds.tt)),
 			}
 		}
 
-		mt.Thresholds = append(mt.Thresholds, summary.Threshold{
-			Source: threshold.Source,
-			Ok:     !threshold.LastFailed,
-		})
-		rts[metric.Name] = mt
+		for _, threshold := range mThresholds.tt {
+			mt.Thresholds = append(mt.Thresholds, summary.Threshold{
+				Source: threshold.Source,
+				Ok:     !threshold.LastFailed,
+			})
+		}
+
+		rts[mName] = mt
 	}
+
 	return rts
 }
 

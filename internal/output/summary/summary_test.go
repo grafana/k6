@@ -59,17 +59,27 @@ func TestOutput_Summary(t *testing.T) {
 
 	// Thresholds
 	thresholds := thresholds{
-		{Threshold: &metrics.Threshold{
-			Source: "count<10",
-		}, aggregatedMetric: relayAggregatedMetricFrom(httpReqsMetric)},
-		{Threshold: &metrics.Threshold{
-			Source:     "rate>2",
-			LastFailed: true,
-		}, aggregatedMetric: relayAggregatedMetricFrom(httpReqsMetric)},
-		{Threshold: &metrics.Threshold{
-			Source:     "count>1",
-			LastFailed: true,
-		}, aggregatedMetric: relayAggregatedMetricFrom(authHTTPReqsMetric)},
+		httpReqsMetric.Name: {
+			aggregatedMetric: relayAggregatedMetricFrom(httpReqsMetric),
+			tt: []*metrics.Threshold{
+				{
+					Source: "count<10",
+				},
+				{
+					Source:     "rate>2",
+					LastFailed: true,
+				},
+			},
+		},
+		authHTTPReqsMetric.Name: {
+			aggregatedMetric: relayAggregatedMetricFrom(authHTTPReqsMetric),
+			tt: []*metrics.Threshold{
+				{
+					Source:     "count>1",
+					LastFailed: true,
+				},
+			},
+		},
 	}
 
 	// Checks
