@@ -75,10 +75,10 @@ func (c *newScriptCmd) run(_ *cobra.Command, args []string) (err error) {
 
 	defer func() {
 		if cerr := fd.Close(); cerr != nil {
-			if _, err := fmt.Fprintf(c.gs.Stderr, "error closing file: %v\n", cerr); err != nil {
-				err = fmt.Errorf("error writing error message to stderr: %w", err) //nolint:staticcheck,ineffassign,wastedassign
+			if _, werr := fmt.Fprintf(c.gs.Stderr, "error closing file: %v\n", cerr); werr != nil {
+				err = fmt.Errorf("error writing error message to stderr: %w", werr)
 			} else {
-				err = cerr //nolint:staticcheck,ineffassign,wastedassign
+				err = cerr
 			}
 		}
 	}()
