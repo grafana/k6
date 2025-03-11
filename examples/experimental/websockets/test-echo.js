@@ -1,6 +1,4 @@
-import { WebSocket, EventName } from "k6/experimental/websockets"
-
-const CLOSED_STATE = 3
+import { WebSocket, EventName, ReadyState, BinaryType } from "k6/experimental/websockets"
 
 export default function() {
 	// local echo server should be launched with `make ws-echo-server-run`
@@ -13,7 +11,7 @@ export default function() {
 		console.log('Connected');
 	})
 
-	ws.binaryType = "arraybuffer";
+	ws.binaryType = BinaryType.ArrayBuffer;
 	ws.onopen = () => {
 		console.log('connected')
 		ws.send(Date.now().toString())
@@ -47,7 +45,7 @@ export default function() {
 	}
 
 	// Multiple event handlers on the same event
-	ws.addEventListener("pong", () => {
+	ws.addEventListener(EventName.Pong, () => {
 		console.log("OTHER PONG!")
 	})
 
@@ -62,7 +60,7 @@ export default function() {
 		console.log(`Roundtrip time: ${Date.now() - parsed} ms`);
 
 		let timeoutId = setTimeout(function() {
-			if (ws.readyState == CLOSED_STATE) {
+			if (ws.readyState == ReadyState.Closed) {
 				console.log("Socket closed, not sending anything");
 
 				clearTimeout(timeoutId);
