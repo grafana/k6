@@ -144,7 +144,7 @@ func TestNewScriptCmd_LocalTemplate(t *testing.T) {
 	data, err := fsext.ReadFile(ts.FS, defaultNewScriptName)
 	require.NoError(t, err)
 
-	assert.Equal(t, templateContent, string(data), "generated file matches the template content")
+	assert.Equal(t, templateContent, string(data), "generated file should match the template content")
 }
 
 func TestNewScriptCmd_LocalTemplateWith_ProjectID(t *testing.T) {
