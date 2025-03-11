@@ -107,7 +107,7 @@ func (r *Runtime) SetupModuleSystemFromAnother(another *Runtime) error {
 //	}
 func (r *Runtime) RunOnEventLoop(code string, waitAllCallbacks ...bool) (value sobek.Value, err error) {
 	defer func() {
-		if len(waitAllCallbacks) > 0 && waitAllCallbacks[0] {
+		if len(waitAllCallbacks) == 0 || waitAllCallbacks[0] {
 			r.EventLoop.WaitOnRegistered()
 		}
 	}()
