@@ -25,7 +25,7 @@ func (c *newScriptCmd) flagSet() *pflag.FlagSet {
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
 	flags.SortFlags = false
 	flags.BoolVarP(&c.overwriteFiles, "force", "f", false, "overwrite existing files")
-	flags.StringVar(&c.templateType, "template", "minimal", "template type (choices: minimal, protocol, browser)")
+	flags.StringVar(&c.templateType, "template", "minimal", "template type (choices: minimal, protocol, browser) or relative/absolute path to a custom template file") //nolint:lll
 	flags.StringVar(&c.projectID, "project-id", "", "specify the Grafana Cloud project ID for the test")
 	return flags
 }

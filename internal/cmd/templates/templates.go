@@ -87,7 +87,13 @@ func (tm *TemplateManager) GetTemplate(templateType string) (*template.Template,
 		return tmpl, nil
 	}
 
-	return nil, fmt.Errorf("invalid template type: %s", templateType)
+	// Check if there's a file with this name in current directory
+	exists, err := fsext.Exists(tm.fs, fsext.JoinFilePath(".", templateType))
+	if err == nil && exists {
+		return nil, fmt.Errorf("invalid template type %q, did you mean ./%s?", templateType, templateType)
+	}
+
+	return nil, fmt.Errorf("invalid template type %q", templateType)
 }
 
 // isFilePath checks if the given string looks like a file path
