@@ -27,7 +27,7 @@ const (
 	legacyString  = "legacy"
 )
 
-// MarshalJSON serializes a MetricType as a human readable string.
+// MarshalJSON serializes a Mode as a human-readable string.
 func (m Mode) MarshalJSON() ([]byte, error) {
 	txt, err := m.MarshalText()
 	if err != nil {
@@ -36,7 +36,7 @@ func (m Mode) MarshalJSON() ([]byte, error) {
 	return []byte(`"` + string(txt) + `"`), nil
 }
 
-// MarshalText serializes a MetricType as a human readable string.
+// MarshalText serializes a Mode as a human-readable string.
 func (m Mode) MarshalText() ([]byte, error) {
 	switch m {
 	case ModeCompact:
@@ -50,7 +50,7 @@ func (m Mode) MarshalText() ([]byte, error) {
 	}
 }
 
-// UnmarshalText deserializes a MetricType from a string representation.
+// UnmarshalText deserializes a Mode from a string representation.
 func (m *Mode) UnmarshalText(data []byte) error {
 	switch string(data) {
 	case compactString:
@@ -66,6 +66,7 @@ func (m *Mode) UnmarshalText(data []byte) error {
 	return nil
 }
 
+// String returns a human-readable string representation of a Mode.
 func (m Mode) String() string {
 	switch m {
 	case ModeCompact:
@@ -182,13 +183,14 @@ type ChecksMetrics struct {
 	Fail    Metric `js:"checks_failed"`
 }
 
+// Check holds the information to be rendered in the summary for a single check.
 type Check struct {
 	Name   string `js:"name"`
 	Passes int64  `js:"passes"`
 	Fails  int64  `js:"fails"`
 }
 
-// Checks holds the checks information to be rendered in the summary.
+// Checks holds the checks to be rendered in the summary.
 type Checks struct {
 	Metrics       ChecksMetrics
 	OrderedChecks []*Check

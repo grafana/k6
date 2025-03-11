@@ -771,10 +771,8 @@ func TestAbortedByUserWithGoodThresholds(t *testing.T) {
 
       {group:::setup}
       ✓ 'count == 0' count=0
-      ✓ 'count == 0' count=0
 
       {group:::teardown}
-      ✓ 'count == 1' count=1
       ✓ 'count == 1' count=1`)
 	assert.Contains(t, stdout, `Stopping k6 in response to signal`)
 	assert.Contains(t, stdout, `level=debug msg="Metrics emission of VUs and VUsMax metrics stopped"`)
@@ -1384,7 +1382,7 @@ func TestMetricTagAndSetupDataIsolation(t *testing.T) {
 	t.Log(stdout)
 	assert.NotContains(t, stdout, "execution: local") // because of --quiet
 	assert.NotContains(t, stdout, "output: cloud")    // because of --quiet
-	assert.Equal(t, 25, strings.Count(stdout, "✓"))
+	assert.Equal(t, 14, strings.Count(stdout, "✓"))
 }
 
 func getSampleValues(t *testing.T, jsonOutput []byte, metric string, tags map[string]string) []float64 {
