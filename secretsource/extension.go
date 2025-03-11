@@ -7,7 +7,11 @@ import (
 	"go.k6.io/k6/lib/fsext"
 )
 
-// Constructor returns an instance of an output extension module.
+// Constructor returns an instance of a secret source extension module.
+// This should return an instance of [Source] given the parameters.
+// The Secret Source should not log its secrets and any returned secret will be cached and redacted
+// by the [Manager]. No additional work needs to be done by the Secret source apart from retrieving
+// the secret.
 type Constructor func(Params) (Source, error)
 
 // Params contains all possible constructor parameters an output may need.

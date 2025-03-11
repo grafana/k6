@@ -65,5 +65,5 @@ func recursiveReplace(v any, replacer *strings.Replacer) any {
 		return v
 	}
 	return fmt.Sprintf("Had a logrus.fields value with type %T, "+
-		"please report that this is unsupported and will be redacted in all logs in case it containing secrets", v)
+		"please report that this is unsupported and will be redacted in all logs in case it contains secrets", v)
 }
