@@ -23,8 +23,10 @@ import (
 	"go.k6.io/k6/internal/event"
 	"go.k6.io/k6/internal/execution"
 	"go.k6.io/k6/internal/execution/local"
+	"go.k6.io/k6/internal/lib/summary"
 	"go.k6.io/k6/internal/lib/trace"
 	"go.k6.io/k6/internal/metrics/engine"
+	summaryoutput "go.k6.io/k6/internal/output/summary"
 	"go.k6.io/k6/internal/ui/pb"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
@@ -189,26 +191,76 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	executionState := execScheduler.GetState()
-	if !testRunState.RuntimeOptions.NoSummary.Bool {
-		defer func() {
-			logger.Debug("Generating the end-of-test summary...")
-			summaryResult, hsErr := test.initRunner.HandleSummary(globalCtx, &lib.Summary{
-				Metrics:         metricsEngine.ObservedMetrics,
-				RootGroup:       testRunState.GroupSummary.Group(),
-				TestRunDuration: executionState.GetCurrentTestRunDuration(),
-				NoColor:         c.gs.Flags.NoColor,
-				UIState: lib.UIState{
-					IsStdOutTTY: c.gs.Stdout.IsTTY,
-					IsStdErrTTY: c.gs.Stderr.IsTTY,
-				},
+	if !testRunState.RuntimeOptions.NoSummary.Bool { //nolint:nestif
+		sm, err := summary.ValidateMode(testRunState.RuntimeOptions.SummaryMode.String)
+		if err != nil {
+			logger.WithError(err).Warnf(
+				"invalid summary mode %q, falling back to \"compact\" (default)",
+				testRunState.RuntimeOptions.SummaryMode.String,
+			)
+		}
+
+		switch sm {
+		// TODO: Remove this code block once we stop supporting the legacy summary, and just leave the default.
+		case summary.ModeLegacy:
+			// At the end of the test run
+			defer func() {
+				logger.Debug("Generating the end-of-test summary...")
+
+				legacySummary := &lib.LegacySummary{
+					Metrics:         metricsEngine.ObservedMetrics,
+					RootGroup:       testRunState.GroupSummary.Group(),
+					TestRunDuration: executionState.GetCurrentTestRunDuration(),
+					NoColor:         c.gs.Flags.NoColor,
+					UIState: lib.UIState{
+						IsStdOutTTY: c.gs.Stdout.IsTTY,
+						IsStdErrTTY: c.gs.Stderr.IsTTY,
+					},
+				}
+
+				summaryResult, hsErr := test.initRunner.HandleSummary(globalCtx, legacySummary, nil)
+				if hsErr == nil {
+					hsErr = handleSummaryResult(c.gs.FS, c.gs.Stdout, c.gs.Stderr, summaryResult)
+				}
+				if hsErr != nil {
+					logger.WithError(hsErr).Error("failed to handle the end-of-test summary")
+				}
+			}()
+		default:
+			// Instantiates the summary output
+			summaryOutput, err := summaryoutput.New(output.Params{
+				RuntimeOptions: testRunState.RuntimeOptions,
+				Logger:         c.gs.Logger,
 			})
-			if hsErr == nil {
-				hsErr = handleSummaryResult(c.gs.FS, c.gs.Stdout, c.gs.Stderr, summaryResult)
+			if err != nil {
+				logger.WithError(err).Error("failed to initialize the end-of-test summary output")
 			}
-			if hsErr != nil {
-				logger.WithError(hsErr).Error("failed to handle the end-of-test summary")
-			}
-		}()
+			outputs = append(outputs, summaryOutput)
+
+			// At the end of the test run
+			defer func() {
+				logger.Debug("Generating the end-of-test summary...")
+
+				summary := summaryOutput.Summary(
+					executionState.GetCurrentTestRunDuration(),
+					metricsEngine.ObservedMetrics,
+					test.initRunner.GetOptions(),
+				)
+
+				// TODO: We should probably try to move these out of the summary,
+				// likely as an additional argument like options.
+				summary.NoColor = c.gs.Flags.NoColor
+				summary.EnableColors = !summary.NoColor && c.gs.Stdout.IsTTY
+
+				summaryResult, hsErr := test.initRunner.HandleSummary(globalCtx, nil, summary)
+				if hsErr == nil {
+					hsErr = handleSummaryResult(c.gs.FS, c.gs.Stdout, c.gs.Stderr, summaryResult)
+				}
+				if hsErr != nil {
+					logger.WithError(hsErr).Error("failed to handle the end-of-test summary")
+				}
+			}()
+		}
 	}
 
 	waitInitDone := emitEvent(&event.Event{Type: event.Init})

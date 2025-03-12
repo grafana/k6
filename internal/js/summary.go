@@ -18,6 +18,11 @@ import (
 //go:embed summary.js
 var jslibSummaryCode string
 
+// TODO: Remove me once we stop supporting the legacy summary.
+//
+//go:embed summary-legacy.js
+var jslibSummaryLegacyCode string
+
 //go:embed summary-wrapper.js
 var summaryWrapperLambdaCode string
 
@@ -33,11 +38,7 @@ func metricValueGetter(summaryTrendStats []string) func(metrics.Sink, time.Durat
 		switch sink := sink.(type) {
 		case *metrics.CounterSink:
 			result = sink.Format(t)
-			rate := 0.0
-			if t > 0 {
-				rate = sink.Value / (float64(t) / float64(time.Second))
-			}
-			result["rate"] = rate
+			result["rate"] = sink.Rate(t)
 		case *metrics.GaugeSink:
 			result = sink.Format(t)
 			result["min"] = sink.Min
@@ -59,7 +60,7 @@ func metricValueGetter(summaryTrendStats []string) func(metrics.Sink, time.Durat
 
 // summarizeMetricsToObject transforms the summary objects in a way that's
 // suitable to pass to the JS runtime or export to JSON.
-func summarizeMetricsToObject(data *lib.Summary, options lib.Options, setupData []byte) map[string]interface{} {
+func summarizeMetricsToObject(data *lib.LegacySummary, options lib.Options, setupData []byte) map[string]interface{} {
 	m := make(map[string]interface{})
 	m["root_group"] = exportGroup(data.RootGroup)
 	m["options"] = map[string]interface{}{
