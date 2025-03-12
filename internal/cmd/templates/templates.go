@@ -22,6 +22,7 @@ var protocolTemplateContent string
 var browserTemplateContent string
 
 // Constants for template types
+// Template names should not contain path separators to not to be confused with file paths
 const (
 	MinimalTemplate  = "minimal"
 	ProtocolTemplate = "protocol"
@@ -62,9 +63,9 @@ func NewTemplateManager(fs fsext.Fs) (*TemplateManager, error) {
 }
 
 // GetTemplate selects the appropriate template based on the type
-func (tm *TemplateManager) GetTemplate(templateType string) (*template.Template, error) {
+func (tm *TemplateManager) GetTemplate(tpl string) (*template.Template, error) {
 	// First check built-in templates
-	switch templateType {
+	switch tpl {
 	case MinimalTemplate:
 		return tm.minimalTemplate, nil
 	case ProtocolTemplate:
@@ -74,48 +75,32 @@ func (tm *TemplateManager) GetTemplate(templateType string) (*template.Template,
 	}
 
 	// Then check if it's a file path
-	if isFilePath(templateType) {
-		content, err := fsext.ReadFile(tm.fs, templateType)
+	if isFilePath(tpl) {
+		content, err := fsext.ReadFile(tm.fs, tpl)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read template file %s: %w", templateType, err)
+			return nil, fmt.Errorf("failed to read template file %s: %w", tpl, err)
 		}
 
-		tmpl, err := template.New(filepath.Base(templateType)).Parse(string(content))
+		tmpl, err := template.New(filepath.Base(tpl)).Parse(string(content))
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse template file %s: %w", templateType, err)
+			return nil, fmt.Errorf("failed to parse template file %s: %w", tpl, err)
 		}
 		return tmpl, nil
 	}
 
 	// Check if there's a file with this name in current directory
-	exists, err := fsext.Exists(tm.fs, fsext.JoinFilePath(".", templateType))
+	exists, err := fsext.Exists(tm.fs, fsext.JoinFilePath(".", tpl))
 	if err == nil && exists {
-		return nil, fmt.Errorf("invalid template type %q, did you mean ./%s?", templateType, templateType)
+		return nil, fmt.Errorf("invalid template type %q, did you mean ./%s?", tpl, tpl)
 	}
 
-	return nil, fmt.Errorf("invalid template type %q", templateType)
+	return nil, fmt.Errorf("invalid template type %q", tpl)
 }
 
-// isFilePath checks if the given string looks like a file path
-// It handles both POSIX-style paths (./, ../, /) and Windows-style paths (C:\, \\, .\)
+// isFilePath checks if the given string looks like a file path by detecting path separators
+// We assume that built-in template names don't contain path separators
 func isFilePath(path string) bool {
-	// Check POSIX-style paths
-	if strings.HasPrefix(path, "./") ||
-		strings.HasPrefix(path, "../") ||
-		strings.HasPrefix(path, "/") {
-		return true
-	}
-
-	// Check Windows-style paths
-	if strings.HasPrefix(path, ".\\") ||
-		strings.HasPrefix(path, "..\\") ||
-		strings.HasPrefix(path, "\\") ||
-		strings.HasPrefix(path, "\\\\") || // UNC paths
-		(len(path) >= 2 && path[1] == ':') { // Drive letter paths like C:
-		return true
-	}
-
-	return false
+	return strings.ContainsRune(path, filepath.Separator) || strings.ContainsRune(path, '/')
 }
 
 // TemplateArgs represents arguments passed to templates
