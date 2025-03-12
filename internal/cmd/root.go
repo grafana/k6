@@ -19,7 +19,11 @@ import (
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
+	"go.k6.io/k6/ext"
 	"go.k6.io/k6/internal/log"
+	"go.k6.io/k6/secretsource"
+
+	_ "go.k6.io/k6/internal/secretsource" // import it to register internal secret sources
 )
 
 const waitLoggerCloseTimeout = time.Second * 5
@@ -162,6 +166,10 @@ func rootCmdPersistentFlagSet(gs *state.GlobalState) *pflag.FlagSet {
 	// `gs.DefaultFlags.<value>`, so that the `k6 --help` message is
 	// not messed up...
 
+	// TODO(@mstoykov): likely needs work - no env variables and such. No config.json.
+	flags.StringArrayVar(&gs.Flags.SecretSource, "secret-source", gs.Flags.SecretSource,
+		"setting secret sources for k6 file[=./path.fileformat],")
+
 	flags.StringVar(&gs.Flags.LogOutput, "log-output", gs.Flags.LogOutput,
 		"change the output for k6 logs, possible values are stderr,stdout,none,loki[=host:port],file[=./path.fileformat]")
 	flags.Lookup("log-output").DefValue = gs.DefaultFlags.LogOutput
@@ -257,6 +265,22 @@ func (c *rootCommand) setupLoggers(stop <-chan struct{}) error {
 		c.globalState.Logger.Debug("Logger format: TEXT")
 	}
 
+	secretsources, err := createSecretSources(c.globalState)
+	if err != nil {
+		return err
+	}
+	// it is important that we add this hook first as hooks are executed in order of addition
+	// and this means no other hook will get secrets
+	var secretsHook logrus.Hook
+	c.globalState.SecretsManager, secretsHook, err = secretsource.NewManager(secretsources)
+	if err != nil {
+		return err
+	}
+	if len(secretsources) != 0 {
+		// don't actually filter anything if there will be no secrets
+		c.globalState.Logger.AddHook(secretsHook)
+	}
+
 	cancel := func() {} // noop as default
 	if hook != nil {
 		ctx := context.Background()
@@ -288,4 +312,72 @@ func (c *rootCommand) setLoggerHook(ctx context.Context, h log.AsyncHook) {
 	}()
 	c.globalState.Logger.AddHook(h)
 	c.globalState.Logger.SetOutput(io.Discard) // don't output to anywhere else
+}
+
+func createSecretSources(gs *state.GlobalState) (map[string]secretsource.Source, error) {
+	baseParams := secretsource.Params{
+		Logger:      gs.Logger,
+		Environment: gs.Env,
+		FS:          gs.FS,
+		Usage:       gs.Usage,
+	}
+
+	result := make(map[string]secretsource.Source)
+	for _, line := range gs.Flags.SecretSource {
+		t, config, ok := strings.Cut(line, "=")
+		if !ok {
+			return nil, fmt.Errorf("couldn't parse secret source configuration %q", line)
+		}
+		secretSources := ext.Get(ext.SecretSourceExtension)
+		found, ok := secretSources[t]
+		if !ok {
+			return nil, fmt.Errorf("no secret source for type %q for configuration %q", t, line)
+		}
+		c := found.Module.(secretsource.Constructor) //nolint:forcetypeassert
+		params := baseParams
+		name, isDefault, config := extractNameAndDefault(config)
+		params.ConfigArgument = config
+
+		secretSource, err := c(params)
+		if err != nil {
+			return nil, err
+		}
+		_, alreadRegistered := result[name]
+		if alreadRegistered {
+			return nil, fmt.Errorf("secret source for name %q already registered before configuration %q", t, line)
+		}
+		result[name] = secretSource
+		if isDefault {
+			if _, ok := result["default"]; ok {
+				return nil, fmt.Errorf("can't have two secret sources that are default ones, second one was %q", config)
+			}
+			result["default"] = secretSource
+		}
+	}
+
+	if len(result) == 1 {
+		for _, l := range result {
+			result["default"] = l
+		}
+	}
+
+	return result, nil
+}
+
+func extractNameAndDefault(config string) (name string, isDefault bool, remaining string) {
+	list := strings.Split(config, ",")
+	remainingArray := make([]string, 0, len(list))
+	for _, kv := range list {
+		if kv == "default" {
+			isDefault = true
+			continue
+		}
+		k, v, _ := strings.Cut(kv, "=")
+		if k == "name" {
+			name = v
+			continue
+		}
+		remainingArray = append(remainingArray, kv)
+	}
+	return name, isDefault, strings.Join(remainingArray, ",")
 }

@@ -18,6 +18,7 @@ import (
 	"go.k6.io/k6/internal/event"
 	"go.k6.io/k6/internal/lib/testutils"
 	"go.k6.io/k6/internal/ui/console"
+	"go.k6.io/k6/internal/usage"
 	"go.k6.io/k6/lib/fsext"
 )
 
@@ -111,6 +112,7 @@ func NewGlobalTestState(tb testing.TB) *GlobalTestState {
 		SignalStop:     signal.Stop,
 		Logger:         logger,
 		FallbackLogger: testutils.NewLogger(tb).WithField("fallback", true),
+		Usage:          usage.New(),
 	}
 
 	return ts

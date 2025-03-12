@@ -25,6 +25,7 @@ import (
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/internal/event"
 	"go.k6.io/k6/internal/js/eventloop"
+	"go.k6.io/k6/internal/lib/summary"
 	"go.k6.io/k6/internal/loader"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
@@ -349,9 +350,11 @@ func (r *Runner) IsExecutable(name string) bool {
 }
 
 // HandleSummary calls the specified summary callback, if supplied.
-func (r *Runner) HandleSummary(ctx context.Context, summary *lib.Summary) (map[string]io.Reader, error) {
-	summaryDataForJS := summarizeMetricsToObject(summary, r.Bundle.Options, r.setupData)
-
+func (r *Runner) HandleSummary(
+	ctx context.Context,
+	legacy *lib.LegacySummary,
+	summary *summary.Summary,
+) (map[string]io.Reader, error) {
 	out := make(chan metrics.SampleContainer, 100)
 	defer close(out)
 
@@ -373,22 +376,15 @@ func (r *Runner) HandleSummary(ctx context.Context, summary *lib.Summary) (map[s
 	})
 	vu.moduleVUImpl.ctx = summaryCtx
 
-	callbackResult := sobek.Undefined()
-	fn := vu.getExported(consts.HandleSummaryFn)
-	if fn != nil {
-		handleSummaryFn, ok := sobek.AssertFunction(fn)
-		if !ok {
-			return nil, fmt.Errorf("exported identifier %s must be a function", consts.HandleSummaryFn)
-		}
+	noColor, enableColors, summaryDataForJS, summaryCode := prepareHandleSummaryCall(r, legacy, summary)
 
-		callbackResult, _, _, err = vu.runFn(summaryCtx, false, handleSummaryFn, nil, vu.Runtime.ToValue(summaryDataForJS))
-		if err != nil {
-			errText, fields := errext.Format(err)
-			r.preInitState.Logger.WithFields(fields).Error(errText)
-		}
+	handleSummaryDataAsValue := vu.Runtime.ToValue(summaryDataForJS)
+	callbackResult, err := runUserProvidedHandleSummaryCallback(summaryCtx, vu, handleSummaryDataAsValue)
+	if err != nil {
+		return nil, err
 	}
 
-	wrapper := strings.Replace(summaryWrapperLambdaCode, "/*JSLIB_SUMMARY_CODE*/", jslibSummaryCode, 1)
+	wrapper := strings.Replace(summaryWrapperLambdaCode, "/*JSLIB_SUMMARY_CODE*/", summaryCode, 1)
 	handleSummaryWrapperRaw, err := vu.Runtime.RunString(wrapper)
 	if err != nil {
 		return nil, fmt.Errorf("unexpected error while getting the summary wrapper: %w", err)
@@ -398,11 +394,7 @@ func (r *Runner) HandleSummary(ctx context.Context, summary *lib.Summary) (map[s
 		return nil, fmt.Errorf("unexpected error did not get a callable summary wrapper")
 	}
 
-	wrapperArgs := []sobek.Value{
-		callbackResult,
-		vu.Runtime.ToValue(r.Bundle.preInitState.RuntimeOptions.SummaryExport.String),
-		vu.Runtime.ToValue(summaryDataForJS),
-	}
+	wrapperArgs := prepareHandleWrapperArgs(vu, noColor, enableColors, callbackResult, handleSummaryDataAsValue)
 	rawResult, _, _, err := vu.runFn(summaryCtx, false, handleSummaryWrapper, nil, wrapperArgs...)
 
 	if deadlineError := r.checkDeadline(summaryCtx, consts.HandleSummaryFn, rawResult, err); deadlineError != nil {
@@ -412,7 +404,88 @@ func (r *Runner) HandleSummary(ctx context.Context, summary *lib.Summary) (map[s
 	if err != nil {
 		return nil, fmt.Errorf("unexpected error while generating the summary: %w", err)
 	}
+
 	return getSummaryResult(rawResult)
+}
+
+func prepareHandleSummaryCall(
+	r *Runner,
+	legacy *lib.LegacySummary,
+	summary *summary.Summary,
+) (bool, bool, interface{}, string) {
+	var (
+		noColor          bool
+		enableColors     bool
+		summaryDataForJS interface{}
+		summaryCode      string
+	)
+
+	// TODO: Remove this code block once we stop supporting the legacy summary.
+	if legacy != nil {
+		noColor = legacy.NoColor
+		enableColors = !legacy.NoColor && legacy.UIState.IsStdOutTTY
+		summaryDataForJS = summarizeMetricsToObject(legacy, r.Bundle.Options, r.setupData)
+		summaryCode = jslibSummaryLegacyCode
+	}
+
+	if summary != nil {
+		noColor = summary.NoColor
+		enableColors = summary.EnableColors
+		summaryDataForJS = summary
+		summaryCode = jslibSummaryCode
+	}
+
+	return noColor, enableColors, summaryDataForJS, summaryCode
+}
+
+func runUserProvidedHandleSummaryCallback(
+	summaryCtx context.Context,
+	vu *VU,
+	summaryData sobek.Value,
+) (sobek.Value, error) {
+	fn := vu.getExported(consts.HandleSummaryFn)
+	if fn == nil {
+		return sobek.Undefined(), nil
+	}
+
+	handleSummaryFn, ok := sobek.AssertFunction(fn)
+	if !ok {
+		return nil, fmt.Errorf("exported identifier %s must be a function", consts.HandleSummaryFn)
+	}
+
+	callbackResult, _, _, err := vu.runFn(summaryCtx, false, handleSummaryFn, nil, summaryData)
+	if err != nil {
+		errText, fields := errext.Format(err)
+		vu.Runner.preInitState.Logger.WithFields(fields).Error(errText)
+	}
+
+	// In case of err, we only want to log it,
+	// but still proceed with the built-in summary handler, so we return nil.
+	return callbackResult, nil
+}
+
+func prepareHandleWrapperArgs(
+	vu *VU,
+	noColor bool, enableColors bool,
+	callbackResult sobek.Value,
+	summaryDataForJS interface{},
+) []sobek.Value {
+	options := map[string]interface{}{
+		// TODO: improve when we can easily export all option values, including defaults?
+		"summaryTrendStats": vu.Runner.Bundle.Options.SummaryTrendStats,
+		"summaryTimeUnit":   vu.Runner.Bundle.Options.SummaryTimeUnit.String,
+		"noColor":           noColor, // TODO: move to the (runtime) options
+		"enableColors":      enableColors,
+	}
+
+	wrapperArgs := []sobek.Value{
+		callbackResult,
+		vu.Runtime.ToValue(vu.Runner.Bundle.preInitState.RuntimeOptions.SummaryExport.String),
+		vu.Runtime.ToValue(summaryDataForJS),
+		vu.Runtime.ToValue(options),
+	}
+
+	return wrapperArgs
 }
 
 func (r *Runner) checkDeadline(ctx context.Context, name string, result sobek.Value, err error) error {
@@ -420,7 +493,7 @@ func (r *Runner) checkDeadline(ctx context.Context, name string, result sobek.Va
 		return nil
 	}
 
-	// deadline is reached so we have timeouted but this might've not been registered correctly
+	// deadline is reached so we have timed-outed but this might've not been registered correctly
 	// we could have an error that is not context.Canceled in which case we should return it instead
 	//nolint:errorlint
 	if err, ok := err.(*sobek.InterruptedError); ok && result != nil && err.Value() != context.Canceled {

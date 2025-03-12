@@ -41,6 +41,7 @@ type RuntimeOptions struct {
 
 	NoThresholds  null.Bool   `json:"noThresholds"`
 	NoSummary     null.Bool   `json:"noSummary"`
+	SummaryMode   null.String `json:"summaryMode"`
 	SummaryExport null.String `json:"summaryExport"`
 	KeyWriter     null.String `json:"-"`
 	TracesOutput  null.String `json:"tracesOutput"`
