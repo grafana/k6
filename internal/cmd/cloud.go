@@ -371,7 +371,10 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
   $ {{.}} cloud run script.js
 
   # Run a k6 archive in the Grafana Cloud k6
-  $ {{.}} cloud run archive.tar`[1:])
+  $ {{.}} cloud run archive.tar
+
+  # Understand what would happen if you run a test in Grafana Cloud k6
+  $ {{.}} cloud plan script.js`[1:])
 
 	cloudCmd := &cobra.Command{
 		Use:   "cloud",
@@ -394,6 +397,7 @@ service. Be sure to run the "k6 cloud login" command prior to authenticate with 
 	cloudCmd.AddCommand(getCmdCloudRun(c))
 	cloudCmd.AddCommand(getCmdCloudLogin(gs))
 	cloudCmd.AddCommand(getCmdCloudUpload(c))
+	cloudCmd.AddCommand(getCmdCloudPlan(gs))
 
 	cloudCmd.Flags().SortFlags = false
 	cloudCmd.Flags().AddFlagSet(c.flagSet())
