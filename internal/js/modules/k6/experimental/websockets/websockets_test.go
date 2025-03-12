@@ -1562,6 +1562,7 @@ func TestEnumEvent(t *testing.T) {
 		testEnum(t, `when EventName.`+event+` is called, should add event`, `
 			var ws = new WebSocket("WSBIN_URL/ws-echo")
 			ws.addEventListener(EventName.`+event+`, () => {ws.close()})
+			ws.close()
 		`)
 	}
 }
