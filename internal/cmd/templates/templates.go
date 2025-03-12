@@ -76,15 +76,22 @@ func (tm *TemplateManager) GetTemplate(tpl string) (*template.Template, error) {
 
 	// Then check if it's a file path
 	if isFilePath(tpl) {
-		content, err := fsext.ReadFile(tm.fs, tpl)
+		tplPath, err := filepath.Abs(tpl)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get absolute path for template %s: %w", tpl, err)
+		}
+
+		// Read the template content using the provided filesystem
+		content, err := fsext.ReadFile(tm.fs, tplPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read template file %s: %w", tpl, err)
 		}
 
-		tmpl, err := template.New(filepath.Base(tpl)).Parse(string(content))
+		tmpl, err := template.New(filepath.Base(tplPath)).Parse(string(content))
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse template file %s: %w", tpl, err)
 		}
+
 		return tmpl, nil
 	}
 
