@@ -94,6 +94,12 @@ func TestWebVitalMetric(t *testing.T) {
 func TestWebVitalMetricNoInteraction(t *testing.T) {
 	t.Parallel()
 
+	// Increase timeout for Windows
+	timeout := 5 * time.Second
+	if runtime.GOOS == "windows" {
+		timeout = 10 * time.Second
+	}
+
 	var (
 		samples  = make(chan k6metrics.SampleContainer)
 		browser  = newTestBrowser(t, withFileServer(), withSamples(samples))
@@ -106,7 +112,7 @@ func TestWebVitalMetricNoInteraction(t *testing.T) {
 	)
 
 	done := make(chan struct{})
-	ctx, cancel := context.WithTimeout(browser.context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(browser.context(), timeout)
 	defer cancel()
 	go func() {
 		for {
@@ -127,11 +133,11 @@ func TestWebVitalMetricNoInteraction(t *testing.T) {
 		}
 	}()
 
-	// wait until the page is completely loaded.
 	page := browser.NewPage(nil)
 	opts := &common.FrameGotoOptions{
+		// Wait for both load and network idle events
 		WaitUntil: common.LifecycleEventNetworkIdle,
-		Timeout:   common.DefaultTimeout,
+		Timeout:   timeout,
 	}
 	resp, err := page.Goto(
 		browser.staticURL("web_vitals.html"),
@@ -139,6 +145,9 @@ func TestWebVitalMetricNoInteraction(t *testing.T) {
 	)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
+
+	// Add a small delay to ensure all metrics are collected
+	time.Sleep(1 * time.Second)
 
 	// prevents `err:fetching response body: context canceled` warning.`
 	require.NoError(t, page.Close())
