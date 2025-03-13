@@ -236,8 +236,12 @@ func TestNewBundle(t *testing.T) {
 						`json: cannot unmarshal array into Go value of type lib.Options`,
 				},
 				"Bad value": {
-					`{"tags":["something"]}`,
-					`parsing options from script got error while parsing "{\"tags\":[\"something\"]": ` +
+					`{
+						"duration": "5m",
+						"tags":["something"],
+						"vus": 5
+					}`,
+					`parsing options from script got error while parsing "\"tags\": [": ` +
 						`json: cannot unmarshal array into Go struct field Options.tags of type map[string]string`,
 				},
 				"Function": {
