@@ -208,7 +208,7 @@ func (b *Bundle) populateExports(updateOptions bool, bi *BundleInstance) error {
 					continue
 				}
 				var data []byte
-				data, err = json.Marshal(v.Export())
+				data, err = json.MarshalIndent(v.Export(), "", "  ")
 				if err != nil {
 					err = fmt.Errorf("error parsing script options: %w", err)
 					return
@@ -217,7 +217,8 @@ func (b *Bundle) populateExports(updateOptions bool, bi *BundleInstance) error {
 				dec.DisallowUnknownFields()
 				if err = dec.Decode(&b.Options); err != nil {
 					if uerr := json.Unmarshal(data, &b.Options); uerr != nil {
-						uerr = beautifyJSONUnmarshalError(data, uerr)
+						// Beautify the error so we can try to show the user the key and potential value that is failing to parse
+						uerr = beautifyOptionsJSONUnmarshalError(data, uerr)
 						err = errext.WithAbortReasonIfNone(
 							errext.WithExitCodeIfNone(uerr, exitcodes.InvalidConfig),
 							errext.AbortedByScriptError,
@@ -248,12 +249,12 @@ func (b *Bundle) populateExports(updateOptions bool, bi *BundleInstance) error {
 	return nil
 }
 
-func beautifyJSONUnmarshalError(data []byte, err error) error {
+func beautifyOptionsJSONUnmarshalError(data []byte, err error) error {
 	unmarshalTypError := new(json.UnmarshalTypeError)
 	if errors.As(err, &unmarshalTypError) {
 		e := unmarshalTypError
 		previousNewLineIndex := max(bytes.LastIndexByte(data[:e.Offset], '\n'), 0)
-		nextNewLineIndex := max(bytes.IndexByte(data[e.Offset:], '\n'), len(data)-1)
+		nextNewLineIndex := max(min(bytes.IndexByte(data[e.Offset:], '\n'), len(data)-1), (int)(e.Offset))
 
 		info := strings.TrimSpace(string(data[previousNewLineIndex:nextNewLineIndex]))
 		err = fmt.Errorf("parsing options from script got error while parsing %q: %w", info, e)
