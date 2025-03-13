@@ -218,7 +218,7 @@ func (b *Bundle) populateExports(updateOptions bool, bi *BundleInstance) error {
 				dec.DisallowUnknownFields()
 				if err = dec.Decode(&b.Options); err != nil {
 					if uerr := json.Unmarshal(data, &b.Options); uerr != nil {
-						uerr = beautifyJSONUnmarshalError(data, uerr)
+						uerr = beautifyOptionsJSONUnmarshalError(data, uerr)
 						err = errext.WithAbortReasonIfNone(
 							errext.WithExitCodeIfNone(uerr, exitcodes.InvalidConfig),
 							errext.AbortedByScriptError,
@@ -249,7 +249,7 @@ func (b *Bundle) populateExports(updateOptions bool, bi *BundleInstance) error {
 	return nil
 }
 
-func beautifyJSONUnmarshalError(data []byte, err error) error {
+func beautifyOptionsJSONUnmarshalError(data []byte, err error) error {
 	unmarshalTypError := new(json.UnmarshalTypeError)
 	if errors.As(err, &unmarshalTypError) {
 		e := unmarshalTypError
