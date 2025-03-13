@@ -1,0 +1,48 @@
+.\" k6.1 - Manual page for the k6 command-line tool with TLDR summary
+.TH K6 1 "2025-03-12" "k6 0.57.0" "k6 Manual"
+.SH NAME
+k6 \- open source load testing tool for engineering teams
+.SH SYNOPSIS
+.B k6
+[\fIOPTIONS\fR] \fIscript.js\fR
+.SH DESCRIPTION
+k6 is an open source load testing tool designed for performance testing and monitoring.
+For detailed documentation, visit: <https://k6.io/docs/>.
+.SH TLDR
+The following examples offer a quick summary of common usage:
+.IP "$ tldr k6" 4
+.IP "Open source load testing tool and SaaS for engineering teams. More information: <https://k6.io>."
+.IP "Run load test locally:"
+.RS
+.B k6 run script.js
+.RE
+.IP "Run load test locally with a given number of virtual users and duration:"
+.RS
+.B k6 run --vus 10 --duration 30s script.js
+.RE
+.IP "Run load test locally with a given environment variable:"
+.RS
+.B k6 run -e HOSTNAME=example.com script.js
+.RE
+.IP "Run load test locally using InfluxDB to store results:"
+.RS
+.B k6 run --out influxdb=http://localhost:8086/k6db script.js
+.RE
+.IP "Run load test locally and discard response bodies (significantly faster):"
+.RS
+.B k6 run --discard-response-bodies script.js
+.RE
+.IP "Run load test locally using the base JavaScript compatibility mode (significantly faster):"
+.RS
+.B k6 run --compatibility-mode=base script.js
+.RE
+.IP "Log in to cloud service using secret token:"
+.RS
+.B k6 login cloud --token secret
+.RE
+.IP "Run load test on cloud infrastructure:"
+.RS
+.B k6 cloud script.js
+.RE
+.SH SEE ALSO
+.B https://k6.io/docs/
