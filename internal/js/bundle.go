@@ -217,8 +217,7 @@ func (b *Bundle) populateExports(updateOptions bool, bi *BundleInstance) error {
 				dec.DisallowUnknownFields()
 				if err = dec.Decode(&b.Options); err != nil {
 					if uerr := json.Unmarshal(data, &b.Options); uerr != nil {
-// comment about the intentions here like
-// Beautify the error because we want to return only the failing key and not the entire options' body as it would be without it. 
+						// Beautify the error so we can try to show the user the key and potential value that is failing to parse
 						uerr = beautifyOptionsJSONUnmarshalError(data, uerr)
 						err = errext.WithAbortReasonIfNone(
 							errext.WithExitCodeIfNone(uerr, exitcodes.InvalidConfig),
