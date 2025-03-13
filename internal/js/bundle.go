@@ -213,7 +213,6 @@ func (b *Bundle) populateExports(updateOptions bool, bi *BundleInstance) error {
 					err = fmt.Errorf("error parsing script options: %w", err)
 					return
 				}
-				fmt.Println(string(data))
 				dec := json.NewDecoder(bytes.NewReader(data))
 				dec.DisallowUnknownFields()
 				if err = dec.Decode(&b.Options); err != nil {
