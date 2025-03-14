@@ -5,7 +5,6 @@ import (
 	"os/exec"
 
 	"github.com/grafana/k6deps"
-	"github.com/spf13/cobra"
 	k6State "go.k6.io/k6/cmd/state"
 )
 
@@ -17,34 +16,13 @@ type state struct {
 	deps    k6deps.Dependencies
 }
 
-func newState(gs *k6State.GlobalState, deps k6deps.Dependencies) *state {
+func newState(gs *k6State.GlobalState, deps k6deps.Dependencies, opt *Options) *state {
 	s := new(state)
 	s.gs = gs
 	s.deps = deps
+	s.Options = *opt
+
 	return s
-}
-
-func (s *state) persistentPreRunE(_ *cobra.Command, _ []string) error {
-	s.Options.BuildServiceURL = s.gs.Flags.BuildServiceURL
-
-	// get authorization token for the build service
-	auth := s.gs.Env["K6_CLOUD_TOKEN"]
-
-	if len(auth) == 0 {
-		// allow overriding the config file for testing
-		// configFile := s.gs.Flags.ConfigFilePath
-
-		config, err := loadConfig("")
-		if err != nil {
-			return err
-		}
-
-		auth = config.Collectors.Cloud.Token
-	}
-
-	s.Options.BuildServiceToken = auth
-
-	return nil
 }
 
 func (s *state) preRunE() error {

@@ -8,8 +8,8 @@ import (
 )
 
 // New creates new cobra command for exec command.
-func New(gs *k6State.GlobalState, deps k6deps.Dependencies) *cobra.Command {
-	state := newState(gs, deps)
+func New(gs *k6State.GlobalState, deps k6deps.Dependencies, opt *Options) *cobra.Command {
+	state := newState(gs, deps, opt)
 
 	root := &cobra.Command{
 		Use:                "k6 [flags] [command]",
@@ -25,7 +25,6 @@ func New(gs *k6State.GlobalState, deps k6deps.Dependencies) *cobra.Command {
 		RunE: func(_ *cobra.Command, _ []string) error {
 			return state.runE()
 		},
-		PersistentPreRunE: state.persistentPreRunE,
 	}
 
 	return root
