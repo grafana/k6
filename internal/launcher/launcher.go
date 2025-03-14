@@ -20,6 +20,7 @@ func Execute() {
 	tryBinaryProvisioning := gs.Flags.BinaryProvisioning
 
 	var deps k6deps.Dependencies
+	var opt *launcherCmd.Options
 	if tryBinaryProvisioning {
 		gs.Logger.Debug("trying to provision binary")
 
@@ -38,6 +39,15 @@ func Execute() {
 			Debug("binary provisioning, dependencies analyzed")
 
 		tryBinaryProvisioning = tryBinaryProvisioning && buildRequired
+
+		opt = launcherCmd.NewOptions(gs)
+		if !opt.CanUseBuildService() && tryBinaryProvisioning {
+			gs.Logger.Warn(
+				"your scripts/archives require a build service token, but it's not set, " +
+					"please set the K6_CLOUD_TOKEN environment variable or k6 cloud login. ",
+			)
+			tryBinaryProvisioning = false
+		}
 	} else {
 		gs.Logger.Debug("binary provisioning disabled")
 	}
@@ -45,15 +55,15 @@ func Execute() {
 	if tryBinaryProvisioning {
 		// this will try to get the k6 binary from the build service
 		// and run it, passing all the original arguments
-		runWithBinaryProvisioning(gs, deps)
+		runWithBinaryProvisioning(gs, deps, opt)
 	} else {
 		// this will run the default k6 command
 		k6Cmd.Execute(gs)
 	}
 }
 
-func runWithBinaryProvisioning(gs *state.GlobalState, deps k6deps.Dependencies) {
-	cmd := launcherCmd.New(gs, deps)
+func runWithBinaryProvisioning(gs *state.GlobalState, deps k6deps.Dependencies, opt *launcherCmd.Options) {
+	cmd := launcherCmd.New(gs, deps, opt)
 
 	// disable binary provisioning any second time
 	gs.Env["K6_BINARY_PROVISIONING"] = "false"
