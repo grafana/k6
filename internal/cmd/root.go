@@ -28,7 +28,6 @@ const waitLoggerCloseTimeout = time.Second * 5
 // This is to keep all fields needed for the main/root k6 command
 type rootCommand struct {
 	globalState *state.GlobalState
-
 	cmd            *cobra.Command
 	stopLoggersCh  chan struct{}
 	loggersWg      sync.WaitGroup
@@ -69,13 +68,12 @@ func newRootCommand(gs *state.GlobalState) *rootCommand {
 	for _, sc := range subCommands {
 		rootCmd.AddCommand(sc(gs))
 	}
-
-	opts := &provision.Options{}
-
-	for _, cmd := range rootCmd.Commands() {
-		provision.Install(opts, gs, cmd)
-	}
 	
+	// TODO: add a flag to enable binary provisioning
+	if gs.Env["K6_BINARY_PROVISIONING"] == "1" {
+		provision.Install(gs, rootCmd)
+	}
+
 	c.cmd = rootCmd
 	return c
 }

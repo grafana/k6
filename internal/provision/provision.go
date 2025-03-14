@@ -2,7 +2,8 @@ package provision
 
 import (
 	"context"
-	"log/slog"
+	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"slices"
@@ -12,32 +13,13 @@ import (
 	"github.com/grafana/k6provider"
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/internal/build"
+	"go.k6.io/k6/lib/fsext"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
 type Options struct {
-	// Manifest contains the properties of the manifest file to be analyzed.
-	// If the Ignore property is not set and no manifest file is specified,
-	// the package.json file closest to the script is searched for.
-	Manifest k6deps.Source
-	// Env contains the properties of the environment variable to be analyzed.
-	// If the Ignore property is not set and no variable is specified,
-	// the value of the variable named K6_DEPENDENCIES is read.
-	Env k6deps.Source
-	// LookupEnv function is used to query the value of the environment variable
-	// specified in the Env option Name if the Contents of the Env option is empty.
-	// If empty, os.LookupEnv will be used.
-	LookupEnv func(key string) (value string, ok bool)
-	// FindManifest function is used to find manifest file for the given scriptfile
-	// if the Contents of Manifest option is empty.
-	// If the scriptfile parameter is empty, FindManifest starts searching
-	// for the manifest file from the current directory
-	// If missing, the closest manifest file will be used.
-	FindManifest func(scriptfile string) (filename string, ok bool, err error)
-	// AppName contains the name of the application. It is used to define the default value of CacheDir.
-	// If empty, it defaults to os.Args[0].
-	AppName string
 	// BuildServiceURL contains the URL of the k6 build service to be used.
 	// If the value is not nil, the k6 binary is built using the build service instead of the local build.
 	BuildServiceURL string
@@ -51,39 +33,47 @@ type provider struct {
 	gs      *state.GlobalState
 	k6Exec  string
 	cleanup func() error
-	preRunE func(c *cobra.Command, args []string) error
+	ppre    func(c *cobra.Command, args []string) error
 }
 
-func noopPreRunE(c *cobra.Command, args []string) error { return nil }
+// noopPPRE is a no-op PersistentPreRunE function.
+func noopPPRE(c *cobra.Command, args []string) error { return nil }
 
-func Install(opts *Options, gs *state.GlobalState, cmd *cobra.Command) {
-
-	preRunE := cmd.PreRunE
+func Install(gs *state.GlobalState, cmd *cobra.Command) {
+	// for root this is never the case but leave in case we want wo install in a subcommand instead
+	preRunE := cmd.PersistentPreRunE
 	if preRunE == nil {
-		preRunE = noopPreRunE
+		preRunE = noopPPRE
 	}
 
 	provider := provider{
-		gs:      gs,
-		opts:    opts,
-		preRunE: preRunE,
+		gs:   gs,
+		ppre: preRunE,
+		opts: &Options{
+			BuildServiceURL:   gs.Env["K6_BUILD_SERVICE_URL"],
+			BuildServiceToken: gs.Env["K6_CLOUD_TOKEN"],
+		},
 	}
 
-	cmd.PreRunE = provider.PreRunE
+	// install the provider as the persistent pre-run function for all commands
+	cmd.PersistentPreRunE = provider.persistentPreRunE
 }
 
-func (p *provider) PreRunE(cmd *cobra.Command, args []string) error {
+func (p *provider) persistentPreRunE(cmd *cobra.Command, args []string) error {
+	if !slices.Contains([]string{"run", "archive", "inspect", "cloud"}, cmd.Name()) {
+		return p.ppre(cmd, args)
+	}
+
 	deps, err := p.analyze(cmd, args)
 	if err != nil {
 		return err
 	}
 
 	if !isCustomBuildRequired(deps) {
-		// execute original's command PreRunE
-		return p.preRunE(cmd, args)
+		return p.ppre(cmd, args)
 	}
 
-	slog.Info("fetching k6 binary")
+	p.gs.Logger.Info("fetching k6 binary")
 
 	k6exec, cleanup, err := p.provision(cmd.Context(), deps)
 	if err != nil {
@@ -102,9 +92,9 @@ func (p *provider) runE(cmd *cobra.Command, _ []string) error {
 	k6Cmd := exec.CommandContext(cmd.Context(), p.k6Exec, p.gs.CmdArgs[1:]...) //nolint:gosec
 	defer p.cleanup()
 
-	k6Cmd.Stderr = os.Stderr //nolint:forbidigo
-	k6Cmd.Stdout = os.Stdout //nolint:forbidigo
-	k6Cmd.Stdin = os.Stdin   //nolint:forbidigo
+	k6Cmd.Stderr = p.gs.Stderr
+	k6Cmd.Stdout = p.gs.Stdout
+	k6Cmd.Stdin = p.gs.Stdin
 
 	return k6Cmd.Run()
 }
@@ -115,27 +105,32 @@ func (p *provider) analyze(cmd *cobra.Command, args []string) (k6deps.Dependenci
 	// we call Analyze before logging because it will return the name of the manifest, in any
 	deps, err := k6deps.Analyze(depsOpts)
 
-	slog.Debug("analyzing sources", depsOptsAttrs(depsOpts)...)
+	// FIXME: only log the sources that are not empty
+	p.gs.Logger.WithFields(
+		logrus.Fields{
+			"script":   depsOpts.Script.Name,
+			"archive":  depsOpts.Archive.Name,
+			"manifest": depsOpts.Manifest.Name,
+			"env":      depsOpts.Env.Name,
+		},
+	).Debug("analyzing dependencies")
 
 	if err == nil && len(deps) > 0 {
-		slog.Debug("found dependencies", "deps", deps.String())
+		p.gs.Logger.Debugf("found dependencies: %s", deps)
 	}
 
 	return deps, err
 }
 
 func (p *provider) newDepsOptions(cmd *cobra.Command, args []string) *k6deps.Options {
-	dopts := &k6deps.Options{
-		Env:          p.opts.Env,
-		Manifest:     p.opts.Manifest,
-		LookupEnv:    p.opts.LookupEnv,
-		FindManifest: p.opts.FindManifest,
-	}
+	dopts := &k6deps.Options{}
 
-	scriptname, hasScript := scriptArg(cmd, args)
-	if !hasScript {
+	if len(args) == 0 {
 		return dopts
 	}
+
+	// FIXME: we assume that the only argument is the script name
+	scriptname := args[0]
 
 	if _, err := os.Stat(scriptname); err != nil { //nolint:forbidigo
 		return dopts
@@ -150,48 +145,10 @@ func (p *provider) newDepsOptions(cmd *cobra.Command, args []string) *k6deps.Opt
 	return dopts
 }
 
-func scriptArg(cmd *cobra.Command, args []string) (string, bool) {
-	if len(args) == 0 {
-		return "", false
-	}
-
-	if !slices.Contains([]string{"run", "archive", "inspect", "cloud"}, cmd.Name()) {
-		return "", false
-	}
-
-	// FIXME: we assume that the only argument is the script name
-	return args[0], true
-}
-
-func depsOptsAttrs(opts *k6deps.Options) []any {
-	attrs := []any{}
-
-	if opts.Manifest.Name != "" {
-		attrs = append(attrs, "Manifest", opts.Manifest.Name)
-	}
-
-	if opts.Archive.Name != "" {
-		attrs = append(attrs, "Archive", opts.Archive.Name)
-	}
-
-	// ignore script if archive is present
-	if opts.Archive.Name == "" && opts.Script.Name != "" {
-		attrs = append(attrs, "Script", opts.Script.Name)
-	}
-
-	if opts.Env.Name != "" {
-		attrs = append(attrs, "Env", opts.Env.Name)
-	}
-
-	return attrs
-}
-
 func (p *provider) provision(ctx context.Context, deps k6deps.Dependencies) (string, func() error, error) {
-	config := k6provider.Config{}
-
-	if p.opts != nil {
-		config.BuildServiceURL = p.opts.BuildServiceURL
-		config.BuildServiceAuth = p.opts.BuildServiceToken
+	config := k6provider.Config{
+		BuildServiceURL:  p.opts.BuildServiceURL,
+		BuildServiceAuth: p.opts.BuildServiceToken,
 	}
 
 	provider, err := k6provider.NewProvider(config)
@@ -199,7 +156,7 @@ func (p *provider) provision(ctx context.Context, deps k6deps.Dependencies) (str
 		return "", nil, err
 	}
 
-	slog.Debug("fetching binary", "build service URL: ", p.opts.BuildServiceURL)
+	p.gs.Logger.Debug("fetching binary", "build service URL: ", p.opts.BuildServiceURL)
 
 	binary, err := provider.GetBinary(ctx, deps)
 	if err != nil {
@@ -208,16 +165,76 @@ func (p *provider) provision(ctx context.Context, deps k6deps.Dependencies) (str
 
 	// Cut the query string from the download URL to reduce noise in the logs
 	downloadURL, _, _ := strings.Cut(binary.DownloadURL, "?")
-	slog.Debug("binary fetched",
-		"Path: ", binary.Path,
-		"dependencies", deps.String(),
-		"checksum", binary.Checksum,
-		"cached", binary.Cached,
-		"download URL", downloadURL,
-	)
+
+	p.gs.Logger.WithFields(logrus.Fields{
+		"Path":         binary.Path,
+		"dependencies": binary.Dependencies,
+		"checksum":     binary.Checksum,
+		"cached":       binary.Cached,
+		"download URL": downloadURL},
+	).Debug("binary fetched")
 
 	// TODO: once k6provider implements the cleanup of binary return the proper cleanup function (pablochacin)
 	return binary.Path, func() error { return nil }, nil
+}
+
+// NewOptions creates a new Options object.
+func NewOptions(gs *state.GlobalState) *Options {
+	return &Options{
+		BuildServiceURL:   gs.Env["K6_BUILD_SERVICE_URL"],
+		BuildServiceToken: extractToken(gs),
+	}
+}
+
+func extractToken(gs *state.GlobalState) string {
+	token, ok := gs.Env["K6_CLOUD_TOKEN"]
+	if ok {
+		return token
+	}
+
+	// load from config file
+	config, err := loadConfig(gs)
+	if err != nil {
+		return ""
+	}
+
+	return config.Collectors.Cloud.Token
+}
+
+// a simple struct to quickly load the config file
+type k6configFile struct {
+	Collectors struct {
+		Cloud struct {
+			Token string `json:"token"`
+		} `json:"cloud"`
+	} `json:"collectors"`
+}
+
+// loadConfig loads the k6 config file from the given path or the default location.
+// if using the default location and the file does not exist, it returns an empty config.
+func loadConfig(gs *state.GlobalState) (k6configFile, error) {
+	var (
+		config k6configFile
+		err    error
+	)
+
+	// if not exists, return empty config
+	_, err = fsext.Exists(gs.FS, gs.Flags.ConfigFilePath)
+	if err != nil {
+		return config, nil //nolint:nilerr
+	}
+
+	buffer, err := fsext.ReadFile(gs.FS, gs.Flags.ConfigFilePath)
+	if err != nil {
+		return config, fmt.Errorf("failed to read config file %q: %w", gs.Flags.ConfigFilePath, err)
+	}
+
+	err = json.Unmarshal(buffer, &config)
+	if err != nil {
+		return config, fmt.Errorf("failed to parse config file %q: %w", gs.Flags.ConfigFilePath, err)
+	}
+
+	return config, nil
 }
 
 // isCustomBuildRequired checks if the build is required
