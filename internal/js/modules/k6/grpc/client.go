@@ -4,10 +4,12 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"strings"
 	"time"
 
@@ -360,7 +362,8 @@ func (c *Client) buildInvokeRequest(
 	if req == nil {
 		return grpcReq, errors.New("request cannot be nil")
 	}
-	b, err := req.ToObject(c.vu.Runtime()).MarshalJSON()
+
+	b, err := json.Marshal(encodeFloatsForJSON(req.ToObject(c.vu.Runtime()).Export()))
 	if err != nil {
 		return grpcReq, fmt.Errorf("unable to serialise request object: %w", err)
 	}
@@ -376,6 +379,35 @@ func (c *Client) buildInvokeRequest(
 		TagsAndMeta:            &p.TagsAndMeta,
 		Metadata:               p.Metadata,
 	}, nil
+}
+
+// encodeFloatsForJSON recursively processes the object and replaces NaN and Infinity with their string equivalents.
+// - math.NaN() is converted to the string "NaN"
+// - math.Inf(1) is converted to the string "Infinity"
+// - math.Inf(-1) is converted to the string "-Infinity"
+// This is necessary because NaN and Infinity are not valid in ProtoJSON, unless represented as strings.
+func encodeFloatsForJSON(data interface{}) interface{} {
+	switch v := data.(type) {
+	case map[string]interface{}:
+		for key, val := range v {
+			v[key] = encodeFloatsForJSON(val)
+		}
+		return v
+	case []interface{}:
+		for i, val := range v {
+			v[i] = encodeFloatsForJSON(val)
+		}
+		return v
+	case float64:
+		if math.IsNaN(v) {
+			return "NaN"
+		} else if math.IsInf(v, 1) {
+			return "Infinity"
+		} else if math.IsInf(v, -1) {
+			return "-Infinity"
+		}
+	}
+	return data
 }
 
 // Close will close the client gRPC connection
