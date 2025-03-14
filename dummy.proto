@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package dummy;
+
+option go_package = "./proto";
+
+service DummyService
+{
+  rpc Do(DummyRequest) returns (DummyResponse) {}
+}
+
+
+message DummyRequest
+{
+  float single_float = 1;
+  repeated float array_float = 2;
+}
+
+message DummyResponse
+{
+  float single_float = 1;
+}
