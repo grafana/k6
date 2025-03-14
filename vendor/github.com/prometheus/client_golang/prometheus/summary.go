@@ -26,6 +26,7 @@ import (
 
 	"github.com/beorn7/perks/quantile"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // quantileLabel is used for the label that defines the quantile in a
@@ -145,6 +146,9 @@ type SummaryOpts struct {
 	// is the internal buffer size of the underlying package
 	// "github.com/bmizerany/perks/quantile").
 	BufCap uint32
+
+	// now is for testing purposes, by default it's time.Now.
+	now func() time.Time
 }
 
 // SummaryVecOpts bundles the options to create a SummaryVec metric.
@@ -154,7 +158,7 @@ type SummaryVecOpts struct {
 	SummaryOpts
 
 	// VariableLabels are used to partition the metric vector by the given set
-	// of labels. Each label value will be constrained with the optional Contraint
+	// of labels. Each label value will be constrained with the optional Constraint
 	// function, if provided.
 	VariableLabels ConstrainableLabels
 }
@@ -188,12 +192,12 @@ func NewSummary(opts SummaryOpts) Summary {
 }
 
 func newSummary(desc *Desc, opts SummaryOpts, labelValues ...string) Summary {
-	if len(desc.variableLabels) != len(labelValues) {
-		panic(makeInconsistentCardinalityError(desc.fqName, desc.variableLabels.labelNames(), labelValues))
+	if len(desc.variableLabels.names) != len(labelValues) {
+		panic(makeInconsistentCardinalityError(desc.fqName, desc.variableLabels.names, labelValues))
 	}
 
-	for _, n := range desc.variableLabels {
-		if n.Name == quantileLabel {
+	for _, n := range desc.variableLabels.names {
+		if n == quantileLabel {
 			panic(errQuantileLabelNotAllowed)
 		}
 	}
@@ -222,6 +226,9 @@ func newSummary(desc *Desc, opts SummaryOpts, labelValues ...string) Summary {
 		opts.BufCap = DefBufCap
 	}
 
+	if opts.now == nil {
+		opts.now = time.Now
+	}
 	if len(opts.Objectives) == 0 {
 		// Use the lock-free implementation of a Summary without objectives.
 		s := &noObjectivesSummary{
@@ -230,11 +237,13 @@ func newSummary(desc *Desc, opts SummaryOpts, labelValues ...string) Summary {
 			counts:     [2]*summaryCounts{{}, {}},
 		}
 		s.init(s) // Init self-collection.
+		s.createdTs = timestamppb.New(opts.now())
 		return s
 	}
 
 	s := &summary{
 		desc: desc,
+		now:  opts.now,
 
 		objectives:       opts.Objectives,
 		sortedObjectives: make([]float64, 0, len(opts.Objectives)),
@@ -245,7 +254,7 @@ func newSummary(desc *Desc, opts SummaryOpts, labelValues ...string) Summary {
 		coldBuf:        make([]float64, 0, opts.BufCap),
 		streamDuration: opts.MaxAge / time.Duration(opts.AgeBuckets),
 	}
-	s.headStreamExpTime = time.Now().Add(s.streamDuration)
+	s.headStreamExpTime = opts.now().Add(s.streamDuration)
 	s.hotBufExpTime = s.headStreamExpTime
 
 	for i := uint32(0); i < opts.AgeBuckets; i++ {
@@ -259,6 +268,7 @@ func newSummary(desc *Desc, opts SummaryOpts, labelValues ...string) Summary {
 	sort.Float64s(s.sortedObjectives)
 
 	s.init(s) // Init self-collection.
+	s.createdTs = timestamppb.New(opts.now())
 	return s
 }
 
@@ -270,6 +280,8 @@ type summary struct {
 	// Lock bufMtx before mtx if both are needed.
 
 	desc *Desc
+
+	now func() time.Time
 
 	objectives       map[float64]float64
 	sortedObjectives []float64
@@ -286,6 +298,8 @@ type summary struct {
 	headStream                       *quantile.Stream
 	headStreamIdx                    int
 	headStreamExpTime, hotBufExpTime time.Time
+
+	createdTs *timestamppb.Timestamp
 }
 
 func (s *summary) Desc() *Desc {
@@ -296,7 +310,7 @@ func (s *summary) Observe(v float64) {
 	s.bufMtx.Lock()
 	defer s.bufMtx.Unlock()
 
-	now := time.Now()
+	now := s.now()
 	if now.After(s.hotBufExpTime) {
 		s.asyncFlush(now)
 	}
@@ -307,13 +321,15 @@ func (s *summary) Observe(v float64) {
 }
 
 func (s *summary) Write(out *dto.Metric) error {
-	sum := &dto.Summary{}
+	sum := &dto.Summary{
+		CreatedTimestamp: s.createdTs,
+	}
 	qs := make([]*dto.Quantile, 0, len(s.objectives))
 
 	s.bufMtx.Lock()
 	s.mtx.Lock()
 	// Swap bufs even if hotBuf is empty to set new hotBufExpTime.
-	s.swapBufs(time.Now())
+	s.swapBufs(s.now())
 	s.bufMtx.Unlock()
 
 	s.flushColdBuf()
@@ -440,6 +456,8 @@ type noObjectivesSummary struct {
 	counts [2]*summaryCounts
 
 	labelPairs []*dto.LabelPair
+
+	createdTs *timestamppb.Timestamp
 }
 
 func (s *noObjectivesSummary) Desc() *Desc {
@@ -453,13 +471,9 @@ func (s *noObjectivesSummary) Observe(v float64) {
 	n := atomic.AddUint64(&s.countAndHotIdx, 1)
 	hotCounts := s.counts[n>>63]
 
-	for {
-		oldBits := atomic.LoadUint64(&hotCounts.sumBits)
-		newBits := math.Float64bits(math.Float64frombits(oldBits) + v)
-		if atomic.CompareAndSwapUint64(&hotCounts.sumBits, oldBits, newBits) {
-			break
-		}
-	}
+	atomicUpdateFloat(&hotCounts.sumBits, func(oldVal float64) float64 {
+		return oldVal + v
+	})
 	// Increment count last as we take it as a signal that the observation
 	// is complete.
 	atomic.AddUint64(&hotCounts.count, 1)
@@ -490,8 +504,9 @@ func (s *noObjectivesSummary) Write(out *dto.Metric) error {
 	}
 
 	sum := &dto.Summary{
-		SampleCount: proto.Uint64(count),
-		SampleSum:   proto.Float64(math.Float64frombits(atomic.LoadUint64(&coldCounts.sumBits))),
+		SampleCount:      proto.Uint64(count),
+		SampleSum:        proto.Float64(math.Float64frombits(atomic.LoadUint64(&coldCounts.sumBits))),
+		CreatedTimestamp: s.createdTs,
 	}
 
 	out.Summary = sum
@@ -500,14 +515,13 @@ func (s *noObjectivesSummary) Write(out *dto.Metric) error {
 	// Finally add all the cold counts to the new hot counts and reset the cold counts.
 	atomic.AddUint64(&hotCounts.count, count)
 	atomic.StoreUint64(&coldCounts.count, 0)
-	for {
-		oldBits := atomic.LoadUint64(&hotCounts.sumBits)
-		newBits := math.Float64bits(math.Float64frombits(oldBits) + sum.GetSampleSum())
-		if atomic.CompareAndSwapUint64(&hotCounts.sumBits, oldBits, newBits) {
-			atomic.StoreUint64(&coldCounts.sumBits, 0)
-			break
-		}
-	}
+
+	// Use atomicUpdateFloat to update hotCounts.sumBits atomically.
+	atomicUpdateFloat(&hotCounts.sumBits, func(oldVal float64) float64 {
+		return oldVal + sum.GetSampleSum()
+	})
+	atomic.StoreUint64(&coldCounts.sumBits, 0)
+
 	return nil
 }
 
@@ -681,6 +695,7 @@ type constSummary struct {
 	sum        float64
 	quantiles  map[float64]float64
 	labelPairs []*dto.LabelPair
+	createdTs  *timestamppb.Timestamp
 }
 
 func (s *constSummary) Desc() *Desc {
@@ -688,7 +703,9 @@ func (s *constSummary) Desc() *Desc {
 }
 
 func (s *constSummary) Write(out *dto.Metric) error {
-	sum := &dto.Summary{}
+	sum := &dto.Summary{
+		CreatedTimestamp: s.createdTs,
+	}
 	qs := make([]*dto.Quantile, 0, len(s.quantiles))
 
 	sum.SampleCount = proto.Uint64(s.count)
@@ -737,7 +754,7 @@ func NewConstSummary(
 	if desc.err != nil {
 		return nil, desc.err
 	}
-	if err := validateLabelValues(labelValues, len(desc.variableLabels)); err != nil {
+	if err := validateLabelValues(labelValues, len(desc.variableLabels.names)); err != nil {
 		return nil, err
 	}
 	return &constSummary{
@@ -759,6 +776,48 @@ func MustNewConstSummary(
 	labelValues ...string,
 ) Metric {
 	m, err := NewConstSummary(desc, count, sum, quantiles, labelValues...)
+	if err != nil {
+		panic(err)
+	}
+	return m
+}
+
+// NewConstSummaryWithCreatedTimestamp does the same thing as NewConstSummary but sets the created timestamp.
+func NewConstSummaryWithCreatedTimestamp(
+	desc *Desc,
+	count uint64,
+	sum float64,
+	quantiles map[float64]float64,
+	ct time.Time,
+	labelValues ...string,
+) (Metric, error) {
+	if desc.err != nil {
+		return nil, desc.err
+	}
+	if err := validateLabelValues(labelValues, len(desc.variableLabels.names)); err != nil {
+		return nil, err
+	}
+	return &constSummary{
+		desc:       desc,
+		count:      count,
+		sum:        sum,
+		quantiles:  quantiles,
+		labelPairs: MakeLabelPairs(desc, labelValues),
+		createdTs:  timestamppb.New(ct),
+	}, nil
+}
+
+// MustNewConstSummaryWithCreatedTimestamp is a version of NewConstSummaryWithCreatedTimestamp that panics where
+// NewConstSummaryWithCreatedTimestamp would have returned an error.
+func MustNewConstSummaryWithCreatedTimestamp(
+	desc *Desc,
+	count uint64,
+	sum float64,
+	quantiles map[float64]float64,
+	ct time.Time,
+	labelValues ...string,
+) Metric {
+	m, err := NewConstSummaryWithCreatedTimestamp(desc, count, sum, quantiles, ct, labelValues...)
 	if err != nil {
 		panic(err)
 	}

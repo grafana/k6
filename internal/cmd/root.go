@@ -20,6 +20,7 @@ import (
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/internal/log"
+	"go.k6.io/k6/internal/provision"
 )
 
 const waitLoggerCloseTimeout = time.Second * 5
@@ -69,11 +70,17 @@ func newRootCommand(gs *state.GlobalState) *rootCommand {
 		rootCmd.AddCommand(sc(gs))
 	}
 
+	opts := &provision.Options{}
+
+	for _, cmd := range rootCmd.Commands() {
+		provision.Install(opts, gs, cmd)
+	}
+	
 	c.cmd = rootCmd
 	return c
 }
 
-func (c *rootCommand) persistentPreRunE(_ *cobra.Command, _ []string) error {
+func (c *rootCommand) persistentPreRunE(cmd *cobra.Command, args []string) error {
 	err := c.setupLoggers(c.stopLoggersCh)
 	if err != nil {
 		return err
