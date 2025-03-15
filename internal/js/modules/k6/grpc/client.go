@@ -404,13 +404,17 @@ func normalizeNumberStrings(obj *sobek.Object, runtime *sobek.Runtime) error {
 			} else if math.IsInf(vfloat, -1) {
 				err = obj.Set(key, "-Infinity")
 			}
-			return err
+			if err != nil {
+				return err
+			}
 		case []interface{}, map[string]interface{}:
 			nestedObj := runtime.ToValue(exported).ToObject(runtime)
 			if err := normalizeNumberStrings(nestedObj, runtime); err != nil {
 				return err
 			}
-			return obj.Set(key, nestedObj)
+			if err := obj.Set(key, nestedObj); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
