@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -363,7 +362,10 @@ func (c *Client) buildInvokeRequest(
 		return grpcReq, errors.New("request cannot be nil")
 	}
 
-	b, err := json.Marshal(encodeFloatsForJSON(req.ToObject(c.vu.Runtime()).Export()))
+	object := req.ToObject(c.vu.Runtime())
+	normalizeNumberStrings(object, c.vu.Runtime())
+
+	b, err := object.MarshalJSON()
 	if err != nil {
 		return grpcReq, fmt.Errorf("unable to serialise request object: %w", err)
 	}
@@ -381,33 +383,29 @@ func (c *Client) buildInvokeRequest(
 	}, nil
 }
 
-// encodeFloatsForJSON recursively processes the object and replaces NaN and Infinity with their string equivalents.
-// - math.NaN() is converted to the string "NaN"
-// - math.Inf(1) is converted to the string "Infinity"
-// - math.Inf(-1) is converted to the string "-Infinity"
-// This is necessary because NaN and Infinity are not valid in ProtoJSON, unless represented as strings.
-func encodeFloatsForJSON(data interface{}) interface{} {
-	switch v := data.(type) {
-	case map[string]interface{}:
-		for key, val := range v {
-			v[key] = encodeFloatsForJSON(val)
-		}
-		return v
-	case []interface{}:
-		for i, val := range v {
-			v[i] = encodeFloatsForJSON(val)
-		}
-		return v
-	case float64:
-		if math.IsNaN(v) {
-			return "NaN"
-		} else if math.IsInf(v, 1) {
-			return "Infinity"
-		} else if math.IsInf(v, -1) {
-			return "-Infinity"
+// normalizeNumberStrings converts special floating-point values (NaN, Infinity) in a Sobek
+// object to their string representations for proper JSON serialization.
+// Recursively processes nested objects and arrays, modifying the object in place.
+func normalizeNumberStrings(obj *sobek.Object, runtime *sobek.Runtime) {
+	for _, key := range obj.Keys() {
+		val := obj.Get(key)
+		exported := val.Export()
+		switch exported.(type) {
+		case float64:
+			vfloat := val.ToFloat()
+			if math.IsNaN(vfloat) {
+				obj.Set(key, "NaN")
+			} else if math.IsInf(vfloat, 1) {
+				obj.Set(key, "Infinity")
+			} else if math.IsInf(vfloat, -1) {
+				obj.Set(key, "-Infinity")
+			}
+		case []interface{}, map[string]interface{}:
+			nestedObj := runtime.ToValue(exported).ToObject(runtime)
+			normalizeNumberStrings(nestedObj, runtime)
+			obj.Set(key, nestedObj)
 		}
 	}
-	return data
 }
 
 // Close will close the client gRPC connection
