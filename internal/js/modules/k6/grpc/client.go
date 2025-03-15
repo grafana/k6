@@ -363,7 +363,10 @@ func (c *Client) buildInvokeRequest(
 	}
 
 	object := req.ToObject(c.vu.Runtime())
-	normalizeNumberStrings(object, c.vu.Runtime())
+	err = normalizeNumberStrings(object, c.vu.Runtime())
+	if err != nil {
+		return grpcReq, fmt.Errorf("unable to normalize number strings: %w", err)
+	}
 
 	b, err := object.MarshalJSON()
 	if err != nil {
@@ -386,26 +389,31 @@ func (c *Client) buildInvokeRequest(
 // normalizeNumberStrings converts special floating-point values (NaN, Infinity) in a Sobek
 // object to their string representations for proper JSON serialization.
 // Recursively processes nested objects and arrays, modifying the object in place.
-func normalizeNumberStrings(obj *sobek.Object, runtime *sobek.Runtime) {
+func normalizeNumberStrings(obj *sobek.Object, runtime *sobek.Runtime) error {
 	for _, key := range obj.Keys() {
 		val := obj.Get(key)
 		exported := val.Export()
 		switch exported.(type) {
 		case float64:
 			vfloat := val.ToFloat()
+			var err error
 			if math.IsNaN(vfloat) {
-				obj.Set(key, "NaN")
+				err = obj.Set(key, "NaN")
 			} else if math.IsInf(vfloat, 1) {
-				obj.Set(key, "Infinity")
+				err = obj.Set(key, "Infinity")
 			} else if math.IsInf(vfloat, -1) {
-				obj.Set(key, "-Infinity")
+				err = obj.Set(key, "-Infinity")
 			}
+			return err
 		case []interface{}, map[string]interface{}:
 			nestedObj := runtime.ToValue(exported).ToObject(runtime)
-			normalizeNumberStrings(nestedObj, runtime)
-			obj.Set(key, nestedObj)
+			if err := normalizeNumberStrings(nestedObj, runtime); err != nil {
+				return err
+			}
+			return obj.Set(key, nestedObj)
 		}
 	}
+	return nil
 }
 
 // Close will close the client gRPC connection
