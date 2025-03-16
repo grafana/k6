@@ -64,6 +64,6 @@ func recursiveReplace(v any, replacer *strings.Replacer) any {
 	case time.Duration:
 		return v
 	}
-	// replace this with a log after more testing
-	panic(fmt.Sprintf("Had a logrus.fields value with type %T, please report that this is unsupported", v))
+	return fmt.Sprintf("Had a logrus.fields value with type %T, "+
+		"please report that this is unsupported and will be redacted in all logs in case it contains secrets", v)
 }
