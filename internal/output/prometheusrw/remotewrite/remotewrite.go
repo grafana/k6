@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"go.k6.io/k6/internal/output/prometheusrw/remote"
 	"go.k6.io/k6/internal/output/prometheusrw/stale"
 
@@ -31,7 +33,8 @@ type Output struct {
 	trendStatsResolver map[string]func(*metrics.TrendSink) float64
 
 	// TODO: copy the prometheus/remote.WriteClient interface and depend on it
-	client *remote.WriteClient
+	rwClient  *remote.WriteClient
+	pgwClient remote.RegistryPusher
 }
 
 // New creates a new Output instance.
@@ -48,14 +51,25 @@ func New(params output.Params) (*Output, error) {
 		return nil, err
 	}
 
-	wc, err := remote.NewWriteClient(config.ServerURL.String, clientConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize the Prometheus remote write client: %w", err)
+	var pgwClient remote.RegistryPusher
+	var rwClient *remote.WriteClient
+
+	if config.UsePushgateway.Bool {
+		pgwClient, err = remote.NewPushgatewayClient(config.ServerURL.String, config.PushgatewayJob.String, clientConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize the Prometheus Pushgateway client: %w", err)
+		}
+	} else {
+		rwClient, err = remote.NewWriteClient(config.ServerURL.String, clientConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize the Prometheus remote write client: %w", err)
+		}
 	}
 
 	o := &Output{
-		client: wc,
-		config: config,
+		rwClient:  rwClient,
+		pgwClient: pgwClient,
+		config:    config,
 		// TODO: consider to do this function millisecond-based
 		// so we don't need to truncate all the time we invoke it.
 		// Before we should analyze if in some cases is it useful to have it in ns.
@@ -95,7 +109,9 @@ func (o *Output) Stop() error {
 	defer o.logger.Debug("Output stopped")
 	o.periodicFlusher.Stop()
 
-	if !o.config.StaleMarkers.Bool {
+	if !o.config.StaleMarkers.Bool || o.config.UsePushgateway.Bool {
+		// Don't write stale markers for pushgateway, as this could result in
+		// data loss if pushgateway hasn't been crawled yet
 		return nil
 	}
 	staleMarkers := o.staleMarkers()
@@ -105,7 +121,7 @@ func (o *Output) Stop() error {
 	}
 	o.logger.WithField("staleMarkers", len(staleMarkers)).Debug("Marking time series as stale")
 
-	err := o.client.Store(context.Background(), staleMarkers)
+	err := o.rwClient.Store(context.Background(), staleMarkers)
 	if err != nil {
 		return fmt.Errorf("marking time series as stale failed: %w", err)
 	}
@@ -131,18 +147,20 @@ func (o *Output) staleMarkers() []*prompb.TimeSeries {
 		// the unique exception where more than 1 is expected is when
 		// trend stats have been configured with multiple values.
 		for _, s := range series {
-			if len(s.Samples) < 1 {
-				if len(s.Histograms) < 1 {
+			if len(s.Series.Samples) < 1 {
+				if len(s.Series.Histograms) < 1 {
 					panic("data integrity check: samples and native histograms" +
 						" can't be empty at the same time")
 				}
-				s.Samples = append(s.Samples, &prompb.Sample{})
+				s.Series.Samples = append(s.Series.Samples, &prompb.Sample{})
 			}
 
-			s.Samples[0].Value = stale.Marker
-			s.Samples[0].Timestamp = timestamp
+			s.Series.Samples[0].Value = stale.Marker
+			s.Series.Samples[0].Timestamp = timestamp
 		}
-		staleMarkers = append(staleMarkers, series...)
+		for _, s := range series {
+			staleMarkers = append(staleMarkers, s.Series)
+		}
 	}
 	return staleMarkers
 }
@@ -223,17 +241,111 @@ func (o *Output) flush() {
 	// c) not have duplicate timestamps within 1 timeseries, see https://github.com/prometheus/prometheus/issues/9210
 	// Prometheus write handler processes only some fields as of now, so here we'll add only them.
 
-	promTimeSeries := o.convertToPbSeries(samplesContainers)
-	nts = len(promTimeSeries)
+	promTimeSeriesWithType := o.convertToPbSeries(samplesContainers)
+	nts = len(promTimeSeriesWithType)
 	o.logger.WithField("nts", nts).Debug("Converted samples to Prometheus TimeSeries")
 
-	if err := o.client.Store(context.Background(), promTimeSeries); err != nil {
-		o.logger.WithError(err).Error("Failed to send the time series data to the endpoint")
-		return
+	if o.pgwClient != nil {
+		o.flushToPushgateway(promTimeSeriesWithType)
+	} else {
+		if o.rwClient == nil {
+			o.logger.Error("Remote write client not initialized")
+			return
+		}
+		o.flushToRemoteWrite(promTimeSeriesWithType)
 	}
 }
 
-func (o *Output) convertToPbSeries(samplesContainers []metrics.SampleContainer) []*prompb.TimeSeries {
+func (o *Output) flushToPushgateway(promTimeSeriesWithType []prompbSeriesWithType) {
+	registries := o.convertToPromRegistries(promTimeSeriesWithType)
+	if err := o.pgwClient.Push(context.Background(), registries); err != nil {
+		o.logger.WithError(err).Error("Failed to send the time series data to the endpoint")
+	}
+}
+
+func (o *Output) flushToRemoteWrite(promTimeSeriesWithType []prompbSeriesWithType) {
+	promTimeSeries := make([]*prompb.TimeSeries, len(promTimeSeriesWithType))
+	for i, seriesWithType := range promTimeSeriesWithType {
+		promTimeSeries[i] = seriesWithType.Series
+	}
+
+	if err := o.rwClient.Store(context.Background(), promTimeSeries); err != nil {
+		o.logger.WithError(err).Error("Failed to send the time series data to the endpoint")
+	}
+}
+
+func (o *Output) convertToPromRegistries(promTimeSeriesWithType []prompbSeriesWithType) []*prometheus.Registry {
+	registries := make([]*prometheus.Registry, 0, len(promTimeSeriesWithType))
+
+	for _, promSeriesWithType := range promTimeSeriesWithType {
+		s := promSeriesWithType.Series
+
+		metricName, labelMap := metricNameAndLabelMap(s)
+
+		var collector prometheus.Collector
+
+		switch promSeriesWithType.Type {
+		case metrics.Counter:
+			captured := s.Samples[0].Value
+			collector = prometheus.NewCounterFunc(
+				prometheus.CounterOpts{
+					Name:        metricName,
+					ConstLabels: labelMap,
+				},
+				func() float64 {
+					return captured
+				})
+		case metrics.Gauge, metrics.Rate:
+			captured := s.Samples[0].Value
+			collector = prometheus.NewGaugeFunc(
+				prometheus.GaugeOpts{
+					Name:        metricName,
+					ConstLabels: labelMap,
+				},
+				func() float64 {
+					return captured
+				})
+		case metrics.Trend:
+			// happens only for native histograms
+			collector = *promSeriesWithType.hist
+		default:
+			panic(
+				fmt.Sprintf(
+					"unhandled metric type %s",
+					promSeriesWithType.Type,
+				),
+			)
+		}
+
+		// Create a new registry for each metric. This approach is required because the samples may include
+		// metrics with the same name but a different number or combination of labels. The Prometheus registry
+		// enforces that metrics with the same name must share the same label structure.
+		// To circumvent this limitation, we use separate registries for each metric.
+		registry := prometheus.NewRegistry()
+		if err := registry.Register(collector); err != nil {
+			o.logger.WithError(err).Errorf("Failed to register prometheus function for metric %s", metricName)
+		}
+
+		registries = append(registries, registry)
+	}
+
+	return registries
+}
+
+func metricNameAndLabelMap(s *prompb.TimeSeries) (string, map[string]string) {
+	var metricName string
+	labelMap := make(map[string]string)
+	for _, label := range s.Labels {
+		if label.GetName() == namelbl {
+			metricName = label.GetValue()
+		} else {
+			labelMap[label.Name] = label.Value
+		}
+	}
+	return metricName, labelMap
+}
+
+func (o *Output) convertToPbSeries(samplesContainers []metrics.SampleContainer) []prompbSeriesWithType {
 	// The seen map is required because the samples containers
 	// could have several samples for the same time series
 	//  in this way, we can aggregate and flush them in a unique value
@@ -291,11 +403,18 @@ func (o *Output) convertToPbSeries(samplesContainers []metrics.SampleContainer) 
 		}
 	}
 
-	pbseries := make([]*prompb.TimeSeries, 0, len(seen))
+	pbseries := make([]prompbSeriesWithType, 0, len(seen))
 	for s := range seen {
 		pbseries = append(pbseries, o.tsdb[s].MapPrompb()...)
 	}
 	return pbseries
+}
+
+type prompbSeriesWithType struct {
+	Series *prompb.TimeSeries
+	Type   metrics.MetricType
+	// only filled for native histograms metrics where Type == Trend
+	hist *prometheus.Histogram
 }
 
 type seriesWithMeasure struct {
@@ -313,8 +432,8 @@ type seriesWithMeasure struct {
 }
 
 // TODO: add unit tests
-func (swm seriesWithMeasure) MapPrompb() []*prompb.TimeSeries {
-	var newts []*prompb.TimeSeries
+func (swm seriesWithMeasure) MapPrompb() []prompbSeriesWithType {
+	var newts []prompbSeriesWithType
 
 	mapMonoSeries := func(s metrics.TimeSeries, suffix string, t time.Time) prompb.TimeSeries {
 		return prompb.TimeSeries{
@@ -330,19 +449,19 @@ func (swm seriesWithMeasure) MapPrompb() []*prompb.TimeSeries {
 	case metrics.Counter:
 		ts := mapMonoSeries(swm.TimeSeries, "total", swm.Latest)
 		ts.Samples[0].Value = swm.Measure.(*metrics.CounterSink).Value
-		newts = []*prompb.TimeSeries{&ts}
+		newts = []prompbSeriesWithType{{Series: &ts, Type: metrics.Counter}}
 
 	case metrics.Gauge:
 		ts := mapMonoSeries(swm.TimeSeries, "", swm.Latest)
 		ts.Samples[0].Value = swm.Measure.(*metrics.GaugeSink).Value
-		newts = []*prompb.TimeSeries{&ts}
+		newts = []prompbSeriesWithType{{Series: &ts, Type: metrics.Gauge}}
 
 	case metrics.Rate:
 		ts := mapMonoSeries(swm.TimeSeries, "rate", swm.Latest)
 		// pass zero duration here because time is useless for formatting rate
 		rateVals := swm.Measure.(*metrics.RateSink).Format(time.Duration(0))
 		ts.Samples[0].Value = rateVals["rate"]
-		newts = []*prompb.TimeSeries{&ts}
+		newts = []prompbSeriesWithType{{Series: &ts, Type: metrics.Rate}}
 
 	case metrics.Trend:
 		// TODO:
@@ -368,7 +487,7 @@ func (swm seriesWithMeasure) MapPrompb() []*prompb.TimeSeries {
 }
 
 type prompbMapper interface {
-	MapPrompb(series metrics.TimeSeries, t time.Time) []*prompb.TimeSeries
+	MapPrompb(series metrics.TimeSeries, t time.Time) []prompbSeriesWithType
 }
 
 func newSeriesWithMeasure(
@@ -385,7 +504,7 @@ func newSeriesWithMeasure(
 	case metrics.Trend:
 		// TODO: refactor encapsulating in a factory method
 		if trendAsNativeHistogram {
-			sink = newNativeHistogramSink(series.Metric)
+			sink = newNativeHistogramSink(&series)
 		} else {
 			var err error
 			sink, err = newExtendedTrendSink(tsr)

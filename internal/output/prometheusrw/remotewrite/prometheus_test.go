@@ -72,10 +72,23 @@ func assertTimeSeriesEqual(t *testing.T, expected []*prompb.TimeSeries, actual [
 }
 
 // sortByLabelName sorts a slice of time series by Name label.
-//
-// TODO: remove the assumption that Name label is the first.
+func nameLabelVal(labels []*prompb.Label) string {
+	for _, label := range labels {
+		if label.Name == "__name__" {
+			return label.Value
+		}
+	}
+	panic("label with name '__name__' does not exist")
+}
+
 func sortByNameLabel(s []*prompb.TimeSeries) {
 	sort.Slice(s, func(i, j int) bool {
-		return s[i].Labels[0].Value <= s[j].Labels[0].Value
+		return nameLabelVal(s[i].Labels) <= nameLabelVal(s[j].Labels)
+	})
+}
+
+func sortWithTypeByNameLabel(s []prompbSeriesWithType) {
+	sort.Slice(s, func(i, j int) bool {
+		return nameLabelVal(s[i].Series.Labels) <= nameLabelVal(s[j].Series.Labels)
 	})
 }

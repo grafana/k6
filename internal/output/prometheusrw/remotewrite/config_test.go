@@ -592,3 +592,79 @@ func TestOptionStaleMarker(t *testing.T) {
 		})
 	}
 }
+
+func TestOptionUsePushgateway(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		arg     string
+		env     map[string]string
+		jsonRaw json.RawMessage
+	}{
+		"JSON": {jsonRaw: json.RawMessage(`{"usePushgateway":true}`)},
+		"Env":  {env: map[string]string{"K6_PROMETHEUS_RW_USE_PUSHGATEWAY": "true"}},
+		//nolint:gocritic
+		//"Arg":  {arg: "usePushgateway=true"},
+	}
+
+	expconfig := Config{
+		ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
+		InsecureSkipTLSVerify: null.BoolFrom(false),
+		Username:              null.NewString("", false),
+		Password:              null.NewString("", false),
+		PushInterval:          types.NullDurationFrom(5 * time.Second),
+		Headers:               make(map[string]string),
+		TrendStats:            []string{"p(99)"},
+		StaleMarkers:          null.BoolFrom(false),
+		UsePushgateway:        null.BoolFrom(true),
+	}
+
+	for name, tc := range cases {
+		tc := tc
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			c, err := GetConsolidatedConfig(
+				tc.jsonRaw, tc.env, tc.arg)
+			require.NoError(t, err)
+			assert.Equal(t, expconfig, c)
+		})
+	}
+}
+
+func TestOptionPushgatewayJob(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		arg     string
+		env     map[string]string
+		jsonRaw json.RawMessage
+	}{
+		"JSON": {jsonRaw: json.RawMessage(`{"pushgatewayJob":"expectedJobname"}`)},
+		"Env":  {env: map[string]string{"K6_PROMETHEUS_RW_PUSHGATEWAY_JOB": "expectedJobname"}},
+		//nolint:gocritic
+		//"Arg":  {arg: "pushgatewayJob=expectedJobname"},
+	}
+
+	expconfig := Config{
+		ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
+		InsecureSkipTLSVerify: null.BoolFrom(false),
+		Username:              null.NewString("", false),
+		Password:              null.NewString("", false),
+		PushInterval:          types.NullDurationFrom(5 * time.Second),
+		Headers:               make(map[string]string),
+		TrendStats:            []string{"p(99)"},
+		StaleMarkers:          null.BoolFrom(false),
+		PushgatewayJob:        null.NewString("expectedJobname", true),
+	}
+
+	for name, tc := range cases {
+		tc := tc
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			c, err := GetConsolidatedConfig(
+				tc.jsonRaw, tc.env, tc.arg)
+			require.NoError(t, err)
+			assert.Equal(t, expconfig, c)
+		})
+	}
+}

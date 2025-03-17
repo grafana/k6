@@ -80,6 +80,13 @@ type Config struct {
 
 	// SigV4SecretKey is the AWS secret key.
 	SigV4SecretKey null.String `json:"sigV4SecretKey"`
+
+	// UsePushgateway defines if the metrics should be exported to a Pushgateway
+	// instead of a remote-write endpoint.
+	UsePushgateway null.Bool `json:"usePushgateway"`
+
+	// PushgatewayJob defines the job name when exporting to a pushgateway
+	PushgatewayJob null.String `json:"pushgatewayJob"`
 }
 
 // NewConfig creates an Output's configuration.
@@ -223,6 +230,14 @@ func (conf Config) Apply(applied Config) Config {
 		conf.ClientCertificateKey = applied.ClientCertificateKey
 	}
 
+	if applied.UsePushgateway.Valid {
+		conf.UsePushgateway = applied.UsePushgateway
+	}
+
+	if applied.PushgatewayJob.Valid {
+		conf.PushgatewayJob = applied.PushgatewayJob
+	}
+
 	return conf
 }
 
@@ -287,7 +302,7 @@ func envMap(env map[string]string, prefix string) map[string]string {
 }
 
 // TODO: try to migrate to github.com/mstoykov/envconfig like it's done on other projects?
-func parseEnvs(env map[string]string) (Config, error) { //nolint:funlen
+func parseEnvs(env map[string]string) (Config, error) { //nolint:funlen,cyclop
 	c := Config{
 		Headers: make(map[string]string),
 	}
@@ -371,6 +386,16 @@ func parseEnvs(env map[string]string) (Config, error) { //nolint:funlen
 		c.TrendStats = strings.Split(trendStats, ",")
 	}
 
+	if b, err := envBool(env, "K6_PROMETHEUS_RW_USE_PUSHGATEWAY"); err != nil {
+		return c, err
+	} else if b.Valid {
+		c.UsePushgateway = b
+	}
+
+	if pushgatewayJob, pushgatewayJobDefined := env["K6_PROMETHEUS_RW_PUSHGATEWAY_JOB"]; pushgatewayJobDefined {
+		c.PushgatewayJob = null.StringFrom(pushgatewayJob)
+	}
+
 	return c, nil
 }
 
@@ -426,6 +451,13 @@ func parseArg(text string) (Config, error) {
 			c.ClientCertificate = null.StringFrom(v)
 		case "clientCertificateKey":
 			c.ClientCertificateKey = null.StringFrom(v)
+
+		case "usePushgateway":
+			if err := c.UsePushgateway.UnmarshalText([]byte(v)); err != nil {
+				return c, fmt.Errorf("usePushgateway value must be true or false, not %q", v)
+			}
+		case "pushgatewayJob":
+			c.PushgatewayJob = null.StringFrom(v)
 
 		default:
 			if !strings.HasPrefix(key, "headers.") {
