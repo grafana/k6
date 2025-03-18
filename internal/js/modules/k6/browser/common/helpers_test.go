@@ -58,7 +58,7 @@ func TestConvertArgument(t *testing.T) {
 
 		execCtx, ctx := newExecCtx()
 
-		var value float64 = 777.0
+		value := 777.0
 		arg, _ := convertArgument(ctx, execCtx, value)
 
 		require.NotNil(t, arg)
