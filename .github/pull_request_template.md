@@ -24,8 +24,8 @@ and code of conduct https://github.com/grafana/k6/blob/master/CODE_OF_CONDUCT.md
 
 - [ ] I have added the correct milestone and labels to the PR.
 - [ ] I have updated the release notes: _link_
-- [ ] I have updated or added an issue to the [k6-documentation](https://github.com/grafana/k6-docs): grafana/k6-docs#NUMBER
-- [ ] I have updated or added an issue to the [TypeScript definitions](https://github.com/grafana/k6-DefinitelyTyped/tree/master/types/k6): grafana/k6-DefinitelyTyped#NUMBER
+- [ ] I have updated or added an issue to the [k6-documentation](https://github.com/grafana/k6-docs): grafana/k6-docs#NUMBER if applicable
+- [ ] I have updated or added an issue to the [TypeScript definitions](https://github.com/grafana/k6-DefinitelyTyped/tree/master/types/k6): grafana/k6-DefinitelyTyped#NUMBER if applicable
 
 <!-- - [ ] Any other relevant item -->
 
