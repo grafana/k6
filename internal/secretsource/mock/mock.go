@@ -13,7 +13,6 @@ func init() {
 	secretsource.RegisterExtension("mock", func(params secretsource.Params) (secretsource.Source, error) {
 		list := strings.Split(params.ConfigArgument, ",")
 		secrets := make(map[string]string, len(list))
-		name := "mock"
 		for _, kv := range list {
 			k, v, ok := strings.Cut(kv, "=")
 			if !ok {
@@ -22,25 +21,19 @@ func init() {
 
 			secrets[k] = v
 		}
-		return NewMockSecretSource(name, secrets), nil
+		return NewMockSecretSource(secrets), nil
 	})
 }
 
 // NewMockSecretSource returns a new secret source mock with the provided name and map of secrets
-func NewMockSecretSource(name string, secrets map[string]string) secretsource.Source {
+func NewMockSecretSource(secrets map[string]string) secretsource.Source {
 	return &mockSecretSource{
 		internal: secrets,
-		name:     name,
 	}
 }
 
 type mockSecretSource struct {
 	internal map[string]string
-	name     string
-}
-
-func (mss *mockSecretSource) Name() string {
-	return mss.name
 }
 
 func (mss *mockSecretSource) Description() string {
