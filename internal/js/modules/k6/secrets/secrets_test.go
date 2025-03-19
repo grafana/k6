@@ -37,7 +37,7 @@ func TestSecrets(t *testing.T) {
 	cases := map[string]secretsTest{
 		"simple": {
 			secretsources: map[string]secretsource.Source{
-				"default": mock.NewMockSecretSource("some", map[string]string{
+				"default": mock.NewMockSecretSource(map[string]string{
 					"secret": "value",
 				}),
 			},
@@ -46,7 +46,7 @@ func TestSecrets(t *testing.T) {
 		},
 		"error": {
 			secretsources: map[string]secretsource.Source{
-				"default": mock.NewMockSecretSource("some", map[string]string{
+				"default": mock.NewMockSecretSource(map[string]string{
 					"secret": "value",
 				}),
 			},
@@ -55,10 +55,10 @@ func TestSecrets(t *testing.T) {
 		},
 		"multiple": {
 			secretsources: map[string]secretsource.Source{
-				"default": mock.NewMockSecretSource("some", map[string]string{
+				"default": mock.NewMockSecretSource(map[string]string{
 					"secret": "value",
 				}),
-				"second": mock.NewMockSecretSource("some", map[string]string{
+				"second": mock.NewMockSecretSource(map[string]string{
 					"secret2": "value2",
 				}),
 			},
@@ -67,10 +67,10 @@ func TestSecrets(t *testing.T) {
 		},
 		"multiple get default": {
 			secretsources: map[string]secretsource.Source{
-				"default": mock.NewMockSecretSource("some", map[string]string{
+				"default": mock.NewMockSecretSource(map[string]string{
 					"secret": "value",
 				}),
-				"second": mock.NewMockSecretSource("some", map[string]string{
+				"second": mock.NewMockSecretSource(map[string]string{
 					"secret2": "value2",
 				}),
 			},
@@ -79,10 +79,10 @@ func TestSecrets(t *testing.T) {
 		},
 		"multiple get not default": {
 			secretsources: map[string]secretsource.Source{
-				"default": mock.NewMockSecretSource("some", map[string]string{
+				"default": mock.NewMockSecretSource(map[string]string{
 					"secret": "value",
 				}),
-				"second": mock.NewMockSecretSource("some", map[string]string{
+				"second": mock.NewMockSecretSource(map[string]string{
 					"secret2": "value2",
 				}),
 			},
@@ -91,10 +91,10 @@ func TestSecrets(t *testing.T) {
 		},
 		"multiple get wrong": {
 			secretsources: map[string]secretsource.Source{
-				"default": mock.NewMockSecretSource("some", map[string]string{
+				"default": mock.NewMockSecretSource(map[string]string{
 					"secret": "value",
 				}),
-				"second": mock.NewMockSecretSource("some", map[string]string{
+				"second": mock.NewMockSecretSource(map[string]string{
 					"secret2": "value2",
 				}),
 			},
@@ -108,7 +108,7 @@ func TestSecrets(t *testing.T) {
 		},
 		"get none existing source": {
 			secretsources: map[string]secretsource.Source{
-				"default": mock.NewMockSecretSource("some", map[string]string{
+				"default": mock.NewMockSecretSource(map[string]string{
 					"secret": "value",
 				}),
 			},
