@@ -10,19 +10,21 @@ import (
 )
 
 func init() {
-	secretsource.RegisterExtension("mock", func(params secretsource.Params) (secretsource.Source, error) {
-		list := strings.Split(params.ConfigArgument, ",")
-		secrets := make(map[string]string, len(list))
-		for _, kv := range list {
-			k, v, ok := strings.Cut(kv, "=")
-			if !ok {
-				return nil, fmt.Errorf("parsing %q, needs =", kv)
-			}
+	secretsource.RegisterExtension("mock", newMockSecretSourceFromParams)
+}
 
-			secrets[k] = v
+func newMockSecretSourceFromParams(params secretsource.Params) (secretsource.Source, error) {
+	list := strings.Split(params.ConfigArgument, ",")
+	secrets := make(map[string]string, len(list))
+	for _, kv := range list {
+		k, v, ok := strings.Cut(kv, "=")
+		if !ok {
+			return nil, fmt.Errorf("parsing %q, needs =", kv)
 		}
-		return NewMockSecretSource(secrets), nil
-	})
+
+		secrets[k] = v
+	}
+	return NewMockSecretSource(secrets), nil
 }
 
 // NewMockSecretSource returns a new secret source mock with the provided name and map of secrets
