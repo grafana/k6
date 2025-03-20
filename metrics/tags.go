@@ -131,7 +131,7 @@ func (ts *TagSet) MarshalEasyJSON(w *jwriter.Writer) {
 func (ts *TagSet) MarshalJSON() ([]byte, error) {
 	w := &jwriter.Writer{NoEscapeHTML: true}
 	ts.MarshalEasyJSON(w)
-	return w.Buffer.Buf, w.Error
+	return w.Buffer.BuildBytes(), w.Error
 }
 
 // UnmarshalEasyJSON WILL ALWAYS RETURN AN ERROR because a TagSet needs to be
