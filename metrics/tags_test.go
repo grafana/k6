@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -88,6 +89,25 @@ func TestTagSets(t *testing.T) {
 	assert.False(t, tags4.Contains(tags2))
 	assert.True(t, tags4.Contains(tags3))
 	assert.True(t, tags4.Contains(tags4))
+}
+
+func TestBigTagSetMarshalJSON(t *testing.T) {
+	t.Parallel()
+
+	expextedJSON := `{"tag0":"value0","tag1":"value1","tag2":"value2","tag3":"value3","tag4":"value4","tag5":"value5","tag6":"value6","tag7":"value7"}`
+	assert.Greater(t, len(expextedJSON), 128)
+
+	r := NewRegistry()
+	root := r.RootTagSet()
+
+	tags := root
+	for i := range 8 {
+		tags = tags.With(fmt.Sprintf("tag%d", i), fmt.Sprintf("value%d", i))
+	}
+
+	rJSON, err := tags.MarshalJSON()
+	require.NoError(t, err)
+	assert.Equal(t, expextedJSON, string(rJSON))
 }
 
 func TestTagSetContains(t *testing.T) {
