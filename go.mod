@@ -17,9 +17,9 @@ require (
 	github.com/golang/protobuf v1.5.4
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
-	github.com/grafana/k6deps v0.2.3
-	github.com/grafana/k6provider v0.1.12
-	github.com/grafana/sobek v0.0.0-20250320150027-203dc85b6d98
+	github.com/grafana/k6deps v0.2.4
+	github.com/grafana/k6provider v0.1.13
+	github.com/grafana/sobek v0.0.0-20250219104821-ed22af7a8d6c
 	github.com/grafana/xk6-dashboard v0.7.5
 	github.com/grafana/xk6-redis v0.3.3
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
@@ -67,7 +67,7 @@ require (
 
 require (
 	github.com/Masterminds/semver/v3 v3.3.1 // indirect
-	github.com/grafana/k6build v0.5.5 // indirect
+	github.com/grafana/k6build v0.5.8 // indirect
 	github.com/grafana/k6pack v0.2.4 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 )
@@ -92,9 +92,9 @@ require (
 	github.com/nxadm/tail v1.4.11 // indirect
 	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/prometheus/client_golang v1.20.5
+	github.com/prometheus/client_golang v1.21.0
 	github.com/prometheus/client_model v0.6.1
-	github.com/prometheus/common v0.55.0 // indirect
+	github.com/prometheus/common v0.62.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/r3labs/sse/v2 v2.10.0 // indirect
 	github.com/redis/go-redis/v9 v9.0.5 // indirect

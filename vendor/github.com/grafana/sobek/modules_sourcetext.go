@@ -177,7 +177,7 @@ func exportEntryFromIdentifier(id *ast.Identifier, lex bool) exportEntry {
 	return exportEntry{localName: name, exportName: name, lex: lex}
 }
 
-func exportEntriesFromObjectPattern(op *ast.ObjectPattern, lex bool) []exportEntry {
+func exportEntriesFromObjectPatter(op *ast.ObjectPattern, lex bool) []exportEntry {
 	result := make([]exportEntry, 0, len(op.Properties))
 	for _, p := range op.Properties {
 		switch p := p.(type) {
@@ -193,30 +193,6 @@ func exportEntriesFromObjectPattern(op *ast.ObjectPattern, lex bool) []exportEnt
 			panic("exported of keyed destructuring is not supported at this time.")
 		case *ast.SpreadElement:
 			panic("exported of spread element destructuring is not supported at this time.")
-		default:
-			panic("exported of destructing with unknown type is not supported at this time.")
-		}
-	}
-	return result
-}
-
-func exportEntriesFromArrayPattern(op *ast.ArrayPattern, lex bool) []exportEntry {
-	result := make([]exportEntry, 0, len(op.Elements))
-	for _, p := range op.Elements {
-		switch p := p.(type) {
-		case *ast.ObjectPattern:
-			panic("exported of destructing with object pattern is not supported at this time.")
-		case *ast.ArrayLiteral:
-			panic("exported of destructing with array literal is not supported at this time.")
-		case *ast.ObjectLiteral:
-			panic("exported of destructing with object literal is not supported at this time.")
-		case *ast.Identifier:
-			result = append(result, exportEntry{
-				localName:  p.Name.String(),
-				exportName: p.Name.String(),
-				lex:        lex,
-				offset:     int(p.Idx0()),
-			})
 		default:
 			panic("exported of destructing with unknown type is not supported at this time.")
 		}
@@ -261,9 +237,7 @@ func exportEntriesFromAst(declarations []*ast.ExportDeclaration) []exportEntry {
 				case *ast.Identifier:
 					result = append(result, exportEntryFromIdentifier(i, false))
 				case *ast.ObjectPattern:
-					result = append(result, exportEntriesFromObjectPattern(i, false)...)
-				case *ast.ArrayPattern:
-					result = append(result, exportEntriesFromArrayPattern(i, false)...)
+					result = append(result, exportEntriesFromObjectPatter(i, false)...)
 				default:
 					panic("target for variable declaration export isn't supported. this is sobek bug.")
 				}
@@ -274,9 +248,7 @@ func exportEntriesFromAst(declarations []*ast.ExportDeclaration) []exportEntry {
 				case *ast.Identifier:
 					result = append(result, exportEntryFromIdentifier(i, true))
 				case *ast.ObjectPattern:
-					result = append(result, exportEntriesFromObjectPattern(i, true)...)
-				case *ast.ArrayPattern:
-					result = append(result, exportEntriesFromArrayPattern(i, true)...)
+					result = append(result, exportEntriesFromObjectPatter(i, true)...)
 				default:
 					panic("target for lexical declaration export isn't supported. this is sobek bug.")
 				}

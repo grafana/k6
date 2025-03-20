@@ -24,8 +24,8 @@ func (o *Options) CanUseBuildService() bool {
 }
 
 // NewOptions creates a new Options object.
-func NewOptions(gs *k6State.GlobalState) *Options {
-	return &Options{
+func NewOptions(gs *k6State.GlobalState) Options {
+	return Options{
 		BuildServiceURL:   gs.Flags.BuildServiceURL,
 		BuildServiceToken: extractToken(gs),
 	}
