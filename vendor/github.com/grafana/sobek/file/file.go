@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/url"
 	"path"
-	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -183,10 +182,9 @@ func (fl *File) Position(offset int) Position {
 
 func ResolveSourcemapURL(basename, source string) *url.URL {
 	// if the url is absolute(has scheme) there is nothing to do
-	smURL, err := url.Parse(filepath.ToSlash(strings.TrimSpace(source)))
+	smURL, err := url.Parse(strings.TrimSpace(source))
 	if err == nil && !smURL.IsAbs() {
-		basename = filepath.ToSlash(strings.TrimSpace(basename))
-		baseURL, err1 := url.Parse(basename)
+		baseURL, err1 := url.Parse(strings.TrimSpace(basename))
 		if err1 == nil && path.IsAbs(baseURL.Path) {
 			smURL = baseURL.ResolveReference(smURL)
 		} else {

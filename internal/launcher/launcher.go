@@ -20,7 +20,7 @@ func Execute() {
 	tryBinaryProvisioning := gs.Flags.BinaryProvisioning
 
 	var deps k6deps.Dependencies
-	var opt *launcherCmd.Options
+	var opt launcherCmd.Options
 	if tryBinaryProvisioning {
 		gs.Logger.Debug("trying to provision binary")
 
@@ -62,7 +62,7 @@ func Execute() {
 	}
 }
 
-func runWithBinaryProvisioning(gs *state.GlobalState, deps k6deps.Dependencies, opt *launcherCmd.Options) {
+func runWithBinaryProvisioning(gs *state.GlobalState, deps k6deps.Dependencies, opt launcherCmd.Options) {
 	cmd := launcherCmd.New(gs, deps, opt)
 
 	// disable binary provisioning any second time

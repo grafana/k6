@@ -8,7 +8,7 @@ import (
 )
 
 // New creates new cobra command for exec command.
-func New(gs *k6State.GlobalState, deps k6deps.Dependencies, opt *Options) *cobra.Command {
+func New(gs *k6State.GlobalState, deps k6deps.Dependencies, opt Options) *cobra.Command {
 	state := newState(gs, deps, opt)
 
 	root := &cobra.Command{
