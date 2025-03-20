@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"sync"
 
 	"github.com/mattn/go-colorable"
@@ -88,16 +89,6 @@ func NewGlobalState(ctx context.Context) *GlobalState {
 	}
 
 	env := BuildEnvMap(os.Environ())
-	_, noColorsSet := env["NO_COLOR"] // even empty values disable colors
-	logger := &logrus.Logger{
-		Out: stderr,
-		Formatter: &logrus.TextFormatter{
-			ForceColors:   stderrTTY,
-			DisableColors: !stderrTTY || noColorsSet || env["K6_NO_COLOR"] != "",
-		},
-		Hooks: make(logrus.LevelHooks),
-		Level: logrus.InfoLevel,
-	}
 
 	confDir, err := os.UserConfigDir()
 	if err != nil {
@@ -110,6 +101,22 @@ func NewGlobalState(ctx context.Context) *GlobalState {
 	}
 
 	defaultFlags := GetDefaultFlags(confDir)
+	flags := getFlags(defaultFlags, env, os.Args)
+
+	logLevel := logrus.InfoLevel
+	if flags.Verbose {
+		logLevel = logrus.DebugLevel
+	}
+
+	logger := &logrus.Logger{
+		Out: stderr,
+		Formatter: &logrus.TextFormatter{
+			ForceColors:   stderrTTY,
+			DisableColors: !stderrTTY || flags.NoColor,
+		},
+		Hooks: make(logrus.LevelHooks),
+		Level: logLevel,
+	}
 
 	return &GlobalState{
 		Ctx:             ctx,
@@ -121,7 +128,7 @@ func NewGlobalState(ctx context.Context) *GlobalState {
 		Env:             env,
 		Events:          event.NewEventSystem(100, logger),
 		DefaultFlags:    defaultFlags,
-		Flags:           getFlags(defaultFlags, env),
+		Flags:           flags,
 		OutMutex:        outMutex,
 		Stdout:          stdout,
 		Stderr:          stderr,
@@ -151,6 +158,9 @@ type GlobalFlags struct {
 	SecretSource     []string
 	LogFormat        string
 	Verbose          bool
+
+	BinaryProvisioning bool
+	BuildServiceURL    string
 }
 
 // GetDefaultFlags returns the default global flags.
@@ -160,10 +170,11 @@ func GetDefaultFlags(homeDir string) GlobalFlags {
 		ProfilingEnabled: false,
 		ConfigFilePath:   filepath.Join(homeDir, "k6", defaultConfigFileName),
 		LogOutput:        "stderr",
+		BuildServiceURL:  "https://ingest.k6.io/builder/api/v1",
 	}
 }
 
-func getFlags(defaultFlags GlobalFlags, env map[string]string) GlobalFlags {
+func getFlags(defaultFlags GlobalFlags, env map[string]string, args []string) GlobalFlags {
 	result := defaultFlags
 
 	// TODO: add env vars for the rest of the values (after adjusting
@@ -189,5 +200,17 @@ func getFlags(defaultFlags GlobalFlags, env map[string]string) GlobalFlags {
 	if _, ok := env["K6_PROFILING_ENABLED"]; ok {
 		result.ProfilingEnabled = true
 	}
+	if env["K6_BINARY_PROVISIONING"] == "true" {
+		result.BinaryProvisioning = true
+	}
+	if val, ok := env["K6_BUILD_SERVICE_URL"]; ok {
+		result.BuildServiceURL = val
+	}
+
+	// check if verbose flag is set
+	if slices.Contains(args, "-v") || slices.Contains(args, "--verbose") {
+		result.Verbose = true
+	}
+
 	return result
 }
