@@ -46,7 +46,7 @@ func (mi *Secrets) Exports() modules.Exports {
 	}
 	return modules.Exports{
 		Default: s,
-		Named:   make(map[string]any), // this is intentionally not nil so it doesn't export anything as named expeorts
+		Named:   make(map[string]any), // this is intentionally not nil so it doesn't export anything as named exports
 	}
 }
 
