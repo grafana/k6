@@ -172,12 +172,12 @@ github.com/google/uuid
 # github.com/gorilla/websocket v1.5.3
 ## explicit; go 1.12
 github.com/gorilla/websocket
-# github.com/grafana/k6build v0.5.5
-## explicit; go 1.22.2
+# github.com/grafana/k6build v0.5.8
+## explicit; go 1.23
 github.com/grafana/k6build
 github.com/grafana/k6build/pkg/api
 github.com/grafana/k6build/pkg/client
-# github.com/grafana/k6deps v0.2.3
+# github.com/grafana/k6deps v0.2.4
 ## explicit; go 1.22
 github.com/grafana/k6deps
 # github.com/grafana/k6pack v0.2.4
@@ -185,8 +185,8 @@ github.com/grafana/k6deps
 github.com/grafana/k6pack
 github.com/grafana/k6pack/internal/plugins/http
 github.com/grafana/k6pack/internal/plugins/k6
-# github.com/grafana/k6provider v0.1.12
-## explicit; go 1.22.4
+# github.com/grafana/k6provider v0.1.13
+## explicit; go 1.23
 github.com/grafana/k6provider
 # github.com/grafana/sobek v0.0.0-20250219104821-ed22af7a8d6c
 ## explicit; go 1.20
@@ -289,15 +289,15 @@ github.com/pkg/browser
 # github.com/pmezard/go-difflib v1.0.0
 ## explicit
 github.com/pmezard/go-difflib/difflib
-# github.com/prometheus/client_golang v1.20.5
-## explicit; go 1.20
+# github.com/prometheus/client_golang v1.21.0
+## explicit; go 1.21
 github.com/prometheus/client_golang/prometheus
 github.com/prometheus/client_golang/prometheus/internal
 # github.com/prometheus/client_model v0.6.1
 ## explicit; go 1.19
 github.com/prometheus/client_model/go
-# github.com/prometheus/common v0.55.0
-## explicit; go 1.20
+# github.com/prometheus/common v0.62.0
+## explicit; go 1.21
 github.com/prometheus/common/expfmt
 github.com/prometheus/common/model
 # github.com/prometheus/procfs v0.15.1
