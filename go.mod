@@ -8,7 +8,6 @@ require (
 	buf.build/gen/go/prometheus/prometheus/protocolbuffers/go v1.36.5-20240802094132-5b212ab78fb7.1
 	github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358
 	github.com/PuerkitoBio/goquery v1.9.2
-	github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
 	github.com/andybalholm/brotli v1.1.1
 	github.com/chromedp/cdproto v0.0.0-20240919203636-12af5e8a671f
 	github.com/evanw/esbuild v0.25.1
@@ -21,6 +20,7 @@ require (
 	github.com/grafana/xk6-dashboard v0.7.5
 	github.com/grafana/xk6-redis v0.3.3
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
+	github.com/icholy/digest v1.1.0
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
 	github.com/jhump/protoreflect v1.17.0
 	github.com/klauspost/compress v1.18.0
@@ -31,7 +31,8 @@ require (
 	github.com/mstoykov/atlas v0.0.0-20220811071828-388f114305dd
 	github.com/mstoykov/envconfig v1.5.0
 	github.com/mstoykov/k6-taskqueue-lib v0.1.3
-	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d
+	github.com/prometheus/client_golang v1.16.0
+	github.com/prometheus/client_model v0.4.0
 	github.com/serenize/snaker v0.0.0-20201027110005-a7ad2135616e
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/afero v1.1.2
@@ -84,8 +85,6 @@ require (
 	github.com/nxadm/tail v1.4.11 // indirect
 	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/prometheus/client_golang v1.16.0
-	github.com/prometheus/client_model v0.4.0
 	github.com/prometheus/common v0.42.0 // indirect
 	github.com/prometheus/procfs v0.10.1 // indirect
 	github.com/r3labs/sse/v2 v2.10.0 // indirect
