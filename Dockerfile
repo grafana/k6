@@ -11,6 +11,12 @@ FROM alpine:3.20 as release
 RUN adduser -D -u 12345 -g 12345 k6
 COPY --from=builder /usr/bin/k6 /usr/bin/k6
 
+# Copy the man page from the repo (ensure "man/k6.1" exists in your repo)
+COPY man/k6.1 /usr/share/man/man1/k6.1
+
+# Set MANPATH so that the man page is discoverable
+ENV MANPATH="/usr/share/man"
+
 USER k6
 WORKDIR /home/k6
 
