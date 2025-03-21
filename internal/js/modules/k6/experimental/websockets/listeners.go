@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/grafana/sobek"
-	"go.k6.io/k6/internal/js/modules/k6/experimental/websockets/events"
+	"go.k6.io/k6/internal/js/modules/k6/experimental/websockets/enums"
 )
 
 // eventListeners keeps track of the eventListeners for each event type
@@ -19,12 +19,12 @@ type eventListeners struct {
 
 func newEventListeners() *eventListeners {
 	return &eventListeners{
-		open:    newListener(events.OPEN),
-		message: newListener(events.MESSAGE),
-		error:   newListener(events.ERROR),
-		close:   newListener(events.CLOSE),
-		ping:    newListener(events.PING),
-		pong:    newListener(events.PONG),
+		open:    newListener(enums.EVENT_OPEN),
+		message: newListener(enums.EVENT_MESSAGE),
+		error:   newListener(enums.EVENT_ERROR),
+		close:   newListener(enums.EVENT_CLOSE),
+		ping:    newListener(enums.EVENT_PING),
+		pong:    newListener(enums.EVENT_PONG),
 	}
 }
 
@@ -74,17 +74,17 @@ func (l *eventListener) all() []func(sobek.Value) (sobek.Value, error) {
 // getTypes return event listener of a certain type
 func (l *eventListeners) getType(t string) *eventListener {
 	switch t {
-	case events.OPEN:
+	case enums.EVENT_OPEN:
 		return l.open
-	case events.MESSAGE:
+	case enums.EVENT_MESSAGE:
 		return l.message
-	case events.ERROR:
+	case enums.EVENT_ERROR:
 		return l.error
-	case events.CLOSE:
+	case enums.EVENT_CLOSE:
 		return l.close
-	case events.PING:
+	case enums.EVENT_PING:
 		return l.ping
-	case events.PONG:
+	case enums.EVENT_PONG:
 		return l.pong
 	default:
 		return nil
