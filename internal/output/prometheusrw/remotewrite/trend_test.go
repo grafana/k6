@@ -59,8 +59,13 @@ func TestExtendedTrendSinkMapPrompb(t *testing.T) {
 	ts := st.MapPrompb(sample.TimeSeries, sample.Time)
 	require.Len(t, ts, 8)
 
-	sortByNameLabel(ts)
-	assertTimeSeriesEqual(t, expected, ts)
+	tsConverted := make([]*prompb.TimeSeries, len(ts))
+	for i, s := range ts {
+		tsConverted[i] = s.Series
+		assert.Equal(t, metrics.Gauge, s.Type)
+	}
+	sortByNameLabel(tsConverted)
+	assertTimeSeriesEqual(t, expected, tsConverted)
 }
 
 func TestTrendAsGaugesFindIxName(t *testing.T) {
@@ -102,13 +107,15 @@ func TestTrendAsGaugesFindIxName(t *testing.T) {
 func TestNativeHistogramSinkAdd(t *testing.T) {
 	t.Parallel()
 
+	r := metrics.NewRegistry()
 	ts := metrics.TimeSeries{
 		Metric: &metrics.Metric{
 			Name:     "k6_test_metric",
 			Contains: metrics.Time,
 		},
+		Tags: r.RootTagSet(),
 	}
-	sink := newNativeHistogramSink(ts.Metric)
+	sink := newNativeHistogramSink(&ts)
 
 	// k6 passes time values with ms time unit
 	// the sink converts them to seconds.
@@ -137,7 +144,7 @@ func TestNativeHistogramSinkMapPrompb(t *testing.T) {
 		Tags: r.RootTagSet().With("tagk1", "tagv1"),
 	}
 
-	st := newNativeHistogramSink(series.Metric)
+	st := newNativeHistogramSink(&series)
 	st.Add(metrics.Sample{
 		TimeSeries: series,
 		Value:      1.52,
@@ -153,11 +160,14 @@ func TestNativeHistogramSinkMapPrompb(t *testing.T) {
 	// It should be the easiest way for asserting the entire struct,
 	// because the structs contains a bunch of internals value that we don't want to assert.
 	require.Len(t, ts, 1)
-	b, err := protojson.Marshal(ts[0])
+	b, err := protojson.Marshal(ts[0].Series)
 	require.NoError(t, err)
 
 	expected := `{"labels":[{"name":"__name__","value":"k6_test"},{"name":"tagk1","value":"tagv1"}],"histograms":[{"countInt":"2","positiveDeltas":["1","0"],"positiveSpans":[{"length":1,"offset":5},{"length":1,"offset":8}],"schema":3,"sum":4.66,"timestamp":"3000","zeroCountInt":"0","zeroThreshold":2.938735877055719e-39}]}`
 	assert.JSONEq(t, expected, string(b))
+
+	assert.NotNil(t, ts[0].hist)
+	assert.Equal(t, `Desc{fqName: "k6_test", help: "", constLabels: {tagk1="tagv1"}, variableLabels: []}`, (*ts[0].hist).Desc().String())
 }
 
 func BenchmarkK6TrendSinkAdd(b *testing.B) {
@@ -191,7 +201,7 @@ func TestNativeHistogramSinkMapPrompbWithValueType(t *testing.T) {
 		Tags: r.RootTagSet(),
 	}
 
-	st := newNativeHistogramSink(series.Metric)
+	st := newNativeHistogramSink(&series)
 	st.Add(metrics.Sample{
 		TimeSeries: series,
 		Value:      1.52,
@@ -199,7 +209,8 @@ func TestNativeHistogramSinkMapPrompbWithValueType(t *testing.T) {
 	})
 	ts := st.MapPrompb(series, time.Unix(2, 0))
 	require.Len(t, ts, 1)
-	assert.Equal(t, "k6_test_seconds", ts[0].Labels[0].Value)
+	assert.Equal(t, metrics.Trend, ts[0].Type)
+	assert.Equal(t, "k6_test_seconds", ts[0].Series.Labels[0].Value)
 }
 
 func TestBaseUnit(t *testing.T) {
@@ -224,7 +235,14 @@ func BenchmarkHistogramSinkAdd(b *testing.B) {
 		Type:     metrics.Trend,
 		Contains: metrics.Time,
 	}
-	ts := newNativeHistogramSink(m)
+
+	r := metrics.NewRegistry()
+	series := metrics.TimeSeries{
+		Metric: m,
+		Tags:   r.RootTagSet(),
+	}
+
+	ts := newNativeHistogramSink(&series)
 	s := metrics.Sample{
 		TimeSeries: metrics.TimeSeries{
 			Metric: m,
