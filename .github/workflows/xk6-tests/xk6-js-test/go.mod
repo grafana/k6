@@ -1,7 +1,7 @@
 module github.com/grafana/xk6-js-test
 
 go 1.23
-toolchain go1.24.1
+toolchain go1.23.7
 
 require go.k6.io/k6 v0.57.0
 
