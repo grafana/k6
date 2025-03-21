@@ -86,7 +86,7 @@ func TestSetTimeoutOrder(t *testing.T) {
 			setTimeout((_) => print("one"), 1);
 			setTimeout((_) => print("two"), 1);
 			setTimeout((_) => print("three"), 1);
-			setTimeout((_) => print("last"), 10);
+			setTimeout((_) => print("last"), 20);
 			setTimeout((_) => print("four"), 1);
 			setTimeout((_) => print("five"), 1);
 			setTimeout((_) => print("six"), 1);
