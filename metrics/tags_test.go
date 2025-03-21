@@ -94,8 +94,8 @@ func TestTagSets(t *testing.T) {
 func TestBigTagSetMarshalJSON(t *testing.T) {
 	t.Parallel()
 
-	expextedJSON := `{"tag0":"value0","tag1":"value1","tag2":"value2","tag3":"value3","tag4":"value4","tag5":"value5","tag6":"value6","tag7":"value7"}`
-	assert.Greater(t, len(expextedJSON), 128)
+	expectedJSON := `{"tag0":"value0","tag1":"value1","tag2":"value2","tag3":"value3","tag4":"value4","tag5":"value5","tag6":"value6","tag7":"value7"}`
+	assert.Greater(t, len(expectedJSON), 128)
 
 	tags := NewRegistry().RootTagSet()
 	for i := range 8 {
@@ -104,7 +104,7 @@ func TestBigTagSetMarshalJSON(t *testing.T) {
 
 	rJSON, err := tags.MarshalJSON()
 	require.NoError(t, err)
-	assert.Equal(t, expextedJSON, string(rJSON))
+	assert.Equal(t, expectedJSON, string(rJSON))
 }
 
 func TestTagSetContains(t *testing.T) {
