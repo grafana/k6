@@ -394,7 +394,8 @@ func (r *Runner) HandleSummary(
 		return nil, fmt.Errorf("unexpected error did not get a callable summary wrapper")
 	}
 
-	wrapperArgs := prepareHandleWrapperArgs(vu, noColor, enableColors, callbackResult, handleSummaryDataAsValue)
+	wrapperArgs := prepareHandleWrapperArgs(
+		vu, noColor, enableColors, callbackResult, handleSummaryDataAsValue, legacy != nil)
 	rawResult, _, _, err := vu.runFn(summaryCtx, false, handleSummaryWrapper, nil, wrapperArgs...)
 
 	if deadlineError := r.checkDeadline(summaryCtx, consts.HandleSummaryFn, rawResult, err); deadlineError != nil {
@@ -469,6 +470,7 @@ func prepareHandleWrapperArgs(
 	noColor bool, enableColors bool,
 	callbackResult sobek.Value,
 	summaryDataForJS interface{},
+	isLegacy bool,
 ) []sobek.Value {
 	options := map[string]interface{}{
 		// TODO: improve when we can easily export all option values, including defaults?
@@ -476,6 +478,7 @@ func prepareHandleWrapperArgs(
 		"summaryTimeUnit":   vu.Runner.Bundle.Options.SummaryTimeUnit.String,
 		"noColor":           noColor, // TODO: move to the (runtime) options
 		"enableColors":      enableColors,
+		"isLegacy":          isLegacy,
 	}
 
 	wrapperArgs := []sobek.Value{
