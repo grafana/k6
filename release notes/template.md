@@ -3,7 +3,6 @@ k6 `<version>` is here 🎉! This release includes:
 - (_optional_) `<highlight of breaking changes>`
 - `<Summary of new features>` (_one or multiple bullets_)
 
-
 ## Breaking changes
 
 - `#pr`, `<small_break_1>`
@@ -34,14 +33,15 @@ _Format as `<number> <present_verb> <object>. <credit>`_:
 ## Bug fixes
 
 _Format as `<number> <present_verb> <object>. <credit>`_:
-- _`#111` fixes race condition in runtime_
+
+- _`#111` Fixes race condition in runtime_
 
 ## Maintenance and internal improvements
 
 _Format as `<number> <present_verb> <object>. <credit>`_:
+
 - _`#2770` Refactors parts of the JS module._
 
 ## _Optional_ Roadmap
 
 _Discussion of future plans_
-
