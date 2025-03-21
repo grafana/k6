@@ -75,13 +75,6 @@
 				}
 			}
 
-			if (data?.checks?.metrics && typeof data.checks.metrics === 'object') {
-				for (const metricName in data.checks.metrics) {
-					const {values} = data.checks.metrics[metricName];
-					group.metrics[metricName] = {...values};
-				}
-			}
-
 			if (data?.metrics && typeof data.metrics === 'object') {
 				for (const metricsGroupName of Object.keys(data.metrics).sort()) {
 					const metrics = data.metrics[metricsGroupName];
@@ -117,7 +110,7 @@
 			}
 		}
 
-		results.root_group = summarizeGroup('root_group', data.root_group);
+		results.root_group = summarizeGroup("", data.root_group);
 		results.metrics = results.root_group.metrics
 
 		results.root_group.groups = {}
