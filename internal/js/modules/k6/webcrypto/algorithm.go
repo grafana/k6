@@ -194,13 +194,15 @@ func isRegisteredAlgorithm(algorithmName string, forOperation string) bool {
 			algorithmName == HMAC ||
 			isEllipticCurve(algorithmName) ||
 			isRSAAlgorithm(algorithmName) ||
-			algorithmName == Ed25519
+			algorithmName == Ed25519 ||
+			algorithmName == X25519
 	case OperationIdentifierExportKey, OperationIdentifierImportKey:
 		return isAesAlgorithm(algorithmName) ||
 			algorithmName == HMAC ||
 			isEllipticCurve(algorithmName) ||
 			isRSAAlgorithm(algorithmName) ||
-			algorithmName == Ed25519
+			algorithmName == Ed25519 ||
+			algorithmName == X25519
 	case OperationIdentifierEncrypt, OperationIdentifierDecrypt:
 		return isAesAlgorithm(algorithmName) || algorithmName == RSAOaep
 	case OperationIdentifierSign, OperationIdentifierVerify:

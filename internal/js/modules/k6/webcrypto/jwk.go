@@ -429,7 +429,7 @@ func exportRSAJWK(key *CryptoKey) (interface{}, error) {
 	return exported, nil
 }
 
-type ed25519JWK struct {
+type alg25519JWK struct {
 	// Key type
 	Kty string `json:"kty"`
 	// Canonical Curve
@@ -446,16 +446,21 @@ type ed25519JWK struct {
 	Ext *bool `json:"ext"`
 }
 
-func exportEd25519JWK(key *CryptoKey) (*JsonWebKey, error) {
+func exportAlg25519JWK(key *CryptoKey) (*JsonWebKey, error) {
 	exported := &JsonWebKey{}
 	exported.Set("kty", "OKP")
-	exported.Set("crv", "Ed25519")
-	switch ed25519Key := key.handle.(type) {
+	exported.Set("crv", key.Algorithm.(Algorithm).Name)
+	switch alg25519Key := key.handle.(type) {
 	case ed25519.PublicKey:
-		exported.Set("x", base64URLEncode([]byte(ed25519Key)))
+		exported.Set("x", base64URLEncode([]byte(alg25519Key)))
 	case ed25519.PrivateKey:
-		exported.Set("x", base64URLEncode([]byte(ed25519Key.Public().(ed25519.PublicKey))))
-		exported.Set("d", base64URLEncode([]byte(ed25519Key)))
+		exported.Set("x", base64URLEncode([]byte(alg25519Key.Public().(ed25519.PublicKey))))
+		exported.Set("d", base64URLEncode([]byte(alg25519Key)))
+	case *ecdh.PublicKey:
+		exported.Set("x", base64URLEncode(alg25519Key.Bytes()))
+	case *ecdh.PrivateKey:
+		exported.Set("x", base64URLEncode(alg25519Key.Public().(*ecdh.PublicKey).Bytes()))
+		exported.Set("d", base64URLEncode(alg25519Key.Bytes()))
 	default:
 		return nil, fmt.Errorf("key's handle isn't an Ed25519 public/private key, got: %T", key.handle)
 	}
@@ -539,8 +544,7 @@ func validateKeyOps(keyOps []CryptoKeyUsage, keyUsages []CryptoKeyUsage) error {
 	return nil
 }
 
-func (jwk *ed25519JWK) validateEd25519JWK(keyUsages []CryptoKeyUsage) error {
-	private := jwk.D != ""
+func validateEd25519Usages(keyUsages []CryptoKeyUsage, private bool) error {
 	if private {
 		for _, usage := range keyUsages {
 			switch usage {
@@ -561,20 +565,56 @@ func (jwk *ed25519JWK) validateEd25519JWK(keyUsages []CryptoKeyUsage) error {
 		}
 	}
 
-	if jwk.Kty != "OKP" {
-		return NewError(DataError, fmt.Sprintf("invalid 'kty': %s. kty value must be 'OKP' for Ed25519 keys", jwk.Kty))
+	return nil
+}
+
+func validateX25519Usages(keyUsages []CryptoKeyUsage, private bool) error {
+	if private {
+		for _, usage := range keyUsages {
+			switch usage {
+			case DeriveKeyCryptoKeyUsage, DeriveBitsCryptoKeyUsage:
+				continue
+			default:
+				return NewError(SyntaxError, fmt.Sprintf("invalid key usage: %s. Only 'deriveKey' and 'deriveBits' are valid for private X25519 keys", usage))
+			}
+		}
+	} else {
+		if len(keyUsages) != 0 {
+			return NewError(SyntaxError, "usages must be empty for public X25519 keys in JWK format")
+		}
 	}
 
-	if jwk.Crv != "Ed25519" {
-		return NewError(DataError, fmt.Sprintf("invalid 'crv': %s. crv value must be Ed25519", jwk.Crv))
+	return nil
+}
+
+func (jwk *alg25519JWK) validateAlg25519JWK(keyUsages []CryptoKeyUsage, algorithm string) error {
+	private := jwk.D != ""
+	if algorithm == "Ed25519" {
+		err := validateEd25519Usages(keyUsages, private)
+		if err != nil {
+			return err
+		}
+	} else if algorithm == "X25519" {
+		err := validateX25519Usages(keyUsages, private)
+		if err != nil {
+			return err
+		}
+	}
+
+	if jwk.Kty != "OKP" {
+		return NewError(DataError, fmt.Sprintf("invalid 'kty': %s. kty value must be 'OKP' for %s keys", jwk.Kty, algorithm))
+	}
+
+	if jwk.Crv != algorithm {
+		return NewError(DataError, fmt.Sprintf("invalid 'crv': %s. crv value must be %s", jwk.Crv, algorithm))
 	}
 
 	if jwk.X == "" {
-		return NewError(DataError, "invalid 'x': x field is required for all Ed25519 keys")
+		return NewError(DataError, fmt.Sprintf("invalid 'x': x field is required for all %s keys", algorithm))
 	}
 
 	if private && jwk.D == "" {
-		return NewError(DataError, "invalid 'd': d field is required for private Ed25519 keys")
+		return NewError(DataError, fmt.Sprintf("invalid 'd': d field is required for private %s keys", algorithm))
 	}
 
 	if len(keyUsages) != 0 && jwk.Use != "" && jwk.Use != "sig" {

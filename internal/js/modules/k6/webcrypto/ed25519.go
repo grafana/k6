@@ -103,7 +103,7 @@ func (ed25519SignerVerifier) Verify(key CryptoKey, signature, data []byte) (bool
 	return ed25519.Verify(keyHandle, data, signature), nil
 }
 
-// Ed25519 is an internal placeholder struct for Ed25519 import parameters.
+// Ed25519ImportParams is an internal placeholder struct for Ed25519 import parameters.
 // Although not described by the specification, we define it to be able to implement
 // our internal KeyImporter interface.
 type Ed25519ImportParams struct {
@@ -191,12 +191,12 @@ func importEd25519Pkcs8(keyData []byte, keyUsages []CryptoKeyUsage) (any, Crypto
 }
 
 func importEd25519Jwk(keyData []byte, keyUsages []CryptoKeyUsage) (any, CryptoKeyType, error) {
-	var jwkKey ed25519JWK
+	var jwkKey alg25519JWK
 	if err := json.Unmarshal(keyData, &jwkKey); err != nil {
 		return nil, UnknownCryptoKeyType, NewError(DataError, "failed to parse input as Ed25519 JWK key: "+err.Error())
 	}
 
-	if err := jwkKey.validateEd25519JWK(keyUsages); err != nil {
+	if err := jwkKey.validateAlg25519JWK(keyUsages, "Ed25519"); err != nil {
 		return nil, UnknownCryptoKeyType, err
 	}
 
@@ -261,7 +261,7 @@ func exportEd25519Key(key *CryptoKey, format KeyFormat) (any, error) {
 	case Pkcs8KeyFormat:
 		return exportEd25519Pkcs8(key)
 	case JwkKeyFormat:
-		return exportEd25519JWK(key)
+		return exportAlg25519JWK(key)
 	case RawKeyFormat:
 		return exportEd25519Raw(key)
 	default:
