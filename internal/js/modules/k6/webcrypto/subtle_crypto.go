@@ -693,8 +693,10 @@ func (sc *SubtleCrypto) DeriveBits( //nolint:funlen,gocognit // we have a lot of
 			)
 		}
 
-		if err := ensureKeysUseSameCurve(privateKey, publicKey); err != nil {
-			return NewError(InvalidAccessError, err.Error())
+		if normalizeAlgorithmName == ECDH {
+			if err := ensureKeysUseSameCurve(privateKey, publicKey); err != nil {
+				return NewError(InvalidAccessError, err.Error())
+			}
 		}
 
 		// currently we don't support lengths that are not multiples of 8
