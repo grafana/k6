@@ -44,6 +44,10 @@ const (
 	INCREMENT   // ++
 	DECREMENT   // --
 
+	LOGICAL_AND_ASSIGN // &&=
+	LOGICAL_OR_ASSIGN  // ||=
+	COALESCE_ASSIGN    // ??=
+
 	EQUAL        // ==
 	STRICT_EQUAL // ===
 	LESS         // <
@@ -176,6 +180,9 @@ var token2string = [...]string{
 	COALESCE:                    "??",
 	INCREMENT:                   "++",
 	DECREMENT:                   "--",
+	LOGICAL_AND_ASSIGN:          "&&=",
+	LOGICAL_OR_ASSIGN:           "||=",
+	COALESCE_ASSIGN:             "??=",
 	EQUAL:                       "==",
 	STRICT_EQUAL:                "===",
 	LESS:                        "<",

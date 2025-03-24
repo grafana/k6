@@ -230,11 +230,28 @@ func TestNewBundle(t *testing.T) {
 			invalidOptions := map[string]struct {
 				Expr, Error string
 			}{
-				"Array":    {`[]`, "json: cannot unmarshal array into Go value of type lib.Options"},
-				"Function": {`function(){}`, "error parsing script options: json: unsupported type: func(sobek.FunctionCall) sobek.Value"},
+				"Array": {
+					`[]`,
+					`parsing options from script got error while parsing "[": ` +
+						`json: cannot unmarshal array into Go value of type lib.Options`,
+				},
+				"Bad value": {
+					`{
+						"duration": "5m",
+						"tags":["something"],
+						"vus": 5
+					}`,
+					`parsing options from script got error while parsing "\"tags\": [": ` +
+						`json: cannot unmarshal array into Go struct field Options.tags of type map[string]string`,
+				},
+				"Function": {
+					`function(){}`,
+					"error parsing script options: json: unsupported type: func(sobek.FunctionCall) sobek.Value",
+				},
 			}
 			for name, data := range invalidOptions {
 				t.Run(name, func(t *testing.T) {
+					t.Parallel()
 					_, err := getSimpleBundle(t, "/script.js", fmt.Sprintf(`
 						export let options = %s;
 						export default function() {};
@@ -687,8 +704,7 @@ func TestOpen(t *testing.T) {
 			return fs, "", func() {}
 		},
 		"OsFS": func() (fsext.Fs, string, func()) {
-			prefix, err := os.MkdirTemp("", "k6_open_test") //nolint:forbidigo
-			require.NoError(t, err)
+			prefix := t.TempDir()
 			fs := fsext.NewOsFs()
 			filePath := filepath.Join(prefix, "/path/to/file.txt")
 			require.NoError(t, fs.MkdirAll(filepath.Join(prefix, "/path/to"), 0o755))

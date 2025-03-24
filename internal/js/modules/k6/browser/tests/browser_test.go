@@ -76,14 +76,7 @@ func TestBrowserNewContext(t *testing.T) {
 func TestTmpDirCleanup(t *testing.T) {
 	t.Parallel()
 
-	tmpDirPath, err := os.MkdirTemp("./", "") //nolint:forbidigo
-	t.Cleanup(
-		func() {
-			err := os.RemoveAll(tmpDirPath) //nolint:forbidigo
-			require.NoError(t, err)
-		},
-	)
-	require.NoError(t, err)
+	tmpDirPath := t.TempDir()
 
 	b := newTestBrowser(
 		t,
@@ -91,8 +84,7 @@ func TestTmpDirCleanup(t *testing.T) {
 		withEnvLookup(env.ConstLookup("TMPDIR", tmpDirPath)),
 	)
 	p := b.NewPage(nil)
-	err = p.Close()
-	require.NoError(t, err)
+	require.NoError(t, p.Close())
 
 	matches, err := filepath.Glob(filepath.Join(tmpDirPath, storage.K6BrowserDataDirPattern))
 	assert.NoError(t, err)
@@ -119,14 +111,7 @@ func TestTmpDirCleanup(t *testing.T) {
 func TestTmpDirCleanupOnContextClose(t *testing.T) {
 	t.Parallel()
 
-	tmpDirPath, err := os.MkdirTemp("./", "") //nolint:forbidigo
-	t.Cleanup(
-		func() {
-			err := os.RemoveAll(tmpDirPath) //nolint:forbidigo
-			require.NoError(t, err)
-		},
-	)
-	require.NoError(t, err)
+	tmpDirPath := t.TempDir()
 
 	b := newTestBrowser(
 		t,

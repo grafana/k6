@@ -329,17 +329,17 @@ func TestMetricsAndThresholds(t *testing.T) {
 	var summary map[string]interface{}
 	require.NoError(t, json.Unmarshal(ts.Stdout.Bytes(), &summary))
 
-	metrics, ok := summary["metrics"].(map[string]interface{})
+	thresholds, ok := summary["thresholds"].(map[string]interface{})
 	require.True(t, ok)
 
-	teardownCounter, ok := metrics["teardown_counter"].(map[string]interface{})
+	teardownCounter, ok := thresholds["teardown_counter"].(map[string]interface{})
 	require.True(t, ok)
 
-	teardownThresholds, ok := teardownCounter["thresholds"].(map[string]interface{})
+	teardownCounterThresholds, ok := teardownCounter["thresholds"].([]interface{})
 	require.True(t, ok)
 
-	expected := map[string]interface{}{"count == 1": map[string]interface{}{"ok": true}}
-	require.Equal(t, expected, teardownThresholds)
+	expected := []interface{}{map[string]interface{}{"source": "count == 1", "ok": true}}
+	require.Equal(t, expected, teardownCounterThresholds)
 }
 
 func TestSSLKEYLOGFILEAbsolute(t *testing.T) {
@@ -468,9 +468,9 @@ func TestSubMetricThresholdNoData(t *testing.T) {
 
 	assert.Len(t, ts.LoggerHook.Drain(), 0)
 	assert.Contains(t, ts.Stdout.String(), `
-     one..................: 0   0/s
-       { tag:xyz }........: 0   0/s
-     two..................: 42`)
+    one....................................: 0   0/s
+      { tag:xyz }..........................: 0   0/s
+    two....................................: 42`)
 }
 
 func getTestServer(tb testing.TB, routes map[string]http.Handler) *httptest.Server {
@@ -616,10 +616,10 @@ func TestSetupTeardownThresholds(t *testing.T) {
 
 	stdOut := ts.Stdout.String()
 	t.Log(stdOut)
-	assert.Contains(t, stdOut, `✓ checks.........................: 100.00% 8 out of 8`)
-	assert.Contains(t, stdOut, `✓ http_reqs......................: 8`)
-	assert.Contains(t, stdOut, `✓ iterations.....................: 5`)
-	assert.Contains(t, stdOut, `✓ setup_teardown.................: 3`)
+	assert.Contains(t, stdOut, "checks\n    ✓ 'rate == 1' rate=100.00%")
+	assert.Contains(t, stdOut, "http_reqs\n    ✓ 'count == 8' count=8")
+	assert.Contains(t, stdOut, "iterations\n    ✓ 'count == 5' count=5")
+	assert.Contains(t, stdOut, "setup_teardown\n    ✓ 'count == 3' count=3")
 
 	logMsgs := ts.LoggerHook.Drain()
 	for _, msg := range logMsgs {
@@ -669,10 +669,10 @@ func TestThresholdsFailed(t *testing.T) {
 	assert.True(t, testutils.LogContains(ts.LoggerHook.Drain(), logrus.ErrorLevel, expErr))
 	stdout := ts.Stdout.String()
 	t.Log(stdout)
-	assert.Contains(t, stdout, `   ✓ iterations...........: 3`)
-	assert.Contains(t, stdout, `     ✗ { scenario:sc1 }...: 1`)
-	assert.Contains(t, stdout, `     ✗ { scenario:sc2 }...: 2`)
-	assert.Contains(t, stdout, `     ✓ { scenario:sc3 }...: 0   0/s`)
+	assert.Contains(t, stdout, "    iterations\n    ✓ 'count == 3' count=3")
+	assert.Contains(t, stdout, "      {scenario:sc1}\n      ✗ 'count == 2' count=1")
+	assert.Contains(t, stdout, "      ✗ 'count == 2' count=1")
+	assert.Contains(t, stdout, "      {scenario:sc2}\n      ✗ 'count == 1' count=2")
 }
 
 func TestAbortedByThreshold(t *testing.T) {
@@ -711,7 +711,7 @@ func TestAbortedByThreshold(t *testing.T) {
 	assert.True(t, testutils.LogContains(ts.LoggerHook.Drain(), logrus.ErrorLevel, expErr))
 	stdOut := ts.Stdout.String()
 	t.Log(stdOut)
-	assert.Contains(t, stdOut, `✗ iterations`)
+	assert.Contains(t, stdOut, "iterations\n    ✗ 'count == 1'")
 	assert.Contains(t, stdOut, `teardown() called`)
 	assert.Contains(t, stdOut, `level=debug msg="Metrics emission of VUs and VUsMax metrics stopped"`)
 	assert.Contains(t, stdOut, `level=debug msg="Metrics and traces processing finished!"`)
@@ -762,9 +762,18 @@ func TestAbortedByUserWithGoodThresholds(t *testing.T) {
 	assert.True(t, testutils.LogContains(logs, logrus.ErrorLevel, `test run was aborted because k6 received a 'interrupt' signal`))
 	stdout := ts.Stdout.String()
 	t.Log(stdout)
-	assert.Contains(t, stdout, `✓ iterations`)
-	assert.Contains(t, stdout, `✓ tc`)
-	assert.Contains(t, stdout, `✓ { group:::teardown }`)
+	assert.Contains(t, stdout, `
+    iterations
+    ✓ 'count >= 1' count=3
+
+    tc
+    ✓ 'count == 1' count=1
+
+      {group:::setup}
+      ✓ 'count == 0' count=0
+
+      {group:::teardown}
+      ✓ 'count == 1' count=1`)
 	assert.Contains(t, stdout, `Stopping k6 in response to signal`)
 	assert.Contains(t, stdout, `level=debug msg="Metrics emission of VUs and VUsMax metrics stopped"`)
 	assert.Contains(t, stdout, `level=debug msg="Metrics and traces processing finished!"`)
@@ -1373,7 +1382,7 @@ func TestMetricTagAndSetupDataIsolation(t *testing.T) {
 	t.Log(stdout)
 	assert.NotContains(t, stdout, "execution: local") // because of --quiet
 	assert.NotContains(t, stdout, "output: cloud")    // because of --quiet
-	assert.Equal(t, 12, strings.Count(stdout, "✓"))
+	assert.Equal(t, 14, strings.Count(stdout, "✓"))
 }
 
 func getSampleValues(t *testing.T, jsonOutput []byte, metric string, tags map[string]string) []float64 {
@@ -1540,7 +1549,7 @@ func TestMinIterationDuration(t *testing.T) {
 
 	stdout := ts.Stdout.String()
 	t.Log(stdout)
-	assert.Contains(t, stdout, "✓ test_counter.........: 3")
+	assert.Contains(t, stdout, "test_counter\n    ✓ 'count == 3")
 }
 
 func TestMetricNameError(t *testing.T) {
@@ -1708,7 +1717,7 @@ func TestRunWithCloudOutputOverrides(t *testing.T) {
 	t.Log(stdout)
 	assert.Contains(t, stdout, "execution: local")
 	assert.Contains(t, stdout, "output: cloud (https://bogus.url/runs/132), json (results.json)")
-	assert.Contains(t, stdout, "iterations...........: 1")
+	assert.Contains(t, stdout, "iterations.............................: 1")
 }
 
 func TestRunWithCloudOutputCustomConfigAndOverridesLegacyCloudOption(t *testing.T) {
@@ -2401,4 +2410,71 @@ func TestTypeScriptSupport(t *testing.T) {
 	stderr := ts.Stderr.String()
 	t.Log(stderr)
 	assert.Contains(t, stderr, `something 42`)
+}
+
+func TestBasicSecrets(t *testing.T) {
+	// This is the example it will be nice if we can just run it ,but in this case it needs extra arguments so ... maybe not such a great idea
+	t.Parallel()
+	mainScript := `
+		import secrets from "k6/secrets";
+
+		export default async () => {
+			const my_secret = await secrets.get("cool"); // get secret from a source with the provided identifier
+			console.log(my_secret);
+			await secrets.get("else"); // get secret from a source with the provided identifier
+			console.log(my_secret);
+		}
+	`
+
+	ts := NewGlobalTestState(t)
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "secrets.js"), []byte(mainScript), 0o644))
+
+	ts.CmdArgs = []string{"k6", "run", "--secret-source=mock=cool=something,else=source", "secrets.js"}
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stderr := ts.Stderr.String()
+	t.Log(stderr)
+
+	assert.Contains(t, stderr, `level=info msg="***SECRET_REDACTED***" source=console`)
+	assert.Contains(t, stderr, `level=info msg="***SECRET_REDACTED***" ***SECRET_REDACTED***=console`)
+}
+
+func TestMultipleSecretSources(t *testing.T) {
+	// This is the example it will be nice if we can just run it ,but in this case it needs extra arguments so ... maybe not such a great idea
+	t.Parallel()
+	mainScript := `
+		import secrets from "k6/secrets";
+
+		export default async () => {
+			const my_secret = await secrets.source("first").get("cool");
+			console.log(my_secret);
+			await secrets.source("second").get("else");
+			console.log(my_secret);
+			try {
+				await secrets.source("second").get("unkwown");
+			} catch {
+				console.log("trigger exception on wrong key")
+			}
+			await secrets.get("else"); // testing default setting
+		}
+	`
+
+	ts := NewGlobalTestState(t)
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "secrets.js"), []byte(mainScript), 0o644))
+
+	ts.CmdArgs = []string{
+		"k6", "run",
+		"--secret-source=mock=name=first,cool=something",
+		"--secret-source=mock=name=second,else=source,default", "secrets.js",
+	}
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stderr := ts.Stderr.String()
+	t.Log(stderr)
+
+	assert.Contains(t, stderr, `level=info msg="***SECRET_REDACTED***" source=console`)
+	assert.Contains(t, stderr, `level=info msg="***SECRET_REDACTED***" ***SECRET_REDACTED***=console`)
+	assert.Contains(t, stderr, `level=info msg="trigger exception on wrong key" ***SECRET_REDACTED***=console`)
 }

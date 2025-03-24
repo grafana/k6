@@ -82,7 +82,7 @@ var _ io.Reader = (*file)(nil)
 //
 // When using SeekModeStart, the offset must be positive.
 // Negative offsets are allowed when using `SeekModeCurrent` or `SeekModeEnd`.
-func (f *file) Seek(offset int64, whence SeekMode) (int64, error) {
+func (f *file) Seek(offset int64, whence SeekMode) (int64, error) { //nolint:govet
 	startingOffset := f.offset.Load()
 
 	newOffset := startingOffset

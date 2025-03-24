@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -99,11 +100,15 @@ func TestNewScriptCmd_InvalidTemplateType(t *testing.T) {
 
 	ts := tests.NewGlobalTestState(t)
 	ts.CmdArgs = []string{"k6", "new", "--template", "invalid-template"}
-
 	ts.ExpectedExitCode = -1
 
 	newRootCommand(ts.GlobalState).execute()
 	assert.Contains(t, ts.Stderr.String(), "invalid template type")
+
+	// Verify that no script file was created
+	exists, err := fsext.Exists(ts.FS, defaultNewScriptName)
+	require.NoError(t, err)
+	assert.False(t, exists, "script file should not exist")
 }
 
 func TestNewScriptCmd_ProjectID(t *testing.T) {
@@ -118,4 +123,102 @@ func TestNewScriptCmd_ProjectID(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Contains(t, string(data), "projectID: 1422")
+}
+
+func TestNewScriptCmd_LocalTemplate(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+
+	// Create template file in test temp directory
+	templatePath := filepath.Join(t.TempDir(), "template.js")
+	templateContent := `export default function() {
+  console.log("Hello, world!");
+}`
+	require.NoError(t, fsext.WriteFile(ts.FS, templatePath, []byte(templateContent), 0o600))
+
+	ts.CmdArgs = []string{"k6", "new", "--template", templatePath}
+
+	newRootCommand(ts.GlobalState).execute()
+
+	data, err := fsext.ReadFile(ts.FS, defaultNewScriptName)
+	require.NoError(t, err)
+
+	assert.Equal(t, templateContent, string(data), "generated file should match the template content")
+}
+
+func TestNewScriptCmd_LocalTemplateWith_ProjectID(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+
+	// Create template file in test temp directory
+	templatePath := filepath.Join(t.TempDir(), "template.js")
+	templateContent := `export default function() {
+  // Template with {{ .ProjectID }} project ID
+  console.log("Hello from project {{ .ProjectID }}");
+}`
+	require.NoError(t, fsext.WriteFile(ts.FS, templatePath, []byte(templateContent), 0o600))
+
+	ts.CmdArgs = []string{"k6", "new", "--template", templatePath, "--project-id", "9876"}
+
+	newRootCommand(ts.GlobalState).execute()
+
+	data, err := fsext.ReadFile(ts.FS, defaultNewScriptName)
+	require.NoError(t, err)
+
+	expectedContent := `export default function() {
+  // Template with 9876 project ID
+  console.log("Hello from project 9876");
+}`
+	assert.Equal(t, expectedContent, string(data), "generated file should have project ID interpolated")
+}
+
+func TestNewScriptCmd_LocalTemplate_NonExistentFile(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+	ts.ExpectedExitCode = -1
+
+	// Use a path that we know doesn't exist in the temp directory
+	nonExistentPath := filepath.Join(t.TempDir(), "nonexistent.js")
+
+	ts.CmdArgs = []string{"k6", "new", "--template", nonExistentPath}
+	ts.ExpectedExitCode = -1
+
+	newRootCommand(ts.GlobalState).execute()
+
+	assert.Contains(t, ts.Stderr.String(), "failed to read template file")
+
+	// Verify that no script file was created
+	exists, err := fsext.Exists(ts.FS, defaultNewScriptName)
+	require.NoError(t, err)
+	assert.False(t, exists, "script file should not exist")
+}
+
+func TestNewScriptCmd_LocalTemplate_SyntaxError(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+	ts.ExpectedExitCode = -1
+
+	// Create template file with invalid content in test temp directory
+	templatePath := filepath.Join(t.TempDir(), "template.js")
+	invalidTemplateContent := `export default function() {
+  // Invalid template with {{ .InvalidField }} field
+  console.log("This will cause an error");
+}`
+	require.NoError(t, fsext.WriteFile(ts.FS, templatePath, []byte(invalidTemplateContent), 0o600))
+
+	ts.CmdArgs = []string{"k6", "new", "--template", templatePath, "--project-id", "9876"}
+	ts.ExpectedExitCode = -1
+
+	newRootCommand(ts.GlobalState).execute()
+
+	assert.Contains(t, ts.Stderr.String(), "failed to execute template")
+
+	// Verify that no script file was created
+	exists, err := fsext.Exists(ts.FS, defaultNewScriptName)
+	require.NoError(t, err)
+	assert.False(t, exists, "script file should not exist")
 }

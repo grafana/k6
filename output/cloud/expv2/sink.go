@@ -3,6 +3,7 @@ package expv2
 import (
 	"fmt"
 
+	"go.k6.io/k6/internal/ds/histogram"
 	"go.k6.io/k6/metrics"
 )
 
@@ -22,7 +23,7 @@ func newMetricValue(mt metrics.MetricType) metricValue {
 	case metrics.Rate:
 		am = &rate{}
 	case metrics.Trend:
-		am = newHistogram()
+		am = histogram.NewHdr()
 	default:
 		// Should not be possible to create
 		// an invalid metric type except for specific
