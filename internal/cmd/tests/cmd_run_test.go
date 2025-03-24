@@ -329,17 +329,17 @@ func TestMetricsAndThresholds(t *testing.T) {
 	var summary map[string]interface{}
 	require.NoError(t, json.Unmarshal(ts.Stdout.Bytes(), &summary))
 
-	thresholds, ok := summary["thresholds"].(map[string]interface{})
+	metrics, ok := summary["metrics"].(map[string]interface{})
 	require.True(t, ok)
 
-	teardownCounter, ok := thresholds["teardown_counter"].(map[string]interface{})
+	teardownCounter, ok := metrics["teardown_counter"].(map[string]interface{})
 	require.True(t, ok)
 
-	teardownCounterThresholds, ok := teardownCounter["thresholds"].([]interface{})
+	teardownThresholds, ok := teardownCounter["thresholds"].(map[string]interface{})
 	require.True(t, ok)
 
-	expected := []interface{}{map[string]interface{}{"source": "count == 1", "ok": true}}
-	require.Equal(t, expected, teardownCounterThresholds)
+	expected := map[string]interface{}{"count == 1": map[string]interface{}{"ok": true}}
+	require.Equal(t, expected, teardownThresholds)
 }
 
 func TestSSLKEYLOGFILEAbsolute(t *testing.T) {
