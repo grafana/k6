@@ -2478,3 +2478,197 @@ func TestMultipleSecretSources(t *testing.T) {
 	assert.Contains(t, stderr, `level=info msg="***SECRET_REDACTED***" ***SECRET_REDACTED***=console`)
 	assert.Contains(t, stderr, `level=info msg="trigger exception on wrong key" ***SECRET_REDACTED***=console`)
 }
+
+func TestSummaryExport(t *testing.T) {
+	t.Parallel()
+
+	mainScript := `
+		import { check } from "k6";
+		import { Counter } from 'k6/metrics';
+
+		const customIter = new Counter("custom_iterations");
+
+		export default function () {
+			customIter.add(1);
+			check(true, { "TRUE is TRUE": (r) => r });
+		};
+	`
+
+	assertSummaryExport := func(t *testing.T, fs fsext.Fs) {
+		t.Helper()
+
+		rawSummaryExport, err := fsext.ReadFile(fs, "results.json")
+		require.NoError(t, err)
+
+		var summaryExport map[string]interface{}
+		require.NoError(t, json.Unmarshal(rawSummaryExport, &summaryExport))
+
+		assert.Equal(t, map[string]interface{}{
+			"groups": map[string]interface{}{},
+			"checks": map[string]interface{}{
+				"TRUE is TRUE": map[string]interface{}{
+					"fails":  float64(0),
+					"id":     "1bed1cc5e442054df516f1ca1076ac6a",
+					"name":   "TRUE is TRUE",
+					"passes": float64(1),
+					"path":   "::TRUE is TRUE",
+				},
+			},
+			"name": "",
+			"path": "",
+			"id":   "d41d8cd98f00b204e9800998ecf8427e",
+		}, summaryExport["root_group"])
+
+		metrics := summaryExport["metrics"].(map[string]interface{})
+
+		assert.Equal(t, 1.0, metrics["custom_iterations"].(map[string]interface{})["count"])
+		assert.Equal(t, 1.0, metrics["iterations"].(map[string]interface{})["count"])
+
+		checks := metrics["checks"].(map[string]interface{})
+		assert.Equal(t, 1.0, checks["passes"])
+		assert.Equal(t, 0.0, checks["fails"])
+		assert.Equal(t, 1.0, checks["value"])
+
+		// These metrics are created adhoc for visual end-of-test summary only,
+		// thus they shouldn't be present on the exported summary.
+		assert.NotContains(t, "checks_total", metrics)
+		assert.NotContains(t, "checks_succeeded", metrics)
+		assert.NotContains(t, "checks_failed", metrics)
+	}
+
+	for _, summaryMode := range []string{"compact", "full"} {
+		t.Run(summaryMode, func(t *testing.T) {
+			t.Parallel()
+
+			ts := NewGlobalTestState(t)
+			require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(mainScript), 0o644))
+
+			ts.CmdArgs = []string{
+				"k6", "run",
+				"--summary-export=results.json",
+				"--summary-mode=" + summaryMode,
+				"script.js",
+			}
+
+			cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+			stdout := ts.Stdout.String()
+			t.Log(stdout)
+
+			assert.Contains(t, stdout, "checks_total.......................: 1")
+			assert.Contains(t, stdout, "checks_succeeded...................: 100.00% 1 out of 1")
+			assert.Contains(t, stdout, "checks_failed......................: 0.00%   0 out of 1")
+
+			assert.Contains(t, stdout, `CUSTOM
+    custom_iterations......................: 1`)
+			assert.Contains(t, stdout, "iterations.............................: 1")
+
+			assertSummaryExport(t, ts.FS)
+		})
+	}
+
+	t.Run("legacy", func(t *testing.T) {
+		t.Parallel()
+
+		ts := NewGlobalTestState(t)
+		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(mainScript), 0o644))
+
+		ts.CmdArgs = []string{
+			"k6", "run",
+			"--summary-export=results.json",
+			"--summary-mode=legacy",
+			"script.js",
+		}
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stdout := ts.Stdout.String()
+		t.Log(stdout)
+
+		assert.Contains(t, stdout, "✓ TRUE is TRUE")
+		assert.Contains(t, stdout, "checks...............: 100.00% 1 out of 1")
+		assert.Contains(t, stdout, "custom_iterations....: 1")
+		assert.Contains(t, stdout, "iterations...........: 1")
+
+		assertSummaryExport(t, ts.FS)
+	})
+}
+
+func TestHandleSummary(t *testing.T) {
+	t.Parallel()
+	mainScript := `
+		import { check } from "k6";
+		import { Counter } from 'k6/metrics';
+
+		const customIter = new Counter("custom_iterations");
+
+		export default function () {
+			customIter.add(1);
+			check(true, { "TRUE is TRUE": (r) => r });
+		};
+
+		export function handleSummary(data) {
+	    return {
+		  'summary.json': JSON.stringify(data), //the default data object
+	    };
+	}
+	`
+
+	for _, summaryMode := range []string{"compact", "full", "legacy"} {
+		t.Run(summaryMode, func(t *testing.T) {
+			t.Parallel()
+
+			ts := NewGlobalTestState(t)
+			require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(mainScript), 0o644))
+
+			ts.CmdArgs = []string{"k6", "run", "script.js"}
+
+			cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+			stdout := ts.Stdout.String()
+			t.Log(stdout)
+
+			rawSummaryExport, err := fsext.ReadFile(ts.FS, "summary.json")
+			require.NoError(t, err)
+
+			var summaryExport map[string]interface{}
+			require.NoError(t, json.Unmarshal(rawSummaryExport, &summaryExport))
+
+			assert.Equal(t, map[string]interface{}{
+				"groups": []interface{}{},
+				"checks": []interface{}{
+					map[string]interface{}{
+						"fails":  float64(0),
+						"id":     "1bed1cc5e442054df516f1ca1076ac6a",
+						"name":   "TRUE is TRUE",
+						"passes": float64(1),
+						"path":   "::TRUE is TRUE",
+					},
+				},
+				"name": "",
+				"path": "",
+				"id":   "d41d8cd98f00b204e9800998ecf8427e",
+			}, summaryExport["root_group"])
+
+			metrics := summaryExport["metrics"].(map[string]interface{})
+
+			assert.Equal(t, 1.0,
+				metrics["custom_iterations"].(map[string]interface{})["values"].(map[string]interface{})["count"],
+			)
+			assert.Equal(t, 1.0,
+				metrics["iterations"].(map[string]interface{})["values"].(map[string]interface{})["count"],
+			)
+
+			checks := metrics["checks"].(map[string]interface{})["values"].(map[string]interface{})
+			assert.Equal(t, 1.0, checks["rate"])
+			assert.Equal(t, 1.0, checks["passes"])
+			assert.Equal(t, 0.0, checks["fails"])
+
+			// These metrics are created adhoc for visual end-of-test summary only,
+			// thus they shouldn't be present on the custom `handleSummary()` data structure.
+			assert.NotContains(t, "checks_total", metrics)
+			assert.NotContains(t, "checks_succeeded", metrics)
+			assert.NotContains(t, "checks_failed", metrics)
+		})
+	}
+}
