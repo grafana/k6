@@ -449,17 +449,32 @@ type alg25519JWK struct {
 func exportAlg25519JWK(key *CryptoKey) (*JsonWebKey, error) {
 	exported := &JsonWebKey{}
 	exported.Set("kty", "OKP")
-	exported.Set("crv", key.Algorithm.(Algorithm).Name)
+	alg, ok := key.Algorithm.(Algorithm)
+	if !ok {
+		return nil, fmt.Errorf("key's algorithm isn't an Algorithm, got: %T", key.Algorithm)
+	}
+
+	exported.Set("crv", alg.Name)
 	switch alg25519Key := key.handle.(type) {
 	case ed25519.PublicKey:
 		exported.Set("x", base64URLEncode([]byte(alg25519Key)))
 	case ed25519.PrivateKey:
-		exported.Set("x", base64URLEncode([]byte(alg25519Key.Public().(ed25519.PublicKey))))
+		pubKey, ok := alg25519Key.Public().(ed25519.PublicKey)
+		if !ok {
+			return nil, fmt.Errorf("key's public key isn't an ed25519.PublicKey, got: %T", alg25519Key.Public())
+		}
+
+		exported.Set("x", base64URLEncode([]byte(pubKey)))
 		exported.Set("d", base64URLEncode([]byte(alg25519Key)))
 	case *ecdh.PublicKey:
 		exported.Set("x", base64URLEncode(alg25519Key.Bytes()))
 	case *ecdh.PrivateKey:
-		exported.Set("x", base64URLEncode(alg25519Key.Public().(*ecdh.PublicKey).Bytes()))
+		pubKey, ok := alg25519Key.Public().(*ecdh.PublicKey)
+		if !ok {
+			return nil, fmt.Errorf("key's public key isn't an ecdh.PublicKey, got: %T", alg25519Key.Public())
+		}
+
+		exported.Set("x", base64URLEncode(pubKey.Bytes()))
 		exported.Set("d", base64URLEncode(alg25519Key.Bytes()))
 	default:
 		return nil, fmt.Errorf("key's handle isn't an Ed25519 public/private key, got: %T", key.handle)
@@ -472,75 +487,104 @@ func exportAlg25519JWK(key *CryptoKey) (*JsonWebKey, error) {
 
 // validateKeyOps validates that the key_ops field on the JWK does not conflict
 // with the given usages according to the JWK specification
+// [specification]: https://www.rfc-editor.org/rfc/rfc7517#section-4.3
 func validateKeyOps(keyOps []CryptoKeyUsage, keyUsages []CryptoKeyUsage) error {
 	if len(keyOps) == 0 {
 		return nil
 	}
 
-	// Check for duplicates in keyOps
+	if err := checkDuplicateOperations(keyOps); err != nil {
+		return err
+	}
+
+	opFlags := getOperationFlags(keyOps)
+
+	if !isValidOperationCombination(opFlags) {
+		return NewError(
+			DataError,
+			"invalid combination of key operations. Only sign/verify, encrypt/decrypt, "+
+				"or wrapKey/unwrapKey pairs are allowed, or single derive operations",
+		)
+	}
+
+	return validateRequestedUsages(keyOps, keyUsages)
+}
+
+func checkDuplicateOperations(keyOps []CryptoKeyUsage) error {
 	seen := make(map[CryptoKeyUsage]bool)
 	for _, op := range keyOps {
 		if seen[op] {
-			return NewError(DataError, "duplicate key operation values are not allowed in key_ops")
+			return NewError(
+				DataError,
+				"duplicate key operation values are not allowed in key_ops",
+			)
 		}
 		seen[op] = true
 	}
+	return nil
+}
 
-	// Validate allowed operation combinations
-	hasSign := false
-	hasVerify := false
-	hasEncrypt := false
-	hasDecrypt := false
-	hasWrapKey := false
-	hasUnwrapKey := false
-	hasDerive := false // covers both deriveKey and deriveBits
+type operationFlags struct {
+	sign      bool
+	verify    bool
+	encrypt   bool
+	decrypt   bool
+	wrapKey   bool
+	unwrapKey bool
+	derive    bool
+}
 
+// getOperationFlags converts a slice of CryptoKeyUsages into a struct of boolean flags
+func getOperationFlags(keyOps []CryptoKeyUsage) operationFlags {
+	flags := operationFlags{}
 	for _, op := range keyOps {
 		switch op {
 		case SignCryptoKeyUsage:
-			hasSign = true
+			flags.sign = true
 		case VerifyCryptoKeyUsage:
-			hasVerify = true
+			flags.verify = true
 		case EncryptCryptoKeyUsage:
-			hasEncrypt = true
+			flags.encrypt = true
 		case DecryptCryptoKeyUsage:
-			hasDecrypt = true
+			flags.decrypt = true
 		case WrapKeyCryptoKeyUsage:
-			hasWrapKey = true
+			flags.wrapKey = true
 		case UnwrapKeyCryptoKeyUsage:
-			hasUnwrapKey = true
+			flags.unwrapKey = true
 		case DeriveKeyCryptoKeyUsage, DeriveBitsCryptoKeyUsage:
-			hasDerive = true
-		default:
-			// Spec allows for other values, so we don't error here
-			continue
+			flags.derive = true
 		}
 	}
+	return flags
+}
 
-	// Check for invalid combinations
-	validCombos := (hasSign && hasVerify && !hasEncrypt && !hasDecrypt && !hasWrapKey && !hasUnwrapKey && !hasDerive) ||
-		(hasEncrypt && hasDecrypt && !hasSign && !hasVerify && !hasWrapKey && !hasUnwrapKey && !hasDerive) ||
-		(hasWrapKey && hasUnwrapKey && !hasSign && !hasVerify && !hasEncrypt && !hasDecrypt && !hasDerive) ||
-		(hasDerive && !hasSign && !hasVerify && !hasEncrypt && !hasDecrypt && !hasWrapKey && !hasUnwrapKey) ||
-		// Single operation cases
-		(hasSign && !hasVerify && !hasEncrypt && !hasDecrypt && !hasWrapKey && !hasUnwrapKey && !hasDerive) ||
-		(hasVerify && !hasSign && !hasEncrypt && !hasDecrypt && !hasWrapKey && !hasUnwrapKey && !hasDerive) ||
-		(hasEncrypt && !hasDecrypt && !hasSign && !hasVerify && !hasWrapKey && !hasUnwrapKey && !hasDerive) ||
-		(hasDecrypt && !hasEncrypt && !hasSign && !hasVerify && !hasWrapKey && !hasUnwrapKey && !hasDerive) ||
-		(hasWrapKey && !hasUnwrapKey && !hasSign && !hasVerify && !hasEncrypt && !hasDecrypt && !hasDerive) ||
-		(hasUnwrapKey && !hasWrapKey && !hasSign && !hasVerify && !hasEncrypt && !hasDecrypt && !hasDerive)
-
-	if !validCombos {
-		return NewError(DataError, "invalid combination of key operations. Only sign/verify, encrypt/decrypt, or wrapKey/unwrapKey pairs are allowed, or single derive operations")
+// isValidOperationCombination checks if the operation flags represent a valid combination
+func isValidOperationCombination(flags operationFlags) bool {
+	if flags.sign || flags.verify {
+		return (!flags.encrypt && !flags.decrypt && !flags.wrapKey && !flags.unwrapKey && !flags.derive)
 	}
 
-	// Verify that all requested usages are present in keyOps
+	if flags.encrypt || flags.decrypt {
+		return (!flags.sign && !flags.verify && !flags.wrapKey && !flags.unwrapKey && !flags.derive)
+	}
+
+	if flags.wrapKey || flags.unwrapKey {
+		return (!flags.sign && !flags.verify && !flags.encrypt && !flags.decrypt && !flags.derive)
+	}
+
+	if flags.derive {
+		return (!flags.sign && !flags.verify && !flags.encrypt && !flags.decrypt && !flags.wrapKey && !flags.unwrapKey)
+	}
+
+	return false
+}
+
+func validateRequestedUsages(keyOps []CryptoKeyUsage, keyUsages []CryptoKeyUsage) error {
 	for _, usage := range keyUsages {
 		if !slices.Contains(keyOps, usage) {
 			return NewError(DataError, fmt.Sprintf("requested usage '%s' is not present in key_ops", usage))
 		}
 	}
-
 	return nil
 }
 
@@ -551,7 +595,8 @@ func validateEd25519Usages(keyUsages []CryptoKeyUsage, private bool) error {
 			case SignCryptoKeyUsage:
 				continue
 			default:
-				return NewError(SyntaxError, fmt.Sprintf("invalid key usage: %s. Only 'sign' is valid for private Ed25519 keys", usage))
+				return NewError(SyntaxError, fmt.Sprintf("invalid key usage: %s. "+
+					"Only 'sign' is valid for private Ed25519 keys", usage))
 			}
 		}
 	} else {
@@ -560,7 +605,8 @@ func validateEd25519Usages(keyUsages []CryptoKeyUsage, private bool) error {
 			case VerifyCryptoKeyUsage:
 				continue
 			default:
-				return NewError(SyntaxError, fmt.Sprintf("invalid key usage: %s. Only 'verify' is valid for public Ed25519 keys", usage))
+				return NewError(SyntaxError, fmt.Sprintf("invalid key usage: %s. "+
+					"Only 'verify' is valid for public Ed25519 keys", usage))
 			}
 		}
 	}
@@ -575,13 +621,12 @@ func validateX25519Usages(keyUsages []CryptoKeyUsage, private bool) error {
 			case DeriveKeyCryptoKeyUsage, DeriveBitsCryptoKeyUsage:
 				continue
 			default:
-				return NewError(SyntaxError, fmt.Sprintf("invalid key usage: %s. Only 'deriveKey' and 'deriveBits' are valid for private X25519 keys", usage))
+				return NewError(SyntaxError, fmt.Sprintf("invalid key usage: %s. "+
+					"Only 'deriveKey' and 'deriveBits' are valid for private X25519 keys", usage))
 			}
 		}
-	} else {
-		if len(keyUsages) != 0 {
-			return NewError(SyntaxError, "usages must be empty for public X25519 keys in JWK format")
-		}
+	} else if len(keyUsages) != 0 {
+		return NewError(SyntaxError, "usages must be empty for public X25519 keys in JWK format")
 	}
 
 	return nil
@@ -618,7 +663,10 @@ func (jwk *alg25519JWK) validateAlg25519JWK(keyUsages []CryptoKeyUsage, algorith
 	}
 
 	if len(keyUsages) != 0 && jwk.Use != "" && jwk.Use != "sig" {
-		return NewError(DataError, fmt.Sprintf("invalid 'use': %s. use field must be 'sig' in the JWK if usages are supplied ", jwk.Use))
+		return NewError(
+			DataError,
+			fmt.Sprintf("invalid 'use': %s. use field must be 'sig' in the JWK if usages are supplied ", jwk.Use),
+		)
 	}
 
 	if err := validateKeyOps(jwk.KeyOps, keyUsages); err != nil {

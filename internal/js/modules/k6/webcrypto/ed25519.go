@@ -9,7 +9,7 @@ import (
 )
 
 // Ed25519KeyGenParams represents the object that should be passed as the algorithm
-// paramter into `SubtleCrypto.GenerateKey`, when generating an Ed25519 key pair.
+// parameter into `SubtleCrypto.GenerateKey`, when generating an Ed25519 key pair.
 // The Ed25519 key generation expects only the algorithm type as a parameter.
 type Ed25519KeyGenParams struct {
 	Algorithm
@@ -23,7 +23,14 @@ func newEd25519KeyGenParams(normalized Algorithm) KeyGenerator {
 	}
 }
 
-func (kgp *Ed25519KeyGenParams) GenerateKey(extractable bool, keyUsages []CryptoKeyUsage) (CryptoKeyGenerationResult, error) {
+// GenerateKey generates a new Ed25519 key pair, according to the algorithm
+// described in the specification.
+//
+// [specification]: https://wicg.github.io/webcrypto-secure-curves/#ed25519
+func (kgp *Ed25519KeyGenParams) GenerateKey(
+	extractable bool,
+	keyUsages []CryptoKeyUsage,
+) (CryptoKeyGenerationResult, error) {
 	rawPublicKey, rawPrivateKey, err := generateEd25519KeyPair(keyUsages)
 	if err != nil {
 		return nil, err
@@ -60,7 +67,11 @@ func (kgp *Ed25519KeyGenParams) GenerateKey(extractable bool, keyUsages []Crypto
 	}, nil
 }
 
-func generateEd25519KeyPair(keyUsages []CryptoKeyUsage) (ed25519.PublicKey, ed25519.PrivateKey, error) {
+func generateEd25519KeyPair(keyUsages []CryptoKeyUsage) (
+	ed25519.PublicKey,
+	ed25519.PrivateKey,
+	error,
+) {
 	for _, usage := range keyUsages {
 		switch usage {
 		case SignCryptoKeyUsage, VerifyCryptoKeyUsage:
@@ -116,7 +127,13 @@ func newEd25519ImportParams(normalized Algorithm) *Ed25519ImportParams {
 	}
 }
 
-func (eip *Ed25519ImportParams) ImportKey(format KeyFormat, keyData []byte, keyUsages []CryptoKeyUsage) (*CryptoKey, error) {
+// ImportKey imports a key according to the algorithm described in the specification.
+// [specification]:https://wicg.github.io/webcrypto-secure-curves/#ed25519-operations
+func (eip *Ed25519ImportParams) ImportKey(
+	format KeyFormat,
+	keyData []byte,
+	keyUsages []CryptoKeyUsage,
+) (*CryptoKey, error) {
 	var importFn func(keyData []byte, keyUsages []CryptoKeyUsage) (any, CryptoKeyType, error)
 
 	switch format {
@@ -193,7 +210,9 @@ func importEd25519Pkcs8(keyData []byte, keyUsages []CryptoKeyUsage) (any, Crypto
 func importEd25519Jwk(keyData []byte, keyUsages []CryptoKeyUsage) (any, CryptoKeyType, error) {
 	var jwkKey alg25519JWK
 	if err := json.Unmarshal(keyData, &jwkKey); err != nil {
-		return nil, UnknownCryptoKeyType, NewError(DataError, "failed to parse input as Ed25519 JWK key: "+err.Error())
+		return nil,
+			UnknownCryptoKeyType,
+			NewError(DataError, "failed to parse input as Ed25519 JWK key: "+err.Error())
 	}
 
 	if err := jwkKey.validateAlg25519JWK(keyUsages, "Ed25519"); err != nil {
@@ -204,11 +223,19 @@ func importEd25519Jwk(keyData []byte, keyUsages []CryptoKeyUsage) (any, CryptoKe
 	if jwkKey.D == "" {
 		xBytes, err := base64URLDecode(jwkKey.X)
 		if err != nil {
-			return nil, UnknownCryptoKeyType, NewError(DataError, "failed to decode public key: "+err.Error())
+			return nil,
+				UnknownCryptoKeyType,
+				NewError(DataError, "failed to decode public key: "+err.Error())
 		}
 
 		if len(xBytes) != ed25519.PublicKeySize {
-			return nil, UnknownCryptoKeyType, NewError(DataError, fmt.Sprintf("invalid Ed25519 public key length: got %d, want %d", len(xBytes), ed25519.PublicKeySize))
+			return nil,
+				UnknownCryptoKeyType,
+				NewError(DataError,
+					fmt.Sprintf("invalid Ed25519 public key length: got %d, want %d",
+						len(xBytes),
+						ed25519.PublicKeySize),
+				)
 		}
 
 		publicKey := ed25519.PublicKey(xBytes)
@@ -217,11 +244,20 @@ func importEd25519Jwk(keyData []byte, keyUsages []CryptoKeyUsage) (any, CryptoKe
 
 	dBytes, err := base64URLDecode(jwkKey.D)
 	if err != nil {
-		return nil, UnknownCryptoKeyType, NewError(DataError, "failed to decode private key: "+err.Error())
+		return nil,
+			UnknownCryptoKeyType,
+			NewError(DataError, "failed to decode private key: "+err.Error())
 	}
 
 	if len(dBytes) != ed25519.PrivateKeySize {
-		return nil, UnknownCryptoKeyType, NewError(DataError, fmt.Sprintf("invalid Ed25519 private key length: got %d, want %d", len(dBytes), ed25519.PrivateKeySize))
+		return nil,
+			UnknownCryptoKeyType,
+			NewError(DataError,
+				fmt.Sprintf("invalid Ed25519 private key length: got %d, want %d",
+					len(dBytes),
+					ed25519.PrivateKeySize,
+				),
+			)
 	}
 
 	privateKey := ed25519.PrivateKey(dBytes)
@@ -234,12 +270,25 @@ func importEd25519Raw(keyData []byte, keyUsages []CryptoKeyUsage) (any, CryptoKe
 		case VerifyCryptoKeyUsage:
 			continue
 		default:
-			return nil, UnknownCryptoKeyType, NewError(SyntaxError, fmt.Sprintf("invalid key usage: %s. Only 'verify' is valid for raw Ed25519 keys", usage))
+			return nil,
+				UnknownCryptoKeyType,
+				NewError(SyntaxError,
+					fmt.Sprintf("invalid key usage: %s. Only 'verify' is valid for raw Ed25519 keys",
+						usage,
+					),
+				)
 		}
 	}
 
 	if len(keyData) != ed25519.PublicKeySize {
-		return nil, UnknownCryptoKeyType, NewError(DataError, fmt.Sprintf("invalid Ed25519 public key length: got %d, want %d", len(keyData), ed25519.PublicKeySize))
+		return nil,
+			UnknownCryptoKeyType,
+			NewError(DataError,
+				fmt.Sprintf("invalid Ed25519 public key length: got %d, want %d",
+					len(keyData),
+					ed25519.PublicKeySize,
+				),
+			)
 	}
 
 	handle := ed25519.PublicKey(keyData)

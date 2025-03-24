@@ -7,7 +7,7 @@ import (
 )
 
 // X25519KeyGenParams represents the object that should be passed as the algorithm
-// paramter into `SubtleCrypto.GenerateKey`, when generating an X25519 key pair.
+// parameter into `SubtleCrypto.GenerateKey`, when generating an X25519 key pair.
 // The X25519 key generation expects only the algorithm type as a parameter.
 // The WebCrypto spec expects the X25519 algorithm defined as a standalone algorithm,
 // and not as a curve, so we implement the generation here separately from the other ECDH
@@ -22,7 +22,14 @@ func newX25519KeyGenParams(normalized Algorithm) *X25519KeyGenParams {
 	return &X25519KeyGenParams{Algorithm: normalized}
 }
 
-func (p *X25519KeyGenParams) GenerateKey(extractable bool, keyUsages []CryptoKeyUsage) (CryptoKeyGenerationResult, error) {
+// GenerateKey generates a new X25519 key pair, according to the algorithm
+// described in the specification.
+//
+// [specification]: https://wicg.github.io/webcrypto-secure-curves/#x25519
+func (p *X25519KeyGenParams) GenerateKey(
+	extractable bool,
+	keyUsages []CryptoKeyUsage,
+) (CryptoKeyGenerationResult, error) {
 	privateHandle, publicHandle, err := generateECDHKeyPair(X25519, keyUsages)
 	if err != nil {
 		return nil, err
@@ -63,7 +70,13 @@ func newX25519ImportParams(normalized Algorithm) *X25519ImportParams {
 	}
 }
 
-func (p *X25519ImportParams) ImportKey(format KeyFormat, keyData []byte, keyUsages []CryptoKeyUsage) (*CryptoKey, error) {
+// ImportKey imports a key according to the algorithm described in the specification.
+// [specification]: https://wicg.github.io/webcrypto-secure-curves/#x25519-operations
+func (p *X25519ImportParams) ImportKey(
+	format KeyFormat,
+	keyData []byte,
+	keyUsages []CryptoKeyUsage,
+) (*CryptoKey, error) {
 	var importFn func(keyData []byte, keyUsages []CryptoKeyUsage) (any, CryptoKeyType, error)
 
 	switch format {
