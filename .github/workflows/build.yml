@@ -199,19 +199,18 @@ jobs:
             -t $DOCKER_IMAGE_ID:$VERSION-with-browser \
             -t ghcr.io/$GHCR_IMAGE_ID:$VERSION-with-browser .
           # We also want to tag the latest stable version as latest
-          if [[ ! "$VERSION" =~ (RC|rc) ]]; then
-            echo "Publish $GHCR_IMAGE_ID:latest"
-            docker buildx build --push \
-              --target release \
-              --platform linux/amd64,linux/arm64 \
-              -t $DOCKER_IMAGE_ID:latest \
-              -t ghcr.io/$GHCR_IMAGE_ID:latest .
-            docker buildx build --push \
-              --target with-browser \
-              --platform linux/amd64,linux/arm64 \
-              -t $DOCKER_IMAGE_ID:latest-with-browser \
-              -t ghcr.io/$GHCR_IMAGE_ID:latest-with-browser .
-          fi
+          echo "Publish $GHCR_IMAGE_ID:latest"
+          docker buildx build --push \
+            --target release \
+            --platform linux/amd64,linux/arm64 \
+            -t $DOCKER_IMAGE_ID:latest \
+            -t ghcr.io/$GHCR_IMAGE_ID:latest .
+          docker buildx build --push \
+            --target with-browser \
+            --platform linux/amd64,linux/arm64 \
+            -t $DOCKER_IMAGE_ID:latest-with-browser \
+            -t ghcr.io/$GHCR_IMAGE_ID:latest-with-browser .
+
 
   package-windows:
     runs-on: windows-latest

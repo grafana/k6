@@ -17,7 +17,7 @@ require (
 	github.com/golang/protobuf v1.5.4
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
-	github.com/grafana/sobek v0.0.0-20250219104821-ed22af7a8d6c
+	github.com/grafana/sobek v0.0.0-20250320150027-203dc85b6d98
 	github.com/grafana/xk6-dashboard v0.7.5
 	github.com/grafana/xk6-redis v0.3.3
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0

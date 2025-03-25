@@ -95,8 +95,8 @@ func ValidateMode(val string) (m Mode, err error) {
 // as well as some other information, like certain rendering options.
 type Summary struct {
 	Thresholds `js:"thresholds"`
-	Group
-	Scenarios map[string]Group
+	Group      `js:"root_group"`
+	Scenarios  map[string]Group
 
 	TestRunDuration time.Duration
 	NoColor         bool // TODO: drop this when noColor is part of the (runtime) options
