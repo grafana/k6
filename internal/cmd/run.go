@@ -192,6 +192,25 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 
 	executionState := execScheduler.GetState()
 	if !testRunState.RuntimeOptions.NoSummary.Bool { //nolint:nestif
+		// Despite having the revamped [summary.Summary], we still keep the use of the
+		// [lib.LegacySummary] for multiple backwards compatibility options,
+		// to be deprecated by v1.0 and likely removed or replaced by v2.0:
+		// - the `legacy` summary mode (which keeps the old summary format/display).
+		// - the data structure for custom `handleSummary()` implementations.
+		// - the data structure for the JSON (--summary-export) output.
+		legacySummary := func() *lib.LegacySummary {
+			return &lib.LegacySummary{
+				Metrics:         metricsEngine.ObservedMetrics,
+				RootGroup:       testRunState.GroupSummary.Group(),
+				TestRunDuration: executionState.GetCurrentTestRunDuration(),
+				NoColor:         c.gs.Flags.NoColor,
+				UIState: lib.UIState{
+					IsStdOutTTY: c.gs.Stdout.IsTTY,
+					IsStdErrTTY: c.gs.Stderr.IsTTY,
+				},
+			}
+		}
+
 		sm, err := summary.ValidateMode(testRunState.RuntimeOptions.SummaryMode.String)
 		if err != nil {
 			logger.WithError(err).Warnf(
@@ -207,18 +226,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 			defer func() {
 				logger.Debug("Generating the end-of-test summary...")
 
-				legacySummary := &lib.LegacySummary{
-					Metrics:         metricsEngine.ObservedMetrics,
-					RootGroup:       testRunState.GroupSummary.Group(),
-					TestRunDuration: executionState.GetCurrentTestRunDuration(),
-					NoColor:         c.gs.Flags.NoColor,
-					UIState: lib.UIState{
-						IsStdOutTTY: c.gs.Stdout.IsTTY,
-						IsStdErrTTY: c.gs.Stderr.IsTTY,
-					},
-				}
-
-				summaryResult, hsErr := test.initRunner.HandleSummary(globalCtx, legacySummary, nil)
+				summaryResult, hsErr := test.initRunner.HandleSummary(globalCtx, legacySummary(), nil)
 				if hsErr == nil {
 					hsErr = handleSummaryResult(c.gs.FS, c.gs.Stdout, c.gs.Stderr, summaryResult)
 				}
@@ -252,7 +260,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 				summary.NoColor = c.gs.Flags.NoColor
 				summary.EnableColors = !summary.NoColor && c.gs.Stdout.IsTTY
 
-				summaryResult, hsErr := test.initRunner.HandleSummary(globalCtx, nil, summary)
+				summaryResult, hsErr := test.initRunner.HandleSummary(globalCtx, legacySummary(), summary)
 				if hsErr == nil {
 					hsErr = handleSummaryResult(c.gs.FS, c.gs.Stdout, c.gs.Stderr, summaryResult)
 				}

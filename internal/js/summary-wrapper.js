@@ -60,7 +60,7 @@
         return JSON.stringify(results, null, 4);
     };
 
-    return function (summaryCallbackResult, jsonSummaryPath, data, options) {
+    return function (summaryCallbackResult, jsonSummaryPath, legacyData, data, options) {
         let result = summaryCallbackResult;
         if (!result) {
             result = {
@@ -72,7 +72,7 @@
         // and if not, log an error and generate the default summary?
 
         if (jsonSummaryPath != '') {
-            result[jsonSummaryPath] = oldJSONSummary(data);
+            result[jsonSummaryPath] = oldJSONSummary(legacyData);
         }
 
         return result;
