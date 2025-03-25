@@ -229,7 +229,7 @@ func (c *compiler) compileLabeledDoWhileStatement(v *ast.DoWhileStatement, needR
 	c.compileStatement(v.Body, needResult)
 	c.block.cont = len(c.p.code)
 	c.emitExpr(c.compileExpression(v.Test), true)
-	c.emit(jeq(start - len(c.p.code)))
+	c.emit(jeqP(start - len(c.p.code)))
 	c.leaveBlock()
 }
 
@@ -342,7 +342,7 @@ func (c *compiler) compileLabeledForStatement(v *ast.ForStatement, needResult bo
 	c.emit(jump(start - len(c.p.code)))
 	if v.Test != nil {
 		if !testConst {
-			c.p.code[j] = jne(len(c.p.code) - j)
+			c.p.code[j] = jneP(len(c.p.code) - j)
 		}
 	}
 end:
@@ -538,7 +538,7 @@ func (c *compiler) compileLabeledWhileStatement(v *ast.WhileStatement, needResul
 	c.compileStatement(v.Body, needResult)
 	c.emit(jump(start - len(c.p.code)))
 	if !testTrue {
-		c.p.code[j] = jne(len(c.p.code) - j)
+		c.p.code[j] = jneP(len(c.p.code) - j)
 	}
 end:
 	c.leaveBlock()
@@ -716,16 +716,16 @@ func (c *compiler) compileIfStatement(v *ast.IfStatement, needResult bool) {
 	if v.Alternate != nil {
 		jmp1 := len(c.p.code)
 		c.emit(nil)
-		c.p.code[jmp] = jne(len(c.p.code) - jmp)
+		c.p.code[jmp] = jneP(len(c.p.code) - jmp)
 		c.compileIfBody(v.Alternate, needResult)
 		c.p.code[jmp1] = jump(len(c.p.code) - jmp1)
 	} else {
 		if needResult {
 			c.emit(jump(2))
-			c.p.code[jmp] = jne(len(c.p.code) - jmp)
+			c.p.code[jmp] = jneP(len(c.p.code) - jmp)
 			c.emit(clearResult)
 		} else {
-			c.p.code[jmp] = jne(len(c.p.code) - jmp)
+			c.p.code[jmp] = jneP(len(c.p.code) - jmp)
 		}
 	}
 }
@@ -1248,9 +1248,9 @@ func (c *compiler) compileSwitchStatement(v *ast.SwitchStatement, needResult boo
 			c.compileExpression(s.Test).emitGetter(true)
 			c.emit(op_strict_eq)
 			if db != nil {
-				c.emit(jne(2))
+				c.emit(jneP(2))
 			} else {
-				c.emit(jne(3), pop)
+				c.emit(jneP(3), pop)
 			}
 			jumps[i] = len(c.p.code)
 			c.emit(nil)

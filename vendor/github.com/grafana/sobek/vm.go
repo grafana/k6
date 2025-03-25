@@ -261,7 +261,14 @@ type objStrRef struct {
 }
 
 func (r *objStrRef) get() Value {
-	return r.base.self.getStr(r.name, r.this)
+	if v := r.base.self.getStr(r.name, r.this); v != nil {
+		return v
+	}
+	if r.binding {
+		rt := r.base.runtime
+		panic(rt.newReferenceError(r.name))
+	}
+	return _undefined
 }
 
 func (r *objStrRef) set(v Value) {
@@ -3471,12 +3478,7 @@ var getValue _getValue
 
 func (_getValue) exec(vm *vm) {
 	ref := vm.refStack[len(vm.refStack)-1]
-	if v := ref.get(); v != nil {
-		vm.push(v)
-	} else {
-		vm.throw(vm.r.newReferenceError(ref.refname()))
-		return
-	}
+	vm.push(nilSafe(ref.get()))
 	vm.pc++
 }
 
@@ -3490,6 +3492,17 @@ func (_putValue) exec(vm *vm) {
 	vm.refStack[l] = nil
 	vm.refStack = vm.refStack[:l]
 	ref.set(vm.stack[vm.sp-1])
+	vm.pc++
+}
+
+type _popRef struct{}
+
+var popRef _popRef
+
+func (_popRef) exec(vm *vm) {
+	l := len(vm.refStack) - 1
+	vm.refStack[l] = nil
+	vm.refStack = vm.refStack[:l]
 	vm.pc++
 }
 
@@ -4416,11 +4429,22 @@ func (b *bindGlobal) exec(vm *vm) {
 	vm.pc++
 }
 
-type jne int32
+type jneP int32
 
-func (j jne) exec(vm *vm) {
+func (j jneP) exec(vm *vm) {
 	vm.sp--
 	if !vm.stack[vm.sp].ToBoolean() {
+		vm.pc += int(j)
+	} else {
+		vm.pc++
+	}
+}
+
+type jeqP int32
+
+func (j jeqP) exec(vm *vm) {
+	vm.sp--
+	if vm.stack[vm.sp].ToBoolean() {
 		vm.pc += int(j)
 	} else {
 		vm.pc++
@@ -4430,17 +4454,6 @@ func (j jne) exec(vm *vm) {
 type jeq int32
 
 func (j jeq) exec(vm *vm) {
-	vm.sp--
-	if vm.stack[vm.sp].ToBoolean() {
-		vm.pc += int(j)
-	} else {
-		vm.pc++
-	}
-}
-
-type jeq1 int32
-
-func (j jeq1) exec(vm *vm) {
 	if vm.stack[vm.sp-1].ToBoolean() {
 		vm.pc += int(j)
 	} else {
@@ -4449,9 +4462,9 @@ func (j jeq1) exec(vm *vm) {
 	}
 }
 
-type jneq1 int32
+type jne int32
 
-func (j jneq1) exec(vm *vm) {
+func (j jne) exec(vm *vm) {
 	if !vm.stack[vm.sp-1].ToBoolean() {
 		vm.pc += int(j)
 	} else {
@@ -4515,6 +4528,18 @@ func (j jcoalesc) exec(vm *vm) {
 	switch vm.stack[vm.sp-1] {
 	case _undefined, _null:
 		vm.sp--
+		vm.pc++
+	default:
+		vm.pc += int(j)
+	}
+}
+
+type jcoalescP int32
+
+func (j jcoalescP) exec(vm *vm) {
+	vm.sp--
+	switch vm.stack[vm.sp] {
+	case _undefined, _null:
 		vm.pc++
 	default:
 		vm.pc += int(j)
