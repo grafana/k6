@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/grafana/sobek"
 )
 
@@ -386,6 +388,11 @@ func (rsasv *RSAPssParams) Sign(key CryptoKey, data []byte) ([]byte, error) {
 
 	hashedData := hash.New()
 	hashedData.Write(data)
+	if rsasv.SaltLength == 0 {
+		logger := logrus.New()
+		warnMsg := "K6 RSA-PSS use standard Golang SDK, doesn't support salt length=0. Sign result might be different!"
+		logger.Warn(warnMsg)
+	}
 
 	signature, err := rsa.SignPSS(rand.Reader, rsaKey, hash, hashedData.Sum(nil), &rsa.PSSOptions{
 		SaltLength: rsasv.SaltLength,
@@ -411,6 +418,12 @@ func (rsasv *RSAPssParams) Verify(key CryptoKey, signature []byte, data []byte) 
 
 	hashedData := hash.New()
 	hashedData.Write(data)
+
+	if rsasv.SaltLength == 0 {
+		logger := logrus.New()
+		warnMsg := "K6 RSA-PSS use standard Golang SDK, doesn't support salt length=0. Verify result might be different!"
+		logger.Warn(warnMsg)
+	}
 
 	err = rsa.VerifyPSS(rsaKey, hash, hashedData.Sum(nil), signature, &rsa.PSSOptions{
 		SaltLength: rsasv.SaltLength,
