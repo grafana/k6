@@ -1,7 +1,7 @@
 ---
 name: k6 Release
 about: k6 release accommodates activities and a checklist with the k6 open-source release process.
-title: 'k6 release v0.5x.0'
+title: 'k6 release v1.x.0'
 labels: ["release"]
 ---
 
@@ -46,7 +46,7 @@ labels: ["release"]
 
 #### Documentation
 
-- [ ] Open and merge a PR from `main` in the `k6-docs` repository, copying the current k6's `next` to a folder named with the k6 version (e.g., `v0.55.x`).
+- [ ] Open and merge a PR from `main` in the `k6-docs` repository, copying the current k6's `next` to a folder named with the k6 version (e.g., `v1.1.x`).
 - [ ] Ensure the `k6` repository release notes PR contains the correct links to the docs.
 
 #### In k6 repository
@@ -55,12 +55,12 @@ labels: ["release"]
 - [ ] Merge the release notes PR.
 - [ ] Pull locally the previously merged changes.
 - [ ] Create a new long-lived `v{major}.{minor}.x` release branch from the `main` branch.
-- [ ] Checkout the new `v{major}.{minor}.x` release branch, create and push a new tag of the form `v{major}.{minor}.0` using git: _e.g._ `git tag v0.55.0 -m "v0.55.0"`.
+- [ ] Checkout the new `v{major}.{minor}.x` release branch, create and push a new tag of the form `v{major}.{minor}.0` using git: _e.g._ `git tag v1.0.0 -m "v1.0.0"`.
 
 #### Announcements
 
-- [ ] Publish a link to the new GitHub release in the #k6-changelog channel.
-- [ ] Notify the larger team in the #k6 channel, letting them know that the release is published.
+- [ ] Notify the larger team in the #k6 channel, letting them know that the release is published by linking the release on GitHub.
+- [ ] Publish a link to the #k6 channel's post in the #k6-changelog channel.
 - [ ] Close the release's milestone.
 
 ## Wrapping Release
