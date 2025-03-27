@@ -2,10 +2,15 @@ package remotewrite
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"math"
 	"testing"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
+	"go.k6.io/k6/internal/output/prometheusrw/remote"
 
 	prompb "buf.build/gen/go/prometheus/prometheus/protocolbuffers/go"
 	"github.com/sirupsen/logrus"
@@ -108,8 +113,16 @@ func TestOutputConvertToPbSeries(t *testing.T) {
 		},
 	}
 
-	sortByNameLabel(pbseries)
-	assert.Equal(t, exp, pbseries)
+	sortWithTypeByNameLabel(pbseries)
+
+	series := make([]*prompb.TimeSeries, len(pbseries))
+	types := make([]metrics.MetricType, len(pbseries))
+	for i, s := range pbseries {
+		series[i] = s.Series
+		types[i] = s.Type
+	}
+	assert.Equal(t, exp, series)
+	assert.Equal(t, []metrics.MetricType{metrics.Counter, metrics.Counter, metrics.Rate}, types)
 }
 
 //nolint:paralleltest,tparallel
@@ -234,6 +247,7 @@ func TestNewSeriesWithNativeHistogramMeasure(t *testing.T) {
 	registry := metrics.NewRegistry()
 	s := metrics.TimeSeries{
 		Metric: registry.MustNewMetric("metric1", metrics.Trend),
+		Tags:   registry.RootTagSet(),
 	}
 
 	swm := newSeriesWithMeasure(s, true, nil)
@@ -386,4 +400,223 @@ func TestOutputStopWithStaleMarkers(t *testing.T) {
 		}
 		assertfn(t, messages, msg)
 	}
+}
+
+type MockPushgatewayClient struct {
+	r []*prometheus.Registry
+}
+
+func (m *MockPushgatewayClient) Push(_ context.Context, registries []*prometheus.Registry) error {
+	m.r = registries
+	return nil
+}
+
+var _ remote.RegistryPusher = new(MockPushgatewayClient)
+
+func TestUsePushgateway(t *testing.T) {
+	t.Parallel()
+
+	logger := logrus.New()
+	logger.SetLevel(logrus.DebugLevel)
+
+	var client remote.RegistryPusher = &MockPushgatewayClient{}
+
+	registry := metrics.NewRegistry()
+	metric1 := registry.MustNewMetric("metric1", metrics.Counter)
+	metric2 := registry.MustNewMetric("metric2", metrics.Gauge)
+	metric3 := registry.MustNewMetric("metric3", metrics.Rate)
+	tagset1 := registry.RootTagSet().With("tagk1", "tagv1")
+	t0 := time.Date(2022, time.September, 1, 0, 0, 0, 0, time.UTC)
+	series1 := metrics.TimeSeries{
+		Metric: metric1,
+		Tags:   tagset1,
+	}
+	series2 := metrics.TimeSeries{
+		Metric: metric2,
+		Tags:   tagset1,
+	}
+	series3 := metrics.TimeSeries{
+		Metric: metric3,
+		Tags:   tagset1,
+	}
+
+	output := Output{
+		logger:    logger,
+		pgwClient: client,
+		tsdb:      map[metrics.TimeSeries]*seriesWithMeasure{},
+	}
+
+	samples := []metrics.SampleContainer{
+		metrics.Sample{
+			TimeSeries: series1,
+			Time:       t0.Add(10 * time.Millisecond),
+			Value:      3,
+		},
+		metrics.Sample{
+			TimeSeries: series2,
+			Time:       t0.Add(10 * time.Millisecond),
+			Value:      5,
+		},
+		metrics.Sample{
+			TimeSeries: series3,
+			Time:       t0.Add(10 * time.Millisecond),
+			Value:      7,
+		},
+	}
+
+	output.AddMetricSamples(samples)
+
+	output.flush()
+
+	assert.Len(t, client.(*MockPushgatewayClient).r, 3)
+
+	sinks := make(map[string]*dto.MetricFamily)
+
+	for _, r := range client.(*MockPushgatewayClient).r {
+		mf, err := r.Gather()
+		require.NoError(t, err)
+		for _, m := range mf {
+			sinks[m.GetName()] = m
+		}
+	}
+
+	assert.InDelta(t, 3., *sinks["k6_metric1_total"].Metric[0].Counter.Value, 1e-6)
+	assert.Equal(t, "tagk1", *sinks["k6_metric1_total"].Metric[0].GetLabel()[0].Name)
+	assert.Equal(t, "tagv1", *sinks["k6_metric1_total"].Metric[0].GetLabel()[0].Value)
+
+	assert.InDelta(t, 5., *sinks["k6_metric2"].Metric[0].Gauge.Value, 1e-6)
+	assert.Equal(t, "tagk1", *sinks["k6_metric2"].Metric[0].GetLabel()[0].Name)
+	assert.Equal(t, "tagv1", *sinks["k6_metric2"].Metric[0].GetLabel()[0].Value)
+
+	assert.InDelta(t, 1., *sinks["k6_metric3_rate"].Metric[0].Gauge.Value, 1e-6)
+	assert.Equal(t, "tagk1", *sinks["k6_metric3_rate"].Metric[0].GetLabel()[0].Name)
+	assert.Equal(t, "tagv1", *sinks["k6_metric3_rate"].Metric[0].GetLabel()[0].Value)
+}
+
+func TestUsePushgatewayTrendAsGauges(t *testing.T) {
+	t.Parallel()
+
+	logger := logrus.New()
+	logger.SetLevel(logrus.DebugLevel)
+
+	var client remote.RegistryPusher = &MockPushgatewayClient{}
+
+	registry := metrics.NewRegistry()
+	metric1 := registry.MustNewMetric("metric1", metrics.Trend)
+	tagset1 := registry.RootTagSet().With("tagk1", "tagv1")
+	t0 := time.Date(2022, time.September, 1, 0, 0, 0, 0, time.UTC)
+	series1 := metrics.TimeSeries{
+		Metric: metric1,
+		Tags:   tagset1,
+	}
+
+	output := Output{
+		logger:    logger,
+		pgwClient: client,
+		tsdb:      map[metrics.TimeSeries]*seriesWithMeasure{},
+	}
+	err := output.setTrendStatsResolver([]string{"avg", "min", "max"})
+	require.NoError(t, err)
+
+	samples := []metrics.SampleContainer{
+		metrics.Sample{
+			TimeSeries: series1,
+			Time:       t0.Add(10 * time.Millisecond),
+			Value:      0,
+		},
+		metrics.Sample{
+			TimeSeries: series1,
+			Time:       t0.Add(10 * time.Millisecond),
+			Value:      10,
+		},
+	}
+
+	output.AddMetricSamples(samples)
+
+	output.flush()
+
+	assert.Len(t, client.(*MockPushgatewayClient).r, 3)
+
+	sinks := make(map[string]*dto.MetricFamily)
+
+	for _, r := range client.(*MockPushgatewayClient).r {
+		mf, err := r.Gather()
+		require.NoError(t, err)
+		for _, m := range mf {
+			sinks[m.GetName()] = m
+		}
+	}
+
+	assert.InDelta(t, 5., *sinks["k6_metric1_avg"].Metric[0].Gauge.Value, 1e-6)
+	assert.Equal(t, "tagk1", *sinks["k6_metric1_avg"].Metric[0].GetLabel()[0].Name)
+	assert.Equal(t, "tagv1", *sinks["k6_metric1_avg"].Metric[0].GetLabel()[0].Value)
+
+	assert.InDelta(t, 0., *sinks["k6_metric1_min"].Metric[0].Gauge.Value, 1e-6)
+	assert.Equal(t, "tagk1", *sinks["k6_metric1_min"].Metric[0].GetLabel()[0].Name)
+	assert.Equal(t, "tagv1", *sinks["k6_metric1_min"].Metric[0].GetLabel()[0].Value)
+
+	assert.InDelta(t, 10., *sinks["k6_metric1_max"].Metric[0].Gauge.Value, 1e-6)
+	assert.Equal(t, "tagk1", *sinks["k6_metric1_max"].Metric[0].GetLabel()[0].Name)
+	assert.Equal(t, "tagv1", *sinks["k6_metric1_max"].Metric[0].GetLabel()[0].Value)
+}
+
+func TestUsePushgatewayTrendAsNativeHistogram(t *testing.T) {
+	t.Parallel()
+
+	logger := logrus.New()
+	logger.SetLevel(logrus.DebugLevel)
+
+	var client remote.RegistryPusher = &MockPushgatewayClient{}
+
+	registry := metrics.NewRegistry()
+	metric1 := registry.MustNewMetric("metric1", metrics.Trend)
+	tagset1 := registry.RootTagSet().With("tagk1", "tagv1")
+	t0 := time.Date(2022, time.September, 1, 0, 0, 0, 0, time.UTC)
+	series1 := metrics.TimeSeries{
+		Metric: metric1,
+		Tags:   tagset1,
+	}
+
+	output := Output{
+		logger:    logger,
+		pgwClient: client,
+		tsdb:      map[metrics.TimeSeries]*seriesWithMeasure{},
+		config:    Config{TrendAsNativeHistogram: null.BoolFrom(true)},
+	}
+	err := output.setTrendStatsResolver([]string{"avg", "min", "max"})
+	require.NoError(t, err)
+
+	samples := []metrics.SampleContainer{
+		metrics.Sample{
+			TimeSeries: series1,
+			Time:       t0.Add(10 * time.Millisecond),
+			Value:      0,
+		},
+		metrics.Sample{
+			TimeSeries: series1,
+			Time:       t0.Add(10 * time.Millisecond),
+			Value:      10,
+		},
+	}
+
+	output.AddMetricSamples(samples)
+
+	output.flush()
+
+	assert.Len(t, client.(*MockPushgatewayClient).r, 1)
+
+	sinks := make(map[string]*dto.MetricFamily)
+
+	for _, r := range client.(*MockPushgatewayClient).r {
+		mf, err := r.Gather()
+		require.NoError(t, err)
+		for _, m := range mf {
+			sinks[m.GetName()] = m
+		}
+	}
+
+	assert.Equal(t, uint64(2), *sinks["k6_metric1"].Metric[0].Histogram.SampleCount)
+	assert.InDelta(t, 10., *sinks["k6_metric1"].Metric[0].Histogram.SampleSum, 1e-6)
+	assert.Equal(t, "tagk1", *sinks["k6_metric1"].Metric[0].GetLabel()[0].Name)
+	assert.Equal(t, "tagv1", *sinks["k6_metric1"].Metric[0].GetLabel()[0].Value)
 }
