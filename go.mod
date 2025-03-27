@@ -58,7 +58,7 @@ require (
 	golang.org/x/term v0.30.0
 	golang.org/x/time v0.11.0
 	google.golang.org/grpc v1.71.0
-	google.golang.org/protobuf v1.36.5
+	google.golang.org/protobuf v1.36.6
 	gopkg.in/guregu/null.v3 v3.3.0
 	gopkg.in/yaml.v3 v3.0.1
 )
