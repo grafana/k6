@@ -376,9 +376,9 @@ func (r *Runner) HandleSummary(
 	})
 	vu.moduleVUImpl.ctx = summaryCtx
 
-	noColor, enableColors, summaryDataForJS, summaryCode := prepareHandleSummaryCall(r, legacy, summary)
+	noColor, enableColors, legacyData, summaryData, summaryCode := prepareHandleSummaryCall(r, legacy, summary)
 
-	handleSummaryDataAsValue := vu.Runtime.ToValue(summaryDataForJS)
+	handleSummaryDataAsValue := vu.Runtime.ToValue(legacyData)
 	callbackResult, err := runUserProvidedHandleSummaryCallback(summaryCtx, vu, handleSummaryDataAsValue)
 	if err != nil {
 		return nil, err
@@ -394,7 +394,8 @@ func (r *Runner) HandleSummary(
 		return nil, fmt.Errorf("unexpected error did not get a callable summary wrapper")
 	}
 
-	wrapperArgs := prepareHandleWrapperArgs(vu, noColor, enableColors, callbackResult, handleSummaryDataAsValue)
+	wrapperArgs := prepareHandleWrapperArgs(
+		vu, noColor, enableColors, callbackResult, handleSummaryDataAsValue, vu.Runtime.ToValue(summaryData))
 	rawResult, _, _, err := vu.runFn(summaryCtx, false, handleSummaryWrapper, nil, wrapperArgs...)
 
 	if deadlineError := r.checkDeadline(summaryCtx, consts.HandleSummaryFn, rawResult, err); deadlineError != nil {
@@ -412,30 +413,29 @@ func prepareHandleSummaryCall(
 	r *Runner,
 	legacy *lib.LegacySummary,
 	summary *summary.Summary,
-) (bool, bool, interface{}, string) {
+) (bool, bool, interface{}, interface{}, string) {
 	var (
 		noColor          bool
 		enableColors     bool
+		legacyDataForJS  interface{}
 		summaryDataForJS interface{}
 		summaryCode      string
 	)
-
-	// TODO: Remove this code block once we stop supporting the legacy summary.
-	if legacy != nil {
-		noColor = legacy.NoColor
-		enableColors = !legacy.NoColor && legacy.UIState.IsStdOutTTY
-		summaryDataForJS = summarizeMetricsToObject(legacy, r.Bundle.Options, r.setupData)
-		summaryCode = jslibSummaryLegacyCode
-	}
-
 	if summary != nil {
 		noColor = summary.NoColor
 		enableColors = summary.EnableColors
+		legacyDataForJS = summarizeMetricsToObject(legacy, r.Bundle.Options, r.setupData)
 		summaryDataForJS = summary
 		summaryCode = jslibSummaryCode
+	} else { // TODO: Remove this code block once we stop supporting the legacy summary.
+		noColor = legacy.NoColor
+		enableColors = !legacy.NoColor && legacy.UIState.IsStdOutTTY
+		legacyDataForJS = summarizeMetricsToObject(legacy, r.Bundle.Options, r.setupData)
+		summaryDataForJS = legacyDataForJS
+		summaryCode = jslibSummaryLegacyCode
 	}
 
-	return noColor, enableColors, summaryDataForJS, summaryCode
+	return noColor, enableColors, legacyDataForJS, summaryDataForJS, summaryCode
 }
 
 func runUserProvidedHandleSummaryCallback(
@@ -467,8 +467,7 @@ func runUserProvidedHandleSummaryCallback(
 func prepareHandleWrapperArgs(
 	vu *VU,
 	noColor bool, enableColors bool,
-	callbackResult sobek.Value,
-	summaryDataForJS interface{},
+	callbackResult, handleSummaryDataAsValue, summaryDataAsValue sobek.Value,
 ) []sobek.Value {
 	options := map[string]interface{}{
 		// TODO: improve when we can easily export all option values, including defaults?
@@ -481,7 +480,8 @@ func prepareHandleWrapperArgs(
 	wrapperArgs := []sobek.Value{
 		callbackResult,
 		vu.Runtime.ToValue(vu.Runner.Bundle.preInitState.RuntimeOptions.SummaryExport.String),
-		vu.Runtime.ToValue(summaryDataForJS),
+		handleSummaryDataAsValue,
+		summaryDataAsValue,
 		vu.Runtime.ToValue(options),
 	}
 
