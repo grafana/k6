@@ -693,8 +693,10 @@ func (sc *SubtleCrypto) DeriveBits( //nolint:funlen,gocognit // we have a lot of
 			)
 		}
 
-		if err := ensureKeysUseSameCurve(privateKey, publicKey); err != nil {
-			return NewError(InvalidAccessError, err.Error())
+		if normalizeAlgorithmName == ECDH {
+			if err := ensureKeysUseSameCurve(privateKey, publicKey); err != nil {
+				return NewError(InvalidAccessError, err.Error())
+			}
 		}
 
 		// currently we don't support lengths that are not multiples of 8
@@ -766,6 +768,7 @@ func (sc *SubtleCrypto) DeriveBits( //nolint:funlen,gocognit // we have a lot of
 //     `ALGORITHM` is the name of the algorithm.
 //   - for PBKDF2: pass the string "PBKDF2"
 //   - for HKDF: pass the string "HKDF"
+//   - for Ed25519: pass the string "Ed25519"
 func (sc *SubtleCrypto) ImportKey( //nolint:funlen // we have a lot of error handling
 	format KeyFormat,
 	keyData sobek.Value,
@@ -911,6 +914,10 @@ func (sc *SubtleCrypto) ExportKey( //nolint:funlen // we have a lot of error han
 			keyExporter = exportECKey
 		case RSASsaPkcs1v15, RSAOaep, RSAPss:
 			keyExporter = exportRSAKey
+		case Ed25519:
+			keyExporter = exportEd25519Key
+		case X25519:
+			keyExporter = exportX25519Key
 		default:
 			return NewError(NotSupportedError, "unsupported algorithm "+algorithm.Name)
 		}
