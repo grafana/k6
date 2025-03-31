@@ -1558,15 +1558,19 @@ func TestReadyStateSwitch(t *testing.T) {
 }
 
 func TestEnumEvent(t *testing.T) {
+	t.Parallel()
 	for event := range enums.GetEventsName() {
-		testEnum(t, `when EventName.`+event+` is called, should add event`, `
-			var ws = new WebSocket("WSBIN_URL/ws-echo")
-			ws.addEventListener(EventName.`+event+`, () => {ws.close()})
-			ws.close()
-		`)
+		testEnum(t,
+			"when EventName."+event+" is called, should add event",
+			`var ws = new WebSocket("WSBIN_URL/ws-echo");
+			ws.addEventListener(EventName.`+event+`, () => { ws.close(); });
+			ws.close();`,
+		)
 	}
 }
+
 func TestEnumReadyState(t *testing.T) {
+	t.Parallel()
 	tests := map[string]func() map[string]any{
 		"ReadyState":           enums.GetReadyState,
 		"BinaryType":           enums.GetBinaryType,

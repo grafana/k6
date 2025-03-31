@@ -19,12 +19,12 @@ type eventListeners struct {
 
 func newEventListeners() *eventListeners {
 	return &eventListeners{
-		open:    newListener(enums.EVENT_OPEN),
-		message: newListener(enums.EVENT_MESSAGE),
-		error:   newListener(enums.EVENT_ERROR),
-		close:   newListener(enums.EVENT_CLOSE),
-		ping:    newListener(enums.EVENT_PING),
-		pong:    newListener(enums.EVENT_PONG),
+		open:    newListener(enums.EventOpen),
+		message: newListener(enums.EventMessage),
+		error:   newListener(enums.EventError),
+		close:   newListener(enums.EventClose),
+		ping:    newListener(enums.EventPing),
+		pong:    newListener(enums.EventPong),
 	}
 }
 
@@ -74,17 +74,17 @@ func (l *eventListener) all() []func(sobek.Value) (sobek.Value, error) {
 // getTypes return event listener of a certain type
 func (l *eventListeners) getType(t string) *eventListener {
 	switch t {
-	case enums.EVENT_OPEN:
+	case enums.EventOpen:
 		return l.open
-	case enums.EVENT_MESSAGE:
+	case enums.EventMessage:
 		return l.message
-	case enums.EVENT_ERROR:
+	case enums.EventError:
 		return l.error
-	case enums.EVENT_CLOSE:
+	case enums.EventClose:
 		return l.close
-	case enums.EVENT_PING:
+	case enums.EventPing:
 		return l.ping
-	case enums.EVENT_PONG:
+	case enums.EventPong:
 		return l.pong
 	default:
 		return nil

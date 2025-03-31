@@ -125,7 +125,7 @@ func (r *WebSocketsAPI) websocket(c sobek.ConstructorCall) *sobek.Object {
 		blobConstructor: r.blobConstructor,
 		url:             url,
 		tq:              taskqueue.New(r.vu.RegisterCallback),
-		readyState:      enums.STATE_CONNECTING,
+		readyState:      enums.StateConnecting,
 		builtinMetrics:  r.vu.State().BuiltinMetrics,
 		done:            make(chan struct{}),
 		writeQueueCh:    make(chan message),
@@ -236,12 +236,12 @@ func defineWebsocket(rt *sobek.Runtime, w *webSocket) {
 			}), sobek.FLAG_FALSE, sobek.FLAG_TRUE))
 	}
 
-	setOn("onmessage", w.eventListeners.getType(enums.EVENT_MESSAGE))
-	setOn("onerror", w.eventListeners.getType(enums.EVENT_ERROR))
-	setOn("onopen", w.eventListeners.getType(enums.EVENT_OPEN))
-	setOn("onclose", w.eventListeners.getType(enums.EVENT_CLOSE))
-	setOn("onping", w.eventListeners.getType(enums.EVENT_PING))
-	setOn("onpong", w.eventListeners.getType(enums.EVENT_PONG))
+	setOn("onmessage", w.eventListeners.getType(enums.EventMessage))
+	setOn("onerror", w.eventListeners.getType(enums.EventError))
+	setOn("onopen", w.eventListeners.getType(enums.EventOpen))
+	setOn("onclose", w.eventListeners.getType(enums.EventClose))
+	setOn("onping", w.eventListeners.getType(enums.EventPing))
+	setOn("onpong", w.eventListeners.getType(enums.EventPong))
 }
 
 type message struct {
@@ -404,7 +404,7 @@ func (w *webSocket) loop() {
 					return w.callErrorListeners(err)
 				}
 
-				return w.callEventListeners(enums.EVENT_PING)
+				return w.callEventListeners(enums.EventPing)
 			})
 
 		case pingID := <-pongChan:
@@ -412,7 +412,7 @@ func (w *webSocket) loop() {
 				// Handle pong responses to our pings
 				w.trackPong(pingID)
 
-				return w.callEventListeners(enums.EVENT_PONG)
+				return w.callEventListeners(enums.EventPong)
 			})
 		}
 	}
@@ -420,7 +420,7 @@ func (w *webSocket) loop() {
 
 func (w *webSocket) queueMessage(msg *message) {
 	w.tq.Queue(func() error {
-		if w.readyState != enums.STATE_OPEN {
+		if w.readyState != enums.StateOpen {
 			return nil // TODO maybe still emit
 		}
 		// TODO maybe emit after all the listeners have fired and skip it if defaultPrevent was called?!?
@@ -435,7 +435,7 @@ func (w *webSocket) queueMessage(msg *message) {
 		})
 
 		rt := w.vu.Runtime()
-		ev := w.newEvent(enums.EVENT_MESSAGE, msg.t)
+		ev := w.newEvent(enums.EventMessage, msg.t)
 
 		if msg.mtype == websocket.BinaryMessage {
 			var data any
@@ -463,7 +463,7 @@ func (w *webSocket) queueMessage(msg *message) {
 			ev.DefineDataProperty("origin", rt.ToValue(w.url.String()), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE),
 		)
 
-		for _, messageListener := range w.eventListeners.all(enums.EVENT_MESSAGE) {
+		for _, messageListener := range w.eventListeners.all(enums.EventMessage) {
 			if _, err := messageListener(ev); err != nil {
 				_ = w.conn.Close()                   // TODO log it?
 				_ = w.connectionClosedWithError(err) // TODO log it?
@@ -709,7 +709,7 @@ func (w *webSocket) trackPong(pingID string) {
 // assertStateOpen checks if the websocket is in the OPEN state
 // otherwise it throws an error (panic)
 func (w *webSocket) assertStateOpen() {
-	if w.readyState == enums.STATE_OPEN {
+	if w.readyState == enums.StateOpen {
 		return
 	}
 
@@ -719,10 +719,10 @@ func (w *webSocket) assertStateOpen() {
 
 // TODO support code and reason
 func (w *webSocket) close(code int, reason string) {
-	if w.readyState == enums.STATE_CLOSED || w.readyState == enums.STATE_CLOSING {
+	if w.readyState == enums.StateClosed || w.readyState == enums.StateClosing {
 		return
 	}
-	w.readyState = enums.STATE_CLOSING
+	w.readyState = enums.StateClosing
 	if code == 0 {
 		code = websocket.CloseNormalClosure
 	}
@@ -743,19 +743,19 @@ func (w *webSocket) queueClose() {
 // to be run only on the eventloop
 // from https://websockets.spec.whatwg.org/#feedback-from-the-protocol
 func (w *webSocket) connectionConnected() error {
-	if w.readyState != enums.STATE_CONNECTING {
+	if w.readyState != enums.StateConnecting {
 		return nil
 	}
-	w.readyState = enums.STATE_OPEN
+	w.readyState = enums.StateOpen
 	return w.callOpenListeners(time.Now()) // TODO fix time
 }
 
 // to be run only on the eventloop
 func (w *webSocket) connectionClosedWithError(err error) error {
-	if w.readyState == enums.STATE_CLOSED {
+	if w.readyState == enums.StateClosed {
 		return nil
 	}
-	w.readyState = enums.STATE_CLOSED
+	w.readyState = enums.StateClosed
 	close(w.done)
 
 	if err != nil {
@@ -763,7 +763,7 @@ func (w *webSocket) connectionClosedWithError(err error) error {
 			return errList // TODO ... still call the close listeners ?!?
 		}
 	}
-	return w.callEventListeners(enums.EVENT_CLOSE)
+	return w.callEventListeners(enums.EventClose)
 }
 
 // newEvent return an event implementing "implements" https://dom.spec.whatwg.org/#event
@@ -796,8 +796,8 @@ func (w *webSocket) newEvent(eventType string, t time.Time) *sobek.Object {
 }
 
 func (w *webSocket) callOpenListeners(timestamp time.Time) error {
-	for _, openListener := range w.eventListeners.all(enums.EVENT_OPEN) {
-		if _, err := openListener(w.newEvent(enums.EVENT_OPEN, timestamp)); err != nil {
+	for _, openListener := range w.eventListeners.all(enums.EventOpen) {
+		if _, err := openListener(w.newEvent(enums.EventOpen, timestamp)); err != nil {
 			_ = w.conn.Close()                   // TODO log it?
 			_ = w.connectionClosedWithError(err) // TODO log it?
 			return err
@@ -809,11 +809,11 @@ func (w *webSocket) callOpenListeners(timestamp time.Time) error {
 func (w *webSocket) callErrorListeners(e error) error { // TODO use the error even thought it is not by the spec
 	rt := w.vu.Runtime()
 
-	ev := w.newEvent(enums.EVENT_ERROR, time.Now())
+	ev := w.newEvent(enums.EventError, time.Now())
 	must(rt, ev.DefineDataProperty("error",
 		rt.ToValue(e.Error()),
 		sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
-	for _, errorListener := range w.eventListeners.all(enums.EVENT_ERROR) {
+	for _, errorListener := range w.eventListeners.all(enums.EventError) {
 		if _, err := errorListener(ev); err != nil { // TODO fix timestamp
 			return err
 		}
