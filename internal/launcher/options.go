@@ -1,4 +1,4 @@
-package cmd
+package launcher
 
 import (
 	"encoding/json"
