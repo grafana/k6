@@ -83,7 +83,7 @@ func TestExamplesInputOutput(t *testing.T) {
 
 				ts := getSingleFileTestState(t, string(script), []string{"-v", "--log-output=stdout"}, 0)
 
-				cmd.ExecuteWithGlobalState(ts.GlobalState)
+				cmd.Execute(ts.GlobalState)
 
 				stdout := ts.Stdout.String()
 

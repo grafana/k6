@@ -27,7 +27,7 @@ func TestK6CloudUpload(t *testing.T) {
 		ts := getSimpleCloudTestState(t, nil, setupK6CloudUploadCmd, nil, nil, nil)
 		delete(ts.Env, "K6_CLOUD_TOKEN")
 		ts.ExpectedExitCode = -1
-		cmd.ExecuteWithGlobalState(ts.GlobalState)
+		cmd.Execute(ts.GlobalState)
 
 		stdout := ts.Stdout.String()
 		t.Log(stdout)
@@ -45,7 +45,7 @@ func TestK6CloudUpload(t *testing.T) {
 		}
 
 		ts := getSimpleCloudTestState(t, nil, setupK6CloudUploadCmd, nil, nil, cs)
-		cmd.ExecuteWithGlobalState(ts.GlobalState)
+		cmd.Execute(ts.GlobalState)
 
 		stdout := ts.Stdout.String()
 		t.Log(stdout)
@@ -141,7 +141,7 @@ func TestK6CloudUpload(t *testing.T) {
 		ts.Env["K6_CLOUD_HOST"] = srv.URL
 		ts.Env["K6_CLOUD_TOKEN"] = "foo" // doesn't matter, we mock the cloud
 
-		cmd.ExecuteWithGlobalState(ts.GlobalState)
+		cmd.Execute(ts.GlobalState)
 
 		stdout := ts.Stdout.String()
 		t.Log(stdout)

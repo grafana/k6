@@ -17,7 +17,7 @@ func TestVersionFlag(t *testing.T) {
 	ts.ExpectedExitCode = 0
 	ts.CmdArgs = []string{"k6", "--version"}
 
-	ExecuteWithGlobalState(ts.GlobalState)
+	Execute(ts.GlobalState)
 
 	stdout := ts.Stdout.String()
 	t.Log(stdout)
@@ -38,7 +38,7 @@ func TestVersionSubCommand(t *testing.T) {
 	ts.ExpectedExitCode = 0
 	ts.CmdArgs = []string{"k6", "version"}
 
-	ExecuteWithGlobalState(ts.GlobalState)
+	Execute(ts.GlobalState)
 
 	stdout := ts.Stdout.String()
 	t.Log(stdout)
@@ -59,7 +59,7 @@ func TestVersionJSONSubCommand(t *testing.T) {
 	ts.ExpectedExitCode = 0
 	ts.CmdArgs = []string{"k6", "version", "--json"}
 
-	ExecuteWithGlobalState(ts.GlobalState)
+	Execute(ts.GlobalState)
 
 	stdout := ts.Stdout.String()
 	t.Log(stdout)
