@@ -1,6 +1,7 @@
 package execution
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
@@ -217,6 +218,60 @@ func TestAbortTest(t *testing.T) { //nolint:tparallel
 	})
 	t.Run("custom reason", func(t *testing.T) { //nolint:paralleltest
 		prove(t, `exec.test.abort("mayday")`, fmt.Sprintf("%s: mayday", errext.AbortTest))
+	})
+}
+
+func TestFailTest(t *testing.T) {
+	t.Parallel()
+
+	var (
+		logsBuffer bytes.Buffer
+		testLogger = logrus.New()
+		rt         = sobek.New()
+		// We need to set up the state with a logger to capture logs and initialize
+		// the TestStatus.
+		state = &lib.State{TestStatus: lib.NewTestStatus(), Logger: testLogger}
+		ctx   = context.Background()
+	)
+
+	// Set up the logger to write to the buffer so we can assert on it later
+	testLogger.AddHook(testutils.NewLogHook(logrus.DebugLevel))
+	testLogger.SetOutput(&logsBuffer)
+
+	// Instantiate the test module instance
+	module, ok := New().NewModuleInstance(
+		&modulestest.VU{
+			RuntimeField: rt,
+			CtxField:     ctx,
+			StateField:   state,
+		},
+	).(*ModuleInstance)
+	require.True(t, ok)
+	require.NoError(t, rt.Set("exec", module.Exports().Default))
+
+	t.Run("default reason", func(t *testing.T) {
+		defer t.Cleanup(func() {
+			// Ensure the logs buffer is reset after each test
+			logsBuffer.Reset()
+		})
+
+		_, err := rt.RunString("exec.test.fail()")
+		require.NoError(t, err)
+
+		assert.True(t, state.TestStatus.Failed())
+	})
+
+	t.Run("custom reason", func(t *testing.T) {
+		defer t.Cleanup(func() {
+			// Ensure the logs buffer is reset after each test
+			logsBuffer.Reset()
+		})
+
+		_, err := rt.RunString(`exec.test.fail("a custom reason")`)
+		require.NoError(t, err)
+
+		assert.True(t, state.TestStatus.Failed())
+		assert.Contains(t, logsBuffer.String(), "a custom reason")
 	})
 }
 
