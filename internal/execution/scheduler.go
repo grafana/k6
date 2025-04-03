@@ -415,7 +415,7 @@ func (e *Scheduler) Init(
 // Run the Scheduler, funneling all generated metric samples through the supplied
 // out channel.
 //
-//nolint:funlen
+//nolint:funlen, gocognit
 func (e *Scheduler) Run(globalCtx, runCtx context.Context, samplesOut chan<- metrics.SampleContainer) (runErr error) {
 	logger := e.state.Test.Logger.WithField("phase", "execution-scheduler-run")
 
@@ -450,7 +450,12 @@ func (e *Scheduler) Run(globalCtx, runCtx context.Context, samplesOut chan<- met
 
 	e.initProgress.Modify(pb.WithConstProgress(1, "Starting test..."))
 	e.state.MarkStarted()
-	defer e.state.MarkEnded()
+	defer func() {
+		isAborted := GetCancelReasonIfTestAborted(runCtx) != nil
+		if !isAborted {
+			e.state.MarkEnded()
+		}
+	}()
 	e.initProgress.Modify(pb.WithConstProgress(1, "running"))
 
 	executorsCount := len(e.executors)
