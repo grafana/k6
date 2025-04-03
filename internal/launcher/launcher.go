@@ -21,55 +21,53 @@ const anyK6Version = k6deps.ConstraintsAny
 func Execute() {
 	gs := state.NewGlobalState(context.Background())
 
-	tryBinaryProvisioning := gs.Flags.BinaryProvisioning
-
-	var deps k6deps.Dependencies
-	var opt Options
-	if tryBinaryProvisioning {
-		gs.Logger.Debug("trying to provision binary")
-
-		var err error
-		deps, err = analyze(gs, gs.CmdArgs[1:])
-		if err != nil {
-			gs.Logger.
-				WithError(err).
-				Error("failed to analyze dependencies, can't try binary provisioning, please report this issue")
-			return
-		}
-
-		buildRequired := isCustomBuildRequired(build.Version, deps)
-		gs.Logger.
-			WithField("buildRequired", buildRequired).
-			WithField("deps", deps).
-			Debug("binary provisioning, dependencies analyzed")
-
-		tryBinaryProvisioning = tryBinaryProvisioning && buildRequired
-
-		opt = NewOptions(gs)
-		if !opt.CanUseBuildService() && tryBinaryProvisioning {
-			gs.Logger.Error(
-				"your scripts/archives require a build service token, but it's not set, " +
-					"please set the K6_CLOUD_TOKEN environment variable or k6 cloud login. ",
-			)
-			return
-		}
-	} else {
+	// if binary provisioning not enabled, continue with regular k6 execution path
+	if !gs.Flags.BinaryProvisioning {
 		gs.Logger.Debug("binary provisioning disabled")
+		k6Cmd.Execute(gs)
+		return
 	}
 
-	if tryBinaryProvisioning {
-		// this will try to get the k6 binary from the build service
-		// and run it, passing all the original arguments
-		runWithBinaryProvisioning(gs, deps, opt)
-	} else {
-		// this will run the default k6 command
-		k6Cmd.Execute(gs)
+	gs.Logger.Debug("trying to provision binary")
+
+	deps, err := analyze(gs, gs.CmdArgs[1:])
+	if err != nil {
+		gs.Logger.
+			WithError(err).
+			Error("failed to analyze dependencies, can't try binary provisioning, please report this issue")
+		return
 	}
+
+	buildRequired := isCustomBuildRequired(build.Version, deps)
+	gs.Logger.
+		WithField("buildRequired", buildRequired).
+		WithField("deps", deps).
+		Debug("binary provisioning, dependencies analyzed")
+
+	// binary provisioning enabled but not required by this command
+	// continue with regular k6 execution path
+	if !buildRequired {
+		k6Cmd.Execute(gs)
+		return
+	}
+
+	opt := NewOptions(gs)
+	if !opt.CanUseBuildService() {
+		gs.Logger.Error(
+			"your scripts/archives require a build service token, but it's not set, " +
+				"please set the K6_CLOUD_TOKEN environment variable or k6 cloud login. ",
+		)
+		return
+	}
+
+	// this will try to get the k6 binary from the build service
+	// and run it, passing all the original arguments
+	runWithBinaryProvisioning(gs, deps, opt)
+
 }
 
 func runWithBinaryProvisioning(gs *state.GlobalState, deps k6deps.Dependencies, opt Options) {
 	binPath, err := provision(gs, deps, opt)
-	// TODO: add logs here?
 	if err != nil {
 		gs.Logger.
 			WithError(err).
