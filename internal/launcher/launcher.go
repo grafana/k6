@@ -2,9 +2,12 @@
 package launcher
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os/exec"
+	"strings"
 
 	"github.com/grafana/k6deps"
 	"github.com/grafana/k6provider"
@@ -28,6 +31,7 @@ func Execute() {
 		return
 	}
 
+	// TODO: maybe use Info to alert user it is using the feature?
 	gs.Logger.Debug("trying to provision binary")
 
 	deps, err := analyze(gs, gs.CmdArgs[1:])
@@ -38,23 +42,23 @@ func Execute() {
 		return
 	}
 
-	buildRequired := isCustomBuildRequired(build.Version, deps)
-	gs.Logger.
-		WithField("buildRequired", buildRequired).
-		WithField("deps", deps).
-		Debug("binary provisioning, dependencies analyzed")
-
 	// binary provisioning enabled but not required by this command
 	// continue with regular k6 execution path
-	if !buildRequired {
+	if !isCustomBuildRequired(build.Version, deps) {
+		gs.Logger.
+			Debug("binary provisioning not required")
 		k6Cmd.Execute(gs)
 		return
 	}
 
+	gs.Logger.
+		WithField("deps", deps).
+		Info("dependencies identified, binary provisioning required")
+
 	opt := NewOptions(gs)
 	if !opt.CanUseBuildService() {
 		gs.Logger.Error(
-			"your scripts/archives require a build service token, but it's not set, " +
+			"your scripts/archives require cloud token to fetch a custom binary with required dependencies, " +
 				"please set the K6_CLOUD_TOKEN environment variable or k6 cloud login. ",
 		)
 		return
@@ -63,7 +67,6 @@ func Execute() {
 	// this will try to get the k6 binary from the build service
 	// and run it, passing all the original arguments
 	runWithBinaryProvisioning(gs, deps, opt)
-
 }
 
 func runWithBinaryProvisioning(gs *state.GlobalState, deps k6deps.Dependencies, opt Options) {
@@ -83,7 +86,7 @@ func runWithBinaryProvisioning(gs *state.GlobalState, deps k6deps.Dependencies, 
 	// disable binary provisioning any second time
 	gs.Env["K6_BINARY_PROVISIONING"] = "false"
 
-	gs.Logger.Debug("running binary provisioning path")
+	gs.Logger.Debug("launching provisioned k6 binary")
 
 	if err := cmd.Run(); err != nil {
 		gs.Logger.Error(formatError(err))
@@ -133,6 +136,14 @@ func isCustomBuildRequired(baseK6Version string, deps k6deps.Dependencies) bool 
 	return v != baseK6Version
 }
 
+func formatDependencies(deps map[string]string) string {
+	buffer := &bytes.Buffer{}
+	for dep, version := range deps {
+		buffer.WriteString(fmt.Sprintf("%s:%s ", dep, version))
+	}
+	return strings.Trim(buffer.String(), " ")
+}
+
 func provision(gs *state.GlobalState, deps k6deps.Dependencies, opt Options) (string, error) {
 	config := k6provider.Config{
 		BuildServiceURL:  opt.BuildServiceURL,
@@ -153,7 +164,7 @@ func provision(gs *state.GlobalState, deps k6deps.Dependencies, opt Options) (st
 	}
 
 	// TODO: for now we just log the version, but we need to come up with a better UI/UX
-	gs.Logger.Infof("k6 has been provisioned with the version %q", binary.Dependencies["k6"])
+	gs.Logger.Infof("k6 has been provisioned with the version %q", formatDependencies(binary.Dependencies))
 
 	return binary.Path, nil
 }
