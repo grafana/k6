@@ -221,7 +221,7 @@ func TestAbortTest(t *testing.T) { //nolint:tparallel
 	})
 }
 
-func TestFailTest(t *testing.T) {
+func TestFailTest(t *testing.T) { //nolint:tparallel
 	t.Parallel()
 
 	var (
