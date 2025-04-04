@@ -112,7 +112,7 @@ func TestGRPCInputOutput(t *testing.T) {
 			}
 			require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "proto.proto"), proto, 0o644))
 
-			cmd.ExecuteWithGlobalState(ts.GlobalState)
+			cmd.Execute(ts.GlobalState)
 
 			stdout := ts.Stdout.String()
 
