@@ -18,11 +18,6 @@ type Options struct {
 	BuildServiceToken string
 }
 
-// CanUseBuildService returns true if the build service can be used.
-func (o *Options) CanUseBuildService() bool {
-	return o.BuildServiceURL != "" && o.BuildServiceToken != ""
-}
-
 // NewOptions creates a new Options object.
 func NewOptions(gs *k6State.GlobalState) Options {
 	return Options{
