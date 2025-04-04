@@ -249,7 +249,7 @@ func TestFailTest(t *testing.T) {
 	require.True(t, ok)
 	require.NoError(t, rt.Set("exec", module.Exports().Default))
 
-	t.Run("default reason", func(t *testing.T) {
+	t.Run("default reason", func(t *testing.T) { //nolint:paralleltest
 		defer t.Cleanup(func() {
 			// Ensure the logs buffer is reset after each test
 			logsBuffer.Reset()
@@ -261,7 +261,7 @@ func TestFailTest(t *testing.T) {
 		assert.True(t, state.TestStatus.Failed())
 	})
 
-	t.Run("custom reason", func(t *testing.T) {
+	t.Run("custom reason", func(t *testing.T) { //nolint:paralleltest
 		defer t.Cleanup(func() {
 			// Ensure the logs buffer is reset after each test
 			logsBuffer.Reset()
