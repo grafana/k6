@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"sync"
 
+	"go.k6.io/k6/lib"
+
 	"github.com/mattn/go-colorable"
 	"github.com/mattn/go-isatty"
 	"github.com/sirupsen/logrus"
@@ -60,6 +62,7 @@ type GlobalState struct {
 
 	SecretsManager *secretsource.Manager
 	Usage          *usage.Usage
+	TestStatus     *lib.TestStatus
 }
 
 // NewGlobalState returns a new GlobalState with the given ctx.
@@ -136,7 +139,8 @@ func NewGlobalState(ctx context.Context) *GlobalState {
 			Hooks:     make(logrus.LevelHooks),
 			Level:     logrus.InfoLevel,
 		},
-		Usage: usage.New(),
+		Usage:      usage.New(),
+		TestStatus: lib.NewTestStatus(),
 	}
 }
 

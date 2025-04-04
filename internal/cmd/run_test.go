@@ -12,11 +12,12 @@ import (
 	"runtime"
 	"testing"
 
+	"go.k6.io/k6/errext"
+
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/internal/cmd/tests"
 	"go.k6.io/k6/internal/lib/testutils"
@@ -221,6 +222,11 @@ func TestRunScriptErrorsAndAbort(t *testing.T) {
 			testFilename: "thresholds/unsupported_aggregation_method.js",
 			name:         "run should succeed on a threshold applying an unsupported aggregation method to a metric with the --no-thresholds flag set",
 			extraArgs:    []string{"--no-thresholds"},
+		},
+		{
+			testFilename: "fail.js",
+			expExitCode:  exitcodes.MarkedAsFailed,
+			expErr:       errext.MarkedAsFailedTest,
 		},
 	}
 

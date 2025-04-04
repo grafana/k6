@@ -3,6 +3,7 @@ package lib
 import (
 	"io"
 	"strings"
+	"sync"
 	"sync/atomic"
 
 	"github.com/sirupsen/logrus"
@@ -26,6 +27,44 @@ type TestPreInitState struct {
 	TracerProvider *trace.TracerProvider
 	Usage          *usage.Usage
 	SecretsManager *secretsource.Manager
+
+	// FIXME (@oleiade): is this the way?
+	TestStatus *TestStatus
+}
+
+// TestStatus holds the test execution status and is used to support marking a test as failed
+// while letting the execution go on.
+type TestStatus struct {
+	// failed is a boolean that indicates whether the test has been marked as failed.
+	failed bool
+
+	// failedOnce is a sync.Once that ensures that the test is ever marked as failed only once.
+	failedOnce sync.Once
+}
+
+// MarkFailed sets the test status to failed, providing the guarantee that the
+// test will be marked as failed only once, even if multiple VUs or goroutines
+// try to mark it at the same time.
+//
+// This is useful for features that need to mark a test as failed while letting the
+// execution of the test finish normally, e.g. when a test script calls
+// `execution.test.fail()`.
+func (ts *TestStatus) MarkFailed() {
+	ts.failedOnce.Do(func() {
+		ts.failed = true
+	})
+}
+
+// Failed returns true if the test has been marked as failed, false otherwise.
+func (ts *TestStatus) Failed() bool {
+	return ts.failed
+}
+
+// NewTestStatus returns a new TestStatus instance
+func NewTestStatus() *TestStatus {
+	return &TestStatus{
+		failed: false,
+	}
 }
 
 // TestRunState contains the pre-init state as well as all of the state and

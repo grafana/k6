@@ -180,6 +180,21 @@ func (mi *ModuleInstance) newTestInfo() (*sobek.Object, error) {
 				rt.Interrupt(&errext.InterruptError{Reason: reason})
 			}
 		},
+		"fail": func() interface{} {
+			return func(msg sobek.Value) {
+				reason := errext.MarkedAsFailedTest
+				if msg != nil && !sobek.IsUndefined(msg) {
+					reason = fmt.Sprintf("%s: %s", reason, msg.String())
+				}
+
+				if mi.vu.State() == nil {
+					common.Throw(rt, fmt.Errorf("execution.test.fail() called outside of VU context"))
+				}
+
+				mi.vu.State().Logger.Errorf(reason)
+				mi.vu.State().TestStatus.MarkFailed()
+			}
+		},
 		"options": func() interface{} {
 			vuState := mi.vu.State()
 			if vuState == nil {

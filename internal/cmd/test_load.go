@@ -85,6 +85,7 @@ func loadLocalTest(gs *state.GlobalState, cmd *cobra.Command, args []string) (*l
 		},
 		Usage:          gs.Usage,
 		SecretsManager: gs.SecretsManager,
+		TestStatus:     gs.TestStatus,
 	}
 
 	test := &loadedTest{

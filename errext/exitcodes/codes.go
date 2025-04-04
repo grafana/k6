@@ -53,4 +53,7 @@ const (
 
 	// GoPanic indicates the script was aborted by a panic in the Go runtime.
 	GoPanic ExitCode = 109
+
+	// MarkedAsFailed indicates that the test was marked as failed.
+	MarkedAsFailed ExitCode = 110
 )
