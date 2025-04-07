@@ -28,7 +28,7 @@ type launcher struct {
 	// function to provision a k6 binary that satisfies the dependencies
 	provision func(*state.GlobalState, k6deps.Dependencies) (string, string, error)
 	// function to execute k6 binary
-	run func(*state.GlobalState, string) (error, int)
+	run func(*state.GlobalState, string) (int, error)
 }
 
 func newLauncher(gs *state.GlobalState) *launcher {
@@ -91,7 +91,7 @@ func (l *launcher) launch() int {
 
 	l.gs.Logger.Debug("launching provisioned k6 binary")
 
-	if err, rc := l.run(l.gs, binPath); err != nil {
+	if rc, err := l.run(l.gs, binPath); err != nil {
 		l.gs.Logger.Error(err)
 		return rc
 	}
@@ -100,7 +100,7 @@ func (l *launcher) launch() int {
 }
 
 // runs the k6 binary
-func runK6Cmd(gs *state.GlobalState, binPath string) (error, int) {
+func runK6Cmd(gs *state.GlobalState, binPath string) (int, error) {
 	cmd := exec.CommandContext(gs.Ctx, binPath, gs.CmdArgs[1:]...) //nolint:gosec
 	cmd.Stderr = gs.Stderr
 	cmd.Stdout = gs.Stdout
@@ -112,16 +112,12 @@ func runK6Cmd(gs *state.GlobalState, binPath string) (error, int) {
 	if err := cmd.Run(); err != nil {
 		var eerr *exec.ExitError
 		if errors.As(err, &eerr) {
-			return err, eerr.ExitCode()
+			return eerr.ExitCode(), err
 		}
 	}
 
-	return nil, 0
+	return 0, nil
 }
-
-// anyK6Version is a wildcard version for k6
-// if that appeared up in the dependencies, we'll use the base k6 version
-const anyK6Version = k6deps.ConstraintsAny
 
 // isCustomBuildRequired checks if the build is required
 // it's required if there is no k6 dependency in deps

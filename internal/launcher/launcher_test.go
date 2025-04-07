@@ -22,27 +22,26 @@ type luncherFixture struct {
 	k6BinaryPath    string
 	k6Versions      string
 	provisionError  error
-	k6RunPath       string
 	runK6Called     bool
 	runK6Error      error
 	runk6ReturnCode int
 	fallbackCalled  bool
 }
 
-func (f *luncherFixture) fallback(gs *state.GlobalState) {
+func (f *luncherFixture) fallback(_ *state.GlobalState) {
 	f.fallbackCalled = true
 }
 
-func (f *luncherFixture) provision(s *state.GlobalState, deps k6deps.Dependencies) (string, string, error) {
+func (f *luncherFixture) provision(_ *state.GlobalState, deps k6deps.Dependencies) (string, string, error) {
 	f.provisionCalled = true
 	f.provisionDeps = deps
 	return f.k6BinaryPath, f.k6Versions, f.provisionError
 }
 
 // function to execute k6 binary
-func (f *luncherFixture) run(*state.GlobalState, string) (error, int) {
+func (f *luncherFixture) run(*state.GlobalState, string) (int, error) {
 	f.runK6Called = true
-	return f.runK6Error, f.runk6ReturnCode
+	return f.runk6ReturnCode, f.runK6Error
 }
 
 const (
@@ -92,6 +91,7 @@ export default function() {
 )
 
 func Test_Launcher(t *testing.T) {
+	t.Parallel()
 
 	testCases := []struct {
 		name            string
@@ -218,6 +218,8 @@ func Test_Launcher(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			ts := tests.NewGlobalTestState(t)
 
 			k6Args := append([]string{"k6"}, tc.k6Cmd)
@@ -226,7 +228,7 @@ func Test_Launcher(t *testing.T) {
 			// create tmp file with the script if specified
 			if len(tc.script) > 0 {
 				scriptPath := filepath.Join(t.TempDir(), "script.js")
-				if err := os.WriteFile(scriptPath, []byte(tc.script), 0644); err != nil {
+				if err := os.WriteFile(scriptPath, []byte(tc.script), 0o600); err != nil { //nolint:forbidigo
 					t.Fatalf("test setup: creating script file %v", err)
 				}
 				k6Args = append(k6Args, scriptPath)

@@ -16,7 +16,7 @@ import (
 func k6buildProvision(gs *state.GlobalState, deps k6deps.Dependencies) (string, string, error) {
 	opt := NewOptions(gs)
 	if opt.BuildServiceToken == "" {
-		return "", "", errors.New("Need a k6 cloud token for binary provisioning. " +
+		return "", "", errors.New("Need a k6 cloud token for binary provisioning. " + //nolint:stylecheck //false positive
 			"Setting K6_CLOUD_TOKEN environment variable or executing k6 cloud login is required.")
 	}
 
