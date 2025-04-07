@@ -21,7 +21,7 @@ export default async function () {
   //Verifies the signature of the encoded data with the provided key
   const verified = await crypto.subtle.verify(
     alg,
-    otherKeyPair.publicKey,
+    keyPair.publicKey,
     signature,
     data
   );
