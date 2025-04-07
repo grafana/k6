@@ -16,7 +16,7 @@ import (
 func Execute() {
 	gs := state.NewGlobalState(context.Background())
 
-	newLauncher(gs).launch()
+	gs.OSExit(newLauncher(gs).launch())
 }
 
 // launcher is a k6 launcher
@@ -27,7 +27,7 @@ type launcher struct {
 	// function to provision a k6 binary that satisfies the dependencies
 	provision func(*state.GlobalState, k6deps.Dependencies) (string, string, error)
 	// function to execute k6 binary
-	run func(*state.GlobalState, string) error
+	run func(*state.GlobalState, string) (error, int)
 }
 
 func newLauncher(gs *state.GlobalState) *launcher {
@@ -40,13 +40,15 @@ func newLauncher(gs *state.GlobalState) *launcher {
 }
 
 // launch executes k6 either by launching a provisioned binary or defaulting to the
-// current binary it this is not necessary
-func (l *launcher) launch() {
+// current binary it this is not necessary.
+// Returns an int to be used as exit code.
+// If the fhe fallback is called, it can exit the process so don't assume it will return
+func (l *launcher) launch() int {
 	// if binary provisioning not enabled, continue with regular k6 execution path
 	if !l.gs.Flags.BinaryProvisioning {
 		l.gs.Logger.Debug("binary provisioning disabled")
 		l.fallback(l.gs)
-		return
+		return 0
 	}
 
 	// TODO: maybe use Info to alert user it is using the feature?
@@ -57,7 +59,7 @@ func (l *launcher) launch() {
 		l.gs.Logger.
 			WithError(err).
 			Error("failed to analyze dependencies, can't try binary provisioning, please report this issue")
-		l.gs.OSExit(1)
+		return 1
 	}
 
 	// binary provisioning enabled but not required by this command
@@ -66,7 +68,7 @@ func (l *launcher) launch() {
 		l.gs.Logger.
 			Debug("binary provisioning not required")
 		l.fallback(l.gs)
-		return
+		return 0
 	}
 
 	l.gs.Logger.
@@ -80,7 +82,7 @@ func (l *launcher) launch() {
 		l.gs.Logger.
 			WithError(err).
 			Error("failed to fetch a binary with required dependencies, please report this issue")
-		l.gs.OSExit(1)
+		return 1
 	}
 
 	l.gs.Logger.
@@ -88,20 +90,16 @@ func (l *launcher) launch() {
 
 	l.gs.Logger.Debug("launching provisioned k6 binary")
 
-	if err := l.run(l.gs, binPath); err != nil {
+	if err, rc := l.run(l.gs, binPath); err != nil {
 		l.gs.Logger.Error(err)
-
-		var eerr *exec.ExitError
-		if errors.As(err, &eerr) {
-			l.gs.OSExit(eerr.ExitCode())
-		}
-
-		l.gs.OSExit(1)
+		return rc
 	}
+
+	return 0
 }
 
 // runs the k6 binary
-func runK6Cmd(gs *state.GlobalState, binPath string) error {
+func runK6Cmd(gs *state.GlobalState, binPath string) (error, int) {
 	cmd := exec.CommandContext(gs.Ctx, binPath, gs.CmdArgs[1:]...) //nolint:gosec
 	cmd.Stderr = gs.Stderr
 	cmd.Stdout = gs.Stdout
@@ -110,7 +108,14 @@ func runK6Cmd(gs *state.GlobalState, binPath string) error {
 	// disable binary provisioning any second time
 	gs.Env["K6_BINARY_PROVISIONING"] = "false"
 
-	return cmd.Run()
+	if err := cmd.Run(); err != nil {
+		var eerr *exec.ExitError
+		if errors.As(err, &eerr) {
+			return err, eerr.ExitCode()
+		}
+	}
+
+	return nil, 0
 }
 
 // anyK6Version is a wildcard version for k6
