@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os/exec"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/grafana/k6deps"
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/internal/build"
@@ -125,7 +126,7 @@ const anyK6Version = k6deps.ConstraintsAny
 // isCustomBuildRequired checks if the build is required
 // it's required if there is no k6 dependency in deps
 // or if the resolved version is not the base version
-// or if there are more than one (not k6) dependency
+// or if there are onr or more not k6 dependencies
 func isCustomBuildRequired(baseK6Version string, deps k6deps.Dependencies) bool {
 	if len(deps) == 0 {
 		return false
@@ -139,21 +140,21 @@ func isCustomBuildRequired(baseK6Version string, deps k6deps.Dependencies) bool 
 	k6Dependency, hasK6 := deps["k6"]
 
 	// Early return if there's exactly one non-k6 dependency
-	if len(deps) == 1 && !hasK6 {
+	if !hasK6 {
 		return true
 	}
 
-	// Get k6 version constraint if it exists
-	v := anyK6Version
-	if hasK6 && k6Dependency != nil && k6Dependency.Constraints != nil {
-		v = k6Dependency.Constraints.String()
-	}
-
-	// No build required when default version is used
-	if v == anyK6Version {
+	// Ignore k6 dependency if nil
+	if k6Dependency == nil || k6Dependency.Constraints == nil {
 		return false
 	}
 
-	// No build required when using the base version
-	return v != baseK6Version
+	k6Ver, err := semver.NewVersion(baseK6Version)
+	if err != nil {
+		// ignore if baseK6Version is not a valid sem ver (e.g. a development version)
+		return false
+	}
+
+	// if the current version satisfies the costrains, binary provisioning is not required
+	return !k6Dependency.Constraints.Check(k6Ver)
 }

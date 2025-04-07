@@ -1,7 +1,6 @@
 package launcher
 
 import (
-	//"errors"
 	"errors"
 	"maps"
 	"os"
@@ -12,6 +11,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"go.k6.io/k6/cmd/state"
+	"go.k6.io/k6/internal/build"
 	"go.k6.io/k6/internal/cmd/tests"
 )
 
@@ -67,7 +67,7 @@ export default function() {
 }
 `
 
-	requireK6Version = `
+	requireUnsatisfiedK6Version = `
 "use k6 = v0.99.9"
 
 import { sleep, check } from 'k6';
@@ -79,9 +79,8 @@ export default function() {
 }
 `
 
-	requireAnyK6Version = `
-"use k6 = *"
-
+	requireSatisfiedK6Version = `
+"use k6 >= ` + build.Version + `";
 import { sleep, check } from 'k6';
 
 export default function() {
@@ -121,12 +120,12 @@ func Test_Launcher(t *testing.T) {
 			expectOsExit:    0,
 		},
 		{
-			name:  "require pinned k6 version",
+			name:  "require unsatisfied k6 version",
 			k6Cmd: "run",
 			k6Env: map[string]string{
 				"K6_BINARY_PROVISIONING": "true",
 			},
-			script:          requireK6Version,
+			script:          requireUnsatisfiedK6Version,
 			fixture:         &luncherFixture{},
 			expectProvision: true,
 			expectK6Run:     true,
@@ -134,12 +133,12 @@ func Test_Launcher(t *testing.T) {
 			expectOsExit:    0,
 		},
 		{
-			name:  "require any k6 version",
+			name:  "require satisfied k6 version",
 			k6Cmd: "run",
 			k6Env: map[string]string{
 				"K6_BINARY_PROVISIONING": "true",
 			},
-			script:          requireAnyK6Version,
+			script:          requireSatisfiedK6Version,
 			fixture:         &luncherFixture{},
 			expectProvision: false,
 			expectK6Run:     false,
@@ -173,7 +172,7 @@ func Test_Launcher(t *testing.T) {
 			expectOsExit:    0,
 		},
 		{
-			name:  " command don't require binary provisioning",
+			name:  "command don't require binary provisioning",
 			k6Cmd: "version",
 			k6Env: map[string]string{
 				"K6_BINARY_PROVISIONING": "false",
