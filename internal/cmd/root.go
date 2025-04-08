@@ -57,6 +57,11 @@ func newRootCommand(gs *state.GlobalState) *rootCommand {
 	rootCmd.SetVersionTemplate(
 		`{{with .Name}}{{printf "%s " .}}{{end}}{{printf "v%s\n" .Version}}`,
 	)
+
+	usageTemplate := rootCmd.UsageTemplate()
+	usageTemplate = strings.ReplaceAll(usageTemplate, "FlagUsages", "FlagUsagesWrapped 120")
+	rootCmd.SetUsageTemplate(usageTemplate)
+
 	rootCmd.PersistentFlags().AddFlagSet(rootCmdPersistentFlagSet(gs))
 	rootCmd.SetArgs(gs.CmdArgs[1:])
 	rootCmd.SetOut(gs.Stdout)
