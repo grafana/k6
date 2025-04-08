@@ -12,7 +12,7 @@ import (
 	"go.k6.io/k6/cmd/state"
 )
 
-// given a set of dependencies, returns the path to a k6 binary and the list of versions it provides
+// k6buildProvision returns the path to a k6 binary that satisfies the dependencies and the list of versions it provides
 func k6buildProvision(gs *state.GlobalState, deps k6deps.Dependencies) (string, string, error) {
 	opt := NewOptions(gs)
 	if opt.BuildServiceToken == "" {
@@ -30,9 +30,6 @@ func k6buildProvision(gs *state.GlobalState, deps k6deps.Dependencies) (string, 
 		return "", "", err
 	}
 
-	// TODO: we need a better handle of errors here
-	// like (network, auth, etc) and give a better error message
-	// to the user
 	binary, err := provider.GetBinary(gs.Ctx, deps)
 	if err != nil {
 		return "", "", err

@@ -67,7 +67,7 @@ export default function() {
 `
 
 	requireUnsatisfiedK6Version = `
-"use k6 = v0.99.9"
+"use k6 = v0.99"
 
 import { sleep, check } from 'k6';
 
@@ -77,9 +77,11 @@ export default function() {
   sleep(1);
 }
 `
-
+	// FIXME: when the build version is a prerelease (e.g v1.0.0-rc1), k6deps fails to parse this pragma
+	// and creates an invalid constrain that is ignored by the test.
+	// see https://github.com/grafana/k6deps/issues/91
 	requireSatisfiedK6Version = `
-"use k6 >= ` + build.Version + `";
+"use k6 = v` + build.Version + `";
 import { sleep, check } from 'k6';
 
 export default function() {

@@ -12,13 +12,17 @@ func analyze(gs *state.GlobalState, args []string) (k6deps.Dependencies, error) 
 	return k6deps.Analyze(newDepsOptions(gs, args))
 }
 
+// newDepsOptions returns the options for dependency resolution.
+// Presently, only the k6 input script or archive (if any) is passed to k6deps for scanning.
+// TODO: if k6 receives the input from stdin, it is not used for scanning because we don't know
+// if it is a script or an archive
 func newDepsOptions(gs *state.GlobalState, args []string) *k6deps.Options {
 	dopts := &k6deps.Options{
 		LookupEnv: func(key string) (string, bool) { v, ok := gs.Env[key]; return v, ok },
 		// TODO: figure out if we need to set FindManifest
 	}
 
-	scriptname, hasScript := scriptArg(args)
+	scriptname, hasScript := inputArg(args)
 	if !hasScript {
 		return dopts
 	}
@@ -41,8 +45,8 @@ func newDepsOptions(gs *state.GlobalState, args []string) *k6deps.Options {
 	return dopts
 }
 
-// scriptArg returns the script name and true if it's a valid script name
-func scriptArg(args []string) (string, bool) {
+// inputArg returns the file name passed as input and true if it's a valid script name
+func inputArg(args []string) (string, bool) {
 	// return early if no arguments passed
 	if len(args) == 0 {
 		return "", false

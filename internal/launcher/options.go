@@ -8,7 +8,7 @@ import (
 	"go.k6.io/k6/lib/fsext"
 )
 
-// Options contains the optional parameters of the Command function.
+// Options contains the optional parameters for provisioning.
 type Options struct {
 	// BuildServiceURL contains the URL of the k6 build service to be used.
 	// If the value is not nil, the k6 binary is built using the build service instead of the local build.
@@ -26,6 +26,8 @@ func NewOptions(gs *k6State.GlobalState) Options {
 	}
 }
 
+// extractToken gets the cloud token required to access the build service
+// from the environment or from the config file
 func extractToken(gs *k6State.GlobalState) string {
 	token, ok := gs.Env["K6_CLOUD_TOKEN"]
 	if ok {
@@ -41,7 +43,7 @@ func extractToken(gs *k6State.GlobalState) string {
 	return config.Collectors.Cloud.Token
 }
 
-// a simple struct to quickly load the config file
+// a simplified struct to get the cloud token from the config file, the rest is ignored
 type k6configFile struct {
 	Collectors struct {
 		Cloud struct {

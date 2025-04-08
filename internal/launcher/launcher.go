@@ -76,8 +76,7 @@ func (l *launcher) launch() int {
 		WithField("deps", deps).
 		Info("dependencies identified, binary provisioning required")
 
-	// this will try to get the k6 binary from the build service
-	// and run it, passing all the original arguments
+	// get the k6 binary from the build service
 	binPath, versions, err := l.provision(l.gs, deps)
 	if err != nil {
 		l.gs.Logger.
@@ -87,10 +86,11 @@ func (l *launcher) launch() int {
 	}
 
 	l.gs.Logger.
-		Info("k6 has been provisioned with version", versions)
+		Info("k6 has been provisioned with version(s) ", versions)
 
 	l.gs.Logger.Debug("launching provisioned k6 binary")
 
+	// execute provisioned binary
 	if rc, err := l.run(l.gs, binPath); err != nil {
 		l.gs.Logger.Error(err)
 		return rc
@@ -99,14 +99,14 @@ func (l *launcher) launch() int {
 	return 0
 }
 
-// runs the k6 binary
+// runK6Cmd runs the k6 binary passing the original arguments
 func runK6Cmd(gs *state.GlobalState, binPath string) (int, error) {
 	cmd := exec.CommandContext(gs.Ctx, binPath, gs.CmdArgs[1:]...) //nolint:gosec
 	cmd.Stderr = gs.Stderr
 	cmd.Stdout = gs.Stdout
 	cmd.Stdin = gs.Stdin
 
-	// disable binary provisioning any second time
+	// disable binary provisioning to avoid a provisioning loop
 	gs.Env["K6_BINARY_PROVISIONING"] = "false"
 
 	if err := cmd.Run(); err != nil {
@@ -120,9 +120,9 @@ func runK6Cmd(gs *state.GlobalState, binPath string) (int, error) {
 }
 
 // isCustomBuildRequired checks if the build is required
-// it's required if there is no k6 dependency in deps
-// or if the resolved version is not the base version
-// or if there are onr or more not k6 dependencies
+// it's required if there is one or more non k6 dependencies
+// or if the required k6 version is not satisfied by the current binary's version
+// TODO: get the version of any built-in extension and check if they satisfy the dependencies
 func isCustomBuildRequired(baseK6Version string, deps k6deps.Dependencies) bool {
 	if len(deps) == 0 {
 		return false
@@ -151,6 +151,6 @@ func isCustomBuildRequired(baseK6Version string, deps k6deps.Dependencies) bool 
 		return true
 	}
 
-	// if the current version satisfies the costrains, binary provisioning is not required
+	// if the current version satisfies the constrains, binary provisioning is not required
 	return !k6Dependency.Constraints.Check(k6Ver)
 }
