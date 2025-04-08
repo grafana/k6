@@ -148,7 +148,7 @@ func isCustomBuildRequired(baseK6Version string, deps k6deps.Dependencies) bool 
 	k6Ver, err := semver.NewVersion(baseK6Version)
 	if err != nil {
 		// ignore if baseK6Version is not a valid sem ver (e.g. a development version)
-		return false
+		return true
 	}
 
 	// if the current version satisfies the costrains, binary provisioning is not required
