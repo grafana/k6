@@ -144,7 +144,8 @@ func addMetadata(orig string, meta *Metadata) (string, error) {
 }
 
 func (plugin *plugin) onEnd(result *api.BuildResult) (api.OnEndResult, error) {
-	if !plugin.options.Metafile {
+	// Skip if metadata was not requested or the esbuild result is missing it due to an error
+	if !plugin.options.Metafile || len(result.Metafile) == 0 {
 		return api.OnEndResult{}, nil
 	}
 

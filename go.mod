@@ -7,6 +7,7 @@ toolchain go1.23.7
 require (
 	buf.build/gen/go/prometheus/prometheus/protocolbuffers/go v1.36.5-20240802094132-5b212ab78fb7.1
 	github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358
+	github.com/Masterminds/semver/v3 v3.3.1
 	github.com/PuerkitoBio/goquery v1.9.2
 	github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
 	github.com/andybalholm/brotli v1.1.1
@@ -17,7 +18,7 @@ require (
 	github.com/golang/protobuf v1.5.4
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
-	github.com/grafana/k6deps v0.2.4
+	github.com/grafana/k6deps v0.2.5
 	github.com/grafana/k6provider v0.1.13
 	github.com/grafana/sobek v0.0.0-20250219104821-ed22af7a8d6c
 	github.com/grafana/xk6-dashboard v0.7.5
@@ -66,9 +67,7 @@ require (
 )
 
 require (
-	github.com/Masterminds/semver/v3 v3.3.1 // indirect
 	github.com/grafana/k6build v0.5.8 // indirect
-	github.com/grafana/k6pack v0.2.4 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 )
 

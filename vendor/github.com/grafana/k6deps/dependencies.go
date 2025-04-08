@@ -11,6 +11,11 @@ import (
 
 //nolint:gochecknoglobals
 var (
+	// matches any sequence of characters enclosed by '/*' and '*/' including new lines and '*' not followed by '/'
+	reMultiLineComment = regexp.MustCompile(`\/\*(?:[^\*]|\*[^\/]|\n)*(\*)+\/`)
+	// matches '//' and any character until end of line skips the '//' sequence in urls (preceded by ':')
+	reCommentLine = regexp.MustCompile(`(^|\s|[^:])(//.*)`)
+
 	srcName       = `(?P<name>k6|k6/[^/]{2}.*|k6/[^x]/.*|k6/x/[/0-9a-zA-Z_-]+|(@[a-zA-Z0-9-_]+/)?xk6-([a-zA-Z0-9-_]+)((/[a-zA-Z0-9-_]+)*))` //nolint:lll
 	srcConstraint = `=?v?0\.0\.0\+[0-9A-Za-z-]+|[vxX*|,&\^0-9.+-><=, ~]+`
 
@@ -266,7 +271,13 @@ func (deps Dependencies) marshalJS(w io.Writer) error {
 func (deps *Dependencies) UnmarshalJS(text []byte) error {
 	*deps = make(Dependencies)
 
-	for _, match := range reRequireOrImport.FindAllSubmatch(text, -1) {
+	// clean multiline comments
+	clean := reMultiLineComment.ReplaceAll(text, []byte(""))
+
+	// clean comment lines
+	clean = reCommentLine.ReplaceAll(clean, []byte("$1"))
+
+	for _, match := range reRequireOrImport.FindAllSubmatch(clean, -1) {
 		extension := string(match[idxRequireOrImportName])
 		if len(extension) == 0 {
 			extension = string(match[idxRequireOrImportModule])
@@ -282,7 +293,7 @@ func (deps *Dependencies) UnmarshalJS(text []byte) error {
 		}
 	}
 
-	return processUseDirectives(text, *deps)
+	return processUseDirectives(clean, *deps)
 }
 
 func processUseDirectives(text []byte, deps Dependencies) error {

@@ -83,12 +83,10 @@ github.com/gorilla/websocket v1.5.3 h1:saDtZ6Pbx/0u+bgYQ3q96pZgCzfhKXGPqt7kZ72aN
 github.com/gorilla/websocket v1.5.3/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
 github.com/grafana/k6build v0.5.8 h1:BIIwY6TgiP8g6mPLa69kVZdJm5mcqgXNy0g9VcJ0NAk=
 github.com/grafana/k6build v0.5.8/go.mod h1:+4sU9YHDhKZ1h8kAEHSdrWbAu65BQokClDftc+U5gK8=
-github.com/grafana/k6deps v0.2.4 h1:OOPnDWWa71fRJIUkN0mvbSi471Pm9t8/vNZncBGUDxA=
-github.com/grafana/k6deps v0.2.4/go.mod h1:SVJT5urqP7Rj9Qs8TxgftE7MinDSs1raDnZVymzSaHc=
+github.com/grafana/k6deps v0.2.5 h1:wxTV63snhG4XYb9Xlx1QW3RpBIdaimF8mYpjhtpdSsQ=
+github.com/grafana/k6deps v0.2.5/go.mod h1:FurALQIHZjSxhi0v3ChcBR02hWkFZpMnSSwkm5IA9sk=
 github.com/grafana/k6foundry v0.4.5 h1:wus8L3e1vTiECOoR5CCexCDHt9wGASyffF7iujZmh+U=
 github.com/grafana/k6foundry v0.4.5/go.mod h1:GDmBp/h370ZDMhjIhx54LpvGCIfmy/cMOLpeU+W+FOk=
-github.com/grafana/k6pack v0.2.4 h1:JzbaO/NnLBaM2Shbn59WynaGAYL+jMvnjsoj/VTr3es=
-github.com/grafana/k6pack v0.2.4/go.mod h1:JTG8lQRU4U4WNKkznSL6zYokviiFVIp1I9W7z7NmrLA=
 github.com/grafana/k6provider v0.1.13 h1:+KRAHMqTGw5jm9fDLgCsXs/wFLIpNgbxLu6B42q6q4Q=
 github.com/grafana/k6provider v0.1.13/go.mod h1:ANqwQwmQ3immSICyV9JajFitTyfebF3Q9THtTKHys80=
 github.com/grafana/sobek v0.0.0-20250219104821-ed22af7a8d6c h1:AnjwFNvLSgko/nVMGp+dPkqBpI6Vdf4rXH60/JQgJlI=
