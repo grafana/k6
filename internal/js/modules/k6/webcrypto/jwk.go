@@ -673,6 +673,5 @@ func (jwk *alg25519JWK) validateAlg25519JWK(keyUsages []CryptoKeyUsage, algorith
 		return err
 	}
 
-	// TODO: pass extractable down from JS params and validate properly
 	return nil
 }
