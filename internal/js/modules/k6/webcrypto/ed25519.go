@@ -109,8 +109,6 @@ func (ed25519SignerVerifier) Verify(key CryptoKey, signature, data []byte) (bool
 		return false, NewError(InvalidAccessError, "Key handle is not an Ed25519 public key")
 	}
 
-	// TODO: verify that the ed25519 library conducts small-order checks, if not add them here
-
 	return ed25519.Verify(keyHandle, data, signature), nil
 }
 
