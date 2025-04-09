@@ -54,7 +54,7 @@ const (
 	ECDH = "ECDH"
 
 	// Ed25519 represents the Ed25519 algorithm.
-	Ed25519 = "ED25519" // TODO: This should be "Ed25519"
+	Ed25519 = "Ed25519"
 
 	// X25519 represents the X25519 algorithm.
 	X25519 = "X25519"
@@ -173,6 +173,11 @@ func normalizeAlgorithmName(name string) string {
 	// exception is made for RSASSA-PKCS1-v1_5
 	if name == strings.ToUpper(RSASsaPkcs1v15) {
 		return RSASsaPkcs1v15
+	}
+
+	// exception is made for Ed25519
+	if name == strings.ToUpper(Ed25519) {
+		return Ed25519
 	}
 
 	return name
