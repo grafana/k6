@@ -125,7 +125,7 @@ func eventLoopTest(t *testing.T, script []byte, testHandle func(logLines []strin
 		append([]byte("import { setTimeout } from 'k6/timers';\n"), script...),
 	)
 
-	cmd.Execute(ts.GlobalState)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	testHandle(ts.LoggerHook.Lines())
 }

@@ -34,7 +34,7 @@ type launcher struct {
 func newLauncher(gs *state.GlobalState) *launcher {
 	return &launcher{
 		gs:        gs,
-		fallback:  k6Cmd.Execute,
+		fallback:  k6Cmd.ExecuteWithGlobalState,
 		provision: k6buildProvision,
 		run:       runK6Cmd,
 	}

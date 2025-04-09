@@ -127,7 +127,15 @@ func (c *rootCommand) execute() {
 }
 
 // Execute adds all child commands to the root command sets flags appropriately.
-func Execute(gs *state.GlobalState) {
+// This is called by main.main(). It only needs to happen once to the rootCmd.
+func Execute() {
+	gs := state.NewGlobalState(context.Background())
+	newRootCommand(gs).execute()
+}
+
+// ExecuteWithGlobalState runs the root command with an existing GlobalState.
+// We keep it don't want to modify the Execute() signature to avoid breaking k6 extensions.
+func ExecuteWithGlobalState(gs *state.GlobalState) {
 	newRootCommand(gs).execute()
 }
 

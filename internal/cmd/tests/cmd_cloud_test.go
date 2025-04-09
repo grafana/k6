@@ -38,7 +38,7 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 		ts := getSimpleCloudTestState(t, nil, setupCmd, nil, nil, nil)
 		delete(ts.Env, "K6_CLOUD_TOKEN")
 		ts.ExpectedExitCode = -1 // TODO: use a more specific exit code?
-		cmd.Execute(ts.GlobalState)
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 		stdout := ts.Stdout.String()
 		t.Log(stdout)
@@ -64,7 +64,7 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 
 		ts := getSimpleCloudTestState(t, []byte(script), setupCmd, nil, nil, nil)
 		delete(ts.Env, "K6_CLOUD_TOKEN")
-		cmd.Execute(ts.GlobalState)
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 		stdout := ts.Stdout.String()
 		t.Log(stdout)
@@ -85,7 +85,7 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 		}
 
 		ts := getSimpleCloudTestState(t, nil, setupCmd, []string{"--exit-on-running", "--log-output=stdout"}, nil, cs)
-		cmd.Execute(ts.GlobalState)
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 		stdout := ts.Stdout.String()
 		t.Log(stdout)
@@ -105,7 +105,7 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 		}
 
 		ts := getSimpleCloudTestState(t, nil, setupCmd, []string{"--upload-only", "--log-output=stdout"}, nil, cs)
-		cmd.Execute(ts.GlobalState)
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 		stdout := ts.Stdout.String()
 		t.Log(stdout)
@@ -134,7 +134,7 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 			assert.NoError(t, err)
 		})
 		ts := getSimpleCloudTestState(t, nil, setupCmd, nil, configOverride, nil)
-		cmd.Execute(ts.GlobalState)
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 		stdout := ts.Stdout.String()
 		t.Log(stdout)
@@ -226,7 +226,7 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 		ts.Env["K6_CLOUD_HOST"] = srv.URL
 		ts.Env["K6_CLOUD_TOKEN"] = "foo" // doesn't matter, we mock the cloud
 
-		cmd.Execute(ts.GlobalState)
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 		stdout := ts.Stdout.String()
 		t.Log(stdout)
@@ -251,7 +251,7 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 		ts := getSimpleCloudTestState(t, nil, setupCmd, nil, nil, progressCallback)
 		ts.ExpectedExitCode = int(exitcodes.ThresholdsHaveFailed)
 
-		cmd.Execute(ts.GlobalState)
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 		stdout := ts.Stdout.String()
 		t.Log(stdout)
@@ -272,7 +272,7 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 		ts := getSimpleCloudTestState(t, nil, setupCmd, nil, nil, progressCallback)
 		ts.ExpectedExitCode = int(exitcodes.ThresholdsHaveFailed)
 
-		cmd.Execute(ts.GlobalState)
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 		stdout := ts.Stdout.String()
 		t.Log(stdout)

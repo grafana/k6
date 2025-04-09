@@ -49,7 +49,7 @@ func TestVersion(t *testing.T) {
 
 	for _, tc := range tests {
 		ts.CmdArgs = []string{"k6", tc.args}
-		cmd.Execute(ts.GlobalState)
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 		stdout := ts.Stdout.String()
 		assert.Contains(t, stdout, "k6 v"+build.Version)
@@ -68,7 +68,7 @@ func TestSimpleTestStdin(t *testing.T) {
 	ts := NewGlobalTestState(t)
 	ts.CmdArgs = []string{"k6", "run", "-"}
 	ts.Stdin = bytes.NewBufferString(`export default function() {};`)
-	cmd.Execute(ts.GlobalState)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	stdout := ts.Stdout.String()
 	assert.Contains(t, stdout, "output: -")
@@ -84,7 +84,7 @@ func TestBinaryNameStdout(t *testing.T) {
 	ts := NewGlobalTestState(t)
 	ts.BinaryName = "customBinaryName"
 	ts.CmdArgs = []string{ts.BinaryName}
-	cmd.Execute(ts.GlobalState)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	stdout := ts.Stdout.String()
 	assert.Contains(t, stdout, fmt.Sprintf("%s [command]", ts.BinaryName))
@@ -123,7 +123,7 @@ func TestBinaryNameHelpStdout(t *testing.T) {
 
 	for _, tt := range tests {
 		ts.CmdArgs = []string{ts.BinaryName, "help", tt.cmdName, tt.extraCmd}
-		cmd.Execute(ts.GlobalState)
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
 		stdout := ts.Stdout.String()
 		assert.Contains(t, stdout, tt.containsOutput)
 		assert.Empty(t, ts.Stderr.Bytes())
@@ -143,7 +143,7 @@ func TestStdoutAndStderrAreEmptyWithQuietAndHandleSummary(t *testing.T) {
 			return {}; // silence the end of test summary
 		};
 	`)
-	cmd.Execute(ts.GlobalState)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	assert.Empty(t, ts.Stderr.Bytes())
 	assert.Empty(t, ts.Stdout.Bytes())
@@ -166,7 +166,7 @@ func TestStdoutAndStderrAreEmptyWithQuietAndLogsForwarded(t *testing.T) {
 		console.log('init');
 		export default function() { console.log('foo'); };
 	`)
-	cmd.Execute(ts.GlobalState)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	// The test state hook still catches this message
 	assert.True(t, testutils.LogContains(ts.LoggerHook.Drain(), logrus.InfoLevel, `foo`))
@@ -193,7 +193,7 @@ func TestRelativeLogPathWithSetupAndTeardown(t *testing.T) {
 		export function setup() { console.log('bar'); };
 		export function teardown() { console.log('baz'); };
 	`)
-	cmd.Execute(ts.GlobalState)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	// The test state hook still catches these messages
 	logEntries := ts.LoggerHook.Drain()
@@ -215,7 +215,7 @@ func TestWrongCliFlagIterations(t *testing.T) {
 	ts.Stdin = bytes.NewBufferString(`export default function() {};`)
 	// TODO: check for exitcodes.InvalidConfig after https://github.com/loadimpact/k6/issues/883 is done...
 	ts.ExpectedExitCode = -1
-	cmd.Execute(ts.GlobalState)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 	assert.True(t, testutils.LogContains(ts.LoggerHook.Drain(), logrus.ErrorLevel, `invalid argument "foo"`))
 }
 
@@ -227,7 +227,7 @@ func TestWrongEnvVarIterations(t *testing.T) {
 	ts.Env["K6_ITERATIONS"] = "4"
 	ts.Stdin = bytes.NewBufferString(`export default function() {};`)
 
-	cmd.Execute(ts.GlobalState)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	stdout := ts.Stdout.String()
 	t.Log(stdout)
@@ -311,7 +311,7 @@ func TestMetricsAndThresholds(t *testing.T) {
 		}
 	`
 	ts := getSingleFileTestState(t, script, []string{"--quiet", "--log-format=raw"}, 0)
-	cmd.Execute(ts.GlobalState)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	expLogLines := []string{
 		`setup() start`, `setup() end`, `default({"foo":"bar"})`,
@@ -375,7 +375,7 @@ func testSSLKEYLOGFILE(t *testing.T, ts *GlobalTestState, filePath string) {
     }
   `)))
 
-	cmd.Execute(ts.GlobalState)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	assert.True(t,
 		testutils.LogContains(ts.LoggerHook.Drain(), logrus.WarnLevel, "SSLKEYLOGFILE was specified"))
@@ -403,7 +403,7 @@ func TestThresholdDeprecationWarnings(t *testing.T) {
 		export default function () { }`,
 	))
 
-	cmd.Execute(ts.GlobalState)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	logs := ts.LoggerHook.Drain()
 
@@ -436,7 +436,7 @@ func TestExecutionTestOptionsDefaultValues(t *testing.T) {
 	`
 
 	ts := getSingleFileTestState(t, script, []string{"--iterations", "1"}, 0)
-	cmd.Execute(ts.GlobalState)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	loglines := ts.LoggerHook.Drain()
 	require.Len(t, loglines, 1)
@@ -464,7 +464,7 @@ func TestSubMetricThresholdNoData(t *testing.T) {
 		}
 	`
 	ts := getSingleFileTestState(t, script, []string{"--quiet"}, 0)
-	cmd.Execute(ts.GlobalState)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	assert.Len(t, ts.LoggerHook.Drain(), 0)
 	assert.Contains(t, ts.Stdout.String(), `
@@ -612,7 +612,7 @@ func TestSetupTeardownThresholds(t *testing.T) {
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 	})
 
-	cmd.Execute(ts.GlobalState)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	stdOut := ts.Stdout.String()
 	t.Log(stdOut)
@@ -663,7 +663,7 @@ func TestThresholdsFailed(t *testing.T) {
 	ts := getSimpleCloudOutputTestState(
 		t, script, nil, cloudapi.RunStatusFinished, cloudapi.ResultStatusFailed, exitcodes.ThresholdsHaveFailed,
 	)
-	cmd.Execute(ts.GlobalState)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	expErr := "thresholds on metrics 'iterations{scenario:sc1}, iterations{scenario:sc2}' have been crossed"
 	assert.True(t, testutils.LogContains(ts.LoggerHook.Drain(), logrus.ErrorLevel, expErr))
@@ -705,7 +705,7 @@ func TestAbortedByThreshold(t *testing.T) {
 	ts := getSimpleCloudOutputTestState(
 		t, script, nil, cloudapi.RunStatusAbortedThreshold, cloudapi.ResultStatusFailed, exitcodes.ThresholdsHaveFailed,
 	)
-	cmd.Execute(ts.GlobalState)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	expErr := "thresholds on metrics 'iterations' were crossed; at least one has abortOnFail enabled, stopping test prematurely"
 	assert.True(t, testutils.LogContains(ts.LoggerHook.Drain(), logrus.ErrorLevel, expErr))
@@ -755,7 +755,7 @@ func TestAbortedByUserWithGoodThresholds(t *testing.T) {
 
 	asyncWaitForStdoutAndStopTestWithInterruptSignal(t, ts, 30, 300*time.Millisecond, "simple iter 2")
 
-	cmd.Execute(ts.GlobalState)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	logs := ts.LoggerHook.Drain()
 	assert.False(t, testutils.LogContains(logs, logrus.ErrorLevel, `thresholds on metrics`))
@@ -897,7 +897,7 @@ func TestAbortedByUserWithRestAPI(t *testing.T) {
 
 	asyncWaitForStdoutAndStopTestFromRESTAPI(t, ts, 15, time.Second, "a simple iteration")
 
-	cmd.Execute(ts.GlobalState)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	stdout := ts.Stdout.String()
 	t.Log(stdout)
@@ -944,7 +944,7 @@ func TestAbortedByScriptSetupErrorWithDependency(t *testing.T) {
 	ts.CmdArgs = []string{"k6", "run", "-v", "--out", "cloud", "--log-output=stdout", "test.js"}
 	ts.ExpectedExitCode = int(exitcodes.ScriptException)
 
-	cmd.Execute(ts.GlobalState)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	stdout := ts.Stdout.String()
 	t.Log(stdout)
@@ -961,13 +961,13 @@ func TestAbortedByScriptSetupErrorWithDependency(t *testing.T) {
 }
 
 func runTestWithNoLinger(_ *testing.T, ts *GlobalTestState) {
-	cmd.Execute(ts.GlobalState)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 }
 
 func runTestWithLinger(t *testing.T, ts *GlobalTestState) {
 	ts.CmdArgs = append(ts.CmdArgs, "--linger")
 	asyncWaitForStdoutAndStopTestWithInterruptSignal(t, ts, 15, time.Second, "waiting for Ctrl+C to continue")
-	cmd.Execute(ts.GlobalState)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 }
 
 func TestAbortedByScriptSetupError(t *testing.T) {
@@ -1074,7 +1074,7 @@ func TestAbortedByTestAbortFirstInitCode(t *testing.T) {
 	`
 
 	ts := getSingleFileTestState(t, script, nil, exitcodes.ScriptAborted)
-	cmd.Execute(ts.GlobalState)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 	stdout := ts.Stdout.String()
 	t.Log(stdout)
 	assert.Contains(t, stdout, "test aborted: foo")
@@ -1226,7 +1226,7 @@ func TestAbortedByInterruptDuringVUInit(t *testing.T) {
 		t, script, nil, cloudapi.RunStatusAbortedUser, cloudapi.ResultStatusPassed, exitcodes.ExternalAbort,
 	)
 	asyncWaitForStdoutAndStopTestWithInterruptSignal(t, ts, 15, time.Second, "VU init sleeping for a while")
-	cmd.Execute(ts.GlobalState)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	stdOut := ts.Stdout.String()
 	t.Log(stdOut)
@@ -1247,7 +1247,7 @@ func TestAbortedByInterruptWhenPaused(t *testing.T) {
 	asyncWaitForStdoutAndStopTestWithInterruptSignal(
 		t, ts, 10, time.Second, "Execution is paused, waiting for resume or interrupt...",
 	)
-	cmd.Execute(ts.GlobalState)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	stdOut := ts.Stdout.String()
 	t.Log(stdOut)
@@ -1276,7 +1276,7 @@ func TestAbortedByScriptInitError(t *testing.T) {
 	ts := getSimpleCloudOutputTestState(
 		t, script, nil, cloudapi.RunStatusAbortedScriptError, cloudapi.ResultStatusPassed, exitcodes.ScriptException,
 	)
-	cmd.Execute(ts.GlobalState)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	stdout := ts.Stdout.String()
 	t.Log(stdout)
@@ -1376,7 +1376,7 @@ func TestMetricTagAndSetupDataIsolation(t *testing.T) {
 		t, script, []string{"--quiet", "--log-output", "stdout"},
 		cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed, 0,
 	)
-	cmd.Execute(ts.GlobalState)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	stdout := ts.Stdout.String()
 	t.Log(stdout)
@@ -1491,7 +1491,7 @@ func TestActiveVUsCount(t *testing.T) {
 	`
 
 	ts := getSingleFileTestState(t, script, []string{"--compatibility-mode", "base", "--out", "json=results.json"}, 0)
-	cmd.Execute(ts.GlobalState)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	stdout := ts.Stdout.String()
 	t.Log(stdout)
@@ -1539,7 +1539,7 @@ func TestMinIterationDuration(t *testing.T) {
 	ts := getSimpleCloudOutputTestState(t, script, nil, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed, 0)
 
 	start := time.Now()
-	cmd.Execute(ts.GlobalState)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 	elapsed := time.Since(start)
 	assert.Greater(t, elapsed, 7*time.Second, "expected more time to have passed because of minIterationDuration")
 	assert.Less(
@@ -1575,7 +1575,7 @@ func TestMetricNameError(t *testing.T) {
 
 	ts := getSingleFileTestState(t, script, nil, exitcodes.ScriptException)
 
-	cmd.Execute(ts.GlobalState)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	stdout := ts.Stdout.String()
 	t.Log(stdout)
@@ -1654,7 +1654,7 @@ func TestRunTags(t *testing.T) {
 	}, 0)
 	ts.Env["K6_ITERATIONS"] = "3"
 	ts.Env["K6_INSECURE_SKIP_TLS_VERIFY"] = "true"
-	cmd.Execute(ts.GlobalState)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	stdout := ts.Stdout.String()
 	t.Log(stdout)
@@ -1711,7 +1711,7 @@ func TestRunWithCloudOutputOverrides(t *testing.T) {
 	srv := getCloudTestEndChecker(t, 132, configOverride, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed)
 	ts.Env["K6_CLOUD_HOST"] = srv.URL
 
-	cmd.Execute(ts.GlobalState)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	stdout := ts.Stdout.String()
 	t.Log(stdout)
@@ -1762,7 +1762,7 @@ export default function() {};`
 	srv := getCloudTestEndChecker(t, 1337, configOverride, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed)
 	ts.Env["K6_CLOUD_HOST"] = srv.URL
 
-	cmd.Execute(ts.GlobalState)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	stdout := ts.Stdout.String()
 	t.Log(stdout)
@@ -1812,7 +1812,7 @@ export default function() {};`
 	srv := getCloudTestEndChecker(t, 1337, configOverride, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed)
 	ts.Env["K6_CLOUD_HOST"] = srv.URL
 
-	cmd.Execute(ts.GlobalState)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	stdout := ts.Stdout.String()
 	t.Log(stdout)
@@ -1830,7 +1830,7 @@ func TestPrometheusRemoteWriteOutput(t *testing.T) {
 	ts.CmdArgs = []string{"k6", "run", "--out", "experimental-prometheus-rw", "-"}
 	ts.Stdin = bytes.NewBufferString(`export default function () {};`)
 
-	cmd.Execute(ts.GlobalState)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 	ts.OutMutex.Lock()
 	stdout := ts.Stdout.String()
 	ts.OutMutex.Unlock()
@@ -1877,7 +1877,7 @@ func BenchmarkReadResponseBody(b *testing.B) {
 	`)
 
 	ts := getSimpleCloudOutputTestState(b, script, nil, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed, 0)
-	cmd.Execute(ts.GlobalState)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 }
 
 func TestUIRenderOutput(t *testing.T) {
@@ -1906,7 +1906,7 @@ func TestUIRenderOutput(t *testing.T) {
 			}
 			ts.CmdArgs = append(ts.CmdArgs, "-")
 			ts.Stdin = bytes.NewBufferString(`export default function() {};`)
-			cmd.Execute(ts.GlobalState)
+			cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 			stdout := ts.Stdout.String()
 			assert.Contains(t, stdout, tc.expRender)
@@ -1941,7 +1941,7 @@ func TestUIRenderWebDashboard(t *testing.T) {
 			ts.CmdArgs = []string{"k6", "run", "--log-output=stdout"}
 			ts.CmdArgs = append(ts.CmdArgs, "-")
 			ts.Stdin = bytes.NewBufferString(`export default function() {};`)
-			cmd.Execute(ts.GlobalState)
+			cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 			if tc.active {
 				assert.Contains(t, ts.Stdout.String(), tc.expRender)
@@ -1986,7 +1986,7 @@ func TestRunStaticArchives(t *testing.T) {
 
 			ts.CmdArgs = []string{"k6", "run", "--log-output=stdout", "archive.tar"}
 
-			cmd.Execute(ts.GlobalState)
+			cmd.ExecuteWithGlobalState(ts.GlobalState)
 			stdout := ts.Stdout.String()
 			assert.Contains(t, stdout, "called default() from script.js")
 			assert.Contains(t, stdout, "called Bar() from foo/bar.js")
@@ -2014,7 +2014,7 @@ func TestBadLogOutput(t *testing.T) {
 			ts.CmdArgs = []string{"k6", "run", "--log-output", tc, "-"}
 			ts.Stdin = bytes.NewBufferString(`export default function () {};`)
 			ts.ExpectedExitCode = -1
-			cmd.Execute(ts.GlobalState)
+			cmd.ExecuteWithGlobalState(ts.GlobalState)
 		})
 	}
 }
@@ -2045,7 +2045,7 @@ func TestEventSystemOK(t *testing.T) {
 		export default function () { sleep(1); }
 	`, moduleName)))
 
-	cmd.Execute(ts.GlobalState)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	doneCh := make(chan struct{})
 	go func() {
@@ -2163,7 +2163,7 @@ func TestEventSystemError(t *testing.T) {
 			ts.ExpectedExitCode = int(tc.expExitCode)
 			ts.Stdin = bytes.NewBuffer([]byte(fmt.Sprintf("import events from '%s';\n%s", moduleName, tc.script)))
 
-			cmd.Execute(ts.GlobalState)
+			cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 			doneCh := make(chan struct{})
 			go func() {
@@ -2201,7 +2201,7 @@ func BenchmarkRun(b *testing.B) {
 		ts.ExpectedExitCode = 0
 
 		b.StartTimer()
-		cmd.Execute(ts.GlobalState)
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
 		b.StopTimer()
 	}
 }
@@ -2229,7 +2229,7 @@ func BenchmarkRunEvents(b *testing.B) {
 		ts.ExpectedExitCode = 0
 
 		b.StartTimer()
-		cmd.Execute(ts.GlobalState)
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
 		b.StopTimer()
 
 		doneCh := make(chan struct{})
@@ -2311,7 +2311,7 @@ func TestBrowserPermissions(t *testing.T) {
 
 			ts := getSingleFileTestState(t, script, []string{}, tt.expectedExitCode)
 			ts.Env["K6_BROWSER_EXECUTABLE_PATH"] = "k6-browser-fake-cmd"
-			cmd.Execute(ts.GlobalState)
+			cmd.ExecuteWithGlobalState(ts.GlobalState)
 			loglines := ts.LoggerHook.Drain()
 
 			assert.Contains(t, loglines[0].Message, tt.expectedError)
@@ -2345,7 +2345,7 @@ func TestBrowserExperimentalImport(t *testing.T) {
 	const wantExitCode = 107
 	ts := getSingleFileTestState(t, script, []string{}, wantExitCode)
 	ts.Env["K6_BROWSER_EXECUTABLE_PATH"] = "k6-browser-fake-cmd"
-	cmd.Execute(ts.GlobalState)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 	loglines := ts.LoggerHook.Drain()
 
 	assert.Contains(t, loglines[0].Message, "use k6/browser instead of k6/experimental/browser")
@@ -2368,7 +2368,7 @@ func TestSetupTimeout(t *testing.T) {
 	`)
 
 	start := time.Now()
-	cmd.Execute(ts.GlobalState)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 	elapsed := time.Since(start)
 	assert.Greater(t, elapsed, 1*time.Second, "expected more time to have passed because of setupTimeout")
 	assert.Less(
@@ -2405,7 +2405,7 @@ func TestTypeScriptSupport(t *testing.T) {
 
 	ts.CmdArgs = []string{"k6", "run", "--quiet", "test.ts"}
 
-	cmd.Execute(ts.GlobalState)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	stderr := ts.Stderr.String()
 	t.Log(stderr)
@@ -2431,7 +2431,7 @@ func TestBasicSecrets(t *testing.T) {
 
 	ts.CmdArgs = []string{"k6", "run", "--secret-source=mock=cool=something,else=source", "secrets.js"}
 
-	cmd.Execute(ts.GlobalState)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	stderr := ts.Stderr.String()
 	t.Log(stderr)
@@ -2469,7 +2469,7 @@ func TestMultipleSecretSources(t *testing.T) {
 		"--secret-source=mock=name=second,else=source,default", "secrets.js",
 	}
 
-	cmd.Execute(ts.GlobalState)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	stderr := ts.Stderr.String()
 	t.Log(stderr)
@@ -2550,7 +2550,7 @@ func TestSummaryExport(t *testing.T) {
 				"script.js",
 			}
 
-			cmd.Execute(ts.GlobalState)
+			cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 			stdout := ts.Stdout.String()
 			t.Log(stdout)
@@ -2580,7 +2580,7 @@ func TestSummaryExport(t *testing.T) {
 			"script.js",
 		}
 
-		cmd.Execute(ts.GlobalState)
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 		stdout := ts.Stdout.String()
 		t.Log(stdout)
@@ -2623,7 +2623,7 @@ func TestHandleSummary(t *testing.T) {
 
 			ts.CmdArgs = []string{"k6", "run", "script.js"}
 
-			cmd.Execute(ts.GlobalState)
+			cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 			stdout := ts.Stdout.String()
 			t.Log(stdout)

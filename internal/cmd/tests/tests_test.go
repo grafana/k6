@@ -27,7 +27,7 @@ func TestRootCommand(t *testing.T) {
 			t.Parallel()
 			ts := NewGlobalTestState(t)
 			ts.CmdArgs = args
-			cmd.Execute(ts.GlobalState)
+			cmd.ExecuteWithGlobalState(ts.GlobalState)
 			assert.Len(t, ts.LoggerHook.Drain(), 0)
 			assert.Contains(t, ts.Stdout.String(), helptxt)
 		})
