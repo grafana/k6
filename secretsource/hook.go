@@ -58,7 +58,7 @@ func recursiveReplace(v any, replacer *strings.Replacer) any {
 	switch s := v.(type) {
 	case string:
 		return replacer.Replace(s)
-	case int, uint, int64, int32, int16, int8, uint64, uint32, uint16, uint8:
+	case int, uint, int64, int32, int16, int8, uint64, uint32, uint16, uint8, float32, float64:
 		// if the secret is encodable in 64 bits ... it is probably not a great secret
 		return v
 	case time.Duration:
