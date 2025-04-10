@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/internal/cmd"
+	"go.k6.io/k6/internal/launcher"
 )
 
 func TestEventLoop(t *testing.T) {
@@ -125,7 +125,7 @@ func eventLoopTest(t *testing.T, script []byte, testHandle func(logLines []strin
 		append([]byte("import { setTimeout } from 'k6/timers';\n"), script...),
 	)
 
-	cmd.ExecuteWithGlobalState(ts.GlobalState)
+	launcher.ExecuteForTesting(ts.GlobalState)
 
 	testHandle(ts.LoggerHook.Lines())
 }
