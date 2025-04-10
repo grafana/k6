@@ -221,7 +221,7 @@ func TestAbortTest(t *testing.T) { //nolint:tparallel
 	})
 }
 
-func TestFailTest(t *testing.T) { //nolint:tparallel
+func TestFailTest(t *testing.T) {
 	t.Parallel()
 
 	t.Run("default reason", func(t *testing.T) {
