@@ -224,36 +224,30 @@ func TestAbortTest(t *testing.T) { //nolint:tparallel
 func TestFailTest(t *testing.T) { //nolint:tparallel
 	t.Parallel()
 
-	var (
-		logsBuffer bytes.Buffer
-		testLogger = logrus.New()
-		rt         = sobek.New()
-		// We need to set up the state with a logger to capture logs and initialize
-		// the TestStatus.
-		state = &lib.State{TestStatus: lib.NewTestStatus(), Logger: testLogger}
-		ctx   = context.Background()
-	)
+	t.Run("default reason", func(t *testing.T) {
+		t.Parallel()
 
-	// Set up the logger to write to the buffer so we can assert on it later
-	testLogger.AddHook(testutils.NewLogHook(logrus.DebugLevel))
-	testLogger.SetOutput(&logsBuffer)
+		// Set up the logger to write to the buffer so we can assert on it later
+		var logsBuffer bytes.Buffer
+		testLogger := logrus.New()
+		testLogger.AddHook(testutils.NewLogHook(logrus.DebugLevel))
+		testLogger.SetOutput(&logsBuffer)
 
-	// Instantiate the test module instance
-	module, ok := New().NewModuleInstance(
-		&modulestest.VU{
-			RuntimeField: rt,
-			CtxField:     ctx,
-			StateField:   state,
-		},
-	).(*ModuleInstance)
-	require.True(t, ok)
-	require.NoError(t, rt.Set("exec", module.Exports().Default))
+		// Prepare the runtime and state for the module, and to be able to
+		// assert the test state at the very end.
+		rt := sobek.New()
+		state := &lib.State{TestStatus: lib.NewTestStatus(), Logger: testLogger}
 
-	t.Run("default reason", func(t *testing.T) { //nolint:paralleltest
-		defer t.Cleanup(func() {
-			// Ensure the logs buffer is reset after each test
-			logsBuffer.Reset()
-		})
+		// Instantiate the test module instance
+		module, ok := New().NewModuleInstance(
+			&modulestest.VU{
+				RuntimeField: rt,
+				CtxField:     context.Background(),
+				StateField:   state,
+			},
+		).(*ModuleInstance)
+		require.True(t, ok)
+		require.NoError(t, rt.Set("exec", module.Exports().Default))
 
 		_, err := rt.RunString("exec.test.fail()")
 		require.NoError(t, err)
@@ -261,11 +255,30 @@ func TestFailTest(t *testing.T) { //nolint:tparallel
 		assert.True(t, state.TestStatus.Failed())
 	})
 
-	t.Run("custom reason", func(t *testing.T) { //nolint:paralleltest
-		defer t.Cleanup(func() {
-			// Ensure the logs buffer is reset after each test
-			logsBuffer.Reset()
-		})
+	t.Run("custom reason", func(t *testing.T) {
+		t.Parallel()
+
+		// Set up the logger to write to the buffer so we can assert on it later
+		var logsBuffer bytes.Buffer
+		testLogger := logrus.New()
+		testLogger.AddHook(testutils.NewLogHook(logrus.DebugLevel))
+		testLogger.SetOutput(&logsBuffer)
+
+		// Prepare the runtime and state for the module, and to be able to
+		// assert the test state at the very end.
+		rt := sobek.New()
+		state := &lib.State{TestStatus: lib.NewTestStatus(), Logger: testLogger}
+
+		// Instantiate the test module instance
+		module, ok := New().NewModuleInstance(
+			&modulestest.VU{
+				RuntimeField: rt,
+				CtxField:     context.Background(),
+				StateField:   state,
+			},
+		).(*ModuleInstance)
+		require.True(t, ok)
+		require.NoError(t, rt.Set("exec", module.Exports().Default))
 
 		_, err := rt.RunString(`exec.test.fail("a custom reason")`)
 		require.NoError(t, err)
