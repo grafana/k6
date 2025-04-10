@@ -52,6 +52,12 @@ const (
 
 	// ECDH represents the ECDH algorithm.
 	ECDH = "ECDH"
+
+	// Ed25519 represents the Ed25519 algorithm.
+	Ed25519 = "Ed25519"
+
+	// X25519 represents the X25519 algorithm.
+	X25519 = "X25519"
 )
 
 // HashAlgorithmIdentifier represents the name of a hash algorithm.
@@ -169,6 +175,11 @@ func normalizeAlgorithmName(name string) string {
 		return RSASsaPkcs1v15
 	}
 
+	// exception is made for Ed25519
+	if name == strings.ToUpper(Ed25519) {
+		return Ed25519
+	}
+
 	return name
 }
 
@@ -187,16 +198,25 @@ func isRegisteredAlgorithm(algorithmName string, forOperation string) bool {
 			isHashAlgorithm(algorithmName) ||
 			algorithmName == HMAC ||
 			isEllipticCurve(algorithmName) ||
-			isRSAAlgorithm(algorithmName)
+			isRSAAlgorithm(algorithmName) ||
+			algorithmName == Ed25519 ||
+			algorithmName == X25519
 	case OperationIdentifierExportKey, OperationIdentifierImportKey:
 		return isAesAlgorithm(algorithmName) ||
 			algorithmName == HMAC ||
 			isEllipticCurve(algorithmName) ||
-			isRSAAlgorithm(algorithmName)
+			isRSAAlgorithm(algorithmName) ||
+			algorithmName == Ed25519 ||
+			algorithmName == X25519
 	case OperationIdentifierEncrypt, OperationIdentifierDecrypt:
 		return isAesAlgorithm(algorithmName) || algorithmName == RSAOaep
 	case OperationIdentifierSign, OperationIdentifierVerify:
-		return algorithmName == HMAC || algorithmName == ECDSA || algorithmName == RSAPss || algorithmName == RSASsaPkcs1v15
+		return algorithmName == HMAC ||
+			algorithmName == ECDSA ||
+			algorithmName == RSAPss ||
+			algorithmName == RSASsaPkcs1v15 ||
+			algorithmName == Ed25519 ||
+			algorithmName == X25519
 	default:
 		return false
 	}
