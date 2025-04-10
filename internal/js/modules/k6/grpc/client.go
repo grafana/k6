@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"strings"
 	"time"
 
@@ -360,7 +361,14 @@ func (c *Client) buildInvokeRequest(
 	if req == nil {
 		return grpcReq, errors.New("request cannot be nil")
 	}
-	b, err := req.ToObject(c.vu.Runtime()).MarshalJSON()
+
+	object := req.ToObject(c.vu.Runtime())
+	normalized, err := normalizeNumberStrings(object, c.vu.Runtime())
+	if err != nil {
+		return grpcReq, fmt.Errorf("unable to normalize number strings: %w", err)
+	}
+
+	b, err := normalized.ToObject(c.vu.Runtime()).MarshalJSON()
 	if err != nil {
 		return grpcReq, fmt.Errorf("unable to serialise request object: %w", err)
 	}
@@ -376,6 +384,55 @@ func (c *Client) buildInvokeRequest(
 		TagsAndMeta:            &p.TagsAndMeta,
 		Metadata:               p.Metadata,
 	}, nil
+}
+
+// normalizeNumberStrings recursively converts special floating-point values (NaN, Infinity) in a Sobek
+// object to their string representations for proper JSON serialization.
+func normalizeNumberStrings(obj *sobek.Object, runtime *sobek.Runtime) (sobek.Value, error) {
+	// We check first for the object as a whole, since it can be a wrapper for a number.
+	exported := obj.Export()
+	if v, ok := exported.(float64); ok {
+		if math.IsNaN(v) {
+			return runtime.ToValue("NaN"), nil
+		} else if math.IsInf(v, 1) {
+			return runtime.ToValue("Infinity"), nil
+		} else if math.IsInf(v, -1) {
+			return runtime.ToValue("-Infinity"), nil
+		}
+		return obj, nil
+	}
+
+	for _, key := range obj.Keys() {
+		val := obj.Get(key)
+		exported := val.Export()
+		switch exported.(type) {
+		case float64:
+			vfloat := val.ToFloat()
+			if math.IsNaN(vfloat) {
+				if err := obj.Set(key, runtime.ToValue("NaN")); err != nil {
+					return nil, err
+				}
+			} else if math.IsInf(vfloat, 1) {
+				if err := obj.Set(key, runtime.ToValue("Infinity")); err != nil {
+					return nil, err
+				}
+			} else if math.IsInf(vfloat, -1) {
+				if err := obj.Set(key, runtime.ToValue("-Infinity")); err != nil {
+					return nil, err
+				}
+			}
+		case []interface{}, map[string]interface{}:
+			nestedObj := runtime.ToValue(exported).ToObject(runtime)
+			normalized, err := normalizeNumberStrings(nestedObj, runtime)
+			if err != nil {
+				return nil, err
+			}
+			if err := obj.Set(key, normalized); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return obj, nil
 }
 
 // Close will close the client gRPC connection
