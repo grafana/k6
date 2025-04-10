@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"go.k6.io/k6/internal/cmd"
+	"go.k6.io/k6/internal/launcher"
 	"go.k6.io/k6/lib/fsext"
 
 	"github.com/stretchr/testify/assert"
@@ -112,7 +112,7 @@ func TestGRPCInputOutput(t *testing.T) {
 			}
 			require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "proto.proto"), proto, 0o644))
 
-			cmd.ExecuteWithGlobalState(ts.GlobalState)
+			launcher.ExecuteForTesting(ts.GlobalState)
 
 			stdout := ts.Stdout.String()
 
