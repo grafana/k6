@@ -85,6 +85,11 @@ type State struct {
 
 	// Usage is a way to report usage statistics
 	Usage *usage.Usage
+
+	// TestStatus holds the test status and is used to support marking a test as failed
+	// in a thread-safe manner. It is used to ensure that the test status is only
+	// marked as failed once, even if multiple VUs or goroutines, try to mark it at the same time.
+	TestStatus *TestStatus
 }
 
 // VUStateTags wraps the current VU's tags and ensures a thread-safe way to
