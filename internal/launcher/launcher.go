@@ -20,6 +20,20 @@ func Execute() {
 	newLauncher(gs).launch()
 }
 
+func ExecuteForTesting(gs *state.GlobalState) {
+	l := &launcher{
+		gs:       gs,
+		fallback: k6Cmd.ExecuteWithGlobalState,
+		provision: func(*state.GlobalState, k6deps.Dependencies) (string, string, error) {
+			panic("launcher.provision function is not expected to be called")
+		},
+		run: func(*state.GlobalState, string) (int, error) {
+			panic("launcher.run function is not expected to be called")
+		},
+	}
+	l.launch()
+}
+
 // launcher is a k6 launcher
 type launcher struct {
 	gs *state.GlobalState
