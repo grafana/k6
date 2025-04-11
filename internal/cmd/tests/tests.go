@@ -39,10 +39,10 @@ func Main(m *testing.M) {
 	bt := &blockingTransport{
 		fallback: http.DefaultTransport,
 		forbiddenHosts: map[string]bool{
-			"ingest.k6.io":    true,
-			"cloudlogs.k6.io": true,
-			"app.k6.io":       true,
-			"reports.k6.io":   true,
+			"ingest.k6.io":      true,
+			"cloudlogs.k6.io":   true,
+			"app.k6.io":         true,
+			"stats.grafana.org": true,
 		},
 	}
 	http.DefaultTransport = bt

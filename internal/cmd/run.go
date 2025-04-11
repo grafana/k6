@@ -176,8 +176,8 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 
 	// We'll need to pipe metrics to the MetricsEngine and process them if any
 	// of these are enabled: thresholds, end-of-test summary
-	shouldProcessMetrics := (!testRunState.RuntimeOptions.NoSummary.Bool ||
-		!testRunState.RuntimeOptions.NoThresholds.Bool)
+	shouldProcessMetrics := !testRunState.RuntimeOptions.NoSummary.Bool ||
+		!testRunState.RuntimeOptions.NoThresholds.Bool
 	var metricsIngester *engine.OutputIngester
 	if shouldProcessMetrics {
 		err = metricsEngine.InitSubMetricsAndThresholds(conf.Options, testRunState.RuntimeOptions.NoThresholds.Bool)
@@ -192,6 +192,25 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 
 	executionState := execScheduler.GetState()
 	if !testRunState.RuntimeOptions.NoSummary.Bool { //nolint:nestif
+		// Despite having the revamped [summary.Summary], we still keep the use of the
+		// [lib.LegacySummary] for multiple backwards compatibility options,
+		// to be deprecated by v1.0 and likely removed or replaced by v2.0:
+		// - the `legacy` summary mode (which keeps the old summary format/display).
+		// - the data structure for custom `handleSummary()` implementations.
+		// - the data structure for the JSON (--summary-export) output.
+		legacySummary := func() *lib.LegacySummary {
+			return &lib.LegacySummary{
+				Metrics:         metricsEngine.ObservedMetrics,
+				RootGroup:       testRunState.GroupSummary.Group(),
+				TestRunDuration: executionState.GetCurrentTestRunDuration(),
+				NoColor:         c.gs.Flags.NoColor,
+				UIState: lib.UIState{
+					IsStdOutTTY: c.gs.Stdout.IsTTY,
+					IsStdErrTTY: c.gs.Stderr.IsTTY,
+				},
+			}
+		}
+
 		sm, err := summary.ValidateMode(testRunState.RuntimeOptions.SummaryMode.String)
 		if err != nil {
 			logger.WithError(err).Warnf(
@@ -207,18 +226,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 			defer func() {
 				logger.Debug("Generating the end-of-test summary...")
 
-				legacySummary := &lib.LegacySummary{
-					Metrics:         metricsEngine.ObservedMetrics,
-					RootGroup:       testRunState.GroupSummary.Group(),
-					TestRunDuration: executionState.GetCurrentTestRunDuration(),
-					NoColor:         c.gs.Flags.NoColor,
-					UIState: lib.UIState{
-						IsStdOutTTY: c.gs.Stdout.IsTTY,
-						IsStdErrTTY: c.gs.Stderr.IsTTY,
-					},
-				}
-
-				summaryResult, hsErr := test.initRunner.HandleSummary(globalCtx, legacySummary, nil)
+				summaryResult, hsErr := test.initRunner.HandleSummary(globalCtx, legacySummary(), nil)
 				if hsErr == nil {
 					hsErr = handleSummaryResult(c.gs.FS, c.gs.Stdout, c.gs.Stderr, summaryResult)
 				}
@@ -252,7 +260,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 				summary.NoColor = c.gs.Flags.NoColor
 				summary.EnableColors = !summary.NoColor && c.gs.Stdout.IsTTY
 
-				summaryResult, hsErr := test.initRunner.HandleSummary(globalCtx, nil, summary)
+				summaryResult, hsErr := test.initRunner.HandleSummary(globalCtx, legacySummary(), summary)
 				if hsErr == nil {
 					hsErr = handleSummaryResult(c.gs.FS, c.gs.Stdout, c.gs.Stderr, summaryResult)
 				}
@@ -479,6 +487,17 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	// Warn if no iterations could be completed.
 	if executionState.GetFullIterationCount() == 0 {
 		logger.Warn("No script iterations fully finished, consider making the test duration longer")
+	}
+
+	// The execution module enables users to mark a test as failed, while letting the test
+	// execution complete. As such, we check the test status here, after the test run has finished, and
+	// ensure we return an error indicating that the test run was marked as failed, and the proper
+	// exit code is used.
+	if testRunState.TestStatus.Failed() {
+		return errext.WithExitCodeIfNone(
+			fmt.Errorf("test run was marked as failed"),
+			exitcodes.MarkedAsFailed,
+		)
 	}
 
 	logger.Debug("Test finished cleanly")

@@ -11,6 +11,8 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"go.k6.io/k6/lib"
+
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -113,6 +115,7 @@ func NewGlobalTestState(tb testing.TB) *GlobalTestState {
 		Logger:         logger,
 		FallbackLogger: testutils.NewLogger(tb).WithField("fallback", true),
 		Usage:          usage.New(),
+		TestStatus:     lib.NewTestStatus(),
 	}
 
 	return ts

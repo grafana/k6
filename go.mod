@@ -11,13 +11,13 @@ require (
 	github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
 	github.com/andybalholm/brotli v1.1.1
 	github.com/chromedp/cdproto v0.0.0-20240919203636-12af5e8a671f
-	github.com/evanw/esbuild v0.25.1
+	github.com/evanw/esbuild v0.25.2
 	github.com/fatih/color v1.18.0
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible
 	github.com/golang/protobuf v1.5.4
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
-	github.com/grafana/sobek v0.0.0-20250219104821-ed22af7a8d6c
+	github.com/grafana/sobek v0.0.0-20250320150027-203dc85b6d98
 	github.com/grafana/xk6-dashboard v0.7.5
 	github.com/grafana/xk6-redis v0.3.3
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
@@ -58,7 +58,7 @@ require (
 	golang.org/x/term v0.30.0
 	golang.org/x/time v0.11.0
 	google.golang.org/grpc v1.71.0
-	google.golang.org/protobuf v1.36.5
+	google.golang.org/protobuf v1.36.6
 	gopkg.in/guregu/null.v3 v3.3.0
 	gopkg.in/yaml.v3 v3.0.1
 )

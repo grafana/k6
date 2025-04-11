@@ -1362,6 +1362,12 @@ func (self *_parser) parseAssignmentExpression() ast.Expression {
 		operator = token.SHIFT_RIGHT
 	case token.UNSIGNED_SHIFT_RIGHT_ASSIGN:
 		operator = token.UNSIGNED_SHIFT_RIGHT
+	case token.LOGICAL_AND_ASSIGN:
+		operator = token.LOGICAL_AND
+	case token.LOGICAL_OR_ASSIGN:
+		operator = token.LOGICAL_OR
+	case token.COALESCE_ASSIGN:
+		operator = token.COALESCE
 	case token.ARROW:
 		var paramList *ast.ParameterList
 		if id, ok := left.(*ast.Identifier); ok {

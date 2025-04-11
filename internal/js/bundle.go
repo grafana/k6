@@ -23,11 +23,11 @@ import (
 	"go.k6.io/k6/internal/js/eventloop"
 	"go.k6.io/k6/internal/js/modules/k6/webcrypto"
 	"go.k6.io/k6/internal/js/tc55/timers"
+	"go.k6.io/k6/internal/lib/consts"
 	"go.k6.io/k6/internal/loader"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/lib/fsext"
 )
 
