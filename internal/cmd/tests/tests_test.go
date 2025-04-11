@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"go.k6.io/k6/internal/cmd"
+	"go.k6.io/k6/internal/launcher"
 )
 
 func TestMain(m *testing.M) {
@@ -27,7 +27,7 @@ func TestRootCommand(t *testing.T) {
 			t.Parallel()
 			ts := NewGlobalTestState(t)
 			ts.CmdArgs = args
-			cmd.ExecuteWithGlobalState(ts.GlobalState)
+			launcher.ExecuteForTesting(ts.GlobalState)
 			assert.Len(t, ts.LoggerHook.Drain(), 0)
 			assert.Contains(t, ts.Stdout.String(), helptxt)
 		})

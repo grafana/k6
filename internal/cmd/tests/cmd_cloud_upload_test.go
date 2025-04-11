@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"go.k6.io/k6/cloudapi"
-	"go.k6.io/k6/internal/cmd"
+	"go.k6.io/k6/internal/launcher"
 	"go.k6.io/k6/internal/lib/testutils"
 	"go.k6.io/k6/lib/fsext"
 
@@ -27,7 +27,7 @@ func TestK6CloudUpload(t *testing.T) {
 		ts := getSimpleCloudTestState(t, nil, setupK6CloudUploadCmd, nil, nil, nil)
 		delete(ts.Env, "K6_CLOUD_TOKEN")
 		ts.ExpectedExitCode = -1
-		cmd.ExecuteWithGlobalState(ts.GlobalState)
+		launcher.ExecuteForTesting(ts.GlobalState)
 
 		stdout := ts.Stdout.String()
 		t.Log(stdout)
@@ -45,7 +45,7 @@ func TestK6CloudUpload(t *testing.T) {
 		}
 
 		ts := getSimpleCloudTestState(t, nil, setupK6CloudUploadCmd, nil, nil, cs)
-		cmd.ExecuteWithGlobalState(ts.GlobalState)
+		launcher.ExecuteForTesting(ts.GlobalState)
 
 		stdout := ts.Stdout.String()
 		t.Log(stdout)
@@ -141,7 +141,7 @@ func TestK6CloudUpload(t *testing.T) {
 		ts.Env["K6_CLOUD_HOST"] = srv.URL
 		ts.Env["K6_CLOUD_TOKEN"] = "foo" // doesn't matter, we mock the cloud
 
-		cmd.ExecuteWithGlobalState(ts.GlobalState)
+		launcher.ExecuteForTesting(ts.GlobalState)
 
 		stdout := ts.Stdout.String()
 		t.Log(stdout)
