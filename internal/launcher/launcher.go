@@ -17,7 +17,7 @@ import (
 func Execute() {
 	gs := state.NewGlobalState(context.Background())
 
-	gs.OSExit(newLauncher(gs).launch())
+	newLauncher(gs).launch()
 }
 
 // launcher is a k6 launcher
@@ -42,14 +42,13 @@ func newLauncher(gs *state.GlobalState) *launcher {
 
 // launch executes k6 either by launching a provisioned binary or defaulting to the
 // current binary it this is not necessary.
-// Returns an int to be used as exit code.
 // If the fhe fallback is called, it can exit the process so don't assume it will return
-func (l *launcher) launch() int {
+func (l *launcher) launch() {
 	// if binary provisioning not enabled, continue with regular k6 execution path
 	if !l.gs.Flags.BinaryProvisioning {
 		l.gs.Logger.Debug("binary provisioning disabled")
 		l.fallback(l.gs)
-		return 0
+		return
 	}
 
 	l.gs.Logger.Info("trying to provision binary")
@@ -59,7 +58,7 @@ func (l *launcher) launch() int {
 		l.gs.Logger.
 			WithError(err).
 			Error("failed to analyze dependencies, can't try binary provisioning, please report this issue")
-		return 1
+		l.gs.OSExit(1)
 	}
 
 	// binary provisioning enabled but not required by this command
@@ -68,20 +67,26 @@ func (l *launcher) launch() int {
 		l.gs.Logger.
 			Debug("binary provisioning not required")
 		l.fallback(l.gs)
-		return 0
+		return
 	}
 
 	l.gs.Logger.
 		WithField("deps", deps).
 		Info("dependencies identified, binary provisioning required")
 
+	l.launchCustomBuild(deps)
+}
+
+func (l *launcher) launchCustomBuild(deps k6deps.Dependencies) {
 	// get the k6 binary from the build service
 	binPath, versions, err := l.provision(l.gs, deps)
 	if err != nil {
 		l.gs.Logger.
 			WithError(err).
 			Error("failed to fetch a binary with required dependencies, please report this issue")
-		return 1
+		l.gs.OSExit(1)
+		// in tests calling l.gs.OSExit does not ends execution so we have to return
+		return
 	}
 
 	l.gs.Logger.
@@ -92,10 +97,8 @@ func (l *launcher) launch() int {
 	// execute provisioned binary
 	if rc, err := l.run(l.gs, binPath); err != nil {
 		l.gs.Logger.Error(err)
-		return rc
+		l.gs.OSExit(rc)
 	}
-
-	return 0
 }
 
 // runK6Cmd runs the k6 binary passing the original arguments

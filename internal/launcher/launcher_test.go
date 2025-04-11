@@ -28,8 +28,9 @@ type luncherFixture struct {
 	fallbackCalled  bool
 }
 
-func (f *luncherFixture) fallback(_ *state.GlobalState) {
+func (f *luncherFixture) fallback(gs *state.GlobalState) {
 	f.fallbackCalled = true
+	gs.OSExit(0)
 }
 
 func (f *luncherFixture) provision(_ *state.GlobalState, deps k6deps.Dependencies) (string, string, error) {
@@ -245,6 +246,9 @@ func Test_Launcher(t *testing.T) {
 			// NewGlobalTestState does not set the Binary provisioning flag, set it manually
 			ts.GlobalState.Flags.BinaryProvisioning = (tc.k6Env["K6_BINARY_PROVISIONING"] == "true")
 
+			// the exit code is checked by the TestGlobalState when the test ends
+			ts.ExpectedExitCode = tc.expectOsExit
+
 			launcher := &launcher{
 				gs:        ts.GlobalState,
 				provision: tc.fixture.provision,
@@ -252,12 +256,11 @@ func Test_Launcher(t *testing.T) {
 				run:       tc.fixture.run,
 			}
 
-			rc := launcher.launch()
+			launcher.launch()
 
 			assert.Equal(t, tc.expectProvision, tc.fixture.provisionCalled)
 			assert.Equal(t, tc.expectK6Run, tc.fixture.runK6Called)
 			assert.Equal(t, tc.expectFallback, tc.fixture.fallbackCalled)
-			assert.Equal(t, tc.expectOsExit, rc)
 
 			for _, l := range tc.expectLogs {
 				assert.Contains(t, ts.Stdout, l)
