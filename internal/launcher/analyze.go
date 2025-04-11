@@ -71,7 +71,7 @@ func scriptNameFromArgs(args []string) (string, bool) {
 					return arg, true
 				}
 			}
-			break
+			return "", false
 		}
 	}
 
