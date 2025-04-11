@@ -394,11 +394,12 @@ func normalizeNumberStrings(obj *sobek.Object, runtime *sobek.Runtime) (sobek.Va
 	exported := obj.ExportType()
 	if exported.Kind() == reflect.Float64 {
 		v := obj.ToFloat()
-		if math.IsNaN(v) {
+		switch {
+		case math.IsNaN(v):
 			return runtime.ToValue("NaN"), nil
-		} else if math.IsInf(v, 1) {
+		case math.IsInf(v, 1):
 			return runtime.ToValue("Infinity"), nil
-		} else if math.IsInf(v, -1) {
+		case math.IsInf(v, -1):
 			return runtime.ToValue("-Infinity"), nil
 		}
 		return obj, nil
