@@ -134,7 +134,7 @@ func TestScriptArg(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			script, hasScript := inputArg(tc.args)
+			script, hasScript := scriptNameFromArgs(tc.args)
 
 			assert.Equal(t, tc.hasScript, hasScript)
 			assert.Equal(t, tc.expected, script)

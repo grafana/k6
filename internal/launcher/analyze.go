@@ -8,10 +8,6 @@ import (
 	"go.k6.io/k6/cmd/state"
 )
 
-func analyze(gs *state.GlobalState, args []string) (k6deps.Dependencies, error) {
-	return k6deps.Analyze(newDepsOptions(gs, args))
-}
-
 // newDepsOptions returns the options for dependency resolution.
 // Presently, only the k6 input script or archive (if any) is passed to k6deps for scanning.
 // TODO: if k6 receives the input from stdin, it is not used for scanning because we don't know
@@ -22,7 +18,7 @@ func newDepsOptions(gs *state.GlobalState, args []string) *k6deps.Options {
 		// TODO: figure out if we need to set FindManifest
 	}
 
-	scriptname, hasScript := inputArg(args)
+	scriptname, hasScript := scriptNameFromArgs(args)
 	if !hasScript {
 		return dopts
 	}
@@ -45,8 +41,8 @@ func newDepsOptions(gs *state.GlobalState, args []string) *k6deps.Options {
 	return dopts
 }
 
-// inputArg returns the file name passed as input and true if it's a valid script name
-func inputArg(args []string) (string, bool) {
+// scriptNameFromArgs returns the file name passed as input and true if it's a valid script name
+func scriptNameFromArgs(args []string) (string, bool) {
 	// return early if no arguments passed
 	if len(args) == 0 {
 		return "", false

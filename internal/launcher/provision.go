@@ -14,7 +14,7 @@ import (
 
 // k6buildProvision returns the path to a k6 binary that satisfies the dependencies and the list of versions it provides
 func k6buildProvision(gs *state.GlobalState, deps k6deps.Dependencies) (string, string, error) {
-	opt := NewOptions(gs)
+	opt := newOptions(gs)
 	if opt.BuildServiceToken == "" {
 		return "", "", errors.New("Need a k6 cloud token for binary provisioning. " + //nolint:stylecheck //false positive
 			"Setting K6_CLOUD_TOKEN environment variable or executing k6 cloud login is required.")

@@ -52,10 +52,9 @@ func (l *launcher) launch() int {
 		return 0
 	}
 
-	// TODO: maybe use Info to alert user it is using the feature?
-	l.gs.Logger.Debug("trying to provision binary")
+	l.gs.Logger.Info("trying to provision binary")
 
-	deps, err := analyze(l.gs, l.gs.CmdArgs[1:])
+	deps, err := k6deps.Analyze(newDepsOptions(l.gs, l.gs.CmdArgs[1:]))
 	if err != nil {
 		l.gs.Logger.
 			WithError(err).
@@ -120,7 +119,7 @@ func runK6Cmd(gs *state.GlobalState, binPath string) (int, error) {
 }
 
 // isCustomBuildRequired checks if the build is required
-// it's required if there is one or more non k6 dependencies
+// it's required if there is one or more dependencies other than k6 itself
 // or if the required k6 version is not satisfied by the current binary's version
 // TODO: get the version of any built-in extension and check if they satisfy the dependencies
 func isCustomBuildRequired(baseK6Version string, deps k6deps.Dependencies) bool {

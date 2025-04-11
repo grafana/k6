@@ -8,8 +8,8 @@ import (
 	"go.k6.io/k6/lib/fsext"
 )
 
-// Options contains the optional parameters for provisioning.
-type Options struct {
+// options contains the optional parameters for provisioning.
+type options struct {
 	// BuildServiceURL contains the URL of the k6 build service to be used.
 	// If the value is not nil, the k6 binary is built using the build service instead of the local build.
 	BuildServiceURL string
@@ -18,9 +18,9 @@ type Options struct {
 	BuildServiceToken string
 }
 
-// NewOptions creates a new Options object.
-func NewOptions(gs *k6State.GlobalState) Options {
-	return Options{
+// newOptions creates a new Options object
+func newOptions(gs *k6State.GlobalState) options {
+	return options{
 		BuildServiceURL:   gs.Flags.BuildServiceURL,
 		BuildServiceToken: extractToken(gs),
 	}

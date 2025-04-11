@@ -15,7 +15,7 @@ import (
 	"go.k6.io/k6/internal/cmd/tests"
 )
 
-// the launcher fixture mocks the functions used by the launcher and tracks their execution
+// launcherFixture mocks the functions used by the launcher and tracks their execution
 type luncherFixture struct {
 	provisionCalled bool
 	provisionDeps   k6deps.Dependencies
