@@ -53,12 +53,13 @@ func (l *launcher) launch() {
 
 	l.gs.Logger.Info("trying to provision binary")
 
-	deps, err := k6deps.Analyze(newDepsOptions(l.gs, l.gs.CmdArgs[1:]))
+	deps, err := analyze(l.gs, l.gs.CmdArgs[1:])
 	if err != nil {
 		l.gs.Logger.
 			WithError(err).
 			Error("failed to analyze dependencies, can't try binary provisioning, please report this issue")
 		l.gs.OSExit(1)
+		return
 	}
 
 	// binary provisioning enabled but not required by this command
