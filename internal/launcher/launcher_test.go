@@ -1,6 +1,7 @@
 package launcher
 
 import (
+	"bytes"
 	"errors"
 	"maps"
 	"os"
@@ -102,6 +103,7 @@ func Test_Launcher(t *testing.T) {
 		k6Env           map[string]string
 		k6Cmd           string
 		k6Args          []string
+		k6Stdin         []byte
 		fixture         *luncherFixture
 		expectLogs      []string
 		expectProvision bool
@@ -224,6 +226,22 @@ func Test_Launcher(t *testing.T) {
 			k6Env: map[string]string{
 				"K6_BINARY_PROVISIONING": "true",
 			},
+			k6Stdin:         []byte(fakerTest),
+			script:          "",
+			fixture:         &luncherFixture{},
+			expectProvision: true,
+			expectK6Run:     true,
+			expectFallback:  false,
+			expectOsExit:    0,
+		},
+		{
+			name:   "script in stdin without dependencies",
+			k6Cmd:  "run",
+			k6Args: []string{"-"},
+			k6Env: map[string]string{
+				"K6_BINARY_PROVISIONING": "true",
+			},
+			k6Stdin:         []byte(noDepsTest),
 			script:          "",
 			fixture:         &luncherFixture{},
 			expectProvision: false,
@@ -253,6 +271,8 @@ func Test_Launcher(t *testing.T) {
 
 			ts.GlobalState.CmdArgs = k6Args
 			maps.Copy(ts.GlobalState.Env, tc.k6Env)
+
+			ts.Stdin = bytes.NewBuffer(tc.k6Stdin)
 
 			// k6deps uses os package to access files. So we need to use it in the global state
 			ts.GlobalState.FS = afero.NewOsFs()
