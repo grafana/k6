@@ -47,7 +47,7 @@ type GlobalState struct {
 	Env             map[string]string
 	Events          *event.System
 
-	DefaultFlags, Flags GlobalFlags
+	DefaultFlags, Flags GlobalOptions
 
 	OutMutex       *sync.Mutex
 	Stdout, Stderr *console.Writer
@@ -70,6 +70,7 @@ type GlobalState struct {
 // global variables and functions from the os package. Anywhere else, things
 // like os.Stdout, os.Stderr, os.Stdin, os.Getenv(), etc. should be removed and
 // the respective properties of globalState used instead.
+// This is expected to be difficult to unit test, we cover them with end-to-end CLI tests.
 //
 //nolint:forbidigo
 func NewGlobalState(ctx context.Context) *GlobalState {
@@ -102,7 +103,7 @@ func NewGlobalState(ctx context.Context) *GlobalState {
 
 	env := BuildEnvMap(os.Environ())
 
-	defaultGlobalOptions := GetDefaultFlags(confDir)
+	defaultGlobalOptions := GetDefaultGlobalOptions(confDir)
 	globalOptions := consolidateGlobalFlags(defaultGlobalOptions, env)
 
 	logger := &logrus.Logger{
@@ -143,56 +144,4 @@ func NewGlobalState(ctx context.Context) *GlobalState {
 		Usage:      usage.New(),
 		TestStatus: lib.NewTestStatus(),
 	}
-}
-
-// GlobalFlags contains global config values that apply for all k6 sub-commands.
-type GlobalFlags struct {
-	ConfigFilePath   string
-	Quiet            bool
-	NoColor          bool
-	Address          string
-	ProfilingEnabled bool
-	LogOutput        string
-	SecretSource     []string
-	LogFormat        string
-	Verbose          bool
-}
-
-// GetDefaultFlags returns the default global flags.
-func GetDefaultFlags(homeDir string) GlobalFlags {
-	return GlobalFlags{
-		Address:          "localhost:6565",
-		ProfilingEnabled: false,
-		ConfigFilePath:   filepath.Join(homeDir, "k6", defaultConfigFileName),
-		LogOutput:        "stderr",
-	}
-}
-
-func consolidateGlobalFlags(defaultFlags GlobalFlags, env map[string]string) GlobalFlags {
-	result := defaultFlags
-
-	// TODO: add env vars for the rest of the values (after adjusting
-	// rootCmdPersistentFlagSet(), of course)
-
-	if val, ok := env["K6_CONFIG"]; ok {
-		result.ConfigFilePath = val
-	}
-	if val, ok := env["K6_LOG_OUTPUT"]; ok {
-		result.LogOutput = val
-	}
-	if val, ok := env["K6_LOG_FORMAT"]; ok {
-		result.LogFormat = val
-	}
-	if env["K6_NO_COLOR"] != "" {
-		result.NoColor = true
-	}
-	// Support https://no-color.org/, even an empty value should disable the
-	// color output from k6.
-	if _, ok := env["NO_COLOR"]; ok {
-		result.NoColor = true
-	}
-	if _, ok := env["K6_PROFILING_ENABLED"]; ok {
-		result.ProfilingEnabled = true
-	}
-	return result
 }

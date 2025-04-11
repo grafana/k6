@@ -144,7 +144,7 @@ type configConsolidationTestCase struct {
 }
 
 func getConfigConsolidationTestCases() []configConsolidationTestCase {
-	defaultFlags := state.GetDefaultFlags(".config")
+	defaultFlags := state.GetDefaultGlobalOptions(".config")
 	defaultConfig := func(jsonConfig string) fsext.Fs {
 		return getFS([]file{{defaultFlags.ConfigFilePath, jsonConfig}})
 	}

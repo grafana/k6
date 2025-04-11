@@ -84,7 +84,7 @@ func NewGlobalTestState(tb testing.TB) *GlobalTestState {
 	})
 
 	outMutex := &sync.Mutex{}
-	defaultFlags := state.GetDefaultFlags(".config")
+	defaultFlags := state.GetDefaultGlobalOptions(".config")
 	defaultFlags.Address = getFreeBindAddr(tb)
 
 	ts.GlobalState = &state.GlobalState{
