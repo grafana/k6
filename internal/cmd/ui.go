@@ -73,11 +73,11 @@ func isTrueColor(env map[string]string) bool {
 }
 
 func printBanner(gs *state.GlobalState) {
-	if gs.Flags.Quiet {
+	if gs.GlobalOptions.Quiet {
 		return // do not print banner when --quiet is enabled
 	}
 
-	banner := getBanner(gs.Flags.NoColor || !gs.Stdout.IsTTY, isTrueColor(gs.Env))
+	banner := getBanner(gs.GlobalOptions.NoColor || !gs.Stdout.IsTTY, isTrueColor(gs.Env))
 	_, err := fmt.Fprintf(gs.Stdout, "\n%s\n\n", banner)
 	if err != nil {
 		gs.Logger.Warnf("could not print k6 banner message to stdout: %s", err.Error())
@@ -85,7 +85,7 @@ func printBanner(gs *state.GlobalState) {
 }
 
 func printBar(gs *state.GlobalState, bar *pb.ProgressBar) {
-	if gs.Flags.Quiet {
+	if gs.GlobalOptions.Quiet {
 		return
 	}
 	end := "\n"
@@ -118,7 +118,7 @@ func printExecutionDescription(
 	gs *state.GlobalState, execution, filename, outputOverride string, conf Config,
 	et *lib.ExecutionTuple, execPlan []lib.ExecutionStep, outputs []output.Output,
 ) {
-	noColor := gs.Flags.NoColor || !gs.Stdout.IsTTY
+	noColor := gs.GlobalOptions.NoColor || !gs.Stdout.IsTTY
 	valueColor := getColor(noColor, color.FgCyan)
 
 	buf := &strings.Builder{}
@@ -149,8 +149,8 @@ func printExecutionDescription(
 	}
 
 	fmt.Fprintf(buf, "        output: %s\n", valueColor.Sprint(strings.Join(outputDescriptions, ", ")))
-	if gs.Flags.ProfilingEnabled && gs.Flags.Address != "" {
-		fmt.Fprintf(buf, "     profiling: %s\n", valueColor.Sprintf("http://%s/debug/pprof/", gs.Flags.Address))
+	if gs.GlobalOptions.ProfilingEnabled && gs.GlobalOptions.Address != "" {
+		fmt.Fprintf(buf, "     profiling: %s\n", valueColor.Sprintf("http://%s/debug/pprof/", gs.GlobalOptions.Address))
 	}
 
 	fmt.Fprintf(buf, "\n")
@@ -174,7 +174,7 @@ func printExecutionDescription(
 	}
 	fmt.Fprintf(buf, "\n")
 
-	if gs.Flags.Quiet {
+	if gs.GlobalOptions.Quiet {
 		gs.Logger.Debug(buf.String())
 	} else {
 		printToStdout(gs, buf.String())
@@ -276,7 +276,7 @@ func renderMultipleBars(
 //
 //nolint:funlen,gocognit
 func showProgress(ctx context.Context, gs *state.GlobalState, pbs []*pb.ProgressBar, logger logrus.FieldLogger) {
-	if gs.Flags.Quiet {
+	if gs.GlobalOptions.Quiet {
 		return
 	}
 
@@ -315,7 +315,7 @@ func showProgress(ctx context.Context, gs *state.GlobalState, pbs []*pb.Progress
 	// Default to responsive progress bars when in an interactive terminal
 	renderProgressBars := func(goBack bool) {
 		barText, longestLine := renderMultipleBars(
-			gs.Flags.NoColor, gs.Stdout.IsTTY, goBack, maxLeft, termWidth, widthDelta, pbs,
+			gs.GlobalOptions.NoColor, gs.Stdout.IsTTY, goBack, maxLeft, termWidth, widthDelta, pbs,
 		)
 		widthDelta = termWidth - longestLine - termPadding
 		progressBarsLastRenderLock.Lock()
@@ -327,7 +327,7 @@ func showProgress(ctx context.Context, gs *state.GlobalState, pbs []*pb.Progress
 	if !gs.Stdout.IsTTY {
 		widthDelta = -pb.DefaultWidth
 		renderProgressBars = func(goBack bool) {
-			barText, _ := renderMultipleBars(gs.Flags.NoColor, gs.Stdout.IsTTY, goBack, maxLeft, termWidth, widthDelta, pbs)
+			barText, _ := renderMultipleBars(gs.GlobalOptions.NoColor, gs.Stdout.IsTTY, goBack, maxLeft, termWidth, widthDelta, pbs)
 			progressBarsLastRenderLock.Lock()
 			progressBarsLastRender = []byte(barText)
 			progressBarsLastRenderLock.Unlock()

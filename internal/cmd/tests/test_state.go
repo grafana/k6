@@ -88,16 +88,16 @@ func NewGlobalTestState(tb testing.TB) *GlobalTestState {
 	defaultFlags.Address = getFreeBindAddr(tb)
 
 	ts.GlobalState = &state.GlobalState{
-		Ctx:          ctx,
-		FS:           fs,
-		Getwd:        func() (string, error) { return ts.Cwd, nil },
-		BinaryName:   "k6",
-		CmdArgs:      []string{},
-		Env:          map[string]string{"K6_NO_USAGE_REPORT": "true"},
-		Events:       event.NewEventSystem(100, logger),
-		DefaultFlags: defaultFlags,
-		Flags:        defaultFlags,
-		OutMutex:     outMutex,
+		Ctx:                  ctx,
+		FS:                   fs,
+		Getwd:                func() (string, error) { return ts.Cwd, nil },
+		BinaryName:           "k6",
+		CmdArgs:              []string{},
+		Env:                  map[string]string{"K6_NO_USAGE_REPORT": "true"},
+		Events:               event.NewEventSystem(100, logger),
+		DefaultGlobalOptions: defaultFlags,
+		GlobalOptions:        defaultFlags,
+		OutMutex:             outMutex,
 		Stdout: &console.Writer{
 			Mutex:  outMutex,
 			Writer: ts.Stdout,

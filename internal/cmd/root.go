@@ -47,7 +47,7 @@ func newRootCommand(gs *state.GlobalState) *rootCommand {
 	rootCmd := &cobra.Command{
 		Use:               gs.BinaryName,
 		Short:             "a next-generation load generator",
-		Long:              "\n" + getBanner(gs.Flags.NoColor || !gs.Stdout.IsTTY, isTrueColor(gs.Env)),
+		Long:              "\n" + getBanner(gs.GlobalOptions.NoColor || !gs.Stdout.IsTTY, isTrueColor(gs.Env)),
 		SilenceUsage:      true,
 		SilenceErrors:     true,
 		PersistentPreRunE: c.persistentPreRunE,
@@ -167,34 +167,34 @@ func rootCmdPersistentFlagSet(gs *state.GlobalState) *pflag.FlagSet {
 	// not messed up...
 
 	// TODO(@mstoykov): likely needs work - no env variables and such. No config.json.
-	flags.StringArrayVar(&gs.Flags.SecretSource, "secret-source", gs.Flags.SecretSource,
+	flags.StringArrayVar(&gs.GlobalOptions.SecretSource, "secret-source", gs.GlobalOptions.SecretSource,
 		"setting secret sources for k6 file[=./path.fileformat],")
 
-	flags.StringVar(&gs.Flags.LogOutput, "log-output", gs.Flags.LogOutput,
+	flags.StringVar(&gs.GlobalOptions.LogOutput, "log-output", gs.GlobalOptions.LogOutput,
 		"change the output for k6 logs, possible values are stderr,stdout,none,loki[=host:port],file[=./path.fileformat]")
-	flags.Lookup("log-output").DefValue = gs.DefaultFlags.LogOutput
+	flags.Lookup("log-output").DefValue = gs.DefaultGlobalOptions.LogOutput
 
-	flags.StringVar(&gs.Flags.LogFormat, "log-format", gs.Flags.LogFormat, "log output format")
-	flags.Lookup("log-format").DefValue = gs.DefaultFlags.LogFormat
+	flags.StringVar(&gs.GlobalOptions.LogFormat, "log-format", gs.GlobalOptions.LogFormat, "log output format")
+	flags.Lookup("log-format").DefValue = gs.DefaultGlobalOptions.LogFormat
 
-	flags.StringVarP(&gs.Flags.ConfigFilePath, "config", "c", gs.Flags.ConfigFilePath, "JSON config file")
+	flags.StringVarP(&gs.GlobalOptions.ConfigFilePath, "config", "c", gs.GlobalOptions.ConfigFilePath, "JSON config file")
 	// And we also need to explicitly set the default value for the usage message here, so things
 	// like `K6_CONFIG="blah" k6 run -h` don't produce a weird usage message
-	flags.Lookup("config").DefValue = gs.DefaultFlags.ConfigFilePath
+	flags.Lookup("config").DefValue = gs.DefaultGlobalOptions.ConfigFilePath
 	must(cobra.MarkFlagFilename(flags, "config"))
 
-	flags.BoolVar(&gs.Flags.NoColor, "no-color", gs.Flags.NoColor, "disable colored output")
-	flags.Lookup("no-color").DefValue = strconv.FormatBool(gs.DefaultFlags.NoColor)
+	flags.BoolVar(&gs.GlobalOptions.NoColor, "no-color", gs.GlobalOptions.NoColor, "disable colored output")
+	flags.Lookup("no-color").DefValue = strconv.FormatBool(gs.DefaultGlobalOptions.NoColor)
 
 	// TODO: support configuring these through environment variables as well?
 	// either with croconf or through the hack above...
-	flags.BoolVarP(&gs.Flags.Verbose, "verbose", "v", gs.DefaultFlags.Verbose, "enable verbose logging")
-	flags.BoolVarP(&gs.Flags.Quiet, "quiet", "q", gs.DefaultFlags.Quiet, "disable progress updates")
-	flags.StringVarP(&gs.Flags.Address, "address", "a", gs.DefaultFlags.Address, "address for the REST API server")
+	flags.BoolVarP(&gs.GlobalOptions.Verbose, "verbose", "v", gs.DefaultGlobalOptions.Verbose, "enable verbose logging")
+	flags.BoolVarP(&gs.GlobalOptions.Quiet, "quiet", "q", gs.DefaultGlobalOptions.Quiet, "disable progress updates")
+	flags.StringVarP(&gs.GlobalOptions.Address, "address", "a", gs.DefaultGlobalOptions.Address, "address for the REST API server")
 	flags.BoolVar(
-		&gs.Flags.ProfilingEnabled,
+		&gs.GlobalOptions.ProfilingEnabled,
 		"profiling-enabled",
-		gs.DefaultFlags.ProfilingEnabled,
+		gs.DefaultGlobalOptions.ProfilingEnabled,
 		"enable profiling (pprof) endpoints, k6's REST API should be enabled as well",
 	)
 
@@ -213,7 +213,7 @@ func (f RawFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 // the provided context is closed. It is closed if the logger isn't buffering and sending messages
 // Asynchronously
 func (c *rootCommand) setupLoggers(stop <-chan struct{}) error {
-	if c.globalState.Flags.Verbose {
+	if c.globalState.GlobalOptions.Verbose {
 		c.globalState.Logger.SetLevel(logrus.DebugLevel)
 	}
 
@@ -223,12 +223,12 @@ func (c *rootCommand) setupLoggers(stop <-chan struct{}) error {
 	)
 
 	loggerForceColors := false // disable color by default
-	switch line := c.globalState.Flags.LogOutput; {
+	switch line := c.globalState.GlobalOptions.LogOutput; {
 	case line == "stderr":
-		loggerForceColors = !c.globalState.Flags.NoColor && c.globalState.Stderr.IsTTY
+		loggerForceColors = !c.globalState.GlobalOptions.NoColor && c.globalState.Stderr.IsTTY
 		c.globalState.Logger.SetOutput(c.globalState.Stderr)
 	case line == "stdout":
-		loggerForceColors = !c.globalState.Flags.NoColor && c.globalState.Stdout.IsTTY
+		loggerForceColors = !c.globalState.GlobalOptions.NoColor && c.globalState.Stdout.IsTTY
 		c.globalState.Logger.SetOutput(c.globalState.Stdout)
 	case line == "none":
 		c.globalState.Logger.SetOutput(io.Discard)
@@ -238,7 +238,7 @@ func (c *rootCommand) setupLoggers(stop <-chan struct{}) error {
 		if err != nil {
 			return err
 		}
-		c.globalState.Flags.LogFormat = "raw"
+		c.globalState.GlobalOptions.LogFormat = "raw"
 	case strings.HasPrefix(line, "file"):
 		hook, err = log.FileHookFromConfigLine(
 			c.globalState.FS, c.globalState.Getwd,
@@ -251,7 +251,7 @@ func (c *rootCommand) setupLoggers(stop <-chan struct{}) error {
 		return fmt.Errorf("unsupported log output '%s'", line)
 	}
 
-	switch c.globalState.Flags.LogFormat {
+	switch c.globalState.GlobalOptions.LogFormat {
 	case "raw":
 		c.globalState.Logger.SetFormatter(&RawFormatter{})
 		c.globalState.Logger.Debug("Logger format: RAW")
@@ -260,7 +260,7 @@ func (c *rootCommand) setupLoggers(stop <-chan struct{}) error {
 		c.globalState.Logger.Debug("Logger format: JSON")
 	default:
 		c.globalState.Logger.SetFormatter(&logrus.TextFormatter{
-			ForceColors: loggerForceColors, DisableColors: c.globalState.Flags.NoColor,
+			ForceColors: loggerForceColors, DisableColors: c.globalState.GlobalOptions.NoColor,
 		})
 		c.globalState.Logger.Debug("Logger format: TEXT")
 	}
@@ -323,7 +323,7 @@ func createSecretSources(gs *state.GlobalState) (map[string]secretsource.Source,
 	}
 
 	result := make(map[string]secretsource.Source)
-	for _, line := range gs.Flags.SecretSource {
+	for _, line := range gs.GlobalOptions.SecretSource {
 		t, config, ok := strings.Cut(line, "=")
 		if !ok {
 			return nil, fmt.Errorf("couldn't parse secret source configuration %q", line)

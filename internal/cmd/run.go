@@ -203,7 +203,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 				Metrics:         metricsEngine.ObservedMetrics,
 				RootGroup:       testRunState.GroupSummary.Group(),
 				TestRunDuration: executionState.GetCurrentTestRunDuration(),
-				NoColor:         c.gs.Flags.NoColor,
+				NoColor:         c.gs.GlobalOptions.NoColor,
 				UIState: lib.UIState{
 					IsStdOutTTY: c.gs.Stdout.IsTTY,
 					IsStdErrTTY: c.gs.Stderr.IsTTY,
@@ -257,7 +257,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 
 				// TODO: We should probably try to move these out of the summary,
 				// likely as an additional argument like options.
-				summary.NoColor = c.gs.Flags.NoColor
+				summary.NoColor = c.gs.GlobalOptions.NoColor
 				summary.EnableColors = !summary.NoColor && c.gs.Stdout.IsTTY
 
 				summaryResult, hsErr := test.initRunner.HandleSummary(globalCtx, legacySummary(), summary)
@@ -286,7 +286,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	})
 	samples := make(chan metrics.SampleContainer, test.derivedConfig.MetricSamplesBufferSize.Int64)
 	// Spin up the REST API server, if not disabled.
-	if c.gs.Flags.Address != "" { //nolint:nestif
+	if c.gs.GlobalOptions.Address != "" { //nolint:nestif
 		initBar.Modify(pb.WithConstProgress(0, "Init API server"))
 
 		// We cannot use backgroundProcesses here, since we need the REST API to
@@ -301,7 +301,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 
 		srv := api.GetServer(
 			runCtx,
-			c.gs.Flags.Address, c.gs.Flags.ProfilingEnabled,
+			c.gs.GlobalOptions.Address, c.gs.GlobalOptions.ProfilingEnabled,
 			testRunState,
 			samples,
 			metricsEngine,
@@ -309,9 +309,9 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		)
 		go func() {
 			defer apiWG.Done()
-			logger.Debugf("Starting the REST API server on %s", c.gs.Flags.Address)
-			if c.gs.Flags.ProfilingEnabled {
-				logger.Debugf("Profiling exposed on http://%s/debug/pprof/", c.gs.Flags.Address)
+			logger.Debugf("Starting the REST API server on %s", c.gs.GlobalOptions.Address)
+			if c.gs.GlobalOptions.ProfilingEnabled {
+				logger.Debugf("Profiling exposed on http://%s/debug/pprof/", c.gs.GlobalOptions.Address)
 			}
 			if aerr := srv.ListenAndServe(); aerr != nil && !errors.Is(aerr, http.ErrServerClosed) {
 				// Only exit k6 if the user has explicitly set the REST API address
@@ -438,7 +438,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 				// do nothing, we were interrupted by Ctrl+C already
 			default:
 				logger.Debug(msg)
-				if !c.gs.Flags.Quiet {
+				if !c.gs.GlobalOptions.Quiet {
 					printToStdout(c.gs, msg)
 				}
 				<-lingerCtx.Done()

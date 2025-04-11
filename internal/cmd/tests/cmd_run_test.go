@@ -600,7 +600,7 @@ func TestSetupTeardownThresholds(t *testing.T) {
 		}()
 		t.Logf("Linger reached, running teardown again and stopping the test...")
 		req, err := http.NewRequestWithContext(
-			ts.Ctx, http.MethodPost, fmt.Sprintf("http://%s/v1/teardown", ts.Flags.Address), nil,
+			ts.Ctx, http.MethodPost, fmt.Sprintf("http://%s/v1/teardown", ts.GlobalOptions.Address), nil,
 		)
 		require.NoError(t, err)
 		resp, err := http.DefaultClient.Do(req)
@@ -859,7 +859,7 @@ func asyncWaitForStdoutAndStopTestFromRESTAPI(
 ) {
 	asyncWaitForStdoutAndRun(t, ts, attempts, interval, expText, func() {
 		req, err := http.NewRequestWithContext(
-			ts.Ctx, http.MethodPatch, fmt.Sprintf("http://%s/v1/status", ts.Flags.Address),
+			ts.Ctx, http.MethodPatch, fmt.Sprintf("http://%s/v1/status", ts.GlobalOptions.Address),
 			bytes.NewBufferString(`{"data":{"type":"status","id":"default","attributes":{"stopped":true}}}`),
 		)
 		require.NoError(t, err)

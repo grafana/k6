@@ -25,7 +25,7 @@ func getCmdScale(gs *state.GlobalState) *cobra.Command {
 				return errors.New("Specify either -u/--vus or -m/--max") //nolint:golint,stylecheck
 			}
 
-			c, err := client.New(gs.Flags.Address)
+			c, err := client.New(gs.GlobalOptions.Address)
 			if err != nil {
 				return err
 			}

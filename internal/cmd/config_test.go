@@ -220,9 +220,9 @@ func TestReadDiskConfigWithDefaultFlags(t *testing.T) {
 
 	defaultFlags := state.GetDefaultGlobalOptions(".config")
 	gs := &state.GlobalState{
-		FS:           memfs,
-		Flags:        defaultFlags,
-		DefaultFlags: defaultFlags,
+		FS:                   memfs,
+		GlobalOptions:        defaultFlags,
+		DefaultGlobalOptions: defaultFlags,
 	}
 	c, err := readDiskConfig(gs)
 	require.NoError(t, err)
@@ -240,11 +240,11 @@ func TestReadDiskConfigCustomFilePath(t *testing.T) {
 
 	defaultFlags := state.GetDefaultGlobalOptions(".config")
 	gs := &state.GlobalState{
-		FS:           memfs,
-		Flags:        defaultFlags,
-		DefaultFlags: defaultFlags,
+		FS:                   memfs,
+		GlobalOptions:        defaultFlags,
+		DefaultGlobalOptions: defaultFlags,
 	}
-	gs.Flags.ConfigFilePath = "custom-path/config.json"
+	gs.GlobalOptions.ConfigFilePath = "custom-path/config.json"
 
 	c, err := readDiskConfig(gs)
 	require.NoError(t, err)
@@ -264,9 +264,9 @@ func TestReadDiskConfigNotFoundSilenced(t *testing.T) {
 
 	defaultFlags := state.GetDefaultGlobalOptions(".config")
 	gs := &state.GlobalState{
-		FS:           memfs,
-		Flags:        defaultFlags,
-		DefaultFlags: defaultFlags,
+		FS:                   memfs,
+		GlobalOptions:        defaultFlags,
+		DefaultGlobalOptions: defaultFlags,
 	}
 	c, err := readDiskConfig(gs)
 	assert.NoError(t, err)
@@ -282,11 +282,11 @@ func TestReadDiskConfigNotJSONExtension(t *testing.T) {
 
 	defaultFlags := state.GetDefaultGlobalOptions(".config")
 	gs := &state.GlobalState{
-		FS:           memfs,
-		DefaultFlags: defaultFlags,
-		Flags:        defaultFlags,
+		FS:                   memfs,
+		DefaultGlobalOptions: defaultFlags,
+		GlobalOptions:        defaultFlags,
 	}
-	gs.Flags.ConfigFilePath = "custom-path/config.txt"
+	gs.GlobalOptions.ConfigFilePath = "custom-path/config.txt"
 
 	c, err := readDiskConfig(gs)
 	require.NoError(t, err)
@@ -304,8 +304,8 @@ func TestReadDiskConfigNotJSONContentError(t *testing.T) {
 	require.NoError(t, fsext.WriteFile(memfs, defaultConfigPath, conf, 0o644))
 
 	gs := &state.GlobalState{
-		FS:    memfs,
-		Flags: state.GetDefaultGlobalOptions(".config"),
+		FS:            memfs,
+		GlobalOptions: state.GetDefaultGlobalOptions(".config"),
 	}
 	_, err := readDiskConfig(gs)
 	var serr *json.SyntaxError
@@ -318,11 +318,11 @@ func TestReadDiskConfigNotFoundErrorWithCustomPath(t *testing.T) {
 
 	defaultFlags := state.GetDefaultGlobalOptions(".config")
 	gs := &state.GlobalState{
-		FS:           memfs,
-		Flags:        defaultFlags,
-		DefaultFlags: defaultFlags,
+		FS:                   memfs,
+		GlobalOptions:        defaultFlags,
+		DefaultGlobalOptions: defaultFlags,
 	}
-	gs.Flags.ConfigFilePath = ".config/my-custom-path/k6/config.json"
+	gs.GlobalOptions.ConfigFilePath = ".config/my-custom-path/k6/config.json"
 
 	c, err := readDiskConfig(gs)
 	assert.ErrorIs(t, err, fs.ErrNotExist)
@@ -335,9 +335,9 @@ func TestWriteDiskConfigWithDefaultFlags(t *testing.T) {
 
 	defaultFlags := state.GetDefaultGlobalOptions(".config")
 	gs := &state.GlobalState{
-		FS:           memfs,
-		Flags:        defaultFlags,
-		DefaultFlags: defaultFlags,
+		FS:                   memfs,
+		GlobalOptions:        defaultFlags,
+		DefaultGlobalOptions: defaultFlags,
 	}
 
 	c := Config{WebDashboard: null.BoolFrom(true)}
@@ -359,9 +359,9 @@ func TestWriteDiskConfigOverwrite(t *testing.T) {
 
 	defaultFlags := state.GetDefaultGlobalOptions(".config")
 	gs := &state.GlobalState{
-		FS:           memfs,
-		Flags:        defaultFlags,
-		DefaultFlags: defaultFlags,
+		FS:                   memfs,
+		GlobalOptions:        defaultFlags,
+		DefaultGlobalOptions: defaultFlags,
 	}
 
 	c := Config{WebDashboard: null.BoolFrom(true)}
@@ -375,11 +375,11 @@ func TestWriteDiskConfigCustomPath(t *testing.T) {
 
 	defaultFlags := state.GetDefaultGlobalOptions(".config")
 	gs := &state.GlobalState{
-		FS:           memfs,
-		Flags:        defaultFlags,
-		DefaultFlags: defaultFlags,
+		FS:                   memfs,
+		GlobalOptions:        defaultFlags,
+		DefaultGlobalOptions: defaultFlags,
 	}
-	gs.Flags.ConfigFilePath = "my-custom-path/config.json"
+	gs.GlobalOptions.ConfigFilePath = "my-custom-path/config.json"
 
 	c := Config{WebDashboard: null.BoolFrom(true)}
 	err := writeDiskConfig(gs, c)
@@ -392,9 +392,9 @@ func TestWriteDiskConfigNoJSONContentError(t *testing.T) {
 
 	defaultFlags := state.GetDefaultGlobalOptions(".config")
 	gs := &state.GlobalState{
-		FS:           memfs,
-		Flags:        defaultFlags,
-		DefaultFlags: defaultFlags,
+		FS:                   memfs,
+		GlobalOptions:        defaultFlags,
+		DefaultGlobalOptions: defaultFlags,
 	}
 
 	c := Config{
@@ -421,11 +421,11 @@ func TestMigrateLegacyConfigFileIfAny(t *testing.T) {
 
 	defaultFlags := state.GetDefaultGlobalOptions(".config")
 	gs := &state.GlobalState{
-		FS:              memfs,
-		Flags:           defaultFlags,
-		DefaultFlags:    defaultFlags,
-		UserOSConfigDir: ".config",
-		Logger:          logger,
+		FS:                   memfs,
+		GlobalOptions:        defaultFlags,
+		DefaultGlobalOptions: defaultFlags,
+		UserOSConfigDir:      ".config",
+		Logger:               logger,
 	}
 
 	err := migrateLegacyConfigFileIfAny(gs)
@@ -444,10 +444,10 @@ func TestMigrateLegacyConfigFileIfAnyWhenFileDoesNotExist(t *testing.T) {
 
 	defaultFlags := state.GetDefaultGlobalOptions(".config")
 	gs := &state.GlobalState{
-		FS:              memfs,
-		Flags:           defaultFlags,
-		DefaultFlags:    defaultFlags,
-		UserOSConfigDir: ".config",
+		FS:                   memfs,
+		GlobalOptions:        defaultFlags,
+		DefaultGlobalOptions: defaultFlags,
+		UserOSConfigDir:      ".config",
 	}
 
 	err := migrateLegacyConfigFileIfAny(gs)
@@ -507,11 +507,11 @@ func TestLoadConfig(t *testing.T) {
 
 			defaultFlags := state.GetDefaultGlobalOptions(".config")
 			gs := &state.GlobalState{
-				FS:              tc.memfs,
-				Flags:           defaultFlags,
-				DefaultFlags:    defaultFlags,
-				UserOSConfigDir: ".config",
-				Logger:          logger,
+				FS:                   tc.memfs,
+				GlobalOptions:        defaultFlags,
+				DefaultGlobalOptions: defaultFlags,
+				UserOSConfigDir:      ".config",
+				Logger:               logger,
 			}
 
 			c, err := loadConfigFile(gs)

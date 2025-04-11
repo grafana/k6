@@ -250,7 +250,7 @@ func TestRunScriptErrorsAndAbort(t *testing.T) {
 				configFile, err := os.ReadFile(path.Join("testdata", tc.configFilename)) //nolint:forbidigo
 				require.NoError(t, err)
 				require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, tc.configFilename), configFile, 0o644))
-				ts.Flags.ConfigFilePath = path.Join(ts.Cwd, tc.configFilename)
+				ts.GlobalOptions.ConfigFilePath = path.Join(ts.Cwd, tc.configFilename)
 			}
 			if tc.envVars != nil {
 				ts.Env = tc.envVars

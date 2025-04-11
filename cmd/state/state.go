@@ -47,7 +47,7 @@ type GlobalState struct {
 	Env             map[string]string
 	Events          *event.System
 
-	DefaultFlags, Flags GlobalOptions
+	DefaultGlobalOptions, GlobalOptions GlobalOptions
 
 	OutMutex       *sync.Mutex
 	Stdout, Stderr *console.Writer
@@ -117,24 +117,24 @@ func NewGlobalState(ctx context.Context) *GlobalState {
 	}
 
 	return &GlobalState{
-		Ctx:             ctx,
-		FS:              fsext.NewOsFs(),
-		Getwd:           os.Getwd,
-		UserOSConfigDir: confDir,
-		BinaryName:      filepath.Base(binary),
-		CmdArgs:         os.Args,
-		Env:             env,
-		Events:          event.NewEventSystem(100, logger),
-		DefaultFlags:    defaultGlobalOptions,
-		Flags:           globalOptions,
-		OutMutex:        outMutex,
-		Stdout:          stdout,
-		Stderr:          stderr,
-		Stdin:           os.Stdin,
-		OSExit:          os.Exit,
-		SignalNotify:    signal.Notify,
-		SignalStop:      signal.Stop,
-		Logger:          logger,
+		Ctx:                  ctx,
+		FS:                   fsext.NewOsFs(),
+		Getwd:                os.Getwd,
+		UserOSConfigDir:      confDir,
+		BinaryName:           filepath.Base(binary),
+		CmdArgs:              os.Args,
+		Env:                  env,
+		Events:               event.NewEventSystem(100, logger),
+		DefaultGlobalOptions: defaultGlobalOptions,
+		GlobalOptions:        globalOptions,
+		OutMutex:             outMutex,
+		Stdout:               stdout,
+		Stderr:               stderr,
+		Stdin:                os.Stdin,
+		OSExit:               os.Exit,
+		SignalNotify:         signal.Notify,
+		SignalStop:           signal.Stop,
+		Logger:               logger,
 		FallbackLogger: &logrus.Logger{ // we may modify the other one
 			Out:       stderr,
 			Formatter: new(logrus.TextFormatter), // no fancy formatting here

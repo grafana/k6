@@ -130,8 +130,8 @@ func getConfig(flags *pflag.FlagSet) (Config, error) {
 // doesn't exist.
 func readDiskConfig(gs *state.GlobalState) (Config, error) {
 	// Try to see if the file exists in the supplied filesystem
-	if _, err := gs.FS.Stat(gs.Flags.ConfigFilePath); err != nil {
-		if errors.Is(err, fs.ErrNotExist) && gs.Flags.ConfigFilePath == gs.DefaultFlags.ConfigFilePath {
+	if _, err := gs.FS.Stat(gs.GlobalOptions.ConfigFilePath); err != nil {
+		if errors.Is(err, fs.ErrNotExist) && gs.GlobalOptions.ConfigFilePath == gs.DefaultGlobalOptions.ConfigFilePath {
 			// If the file doesn't exist, but it was the default config file (i.e. the user
 			// didn't specify anything), silence the error
 			err = nil
@@ -139,14 +139,14 @@ func readDiskConfig(gs *state.GlobalState) (Config, error) {
 		return Config{}, err
 	}
 
-	data, err := fsext.ReadFile(gs.FS, gs.Flags.ConfigFilePath)
+	data, err := fsext.ReadFile(gs.FS, gs.GlobalOptions.ConfigFilePath)
 	if err != nil {
-		return Config{}, fmt.Errorf("couldn't load the configuration from %q: %w", gs.Flags.ConfigFilePath, err)
+		return Config{}, fmt.Errorf("couldn't load the configuration from %q: %w", gs.GlobalOptions.ConfigFilePath, err)
 	}
 	var conf Config
 	err = json.Unmarshal(data, &conf)
 	if err != nil {
-		return Config{}, fmt.Errorf("couldn't parse the configuration from %q: %w", gs.Flags.ConfigFilePath, err)
+		return Config{}, fmt.Errorf("couldn't parse the configuration from %q: %w", gs.GlobalOptions.ConfigFilePath, err)
 	}
 	return conf, nil
 }
@@ -184,11 +184,11 @@ func writeDiskConfig(gs *state.GlobalState, conf Config) error {
 		return err
 	}
 
-	if err := gs.FS.MkdirAll(filepath.Dir(gs.Flags.ConfigFilePath), 0o755); err != nil {
+	if err := gs.FS.MkdirAll(filepath.Dir(gs.GlobalOptions.ConfigFilePath), 0o755); err != nil {
 		return err
 	}
 
-	return fsext.WriteFile(gs.FS, gs.Flags.ConfigFilePath, data, 0o644)
+	return fsext.WriteFile(gs.FS, gs.GlobalOptions.ConfigFilePath, data, 0o644)
 }
 
 // readEnvConfig reads configuration variables from the environment.
@@ -211,11 +211,11 @@ func readEnvConfig(envMap map[string]string) (Config, error) {
 // After we should restore to lookup only in a single location for config file (the default).
 func loadConfigFile(gs *state.GlobalState) (Config, error) {
 	// use directly the main flow if the user passed a custom path
-	if gs.Flags.ConfigFilePath != gs.DefaultFlags.ConfigFilePath {
+	if gs.GlobalOptions.ConfigFilePath != gs.DefaultGlobalOptions.ConfigFilePath {
 		return readDiskConfig(gs)
 	}
 
-	_, err := gs.FS.Stat(gs.Flags.ConfigFilePath)
+	_, err := gs.FS.Stat(gs.GlobalOptions.ConfigFilePath)
 	if err != nil && errors.Is(err, fs.ErrNotExist) {
 		// if the passed path (the default) does not exist
 		// then we attempt to load the legacy path
@@ -380,7 +380,7 @@ func migrateLegacyConfigFileIfAny(gs *state.GlobalState) error {
 		if err != nil {
 			return err
 		}
-		newPath := gs.DefaultFlags.ConfigFilePath
+		newPath := gs.DefaultGlobalOptions.ConfigFilePath
 		if err := gs.FS.MkdirAll(filepath.Dir(newPath), 0o755); err != nil {
 			return err
 		}

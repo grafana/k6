@@ -303,8 +303,8 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 		return errext.WithExitCodeIfNone(errors.New("Test progress error"), exitcodes.CloudFailedToGetProgress)
 	}
 
-	if !c.gs.Flags.Quiet {
-		valueColor := getColor(c.gs.Flags.NoColor || !c.gs.Stdout.IsTTY, color.FgCyan)
+	if !c.gs.GlobalOptions.Quiet {
+		valueColor := getColor(c.gs.GlobalOptions.NoColor || !c.gs.Stdout.IsTTY, color.FgCyan)
 		printToStdout(c.gs, fmt.Sprintf(
 			"     test status: %s\n", valueColor.Sprint(testProgress.RunStatusText),
 		))

@@ -97,7 +97,7 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 		newCloudConf.Token = null.StringFromPtr(nil)
 		printToStdout(c.globalState, "  token reset\n")
 	case show.Bool:
-		valueColor := getColor(c.globalState.Flags.NoColor || !c.globalState.Stdout.IsTTY, color.FgCyan)
+		valueColor := getColor(c.globalState.GlobalOptions.NoColor || !c.globalState.Stdout.IsTTY, color.FgCyan)
 		printToStdout(c.globalState, fmt.Sprintf("  token: %s\n", valueColor.Sprint(newCloudConf.Token.String)))
 		return nil
 	case token.Valid:
@@ -145,7 +145,7 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 
 	if newCloudConf.Token.Valid {
 		printToStdout(c.globalState, fmt.Sprintf(
-			"Logged in successfully, token saved in %s\n", c.globalState.Flags.ConfigFilePath,
+			"Logged in successfully, token saved in %s\n", c.globalState.GlobalOptions.ConfigFilePath,
 		))
 	}
 	return nil

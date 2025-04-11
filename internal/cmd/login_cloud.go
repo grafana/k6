@@ -142,12 +142,12 @@ Please use the "k6 cloud login" command instead.
 			}
 
 			if newCloudConf.Token.Valid {
-				valueColor := getColor(gs.Flags.NoColor || !gs.Stdout.IsTTY, color.FgCyan)
-				if !gs.Flags.Quiet {
+				valueColor := getColor(gs.GlobalOptions.NoColor || !gs.Stdout.IsTTY, color.FgCyan)
+				if !gs.GlobalOptions.Quiet {
 					printToStdout(gs, fmt.Sprintf("  token: %s\n", valueColor.Sprint(newCloudConf.Token.String)))
 				}
 				printToStdout(gs, fmt.Sprintf(
-					"Logged in successfully, token saved in %s\n", gs.Flags.ConfigFilePath,
+					"Logged in successfully, token saved in %s\n", gs.GlobalOptions.ConfigFilePath,
 				))
 			}
 			return nil
