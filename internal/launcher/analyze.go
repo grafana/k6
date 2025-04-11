@@ -22,6 +22,12 @@ func newDepsOptions(gs *state.GlobalState, args []string) *k6deps.Options {
 		return dopts
 	}
 
+	if scriptname == "-" {
+		gs.Logger.
+			Warn("binary provisioning is not supported when using input from stdin")
+		return dopts
+	}
+
 	if _, err := gs.FS.Stat(scriptname); err != nil {
 		gs.Logger.
 			WithField("scriptname", scriptname).
@@ -54,7 +60,9 @@ func scriptNameFromArgs(args []string) (string, bool) {
 			// Look for script files (non-flag arguments with .js, or .tar extension) in the reminder args
 			for _, arg = range args[i+1:] {
 				if strings.HasPrefix(arg, "-") {
-					// TODO: it may be we are using stdin as a source. Handle this case
+					if arg == "-" { // we are running a script from stdin
+						return arg, true
+					}
 					continue
 				}
 				if strings.HasSuffix(arg, ".js") ||

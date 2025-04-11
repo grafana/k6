@@ -217,6 +217,20 @@ func Test_Launcher(t *testing.T) {
 			expectK6Run:     true,
 			expectOsExit:    108,
 		},
+		{
+			name:   "script in stdin",
+			k6Cmd:  "run",
+			k6Args: []string{"-"},
+			k6Env: map[string]string{
+				"K6_BINARY_PROVISIONING": "true",
+			},
+			script:          "",
+			fixture:         &luncherFixture{},
+			expectProvision: false,
+			expectK6Run:     false,
+			expectFallback:  true,
+			expectOsExit:    0,
+		},
 	}
 
 	for _, tc := range testCases {
