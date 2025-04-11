@@ -409,9 +409,9 @@ func (self *_parser) scan() (tkn token.Token, literal string, parsedLiteral unis
 					tkn = token.STRICT_NOT_EQUAL
 				}
 			case '&':
-				tkn = self.switch4(token.AND, token.AND_ASSIGN, '&', token.LOGICAL_AND, token.LOGICAL_AND_ASSIGN)
+				tkn = self.switch3(token.AND, token.AND_ASSIGN, '&', token.LOGICAL_AND)
 			case '|':
-				tkn = self.switch4(token.OR, token.OR_ASSIGN, '|', token.LOGICAL_OR, token.LOGICAL_OR_ASSIGN)
+				tkn = self.switch3(token.OR, token.OR_ASSIGN, '|', token.LOGICAL_OR)
 			case '~':
 				tkn = token.BITWISE_NOT
 			case '?':
@@ -420,12 +420,7 @@ func (self *_parser) scan() (tkn token.Token, literal string, parsedLiteral unis
 					tkn = token.QUESTION_DOT
 				} else if self.chr == '?' {
 					self.read()
-					if self.chr == '=' {
-						self.read()
-						tkn = token.COALESCE_ASSIGN
-					} else {
-						tkn = token.COALESCE
-					}
+					tkn = token.COALESCE
 				} else {
 					tkn = token.QUESTION_MARK
 				}
