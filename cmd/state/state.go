@@ -90,18 +90,6 @@ func NewGlobalState(ctx context.Context) *GlobalState {
 		IsTTY:    stderrTTY,
 	}
 
-	env := BuildEnvMap(os.Environ())
-	_, noColorsSet := env["NO_COLOR"] // even empty values disable colors
-	logger := &logrus.Logger{
-		Out: stderr,
-		Formatter: &logrus.TextFormatter{
-			ForceColors:   stderrTTY,
-			DisableColors: !stderrTTY || noColorsSet || env["K6_NO_COLOR"] != "",
-		},
-		Hooks: make(logrus.LevelHooks),
-		Level: logrus.InfoLevel,
-	}
-
 	confDir, err := os.UserConfigDir()
 	if err != nil {
 		confDir = ".config"
@@ -112,7 +100,20 @@ func NewGlobalState(ctx context.Context) *GlobalState {
 		binary = "k6"
 	}
 
-	defaultFlags := GetDefaultFlags(confDir)
+	env := BuildEnvMap(os.Environ())
+
+	defaultGlobalOptions := GetDefaultFlags(confDir)
+	globalOptions := consolidateGlobalFlags(defaultGlobalOptions, env)
+
+	logger := &logrus.Logger{
+		Out: stderr,
+		Formatter: &logrus.TextFormatter{
+			ForceColors:   stderrTTY,
+			DisableColors: !stderrTTY || globalOptions.NoColor,
+		},
+		Hooks: make(logrus.LevelHooks),
+		Level: logrus.InfoLevel,
+	}
 
 	return &GlobalState{
 		Ctx:             ctx,
@@ -123,8 +124,8 @@ func NewGlobalState(ctx context.Context) *GlobalState {
 		CmdArgs:         os.Args,
 		Env:             env,
 		Events:          event.NewEventSystem(100, logger),
-		DefaultFlags:    defaultFlags,
-		Flags:           getFlags(defaultFlags, env),
+		DefaultFlags:    defaultGlobalOptions,
+		Flags:           globalOptions,
 		OutMutex:        outMutex,
 		Stdout:          stdout,
 		Stderr:          stderr,
@@ -167,7 +168,7 @@ func GetDefaultFlags(homeDir string) GlobalFlags {
 	}
 }
 
-func getFlags(defaultFlags GlobalFlags, env map[string]string) GlobalFlags {
+func consolidateGlobalFlags(defaultFlags GlobalFlags, env map[string]string) GlobalFlags {
 	result := defaultFlags
 
 	// TODO: add env vars for the rest of the values (after adjusting
