@@ -1,7 +1,6 @@
 package launcher
 
 import (
-	"slices"
 	"strings"
 
 	"github.com/grafana/k6deps"
@@ -50,7 +49,8 @@ func scriptNameFromArgs(args []string) (string, bool) {
 
 	// search for a command that requires binary provisioning and then get the target script or archive
 	for i, arg := range args {
-		if slices.Contains([]string{"run", "archive", "inspect", "cloud"}, arg) {
+		switch arg {
+		case "run", "archive", "inspect", "cloud":
 			// Look for script files (non-flag arguments with .js, or .tar extension) in the reminder args
 			for _, arg = range args[i+1:] {
 				if strings.HasPrefix(arg, "-") {
