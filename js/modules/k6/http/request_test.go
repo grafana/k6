@@ -30,7 +30,7 @@ import (
 
 	"github.com/andybalholm/brotli"
 	"github.com/klauspost/compress/zstd"
-	"github.com/mccutchen/go-httpbin/httpbin"
+	"github.com/mccutchen/go-httpbin/v2/httpbin"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -274,7 +274,7 @@ func TestRequest(t *testing.T) {
 				http.Redirect(w, r, sr("HTTPBIN_URL/post"), http.StatusPermanentRedirect)
 			}))
 			_, err := rt.RunString(sr(`
-			var res = http.post("HTTPBIN_URL/post-redirect", "pesho", {redirects: 1});
+				var res = http.post("HTTPBIN_URL/post-redirect", "pesho", {redirects: 1, headers: {"Content-Type": "text"}});
 
 			if (res.status != 200) { throw new Error("wrong status: " + res.status) }
 			if (res.url != "HTTPBIN_URL/post") { throw new Error("incorrect URL: " + res.url) }
@@ -1076,11 +1076,11 @@ func TestRequest(t *testing.T) {
 			t.Run("name/template", func(t *testing.T) {
 				_, err := rt.RunString("http.get(http.url`" + sr(`HTTPBIN_URL/anything/${1+1}`) + "`);")
 				assert.NoError(t, err)
-				// There's no /anything endpoint in the go-httpbin library we're using, hence the 404,
+				// There's no /anythingwrong endpoint in the go-httpbin library we're using, hence the 404,
 				// but it doesn't matter for this test.
 				//
 				// Setting name will overwrite both name and url tags
-				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/anything/${}"), 404, "")
+				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/anythingwrong/${}"), 404, "")
 			})
 
 			t.Run("object", func(t *testing.T) {
