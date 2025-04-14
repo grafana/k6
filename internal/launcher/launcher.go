@@ -2,63 +2,75 @@
 package launcher
 
 import (
-	"context"
 	"errors"
+	"fmt"
 	"os/exec"
+	"slices"
+
+	"github.com/spf13/cobra"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/grafana/k6deps"
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/internal/build"
-	k6Cmd "go.k6.io/k6/internal/cmd"
 )
 
-// Execute runs the k6 command.
-func Execute() {
-	gs := state.NewGlobalState(context.Background())
-
-	newLauncher(gs).launch()
-}
-
 // launcher is a k6 launcher
-type launcher struct {
-	gs *state.GlobalState
-	// function to fall back if binary provisioning is not required
-	fallback func(gs *state.GlobalState)
+type Launcher struct {
+	gs      *state.GlobalState
+	// path to the provisioned k6 binary
+	binPath string
 	// function to provision a k6 binary that satisfies the dependencies
 	provision func(*state.GlobalState, k6deps.Dependencies) (string, string, error)
 	// function to execute k6 binary
-	run func(*state.GlobalState, string) (int, error)
+	exec func(*state.GlobalState, string) (int, error)
+	// original root command's persistent pre-run function
+	rootPPRE func(*cobra.Command, []string) error
 }
 
-func newLauncher(gs *state.GlobalState) *launcher {
-	return &launcher{
+func New(gs *state.GlobalState) *Launcher {
+	return &Launcher{
 		gs:        gs,
-		fallback:  k6Cmd.ExecuteWithGlobalState,
 		provision: k6buildProvision,
-		run:       runK6Cmd,
+		exec:      execK6,
 	}
+
 }
 
-// launch executes k6 either by launching a provisioned binary or defaulting to the
-// current binary it this is not necessary.
-// If the fhe fallback is called, it can exit the process so don't assume it will return
-func (l *launcher) launch() {
-	// if binary provisioning not enabled, continue with regular k6 execution path
+func (l *Launcher) Install(root *cobra.Command) {
 	if !l.gs.Flags.BinaryProvisioning {
-		l.gs.Logger.Debug("binary provisioning disabled")
-		l.fallback(l.gs)
 		return
+	}
+
+	l.rootPPRE = root.PersistentPreRunE
+
+	root.PersistentPreRunE = l.ppre
+}
+
+// ppre runs previous to the execution of the command.
+// If the script has dependencies that cannot satisfied by the current binary, tries to provision a binary
+// and executes it as a sub-process.
+// Otherwise, returns control to the current binary and continue the normal execution flow.
+func (l *Launcher) ppre(cmd *cobra.Command, args []string) error {
+	// call root command's persistent pre run function to ensuere proper setup of logs
+	err := l.rootPPRE(cmd, args)
+	if err != nil {
+		return err
+	}
+
+	// return early if the command do not require binary provisioning
+	if !slices.Contains([]string{"run", "archive", "inspect", "cloud"}, cmd.Name()) {
+		return nil
 	}
 
 	l.gs.Logger.Info("trying to provision binary")
 
-	deps, err := k6deps.Analyze(newDepsOptions(l.gs, l.gs.CmdArgs[1:]))
+	deps, err := k6deps.Analyze(newDepsOptions(l.gs, args))
 	if err != nil {
 		l.gs.Logger.
 			WithError(err).
 			Error("failed to analyze dependencies, can't try binary provisioning, please report this issue")
-		l.gs.OSExit(1)
+		return fmt.Errorf("failed binary provisioning")
 	}
 
 	// binary provisioning enabled but not required by this command
@@ -66,43 +78,53 @@ func (l *launcher) launch() {
 	if !isCustomBuildRequired(build.Version, deps) {
 		l.gs.Logger.
 			Debug("binary provisioning not required")
-		l.fallback(l.gs)
-		return
+		return nil
 	}
 
 	l.gs.Logger.
 		WithField("deps", deps).
 		Info("dependencies identified, binary provisioning required")
 
-	l.launchCustomBuild(deps)
-}
-
-func (l *launcher) launchCustomBuild(deps k6deps.Dependencies) {
 	// get the k6 binary from the build service
 	binPath, versions, err := l.provision(l.gs, deps)
 	if err != nil {
 		l.gs.Logger.
 			WithError(err).
 			Error("failed to fetch a binary with required dependencies, please report this issue")
-		l.gs.OSExit(1)
-		// in tests calling l.gs.OSExit does not ends execution so we have to return
-		return
+		return fmt.Errorf("failed binary provisioning")
 	}
 
 	l.gs.Logger.
 		Info("k6 has been provisioned with version(s) ", versions)
 
-	l.gs.Logger.Debug("launching provisioned k6 binary")
+	// replace command's execution with binary provisioning
+	l.binPath = binPath
+	cmd.RunE = l.runE
 
-	// execute provisioned binary
-	if rc, err := l.run(l.gs, binPath); err != nil {
-		l.gs.Logger.Error(err)
-		l.gs.OSExit(rc)
-	}
+	return nil
 }
 
-// runK6Cmd runs the k6 binary passing the original arguments
-func runK6Cmd(gs *state.GlobalState, binPath string) (int, error) {
+func (l *Launcher) runE(cmd *cobra.Command, args []string) error {
+	l.gs.Logger.
+		Debug("launching provisioned k6 binary")
+
+	// execute provisioned binary
+	// TODO: ensure we return the rc from k6
+	rc, err := l.exec(l.gs, l.binPath)
+	if err != nil {
+		l.gs.Logger.
+			WithError(err).
+			Debug("failed to execute k6 binary")
+			return err
+	}
+
+	l.gs.OSExit(rc)
+
+	return nil
+}
+
+// execK6 runs the k6 binary passing the original arguments
+func execK6(gs *state.GlobalState, binPath string) (int, error) {
 	cmd := exec.CommandContext(gs.Ctx, binPath, gs.CmdArgs[1:]...) //nolint:gosec
 	cmd.Stderr = gs.Stderr
 	cmd.Stdout = gs.Stdout
@@ -114,8 +136,9 @@ func runK6Cmd(gs *state.GlobalState, binPath string) (int, error) {
 	if err := cmd.Run(); err != nil {
 		var eerr *exec.ExitError
 		if errors.As(err, &eerr) {
-			return eerr.ExitCode(), err
+			return eerr.ExitCode(), nil
 		}
+		return 0, err
 	}
 
 	return 0, nil

@@ -23,6 +23,7 @@ import (
 	"go.k6.io/k6/internal/log"
 	"go.k6.io/k6/secretsource"
 
+	"go.k6.io/k6/internal/launcher"
 	_ "go.k6.io/k6/internal/secretsource" // import it to register internal secret sources
 )
 
@@ -72,6 +73,8 @@ func newRootCommand(gs *state.GlobalState) *rootCommand {
 	for _, sc := range subCommands {
 		rootCmd.AddCommand(sc(gs))
 	}
+
+	launcher.New(gs).Install(rootCmd)
 
 	c.cmd = rootCmd
 	return c
