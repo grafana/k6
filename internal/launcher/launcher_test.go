@@ -9,6 +9,7 @@ import (
 
 	"github.com/grafana/k6deps"
 	"github.com/spf13/afero"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/internal/build"
@@ -25,12 +26,18 @@ type luncherFixture struct {
 	runK6Called     bool
 	runK6Error      error
 	runk6ReturnCode int
-	fallbackCalled  bool
+	rootPPERCalled  bool
+	rootRunCalled   bool
 }
 
-func (f *luncherFixture) fallback(gs *state.GlobalState) {
-	f.fallbackCalled = true
-	gs.OSExit(0)
+func (f *luncherFixture) PersistentPreRunE(_ *cobra.Command, _ []string) error {
+	f.rootPPERCalled = true
+	return nil
+}
+
+func (f *luncherFixture) RunE(_ *cobra.Command, _ []string) error {
+	f.rootRunCalled = true
+	return nil
 }
 
 func (f *luncherFixture) provision(_ *state.GlobalState, deps k6deps.Dependencies) (string, string, error) {
@@ -40,7 +47,7 @@ func (f *luncherFixture) provision(_ *state.GlobalState, deps k6deps.Dependencie
 }
 
 // function to execute k6 binary
-func (f *luncherFixture) run(*state.GlobalState, string) (int, error) {
+func (f *luncherFixture) execK6(*state.GlobalState, string) (int, error) {
 	f.runK6Called = true
 	return f.runk6ReturnCode, f.runK6Error
 }
@@ -106,7 +113,7 @@ func Test_Launcher(t *testing.T) {
 		expectLogs      []string
 		expectProvision bool
 		expectK6Run     bool
-		expectFallback  bool
+		expectRootRun   bool
 		expectOsExit    int
 	}{
 		{
@@ -119,7 +126,7 @@ func Test_Launcher(t *testing.T) {
 			fixture:         &luncherFixture{},
 			expectProvision: true,
 			expectK6Run:     true,
-			expectFallback:  false,
+			expectRootRun:   false,
 			expectOsExit:    0,
 		},
 		{
@@ -132,7 +139,7 @@ func Test_Launcher(t *testing.T) {
 			fixture:         &luncherFixture{},
 			expectProvision: true,
 			expectK6Run:     true,
-			expectFallback:  false,
+			expectRootRun:   false,
 			expectOsExit:    0,
 		},
 		{
@@ -145,7 +152,7 @@ func Test_Launcher(t *testing.T) {
 			fixture:         &luncherFixture{},
 			expectProvision: false,
 			expectK6Run:     false,
-			expectFallback:  true,
+			expectRootRun:   true,
 			expectOsExit:    0,
 		},
 		{
@@ -158,20 +165,7 @@ func Test_Launcher(t *testing.T) {
 			fixture:         &luncherFixture{},
 			expectProvision: false,
 			expectK6Run:     false,
-			expectFallback:  true,
-			expectOsExit:    0,
-		},
-		{
-			name:  "binary provisioning disabled",
-			k6Cmd: "run",
-			k6Env: map[string]string{
-				"K6_BINARY_PROVISIONING": "false",
-			},
-			script:          fakerTest,
-			fixture:         &luncherFixture{},
-			expectProvision: false,
-			expectK6Run:     false,
-			expectFallback:  true,
+			expectRootRun:   true,
 			expectOsExit:    0,
 		},
 		{
@@ -183,7 +177,7 @@ func Test_Launcher(t *testing.T) {
 			fixture:         &luncherFixture{},
 			expectProvision: false,
 			expectK6Run:     false,
-			expectFallback:  true,
+			expectRootRun:   true,
 			expectOsExit:    0,
 		},
 		{
@@ -197,7 +191,7 @@ func Test_Launcher(t *testing.T) {
 				provisionError: errors.New("test error"),
 			},
 			expectProvision: true,
-			expectFallback:  false,
+			expectRootRun:   false,
 			expectK6Run:     false,
 			expectOsExit:    1,
 		},
@@ -213,7 +207,7 @@ func Test_Launcher(t *testing.T) {
 				runk6ReturnCode: 108,
 			},
 			expectProvision: true,
-			expectFallback:  false,
+			expectRootRun:   false,
 			expectK6Run:     true,
 			expectOsExit:    108,
 		},
@@ -228,23 +222,24 @@ func Test_Launcher(t *testing.T) {
 			fixture:         &luncherFixture{},
 			expectProvision: false,
 			expectK6Run:     false,
-			expectFallback:  true,
+			expectRootRun:   true,
 			expectOsExit:    0,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
+			//t.Parallel()
 
 			ts := tests.NewGlobalTestState(t)
 
 			k6Args := append([]string{"k6"}, tc.k6Cmd)
 			k6Args = append(k6Args, tc.k6Args...)
 
+			scriptPath := ""
 			// create tmp file with the script if specified
 			if len(tc.script) > 0 {
-				scriptPath := filepath.Join(t.TempDir(), "script.js")
+				scriptPath = filepath.Join(t.TempDir(), "script.js")
 				if err := os.WriteFile(scriptPath, []byte(tc.script), 0o600); err != nil { //nolint:forbidigo
 					t.Fatalf("test setup: creating script file %v", err)
 				}
@@ -263,18 +258,28 @@ func Test_Launcher(t *testing.T) {
 			// the exit code is checked by the TestGlobalState when the test ends
 			ts.ExpectedExitCode = tc.expectOsExit
 
-			launcher := &launcher{
+			launcher := &Launcher{
 				gs:        ts.GlobalState,
+				exec:      tc.fixture.execK6,
 				provision: tc.fixture.provision,
-				fallback:  tc.fixture.fallback,
-				run:       tc.fixture.run,
 			}
 
-			launcher.launch()
+			root := &cobra.Command{
+				Use:               tc.k6Cmd,
+				PersistentPreRunE: tc.fixture.PersistentPreRunE,
+				RunE:              tc.fixture.RunE,
+				SilenceErrors:     true,
+				SilenceUsage:      true,
+			}
+
+			launcher.Install(root)
+
+			root.SetArgs([]string{scriptPath})
+			root.Execute()
 
 			assert.Equal(t, tc.expectProvision, tc.fixture.provisionCalled)
 			assert.Equal(t, tc.expectK6Run, tc.fixture.runK6Called)
-			assert.Equal(t, tc.expectFallback, tc.fixture.fallbackCalled)
+			assert.Equal(t, tc.expectRootRun, tc.fixture.rootRunCalled)
 
 			for _, l := range tc.expectLogs {
 				assert.Contains(t, ts.Stdout, l)

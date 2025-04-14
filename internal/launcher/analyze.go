@@ -17,10 +17,13 @@ func newDepsOptions(gs *state.GlobalState, args []string) *k6deps.Options {
 		// TODO: figure out if we need to set FindManifest
 	}
 
-	scriptname, hasScript := scriptNameFromArgs(args)
-	if !hasScript {
+	// command has no script
+	if len(args) == 0 {
 		return dopts
 	}
+
+	// assume first argument is the script name
+	scriptname := args[0]
 
 	if scriptname == "-" {
 		gs.Logger.
@@ -44,37 +47,4 @@ func newDepsOptions(gs *state.GlobalState, args []string) *k6deps.Options {
 	}
 
 	return dopts
-}
-
-// scriptNameFromArgs returns the file name passed as input and true if it's a valid script name
-func scriptNameFromArgs(args []string) (string, bool) {
-	// return early if no arguments passed
-	if len(args) == 0 {
-		return "", false
-	}
-
-	// search for a command that requires binary provisioning and then get the target script or archive
-	for i, arg := range args {
-		switch arg {
-		case "run", "archive", "inspect", "cloud":
-			// Look for script files (non-flag arguments with .js, or .tar extension) in the reminder args
-			for _, arg = range args[i+1:] {
-				if strings.HasPrefix(arg, "-") {
-					if arg == "-" { // we are running a script from stdin
-						return arg, true
-					}
-					continue
-				}
-				if strings.HasSuffix(arg, ".js") ||
-					strings.HasSuffix(arg, ".tar") ||
-					strings.HasSuffix(arg, ".ts") {
-					return arg, true
-				}
-			}
-			return "", false
-		}
-	}
-
-	// not found
-	return "", false
 }
