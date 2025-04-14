@@ -270,7 +270,7 @@ func TestLauncherLaunch(t *testing.T) {
 				run:       tc.fixture.run,
 			}
 
-			launcher.launch()
+			launcher.Launch()
 
 			assert.Equal(t, tc.expectProvision, tc.fixture.provisionCalled)
 			assert.Equal(t, tc.expectK6Run, tc.fixture.runK6Called)

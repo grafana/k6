@@ -2,7 +2,6 @@
 package launcher
 
 import (
-	"context"
 	"errors"
 	"os/exec"
 
@@ -12,13 +11,6 @@ import (
 	"go.k6.io/k6/internal/build"
 	k6Cmd "go.k6.io/k6/internal/cmd"
 )
-
-// Execute runs the k6 command.
-func Execute() {
-	gs := state.NewGlobalState(context.Background())
-
-	newLauncher(gs).launch()
-}
 
 // launcher is a k6 launcher
 type launcher struct {
@@ -31,7 +23,7 @@ type launcher struct {
 	run func(*state.GlobalState, string) (int, error)
 }
 
-func newLauncher(gs *state.GlobalState) *launcher {
+func New(gs *state.GlobalState) *launcher {
 	return &launcher{
 		gs:        gs,
 		fallback:  k6Cmd.ExecuteWithGlobalState,
@@ -43,7 +35,7 @@ func newLauncher(gs *state.GlobalState) *launcher {
 // launch executes k6 either by launching a provisioned binary or defaulting to the
 // current binary it this is not necessary.
 // If the fhe fallback is called, it can exit the process so don't assume it will return
-func (l *launcher) launch() {
+func (l *launcher) Launch() {
 	// if binary provisioning not enabled, continue with regular k6 execution path
 	if !l.gs.Flags.BinaryProvisioning {
 		l.gs.Logger.Debug("Binary provisioning feature is disabled")
@@ -96,7 +88,7 @@ func (l *launcher) launchCustomBuild(deps k6deps.Dependencies) {
 
 	// execute provisioned binary
 	if rc, err := l.run(l.gs, binPath); err != nil {
-		l.gs.Logger.WithErr(err).Error("Failed to run the new provisioned k6 binary")
+		l.gs.Logger.WithError(err).Error("Failed to run the new provisioned k6 binary")
 		l.gs.OSExit(rc)
 	}
 }
