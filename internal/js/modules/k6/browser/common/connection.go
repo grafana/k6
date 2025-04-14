@@ -1,6 +1,7 @@
 package common
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"errors"
@@ -327,13 +328,26 @@ func (c *Connection) findTargetIDForLog(id target.SessionID) target.ID {
 
 //nolint:funlen,gocognit,cyclop
 func (c *Connection) recvLoop() {
+	var buffer bytes.Buffer
 	c.logger.Debugf("Connection:recvLoop", "wsURL:%q", c.wsURL)
 	for {
-		_, buf, err := c.conn.ReadMessage()
+		_, reader, err := c.conn.NextReader()
 		if err != nil {
 			c.handleIOError(err)
 			return
 		}
+
+		if _, err := buffer.ReadFrom(reader); err != nil {
+			c.handleIOError(err)
+			return
+		}
+
+		// Clone the bytes from the recvBuffer to buf before unmarshaling
+		// the message. Without this, the unmarshaling will fail as it
+		// reuses the buf as the underlying bytes buffer.
+		buf := bytes.Clone(buffer.Bytes())
+
+		buffer.Reset()
 
 		c.logger.Tracef("cdp:recv", "<- %s", buf)
 
