@@ -328,6 +328,7 @@ func (c *Connection) findTargetIDForLog(id target.SessionID) target.ID {
 
 //nolint:funlen,gocognit,cyclop
 func (c *Connection) recvLoop() {
+	decoder := jlexer.Lexer{}
 	var buffer bytes.Buffer
 	c.logger.Debugf("Connection:recvLoop", "wsURL:%q", c.wsURL)
 	for {
@@ -352,7 +353,8 @@ func (c *Connection) recvLoop() {
 		c.logger.Tracef("cdp:recv", "<- %s", buf)
 
 		var msg cdproto.Message
-		c.decoder = jlexer.Lexer{Data: buf}
+		decoder.Data = buf
+		c.decoder = decoder
 		msg.UnmarshalEasyJSON(&c.decoder)
 		if err := c.decoder.Error(); err != nil {
 			select {
