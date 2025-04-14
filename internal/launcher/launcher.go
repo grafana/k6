@@ -46,18 +46,18 @@ func newLauncher(gs *state.GlobalState) *launcher {
 func (l *launcher) launch() {
 	// if binary provisioning not enabled, continue with regular k6 execution path
 	if !l.gs.Flags.BinaryProvisioning {
-		l.gs.Logger.Debug("binary provisioning disabled")
+		l.gs.Logger.Debug("Binary provisioning feature is disabled")
 		l.fallback(l.gs)
 		return
 	}
 
-	l.gs.Logger.Info("trying to provision binary")
+	l.gs.Logger.Info("Binary provisioning feature is enabled. If it's required, k6 will try to provision a new binary.")
 
 	deps, err := k6deps.Analyze(newDepsOptions(l.gs, l.gs.CmdArgs[1:]))
 	if err != nil {
 		l.gs.Logger.
 			WithError(err).
-			Error("failed to analyze dependencies, can't try binary provisioning, please report this issue")
+			Error("Failed to analyze the required dependencies. Please, make sure to report this issue by opening a bug report.")
 		l.gs.OSExit(1)
 	}
 
@@ -65,14 +65,14 @@ func (l *launcher) launch() {
 	// continue with regular k6 execution path
 	if !isCustomBuildRequired(build.Version, deps) {
 		l.gs.Logger.
-			Debug("binary provisioning not required")
+			Debug("The current k6 binary already satisfies all the required dependencies, it isn't required to provision a new binary.")
 		l.fallback(l.gs)
 		return
 	}
 
 	l.gs.Logger.
 		WithField("deps", deps).
-		Info("dependencies identified, binary provisioning required")
+		Info("The current k6 binary doesn't satisfy all the required dependencies, it is required to provision a new binary.")
 
 	l.launchCustomBuild(deps)
 }
@@ -83,20 +83,20 @@ func (l *launcher) launchCustomBuild(deps k6deps.Dependencies) {
 	if err != nil {
 		l.gs.Logger.
 			WithError(err).
-			Error("failed to fetch a binary with required dependencies, please report this issue")
+			Error("Failed to provision a new k6 binary with required dependencies. Please, make sure to report this issue by opening a bug report.")
 		l.gs.OSExit(1)
 		// in tests calling l.gs.OSExit does not ends execution so we have to return
 		return
 	}
 
 	l.gs.Logger.
-		Info("k6 has been provisioned with version(s) ", versions)
+		Info("A new k6 binary has been provisioned with version(s): ", versions)
 
-	l.gs.Logger.Debug("launching provisioned k6 binary")
+	l.gs.Logger.Debug("Launching the new provisioned k6 binary")
 
 	// execute provisioned binary
 	if rc, err := l.run(l.gs, binPath); err != nil {
-		l.gs.Logger.Error(err)
+		l.gs.Logger.WithErr(err).Error("Failed to run the new provisioned k6 binary")
 		l.gs.OSExit(rc)
 	}
 }

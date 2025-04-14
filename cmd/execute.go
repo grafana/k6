@@ -6,5 +6,6 @@ import "go.k6.io/k6/internal/launcher"
 // Execute exectues the k6 command
 // It only is exported here for backwards compatibility and the ability to use xk6 to build extended k6
 func Execute() {
-	launcher.Execute()
+	gs := state.NewGlobalState(context.Background())
+	launcher.New(gs).Launch()
 }

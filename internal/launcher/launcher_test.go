@@ -93,7 +93,7 @@ export default function() {
 `
 )
 
-func Test_Launcher(t *testing.T) {
+func TestLauncherLaunch(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {

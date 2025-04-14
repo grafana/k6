@@ -24,15 +24,15 @@ func newDepsOptions(gs *state.GlobalState, args []string) *k6deps.Options {
 
 	if scriptname == "-" {
 		gs.Logger.
-			Warn("binary provisioning is not supported when using input from stdin")
+			Warn("Test script provided by Stdin is not yet supported from Binary provisioning feature.")
 		return dopts
 	}
 
 	if _, err := gs.FS.Stat(scriptname); err != nil {
 		gs.Logger.
-			WithField("scriptname", scriptname).
+			WithField("path", scriptname).
 			WithError(err).
-			Error("failed to stat script")
+			Error("The requested test script's file is not available on the file system. Make sure that the correct name has been passed or that the file still exists on the file system.")
 
 		return dopts
 	}
