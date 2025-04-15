@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"go.k6.io/k6/ext"
+	"go.k6.io/k6/internal/js/modules/k6"
 	"go.k6.io/k6/internal/js/modules/k6/browser/browser"
 	"go.k6.io/k6/internal/js/modules/k6/crypto"
 	"go.k6.io/k6/internal/js/modules/k6/crypto/x509"
@@ -23,7 +24,6 @@ import (
 	"go.k6.io/k6/internal/js/modules/k6/ws"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
-	"go.k6.io/k6/js/modules/k6"
 	"go.k6.io/k6/js/modules/k6/html"
 	"go.k6.io/k6/js/modules/k6/http"
 

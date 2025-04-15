@@ -6,7 +6,7 @@ import (
 
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
-	"go.k6.io/k6/lib/consts"
+	"go.k6.io/k6/internal/lib/consts"
 )
 
 // timeoutError is used when some operation times out.

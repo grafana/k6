@@ -35,6 +35,9 @@ func (i *InterruptError) AbortReason() AbortReason {
 // AbortTest is the reason emitted when a test script calls test.abort()
 const AbortTest = "test aborted"
 
+// MarkedAsFailedTest is the reason emitted when a test script fails
+const MarkedAsFailedTest = "test marked as failed"
+
 // IsInterruptError returns true if err is *InterruptError.
 func IsInterruptError(err error) bool {
 	if err == nil {

@@ -1,6 +1,7 @@
 package execution
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
@@ -217,6 +218,73 @@ func TestAbortTest(t *testing.T) { //nolint:tparallel
 	})
 	t.Run("custom reason", func(t *testing.T) { //nolint:paralleltest
 		prove(t, `exec.test.abort("mayday")`, fmt.Sprintf("%s: mayday", errext.AbortTest))
+	})
+}
+
+func TestFailTest(t *testing.T) {
+	t.Parallel()
+
+	t.Run("default reason", func(t *testing.T) {
+		t.Parallel()
+
+		// Set up the logger to write to the buffer so we can assert on it later
+		var logsBuffer bytes.Buffer
+		testLogger := logrus.New()
+		testLogger.AddHook(testutils.NewLogHook(logrus.DebugLevel))
+		testLogger.SetOutput(&logsBuffer)
+
+		// Prepare the runtime and state for the module, and to be able to
+		// assert the test state at the very end.
+		rt := sobek.New()
+		state := &lib.State{TestStatus: lib.NewTestStatus(), Logger: testLogger}
+
+		// Instantiate the test module instance
+		module, ok := New().NewModuleInstance(
+			&modulestest.VU{
+				RuntimeField: rt,
+				CtxField:     context.Background(),
+				StateField:   state,
+			},
+		).(*ModuleInstance)
+		require.True(t, ok)
+		require.NoError(t, rt.Set("exec", module.Exports().Default))
+
+		_, err := rt.RunString("exec.test.fail()")
+		require.NoError(t, err)
+
+		assert.True(t, state.TestStatus.Failed())
+	})
+
+	t.Run("custom reason", func(t *testing.T) {
+		t.Parallel()
+
+		// Set up the logger to write to the buffer so we can assert on it later
+		var logsBuffer bytes.Buffer
+		testLogger := logrus.New()
+		testLogger.AddHook(testutils.NewLogHook(logrus.DebugLevel))
+		testLogger.SetOutput(&logsBuffer)
+
+		// Prepare the runtime and state for the module, and to be able to
+		// assert the test state at the very end.
+		rt := sobek.New()
+		state := &lib.State{TestStatus: lib.NewTestStatus(), Logger: testLogger}
+
+		// Instantiate the test module instance
+		module, ok := New().NewModuleInstance(
+			&modulestest.VU{
+				RuntimeField: rt,
+				CtxField:     context.Background(),
+				StateField:   state,
+			},
+		).(*ModuleInstance)
+		require.True(t, ok)
+		require.NoError(t, rt.Set("exec", module.Exports().Default))
+
+		_, err := rt.RunString(`exec.test.fail("a custom reason")`)
+		require.NoError(t, err)
+
+		assert.True(t, state.TestStatus.Failed())
+		assert.Contains(t, logsBuffer.String(), "a custom reason")
 	})
 }
 
