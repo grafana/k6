@@ -126,7 +126,6 @@ type Meminfo struct {
 	VmallocUsed *uint64
 	// largest contiguous block of vmalloc area which is free
 	VmallocChunk      *uint64
-	Percpu            *uint64
 	HardwareCorrupted *uint64
 	AnonHugePages     *uint64
 	ShmemHugePages    *uint64
@@ -141,55 +140,6 @@ type Meminfo struct {
 	DirectMap4k       *uint64
 	DirectMap2M       *uint64
 	DirectMap1G       *uint64
-
-	// The struct fields below are the byte-normalized counterparts to the
-	// existing struct fields. Values are normalized using the optional
-	// unit field in the meminfo line.
-	MemTotalBytes          *uint64
-	MemFreeBytes           *uint64
-	MemAvailableBytes      *uint64
-	BuffersBytes           *uint64
-	CachedBytes            *uint64
-	SwapCachedBytes        *uint64
-	ActiveBytes            *uint64
-	InactiveBytes          *uint64
-	ActiveAnonBytes        *uint64
-	InactiveAnonBytes      *uint64
-	ActiveFileBytes        *uint64
-	InactiveFileBytes      *uint64
-	UnevictableBytes       *uint64
-	MlockedBytes           *uint64
-	SwapTotalBytes         *uint64
-	SwapFreeBytes          *uint64
-	DirtyBytes             *uint64
-	WritebackBytes         *uint64
-	AnonPagesBytes         *uint64
-	MappedBytes            *uint64
-	ShmemBytes             *uint64
-	SlabBytes              *uint64
-	SReclaimableBytes      *uint64
-	SUnreclaimBytes        *uint64
-	KernelStackBytes       *uint64
-	PageTablesBytes        *uint64
-	NFSUnstableBytes       *uint64
-	BounceBytes            *uint64
-	WritebackTmpBytes      *uint64
-	CommitLimitBytes       *uint64
-	CommittedASBytes       *uint64
-	VmallocTotalBytes      *uint64
-	VmallocUsedBytes       *uint64
-	VmallocChunkBytes      *uint64
-	PercpuBytes            *uint64
-	HardwareCorruptedBytes *uint64
-	AnonHugePagesBytes     *uint64
-	ShmemHugePagesBytes    *uint64
-	ShmemPmdMappedBytes    *uint64
-	CmaTotalBytes          *uint64
-	CmaFreeBytes           *uint64
-	HugepagesizeBytes      *uint64
-	DirectMap4kBytes       *uint64
-	DirectMap2MBytes       *uint64
-	DirectMap1GBytes       *uint64
 }
 
 // Meminfo returns an information about current kernel/system memory statistics.
@@ -202,7 +152,7 @@ func (fs FS) Meminfo() (Meminfo, error) {
 
 	m, err := parseMemInfo(bytes.NewReader(b))
 	if err != nil {
-		return Meminfo{}, fmt.Errorf("%w: %w", ErrFileParse, err)
+		return Meminfo{}, fmt.Errorf("failed to parse meminfo: %w", err)
 	}
 
 	return *m, nil
@@ -212,176 +162,114 @@ func parseMemInfo(r io.Reader) (*Meminfo, error) {
 	var m Meminfo
 	s := bufio.NewScanner(r)
 	for s.Scan() {
+		// Each line has at least a name and value; we ignore the unit.
 		fields := strings.Fields(s.Text())
-		var val, valBytes uint64
+		if len(fields) < 2 {
+			return nil, fmt.Errorf("malformed meminfo line: %q", s.Text())
+		}
 
-		val, err := strconv.ParseUint(fields[1], 0, 64)
+		v, err := strconv.ParseUint(fields[1], 0, 64)
 		if err != nil {
 			return nil, err
 		}
 
-		switch len(fields) {
-		case 2:
-			// No unit present, use the parsed the value as bytes directly.
-			valBytes = val
-		case 3:
-			// Unit present in optional 3rd field, convert it to
-			// bytes. The only unit supported within the Linux
-			// kernel is `kB`.
-			if fields[2] != "kB" {
-				return nil, fmt.Errorf("%w: Unsupported unit in optional 3rd field %q", ErrFileParse, fields[2])
-			}
-
-			valBytes = 1024 * val
-
-		default:
-			return nil, fmt.Errorf("%w: Malformed line %q", ErrFileParse, s.Text())
-		}
-
 		switch fields[0] {
 		case "MemTotal:":
-			m.MemTotal = &val
-			m.MemTotalBytes = &valBytes
+			m.MemTotal = &v
 		case "MemFree:":
-			m.MemFree = &val
-			m.MemFreeBytes = &valBytes
+			m.MemFree = &v
 		case "MemAvailable:":
-			m.MemAvailable = &val
-			m.MemAvailableBytes = &valBytes
+			m.MemAvailable = &v
 		case "Buffers:":
-			m.Buffers = &val
-			m.BuffersBytes = &valBytes
+			m.Buffers = &v
 		case "Cached:":
-			m.Cached = &val
-			m.CachedBytes = &valBytes
+			m.Cached = &v
 		case "SwapCached:":
-			m.SwapCached = &val
-			m.SwapCachedBytes = &valBytes
+			m.SwapCached = &v
 		case "Active:":
-			m.Active = &val
-			m.ActiveBytes = &valBytes
+			m.Active = &v
 		case "Inactive:":
-			m.Inactive = &val
-			m.InactiveBytes = &valBytes
+			m.Inactive = &v
 		case "Active(anon):":
-			m.ActiveAnon = &val
-			m.ActiveAnonBytes = &valBytes
+			m.ActiveAnon = &v
 		case "Inactive(anon):":
-			m.InactiveAnon = &val
-			m.InactiveAnonBytes = &valBytes
+			m.InactiveAnon = &v
 		case "Active(file):":
-			m.ActiveFile = &val
-			m.ActiveFileBytes = &valBytes
+			m.ActiveFile = &v
 		case "Inactive(file):":
-			m.InactiveFile = &val
-			m.InactiveFileBytes = &valBytes
+			m.InactiveFile = &v
 		case "Unevictable:":
-			m.Unevictable = &val
-			m.UnevictableBytes = &valBytes
+			m.Unevictable = &v
 		case "Mlocked:":
-			m.Mlocked = &val
-			m.MlockedBytes = &valBytes
+			m.Mlocked = &v
 		case "SwapTotal:":
-			m.SwapTotal = &val
-			m.SwapTotalBytes = &valBytes
+			m.SwapTotal = &v
 		case "SwapFree:":
-			m.SwapFree = &val
-			m.SwapFreeBytes = &valBytes
+			m.SwapFree = &v
 		case "Dirty:":
-			m.Dirty = &val
-			m.DirtyBytes = &valBytes
+			m.Dirty = &v
 		case "Writeback:":
-			m.Writeback = &val
-			m.WritebackBytes = &valBytes
+			m.Writeback = &v
 		case "AnonPages:":
-			m.AnonPages = &val
-			m.AnonPagesBytes = &valBytes
+			m.AnonPages = &v
 		case "Mapped:":
-			m.Mapped = &val
-			m.MappedBytes = &valBytes
+			m.Mapped = &v
 		case "Shmem:":
-			m.Shmem = &val
-			m.ShmemBytes = &valBytes
+			m.Shmem = &v
 		case "Slab:":
-			m.Slab = &val
-			m.SlabBytes = &valBytes
+			m.Slab = &v
 		case "SReclaimable:":
-			m.SReclaimable = &val
-			m.SReclaimableBytes = &valBytes
+			m.SReclaimable = &v
 		case "SUnreclaim:":
-			m.SUnreclaim = &val
-			m.SUnreclaimBytes = &valBytes
+			m.SUnreclaim = &v
 		case "KernelStack:":
-			m.KernelStack = &val
-			m.KernelStackBytes = &valBytes
+			m.KernelStack = &v
 		case "PageTables:":
-			m.PageTables = &val
-			m.PageTablesBytes = &valBytes
+			m.PageTables = &v
 		case "NFS_Unstable:":
-			m.NFSUnstable = &val
-			m.NFSUnstableBytes = &valBytes
+			m.NFSUnstable = &v
 		case "Bounce:":
-			m.Bounce = &val
-			m.BounceBytes = &valBytes
+			m.Bounce = &v
 		case "WritebackTmp:":
-			m.WritebackTmp = &val
-			m.WritebackTmpBytes = &valBytes
+			m.WritebackTmp = &v
 		case "CommitLimit:":
-			m.CommitLimit = &val
-			m.CommitLimitBytes = &valBytes
+			m.CommitLimit = &v
 		case "Committed_AS:":
-			m.CommittedAS = &val
-			m.CommittedASBytes = &valBytes
+			m.CommittedAS = &v
 		case "VmallocTotal:":
-			m.VmallocTotal = &val
-			m.VmallocTotalBytes = &valBytes
+			m.VmallocTotal = &v
 		case "VmallocUsed:":
-			m.VmallocUsed = &val
-			m.VmallocUsedBytes = &valBytes
+			m.VmallocUsed = &v
 		case "VmallocChunk:":
-			m.VmallocChunk = &val
-			m.VmallocChunkBytes = &valBytes
-		case "Percpu:":
-			m.Percpu = &val
-			m.PercpuBytes = &valBytes
+			m.VmallocChunk = &v
 		case "HardwareCorrupted:":
-			m.HardwareCorrupted = &val
-			m.HardwareCorruptedBytes = &valBytes
+			m.HardwareCorrupted = &v
 		case "AnonHugePages:":
-			m.AnonHugePages = &val
-			m.AnonHugePagesBytes = &valBytes
+			m.AnonHugePages = &v
 		case "ShmemHugePages:":
-			m.ShmemHugePages = &val
-			m.ShmemHugePagesBytes = &valBytes
+			m.ShmemHugePages = &v
 		case "ShmemPmdMapped:":
-			m.ShmemPmdMapped = &val
-			m.ShmemPmdMappedBytes = &valBytes
+			m.ShmemPmdMapped = &v
 		case "CmaTotal:":
-			m.CmaTotal = &val
-			m.CmaTotalBytes = &valBytes
+			m.CmaTotal = &v
 		case "CmaFree:":
-			m.CmaFree = &val
-			m.CmaFreeBytes = &valBytes
+			m.CmaFree = &v
 		case "HugePages_Total:":
-			m.HugePagesTotal = &val
+			m.HugePagesTotal = &v
 		case "HugePages_Free:":
-			m.HugePagesFree = &val
+			m.HugePagesFree = &v
 		case "HugePages_Rsvd:":
-			m.HugePagesRsvd = &val
+			m.HugePagesRsvd = &v
 		case "HugePages_Surp:":
-			m.HugePagesSurp = &val
+			m.HugePagesSurp = &v
 		case "Hugepagesize:":
-			m.Hugepagesize = &val
-			m.HugepagesizeBytes = &valBytes
+			m.Hugepagesize = &v
 		case "DirectMap4k:":
-			m.DirectMap4k = &val
-			m.DirectMap4kBytes = &valBytes
+			m.DirectMap4k = &v
 		case "DirectMap2M:":
-			m.DirectMap2M = &val
-			m.DirectMap2MBytes = &valBytes
+			m.DirectMap2M = &v
 		case "DirectMap1G:":
-			m.DirectMap1G = &val
-			m.DirectMap1GBytes = &valBytes
+			m.DirectMap1G = &v
 		}
 	}
 

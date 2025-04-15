@@ -1,4 +1,4 @@
-// Copyright 2023 The Prometheus Authors
+// Copyright 2019 The Prometheus Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -11,18 +11,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package model
+//go:build js
+// +build js
 
-// MetricType represents metric type values.
-type MetricType string
+package prometheus
 
-const (
-	MetricTypeCounter        = MetricType("counter")
-	MetricTypeGauge          = MetricType("gauge")
-	MetricTypeHistogram      = MetricType("histogram")
-	MetricTypeGaugeHistogram = MetricType("gaugehistogram")
-	MetricTypeSummary        = MetricType("summary")
-	MetricTypeInfo           = MetricType("info")
-	MetricTypeStateset       = MetricType("stateset")
-	MetricTypeUnknown        = MetricType("unknown")
-)
+func canCollectProcess() bool {
+	return false
+}
+
+func (c *processCollector) processCollect(ch chan<- Metric) {
+	// noop on this platform
+	return
+}

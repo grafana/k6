@@ -20,7 +20,6 @@ import (
 	"time"
 
 	dto "github.com/prometheus/client_model/go"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // Counter is a Metric that represents a single numerical value that only ever
@@ -67,7 +66,7 @@ type CounterVecOpts struct {
 	CounterOpts
 
 	// VariableLabels are used to partition the metric vector by the given set
-	// of labels. Each label value will be constrained with the optional Constraint
+	// of labels. Each label value will be constrained with the optional Contraint
 	// function, if provided.
 	VariableLabels ConstrainableLabels
 }
@@ -91,12 +90,8 @@ func NewCounter(opts CounterOpts) Counter {
 		nil,
 		opts.ConstLabels,
 	)
-	if opts.now == nil {
-		opts.now = time.Now
-	}
-	result := &counter{desc: desc, labelPairs: desc.constLabelPairs, now: opts.now}
+	result := &counter{desc: desc, labelPairs: desc.constLabelPairs, now: time.Now}
 	result.init(result) // Init self-collection.
-	result.createdTs = timestamppb.New(opts.now())
 	return result
 }
 
@@ -111,12 +106,10 @@ type counter struct {
 	selfCollector
 	desc *Desc
 
-	createdTs  *timestamppb.Timestamp
 	labelPairs []*dto.LabelPair
 	exemplar   atomic.Value // Containing nil or a *dto.Exemplar.
 
-	// now is for testing purposes, by default it's time.Now.
-	now func() time.Time
+	now func() time.Time // To mock out time.Now() for testing.
 }
 
 func (c *counter) Desc() *Desc {
@@ -134,9 +127,13 @@ func (c *counter) Add(v float64) {
 		return
 	}
 
-	atomicUpdateFloat(&c.valBits, func(oldVal float64) float64 {
-		return oldVal + v
-	})
+	for {
+		oldBits := atomic.LoadUint64(&c.valBits)
+		newBits := math.Float64bits(math.Float64frombits(oldBits) + v)
+		if atomic.CompareAndSwapUint64(&c.valBits, oldBits, newBits) {
+			return
+		}
+	}
 }
 
 func (c *counter) AddWithExemplar(v float64, e Labels) {
@@ -162,7 +159,8 @@ func (c *counter) Write(out *dto.Metric) error {
 		exemplar = e.(*dto.Exemplar)
 	}
 	val := c.get()
-	return populateMetric(CounterValue, val, c.labelPairs, exemplar, out, c.createdTs)
+
+	return populateMetric(CounterValue, val, c.labelPairs, exemplar, out)
 }
 
 func (c *counter) updateExemplar(v float64, l Labels) {
@@ -202,17 +200,13 @@ func (v2) NewCounterVec(opts CounterVecOpts) *CounterVec {
 		opts.VariableLabels,
 		opts.ConstLabels,
 	)
-	if opts.now == nil {
-		opts.now = time.Now
-	}
 	return &CounterVec{
 		MetricVec: NewMetricVec(desc, func(lvs ...string) Metric {
-			if len(lvs) != len(desc.variableLabels.names) {
-				panic(makeInconsistentCardinalityError(desc.fqName, desc.variableLabels.names, lvs))
+			if len(lvs) != len(desc.variableLabels) {
+				panic(makeInconsistentCardinalityError(desc.fqName, desc.variableLabels.labelNames(), lvs))
 			}
-			result := &counter{desc: desc, labelPairs: MakeLabelPairs(desc, lvs), now: opts.now}
+			result := &counter{desc: desc, labelPairs: MakeLabelPairs(desc, lvs), now: time.Now}
 			result.init(result) // Init self-collection.
-			result.createdTs = timestamppb.New(opts.now())
 			return result
 		}),
 	}

@@ -1629,6 +1629,13 @@ Notes on individual types:
 Primitive types (numbers, string, bool) are converted to the corresponding JavaScript primitives. These values
 are goroutine-safe and can be transferred between runtimes.
 
+# *big.Int
+
+A *big.Int value is converted to a BigInt value. Note, because BigInt is immutable, but *big.Int isn't, the value is
+copied. Export()'ing this value returns a *big.Int which is also a copy.
+
+If the pointer value is nil, the resulting BigInt is 0n.
+
 # Strings
 
 Because of the difference in internal string representation between ECMAScript (which uses UTF-16) and Go (which uses
@@ -1870,7 +1877,11 @@ func (r *Runtime) toValue(i interface{}, origValue reflect.Value) Value {
 	case float64:
 		return floatToValue(i)
 	case *big.Int:
-		return (*valueBigInt)(new(big.Int).Set(i))
+		v := new(big.Int)
+		if i != nil {
+			v.Set(i)
+		}
+		return (*valueBigInt)(v)
 	case map[string]interface{}:
 		if i == nil {
 			return _null
@@ -2543,6 +2554,25 @@ func IsNaN(v Value) bool {
 // IsInfinity returns true if the supplied is (+/-)Infinity
 func IsInfinity(v Value) bool {
 	return v == _positiveInf || v == _negativeInf
+}
+
+func IsNumber(v Value) bool {
+	switch v.(type) {
+	case valueInt, valueFloat:
+		return true
+	default:
+		return false
+	}
+}
+
+func IsBigInt(v Value) bool {
+	_, ok := v.(*valueBigInt)
+	return ok
+}
+
+func IsString(v Value) bool {
+	_, ok := v.(String)
+	return ok
 }
 
 // Undefined returns JS undefined value. Note if global 'undefined' property is changed this still returns the original value.

@@ -66,8 +66,7 @@ func RuntimeMetricsToProm(d *metrics.Description) (string, string, string, bool)
 		name += "_total"
 	}
 
-	// Our current conversion moves to legacy naming, so use legacy validation.
-	valid := model.IsValidLegacyMetricName(namespace + "_" + subsystem + "_" + name)
+	valid := model.IsValidMetricName(model.LabelValue(namespace + "_" + subsystem + "_" + name))
 	switch d.Kind {
 	case metrics.KindUint64:
 	case metrics.KindFloat64:

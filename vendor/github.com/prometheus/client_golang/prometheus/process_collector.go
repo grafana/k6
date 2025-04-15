@@ -22,16 +22,14 @@ import (
 )
 
 type processCollector struct {
-	collectFn         func(chan<- Metric)
-	describeFn        func(chan<- *Desc)
-	pidFn             func() (int, error)
-	reportErrors      bool
-	cpuTotal          *Desc
-	openFDs, maxFDs   *Desc
-	vsize, maxVsize   *Desc
-	rss               *Desc
-	startTime         *Desc
-	inBytes, outBytes *Desc
+	collectFn       func(chan<- Metric)
+	pidFn           func() (int, error)
+	reportErrors    bool
+	cpuTotal        *Desc
+	openFDs, maxFDs *Desc
+	vsize, maxVsize *Desc
+	rss             *Desc
+	startTime       *Desc
 }
 
 // ProcessCollectorOpts defines the behavior of a process metrics collector
@@ -102,16 +100,6 @@ func NewProcessCollector(opts ProcessCollectorOpts) Collector {
 			"Start time of the process since unix epoch in seconds.",
 			nil, nil,
 		),
-		inBytes: NewDesc(
-			ns+"process_network_receive_bytes_total",
-			"Number of bytes received by the process over the network.",
-			nil, nil,
-		),
-		outBytes: NewDesc(
-			ns+"process_network_transmit_bytes_total",
-			"Number of bytes sent by the process over the network.",
-			nil, nil,
-		),
 	}
 
 	if opts.PidFn == nil {
@@ -123,33 +111,29 @@ func NewProcessCollector(opts ProcessCollectorOpts) Collector {
 	// Set up process metric collection if supported by the runtime.
 	if canCollectProcess() {
 		c.collectFn = c.processCollect
-		c.describeFn = c.describe
 	} else {
-		c.collectFn = c.errorCollectFn
-		c.describeFn = c.errorDescribeFn
+		c.collectFn = func(ch chan<- Metric) {
+			c.reportError(ch, nil, errors.New("process metrics not supported on this platform"))
+		}
 	}
 
 	return c
 }
 
-func (c *processCollector) errorCollectFn(ch chan<- Metric) {
-	c.reportError(ch, nil, errors.New("process metrics not supported on this platform"))
-}
-
-func (c *processCollector) errorDescribeFn(ch chan<- *Desc) {
-	if c.reportErrors {
-		ch <- NewInvalidDesc(errors.New("process metrics not supported on this platform"))
-	}
+// Describe returns all descriptions of the collector.
+func (c *processCollector) Describe(ch chan<- *Desc) {
+	ch <- c.cpuTotal
+	ch <- c.openFDs
+	ch <- c.maxFDs
+	ch <- c.vsize
+	ch <- c.maxVsize
+	ch <- c.rss
+	ch <- c.startTime
 }
 
 // Collect returns the current state of all metrics of the collector.
 func (c *processCollector) Collect(ch chan<- Metric) {
 	c.collectFn(ch)
-}
-
-// Describe returns all descriptions of the collector.
-func (c *processCollector) Describe(ch chan<- *Desc) {
-	c.describeFn(ch)
 }
 
 func (c *processCollector) reportError(ch chan<- Metric, desc *Desc, err error) {

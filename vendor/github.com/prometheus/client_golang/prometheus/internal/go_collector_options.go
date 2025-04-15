@@ -30,5 +30,3 @@ type GoCollectorOptions struct {
 	RuntimeMetricSumForHist    map[string]string
 	RuntimeMetricRules         []GoCollectorRule
 }
-
-var GoCollectorDefaultRuntimeMetrics = regexp.MustCompile(`/gc/gogc:percent|/gc/gomemlimit:bytes|/sched/gomaxprocs:threads`)

@@ -15,18 +15,19 @@ package model
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math"
 	"strconv"
 )
 
-// ZeroSamplePair is the pseudo zero-value of SamplePair used to signal a
-// non-existing sample pair. It is a SamplePair with timestamp Earliest and
-// value 0.0. Note that the natural zero value of SamplePair has a timestamp
-// of 0, which is possible to appear in a real SamplePair and thus not
-// suitable to signal a non-existing SamplePair.
-var ZeroSamplePair = SamplePair{Timestamp: Earliest}
+var (
+	// ZeroSamplePair is the pseudo zero-value of SamplePair used to signal a
+	// non-existing sample pair. It is a SamplePair with timestamp Earliest and
+	// value 0.0. Note that the natural zero value of SamplePair has a timestamp
+	// of 0, which is possible to appear in a real SamplePair and thus not
+	// suitable to signal a non-existing SamplePair.
+	ZeroSamplePair = SamplePair{Timestamp: Earliest}
+)
 
 // A SampleValue is a representation of a value for a given sample at a given
 // time.
@@ -40,7 +41,7 @@ func (v SampleValue) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON implements json.Unmarshaler.
 func (v *SampleValue) UnmarshalJSON(b []byte) error {
 	if len(b) < 2 || b[0] != '"' || b[len(b)-1] != '"' {
-		return errors.New("sample value must be a quoted string")
+		return fmt.Errorf("sample value must be a quoted string")
 	}
 	f, err := strconv.ParseFloat(string(b[1:len(b)-1]), 64)
 	if err != nil {

@@ -15,7 +15,6 @@ package model
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"regexp"
 	"time"
@@ -35,7 +34,7 @@ func (m *Matcher) UnmarshalJSON(b []byte) error {
 	}
 
 	if len(m.Name) == 0 {
-		return errors.New("label name in matcher must not be empty")
+		return fmt.Errorf("label name in matcher must not be empty")
 	}
 	if m.IsRegex {
 		if _, err := regexp.Compile(m.Value); err != nil {
@@ -78,30 +77,30 @@ type Silence struct {
 // Validate returns true iff all fields of the silence have valid values.
 func (s *Silence) Validate() error {
 	if len(s.Matchers) == 0 {
-		return errors.New("at least one matcher required")
+		return fmt.Errorf("at least one matcher required")
 	}
 	for _, m := range s.Matchers {
 		if err := m.Validate(); err != nil {
-			return fmt.Errorf("invalid matcher: %w", err)
+			return fmt.Errorf("invalid matcher: %s", err)
 		}
 	}
 	if s.StartsAt.IsZero() {
-		return errors.New("start time missing")
+		return fmt.Errorf("start time missing")
 	}
 	if s.EndsAt.IsZero() {
-		return errors.New("end time missing")
+		return fmt.Errorf("end time missing")
 	}
 	if s.EndsAt.Before(s.StartsAt) {
-		return errors.New("start time must be before end time")
+		return fmt.Errorf("start time must be before end time")
 	}
 	if s.CreatedBy == "" {
-		return errors.New("creator information missing")
+		return fmt.Errorf("creator information missing")
 	}
 	if s.Comment == "" {
-		return errors.New("comment missing")
+		return fmt.Errorf("comment missing")
 	}
 	if s.CreatedAt.IsZero() {
-		return errors.New("creation timestamp missing")
+		return fmt.Errorf("creation timestamp missing")
 	}
 	return nil
 }

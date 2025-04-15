@@ -92,9 +92,6 @@ type Opts struct {
 	// machine_role metric). See also
 	// https://prometheus.io/docs/instrumenting/writing_exporters/#target-labels-not-static-scraped-labels
 	ConstLabels Labels
-
-	// now is for testing purposes, by default it's time.Now.
-	now func() time.Time
 }
 
 // BuildFQName joins the given three name components by "_". Empty name
@@ -108,23 +105,15 @@ func BuildFQName(namespace, subsystem, name string) string {
 	if name == "" {
 		return ""
 	}
-
-	sb := strings.Builder{}
-	sb.Grow(len(namespace) + len(subsystem) + len(name) + 2)
-
-	if namespace != "" {
-		sb.WriteString(namespace)
-		sb.WriteString("_")
+	switch {
+	case namespace != "" && subsystem != "":
+		return strings.Join([]string{namespace, subsystem, name}, "_")
+	case namespace != "":
+		return strings.Join([]string{namespace, name}, "_")
+	case subsystem != "":
+		return strings.Join([]string{subsystem, name}, "_")
 	}
-
-	if subsystem != "" {
-		sb.WriteString(subsystem)
-		sb.WriteString("_")
-	}
-
-	sb.WriteString(name)
-
-	return sb.String()
+	return name
 }
 
 type invalidMetric struct {
@@ -242,7 +231,7 @@ func NewMetricWithExemplars(m Metric, exemplars ...Exemplar) (Metric, error) {
 	)
 	for i, e := range exemplars {
 		ts := e.Timestamp
-		if ts.IsZero() {
+		if ts == (time.Time{}) {
 			ts = now
 		}
 		exs[i], err = newExemplar(e.Value, ts, e.Labels)
