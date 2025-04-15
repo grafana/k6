@@ -1,10 +1,9 @@
-// Copyright 2013-2023 The Cobra Authors
+// Copyright © 2013 Steve Francia <spf@spf13.com>.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-//
-//      http://www.apache.org/licenses/LICENSE-2.0
+// http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -40,30 +39,15 @@ var templateFuncs = template.FuncMap{
 }
 
 var initializers []func()
-var finalizers []func()
 
-const (
-	defaultPrefixMatching   = false
-	defaultCommandSorting   = true
-	defaultCaseInsensitive  = false
-	defaultTraverseRunHooks = false
-)
-
-// EnablePrefixMatching allows setting automatic prefix matching. Automatic prefix matching can be a dangerous thing
+// EnablePrefixMatching allows to set automatic prefix matching. Automatic prefix matching can be a dangerous thing
 // to automatically enable in CLI tools.
 // Set this to true to enable it.
-var EnablePrefixMatching = defaultPrefixMatching
+var EnablePrefixMatching = false
 
 // EnableCommandSorting controls sorting of the slice of commands, which is turned on by default.
 // To disable sorting, set it to false.
-var EnableCommandSorting = defaultCommandSorting
-
-// EnableCaseInsensitive allows case-insensitive commands names. (case sensitive by default)
-var EnableCaseInsensitive = defaultCaseInsensitive
-
-// EnableTraverseRunHooks executes persistent pre-run and post-run hooks from all parents.
-// By default this is disabled, which means only the first run hook to be found is executed.
-var EnableTraverseRunHooks = defaultTraverseRunHooks
+var EnableCommandSorting = true
 
 // MousetrapHelpText enables an information splash screen on Windows
 // if the CLI is started from explorer.exe.
@@ -98,12 +82,6 @@ func AddTemplateFuncs(tmplFuncs template.FuncMap) {
 // Execute method is called.
 func OnInitialize(y ...func()) {
 	initializers = append(initializers, y...)
-}
-
-// OnFinalize sets the passed functions to be run when each command's
-// Execute method is terminated.
-func OnFinalize(y ...func()) {
-	finalizers = append(finalizers, y...)
 }
 
 // FIXME Gt is unused by cobra and should be removed in a version 2. It exists only for compatibility with users of cobra.
@@ -172,20 +150,16 @@ func appendIfNotPresent(s, stringToAppend string) string {
 
 // rpad adds padding to the right of a string.
 func rpad(s string, padding int) string {
-	formattedString := fmt.Sprintf("%%-%ds", padding)
-	return fmt.Sprintf(formattedString, s)
+	template := fmt.Sprintf("%%-%ds", padding)
+	return fmt.Sprintf(template, s)
 }
 
-func tmpl(text string) *tmplFunc {
-	return &tmplFunc{
-		tmpl: text,
-		fn: func(w io.Writer, data interface{}) error {
-			t := template.New("top")
-			t.Funcs(templateFuncs)
-			template.Must(t.Parse(text))
-			return t.Execute(w, data)
-		},
-	}
+// tmpl executes the given template text on data, writing the result to w.
+func tmpl(w io.Writer, text string, data interface{}) error {
+	t := template.New("top")
+	t.Funcs(templateFuncs)
+	template.Must(t.Parse(text))
+	return t.Execute(w, data)
 }
 
 // ld compares two strings and returns the levenshtein distance between them.
@@ -197,6 +171,8 @@ func ld(s, t string, ignoreCase bool) int {
 	d := make([][]int, len(s)+1)
 	for i := range d {
 		d[i] = make([]int, len(t)+1)
+	}
+	for i := range d {
 		d[i][0] = i
 	}
 	for j := range d[0] {

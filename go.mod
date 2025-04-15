@@ -19,7 +19,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/grafana/k6deps v0.2.6
-	github.com/grafana/k6provider v0.1.14
+	github.com/grafana/k6provider v0.1.15
 	github.com/grafana/sobek v0.0.0-20250320150027-203dc85b6d98
 	github.com/grafana/xk6-dashboard v0.7.5
 	github.com/grafana/xk6-redis v0.3.3
@@ -38,8 +38,8 @@ require (
 	github.com/serenize/snaker v0.0.0-20201027110005-a7ad2135616e
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/afero v1.1.2
-	github.com/spf13/cobra v1.9.1
-	github.com/spf13/pflag v1.0.6
+	github.com/spf13/cobra v1.4.0
+	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.10.0
 	github.com/tidwall/gjson v1.18.0
 	go.opentelemetry.io/otel v1.35.0
@@ -67,7 +67,7 @@ require (
 )
 
 require (
-	github.com/grafana/k6build v0.5.10 // indirect
+	github.com/grafana/k6build v0.5.11 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 )
 
@@ -86,7 +86,7 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/pprof v0.0.0-20230728192033-2ba5b33183c6 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.26.1 // indirect
-	github.com/inconshreveable/mousetrap v1.1.0 // indirect
+	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/nxadm/tail v1.4.11 // indirect
 	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8 // indirect
