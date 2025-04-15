@@ -33,10 +33,10 @@ func New(gs *state.GlobalState) *launcher {
 }
 
 // launch executes k6 either by launching a provisioned binary or defaulting to the
-// current binary it this is not necessary.
+// current binary if this is not necessary.
 // If the fhe fallback is called, it can exit the process so don't assume it will return
 func (l *launcher) Launch() {
-	// if binary provisioning not enabled, continue with regular k6 execution path
+	// if binary provisioning is not enabled, continue with the regular k6 execution path
 	if !l.gs.Flags.BinaryProvisioning {
 		l.gs.Logger.Debug("Binary provisioning feature is disabled")
 		l.fallback(l.gs)

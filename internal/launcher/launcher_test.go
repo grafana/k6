@@ -16,7 +16,7 @@ import (
 )
 
 // launcherFixture mocks the functions used by the launcher and tracks their execution
-type luncherFixture struct {
+type launcherFixture struct {
 	provisionCalled bool
 	provisionDeps   k6deps.Dependencies
 	k6BinaryPath    string

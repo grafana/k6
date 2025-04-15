@@ -15,7 +15,7 @@ type options struct {
 	BuildServiceURL string
 
 	// BuildServiceToken contains the token to be used to authenticate with the build service.
-	// Defaults to K6_CLOUD_TOKEN environment variable is set, or the value stored in the k6 config file.
+	// Defaults to K6_CLOUD_TOKEN environment variable if set, or the value stored in the k6 config file.
 	BuildServiceToken string
 }
 
