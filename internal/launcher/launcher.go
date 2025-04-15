@@ -12,8 +12,8 @@ import (
 	k6Cmd "go.k6.io/k6/internal/cmd"
 )
 
-// launcher is a k6 launcher
-type launcher struct {
+// Launcher is a k6 Launcher
+type Launcher struct {
 	gs *state.GlobalState
 	// function to fall back if binary provisioning is not required
 	fallback func(gs *state.GlobalState)
@@ -23,8 +23,8 @@ type launcher struct {
 	run func(*state.GlobalState, string) (int, error)
 }
 
-func New(gs *state.GlobalState) *launcher {
-	return &launcher{
+func New(gs *state.GlobalState) *Launcher {
+	return &Launcher{
 		gs:        gs,
 		fallback:  k6Cmd.ExecuteWithGlobalState,
 		provision: k6buildProvision,
@@ -32,10 +32,10 @@ func New(gs *state.GlobalState) *launcher {
 	}
 }
 
-// launch executes k6 either by launching a provisioned binary or defaulting to the
+// Launch executes k6 either by launching a provisioned binary or defaulting to the
 // current binary if this is not necessary.
 // If the fhe fallback is called, it can exit the process so don't assume it will return
-func (l *launcher) Launch() {
+func (l *Launcher) Launch() {
 	// if binary provisioning is not enabled, continue with the regular k6 execution path
 	if !l.gs.Flags.BinaryProvisioning {
 		l.gs.Logger.Debug("Binary provisioning feature is disabled")
@@ -43,13 +43,14 @@ func (l *launcher) Launch() {
 		return
 	}
 
-	l.gs.Logger.Info("Binary provisioning feature is enabled. If it's required, k6 will try to provision a new binary.")
+	l.gs.Logger.Info("Binary provisioning feature is enabled. If it's required, k6 will provision a new binary")
 
 	deps, err := k6deps.Analyze(newDepsOptions(l.gs, l.gs.CmdArgs[1:]))
 	if err != nil {
 		l.gs.Logger.
 			WithError(err).
-			Error("Failed to analyze the required dependencies. Please, make sure to report this issue by opening a bug report.")
+			Error("Failed to analyze the required dependencies. Please, make sure to report this issue by" +
+				" opening a bug report.")
 		l.gs.OSExit(1)
 	}
 
@@ -57,25 +58,28 @@ func (l *launcher) Launch() {
 	// continue with regular k6 execution path
 	if !isCustomBuildRequired(build.Version, deps) {
 		l.gs.Logger.
-			Debug("The current k6 binary already satisfies all the required dependencies, it isn't required to provision a new binary.")
+			Debug("The current k6 binary already satisfies all the required dependencies," +
+				" it isn't required to provision a new binary.")
 		l.fallback(l.gs)
 		return
 	}
 
 	l.gs.Logger.
 		WithField("deps", deps).
-		Info("The current k6 binary doesn't satisfy all the required dependencies, it is required to provision a new binary.")
+		Info("The current k6 binary doesn't satisfy all the required dependencies, it is required to" +
+			" provision a new binary.")
 
 	l.launchCustomBuild(deps)
 }
 
-func (l *launcher) launchCustomBuild(deps k6deps.Dependencies) {
+func (l *Launcher) launchCustomBuild(deps k6deps.Dependencies) {
 	// get the k6 binary from the build service
 	binPath, versions, err := l.provision(l.gs, deps)
 	if err != nil {
 		l.gs.Logger.
 			WithError(err).
-			Error("Failed to provision a new k6 binary with required dependencies. Please, make sure to report this issue by opening a bug report.")
+			Error("Failed to provision a new k6 binary with required dependencies. Please, make sure to" +
+				" report this issue by opening a bug report.")
 		l.gs.OSExit(1)
 		// in tests calling l.gs.OSExit does not ends execution so we have to return
 		return

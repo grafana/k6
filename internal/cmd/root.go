@@ -134,7 +134,8 @@ func Execute() {
 }
 
 // ExecuteWithGlobalState runs the root command with an existing GlobalState.
-// This is only used by tests. We might unify it with `Execute` function, but we don't want to modify the Execute() signature to avoid breaking k6 extensions.
+// This is only used by tests. We might unify it with `Execute` function, but we don't want to modify the Execute()
+// signature to avoid breaking k6 extensions.
 func ExecuteWithGlobalState(gs *state.GlobalState) {
 	newRootCommand(gs).execute()
 }

@@ -263,7 +263,7 @@ func TestLauncherLaunch(t *testing.T) {
 			// the exit code is checked by the TestGlobalState when the test ends
 			ts.ExpectedExitCode = tc.expectOsExit
 
-			launcher := &launcher{
+			launcher := &Launcher{
 				gs:        ts.GlobalState,
 				provision: tc.fixture.provision,
 				fallback:  tc.fixture.fallback,

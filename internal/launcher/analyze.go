@@ -32,7 +32,8 @@ func newDepsOptions(gs *state.GlobalState, args []string) *k6deps.Options {
 		gs.Logger.
 			WithField("path", scriptname).
 			WithError(err).
-			Error("The requested test script's file is not available on the file system. Make sure that the correct name has been passed or that the file still exists on the file system.")
+			Error("The requested test script's file is not available on the file system. Make sure that" +
+				" the correct name has been passed or that the file still exists on the file system.")
 
 		return dopts
 	}
