@@ -14,7 +14,6 @@ import (
 func newDepsOptions(gs *state.GlobalState, args []string) *k6deps.Options {
 	dopts := &k6deps.Options{
 		LookupEnv: func(key string) (string, bool) { v, ok := gs.Env[key]; return v, ok },
-		// TODO: figure out if we need to set FindManifest
 	}
 
 	scriptname, hasScript := scriptNameFromArgs(args)

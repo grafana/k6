@@ -17,8 +17,9 @@ type Launcher struct {
 	gs *state.GlobalState
 	// function to fall back if binary provisioning is not required
 	fallback func(gs *state.GlobalState)
-	// function to provision a k6 binary that satisfies the dependencies
-	provision func(*state.GlobalState, k6deps.Dependencies) (string, string, error)
+	// provision function receives a list of dependencies with their constrains and returns the path to a binary
+	// than satisfies them and the versions of the dependencies provided by the binary
+	provision func(*state.GlobalState, k6deps.Dependencies) (path string, versions string, err error)
 	// function to execute k6 binary
 	run func(*state.GlobalState, string) (int, error)
 }
@@ -105,7 +106,9 @@ func runK6Cmd(gs *state.GlobalState, binPath string) (int, error) {
 	cmd.Stdout = gs.Stdout
 	cmd.Stdin = gs.Stdin
 
-	// disable binary provisioning to avoid a provisioning loop
+	// disable binary provisioning to avoid a provisioning loop.
+	// if we keep it enabled the k6 binary executed here will receive the same input script
+	// will analyze it and detect the dependencies, triggering the binary provisioning again
 	gs.Env["K6_BINARY_PROVISIONING"] = "false"
 
 	if err := cmd.Run(); err != nil {

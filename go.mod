@@ -67,11 +67,6 @@ require (
 )
 
 require (
-	github.com/grafana/k6build v0.5.11 // indirect
-	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
-)
-
-require (
 	buf.build/gen/go/gogo/protobuf/protocolbuffers/go v1.36.5-20210810001428-4df00b267f94.1 // indirect
 	github.com/andybalholm/cascadia v1.3.2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -105,4 +100,6 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20250218202821-56aae31c358a // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250218202821-56aae31c358a // indirect
 	gopkg.in/cenkalti/backoff.v1 v1.1.0 // indirect
+	github.com/grafana/k6build v0.5.11 // indirect
+	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 )

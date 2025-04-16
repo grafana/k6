@@ -103,10 +103,10 @@ func NewGlobalState(ctx context.Context) *GlobalState {
 
 	env := BuildEnvMap(os.Environ())
 	defaultFlags := GetDefaultFlags(confDir)
-	flags := getFlags(defaultFlags, env, os.Args)
+	globalFlags := getFlags(defaultFlags, env, os.Args)
 
 	logLevel := logrus.InfoLevel
-	if flags.Verbose {
+	if globalFlags.Verbose {
 		logLevel = logrus.DebugLevel
 	}
 
@@ -114,7 +114,7 @@ func NewGlobalState(ctx context.Context) *GlobalState {
 		Out: stderr,
 		Formatter: &logrus.TextFormatter{
 			ForceColors:   stderrTTY,
-			DisableColors: !stderrTTY || flags.NoColor,
+			DisableColors: !stderrTTY || globalFlags.NoColor,
 		},
 		Hooks: make(logrus.LevelHooks),
 		Level: logLevel,
@@ -130,7 +130,7 @@ func NewGlobalState(ctx context.Context) *GlobalState {
 		Env:             env,
 		Events:          event.NewEventSystem(100, logger),
 		DefaultFlags:    defaultFlags,
-		Flags:           flags,
+		Flags:           globalFlags,
 		OutMutex:        outMutex,
 		Stdout:          stdout,
 		Stderr:          stderr,
