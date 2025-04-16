@@ -23,6 +23,7 @@ type Launcher struct {
 	run func(*state.GlobalState, string) (int, error)
 }
 
+// New creates a new Launcher from a GlobalState using the default fallback and provision functions
 func New(gs *state.GlobalState) *Launcher {
 	return &Launcher{
 		gs:        gs,

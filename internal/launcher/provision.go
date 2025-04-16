@@ -17,7 +17,7 @@ func k6buildProvision(gs *state.GlobalState, deps k6deps.Dependencies) (string, 
 	opt := newOptions(gs)
 	if opt.BuildServiceToken == "" {
 		return "", "", errors.New("k6 cloud token is required when Binary provisioning feature is enabled." +
-			" Set K6_CLOUD_TOKEN environment variable or execute the k6 cloud login command.")
+			" Set K6_CLOUD_TOKEN environment variable or execute the k6 cloud login command")
 	}
 
 	config := k6provider.Config{
