@@ -1,40 +1,46 @@
 package launcher
 
 import (
+	"errors"
 	"strings"
 
 	"github.com/grafana/k6deps"
 	"go.k6.io/k6/cmd/state"
 )
 
-// newDepsOptions returns the options for dependency resolution.
+var (
+	errScriptNotFound     = errors.New("script not found")
+	errUnsupportedFeature = errors.New("not supported")
+)
+
+// analyze returns the dependencies for the command to be executed.
 // Presently, only the k6 input script or archive (if any) is passed to k6deps for scanning.
 // TODO: if k6 receives the input from stdin, it is not used for scanning because we don't know
 // if it is a script or an archive
-func newDepsOptions(gs *state.GlobalState, args []string) *k6deps.Options {
+func analyze(gs *state.GlobalState, args []string) (k6deps.Dependencies, error) {
 	dopts := &k6deps.Options{
 		LookupEnv: func(key string) (string, bool) { v, ok := gs.Env[key]; return v, ok },
 	}
 
 	scriptname, hasScript := scriptNameFromArgs(args)
 	if !hasScript {
-		return dopts
+		gs.Logger.
+			Debug("The command did not receive an input script.")
+		return nil, errScriptNotFound
 	}
 
 	if scriptname == "-" {
 		gs.Logger.
-			Warn("Test script provided by Stdin is not yet supported from Binary provisioning feature.")
-		return dopts
+			Debug("Test script provided by Stdin is not yet supported from Binary provisioning feature.")
+		return nil, errUnsupportedFeature
 	}
 
 	if _, err := gs.FS.Stat(scriptname); err != nil {
 		gs.Logger.
 			WithField("path", scriptname).
 			WithError(err).
-			Error("The requested test script's file is not available on the file system. Make sure that" +
-				" the correct name has been passed or that the file still exists on the file system.")
-
-		return dopts
+			Debug("The requested test script's file is not available on the file system.")
+		return nil, errScriptNotFound
 	}
 
 	if strings.HasSuffix(scriptname, ".tar") {
@@ -43,7 +49,7 @@ func newDepsOptions(gs *state.GlobalState, args []string) *k6deps.Options {
 		dopts.Script.Name = scriptname
 	}
 
-	return dopts
+	return k6deps.Analyze(dopts)
 }
 
 // scriptNameFromArgs returns the file name passed as input and true if it's a valid script name

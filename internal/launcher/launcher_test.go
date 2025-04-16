@@ -228,8 +228,8 @@ func TestLauncherLaunch(t *testing.T) {
 			fixture:         &launcherFixture{},
 			expectProvision: false,
 			expectK6Run:     false,
-			expectFallback:  true,
-			expectOsExit:    0,
+			expectFallback:  false,
+			expectOsExit:    1,
 		},
 	}
 
