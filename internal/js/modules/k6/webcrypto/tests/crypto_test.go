@@ -1,5 +1,3 @@
-//go:build wpt
-
 package tests
 
 import (

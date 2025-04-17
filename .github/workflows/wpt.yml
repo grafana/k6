@@ -24,10 +24,10 @@ jobs:
           set -x
           cd internal/js/modules/k6/experimental/streams/tests
           sh checkout.sh
-          go test -race ../... -tags=wpt
+          go test -race ../...
       - name: Run Webcrypto Tests
         run: |
           set -x
           cd internal/js/modules/k6/webcrypto/tests
           sh checkout.sh
-          go test -race ./... -tags=wpt
+          go test -race ./...
