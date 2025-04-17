@@ -1,5 +1,3 @@
-//go:build wpt
-
 package tests
 
 import (
@@ -29,9 +27,6 @@ func newConfiguredRuntime(t testing.TB) *modulestest.Runtime {
 	require.NoError(t, err)
 
 	require.NoError(t, webcrypto.SetupGlobally(rt.VU))
-
-	// We compile the Web Platform testharness script into a sobek.Program
-	compileAndRun(t, rt, "./wpt/resources", "testharness.js")
 
 	// We compile the Web Platform helpers script into a sobek.Program
 	// TODO: check if we need to compile the helpers.js script each time
