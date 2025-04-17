@@ -1,0 +1,14 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: k6
+  title: k6
+  description: |
+    k6 is a modern load-testing tool
+  annotations:
+    backstage.io/techdocs-ref: dir:./docs
+    github.com/project-slug: grafana/k6
+spec:
+  type: tool
+  owner: group:default/k6-core
+  lifecycle: production
