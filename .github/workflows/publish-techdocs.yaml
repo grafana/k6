@@ -2,7 +2,7 @@ name: Publish TechDocs
 on:
   push:
     branches:
-      - main
+      - register-component-software-catalog-and-techdocs
     paths:
       - 'docs/docs/**'
       - 'docs/mkdocs.yml'
