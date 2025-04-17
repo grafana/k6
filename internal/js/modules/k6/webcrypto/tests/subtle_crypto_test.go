@@ -8,7 +8,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const webPlatformTestSuite = "./wpt/WebCryptoAPI/"
@@ -159,6 +161,23 @@ func TestWebPlatformTestSuite(t *testing.T) {
 			ts := newConfiguredRuntime(t)
 
 			gotErr := ts.EventLoop.Start(func() error {
+				rt := ts.VU.Runtime()
+				// https://web-platform-tests.org/writing-tests/testharness-api.html#callbacks
+				// gets back the Test instance for each test when it finishes
+				cal, ok := sobek.AssertFunction(rt.Get("add_result_callback"))
+				require.True(t, ok)
+				_, err := cal(sobek.Undefined(), rt.ToValue(func(test *sobek.Object) {
+					// TODO(@mstoykov): In some future place do this better and potentially record
+					// and expect failures on unimplemented stuff
+					status := test.Get("status").ToInteger()
+					t.Run(test.Get("name").String(), func(t *testing.T) {
+						// Report issues
+						assert.Equal(t, "null", test.Get("message").String())
+						assert.Equal(t, "null", test.Get("stack").String())
+						require.EqualValues(t, 0, status) // 0 is a PASS, all other values are some kind of failures
+					})
+				}))
+				require.NoError(t, err)
 				for _, script := range tt.files {
 					compileAndRun(t, ts, webPlatformTestSuite+tt.catalog, script)
 				}
@@ -167,10 +186,10 @@ func TestWebPlatformTestSuite(t *testing.T) {
 					return nil
 				}
 
-				_, err := ts.VU.Runtime().RunString(tt.callFn + `()`)
+				_, err = rt.RunString(tt.callFn + `()`)
 				return err
 			})
-			assert.NoError(t, gotErr)
+			require.NoError(t, gotErr)
 		})
 	}
 }

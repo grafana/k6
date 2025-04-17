@@ -44,15 +44,19 @@ var (
 //
 // It implements the [resolver.Resolver] interface.
 type delegatingResolver struct {
-	target         resolver.Target     // parsed target URI to be resolved
-	cc             resolver.ClientConn // gRPC ClientConn
-	targetResolver resolver.Resolver   // resolver for the target URI, based on its scheme
-	proxyResolver  resolver.Resolver   // resolver for the proxy URI; nil if no proxy is configured
-	proxyURL       *url.URL            // proxy URL, derived from proxy environment and target
+	target   resolver.Target     // parsed target URI to be resolved
+	cc       resolver.ClientConn // gRPC ClientConn
+	proxyURL *url.URL            // proxy URL, derived from proxy environment and target
 
 	mu                  sync.Mutex         // protects all the fields below
 	targetResolverState *resolver.State    // state of the target resolver
 	proxyAddrs          []resolver.Address // resolved proxy addresses; empty if no proxy is configured
+
+	// childMu serializes calls into child resolvers. It also protects access to
+	// the following fields.
+	childMu        sync.Mutex
+	targetResolver resolver.Resolver // resolver for the target URI, based on its scheme
+	proxyResolver  resolver.Resolver // resolver for the proxy URI; nil if no proxy is configured
 }
 
 // nopResolver is a resolver that does nothing.
@@ -111,6 +115,10 @@ func New(target resolver.Target, cc resolver.ClientConn, opts resolver.BuildOpti
 		logger.Infof("Proxy URL detected : %s", r.proxyURL)
 	}
 
+	// Resolver updates from one child may trigger calls into the other. Block
+	// updates until the children are initialized.
+	r.childMu.Lock()
+	defer r.childMu.Unlock()
 	// When the scheme is 'dns' and target resolution on client is not enabled,
 	// resolution should be handled by the proxy, not the client. Therefore, we
 	// bypass the target resolver and store the unresolved target address.
@@ -165,11 +173,15 @@ func (r *delegatingResolver) proxyURIResolver(opts resolver.BuildOptions) (resol
 }
 
 func (r *delegatingResolver) ResolveNow(o resolver.ResolveNowOptions) {
+	r.childMu.Lock()
+	defer r.childMu.Unlock()
 	r.targetResolver.ResolveNow(o)
 	r.proxyResolver.ResolveNow(o)
 }
 
 func (r *delegatingResolver) Close() {
+	r.childMu.Lock()
+	defer r.childMu.Unlock()
 	r.targetResolver.Close()
 	r.targetResolver = nil
 
@@ -267,11 +279,17 @@ func (r *delegatingResolver) updateProxyResolverState(state resolver.State) erro
 	err := r.updateClientConnStateLocked()
 	// Another possible approach was to block until updates are received from
 	// both resolvers. But this is not used because calling `New()` triggers
-	// `Build()`  for the first resolver, which calls `UpdateState()`. And the
+	// `Build()` for the first resolver, which calls `UpdateState()`. And the
 	// second resolver hasn't sent an update yet, so it would cause `New()` to
 	// block indefinitely.
 	if err != nil {
-		r.targetResolver.ResolveNow(resolver.ResolveNowOptions{})
+		go func() {
+			r.childMu.Lock()
+			defer r.childMu.Unlock()
+			if r.targetResolver != nil {
+				r.targetResolver.ResolveNow(resolver.ResolveNowOptions{})
+			}
+		}()
 	}
 	return err
 }
@@ -291,7 +309,13 @@ func (r *delegatingResolver) updateTargetResolverState(state resolver.State) err
 	r.targetResolverState = &state
 	err := r.updateClientConnStateLocked()
 	if err != nil {
-		r.proxyResolver.ResolveNow(resolver.ResolveNowOptions{})
+		go func() {
+			r.childMu.Lock()
+			defer r.childMu.Unlock()
+			if r.proxyResolver != nil {
+				r.proxyResolver.ResolveNow(resolver.ResolveNowOptions{})
+			}
+		}()
 	}
 	return nil
 }

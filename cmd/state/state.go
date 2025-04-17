@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"sync"
 
+	"go.k6.io/k6/lib"
+
 	"github.com/mattn/go-colorable"
 	"github.com/mattn/go-isatty"
 	"github.com/sirupsen/logrus"
@@ -60,6 +62,7 @@ type GlobalState struct {
 
 	SecretsManager *secretsource.Manager
 	Usage          *usage.Usage
+	TestStatus     *lib.TestStatus
 }
 
 // NewGlobalState returns a new GlobalState with the given ctx.
@@ -87,18 +90,6 @@ func NewGlobalState(ctx context.Context) *GlobalState {
 		IsTTY:    stderrTTY,
 	}
 
-	env := BuildEnvMap(os.Environ())
-	_, noColorsSet := env["NO_COLOR"] // even empty values disable colors
-	logger := &logrus.Logger{
-		Out: stderr,
-		Formatter: &logrus.TextFormatter{
-			ForceColors:   stderrTTY,
-			DisableColors: !stderrTTY || noColorsSet || env["K6_NO_COLOR"] != "",
-		},
-		Hooks: make(logrus.LevelHooks),
-		Level: logrus.InfoLevel,
-	}
-
 	confDir, err := os.UserConfigDir()
 	if err != nil {
 		confDir = ".config"
@@ -109,7 +100,19 @@ func NewGlobalState(ctx context.Context) *GlobalState {
 		binary = "k6"
 	}
 
+	env := BuildEnvMap(os.Environ())
 	defaultFlags := GetDefaultFlags(confDir)
+	globalFlags := getFlags(defaultFlags, env)
+
+	logger := &logrus.Logger{
+		Out: stderr,
+		Formatter: &logrus.TextFormatter{
+			ForceColors:   stderrTTY,
+			DisableColors: !stderrTTY || globalFlags.NoColor,
+		},
+		Hooks: make(logrus.LevelHooks),
+		Level: logrus.InfoLevel,
+	}
 
 	return &GlobalState{
 		Ctx:             ctx,
@@ -121,7 +124,7 @@ func NewGlobalState(ctx context.Context) *GlobalState {
 		Env:             env,
 		Events:          event.NewEventSystem(100, logger),
 		DefaultFlags:    defaultFlags,
-		Flags:           getFlags(defaultFlags, env),
+		Flags:           globalFlags,
 		OutMutex:        outMutex,
 		Stdout:          stdout,
 		Stderr:          stderr,
@@ -136,7 +139,8 @@ func NewGlobalState(ctx context.Context) *GlobalState {
 			Hooks:     make(logrus.LevelHooks),
 			Level:     logrus.InfoLevel,
 		},
-		Usage: usage.New(),
+		Usage:      usage.New(),
+		TestStatus: lib.NewTestStatus(),
 	}
 }
 
