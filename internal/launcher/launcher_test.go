@@ -15,34 +15,14 @@ import (
 	"go.k6.io/k6/internal/cmd/tests"
 )
 
-// launcherFixture mocks the functions used by the launcher and tracks their execution
-type launcherFixture struct {
-	provisionCalled bool
-	provisionDeps   k6deps.Dependencies
-	k6BinaryPath    string
-	k6Versions      string
-	provisionError  error
-	runK6Called     bool
-	runK6Error      error
-	runk6ReturnCode int
-	fallbackCalled  bool
+type mockRunner struct {
+	invoked bool
+	rc      int
 }
 
-func (f *launcherFixture) fallback(gs *state.GlobalState) {
-	f.fallbackCalled = true
-	gs.OSExit(0)
-}
-
-func (f *launcherFixture) provision(_ *state.GlobalState, deps k6deps.Dependencies) (string, string, error) {
-	f.provisionCalled = true
-	f.provisionDeps = deps
-	return f.k6BinaryPath, f.k6Versions, f.provisionError
-}
-
-// function to execute k6 binary
-func (f *launcherFixture) run(*state.GlobalState, string) (int, error) {
-	f.runK6Called = true
-	return f.runk6ReturnCode, f.runK6Error
+func (m *mockRunner) run(gs *state.GlobalState) {
+	m.invoked = true
+	gs.OSExit(m.rc)
 }
 
 const (
@@ -102,11 +82,11 @@ func TestLauncherLaunch(t *testing.T) {
 		k6Env           map[string]string
 		k6Cmd           string
 		k6Args          []string
-		fixture         *launcherFixture
-		expectLogs      []string
 		expectProvision bool
+		provisionError  error
 		expectK6Run     bool
-		expectFallback  bool
+		expectDefault   bool
+		k6ReturnCode    int
 		expectOsExit    int
 	}{
 		{
@@ -116,10 +96,9 @@ func TestLauncherLaunch(t *testing.T) {
 				"K6_BINARY_PROVISIONING": "true",
 			},
 			script:          fakerTest,
-			fixture:         &launcherFixture{},
 			expectProvision: true,
 			expectK6Run:     true,
-			expectFallback:  false,
+			expectDefault:   false,
 			expectOsExit:    0,
 		},
 		{
@@ -129,10 +108,9 @@ func TestLauncherLaunch(t *testing.T) {
 				"K6_BINARY_PROVISIONING": "true",
 			},
 			script:          requireUnsatisfiedK6Version,
-			fixture:         &launcherFixture{},
 			expectProvision: true,
 			expectK6Run:     true,
-			expectFallback:  false,
+			expectDefault:   false,
 			expectOsExit:    0,
 		},
 		{
@@ -142,10 +120,9 @@ func TestLauncherLaunch(t *testing.T) {
 				"K6_BINARY_PROVISIONING": "true",
 			},
 			script:          requireSatisfiedK6Version,
-			fixture:         &launcherFixture{},
 			expectProvision: false,
 			expectK6Run:     false,
-			expectFallback:  true,
+			expectDefault:   true,
 			expectOsExit:    0,
 		},
 		{
@@ -155,10 +132,9 @@ func TestLauncherLaunch(t *testing.T) {
 				"K6_BINARY_PROVISIONING": "true",
 			},
 			script:          noDepsTest,
-			fixture:         &launcherFixture{},
 			expectProvision: false,
 			expectK6Run:     false,
-			expectFallback:  true,
+			expectDefault:   true,
 			expectOsExit:    0,
 		},
 		{
@@ -168,10 +144,9 @@ func TestLauncherLaunch(t *testing.T) {
 				"K6_BINARY_PROVISIONING": "false",
 			},
 			script:          fakerTest,
-			fixture:         &launcherFixture{},
 			expectProvision: false,
 			expectK6Run:     false,
-			expectFallback:  true,
+			expectDefault:   true,
 			expectOsExit:    0,
 		},
 		{
@@ -180,10 +155,9 @@ func TestLauncherLaunch(t *testing.T) {
 			k6Env: map[string]string{
 				"K6_BINARY_PROVISIONING": "false",
 			},
-			fixture:         &launcherFixture{},
 			expectProvision: false,
 			expectK6Run:     false,
-			expectFallback:  true,
+			expectDefault:   true,
 			expectOsExit:    0,
 		},
 		{
@@ -192,12 +166,10 @@ func TestLauncherLaunch(t *testing.T) {
 			k6Env: map[string]string{
 				"K6_BINARY_PROVISIONING": "true",
 			},
-			script: fakerTest,
-			fixture: &launcherFixture{
-				provisionError: errors.New("test error"),
-			},
+			script:          fakerTest,
+			provisionError:  errors.New("test error"),
 			expectProvision: true,
-			expectFallback:  false,
+			expectDefault:   false,
 			expectK6Run:     false,
 			expectOsExit:    1,
 		},
@@ -207,13 +179,10 @@ func TestLauncherLaunch(t *testing.T) {
 			k6Env: map[string]string{
 				"K6_BINARY_PROVISIONING": "true",
 			},
-			script: fakerTest,
-			fixture: &launcherFixture{
-				runK6Error:      errors.New("error executing k6"),
-				runk6ReturnCode: 108,
-			},
+			script:          fakerTest,
+			k6ReturnCode:    108,
 			expectProvision: true,
-			expectFallback:  false,
+			expectDefault:   false,
 			expectK6Run:     true,
 			expectOsExit:    108,
 		},
@@ -225,10 +194,9 @@ func TestLauncherLaunch(t *testing.T) {
 				"K6_BINARY_PROVISIONING": "true",
 			},
 			script:          "",
-			fixture:         &launcherFixture{},
 			expectProvision: false,
 			expectK6Run:     false,
-			expectFallback:  false,
+			expectDefault:   false,
 			expectOsExit:    1,
 		},
 	}
@@ -263,22 +231,23 @@ func TestLauncherLaunch(t *testing.T) {
 			// the exit code is checked by the TestGlobalState when the test ends
 			ts.ExpectedExitCode = tc.expectOsExit
 
+			defaultRunner := &mockRunner{}
+			provisionRunner := &mockRunner{rc: tc.k6ReturnCode}
+			provisionCalled := false
 			launcher := &Launcher{
-				gs:        ts.GlobalState,
-				provision: tc.fixture.provision,
-				fallback:  tc.fixture.fallback,
-				run:       tc.fixture.run,
+				gs: ts.GlobalState,
+				provision: func(_ *state.GlobalState, _ k6deps.Dependencies) (k6Runner, error) {
+					provisionCalled = true
+					return provisionRunner, tc.provisionError
+				},
+				runner: defaultRunner,
 			}
 
 			launcher.Launch()
 
-			assert.Equal(t, tc.expectProvision, tc.fixture.provisionCalled)
-			assert.Equal(t, tc.expectK6Run, tc.fixture.runK6Called)
-			assert.Equal(t, tc.expectFallback, tc.fixture.fallbackCalled)
-
-			for _, l := range tc.expectLogs {
-				assert.Contains(t, ts.Stdout, l)
-			}
+			assert.Equal(t, tc.expectProvision, provisionCalled)
+			assert.Equal(t, tc.expectK6Run, provisionRunner.invoked)
+			assert.Equal(t, tc.expectDefault, defaultRunner.invoked)
 		})
 	}
 }

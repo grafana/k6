@@ -2,35 +2,30 @@
 package launcher
 
 import (
-	"errors"
-	"os/exec"
-
 	"github.com/Masterminds/semver/v3"
 	"github.com/grafana/k6deps"
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/internal/build"
-	k6Cmd "go.k6.io/k6/internal/cmd"
 )
 
 // Launcher is a k6 Launcher
+// It analyses the requirements of a k6 execution. If required, provisions a k6Runner to satisfy these
+// requirements.
 type Launcher struct {
 	gs *state.GlobalState
-	// function to fall back if binary provisioning is not required
-	fallback func(gs *state.GlobalState)
-	// provision function receives a list of dependencies with their constrains and returns the path to a binary
-	// than satisfies them and the versions of the dependencies provided by the binary
-	provision func(*state.GlobalState, k6deps.Dependencies) (path string, versions string, err error)
-	// function to execute k6 binary
-	run func(*state.GlobalState, string) (int, error)
+	// provision function receives a list of dependencies with their constrains and returns
+	// a k6runner than satisfies them
+	provision func(*state.GlobalState, k6deps.Dependencies) (k6Runner, error)
+	// k6Runner to execute k6 command
+	runner k6Runner
 }
 
 // New creates a new Launcher from a GlobalState using the default fallback and provision functions
 func New(gs *state.GlobalState) *Launcher {
 	return &Launcher{
 		gs:        gs,
-		fallback:  k6Cmd.ExecuteWithGlobalState,
 		provision: k6buildProvision,
-		run:       runK6Cmd,
+		runner:    newDefaultK6Runner(),
 	}
 }
 
@@ -41,7 +36,7 @@ func (l *Launcher) Launch() {
 	// if binary provisioning is not enabled, continue with the regular k6 execution path
 	if !l.gs.Flags.BinaryProvisioning {
 		l.gs.Logger.Debug("Binary provisioning feature is disabled")
-		l.fallback(l.gs)
+		l.runner.run(l.gs)
 		return
 	}
 
@@ -57,13 +52,11 @@ func (l *Launcher) Launch() {
 		return // this is required for testing
 	}
 
-	// binary provisioning enabled but not required by this command
-	// continue with regular k6 execution path
-	if !isCustomBuildRequired(build.Version, deps) {
+	if !customBuildRequired(build.Version, deps) {
 		l.gs.Logger.
 			Debug("The current k6 binary already satisfies all the required dependencies," +
 				" it isn't required to provision a new binary.")
-		l.fallback(l.gs)
+		l.runner.run(l.gs)
 		return
 	}
 
@@ -72,61 +65,24 @@ func (l *Launcher) Launch() {
 		Info("The current k6 binary doesn't satisfy all the required dependencies, it is required to" +
 			" provision a new binary.")
 
-	l.launchCustomBuild(deps)
-}
-
-func (l *Launcher) launchCustomBuild(deps k6deps.Dependencies) {
-	// get the k6 binary from the build service
-	binPath, versions, err := l.provision(l.gs, deps)
+	runner, err := l.provision(l.gs, deps)
 	if err != nil {
 		l.gs.Logger.
 			WithError(err).
-			Error("Failed to provision a new k6 binary with required dependencies. Please, make sure to" +
-				" report this issue by opening a bug report.")
+			Error("Failed to provision a new k6 binary with required dependencies." +
+				" Please, make sure to report this issue by opening a bug report.")
 		l.gs.OSExit(1)
-		// in tests calling l.gs.OSExit does not ends execution so we have to return
 		return
 	}
 
-	l.gs.Logger.
-		Info("A new k6 binary has been provisioned with version(s): ", versions)
-
-	l.gs.Logger.Debug("Launching the new provisioned k6 binary")
-
-	// execute provisioned binary
-	if rc, err := l.run(l.gs, binPath); err != nil {
-		l.gs.Logger.WithError(err).Error("Failed to run the new provisioned k6 binary")
-		l.gs.OSExit(rc)
-	}
+	runner.run(l.gs)
 }
 
-// runK6Cmd runs the k6 binary passing the original arguments
-func runK6Cmd(gs *state.GlobalState, binPath string) (int, error) {
-	cmd := exec.CommandContext(gs.Ctx, binPath, gs.CmdArgs[1:]...) //nolint:gosec
-	cmd.Stderr = gs.Stderr
-	cmd.Stdout = gs.Stdout
-	cmd.Stdin = gs.Stdin
-
-	// disable binary provisioning to avoid a provisioning loop.
-	// if we keep it enabled the k6 binary executed here will receive the same input script
-	// will analyze it and detect the dependencies, triggering the binary provisioning again
-	gs.Env["K6_BINARY_PROVISIONING"] = "false"
-
-	if err := cmd.Run(); err != nil {
-		var eerr *exec.ExitError
-		if errors.As(err, &eerr) {
-			return eerr.ExitCode(), err
-		}
-	}
-
-	return 0, nil
-}
-
-// isCustomBuildRequired checks if the build is required
+// customBuildRequired checks if the build is required
 // it's required if there is one or more dependencies other than k6 itself
 // or if the required k6 version is not satisfied by the current binary's version
 // TODO: get the version of any built-in extension and check if they satisfy the dependencies
-func isCustomBuildRequired(baseK6Version string, deps k6deps.Dependencies) bool {
+func customBuildRequired(baseK6Version string, deps k6deps.Dependencies) bool {
 	if len(deps) == 0 {
 		return false
 	}
