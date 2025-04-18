@@ -53,7 +53,7 @@ func optionFlagSet() *pflag.FlagSet {
 	// are set in applyDefault().
 	sumTrendStatsHelp := fmt.Sprintf(
 		"define `stats` for trend metrics (response times), one or more as 'avg,p(95),...' (default '%s')",
-		strings.Join(lib.DefaultSummaryTrendStats, ","),
+		strings.Join(lib.DefaultSummaryTrendStats, ", "),
 	)
 	flags.StringSlice("summary-trend-stats", nil, sumTrendStatsHelp)
 	flags.String("summary-time-unit", "", "define the time unit used to display the trend stats. Possible units are: 's', 'ms' and 'us'") //nolint:lll
@@ -61,7 +61,7 @@ func optionFlagSet() *pflag.FlagSet {
 	// set it to nil here, and add the default in applyDefault() instead.
 	systemTagsCliHelpText := fmt.Sprintf(
 		"only include these system tags in metrics (default %q)",
-		metrics.DefaultSystemTagSet.SetString(),
+		strings.ReplaceAll(metrics.DefaultSystemTagSet.SetString(), ",", ", "),
 	)
 	flags.StringSlice("system-tags", nil, systemTagsCliHelpText)
 	flags.StringArray("tag", nil, "add a `tag` to be applied to all samples, as `[name]=[value]`")
@@ -70,10 +70,10 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.String("local-ips", "", "Client IP Ranges and/or CIDRs from which each VU will be making requests, "+
 		"e.g. '192.168.220.1,192.168.0.10-192.168.0.25', 'fd:1::0/120', etc.")
 	flags.String("dns", types.DefaultDNSConfig().String(), "DNS resolver configuration. Possible ttl values are: 'inf' "+
-		"for a persistent cache, '0' to disable the cache,\nor a positive duration, e.g. '1s', '1m', etc. "+
-		"Milliseconds are assumed if no unit is provided.\n"+
-		"Possible select values to return a single IP are: 'first', 'random' or 'roundRobin'.\n"+
-		"Possible policy values are: 'preferIPv4', 'preferIPv6', 'onlyIPv4', 'onlyIPv6' or 'any'.\n")
+		"for a persistent cache, '0' to disable the cache, or a positive duration, e.g. '1s', '1m', etc. "+
+		"Milliseconds are assumed if no unit is provided. "+
+		"Possible select values to return a single IP are: 'first', 'random' or 'roundRobin'. "+
+		"Possible policy values are: 'preferIPv4', 'preferIPv6', 'onlyIPv4', 'onlyIPv6' or 'any'.")
 	return flags
 }
 
