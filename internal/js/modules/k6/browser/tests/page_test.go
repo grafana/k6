@@ -2750,3 +2750,55 @@ func TestPageOnResponse(t *testing.T) {
 		assert.Equal(t, expected[i], resp)
 	}
 }
+
+func TestPageMustUseNativeJavaScriptObjects(t *testing.T) {
+	t.Parallel()
+
+	// Add an element to query for later.
+	tb := newTestBrowser(t)
+	page := tb.NewPage(nil)
+	require.NoError(t, page.SetContent(`
+		<!DOCTYPE html>
+		<html>
+		<head></head>
+		<body>
+			<div id='textField'>Hello World</div>
+		</div>
+		</body>
+		</html>
+	`, nil))
+
+	// Override the native objects using the test page.
+	//
+	// WARNING: Keep the function names and the native
+	// type names in sync for isOverwritten() to work.
+	// E.g.: Set() and window.overrides.Set are the same.
+	_, err := page.Evaluate(`() => {
+		window.overrides = {};
+		Set = () => window.overrides.Set = true;
+		Map = () => window.overrides.Map = true;
+		// Add other native objects here as needed.
+	}`)
+	require.NoError(t, err)
+
+	// Ensure that our test page has overridden the
+	// native Set and Map JavaScript objects.
+	isOverwritten := func(page *common.Page, objectName string) bool {
+		v, err := page.Evaluate(fmt.Sprintf(`
+			() => { %s(); return window.overrides.%[1]s; }`,
+			objectName,
+		), nil)
+		require.NoErrorf(t, err, "page should not have thrown an error: %s", err)
+		require.IsTypef(t, v, true, "expected %s to be a boolean", objectName)
+		return v.(bool)
+	}
+	require.True(t, isOverwritten(page, "Set"), "page should override the native Set")
+	require.True(t, isOverwritten(page, "Map"), "page should override the native Map")
+
+	// Ensure that we can still use the native Set and
+	// Map, even if the page under test has overridden
+	// them. QueryAll calls injected script, which
+	// requires Set and Map.
+	_, err = page.QueryAll("#textField")
+	require.NoErrorf(t, err, "page should not override the native objects, but it did")
+}
