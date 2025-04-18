@@ -8,24 +8,33 @@ import (
 	"go.k6.io/k6/internal/build"
 )
 
-// Launcher is a k6 Launcher
-// It analyses the requirements of a k6 execution. If required, provisions a k6Runner to satisfy these
-// requirements.
+// binaryRunner executes the requested k6 command line command.
+// It abstract the execution path from the concrete binary.
+type binaryRunner interface {
+	run(*state.GlobalState)
+}
+
+// Launcher is a k6 launcher. It analyses the requirements of a k6 execution,
+// then if required, it provisions a binary executor to satisfy the requirements.
 type Launcher struct {
+	// gs is the global state of k6.
 	gs *state.GlobalState
-	// provision function receives a list of dependencies with their constrains and returns
-	// a k6runner than satisfies them
-	provision func(*state.GlobalState, k6deps.Dependencies) (k6Runner, error)
-	// k6Runner to execute k6 command
-	runner k6Runner
+
+	// provision generates a custom binary from the received list of dependencies
+	// with their constrains, and it returns an executor that satisfies them.
+	provision func(*state.GlobalState, k6deps.Dependencies) (binaryRunner, error)
+
+	// binaryRunner executes the requested k6 command line command
+	binaryRunner binaryRunner
 }
 
 // New creates a new Launcher from a GlobalState using the default fallback and provision functions
 func New(gs *state.GlobalState) *Launcher {
+	defaultRunner := &currentBinary{}
 	return &Launcher{
-		gs:        gs,
-		provision: k6buildProvision,
-		runner:    newDefaultK6Runner(),
+		gs:           gs,
+		provision:    k6buildProvision,
+		binaryRunner: defaultRunner,
 	}
 }
 
@@ -33,10 +42,10 @@ func New(gs *state.GlobalState) *Launcher {
 // current binary if this is not necessary.
 // If the fhe fallback is called, it can exit the process so don't assume it will return
 func (l *Launcher) Launch() {
-	// if binary provisioning is not enabled, continue with the regular k6 execution path
+	// If binary provisioning is not enabled, continue with the regular k6 execution path
 	if !l.gs.Flags.BinaryProvisioning {
 		l.gs.Logger.Debug("Binary provisioning feature is disabled")
-		l.runner.run(l.gs)
+		l.binaryRunner.run(l.gs)
 		return
 	}
 
@@ -56,7 +65,7 @@ func (l *Launcher) Launch() {
 		l.gs.Logger.
 			Debug("The current k6 binary already satisfies all the required dependencies," +
 				" it isn't required to provision a new binary.")
-		l.runner.run(l.gs)
+		l.binaryRunner.run(l.gs)
 		return
 	}
 
@@ -65,7 +74,7 @@ func (l *Launcher) Launch() {
 		Info("The current k6 binary doesn't satisfy all the required dependencies, it is required to" +
 			" provision a new binary.")
 
-	runner, err := l.provision(l.gs, deps)
+	customBinary, err := l.provision(l.gs, deps)
 	if err != nil {
 		l.gs.Logger.
 			WithError(err).
@@ -75,7 +84,7 @@ func (l *Launcher) Launch() {
 		return
 	}
 
-	runner.run(l.gs)
+	customBinary.run(l.gs)
 }
 
 // customBuildRequired checks if the build is required

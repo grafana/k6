@@ -13,7 +13,7 @@ import (
 )
 
 // k6buildProvision returns the path to a k6 binary that satisfies the dependencies and the list of versions it provides
-func k6buildProvision(gs *state.GlobalState, deps k6deps.Dependencies) (k6Runner, error) {
+func k6buildProvision(gs *state.GlobalState, deps k6deps.Dependencies) (binaryRunner, error) {
 	opt := newOptions(gs)
 	if opt.BuildServiceToken == "" {
 		return nil, errors.New("k6 cloud token is required when Binary provisioning feature is enabled." +
@@ -38,7 +38,7 @@ func k6buildProvision(gs *state.GlobalState, deps k6deps.Dependencies) (k6Runner
 	gs.Logger.
 		Info("A new k6 binary has been provisioned with version(s): ", formatDependencies(binary.Dependencies))
 
-	return newK6Runner(binary.Path), nil
+	return &customBinary{binary.Path}, nil
 }
 
 func formatDependencies(deps map[string]string) string {
