@@ -176,7 +176,8 @@ func rootCmdPersistentFlagSet(gs *state.GlobalState) *pflag.FlagSet {
 		"setting secret sources for k6 file[=./path.fileformat],")
 
 	flags.StringVar(&gs.Flags.LogOutput, "log-output", gs.Flags.LogOutput,
-		"change the output for k6 logs, possible values are stderr,stdout,none,loki[=host:port],file[=./path.fileformat]")
+		"change the output for k6 logs, possible values are: "+
+			"'stderr', 'stdout', 'none', 'loki[=host:port]', 'file[=./path.fileformat]'")
 	flags.Lookup("log-output").DefValue = gs.DefaultFlags.LogOutput
 
 	flags.StringVar(&gs.Flags.LogFormat, "log-format", gs.Flags.LogFormat, "log output format")
