@@ -14,7 +14,32 @@
  * limitations under the License.
  */
 
-const autoClosingTags = new Set([
+// k6BrowserNative allows accessing native browser objects
+// even if the page under test has overridden them.
+const k6BrowserNative = (() => {
+  const iframe = document.createElement('iframe');
+  // hide it offscreen with zero size
+  iframe.style.position = 'absolute';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = '0';
+  iframe.style.top = '-9999px';
+  iframe.style.left = '-9999px';
+  iframe.style.display = 'none';
+
+  // grab the native browser object
+  document.documentElement.appendChild(iframe);
+  const win = iframe.contentWindow;
+  document.documentElement.removeChild(iframe);
+
+  return {
+    Set: win.Set,
+    Map: win.Map,
+    // Add other native browser objects as needed.
+  }
+})();
+
+const autoClosingTags = new k6BrowserNative.Set([
   "AREA",
   "BASE",
   "BR",
@@ -33,14 +58,14 @@ const autoClosingTags = new Set([
   "TRACK",
   "WBR",
 ]);
-const booleanAttributes = new Set([
+const booleanAttributes = new k6BrowserNative.Set([
   "checked",
   "selected",
   "disabled",
   "readonly",
   "multiple",
 ]);
-const eventType = new Map([
+const eventType = new k6BrowserNative.Map([
   ["auxclick", "mouse"],
   ["click", "mouse"],
   ["dblclick", "mouse"],
@@ -226,7 +251,7 @@ class InjectedScript {
           return "error:nthnocapture";
         }
         const nth = part.body;
-        const set = new Set();
+        const set = new k6BrowserNative.Set();
         for (const root of roots) {
           set.add(root.element);
           if (nth + 1 === set.size) {
@@ -528,7 +553,7 @@ class InjectedScript {
     if (element.nodeName.toLowerCase() === "input") {
       const input = element;
       const type = input.type.toLowerCase();
-      const kDateTypes = new Set([
+      const kDateTypes = new k6BrowserNative.Set([
         "date",
         "time",
         "datetime",
@@ -536,7 +561,7 @@ class InjectedScript {
         "month",
         "week",
       ]);
-      const kTextInputTypes = new Set([
+      const kTextInputTypes = new k6BrowserNative.Set([
         "",
         "email",
         "number",
@@ -682,7 +707,7 @@ class InjectedScript {
       [{ element: root, capture: undefined }],
       selector,
       0,
-      new Map()
+      new k6BrowserNative.Map()
     );
     if (strict && result.length > 1) {
       throw "error:strictmodeviolation";
@@ -701,9 +726,9 @@ class InjectedScript {
       [{ element: root, capture: undefined }],
       selector,
       0,
-      new Map()
+      new k6BrowserNative.Map()
     );
-    const set = new Set();
+    const set = new k6BrowserNative.Set();
     for (const r of result) {
       set.add(r.capture || r.element);
     }
