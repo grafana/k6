@@ -342,6 +342,38 @@ func TestMetricsAndThresholds(t *testing.T) {
 	require.Equal(t, expected, teardownThresholds)
 }
 
+func TestThresholdsWithCustomPercentile(t *testing.T) {
+	t.Parallel()
+	script := `
+		export const options = {
+			scenarios: {
+				sc1: {
+					executor: 'per-vu-iterations',
+					vus: 1,
+					iterations: 1,
+				},
+			},
+			thresholds: {
+				'iteration_duration': ['p(0)<50', 'p(90)<100', 'p(99.5)<150', 'p(99.99)<200'],
+			},
+		};
+
+		export default function () {}
+	`
+	ts := getSingleFileTestState(t, script, nil, 0)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stdout := ts.Stdout.String()
+	t.Log(stdout)
+
+	// We want to make sure that all the thresholds expressions are accompanied
+	// by their values, despite those being present in `options.summaryTrendStats` or not.
+	assert.Regexp(t, `✓ 'p\(0\)<50' p\(0\)=\d+(\.\d+)?(µs|ms|ns|s)`, stdout)
+	assert.Regexp(t, `✓ 'p\(90\)<100' p\(90\)=\d+(\.\d+)?(µs|ms|ns|s)`, stdout)
+	assert.Regexp(t, `✓ 'p\(99.5\)<150' p\(99.5\)=\d+(\.\d+)?(µs|ms|ns|s)`, stdout)
+	assert.Regexp(t, `✓ 'p\(99.99\)<200' p\(99.99\)=\d+(\.\d+)?(µs|ms|ns|s)`, stdout)
+}
+
 func TestSSLKEYLOGFILEAbsolute(t *testing.T) {
 	t.Parallel()
 	ts := NewGlobalTestState(t)

@@ -1,6 +1,8 @@
 package summary
 
 import (
+	"regexp"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -245,6 +247,15 @@ func summaryThresholds(
 				Source: threshold.Source,
 				Ok:     !threshold.LastFailed,
 			})
+
+			// Additionally, if metric is a trend and the threshold source is a percentile,
+			// we may need to add the percentile value to the metric values, in case it's
+			// not one of [summaryTrendStats].
+			if trendSink, isTrend := mThresholds.Sink.(*metrics.TrendSink); isTrend {
+				if agg, percentile, isPercentile := extractPercentileThresholdSource(threshold.Source); isPercentile {
+					mt.Metric.Values[agg] = trendSink.P(percentile / 100)
+				}
+			}
 		}
 
 		rts[mName] = mt
@@ -392,4 +403,29 @@ func metricValueGetter(summaryTrendStats []string) func(metrics.Sink, time.Durat
 
 		return result
 	}
+}
+
+var percentileThresholdSourceRe = regexp.MustCompile(`^p\((\d+(?:\.\d+)?)\)\s*([<>=])`)
+
+func extractPercentileThresholdSource(source string) (agg string, percentile float64, isPercentile bool) {
+	// We capture the following three matches, in order to detect whether source is a percentile:
+	// 1. The percentile definition: p(...)
+	// 2. The percentile value: p(??)
+	// 3. The beginning of the operator: '<', '>', or '='
+	const expectedMatches = 3
+	matches := percentileThresholdSourceRe.FindStringSubmatch(strings.TrimSpace(source))
+
+	if len(matches) == expectedMatches {
+		var err error
+		percentile, err = strconv.ParseFloat(matches[1], 64)
+		if err != nil {
+			return "", 0, false
+		}
+
+		agg = "p(" + matches[1] + ")"
+		isPercentile = true
+		return
+	}
+
+	return "", 0, false
 }
