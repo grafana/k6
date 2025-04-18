@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"sync"
 
 	"go.k6.io/k6/lib"
@@ -102,7 +103,12 @@ func NewGlobalState(ctx context.Context) *GlobalState {
 
 	env := BuildEnvMap(os.Environ())
 	defaultFlags := GetDefaultFlags(confDir)
-	globalFlags := getFlags(defaultFlags, env)
+	globalFlags := getFlags(defaultFlags, env, os.Args)
+
+	logLevel := logrus.InfoLevel
+	if globalFlags.Verbose {
+		logLevel = logrus.DebugLevel
+	}
 
 	logger := &logrus.Logger{
 		Out: stderr,
@@ -111,7 +117,7 @@ func NewGlobalState(ctx context.Context) *GlobalState {
 			DisableColors: !stderrTTY || globalFlags.NoColor,
 		},
 		Hooks: make(logrus.LevelHooks),
-		Level: logrus.InfoLevel,
+		Level: logLevel,
 	}
 
 	return &GlobalState{
@@ -155,6 +161,9 @@ type GlobalFlags struct {
 	SecretSource     []string
 	LogFormat        string
 	Verbose          bool
+
+	BinaryProvisioning bool
+	BuildServiceURL    string
 }
 
 // GetDefaultFlags returns the default global flags.
@@ -164,10 +173,11 @@ func GetDefaultFlags(homeDir string) GlobalFlags {
 		ProfilingEnabled: false,
 		ConfigFilePath:   filepath.Join(homeDir, "k6", defaultConfigFileName),
 		LogOutput:        "stderr",
+		BuildServiceURL:  "https://ingest.k6.io/builder/api/v1",
 	}
 }
 
-func getFlags(defaultFlags GlobalFlags, env map[string]string) GlobalFlags {
+func getFlags(defaultFlags GlobalFlags, env map[string]string, args []string) GlobalFlags {
 	result := defaultFlags
 
 	// TODO: add env vars for the rest of the values (after adjusting
@@ -193,5 +203,17 @@ func getFlags(defaultFlags GlobalFlags, env map[string]string) GlobalFlags {
 	if _, ok := env["K6_PROFILING_ENABLED"]; ok {
 		result.ProfilingEnabled = true
 	}
+	if env["K6_BINARY_PROVISIONING"] == "true" {
+		result.BinaryProvisioning = true
+	}
+	if val, ok := env["K6_BUILD_SERVICE_URL"]; ok {
+		result.BuildServiceURL = val
+	}
+
+	// check if verbose flag is set
+	if slices.Contains(args, "-v") || slices.Contains(args, "--verbose") {
+		result.Verbose = true
+	}
+
 	return result
 }
