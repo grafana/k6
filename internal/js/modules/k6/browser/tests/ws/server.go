@@ -19,7 +19,7 @@ import (
 	"github.com/mailru/easyjson"
 	"github.com/mailru/easyjson/jlexer"
 	"github.com/mailru/easyjson/jwriter"
-	"github.com/mccutchen/go-httpbin/httpbin"
+	"github.com/mccutchen/go-httpbin/v2/httpbin"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/http2"
 )
