@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//go:build go1.20
-
 // Package fallback embeds a set of fallback X.509 trusted roots in the
 // application by automatically invoking [x509.SetFallbackRoots]. This allows
 // the application to work correctly even if the operating system does not
@@ -24,8 +22,19 @@ import "crypto/x509"
 
 func init() {
 	p := x509.NewCertPool()
-	for _, c := range bundle {
-		p.AddCert(c)
+	for _, c := range parsedCertificates {
+		if len(c.constraints) == 0 {
+			p.AddCert(c.cert)
+		} else {
+			p.AddCertWithConstraint(c.cert, func(chain []*x509.Certificate) error {
+				for _, constraint := range c.constraints {
+					if err := constraint(chain); err != nil {
+						return err
+					}
+				}
+				return nil
+			})
+		}
 	}
 	x509.SetFallbackRoots(p)
 }
