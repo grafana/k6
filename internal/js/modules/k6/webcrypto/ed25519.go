@@ -36,13 +36,10 @@ func (kgp *Ed25519KeyGenParams) GenerateKey(
 		return nil, err
 	}
 
-	alg := KeyAlgorithm{
-		Algorithm: kgp.Algorithm,
-	}
 	privateKey := &CryptoKey{
 		Type:        PrivateCryptoKeyType,
 		Extractable: extractable,
-		Algorithm:   alg,
+		Algorithm:   kgp.Algorithm,
 		Usages: UsageIntersection(
 			keyUsages,
 			[]CryptoKeyUsage{SignCryptoKeyUsage},
@@ -53,7 +50,7 @@ func (kgp *Ed25519KeyGenParams) GenerateKey(
 	publicKey := &CryptoKey{
 		Type:        PublicCryptoKeyType,
 		Extractable: true,
-		Algorithm:   alg,
+		Algorithm:   kgp.Algorithm,
 		Usages: UsageIntersection(
 			keyUsages,
 			[]CryptoKeyUsage{VerifyCryptoKeyUsage},
@@ -72,6 +69,10 @@ func generateEd25519KeyPair(keyUsages []CryptoKeyUsage) (
 	ed25519.PrivateKey,
 	error,
 ) {
+	if len(keyUsages) == 0 {
+		return nil, nil, NewError(SyntaxError, "Invalid key usage: no key usages provided")
+	}
+
 	for _, usage := range keyUsages {
 		switch usage {
 		case SignCryptoKeyUsage, VerifyCryptoKeyUsage:

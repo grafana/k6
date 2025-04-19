@@ -30,6 +30,10 @@ func (p *X25519KeyGenParams) GenerateKey(
 	extractable bool,
 	keyUsages []CryptoKeyUsage,
 ) (CryptoKeyGenerationResult, error) {
+	if len(keyUsages) == 0 {
+		return nil, NewError(SyntaxError, "Invalid key usage: no key usages provided")
+	}
+
 	privateHandle, publicHandle, err := generateECDHKeyPair(X25519, keyUsages)
 	if err != nil {
 		return nil, err
