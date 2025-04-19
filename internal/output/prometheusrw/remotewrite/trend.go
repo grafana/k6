@@ -33,7 +33,7 @@ func newExtendedTrendSink(tsr TrendStatsResolver) (*extendedTrendSink, error) {
 // MapPrompb converts a k6 time series and its relative
 // Sink into the equivalent TimeSeries model as defined from
 // the Remote write specification.
-func (sink *extendedTrendSink) MapPrompb(series metrics.TimeSeries, t time.Time) []*prompb.TimeSeries {
+func (sink *extendedTrendSink) MapPrompb(series metrics.TimeSeries, t time.Time) []prompbSeriesWithType {
 	// Prometheus metric system does not support Trend so this mapping will
 	// store a counter for the number of reported values and gauges to keep
 	// track of aggregated values. Also store a sum of the values to allow
@@ -41,7 +41,7 @@ func (sink *extendedTrendSink) MapPrompb(series metrics.TimeSeries, t time.Time)
 	// TODO: when Prometheus implements support for sparse histograms, re-visit this implementation
 
 	tg := &trendAsGauges{
-		series: make([]*prompb.TimeSeries, 0, len(sink.trendStats)),
+		series: make([]prompbSeriesWithType, 0, len(sink.trendStats)),
 		// TODO: should we add the base unit suffix?
 		// It could depends from the decision for other metric types
 		// Does k6_http_req_duration_seconds_count make sense?
@@ -58,7 +58,7 @@ func (sink *extendedTrendSink) MapPrompb(series metrics.TimeSeries, t time.Time)
 
 type trendAsGauges struct {
 	// series is the slice of the converted TimeSeries.
-	series []*prompb.TimeSeries
+	series []prompbSeriesWithType
 
 	// labels are the shared labels between all the Gauges.
 	labels []*prompb.Label
@@ -92,7 +92,10 @@ func (tg *trendAsGauges) Append(suffix string, v float64) {
 		Timestamp: tg.timestamp,
 		Value:     v,
 	}
-	tg.series = append(tg.series, ts)
+	tg.series = append(tg.series, prompbSeriesWithType{
+		Series: ts,
+		Type:   metrics.Gauge,
+	})
 }
 
 // CacheNameIndex finds the __name__ label's index
@@ -122,10 +125,15 @@ type nativeHistogramSink struct {
 	H prometheus.Histogram
 }
 
-func newNativeHistogramSink(m *metrics.Metric) *nativeHistogramSink {
+func newNativeHistogramSink(ts *metrics.TimeSeries) *nativeHistogramSink {
+	// Create histogram with exportable name and labels, as this instance is
+	// exported as is when exporting to a pushgateway
+	metricName, labels := makeLabels(ts)
+
 	return &nativeHistogramSink{
 		H: prometheus.NewHistogram(prometheus.HistogramOpts{
-			Name: m.Name,
+			Name:        metricName,
+			ConstLabels: labels,
 			// 1.1 is the starting value suggested by Prometheus'
 			// It sounds good considering the general purpose
 			// it have to address.
@@ -134,6 +142,22 @@ func newNativeHistogramSink(m *metrics.Metric) *nativeHistogramSink {
 			NativeHistogramBucketFactor: 1.1,
 		}),
 	}
+}
+
+func makeLabels(ts *metrics.TimeSeries) (string, map[string]string) {
+	suffix := baseUnit(ts.Metric.Contains)
+	pbLabels := MapSeries(*ts, suffix)
+	var metricName string
+	labels := make(map[string]string, len(pbLabels))
+	for _, label := range pbLabels {
+		if label.Name == namelbl {
+			metricName = label.Value
+		} else {
+			labels[label.Name] = label.Value
+		}
+	}
+
+	return metricName, labels
 }
 
 func (sink *nativeHistogramSink) Add(s metrics.Sample) {
@@ -180,17 +204,21 @@ func (*nativeHistogramSink) Merge(_ []byte) error {
 }
 
 // MapPrompb maps the Trend type to the experimental Native Histogram.
-func (sink *nativeHistogramSink) MapPrompb(series metrics.TimeSeries, t time.Time) []*prompb.TimeSeries {
+func (sink *nativeHistogramSink) MapPrompb(series metrics.TimeSeries, t time.Time) []prompbSeriesWithType {
 	suffix := baseUnit(series.Metric.Contains)
 	labels := MapSeries(series, suffix)
 	timestamp := t.UnixMilli()
 
-	return []*prompb.TimeSeries{
+	return []prompbSeriesWithType{
 		{
-			Labels: labels,
-			Histograms: []*prompb.Histogram{
-				histogramToHistogramProto(timestamp, sink.H),
+			Series: &prompb.TimeSeries{
+				Labels: labels,
+				Histograms: []*prompb.Histogram{
+					histogramToHistogramProto(timestamp, sink.H),
+				},
 			},
+			Type: metrics.Trend,
+			hist: &sink.H,
 		},
 	}
 }
