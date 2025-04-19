@@ -17,6 +17,7 @@ const (
 	p256Canonical = "P-256"
 	p384Canonical = "P-384"
 	p521Canonical = "P-521"
+	x25519        = "X25519"
 )
 
 // EcKeyAlgorithm is the algorithm for elliptic curve keys as defined in the [specification].
@@ -394,6 +395,8 @@ func pickECDHCurve(k string) (ecdh.Curve, error) {
 		return ecdh.P384(), nil
 	case p521Canonical:
 		return ecdh.P521(), nil
+	case x25519:
+		return ecdh.X25519(), nil
 	default:
 		return nil, errors.New("invalid ECDH curve")
 	}
