@@ -233,6 +233,7 @@ type Page struct {
 	frameSessions    map[cdp.FrameID]*FrameSession
 	frameSessionsMu  sync.RWMutex
 	workers          map[target.SessionID]*Worker
+	workersMu        sync.Mutex
 	routes           []any // TODO: Implement
 	vu               k6modules.VU
 
@@ -604,6 +605,8 @@ func (p *Page) consoleMsgFromConsoleEvent(e *runtime.EventConsoleAPICalled) (*Co
 func (p *Page) removeWorker(sessionID target.SessionID) {
 	p.logger.Debugf("Page:removeWorker", "sid:%v", sessionID)
 
+	p.workersMu.Lock()
+	defer p.workersMu.Unlock()
 	delete(p.workers, sessionID)
 }
 
@@ -1603,6 +1606,8 @@ func (p *Page) WaitForTimeout(timeout int64) {
 
 // Workers returns all WebWorkers of page.
 func (p *Page) Workers() []*Worker {
+	p.workersMu.Lock()
+	defer p.workersMu.Unlock()
 	workers := make([]*Worker, 0, len(p.workers))
 	for _, w := range p.workers {
 		workers = append(workers, w)
