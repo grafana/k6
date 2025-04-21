@@ -31,9 +31,9 @@ type Keyboard struct {
 	ctx     context.Context
 	session session
 
-	modifiers   int64          // like shift, alt, ctrl, ...
-	pressedKeys map[int64]bool // tracks keys through down() and up()
-	layoutName  string         // us by default
+	modifiers   int64              // like shift, alt, ctrl, ...
+	pressedKeys map[int64]struct{} // tracks keys through down() and up()
+	layoutName  string             // us by default
 	layout      keyboardlayout.KeyboardLayout
 }
 
@@ -42,7 +42,7 @@ func NewKeyboard(ctx context.Context, s session) *Keyboard {
 	return &Keyboard{
 		ctx:         ctx,
 		session:     s,
-		pressedKeys: make(map[int64]bool),
+		pressedKeys: make(map[int64]struct{}),
 		layoutName:  "us",
 		layout:      keyboardlayout.GetKeyboardLayout("us"),
 	}
@@ -107,7 +107,7 @@ func (k *Keyboard) down(key string) error {
 	k.modifiers |= k.modifierBitFromKeyName(keyDef.Key)
 	text := keyDef.Text
 	_, autoRepeat := k.pressedKeys[keyDef.KeyCode]
-	k.pressedKeys[keyDef.KeyCode] = true
+	k.pressedKeys[keyDef.KeyCode] = struct{}{}
 
 	keyType := input.KeyDown
 	if text == "" {
