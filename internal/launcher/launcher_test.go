@@ -153,7 +153,7 @@ func TestLauncherLaunch(t *testing.T) {
 			name:  "command don't require binary provisioning",
 			k6Cmd: "version",
 			k6Env: map[string]string{
-				"K6_BINARY_PROVISIONING": "false",
+				"K6_BINARY_PROVISIONING": "true",
 			},
 			expectProvision: false,
 			expectK6Run:     false,
@@ -185,6 +185,19 @@ func TestLauncherLaunch(t *testing.T) {
 			expectDefault:   false,
 			expectK6Run:     true,
 			expectOsExit:    108,
+		},
+		{
+			name:   "missing input script",
+			k6Cmd:  "run",
+			k6Args: []string{},
+			k6Env: map[string]string{
+				"K6_BINARY_PROVISIONING": "true",
+			},
+			script:          "",
+			expectProvision: false,
+			expectK6Run:     false,
+			expectDefault:   false,
+			expectOsExit:    1,
 		},
 		{
 			name:   "script in stdin",
