@@ -1,6 +1,4 @@
-// Part of the Web Platform Tests suite for the k6's WebCrypto API
-//go:build wpt
-
+// Package tests runs part of the Web Platform Tests suite for the k6's WebCrypto API
 package tests
 
 import (
@@ -18,13 +16,9 @@ const webPlatformTestSuite = "./wpt/WebCryptoAPI/"
 func TestWebPlatformTestSuite(t *testing.T) {
 	t.Parallel()
 
-	// check if the test is running in the correct environment
-	info, err := os.Stat(webPlatformTestSuite)
-	if os.IsNotExist(err) || err != nil || !info.IsDir() {
-		t.Fatalf(
-			"The Web Platform Test directory does not exist, err: %s. Please check webcrypto/tests/README.md how to setup it",
-			err,
-		)
+	if _, err := os.Stat(webPlatformTestSuite); err != nil { //nolint:forbidigo
+		t.Skipf("If you want to run WebCrypto tests, you need to run the 'checkout.sh` script in the directory to get "+
+			"https://github.com/web-platform-tests/wpt at the correct last tested commit (%v)", err)
 	}
 
 	tests := []struct {
@@ -159,6 +153,8 @@ func TestWebPlatformTestSuite(t *testing.T) {
 			t.Parallel()
 
 			ts := newConfiguredRuntime(t)
+			// We compile the Web Platform testharness script into a sobek.Program
+			compileAndRun(t, ts, "./wpt/resources", "testharness.js")
 
 			gotErr := ts.EventLoop.Start(func() error {
 				rt := ts.VU.Runtime()
