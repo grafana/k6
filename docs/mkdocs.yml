@@ -3,7 +3,7 @@
 # 
 site_name: 'k6 Internal Documentation'
 repo_url: https://github.com/grafana/k6
-edit_uri: edit/main/docs/docs
+edit_uri: edit/main/docs
 
 theme:
   name: material
