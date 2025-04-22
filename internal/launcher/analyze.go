@@ -22,7 +22,7 @@ func analyze(gs *state.GlobalState, args []string) (k6deps.Dependencies, error) 
 		LookupEnv: func(key string) (string, bool) { v, ok := gs.Env[key]; return v, ok },
 	}
 
-	if !requiresScript(args) {
+	if !isScriptRequired(args) {
 		return k6deps.Dependencies{}, nil
 	}
 
@@ -56,8 +56,8 @@ func analyze(gs *state.GlobalState, args []string) (k6deps.Dependencies, error) 
 	return k6deps.Analyze(dopts)
 }
 
-// search for the command and returns a boolean indicating it takes a script or not
-func requiresScript(args []string) bool {
+// isScriptRequired searches for the command and returns a boolean indicating if it is required to pass a script or not
+func isScriptRequired(args []string) bool {
 	// return early if no arguments passed
 	if len(args) == 0 {
 		return false
