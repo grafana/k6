@@ -236,11 +236,11 @@ func TestLauncherLaunch(t *testing.T) {
 			provisionCalled := false
 			launcher := &Launcher{
 				gs: ts.GlobalState,
-				provision: func(_ *state.GlobalState, _ k6deps.Dependencies) (binaryRunner, error) {
+				provision: func(_ *state.GlobalState, _ k6deps.Dependencies) (commandExecutor, error) {
 					provisionCalled = true
 					return provisionRunner, tc.provisionError
 				},
-				binaryRunner: defaultRunner,
+				commandExecutor: defaultRunner,
 			}
 
 			launcher.Launch()

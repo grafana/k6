@@ -8,9 +8,9 @@ import (
 	"go.k6.io/k6/internal/build"
 )
 
-// binaryRunner executes the requested k6 command line command.
+// commandExecutor executes the requested k6 command line command.
 // It abstract the execution path from the concrete binary.
-type binaryRunner interface {
+type commandExecutor interface {
 	run(*state.GlobalState)
 }
 
@@ -22,19 +22,19 @@ type Launcher struct {
 
 	// provision generates a custom binary from the received list of dependencies
 	// with their constrains, and it returns an executor that satisfies them.
-	provision func(*state.GlobalState, k6deps.Dependencies) (binaryRunner, error)
+	provision func(*state.GlobalState, k6deps.Dependencies) (commandExecutor, error)
 
-	// binaryRunner executes the requested k6 command line command
-	binaryRunner binaryRunner
+	// commandExecutor executes the requested k6 command line command
+	commandExecutor commandExecutor
 }
 
 // New creates a new Launcher from a GlobalState using the default fallback and provision functions
 func New(gs *state.GlobalState) *Launcher {
 	defaultRunner := &currentBinary{}
 	return &Launcher{
-		gs:           gs,
-		provision:    k6buildProvision,
-		binaryRunner: defaultRunner,
+		gs:              gs,
+		provision:       k6buildProvision,
+		commandExecutor: defaultRunner,
 	}
 }
 
@@ -45,7 +45,7 @@ func (l *Launcher) Launch() {
 	// If binary provisioning is not enabled, continue with the regular k6 execution path
 	if !l.gs.Flags.BinaryProvisioning {
 		l.gs.Logger.Debug("Binary provisioning feature is disabled")
-		l.binaryRunner.run(l.gs)
+		l.commandExecutor.run(l.gs)
 		return
 	}
 
@@ -65,7 +65,7 @@ func (l *Launcher) Launch() {
 		l.gs.Logger.
 			Debug("The current k6 binary already satisfies all the required dependencies," +
 				" it isn't required to provision a new binary.")
-		l.binaryRunner.run(l.gs)
+		l.commandExecutor.run(l.gs)
 		return
 	}
 
