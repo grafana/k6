@@ -32,19 +32,18 @@ func (r *execRunner) run(gs *state.GlobalState) {
 	cmd.Stdout = gs.Stdout
 	cmd.Stdin = gs.Stdin
 
-	// disable binary provisioning to avoid a provisioning loop.
-	// if we keep it enabled the k6 binary executed here will receive the same input script
-	// will analyze it and detect the dependencies, triggering the binary provisioning again
+	// If not disabled, then the executed k6 binary would enter an infinite loop, where it continuously
+	// process the input script, detect dependencies, and retrigger provisioning.
 	gs.Env["K6_BINARY_PROVISIONING"] = "false"
 
-	gs.Logger.Debug("Launching the new provisioned k6 binary")
+	gs.Logger.Debug("Launching the provisioned k6 binary")
 
 	rc := 0
 	if err := cmd.Run(); err != nil {
 		rc = 1
 		gs.Logger.
 			WithError(err).
-			Error("Failed to run the new provisioned k6 binary")
+			Error("Failed to run the provisioned k6 binary")
 
 		var eerr *exec.ExitError
 		if errors.As(err, &eerr) {
