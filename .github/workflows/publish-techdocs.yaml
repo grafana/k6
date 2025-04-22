@@ -19,4 +19,4 @@ jobs:
       namespace: default
       kind: component
       name: k6
-      default-working-directory: ./docs
+      default-working-directory: .
