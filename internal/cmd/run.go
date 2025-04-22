@@ -176,8 +176,8 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 
 	// We'll need to pipe metrics to the MetricsEngine and process them if any
 	// of these are enabled: thresholds, end-of-test summary
-	shouldProcessMetrics := (!testRunState.RuntimeOptions.NoSummary.Bool ||
-		!testRunState.RuntimeOptions.NoThresholds.Bool)
+	shouldProcessMetrics := !testRunState.RuntimeOptions.NoSummary.Bool ||
+		!testRunState.RuntimeOptions.NoThresholds.Bool
 	var metricsIngester *engine.OutputIngester
 	if shouldProcessMetrics {
 		err = metricsEngine.InitSubMetricsAndThresholds(conf.Options, testRunState.RuntimeOptions.NoThresholds.Bool)
@@ -487,6 +487,17 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	// Warn if no iterations could be completed.
 	if executionState.GetFullIterationCount() == 0 {
 		logger.Warn("No script iterations fully finished, consider making the test duration longer")
+	}
+
+	// The execution module enables users to mark a test as failed, while letting the test
+	// execution complete. As such, we check the test status here, after the test run has finished, and
+	// ensure we return an error indicating that the test run was marked as failed, and the proper
+	// exit code is used.
+	if testRunState.TestStatus.Failed() {
+		return errext.WithExitCodeIfNone(
+			fmt.Errorf("test run was marked as failed"),
+			exitcodes.MarkedAsFailed,
+		)
 	}
 
 	logger.Debug("Test finished cleanly")

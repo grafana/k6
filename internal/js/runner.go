@@ -25,11 +25,11 @@ import (
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/internal/event"
 	"go.k6.io/k6/internal/js/eventloop"
+	"go.k6.io/k6/internal/lib/consts"
 	"go.k6.io/k6/internal/lib/summary"
 	"go.k6.io/k6/internal/loader"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/lib/netext"
 	"go.k6.io/k6/lib/types"
@@ -244,6 +244,7 @@ func (r *Runner) newVU(
 		BuiltinMetrics: r.preInitState.BuiltinMetrics,
 		TracerProvider: r.preInitState.TracerProvider,
 		Usage:          r.preInitState.Usage,
+		TestStatus:     r.preInitState.TestStatus,
 	}
 	vu.moduleVUImpl.state = vu.state
 	_ = vu.Runtime.Set("console", vu.Console)

@@ -9,8 +9,8 @@ import (
 
 	"gopkg.in/guregu/null.v3"
 
+	"go.k6.io/k6/internal/lib/consts"
 	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/lib/types"
 )
 
