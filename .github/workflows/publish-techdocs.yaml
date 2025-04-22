@@ -2,7 +2,7 @@ name: Publish TechDocs
 on:
   push:
     branches:
-      - main
+      - master
     paths:
       - 'docs/docs/**'
       - 'docs/mkdocs.yml'
