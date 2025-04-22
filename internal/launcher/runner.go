@@ -2,6 +2,7 @@ package launcher
 
 import (
 	"errors"
+	"fmt"
 	"os/exec"
 
 	"go.k6.io/k6/cmd/state"
@@ -32,9 +33,17 @@ func (r *execRunner) run(gs *state.GlobalState) {
 	cmd.Stdout = gs.Stdout
 	cmd.Stdin = gs.Stdin
 
+	// Copy environment variables to the k6 process and skip binary provisioning feature flag to disable it.
 	// If not disabled, then the executed k6 binary would enter an infinite loop, where it continuously
 	// process the input script, detect dependencies, and retrigger provisioning.
-	gs.Env["K6_BINARY_PROVISIONING"] = "false"
+	env := []string{}
+	for k, v := range gs.Env {
+		if k == "K6_BINARY_PROVISIONING" {
+			continue
+		}
+		env = append(env, fmt.Sprintf("%s=%s", k, v))
+	}
+	cmd.Env = env
 
 	gs.Logger.Debug("Launching the provisioned k6 binary")
 
