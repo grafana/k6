@@ -78,6 +78,7 @@ func TestLauncherLaunch(t *testing.T) {
 	testCases := []struct {
 		name            string
 		script          string
+		disableBP       bool
 		k6Cmd           string
 		k6Args          []string
 		expectProvision bool
@@ -87,6 +88,16 @@ func TestLauncherLaunch(t *testing.T) {
 		k6ReturnCode    int
 		expectOsExit    int
 	}{
+		{
+			name:            "disable binary provisioning",
+			k6Cmd:           "run",
+			disableBP:       true,
+			script:          fakerTest,
+			expectProvision: false,
+			expectK6Run:     false,
+			expectDefault:   true,
+			expectOsExit:    0,
+		},
 		{
 			name:            "execute binary provisioned",
 			k6Cmd:           "run",
@@ -198,7 +209,7 @@ func TestLauncherLaunch(t *testing.T) {
 
 			// NewGlobalTestState does not set the Binary provisioning flag even if we set
 			// the K6_BINARY_PROVISIONING variable in the global state, so we do it manually
-			ts.GlobalState.Flags.BinaryProvisioning = true
+			ts.GlobalState.Flags.BinaryProvisioning = !tc.disableBP
 
 			// the exit code is checked by the TestGlobalState when the test ends
 			ts.ExpectedExitCode = tc.expectOsExit
