@@ -22,8 +22,12 @@ func analyze(gs *state.GlobalState, args []string) (k6deps.Dependencies, error) 
 		LookupEnv: func(key string) (string, bool) { v, ok := gs.Env[key]; return v, ok },
 	}
 
-	scriptname, hasScript := scriptNameFromArgs(args)
-	if !hasScript {
+	if !isScriptRequired(args) {
+		return k6deps.Dependencies{}, nil
+	}
+
+	scriptname := scriptNameFromArgs(args)
+	if len(scriptname) == 0 {
 		gs.Logger.
 			Debug("The command did not receive an input script.")
 		return nil, errScriptNotFound
@@ -52,35 +56,46 @@ func analyze(gs *state.GlobalState, args []string) (k6deps.Dependencies, error) 
 	return k6deps.Analyze(dopts)
 }
 
-// scriptNameFromArgs returns the file name passed as input and true if it's a valid script name
-func scriptNameFromArgs(args []string) (string, bool) {
+// isScriptRequired searches for the command and returns a boolean indicating if it is required to pass a script or not
+func isScriptRequired(args []string) bool {
 	// return early if no arguments passed
 	if len(args) == 0 {
-		return "", false
+		return false
 	}
 
 	// search for a command that requires binary provisioning and then get the target script or archive
-	for i, arg := range args {
+	for _, arg := range args {
 		switch arg {
 		case "run", "archive", "inspect", "cloud":
-			// Look for script files (non-flag arguments with .js, or .tar extension) in the reminder args
-			for _, arg = range args[i+1:] {
-				if strings.HasPrefix(arg, "-") {
-					if arg == "-" { // we are running a script from stdin
-						return arg, true
-					}
-					continue
-				}
-				if strings.HasSuffix(arg, ".js") ||
-					strings.HasSuffix(arg, ".tar") ||
-					strings.HasSuffix(arg, ".ts") {
-					return arg, true
-				}
-			}
-			return "", false
+			return true
 		}
 	}
 
 	// not found
-	return "", false
+	return false
+}
+
+// scriptNameFromArgs returns the file name passed as input and true if it's a valid script name
+func scriptNameFromArgs(args []string) string {
+	// return early if no arguments passed
+	if len(args) == 0 {
+		return ""
+	}
+
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "-") {
+			if arg == "-" { // we are running a script from stdin
+				return arg
+			}
+			continue
+		}
+		if strings.HasSuffix(arg, ".js") ||
+			strings.HasSuffix(arg, ".tar") ||
+			strings.HasSuffix(arg, ".ts") {
+			return arg
+		}
+	}
+
+	// not found
+	return ""
 }

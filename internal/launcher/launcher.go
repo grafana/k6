@@ -61,6 +61,7 @@ func (l *Launcher) Launch() {
 		return // this is required for testing
 	}
 
+	// if the command does not have dependencies or a custom build
 	if !customBuildRequired(build.Version, deps) {
 		l.gs.Logger.
 			Debug("The current k6 binary already satisfies all the required dependencies," +

@@ -2,7 +2,6 @@ package launcher
 
 import (
 	"errors"
-	"maps"
 	"os"
 	"path/filepath"
 	"testing"
@@ -79,7 +78,7 @@ func TestLauncherLaunch(t *testing.T) {
 	testCases := []struct {
 		name            string
 		script          string
-		k6Env           map[string]string
+		disableBP       bool
 		k6Cmd           string
 		k6Args          []string
 		expectProvision bool
@@ -90,11 +89,18 @@ func TestLauncherLaunch(t *testing.T) {
 		expectOsExit    int
 	}{
 		{
-			name:  "execute binary provisioned",
-			k6Cmd: "run",
-			k6Env: map[string]string{
-				"K6_BINARY_PROVISIONING": "true",
-			},
+			name:            "disable binary provisioning",
+			k6Cmd:           "run",
+			disableBP:       true,
+			script:          fakerTest,
+			expectProvision: false,
+			expectK6Run:     false,
+			expectDefault:   true,
+			expectOsExit:    0,
+		},
+		{
+			name:            "execute binary provisioned",
+			k6Cmd:           "run",
 			script:          fakerTest,
 			expectProvision: true,
 			expectK6Run:     true,
@@ -102,11 +108,8 @@ func TestLauncherLaunch(t *testing.T) {
 			expectOsExit:    0,
 		},
 		{
-			name:  "require unsatisfied k6 version",
-			k6Cmd: "run",
-			k6Env: map[string]string{
-				"K6_BINARY_PROVISIONING": "true",
-			},
+			name:            "require unsatisfied k6 version",
+			k6Cmd:           "run",
 			script:          requireUnsatisfiedK6Version,
 			expectProvision: true,
 			expectK6Run:     true,
@@ -114,11 +117,8 @@ func TestLauncherLaunch(t *testing.T) {
 			expectOsExit:    0,
 		},
 		{
-			name:  "require satisfied k6 version",
-			k6Cmd: "run",
-			k6Env: map[string]string{
-				"K6_BINARY_PROVISIONING": "true",
-			},
+			name:            "require satisfied k6 version",
+			k6Cmd:           "run",
 			script:          requireSatisfiedK6Version,
 			expectProvision: false,
 			expectK6Run:     false,
@@ -126,11 +126,8 @@ func TestLauncherLaunch(t *testing.T) {
 			expectOsExit:    0,
 		},
 		{
-			name:  "script with no dependencies",
-			k6Cmd: "run",
-			k6Env: map[string]string{
-				"K6_BINARY_PROVISIONING": "true",
-			},
+			name:            "script with no dependencies",
+			k6Cmd:           "run",
 			script:          noDepsTest,
 			expectProvision: false,
 			expectK6Run:     false,
@@ -138,34 +135,16 @@ func TestLauncherLaunch(t *testing.T) {
 			expectOsExit:    0,
 		},
 		{
-			name:  "binary provisioning disabled",
-			k6Cmd: "run",
-			k6Env: map[string]string{
-				"K6_BINARY_PROVISIONING": "false",
-			},
-			script:          fakerTest,
+			name:            "command don't require binary provisioning",
+			k6Cmd:           "version",
 			expectProvision: false,
 			expectK6Run:     false,
 			expectDefault:   true,
 			expectOsExit:    0,
 		},
 		{
-			name:  "command don't require binary provisioning",
-			k6Cmd: "version",
-			k6Env: map[string]string{
-				"K6_BINARY_PROVISIONING": "false",
-			},
-			expectProvision: false,
-			expectK6Run:     false,
-			expectDefault:   true,
-			expectOsExit:    0,
-		},
-		{
-			name:  "failed binary provisioning",
-			k6Cmd: "run",
-			k6Env: map[string]string{
-				"K6_BINARY_PROVISIONING": "true",
-			},
+			name:            "failed binary provisioning",
+			k6Cmd:           "run",
 			script:          fakerTest,
 			provisionError:  errors.New("test error"),
 			expectProvision: true,
@@ -174,11 +153,8 @@ func TestLauncherLaunch(t *testing.T) {
 			expectOsExit:    1,
 		},
 		{
-			name:  "failed k6 execution",
-			k6Cmd: "run",
-			k6Env: map[string]string{
-				"K6_BINARY_PROVISIONING": "true",
-			},
+			name:            "failed k6 execution",
+			k6Cmd:           "run",
 			script:          fakerTest,
 			k6ReturnCode:    108,
 			expectProvision: true,
@@ -187,12 +163,19 @@ func TestLauncherLaunch(t *testing.T) {
 			expectOsExit:    108,
 		},
 		{
-			name:   "script in stdin",
-			k6Cmd:  "run",
-			k6Args: []string{"-"},
-			k6Env: map[string]string{
-				"K6_BINARY_PROVISIONING": "true",
-			},
+			name:            "missing input script",
+			k6Cmd:           "run",
+			k6Args:          []string{},
+			script:          "",
+			expectProvision: false,
+			expectK6Run:     false,
+			expectDefault:   false,
+			expectOsExit:    1,
+		},
+		{
+			name:            "script in stdin",
+			k6Cmd:           "run",
+			k6Args:          []string{"-"},
 			script:          "",
 			expectProvision: false,
 			expectK6Run:     false,
@@ -220,13 +203,13 @@ func TestLauncherLaunch(t *testing.T) {
 			}
 
 			ts.GlobalState.CmdArgs = k6Args
-			maps.Copy(ts.GlobalState.Env, tc.k6Env)
 
 			// k6deps uses os package to access files. So we need to use it in the global state
 			ts.GlobalState.FS = afero.NewOsFs()
 
-			// NewGlobalTestState does not set the Binary provisioning flag, set it manually
-			ts.GlobalState.Flags.BinaryProvisioning = (tc.k6Env["K6_BINARY_PROVISIONING"] == "true")
+			// NewGlobalTestState does not set the Binary provisioning flag even if we set
+			// the K6_BINARY_PROVISIONING variable in the global state, so we do it manually
+			ts.GlobalState.Flags.BinaryProvisioning = !tc.disableBP
 
 			// the exit code is checked by the TestGlobalState when the test ends
 			ts.ExpectedExitCode = tc.expectOsExit
