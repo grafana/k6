@@ -1,8 +1,7 @@
-//go:build wpt
-
 package streams
 
 import (
+	"os"
 	"testing"
 
 	"go.k6.io/k6/js/modules"
@@ -12,8 +11,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const webPlatformTestSuite = "tests/wpt"
+
 func TestReadableStream(t *testing.T) {
 	t.Parallel()
+	if _, err := os.Stat(webPlatformTestSuite); err != nil { //nolint:forbidigo
+		t.Skipf("If you want to run Streams tests, you need to run the 'checkout.sh` script in the directory to get "+
+			"https://github.com/web-platform-tests/wpt at the correct last tested commit (%v)", err)
+	}
 
 	suites := []string{
 		"bad-strategies.any.js",
@@ -34,7 +39,7 @@ func TestReadableStream(t *testing.T) {
 			t.Parallel()
 			ts := newConfiguredRuntime(t)
 			gotErr := ts.EventLoop.Start(func() error {
-				return executeTestScript(ts.VU, "tests/wpt/streams/readable-streams", suite)
+				return executeTestScript(ts.VU, webPlatformTestSuite+"/streams/readable-streams", suite)
 			})
 			assert.NoError(t, gotErr)
 		})
@@ -57,7 +62,7 @@ func newConfiguredRuntime(t testing.TB) *modulestest.Runtime {
 	}
 
 	// Then, we register the Web Platform Tests harness.
-	compileAndRun(t, rt, "tests/wpt", "resources/testharness.js")
+	compileAndRun(t, rt, webPlatformTestSuite, "resources/testharness.js")
 
 	// And the Streams-specific test utilities.
 	files := []string{
@@ -66,7 +71,7 @@ func newConfiguredRuntime(t testing.TB) *modulestest.Runtime {
 		"resources/test-utils.js",
 	}
 	for _, file := range files {
-		compileAndRun(t, rt, "tests/wpt/streams", file)
+		compileAndRun(t, rt, webPlatformTestSuite+"/streams", file)
 	}
 
 	return rt
