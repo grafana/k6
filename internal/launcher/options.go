@@ -8,25 +8,6 @@ import (
 	"go.k6.io/k6/lib/fsext"
 )
 
-// options contains the optional parameters for provisioning.
-type options struct {
-	// BuildServiceURL contains the URL of the k6 build service to be used.
-	// If the value is not nil, the k6 binary is built using the build service instead of the local build.
-	BuildServiceURL string
-
-	// BuildServiceToken contains the token to be used to authenticate with the build service.
-	// Defaults to K6_CLOUD_TOKEN environment variable if set, or the value stored in the k6 config file.
-	BuildServiceToken string
-}
-
-// newOptions creates a new Options object
-func newOptions(gs *k6State.GlobalState) options {
-	return options{
-		BuildServiceURL:   gs.Flags.BuildServiceURL,
-		BuildServiceToken: extractToken(gs),
-	}
-}
-
 // extractToken gets the cloud token required to access the build service
 // from the environment or from the config file
 func extractToken(gs *k6State.GlobalState) string {

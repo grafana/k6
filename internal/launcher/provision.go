@@ -14,15 +14,14 @@ import (
 
 // k6buildProvision returns the path to a k6 binary that satisfies the dependencies and the list of versions it provides
 func k6buildProvision(gs *state.GlobalState, deps k6deps.Dependencies) (commandExecutor, error) {
-	opt := newOptions(gs)
-	if opt.BuildServiceToken == "" {
-		return nil, errors.New("k6 cloud token is required when Binary provisioning feature is enabled." +
-			" Set K6_CLOUD_TOKEN environment variable or execute the k6 cloud login command")
+	config := k6provider.Config{
+		BuildServiceURL:  gs.Flags.BuildServiceURL,
+		BuildServiceAuth: extractToken(gs),
 	}
 
-	config := k6provider.Config{
-		BuildServiceURL:  opt.BuildServiceURL,
-		BuildServiceAuth: opt.BuildServiceToken,
+	if config.BuildServiceAuth == "" {
+		return nil, errors.New("k6 cloud token is required when Binary provisioning feature is enabled." +
+			" Set K6_CLOUD_TOKEN environment variable or execute the `k6 cloud login` command")
 	}
 
 	provider, err := k6provider.NewProvider(config)
