@@ -56,20 +56,23 @@ func NewLauncher(gs *state.GlobalState) *Launcher {
 func (l *Launcher) Launch() {
 	// If binary provisioning is not enabled, continue with the regular k6 execution path
 	if !l.gs.Flags.BinaryProvisioning {
-		l.gs.Logger.Debug("Binary provisioning feature is disabled.")
+		l.gs.Logger.Debug("Binary Provisioning feature is disabled.")
 		l.commandExecutor.run(l.gs)
 		return
 	}
 
 	l.gs.Logger.
-		Debug("Binary provisioning feature is enabled.")
+		Debug("Binary Provisioning feature is enabled.")
+
+	reportIssues := "If you encounter any unexpected user experience or something didn't go as planned," +
+		" please report it by creating an issue."
 
 	deps, err := analyze(l.gs, l.gs.CmdArgs[1:])
 	if err != nil {
 		l.gs.Logger.
 			WithError(err).
-			Error("Binary provisioning is enabled but it failed to analyze the dependencies." +
-				" Please, make sure to report this issue by opening a bug report.")
+			Error("Binary Provisioning is enabled but it failed to analyze the dependencies. " +
+				reportIssues)
 		l.gs.OSExit(1)
 		return // this is required for testing
 	}
@@ -85,15 +88,16 @@ func (l *Launcher) Launch() {
 
 	l.gs.Logger.
 		WithField("deps", deps).
-		Info("The current k6 binary doesn't satisfy all dependencies, it is required to" +
+		Info("Binary Provisioning experimental feature is enabled." +
+			" The current k6 binary doesn't satisfy all dependencies, it's required to" +
 			" provision a custom binary.")
 
 	customBinary, err := l.provision(l.gs, deps)
 	if err != nil {
 		l.gs.Logger.
 			WithError(err).
-			Error("Failed to provision a k6 binary with required dependencies." +
-				" Please, make sure to report this issue by opening a bug report.")
+			Error("Failed to provision a k6 binary with required dependencies. " +
+				reportIssues)
 		l.gs.OSExit(1)
 		return
 	}
