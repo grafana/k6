@@ -64,9 +64,17 @@ func isScriptRequired(args []string) bool {
 	}
 
 	// search for a command that requires binary provisioning and then get the target script or archive
-	for _, arg := range args {
+	// we handle cloud login subcommand as a special case because it does not require binary provisioning
+	for i, arg := range args {
 		switch arg {
-		case "run", "archive", "inspect", "cloud":
+		case "cloud":
+			for _, arg = range args[i+1:] {
+				if arg == "login" {
+					return false
+				}
+			}
+			return true
+		case "run", "archive", "inspect":
 			return true
 		}
 	}

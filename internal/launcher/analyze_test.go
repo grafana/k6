@@ -164,6 +164,11 @@ func TestIsScriptRequired(t *testing.T) {
 			expected: true,
 		},
 		{
+			name:     "cloud login command",
+			args:     []string{"cloud", "login"},
+			expected: false,
+		},
+		{
 			name:     "archive command",
 			args:     []string{"archive", "script.js"},
 			expected: true,
