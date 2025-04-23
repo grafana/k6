@@ -839,7 +839,7 @@ function renderThresholdResults(
 			: formatter.decorate(failMark, 'red');
 
 		const sourceText = formatter.decorate(
-			`'${threshold.source}'`,
+			`'${threshold.source.trim()}'`,
 			'white',
 		);
 
@@ -941,13 +941,16 @@ function renderMetricValueForThresholds(
 	info,
 	formatter,
 ) {
-	const {trendStats, trendCols, nonTrendValues, nonTrendExtras} = info;
+	const {trendStats, trendCols, trendKeys, nonTrendValues, nonTrendExtras} = info;
 	const thresholdAgg = threshold.source.split(/[=><]/)[0].trim();
 
 	let value;
 	switch (metric.type) {
 		case 'trend':
-			value = trendCols[metric.name][trendStats.indexOf(thresholdAgg)]
+			const trendStatIndex = trendStats.indexOf(thresholdAgg);
+			value = (trendStatIndex !== -1)
+				? trendCols[metric.name]?.[trendStatIndex]
+				: trendKeys[metric.name]?.[thresholdAgg];
 			break;
 		case 'counter':
 			value = (thresholdAgg === 'count')
@@ -1042,6 +1045,7 @@ function renderTrendValue(value, stat, metric, options) {
  * @property {Object} nonTrendValues - The non-trend metric values.
  * @property {Object} nonTrendExtras - The non-trend metric extras.
  * @property {Object} trendCols - The trend columns.
+ * @property {Object} trendKeys - The trend keys (values that aren't included within `trendStats`).
  * @property {number[]} trendColMaxLens - The trend column maximum lengths.
  * @property {number} numTrendColumns - The number of trend columns.
  * @property {string[]} trendStats - The trend statistics.
@@ -1060,6 +1064,10 @@ function computeSummaryInfo(metrics, renderContext, options) {
 	const nonTrendValues = {};
 	const nonTrendExtras = {};
 	const trendCols = {};
+
+	// While "trendCols" contain the values for each "trendStats" aggregation (e.g. p(90) as a sorted array,
+	// "trendKeys" is used to store specific aggregation values that aren't part of "trendStats"; mainly for thresholds.
+	const trendKeys = {};
 
 	let maxNameWidth = 0;
 	let maxNonTrendValueLen = 0;
@@ -1082,6 +1090,13 @@ function computeSummaryInfo(metrics, renderContext, options) {
 		maxNameWidth = Math.max(maxNameWidth, strWidth(displayName));
 
 		if (metric.type === 'trend') {
+			const keys = Object.keys(metric.values).reduce((acc, key) => {
+				if (!trendStats.includes(key)) {
+					acc[key] = renderTrendValue(metric.values[key], key, metric, options);
+				}
+				return acc;
+			}, {});
+
 			const cols = trendStats.map((stat) =>
 				renderTrendValue(metric.values[stat], stat, metric, options),
 			);
@@ -1094,6 +1109,7 @@ function computeSummaryInfo(metrics, renderContext, options) {
 				);
 			});
 			trendCols[name] = cols;
+			trendKeys[name] = keys;
 		} else {
 			const values = nonTrendMetricValueForSum(
 				metric,
@@ -1127,6 +1143,7 @@ function computeSummaryInfo(metrics, renderContext, options) {
 		nonTrendExtras,
 		trendCols,
 		trendColMaxLens,
+		trendKeys,
 		numTrendColumns,
 		trendStats,
 		maxNonTrendValueLen,
