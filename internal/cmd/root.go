@@ -28,6 +28,13 @@ import (
 
 const waitLoggerCloseTimeout = time.Second * 5
 
+// ExecuteWithGlobalState runs the root command with an existing GlobalState.
+// It adds all child commands to the root command and it sets flags appropriately.
+// It is called by main.main(). It only needs to happen once to the rootCmd.
+func ExecuteWithGlobalState(gs *state.GlobalState) {
+	newRootCommand(gs).execute()
+}
+
 // This is to keep all fields needed for the main/root k6 command
 type rootCommand struct {
 	globalState *state.GlobalState
@@ -124,13 +131,6 @@ func (c *rootCommand) execute() {
 	if c.loggerIsRemote {
 		c.globalState.FallbackLogger.WithFields(fields).Error(errText)
 	}
-}
-
-// ExecuteWithGlobalState runs the root command with an existing GlobalState.
-// It adds all child commands to the root command and it sets flags appropriately.
-// It is called by main.main(). It only needs to happen once to the rootCmd.
-func ExecuteWithGlobalState(gs *state.GlobalState) {
-	newRootCommand(gs).execute()
 }
 
 func (c *rootCommand) stopLoggers() {
