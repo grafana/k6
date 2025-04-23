@@ -1,5 +1,5 @@
 // Package launcher is the entry point for the k6 command.
-package launcher
+package cmd
 
 import (
 	"bytes"
@@ -14,7 +14,6 @@ import (
 	"go.k6.io/k6/cmd/state"
 	k6State "go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/internal/build"
-	k6Cmd "go.k6.io/k6/internal/cmd"
 )
 
 // commandExecutor executes the requested k6 command line command.
@@ -38,7 +37,7 @@ type Launcher struct {
 }
 
 // New creates a new Launcher from a GlobalState using the default fallback and provision functions
-func New(gs *state.GlobalState) *Launcher {
+func NewLauncher(gs *state.GlobalState) *Launcher {
 	defaultExecutor := &currentBinary{}
 	return &Launcher{
 		gs:              gs,
@@ -144,7 +143,7 @@ func (b *customBinary) run(gs *state.GlobalState) {
 type currentBinary struct{}
 
 func (b *currentBinary) run(gs *state.GlobalState) {
-	k6Cmd.ExecuteWithGlobalState(gs)
+	ExecuteWithGlobalState(gs)
 }
 
 // customBuildRequired checks if the build is required
