@@ -15,7 +15,7 @@ import (
 
 	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/errext/exitcodes"
-	"go.k6.io/k6/internal/cmd"
+	"go.k6.io/k6/internal/launcher"
 	"go.k6.io/k6/lib/fsext"
 )
 
@@ -61,7 +61,7 @@ func TestCloudRunCommandIncompatibleFlags(t *testing.T) {
 
 			ts := getSimpleCloudTestState(t, nil, setupK6CloudRunCmd, tc.cliArgs, nil, nil)
 			ts.ExpectedExitCode = int(exitcodes.InvalidConfig)
-			cmd.ExecuteWithGlobalState(ts.GlobalState)
+			launcher.ExecuteForTesting(ts.GlobalState)
 
 			stderr := ts.Stderr.String()
 			assert.Contains(t, stderr, tc.wantStderrContains)
@@ -112,7 +112,7 @@ export default function() {};`
 		srv := getCloudTestEndChecker(t, 1337, testServerHandlerFunc, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed)
 		ts.Env["K6_CLOUD_HOST"] = srv.URL
 
-		cmd.ExecuteWithGlobalState(ts.GlobalState)
+		launcher.ExecuteForTesting(ts.GlobalState)
 
 		stdout := ts.Stdout.String()
 		t.Log(stdout)
@@ -162,7 +162,7 @@ export default function() {};`
 		srv := getCloudTestEndChecker(t, 1337, testServerHandlerFunc, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed)
 		ts.Env["K6_CLOUD_HOST"] = srv.URL
 
-		cmd.ExecuteWithGlobalState(ts.GlobalState)
+		launcher.ExecuteForTesting(ts.GlobalState)
 
 		stdout := ts.Stdout.String()
 		t.Log(stdout)
@@ -191,7 +191,7 @@ export default function() {
 		srv := getCloudTestEndChecker(t, testRunID, nil, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed)
 		ts.Env["K6_CLOUD_HOST"] = srv.URL
 
-		cmd.ExecuteWithGlobalState(ts.GlobalState)
+		launcher.ExecuteForTesting(ts.GlobalState)
 
 		stdout := ts.Stdout.String()
 		t.Log(stdout)

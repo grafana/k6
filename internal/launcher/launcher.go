@@ -14,6 +14,14 @@ type commandExecutor interface {
 	run(*state.GlobalState)
 }
 
+func ExecuteForTesting(gs *state.GlobalState) {
+	l := New(gs)
+	l.provision = func(*state.GlobalState, k6deps.Dependencies) (commandExecutor, error) {
+		panic("launcher.provision function is not expected to be called")
+	}
+	l.Launch()
+}
+
 // Launcher is a k6 launcher. It analyses the requirements of a k6 execution,
 // then if required, it provisions a binary executor to satisfy the requirements.
 type Launcher struct {
