@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestIsScriptRequired(t *testing.T) {
+func TestScriptNameFromArgs(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
 		name     string
@@ -116,7 +116,7 @@ func TestIsScriptRequired(t *testing.T) {
 	}
 }
 
-func TestRequiresScript(t *testing.T) {
+func TestIsScriptRequired(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
 		name     string
