@@ -30,11 +30,11 @@ type Launcher struct {
 
 // New creates a new Launcher from a GlobalState using the default fallback and provision functions
 func New(gs *state.GlobalState) *Launcher {
-	defaultRunner := &currentBinary{}
+	defaultExecutor := &currentBinary{}
 	return &Launcher{
 		gs:              gs,
 		provision:       k6buildProvision,
-		commandExecutor: defaultRunner,
+		commandExecutor: defaultExecutor,
 	}
 }
 
