@@ -90,7 +90,7 @@ func TestLauncherLaunch(t *testing.T) {
 	}{
 		{
 			name:            "disable binary provisioning",
-			k6Cmd:           "run",
+			k6Cmd:           "cloud",
 			disableBP:       true,
 			script:          fakerTest,
 			expectProvision: false,
@@ -100,7 +100,7 @@ func TestLauncherLaunch(t *testing.T) {
 		},
 		{
 			name:            "execute binary provisioned",
-			k6Cmd:           "run",
+			k6Cmd:           "cloud",
 			script:          fakerTest,
 			expectProvision: true,
 			expectK6Run:     true,
@@ -109,7 +109,7 @@ func TestLauncherLaunch(t *testing.T) {
 		},
 		{
 			name:            "require unsatisfied k6 version",
-			k6Cmd:           "run",
+			k6Cmd:           "cloud",
 			script:          requireUnsatisfiedK6Version,
 			expectProvision: true,
 			expectK6Run:     true,
@@ -118,7 +118,7 @@ func TestLauncherLaunch(t *testing.T) {
 		},
 		{
 			name:            "require satisfied k6 version",
-			k6Cmd:           "run",
+			k6Cmd:           "cloud",
 			script:          requireSatisfiedK6Version,
 			expectProvision: false,
 			expectK6Run:     false,
@@ -127,7 +127,7 @@ func TestLauncherLaunch(t *testing.T) {
 		},
 		{
 			name:            "script with no dependencies",
-			k6Cmd:           "run",
+			k6Cmd:           "cloud",
 			script:          noDepsTest,
 			expectProvision: false,
 			expectK6Run:     false,
@@ -143,8 +143,16 @@ func TestLauncherLaunch(t *testing.T) {
 			expectOsExit:    0,
 		},
 		{
-			name:            "failed binary provisioning",
+			name:            "binary provisioning is not enabled for run command",
 			k6Cmd:           "run",
+			expectProvision: false,
+			expectK6Run:     false,
+			expectDefault:   true,
+			expectOsExit:    0,
+		},
+		{
+			name:            "failed binary provisioning",
+			k6Cmd:           "cloud",
 			script:          fakerTest,
 			provisionError:  errors.New("test error"),
 			expectProvision: true,
@@ -154,7 +162,7 @@ func TestLauncherLaunch(t *testing.T) {
 		},
 		{
 			name:            "failed k6 execution",
-			k6Cmd:           "run",
+			k6Cmd:           "cloud",
 			script:          fakerTest,
 			k6ReturnCode:    108,
 			expectProvision: true,
@@ -164,7 +172,7 @@ func TestLauncherLaunch(t *testing.T) {
 		},
 		{
 			name:            "missing input script",
-			k6Cmd:           "run",
+			k6Cmd:           "cloud",
 			k6Args:          []string{},
 			script:          "",
 			expectProvision: false,
@@ -174,7 +182,7 @@ func TestLauncherLaunch(t *testing.T) {
 		},
 		{
 			name:            "script in stdin",
-			k6Cmd:           "run",
+			k6Cmd:           "cloud",
 			k6Args:          []string{"-"},
 			script:          "",
 			expectProvision: false,
@@ -314,7 +322,7 @@ func TestScriptNameFromArgs(t *testing.T) {
 		},
 		{
 			name:     "complex case with multiple flags",
-			args:     []string{"-v", "--quiet", "run", "-o", "output.json", "--console-output", "loadtest.log", "script.js", "--tag", "env=staging"},
+			args:     []string{"-v", "--quiet", "cloud", "run", "-o", "output.json", "--console-output", "loadtest.log", "script.js", "--tag", "env=staging"},
 			expected: "script.js",
 		},
 		{
@@ -370,26 +378,36 @@ func TestIsScriptRequired(t *testing.T) {
 		{
 			name:     "run command",
 			args:     []string{"run", "script.js"},
-			expected: true,
-		},
-		{
-			name:     "flag before command",
-			args:     []string{"-v", "run", "script.js"},
-			expected: true,
-		},
-		{
-			name:     "verbose flag before command",
-			args:     []string{"--verbose", "run", "script.js"},
-			expected: true,
-		},
-		{
-			name:     "cloud run with flag in the middle",
-			args:     []string{"cloud", "-v", "run", "archive.tar"},
-			expected: true,
+			expected: false,
 		},
 		{
 			name:     "cloud command",
 			args:     []string{"cloud", "script.js"},
+			expected: true,
+		},
+		{
+			name:     "cloud run command",
+			args:     []string{"cloud", "run", "script.js"},
+			expected: true,
+		},
+		{
+			name:     "flag before command",
+			args:     []string{"-v", "cloud", "script.js"},
+			expected: true,
+		},
+		{
+			name:     "verbose flag before command",
+			args:     []string{"--verbose", "cloud", "script.js"},
+			expected: true,
+		},
+		{
+			name:     "cloud run with flag in the middle",
+			args:     []string{"cloud", "-v", "cloud", "archive.tar"},
+			expected: true,
+		},
+		{
+			name:     "cloud upload command",
+			args:     []string{"cloud", "upload", "script.js"},
 			expected: true,
 		},
 		{
@@ -409,7 +427,7 @@ func TestIsScriptRequired(t *testing.T) {
 		},
 		{
 			name:     "complex case with multiple flags",
-			args:     []string{"-v", "--quiet", "run", "-o", "output.json", "--console-output", "loadtest.log", "script.js", "--tag", "env=staging"},
+			args:     []string{"-v", "--quiet", "cloud", "run", "-o", "output.json", "--console-output", "loadtest.log", "script.js", "--tag", "env=staging"},
 			expected: true,
 		},
 	}

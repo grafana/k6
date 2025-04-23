@@ -300,7 +300,7 @@ func isScriptRequired(args []string) bool {
 				}
 			}
 			return true
-		case "run", "archive", "inspect":
+		case "archive", "inspect":
 			return true
 		}
 	}
