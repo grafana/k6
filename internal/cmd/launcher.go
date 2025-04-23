@@ -11,8 +11,8 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/grafana/k6deps"
 	"github.com/grafana/k6provider"
+	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/cmd/state"
-	k6State "go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/internal/build"
 )
 
@@ -220,17 +220,16 @@ func formatDependencies(deps map[string]string) string {
 
 // extractToken gets the cloud token required to access the build service
 // from the environment or from the config file
-func extractToken(gs *k6State.GlobalState) string {
-	token, ok := gs.Env["K6_CLOUD_TOKEN"]
-	if ok {
-		return token
-	}
-
-	// load from config file
-	config, err := loadConfig(gs)
+func extractToken(gs *state.GlobalState) string {
+	diskConfig, err := readDiskConfig(gs)
 	if err != nil {
 		return ""
 	}
 
-	return config.Collectors.Cloud.Token
+	config, _, err := cloudapi.GetConsolidatedConfig(diskConfig.Collectors["collectors"], gs.Env, "", nil, nil)
+	if err != nil {
+		return ""
+	}
+
+	return config.Token.String
 }
