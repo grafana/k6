@@ -249,8 +249,8 @@ func summaryThresholds(
 			})
 
 			// Additionally, if metric is a trend and the threshold source is a percentile,
-			// we may need to add the percentile value to the metric values, in case it's
-			// not one of [summaryTrendStats].
+			// we may need to add the percentile value to the metric values, in case it
+			// isn't one of [summaryTrendStats].
 			if trendSink, isTrend := mThresholds.Sink.(*metrics.TrendSink); isTrend {
 				if agg, percentile, isPercentile := extractPercentileThresholdSource(threshold.Source); isPercentile {
 					mt.Metric.Values[agg] = trendSink.P(percentile / 100)
@@ -407,6 +407,9 @@ func metricValueGetter(summaryTrendStats []string) func(metrics.Sink, time.Durat
 
 var percentileThresholdSourceRe = regexp.MustCompile(`^p\((\d+(?:\.\d+)?)\)\s*([<>=])`)
 
+// TODO(@joanlopez): Evaluate whether we should expose the parsed expression from the threshold.
+// For now, and until we formally decide how do we want the `metrics` package to look like, we do "manually"
+// parse the threshold expression here in order to extract, if existing, the percentile aggregation.
 func extractPercentileThresholdSource(source string) (agg string, percentile float64, isPercentile bool) {
 	// We capture the following three matches, in order to detect whether source is a percentile:
 	// 1. The percentile definition: p(...)
