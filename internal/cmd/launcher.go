@@ -245,6 +245,7 @@ func extractToken(gs *state.GlobalState) string {
 func analyze(gs *state.GlobalState, args []string) (k6deps.Dependencies, error) {
 	dopts := &k6deps.Options{
 		LookupEnv: func(key string) (string, bool) { v, ok := gs.Env[key]; return v, ok },
+		Manifest:  k6deps.Source{Ignore: true},
 	}
 
 	if !isScriptRequired(args) {
