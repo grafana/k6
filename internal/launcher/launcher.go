@@ -12,6 +12,7 @@ import (
 	"github.com/grafana/k6deps"
 	"github.com/grafana/k6provider"
 	"go.k6.io/k6/cmd/state"
+	k6State "go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/internal/build"
 	k6Cmd "go.k6.io/k6/internal/cmd"
 )
@@ -216,4 +217,21 @@ func formatDependencies(deps map[string]string) string {
 		buffer.WriteString(fmt.Sprintf("%s:%s ", dep, version))
 	}
 	return strings.Trim(buffer.String(), " ")
+}
+
+// extractToken gets the cloud token required to access the build service
+// from the environment or from the config file
+func extractToken(gs *k6State.GlobalState) string {
+	token, ok := gs.Env["K6_CLOUD_TOKEN"]
+	if ok {
+		return token
+	}
+
+	// load from config file
+	config, err := loadConfig(gs)
+	if err != nil {
+		return ""
+	}
+
+	return config.Collectors.Cloud.Token
 }

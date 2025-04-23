@@ -8,23 +8,6 @@ import (
 	"go.k6.io/k6/lib/fsext"
 )
 
-// extractToken gets the cloud token required to access the build service
-// from the environment or from the config file
-func extractToken(gs *k6State.GlobalState) string {
-	token, ok := gs.Env["K6_CLOUD_TOKEN"]
-	if ok {
-		return token
-	}
-
-	// load from config file
-	config, err := loadConfig(gs)
-	if err != nil {
-		return ""
-	}
-
-	return config.Collectors.Cloud.Token
-}
-
 // a simplified struct to get the cloud token from the config file, the rest is ignored
 type k6configFile struct {
 	Collectors struct {
