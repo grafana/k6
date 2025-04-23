@@ -1,4 +1,3 @@
-// Package launcher is the entry point for the k6 command.
 package cmd
 
 import (
@@ -41,7 +40,7 @@ type Launcher struct {
 	commandExecutor commandExecutor
 }
 
-// New creates a new Launcher from a GlobalState using the default fallback and provision functions
+// NewLauncher creates a new Launcher from a GlobalState using the default fallback and provision functions
 func NewLauncher(gs *state.GlobalState) *Launcher {
 	defaultExecutor := &currentBinary{}
 	return &Launcher{
