@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
@@ -14,6 +15,7 @@ import (
 	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/internal/build"
+	"go.k6.io/k6/lib/fsext"
 )
 
 var (
@@ -204,9 +206,15 @@ func k6buildProvision(gs *state.GlobalState, deps k6deps.Dependencies) (commandE
 			" Set K6_CLOUD_TOKEN environment variable or execute the `k6 cloud login` command")
 	}
 
+	binaryCacheDir, err := getBinaryCacheDir(gs.FS)
+	if err != nil {
+		return nil, fmt.Errorf("failed to acquire the user's cache directory: %w", err)
+	}
+
 	config := k6provider.Config{
 		BuildServiceURL:  gs.Flags.BuildServiceURL,
 		BuildServiceAuth: token,
+		BinaryCacheDir:   binaryCacheDir,
 	}
 
 	provider, err := k6provider.NewProvider(config)
@@ -223,6 +231,21 @@ func k6buildProvision(gs *state.GlobalState, deps k6deps.Dependencies) (commandE
 		Info("A new k6 binary has been provisioned with version(s): ", formatDependencies(binary.Dependencies))
 
 	return &customBinary{binary.Path}, nil
+}
+
+func getBinaryCacheDir(fs fsext.Fs) (string, error) {
+	//nolint:forbidigo
+	// TODO: init this as part of the GlobalState
+	// and remote it from here
+	userdir, err := os.UserCacheDir()
+	if err != nil {
+		return "", err
+	}
+	cacheDir := filepath.Join(userdir, "k6", "builds")
+	if err := fs.MkdirAll(cacheDir, 0o700); err != nil {
+		return "", err
+	}
+	return cacheDir, nil
 }
 
 func formatDependencies(deps map[string]string) string {

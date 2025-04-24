@@ -9,9 +9,11 @@ import (
 	"github.com/grafana/k6deps"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/internal/build"
 	"go.k6.io/k6/internal/cmd/tests"
+	"go.k6.io/k6/internal/lib/testutils"
 )
 
 type mockRunner struct {
@@ -440,4 +442,70 @@ func TestIsScriptRequired(t *testing.T) {
 			assert.Equal(t, tc.expected, actual)
 		})
 	}
+}
+
+func TestGetBinaryCacheDir(t *testing.T) {
+	t.Parallel()
+
+	//nolint:forbidigo
+	// TODO: remove it as soon as we have the fix for injecting it from GlobalState
+	userDir, err := os.UserCacheDir()
+	require.NoError(t, err)
+
+	t.Run("successful directory creation", func(t *testing.T) {
+		t.Parallel()
+
+		fs := testutils.MakeMemMapFs(t, nil)
+
+		dir, err := getBinaryCacheDir(fs)
+		require.NoError(t, err)
+		assert.NotEmpty(t, dir)
+
+		// Check if directory was created
+		expDir := filepath.Join(userDir, "k6/builds")
+		info, err := fs.Stat(expDir)
+		assert.NoError(t, err)
+		assert.True(t, info.IsDir())
+	})
+
+	t.Run("directory already exists", func(t *testing.T) {
+		t.Parallel()
+		fs := testutils.MakeMemMapFs(t, map[string][]byte{
+			filepath.Join(userDir, "/k6/builds/marker.bin"): []byte(`example binary file`),
+		})
+
+		dir, err := getBinaryCacheDir(fs)
+		require.NoError(t, err)
+		assert.Contains(t, dir, "k6/builds")
+
+		// Verify marker file still exists (directory wasn't overwritten)
+		info, err := fs.Stat(filepath.Join(userDir, "k6/builds/marker.bin"))
+		require.NoError(t, err)
+		require.NotNil(t, info)
+		assert.Equal(t, "marker.bin", info.Name())
+	})
+
+	t.Run("partial directory path exists", func(t *testing.T) {
+		t.Parallel()
+
+		otherFolder := filepath.Join(userDir, "k6/other-subfolder")
+		fs := testutils.MakeMemMapFs(t, map[string][]byte{
+			filepath.Join(otherFolder, "example.txt"): []byte(`example binary file`),
+		})
+
+		dir, err := getBinaryCacheDir(fs)
+		require.NoError(t, err)
+
+		// Verify directory was created
+		expDir := filepath.Join(userDir, "k6/builds")
+		assert.Equal(t, expDir, dir)
+
+		info, err := fs.Stat(expDir)
+		assert.NoError(t, err)
+		assert.True(t, info.IsDir())
+
+		info, err = fs.Stat(otherFolder)
+		assert.NoError(t, err)
+		assert.True(t, info.IsDir())
+	})
 }
