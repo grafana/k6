@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"sync"
 
 	"go.k6.io/k6/lib"
@@ -203,8 +204,11 @@ func getFlags(defaultFlags GlobalFlags, env map[string]string, args []string) Gl
 	if _, ok := env["K6_PROFILING_ENABLED"]; ok {
 		result.ProfilingEnabled = true
 	}
-	if env["K6_BINARY_PROVISIONING"] == "true" {
-		result.BinaryProvisioning = true
+	if v, ok := env["K6_BINARY_PROVISIONING"]; ok {
+		vb, err := strconv.ParseBool(v)
+		if err == nil {
+			result.BinaryProvisioning = vb
+		}
 	}
 	if val, ok := env["K6_BUILD_SERVICE_URL"]; ok {
 		result.BuildServiceURL = val
