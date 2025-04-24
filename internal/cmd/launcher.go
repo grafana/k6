@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -109,11 +110,15 @@ type customBinary struct {
 	path string
 }
 
+//nolint:forbidigo
 func (b *customBinary) run(gs *state.GlobalState) {
 	cmd := exec.CommandContext(gs.Ctx, b.path, gs.CmdArgs[1:]...) //nolint:gosec
-	cmd.Stderr = gs.Stderr
-	cmd.Stdout = gs.Stdout
-	cmd.Stdin = gs.Stdin
+
+	// we pass os stdout, err, in because passing them from GlobalState changes how
+	// the subprocess detects the type of terminal
+	cmd.Stderr = os.Stderr
+	cmd.Stdout = os.Stdout
+	cmd.Stdin = os.Stdin
 
 	// Copy environment variables to the k6 process and skip binary provisioning feature flag to disable it.
 	// If not disabled, then the executed k6 binary would enter an infinite loop, where it continuously
