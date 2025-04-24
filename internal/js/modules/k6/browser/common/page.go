@@ -602,6 +602,14 @@ func (p *Page) consoleMsgFromConsoleEvent(e *runtime.EventConsoleAPICalled) (*Co
 	}, nil
 }
 
+func (p *Page) addWorker(sessionID target.SessionID, w *Worker) {
+	p.logger.Debugf("Page:addWorker", "sid:%v", sessionID)
+
+	p.workersMu.Lock()
+	defer p.workersMu.Unlock()
+	p.workers[sessionID] = w
+}
+
 func (p *Page) removeWorker(sessionID target.SessionID) {
 	p.logger.Debugf("Page:removeWorker", "sid:%v", sessionID)
 
