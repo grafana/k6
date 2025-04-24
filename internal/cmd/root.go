@@ -28,6 +28,13 @@ import (
 
 const waitLoggerCloseTimeout = time.Second * 5
 
+// ExecuteWithGlobalState runs the root command with an existing GlobalState.
+// It adds all child commands to the root command and it sets flags appropriately.
+// It is called by main.main(). It only needs to happen once to the rootCmd.
+func ExecuteWithGlobalState(gs *state.GlobalState) {
+	newRootCommand(gs).execute()
+}
+
 // This is to keep all fields needed for the main/root k6 command
 type rootCommand struct {
 	globalState *state.GlobalState
@@ -57,6 +64,11 @@ func newRootCommand(gs *state.GlobalState) *rootCommand {
 	rootCmd.SetVersionTemplate(
 		`{{with .Name}}{{printf "%s " .}}{{end}}{{printf "v%s\n" .Version}}`,
 	)
+
+	usageTemplate := rootCmd.UsageTemplate()
+	usageTemplate = strings.ReplaceAll(usageTemplate, "FlagUsages", "FlagUsagesWrapped 120")
+	rootCmd.SetUsageTemplate(usageTemplate)
+
 	rootCmd.PersistentFlags().AddFlagSet(rootCmdPersistentFlagSet(gs))
 	rootCmd.SetArgs(gs.CmdArgs[1:])
 	rootCmd.SetOut(gs.Stdout)
@@ -126,20 +138,6 @@ func (c *rootCommand) execute() {
 	}
 }
 
-// Execute adds all child commands to the root command sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
-func Execute() {
-	gs := state.NewGlobalState(context.Background())
-	newRootCommand(gs).execute()
-}
-
-// ExecuteWithGlobalState runs the root command with an existing GlobalState.
-// This is needed by integration tests, and we don't want to modify the
-// Execute() signature to avoid breaking k6 extensions.
-func ExecuteWithGlobalState(gs *state.GlobalState) {
-	newRootCommand(gs).execute()
-}
-
 func (c *rootCommand) stopLoggers() {
 	done := make(chan struct{})
 	go func() {
@@ -171,7 +169,8 @@ func rootCmdPersistentFlagSet(gs *state.GlobalState) *pflag.FlagSet {
 		"setting secret sources for k6 file[=./path.fileformat],")
 
 	flags.StringVar(&gs.Flags.LogOutput, "log-output", gs.Flags.LogOutput,
-		"change the output for k6 logs, possible values are stderr,stdout,none,loki[=host:port],file[=./path.fileformat]")
+		"change the output for k6 logs, possible values are: "+
+			"'stderr', 'stdout', 'none', 'loki[=host:port]', 'file[=./path.fileformat]'")
 	flags.Lookup("log-output").DefValue = gs.DefaultFlags.LogOutput
 
 	flags.StringVar(&gs.Flags.LogFormat, "log-format", gs.Flags.LogFormat, "log output format")
