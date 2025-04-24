@@ -56,19 +56,20 @@ func NewLauncher(gs *state.GlobalState) *Launcher {
 func (l *Launcher) Launch() {
 	// If binary provisioning is not enabled, continue with the regular k6 execution path
 	if !l.gs.Flags.BinaryProvisioning {
-		l.gs.Logger.Debug("Binary provisioning feature is disabled")
+		l.gs.Logger.Debug("Binary provisioning feature is disabled.")
 		l.commandExecutor.run(l.gs)
 		return
 	}
 
-	l.gs.Logger.Info("Binary provisioning feature is enabled. If it's required, k6 will provision a new binary")
+	l.gs.Logger.
+		Debug("Binary provisioning feature is enabled.")
 
 	deps, err := analyze(l.gs, l.gs.CmdArgs[1:])
 	if err != nil {
 		l.gs.Logger.
 			WithError(err).
-			Error("Failed to analyze the required dependencies. Please, make sure to report this issue by" +
-				" opening a bug report.")
+			Error("Binary provisioning is enabled but it failed to analyze the dependencies." +
+				" Please, make sure to report this issue by opening a bug report.")
 		l.gs.OSExit(1)
 		return // this is required for testing
 	}
@@ -84,14 +85,14 @@ func (l *Launcher) Launch() {
 
 	l.gs.Logger.
 		WithField("deps", deps).
-		Info("The current k6 binary doesn't satisfy all the required dependencies, it is required to" +
-			" provision a new binary.")
+		Info("The current k6 binary doesn't satisfy all dependencies, it is required to" +
+			" provision a custom binary.")
 
 	customBinary, err := l.provision(l.gs, deps)
 	if err != nil {
 		l.gs.Logger.
 			WithError(err).
-			Error("Failed to provision a new k6 binary with required dependencies." +
+			Error("Failed to provision a k6 binary with required dependencies." +
 				" Please, make sure to report this issue by opening a bug report.")
 		l.gs.OSExit(1)
 		return
@@ -194,7 +195,7 @@ func k6buildProvision(gs *state.GlobalState, deps k6deps.Dependencies) (commandE
 	}
 
 	if config.BuildServiceAuth == "" {
-		return nil, errors.New("k6 cloud token is required when Binary provisioning feature is enabled." +
+		return nil, errors.New("k6 cloud token is required when the Binary provisioning feature is enabled." +
 			" Set K6_CLOUD_TOKEN environment variable or execute the `k6 cloud login` command")
 	}
 
@@ -249,6 +250,8 @@ func analyze(gs *state.GlobalState, args []string) (k6deps.Dependencies, error) 
 	}
 
 	if !isScriptRequired(args) {
+		gs.Logger.
+			Debug("The command to execute does not require Binary provisioning")
 		return k6deps.Dependencies{}, nil
 	}
 
@@ -300,7 +303,7 @@ func isScriptRequired(args []string) bool {
 				}
 			}
 			return true
-		case "run", "archive", "inspect":
+		case "archive", "inspect":
 			return true
 		}
 	}
