@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
@@ -204,9 +205,20 @@ func k6buildProvision(gs *state.GlobalState, deps k6deps.Dependencies) (commandE
 			" Set K6_CLOUD_TOKEN environment variable or execute the `k6 cloud login` command")
 	}
 
+	buildsDir := gs.Env["K6_BINARY_CACHE"]
+	if buildsDir == "" {
+		cacheDir, err := os.UserCacheDir() //nolint:forbidigo
+		if err != nil {
+			gs.Logger.WithError(err).Debug("Failed to get user cache dir")
+			return nil, errors.New("failed to find the user's cache dir")
+		}
+		buildsDir = filepath.Join(cacheDir, "k6", "builds")
+	}
+
 	config := k6provider.Config{
 		BuildServiceURL:  gs.Flags.BuildServiceURL,
 		BuildServiceAuth: token,
+		BinaryCacheDir:   buildsDir,
 	}
 
 	provider, err := k6provider.NewProvider(config)
