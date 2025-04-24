@@ -63,16 +63,12 @@ func (l *Launcher) Launch() {
 
 	l.gs.Logger.
 		Debug("Binary Provisioning feature is enabled.")
-
-	reportIssues := "If you encounter any unexpected user experience or something didn't go as planned," +
-		" please report it by creating an issue."
-
 	deps, err := analyze(l.gs, l.gs.CmdArgs[1:])
 	if err != nil {
 		l.gs.Logger.
 			WithError(err).
-			Error("Binary Provisioning is enabled but it failed to analyze the dependencies. " +
-				reportIssues)
+			Error("Binary provisioning is enabled but it failed to analyze the dependencies." +
+				" Please, make sure to report this issue by opening a bug report.")
 		l.gs.OSExit(1)
 		return // this is required for testing
 	}
@@ -96,8 +92,8 @@ func (l *Launcher) Launch() {
 	if err != nil {
 		l.gs.Logger.
 			WithError(err).
-			Error("Failed to provision a k6 binary with required dependencies. " +
-				reportIssues)
+			Error("Failed to provision a k6 binary with required dependencies." +
+				" Please, make sure to report this issue by opening a bug report.")
 		l.gs.OSExit(1)
 		return
 	}
