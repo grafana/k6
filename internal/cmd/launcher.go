@@ -56,14 +56,13 @@ func NewLauncher(gs *state.GlobalState) *Launcher {
 func (l *Launcher) Launch() {
 	// If binary provisioning is not enabled, continue with the regular k6 execution path
 	if !l.gs.Flags.BinaryProvisioning {
-		l.gs.Logger.Debug("Binary provisioning feature is disabled.")
+		l.gs.Logger.Debug("Binary Provisioning feature is disabled.")
 		l.commandExecutor.run(l.gs)
 		return
 	}
 
 	l.gs.Logger.
-		Debug("Binary provisioning feature is enabled.")
-
+		Debug("Binary Provisioning feature is enabled.")
 	deps, err := analyze(l.gs, l.gs.CmdArgs[1:])
 	if err != nil {
 		l.gs.Logger.
@@ -85,7 +84,8 @@ func (l *Launcher) Launch() {
 
 	l.gs.Logger.
 		WithField("deps", deps).
-		Info("The current k6 binary doesn't satisfy all dependencies, it is required to" +
+		Info("Binary Provisioning experimental feature is enabled." +
+			" The current k6 binary doesn't satisfy all dependencies, it's required to" +
 			" provision a custom binary.")
 
 	customBinary, err := l.provision(l.gs, deps)
@@ -189,14 +189,19 @@ func customBuildRequired(baseK6Version string, deps k6deps.Dependencies) bool {
 
 // k6buildProvision returns the path to a k6 binary that satisfies the dependencies and the list of versions it provides
 func k6buildProvision(gs *state.GlobalState, deps k6deps.Dependencies) (commandExecutor, error) {
-	config := k6provider.Config{
-		BuildServiceURL:  gs.Flags.BuildServiceURL,
-		BuildServiceAuth: extractToken(gs),
+	token, err := extractToken(gs)
+	if err != nil {
+		gs.Logger.WithError(err).Debug("Failed to get a valid token")
 	}
 
-	if config.BuildServiceAuth == "" {
+	if token == "" {
 		return nil, errors.New("k6 cloud token is required when the Binary provisioning feature is enabled." +
 			" Set K6_CLOUD_TOKEN environment variable or execute the `k6 cloud login` command")
+	}
+
+	config := k6provider.Config{
+		BuildServiceURL:  gs.Flags.BuildServiceURL,
+		BuildServiceAuth: token,
 	}
 
 	provider, err := k6provider.NewProvider(config)
@@ -225,18 +230,18 @@ func formatDependencies(deps map[string]string) string {
 
 // extractToken gets the cloud token required to access the build service
 // from the environment or from the config file
-func extractToken(gs *state.GlobalState) string {
+func extractToken(gs *state.GlobalState) (string, error) {
 	diskConfig, err := readDiskConfig(gs)
 	if err != nil {
-		return ""
+		return "", err
 	}
 
-	config, _, err := cloudapi.GetConsolidatedConfig(diskConfig.Collectors["collectors"], gs.Env, "", nil, nil)
+	config, _, err := cloudapi.GetConsolidatedConfig(diskConfig.Collectors["cloud"], gs.Env, "", nil, nil)
 	if err != nil {
-		return ""
+		return "", err
 	}
 
-	return config.Token.String
+	return config.Token.String, nil
 }
 
 // analyze returns the dependencies for the command to be executed.
