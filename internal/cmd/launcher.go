@@ -53,7 +53,7 @@ func NewLauncher(gs *state.GlobalState) *Launcher {
 
 // Launch executes k6 either by launching a provisioned binary or defaulting to the
 // current binary if this is not necessary.
-// If the fhe fallback is called, it can exit the process so don't assume it will return
+// The commandExecutor can exit the process so don't assume it will return
 func (l *Launcher) Launch() {
 	// If binary provisioning is not enabled, continue with the regular k6 execution path
 	if !l.gs.Flags.BinaryProvisioning {
@@ -74,7 +74,7 @@ func (l *Launcher) Launch() {
 		return // this is required for testing
 	}
 
-	// if the command does not have dependencies or a custom build
+	//  if the command does not have dependencies nor a custom build is required
 	if !customBuildRequired(build.Version, deps) {
 		l.gs.Logger.
 			Debug("The current k6 binary already satisfies all the required dependencies," +
@@ -125,7 +125,7 @@ func (b *customBinary) run(gs *state.GlobalState) {
 	// process the input script, detect dependencies, and retrigger provisioning.
 	env := []string{}
 	for k, v := range gs.Env {
-		if k == "K6_BINARY_PROVISIONING" {
+		if k == state.BinaryProvisioningFeatureFlag {
 			continue
 		}
 		env = append(env, fmt.Sprintf("%s=%s", k, v))

@@ -23,7 +23,13 @@ import (
 	"go.k6.io/k6/secretsource"
 )
 
-const defaultConfigFileName = "config.json"
+const (
+	// BinaryProvisioningFeatureFlag defines the environment variable that enables the binary provisioning
+	BinaryProvisioningFeatureFlag = "K6_BINARY_PROVISIONING"
+
+	defaultBuildServiceURL = "https://ingest.k6.io/builder/api/v1"
+	defaultConfigFileName  = "config.json"
+)
 
 // GlobalState contains the GlobalFlags and accessors for most of the global
 // process-external state like CLI arguments, env vars, standard input, output
@@ -174,7 +180,7 @@ func GetDefaultFlags(homeDir string) GlobalFlags {
 		ProfilingEnabled: false,
 		ConfigFilePath:   filepath.Join(homeDir, "k6", defaultConfigFileName),
 		LogOutput:        "stderr",
-		BuildServiceURL:  "https://ingest.k6.io/builder/api/v1",
+		BuildServiceURL:  defaultBuildServiceURL,
 	}
 }
 
