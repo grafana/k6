@@ -251,7 +251,7 @@ func analyze(gs *state.GlobalState, args []string) (k6deps.Dependencies, error) 
 
 	if !isScriptRequired(args) {
 		gs.Logger.
-			Debug("command does not require Binary provisioning")
+			Debug("The command to execute does not require Binary provisioning")
 		return k6deps.Dependencies{}, nil
 	}
 
