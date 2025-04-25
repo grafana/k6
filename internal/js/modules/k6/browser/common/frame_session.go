@@ -1045,7 +1045,7 @@ func (fs *FrameSession) attachWorkerToTarget(ti *target.Info, session *Session) 
 		return fmt.Errorf("attaching worker target ID %v to session ID %v: %w",
 			ti.TargetID, session.ID(), err)
 	}
-	fs.page.workers[session.ID()] = w
+	fs.page.addWorker(session.ID(), w)
 
 	return nil
 }
