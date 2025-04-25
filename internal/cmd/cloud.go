@@ -252,9 +252,10 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 
 			statusText := testProgress.RunStatusText
 
-			if testProgress.RunStatus == cloudapi.RunStatusFinished {
+			switch testProgress.RunStatus {
+			case cloudapi.RunStatusFinished:
 				testProgress.Progress = 1
-			} else if testProgress.RunStatus == cloudapi.RunStatusRunning {
+			case cloudapi.RunStatusRunning:
 				if startTime.IsZero() {
 					startTime = time.Now()
 				}

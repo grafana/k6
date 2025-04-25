@@ -177,11 +177,11 @@ func exportECJWK(key *CryptoKey) (interface{}, error) {
 		x = k.X
 		y = k.Y
 		d = k.D
-		curveParams = k.Curve.Params()
+		curveParams = k.Params()
 	case *ecdsa.PublicKey:
 		x = k.X
 		y = k.Y
-		curveParams = k.Curve.Params()
+		curveParams = k.Params()
 	case *ecdh.PrivateKey:
 		ecdsaKey, err := convertECDHtoECDSAKey(k)
 		if err != nil {
@@ -191,7 +191,7 @@ func exportECJWK(key *CryptoKey) (interface{}, error) {
 		x = ecdsaKey.X
 		y = ecdsaKey.Y
 		d = ecdsaKey.D
-		curveParams = ecdsaKey.Curve.Params()
+		curveParams = ecdsaKey.Params()
 	case *ecdh.PublicKey:
 		ecdsaKey, err := convertPublicECDHtoECDSA(k)
 		if err != nil {
@@ -200,7 +200,7 @@ func exportECJWK(key *CryptoKey) (interface{}, error) {
 
 		x = ecdsaKey.X
 		y = ecdsaKey.Y
-		curveParams = ecdsaKey.Curve.Params()
+		curveParams = ecdsaKey.Params()
 	default:
 		return nil, errors.New("key's handle isn't an ECDSA/ECDH public/private key")
 	}

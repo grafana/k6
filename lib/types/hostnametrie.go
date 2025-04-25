@@ -135,5 +135,5 @@ func (t *HostnameTrie) insert(s string) error {
 // along with the matching pattern, if one was found.
 func (t *HostnameTrie) Contains(s string) (matchedPattern string, matchFound bool) {
 	s = strings.ToLower(s)
-	return t.trieNode.contains(s)
+	return t.contains(s)
 }

@@ -854,7 +854,7 @@ func asyncWaitForStdoutAndRun(
 
 func injectMockSignalNotifier(ts *GlobalTestState) (sendSignal chan os.Signal) {
 	sendSignal = make(chan os.Signal)
-	ts.GlobalState.SignalNotify = func(c chan<- os.Signal, signals ...os.Signal) {
+	ts.SignalNotify = func(c chan<- os.Signal, signals ...os.Signal) {
 		isAbortNotify := false
 		for _, s := range signals {
 			if s == os.Interrupt {
@@ -871,7 +871,7 @@ func injectMockSignalNotifier(ts *GlobalTestState) (sendSignal chan os.Signal) {
 			close(sendSignal)
 		}()
 	}
-	ts.GlobalState.SignalStop = func(_ chan<- os.Signal) { /* noop */ }
+	ts.SignalStop = func(_ chan<- os.Signal) { /* noop */ }
 	return sendSignal
 }
 

@@ -675,7 +675,7 @@ func TestSelectOption(t *testing.T) {
 	tb := newTestBrowser(t,
 		withFileServer(),
 	)
-	defer tb.Browser.Close()
+	defer tb.Close()
 
 	vu, _, _, cleanUp := startIteration(t)
 	defer cleanUp()

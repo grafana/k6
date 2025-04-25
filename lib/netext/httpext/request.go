@@ -204,7 +204,8 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 		}
 	}
 
-	if preq.Auth == "digest" {
+	switch preq.Auth {
+	case "digest":
 		// Until digest authentication is refactored, the first response will always
 		// be a 401 error, so we expect that.
 		if tracerTransport.responseCallback != nil {
@@ -215,7 +216,7 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 			}
 		}
 		transport = digestTransport{originalTransport: transport}
-	} else if preq.Auth == "ntlm" {
+	case "ntlm":
 		// The first response of NTLM auth may be a 401 error.
 		if tracerTransport.responseCallback != nil {
 			originalResponseCallback := tracerTransport.responseCallback

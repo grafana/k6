@@ -129,8 +129,8 @@ func Load(
 		}).Debug("Loading...")
 
 	var pathOnFs string
-	switch {
-	case moduleSpecifier.Scheme == "":
+	switch moduleSpecifier.Scheme {
+	case "":
 		pathOnFs = path.Clean(moduleSpecifier.String())
 	default:
 		pathOnFs = path.Clean(moduleSpecifier.String()[len(moduleSpecifier.Scheme)+len(":/"):])

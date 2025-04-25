@@ -28,7 +28,7 @@ type moduleVU struct {
 
 // browser returns the VU browser instance for the current iteration.
 func (vu moduleVU) browser() (*common.Browser, error) {
-	return vu.browserRegistry.getBrowser(vu.State().Iteration)
+	return vu.getBrowser(vu.State().Iteration)
 }
 
 func (vu moduleVU) Context() context.Context {

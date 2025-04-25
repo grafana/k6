@@ -64,24 +64,24 @@ func (e *EcKeyImportParams) ImportKey(
 	var importFn func(curve EllipticCurveKind, keyData []byte) (any, CryptoKeyType, error)
 
 	switch {
-	case e.Algorithm.Name == ECDH && format == Pkcs8KeyFormat:
+	case e.Name == ECDH && format == Pkcs8KeyFormat:
 		importFn = importECDHPrivateKey
-	case e.Algorithm.Name == ECDH && format == RawKeyFormat:
+	case e.Name == ECDH && format == RawKeyFormat:
 		importFn = importECDHPublicKey
-	case e.Algorithm.Name == ECDSA && format == Pkcs8KeyFormat:
+	case e.Name == ECDSA && format == Pkcs8KeyFormat:
 		importFn = importECDSAPrivateKey
-	case e.Algorithm.Name == ECDSA && format == RawKeyFormat:
+	case e.Name == ECDSA && format == RawKeyFormat:
 		importFn = importECDSAPublicKey
-	case e.Algorithm.Name == ECDH && format == SpkiKeyFormat:
+	case e.Name == ECDH && format == SpkiKeyFormat:
 		importFn = importECDHSPKIPublicKey
-	case e.Algorithm.Name == ECDSA && format == SpkiKeyFormat:
+	case e.Name == ECDSA && format == SpkiKeyFormat:
 		importFn = importECDSASPKIPublicKey
-	case e.Algorithm.Name == ECDSA && format == JwkKeyFormat:
+	case e.Name == ECDSA && format == JwkKeyFormat:
 		importFn = importECDSAJWK
-	case e.Algorithm.Name == ECDH && format == JwkKeyFormat:
+	case e.Name == ECDH && format == JwkKeyFormat:
 		importFn = importECDHJWK
 	default:
-		return nil, NewError(NotSupportedError, unsupportedKeyFormatErrorMsg+" "+format+" for algorithm "+e.Algorithm.Name)
+		return nil, NewError(NotSupportedError, unsupportedKeyFormatErrorMsg+" "+format+" for algorithm "+e.Name)
 	}
 
 	handle, keyType, err := importFn(e.NamedCurve, keyData)
@@ -273,7 +273,7 @@ func (ecgp *ECKeyGenParams) GenerateKey(
 	var keyPairGenerator func(curve EllipticCurveKind, keyUsages []CryptoKeyUsage) (any, any, error)
 	var privateKeyUsages, publicKeyUsages []CryptoKeyUsage
 
-	switch ecgp.Algorithm.Name {
+	switch ecgp.Name {
 	case ECDH:
 		keyPairGenerator = generateECDHKeyPair
 		privateKeyUsages = []CryptoKeyUsage{DeriveKeyCryptoKeyUsage, DeriveBitsCryptoKeyUsage}
@@ -283,7 +283,7 @@ func (ecgp *ECKeyGenParams) GenerateKey(
 		privateKeyUsages = []CryptoKeyUsage{SignCryptoKeyUsage}
 		publicKeyUsages = []CryptoKeyUsage{VerifyCryptoKeyUsage}
 	default:
-		return nil, NewError(NotSupportedError, "unsupported elliptic algorithm: "+ecgp.Algorithm.Name)
+		return nil, NewError(NotSupportedError, "unsupported elliptic algorithm: "+ecgp.Name)
 	}
 
 	if !isValidEllipticCurve(ecgp.NamedCurve) {

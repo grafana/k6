@@ -252,7 +252,7 @@ func k6buildProvision(gs *state.GlobalState, deps k6deps.Dependencies) (commandE
 func formatDependencies(deps map[string]string) string {
 	buffer := &bytes.Buffer{}
 	for dep, version := range deps {
-		buffer.WriteString(fmt.Sprintf("%s:%s ", dep, version))
+		fmt.Fprintf(buffer, "%s:%s ", dep, version)
 	}
 	return strings.Trim(buffer.String(), " ")
 }

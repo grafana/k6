@@ -48,7 +48,7 @@ func TestNestedFrames(t *testing.T) {
 	tb := newTestBrowser(t,
 		withFileServer(),
 	)
-	defer tb.Browser.Close()
+	defer tb.Close()
 
 	page := tb.NewPage(nil)
 	opts := &common.FrameGotoOptions{
@@ -2134,9 +2134,9 @@ func TestPageOnMetric(t *testing.T) {
 					for _, s := range ss {
 						// At the moment all metrics that the browser emits contains
 						// both a url and name tag on each metric.
-						u, ok := s.TimeSeries.Tags.Get("url")
+						u, ok := s.Tags.Get("url")
 						assert.True(t, ok)
-						n, ok := s.TimeSeries.Tags.Get("name")
+						n, ok := s.Tags.Get("name")
 						assert.True(t, ok)
 
 						// The name and url tags should have the same value.
@@ -2209,7 +2209,7 @@ func TestPageOnRequest(t *testing.T) {
 
 	// Start and setup a webserver to test the page.on('request') handler.
 	tb := newTestBrowser(t, withHTTPServer())
-	defer tb.Browser.Close()
+	defer tb.Close()
 
 	tb.withHandler("/home", func(w http.ResponseWriter, r *http.Request) {
 		_, err := fmt.Fprintf(w, `<!DOCTYPE html>
@@ -2475,7 +2475,7 @@ func TestPageOnResponse(t *testing.T) {
 
 	// Start and setup a webserver to test the page.on('request') handler.
 	tb := newTestBrowser(t, withHTTPServer())
-	defer tb.Browser.Close()
+	defer tb.Close()
 
 	tb.withHandler("/home", func(w http.ResponseWriter, _ *http.Request) {
 		_, err := fmt.Fprintf(w, `<!DOCTYPE html>
