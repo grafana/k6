@@ -74,7 +74,7 @@ func TestRunnerNew(t *testing.T) {
 			assert.Equal(t, int64(0), vuc.getExported("counter").Export())
 
 			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
-			t.Run("RunOnce", func(t *testing.T) {
+			t.Run("RunOnce", func(t *testing.T) { //nolint:paralleltest
 				err = vu.RunOnce()
 				require.NoError(t, err)
 				assert.Equal(t, int64(1), vuc.getExported("counter").Export())
@@ -535,7 +535,9 @@ func TestRunnerIntegrationImports(t *testing.T) {
 		for _, mod := range modules {
 			mod := mod
 			t.Run(mod, func(t *testing.T) {
+				t.Parallel()
 				t.Run("Source", func(t *testing.T) {
+					t.Parallel()
 					_, err := getSimpleRunner(t, "/script.js",
 						fmt.Sprintf(`import "%s"; export default function() {}`, mod), rtOpts)
 					require.NoError(t, err)
@@ -575,6 +577,7 @@ func TestRunnerIntegrationImports(t *testing.T) {
 				for name, r := range testdata {
 					r := r
 					t.Run(name, func(t *testing.T) {
+						t.Parallel()
 						ctx, cancel := context.WithCancel(context.Background())
 						defer cancel()
 						initVU, err := r.NewVU(ctx, 1, 1, make(chan metrics.SampleContainer, 100))
