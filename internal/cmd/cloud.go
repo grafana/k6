@@ -252,7 +252,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 
 			statusText := testProgress.RunStatusText
 
-			switch testProgress.RunStatus {
+			switch testProgress.RunStatus { //nolint:exhaustive
 			case cloudapi.RunStatusFinished:
 				testProgress.Progress = 1
 			case cloudapi.RunStatusRunning:
