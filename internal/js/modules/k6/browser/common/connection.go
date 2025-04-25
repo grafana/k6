@@ -153,6 +153,7 @@ func NewConnection(
 		Proxy:            http.ProxyFromEnvironment, // TODO(fix): use proxy settings from launch options
 		TLSClientConfig:  tlsConfig,
 		WriteBufferSize:  wsWriteBufferSize,
+		ReadBufferSize:   wsWriteBufferSize,
 	}
 
 	ctx, cancelCtx := context.WithCancel(ctx)
