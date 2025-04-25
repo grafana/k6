@@ -372,6 +372,7 @@ func TestOptions(t *testing.T) {
 		}
 		for _, tc := range tests {
 			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
 				tlsAuth := []*TLSAuth{
 					{TLSAuthFields{
 						Domains:  domains,
@@ -384,6 +385,7 @@ func TestOptions(t *testing.T) {
 				assert.Equal(t, tlsAuth, opts.TLSAuth)
 
 				t.Run("Roundtrip", func(t *testing.T) {
+					t.Parallel()
 					optsData, err := json.Marshal(opts)
 					assert.NoError(t, err)
 

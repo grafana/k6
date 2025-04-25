@@ -251,10 +251,11 @@ func TestLoad(t *testing.T) {
 			{"HOST", "https://some-path-that-doesnt-exist.js"},
 		}
 
-		filesystems := map[string]fsext.Fs{"https": fsext.NewMemMapFs()}
 		for _, data := range testData {
 			moduleSpecifier := data.moduleSpecifier
 			t.Run(data.name, func(t *testing.T) {
+				filesystems := map[string]fsext.Fs{"https": fsext.NewMemMapFs()}
+				t.Parallel()
 				moduleSpecifierURL, err := loader.Resolve(root, moduleSpecifier)
 				require.NoError(t, err)
 

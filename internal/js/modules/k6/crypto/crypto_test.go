@@ -509,7 +509,7 @@ func TestHexEncode(t *testing.T) {
 
 		for _, tc := range testCases {
 			tc := tc
-			t.Run(fmt.Sprintf("%T", tc), func(t *testing.T) {
+			t.Run(fmt.Sprintf("%T", tc), func(t *testing.T) { //nolint:paralleltest
 				c := Crypto{}
 				out, err := c.hexEncode(tc)
 				require.NoError(t, err)

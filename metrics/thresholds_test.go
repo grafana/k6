@@ -192,7 +192,7 @@ func TestThresholdRun(t *testing.T) {
 		threshold := newThreshold(`rate<0.01`, false, types.NullDuration{})
 		threshold.parsed = parsed
 
-		t.Run("no taint", func(t *testing.T) {
+		t.Run("no taint", func(t *testing.T) { //nolint:paralleltest
 			b, err := threshold.runNoTaint(sinks)
 			assert.NoError(t, err)
 			assert.True(t, b)
@@ -218,14 +218,14 @@ func TestThresholdRun(t *testing.T) {
 		threshold := newThreshold(`rate<0.01`, false, types.NullDuration{})
 		threshold.parsed = parsed
 
-		t.Run("no taint", func(t *testing.T) {
+		t.Run("no taint", func(t *testing.T) { //nolint:paralleltest
 			b, err := threshold.runNoTaint(sinks)
 			assert.NoError(t, err)
 			assert.False(t, b)
 			assert.False(t, threshold.LastFailed)
 		})
 
-		t.Run("taint", func(t *testing.T) {
+		t.Run("taint", func(t *testing.T) { //nolint:paralleltest
 			b, err := threshold.run(sinks)
 			assert.NoError(t, err)
 			assert.False(t, b)
@@ -839,7 +839,7 @@ func TestThresholdsJSON(t *testing.T) {
 				assert.Equal(t, data.gracePeriod, ts.Thresholds[i].AbortGracePeriod)
 			}
 
-			t.Run("marshal", func(t *testing.T) {
+			t.Run("marshal", func(t *testing.T) { //nolint:paralleltest
 				data2, err := MarshalJSONWithoutHTMLEscape(ts)
 				assert.NoError(t, err)
 				output := data.JSON

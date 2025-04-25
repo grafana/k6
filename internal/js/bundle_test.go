@@ -760,7 +760,7 @@ func TestOpen(t *testing.T) {
 
 					for source, b := range map[string]*Bundle{"source": sourceBundle, "archive": arcBundle} {
 						b := b
-						t.Run(source, func(t *testing.T) {
+						t.Run(source, func(t *testing.T) { //nolint:paralleltest
 							bi, err := b.Instantiate(context.Background(), 0)
 							require.NoError(t, err)
 							v, err := bi.getCallableExport(consts.DefaultFn)(sobek.Undefined())
@@ -770,13 +770,13 @@ func TestOpen(t *testing.T) {
 					}
 				}
 
-				t.Run(tCase.name, testFunc)
+				t.Run(tCase.name, testFunc) //nolint:paralleltest
 				if isWindows {
 					tCase := tCase // copy test case before making modifications
 					// windowsify the testcase
 					tCase.openPath = strings.ReplaceAll(tCase.openPath, `/`, `\`)
 					tCase.pwd = strings.ReplaceAll(tCase.pwd, `/`, `\`)
-					t.Run(tCase.name+" with windows slash", testFunc)
+					t.Run(tCase.name+" with windows slash", testFunc) //nolint:paralleltest
 				}
 			}
 		})
