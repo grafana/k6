@@ -220,7 +220,7 @@ func (controller *ReadableStreamDefaultController) pullSteps(readRequest ReadReq
 // [specification]: https://streams.spec.whatwg.org/#abstract-opdef-readablestreamdefaultcontroller-releasesteps
 func (controller *ReadableStreamDefaultController) releaseSteps() {
 	// 1.
-	return //nolint:gosimple
+	return //nolint:gosimple,staticcheck
 }
 
 // close implements the [ReadableStreamDefaultControllerClose] algorithm
