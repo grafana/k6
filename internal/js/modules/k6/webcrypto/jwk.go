@@ -20,7 +20,7 @@ const (
 )
 
 // JsonWebKey represents a JSON Web Key (JsonWebKey) key.
-type JsonWebKey map[string]interface{} //nolint:stylecheck,revive // we name this type JsonWebKey to match the spec
+type JsonWebKey map[string]interface{} //nolint:revive // we name this type JsonWebKey to match the spec
 
 // Set sets a key-value pair in the JWK.
 func (jwk *JsonWebKey) Set(key string, value interface{}) {

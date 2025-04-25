@@ -9,7 +9,7 @@ import (
 	"go.k6.io/k6/lib"
 )
 
-//nolint:golint,revive,stylecheck // we want to keep these constants as they are
+//nolint:revive // we want to keep these constants as they are
 const (
 	OCSP_STATUS_GOOD                   = "good"
 	OCSP_STATUS_REVOKED                = "revoked"

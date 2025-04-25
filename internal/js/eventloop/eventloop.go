@@ -193,7 +193,7 @@ func (e *EventLoop) Start(firstCallback func() error) error {
 				}
 			}
 			// this is the de facto wording in both firefox and deno at least
-			return fmt.Errorf("Uncaught (in promise) %s", value) //nolint:stylecheck,staticcheck
+			return fmt.Errorf("Uncaught (in promise) %s", value) //nolint:staticcheck
 		}
 	}
 }

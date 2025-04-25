@@ -299,7 +299,7 @@ func (s Selection) Attr(name string, def ...sobek.Value) sobek.Value {
 	return s.rt.ToValue(val)
 }
 
-//nolint:revive,stylecheck // var-naming wants this to be HTML but this will break the API
+//nolint:revive // var-naming wants this to be HTML but this will break the API
 func (s Selection) Html() sobek.Value {
 	val, err := s.sel.Html()
 	if err != nil {

@@ -118,7 +118,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if !cloudConfig.Token.Valid {
-		return errors.New( //nolint:golint
+		return errors.New(
 			"not logged in, please login first to the Grafana Cloud k6 " +
 				"using the \"k6 cloud login\" command",
 		)
@@ -313,7 +313,6 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 		logger.WithField("run_status", testProgress.RunStatusText).Debug("Test finished")
 	}
 
-	//nolint:stylecheck,golint
 	if testProgress.ResultStatus == cloudapi.ResultStatusFailed {
 		// Although by looking at [ResultStatus] and [RunStatus] isn't self-explanatory,
 		// the scenario when the test run has finished, but it failed is an exceptional case for those situations

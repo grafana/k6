@@ -257,7 +257,7 @@ var (
 	update = flag.Bool("update", false, "update breaking_test_errors-*.json files") //nolint:gochecknoglobals
 )
 
-//nolint:unused,structcheck
+//nolint:unused
 type tc39Test struct {
 	name string
 	f    func(t *testing.T)
@@ -278,7 +278,7 @@ type tc39TestCtx struct {
 	enableBench    bool
 	benchmark      tc39BenchmarkData
 	benchLock      sync.Mutex
-	testQueue      []tc39Test //nolint:unused,structcheck
+	testQueue      []tc39Test //nolint:unused
 	expectedErrors map[string]string
 
 	errorsLock sync.Mutex
@@ -419,7 +419,7 @@ func (ctx *tc39TestCtx) runTC39Test(t testing.TB, name, src string, meta *tc39Me
 	}
 
 	var out []string
-	async := meta.hasFlag("async") //nolint:ifshort // false positive
+	async := meta.hasFlag("async")
 	if async {
 		err = ctx.runFile(ctx.base, path.Join("harness", "doneprintHandle.js"), vm)
 		if err != nil {
