@@ -124,9 +124,10 @@ func TestRampingArrivalRateRunUnplannedVUs(t *testing.T) {
 	ch2 := make(chan struct{}) // closed when a second iteration was started on an old VU in order to test it won't start a second unplanned VU in parallel or at all
 	runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
 		cur := atomic.AddInt64(&count, 1)
-		if cur == 1 {
+		switch cur {
+		case 1:
 			<-ch // wait to start again
-		} else if cur == 2 {
+		case 2:
 			<-ch2 // wait to start again
 		}
 

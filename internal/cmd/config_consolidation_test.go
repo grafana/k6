@@ -332,16 +332,16 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 
 		// Test system tags
 		{opts{}, exp{}, func(t *testing.T, c Config) {
-			assert.Equal(t, &metrics.DefaultSystemTagSet, c.Options.SystemTags)
+			assert.Equal(t, &metrics.DefaultSystemTagSet, c.SystemTags)
 		}},
 		{opts{cli: []string{"--system-tags", `""`}}, exp{}, func(t *testing.T, c Config) {
-			assert.Equal(t, metrics.SystemTagSet(0), *c.Options.SystemTags)
+			assert.Equal(t, metrics.SystemTagSet(0), *c.SystemTags)
 		}},
 		{opts{env: []string{`K6_SYSTEM_TAGS=""`}}, exp{}, func(t *testing.T, c Config) {
-			assert.Equal(t, metrics.SystemTagSet(0), *c.Options.SystemTags)
+			assert.Equal(t, metrics.SystemTagSet(0), *c.SystemTags)
 		}},
 		{opts{env: []string{`K6_SYSTEM_TAGS=proto,method`}}, exp{}, func(t *testing.T, c Config) {
-			assert.Equal(t, metrics.SystemTagSet(metrics.TagProto|metrics.TagMethod), *c.Options.SystemTags)
+			assert.Equal(t, metrics.SystemTagSet(metrics.TagProto|metrics.TagMethod), *c.SystemTags)
 		}},
 		{
 			opts{
@@ -354,7 +354,7 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 				assert.Equal(
 					t,
 					*metrics.NewSystemTagSet(metrics.TagSubproto, metrics.TagURL),
-					*c.Options.SystemTags,
+					*c.SystemTags,
 				)
 			},
 		},
@@ -374,23 +374,23 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 
 		// Test summary trend stats
 		{opts{}, exp{}, func(t *testing.T, c Config) {
-			assert.Equal(t, lib.DefaultSummaryTrendStats, c.Options.SummaryTrendStats)
+			assert.Equal(t, lib.DefaultSummaryTrendStats, c.SummaryTrendStats)
 		}},
 		{opts{cli: []string{"--summary-trend-stats", ""}}, exp{}, func(t *testing.T, c Config) {
-			assert.Equal(t, []string{}, c.Options.SummaryTrendStats)
+			assert.Equal(t, []string{}, c.SummaryTrendStats)
 		}},
 		{opts{cli: []string{"--summary-trend-stats", "coun"}}, exp{consolidationError: true}, nil},
 		{opts{cli: []string{"--summary-trend-stats", "med,avg,p("}}, exp{consolidationError: true}, nil},
 		{opts{cli: []string{"--summary-trend-stats", "med,avg,p(-1)"}}, exp{consolidationError: true}, nil},
 		{opts{cli: []string{"--summary-trend-stats", "med,avg,p(101)"}}, exp{consolidationError: true}, nil},
 		{opts{cli: []string{"--summary-trend-stats", "med,avg,p(99.999)"}}, exp{}, func(t *testing.T, c Config) {
-			assert.Equal(t, []string{"med", "avg", "p(99.999)"}, c.Options.SummaryTrendStats)
+			assert.Equal(t, []string{"med", "avg", "p(99.999)"}, c.SummaryTrendStats)
 		}},
 		{
 			opts{runner: &lib.Options{SummaryTrendStats: []string{"avg", "p(90)", "count"}}},
 			exp{},
 			func(t *testing.T, c Config) {
-				assert.Equal(t, []string{"avg", "p(90)", "count"}, c.Options.SummaryTrendStats)
+				assert.Equal(t, []string{"avg", "p(90)", "count"}, c.SummaryTrendStats)
 			},
 		},
 		{opts{cli: []string{}}, exp{}, func(t *testing.T, c Config) {
@@ -398,21 +398,21 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 				TTL:    null.NewString("5m", false),
 				Select: types.NullDNSSelect{DNSSelect: types.DNSrandom, Valid: false},
 				Policy: types.NullDNSPolicy{DNSPolicy: types.DNSpreferIPv4, Valid: false},
-			}, c.Options.DNS)
+			}, c.DNS)
 		}},
 		{opts{env: []string{"K6_DNS=ttl=5,select=roundRobin"}}, exp{}, func(t *testing.T, c Config) {
 			assert.Equal(t, types.DNSConfig{
 				TTL:    null.StringFrom("5"),
 				Select: types.NullDNSSelect{DNSSelect: types.DNSroundRobin, Valid: true},
 				Policy: types.NullDNSPolicy{DNSPolicy: types.DNSpreferIPv4, Valid: false},
-			}, c.Options.DNS)
+			}, c.DNS)
 		}},
 		{opts{env: []string{"K6_DNS=ttl=inf,select=random,policy=preferIPv6"}}, exp{}, func(t *testing.T, c Config) {
 			assert.Equal(t, types.DNSConfig{
 				TTL:    null.StringFrom("inf"),
 				Select: types.NullDNSSelect{DNSSelect: types.DNSrandom, Valid: true},
 				Policy: types.NullDNSPolicy{DNSPolicy: types.DNSpreferIPv6, Valid: true},
-			}, c.Options.DNS)
+			}, c.DNS)
 		}},
 		// This is functionally invalid, but will error out in validation done in js.parseTTL().
 		{opts{cli: []string{"--dns", "ttl=-1"}}, exp{}, func(t *testing.T, c Config) {
@@ -420,7 +420,7 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 				TTL:    null.StringFrom("-1"),
 				Select: types.NullDNSSelect{DNSSelect: types.DNSrandom, Valid: false},
 				Policy: types.NullDNSPolicy{DNSPolicy: types.DNSpreferIPv4, Valid: false},
-			}, c.Options.DNS)
+			}, c.DNS)
 		}},
 		{opts{cli: []string{"--dns", "ttl=0,blah=nope"}}, exp{cliReadError: true}, nil},
 		{opts{cli: []string{"--dns", "ttl=0"}}, exp{}, func(t *testing.T, c Config) {
@@ -428,7 +428,7 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 				TTL:    null.StringFrom("0"),
 				Select: types.NullDNSSelect{DNSSelect: types.DNSrandom, Valid: false},
 				Policy: types.NullDNSPolicy{DNSPolicy: types.DNSpreferIPv4, Valid: false},
-			}, c.Options.DNS)
+			}, c.DNS)
 		}},
 		{opts{cli: []string{"--dns", "ttl=5s,select="}}, exp{cliReadError: true}, nil},
 		{
@@ -439,7 +439,7 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 					TTL:    null.StringFrom("0"),
 					Select: types.NullDNSSelect{DNSSelect: types.DNSroundRobin, Valid: true},
 					Policy: types.NullDNSPolicy{DNSPolicy: types.DNSonlyIPv4, Valid: true},
-				}, c.Options.DNS)
+				}, c.DNS)
 			},
 		},
 		{
@@ -453,7 +453,7 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 					TTL:    null.StringFrom("30"),
 					Select: types.NullDNSSelect{DNSSelect: types.DNSrandom, Valid: false},
 					Policy: types.NullDNSPolicy{DNSPolicy: types.DNSany, Valid: true},
-				}, c.Options.DNS)
+				}, c.DNS)
 			},
 		},
 		{
@@ -469,15 +469,15 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 					TTL:    null.StringFrom("5"),
 					Select: types.NullDNSSelect{DNSSelect: types.DNSrandom, Valid: true},
 					Policy: types.NullDNSPolicy{DNSPolicy: types.DNSany, Valid: true},
-				}, c.Options.DNS)
+				}, c.DNS)
 			},
 		},
 		{
 			opts{env: []string{"K6_NO_SETUP=true", "K6_NO_TEARDOWN=false"}},
 			exp{},
 			func(t *testing.T, c Config) {
-				assert.Equal(t, null.BoolFrom(true), c.Options.NoSetup)
-				assert.Equal(t, null.BoolFrom(false), c.Options.NoTeardown)
+				assert.Equal(t, null.BoolFrom(true), c.NoSetup)
+				assert.Equal(t, null.BoolFrom(false), c.NoTeardown)
 			},
 		},
 		{
@@ -509,7 +509,7 @@ func runTestCase(t *testing.T, testCase configConsolidationTestCase, subCmd stri
 	ts.CmdArgs = append([]string{"k6", subCmd}, testCase.options.cli...)
 	ts.Env = state.BuildEnvMap(testCase.options.env)
 	if testCase.options.fs != nil {
-		ts.GlobalState.FS = testCase.options.fs
+		ts.FS = testCase.options.fs
 	}
 
 	rootCmd := newRootCommand(ts.GlobalState)

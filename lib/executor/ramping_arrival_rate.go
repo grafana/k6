@@ -164,7 +164,7 @@ var _ lib.Executor = &RampingArrivalRate{}
 func (varr *RampingArrivalRate) Init(_ context.Context) error {
 	// err should always be nil, because Init() won't be called for executors
 	// with no work, as determined by their config's HasWork() method.
-	et, err := varr.BaseExecutor.executionState.ExecutionTuple.GetNewExecutionTupleFromValue(varr.config.MaxVUs.Int64)
+	et, err := varr.executionState.ExecutionTuple.GetNewExecutionTupleFromValue(varr.config.MaxVUs.Int64)
 	varr.et = et
 	varr.iterSegIndex = lib.NewSegmentedIndex(et)
 

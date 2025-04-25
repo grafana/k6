@@ -210,14 +210,14 @@ func TestLauncherLaunch(t *testing.T) {
 				k6Args = append(k6Args, scriptPath)
 			}
 
-			ts.GlobalState.CmdArgs = k6Args
+			ts.CmdArgs = k6Args
 
 			// k6deps uses os package to access files. So we need to use it in the global state
-			ts.GlobalState.FS = afero.NewOsFs()
+			ts.FS = afero.NewOsFs()
 
 			// NewGlobalTestState does not set the Binary provisioning flag even if we set
 			// the K6_BINARY_PROVISIONING variable in the global state, so we do it manually
-			ts.GlobalState.Flags.BinaryProvisioning = !tc.disableBP
+			ts.Flags.BinaryProvisioning = !tc.disableBP
 
 			// the exit code is checked by the TestGlobalState when the test ends
 			ts.ExpectedExitCode = tc.expectOsExit

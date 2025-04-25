@@ -68,7 +68,7 @@ func (mi *ModuleInstance) expectedStatuses(args ...sobek.Value) *expectedStatuse
 			if minValue == nil || maxValue == nil {
 				common.Throw(rt, fmt.Errorf(errMsg, i+1))
 			}
-			if !(isInt(minValue) && isInt(maxValue)) {
+			if !isInt(minValue) || !isInt(maxValue) {
 				common.Throw(rt, fmt.Errorf("both min and max need to be integers for argument number %d", i+1))
 			}
 

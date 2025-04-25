@@ -493,7 +493,7 @@ func (b *Bundle) setInitGlobals(rt *sobek.Runtime, vu *moduleVUImpl, modSys *mod
 		if err != nil {
 			return nil, err
 		}
-		if !(strings.HasPrefix(filename, "file://") || filepath.IsAbs(filename)) {
+		if !strings.HasPrefix(filename, "file://") && !filepath.IsAbs(filename) {
 			otherPath, shouldWarn := modSys.ShouldWarnOnParentDirNotMatchingCurrentModuleParentDir(vu, pwd)
 			logger := b.preInitState.Logger
 			if shouldWarn {

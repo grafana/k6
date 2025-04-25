@@ -1698,7 +1698,7 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 					},
 				}
 				if data.withDomains {
-					opt.TLSAuth[0].TLSAuthFields.Domains = []string{"127.0.0.1"}
+					opt.TLSAuth[0].Domains = []string{"127.0.0.1"}
 				}
 				_, _ = opt.TLSAuth[0].Certificate()
 			}

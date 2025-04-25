@@ -43,8 +43,8 @@ func (v *VU) ToSobekValue(i any) sobek.Value { return v.Runtime().ToValue(i) }
 // It transitions the VU from the init stage to the execution stage by
 // setting the VU's state to the state that was passed to NewVU.
 func (v *VU) ActivateVU() {
-	v.VU.StateField = v.toBeState
-	v.VU.InitEnvField = nil
+	v.StateField = v.toBeState
+	v.InitEnvField = nil
 }
 
 // AssertSamples asserts each sample VU received since AssertSamples

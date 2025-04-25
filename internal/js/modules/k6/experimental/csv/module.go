@@ -130,7 +130,7 @@ func (mi *ModuleInstance) Parse(file sobek.Value, options sobek.Value) *sobek.Pr
 		// it multiple times.
 		//
 		// As such we hold a single instance of it in the RootModule, and we use it to create the shared array.
-		resolve(mi.RootModule.dataModuleInstance.NewSharedArrayFrom(mi.vu.Runtime(), underlyingSharedArrayName, r))
+		resolve(mi.dataModuleInstance.NewSharedArrayFrom(mi.vu.Runtime(), underlyingSharedArrayName, r))
 	}()
 
 	return promise

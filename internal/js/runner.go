@@ -167,7 +167,7 @@ func (r *Runner) newVU(
 		if idLocal > 0 {
 			ipIndex = idLocal - 1
 		}
-		dialer.Dialer.LocalAddr = &net.TCPAddr{IP: r.Bundle.Options.LocalIPs.Pool.GetIP(ipIndex)}
+		dialer.LocalAddr = &net.TCPAddr{IP: r.Bundle.Options.LocalIPs.Pool.GetIP(ipIndex)}
 	}
 
 	tlsConfig := &tls.Config{
@@ -490,7 +490,7 @@ func prepareHandleWrapperArgs(
 }
 
 func (r *Runner) checkDeadline(ctx context.Context, name string, result sobek.Value, err error) error {
-	if deadline, ok := ctx.Deadline(); !(ok && time.Now().After(deadline)) {
+	if deadline, ok := ctx.Deadline(); !ok || !time.Now().After(deadline) {
 		return nil
 	}
 
