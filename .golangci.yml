@@ -106,6 +106,10 @@ linters:
       - linters:
           - paralleltest
           - tparallel
+        path: js\/modules\/k6\/html\/.*\.go
+      - linters:
+          - paralleltest
+          - tparallel
         path: js\/modules\/k6\/http\/.*_test\.go
       - linters:
           - forbidigo
