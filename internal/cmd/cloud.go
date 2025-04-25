@@ -300,7 +300,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	}
 
 	if testProgress == nil {
-		//nolint:stylecheck,golint
+		//nolint:staticcheck
 		return errext.WithExitCodeIfNone(errors.New("Test progress error"), exitcodes.CloudFailedToGetProgress)
 	}
 
@@ -320,11 +320,12 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 		// when thresholds have been crossed (failed). So, we report this situation as such.
 		if testProgress.RunStatus == cloudapi.RunStatusFinished ||
 			testProgress.RunStatus == cloudapi.RunStatusAbortedThreshold {
+			//nolint:staticcheck
 			return errext.WithExitCodeIfNone(errors.New("Thresholds have been crossed"), exitcodes.ThresholdsHaveFailed)
 		}
 
 		// TODO: use different exit codes for failed thresholds vs failed test (e.g. aborted by system/limit)
-		return errext.WithExitCodeIfNone(errors.New("The test has failed"), exitcodes.CloudTestRunFailed)
+		return errext.WithExitCodeIfNone(errors.New("The test has failed"), exitcodes.CloudTestRunFailed) //nolint:staticcheck
 	}
 
 	return nil

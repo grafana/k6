@@ -138,8 +138,7 @@ func Load(
 	scheme := moduleSpecifier.Scheme
 	if scheme == "" {
 		if moduleSpecifier.Opaque == "" {
-			//nolint:stylecheck
-			return nil, fmt.Errorf(fileSchemeCouldntBeLoadedMsg, originalModuleSpecifier)
+			return nil, fmt.Errorf(fileSchemeCouldntBeLoadedMsg, originalModuleSpecifier) //nolint:staticcheck
 		}
 		scheme = "https"
 	}
@@ -158,8 +157,7 @@ func Load(
 		return nil, err
 	}
 	if scheme != "https" {
-		//nolint:stylecheck
-		return nil, fmt.Errorf(fileSchemeCouldntBeLoadedMsg, originalModuleSpecifier)
+		return nil, fmt.Errorf(fileSchemeCouldntBeLoadedMsg, originalModuleSpecifier) //nolint:staticcheck
 	}
 
 	finalModuleSpecifierURL := moduleSpecifier
@@ -167,7 +165,7 @@ func Load(
 	var result *SourceData
 	result, err = loadRemoteURL(logger, finalModuleSpecifierURL)
 	if err != nil {
-		//nolint:stylecheck
+		//nolint:staticcheck
 		return nil, fmt.Errorf(httpsSchemeCouldntBeLoadedMsg, originalModuleSpecifier, finalModuleSpecifierURL, err)
 	}
 	result.URL = moduleSpecifier

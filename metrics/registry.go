@@ -45,7 +45,7 @@ func (r *Registry) NewMetric(name string, typ MetricType, t ...ValueType) (*Metr
 	defer r.l.Unlock()
 
 	if !checkName(name) {
-		return nil, fmt.Errorf("Invalid metric name: '%s'. %s", name, badNameWarning) //nolint:golint,stylecheck
+		return nil, fmt.Errorf("Invalid metric name: '%s'. %s", name, badNameWarning) //nolint:staticcheck
 	}
 	oldMetric, ok := r.metrics[name]
 
