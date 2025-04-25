@@ -240,7 +240,7 @@ func (statsHandler) TagRPC(ctx context.Context, _ *grpcstats.RPCTagInfo) context
 // HandleRPC implements the grpcstats.Handler interface
 func (h statsHandler) HandleRPC(ctx context.Context, stat grpcstats.RPCStats) {
 	state := h.getState()
-	stateRPC := getRPCState(ctx) //nolint:ifshort
+	stateRPC := getRPCState(ctx)
 
 	// If the request is done by the reflection handler then the tags will be
 	// nil. In this case, we can reuse the VU.State's Tags.

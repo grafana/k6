@@ -43,13 +43,13 @@ const (
 	tcpDialUnknownErrnoCode  errCode = 1213
 	tcpResetByPeerErrorCode  errCode = 1220
 	// TLS errors
-	defaultTLSErrorCode           errCode = 1300 //nolint:deadcode,varcheck // this is here to save the number
+	defaultTLSErrorCode           errCode = 1300
 	tlsHeaderErrorCode            errCode = 1301
 	x509UnknownAuthorityErrorCode errCode = 1310
 	x509HostnameErrorCode         errCode = 1311
 
 	// HTTP2 errors
-	// defaultHTTP2ErrorCode errCode = 1600 // commented because of golint
+	defaultHTTP2ErrorCode errCode = 1600 //nolint:unused
 	// HTTP2 GoAway errors
 	unknownHTTP2GoAwayErrorCode errCode = 1610
 	// errors till 1611 + 13 are other HTTP2 GoAway errors with a specific errCode

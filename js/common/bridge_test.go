@@ -12,8 +12,8 @@ type bridgeTestFieldsType struct {
 	Exported       string
 	ExportedTag    string `js:"renamed"`
 	ExportedHidden string `js:"-"`
-	unexported     string //nolint:structcheck,unused // actually checked in the test
-	unexportedTag  string `js:"unexported"` //nolint:structcheck,unused // actually checked in the test
+	unexported     string //nolint:unused // actually checked in the test
+	unexportedTag  string `js:"unexported"` //nolint:unused // actually checked in the test
 }
 
 type bridgeTestMethodsType struct{}
