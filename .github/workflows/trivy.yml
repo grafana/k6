@@ -21,7 +21,7 @@ jobs:
     if: github.repository == 'grafana/k6' # avoid running on forks
     steps:
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@22d2755f774d925b191a185b74e782a4b0638a41
+        uses: aquasecurity/trivy-action@22d2755f774d925b191a185b74e782a4b0638a41 # v0.15.0
         with:
           image-ref: 'grafana/k6:master'
           format: 'sarif'
@@ -29,6 +29,6 @@ jobs:
           severity: 'CRITICAL,HIGH,MEDIUM'
 
       - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@4c3e5362829f0b0bb62ff5f6c938d7f95574c306 # v2.21.1
         with:
           sarif_file: 'trivy-results.sarif'
