@@ -4,6 +4,10 @@ on:
   push:
     branches: [ master ]
 
+permissions:
+  contents: read
+  security-events: write
+
 jobs:
   analyze:
     name: Analyze
@@ -12,11 +16,13 @@ jobs:
     steps:
     - name: Checkout repo
       uses: actions/checkout@v4
+      with:
+        persist-credentials: false
 
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@v3
+      uses: github/codeql-action/init@28deaeda66b76a05916b6923827895f2b14ab387 # v3.28.16
       with:
         languages: go
 
     - name: CodeQL Analysis
-      uses: github/codeql-action/analyze@v3
+      uses: github/codeql-action/analyze@28deaeda66b76a05916b6923827895f2b14ab387 # v3.28.16
