@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"syscall"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/grafana/k6deps"
@@ -132,21 +133,43 @@ func (b *customBinary) run(gs *state.GlobalState) {
 	}
 	cmd.Env = env
 
+	// handle signals
+	sigC := make(chan os.Signal, 2)
+	gs.SignalNotify(sigC, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+
 	gs.Logger.Debug("Launching the provisioned k6 binary")
 
-	rc := 0
-	if err := cmd.Run(); err != nil {
-		rc = 1
+	if err := cmd.Start(); err != nil {
 		gs.Logger.
 			WithError(err).
 			Error("Failed to run the provisioned k6 binary")
+		gs.OSExit(1)
+	}
 
-		var eerr *exec.ExitError
-		if errors.As(err, &eerr) {
-			rc = eerr.ExitCode()
+	// wait for the subprocess to end
+	done := make(chan error)
+	go func() {
+		done <- cmd.Wait()
+	}()
+
+	for {
+		select {
+		case err := <-done:
+			rc := 0
+			if err != nil {
+				rc = 1
+				var eerr *exec.ExitError
+				if errors.As(err, &eerr) {
+					rc = eerr.ExitCode()
+				}
+			}
+			gs.OSExit(rc)
+		case sig := <-sigC:
+			gs.Logger.
+				WithField("signal", sig.String()).
+				Debug("Signal received, waiting for the subprocess to handle it and return.")
 		}
 	}
-	gs.OSExit(rc)
 }
 
 // currentBinary runs the requested commands on the current binary
