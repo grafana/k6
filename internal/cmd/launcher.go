@@ -164,9 +164,10 @@ func (b *customBinary) run(gs *state.GlobalState) {
 				}
 			}
 			gs.OSExit(rc)
-		case <-sigC:
-			// TODO: maybe we should set a timeout while waiting for the subprocess
-			gs.Logger.Debug("Signal received. Waiting for subprocess to end.")
+		case sig := <-sigC:
+			gs.Logger.
+				WithField("signal", sig.String()).
+				Debug("Signal received, waiting for the subprocess to handle it and return.")
 		}
 	}
 }
