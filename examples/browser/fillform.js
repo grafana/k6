@@ -23,7 +23,7 @@ export default async function() {
 
   try {
     // Goto front page, find login link and click it
-    await page.goto('https://test.k6.io/', { waitUntil: 'networkidle' });
+    await page.goto('https://quickpizza.grafana.com/test.k6.io/', { waitUntil: 'networkidle' });
     await Promise.all([
       page.waitForNavigation(),
       page.locator('a[href="/my_messages.php"]').click(),

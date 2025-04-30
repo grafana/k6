@@ -21,7 +21,7 @@ export default async function() {
   const page = await browser.newPage();
   
   try {
-    await page.goto('https://test.k6.io/');
+    await page.goto('https://quickpizza.grafana.com/test.k6.io/');
 
     page.on('console', async msg => check(msg, {
       'assert console message type': msg =>
