@@ -227,9 +227,6 @@ func getFlags(defaultFlags GlobalFlags, env map[string]string, args []string) Gl
 	if val, ok := env["K6_BUILD_SERVICE_URL"]; ok {
 		result.BuildServiceURL = val
 	}
-	if val, ok := env["K6_BINARY_CACHE"]; ok {
-		result.BinaryCache = val
-	}
 
 	// check if verbose flag is set
 	if slices.Contains(args, "-v") || slices.Contains(args, "--verbose") {
