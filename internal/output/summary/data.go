@@ -294,8 +294,8 @@ func populateSummaryChecks(
 		getMetricValues(checksMetric.Sink, testRunDuration),
 	)
 
-	summaryGroup.Checks.Metrics.Fail.Values["passes"] = totalChecks - successChecks
-	summaryGroup.Checks.Metrics.Fail.Values["fails"] = successChecks
+	summaryGroup.Checks.Metrics.Fail.Values["passes"] = successChecks
+	summaryGroup.Checks.Metrics.Fail.Values["fails"] = totalChecks - successChecks
 	summaryGroup.Checks.Metrics.Fail.Values["rate"] = (totalChecks - successChecks) / totalChecks
 
 	summaryGroup.Checks.OrderedChecks = groupData.checks.orderedChecks
