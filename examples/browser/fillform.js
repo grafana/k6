@@ -23,7 +23,7 @@ export default async function() {
 
   try {
     // Goto front page, find login link and click it
-    await page.goto('https://test.k6.io/', { waitUntil: 'networkidle' });
+    await page.goto('https://quickpizza.grafana.com/test.k6.io/', { waitUntil: 'networkidle' });
     await Promise.all([
       page.waitForNavigation(),
       page.locator('a[href="/my_messages.php"]').click(),
@@ -51,7 +51,7 @@ export default async function() {
     await check(context, {
       'session cookie is set': async ctx => {
         const cookies = await ctx.cookies();
-        return cookies.find(c => c.name == 'sid') !== undefined;
+        return cookies.find(c => c.name == 'AWSALB') !== undefined;
       }
     });
   } finally {
