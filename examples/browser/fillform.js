@@ -51,7 +51,7 @@ export default async function() {
     await check(context, {
       'session cookie is set': async ctx => {
         const cookies = await ctx.cookies();
-        return cookies.find(c => c.name == 'sid') !== undefined;
+        return cookies.find(c => c.name == 'AWSALB') !== undefined;
       }
     });
   } finally {
