@@ -16,7 +16,7 @@ export const options = {
 export default async function () {
   const page = await browser.newPage();
 
-  await page.goto('https://test.k6.io/my_messages.php', { waitUntil: 'networkidle' });
+  await page.goto('https://quickpizza.grafana.com/test.k6.io/my_messages.php', { waitUntil: 'networkidle' });
 
   const userInput = page.locator('input[name="login"]');
   await userInput.click();

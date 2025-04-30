@@ -12,7 +12,7 @@ export const options = {
       },
     },
   },
-  hosts: { 'test.k6.io': '127.0.0.254' },
+  hosts: { 'quickpizza.grafana.com': '127.0.0.254' },
   thresholds: {
     checks: ["rate==1.0"]
   }
@@ -23,7 +23,7 @@ export default async function() {
   const page = await context.newPage();
 
   try {
-    const res = await page.goto('http://test.k6.io/', {
+    const res = await page.goto('http://quickpizza.grafana.com/test.k6.io/', {
       waitUntil: 'load'
     });
     await check(res, {
