@@ -27,11 +27,11 @@ export default async function() {
     await check(page, {
       'Title with CSS selector': async p => {
         const e = await p.$('header h1.title');
-        return await e.textContent() === 'quickpizza.grafana.com/test.k6.io';
+        return await e.textContent() === 'QuickPizza Legacy';
       },
       'Title with XPath selector': async p => {
         const e = await p.$('//header//h1[@class="title"]');
-        return await e.textContent() === 'quickpizza.grafana.com/test.k6.io';
+        return await e.textContent() === 'QuickPizza Legacy';
       }
     });
   } finally {
