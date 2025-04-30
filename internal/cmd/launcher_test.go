@@ -353,7 +353,7 @@ func TestScriptNameFromArgs(t *testing.T) {
 	}
 }
 
-func TestIsScriptRequired(t *testing.T) {
+func TestIsAnalysisRequired(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
 		name     string
@@ -389,6 +389,21 @@ func TestIsScriptRequired(t *testing.T) {
 			name:     "cloud run command",
 			args:     []string{"cloud", "run", "script.js"},
 			expected: true,
+		},
+		{
+			name:     "cloud run command with help",
+			args:     []string{"cloud", "run", "--help"},
+			expected: false,
+		},
+		{
+			name:     "cloud run command with short help",
+			args:     []string{"cloud", "run", "-h"},
+			expected: false,
+		},
+		{
+			name:     "cloud command with short help in front",
+			args:     []string{"-h", "cloud"},
+			expected: false,
 		},
 		{
 			name:     "flag before command",
@@ -436,7 +451,7 @@ func TestIsScriptRequired(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			actual := isScriptRequired(tc.args)
+			actual := isAnalysisRequired(tc.args)
 			assert.Equal(t, tc.expected, actual)
 		})
 	}

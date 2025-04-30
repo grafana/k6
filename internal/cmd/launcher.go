@@ -259,9 +259,9 @@ func analyze(gs *state.GlobalState, args []string) (k6deps.Dependencies, error) 
 		Manifest:  k6deps.Source{Ignore: true},
 	}
 
-	if !isScriptRequired(args) {
+	if !isAnalysisRequired(args) {
 		gs.Logger.
-			Debug("The command to execute does not require Binary provisioning")
+			Debug("The command to execute does not require dependency analysis.")
 		return k6deps.Dependencies{}, nil
 	}
 
@@ -295,8 +295,8 @@ func analyze(gs *state.GlobalState, args []string) (k6deps.Dependencies, error) 
 	return k6deps.Analyze(dopts)
 }
 
-// isScriptRequired searches for the command and returns a boolean indicating if it is required to pass a script or not
-func isScriptRequired(args []string) bool {
+// isAnalysisRequired searches for the command and returns a boolean indicating if dependency analysis is required
+func isAnalysisRequired(args []string) bool {
 	// return early if no arguments passed
 	if len(args) == 0 {
 		return false
@@ -306,9 +306,11 @@ func isScriptRequired(args []string) bool {
 	// we handle cloud login subcommand as a special case because it does not require binary provisioning
 	for i, arg := range args {
 		switch arg {
+		case "--help", "-h":
+			return false
 		case "cloud":
 			for _, arg = range args[i+1:] {
-				if arg == "login" {
+				if arg == "login" || arg == "--help" || arg == "-h" {
 					return false
 				}
 			}
