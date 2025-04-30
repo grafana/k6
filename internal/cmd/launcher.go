@@ -230,6 +230,7 @@ func k6buildProvision(gs *state.GlobalState, deps k6deps.Dependencies) (commandE
 	config := k6provider.Config{
 		BuildServiceURL:  gs.Flags.BuildServiceURL,
 		BuildServiceAuth: token,
+		BinaryCacheDir:   gs.Flags.BinaryCache,
 	}
 
 	provider, err := k6provider.NewProvider(config)

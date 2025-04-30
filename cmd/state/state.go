@@ -29,6 +29,7 @@ const (
 
 	defaultBuildServiceURL = "https://ingest.k6.io/builder/api/v1"
 	defaultConfigFileName  = "config.json"
+	defaultBinaryCacheDir  = "builds"
 )
 
 // GlobalState contains the GlobalFlags and accessors for most of the global
@@ -103,13 +104,18 @@ func NewGlobalState(ctx context.Context) *GlobalState {
 		confDir = ".config"
 	}
 
+	cacheDir, err := os.UserCacheDir()
+	if err != nil {
+		confDir = ".cache"
+	}
+
 	binary, err := os.Executable()
 	if err != nil {
 		binary = "k6"
 	}
 
 	env := BuildEnvMap(os.Environ())
-	defaultFlags := GetDefaultFlags(confDir)
+	defaultFlags := GetDefaultFlags(confDir, cacheDir)
 	globalFlags := getFlags(defaultFlags, env, os.Args)
 
 	logLevel := logrus.InfoLevel
@@ -171,16 +177,18 @@ type GlobalFlags struct {
 
 	BinaryProvisioning bool
 	BuildServiceURL    string
+	BinaryCache        string
 }
 
 // GetDefaultFlags returns the default global flags.
-func GetDefaultFlags(homeDir string) GlobalFlags {
+func GetDefaultFlags(homeDir string, cacheDir string) GlobalFlags {
 	return GlobalFlags{
 		Address:          "localhost:6565",
 		ProfilingEnabled: false,
 		ConfigFilePath:   filepath.Join(homeDir, "k6", defaultConfigFileName),
 		LogOutput:        "stderr",
 		BuildServiceURL:  defaultBuildServiceURL,
+		BinaryCache:      filepath.Join(cacheDir, "k6", defaultBinaryCacheDir),
 	}
 }
 
