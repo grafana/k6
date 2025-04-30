@@ -36,7 +36,7 @@ export async function messages() {
   const page = await browser.newPage();
 
   try {
-    await page.goto('https://test.k6.io/my_messages.php', { waitUntil: 'networkidle' });
+    await page.goto('https://quickpizza.grafana.com/test.k6.io/my_messages.php', { waitUntil: 'networkidle' });
   } finally {
     await page.close();
   }
@@ -46,7 +46,7 @@ export async function news() {
   const page = await browser.newPage();
 
   try {
-    await page.goto('https://test.k6.io/news.php', { waitUntil: 'networkidle' });
+    await page.goto('https://quickpizza.grafana.com/test.k6.io/news.php', { waitUntil: 'networkidle' });
   } finally {
     await page.close();
   }

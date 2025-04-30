@@ -26,7 +26,7 @@ export default async function() {
 
   try {
     await page.goto(
-      'https://test.k6.io',
+      'https://quickpizza.grafana.com/test.k6.io',
       { waitUntil: 'load' },
     )
     await check(page, {

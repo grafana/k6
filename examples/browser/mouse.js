@@ -16,7 +16,7 @@ export const options = {
 export default async function () {
   const page = await browser.newPage();
 
-  await page.goto('https://test.k6.io/', { waitUntil: 'networkidle' });
+  await page.goto('https://quickpizza.grafana.com/test.k6.io/', { waitUntil: 'networkidle' });
 
   // Obtain ElementHandle for news link and navigate to it
   // by clicking in the 'a' element's bounding box
