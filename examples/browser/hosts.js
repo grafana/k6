@@ -12,7 +12,7 @@ export const options = {
       },
     },
   },
-  hosts: { 'quickpizza.grafana.com/test.k6.io': '127.0.0.254' },
+  hosts: { 'quickpizza.grafana.com': '127.0.0.254' },
   thresholds: {
     checks: ["rate==1.0"]
   }
