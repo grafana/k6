@@ -27,7 +27,7 @@ export default async function() {
   const page = await context.newPage();
 
   try {
-    await page.goto('https://test.k6.io/', { waitUntil: 'networkidle' });
+    await page.goto('https://quickpizza.grafana.com/test.k6.io/', { waitUntil: 'networkidle' });
     const dimensions = await page.evaluate(() => {
       return {
         width: document.documentElement.clientWidth,

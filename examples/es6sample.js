@@ -3,7 +3,6 @@ import { Counter, Rate } from "k6/metrics";
 import http from "k6/http";
 
 export let options = {
-	vus: 5,
 	thresholds: {
 		my_rate: ["rate>=0.4"], // Require my_rate's success rate to be >=40%
 		http_req_duration: ["avg<1000"], // Require http_req_duration's average to be <1000ms
@@ -36,10 +35,12 @@ export default function() {
 		});
 
 		group("html", function() {
-			check(http.get("http://test.k6.io/"), {
+			const res = http.get("https://quickpizza.grafana.com/test.k6.io/")
+			console.log(res.html("p.description").text())
+			check(res, {
 				"status is 200": (res) => res.status === 200,
 				"content type is html": (res) => res.headers['Content-Type'].startsWith("text/html"),
-				"welcome message is correct": (res) => res.html("p.description").text() === "Collection of simple web-pages suitable for load testing.",
+				"welcome message is correct": (res) => res.html("p.description").text().includes("This is a replacement"),
 			});
 		});
 

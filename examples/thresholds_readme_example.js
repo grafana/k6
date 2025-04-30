@@ -18,9 +18,9 @@ export let options = {
     ],
     thresholds: {
         // We want the 95th percentile of all HTTP request durations to be less than 500ms
-        "http_req_duration": ["p(95)<500"],
+        "http_req_duration": ["p(95)<750"],
         // Requests with the staticAsset tag should finish even faster
-        "http_req_duration{staticAsset:yes}": ["p(99)<250"],
+        "http_req_duration{staticAsset:yes}": ["p(99)<500"],
         // Thresholds based on the custom metric we defined and use to track application failures
         "check_failure_rate": [
             // Global failure rate should be less than 1%
@@ -33,13 +33,13 @@ export let options = {
 
 // Main function
 export default function () {
-    let response = http.get("https://test.k6.io/");
+    let response = http.get("https://quickpizza.grafana.com/test.k6.io/");
 
     // check() returns false if any of the specified conditions fail
     let checkRes = check(response, {
         "http2 is used": (r) => r.proto === "HTTP/2.0",
         "status is 200": (r) => r.status === 200,
-        "content is present": (r) => r.body.indexOf("Collection of simple web-pages suitable for load testing.") !== -1,
+        "content is present": (r) => r.body.indexOf("This is a replacement of the service ") !== -1,
     });
 
     // We reverse the check() result since we want to count the failures
@@ -49,9 +49,9 @@ export default function () {
     group("Static Assets", function () {
         // Execute multiple requests in parallel like a browser, to fetch some static resources
         let resps = http.batch([
-            ["GET", "https://test.k6.io/static/css/site.css", null, { tags: { staticAsset: "yes" } }],
-            ["GET", "https://test.k6.io/static/favicon.ico", null, { tags: { staticAsset: "yes" } }],
-            ["GET", "https://test.k6.io/static/js/prisms.js", null, { tags: { staticAsset: "yes" } }],
+            ["GET", "https://quickpizza.grafana.com/test.k6.io/static/css/site.css", null, { tags: { staticAsset: "yes" } }],
+            ["GET", "https://quickpizza.grafana.com/test.k6.io/static/favicon.ico", null, { tags: { staticAsset: "yes" } }],
+            ["GET", "https://quickpizza.grafana.com/test.k6.io/static/js/prisms.js", null, { tags: { staticAsset: "yes" } }],
         ]);
         // Combine check() call with failure tracking
         failureRate.add(!check(resps, {
