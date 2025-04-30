@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
+	"go.k6.io/k6/internal/lib/consts"
 	"go.k6.io/k6/internal/lib/summary"
 	"go.k6.io/k6/internal/lib/testutils"
 	"go.k6.io/k6/lib"
@@ -228,6 +229,22 @@ func TestOutput_AddMetricSamples(t *testing.T) {
 				TimeSeries: metrics.TimeSeries{
 					Metric: httpReqsMetric,
 					Tags:   reg.RootTagSet().With("group", lib.RootGroupPath),
+				},
+				Time:  time.Now(),
+				Value: 1,
+			},
+			{
+				TimeSeries: metrics.TimeSeries{
+					Metric: httpReqsMetric,
+					Tags:   reg.RootTagSet().With("group", lib.GroupSeparator+consts.SetupFn),
+				},
+				Time:  time.Now(),
+				Value: 1,
+			},
+			{
+				TimeSeries: metrics.TimeSeries{
+					Metric: httpReqsMetric,
+					Tags:   reg.RootTagSet().With("group", lib.GroupSeparator+consts.TeardownFn),
 				},
 				Time:  time.Now(),
 				Value: 1,

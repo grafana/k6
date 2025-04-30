@@ -12,11 +12,13 @@ runs:
     - name: Get golangci-lint version and download rules
       shell: bash
       env: #TODO: remove after https://github.com/actions/runner/issues/2473 is fixed
-        GITHUB_ACTION_REF: ${{ github.action_ref || github.head_ref }}
+        GITHUB_ACTION_REF: ${{ github.action_ref }}
+        GITHUB_HEAD_REF: ${{  github.head_ref }}
+        REPO_FULL_NAME: ${{ github.event.pull_request.head.repo.full_name }}
       run: |
         branch="master"
-        if [ "${{ github.event.pull_request.head.repo.full_name }}" = "grafana/k6" ]; then
-            branch="${{ env.GITHUB_ACTION_REF }}"
+        if [ "${REPO_FULL_NAME}" = "grafana/k6" ]; then
+          branch="${GITHUB_ACTION_REF:-${GITHUB_HEAD_REF}}"
         fi
         rules_url="https://raw.githubusercontent.com/grafana/k6/${branch}/.golangci.yml"
         echo "Downloading '${rules_url}' ..."

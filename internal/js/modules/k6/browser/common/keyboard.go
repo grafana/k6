@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/chromedp/cdproto/cdp"
@@ -31,10 +32,11 @@ type Keyboard struct {
 	ctx     context.Context
 	session session
 
-	modifiers   int64          // like shift, alt, ctrl, ...
-	pressedKeys map[int64]bool // tracks keys through down() and up()
-	layoutName  string         // us by default
-	layout      keyboardlayout.KeyboardLayout
+	modifiers     int64              // like shift, alt, ctrl, ...
+	pressedKeys   map[int64]struct{} // tracks keys through down() and up()
+	pressedKeysMu sync.Mutex
+	layoutName    string // us by default
+	layout        keyboardlayout.KeyboardLayout
 }
 
 // NewKeyboard returns a new keyboard with a "us" layout.
@@ -42,7 +44,7 @@ func NewKeyboard(ctx context.Context, s session) *Keyboard {
 	return &Keyboard{
 		ctx:         ctx,
 		session:     s,
-		pressedKeys: make(map[int64]bool),
+		pressedKeys: make(map[int64]struct{}),
 		layoutName:  "us",
 		layout:      keyboardlayout.GetKeyboardLayout("us"),
 	}
@@ -106,8 +108,11 @@ func (k *Keyboard) down(key string) error {
 	keyDef := k.keyDefinitionFromKey(keyInput)
 	k.modifiers |= k.modifierBitFromKeyName(keyDef.Key)
 	text := keyDef.Text
+
+	k.pressedKeysMu.Lock()
 	_, autoRepeat := k.pressedKeys[keyDef.KeyCode]
-	k.pressedKeys[keyDef.KeyCode] = true
+	k.pressedKeys[keyDef.KeyCode] = struct{}{}
+	k.pressedKeysMu.Unlock()
 
 	keyType := input.KeyDown
 	if text == "" {
@@ -141,7 +146,9 @@ func (k *Keyboard) up(key string) error {
 
 	keyDef := k.keyDefinitionFromKey(keyInput)
 	k.modifiers &= ^k.modifierBitFromKeyName(keyDef.Key)
+	k.pressedKeysMu.Lock()
 	delete(k.pressedKeys, keyDef.KeyCode)
+	k.pressedKeysMu.Unlock()
 
 	action := input.DispatchKeyEvent(input.KeyUp).
 		WithModifiers(input.Modifier(k.modifiers)).

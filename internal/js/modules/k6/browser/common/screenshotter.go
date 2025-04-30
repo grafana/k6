@@ -239,29 +239,24 @@ func getViewPortDimensions(ctx context.Context, sess session, logger *log.Logger
 
 	// Add clip region
 	//nolint:dogsled
-	_, visualViewport, _, _, cssVisualViewport, _, err := cdppage.GetLayoutMetrics().Do(cdp.WithExecutor(ctx, sess))
+	_, _, _, _, cssVisualViewport, _, err := cdppage.GetLayoutMetrics().Do(cdp.WithExecutor(ctx, sess))
 	if err != nil {
 		return 0, 0, 0, fmt.Errorf("getting layout metrics for screenshot: %w", err)
 	}
 
 	// we had a null pointer panic cases, when visualViewport is nil
 	// instead of the erroring out, we fallback to defaults and still try to do a screenshot
-	switch {
-	case cssVisualViewport != nil:
+	if cssVisualViewport != nil {
 		visualViewportScale = cssVisualViewport.Scale
 		visualViewportPageX = cssVisualViewport.PageX
 		visualViewportPageY = cssVisualViewport.PageY
-	case visualViewport != nil:
-		visualViewportScale = visualViewport.Scale
-		visualViewportPageX = visualViewport.PageX
-		visualViewportPageY = visualViewport.PageY
-	default:
+	} else {
 		logger.Warnf(
 			"Screenshotter::screenshot",
-			"chrome browser returned nil on page.getLayoutMetrics, falling back to defaults for visualViewport "+
+			"chrome browser returned nil on page.getLayoutMetrics, falling back to defaults for cssVisualViewport "+
 				"(scale: %v, pageX: %v, pageY: %v)."+
-				"This is non-standard behavior, if possible please report this issue (with reproducible script) "+
-				"to the https://go.k6.io/k6/js/modules/k6/browser/issues/1502.",
+				"This is non-standard behavior, if possible please report this issue (with a reproducible script) "+
+				"to the https://github.com/grafana/k6/issues/new.",
 			visualViewportScale, visualViewportPageX, visualViewportPageY,
 		)
 	}
