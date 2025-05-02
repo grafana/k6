@@ -14,6 +14,1255 @@
  * limitations under the License.
  */
 
+// packages/playwright-core/src/utils/isomorphic/stringUtils.ts
+var normalizedWhitespaceCache;
+function normalizeWhiteSpace(text) {
+  let result = normalizedWhitespaceCache == null ? void 0 : normalizedWhitespaceCache.get(text);
+  if (result === void 0) {
+    result = text.replace(/[\u200b\u00ad]/g, "").trim().replace(/\s+/g, " ");
+    normalizedWhitespaceCache == null ? void 0 : normalizedWhitespaceCache.set(text, result);
+  }
+  return result;
+}
+
+// packages/injected/src/domUtils.ts
+var globalOptions = {};
+function getGlobalOptions() {
+  return globalOptions;
+}
+function parentElementOrShadowHost(element) {
+  if (element.parentElement)
+    return element.parentElement;
+  if (!element.parentNode)
+    return;
+  if (element.parentNode.nodeType === 11 && element.parentNode.host)
+    return element.parentNode.host;
+}
+function enclosingShadowRootOrDocument(element) {
+  let node = element;
+  while (node.parentNode)
+    node = node.parentNode;
+  if (node.nodeType === 11 || node.nodeType === 9)
+    return node;
+}
+function enclosingShadowHost(element) {
+  while (element.parentElement)
+    element = element.parentElement;
+  return parentElementOrShadowHost(element);
+}
+function closestCrossShadow(element, css, scope) {
+  while (element) {
+    const closest = element.closest(css);
+    if (scope && closest !== scope && (closest == null ? void 0 : closest.contains(scope)))
+      return;
+    if (closest)
+      return closest;
+    element = enclosingShadowHost(element);
+  }
+}
+function getElementComputedStyle(element, pseudo) {
+  return element.ownerDocument && element.ownerDocument.defaultView ? element.ownerDocument.defaultView.getComputedStyle(element, pseudo) : void 0;
+}
+function isElementStyleVisibilityVisible(element, style) {
+  style = style != null ? style : getElementComputedStyle(element);
+  if (!style)
+    return true;
+  if (Element.prototype.checkVisibility && globalOptions.browserNameForWorkarounds !== "webkit") {
+    if (!element.checkVisibility())
+      return false;
+  } else {
+    const detailsOrSummary = element.closest("details,summary");
+    if (detailsOrSummary !== element && (detailsOrSummary == null ? void 0 : detailsOrSummary.nodeName) === "DETAILS" && !detailsOrSummary.open)
+      return false;
+  }
+  if (style.visibility !== "visible")
+    return false;
+  return true;
+}
+function isVisibleTextNode(node) {
+  const range = node.ownerDocument.createRange();
+  range.selectNode(node);
+  const rect = range.getBoundingClientRect();
+  return rect.width > 0 && rect.height > 0;
+}
+function elementSafeTagName(element) {
+  if (element instanceof HTMLFormElement)
+    return "FORM";
+  return element.tagName.toUpperCase();
+}
+
+// packages/injected/src/roleUtils.ts
+function hasExplicitAccessibleName(e) {
+  return e.hasAttribute("aria-label") || e.hasAttribute("aria-labelledby");
+}
+var kAncestorPreventingLandmark = "article:not([role]), aside:not([role]), main:not([role]), nav:not([role]), section:not([role]), [role=article], [role=complementary], [role=main], [role=navigation], [role=region]";
+var kGlobalAriaAttributes = [
+  ["aria-atomic", void 0],
+  ["aria-busy", void 0],
+  ["aria-controls", void 0],
+  ["aria-current", void 0],
+  ["aria-describedby", void 0],
+  ["aria-details", void 0],
+  // Global use deprecated in ARIA 1.2
+  // ['aria-disabled', undefined],
+  ["aria-dropeffect", void 0],
+  // Global use deprecated in ARIA 1.2
+  // ['aria-errormessage', undefined],
+  ["aria-flowto", void 0],
+  ["aria-grabbed", void 0],
+  // Global use deprecated in ARIA 1.2
+  // ['aria-haspopup', undefined],
+  ["aria-hidden", void 0],
+  // Global use deprecated in ARIA 1.2
+  // ['aria-invalid', undefined],
+  ["aria-keyshortcuts", void 0],
+  ["aria-label", ["caption", "code", "deletion", "emphasis", "generic", "insertion", "paragraph", "presentation", "strong", "subscript", "superscript"]],
+  ["aria-labelledby", ["caption", "code", "deletion", "emphasis", "generic", "insertion", "paragraph", "presentation", "strong", "subscript", "superscript"]],
+  ["aria-live", void 0],
+  ["aria-owns", void 0],
+  ["aria-relevant", void 0],
+  ["aria-roledescription", ["generic"]]
+];
+function hasGlobalAriaAttribute(element, forRole) {
+  return kGlobalAriaAttributes.some(([attr, prohibited]) => {
+    return !(prohibited == null ? void 0 : prohibited.includes(forRole || "")) && element.hasAttribute(attr);
+  });
+}
+function hasTabIndex(element) {
+  return !Number.isNaN(Number(String(element.getAttribute("tabindex"))));
+}
+function isFocusable(element) {
+  return !isNativelyDisabled(element) && (isNativelyFocusable(element) || hasTabIndex(element));
+}
+function isNativelyFocusable(element) {
+  const tagName = elementSafeTagName(element);
+  if (["BUTTON", "DETAILS", "SELECT", "TEXTAREA"].includes(tagName))
+    return true;
+  if (tagName === "A" || tagName === "AREA")
+    return element.hasAttribute("href");
+  if (tagName === "INPUT")
+    return !element.hidden;
+  return false;
+}
+var kImplicitRoleByTagName = {
+  "A": (e) => {
+    return e.hasAttribute("href") ? "link" : null;
+  },
+  "AREA": (e) => {
+    return e.hasAttribute("href") ? "link" : null;
+  },
+  "ARTICLE": () => "article",
+  "ASIDE": () => "complementary",
+  "BLOCKQUOTE": () => "blockquote",
+  "BUTTON": () => "button",
+  "CAPTION": () => "caption",
+  "CODE": () => "code",
+  "DATALIST": () => "listbox",
+  "DD": () => "definition",
+  "DEL": () => "deletion",
+  "DETAILS": () => "group",
+  "DFN": () => "term",
+  "DIALOG": () => "dialog",
+  "DT": () => "term",
+  "EM": () => "emphasis",
+  "FIELDSET": () => "group",
+  "FIGURE": () => "figure",
+  "FOOTER": (e) => closestCrossShadow(e, kAncestorPreventingLandmark) ? null : "contentinfo",
+  "FORM": (e) => hasExplicitAccessibleName(e) ? "form" : null,
+  "H1": () => "heading",
+  "H2": () => "heading",
+  "H3": () => "heading",
+  "H4": () => "heading",
+  "H5": () => "heading",
+  "H6": () => "heading",
+  "HEADER": (e) => closestCrossShadow(e, kAncestorPreventingLandmark) ? null : "banner",
+  "HR": () => "separator",
+  "HTML": () => "document",
+  "IMG": (e) => e.getAttribute("alt") === "" && !e.getAttribute("title") && !hasGlobalAriaAttribute(e) && !hasTabIndex(e) ? "presentation" : "img",
+  "INPUT": (e) => {
+    const type = e.type.toLowerCase();
+    if (type === "search")
+      return e.hasAttribute("list") ? "combobox" : "searchbox";
+    if (["email", "tel", "text", "url", ""].includes(type)) {
+      const list = getIdRefs(e, e.getAttribute("list"))[0];
+      return list && elementSafeTagName(list) === "DATALIST" ? "combobox" : "textbox";
+    }
+    if (type === "hidden")
+      return null;
+    if (type === "file" && !getGlobalOptions().inputFileRoleTextbox)
+      return "button";
+    return inputTypeToRole[type] || "textbox";
+  },
+  "INS": () => "insertion",
+  "LI": () => "listitem",
+  "MAIN": () => "main",
+  "MARK": () => "mark",
+  "MATH": () => "math",
+  "MENU": () => "list",
+  "METER": () => "meter",
+  "NAV": () => "navigation",
+  "OL": () => "list",
+  "OPTGROUP": () => "group",
+  "OPTION": () => "option",
+  "OUTPUT": () => "status",
+  "P": () => "paragraph",
+  "PROGRESS": () => "progressbar",
+  "SECTION": (e) => hasExplicitAccessibleName(e) ? "region" : null,
+  "SELECT": (e) => e.hasAttribute("multiple") || e.size > 1 ? "listbox" : "combobox",
+  "STRONG": () => "strong",
+  "SUB": () => "subscript",
+  "SUP": () => "superscript",
+  // For <svg> we default to Chrome behavior:
+  // - Chrome reports 'img'.
+  // - Firefox reports 'diagram' that is not in official ARIA spec yet.
+  // - Safari reports 'no role', but still computes accessible name.
+  "SVG": () => "img",
+  "TABLE": () => "table",
+  "TBODY": () => "rowgroup",
+  "TD": (e) => {
+    const table = closestCrossShadow(e, "table");
+    const role = table ? getExplicitAriaRole(table) : "";
+    return role === "grid" || role === "treegrid" ? "gridcell" : "cell";
+  },
+  "TEXTAREA": () => "textbox",
+  "TFOOT": () => "rowgroup",
+  "TH": (e) => {
+    if (e.getAttribute("scope") === "col")
+      return "columnheader";
+    if (e.getAttribute("scope") === "row")
+      return "rowheader";
+    const table = closestCrossShadow(e, "table");
+    const role = table ? getExplicitAriaRole(table) : "";
+    return role === "grid" || role === "treegrid" ? "gridcell" : "cell";
+  },
+  "THEAD": () => "rowgroup",
+  "TIME": () => "time",
+  "TR": () => "row",
+  "UL": () => "list"
+};
+var kPresentationInheritanceParents = {
+  "DD": ["DL", "DIV"],
+  "DIV": ["DL"],
+  "DT": ["DL", "DIV"],
+  "LI": ["OL", "UL"],
+  "TBODY": ["TABLE"],
+  "TD": ["TR"],
+  "TFOOT": ["TABLE"],
+  "TH": ["TR"],
+  "THEAD": ["TABLE"],
+  "TR": ["THEAD", "TBODY", "TFOOT", "TABLE"]
+};
+function getImplicitAriaRole(element) {
+  var _a;
+  const implicitRole = ((_a = kImplicitRoleByTagName[elementSafeTagName(element)]) == null ? void 0 : _a.call(kImplicitRoleByTagName, element)) || "";
+  if (!implicitRole)
+    return null;
+  let ancestor = element;
+  while (ancestor) {
+    const parent = parentElementOrShadowHost(ancestor);
+    const parents = kPresentationInheritanceParents[elementSafeTagName(ancestor)];
+    if (!parents || !parent || !parents.includes(elementSafeTagName(parent)))
+      break;
+    const parentExplicitRole = getExplicitAriaRole(parent);
+    if ((parentExplicitRole === "none" || parentExplicitRole === "presentation") && !hasPresentationConflictResolution(parent, parentExplicitRole))
+      return parentExplicitRole;
+    ancestor = parent;
+  }
+  return implicitRole;
+}
+var validRoles = [
+  "alert",
+  "alertdialog",
+  "application",
+  "article",
+  "banner",
+  "blockquote",
+  "button",
+  "caption",
+  "cell",
+  "checkbox",
+  "code",
+  "columnheader",
+  "combobox",
+  "complementary",
+  "contentinfo",
+  "definition",
+  "deletion",
+  "dialog",
+  "directory",
+  "document",
+  "emphasis",
+  "feed",
+  "figure",
+  "form",
+  "generic",
+  "grid",
+  "gridcell",
+  "group",
+  "heading",
+  "img",
+  "insertion",
+  "link",
+  "list",
+  "listbox",
+  "listitem",
+  "log",
+  "main",
+  "mark",
+  "marquee",
+  "math",
+  "meter",
+  "menu",
+  "menubar",
+  "menuitem",
+  "menuitemcheckbox",
+  "menuitemradio",
+  "navigation",
+  "none",
+  "note",
+  "option",
+  "paragraph",
+  "presentation",
+  "progressbar",
+  "radio",
+  "radiogroup",
+  "region",
+  "row",
+  "rowgroup",
+  "rowheader",
+  "scrollbar",
+  "search",
+  "searchbox",
+  "separator",
+  "slider",
+  "spinbutton",
+  "status",
+  "strong",
+  "subscript",
+  "superscript",
+  "switch",
+  "tab",
+  "table",
+  "tablist",
+  "tabpanel",
+  "term",
+  "textbox",
+  "time",
+  "timer",
+  "toolbar",
+  "tooltip",
+  "tree",
+  "treegrid",
+  "treeitem"
+];
+function getExplicitAriaRole(element) {
+  const roles = (element.getAttribute("role") || "").split(" ").map((role) => role.trim());
+  return roles.find((role) => validRoles.includes(role)) || null;
+}
+function hasPresentationConflictResolution(element, role) {
+  return hasGlobalAriaAttribute(element, role) || isFocusable(element);
+}
+function getAriaRole(element) {
+  const explicitRole = getExplicitAriaRole(element);
+  if (!explicitRole)
+    return getImplicitAriaRole(element);
+  if (explicitRole === "none" || explicitRole === "presentation") {
+    const implicitRole = getImplicitAriaRole(element);
+    if (hasPresentationConflictResolution(element, implicitRole))
+      return implicitRole;
+  }
+  return explicitRole;
+}
+function getAriaBoolean(attr) {
+  return attr === null ? void 0 : attr.toLowerCase() === "true";
+}
+function isElementIgnoredForAria(element) {
+  return ["STYLE", "SCRIPT", "NOSCRIPT", "TEMPLATE"].includes(elementSafeTagName(element));
+}
+function isElementHiddenForAria(element) {
+  if (isElementIgnoredForAria(element))
+    return true;
+  const style = getElementComputedStyle(element);
+  const isSlot = element.nodeName === "SLOT";
+  if ((style == null ? void 0 : style.display) === "contents" && !isSlot) {
+    for (let child = element.firstChild; child; child = child.nextSibling) {
+      if (child.nodeType === 1 && !isElementHiddenForAria(child))
+        return false;
+      if (child.nodeType === 3 && isVisibleTextNode(child))
+        return false;
+    }
+    return true;
+  }
+  const isOptionInsideSelect = element.nodeName === "OPTION" && !!element.closest("select");
+  if (!isOptionInsideSelect && !isSlot && !isElementStyleVisibilityVisible(element, style))
+    return true;
+  return belongsToDisplayNoneOrAriaHiddenOrNonSlotted(element);
+}
+function belongsToDisplayNoneOrAriaHiddenOrNonSlotted(element) {
+  let hidden = cacheIsHidden == null ? void 0 : cacheIsHidden.get(element);
+  if (hidden === void 0) {
+    hidden = false;
+    if (element.parentElement && element.parentElement.shadowRoot && !element.assignedSlot)
+      hidden = true;
+    if (!hidden) {
+      const style = getElementComputedStyle(element);
+      hidden = !style || style.display === "none" || getAriaBoolean(element.getAttribute("aria-hidden")) === true;
+    }
+    if (!hidden) {
+      const parent = parentElementOrShadowHost(element);
+      if (parent)
+        hidden = belongsToDisplayNoneOrAriaHiddenOrNonSlotted(parent);
+    }
+    cacheIsHidden == null ? void 0 : cacheIsHidden.set(element, hidden);
+  }
+  return hidden;
+}
+function getIdRefs(element, ref) {
+  if (!ref)
+    return [];
+  const root = enclosingShadowRootOrDocument(element);
+  if (!root)
+    return [];
+  try {
+    const ids = ref.split(" ").filter((id) => !!id);
+    const result = [];
+    for (const id of ids) {
+      const firstElement = root.querySelector("#" + CSS.escape(id));
+      if (firstElement && !result.includes(firstElement))
+        result.push(firstElement);
+    }
+    return result;
+  } catch (e) {
+    return [];
+  }
+}
+function trimFlatString(s) {
+  return s.trim();
+}
+function asFlatString(s) {
+  return s.split("\xA0").map((chunk) => chunk.replace(/\r\n/g, "\
+").replace(/[\u200b\u00ad]/g, "").replace(/\s\s*/g, " ")).join("\xA0").trim();
+}
+function queryInAriaOwned(element, selector) {
+  const result = [...element.querySelectorAll(selector)];
+  for (const owned of getIdRefs(element, element.getAttribute("aria-owns"))) {
+    if (owned.matches(selector))
+      result.push(owned);
+    result.push(...owned.querySelectorAll(selector));
+  }
+  return result;
+}
+function getPseudoContent(element, pseudo) {
+  const cache = pseudo === "::before" ? cachePseudoContentBefore : cachePseudoContentAfter;
+  if (cache == null ? void 0 : cache.has(element))
+    return (cache == null ? void 0 : cache.get(element)) || "";
+  const pseudoStyle = getElementComputedStyle(element, pseudo);
+  const content = getPseudoContentImpl(element, pseudoStyle);
+  if (cache)
+    cache.set(element, content);
+  return content;
+}
+function getPseudoContentImpl(element, pseudoStyle) {
+  if (!pseudoStyle || pseudoStyle.display === "none" || pseudoStyle.visibility === "hidden")
+    return "";
+  const content = pseudoStyle.content;
+  let resolvedContent;
+  if (content[0] === "'" && content[content.length - 1] === "'" || content[0] === '"' && content[content.length - 1] === '"') {
+    resolvedContent = content.substring(1, content.length - 1);
+  } else if (content.startsWith("attr(") && content.endsWith(")")) {
+    const attrName = content.substring("attr(".length, content.length - 1).trim();
+    resolvedContent = element.getAttribute(attrName) || "";
+  }
+  if (resolvedContent !== void 0) {
+    const display = pseudoStyle.display || "inline";
+    if (display !== "inline")
+      return " " + resolvedContent + " ";
+    return resolvedContent;
+  }
+  return "";
+}
+function getAriaLabelledByElements(element) {
+  const ref = element.getAttribute("aria-labelledby");
+  if (ref === null)
+    return null;
+  const refs = getIdRefs(element, ref);
+  return refs.length ? refs : null;
+}
+function allowsNameFromContent(role, targetDescendant) {
+  const alwaysAllowsNameFromContent = ["button", "cell", "checkbox", "columnheader", "gridcell", "heading", "link", "menuitem", "menuitemcheckbox", "menuitemradio", "option", "radio", "row", "rowheader", "switch", "tab", "tooltip", "treeitem"].includes(role);
+  const descendantAllowsNameFromContent = targetDescendant && ["", "caption", "code", "contentinfo", "definition", "deletion", "emphasis", "insertion", "list", "listitem", "mark", "none", "paragraph", "presentation", "region", "row", "rowgroup", "section", "strong", "subscript", "superscript", "table", "term", "time"].includes(role);
+  return alwaysAllowsNameFromContent || descendantAllowsNameFromContent;
+}
+function getElementAccessibleName(element, includeHidden) {
+  const cache = includeHidden ? cacheAccessibleNameHidden : cacheAccessibleName;
+  let accessibleName = cache == null ? void 0 : cache.get(element);
+  if (accessibleName === void 0) {
+    accessibleName = "";
+    const elementProhibitsNaming = ["caption", "code", "definition", "deletion", "emphasis", "generic", "insertion", "mark", "paragraph", "presentation", "strong", "subscript", "suggestion", "superscript", "term", "time"].includes(getAriaRole(element) || "");
+    if (!elementProhibitsNaming) {
+      accessibleName = asFlatString(getTextAlternativeInternal(element, {
+        includeHidden,
+        visitedElements: new Set(),
+        embeddedInTargetElement: "self"
+      }));
+    }
+    cache == null ? void 0 : cache.set(element, accessibleName);
+  }
+  return accessibleName;
+}
+function getTextAlternativeInternal(element, options) {
+  var _a, _b, _c, _d;
+  if (options.visitedElements.has(element))
+    return "";
+  const childOptions = {
+    ...options,
+    embeddedInTargetElement: options.embeddedInTargetElement === "self" ? "descendant" : options.embeddedInTargetElement
+  };
+  if (!options.includeHidden) {
+    const isEmbeddedInHiddenReferenceTraversal = !!((_a = options.embeddedInLabelledBy) == null ? void 0 : _a.hidden) || !!((_b = options.embeddedInDescribedBy) == null ? void 0 : _b.hidden) || !!((_c = options.embeddedInNativeTextAlternative) == null ? void 0 : _c.hidden) || !!((_d = options.embeddedInLabel) == null ? void 0 : _d.hidden);
+    if (isElementIgnoredForAria(element) || !isEmbeddedInHiddenReferenceTraversal && isElementHiddenForAria(element)) {
+      options.visitedElements.add(element);
+      return "";
+    }
+  }
+  const labelledBy = getAriaLabelledByElements(element);
+  if (!options.embeddedInLabelledBy) {
+    const accessibleName = (labelledBy || []).map((ref) => getTextAlternativeInternal(ref, {
+      ...options,
+      embeddedInLabelledBy: { element: ref, hidden: isElementHiddenForAria(ref) },
+      embeddedInDescribedBy: void 0,
+      embeddedInTargetElement: void 0,
+      embeddedInLabel: void 0,
+      embeddedInNativeTextAlternative: void 0
+    })).join(" ");
+    if (accessibleName)
+      return accessibleName;
+  }
+  const role = getAriaRole(element) || "";
+  const tagName = elementSafeTagName(element);
+  if (!!options.embeddedInLabel || !!options.embeddedInLabelledBy || options.embeddedInTargetElement === "descendant") {
+    const isOwnLabel = [...element.labels || []].includes(element);
+    const isOwnLabelledBy = (labelledBy || []).includes(element);
+    if (!isOwnLabel && !isOwnLabelledBy) {
+      if (role === "textbox") {
+        options.visitedElements.add(element);
+        if (tagName === "INPUT" || tagName === "TEXTAREA")
+          return element.value;
+        return element.textContent || "";
+      }
+      if (["combobox", "listbox"].includes(role)) {
+        options.visitedElements.add(element);
+        let selectedOptions;
+        if (tagName === "SELECT") {
+          selectedOptions = [...element.selectedOptions];
+          if (!selectedOptions.length && element.options.length)
+            selectedOptions.push(element.options[0]);
+        } else {
+          const listbox = role === "combobox" ? queryInAriaOwned(element, "*").find((e) => getAriaRole(e) === "listbox") : element;
+          selectedOptions = listbox ? queryInAriaOwned(listbox, '[aria-selected="true"]').filter((e) => getAriaRole(e) === "option") : [];
+        }
+        if (!selectedOptions.length && tagName === "INPUT") {
+          return element.value;
+        }
+        return selectedOptions.map((option) => getTextAlternativeInternal(option, childOptions)).join(" ");
+      }
+      if (["progressbar", "scrollbar", "slider", "spinbutton", "meter"].includes(role)) {
+        options.visitedElements.add(element);
+        if (element.hasAttribute("aria-valuetext"))
+          return element.getAttribute("aria-valuetext") || "";
+        if (element.hasAttribute("aria-valuenow"))
+          return element.getAttribute("aria-valuenow") || "";
+        return element.getAttribute("value") || "";
+      }
+      if (["menu"].includes(role)) {
+        options.visitedElements.add(element);
+        return "";
+      }
+    }
+  }
+  const ariaLabel = element.getAttribute("aria-label") || "";
+  if (trimFlatString(ariaLabel)) {
+    options.visitedElements.add(element);
+    return ariaLabel;
+  }
+  if (!["presentation", "none"].includes(role)) {
+    if (tagName === "INPUT" && ["button", "submit", "reset"].includes(element.type)) {
+      options.visitedElements.add(element);
+      const value = element.value || "";
+      if (trimFlatString(value))
+        return value;
+      if (element.type === "submit")
+        return "Submit";
+      if (element.type === "reset")
+        return "Reset";
+      const title = element.getAttribute("title") || "";
+      return title;
+    }
+    if (!getGlobalOptions().inputFileRoleTextbox && tagName === "INPUT" && element.type === "file") {
+      options.visitedElements.add(element);
+      const labels = element.labels || [];
+      if (labels.length && !options.embeddedInLabelledBy)
+        return getAccessibleNameFromAssociatedLabels(labels, options);
+      return "Choose File";
+    }
+    if (tagName === "INPUT" && element.type === "image") {
+      options.visitedElements.add(element);
+      const labels = element.labels || [];
+      if (labels.length && !options.embeddedInLabelledBy)
+        return getAccessibleNameFromAssociatedLabels(labels, options);
+      const alt = element.getAttribute("alt") || "";
+      if (trimFlatString(alt))
+        return alt;
+      const title = element.getAttribute("title") || "";
+      if (trimFlatString(title))
+        return title;
+      return "Submit";
+    }
+    if (!labelledBy && tagName === "BUTTON") {
+      options.visitedElements.add(element);
+      const labels = element.labels || [];
+      if (labels.length)
+        return getAccessibleNameFromAssociatedLabels(labels, options);
+    }
+    if (!labelledBy && tagName === "OUTPUT") {
+      options.visitedElements.add(element);
+      const labels = element.labels || [];
+      if (labels.length)
+        return getAccessibleNameFromAssociatedLabels(labels, options);
+      return element.getAttribute("title") || "";
+    }
+    if (!labelledBy && (tagName === "TEXTAREA" || tagName === "SELECT" || tagName === "INPUT")) {
+      options.visitedElements.add(element);
+      const labels = element.labels || [];
+      if (labels.length)
+        return getAccessibleNameFromAssociatedLabels(labels, options);
+      const usePlaceholder = tagName === "INPUT" && ["text", "password", "search", "tel", "email", "url"].includes(element.type) || tagName === "TEXTAREA";
+      const placeholder = element.getAttribute("placeholder") || "";
+      const title = element.getAttribute("title") || "";
+      if (!usePlaceholder || title)
+        return title;
+      return placeholder;
+    }
+    if (!labelledBy && tagName === "FIELDSET") {
+      options.visitedElements.add(element);
+      for (let child = element.firstElementChild; child; child = child.nextElementSibling) {
+        if (elementSafeTagName(child) === "LEGEND") {
+          return getTextAlternativeInternal(child, {
+            ...childOptions,
+            embeddedInNativeTextAlternative: { element: child, hidden: isElementHiddenForAria(child) }
+          });
+        }
+      }
+      const title = element.getAttribute("title") || "";
+      return title;
+    }
+    if (!labelledBy && tagName === "FIGURE") {
+      options.visitedElements.add(element);
+      for (let child = element.firstElementChild; child; child = child.nextElementSibling) {
+        if (elementSafeTagName(child) === "FIGCAPTION") {
+          return getTextAlternativeInternal(child, {
+            ...childOptions,
+            embeddedInNativeTextAlternative: { element: child, hidden: isElementHiddenForAria(child) }
+          });
+        }
+      }
+      const title = element.getAttribute("title") || "";
+      return title;
+    }
+    if (tagName === "IMG") {
+      options.visitedElements.add(element);
+      const alt = element.getAttribute("alt") || "";
+      if (trimFlatString(alt))
+        return alt;
+      const title = element.getAttribute("title") || "";
+      return title;
+    }
+    if (tagName === "TABLE") {
+      options.visitedElements.add(element);
+      for (let child = element.firstElementChild; child; child = child.nextElementSibling) {
+        if (elementSafeTagName(child) === "CAPTION") {
+          return getTextAlternativeInternal(child, {
+            ...childOptions,
+            embeddedInNativeTextAlternative: { element: child, hidden: isElementHiddenForAria(child) }
+          });
+        }
+      }
+      const summary = element.getAttribute("summary") || "";
+      if (summary)
+        return summary;
+    }
+    if (tagName === "AREA") {
+      options.visitedElements.add(element);
+      const alt = element.getAttribute("alt") || "";
+      if (trimFlatString(alt))
+        return alt;
+      const title = element.getAttribute("title") || "";
+      return title;
+    }
+    if (tagName === "SVG" || element.ownerSVGElement) {
+      options.visitedElements.add(element);
+      for (let child = element.firstElementChild; child; child = child.nextElementSibling) {
+        if (elementSafeTagName(child) === "TITLE" && child.ownerSVGElement) {
+          return getTextAlternativeInternal(child, {
+            ...childOptions,
+            embeddedInLabelledBy: { element: child, hidden: isElementHiddenForAria(child) }
+          });
+        }
+      }
+    }
+    if (element.ownerSVGElement && tagName === "A") {
+      const title = element.getAttribute("xlink:title") || "";
+      if (trimFlatString(title)) {
+        options.visitedElements.add(element);
+        return title;
+      }
+    }
+  }
+  const shouldNameFromContentForSummary = tagName === "SUMMARY" && !["presentation", "none"].includes(role);
+  if (allowsNameFromContent(role, options.embeddedInTargetElement === "descendant") || shouldNameFromContentForSummary || !!options.embeddedInLabelledBy || !!options.embeddedInDescribedBy || !!options.embeddedInLabel || !!options.embeddedInNativeTextAlternative) {
+    options.visitedElements.add(element);
+    const accessibleName = innerAccumulatedElementText(element, childOptions);
+    const maybeTrimmedAccessibleName = options.embeddedInTargetElement === "self" ? trimFlatString(accessibleName) : accessibleName;
+    if (maybeTrimmedAccessibleName)
+      return accessibleName;
+  }
+  if (!["presentation", "none"].includes(role) || tagName === "IFRAME") {
+    options.visitedElements.add(element);
+    const title = element.getAttribute("title") || "";
+    if (trimFlatString(title))
+      return title;
+  }
+  options.visitedElements.add(element);
+  return "";
+}
+function innerAccumulatedElementText(element, options) {
+  const tokens = [];
+  const visit = (node, skipSlotted) => {
+    var _a;
+    if (skipSlotted && node.assignedSlot)
+      return;
+    if (node.nodeType === 1) {
+      const display = ((_a = getElementComputedStyle(node)) == null ? void 0 : _a.display) || "inline";
+      let token = getTextAlternativeInternal(node, options);
+      if (display !== "inline" || node.nodeName === "BR")
+        token = " " + token + " ";
+      tokens.push(token);
+    } else if (node.nodeType === 3) {
+      tokens.push(node.textContent || "");
+    }
+  };
+  tokens.push(getPseudoContent(element, "::before"));
+  const assignedNodes = element.nodeName === "SLOT" ? element.assignedNodes() : [];
+  if (assignedNodes.length) {
+    for (const child of assignedNodes)
+      visit(child, false);
+  } else {
+    for (let child = element.firstChild; child; child = child.nextSibling)
+      visit(child, true);
+    if (element.shadowRoot) {
+      for (let child = element.shadowRoot.firstChild; child; child = child.nextSibling)
+        visit(child, true);
+    }
+    for (const owned of getIdRefs(element, element.getAttribute("aria-owns")))
+      visit(owned, true);
+  }
+  tokens.push(getPseudoContent(element, "::after"));
+  return tokens.join("");
+}
+var kAriaSelectedRoles = ["gridcell", "option", "row", "tab", "rowheader", "columnheader", "treeitem"];
+function getAriaSelected(element) {
+  if (elementSafeTagName(element) === "OPTION")
+    return element.selected;
+  if (kAriaSelectedRoles.includes(getAriaRole(element) || ""))
+    return getAriaBoolean(element.getAttribute("aria-selected")) === true;
+  return false;
+}
+var kAriaCheckedRoles = ["checkbox", "menuitemcheckbox", "option", "radio", "switch", "menuitemradio", "treeitem"];
+function getAriaChecked(element) {
+  const result = getChecked(element, true);
+  return result === "error" ? false : result;
+}
+function getChecked(element, allowMixed) {
+  const tagName = elementSafeTagName(element);
+  if (allowMixed && tagName === "INPUT" && element.indeterminate)
+    return "mixed";
+  if (tagName === "INPUT" && ["checkbox", "radio"].includes(element.type))
+    return element.checked;
+  if (kAriaCheckedRoles.includes(getAriaRole(element) || "")) {
+    const checked = element.getAttribute("aria-checked");
+    if (checked === "true")
+      return true;
+    if (allowMixed && checked === "mixed")
+      return "mixed";
+    return false;
+  }
+  return "error";
+}
+var kAriaPressedRoles = ["button"];
+function getAriaPressed(element) {
+  if (kAriaPressedRoles.includes(getAriaRole(element) || "")) {
+    const pressed = element.getAttribute("aria-pressed");
+    if (pressed === "true")
+      return true;
+    if (pressed === "mixed")
+      return "mixed";
+  }
+  return false;
+}
+var kAriaExpandedRoles = ["application", "button", "checkbox", "combobox", "gridcell", "link", "listbox", "menuitem", "row", "rowheader", "tab", "treeitem", "columnheader", "menuitemcheckbox", "menuitemradio", "rowheader", "switch"];
+function getAriaExpanded(element) {
+  if (elementSafeTagName(element) === "DETAILS")
+    return element.open;
+  if (kAriaExpandedRoles.includes(getAriaRole(element) || "")) {
+    const expanded = element.getAttribute("aria-expanded");
+    if (expanded === null)
+      return void 0;
+    if (expanded === "true")
+      return true;
+    return false;
+  }
+  return void 0;
+}
+var kAriaLevelRoles = ["heading", "listitem", "row", "treeitem"];
+function getAriaLevel(element) {
+  const native = { "H1": 1, "H2": 2, "H3": 3, "H4": 4, "H5": 5, "H6": 6 }[elementSafeTagName(element)];
+  if (native)
+    return native;
+  if (kAriaLevelRoles.includes(getAriaRole(element) || "")) {
+    const attr = element.getAttribute("aria-level");
+    const value = attr === null ? Number.NaN : Number(attr);
+    if (Number.isInteger(value) && value >= 1)
+      return value;
+  }
+  return 0;
+}
+var kAriaDisabledRoles = ["application", "button", "composite", "gridcell", "group", "input", "link", "menuitem", "scrollbar", "separator", "tab", "checkbox", "columnheader", "combobox", "grid", "listbox", "menu", "menubar", "menuitemcheckbox", "menuitemradio", "option", "radio", "radiogroup", "row", "rowheader", "searchbox", "select", "slider", "spinbutton", "switch", "tablist", "textbox", "toolbar", "tree", "treegrid", "treeitem"];
+function getAriaDisabled(element) {
+  return isNativelyDisabled(element) || hasExplicitAriaDisabled(element);
+}
+function isNativelyDisabled(element) {
+  const isNativeFormControl = ["BUTTON", "INPUT", "SELECT", "TEXTAREA", "OPTION", "OPTGROUP"].includes(element.tagName);
+  return isNativeFormControl && (element.hasAttribute("disabled") || belongsToDisabledFieldSet(element));
+}
+function belongsToDisabledFieldSet(element) {
+  const fieldSetElement = element == null ? void 0 : element.closest("FIELDSET[DISABLED]");
+  if (!fieldSetElement)
+    return false;
+  const legendElement = fieldSetElement.querySelector(":scope > LEGEND");
+  return !legendElement || !legendElement.contains(element);
+}
+function hasExplicitAriaDisabled(element, isAncestor = false) {
+  if (!element)
+    return false;
+  if (isAncestor || kAriaDisabledRoles.includes(getAriaRole(element) || "")) {
+    const attribute = (element.getAttribute("aria-disabled") || "").toLowerCase();
+    if (attribute === "true")
+      return true;
+    if (attribute === "false")
+      return false;
+    return hasExplicitAriaDisabled(parentElementOrShadowHost(element), true);
+  }
+  return false;
+}
+function getAccessibleNameFromAssociatedLabels(labels, options) {
+  return [...labels].map((label) => getTextAlternativeInternal(label, {
+    ...options,
+    embeddedInLabel: { element: label, hidden: isElementHiddenForAria(label) },
+    embeddedInNativeTextAlternative: void 0,
+    embeddedInLabelledBy: void 0,
+    embeddedInDescribedBy: void 0,
+    embeddedInTargetElement: void 0
+  })).filter((accessibleName) => !!accessibleName).join(" ");
+}
+var cacheAccessibleName;
+var cacheAccessibleNameHidden;
+var cacheAccessibleDescription;
+var cacheAccessibleDescriptionHidden;
+var cacheAccessibleErrorMessage;
+var cacheIsHidden;
+var cachePseudoContentBefore;
+var cachePseudoContentAfter;
+var cachesCounter = 0;
+function beginAriaCaches() {
+  ++cachesCounter;
+  cacheAccessibleName != null ? cacheAccessibleName : cacheAccessibleName = new Map();
+  cacheAccessibleNameHidden != null ? cacheAccessibleNameHidden : cacheAccessibleNameHidden = new Map();
+  cacheAccessibleDescription != null ? cacheAccessibleDescription : cacheAccessibleDescription = new Map();
+  cacheAccessibleDescriptionHidden != null ? cacheAccessibleDescriptionHidden : cacheAccessibleDescriptionHidden = new Map();
+  cacheAccessibleErrorMessage != null ? cacheAccessibleErrorMessage : cacheAccessibleErrorMessage = new Map();
+  cacheIsHidden != null ? cacheIsHidden : cacheIsHidden = new Map();
+  cachePseudoContentBefore != null ? cachePseudoContentBefore : cachePseudoContentBefore = new Map();
+  cachePseudoContentAfter != null ? cachePseudoContentAfter : cachePseudoContentAfter = new Map();
+}
+function endAriaCaches() {
+  if (!--cachesCounter) {
+    cacheAccessibleName = void 0;
+    cacheAccessibleNameHidden = void 0;
+    cacheAccessibleDescription = void 0;
+    cacheAccessibleDescriptionHidden = void 0;
+    cacheAccessibleErrorMessage = void 0;
+    cacheIsHidden = void 0;
+    cachePseudoContentBefore = void 0;
+    cachePseudoContentAfter = void 0;
+  }
+}
+var inputTypeToRole = {
+  "button": "button",
+  "checkbox": "checkbox",
+  "image": "button",
+  "number": "spinbutton",
+  "radio": "radio",
+  "range": "slider",
+  "reset": "button",
+  "submit": "button"
+};
+
+// packages/injected/src/selectorUtils.ts
+function matchesAttributePart(value, attr) {
+  const objValue = typeof value === "string" && !attr.caseSensitive ? value.toUpperCase() : value;
+  const attrValue = typeof attr.value === "string" && !attr.caseSensitive ? attr.value.toUpperCase() : attr.value;
+  if (attr.op === "<truthy>")
+    return !!objValue;
+  if (attr.op === "=") {
+    if (attrValue instanceof RegExp)
+      return typeof objValue === "string" && !!objValue.match(attrValue);
+    return objValue === attrValue;
+  }
+  if (typeof objValue !== "string" || typeof attrValue !== "string")
+    return false;
+  if (attr.op === "*=")
+    return objValue.includes(attrValue);
+  if (attr.op === "^=")
+    return objValue.startsWith(attrValue);
+  if (attr.op === "$=")
+    return objValue.endsWith(attrValue);
+  if (attr.op === "|=")
+    return objValue === attrValue || objValue.startsWith(attrValue + "-");
+  if (attr.op === "~=")
+    return objValue.split(" ").includes(attrValue);
+  return false;
+}
+
+// packages/playwright-core/src/utils/isomorphic/selectorParser.ts
+function parseAttributeSelector(selector, allowUnquotedStrings) {
+  let wp = 0;
+  let EOL = selector.length === 0;
+  const next = () => selector[wp] || "";
+  const eat1 = () => {
+    const result2 = next();
+    ++wp;
+    EOL = wp >= selector.length;
+    return result2;
+  };
+  const syntaxError = (stage) => {
+    if (EOL)
+      throw new InvalidSelectorError(`Unexpected end of selector while parsing selector \`${selector}\``);
+    throw new InvalidSelectorError(`Error while parsing selector \`${selector}\` - unexpected symbol "${next()}" at position ${wp}` + (stage ? " during " + stage : ""));
+  };
+  function skipSpaces() {
+    while (!EOL && /\s/.test(next()))
+      eat1();
+  }
+  function isCSSNameChar(char) {
+    return char >= "\x80" || char >= "0" && char <= "9" || char >= "A" && char <= "Z" || char >= "a" && char <= "z" || char >= "0" && char <= "9" || char === "_" || char === "-";
+  }
+  function readIdentifier() {
+    let result2 = "";
+    skipSpaces();
+    while (!EOL && isCSSNameChar(next()))
+      result2 += eat1();
+    return result2;
+  }
+  function readQuotedString(quote) {
+    let result2 = eat1();
+    if (result2 !== quote)
+      syntaxError("parsing quoted string");
+    while (!EOL && next() !== quote) {
+      if (next() === "\\")
+        eat1();
+      result2 += eat1();
+    }
+    if (next() !== quote)
+      syntaxError("parsing quoted string");
+    result2 += eat1();
+    return result2;
+  }
+  function readRegularExpression() {
+    if (eat1() !== "/")
+      syntaxError("parsing regular expression");
+    let source = "";
+    let inClass = false;
+    while (!EOL) {
+      if (next() === "\\") {
+        source += eat1();
+        if (EOL)
+          syntaxError("parsing regular expression");
+      } else if (inClass && next() === "]") {
+        inClass = false;
+      } else if (!inClass && next() === "[") {
+        inClass = true;
+      } else if (!inClass && next() === "/") {
+        break;
+      }
+      source += eat1();
+    }
+    if (eat1() !== "/")
+      syntaxError("parsing regular expression");
+    let flags = "";
+    while (!EOL && next().match(/[dgimsuy]/))
+      flags += eat1();
+    try {
+      return new RegExp(source, flags);
+    } catch (e) {
+      throw new InvalidSelectorError(`Error while parsing selector \`${selector}\`: ${e.message}`);
+    }
+  }
+  function readAttributeToken() {
+    let token = "";
+    skipSpaces();
+    if (next() === `'` || next() === `"`)
+      token = readQuotedString(next()).slice(1, -1);
+    else
+      token = readIdentifier();
+    if (!token)
+      syntaxError("parsing property path");
+    return token;
+  }
+  function readOperator() {
+    skipSpaces();
+    let op = "";
+    if (!EOL)
+      op += eat1();
+    if (!EOL && op !== "=")
+      op += eat1();
+    if (!["=", "*=", "^=", "$=", "|=", "~="].includes(op))
+      syntaxError("parsing operator");
+    return op;
+  }
+  function readAttribute() {
+    eat1();
+    const jsonPath = [];
+    jsonPath.push(readAttributeToken());
+    skipSpaces();
+    while (next() === ".") {
+      eat1();
+      jsonPath.push(readAttributeToken());
+      skipSpaces();
+    }
+    if (next() === "]") {
+      eat1();
+      return { name: jsonPath.join("."), jsonPath, op: "<truthy>", value: null, caseSensitive: false };
+    }
+    const operator = readOperator();
+    let value = void 0;
+    let caseSensitive = true;
+    skipSpaces();
+    if (next() === "/") {
+      if (operator !== "=")
+        throw new InvalidSelectorError(`Error while parsing selector \`${selector}\` - cannot use ${operator} in attribute with regular expression`);
+      value = readRegularExpression();
+    } else if (next() === `'` || next() === `"`) {
+      value = readQuotedString(next()).slice(1, -1);
+      skipSpaces();
+      if (next() === "i" || next() === "I") {
+        caseSensitive = false;
+        eat1();
+      } else if (next() === "s" || next() === "S") {
+        caseSensitive = true;
+        eat1();
+      }
+    } else {
+      value = "";
+      while (!EOL && (isCSSNameChar(next()) || next() === "+" || next() === "."))
+        value += eat1();
+      if (value === "true") {
+        value = true;
+      } else if (value === "false") {
+        value = false;
+      } else {
+        if (!allowUnquotedStrings) {
+          value = +value;
+          if (Number.isNaN(value))
+            syntaxError("parsing attribute value");
+        }
+      }
+    }
+    skipSpaces();
+    if (next() !== "]")
+      syntaxError("parsing attribute value");
+    eat1();
+    if (operator !== "=" && typeof value !== "string")
+      throw new InvalidSelectorError(`Error while parsing selector \`${selector}\` - cannot use ${operator} in attribute with non-string matching value - ${value}`);
+    return { name: jsonPath.join("."), jsonPath, op: operator, value, caseSensitive };
+  }
+  const result = {
+    name: "",
+    attributes: []
+  };
+  result.name = readIdentifier();
+  skipSpaces();
+  while (next() === "[") {
+    result.attributes.push(readAttribute());
+    skipSpaces();
+  }
+  if (!EOL)
+    syntaxError(void 0);
+  if (!result.name && !result.attributes.length)
+    throw new InvalidSelectorError(`Error while parsing selector \`${selector}\` - selector cannot be empty`);
+  return result;
+}
+
+// packages/injected/src/roleSelectorEngine.ts
+var kSupportedAttributes = ["selected", "checked", "pressed", "expanded", "level", "disabled", "name", "include-hidden"];
+kSupportedAttributes.sort();
+function validateSupportedRole(attr, roles, role) {
+  if (!roles.includes(role))
+    throw new Error(`"${attr}" attribute is only supported for roles: ${roles.slice().sort().map((role2) => `"${role2}"`).join(", ")}`);
+}
+function validateSupportedValues(attr, values) {
+  if (attr.op !== "<truthy>" && !values.includes(attr.value))
+    throw new Error(`"${attr.name}" must be one of ${values.map((v) => JSON.stringify(v)).join(", ")}`);
+}
+function validateSupportedOp(attr, ops) {
+  if (!ops.includes(attr.op))
+    throw new Error(`"${attr.name}" does not support "${attr.op}" matcher`);
+}
+function validateAttributes(attrs, role) {
+  const options = { role };
+  for (const attr of attrs) {
+    switch (attr.name) {
+      case "checked": {
+        validateSupportedRole(attr.name, kAriaCheckedRoles, role);
+        validateSupportedValues(attr, [true, false, "mixed"]);
+        validateSupportedOp(attr, ["<truthy>", "="]);
+        options.checked = attr.op === "<truthy>" ? true : attr.value;
+        break;
+      }
+      case "pressed": {
+        validateSupportedRole(attr.name, kAriaPressedRoles, role);
+        validateSupportedValues(attr, [true, false, "mixed"]);
+        validateSupportedOp(attr, ["<truthy>", "="]);
+        options.pressed = attr.op === "<truthy>" ? true : attr.value;
+        break;
+      }
+      case "selected": {
+        validateSupportedRole(attr.name, kAriaSelectedRoles, role);
+        validateSupportedValues(attr, [true, false]);
+        validateSupportedOp(attr, ["<truthy>", "="]);
+        options.selected = attr.op === "<truthy>" ? true : attr.value;
+        break;
+      }
+      case "expanded": {
+        validateSupportedRole(attr.name, kAriaExpandedRoles, role);
+        validateSupportedValues(attr, [true, false]);
+        validateSupportedOp(attr, ["<truthy>", "="]);
+        options.expanded = attr.op === "<truthy>" ? true : attr.value;
+        break;
+      }
+      case "level": {
+        validateSupportedRole(attr.name, kAriaLevelRoles, role);
+        if (typeof attr.value === "string")
+          attr.value = +attr.value;
+        if (attr.op !== "=" || typeof attr.value !== "number" || Number.isNaN(attr.value))
+          throw new Error(`"level" attribute must be compared to a number`);
+        options.level = attr.value;
+        break;
+      }
+      case "disabled": {
+        validateSupportedValues(attr, [true, false]);
+        validateSupportedOp(attr, ["<truthy>", "="]);
+        options.disabled = attr.op === "<truthy>" ? true : attr.value;
+        break;
+      }
+      case "name": {
+        if (attr.op === "<truthy>")
+          throw new Error(`"name" attribute must have a value`);
+        if (typeof attr.value !== "string" && !(attr.value instanceof RegExp))
+          throw new Error(`"name" attribute must be a string or a regular expression`);
+        options.name = attr.value;
+        options.nameOp = attr.op;
+        options.exact = attr.caseSensitive;
+        break;
+      }
+      case "include-hidden": {
+        validateSupportedValues(attr, [true, false]);
+        validateSupportedOp(attr, ["<truthy>", "="]);
+        options.includeHidden = attr.op === "<truthy>" ? true : attr.value;
+        break;
+      }
+      default: {
+        throw new Error(`Unknown attribute "${attr.name}", must be one of ${kSupportedAttributes.map((a) => `"${a}"`).join(", ")}.`);
+      }
+    }
+  }
+  return options;
+}
+function queryRole(scope, options, internal) {
+  const result = [];
+  const match = (element) => {
+    if (getAriaRole(element) !== options.role)
+      return;
+    if (options.selected !== void 0 && getAriaSelected(element) !== options.selected)
+      return;
+    if (options.checked !== void 0 && getAriaChecked(element) !== options.checked)
+      return;
+    if (options.pressed !== void 0 && getAriaPressed(element) !== options.pressed)
+      return;
+    if (options.expanded !== void 0 && getAriaExpanded(element) !== options.expanded)
+      return;
+    if (options.level !== void 0 && getAriaLevel(element) !== options.level)
+      return;
+    if (options.disabled !== void 0 && getAriaDisabled(element) !== options.disabled)
+      return;
+    if (!options.includeHidden) {
+      const isHidden = isElementHiddenForAria(element);
+      if (isHidden)
+        return;
+    }
+    if (options.name !== void 0) {
+      const accessibleName = normalizeWhiteSpace(getElementAccessibleName(element, !!options.includeHidden));
+      if (typeof options.name === "string")
+        options.name = normalizeWhiteSpace(options.name);
+      if (internal && !options.exact && options.nameOp === "=")
+        options.nameOp = "*=";
+      if (!matchesAttributePart(accessibleName, { name: "", jsonPath: [], op: options.nameOp || "=", value: options.name, caseSensitive: !!options.exact }))
+        return;
+    }
+    result.push(element);
+  };
+  const query = (root) => {
+    const shadows = [];
+    if (root.shadowRoot)
+      shadows.push(root.shadowRoot);
+    for (const element of root.querySelectorAll("*")) {
+      match(element);
+      if (element.shadowRoot)
+        shadows.push(element.shadowRoot);
+    }
+    shadows.forEach(query);
+  };
+  query(scope);
+  return result;
+}
+function createRoleEngine(internal) {
+  return {
+    queryAll: (scope, selector) => {
+      const parsed = parseAttributeSelector(selector, true);
+      const role = parsed.name.toLowerCase();
+      if (!role)
+        throw new Error(`Role must not be empty`);
+      const options = validateAttributes(parsed.attributes, role);
+      beginAriaCaches();
+      try {
+        return queryRole(scope, options, internal);
+      } finally {
+        endAriaCaches();
+      }
+    }
+  };
+}
+
+
 // k6BrowserNative allows accessing native browser objects
 // even if the page under test has overridden them.
 const k6BrowserNative = (() => {
@@ -225,6 +1474,7 @@ class InjectedScript {
       css: new CSSQueryEngine(),
       text: new TextQueryEngine(),
       xpath: new XPathQueryEngine(),
+      role: createRoleEngine(false),
     };
   }
 
