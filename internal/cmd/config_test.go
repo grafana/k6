@@ -218,7 +218,7 @@ func TestReadDiskConfigWithDefaultFlags(t *testing.T) {
 	defaultConfigPath := ".config/k6/config.json"
 	require.NoError(t, fsext.WriteFile(memfs, defaultConfigPath, conf, 0o644))
 
-	defaultFlags := state.GetDefaultFlags(".config")
+	defaultFlags := state.GetDefaultFlags(".config", ".cache")
 	gs := &state.GlobalState{
 		FS:           memfs,
 		Flags:        defaultFlags,
@@ -238,7 +238,7 @@ func TestReadDiskConfigCustomFilePath(t *testing.T) {
 	conf := []byte(`{"iterations":1028,"cloud":{"field1":"testvalue"}}`)
 	require.NoError(t, fsext.WriteFile(memfs, "custom-path/config.json", conf, 0o644))
 
-	defaultFlags := state.GetDefaultFlags(".config")
+	defaultFlags := state.GetDefaultFlags(".config", ".cache")
 	gs := &state.GlobalState{
 		FS:           memfs,
 		Flags:        defaultFlags,
@@ -262,7 +262,7 @@ func TestReadDiskConfigNotFoundSilenced(t *testing.T) {
 	defaultConfigPath := ".config/unknown-folder/k6/config.json"
 	require.NoError(t, fsext.WriteFile(memfs, defaultConfigPath, conf, 0o644))
 
-	defaultFlags := state.GetDefaultFlags(".config")
+	defaultFlags := state.GetDefaultFlags(".config", ".cache")
 	gs := &state.GlobalState{
 		FS:           memfs,
 		Flags:        defaultFlags,
@@ -280,7 +280,7 @@ func TestReadDiskConfigNotJSONExtension(t *testing.T) {
 	conf := []byte(`{"iterations":1028,"cloud":{"field1":"testvalue"}}`)
 	require.NoError(t, fsext.WriteFile(memfs, "custom-path/config.txt", conf, 0o644))
 
-	defaultFlags := state.GetDefaultFlags(".config")
+	defaultFlags := state.GetDefaultFlags(".config", ".cache")
 	gs := &state.GlobalState{
 		FS:           memfs,
 		DefaultFlags: defaultFlags,
@@ -305,7 +305,7 @@ func TestReadDiskConfigNotJSONContentError(t *testing.T) {
 
 	gs := &state.GlobalState{
 		FS:    memfs,
-		Flags: state.GetDefaultFlags(".config"),
+		Flags: state.GetDefaultFlags(".config", ".cache"),
 	}
 	_, err := readDiskConfig(gs)
 	var serr *json.SyntaxError
@@ -316,7 +316,7 @@ func TestReadDiskConfigNotFoundErrorWithCustomPath(t *testing.T) {
 	t.Parallel()
 	memfs := fsext.NewMemMapFs()
 
-	defaultFlags := state.GetDefaultFlags(".config")
+	defaultFlags := state.GetDefaultFlags(".config", ".cache")
 	gs := &state.GlobalState{
 		FS:           memfs,
 		Flags:        defaultFlags,
@@ -333,7 +333,7 @@ func TestWriteDiskConfigWithDefaultFlags(t *testing.T) {
 	t.Parallel()
 	memfs := fsext.NewMemMapFs()
 
-	defaultFlags := state.GetDefaultFlags(".config")
+	defaultFlags := state.GetDefaultFlags(".config", ".cache")
 	gs := &state.GlobalState{
 		FS:           memfs,
 		Flags:        defaultFlags,
@@ -357,7 +357,7 @@ func TestWriteDiskConfigOverwrite(t *testing.T) {
 	defaultConfigPath := ".config/k6/config.json"
 	require.NoError(t, fsext.WriteFile(memfs, defaultConfigPath, conf, 0o644))
 
-	defaultFlags := state.GetDefaultFlags(".config")
+	defaultFlags := state.GetDefaultFlags(".config", ".cache")
 	gs := &state.GlobalState{
 		FS:           memfs,
 		Flags:        defaultFlags,
@@ -373,7 +373,7 @@ func TestWriteDiskConfigCustomPath(t *testing.T) {
 	t.Parallel()
 	memfs := fsext.NewMemMapFs()
 
-	defaultFlags := state.GetDefaultFlags(".config")
+	defaultFlags := state.GetDefaultFlags(".config", ".cache")
 	gs := &state.GlobalState{
 		FS:           memfs,
 		Flags:        defaultFlags,
@@ -390,7 +390,7 @@ func TestWriteDiskConfigNoJSONContentError(t *testing.T) {
 	t.Parallel()
 	memfs := fsext.NewMemMapFs()
 
-	defaultFlags := state.GetDefaultFlags(".config")
+	defaultFlags := state.GetDefaultFlags(".config", ".cache")
 	gs := &state.GlobalState{
 		FS:           memfs,
 		Flags:        defaultFlags,
@@ -419,7 +419,7 @@ func TestMigrateLegacyConfigFileIfAny(t *testing.T) {
 	l, hook := testutils.NewLoggerWithHook(t)
 	logger := l.(*logrus.Logger) //nolint:forbidigo // no alternative, required
 
-	defaultFlags := state.GetDefaultFlags(".config")
+	defaultFlags := state.GetDefaultFlags(".config", ".cache")
 	gs := &state.GlobalState{
 		FS:              memfs,
 		Flags:           defaultFlags,
@@ -442,7 +442,7 @@ func TestMigrateLegacyConfigFileIfAnyWhenFileDoesNotExist(t *testing.T) {
 	t.Parallel()
 	memfs := fsext.NewMemMapFs()
 
-	defaultFlags := state.GetDefaultFlags(".config")
+	defaultFlags := state.GetDefaultFlags(".config", ".cache")
 	gs := &state.GlobalState{
 		FS:              memfs,
 		Flags:           defaultFlags,
@@ -505,7 +505,7 @@ func TestLoadConfig(t *testing.T) {
 			l, hook := testutils.NewLoggerWithHook(t)
 			logger := l.(*logrus.Logger) //nolint:forbidigo // no alternative, required
 
-			defaultFlags := state.GetDefaultFlags(".config")
+			defaultFlags := state.GetDefaultFlags(".config", ".cache")
 			gs := &state.GlobalState{
 				FS:              tc.memfs,
 				Flags:           defaultFlags,

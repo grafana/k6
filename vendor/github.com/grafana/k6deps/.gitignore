@@ -1,0 +1,8 @@
+/k6deps
+/k6deps.exe
+/build
+/node_modules
+/package.json
+/yarn.lock
+test*.db
+/coverage.txt
