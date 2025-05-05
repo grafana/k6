@@ -9,10 +9,6 @@ defaults:
   run:
     shell: bash
 
-permissions:
-  contents: read
-
-
 jobs:
   publish-packager:
     runs-on: ubuntu-latest
@@ -25,6 +21,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
+      packages: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -34,8 +31,6 @@ jobs:
         run: |
           cd packaging
           docker compose build packager
-      - name: Login to DockerHub
-        uses: grafana/shared-workflows/actions/dockerhub-login@117d8511cbc5da0337972deeb400c4298b057af3 # dockerhub-login-v1.0.1
       - name: Publish
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login https://ghcr.io -u ${GITHUB_ACTOR} --password-stdin
