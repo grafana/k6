@@ -17,7 +17,8 @@ import (
 const cloudPlanCommandName = "plan"
 
 type cmdCloudPlan struct {
-	gs *state.GlobalState
+	gs         *state.GlobalState
+	outputJSON bool
 }
 
 func (c *cmdCloudPlan) flagSet() *pflag.FlagSet {
@@ -25,6 +26,7 @@ func (c *cmdCloudPlan) flagSet() *pflag.FlagSet {
 	flags.SortFlags = false
 	flags.AddFlagSet(optionFlagSet())
 	flags.AddFlagSet(runtimeOptionFlagSet(false))
+	flags.BoolVar(&c.outputJSON, "json", false, "Output result in JSON format")
 	return flags
 }
 
@@ -94,15 +96,33 @@ func (c *cmdCloudPlan) run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("error finding stack: %w", err)
 	}
 
-	fmt.Printf("Stack: %s (%d)\nProject: %s (%d)\n", cloudContext.StackName, cloudContext.StackID, cloudContext.ProjectName, cloudContext.ProjectID)
-
 	optionsMap, _ := StructToMap(cloudConfig)
 	validationResponse, err := validateOptions(cloudConfig.Token.String, cloudContext.StackID, cloudContext.ProjectID, optionsMap)
 	if err != nil {
 		return fmt.Errorf("error validating options: %w", err)
 	}
 
-	fmt.Println(fmt.Sprintf("Estimated Usage: %v VUh  ", validationResponse.VuhUsage))
+	if c.outputJSON {
+		output := map[string]interface{}{
+			"stack": map[string]interface{}{
+				"name": cloudContext.StackName,
+				"id":   cloudContext.StackID,
+			},
+			"project": map[string]interface{}{
+				"name": cloudContext.ProjectName,
+				"id":   cloudContext.ProjectID,
+			},
+			"estimated_vuh_usage": validationResponse.VuhUsage,
+		}
+		jsonOutput, err := json.MarshalIndent(output, "", "  ")
+		if err != nil {
+			return fmt.Errorf("error marshalling JSON output: %w", err)
+		}
+		fmt.Println(string(jsonOutput))
+	} else {
+		fmt.Printf("Stack: %s (%d)\nProject: %s (%d)\n", cloudContext.StackName, cloudContext.StackID, cloudContext.ProjectName, cloudContext.ProjectID)
+		fmt.Println(fmt.Sprintf("Estimated Usage: %v VUh  ", validationResponse.VuhUsage))
+	}
 
 	return nil
 }
