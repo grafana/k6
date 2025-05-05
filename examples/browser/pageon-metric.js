@@ -26,8 +26,8 @@ export default async function() {
   });
 
   try {
-    await page.goto('https://test.k6.io/?q=abc123');
-    await page.goto('https://test.k6.io/?q=def456');
+    await page.goto('https://quickpizza.grafana.com/test.k6.io/?q=abc123');
+    await page.goto('https://quickpizza.grafana.com/test.k6.io/?q=def456');
   } finally {
     await page.close();
   }

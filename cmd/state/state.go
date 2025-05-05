@@ -6,6 +6,8 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"slices"
+	"strconv"
 	"sync"
 
 	"go.k6.io/k6/lib"
@@ -21,7 +23,14 @@ import (
 	"go.k6.io/k6/secretsource"
 )
 
-const defaultConfigFileName = "config.json"
+const (
+	// BinaryProvisioningFeatureFlag defines the environment variable that enables the binary provisioning
+	BinaryProvisioningFeatureFlag = "K6_BINARY_PROVISIONING"
+
+	defaultBuildServiceURL = "https://ingest.k6.io/builder/api/v1"
+	defaultConfigFileName  = "config.json"
+	defaultBinaryCacheDir  = "builds"
+)
 
 // GlobalState contains the GlobalFlags and accessors for most of the global
 // process-external state like CLI arguments, env vars, standard input, output
@@ -95,14 +104,24 @@ func NewGlobalState(ctx context.Context) *GlobalState {
 		confDir = ".config"
 	}
 
+	cacheDir, err := os.UserCacheDir()
+	if err != nil {
+		confDir = ".cache"
+	}
+
 	binary, err := os.Executable()
 	if err != nil {
 		binary = "k6"
 	}
 
 	env := BuildEnvMap(os.Environ())
-	defaultFlags := GetDefaultFlags(confDir)
-	globalFlags := getFlags(defaultFlags, env)
+	defaultFlags := GetDefaultFlags(confDir, cacheDir)
+	globalFlags := getFlags(defaultFlags, env, os.Args)
+
+	logLevel := logrus.InfoLevel
+	if globalFlags.Verbose {
+		logLevel = logrus.DebugLevel
+	}
 
 	logger := &logrus.Logger{
 		Out: stderr,
@@ -111,7 +130,7 @@ func NewGlobalState(ctx context.Context) *GlobalState {
 			DisableColors: !stderrTTY || globalFlags.NoColor,
 		},
 		Hooks: make(logrus.LevelHooks),
-		Level: logrus.InfoLevel,
+		Level: logLevel,
 	}
 
 	return &GlobalState{
@@ -155,19 +174,25 @@ type GlobalFlags struct {
 	SecretSource     []string
 	LogFormat        string
 	Verbose          bool
+
+	BinaryProvisioning bool
+	BuildServiceURL    string
+	BinaryCache        string
 }
 
 // GetDefaultFlags returns the default global flags.
-func GetDefaultFlags(homeDir string) GlobalFlags {
+func GetDefaultFlags(homeDir string, cacheDir string) GlobalFlags {
 	return GlobalFlags{
 		Address:          "localhost:6565",
 		ProfilingEnabled: false,
 		ConfigFilePath:   filepath.Join(homeDir, "k6", defaultConfigFileName),
 		LogOutput:        "stderr",
+		BuildServiceURL:  defaultBuildServiceURL,
+		BinaryCache:      filepath.Join(cacheDir, "k6", defaultBinaryCacheDir),
 	}
 }
 
-func getFlags(defaultFlags GlobalFlags, env map[string]string) GlobalFlags {
+func getFlags(defaultFlags GlobalFlags, env map[string]string, args []string) GlobalFlags {
 	result := defaultFlags
 
 	// TODO: add env vars for the rest of the values (after adjusting
@@ -193,5 +218,20 @@ func getFlags(defaultFlags GlobalFlags, env map[string]string) GlobalFlags {
 	if _, ok := env["K6_PROFILING_ENABLED"]; ok {
 		result.ProfilingEnabled = true
 	}
+	if v, ok := env["K6_BINARY_PROVISIONING"]; ok {
+		vb, err := strconv.ParseBool(v)
+		if err == nil {
+			result.BinaryProvisioning = vb
+		}
+	}
+	if val, ok := env["K6_BUILD_SERVICE_URL"]; ok {
+		result.BuildServiceURL = val
+	}
+
+	// check if verbose flag is set
+	if slices.Contains(args, "-v") || slices.Contains(args, "--verbose") {
+		result.Verbose = true
+	}
+
 	return result
 }

@@ -20,6 +20,9 @@ defaults:
   run:
     shell: bash
 
+permissions:
+  contents: read
+
 env:
   APP_NAME: "k6"
   DOCKER_IMAGE_ID: "grafana/k6"
@@ -37,12 +40,15 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
       - name: Get the k6 version
         id: get_k6_version
+        env:
+          INPUT_K6_VERSION: ${{ github.event.inputs.k6_version  }}
         run: |
           set -x # Show exactly what commands are executed
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]] && [[ "${{ github.event.inputs.k6_version }}" != "" ]]; then
-            VERSION="${{ github.event.inputs.k6_version }}"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]] && [[ "${INPUT_K6_VERSION}" != "" ]]; then
+            VERSION="${INPUT_K6_VERSION}"
             echo "Building custom dev build with version '${VERSION}' from manual workflow_dispatch..."
           elif [[ "${GITHUB_REF}" =~ ^refs/tags/v.+$ ]]; then
             VERSION="${GITHUB_REF##*/}"
@@ -55,10 +61,12 @@ jobs:
           echo "k6_version=${VERSION}" >> $GITHUB_OUTPUT
       - name: Get the used Go version
         id: get_go_version
+        env:
+          INPUT_GO_VERSION: ${{ github.event.inputs.go_version  }}
         run: |
           set -x # Show exactly what commands are executed
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]] && [[ "${{ github.event.inputs.go_version }}" != "" ]]; then
-            GO_VERSION="${{ github.event.inputs.go_version }}"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]] && [[ "${INPUT_GO_VERSION}" != "" ]]; then
+            GO_VERSION="${INPUT_GO_VERSION}"
             echo "Using custom Go version '${GO_VERSION}' from manual workflow_dispatch..."
           else
             GO_VERSION="${DEFAULT_GO_VERSION}"
@@ -77,11 +85,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
       - name: Install Go
         uses: actions/setup-go@v5
         with:
           go-version: ${{ needs.configure.outputs.go_version }}
           check-latest: true
+          cache: false # against cache-poisoning
       - name: Install nfpm (dep and rpm package builder)
         run: |
           go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.16.0
@@ -128,6 +138,10 @@ jobs:
           retention-days: 7
 
   build-docker:
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
     runs-on: ubuntu-latest
     needs: [configure]
     env:
@@ -137,6 +151,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
       - name: Build
         run: |
           docker buildx create \
@@ -161,14 +176,16 @@ jobs:
             docker run $DOCKER_IMAGE_ID scale --help
             docker run $DOCKER_IMAGE_ID pause --help
             docker run $DOCKER_IMAGE_ID resume --help
-
-      - name: Log into registries (ghcr.io and Docker Hub)
+      - name: Login to DockerHub
+        if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') }}
+        uses: grafana/shared-workflows/actions/dockerhub-login@13fb504e3bfe323c1188bf244970d94b2d336e86 # dockerhub-login-v1.0.1
+      - name: Login to ghcr.io
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
         if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') }}
         run: |
           # Log into GitHub Container Registry
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login https://ghcr.io -u ${{ github.actor }} --password-stdin
-          # Log into Docker Hub Registry
-          echo "${{ secrets.DOCKER_PASS }}" | docker login -u "${{ secrets.DOCKER_USER }}" --password-stdin
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login https://ghcr.io -u ${GITHUB_ACTOR} --password-stdin
       - name: Publish k6:master images
         if: ${{ github.ref == 'refs/heads/master' }}
         run: |
@@ -211,8 +228,11 @@ jobs:
             -t $DOCKER_IMAGE_ID:latest-with-browser \
             -t ghcr.io/$GHCR_IMAGE_ID:latest-with-browser .
 
-
   package-windows:
+    permissions:
+      contents: read
+      actions: read
+
     runs-on: windows-latest
     defaults:
       run:
@@ -223,6 +243,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Install pandoc
         uses: crazy-max/ghaction-chocolatey@0e015857dd851f84fcb7fb53380eb5c4c8202333 # v3.0.0
         with:
@@ -265,7 +287,7 @@ jobs:
 
           # Get the latest signtool executable
           $SignTool = Get-ChildItem -Path "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Recurse -Filter signtool.exe | Where-Object { $_.DirectoryName -like "*\x64" } | Sort-Object -Descending | Select-Object -First 1
-          
+
           # Sign the Windows binary
           & $SignTool sign /f k6.pfx /p "${{ secrets.WIN_SIGN_PASS }}" /tr "http://timestamp.digicert.com" /td sha256 /fd sha256 "packaging\k6.exe"
 
@@ -293,9 +315,14 @@ jobs:
     if: ${{ startsWith(github.ref, 'refs/tags/v') && github.event_name != 'workflow_dispatch' }}
     env:
       VERSION: ${{ needs.configure.outputs.k6_version }}
+    permissions:
+       actions: read
+       contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Download binaries
         uses: actions/download-artifact@v4
         with:
@@ -332,9 +359,15 @@ jobs:
     if: ${{ startsWith(github.ref, 'refs/tags/v') && github.event_name != 'workflow_dispatch' }}
     env:
       VERSION: ${{ needs.configure.outputs.k6_version }}
+    permissions:
+      actions: read
+      contents: read
+      packages: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Download binaries
         uses: actions/download-artifact@v4
         with:
@@ -362,8 +395,10 @@ jobs:
           EOF
           echo "${{ secrets.PGP_SIGN_KEY }}" > packaging/sign-key.gpg
       - name: Publish packages
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
         run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login https://ghcr.io -u ${{ github.actor }} --password-stdin
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login https://ghcr.io -u ${GITHUB_ACTOR} --password-stdin
           cd packaging
           docker compose pull packager
           docker compose run --rm packager

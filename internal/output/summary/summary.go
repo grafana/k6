@@ -5,6 +5,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"go.k6.io/k6/internal/lib/consts"
 	"go.k6.io/k6/internal/lib/summary"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/metrics"
@@ -99,6 +100,9 @@ func (o *Output) flushSample(sample metrics.Sample) {
 
 	if groupTag, exists := sample.Tags.Get("group"); exists && len(groupTag) > 0 {
 		normalizedGroupName := strings.TrimPrefix(groupTag, lib.GroupSeparator)
+		if normalizedGroupName == consts.SetupFn || normalizedGroupName == consts.TeardownFn {
+			return // Essentially skip samples tagged with group: setup/teardown.
+		}
 		groupNames := strings.Split(normalizedGroupName, lib.GroupSeparator)
 
 		// We traverse over all the groups to create a nested structure,
