@@ -3,4 +3,4 @@ package build
 
 // Version contains the current version of k6
 // represented using Semantic Versioning expression.
-const Version = "1.0.0-rc2"
+const Version = "1.0.0"
