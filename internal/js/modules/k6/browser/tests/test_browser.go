@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -80,14 +81,12 @@ func newTestBrowser(tb testing.TB, opts ...func(*testBrowser)) *testBrowser {
 	tbr.isBrowserTypeInitialized = true // some option require the browser type to be initialized.
 	tbr.applyOptions(opts...)           // apply post-init stage options.
 
-	b, pid, err := tbr.browserType.Launch(context.Background(), tbr.vu.Context())
-	if err != nil {
-		tb.Fatalf("testBrowser: %v", err)
-	}
+	b, pid := launchOrConnectBrowser(tb, tbr)
 	tbr.Browser = b
 	tbr.ctx = tbr.browserType.Ctx
 	tbr.pid = pid
 	tbr.wsURL = b.WsURL()
+
 	tb.Cleanup(func() {
 		select {
 		case <-tbr.vu.Context().Done():
@@ -99,6 +98,46 @@ func newTestBrowser(tb testing.TB, opts ...func(*testBrowser)) *testBrowser {
 	})
 
 	return tbr
+}
+
+// launchOrConnectBrowser launches a new browser or connects to an existing one.
+// If it connects to one, the returned `pid` is -1.
+func launchOrConnectBrowser(tb testing.TB, tbr *testBrowser) (*common.Browser, int) {
+	tb.Helper()
+
+	wsUrls, isRemote := env.Lookup(env.WebSocketURLs)
+	if !isRemote {
+		b, pid, err := tbr.browserType.Launch(context.Background(), tbr.vu.Context())
+		if err != nil {
+			tb.Fatalf("Failed to launch a new browser: %v", err)
+		}
+
+		return b, pid
+	}
+
+	// Parse K6_BROWSER_WS_URL
+	var wsUrl string
+	if !strings.ContainsRune(wsUrls, ',') {
+		wsUrl = wsUrls
+	}
+
+	// If last parts element is a void string,
+	// because WS URL contained an ending comma,
+	// remove it
+	parts := strings.Split(wsUrl, ",")
+	if parts[len(parts)-1] == "" {
+		parts = parts[:len(parts)-1]
+	}
+
+	// In testing scenario, just pick the first one.
+	wsUrl = parts[0]
+
+	b, err := tbr.browserType.Connect(context.Background(), tbr.vu.Context(), wsUrl)
+	if err != nil {
+		tb.Fatalf("Failed to connect to an existing browser: %v", err)
+	}
+
+	return b, -1
 }
 
 // newTestBrowserVU initializes a new VU for browser testing.
