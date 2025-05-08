@@ -34,7 +34,6 @@ func TestReadableStream(t *testing.T) {
 	}
 
 	for _, suite := range suites {
-		suite := suite
 		t.Run(suite, func(t *testing.T) {
 			t.Parallel()
 			ts := newConfiguredRuntime(t)

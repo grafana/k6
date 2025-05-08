@@ -223,7 +223,6 @@ func TestBrowserOptionsParse(t *testing.T) {
 			err:          "browser type option must be set",
 		},
 	} {
-		tt := tt
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			var (

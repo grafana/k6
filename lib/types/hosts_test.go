@@ -177,7 +177,6 @@ func TestHosts(t *testing.T) {
 // runTcs is utility function for testing HostTestCase slice
 func runTcs(t *testing.T, at *Hosts, tcs []HostTestCase) {
 	for _, tc := range tcs {
-		tc := tc
 		t.Run(tc.desc+"-"+tc.hostname, func(t *testing.T) {
 			t.Parallel()
 			addr := at.Match(tc.hostname)
@@ -223,7 +222,6 @@ func TestHostsJSON(t *testing.T) {
 		t.Parallel()
 
 		for _, tc := range tcs {
-			tc := tc
 			t.Run(tc.marshal, func(t *testing.T) {
 				t.Parallel()
 				m, err := json.Marshal(tc.t)
@@ -237,8 +235,6 @@ func TestHostsJSON(t *testing.T) {
 		t.Parallel()
 
 		for _, tc := range tcs {
-			tc := tc
-
 			t.Run(tc.marshal, func(t *testing.T) {
 				t.Parallel()
 				var trie NullHosts

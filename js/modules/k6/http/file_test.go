@@ -43,7 +43,6 @@ func TestHTTPFile(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		tc := tc
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			t.Parallel()
 			runtime, mi := getTestModuleInstance(t)

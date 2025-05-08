@@ -60,11 +60,9 @@ func TestConfigCmd(t *testing.T) {
 	}
 
 	for _, data := range testdata {
-		data := data
 		t.Run(data.Name, func(t *testing.T) {
 			t.Parallel()
 			for _, test := range data.Tests {
-				test := test
 				t.Run(`"`+test.Name+`"`, func(t *testing.T) {
 					t.Parallel()
 					fs := configFlagSet()
@@ -104,11 +102,9 @@ func TestConfigEnv(t *testing.T) {
 		},
 	}
 	for field, data := range testdata {
-		field, data := field, data
 		t.Run(field.Name, func(t *testing.T) {
 			t.Parallel()
 			for value, fn := range data {
-				value, fn := value, fn
 				t.Run(`"`+value+`"`, func(t *testing.T) {
 					t.Parallel()
 					var config Config
@@ -193,7 +189,6 @@ func TestDeriveAndValidateConfig(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			_, err := deriveAndValidateConfig(tc.conf,
@@ -499,7 +494,6 @@ func TestLoadConfig(t *testing.T) {
 		},
 	}
 	for _, tc := range testcases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			l, hook := testutils.NewLoggerWithHook(t)

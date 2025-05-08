@@ -35,7 +35,6 @@ func TestViewportCalculateInset(t *testing.T) {
 	// should add a different inset to viewport than the default one
 	// if a recognized os is given.
 	for _, os := range []string{"windows", "linux", "darwin"} {
-		os := os
 		t.Run(os, func(t *testing.T) {
 			t.Parallel()
 

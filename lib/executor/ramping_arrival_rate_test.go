@@ -434,7 +434,6 @@ func BenchmarkCal(b *testing.B) {
 	for _, t := range []time.Duration{
 		time.Second, time.Minute,
 	} {
-		t := t
 		b.Run(t.String(), func(b *testing.B) {
 			config := RampingArrivalRateConfig{
 				TimeUnit:  types.NullDurationFrom(time.Second),
@@ -470,7 +469,6 @@ func BenchmarkCalRat(b *testing.B) {
 	for _, t := range []time.Duration{
 		time.Second, time.Minute,
 	} {
-		t := t
 		b.Run(t.String(), func(b *testing.B) {
 			config := RampingArrivalRateConfig{
 				TimeUnit:  types.NullDurationFrom(time.Second),
@@ -692,7 +690,6 @@ func TestRampingArrivalRateGlobalIters(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(fmt.Sprintf("%s_%s", tc.seq, tc.seg), func(t *testing.T) {
 			t.Parallel()
 
@@ -797,7 +794,6 @@ func TestRampingArrivalRateActiveVUs_GetExecutionRequirements(t *testing.T) {
 	}
 
 	for name, tc := range tcs {
-		tc := tc
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 

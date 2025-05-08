@@ -155,7 +155,6 @@ func TestGetGroups(t *testing.T) {
 		})
 	})
 	for _, gp := range []*lib.Group{g0, g1, g2} {
-		gp := gp
 		t.Run(gp.Name, func(t *testing.T) {
 			t.Parallel()
 			rw := httptest.NewRecorder()

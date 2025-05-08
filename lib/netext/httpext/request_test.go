@@ -158,7 +158,6 @@ func TestResponseStatus(t *testing.T) {
 		}
 
 		for _, tc := range testCases {
-			tc := tc
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
 				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -218,7 +217,6 @@ func TestURL(t *testing.T) {
 		}
 
 		for _, tc := range testCases {
-			tc := tc
 			t.Run(tc.url, func(t *testing.T) {
 				t.Parallel()
 				u, err := url.Parse(tc.url)

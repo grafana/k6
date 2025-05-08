@@ -58,7 +58,6 @@ func TestExpectedStatuses(t *testing.T) {
 	}
 
 	for name, testCase := range cases {
-		name, testCase := name, testCase
 		t.Run(name, func(t *testing.T) {
 			val, err := rt.RunString(testCase.code)
 			if testCase.err == "" {
@@ -258,8 +257,6 @@ func TestResponseCallbackInAction(t *testing.T) {
 		},
 	}
 	for name, testCase := range testCases {
-		testCase := testCase
-
 		runCode := func(code string) {
 			t.Helper()
 			ts.instance.defaultClient.responseCallback = defaultExpectedStatuses.match
@@ -379,7 +376,6 @@ func TestResponseCallbackBatch(t *testing.T) {
 		},
 	}
 	for name, testCase := range testCases {
-		testCase := testCase
 		t.Run(name, func(t *testing.T) {
 			ts.instance.defaultClient.responseCallback = defaultExpectedStatuses.match
 

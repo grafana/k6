@@ -137,7 +137,6 @@ func TestIsRemoteBrowser(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -388,7 +387,6 @@ func TestParseTracesMetadata(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			lookup := func(key string) (string, bool) {

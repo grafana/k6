@@ -105,7 +105,6 @@ func TestPatchStatus(t *testing.T) {
 	}
 
 	for name, testCase := range testData {
-		name, testCase := name, testCase
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
