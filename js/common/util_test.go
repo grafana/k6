@@ -40,7 +40,6 @@ func TestToBytes(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(fmt.Sprintf("%T", tc.in), func(t *testing.T) {
 			t.Parallel()
 			out, err := ToBytes(tc.in)
@@ -68,7 +67,6 @@ func TestToString(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(fmt.Sprintf("%T", tc.in), func(t *testing.T) {
 			t.Parallel()
 			out, err := ToString(tc.in)

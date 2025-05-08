@@ -47,7 +47,6 @@ func TestFrameDismissDialogBox(t *testing.T) {
 		"prompt",
 		"beforeunload",
 	} {
-		tt := tt
 		t.Run(tt, func(t *testing.T) {
 			t.Parallel()
 

@@ -58,8 +58,6 @@ func TestDialerAddr(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
-
 		t.Run(tc.address, func(t *testing.T) {
 			t.Parallel()
 			addr, err := dialer.getDialAddr(tc.address)
@@ -97,8 +95,6 @@ func TestDialerAddrBlockHostnamesStar(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
-
 		t.Run(tc.address, func(t *testing.T) {
 			t.Parallel()
 			addr, err := dialer.getDialAddr(tc.address)

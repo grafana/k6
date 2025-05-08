@@ -128,7 +128,6 @@ func TestLoad(t *testing.T) {
 		}
 
 		for name, data := range testdata {
-			data := data
 			t.Run(name, func(t *testing.T) {
 				t.Parallel()
 				pwdURL, err := url.Parse("file://" + data.pwd)

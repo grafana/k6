@@ -206,7 +206,6 @@ func TestSetupData(t *testing.T) {
 	}
 
 	for id := range testCases {
-		id := id
 		t.Run(fmt.Sprintf("testcase_%d", id), func(t *testing.T) {
 			t.Parallel()
 			runTestCase(t, id)

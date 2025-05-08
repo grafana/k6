@@ -195,7 +195,6 @@ func TestNewBundle(t *testing.T) {
 			}
 
 			for _, tc := range testCases {
-				tc := tc
 				t.Run(tc.name, func(t *testing.T) {
 					t.Parallel()
 					rtOpts := lib.RuntimeOptions{CompatibilityMode: null.StringFrom(tc.compatMode)}
@@ -414,7 +413,6 @@ func TestNewBundle(t *testing.T) {
 		t.Run("TLSCipherSuites", func(t *testing.T) {
 			t.Parallel()
 			for suiteName, suiteID := range lib.SupportedTLSCipherSuites {
-				suiteName, suiteID := suiteName, suiteID
 				t.Run(suiteName, func(t *testing.T) {
 					t.Parallel()
 					script := `
@@ -723,12 +721,9 @@ func TestOpen(t *testing.T) {
 	logger := testutils.NewLogger(t)
 
 	for name, fsInit := range fss {
-		name, fsInit := name, fsInit
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			for _, tCase := range testCases {
-				tCase := tCase
-
 				testFunc := func(t *testing.T) {
 					t.Parallel()
 					fs, _, cleanUp := fsInit()
@@ -759,7 +754,6 @@ func TestOpen(t *testing.T) {
 					require.NoError(t, err)
 
 					for source, b := range map[string]*Bundle{"source": sourceBundle, "archive": arcBundle} {
-						b := b
 						t.Run(source, func(t *testing.T) { //nolint:paralleltest
 							bi, err := b.Instantiate(context.Background(), 0)
 							require.NoError(t, err)
@@ -858,7 +852,6 @@ func TestBundleEnv(t *testing.T) {
 
 	bundles := map[string]*Bundle{"Source": b1, "Archive": b2}
 	for name, b := range bundles {
-		b := b
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			require.Equal(t, "1", b.preInitState.RuntimeOptions.Env["TEST_A"])
@@ -896,7 +889,6 @@ func TestBundleNotSharable(t *testing.T) {
 	bundles := map[string]*Bundle{"Source": b1, "Archive": b2}
 	var vus, iters uint64 = 10, 1000
 	for name, b := range bundles {
-		b := b
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			for i := uint64(0); i < vus; i++ {
@@ -938,7 +930,6 @@ func TestBundleMakeArchive(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.cm.String(), func(t *testing.T) {
 			t.Parallel()
 			fs := fsext.NewMemMapFs()
@@ -999,7 +990,6 @@ func TestGlobalTimers(t *testing.T) {
 
 	bundles := map[string]*Bundle{"Source": b1, "Archive": b2}
 	for name, b := range bundles {
-		b := b
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			_, err := b.Instantiate(context.Background(), 1)

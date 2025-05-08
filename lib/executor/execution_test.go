@@ -30,7 +30,6 @@ func TestExecutionStateVUIDs(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(fmt.Sprintf("seq:%s;segment:%s", tc.seq, tc.seg), func(t *testing.T) {
 			t.Parallel()
 			ess, err := lib.NewExecutionSegmentSequenceFromString(tc.seq)

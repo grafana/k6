@@ -46,7 +46,6 @@ func TestTextSummary(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		i, tc := i, tc
 		t.Run(fmt.Sprintf("%d_%v", i, tc.stats), func(t *testing.T) {
 			t.Parallel()
 			legacySummary := createTestLegacySummary(t)
@@ -647,7 +646,6 @@ func TestWrongSummaryHandlerExportTypes(t *testing.T) {
 	testCases := []string{"{}", `"foo"`, "null", "undefined", "123"}
 
 	for i, tc := range testCases {
-		i, tc := i, tc
 		t.Run(fmt.Sprintf("%d_%s", i, tc), func(t *testing.T) {
 			t.Parallel()
 			runner, err := getSimpleRunner(t, "/script.js",

@@ -42,8 +42,6 @@ func TestParseThresholdExpression(t *testing.T) {
 		},
 	}
 	for _, testCase := range tests {
-		testCase := testCase
-
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -173,8 +171,6 @@ func TestParseThresholdAggregationMethod(t *testing.T) {
 		},
 	}
 	for _, testCase := range tests {
-		testCase := testCase
-
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -300,8 +296,6 @@ func TestScanThresholdExpression(t *testing.T) {
 		},
 	}
 	for _, testCase := range tests {
-		testCase := testCase
-
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 

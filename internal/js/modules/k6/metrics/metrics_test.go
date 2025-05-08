@@ -89,11 +89,9 @@ func TestMetrics(t *testing.T) {
 		"no argument":           {JS: ``, errStr: "no value was provided", noTags: true},
 	}
 	for fn, mtyp := range types {
-		fn, mtyp := fn, mtyp
 		t.Run(fn, func(t *testing.T) {
 			t.Parallel()
 			for isTime, valueType := range map[bool]metrics.ValueType{false: metrics.Default, true: metrics.Time} {
-				isTime, valueType := isTime, valueType
 				t.Run(fmt.Sprintf("isTime=%v", isTime), func(t *testing.T) {
 					t.Parallel()
 					test := addTest{

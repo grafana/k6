@@ -53,7 +53,6 @@ func TestParseTagKeyValue(t *testing.T) {
 	}
 
 	for _, data := range testData {
-		data := data
 		t.Run(data.input, func(t *testing.T) {
 			t.Parallel()
 			name, value, err := parseTagNameValue(data.input)

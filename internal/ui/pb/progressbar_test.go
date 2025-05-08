@@ -70,7 +70,6 @@ func TestProgressBarRender(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.expected, func(t *testing.T) {
 			t.Parallel()
 			pbar := New(tc.options...)
@@ -94,7 +93,6 @@ func TestProgressBarRenderPaddingMaxLeft(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.left, func(t *testing.T) {
 			t.Parallel()
 			pbar := New(WithLeft(func() string { return tc.left }))
@@ -116,7 +114,6 @@ func TestProgressBarLeft(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.expected, func(t *testing.T) {
 			t.Parallel()
 			pbar := New(WithLeft(tc.left))

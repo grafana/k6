@@ -125,8 +125,6 @@ func TestQueryAll(t *testing.T) {
 			wantErr:     true,
 		},
 	} {
-		name, tt := name, tt
-
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 

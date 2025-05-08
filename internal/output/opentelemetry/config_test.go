@@ -188,7 +188,6 @@ func TestConfig(t *testing.T) {
 	}
 
 	for name, testCase := range testCases {
-		testCase := testCase
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			config, err := GetConsolidatedConfig(testCase.jsonRaw, testCase.env)
