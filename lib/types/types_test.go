@@ -47,7 +47,6 @@ func TestParseExtendedDuration(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(fmt.Sprintf("tc_%s_exp", tc.durStr), func(t *testing.T) {
 			t.Parallel()
 			result, err := ParseExtendedDuration(tc.durStr)
@@ -224,7 +223,6 @@ func TestGetDurationValue(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		i, tc := i, tc
 		t.Run(fmt.Sprintf("testcase_%02d", i), func(t *testing.T) {
 			t.Parallel()
 			res, err := GetDurationValue(tc.val)

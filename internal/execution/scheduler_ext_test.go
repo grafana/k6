@@ -132,7 +132,6 @@ func TestSchedulerRunNonDefault(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			piState := getTestPreInitState(t)
@@ -247,7 +246,6 @@ func TestSchedulerRunEnv(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			piState := getTestPreInitState(t)
@@ -462,7 +460,6 @@ func TestSchedulerRunCustomTags(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			piState := getTestPreInitState(t)
@@ -843,7 +840,6 @@ func TestSchedulerStages(t *testing.T) {
 	}
 
 	for name, data := range testdata {
-		data := data
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			runner := &minirunner.MiniRunner{
@@ -1099,7 +1095,6 @@ func TestDNSResolverCache(t *testing.T) {
 	}
 
 	for name, tc := range testCases {
-		tc := tc
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			logger := logrus.New()

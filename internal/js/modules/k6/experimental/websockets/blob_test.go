@@ -75,7 +75,6 @@ func TestBlob(t *testing.T) {
 	}
 
 	for name, tc := range tcs {
-		tc := tc
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			ts := newTestState(t)
@@ -193,7 +192,6 @@ func TestBlob_slice(t *testing.T) {
 	}
 
 	for name, tc := range tcs {
-		tc := tc
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			ts := newTestState(t)

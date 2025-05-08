@@ -68,7 +68,6 @@ func TestOldArchive(t *testing.T) {
 		"/absolulte/path2":   `unix script`,
 	}
 	for filename, data := range testCases {
-		filename, data := filename, data
 		t.Run(filename, func(t *testing.T) {
 			t.Parallel()
 			metadata := `{"filename": "` + filename + `", "options": {}}`

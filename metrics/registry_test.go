@@ -44,7 +44,6 @@ func TestMetricNames(t *testing.T) {
 	}
 
 	for key, value := range testMap {
-		key, value := key, value
 		t.Run(key, func(t *testing.T) {
 			t.Parallel()
 			assert.Equal(t, value, checkName(key), key)

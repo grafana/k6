@@ -46,7 +46,6 @@ func TestVUTagsMetadatasGet(t *testing.T) {
 	t.Parallel()
 
 	for prop, propType := range tagsAndMetricsPropertyNames {
-		prop, propType := prop, propType
 		t.Run(prop, func(t *testing.T) {
 			t.Parallel()
 			tenv := setupTagsExecEnv(t)
@@ -72,7 +71,6 @@ func TestVUTagsMetadatasJSONEncoding(t *testing.T) {
 	t.Parallel()
 
 	for prop, propType := range tagsAndMetricsPropertyNames {
-		prop, propType := prop, propType
 		t.Run(prop, func(t *testing.T) {
 			t.Parallel()
 			tenv := setupTagsExecEnv(t)
@@ -111,7 +109,6 @@ func TestVUTagMetadatasSetSuccessAcceptedTypes(t *testing.T) {
 		"float":  {v: 3.14, exp: "3.14"},
 	}
 	for prop := range tagsAndMetricsPropertyNames {
-		prop := prop
 		t.Run(prop, func(t *testing.T) {
 			t.Parallel()
 			tenv := setupTagsExecEnv(t)
@@ -160,7 +157,6 @@ func TestVUTagsMetadataErrorOutOnInvalidValues(t *testing.T) {
 		`{"foo": "bar"}`,
 	}
 	for prop, propType := range tagsAndMetricsPropertyNames {
-		prop, propType := prop, propType
 		t.Run(prop, func(t *testing.T) {
 			t.Parallel()
 			for _, val := range cases {

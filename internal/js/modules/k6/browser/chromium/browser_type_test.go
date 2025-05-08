@@ -123,7 +123,6 @@ func TestBrowserTypePrepareFlags(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.flag, func(t *testing.T) {
 			t.Parallel()
 
@@ -235,7 +234,6 @@ func TestExecutablePath(t *testing.T) {
 		},
 	}
 	for name, tt := range tests {
-		tt := tt
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -317,7 +315,6 @@ func TestParseArgs(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
