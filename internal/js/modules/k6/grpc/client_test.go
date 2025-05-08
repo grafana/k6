@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"math"
 	"strings"
 	"testing"
 
@@ -1121,6 +1122,50 @@ func TestClient(t *testing.T) {
 				let respBool = client.invoke("grpc.wrappers.testing.Service/TestValue", false)
 				if (respBool.message !== "I don't know what to answer") {
 					throw new Error("expected to get 'I don't know what to answer', but got a " + respBool.message)
+				}
+			`,
+			},
+		},
+		{
+			name: "WrappersSpecialNumberValues",
+			initString: codeBlock{
+				code: `
+				var client = new grpc.Client();
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_wrappers_testing/test.proto");`,
+			},
+			setup: func(tb *httpmultibin.HTTPMultiBin) {
+				srv := grpc_wrappers_testing.Register(tb.ServerGRPC)
+
+				srv.TestDoubleImplementation = func(_ context.Context, in *wrappers.DoubleValue) (*wrappers.DoubleValue, error) {
+					if math.IsNaN(in.Value) {
+						return &wrappers.DoubleValue{Value: math.NaN()}, nil
+					}
+					if math.IsInf(in.Value, -1) {
+						return &wrappers.DoubleValue{Value: math.Inf(-1)}, nil
+					}
+					if math.IsInf(in.Value, 1) {
+						return &wrappers.DoubleValue{Value: math.Inf(1)}, nil
+					}
+					return &wrappers.DoubleValue{Value: in.Value}, nil
+				}
+			},
+			vuString: codeBlock{
+				code: `
+				client.connect("GRPCBIN_ADDR");
+
+				let respNaN = client.invoke("grpc.wrappers.testing.Service/TestDouble", NaN);
+				if (respNaN.message !== "NaN") {
+					throw new Error("expected to get 'NaN', but got a " + respString.message)
+				}
+
+				let respInfinity = client.invoke("grpc.wrappers.testing.Service/TestDouble", Infinity);
+				if (respInfinity.message !== "Infinity") {
+					throw new Error("expected to get 'Infinity', but got a " + respString.message)
+				}
+
+				let respNegativeInfinity = client.invoke("grpc.wrappers.testing.Service/TestDouble", -Infinity);
+				if (respNegativeInfinity.message !== "-Infinity") {
+					throw new Error("expected to get '-Infinity', but got a " + respString.message)
 				}
 			`,
 			},
