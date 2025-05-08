@@ -73,7 +73,6 @@ func (l *Listener) Close() error {
 	select {
 	case <-l.done:
 		// Already closed.
-		break
 	default:
 		close(l.done)
 	}
