@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv='content-type' value='text/html;charset=utf8'>
+  <meta name='generator' value='Ronn/v0.7.3 (http://github.com/rtomayko/ronn/tree/0.7.3)'>
+  <title>go-httpbin(1): HTTP Client Testing Service</title>
+  <style type='text/css' media='all'>
+  /* style: man */
+  body#manpage {margin:0;background:#fff;}
+  .mp {max-width:100ex;padding:0 9ex 1ex 4ex}
+  .mp p,.mp pre,.mp ul,.mp ol,.mp dl {margin:0 0 20px 0}
+  .mp h2 {margin:10px 0 0 0}
+  .mp > p,.mp > pre,.mp > ul,.mp > ol,.mp > dl {margin-left:8ex}
+  .mp h3 {margin:0 0 0 4ex}
+  .mp dt {margin:0;clear:left}
+  .mp dt.flush {float:left;width:8ex}
+  .mp dd {margin:0 0 0 9ex}
+  .mp h1,.mp h2,.mp h3,.mp h4 {clear:left}
+  .mp pre {margin-bottom:20px}
+  .mp pre+h2,.mp pre+h3 {margin-top:22px}
+  .mp h2+pre,.mp h3+pre {margin-top:5px}
+  .mp img {display:block;margin:auto}
+  .mp h1.man-title {display:none}
+  .mp,.mp code,.mp pre,.mp tt,.mp kbd,.mp samp,.mp h3,.mp h4 {font-family:monospace;font-size:14px;line-height:1.42857142857143}
+  .mp h2 {font-size:16px;line-height:1.25}
+  .mp h1 {font-size:20px;line-height:2}
+  .mp,.mp code,.mp pre,.mp pre code,.mp tt,.mp kbd,.mp samp {color:#131211}
+  .mp h1,.mp h2,.mp h3,.mp h4 {color:#030201}
+  .mp u {text-decoration:underline}
+  .mp code,.mp strong,.mp b {font-weight:bold;color:#131211}
+  .mp em,.mp var {font-style:italic;color:#232221;text-decoration:none}
+  .mp a,.mp a:link,.mp a:hover,.mp a code,.mp a pre,.mp a tt,.mp a kbd,.mp a samp {color:#0000ff}
+  .mp b.man-ref {font-weight:normal;color:#434241}
+  .mp pre {padding:0 4ex}
+  .mp pre code {font-weight:normal;color:#434241}
+  .mp h2+pre,h3+pre {padding-left:0}
+  ol.man-decor,ol.man-decor li {margin:3px 0 10px 0;padding:0;float:left;width:33%;list-style-type:none;text-transform:uppercase;color:#999;letter-spacing:1px}
+  ol.man-decor {width:100%}
+  ol.man-decor li.tl {text-align:left}
+  ol.man-decor li.tc {text-align:center;letter-spacing:4px}
+  ol.man-decor li.tr {text-align:right;float:right}
+  </style>
+  <style type='text/css' media='all'>
+  /* style: 80c */
+  .mp {max-width:86ex}
+  ul {list-style: None; margin-left: 1em!important}
+  .man-navigation {left:101ex}
+  </style>
+</head>
+
+<body id='manpage'>
+
+
+<div class='mp'>
+<h1>go-httpbin(1)</h1>
+<p>A golang port of the venerable <a href="https://httpbin.org/">httpbin.org</a> HTTP request &amp; response testing service.</p>
+
+<h2 id="ENDPOINTS">ENDPOINTS</h2>
+
+<ul>
+<li><a href="{{.Prefix}}/"><code>{{.Prefix}}/</code></a> This page.</li>
+<li><a href="{{.Prefix}}/absolute-redirect/6"><code>{{.Prefix}}/absolute-redirect/:n</code></a> 302 Absolute redirects <em>n</em> times.</li>
+<li><a href="{{.Prefix}}/anything"><code>{{.Prefix}}/anything/:anything</code></a> Returns anything that is passed to request.</li>
+<li><a href="{{.Prefix}}/base64/eyJzZXJ2ZXIiOiAiZ28taHR0cGJpbiJ9Cg==?content-type=application/json"><code>{{.Prefix}}/base64/:value?content-type=ct</code></a> Decodes a Base64-encoded string, with optional Content-Type.</li>
+<li><a href="{{.Prefix}}/base64/decode/aHR0cGJpbmdvLm9yZw=="><code>{{.Prefix}}/base64/decode/:value?content-type=ct</code></a> Explicit URL for decoding a Base64 encoded string.</li>
+<li><a href="{{.Prefix}}/base64/encode/httpbingo.org"><code>{{.Prefix}}/base64/encode/:value</code></a> Encodes a string into URL-safe Base64.</li>
+<li><a href="{{.Prefix}}/basic-auth/user/password"><code>{{.Prefix}}/basic-auth/:user/:password</code></a> Challenges HTTPBasic Auth.</li>
+<li><a href="{{.Prefix}}/bearer"><code>{{.Prefix}}/bearer</code></a> Checks Bearer token header - returns 401 if not set.</li>
+<li><a href="{{.Prefix}}/brotli"><code><del>{{.Prefix}}/brotli</del></code></a> Returns brotli-encoded data.</del> <i>Not implemented!</i></li>
+<li><a href="{{.Prefix}}/bytes/1024"><code>{{.Prefix}}/bytes/:n</code></a> Generates <em>n</em> random bytes of binary data, accepts optional <em>seed</em> integer parameter.</li>
+<li><a href="{{.Prefix}}/cache"><code>{{.Prefix}}/cache</code></a> Returns 200 unless an If-Modified-Since or If-None-Match header is provided, when it returns a 304.</li>
+<li><a href="{{.Prefix}}/cache/60"><code>{{.Prefix}}/cache/:n</code></a> Sets a Cache-Control header for <em>n</em> seconds.</li>
+<li><a href="{{.Prefix}}/cookies"><code>{{.Prefix}}/cookies</code></a> Returns cookie data.</li>
+<li><a href="{{.Prefix}}/cookies/delete?k1=&amp;k2="><code>{{.Prefix}}/cookies/delete?name</code></a> Deletes one or more simple cookies.</li>
+<li><a href="{{.Prefix}}/cookies/set?k1=v1&amp;k2=v2"><code>{{.Prefix}}/cookies/set?name=value</code></a> Sets one or more simple cookies.</li>
+<li><a href="{{.Prefix}}/deflate"><code>{{.Prefix}}/deflate</code></a> Returns deflate-encoded data.</li>
+<li><a href="{{.Prefix}}/delay/3"><code>{{.Prefix}}/delay/:n</code></a> Delays responding for <em>min(n, 10)</em> seconds.</li>
+<li><code>{{.Prefix}}/delete</code> Returns request data.  Allows only <code>DELETE</code> requests.</li>
+<li><a href="{{.Prefix}}/deny"><code>{{.Prefix}}/deny</code></a> Denied by robots.txt file.</li>
+<li><a href="{{.Prefix}}/digest-auth/auth/user/password"><code>{{.Prefix}}/digest-auth/:qop/:user/:password</code></a> Challenges HTTP Digest Auth using default MD5 algorithm</li>
+<li><a href="{{.Prefix}}/digest-auth/auth/user/password/SHA-256"><code>{{.Prefix}}/digest-auth/:qop/:user/:password/:algorithm</code></a> Challenges HTTP Digest Auth using specified algorithm (MD5 or SHA-256)</li>
+<li><a href="{{.Prefix}}/drip?code=200&amp;numbytes=5&amp;duration=5"><code>{{.Prefix}}/drip?numbytes=n&amp;duration=s&amp;delay=s&amp;code=code</code></a> Drips data over the given duration after an optional initial delay, simulating a slow HTTP server.</li>
+<li><a href="{{.Prefix}}/dump/request"><code>{{.Prefix}}/dump/request</code></a> Returns the given request in its HTTP/1.x wire approximate representation.</li>
+<li><a href="{{.Prefix}}/encoding/utf8"><code>{{.Prefix}}/encoding/utf8</code></a> Returns page containing UTF-8 data.</li>
+<li><a href="{{.Prefix}}/env"><code>{{.Prefix}}/env</code></a> Returns all environment variables named with <code>HTTPBIN_ENV_</code> prefix.</li>
+<li><a href="{{.Prefix}}/etag/etag"><code>{{.Prefix}}/etag/:etag</code></a> Assumes the resource has the given etag and responds to If-None-Match header with a 200 or 304 and If-Match with a 200 or 412 as appropriate.</li>
+<li><a href="{{.Prefix}}/forms/post"><code>{{.Prefix}}/forms/post</code></a> HTML form that submits to <em>{{.Prefix}}/post</em></li>
+<li><a href="{{.Prefix}}/get"><code>{{.Prefix}}/get</code></a> Returns GET data.</li>
+<li><a href="{{.Prefix}}/gzip"><code>{{.Prefix}}/gzip</code></a> Returns gzip-encoded data.</li>
+<li><code>{{.Prefix}}/head</code> Returns response headers.  Allows only <code>HEAD</code> requests.</li>
+<li><a href="{{.Prefix}}/headers"><code>{{.Prefix}}/headers</code></a> Returns request header dict.</li>
+<li><a href="{{.Prefix}}/hidden-basic-auth/user/password"><code>{{.Prefix}}/hidden-basic-auth/:user/:password</code></a> 404'd BasicAuth.</li>
+<li><a href="{{.Prefix}}/html"><code>{{.Prefix}}/html</code></a> Renders an HTML Page.</li>
+<li><a href="{{.Prefix}}/hostname"><code>{{.Prefix}}/hostname</code></a> Returns the name of the host serving the request.</li>
+<li><a href="{{.Prefix}}/image"><code>{{.Prefix}}/image</code></a> Returns page containing an image based on sent Accept header.</li>
+<li><a href="{{.Prefix}}/image/jpeg"><code>{{.Prefix}}/image/jpeg</code></a> Returns a JPEG image.</li>
+<li><a href="{{.Prefix}}/image/png"><code>{{.Prefix}}/image/png</code></a> Returns a PNG image.</li>
+<li><a href="{{.Prefix}}/image/svg"><code>{{.Prefix}}/image/svg</code></a> Returns a SVG image.</li>
+<li><a href="{{.Prefix}}/image/webp"><code>{{.Prefix}}/image/webp</code></a> Returns a WEBP image.</li>
+<li><a href="{{.Prefix}}/ip"><code>{{.Prefix}}/ip</code></a> Returns Origin IP.</li>
+<li><a href="{{.Prefix}}/json"><code>{{.Prefix}}/json</code></a> Returns JSON.</li>
+<li><a href="{{.Prefix}}/links/10"><code>{{.Prefix}}/links/:n</code></a> Returns page containing <em>n</em> HTML links.</li>
+<li><code>{{.Prefix}}/patch</code> Returns request data.  Allows only <code>PATCH</code> requests.</li>
+<li><code>{{.Prefix}}/post</code> Returns request data.  Allows only <code>POST</code> requests.</li>
+<li><code>{{.Prefix}}/put</code> Returns request data.  Allows only <code>PUT</code> requests.</li>
+<li><a href="{{.Prefix}}/range/:n"><code>{{.Prefix}}/range/1024?duration=s&amp;chunk_size=code</code></a> Streams <em>n</em> bytes, and allows specifying a <em>Range</em> header to select a subset of the data. Accepts a <em>chunk_size</em> and request <em>duration</em> parameter.</li>
+<li><a href="{{.Prefix}}/redirect-to?status_code=307&amp;url=http%3A%2F%2Fexample.com%2F"><code>{{.Prefix}}/redirect-to?url=foo&status_code=307</code></a> 307 Redirects to the <em>foo</em> URL.</li>
+<li><a href="{{.Prefix}}/redirect-to?url=http%3A%2F%2Fexample.com%2F"><code>{{.Prefix}}/redirect-to?url=foo</code></a> 302 Redirects to the <em>foo</em> URL.</li>
+<li><a href="{{.Prefix}}/redirect/6"><code>{{.Prefix}}/redirect/:n</code></a> 302 Redirects <em>n</em> times.</li>
+<li><a href="{{.Prefix}}/relative-redirect/6"><code>{{.Prefix}}/relative-redirect/:n</code></a> 302 Relative redirects <em>n</em> times.</li>
+<li><a href="{{.Prefix}}/response-headers?Server=httpbin&amp;Content-Type=text%2Fplain%3B+charset%3DUTF-8"><code>{{.Prefix}}/response-headers?key=val</code></a> Returns given response headers.</li>
+<li><a href="{{.Prefix}}/robots.txt"><code>{{.Prefix}}/robots.txt</code></a> Returns some robots.txt rules.</li>
+<li><a href="{{.Prefix}}/sse?delay=1s&amp;duration=5s&count=10"><code>{{.Prefix}}/sse?delay=1s&amp;duration=5s&count=10</code></a> a stream of server-sent events.</li>
+<li><a href="{{.Prefix}}/status/418"><code>{{.Prefix}}/status/:code</code></a> Returns given HTTP Status code.</li>
+<li><a href="{{.Prefix}}/stream-bytes/1024"><code>{{.Prefix}}/stream-bytes/:n</code></a> Streams <em>n</em> random bytes of binary data, accepts optional <em>seed</em> and <em>chunk_size</em> integer parameters.</li>
+<li><a href="{{.Prefix}}/stream/20"><code>{{.Prefix}}/stream/:n</code></a> Streams <em>min(n, 100)</em> lines.</li>
+<li><a href="{{.Prefix}}/trailers?trailer1=value1&amp;trailer2=value2"><code>{{.Prefix}}/trailers?key=val</code></a> Returns JSON response with query params added as HTTP Trailers.</li>
+<li><a href="{{.Prefix}}/unstable"><code>{{.Prefix}}/unstable</code></a> Fails half the time, accepts optional <em>failure_rate</em> float and <em>seed</em> integer parameters.</li>
+<li><a href="{{.Prefix}}/user-agent"><code>{{.Prefix}}/user-agent</code></a> Returns user-agent.</li>
+<li><a href="{{.Prefix}}/uuid"><code>{{.Prefix}}/uuid</code></a> Generates a <a href="https://en.wikipedia.org/wiki/Universally_unique_identifier">UUIDv4</a> value.</li>
+<li><a href="{{.Prefix}}/websocket/echo?max_fragment_size=2048&amp;max_message_size=10240"><code>{{.Prefix}}/websocket/echo?max_fragment_size=2048&amp;max_message_size=10240</code></a> A WebSocket echo service.</li>
+<li><a href="{{.Prefix}}/xml"><code>{{.Prefix}}/xml</code></a> Returns some XML</li>
+</ul>
+
+<h2 id="DESCRIPTION">DESCRIPTION</h2>
+
+<p>Testing an HTTP Library can become difficult sometimes. <a href="http://requestb.in">RequestBin</a> is fantastic for testing POST requests, but doesn't let you control the response. This exists to cover all kinds of HTTP scenarios. Additional endpoints are being considered.</p>
+
+<p>All endpoint responses are JSON-encoded.</p>
+
+<h2 id="EXAMPLES">EXAMPLES</h2>
+
+<h3 id="-curl-http-httpbin-org-ip">$ curl https://httpbingo.org/ip</h3>
+
+<pre><code>{"origin":"73.238.9.52, 77.83.142.42"}
+</code></pre>
+
+<h3 id="-curl-http-httpbin-org-user-agent">$ curl https://httpbingo.org/user-agent</h3>
+
+<pre><code>{"user-agent":"curl/7.64.1"}</code></pre>
+
+<h3 id="-curl-http-httpbin-org-get">$ curl https://httpbingo.org/get?foo=bar</h3>
+
+<pre><code>{
+  "args": {
+    "foo": [
+      "bar"
+    ]
+  },
+  "headers": {
+    "Accept": [
+      "*/*"
+    ],
+    "Host": [
+      "httpbingo.org"
+    ],
+    "User-Agent": [
+      "curl/7.64.1"
+    ]
+  },
+  "origin": "73.238.9.52, 77.83.142.42",
+  "url": "https://httpbingo.org/get?foo=bar"
+}
+</code></pre>
+
+<h3 id="-curl-http-httpbin-org-dump-request">$ curl https://httpbingo.org/dump/request?foo=bar</h3>
+
+<pre><code>GET /dump/request?foo=bar HTTP/1.1
+Host: httpbingo.org
+Accept: */*
+User-Agent: curl/7.64.1
+</code></pre>
+
+<h3 id="-curl-I-http-httpbin-org-status-418">$ curl -I https://httpbingo.org/status/418</h3>
+
+<pre><code>HTTP/1.1 418 I'm a teapot
+Access-Control-Allow-Credentials: true
+Access-Control-Allow-Origin: *
+X-More-Info: http://tools.ietf.org/html/rfc2324
+Date: Tue, 13 Jul 2021 13:12:37 GMT
+Content-Length: 0
+</code></pre>
+
+
+<h2 id="AUTHOR">AUTHOR</h2>
+
+<p>Ported to Go by <a href="https://github.com/mccutchen">Will McCutchen</a>.</p>
+<p>From <a href="https://httpbin.org/">the original</a> <a href="https://kennethreitz.org/">Kenneth Reitz</a> project.</p>
+
+<h2 id="SEE-ALSO">SEE ALSO</h2>
+
+<p><a href="https://httpbin.org/">httpbin.org</a> &mdash; the original httpbin</p>
+
+</div>
+
+<a href="https://github.com/mccutchen/go-httpbin" class="github-corner" aria-label="Fork me on GitHub"><svg width="80" height="80" viewBox="0 0 250 250" style="fill:#ff0083; color:#fff; position: absolute; top: 0; border: 0; right: 0;" aria-hidden="true"><path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"/><path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"/><path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"/></svg></a><style>.github-corner:hover .octo-arm{animation:octocat-wave 560ms ease-in-out}@keyframes octocat-wave{0%,100%{transform:rotate(0)}20%,60%{transform:rotate(-25deg)}40%,80%{transform:rotate(10deg)}}@media (max-width:500px){.github-corner:hover .octo-arm{animation:none}.github-corner .octo-arm{animation:octocat-wave 560ms ease-in-out}}</style>
+
+</body>
+</html>
