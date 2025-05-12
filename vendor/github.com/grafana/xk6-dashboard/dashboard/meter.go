@@ -57,7 +57,7 @@ func (m *meter) toSnapshot(period time.Duration, now time.Time) *meter {
 		)
 
 		for _, sub := range met.Submetrics {
-			clone.AddSubmetric(sub.Suffix) //nolint:errcheck,gosec
+			_, _ = clone.AddSubmetric(sub.Suffix) //#nosec G104
 		}
 	}
 
@@ -287,6 +287,7 @@ type metricData struct {
 
 func newMetricData(origin *metrics.Metric) *metricData {
 	name := origin.Name
+
 	openingPos := strings.IndexByte(name, '{')
 	if openingPos != -1 {
 		name = name[:openingPos]

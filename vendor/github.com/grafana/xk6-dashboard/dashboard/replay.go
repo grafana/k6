@@ -35,8 +35,10 @@ func replay(input string, opts *options, assets *assets, proc *process) error {
 		eventSource: new(eventSource),
 	}
 
-	var inputFile afero.File
-	var err error
+	var (
+		inputFile afero.File
+		err       error
+	)
 
 	if inputFile, err = proc.fs.Open(input); err != nil {
 		return err
