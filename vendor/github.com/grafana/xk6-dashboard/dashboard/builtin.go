@@ -7,10 +7,10 @@ import (
 )
 
 const (
-	// xk6-dashboard's time
+	// xk6-dashboard's time.
 	keyTime = "time"
 
-	// from k6 metrics/builtin.go
+	// from k6 metrics/builtin.go.
 	keyVUsName               = metrics.VUsName
 	keyVUsMaxName            = metrics.VUsMaxName
 	keyIterationsName        = metrics.IterationsName
@@ -42,7 +42,7 @@ const (
 	keyDataSentName     = metrics.DataSentName
 	keyDataReceivedName = metrics.DataReceivedName
 
-	// from xk6-browser
+	// from xk6-browser.
 
 	keyfidName  = "browser_web_vital_fid"
 	keyttfbName = "browser_web_vital_ttfb"
@@ -56,7 +56,7 @@ const (
 	keybrowserHTTPReqDurationName = "browser_http_req_duration"
 	keybrowserHTTPReqFailedName   = "browser_http_req_failed"
 
-	// from k6/grpc
+	// from k6/grpc.
 
 	keyGRPCStreamsName             = "grpc_streams"
 	keyGRPCStreamsMsgsReceivedName = "grpc_streams_msgs_received"

@@ -100,13 +100,15 @@ The compressed file will be automatically decompressed if the file extension is 
 }
 
 func newAggregateCommand(proc *process) *cobra.Command {
+	const nArgs = 2
+
 	opts := new(options)
 	cmd := &cobra.Command{ //nolint:exhaustruct
 		Use:   "aggregate input-file output-file",
 		Short: "Convert saved json output to recorded dashboard events",
 		Long: `The aggregate command converts the file saved by json output to dashboard format events file.
 The files will be automatically compressed/decompressed if the file extension is .gz`,
-		Args: cobra.ExactArgs(2),
+		Args: cobra.ExactArgs(nArgs),
 		RunE: func(_ *cobra.Command, args []string) error {
 			return aggregate(args[0], args[1], opts, proc)
 		},
@@ -135,6 +137,8 @@ The files will be automatically compressed/decompressed if the file extension is
 func newReportCommand(assets *assets, proc *process) *cobra.Command {
 	opts := new(options)
 
+	const nArgs = 2
+
 	cmd := &cobra.Command{ //nolint:exhaustruct
 		Use:   "report events-file report-file",
 		Short: "Create report from a recorded event file",
@@ -152,7 +156,7 @@ $ k6 ` + OutputName + ` replay test_result.ndjson
 # Generate report from previous test run (using events file):
 $ k6 run --out web-dashboard=record=test_result.ndjson script.js
 $ k6 ` + OutputName + ` report test_result.ndjson test_result_report.html`,
-		Args: cobra.ExactArgs(2),
+		Args: cobra.ExactArgs(nArgs),
 		RunE: func(_ *cobra.Command, args []string) error {
 			opts.Port = -1
 			opts.Export = args[1]

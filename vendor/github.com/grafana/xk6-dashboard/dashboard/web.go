@@ -82,7 +82,7 @@ func (srv *webServer) listenAndServe(addr string) (*net.TCPAddr, error) {
 }
 
 func (srv *webServer) stop() error {
-	srv.eventEmitter.Close()
+	srv.Close()
 
 	err := srv.server.Close()
 	if err != nil && !errors.Is(err, http.ErrServerClosed) {
