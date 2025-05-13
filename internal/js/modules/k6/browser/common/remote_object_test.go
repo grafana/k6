@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/chromedp/cdproto/runtime"
-	"github.com/mailru/easyjson"
+	"github.com/go-json-experiment/json/jsontext"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -186,7 +186,7 @@ func TestParseRemoteObject(t *testing.T) {
 		name     string
 		subtype  string
 		preview  *runtime.ObjectPreview
-		value    easyjson.RawMessage
+		value    jsontext.Value
 		expected any
 		expErr   string
 	}{

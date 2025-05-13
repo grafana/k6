@@ -19,9 +19,9 @@ import (
 
 // GetEventListenersParams returns event listeners of the given object.
 type GetEventListenersParams struct {
-	ObjectID runtime.RemoteObjectID `json:"objectId"`         // Identifier of the object to return listeners for.
-	Depth    int64                  `json:"depth,omitempty"`  // The maximum depth at which Node children should be retrieved, defaults to 1. Use -1 for the entire subtree or provide an integer larger than 0.
-	Pierce   bool                   `json:"pierce,omitempty"` // Whether or not iframes and shadow roots should be traversed when returning the subtree (default is false). Reports listeners for all contexts if pierce is enabled.
+	ObjectID runtime.RemoteObjectID `json:"objectId"`                 // Identifier of the object to return listeners for.
+	Depth    int64                  `json:"depth,omitempty,omitzero"` // The maximum depth at which Node children should be retrieved, defaults to 1. Use -1 for the entire subtree or provide an integer larger than 0.
+	Pierce   bool                   `json:"pierce"`                   // Whether or not iframes and shadow roots should be traversed when returning the subtree (default is false). Reports listeners for all contexts if pierce is enabled.
 }
 
 // GetEventListeners returns event listeners of the given object.
@@ -34,6 +34,7 @@ type GetEventListenersParams struct {
 func GetEventListeners(objectID runtime.RemoteObjectID) *GetEventListenersParams {
 	return &GetEventListenersParams{
 		ObjectID: objectID,
+		Pierce:   false,
 	}
 }
 
@@ -55,7 +56,7 @@ func (p GetEventListenersParams) WithPierce(pierce bool) *GetEventListenersParam
 
 // GetEventListenersReturns return values.
 type GetEventListenersReturns struct {
-	Listeners []*EventListener `json:"listeners,omitempty"` // Array of relevant listeners.
+	Listeners []*EventListener `json:"listeners,omitempty,omitzero"` // Array of relevant listeners.
 }
 
 // Do executes DOMDebugger.getEventListeners against the provided context.
@@ -105,8 +106,8 @@ func (p *RemoveDOMBreakpointParams) Do(ctx context.Context) (err error) {
 // RemoveEventListenerBreakpointParams removes breakpoint on particular DOM
 // event.
 type RemoveEventListenerBreakpointParams struct {
-	EventName  string `json:"eventName"`            // Event name.
-	TargetName string `json:"targetName,omitempty"` // EventTarget interface name.
+	EventName  string `json:"eventName"`                     // Event name.
+	TargetName string `json:"targetName,omitempty,omitzero"` // EventTarget interface name.
 }
 
 // RemoveEventListenerBreakpoint removes breakpoint on particular DOM event.
@@ -207,8 +208,8 @@ func (p *SetDOMBreakpointParams) Do(ctx context.Context) (err error) {
 
 // SetEventListenerBreakpointParams sets breakpoint on particular DOM event.
 type SetEventListenerBreakpointParams struct {
-	EventName  string `json:"eventName"`            // DOM Event name to stop on (any DOM event will do).
-	TargetName string `json:"targetName,omitempty"` // EventTarget interface name to stop on. If equal to "*" or not provided, will stop on any EventTarget.
+	EventName  string `json:"eventName"`                     // DOM Event name to stop on (any DOM event will do).
+	TargetName string `json:"targetName,omitempty,omitzero"` // EventTarget interface name to stop on. If equal to "*" or not provided, will stop on any EventTarget.
 }
 
 // SetEventListenerBreakpoint sets breakpoint on particular DOM event.

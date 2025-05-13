@@ -4,11 +4,9 @@ package serviceworker
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/chromedp/cdproto/target"
-	"github.com/mailru/easyjson"
-	"github.com/mailru/easyjson/jlexer"
-	"github.com/mailru/easyjson/jwriter"
 )
 
 // RegistrationID [no description].
@@ -48,20 +46,12 @@ const (
 	VersionRunningStatusStopping VersionRunningStatus = "stopping"
 )
 
-// MarshalEasyJSON satisfies easyjson.Marshaler.
-func (t VersionRunningStatus) MarshalEasyJSON(out *jwriter.Writer) {
-	out.String(string(t))
-}
+// UnmarshalJSON satisfies [json.Unmarshaler].
+func (t *VersionRunningStatus) UnmarshalJSON(buf []byte) error {
+	s := string(buf)
+	s = strings.TrimSuffix(strings.TrimPrefix(s, `"`), `"`)
 
-// MarshalJSON satisfies json.Marshaler.
-func (t VersionRunningStatus) MarshalJSON() ([]byte, error) {
-	return easyjson.Marshal(t)
-}
-
-// UnmarshalEasyJSON satisfies easyjson.Unmarshaler.
-func (t *VersionRunningStatus) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	v := in.String()
-	switch VersionRunningStatus(v) {
+	switch VersionRunningStatus(s) {
 	case VersionRunningStatusStopped:
 		*t = VersionRunningStatusStopped
 	case VersionRunningStatusStarting:
@@ -70,15 +60,10 @@ func (t *VersionRunningStatus) UnmarshalEasyJSON(in *jlexer.Lexer) {
 		*t = VersionRunningStatusRunning
 	case VersionRunningStatusStopping:
 		*t = VersionRunningStatusStopping
-
 	default:
-		in.AddError(fmt.Errorf("unknown VersionRunningStatus value: %v", v))
+		return fmt.Errorf("unknown VersionRunningStatus value: %v", s)
 	}
-}
-
-// UnmarshalJSON satisfies json.Unmarshaler.
-func (t *VersionRunningStatus) UnmarshalJSON(buf []byte) error {
-	return easyjson.Unmarshal(buf, t)
+	return nil
 }
 
 // VersionStatus [no description].
@@ -101,20 +86,12 @@ const (
 	VersionStatusRedundant  VersionStatus = "redundant"
 )
 
-// MarshalEasyJSON satisfies easyjson.Marshaler.
-func (t VersionStatus) MarshalEasyJSON(out *jwriter.Writer) {
-	out.String(string(t))
-}
+// UnmarshalJSON satisfies [json.Unmarshaler].
+func (t *VersionStatus) UnmarshalJSON(buf []byte) error {
+	s := string(buf)
+	s = strings.TrimSuffix(strings.TrimPrefix(s, `"`), `"`)
 
-// MarshalJSON satisfies json.Marshaler.
-func (t VersionStatus) MarshalJSON() ([]byte, error) {
-	return easyjson.Marshal(t)
-}
-
-// UnmarshalEasyJSON satisfies easyjson.Unmarshaler.
-func (t *VersionStatus) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	v := in.String()
-	switch VersionStatus(v) {
+	switch VersionStatus(s) {
 	case VersionStatusNew:
 		*t = VersionStatusNew
 	case VersionStatusInstalling:
@@ -127,15 +104,10 @@ func (t *VersionStatus) UnmarshalEasyJSON(in *jlexer.Lexer) {
 		*t = VersionStatusActivated
 	case VersionStatusRedundant:
 		*t = VersionStatusRedundant
-
 	default:
-		in.AddError(fmt.Errorf("unknown VersionStatus value: %v", v))
+		return fmt.Errorf("unknown VersionStatus value: %v", s)
 	}
-}
-
-// UnmarshalJSON satisfies json.Unmarshaler.
-func (t *VersionStatus) UnmarshalJSON(buf []byte) error {
-	return easyjson.Unmarshal(buf, t)
+	return nil
 }
 
 // Version serviceWorker version.
@@ -147,11 +119,11 @@ type Version struct {
 	ScriptURL          string               `json:"scriptURL"`
 	RunningStatus      VersionRunningStatus `json:"runningStatus"`
 	Status             VersionStatus        `json:"status"`
-	ScriptLastModified float64              `json:"scriptLastModified,omitempty"` // The Last-Modified header value of the main script.
-	ScriptResponseTime float64              `json:"scriptResponseTime,omitempty"` // The time at which the response headers of the main script were received from the server. For cached script it is the last time the cache entry was validated.
-	ControlledClients  []target.ID          `json:"controlledClients,omitempty"`
-	TargetID           target.ID            `json:"targetId,omitempty"`
-	RouterRules        string               `json:"routerRules,omitempty"`
+	ScriptLastModified float64              `json:"scriptLastModified,omitempty,omitzero"` // The Last-Modified header value of the main script.
+	ScriptResponseTime float64              `json:"scriptResponseTime,omitempty,omitzero"` // The time at which the response headers of the main script were received from the server. For cached script it is the last time the cache entry was validated.
+	ControlledClients  []target.ID          `json:"controlledClients,omitempty,omitzero"`
+	TargetID           target.ID            `json:"targetId,omitempty,omitzero"`
+	RouterRules        string               `json:"routerRules,omitempty,omitzero"`
 }
 
 // ErrorMessage serviceWorker error message.

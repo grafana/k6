@@ -16,7 +16,7 @@ import (
 
 // EnableParams [no description].
 type EnableParams struct {
-	DisableRejectionDelay bool `json:"disableRejectionDelay,omitempty"` // Allows callers to disable the promise rejection delay that would normally happen, if this is unimportant to what's being tested. (step 4 of https://fedidcg.github.io/FedCM/#browser-api-rp-sign-in)
+	DisableRejectionDelay bool `json:"disableRejectionDelay"` // Allows callers to disable the promise rejection delay that would normally happen, if this is unimportant to what's being tested. (step 4 of https://fedidcg.github.io/FedCM/#browser-api-rp-sign-in)
 }
 
 // Enable [no description].
@@ -25,7 +25,9 @@ type EnableParams struct {
 //
 // parameters:
 func Enable() *EnableParams {
-	return &EnableParams{}
+	return &EnableParams{
+		DisableRejectionDelay: false,
+	}
 }
 
 // WithDisableRejectionDelay allows callers to disable the promise rejection
@@ -140,7 +142,7 @@ func (p *OpenURLParams) Do(ctx context.Context) (err error) {
 // DismissDialogParams [no description].
 type DismissDialogParams struct {
 	DialogID        string `json:"dialogId"`
-	TriggerCooldown bool   `json:"triggerCooldown,omitempty"`
+	TriggerCooldown bool   `json:"triggerCooldown"`
 }
 
 // DismissDialog [no description].
@@ -152,7 +154,8 @@ type DismissDialogParams struct {
 //	dialogID
 func DismissDialog(dialogID string) *DismissDialogParams {
 	return &DismissDialogParams{
-		DialogID: dialogID,
+		DialogID:        dialogID,
+		TriggerCooldown: false,
 	}
 }
 

@@ -1,4 +1,4 @@
-// +build !linux,!windows,!darwin,!freebsd,!openbsd,!netbsd
+//go:build !linux && !windows && !darwin && !freebsd && !openbsd && !netbsd
 
 package sysutil
 

@@ -45,7 +45,7 @@ func CollectClassNamesFromSubtree(nodeID cdp.NodeID) *CollectClassNamesFromSubtr
 
 // CollectClassNamesFromSubtreeReturns return values.
 type CollectClassNamesFromSubtreeReturns struct {
-	ClassNames []string `json:"classNames,omitempty"` // Class name list.
+	ClassNames []string `json:"classNames,omitempty,omitzero"` // Class name list.
 }
 
 // Do executes DOM.collectClassNamesFromSubtree against the provided context.
@@ -67,9 +67,9 @@ func (p *CollectClassNamesFromSubtreeParams) Do(ctx context.Context) (classNames
 // CopyToParams creates a deep copy of the specified node and places it into
 // the target container before the given anchor.
 type CopyToParams struct {
-	NodeID             cdp.NodeID `json:"nodeId"`                       // Id of the node to copy.
-	TargetNodeID       cdp.NodeID `json:"targetNodeId"`                 // Id of the element to drop the copy into.
-	InsertBeforeNodeID cdp.NodeID `json:"insertBeforeNodeId,omitempty"` // Drop the copy before this node (if absent, the copy becomes the last child of targetNodeId).
+	NodeID             cdp.NodeID `json:"nodeId"`                                // Id of the node to copy.
+	TargetNodeID       cdp.NodeID `json:"targetNodeId"`                          // Id of the element to drop the copy into.
+	InsertBeforeNodeID cdp.NodeID `json:"insertBeforeNodeId,omitempty,omitzero"` // Drop the copy before this node (if absent, the copy becomes the last child of targetNodeId).
 }
 
 // CopyTo creates a deep copy of the specified node and places it into the
@@ -97,7 +97,7 @@ func (p CopyToParams) WithInsertBeforeNodeID(insertBeforeNodeID cdp.NodeID) *Cop
 
 // CopyToReturns return values.
 type CopyToReturns struct {
-	NodeID cdp.NodeID `json:"nodeId,omitempty"` // Id of the node clone.
+	NodeID cdp.NodeID `json:"nodeId,omitempty,omitzero"` // Id of the node clone.
 }
 
 // Do executes DOM.copyTo against the provided context.
@@ -119,11 +119,11 @@ func (p *CopyToParams) Do(ctx context.Context) (nodeID cdp.NodeID, err error) {
 // DescribeNodeParams describes node given its id, does not require domain to
 // be enabled. Does not start tracking any objects, can be used for automation.
 type DescribeNodeParams struct {
-	NodeID        cdp.NodeID             `json:"nodeId,omitempty"`        // Identifier of the node.
-	BackendNodeID cdp.BackendNodeID      `json:"backendNodeId,omitempty"` // Identifier of the backend node.
-	ObjectID      runtime.RemoteObjectID `json:"objectId,omitempty"`      // JavaScript object id of the node wrapper.
-	Depth         int64                  `json:"depth,omitempty"`         // The maximum depth at which children should be retrieved, defaults to 1. Use -1 for the entire subtree or provide an integer larger than 0.
-	Pierce        bool                   `json:"pierce,omitempty"`        // Whether or not iframes and shadow roots should be traversed when returning the subtree (default is false).
+	NodeID        cdp.NodeID             `json:"nodeId,omitempty,omitzero"`        // Identifier of the node.
+	BackendNodeID cdp.BackendNodeID      `json:"backendNodeId,omitempty,omitzero"` // Identifier of the backend node.
+	ObjectID      runtime.RemoteObjectID `json:"objectId,omitempty,omitzero"`      // JavaScript object id of the node wrapper.
+	Depth         int64                  `json:"depth,omitempty,omitzero"`         // The maximum depth at which children should be retrieved, defaults to 1. Use -1 for the entire subtree or provide an integer larger than 0.
+	Pierce        bool                   `json:"pierce"`                           // Whether or not iframes and shadow roots should be traversed when returning the subtree (default is false).
 }
 
 // DescribeNode describes node given its id, does not require domain to be
@@ -133,7 +133,9 @@ type DescribeNodeParams struct {
 //
 // parameters:
 func DescribeNode() *DescribeNodeParams {
-	return &DescribeNodeParams{}
+	return &DescribeNodeParams{
+		Pierce: false,
+	}
 }
 
 // WithNodeID identifier of the node.
@@ -171,7 +173,7 @@ func (p DescribeNodeParams) WithPierce(pierce bool) *DescribeNodeParams {
 
 // DescribeNodeReturns return values.
 type DescribeNodeReturns struct {
-	Node *cdp.Node `json:"node,omitempty"` // Node description.
+	Node *cdp.Node `json:"node,omitempty,omitzero"` // Node description.
 }
 
 // Do executes DOM.describeNode against the provided context.
@@ -194,10 +196,10 @@ func (p *DescribeNodeParams) Do(ctx context.Context) (node *cdp.Node, err error)
 // into view if not already visible. Note: exactly one between nodeId,
 // backendNodeId and objectId should be passed to identify the node.
 type ScrollIntoViewIfNeededParams struct {
-	NodeID        cdp.NodeID             `json:"nodeId,omitempty"`        // Identifier of the node.
-	BackendNodeID cdp.BackendNodeID      `json:"backendNodeId,omitempty"` // Identifier of the backend node.
-	ObjectID      runtime.RemoteObjectID `json:"objectId,omitempty"`      // JavaScript object id of the node wrapper.
-	Rect          *Rect                  `json:"rect,omitempty"`          // The rect to be scrolled into view, relative to the node's border box, in CSS pixels. When omitted, center of the node will be used, similar to Element.scrollIntoView.
+	NodeID        cdp.NodeID             `json:"nodeId,omitempty,omitzero"`        // Identifier of the node.
+	BackendNodeID cdp.BackendNodeID      `json:"backendNodeId,omitempty,omitzero"` // Identifier of the backend node.
+	ObjectID      runtime.RemoteObjectID `json:"objectId,omitempty,omitzero"`      // JavaScript object id of the node wrapper.
+	Rect          *Rect                  `json:"rect,omitempty,omitzero"`          // The rect to be scrolled into view, relative to the node's border box, in CSS pixels. When omitted, center of the node will be used, similar to Element.scrollIntoView.
 }
 
 // ScrollIntoViewIfNeeded scrolls the specified rect of the given node into
@@ -284,7 +286,7 @@ func (p *DiscardSearchResultsParams) Do(ctx context.Context) (err error) {
 
 // EnableParams enables DOM agent for the given page.
 type EnableParams struct {
-	IncludeWhitespace EnableIncludeWhitespace `json:"includeWhitespace,omitempty"` // Whether to include whitespaces in the children array of returned Nodes.
+	IncludeWhitespace EnableIncludeWhitespace `json:"includeWhitespace,omitempty,omitzero"` // Whether to include whitespaces in the children array of returned Nodes.
 }
 
 // Enable enables DOM agent for the given page.
@@ -310,9 +312,9 @@ func (p *EnableParams) Do(ctx context.Context) (err error) {
 
 // FocusParams focuses the given element.
 type FocusParams struct {
-	NodeID        cdp.NodeID             `json:"nodeId,omitempty"`        // Identifier of the node.
-	BackendNodeID cdp.BackendNodeID      `json:"backendNodeId,omitempty"` // Identifier of the backend node.
-	ObjectID      runtime.RemoteObjectID `json:"objectId,omitempty"`      // JavaScript object id of the node wrapper.
+	NodeID        cdp.NodeID             `json:"nodeId,omitempty,omitzero"`        // Identifier of the node.
+	BackendNodeID cdp.BackendNodeID      `json:"backendNodeId,omitempty,omitzero"` // Identifier of the backend node.
+	ObjectID      runtime.RemoteObjectID `json:"objectId,omitempty,omitzero"`      // JavaScript object id of the node wrapper.
 }
 
 // Focus focuses the given element.
@@ -367,7 +369,7 @@ func GetAttributes(nodeID cdp.NodeID) *GetAttributesParams {
 
 // GetAttributesReturns return values.
 type GetAttributesReturns struct {
-	Attributes []string `json:"attributes,omitempty"` // An interleaved array of node attribute names and values.
+	Attributes []string `json:"attributes,omitempty,omitzero"` // An interleaved array of node attribute names and values.
 }
 
 // Do executes DOM.getAttributes against the provided context.
@@ -388,9 +390,9 @@ func (p *GetAttributesParams) Do(ctx context.Context) (attributes []string, err 
 
 // GetBoxModelParams returns boxes for the given node.
 type GetBoxModelParams struct {
-	NodeID        cdp.NodeID             `json:"nodeId,omitempty"`        // Identifier of the node.
-	BackendNodeID cdp.BackendNodeID      `json:"backendNodeId,omitempty"` // Identifier of the backend node.
-	ObjectID      runtime.RemoteObjectID `json:"objectId,omitempty"`      // JavaScript object id of the node wrapper.
+	NodeID        cdp.NodeID             `json:"nodeId,omitempty,omitzero"`        // Identifier of the node.
+	BackendNodeID cdp.BackendNodeID      `json:"backendNodeId,omitempty,omitzero"` // Identifier of the backend node.
+	ObjectID      runtime.RemoteObjectID `json:"objectId,omitempty,omitzero"`      // JavaScript object id of the node wrapper.
 }
 
 // GetBoxModel returns boxes for the given node.
@@ -422,7 +424,7 @@ func (p GetBoxModelParams) WithObjectID(objectID runtime.RemoteObjectID) *GetBox
 
 // GetBoxModelReturns return values.
 type GetBoxModelReturns struct {
-	Model *BoxModel `json:"model,omitempty"` // Box model for the node.
+	Model *BoxModel `json:"model,omitempty,omitzero"` // Box model for the node.
 }
 
 // Do executes DOM.getBoxModel against the provided context.
@@ -444,9 +446,9 @@ func (p *GetBoxModelParams) Do(ctx context.Context) (model *BoxModel, err error)
 // GetContentQuadsParams returns quads that describe node position on the
 // page. This method might return multiple quads for inline nodes.
 type GetContentQuadsParams struct {
-	NodeID        cdp.NodeID             `json:"nodeId,omitempty"`        // Identifier of the node.
-	BackendNodeID cdp.BackendNodeID      `json:"backendNodeId,omitempty"` // Identifier of the backend node.
-	ObjectID      runtime.RemoteObjectID `json:"objectId,omitempty"`      // JavaScript object id of the node wrapper.
+	NodeID        cdp.NodeID             `json:"nodeId,omitempty,omitzero"`        // Identifier of the node.
+	BackendNodeID cdp.BackendNodeID      `json:"backendNodeId,omitempty,omitzero"` // Identifier of the backend node.
+	ObjectID      runtime.RemoteObjectID `json:"objectId,omitempty,omitzero"`      // JavaScript object id of the node wrapper.
 }
 
 // GetContentQuads returns quads that describe node position on the page.
@@ -479,7 +481,7 @@ func (p GetContentQuadsParams) WithObjectID(objectID runtime.RemoteObjectID) *Ge
 
 // GetContentQuadsReturns return values.
 type GetContentQuadsReturns struct {
-	Quads []Quad `json:"quads,omitempty"` // Quads that describe node layout relative to viewport.
+	Quads []Quad `json:"quads,omitempty,omitzero"` // Quads that describe node layout relative to viewport.
 }
 
 // Do executes DOM.getContentQuads against the provided context.
@@ -502,8 +504,8 @@ func (p *GetContentQuadsParams) Do(ctx context.Context) (quads []Quad, err error
 // to the caller. Implicitly enables the DOM domain events for the current
 // target.
 type GetDocumentParams struct {
-	Depth  int64 `json:"depth,omitempty"`  // The maximum depth at which children should be retrieved, defaults to 1. Use -1 for the entire subtree or provide an integer larger than 0.
-	Pierce bool  `json:"pierce,omitempty"` // Whether or not iframes and shadow roots should be traversed when returning the subtree (default is false).
+	Depth  int64 `json:"depth,omitempty,omitzero"` // The maximum depth at which children should be retrieved, defaults to 1. Use -1 for the entire subtree or provide an integer larger than 0.
+	Pierce bool  `json:"pierce"`                   // Whether or not iframes and shadow roots should be traversed when returning the subtree (default is false).
 }
 
 // GetDocument returns the root DOM node (and optionally the subtree) to the
@@ -513,7 +515,9 @@ type GetDocumentParams struct {
 //
 // parameters:
 func GetDocument() *GetDocumentParams {
-	return &GetDocumentParams{}
+	return &GetDocumentParams{
+		Pierce: false,
+	}
 }
 
 // WithDepth the maximum depth at which children should be retrieved,
@@ -533,7 +537,7 @@ func (p GetDocumentParams) WithPierce(pierce bool) *GetDocumentParams {
 
 // GetDocumentReturns return values.
 type GetDocumentReturns struct {
-	Root *cdp.Node `json:"root,omitempty"` // Resulting node.
+	Root *cdp.Node `json:"root,omitempty,omitzero"` // Resulting node.
 }
 
 // Do executes DOM.getDocument against the provided context.
@@ -555,9 +559,9 @@ func (p *GetDocumentParams) Do(ctx context.Context) (root *cdp.Node, err error) 
 // GetNodesForSubtreeByStyleParams finds nodes with a given computed style in
 // a subtree.
 type GetNodesForSubtreeByStyleParams struct {
-	NodeID         cdp.NodeID                  `json:"nodeId"`           // Node ID pointing to the root of a subtree.
-	ComputedStyles []*CSSComputedStyleProperty `json:"computedStyles"`   // The style to filter nodes by (includes nodes if any of properties matches).
-	Pierce         bool                        `json:"pierce,omitempty"` // Whether or not iframes and shadow roots in the same target should be traversed when returning the results (default is false).
+	NodeID         cdp.NodeID                  `json:"nodeId"`         // Node ID pointing to the root of a subtree.
+	ComputedStyles []*CSSComputedStyleProperty `json:"computedStyles"` // The style to filter nodes by (includes nodes if any of properties matches).
+	Pierce         bool                        `json:"pierce"`         // Whether or not iframes and shadow roots in the same target should be traversed when returning the results (default is false).
 }
 
 // GetNodesForSubtreeByStyle finds nodes with a given computed style in a
@@ -573,6 +577,7 @@ func GetNodesForSubtreeByStyle(nodeID cdp.NodeID, computedStyles []*CSSComputedS
 	return &GetNodesForSubtreeByStyleParams{
 		NodeID:         nodeID,
 		ComputedStyles: computedStyles,
+		Pierce:         false,
 	}
 }
 
@@ -585,7 +590,7 @@ func (p GetNodesForSubtreeByStyleParams) WithPierce(pierce bool) *GetNodesForSub
 
 // GetNodesForSubtreeByStyleReturns return values.
 type GetNodesForSubtreeByStyleReturns struct {
-	NodeIDs []cdp.NodeID `json:"nodeIds,omitempty"` // Resulting nodes.
+	NodeIDs []cdp.NodeID `json:"nodeIds,omitempty,omitzero"` // Resulting nodes.
 }
 
 // Do executes DOM.getNodesForSubtreeByStyle against the provided context.
@@ -607,10 +612,10 @@ func (p *GetNodesForSubtreeByStyleParams) Do(ctx context.Context) (nodeIDs []cdp
 // GetNodeForLocationParams returns node id at given location. Depending on
 // whether DOM domain is enabled, nodeId is either returned or not.
 type GetNodeForLocationParams struct {
-	X                         int64 `json:"x"`                                   // X coordinate.
-	Y                         int64 `json:"y"`                                   // Y coordinate.
-	IncludeUserAgentShadowDOM bool  `json:"includeUserAgentShadowDOM,omitempty"` // False to skip to the nearest non-UA shadow root ancestor (default: false).
-	IgnorePointerEventsNone   bool  `json:"ignorePointerEventsNone,omitempty"`   // Whether to ignore pointer-events: none on elements and hit test them.
+	X                         int64 `json:"x"`                         // X coordinate.
+	Y                         int64 `json:"y"`                         // Y coordinate.
+	IncludeUserAgentShadowDOM bool  `json:"includeUserAgentShadowDOM"` // False to skip to the nearest non-UA shadow root ancestor (default: false).
+	IgnorePointerEventsNone   bool  `json:"ignorePointerEventsNone"`   // Whether to ignore pointer-events: none on elements and hit test them.
 }
 
 // GetNodeForLocation returns node id at given location. Depending on whether
@@ -624,8 +629,10 @@ type GetNodeForLocationParams struct {
 //	y - Y coordinate.
 func GetNodeForLocation(x int64, y int64) *GetNodeForLocationParams {
 	return &GetNodeForLocationParams{
-		X: x,
-		Y: y,
+		X:                         x,
+		Y:                         y,
+		IncludeUserAgentShadowDOM: false,
+		IgnorePointerEventsNone:   false,
 	}
 }
 
@@ -645,9 +652,9 @@ func (p GetNodeForLocationParams) WithIgnorePointerEventsNone(ignorePointerEvent
 
 // GetNodeForLocationReturns return values.
 type GetNodeForLocationReturns struct {
-	BackendNodeID cdp.BackendNodeID `json:"backendNodeId,omitempty"` // Resulting node.
-	FrameID       cdp.FrameID       `json:"frameId,omitempty"`       // Frame this node belongs to.
-	NodeID        cdp.NodeID        `json:"nodeId,omitempty"`        // Id of the node at given coordinates, only when enabled and requested document.
+	BackendNodeID cdp.BackendNodeID `json:"backendNodeId,omitempty,omitzero"` // Resulting node.
+	FrameID       cdp.FrameID       `json:"frameId,omitempty,omitzero"`       // Frame this node belongs to.
+	NodeID        cdp.NodeID        `json:"nodeId,omitempty,omitzero"`        // Id of the node at given coordinates, only when enabled and requested document.
 }
 
 // Do executes DOM.getNodeForLocation against the provided context.
@@ -670,9 +677,9 @@ func (p *GetNodeForLocationParams) Do(ctx context.Context) (backendNodeID cdp.Ba
 
 // GetOuterHTMLParams returns node's HTML markup.
 type GetOuterHTMLParams struct {
-	NodeID        cdp.NodeID             `json:"nodeId,omitempty"`        // Identifier of the node.
-	BackendNodeID cdp.BackendNodeID      `json:"backendNodeId,omitempty"` // Identifier of the backend node.
-	ObjectID      runtime.RemoteObjectID `json:"objectId,omitempty"`      // JavaScript object id of the node wrapper.
+	NodeID        cdp.NodeID             `json:"nodeId,omitempty,omitzero"`        // Identifier of the node.
+	BackendNodeID cdp.BackendNodeID      `json:"backendNodeId,omitempty,omitzero"` // Identifier of the backend node.
+	ObjectID      runtime.RemoteObjectID `json:"objectId,omitempty,omitzero"`      // JavaScript object id of the node wrapper.
 }
 
 // GetOuterHTML returns node's HTML markup.
@@ -704,7 +711,7 @@ func (p GetOuterHTMLParams) WithObjectID(objectID runtime.RemoteObjectID) *GetOu
 
 // GetOuterHTMLReturns return values.
 type GetOuterHTMLReturns struct {
-	OuterHTML string `json:"outerHTML,omitempty"` // Outer HTML markup.
+	OuterHTML string `json:"outerHTML,omitempty,omitzero"` // Outer HTML markup.
 }
 
 // Do executes DOM.getOuterHTML against the provided context.
@@ -745,7 +752,7 @@ func GetRelayoutBoundary(nodeID cdp.NodeID) *GetRelayoutBoundaryParams {
 
 // GetRelayoutBoundaryReturns return values.
 type GetRelayoutBoundaryReturns struct {
-	NodeID cdp.NodeID `json:"nodeId,omitempty"` // Relayout boundary node id for the given node.
+	NodeID cdp.NodeID `json:"nodeId,omitempty,omitzero"` // Relayout boundary node id for the given node.
 }
 
 // Do executes DOM.getRelayoutBoundary against the provided context.
@@ -792,7 +799,7 @@ func GetSearchResults(searchID string, fromIndex int64, toIndex int64) *GetSearc
 
 // GetSearchResultsReturns return values.
 type GetSearchResultsReturns struct {
-	NodeIDs []cdp.NodeID `json:"nodeIds,omitempty"` // Ids of the search result nodes.
+	NodeIDs []cdp.NodeID `json:"nodeIds,omitempty,omitzero"` // Ids of the search result nodes.
 }
 
 // Do executes DOM.getSearchResults against the provided context.
@@ -829,9 +836,9 @@ func (p *MarkUndoableStateParams) Do(ctx context.Context) (err error) {
 // MoveToParams moves node into the new container, places it before the given
 // anchor.
 type MoveToParams struct {
-	NodeID             cdp.NodeID `json:"nodeId"`                       // Id of the node to move.
-	TargetNodeID       cdp.NodeID `json:"targetNodeId"`                 // Id of the element to drop the moved node into.
-	InsertBeforeNodeID cdp.NodeID `json:"insertBeforeNodeId,omitempty"` // Drop node before this one (if absent, the moved node becomes the last child of targetNodeId).
+	NodeID             cdp.NodeID `json:"nodeId"`                                // Id of the node to move.
+	TargetNodeID       cdp.NodeID `json:"targetNodeId"`                          // Id of the element to drop the moved node into.
+	InsertBeforeNodeID cdp.NodeID `json:"insertBeforeNodeId,omitempty,omitzero"` // Drop node before this one (if absent, the moved node becomes the last child of targetNodeId).
 }
 
 // MoveTo moves node into the new container, places it before the given
@@ -859,7 +866,7 @@ func (p MoveToParams) WithInsertBeforeNodeID(insertBeforeNodeID cdp.NodeID) *Mov
 
 // MoveToReturns return values.
 type MoveToReturns struct {
-	NodeID cdp.NodeID `json:"nodeId,omitempty"` // New id of the moved node.
+	NodeID cdp.NodeID `json:"nodeId,omitempty,omitzero"` // New id of the moved node.
 }
 
 // Do executes DOM.moveTo against the provided context.
@@ -882,8 +889,8 @@ func (p *MoveToParams) Do(ctx context.Context) (nodeID cdp.NodeID, err error) {
 // getSearchResults to access search results or cancelSearch to end this search
 // session.
 type PerformSearchParams struct {
-	Query                     string `json:"query"`                               // Plain text or query selector or XPath search query.
-	IncludeUserAgentShadowDOM bool   `json:"includeUserAgentShadowDOM,omitempty"` // True to search in user agent shadow DOM.
+	Query                     string `json:"query"`                     // Plain text or query selector or XPath search query.
+	IncludeUserAgentShadowDOM bool   `json:"includeUserAgentShadowDOM"` // True to search in user agent shadow DOM.
 }
 
 // PerformSearch searches for a given string in the DOM tree. Use
@@ -897,7 +904,8 @@ type PerformSearchParams struct {
 //	query - Plain text or query selector or XPath search query.
 func PerformSearch(query string) *PerformSearchParams {
 	return &PerformSearchParams{
-		Query: query,
+		Query:                     query,
+		IncludeUserAgentShadowDOM: false,
 	}
 }
 
@@ -909,8 +917,8 @@ func (p PerformSearchParams) WithIncludeUserAgentShadowDOM(includeUserAgentShado
 
 // PerformSearchReturns return values.
 type PerformSearchReturns struct {
-	SearchID    string `json:"searchId,omitempty"`    // Unique search session identifier.
-	ResultCount int64  `json:"resultCount,omitempty"` // Number of search results.
+	SearchID    string `json:"searchId,omitempty,omitzero"`    // Unique search session identifier.
+	ResultCount int64  `json:"resultCount,omitempty,omitzero"` // Number of search results.
 }
 
 // Do executes DOM.performSearch against the provided context.
@@ -952,7 +960,7 @@ func PushNodeByPathToFrontend(path string) *PushNodeByPathToFrontendParams {
 
 // PushNodeByPathToFrontendReturns return values.
 type PushNodeByPathToFrontendReturns struct {
-	NodeID cdp.NodeID `json:"nodeId,omitempty"` // Id of the node for given path.
+	NodeID cdp.NodeID `json:"nodeId,omitempty,omitzero"` // Id of the node for given path.
 }
 
 // Do executes DOM.pushNodeByPathToFrontend against the provided context.
@@ -993,7 +1001,7 @@ func PushNodesByBackendIDsToFrontend(backendNodeIDs []cdp.BackendNodeID) *PushNo
 
 // PushNodesByBackendIDsToFrontendReturns return values.
 type PushNodesByBackendIDsToFrontendReturns struct {
-	NodeIDs []cdp.NodeID `json:"nodeIds,omitempty"` // The array of ids of pushed nodes that correspond to the backend ids specified in backendNodeIds.
+	NodeIDs []cdp.NodeID `json:"nodeIds,omitempty,omitzero"` // The array of ids of pushed nodes that correspond to the backend ids specified in backendNodeIds.
 }
 
 // Do executes DOM.pushNodesByBackendIdsToFrontend against the provided context.
@@ -1035,7 +1043,7 @@ func QuerySelector(nodeID cdp.NodeID, selector string) *QuerySelectorParams {
 
 // QuerySelectorReturns return values.
 type QuerySelectorReturns struct {
-	NodeID cdp.NodeID `json:"nodeId,omitempty"` // Query selector result.
+	NodeID cdp.NodeID `json:"nodeId,omitempty,omitzero"` // Query selector result.
 }
 
 // Do executes DOM.querySelector against the provided context.
@@ -1077,7 +1085,7 @@ func QuerySelectorAll(nodeID cdp.NodeID, selector string) *QuerySelectorAllParam
 
 // QuerySelectorAllReturns return values.
 type QuerySelectorAllReturns struct {
-	NodeIDs []cdp.NodeID `json:"nodeIds,omitempty"` // Query selector result.
+	NodeIDs []cdp.NodeID `json:"nodeIds,omitempty,omitzero"` // Query selector result.
 }
 
 // Do executes DOM.querySelectorAll against the provided context.
@@ -1112,7 +1120,7 @@ func GetTopLayerElements() *GetTopLayerElementsParams {
 
 // GetTopLayerElementsReturns return values.
 type GetTopLayerElementsReturns struct {
-	NodeIDs []cdp.NodeID `json:"nodeIds,omitempty"` // NodeIds of top layer elements
+	NodeIDs []cdp.NodeID `json:"nodeIds,omitempty,omitzero"` // NodeIds of top layer elements
 }
 
 // Do executes DOM.getTopLayerElements against the provided context.
@@ -1156,7 +1164,7 @@ func GetElementByRelation(nodeID cdp.NodeID, relation GetElementByRelationRelati
 
 // GetElementByRelationReturns return values.
 type GetElementByRelationReturns struct {
-	NodeID cdp.NodeID `json:"nodeId,omitempty"` // NodeId of the element matching the queried relation.
+	NodeID cdp.NodeID `json:"nodeId,omitempty,omitzero"` // NodeId of the element matching the queried relation.
 }
 
 // Do executes DOM.getElementByRelation against the provided context.
@@ -1246,9 +1254,9 @@ func (p *RemoveNodeParams) Do(ctx context.Context) (err error) {
 // immediate children are retrieved, but all children down to the specified
 // depth.
 type RequestChildNodesParams struct {
-	NodeID cdp.NodeID `json:"nodeId"`           // Id of the node to get children for.
-	Depth  int64      `json:"depth,omitempty"`  // The maximum depth at which children should be retrieved, defaults to 1. Use -1 for the entire subtree or provide an integer larger than 0.
-	Pierce bool       `json:"pierce,omitempty"` // Whether or not iframes and shadow roots should be traversed when returning the sub-tree (default is false).
+	NodeID cdp.NodeID `json:"nodeId"`                   // Id of the node to get children for.
+	Depth  int64      `json:"depth,omitempty,omitzero"` // The maximum depth at which children should be retrieved, defaults to 1. Use -1 for the entire subtree or provide an integer larger than 0.
+	Pierce bool       `json:"pierce"`                   // Whether or not iframes and shadow roots should be traversed when returning the sub-tree (default is false).
 }
 
 // RequestChildNodes requests that children of the node with given id are
@@ -1264,6 +1272,7 @@ type RequestChildNodesParams struct {
 func RequestChildNodes(nodeID cdp.NodeID) *RequestChildNodesParams {
 	return &RequestChildNodesParams{
 		NodeID: nodeID,
+		Pierce: false,
 	}
 }
 
@@ -1313,7 +1322,7 @@ func RequestNode(objectID runtime.RemoteObjectID) *RequestNodeParams {
 
 // RequestNodeReturns return values.
 type RequestNodeReturns struct {
-	NodeID cdp.NodeID `json:"nodeId,omitempty"` // Node id for given object.
+	NodeID cdp.NodeID `json:"nodeId,omitempty,omitzero"` // Node id for given object.
 }
 
 // Do executes DOM.requestNode against the provided context.
@@ -1335,10 +1344,10 @@ func (p *RequestNodeParams) Do(ctx context.Context) (nodeID cdp.NodeID, err erro
 // ResolveNodeParams resolves the JavaScript node object for a given NodeId
 // or BackendNodeId.
 type ResolveNodeParams struct {
-	NodeID             cdp.NodeID                 `json:"nodeId,omitempty"`             // Id of the node to resolve.
-	BackendNodeID      cdp.BackendNodeID          `json:"backendNodeId,omitempty"`      // Backend identifier of the node to resolve.
-	ObjectGroup        string                     `json:"objectGroup,omitempty"`        // Symbolic group name that can be used to release multiple objects.
-	ExecutionContextID runtime.ExecutionContextID `json:"executionContextId,omitempty"` // Execution context in which to resolve the node.
+	NodeID             cdp.NodeID                 `json:"nodeId,omitempty,omitzero"`             // Id of the node to resolve.
+	BackendNodeID      cdp.BackendNodeID          `json:"backendNodeId,omitempty,omitzero"`      // Backend identifier of the node to resolve.
+	ObjectGroup        string                     `json:"objectGroup,omitempty,omitzero"`        // Symbolic group name that can be used to release multiple objects.
+	ExecutionContextID runtime.ExecutionContextID `json:"executionContextId,omitempty,omitzero"` // Execution context in which to resolve the node.
 }
 
 // ResolveNode resolves the JavaScript node object for a given NodeId or
@@ -1378,7 +1387,7 @@ func (p ResolveNodeParams) WithExecutionContextID(executionContextID runtime.Exe
 
 // ResolveNodeReturns return values.
 type ResolveNodeReturns struct {
-	Object *runtime.RemoteObject `json:"object,omitempty"` // JavaScript object wrapper for given node.
+	Object *runtime.RemoteObject `json:"object,omitempty,omitzero"` // JavaScript object wrapper for given node.
 }
 
 // Do executes DOM.resolveNode against the provided context.
@@ -1430,9 +1439,9 @@ func (p *SetAttributeValueParams) Do(ctx context.Context) (err error) {
 // method is useful when user edits some existing attribute value and types in
 // several attribute name/value pairs.
 type SetAttributesAsTextParams struct {
-	NodeID cdp.NodeID `json:"nodeId"`         // Id of the element to set attributes for.
-	Text   string     `json:"text"`           // Text with a number of attributes. Will parse this text using HTML parser.
-	Name   string     `json:"name,omitempty"` // Attribute name to replace with new attributes derived from text in case text parsed successfully.
+	NodeID cdp.NodeID `json:"nodeId"`                  // Id of the element to set attributes for.
+	Text   string     `json:"text"`                    // Text with a number of attributes. Will parse this text using HTML parser.
+	Name   string     `json:"name,omitempty,omitzero"` // Attribute name to replace with new attributes derived from text in case text parsed successfully.
 }
 
 // SetAttributesAsText sets attributes on element with given id. This method
@@ -1466,10 +1475,10 @@ func (p *SetAttributesAsTextParams) Do(ctx context.Context) (err error) {
 
 // SetFileInputFilesParams sets files for the given file input element.
 type SetFileInputFilesParams struct {
-	Files         []string               `json:"files"`                   // Array of file paths to set.
-	NodeID        cdp.NodeID             `json:"nodeId,omitempty"`        // Identifier of the node.
-	BackendNodeID cdp.BackendNodeID      `json:"backendNodeId,omitempty"` // Identifier of the backend node.
-	ObjectID      runtime.RemoteObjectID `json:"objectId,omitempty"`      // JavaScript object id of the node wrapper.
+	Files         []string               `json:"files"`                            // Array of file paths to set.
+	NodeID        cdp.NodeID             `json:"nodeId,omitempty,omitzero"`        // Identifier of the node.
+	BackendNodeID cdp.BackendNodeID      `json:"backendNodeId,omitempty,omitzero"` // Identifier of the backend node.
+	ObjectID      runtime.RemoteObjectID `json:"objectId,omitempty,omitzero"`      // JavaScript object id of the node wrapper.
 }
 
 // SetFileInputFiles sets files for the given file input element.
@@ -1555,7 +1564,7 @@ func GetNodeStackTraces(nodeID cdp.NodeID) *GetNodeStackTracesParams {
 
 // GetNodeStackTracesReturns return values.
 type GetNodeStackTracesReturns struct {
-	Creation *runtime.StackTrace `json:"creation,omitempty"` // Creation stack trace, if available.
+	Creation *runtime.StackTrace `json:"creation,omitempty,omitzero"` // Creation stack trace, if available.
 }
 
 // Do executes DOM.getNodeStackTraces against the provided context.
@@ -1594,7 +1603,7 @@ func GetFileInfo(objectID runtime.RemoteObjectID) *GetFileInfoParams {
 
 // GetFileInfoReturns return values.
 type GetFileInfoReturns struct {
-	Path string `json:"path,omitempty"`
+	Path string `json:"path,omitempty,omitzero"`
 }
 
 // Do executes DOM.getFileInfo against the provided context.
@@ -1625,7 +1634,7 @@ func GetDetachedDomNodes() *GetDetachedDomNodesParams {
 
 // GetDetachedDomNodesReturns return values.
 type GetDetachedDomNodesReturns struct {
-	DetachedNodes []*DetachedElementInfo `json:"detachedNodes,omitempty"` // The list of detached nodes
+	DetachedNodes []*DetachedElementInfo `json:"detachedNodes,omitempty,omitzero"` // The list of detached nodes
 }
 
 // Do executes DOM.getDetachedDomNodes against the provided context.
@@ -1692,7 +1701,7 @@ func SetNodeName(nodeID cdp.NodeID, name string) *SetNodeNameParams {
 
 // SetNodeNameReturns return values.
 type SetNodeNameReturns struct {
-	NodeID cdp.NodeID `json:"nodeId,omitempty"` // New node's id.
+	NodeID cdp.NodeID `json:"nodeId,omitempty,omitzero"` // New node's id.
 }
 
 // Do executes DOM.setNodeName against the provided context.
@@ -1799,8 +1808,8 @@ func GetFrameOwner(frameID cdp.FrameID) *GetFrameOwnerParams {
 
 // GetFrameOwnerReturns return values.
 type GetFrameOwnerReturns struct {
-	BackendNodeID cdp.BackendNodeID `json:"backendNodeId,omitempty"` // Resulting node.
-	NodeID        cdp.NodeID        `json:"nodeId,omitempty"`        // Id of the node at given coordinates, only when enabled and requested document.
+	BackendNodeID cdp.BackendNodeID `json:"backendNodeId,omitempty,omitzero"` // Resulting node.
+	NodeID        cdp.NodeID        `json:"nodeId,omitempty,omitzero"`        // Id of the node at given coordinates, only when enabled and requested document.
 }
 
 // Do executes DOM.getFrameOwner against the provided context.
@@ -1821,20 +1830,23 @@ func (p *GetFrameOwnerParams) Do(ctx context.Context) (backendNodeID cdp.Backend
 }
 
 // GetContainerForNodeParams returns the query container of the given node
-// based on container query conditions: containerName, physical, and logical
-// axes. If no axes are provided, the style container is returned, which is the
+// based on container query conditions: containerName, physical and logical
+// axes, and whether it queries scroll-state. If no axes are provided and
+// queriesScrollState is false, the style container is returned, which is the
 // direct parent or the closest element with a matching container-name.
 type GetContainerForNodeParams struct {
-	NodeID        cdp.NodeID   `json:"nodeId"`
-	ContainerName string       `json:"containerName,omitempty"`
-	PhysicalAxes  PhysicalAxes `json:"physicalAxes,omitempty"`
-	LogicalAxes   LogicalAxes  `json:"logicalAxes,omitempty"`
+	NodeID             cdp.NodeID   `json:"nodeId"`
+	ContainerName      string       `json:"containerName,omitempty,omitzero"`
+	PhysicalAxes       PhysicalAxes `json:"physicalAxes,omitempty,omitzero"`
+	LogicalAxes        LogicalAxes  `json:"logicalAxes,omitempty,omitzero"`
+	QueriesScrollState bool         `json:"queriesScrollState"`
 }
 
 // GetContainerForNode returns the query container of the given node based on
-// container query conditions: containerName, physical, and logical axes. If no
-// axes are provided, the style container is returned, which is the direct
-// parent or the closest element with a matching container-name.
+// container query conditions: containerName, physical and logical axes, and
+// whether it queries scroll-state. If no axes are provided and
+// queriesScrollState is false, the style container is returned, which is the
+// direct parent or the closest element with a matching container-name.
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/DOM#method-getContainerForNode
 //
@@ -1843,7 +1855,8 @@ type GetContainerForNodeParams struct {
 //	nodeID
 func GetContainerForNode(nodeID cdp.NodeID) *GetContainerForNodeParams {
 	return &GetContainerForNodeParams{
-		NodeID: nodeID,
+		NodeID:             nodeID,
+		QueriesScrollState: false,
 	}
 }
 
@@ -1865,9 +1878,15 @@ func (p GetContainerForNodeParams) WithLogicalAxes(logicalAxes LogicalAxes) *Get
 	return &p
 }
 
+// WithQueriesScrollState [no description].
+func (p GetContainerForNodeParams) WithQueriesScrollState(queriesScrollState bool) *GetContainerForNodeParams {
+	p.QueriesScrollState = queriesScrollState
+	return &p
+}
+
 // GetContainerForNodeReturns return values.
 type GetContainerForNodeReturns struct {
-	NodeID cdp.NodeID `json:"nodeId,omitempty"` // The container node for the given node, or null if not found.
+	NodeID cdp.NodeID `json:"nodeId,omitempty,omitzero"` // The container node for the given node, or null if not found.
 }
 
 // Do executes DOM.getContainerForNode against the provided context.
@@ -1908,7 +1927,7 @@ func GetQueryingDescendantsForContainer(nodeID cdp.NodeID) *GetQueryingDescendan
 
 // GetQueryingDescendantsForContainerReturns return values.
 type GetQueryingDescendantsForContainerReturns struct {
-	NodeIDs []cdp.NodeID `json:"nodeIds,omitempty"` // Descendant nodes with container queries against the given container.
+	NodeIDs []cdp.NodeID `json:"nodeIds,omitempty,omitzero"` // Descendant nodes with container queries against the given container.
 }
 
 // Do executes DOM.getQueryingDescendantsForContainer against the provided context.
@@ -1931,8 +1950,8 @@ func (p *GetQueryingDescendantsForContainerParams) Do(ctx context.Context) (node
 // anchor query according to
 // https://www.w3.org/TR/css-anchor-position-1/#target.
 type GetAnchorElementParams struct {
-	NodeID          cdp.NodeID `json:"nodeId"`                    // Id of the positioned element from which to find the anchor.
-	AnchorSpecifier string     `json:"anchorSpecifier,omitempty"` // An optional anchor specifier, as defined in https://www.w3.org/TR/css-anchor-position-1/#anchor-specifier. If not provided, it will return the implicit anchor element for the given positioned element.
+	NodeID          cdp.NodeID `json:"nodeId"`                             // Id of the positioned element from which to find the anchor.
+	AnchorSpecifier string     `json:"anchorSpecifier,omitempty,omitzero"` // An optional anchor specifier, as defined in https://www.w3.org/TR/css-anchor-position-1/#anchor-specifier. If not provided, it will return the implicit anchor element for the given positioned element.
 }
 
 // GetAnchorElement returns the target anchor element of the given anchor
@@ -1960,7 +1979,7 @@ func (p GetAnchorElementParams) WithAnchorSpecifier(anchorSpecifier string) *Get
 
 // GetAnchorElementReturns return values.
 type GetAnchorElementReturns struct {
-	NodeID cdp.NodeID `json:"nodeId,omitempty"` // The anchor element of the given anchor query.
+	NodeID cdp.NodeID `json:"nodeId,omitempty,omitzero"` // The anchor element of the given anchor query.
 }
 
 // Do executes DOM.getAnchorElement against the provided context.

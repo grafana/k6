@@ -13,8 +13,8 @@ import (
 	"github.com/chromedp/cdproto/cdp"
 	cdppage "github.com/chromedp/cdproto/page"
 	"github.com/chromedp/cdproto/target"
+	"github.com/go-json-experiment/json/jsontext"
 	"github.com/gorilla/websocket"
-	"github.com/mailru/easyjson"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -63,17 +63,17 @@ func TestSessionCreateSession(t *testing.T) {
 				writeCh <- cdproto.Message{
 					ID:        msg.ID,
 					SessionID: msg.SessionID,
-					Result:    easyjson.RawMessage([]byte("{}")),
+					Result:    jsontext.Value([]byte("{}")),
 				}
 			case cdproto.MethodType(cdproto.CommandTargetAttachToTarget):
 				writeCh <- cdproto.Message{
 					Method: cdproto.EventTargetAttachedToTarget,
-					Params: easyjson.RawMessage([]byte(targetAttachedToTargetEvent)),
+					Params: jsontext.Value([]byte(targetAttachedToTargetEvent)),
 				}
 				writeCh <- cdproto.Message{
 					ID:        msg.ID,
 					SessionID: msg.SessionID,
-					Result:    easyjson.RawMessage([]byte(targetAttachedToTargetResult)),
+					Result:    jsontext.Value([]byte(targetAttachedToTargetResult)),
 				}
 			}
 		}

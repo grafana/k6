@@ -4,12 +4,10 @@ package log
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/cdproto/runtime"
-	"github.com/mailru/easyjson"
-	"github.com/mailru/easyjson/jlexer"
-	"github.com/mailru/easyjson/jwriter"
 )
 
 // Entry log entry.
@@ -19,14 +17,14 @@ type Entry struct {
 	Source           Source                  `json:"source"` // Log entry source.
 	Level            Level                   `json:"level"`  // Log entry severity.
 	Text             string                  `json:"text"`   // Logged text.
-	Category         EntryCategory           `json:"category,omitempty"`
-	Timestamp        *runtime.Timestamp      `json:"timestamp"`                  // Timestamp when this entry was added.
-	URL              string                  `json:"url,omitempty"`              // URL of the resource if known.
-	LineNumber       int64                   `json:"lineNumber,omitempty"`       // Line number in the resource.
-	StackTrace       *runtime.StackTrace     `json:"stackTrace,omitempty"`       // JavaScript stack trace.
-	NetworkRequestID network.RequestID       `json:"networkRequestId,omitempty"` // Identifier of the network request associated with this entry.
-	WorkerID         string                  `json:"workerId,omitempty"`         // Identifier of the worker associated with this entry.
-	Args             []*runtime.RemoteObject `json:"args,omitempty"`             // Call arguments.
+	Category         EntryCategory           `json:"category,omitempty,omitzero"`
+	Timestamp        *runtime.Timestamp      `json:"timestamp"`                           // Timestamp when this entry was added.
+	URL              string                  `json:"url,omitempty,omitzero"`              // URL of the resource if known.
+	LineNumber       int64                   `json:"lineNumber,omitempty,omitzero"`       // Line number in the resource.
+	StackTrace       *runtime.StackTrace     `json:"stackTrace,omitempty,omitzero"`       // JavaScript stack trace.
+	NetworkRequestID network.RequestID       `json:"networkRequestId,omitempty,omitzero"` // Identifier of the network request associated with this entry.
+	WorkerID         string                  `json:"workerId,omitempty,omitzero"`         // Identifier of the worker associated with this entry.
+	Args             []*runtime.RemoteObject `json:"args,omitempty,omitzero"`             // Call arguments.
 }
 
 // ViolationSetting violation configuration setting.
@@ -64,20 +62,12 @@ const (
 	SourceOther          Source = "other"
 )
 
-// MarshalEasyJSON satisfies easyjson.Marshaler.
-func (t Source) MarshalEasyJSON(out *jwriter.Writer) {
-	out.String(string(t))
-}
+// UnmarshalJSON satisfies [json.Unmarshaler].
+func (t *Source) UnmarshalJSON(buf []byte) error {
+	s := string(buf)
+	s = strings.TrimSuffix(strings.TrimPrefix(s, `"`), `"`)
 
-// MarshalJSON satisfies json.Marshaler.
-func (t Source) MarshalJSON() ([]byte, error) {
-	return easyjson.Marshal(t)
-}
-
-// UnmarshalEasyJSON satisfies easyjson.Unmarshaler.
-func (t *Source) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	v := in.String()
-	switch Source(v) {
+	switch Source(s) {
 	case SourceXML:
 		*t = SourceXML
 	case SourceJavascript:
@@ -104,15 +94,10 @@ func (t *Source) UnmarshalEasyJSON(in *jlexer.Lexer) {
 		*t = SourceRecommendation
 	case SourceOther:
 		*t = SourceOther
-
 	default:
-		in.AddError(fmt.Errorf("unknown Source value: %v", v))
+		return fmt.Errorf("unknown Source value: %v", s)
 	}
-}
-
-// UnmarshalJSON satisfies json.Unmarshaler.
-func (t *Source) UnmarshalJSON(buf []byte) error {
-	return easyjson.Unmarshal(buf, t)
+	return nil
 }
 
 // Level log entry severity.
@@ -133,20 +118,12 @@ const (
 	LevelError   Level = "error"
 )
 
-// MarshalEasyJSON satisfies easyjson.Marshaler.
-func (t Level) MarshalEasyJSON(out *jwriter.Writer) {
-	out.String(string(t))
-}
+// UnmarshalJSON satisfies [json.Unmarshaler].
+func (t *Level) UnmarshalJSON(buf []byte) error {
+	s := string(buf)
+	s = strings.TrimSuffix(strings.TrimPrefix(s, `"`), `"`)
 
-// MarshalJSON satisfies json.Marshaler.
-func (t Level) MarshalJSON() ([]byte, error) {
-	return easyjson.Marshal(t)
-}
-
-// UnmarshalEasyJSON satisfies easyjson.Unmarshaler.
-func (t *Level) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	v := in.String()
-	switch Level(v) {
+	switch Level(s) {
 	case LevelVerbose:
 		*t = LevelVerbose
 	case LevelInfo:
@@ -155,15 +132,10 @@ func (t *Level) UnmarshalEasyJSON(in *jlexer.Lexer) {
 		*t = LevelWarning
 	case LevelError:
 		*t = LevelError
-
 	default:
-		in.AddError(fmt.Errorf("unknown Level value: %v", v))
+		return fmt.Errorf("unknown Level value: %v", s)
 	}
-}
-
-// UnmarshalJSON satisfies json.Unmarshaler.
-func (t *Level) UnmarshalJSON(buf []byte) error {
-	return easyjson.Unmarshal(buf, t)
+	return nil
 }
 
 // EntryCategory [no description].
@@ -181,31 +153,18 @@ const (
 	EntryCategoryCors EntryCategory = "cors"
 )
 
-// MarshalEasyJSON satisfies easyjson.Marshaler.
-func (t EntryCategory) MarshalEasyJSON(out *jwriter.Writer) {
-	out.String(string(t))
-}
+// UnmarshalJSON satisfies [json.Unmarshaler].
+func (t *EntryCategory) UnmarshalJSON(buf []byte) error {
+	s := string(buf)
+	s = strings.TrimSuffix(strings.TrimPrefix(s, `"`), `"`)
 
-// MarshalJSON satisfies json.Marshaler.
-func (t EntryCategory) MarshalJSON() ([]byte, error) {
-	return easyjson.Marshal(t)
-}
-
-// UnmarshalEasyJSON satisfies easyjson.Unmarshaler.
-func (t *EntryCategory) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	v := in.String()
-	switch EntryCategory(v) {
+	switch EntryCategory(s) {
 	case EntryCategoryCors:
 		*t = EntryCategoryCors
-
 	default:
-		in.AddError(fmt.Errorf("unknown EntryCategory value: %v", v))
+		return fmt.Errorf("unknown EntryCategory value: %v", s)
 	}
-}
-
-// UnmarshalJSON satisfies json.Unmarshaler.
-func (t *EntryCategory) UnmarshalJSON(buf []byte) error {
-	return easyjson.Unmarshal(buf, t)
+	return nil
 }
 
 // Violation violation type.
@@ -229,20 +188,12 @@ const (
 	ViolationRecurringHandler  Violation = "recurringHandler"
 )
 
-// MarshalEasyJSON satisfies easyjson.Marshaler.
-func (t Violation) MarshalEasyJSON(out *jwriter.Writer) {
-	out.String(string(t))
-}
+// UnmarshalJSON satisfies [json.Unmarshaler].
+func (t *Violation) UnmarshalJSON(buf []byte) error {
+	s := string(buf)
+	s = strings.TrimSuffix(strings.TrimPrefix(s, `"`), `"`)
 
-// MarshalJSON satisfies json.Marshaler.
-func (t Violation) MarshalJSON() ([]byte, error) {
-	return easyjson.Marshal(t)
-}
-
-// UnmarshalEasyJSON satisfies easyjson.Unmarshaler.
-func (t *Violation) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	v := in.String()
-	switch Violation(v) {
+	switch Violation(s) {
 	case ViolationLongTask:
 		*t = ViolationLongTask
 	case ViolationLongLayout:
@@ -257,13 +208,8 @@ func (t *Violation) UnmarshalEasyJSON(in *jlexer.Lexer) {
 		*t = ViolationHandler
 	case ViolationRecurringHandler:
 		*t = ViolationRecurringHandler
-
 	default:
-		in.AddError(fmt.Errorf("unknown Violation value: %v", v))
+		return fmt.Errorf("unknown Violation value: %v", s)
 	}
-}
-
-// UnmarshalJSON satisfies json.Unmarshaler.
-func (t *Violation) UnmarshalJSON(buf []byte) error {
-	return easyjson.Unmarshal(buf, t)
+	return nil
 }

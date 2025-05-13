@@ -56,7 +56,7 @@ func GetBestEffortCoverage() *GetBestEffortCoverageParams {
 
 // GetBestEffortCoverageReturns return values.
 type GetBestEffortCoverageReturns struct {
-	Result []*ScriptCoverage `json:"result,omitempty"` // Coverage data for the current isolate.
+	Result []*ScriptCoverage `json:"result,omitempty,omitzero"` // Coverage data for the current isolate.
 }
 
 // Do executes Profiler.getBestEffortCoverage against the provided context.
@@ -119,9 +119,9 @@ func (p *StartParams) Do(ctx context.Context) (err error) {
 // JavaScript executed before enabling precise code coverage may be incomplete.
 // Enabling prevents running optimized code and resets execution counters.
 type StartPreciseCoverageParams struct {
-	CallCount             bool `json:"callCount,omitempty"`             // Collect accurate call counts beyond simple 'covered' or 'not covered'.
-	Detailed              bool `json:"detailed,omitempty"`              // Collect block-based coverage.
-	AllowTriggeredUpdates bool `json:"allowTriggeredUpdates,omitempty"` // Allow the backend to send updates on its own initiative
+	CallCount             bool `json:"callCount"`             // Collect accurate call counts beyond simple 'covered' or 'not covered'.
+	Detailed              bool `json:"detailed"`              // Collect block-based coverage.
+	AllowTriggeredUpdates bool `json:"allowTriggeredUpdates"` // Allow the backend to send updates on its own initiative
 }
 
 // StartPreciseCoverage enable precise code coverage. Coverage data for
@@ -132,7 +132,11 @@ type StartPreciseCoverageParams struct {
 //
 // parameters:
 func StartPreciseCoverage() *StartPreciseCoverageParams {
-	return &StartPreciseCoverageParams{}
+	return &StartPreciseCoverageParams{
+		CallCount:             false,
+		Detailed:              false,
+		AllowTriggeredUpdates: false,
+	}
 }
 
 // WithCallCount collect accurate call counts beyond simple 'covered' or 'not
@@ -157,7 +161,7 @@ func (p StartPreciseCoverageParams) WithAllowTriggeredUpdates(allowTriggeredUpda
 
 // StartPreciseCoverageReturns return values.
 type StartPreciseCoverageReturns struct {
-	Timestamp float64 `json:"timestamp,omitempty"` // Monotonically increasing time (in seconds) when the coverage update was taken in the backend.
+	Timestamp float64 `json:"timestamp,omitempty,omitzero"` // Monotonically increasing time (in seconds) when the coverage update was taken in the backend.
 }
 
 // Do executes Profiler.startPreciseCoverage against the provided context.
@@ -188,7 +192,7 @@ func Stop() *StopParams {
 
 // StopReturns return values.
 type StopReturns struct {
-	Profile *Profile `json:"profile,omitempty"` // Recorded profile.
+	Profile *Profile `json:"profile,omitempty,omitzero"` // Recorded profile.
 }
 
 // Do executes Profiler.stop against the provided context.
@@ -239,8 +243,8 @@ func TakePreciseCoverage() *TakePreciseCoverageParams {
 
 // TakePreciseCoverageReturns return values.
 type TakePreciseCoverageReturns struct {
-	Result    []*ScriptCoverage `json:"result,omitempty"`    // Coverage data for the current isolate.
-	Timestamp float64           `json:"timestamp,omitempty"` // Monotonically increasing time (in seconds) when the coverage update was taken in the backend.
+	Result    []*ScriptCoverage `json:"result,omitempty,omitzero"`    // Coverage data for the current isolate.
+	Timestamp float64           `json:"timestamp,omitempty,omitzero"` // Monotonically increasing time (in seconds) when the coverage update was taken in the backend.
 }
 
 // Do executes Profiler.takePreciseCoverage against the provided context.

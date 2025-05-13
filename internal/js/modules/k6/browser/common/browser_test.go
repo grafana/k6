@@ -8,7 +8,6 @@ import (
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/target"
-	"github.com/mailru/easyjson"
 	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
@@ -56,7 +55,7 @@ func TestBrowserNewPageInContext(t *testing.T) {
 
 		tc.b.conn = fakeConn{
 			execute: func(
-				ctx context.Context, method string, params easyjson.Marshaler, res easyjson.Unmarshaler,
+				ctx context.Context, method string, params, res any,
 			) error {
 				require.Equal(t, target.CommandCreateTarget, method)
 				require.IsType(t, params, &target.CreateTargetParams{})
@@ -110,7 +109,7 @@ func TestBrowserNewPageInContext(t *testing.T) {
 
 		tc := newTestCase(browserContextID)
 		tc.b.conn = fakeConn{
-			execute: func(context.Context, string, easyjson.Marshaler, easyjson.Unmarshaler) error {
+			execute: func(context.Context, string, any, any) error {
 				return errors.New(wantErr)
 			},
 		}
@@ -131,7 +130,7 @@ func TestBrowserNewPageInContext(t *testing.T) {
 		// set the timeout for the browser value.
 		tc.b.browserOpts.Timeout = timeout
 		tc.b.conn = fakeConn{
-			execute: func(context.Context, string, easyjson.Marshaler, easyjson.Unmarshaler) error {
+			execute: func(context.Context, string, any, any) error {
 				// executor takes more time than the timeout.
 				time.Sleep(2 * timeout)
 				return nil
@@ -165,7 +164,7 @@ func TestBrowserNewPageInContext(t *testing.T) {
 		tc := newTestCase(browserContextID)
 
 		tc.b.conn = fakeConn{
-			execute: func(context.Context, string, easyjson.Marshaler, easyjson.Unmarshaler) error {
+			execute: func(context.Context, string, any, any) error {
 				return nil
 			},
 		}
@@ -184,11 +183,11 @@ func TestBrowserNewPageInContext(t *testing.T) {
 
 type fakeConn struct {
 	connection
-	execute func(context.Context, string, easyjson.Marshaler, easyjson.Unmarshaler) error
+	execute func(context.Context, string, any, any) error
 }
 
 func (c fakeConn) Execute(
-	ctx context.Context, method string, params easyjson.Marshaler, res easyjson.Unmarshaler,
+	ctx context.Context, method string, params, res any,
 ) error {
 	return c.execute(ctx, method, params, res)
 }

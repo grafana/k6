@@ -11,6 +11,24 @@ type EventCredentialAdded struct {
 	Credential      *Credential     `json:"credential"`
 }
 
+// EventCredentialDeleted triggered when a credential is deleted, e.g.
+// through PublicKeyCredential.signalUnknownCredential().
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/WebAuthn#event-credentialDeleted
+type EventCredentialDeleted struct {
+	AuthenticatorID AuthenticatorID `json:"authenticatorId"`
+	CredentialID    string          `json:"credentialId"`
+}
+
+// EventCredentialUpdated triggered when a credential is updated, e.g.
+// through PublicKeyCredential.signalCurrentUserDetails().
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/WebAuthn#event-credentialUpdated
+type EventCredentialUpdated struct {
+	AuthenticatorID AuthenticatorID `json:"authenticatorId"`
+	Credential      *Credential     `json:"credential"`
+}
+
 // EventCredentialAsserted triggered when a credential is used in a webauthn
 // assertion.
 //
