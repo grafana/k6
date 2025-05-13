@@ -12,8 +12,8 @@ import (
 	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/target"
+	"github.com/go-json-experiment/json/jsontext"
 	"github.com/gorilla/websocket"
-	"github.com/mailru/easyjson"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -89,7 +89,7 @@ func TestConnectionCreateSession(t *testing.T) {
 				writeCh <- cdproto.Message{
 					ID:        msg.ID,
 					SessionID: msg.SessionID,
-					Result:    easyjson.RawMessage([]byte("{}")),
+					Result:    jsontext.Value([]byte("{}")),
 				}
 			case cdproto.MethodType(cdproto.CommandTargetAttachToTarget):
 				switch msg.Method {
@@ -97,12 +97,12 @@ func TestConnectionCreateSession(t *testing.T) {
 					writeCh <- cdproto.Message{
 						ID:        msg.ID,
 						SessionID: msg.SessionID,
-						Result:    easyjson.RawMessage([]byte("{}")),
+						Result:    jsontext.Value([]byte("{}")),
 					}
 				case cdproto.MethodType(cdproto.CommandTargetAttachToTarget):
 					writeCh <- cdproto.Message{
 						Method: cdproto.EventTargetAttachedToTarget,
-						Params: easyjson.RawMessage([]byte(`
+						Params: jsontext.Value([]byte(`
 						{
 							"sessionId": "0123456789",
 							"targetInfo": {
@@ -120,7 +120,7 @@ func TestConnectionCreateSession(t *testing.T) {
 					writeCh <- cdproto.Message{
 						ID:        msg.ID,
 						SessionID: msg.SessionID,
-						Result:    easyjson.RawMessage([]byte(`{"sessionId":"0123456789"}`)),
+						Result:    jsontext.Value([]byte(`{"sessionId":"0123456789"}`)),
 					}
 				}
 			}

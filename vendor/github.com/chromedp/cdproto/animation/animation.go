@@ -63,7 +63,7 @@ func GetCurrentTime(id string) *GetCurrentTimeParams {
 
 // GetCurrentTimeReturns return values.
 type GetCurrentTimeReturns struct {
-	CurrentTime float64 `json:"currentTime,omitempty"` // Current time of the page.
+	CurrentTime float64 `json:"currentTime,omitempty,omitzero"` // Current time of the page.
 }
 
 // Do executes Animation.getCurrentTime against the provided context.
@@ -94,7 +94,7 @@ func GetPlaybackRate() *GetPlaybackRateParams {
 
 // GetPlaybackRateReturns return values.
 type GetPlaybackRateReturns struct {
-	PlaybackRate float64 `json:"playbackRate,omitempty"` // Playback rate for animations on page.
+	PlaybackRate float64 `json:"playbackRate,omitempty,omitzero"` // Playback rate for animations on page.
 }
 
 // Do executes Animation.getPlaybackRate against the provided context.
@@ -158,7 +158,7 @@ func ResolveAnimation(animationID string) *ResolveAnimationParams {
 
 // ResolveAnimationReturns return values.
 type ResolveAnimationReturns struct {
-	RemoteObject *runtime.RemoteObject `json:"remoteObject,omitempty"` // Corresponding remote object.
+	RemoteObject *runtime.RemoteObject `json:"remoteObject,omitempty,omitzero"` // Corresponding remote object.
 }
 
 // Do executes Animation.resolveAnimation against the provided context.

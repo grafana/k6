@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 
+	jsonv2 "github.com/go-json-experiment/json"
+
 	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/target"
-	"github.com/mailru/easyjson"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/log"
 )
@@ -106,7 +107,7 @@ func (s *Session) readLoop() {
 
 // Execute implements the cdp.Executor interface.
 func (s *Session) Execute(
-	ctx context.Context, method string, params easyjson.Marshaler, res easyjson.Unmarshaler,
+	ctx context.Context, method string, params, res any,
 ) error {
 	s.logger.Debugf("Session:Execute", "sid:%v tid:%v method:%q", s.id, s.targetID, method)
 	if s.crashed {
@@ -151,7 +152,7 @@ func (s *Session) Execute(
 	var buf []byte
 	if params != nil {
 		var err error
-		buf, err = easyjson.Marshal(params)
+		buf, err = jsonv2.Marshal(params)
 		if err != nil {
 			return err
 		}
@@ -166,7 +167,7 @@ func (s *Session) Execute(
 }
 
 func (s *Session) ExecuteWithoutExpectationOnReply(
-	ctx context.Context, method string, params easyjson.Marshaler, res easyjson.Unmarshaler,
+	ctx context.Context, method string, params, res any,
 ) error {
 	s.logger.Debugf("Session:ExecuteWithoutExpectationOnReply", "sid:%v tid:%v method:%q", s.id, s.targetID, method)
 	if s.crashed {
@@ -180,7 +181,7 @@ func (s *Session) ExecuteWithoutExpectationOnReply(
 	var buf []byte
 	if params != nil {
 		var err error
-		buf, err = easyjson.Marshal(params)
+		buf, err = jsonv2.Marshal(params)
 		if err != nil {
 			s.logger.Debugf("Session:ExecuteWithoutExpectationOnReply:Marshal", "sid:%v tid:%v method:%q err=%v",
 				s.id, s.targetID, method, err)

@@ -36,8 +36,8 @@ func GetOsAppState(manifestID string) *GetOsAppStateParams {
 
 // GetOsAppStateReturns return values.
 type GetOsAppStateReturns struct {
-	BadgeCount   int64          `json:"badgeCount,omitempty"`
-	FileHandlers []*FileHandler `json:"fileHandlers,omitempty"`
+	BadgeCount   int64          `json:"badgeCount,omitempty,omitzero"`
+	FileHandlers []*FileHandler `json:"fileHandlers,omitempty,omitzero"`
 }
 
 // Do executes PWA.getOsAppState against the provided context.
@@ -67,7 +67,7 @@ func (p *GetOsAppStateParams) Do(ctx context.Context) (badgeCount int64, fileHan
 // regardless of the state of the allowlist.
 type InstallParams struct {
 	ManifestID            string `json:"manifestId"`
-	InstallURLOrBundleURL string `json:"installUrlOrBundleUrl,omitempty"` // The location of the app or bundle overriding the one derived from the manifestId.
+	InstallURLOrBundleURL string `json:"installUrlOrBundleUrl,omitempty,omitzero"` // The location of the app or bundle overriding the one derived from the manifestId.
 }
 
 // Install installs the given manifest identity, optionally using the given
@@ -133,7 +133,7 @@ func (p *UninstallParams) Do(ctx context.Context) (err error) {
 // similar APIs.
 type LaunchParams struct {
 	ManifestID string `json:"manifestId"`
-	URL        string `json:"url,omitempty"`
+	URL        string `json:"url,omitempty,omitzero"`
 }
 
 // Launch launches the installed web app, or an url in the same web app
@@ -160,7 +160,7 @@ func (p LaunchParams) WithURL(url string) *LaunchParams {
 
 // LaunchReturns return values.
 type LaunchReturns struct {
-	TargetID target.ID `json:"targetId,omitempty"` // ID of the tab target created as a result.
+	TargetID target.ID `json:"targetId,omitempty,omitzero"` // ID of the tab target created as a result.
 }
 
 // Do executes PWA.launch against the provided context.
@@ -222,7 +222,7 @@ func LaunchFilesInApp(manifestID string, files []string) *LaunchFilesInAppParams
 
 // LaunchFilesInAppReturns return values.
 type LaunchFilesInAppReturns struct {
-	TargetIDs []target.ID `json:"targetIds,omitempty"` // IDs of the tab targets created as the result.
+	TargetIDs []target.ID `json:"targetIds,omitempty,omitzero"` // IDs of the tab targets created as the result.
 }
 
 // Do executes PWA.launchFilesInApp against the provided context.
@@ -277,8 +277,8 @@ func (p *OpenCurrentPageInAppParams) Do(ctx context.Context) (err error) {
 // each parameter.
 type ChangeAppUserSettingsParams struct {
 	ManifestID    string      `json:"manifestId"`
-	LinkCapturing bool        `json:"linkCapturing,omitempty"` // If user allows the links clicked on by the user in the app's scope, or extended scope if the manifest has scope extensions and the flags DesktopPWAsLinkCapturingWithScopeExtensions and WebAppEnableScopeExtensions are enabled.  Note, the API does not support resetting the linkCapturing to the initial value, uninstalling and installing the web app again will reset it.  TODO(crbug.com/339453269): Setting this value on ChromeOS is not supported yet.
-	DisplayMode   DisplayMode `json:"displayMode,omitempty"`
+	LinkCapturing bool        `json:"linkCapturing"` // If user allows the links clicked on by the user in the app's scope, or extended scope if the manifest has scope extensions and the flags DesktopPWAsLinkCapturingWithScopeExtensions and WebAppEnableScopeExtensions are enabled.  Note, the API does not support resetting the linkCapturing to the initial value, uninstalling and installing the web app again will reset it.  TODO(crbug.com/339453269): Setting this value on ChromeOS is not supported yet.
+	DisplayMode   DisplayMode `json:"displayMode,omitempty,omitzero"`
 }
 
 // ChangeAppUserSettings changes user settings of the web app identified by
@@ -295,7 +295,8 @@ type ChangeAppUserSettingsParams struct {
 //	manifestID
 func ChangeAppUserSettings(manifestID string) *ChangeAppUserSettingsParams {
 	return &ChangeAppUserSettingsParams{
-		ManifestID: manifestID,
+		ManifestID:    manifestID,
+		LinkCapturing: false,
 	}
 }
 

@@ -1,10 +1,10 @@
-// +build linux
+//go:build linux
 
 package sysutil
 
 import (
 	"bytes"
-	"io/ioutil"
+	"os"
 	"strconv"
 	"time"
 )
@@ -15,7 +15,7 @@ var (
 )
 
 func init() {
-	buf, err := ioutil.ReadFile("/proc/stat")
+	buf, err := os.ReadFile("/proc/stat")
 	if err != nil {
 		btime = time.Now()
 		return

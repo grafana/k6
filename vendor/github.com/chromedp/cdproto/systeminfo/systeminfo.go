@@ -27,10 +27,10 @@ func GetInfo() *GetInfoParams {
 
 // GetInfoReturns return values.
 type GetInfoReturns struct {
-	Gpu          *GPUInfo `json:"gpu,omitempty"`          // Information about the GPUs on the system.
-	ModelName    string   `json:"modelName,omitempty"`    // A platform-dependent description of the model of the machine. On Mac OS, this is, for example, 'MacBookPro'. Will be the empty string if not supported.
-	ModelVersion string   `json:"modelVersion,omitempty"` // A platform-dependent description of the version of the machine. On Mac OS, this is, for example, '10.1'. Will be the empty string if not supported.
-	CommandLine  string   `json:"commandLine,omitempty"`  // The command line string used to launch the browser. Will be the empty string if not supported.
+	GPU          *GPUInfo `json:"gpu,omitempty,omitzero"`          // Information about the GPUs on the system.
+	ModelName    string   `json:"modelName,omitempty,omitzero"`    // A platform-dependent description of the model of the machine. On Mac OS, this is, for example, 'MacBookPro'. Will be the empty string if not supported.
+	ModelVersion string   `json:"modelVersion,omitempty,omitzero"` // A platform-dependent description of the version of the machine. On Mac OS, this is, for example, '10.1'. Will be the empty string if not supported.
+	CommandLine  string   `json:"commandLine,omitempty,omitzero"`  // The command line string used to launch the browser. Will be the empty string if not supported.
 }
 
 // Do executes SystemInfo.getInfo against the provided context.
@@ -49,7 +49,7 @@ func (p *GetInfoParams) Do(ctx context.Context) (gpu *GPUInfo, modelName string,
 		return nil, "", "", "", err
 	}
 
-	return res.Gpu, res.ModelName, res.ModelVersion, res.CommandLine, nil
+	return res.GPU, res.ModelName, res.ModelVersion, res.CommandLine, nil
 }
 
 // GetFeatureStateParams returns information about the feature state.
@@ -72,7 +72,7 @@ func GetFeatureState(featureState string) *GetFeatureStateParams {
 
 // GetFeatureStateReturns return values.
 type GetFeatureStateReturns struct {
-	FeatureEnabled bool `json:"featureEnabled,omitempty"`
+	FeatureEnabled bool `json:"featureEnabled"`
 }
 
 // Do executes SystemInfo.getFeatureState against the provided context.
@@ -103,7 +103,7 @@ func GetProcessInfo() *GetProcessInfoParams {
 
 // GetProcessInfoReturns return values.
 type GetProcessInfoReturns struct {
-	ProcessInfo []*ProcessInfo `json:"processInfo,omitempty"` // An array of process info blocks.
+	ProcessInfo []*ProcessInfo `json:"processInfo,omitempty,omitzero"` // An array of process info blocks.
 }
 
 // Do executes SystemInfo.getProcessInfo against the provided context.

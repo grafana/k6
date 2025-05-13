@@ -19,7 +19,6 @@ import (
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/fetch"
 	"github.com/chromedp/cdproto/network"
-	"github.com/mailru/easyjson"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -34,7 +33,7 @@ type fakeSession struct {
 // Execute implements the cdp.Executor interface to record calls made to it and
 // allow assertions in tests.
 func (s *fakeSession) Execute(
-	ctx context.Context, method string, params easyjson.Marshaler, res easyjson.Unmarshaler,
+	ctx context.Context, method string, params, res any,
 ) error {
 	s.cdpCalls = append(s.cdpCalls, method)
 	return nil

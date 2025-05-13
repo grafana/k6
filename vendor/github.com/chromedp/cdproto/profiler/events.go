@@ -13,7 +13,7 @@ type EventConsoleProfileFinished struct {
 	ID       string             `json:"id"`
 	Location *debugger.Location `json:"location"` // Location of console.profileEnd().
 	Profile  *Profile           `json:"profile"`
-	Title    string             `json:"title,omitempty"` // Profile title passed as an argument to console.profile().
+	Title    string             `json:"title,omitempty,omitzero"` // Profile title passed as an argument to console.profile().
 }
 
 // EventConsoleProfileStarted sent when new profile recording is started
@@ -22,8 +22,8 @@ type EventConsoleProfileFinished struct {
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Profiler#event-consoleProfileStarted
 type EventConsoleProfileStarted struct {
 	ID       string             `json:"id"`
-	Location *debugger.Location `json:"location"`        // Location of console.profile().
-	Title    string             `json:"title,omitempty"` // Profile title passed as an argument to console.profile().
+	Location *debugger.Location `json:"location"`                 // Location of console.profile().
+	Title    string             `json:"title,omitempty,omitzero"` // Profile title passed as an argument to console.profile().
 }
 
 // EventPreciseCoverageDeltaUpdate reports coverage delta since the last poll

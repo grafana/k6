@@ -4,24 +4,23 @@ package systeminfo
 
 import (
 	"fmt"
+	"strings"
 
-	"github.com/mailru/easyjson"
-	"github.com/mailru/easyjson/jlexer"
-	"github.com/mailru/easyjson/jwriter"
+	"github.com/go-json-experiment/json/jsontext"
 )
 
 // GPUDevice describes a single graphics processor (GPU).
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/SystemInfo#type-GPUDevice
 type GPUDevice struct {
-	VendorID      float64 `json:"vendorId"`           // PCI ID of the GPU vendor, if available; 0 otherwise.
-	DeviceID      float64 `json:"deviceId"`           // PCI ID of the GPU device, if available; 0 otherwise.
-	SubSysID      float64 `json:"subSysId,omitempty"` // Sub sys ID of the GPU, only available on Windows.
-	Revision      float64 `json:"revision,omitempty"` // Revision of the GPU, only available on Windows.
-	VendorString  string  `json:"vendorString"`       // String description of the GPU vendor, if the PCI ID is not available.
-	DeviceString  string  `json:"deviceString"`       // String description of the GPU device, if the PCI ID is not available.
-	DriverVendor  string  `json:"driverVendor"`       // String description of the GPU driver vendor.
-	DriverVersion string  `json:"driverVersion"`      // String description of the GPU driver version.
+	VendorID      float64 `json:"vendorId"`                    // PCI ID of the GPU vendor, if available; 0 otherwise.
+	DeviceID      float64 `json:"deviceId"`                    // PCI ID of the GPU device, if available; 0 otherwise.
+	SubSysID      float64 `json:"subSysId,omitempty,omitzero"` // Sub sys ID of the GPU, only available on Windows.
+	Revision      float64 `json:"revision,omitempty,omitzero"` // Revision of the GPU, only available on Windows.
+	VendorString  string  `json:"vendorString"`                // String description of the GPU vendor, if the PCI ID is not available.
+	DeviceString  string  `json:"deviceString"`                // String description of the GPU device, if the PCI ID is not available.
+	DriverVendor  string  `json:"driverVendor"`                // String description of the GPU driver vendor.
+	DriverVersion string  `json:"driverVersion"`               // String description of the GPU driver version.
 }
 
 // Size describes the width and height dimensions of an entity.
@@ -70,35 +69,22 @@ const (
 	SubsamplingFormatYuv444 SubsamplingFormat = "yuv444"
 )
 
-// MarshalEasyJSON satisfies easyjson.Marshaler.
-func (t SubsamplingFormat) MarshalEasyJSON(out *jwriter.Writer) {
-	out.String(string(t))
-}
+// UnmarshalJSON satisfies [json.Unmarshaler].
+func (t *SubsamplingFormat) UnmarshalJSON(buf []byte) error {
+	s := string(buf)
+	s = strings.TrimSuffix(strings.TrimPrefix(s, `"`), `"`)
 
-// MarshalJSON satisfies json.Marshaler.
-func (t SubsamplingFormat) MarshalJSON() ([]byte, error) {
-	return easyjson.Marshal(t)
-}
-
-// UnmarshalEasyJSON satisfies easyjson.Unmarshaler.
-func (t *SubsamplingFormat) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	v := in.String()
-	switch SubsamplingFormat(v) {
+	switch SubsamplingFormat(s) {
 	case SubsamplingFormatYuv420:
 		*t = SubsamplingFormatYuv420
 	case SubsamplingFormatYuv422:
 		*t = SubsamplingFormatYuv422
 	case SubsamplingFormatYuv444:
 		*t = SubsamplingFormatYuv444
-
 	default:
-		in.AddError(fmt.Errorf("unknown SubsamplingFormat value: %v", v))
+		return fmt.Errorf("unknown SubsamplingFormat value: %v", s)
 	}
-}
-
-// UnmarshalJSON satisfies json.Unmarshaler.
-func (t *SubsamplingFormat) UnmarshalJSON(buf []byte) error {
-	return easyjson.Unmarshal(buf, t)
+	return nil
 }
 
 // ImageType image format of a given image.
@@ -118,35 +104,22 @@ const (
 	ImageTypeUnknown ImageType = "unknown"
 )
 
-// MarshalEasyJSON satisfies easyjson.Marshaler.
-func (t ImageType) MarshalEasyJSON(out *jwriter.Writer) {
-	out.String(string(t))
-}
+// UnmarshalJSON satisfies [json.Unmarshaler].
+func (t *ImageType) UnmarshalJSON(buf []byte) error {
+	s := string(buf)
+	s = strings.TrimSuffix(strings.TrimPrefix(s, `"`), `"`)
 
-// MarshalJSON satisfies json.Marshaler.
-func (t ImageType) MarshalJSON() ([]byte, error) {
-	return easyjson.Marshal(t)
-}
-
-// UnmarshalEasyJSON satisfies easyjson.Unmarshaler.
-func (t *ImageType) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	v := in.String()
-	switch ImageType(v) {
+	switch ImageType(s) {
 	case ImageTypeJpeg:
 		*t = ImageTypeJpeg
 	case ImageTypeWebp:
 		*t = ImageTypeWebp
 	case ImageTypeUnknown:
 		*t = ImageTypeUnknown
-
 	default:
-		in.AddError(fmt.Errorf("unknown ImageType value: %v", v))
+		return fmt.Errorf("unknown ImageType value: %v", s)
 	}
-}
-
-// UnmarshalJSON satisfies json.Unmarshaler.
-func (t *ImageType) UnmarshalJSON(buf []byte) error {
-	return easyjson.Unmarshal(buf, t)
+	return nil
 }
 
 // ImageDecodeAcceleratorCapability describes a supported image decoding
@@ -165,8 +138,8 @@ type ImageDecodeAcceleratorCapability struct {
 // See: https://chromedevtools.github.io/devtools-protocol/tot/SystemInfo#type-GPUInfo
 type GPUInfo struct {
 	Devices              []*GPUDevice                        `json:"devices"` // The graphics devices on the system. Element 0 is the primary GPU.
-	AuxAttributes        easyjson.RawMessage                 `json:"auxAttributes,omitempty"`
-	FeatureStatus        easyjson.RawMessage                 `json:"featureStatus,omitempty"`
+	AuxAttributes        jsontext.Value                      `json:"auxAttributes,omitempty,omitzero"`
+	FeatureStatus        jsontext.Value                      `json:"featureStatus,omitempty,omitzero"`
 	DriverBugWorkarounds []string                            `json:"driverBugWorkarounds"` // An optional array of GPU driver bug workarounds.
 	VideoDecoding        []*VideoDecodeAcceleratorCapability `json:"videoDecoding"`        // Supported accelerated video decoding capabilities.
 	VideoEncoding        []*VideoEncodeAcceleratorCapability `json:"videoEncoding"`        // Supported accelerated video encoding capabilities.
