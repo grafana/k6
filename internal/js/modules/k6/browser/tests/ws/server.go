@@ -168,7 +168,7 @@ func WithCDPHandler(
 				}
 
 				var msg cdproto.Message
-				err = jsonv2.Unmarshal(buf, msg)
+				err = jsonv2.Unmarshal(buf, &msg)
 				if err != nil {
 					return nil, err
 				}
