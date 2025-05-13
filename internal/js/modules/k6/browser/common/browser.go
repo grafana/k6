@@ -481,7 +481,7 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 	defer removeEventHandler()
 
 	// create a new page.
-	action := target.CreateTarget(BlankPage).WithBrowserContextID(id)
+	action := target.CreateTarget(BlankPage).WithNewWindow(true).WithBrowserContextID(id)
 	tid, err := action.Do(cdp.WithExecutor(ctx, b.conn))
 	if err != nil {
 		return nil, fmt.Errorf("creating a new blank page: %w", err)
