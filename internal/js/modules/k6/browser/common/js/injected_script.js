@@ -934,7 +934,7 @@ class InjectedScript {
     }
   }
 
-  waitForElementStates(node, states, timeout, ...args) {
+  waitForElementStates(node, states=[], timeout, ...args) {
     let lastRect = undefined;
     let counter = 0;
     let samePositionCounter = 0;
