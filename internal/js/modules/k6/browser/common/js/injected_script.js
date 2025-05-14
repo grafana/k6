@@ -545,7 +545,7 @@ class InjectedScript {
     };
   }
 
-  fill(node, value) {
+  fill(node, value="") {
     const element = this._retarget(node, "follow-label");
     if (!element) {
       return "error:notconnected";
