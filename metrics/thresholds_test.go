@@ -731,6 +731,16 @@ func TestThresholdsRun(t *testing.T) {
 			want:    false,
 			wantErr: false,
 		},
+		{
+			name: "when sink type is rate and sink.Total is 0, should set rate with 0",
+			args: args{
+				sink:                 &RateSink{Trues: 0, Total: 0},
+				thresholdExpressions: []string{"rate>=0.5"},
+				duration:             0,
+			},
+			want:    false,
+			wantErr: false,
+		},
 	}
 	for _, testCase := range tests {
 		testCase := testCase
