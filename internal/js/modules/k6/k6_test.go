@@ -30,7 +30,6 @@ func TestSleep(t *testing.T) {
 		"0.5": 500 * time.Millisecond,
 	}
 	for name, d := range testdata {
-		d := d
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			tc := testCaseRuntime(t)
@@ -310,11 +309,9 @@ func TestCheckTypes(t *testing.T) {
 		`undefined`: false,
 	}
 	for name, tpl := range templates {
-		name, tpl := name, tpl
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			for value, succ := range testdata {
-				value, succ := value, succ
 				t.Run(value, func(t *testing.T) {
 					t.Parallel()
 					tc := testCaseRuntime(t)

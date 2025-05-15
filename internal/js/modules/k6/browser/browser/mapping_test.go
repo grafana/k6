@@ -222,7 +222,6 @@ func TestMappings(t *testing.T) {
 			},
 		},
 	} {
-		tt := tt
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			testMapping(t, tt)

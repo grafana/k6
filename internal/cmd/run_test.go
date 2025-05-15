@@ -231,7 +231,6 @@ func TestRunScriptErrorsAndAbort(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		name := tc.testFilename
 		if tc.name != "" {
 			name = fmt.Sprintf("%s (%s)", tc.testFilename, tc.name)
@@ -299,8 +298,6 @@ func TestInvalidOptionsThresholdErrExitCode(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
-
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -349,8 +346,6 @@ func TestThresholdsRuntimeBehavior(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
-
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 

@@ -134,11 +134,9 @@ func TestRequire(t *testing.T) {
 			}},
 		}
 		for libName, data := range imports {
-			libName, data := libName, data
 			t.Run("lib=\""+libName+"\"", func(t *testing.T) {
 				t.Parallel()
 				for constName, constPath := range data.ConstPaths {
-					constName, constPath := constName, constPath
 					name := "inline"
 					if constName != "" {
 						name = "const=\"" + constName + "\""
@@ -243,7 +241,6 @@ func TestInitContextOpen(t *testing.T) {
 		// {[]byte{00, 36, 32, 127}, "utf-16", 2},   // $€
 	}
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.file, func(t *testing.T) {
 			t.Parallel()
 			bi, err := createAndReadFile(t, tc.file, tc.content, tc.length, "")
@@ -266,7 +263,6 @@ func TestInitContextOpen(t *testing.T) {
 	}
 
 	for name, loadPath := range testdata {
-		loadPath := loadPath
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			_, err := createAndReadFile(t, loadPath, []byte("content"), 7, "")

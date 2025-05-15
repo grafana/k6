@@ -52,7 +52,6 @@ func TestTrieContains(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-		tc := tc
 		t.Run(tc.query, func(t *testing.T) {
 			t.Parallel()
 
@@ -74,8 +73,6 @@ func TestReverseString(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-		tc := tc
-
 		t.Run(tc.str, func(t *testing.T) {
 			t.Parallel()
 			val := reverseString(tc.str)

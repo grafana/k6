@@ -31,7 +31,6 @@ func TestTagURL(t *testing.T) {
 		`http://localhost/anything/${1+1}/${1+2}/`: {"http://localhost/anything/2/3/", "http://localhost/anything/${}/${}/"},
 	}
 	for expr, data := range testdata {
-		expr, data := expr, data
 		t.Run("expr="+expr, func(t *testing.T) {
 			t.Parallel()
 			runtime, _ := getTestModuleInstance(t)

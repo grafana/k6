@@ -306,7 +306,6 @@ func (b *testBrowser) run(ctx context.Context, fs ...func() error) error {
 
 	g, ctx := errgroup.WithContext(ctx)
 	for _, f := range fs {
-		f := f
 		g.Go(func() error {
 			errc := make(chan error, 1)
 			go func() { errc <- f() }()

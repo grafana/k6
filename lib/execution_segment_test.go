@@ -87,7 +87,6 @@ func TestExecutionSegmentUnmarshalText(t *testing.T) {
 		// TODO add more strange or not so strange cases
 	}
 	for _, testCase := range testCases {
-		testCase := testCase
 		t.Run(testCase.input, func(t *testing.T) {
 			t.Parallel()
 			es := new(ExecutionSegment)
@@ -313,7 +312,6 @@ func TestExecutionSegmentSubSegment(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		testCase := testCase
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 			require.Equal(t, testCase.result, testCase.base.SubSegment(testCase.sub))
@@ -356,7 +354,6 @@ func TestSegmentExecutionFloatLength(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		testCase := testCase
 		t.Run(testCase.es.String(), func(t *testing.T) {
 			t.Parallel()
 			require.InEpsilon(t, testCase.expected, testCase.es.FloatLength(), 0.001)
@@ -400,7 +397,6 @@ func TestExecutionSegmentStringSequences(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.seq, func(t *testing.T) {
 			t.Parallel()
 			result, err := NewExecutionSegmentSequenceFromString(tc.seq)
@@ -574,7 +570,6 @@ func TestGetStripedOffsets(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(fmt.Sprintf("seq:%s;segment:%s", tc.seq, tc.seg), func(t *testing.T) {
 			t.Parallel()
 			ess, err := NewExecutionSegmentSequenceFromString(tc.seq)
@@ -611,7 +606,6 @@ func TestSequenceLCD(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(fmt.Sprintf("seq:%s", tc.seq), func(t *testing.T) {
 			t.Parallel()
 			ess, err := NewExecutionSegmentSequenceFromString(tc.seq)
@@ -627,7 +621,6 @@ func BenchmarkGetStripedOffsets(b *testing.B) {
 	r := rand.New(rand.NewSource(seed)) //nolint:gosec
 
 	for _, length := range lengths {
-		length := length
 		b.Run(fmt.Sprintf("length%d,seed%d", length, seed), func(b *testing.B) {
 			sequence := generateRandomSequence(b, length, 100, r)
 			b.ResetTimer()
@@ -663,7 +656,6 @@ func BenchmarkGetStripedOffsetsEven(b *testing.B) {
 	}
 
 	for _, length := range lengths {
-		length := length
 		b.Run(fmt.Sprintf("length%d", length), func(b *testing.B) {
 			sequence := generateSequence(length)
 			b.ResetTimer()
@@ -691,7 +683,6 @@ func TestGetNewExecutionTupleBesedOnValue(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(fmt.Sprintf("seq:%s;segment:%s", tc.seq, tc.seg), func(t *testing.T) {
 			t.Parallel()
 			ess, err := NewExecutionSegmentSequenceFromString(tc.seq)
@@ -848,7 +839,6 @@ func TestNewExecutionTuple(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		testCase := testCase
 		t.Run(fmt.Sprintf("seg:'%s',seq:'%s'", testCase.seg, testCase.seq), func(t *testing.T) {
 			t.Parallel()
 			et, err := NewExecutionTuple(testCase.seg, testCase.seq)
@@ -888,7 +878,6 @@ func BenchmarkExecutionSegmentScale(b *testing.B) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		b.Run(fmt.Sprintf("seq:%s;segment:%s", tc.seq, tc.seg), func(b *testing.B) {
 			ess, err := NewExecutionSegmentSequenceFromString(tc.seq)
 			require.NoError(b, err)
@@ -900,7 +889,6 @@ func BenchmarkExecutionSegmentScale(b *testing.B) {
 			et, err := NewExecutionTuple(segment, &ess)
 			require.NoError(b, err)
 			for _, value := range []int64{5, 5523, 5000000, 67280421310721} {
-				value := value
 				b.Run(fmt.Sprintf("segment.Scale(%d)", value), func(b *testing.B) {
 					for i := 0; i < b.N; i++ {
 						segment.Scale(value)

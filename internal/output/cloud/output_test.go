@@ -57,8 +57,6 @@ func TestNewOutputNameResolution(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		testCase := testCase
-
 		t.Run(testCase.url.String(), func(t *testing.T) {
 			t.Parallel()
 			out, err := newOutput(output.Params{

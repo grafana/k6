@@ -25,7 +25,6 @@ func TestNullMetricTypeJSON(t *testing.T) {
 		t.Parallel()
 
 		for mt, val := range values {
-			mt, val := mt, val
 			t.Run(val, func(t *testing.T) {
 				t.Parallel()
 
@@ -39,7 +38,6 @@ func TestNullMetricTypeJSON(t *testing.T) {
 		t.Parallel()
 
 		for mt, val := range values {
-			mt, val := mt, val
 			t.Run(val, func(t *testing.T) {
 				t.Parallel()
 
@@ -63,7 +61,6 @@ func TestNullValueTypeJSON(t *testing.T) {
 		t.Parallel()
 
 		for mt, val := range values {
-			mt, val := mt, val
 			t.Run(val, func(t *testing.T) {
 				t.Parallel()
 
@@ -77,7 +74,6 @@ func TestNullValueTypeJSON(t *testing.T) {
 		t.Parallel()
 
 		for mt, val := range values {
-			mt, val := mt, val
 			t.Run(val, func(t *testing.T) {
 				t.Parallel()
 

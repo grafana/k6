@@ -68,9 +68,7 @@ func TestFieldNameMapper(t *testing.T) {
 		}},
 	}
 	for _, data := range testdata {
-		data := data
 		for field, name := range data.Fields {
-			field, name := field, name
 			t.Run(field, func(t *testing.T) {
 				t.Parallel()
 				f, ok := data.Typ.FieldByName(field)
@@ -79,7 +77,6 @@ func TestFieldNameMapper(t *testing.T) {
 			})
 		}
 		for meth, name := range data.Methods {
-			meth, name := meth, name
 			t.Run(meth, func(t *testing.T) {
 				t.Parallel()
 				m, ok := data.Typ.MethodByName(meth)

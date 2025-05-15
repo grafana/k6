@@ -90,7 +90,6 @@ func TestSharedArrayConstructorExceptions(t *testing.T) {
 	}
 
 	for name, testCase := range cases {
-		name, testCase := name, testCase
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			runtime, err := newConfiguredRuntime(t)
@@ -135,7 +134,6 @@ func TestSharedArrayAnotherRuntimeExceptions(t *testing.T) {
 	}
 
 	for name, testCase := range cases {
-		name, testCase := name, testCase
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			testRuntime, err := newConfiguredRuntime(t)
@@ -232,7 +230,6 @@ func TestSharedArrayRaceInInitialization(t *testing.T) {
 		}
 		var wg sync.WaitGroup
 		for _, rt := range runtimes {
-			rt := rt
 			wg.Add(1)
 			go func() {
 				defer wg.Done()

@@ -580,13 +580,11 @@ func TestConfigConsolidation(t *testing.T) {
 	t.Parallel()
 
 	for tcNum, testCase := range getConfigConsolidationTestCases() {
-		tcNum, testCase := tcNum, testCase
 		subCommands := testCase.options.cmds
 		if subCommands == nil { // handle the most common case
 			subCommands = []string{"run", "archive", "cloud"}
 		}
 		for fsNum, subCmd := range subCommands {
-			fsNum, subCmd := fsNum, subCmd
 			t.Run(
 				fmt.Sprintf("TestCase#%d_FlagSet#%d", tcNum, fsNum),
 				func(t *testing.T) {

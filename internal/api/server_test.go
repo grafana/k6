@@ -23,11 +23,9 @@ func testHTTPHandler(rw http.ResponseWriter, _ *http.Request) {
 func TestLogger(t *testing.T) {
 	t.Parallel()
 	for _, method := range []string{"GET", "POST", "PUT", "PATCH"} {
-		method := method
 		t.Run("method="+method, func(t *testing.T) {
 			t.Parallel()
 			for _, path := range []string{"/", "/test", "/test/path"} {
-				path := path
 				t.Run("path="+path, func(t *testing.T) {
 					t.Parallel()
 					rw := httptest.NewRecorder()

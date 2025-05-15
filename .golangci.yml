@@ -10,6 +10,7 @@ linters:
     - bodyclose
     - canonicalheader
     - contextcheck
+    - copyloopvar
     - cyclop
     - dogsled
     - dupl
