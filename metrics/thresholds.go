@@ -205,6 +205,8 @@ func (ts *Thresholds) Run(sink Sink, duration time.Duration) (bool, error) {
 		// would lead to [#2520](https://github.com/grafana/k6/issues/2520)
 		if sinkImpl.Total > 0 {
 			ts.sinked["rate"] = float64(sinkImpl.Trues) / float64(sinkImpl.Total)
+		} else {
+			ts.sinked["rate"] = 0
 		}
 	default:
 		return false, fmt.Errorf("unable to run Thresholds; reason: unknown sink type")
