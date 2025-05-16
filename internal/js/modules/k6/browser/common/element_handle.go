@@ -43,6 +43,16 @@ type ElementHandle struct {
 	frame *Frame
 }
 
+// String returns a string repesentation of ElementHandle.
+// It exists mostly for debugging where we don't want fmt.Sprintf to just
+// go through a complex object and try to stringify it.
+func (h *ElementHandle) String() string {
+	return "ElementHandle{" +
+		" BaseJSHandle:  " + h.BaseJSHandle.String() +
+		" frame: " + h.frame.String() +
+		"}"
+}
+
 func (h *ElementHandle) boundingBox() (*Rect, error) {
 	var box *dom.BoxModel
 	var err error

@@ -120,6 +120,17 @@ type Frame struct {
 	log *log.Logger
 }
 
+// String returns a string repesentation of Frame.
+// It exists mostly for debugging where we don't want fmt.Sprintf to just
+// go through a complex object and try to stringify it.
+func (f *Frame) String() string {
+	return "Frame: {" +
+		" id: " + f.id.String() +
+		" name: " + f.name +
+		" url: " + f.url +
+		"}"
+}
+
 // NewFrame creates a new HTML document frame.
 func NewFrame(
 	ctx context.Context, m *FrameManager, parentFrame *Frame, frameID cdp.FrameID, log *log.Logger,
