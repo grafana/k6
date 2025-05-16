@@ -2293,7 +2293,16 @@ func (c *linkerContext) createExportsForFile(sourceIndex uint32) {
 		} else {
 			getter = js_ast.Expr{Data: &js_ast.EArrow{PreferExpr: true, Body: body}}
 		}
+
+		// Special case for __proto__ property: use a computed property
+		// name to avoid it being treated as the object's prototype
+		var flags js_ast.PropertyFlags
+		if alias == "__proto__" && !c.options.UnsupportedJSFeatures.Has(compat.ObjectExtensions) {
+			flags |= js_ast.PropertyIsComputed
+		}
+
 		properties = append(properties, js_ast.Property{
+			Flags:      flags,
 			Key:        js_ast.Expr{Data: &js_ast.EString{Value: helpers.StringToUTF16(alias)}},
 			ValueOrNil: getter,
 		})
