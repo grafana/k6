@@ -191,8 +191,25 @@ func newKeyGenerator(rt *sobek.Runtime, normalized Algorithm, params sobek.Value
 		kg, err = newECKeyGenParams(rt, normalized, params)
 	case RSASsaPkcs1v15, RSAPss, RSAOaep:
 		kg, err = newRsaHashedKeyGenParams(rt, normalized, params)
+	case Ed25519:
+		kg = newEd25519KeyGenParams(normalized)
+	case X25519:
+		kg = newX25519KeyGenParams(normalized)
 	default:
-		validAlgorithms := []string{AESCbc, AESCtr, AESGcm, AESKw, HMAC, ECDH, ECDSA, RSASsaPkcs1v15, RSAPss, RSAOaep}
+		validAlgorithms := []string{
+			AESCbc,
+			AESCtr,
+			AESGcm,
+			AESKw,
+			HMAC,
+			ECDH,
+			ECDSA,
+			RSASsaPkcs1v15,
+			RSAPss,
+			RSAOaep,
+			Ed25519,
+			X25519,
+		}
 		return nil, NewError(
 			NotImplemented,
 			"unsupported key generation algorithm '"+normalized.Name+"', "+
@@ -226,6 +243,10 @@ func newKeyImporter(rt *sobek.Runtime, normalized Algorithm, params sobek.Value)
 		ki, err = newEcKeyImportParams(rt, normalized, params)
 	case RSASsaPkcs1v15, RSAPss, RSAOaep:
 		ki, err = newRsaHashedImportParams(rt, normalized, params)
+	case Ed25519:
+		ki = newEd25519ImportParams(normalized)
+	case X25519:
+		ki = newX25519ImportParams(normalized)
 	default:
 		return nil, errors.New("key import not implemented for algorithm " + normalized.Name)
 	}
