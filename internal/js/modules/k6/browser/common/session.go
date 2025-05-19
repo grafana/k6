@@ -2,9 +2,8 @@ package common
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
-
-	jsonv2 "github.com/go-json-experiment/json"
 
 	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/cdp"
@@ -152,7 +151,7 @@ func (s *Session) Execute(
 	var buf []byte
 	if params != nil {
 		var err error
-		buf, err = jsonv2.Marshal(params)
+		buf, err = json.Marshal(params)
 		if err != nil {
 			return err
 		}
@@ -181,7 +180,7 @@ func (s *Session) ExecuteWithoutExpectationOnReply(
 	var buf []byte
 	if params != nil {
 		var err error
-		buf, err = jsonv2.Marshal(params)
+		buf, err = json.Marshal(params)
 		if err != nil {
 			s.logger.Debugf("Session:ExecuteWithoutExpectationOnReply:Marshal", "sid:%v tid:%v method:%q err=%v",
 				s.id, s.targetID, method, err)

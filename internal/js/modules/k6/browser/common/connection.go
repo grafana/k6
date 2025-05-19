@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -10,7 +11,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	jsonv2 "github.com/go-json-experiment/json"
 	"go.k6.io/k6/internal/js/modules/k6/browser/log"
 
 	"github.com/chromedp/cdproto"
@@ -332,7 +332,7 @@ func (c *Connection) recvLoop() {
 		c.logger.Tracef("cdp:recv", "<- %s", buf)
 
 		var msg cdproto.Message
-		err = jsonv2.Unmarshal(buf, &msg)
+		err = json.Unmarshal(buf, &msg)
 		if err != nil {
 			select {
 			case c.errorCh <- err:
@@ -503,7 +503,7 @@ func (c *Connection) send(
 			c.logger.Debugf("Connection:send", "sid:%v tid:%v wsURL:%q, msg err:%v", sid, tid, c.wsURL, msg.Error)
 			return msg.Error
 		case res != nil:
-			return jsonv2.Unmarshal(msg.Result, res)
+			return json.Unmarshal(msg.Result, res)
 		}
 	case err := <-c.errorCh:
 		c.logger.Debugf("Connection:send:<-c.errorCh #2", "sid:%v tid:%v wsURL:%q, err:%v", msg.SessionID, tid, c.wsURL, err)
@@ -532,7 +532,7 @@ func (c *Connection) sendLoop() {
 	for {
 		select {
 		case msg := <-c.sendCh:
-			buf, err := jsonv2.Marshal(msg)
+			buf, err := json.Marshal(msg)
 			if err != nil {
 				sid := msg.SessionID
 				tid := c.findTargetIDForLog(sid)
@@ -623,7 +623,7 @@ func (c *Connection) Execute(
 	var buf []byte
 	if params != nil {
 		var err error
-		buf, err = jsonv2.Marshal(params)
+		buf, err = json.Marshal(params)
 		if err != nil {
 			return err
 		}

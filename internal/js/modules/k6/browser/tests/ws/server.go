@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	jsonv2 "github.com/go-json-experiment/json"
+	json "github.com/go-json-experiment/json"
 	"github.com/go-json-experiment/json/jsontext"
 
 	k6netext "go.k6.io/k6/lib/netext"
@@ -168,7 +168,7 @@ func WithCDPHandler(
 				}
 
 				var msg cdproto.Message
-				err = jsonv2.Unmarshal(buf, &msg)
+				err = json.Unmarshal(buf, &msg)
 				if err != nil {
 					return nil, err
 				}
@@ -204,7 +204,7 @@ func WithCDPHandler(
 					return
 				}
 				encoder := jsontext.NewEncoder(writer)
-				err = jsonv2.MarshalEncode(encoder, msg)
+				err = json.MarshalEncode(encoder, msg)
 				if err != nil {
 					return
 				}
