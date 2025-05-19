@@ -1041,4 +1041,9 @@ class InjectedScript {
 
     return this.waitForPredicateFunction(predicate, polling, timeout, ...args);
   }
+
+  count(selector, root) {
+    const elements = this.querySelectorAll(selector, root || document);
+    return elements.length;
+  }
 }
