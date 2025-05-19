@@ -80,6 +80,13 @@ func (l *Locator) click(opts *FrameClickOptions) error {
 	return l.frame.click(l.selector, opts)
 }
 
+// Count APIs do not wait for the element to be present. It also does not set
+// strict to true, allowing it to return the total number of elements matching
+// the selector.
+func (l *Locator) Count() (int, error) {
+	return l.frame.count(l.selector)
+}
+
 // Dblclick double clicks on an element using locator's selector with strict mode on.
 func (l *Locator) Dblclick(opts sobek.Value) error {
 	l.log.Debugf("Locator:Dblclick", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
