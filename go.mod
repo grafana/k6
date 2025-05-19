@@ -12,7 +12,7 @@ require (
 	github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
 	github.com/andybalholm/brotli v1.1.1
 	github.com/chromedp/cdproto v0.0.0-20250509201441-70372ae9ef75
-	github.com/evanw/esbuild v0.25.3
+	github.com/evanw/esbuild v0.25.4
 	github.com/fatih/color v1.18.0
 	github.com/go-json-experiment/json v0.0.0-20250211171154-1ae217ad3535
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible
