@@ -31,6 +31,11 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping { //nolint:funlen
 				return nil, lo.Click(popts) //nolint:wrapcheck
 			}), nil
 		},
+		"count": func() *sobek.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return lo.Count() //nolint:wrapcheck
+			})
+		},
 		"dblclick": func(opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return nil, lo.Dblclick(opts) //nolint:wrapcheck
