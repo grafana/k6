@@ -758,6 +758,36 @@ func (h *ElementHandle) waitForSelector(
 	}
 }
 
+func (h *ElementHandle) count(apiCtx context.Context, selector string) (int, error) {
+	parsedSelector, err := NewSelector(selector)
+	if err != nil {
+		return 0, err
+	}
+
+	fn := `
+			(node, injected, selector) => {
+				return injected.count(selector, node);
+			}
+		`
+	eopts := evalOptions{
+		forceCallable: true,
+		returnByValue: true,
+	}
+	result, err := h.evalWithScript(
+		apiCtx,
+		eopts, fn, parsedSelector,
+	)
+	if err != nil {
+		return 0, err
+	}
+	switch r := result.(type) {
+	case float64:
+		return int(r), nil
+	default:
+		return 0, fmt.Errorf("unexpected value %v of type %T", r, r)
+	}
+}
+
 // AsElement returns this element handle.
 func (h *ElementHandle) AsElement() *ElementHandle {
 	return h
