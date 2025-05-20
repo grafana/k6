@@ -10,13 +10,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	jsonv2 "github.com/go-json-experiment/json"
 	"go.k6.io/k6/internal/js/modules/k6/browser/log"
 
 	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/cdp"
 	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/target"
+	jsonv2 "github.com/go-json-experiment/json"
+	"github.com/go-json-experiment/json/jsontext"
 	"github.com/gorilla/websocket"
 )
 
@@ -32,6 +33,12 @@ const wsWriteBufferSize = 1 << 20
 type msgID struct {
 	id int64
 }
+
+//nolint:gochecknoglobals
+var defaultJSONV2Options = jsonv2.JoinOptions(
+	jsonv2.DefaultOptionsV2(),
+	jsontext.AllowInvalidUTF8(true), // this is needed as chromium sometimes returns invalid utf-8
+)
 
 func (m *msgID) newID() int64 {
 	return atomic.AddInt64(&m.id, 1)
@@ -332,7 +339,7 @@ func (c *Connection) recvLoop() {
 		c.logger.Tracef("cdp:recv", "<- %s", buf)
 
 		var msg cdproto.Message
-		err = jsonv2.Unmarshal(buf, &msg)
+		err = jsonv2.Unmarshal(buf, &msg, defaultJSONV2Options)
 		if err != nil {
 			select {
 			case c.errorCh <- err:
@@ -503,7 +510,7 @@ func (c *Connection) send(
 			c.logger.Debugf("Connection:send", "sid:%v tid:%v wsURL:%q, msg err:%v", sid, tid, c.wsURL, msg.Error)
 			return msg.Error
 		case res != nil:
-			return jsonv2.Unmarshal(msg.Result, res)
+			return jsonv2.Unmarshal(msg.Result, res, defaultJSONV2Options)
 		}
 	case err := <-c.errorCh:
 		c.logger.Debugf("Connection:send:<-c.errorCh #2", "sid:%v tid:%v wsURL:%q, err:%v", msg.SessionID, tid, c.wsURL, err)
@@ -532,7 +539,7 @@ func (c *Connection) sendLoop() {
 	for {
 		select {
 		case msg := <-c.sendCh:
-			buf, err := jsonv2.Marshal(msg)
+			buf, err := jsonv2.Marshal(msg, defaultJSONV2Options)
 			if err != nil {
 				sid := msg.SessionID
 				tid := c.findTargetIDForLog(sid)
@@ -623,7 +630,7 @@ func (c *Connection) Execute(
 	var buf []byte
 	if params != nil {
 		var err error
-		buf, err = jsonv2.Marshal(params)
+		buf, err = jsonv2.Marshal(params, defaultJSONV2Options)
 		if err != nil {
 			return err
 		}
