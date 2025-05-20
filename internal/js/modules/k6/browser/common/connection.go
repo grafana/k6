@@ -34,6 +34,7 @@ type msgID struct {
 	id int64
 }
 
+//nolint:gochecknoglobals
 var defaultJSONV2Options = jsonv2.JoinOptions(
 	jsonv2.DefaultOptionsV2(),
 	jsontext.AllowInvalidUTF8(true),

@@ -23,6 +23,7 @@ import (
 	"golang.org/x/net/http2"
 )
 
+//nolint:gochecknoglobals
 var defaultJSONV2Options = jsonv2.JoinOptions(
 	jsonv2.DefaultOptionsV2(),
 	jsontext.AllowInvalidUTF8(true),
