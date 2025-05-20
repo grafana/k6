@@ -1054,6 +1054,27 @@ func (f *Frame) GetByRole(role string, opts *GetByRoleOptions) *Locator {
 	return f.Locator(builder.String(), nil)
 }
 
+// Locator creates and returns a new locator for this frame.
+func (f *Frame) GetByAltText(attr string, opts *GetByAltTextOptions) *Locator {
+	f.log.Debugf("Frame:GetByAltText", "fid:%s furl:%q role:%q opts:%+v", f.ID(), f.URL(), attr, opts)
+
+	properties := make(map[string]string)
+
+	if opts.Exact != nil && *opts.Exact {
+		properties["alt"] = fmt.Sprintf("'%v's", attr)
+	} else {
+		properties["alt"] = fmt.Sprintf("'%v'i", attr)
+	}
+
+	var builder strings.Builder
+	builder.WriteString("internal:attr=")
+	for key, value := range properties {
+		builder.WriteString(fmt.Sprintf("[%s=%s]", key, value))
+	}
+
+	return f.Locator(builder.String(), nil)
+}
+
 // Referrer returns the referrer of the frame from the network manager
 // of the frame's session.
 // It's an internal method not to be exposed as a JS API.
