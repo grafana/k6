@@ -1009,7 +1009,7 @@ func (f *Frame) GetByRole(role string, opts *GetByRoleOptions) *Locator {
 	properties := make(map[string]string)
 
 	if opts == nil {
-		return f.Locator(fmt.Sprintf("role=%s", role), nil)
+		return f.Locator(fmt.Sprintf("internal:role=%s", role), nil)
 	}
 
 	if opts.Checked != nil {
@@ -1046,7 +1046,7 @@ func (f *Frame) GetByRole(role string, opts *GetByRoleOptions) *Locator {
 	}
 
 	var builder strings.Builder
-	builder.WriteString(fmt.Sprintf("role=%s", role))
+	builder.WriteString(fmt.Sprintf("internal:role=%s", role))
 	for key, value := range properties {
 		builder.WriteString(fmt.Sprintf("[%s=%s]", key, value))
 	}
