@@ -11,17 +11,21 @@ import (
 	"testing"
 	"time"
 
-	jsonv2 "github.com/go-json-experiment/json"
-	"github.com/go-json-experiment/json/jsontext"
-
 	k6netext "go.k6.io/k6/lib/netext"
 	k6types "go.k6.io/k6/lib/types"
 
 	"github.com/chromedp/cdproto"
+	jsonv2 "github.com/go-json-experiment/json"
+	"github.com/go-json-experiment/json/jsontext"
 	"github.com/gorilla/websocket"
 	"github.com/mccutchen/go-httpbin/httpbin"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/http2"
+)
+
+var defaultJSONV2Options = jsonv2.JoinOptions(
+	jsonv2.DefaultOptionsV2(),
+	jsontext.AllowInvalidUTF8(true),
 )
 
 // Server can be used as a test alternative to a real CDP compatible browser.
@@ -168,7 +172,7 @@ func WithCDPHandler(
 				}
 
 				var msg cdproto.Message
-				err = jsonv2.Unmarshal(buf, &msg)
+				err = jsonv2.Unmarshal(buf, &msg, defaultJSONV2Options)
 				if err != nil {
 					return nil, err
 				}
@@ -204,7 +208,7 @@ func WithCDPHandler(
 					return
 				}
 				encoder := jsontext.NewEncoder(writer)
-				err = jsonv2.MarshalEncode(encoder, msg)
+				err = jsonv2.MarshalEncode(encoder, msg, defaultJSONV2Options)
 				if err != nil {
 					return
 				}
