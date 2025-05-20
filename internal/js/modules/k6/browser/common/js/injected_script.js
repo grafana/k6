@@ -1474,7 +1474,7 @@ class InjectedScript {
       css: new CSSQueryEngine(),
       text: new TextQueryEngine(),
       xpath: new XPathQueryEngine(),
-      role: createRoleEngine(false),
+      'internal:role': createRoleEngine(true),
     };
   }
 
