@@ -30,6 +30,17 @@ func (m *mockExecutor) run(_ *state.GlobalState) error {
 	return m.err
 }
 
+type mockProvider struct {
+	invoked  bool
+	executor commandExecutor
+	err      error
+}
+
+func (m *mockProvider) provision(_ k6deps.Dependencies) (commandExecutor, error) {
+	m.invoked = true
+	return m.executor, m.err
+}
+
 const (
 	fakerTest = `
 import { Faker } from "k6/x/faker";
@@ -222,15 +233,11 @@ func TestLauncherLaunch(t *testing.T) {
 
 			cmdExecutor := mockExecutor{err: tc.k6ExecutorErr}
 
-			// mock launcher's provision function recording the invocation and
-			// returning the mock command executor
-			provisionCalled := false
+			// use a provider returning the mock command executor
+			provider := mockProvider{executor: &cmdExecutor, err: tc.provisionError}
 			launcher := &launcher{
-				gs: ts.GlobalState,
-				provision: func(_ *state.GlobalState, _ k6deps.Dependencies) (commandExecutor, error) {
-					provisionCalled = true
-					return &cmdExecutor, tc.provisionError
-				},
+				gs:       ts.GlobalState,
+				provider: &provider,
 			}
 
 			rootCommand := newRootWithLauncher(ts.GlobalState, launcher)
@@ -251,7 +258,7 @@ func TestLauncherLaunch(t *testing.T) {
 			// TODO: check error
 			rootCommand.execute()
 
-			assert.Equal(t, tc.expectProvision, provisionCalled)
+			assert.Equal(t, tc.expectProvision, provider.invoked)
 			assert.Equal(t, tc.expectCmdRunE, runECalled)
 			assert.Equal(t, tc.expectK6Run, cmdExecutor.invoked)
 		})
