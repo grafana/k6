@@ -37,7 +37,7 @@ type msgID struct {
 //nolint:gochecknoglobals
 var defaultJSONV2Options = jsonv2.JoinOptions(
 	jsonv2.DefaultOptionsV2(),
-	jsontext.AllowInvalidUTF8(true),
+	jsontext.AllowInvalidUTF8(true), // this is needed as chromium sometimes returns invalid utf-8
 )
 
 func (m *msgID) newID() int64 {
