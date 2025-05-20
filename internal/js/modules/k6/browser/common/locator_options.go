@@ -79,3 +79,34 @@ func (o *GetByRoleOptions) Parse(ctx context.Context, opts sobek.Value) error {
 
 	return nil
 }
+
+// GetByAltTextOptions are the optional options for when working with the
+// GetByAltText API.
+type GetByAltTextOptions struct {
+	Exact *bool `json:"exact"`
+}
+
+// NewGetByRoleOptions will create a new empty GetByRoleOptions instance.
+func NewGetByAltTextOptions() *GetByAltTextOptions {
+	return &GetByAltTextOptions{}
+}
+
+// Parse parses the GetByRole options from the Sobek.Value.
+func (o *GetByAltTextOptions) Parse(ctx context.Context, opts sobek.Value) error {
+	if !sobekValueExists(opts) {
+		return nil
+	}
+
+	rt := k6ext.Runtime(ctx)
+
+	obj := opts.ToObject(rt)
+	for _, k := range obj.Keys() {
+		switch k {
+		case "exact":
+			val := obj.Get(k).ToBoolean()
+			o.Exact = &val
+		}
+	}
+
+	return nil
+}
