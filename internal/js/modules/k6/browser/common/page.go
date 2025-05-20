@@ -1087,6 +1087,13 @@ func (p *Page) GetAttribute(selector string, name string, popts *FrameBaseOption
 	return p.MainFrame().GetAttribute(selector, name, popts)
 }
 
+// GetByRole creates and returns a new locator for this page (main frame) based on their ARIA role.
+func (p *Page) GetByRole(role string, opts *GetByRoleOptions) *Locator {
+	p.logger.Debugf("Page:GetByRole", "sid:%s role: %q opts:%+v", p.sessionID(), role, opts)
+
+	return p.MainFrame().GetByRole(role, opts)
+}
+
 // GetKeyboard returns the keyboard for the page.
 func (p *Page) GetKeyboard() *Keyboard {
 	return p.Keyboard
