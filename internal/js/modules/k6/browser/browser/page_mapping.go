@@ -163,6 +163,15 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return s, nil
 			}), nil
 		},
+		"getByRole": func(role string, opts sobek.Value) (*sobek.Object, error) {
+			popts := common.NewGetByRoleOptions()
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing getByRole options: %w", err)
+			}
+
+			ml := mapLocator(vu, p.GetByRole(role, popts))
+			return rt.ToValue(ml).ToObject(rt), nil
+		},
 		"goto": func(url string, opts sobek.Value) (*sobek.Promise, error) {
 			gopts := common.NewFrameGotoOptions(
 				p.Referrer(),
