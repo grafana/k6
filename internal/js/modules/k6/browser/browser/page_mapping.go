@@ -181,6 +181,23 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			ml := mapLocator(vu, p.GetByAltText(role, popts))
 			return rt.ToValue(ml).ToObject(rt), nil
 		},
+		"getByLabel": func(label sobek.Value, opts sobek.Value) (*sobek.Object, error) {
+			var val string
+			switch label.ExportType() {
+			case reflect.TypeOf(string("")):
+				val = fmt.Sprintf("\"%s\"", label.String()) // Strings require double quotes
+			default: // JS RegExp
+				val = label.String() // No quotes
+			}
+
+			popts := common.NewGetByAltTextOptions()
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing getByLabel options: %w", err)
+			}
+
+			ml := mapLocator(vu, p.GetByLabel(val, popts))
+			return rt.ToValue(ml).ToObject(rt), nil
+		},
 		"goto": func(url string, opts sobek.Value) (*sobek.Promise, error) {
 			gopts := common.NewFrameGotoOptions(
 				p.Referrer(),

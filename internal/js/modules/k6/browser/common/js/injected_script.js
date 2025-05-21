@@ -1762,6 +1762,148 @@ function sortInDOMOrder(elements) {
   return result;
 }
 
+// packages/injected/src/selectorUtils.ts
+function shouldSkipForTextMatching(element) {
+  const document = element.ownerDocument;
+  return element.nodeName === "SCRIPT" || element.nodeName === "NOSCRIPT" || element.nodeName === "STYLE" || document.head && document.head.contains(element);
+}
+function elementText(cache, root) {
+  let value = cache.get(root);
+  if (value === void 0) {
+    value = { full: "", normalized: "", immediate: [] };
+    if (!shouldSkipForTextMatching(root)) {
+      let currentImmediate = "";
+      if (root instanceof HTMLInputElement && (root.type === "submit" || root.type === "button")) {
+        value = { full: root.value, normalized: normalizeWhiteSpace(root.value), immediate: [root.value] };
+      } else {
+        for (let child = root.firstChild; child; child = child.nextSibling) {
+          if (child.nodeType === Node.TEXT_NODE) {
+            value.full += child.nodeValue || "";
+            currentImmediate += child.nodeValue || "";
+          } else if (child.nodeType === Node.COMMENT_NODE) {
+            continue;
+          } else {
+            if (currentImmediate)
+              value.immediate.push(currentImmediate);
+            currentImmediate = "";
+            if (child.nodeType === Node.ELEMENT_NODE)
+              value.full += elementText(cache, child).full;
+          }
+        }
+        if (currentImmediate)
+          value.immediate.push(currentImmediate);
+        if (root.shadowRoot)
+          value.full += elementText(cache, root.shadowRoot).full;
+        if (value.full)
+          value.normalized = normalizeWhiteSpace(value.full);
+      }
+    }
+    cache.set(root, value);
+  }
+  return value;
+}
+function getElementLabels(textCache, element) {
+  const labels = getAriaLabelledByElements(element);
+  if (labels)
+    return labels.map((label) => elementText(textCache, label));
+  const ariaLabel = element.getAttribute("aria-label");
+  if (ariaLabel !== null && !!ariaLabel.trim())
+    return [{ full: ariaLabel, normalized: normalizeWhiteSpace(ariaLabel), immediate: [ariaLabel] }];
+  const isNonHiddenInput = element.nodeName === "INPUT" && element.type !== "hidden";
+  if (["BUTTON", "METER", "OUTPUT", "PROGRESS", "SELECT", "TEXTAREA"].includes(element.nodeName) || isNonHiddenInput) {
+    const labels2 = element.labels;
+    if (labels2)
+      return [...labels2].map((label) => elementText(textCache, label));
+  }
+  return [];
+}
+
+// packages/injected/src/injectedScript.ts
+function cssUnquote(s) {
+  s = s.substring(1, s.length - 1);
+  if (!s.includes("\\"))
+    return s;
+  const r = [];
+  let i = 0;
+  while (i < s.length) {
+    if (s[i] === "\\" && i + 1 < s.length)
+      i++;
+    r.push(s[i++]);
+  }
+  return r.join("");
+}
+function createTextMatcher(selector, internal) {
+  if (selector[0] === "/" && selector.lastIndexOf("/") > 0) {
+    const lastSlash = selector.lastIndexOf("/");
+    const re = new RegExp(selector.substring(1, lastSlash), selector.substring(lastSlash + 1));
+    return { matcher: (elementText2) => re.test(elementText2.full), kind: "regex" };
+  }
+  const unquote = internal ? JSON.parse.bind(JSON) : cssUnquote;
+  let strict = false;
+  if (selector.length > 1 && selector[0] === '"' && selector[selector.length - 1] === '"') {
+    selector = unquote(selector);
+    strict = true;
+  } else if (internal && selector.length > 1 && selector[0] === '"' && selector[selector.length - 2] === '"' && selector[selector.length - 1] === "i") {
+    selector = unquote(selector.substring(0, selector.length - 1));
+    strict = false;
+  } else if (internal && selector.length > 1 && selector[0] === '"' && selector[selector.length - 2] === '"' && selector[selector.length - 1] === "s") {
+    selector = unquote(selector.substring(0, selector.length - 1));
+    strict = true;
+  } else if (selector.length > 1 && selector[0] === "'" && selector[selector.length - 1] === "'") {
+    selector = unquote(selector);
+    strict = true;
+  }
+  selector = normalizeWhiteSpace(selector);
+  if (strict) {
+    if (internal)
+      return { kind: "strict", matcher: (elementText2) => elementText2.normalized === selector };
+    const strictTextNodeMatcher = (elementText2) => {
+      if (!selector && !elementText2.immediate.length)
+        return true;
+      return elementText2.immediate.some((s) => normalizeWhiteSpace(s) === selector);
+    };
+    return { matcher: strictTextNodeMatcher, kind: "strict" };
+  }
+  selector = selector.toLowerCase();
+  return { kind: "lax", matcher: (elementText2) => elementText2.normalized.toLowerCase().includes(selector) };
+}
+function elementText(cache, root) {
+  let value = cache.get(root);
+  if (value === void 0) {
+    value = { full: "", normalized: "", immediate: [] };
+    if (!shouldSkipForTextMatching(root)) {
+      let currentImmediate = "";
+      if (root instanceof HTMLInputElement && (root.type === "submit" || root.type === "button")) {
+        value = { full: root.value, normalized: normalizeWhiteSpace(root.value), immediate: [root.value] };
+      } else {
+        for (let child = root.firstChild; child; child = child.nextSibling) {
+          if (child.nodeType === Node.TEXT_NODE) {
+            value.full += child.nodeValue || "";
+            currentImmediate += child.nodeValue || "";
+          } else if (child.nodeType === Node.COMMENT_NODE) {
+            continue;
+          } else {
+            if (currentImmediate)
+              value.immediate.push(currentImmediate);
+            currentImmediate = "";
+            if (child.nodeType === Node.ELEMENT_NODE)
+              value.full += elementText(cache, child).full;
+          }
+        }
+        if (currentImmediate)
+          value.immediate.push(currentImmediate);
+        if (root.shadowRoot)
+          value.full += elementText(cache, root.shadowRoot).full;
+        if (value.full)
+          value.normalized = normalizeWhiteSpace(value.full);
+      }
+    }
+    cache.set(root, value);
+  }
+  return value;
+}
+
+
 
 // k6BrowserNative allows accessing native browser objects
 // even if the page under test has overridden them.
@@ -1878,6 +2020,19 @@ function isVisible(element) {
 
 function oneLine(s) {
   return s.replace(/\n/g, "↵").replace(/\t/g, "⇆");
+}
+
+class LabelEngine {
+  constructor() {
+    this._evaluator = new SelectorEvaluatorImpl();
+  }
+  queryAll(root, selector) {
+    const { matcher } = createTextMatcher(selector, true);
+    const allElements = this._evaluator._queryCSS({ scope: root, pierceShadow: true }, "*");
+    return allElements.filter((element) => {
+      return getElementLabels(this._evaluator._cacheText, element).some((label) => matcher(label));
+    });
+  }
 }
 
 class AttributeEngine {
@@ -1998,6 +2153,7 @@ class InjectedScript {
       xpath: new XPathQueryEngine(),
       'internal:role': createRoleEngine(true),
       'internal:attr': new AttributeEngine(),
+      'internal:label': new LabelEngine(),
     };
   }
 
