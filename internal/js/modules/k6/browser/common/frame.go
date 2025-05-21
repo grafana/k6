@@ -1118,6 +1118,27 @@ func (f *Frame) GetByPlaceholder(placeholder string, opts *GetByAltTextOptions) 
 	return f.Locator(builder.String(), nil)
 }
 
+// Locator creates and returns a new locator for this frame.
+func (f *Frame) GetByTitle(title string, opts *GetByAltTextOptions) *Locator {
+	f.log.Debugf("Frame:GetByTitle", "fid:%s furl:%q title:%q opts:%+v", f.ID(), f.URL(), title, opts)
+
+	properties := make(map[string]string)
+
+	if opts.Exact != nil && *opts.Exact {
+		properties["title"] = fmt.Sprintf("'%v's", title)
+	} else {
+		properties["title"] = fmt.Sprintf("'%v'i", title)
+	}
+
+	var builder strings.Builder
+	builder.WriteString("internal:attr=")
+	for key, value := range properties {
+		builder.WriteString(fmt.Sprintf("[%s=%s]", key, value))
+	}
+
+	return f.Locator(builder.String(), nil)
+}
+
 // Referrer returns the referrer of the frame from the network manager
 // of the frame's session.
 // It's an internal method not to be exposed as a JS API.
