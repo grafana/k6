@@ -1101,6 +1101,13 @@ func (p *Page) GetByAltText(role string, opts *GetByAltTextOptions) *Locator {
 	return p.MainFrame().GetByAltText(role, opts)
 }
 
+// GetByLabel creates and returns a new locator for this page (main frame) based on the label text.
+func (p *Page) GetByLabel(label string, opts *GetByAltTextOptions) *Locator {
+	p.logger.Debugf("Page:GetByRole", "sid:%s role: %q opts:%+v", p.sessionID(), label, opts)
+
+	return p.MainFrame().GetByLabel(label, opts)
+}
+
 // GetKeyboard returns the keyboard for the page.
 func (p *Page) GetKeyboard() *Keyboard {
 	return p.Keyboard

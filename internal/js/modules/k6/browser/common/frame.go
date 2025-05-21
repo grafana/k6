@@ -1075,6 +1075,28 @@ func (f *Frame) GetByAltText(attr string, opts *GetByAltTextOptions) *Locator {
 	return f.Locator(builder.String(), nil)
 }
 
+// Locator creates and returns a new locator for this frame.
+func (f *Frame) GetByLabel(label string, opts *GetByAltTextOptions) *Locator {
+	f.log.Debugf("Frame:GetByLabel", "fid:%s furl:%q role:%q opts:%+v", f.ID(), f.URL(), label, opts)
+
+	var l string
+
+	// Note: We use double quotes instead of single quotes as prescribed by PW.
+	if label[0] == '"' {
+		if opts.Exact != nil && *opts.Exact {
+			l = fmt.Sprintf("internal:label=%vs", label)
+		} else {
+			l = fmt.Sprintf("internal:label=%vi", label)
+		}
+	} else {
+		l = fmt.Sprintf("internal:label=%v", label)
+	}
+
+	fmt.Println("blah", l)
+
+	return f.Locator(l, nil)
+}
+
 // Referrer returns the referrer of the frame from the network manager
 // of the frame's session.
 // It's an internal method not to be exposed as a JS API.
