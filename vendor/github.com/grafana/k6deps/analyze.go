@@ -4,47 +4,144 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"os"
+	"io"
 )
 
-// Analyze searches, loads and analyzes the specified sources,
-// extracting the k6 extensions and their version constraints.
-// Note: if archive is specified, the other three sources will not be taken into account,
-// since the archive may contain them.
-func Analyze(opts *Options) (Dependencies, error) {
-	if !opts.Archive.Ignore && !opts.Archive.IsEmpty() {
-		return archiveAnalizer(opts.Archive)()
-	}
-
-	// if the manifest is not provided, we try to find it
-	// if not found, it will be empty and ignored by the analyzer
-	if !opts.Manifest.Ignore && opts.Manifest.IsEmpty() {
-		if err := opts.setManifest(); err != nil {
-			return nil, err
-		}
-	}
-
-	if !opts.Script.Ignore {
-		if err := loadScript(opts); err != nil {
-			return nil, err
-		}
-	}
-
-	if !opts.Env.Ignore {
-		loadEnv(opts)
-	}
-
-	return mergeAnalyzers(
-		scriptAnalyzer(opts.Script),
-		manifestAnalyzer(opts.Manifest),
-		envAnalyzer(opts.Env),
-	)()
+// analyzer defines the interface for a dependency analyzer
+type analyzer interface {
+	analyze() (Dependencies, error)
 }
 
-type analyzer func() (Dependencies, error)
+// emptyAnalyzer returns empty Dependencies
+type emptyAnalyzer struct{}
 
-func empty() (Dependencies, error) {
+func newEmptyAnalyzer() analyzer {
+	return &emptyAnalyzer{}
+}
+
+func (e *emptyAnalyzer) analyze() (Dependencies, error) {
 	return make(Dependencies), nil
+}
+
+type manifestAnalyzer struct {
+	src io.ReadCloser
+}
+
+func newManifestAnalyzer(src io.ReadCloser) analyzer {
+	return &manifestAnalyzer{src: src}
+}
+
+func (m *manifestAnalyzer) analyze() (Dependencies, error) {
+	defer m.src.Close() //nolint:errcheck
+
+	var manifest struct {
+		Dependencies Dependencies `json:"dependencies,omitempty"`
+	}
+
+	err := json.NewDecoder(m.src).Decode(&manifest)
+
+	if err == nil {
+		return filterInvalid(manifest.Dependencies), nil
+	}
+
+	if errors.Is(err, io.EOF) {
+		return make(Dependencies), nil
+	}
+
+	return nil, err
+}
+
+type scriptAnalyzer struct {
+	src io.ReadCloser
+}
+
+func newScriptAnalyzer(src io.ReadCloser) analyzer {
+	return &scriptAnalyzer{src: src}
+}
+
+func (s *scriptAnalyzer) analyze() (Dependencies, error) {
+	var deps Dependencies
+	defer s.src.Close() //nolint:errcheck
+
+	buffer := new(bytes.Buffer)
+	if _, err := buffer.ReadFrom(s.src); err != nil {
+		return nil, err
+	}
+
+	if err := (&deps).UnmarshalJS(buffer.Bytes()); err != nil {
+		return nil, err
+	}
+
+	return deps, nil
+}
+
+// textAnalyzer analyzes dependencies from a text format
+type textAnalyzer struct {
+	src io.ReadCloser
+}
+
+func newTextAnalyzer(src io.ReadCloser) analyzer {
+	return &textAnalyzer{src: src}
+}
+
+func (e *textAnalyzer) analyze() (Dependencies, error) {
+	var deps Dependencies
+	content := &bytes.Buffer{}
+	_, err := content.ReadFrom(e.src)
+	if err != nil {
+		return nil, err
+	}
+
+	if content.Len() == 0 {
+		return make(Dependencies), nil
+	}
+
+	if err := (&deps).UnmarshalText(content.Bytes()); err != nil {
+		return nil, err
+	}
+
+	return filterInvalid(deps), nil
+}
+
+// archiveAnalizer analizes a k6 archive in .tar format
+type archiveAnalizer struct {
+	src io.ReadCloser
+}
+
+func newArchiveAnalyzer(src io.ReadCloser) analyzer {
+	return &archiveAnalizer{src: src}
+}
+
+func (a *archiveAnalizer) analyze() (Dependencies, error) {
+	defer a.src.Close() //nolint:errcheck
+
+	return processArchive(a.src)
+}
+
+type mergeAnalyzer struct {
+	analyzers []analyzer
+}
+
+func newMergeAnalyzer(analyzers ...analyzer) analyzer {
+	return &mergeAnalyzer{analyzers: analyzers}
+}
+
+func (m *mergeAnalyzer) analyze() (Dependencies, error) {
+	deps := make(Dependencies)
+
+	for _, a := range m.analyzers {
+		dep, err := a.analyze()
+		if err != nil {
+			return nil, err
+		}
+
+		err = deps.Merge(dep)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return deps, nil
 }
 
 func filterInvalid(from Dependencies) Dependencies {
@@ -57,120 +154,4 @@ func filterInvalid(from Dependencies) Dependencies {
 	}
 
 	return deps
-}
-
-func manifestAnalyzer(src Source) analyzer {
-	if src.IsEmpty() {
-		return empty
-	}
-
-	return func() (Dependencies, error) {
-		reader, closer, err := src.contentReader()
-
-		// we tolerate the manifest file not existing
-		if errors.Is(err, os.ErrNotExist) { //nolint:forbidigo
-			return make(Dependencies), nil
-		}
-
-		if err != nil {
-			return nil, err
-		}
-		defer closer() //nolint:errcheck
-
-		var manifest struct {
-			Dependencies Dependencies `json:"dependencies,omitempty"`
-		}
-
-		err = json.NewDecoder(reader).Decode(&manifest)
-		if err != nil {
-			return nil, err
-		}
-
-		return filterInvalid(manifest.Dependencies), nil
-	}
-}
-
-func scriptAnalyzer(src Source) analyzer {
-	if src.IsEmpty() {
-		return empty
-	}
-
-	return func() (Dependencies, error) {
-		var deps Dependencies
-
-		reader, closer, err := src.contentReader()
-		if err != nil {
-			return nil, err
-		}
-		defer closer() //nolint:errcheck
-
-		buffer := new(bytes.Buffer)
-		_, err = buffer.ReadFrom(reader)
-		if err != nil {
-			return nil, err
-		}
-
-		if err := (&deps).UnmarshalJS(buffer.Bytes()); err != nil {
-			return nil, err
-		}
-
-		return deps, nil
-	}
-}
-
-func envAnalyzer(src Source) analyzer {
-	if len(src.Contents) == 0 {
-		return empty
-	}
-
-	return func() (Dependencies, error) {
-		var deps Dependencies
-
-		if err := (&deps).UnmarshalText(src.Contents); err != nil {
-			return nil, err
-		}
-
-		return filterInvalid(deps), nil
-	}
-}
-
-func archiveAnalizer(src Source) analyzer {
-	if src.IsEmpty() {
-		return empty
-	}
-
-	return func() (Dependencies, error) {
-		input := src.Reader
-		if input == nil {
-			tar, err := os.Open(src.Name) //nolint:forbidigo
-			if err != nil {
-				return nil, err
-			}
-			defer tar.Close() //nolint:errcheck
-
-			input = tar
-		}
-
-		return processArchive(input)
-	}
-}
-
-func mergeAnalyzers(sources ...analyzer) analyzer {
-	return func() (Dependencies, error) {
-		deps := make(Dependencies)
-
-		for _, src := range sources {
-			dep, err := src()
-			if err != nil {
-				return nil, err
-			}
-
-			err = deps.Merge(dep)
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		return deps, nil
-	}
 }
