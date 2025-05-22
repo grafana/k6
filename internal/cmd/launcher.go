@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"syscall"
 
@@ -16,11 +17,6 @@ import (
 	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/internal/build"
-)
-
-var (
-	errScriptNotFound     = errors.New("script not found")
-	errUnsupportedFeature = errors.New("not supported")
 )
 
 // commandExecutor executes the requested k6 command line command.
@@ -62,7 +58,7 @@ func (l *launcher) launch(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	deps, err := analyze(l.gs, args)
+	deps, err := analyze(l.gs, cmd, args)
 	if err != nil {
 		l.gs.Logger.
 			WithError(err).
@@ -277,31 +273,28 @@ func extractToken(gs *state.GlobalState) (string, error) {
 // Presently, only the k6 input script or archive (if any) is passed to k6deps for scanning.
 // TODO: if k6 receives the input from stdin, it is not used for scanning because we don't know
 // if it is a script or an archive
-func analyze(gs *state.GlobalState, args []string) (k6deps.Dependencies, error) {
+func analyze(gs *state.GlobalState, _ *cobra.Command, args []string) (k6deps.Dependencies, error) {
 	dopts := &k6deps.Options{
 		LookupEnv: func(key string) (string, bool) { v, ok := gs.Env[key]; return v, ok },
 		Manifest:  k6deps.Source{Ignore: true},
 	}
 
-	scriptname := args[0]
-	if scriptname == "-" {
-		gs.Logger.
-			Debug("Test script provided by Stdin is not yet supported from Binary provisioning feature.")
-		return nil, errUnsupportedFeature
+	sourceRootPath := args[0]
+	gs.Logger.Debugf("Resolving and reading test '%s'...", sourceRootPath)
+	src, _, pwd, err := readSource(gs, sourceRootPath)
+	if err != nil {
+		return nil, err
 	}
 
-	if _, err := gs.FS.Stat(scriptname); err != nil {
-		gs.Logger.
-			WithField("path", scriptname).
-			WithError(err).
-			Debug("The requested test script's file is not available on the file system.")
-		return nil, errScriptNotFound
-	}
-
-	if strings.HasSuffix(scriptname, ".tar") {
-		dopts.Archive.Name = scriptname
+	if strings.HasSuffix(sourceRootPath, ".tar") {
+		dopts.Archive.Contents = src.Data
 	} else {
-		dopts.Script.Name = scriptname
+		if !filepath.IsAbs(sourceRootPath) {
+			sourceRootPath = filepath.Join(pwd, sourceRootPath)
+		}
+		dopts.Script.Name = sourceRootPath
+		dopts.Script.Contents = src.Data
+		dopts.Fs = gs.FS
 	}
 
 	return k6deps.Analyze(dopts)
