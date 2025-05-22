@@ -518,6 +518,7 @@ type responseAPI interface { //nolint:interfacebloat
 type locatorAPI interface { //nolint:interfacebloat
 	Clear(opts *common.FrameFillOptions) error
 	Click(opts sobek.Value) error
+	Count() (int, error)
 	Dblclick(opts sobek.Value) error
 	SetChecked(checked bool, opts sobek.Value) error
 	Check(opts sobek.Value) error
