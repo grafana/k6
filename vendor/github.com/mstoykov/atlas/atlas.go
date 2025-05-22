@@ -88,8 +88,9 @@ func (n *Node) Path() map[string]string {
 //
 // If another pair with the same key and a different value already exists in the path
 // then the new Node will have the key replaced with the new provided value from the pair.
-//   (e.g. adding keyA, val2 to a set of {keyA:val1, keyB:val3}
-//   will return the set {keyA: val2, keyB: val3}).
+//
+//	(e.g. adding keyA, val2 to a set of {keyA:val1, keyB:val3}
+//	will return the set {keyA: val2, keyB: val3}).
 func (n *Node) AddLink(key, value string) *Node {
 	if n.linkKey[0] == key && n.linkKey[1] == value {
 		return n

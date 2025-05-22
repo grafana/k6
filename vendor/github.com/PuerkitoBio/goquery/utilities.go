@@ -26,13 +26,12 @@ var nodeNames = []string{
 // Go's net/html package defines the following node types, listed with
 // the corresponding returned value from this function:
 //
-//     ErrorNode : #error
-//     TextNode : #text
-//     DocumentNode : #document
-//     ElementNode : the element's tag name
-//     CommentNode : #comment
-//     DoctypeNode : the name of the document type
-//
+//	ErrorNode : #error
+//	TextNode : #text
+//	DocumentNode : #document
+//	ElementNode : the element's tag name
+//	CommentNode : #comment
+//	DoctypeNode : the name of the document type
 func NodeName(s *Selection) string {
 	if s.Length() == 0 {
 		return ""

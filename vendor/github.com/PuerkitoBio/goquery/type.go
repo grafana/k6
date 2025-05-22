@@ -131,8 +131,8 @@ type Matcher interface {
 //
 // For example, those two statements are semantically equivalent:
 //
-//     sel1 := doc.Find("a").First()
-//     sel2 := doc.FindMatcher(goquery.Single("a"))
+//	sel1 := doc.Find("a").First()
+//	sel2 := doc.FindMatcher(goquery.Single("a"))
 //
 // The one using Single is optimized to be potentially much faster on large
 // documents.

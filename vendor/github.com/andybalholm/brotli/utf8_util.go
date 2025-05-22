@@ -10,9 +10,12 @@ package brotli
 
 const kMinUTF8Ratio float64 = 0.75
 
-/* Returns 1 if at least min_fraction of the bytes between pos and
-   pos + length in the (data, mask) ring-buffer is UTF8-encoded, otherwise
-   returns 0. */
+/*
+Returns 1 if at least min_fraction of the bytes between pos and
+
+	pos + length in the (data, mask) ring-buffer is UTF8-encoded, otherwise
+	returns 0.
+*/
 func parseAsUTF8(symbol *int, input []byte, size uint) uint {
 	/* ASCII */
 	if input[0]&0x80 == 0 {

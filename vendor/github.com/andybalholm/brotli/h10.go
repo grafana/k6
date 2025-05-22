@@ -24,12 +24,15 @@ func hashBytesH10(data []byte) uint32 {
 	return h >> (32 - 17)
 }
 
-/* A (forgetful) hash table where each hash bucket contains a binary tree of
-   sequences whose first 4 bytes share the same hash code.
-   Each sequence is 128 long and is identified by its starting
-   position in the input data. The binary tree is sorted by the lexicographic
-   order of the sequences, and it is also a max-heap with respect to the
-   starting positions. */
+/*
+A (forgetful) hash table where each hash bucket contains a binary tree of
+
+	sequences whose first 4 bytes share the same hash code.
+	Each sequence is 128 long and is identified by its starting
+	position in the input data. The binary tree is sorted by the lexicographic
+	order of the sequences, and it is also a max-heap with respect to the
+	starting positions.
+*/
 type h10 struct {
 	hasherCommon
 	window_mask_ uint
@@ -61,16 +64,19 @@ func rightChildIndexH10(self *h10, pos uint) uint {
 	return 2*(pos&self.window_mask_) + 1
 }
 
-/* Stores the hash of the next 4 bytes and in a single tree-traversal, the
-   hash bucket's binary tree is searched for matches and is re-rooted at the
-   current position.
+/*
+Stores the hash of the next 4 bytes and in a single tree-traversal, the
 
-   If less than 128 data is available, the hash bucket of the
-   current position is searched for matches, but the state of the hash table
-   is not changed, since we can not know the final sorting order of the
-   current (incomplete) sequence.
+	hash bucket's binary tree is searched for matches and is re-rooted at the
+	current position.
 
-   This function must be called with increasing cur_ix positions. */
+	If less than 128 data is available, the hash bucket of the
+	current position is searched for matches, but the state of the hash table
+	is not changed, since we can not know the final sorting order of the
+	current (incomplete) sequence.
+
+	This function must be called with increasing cur_ix positions.
+*/
 func storeAndFindMatchesH10(self *h10, data []byte, cur_ix uint, ring_buffer_mask uint, max_length uint, max_backward uint, best_len *uint, matches []backwardMatch) []backwardMatch {
 	var cur_ix_masked uint = cur_ix & ring_buffer_mask
 	var max_comp_len uint = brotli_min_size_t(max_length, 128)
@@ -152,13 +158,16 @@ func storeAndFindMatchesH10(self *h10, data []byte, cur_ix uint, ring_buffer_mas
 	return matches
 }
 
-/* Finds all backward matches of &data[cur_ix & ring_buffer_mask] up to the
-   length of max_length and stores the position cur_ix in the hash table.
+/*
+Finds all backward matches of &data[cur_ix & ring_buffer_mask] up to the
 
-   Sets *num_matches to the number of matches found, and stores the found
-   matches in matches[0] to matches[*num_matches - 1]. The matches will be
-   sorted by strictly increasing length and (non-strictly) increasing
-   distance. */
+	length of max_length and stores the position cur_ix in the hash table.
+
+	Sets *num_matches to the number of matches found, and stores the found
+	matches in matches[0] to matches[*num_matches - 1]. The matches will be
+	sorted by strictly increasing length and (non-strictly) increasing
+	distance.
+*/
 func findAllMatchesH10(handle *h10, dictionary *encoderDictionary, data []byte, ring_buffer_mask uint, cur_ix uint, max_length uint, max_backward uint, gap uint, params *encoderParams, matches []backwardMatch) uint {
 	var orig_matches []backwardMatch = matches
 	var cur_ix_masked uint = cur_ix & ring_buffer_mask
@@ -224,9 +233,12 @@ func findAllMatchesH10(handle *h10, dictionary *encoderDictionary, data []byte, 
 	return uint(-cap(matches) + cap(orig_matches))
 }
 
-/* Stores the hash of the next 4 bytes and re-roots the binary tree at the
-   current sequence, without returning any matches.
-   REQUIRES: ix + 128 <= end-of-current-block */
+/*
+Stores the hash of the next 4 bytes and re-roots the binary tree at the
+
+	current sequence, without returning any matches.
+	REQUIRES: ix + 128 <= end-of-current-block
+*/
 func (h *h10) Store(data []byte, mask uint, ix uint) {
 	var max_backward uint = h.window_mask_ - windowGap + 1
 	/* Maximum distance is window size - 16, see section 9.1. of the spec. */

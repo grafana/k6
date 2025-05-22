@@ -58,10 +58,13 @@ func initBlockSplitterDistance(self *blockSplitterDistance, alphabet_size uint, 
 	self.last_histogram_ix_[0] = self.last_histogram_ix_[1]
 }
 
-/* Does either of three things:
-   (1) emits the current block with a new block type;
-   (2) emits the current block with the type of the second last block;
-   (3) merges the current block with the last block. */
+/*
+Does either of three things:
+
+	(1) emits the current block with a new block type;
+	(2) emits the current block with the type of the second last block;
+	(3) merges the current block with the last block.
+*/
 func blockSplitterFinishBlockDistance(self *blockSplitterDistance, is_final bool) {
 	var split *blockSplit = self.split_
 	var last_entropy []float64 = self.last_entropy_[:]
@@ -154,8 +157,11 @@ func blockSplitterFinishBlockDistance(self *blockSplitterDistance, is_final bool
 	}
 }
 
-/* Adds the next symbol to the current histogram. When the current histogram
-   reaches the target size, decides on merging the block. */
+/*
+Adds the next symbol to the current histogram. When the current histogram
+
+	reaches the target size, decides on merging the block.
+*/
 func blockSplitterAddSymbolDistance(self *blockSplitterDistance, symbol uint) {
 	histogramAddDistance(&self.histograms_[self.curr_histogram_ix_], symbol)
 	self.block_size_++

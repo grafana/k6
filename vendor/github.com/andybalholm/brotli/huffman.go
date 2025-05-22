@@ -10,8 +10,11 @@ package brotli
 
 const huffmanMaxCodeLength = 15
 
-/* Maximum possible Huffman table size for an alphabet size of (index * 32),
-   max code length 15 and root table bits 8. */
+/*
+Maximum possible Huffman table size for an alphabet size of (index * 32),
+
+	max code length 15 and root table bits 8.
+*/
 var kMaxHuffmanTableSize = []uint16{
 	256,
 	402,
@@ -363,9 +366,12 @@ var kReverseBits = [1 << reverseBitsMax]byte{
 
 const reverseBitsLowest = (uint64(1) << (reverseBitsMax - 1 + reverseBitsBase))
 
-/* Returns reverse(num >> BROTLI_REVERSE_BITS_BASE, BROTLI_REVERSE_BITS_MAX),
-   where reverse(value, len) is the bit-wise reversal of the len least
-   significant bits of value. */
+/*
+Returns reverse(num >> BROTLI_REVERSE_BITS_BASE, BROTLI_REVERSE_BITS_MAX),
+
+	where reverse(value, len) is the bit-wise reversal of the len least
+	significant bits of value.
+*/
 func reverseBits8(num uint64) uint64 {
 	return uint64(kReverseBits[num])
 }
@@ -382,9 +388,12 @@ func replicateValue(table []huffmanCode, step int, end int, code huffmanCode) {
 	}
 }
 
-/* Returns the table width of the next 2nd level table. |count| is the histogram
-   of bit lengths for the remaining symbols, |len| is the code length of the
-   next processed symbol. */
+/*
+Returns the table width of the next 2nd level table. |count| is the histogram
+
+	of bit lengths for the remaining symbols, |len| is the code length of the
+	next processed symbol.
+*/
 func nextTableBitSize(count []uint16, len int, root_bits int) int {
 	var left int = 1 << uint(len-root_bits)
 	for len < huffmanMaxCodeLength {

@@ -37,14 +37,17 @@ func isMatch5(p1 []byte, p2 []byte) bool {
 		p1[4] == p2[4]
 }
 
-/* Builds a literal prefix code into "depths" and "bits" based on the statistics
-   of the "input" string and stores it into the bit stream.
-   Note that the prefix code here is built from the pre-LZ77 input, therefore
-   we can only approximate the statistics of the actual literal stream.
-   Moreover, for long inputs we build a histogram from a sample of the input
-   and thus have to assign a non-zero depth for each literal.
-   Returns estimated compression ratio millibytes/char for encoding given input
-   with generated code. */
+/*
+Builds a literal prefix code into "depths" and "bits" based on the statistics
+
+	of the "input" string and stores it into the bit stream.
+	Note that the prefix code here is built from the pre-LZ77 input, therefore
+	we can only approximate the statistics of the actual literal stream.
+	Moreover, for long inputs we build a histogram from a sample of the input
+	and thus have to assign a non-zero depth for each literal.
+	Returns estimated compression ratio millibytes/char for encoding given input
+	with generated code.
+*/
 func buildAndStoreLiteralPrefixCode(input []byte, input_size uint, depths []byte, bits []uint16, storage_ix *uint, storage []byte) uint {
 	var histogram = [256]uint32{0}
 	var histogram_total uint
@@ -96,8 +99,11 @@ func buildAndStoreLiteralPrefixCode(input []byte, input_size uint, depths []byte
 	}
 }
 
-/* Builds a command and distance prefix code (each 64 symbols) into "depth" and
-   "bits" based on "histogram" and stores it into the bit stream. */
+/*
+Builds a command and distance prefix code (each 64 symbols) into "depth" and
+
+	"bits" based on "histogram" and stores it into the bit stream.
+*/
 func buildAndStoreCommandPrefixCode1(histogram []uint32, depth []byte, bits []uint16, storage_ix *uint, storage []byte) {
 	var tree [129]huffmanTree
 	var cmd_depth = [numCommandSymbols]byte{0}
@@ -785,28 +791,31 @@ next_block:
 	}
 }
 
-/* Compresses "input" string to the "*storage" buffer as one or more complete
-   meta-blocks, and updates the "*storage_ix" bit position.
+/*
+Compresses "input" string to the "*storage" buffer as one or more complete
 
-   If "is_last" is 1, emits an additional empty last meta-block.
+	meta-blocks, and updates the "*storage_ix" bit position.
 
-   "cmd_depth" and "cmd_bits" contain the command and distance prefix codes
-   (see comment in encode.h) used for the encoding of this input fragment.
-   If "is_last" is 0, they are updated to reflect the statistics
-   of this input fragment, to be used for the encoding of the next fragment.
+	If "is_last" is 1, emits an additional empty last meta-block.
 
-   "*cmd_code_numbits" is the number of bits of the compressed representation
-   of the command and distance prefix codes, and "cmd_code" is an array of
-   at least "(*cmd_code_numbits + 7) >> 3" size that contains the compressed
-   command and distance prefix codes. If "is_last" is 0, these are also
-   updated to represent the updated "cmd_depth" and "cmd_bits".
+	"cmd_depth" and "cmd_bits" contain the command and distance prefix codes
+	(see comment in encode.h) used for the encoding of this input fragment.
+	If "is_last" is 0, they are updated to reflect the statistics
+	of this input fragment, to be used for the encoding of the next fragment.
 
-   REQUIRES: "input_size" is greater than zero, or "is_last" is 1.
-   REQUIRES: "input_size" is less or equal to maximal metablock size (1 << 24).
-   REQUIRES: All elements in "table[0..table_size-1]" are initialized to zero.
-   REQUIRES: "table_size" is an odd (9, 11, 13, 15) power of two
-   OUTPUT: maximal copy distance <= |input_size|
-   OUTPUT: maximal copy distance <= BROTLI_MAX_BACKWARD_LIMIT(18) */
+	"*cmd_code_numbits" is the number of bits of the compressed representation
+	of the command and distance prefix codes, and "cmd_code" is an array of
+	at least "(*cmd_code_numbits + 7) >> 3" size that contains the compressed
+	command and distance prefix codes. If "is_last" is 0, these are also
+	updated to represent the updated "cmd_depth" and "cmd_bits".
+
+	REQUIRES: "input_size" is greater than zero, or "is_last" is 1.
+	REQUIRES: "input_size" is less or equal to maximal metablock size (1 << 24).
+	REQUIRES: All elements in "table[0..table_size-1]" are initialized to zero.
+	REQUIRES: "table_size" is an odd (9, 11, 13, 15) power of two
+	OUTPUT: maximal copy distance <= |input_size|
+	OUTPUT: maximal copy distance <= BROTLI_MAX_BACKWARD_LIMIT(18)
+*/
 func compressFragmentFast(input []byte, input_size uint, is_last bool, table []int, table_size uint, cmd_depth []byte, cmd_bits []uint16, cmd_code_numbits *uint, cmd_code []byte, storage_ix *uint, storage []byte) {
 	var initial_storage_ix uint = *storage_ix
 	var table_bits uint = uint(log2FloorNonZero(table_size))
