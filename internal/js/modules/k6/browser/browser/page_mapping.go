@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/grafana/sobek"
@@ -218,6 +219,23 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		},
 		"getByTestId": func(testID string) (*sobek.Object, error) {
 			ml := mapLocator(vu, p.GetByTestID(testID))
+			return rt.ToValue(ml).ToObject(rt), nil
+		},
+		"getByText": func(text sobek.Value, opts sobek.Value) (*sobek.Object, error) {
+			var val string
+			switch text.ExportType() {
+			case reflect.TypeOf(string("")):
+				val = fmt.Sprintf("\"%s\"", text.String()) // Strings require double quotes
+			default: // JS RegExp
+				val = text.String() // No quotes
+			}
+
+			popts := common.NewGetByAltTextOptions()
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing getByText options: %w", err)
+			}
+
+			ml := mapLocator(vu, p.GetByText(val, popts))
 			return rt.ToValue(ml).ToObject(rt), nil
 		},
 		"goto": func(url string, opts sobek.Value) (*sobek.Promise, error) {
