@@ -57,7 +57,7 @@ type aggregatedGroupData struct {
 	checks            *aggregatedChecksData
 	aggregatedMetrics aggregatedMetricData
 	groupsData        map[string]aggregatedGroupData
-	orderedGroupsData []*aggregatedGroupData
+	orderedGroupsData *[]string
 }
 
 func newAggregatedGroupData() aggregatedGroupData {
@@ -65,17 +65,17 @@ func newAggregatedGroupData() aggregatedGroupData {
 		checks:            newAggregatedChecksData(),
 		aggregatedMetrics: make(map[string]aggregatedMetric),
 		groupsData:        make(map[string]aggregatedGroupData),
-		orderedGroupsData: make([]*aggregatedGroupData, 0),
+		orderedGroupsData: &[]string{},
 	}
 }
 
-func (a aggregatedGroupData) groupDataFor(group string) aggregatedGroupData {
+func (a *aggregatedGroupData) groupDataFor(group string) aggregatedGroupData {
 	if groupData, exists := a.groupsData[group]; exists {
 		return groupData
 	}
-	aggregatedGroupData := newAggregatedGroupData()
-	a.groupsData[group] = aggregatedGroupData
-	a.orderedGroupsData = append(a.orderedGroupsData, &aggregatedGroupData)
+	newGroupData := newAggregatedGroupData()
+	a.groupsData[group] = newGroupData
+	a.orderedGroupsData = append(*a.orderedGroupsData, group)
 	return a.groupsData[group]
 }
 
