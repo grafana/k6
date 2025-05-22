@@ -145,7 +145,7 @@ func (o *Output) Summary(
 
 	// Populate scenario groups and nested groups recursively.
 	for scenarioName, scenarioData := range o.dataModel.scenarios {
-		scenarioSummaryGroup := summary.NewGroup()
+		scenarioSummaryGroup := summary.NewGroup(scenarioName)
 		populateSummaryGroup(
 			o.summaryMode,
 			&scenarioSummaryGroup,
