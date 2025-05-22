@@ -12,6 +12,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/grafana/k6deps"
 	"github.com/grafana/k6provider"
+	"github.com/spf13/cobra"
 	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/internal/build"
@@ -25,12 +26,20 @@ var (
 // commandExecutor executes the requested k6 command line command.
 // It abstract the execution path from the concrete binary.
 type commandExecutor interface {
-	run(*state.GlobalState)
+	run(*state.GlobalState) error
 }
 
-// Launcher is a k6 launcher. It analyses the requirements of a k6 execution,
+// customBinary runs the requested commands
+// on a different binary on a subprocess passing the original arguments
+type customBinary struct {
+	// path represents the local file path
+	// on the file system of the binary
+	path string
+}
+
+// launcher is a k6 launcher. It analyses the requirements of a k6 execution,
 // then if required, it provisions a binary executor to satisfy the requirements.
-type Launcher struct {
+type launcher struct {
 	// gs is the global state of k6.
 	gs *state.GlobalState
 
@@ -42,46 +51,42 @@ type Launcher struct {
 	commandExecutor commandExecutor
 }
 
-// NewLauncher creates a new Launcher from a GlobalState using the default fallback and provision functions
-func NewLauncher(gs *state.GlobalState) *Launcher {
-	defaultExecutor := &currentBinary{}
-	return &Launcher{
-		gs:              gs,
-		provision:       k6buildProvision,
-		commandExecutor: defaultExecutor,
+// newLauncher creates a new Launcher from a GlobalState using the default provision function
+func newLauncher(gs *state.GlobalState) *launcher {
+	return &launcher{
+		gs:        gs,
+		provision: k6buildProvision,
 	}
 }
 
-// Launch executes k6 either by launching a provisioned binary or defaulting to the
-// current binary if this is not necessary.
-// The commandExecutor can exit the process so don't assume it will return
-func (l *Launcher) Launch() {
-	// If binary provisioning is not enabled, continue with the regular k6 execution path
-	if !l.gs.Flags.BinaryProvisioning {
-		l.gs.Logger.Debug("Binary Provisioning feature is disabled.")
-		l.commandExecutor.run(l.gs)
-		return
+// launch analyzies the command to be executed and its input (e.g. script)
+// to identify if its dependencies. It it has dependencies tha cannot be satisfied by the
+// current binary, it obtains a custom binary usign the provision function and delegates
+// the execution of the command to this binary. if not, continues with the execution of the
+// command in the current binary.
+func (l *launcher) launch(cmd *cobra.Command, args []string) error {
+	if !isAnalysisRequired(cmd) {
+		l.gs.Logger.
+			WithField("command", cmd.Name()).
+			Debug("command does not require dependency analysis")
+		return nil
 	}
 
-	l.gs.Logger.
-		Debug("Binary Provisioning feature is enabled.")
-	deps, err := analyze(l.gs, l.gs.CmdArgs[1:])
+	deps, err := analyze(l.gs, args)
 	if err != nil {
 		l.gs.Logger.
 			WithError(err).
 			Error("Binary provisioning is enabled but it failed to analyze the dependencies." +
 				" Please, make sure to report this issue by opening a bug report.")
-		l.gs.OSExit(1)
-		return // this is required for testing
+		return err
 	}
 
 	//  if the command does not have dependencies nor a custom build is required
-	if !customBuildRequired(build.Version, deps) {
+	if !isCustomBuildRequired(build.Version, deps) {
 		l.gs.Logger.
 			Debug("The current k6 binary already satisfies all the required dependencies," +
 				" it isn't required to provision a new binary.")
-		l.commandExecutor.run(l.gs)
-		return
+		return nil
 	}
 
 	l.gs.Logger.
@@ -96,23 +101,24 @@ func (l *Launcher) Launch() {
 			WithError(err).
 			Error("Failed to provision a k6 binary with required dependencies." +
 				" Please, make sure to report this issue by opening a bug report.")
-		l.gs.OSExit(1)
-		return
+		return err
 	}
 
-	customBinary.run(l.gs)
+	l.commandExecutor = customBinary
+
+	// override command's RunE method to be processed by the command executor
+	cmd.RunE = l.runE
+
+	return nil
 }
 
-// customBinary runs the requested commands
-// on a different binary on a subprocess passing the original arguments
-type customBinary struct {
-	// path represents the local file path
-	// on the file system of the binary
-	path string
+// runE executes the k6 command using a command executor
+func (l *launcher) runE(_ *cobra.Command, _ []string) error {
+	return l.commandExecutor.run(l.gs)
 }
 
 //nolint:forbidigo
-func (b *customBinary) run(gs *state.GlobalState) {
+func (b *customBinary) run(gs *state.GlobalState) error {
 	cmd := exec.CommandContext(gs.Ctx, b.path, gs.CmdArgs[1:]...) //nolint:gosec
 
 	// we pass os stdout, err, in because passing them from GlobalState changes how
@@ -124,6 +130,8 @@ func (b *customBinary) run(gs *state.GlobalState) {
 	// Copy environment variables to the k6 process and skip binary provisioning feature flag to disable it.
 	// If not disabled, then the executed k6 binary would enter an infinite loop, where it continuously
 	// process the input script, detect dependencies, and retrigger provisioning.
+	// This can be avoided by checking if the current binary has already extensins that
+	// satisfies the dependencies. See comment in isCustomBuildRequired function.
 	env := []string{}
 	for k, v := range gs.Env {
 		if k == state.BinaryProvisioningFeatureFlag {
@@ -143,7 +151,7 @@ func (b *customBinary) run(gs *state.GlobalState) {
 		gs.Logger.
 			WithError(err).
 			Error("Failed to run the provisioned k6 binary")
-		gs.OSExit(1)
+		return err
 	}
 
 	// wait for the subprocess to end
@@ -155,15 +163,7 @@ func (b *customBinary) run(gs *state.GlobalState) {
 	for {
 		select {
 		case err := <-done:
-			rc := 0
-			if err != nil {
-				rc = 1
-				var eerr *exec.ExitError
-				if errors.As(err, &eerr) {
-					rc = eerr.ExitCode()
-				}
-			}
-			gs.OSExit(rc)
+			return err
 		case sig := <-sigC:
 			gs.Logger.
 				WithField("signal", sig.String()).
@@ -172,18 +172,11 @@ func (b *customBinary) run(gs *state.GlobalState) {
 	}
 }
 
-// currentBinary runs the requested commands on the current binary
-type currentBinary struct{}
-
-func (b *currentBinary) run(gs *state.GlobalState) {
-	ExecuteWithGlobalState(gs)
-}
-
-// customBuildRequired checks if the build is required
+// isCustomBuildRequired checks if the build is required
 // it's required if there is one or more dependencies other than k6 itself
 // or if the required k6 version is not satisfied by the current binary's version
 // TODO: get the version of any built-in extension and check if they satisfy the dependencies
-func customBuildRequired(baseK6Version string, deps k6deps.Dependencies) bool {
+func isCustomBuildRequired(baseK6Version string, deps k6deps.Dependencies) bool {
 	if len(deps) == 0 {
 		return false
 	}
@@ -283,19 +276,13 @@ func analyze(gs *state.GlobalState, args []string) (k6deps.Dependencies, error) 
 		Manifest:  k6deps.Source{Ignore: true},
 	}
 
-	if !isAnalysisRequired(args) {
-		gs.Logger.
-			Debug("The command to execute does not require dependency analysis.")
-		return k6deps.Dependencies{}, nil
-	}
-
-	scriptname := scriptNameFromArgs(args)
-	if len(scriptname) == 0 {
+	if len(args) == 0 {
 		gs.Logger.
 			Debug("The command did not receive an input script.")
 		return nil, errScriptNotFound
 	}
 
+	scriptname := args[0]
 	if scriptname == "-" {
 		gs.Logger.
 			Debug("Test script provided by Stdin is not yet supported from Binary provisioning feature.")
@@ -319,56 +306,18 @@ func analyze(gs *state.GlobalState, args []string) (k6deps.Dependencies, error) 
 	return k6deps.Analyze(dopts)
 }
 
-// isAnalysisRequired searches for the command and returns a boolean indicating if dependency analysis is required
-func isAnalysisRequired(args []string) bool {
-	// return early if no arguments passed
-	if len(args) == 0 {
-		return false
-	}
-
-	// search for a command that requires binary provisioning and then get the target script or archive
-	// we handle cloud login subcommand as a special case because it does not require binary provisioning
-	for i, arg := range args {
-		switch arg {
-		case "--help", "-h":
-			return false
-		case "cloud":
-			for _, arg = range args[i+1:] {
-				if arg == "login" || arg == "--help" || arg == "-h" {
-					return false
-				}
-			}
-			return true
-		case "archive", "inspect":
+// isAnalysisRequired returns a boolean indicating if dependency analysis is required for the command
+func isAnalysisRequired(cmd *cobra.Command) bool {
+	switch cmd.Name() {
+	case "run":
+		if cmd.Parent() != nil && cmd.Parent().Name() == "cloud" {
 			return true
 		}
+		return false
+	case "archive", "inspect", "upload", "cloud":
+		return true
 	}
 
 	// not found
 	return false
-}
-
-// scriptNameFromArgs returns the file name passed as input and true if it's a valid script name
-func scriptNameFromArgs(args []string) string {
-	// return early if no arguments passed
-	if len(args) == 0 {
-		return ""
-	}
-
-	for _, arg := range args {
-		if strings.HasPrefix(arg, "-") {
-			if arg == "-" { // we are running a script from stdin
-				return arg
-			}
-			continue
-		}
-		if strings.HasSuffix(arg, ".js") ||
-			strings.HasSuffix(arg, ".tar") ||
-			strings.HasSuffix(arg, ".ts") {
-			return arg
-		}
-	}
-
-	// not found
-	return ""
 }
