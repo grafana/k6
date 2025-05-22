@@ -2040,11 +2040,17 @@ class LabelEngine {
     this._evaluator = new SelectorEvaluatorImpl();
   }
   queryAll(root, selector) {
-    const { matcher } = createTextMatcher(selector, true);
-    const allElements = this._evaluator._queryCSS({ scope: root, pierceShadow: true }, "*");
-    return allElements.filter((element) => {
-      return getElementLabels(this._evaluator._cacheText, element).some((label) => matcher(label));
-    });
+    try {
+      this._evaluator.begin();
+
+      const { matcher } = createTextMatcher(selector, true);
+      const allElements = this._evaluator._queryCSS({ scope: root, pierceShadow: true }, "*");
+      return allElements.filter((element) => {
+        return getElementLabels(this._evaluator._cacheText, element).some((label) => matcher(label));
+      });
+    } finally {
+      this._evaluator.end();
+    }
   }
 }
 
@@ -2053,20 +2059,26 @@ class AttributeEngine {
     this._evaluator = new SelectorEvaluatorImpl();
   }
   queryAll(root, selector) {
-    const parsed = parseAttributeSelector(selector, true);
-    if (parsed.name || parsed.attributes.length !== 1)
-      throw new Error("Malformed attribute selector: " + selector);
-    const { name, value, caseSensitive } = parsed.attributes[0];
-    const lowerCaseValue = caseSensitive ? null : value.toLowerCase();
-    let matcher;
-    if (value instanceof RegExp)
-      matcher = (s) => !!s.match(value);
-    else if (caseSensitive)
-      matcher = (s) => s === value;
-    else
-      matcher = (s) => s.toLowerCase().includes(lowerCaseValue);
-    const elements = this._evaluator._queryCSS({ scope: root, pierceShadow: true }, `[${name}]`);
-    return elements.filter((e) => matcher(e.getAttribute(name)));
+    try {
+      this._evaluator.begin();
+
+      const parsed = parseAttributeSelector(selector, true);
+      if (parsed.name || parsed.attributes.length !== 1)
+        throw new Error("Malformed attribute selector: " + selector);
+      const { name, value, caseSensitive } = parsed.attributes[0];
+      const lowerCaseValue = caseSensitive ? null : value.toLowerCase();
+      let matcher;
+      if (value instanceof RegExp)
+        matcher = (s) => !!s.match(value);
+      else if (caseSensitive)
+        matcher = (s) => s === value;
+      else
+        matcher = (s) => s.toLowerCase().includes(lowerCaseValue);
+      const elements = this._evaluator._queryCSS({ scope: root, pierceShadow: true }, `[${name}]`);
+      return elements.filter((e) => matcher(e.getAttribute(name)));
+    } finally {
+      this._evaluator.end();
+    }
   };
 }
 
@@ -2075,20 +2087,26 @@ class TestIDEngine {
     this._evaluator = new SelectorEvaluatorImpl();
   }
   queryAll(root, selector) {
-    const parsed = parseAttributeSelector(selector, true);
-    if (parsed.name || parsed.attributes.length !== 1)
-      throw new Error("Malformed attribute selector: " + selector);
-    const { name, value, caseSensitive } = parsed.attributes[0];
-    const lowerCaseValue = caseSensitive ? null : value.toLowerCase();
-    let matcher;
-    if (value instanceof RegExp)
-      matcher = (s) => !!s.match(value);
-    else if (caseSensitive)
-      matcher = (s) => s === value;
-    else
-      matcher = (s) => s.toLowerCase().includes(lowerCaseValue);
-    const elements = this._evaluator._queryCSS({ scope: root, pierceShadow: true }, `[${name}]`);
-    return elements.filter((e) => matcher(e.getAttribute(name)));
+    try {
+      this._evaluator.begin();
+
+      const parsed = parseAttributeSelector(selector, true);
+      if (parsed.name || parsed.attributes.length !== 1)
+        throw new Error("Malformed attribute selector: " + selector);
+      const { name, value, caseSensitive } = parsed.attributes[0];
+      const lowerCaseValue = caseSensitive ? null : value.toLowerCase();
+      let matcher;
+      if (value instanceof RegExp)
+        matcher = (s) => !!s.match(value);
+      else if (caseSensitive)
+        matcher = (s) => s === value;
+      else
+        matcher = (s) => s.toLowerCase().includes(lowerCaseValue);
+      const elements = this._evaluator._queryCSS({ scope: root, pierceShadow: true }, `[${name}]`);
+      return elements.filter((e) => matcher(e.getAttribute(name)));
+    } finally {
+      this._evaluator.end();
+    }
   }
 }
 
@@ -2099,24 +2117,30 @@ class TextEngine {
     this._internal = internal;
   }
   queryAll(root, selector) {
-    const { matcher, kind } = createTextMatcher(selector, this._internal);
-    const result = [];
-    let lastDidNotMatchSelf = null;
-    const appendElement = (element) => {
-      if (kind === "lax" && lastDidNotMatchSelf && lastDidNotMatchSelf.contains(element))
-        return false;
-      const matches = elementMatchesText(this._evaluator._cacheText, element, matcher);
-      if (matches === "none")
-        lastDidNotMatchSelf = element;
-      if (matches === "self" || matches === "selfAndChildren" && kind === "strict" && !this._internal)
-        result.push(element);
-    };
-    if (root.nodeType === Node.ELEMENT_NODE)
-      appendElement(root);
-    const elements = this._evaluator._queryCSS({ scope: root, pierceShadow: this._shadow }, "*");
-    for (const element of elements)
-      appendElement(element);
-    return result;
+    try {
+      this._evaluator.begin();
+
+      const { matcher, kind } = createTextMatcher(selector, this._internal);
+      const result = [];
+      let lastDidNotMatchSelf = null;
+      const appendElement = (element) => {
+        if (kind === "lax" && lastDidNotMatchSelf && lastDidNotMatchSelf.contains(element))
+          return false;
+        const matches = elementMatchesText(this._evaluator._cacheText, element, matcher);
+        if (matches === "none")
+          lastDidNotMatchSelf = element;
+        if (matches === "self" || matches === "selfAndChildren" && kind === "strict" && !this._internal)
+          result.push(element);
+      };
+      if (root.nodeType === Node.ELEMENT_NODE)
+        appendElement(root);
+      const elements = this._evaluator._queryCSS({ scope: root, pierceShadow: this._shadow }, "*");
+      for (const element of elements)
+        appendElement(element);
+      return result;
+    } finally {
+      this._evaluator.end();
+    }
   }
 }
 
