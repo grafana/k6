@@ -16,6 +16,7 @@ import (
 	"github.com/spf13/cobra"
 	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/cmd/state"
+	"go.k6.io/k6/ext"
 	"go.k6.io/k6/internal/build"
 )
 
@@ -76,8 +77,7 @@ func (l *launcher) launch(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	//  if the command does not have dependencies nor a custom build is required
-	if !isCustomBuildRequired(build.Version, deps) {
+	if !isCustomBuildRequired(deps, build.Version, ext.GetAll()) {
 		l.gs.Logger.
 			Debug("The current k6 binary already satisfies all the required dependencies," +
 				" it isn't required to provision a new binary.")
@@ -171,39 +171,43 @@ func (b *customBinary) run(gs *state.GlobalState) error {
 }
 
 // isCustomBuildRequired checks if the build is required
-// it's required if there is one or more dependencies other than k6 itself
-// or if the required k6 version is not satisfied by the current binary's version
-// TODO: get the version of any built-in extension and check if they satisfy the dependencies
-func isCustomBuildRequired(baseK6Version string, deps k6deps.Dependencies) bool {
+// it's required if there is one or more dependencies that are not satisfied by the binary
+// considering the version of k6 and any built-in extension
+func isCustomBuildRequired(deps k6deps.Dependencies, k6Version string, exts []*ext.Extension) bool {	
 	if len(deps) == 0 {
 		return false
 	}
 
-	// Early return if there are multiple dependencies
-	if len(deps) > 1 {
-		return true
+	// collect modules that this binary offer, including k6 itself
+	mods := map[string]string{"k6": k6Version}
+	for _, e := range exts {
+		mods[e.Path] = e.Version
 	}
 
-	k6Dependency, hasK6 := deps["k6"]
+	for _, dep := range deps {
+		// Ignore dependency if null. See https://github.com/grafana/k6deps/issues/91
+		if dep == nil || dep.Constraints == nil {
+			continue
+		}
 
-	// Early return if there's exactly one non-k6 dependency
-	if !hasK6 {
-		return true
+		modVersion, provided := mods[dep.Name]
+		if !provided {
+			return true
+		}
+
+		k6Ver, err := semver.NewVersion(modVersion)
+		if err != nil {
+			// ignore if baseK6Version is not a valid sem ver (e.g. a development version)
+			return true
+		}
+	
+		// if the current version satisfies the constrains, binary provisioning is not required
+		if !dep.Constraints.Check(k6Ver) {
+			return true
+		}
 	}
 
-	// Ignore k6 dependency if nil
-	if k6Dependency == nil || k6Dependency.Constraints == nil {
-		return false
-	}
-
-	k6Ver, err := semver.NewVersion(baseK6Version)
-	if err != nil {
-		// ignore if baseK6Version is not a valid sem ver (e.g. a development version)
-		return true
-	}
-
-	// if the current version satisfies the constrains, binary provisioning is not required
-	return !k6Dependency.Constraints.Check(k6Ver)
+	return false
 }
 
 // k6buildProvider provides a k6 binary that satisfies the dependencies using the k6build service
