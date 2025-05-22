@@ -241,15 +241,19 @@ func NewThresholds() Thresholds {
 
 // Group is a group of metrics and subgroups (recursive) that will be rendered in the summary.
 type Group struct {
-	Checks  *Checks // Not always present, thus we use a pointer.
-	Metrics Metrics
-	Groups  map[string]Group
+	Name          string
+	Checks        *Checks // Not always present, thus we use a pointer.
+	Metrics       Metrics
+	Groups        map[string]Group
+	OrderedGroups []*Group
 }
 
 // NewGroup instantiates an empty Group.
-func NewGroup() Group {
+func NewGroup(name string) Group {
 	return Group{
-		Metrics: NewMetrics(),
-		Groups:  make(map[string]Group),
+		Name:          name,
+		Metrics:       NewMetrics(),
+		Groups:        make(map[string]Group),
+		OrderedGroups: make([]*Group, 0),
 	}
 }
