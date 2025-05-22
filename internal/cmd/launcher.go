@@ -119,7 +119,10 @@ func (b *customBinary) run(gs *state.GlobalState) error {
 	// the subprocess detects the type of terminal
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
-	cmd.Stdin = os.Stdin
+
+	// is we are here, it is possible that the analyze function read the stdin to analyse it
+	// and restored the content into gs.Stdin, so we pass it to the command
+	cmd.Stdin = gs.Stdin
 
 	// Copy environment variables to the k6 process and skip binary provisioning feature flag to disable it.
 	// If not disabled, then the executed k6 binary would enter an infinite loop, where it continuously
@@ -284,6 +287,11 @@ func analyze(gs *state.GlobalState, _ *cobra.Command, args []string) (k6deps.Dep
 	src, _, pwd, err := readSource(gs, sourceRootPath)
 	if err != nil {
 		return nil, err
+	}
+
+	// if sourceRooPath is stdin ('-') we need to preserve the content
+	if sourceRootPath == "-" {
+		gs.Stdin = bytes.NewBuffer(src.Data)
 	}
 
 	if strings.HasSuffix(sourceRootPath, ".tar") {
