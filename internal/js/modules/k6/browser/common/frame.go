@@ -1092,8 +1092,6 @@ func (f *Frame) GetByLabel(label string, opts *GetByAltTextOptions) *Locator {
 		l = fmt.Sprintf("internal:label=%v", label)
 	}
 
-	fmt.Println("blah", l)
-
 	return f.Locator(l, nil)
 }
 
@@ -1137,6 +1135,17 @@ func (f *Frame) GetByTitle(title string, opts *GetByAltTextOptions) *Locator {
 	}
 
 	return f.Locator(builder.String(), nil)
+}
+
+// Locator creates and returns a new locator for this frame.
+func (f *Frame) GetByTestID(testID string) *Locator {
+	f.log.Debugf("Frame:GetByTestID", "fid:%s furl:%q role:%q", f.ID(), f.URL(), testID)
+
+	var l string
+
+	l = fmt.Sprintf("internal:testid=[data-testid='%v']", testID)
+
+	return f.Locator(l, nil)
 }
 
 // Referrer returns the referrer of the frame from the network manager
