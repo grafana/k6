@@ -184,12 +184,14 @@ github.com/gorilla/websocket
 github.com/grafana/k6build
 github.com/grafana/k6build/pkg/api
 github.com/grafana/k6build/pkg/client
-# github.com/grafana/k6deps v0.2.6
+# github.com/grafana/k6deps v0.3.0
 ## explicit; go 1.23.0
 github.com/grafana/k6deps
 github.com/grafana/k6deps/internal/pack
+github.com/grafana/k6deps/internal/pack/plugins/file
 github.com/grafana/k6deps/internal/pack/plugins/http
 github.com/grafana/k6deps/internal/pack/plugins/k6
+github.com/grafana/k6deps/internal/rootfs
 # github.com/grafana/k6provider v0.1.15
 ## explicit; go 1.23.0
 github.com/grafana/k6provider
