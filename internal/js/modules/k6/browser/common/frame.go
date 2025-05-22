@@ -1141,9 +1141,27 @@ func (f *Frame) GetByTitle(title string, opts *GetByAltTextOptions) *Locator {
 func (f *Frame) GetByTestID(testID string) *Locator {
 	f.log.Debugf("Frame:GetByTestID", "fid:%s furl:%q role:%q", f.ID(), f.URL(), testID)
 
+	l := fmt.Sprintf("internal:testid=[data-testid='%v']", testID)
+
+	return f.Locator(l, nil)
+}
+
+// Locator creates and returns a new locator for this frame.
+func (f *Frame) GetByText(text string, opts *GetByAltTextOptions) *Locator {
+	f.log.Debugf("Frame:GetByText", "fid:%s furl:%q role:%q opts:%+v", f.ID(), f.URL(), text, opts)
+
 	var l string
 
-	l = fmt.Sprintf("internal:testid=[data-testid='%v']", testID)
+	// Note: We use double quotes instead of single quotes as prescribed by PW.
+	if text[0] == '"' {
+		if opts.Exact != nil && *opts.Exact {
+			l = fmt.Sprintf("internal:text=%vs", text)
+		} else {
+			l = fmt.Sprintf("internal:text=%vi", text)
+		}
+	} else {
+		l = fmt.Sprintf("internal:text=%v", text)
+	}
 
 	return f.Locator(l, nil)
 }
