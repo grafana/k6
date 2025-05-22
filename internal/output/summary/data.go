@@ -13,19 +13,19 @@ import (
 
 type dataModel struct {
 	thresholds
-	aggregatedGroupData
-	scenarios map[string]aggregatedGroupData
+	*aggregatedGroupData
+	scenarios map[string]*aggregatedGroupData
 }
 
 func newDataModel() dataModel {
 	return dataModel{
 		thresholds:          make(map[string]metricThresholds),
 		aggregatedGroupData: newAggregatedGroupData(),
-		scenarios:           make(map[string]aggregatedGroupData),
+		scenarios:           make(map[string]*aggregatedGroupData),
 	}
 }
 
-func (d *dataModel) groupDataFor(scenario string) aggregatedGroupData {
+func (d *dataModel) groupDataFor(scenario string) *aggregatedGroupData {
 	if groupData, exists := d.scenarios[scenario]; exists {
 		return groupData
 	}
@@ -56,33 +56,33 @@ type thresholds map[string]metricThresholds
 type aggregatedGroupData struct {
 	checks            *aggregatedChecksData
 	aggregatedMetrics aggregatedMetricData
-	groupsData        map[string]aggregatedGroupData
-	orderedGroupsData *[]string
+	groupsData        map[string]*aggregatedGroupData
+	orderedGroupsData []string
 }
 
-func newAggregatedGroupData() aggregatedGroupData {
-	return aggregatedGroupData{
+func newAggregatedGroupData() *aggregatedGroupData {
+	return &aggregatedGroupData{
 		checks:            newAggregatedChecksData(),
 		aggregatedMetrics: make(map[string]aggregatedMetric),
-		groupsData:        make(map[string]aggregatedGroupData),
-		orderedGroupsData: &[]string{},
+		groupsData:        make(map[string]*aggregatedGroupData),
+		orderedGroupsData: make([]string, 0),
 	}
 }
 
-func (a *aggregatedGroupData) groupDataFor(group string) aggregatedGroupData {
+func (a *aggregatedGroupData) groupDataFor(group string) *aggregatedGroupData {
 	if groupData, exists := a.groupsData[group]; exists {
 		return groupData
 	}
 	newGroupData := newAggregatedGroupData()
 	a.groupsData[group] = newGroupData
-	a.orderedGroupsData = append(*a.orderedGroupsData, group)
+	a.orderedGroupsData = append(a.orderedGroupsData, group)
 	return a.groupsData[group]
 }
 
 // addSample differs from relayAggregatedMetricFrom in that it updates the internally stored metric sink with the
 // sample, which differs from the original metric sink, while relayAggregatedMetricFrom stores the metric and the
 // metric sink from the sample's metric.
-func (a aggregatedGroupData) addSample(sample metrics.Sample) {
+func (a *aggregatedGroupData) addSample(sample metrics.Sample) {
 	a.aggregatedMetrics.addSample(sample)
 
 	checkName, hasCheckTag := sample.Tags.Get(metrics.TagCheck.String())
@@ -168,7 +168,7 @@ func (a *aggregatedChecksData) checkFor(name string) *summary.Check {
 func populateSummaryGroup(
 	summaryMode summary.Mode,
 	summaryGroup *summary.Group,
-	groupData aggregatedGroupData,
+	groupData *aggregatedGroupData,
 	testRunDuration time.Duration,
 	summaryTrendStats []string,
 ) {
@@ -218,12 +218,13 @@ func populateSummaryGroup(
 		)
 	}
 
+	summaryGroup.OrderedGroups = groupData.orderedGroupsData
+
 	// Finally, we keep moving down the hierarchy and populate the nested groups.
 	for groupName, subGroupData := range groupData.groupsData {
 		summarySubGroup := summary.NewGroup(groupName)
 		populateSummaryGroup(summaryMode, &summarySubGroup, subGroupData, testRunDuration, summaryTrendStats)
 		summaryGroup.Groups[groupName] = summarySubGroup
-		summaryGroup.OrderedGroups = append(summaryGroup.OrderedGroups, &summarySubGroup)
 	}
 }
 
@@ -271,7 +272,7 @@ func summaryThresholds(
 
 func populateSummaryChecks(
 	summaryGroup *summary.Group,
-	groupData aggregatedGroupData,
+	groupData *aggregatedGroupData,
 	testRunDuration time.Duration,
 	summaryTrendStats []string,
 ) {

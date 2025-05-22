@@ -254,7 +254,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 					metricsEngine.ObservedMetrics,
 					test.initRunner.GetOptions(),
 				)
-
+				
 				// TODO: We should probably try to move these out of the summary,
 				// likely as an additional argument like options.
 				summary.NoColor = c.gs.Flags.NoColor

@@ -245,7 +245,7 @@ type Group struct {
 	Checks        *Checks // Not always present, thus we use a pointer.
 	Metrics       Metrics
 	Groups        map[string]Group
-	OrderedGroups []*Group
+	OrderedGroups []string
 }
 
 // NewGroup instantiates an empty Group.
@@ -254,6 +254,6 @@ func NewGroup(name string) Group {
 		Name:          name,
 		Metrics:       NewMetrics(),
 		Groups:        make(map[string]Group),
-		OrderedGroups: make([]*Group, 0),
+		OrderedGroups: make([]string, 0),
 	}
 }

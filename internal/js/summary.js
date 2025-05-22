@@ -65,6 +65,7 @@ function humanizeValue(val, metric, timeUnit) {
  * @property {Record<string, ReportThreshold>} thresholds - The thresholds report.
  * @property {ReportMetrics} metrics - The metrics report.
  * @property {Record<string, ReportGroup>} groups - The groups report.
+ * @property {string[]} ordered_groups - Group names sorted the same way as in code.
  * @property {Record<string, ReportGroup>} scenarios - The scenarios report.
  */
 
@@ -79,6 +80,7 @@ function humanizeValue(val, metric, timeUnit) {
  * @property {ReportChecks} checks - The checks report.
  * @property {ReportMetrics} metrics - The metrics report.
  * @property {Record<string, ReportGroup>} groups - The nested groups report.
+ * @property {string[]} ordered_groups - Group names sorted the same way as in code.
  */
 
 /**
@@ -174,7 +176,7 @@ class TestReportGenerator {
 		return reportBuilder
 			.addThresholds(report.thresholds)
 			.addTotalResults(report)
-			.addGroups(report.groups)
+			.addGroups(report.groups, report.ordered_groups)
 			.addScenarios(report.scenarios)
 			.build();
 	}
@@ -235,17 +237,17 @@ class ReportBuilder {
 	 * Adds groups sections to the report.
 	 *
 	 * @param {Record<string, ReportGroup>} groups - The groups to add to the report.
+	 * @param {string[]} orderedGroups - Group names sorted the same way as in code.
 	 * @returns {ReportBuilder}
 	 */
-	addGroups(groups) {
+	addGroups(groups, orderedGroups) {
 		if (!groups) return this;
 
-		Object.entries(groups)
-			.sort(([a], [b]) => a.localeCompare(b))
-			.forEach(([groupName, groupData]) => {
+		orderedGroups
+			.forEach((groupName) => {
 				this.sections.push({
 					title: `GROUP: ${groupName}`,
-					content: this._renderGroupContent(groupData),
+					content: this._renderGroupContent(groups[groupName]),
 				});
 			});
 		return this;
@@ -385,7 +387,7 @@ class ReportBuilder {
 		return [
 			...this._renderChecks(group.checks, renderContext),
 			...this._renderMetrics(group.metrics, renderContext),
-			...(group.groups ? this._renderNestedGroups(group.groups) : []),
+			...(group.groups ? this._renderNestedGroups(group.groups, group.ordered_groups, renderContext) : []),
 		];
 	}
 
@@ -403,30 +405,30 @@ class ReportBuilder {
 			...this._renderChecks(scenarioData.checks, renderContext),
 			...this._renderMetrics(scenarioData.metrics, renderContext),
 			...(scenarioData.groups
-				? this._renderNestedGroups(scenarioData.groups)
+				? this._renderNestedGroups(scenarioData.groups, scenarioData.ordered_groups)
 				: []),
 		];
 	}
 
 	/**
 	 * @param {Record<string, ReportGroup>} groups - The nested groups data to render.
+	 * @param {string[]} orderedGroups - Group names sorted the same way as in code.
 	 * @param {RenderContext} [renderContext] - The render context to use for text rendering.
 	 * @returns {string[]}
 	 * @private
 	 */
-	_renderNestedGroups(groups, renderContext) {
+	_renderNestedGroups(groups, orderedGroups, renderContext) {
 		renderContext = renderContext || this.renderContext;
 		renderContext = renderContext.indentedContext(1);
 
 		// Render nested groups recursively
-		return Object.entries(groups)
-			.sort(([a], [b]) => a.localeCompare(b))
-			.flatMap(([groupName, groupData]) => [
+		return orderedGroups
+			.flatMap((groupName) => [
 				renderTitle(`GROUP: ${groupName}`, this.formatter, renderContext, {
 					prefix: subtitlePrefix,
 					suffix: '\n',
 				}),
-				...this._renderGroupContent(groupData, renderContext),
+				...this._renderGroupContent(groups[groupName], renderContext),
 			]);
 	}
 
