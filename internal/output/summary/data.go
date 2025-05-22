@@ -57,7 +57,7 @@ type aggregatedGroupData struct {
 	checks            *aggregatedChecksData
 	aggregatedMetrics aggregatedMetricData
 	groupsData        map[string]*aggregatedGroupData
-	orderedGroupsData []string
+	groupsOrderData   []string
 }
 
 func newAggregatedGroupData() *aggregatedGroupData {
@@ -65,7 +65,7 @@ func newAggregatedGroupData() *aggregatedGroupData {
 		checks:            newAggregatedChecksData(),
 		aggregatedMetrics: make(map[string]aggregatedMetric),
 		groupsData:        make(map[string]*aggregatedGroupData),
-		orderedGroupsData: make([]string, 0),
+		groupsOrderData:   make([]string, 0),
 	}
 }
 
@@ -75,7 +75,7 @@ func (a *aggregatedGroupData) groupDataFor(group string) *aggregatedGroupData {
 	}
 	newGroupData := newAggregatedGroupData()
 	a.groupsData[group] = newGroupData
-	a.orderedGroupsData = append(a.orderedGroupsData, group)
+	a.groupsOrderData = append(a.groupsOrderData, group)
 	return a.groupsData[group]
 }
 
@@ -218,7 +218,7 @@ func populateSummaryGroup(
 		)
 	}
 
-	summaryGroup.OrderedGroups = groupData.orderedGroupsData
+	summaryGroup.GroupsOrder = groupData.groupsOrderData
 
 	// Finally, we keep moving down the hierarchy and populate the nested groups.
 	for groupName, subGroupData := range groupData.groupsData {

@@ -340,6 +340,6 @@ func TestOutput_AddMetricSamples(t *testing.T) {
 		authHTTPReqsSummaryMetric = o.dataModel.groupsData["something"].aggregatedMetrics[authHTTPReqsMetric.Name]
 		assert.Equal(t, float64(1), authHTTPReqsSummaryMetric.Sink.(*metrics.CounterSink).Value)
 
-		assert.Equal(t, []string{"something", "auth"}, o.dataModel.orderedGroupsData)
+		assert.Equal(t, []string{"something", "auth"}, o.dataModel.groupsOrderData)
 	})
 }
