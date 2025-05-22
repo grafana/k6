@@ -2,26 +2,32 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/grafana/k6deps"
 	"github.com/spf13/afero"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"go.k6.io/k6/cmd/state"
+
+	"go.k6.io/k6/errext"
 	"go.k6.io/k6/internal/build"
 	"go.k6.io/k6/internal/cmd/tests"
 )
 
-type mockRunner struct {
+// mockExecutor mocks commandExecutor
+// Records the invocation of the run function and returns the defined error
+type mockExecutor struct {
 	invoked bool
-	rc      int
+	err     error
 }
 
-func (m *mockRunner) run(gs *state.GlobalState) {
+func (m *mockExecutor) run(_ *state.GlobalState) error {
 	m.invoked = true
-	gs.OSExit(m.rc)
+	return m.err
 }
 
 const (
@@ -83,9 +89,9 @@ func TestLauncherLaunch(t *testing.T) {
 		k6Args          []string
 		expectProvision bool
 		provisionError  error
+		expectCmdRunE   bool
 		expectK6Run     bool
-		expectDefault   bool
-		k6ReturnCode    int
+		k6ExecutorErr   error
 		expectOsExit    int
 	}{
 		{
@@ -94,8 +100,8 @@ func TestLauncherLaunch(t *testing.T) {
 			disableBP:       true,
 			script:          fakerTest,
 			expectProvision: false,
+			expectCmdRunE:   true,
 			expectK6Run:     false,
-			expectDefault:   true,
 			expectOsExit:    0,
 		},
 		{
@@ -103,8 +109,8 @@ func TestLauncherLaunch(t *testing.T) {
 			k6Cmd:           "cloud",
 			script:          fakerTest,
 			expectProvision: true,
+			expectCmdRunE:   false,
 			expectK6Run:     true,
-			expectDefault:   false,
 			expectOsExit:    0,
 		},
 		{
@@ -112,17 +118,18 @@ func TestLauncherLaunch(t *testing.T) {
 			k6Cmd:           "cloud",
 			script:          requireUnsatisfiedK6Version,
 			expectProvision: true,
-			expectK6Run:     true,
-			expectDefault:   false,
-			expectOsExit:    0,
+			expectCmdRunE:   false,
+			expectK6Run:     false,
+			provisionError:  fmt.Errorf("unsatisfied version"),
+			expectOsExit:    -1,
 		},
 		{
 			name:            "require satisfied k6 version",
 			k6Cmd:           "cloud",
 			script:          requireSatisfiedK6Version,
 			expectProvision: false,
+			expectCmdRunE:   true,
 			expectK6Run:     false,
-			expectDefault:   true,
 			expectOsExit:    0,
 		},
 		{
@@ -130,24 +137,25 @@ func TestLauncherLaunch(t *testing.T) {
 			k6Cmd:           "cloud",
 			script:          noDepsTest,
 			expectProvision: false,
+			expectCmdRunE:   true,
 			expectK6Run:     false,
-			expectDefault:   true,
 			expectOsExit:    0,
 		},
 		{
 			name:            "command don't require binary provisioning",
 			k6Cmd:           "version",
 			expectProvision: false,
+			expectCmdRunE:   true,
 			expectK6Run:     false,
-			expectDefault:   true,
 			expectOsExit:    0,
 		},
 		{
 			name:            "binary provisioning is not enabled for run command",
 			k6Cmd:           "run",
+			script:          noDepsTest,
 			expectProvision: false,
+			expectCmdRunE:   true,
 			expectK6Run:     false,
-			expectDefault:   true,
 			expectOsExit:    0,
 		},
 		{
@@ -156,39 +164,29 @@ func TestLauncherLaunch(t *testing.T) {
 			script:          fakerTest,
 			provisionError:  errors.New("test error"),
 			expectProvision: true,
-			expectDefault:   false,
+			expectCmdRunE:   false,
 			expectK6Run:     false,
-			expectOsExit:    1,
+			expectOsExit:    -1,
 		},
 		{
 			name:            "failed k6 execution",
 			k6Cmd:           "cloud",
 			script:          fakerTest,
-			k6ReturnCode:    108,
+			k6ExecutorErr:   errext.WithExitCodeIfNone(errors.New("execution failed"), 108),
 			expectProvision: true,
-			expectDefault:   false,
+			expectCmdRunE:   false,
 			expectK6Run:     true,
 			expectOsExit:    108,
 		},
 		{
-			name:            "missing input script",
-			k6Cmd:           "cloud",
-			k6Args:          []string{},
-			script:          "",
-			expectProvision: false,
-			expectK6Run:     false,
-			expectDefault:   false,
-			expectOsExit:    1,
-		},
-		{
-			name:            "script in stdin",
+			name:            "script in stdin (unsupported)",
 			k6Cmd:           "cloud",
 			k6Args:          []string{"-"},
 			script:          "",
 			expectProvision: false,
+			expectCmdRunE:   false,
 			expectK6Run:     false,
-			expectDefault:   false,
-			expectOsExit:    1,
+			expectOsExit:    -1,
 		},
 	}
 
@@ -222,133 +220,40 @@ func TestLauncherLaunch(t *testing.T) {
 			// the exit code is checked by the TestGlobalState when the test ends
 			ts.ExpectedExitCode = tc.expectOsExit
 
-			defaultRunner := &mockRunner{}
-			provisionRunner := &mockRunner{rc: tc.k6ReturnCode}
+			cmdExecutor := mockExecutor{err: tc.k6ExecutorErr}
+
+			// mock launcher's provision function recording the invocation and
+			// returning the mock command executor
 			provisionCalled := false
-			launcher := &Launcher{
+			launcher := &launcher{
 				gs: ts.GlobalState,
 				provision: func(_ *state.GlobalState, _ k6deps.Dependencies) (commandExecutor, error) {
 					provisionCalled = true
-					return provisionRunner, tc.provisionError
+					return &cmdExecutor, tc.provisionError
 				},
-				commandExecutor: defaultRunner,
 			}
 
-			launcher.Launch()
+			rootCommand := newRootWithLauncher(ts.GlobalState, launcher)
+
+			// find the command to be executed
+			cmd, _, err := rootCommand.cmd.Find(k6Args[1:])
+			if err != nil {
+				t.Fatalf("parsing args %v", err)
+			}
+
+			// replace command's the RunE function by a mock that indicates if the command was executed
+			runECalled := false
+			cmd.RunE = func(_ *cobra.Command, _ []string) error {
+				runECalled = true
+				return nil
+			}
+
+			// TODO: check error
+			rootCommand.execute()
 
 			assert.Equal(t, tc.expectProvision, provisionCalled)
-			assert.Equal(t, tc.expectK6Run, provisionRunner.invoked)
-			assert.Equal(t, tc.expectDefault, defaultRunner.invoked)
-		})
-	}
-}
-
-func TestScriptNameFromArgs(t *testing.T) {
-	t.Parallel()
-	testCases := []struct {
-		name     string
-		args     []string
-		expected string
-	}{
-		{
-			name:     "empty args",
-			args:     []string{},
-			expected: "",
-		},
-		{
-			name:     "only flags",
-			args:     []string{"-v", "--verbose"},
-			expected: "",
-		},
-		{
-			name:     "run with script at end",
-			args:     []string{"run", "script.js"},
-			expected: "script.js",
-		},
-		{
-			name:     "run with script and flags",
-			args:     []string{"run", "script.js", "-v"},
-			expected: "script.js",
-		},
-		{
-			name:     "run with flags before script",
-			args:     []string{"run", "-v", "script.js"},
-			expected: "script.js",
-		},
-		{
-			name:     "run with verbose flag before script",
-			args:     []string{"run", "--verbose", "script.js"},
-			expected: "script.js",
-		},
-		{
-			name:     "run with flag with value before script",
-			args:     []string{"run", "--console-output", "loadtest.log", "script.js"},
-			expected: "script.js",
-		},
-		{
-			name:     "run with script before flag with value",
-			args:     []string{"run", "script.js", "--console-output", "loadtest2.log"},
-			expected: "script.js",
-		},
-		{
-			name:     "cloud run with script",
-			args:     []string{"cloud", "run", "archive.tar"},
-			expected: "archive.tar",
-		},
-		{
-			name:     "cloud run with script and flags",
-			args:     []string{"cloud", "run", "archive.tar", "-v"},
-			expected: "archive.tar",
-		},
-		{
-			name:     "cloud with script and flags",
-			args:     []string{"cloud", "archive.tar", "-v"},
-			expected: "archive.tar",
-		},
-		{
-			name:     "cloud with flags and script",
-			args:     []string{"cloud", "--console-output", "loadtest.log", "script.js"},
-			expected: "script.js",
-		},
-		{
-			name:     "cloud with script and flags with value",
-			args:     []string{"cloud", "script.js", "--console-output", "loadtest2.log"},
-			expected: "script.js",
-		},
-		{
-			name:     "flags before command",
-			args:     []string{"-v", "run", "script.js"},
-			expected: "script.js",
-		},
-		{
-			name:     "complex case with multiple flags",
-			args:     []string{"-v", "--quiet", "cloud", "run", "-o", "output.json", "--console-output", "loadtest.log", "script.js", "--tag", "env=staging"},
-			expected: "script.js",
-		},
-		{
-			name:     "no script file",
-			args:     []string{"run", "-v", "--quiet"},
-			expected: "",
-		},
-		{
-			name:     "non-script file",
-			args:     []string{"run", "notascript.txt"},
-			expected: "",
-		},
-		{
-			name:     "ts extension",
-			args:     []string{"run", "script.ts"},
-			expected: "script.ts",
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			script := scriptNameFromArgs(tc.args)
-
-			assert.Equal(t, tc.expected, script)
+			assert.Equal(t, tc.expectCmdRunE, runECalled)
+			assert.Equal(t, tc.expectK6Run, cmdExecutor.invoked)
 		})
 	}
 }
@@ -391,36 +296,6 @@ func TestIsAnalysisRequired(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "cloud run command with help",
-			args:     []string{"cloud", "run", "--help"},
-			expected: false,
-		},
-		{
-			name:     "cloud run command with short help",
-			args:     []string{"cloud", "run", "-h"},
-			expected: false,
-		},
-		{
-			name:     "cloud command with short help in front",
-			args:     []string{"-h", "cloud"},
-			expected: false,
-		},
-		{
-			name:     "flag before command",
-			args:     []string{"-v", "cloud", "script.js"},
-			expected: true,
-		},
-		{
-			name:     "verbose flag before command",
-			args:     []string{"--verbose", "cloud", "script.js"},
-			expected: true,
-		},
-		{
-			name:     "cloud run with flag in the middle",
-			args:     []string{"cloud", "-v", "cloud", "archive.tar"},
-			expected: true,
-		},
-		{
 			name:     "cloud upload command",
 			args:     []string{"cloud", "upload", "script.js"},
 			expected: true,
@@ -451,7 +326,18 @@ func TestIsAnalysisRequired(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			actual := isAnalysisRequired(tc.args)
+			args := append([]string{"k6"}, tc.args...)
+			ts := tests.NewGlobalTestState(t)
+			ts.CmdArgs = args
+			rootCommand := newRootCommand(ts.GlobalState)
+
+			// find the command to be executed
+			cmd, _, err := rootCommand.cmd.Find(tc.args)
+			if err != nil {
+				t.Fatalf("parsing args %v", err)
+			}
+
+			actual := isAnalysisRequired(cmd)
 			assert.Equal(t, tc.expected, actual)
 		})
 	}
