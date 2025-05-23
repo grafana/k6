@@ -346,6 +346,10 @@ func (r *Request) Size() HTTPMessageSize {
 	}
 }
 
+func (r *Request) SetInterceptionID(interceptionID string) {
+	r.interceptionID = interceptionID
+}
+
 // resourceTiming is the type returned from request.timing.
 type resourceTiming struct {
 	StartTime             float64 `js:"startTime"`
@@ -709,18 +713,21 @@ func (r *Response) URL() string {
 
 // Route allows to handle a request
 type Route struct {
-	ctx     context.Context
-	logger  *log.Logger
+	ctx            context.Context
+	logger         *log.Logger
+	networkManager *NetworkManager
+
 	request *Request
 	handled bool
 }
 
-func NewRoute(ctx context.Context, logger *log.Logger, request *Request) *Route {
+func NewRoute(ctx context.Context, logger *log.Logger, networkManager *NetworkManager, request *Request) *Route {
 	return &Route{
-		ctx:     ctx,
-		logger:  logger,
-		request: request,
-		handled: false,
+		ctx:            ctx,
+		logger:         logger,
+		networkManager: networkManager,
+		request:        request,
+		handled:        false,
 	}
 }
 
@@ -729,11 +736,15 @@ func (r *Route) Request() *Request { return r.request }
 func (r *Route) Abort(errorCode string) {
 	err := r.startHandling()
 	if err != nil {
-		r.logger.Errorf("Route:Abort", "rurl:%s err:%w", r.request.URL(), err)
+		r.logger.Errorf("Route:Abort", "rurl:%s err:%s", r.request.URL(), err)
 		return
 	}
-	// TODO: actually abort request (see https://github.com/microsoft/playwright/blob/main/packages/playwright-core/src/server/network.ts#L266)
-	// r.request.
+
+	if errorCode == "" {
+		errorCode = "failed"
+	}
+
+	r.networkManager.AbortRequest(r.request, errorCode)
 }
 
 func (r *Route) startHandling() error {

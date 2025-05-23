@@ -527,6 +527,7 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, interc
 	}
 	m.reqsMu.Lock()
 	m.reqIDToRequest[event.RequestID] = req
+	m.logger.Infof("NetworkManager", "adding request ID: %s", event.RequestID)
 	m.reqsMu.Unlock()
 	m.emitRequestMetrics(req)
 	m.frameManager.requestStarted(req)
@@ -573,6 +574,14 @@ func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
 			m.logger.Errorf("NetworkManager:onRequestPaused", "continuing request: %s", err)
 		}
 	}()
+
+	request, ok := m.requestFromID(event.NetworkID)
+	if ok {
+		m.logger.Infof("NetworkManager:onRequestPaused", "setting interception ID: %s, url: %s", event.RequestID, event.Request.URL)
+		request.SetInterceptionID(string(event.RequestID))
+	} else {
+		m.logger.Infof("NetworkManager:onRequestPaused", "failed to find request from ID: %s", event.NetworkID)
+	}
 
 	purl, err := url.Parse(event.Request.URL)
 	if err != nil {
@@ -773,7 +782,7 @@ func (m *NetworkManager) AbortRequest(request *Request, errorReason string) {
 		if errors.Is(err, context.Canceled) {
 			m.logger.Debug("NetworkManager:AbortRequest", "context canceled interrupting request")
 		} else {
-			m.logger.Errorf("NetworkManager:AbortRequest", "fail to abort request: %s", err)
+			m.logger.Errorf("NetworkManager:AbortRequest", "fail to abort request (id: %s): %s", request.interceptionID, err)
 		}
 		return
 	}

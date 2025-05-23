@@ -1258,6 +1258,8 @@ func (p *Page) Referrer() string {
 func (p *Page) Route(path string, handlerCallback RouteHandlerCallback) {
 	routeHandler := NewRouteHandler(path, handlerCallback)
 	p.routes = append([]*RouteHandler{routeHandler}, p.routes...)
+	// TODO: improve this?
+	p.mainFrameSession.updateRequestInterception(true)
 }
 
 // NavigationTimeout returns the page's navigation timeout.

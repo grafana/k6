@@ -526,7 +526,7 @@ func (m *FrameManager) requestStarted(req *Request) {
 
 	// TODO: If the handler doesn't match we return false and perform a route.continue like in https://github.com/microsoft/playwright/blob/main/packages/playwright-core/src/server/frames.ts#L315
 	// TODO: Perform some tests against PW to ensure that the behaviour matches. Where it doesn't create new issues or resolve there and then.
-	route := NewRoute(m.ctx, m.logger, req)
+	route := NewRoute(m.ctx, m.logger, m.page.mainFrameSession.networkManager, req)
 	for _, r := range m.page.routes {
 		if r.Matches(req.URL()) {
 			err := r.handler(route)
