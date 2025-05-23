@@ -21,8 +21,8 @@ const (
 	KEY_WWW_Authenticate = "WWW-Authenticate"
 )
 
-// The 401 (Unauthorized) response message is used by an origin server
-// to challenge the authorization of a user agent.
+//The 401 (Unauthorized) response message is used by an origin server
+//to challenge the authorization of a user agent.
 //
 // And the CHALLENGE will include informations about auth
 type Challenge map[string]string
@@ -71,7 +71,7 @@ func (info Challenge) ToAuthorizationStr() string {
 	auth_schema := KEY_DIGEST
 	authorization_content := ""
 	// how to specify the sequence
-	for k := range info {
+	for k, _ := range info {
 		if k != KEY_AUTH_SCHEMA {
 			authorization_content += fmt.Sprintf(", %s=%s", k, info.GetChallengeItemFormat(k))
 		}

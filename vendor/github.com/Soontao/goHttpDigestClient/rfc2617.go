@@ -13,9 +13,9 @@ func toMd5(s string) string {
 	return fmt.Sprintf("%x", md5.Sum(sByte))
 }
 
-// In RFC 2617
+//In RFC 2617
 //
-// HA1 is equal to MD5("username:realm:password")
+//HA1 is equal to MD5("username:realm:password")
 func computeHa1(username, realm, password string) string {
 	return toMd5(fmt.Sprintf("%s:%s:%s", username, realm, password))
 }
