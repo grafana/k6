@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -64,7 +65,7 @@ export default function() {
 `
 
 	requireUnsatisfiedK6Version = `
-"use k6 = v0.99"
+"use k6 = v9.99"
 
 import { sleep, check } from 'k6';
 
@@ -189,16 +190,6 @@ func TestLauncherLaunch(t *testing.T) {
 			expectK6Run:     true,
 			expectOsExit:    108,
 		},
-		{
-			name:            "script in stdin (unsupported)",
-			k6Cmd:           "cloud",
-			k6Args:          []string{"-"},
-			script:          "",
-			expectProvision: false,
-			expectCmdRunE:   false,
-			expectK6Run:     false,
-			expectOsExit:    -1,
-		},
 	}
 
 	for _, tc := range testCases {
@@ -255,7 +246,6 @@ func TestLauncherLaunch(t *testing.T) {
 				return nil
 			}
 
-			// TODO: check error
 			rootCommand.execute()
 
 			assert.Equal(t, tc.expectProvision, provider.invoked)
@@ -263,6 +253,61 @@ func TestLauncherLaunch(t *testing.T) {
 			assert.Equal(t, tc.expectK6Run, cmdExecutor.invoked)
 		})
 	}
+}
+
+func TestStdin(t *testing.T) {
+	t.Parallel()
+
+	k6Args := []string{"k6", "archive", "-"}
+
+	ts := tests.NewGlobalTestState(t)
+	ts.CmdArgs = k6Args
+
+	// k6deps uses os package to access files. So we need to use it in the global state
+	ts.FS = afero.NewOsFs()
+
+	// NewGlobalTestState does not set the Binary provisioning flag even if we set
+	// the K6_BINARY_PROVISIONING variable in the global state, so we do it manually
+	ts.Flags.BinaryProvisioning = true
+
+	// pass script using stdin
+	stdin := bytes.NewBuffer([]byte(requireUnsatisfiedK6Version))
+	ts.Stdin = stdin
+
+	// the exit code is checked by the TestGlobalState when the test ends
+	ts.ExpectedExitCode = 0
+
+	rootCommand := newRootCommand(ts.GlobalState)
+	cmdExecutor := mockExecutor{}
+
+	// use a provider returning the mock command executor
+	provider := mockProvider{executor: &cmdExecutor}
+	launcher := &launcher{
+		gs:       ts.GlobalState,
+		provider: &provider,
+	}
+
+	// override the rootCommand launcher
+	rootCommand.launcher = launcher
+
+	// find the command to be executed
+	cmd, _, err := rootCommand.cmd.Find(k6Args[1:])
+	if err != nil {
+		t.Fatalf("parsing args %v", err)
+	}
+
+	// replace command's the RunE function by a mock that indicates if the command was executed
+	runECalled := false
+	cmd.RunE = func(_ *cobra.Command, _ []string) error {
+		runECalled = true
+		return nil
+	}
+
+	rootCommand.execute()
+
+	assert.Equal(t, true, provider.invoked)
+	assert.Equal(t, false, runECalled)
+	assert.Equal(t, true, cmdExecutor.invoked)
 }
 
 func TestIsAnalysisRequired(t *testing.T) {
