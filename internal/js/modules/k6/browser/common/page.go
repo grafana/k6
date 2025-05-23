@@ -190,6 +190,33 @@ type ConsoleMessage struct {
 
 type PageOnHandler func(PageOnEvent) error
 
+type RouteHandler struct {
+	path    string
+	handler RouteHandlerCallback
+}
+
+func NewRouteHandler(path string, handler RouteHandlerCallback) *RouteHandler {
+	return &RouteHandler{
+		path:    path,
+		handler: handler,
+	}
+}
+
+func (rh *RouteHandler) Matches(requestURL string) bool {
+	if requestURL == "" {
+		return true
+	}
+	if rh.path == requestURL {
+		return true
+	}
+
+	// TODO: handle regexp, glob expression and even function?
+
+	return false
+}
+
+type RouteHandlerCallback func(*Route) error
+
 // Page stores Page/tab related context.
 type Page struct {
 	Keyboard    *Keyboard
@@ -234,7 +261,7 @@ type Page struct {
 	frameSessionsMu  sync.RWMutex
 	workers          map[target.SessionID]*Worker
 	workersMu        sync.Mutex
-	routes           []any // TODO: Implement
+	routes           []*RouteHandler
 	vu               k6modules.VU
 
 	logger *log.Logger
@@ -1225,6 +1252,12 @@ func (p *Page) MainFrame() *Frame {
 func (p *Page) Referrer() string {
 	nm := p.mainFrameSession.getNetworkManager()
 	return nm.extraHTTPHeaders["referer"]
+}
+
+// Route register a handler to be executed for a given request path
+func (p *Page) Route(path string, handlerCallback RouteHandlerCallback) {
+	routeHandler := NewRouteHandler(path, handlerCallback)
+	p.routes = append([]*RouteHandler{routeHandler}, p.routes...)
 }
 
 // NavigationTimeout returns the page's navigation timeout.

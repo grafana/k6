@@ -312,6 +312,38 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return mapResponse(vu, resp), nil
 			}), nil
 		},
+		// TODO: path could also be a regex, a glob expression or a function?
+		"route": func(path string, handler sobek.Callable) (*sobek.Promise, error) {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				ctx := vu.Context()
+
+				// TODO: Is this necessary? 
+				// Run the event handler in the task queue to
+				// ensure that the handler is executed on the event loop.
+				tq := vu.get(ctx, p.TargetID())
+				routeHandler := func(route *common.Route) error {
+					done := make(chan struct{})
+
+					tq.Queue(func() error {
+						defer close(done)
+
+						_, err := handler(
+							sobek.Undefined(),
+							rt.ToValue(route),
+						)
+						if err != nil {
+							return fmt.Errorf("executing page.route('%s') handler: %w", path, err)
+						}
+
+						return nil
+					})
+					return nil
+				}
+
+				p.Route(path, routeHandler)
+				return nil, nil
+			}), nil
+		},
 		"screenshot": func(opts sobek.Value) (*sobek.Promise, error) {
 			popts := common.NewPageScreenshotOptions()
 			if err := popts.Parse(vu.Context(), opts); err != nil {
@@ -608,7 +640,7 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 
 		ctx := vu.Context()
 
-		// Run the the event handler in the task queue to
+		// Run the event handler in the task queue to
 		// ensure that the handler is executed on the event loop.
 		tq := vu.get(ctx, p.TargetID())
 		eventHandler := func(event common.PageOnEvent) error {

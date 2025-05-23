@@ -28,6 +28,23 @@ import (
 	"github.com/chromedp/cdproto/network"
 )
 
+var ErrorReasons = map[string]network.ErrorReason{
+	"aborted":              network.ErrorReasonAborted,
+	"accessdenied":         network.ErrorReasonAccessDenied,
+	"addressunreachable":   network.ErrorReasonAddressUnreachable,
+	"blockedbyclient":      network.ErrorReasonBlockedByClient,
+	"blockedbyresponse":    network.ErrorReasonBlockedByResponse,
+	"connectionaborted":    network.ErrorReasonConnectionAborted,
+	"connectionclosed":     network.ErrorReasonConnectionClosed,
+	"connectionfailed":     network.ErrorReasonConnectionFailed,
+	"connectionrefused":    network.ErrorReasonConnectionRefused,
+	"connectionreset":      network.ErrorReasonConnectionReset,
+	"internetdisconnected": network.ErrorReasonInternetDisconnected,
+	"namenotresolved":      network.ErrorReasonNameNotResolved,
+	"timedout":             network.ErrorReasonTimedOut,
+	"failed":               network.ErrorReasonFailed,
+}
+
 // Credentials holds HTTP authentication credentials.
 type Credentials struct {
 	Username string `js:"username"`
@@ -739,6 +756,27 @@ func (m *NetworkManager) Authenticate(credentials Credentials) error {
 	}
 
 	return nil
+}
+
+func (m *NetworkManager) AbortRequest(request *Request, errorReason string) {
+	netErrorReason, ok := ErrorReasons[errorReason]
+	if !ok {
+		m.logger.Errorf("NetworkManager:AbortRequest", "unknown error code: %s", errorReason)
+		return
+	}
+
+	action := fetch.FailRequest(fetch.RequestID(request.interceptionID), netErrorReason)
+	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+		// Avoid logging as error when context is canceled.
+		// Most probably this happens when trying to fail a site's background request
+		// while the iteration is ending and therefore the browser context is being closed.
+		if errors.Is(err, context.Canceled) {
+			m.logger.Debug("NetworkManager:AbortRequest", "context canceled interrupting request")
+		} else {
+			m.logger.Errorf("NetworkManager:AbortRequest", "fail to abort request: %s", err)
+		}
+		return
+	}
 }
 
 // SetExtraHTTPHeaders sets extra HTTP request headers to be sent with every request.

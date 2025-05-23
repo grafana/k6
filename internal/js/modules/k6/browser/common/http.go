@@ -706,3 +706,40 @@ func (r *Response) Text() (string, error) {
 func (r *Response) URL() string {
 	return r.url
 }
+
+// Route allows to handle a request
+type Route struct {
+	ctx     context.Context
+	logger  *log.Logger
+	request *Request
+	handled bool
+}
+
+func NewRoute(ctx context.Context, logger *log.Logger, request *Request) *Route {
+	return &Route{
+		ctx:     ctx,
+		logger:  logger,
+		request: request,
+		handled: false,
+	}
+}
+
+func (r *Route) Request() *Request { return r.request }
+
+func (r *Route) Abort(errorCode string) {
+	err := r.startHandling()
+	if err != nil {
+		r.logger.Errorf("Route:Abort", "rurl:%s err:%w", r.request.URL(), err)
+		return
+	}
+	// TODO: actually abort request (see https://github.com/microsoft/playwright/blob/main/packages/playwright-core/src/server/network.ts#L266)
+	// r.request.
+}
+
+func (r *Route) startHandling() error {
+	if r.handled {
+		return fmt.Errorf("route is already handled")
+	}
+	r.handled = true
+	return nil
+}
