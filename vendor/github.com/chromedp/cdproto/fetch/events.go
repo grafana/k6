@@ -21,16 +21,16 @@ import (
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Fetch#event-requestPaused
 type EventRequestPaused struct {
-	RequestID           RequestID            `json:"requestId"`                     // Each request the page makes will have a unique id.
-	Request             *network.Request     `json:"request"`                       // The details of the request.
-	FrameID             cdp.FrameID          `json:"frameId"`                       // The id of the frame that initiated the request.
-	ResourceType        network.ResourceType `json:"resourceType"`                  // How the requested resource will be used.
-	ResponseErrorReason network.ErrorReason  `json:"responseErrorReason,omitempty"` // Response error if intercepted at response stage.
-	ResponseStatusCode  int64                `json:"responseStatusCode,omitempty"`  // Response code if intercepted at response stage.
-	ResponseStatusText  string               `json:"responseStatusText,omitempty"`  // Response status text if intercepted at response stage.
-	ResponseHeaders     []*HeaderEntry       `json:"responseHeaders,omitempty"`     // Response headers if intercepted at the response stage.
-	NetworkID           network.RequestID    `json:"networkId,omitempty"`           // If the intercepted request had a corresponding Network.requestWillBeSent event fired for it, then this networkId will be the same as the requestId present in the requestWillBeSent event.
-	RedirectedRequestID RequestID            `json:"redirectedRequestId,omitempty"` // If the request is due to a redirect response from the server, the id of the request that has caused the redirect.
+	RequestID           RequestID            `json:"requestId"`                              // Each request the page makes will have a unique id.
+	Request             *network.Request     `json:"request"`                                // The details of the request.
+	FrameID             cdp.FrameID          `json:"frameId"`                                // The id of the frame that initiated the request.
+	ResourceType        network.ResourceType `json:"resourceType"`                           // How the requested resource will be used.
+	ResponseErrorReason network.ErrorReason  `json:"responseErrorReason,omitempty,omitzero"` // Response error if intercepted at response stage.
+	ResponseStatusCode  int64                `json:"responseStatusCode,omitempty,omitzero"`  // Response code if intercepted at response stage.
+	ResponseStatusText  string               `json:"responseStatusText,omitempty,omitzero"`  // Response status text if intercepted at response stage.
+	ResponseHeaders     []*HeaderEntry       `json:"responseHeaders,omitempty,omitzero"`     // Response headers if intercepted at the response stage.
+	NetworkID           network.RequestID    `json:"networkId,omitempty,omitzero"`           // If the intercepted request had a corresponding Network.requestWillBeSent event fired for it, then this networkId will be the same as the requestId present in the requestWillBeSent event.
+	RedirectedRequestID RequestID            `json:"redirectedRequestId,omitempty,omitzero"` // If the request is due to a redirect response from the server, the id of the request that has caused the redirect.
 }
 
 // EventAuthRequired issued when the domain is enabled with

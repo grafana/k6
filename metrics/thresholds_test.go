@@ -133,8 +133,6 @@ func TestThreshold_runNoTaint(t *testing.T) {
 	}
 
 	for _, testCase := range tests {
-		testCase := testCase
-
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -487,8 +485,6 @@ func TestThresholdsValidate(t *testing.T) {
 		}
 
 		for _, testCase := range tests {
-			testCase := testCase
-
 			t.Run(testCase.name, func(t *testing.T) {
 				t.Parallel()
 
@@ -603,7 +599,6 @@ func TestThresholdsRunAll(t *testing.T) {
 	}
 
 	for name, data := range testdata {
-		name, data := name, data
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -743,8 +738,6 @@ func TestThresholdsRun(t *testing.T) {
 		},
 	}
 	for _, testCase := range tests {
-		testCase := testCase
-
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -835,8 +828,6 @@ func TestThresholdsJSON(t *testing.T) {
 	}
 
 	for _, data := range testdata {
-		data := data
-
 		t.Run(data.JSON, func(t *testing.T) {
 			t.Parallel()
 

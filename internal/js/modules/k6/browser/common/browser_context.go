@@ -236,7 +236,6 @@ func (b *BrowserContext) GrantPermissions(permissions []string, opts GrantPermis
 		"accelerometer":        cdpbrowser.PermissionTypeSensors,
 		"gyroscope":            cdpbrowser.PermissionTypeSensors,
 		"magnetometer":         cdpbrowser.PermissionTypeSensors,
-		"accessibility-events": cdpbrowser.PermissionTypeAccessibilityEvents,
 		"clipboard-read":       cdpbrowser.PermissionTypeClipboardReadWrite,
 		"clipboard-write":      cdpbrowser.PermissionTypeClipboardSanitizedWrite,
 		"payment-handler":      cdpbrowser.PermissionTypePaymentHandler,

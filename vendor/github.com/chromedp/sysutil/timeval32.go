@@ -1,4 +1,4 @@
-// +build darwin freebsd
+//go:build darwin || freebsd
 
 package sysutil
 

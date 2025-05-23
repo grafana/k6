@@ -4,10 +4,9 @@ package media
 
 import (
 	"fmt"
+	"strings"
 
-	"github.com/mailru/easyjson"
-	"github.com/mailru/easyjson/jlexer"
-	"github.com/mailru/easyjson/jwriter"
+	"github.com/go-json-experiment/json/jsontext"
 )
 
 // PlayerID players will get an ID that is unique within the agent context.
@@ -73,7 +72,7 @@ type PlayerError struct {
 	Code      int64                        `json:"code"`  // Code is the numeric enum entry for a specific set of error codes, such as PipelineStatusCodes in media/base/pipeline_status.h
 	Stack     []*PlayerErrorSourceLocation `json:"stack"` // A trace of where this error was caused / where it passed through.
 	Cause     []*PlayerError               `json:"cause"` // Errors potentially have a root cause error, ie, a DecoderError might be caused by an WindowsError
-	Data      easyjson.RawMessage          `json:"data"`
+	Data      jsontext.Value               `json:"data"`
 }
 
 // PlayerMessageLevel keep in sync with MediaLogMessageLevel We are currently
@@ -101,20 +100,12 @@ const (
 	PlayerMessageLevelDebug   PlayerMessageLevel = "debug"
 )
 
-// MarshalEasyJSON satisfies easyjson.Marshaler.
-func (t PlayerMessageLevel) MarshalEasyJSON(out *jwriter.Writer) {
-	out.String(string(t))
-}
+// UnmarshalJSON satisfies [json.Unmarshaler].
+func (t *PlayerMessageLevel) UnmarshalJSON(buf []byte) error {
+	s := string(buf)
+	s = strings.TrimSuffix(strings.TrimPrefix(s, `"`), `"`)
 
-// MarshalJSON satisfies json.Marshaler.
-func (t PlayerMessageLevel) MarshalJSON() ([]byte, error) {
-	return easyjson.Marshal(t)
-}
-
-// UnmarshalEasyJSON satisfies easyjson.Unmarshaler.
-func (t *PlayerMessageLevel) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	v := in.String()
-	switch PlayerMessageLevel(v) {
+	switch PlayerMessageLevel(s) {
 	case PlayerMessageLevelError:
 		*t = PlayerMessageLevelError
 	case PlayerMessageLevelWarning:
@@ -123,13 +114,8 @@ func (t *PlayerMessageLevel) UnmarshalEasyJSON(in *jlexer.Lexer) {
 		*t = PlayerMessageLevelInfo
 	case PlayerMessageLevelDebug:
 		*t = PlayerMessageLevelDebug
-
 	default:
-		in.AddError(fmt.Errorf("unknown PlayerMessageLevel value: %v", v))
+		return fmt.Errorf("unknown PlayerMessageLevel value: %v", s)
 	}
-}
-
-// UnmarshalJSON satisfies json.Unmarshaler.
-func (t *PlayerMessageLevel) UnmarshalJSON(buf []byte) error {
-	return easyjson.Unmarshal(buf, t)
+	return nil
 }

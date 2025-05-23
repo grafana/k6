@@ -50,10 +50,10 @@ func (p *EnableParams) Do(ctx context.Context) (err error) {
 // GetPartialAXTreeParams fetches the accessibility node and partial
 // accessibility tree for this DOM node, if it exists.
 type GetPartialAXTreeParams struct {
-	NodeID         cdp.NodeID             `json:"nodeId,omitempty"`         // Identifier of the node to get the partial accessibility tree for.
-	BackendNodeID  cdp.BackendNodeID      `json:"backendNodeId,omitempty"`  // Identifier of the backend node to get the partial accessibility tree for.
-	ObjectID       runtime.RemoteObjectID `json:"objectId,omitempty"`       // JavaScript object id of the node wrapper to get the partial accessibility tree for.
-	FetchRelatives bool                   `json:"fetchRelatives,omitempty"` // Whether to fetch this node's ancestors, siblings and children. Defaults to true.
+	NodeID         cdp.NodeID             `json:"nodeId,omitempty,omitzero"`        // Identifier of the node to get the partial accessibility tree for.
+	BackendNodeID  cdp.BackendNodeID      `json:"backendNodeId,omitempty,omitzero"` // Identifier of the backend node to get the partial accessibility tree for.
+	ObjectID       runtime.RemoteObjectID `json:"objectId,omitempty,omitzero"`      // JavaScript object id of the node wrapper to get the partial accessibility tree for.
+	FetchRelatives bool                   `json:"fetchRelatives"`                   // Whether to fetch this node's ancestors, siblings and children. Defaults to true.
 }
 
 // GetPartialAXTree fetches the accessibility node and partial accessibility
@@ -63,7 +63,9 @@ type GetPartialAXTreeParams struct {
 //
 // parameters:
 func GetPartialAXTree() *GetPartialAXTreeParams {
-	return &GetPartialAXTreeParams{}
+	return &GetPartialAXTreeParams{
+		FetchRelatives: true,
+	}
 }
 
 // WithNodeID identifier of the node to get the partial accessibility tree
@@ -96,7 +98,7 @@ func (p GetPartialAXTreeParams) WithFetchRelatives(fetchRelatives bool) *GetPart
 
 // GetPartialAXTreeReturns return values.
 type GetPartialAXTreeReturns struct {
-	Nodes []*Node `json:"nodes,omitempty"` // The Accessibility.AXNode for this DOM node, if it exists, plus its ancestors, siblings and children, if requested.
+	Nodes []*Node `json:"nodes,omitempty,omitzero"` // The Accessibility.AXNode for this DOM node, if it exists, plus its ancestors, siblings and children, if requested.
 }
 
 // Do executes Accessibility.getPartialAXTree against the provided context.
@@ -118,8 +120,8 @@ func (p *GetPartialAXTreeParams) Do(ctx context.Context) (nodes []*Node, err err
 // GetFullAXTreeParams fetches the entire accessibility tree for the root
 // Document.
 type GetFullAXTreeParams struct {
-	Depth   int64       `json:"depth,omitempty"`   // The maximum depth at which descendants of the root node should be retrieved. If omitted, the full tree is returned.
-	FrameID cdp.FrameID `json:"frameId,omitempty"` // The frame for whose document the AX tree should be retrieved. If omitted, the root frame is used.
+	Depth   int64       `json:"depth,omitempty,omitzero"`   // The maximum depth at which descendants of the root node should be retrieved. If omitted, the full tree is returned.
+	FrameID cdp.FrameID `json:"frameId,omitempty,omitzero"` // The frame for whose document the AX tree should be retrieved. If omitted, the root frame is used.
 }
 
 // GetFullAXTree fetches the entire accessibility tree for the root Document.
@@ -147,7 +149,7 @@ func (p GetFullAXTreeParams) WithFrameID(frameID cdp.FrameID) *GetFullAXTreePara
 
 // GetFullAXTreeReturns return values.
 type GetFullAXTreeReturns struct {
-	Nodes []*Node `json:"nodes,omitempty"`
+	Nodes []*Node `json:"nodes,omitempty,omitzero"`
 }
 
 // Do executes Accessibility.getFullAXTree against the provided context.
@@ -169,7 +171,7 @@ func (p *GetFullAXTreeParams) Do(ctx context.Context) (nodes []*Node, err error)
 // GetRootAXNodeParams fetches the root node. Requires enable() to have been
 // called previously.
 type GetRootAXNodeParams struct {
-	FrameID cdp.FrameID `json:"frameId,omitempty"` // The frame in whose document the node resides. If omitted, the root frame is used.
+	FrameID cdp.FrameID `json:"frameId,omitempty,omitzero"` // The frame in whose document the node resides. If omitted, the root frame is used.
 }
 
 // GetRootAXNode fetches the root node. Requires enable() to have been called
@@ -191,7 +193,7 @@ func (p GetRootAXNodeParams) WithFrameID(frameID cdp.FrameID) *GetRootAXNodePara
 
 // GetRootAXNodeReturns return values.
 type GetRootAXNodeReturns struct {
-	Node *Node `json:"node,omitempty"`
+	Node *Node `json:"node,omitempty,omitzero"`
 }
 
 // Do executes Accessibility.getRootAXNode against the provided context.
@@ -213,9 +215,9 @@ func (p *GetRootAXNodeParams) Do(ctx context.Context) (node *Node, err error) {
 // GetAXNodeAndAncestorsParams fetches a node and all ancestors up to and
 // including the root. Requires enable() to have been called previously.
 type GetAXNodeAndAncestorsParams struct {
-	NodeID        cdp.NodeID             `json:"nodeId,omitempty"`        // Identifier of the node to get.
-	BackendNodeID cdp.BackendNodeID      `json:"backendNodeId,omitempty"` // Identifier of the backend node to get.
-	ObjectID      runtime.RemoteObjectID `json:"objectId,omitempty"`      // JavaScript object id of the node wrapper to get.
+	NodeID        cdp.NodeID             `json:"nodeId,omitempty,omitzero"`        // Identifier of the node to get.
+	BackendNodeID cdp.BackendNodeID      `json:"backendNodeId,omitempty,omitzero"` // Identifier of the backend node to get.
+	ObjectID      runtime.RemoteObjectID `json:"objectId,omitempty,omitzero"`      // JavaScript object id of the node wrapper to get.
 }
 
 // GetAXNodeAndAncestors fetches a node and all ancestors up to and including
@@ -248,7 +250,7 @@ func (p GetAXNodeAndAncestorsParams) WithObjectID(objectID runtime.RemoteObjectI
 
 // GetAXNodeAndAncestorsReturns return values.
 type GetAXNodeAndAncestorsReturns struct {
-	Nodes []*Node `json:"nodes,omitempty"`
+	Nodes []*Node `json:"nodes,omitempty,omitzero"`
 }
 
 // Do executes Accessibility.getAXNodeAndAncestors against the provided context.
@@ -271,7 +273,7 @@ func (p *GetAXNodeAndAncestorsParams) Do(ctx context.Context) (nodes []*Node, er
 // Requires enable() to have been called previously.
 type GetChildAXNodesParams struct {
 	ID      NodeID      `json:"id"`
-	FrameID cdp.FrameID `json:"frameId,omitempty"` // The frame in whose document the node resides. If omitted, the root frame is used.
+	FrameID cdp.FrameID `json:"frameId,omitempty,omitzero"` // The frame in whose document the node resides. If omitted, the root frame is used.
 }
 
 // GetChildAXNodes fetches a particular accessibility node by AXNodeId.
@@ -297,7 +299,7 @@ func (p GetChildAXNodesParams) WithFrameID(frameID cdp.FrameID) *GetChildAXNodes
 
 // GetChildAXNodesReturns return values.
 type GetChildAXNodesReturns struct {
-	Nodes []*Node `json:"nodes,omitempty"`
+	Nodes []*Node `json:"nodes,omitempty,omitzero"`
 }
 
 // Do executes Accessibility.getChildAXNodes against the provided context.
@@ -324,11 +326,11 @@ func (p *GetChildAXNodesParams) Do(ctx context.Context) (nodes []*Node, err erro
 // accessibleName or role is specified, it returns all the accessibility nodes
 // in the subtree.
 type QueryAXTreeParams struct {
-	NodeID         cdp.NodeID             `json:"nodeId,omitempty"`         // Identifier of the node for the root to query.
-	BackendNodeID  cdp.BackendNodeID      `json:"backendNodeId,omitempty"`  // Identifier of the backend node for the root to query.
-	ObjectID       runtime.RemoteObjectID `json:"objectId,omitempty"`       // JavaScript object id of the node wrapper for the root to query.
-	AccessibleName string                 `json:"accessibleName,omitempty"` // Find nodes with this computed name.
-	Role           string                 `json:"role,omitempty"`           // Find nodes with this computed role.
+	NodeID         cdp.NodeID             `json:"nodeId,omitempty,omitzero"`         // Identifier of the node for the root to query.
+	BackendNodeID  cdp.BackendNodeID      `json:"backendNodeId,omitempty,omitzero"`  // Identifier of the backend node for the root to query.
+	ObjectID       runtime.RemoteObjectID `json:"objectId,omitempty,omitzero"`       // JavaScript object id of the node wrapper for the root to query.
+	AccessibleName string                 `json:"accessibleName,omitempty,omitzero"` // Find nodes with this computed name.
+	Role           string                 `json:"role,omitempty,omitzero"`           // Find nodes with this computed role.
 }
 
 // QueryAXTree query a DOM node's accessibility subtree for accessible name
@@ -379,7 +381,7 @@ func (p QueryAXTreeParams) WithRole(role string) *QueryAXTreeParams {
 
 // QueryAXTreeReturns return values.
 type QueryAXTreeReturns struct {
-	Nodes []*Node `json:"nodes,omitempty"` // A list of Accessibility.AXNode matching the specified attributes, including nodes that are ignored for accessibility.
+	Nodes []*Node `json:"nodes,omitempty,omitzero"` // A list of Accessibility.AXNode matching the specified attributes, including nodes that are ignored for accessibility.
 }
 
 // Do executes Accessibility.queryAXTree against the provided context.

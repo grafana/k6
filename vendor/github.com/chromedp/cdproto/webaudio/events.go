@@ -82,8 +82,8 @@ type EventNodesConnected struct {
 	ContextID             GraphObjectID `json:"contextId"`
 	SourceID              GraphObjectID `json:"sourceId"`
 	DestinationID         GraphObjectID `json:"destinationId"`
-	SourceOutputIndex     float64       `json:"sourceOutputIndex,omitempty"`
-	DestinationInputIndex float64       `json:"destinationInputIndex,omitempty"`
+	SourceOutputIndex     float64       `json:"sourceOutputIndex,omitempty,omitzero"`
+	DestinationInputIndex float64       `json:"destinationInputIndex,omitempty,omitzero"`
 }
 
 // EventNodesDisconnected notifies that AudioNodes are disconnected. The
@@ -95,8 +95,8 @@ type EventNodesDisconnected struct {
 	ContextID             GraphObjectID `json:"contextId"`
 	SourceID              GraphObjectID `json:"sourceId"`
 	DestinationID         GraphObjectID `json:"destinationId"`
-	SourceOutputIndex     float64       `json:"sourceOutputIndex,omitempty"`
-	DestinationInputIndex float64       `json:"destinationInputIndex,omitempty"`
+	SourceOutputIndex     float64       `json:"sourceOutputIndex,omitempty,omitzero"`
+	DestinationInputIndex float64       `json:"destinationInputIndex,omitempty,omitzero"`
 }
 
 // EventNodeParamConnected notifies that an AudioNode is connected to an
@@ -107,7 +107,7 @@ type EventNodeParamConnected struct {
 	ContextID         GraphObjectID `json:"contextId"`
 	SourceID          GraphObjectID `json:"sourceId"`
 	DestinationID     GraphObjectID `json:"destinationId"`
-	SourceOutputIndex float64       `json:"sourceOutputIndex,omitempty"`
+	SourceOutputIndex float64       `json:"sourceOutputIndex,omitempty,omitzero"`
 }
 
 // EventNodeParamDisconnected notifies that an AudioNode is disconnected to
@@ -118,5 +118,5 @@ type EventNodeParamDisconnected struct {
 	ContextID         GraphObjectID `json:"contextId"`
 	SourceID          GraphObjectID `json:"sourceId"`
 	DestinationID     GraphObjectID `json:"destinationId"`
-	SourceOutputIndex float64       `json:"sourceOutputIndex,omitempty"`
+	SourceOutputIndex float64       `json:"sourceOutputIndex,omitempty,omitzero"`
 }

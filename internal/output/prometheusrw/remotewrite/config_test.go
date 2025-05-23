@@ -192,7 +192,6 @@ func TestGetConsolidatedConfig(t *testing.T) {
 	}
 
 	for name, testCase := range testCases {
-		testCase := testCase
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			c, err := GetConsolidatedConfig(testCase.jsonRaw, testCase.env, testCase.arg)
@@ -253,7 +252,6 @@ func TestOptionServerURL(t *testing.T) {
 		StaleMarkers:          null.BoolFrom(false),
 	}
 	for name, tc := range cases {
-		tc := tc
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			c, err := GetConsolidatedConfig(
@@ -300,7 +298,6 @@ func TestOptionHeaders(t *testing.T) {
 		StaleMarkers: null.BoolFrom(false),
 	}
 	for name, tc := range cases {
-		tc := tc
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			c, err := GetConsolidatedConfig(
@@ -334,7 +331,6 @@ func TestOptionInsecureSkipTLSVerify(t *testing.T) {
 		StaleMarkers:          null.BoolFrom(false),
 	}
 	for name, tc := range cases {
-		tc := tc
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			c, err := GetConsolidatedConfig(
@@ -371,7 +367,6 @@ func TestOptionBasicAuth(t *testing.T) {
 	}
 
 	for name, tc := range cases {
-		tc := tc
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			c, err := GetConsolidatedConfig(
@@ -405,7 +400,6 @@ func TestOptionBearerToken(t *testing.T) {
 	}
 
 	for name, tc := range cases {
-		tc := tc
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			c, err := GetConsolidatedConfig(
@@ -440,7 +434,6 @@ func TestOptionClientCertificate(t *testing.T) {
 	}
 
 	for name, tc := range cases {
-		tc := tc
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			c, err := GetConsolidatedConfig(
@@ -478,7 +471,6 @@ func TestOptionTrendAsNativeHistogram(t *testing.T) {
 	}
 
 	for name, tc := range cases {
-		tc := tc
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			c, err := GetConsolidatedConfig(
@@ -513,7 +505,6 @@ func TestOptionPushInterval(t *testing.T) {
 	}
 
 	for name, tc := range cases {
-		tc := tc
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			c, err := GetConsolidatedConfig(
@@ -549,7 +540,6 @@ func TestConfigTrendStats(t *testing.T) {
 	}
 
 	for name, tc := range cases {
-		tc := tc
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			c, err := GetConsolidatedConfig(
@@ -582,7 +572,6 @@ func TestOptionStaleMarker(t *testing.T) {
 	}
 
 	for name, tc := range cases {
-		tc := tc
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			c, err := GetConsolidatedConfig(

@@ -168,7 +168,6 @@ func TestOutputConvertToPbSeries_WithPreviousState(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			pbseries := o.convertToPbSeries([]metrics.SampleContainer{
 				metrics.Sample{

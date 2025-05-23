@@ -29,7 +29,7 @@ func (p *DisableParams) Do(ctx context.Context) (err error) {
 
 // EnableParams enable collecting and reporting metrics.
 type EnableParams struct {
-	TimeDomain EnableTimeDomain `json:"timeDomain,omitempty"` // Time domain to use for collecting and reporting duration metrics.
+	TimeDomain EnableTimeDomain `json:"timeDomain,omitempty,omitzero"` // Time domain to use for collecting and reporting duration metrics.
 }
 
 // Enable enable collecting and reporting metrics.
@@ -65,7 +65,7 @@ func GetMetrics() *GetMetricsParams {
 
 // GetMetricsReturns return values.
 type GetMetricsReturns struct {
-	Metrics []*Metric `json:"metrics,omitempty"` // Current values for run-time metrics.
+	Metrics []*Metric `json:"metrics,omitempty,omitzero"` // Current values for run-time metrics.
 }
 
 // Do executes Performance.getMetrics against the provided context.

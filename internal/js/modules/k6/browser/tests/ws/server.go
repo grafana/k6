@@ -15,13 +15,18 @@ import (
 	k6types "go.k6.io/k6/lib/types"
 
 	"github.com/chromedp/cdproto"
+	jsonv2 "github.com/go-json-experiment/json"
+	"github.com/go-json-experiment/json/jsontext"
 	"github.com/gorilla/websocket"
-	"github.com/mailru/easyjson"
-	"github.com/mailru/easyjson/jlexer"
-	"github.com/mailru/easyjson/jwriter"
 	"github.com/mccutchen/go-httpbin/httpbin"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/http2"
+)
+
+//nolint:gochecknoglobals
+var defaultJSONV2Options = jsonv2.JoinOptions(
+	jsonv2.DefaultOptionsV2(),
+	jsontext.AllowInvalidUTF8(true), // this is needed as chromium sometimes returns invalid utf-8
 )
 
 // Server can be used as a test alternative to a real CDP compatible browser.
@@ -145,7 +150,7 @@ func WithEchoHandler(path string) func(*Server) {
 
 // WithCDPHandler attaches a custom CDP handler function to Server.
 //
-//nolint:funlen,gocognit
+//nolint:gocognit
 func WithCDPHandler(
 	path string,
 	fn func(conn *websocket.Conn, msg *cdproto.Message, writeCh chan cdproto.Message, done chan struct{}),
@@ -168,9 +173,8 @@ func WithCDPHandler(
 				}
 
 				var msg cdproto.Message
-				decoder := jlexer.Lexer{Data: buf}
-				msg.UnmarshalEasyJSON(&decoder)
-				if err := decoder.Error(); err != nil {
+				err = jsonv2.Unmarshal(buf, &msg, defaultJSONV2Options)
+				if err != nil {
 					return nil, err
 				}
 
@@ -200,17 +204,13 @@ func WithCDPHandler(
 
 		go func() {
 			write := func(conn *websocket.Conn, msg *cdproto.Message) {
-				encoder := jwriter.Writer{}
-				msg.MarshalEasyJSON(&encoder)
-				if err := encoder.Error; err != nil {
-					return
-				}
-
 				writer, err := conn.NextWriter(websocket.TextMessage)
 				if err != nil {
 					return
 				}
-				if _, err := encoder.DumpTo(writer); err != nil {
+				encoder := jsontext.NewEncoder(writer)
+				err = jsonv2.MarshalEncode(encoder, msg, defaultJSONV2Options)
+				if err != nil {
 					return
 				}
 				if err := writer.Close(); err != nil {
@@ -268,18 +268,18 @@ func CDPDefaultHandler(conn *websocket.Conn, msg *cdproto.Message, writeCh chan 
 		case cdproto.MethodType(cdproto.CommandTargetAttachToTarget):
 			writeCh <- cdproto.Message{
 				Method: cdproto.EventTargetAttachedToTarget,
-				Params: easyjson.RawMessage([]byte(targetAttachedToTargetEvent)),
+				Params: jsontext.Value([]byte(targetAttachedToTargetEvent)),
 			}
 			writeCh <- cdproto.Message{
 				ID:        msg.ID,
 				SessionID: msg.SessionID,
-				Result:    easyjson.RawMessage([]byte(targetAttachedToTargetResult)),
+				Result:    jsontext.Value([]byte(targetAttachedToTargetResult)),
 			}
 		default:
 			writeCh <- cdproto.Message{
 				ID:        msg.ID,
 				SessionID: msg.SessionID,
-				Result:    easyjson.RawMessage([]byte("{}")),
+				Result:    jsontext.Value([]byte("{}")),
 			}
 		}
 	}

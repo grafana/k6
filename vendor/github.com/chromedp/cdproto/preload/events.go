@@ -39,6 +39,7 @@ type EventPreloadEnabledStateUpdated struct {
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Preload#event-prefetchStatusUpdated
 type EventPrefetchStatusUpdated struct {
 	Key               *IngAttemptKey    `json:"key"`
+	PipelineID        PipelineID        `json:"pipelineId"`
 	InitiatingFrameID cdp.FrameID       `json:"initiatingFrameId"` // The frame id of the frame initiating prefetch.
 	PrefetchURL       string            `json:"prefetchUrl"`
 	Status            IngStatus         `json:"status"`
@@ -51,10 +52,11 @@ type EventPrefetchStatusUpdated struct {
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Preload#event-prerenderStatusUpdated
 type EventPrerenderStatusUpdated struct {
 	Key                     *IngAttemptKey                `json:"key"`
+	PipelineID              PipelineID                    `json:"pipelineId"`
 	Status                  IngStatus                     `json:"status"`
-	PrerenderStatus         PrerenderFinalStatus          `json:"prerenderStatus,omitempty"`
-	DisallowedMojoInterface string                        `json:"disallowedMojoInterface,omitempty"` // This is used to give users more information about the name of Mojo interface that is incompatible with prerender and has caused the cancellation of the attempt.
-	MismatchedHeaders       []*PrerenderMismatchedHeaders `json:"mismatchedHeaders,omitempty"`
+	PrerenderStatus         PrerenderFinalStatus          `json:"prerenderStatus,omitempty,omitzero"`
+	DisallowedMojoInterface string                        `json:"disallowedMojoInterface,omitempty,omitzero"` // This is used to give users more information about the name of Mojo interface that is incompatible with prerender and has caused the cancellation of the attempt.
+	MismatchedHeaders       []*PrerenderMismatchedHeaders `json:"mismatchedHeaders,omitempty,omitzero"`
 }
 
 // EventPreloadingAttemptSourcesUpdated send a list of sources for all

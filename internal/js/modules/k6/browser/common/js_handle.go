@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/log"
@@ -41,6 +42,16 @@ type BaseJSHandle struct {
 	execCtx      *ExecutionContext
 	remoteObject *runtime.RemoteObject
 	disposed     bool
+}
+
+// String returns a string repesentation of BaseJSHandle.
+// It exists mostly for debugging where we don't want fmt.Sprintf to just
+// go through a complex object and try to stringify it.
+func (h *BaseJSHandle) String() string {
+	return "BaseJSHandle{ " +
+		"SessionID: " + h.session.ID().String() + ", " +
+		"dispose: " + strconv.FormatBool(h.disposed) +
+		"}"
 }
 
 // NewJSHandle creates a new JS handle referencing a remote object.

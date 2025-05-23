@@ -32,7 +32,7 @@ func GetDirectory(bucketFileSystemLocator *BucketFileSystemLocator) *GetDirector
 
 // GetDirectoryReturns return values.
 type GetDirectoryReturns struct {
-	Directory *Directory `json:"directory,omitempty"` // Returns the directory object at the path.
+	Directory *Directory `json:"directory,omitempty,omitzero"` // Returns the directory object at the path.
 }
 
 // Do executes FileSystem.getDirectory against the provided context.

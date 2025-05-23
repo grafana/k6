@@ -19,7 +19,6 @@ import (
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/fetch"
 	"github.com/chromedp/cdproto/network"
-	"github.com/mailru/easyjson"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -34,7 +33,7 @@ type fakeSession struct {
 // Execute implements the cdp.Executor interface to record calls made to it and
 // allow assertions in tests.
 func (s *fakeSession) Execute(
-	ctx context.Context, method string, params easyjson.Marshaler, res easyjson.Unmarshaler,
+	ctx context.Context, method string, params, res any,
 ) error {
 	s.cdpCalls = append(s.cdpCalls, method)
 	return nil
@@ -117,7 +116,6 @@ func TestOnRequestPausedBlockedHostnames(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -181,7 +179,6 @@ func TestOnRequestPausedBlockedIPs(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -272,7 +269,6 @@ func TestNetworkManagerEmitRequestResponseMetricsTimingSkew(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -372,7 +368,6 @@ func TestRequestForOnLoadingFinished(t *testing.T) {
 		},
 	}
 	for name, tt := range tests {
-		tt := tt
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 

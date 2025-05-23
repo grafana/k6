@@ -146,7 +146,6 @@ func TestWebPlatformTestSuite(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		testName := tt.catalog + "/" + strings.Join(tt.files, "_")
 
 		t.Run(testName, func(t *testing.T) {

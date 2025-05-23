@@ -17,9 +17,9 @@ import (
 // TriggerParams trigger autofill on a form identified by the fieldId. If the
 // field and related form cannot be autofilled, returns an error.
 type TriggerParams struct {
-	FieldID cdp.BackendNodeID `json:"fieldId"`           // Identifies a field that serves as an anchor for autofill.
-	FrameID cdp.FrameID       `json:"frameId,omitempty"` // Identifies the frame that field belongs to.
-	Card    *CreditCard       `json:"card"`              // Credit card information to fill out the form. Credit card data is not saved.
+	FieldID cdp.BackendNodeID `json:"fieldId"`                    // Identifies a field that serves as an anchor for autofill.
+	FrameID cdp.FrameID       `json:"frameId,omitempty,omitzero"` // Identifies the frame that field belongs to.
+	Card    *CreditCard       `json:"card"`                       // Credit card information to fill out the form. Credit card data is not saved.
 }
 
 // Trigger trigger autofill on a form identified by the fieldId. If the field

@@ -15,7 +15,7 @@ import (
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/cdproto/runtime"
-	"github.com/mailru/easyjson"
+	"github.com/go-json-experiment/json/jsontext"
 )
 
 // DisableParams disables domain notifications.
@@ -50,11 +50,11 @@ func (p *EnableParams) Do(ctx context.Context) (err error) {
 
 // GetHighlightObjectForTestParams for testing.
 type GetHighlightObjectForTestParams struct {
-	NodeID                cdp.NodeID  `json:"nodeId"`                          // Id of the node to get highlight object for.
-	IncludeDistance       bool        `json:"includeDistance,omitempty"`       // Whether to include distance info.
-	IncludeStyle          bool        `json:"includeStyle,omitempty"`          // Whether to include style info.
-	ColorFormat           ColorFormat `json:"colorFormat,omitempty"`           // The color format to get config with (default: hex).
-	ShowAccessibilityInfo bool        `json:"showAccessibilityInfo,omitempty"` // Whether to show accessibility info (default: true).
+	NodeID                cdp.NodeID  `json:"nodeId"`                         // Id of the node to get highlight object for.
+	IncludeDistance       bool        `json:"includeDistance"`                // Whether to include distance info.
+	IncludeStyle          bool        `json:"includeStyle"`                   // Whether to include style info.
+	ColorFormat           ColorFormat `json:"colorFormat,omitempty,omitzero"` // The color format to get config with (default: hex).
+	ShowAccessibilityInfo bool        `json:"showAccessibilityInfo"`          // Whether to show accessibility info (default: true).
 }
 
 // GetHighlightObjectForTest for testing.
@@ -66,7 +66,10 @@ type GetHighlightObjectForTestParams struct {
 //	nodeID - Id of the node to get highlight object for.
 func GetHighlightObjectForTest(nodeID cdp.NodeID) *GetHighlightObjectForTestParams {
 	return &GetHighlightObjectForTestParams{
-		NodeID: nodeID,
+		NodeID:                nodeID,
+		IncludeDistance:       false,
+		IncludeStyle:          false,
+		ShowAccessibilityInfo: true,
 	}
 }
 
@@ -97,7 +100,7 @@ func (p GetHighlightObjectForTestParams) WithShowAccessibilityInfo(showAccessibi
 
 // GetHighlightObjectForTestReturns return values.
 type GetHighlightObjectForTestReturns struct {
-	Highlight easyjson.RawMessage `json:"highlight,omitempty"`
+	Highlight jsontext.Value `json:"highlight,omitempty,omitzero"`
 }
 
 // Do executes Overlay.getHighlightObjectForTest against the provided context.
@@ -105,7 +108,7 @@ type GetHighlightObjectForTestReturns struct {
 // returns:
 //
 //	highlight - Highlight data for the node.
-func (p *GetHighlightObjectForTestParams) Do(ctx context.Context) (highlight easyjson.RawMessage, err error) {
+func (p *GetHighlightObjectForTestParams) Do(ctx context.Context) (highlight jsontext.Value, err error) {
 	// execute
 	var res GetHighlightObjectForTestReturns
 	err = cdp.Execute(ctx, CommandGetHighlightObjectForTest, p, &res)
@@ -136,7 +139,7 @@ func GetGridHighlightObjectsForTest(nodeIDs []cdp.NodeID) *GetGridHighlightObjec
 
 // GetGridHighlightObjectsForTestReturns return values.
 type GetGridHighlightObjectsForTestReturns struct {
-	Highlights easyjson.RawMessage `json:"highlights,omitempty"`
+	Highlights jsontext.Value `json:"highlights,omitempty,omitzero"`
 }
 
 // Do executes Overlay.getGridHighlightObjectsForTest against the provided context.
@@ -144,7 +147,7 @@ type GetGridHighlightObjectsForTestReturns struct {
 // returns:
 //
 //	highlights - Grid Highlight data for the node ids provided.
-func (p *GetGridHighlightObjectsForTestParams) Do(ctx context.Context) (highlights easyjson.RawMessage, err error) {
+func (p *GetGridHighlightObjectsForTestParams) Do(ctx context.Context) (highlights jsontext.Value, err error) {
 	// execute
 	var res GetGridHighlightObjectsForTestReturns
 	err = cdp.Execute(ctx, CommandGetGridHighlightObjectsForTest, p, &res)
@@ -176,7 +179,7 @@ func GetSourceOrderHighlightObjectForTest(nodeID cdp.NodeID) *GetSourceOrderHigh
 
 // GetSourceOrderHighlightObjectForTestReturns return values.
 type GetSourceOrderHighlightObjectForTestReturns struct {
-	Highlight easyjson.RawMessage `json:"highlight,omitempty"`
+	Highlight jsontext.Value `json:"highlight,omitempty,omitzero"`
 }
 
 // Do executes Overlay.getSourceOrderHighlightObjectForTest against the provided context.
@@ -184,7 +187,7 @@ type GetSourceOrderHighlightObjectForTestReturns struct {
 // returns:
 //
 //	highlight - Source order highlight data for the node id provided.
-func (p *GetSourceOrderHighlightObjectForTestParams) Do(ctx context.Context) (highlight easyjson.RawMessage, err error) {
+func (p *GetSourceOrderHighlightObjectForTestParams) Do(ctx context.Context) (highlight jsontext.Value, err error) {
 	// execute
 	var res GetSourceOrderHighlightObjectForTestReturns
 	err = cdp.Execute(ctx, CommandGetSourceOrderHighlightObjectForTest, p, &res)
@@ -213,11 +216,11 @@ func (p *HideHighlightParams) Do(ctx context.Context) (err error) {
 // HighlightNodeParams highlights DOM node with given id or with the given
 // JavaScript object wrapper. Either nodeId or objectId must be specified.
 type HighlightNodeParams struct {
-	HighlightConfig *HighlightConfig       `json:"highlightConfig"`         // A descriptor for the highlight appearance.
-	NodeID          cdp.NodeID             `json:"nodeId,omitempty"`        // Identifier of the node to highlight.
-	BackendNodeID   cdp.BackendNodeID      `json:"backendNodeId,omitempty"` // Identifier of the backend node to highlight.
-	ObjectID        runtime.RemoteObjectID `json:"objectId,omitempty"`      // JavaScript object id of the node to be highlighted.
-	Selector        string                 `json:"selector,omitempty"`      // Selectors to highlight relevant nodes.
+	HighlightConfig *HighlightConfig       `json:"highlightConfig"`                  // A descriptor for the highlight appearance.
+	NodeID          cdp.NodeID             `json:"nodeId,omitempty,omitzero"`        // Identifier of the node to highlight.
+	BackendNodeID   cdp.BackendNodeID      `json:"backendNodeId,omitempty,omitzero"` // Identifier of the backend node to highlight.
+	ObjectID        runtime.RemoteObjectID `json:"objectId,omitempty,omitzero"`      // JavaScript object id of the node to be highlighted.
+	Selector        string                 `json:"selector,omitempty,omitzero"`      // Selectors to highlight relevant nodes.
 }
 
 // HighlightNode highlights DOM node with given id or with the given
@@ -266,9 +269,9 @@ func (p *HighlightNodeParams) Do(ctx context.Context) (err error) {
 // HighlightQuadParams highlights given quad. Coordinates are absolute with
 // respect to the main frame viewport.
 type HighlightQuadParams struct {
-	Quad         dom.Quad  `json:"quad"`                   // Quad to highlight
-	Color        *cdp.RGBA `json:"color,omitempty"`        // The highlight fill color (default: transparent).
-	OutlineColor *cdp.RGBA `json:"outlineColor,omitempty"` // The highlight outline color (default: transparent).
+	Quad         dom.Quad  `json:"quad"`                            // Quad to highlight
+	Color        *cdp.RGBA `json:"color,omitempty,omitzero"`        // The highlight fill color (default: transparent).
+	OutlineColor *cdp.RGBA `json:"outlineColor,omitempty,omitzero"` // The highlight outline color (default: transparent).
 }
 
 // HighlightQuad highlights given quad. Coordinates are absolute with respect
@@ -305,12 +308,12 @@ func (p *HighlightQuadParams) Do(ctx context.Context) (err error) {
 // HighlightRectParams highlights given rectangle. Coordinates are absolute
 // with respect to the main frame viewport.
 type HighlightRectParams struct {
-	X            int64     `json:"x"`                      // X coordinate
-	Y            int64     `json:"y"`                      // Y coordinate
-	Width        int64     `json:"width"`                  // Rectangle width
-	Height       int64     `json:"height"`                 // Rectangle height
-	Color        *cdp.RGBA `json:"color,omitempty"`        // The highlight fill color (default: transparent).
-	OutlineColor *cdp.RGBA `json:"outlineColor,omitempty"` // The highlight outline color (default: transparent).
+	X            int64     `json:"x"`                               // X coordinate
+	Y            int64     `json:"y"`                               // Y coordinate
+	Width        int64     `json:"width"`                           // Rectangle width
+	Height       int64     `json:"height"`                          // Rectangle height
+	Color        *cdp.RGBA `json:"color,omitempty,omitzero"`        // The highlight fill color (default: transparent).
+	OutlineColor *cdp.RGBA `json:"outlineColor,omitempty,omitzero"` // The highlight outline color (default: transparent).
 }
 
 // HighlightRect highlights given rectangle. Coordinates are absolute with
@@ -354,10 +357,10 @@ func (p *HighlightRectParams) Do(ctx context.Context) (err error) {
 // the DOM node with given id or with the given JavaScript object wrapper.
 // Either nodeId or objectId must be specified.
 type HighlightSourceOrderParams struct {
-	SourceOrderConfig *SourceOrderConfig     `json:"sourceOrderConfig"`       // A descriptor for the appearance of the overlay drawing.
-	NodeID            cdp.NodeID             `json:"nodeId,omitempty"`        // Identifier of the node to highlight.
-	BackendNodeID     cdp.BackendNodeID      `json:"backendNodeId,omitempty"` // Identifier of the backend node to highlight.
-	ObjectID          runtime.RemoteObjectID `json:"objectId,omitempty"`      // JavaScript object id of the node to be highlighted.
+	SourceOrderConfig *SourceOrderConfig     `json:"sourceOrderConfig"`                // A descriptor for the appearance of the overlay drawing.
+	NodeID            cdp.NodeID             `json:"nodeId,omitempty,omitzero"`        // Identifier of the node to highlight.
+	BackendNodeID     cdp.BackendNodeID      `json:"backendNodeId,omitempty,omitzero"` // Identifier of the backend node to highlight.
+	ObjectID          runtime.RemoteObjectID `json:"objectId,omitempty,omitzero"`      // JavaScript object id of the node to be highlighted.
 }
 
 // HighlightSourceOrder highlights the source order of the children of the
@@ -402,8 +405,8 @@ func (p *HighlightSourceOrderParams) Do(ctx context.Context) (err error) {
 // that user is hovering over are highlighted. Backend then generates
 // 'inspectNodeRequested' event upon element selection.
 type SetInspectModeParams struct {
-	Mode            InspectMode      `json:"mode"`                      // Set an inspection mode.
-	HighlightConfig *HighlightConfig `json:"highlightConfig,omitempty"` // A descriptor for the highlight appearance of hovered-over nodes. May be omitted if enabled == false.
+	Mode            InspectMode      `json:"mode"`                               // Set an inspection mode.
+	HighlightConfig *HighlightConfig `json:"highlightConfig,omitempty,omitzero"` // A descriptor for the highlight appearance of hovered-over nodes. May be omitted if enabled == false.
 }
 
 // SetInspectMode enters the 'inspect' mode. In this mode, elements that user
@@ -460,7 +463,7 @@ func (p *SetShowAdHighlightsParams) Do(ctx context.Context) (err error) {
 
 // SetPausedInDebuggerMessageParams [no description].
 type SetPausedInDebuggerMessageParams struct {
-	Message string `json:"message,omitempty"` // The message to display, also triggers resume and step over controls.
+	Message string `json:"message,omitempty,omitzero"` // The message to display, also triggers resume and step over controls.
 }
 
 // SetPausedInDebuggerMessage [no description].
@@ -723,7 +726,7 @@ func (p *SetShowViewportSizeOnResizeParams) Do(ctx context.Context) (err error) 
 
 // SetShowHingeParams add a dual screen device hinge.
 type SetShowHingeParams struct {
-	HingeConfig *HingeConfig `json:"hingeConfig,omitempty"` // hinge data, null means hideHinge
+	HingeConfig *HingeConfig `json:"hingeConfig,omitempty,omitzero"` // hinge data, null means hideHinge
 }
 
 // SetShowHinge add a dual screen device hinge.
@@ -772,7 +775,7 @@ func (p *SetShowIsolatedElementsParams) Do(ctx context.Context) (err error) {
 
 // SetShowWindowControlsOverlayParams show Window Controls Overlay for PWA.
 type SetShowWindowControlsOverlayParams struct {
-	WindowControlsOverlayConfig *WindowControlsOverlayConfig `json:"windowControlsOverlayConfig,omitempty"` // Window Controls Overlay data, null means hide Window Controls Overlay
+	WindowControlsOverlayConfig *WindowControlsOverlayConfig `json:"windowControlsOverlayConfig,omitempty,omitzero"` // Window Controls Overlay data, null means hide Window Controls Overlay
 }
 
 // SetShowWindowControlsOverlay show Window Controls Overlay for PWA.

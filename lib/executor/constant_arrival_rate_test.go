@@ -170,8 +170,6 @@ func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		test := test
-
 		t.Run(fmt.Sprintf("segment %s sequence %s", test.segment, test.sequence), func(t *testing.T) {
 			var count int64
 			startTime := time.Now()
@@ -240,7 +238,6 @@ func TestArrivalRateCancel(t *testing.T) {
 		"ramping":  getTestRampingArrivalRateConfig(),
 	}
 	for name, config := range testCases {
-		config := config
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			ch := make(chan struct{})
@@ -338,7 +335,6 @@ func TestConstantArrivalRateGlobalIters(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(fmt.Sprintf("%s_%s", tc.seq, tc.seg), func(t *testing.T) {
 			t.Parallel()
 

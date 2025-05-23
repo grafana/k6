@@ -21,7 +21,7 @@ import (
 // issue messages. When an issue is added or removed, an |issueUpdated| event is
 // fired.
 type EnableParams struct {
-	PresentationURL string `json:"presentationUrl,omitempty"`
+	PresentationURL string `json:"presentationUrl,omitempty,omitzero"`
 }
 
 // Enable starts observing for sinks that can be used for tab mirroring, and

@@ -68,7 +68,7 @@ func GetRealtimeData(contextID GraphObjectID) *GetRealtimeDataParams {
 
 // GetRealtimeDataReturns return values.
 type GetRealtimeDataReturns struct {
-	RealtimeData *ContextRealtimeData `json:"realtimeData,omitempty"`
+	RealtimeData *ContextRealtimeData `json:"realtimeData,omitempty,omitzero"`
 }
 
 // Do executes WebAudio.getRealtimeData against the provided context.

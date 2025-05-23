@@ -1005,7 +1005,6 @@ func TestRampingVUsGetRawExecutionStepsCornerCases(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		testCase := testCase
 		conf := NewRampingVUsConfig("test")
 		conf.StartVUs = null.IntFrom(testCase.start)
 		conf.Stages = testCase.stages
@@ -1059,7 +1058,6 @@ func BenchmarkRampingVUsGetRawExecutionSteps(b *testing.B) {
 		},
 	}
 	for _, tc := range testCases {
-		tc := tc
 		b.Run(fmt.Sprintf("seq:%s;segment:%s", tc.seq, tc.seg), func(b *testing.B) {
 			ess, err := lib.NewExecutionSegmentSequenceFromString(tc.seq)
 			require.NoError(b, err)

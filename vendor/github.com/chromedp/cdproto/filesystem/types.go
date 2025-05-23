@@ -30,7 +30,7 @@ type Directory struct {
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/FileSystem#type-BucketFileSystemLocator
 type BucketFileSystemLocator struct {
-	StorageKey     storage.SerializedStorageKey `json:"storageKey"`           // Storage key
-	BucketName     string                       `json:"bucketName,omitempty"` // Bucket name. Not passing a bucketName will retrieve the default Bucket. (https://developer.mozilla.org/en-US/docs/Web/API/Storage_API#storage_buckets)
-	PathComponents []string                     `json:"pathComponents"`       // Path to the directory using each path component as an array item.
+	StorageKey     storage.SerializedStorageKey `json:"storageKey"`                    // Storage key
+	BucketName     string                       `json:"bucketName,omitempty,omitzero"` // Bucket name. Not passing a bucketName will retrieve the default Bucket. (https://developer.mozilla.org/en-US/docs/Web/API/Storage_API#storage_buckets)
+	PathComponents []string                     `json:"pathComponents"`                // Path to the directory using each path component as an array item.
 }

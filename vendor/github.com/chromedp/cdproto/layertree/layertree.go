@@ -11,7 +11,7 @@ import (
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/dom"
-	"github.com/mailru/easyjson"
+	"github.com/go-json-experiment/json/jsontext"
 )
 
 // CompositingReasonsParams provides the reasons why the given layer was
@@ -36,8 +36,8 @@ func CompositingReasons(layerID LayerID) *CompositingReasonsParams {
 
 // CompositingReasonsReturns return values.
 type CompositingReasonsReturns struct {
-	CompositingReasons   []string `json:"compositingReasons,omitempty"`   // A list of strings specifying reasons for the given layer to become composited.
-	CompositingReasonIDs []string `json:"compositingReasonIds,omitempty"` // A list of strings specifying reason IDs for the given layer to become composited.
+	CompositingReasons   []string `json:"compositingReasons,omitempty,omitzero"`   // A list of strings specifying reasons for the given layer to become composited.
+	CompositingReasonIDs []string `json:"compositingReasonIds,omitempty,omitzero"` // A list of strings specifying reason IDs for the given layer to become composited.
 }
 
 // Do executes LayerTree.compositingReasons against the provided context.
@@ -107,7 +107,7 @@ func LoadSnapshot(tiles []*PictureTile) *LoadSnapshotParams {
 
 // LoadSnapshotReturns return values.
 type LoadSnapshotReturns struct {
-	SnapshotID SnapshotID `json:"snapshotId,omitempty"` // The id of the snapshot.
+	SnapshotID SnapshotID `json:"snapshotId,omitempty,omitzero"` // The id of the snapshot.
 }
 
 // Do executes LayerTree.loadSnapshot against the provided context.
@@ -146,7 +146,7 @@ func MakeSnapshot(layerID LayerID) *MakeSnapshotParams {
 
 // MakeSnapshotReturns return values.
 type MakeSnapshotReturns struct {
-	SnapshotID SnapshotID `json:"snapshotId,omitempty"` // The id of the layer snapshot.
+	SnapshotID SnapshotID `json:"snapshotId,omitempty,omitzero"` // The id of the layer snapshot.
 }
 
 // Do executes LayerTree.makeSnapshot against the provided context.
@@ -167,10 +167,10 @@ func (p *MakeSnapshotParams) Do(ctx context.Context) (snapshotID SnapshotID, err
 
 // ProfileSnapshotParams [no description].
 type ProfileSnapshotParams struct {
-	SnapshotID     SnapshotID `json:"snapshotId"`               // The id of the layer snapshot.
-	MinRepeatCount int64      `json:"minRepeatCount,omitempty"` // The maximum number of times to replay the snapshot (1, if not specified).
-	MinDuration    float64    `json:"minDuration,omitempty"`    // The minimum duration (in seconds) to replay the snapshot.
-	ClipRect       *dom.Rect  `json:"clipRect,omitempty"`       // The clip rectangle to apply when replaying the snapshot.
+	SnapshotID     SnapshotID `json:"snapshotId"`                        // The id of the layer snapshot.
+	MinRepeatCount int64      `json:"minRepeatCount,omitempty,omitzero"` // The maximum number of times to replay the snapshot (1, if not specified).
+	MinDuration    float64    `json:"minDuration,omitempty,omitzero"`    // The minimum duration (in seconds) to replay the snapshot.
+	ClipRect       *dom.Rect  `json:"clipRect,omitempty,omitzero"`       // The clip rectangle to apply when replaying the snapshot.
 }
 
 // ProfileSnapshot [no description].
@@ -207,7 +207,7 @@ func (p ProfileSnapshotParams) WithClipRect(clipRect *dom.Rect) *ProfileSnapshot
 
 // ProfileSnapshotReturns return values.
 type ProfileSnapshotReturns struct {
-	Timings []PaintProfile `json:"timings,omitempty"` // The array of paint profiles, one per run.
+	Timings []PaintProfile `json:"timings,omitempty,omitzero"` // The array of paint profiles, one per run.
 }
 
 // Do executes LayerTree.profileSnapshot against the provided context.
@@ -252,10 +252,10 @@ func (p *ReleaseSnapshotParams) Do(ctx context.Context) (err error) {
 // ReplaySnapshotParams replays the layer snapshot and returns the resulting
 // bitmap.
 type ReplaySnapshotParams struct {
-	SnapshotID SnapshotID `json:"snapshotId"`         // The id of the layer snapshot.
-	FromStep   int64      `json:"fromStep,omitempty"` // The first step to replay from (replay from the very start if not specified).
-	ToStep     int64      `json:"toStep,omitempty"`   // The last step to replay to (replay till the end if not specified).
-	Scale      float64    `json:"scale,omitempty"`    // The scale to apply while replaying (defaults to 1).
+	SnapshotID SnapshotID `json:"snapshotId"`                  // The id of the layer snapshot.
+	FromStep   int64      `json:"fromStep,omitempty,omitzero"` // The first step to replay from (replay from the very start if not specified).
+	ToStep     int64      `json:"toStep,omitempty,omitzero"`   // The last step to replay to (replay till the end if not specified).
+	Scale      float64    `json:"scale,omitempty,omitzero"`    // The scale to apply while replaying (defaults to 1).
 }
 
 // ReplaySnapshot replays the layer snapshot and returns the resulting
@@ -294,7 +294,7 @@ func (p ReplaySnapshotParams) WithScale(scale float64) *ReplaySnapshotParams {
 
 // ReplaySnapshotReturns return values.
 type ReplaySnapshotReturns struct {
-	DataURL string `json:"dataURL,omitempty"` // A data: URL for resulting image.
+	DataURL string `json:"dataURL,omitempty,omitzero"` // A data: URL for resulting image.
 }
 
 // Do executes LayerTree.replaySnapshot against the provided context.
@@ -334,7 +334,7 @@ func SnapshotCommandLog(snapshotID SnapshotID) *SnapshotCommandLogParams {
 
 // SnapshotCommandLogReturns return values.
 type SnapshotCommandLogReturns struct {
-	CommandLog []easyjson.RawMessage `json:"commandLog,omitempty"` // The array of canvas function calls.
+	CommandLog []jsontext.Value `json:"commandLog,omitempty,omitzero"` // The array of canvas function calls.
 }
 
 // Do executes LayerTree.snapshotCommandLog against the provided context.
@@ -342,7 +342,7 @@ type SnapshotCommandLogReturns struct {
 // returns:
 //
 //	commandLog - The array of canvas function calls.
-func (p *SnapshotCommandLogParams) Do(ctx context.Context) (commandLog []easyjson.RawMessage, err error) {
+func (p *SnapshotCommandLogParams) Do(ctx context.Context) (commandLog []jsontext.Value, err error) {
 	// execute
 	var res SnapshotCommandLogReturns
 	err = cdp.Execute(ctx, CommandSnapshotCommandLog, p, &res)

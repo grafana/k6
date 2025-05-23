@@ -428,7 +428,6 @@ var configMapTestCases = []configMapTestCase{
 func TestConfigMapParsingAndValidation(t *testing.T) {
 	t.Parallel()
 	for i, tc := range configMapTestCases {
-		tc := tc
 		t.Run(fmt.Sprintf("TestCase#%d", i), func(t *testing.T) {
 			t.Parallel()
 			t.Log(tc.rawJSON)

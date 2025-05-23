@@ -16,9 +16,9 @@ func (t SerializedStorageKey) String() string {
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/DOMStorage#type-StorageId
 type StorageID struct {
-	SecurityOrigin string               `json:"securityOrigin,omitempty"` // Security origin for the storage.
-	StorageKey     SerializedStorageKey `json:"storageKey,omitempty"`     // Represents a key by which DOM Storage keys its CachedStorageAreas
-	IsLocalStorage bool                 `json:"isLocalStorage"`           // Whether the storage is local storage (not session storage).
+	SecurityOrigin string               `json:"securityOrigin,omitempty,omitzero"` // Security origin for the storage.
+	StorageKey     SerializedStorageKey `json:"storageKey,omitempty,omitzero"`     // Represents a key by which DOM Storage keys its CachedStorageAreas
+	IsLocalStorage bool                 `json:"isLocalStorage"`                    // Whether the storage is local storage (not session storage).
 }
 
 // Item DOM Storage item.

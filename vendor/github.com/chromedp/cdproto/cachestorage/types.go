@@ -4,11 +4,9 @@ package cachestorage
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/chromedp/cdproto/storage"
-	"github.com/mailru/easyjson"
-	"github.com/mailru/easyjson/jlexer"
-	"github.com/mailru/easyjson/jwriter"
 )
 
 // CacheID unique identifier of the Cache object.
@@ -41,20 +39,12 @@ const (
 	CachedResponseTypeOpaqueRedirect CachedResponseType = "opaqueRedirect"
 )
 
-// MarshalEasyJSON satisfies easyjson.Marshaler.
-func (t CachedResponseType) MarshalEasyJSON(out *jwriter.Writer) {
-	out.String(string(t))
-}
+// UnmarshalJSON satisfies [json.Unmarshaler].
+func (t *CachedResponseType) UnmarshalJSON(buf []byte) error {
+	s := string(buf)
+	s = strings.TrimSuffix(strings.TrimPrefix(s, `"`), `"`)
 
-// MarshalJSON satisfies json.Marshaler.
-func (t CachedResponseType) MarshalJSON() ([]byte, error) {
-	return easyjson.Marshal(t)
-}
-
-// UnmarshalEasyJSON satisfies easyjson.Unmarshaler.
-func (t *CachedResponseType) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	v := in.String()
-	switch CachedResponseType(v) {
+	switch CachedResponseType(s) {
 	case CachedResponseTypeBasic:
 		*t = CachedResponseTypeBasic
 	case CachedResponseTypeCors:
@@ -67,15 +57,10 @@ func (t *CachedResponseType) UnmarshalEasyJSON(in *jlexer.Lexer) {
 		*t = CachedResponseTypeOpaqueResponse
 	case CachedResponseTypeOpaqueRedirect:
 		*t = CachedResponseTypeOpaqueRedirect
-
 	default:
-		in.AddError(fmt.Errorf("unknown CachedResponseType value: %v", v))
+		return fmt.Errorf("unknown CachedResponseType value: %v", s)
 	}
-}
-
-// UnmarshalJSON satisfies json.Unmarshaler.
-func (t *CachedResponseType) UnmarshalJSON(buf []byte) error {
-	return easyjson.Unmarshal(buf, t)
+	return nil
 }
 
 // DataEntry data entry.
@@ -96,11 +81,11 @@ type DataEntry struct {
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/CacheStorage#type-Cache
 type Cache struct {
-	CacheID        CacheID         `json:"cacheId"`                 // An opaque unique id of the cache.
-	SecurityOrigin string          `json:"securityOrigin"`          // Security origin of the cache.
-	StorageKey     string          `json:"storageKey"`              // Storage key of the cache.
-	StorageBucket  *storage.Bucket `json:"storageBucket,omitempty"` // Storage bucket of the cache.
-	CacheName      string          `json:"cacheName"`               // The name of the cache.
+	CacheID        CacheID         `json:"cacheId"`                          // An opaque unique id of the cache.
+	SecurityOrigin string          `json:"securityOrigin"`                   // Security origin of the cache.
+	StorageKey     string          `json:"storageKey"`                       // Storage key of the cache.
+	StorageBucket  *storage.Bucket `json:"storageBucket,omitempty,omitzero"` // Storage bucket of the cache.
+	CacheName      string          `json:"cacheName"`                        // The name of the cache.
 }
 
 // Header [no description].
