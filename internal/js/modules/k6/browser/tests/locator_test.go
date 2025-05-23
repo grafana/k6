@@ -4,6 +4,7 @@
 package tests
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -784,6 +785,43 @@ func TestCount(t *testing.T) {
 			}
 			_, err := p.Goto(
 				tb.staticURL("locators.html"),
+				opts,
+			)
+			tt.do(tb, p)
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestReactInput(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		do   func(*testBrowser, *common.Page)
+	}{
+		{
+			"Fill", func(_ *testBrowser, p *common.Page) {
+				const value = "test@example.com"
+				lo := p.Locator("input[placeholder='Username or email']", nil)
+				require.NoError(t, lo.Fill(value, nil))
+				inputValue, err := p.InnerText("p[id='react-state']", common.NewFrameInnerTextOptions(p.MainFrame().Timeout()))
+				require.NoError(t, err)
+				require.Equal(t, fmt.Sprintf("React state: %q", value), inputValue)
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tb := newTestBrowser(t, withFileServer())
+			p := tb.NewPage(nil)
+			opts := &common.FrameGotoOptions{
+				Timeout: common.DefaultTimeout,
+			}
+			_, err := p.Goto(
+				tb.staticURL("react_input.html"),
 				opts,
 			)
 			tt.do(tb, p)
