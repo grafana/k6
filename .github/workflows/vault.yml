@@ -1,0 +1,31 @@
+name: List Vault Secret
+
+permissions:
+  id-token: write
+  contents: read
+
+on:
+  push:
+    branches:
+      - "vault"
+  pull_request:
+    branches:
+      - "main"
+    paths:
+      - ".github/workflows/vault.yml"
+  workflow_dispatch:
+
+jobs:
+  list-secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: grafana/shared-workflows/actions/get-vault-secrets@main
+        id: get-secrets
+        with:
+          repo_secrets: |
+              TEST=secret:test
+              WIN_SIGN_PASS=WIN_SIGN_PASS:WIN_SIGN_PASS
+              CODECOV_TOKEN=CODECOV_TOKEN:CODECOV_TOKEN
+              WIN_SIGN_CERT=WIN_SIGN_CERT:WIN_SIGN_CERT
+
+      - run: echo "${{ steps.get-secrets.outputs.secrets }}"
