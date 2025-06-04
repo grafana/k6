@@ -228,6 +228,13 @@ func TestLocator(t *testing.T) {
 			},
 		},
 		{
+			"Nth", func(_ *testBrowser, p *common.Page) {
+				text, err := p.Locator("a", nil).Nth(0).InnerText(nil)
+				require.NoError(t, err)
+				require.Equal(t, `Click`, text)
+			},
+		},
+		{
 			"Press", func(_ *testBrowser, p *common.Page) {
 				lo := p.Locator("#inputText", nil)
 				require.NoError(t, lo.Press("x", nil))
