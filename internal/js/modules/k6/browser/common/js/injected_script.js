@@ -250,7 +250,7 @@ class InjectedScript {
         if (typeof selector.capture === "number") {
           return "error:nthnocapture";
         }
-        const nth = part.body;
+        const nth = parseInt(part.body, 10);
         const set = new k6BrowserNative.Set();
         for (const root of roots) {
           set.add(root.element);
