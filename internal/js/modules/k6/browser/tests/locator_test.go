@@ -157,6 +157,13 @@ func TestLocator(t *testing.T) {
 			},
 		},
 		{
+			"First", func(_ *testBrowser, p *common.Page) {
+				text, err := p.Locator("a", nil).First().InnerText(nil)
+				require.NoError(t, err)
+				require.Equal(t, `Click`, text)
+			},
+		},
+		{
 			"Focus", func(_ *testBrowser, p *common.Page) {
 				focused := func() bool {
 					v, err := p.Evaluate(
