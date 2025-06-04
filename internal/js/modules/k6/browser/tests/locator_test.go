@@ -235,6 +235,13 @@ func TestLocator(t *testing.T) {
 			},
 		},
 		{
+			"Last", func(_ *testBrowser, p *common.Page) {
+				text, err := p.Locator("div", nil).Last().InnerText(nil)
+				require.NoError(t, err)
+				require.Equal(t, `bye`, text)
+			},
+		},
+		{
 			"Nth", func(_ *testBrowser, p *common.Page) {
 				text, err := p.Locator("a", nil).Nth(0).InnerText(nil)
 				require.NoError(t, err)

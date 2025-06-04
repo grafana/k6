@@ -429,6 +429,12 @@ func (l *Locator) innerText(opts *FrameInnerTextOptions) (string, error) {
 	return l.frame.innerText(l.selector, opts)
 }
 
+// Last will return the last child of the element matching the locator's
+// selector.
+func (l *Locator) Last() *Locator {
+	return NewLocator(l.ctx, fmt.Sprintf("%s >> nth=-1", l.selector), l.frame, l.log)
+}
+
 // Nth will return the nth child of the element matching the locator's
 // selector.
 func (l *Locator) Nth(nth int) *Locator {

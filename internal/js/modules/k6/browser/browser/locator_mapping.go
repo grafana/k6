@@ -123,6 +123,10 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping { //nolint:funlen
 				return lo.InnerText(opts) //nolint:wrapcheck
 			})
 		},
+		"last": func() *sobek.Object {
+			ml := mapLocator(vu, lo.Last())
+			return rt.ToValue(ml).ToObject(rt)
+		},
 		"nth": func(nth int) *sobek.Object {
 			ml := mapLocator(vu, lo.Nth(nth))
 			return rt.ToValue(ml).ToObject(rt)
