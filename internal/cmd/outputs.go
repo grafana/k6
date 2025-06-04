@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -124,9 +125,9 @@ func createOutputs(
 	if test.derivedConfig.WebDashboard.Bool {
 		outputs = append(outputs, dashboard.OutputName)
 	}
+	outputs = slices.Compact(outputs) // avoid duplicate outputs
 
 	result := make([]output.Output, 0, len(outputs))
-
 	for _, outputFullArg := range outputs {
 		outputType, outputArg, _ := strings.Cut(outputFullArg, "=")
 		outputConstructor, ok := outputConstructors[outputType]
