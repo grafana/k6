@@ -73,6 +73,9 @@ func (s *Selector) parse() error {
 		var name, body string
 
 		switch {
+		case strings.HasPrefix(part, "nth="):
+			name = "nth"
+			body = part[eqIndex+1:]
 		case eqIndex != -1 && reQueryEngine.Match([]byte(strings.TrimSpace(part[0:eqIndex]))):
 			name = strings.TrimSpace(part[0:eqIndex])
 			body = part[eqIndex+1:]
