@@ -65,7 +65,7 @@ func (s *Selector) appendPart(p *SelectorPart, capture bool) error {
 	return nil
 }
 
-//nolint:cyclop
+//nolint:cyclop,funlen
 func (s *Selector) parse() error {
 	parsePart := func(selector string, start, index int) (*SelectorPart, bool) {
 		part := strings.TrimSpace(selector[start:index])
