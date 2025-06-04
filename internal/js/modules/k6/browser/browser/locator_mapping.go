@@ -92,6 +92,10 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping { //nolint:funlen
 				return nil, lo.Fill(value, opts) //nolint:wrapcheck
 			})
 		},
+		"first": func() *sobek.Object {
+			ml := mapLocator(vu, lo.First())
+			return rt.ToValue(ml).ToObject(rt)
+		},
 		"focus": func(opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return nil, lo.Focus(opts) //nolint:wrapcheck

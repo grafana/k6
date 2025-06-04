@@ -332,6 +332,12 @@ func (l *Locator) fill(value string, opts *FrameFillOptions) error {
 	return l.frame.fill(l.selector, value, opts)
 }
 
+// First will return the first child of the element matching the locator's
+// selector.
+func (l *Locator) First() *Locator {
+	return NewLocator(l.ctx, fmt.Sprintf("%s >> nth=0", l.selector), l.frame, l.log)
+}
+
 // Focus on the element using locator's selector with strict mode on.
 func (l *Locator) Focus(opts sobek.Value) error {
 	l.log.Debugf("Locator:Focus", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
