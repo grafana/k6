@@ -537,6 +537,7 @@ type locatorAPI interface { //nolint:interfacebloat
 	InnerText(opts sobek.Value) (string, error)
 	TextContent(opts sobek.Value) (string, bool, error)
 	InputValue(opts sobek.Value) (string, error)
+	Last() *common.Locator
 	Nth(nth int) *common.Locator
 	SelectOption(values sobek.Value, opts sobek.Value) ([]string, error)
 	Press(key string, opts sobek.Value) error
