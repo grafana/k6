@@ -423,6 +423,12 @@ func (l *Locator) innerText(opts *FrameInnerTextOptions) (string, error) {
 	return l.frame.innerText(l.selector, opts)
 }
 
+// Nth will return the nth child of the element matching the locator's
+// selector.
+func (l *Locator) Nth(nth int) *Locator {
+	return NewLocator(l.ctx, fmt.Sprintf("%s >> nth=%d", l.selector, nth), l.frame, l.log)
+}
+
 // TextContent returns the element's text content that matches
 // the locator's selector with strict mode on. The second return
 // value is true if the returned text content is not null or empty,
