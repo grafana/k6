@@ -8,7 +8,7 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -o /usr/b
 # Runtime stage
 FROM alpine:3.21 as release
 
-RUN adduser -D -u 12345 -g 12345
+RUN adduser -D -u 12345 -g 12345 k6
 COPY --from=builder /usr/bin/k6 /usr/bin/k6
 
 USER 12345
