@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/grafana/sobek"
@@ -335,7 +336,7 @@ func (l *Locator) fill(value string, opts *FrameFillOptions) error {
 // First will return the first child of the element matching the locator's
 // selector.
 func (l *Locator) First() *Locator {
-	return NewLocator(l.ctx, fmt.Sprintf("%s >> nth=0", l.selector), l.frame, l.log)
+	return NewLocator(l.ctx, l.selector+" >> nth=0", l.frame, l.log)
 }
 
 // Focus on the element using locator's selector with strict mode on.
@@ -432,13 +433,13 @@ func (l *Locator) innerText(opts *FrameInnerTextOptions) (string, error) {
 // Last will return the last child of the element matching the locator's
 // selector.
 func (l *Locator) Last() *Locator {
-	return NewLocator(l.ctx, fmt.Sprintf("%s >> nth=-1", l.selector), l.frame, l.log)
+	return NewLocator(l.ctx, l.selector+" >> nth=-1", l.frame, l.log)
 }
 
 // Nth will return the nth child of the element matching the locator's
 // selector.
 func (l *Locator) Nth(nth int) *Locator {
-	return NewLocator(l.ctx, fmt.Sprintf("%s >> nth=%d", l.selector, nth), l.frame, l.log)
+	return NewLocator(l.ctx, l.selector+" >> nth="+strconv.Itoa(nth), l.frame, l.log)
 }
 
 // TextContent returns the element's text content that matches
