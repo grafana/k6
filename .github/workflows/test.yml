@@ -132,8 +132,7 @@ jobs:
           rm -f *.coverage
       # Sets CODECOV_TOKEN as an environment variable for the next step
       - name: Get Codecov token
-        uses: grafana/shared-workflows/actions/get-vault-secrets@main
-        id: get-codecov-token
+        uses: grafana/shared-workflows/actions/get-vault-secrets@get-vault-secrets/v1.2.1
         with:
           repo_secrets: |
             CODECOV_TOKEN=CODECOV_TOKEN:CODECOV_TOKEN
