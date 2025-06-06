@@ -545,7 +545,7 @@ func (t *http2Client) createHeaderFields(ctx context.Context, callHdr *CallHdr) 
 		Method:   callHdr.Method,
 		AuthInfo: t.authInfo,
 	}
-	ctxWithRequestInfo := icredentials.NewRequestInfoContext(ctx, ri)
+	ctxWithRequestInfo := credentials.NewContextWithRequestInfo(ctx, ri)
 	authData, err := t.getTrAuthData(ctxWithRequestInfo, aud)
 	if err != nil {
 		return nil, err
@@ -592,6 +592,9 @@ func (t *http2Client) createHeaderFields(ctx context.Context, callHdr *CallHdr) 
 		// Send out timeout regardless its value. The server can detect timeout context by itself.
 		// TODO(mmukhi): Perhaps this field should be updated when actually writing out to the wire.
 		timeout := time.Until(dl)
+		if timeout <= 0 {
+			return nil, status.Error(codes.DeadlineExceeded, context.DeadlineExceeded.Error())
+		}
 		headerFields = append(headerFields, hpack.HeaderField{Name: "grpc-timeout", Value: grpcutil.EncodeDuration(timeout)})
 	}
 	for k, v := range authData {
@@ -746,6 +749,25 @@ func (t *http2Client) NewStream(ctx context.Context, callHdr *CallHdr) (*ClientS
 	if t.address.ServerName != "" {
 		newCallHdr := *callHdr
 		newCallHdr.Host = t.address.ServerName
+		callHdr = &newCallHdr
+	}
+
+	// The authority specified via the `CallAuthority` CallOption takes the
+	// highest precedence when determining the `:authority` header. It overrides
+	// any value present in the Host field of CallHdr. Before applying this
+	// override, the authority string is validated. If the credentials do not
+	// implement the AuthorityValidator interface, or if validation fails, the
+	// RPC is failed with a status code of `UNAVAILABLE`.
+	if callHdr.Authority != "" {
+		auth, ok := t.authInfo.(credentials.AuthorityValidator)
+		if !ok {
+			return nil, &NewStreamError{Err: status.Errorf(codes.Unavailable, "credentials type %q does not implement the AuthorityValidator interface, but authority override specified with CallAuthority call option", t.authInfo.AuthType())}
+		}
+		if err := auth.ValidateAuthority(callHdr.Authority); err != nil {
+			return nil, &NewStreamError{Err: status.Errorf(codes.Unavailable, "failed to validate authority %q : %v", callHdr.Authority, err)}
+		}
+		newCallHdr := *callHdr
+		newCallHdr.Host = callHdr.Authority
 		callHdr = &newCallHdr
 	}
 
