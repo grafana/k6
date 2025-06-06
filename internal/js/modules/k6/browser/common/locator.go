@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/grafana/sobek"
@@ -332,6 +333,12 @@ func (l *Locator) fill(value string, opts *FrameFillOptions) error {
 	return l.frame.fill(l.selector, value, opts)
 }
 
+// First will return the first child of the element matching the locator's
+// selector.
+func (l *Locator) First() *Locator {
+	return NewLocator(l.ctx, l.selector+" >> nth=0", l.frame, l.log)
+}
+
 // Focus on the element using locator's selector with strict mode on.
 func (l *Locator) Focus(opts sobek.Value) error {
 	l.log.Debugf("Locator:Focus", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
@@ -421,6 +428,18 @@ func (l *Locator) InnerText(opts sobek.Value) (string, error) {
 func (l *Locator) innerText(opts *FrameInnerTextOptions) (string, error) {
 	opts.Strict = true
 	return l.frame.innerText(l.selector, opts)
+}
+
+// Last will return the last child of the element matching the locator's
+// selector.
+func (l *Locator) Last() *Locator {
+	return NewLocator(l.ctx, l.selector+" >> nth=-1", l.frame, l.log)
+}
+
+// Nth will return the nth child of the element matching the locator's
+// selector.
+func (l *Locator) Nth(nth int) *Locator {
+	return NewLocator(l.ctx, l.selector+" >> nth="+strconv.Itoa(nth), l.frame, l.log)
 }
 
 // TextContent returns the element's text content that matches

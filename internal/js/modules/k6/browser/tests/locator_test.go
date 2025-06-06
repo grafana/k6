@@ -157,6 +157,13 @@ func TestLocator(t *testing.T) {
 			},
 		},
 		{
+			"First", func(_ *testBrowser, p *common.Page) {
+				text, err := p.Locator("a", nil).First().InnerText(nil)
+				require.NoError(t, err)
+				require.Equal(t, `Click`, text)
+			},
+		},
+		{
 			"Focus", func(_ *testBrowser, p *common.Page) {
 				focused := func() bool {
 					v, err := p.Evaluate(
@@ -225,6 +232,20 @@ func TestLocator(t *testing.T) {
 					require.NoError(t, err)
 					require.Equal(t, "option text", v)
 				})
+			},
+		},
+		{
+			"Last", func(_ *testBrowser, p *common.Page) {
+				text, err := p.Locator("div", nil).Last().InnerText(nil)
+				require.NoError(t, err)
+				require.Equal(t, `bye`, text)
+			},
+		},
+		{
+			"Nth", func(_ *testBrowser, p *common.Page) {
+				text, err := p.Locator("a", nil).Nth(0).InnerText(nil)
+				require.NoError(t, err)
+				require.Equal(t, `Click`, text)
 			},
 		},
 		{

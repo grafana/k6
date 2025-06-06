@@ -530,12 +530,15 @@ type locatorAPI interface { //nolint:interfacebloat
 	IsVisible(opts sobek.Value) (bool, error)
 	IsHidden(opts sobek.Value) (bool, error)
 	Fill(value string, opts sobek.Value) error
+	First() *common.Locator
 	Focus(opts sobek.Value) error
 	GetAttribute(name string, opts sobek.Value) (string, bool, error)
 	InnerHTML(opts sobek.Value) (string, error)
 	InnerText(opts sobek.Value) (string, error)
 	TextContent(opts sobek.Value) (string, bool, error)
 	InputValue(opts sobek.Value) (string, error)
+	Last() *common.Locator
+	Nth(nth int) *common.Locator
 	SelectOption(values sobek.Value, opts sobek.Value) ([]string, error)
 	Press(key string, opts sobek.Value) error
 	Type(text string, opts sobek.Value) error

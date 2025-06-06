@@ -11,6 +11,7 @@ import (
 
 // mapLocator API to the JS module.
 func mapLocator(vu moduleVU, lo *common.Locator) mapping { //nolint:funlen
+	rt := vu.Runtime()
 	return mapping{
 		"clear": func(opts sobek.Value) (*sobek.Promise, error) {
 			copts := common.NewFrameFillOptions(lo.Timeout())
@@ -91,6 +92,10 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping { //nolint:funlen
 				return nil, lo.Fill(value, opts) //nolint:wrapcheck
 			})
 		},
+		"first": func() *sobek.Object {
+			ml := mapLocator(vu, lo.First())
+			return rt.ToValue(ml).ToObject(rt)
+		},
 		"focus": func(opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return nil, lo.Focus(opts) //nolint:wrapcheck
@@ -117,6 +122,14 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping { //nolint:funlen
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return lo.InnerText(opts) //nolint:wrapcheck
 			})
+		},
+		"last": func() *sobek.Object {
+			ml := mapLocator(vu, lo.Last())
+			return rt.ToValue(ml).ToObject(rt)
+		},
+		"nth": func(nth int) *sobek.Object {
+			ml := mapLocator(vu, lo.Nth(nth))
+			return rt.ToValue(ml).ToObject(rt)
 		},
 		"textContent": func(opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
