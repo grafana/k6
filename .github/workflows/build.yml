@@ -3,11 +3,11 @@ on:
   workflow_dispatch:
     inputs:
       k6_version:
-        description: 'The version of the release, it must use the semantic versioning format with the v prefix. It is a development release so it is suggested to append a build metadata (e.g. v0.38.0-dev).'
+        description: "The version of the release, it must use the semantic versioning format with the v prefix. It is a development release so it is suggested to append a build metadata (e.g. v0.38.0-dev)."
         required: true
       go_version:
-        description: 'Go version for building binaries'
-        default: '1.x'
+        description: "Go version for building binaries"
+        default: "1.x"
         required: true
   push:
     branches:
@@ -164,28 +164,31 @@ jobs:
             -t $DOCKER_IMAGE_ID .
       - name: Check
         run: |
-            docker buildx build --load -t $DOCKER_IMAGE_ID .
-            # Assert that simple cases works for the new built image
-            docker run $DOCKER_IMAGE_ID version
-            docker run $DOCKER_IMAGE_ID --help
-            docker run $DOCKER_IMAGE_ID help
-            docker run $DOCKER_IMAGE_ID run --help
-            docker run $DOCKER_IMAGE_ID inspect --help
-            docker run $DOCKER_IMAGE_ID status --help
-            docker run $DOCKER_IMAGE_ID stats --help
-            docker run $DOCKER_IMAGE_ID scale --help
-            docker run $DOCKER_IMAGE_ID pause --help
-            docker run $DOCKER_IMAGE_ID resume --help
+          docker buildx build --load -t $DOCKER_IMAGE_ID .
+          # Assert that simple cases works for the new built image
+          docker run $DOCKER_IMAGE_ID version
+          docker run $DOCKER_IMAGE_ID --help
+          docker run $DOCKER_IMAGE_ID help
+          docker run $DOCKER_IMAGE_ID run --help
+          docker run $DOCKER_IMAGE_ID inspect --help
+          docker run $DOCKER_IMAGE_ID status --help
+          docker run $DOCKER_IMAGE_ID stats --help
+          docker run $DOCKER_IMAGE_ID scale --help
+          docker run $DOCKER_IMAGE_ID pause --help
+          docker run $DOCKER_IMAGE_ID resume --help
+
       - name: Login to DockerHub
         if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') }}
         uses: grafana/shared-workflows/actions/dockerhub-login@13fb504e3bfe323c1188bf244970d94b2d336e86 # dockerhub-login-v1.0.1
-      - name: Login to ghcr.io
-        env:
-          GITHUB_ACTOR: ${{ github.actor }}
+
+      - name: Login to GitHub Container Registry
         if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') }}
-        run: |
-          # Log into GitHub Container Registry
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login https://ghcr.io -u ${GITHUB_ACTOR} --password-stdin
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Publish k6:master images
         if: ${{ github.ref == 'refs/heads/master' }}
         run: |
@@ -200,6 +203,7 @@ jobs:
             --platform linux/amd64,linux/arm64 \
             -t $DOCKER_IMAGE_ID:master-with-browser \
             -t ghcr.io/$GHCR_IMAGE_ID:master-with-browser .
+
       - name: Publish tagged version images
         if: ${{ startsWith(github.ref, 'refs/tags/v') }}
         run: |
@@ -316,8 +320,8 @@ jobs:
     env:
       VERSION: ${{ needs.configure.outputs.k6_version }}
     permissions:
-       actions: read
-       contents: write
+      actions: read
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -394,11 +398,14 @@ jobs:
           PGP_SIGN_KEY_PASSPHRASE=${{ secrets.PGP_SIGN_KEY_PASSPHRASE }}
           EOF
           echo "${{ secrets.PGP_SIGN_KEY }}" > packaging/sign-key.gpg
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Publish packages
-        env:
-          GITHUB_ACTOR: ${{ github.actor }}
         run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login https://ghcr.io -u ${GITHUB_ACTOR} --password-stdin
           cd packaging
           docker compose pull packager
           docker compose run --rm packager
