@@ -132,6 +132,9 @@ jobs:
           rm -f *.coverage
       # Sets CODECOV_TOKEN as an environment variable for the next step
       - name: Get Codecov token
+        # Skip this step if the PR is from a fork, as we can't fetch secrets for forks.
+        # We'll be automatically passing a blank CODECOV_TOKEN in that case.
+        if: github.event.repository.fork == false && github.event.sender.login != 'dependabot[bot]'
         uses: grafana/shared-workflows/actions/get-vault-secrets@get-vault-secrets/v1.2.1
         with:
           repo_secrets: |
