@@ -24,6 +24,446 @@ func int64Ptr(i int64) *int64 {
 func TestGetByRoleSuccess(t *testing.T) {
 	t.Parallel()
 
+	// This test all the implicit roles that are valid for the role based
+	// selector engine that is in the injectd_script.js file. Implicit roles
+	// are roles that are not explicitly defined in the HTML, but are
+	// implied by the context of the element.
+	t.Run("implicit", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withFileServer())
+		p := tb.NewPage(nil)
+		opts := &common.FrameGotoOptions{
+			Timeout: common.DefaultTimeout,
+		}
+		_, err := p.Goto(
+			tb.staticURL("get_by_role_implicit.html"),
+			opts,
+		)
+		require.NoError(t, err)
+
+		tests := []struct {
+			name         string
+			role         string
+			opts         *common.GetByRoleOptions
+			expected     int
+			expectedText string
+		}{
+			{
+				name:     "link",
+				role:     "link",
+				opts:     &common.GetByRoleOptions{Name: stringPtr(`"Link text"`)},
+				expected: 1, expectedText: "Link text",
+			},
+			{
+				name:     "area",
+				role:     "link",
+				opts:     &common.GetByRoleOptions{Name: stringPtr(`"Map area"`)},
+				expected: 1, expectedText: "",
+			},
+			{
+				name:     "button",
+				role:     "button",
+				opts:     &common.GetByRoleOptions{Name: stringPtr(`"Click"`)},
+				expected: 1, expectedText: "Click",
+			},
+			{
+				name:     "submit_type",
+				role:     "button",
+				opts:     &common.GetByRoleOptions{Name: stringPtr(`"Submit"`)},
+				expected: 1, expectedText: "",
+			},
+			{
+				name:     "image_type",
+				role:     "button",
+				opts:     &common.GetByRoleOptions{Name: stringPtr(`"Image Button"`)},
+				expected: 1, expectedText: "",
+			},
+			{
+				name:     "checkbox_type",
+				role:     "checkbox",
+				expected: 1, expectedText: "",
+			},
+			{
+				name:     "radio_type",
+				role:     "radio",
+				expected: 1, expectedText: "",
+			},
+			{
+				name:     "text_type",
+				role:     "textbox",
+				opts:     &common.GetByRoleOptions{Name: stringPtr(`"Text type"`)},
+				expected: 1, expectedText: "",
+			},
+			{
+				name:     "textarea",
+				role:     "textbox",
+				opts:     &common.GetByRoleOptions{Name: stringPtr(`"Text area"`)},
+				expected: 1, expectedText: "Textarea",
+			},
+			{
+				name:     "search_type",
+				role:     "searchbox",
+				expected: 1, expectedText: "",
+			},
+			{
+				name:     "range_type",
+				role:     "slider",
+				expected: 1, expectedText: "",
+			},
+			{
+				name:     "number_type",
+				role:     "spinbutton",
+				expected: 1, expectedText: "",
+			},
+			{
+				name:     "progress",
+				role:     "progressbar",
+				expected: 1, expectedText: "Progress",
+			},
+			{
+				name:     "output",
+				role:     "status",
+				expected: 1, expectedText: "Output",
+			},
+			{
+				name:     "details_summary",
+				role:     "group",
+				opts:     &common.GetByRoleOptions{Name: stringPtr(`"details"`)},
+				expected: 1, expectedText: "SummaryDetails",
+			},
+			{
+				name:     "dialog",
+				role:     "dialog",
+				expected: 1, expectedText: "Dialog",
+			},
+			{
+				name:     "h1",
+				role:     "heading",
+				opts:     &common.GetByRoleOptions{Level: int64Ptr(1)},
+				expected: 1, expectedText: "Heading1",
+			},
+			{
+				name:     "h2",
+				role:     "heading",
+				opts:     &common.GetByRoleOptions{Level: int64Ptr(2)},
+				expected: 1, expectedText: "Heading2",
+			},
+			{
+				name:     "h3",
+				role:     "heading",
+				opts:     &common.GetByRoleOptions{Level: int64Ptr(3)},
+				expected: 1, expectedText: "Heading3",
+			},
+			{
+				name:     "h4",
+				role:     "heading",
+				opts:     &common.GetByRoleOptions{Level: int64Ptr(4)},
+				expected: 1, expectedText: "Heading4",
+			},
+			{
+				name:     "h5",
+				role:     "heading",
+				opts:     &common.GetByRoleOptions{Level: int64Ptr(5)},
+				expected: 1, expectedText: "Heading5",
+			},
+			{
+				name:     "h6",
+				role:     "heading",
+				opts:     &common.GetByRoleOptions{Level: int64Ptr(6)},
+				expected: 1, expectedText: "Heading6",
+			},
+			{
+				name:     "hr",
+				role:     "separator",
+				expected: 1, expectedText: "",
+			},
+			{
+				name:     "img",
+				role:     "img",
+				opts:     &common.GetByRoleOptions{Name: stringPtr(`"Img"`)},
+				expected: 1, expectedText: "",
+			},
+			{
+				name:     "img_presentation",
+				role:     "presentation",
+				expected: 1, expectedText: "",
+			},
+			{
+				name:     "ul_list",
+				role:     "list",
+				opts:     &common.GetByRoleOptions{Name: stringPtr(`"ul"`)},
+				expected: 1, expectedText: "",
+			},
+			{
+				name:     "ol_list",
+				role:     "list",
+				opts:     &common.GetByRoleOptions{Name: stringPtr(`"ol"`)},
+				expected: 1, expectedText: "",
+			},
+			{
+				name:     "ul_li_listitem",
+				role:     "listitem",
+				opts:     &common.GetByRoleOptions{Name: stringPtr(`"ul-li"`)},
+				expected: 1, expectedText: "Item1",
+			},
+			{
+				name:     "ol_li_listitem",
+				role:     "listitem",
+				opts:     &common.GetByRoleOptions{Name: stringPtr(`"ol-li"`)},
+				expected: 1, expectedText: "Item2",
+			},
+			{
+				name:     "dd",
+				role:     "definition",
+				expected: 1, expectedText: "Description",
+			},
+			{
+				name:     "dt_dfn",
+				role:     "term",
+				expected: 2, expectedText: "",
+			},
+			{
+				name:     "fieldset_legend",
+				role:     "group",
+				opts:     &common.GetByRoleOptions{Name: stringPtr(`"Legend"`)},
+				expected: 1, expectedText: "Legend",
+			},
+			{
+				name:     "figure_figcaption",
+				role:     "figure",
+				opts:     &common.GetByRoleOptions{Name: stringPtr(`"Caption"`)},
+				expected: 1, expectedText: "Caption",
+			},
+			{
+				name:     "table",
+				role:     "table",
+				opts:     &common.GetByRoleOptions{Name: stringPtr(`"table"`)},
+				expected: 1, expectedText: "",
+			},
+			{
+				name:     "table_scope_row",
+				role:     "rowheader",
+				expected: 1, expectedText: "Head Row",
+			},
+			{
+				name:     "table_scope_col",
+				role:     "columnheader",
+				expected: 1, expectedText: "Head Column",
+			},
+			{
+				name:     "table_head_cell",
+				role:     "cell",
+				opts:     &common.GetByRoleOptions{Name: stringPtr(`"th"`)},
+				expected: 1, expectedText: "Head Cell",
+			},
+			{
+				name:     "table_head_gridcell",
+				role:     "gridcell",
+				opts:     &common.GetByRoleOptions{Name: stringPtr(`"th gridcell"`)},
+				expected: 1, expectedText: "Head Gridcell",
+			},
+			{
+				name:     "table_body",
+				role:     "rowgroup",
+				opts:     &common.GetByRoleOptions{Name: stringPtr(`"tbody"`)},
+				expected: 1, expectedText: "Cell",
+			},
+			{
+				name:     "table_foot",
+				role:     "rowgroup",
+				opts:     &common.GetByRoleOptions{Name: stringPtr(`"tfoot"`)},
+				expected: 1, expectedText: "Foot",
+			},
+			{
+				name:     "table_tr",
+				role:     "row",
+				opts:     &common.GetByRoleOptions{Name: stringPtr(`"tr"`)},
+				expected: 1, expectedText: "Row",
+			},
+			{
+				name:     "table_td_cell",
+				role:     "cell",
+				opts:     &common.GetByRoleOptions{Name: stringPtr(`"td"`)},
+				expected: 1, expectedText: "Column Cell",
+			},
+			{
+				name:     "table_td_gridcell",
+				role:     "gridcell",
+				opts:     &common.GetByRoleOptions{Name: stringPtr(`"td gridcell"`)},
+				expected: 1, expectedText: "Column Gridcell",
+			},
+			{
+				name:     "main",
+				role:     "main",
+				expected: 1, expectedText: "Main",
+			},
+			{
+				name:     "nav",
+				role:     "navigation",
+				expected: 1, expectedText: "Nav",
+			},
+			{
+				name:     "article",
+				role:     "article",
+				expected: 1, expectedText: "Article",
+			},
+			{
+				name:     "aside",
+				role:     "complementary",
+				expected: 1, expectedText: "Aside",
+			},
+			// Only works when outside the <section> element.
+			{
+				name:     "header",
+				role:     "banner",
+				expected: 1, expectedText: "Header",
+			},
+			// Only works when outside the <section> element.
+			{
+				name:     "footer",
+				role:     "contentinfo",
+				expected: 1, expectedText: "Footer",
+			},
+			// Only works with aria labels.
+			{
+				name:     "form",
+				role:     "form",
+				opts:     &common.GetByRoleOptions{Name: stringPtr(`"form"`)},
+				expected: 1, expectedText: "",
+			},
+			// Only works with aria labels.
+			{
+				name:     "section",
+				role:     "region",
+				opts:     &common.GetByRoleOptions{Name: stringPtr(`"Region Section"`)},
+				expected: 1, expectedText: "Region content",
+			},
+			{
+				name:     "blockquote",
+				role:     "blockquote",
+				expected: 1, expectedText: "Blockquote text",
+			},
+			{
+				name:     "caption",
+				role:     "caption",
+				expected: 1, expectedText: "Table Caption",
+			},
+			{
+				name:     "code",
+				role:     "code",
+				expected: 1, expectedText: "Code sample",
+			},
+			{
+				name:     "del",
+				role:     "deletion",
+				expected: 1, expectedText: "Deleted text",
+			},
+			{
+				name:     "em",
+				role:     "emphasis",
+				expected: 1, expectedText: "Emphasized text",
+			},
+			{
+				name:     "ins",
+				role:     "insertion",
+				expected: 1, expectedText: "Inserted text",
+			},
+			{
+				name:     "mark",
+				role:     "mark",
+				expected: 1, expectedText: "Marked text",
+			},
+			{
+				name:     "math",
+				role:     "math",
+				expected: 1, expectedText: "x=1",
+			},
+			{
+				name:     "menu",
+				role:     "list",
+				opts:     &common.GetByRoleOptions{Name: stringPtr(`"menu"`)},
+				expected: 1, expectedText: "Menu item",
+			},
+			{
+				name:     "meter",
+				role:     "meter",
+				expected: 1, expectedText: "50%",
+			},
+			{
+				name:     "p",
+				role:     "paragraph",
+				expected: 1, expectedText: "Paragraph text",
+			},
+			{
+				name:     "strong",
+				role:     "strong",
+				expected: 1, expectedText: "Strong text",
+			},
+			{
+				name:     "sub",
+				role:     "subscript",
+				expected: 1, expectedText: "Subscript",
+			},
+			{
+				name:     "sup",
+				role:     "superscript",
+				expected: 1, expectedText: "Superscript",
+			},
+			{
+				name:     "svg",
+				role:     "img",
+				opts:     &common.GetByRoleOptions{Name: stringPtr(`"svg"`)},
+				expected: 1, expectedText: "",
+			},
+			{
+				name:     "time",
+				role:     "time",
+				expected: 1, expectedText: "June 9, 2025",
+			},
+			{
+				name:     "select",
+				role:     "combobox",
+				opts:     &common.GetByRoleOptions{Name: stringPtr(`"select"`)},
+				expected: 1, expectedText: "",
+			},
+			{
+				name:     "select_multiple",
+				role:     "listbox",
+				opts:     &common.GetByRoleOptions{Name: stringPtr(`"select multiple"`)},
+				expected: 1, expectedText: "",
+			},
+			{
+				name:     "datalist",
+				role:     "listbox",
+				expected: 1, expectedText: "",
+			},
+			// TODO: This is not working, not even in Playwright.
+			// {
+			// 	name:     "optgroup",
+			// 	role:     "group",
+			// 	opts:     &common.GetByRoleOptions{Name: stringPtr(`"optgroup"`)},
+			// 	expected: 1, expectedText: "",
+			// },
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+
+				l := p.GetByRole(tt.role, tt.opts)
+				c, err := l.Count()
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expected, c)
+
+				if tt.expectedText != "" {
+					text, _, err := l.TextContent(sobek.Undefined())
+					assert.NoError(t, err)
+					assert.Equal(t, tt.expectedText, text)
+				}
+			})
+		}
+	})
+
 	// This test all the explicit roles that are valid for the role based
 	// selector engine that is in the injectd_script.js file. Explicit roles
 	// are roles that are explicitly defined in the HTML using the correct
