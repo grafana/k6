@@ -27,7 +27,7 @@ func TestDeriveOutputs(t *testing.T) {
 		{
 			name: "empty",
 			cfg:  Config{},
-			want: nil,
+			want: []string{},
 		},
 		{
 			name: "single",
@@ -43,6 +43,11 @@ func TestDeriveOutputs(t *testing.T) {
 			name: "duplicate",
 			cfg:  Config{Out: []string{"json", "json"}},
 			want: []string{"json"},
+		},
+		{
+			name: "duplicate_non_consecutive",
+			cfg:  Config{Out: []string{"json", "cloud", "json"}},
+			want: []string{"json", "cloud"},
 		},
 		// web dashboard
 		{

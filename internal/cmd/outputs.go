@@ -106,7 +106,15 @@ func deriveOutputs(cfg Config) []string {
 	if cfg.WebDashboard.Bool {
 		outputs = append(outputs, dashboard.OutputName)
 	}
-	return slices.Compact(outputs) // avoid duplicate outputs
+	// avoid duplicate outputs (including non-consecutive ones).
+	derived := make([]string, 0, len(outputs))
+	for _, out := range outputs {
+		if slices.Contains(derived, out) {
+			continue
+		}
+		derived = append(derived, out)
+	}
+	return derived
 }
 
 func createOutputs(
