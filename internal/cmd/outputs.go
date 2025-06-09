@@ -101,6 +101,14 @@ func getPossibleIDList(constrs map[string]output.Constructor) string {
 	return strings.Join(res, ", ")
 }
 
+func deriveOutputs(cfg Config) []string {
+	outputs := cfg.Out
+	if cfg.WebDashboard.Bool {
+		outputs = append(outputs, dashboard.OutputName)
+	}
+	return slices.Compact(outputs) // avoid duplicate outputs
+}
+
 func createOutputs(
 	gs *state.GlobalState, test *loadedAndConfiguredTest, executionPlan []lib.ExecutionStep,
 ) ([]output.Output, error) {
@@ -121,11 +129,7 @@ func createOutputs(
 		Usage:          test.preInitState.Usage,
 	}
 
-	outputs := test.derivedConfig.Out
-	if test.derivedConfig.WebDashboard.Bool {
-		outputs = append(outputs, dashboard.OutputName)
-	}
-	outputs = slices.Compact(outputs) // avoid duplicate outputs
+	outputs := deriveOutputs(test.derivedConfig)
 
 	result := make([]output.Output, 0, len(outputs))
 	for _, outputFullArg := range outputs {
