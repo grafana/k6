@@ -232,6 +232,7 @@ jobs:
     permissions:
       contents: read
       actions: read
+      id-token: write # Required for Vault
 
     runs-on: windows-latest
     defaults:
@@ -273,6 +274,12 @@ jobs:
           candle.exe -arch x64 "-dVERSION=$env:VERSION" k6.wxs
           light.exe -ext WixUIExtension k6.wixobj
 
+      - uses: grafana/shared-workflows/actions/get-vault-secrets@get-vault-secrets/v1.2.1
+        with:
+          repo_secrets: |
+            WIN_SIGN_CERT=winsign:WIN_SIGN_CERT
+            WIN_SIGN_PASS=winsign:WIN_SIGN_PASS
+
       - name: Sign Windows binary and .msi package
         # GH secrets are unavailable when building from project forks, so this
         # will fail for external PRs, even if we wanted to do it. And we don't.
@@ -282,17 +289,17 @@ jobs:
         if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' }}
         run: |
           # Convert base64 certificate to PFX
-          $bytes = [Convert]::FromBase64String("${{ secrets.WIN_SIGN_CERT }}")
+          $bytes = [Convert]::FromBase64String("${{ env.WIN_SIGN_CERT }}")
           [IO.File]::WriteAllBytes("k6.pfx", $bytes)
 
           # Get the latest signtool executable
           $SignTool = Get-ChildItem -Path "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Recurse -Filter signtool.exe | Where-Object { $_.DirectoryName -like "*\x64" } | Sort-Object -Descending | Select-Object -First 1
 
           # Sign the Windows binary
-          & $SignTool sign /f k6.pfx /p "${{ secrets.WIN_SIGN_PASS }}" /tr "http://timestamp.digicert.com" /td sha256 /fd sha256 "packaging\k6.exe"
+          & $SignTool sign /f k6.pfx /p "${{ env.WIN_SIGN_PASS }}" /tr "http://timestamp.digicert.com" /td sha256 /fd sha256 "packaging\k6.exe"
 
           # Sign the MSI package
-          & $SignTool sign /f k6.pfx /p "${{ secrets.WIN_SIGN_PASS }}" /tr "http://timestamp.digicert.com" /td sha256 /fd sha256 "packaging\k6.msi"
+          & $SignTool sign /f k6.pfx /p "${{ env.WIN_SIGN_PASS }}" /tr "http://timestamp.digicert.com" /td sha256 /fd sha256 "packaging\k6.msi"
 
           # Cleanup signing artifacts
           del k6.pfx
