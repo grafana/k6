@@ -370,6 +370,7 @@ jobs:
       actions: read
       contents: read
       packages: read
+      id-token: write # Required for Vault
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -391,6 +392,11 @@ jobs:
           mv "dist/k6-$VERSION-windows-amd64.msi" "dist/k6-$VERSION-amd64.msi"
           mv "dist/k6-$VERSION-linux-amd64.rpm" "dist/k6-$VERSION-amd64.rpm"
           mv "dist/k6-$VERSION-linux-amd64.deb" "dist/k6-$VERSION-amd64.deb"
+      - uses: grafana/shared-workflows/actions/get-vault-secrets@get-vault-secrets/v1.2.1
+        with:
+          repo_secrets: |
+            PGP_SIGN_KEY_PASSPHRASE=pgp:PGP_SIGN_KEY_PASSPHRASE
+            PGP_SIGN_KEY=pgp:PGP_SIGN_KEY
       - name: Setup docker compose environment
         run: |
           cat > packaging/.env <<EOF
@@ -398,9 +404,9 @@ jobs:
           AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION=us-east-1
           AWS_CF_DISTRIBUTION="${{ secrets.AWS_CF_DISTRIBUTION }}"
-          PGP_SIGN_KEY_PASSPHRASE=${{ secrets.PGP_SIGN_KEY_PASSPHRASE }}
+          PGP_SIGN_KEY_PASSPHRASE=${{ env.PGP_SIGN_KEY_PASSPHRASE }}
           EOF
-          echo "${{ secrets.PGP_SIGN_KEY }}" > packaging/sign-key.gpg
+          echo "${{ env.PGP_SIGN_KEY }}" > packaging/sign-key.gpg
       - name: Publish packages
         env:
           GITHUB_ACTOR: ${{ github.actor }}
