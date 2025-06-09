@@ -15,7 +15,7 @@ services:
       - AWS_SECRET_ACCESS_KEY
       - AWS_SESSION_TOKEN
       - PGP_SIGN_KEY_PASSPHRASE
-      - S3_BUCKET=dl.k6.io
+      - S3_BUCKET
     volumes:
       - ../dist:/home/k6/dist
       - ./sign-key.gpg:/home/k6/sign-key.gpg

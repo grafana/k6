@@ -17,7 +17,7 @@ log() {
 }
 
 signkeypath="$PWD/sign-key.gpg"
-s3bucket="${S3_BUCKET-dl.k6.io}"
+s3bucket="${S3_BUCKET}"
 pkgdir="$PWD/Packages"
 
 if ! [ -r "$signkeypath" ]; then
