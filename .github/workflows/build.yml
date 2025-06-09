@@ -395,15 +395,22 @@ jobs:
       - uses: grafana/shared-workflows/actions/get-vault-secrets@get-vault-secrets/v1.2.1
         with:
           repo_secrets: |
+            IAM_ROLE_ARN=deploy:packager-iam-role
             PGP_SIGN_KEY_PASSPHRASE=pgp:PGP_SIGN_KEY_PASSPHRASE
             PGP_SIGN_KEY=pgp:PGP_SIGN_KEY
+      - uses: grafana/shared-workflows/actions/aws-auth@aws-auth/v1.0.2
+        with:
+          aws-region: "us-east-2"
+          role-arn: ${{ env.IAM_ROLE_ARN }}
+          set-creds-in-environment: true
       - name: Setup docker compose environment
         run: |
           cat > packaging/.env <<EOF
-          AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION=us-east-1
-          AWS_CF_DISTRIBUTION="${{ secrets.AWS_CF_DISTRIBUTION }}"
+          AWS_ACCESS_KEY_ID=${{ env.AWS_ACCESS_KEY_ID }}
+          AWS_CF_DISTRIBUTION="${{ env.AWS_CF_DISTRIBUTION }}"
+          AWS_DEFAULT_REGION=us-east-2
+          AWS_SECRET_ACCESS_KEY=${{ env.AWS_SECRET_ACCESS_KEY }}
+          AWS_SESSION_TOKEN=${{ env.AWS_SESSION_TOKEN }}
           PGP_SIGN_KEY_PASSPHRASE=${{ env.PGP_SIGN_KEY_PASSPHRASE }}
           EOF
           echo "${{ env.PGP_SIGN_KEY }}" > packaging/sign-key.gpg
