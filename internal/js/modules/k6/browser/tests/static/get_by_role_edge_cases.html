@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<head>
+  <title>Role Selector Engine Test Suite</title>
+</head>
+<body>
+  <!-- 1. Name Matching -->
+  <section>
+    <!-- Text content as name -->
+    <button>Submit Form</button>
+    <!-- aria-label -->
+    <button aria-label="Save Draft"></button>
+    <!-- aria-labelledby -->
+    <span id="label-source">Upload</span>
+    <div role="button" aria-labelledby="label-source">labelledby-upload-button</div>
+    <!-- Hidden text nodes should be ignored -->
+    <button><span style="display:none">Foo</span>Bar</button>
+  </section>
+
+  <!-- 2. Regex matching -->
+  <section>
+    <h3>abc123</h3>
+  </section>
+
+  <!-- 3. State Filters -->
+  <section>
+    <!-- select (listbox) -->
+    <select>
+      <option selected>One</option>
+      <option>Two</option>
+    </select>
+    <!-- pressed (aria-pressed) -->
+    <button aria-pressed="true">Toggle</button>
+    <!-- expanded (aria-expanded) -->
+    <div role="button" aria-expanded="true">Expanded</div>
+    <!-- level (heading) -->
+    <h6>Section</h6>
+    <!-- checked (checkbox/radio) -->
+    <input type="checkbox" checked>
+    <input type="radio" name="group1" checked>
+    <!-- disabled (native) -->
+    <button disabled>Go</button>
+  </section>
+
+  <!-- 4. Hidden Filtering -->
+  <section>
+    <!-- CSS hidden -->
+    <button style="display:none" aria-label="Hidden X Button">X</button>
+    <!-- aria-hidden -->
+    <div aria-hidden="true">
+      <button aria-label="Hidden Hi Button">Hi</button>
+    </div>
+  </section>
+
+  <!-- 5. Combination Tests -->
+  <section>
+    <!-- hidden + state + name -->
+    <div role="button" aria-label="Archive" aria-pressed="false" hidden>Combo Options Button</div>
+  </section>
+</body>
+</html>
