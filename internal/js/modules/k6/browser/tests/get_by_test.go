@@ -241,7 +241,7 @@ func TestGetByRoleSuccess(t *testing.T) {
 			{
 				name:     "table",
 				role:     "table",
-				opts:     &common.GetByRoleOptions{Name: stringPtr(`'table'`)},
+				opts:     &common.GetByRoleOptions{Name: stringPtr(`'table1'`)},
 				expected: 1, expectedText: "",
 			},
 			{
