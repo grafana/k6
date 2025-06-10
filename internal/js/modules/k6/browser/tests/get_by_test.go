@@ -1,3 +1,6 @@
+// practically none of this work on windows
+//go:build !windows
+
 package tests
 
 import (
