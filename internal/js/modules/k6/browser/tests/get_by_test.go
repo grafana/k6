@@ -743,13 +743,13 @@ func TestGetByRoleFailure(t *testing.T) {
 			"missing_quotes_on_string",
 			"button",
 			&common.GetByRoleOptions{Name: stringPtr(`Submit Form`)},
-			"InvalidSelectorError: Error while parsing selector `button[name=Submit Form]`",
+			"Error while parsing selector `button[name=Submit Form]` - unexpected symbol",
 		},
 		{
 			"missing_role",
 			"",
 			nil,
-			"counting elements: InvalidSelectorError: Error while parsing selector `` - selector cannot be empty",
+			"Error while parsing selector `` - selector cannot be empty",
 		},
 	}
 	for _, tt := range tests {
