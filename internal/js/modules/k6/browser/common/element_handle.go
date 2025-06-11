@@ -11,7 +11,6 @@ import (
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/dom"
-	cdppage "github.com/chromedp/cdproto/page"
 	"github.com/grafana/sobek"
 	"go.opentelemetry.io/otel/attribute"
 
@@ -170,14 +169,12 @@ func (h *ElementHandle) clickablePoint() (*Position, error) {
 		return nil, fmt.Errorf("node is either not visible or not an HTMLElement: %w", err)
 	}
 
-	// Filter out quads that have too small area to click into.
-	var layoutViewport *cdppage.LayoutViewport
-	getLayoutMetrics := cdppage.GetLayoutMetrics()
-	if _, _, _, layoutViewport, _, _, err = getLayoutMetrics.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
-		return nil, fmt.Errorf("getting page layout metrics %T: %w", getLayoutMetrics, err)
+	width, height, err := h.evaluateInnerWidthHeight()
+	if err != nil {
+		return nil, err
 	}
 
-	return filterQuads(layoutViewport.ClientWidth, layoutViewport.ClientHeight, quads)
+	return filterQuads(width, height, quads)
 }
 
 // We are evaluating the inner width and height of the current frame that the
