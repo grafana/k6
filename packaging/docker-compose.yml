@@ -5,8 +5,8 @@ services:
     build:
       context: .
       args:
-        - AWSCLI_VERSION=${AWSCLI_VERSION:-2.1.36}
-        - S3CMD_VERSION=${S3CMD_VERSION:-2.1.0}
+        - AWSCLI_VERSION=${AWSCLI_VERSION:-2.26.5}
+        - S3CMD_VERSION=${S3CMD_VERSION:-2.4.0}
     image: ghcr.io/grafana/k6packager:latest
     environment:
       - AWS_ACCESS_KEY_ID
