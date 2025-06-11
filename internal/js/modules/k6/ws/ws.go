@@ -69,13 +69,14 @@ var ErrWSInInitContext = common.NewInitContextError("using websockets in the ini
 
 // Socket is the representation of the websocket returned to the js.
 type Socket struct {
-	rt            *sobek.Runtime
-	ctx           context.Context //nolint:containedctx
-	conn          *websocket.Conn
-	eventHandlers map[string][]sobek.Callable
-	scheduled     chan sobek.Callable
-	done          chan struct{}
-	shutdownOnce  sync.Once
+	rt               *sobek.Runtime
+	ctx              context.Context //nolint:containedctx
+	conn             *websocket.Conn
+	eventHandlers    map[string][]sobek.Callable
+	eventHandlerVals map[string][]sobek.Value
+	scheduled        chan sobek.Callable
+	done             chan struct{}
+	shutdownOnce     sync.Once
 
 	pingSendTimestamps map[string]time.Time
 	pingSendCounter    int
@@ -295,6 +296,7 @@ func (mi *WS) dial(
 		rt:                 rt,
 		conn:               conn,
 		eventHandlers:      make(map[string][]sobek.Callable),
+		eventHandlerVals:   make(map[string][]sobek.Value),
 		pingSendTimestamps: make(map[string]time.Time),
 		scheduled:          make(chan sobek.Callable),
 		done:               make(chan struct{}),
@@ -310,8 +312,9 @@ func (mi *WS) dial(
 
 // On is used to configure what the websocket should do on each event.
 func (s *Socket) On(event string, handler sobek.Value) {
-	if handler, ok := sobek.AssertFunction(handler); ok {
-		s.eventHandlers[event] = append(s.eventHandlers[event], handler)
+	if handlerCallable, ok := sobek.AssertFunction(handler); ok {
+		s.eventHandlers[event] = append(s.eventHandlers[event], handlerCallable)
+		s.eventHandlerVals[event] = append(s.eventHandlerVals[event], handler)
 	}
 }
 
