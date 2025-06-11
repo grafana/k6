@@ -1226,3 +1226,48 @@ func TestWSConnectDisableThrowErrorOption(t *testing.T) {
 	entries := logHook.Drain()
 	assert.Empty(t, entries)
 }
+
+func TestRemoveEventListener(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	sr := tb.Replacer.Replace
+
+	test := newTestState(t)
+	_, err := test.VU.Runtime().RunString(sr(`
+		var handlerCallCount = 0;
+		var removedHandlerCalled = false;
+
+		var res = ws.connect("WSBIN_URL/ws-echo", function(socket){
+			var handlerToRemove = function() {
+				removedHandlerCalled = true;
+			};
+			
+			var handlerToKeep = function() {
+				handlerCallCount++;
+				socket.close();
+			};
+
+			socket.on("open", function(data) {
+				socket.on("pong", handlerToRemove);
+				socket.on("pong", handlerToKeep);
+				
+				socket.off("pong", handlerToRemove);
+				
+				socket.ping();
+			});
+			
+			socket.setTimeout(function (){socket.close();}, 3000);
+		});
+		
+		if (removedHandlerCalled) {
+			throw new Error("removed handler was called");
+		}
+		
+		if (handlerCallCount !== 1) {
+			throw new Error("kept handler was not called exactly once, got: " + handlerCallCount);
+		}
+	`))
+	require.NoError(t, err)
+	samplesBuf := metrics.GetBufferedSamples(test.samples)
+	assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSBIN_URL/ws-echo"), statusProtocolSwitch, "")
+}
