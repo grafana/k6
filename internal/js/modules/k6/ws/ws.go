@@ -318,6 +318,44 @@ func (s *Socket) On(event string, handler sobek.Value) {
 	}
 }
 
+// Off is used to unregister handler mappped to certain event
+func (s *Socket) Off(event string, handler sobek.Value) {
+	select {
+	case <-s.done:
+		return
+	default:
+	}
+
+	_, ok := sobek.AssertFunction(handler)
+	if !ok {
+		return
+	}
+
+	handlerEntries, exists := s.eventHandlerVals[event]
+	if !exists {
+		return
+	}
+
+	updatedHandlers := make([]sobek.Callable, 0, len(handlerEntries))
+	updatedHandlerEntries := make([]sobek.Value, 0, len(handlerEntries))
+
+	for _, fnVal := range handlerEntries {
+		if !handler.SameAs(fnVal) {
+			if fnCallable, ok := sobek.AssertFunction(fnVal); ok {
+				updatedHandlers = append(updatedHandlers, fnCallable)
+				updatedHandlerEntries = append(updatedHandlerEntries, fnVal)
+			}
+		}
+	}
+
+	if len(updatedHandlerEntries) == 0 {
+		delete(s.eventHandlers, event)
+	} else {
+		s.eventHandlers[event] = updatedHandlers
+		s.eventHandlerVals[event] = updatedHandlerEntries
+	}
+}
+
 func (s *Socket) handleEvent(event string, args ...sobek.Value) {
 	if handlers, ok := s.eventHandlers[event]; ok {
 		for _, handler := range handlers {
