@@ -20,7 +20,11 @@ jobs:
       fail-fast: false
       matrix:
         go: [stable, tip]
-        platform: [ubuntu-latest, windows-latest, macos-latest]
+        platform: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, macos-latest]
+        # TODO: Remove exclusion after https://github.com/grafana/gotip/pull/4 is merged.
+        exclude:
+          - go: tip
+            platform: ubuntu-24.04-arm
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout code
