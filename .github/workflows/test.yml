@@ -59,8 +59,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # TODO: Add ubuntu-22.04-arm to this list after figuring out how to run browser on arm runners.
-        platform: [ubuntu-22.04, windows-latest]
+        platform: [ubuntu-22.04, ubuntu-24.04-arm, windows-latest]
     runs-on: ${{ matrix.platform }}
     continue-on-error: true
     steps:
