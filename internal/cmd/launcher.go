@@ -17,6 +17,7 @@ import (
 	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/internal/build"
+	"go.k6.io/k6/lib/fsext"
 )
 
 // commandExecutor executes the requested k6 command line command.
@@ -306,7 +307,7 @@ func analyze(gs *state.GlobalState, _ *cobra.Command, args []string) (k6deps.Dep
 		}
 		dopts.Script.Name = sourceRootPath
 		dopts.Script.Contents = src.Data
-		dopts.Fs = gs.FS
+		dopts.Fs = fsext.NewIOFSBridge(gs.FS)
 	}
 
 	return k6deps.Analyze(dopts)
