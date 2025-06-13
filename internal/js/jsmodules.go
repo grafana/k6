@@ -32,13 +32,24 @@ import (
 
 func getInternalJSModules() map[string]interface{} {
 	return map[string]interface{}{
-		"k6":                      k6.New(),
-		"k6/crypto":               crypto.New(),
-		"k6/crypto/x509":          x509.New(),
-		"k6/data":                 data.New(),
-		"k6/encoding":             encoding.New(),
-		"k6/timers":               timers.New(),
-		"k6/execution":            execution.New(),
+		// Stable modules
+		"k6":             k6.New(),
+		"k6/crypto":      crypto.New(),
+		"k6/crypto/x509": x509.New(),
+		"k6/data":        data.New(),
+		"k6/encoding":    encoding.New(),
+		"k6/timers":      timers.New(),
+		"k6/execution":   execution.New(),
+		"k6/browser":     browser.New(),
+		"k6/net/grpc":    grpc.New(),
+		"k6/html":        html.New(),
+		"k6/http":        http.New(),
+		"k6/metrics":     metrics.New(),
+		"k6/secrets":     secrets.New(),
+		"k6/ws":          ws.New(),
+
+		// Experimental modules
+		"k6/experimental/fs":      fs.New(),
 		"k6/experimental/csv":     csv.New(),
 		"k6/experimental/redis":   redis.New(),
 		"k6/experimental/streams": streams.New(),
@@ -46,6 +57,8 @@ func getInternalJSModules() map[string]interface{} {
 			"k6/experimental/webcrypto is now part of the k6 core, and globally available. You could just remove import."+
 				" The k6/experimental/webcrypto will be removed in k6 v1.1.0"),
 		"k6/experimental/websockets": expws.New(),
+
+		// Removed modules
 		"k6/experimental/timers": newRemovedModule(
 			"k6/experimental/timers has been graduated, please use k6/timers instead."),
 		"k6/experimental/tracing": newRemovedModule(
@@ -57,14 +70,6 @@ func getInternalJSModules() map[string]interface{} {
 				"Please update your imports to use k6/browser instead of k6/experimental/browser," +
 				" For more information, see the migration guide at the link:" +
 				" https://grafana.com/docs/k6/latest/using-k6-browser/migrating-to-k6-v0-52/"),
-		"k6/browser":         browser.New(),
-		"k6/experimental/fs": fs.New(),
-		"k6/net/grpc":        grpc.New(),
-		"k6/html":            html.New(),
-		"k6/http":            http.New(),
-		"k6/metrics":         metrics.New(),
-		"k6/secrets":         secrets.New(),
-		"k6/ws":              ws.New(),
 		"k6/experimental/grpc": newRemovedModule(
 			"k6/experimental/grpc has been graduated, please use k6/net/grpc instead." +
 				" See https://grafana.com/docs/k6/latest/javascript-api/k6-net-grpc/ for more information.",
