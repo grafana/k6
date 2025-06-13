@@ -2,7 +2,6 @@ package js
 
 import (
 	"errors"
-	"sync"
 
 	"go.k6.io/k6/ext"
 	"go.k6.io/k6/internal/js/modules/k6"
@@ -86,25 +85,6 @@ func getJSModules() map[string]interface{} {
 	}
 
 	return result
-}
-
-type warnExperimentalModule struct {
-	once *sync.Once
-	msg  string
-	base modules.Module
-}
-
-func newWarnExperimentalModule(base modules.Module, msg string) modules.Module {
-	return &warnExperimentalModule{
-		msg:  msg,
-		base: base,
-		once: &sync.Once{},
-	}
-}
-
-func (w *warnExperimentalModule) NewModuleInstance(vu modules.VU) modules.Instance {
-	w.once.Do(func() { vu.InitEnv().Logger.Warn(w.msg) })
-	return w.base.NewModuleInstance(vu)
 }
 
 type removedModule struct {
