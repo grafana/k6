@@ -30,7 +30,9 @@ sync_to_s3() {
   s3cmd sync --delete-removed "${REPODIR}/" "s3://${S3PATH}/"
 
   # Set a short cache expiration for index files and the latest MSI package.
-  s3cmd modify --recursive --exclude='*' \
+  # We set --private-acl since we manage ACLs ourselves and don't want
+  # s3cmd to modify them. Otherwise, we receive AccessControlListNotSupported.
+  s3cmd modify --acl-private --recursive --exclude='*' \
     --include='index.html' --include='k6-latest-amd64.msi' \
     --add-header='Cache-Control: max-age=60,must-revalidate' "s3://${S3PATH}/"
 }
