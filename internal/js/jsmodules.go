@@ -34,23 +34,23 @@ func getInternalJSModules() map[string]interface{} {
 	return map[string]interface{}{
 		// Stable modules
 		"k6":             k6.New(),
+		"k6/browser":     browser.New(),
 		"k6/crypto":      crypto.New(),
 		"k6/crypto/x509": x509.New(),
 		"k6/data":        data.New(),
 		"k6/encoding":    encoding.New(),
-		"k6/timers":      timers.New(),
 		"k6/execution":   execution.New(),
-		"k6/browser":     browser.New(),
-		"k6/net/grpc":    grpc.New(),
 		"k6/html":        html.New(),
 		"k6/http":        http.New(),
+		"k6/net/grpc":    grpc.New(),
 		"k6/metrics":     metrics.New(),
 		"k6/secrets":     secrets.New(),
+		"k6/timers":      timers.New(),
 		"k6/ws":          ws.New(),
 
 		// Experimental modules
-		"k6/experimental/fs":      fs.New(),
 		"k6/experimental/csv":     csv.New(),
+		"k6/experimental/fs":      fs.New(),
 		"k6/experimental/redis":   redis.New(),
 		"k6/experimental/streams": streams.New(),
 		"k6/experimental/webcrypto": newWarnExperimentalModule(webcrypto.New(),
@@ -59,12 +59,6 @@ func getInternalJSModules() map[string]interface{} {
 		"k6/experimental/websockets": expws.New(),
 
 		// Removed modules
-		"k6/experimental/timers": newRemovedModule(
-			"k6/experimental/timers has been graduated, please use k6/timers instead."),
-		"k6/experimental/tracing": newRemovedModule(
-			"k6/experimental/tracing has been removed. All of it functionality is available as pure javascript module." +
-				" More info available at the docs:" +
-				" https://grafana.com/docs/k6/latest/javascript-api/jslib/http-instrumentation-tempo"),
 		"k6/experimental/browser": newRemovedModule(
 			"k6/experimental/browser has been graduated, please use k6/browser instead." +
 				"Please update your imports to use k6/browser instead of k6/experimental/browser," +
@@ -74,6 +68,12 @@ func getInternalJSModules() map[string]interface{} {
 			"k6/experimental/grpc has been graduated, please use k6/net/grpc instead." +
 				" See https://grafana.com/docs/k6/latest/javascript-api/k6-net-grpc/ for more information.",
 		),
+		"k6/experimental/timers": newRemovedModule(
+			"k6/experimental/timers has been graduated, please use k6/timers instead."),
+		"k6/experimental/tracing": newRemovedModule(
+			"k6/experimental/tracing has been removed. All of it functionality is available as pure javascript module." +
+				" More info available at the docs:" +
+				" https://grafana.com/docs/k6/latest/javascript-api/jslib/http-instrumentation-tempo"),
 	}
 }
 
