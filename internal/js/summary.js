@@ -65,7 +65,7 @@ function humanizeValue(val, metric, timeUnit) {
  * @property {Record<string, ReportThreshold>} thresholds - The thresholds report.
  * @property {ReportMetrics} metrics - The metrics report.
  * @property {Record<string, ReportGroup>} groups - The groups report.
- * @property {string[]} groups_order - Group names sorted the same way as in code.
+ * @property {string[]} groups_order - Group names sorted with the order to be displayed in the summary. Typically same as in code.
  * @property {Record<string, ReportGroup>} scenarios - The scenarios report.
  */
 
@@ -80,7 +80,7 @@ function humanizeValue(val, metric, timeUnit) {
  * @property {ReportChecks} checks - The checks report.
  * @property {ReportMetrics} metrics - The metrics report.
  * @property {Record<string, ReportGroup>} groups - The nested groups report.
- * @property {string[]} groups_order - Group names sorted the same way as in code.
+ * @property {string[]} groups_order - Group names sorted with the order to be displayed in the summary. Typically same as in code.
  */
 
 /**
@@ -237,13 +237,13 @@ class ReportBuilder {
 	 * Adds groups sections to the report.
 	 *
 	 * @param {Record<string, ReportGroup>} groups - The groups to add to the report.
-	 * @param {string[]} groupOrder - Group names sorted the same way as in code.
+	 * @param {string[]} groupsOrder - Group names sorted with the order to be displayed in the summary. Typically same as in code.
 	 * @returns {ReportBuilder}
 	 */
-	addGroups(groups, groupOrder) {
+	addGroups(groups, groupsOrder) {
 		if (!groups) return this;
 
-		groupOrder
+		groupsOrder
 			.forEach((groupName) => {
 				this.sections.push({
 					title: `GROUP: ${groupName}`,
@@ -405,14 +405,14 @@ class ReportBuilder {
 			...this._renderChecks(scenarioData.checks, renderContext),
 			...this._renderMetrics(scenarioData.metrics, renderContext),
 			...(scenarioData.groups
-				? this._renderNestedGroups(scenarioData.groups, scenarioData.groups_order)
+				? this._renderNestedGroups(scenarioData.groups, scenarioData.groups_order, renderContext)
 				: []),
 		];
 	}
 
 	/**
 	 * @param {Record<string, ReportGroup>} groups - The nested groups data to render.
-	 * @param {string[]} groupsOrder - Group names sorted the same way as in code.
+	 * @param {string[]} groupsOrder - Group names sorted with the order to be displayed in the summary. Typically same as in code.
 	 * @param {RenderContext} [renderContext] - The render context to use for text rendering.
 	 * @returns {string[]}
 	 * @private

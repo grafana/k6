@@ -57,7 +57,7 @@ type aggregatedGroupData struct {
 	checks            *aggregatedChecksData
 	aggregatedMetrics aggregatedMetricData
 	groupsData        map[string]*aggregatedGroupData
-	groupsOrderData   []string
+	groupsOrder       []string
 }
 
 func newAggregatedGroupData() *aggregatedGroupData {
@@ -65,7 +65,7 @@ func newAggregatedGroupData() *aggregatedGroupData {
 		checks:            newAggregatedChecksData(),
 		aggregatedMetrics: make(map[string]aggregatedMetric),
 		groupsData:        make(map[string]*aggregatedGroupData),
-		groupsOrderData:   make([]string, 0),
+		groupsOrder:       make([]string, 0),
 	}
 }
 
@@ -75,7 +75,7 @@ func (a *aggregatedGroupData) groupDataFor(group string) *aggregatedGroupData {
 	}
 	newGroupData := newAggregatedGroupData()
 	a.groupsData[group] = newGroupData
-	a.groupsOrderData = append(a.groupsOrderData, group)
+	a.groupsOrder = append(a.groupsOrder, group)
 	return a.groupsData[group]
 }
 
@@ -165,6 +165,9 @@ func (a *aggregatedChecksData) checkFor(name string) *summary.Check {
 	return check
 }
 
+// populateSummaryGroup populates a [summary.Group], which is the common type for holding groups data to be displayed
+// in the summary, with the data hold by [aggregatedGroupData], which is the type used specifically by this output
+// implementation aimed to collect data that will be displayed in the summary.
 func populateSummaryGroup(
 	summaryMode summary.Mode,
 	summaryGroup *summary.Group,
@@ -218,11 +221,12 @@ func populateSummaryGroup(
 		)
 	}
 
-	summaryGroup.GroupsOrder = groupData.groupsOrderData
+	// We also set the groups order, so it's preserved from code.
+	summaryGroup.GroupsOrder = groupData.groupsOrder
 
 	// Finally, we keep moving down the hierarchy and populate the nested groups.
 	for groupName, subGroupData := range groupData.groupsData {
-		summarySubGroup := summary.NewGroup(groupName)
+		summarySubGroup := summary.NewGroup()
 		populateSummaryGroup(summaryMode, &summarySubGroup, subGroupData, testRunDuration, summaryTrendStats)
 		summaryGroup.Groups[groupName] = summarySubGroup
 	}

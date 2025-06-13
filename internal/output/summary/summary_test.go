@@ -252,7 +252,7 @@ func TestOutput_AddMetricSamples(t *testing.T) {
 			{
 				TimeSeries: metrics.TimeSeries{
 					Metric: authHTTPReqsMetric,
-					Tags:   reg.RootTagSet().With("group", "::something"),
+					Tags:   reg.RootTagSet().With("group", lib.GroupSeparator+"something"),
 				},
 				Time:  time.Now(),
 				Value: 1,
@@ -260,7 +260,7 @@ func TestOutput_AddMetricSamples(t *testing.T) {
 			{
 				TimeSeries: metrics.TimeSeries{
 					Metric: authHTTPReqsMetric,
-					Tags:   reg.RootTagSet().With("group", "::auth"),
+					Tags:   reg.RootTagSet().With("group", lib.GroupSeparator+"auth"),
 				},
 				Time:  time.Now(),
 				Value: 1,
@@ -340,6 +340,6 @@ func TestOutput_AddMetricSamples(t *testing.T) {
 		authHTTPReqsSummaryMetric = o.dataModel.groupsData["something"].aggregatedMetrics[authHTTPReqsMetric.Name]
 		assert.Equal(t, float64(1), authHTTPReqsSummaryMetric.Sink.(*metrics.CounterSink).Value)
 
-		assert.Equal(t, []string{"something", "auth"}, o.dataModel.groupsOrderData)
+		assert.Equal(t, []string{"something", "auth"}, o.dataModel.groupsOrder)
 	})
 }
