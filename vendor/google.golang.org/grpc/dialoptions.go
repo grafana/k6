@@ -360,7 +360,7 @@ func WithReturnConnectionError() DialOption {
 //
 // Note that using this DialOption with per-RPC credentials (through
 // WithCredentialsBundle or WithPerRPCCredentials) which require transport
-// security is incompatible and will cause grpc.Dial() to fail.
+// security is incompatible and will cause RPCs to fail.
 //
 // Deprecated: use WithTransportCredentials and insecure.NewCredentials()
 // instead. Will be supported throughout 1.x.
