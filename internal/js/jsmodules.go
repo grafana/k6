@@ -57,7 +57,7 @@ func getInternalJSModules() map[string]interface{} {
 		"k6/experimental/browser": newRemovedModule(
 			"k6/experimental/browser has been graduated, please use k6/browser instead." +
 				"Please update your imports to use k6/browser instead of k6/experimental/browser," +
-				" For more information, see the migrati:74on guide at the link:" +
+				" For more information, see the migration guide at the link:" +
 				" https://grafana.com/docs/k6/latest/using-k6-browser/migrating-to-k6-v0-52/"),
 		"k6/experimental/grpc": newRemovedModule(
 			"k6/experimental/grpc has been graduated, please use k6/net/grpc instead." +
