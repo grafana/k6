@@ -17,7 +17,45 @@ import (
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/dynamicpb"
+
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 )
+
+type healthcheckmock func(in *healthpb.HealthCheckRequest, out *healthpb.HealthCheckResponse, opts ...grpc.CallOption) error
+
+func (im healthcheckmock) Invoke(_ context.Context, _ string, payload, reply any, opts ...grpc.CallOption) error {
+	in, ok := payload.(*healthpb.HealthCheckRequest)
+	if !ok {
+		return fmt.Errorf("unexpected type for payload")
+	}
+	out, ok := reply.(*healthpb.HealthCheckResponse)
+	if !ok {
+		return fmt.Errorf("unexpected type for reply")
+	}
+	return im(in, out, opts...)
+}
+
+func (healthcheckmock) Close() error {
+	return nil
+}
+
+func (healthcheckmock) NewStream(_ context.Context, _ *grpc.StreamDesc, _ string, _ ...grpc.CallOption) (grpc.ClientStream, error) {
+	panic("not implemented")
+}
+
+func TestHealthcheck(t *testing.T) {
+	t.Parallel()
+	healthReply := func(_ *healthpb.HealthCheckRequest, out *healthpb.HealthCheckResponse, _ ...grpc.CallOption) error {
+		err := protojson.Unmarshal([]byte(`{"status":1}`), out)
+		require.NoError(t, err)
+
+		return nil
+	}
+	c := Conn{raw: healthcheckmock(healthReply)}
+	res, err := c.HealthCheck(context.Background(), "")
+	require.NoError(t, err)
+	assert.Equal(t, healthpb.HealthCheckResponse_SERVING, res.Status)
+}
 
 func TestInvoke(t *testing.T) {
 	t.Parallel()

@@ -278,6 +278,11 @@ func (c *Client) Connect(addr string, params sobek.Value) (bool, error) {
 	return true, err
 }
 
+// Healthcheck runs healtcheck
+func (c *Client) Healthcheck(svc string) (*grpcext.HealthCheckResponse, error) {
+	return c.conn.HealthCheck(c.vu.Context(), svc)
+}
+
 // Invoke creates and calls a unary RPC by fully qualified method name
 func (c *Client) Invoke(
 	method string,
