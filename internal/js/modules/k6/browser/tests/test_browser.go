@@ -89,12 +89,8 @@ func newTestBrowser(tb testing.TB, opts ...func(*testBrowser)) *testBrowser {
 	tbr.pid = pid
 	tbr.wsURL = b.WsURL()
 	tb.Cleanup(func() {
-		select {
-		case <-tbr.vu.Context().Done():
-		default:
-			if !tbr.skipClose {
-				b.Close()
-			}
+		if !tbr.skipClose {
+			b.Close()
 		}
 	})
 
