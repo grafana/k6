@@ -171,10 +171,15 @@ func (h *ElementHandle) clickablePoint() (*Position, error) {
 
 	width, height, err := h.evaluateInnerWidthHeight()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("evaluating inner width and height: %w", err)
 	}
 
-	return filterQuads(width, height, quads)
+	p, err := filterQuads(width, height, quads)
+	if err != nil {
+		return nil, fmt.Errorf("filtering quads: %w", err)
+	}
+
+	return p, nil
 }
 
 // We are evaluating the inner width and height of the current frame that the
@@ -200,17 +205,17 @@ func (h *ElementHandle) evaluateInnerWidthHeight() (int64, int64, error) {
 
 	m, ok := v.(map[string]any)
 	if !ok {
-		return 0, 0, fmt.Errorf("unexpected value %v when getting inner width and height", v)
+		return 0, 0, fmt.Errorf("unexpected value %q when getting inner width and height", v)
 	}
 
 	width, ok := m["width"].(float64)
 	if !ok {
-		return 0, 0, fmt.Errorf("unexpected value %v when getting inner width", m["width"])
+		return 0, 0, fmt.Errorf("unexpected value %q when getting inner width", m["width"])
 	}
 
 	height, ok := m["height"].(float64)
 	if !ok {
-		return 0, 0, fmt.Errorf("unexpected value %v when getting inner height", m["height"])
+		return 0, 0, fmt.Errorf("unexpected value %q when getting inner height", m["height"])
 	}
 
 	return int64(width), int64(height), nil
