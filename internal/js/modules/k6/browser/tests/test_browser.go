@@ -20,7 +20,6 @@ import (
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext/k6test"
 
 	k6httpmultibin "go.k6.io/k6/internal/lib/testutils/httpmultibin"
-	k6http "go.k6.io/k6/js/modules/k6/http"
 	k6metrics "go.k6.io/k6/metrics"
 )
 
@@ -104,9 +103,6 @@ func newTestBrowserVU(tb testing.TB, tbr *testBrowser) (_ *k6test.VU, cancel fun
 	tb.Helper()
 
 	vu := k6test.NewVU(tb, k6test.WithSamples(tbr.samples))
-	mi, ok := k6http.New().NewModuleInstance(vu).(*k6http.ModuleInstance)
-	require.Truef(tb, ok, "want *k6http.ModuleInstance; got %T", mi)
-	require.NoError(tb, vu.Runtime().Set("http", mi.Exports().Default))
 	metricsCtx := k6ext.WithCustomMetrics(
 		vu.Context(),
 		k6ext.RegisterCustomMetrics(k6metrics.NewRegistry()),
