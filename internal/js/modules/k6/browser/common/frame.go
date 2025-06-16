@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -1010,46 +1011,46 @@ func (f *Frame) GetByRole(role string, opts *GetByRoleOptions) *Locator {
 	properties := make(map[string]string)
 
 	if opts == nil {
-		return f.Locator(fmt.Sprintf("internal:role=%s", role), nil)
+		return f.Locator("internal:role="+role, nil)
 	}
 
 	if opts.Checked != nil {
-		properties["checked"] = fmt.Sprintf("%v", *opts.Checked)
+		properties["checked"] = strconv.FormatBool(*opts.Checked)
 	}
 	if opts.Disabled != nil {
-		properties["disabled"] = fmt.Sprintf("%v", *opts.Disabled)
+		properties["disabled"] = strconv.FormatBool(*opts.Disabled)
 	}
 	if opts.Selected != nil {
-		properties["selected"] = fmt.Sprintf("%v", *opts.Selected)
+		properties["selected"] = strconv.FormatBool(*opts.Selected)
 	}
 	if opts.Expanded != nil {
-		properties["expanded"] = fmt.Sprintf("%v", *opts.Expanded)
+		properties["expanded"] = strconv.FormatBool(*opts.Expanded)
 	}
 	if opts.IncludeHidden != nil {
-		properties["include-hidden"] = fmt.Sprintf("%v", *opts.IncludeHidden)
+		properties["include-hidden"] = strconv.FormatBool(*opts.IncludeHidden)
 	}
 	if opts.Level != nil {
-		properties["level"] = fmt.Sprintf("%v", *opts.Level)
+		properties["level"] = strconv.FormatInt(*opts.Level, 10)
 	}
 	if opts.Name != nil && *opts.Name != "" {
 		// Exact option can only be applied to quoted strings.
 		if (*opts.Name)[0] == '\'' && (*opts.Name)[len(*opts.Name)-1] == '\'' {
 			if opts.Exact != nil && *opts.Exact {
-				*opts.Name = fmt.Sprintf("%vs", *opts.Name)
+				*opts.Name = *opts.Name + "s"
 			} else {
-				*opts.Name = fmt.Sprintf("%vi", *opts.Name)
+				*opts.Name = *opts.Name + "i"
 			}
 		}
 		properties["name"] = *opts.Name
 	}
 	if opts.Pressed != nil {
-		properties["pressed"] = fmt.Sprintf("%v", *opts.Pressed)
+		properties["pressed"] = strconv.FormatBool(*opts.Pressed)
 	}
 
 	var builder strings.Builder
-	builder.WriteString(fmt.Sprintf("internal:role=%s", role))
+	builder.WriteString("internal:role=" + role)
 	for key, value := range properties {
-		builder.WriteString(fmt.Sprintf("[%s=%s]", key, value))
+		builder.WriteString("[" + key + "=" + value + "]")
 	}
 
 	return f.Locator(builder.String(), nil)
