@@ -64,7 +64,8 @@ func getInternalJSModules() map[string]interface{} {
 				" See https://grafana.com/docs/k6/latest/javascript-api/k6-net-grpc/ for more information.",
 		),
 		"k6/experimental/timers": newRemovedModule(
-			"k6/experimental/timers has been graduated, please use k6/timers instead."),
+			"k6/experimental/timers has been graduated, and it's now globally available as defined by standard WebAPIs." +
+				" You just need to remove the import."),
 		"k6/experimental/tracing": newRemovedModule(
 			"k6/experimental/tracing has been removed. All of it functionality is available as pure javascript module." +
 				" More info available at the docs:" +
