@@ -1036,9 +1036,9 @@ func (f *Frame) GetByRole(role string, opts *GetByRoleOptions) *Locator {
 		// Exact option can only be applied to quoted strings.
 		if (*opts.Name)[0] == '\'' && (*opts.Name)[len(*opts.Name)-1] == '\'' {
 			if opts.Exact != nil && *opts.Exact {
-				*opts.Name = *opts.Name + "s"
+				*opts.Name = (*opts.Name) + "s"
 			} else {
-				*opts.Name = *opts.Name + "i"
+				*opts.Name = (*opts.Name) + "i"
 			}
 		}
 		properties["name"] = *opts.Name
