@@ -1002,9 +1002,10 @@ func (f *Frame) getAttribute(selector, name string, opts *FrameBaseOptions) (str
 	return s, true, nil
 }
 
-// Locator creates and returns a new locator for this frame.
+// GetByRole creates and returns a new locator for this frame using the ARIA role
+// and any additional options.
 func (f *Frame) GetByRole(role string, opts *GetByRoleOptions) *Locator {
-	f.log.Debugf("Frame:Locator", "fid:%s furl:%q role:%q opts:%+v", f.ID(), f.URL(), role, opts)
+	f.log.Debugf("Frame:GetByRole", "fid:%s furl:%q role:%q opts:%+v", f.ID(), f.URL(), role, opts)
 
 	properties := make(map[string]string)
 
