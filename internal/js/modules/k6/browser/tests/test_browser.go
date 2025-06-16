@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
+	"go.k6.io/k6/internal/js/modules/k6/browser/browser"
 	"go.k6.io/k6/internal/js/modules/k6/browser/chromium"
 	"go.k6.io/k6/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/internal/js/modules/k6/browser/env"
@@ -111,6 +112,12 @@ func newTestBrowserVU(tb testing.TB, tbr *testBrowser) (_ *k6test.VU, cancel fun
 	tb.Cleanup(cancel)
 	vu.CtxField = ctx
 	vu.InitEnvField.LookupEnv = tbr.lookupFunc
+
+	mod := browser.New().NewModuleInstance(vu)
+	jsMod, ok := mod.Exports().Default.(*browser.JSModule)
+	require.Truef(tb, ok, "unexpected default mod export type %T", mod.Exports().Default)
+	// Setting the mapped browser into the vu's sobek runtime.
+	require.NoError(tb, vu.Runtime().Set("browser", jsMod.Browser))
 
 	return vu, cancel
 }

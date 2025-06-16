@@ -688,15 +688,11 @@ func TestLocatorShadowDOM(t *testing.T) {
 func TestSelectOption(t *testing.T) {
 	t.Parallel()
 
-	tb := newTestBrowser(t,
-		withFileServer(),
-	)
-	defer tb.Close()
+	tb := newTestBrowser(t, withFileServer())
+	tb.vu.ActivateVU()
+	tb.vu.StartIteration(t)
 
-	vu, _, _, cleanUp := startIteration(t)
-	defer cleanUp()
-
-	got := vu.RunPromise(t, `
+	got := tb.vu.RunPromise(t, `
 		const page = await browser.newPage();
 
 		await page.goto('%s');
