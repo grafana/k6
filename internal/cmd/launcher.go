@@ -58,7 +58,7 @@ func (l *launcher) launch(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	deps, err := analyze(l.gs, cmd, args)
+	deps, err := analyze(l.gs, args)
 	if err != nil {
 		l.gs.Logger.
 			WithError(err).
@@ -276,17 +276,18 @@ func extractToken(gs *state.GlobalState) (string, error) {
 // Presently, only the k6 input script or archive (if any) is passed to k6deps for scanning.
 // TODO: if k6 receives the input from stdin, it is not used for scanning because we don't know
 // if it is a script or an archive
-func analyze(gs *state.GlobalState, _ *cobra.Command, args []string) (k6deps.Dependencies, error) {
+func analyze(gs *state.GlobalState, args []string) (k6deps.Dependencies, error) {
 	dopts := &k6deps.Options{
 		LookupEnv: func(key string) (string, bool) { v, ok := gs.Env[key]; return v, ok },
 		Manifest:  k6deps.Source{Ignore: true},
 	}
 
 	sourceRootPath := args[0]
-	gs.Logger.Debugf("Resolving and reading test '%s'...", sourceRootPath)
+	gs.Logger.WithField("source", "sourceRootPath").
+		Debug("Launcher is resolving and reading the test")
 	src, _, pwd, err := readSource(gs, sourceRootPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("reading source for analysis %w", err)
 	}
 
 	// if sourceRooPath is stdin ('-') we need to preserve the content
