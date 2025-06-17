@@ -165,8 +165,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"getByRole": func(role string, opts sobek.Value) (*sobek.Object, error) {
-			popts := common.NewGetByRoleOptions()
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseGetByRoleOptions(vu.Context(), opts)
+			if err != nil {
 				return nil, fmt.Errorf("parsing getByRole options: %w", err)
 			}
 
