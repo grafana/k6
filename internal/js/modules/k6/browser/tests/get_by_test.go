@@ -12,10 +12,6 @@ import (
 	"go.k6.io/k6/internal/js/modules/k6/browser/common"
 )
 
-func ptr[T any](v T) *T {
-	return &v
-}
-
 func TestGetByRoleSuccess(t *testing.T) {
 	t.Parallel()
 
@@ -47,31 +43,31 @@ func TestGetByRoleSuccess(t *testing.T) {
 			{
 				name:     "link",
 				role:     "link",
-				opts:     &common.GetByRoleOptions{Name: ptr(`'Link text'`)},
+				opts:     &common.GetByRoleOptions{Name: toPtr(`'Link text'`)},
 				expected: 1, expectedText: "Link text",
 			},
 			{
 				name:     "area",
 				role:     "link",
-				opts:     &common.GetByRoleOptions{Name: ptr(`'Map area'`)},
+				opts:     &common.GetByRoleOptions{Name: toPtr(`'Map area'`)},
 				expected: 1, expectedText: "",
 			},
 			{
 				name:     "button",
 				role:     "button",
-				opts:     &common.GetByRoleOptions{Name: ptr(`'Click'`)},
+				opts:     &common.GetByRoleOptions{Name: toPtr(`'Click'`)},
 				expected: 1, expectedText: "Click",
 			},
 			{
 				name:     "submit_type",
 				role:     "button",
-				opts:     &common.GetByRoleOptions{Name: ptr(`'Submit'`)},
+				opts:     &common.GetByRoleOptions{Name: toPtr(`'Submit'`)},
 				expected: 1, expectedText: "",
 			},
 			{
 				name:     "image_type",
 				role:     "button",
-				opts:     &common.GetByRoleOptions{Name: ptr(`'Image Button'`)},
+				opts:     &common.GetByRoleOptions{Name: toPtr(`'Image Button'`)},
 				expected: 1, expectedText: "",
 			},
 			{
@@ -87,13 +83,13 @@ func TestGetByRoleSuccess(t *testing.T) {
 			{
 				name:     "text_type",
 				role:     "textbox",
-				opts:     &common.GetByRoleOptions{Name: ptr(`'Text type'`)},
+				opts:     &common.GetByRoleOptions{Name: toPtr(`'Text type'`)},
 				expected: 1, expectedText: "",
 			},
 			{
 				name:     "textarea",
 				role:     "textbox",
-				opts:     &common.GetByRoleOptions{Name: ptr(`'Text area'`)},
+				opts:     &common.GetByRoleOptions{Name: toPtr(`'Text area'`)},
 				expected: 1, expectedText: "Textarea",
 			},
 			{
@@ -124,7 +120,7 @@ func TestGetByRoleSuccess(t *testing.T) {
 			{
 				name:     "details_summary",
 				role:     "group",
-				opts:     &common.GetByRoleOptions{Name: ptr(`'details'`)},
+				opts:     &common.GetByRoleOptions{Name: toPtr(`'details'`)},
 				expected: 1, expectedText: "SummaryDetails",
 			},
 			{
@@ -135,37 +131,37 @@ func TestGetByRoleSuccess(t *testing.T) {
 			{
 				name:     "h1",
 				role:     "heading",
-				opts:     &common.GetByRoleOptions{Level: ptr(int64(1))},
+				opts:     &common.GetByRoleOptions{Level: toPtr(int64(1))},
 				expected: 1, expectedText: "Heading1",
 			},
 			{
 				name:     "h2",
 				role:     "heading",
-				opts:     &common.GetByRoleOptions{Level: ptr(int64(2))},
+				opts:     &common.GetByRoleOptions{Level: toPtr(int64(2))},
 				expected: 1, expectedText: "Heading2",
 			},
 			{
 				name:     "h3",
 				role:     "heading",
-				opts:     &common.GetByRoleOptions{Level: ptr(int64(3))},
+				opts:     &common.GetByRoleOptions{Level: toPtr(int64(3))},
 				expected: 1, expectedText: "Heading3",
 			},
 			{
 				name:     "h4",
 				role:     "heading",
-				opts:     &common.GetByRoleOptions{Level: ptr(int64(4))},
+				opts:     &common.GetByRoleOptions{Level: toPtr(int64(4))},
 				expected: 1, expectedText: "Heading4",
 			},
 			{
 				name:     "h5",
 				role:     "heading",
-				opts:     &common.GetByRoleOptions{Level: ptr(int64(5))},
+				opts:     &common.GetByRoleOptions{Level: toPtr(int64(5))},
 				expected: 1, expectedText: "Heading5",
 			},
 			{
 				name:     "h6",
 				role:     "heading",
-				opts:     &common.GetByRoleOptions{Level: ptr(int64(6))},
+				opts:     &common.GetByRoleOptions{Level: toPtr(int64(6))},
 				expected: 1, expectedText: "Heading6",
 			},
 			{
@@ -176,7 +172,7 @@ func TestGetByRoleSuccess(t *testing.T) {
 			{
 				name:     "img",
 				role:     "img",
-				opts:     &common.GetByRoleOptions{Name: ptr(`'Img'`)},
+				opts:     &common.GetByRoleOptions{Name: toPtr(`'Img'`)},
 				expected: 1, expectedText: "",
 			},
 			{
@@ -187,25 +183,25 @@ func TestGetByRoleSuccess(t *testing.T) {
 			{
 				name:     "ul_list",
 				role:     "list",
-				opts:     &common.GetByRoleOptions{Name: ptr(`'ul'`)},
+				opts:     &common.GetByRoleOptions{Name: toPtr(`'ul'`)},
 				expected: 1, expectedText: "",
 			},
 			{
 				name:     "ol_list",
 				role:     "list",
-				opts:     &common.GetByRoleOptions{Name: ptr(`'ol'`)},
+				opts:     &common.GetByRoleOptions{Name: toPtr(`'ol'`)},
 				expected: 1, expectedText: "",
 			},
 			{
 				name:     "ul_li_listitem",
 				role:     "listitem",
-				opts:     &common.GetByRoleOptions{Name: ptr(`'ul-li'`)},
+				opts:     &common.GetByRoleOptions{Name: toPtr(`'ul-li'`)},
 				expected: 1, expectedText: "Item1",
 			},
 			{
 				name:     "ol_li_listitem",
 				role:     "listitem",
-				opts:     &common.GetByRoleOptions{Name: ptr(`'ol-li'`)},
+				opts:     &common.GetByRoleOptions{Name: toPtr(`'ol-li'`)},
 				expected: 1, expectedText: "Item2",
 			},
 			{
@@ -221,19 +217,19 @@ func TestGetByRoleSuccess(t *testing.T) {
 			{
 				name:     "fieldset_legend",
 				role:     "group",
-				opts:     &common.GetByRoleOptions{Name: ptr(`'Legend'`)},
+				opts:     &common.GetByRoleOptions{Name: toPtr(`'Legend'`)},
 				expected: 1, expectedText: "Legend",
 			},
 			{
 				name:     "figure_figcaption",
 				role:     "figure",
-				opts:     &common.GetByRoleOptions{Name: ptr(`'Caption'`)},
+				opts:     &common.GetByRoleOptions{Name: toPtr(`'Caption'`)},
 				expected: 1, expectedText: "Caption",
 			},
 			{
 				name:     "table",
 				role:     "table",
-				opts:     &common.GetByRoleOptions{Name: ptr(`'table1'`)},
+				opts:     &common.GetByRoleOptions{Name: toPtr(`'table1'`)},
 				expected: 1, expectedText: "",
 			},
 			{
@@ -249,43 +245,43 @@ func TestGetByRoleSuccess(t *testing.T) {
 			{
 				name:     "table_head_cell",
 				role:     "cell",
-				opts:     &common.GetByRoleOptions{Name: ptr(`'th'`)},
+				opts:     &common.GetByRoleOptions{Name: toPtr(`'th'`)},
 				expected: 1, expectedText: "Head Cell",
 			},
 			{
 				name:     "table_head_gridcell",
 				role:     "gridcell",
-				opts:     &common.GetByRoleOptions{Name: ptr(`'th gridcell'`)},
+				opts:     &common.GetByRoleOptions{Name: toPtr(`'th gridcell'`)},
 				expected: 1, expectedText: "Head Gridcell",
 			},
 			{
 				name:     "table_body",
 				role:     "rowgroup",
-				opts:     &common.GetByRoleOptions{Name: ptr(`'tbody'`)},
+				opts:     &common.GetByRoleOptions{Name: toPtr(`'tbody'`)},
 				expected: 1, expectedText: "Cell",
 			},
 			{
 				name:     "table_foot",
 				role:     "rowgroup",
-				opts:     &common.GetByRoleOptions{Name: ptr(`'tfoot'`)},
+				opts:     &common.GetByRoleOptions{Name: toPtr(`'tfoot'`)},
 				expected: 1, expectedText: "Foot",
 			},
 			{
 				name:     "table_tr",
 				role:     "row",
-				opts:     &common.GetByRoleOptions{Name: ptr(`'tr'`)},
+				opts:     &common.GetByRoleOptions{Name: toPtr(`'tr'`)},
 				expected: 1, expectedText: "Row",
 			},
 			{
 				name:     "table_td_cell",
 				role:     "cell",
-				opts:     &common.GetByRoleOptions{Name: ptr(`'td'`)},
+				opts:     &common.GetByRoleOptions{Name: toPtr(`'td'`)},
 				expected: 1, expectedText: "Column Cell",
 			},
 			{
 				name:     "table_td_gridcell",
 				role:     "gridcell",
-				opts:     &common.GetByRoleOptions{Name: ptr(`'td gridcell'`)},
+				opts:     &common.GetByRoleOptions{Name: toPtr(`'td gridcell'`)},
 				expected: 1, expectedText: "Column Gridcell",
 			},
 			{
@@ -324,14 +320,14 @@ func TestGetByRoleSuccess(t *testing.T) {
 			{
 				name:     "form",
 				role:     "form",
-				opts:     &common.GetByRoleOptions{Name: ptr(`'form'`)},
+				opts:     &common.GetByRoleOptions{Name: toPtr(`'form'`)},
 				expected: 1, expectedText: "",
 			},
 			// Only works with aria labels.
 			{
 				name:     "section",
 				role:     "region",
-				opts:     &common.GetByRoleOptions{Name: ptr(`'Region Section'`)},
+				opts:     &common.GetByRoleOptions{Name: toPtr(`'Region Section'`)},
 				expected: 1, expectedText: "Region content",
 			},
 			{
@@ -377,7 +373,7 @@ func TestGetByRoleSuccess(t *testing.T) {
 			{
 				name:     "menu",
 				role:     "list",
-				opts:     &common.GetByRoleOptions{Name: ptr(`'menu'`)},
+				opts:     &common.GetByRoleOptions{Name: toPtr(`'menu'`)},
 				expected: 1, expectedText: "Menu item",
 			},
 			{
@@ -408,7 +404,7 @@ func TestGetByRoleSuccess(t *testing.T) {
 			{
 				name:     "svg",
 				role:     "img",
-				opts:     &common.GetByRoleOptions{Name: ptr(`'svg'`)},
+				opts:     &common.GetByRoleOptions{Name: toPtr(`'svg'`)},
 				expected: 1, expectedText: "",
 			},
 			{
@@ -419,13 +415,13 @@ func TestGetByRoleSuccess(t *testing.T) {
 			{
 				name:     "select",
 				role:     "combobox",
-				opts:     &common.GetByRoleOptions{Name: ptr(`'select'`)},
+				opts:     &common.GetByRoleOptions{Name: toPtr(`'select'`)},
 				expected: 1, expectedText: "",
 			},
 			{
 				name:     "select_multiple",
 				role:     "listbox",
-				opts:     &common.GetByRoleOptions{Name: ptr(`'select multiple'`)},
+				opts:     &common.GetByRoleOptions{Name: toPtr(`'select multiple'`)},
 				expected: 1, expectedText: "",
 			},
 			{
@@ -437,7 +433,7 @@ func TestGetByRoleSuccess(t *testing.T) {
 			// {
 			// 	name:     "optgroup",
 			// 	role:     "group",
-			// 	opts:     &common.GetByRoleOptions{Name: ptr(`'optgroup'`)},
+			// 	opts:     &common.GetByRoleOptions{Name: toPtr(`'optgroup'`)},
 			// 	expected: 1, expectedText: "",
 			// },
 		}
@@ -612,97 +608,97 @@ func TestGetByRoleSuccess(t *testing.T) {
 			{
 				name:     "text_content_as_name",
 				role:     "button",
-				opts:     &common.GetByRoleOptions{Name: ptr(`'Submit Form'`)},
+				opts:     &common.GetByRoleOptions{Name: toPtr(`'Submit Form'`)},
 				expected: 1, expectedText: "",
 			},
 			{
 				name:     "aria_label_as_name",
 				role:     "button",
-				opts:     &common.GetByRoleOptions{Name: ptr(`'Save Draft'`)},
+				opts:     &common.GetByRoleOptions{Name: toPtr(`'Save Draft'`)},
 				expected: 1, expectedText: "",
 			},
 			{
 				name:     "aria_labelledby_as_name",
 				role:     "button",
-				opts:     &common.GetByRoleOptions{Name: ptr(`'Upload'`)},
+				opts:     &common.GetByRoleOptions{Name: toPtr(`'Upload'`)},
 				expected: 1, expectedText: "labelledby-upload-button",
 			},
 			{
 				name:     "hidden_text_nodes_should_be_ignored",
 				role:     "button",
-				opts:     &common.GetByRoleOptions{Name: ptr(`'FooBar'`)},
+				opts:     &common.GetByRoleOptions{Name: toPtr(`'FooBar'`)},
 				expected: 0, expectedText: "",
 			},
 			{
 				name:     "only_visible_node",
 				role:     "button",
-				opts:     &common.GetByRoleOptions{Name: ptr(`'Bar'`)},
+				opts:     &common.GetByRoleOptions{Name: toPtr(`'Bar'`)},
 				expected: 1, expectedText: "Bar",
 			},
 			{
 				name:     "regex_matching",
 				role:     "heading",
-				opts:     &common.GetByRoleOptions{Name: ptr(`/^[a-z0-9]+$/`)},
+				opts:     &common.GetByRoleOptions{Name: toPtr(`/^[a-z0-9]+$/`)},
 				expected: 1, expectedText: "abc123",
 			},
 			{
 				name:     "selected_option",
 				role:     "option",
-				opts:     &common.GetByRoleOptions{Selected: ptr(true)},
+				opts:     &common.GetByRoleOptions{Selected: toPtr(true)},
 				expected: 1, expectedText: "One",
 			},
 			{
 				name:     "pressed_option",
 				role:     "button",
-				opts:     &common.GetByRoleOptions{Pressed: ptr(true)},
+				opts:     &common.GetByRoleOptions{Pressed: toPtr(true)},
 				expected: 1, expectedText: "Toggle",
 			},
 			{
 				name:     "expanded_option",
 				role:     "button",
-				opts:     &common.GetByRoleOptions{Expanded: ptr(true)},
+				opts:     &common.GetByRoleOptions{Expanded: toPtr(true)},
 				expected: 1, expectedText: "Expanded",
 			},
 			{
 				name:     "level_option",
 				role:     "heading",
-				opts:     &common.GetByRoleOptions{Level: ptr(int64(6))},
+				opts:     &common.GetByRoleOptions{Level: toPtr(int64(6))},
 				expected: 1, expectedText: "Section",
 			},
 			{
 				name:     "checked_option",
 				role:     "checkbox",
-				opts:     &common.GetByRoleOptions{Checked: ptr(true)},
+				opts:     &common.GetByRoleOptions{Checked: toPtr(true)},
 				expected: 1, expectedText: "",
 			},
 			{
 				name:     "radio_checked_option",
 				role:     "radio",
-				opts:     &common.GetByRoleOptions{Checked: ptr(true)},
+				opts:     &common.GetByRoleOptions{Checked: toPtr(true)},
 				expected: 1, expectedText: "",
 			},
 			{
 				name:     "disabled_option",
 				role:     "button",
-				opts:     &common.GetByRoleOptions{Disabled: ptr(true)},
+				opts:     &common.GetByRoleOptions{Disabled: toPtr(true)},
 				expected: 1, expectedText: "Go",
 			},
 			{
 				name:     "include_css_hidden",
 				role:     "button",
-				opts:     &common.GetByRoleOptions{Name: ptr(`'Hidden X Button'`), IncludeHidden: ptr(true)},
+				opts:     &common.GetByRoleOptions{Name: toPtr(`'Hidden X Button'`), IncludeHidden: toPtr(true)},
 				expected: 1, expectedText: "X",
 			},
 			{
 				name:     "include_aria_hidden",
 				role:     "button",
-				opts:     &common.GetByRoleOptions{Name: ptr(`'Hidden Hi Button'`), IncludeHidden: ptr(true)},
+				opts:     &common.GetByRoleOptions{Name: toPtr(`'Hidden Hi Button'`), IncludeHidden: toPtr(true)},
 				expected: 1, expectedText: "Hi",
 			},
 			{
 				name:     "combo_options",
 				role:     "button",
-				opts:     &common.GetByRoleOptions{Pressed: ptr(false), Name: ptr(`'Archive'`), IncludeHidden: ptr(true)},
+				opts:     &common.GetByRoleOptions{Pressed: toPtr(false), Name: toPtr(`'Archive'`), IncludeHidden: toPtr(true)},
 				expected: 1, expectedText: "Combo Options Button",
 			},
 		}
@@ -737,7 +733,7 @@ func TestGetByRoleFailure(t *testing.T) {
 		{
 			"missing_quotes_on_string",
 			"button",
-			&common.GetByRoleOptions{Name: ptr(`Submit Form`)},
+			&common.GetByRoleOptions{Name: toPtr(`Submit Form`)},
 			"Error while parsing selector `button[name=Submit Form]` - unexpected symbol",
 		},
 		{
