@@ -98,7 +98,7 @@ func TestOutput_Summary(t *testing.T) {
 	// Set up
 	o.dataModel = dataModel{
 		thresholds: thresholds,
-		aggregatedGroupData: aggregatedGroupData{
+		aggregatedGroupData: &aggregatedGroupData{
 			checks: checks,
 			aggregatedMetrics: map[string]aggregatedMetric{
 				checksMetric.Name: {
@@ -114,7 +114,7 @@ func TestOutput_Summary(t *testing.T) {
 					Sink:       authHTTPReqsMetric.Sink,
 				},
 			},
-			groupsData: make(map[string]aggregatedGroupData),
+			groupsData: make(map[string]*aggregatedGroupData),
 		},
 	}
 
@@ -252,7 +252,15 @@ func TestOutput_AddMetricSamples(t *testing.T) {
 			{
 				TimeSeries: metrics.TimeSeries{
 					Metric: authHTTPReqsMetric,
-					Tags:   reg.RootTagSet().With("group", "::auth"),
+					Tags:   reg.RootTagSet().With("group", lib.GroupSeparator+"something"),
+				},
+				Time:  time.Now(),
+				Value: 1,
+			},
+			{
+				TimeSeries: metrics.TimeSeries{
+					Metric: authHTTPReqsMetric,
+					Tags:   reg.RootTagSet().With("group", lib.GroupSeparator+"auth"),
 				},
 				Time:  time.Now(),
 				Value: 1,
@@ -323,10 +331,15 @@ func TestOutput_AddMetricSamples(t *testing.T) {
 		authHTTPReqsSummaryMetric := o.dataModel.aggregatedMetrics[authHTTPReqsMetric.Name]
 		assert.Equal(t, float64(1), authHTTPReqsSummaryMetric.Sink.(*metrics.CounterSink).Value)
 
-		assert.Len(t, o.dataModel.groupsData, 1)
+		assert.Len(t, o.dataModel.groupsData, 2)
+		assert.Len(t, o.dataModel.groupsData["something"].aggregatedMetrics, 1)
 		assert.Len(t, o.dataModel.groupsData["auth"].aggregatedMetrics, 1)
 
 		authHTTPReqsSummaryMetric = o.dataModel.groupsData["auth"].aggregatedMetrics[authHTTPReqsMetric.Name]
 		assert.Equal(t, float64(1), authHTTPReqsSummaryMetric.Sink.(*metrics.CounterSink).Value)
+		authHTTPReqsSummaryMetric = o.dataModel.groupsData["something"].aggregatedMetrics[authHTTPReqsMetric.Name]
+		assert.Equal(t, float64(1), authHTTPReqsSummaryMetric.Sink.(*metrics.CounterSink).Value)
+
+		assert.Equal(t, []string{"something", "auth"}, o.dataModel.groupsOrder)
 	})
 }
