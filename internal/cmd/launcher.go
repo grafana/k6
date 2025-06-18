@@ -174,6 +174,7 @@ func (b *customBinary) run(gs *state.GlobalState) error {
 // it's required if there is one or more dependencies other than k6 itself
 // or if the required k6 version is not satisfied by the current binary's version
 // TODO: get the version of any built-in extension and check if they satisfy the dependencies
+// (see https://github.com/grafana/k6/issues/4697)
 func isCustomBuildRequired(baseK6Version string, deps k6deps.Dependencies) bool {
 	if len(deps) == 0 {
 		return false
