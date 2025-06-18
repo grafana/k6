@@ -165,10 +165,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"getByRole": func(role string, opts sobek.Value) (*sobek.Object, error) {
-			popts, err := parseGetByRoleOptions(vu.Context(), opts)
-			if err != nil {
-				return nil, fmt.Errorf("parsing getByRole options: %w", err)
-			}
+			popts := parseGetByRoleOptions(vu.Context(), opts)
 
 			ml := mapLocator(vu, p.GetByRole(role, popts))
 			return rt.ToValue(ml).ToObject(rt), nil
@@ -692,9 +689,9 @@ func parseWaitForFunctionArgs(
 }
 
 // parseGetByRoleOptions parses the GetByRole options from the Sobek.Value.
-func parseGetByRoleOptions(ctx context.Context, opts sobek.Value) (*common.GetByRoleOptions, error) {
+func parseGetByRoleOptions(ctx context.Context, opts sobek.Value) *common.GetByRoleOptions {
 	if !sobekValueExists(opts) {
-		return nil, nil
+		return nil
 	}
 
 	o := &common.GetByRoleOptions{}
@@ -742,5 +739,5 @@ func parseGetByRoleOptions(ctx context.Context, opts sobek.Value) (*common.GetBy
 		}
 	}
 
-	return o, nil
+	return o
 }
