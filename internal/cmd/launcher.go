@@ -121,7 +121,7 @@ func (b *customBinary) run(gs *state.GlobalState) error {
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
 
-	// is we are here, it is possible that the analyze function read the stdin to analyse it
+	// if we are here, it is possible that the analyze function read the stdin to analyse it
 	// and restored the content into gs.Stdin, so we pass it to the command
 	cmd.Stdin = gs.Stdin
 
