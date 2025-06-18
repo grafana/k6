@@ -16,7 +16,7 @@ import (
 	k6types "go.k6.io/k6/lib/types"
 )
 
-func TestURLSkipRequest(t *testing.T) {
+func TestURLSkipRequestForDataFile(t *testing.T) {
 	t.Parallel()
 
 	tb := newTestBrowser(t, withLogCache())
@@ -26,15 +26,72 @@ func TestURLSkipRequest(t *testing.T) {
 		Timeout: common.DefaultTimeout,
 	}
 	_, err := p.Goto(
-		"data:text/html,hello",
+		"data:text/html,static/empty.html",
 		opts,
 	)
 	require.NoError(t, err)
 	tb.logCache.assertContains(t, "skipping request handling of data URL")
+}
 
-	_, err = p.Goto(
-		"blob:something",
+func TestURLSkipRequestForBlobFile(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withLogCache(), withFileServer())
+	p := tb.NewPage(nil)
+
+	// First create the blob file in memory.
+	opts := &common.FrameGotoOptions{
+		Timeout: common.DefaultTimeout,
+	}
+	_, err := p.Goto(
+		tb.staticURL("blob.html"),
 		opts,
+	)
+	require.NoError(t, err)
+
+	// Now get the blob URL from the page.
+	url, ok, err := p.Locator("a", nil).GetAttribute("href", nil)
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	// Now try to navigate to the blob URL.
+	_, err = p.Goto(
+		url,
+		opts,
+	)
+	require.NoError(t, err)
+	tb.logCache.assertContains(t, "skipping request handling of blob URL")
+}
+
+func TestClickSkipRequestForBlobFile(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withLogCache(), withFileServer())
+	p := tb.NewPage(nil)
+
+	// First create the blob file in memory.
+	opts := &common.FrameGotoOptions{
+		Timeout: common.DefaultTimeout,
+	}
+	_, err := p.Goto(
+		tb.staticURL("blob.html"),
+		opts,
+	)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(tb.context(), 5*time.Second)
+	defer cancel()
+
+	// Try to click on the link to the blob.
+	err = tb.run(
+		ctx,
+		func() error { return p.Locator("a", nil).Click(common.NewFrameClickOptions(p.Timeout())) },
+		func() error {
+			_, err := p.WaitForNavigation(
+				common.NewFrameWaitForNavigationOptions(p.Timeout()),
+			)
+			return err
+		},
 	)
 	require.NoError(t, err)
 	tb.logCache.assertContains(t, "skipping request handling of blob URL")
