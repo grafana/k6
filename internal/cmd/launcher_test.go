@@ -255,7 +255,6 @@ func TestLauncherLaunch(t *testing.T) {
 				return nil
 			}
 
-			// TODO: check error
 			rootCommand.execute()
 
 			assert.Equal(t, tc.expectProvision, provider.invoked)
