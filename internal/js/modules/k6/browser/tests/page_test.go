@@ -2788,7 +2788,7 @@ func TestPageMustUseNativeJavaScriptObjects(t *testing.T) {
 	require.NoErrorf(t, err, "page should not override the native objects, but it did")
 }
 
-func TestNameNotResolved(t *testing.T) {
+func TestDNSNameNotResolved(t *testing.T) {
 	t.Parallel()
 
 	b := newTestBrowser(t)
