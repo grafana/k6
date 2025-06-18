@@ -115,7 +115,7 @@ func TestBlockHostnames(t *testing.T) {
 		"http://host.test/",
 		opts,
 	)
-	require.NoError(t, err)
+	require.ErrorContains(t, err, "navigation failed: net::ERR_BLOCKED_BY_CLIENT")
 	require.Nil(t, res)
 	tb.logCache.assertContains(t, "was interrupted: hostname host.test is in a blocked pattern")
 
@@ -144,7 +144,7 @@ func TestBlockIPs(t *testing.T) {
 		"http://10.0.0.1:8000/",
 		opts,
 	)
-	require.NoError(t, err)
+	require.ErrorContains(t, err, "navigation failed: net::ERR_BLOCKED_BY_CLIENT")
 	require.Nil(t, res)
 	tb.logCache.assertContains(t, `was interrupted: IP 10.0.0.1 is in a blacklisted range "10.0.0.0/8"`)
 
