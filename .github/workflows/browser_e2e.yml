@@ -23,7 +23,7 @@ jobs:
       fail-fast: false
       matrix:
         go: [stable, tip]
-        platform: [ubuntu-latest, windows-latest, macos-latest]
+        platform: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, macos-latest]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout code
@@ -35,6 +35,7 @@ jobs:
         with:
           go-version: 1.x
       - name: Install Go tip
+        if: matrix.go == 'tip'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -44,6 +45,12 @@ jobs:
           echo "GOPATH=$HOME/go" >> "$GITHUB_ENV"
           echo "$HOME/go/bin" >> "$GITHUB_PATH"
           echo "$HOME/sdk/gotip/bin" >> "$GITHUB_PATH"
+      - name: Install chromium
+        # This is only needed on arm images, chromium comes preinstalled on amd64 runner images.
+        if: contains(matrix.platform, 'arm')
+        run: |
+          sudo apt update && sudo apt install chromium-browser
+          chromium --version
       - name: Build k6
         run: |
           which go
@@ -54,7 +61,7 @@ jobs:
       - name: Run E2E tests
         run: |
           set -x
-          if [ "$RUNNER_OS" == "Linux" ]; then
+          if [ "$RUNNER_OS" == "Linux" ] && [ "$RUNNER_ARCH" == "X64" ]; then
             export K6_BROWSER_EXECUTABLE_PATH=/usr/bin/google-chrome
           fi
           export K6_BROWSER_HEADLESS=true
