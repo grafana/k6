@@ -615,7 +615,7 @@ func (fs *FrameSession) handleFrameTree(frameTree *cdppage.FrameTree, initialFra
 	}
 }
 
-func (fs *FrameSession) navigateFrame(frame *Frame, url, referrer string) (string, error) {
+func (fs *FrameSession) navigateFrame(frame *Frame, url, referrer string) (string, string, error) {
 	fs.logger.Debugf("FrameSession:navigateFrame",
 		"sid:%v fid:%s tid:%v url:%q referrer:%q",
 		fs.session.ID(), frame.ID(), fs.targetID, url, referrer)
@@ -629,7 +629,7 @@ func (fs *FrameSession) navigateFrame(frame *Frame, url, referrer string) (strin
 			err = fmt.Errorf("%q: %w", errorText, err)
 		}
 	}
-	return documentID.String(), err
+	return documentID.String(), errorText, err
 }
 
 func (fs *FrameSession) onConsoleAPICalled(event *cdpruntime.EventConsoleAPICalled) {
