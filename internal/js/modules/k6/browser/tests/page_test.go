@@ -2787,3 +2787,20 @@ func TestPageMustUseNativeJavaScriptObjects(t *testing.T) {
 	_, err = page.QueryAll("#textField")
 	require.NoErrorf(t, err, "page should not override the native objects, but it did")
 }
+
+func TestNameNotResolved(t *testing.T) {
+	t.Parallel()
+
+	b := newTestBrowser(t)
+	p := b.NewPage(nil)
+
+	opts := &common.FrameGotoOptions{
+		Timeout: common.DefaultTimeout,
+	}
+	r, err := p.Goto(
+		"https://blah.madeupurl.com",
+		opts,
+	)
+	require.ErrorContains(t, err, "navigation failed: net::ERR_NAME_NOT_RESOLVED")
+	assert.Nil(t, r, `expected response to be nil`)
+}
