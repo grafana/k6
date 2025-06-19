@@ -3,9 +3,8 @@ package k6deps
 import (
 	"bytes"
 	"io"
+	"io/fs"
 	"os"
-
-	"github.com/spf13/afero"
 
 	"github.com/grafana/k6deps/internal/pack"
 	"github.com/grafana/k6deps/internal/rootfs"
@@ -60,7 +59,7 @@ type Options struct {
 	// If not provided, os.LookupEnv will be used.
 	LookupEnv func(key string) (value string, ok bool)
 	// Fs is the file system to use for accessing files. If not provided, os file system is used
-	Fs afero.Fs
+	Fs fs.FS
 	// Root directory for searching for files. Must an absolute path. If omitted, CWD is used
 	RootDir string
 }
@@ -94,30 +93,30 @@ func (opts *Options) fs() (rootfs.FS, error) {
 
 // Analyze searches, loads and analyzes the specified sources,
 // extracting the k6 extensions and their version constraints.
-// Note: if archive is specified, the other three sources will not be taken into account,
-// since the archive may contain them.
+// The constrains from the script or archive are complemented with the
+// overrides from the manifest or environment
 func Analyze(opts *Options) (Dependencies, error) {
 	var err error
-
-	if !opts.Archive.Ignore && !opts.Archive.IsEmpty() {
-		archiveAnalyzer, err := opts.archiveAnalyzer()
-		if err != nil {
-			return nil, err
-		}
-		return archiveAnalyzer.analyze()
-	}
 
 	manifestAnalyzer, err := opts.manifestAnalyzer()
 	if err != nil {
 		return nil, err
 	}
 
-	scriptAnalyzeer, err := opts.scriptAnalyzer()
+	if !opts.Archive.Ignore && !opts.Archive.IsEmpty() {
+		archiveAnalyzer, err := opts.archiveAnalyzer()
+		if err != nil {
+			return nil, err
+		}
+		return resolveOverrides(archiveAnalyzer, manifestAnalyzer, opts.envAnalyzer())
+	}
+
+	scriptAnalyzer, err := opts.scriptAnalyzer()
 	if err != nil {
 		return nil, err
 	}
 
-	return newMergeAnalyzer(scriptAnalyzeer, manifestAnalyzer, opts.envAnalyzer()).analyze()
+	return resolveOverrides(scriptAnalyzer, manifestAnalyzer, opts.envAnalyzer())
 }
 
 // scriptAnalyzer loads a script Source and alls its dependencies into the Script's content
