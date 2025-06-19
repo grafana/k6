@@ -21,7 +21,7 @@ func NewIOFSBridge(fs Fs) fs.FS {
 func (b *IOFSBridge) Open(name string) (fs.File, error) {
 	f, err := b.FSExt.Open(name)
 	if err != nil {
-		return nil, fmt.Errorf("opening file %w", err)
+		return nil, fmt.Errorf("opening file: %w", err)
 	}
 	return f, nil
 }
