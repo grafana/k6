@@ -128,7 +128,7 @@ func (b *customBinary) run(gs *state.GlobalState) error {
 	// Copy environment variables to the k6 process and skip binary provisioning feature flag to disable it.
 	// If not disabled, then the executed k6 binary would enter an infinite loop, where it continuously
 	// process the input script, detect dependencies, and retrigger provisioning.
-	// This can be avoided by checking if the current binary has already extensins that
+	// This can be avoided by checking if the current binary has already extensions that
 	// satisfies the dependencies. See comment in isCustomBuildRequired function.
 	env := []string{}
 	for k, v := range gs.Env {
