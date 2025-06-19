@@ -29,7 +29,7 @@ type commandExecutor interface {
 	run(*state.GlobalState) error
 }
 
-// customBinary runs the requested commands on a different binary on a subprocess passing the 
+// customBinary runs the requested commands on a different binary on a subprocess passing the
 // original arguments
 type customBinary struct {
 	// path represents the local file path
