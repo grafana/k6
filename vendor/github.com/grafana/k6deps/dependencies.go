@@ -52,17 +52,38 @@ func (deps Dependencies) update(from *Dependency) error {
 	return dep.update(from)
 }
 
-// Merge updates deps dependencies based on from dependencies.
-// Adds a dependency that doesn't exist yet.
+// Merge combines two sets of dependencies.
 // If the dependency exists in both collections, but one of them does not have version constraints,
 // then the dependency with version constraints is placed in deps.
-// Otherwise, i.e. if the dependency is included in both collections and in both with version constraints,
+// If the dependency is included in both collections and in both with version constraints,
 // an error is generated.
 func (deps Dependencies) Merge(from Dependencies) error {
 	for _, dep := range from {
 		if err := deps.update(dep); err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+// Override updates dependencies without constrains.
+func (deps Dependencies) Override(from Dependencies) error {
+	if len(from) == 0 {
+		return nil
+	}
+
+	for _, dep := range deps {
+		over, found := from[dep.Name]
+		if !found {
+			continue
+		}
+
+		if dep.GetConstraints().String() != defaultConstraintsString {
+			continue
+		}
+
+		dep.Constraints = over.Constraints
 	}
 
 	return nil
