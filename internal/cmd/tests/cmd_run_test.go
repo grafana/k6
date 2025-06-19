@@ -1032,6 +1032,33 @@ func TestAbortedByScriptSetupErrorWithDependency(t *testing.T) {
 	assert.Contains(t, stdout, "bogus summary")
 }
 
+func TestAbortedByUnknownModules(t *testing.T) {
+	t.Parallel()
+	depScript := `
+		import { something } from "k6/x/somethinghere"
+		import { another } from "k6/x/anotherone"
+	`
+	mainScript := `
+		import { something } from "k6/x/somethinghere"
+		import "./a.js"
+		export default function () { }
+	`
+
+	ts := NewGlobalTestState(t)
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test.js"), []byte(mainScript), 0o644))
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "a.js"), []byte(depScript), 0o644))
+
+	ts.CmdArgs = []string{"k6", "run", "-v", "--log-output=stdout", "test.js"}
+	ts.ExpectedExitCode = int(exitcodes.ScriptException)
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stdout := ts.Stdout.String()
+	t.Log(stdout)
+
+	assert.Contains(t, stdout, `level=error msg="GoError: unknown modules [\"k6/x/anotherone\" \"k6/x/somethinghere\"] were tried to be loaded,`)
+}
+
 func runTestWithNoLinger(_ *testing.T, ts *GlobalTestState) {
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 }
