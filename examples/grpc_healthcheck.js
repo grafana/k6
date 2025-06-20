@@ -12,7 +12,7 @@ let client = new grpc.Client();
 export default () => {
 	client.connect(GRPC_ADDR, { plaintext: true });
 
-	const response = client.healthcheck("")
+	const response = client.healthCheck()
 
 	check(response, { "healthcheck status is OK": (r) => r && r.status === grpc.HealthcheckServing });
 
