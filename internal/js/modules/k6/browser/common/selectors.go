@@ -91,6 +91,9 @@ func (s *Selector) parse() error {
 			// If selector starts with '..', consider xpath as well.
 			name = "xpath"
 			body = part
+		case strings.HasPrefix(part, "internal:role="):
+			name = "internal:role"
+			body = part
 		default:
 			name = "css"
 			body = part

@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<head>
+  <title>Role Selector Engine Test Suite</title>
+</head>
+<body>
+  <!-- header -->
+  <header>Header</header>
+  <!-- 7. Implicit Role Coverage -->
+  <section>
+    <!-- a[href] -->
+    <a href="#">Link text</a>
+    <!-- area[href] -->
+    <map><area href="#" aria-label="Map area"></map>
+    <!-- button -->
+    <button>Click</button>
+    <!-- input type=submit -->
+    <input type="submit" value="Submit">
+    <!-- input type=image -->
+    <input type="image" src="#" alt="Image Button">
+    <!-- input type=checkbox -->
+    <input type="checkbox">
+    <!-- input type=radio -->
+    <input type="radio" name="r">
+    <!-- input type=text -->
+    <input type="text" value="Text" aria-label="Text type">
+    <!-- textarea -->
+    <textarea aria-label="Text area">Textarea</textarea>
+    <!-- input type=search -->
+    <input type="search" value="Search">
+    <!-- input type=range -->
+    <input type="range" min="0" max="100" value="50">
+    <!-- input type=number -->
+    <input type="number" value="3">
+    <!-- progress -->
+    <progress value="30" max="100">Progress</progress>
+    <!-- output -->
+    <output>Output</output>
+    <!-- details/summary -->
+    <details aria-label="details"><summary>Summary</summary><div>Details</div></details>
+    <!-- dialog -->
+    <dialog open>Dialog</dialog>
+    <!-- headings h1-h6 -->
+    <h1>Heading1</h1><h2>Heading2</h2><h3>Heading3</h3><h4>Heading4</h4><h5>Heading5</h5><h6>Heading6</h6>
+    <!-- hr -->
+    <hr>
+    <!-- img -->
+    <img src="" alt="Img" aria-label="Img">
+    <!-- ul/ol and li -->
+    <ul aria-label="ul"><li aria-label="ul-li">Item1</li></ul>
+    <ol aria-label="ol"><li aria-label="ol-li">Item2</li></ol>
+    <!-- dl dt dd -->
+    <dl><dt>Term</dt><dd>Description</dd></dl>
+    <!-- fieldset/legend -->
+    <fieldset><legend>Legend</legend><input></fieldset>
+    <!-- figure/figcaption -->
+    <figure><figcaption>Caption</figcaption><img src="" alt=""></figure>
+    <!-- table, thead, tbody, tfoot, tr, th, td -->
+    <table aria-label="table1">
+      <thead><tr><th aria-label="th gridcell" role="gridcell">Head Gridcell</th></tr></thead>
+      <thead><tr><th aria-label="th">Head Cell</th></tr></thead>
+      <thead><tr><th scope="col">Head Column</th></tr></thead>
+      <thead><tr><th scope="row">Head Row</th></tr></thead>
+      <tbody aria-label="tbody"><tr><td>Cell</td></tr></tbody>
+      <tbody><tr aria-label="tr"><td>Row</td></tr></tbody>
+      <tbody><tr><td aria-label="td">Column Cell</td></tr></tbody>
+      <tbody><tr><td aria-label="td gridcell" role="gridcell">Column Gridcell</td></tr></tbody>
+      <tfoot aria-label="tfoot"><tr><td>Foot</td></tr></tfoot>
+    </table>
+    <!-- main -->
+    <main>Main</main>
+    <!-- nav -->
+    <nav>Nav</nav>
+    <!-- article -->
+    <article>Article</article>
+    <!-- aside -->
+    <aside>Aside</aside>
+    <!-- form -->
+    <form aria-label="form"><input></form>
+    <!-- section (region) -->
+    <section aria-label="Region Section">Region content</section>
+    <blockquote>Blockquote text</blockquote>
+    <!-- caption -->
+    <table><caption>Table Caption</caption><tr><td>Cell</td></tr></table>
+    <!-- code -->
+    <code>Code sample</code>
+    <!-- del -->
+    <del>Deleted text</del>
+    <!-- dfn -->
+    <dfn>Definition term</dfn>
+    <!-- em -->
+    <em>Emphasized text</em>
+    <!-- ins -->
+    <ins>Inserted text</ins>
+    <!-- mark -->
+    <mark>Marked text</mark>
+    <!-- math -->
+    <math><mi>x</mi><mo>=</mo><mn>1</mn></math>
+    <!-- menu -->
+    <menu aria-label="menu"><li>Menu item</li></menu>
+    <!-- meter -->
+    <meter value="0.5">50%</meter>
+    <!-- p -->
+    <p>Paragraph text</p>
+    <!-- strong -->
+    <strong>Strong text</strong>
+    <!-- sub -->
+    <sub>Subscript</sub>
+    <!-- sup -->
+    <sup>Superscript</sup>
+    <!-- svg -->
+    <svg aria-label="svg"><circle cx="10" cy="10" r="5"></circle></svg>
+    <!-- time -->
+    <time datetime="2025-06-09">June 9, 2025</time>
+    <!-- select (combobox) -->
+    <select aria-label="select">
+        <option>A</option>
+    </select>
+    <!-- select (listbox) -->
+    <select aria-label="select multiple" multiple>
+      <option>A</option>
+      <option>B</option>
+    </select>
+    <!-- select (optgroup) -->
+    <select>
+      <optgroup label="optgroup">
+        <option>A</option>
+        <option>B</option>
+      </optgroup>
+    </select>
+    <!-- datalist -->
+    <datalist id="dl2"><option>One</option></datalist><input list="dl2">
+  </section>
+  <!-- footer -->
+  <footer>Footer</footer>
+</body>
+</html>

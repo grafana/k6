@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/grafana/sobek"
@@ -162,6 +163,12 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				}
 				return s, nil
 			}), nil
+		},
+		"getByRole": func(role string, opts sobek.Value) (*sobek.Object, error) {
+			popts := parseGetByRoleOptions(vu.Context(), opts)
+
+			ml := mapLocator(vu, p.GetByRole(role, popts))
+			return rt.ToValue(ml).ToObject(rt), nil
 		},
 		"goto": func(url string, opts sobek.Value) (*sobek.Promise, error) {
 			gopts := common.NewFrameGotoOptions(
@@ -679,4 +686,58 @@ func parseWaitForFunctionArgs(
 	}
 
 	return js, popts, exportArgs(gargs), nil
+}
+
+// parseGetByRoleOptions parses the GetByRole options from the Sobek.Value.
+func parseGetByRoleOptions(ctx context.Context, opts sobek.Value) *common.GetByRoleOptions {
+	if !sobekValueExists(opts) {
+		return nil
+	}
+
+	o := &common.GetByRoleOptions{}
+
+	rt := k6ext.Runtime(ctx)
+
+	obj := opts.ToObject(rt)
+	for _, k := range obj.Keys() {
+		switch k {
+		case "checked":
+			val := obj.Get(k).ToBoolean()
+			o.Checked = &val
+		case "disabled":
+			val := obj.Get(k).ToBoolean()
+			o.Disabled = &val
+		case "exact":
+			val := obj.Get(k).ToBoolean()
+			o.Exact = &val
+		case "expanded":
+			val := obj.Get(k).ToBoolean()
+			o.Expanded = &val
+		case "includeHidden":
+			val := obj.Get(k).ToBoolean()
+			o.IncludeHidden = &val
+		case "level":
+			val := obj.Get(k).ToInteger()
+			o.Level = &val
+		case "name":
+			var val string
+			switch obj.Get(k).ExportType() {
+			case reflect.TypeOf(string("")):
+				val = fmt.Sprintf("'%s'", obj.Get(k).String()) // Strings require quotes
+			case reflect.TypeOf(map[string]interface{}(nil)): // JS RegExp
+				val = obj.Get(k).String() // No quotes
+			default: // CSS, numbers or booleans
+				val = obj.Get(k).String() // No quotes
+			}
+			o.Name = &val
+		case "pressed":
+			val := obj.Get(k).ToBoolean()
+			o.Pressed = &val
+		case "selected":
+			val := obj.Get(k).ToBoolean()
+			o.Selected = &val
+		}
+	}
+
+	return o
 }

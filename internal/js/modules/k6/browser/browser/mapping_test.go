@@ -318,6 +318,7 @@ type pageAPI interface { //nolint:interfacebloat
 	Focus(selector string, opts sobek.Value) error
 	Frames() []*common.Frame
 	GetAttribute(selector string, name string, opts sobek.Value) (string, bool, error)
+	GetByRole(role string, opts *common.GetByRoleOptions) (*common.ElementHandle, error)
 	GetKeyboard() *common.Keyboard
 	GetMouse() *common.Mouse
 	GetTouchscreen() *common.Touchscreen

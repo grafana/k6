@@ -378,3 +378,8 @@ func asString(tb testing.TB, v any) string {
 	require.True(tb, ok)
 	return s
 }
+
+// toPtr is a helper function to convert a value to a pointer.
+func toPtr[T any](v T) *T {
+	return &v
+}
