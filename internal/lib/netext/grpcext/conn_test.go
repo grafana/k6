@@ -17,7 +17,74 @@ import (
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/dynamicpb"
+
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 )
+
+type healthcheckmock func(in *healthpb.HealthCheckRequest, out *healthpb.HealthCheckResponse, opts ...grpc.CallOption) error
+
+func (im healthcheckmock) Invoke(_ context.Context, _ string, payload, reply any, opts ...grpc.CallOption) error {
+	in, ok := payload.(*healthpb.HealthCheckRequest)
+	if !ok {
+		return fmt.Errorf("unexpected type for payload")
+	}
+	out, ok := reply.(*healthpb.HealthCheckResponse)
+	if !ok {
+		return fmt.Errorf("unexpected type for reply")
+	}
+	return im(in, out, opts...)
+}
+
+func (healthcheckmock) Close() error {
+	return nil
+}
+
+func (healthcheckmock) NewStream(_ context.Context, _ *grpc.StreamDesc, _ string, _ ...grpc.CallOption) (grpc.ClientStream, error) {
+	panic("not implemented")
+}
+
+func TestHealthcheck(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name     string
+		status   int
+		expected healthpb.HealthCheckResponse_ServingStatus
+	}{
+		{
+			name:     "unknown",
+			status:   0,
+			expected: healthpb.HealthCheckResponse_UNKNOWN,
+		},
+		{
+			name:     "serving",
+			status:   1,
+			expected: healthpb.HealthCheckResponse_SERVING,
+		},
+		{
+			name:     "not serving",
+			status:   2,
+			expected: healthpb.HealthCheckResponse_NOT_SERVING,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			healthReply := func(_ *healthpb.HealthCheckRequest, out *healthpb.HealthCheckResponse, _ ...grpc.CallOption) error {
+				err := protojson.Unmarshal(fmt.Appendf(nil, `{"status":%d}`, tc.status), out)
+				require.NoError(t, err)
+
+				return nil
+			}
+			c := Conn{raw: healthcheckmock(healthReply)}
+			res, err := c.HealthCheck(context.Background(), "")
+			require.NoError(t, err)
+			assert.Equal(t, tc.expected, res.Status, "unexpected response status")
+		})
+	}
+}
 
 func TestInvoke(t *testing.T) {
 	t.Parallel()
