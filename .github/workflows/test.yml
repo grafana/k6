@@ -53,6 +53,7 @@ jobs:
             args[1]="1"
             export GOMAXPROCS=1
           fi
+          curl --cert-status https://www.wikipedia.org -v
           go test "${args[@]}" -timeout 800s ./...
 
   test-tip:
@@ -145,6 +146,7 @@ jobs:
                   list=$(echo "$list" | cut -f1 -d ' ' | sort -u | paste -sd, -)
               fi
 
+              curl --cert-status https://www.wikipedia.org -v
               go test "${args[@]}" -timeout 800s --coverpkg="$list" -coverprofile=$(echo $pkg | tr / -).coverage $pkg
           done
           grep -h -v "^mode:" *.coverage >> coverage.txt
