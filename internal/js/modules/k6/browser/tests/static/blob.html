@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Blob URL in DOM</title>
+</head>
+<body>
+  <h1>Generated Blob URL</h1>
+  <div id="blob-link-container"></div>
+
+  <script>
+    // Create the blob content
+    const content = "Hello from the Blob!";
+    const blob = new Blob([content], { type: 'text/plain' });
+
+    // Create the blob URL
+    const blobUrl = URL.createObjectURL(blob);
+
+    // Create a link element
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.textContent = "Click to view Blob content";
+
+    // Append it to the page
+    document.getElementById('blob-link-container').appendChild(link);
+  </script>
+</body>
+</html>
