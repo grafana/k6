@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"reflect"
 	"strings"
 	"time"
 
@@ -387,36 +386,60 @@ func (c *Client) buildInvokeRequest(
 	}, nil
 }
 
-// normalizeNumberStrings recursively converts special floating-point values (NaN, Infinity) in a Sobek
-// object to their string representations for proper JSON serialization.
-func normalizeNumberStrings(obj *sobek.Object, runtime *sobek.Runtime) (sobek.Value, error) {
-	// We check first for the object as a whole, since it can be a wrapper for a number.
-	exported := obj.ExportType()
-	if exported.Kind() == reflect.Float64 {
-		v := obj.ToFloat()
+// normalizeNumberStrings recursively traverses a sobek.Value. It creates a deep copy of any
+// objects or arrays, and converts special float values (NaN, Infinity) to their
+// string representations for proper JSON serialization.
+func normalizeNumberStrings(v sobek.Value, runtime *sobek.Runtime) (sobek.Value, error) {
+	// If v is a primitive (not an object or array), handle it directly.
+	if v == nil || sobek.IsNull(v) || sobek.IsUndefined(v) {
+		return v, nil
+	}
+
+	// Handle special float values.
+	if f, ok := v.Export().(float64); ok {
 		switch {
-		case math.IsNaN(v):
+		case math.IsNaN(f):
 			return runtime.ToValue("NaN"), nil
-		case math.IsInf(v, 1):
+		case math.IsInf(f, 1):
 			return runtime.ToValue("Infinity"), nil
-		case math.IsInf(v, -1):
+		case math.IsInf(f, -1):
 			return runtime.ToValue("-Infinity"), nil
 		}
-		return obj, nil
+
+		return v, nil
+	}
+
+	obj := v.ToObject(runtime)
+
+	// If it's not a real object (e.g., a string, bool, or regular number primitive),
+	// after checking for special floats, we can just return it.
+	// We use obj.ClassName() to distinguish real objects from primitive wrappers.
+	className := obj.ClassName()
+	if className != "Object" && className != "Array" {
+		return v, nil
+	}
+
+	// It's a real object or array, so we need to deep-copy and normalize it.
+	var newObj *sobek.Object
+	if className == "Array" {
+		newObj = runtime.NewArray()
+	} else {
+		newObj = runtime.NewObject()
 	}
 
 	for _, key := range obj.Keys() {
 		val := obj.Get(key)
-		nestedObj := runtime.ToValue(val.Export()).ToObject(runtime)
-		normalized, err := normalizeNumberStrings(nestedObj, runtime)
+		normalizedVal, err := normalizeNumberStrings(val, runtime)
 		if err != nil {
 			return nil, err
 		}
-		if err := obj.Set(key, normalized); err != nil {
+
+		if err := newObj.Set(key, normalizedVal); err != nil {
 			return nil, err
 		}
 	}
-	return obj, nil
+
+	return newObj, nil
 }
 
 // Close will close the client gRPC connection
