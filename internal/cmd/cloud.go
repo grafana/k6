@@ -118,7 +118,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if !cloudConfig.Token.Valid {
-		return errors.New( //nolint:golint
+		return errors.New(
 			"not logged in, please login first to the Grafana Cloud k6 " +
 				"using the \"k6 cloud login\" command",
 		)
@@ -252,9 +252,10 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 
 			statusText := testProgress.RunStatusText
 
-			if testProgress.RunStatus == cloudapi.RunStatusFinished {
+			switch testProgress.RunStatus { //nolint:exhaustive
+			case cloudapi.RunStatusFinished:
 				testProgress.Progress = 1
-			} else if testProgress.RunStatus == cloudapi.RunStatusRunning {
+			case cloudapi.RunStatusRunning:
 				if startTime.IsZero() {
 					startTime = time.Now()
 				}
@@ -299,7 +300,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	}
 
 	if testProgress == nil {
-		//nolint:stylecheck,golint
+		//nolint:staticcheck
 		return errext.WithExitCodeIfNone(errors.New("Test progress error"), exitcodes.CloudFailedToGetProgress)
 	}
 
@@ -312,18 +313,18 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 		logger.WithField("run_status", testProgress.RunStatusText).Debug("Test finished")
 	}
 
-	//nolint:stylecheck,golint
 	if testProgress.ResultStatus == cloudapi.ResultStatusFailed {
 		// Although by looking at [ResultStatus] and [RunStatus] isn't self-explanatory,
 		// the scenario when the test run has finished, but it failed is an exceptional case for those situations
 		// when thresholds have been crossed (failed). So, we report this situation as such.
 		if testProgress.RunStatus == cloudapi.RunStatusFinished ||
 			testProgress.RunStatus == cloudapi.RunStatusAbortedThreshold {
+			//nolint:staticcheck
 			return errext.WithExitCodeIfNone(errors.New("Thresholds have been crossed"), exitcodes.ThresholdsHaveFailed)
 		}
 
 		// TODO: use different exit codes for failed thresholds vs failed test (e.g. aborted by system/limit)
-		return errext.WithExitCodeIfNone(errors.New("The test has failed"), exitcodes.CloudTestRunFailed)
+		return errext.WithExitCodeIfNone(errors.New("The test has failed"), exitcodes.CloudTestRunFailed) //nolint:staticcheck
 	}
 
 	return nil

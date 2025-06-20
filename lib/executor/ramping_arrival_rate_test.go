@@ -124,9 +124,10 @@ func TestRampingArrivalRateRunUnplannedVUs(t *testing.T) {
 	ch2 := make(chan struct{}) // closed when a second iteration was started on an old VU in order to test it won't start a second unplanned VU in parallel or at all
 	runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
 		cur := atomic.AddInt64(&count, 1)
-		if cur == 1 {
+		switch cur {
+		case 1:
 			<-ch // wait to start again
-		} else if cur == 2 {
+		case 2:
 			<-ch2 // wait to start again
 		}
 
@@ -433,7 +434,6 @@ func BenchmarkCal(b *testing.B) {
 	for _, t := range []time.Duration{
 		time.Second, time.Minute,
 	} {
-		t := t
 		b.Run(t.String(), func(b *testing.B) {
 			config := RampingArrivalRateConfig{
 				TimeUnit:  types.NullDurationFrom(time.Second),
@@ -469,7 +469,6 @@ func BenchmarkCalRat(b *testing.B) {
 	for _, t := range []time.Duration{
 		time.Second, time.Minute,
 	} {
-		t := t
 		b.Run(t.String(), func(b *testing.B) {
 			config := RampingArrivalRateConfig{
 				TimeUnit:  types.NullDurationFrom(time.Second),
@@ -691,7 +690,6 @@ func TestRampingArrivalRateGlobalIters(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(fmt.Sprintf("%s_%s", tc.seq, tc.seg), func(t *testing.T) {
 			t.Parallel()
 
@@ -796,7 +794,6 @@ func TestRampingArrivalRateActiveVUs_GetExecutionRequirements(t *testing.T) {
 	}
 
 	for name, tc := range tcs {
-		tc := tc
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 

@@ -94,7 +94,7 @@ func (cmi *cjsModuleInstance) ExecuteModule(
 			callback(cmi.w.exportedNames)
 		}
 	}
-	__esModule := cmi.exports.Get("__esModule") //nolint:revive,stylecheck
+	__esModule := cmi.exports.Get("__esModule") //nolint:revive
 	cmi.isEsModuleMarked = __esModule != nil && __esModule.ToBoolean()
 	return cmi, nil
 }

@@ -74,7 +74,7 @@ func TestRunnerNew(t *testing.T) {
 			assert.Equal(t, int64(0), vuc.getExported("counter").Export())
 
 			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
-			t.Run("RunOnce", func(t *testing.T) {
+			t.Run("RunOnce", func(t *testing.T) { //nolint:paralleltest
 				err = vu.RunOnce()
 				require.NoError(t, err)
 				assert.Equal(t, int64(1), vuc.getExported("counter").Export())
@@ -99,7 +99,6 @@ func TestRunnerOptions(t *testing.T) {
 
 	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range testdata {
-		name, r := name, r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			assert.Equal(t, r.Bundle.Options, r.GetOptions())
@@ -147,8 +146,6 @@ func TestRunnerRPSLimit(t *testing.T) {
 	}
 
 	for _, variant := range variants {
-		variant := variant
-
 		t.Run(variant.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -170,7 +167,6 @@ func TestOptionsSettingToScript(t *testing.T) {
 	}
 
 	for i, variant := range optionVariants {
-		variant := variant
 		t.Run(fmt.Sprintf("Variant#%d", i), func(t *testing.T) {
 			t.Parallel()
 			data := variant + `
@@ -237,7 +233,6 @@ func TestOptionsPropagationToScript(t *testing.T) {
 
 	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range testdata {
-		r := r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			samples := make(chan metrics.SampleContainer, 100)
@@ -404,7 +399,6 @@ func testSetupDataHelper(t *testing.T, data string) {
 
 	testdata := map[string]*Runner{"Source": r1}
 	for name, r := range testdata {
-		r := r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			ctx, cancel := context.WithCancel(context.Background())
@@ -469,7 +463,6 @@ func TestConsoleInInitContext(t *testing.T) {
 
 	testdata := map[string]*Runner{"Source": r1}
 	for name, r := range testdata {
-		r := r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			samples := make(chan metrics.SampleContainer, 100)
@@ -533,9 +526,10 @@ func TestRunnerIntegrationImports(t *testing.T) {
 		}
 		rtOpts := lib.RuntimeOptions{CompatibilityMode: null.StringFrom("extended")}
 		for _, mod := range modules {
-			mod := mod
 			t.Run(mod, func(t *testing.T) {
+				t.Parallel()
 				t.Run("Source", func(t *testing.T) {
+					t.Parallel()
 					_, err := getSimpleRunner(t, "/script.js",
 						fmt.Sprintf(`import "%s"; export default function() {}`, mod), rtOpts)
 					require.NoError(t, err)
@@ -555,7 +549,6 @@ func TestRunnerIntegrationImports(t *testing.T) {
 			"STDIN-Relative": {"/-", "./path/to/lib.js"},
 		}
 		for name, data := range testdata {
-			name, data := name, data
 			t.Run(name, func(t *testing.T) {
 				t.Parallel()
 				fs := fsext.NewMemMapFs()
@@ -573,8 +566,8 @@ func TestRunnerIntegrationImports(t *testing.T) {
 
 				testdata := map[string]*Runner{"Source": r1, "Archive": r2}
 				for name, r := range testdata {
-					r := r
 					t.Run(name, func(t *testing.T) {
+						t.Parallel()
 						ctx, cancel := context.WithCancel(context.Background())
 						defer cancel()
 						initVU, err := r.NewVU(ctx, 1, 1, make(chan metrics.SampleContainer, 100))
@@ -603,7 +596,6 @@ func TestVURunContext(t *testing.T) {
 
 	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range testdata {
-		r := r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			ctx, cancel := context.WithCancel(context.Background())
@@ -647,7 +639,6 @@ func TestVURunInterrupt(t *testing.T) {
 	require.NoError(t, err)
 	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range testdata {
-		name, r := name, r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			samples := newDevNullSampleChannel()
@@ -677,7 +668,6 @@ func TestVURunInterruptDoesntPanic(t *testing.T) {
 	require.NoError(t, err)
 	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range testdata {
-		r := r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -730,7 +720,6 @@ func TestVUIntegrationMetrics(t *testing.T) {
 	}
 
 	for name, r := range testdata {
-		r := r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			samples := make(chan metrics.SampleContainer, 100)
@@ -919,7 +908,6 @@ func TestVUIntegrationInsecureRequests(t *testing.T) {
 		},
 	}
 	for name, data := range testdata {
-		data := data
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			r1, err := getSimpleRunner(t, "/script.js", `
@@ -937,7 +925,6 @@ func TestVUIntegrationInsecureRequests(t *testing.T) {
 			require.NoError(t, err)
 			runners := map[string]*Runner{"Source": r1, "Archive": r2}
 			for name, r := range runners {
-				r := r
 				t.Run(name, func(t *testing.T) {
 					t.Parallel()
 					r.preInitState.Logger, _ = logtest.NewNullLogger()
@@ -981,7 +968,6 @@ func TestVUIntegrationBlacklistOption(t *testing.T) {
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range runners {
-		r := r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			ctx, cancel := context.WithCancel(context.Background())
@@ -1016,7 +1002,6 @@ func TestVUIntegrationBlacklistScript(t *testing.T) {
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
 
 	for name, r := range runners {
-		r := r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			ctx, cancel := context.WithCancel(context.Background())
@@ -1051,7 +1036,6 @@ func TestVUIntegrationBlockHostnamesOption(t *testing.T) {
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
 
 	for name, r := range runners {
-		r := r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			ctx, cancel := context.WithCancel(context.Background())
@@ -1088,7 +1072,6 @@ func TestVUIntegrationBlockHostnamesScript(t *testing.T) {
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
 
 	for name, r := range runners {
-		r := r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			ctx, cancel := context.WithCancel(context.Background())
@@ -1139,7 +1122,6 @@ func TestVUIntegrationHosts(t *testing.T) {
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range runners {
-		r := r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			ctx, cancel := context.WithCancel(context.Background())
@@ -1211,7 +1193,6 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 	cert, err := x509.ParseCertificate(s.TLS.Certificates[0].Certificate[0])
 	require.NoError(t, err)
 	for name, data := range testdata {
-		data := data
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			r1, err := getSimpleRunner(t, "/script.js", `
@@ -1232,7 +1213,6 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 
 			runners := map[string]*Runner{"Source": r1, "Archive": r2}
 			for name, r := range runners {
-				r := r
 				t.Run(name, func(t *testing.T) {
 					t.Parallel()
 					r.preInitState.Logger, _ = logtest.NewNullLogger()
@@ -1508,7 +1488,6 @@ func TestVUIntegrationCookiesReset(t *testing.T) {
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range runners {
-		r := r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			ctx, cancel := context.WithCancel(context.Background())
@@ -1561,7 +1540,6 @@ func TestVUIntegrationCookiesNoReset(t *testing.T) {
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range runners {
-		r := r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			ctx, cancel := context.WithCancel(context.Background())
@@ -1595,7 +1573,6 @@ func TestVUIntegrationVUID(t *testing.T) {
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range runners {
-		r := r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			ctx, cancel := context.WithCancel(context.Background())
@@ -1666,8 +1643,6 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 	go func() { _ = srv.Serve(listener) }()
 	t.Cleanup(func() { _ = listener.Close() })
 	for name, data := range testdata {
-		data := data
-
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1698,7 +1673,7 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 					},
 				}
 				if data.withDomains {
-					opt.TLSAuth[0].TLSAuthFields.Domains = []string{"127.0.0.1"}
+					opt.TLSAuth[0].Domains = []string{"127.0.0.1"}
 				}
 				_, _ = opt.TLSAuth[0].Certificate()
 			}
@@ -1708,7 +1683,6 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 
 			runners := map[string]*Runner{"Source": r1, "Archive": r2}
 			for name, r := range runners {
-				r := r
 				t.Run(name, func(t *testing.T) {
 					t.Parallel()
 					r.preInitState.Logger, _ = logtest.NewNullLogger()
@@ -1822,7 +1796,6 @@ func TestInitContextForbidden(t *testing.T) {
 	tb := httpmultibin.NewHTTPMultiBin(t)
 
 	for _, test := range table {
-		test := test
 		t.Run(test[0], func(t *testing.T) {
 			t.Parallel()
 			_, err := getSimpleRunner(t, "/script.js", tb.Replacer.Replace(test[1]))
@@ -1866,7 +1839,6 @@ func TestArchiveRunningIntegrity(t *testing.T) {
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range runners {
-		r := r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			var err error
@@ -2041,7 +2013,6 @@ func TestSystemTags(t *testing.T) {
 	}
 
 	for num, tc := range testedSystemTags {
-		num, tc := num, tc
 		t.Run(fmt.Sprintf("TC %d with only %s", num, tc.tag), func(t *testing.T) {
 			t.Parallel()
 			samples := make(chan metrics.SampleContainer, 100)
@@ -2250,7 +2221,6 @@ func TestComplicatedFileImportsForGRPC(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		i, tc := i, tc
 		t.Run(fmt.Sprintf("TestCase_%d", i), func(t *testing.T) {
 			t.Parallel()
 			t.Logf(
@@ -2313,7 +2283,6 @@ func TestForceHTTP1Feature(t *testing.T) {
 	}
 
 	for name, tc := range cases {
-		name, tc := name, tc
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -2363,7 +2332,6 @@ func TestForceHTTP1Feature(t *testing.T) {
 
 			runners := map[string]*Runner{"Source": r1, "Archive": r2}
 			for name, r := range runners {
-				r := r
 				t.Run(name, func(t *testing.T) {
 					ctx, cancel := context.WithCancel(context.Background())
 					defer cancel()
@@ -2435,7 +2403,6 @@ func TestExecutionInfo(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			r, err := getSimpleRunner(t, "/script.js", tc.script)
@@ -2508,7 +2475,6 @@ exports.default = () => {
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range runners {
-		r := r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			ctx, cancel := context.WithCancel(context.Background())

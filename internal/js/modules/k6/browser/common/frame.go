@@ -120,6 +120,17 @@ type Frame struct {
 	log *log.Logger
 }
 
+// String returns a string repesentation of Frame.
+// It exists mostly for debugging where we don't want fmt.Sprintf to just
+// go through a complex object and try to stringify it.
+func (f *Frame) String() string {
+	return "Frame: {" +
+		" id: " + f.id.String() +
+		" name: " + f.name +
+		" url: " + f.url +
+		"}"
+}
+
 // NewFrame creates a new HTML document frame.
 func NewFrame(
 	ctx context.Context, m *FrameManager, parentFrame *Frame, frameID cdp.FrameID, log *log.Logger,
@@ -589,6 +600,22 @@ func (f *Frame) click(selector string, opts *FrameClickOptions) error {
 	}
 
 	return nil
+}
+
+func (f *Frame) count(selector string) (int, error) {
+	f.log.Debugf("Frame:count", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
+
+	document, err := f.document()
+	if err != nil {
+		return 0, fmt.Errorf("getting document: %w", err)
+	}
+
+	c, err := document.count(f.ctx, selector)
+	if err != nil {
+		return 0, fmt.Errorf("counting elements: %w", err)
+	}
+
+	return c, nil
 }
 
 // Check clicks the first element found that matches selector.

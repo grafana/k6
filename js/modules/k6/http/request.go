@@ -512,7 +512,7 @@ func (c *Client) Batch(reqsV ...sobek.Value) (interface{}, error) {
 	}
 	for _, req := range batchReqs {
 		if req.Response != nil {
-			c.processResponse(req.Response, req.ParsedHTTPRequest.ResponseType)
+			c.processResponse(req.Response, req.ResponseType)
 		}
 	}
 	return results, err

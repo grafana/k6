@@ -33,11 +33,11 @@ func (reg *registry) getOrNew(
 	valTyp metrics.ValueType,
 	thresholds []string,
 ) (*metrics.Metric, error) {
-	if metric := reg.Registry.Get(name); metric != nil {
+	if metric := reg.Get(name); metric != nil {
 		return metric, nil
 	}
 
-	metric, err := reg.Registry.NewMetric(name, typ, valTyp)
+	metric, err := reg.NewMetric(name, typ, valTyp)
 	if err != nil {
 		return nil, err
 	}

@@ -121,6 +121,7 @@ func TestSetIntervalOrder(t *testing.T) {
 			print("outside");
 		`)
 		require.NoError(t, err)
+		runtime.EventLoop.WaitOnRegistered()
 		require.GreaterOrEqual(t, len(log), 5)
 		require.Equal(t, log[0], "outside")
 		for i := 1; i < len(log)-1; i += 3 {

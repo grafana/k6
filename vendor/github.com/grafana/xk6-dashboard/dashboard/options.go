@@ -38,7 +38,7 @@ type options struct {
 	TagsS  string
 }
 
-func envopts(env map[string]string) (*options, error) {
+func envopts(env map[string]string) (*options, error) { //nolint:cyclop
 	opts := &options{
 		Port:   defaultPort,
 		Host:   defaultHost,
@@ -97,7 +97,7 @@ func envopts(env map[string]string) (*options, error) {
 	return opts, nil
 }
 
-func getopts(query string, env map[string]string) (*options, error) {
+func getopts(query string, env map[string]string) (*options, error) { //nolint:cyclop
 	opts, err := envopts(env)
 	if err != nil {
 		return nil, err

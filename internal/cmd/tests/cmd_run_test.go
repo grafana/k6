@@ -854,7 +854,7 @@ func asyncWaitForStdoutAndRun(
 
 func injectMockSignalNotifier(ts *GlobalTestState) (sendSignal chan os.Signal) {
 	sendSignal = make(chan os.Signal)
-	ts.GlobalState.SignalNotify = func(c chan<- os.Signal, signals ...os.Signal) {
+	ts.SignalNotify = func(c chan<- os.Signal, signals ...os.Signal) {
 		isAbortNotify := false
 		for _, s := range signals {
 			if s == os.Interrupt {
@@ -871,7 +871,7 @@ func injectMockSignalNotifier(ts *GlobalTestState) (sendSignal chan os.Signal) {
 			close(sendSignal)
 		}()
 	}
-	ts.GlobalState.SignalStop = func(_ chan<- os.Signal) { /* noop */ }
+	ts.SignalStop = func(_ chan<- os.Signal) { /* noop */ }
 	return sendSignal
 }
 
@@ -1925,8 +1925,6 @@ func TestUIRenderOutput(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
-
 		t.Run(tc.expRender, func(t *testing.T) {
 			t.Parallel()
 
@@ -1960,8 +1958,6 @@ func TestUIRenderWebDashboard(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
-
 		t.Run(tc.expRender, func(t *testing.T) {
 			t.Parallel()
 
@@ -2004,8 +2000,6 @@ func TestRunStaticArchives(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
-
 		t.Run("Using "+tc.archive, func(t *testing.T) {
 			t.Parallel()
 
@@ -2038,8 +2032,6 @@ func TestBadLogOutput(t *testing.T) {
 	}
 
 	for name, tc := range cases {
-		name := name
-		tc := tc
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			ts := NewGlobalTestState(t)
@@ -2182,7 +2174,6 @@ func TestEventSystemError(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			ts := NewGlobalTestState(t)
@@ -2328,7 +2319,6 @@ func TestBrowserPermissions(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			script := fmt.Sprintf(`
@@ -2703,4 +2693,48 @@ func TestHandleSummary(t *testing.T) {
 			assert.NotContains(t, "checks_failed", metrics)
 		})
 	}
+}
+
+func TestGroupsOrderInFullSummary(t *testing.T) {
+	t.Parallel()
+
+	mainScript := `
+		import { group } from 'k6';
+
+		export default function () {
+			group('E', function () {});
+			group('D', function () {});
+			group('C', function () {
+				group('B', function () {
+					group('A', function () {
+						group('too much nesting', function () {
+						});
+					});
+				});
+			});
+		}
+	`
+
+	ts := NewGlobalTestState(t)
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(mainScript), 0o644))
+
+	ts.CmdArgs = []string{
+		"k6", "run",
+		"--summary-mode=full",
+		"script.js",
+	}
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stdout := ts.Stdout.String()
+	t.Log(stdout)
+
+	expectedGroupsRegex := `(?m)^  █ GROUP: E\s*^
+  █ GROUP: D\s*^
+  █ GROUP: C\s*^
+    ↳ GROUP: B\s*^
+      ↳ GROUP: A\s*^
+        ↳ GROUP: too much nesting\s*`
+
+	assert.Regexp(t, regexp.MustCompile(expectedGroupsRegex), stdout)
 }

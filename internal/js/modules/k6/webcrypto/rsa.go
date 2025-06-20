@@ -77,7 +77,7 @@ func (rsakgp *RSAHashedKeyGenParams) GenerateKey(
 		return nil, NewError(SyntaxError, "key usages cannot be empty")
 	}
 
-	if rsakgp.Algorithm.Name == RSASsaPkcs1v15 || rsakgp.Algorithm.Name == RSAPss {
+	if rsakgp.Name == RSASsaPkcs1v15 || rsakgp.Name == RSAPss {
 		privateKeyUsages = []CryptoKeyUsage{SignCryptoKeyUsage}
 		publicKeyUsages = []CryptoKeyUsage{VerifyCryptoKeyUsage}
 		for _, usage := range keyUsages {
@@ -90,7 +90,7 @@ func (rsakgp *RSAHashedKeyGenParams) GenerateKey(
 			}
 		}
 	}
-	if rsakgp.Algorithm.Name == RSAOaep {
+	if rsakgp.Name == RSAOaep {
 		privateKeyUsages = []CryptoKeyUsage{DecryptCryptoKeyUsage}
 		publicKeyUsages = []CryptoKeyUsage{EncryptCryptoKeyUsage}
 		for _, usage := range keyUsages {
@@ -166,7 +166,7 @@ func generateRSAKeyPair(
 		return nil, nil, NewError(OperationError, "could not generate RSA key pair")
 	}
 
-	privateKey.PublicKey.E = publicExponent
+	privateKey.E = publicExponent
 
 	// validate the key pair, since we are setting the public exponent manually
 	if err := privateKey.Validate(); err != nil {
@@ -238,17 +238,17 @@ func (rhkip *RSAHashedImportParams) ImportKey(
 ) (*CryptoKey, error) {
 	var importFn func(keyData []byte) (any, CryptoKeyType, int, error)
 
-	switch {
-	case format == Pkcs8KeyFormat:
+	switch format {
+	case Pkcs8KeyFormat:
 		importFn = importRSAPrivateKey
-	case format == SpkiKeyFormat:
+	case SpkiKeyFormat:
 		importFn = importRSAPublicKey
-	case format == JwkKeyFormat:
+	case JwkKeyFormat:
 		importFn = importRSAJWK
 	default:
 		return nil, NewError(
 			NotSupportedError,
-			unsupportedKeyFormatErrorMsg+" "+format+" for algorithm "+rhkip.Algorithm.Name,
+			unsupportedKeyFormatErrorMsg+" "+format+" for algorithm "+rhkip.Name,
 		)
 	}
 
@@ -282,7 +282,7 @@ func importRSAPrivateKey(keyData []byte) (any, CryptoKeyType, int, error) {
 		return nil, UnknownCryptoKeyType, 0, NewError(DataError, fmt.Sprintf(errMsgNotExpectedPrivateKey, "RSA", privateKey))
 	}
 
-	return privateKey, PrivateCryptoKeyType, privateKey.PublicKey.N.BitLen(), nil
+	return privateKey, PrivateCryptoKeyType, privateKey.N.BitLen(), nil
 }
 
 func importRSAPublicKey(keyData []byte) (any, CryptoKeyType, int, error) {

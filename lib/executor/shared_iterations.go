@@ -153,7 +153,7 @@ func (sic SharedIterationsConfig) HasWork(et *lib.ExecutionTuple) bool {
 func (si *SharedIterations) Init(_ context.Context) error {
 	// err should always be nil, because Init() won't be called for executors
 	// with no work, as determined by their config's HasWork() method.
-	et, err := si.BaseExecutor.executionState.ExecutionTuple.GetNewExecutionTupleFromValue(si.config.VUs.Int64)
+	et, err := si.executionState.ExecutionTuple.GetNewExecutionTupleFromValue(si.config.VUs.Int64)
 	si.et = et
 	si.iterSegIndex = lib.NewSegmentedIndex(et)
 

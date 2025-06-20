@@ -42,7 +42,6 @@ func TestIpBlock(t *testing.T) {
 		"fd00::2/112":     {get128BigInt(0, 65536), net.ParseIP("fd00::0"), net.ParseIP("fd00::ffff")},
 	}
 	for name, data := range testdata {
-		name, data := name, data
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			b, err := getIPBlock(name)
@@ -102,7 +101,6 @@ func TestIPPool(t *testing.T) {
 		},
 	}
 	for name, data := range testdata {
-		name, data := name, data
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			p, err := NewIPPool(name)
@@ -129,7 +127,6 @@ func TestIpBlockError(t *testing.T) {
 		"fd00:1:1:0::0-fd00:1:0:ff::3ff": "negative IP range",
 	}
 	for name, data := range testdata {
-		name, data := name, data
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			_, err := getIPBlock(name)

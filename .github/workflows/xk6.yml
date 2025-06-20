@@ -11,17 +11,22 @@ defaults:
   run:
     shell: bash
 
+permissions:
+  contents: read
+
 jobs:
   test-xk6:
     strategy:
       fail-fast: false
       matrix:
         go: [stable, tip]
-        platform: [ubuntu-latest, windows-latest, macos-latest]
+        platform: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, macos-latest]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Install Go
         if: matrix.go != 'tip'
         uses: actions/setup-go@v5
@@ -43,6 +48,8 @@ jobs:
           echo "$HOME/go/bin" >> "$GITHUB_PATH"
           echo "$HOME/sdk/gotip/bin" >> "$GITHUB_PATH"
       - name: Run tests
+        env:
+          PR_REPO: ${{  github.event.pull_request.head.repo.full_name  }}
         run: |
           set -x
           which go
@@ -58,8 +65,8 @@ jobs:
           cd .github/workflows/xk6-tests
           go install go.k6.io/xk6/cmd/xk6@master
           if [ "${{ github.event_name }}" == "pull_request" -a \
-               "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.repository }}" ]; then
-            export XK6_K6_REPO="github.com/${{ github.event.pull_request.head.repo.full_name }}"
+               "${PR_REPO}" != "${{ github.repository }}" ]; then
+            export XK6_K6_REPO="github.com/${PR_REPO}"
           fi
           # The following is a workaround for Windows, cause when using 'shell: bash', the PATH is expressed
           # with ':' as separator, but Go code, running on a Windows OS, expects ';' as separator.

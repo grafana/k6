@@ -20,7 +20,6 @@ func TestNewMetric(t *testing.T) {
 	}
 
 	for name, data := range testdata {
-		name, data := name, data
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			r := NewRegistry()
@@ -51,7 +50,6 @@ func TestAddSubmetric(t *testing.T) {
 	}
 
 	for name, expected := range testdata {
-		name, expected := name, expected
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -169,8 +167,6 @@ func TestParseMetricName(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
-
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 

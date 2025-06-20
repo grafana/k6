@@ -44,6 +44,14 @@ func newReporter(output string, assets *assets, proc *process) *reporter {
 	return rep
 }
 
+func (rep *reporter) ServeHTTP(res http.ResponseWriter, _ *http.Request) {
+	res.Header().Set("Content-Type", "text/html; charset=utf-8")
+
+	if err := rep.exportHTML(res); err != nil {
+		http.Error(res, err.Error(), http.StatusInternalServerError)
+	}
+}
+
 func (rep *reporter) onStart() error {
 	return nil
 }
@@ -53,10 +61,11 @@ func (rep *reporter) onStop(_ error) error {
 		return nil
 	}
 
-	if rep.snapshotCount < 2 {
+	if rep.snapshotCount <= 1 {
 		rep.proc.logger.Warn(
 			"The test run was short, report generation was skipped (not enough data)",
 		)
+
 		return nil
 	}
 
@@ -120,14 +129,6 @@ func (rep *reporter) onEvent(name string, data interface{}) {
 
 	if name == snapshotEvent {
 		rep.snapshotCount++
-	}
-}
-
-func (rep *reporter) ServeHTTP(res http.ResponseWriter, _ *http.Request) {
-	res.Header().Set("Content-Type", "text/html; charset=utf-8")
-
-	if err := rep.exportHTML(res); err != nil {
-		http.Error(res, err.Error(), http.StatusInternalServerError)
 	}
 }
 

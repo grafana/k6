@@ -8,6 +8,9 @@ defaults:
   run:
     shell: bash
 
+permissions:
+  contents: read
+
 jobs:
   deps:
     runs-on: ubuntu-latest
@@ -15,6 +18,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          persist-credentials: false
           fetch-depth: 0
       - name: Install Go
         uses: actions/setup-go@v5
@@ -38,6 +42,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          persist-credentials: false
           fetch-depth: 0
       - name: Run linters
         uses: ./.github/actions/lint/

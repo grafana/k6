@@ -22,7 +22,7 @@ func getCmdScale(gs *state.GlobalState) *cobra.Command {
 			vus := getNullInt64(cmd.Flags(), "vus")
 			maxVUs := getNullInt64(cmd.Flags(), "max")
 			if !vus.Valid && !maxVUs.Valid {
-				return errors.New("Specify either -u/--vus or -m/--max") //nolint:golint,stylecheck
+				return errors.New("Specify either -u/--vus or -m/--max") //nolint:staticcheck
 			}
 
 			c, err := client.New(gs.Flags.Address)

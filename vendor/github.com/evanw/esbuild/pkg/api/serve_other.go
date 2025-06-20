@@ -49,6 +49,7 @@ type apiHandler struct {
 	certfileToLower  string
 	fallback         string
 	hosts            []string
+	corsOrigin       []string
 	serveWaitGroup   sync.WaitGroup
 	activeStreams    []chan serverSentEvent
 	currentHashes    map[string]string
@@ -103,6 +104,25 @@ func errorsToString(errors []Message) string {
 
 func (h *apiHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	start := time.Now()
+
+	// Add CORS headers to all relevant requests
+	if origin := req.Header.Get("Origin"); origin != "" {
+		for _, allowed := range h.corsOrigin {
+			if allowed == "*" {
+				res.Header().Set("Access-Control-Allow-Origin", "*")
+				break
+			} else if star := strings.IndexByte(allowed, '*'); star >= 0 {
+				prefix, suffix := allowed[:star], allowed[star+1:]
+				if len(origin) >= len(prefix)+len(suffix) && strings.HasPrefix(origin, prefix) && strings.HasSuffix(origin, suffix) {
+					res.Header().Set("Access-Control-Allow-Origin", origin)
+					break
+				}
+			} else if origin == allowed {
+				res.Header().Set("Access-Control-Allow-Origin", origin)
+				break
+			}
+		}
+	}
 
 	// HEAD requests omit the body
 	maybeWriteResponseBody := func(bytes []byte) { res.Write(bytes) }
@@ -736,6 +756,13 @@ func (ctx *internalContext) Serve(serveOptions ServeOptions) (ServeResult, error
 		}
 	}
 
+	// Validate the CORS origins
+	for _, origin := range serveOptions.CORS.Origin {
+		if star := strings.IndexByte(origin, '*'); star >= 0 && strings.ContainsRune(origin[star+1:], '*') {
+			return ServeResult{}, fmt.Errorf("Invalid origin: %s", origin)
+		}
+	}
+
 	// Stuff related to the output directory only matters if there are entry points
 	outdirPathPrefix := ""
 	if len(ctx.args.entryPoints) > 0 {
@@ -774,12 +801,19 @@ func (ctx *internalContext) Serve(serveOptions ServeOptions) (ServeResult, error
 	var listener net.Listener
 	network := "tcp4"
 	host := "0.0.0.0"
+	hostIsIP := true
 	if serveOptions.Host != "" {
 		host = serveOptions.Host
+		ip := net.ParseIP(host)
 
 		// Only use "tcp4" if this is an IPv4 address, otherwise use "tcp"
-		if ip := net.ParseIP(host); ip == nil || ip.To4() == nil {
+		if ip == nil || ip.To4() == nil {
 			network = "tcp"
+		}
+
+		// Remember whether the host is a valid IP address or not
+		if ip == nil {
+			hostIsIP = false
 		}
 	}
 
@@ -833,6 +867,14 @@ func (ctx *internalContext) Serve(serveOptions ServeOptions) (ServeResult, error
 		result.Hosts = append(result.Hosts, boundHost)
 	}
 
+	// If the host isn't a valid IP address, add it to the list of allowed hosts.
+	// For example, mapping "local.example.com" to "127.0.0.1" in "/etc/hosts"
+	// and then using "--serve=local.example.com:8000" should make it possible to
+	// successfully visit "http://local.example.com:8000/" in a browser.
+	if !hostIsIP {
+		result.Hosts = append(result.Hosts, host)
+	}
+
 	// HTTPS-related files should be absolute paths
 	isHTTPS := serveOptions.Keyfile != "" && serveOptions.Certfile != ""
 	if isHTTPS {
@@ -853,6 +895,7 @@ func (ctx *internalContext) Serve(serveOptions ServeOptions) (ServeResult, error
 		certfileToLower:  strings.ToLower(serveOptions.Certfile),
 		fallback:         serveOptions.Fallback,
 		hosts:            append([]string{}, result.Hosts...),
+		corsOrigin:       append([]string{}, serveOptions.CORS.Origin...),
 		rebuild: func() BuildResult {
 			if atomic.LoadInt32(&shouldStop) != 0 {
 				// Don't start more rebuilds if we were told to stop

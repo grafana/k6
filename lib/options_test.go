@@ -114,7 +114,6 @@ func TestOptions(t *testing.T) {
 	t.Run("TLSCipherSuites", func(t *testing.T) {
 		t.Parallel()
 		for suiteName, suiteID := range SupportedTLSCipherSuites {
-			suiteName, suiteID := suiteName, suiteID
 			t.Run(suiteName, func(t *testing.T) {
 				t.Parallel()
 				opts := Options{}.Apply(Options{TLSCipherSuites: &TLSCipherSuites{suiteID}})
@@ -372,6 +371,7 @@ func TestOptions(t *testing.T) {
 		}
 		for _, tc := range tests {
 			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
 				tlsAuth := []*TLSAuth{
 					{TLSAuthFields{
 						Domains:  domains,
@@ -384,6 +384,7 @@ func TestOptions(t *testing.T) {
 				assert.Equal(t, tlsAuth, opts.TLSAuth)
 
 				t.Run("Roundtrip", func(t *testing.T) {
+					t.Parallel()
 					optsData, err := json.Marshal(opts)
 					assert.NoError(t, err)
 
@@ -662,11 +663,9 @@ func TestOptionsEnv(t *testing.T) {
 		// External
 	}
 	for field, data := range testdata {
-		field, data := field, data
 		t.Run(field.Name, func(t *testing.T) {
 			t.Parallel()
 			for str, val := range data {
-				str, val := str, val
 				t.Run(`"`+str+`"`, func(t *testing.T) {
 					t.Parallel()
 					var opts Options
@@ -712,7 +711,6 @@ func TestCIDRUnmarshal(t *testing.T) {
 	}
 
 	for _, data := range testData {
-		data := data
 		t.Run(data.input, func(t *testing.T) {
 			t.Parallel()
 			actualIPNet := &IPNet{}
@@ -774,7 +772,6 @@ func TestHost(t *testing.T) {
 	}
 
 	for _, data := range testData {
-		data := data
 		t.Run(data.input, func(t *testing.T) {
 			t.Parallel()
 			actualHost := &types.Host{}
@@ -814,7 +811,6 @@ func TestValidate(t *testing.T) {
 			},
 		}
 		for _, data := range testData {
-			data := data
 			t.Run(data.input, func(t *testing.T) {
 				t.Parallel()
 				sec, _ := time.ParseDuration(data.input)

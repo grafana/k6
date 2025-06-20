@@ -64,9 +64,9 @@ func (p *DeleteEntryParams) Do(ctx context.Context) (err error) {
 
 // RequestCacheNamesParams requests cache names.
 type RequestCacheNamesParams struct {
-	SecurityOrigin string          `json:"securityOrigin,omitempty"` // At least and at most one of securityOrigin, storageKey, storageBucket must be specified. Security origin.
-	StorageKey     string          `json:"storageKey,omitempty"`     // Storage key.
-	StorageBucket  *storage.Bucket `json:"storageBucket,omitempty"`  // Storage bucket. If not specified, it uses the default bucket.
+	SecurityOrigin string          `json:"securityOrigin,omitempty,omitzero"` // At least and at most one of securityOrigin, storageKey, storageBucket must be specified. Security origin.
+	StorageKey     string          `json:"storageKey,omitempty,omitzero"`     // Storage key.
+	StorageBucket  *storage.Bucket `json:"storageBucket,omitempty,omitzero"`  // Storage bucket. If not specified, it uses the default bucket.
 }
 
 // RequestCacheNames requests cache names.
@@ -100,7 +100,7 @@ func (p RequestCacheNamesParams) WithStorageBucket(storageBucket *storage.Bucket
 
 // RequestCacheNamesReturns return values.
 type RequestCacheNamesReturns struct {
-	Caches []*Cache `json:"caches,omitempty"` // Caches for the security origin.
+	Caches []*Cache `json:"caches,omitempty,omitzero"` // Caches for the security origin.
 }
 
 // Do executes CacheStorage.requestCacheNames against the provided context.
@@ -145,7 +145,7 @@ func RequestCachedResponse(cacheID CacheID, requestURL string, requestHeaders []
 
 // RequestCachedResponseReturns return values.
 type RequestCachedResponseReturns struct {
-	Response *CachedResponse `json:"response,omitempty"` // Response read from the cache.
+	Response *CachedResponse `json:"response,omitempty,omitzero"` // Response read from the cache.
 }
 
 // Do executes CacheStorage.requestCachedResponse against the provided context.
@@ -166,10 +166,10 @@ func (p *RequestCachedResponseParams) Do(ctx context.Context) (response *CachedR
 
 // RequestEntriesParams requests data from cache.
 type RequestEntriesParams struct {
-	CacheID    CacheID `json:"cacheId"`              // ID of cache to get entries from.
-	SkipCount  int64   `json:"skipCount,omitempty"`  // Number of records to skip.
-	PageSize   int64   `json:"pageSize,omitempty"`   // Number of records to fetch.
-	PathFilter string  `json:"pathFilter,omitempty"` // If present, only return the entries containing this substring in the path
+	CacheID    CacheID `json:"cacheId"`                       // ID of cache to get entries from.
+	SkipCount  int64   `json:"skipCount,omitempty,omitzero"`  // Number of records to skip.
+	PageSize   int64   `json:"pageSize,omitempty,omitzero"`   // Number of records to fetch.
+	PathFilter string  `json:"pathFilter,omitempty,omitzero"` // If present, only return the entries containing this substring in the path
 }
 
 // RequestEntries requests data from cache.
@@ -206,8 +206,8 @@ func (p RequestEntriesParams) WithPathFilter(pathFilter string) *RequestEntriesP
 
 // RequestEntriesReturns return values.
 type RequestEntriesReturns struct {
-	CacheDataEntries []*DataEntry `json:"cacheDataEntries,omitempty"` // Array of object store data entries.
-	ReturnCount      float64      `json:"returnCount,omitempty"`      // Count of returned entries from this storage. If pathFilter is empty, it is the count of all entries from this storage.
+	CacheDataEntries []*DataEntry `json:"cacheDataEntries,omitempty,omitzero"` // Array of object store data entries.
+	ReturnCount      float64      `json:"returnCount,omitempty,omitzero"`      // Count of returned entries from this storage. If pathFilter is empty, it is the count of all entries from this storage.
 }
 
 // Do executes CacheStorage.requestEntries against the provided context.

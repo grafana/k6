@@ -89,11 +89,9 @@ func TestMetrics(t *testing.T) {
 		"no argument":           {JS: ``, errStr: "no value was provided", noTags: true},
 	}
 	for fn, mtyp := range types {
-		fn, mtyp := fn, mtyp
 		t.Run(fn, func(t *testing.T) {
 			t.Parallel()
 			for isTime, valueType := range map[bool]metrics.ValueType{false: metrics.Default, true: metrics.Time} {
-				isTime, valueType := isTime, valueType
 				t.Run(fmt.Sprintf("isTime=%v", isTime), func(t *testing.T) {
 					t.Parallel()
 					test := addTest{
@@ -129,7 +127,7 @@ func TestMetrics(t *testing.T) {
 					_, err := test.rt.RunString(fmt.Sprintf(`var m = new metrics.%s("my_metric"%s)`, fn, isTimeString))
 					require.NoError(t, err)
 
-					t.Run("ExitInit", func(t *testing.T) {
+					t.Run("ExitInit", func(t *testing.T) { //nolint:paralleltest
 						mii.StateField = state
 						mii.InitEnvField = nil
 						_, err := test.rt.RunString(fmt.Sprintf(`new metrics.%s("my_metric")`, fn))
@@ -147,13 +145,13 @@ func TestMetrics(t *testing.T) {
 						for _, isThrow := range []bool{false, true} {
 							state.Options.Throw.Bool = isThrow
 							test.isThrow = isThrow
-							t.Run(fmt.Sprintf("%s/isThrow=%v/Simple", name, isThrow), func(t *testing.T) {
+							t.Run(fmt.Sprintf("%s/isThrow=%v/Simple", name, isThrow), func(t *testing.T) { //nolint:paralleltest
 								test.js = fmt.Sprintf(`m.add(%v)`, val.JS)
 								test.expectedTags = map[string]string{"key": "value"}
 								test.run(t)
 							})
 							if !val.noTags {
-								t.Run(fmt.Sprintf("%s/isThrow=%v/Tags", name, isThrow), func(t *testing.T) {
+								t.Run(fmt.Sprintf("%s/isThrow=%v/Tags", name, isThrow), func(t *testing.T) { //nolint:paralleltest
 									test.js = fmt.Sprintf(`m.add(%v, {a:1})`, val.JS)
 									test.expectedTags = map[string]string{"key": "value", "a": "1"}
 									test.run(t)

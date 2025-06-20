@@ -24,9 +24,9 @@ func GetDOMCounters() *GetDOMCountersParams {
 
 // GetDOMCountersReturns return values.
 type GetDOMCountersReturns struct {
-	Documents        int64 `json:"documents,omitempty"`
-	Nodes            int64 `json:"nodes,omitempty"`
-	JsEventListeners int64 `json:"jsEventListeners,omitempty"`
+	Documents        int64 `json:"documents,omitempty,omitzero"`
+	Nodes            int64 `json:"nodes,omitempty,omitzero"`
+	JsEventListeners int64 `json:"jsEventListeners,omitempty,omitzero"`
 }
 
 // Do executes Memory.getDOMCounters against the provided context.
@@ -61,7 +61,7 @@ func GetDOMCountersForLeakDetection() *GetDOMCountersForLeakDetectionParams {
 
 // GetDOMCountersForLeakDetectionReturns return values.
 type GetDOMCountersForLeakDetectionReturns struct {
-	Counters []*DOMCounter `json:"counters,omitempty"` // DOM object counters.
+	Counters []*DOMCounter `json:"counters,omitempty,omitzero"` // DOM object counters.
 }
 
 // Do executes Memory.getDOMCountersForLeakDetection against the provided context.
@@ -168,8 +168,8 @@ func (p *SimulatePressureNotificationParams) Do(ctx context.Context) (err error)
 
 // StartSamplingParams start collecting native memory profile.
 type StartSamplingParams struct {
-	SamplingInterval   int64 `json:"samplingInterval,omitempty"`   // Average number of bytes between samples.
-	SuppressRandomness bool  `json:"suppressRandomness,omitempty"` // Do not randomize intervals between samples.
+	SamplingInterval   int64 `json:"samplingInterval,omitempty,omitzero"` // Average number of bytes between samples.
+	SuppressRandomness bool  `json:"suppressRandomness"`                  // Do not randomize intervals between samples.
 }
 
 // StartSampling start collecting native memory profile.
@@ -178,7 +178,9 @@ type StartSamplingParams struct {
 //
 // parameters:
 func StartSampling() *StartSamplingParams {
-	return &StartSamplingParams{}
+	return &StartSamplingParams{
+		SuppressRandomness: false,
+	}
 }
 
 // WithSamplingInterval average number of bytes between samples.
@@ -227,7 +229,7 @@ func GetAllTimeSamplingProfile() *GetAllTimeSamplingProfileParams {
 
 // GetAllTimeSamplingProfileReturns return values.
 type GetAllTimeSamplingProfileReturns struct {
-	Profile *SamplingProfile `json:"profile,omitempty"`
+	Profile *SamplingProfile `json:"profile,omitempty,omitzero"`
 }
 
 // Do executes Memory.getAllTimeSamplingProfile against the provided context.
@@ -260,7 +262,7 @@ func GetBrowserSamplingProfile() *GetBrowserSamplingProfileParams {
 
 // GetBrowserSamplingProfileReturns return values.
 type GetBrowserSamplingProfileReturns struct {
-	Profile *SamplingProfile `json:"profile,omitempty"`
+	Profile *SamplingProfile `json:"profile,omitempty,omitzero"`
 }
 
 // Do executes Memory.getBrowserSamplingProfile against the provided context.
@@ -293,7 +295,7 @@ func GetSamplingProfile() *GetSamplingProfileParams {
 
 // GetSamplingProfileReturns return values.
 type GetSamplingProfileReturns struct {
-	Profile *SamplingProfile `json:"profile,omitempty"`
+	Profile *SamplingProfile `json:"profile,omitempty,omitzero"`
 }
 
 // Do executes Memory.getSamplingProfile against the provided context.

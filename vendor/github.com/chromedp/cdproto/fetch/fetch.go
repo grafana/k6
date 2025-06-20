@@ -37,8 +37,8 @@ func (p *DisableParams) Do(ctx context.Context) (err error) {
 // paused until client calls one of failRequest, fulfillRequest or
 // continueRequest/continueWithAuth.
 type EnableParams struct {
-	Patterns           []*RequestPattern `json:"patterns,omitempty"`           // If specified, only requests matching any of these patterns will produce fetchRequested event and will be paused until clients response. If not set, all requests will be affected.
-	HandleAuthRequests bool              `json:"handleAuthRequests,omitempty"` // If true, authRequired events will be issued and requests will be paused expecting a call to continueWithAuth.
+	Patterns           []*RequestPattern `json:"patterns,omitempty,omitzero"` // If specified, only requests matching any of these patterns will produce fetchRequested event and will be paused until clients response. If not set, all requests will be affected.
+	HandleAuthRequests bool              `json:"handleAuthRequests"`          // If true, authRequired events will be issued and requests will be paused expecting a call to continueWithAuth.
 }
 
 // Enable enables issuing of requestPaused events. A request will be paused
@@ -49,7 +49,9 @@ type EnableParams struct {
 //
 // parameters:
 func Enable() *EnableParams {
-	return &EnableParams{}
+	return &EnableParams{
+		HandleAuthRequests: false,
+	}
 }
 
 // WithPatterns if specified, only requests matching any of these patterns
@@ -100,12 +102,12 @@ func (p *FailRequestParams) Do(ctx context.Context) (err error) {
 
 // FulfillRequestParams provides response to the request.
 type FulfillRequestParams struct {
-	RequestID             RequestID      `json:"requestId"`                       // An id the client received in requestPaused event.
-	ResponseCode          int64          `json:"responseCode"`                    // An HTTP response code.
-	ResponseHeaders       []*HeaderEntry `json:"responseHeaders,omitempty"`       // Response headers.
-	BinaryResponseHeaders string         `json:"binaryResponseHeaders,omitempty"` // Alternative way of specifying response headers as a \0-separated series of name: value pairs. Prefer the above method unless you need to represent some non-UTF8 values that can't be transmitted over the protocol as text.
-	Body                  string         `json:"body,omitempty"`                  // A response body. If absent, original response body will be used if the request is intercepted at the response stage and empty body will be used if the request is intercepted at the request stage.
-	ResponsePhrase        string         `json:"responsePhrase,omitempty"`        // A textual representation of responseCode. If absent, a standard phrase matching responseCode is used.
+	RequestID             RequestID      `json:"requestId"`                                // An id the client received in requestPaused event.
+	ResponseCode          int64          `json:"responseCode"`                             // An HTTP response code.
+	ResponseHeaders       []*HeaderEntry `json:"responseHeaders,omitempty,omitzero"`       // Response headers.
+	BinaryResponseHeaders string         `json:"binaryResponseHeaders,omitempty,omitzero"` // Alternative way of specifying response headers as a \0-separated series of name: value pairs. Prefer the above method unless you need to represent some non-UTF8 values that can't be transmitted over the protocol as text.
+	Body                  string         `json:"body,omitempty,omitzero"`                  // A response body. If absent, original response body will be used if the request is intercepted at the response stage and empty body will be used if the request is intercepted at the request stage.
+	ResponsePhrase        string         `json:"responsePhrase,omitempty,omitzero"`        // A textual representation of responseCode. If absent, a standard phrase matching responseCode is used.
 }
 
 // FulfillRequest provides response to the request.
@@ -162,11 +164,11 @@ func (p *FulfillRequestParams) Do(ctx context.Context) (err error) {
 // its parameters.
 type ContinueRequestParams struct {
 	RequestID         RequestID      `json:"requestId"`                   // An id the client received in requestPaused event.
-	URL               string         `json:"url,omitempty"`               // If set, the request url will be modified in a way that's not observable by page.
-	Method            string         `json:"method,omitempty"`            // If set, the request method is overridden.
-	PostData          string         `json:"postData,omitempty"`          // If set, overrides the post data in the request.
-	Headers           []*HeaderEntry `json:"headers,omitempty"`           // If set, overrides the request headers. Note that the overrides do not extend to subsequent redirect hops, if a redirect happens. Another override may be applied to a different request produced by a redirect.
-	InterceptResponse bool           `json:"interceptResponse,omitempty"` // If set, overrides response interception behavior for this request.
+	URL               string         `json:"url,omitempty,omitzero"`      // If set, the request url will be modified in a way that's not observable by page.
+	Method            string         `json:"method,omitempty,omitzero"`   // If set, the request method is overridden.
+	PostData          string         `json:"postData,omitempty,omitzero"` // If set, overrides the post data in the request.
+	Headers           []*HeaderEntry `json:"headers,omitempty,omitzero"`  // If set, overrides the request headers. Note that the overrides do not extend to subsequent redirect hops, if a redirect happens. Another override may be applied to a different request produced by a redirect.
+	InterceptResponse bool           `json:"interceptResponse"`           // If set, overrides response interception behavior for this request.
 }
 
 // ContinueRequest continues the request, optionally modifying some of its
@@ -179,7 +181,8 @@ type ContinueRequestParams struct {
 //	requestID - An id the client received in requestPaused event.
 func ContinueRequest(requestID RequestID) *ContinueRequestParams {
 	return &ContinueRequestParams{
-		RequestID: requestID,
+		RequestID:         requestID,
+		InterceptResponse: false,
 	}
 }
 
@@ -254,11 +257,11 @@ func (p *ContinueWithAuthParams) Do(ctx context.Context) (err error) {
 // optionally modifying the response headers. If either responseCode or headers
 // are modified, all of them must be present.
 type ContinueResponseParams struct {
-	RequestID             RequestID      `json:"requestId"`                       // An id the client received in requestPaused event.
-	ResponseCode          int64          `json:"responseCode,omitempty"`          // An HTTP response code. If absent, original response code will be used.
-	ResponsePhrase        string         `json:"responsePhrase,omitempty"`        // A textual representation of responseCode. If absent, a standard phrase matching responseCode is used.
-	ResponseHeaders       []*HeaderEntry `json:"responseHeaders,omitempty"`       // Response headers. If absent, original response headers will be used.
-	BinaryResponseHeaders string         `json:"binaryResponseHeaders,omitempty"` // Alternative way of specifying response headers as a \0-separated series of name: value pairs. Prefer the above method unless you need to represent some non-UTF8 values that can't be transmitted over the protocol as text.
+	RequestID             RequestID      `json:"requestId"`                                // An id the client received in requestPaused event.
+	ResponseCode          int64          `json:"responseCode,omitempty,omitzero"`          // An HTTP response code. If absent, original response code will be used.
+	ResponsePhrase        string         `json:"responsePhrase,omitempty,omitzero"`        // A textual representation of responseCode. If absent, a standard phrase matching responseCode is used.
+	ResponseHeaders       []*HeaderEntry `json:"responseHeaders,omitempty,omitzero"`       // Response headers. If absent, original response headers will be used.
+	BinaryResponseHeaders string         `json:"binaryResponseHeaders,omitempty,omitzero"` // Alternative way of specifying response headers as a \0-separated series of name: value pairs. Prefer the above method unless you need to represent some non-UTF8 values that can't be transmitted over the protocol as text.
 }
 
 // ContinueResponse continues loading of the paused response, optionally
@@ -347,8 +350,8 @@ func GetResponseBody(requestID RequestID) *GetResponseBodyParams {
 
 // GetResponseBodyReturns return values.
 type GetResponseBodyReturns struct {
-	Body          string `json:"body,omitempty"`          // Response body.
-	Base64encoded bool   `json:"base64Encoded,omitempty"` // True, if content was sent as base64.
+	Body          string `json:"body,omitempty,omitzero"` // Response body.
+	Base64encoded bool   `json:"base64Encoded"`           // True, if content was sent as base64.
 }
 
 // Do executes Fetch.getResponseBody against the provided context.
@@ -411,7 +414,7 @@ func TakeResponseBodyAsStream(requestID RequestID) *TakeResponseBodyAsStreamPara
 
 // TakeResponseBodyAsStreamReturns return values.
 type TakeResponseBodyAsStreamReturns struct {
-	Stream io.StreamHandle `json:"stream,omitempty"`
+	Stream io.StreamHandle `json:"stream,omitempty,omitzero"`
 }
 
 // Do executes Fetch.takeResponseBodyAsStream against the provided context.

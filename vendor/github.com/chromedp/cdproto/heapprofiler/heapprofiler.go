@@ -103,7 +103,7 @@ func GetHeapObjectID(objectID runtime.RemoteObjectID) *GetHeapObjectIDParams {
 
 // GetHeapObjectIDReturns return values.
 type GetHeapObjectIDReturns struct {
-	HeapSnapshotObjectID HeapSnapshotObjectID `json:"heapSnapshotObjectId,omitempty"` // Id of the heap snapshot object corresponding to the passed remote object id.
+	HeapSnapshotObjectID HeapSnapshotObjectID `json:"heapSnapshotObjectId,omitempty,omitzero"` // Id of the heap snapshot object corresponding to the passed remote object id.
 }
 
 // Do executes HeapProfiler.getHeapObjectId against the provided context.
@@ -125,7 +125,7 @@ func (p *GetHeapObjectIDParams) Do(ctx context.Context) (heapSnapshotObjectID He
 // GetObjectByHeapObjectIDParams [no description].
 type GetObjectByHeapObjectIDParams struct {
 	ObjectID    HeapSnapshotObjectID `json:"objectId"`
-	ObjectGroup string               `json:"objectGroup,omitempty"` // Symbolic group name that can be used to release multiple objects.
+	ObjectGroup string               `json:"objectGroup,omitempty,omitzero"` // Symbolic group name that can be used to release multiple objects.
 }
 
 // GetObjectByHeapObjectID [no description].
@@ -150,7 +150,7 @@ func (p GetObjectByHeapObjectIDParams) WithObjectGroup(objectGroup string) *GetO
 
 // GetObjectByHeapObjectIDReturns return values.
 type GetObjectByHeapObjectIDReturns struct {
-	Result *runtime.RemoteObject `json:"result,omitempty"` // Evaluation result.
+	Result *runtime.RemoteObject `json:"result,omitempty,omitzero"` // Evaluation result.
 }
 
 // Do executes HeapProfiler.getObjectByHeapObjectId against the provided context.
@@ -181,7 +181,7 @@ func GetSamplingProfile() *GetSamplingProfileParams {
 
 // GetSamplingProfileReturns return values.
 type GetSamplingProfileReturns struct {
-	Profile *SamplingHeapProfile `json:"profile,omitempty"` // Return the sampling profile being collected.
+	Profile *SamplingHeapProfile `json:"profile,omitempty,omitzero"` // Return the sampling profile being collected.
 }
 
 // Do executes HeapProfiler.getSamplingProfile against the provided context.
@@ -202,9 +202,9 @@ func (p *GetSamplingProfileParams) Do(ctx context.Context) (profile *SamplingHea
 
 // StartSamplingParams [no description].
 type StartSamplingParams struct {
-	SamplingInterval                 float64 `json:"samplingInterval,omitempty"`                 // Average sample interval in bytes. Poisson distribution is used for the intervals. The default value is 32768 bytes.
-	IncludeObjectsCollectedByMajorGC bool    `json:"includeObjectsCollectedByMajorGC,omitempty"` // By default, the sampling heap profiler reports only objects which are still alive when the profile is returned via getSamplingProfile or stopSampling, which is useful for determining what functions contribute the most to steady-state memory usage. This flag instructs the sampling heap profiler to also include information about objects discarded by major GC, which will show which functions cause large temporary memory usage or long GC pauses.
-	IncludeObjectsCollectedByMinorGC bool    `json:"includeObjectsCollectedByMinorGC,omitempty"` // By default, the sampling heap profiler reports only objects which are still alive when the profile is returned via getSamplingProfile or stopSampling, which is useful for determining what functions contribute the most to steady-state memory usage. This flag instructs the sampling heap profiler to also include information about objects discarded by minor GC, which is useful when tuning a latency-sensitive application for minimal GC activity.
+	SamplingInterval                 float64 `json:"samplingInterval,omitempty,omitzero"` // Average sample interval in bytes. Poisson distribution is used for the intervals. The default value is 32768 bytes.
+	IncludeObjectsCollectedByMajorGC bool    `json:"includeObjectsCollectedByMajorGC"`    // By default, the sampling heap profiler reports only objects which are still alive when the profile is returned via getSamplingProfile or stopSampling, which is useful for determining what functions contribute the most to steady-state memory usage. This flag instructs the sampling heap profiler to also include information about objects discarded by major GC, which will show which functions cause large temporary memory usage or long GC pauses.
+	IncludeObjectsCollectedByMinorGC bool    `json:"includeObjectsCollectedByMinorGC"`    // By default, the sampling heap profiler reports only objects which are still alive when the profile is returned via getSamplingProfile or stopSampling, which is useful for determining what functions contribute the most to steady-state memory usage. This flag instructs the sampling heap profiler to also include information about objects discarded by minor GC, which is useful when tuning a latency-sensitive application for minimal GC activity.
 }
 
 // StartSampling [no description].
@@ -213,7 +213,10 @@ type StartSamplingParams struct {
 //
 // parameters:
 func StartSampling() *StartSamplingParams {
-	return &StartSamplingParams{}
+	return &StartSamplingParams{
+		IncludeObjectsCollectedByMajorGC: false,
+		IncludeObjectsCollectedByMinorGC: false,
+	}
 }
 
 // WithSamplingInterval average sample interval in bytes. Poisson
@@ -254,7 +257,7 @@ func (p *StartSamplingParams) Do(ctx context.Context) (err error) {
 
 // StartTrackingHeapObjectsParams [no description].
 type StartTrackingHeapObjectsParams struct {
-	TrackAllocations bool `json:"trackAllocations,omitempty"`
+	TrackAllocations bool `json:"trackAllocations"`
 }
 
 // StartTrackingHeapObjects [no description].
@@ -263,7 +266,9 @@ type StartTrackingHeapObjectsParams struct {
 //
 // parameters:
 func StartTrackingHeapObjects() *StartTrackingHeapObjectsParams {
-	return &StartTrackingHeapObjectsParams{}
+	return &StartTrackingHeapObjectsParams{
+		TrackAllocations: false,
+	}
 }
 
 // WithTrackAllocations [no description].
@@ -289,7 +294,7 @@ func StopSampling() *StopSamplingParams {
 
 // StopSamplingReturns return values.
 type StopSamplingReturns struct {
-	Profile *SamplingHeapProfile `json:"profile,omitempty"` // Recorded sampling heap profile.
+	Profile *SamplingHeapProfile `json:"profile,omitempty,omitzero"` // Recorded sampling heap profile.
 }
 
 // Do executes HeapProfiler.stopSampling against the provided context.
@@ -310,9 +315,9 @@ func (p *StopSamplingParams) Do(ctx context.Context) (profile *SamplingHeapProfi
 
 // StopTrackingHeapObjectsParams [no description].
 type StopTrackingHeapObjectsParams struct {
-	ReportProgress      bool `json:"reportProgress,omitempty"`      // If true 'reportHeapSnapshotProgress' events will be generated while snapshot is being taken when the tracking is stopped.
-	CaptureNumericValue bool `json:"captureNumericValue,omitempty"` // If true, numerical values are included in the snapshot
-	ExposeInternals     bool `json:"exposeInternals,omitempty"`     // If true, exposes internals of the snapshot.
+	ReportProgress      bool `json:"reportProgress"`      // If true 'reportHeapSnapshotProgress' events will be generated while snapshot is being taken when the tracking is stopped.
+	CaptureNumericValue bool `json:"captureNumericValue"` // If true, numerical values are included in the snapshot
+	ExposeInternals     bool `json:"exposeInternals"`     // If true, exposes internals of the snapshot.
 }
 
 // StopTrackingHeapObjects [no description].
@@ -321,7 +326,11 @@ type StopTrackingHeapObjectsParams struct {
 //
 // parameters:
 func StopTrackingHeapObjects() *StopTrackingHeapObjectsParams {
-	return &StopTrackingHeapObjectsParams{}
+	return &StopTrackingHeapObjectsParams{
+		ReportProgress:      false,
+		CaptureNumericValue: false,
+		ExposeInternals:     false,
+	}
 }
 
 // WithReportProgress if true 'reportHeapSnapshotProgress' events will be
@@ -351,9 +360,9 @@ func (p *StopTrackingHeapObjectsParams) Do(ctx context.Context) (err error) {
 
 // TakeHeapSnapshotParams [no description].
 type TakeHeapSnapshotParams struct {
-	ReportProgress      bool `json:"reportProgress,omitempty"`      // If true 'reportHeapSnapshotProgress' events will be generated while snapshot is being taken.
-	CaptureNumericValue bool `json:"captureNumericValue,omitempty"` // If true, numerical values are included in the snapshot
-	ExposeInternals     bool `json:"exposeInternals,omitempty"`     // If true, exposes internals of the snapshot.
+	ReportProgress      bool `json:"reportProgress"`      // If true 'reportHeapSnapshotProgress' events will be generated while snapshot is being taken.
+	CaptureNumericValue bool `json:"captureNumericValue"` // If true, numerical values are included in the snapshot
+	ExposeInternals     bool `json:"exposeInternals"`     // If true, exposes internals of the snapshot.
 }
 
 // TakeHeapSnapshot [no description].
@@ -362,7 +371,11 @@ type TakeHeapSnapshotParams struct {
 //
 // parameters:
 func TakeHeapSnapshot() *TakeHeapSnapshotParams {
-	return &TakeHeapSnapshotParams{}
+	return &TakeHeapSnapshotParams{
+		ReportProgress:      false,
+		CaptureNumericValue: false,
+		ExposeInternals:     false,
+	}
 }
 
 // WithReportProgress if true 'reportHeapSnapshotProgress' events will be

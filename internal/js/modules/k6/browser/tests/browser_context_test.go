@@ -192,7 +192,6 @@ func TestBrowserContextAddCookies(t *testing.T) {
 		},
 	}
 	for name, tt := range tests {
-		tt := tt
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -538,7 +537,6 @@ func TestBrowserContextCookies(t *testing.T) {
 		},
 	}
 	for name, tt := range tests {
-		tt := tt
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -646,15 +644,17 @@ func TestK6Object(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			vu, _, _, cleanUp := startIteration(t, env.ConstLookup(env.K6TestRunID, tt.testRunID))
-			defer cleanUp()
+			tb := newTestBrowser(t, withFileServer(), withEnvLookup(env.ConstLookup(env.K6TestRunID, tt.testRunID)))
+
+			tb.vu.ActivateVU()
+			tb.vu.StartIteration(t)
+			defer tb.vu.EndIteration(t)
 
 			// First test with browser.newPage
-			got := vu.RunPromise(t, `
+			got := tb.vu.RunPromise(t, `
 				const p = await browser.newPage();
 				await p.goto("about:blank");
 				const o = await p.evaluate(() => window.k6);
@@ -663,7 +663,7 @@ func TestK6Object(t *testing.T) {
 			assert.Equal(t, tt.want, got.Result().String())
 
 			// Now test with browser.newContext
-			got = vu.RunPromise(t, `
+			got = tb.vu.RunPromise(t, `
 				await browser.closeContext();
 				const c = await browser.newContext();
 				const p2 = await c.newPage();
@@ -682,14 +682,13 @@ func TestK6Object(t *testing.T) {
 func TestNewTab(t *testing.T) {
 	t.Parallel()
 
-	tb := newTestBrowser(t, withFileServer())
+	tb := newTestBrowser(t, withFileServer(), withEnvLookup(env.ConstLookup(env.K6TestRunID, "12345")))
 
-	// Start the iteration
-	vu, _, _, cleanUp := startIteration(t, env.ConstLookup(env.K6TestRunID, "12345"))
-	defer cleanUp()
+	tb.vu.ActivateVU()
+	tb.vu.StartIteration(t)
+	defer tb.vu.EndIteration(t)
 
-	// Run the test script
-	_, err := vu.RunAsync(t, `
+	_, err := tb.vu.RunAsync(t, `
 		const p = await browser.newPage()
 		await p.goto("%s")
 
@@ -723,7 +722,6 @@ func TestBrowserContextTimeout(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -802,7 +800,6 @@ func TestBrowserContextWaitForEvent(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -892,7 +889,6 @@ func TestBrowserContextGrantPermissions(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 

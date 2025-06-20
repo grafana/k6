@@ -48,8 +48,6 @@ func TestCallParamsInvalidInput(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
-
 		t.Run(tc.Name, func(t *testing.T) {
 			t.Parallel()
 
@@ -83,8 +81,6 @@ func TestCallParamsMetadata(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
-
 		t.Run(tc.Name, func(t *testing.T) {
 			t.Parallel()
 
@@ -124,8 +120,6 @@ func TestCallParamsTimeOutParse(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
-
 		t.Run(tc.Name, func(t *testing.T) {
 			t.Parallel()
 
@@ -165,8 +159,6 @@ func TestCallParamsDiscardResponseMessageParse(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
-
 		t.Run(tc.Name, func(t *testing.T) {
 			t.Parallel()
 

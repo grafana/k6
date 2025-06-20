@@ -34,7 +34,7 @@ export class Bet {
   }
 
   goto() {
-    return this.page.goto("https://test.k6.io/flip_coin.php", { waitUntil: "networkidle" });
+    return this.page.goto("https://quickpizza.grafana.com/test.k6.io/flip_coin.php", { waitUntil: "networkidle" });
   }
 
   heads() {

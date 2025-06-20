@@ -78,7 +78,7 @@ func stringToRat(s string) (*big.Rat, error) {
 		}
 		return new(big.Rat).SetFrac(num, big.NewInt(100)), nil
 	}
-	rat, ok := new(big.Rat).SetString(s) //nolint:gosec // the vulnerability was patched in 1.16
+	rat, ok := new(big.Rat).SetString(s)
 	if !ok {
 		return nil, fmt.Errorf("'%s' is not a valid percentage, decimal, fraction or interval value", s)
 	}

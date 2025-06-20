@@ -48,7 +48,6 @@ func TestNestedFrames(t *testing.T) {
 	tb := newTestBrowser(t,
 		withFileServer(),
 	)
-	defer tb.Browser.Close()
 
 	page := tb.NewPage(nil)
 	opts := &common.FrameGotoOptions{
@@ -179,7 +178,6 @@ func TestPageEvaluate(t *testing.T) {
 		}
 
 		for _, tc := range testCases {
-			tc := tc
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
 
@@ -228,34 +226,36 @@ func TestPageEvaluateMapping(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			vu, _, _, cleanUp := startIteration(t)
-			defer cleanUp()
+			tb := newTestBrowser(t)
+			tb.vu.ActivateVU()
+			tb.vu.StartIteration(t)
+			defer tb.vu.EndIteration(t)
 
 			// Test script as non string input
-			vu.SetVar(t, "p", &sobek.Object{})
-			got := vu.RunPromise(t, `
+			tb.vu.SetVar(t, "p", &sobek.Object{})
+			got := tb.vu.RunPromise(t, `
 				p = await browser.newPage()
 				return await p.evaluate(%s)
 			`, tt.script)
-			assert.Equal(t, vu.ToSobekValue(tt.want), got.Result())
+			assert.Equal(t, tb.vu.ToSobekValue(tt.want), got.Result())
 
 			// Test script as string input
-			got = vu.RunPromise(t,
+			got = tb.vu.RunPromise(t,
 				`return await p.evaluate("%s")`,
 				tt.script,
 			)
-			assert.Equal(t, vu.ToSobekValue(tt.want), got.Result())
+			assert.Equal(t, tb.vu.ToSobekValue(tt.want), got.Result())
 		})
 	}
 }
 
-func TestPageEvaluateMappingError(t *testing.T) {
+func TestPageEvaluateMappingError(t *testing.T) { //nolint:tparallel
 	t.Parallel()
 
+	tb := newTestBrowser(t)
 	tests := []struct {
 		name    string
 		script  string
@@ -278,24 +278,21 @@ func TestPageEvaluateMappingError(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		tt := tt
+	for _, tt := range tests { //nolint:paralleltest
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			vu, _, _, cleanUp := startIteration(t)
-			defer cleanUp()
-
+			tb.vu.ActivateVU()
+			tb.vu.StartIteration(t)
+			defer tb.vu.EndIteration(t)
 			// Test script as non string input
-			vu.SetVar(t, "p", &sobek.Object{})
-			_, err := vu.RunAsync(t, `
+			tb.vu.SetVar(t, "p", &sobek.Object{})
+			_, err := tb.vu.RunAsync(t, `
 				p = await browser.newPage()
 				await p.evaluate(%s)
 			`, tt.script)
 			assert.ErrorContains(t, err, tt.wantErr)
 
 			// Test script as string input
-			_, err = vu.RunAsync(t, `
+			_, err = tb.vu.RunAsync(t, `
 				await p.evaluate("%s")
 			`, tt.script)
 			assert.ErrorContains(t, err, tt.wantErr)
@@ -776,14 +773,21 @@ func TestPageWaitForFunction(t *testing.T) {
 		let resp = await page.waitForFunction(%s, %s, %s);
 		log('ok: '+resp);`
 
+	setup := func(t *testing.T) *testBrowser {
+		tb := newTestBrowser(t, withLogCache())
+		tb.vu.ActivateVU()
+		tb.vu.StartIteration(t)
+		t.Cleanup(func() { tb.vu.EndIteration(t) })
+		require.NoError(t, tb.vu.Runtime().Set("log", func(s string) { tb.vu.State().Logger.Warn(s) }))
+		return tb
+	}
+
 	t.Run("ok_func_raf_default", func(t *testing.T) {
 		t.Parallel()
+		tb := setup(t)
 
-		vu, _, log, cleanUp := startIteration(t)
-		defer cleanUp()
-
-		vu.SetVar(t, "page", &sobek.Object{})
-		_, err := vu.RunOnEventLoop(t, `fn = () => {
+		tb.vu.SetVar(t, "page", &sobek.Object{})
+		_, err := tb.vu.RunOnEventLoop(t, `fn = () => {
 			if (typeof window._cnt == 'undefined') window._cnt = 0;
 			if (window._cnt >= 50) return true;
 			window._cnt++;
@@ -791,28 +795,27 @@ func TestPageWaitForFunction(t *testing.T) {
 		}`)
 		require.NoError(t, err)
 
-		_, err = vu.RunAsync(t, script, "fn", "{}", "null")
+		_, err = tb.vu.RunAsync(t, script, "fn", "{}", "null")
 		require.NoError(t, err)
-		assert.Contains(t, *log, "ok: null")
+		tb.logCache.assertContains(t, "ok: null")
 	})
 
 	t.Run("ok_func_raf_default_arg", func(t *testing.T) {
 		t.Parallel()
 
-		vu, _, log, cleanUp := startIteration(t)
-		defer cleanUp()
+		tb := setup(t)
 
-		_, err := vu.RunOnEventLoop(t, `fn = arg => {
+		_, err := tb.vu.RunOnEventLoop(t, `fn = arg => {
 			window._arg = arg;
 			return true;
 		}`)
 		require.NoError(t, err)
 
-		_, err = vu.RunAsync(t, script, "fn", "{}", `"raf_arg"`)
+		_, err = tb.vu.RunAsync(t, script, "fn", "{}", `"raf_arg"`)
 		require.NoError(t, err)
-		assert.Contains(t, *log, "ok: null")
+		tb.logCache.contains("ok: null")
 
-		p := vu.RunPromise(t, `return await page.evaluate(() => window._arg);`)
+		p := tb.vu.RunPromise(t, `return await page.evaluate(() => window._arg);`)
 		require.Equal(t, p.State(), sobek.PromiseStateFulfilled)
 		assert.Equal(t, "raf_arg", p.Result().String())
 	})
@@ -820,10 +823,9 @@ func TestPageWaitForFunction(t *testing.T) {
 	t.Run("ok_func_raf_default_args", func(t *testing.T) {
 		t.Parallel()
 
-		vu, rt, log, cleanUp := startIteration(t)
-		defer cleanUp()
+		tb := setup(t)
 
-		_, err := vu.RunOnEventLoop(t, `fn = (...args) => {
+		_, err := tb.vu.RunOnEventLoop(t, `fn = (...args) => {
 			window._args = args;
 			return true;
 		}`)
@@ -833,34 +835,32 @@ func TestPageWaitForFunction(t *testing.T) {
 		argsJS, err := json.Marshal(args)
 		require.NoError(t, err)
 
-		_, err = vu.RunAsync(t, script, "fn", "{}", "..."+string(argsJS))
+		_, err = tb.vu.RunAsync(t, script, "fn", "{}", "..."+string(argsJS))
 		require.NoError(t, err)
-		assert.Contains(t, *log, "ok: null")
+		tb.logCache.contains("ok: null")
 
-		p := vu.RunPromise(t, `return await page.evaluate(() => window._args);`)
+		p := tb.vu.RunPromise(t, `return await page.evaluate(() => window._args);`)
 		require.Equal(t, p.State(), sobek.PromiseStateFulfilled)
 		var gotArgs []int
-		_ = rt.ExportTo(p.Result(), &gotArgs)
+		_ = tb.vu.Runtime().ExportTo(p.Result(), &gotArgs)
 		assert.Equal(t, args, gotArgs)
 	})
 
 	t.Run("err_expr_raf_timeout", func(t *testing.T) {
 		t.Parallel()
 
-		vu, _, _, cleanUp := startIteration(t)
-		defer cleanUp()
+		tb := setup(t)
 
-		_, err := vu.RunAsync(t, script, "false", "{ polling: 'raf', timeout: 500 }", "null")
+		_, err := tb.vu.RunAsync(t, script, "false", "{ polling: 'raf', timeout: 500 }", "null")
 		require.ErrorContains(t, err, "timed out after 500ms")
 	})
 
 	t.Run("err_wrong_polling", func(t *testing.T) {
 		t.Parallel()
 
-		vu, _, _, cleanUp := startIteration(t)
-		defer cleanUp()
+		tb := setup(t)
 
-		_, err := vu.RunAsync(t, script, "false", "{ polling: 'blah' }", "null")
+		_, err := tb.vu.RunAsync(t, script, "false", "{ polling: 'blah' }", "null")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(),
 			`parsing waitForFunction options: wrong polling option value:`,
@@ -870,11 +870,9 @@ func TestPageWaitForFunction(t *testing.T) {
 	t.Run("ok_expr_poll_interval", func(t *testing.T) {
 		t.Parallel()
 
-		vu, _, log, cleanUp := startIteration(t)
-		defer cleanUp()
-
-		vu.SetVar(t, "page", &sobek.Object{})
-		_, err := vu.RunAsync(t, `
+		tb := setup(t)
+		tb.vu.SetVar(t, "page", &sobek.Object{})
+		_, err := tb.vu.RunAsync(t, `
 			page = await browser.newPage();
 			await page.evaluate(() => {
 				setTimeout(() => {
@@ -893,19 +891,18 @@ func TestPageWaitForFunction(t *testing.T) {
 			} else {
 				log('err: '+err);
 			}`
-		_, err = vu.RunAsync(t, script, `"document.querySelector('h1')"`, "{ polling: 100, timeout: 2000, }", "null")
+		_, err = tb.vu.RunAsync(t, script, `"document.querySelector('h1')"`, "{ polling: 100, timeout: 2000, }", "null")
 		require.NoError(t, err)
-		assert.Contains(t, *log, "ok: Hello")
+		tb.logCache.contains("ok: Hello")
 	})
 
 	t.Run("ok_func_poll_mutation", func(t *testing.T) {
 		t.Parallel()
 
-		vu, _, log, cleanUp := startIteration(t)
-		defer cleanUp()
+		tb := setup(t)
 
-		vu.SetVar(t, "page", &sobek.Object{})
-		_, err := vu.RunAsync(t, `
+		tb.vu.SetVar(t, "page", &sobek.Object{})
+		_, err := tb.vu.RunAsync(t, `
 			fn = () => document.querySelector('h1') !== null
 
 			page = await browser.newPage();
@@ -925,9 +922,9 @@ func TestPageWaitForFunction(t *testing.T) {
 			let resp = await page.waitForFunction(%s, %s, %s);
 			log('ok: '+resp);`
 
-		_, err = vu.RunAsync(t, script, "fn", "{ polling: 'mutation', timeout: 2000, }", "null")
+		_, err = tb.vu.RunAsync(t, script, "fn", "{ polling: 'mutation', timeout: 2000, }", "null")
 		require.NoError(t, err)
-		assert.Contains(t, *log, "ok: null")
+		tb.logCache.assertContains(t, "ok: null")
 	})
 }
 
@@ -1268,7 +1265,6 @@ func TestPageOn(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1348,7 +1344,6 @@ func TestPageTimeout(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1423,7 +1418,6 @@ func TestPageWaitForSelector(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1509,7 +1503,6 @@ func TestPageThrottleNetwork(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1669,7 +1662,6 @@ func TestPageIsVisible(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1742,7 +1734,6 @@ func TestPageIsHidden(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1771,7 +1762,7 @@ func TestPageIsHidden(t *testing.T) {
 	}
 }
 
-func TestShadowDOMAndDocumentFragment(t *testing.T) {
+func TestShadowDOMAndDocumentFragment(t *testing.T) { //nolint:tparallel
 	t.Parallel()
 	if runtime.GOOS == "windows" {
 		t.Skip() // timeouts
@@ -1805,15 +1796,13 @@ func TestShadowDOMAndDocumentFragment(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		tt := tt
+	for _, tt := range tests { //nolint:paralleltest
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+			tb.vu.ActivateVU()
+			tb.vu.StartIteration(t)
+			defer tb.vu.EndIteration(t)
 
-			vu, _, _, cleanUp := startIteration(t)
-			defer cleanUp()
-
-			got := vu.RunPromise(t, `
+			got := tb.vu.RunPromise(t, `
 				const p = await browser.newPage()
 				await p.goto("%s")
 
@@ -1928,35 +1917,6 @@ func TestPageGetAttributeEmpty(t *testing.T) {
 
 func TestPageOnMetric(t *testing.T) {
 	t.Parallel()
-
-	// This page will perform many pings with a changing h query parameter.
-	// This URL should be grouped according to how page.on('metric') is used.
-	tb := newTestBrowser(t, withHTTPServer())
-	tb.withHandler("/home", func(w http.ResponseWriter, r *http.Request) {
-		_, err := fmt.Fprintf(w, `
-		<html>
-			<head></head>
-			<body>
-				<script type="module">
-					await ping();
-					async function ping() {
-						await fetch('/ping?h=2kq2lo6n06');
-						await fetch('/ping?h=ej0ypprcjk');
-					}
-				</script>
-			</body>
-		</html>`)
-		require.NoError(t, err)
-	})
-	tb.withHandler("/ping", func(w http.ResponseWriter, r *http.Request) {
-		_, err := fmt.Fprintf(w, `pong`)
-		require.NoError(t, err)
-	})
-
-	ignoreURLs := map[string]any{
-		tb.url("/home"):        nil,
-		tb.url("/favicon.ico"): nil,
-	}
 
 	tests := []struct {
 		name      string
@@ -2117,7 +2077,6 @@ func TestPageOnMetric(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -2127,6 +2086,34 @@ func TestPageOnMetric(t *testing.T) {
 			done := make(chan bool)
 
 			samples := make(chan k6metrics.SampleContainer)
+			// This page will perform many pings with a changing h query parameter.
+			// This URL should be grouped according to how page.on('metric') is used.
+			tb := newTestBrowser(t, withHTTPServer(), withSamples(samples))
+			tb.withHandler("/home", func(w http.ResponseWriter, r *http.Request) {
+				_, err := fmt.Fprintf(w, `
+		<html>
+			<head></head>
+			<body>
+				<script type="module">
+					await ping();
+					async function ping() {
+						await fetch('/ping?h=2kq2lo6n06');
+						await fetch('/ping?h=ej0ypprcjk');
+					}
+				</script>
+			</body>
+		</html>`)
+				require.NoError(t, err)
+			})
+			tb.withHandler("/ping", func(w http.ResponseWriter, r *http.Request) {
+				_, err := fmt.Fprintf(w, `pong`)
+				require.NoError(t, err)
+			})
+
+			ignoreURLs := map[string]any{
+				tb.url("/home"):        nil,
+				tb.url("/favicon.ico"): nil,
+			}
 			go func() {
 				defer close(done)
 				for e := range samples {
@@ -2134,9 +2121,9 @@ func TestPageOnMetric(t *testing.T) {
 					for _, s := range ss {
 						// At the moment all metrics that the browser emits contains
 						// both a url and name tag on each metric.
-						u, ok := s.TimeSeries.Tags.Get("url")
+						u, ok := s.Tags.Get("url")
 						assert.True(t, ok)
-						n, ok := s.TimeSeries.Tags.Get("name")
+						n, ok := s.Tags.Get("name")
 						assert.True(t, ok)
 
 						// The name and url tags should have the same value.
@@ -2163,13 +2150,14 @@ func TestPageOnMetric(t *testing.T) {
 				}
 			}()
 
-			vu, _, _, cleanUp := startIteration(t, k6test.WithSamples(samples))
-			defer cleanUp()
+			tb.vu.ActivateVU()
+			tb.vu.StartIteration(t)
+			defer tb.vu.EndIteration(t)
 
 			// Some of the business logic is in the mapping layer unfortunately.
 			// To test everything is wried up correctly, we're required to work
 			// with RunPromise.
-			gv, err := vu.RunAsync(t, `
+			gv, err := tb.vu.RunAsync(t, `
 				const page = await browser.newPage()
 
 				%s
@@ -2209,7 +2197,6 @@ func TestPageOnRequest(t *testing.T) {
 
 	// Start and setup a webserver to test the page.on('request') handler.
 	tb := newTestBrowser(t, withHTTPServer())
-	defer tb.Browser.Close()
 
 	tb.withHandler("/home", func(w http.ResponseWriter, r *http.Request) {
 		_, err := fmt.Fprintf(w, `<!DOCTYPE html>
@@ -2248,9 +2235,9 @@ func TestPageOnRequest(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	// Start and setup a k6 iteration to test the page.on('request') handler.
-	vu, _, _, cleanUp := startIteration(t)
-	defer cleanUp()
+	tb.vu.ActivateVU()
+	tb.vu.StartIteration(t)
+	defer tb.vu.EndIteration(t)
 
 	// Some of the business logic is in the mapping layer unfortunately.
 	// To test everything is wried up correctly, we're required to work
@@ -2258,7 +2245,7 @@ func TestPageOnRequest(t *testing.T) {
 	//
 	// The code below is the JavaScript code that is executed in the k6 iteration.
 	// It will wait for all requests to be captured in returnValue, before returning.
-	gv, err := vu.RunAsync(t, `
+	gv, err := tb.vu.RunAsync(t, `
 		const context = await browser.newContext({locale: 'en-US', userAgent: 'some-user-agent'});
 		const page = await context.newPage();
 
@@ -2475,7 +2462,6 @@ func TestPageOnResponse(t *testing.T) {
 
 	// Start and setup a webserver to test the page.on('request') handler.
 	tb := newTestBrowser(t, withHTTPServer())
-	defer tb.Browser.Close()
 
 	tb.withHandler("/home", func(w http.ResponseWriter, _ *http.Request) {
 		_, err := fmt.Fprintf(w, `<!DOCTYPE html>
@@ -2516,17 +2502,16 @@ func TestPageOnResponse(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	// Start and setup a k6 iteration to test the page.on('request') handler.
-	vu, _, _, cleanUp := startIteration(t)
-	defer cleanUp()
-
+	tb.vu.ActivateVU()
+	tb.vu.StartIteration(t)
+	defer tb.vu.EndIteration(t)
 	// Some of the business logic is in the mapping layer unfortunately.
 	// To test everything is wried up correctly, we're required to work
 	// with RunPromise.
 	//
 	// The code below is the JavaScript code that is executed in the k6 iteration.
 	// It will wait for all requests to be captured in returnValue, before returning.
-	gv, err := vu.RunAsync(t, `
+	gv, err := tb.vu.RunAsync(t, `
 		const context = await browser.newContext({locale: 'en-US', userAgent: 'some-user-agent'});
 		const page = await context.newPage();
 

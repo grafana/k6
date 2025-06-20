@@ -93,7 +93,6 @@ func TestLoadOnceGlobalVars(t *testing.T) {
 
 			runners := map[string]*Runner{"Source": r1, "Archive": r2}
 			for name, r := range runners {
-				r := r
 				t.Run(name, func(t *testing.T) {
 					t.Parallel()
 					ch := newDevNullSampleChannel()
@@ -144,7 +143,6 @@ func TestLoadExportsIsntUsableInModule(t *testing.T) {
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range runners {
-		r := r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			ch := newDevNullSampleChannel()
@@ -191,7 +189,6 @@ func TestLoadDoesntBreakHTTPGet(t *testing.T) {
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range runners {
-		r := r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			ch := newDevNullSampleChannel()
@@ -236,7 +233,6 @@ func TestLoadGlobalVarsAreNotSharedBetweenVUs(t *testing.T) {
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range runners {
-		r := r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			ch := newDevNullSampleChannel()
@@ -298,7 +294,6 @@ func TestLoadCycle(t *testing.T) {
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range runners {
-		r := r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			ch := newDevNullSampleChannel()
@@ -360,7 +355,6 @@ func TestLoadCycleBinding(t *testing.T) {
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range runners {
-		r := r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			ch := newDevNullSampleChannel()
@@ -424,7 +418,6 @@ func TestBrowserified(t *testing.T) {
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range runners {
-		r := r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			ch := make(chan metrics.SampleContainer, 100)
@@ -467,7 +460,6 @@ func TestLoadingUnexistingModuleDoesntPanic(t *testing.T) {
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range runners {
-		r := r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			ch := newDevNullSampleChannel()
@@ -503,7 +495,6 @@ func TestLoadingSourceMapsDoesntErrorOut(t *testing.T) {
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range runners {
-		r := r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			ch := newDevNullSampleChannel()
@@ -556,7 +547,6 @@ func TestOptionsAreGloballyReadable(t *testing.T) {
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range runners {
-		r := r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			ch := newDevNullSampleChannel()

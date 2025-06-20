@@ -12,7 +12,7 @@ import (
 	"context"
 
 	"github.com/chromedp/cdproto/cdp"
-	"github.com/mailru/easyjson"
+	"github.com/go-json-experiment/json/jsontext"
 )
 
 // LoadUnpackedParams installs an unpacked extension from the filesystem
@@ -43,7 +43,7 @@ func LoadUnpacked(path string) *LoadUnpackedParams {
 
 // LoadUnpackedReturns return values.
 type LoadUnpackedReturns struct {
-	ID string `json:"id,omitempty"` // Extension id.
+	ID string `json:"id,omitempty,omitzero"` // Extension id.
 }
 
 // Do executes Extensions.loadUnpacked against the provided context.
@@ -62,12 +62,39 @@ func (p *LoadUnpackedParams) Do(ctx context.Context) (id string, err error) {
 	return res.ID, nil
 }
 
+// UninstallParams uninstalls an unpacked extension (others not supported)
+// from the profile. Available if the client is connected using the
+// --remote-debugging-pipe flag and the --enable-unsafe-extension-debugging.
+type UninstallParams struct {
+	ID string `json:"id"` // Extension id.
+}
+
+// Uninstall uninstalls an unpacked extension (others not supported) from the
+// profile. Available if the client is connected using the
+// --remote-debugging-pipe flag and the --enable-unsafe-extension-debugging.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Extensions#method-uninstall
+//
+// parameters:
+//
+//	id - Extension id.
+func Uninstall(id string) *UninstallParams {
+	return &UninstallParams{
+		ID: id,
+	}
+}
+
+// Do executes Extensions.uninstall against the provided context.
+func (p *UninstallParams) Do(ctx context.Context) (err error) {
+	return cdp.Execute(ctx, CommandUninstall, p, nil)
+}
+
 // GetStorageItemsParams gets data from extension storage in the given
 // storageArea. If keys is specified, these are used to filter the result.
 type GetStorageItemsParams struct {
-	ID          string      `json:"id"`             // ID of extension.
-	StorageArea StorageArea `json:"storageArea"`    // StorageArea to retrieve data from.
-	Keys        []string    `json:"keys,omitempty"` // Keys to retrieve.
+	ID          string      `json:"id"`                      // ID of extension.
+	StorageArea StorageArea `json:"storageArea"`             // StorageArea to retrieve data from.
+	Keys        []string    `json:"keys,omitempty,omitzero"` // Keys to retrieve.
 }
 
 // GetStorageItems gets data from extension storage in the given storageArea.
@@ -94,7 +121,7 @@ func (p GetStorageItemsParams) WithKeys(keys []string) *GetStorageItemsParams {
 
 // GetStorageItemsReturns return values.
 type GetStorageItemsReturns struct {
-	Data easyjson.RawMessage `json:"data,omitempty"`
+	Data jsontext.Value `json:"data,omitempty,omitzero"`
 }
 
 // Do executes Extensions.getStorageItems against the provided context.
@@ -102,7 +129,7 @@ type GetStorageItemsReturns struct {
 // returns:
 //
 //	data
-func (p *GetStorageItemsParams) Do(ctx context.Context) (data easyjson.RawMessage, err error) {
+func (p *GetStorageItemsParams) Do(ctx context.Context) (data jsontext.Value, err error) {
 	// execute
 	var res GetStorageItemsReturns
 	err = cdp.Execute(ctx, CommandGetStorageItems, p, &res)
@@ -174,9 +201,9 @@ func (p *ClearStorageItemsParams) Do(ctx context.Context) (err error) {
 // storageArea. The provided values will be merged with existing values in the
 // storage area.
 type SetStorageItemsParams struct {
-	ID          string              `json:"id"`          // ID of extension.
-	StorageArea StorageArea         `json:"storageArea"` // StorageArea to set data in.
-	Values      easyjson.RawMessage `json:"values"`
+	ID          string         `json:"id"`          // ID of extension.
+	StorageArea StorageArea    `json:"storageArea"` // StorageArea to set data in.
+	Values      jsontext.Value `json:"values"`
 }
 
 // SetStorageItems sets values in extension storage in the given storageArea.
@@ -189,7 +216,7 @@ type SetStorageItemsParams struct {
 //	id - ID of extension.
 //	storageArea - StorageArea to set data in.
 //	values - Values to set.
-func SetStorageItems(id string, storageArea StorageArea, values easyjson.RawMessage) *SetStorageItemsParams {
+func SetStorageItems(id string, storageArea StorageArea, values jsontext.Value) *SetStorageItemsParams {
 	return &SetStorageItemsParams{
 		ID:          id,
 		StorageArea: storageArea,
@@ -205,6 +232,7 @@ func (p *SetStorageItemsParams) Do(ctx context.Context) (err error) {
 // Command names.
 const (
 	CommandLoadUnpacked       = "Extensions.loadUnpacked"
+	CommandUninstall          = "Extensions.uninstall"
 	CommandGetStorageItems    = "Extensions.getStorageItems"
 	CommandRemoveStorageItems = "Extensions.removeStorageItems"
 	CommandClearStorageItems  = "Extensions.clearStorageItems"

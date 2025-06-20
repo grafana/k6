@@ -392,9 +392,6 @@ func TestHMac(t *testing.T) {
 		"ripemd160":  "00bb4ce0d6afd4c7424c9d01b8a6caa3e749b08b",
 	}
 	for algorithm, value := range testData {
-		algorithm := algorithm
-		value := value
-
 		t.Run(algorithm+" hasher: valid", func(t *testing.T) {
 			t.Parallel()
 
@@ -457,9 +454,6 @@ func TestHMac(t *testing.T) {
 		"sha348": "d331e169e2dcfc742e80a3bf4dcc76d0e6425ab3777a3ac217ac6b2552aad5529ed4d40135b06e53a495ac7425d1e462",
 	}
 	for algorithm, value := range invalidData {
-		algorithm := algorithm
-		value := value
-
 		t.Run(algorithm+" hasher: invalid", func(t *testing.T) {
 			t.Parallel()
 
@@ -508,8 +502,7 @@ func TestHexEncode(t *testing.T) {
 		}
 
 		for _, tc := range testCases {
-			tc := tc
-			t.Run(fmt.Sprintf("%T", tc), func(t *testing.T) {
+			t.Run(fmt.Sprintf("%T", tc), func(t *testing.T) { //nolint:paralleltest
 				c := Crypto{}
 				out, err := c.hexEncode(tc)
 				require.NoError(t, err)

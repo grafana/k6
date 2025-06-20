@@ -1,4 +1,4 @@
-// +build openbsd netbsd
+//go:build openbsd || netbsd
 
 package sysutil
 

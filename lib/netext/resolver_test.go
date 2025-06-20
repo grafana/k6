@@ -63,7 +63,6 @@ func TestResolver(t *testing.T) {
 		}
 
 		for _, tc := range testCases {
-			tc := tc
 			t.Run(fmt.Sprintf("%s_%s_%s", tc.ttl, tc.sel, tc.pol), func(t *testing.T) {
 				t.Parallel()
 				r := NewResolver(mr.LookupIPAll, tc.ttl, tc.sel, tc.pol)

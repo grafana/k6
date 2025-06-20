@@ -120,6 +120,8 @@ func TestGetMetric(t *testing.T) {
 		})
 
 		t.Run("metric", func(t *testing.T) {
+			t.Parallel()
+
 			var envelop metricJSONAPI
 
 			assert.NoError(t, json.Unmarshal(rw.Body.Bytes(), &envelop))

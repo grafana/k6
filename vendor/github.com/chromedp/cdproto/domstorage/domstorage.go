@@ -91,7 +91,7 @@ func GetDOMStorageItems(storageID *StorageID) *GetDOMStorageItemsParams {
 
 // GetDOMStorageItemsReturns return values.
 type GetDOMStorageItemsReturns struct {
-	Entries []Item `json:"entries,omitempty"`
+	Entries []Item `json:"entries,omitempty,omitzero"`
 }
 
 // Do executes DOMStorage.getDOMStorageItems against the provided context.

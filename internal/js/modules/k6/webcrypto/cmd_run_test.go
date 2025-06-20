@@ -73,7 +73,6 @@ func TestExamplesInputOutput(t *testing.T) {
 
 		for _, file := range list {
 			name := filepath.Base(file)
-			file := file
 
 			t.Run(name, func(t *testing.T) {
 				t.Parallel()

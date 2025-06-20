@@ -26,22 +26,15 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"math/rand"
 	"net"
-	"time"
 
 	"google.golang.org/grpc"
-
-	"go.k6.io/k6/lib/testutils/grpcservice"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/testdata"
 
-	"google.golang.org/grpc/reflection"
+	"go.k6.io/k6/internal/lib/testutils/grpcservice"
 )
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
 
 var (
 	tls        = flag.Bool("tls", false, "Connection uses TLS if true, else plain TCP")

@@ -59,8 +59,10 @@ func aggregate(input, output string, opts *options, proc *process) error {
 	agg.logger = proc.logger
 	agg.seenMetrics = make([]string, 0)
 
-	var inputFile, outputFile afero.File
-	var err error
+	var (
+		inputFile, outputFile afero.File
+		err                   error
+	)
 
 	if inputFile, err = proc.fs.Open(input); err != nil {
 		return err
@@ -272,7 +274,7 @@ func (agg *aggregator) tagSetFrom(res gjson.Result) *metrics.TagSet {
 		return nil
 	}
 
-	set := agg.registry.Registry.RootTagSet()
+	set := agg.registry.RootTagSet()
 
 	for key, value := range asMap {
 		set = set.With(key, value.String())

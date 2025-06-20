@@ -163,7 +163,7 @@ func TestBrowserOn(t *testing.T) {
 		require.NoError(t, rt.Set("b", b.Browser))
 		require.NoError(t, rt.Set("log", func(s string) { log = append(log, s) }))
 
-		time.AfterFunc(100*time.Millisecond, b.Browser.Close)
+		time.AfterFunc(100*time.Millisecond, b.Close)
 		_, err := b.runJavaScript(script, "disconnected")
 		require.NoError(t, err)
 		assert.Contains(t, log, "true")

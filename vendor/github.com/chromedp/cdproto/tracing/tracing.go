@@ -39,7 +39,7 @@ func GetCategories() *GetCategoriesParams {
 
 // GetCategoriesReturns return values.
 type GetCategoriesReturns struct {
-	Categories []string `json:"categories,omitempty"` // A list of supported tracing categories.
+	Categories []string `json:"categories,omitempty,omitzero"` // A list of supported tracing categories.
 }
 
 // Do executes Tracing.getCategories against the provided context.
@@ -83,8 +83,8 @@ func (p *RecordClockSyncMarkerParams) Do(ctx context.Context) (err error) {
 
 // RequestMemoryDumpParams request a global memory dump.
 type RequestMemoryDumpParams struct {
-	Deterministic bool                    `json:"deterministic,omitempty"` // Enables more deterministic results by forcing garbage collection
-	LevelOfDetail MemoryDumpLevelOfDetail `json:"levelOfDetail,omitempty"` // Specifies level of details in memory dump. Defaults to "detailed".
+	Deterministic bool                    `json:"deterministic"`                    // Enables more deterministic results by forcing garbage collection
+	LevelOfDetail MemoryDumpLevelOfDetail `json:"levelOfDetail,omitempty,omitzero"` // Specifies level of details in memory dump. Defaults to "detailed".
 }
 
 // RequestMemoryDump request a global memory dump.
@@ -93,7 +93,9 @@ type RequestMemoryDumpParams struct {
 //
 // parameters:
 func RequestMemoryDump() *RequestMemoryDumpParams {
-	return &RequestMemoryDumpParams{}
+	return &RequestMemoryDumpParams{
+		Deterministic: false,
+	}
 }
 
 // WithDeterministic enables more deterministic results by forcing garbage
@@ -112,8 +114,8 @@ func (p RequestMemoryDumpParams) WithLevelOfDetail(levelOfDetail MemoryDumpLevel
 
 // RequestMemoryDumpReturns return values.
 type RequestMemoryDumpReturns struct {
-	DumpGUID string `json:"dumpGuid,omitempty"` // GUID of the resulting global memory dump.
-	Success  bool   `json:"success,omitempty"`  // True iff the global memory dump succeeded.
+	DumpGUID string `json:"dumpGuid,omitempty,omitzero"` // GUID of the resulting global memory dump.
+	Success  bool   `json:"success"`                     // True iff the global memory dump succeeded.
 }
 
 // Do executes Tracing.requestMemoryDump against the provided context.
@@ -135,13 +137,13 @@ func (p *RequestMemoryDumpParams) Do(ctx context.Context) (dumpGUID string, succ
 
 // StartParams start trace events collection.
 type StartParams struct {
-	BufferUsageReportingInterval float64           `json:"bufferUsageReportingInterval,omitempty"` // If set, the agent will issue bufferUsage events at this interval, specified in milliseconds
-	TransferMode                 TransferMode      `json:"transferMode,omitempty"`                 // Whether to report trace events as series of dataCollected events or to save trace to a stream (defaults to ReportEvents).
-	StreamFormat                 StreamFormat      `json:"streamFormat,omitempty"`                 // Trace data format to use. This only applies when using ReturnAsStream transfer mode (defaults to json).
-	StreamCompression            StreamCompression `json:"streamCompression,omitempty"`            // Compression format to use. This only applies when using ReturnAsStream transfer mode (defaults to none)
-	TraceConfig                  *TraceConfig      `json:"traceConfig,omitempty"`
-	PerfettoConfig               string            `json:"perfettoConfig,omitempty"` // Base64-encoded serialized perfetto.protos.TraceConfig protobuf message When specified, the parameters categories, options, traceConfig are ignored.
-	TracingBackend               Backend           `json:"tracingBackend,omitempty"` // Backend type (defaults to auto)
+	BufferUsageReportingInterval float64           `json:"bufferUsageReportingInterval,omitempty,omitzero"` // If set, the agent will issue bufferUsage events at this interval, specified in milliseconds
+	TransferMode                 TransferMode      `json:"transferMode,omitempty,omitzero"`                 // Whether to report trace events as series of dataCollected events or to save trace to a stream (defaults to ReportEvents).
+	StreamFormat                 StreamFormat      `json:"streamFormat,omitempty,omitzero"`                 // Trace data format to use. This only applies when using ReturnAsStream transfer mode (defaults to json).
+	StreamCompression            StreamCompression `json:"streamCompression,omitempty,omitzero"`            // Compression format to use. This only applies when using ReturnAsStream transfer mode (defaults to none)
+	TraceConfig                  *TraceConfig      `json:"traceConfig,omitempty,omitzero"`
+	PerfettoConfig               string            `json:"perfettoConfig,omitempty,omitzero"` // Base64-encoded serialized perfetto.protos.TraceConfig protobuf message When specified, the parameters categories, options, traceConfig are ignored.
+	TracingBackend               Backend           `json:"tracingBackend,omitempty,omitzero"` // Backend type (defaults to auto)
 }
 
 // Start start trace events collection.

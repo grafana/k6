@@ -105,9 +105,6 @@ func TestParseArg(t *testing.T) {
 	}
 
 	for arg, testCase := range cases {
-		arg := arg
-		testCase := testCase
-
 		t.Run(arg, func(t *testing.T) {
 			t.Parallel()
 

@@ -41,7 +41,7 @@ func (p *parser) lowerNestingInRule(rule css_ast.Rule, results []css_ast.Rule) [
 			// Filter out pseudo elements because they are ignored by nested style
 			// rules. This is because pseudo-elements are not valid within :is():
 			// https://www.w3.org/TR/selectors-4/#matches-pseudo. This restriction
-			// may be relaxed in the future, but this restriction hash shipped so
+			// may be relaxed in the future, but this restriction has shipped so
 			// we're stuck with it: https://github.com/w3c/csswg-drafts/issues/7433.
 			//
 			// Note: This is only for the parent selector list that is used to
@@ -101,6 +101,34 @@ func (p *parser) lowerNestingInRulesAndReturnRemaining(rules []css_ast.Rule, con
 	return rules[:n]
 }
 
+func compoundSelectorTermCount(sel css_ast.CompoundSelector) int {
+	count := 0
+	for _, ss := range sel.SubclassSelectors {
+		count++
+		if list, ok := ss.Data.(*css_ast.SSPseudoClassWithSelectorList); ok {
+			count += complexSelectorTermCount(list.Selectors)
+		}
+	}
+	return count
+}
+
+func complexSelectorTermCount(selectors []css_ast.ComplexSelector) int {
+	count := 0
+	for _, sel := range selectors {
+		for _, inner := range sel.Selectors {
+			count += compoundSelectorTermCount(inner)
+		}
+	}
+	return count
+}
+
+func (p *parser) addExpansionError(loc logger.Loc, n int) {
+	p.log.AddErrorWithNotes(&p.tracker, logger.Range{Loc: loc}, "CSS nesting is causing too much expansion",
+		[]logger.MsgData{{Text: fmt.Sprintf("CSS nesting expansion was terminated because a rule was generated with %d selectors. "+
+			"This limit exists to prevent esbuild from using too much time and/or memory. "+
+			"Please change your CSS to use fewer levels of nesting.", n)}})
+}
+
 type lowerNestingContext struct {
 	parentSelectors []css_ast.ComplexSelector
 	loweredRules    []css_ast.Rule
@@ -109,6 +137,9 @@ type lowerNestingContext struct {
 func (p *parser) lowerNestingInRuleWithContext(rule css_ast.Rule, context *lowerNestingContext) css_ast.Rule {
 	switch r := rule.Data.(type) {
 	case *css_ast.RSelector:
+		oldSelectorsLen := len(r.Selectors)
+		oldSelectorsComplexity := complexSelectorTermCount(r.Selectors)
+
 		// "a { & b {} }" => "a b {}"
 		// "a { &b {} }" => "a:is(b) {}"
 		// "a { &:hover {} }" => "a:hover {}"
@@ -225,6 +256,16 @@ func (p *parser) lowerNestingInRuleWithContext(rule css_ast.Rule, context *lower
 				}
 			}
 			r.Selectors = selectors
+		}
+
+		// Put limits on the combinatorial explosion to avoid using too much time and/or memory
+		if n := len(r.Selectors); n > oldSelectorsLen && n > 0xFF00 {
+			p.addExpansionError(rule.Loc, n)
+			return css_ast.Rule{}
+		}
+		if n := complexSelectorTermCount(r.Selectors); n > oldSelectorsComplexity && n > 0xFF00 {
+			p.addExpansionError(rule.Loc, n)
+			return css_ast.Rule{}
 		}
 
 		// Lower all child rules using our newly substituted selector

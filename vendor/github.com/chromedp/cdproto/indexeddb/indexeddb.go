@@ -15,11 +15,11 @@ import (
 
 // ClearObjectStoreParams clears all entries from an object store.
 type ClearObjectStoreParams struct {
-	SecurityOrigin  string          `json:"securityOrigin,omitempty"` // At least and at most one of securityOrigin, storageKey, or storageBucket must be specified. Security origin.
-	StorageKey      string          `json:"storageKey,omitempty"`     // Storage key.
-	StorageBucket   *storage.Bucket `json:"storageBucket,omitempty"`  // Storage bucket. If not specified, it uses the default bucket.
-	DatabaseName    string          `json:"databaseName"`             // Database name.
-	ObjectStoreName string          `json:"objectStoreName"`          // Object store name.
+	SecurityOrigin  string          `json:"securityOrigin,omitempty,omitzero"` // At least and at most one of securityOrigin, storageKey, or storageBucket must be specified. Security origin.
+	StorageKey      string          `json:"storageKey,omitempty,omitzero"`     // Storage key.
+	StorageBucket   *storage.Bucket `json:"storageBucket,omitempty,omitzero"`  // Storage bucket. If not specified, it uses the default bucket.
+	DatabaseName    string          `json:"databaseName"`                      // Database name.
+	ObjectStoreName string          `json:"objectStoreName"`                   // Object store name.
 }
 
 // ClearObjectStore clears all entries from an object store.
@@ -64,10 +64,10 @@ func (p *ClearObjectStoreParams) Do(ctx context.Context) (err error) {
 
 // DeleteDatabaseParams deletes a database.
 type DeleteDatabaseParams struct {
-	SecurityOrigin string          `json:"securityOrigin,omitempty"` // At least and at most one of securityOrigin, storageKey, or storageBucket must be specified. Security origin.
-	StorageKey     string          `json:"storageKey,omitempty"`     // Storage key.
-	StorageBucket  *storage.Bucket `json:"storageBucket,omitempty"`  // Storage bucket. If not specified, it uses the default bucket.
-	DatabaseName   string          `json:"databaseName"`             // Database name.
+	SecurityOrigin string          `json:"securityOrigin,omitempty,omitzero"` // At least and at most one of securityOrigin, storageKey, or storageBucket must be specified. Security origin.
+	StorageKey     string          `json:"storageKey,omitempty,omitzero"`     // Storage key.
+	StorageBucket  *storage.Bucket `json:"storageBucket,omitempty,omitzero"`  // Storage bucket. If not specified, it uses the default bucket.
+	DatabaseName   string          `json:"databaseName"`                      // Database name.
 }
 
 // DeleteDatabase deletes a database.
@@ -111,9 +111,9 @@ func (p *DeleteDatabaseParams) Do(ctx context.Context) (err error) {
 // DeleteObjectStoreEntriesParams delete a range of entries from an object
 // store.
 type DeleteObjectStoreEntriesParams struct {
-	SecurityOrigin  string          `json:"securityOrigin,omitempty"` // At least and at most one of securityOrigin, storageKey, or storageBucket must be specified. Security origin.
-	StorageKey      string          `json:"storageKey,omitempty"`     // Storage key.
-	StorageBucket   *storage.Bucket `json:"storageBucket,omitempty"`  // Storage bucket. If not specified, it uses the default bucket.
+	SecurityOrigin  string          `json:"securityOrigin,omitempty,omitzero"` // At least and at most one of securityOrigin, storageKey, or storageBucket must be specified. Security origin.
+	StorageKey      string          `json:"storageKey,omitempty,omitzero"`     // Storage key.
+	StorageBucket   *storage.Bucket `json:"storageBucket,omitempty,omitzero"`  // Storage bucket. If not specified, it uses the default bucket.
 	DatabaseName    string          `json:"databaseName"`
 	ObjectStoreName string          `json:"objectStoreName"`
 	KeyRange        *KeyRange       `json:"keyRange"` // Range of entry keys to delete
@@ -193,15 +193,15 @@ func (p *EnableParams) Do(ctx context.Context) (err error) {
 
 // RequestDataParams requests data from object store or index.
 type RequestDataParams struct {
-	SecurityOrigin  string          `json:"securityOrigin,omitempty"` // At least and at most one of securityOrigin, storageKey, or storageBucket must be specified. Security origin.
-	StorageKey      string          `json:"storageKey,omitempty"`     // Storage key.
-	StorageBucket   *storage.Bucket `json:"storageBucket,omitempty"`  // Storage bucket. If not specified, it uses the default bucket.
-	DatabaseName    string          `json:"databaseName"`             // Database name.
-	ObjectStoreName string          `json:"objectStoreName"`          // Object store name.
-	IndexName       string          `json:"indexName"`                // Index name, empty string for object store data requests.
-	SkipCount       int64           `json:"skipCount"`                // Number of records to skip.
-	PageSize        int64           `json:"pageSize"`                 // Number of records to fetch.
-	KeyRange        *KeyRange       `json:"keyRange,omitempty"`       // Key range.
+	SecurityOrigin  string          `json:"securityOrigin,omitempty,omitzero"` // At least and at most one of securityOrigin, storageKey, or storageBucket must be specified. Security origin.
+	StorageKey      string          `json:"storageKey,omitempty,omitzero"`     // Storage key.
+	StorageBucket   *storage.Bucket `json:"storageBucket,omitempty,omitzero"`  // Storage bucket. If not specified, it uses the default bucket.
+	DatabaseName    string          `json:"databaseName"`                      // Database name.
+	ObjectStoreName string          `json:"objectStoreName"`                   // Object store name.
+	IndexName       string          `json:"indexName"`                         // Index name, empty string for object store data requests.
+	SkipCount       int64           `json:"skipCount"`                         // Number of records to skip.
+	PageSize        int64           `json:"pageSize"`                          // Number of records to fetch.
+	KeyRange        *KeyRange       `json:"keyRange,omitempty,omitzero"`       // Key range.
 }
 
 // RequestData requests data from object store or index.
@@ -253,8 +253,8 @@ func (p RequestDataParams) WithKeyRange(keyRange *KeyRange) *RequestDataParams {
 
 // RequestDataReturns return values.
 type RequestDataReturns struct {
-	ObjectStoreDataEntries []*DataEntry `json:"objectStoreDataEntries,omitempty"` // Array of object store data entries.
-	HasMore                bool         `json:"hasMore,omitempty"`                // If true, there are more entries to fetch in the given range.
+	ObjectStoreDataEntries []*DataEntry `json:"objectStoreDataEntries,omitempty,omitzero"` // Array of object store data entries.
+	HasMore                bool         `json:"hasMore"`                                   // If true, there are more entries to fetch in the given range.
 }
 
 // Do executes IndexedDB.requestData against the provided context.
@@ -276,11 +276,11 @@ func (p *RequestDataParams) Do(ctx context.Context) (objectStoreDataEntries []*D
 
 // GetMetadataParams gets metadata of an object store.
 type GetMetadataParams struct {
-	SecurityOrigin  string          `json:"securityOrigin,omitempty"` // At least and at most one of securityOrigin, storageKey, or storageBucket must be specified. Security origin.
-	StorageKey      string          `json:"storageKey,omitempty"`     // Storage key.
-	StorageBucket   *storage.Bucket `json:"storageBucket,omitempty"`  // Storage bucket. If not specified, it uses the default bucket.
-	DatabaseName    string          `json:"databaseName"`             // Database name.
-	ObjectStoreName string          `json:"objectStoreName"`          // Object store name.
+	SecurityOrigin  string          `json:"securityOrigin,omitempty,omitzero"` // At least and at most one of securityOrigin, storageKey, or storageBucket must be specified. Security origin.
+	StorageKey      string          `json:"storageKey,omitempty,omitzero"`     // Storage key.
+	StorageBucket   *storage.Bucket `json:"storageBucket,omitempty,omitzero"`  // Storage bucket. If not specified, it uses the default bucket.
+	DatabaseName    string          `json:"databaseName"`                      // Database name.
+	ObjectStoreName string          `json:"objectStoreName"`                   // Object store name.
 }
 
 // GetMetadata gets metadata of an object store.
@@ -320,8 +320,8 @@ func (p GetMetadataParams) WithStorageBucket(storageBucket *storage.Bucket) *Get
 
 // GetMetadataReturns return values.
 type GetMetadataReturns struct {
-	EntriesCount      float64 `json:"entriesCount,omitempty"`      // the entries count
-	KeyGeneratorValue float64 `json:"keyGeneratorValue,omitempty"` // the current value of key generator, to become the next inserted key into the object store. Valid if objectStore.autoIncrement is true.
+	EntriesCount      float64 `json:"entriesCount,omitempty,omitzero"`      // the entries count
+	KeyGeneratorValue float64 `json:"keyGeneratorValue,omitempty,omitzero"` // the current value of key generator, to become the next inserted key into the object store. Valid if objectStore.autoIncrement is true.
 }
 
 // Do executes IndexedDB.getMetadata against the provided context.
@@ -343,10 +343,10 @@ func (p *GetMetadataParams) Do(ctx context.Context) (entriesCount float64, keyGe
 
 // RequestDatabaseParams requests database with given name in given frame.
 type RequestDatabaseParams struct {
-	SecurityOrigin string          `json:"securityOrigin,omitempty"` // At least and at most one of securityOrigin, storageKey, or storageBucket must be specified. Security origin.
-	StorageKey     string          `json:"storageKey,omitempty"`     // Storage key.
-	StorageBucket  *storage.Bucket `json:"storageBucket,omitempty"`  // Storage bucket. If not specified, it uses the default bucket.
-	DatabaseName   string          `json:"databaseName"`             // Database name.
+	SecurityOrigin string          `json:"securityOrigin,omitempty,omitzero"` // At least and at most one of securityOrigin, storageKey, or storageBucket must be specified. Security origin.
+	StorageKey     string          `json:"storageKey,omitempty,omitzero"`     // Storage key.
+	StorageBucket  *storage.Bucket `json:"storageBucket,omitempty,omitzero"`  // Storage bucket. If not specified, it uses the default bucket.
+	DatabaseName   string          `json:"databaseName"`                      // Database name.
 }
 
 // RequestDatabase requests database with given name in given frame.
@@ -384,7 +384,7 @@ func (p RequestDatabaseParams) WithStorageBucket(storageBucket *storage.Bucket) 
 
 // RequestDatabaseReturns return values.
 type RequestDatabaseReturns struct {
-	DatabaseWithObjectStores *DatabaseWithObjectStores `json:"databaseWithObjectStores,omitempty"` // Database with an array of object stores.
+	DatabaseWithObjectStores *DatabaseWithObjectStores `json:"databaseWithObjectStores,omitempty,omitzero"` // Database with an array of object stores.
 }
 
 // Do executes IndexedDB.requestDatabase against the provided context.
@@ -406,9 +406,9 @@ func (p *RequestDatabaseParams) Do(ctx context.Context) (databaseWithObjectStore
 // RequestDatabaseNamesParams requests database names for given security
 // origin.
 type RequestDatabaseNamesParams struct {
-	SecurityOrigin string          `json:"securityOrigin,omitempty"` // At least and at most one of securityOrigin, storageKey, or storageBucket must be specified. Security origin.
-	StorageKey     string          `json:"storageKey,omitempty"`     // Storage key.
-	StorageBucket  *storage.Bucket `json:"storageBucket,omitempty"`  // Storage bucket. If not specified, it uses the default bucket.
+	SecurityOrigin string          `json:"securityOrigin,omitempty,omitzero"` // At least and at most one of securityOrigin, storageKey, or storageBucket must be specified. Security origin.
+	StorageKey     string          `json:"storageKey,omitempty,omitzero"`     // Storage key.
+	StorageBucket  *storage.Bucket `json:"storageBucket,omitempty,omitzero"`  // Storage bucket. If not specified, it uses the default bucket.
 }
 
 // RequestDatabaseNames requests database names for given security origin.
@@ -442,7 +442,7 @@ func (p RequestDatabaseNamesParams) WithStorageBucket(storageBucket *storage.Buc
 
 // RequestDatabaseNamesReturns return values.
 type RequestDatabaseNamesReturns struct {
-	DatabaseNames []string `json:"databaseNames,omitempty"` // Database names for origin.
+	DatabaseNames []string `json:"databaseNames,omitempty,omitzero"` // Database names for origin.
 }
 
 // Do executes IndexedDB.requestDatabaseNames against the provided context.

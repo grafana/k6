@@ -4,11 +4,10 @@ package dom
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/chromedp/cdproto/cdp"
-	"github.com/mailru/easyjson"
-	"github.com/mailru/easyjson/jlexer"
-	"github.com/mailru/easyjson/jwriter"
+	"github.com/go-json-experiment/json/jsontext"
 )
 
 // PhysicalAxes containerSelector physical axes.
@@ -28,35 +27,22 @@ const (
 	PhysicalAxesBoth       PhysicalAxes = "Both"
 )
 
-// MarshalEasyJSON satisfies easyjson.Marshaler.
-func (t PhysicalAxes) MarshalEasyJSON(out *jwriter.Writer) {
-	out.String(string(t))
-}
+// UnmarshalJSON satisfies [json.Unmarshaler].
+func (t *PhysicalAxes) UnmarshalJSON(buf []byte) error {
+	s := string(buf)
+	s = strings.TrimSuffix(strings.TrimPrefix(s, `"`), `"`)
 
-// MarshalJSON satisfies json.Marshaler.
-func (t PhysicalAxes) MarshalJSON() ([]byte, error) {
-	return easyjson.Marshal(t)
-}
-
-// UnmarshalEasyJSON satisfies easyjson.Unmarshaler.
-func (t *PhysicalAxes) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	v := in.String()
-	switch PhysicalAxes(v) {
+	switch PhysicalAxes(s) {
 	case PhysicalAxesHorizontal:
 		*t = PhysicalAxesHorizontal
 	case PhysicalAxesVertical:
 		*t = PhysicalAxesVertical
 	case PhysicalAxesBoth:
 		*t = PhysicalAxesBoth
-
 	default:
-		in.AddError(fmt.Errorf("unknown PhysicalAxes value: %v", v))
+		return fmt.Errorf("unknown PhysicalAxes value: %v", s)
 	}
-}
-
-// UnmarshalJSON satisfies json.Unmarshaler.
-func (t *PhysicalAxes) UnmarshalJSON(buf []byte) error {
-	return easyjson.Unmarshal(buf, t)
+	return nil
 }
 
 // LogicalAxes containerSelector logical axes.
@@ -76,35 +62,22 @@ const (
 	LogicalAxesBoth   LogicalAxes = "Both"
 )
 
-// MarshalEasyJSON satisfies easyjson.Marshaler.
-func (t LogicalAxes) MarshalEasyJSON(out *jwriter.Writer) {
-	out.String(string(t))
-}
+// UnmarshalJSON satisfies [json.Unmarshaler].
+func (t *LogicalAxes) UnmarshalJSON(buf []byte) error {
+	s := string(buf)
+	s = strings.TrimSuffix(strings.TrimPrefix(s, `"`), `"`)
 
-// MarshalJSON satisfies json.Marshaler.
-func (t LogicalAxes) MarshalJSON() ([]byte, error) {
-	return easyjson.Marshal(t)
-}
-
-// UnmarshalEasyJSON satisfies easyjson.Unmarshaler.
-func (t *LogicalAxes) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	v := in.String()
-	switch LogicalAxes(v) {
+	switch LogicalAxes(s) {
 	case LogicalAxesInline:
 		*t = LogicalAxesInline
 	case LogicalAxesBlock:
 		*t = LogicalAxesBlock
 	case LogicalAxesBoth:
 		*t = LogicalAxesBoth
-
 	default:
-		in.AddError(fmt.Errorf("unknown LogicalAxes value: %v", v))
+		return fmt.Errorf("unknown LogicalAxes value: %v", s)
 	}
-}
-
-// UnmarshalJSON satisfies json.Unmarshaler.
-func (t *LogicalAxes) UnmarshalJSON(buf []byte) error {
-	return easyjson.Unmarshal(buf, t)
+	return nil
 }
 
 // ScrollOrientation physical scroll orientation.
@@ -123,33 +96,20 @@ const (
 	ScrollOrientationVertical   ScrollOrientation = "vertical"
 )
 
-// MarshalEasyJSON satisfies easyjson.Marshaler.
-func (t ScrollOrientation) MarshalEasyJSON(out *jwriter.Writer) {
-	out.String(string(t))
-}
+// UnmarshalJSON satisfies [json.Unmarshaler].
+func (t *ScrollOrientation) UnmarshalJSON(buf []byte) error {
+	s := string(buf)
+	s = strings.TrimSuffix(strings.TrimPrefix(s, `"`), `"`)
 
-// MarshalJSON satisfies json.Marshaler.
-func (t ScrollOrientation) MarshalJSON() ([]byte, error) {
-	return easyjson.Marshal(t)
-}
-
-// UnmarshalEasyJSON satisfies easyjson.Unmarshaler.
-func (t *ScrollOrientation) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	v := in.String()
-	switch ScrollOrientation(v) {
+	switch ScrollOrientation(s) {
 	case ScrollOrientationHorizontal:
 		*t = ScrollOrientationHorizontal
 	case ScrollOrientationVertical:
 		*t = ScrollOrientationVertical
-
 	default:
-		in.AddError(fmt.Errorf("unknown ScrollOrientation value: %v", v))
+		return fmt.Errorf("unknown ScrollOrientation value: %v", s)
 	}
-}
-
-// UnmarshalJSON satisfies json.Unmarshaler.
-func (t *ScrollOrientation) UnmarshalJSON(buf []byte) error {
-	return easyjson.Unmarshal(buf, t)
+	return nil
 }
 
 // DetachedElementInfo a structure to hold the top-level node of a detached
@@ -171,22 +131,22 @@ type Quad []float64
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/DOM#type-BoxModel
 type BoxModel struct {
-	Content      Quad              `json:"content"`                // Content box
-	Padding      Quad              `json:"padding"`                // Padding box
-	Border       Quad              `json:"border"`                 // Border box
-	Margin       Quad              `json:"margin"`                 // Margin box
-	Width        int64             `json:"width"`                  // Node width
-	Height       int64             `json:"height"`                 // Node height
-	ShapeOutside *ShapeOutsideInfo `json:"shapeOutside,omitempty"` // Shape outside coordinates
+	Content      Quad              `json:"content"`                         // Content box
+	Padding      Quad              `json:"padding"`                         // Padding box
+	Border       Quad              `json:"border"`                          // Border box
+	Margin       Quad              `json:"margin"`                          // Margin box
+	Width        int64             `json:"width"`                           // Node width
+	Height       int64             `json:"height"`                          // Node height
+	ShapeOutside *ShapeOutsideInfo `json:"shapeOutside,omitempty,omitzero"` // Shape outside coordinates
 }
 
 // ShapeOutsideInfo CSS Shape Outside details.
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/DOM#type-ShapeOutsideInfo
 type ShapeOutsideInfo struct {
-	Bounds      Quad                  `json:"bounds"`      // Shape bounds
-	Shape       []easyjson.RawMessage `json:"shape"`       // Shape coordinate details
-	MarginShape []easyjson.RawMessage `json:"marginShape"` // Margin shape bounds
+	Bounds      Quad             `json:"bounds"`      // Shape bounds
+	Shape       []jsontext.Value `json:"shape"`       // Shape coordinate details
+	MarginShape []jsontext.Value `json:"marginShape"` // Margin shape bounds
 }
 
 // Rect Rectangle.
@@ -224,33 +184,20 @@ const (
 	EnableIncludeWhitespaceAll  EnableIncludeWhitespace = "all"
 )
 
-// MarshalEasyJSON satisfies easyjson.Marshaler.
-func (t EnableIncludeWhitespace) MarshalEasyJSON(out *jwriter.Writer) {
-	out.String(string(t))
-}
+// UnmarshalJSON satisfies [json.Unmarshaler].
+func (t *EnableIncludeWhitespace) UnmarshalJSON(buf []byte) error {
+	s := string(buf)
+	s = strings.TrimSuffix(strings.TrimPrefix(s, `"`), `"`)
 
-// MarshalJSON satisfies json.Marshaler.
-func (t EnableIncludeWhitespace) MarshalJSON() ([]byte, error) {
-	return easyjson.Marshal(t)
-}
-
-// UnmarshalEasyJSON satisfies easyjson.Unmarshaler.
-func (t *EnableIncludeWhitespace) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	v := in.String()
-	switch EnableIncludeWhitespace(v) {
+	switch EnableIncludeWhitespace(s) {
 	case EnableIncludeWhitespaceNone:
 		*t = EnableIncludeWhitespaceNone
 	case EnableIncludeWhitespaceAll:
 		*t = EnableIncludeWhitespaceAll
-
 	default:
-		in.AddError(fmt.Errorf("unknown EnableIncludeWhitespace value: %v", v))
+		return fmt.Errorf("unknown EnableIncludeWhitespace value: %v", s)
 	}
-}
-
-// UnmarshalJSON satisfies json.Unmarshaler.
-func (t *EnableIncludeWhitespace) UnmarshalJSON(buf []byte) error {
-	return easyjson.Unmarshal(buf, t)
+	return nil
 }
 
 // GetElementByRelationRelation type of relation to get.
@@ -265,32 +212,22 @@ func (t GetElementByRelationRelation) String() string {
 
 // GetElementByRelationRelation values.
 const (
-	GetElementByRelationRelationPopoverTarget GetElementByRelationRelation = "PopoverTarget"
+	GetElementByRelationRelationPopoverTarget  GetElementByRelationRelation = "PopoverTarget"
+	GetElementByRelationRelationInterestTarget GetElementByRelationRelation = "InterestTarget"
 )
 
-// MarshalEasyJSON satisfies easyjson.Marshaler.
-func (t GetElementByRelationRelation) MarshalEasyJSON(out *jwriter.Writer) {
-	out.String(string(t))
-}
+// UnmarshalJSON satisfies [json.Unmarshaler].
+func (t *GetElementByRelationRelation) UnmarshalJSON(buf []byte) error {
+	s := string(buf)
+	s = strings.TrimSuffix(strings.TrimPrefix(s, `"`), `"`)
 
-// MarshalJSON satisfies json.Marshaler.
-func (t GetElementByRelationRelation) MarshalJSON() ([]byte, error) {
-	return easyjson.Marshal(t)
-}
-
-// UnmarshalEasyJSON satisfies easyjson.Unmarshaler.
-func (t *GetElementByRelationRelation) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	v := in.String()
-	switch GetElementByRelationRelation(v) {
+	switch GetElementByRelationRelation(s) {
 	case GetElementByRelationRelationPopoverTarget:
 		*t = GetElementByRelationRelationPopoverTarget
-
+	case GetElementByRelationRelationInterestTarget:
+		*t = GetElementByRelationRelationInterestTarget
 	default:
-		in.AddError(fmt.Errorf("unknown GetElementByRelationRelation value: %v", v))
+		return fmt.Errorf("unknown GetElementByRelationRelation value: %v", s)
 	}
-}
-
-// UnmarshalJSON satisfies json.Unmarshaler.
-func (t *GetElementByRelationRelation) UnmarshalJSON(buf []byte) error {
-	return easyjson.Unmarshal(buf, t)
+	return nil
 }

@@ -11,7 +11,7 @@ import (
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/network"
-	"github.com/mailru/easyjson"
+	"github.com/go-json-experiment/json/jsontext"
 )
 
 // GetStorageKeyForFrameParams returns a storage key given a frame id.
@@ -34,7 +34,7 @@ func GetStorageKeyForFrame(frameID cdp.FrameID) *GetStorageKeyForFrameParams {
 
 // GetStorageKeyForFrameReturns return values.
 type GetStorageKeyForFrameReturns struct {
-	StorageKey SerializedStorageKey `json:"storageKey,omitempty"`
+	StorageKey SerializedStorageKey `json:"storageKey,omitempty,omitzero"`
 }
 
 // Do executes Storage.getStorageKeyForFrame against the provided context.
@@ -107,7 +107,7 @@ func (p *ClearDataForStorageKeyParams) Do(ctx context.Context) (err error) {
 
 // GetCookiesParams returns all browser cookies.
 type GetCookiesParams struct {
-	BrowserContextID cdp.BrowserContextID `json:"browserContextId,omitempty"` // Browser context to use when called on the browser endpoint.
+	BrowserContextID cdp.BrowserContextID `json:"browserContextId,omitempty,omitzero"` // Browser context to use when called on the browser endpoint.
 }
 
 // GetCookies returns all browser cookies.
@@ -128,7 +128,7 @@ func (p GetCookiesParams) WithBrowserContextID(browserContextID cdp.BrowserConte
 
 // GetCookiesReturns return values.
 type GetCookiesReturns struct {
-	Cookies []*network.Cookie `json:"cookies,omitempty"` // Array of cookie objects.
+	Cookies []*network.Cookie `json:"cookies,omitempty,omitzero"` // Array of cookie objects.
 }
 
 // Do executes Storage.getCookies against the provided context.
@@ -149,8 +149,8 @@ func (p *GetCookiesParams) Do(ctx context.Context) (cookies []*network.Cookie, e
 
 // SetCookiesParams sets given cookies.
 type SetCookiesParams struct {
-	Cookies          []*network.CookieParam `json:"cookies"`                    // Cookies to be set.
-	BrowserContextID cdp.BrowserContextID   `json:"browserContextId,omitempty"` // Browser context to use when called on the browser endpoint.
+	Cookies          []*network.CookieParam `json:"cookies"`                             // Cookies to be set.
+	BrowserContextID cdp.BrowserContextID   `json:"browserContextId,omitempty,omitzero"` // Browser context to use when called on the browser endpoint.
 }
 
 // SetCookies sets given cookies.
@@ -180,7 +180,7 @@ func (p *SetCookiesParams) Do(ctx context.Context) (err error) {
 
 // ClearCookiesParams clears cookies.
 type ClearCookiesParams struct {
-	BrowserContextID cdp.BrowserContextID `json:"browserContextId,omitempty"` // Browser context to use when called on the browser endpoint.
+	BrowserContextID cdp.BrowserContextID `json:"browserContextId,omitempty,omitzero"` // Browser context to use when called on the browser endpoint.
 }
 
 // ClearCookies clears cookies.
@@ -224,10 +224,10 @@ func GetUsageAndQuota(origin string) *GetUsageAndQuotaParams {
 
 // GetUsageAndQuotaReturns return values.
 type GetUsageAndQuotaReturns struct {
-	Usage          float64         `json:"usage,omitempty"`          // Storage usage (bytes).
-	Quota          float64         `json:"quota,omitempty"`          // Storage quota (bytes).
-	OverrideActive bool            `json:"overrideActive,omitempty"` // Whether or not the origin has an active storage quota override
-	UsageBreakdown []*UsageForType `json:"usageBreakdown,omitempty"` // Storage usage per type (bytes).
+	Usage          float64         `json:"usage,omitempty,omitzero"`          // Storage usage (bytes).
+	Quota          float64         `json:"quota,omitempty,omitzero"`          // Storage quota (bytes).
+	OverrideActive bool            `json:"overrideActive"`                    // Whether or not the origin has an active storage quota override
+	UsageBreakdown []*UsageForType `json:"usageBreakdown,omitempty,omitzero"` // Storage usage per type (bytes).
 }
 
 // Do executes Storage.getUsageAndQuota against the provided context.
@@ -251,8 +251,8 @@ func (p *GetUsageAndQuotaParams) Do(ctx context.Context) (usage float64, quota f
 
 // OverrideQuotaForOriginParams override quota for the specified origin.
 type OverrideQuotaForOriginParams struct {
-	Origin    string  `json:"origin"`              // Security origin.
-	QuotaSize float64 `json:"quotaSize,omitempty"` // The quota size (in bytes) to override the original quota with. If this is called multiple times, the overridden quota will be equal to the quotaSize provided in the final call. If this is called without specifying a quotaSize, the quota will be reset to the default value for the specified origin. If this is called multiple times with different origins, the override will be maintained for each origin until it is disabled (called without a quotaSize).
+	Origin    string  `json:"origin"`                       // Security origin.
+	QuotaSize float64 `json:"quotaSize,omitempty,omitzero"` // The quota size (in bytes) to override the original quota with. If this is called multiple times, the overridden quota will be equal to the quotaSize provided in the final call. If this is called without specifying a quotaSize, the quota will be reset to the default value for the specified origin. If this is called multiple times with different origins, the override will be maintained for each origin until it is disabled (called without a quotaSize).
 }
 
 // OverrideQuotaForOrigin override quota for the specified origin.
@@ -499,7 +499,7 @@ func GetTrustTokens() *GetTrustTokensParams {
 
 // GetTrustTokensReturns return values.
 type GetTrustTokensReturns struct {
-	Tokens []*TrustTokens `json:"tokens,omitempty"`
+	Tokens []*TrustTokens `json:"tokens,omitempty,omitzero"`
 }
 
 // Do executes Storage.getTrustTokens against the provided context.
@@ -542,7 +542,7 @@ func ClearTrustTokens(issuerOrigin string) *ClearTrustTokensParams {
 
 // ClearTrustTokensReturns return values.
 type ClearTrustTokensReturns struct {
-	DidDeleteTokens bool `json:"didDeleteTokens,omitempty"` // True if any tokens were deleted, false otherwise.
+	DidDeleteTokens bool `json:"didDeleteTokens"` // True if any tokens were deleted, false otherwise.
 }
 
 // Do executes Storage.clearTrustTokens against the provided context.
@@ -584,7 +584,7 @@ func GetInterestGroupDetails(ownerOrigin string, name string) *GetInterestGroupD
 
 // GetInterestGroupDetailsReturns return values.
 type GetInterestGroupDetailsReturns struct {
-	Details easyjson.RawMessage `json:"details,omitempty"`
+	Details jsontext.Value `json:"details,omitempty,omitzero"`
 }
 
 // Do executes Storage.getInterestGroupDetails against the provided context.
@@ -592,7 +592,7 @@ type GetInterestGroupDetailsReturns struct {
 // returns:
 //
 //	details - This largely corresponds to: https://wicg.github.io/turtledove/#dictdef-generatebidinterestgroup but has absolute expirationTime instead of relative lifetimeMs and also adds joiningOrigin.
-func (p *GetInterestGroupDetailsParams) Do(ctx context.Context) (details easyjson.RawMessage, err error) {
+func (p *GetInterestGroupDetailsParams) Do(ctx context.Context) (details jsontext.Value, err error) {
 	// execute
 	var res GetInterestGroupDetailsReturns
 	err = cdp.Execute(ctx, CommandGetInterestGroupDetails, p, &res)
@@ -676,7 +676,7 @@ func GetSharedStorageMetadata(ownerOrigin string) *GetSharedStorageMetadataParam
 
 // GetSharedStorageMetadataReturns return values.
 type GetSharedStorageMetadataReturns struct {
-	Metadata *SharedStorageMetadata `json:"metadata,omitempty"`
+	Metadata *SharedStorageMetadata `json:"metadata,omitempty,omitzero"`
 }
 
 // Do executes Storage.getSharedStorageMetadata against the provided context.
@@ -717,7 +717,7 @@ func GetSharedStorageEntries(ownerOrigin string) *GetSharedStorageEntriesParams 
 
 // GetSharedStorageEntriesReturns return values.
 type GetSharedStorageEntriesReturns struct {
-	Entries []*SharedStorageEntry `json:"entries,omitempty"`
+	Entries []*SharedStorageEntry `json:"entries,omitempty,omitzero"`
 }
 
 // Do executes Storage.getSharedStorageEntries against the provided context.
@@ -742,7 +742,7 @@ type SetSharedStorageEntryParams struct {
 	OwnerOrigin     string `json:"ownerOrigin"`
 	Key             string `json:"key"`
 	Value           string `json:"value"`
-	IgnoreIfPresent bool   `json:"ignoreIfPresent,omitempty"` // If ignoreIfPresent is included and true, then only sets the entry if key doesn't already exist.
+	IgnoreIfPresent bool   `json:"ignoreIfPresent"` // If ignoreIfPresent is included and true, then only sets the entry if key doesn't already exist.
 }
 
 // SetSharedStorageEntry sets entry with key and value for a given origin's
@@ -757,9 +757,10 @@ type SetSharedStorageEntryParams struct {
 //	value
 func SetSharedStorageEntry(ownerOrigin string, key string, value string) *SetSharedStorageEntryParams {
 	return &SetSharedStorageEntryParams{
-		OwnerOrigin: ownerOrigin,
-		Key:         key,
-		Value:       value,
+		OwnerOrigin:     ownerOrigin,
+		Key:             key,
+		Value:           value,
+		IgnoreIfPresent: false,
 	}
 }
 
@@ -943,7 +944,7 @@ func RunBounceTrackingMitigations() *RunBounceTrackingMitigationsParams {
 
 // RunBounceTrackingMitigationsReturns return values.
 type RunBounceTrackingMitigationsReturns struct {
-	DeletedSites []string `json:"deletedSites,omitempty"`
+	DeletedSites []string `json:"deletedSites,omitempty,omitzero"`
 }
 
 // Do executes Storage.runBounceTrackingMitigations against the provided context.
@@ -1026,7 +1027,7 @@ func SendPendingAttributionReports() *SendPendingAttributionReportsParams {
 
 // SendPendingAttributionReportsReturns return values.
 type SendPendingAttributionReportsReturns struct {
-	NumSent int64 `json:"numSent,omitempty"` // The number of reports that were sent.
+	NumSent int64 `json:"numSent,omitempty,omitzero"` // The number of reports that were sent.
 }
 
 // Do executes Storage.sendPendingAttributionReports against the provided context.
@@ -1061,7 +1062,7 @@ func GetRelatedWebsiteSets() *GetRelatedWebsiteSetsParams {
 
 // GetRelatedWebsiteSetsReturns return values.
 type GetRelatedWebsiteSetsReturns struct {
-	Sets []*RelatedWebsiteSet `json:"sets,omitempty"`
+	Sets []*RelatedWebsiteSet `json:"sets,omitempty,omitzero"`
 }
 
 // Do executes Storage.getRelatedWebsiteSets against the provided context.
@@ -1080,41 +1081,120 @@ func (p *GetRelatedWebsiteSetsParams) Do(ctx context.Context) (sets []*RelatedWe
 	return res.Sets, nil
 }
 
+// GetAffectedURLsForThirdPartyCookieMetadataParams returns the list of URLs
+// from a page and its embedded resources that match existing grace period URL
+// pattern rules.
+// https://developers.google.com/privacy-sandbox/cookies/temporary-exceptions/grace-period.
+type GetAffectedURLsForThirdPartyCookieMetadataParams struct {
+	FirstPartyURL  string   `json:"firstPartyUrl"`  // The URL of the page currently being visited.
+	ThirdPartyURLs []string `json:"thirdPartyUrls"` // The list of embedded resource URLs from the page.
+}
+
+// GetAffectedURLsForThirdPartyCookieMetadata returns the list of URLs from a
+// page and its embedded resources that match existing grace period URL pattern
+// rules.
+// https://developers.google.com/privacy-sandbox/cookies/temporary-exceptions/grace-period.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Storage#method-getAffectedUrlsForThirdPartyCookieMetadata
+//
+// parameters:
+//
+//	firstPartyURL - The URL of the page currently being visited.
+//	thirdPartyURLs - The list of embedded resource URLs from the page.
+func GetAffectedURLsForThirdPartyCookieMetadata(firstPartyURL string, thirdPartyURLs []string) *GetAffectedURLsForThirdPartyCookieMetadataParams {
+	return &GetAffectedURLsForThirdPartyCookieMetadataParams{
+		FirstPartyURL:  firstPartyURL,
+		ThirdPartyURLs: thirdPartyURLs,
+	}
+}
+
+// GetAffectedURLsForThirdPartyCookieMetadataReturns return values.
+type GetAffectedURLsForThirdPartyCookieMetadataReturns struct {
+	MatchedURLs []string `json:"matchedUrls,omitempty,omitzero"` // Array of matching URLs. If there is a primary pattern match for the first- party URL, only the first-party URL is returned in the array.
+}
+
+// Do executes Storage.getAffectedUrlsForThirdPartyCookieMetadata against the provided context.
+//
+// returns:
+//
+//	matchedURLs - Array of matching URLs. If there is a primary pattern match for the first- party URL, only the first-party URL is returned in the array.
+func (p *GetAffectedURLsForThirdPartyCookieMetadataParams) Do(ctx context.Context) (matchedURLs []string, err error) {
+	// execute
+	var res GetAffectedURLsForThirdPartyCookieMetadataReturns
+	err = cdp.Execute(ctx, CommandGetAffectedURLsForThirdPartyCookieMetadata, p, &res)
+	if err != nil {
+		return nil, err
+	}
+
+	return res.MatchedURLs, nil
+}
+
+// SetProtectedAudienceKAnonymityParams [no description].
+type SetProtectedAudienceKAnonymityParams struct {
+	Owner  string   `json:"owner"`
+	Name   string   `json:"name"`
+	Hashes []string `json:"hashes"`
+}
+
+// SetProtectedAudienceKAnonymity [no description].
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Storage#method-setProtectedAudienceKAnonymity
+//
+// parameters:
+//
+//	owner
+//	name
+//	hashes
+func SetProtectedAudienceKAnonymity(owner string, name string, hashes []string) *SetProtectedAudienceKAnonymityParams {
+	return &SetProtectedAudienceKAnonymityParams{
+		Owner:  owner,
+		Name:   name,
+		Hashes: hashes,
+	}
+}
+
+// Do executes Storage.setProtectedAudienceKAnonymity against the provided context.
+func (p *SetProtectedAudienceKAnonymityParams) Do(ctx context.Context) (err error) {
+	return cdp.Execute(ctx, CommandSetProtectedAudienceKAnonymity, p, nil)
+}
+
 // Command names.
 const (
-	CommandGetStorageKeyForFrame                   = "Storage.getStorageKeyForFrame"
-	CommandClearDataForOrigin                      = "Storage.clearDataForOrigin"
-	CommandClearDataForStorageKey                  = "Storage.clearDataForStorageKey"
-	CommandGetCookies                              = "Storage.getCookies"
-	CommandSetCookies                              = "Storage.setCookies"
-	CommandClearCookies                            = "Storage.clearCookies"
-	CommandGetUsageAndQuota                        = "Storage.getUsageAndQuota"
-	CommandOverrideQuotaForOrigin                  = "Storage.overrideQuotaForOrigin"
-	CommandTrackCacheStorageForOrigin              = "Storage.trackCacheStorageForOrigin"
-	CommandTrackCacheStorageForStorageKey          = "Storage.trackCacheStorageForStorageKey"
-	CommandTrackIndexedDBForOrigin                 = "Storage.trackIndexedDBForOrigin"
-	CommandTrackIndexedDBForStorageKey             = "Storage.trackIndexedDBForStorageKey"
-	CommandUntrackCacheStorageForOrigin            = "Storage.untrackCacheStorageForOrigin"
-	CommandUntrackCacheStorageForStorageKey        = "Storage.untrackCacheStorageForStorageKey"
-	CommandUntrackIndexedDBForOrigin               = "Storage.untrackIndexedDBForOrigin"
-	CommandUntrackIndexedDBForStorageKey           = "Storage.untrackIndexedDBForStorageKey"
-	CommandGetTrustTokens                          = "Storage.getTrustTokens"
-	CommandClearTrustTokens                        = "Storage.clearTrustTokens"
-	CommandGetInterestGroupDetails                 = "Storage.getInterestGroupDetails"
-	CommandSetInterestGroupTracking                = "Storage.setInterestGroupTracking"
-	CommandSetInterestGroupAuctionTracking         = "Storage.setInterestGroupAuctionTracking"
-	CommandGetSharedStorageMetadata                = "Storage.getSharedStorageMetadata"
-	CommandGetSharedStorageEntries                 = "Storage.getSharedStorageEntries"
-	CommandSetSharedStorageEntry                   = "Storage.setSharedStorageEntry"
-	CommandDeleteSharedStorageEntry                = "Storage.deleteSharedStorageEntry"
-	CommandClearSharedStorageEntries               = "Storage.clearSharedStorageEntries"
-	CommandResetSharedStorageBudget                = "Storage.resetSharedStorageBudget"
-	CommandSetSharedStorageTracking                = "Storage.setSharedStorageTracking"
-	CommandSetStorageBucketTracking                = "Storage.setStorageBucketTracking"
-	CommandDeleteStorageBucket                     = "Storage.deleteStorageBucket"
-	CommandRunBounceTrackingMitigations            = "Storage.runBounceTrackingMitigations"
-	CommandSetAttributionReportingLocalTestingMode = "Storage.setAttributionReportingLocalTestingMode"
-	CommandSetAttributionReportingTracking         = "Storage.setAttributionReportingTracking"
-	CommandSendPendingAttributionReports           = "Storage.sendPendingAttributionReports"
-	CommandGetRelatedWebsiteSets                   = "Storage.getRelatedWebsiteSets"
+	CommandGetStorageKeyForFrame                      = "Storage.getStorageKeyForFrame"
+	CommandClearDataForOrigin                         = "Storage.clearDataForOrigin"
+	CommandClearDataForStorageKey                     = "Storage.clearDataForStorageKey"
+	CommandGetCookies                                 = "Storage.getCookies"
+	CommandSetCookies                                 = "Storage.setCookies"
+	CommandClearCookies                               = "Storage.clearCookies"
+	CommandGetUsageAndQuota                           = "Storage.getUsageAndQuota"
+	CommandOverrideQuotaForOrigin                     = "Storage.overrideQuotaForOrigin"
+	CommandTrackCacheStorageForOrigin                 = "Storage.trackCacheStorageForOrigin"
+	CommandTrackCacheStorageForStorageKey             = "Storage.trackCacheStorageForStorageKey"
+	CommandTrackIndexedDBForOrigin                    = "Storage.trackIndexedDBForOrigin"
+	CommandTrackIndexedDBForStorageKey                = "Storage.trackIndexedDBForStorageKey"
+	CommandUntrackCacheStorageForOrigin               = "Storage.untrackCacheStorageForOrigin"
+	CommandUntrackCacheStorageForStorageKey           = "Storage.untrackCacheStorageForStorageKey"
+	CommandUntrackIndexedDBForOrigin                  = "Storage.untrackIndexedDBForOrigin"
+	CommandUntrackIndexedDBForStorageKey              = "Storage.untrackIndexedDBForStorageKey"
+	CommandGetTrustTokens                             = "Storage.getTrustTokens"
+	CommandClearTrustTokens                           = "Storage.clearTrustTokens"
+	CommandGetInterestGroupDetails                    = "Storage.getInterestGroupDetails"
+	CommandSetInterestGroupTracking                   = "Storage.setInterestGroupTracking"
+	CommandSetInterestGroupAuctionTracking            = "Storage.setInterestGroupAuctionTracking"
+	CommandGetSharedStorageMetadata                   = "Storage.getSharedStorageMetadata"
+	CommandGetSharedStorageEntries                    = "Storage.getSharedStorageEntries"
+	CommandSetSharedStorageEntry                      = "Storage.setSharedStorageEntry"
+	CommandDeleteSharedStorageEntry                   = "Storage.deleteSharedStorageEntry"
+	CommandClearSharedStorageEntries                  = "Storage.clearSharedStorageEntries"
+	CommandResetSharedStorageBudget                   = "Storage.resetSharedStorageBudget"
+	CommandSetSharedStorageTracking                   = "Storage.setSharedStorageTracking"
+	CommandSetStorageBucketTracking                   = "Storage.setStorageBucketTracking"
+	CommandDeleteStorageBucket                        = "Storage.deleteStorageBucket"
+	CommandRunBounceTrackingMitigations               = "Storage.runBounceTrackingMitigations"
+	CommandSetAttributionReportingLocalTestingMode    = "Storage.setAttributionReportingLocalTestingMode"
+	CommandSetAttributionReportingTracking            = "Storage.setAttributionReportingTracking"
+	CommandSendPendingAttributionReports              = "Storage.sendPendingAttributionReports"
+	CommandGetRelatedWebsiteSets                      = "Storage.getRelatedWebsiteSets"
+	CommandGetAffectedURLsForThirdPartyCookieMetadata = "Storage.getAffectedUrlsForThirdPartyCookieMetadata"
+	CommandSetProtectedAudienceKAnonymity             = "Storage.setProtectedAudienceKAnonymity"
 )

@@ -41,6 +41,20 @@ func newEventEmitter(channel string, logger logrus.FieldLogger) *eventEmitter {
 	return emitter
 }
 
+func (emitter *eventEmitter) ServeHTTP(res http.ResponseWriter, req *http.Request) {
+	values := req.URL.Query()
+
+	values.Add("stream", emitter.channel)
+	req.URL.RawQuery = values.Encode()
+
+	res.Header().Set("Access-Control-Allow-Origin", "*")
+
+	emitter.wait.Add(1)
+	defer emitter.wait.Done()
+
+	emitter.Server.ServeHTTP(res, req)
+}
+
 func (emitter *eventEmitter) onStart() error {
 	return nil
 }
@@ -75,20 +89,6 @@ func (emitter *eventEmitter) onEvent(name string, data interface{}) {
 		emitter.channel,
 		&sse.Event{Event: []byte(name), Data: buff, Retry: retry, ID: []byte(id)},
 	) //nolint:exhaustruct
-}
-
-func (emitter *eventEmitter) ServeHTTP(res http.ResponseWriter, req *http.Request) {
-	values := req.URL.Query()
-
-	values.Add("stream", emitter.channel)
-	req.URL.RawQuery = values.Encode()
-
-	res.Header().Set("Access-Control-Allow-Origin", "*")
-
-	emitter.wait.Add(1)
-	defer emitter.wait.Done()
-
-	emitter.Server.ServeHTTP(res, req)
 }
 
 const maxSafeInteger = 9007199254740991

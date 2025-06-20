@@ -68,7 +68,7 @@ func (akgp *AESKeyGenParams) GenerateKey(
 			// At the time of writing, the go standard library [doesn't
 			// support AES-KW](https://github.com/golang/go/issues/27599), we
 			// might want to revisit this in the future.
-			if akgp.Algorithm.Name != AESKw {
+			if akgp.Name != AESKw {
 				continue
 			}
 

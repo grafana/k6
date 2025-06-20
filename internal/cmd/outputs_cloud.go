@@ -39,8 +39,8 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 		test.derivedConfig.Collectors[builtinOutputCloud.String()],
 		gs.Env,
 		"", // Historically used for -o cloud=..., no longer used (deprecated).
-		test.derivedConfig.Options.Cloud,
-		test.derivedConfig.Options.External,
+		test.derivedConfig.Cloud,
+		test.derivedConfig.External,
 	)
 	if err != nil {
 		return err
@@ -51,7 +51,7 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 	}
 
 	// If not, we continue with some validations and the creation of the test run.
-	if err := validateRequiredSystemTags(test.derivedConfig.Options.SystemTags); err != nil {
+	if err := validateRequiredSystemTags(test.derivedConfig.SystemTags); err != nil {
 		return err
 	}
 
@@ -76,13 +76,13 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 	}
 
 	et, err := lib.NewExecutionTuple(
-		test.derivedConfig.Options.ExecutionSegment,
-		test.derivedConfig.Options.ExecutionSegmentSequence,
+		test.derivedConfig.ExecutionSegment,
+		test.derivedConfig.ExecutionSegmentSequence,
 	)
 	if err != nil {
 		return err
 	}
-	executionPlan := test.derivedConfig.Options.Scenarios.GetFullExecutionRequirements(et)
+	executionPlan := test.derivedConfig.Scenarios.GetFullExecutionRequirements(et)
 
 	duration, testEnds := lib.GetEndOffset(executionPlan)
 	if !testEnds {

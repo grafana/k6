@@ -22,7 +22,6 @@ func TestRootCommand(t *testing.T) {
 
 	helptxt := "Usage:\n  k6 [command]\n\nAvailable Commands"
 	for name, args := range cases {
-		name, args := name, args
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			ts := NewGlobalTestState(t)

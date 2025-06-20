@@ -112,7 +112,7 @@ func TestKeyboardPress(t *testing.T) {
 		ctx, cancel := context.WithTimeout(tb.context(), 5*time.Second)
 		defer cancel()
 
-		bc := tb.Browser.Context()
+		bc := tb.Context()
 		var newTab *common.Page
 
 		// We want to meta/control click the link so that it opens in a new tab.

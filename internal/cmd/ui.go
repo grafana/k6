@@ -284,7 +284,7 @@ func showProgress(ctx context.Context, gs *state.GlobalState, pbs []*pb.Progress
 	termWidth := defaultTermWidth
 	if gs.Stdout.IsTTY {
 		tw, _, err := term.GetSize(gs.Stdout.RawOutFd)
-		if !(tw > 0) || err != nil {
+		if (tw <= 0) || err != nil {
 			terminalSizeUnknown = true
 			logger.WithError(err).Debug("can't get terminal size")
 		} else {

@@ -21,7 +21,7 @@ export default async function() {
   const page = await context.newPage();
   
   try {
-    await page.goto("https://test.k6.io/flip_coin.php", {
+    await page.goto("https://quickpizza.grafana.com/test.k6.io/flip_coin.php", {
       waitUntil: "networkidle",
     })
 

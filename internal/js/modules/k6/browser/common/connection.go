@@ -16,10 +16,9 @@ import (
 	"github.com/chromedp/cdproto/cdp"
 	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/target"
+	jsonv2 "github.com/go-json-experiment/json"
+	"github.com/go-json-experiment/json/jsontext"
 	"github.com/gorilla/websocket"
-	"github.com/mailru/easyjson"
-	"github.com/mailru/easyjson/jlexer"
-	"github.com/mailru/easyjson/jwriter"
 )
 
 const wsWriteBufferSize = 1 << 20
@@ -34,6 +33,12 @@ const wsWriteBufferSize = 1 << 20
 type msgID struct {
 	id int64
 }
+
+//nolint:gochecknoglobals
+var defaultJSONV2Options = jsonv2.JoinOptions(
+	jsonv2.DefaultOptionsV2(),
+	jsontext.AllowInvalidUTF8(true), // this is needed as chromium sometimes returns invalid utf-8
+)
 
 func (m *msgID) newID() int64 {
 	return atomic.AddInt64(&m.id, 1)
@@ -58,7 +63,7 @@ type connection interface {
 type session interface {
 	cdp.Executor
 	executorEmitter
-	ExecuteWithoutExpectationOnReply(context.Context, string, easyjson.Marshaler, easyjson.Unmarshaler) error
+	ExecuteWithoutExpectationOnReply(context.Context, string, any, any) error
 	ID() target.SessionID
 	TargetID() target.ID
 	Done() <-chan struct{}
@@ -129,10 +134,6 @@ type Connection struct {
 	sessionsMu sync.RWMutex
 	sessions   map[target.SessionID]*Session
 
-	// Reuse the easyjson structs to avoid allocs per Read/Write.
-	decoder jlexer.Lexer
-	encoder jwriter.Writer
-
 	// onTargetAttachedToTarget is called when a new target is attached to the browser.
 	// Returning false will prevent the session from being created.
 	// If onTargetAttachedToTarget is nil, the session will be created.
@@ -153,6 +154,7 @@ func NewConnection(
 		Proxy:            http.ProxyFromEnvironment, // TODO(fix): use proxy settings from launch options
 		TLSClientConfig:  tlsConfig,
 		WriteBufferSize:  wsWriteBufferSize,
+		ReadBufferSize:   wsWriteBufferSize,
 	}
 
 	ctx, cancelCtx := context.WithCancel(ctx)
@@ -338,9 +340,8 @@ func (c *Connection) recvLoop() {
 		c.logger.Tracef("cdp:recv", "<- %s", buf)
 
 		var msg cdproto.Message
-		c.decoder = jlexer.Lexer{Data: buf}
-		msg.UnmarshalEasyJSON(&c.decoder)
-		if err := c.decoder.Error(); err != nil {
+		err = jsonv2.Unmarshal(buf, &msg, defaultJSONV2Options)
+		if err != nil {
 			select {
 			case c.errorCh <- err:
 				c.logger.Debugf("Connection:recvLoop:<-err", "wsURL:%q err:%v", c.wsURL, err)
@@ -470,7 +471,7 @@ func (c *Connection) stopWaitingForDebugger(sid target.SessionID) {
 }
 
 func (c *Connection) send(
-	ctx context.Context, msg *cdproto.Message, recvCh chan *cdproto.Message, res easyjson.Unmarshaler,
+	ctx context.Context, msg *cdproto.Message, recvCh chan *cdproto.Message, res any,
 ) error {
 	select {
 	case c.sendCh <- msg:
@@ -510,7 +511,7 @@ func (c *Connection) send(
 			c.logger.Debugf("Connection:send", "sid:%v tid:%v wsURL:%q, msg err:%v", sid, tid, c.wsURL, msg.Error)
 			return msg.Error
 		case res != nil:
-			return easyjson.Unmarshal(msg.Result, res)
+			return jsonv2.Unmarshal(msg.Result, res, defaultJSONV2Options)
 		}
 	case err := <-c.errorCh:
 		c.logger.Debugf("Connection:send:<-c.errorCh #2", "sid:%v tid:%v wsURL:%q, err:%v", msg.SessionID, tid, c.wsURL, err)
@@ -539,9 +540,8 @@ func (c *Connection) sendLoop() {
 	for {
 		select {
 		case msg := <-c.sendCh:
-			c.encoder = jwriter.Writer{}
-			msg.MarshalEasyJSON(&c.encoder)
-			if err := c.encoder.Error; err != nil {
+			buf, err := jsonv2.Marshal(msg, defaultJSONV2Options)
+			if err != nil {
 				sid := msg.SessionID
 				tid := c.findTargetIDForLog(sid)
 				select {
@@ -553,7 +553,6 @@ func (c *Connection) sendLoop() {
 				}
 			}
 
-			buf, _ := c.encoder.BuildBytes()
 			c.logger.Tracef("cdp:send", "-> %s", buf)
 			writer, err := c.conn.NextWriter(websocket.TextMessage)
 			if err != nil {
@@ -594,7 +593,7 @@ func (c *Connection) Close() {
 
 // Execute implements cdproto.Executor and performs a synchronous send and receive.
 func (c *Connection) Execute(
-	ctx context.Context, method string, params easyjson.Marshaler, res easyjson.Unmarshaler,
+	ctx context.Context, method string, params, res any,
 ) error {
 	c.logger.Debugf("connection:Execute", "wsURL:%q method:%q", c.wsURL, method)
 	id := c.msgIDGen.newID()
@@ -632,7 +631,7 @@ func (c *Connection) Execute(
 	var buf []byte
 	if params != nil {
 		var err error
-		buf, err = easyjson.Marshal(params)
+		buf, err = jsonv2.Marshal(params, defaultJSONV2Options)
 		if err != nil {
 			return err
 		}

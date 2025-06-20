@@ -40,9 +40,9 @@ func (p *CloseParams) Do(ctx context.Context) (err error) {
 
 // ReadParams read a chunk of the stream.
 type ReadParams struct {
-	Handle StreamHandle `json:"handle"`           // Handle of the stream to read.
-	Offset int64        `json:"offset,omitempty"` // Seek to the specified offset before reading (if not specified, proceed with offset following the last read). Some types of streams may only support sequential reads.
-	Size   int64        `json:"size,omitempty"`   // Maximum number of bytes to read (left upon the agent discretion if not specified).
+	Handle StreamHandle `json:"handle"`                    // Handle of the stream to read.
+	Offset int64        `json:"offset,omitempty,omitzero"` // Seek to the specified offset before reading (if not specified, proceed with offset following the last read). Some types of streams may only support sequential reads.
+	Size   int64        `json:"size,omitempty,omitzero"`   // Maximum number of bytes to read (left upon the agent discretion if not specified).
 }
 
 // Read read a chunk of the stream.
@@ -75,9 +75,9 @@ func (p ReadParams) WithSize(size int64) *ReadParams {
 
 // ReadReturns return values.
 type ReadReturns struct {
-	Base64encoded bool   `json:"base64Encoded,omitempty"` // Set if the data is base64-encoded
-	Data          string `json:"data,omitempty"`          // Data that were read.
-	EOF           bool   `json:"eof,omitempty"`           // Set if the end-of-file condition occurred while reading.
+	Base64encoded bool   `json:"base64Encoded"`           // Set if the data is base64-encoded
+	Data          string `json:"data,omitempty,omitzero"` // Data that were read.
+	EOF           bool   `json:"eof"`                     // Set if the end-of-file condition occurred while reading.
 }
 
 // Do executes IO.read against the provided context.
@@ -118,7 +118,7 @@ func ResolveBlob(objectID runtime.RemoteObjectID) *ResolveBlobParams {
 
 // ResolveBlobReturns return values.
 type ResolveBlobReturns struct {
-	UUID string `json:"uuid,omitempty"` // UUID of the specified Blob.
+	UUID string `json:"uuid,omitempty,omitzero"` // UUID of the specified Blob.
 }
 
 // Do executes IO.resolveBlob against the provided context.

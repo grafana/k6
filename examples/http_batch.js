@@ -3,8 +3,8 @@ import http from 'k6/http';
 
 export default function() {
   const responses = http.batch([
-    "http://test.k6.io",
-    "http://test.k6.io/pi.php"
+    "https://quickpizza.grafana.com/test.k6.io",
+    "https://quickpizza.grafana.com/pi.php"
   ]);
 
   check(responses[0], {

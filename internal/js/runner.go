@@ -167,7 +167,7 @@ func (r *Runner) newVU(
 		if idLocal > 0 {
 			ipIndex = idLocal - 1
 		}
-		dialer.Dialer.LocalAddr = &net.TCPAddr{IP: r.Bundle.Options.LocalIPs.Pool.GetIP(ipIndex)}
+		dialer.LocalAddr = &net.TCPAddr{IP: r.Bundle.Options.LocalIPs.Pool.GetIP(ipIndex)}
 	}
 
 	tlsConfig := &tls.Config{
@@ -377,7 +377,12 @@ func (r *Runner) HandleSummary(
 	})
 	vu.moduleVUImpl.ctx = summaryCtx
 
-	noColor, enableColors, legacyData, summaryData, summaryCode := prepareHandleSummaryCall(r, legacy, summary)
+	noColor, enableColors, legacyData, summaryData, summaryCode, err := prepareHandleSummaryCall(
+		r, vu.Runtime, legacy, summary,
+	)
+	if err != nil {
+		return nil, err
+	}
 
 	handleSummaryDataAsValue := vu.Runtime.ToValue(legacyData)
 	callbackResult, err := runUserProvidedHandleSummaryCallback(summaryCtx, vu, handleSummaryDataAsValue)
@@ -412,21 +417,23 @@ func (r *Runner) HandleSummary(
 
 func prepareHandleSummaryCall(
 	r *Runner,
+	rt *sobek.Runtime,
 	legacy *lib.LegacySummary,
 	summary *summary.Summary,
-) (bool, bool, interface{}, interface{}, string) {
+) (bool, bool, interface{}, interface{}, string, error) {
 	var (
 		noColor          bool
 		enableColors     bool
 		legacyDataForJS  interface{}
 		summaryDataForJS interface{}
 		summaryCode      string
+		err              error
 	)
 	if summary != nil {
 		noColor = summary.NoColor
 		enableColors = summary.EnableColors
 		legacyDataForJS = summarizeMetricsToObject(legacy, r.Bundle.Options, r.setupData)
-		summaryDataForJS = summary
+		summaryDataForJS, err = summarizeReportToObject(rt, summary)
 		summaryCode = jslibSummaryCode
 	} else { // TODO: Remove this code block once we stop supporting the legacy summary.
 		noColor = legacy.NoColor
@@ -436,7 +443,7 @@ func prepareHandleSummaryCall(
 		summaryCode = jslibSummaryLegacyCode
 	}
 
-	return noColor, enableColors, legacyDataForJS, summaryDataForJS, summaryCode
+	return noColor, enableColors, legacyDataForJS, summaryDataForJS, summaryCode, err
 }
 
 func runUserProvidedHandleSummaryCallback(
@@ -490,7 +497,7 @@ func prepareHandleWrapperArgs(
 }
 
 func (r *Runner) checkDeadline(ctx context.Context, name string, result sobek.Value, err error) error {
-	if deadline, ok := ctx.Deadline(); !(ok && time.Now().After(deadline)) {
+	if deadline, ok := ctx.Deadline(); !ok || !time.Now().After(deadline) {
 		return nil
 	}
 

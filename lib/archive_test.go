@@ -44,7 +44,6 @@ func TestNormalizeAndAnonymizePath(t *testing.T) {
 		testdata["//etc/hosts"] = "/etc/hosts"
 	}
 	for from, to := range testdata {
-		from, to := from, to
 		t.Run("path="+from, func(t *testing.T) {
 			t.Parallel()
 			res := NormalizeAndAnonymizePath(from)

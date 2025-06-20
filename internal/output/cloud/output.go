@@ -394,7 +394,7 @@ func (out *Output) startVersionedOutput() error {
 		return err
 	}
 
-	out.versionedOutput.SetTestRunID(out.testRunID)
+	out.SetTestRunID(out.testRunID)
 	out.versionedOutput.SetTestRunStopCallback(out.testStopFunc)
 	return out.versionedOutput.Start()
 }

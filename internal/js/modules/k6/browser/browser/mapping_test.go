@@ -222,7 +222,6 @@ func TestMappings(t *testing.T) {
 			},
 		},
 	} {
-		tt := tt
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			testMapping(t, tt)
@@ -519,6 +518,7 @@ type responseAPI interface { //nolint:interfacebloat
 type locatorAPI interface { //nolint:interfacebloat
 	Clear(opts *common.FrameFillOptions) error
 	Click(opts sobek.Value) error
+	Count() (int, error)
 	Dblclick(opts sobek.Value) error
 	SetChecked(checked bool, opts sobek.Value) error
 	Check(opts sobek.Value) error
@@ -530,12 +530,15 @@ type locatorAPI interface { //nolint:interfacebloat
 	IsVisible(opts sobek.Value) (bool, error)
 	IsHidden(opts sobek.Value) (bool, error)
 	Fill(value string, opts sobek.Value) error
+	First() *common.Locator
 	Focus(opts sobek.Value) error
 	GetAttribute(name string, opts sobek.Value) (string, bool, error)
 	InnerHTML(opts sobek.Value) (string, error)
 	InnerText(opts sobek.Value) (string, error)
 	TextContent(opts sobek.Value) (string, bool, error)
 	InputValue(opts sobek.Value) (string, error)
+	Last() *common.Locator
+	Nth(nth int) *common.Locator
 	SelectOption(values sobek.Value, opts sobek.Value) ([]string, error)
 	Press(key string, opts sobek.Value) error
 	Type(text string, opts sobek.Value) error

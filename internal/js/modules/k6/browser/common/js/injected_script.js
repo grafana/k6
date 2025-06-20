@@ -250,7 +250,7 @@ class InjectedScript {
         if (typeof selector.capture === "number") {
           return "error:nthnocapture";
         }
-        const nth = part.body;
+        const nth = parseInt(part.body, 10);
         const set = new k6BrowserNative.Set();
         for (const root of roots) {
           set.add(root.element);
@@ -545,7 +545,7 @@ class InjectedScript {
     };
   }
 
-  fill(node, value) {
+  fill(node, value="") {
     const element = this._retarget(node, "follow-label");
     if (!element) {
       return "error:notconnected";
@@ -578,14 +578,16 @@ class InjectedScript {
       if (type === "number" && isNaN(Number(value))) {
         return "error:notfillablenumberinput";
       }
-      input.focus();
-      input.value = value;
-      if (kDateTypes.has(type) && input.value !== value) {
-        return "error:notvaliddate";
+      if (kDateTypes.has(type)) {
+        input.focus();
+        input.value = value;
+        if (input.value !== value) {
+          return "error:notvaliddate";
+        }
+        element.dispatchEvent(new Event("input", { bubbles: true }));
+        element.dispatchEvent(new Event("change", { bubbles: true }));
+        return "done"; // We have already changed the value, no need to input it.
       }
-      element.dispatchEvent(new Event("input", { bubbles: true }));
-      element.dispatchEvent(new Event("change", { bubbles: true }));
-      return "done"; // We have already changed the value, no need to input it.
     } else if (element.nodeName.toLowerCase() === "textarea") {
       // Nothing to check here.
     } else if (!element.isContentEditable) {
@@ -934,7 +936,7 @@ class InjectedScript {
     }
   }
 
-  waitForElementStates(node, states, timeout, ...args) {
+  waitForElementStates(node, states=[], timeout, ...args) {
     let lastRect = undefined;
     let counter = 0;
     let samePositionCounter = 0;
@@ -1017,7 +1019,8 @@ class InjectedScript {
       if (lastElement !== element) {
         lastElement = element;
         if (!element) {
-          console.log(`  ${selector} did not match any elements`);
+          // assume that the element is not attached.
+          console.debug(`'${selector.selector}' did not match any elements with state '${state}'`);
         } else {
           if (elements.length > 1) {
             if (strict) {
@@ -1040,5 +1043,10 @@ class InjectedScript {
     };
 
     return this.waitForPredicateFunction(predicate, polling, timeout, ...args);
+  }
+
+  count(selector, root) {
+    const elements = this.querySelectorAll(selector, root || document);
+    return elements.length;
   }
 }
