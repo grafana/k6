@@ -1693,7 +1693,6 @@ func (e *compiledFunctionLiteral) compile() (prg *Program, name unistring.String
 		}
 	}
 
-	needInitThis := false
 	if thisBinding != nil {
 		if !s.isDynamic() && thisBinding.useCount() == 0 {
 			s.deleteBinding(thisBinding)
@@ -1702,15 +1701,13 @@ func (e *compiledFunctionLiteral) compile() (prg *Program, name unistring.String
 			if thisBinding.inStash || s.isDynamic() {
 				delta++
 				thisBinding.emitInitAtScope(s, preambleLen-delta)
-				needInitThis = true
 			}
 		}
 	}
 
 	stashSize, stackSize := s.finaliseVarAlloc(0)
 
-	if needInitThis && (s.numArgs > 0 && !s.argsInStash || stackSize > 0) {
-		code[preambleLen-delta] = initStashP(code[preambleLen-delta].(initStash))
+	if thisBinding != nil && thisBinding.inStash && (!s.argsInStash || stackSize > 0) {
 		delta++
 		code[preambleLen-delta] = loadStack(0)
 	} // otherwise, 'this' will be at stack[sp-1], no need to load
