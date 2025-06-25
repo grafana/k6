@@ -782,3 +782,73 @@ func TestGetByRoleFailure(t *testing.T) {
 		})
 	}
 }
+
+func TestGetByAltTextSuccess(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		alt      string
+		opts     *common.GetByAltTextOptions
+		expected int
+	}{
+		{
+			"missing_alt",
+			"",
+			nil,
+			0,
+		},
+		{
+			// matches on all the elements with an alt attribute.
+			"empty_string",
+			"''",
+			nil,
+			2,
+		},
+		{
+			"no_options",
+			"'World Map'",
+			nil,
+			1,
+		},
+		{
+			"exact_match",
+			"'World Map'",
+			&common.GetByAltTextOptions{Exact: toPtr(true)},
+			1,
+		},
+		{
+			"no_exact_match",
+			"'world map'",
+			&common.GetByAltTextOptions{Exact: toPtr(true)},
+			0,
+		},
+		{
+			"regex_match",
+			`/^[a-z0-9]+$/`,
+			nil,
+			1,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tb := newTestBrowser(t, withFileServer())
+			p := tb.NewPage(nil)
+			opts := &common.FrameGotoOptions{
+				Timeout: common.DefaultTimeout,
+			}
+			_, err := p.Goto(
+				tb.staticURL("get_by_alt_text.html"),
+				opts,
+			)
+			require.NoError(t, err)
+
+			l := p.GetByAltText(tt.alt, tt.opts)
+			c, err := l.Count()
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expected, c)
+		})
+	}
+}
