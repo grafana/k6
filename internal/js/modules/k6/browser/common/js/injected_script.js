@@ -1934,20 +1934,26 @@ class AttributeEngine {
     this._evaluator = new SelectorEvaluatorImpl();
   }
   queryAll(root, selector) {
-    const parsed = parseAttributeSelector(selector, true);
-    if (parsed.name || parsed.attributes.length !== 1)
-      throw new Error("Malformed attribute selector: " + selector);
-    const { name, value, caseSensitive } = parsed.attributes[0];
-    const lowerCaseValue = caseSensitive ? null : value.toLowerCase();
-    let matcher;
-    if (value instanceof RegExp)
-      matcher = (s) => !!s.match(value);
-    else if (caseSensitive)
-      matcher = (s) => s === value;
-    else
-      matcher = (s) => s.toLowerCase().includes(lowerCaseValue);
-    const elements = this._evaluator._queryCSS({ scope: root, pierceShadow: true }, `[${name}]`);
-    return elements.filter((e) => matcher(e.getAttribute(name)));
+    try {
+      this._evaluator.begin();
+
+      const parsed = parseAttributeSelector(selector, true);
+      if (parsed.name || parsed.attributes.length !== 1)
+        throw new Error("Malformed attribute selector: " + selector);
+      const { name, value, caseSensitive } = parsed.attributes[0];
+      const lowerCaseValue = caseSensitive ? null : value.toLowerCase();
+      let matcher;
+      if (value instanceof RegExp)
+        matcher = (s) => !!s.match(value);
+      else if (caseSensitive)
+        matcher = (s) => s === value;
+      else
+        matcher = (s) => s.toLowerCase().includes(lowerCaseValue);
+      const elements = this._evaluator._queryCSS({ scope: root, pierceShadow: true }, `[${name}]`);
+      return elements.filter((e) => matcher(e.getAttribute(name)));
+    } finally {
+      this._evaluator.end();
+    }
   };
 }
 
