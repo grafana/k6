@@ -788,15 +788,7 @@ func parseGetByRoleOptions(ctx context.Context, opts sobek.Value) *common.GetByR
 			val := obj.Get(k).ToInteger()
 			o.Level = &val
 		case "name":
-			var val string
-			switch obj.Get(k).ExportType() {
-			case reflect.TypeOf(string("")):
-				val = fmt.Sprintf("'%s'", obj.Get(k).String()) // Strings require quotes
-			case reflect.TypeOf(map[string]interface{}(nil)): // JS RegExp
-				val = obj.Get(k).String() // No quotes
-			default: // CSS, numbers or booleans
-				val = obj.Get(k).String() // No quotes
-			}
+			val := parseStringOrRegex(obj.Get(k))
 			o.Name = &val
 		case "pressed":
 			val := obj.Get(k).ToBoolean()
