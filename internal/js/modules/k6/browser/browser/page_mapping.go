@@ -170,6 +170,12 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			ml := mapLocator(vu, p.GetByRole(role, popts))
 			return rt.ToValue(ml).ToObject(rt), nil
 		},
+		"getByAltText": func(alt sobek.Value, opts sobek.Value) (*sobek.Object, error) {
+			palt, popts := parseGetByAltTextOptions(vu.Context(), alt, opts)
+
+			ml := mapLocator(vu, p.GetByAltText(palt, popts))
+			return rt.ToValue(ml).ToObject(rt), nil
+		},
 		"goto": func(url string, opts sobek.Value) (*sobek.Promise, error) {
 			gopts := common.NewFrameGotoOptions(
 				p.Referrer(),
