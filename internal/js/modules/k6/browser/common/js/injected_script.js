@@ -2003,6 +2003,7 @@ class InjectedScript {
       text: new TextQueryEngine(),
       xpath: new XPathQueryEngine(),
       'internal:role': createRoleEngine(true),
+      'internal:attr': new AttributeEngine(),
     };
   }
 
