@@ -743,6 +743,19 @@ func parseWaitForFunctionArgs(
 	return js, popts, exportArgs(gargs), nil
 }
 
+func parseStringOrRegex(v sobek.Value) string {
+	var a string
+	switch v.ExportType() {
+	case reflect.TypeOf(string("")):
+		a = fmt.Sprintf("'%s'", v.String()) // Strings require quotes
+	case reflect.TypeOf(map[string]interface{}(nil)): // JS RegExp
+		a = v.String() // No quotes
+	default: // CSS, numbers or booleans
+		a = v.String() // No quotes
+	}
+	return a
+}
+
 // parseGetByRoleOptions parses the GetByRole options from the Sobek.Value.
 func parseGetByRoleOptions(ctx context.Context, opts sobek.Value) *common.GetByRoleOptions {
 	if !sobekValueExists(opts) {
@@ -795,4 +808,32 @@ func parseGetByRoleOptions(ctx context.Context, opts sobek.Value) *common.GetByR
 	}
 
 	return o
+}
+
+// parseGetByAltTextOptions parses the GetByAltText alt input value and the
+// options from the Sobek.Value.
+func parseGetByAltTextOptions(
+	ctx context.Context,
+	alt sobek.Value,
+	opts sobek.Value,
+) (string, *common.GetByAltTextOptions) {
+	a := parseStringOrRegex(alt)
+
+	if !sobekValueExists(opts) {
+		return a, nil
+	}
+
+	o := &common.GetByAltTextOptions{}
+
+	rt := k6ext.Runtime(ctx)
+
+	obj := opts.ToObject(rt)
+	for _, k := range obj.Keys() {
+		if k == "exact" {
+			val := obj.Get(k).ToBoolean()
+			o.Exact = &val
+		}
+	}
+
+	return a, o
 }
