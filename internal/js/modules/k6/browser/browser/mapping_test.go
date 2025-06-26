@@ -319,7 +319,7 @@ type pageAPI interface { //nolint:interfacebloat
 	Frames() []*common.Frame
 	GetAttribute(selector string, name string, opts sobek.Value) (string, bool, error)
 	GetByRole(role string, opts *common.GetByRoleOptions) *common.Locator
-	GetByAltText(alt string, opts *common.GetByAltTextOptions) *common.Locator
+	GetByAltText(alt string, opts *common.GetByBaseOptions) *common.Locator
 	GetKeyboard() *common.Keyboard
 	GetMouse() *common.Mouse
 	GetTouchscreen() *common.Touchscreen
