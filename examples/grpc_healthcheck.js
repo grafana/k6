@@ -14,7 +14,7 @@ export default () => {
 
 	const response = client.healthCheck()
 
-	check(response, { "healthcheck status is OK": (r) => r && r.status === grpc.HealthcheckServing });
+	check(response, { "healthcheck status is OK": (r) => r && r.status === grpc.HealthCheckServing });
 
 	client.close()
 }

@@ -43,7 +43,7 @@ func (healthcheckmock) NewStream(_ context.Context, _ *grpc.StreamDesc, _ string
 	panic("not implemented")
 }
 
-func TestHealthcheck(t *testing.T) {
+func TestHealthCheck(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {

@@ -92,10 +92,10 @@ func (mi *ModuleInstance) defineConstants() {
 	mustAddCode("StatusDataLoss", codes.DataLoss)
 	mustAddCode("StatusUnauthenticated", codes.Unauthenticated)
 
-	mustAddServingStatus("HealthcheckUnknown", healthpb.HealthCheckResponse_UNKNOWN)
-	mustAddServingStatus("HealthcheckServing", healthpb.HealthCheckResponse_SERVING)
-	mustAddServingStatus("HealthcheckNotServing", healthpb.HealthCheckResponse_NOT_SERVING)
-	mustAddServingStatus("HealthcheckServiceUnkown", healthpb.HealthCheckResponse_SERVICE_UNKNOWN)
+	mustAddServingStatus("HealthCheckUnknown", healthpb.HealthCheckResponse_UNKNOWN)
+	mustAddServingStatus("HealthCheckServing", healthpb.HealthCheckResponse_SERVING)
+	mustAddServingStatus("HealthCheckNotServing", healthpb.HealthCheckResponse_NOT_SERVING)
+	mustAddServingStatus("HealthCheckServiceUnkown", healthpb.HealthCheckResponse_SERVICE_UNKNOWN)
 }
 
 // Exports returns the exports of the grpc module.

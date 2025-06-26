@@ -1140,7 +1140,7 @@ func TestClient(t *testing.T) {
 				code: `
 				client.connect("GRPCBIN_ADDR");
 				var resp = client.healthCheck()
-				if (resp.status !== grpc.HealthcheckServing) {
+				if (resp.status !== grpc.HealthCheckServing) {
 					throw new Error("unexpected status: " + resp.status)
 				}`,
 			},
@@ -1157,7 +1157,7 @@ func TestClient(t *testing.T) {
 				code: `
 				client.connect("GRPCBIN_ADDR");
 				var resp = client.healthCheck()
-				if (resp.status !== grpc.HealthcheckNotServing) {
+				if (resp.status !== grpc.HealthCheckNotServing) {
 					throw new Error("unexpected status: " + resp.status)
 				}`,
 			},
@@ -1174,7 +1174,7 @@ func TestClient(t *testing.T) {
 				code: `
 				client.connect("GRPCBIN_ADDR");
 				var resp = client.healthCheck()
-				if (resp.status !== grpc.HealthcheckUnknown) {
+				if (resp.status !== grpc.HealthCheckUnknown) {
 					throw new Error("unexpected status: " + resp.status)
 				}`,
 			},
