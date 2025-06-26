@@ -2129,6 +2129,7 @@ class InjectedScript {
       xpath: new XPathQueryEngine(),
       'internal:role': createRoleEngine(true),
       'internal:attr': new AttributeEngine(),
+      'internal:label': new LabelEngine(),
     };
   }
 
