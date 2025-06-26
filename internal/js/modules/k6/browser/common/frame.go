@@ -1088,7 +1088,7 @@ func isQuotedText(s string) bool {
 }
 
 // Locator creates and returns a new locator for this frame.
-func (f *Frame) GetByAltText(alt string, opts *GetByAltTextOptions) *Locator {
+func (f *Frame) GetByAltText(alt string, opts *GetByBaseOptions) *Locator {
 	f.log.Debugf("Frame:GetByAltText", "fid:%s furl:%q alt:%q opts:%+v", f.ID(), f.URL(), alt, opts)
 
 	a := "[alt=" + alt + "]"

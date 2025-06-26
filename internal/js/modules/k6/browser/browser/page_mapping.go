@@ -171,7 +171,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			return rt.ToValue(ml).ToObject(rt), nil
 		},
 		"getByAltText": func(alt sobek.Value, opts sobek.Value) (*sobek.Object, error) {
-			palt, popts := parseGetByAltTextOptions(vu.Context(), alt, opts)
+			palt, popts := parseGetByBaseOptions(vu.Context(), alt, opts)
 
 			ml := mapLocator(vu, p.GetByAltText(palt, popts))
 			return rt.ToValue(ml).ToObject(rt), nil
@@ -808,20 +808,20 @@ func parseGetByRoleOptions(ctx context.Context, opts sobek.Value) *common.GetByR
 	return o
 }
 
-// parseGetByAltTextOptions parses the GetByAltText alt input value and the
-// options from the Sobek.Value.
-func parseGetByAltTextOptions(
+// parseGetByBaseOptions parses the options for the GetBy* APIs and the input
+// text/regex.
+func parseGetByBaseOptions(
 	ctx context.Context,
-	alt sobek.Value,
+	input sobek.Value,
 	opts sobek.Value,
-) (string, *common.GetByAltTextOptions) {
-	a := parseStringOrRegex(alt)
+) (string, *common.GetByBaseOptions) {
+	a := parseStringOrRegex(input)
 
 	if !sobekValueExists(opts) {
 		return a, nil
 	}
 
-	o := &common.GetByAltTextOptions{}
+	o := &common.GetByBaseOptions{}
 
 	rt := k6ext.Runtime(ctx)
 
