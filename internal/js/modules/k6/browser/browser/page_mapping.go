@@ -171,7 +171,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			return rt.ToValue(ml).ToObject(rt), nil
 		},
 		"getByAltText": func(alt sobek.Value, opts sobek.Value) (*sobek.Object, error) {
-			palt, popts := parseGetByBaseOptions(vu.Context(), alt, opts)
+			palt, popts := parseGetByBaseOptions(vu.Context(), alt, false, opts)
 
 			ml := mapLocator(vu, p.GetByAltText(palt, popts))
 			return rt.ToValue(ml).ToObject(rt), nil
@@ -749,11 +749,15 @@ func parseWaitForFunctionArgs(
 	return js, popts, exportArgs(gargs), nil
 }
 
-func parseStringOrRegex(v sobek.Value) string {
+func parseStringOrRegex(v sobek.Value, doubleQuote bool) string {
 	var a string
 	switch v.ExportType() {
 	case reflect.TypeOf(string("")):
-		a = fmt.Sprintf("'%s'", v.String()) // Strings require quotes
+		if doubleQuote {
+			a = fmt.Sprintf(`"%s"`, v.String()) // Strings require quotes
+		} else {
+			a = fmt.Sprintf("'%s'", v.String()) // Strings require quotes
+		}
 	case reflect.TypeOf(map[string]interface{}(nil)): // JS RegExp
 		a = v.String() // No quotes
 	default: // CSS, numbers or booleans
@@ -794,7 +798,7 @@ func parseGetByRoleOptions(ctx context.Context, opts sobek.Value) *common.GetByR
 			val := obj.Get(k).ToInteger()
 			o.Level = &val
 		case "name":
-			val := parseStringOrRegex(obj.Get(k))
+			val := parseStringOrRegex(obj.Get(k), false)
 			o.Name = &val
 		case "pressed":
 			val := obj.Get(k).ToBoolean()
@@ -813,9 +817,10 @@ func parseGetByRoleOptions(ctx context.Context, opts sobek.Value) *common.GetByR
 func parseGetByBaseOptions(
 	ctx context.Context,
 	input sobek.Value,
+	doubleQuote bool,
 	opts sobek.Value,
 ) (string, *common.GetByBaseOptions) {
-	a := parseStringOrRegex(input)
+	a := parseStringOrRegex(input, doubleQuote)
 
 	if !sobekValueExists(opts) {
 		return a, nil
