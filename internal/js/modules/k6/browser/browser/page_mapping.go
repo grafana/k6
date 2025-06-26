@@ -176,6 +176,14 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			ml := mapLocator(vu, p.GetByAltText(palt, popts))
 			return rt.ToValue(ml).ToObject(rt), nil
 		},
+		"getByLabel": func(label sobek.Value, opts sobek.Value) (*sobek.Object, error) {
+			plabel, popts := parseGetByBaseOptions(vu.Context(), label, true, opts)
+
+			fmt.Println("plabel", plabel)
+
+			ml := mapLocator(vu, p.GetByLabel(plabel, popts))
+			return rt.ToValue(ml).ToObject(rt), nil
+		},
 		"goto": func(url string, opts sobek.Value) (*sobek.Promise, error) {
 			gopts := common.NewFrameGotoOptions(
 				p.Referrer(),
