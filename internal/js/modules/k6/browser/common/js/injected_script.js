@@ -2063,6 +2063,25 @@ class AttributeEngine {
   };
 }
 
+class LabelEngine {
+  constructor() {
+    this._evaluator = new SelectorEvaluatorImpl();
+  }
+  queryAll(root, selector) {
+    try {
+      this._evaluator.begin();
+
+      const { matcher } = createTextMatcher(selector, true);
+      const allElements = this._evaluator._queryCSS({ scope: root, pierceShadow: true }, "*");
+      return allElements.filter((element) => {
+        return getElementLabels(this._evaluator._cacheText, element).some((label) => matcher(label));
+      });
+    } finally {
+      this._evaluator.end();
+    }
+  }
+}
+
 // convertToDocument will convert a DocumentFragment into a Document. It does
 // this by creating a new Document and copying the elements from the
 // DocumentFragment to the Document.
