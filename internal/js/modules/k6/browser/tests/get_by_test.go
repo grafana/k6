@@ -771,7 +771,7 @@ func TestGetByAltTextSuccess(t *testing.T) {
 	tests := []struct {
 		name     string
 		alt      string
-		opts     *common.GetByAltTextOptions
+		opts     *common.GetByBaseOptions
 		expected int
 	}{
 		{
@@ -796,13 +796,13 @@ func TestGetByAltTextSuccess(t *testing.T) {
 		{
 			"exact_match",
 			"'World Map'",
-			&common.GetByAltTextOptions{Exact: toPtr(true)},
+			&common.GetByBaseOptions{Exact: toPtr(true)},
 			1,
 		},
 		{
 			"no_exact_match",
 			"'world map'",
-			&common.GetByAltTextOptions{Exact: toPtr(true)},
+			&common.GetByBaseOptions{Exact: toPtr(true)},
 			0,
 		},
 		{
@@ -828,6 +828,77 @@ func TestGetByAltTextSuccess(t *testing.T) {
 			require.NoError(t, err)
 
 			l := p.GetByAltText(tt.alt, tt.opts)
+			c, err := l.Count()
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expected, c)
+		})
+	}
+}
+
+func TestGetByLabelSuccess(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		label    string
+		opts     *common.GetByBaseOptions
+		expected int
+	}{
+		{
+			// matches on all the elements with a label.
+			"missing_label",
+			"",
+			nil,
+			3,
+		},
+		{
+			// matches on all the elements with a label.
+			"empty_string",
+			`""`,
+			nil,
+			3,
+		},
+		{
+			"aria_label",
+			`"username"`,
+			nil,
+			1,
+		},
+		{
+			"exact_match",
+			`"Password"`,
+			&common.GetByBaseOptions{Exact: toPtr(true)},
+			1,
+		},
+		{
+			"no_exact_match",
+			`"password"`,
+			&common.GetByBaseOptions{Exact: toPtr(true)},
+			0,
+		},
+		{
+			"regex_match",
+			`/^[a-z0-9]+$/`,
+			nil,
+			1,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tb := newTestBrowser(t, withFileServer())
+			p := tb.NewPage(nil)
+			opts := &common.FrameGotoOptions{
+				Timeout: common.DefaultTimeout,
+			}
+			_, err := p.Goto(
+				tb.staticURL("get_by_label.html"),
+				opts,
+			)
+			require.NoError(t, err)
+
+			l := p.GetByLabel(tt.label, tt.opts)
 			c, err := l.Count()
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expected, c)
