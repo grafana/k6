@@ -789,7 +789,7 @@ func TestGetByAltTextSuccess(t *testing.T) {
 	tests := []struct {
 		name     string
 		alt      string
-		opts     *common.GetByAltTextOptions
+		opts     *common.GetByBaseOptions
 		expected int
 	}{
 		{
@@ -814,13 +814,13 @@ func TestGetByAltTextSuccess(t *testing.T) {
 		{
 			"exact_match",
 			"'World Map'",
-			&common.GetByAltTextOptions{Exact: toPtr(true)},
+			&common.GetByBaseOptions{Exact: toPtr(true)},
 			1,
 		},
 		{
 			"no_exact_match",
 			"'world map'",
-			&common.GetByAltTextOptions{Exact: toPtr(true)},
+			&common.GetByBaseOptions{Exact: toPtr(true)},
 			0,
 		},
 		{
