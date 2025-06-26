@@ -14,8 +14,8 @@ type GetByRoleOptions struct {
 	Selected      *bool   `json:"selected"`
 }
 
-// GetByAltTextOptions are the optional options for when working with the
-// GetByAltText API.
-type GetByAltTextOptions struct {
+// GetByBaseOptions are the optional options for when working with the
+// several GetBy* APIs.
+type GetByBaseOptions struct {
 	Exact *bool `json:"exact"`
 }
