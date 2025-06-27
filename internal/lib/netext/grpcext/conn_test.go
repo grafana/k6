@@ -46,25 +46,50 @@ func (healthcheckmock) NewStream(_ context.Context, _ *grpc.StreamDesc, _ string
 func TestHealthCheck(t *testing.T) {
 	t.Parallel()
 
+	servingsSvc := "serving-service"
+	notServingSvc := "not-serving-service"
+	healthReply := func(req *healthpb.HealthCheckRequest, out *healthpb.HealthCheckResponse, _ ...grpc.CallOption) error {
+		var status healthpb.HealthCheckResponse_ServingStatus
+		switch req.Service {
+		case "", notServingSvc:
+			status = healthpb.HealthCheckResponse_NOT_SERVING
+		case servingsSvc:
+			status = healthpb.HealthCheckResponse_SERVING
+		default:
+			status = healthpb.HealthCheckResponse_UNKNOWN
+		}
+
+		err := protojson.Unmarshal(fmt.Appendf(nil, `{"status":%d}`, status), out)
+		require.NoError(t, err)
+
+		return nil
+	}
+	c := Conn{raw: healthcheckmock(healthReply)}
+
 	cases := []struct {
-		name     string
-		status   int
-		expected healthpb.HealthCheckResponse_ServingStatus
+		name           string
+		svc            string
+		expectedStatus healthpb.HealthCheckResponse_ServingStatus
 	}{
 		{
-			name:     "unknown",
-			status:   0,
-			expected: healthpb.HealthCheckResponse_UNKNOWN,
+			name:           "server is not serving",
+			svc:            "",
+			expectedStatus: healthpb.HealthCheckResponse_NOT_SERVING,
 		},
 		{
-			name:     "serving",
-			status:   1,
-			expected: healthpb.HealthCheckResponse_SERVING,
+			name:           "unknown service",
+			svc:            "unknown-service",
+			expectedStatus: healthpb.HealthCheckResponse_UNKNOWN,
 		},
 		{
-			name:     "not serving",
-			status:   2,
-			expected: healthpb.HealthCheckResponse_NOT_SERVING,
+			name:           "serving service",
+			svc:            servingsSvc,
+			expectedStatus: healthpb.HealthCheckResponse_SERVING,
+		},
+		{
+			name:           "not serving service",
+			svc:            notServingSvc,
+			expectedStatus: healthpb.HealthCheckResponse_NOT_SERVING,
 		},
 	}
 
@@ -72,16 +97,9 @@ func TestHealthCheck(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			healthReply := func(_ *healthpb.HealthCheckRequest, out *healthpb.HealthCheckResponse, _ ...grpc.CallOption) error {
-				err := protojson.Unmarshal(fmt.Appendf(nil, `{"status":%d}`, tc.status), out)
-				require.NoError(t, err)
-
-				return nil
-			}
-			c := Conn{raw: healthcheckmock(healthReply)}
-			res, err := c.HealthCheck(context.Background(), "")
+			res, err := c.HealthCheck(context.Background(), tc.svc)
 			require.NoError(t, err)
-			assert.Equal(t, tc.expected, res.Status, "unexpected response status")
+			assert.Equal(t, tc.expectedStatus, res.Status)
 		})
 	}
 }
