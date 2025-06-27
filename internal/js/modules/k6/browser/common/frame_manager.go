@@ -648,7 +648,7 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *Frame
 		// main frame's session.
 		fs = frame.page.mainFrameSession
 	}
-	newDocumentID, err := fs.navigateFrame(frame, url, parsedOpts.Referer)
+	newDocumentID, errorText, err := fs.navigateFrame(frame, url, parsedOpts.Referer)
 	if err != nil {
 		return nil, fmt.Errorf("navigating to %q: %w", url, err)
 	}
@@ -700,7 +700,14 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *Frame
 		return nil, wrapTimeoutError(timeoutCtx.Err())
 	}
 
-	return resp, nil
+	// This needs to be handled here to allow the event loop messages to be
+	// consumed and processed, otherwise subsequent calls to navigate on the
+	// page will not return a response back to the caller.
+	if errorText != "" {
+		err = fmt.Errorf("navigation failed: %v", errorText)
+	}
+
+	return resp, err
 }
 
 // Page returns the page that this frame manager belongs to.
