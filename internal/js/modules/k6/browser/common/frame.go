@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -1000,6 +1001,59 @@ func (f *Frame) getAttribute(selector, name string, opts *FrameBaseOptions) (str
 	}
 
 	return s, true, nil
+}
+
+// GetByRole creates and returns a new locator for this frame using the ARIA role
+// and any additional options.
+func (f *Frame) GetByRole(role string, opts *GetByRoleOptions) *Locator {
+	f.log.Debugf("Frame:GetByRole", "fid:%s furl:%q role:%q opts:%+v", f.ID(), f.URL(), role, opts)
+
+	properties := make(map[string]string)
+
+	if opts == nil {
+		return f.Locator("internal:role="+role, nil)
+	}
+
+	if opts.Checked != nil {
+		properties["checked"] = strconv.FormatBool(*opts.Checked)
+	}
+	if opts.Disabled != nil {
+		properties["disabled"] = strconv.FormatBool(*opts.Disabled)
+	}
+	if opts.Selected != nil {
+		properties["selected"] = strconv.FormatBool(*opts.Selected)
+	}
+	if opts.Expanded != nil {
+		properties["expanded"] = strconv.FormatBool(*opts.Expanded)
+	}
+	if opts.IncludeHidden != nil {
+		properties["include-hidden"] = strconv.FormatBool(*opts.IncludeHidden)
+	}
+	if opts.Level != nil {
+		properties["level"] = strconv.FormatInt(*opts.Level, 10)
+	}
+	if opts.Name != nil && *opts.Name != "" {
+		// Exact option can only be applied to quoted strings.
+		if (*opts.Name)[0] == '\'' && (*opts.Name)[len(*opts.Name)-1] == '\'' {
+			if opts.Exact != nil && *opts.Exact {
+				*opts.Name = (*opts.Name) + "s"
+			} else {
+				*opts.Name = (*opts.Name) + "i"
+			}
+		}
+		properties["name"] = *opts.Name
+	}
+	if opts.Pressed != nil {
+		properties["pressed"] = strconv.FormatBool(*opts.Pressed)
+	}
+
+	var builder strings.Builder
+	builder.WriteString("internal:role=" + role)
+	for key, value := range properties {
+		builder.WriteString("[" + key + "=" + value + "]")
+	}
+
+	return f.Locator(builder.String(), nil)
 }
 
 // Referrer returns the referrer of the frame from the network manager
