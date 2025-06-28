@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"strings"
 	"time"
 
@@ -360,7 +361,14 @@ func (c *Client) buildInvokeRequest(
 	if req == nil {
 		return grpcReq, errors.New("request cannot be nil")
 	}
-	b, err := req.ToObject(c.vu.Runtime()).MarshalJSON()
+
+	object := req.ToObject(c.vu.Runtime())
+	normalized, err := normalizeNumberStrings(object, c.vu.Runtime())
+	if err != nil {
+		return grpcReq, fmt.Errorf("unable to normalize number strings: %w", err)
+	}
+
+	b, err := normalized.ToObject(c.vu.Runtime()).MarshalJSON()
 	if err != nil {
 		return grpcReq, fmt.Errorf("unable to serialise request object: %w", err)
 	}
@@ -376,6 +384,62 @@ func (c *Client) buildInvokeRequest(
 		TagsAndMeta:            &p.TagsAndMeta,
 		Metadata:               p.Metadata,
 	}, nil
+}
+
+// normalizeNumberStrings recursively traverses a sobek.Value. It creates a deep copy of any
+// objects or arrays, and converts special float values (NaN, Infinity) to their
+// string representations for proper JSON serialization.
+func normalizeNumberStrings(v sobek.Value, runtime *sobek.Runtime) (sobek.Value, error) {
+	// If v is a primitive (not an object or array), handle it directly.
+	if v == nil || sobek.IsNull(v) || sobek.IsUndefined(v) {
+		return v, nil
+	}
+
+	// Handle special float values.
+	if f, ok := v.Export().(float64); ok {
+		switch {
+		case math.IsNaN(f):
+			return runtime.ToValue("NaN"), nil
+		case math.IsInf(f, 1):
+			return runtime.ToValue("Infinity"), nil
+		case math.IsInf(f, -1):
+			return runtime.ToValue("-Infinity"), nil
+		}
+
+		return v, nil
+	}
+
+	obj := v.ToObject(runtime)
+
+	// If it's not a real object (e.g., a string, bool, or regular number primitive),
+	// after checking for special floats, we can just return it.
+	// We use obj.ClassName() to distinguish real objects from primitive wrappers.
+	className := obj.ClassName()
+	if className != "Object" && className != "Array" {
+		return v, nil
+	}
+
+	// It's a real object or array, so we need to deep-copy and normalize it.
+	var newObj *sobek.Object
+	if className == "Array" {
+		newObj = runtime.NewArray()
+	} else {
+		newObj = runtime.NewObject()
+	}
+
+	for _, key := range obj.Keys() {
+		val := obj.Get(key)
+		normalizedVal, err := normalizeNumberStrings(val, runtime)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := newObj.Set(key, normalizedVal); err != nil {
+			return nil, err
+		}
+	}
+
+	return newObj, nil
 }
 
 // Close will close the client gRPC connection
