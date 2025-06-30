@@ -1,6 +1,7 @@
 package matchfinder
 
 import (
+	"bytes"
 	"encoding/binary"
 	"math/bits"
 	"runtime"
@@ -42,7 +43,7 @@ type M4 struct {
 	DistanceBitCost int
 
 	table []uint32
-	chain []uint16
+	chain []uint32
 
 	history []byte
 }
@@ -100,7 +101,7 @@ func (q *M4) FindMatches(dst []Match, src []byte) []Match {
 	e.NextEmit = len(q.history)
 	q.history = append(q.history, src...)
 	if q.ChainLength > 0 {
-		q.chain = append(q.chain, make([]uint16, len(src))...)
+		q.chain = append(q.chain, make([]uint32, len(src))...)
 	}
 	src = q.history
 
@@ -123,15 +124,25 @@ func (q *M4) FindMatches(dst []Match, src []byte) []Match {
 			matches = [3]absoluteMatch{}
 		}
 
+		// Look for a repeat match one byte after the current position.
+		if matches[0] == (absoluteMatch{}) && len(e.Dst) > 0 {
+			prevDistance := e.Dst[len(e.Dst)-1].Distance
+			if binary.LittleEndian.Uint32(src[i+1:]) == binary.LittleEndian.Uint32(src[i+1-prevDistance:]) {
+				// We have a 4-byte match.
+				m := extendMatch2(src, i+1, i+1-prevDistance, e.NextEmit+1)
+				if m.End-m.Start >= q.MinLength {
+					matches[0] = m
+				}
+			}
+		}
+
 		// Calculate and store the hash.
 		h := ((binary.LittleEndian.Uint64(src[i:]) & (1<<(8*q.HashLen) - 1)) * hashMul64) >> (64 - q.TableBits)
 		candidate := int(q.table[h])
 		q.table[h] = uint32(i)
 		if q.ChainLength > 0 && candidate != 0 {
 			delta := i - candidate
-			if delta < 1<<16 {
-				q.chain[i] = uint16(delta)
-			}
+			q.chain[i] = uint32(delta)
 		}
 
 		if i < matches[0].End && i != matches[0].End+2-q.HashLen {
@@ -220,6 +231,25 @@ func (q *M4) FindMatches(dst []Match, src []byte) []Match {
 			// Emit the first match, shortening it if necessary to avoid overlap with the second.
 			if matches[2].End > matches[1].Start {
 				matches[2].End = matches[1].Start
+				if q.ChainLength > 0 && matches[2].End-matches[2].Start >= q.MinLength {
+					// Since the match length was trimmed, we may be able to find a closer match
+					// to replace it.
+					pos := matches[2].Start
+					for {
+						delta := int(q.chain[pos])
+						if delta == 0 {
+							break
+						}
+						pos -= delta
+						if pos <= matches[2].Match {
+							break
+						}
+						if bytes.Equal(src[matches[2].Start:matches[2].End], src[pos:pos+matches[2].End-matches[2].Start]) {
+							matches[2].Match = pos
+							break
+						}
+					}
+				}
 			}
 			if matches[2].End-matches[2].Start >= q.MinLength && q.score(matches[2]) > 0 {
 				e.emit(matches[2])
@@ -261,7 +291,7 @@ const hashMul64 = 0x1E35A7BD1E35A7BD
 //	0 <= i && i < j && j <= len(src)
 func extendMatch(src []byte, i, j int) int {
 	switch runtime.GOARCH {
-	case "amd64":
+	case "amd64", "arm64":
 		// As long as we are 8 or more bytes before the end of src, we can load and
 		// compare 8 bytes at a time. If those 8 bytes are equal, repeat.
 		for j+8 < len(src) {
