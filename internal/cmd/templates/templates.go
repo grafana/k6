@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"sort"
 	"strings"
 	"text/template"
 
@@ -21,24 +22,30 @@ var protocolTemplateContent string
 //go:embed browser.js
 var browserTemplateContent string
 
+//go:embed rest.js
+var restTemplateContent string
+
 // Constants for template types
 // Template names should not contain path separators to not to be confused with file paths
 const (
 	MinimalTemplate  = "minimal"
 	ProtocolTemplate = "protocol"
 	BrowserTemplate  = "browser"
+	RestTemplate     = "rest"
 )
 
-// TemplateManager manages the pre-parsed templates
+// TemplateManager manages the pre-parsed templates and template search paths
 type TemplateManager struct {
 	minimalTemplate  *template.Template
 	protocolTemplate *template.Template
 	browserTemplate  *template.Template
+	restTemplate     *template.Template
 	fs               fsext.Fs
+	homeDir          string
 }
 
 // NewTemplateManager initializes a new TemplateManager with parsed templates
-func NewTemplateManager(fs fsext.Fs) (*TemplateManager, error) {
+func NewTemplateManager(fs fsext.Fs, homeDir string) (*TemplateManager, error) {
 	minimalTmpl, err := template.New(MinimalTemplate).Parse(minimalTemplateContent)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse minimal template: %w", err)
@@ -54,11 +61,18 @@ func NewTemplateManager(fs fsext.Fs) (*TemplateManager, error) {
 		return nil, fmt.Errorf("failed to parse browser template: %w", err)
 	}
 
+	restTmpl, err := template.New(RestTemplate).Parse(restTemplateContent)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse rest template: %w", err)
+	}
+
 	return &TemplateManager{
 		minimalTemplate:  minimalTmpl,
 		protocolTemplate: protocolTmpl,
 		browserTemplate:  browserTmpl,
+		restTemplate:     restTmpl,
 		fs:               fs,
+		homeDir:          homeDir,
 	}, nil
 }
 
@@ -72,27 +86,32 @@ func (tm *TemplateManager) GetTemplate(tpl string) (*template.Template, error) {
 		return tm.protocolTemplate, nil
 	case BrowserTemplate:
 		return tm.browserTemplate, nil
+	case RestTemplate:
+		return tm.restTemplate, nil
 	}
 
 	// Then check if it's a file path
 	if isFilePath(tpl) {
-		tplPath, err := filepath.Abs(tpl)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get absolute path for template %s: %w", tpl, err)
-		}
+		return tm.loadTemplateFromPath(tpl)
+	}
 
-		// Read the template content using the provided filesystem
-		content, err := fsext.ReadFile(tm.fs, tplPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read template file %s: %w", tpl, err)
-		}
+	// Search for templates in the specified order:
+	// 1. ./templates/<name>/script.js
+	// 2. ~/.k6/templates/<name>/script.js
+	// 3. Built-in templates (already checked above)
 
-		tmpl, err := template.New(filepath.Base(tplPath)).Parse(string(content))
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse template file %s: %w", tpl, err)
-		}
+	// Check local templates directory
+	localPath := filepath.Join("templates", tpl, "script.js")
+	if exists, _ := fsext.Exists(tm.fs, localPath); exists {
+		return tm.loadTemplateFromPath(localPath)
+	}
 
-		return tmpl, nil
+	// Check user-global templates directory
+	if tm.homeDir != "" {
+		globalPath := filepath.Join(tm.homeDir, ".k6", "templates", tpl, "script.js")
+		if exists, _ := fsext.Exists(tm.fs, globalPath); exists {
+			return tm.loadTemplateFromPath(globalPath)
+		}
 	}
 
 	// Check if there's a file with this name in current directory
@@ -102,6 +121,135 @@ func (tm *TemplateManager) GetTemplate(tpl string) (*template.Template, error) {
 	}
 
 	return nil, fmt.Errorf("invalid template type %q", tpl)
+}
+
+// loadTemplateFromPath loads a template from a file path
+func (tm *TemplateManager) loadTemplateFromPath(tplPath string) (*template.Template, error) {
+	// For absolute paths, use as-is. For relative paths, use directly without conversion
+	// since we want to work with the filesystem as provided (which may be in-memory for tests)
+	pathToUse := tplPath
+	if !filepath.IsAbs(tplPath) {
+		pathToUse = tplPath
+	} else {
+		// Only convert to absolute path if we're not dealing with a memory filesystem
+		// Check if the path exists first with the filesystem
+		if exists, _ := fsext.Exists(tm.fs, tplPath); !exists {
+			// Try to get absolute path only if the relative path doesn't exist
+			if absPath, err := filepath.Abs(tplPath); err == nil {
+				pathToUse = absPath
+			}
+		}
+	}
+
+	// Read the template content using the provided filesystem
+	content, err := fsext.ReadFile(tm.fs, pathToUse)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read template file %s: %w", tplPath, err)
+	}
+
+	tmpl, err := template.New(filepath.Base(pathToUse)).Parse(string(content))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse template file %s: %w", tplPath, err)
+	}
+
+	return tmpl, nil
+}
+
+// ListTemplates returns a list of all available templates
+func (tm *TemplateManager) ListTemplates() ([]string, error) {
+	templates := make(map[string]bool)
+
+	// Add built-in templates
+	templates[MinimalTemplate] = true
+	templates[ProtocolTemplate] = true
+	templates[BrowserTemplate] = true
+	templates[RestTemplate] = true
+
+	// Add local templates (./templates/)
+	localTemplatesDir := "templates"
+	if exists, _ := fsext.Exists(tm.fs, localTemplatesDir); exists {
+		localTemplates, err := tm.scanTemplateDirectory(localTemplatesDir)
+		if err == nil {
+			for _, tmpl := range localTemplates {
+				templates[tmpl] = true
+			}
+		}
+	}
+
+	// Add user-global templates (~/.k6/templates/)
+	if tm.homeDir != "" {
+		globalTemplatesDir := filepath.Join(tm.homeDir, ".k6", "templates")
+		if exists, _ := fsext.Exists(tm.fs, globalTemplatesDir); exists {
+			globalTemplates, err := tm.scanTemplateDirectory(globalTemplatesDir)
+			if err == nil {
+				for _, tmpl := range globalTemplates {
+					templates[tmpl] = true
+				}
+			}
+		}
+	}
+
+	// Convert map to sorted slice
+	result := make([]string, 0, len(templates))
+	for tmpl := range templates {
+		result = append(result, tmpl)
+	}
+	sort.Strings(result)
+
+	return result, nil
+}
+
+// scanTemplateDirectory scans a directory for template folders
+func (tm *TemplateManager) scanTemplateDirectory(dir string) ([]string, error) {
+	var templates []string
+
+	entries, err := fsext.ReadDir(tm.fs, dir)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			scriptPath := filepath.Join(dir, entry.Name(), "script.js")
+			if exists, _ := fsext.Exists(tm.fs, scriptPath); exists {
+				templates = append(templates, entry.Name())
+			}
+		}
+	}
+
+	return templates, nil
+}
+
+// CreateUserTemplate creates a new user template from an existing script
+func (tm *TemplateManager) CreateUserTemplate(name, scriptPath string) error {
+	if tm.homeDir == "" {
+		return fmt.Errorf("home directory not available")
+	}
+
+	// Validate template name
+	if strings.ContainsAny(name, "/\\") {
+		return fmt.Errorf("template name cannot contain path separators")
+	}
+
+	// Read the source script
+	content, err := fsext.ReadFile(tm.fs, scriptPath)
+	if err != nil {
+		return fmt.Errorf("failed to read script file %s: %w", scriptPath, err)
+	}
+
+	// Create template directory
+	templateDir := filepath.Join(tm.homeDir, ".k6", "templates", name)
+	if err := tm.fs.MkdirAll(templateDir, 0o755); err != nil {
+		return fmt.Errorf("failed to create template directory %s: %w", templateDir, err)
+	}
+
+	// Write the template file
+	templatePath := filepath.Join(templateDir, "script.js")
+	if err := fsext.WriteFile(tm.fs, templatePath, content, 0o644); err != nil {
+		return fmt.Errorf("failed to write template file %s: %w", templatePath, err)
+	}
+
+	return nil
 }
 
 // isFilePath checks if the given string looks like a file path by detecting path separators

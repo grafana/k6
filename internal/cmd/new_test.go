@@ -199,25 +199,152 @@ func TestNewScriptCmd_LocalTemplate_SyntaxError(t *testing.T) {
 	t.Parallel()
 
 	ts := tests.NewGlobalTestState(t)
-	ts.ExpectedExitCode = -1
 
-	// Create template file with invalid content in test temp directory
 	templatePath := filepath.Join(t.TempDir(), "template.js")
-	invalidTemplateContent := `export default function() {
-  // Invalid template with {{ .InvalidField }} field
-  console.log("This will cause an error");
+	templateContent := `export default function() {
+  // Invalid template syntax 
+  {{ .NotClosed 
 }`
-	require.NoError(t, fsext.WriteFile(ts.FS, templatePath, []byte(invalidTemplateContent), 0o600))
+	require.NoError(t, fsext.WriteFile(ts.FS, templatePath, []byte(templateContent), 0o600))
 
-	ts.CmdArgs = []string{"k6", "new", "--template", templatePath, "--project-id", "9876"}
+	ts.CmdArgs = []string{"k6", "new", "--template", templatePath}
 	ts.ExpectedExitCode = -1
 
 	newRootCommand(ts.GlobalState).execute()
 
-	assert.Contains(t, ts.Stderr.String(), "failed to execute template")
+	assert.Contains(t, ts.Stderr.String(), "failed to parse template file")
 
 	// Verify that no script file was created
 	exists, err := fsext.Exists(ts.FS, defaultNewScriptName)
 	require.NoError(t, err)
 	assert.False(t, exists, "script file should not exist")
+}
+
+func TestNewScriptCmd_RestTemplate(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+	ts.CmdArgs = []string{"k6", "new", "--template", "rest"}
+
+	newRootCommand(ts.GlobalState).execute()
+
+	data, err := fsext.ReadFile(ts.FS, defaultNewScriptName)
+	require.NoError(t, err)
+
+	jsData := string(data)
+	assert.Contains(t, jsData, "REST API test")
+	assert.Contains(t, jsData, "httpbin.org")
+	assert.Contains(t, jsData, "export default function()")
+	assert.Contains(t, jsData, "http.get")
+	assert.Contains(t, jsData, "http.post")
+}
+
+func TestNewScriptCmd_ListTemplates(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+	ts.CmdArgs = []string{"k6", "new", "--list-templates"}
+
+	newRootCommand(ts.GlobalState).execute()
+
+	output := ts.Stdout.String()
+	assert.Contains(t, output, "Available templates:")
+	assert.Contains(t, output, "minimal")
+	assert.Contains(t, output, "protocol")
+	assert.Contains(t, output, "browser")
+	assert.Contains(t, output, "rest")
+}
+
+func TestNewScriptCmd_LocalTemplateDirectory(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+
+	// Create a local template directory structure
+	templateDir := "templates/myapi"
+	require.NoError(t, ts.FS.MkdirAll(templateDir, 0o755))
+
+	templateContent := `import http from 'k6/http';
+
+export const options = {
+  vus: 1,
+  duration: '10s',
+};
+
+export default function() {
+  // Local template content
+  http.get('https://example.com');
+}`
+
+	templatePath := filepath.Join(templateDir, "script.js")
+	require.NoError(t, fsext.WriteFile(ts.FS, templatePath, []byte(templateContent), 0o644))
+
+	// Test listing templates includes the local one
+	ts.CmdArgs = []string{"k6", "new", "--list-templates"}
+	newRootCommand(ts.GlobalState).execute()
+
+	output := ts.Stdout.String()
+	assert.Contains(t, output, "myapi")
+
+	// Test using the local template
+	ts.Stdout.Reset()
+	ts.Stderr.Reset()
+	ts.CmdArgs = []string{"k6", "new", "test.js", "--template", "myapi"}
+	newRootCommand(ts.GlobalState).execute()
+
+	// Check if there were any errors
+	if ts.Stderr.Len() > 0 {
+		t.Logf("Stderr: %s", ts.Stderr.String())
+	}
+
+	data, err := fsext.ReadFile(ts.FS, "test.js")
+	require.NoError(t, err)
+
+	jsData := string(data)
+	assert.Contains(t, jsData, "Local template content")
+	assert.Contains(t, jsData, "https://example.com")
+}
+
+func TestNewScriptCmd_LocalTemplateWithProjectID(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+
+	// Create a local template directory structure
+	templateDir := "templates/myapi"
+	require.NoError(t, ts.FS.MkdirAll(templateDir, 0o755))
+
+	templateContent := `import http from 'k6/http';
+
+export const options = {
+  vus: 1,
+  duration: '10s',{{ if .ProjectID }}
+  cloud: {
+    projectID: {{ .ProjectID }},
+    name: "{{ .ScriptName }}",
+  },{{ end }}
+};
+
+export default function() {
+  // Local template with project ID
+  http.get('https://example.com');
+}`
+
+	templatePath := filepath.Join(templateDir, "script.js")
+	require.NoError(t, fsext.WriteFile(ts.FS, templatePath, []byte(templateContent), 0o644))
+
+	ts.CmdArgs = []string{"k6", "new", "test.js", "--template", "myapi", "--project-id", "123"}
+	newRootCommand(ts.GlobalState).execute()
+
+	// Check if there were any errors
+	if ts.Stderr.Len() > 0 {
+		t.Logf("Stderr: %s", ts.Stderr.String())
+	}
+
+	data, err := fsext.ReadFile(ts.FS, "test.js")
+	require.NoError(t, err)
+
+	jsData := string(data)
+	assert.Contains(t, jsData, "projectID: 123")
+	assert.Contains(t, jsData, `name: "test.js"`)
 }

@@ -43,6 +43,10 @@ func TestRootCommandHelpDisplayCommands(t *testing.T) {
 			wantStdoutContains: "  new         Create and initialize a new k6 script",
 		},
 		{
+			name:               "should have template command",
+			wantStdoutContains: "  template    Manage k6 script templates",
+		},
+		{
 			name:               "should have pause command",
 			wantStdoutContains: "  pause       Pause a running test",
 		},

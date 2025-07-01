@@ -19,18 +19,45 @@ type newScriptCmd struct {
 	overwriteFiles bool
 	templateType   string
 	projectID      string
+	listTemplates  bool
 }
 
 func (c *newScriptCmd) flagSet() *pflag.FlagSet {
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
 	flags.SortFlags = false
 	flags.BoolVarP(&c.overwriteFiles, "force", "f", false, "overwrite existing files")
-	flags.StringVar(&c.templateType, "template", "minimal", "template type (choices: minimal, protocol, browser) or relative/absolute path to a custom template file") //nolint:lll
+	flags.StringVar(&c.templateType, "template", "minimal", "template type (choices: minimal, protocol, browser, rest) or relative/absolute path to a custom template file") //nolint:lll
 	flags.StringVar(&c.projectID, "project-id", "", "specify the Grafana Cloud project ID for the test")
+	flags.BoolVar(&c.listTemplates, "list-templates", false, "list all available templates")
 	return flags
 }
 
 func (c *newScriptCmd) run(_ *cobra.Command, args []string) (err error) {
+	// Initialize template manager
+	tm, err := templates.NewTemplateManager(c.gs.FS, c.gs.UserOSConfigDir)
+	if err != nil {
+		return fmt.Errorf("error initializing template manager: %w", err)
+	}
+
+	// Handle --list-templates flag
+	if c.listTemplates {
+		availableTemplates, err := tm.ListTemplates()
+		if err != nil {
+			return fmt.Errorf("error listing templates: %w", err)
+		}
+
+		if len(availableTemplates) == 0 {
+			fmt.Fprintln(c.gs.Stdout, "No templates available.")
+			return nil
+		}
+
+		fmt.Fprintln(c.gs.Stdout, "Available templates:")
+		for _, tmpl := range availableTemplates {
+			fmt.Fprintf(c.gs.Stdout, "  %s\n", tmpl)
+		}
+		return nil
+	}
+
 	target := defaultNewScriptName
 	if len(args) > 0 {
 		target = args[0]
@@ -42,12 +69,6 @@ func (c *newScriptCmd) run(_ *cobra.Command, args []string) (err error) {
 	}
 	if fileExists && !c.overwriteFiles {
 		return fmt.Errorf("%s already exists. Use the `--force` flag to overwrite it", target)
-	}
-
-	// Initialize template manager and validate template before creating any files
-	tm, err := templates.NewTemplateManager(c.gs.FS)
-	if err != nil {
-		return fmt.Errorf("error initializing template manager: %w", err)
 	}
 
 	tmpl, err := tm.GetTemplate(c.templateType)
@@ -109,7 +130,10 @@ func getCmdNewScript(gs *state.GlobalState) *cobra.Command {
     $ {{.}} new -f test.js
 
     # Create a script using a specific template
-    $ {{.}} new --template protocol
+    $ {{.}} new --template rest
+
+    # List all available templates
+    $ {{.}} new --list-templates
 
     # Create a cloud-ready script with a specific project ID
     $ {{.}} new --project-id 12315`[1:])
@@ -119,7 +143,14 @@ func getCmdNewScript(gs *state.GlobalState) *cobra.Command {
 		Short: "Create and initialize a new k6 script",
 		Long: `Create and initialize a new k6 script using one of the predefined templates.
 
-By default, the script will be named script.js unless a different name is specified.`,
+By default, the script will be named script.js unless a different name is specified.
+
+Templates are searched in the following order:
+1. ./templates/<name>/script.js (local to current working directory)
+2. ~/.k6/templates/<name>/script.js (user-global templates)  
+3. Built-in templates (minimal, protocol, browser, rest)
+
+Use --list-templates to see all available templates.`,
 		Example: exampleText,
 		Args:    cobra.MaximumNArgs(1),
 		RunE:    c.run,
