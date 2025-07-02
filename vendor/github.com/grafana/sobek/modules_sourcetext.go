@@ -568,7 +568,7 @@ func (module *SourceTextModuleRecord) handleAsyncGeteExportNames(
 
 func (module *SourceTextModuleRecord) InitializeEnvironment() (err error) {
 	module.once.Do(func() {
-		c := newCompiler()
+		c := newCompiler(false)
 		defer func() {
 			if x := recover(); x != nil {
 				switch x1 := x.(type) {
@@ -691,7 +691,7 @@ func (module *SourceTextModuleRecord) Evaluate(rt *Runtime) *Promise {
 }
 
 func (module *SourceTextModuleRecord) Link() error {
-	c := newCompiler()
+	c := newCompiler(false)
 	c.hostResolveImportedModule = module.hostResolveImportedModule
 	return c.CyclicModuleRecordConcreteLink(module)
 }

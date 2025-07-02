@@ -89,8 +89,9 @@ type compiler struct {
 
 	enumGetExpr compiledEnumGetExpr
 
-	evalVM *vm // VM used to evaluate constant expressions
-	ctxVM  *vm // VM in which an eval() code is compiled
+	debug  bool // enable debug mode, effectively disabling a lot of optimizations
+	evalVM *vm  // VM used to evaluate constant expressions
+	ctxVM  *vm  // VM in which an eval() code is compiled
 
 	codeScratchpad []instruction
 
@@ -389,10 +390,12 @@ func (c *compiler) newScope() {
 		strict = c.scope.strict
 	}
 	c.scope = &scope{
-		c:      c,
-		prg:    c.p,
-		outer:  c.scope,
-		strict: strict,
+		c:         c,
+		prg:       c.p,
+		outer:     c.scope,
+		strict:    strict,
+		dynLookup: c.debug,
+		dynamic:   c.debug,
 	}
 }
 
@@ -431,9 +434,10 @@ func (c *compiler) emitLiteralValue(v Value) {
 	c.emit(loadVal{v})
 }
 
-func newCompiler() *compiler {
+func newCompiler(debug bool) *compiler {
 	c := &compiler{
-		p: &Program{},
+		p:     &Program{},
+		debug: debug,
 	}
 
 	c.enumGetExpr.init(c, file.Idx(0))
@@ -672,6 +676,8 @@ func (s *scope) finaliseVarAlloc(stackOffset int) (stashSize, stackSize int) {
 								*ap = loadThisStash(idx)
 							case initStack:
 								*ap = initStash(idx)
+							case initStackP:
+								*ap = initStashP(idx)
 							case resolveThisStack:
 								*ap = resolveThisStash(idx)
 							case _ret:
@@ -688,6 +694,8 @@ func (s *scope) finaliseVarAlloc(stackOffset int) (stashSize, stackSize int) {
 								*ap = loadStash(idx)
 							case initStack:
 								*ap = initStash(idx)
+							case initStackP:
+								*ap = initStashP(idx)
 							default:
 								s.c.assert(false, s.c.p.sourceOffset(pc), "Unsupported instruction for 'this'")
 							}
@@ -770,6 +778,8 @@ func (s *scope) finaliseVarAlloc(stackOffset int) (stashSize, stackSize int) {
 							case loadStack:
 								*ap = loadThisStack{}
 							case initStack:
+								// no-op
+							case initStackP:
 								// no-op
 							case resolveThisStack:
 								// no-op
@@ -1589,6 +1599,7 @@ func (c *compiler) checkIdentifierLName(name unistring.String, offset int) {
 // Such code should not be included in the final compilation result as it's never called, but it must
 // still produce compilation errors if there are any.
 // TODO: make sure variable lookups do not de-optimise parent scopes
+// TODO: the code needs to stay in debug mode
 func (c *compiler) enterDummyMode() (leaveFunc func()) {
 	savedBlock, savedProgram := c.block, c.p
 	if savedBlock != nil {

@@ -50,11 +50,12 @@ func (c *compiler) compileStatement(v ast.Statement, needResult bool) {
 		c.compileClassDeclaration(v)
 	case *ast.WithStatement:
 		c.compileWithStatement(v, needResult)
-	case *ast.DebuggerStatement:
 	case *ast.ImportDeclaration:
 		// this is already done, earlier
 	case *ast.ExportDeclaration:
 		c.compileExportDeclaration(v)
+	case *ast.DebuggerStatement:
+		c.compileDebuggerStatement()
 	default:
 		c.assert(false, int(v.Idx0())-1, "Unknown statement type: %T", v)
 		panic("unreachable")
@@ -1287,6 +1288,12 @@ func (c *compiler) compileSwitchStatement(v *ast.SwitchStatement, needResult boo
 		c.popScope()
 	}
 	c.leaveBlock()
+}
+
+func (c *compiler) compileDebuggerStatement() {
+	// The emitted debugger instruction will have no effect other than
+	// increasing vm.pc, if r.debugMode is not set
+	c.emit(debugger)
 }
 
 func (c *compiler) compileClassDeclaration(v *ast.ClassDeclaration) {

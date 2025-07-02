@@ -764,7 +764,6 @@ func (r *Runtime) newNativeFunc(call func(FunctionCall) Value, name unistring.St
 }
 
 func (r *Runtime) newWrappedFunc(value reflect.Value) *Object {
-
 	v := &Object{runtime: r}
 
 	f := &wrappedFuncObject{
@@ -1308,18 +1307,36 @@ func New() *Runtime {
 	return r
 }
 
+// AttachDebugger will attach and return a Debugger instance to the runtime.
+// This will also compile all future scripts directly ran through it in a debug mode until it's detached
+// Another way to compile in debug mode is to use CompileASTDebug
+// Only 1 debugger can be attached at a time
+// This method needs to be called before running any script and to call Continue on the debugger before running a script
+// in order to get when it blocks on a debugger statement or breakpoint
+// There can only be 1 debugger attached at a time, attaching more is has undefined behaviour
+func (r *Runtime) AttachDebugger() *Debugger {
+	r.vm.debugMode = true // maybe don't do this?
+	r.vm.debugger = newDebugger(r.vm)
+	return r.vm.debugger
+}
+
 // Compile creates an internal representation of the JavaScript code that can be later run using the Runtime.RunProgram()
 // method. This representation is not linked to a runtime in any way and can be run in multiple runtimes (possibly
 // at the same time).
 func Compile(name, src string, strict bool) (*Program, error) {
-	return compile(name, src, strict, true, nil)
+	return compile(name, src, strict, true, nil, false)
 }
 
 // CompileAST creates an internal representation of the JavaScript code that can be later run using the Runtime.RunProgram()
 // method. This representation is not linked to a runtime in any way and can be run in multiple runtimes (possibly
 // at the same time).
 func CompileAST(prg *js_ast.Program, strict bool) (*Program, error) {
-	return compileAST(prg, strict, true, nil)
+	return compileAST(prg, strict, true, nil, false)
+}
+
+// CompileASTDebug is like CompileAST but enables debug mode when compiling
+func CompileASTDebug(prg *js_ast.Program, strict bool) (*Program, error) {
+	return compileAST(prg, strict, true, nil, true)
 }
 
 // MustCompile is like Compile but panics if the code cannot be compiled.
@@ -1355,17 +1372,17 @@ func Parse(name, src string, options ...parser.Option) (prg *js_ast.Program, err
 	return
 }
 
-func compile(name, src string, strict, inGlobal bool, evalVm *vm, parserOptions ...parser.Option) (p *Program, err error) {
+func compile(name, src string, strict, inGlobal bool, evalVm *vm, debug bool, parserOptions ...parser.Option) (p *Program, err error) {
 	prg, err := Parse(name, src, parserOptions...)
 	if err != nil {
 		return
 	}
 
-	return compileAST(prg, strict, inGlobal, evalVm)
+	return compileAST(prg, strict, inGlobal, evalVm, debug)
 }
 
-func compileAST(prg *js_ast.Program, strict, inGlobal bool, evalVm *vm) (p *Program, err error) {
-	c := newCompiler()
+func compileAST(prg *js_ast.Program, strict, inGlobal bool, evalVm *vm, debug bool) (p *Program, err error) {
+	c := newCompiler(debug)
 
 	defer func() {
 		if x := recover(); x != nil {
@@ -1385,7 +1402,7 @@ func compileAST(prg *js_ast.Program, strict, inGlobal bool, evalVm *vm) (p *Prog
 }
 
 func (r *Runtime) compile(name, src string, strict, inGlobal bool, evalVm *vm) (p *Program, err error) {
-	p, err = compile(name, src, strict, inGlobal, evalVm, r.parserOptions...)
+	p, err = compile(name, src, strict, inGlobal, evalVm, r.vm.debugMode, r.parserOptions...)
 	if err != nil {
 		switch x1 := err.(type) {
 		case *CompilerSyntaxError:
@@ -1409,7 +1426,6 @@ func (r *Runtime) RunString(str string) (Value, error) {
 // RunScript executes the given string in the global context.
 func (r *Runtime) RunScript(name, src string) (Value, error) {
 	p, err := r.compile(name, src, false, true, nil)
-
 	if err != nil {
 		return nil, err
 	}
