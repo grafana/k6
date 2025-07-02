@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"path/filepath"
 	"testing"
 
@@ -347,4 +348,182 @@ export default function() {
 	jsData := string(data)
 	assert.Contains(t, jsData, "projectID: 123")
 	assert.Contains(t, jsData, `name: "test.js"`)
+}
+
+func TestNewScriptCmd_ListTemplatesWithMetadata(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+
+	// Create a template with metadata
+	templateDir := "templates/withmetadata"
+	require.NoError(t, ts.FS.MkdirAll(templateDir, 0o755))
+
+	// Create script.js
+	scriptContent := `export default function() { console.log("test"); }`
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(templateDir, "script.js"), []byte(scriptContent), 0o644))
+
+	// Create metadata file
+	metadataContent := `{
+  "name": "withmetadata",
+  "description": "A test template with metadata",
+  "tags": ["test", "metadata"],
+  "owner": "test-team",
+  "defaultFilename": "test-output.js"
+}`
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(templateDir, "k6.template.json"), []byte(metadataContent), 0o644))
+
+	// Create a template without metadata for comparison
+	templateDirNoMeta := "templates/nometa"
+	require.NoError(t, ts.FS.MkdirAll(templateDirNoMeta, 0o755))
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(templateDirNoMeta, "script.js"), []byte(scriptContent), 0o644))
+
+	ts.CmdArgs = []string{"k6", "new", "--list-templates"}
+	newRootCommand(ts.GlobalState).execute()
+
+	output := ts.Stdout.String()
+	assert.Contains(t, output, "Available templates:")
+	assert.Contains(t, output, "withmetadata - A test template with metadata")
+	assert.Contains(t, output, "nometa (no metadata)")
+	assert.Contains(t, output, "minimal (no metadata)")
+}
+
+func TestNewScriptCmd_ListTemplatesVerbose(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+
+	// Create a template with metadata
+	templateDir := "templates/verbose"
+	require.NoError(t, ts.FS.MkdirAll(templateDir, 0o755))
+
+	// Create script.js
+	scriptContent := `export default function() { console.log("verbose test"); }`
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(templateDir, "script.js"), []byte(scriptContent), 0o644))
+
+	// Create metadata file
+	metadataContent := `{
+  "name": "verbose",
+  "description": "Verbose test template",
+  "tags": ["verbose", "test", "json"],
+  "owner": "k6-dev-team",
+  "defaultFilename": "verbose-test.js"
+}`
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(templateDir, "k6.template.json"), []byte(metadataContent), 0o644))
+
+	ts.CmdArgs = []string{"k6", "new", "--list-templates", "--verbose"}
+	newRootCommand(ts.GlobalState).execute()
+
+	output := ts.Stdout.String()
+
+	// Should contain JSON output (using capitalized field names)
+	assert.Contains(t, output, `"Name": "verbose"`)
+	assert.Contains(t, output, `"description": "Verbose test template"`)
+	assert.Contains(t, output, `"tags": [`)
+	assert.Contains(t, output, `"verbose"`)
+	assert.Contains(t, output, `"test"`)
+	assert.Contains(t, output, `"json"`)
+	assert.Contains(t, output, `"owner": "k6-dev-team"`)
+	assert.Contains(t, output, `"defaultFilename": "verbose-test.js"`)
+	assert.Contains(t, output, `"IsBuiltIn": false`)
+
+	// Should also contain built-in templates
+	assert.Contains(t, output, `"Name": "minimal"`)
+	assert.Contains(t, output, `"IsBuiltIn": true`)
+
+	// Verify it's valid JSON
+	var templates []map[string]interface{}
+	require.NoError(t, json.Unmarshal([]byte(output), &templates))
+
+	// Should have built-ins plus our custom template
+	assert.GreaterOrEqual(t, len(templates), 5) // 4 built-ins + 1 custom
+}
+
+func TestNewScriptCmd_ListTemplatesVerboseEmpty(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+
+	// Test with no custom templates (only built-ins)
+	ts.CmdArgs = []string{"k6", "new", "--list-templates", "--verbose"}
+	newRootCommand(ts.GlobalState).execute()
+
+	output := ts.Stdout.String()
+
+	// Should contain JSON output with built-in templates
+	var templates []map[string]interface{}
+	require.NoError(t, json.Unmarshal([]byte(output), &templates))
+
+	// Should have exactly 4 built-in templates
+	assert.Len(t, templates, 4)
+
+	// All should be built-in
+	for _, tmpl := range templates {
+		isBuiltIn, ok := tmpl["IsBuiltIn"]
+		require.True(t, ok, "IsBuiltIn field should exist")
+		if isBuiltIn != nil {
+			assert.True(t, isBuiltIn.(bool), "Template should be built-in")
+		}
+		assert.Nil(t, tmpl["Metadata"])
+		assert.Equal(t, "", tmpl["Path"])
+	}
+}
+
+func TestNewScriptCmd_TemplateWithMalformedMetadata(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+
+	// Create a template with malformed metadata
+	templateDir := "templates/badmeta"
+	require.NoError(t, ts.FS.MkdirAll(templateDir, 0o755))
+
+	// Create script.js
+	scriptContent := `export default function() { console.log("bad metadata test"); }`
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(templateDir, "script.js"), []byte(scriptContent), 0o644))
+
+	// Create malformed metadata file
+	malformedMetadata := `{
+  "name": "badmeta",
+  "description": "This JSON is missing the closing brace...`
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(templateDir, "k6.template.json"), []byte(malformedMetadata), 0o644))
+
+	// Test that listing templates still works
+	ts.CmdArgs = []string{"k6", "new", "--list-templates"}
+	newRootCommand(ts.GlobalState).execute()
+
+	output := ts.Stdout.String()
+	assert.Contains(t, output, "Available templates:")
+	assert.Contains(t, output, "badmeta (no metadata)")
+
+	// Test that the template can still be used
+	ts.Stdout.Reset()
+	ts.Stderr.Reset()
+	ts.CmdArgs = []string{"k6", "new", "test-bad.js", "--template", "badmeta"}
+	newRootCommand(ts.GlobalState).execute()
+
+	// Should succeed despite bad metadata
+	data, err := fsext.ReadFile(ts.FS, "test-bad.js")
+	require.NoError(t, err)
+	assert.Contains(t, string(data), "bad metadata test")
+}
+
+func TestNewScriptCmd_VerboseFlagWithoutListTemplates(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+
+	// Test that --verbose flag without --list-templates works normally
+	ts.CmdArgs = []string{"k6", "new", "--verbose", "--template", "minimal"}
+	newRootCommand(ts.GlobalState).execute()
+
+	// Should create a script normally
+	data, err := fsext.ReadFile(ts.FS, defaultNewScriptName)
+	require.NoError(t, err)
+	assert.Contains(t, string(data), "export default function")
+
+	// Output should not be JSON
+	output := ts.Stdout.String()
+	assert.Contains(t, output, "New script created:")
+	assert.NotContains(t, output, `"name":`)
 }

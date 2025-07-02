@@ -35,3 +35,6 @@
 
 /packaging/.env
 /packaging/*.gpg
+
+# Local documentation drafts (not tracked)
+docs/drafts/

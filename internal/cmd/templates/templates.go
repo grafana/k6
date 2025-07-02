@@ -3,6 +3,7 @@ package templates
 
 import (
 	_ "embed"
+	"encoding/json"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -33,6 +34,29 @@ const (
 	BrowserTemplate  = "browser"
 	RestTemplate     = "rest"
 )
+
+// TemplateMetadata represents optional metadata for templates
+type TemplateMetadata struct {
+	Name            string   `json:"name"`
+	Description     string   `json:"description"`
+	Tags            []string `json:"tags"`
+	Owner           string   `json:"owner"`
+	DefaultFilename string   `json:"defaultFilename"`
+}
+
+// TemplateInfo combines template information with optional metadata
+type TemplateInfo struct {
+	Name      string
+	Path      string
+	Metadata  *TemplateMetadata
+	IsBuiltIn bool
+}
+
+// TemplateArgs represents arguments passed to templates
+type TemplateArgs struct {
+	ScriptName string
+	ProjectID  string
+}
 
 // TemplateManager manages the pre-parsed templates and template search paths
 type TemplateManager struct {
@@ -155,23 +179,55 @@ func (tm *TemplateManager) loadTemplateFromPath(tplPath string) (*template.Templ
 	return tmpl, nil
 }
 
-// ListTemplates returns a list of all available templates
-func (tm *TemplateManager) ListTemplates() ([]string, error) {
-	templates := make(map[string]bool)
+// isFilePath checks if the given string looks like a file path by detecting path separators
+// We assume that built-in template names don't contain path separators
+func isFilePath(path string) bool {
+	return strings.ContainsRune(path, filepath.Separator) || strings.ContainsRune(path, '/')
+}
+
+// parseTemplateMetadata attempts to parse a k6.template.json file from the given directory
+func (tm *TemplateManager) parseTemplateMetadata(templateDir string) (*TemplateMetadata, error) {
+	metadataPath := filepath.Join(templateDir, "k6.template.json")
+	exists, err := fsext.Exists(tm.fs, metadataPath)
+	if err != nil || !exists {
+		return nil, nil // Not an error, metadata is optional
+	}
+
+	data, err := fsext.ReadFile(tm.fs, metadataPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read metadata file %s: %w", metadataPath, err)
+	}
+
+	var metadata TemplateMetadata
+	if err := json.Unmarshal(data, &metadata); err != nil {
+		return nil, fmt.Errorf("failed to parse metadata file %s: %w", metadataPath, err)
+	}
+
+	return &metadata, nil
+}
+
+// ListTemplatesWithInfo returns a list of available templates with metadata
+func (tm *TemplateManager) ListTemplatesWithInfo() ([]TemplateInfo, error) {
+	templates := make(map[string]TemplateInfo)
 
 	// Add built-in templates
-	templates[MinimalTemplate] = true
-	templates[ProtocolTemplate] = true
-	templates[BrowserTemplate] = true
-	templates[RestTemplate] = true
+	builtins := []string{MinimalTemplate, ProtocolTemplate, BrowserTemplate, RestTemplate}
+	for _, name := range builtins {
+		templates[name] = TemplateInfo{
+			Name:      name,
+			Path:      "",
+			Metadata:  nil,
+			IsBuiltIn: true,
+		}
+	}
 
 	// Add local templates (./templates/)
 	localTemplatesDir := "templates"
 	if exists, _ := fsext.Exists(tm.fs, localTemplatesDir); exists {
-		localTemplates, err := tm.scanTemplateDirectory(localTemplatesDir)
+		localTemplates, err := tm.scanTemplateDirectoryWithInfo(localTemplatesDir)
 		if err == nil {
 			for _, tmpl := range localTemplates {
-				templates[tmpl] = true
+				templates[tmpl.Name] = tmpl
 			}
 		}
 	}
@@ -180,28 +236,32 @@ func (tm *TemplateManager) ListTemplates() ([]string, error) {
 	if tm.homeDir != "" {
 		globalTemplatesDir := filepath.Join(tm.homeDir, ".k6", "templates")
 		if exists, _ := fsext.Exists(tm.fs, globalTemplatesDir); exists {
-			globalTemplates, err := tm.scanTemplateDirectory(globalTemplatesDir)
+			globalTemplates, err := tm.scanTemplateDirectoryWithInfo(globalTemplatesDir)
 			if err == nil {
 				for _, tmpl := range globalTemplates {
-					templates[tmpl] = true
+					templates[tmpl.Name] = tmpl
 				}
 			}
 		}
 	}
 
 	// Convert map to sorted slice
-	result := make([]string, 0, len(templates))
-	for tmpl := range templates {
+	result := make([]TemplateInfo, 0, len(templates))
+	for _, tmpl := range templates {
 		result = append(result, tmpl)
 	}
-	sort.Strings(result)
+
+	// Sort by name
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Name < result[j].Name
+	})
 
 	return result, nil
 }
 
-// scanTemplateDirectory scans a directory for template folders
-func (tm *TemplateManager) scanTemplateDirectory(dir string) ([]string, error) {
-	var templates []string
+// scanTemplateDirectoryWithInfo scans a directory for template folders and returns TemplateInfo
+func (tm *TemplateManager) scanTemplateDirectoryWithInfo(dir string) ([]TemplateInfo, error) {
+	var templates []TemplateInfo
 
 	entries, err := fsext.ReadDir(tm.fs, dir)
 	if err != nil {
@@ -210,14 +270,47 @@ func (tm *TemplateManager) scanTemplateDirectory(dir string) ([]string, error) {
 
 	for _, entry := range entries {
 		if entry.IsDir() {
-			scriptPath := filepath.Join(dir, entry.Name(), "script.js")
+			templateDir := filepath.Join(dir, entry.Name())
+			scriptPath := filepath.Join(templateDir, "script.js")
 			if exists, _ := fsext.Exists(tm.fs, scriptPath); exists {
-				templates = append(templates, entry.Name())
+				// Try to parse metadata
+				metadata, err := tm.parseTemplateMetadata(templateDir)
+				if err != nil {
+					// Log warning but continue processing
+					fmt.Printf("Warning: failed to parse metadata for template %s: %v\n", entry.Name(), err)
+				}
+
+				templates = append(templates, TemplateInfo{
+					Name:      entry.Name(),
+					Path:      templateDir,
+					Metadata:  metadata,
+					IsBuiltIn: false,
+				})
 			}
 		}
 	}
 
 	return templates, nil
+}
+
+// ExecuteTemplate applies the template with provided arguments and writes to the provided writer
+func ExecuteTemplate(w io.Writer, tmpl *template.Template, args TemplateArgs) error {
+	return tmpl.Execute(w, args)
+}
+
+// ListTemplates returns a list of all available templates (backward compatibility)
+func (tm *TemplateManager) ListTemplates() ([]string, error) {
+	templatesWithInfo, err := tm.ListTemplatesWithInfo()
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]string, len(templatesWithInfo))
+	for i, tmpl := range templatesWithInfo {
+		result[i] = tmpl.Name
+	}
+
+	return result, nil
 }
 
 // CreateUserTemplate creates a new user template from an existing script
@@ -250,21 +343,4 @@ func (tm *TemplateManager) CreateUserTemplate(name, scriptPath string) error {
 	}
 
 	return nil
-}
-
-// isFilePath checks if the given string looks like a file path by detecting path separators
-// We assume that built-in template names don't contain path separators
-func isFilePath(path string) bool {
-	return strings.ContainsRune(path, filepath.Separator) || strings.ContainsRune(path, '/')
-}
-
-// TemplateArgs represents arguments passed to templates
-type TemplateArgs struct {
-	ScriptName string
-	ProjectID  string
-}
-
-// ExecuteTemplate applies the template with provided arguments and writes to the provided writer
-func ExecuteTemplate(w io.Writer, tmpl *template.Template, args TemplateArgs) error {
-	return tmpl.Execute(w, args)
 }

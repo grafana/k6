@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -20,6 +21,7 @@ type newScriptCmd struct {
 	templateType   string
 	projectID      string
 	listTemplates  bool
+	verbose        bool
 }
 
 func (c *newScriptCmd) flagSet() *pflag.FlagSet {
@@ -29,6 +31,7 @@ func (c *newScriptCmd) flagSet() *pflag.FlagSet {
 	flags.StringVar(&c.templateType, "template", "minimal", "template type (choices: minimal, protocol, browser, rest) or relative/absolute path to a custom template file") //nolint:lll
 	flags.StringVar(&c.projectID, "project-id", "", "specify the Grafana Cloud project ID for the test")
 	flags.BoolVar(&c.listTemplates, "list-templates", false, "list all available templates")
+	flags.BoolVar(&c.verbose, "verbose", false, "show detailed template information in JSON format (used with --list-templates)")
 	return flags
 }
 
@@ -41,19 +44,41 @@ func (c *newScriptCmd) run(_ *cobra.Command, args []string) (err error) {
 
 	// Handle --list-templates flag
 	if c.listTemplates {
-		availableTemplates, err := tm.ListTemplates()
+		if c.verbose {
+			// Return JSON output with full metadata
+			templatesWithInfo, err := tm.ListTemplatesWithInfo()
+			if err != nil {
+				return fmt.Errorf("error listing templates: %w", err)
+			}
+
+			// Create JSON output
+			jsonData, err := json.MarshalIndent(templatesWithInfo, "", "  ")
+			if err != nil {
+				return fmt.Errorf("error marshaling templates to JSON: %w", err)
+			}
+
+			fmt.Fprintln(c.gs.Stdout, string(jsonData))
+			return nil
+		}
+
+		// Standard list output with metadata if available
+		templatesWithInfo, err := tm.ListTemplatesWithInfo()
 		if err != nil {
 			return fmt.Errorf("error listing templates: %w", err)
 		}
 
-		if len(availableTemplates) == 0 {
+		if len(templatesWithInfo) == 0 {
 			fmt.Fprintln(c.gs.Stdout, "No templates available.")
 			return nil
 		}
 
 		fmt.Fprintln(c.gs.Stdout, "Available templates:")
-		for _, tmpl := range availableTemplates {
-			fmt.Fprintf(c.gs.Stdout, "  %s\n", tmpl)
+		for _, tmpl := range templatesWithInfo {
+			if tmpl.Metadata != nil && tmpl.Metadata.Description != "" {
+				fmt.Fprintf(c.gs.Stdout, "  %s - %s\n", tmpl.Name, tmpl.Metadata.Description)
+			} else {
+				fmt.Fprintf(c.gs.Stdout, "  %s (no metadata)\n", tmpl.Name)
+			}
 		}
 		return nil
 	}
@@ -134,6 +159,9 @@ func getCmdNewScript(gs *state.GlobalState) *cobra.Command {
 
     # List all available templates
     $ {{.}} new --list-templates
+
+    # List all templates with detailed metadata in JSON format
+    $ {{.}} new --list-templates --verbose
 
     # Create a cloud-ready script with a specific project ID
     $ {{.}} new --project-id 12315`[1:])

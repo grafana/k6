@@ -1,0 +1,7 @@
+{
+  "name": "customapi",
+  "description": "Custom API testing template with authentication and error handling",
+  "tags": ["api", "http", "authentication", "performance"],
+  "owner": "k6-team",
+  "defaultFilename": "api-test.js"
+} 
