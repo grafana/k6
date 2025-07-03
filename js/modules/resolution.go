@@ -151,7 +151,7 @@ func (mr *ModuleResolver) resolveLoaded(basePWD *url.URL, arg string, data []byt
 	if isESM(prg) {
 		mod, err = sobek.ModuleFromAST(prg, mr.sobekModuleResolver)
 	} else {
-		mod, err = cjsModuleFromString(prg)
+		mod, err = cjsModuleFromString(prg, mr.debug)
 	}
 	mr.reverse[mod] = specifier
 	mr.cache[specifier.String()] = moduleCacheElement{mod: mod, err: err}

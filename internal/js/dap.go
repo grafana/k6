@@ -7,19 +7,16 @@ import (
 	"log"
 	"net"
 	"sync"
-	"time"
 
 	"github.com/google/go-dap"
 	"github.com/grafana/sobek"
 )
 
-type DebugSession struct {
+type debugSession struct {
 	rw        *bufio.ReadWriter
 	sendQueue chan dap.Message
 	stopDebug chan struct{}
 	sendWg    sync.WaitGroup
-	bpSet     int
-	bpSetMux  sync.Mutex
 	dbg       *sobek.Debugger
 }
 
@@ -44,7 +41,7 @@ func server(dbg *sobek.Debugger, host, port string) error {
 }
 
 func handleConnection(conn net.Conn, dbg *sobek.Debugger) {
-	debugSession := DebugSession{
+	debugSession := debugSession{
 		dbg:       dbg,
 		rw:        bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn)),
 		sendQueue: make(chan dap.Message),
@@ -74,11 +71,11 @@ func handleConnection(conn net.Conn, dbg *sobek.Debugger) {
 	conn.Close()
 }
 
-func (ds *DebugSession) send(message dap.Message) {
+func (ds *debugSession) send(message dap.Message) {
 	ds.sendQueue <- message
 }
 
-func (ds *DebugSession) sendFromQueue() {
+func (ds *debugSession) sendFromQueue() {
 	for message := range ds.sendQueue {
 		dap.WriteProtocolMessage(ds.rw.Writer, message)
 		log.Printf("Message sent\n\t%#v\n", message)
@@ -86,7 +83,7 @@ func (ds *DebugSession) sendFromQueue() {
 	}
 }
 
-func (ds *DebugSession) handleRequest() error {
+func (ds *debugSession) handleRequest() error {
 	log.Println("Reading request...")
 	request, err := dap.ReadProtocolMessage(ds.rw.Reader)
 	if err != nil {
@@ -101,7 +98,7 @@ func (ds *DebugSession) handleRequest() error {
 	return nil
 }
 
-func (ds *DebugSession) doContinue() {
+func (ds *debugSession) doContinue() {
 	var e dap.Message
 	reason := ds.dbg.Continue()
 	e = &dap.StoppedEvent{
@@ -111,7 +108,7 @@ func (ds *DebugSession) doContinue() {
 	ds.send(e)
 }
 
-func (ds *DebugSession) dispatchRequest(request dap.Message) {
+func (ds *debugSession) dispatchRequest(request dap.Message) {
 	switch request := request.(type) {
 	case *dap.InitializeRequest:
 		ds.onInitializeRequest(request)
@@ -196,7 +193,7 @@ func (ds *DebugSession) dispatchRequest(request dap.Message) {
 	}
 }
 
-func (ds *DebugSession) onInitializeRequest(request *dap.InitializeRequest) {
+func (ds *debugSession) onInitializeRequest(request *dap.InitializeRequest) {
 	response := &dap.InitializeResponse{}
 	response.Response = newResponse(request.Seq, request.Command)
 	response.Body.SupportsConfigurationDoneRequest = true
@@ -240,7 +237,7 @@ func (ds *DebugSession) onInitializeRequest(request *dap.InitializeRequest) {
 	ds.send(response)
 }
 
-func (ds *DebugSession) onLaunchRequest(request *dap.LaunchRequest) {
+func (ds *debugSession) onLaunchRequest(request *dap.LaunchRequest) {
 	// This is where a real debug adaptor would check the soundness of the
 	// arguments (e.g. program from launch.json) and then use them to launch the
 	// debugger and attach to the program.
@@ -249,27 +246,27 @@ func (ds *DebugSession) onLaunchRequest(request *dap.LaunchRequest) {
 	ds.send(response)
 }
 
-func (ds *DebugSession) onAttachRequest(request *dap.AttachRequest) {
+func (ds *debugSession) onAttachRequest(request *dap.AttachRequest) {
 	response := &dap.AttachResponse{}
 	response.Response = newResponse(request.Seq, request.Command)
 	ds.send(response)
 }
 
-func (ds *DebugSession) onDisconnectRequest(request *dap.DisconnectRequest) {
+func (ds *debugSession) onDisconnectRequest(request *dap.DisconnectRequest) {
 	response := &dap.DisconnectResponse{}
 	response.Response = newResponse(request.Seq, request.Command)
 	ds.send(response)
 }
 
-func (ds *DebugSession) onTerminateRequest(request *dap.TerminateRequest) {
+func (ds *debugSession) onTerminateRequest(request *dap.TerminateRequest) {
 	ds.send(newErrorResponse(request.Seq, request.Command, "TerminateRequest is not yet supported"))
 }
 
-func (ds *DebugSession) onRestartRequest(request *dap.RestartRequest) {
+func (ds *debugSession) onRestartRequest(request *dap.RestartRequest) {
 	ds.send(newErrorResponse(request.Seq, request.Command, "RestartRequest is not yet supported"))
 }
 
-func (ds *DebugSession) onSetBreakpointsRequest(request *dap.SetBreakpointsRequest) {
+func (ds *debugSession) onSetBreakpointsRequest(request *dap.SetBreakpointsRequest) {
 	response := &dap.SetBreakpointsResponse{}
 	response.Response = newResponse(request.Seq, request.Command)
 	response.Body.Breakpoints = make([]dap.Breakpoint, len(request.Arguments.Breakpoints))
@@ -282,17 +279,17 @@ func (ds *DebugSession) onSetBreakpointsRequest(request *dap.SetBreakpointsReque
 	ds.send(response)
 }
 
-func (ds *DebugSession) onSetFunctionBreakpointsRequest(request *dap.SetFunctionBreakpointsRequest) {
+func (ds *debugSession) onSetFunctionBreakpointsRequest(request *dap.SetFunctionBreakpointsRequest) {
 	ds.send(newErrorResponse(request.Seq, request.Command, "SetFunctionBreakpointsRequest is not yet supported"))
 }
 
-func (ds *DebugSession) onSetExceptionBreakpointsRequest(request *dap.SetExceptionBreakpointsRequest) {
+func (ds *debugSession) onSetExceptionBreakpointsRequest(request *dap.SetExceptionBreakpointsRequest) {
 	response := &dap.SetExceptionBreakpointsResponse{}
 	response.Response = newResponse(request.Seq, request.Command)
 	ds.send(response)
 }
 
-func (ds *DebugSession) onConfigurationDoneRequest(request *dap.ConfigurationDoneRequest) {
+func (ds *debugSession) onConfigurationDoneRequest(request *dap.ConfigurationDoneRequest) {
 	// This would be the place to check if the session was configured to
 	// stop on entry and if that is the case, to issue a
 	// stopped-on-breakpoint event. This being a mock implementation,
@@ -305,46 +302,46 @@ func (ds *DebugSession) onConfigurationDoneRequest(request *dap.ConfigurationDon
 	ds.doContinue()
 }
 
-func (ds *DebugSession) onContinueRequest(request *dap.ContinueRequest) {
+func (ds *debugSession) onContinueRequest(request *dap.ContinueRequest) {
 	response := &dap.ContinueResponse{}
 	response.Response = newResponse(request.Seq, request.Command)
 	ds.send(response)
 	ds.doContinue()
 }
 
-func (ds *DebugSession) onNextRequest(request *dap.NextRequest) {
+func (ds *debugSession) onNextRequest(request *dap.NextRequest) {
 	ds.send(newErrorResponse(request.Seq, request.Command, "NextRequest is not yet supported"))
 }
 
-func (ds *DebugSession) onStepInRequest(request *dap.StepInRequest) {
+func (ds *debugSession) onStepInRequest(request *dap.StepInRequest) {
 	ds.send(newErrorResponse(request.Seq, request.Command, "StepInRequest is not yet supported"))
 }
 
-func (ds *DebugSession) onStepOutRequest(request *dap.StepOutRequest) {
+func (ds *debugSession) onStepOutRequest(request *dap.StepOutRequest) {
 	ds.send(newErrorResponse(request.Seq, request.Command, "StepOutRequest is not yet supported"))
 }
 
-func (ds *DebugSession) onStepBackRequest(request *dap.StepBackRequest) {
+func (ds *debugSession) onStepBackRequest(request *dap.StepBackRequest) {
 	ds.send(newErrorResponse(request.Seq, request.Command, "StepBackRequest is not yet supported"))
 }
 
-func (ds *DebugSession) onReverseContinueRequest(request *dap.ReverseContinueRequest) {
+func (ds *debugSession) onReverseContinueRequest(request *dap.ReverseContinueRequest) {
 	ds.send(newErrorResponse(request.Seq, request.Command, "ReverseContinueRequest is not yet supported"))
 }
 
-func (ds *DebugSession) onRestartFrameRequest(request *dap.RestartFrameRequest) {
+func (ds *debugSession) onRestartFrameRequest(request *dap.RestartFrameRequest) {
 	ds.send(newErrorResponse(request.Seq, request.Command, "RestartFrameRequest is not yet supported"))
 }
 
-func (ds *DebugSession) onGotoRequest(request *dap.GotoRequest) {
+func (ds *debugSession) onGotoRequest(request *dap.GotoRequest) {
 	ds.send(newErrorResponse(request.Seq, request.Command, "GotoRequest is not yet supported"))
 }
 
-func (ds *DebugSession) onPauseRequest(request *dap.PauseRequest) {
+func (ds *debugSession) onPauseRequest(request *dap.PauseRequest) {
 	ds.send(newErrorResponse(request.Seq, request.Command, "PauseRequest is not yet supported"))
 }
 
-func (ds *DebugSession) onStackTraceRequest(request *dap.StackTraceRequest) {
+func (ds *debugSession) onStackTraceRequest(request *dap.StackTraceRequest) {
 	response := &dap.StackTraceResponse{}
 	response.Response = newResponse(request.Seq, request.Command)
 	response.Body = dap.StackTraceResponseBody{
@@ -362,7 +359,7 @@ func (ds *DebugSession) onStackTraceRequest(request *dap.StackTraceRequest) {
 	ds.send(response)
 }
 
-func (ds *DebugSession) onScopesRequest(request *dap.ScopesRequest) {
+func (ds *debugSession) onScopesRequest(request *dap.ScopesRequest) {
 	response := &dap.ScopesResponse{}
 	response.Response = newResponse(request.Seq, request.Command)
 	response.Body = dap.ScopesResponseBody{
@@ -374,91 +371,91 @@ func (ds *DebugSession) onScopesRequest(request *dap.ScopesRequest) {
 	ds.send(response)
 }
 
-func (ds *DebugSession) onVariablesRequest(request *dap.VariablesRequest) {
-	select {
-	case <-ds.stopDebug:
-		return
-	// simulate long-running processing to make this handler
-	// respond to this request after the next request is received
-	case <-time.After(100 * time.Millisecond):
-		response := &dap.VariablesResponse{}
-		response.Response = newResponse(request.Seq, request.Command)
-		response.Body = dap.VariablesResponseBody{
-			Variables: []dap.Variable{{Name: "i", Value: "18434528", EvaluateName: "i", VariablesReference: 0}},
-		}
-		ds.send(response)
+func (ds *debugSession) onVariablesRequest(request *dap.VariablesRequest) {
+	response := &dap.VariablesResponse{}
+	response.Response = newResponse(request.Seq, request.Command)
+	response.Body = dap.VariablesResponseBody{
+		Variables: []dap.Variable{},
 	}
+	variables, err := ds.dbg.GetLocalVariables()
+	fmt.Println(variables, err)
+	for n, v := range variables {
+		response.Body.Variables = append(response.Body.Variables, dap.Variable{
+			Name:  n,
+			Value: v.String(),
+		})
+	}
+	ds.send(response)
 }
 
-func (ds *DebugSession) onSetVariableRequest(request *dap.SetVariableRequest) {
+func (ds *debugSession) onSetVariableRequest(request *dap.SetVariableRequest) {
 	ds.send(newErrorResponse(request.Seq, request.Command, "setVariableRequest is not yet supported"))
 }
 
-func (ds *DebugSession) onSetExpressionRequest(request *dap.SetExpressionRequest) {
+func (ds *debugSession) onSetExpressionRequest(request *dap.SetExpressionRequest) {
 	ds.send(newErrorResponse(request.Seq, request.Command, "SetExpressionRequest is not yet supported"))
 }
 
-func (ds *DebugSession) onSourceRequest(request *dap.SourceRequest) {
+func (ds *debugSession) onSourceRequest(request *dap.SourceRequest) {
 	ds.send(newErrorResponse(request.Seq, request.Command, "SourceRequest is not yet supported"))
 }
 
-func (ds *DebugSession) onThreadsRequest(request *dap.ThreadsRequest) {
+func (ds *debugSession) onThreadsRequest(request *dap.ThreadsRequest) {
 	response := &dap.ThreadsResponse{}
 	response.Response = newResponse(request.Seq, request.Command)
 	response.Body = dap.ThreadsResponseBody{Threads: []dap.Thread{{Id: 1, Name: "main"}}}
 	ds.send(response)
-
 }
 
-func (ds *DebugSession) onTerminateThreadsRequest(request *dap.TerminateThreadsRequest) {
+func (ds *debugSession) onTerminateThreadsRequest(request *dap.TerminateThreadsRequest) {
 	ds.send(newErrorResponse(request.Seq, request.Command, "TerminateRequest is not yet supported"))
 }
 
-func (ds *DebugSession) onEvaluateRequest(request *dap.EvaluateRequest) {
+func (ds *debugSession) onEvaluateRequest(request *dap.EvaluateRequest) {
 	ds.send(newErrorResponse(request.Seq, request.Command, "EvaluateRequest is not yet supported"))
 }
 
-func (ds *DebugSession) onStepInTargetsRequest(request *dap.StepInTargetsRequest) {
+func (ds *debugSession) onStepInTargetsRequest(request *dap.StepInTargetsRequest) {
 	ds.send(newErrorResponse(request.Seq, request.Command, "StepInTargetRequest is not yet supported"))
 }
 
-func (ds *DebugSession) onGotoTargetsRequest(request *dap.GotoTargetsRequest) {
+func (ds *debugSession) onGotoTargetsRequest(request *dap.GotoTargetsRequest) {
 	ds.send(newErrorResponse(request.Seq, request.Command, "GotoTargetRequest is not yet supported"))
 }
 
-func (ds *DebugSession) onCompletionsRequest(request *dap.CompletionsRequest) {
+func (ds *debugSession) onCompletionsRequest(request *dap.CompletionsRequest) {
 	ds.send(newErrorResponse(request.Seq, request.Command, "CompletionRequest is not yet supported"))
 }
 
-func (ds *DebugSession) onExceptionInfoRequest(request *dap.ExceptionInfoRequest) {
+func (ds *debugSession) onExceptionInfoRequest(request *dap.ExceptionInfoRequest) {
 	ds.send(newErrorResponse(request.Seq, request.Command, "ExceptionRequest is not yet supported"))
 }
 
-func (ds *DebugSession) onLoadedSourcesRequest(request *dap.LoadedSourcesRequest) {
+func (ds *debugSession) onLoadedSourcesRequest(request *dap.LoadedSourcesRequest) {
 	ds.send(newErrorResponse(request.Seq, request.Command, "LoadedRequest is not yet supported"))
 }
 
-func (ds *DebugSession) onDataBreakpointInfoRequest(request *dap.DataBreakpointInfoRequest) {
+func (ds *debugSession) onDataBreakpointInfoRequest(request *dap.DataBreakpointInfoRequest) {
 	ds.send(newErrorResponse(request.Seq, request.Command, "DataBreakpointInfoRequest is not yet supported"))
 }
 
-func (ds *DebugSession) onSetDataBreakpointsRequest(request *dap.SetDataBreakpointsRequest) {
+func (ds *debugSession) onSetDataBreakpointsRequest(request *dap.SetDataBreakpointsRequest) {
 	ds.send(newErrorResponse(request.Seq, request.Command, "SetDataBreakpointsRequest is not yet supported"))
 }
 
-func (ds *DebugSession) onReadMemoryRequest(request *dap.ReadMemoryRequest) {
+func (ds *debugSession) onReadMemoryRequest(request *dap.ReadMemoryRequest) {
 	ds.send(newErrorResponse(request.Seq, request.Command, "ReadMemoryRequest is not yet supported"))
 }
 
-func (ds *DebugSession) onDisassembleRequest(request *dap.DisassembleRequest) {
+func (ds *debugSession) onDisassembleRequest(request *dap.DisassembleRequest) {
 	ds.send(newErrorResponse(request.Seq, request.Command, "DisassembleRequest is not yet supported"))
 }
 
-func (ds *DebugSession) onCancelRequest(request *dap.CancelRequest) {
+func (ds *debugSession) onCancelRequest(request *dap.CancelRequest) {
 	ds.send(newErrorResponse(request.Seq, request.Command, "CancelRequest is not yet supported"))
 }
 
-func (ds *DebugSession) onBreakpointLocationsRequest(request *dap.BreakpointLocationsRequest) {
+func (ds *debugSession) onBreakpointLocationsRequest(request *dap.BreakpointLocationsRequest) {
 	ds.send(newErrorResponse(request.Seq, request.Command, "BreakpointLocationsRequest is not yet supported"))
 }
 

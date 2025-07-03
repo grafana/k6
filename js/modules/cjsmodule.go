@@ -112,8 +112,14 @@ func (cmi *cjsModuleInstance) GetBindingValue(name string) sobek.Value {
 }
 
 // cjsModuleFromString is a helper function which returns CJSModule given the argument it has.
-func cjsModuleFromString(prg *ast.Program) (sobek.ModuleRecord, error) {
-	pgm, err := sobek.CompileAST(prg, true)
+func cjsModuleFromString(prg *ast.Program, debug bool) (sobek.ModuleRecord, error) {
+	var pgm *sobek.Program
+	var err error
+	if debug {
+		pgm, err = sobek.CompileASTDebug(prg, true)
+	} else {
+		pgm, err = sobek.CompileAST(prg, true)
+	}
 	if err != nil {
 		return nil, err
 	}
