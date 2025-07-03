@@ -2,13 +2,16 @@ package js
 
 import (
 	"bufio"
+	"context"
 	"io"
 	"log"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/google/go-dap"
 	"github.com/grafana/sobek"
+	"go.k6.io/k6/errext"
 )
 
 type debugSession struct {
@@ -18,11 +21,15 @@ type debugSession struct {
 	sendWg    sync.WaitGroup
 	dbg       *sobek.Debugger
 	rt        *sobek.Runtime
+	cancel    context.CancelFunc
 }
 
 func server(dbg *sobek.Debugger, rt *sobek.Runtime, host, port string) error {
-	listener, err := net.Listen("tcp", host+":"+port)
+	var lc net.ListenConfig
+	ctx, cancel := context.WithCancel(context.Background())
+	listener, err := lc.Listen(ctx, "tcp", host+":"+port)
 	if err != nil {
+		cancel()
 		return err
 	}
 	defer listener.Close()
@@ -36,17 +43,18 @@ func server(dbg *sobek.Debugger, rt *sobek.Runtime, host, port string) error {
 		}
 		// log.Println("Accepted connection from", conn.RemoteAddr())
 		// Handle multiple client connections concurrently
-		go handleConnection(conn, dbg, rt)
+		go handleConnection(conn, dbg, rt, cancel)
 	}
 }
 
-func handleConnection(conn net.Conn, dbg *sobek.Debugger, rt *sobek.Runtime) {
+func handleConnection(conn net.Conn, dbg *sobek.Debugger, rt *sobek.Runtime, cancel context.CancelFunc) {
 	debugSession := debugSession{
 		dbg:       dbg,
 		rw:        bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn)),
 		sendQueue: make(chan dap.Message),
 		stopDebug: make(chan struct{}),
 		rt:        rt,
+		cancel:    cancel,
 	}
 	go debugSession.sendFromQueue()
 
@@ -228,7 +236,7 @@ func (ds *debugSession) onInitializeRequest(request *dap.InitializeRequest) {
 	response.Body.SupportsLogPoints = false
 	response.Body.SupportsTerminateThreadsRequest = false
 	response.Body.SupportsSetExpression = true
-	response.Body.SupportsTerminateRequest = false
+	response.Body.SupportsTerminateRequest = true
 	response.Body.SupportsDataBreakpoints = false
 	response.Body.SupportsReadMemoryRequest = false
 	response.Body.SupportsDisassembleRequest = false
@@ -265,7 +273,19 @@ func (ds *debugSession) onDisconnectRequest(request *dap.DisconnectRequest) {
 }
 
 func (ds *debugSession) onTerminateRequest(request *dap.TerminateRequest) {
-	ds.send(newErrorResponse(request.Seq, request.Command, "TerminateRequest is not yet supported"))
+	defer func() {
+		go func() {
+			ds.rt.Interrupt(&errext.InterruptError{Reason: "TerminateRequest"})
+			time.Sleep(1 * time.Second)
+			panic("TerminateRequest")
+		}()
+	}()
+	ds.cancel()
+
+	response := &dap.TerminateResponse{
+		Response: newResponse(request.Seq, request.Command),
+	}
+	ds.send(response)
 }
 
 func (ds *debugSession) onRestartRequest(request *dap.RestartRequest) {
