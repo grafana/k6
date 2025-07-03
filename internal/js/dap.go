@@ -297,15 +297,19 @@ func (ds *debugSession) onSetBreakpointsRequest(request *dap.SetBreakpointsReque
 	response.Response = newResponse(request.Seq, request.Command)
 	response.Body.Breakpoints = make([]dap.Breakpoint, len(request.Arguments.Breakpoints))
 	for i, b := range request.Arguments.Breakpoints {
-		log.Println("Setting breakpoint", b.Line, request.Arguments.Source.Path)
+		// First clear the breakpoint if it already exists.
+		err := ds.dbg.ClearBreakpoint("file://"+request.Arguments.Source.Path, b.Line)
+		if err != nil {
+			log.Println(err.Error())
+		}
+
+		// Now set the breakpoint.
 		id, err := ds.dbg.SetBreakpoint("file://"+request.Arguments.Source.Path, b.Line)
 		if err != nil {
 			log.Println(err.Error())
 			response.Body.Breakpoints[i].Verified = false
 		} else {
 			response.Body.Breakpoints[i].Id = id
-
-			log.Println("breakpoint set")
 			response.Body.Breakpoints[i].Verified = true
 		}
 
