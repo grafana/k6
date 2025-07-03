@@ -199,7 +199,7 @@ github.com/grafana/k6deps/internal/pack/plugins/k6
 # github.com/grafana/k6provider v0.1.15
 ## explicit; go 1.23.0
 github.com/grafana/k6provider
-# github.com/grafana/sobek v0.0.0-20250630142345-bf4c78358400
+# github.com/grafana/sobek v0.0.0-20250703135902-64a6c5c327be
 ## explicit; go 1.20
 github.com/grafana/sobek
 github.com/grafana/sobek/ast

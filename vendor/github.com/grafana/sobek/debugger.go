@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/grafana/sobek/parser"
 	"github.com/grafana/sobek/unistring"
@@ -14,13 +16,16 @@ import (
 type Debugger struct {
 	vm *vm
 
-	currentLine    int
-	lastLine       int
-	breakpoints    map[string][]int
-	activationCh   chan chan ActivationReason
-	currentCh      chan ActivationReason
-	active         bool
-	lastBreakpoint struct {
+	currentLine     int
+	lastLine        int
+	breakpoints     map[string][]int
+	breakpointMutex sync.RWMutex
+	breakpointIDs   map[string]int
+	breakPointCount int
+	activationCh    chan chan DebuggerActivation
+	currentCh       chan DebuggerActivation
+	active          bool
+	lastBreakpoint  struct {
 		filename   string
 		line       int
 		stackDepth int
@@ -29,11 +34,12 @@ type Debugger struct {
 
 func newDebugger(vm *vm) *Debugger {
 	dbg := &Debugger{
-		vm:           vm,
-		activationCh: make(chan chan ActivationReason),
-		active:       false,
-		breakpoints:  make(map[string][]int),
-		lastLine:     0,
+		vm:            vm,
+		activationCh:  make(chan chan DebuggerActivation),
+		active:        false,
+		breakpoints:   make(map[string][]int),
+		breakpointIDs: make(map[string]int),
+		lastLine:      0,
 	}
 	return dbg
 }
@@ -46,25 +52,45 @@ const (
 	BreakpointActivation        ActivationReason = "breakpoint"
 )
 
+type DebuggerActivation struct {
+	Reason   ActivationReason
+	Filename string
+	Line     int
+	ID       int
+}
+
 var globalBuiltinKeys = map[string]bool{"Object": true, "Function": true, "Array": true, "String": true, "globalThis": true, "NaN": true, "undefined": true, "Infinity": true, "isNaN": true, "parseInt": true, "parseFloat": true, "isFinite": true, "decodeURI": true, "decodeURIComponent": true, "encodeURI": true, "encodeURIComponent": true, "escape": true, "unescape": true, "Number": true, "RegExp": true, "Date": true, "Boolean": true, "Proxy": true, "Reflect": true, "Error": true, "AggregateError": true, "TypeError": true, "ReferenceError": true, "SyntaxError": true, "RangeError": true, "EvalError": true, "URIError": true, "GoError": true, "eval": true, "Math": true, "JSON": true, "ArrayBuffer": true, "DataView": true, "Uint8Array": true, "Uint8ClampedArray": true, "Int8Array": true, "Uint16Array": true, "Int16Array": true, "Uint32Array": true, "Int32Array": true, "Float32Array": true, "Float64Array": true, "Symbol": true, "WeakSet": true, "WeakMap": true, "Map": true, "Set": true, "Promise": true}
 
-func (dbg *Debugger) activate(reason ActivationReason) {
+func (dbg *Debugger) activate(reason ActivationReason, filename string, line int) {
 	dbg.active = true
 	ch := <-dbg.activationCh // get channel from waiter
-	ch <- reason             // send what activated it
-	<-ch                     // wait for deactivation
+
+	id := 0
+	if reason != DebuggerStatementActivation {
+		dbg.breakpointMutex.RLock()
+		id = dbg.breakpointIDs[filename+":"+strconv.Itoa(line)]
+		dbg.breakpointMutex.RUnlock()
+	}
+
+	ch <- DebuggerActivation{
+		Reason:   reason,
+		Filename: filename,
+		Line:     line,
+		ID:       id,
+	} // send what activated it
+	<-ch // wait for deactivation
 	dbg.active = false
 }
 
 // Continue unblocks the goja runtime to run code as is and will return the reason why it blocked again.
-func (dbg *Debugger) Continue() ActivationReason {
+func (dbg *Debugger) Continue() DebuggerActivation {
 	if dbg.currentCh != nil {
 		close(dbg.currentCh)
 	}
-	dbg.currentCh = make(chan ActivationReason)
+	dbg.currentCh = make(chan DebuggerActivation)
 	dbg.activationCh <- dbg.currentCh
-	reason := <-dbg.currentCh
-	return reason
+	activation := <-dbg.currentCh
+	return activation
 }
 
 func (dbg *Debugger) PC() int {
@@ -84,7 +110,7 @@ func (dbg *Debugger) Detach() { // TODO return an error?
 	}
 }
 
-func (dbg *Debugger) SetBreakpoint(filename string, line int) (err error) {
+func (dbg *Debugger) SetBreakpoint(filename string, line int) (id int, err error) {
 	idx := sort.SearchInts(dbg.breakpoints[filename], line)
 	if idx < len(dbg.breakpoints[filename]) && dbg.breakpoints[filename][idx] == line {
 		err = errors.New("breakpoint exists")
@@ -93,6 +119,11 @@ func (dbg *Debugger) SetBreakpoint(filename string, line int) (err error) {
 		if len(dbg.breakpoints[filename]) > 1 {
 			sort.Ints(dbg.breakpoints[filename])
 		}
+		dbg.breakpointMutex.Lock()
+		id = dbg.breakPointCount
+		dbg.breakPointCount++
+		dbg.breakpointIDs[filename+":"+strconv.Itoa(line)] = id
+		dbg.breakpointMutex.Unlock()
 	}
 	return
 }

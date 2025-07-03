@@ -331,9 +331,10 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*BundleInstance
 	moduleResolver := b.ModuleResolver
 	if vuID == 1 {
 		dbg := vuImpl.runtime.AttachDebugger()
+		rt := vuImpl.runtime
 		moduleResolver = moduleResolver.DebugCopy()
 		go func() {
-			server(dbg, "127.0.0.1", "4711")
+			server(dbg, rt, "127.0.0.1", "4711")
 		}()
 	}
 	modSys := modules.NewModuleSystem(moduleResolver, vuImpl)

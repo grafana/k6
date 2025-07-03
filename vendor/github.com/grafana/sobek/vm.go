@@ -723,7 +723,7 @@ func (vm *vm) debug() {
 					vm.debugger.lastBreakpoint.stackDepth = vm.debugger.callStackDepth()
 					if vm.debugger.lastBreakpoint.stackDepth >= prevStackDepth {
 						vm.debugger.updateCurrentLine()
-						vm.debugger.activate(BreakpointActivation)
+						vm.debugger.activate(BreakpointActivation, vm.debugger.Filename(), vm.debugger.currentLine)
 					}
 
 				}
@@ -1962,7 +1962,7 @@ var debugger _debugger
 func (_debugger) exec(vm *vm) {
 	vm.pc++
 	if vm.debugMode && !vm.debugger.active { // this jumps over debugger statements
-		vm.debugger.activate(DebuggerStatementActivation)
+		vm.debugger.activate(DebuggerStatementActivation, vm.debugger.Filename(), vm.debugger.Line())
 	}
 }
 

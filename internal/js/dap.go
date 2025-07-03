@@ -18,9 +18,10 @@ type debugSession struct {
 	stopDebug chan struct{}
 	sendWg    sync.WaitGroup
 	dbg       *sobek.Debugger
+	rt        *sobek.Runtime
 }
 
-func server(dbg *sobek.Debugger, host, port string) error {
+func server(dbg *sobek.Debugger, rt *sobek.Runtime, host, port string) error {
 	listener, err := net.Listen("tcp", host+":"+port)
 	if err != nil {
 		return err
@@ -36,16 +37,17 @@ func server(dbg *sobek.Debugger, host, port string) error {
 		}
 		log.Println("Accepted connection from", conn.RemoteAddr())
 		// Handle multiple client connections concurrently
-		go handleConnection(conn, dbg)
+		go handleConnection(conn, dbg, rt)
 	}
 }
 
-func handleConnection(conn net.Conn, dbg *sobek.Debugger) {
+func handleConnection(conn net.Conn, dbg *sobek.Debugger, rt *sobek.Runtime) {
 	debugSession := debugSession{
 		dbg:       dbg,
 		rw:        bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn)),
 		sendQueue: make(chan dap.Message),
 		stopDebug: make(chan struct{}),
+		rt:        rt,
 	}
 	go debugSession.sendFromQueue()
 
@@ -100,10 +102,15 @@ func (ds *debugSession) handleRequest() error {
 
 func (ds *debugSession) doContinue() {
 	var e dap.Message
-	reason := ds.dbg.Continue()
+	activation := ds.dbg.Continue()
 	e = &dap.StoppedEvent{
 		Event: *newEvent("stopped"),
-		Body:  dap.StoppedEventBody{Reason: string(reason), ThreadId: 1, AllThreadsStopped: true},
+		Body: dap.StoppedEventBody{
+			Reason:            string(activation.Reason),
+			ThreadId:          1,
+			AllThreadsStopped: true,
+			HitBreakpointIds:  []int{activation.ID},
+		},
 	}
 	ds.send(e)
 }
@@ -197,7 +204,7 @@ func (ds *debugSession) onInitializeRequest(request *dap.InitializeRequest) {
 	response := &dap.InitializeResponse{}
 	response.Response = newResponse(request.Seq, request.Command)
 	response.Body.SupportsConfigurationDoneRequest = true
-	response.Body.SupportsFunctionBreakpoints = true
+	response.Body.SupportsFunctionBreakpoints = false
 	response.Body.SupportsConditionalBreakpoints = false
 	response.Body.SupportsHitConditionalBreakpoints = false
 	response.Body.SupportsEvaluateForHovers = false
@@ -227,7 +234,7 @@ func (ds *debugSession) onInitializeRequest(request *dap.InitializeRequest) {
 	response.Body.SupportsReadMemoryRequest = false
 	response.Body.SupportsDisassembleRequest = false
 	response.Body.SupportsCancelRequest = false
-	response.Body.SupportsBreakpointLocationsRequest = true
+	response.Body.SupportsBreakpointLocationsRequest = false
 	// This is a fake set up, so we can start "accepting" configuration
 	// requests for setting breakpoints, etc from the client at any time.
 	// Notify the client with an 'initialized' event. The client will end
@@ -270,11 +277,20 @@ func (ds *debugSession) onSetBreakpointsRequest(request *dap.SetBreakpointsReque
 	response := &dap.SetBreakpointsResponse{}
 	response.Response = newResponse(request.Seq, request.Command)
 	response.Body.Breakpoints = make([]dap.Breakpoint, len(request.Arguments.Breakpoints))
-	for _, b := range request.Arguments.Breakpoints {
-		err := ds.dbg.SetBreakpoint("file://"+request.Arguments.Source.Path, b.Line)
+	for i, b := range request.Arguments.Breakpoints {
+		log.Println("Setting breakpoint", b.Line, request.Arguments.Source.Path)
+		id, err := ds.dbg.SetBreakpoint("file://"+request.Arguments.Source.Path, b.Line)
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err.Error())
+			response.Body.Breakpoints[i].Verified = false
+		} else {
+			response.Body.Breakpoints[i].Id = id
+
+			log.Println("breakpoint set")
+			response.Body.Breakpoints[i].Verified = true
 		}
+
+		response.Body.Breakpoints[i].Line = b.Line
 	}
 	ds.send(response)
 }
@@ -342,21 +358,26 @@ func (ds *debugSession) onPauseRequest(request *dap.PauseRequest) {
 }
 
 func (ds *debugSession) onStackTraceRequest(request *dap.StackTraceRequest) {
-	line := ds.dbg.Line()
-	filename := ds.dbg.Filename()
+	stack := ds.rt.CaptureCallStack(-1, nil)
+	frames := make([]dap.StackFrame, len(stack))
+	for i, frame := range stack {
+		frames[i] = dap.StackFrame{
+			Id: i,
+			Source: &dap.Source{
+				Name: frame.SrcName(),
+				Path: frame.Position().Filename,
+			},
+			Line:   frame.Position().Line,
+			Column: frame.Position().Column,
+			Name:   frame.FuncName(),
+		}
+	}
+
 	response := &dap.StackTraceResponse{}
 	response.Response = newResponse(request.Seq, request.Command)
 	response.Body = dap.StackTraceResponseBody{
-		StackFrames: []dap.StackFrame{
-			{
-				Id:     1000,
-				Source: &dap.Source{Name: filename, Path: filename, SourceReference: 0},
-				Line:   line,
-				Column: 0,
-				Name:   "main.main",
-			},
-		},
-		TotalFrames: 1,
+		StackFrames: frames,
+		TotalFrames: len(frames),
 	}
 	ds.send(response)
 }
