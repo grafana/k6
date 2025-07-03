@@ -20,6 +20,7 @@ type DebugSession struct {
 	sendWg    sync.WaitGroup
 	bpSet     int
 	bpSetMux  sync.Mutex
+	dbg       *sobek.Debugger
 }
 
 func server(dbg *sobek.Debugger, host, port string) error {
@@ -44,6 +45,7 @@ func server(dbg *sobek.Debugger, host, port string) error {
 
 func handleConnection(conn net.Conn, dbg *sobek.Debugger) {
 	debugSession := DebugSession{
+		dbg:       dbg,
 		rw:        bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn)),
 		sendQueue: make(chan dap.Message),
 		stopDebug: make(chan struct{}),
@@ -101,23 +103,11 @@ func (ds *DebugSession) handleRequest() error {
 
 func (ds *DebugSession) doContinue() {
 	var e dap.Message
-	ds.bpSetMux.Lock()
-	if ds.bpSet == 0 {
-		// Pretend that the program is running.
-		// The delay will alow for all in-flight responses
-		// to be sent before termination.
-		time.Sleep(1000 * time.Millisecond)
-		e = &dap.TerminatedEvent{
-			Event: *newEvent("terminated"),
-		}
-	} else {
-		e = &dap.StoppedEvent{
-			Event: *newEvent("stopped"),
-			Body:  dap.StoppedEventBody{Reason: "breakpoint", ThreadId: 1, AllThreadsStopped: true},
-		}
-		ds.bpSet--
+	reason := ds.dbg.Continue()
+	e = &dap.StoppedEvent{
+		Event: *newEvent("stopped"),
+		Body:  dap.StoppedEventBody{Reason: string(reason), ThreadId: 1, AllThreadsStopped: true},
 	}
-	ds.bpSetMux.Unlock()
 	ds.send(e)
 }
 
@@ -260,7 +250,6 @@ func (ds *DebugSession) onLaunchRequest(request *dap.LaunchRequest) {
 }
 
 func (ds *DebugSession) onAttachRequest(request *dap.AttachRequest) {
-	fmt.Println(string(request.Arguments))
 	response := &dap.AttachResponse{}
 	response.Response = newResponse(request.Seq, request.Command)
 	ds.send(response)
@@ -284,12 +273,11 @@ func (ds *DebugSession) onSetBreakpointsRequest(request *dap.SetBreakpointsReque
 	response := &dap.SetBreakpointsResponse{}
 	response.Response = newResponse(request.Seq, request.Command)
 	response.Body.Breakpoints = make([]dap.Breakpoint, len(request.Arguments.Breakpoints))
-	for i, b := range request.Arguments.Breakpoints {
-		response.Body.Breakpoints[i].Line = b.Line
-		response.Body.Breakpoints[i].Verified = true
-		ds.bpSetMux.Lock()
-		ds.bpSet++
-		ds.bpSetMux.Unlock()
+	for _, b := range request.Arguments.Breakpoints {
+		err := ds.dbg.SetBreakpoint("file://"+request.Arguments.Source.Path, b.Line)
+		if err != nil {
+			fmt.Println(err)
+		}
 	}
 	ds.send(response)
 }
