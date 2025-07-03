@@ -17,11 +17,12 @@ func TestPolicyChecker_LoadPolicy(t *testing.T) {
 	fs := fsext.NewMemMapFs()
 	pc := NewPolicyChecker(fs)
 
-	// Create a valid policy file
+	// Create a valid policy file with new schema
 	policyContent := `{
 		"requireThresholds": true,
 		"requiredTags": ["team", "env"],
-		"disallowedPatterns": ["console.log", "sleep\\(\\d{5,}\\)"]
+		"disallowedStrings": ["console.log", "debugger"],
+		"disallowedRegex": ["sleep\\(\\d{4,}\\)", "\\btodo\\b.*"]
 	}`
 	require.NoError(t, fsext.WriteFile(fs, "policy.json", []byte(policyContent), 0o644))
 
@@ -30,7 +31,8 @@ func TestPolicyChecker_LoadPolicy(t *testing.T) {
 
 	assert.True(t, policy.RequireThresholds)
 	assert.Equal(t, []string{"team", "env"}, policy.RequiredTags)
-	assert.Equal(t, []string{"console.log", "sleep\\(\\d{5,}\\)"}, policy.DisallowedPatterns)
+	assert.Equal(t, []string{"console.log", "debugger"}, policy.DisallowedStrings)
+	assert.Equal(t, []string{"sleep\\(\\d{4,}\\)", "\\btodo\\b.*"}, policy.DisallowedRegex)
 }
 
 func TestPolicyChecker_LoadPolicy_InvalidJSON(t *testing.T) {
@@ -127,14 +129,14 @@ func TestPolicyChecker_ValidatePolicy_RequiredTags(t *testing.T) {
 	assert.Len(t, violations, 0)
 }
 
-func TestPolicyChecker_ValidatePolicy_DisallowedPatterns(t *testing.T) {
+func TestPolicyChecker_ValidatePolicy_DisallowedStrings(t *testing.T) {
 	t.Parallel()
 
 	fs := fsext.NewMemMapFs()
 	pc := NewPolicyChecker(fs)
 
 	policy := &PolicyConfig{
-		DisallowedPatterns: []string{"console.log", "sleep\\(\\d{5,}\\)"},
+		DisallowedStrings: []string{"console.log", "debugger", "alert("},
 	}
 
 	// Test with no violations
@@ -148,7 +150,7 @@ func TestPolicyChecker_ValidatePolicy_DisallowedPatterns(t *testing.T) {
 	violations := pc.ValidatePolicy(policy, lib.Options{}, scriptContent)
 	assert.Len(t, violations, 0)
 
-	// Test with console.log violation
+	// Test with console.log violation (exact string match)
 	scriptContentWithConsole := `
 		import http from 'k6/http';
 		export default function() {
@@ -158,29 +160,120 @@ func TestPolicyChecker_ValidatePolicy_DisallowedPatterns(t *testing.T) {
 	`
 	violations = pc.ValidatePolicy(policy, lib.Options{}, scriptContentWithConsole)
 	assert.Len(t, violations, 1)
-	assert.Contains(t, violations[0].Description, "Found disallowed pattern: console.log")
+	assert.Contains(t, violations[0].Description, "Found disallowed string: console.log")
 
-	// Test with long sleep violation
+	// Test with debugger violation
+	scriptContentWithDebugger := `
+		export default function() {
+			debugger;
+		}
+	`
+	violations = pc.ValidatePolicy(policy, lib.Options{}, scriptContentWithDebugger)
+	assert.Len(t, violations, 1)
+	assert.Contains(t, violations[0].Description, "Found disallowed string: debugger")
+
+	// Test with alert( violation
+	scriptContentWithAlert := `
+		export default function() {
+			alert('test');
+		}
+	`
+	violations = pc.ValidatePolicy(policy, lib.Options{}, scriptContentWithAlert)
+	assert.Len(t, violations, 1)
+	assert.Contains(t, violations[0].Description, "Found disallowed string: alert(")
+
+	// Test string matching is exact (consolexlog should NOT match console.log)
+	scriptContentSimilar := `
+		export default function() {
+			consolexlog('this should not match');
+		}
+	`
+	violations = pc.ValidatePolicy(policy, lib.Options{}, scriptContentSimilar)
+	assert.Len(t, violations, 0)
+
+	// Test with multiple string violations
+	scriptContentWithMultiple := `
+		export default function() {
+			console.log('Debug');
+			debugger;
+			alert('warning');
+		}
+	`
+	violations = pc.ValidatePolicy(policy, lib.Options{}, scriptContentWithMultiple)
+	assert.Len(t, violations, 3)
+}
+
+func TestPolicyChecker_ValidatePolicy_DisallowedRegex(t *testing.T) {
+	t.Parallel()
+
+	fs := fsext.NewMemMapFs()
+	pc := NewPolicyChecker(fs)
+
+	policy := &PolicyConfig{
+		DisallowedRegex: []string{"sleep\\(\\d{4,}\\)", "(?i)\\btodo\\b.*", "http://[^s]"},
+	}
+
+	// Test with no violations
+	scriptContent := `
+		import http from 'k6/http';
+		export default function() {
+			https.get('https://example.com');
+			sleep(500);
+		}
+	`
+	violations := pc.ValidatePolicy(policy, lib.Options{}, scriptContent)
+	assert.Len(t, violations, 0)
+
+	// Test with long sleep violation (sleep with 4+ digits)
 	scriptContentWithLongSleep := `
 		import { sleep } from 'k6';
 		export default function() {
-			sleep(60000);
+			sleep(10000);
 		}
 	`
 	violations = pc.ValidatePolicy(policy, lib.Options{}, scriptContentWithLongSleep)
 	assert.Len(t, violations, 1)
-	assert.Contains(t, violations[0].Description, "Found disallowed pattern: sleep\\(\\d{5,}\\)")
+	assert.Contains(t, violations[0].Description, "Found disallowed pattern: sleep\\(\\d{4,}\\)")
 
-	// Test with multiple violations
-	scriptContentWithBoth := `
-		import { sleep } from 'k6';
+	// Test with TODO comment violation
+	scriptContentWithTodo := `
 		export default function() {
-			console.log('Debug');
-			sleep(60000);
+			// todo: fix this later
 		}
 	`
-	violations = pc.ValidatePolicy(policy, lib.Options{}, scriptContentWithBoth)
-	assert.Len(t, violations, 2)
+	violations = pc.ValidatePolicy(policy, lib.Options{}, scriptContentWithTodo)
+	assert.Len(t, violations, 1)
+	assert.Contains(t, violations[0].Description, "Found disallowed pattern: (?i)\\btodo\\b.*")
+
+	// Test with insecure HTTP URL violation
+	scriptContentWithHTTP := `
+		export default function() {
+			http.get('http://example.com');
+		}
+	`
+	violations = pc.ValidatePolicy(policy, lib.Options{}, scriptContentWithHTTP)
+	assert.Len(t, violations, 1)
+	assert.Contains(t, violations[0].Description, "Found disallowed pattern: http://[^s]")
+
+	// Test that HTTPS is allowed (doesn't match http://[^s])
+	scriptContentWithHTTPS := `
+		export default function() {
+			http.get('https://example.com');
+		}
+	`
+	violations = pc.ValidatePolicy(policy, lib.Options{}, scriptContentWithHTTPS)
+	assert.Len(t, violations, 0)
+
+	// Test with multiple regex violations
+	scriptContentWithMultiple := `
+		export default function() {
+			sleep(60000);
+			// TODO: remove this debug code
+			http.get('http://insecure.com');
+		}
+	`
+	violations = pc.ValidatePolicy(policy, lib.Options{}, scriptContentWithMultiple)
+	assert.Len(t, violations, 3)
 }
 
 func TestPolicyChecker_ValidatePolicy_InvalidRegex(t *testing.T) {
@@ -190,12 +283,49 @@ func TestPolicyChecker_ValidatePolicy_InvalidRegex(t *testing.T) {
 	pc := NewPolicyChecker(fs)
 
 	policy := &PolicyConfig{
-		DisallowedPatterns: []string{"[invalid"},
+		DisallowedRegex: []string{"[invalid"},
 	}
 
 	violations := pc.ValidatePolicy(policy, lib.Options{}, "test content")
 	assert.Len(t, violations, 1)
 	assert.Contains(t, violations[0].Description, "Invalid regex pattern in policy")
+}
+
+func TestPolicyChecker_ValidatePolicy_CombinedStringAndRegex(t *testing.T) {
+	t.Parallel()
+
+	fs := fsext.NewMemMapFs()
+	pc := NewPolicyChecker(fs)
+
+	policy := &PolicyConfig{
+		DisallowedStrings: []string{"console.log", "debugger"},
+		DisallowedRegex:   []string{"sleep\\(\\d{4,}\\)", "(?i)\\btodo\\b.*"},
+	}
+
+	// Test with both string and regex violations
+	scriptContent := `
+		export default function() {
+			console.log('Debug message');  // String violation
+			sleep(10000);                  // Regex violation
+			// TODO: fix this               // Regex violation
+			debugger;                      // String violation
+		}
+	`
+	violations := pc.ValidatePolicy(policy, lib.Options{}, scriptContent)
+	assert.Len(t, violations, 4)
+
+	// Verify we have both string and pattern violation types
+	stringViolations := 0
+	patternViolations := 0
+	for _, violation := range violations {
+		if violation.Type == "string" {
+			stringViolations++
+		} else if violation.Type == "pattern" {
+			patternViolations++
+		}
+	}
+	assert.Equal(t, 2, stringViolations)
+	assert.Equal(t, 2, patternViolations)
 }
 
 func TestPolicyChecker_CheckPolicy_NoPolicy(t *testing.T) {
@@ -219,12 +349,13 @@ func TestPolicyChecker_CheckPolicy_AutoDetect(t *testing.T) {
 	fs := fsext.NewMemMapFs()
 	pc := NewPolicyChecker(fs)
 
-	// Create script and policy in same directory
+	// Create script and policy in same directory with new schema
 	require.NoError(t, fsext.WriteFile(fs, "test/script.js", []byte("console.log('test')"), 0o644))
 	policyContent := `{
 		"requireThresholds": false,
 		"requiredTags": [],
-		"disallowedPatterns": ["console.log"]
+		"disallowedStrings": ["console.log"],
+		"disallowedRegex": []
 	}`
 	require.NoError(t, fsext.WriteFile(fs, "test/k6policy.json", []byte(policyContent), 0o644))
 
@@ -233,7 +364,7 @@ func TestPolicyChecker_CheckPolicy_AutoDetect(t *testing.T) {
 	assert.True(t, result.Used)
 	assert.Equal(t, "test/k6policy.json", result.PolicyFile)
 	assert.Len(t, result.Violations, 1)
-	assert.Contains(t, result.Violations[0].Description, "Found disallowed pattern: console.log")
+	assert.Contains(t, result.Violations[0].Description, "Found disallowed string: console.log")
 }
 
 func TestPolicyChecker_CheckPolicy_ExplicitPolicy(t *testing.T) {
@@ -242,12 +373,13 @@ func TestPolicyChecker_CheckPolicy_ExplicitPolicy(t *testing.T) {
 	fs := fsext.NewMemMapFs()
 	pc := NewPolicyChecker(fs)
 
-	// Create script and explicit policy file
+	// Create script and explicit policy file with new schema
 	require.NoError(t, fsext.WriteFile(fs, "script.js", []byte("test content"), 0o644))
 	policyContent := `{
 		"requireThresholds": true,
 		"requiredTags": ["team"],
-		"disallowedPatterns": []
+		"disallowedStrings": [],
+		"disallowedRegex": []
 	}`
 	require.NoError(t, fsext.WriteFile(fs, "custom-policy.json", []byte(policyContent), 0o644))
 
@@ -293,13 +425,14 @@ func TestPrintPolicyResult(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, output.String(), "✓ Using policy file: k6policy.json")
 
-	// Test policy used with violations
+	// Test policy used with violations (both string and regex)
 	result = &PolicyResult{
 		Used:       true,
 		PolicyFile: "k6policy.json",
 		Violations: []PolicyViolation{
 			{Type: "tags", Description: "Missing required tag: team"},
-			{Type: "pattern", Description: "Found disallowed pattern: console.log"},
+			{Type: "string", Description: "Found disallowed string: console.log"},
+			{Type: "pattern", Description: "Found disallowed pattern: sleep\\(\\d{4,}\\)"},
 		},
 	}
 	output.Reset()
@@ -309,32 +442,35 @@ func TestPrintPolicyResult(t *testing.T) {
 	assert.Contains(t, outputStr, "✓ Using policy file: k6policy.json")
 	assert.Contains(t, outputStr, "⚠️ Policy Violations:")
 	assert.Contains(t, outputStr, "- Missing required tag: team")
-	assert.Contains(t, outputStr, "- Found disallowed pattern: console.log")
+	assert.Contains(t, outputStr, "- Found disallowed string: console.log")
+	assert.Contains(t, outputStr, "- Found disallowed pattern: sleep\\(\\d{4,}\\)")
 }
 
 func TestPrintPolicyRules(t *testing.T) {
 	t.Parallel()
 
+	// Test comprehensive policy with all new fields
 	policy := &PolicyConfig{
-		RequireThresholds:  true,
-		RequiredTags:       []string{"team", "env"},
-		DisallowedPatterns: []string{"console.log", "debugger"},
+		RequireThresholds: true,
+		RequiredTags:      []string{"team", "env"},
+		DisallowedStrings: []string{"console.log", "debugger"},
+		DisallowedRegex:   []string{"sleep\\(\\d{4,}\\)", "\\btodo\\b.*"},
 	}
 
 	var output strings.Builder
-	err := PrintPolicyRules(policy, &output)
-	require.NoError(t, err)
-
+	PrintPolicyRules(policy, &output)
 	outputStr := output.String()
-	assert.Contains(t, outputStr, "Policy rules:")
+
+	assert.Contains(t, outputStr, "Policy Rules:")
 	assert.Contains(t, outputStr, "- Required thresholds")
 	assert.Contains(t, outputStr, "- Required tags: team, env")
-	assert.Contains(t, outputStr, "- Disallowed patterns: console.log, debugger")
+	assert.Contains(t, outputStr, "- Disallowed strings: console.log, debugger")
+	assert.Contains(t, outputStr, "- Disallowed regex patterns: sleep\\(\\d{4,}\\), \\btodo\\b.*")
 
 	// Test empty policy
 	emptyPolicy := &PolicyConfig{}
 	output.Reset()
-	err = PrintPolicyRules(emptyPolicy, &output)
-	require.NoError(t, err)
-	assert.Empty(t, output.String())
+	PrintPolicyRules(emptyPolicy, &output)
+	assert.Contains(t, output.String(), "Policy Rules:")
+	assert.Contains(t, output.String(), "- No policy rules defined")
 }

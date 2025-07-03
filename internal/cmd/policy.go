@@ -14,9 +14,10 @@ import (
 
 // PolicyConfig represents the structure of k6policy.json
 type PolicyConfig struct {
-	RequireThresholds  bool     `json:"requireThresholds"`
-	RequiredTags       []string `json:"requiredTags"`
-	DisallowedPatterns []string `json:"disallowedPatterns"`
+	RequireThresholds bool     `json:"requireThresholds"`
+	RequiredTags      []string `json:"requiredTags"`
+	DisallowedStrings []string `json:"disallowedStrings"`
+	DisallowedRegex   []string `json:"disallowedRegex"`
 }
 
 // PolicyViolation represents a single policy violation
@@ -103,8 +104,18 @@ func (pc *PolicyChecker) ValidatePolicy(policy *PolicyConfig, options lib.Option
 		}
 	}
 
-	// Check disallowed patterns
-	for _, pattern := range policy.DisallowedPatterns {
+	// Check disallowed strings (literal matching)
+	for _, str := range policy.DisallowedStrings {
+		if strings.Contains(scriptContent, str) {
+			violations = append(violations, PolicyViolation{
+				Type:        "string",
+				Description: fmt.Sprintf("Found disallowed string: %s", str),
+			})
+		}
+	}
+
+	// Check disallowed regex patterns
+	for _, pattern := range policy.DisallowedRegex {
 		regex, err := regexp.Compile(pattern)
 		if err != nil {
 			// Skip invalid regex patterns but log them
@@ -209,18 +220,27 @@ func PrintPolicyRules(policy *PolicyConfig, stdout io.Writer) error {
 		rules = append(rules, fmt.Sprintf("Required tags: %s", strings.Join(policy.RequiredTags, ", ")))
 	}
 
-	if len(policy.DisallowedPatterns) > 0 {
-		rules = append(rules, fmt.Sprintf("Disallowed patterns: %s", strings.Join(policy.DisallowedPatterns, ", ")))
+	if len(policy.DisallowedStrings) > 0 {
+		rules = append(rules, fmt.Sprintf("Disallowed strings: %s", strings.Join(policy.DisallowedStrings, ", ")))
+	}
+
+	if len(policy.DisallowedRegex) > 0 {
+		rules = append(rules, fmt.Sprintf("Disallowed regex patterns: %s", strings.Join(policy.DisallowedRegex, ", ")))
+	}
+
+	if _, err := fmt.Fprintf(stdout, "Policy Rules:\n"); err != nil {
+		return err
 	}
 
 	if len(rules) > 0 {
-		if _, err := fmt.Fprintf(stdout, "Policy rules:\n"); err != nil {
-			return err
-		}
 		for _, rule := range rules {
-			if _, err := fmt.Fprintf(stdout, "  - %s\n", rule); err != nil {
+			if _, err := fmt.Fprintf(stdout, "- %s\n", rule); err != nil {
 				return err
 			}
+		}
+	} else {
+		if _, err := fmt.Fprintf(stdout, "- No policy rules defined\n"); err != nil {
+			return err
 		}
 	}
 

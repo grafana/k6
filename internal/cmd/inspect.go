@@ -31,7 +31,8 @@ specify a different policy file.
 Policy validation checks for:
 - Required thresholds
 - Required tags  
-- Disallowed patterns in script content
+- Disallowed strings (exact matches) in script content
+- Disallowed regex patterns in script content
 
 Exit codes:
 - 0: Inspection successful, no policy violations

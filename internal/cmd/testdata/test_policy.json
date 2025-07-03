@@ -1,5 +1,6 @@
 {
     "requireThresholds": true,
-    "requiredTags": ["env"],
-    "disallowedPatterns": ["console.log"]
+    "requiredTags": ["team", "env"],
+    "disallowedStrings": ["console.log", "debugger"],
+    "disallowedRegex": ["sleep\\(\\d{4,}\\)", "(?i)\\btodo\\b.*"]
 } 
