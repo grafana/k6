@@ -649,3 +649,247 @@ func TestTemplateManager_CopyTemplateFiles_NonDirectoryTemplate(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "is not a directory-based template")
 }
+
+func TestTemplateArgs_TeamAndEnvVariables(t *testing.T) {
+	t.Parallel()
+
+	fs := fsext.NewMemMapFs()
+
+	// Create a template that uses all template variables
+	templateDir := "templates/all-vars"
+	require.NoError(t, fs.MkdirAll(templateDir, 0o755))
+
+	templateContent := `import http from 'k6/http';
+
+export const options = {
+  vus: 1,
+  duration: '10s',{{ if .Project }}
+  cloud: {
+    projectID: {{ .Project }},
+    name: "{{ .ScriptName }}",
+  },{{ end }}
+  tags: { {{- if .Team }}
+    team: "{{ .Team }}",{{ end }}{{ if .Env }}
+    env: "{{ .Env }}",{{ end }}
+  },
+};
+
+export default function() {
+  // Script: {{ .ScriptName }}
+  // Project: {{ .Project }} (alias: {{ .ProjectID }})
+  // Team: {{ .Team }}
+  // Environment: {{ .Env }}
+  http.get('https://example.com');
+}`
+
+	require.NoError(t, fsext.WriteFile(fs, filepath.Join(templateDir, "script.js"), []byte(templateContent), 0o644))
+
+	tm, err := NewTemplateManager(fs, "")
+	require.NoError(t, err)
+
+	// Test template execution with all variables
+	args := TemplateArgs{
+		ScriptName: "test-script.js",
+		ProjectID:  "12345",
+		Project:    "12345",
+		Team:       "platform-team",
+		Env:        "staging",
+	}
+
+	var buf strings.Builder
+	tmpl, err := tm.GetTemplate("all-vars")
+	require.NoError(t, err)
+
+	err = ExecuteTemplate(&buf, tmpl, args)
+	require.NoError(t, err)
+
+	result := buf.String()
+	assert.Contains(t, result, "projectID: 12345")
+	assert.Contains(t, result, `team: "platform-team"`)
+	assert.Contains(t, result, `env: "staging"`)
+	assert.Contains(t, result, "Script: test-script.js")
+	assert.Contains(t, result, "Project: 12345 (alias: 12345)")
+	assert.Contains(t, result, "Team: platform-team")
+	assert.Contains(t, result, "Environment: staging")
+}
+
+func TestTemplateArgs_EmptyOptionalFields(t *testing.T) {
+	t.Parallel()
+
+	fs := fsext.NewMemMapFs()
+
+	// Create a template with conditional rendering
+	templateDir := "templates/conditional"
+	require.NoError(t, fs.MkdirAll(templateDir, 0o755))
+
+	templateContent := `export const options = {
+  vus: 1,
+  duration: '10s',{{ if .Project }}
+  cloud: {
+    projectID: {{ .Project }},
+    name: "{{ .ScriptName }}",
+  },{{ end }}
+  tags: { {{- if .Team }}
+    team: "{{ .Team }}",{{ end }}{{ if .Env }}
+    env: "{{ .Env }}",{{ end }}
+  },
+};
+
+export default function() {
+  // Has team: {{ if .Team }}yes{{ else }}no{{ end }}
+  // Has env: {{ if .Env }}yes{{ else }}no{{ end }}
+  http.get('https://example.com');
+}`
+
+	require.NoError(t, fsext.WriteFile(fs, filepath.Join(templateDir, "script.js"), []byte(templateContent), 0o644))
+
+	tm, err := NewTemplateManager(fs, "")
+	require.NoError(t, err)
+
+	// Test with empty optional fields
+	args := TemplateArgs{
+		ScriptName: "test.js",
+		ProjectID:  "",
+		Project:    "",
+		Team:       "",
+		Env:        "",
+	}
+
+	var buf strings.Builder
+	tmpl, err := tm.GetTemplate("conditional")
+	require.NoError(t, err)
+
+	err = ExecuteTemplate(&buf, tmpl, args)
+	require.NoError(t, err)
+
+	result := buf.String()
+	assert.Contains(t, result, "Has team: no")
+	assert.Contains(t, result, "Has env: no")
+	assert.Contains(t, result, "tags: {")
+	assert.NotContains(t, result, "cloud:")
+	assert.NotContains(t, result, `team: ""`)
+	assert.NotContains(t, result, `env: ""`)
+}
+
+func TestTemplateManager_CopyTemplateFiles_WithTeamAndEnv(t *testing.T) {
+	t.Parallel()
+
+	fs := fsext.NewMemMapFs()
+
+	// Create a multi-file template with team/env variables
+	templateDir := "templates/multi-vars"
+	require.NoError(t, fs.MkdirAll(templateDir, 0o755))
+
+	files := map[string]string{
+		"script.js": `export default function() {
+  // Team: {{ .Team }}, Env: {{ .Env }}
+  console.log("Running for {{ .Team }} in {{ .Env }}");
+}`,
+		"config.json": `{
+  "name": "{{ .ScriptName }}"{{ if .Team }},
+  "team": "{{ .Team }}"{{ end }}{{ if .Env }},
+  "environment": "{{ .Env }}"{{ end }}
+}`,
+		"helpers/utils.js": `export const CONFIG = {
+  team: "{{ .Team }}",
+  env: "{{ .Env }}",
+  script: "{{ .ScriptName }}"
+};`,
+	}
+
+	for filePath, content := range files {
+		fullPath := filepath.Join(templateDir, filePath)
+		require.NoError(t, fs.MkdirAll(filepath.Dir(fullPath), 0o755))
+		require.NoError(t, fsext.WriteFile(fs, fullPath, []byte(content), 0o644))
+	}
+
+	tm, err := NewTemplateManager(fs, "")
+	require.NoError(t, err)
+
+	args := TemplateArgs{
+		ScriptName: "multi-test.js",
+		ProjectID:  "",
+		Project:    "",
+		Team:       "qa-team",
+		Env:        "production",
+	}
+
+	var output strings.Builder
+	err = tm.CopyTemplateFiles("multi-vars", args, false, &output)
+	require.NoError(t, err)
+
+	// Check that all files were created and processed
+	expectedFiles := map[string][]string{
+		"script.js": {
+			"Team: qa-team, Env: production",
+			"Running for qa-team in production",
+		},
+		"config.json": {
+			`"name": "multi-test.js"`,
+			`"team": "qa-team"`,
+			`"environment": "production"`,
+		},
+		"helpers/utils.js": {
+			`team: "qa-team"`,
+			`env: "production"`,
+			`script: "multi-test.js"`,
+		},
+	}
+
+	for file, expectedContent := range expectedFiles {
+		content, err := fsext.ReadFile(fs, file)
+		require.NoError(t, err)
+		contentStr := string(content)
+
+		for _, expected := range expectedContent {
+			assert.Contains(t, contentStr, expected, "File %s should contain %s", file, expected)
+		}
+	}
+}
+
+func TestTemplateArgs_ProjectIDAndProjectAlias(t *testing.T) {
+	t.Parallel()
+
+	fs := fsext.NewMemMapFs()
+
+	templateDir := "templates/project-alias"
+	require.NoError(t, fs.MkdirAll(templateDir, 0o755))
+
+	templateContent := `export const options = {
+  cloud: {
+    projectID: {{ .ProjectID }},
+    project: {{ .Project }},
+    name: "{{ .ScriptName }}",
+  },
+};
+
+// ProjectID: {{ .ProjectID }}
+// Project: {{ .Project }}`
+
+	require.NoError(t, fsext.WriteFile(fs, filepath.Join(templateDir, "script.js"), []byte(templateContent), 0o644))
+
+	tm, err := NewTemplateManager(fs, "")
+	require.NoError(t, err)
+
+	// Test that Project and ProjectID have the same value
+	args := TemplateArgs{
+		ScriptName: "alias-test.js",
+		ProjectID:  "99999",
+		Project:    "99999",
+		Team:       "",
+		Env:        "",
+	}
+
+	var buf strings.Builder
+	tmpl, err := tm.GetTemplate("project-alias")
+	require.NoError(t, err)
+
+	err = ExecuteTemplate(&buf, tmpl, args)
+	require.NoError(t, err)
+
+	result := buf.String()
+	assert.Contains(t, result, "projectID: 99999")
+	assert.Contains(t, result, "project: 99999")
+	assert.Contains(t, result, "ProjectID: 99999")
+	assert.Contains(t, result, "Project: 99999")
+}

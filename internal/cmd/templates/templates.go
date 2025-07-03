@@ -57,6 +57,9 @@ type TemplateInfo struct {
 type TemplateArgs struct {
 	ScriptName string
 	ProjectID  string
+	Project    string // Alias for ProjectID for template compatibility
+	Team       string
+	Env        string
 }
 
 // TemplateManager manages the pre-parsed templates and template search paths

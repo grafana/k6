@@ -959,3 +959,222 @@ func TestNewScriptCmd_FileBasedTemplates_StillWork(t *testing.T) {
 	assert.Contains(t, output, fmt.Sprintf("New script created: file-test.js (%s template)", templatePath))
 	assert.NotContains(t, output, "New script created from template:")
 }
+
+func TestNewScriptCmd_TeamAndEnvFlags(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+
+	// Create a template that uses team and env variables
+	templateDir := "templates/team-env-test"
+	require.NoError(t, ts.FS.MkdirAll(templateDir, 0o755))
+
+	templateContent := `import http from 'k6/http';
+
+export const options = {
+  vus: 1,
+  duration: '10s',{{ if .Project }}
+  cloud: {
+    projectID: {{ .Project }},
+    name: "{{ .ScriptName }}",
+  },{{ end }}
+  tags: { {{- if .Team }}
+    team: "{{ .Team }}",{{ end }}{{ if .Env }}
+    env: "{{ .Env }}",{{ end }}
+  },
+};
+
+export default function() {
+  // Team: {{ .Team }}, Environment: {{ .Env }}
+  const baseURL = "{{ .Env }}" === "prod" ? "https://api.prod.com" : "https://api.{{ .Env }}.example.com";
+  http.get(baseURL);
+}`
+
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(templateDir, "script.js"), []byte(templateContent), 0o644))
+
+	// Test using team and env flags
+	ts.CmdArgs = []string{"k6", "new", "--template", "team-env-test", "--team", "platform", "--env", "staging", "--project", "12345"}
+	newRootCommand(ts.GlobalState).execute()
+
+	// Check that the template was processed correctly
+	scriptContent, err := fsext.ReadFile(ts.FS, "script.js")
+	require.NoError(t, err)
+	contentStr := string(scriptContent)
+
+	assert.Contains(t, contentStr, `team: "platform"`)
+	assert.Contains(t, contentStr, `env: "staging"`)
+	assert.Contains(t, contentStr, "projectID: 12345")
+	assert.Contains(t, contentStr, "Team: platform, Environment: staging")
+	assert.Contains(t, contentStr, "https://api.staging.example.com")
+}
+
+func TestNewScriptCmd_TeamAndEnvFlags_MultipleFiles(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+
+	// Create a multi-file template using team and env variables
+	templateDir := "templates/multi-team-env"
+	require.NoError(t, ts.FS.MkdirAll(templateDir, 0o755))
+
+	files := map[string]string{
+		"script.js": `import http from 'k6/http';
+
+export const options = {
+  vus: 5,
+  duration: '10s',
+  tags: { {{- if .Team }}
+    team: "{{ .Team }}",{{ end }}{{ if .Env }}
+    env: "{{ .Env }}",{{ end }}
+  },
+};
+
+export default function() {
+  http.get('https://api.example.com');
+}`,
+		"config.json": `{
+  "testName": "{{ .ScriptName }}"{{ if .Team }},
+  "team": "{{ .Team }}"{{ end }}{{ if .Env }},
+  "environment": "{{ .Env }}"{{ end }}{{ if .Project }},
+  "projectId": "{{ .Project }}"{{ end }}
+}`,
+		"README.md": `# {{ .ScriptName }}
+
+{{ if .Team }}Team: {{ .Team }}{{ end }}
+{{ if .Env }}Environment: {{ .Env }}{{ end }}
+
+This test was generated for the {{ .Team }} team in the {{ .Env }} environment.
+`,
+	}
+
+	for filePath, content := range files {
+		fullPath := filepath.Join(templateDir, filePath)
+		require.NoError(t, ts.FS.MkdirAll(filepath.Dir(fullPath), 0o755))
+		require.NoError(t, fsext.WriteFile(ts.FS, fullPath, []byte(content), 0o644))
+	}
+
+	// Test using the multi-file template with team and env
+	ts.CmdArgs = []string{"k6", "new", "team-test.js", "--template", "multi-team-env", "--team", "qa", "--env", "prod"}
+	newRootCommand(ts.GlobalState).execute()
+
+	// Verify all files were created and processed
+	expectedFiles := []string{"script.js", "config.json", "README.md"}
+	for _, file := range expectedFiles {
+		content, err := fsext.ReadFile(ts.FS, file)
+		require.NoError(t, err)
+		contentStr := string(content)
+
+		switch file {
+		case "script.js":
+			assert.Contains(t, contentStr, `team: "qa"`)
+			assert.Contains(t, contentStr, `env: "prod"`)
+		case "config.json":
+			assert.Contains(t, contentStr, `"team": "qa"`)
+			assert.Contains(t, contentStr, `"environment": "prod"`)
+			assert.Contains(t, contentStr, `"testName": "team-test.js"`)
+		case "README.md":
+			assert.Contains(t, contentStr, "Team: qa")
+			assert.Contains(t, contentStr, "Environment: prod")
+			assert.Contains(t, contentStr, "qa team in the prod environment")
+		}
+	}
+}
+
+func TestNewScriptCmd_TeamAndEnvFlags_EmptyValues(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+
+	// Create a template with conditional team/env content
+	templateDir := "templates/conditional-test"
+	require.NoError(t, ts.FS.MkdirAll(templateDir, 0o755))
+
+	templateContent := `import http from 'k6/http';
+
+export const options = {
+  vus: 1,
+  duration: '10s',
+  tags: { {{- if .Team }}
+    team: "{{ .Team }}",{{ end }}{{ if .Env }}
+    env: "{{ .Env }}",{{ end }}
+  },
+};
+
+export default function() {
+  // Team: {{ if .Team }}{{ .Team }}{{ else }}unspecified{{ end }}
+  // Environment: {{ if .Env }}{{ .Env }}{{ else }}unspecified{{ end }}
+  http.get('https://example.com');
+}`
+
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(templateDir, "script.js"), []byte(templateContent), 0o644))
+
+	// Test without team and env flags (should handle empty values gracefully)
+	ts.CmdArgs = []string{"k6", "new", "--template", "conditional-test"}
+	newRootCommand(ts.GlobalState).execute()
+
+	// Check that conditional logic works with empty values
+	scriptContent, err := fsext.ReadFile(ts.FS, "script.js")
+	require.NoError(t, err)
+	contentStr := string(scriptContent)
+
+	assert.Contains(t, contentStr, "Team: unspecified")
+	assert.Contains(t, contentStr, "Environment: unspecified")
+	assert.Contains(t, contentStr, "tags: {")
+	assert.NotContains(t, contentStr, `team: ""`)
+	assert.NotContains(t, contentStr, `env: ""`)
+}
+
+func TestNewScriptCmd_ProjectVsProjectID_Aliases(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+
+	templateContent := `export const options = {
+  vus: 1,
+  duration: '10s',{{ if .Project }}
+  cloud: {
+    projectID: {{ .Project }},
+    name: "{{ .ScriptName }}",
+  },{{ end }}
+};
+
+export default function() {
+  // Project: {{ .Project }}
+  // ProjectID: {{ .ProjectID }}
+}`
+
+	// Test with --project flag
+	ts.CmdArgs = []string{"k6", "new", "project-test.js", "--template", "minimal"}
+	require.NoError(t, fsext.WriteFile(ts.FS, "minimal-template.js", []byte(templateContent), 0o644))
+
+	ts.CmdArgs = []string{"k6", "new", "project-alias-test.js", "--template", "./minimal-template.js", "--project", "99999"}
+	newRootCommand(ts.GlobalState).execute()
+
+	// Check that both Project and ProjectID are populated
+	scriptContent, err := fsext.ReadFile(ts.FS, "project-alias-test.js")
+	require.NoError(t, err)
+	contentStr := string(scriptContent)
+
+	assert.Contains(t, contentStr, "projectID: 99999")
+	assert.Contains(t, contentStr, "Project: 99999")
+	assert.Contains(t, contentStr, "ProjectID: 99999")
+}
+
+func TestNewScriptCmd_BuiltInTemplates_WithNewFlags(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+
+	// Test that built-in templates work with new flags (though they might not use them)
+	ts.CmdArgs = []string{"k6", "new", "builtin-with-flags.js", "--template", "minimal", "--team", "test-team", "--env", "dev", "--project", "123"}
+	newRootCommand(ts.GlobalState).execute()
+
+	// Check that file was created successfully
+	data, err := fsext.ReadFile(ts.FS, "builtin-with-flags.js")
+	require.NoError(t, err)
+	assert.NotEmpty(t, string(data))
+
+	// Check success message
+	output := ts.Stdout.String()
+	assert.Contains(t, output, "New script created: builtin-with-flags.js (minimal template)")
+}
