@@ -2,6 +2,7 @@ package templates
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -892,4 +893,428 @@ func TestTemplateArgs_ProjectIDAndProjectAlias(t *testing.T) {
 	assert.Contains(t, result, "project: 99999")
 	assert.Contains(t, result, "ProjectID: 99999")
 	assert.Contains(t, result, "Project: 99999")
+}
+
+func TestTemplateManager_GetTemplateType(t *testing.T) {
+	t.Parallel()
+
+	fs := fsext.NewMemMapFs()
+	tm, err := NewTemplateManager(fs, "/home/user")
+	require.NoError(t, err)
+
+	// Test built-in templates
+	templateType, err := tm.GetTemplateType("minimal")
+	require.NoError(t, err)
+	assert.Equal(t, "new", templateType)
+
+	templateType, err = tm.GetTemplateType("protocol")
+	require.NoError(t, err)
+	assert.Equal(t, "new", templateType)
+
+	// Test directory-based template with type metadata
+	templateDir := "templates/typed-template"
+	require.NoError(t, fs.MkdirAll(templateDir, 0o755))
+	require.NoError(t, fsext.WriteFile(fs, filepath.Join(templateDir, "script.js"), []byte("export default function() {}"), 0o644))
+
+	metadataContent := `{
+		"name": "typed-template",
+		"description": "Template with type",
+		"type": "init"
+	}`
+	require.NoError(t, fsext.WriteFile(fs, filepath.Join(templateDir, "k6.template.json"), []byte(metadataContent), 0o644))
+
+	templateType, err = tm.GetTemplateType("typed-template")
+	require.NoError(t, err)
+	assert.Equal(t, "init", templateType)
+
+	// Test directory-based template without type metadata (should default to "new")
+	templateDir2 := "templates/untyped-template"
+	require.NoError(t, fs.MkdirAll(templateDir2, 0o755))
+	require.NoError(t, fsext.WriteFile(fs, filepath.Join(templateDir2, "script.js"), []byte("export default function() {}"), 0o644))
+
+	templateType, err = tm.GetTemplateType("untyped-template")
+	require.NoError(t, err)
+	assert.Equal(t, "new", templateType)
+
+	// Test non-existent template
+	_, err = tm.GetTemplateType("non-existent")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "template \"non-existent\" not found")
+}
+
+func TestTemplateManager_ValidateTemplateUsage(t *testing.T) {
+	t.Parallel()
+
+	fs := fsext.NewMemMapFs()
+	tm, err := NewTemplateManager(fs, "/home/user")
+	require.NoError(t, err)
+
+	// Create templates with different types
+	testCases := []struct {
+		templateName string
+		templateType string
+		metadata     string
+	}{
+		{
+			"init-only",
+			"init",
+			`{"name": "init-only", "type": "init"}`,
+		},
+		{
+			"new-only",
+			"new",
+			`{"name": "new-only", "type": "new"}`,
+		},
+		{
+			"both-type",
+			"both",
+			`{"name": "both-type", "type": "both"}`,
+		},
+		{
+			"no-type",
+			"new", // defaults to "new"
+			`{"name": "no-type"}`,
+		},
+	}
+
+	for _, tc := range testCases {
+		templateDir := filepath.Join("templates", tc.templateName)
+		require.NoError(t, fs.MkdirAll(templateDir, 0o755))
+		require.NoError(t, fsext.WriteFile(fs, filepath.Join(templateDir, "script.js"), []byte("export default function() {}"), 0o644))
+		require.NoError(t, fsext.WriteFile(fs, filepath.Join(templateDir, "k6.template.json"), []byte(tc.metadata), 0o644))
+	}
+
+	// Test validation for new command
+	tests := []struct {
+		template      string
+		command       string
+		expectWarning bool
+		warningText   string
+	}{
+		{"init-only", "new", true, "⚠️ This template is designed for full project scaffolding. Use k6 init instead to get the full experience."},
+		{"new-only", "new", false, ""},
+		{"both-type", "new", false, ""},
+		{"no-type", "new", false, ""},
+		{"init-only", "init", false, ""},
+		{"new-only", "init", true, "⚠️ This template is intended for single-script usage (k6 new). You may want to use k6 new instead."},
+		{"both-type", "init", false, ""},
+		{"no-type", "init", true, "⚠️ This template is intended for single-script usage (k6 new). You may want to use k6 new instead."},
+	}
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("%s_%s", tt.template, tt.command), func(t *testing.T) {
+			warning, err := tm.ValidateTemplateUsage(tt.template, tt.command)
+			require.NoError(t, err)
+
+			if tt.expectWarning {
+				assert.Equal(t, tt.warningText, warning)
+			} else {
+				assert.Empty(t, warning)
+			}
+		})
+	}
+
+	// Test built-in templates
+	warning, err := tm.ValidateTemplateUsage("minimal", "new")
+	require.NoError(t, err)
+	assert.Empty(t, warning)
+
+	warning, err = tm.ValidateTemplateUsage("minimal", "init")
+	require.NoError(t, err)
+	assert.Equal(t, "⚠️ This template is intended for single-script usage (k6 new). You may want to use k6 new instead.", warning)
+}
+
+func TestTemplateManager_ScaffoldProject(t *testing.T) {
+	t.Parallel()
+
+	fs := fsext.NewMemMapFs()
+	tm, err := NewTemplateManager(fs, "/home/user")
+	require.NoError(t, err)
+
+	// Create a template for scaffolding
+	templateDir := "templates/scaffold-test"
+	require.NoError(t, fs.MkdirAll(templateDir, 0o755))
+
+	templateFiles := map[string]string{
+		"script.js": `export default function() {
+  console.log("Project: {{ .Name }}");
+  console.log("Team: {{ .Team }}");
+  console.log("Env: {{ .Env }}");
+  console.log("ProjectID: {{ .ProjectID }}");
+}`,
+		"config.json": `{
+  "name": "{{ .Name }}"{{ if .Team }},
+  "team": "{{ .Team }}"{{ end }}
+}`,
+		"README.md": `# {{ .Name }}
+
+{{ if .Team }}Team: {{ .Team }}{{ end }}
+{{ if .Env }}Environment: {{ .Env }}{{ end }}`,
+		"k6.template.json": `{
+  "name": "scaffold-test",
+  "description": "Test scaffolding template",
+  "type": "init"
+}`,
+	}
+
+	for filePath, content := range templateFiles {
+		fullPath := filepath.Join(templateDir, filePath)
+		require.NoError(t, fs.MkdirAll(filepath.Dir(fullPath), 0o755))
+		require.NoError(t, fsext.WriteFile(fs, fullPath, []byte(content), 0o644))
+	}
+
+	// Test scaffolding
+	var stdout strings.Builder
+	args := TemplateArgs{
+		Name:       "test-project",
+		Team:       "platform",
+		Env:        "staging",
+		ProjectID:  "12345",
+		Project:    "12345",
+		ScriptName: "script.js",
+	}
+
+	err = tm.ScaffoldProject("scaffold-test", args, &stdout)
+	require.NoError(t, err)
+
+	// Check that project directory was created
+	projectExists, err := fsext.Exists(fs, "test-project")
+	require.NoError(t, err)
+	assert.True(t, projectExists)
+
+	// Check that files were copied and processed
+	expectedFiles := []string{"script.js", "config.json", "README.md"}
+	for _, file := range expectedFiles {
+		projectFile := filepath.Join("test-project", file)
+		content, err := fsext.ReadFile(fs, projectFile)
+		require.NoError(t, err)
+		contentStr := string(content)
+
+		switch file {
+		case "script.js":
+			assert.Contains(t, contentStr, `console.log("Project: test-project");`)
+			assert.Contains(t, contentStr, `console.log("Team: platform");`)
+			assert.Contains(t, contentStr, `console.log("Env: staging");`)
+			assert.Contains(t, contentStr, `console.log("ProjectID: 12345");`)
+		case "config.json":
+			assert.Contains(t, contentStr, `"name": "test-project"`)
+			assert.Contains(t, contentStr, `"team": "platform"`)
+		case "README.md":
+			assert.Contains(t, contentStr, "# test-project")
+			assert.Contains(t, contentStr, "Team: platform")
+			assert.Contains(t, contentStr, "Environment: staging")
+		}
+	}
+
+	// Check that k6.template.json was NOT copied
+	templateMetadata := filepath.Join("test-project", "k6.template.json")
+	exists, err := fsext.Exists(fs, templateMetadata)
+	require.NoError(t, err)
+	assert.False(t, exists)
+
+	// Check success message
+	output := stdout.String()
+	assert.Contains(t, output, "✅ Project scaffolded to ./test-project")
+	assert.Contains(t, output, "Run 'cd test-project && k6 run script.js' to get started")
+}
+
+func TestTemplateManager_ScaffoldProject_DefaultProjectName(t *testing.T) {
+	t.Parallel()
+
+	fs := fsext.NewMemMapFs()
+	tm, err := NewTemplateManager(fs, "/home/user")
+	require.NoError(t, err)
+
+	// Create a template with defaultFilename
+	templateDir := "templates/default-name-test"
+	require.NoError(t, fs.MkdirAll(templateDir, 0o755))
+
+	require.NoError(t, fsext.WriteFile(fs, filepath.Join(templateDir, "script.js"), []byte(`export default function() {
+  console.log("Project: {{ .Name }}");
+}`), 0o644))
+
+	metadataContent := `{
+  "name": "default-name-test",
+  "description": "Test default naming",
+  "defaultFilename": "awesome-project",
+  "type": "init"
+}`
+	require.NoError(t, fsext.WriteFile(fs, filepath.Join(templateDir, "k6.template.json"), []byte(metadataContent), 0o644))
+
+	// Test without providing Name (should use defaultFilename)
+	var stdout strings.Builder
+	args := TemplateArgs{
+		Name:       "", // Empty name
+		Team:       "platform",
+		Env:        "staging",
+		ProjectID:  "12345",
+		Project:    "12345",
+		ScriptName: "script.js",
+	}
+
+	err = tm.ScaffoldProject("default-name-test", args, &stdout)
+	require.NoError(t, err)
+
+	// Verify project was created with default name
+	projectExists, err := fsext.Exists(fs, "awesome-project")
+	require.NoError(t, err)
+	assert.True(t, projectExists)
+
+	// Check that template was processed with correct name
+	content, err := fsext.ReadFile(fs, filepath.Join("awesome-project", "script.js"))
+	require.NoError(t, err)
+	assert.Contains(t, string(content), `console.log("Project: awesome-project");`)
+}
+
+func TestTemplateManager_ScaffoldProject_FallbackToTemplateName(t *testing.T) {
+	t.Parallel()
+
+	fs := fsext.NewMemMapFs()
+	tm, err := NewTemplateManager(fs, "/home/user")
+	require.NoError(t, err)
+
+	// Create a template without defaultFilename
+	templateDir := "templates/fallback-name-test"
+	require.NoError(t, fs.MkdirAll(templateDir, 0o755))
+
+	require.NoError(t, fsext.WriteFile(fs, filepath.Join(templateDir, "script.js"), []byte(`export default function() {
+  console.log("Project: {{ .Name }}");
+}`), 0o644))
+
+	// No metadata file, so should fallback to template name
+	var stdout strings.Builder
+	args := TemplateArgs{
+		Name:       "", // Empty name
+		Team:       "platform",
+		Env:        "staging",
+		ProjectID:  "12345",
+		Project:    "12345",
+		ScriptName: "script.js",
+	}
+
+	err = tm.ScaffoldProject("fallback-name-test", args, &stdout)
+	require.NoError(t, err)
+
+	// Verify project was created with template name
+	projectExists, err := fsext.Exists(fs, "fallback-name-test")
+	require.NoError(t, err)
+	assert.True(t, projectExists)
+
+	// Check that template was processed with correct name
+	content, err := fsext.ReadFile(fs, filepath.Join("fallback-name-test", "script.js"))
+	require.NoError(t, err)
+	assert.Contains(t, string(content), `console.log("Project: fallback-name-test");`)
+}
+
+func TestTemplateManager_ScaffoldProject_DirectoryExists(t *testing.T) {
+	t.Parallel()
+
+	fs := fsext.NewMemMapFs()
+	tm, err := NewTemplateManager(fs, "/home/user")
+	require.NoError(t, err)
+
+	// Create a template
+	templateDir := "templates/exists-test"
+	require.NoError(t, fs.MkdirAll(templateDir, 0o755))
+	require.NoError(t, fsext.WriteFile(fs, filepath.Join(templateDir, "script.js"), []byte("export default function() {}"), 0o644))
+
+	// Create the target directory first
+	require.NoError(t, fs.MkdirAll("existing-project", 0o755))
+
+	// Test should fail when directory exists
+	var stdout strings.Builder
+	args := TemplateArgs{
+		Name:       "existing-project",
+		Team:       "platform",
+		Env:        "staging",
+		ProjectID:  "12345",
+		Project:    "12345",
+		ScriptName: "script.js",
+	}
+
+	err = tm.ScaffoldProject("exists-test", args, &stdout)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `directory "existing-project" already exists`)
+}
+
+func TestTemplateManager_ScaffoldProject_NonDirectoryBasedTemplate(t *testing.T) {
+	t.Parallel()
+
+	fs := fsext.NewMemMapFs()
+	tm, err := NewTemplateManager(fs, "/home/user")
+	require.NoError(t, err)
+
+	// Test with built-in template (not directory-based)
+	var stdout strings.Builder
+	args := TemplateArgs{
+		Name:       "test-project",
+		Team:       "platform",
+		Env:        "staging",
+		ProjectID:  "12345",
+		Project:    "12345",
+		ScriptName: "script.js",
+	}
+
+	err = tm.ScaffoldProject("minimal", args, &stdout)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `template "minimal" is not a directory-based template suitable for project scaffolding`)
+}
+
+func TestTemplateManager_ListTemplatesWithInfo_IncludesType(t *testing.T) {
+	t.Parallel()
+
+	fs := fsext.NewMemMapFs()
+	tm, err := NewTemplateManager(fs, "/home/user")
+	require.NoError(t, err)
+
+	// Create templates with different types
+	testCases := []struct {
+		name         string
+		templateType string
+		metadata     string
+	}{
+		{
+			"init-template",
+			"init",
+			`{"name": "init-template", "description": "Init template", "type": "init"}`,
+		},
+		{
+			"both-template",
+			"both",
+			`{"name": "both-template", "description": "Both template", "type": "both"}`,
+		},
+		{
+			"default-template",
+			"new",
+			`{"name": "default-template", "description": "Default template"}`,
+		},
+	}
+
+	for _, tc := range testCases {
+		templateDir := filepath.Join("templates", tc.name)
+		require.NoError(t, fs.MkdirAll(templateDir, 0o755))
+		require.NoError(t, fsext.WriteFile(fs, filepath.Join(templateDir, "script.js"), []byte("export default function() {}"), 0o644))
+		require.NoError(t, fsext.WriteFile(fs, filepath.Join(templateDir, "k6.template.json"), []byte(tc.metadata), 0o644))
+	}
+
+	// Get template info
+	templates, err := tm.ListTemplatesWithInfo()
+	require.NoError(t, err)
+
+	// Check that templates include type information
+	templateMap := make(map[string]TemplateInfo)
+	for _, tmpl := range templates {
+		templateMap[tmpl.Name] = tmpl
+	}
+
+	// Built-in templates should have type "new"
+	assert.Equal(t, "new", templateMap["minimal"].Type)
+	assert.Equal(t, "new", templateMap["protocol"].Type)
+	assert.Equal(t, "new", templateMap["browser"].Type)
+	assert.Equal(t, "new", templateMap["rest"].Type)
+
+	// Custom templates should have their specified types
+	assert.Equal(t, "init", templateMap["init-template"].Type)
+	assert.Equal(t, "both", templateMap["both-template"].Type)
+	assert.Equal(t, "new", templateMap["default-template"].Type)
 }

@@ -79,14 +79,19 @@ func (c *newScriptCmd) run(_ *cobra.Command, args []string) (err error) {
 
 		fmt.Fprintln(c.gs.Stdout, "Available templates:")
 		for _, tmpl := range templatesWithInfo {
+			typeInfo := ""
+			if tmpl.Type != "new" && tmpl.Type != "" {
+				typeInfo = fmt.Sprintf(" [%s]", tmpl.Type)
+			}
+
 			if tmpl.Metadata != nil && tmpl.Metadata.Description != "" {
-				fmt.Fprintf(c.gs.Stdout, "  %s - %s\n", tmpl.Name, tmpl.Metadata.Description)
+				fmt.Fprintf(c.gs.Stdout, "  %s - %s%s\n", tmpl.Name, tmpl.Metadata.Description, typeInfo)
 			} else {
 				warning := ""
 				if tmpl.Warning != "" {
 					warning = " ⚠️"
 				}
-				fmt.Fprintf(c.gs.Stdout, "  %s (no metadata)%s\n", tmpl.Name, warning)
+				fmt.Fprintf(c.gs.Stdout, "  %s (no metadata)%s%s\n", tmpl.Name, warning, typeInfo)
 			}
 		}
 		return nil
@@ -95,6 +100,15 @@ func (c *newScriptCmd) run(_ *cobra.Command, args []string) (err error) {
 	target := defaultNewScriptName
 	if len(args) > 0 {
 		target = args[0]
+	}
+
+	// Validate template usage and show warnings if appropriate
+	warning, err := tm.ValidateTemplateUsage(c.templateType, "new")
+	if err != nil {
+		return fmt.Errorf("error validating template: %w", err)
+	}
+	if warning != "" {
+		fmt.Fprintln(c.gs.Stderr, warning)
 	}
 
 	// Prepare template arguments
@@ -204,7 +218,7 @@ func getCmdNewScript(gs *state.GlobalState) *cobra.Command {
 
 	initCmd := &cobra.Command{
 		Use:   "new [file]",
-		Short: "Create and initialize a new k6 script",
+		Short: "Create a new k6 script from a reusable template",
 		Long: `Create and initialize a new k6 script using one of the predefined templates.
 
 By default, the script will be named script.js unless a different name is specified.

@@ -42,6 +42,7 @@ type TemplateMetadata struct {
 	Tags            []string `json:"tags"`
 	Owner           string   `json:"owner"`
 	DefaultFilename string   `json:"defaultFilename"`
+	Type            string   `json:"type,omitempty"` // "new", "init", "both" - defaults to "new"
 }
 
 // TemplateInfo combines template information with optional metadata
@@ -51,6 +52,7 @@ type TemplateInfo struct {
 	Metadata  *TemplateMetadata
 	IsBuiltIn bool
 	Warning   string `json:"warning,omitempty"`
+	Type      string `json:"type,omitempty"` // Template type: "new", "init", "both"
 }
 
 // TemplateArgs represents arguments passed to templates
@@ -60,6 +62,7 @@ type TemplateArgs struct {
 	Project    string // Alias for ProjectID for template compatibility
 	Team       string
 	Env        string
+	Name       string // Project name for k6 init command
 }
 
 // TemplateManager manages the pre-parsed templates and template search paths
@@ -230,6 +233,7 @@ func (tm *TemplateManager) ListTemplatesWithInfo() ([]TemplateInfo, error) {
 			Metadata:  nil,
 			IsBuiltIn: true,
 			Warning:   "Missing k6.template.json",
+			Type:      "new", // Built-in templates are always "new" type
 		}
 	}
 
@@ -297,12 +301,19 @@ func (tm *TemplateManager) scanTemplateDirectoryWithInfo(dir string) ([]Template
 					warning = "Missing k6.template.json"
 				}
 
+				// Determine template type
+				templateType := "new" // Default
+				if metadata != nil && metadata.Type != "" {
+					templateType = metadata.Type
+				}
+
 				templates = append(templates, TemplateInfo{
 					Name:      entry.Name(),
 					Path:      templateDir,
 					Metadata:  metadata,
 					IsBuiltIn: false,
 					Warning:   warning,
+					Type:      templateType,
 				})
 			}
 		}
@@ -532,6 +543,122 @@ func (tm *TemplateManager) copyTemplateFile(srcPath, dstPath string, args Templa
 		if err := fsext.WriteFile(tm.fs, dstPath, content, fileInfo.Mode()); err != nil {
 			return fmt.Errorf("failed to write file %s: %w", dstPath, err)
 		}
+	}
+
+	return nil
+}
+
+// GetTemplateType returns the template type from metadata, defaulting to "new"
+func (tm *TemplateManager) GetTemplateType(templateName string) (string, error) {
+	// Built-in templates are always "new" type
+	builtins := []string{MinimalTemplate, ProtocolTemplate, BrowserTemplate, RestTemplate}
+	for _, builtin := range builtins {
+		if templateName == builtin {
+			return "new", nil
+		}
+	}
+
+	// Check if it's a file path (file-based template)
+	if isFilePath(templateName) {
+		// File-based templates default to "new" type
+		return "new", nil
+	}
+
+	// For directory-based templates, check metadata
+	if tm.IsDirectoryBasedTemplate(templateName) {
+		templateDir := tm.getTemplateDirectoryPath(templateName)
+		if templateDir == "" {
+			return "", fmt.Errorf("template %q not found", templateName)
+		}
+
+		metadata, err := tm.parseTemplateMetadata(templateDir)
+		if err != nil {
+			return "", fmt.Errorf("failed to parse template metadata: %w", err)
+		}
+
+		if metadata != nil && metadata.Type != "" {
+			return metadata.Type, nil
+		}
+
+		// Directory-based template without type metadata defaults to "new"
+		return "new", nil
+	}
+
+	// If we get here, the template doesn't exist
+	return "", fmt.Errorf("template %q not found", templateName)
+}
+
+// ValidateTemplateUsage checks if a template is appropriate for the given command and returns warnings
+func (tm *TemplateManager) ValidateTemplateUsage(templateName, command string) (string, error) {
+	templateType, err := tm.GetTemplateType(templateName)
+	if err != nil {
+		return "", err
+	}
+
+	if templateType == "both" {
+		return "", nil // No warning needed
+	}
+
+	if command == "new" && templateType == "init" {
+		return "⚠️ This template is designed for full project scaffolding. Use k6 init instead to get the full experience.", nil
+	}
+
+	if command == "init" && templateType == "new" {
+		return "⚠️ This template is intended for single-script usage (k6 new). You may want to use k6 new instead.", nil
+	}
+
+	return "", nil
+}
+
+// ScaffoldProject creates a new project directory from a template
+func (tm *TemplateManager) ScaffoldProject(templateName string, args TemplateArgs, stdout io.Writer) error {
+	// Validate that this is a directory-based template
+	if !tm.IsDirectoryBasedTemplate(templateName) {
+		return fmt.Errorf("template %q is not a directory-based template suitable for project scaffolding", templateName)
+	}
+
+	templateDir := tm.getTemplateDirectoryPath(templateName)
+	if templateDir == "" {
+		return fmt.Errorf("template %q not found", templateName)
+	}
+
+	// Determine project directory name
+	projectName := args.Name
+	if projectName == "" {
+		// Try to get default from metadata
+		metadata, err := tm.parseTemplateMetadata(templateDir)
+		if err == nil && metadata != nil && metadata.DefaultFilename != "" {
+			projectName = metadata.DefaultFilename
+		} else {
+			// Fallback to template name
+			projectName = templateName
+		}
+	}
+
+	// Update args with the determined project name for template processing
+	args.Name = projectName
+
+	// Check if project directory already exists
+	if exists, _ := fsext.Exists(tm.fs, projectName); exists {
+		return fmt.Errorf("directory %q already exists", projectName)
+	}
+
+	// Create project directory
+	if err := tm.fs.MkdirAll(projectName, 0o755); err != nil {
+		return fmt.Errorf("failed to create project directory %q: %w", projectName, err)
+	}
+
+	// Copy template files to project directory
+	if err := tm.copyDirectoryFiles(templateDir, projectName, args, false, stdout); err != nil {
+		return fmt.Errorf("failed to copy template files: %w", err)
+	}
+
+	if _, err := fmt.Fprintf(stdout, "✅ Project scaffolded to ./%s\n", projectName); err != nil {
+		return err
+	}
+
+	if _, err := fmt.Fprintf(stdout, "Run 'cd %s && k6 run script.js' to get started\n", projectName); err != nil {
+		return err
 	}
 
 	return nil
