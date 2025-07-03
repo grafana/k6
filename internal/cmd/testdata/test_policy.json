@@ -1,0 +1,5 @@
+{
+    "requireThresholds": true,
+    "requiredTags": ["env"],
+    "disallowedPatterns": ["console.log"]
+} 

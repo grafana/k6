@@ -2,28 +2,70 @@ package cmd
 
 import (
 	"encoding/json"
+	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/lib/types"
 )
 
 // TODO: split apart like `k6 run` and `k6 archive`
 func getCmdInspect(gs *state.GlobalState) *cobra.Command {
 	var addExecReqs bool
+	var policyPath string
 
 	// inspectCmd represents the inspect command
 	inspectCmd := &cobra.Command{
 		Use:   "inspect [file]",
 		Short: "Inspect a script or archive",
-		Long:  `Inspect a script or archive.`,
-		Args:  cobra.ExactArgs(1),
+		Long: `Inspect a script or archive.
+
+If a k6policy.json file is found in the same directory as the script, 
+policy validation will be performed automatically. Use --policy to 
+specify a different policy file.
+
+Policy validation checks for:
+- Required thresholds
+- Required tags  
+- Disallowed patterns in script content
+
+Exit codes:
+- 0: Inspection successful, no policy violations
+- 1: Policy violations found (when policy checking is enabled)
+- 2: Other errors (file not found, parsing errors, etc.)`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			test, err := loadLocalTest(gs, cmd, args)
 			if err != nil {
 				return err
+			}
+
+			// Read script content for policy checking
+			scriptPath := args[0]
+			scriptContent, err := fsext.ReadFile(gs.FS, scriptPath)
+			if err != nil {
+				return fmt.Errorf("failed to read script content: %w", err)
+			}
+
+			// Perform policy checking
+			policyChecker := NewPolicyChecker(gs.FS)
+			policyResult, err := policyChecker.CheckPolicy(scriptPath, policyPath, test.initRunner.GetOptions(), string(scriptContent))
+			if err != nil {
+				return err
+			}
+
+			// Print policy results first
+			if err := PrintPolicyResult(policyResult, gs.Stdout); err != nil {
+				return err
+			}
+
+			// Print separator if policy was used
+			if policyResult.Used {
+				printToStdout(gs, "") // Empty line for separation
 			}
 
 			// At the moment, `k6 inspect` output can take 2 forms: standard
@@ -45,6 +87,11 @@ func getCmdInspect(gs *state.GlobalState) *cobra.Command {
 			}
 			printToStdout(gs, string(data))
 
+			// Exit with non-zero code if policy violations found
+			if policyResult.Used && len(policyResult.Violations) > 0 {
+				os.Exit(1)
+			}
+
 			return nil
 		},
 	}
@@ -55,6 +102,10 @@ func getCmdInspect(gs *state.GlobalState) *cobra.Command {
 		"execution-requirements",
 		false,
 		"include calculations of execution requirements for the test")
+	inspectCmd.Flags().StringVar(&policyPath,
+		"policy",
+		"",
+		"path to policy file (k6policy.json) for validation. If not specified, will look for k6policy.json in script directory")
 
 	return inspectCmd
 }
