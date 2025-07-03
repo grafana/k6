@@ -2,7 +2,9 @@ package cmd
 
 import (
 	"encoding/json"
+	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -526,4 +528,434 @@ func TestNewScriptCmd_VerboseFlagWithoutListTemplates(t *testing.T) {
 	output := ts.Stdout.String()
 	assert.Contains(t, output, "New script created:")
 	assert.NotContains(t, output, `"name":`)
+}
+
+func TestNewScriptCmd_ListTemplatesWithWarnings(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+
+	// Create a template without metadata
+	templateDir := "templates/no-metadata"
+	require.NoError(t, ts.FS.MkdirAll(templateDir, 0o755))
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(templateDir, "script.js"), []byte("test"), 0o644))
+
+	// Create a template with metadata
+	templateDirWithMeta := "templates/with-metadata"
+	require.NoError(t, ts.FS.MkdirAll(templateDirWithMeta, 0o755))
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(templateDirWithMeta, "script.js"), []byte("test"), 0o644))
+
+	metadataContent := `{
+  "name": "with-metadata",
+  "description": "A template with metadata",
+  "tags": ["test"],
+  "owner": "test-user",
+  "defaultFilename": "test.js"
+}`
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(templateDirWithMeta, "k6.template.json"), []byte(metadataContent), 0o644))
+
+	ts.CmdArgs = []string{"k6", "new", "--list-templates"}
+	newRootCommand(ts.GlobalState).execute()
+
+	output := ts.Stdout.String()
+	assert.Contains(t, output, "Available templates:")
+
+	// Template with metadata should show description
+	assert.Contains(t, output, "with-metadata - A template with metadata")
+
+	// Template without metadata should show warning
+	assert.Contains(t, output, "no-metadata (no metadata) ⚠️")
+
+	// Built-in templates should show warning
+	assert.Contains(t, output, "minimal (no metadata) ⚠️")
+}
+
+func TestNewScriptCmd_VerboseOutputWithWarnings(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+
+	// Create a template without metadata
+	templateDir := "templates/warning-test"
+	require.NoError(t, ts.FS.MkdirAll(templateDir, 0o755))
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(templateDir, "script.js"), []byte("test"), 0o644))
+
+	ts.CmdArgs = []string{"k6", "new", "--list-templates", "--verbose"}
+	newRootCommand(ts.GlobalState).execute()
+
+	output := ts.Stdout.String()
+
+	// Should contain JSON output
+	var templates []map[string]interface{}
+	require.NoError(t, json.Unmarshal([]byte(output), &templates))
+
+	// Find templates with and without warnings
+	var warningTemplate, builtinTemplate *map[string]interface{}
+	for _, tmpl := range templates {
+		name := tmpl["Name"].(string)
+		if name == "warning-test" {
+			warningTemplate = &tmpl
+		} else if name == "minimal" {
+			builtinTemplate = &tmpl
+		}
+	}
+
+	// Verify warning fields
+	require.NotNil(t, warningTemplate)
+	assert.Equal(t, "Missing k6.template.json", (*warningTemplate)["warning"])
+
+	require.NotNil(t, builtinTemplate)
+	assert.Equal(t, "Missing k6.template.json", (*builtinTemplate)["warning"])
+	assert.Equal(t, true, (*builtinTemplate)["IsBuiltIn"])
+}
+
+func TestTemplateAddCmd_AutoCreateMetadata(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+	ts.UserOSConfigDir = "/test/home"
+	require.NoError(t, ts.FS.MkdirAll(ts.UserOSConfigDir, 0o755))
+
+	// Create a test script to promote to template
+	scriptContent := `import http from 'k6/http';
+
+export const options = {
+  vus: 2,
+  duration: '30s',
+};
+
+export default function() {
+  http.get('https://test.example.com');
+}`
+
+	scriptPath := "auto-metadata-test.js"
+	require.NoError(t, fsext.WriteFile(ts.FS, scriptPath, []byte(scriptContent), 0o644))
+
+	ts.CmdArgs = []string{"k6", "template", "add", "auto-metadata", scriptPath}
+	newRootCommand(ts.GlobalState).execute()
+
+	// Check success message
+	output := ts.Stdout.String()
+	assert.Contains(t, output, "Template 'auto-metadata' created successfully")
+
+	// Verify the template script was created
+	templatePath := filepath.Join(ts.UserOSConfigDir, ".k6", "templates", "auto-metadata", "script.js")
+	exists, err := fsext.Exists(ts.FS, templatePath)
+	require.NoError(t, err)
+	assert.True(t, exists)
+
+	// Verify metadata file was auto-created
+	metadataPath := filepath.Join(ts.UserOSConfigDir, ".k6", "templates", "auto-metadata", "k6.template.json")
+	exists, err = fsext.Exists(ts.FS, metadataPath)
+	require.NoError(t, err)
+	assert.True(t, exists)
+
+	// Verify metadata content
+	metadataData, err := fsext.ReadFile(ts.FS, metadataPath)
+	require.NoError(t, err)
+
+	var metadata map[string]interface{}
+	require.NoError(t, json.Unmarshal(metadataData, &metadata))
+
+	assert.Equal(t, "auto-metadata", metadata["name"])
+	assert.Equal(t, "Describe your template here.", metadata["description"])
+	assert.Equal(t, []interface{}{}, metadata["tags"])
+	assert.Equal(t, "", metadata["owner"])
+	assert.Equal(t, "auto-metadata-test.js", metadata["defaultFilename"])
+}
+
+func TestTemplateAddCmd_DoNotOverwriteMetadata(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+	ts.UserOSConfigDir = "/test/home"
+	require.NoError(t, ts.FS.MkdirAll(ts.UserOSConfigDir, 0o755))
+
+	// Create existing template directory with metadata
+	templateDir := filepath.Join(ts.UserOSConfigDir, ".k6", "templates", "existing")
+	require.NoError(t, ts.FS.MkdirAll(templateDir, 0o755))
+
+	// Create existing metadata
+	existingMetadata := `{
+  "name": "existing",
+  "description": "Existing description",
+  "tags": ["existing"],
+  "owner": "existing-owner",
+  "defaultFilename": "existing.js"
+}`
+	metadataPath := filepath.Join(templateDir, "k6.template.json")
+	require.NoError(t, fsext.WriteFile(ts.FS, metadataPath, []byte(existingMetadata), 0o644))
+
+	// Create a new script to add
+	scriptContent := `export default function() { console.log("new script"); }`
+	scriptPath := "new-script.js"
+	require.NoError(t, fsext.WriteFile(ts.FS, scriptPath, []byte(scriptContent), 0o644))
+
+	ts.CmdArgs = []string{"k6", "template", "add", "existing", scriptPath}
+	newRootCommand(ts.GlobalState).execute()
+
+	// Verify metadata was not overwritten
+	metadataData, err := fsext.ReadFile(ts.FS, metadataPath)
+	require.NoError(t, err)
+
+	var metadata map[string]interface{}
+	require.NoError(t, json.Unmarshal(metadataData, &metadata))
+
+	// Should still have original values
+	assert.Equal(t, "existing", metadata["name"])
+	assert.Equal(t, "Existing description", metadata["description"])
+	assert.Equal(t, []interface{}{"existing"}, metadata["tags"])
+	assert.Equal(t, "existing-owner", metadata["owner"])
+	assert.Equal(t, "existing.js", metadata["defaultFilename"])
+}
+
+func TestNewScriptCmd_DirectoryBasedTemplate_MultipleFiles(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+
+	// Create a multi-file template directory structure
+	templateDir := "templates/multifile"
+	require.NoError(t, ts.FS.MkdirAll(templateDir, 0o755))
+
+	// Create multiple files in the template
+	files := map[string]string{
+		"script.js": `import http from 'k6/http';
+
+export const options = {
+  vus: 5,
+  duration: '10s',{{ if .ProjectID }}
+  cloud: {
+    projectID: {{ .ProjectID }},
+    name: "{{ .ScriptName }}",
+  },{{ end }}
+};
+
+export default function() {
+  http.get('https://example.com/api');
+}`,
+		"config.json": `{
+  "name": "{{ .ScriptName }}",
+  "description": "Multi-file template test",
+  "projectId": "{{ .ProjectID }}"
+}`,
+		"README.md": `# {{ .ScriptName }}
+
+This is a test script generated from a multi-file template.
+`,
+		"helpers/utils.js": `export function logMessage(msg) {
+  console.log('{{ .ScriptName }}: ' + msg);
+}`,
+		"k6.template.json": `{
+  "name": "multifile",
+  "description": "Multi-file template for testing",
+  "tags": ["test", "multifile"],
+  "owner": "test-team",
+  "defaultFilename": "test-script.js"
+}`,
+		".hidden": "This should not be copied",
+	}
+
+	for filePath, content := range files {
+		fullPath := filepath.Join(templateDir, filePath)
+		require.NoError(t, ts.FS.MkdirAll(filepath.Dir(fullPath), 0o755))
+		require.NoError(t, fsext.WriteFile(ts.FS, fullPath, []byte(content), 0o644))
+	}
+
+	// Test using the multi-file template
+	ts.CmdArgs = []string{"k6", "new", "--template", "multifile", "--project-id", "9999"}
+	newRootCommand(ts.GlobalState).execute()
+
+	// Check if there were any errors
+	if ts.Stderr.Len() > 0 {
+		t.Logf("Stderr: %s", ts.Stderr.String())
+	}
+
+	// Verify that all expected files were created
+	expectedFiles := []string{"script.js", "config.json", "README.md", "helpers/utils.js"}
+	for _, file := range expectedFiles {
+		exists, err := fsext.Exists(ts.FS, file)
+		require.NoError(t, err)
+		assert.True(t, exists, "File %s should exist", file)
+
+		// Check content was processed with template variables
+		content, err := fsext.ReadFile(ts.FS, file)
+		require.NoError(t, err)
+		contentStr := string(content)
+
+		if strings.Contains(file, ".js") || strings.Contains(file, ".json") || strings.Contains(file, ".md") {
+			assert.Contains(t, contentStr, "script.js", "File %s should contain processed script name", file)
+			if file == "config.json" || file == "script.js" {
+				assert.Contains(t, contentStr, "9999", "File %s should contain processed project ID", file)
+			}
+		}
+	}
+
+	// Verify that excluded files were NOT created
+	excludedFiles := []string{"k6.template.json", ".hidden"}
+	for _, file := range excludedFiles {
+		exists, err := fsext.Exists(ts.FS, file)
+		require.NoError(t, err)
+		assert.False(t, exists, "File %s should not exist", file)
+	}
+
+	// Check success message
+	output := ts.Stdout.String()
+	assert.Contains(t, output, "New script created from template: multifile")
+}
+
+func TestNewScriptCmd_DirectoryBasedTemplate_ConflictHandling(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+
+	// Create a template
+	templateDir := "templates/conflict-test"
+	require.NoError(t, ts.FS.MkdirAll(templateDir, 0o755))
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(templateDir, "script.js"), []byte("template content"), 0o644))
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(templateDir, "README.md"), []byte("template readme"), 0o644))
+
+	// Create existing files
+	require.NoError(t, fsext.WriteFile(ts.FS, "script.js", []byte("existing content"), 0o644))
+
+	// Test without force flag - should show warning for conflicting files
+	ts.CmdArgs = []string{"k6", "new", "--template", "conflict-test"}
+	newRootCommand(ts.GlobalState).execute()
+
+	// Check that warning was printed
+	output := ts.Stdout.String()
+	assert.Contains(t, output, "Warning: File script.js already exists, skipping.")
+
+	// Check that existing file was not overwritten
+	content, err := fsext.ReadFile(ts.FS, "script.js")
+	require.NoError(t, err)
+	assert.Equal(t, "existing content", string(content))
+
+	// Check that non-conflicting files were still copied
+	readmeContent, err := fsext.ReadFile(ts.FS, "README.md")
+	require.NoError(t, err)
+	assert.Equal(t, "template readme", string(readmeContent))
+
+	// Test with force flag - should overwrite existing files
+	ts.Stdout.Reset()
+	ts.Stderr.Reset()
+	ts.CmdArgs = []string{"k6", "new", "--template", "conflict-test", "--force"}
+	newRootCommand(ts.GlobalState).execute()
+
+	// Check that existing file was overwritten
+	content, err = fsext.ReadFile(ts.FS, "script.js")
+	require.NoError(t, err)
+	assert.Equal(t, "template content", string(content))
+
+	// Check that no warning was printed with force flag
+	output = ts.Stdout.String()
+	assert.NotContains(t, output, "Warning:")
+}
+
+func TestNewScriptCmd_DirectoryBasedTemplate_CustomScriptName(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+
+	// Create a template
+	templateDir := "templates/custom-name"
+	require.NoError(t, ts.FS.MkdirAll(templateDir, 0o755))
+
+	templateContent := `import http from 'k6/http';
+
+export const options = {
+  vus: 1,
+  duration: '10s',{{ if .ProjectID }}
+  cloud: {
+    projectID: {{ .ProjectID }},
+    name: "{{ .ScriptName }}",
+  },{{ end }}
+};
+
+export default function() {
+  // Script name: {{ .ScriptName }}
+  http.get('https://example.com');
+}`
+
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(templateDir, "script.js"), []byte(templateContent), 0o644))
+
+	// Test using custom script name (should be ignored for directory-based templates)
+	ts.CmdArgs = []string{"k6", "new", "custom-test.js", "--template", "custom-name", "--project-id", "1234"}
+	newRootCommand(ts.GlobalState).execute()
+
+	// For directory-based templates, the script name should still be "script.js"
+	// but template variables should use the custom name
+	scriptContent, err := fsext.ReadFile(ts.FS, "script.js")
+	require.NoError(t, err)
+	contentStr := string(scriptContent)
+
+	assert.Contains(t, contentStr, `name: "custom-test.js"`)
+	assert.Contains(t, contentStr, "projectID: 1234")
+	assert.Contains(t, contentStr, "Script name: custom-test.js")
+
+	// The custom filename should not create a separate file
+	exists, err := fsext.Exists(ts.FS, "custom-test.js")
+	require.NoError(t, err)
+	assert.False(t, exists)
+}
+
+func TestNewScriptCmd_BuiltInTemplates_StillWork(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+
+	// Test that built-in templates still work with single file creation
+	builtinTemplates := []string{"minimal", "protocol", "browser", "rest"}
+
+	for _, template := range builtinTemplates {
+		t.Run(template, func(t *testing.T) {
+			// Reset for each template
+			ts.Stdout.Reset()
+			ts.Stderr.Reset()
+
+			// Create unique filename for each test
+			filename := fmt.Sprintf("%s-test.js", template)
+			ts.CmdArgs = []string{"k6", "new", filename, "--template", template}
+			newRootCommand(ts.GlobalState).execute()
+
+			// Check that single file was created with expected name
+			data, err := fsext.ReadFile(ts.FS, filename)
+			require.NoError(t, err)
+			assert.NotEmpty(t, string(data))
+
+			// Check success message uses old format for built-in templates
+			output := ts.Stdout.String()
+			assert.Contains(t, output, fmt.Sprintf("New script created: %s (%s template)", filename, template))
+
+			// Verify it's not using directory-based logic
+			assert.NotContains(t, output, "New script created from template:")
+		})
+	}
+}
+
+func TestNewScriptCmd_FileBasedTemplates_StillWork(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+
+	// Create a file-based template
+	templatePath := "my-template.js"
+	templateContent := `export default function() {
+  console.log("File-based template: {{ .ScriptName }}");
+}`
+	require.NoError(t, fsext.WriteFile(ts.FS, templatePath, []byte(templateContent), 0o644))
+
+	// Test using file-based template
+	ts.CmdArgs = []string{"k6", "new", "file-test.js", "--template", templatePath}
+	newRootCommand(ts.GlobalState).execute()
+
+	// Check that single file was created
+	data, err := fsext.ReadFile(ts.FS, "file-test.js")
+	require.NoError(t, err)
+	assert.Contains(t, string(data), "File-based template: file-test.js")
+
+	// Check success message uses old format
+	output := ts.Stdout.String()
+	assert.Contains(t, output, fmt.Sprintf("New script created: file-test.js (%s template)", templatePath))
+	assert.NotContains(t, output, "New script created from template:")
 }

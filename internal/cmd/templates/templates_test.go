@@ -2,7 +2,9 @@ package templates
 
 import (
 	"encoding/json"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -242,4 +244,408 @@ func TestTemplateInfo_Sorting(t *testing.T) {
 	// Should be sorted alphabetically
 	expectedOrder := []string{"apple", "beta", BrowserTemplate, MinimalTemplate, ProtocolTemplate, RestTemplate, "zebra"}
 	assert.Equal(t, expectedOrder, names)
+}
+
+func TestCreateUserTemplate_AutoCreateMetadata(t *testing.T) {
+	t.Parallel()
+
+	fs := fsext.NewMemMapFs()
+	homeDir := "/test/home"
+	require.NoError(t, fs.MkdirAll(homeDir, 0o755))
+
+	// Create a script file to promote
+	scriptContent := `import http from 'k6/http';
+export default function() {
+  http.get('https://example.com');
+}`
+	scriptPath := "my-script.js"
+	require.NoError(t, fsext.WriteFile(fs, scriptPath, []byte(scriptContent), 0o644))
+
+	tm, err := NewTemplateManager(fs, homeDir)
+	require.NoError(t, err)
+
+	// Create template - should auto-create metadata
+	err = tm.CreateUserTemplate("my-template", scriptPath)
+	require.NoError(t, err)
+
+	// Verify template script was created
+	templatePath := filepath.Join(homeDir, ".k6", "templates", "my-template", "script.js")
+	exists, err := fsext.Exists(fs, templatePath)
+	require.NoError(t, err)
+	assert.True(t, exists)
+
+	// Verify metadata file was auto-created
+	metadataPath := filepath.Join(homeDir, ".k6", "templates", "my-template", "k6.template.json")
+	exists, err = fsext.Exists(fs, metadataPath)
+	require.NoError(t, err)
+	assert.True(t, exists)
+
+	// Verify metadata content
+	metadataData, err := fsext.ReadFile(fs, metadataPath)
+	require.NoError(t, err)
+
+	var metadata TemplateMetadata
+	require.NoError(t, json.Unmarshal(metadataData, &metadata))
+
+	assert.Equal(t, "my-template", metadata.Name)
+	assert.Equal(t, "Describe your template here.", metadata.Description)
+	assert.Equal(t, []string{}, metadata.Tags)
+	assert.Equal(t, "", metadata.Owner)
+	assert.Equal(t, "my-script.js", metadata.DefaultFilename)
+}
+
+func TestCreateUserTemplate_DoNotOverwriteExistingMetadata(t *testing.T) {
+	t.Parallel()
+
+	fs := fsext.NewMemMapFs()
+	homeDir := "/test/home"
+	require.NoError(t, fs.MkdirAll(homeDir, 0o755))
+
+	// Create template directory with existing metadata
+	templateDir := filepath.Join(homeDir, ".k6", "templates", "existing-template")
+	require.NoError(t, fs.MkdirAll(templateDir, 0o755))
+
+	// Create existing metadata
+	existingMetadata := TemplateMetadata{
+		Name:            "existing-template",
+		Description:     "Existing description",
+		Tags:            []string{"existing", "tag"},
+		Owner:           "existing-owner",
+		DefaultFilename: "existing.js",
+	}
+	existingMetadataJSON, err := json.Marshal(existingMetadata)
+	require.NoError(t, err)
+
+	metadataPath := filepath.Join(templateDir, "k6.template.json")
+	require.NoError(t, fsext.WriteFile(fs, metadataPath, existingMetadataJSON, 0o644))
+
+	// Create a script file to promote
+	scriptContent := `export default function() { console.log("test"); }`
+	scriptPath := "new-script.js"
+	require.NoError(t, fsext.WriteFile(fs, scriptPath, []byte(scriptContent), 0o644))
+
+	tm, err := NewTemplateManager(fs, homeDir)
+	require.NoError(t, err)
+
+	// Create template - should NOT overwrite existing metadata
+	err = tm.CreateUserTemplate("existing-template", scriptPath)
+	require.NoError(t, err)
+
+	// Verify metadata was not overwritten
+	metadataData, err := fsext.ReadFile(fs, metadataPath)
+	require.NoError(t, err)
+
+	var metadata TemplateMetadata
+	require.NoError(t, json.Unmarshal(metadataData, &metadata))
+
+	// Should still have original values
+	assert.Equal(t, "existing-template", metadata.Name)
+	assert.Equal(t, "Existing description", metadata.Description)
+	assert.Equal(t, []string{"existing", "tag"}, metadata.Tags)
+	assert.Equal(t, "existing-owner", metadata.Owner)
+	assert.Equal(t, "existing.js", metadata.DefaultFilename)
+}
+
+func TestListTemplatesWithInfo_MissingMetadataWarning(t *testing.T) {
+	t.Parallel()
+
+	fs := fsext.NewMemMapFs()
+
+	// Create template without metadata
+	templateDir := "templates/no-metadata"
+	require.NoError(t, fs.MkdirAll(templateDir, 0o755))
+	require.NoError(t, fsext.WriteFile(fs, filepath.Join(templateDir, "script.js"), []byte("test"), 0o644))
+
+	// Create template with metadata
+	templateDirWithMeta := "templates/with-metadata"
+	require.NoError(t, fs.MkdirAll(templateDirWithMeta, 0o755))
+	require.NoError(t, fsext.WriteFile(fs, filepath.Join(templateDirWithMeta, "script.js"), []byte("test"), 0o644))
+
+	metadata := TemplateMetadata{
+		Name:        "with-metadata",
+		Description: "Has metadata",
+	}
+	metadataJSON, err := json.Marshal(metadata)
+	require.NoError(t, err)
+	require.NoError(t, fsext.WriteFile(fs, filepath.Join(templateDirWithMeta, "k6.template.json"), metadataJSON, 0o644))
+
+	tm, err := NewTemplateManager(fs, "")
+	require.NoError(t, err)
+
+	templatesWithInfo, err := tm.ListTemplatesWithInfo()
+	require.NoError(t, err)
+
+	// Find templates
+	var noMetaTemplate, withMetaTemplate, builtinTemplate *TemplateInfo
+	for _, tmpl := range templatesWithInfo {
+		switch tmpl.Name {
+		case "no-metadata":
+			noMetaTemplate = &tmpl
+		case "with-metadata":
+			withMetaTemplate = &tmpl
+		case MinimalTemplate:
+			builtinTemplate = &tmpl
+		}
+	}
+
+	// Verify warnings
+	require.NotNil(t, noMetaTemplate)
+	assert.Equal(t, "Missing k6.template.json", noMetaTemplate.Warning)
+	assert.Nil(t, noMetaTemplate.Metadata)
+
+	require.NotNil(t, withMetaTemplate)
+	assert.Empty(t, withMetaTemplate.Warning)
+	assert.NotNil(t, withMetaTemplate.Metadata)
+
+	require.NotNil(t, builtinTemplate)
+	assert.Equal(t, "Missing k6.template.json", builtinTemplate.Warning)
+	assert.True(t, builtinTemplate.IsBuiltIn)
+}
+
+func TestTemplateManager_IsDirectoryBasedTemplate(t *testing.T) {
+	t.Parallel()
+
+	fs := fsext.NewMemMapFs()
+	homeDir := "/test/home"
+	require.NoError(t, fs.MkdirAll(homeDir, 0o755))
+
+	// Create a directory-based template
+	templateDir := "templates/multifile"
+	require.NoError(t, fs.MkdirAll(templateDir, 0o755))
+	require.NoError(t, fsext.WriteFile(fs, filepath.Join(templateDir, "script.js"), []byte("test"), 0o644))
+
+	tm, err := NewTemplateManager(fs, homeDir)
+	require.NoError(t, err)
+
+	// Test built-in templates (should not be directory-based)
+	assert.False(t, tm.IsDirectoryBasedTemplate("minimal"))
+	assert.False(t, tm.IsDirectoryBasedTemplate("protocol"))
+	assert.False(t, tm.IsDirectoryBasedTemplate("browser"))
+	assert.False(t, tm.IsDirectoryBasedTemplate("rest"))
+
+	// Test file paths (should not be directory-based)
+	assert.False(t, tm.IsDirectoryBasedTemplate("./script.js"))
+	assert.False(t, tm.IsDirectoryBasedTemplate("/path/to/script.js"))
+
+	// Test directory-based template
+	assert.True(t, tm.IsDirectoryBasedTemplate("multifile"))
+
+	// Test non-existent template
+	assert.False(t, tm.IsDirectoryBasedTemplate("nonexistent"))
+}
+
+func TestTemplateManager_CopyTemplateFiles(t *testing.T) {
+	t.Parallel()
+
+	fs := fsext.NewMemMapFs()
+	homeDir := "/test/home"
+	require.NoError(t, fs.MkdirAll(homeDir, 0o755))
+
+	// Create a multi-file template
+	templateDir := "templates/multifile"
+	require.NoError(t, fs.MkdirAll(templateDir, 0o755))
+
+	// Create various files in the template
+	files := map[string]string{
+		"script.js":          `import http from 'k6/http';\nexport default function() { http.get('{{.ScriptName}}'); }`,
+		"config.json":        `{"name": "{{.ScriptName}}", "projectId": "{{.ProjectID}}"}`,
+		"README.md":          "# Test Template\n\nThis is a test template.",
+		"k6.template.json":   `{"name": "multifile", "description": "Multi-file template"}`,
+		".hidden":            "hidden file content",
+		"subdir/helper.js":   `export function helper() { return "{{.ScriptName}}"; }`,
+		"subdir/.hidden_dir": "hidden directory file",
+	}
+
+	for filePath, content := range files {
+		fullPath := filepath.Join(templateDir, filePath)
+		require.NoError(t, fs.MkdirAll(filepath.Dir(fullPath), 0o755))
+		require.NoError(t, fsext.WriteFile(fs, fullPath, []byte(content), 0o644))
+	}
+
+	tm, err := NewTemplateManager(fs, homeDir)
+	require.NoError(t, err)
+
+	args := TemplateArgs{
+		ScriptName: "my-test.js",
+		ProjectID:  "12345",
+	}
+
+	var output strings.Builder
+	err = tm.CopyTemplateFiles("multifile", args, false, &output)
+	require.NoError(t, err)
+
+	// Check that regular files were copied and processed
+	scriptContent, err := fsext.ReadFile(fs, "script.js")
+	require.NoError(t, err)
+	assert.Contains(t, string(scriptContent), "my-test.js") // Template processed
+
+	configContent, err := fsext.ReadFile(fs, "config.json")
+	require.NoError(t, err)
+	assert.Contains(t, string(configContent), `"name": "my-test.js"`)
+	assert.Contains(t, string(configContent), `"projectId": "12345"`)
+
+	readmeContent, err := fsext.ReadFile(fs, "README.md")
+	require.NoError(t, err)
+	assert.Equal(t, "# Test Template\n\nThis is a test template.", string(readmeContent))
+
+	// Check that subdirectory was created and file copied
+	helperContent, err := fsext.ReadFile(fs, "subdir/helper.js")
+	require.NoError(t, err)
+	assert.Contains(t, string(helperContent), "my-test.js")
+
+	// Check that k6.template.json was NOT copied
+	exists, err := fsext.Exists(fs, "k6.template.json")
+	require.NoError(t, err)
+	assert.False(t, exists)
+
+	// Check that hidden files were NOT copied
+	exists, err = fsext.Exists(fs, ".hidden")
+	require.NoError(t, err)
+	assert.False(t, exists)
+
+	exists, err = fsext.Exists(fs, "subdir/.hidden_dir")
+	require.NoError(t, err)
+	assert.False(t, exists)
+}
+
+func TestTemplateManager_CopyTemplateFiles_ConflictHandling(t *testing.T) {
+	t.Parallel()
+
+	fs := fsext.NewMemMapFs()
+	homeDir := "/test/home"
+	require.NoError(t, fs.MkdirAll(homeDir, 0o755))
+
+	// Create a template
+	templateDir := "templates/conflict"
+	require.NoError(t, fs.MkdirAll(templateDir, 0o755))
+	require.NoError(t, fsext.WriteFile(fs, filepath.Join(templateDir, "script.js"), []byte("template content"), 0o644))
+	require.NoError(t, fsext.WriteFile(fs, filepath.Join(templateDir, "README.md"), []byte("template readme"), 0o644))
+
+	// Create existing files
+	require.NoError(t, fsext.WriteFile(fs, "script.js", []byte("existing content"), 0o644))
+
+	tm, err := NewTemplateManager(fs, homeDir)
+	require.NoError(t, err)
+
+	args := TemplateArgs{ScriptName: "test.js", ProjectID: ""}
+
+	// Test without overwrite - should skip existing files
+	var output strings.Builder
+	err = tm.CopyTemplateFiles("conflict", args, false, &output)
+	require.NoError(t, err)
+
+	// Check that warning was printed
+	assert.Contains(t, output.String(), "Warning: File script.js already exists, skipping.")
+
+	// Check that existing file was not overwritten
+	content, err := fsext.ReadFile(fs, "script.js")
+	require.NoError(t, err)
+	assert.Equal(t, "existing content", string(content))
+
+	// Check that non-conflicting files were still copied
+	readmeContent, err := fsext.ReadFile(fs, "README.md")
+	require.NoError(t, err)
+	assert.Equal(t, "template readme", string(readmeContent))
+
+	// Test with overwrite - should overwrite existing files
+	output.Reset()
+	err = tm.CopyTemplateFiles("conflict", args, true, &output)
+	require.NoError(t, err)
+
+	// Check that no warning was printed
+	assert.NotContains(t, output.String(), "Warning:")
+
+	// Check that existing file was overwritten
+	content, err = fsext.ReadFile(fs, "script.js")
+	require.NoError(t, err)
+	assert.Equal(t, "template content", string(content))
+}
+
+func TestTemplateManager_CopyTemplateFiles_PreservePermissions(t *testing.T) {
+	t.Parallel()
+
+	fs := fsext.NewMemMapFs()
+	homeDir := "/test/home"
+	require.NoError(t, fs.MkdirAll(homeDir, 0o755))
+
+	// Create a template with specific permissions
+	templateDir := "templates/permissions"
+	require.NoError(t, fs.MkdirAll(templateDir, 0o755))
+	require.NoError(t, fsext.WriteFile(fs, filepath.Join(templateDir, "script.js"), []byte("#!/usr/bin/env k6"), 0o755))
+	require.NoError(t, fsext.WriteFile(fs, filepath.Join(templateDir, "config.json"), []byte("{}"), 0o644))
+
+	tm, err := NewTemplateManager(fs, homeDir)
+	require.NoError(t, err)
+
+	args := TemplateArgs{ScriptName: "test.js", ProjectID: ""}
+
+	var output strings.Builder
+	err = tm.CopyTemplateFiles("permissions", args, false, &output)
+	require.NoError(t, err)
+
+	// Check that permissions were preserved
+	scriptInfo, err := fs.Stat("script.js")
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o755), scriptInfo.Mode().Perm())
+
+	configInfo, err := fs.Stat("config.json")
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o644), configInfo.Mode().Perm())
+}
+
+func TestTemplateManager_CopyTemplateFiles_NonTemplateFiles(t *testing.T) {
+	t.Parallel()
+
+	fs := fsext.NewMemMapFs()
+	homeDir := "/test/home"
+	require.NoError(t, fs.MkdirAll(homeDir, 0o755))
+
+	// Create a template with files that don't contain template syntax
+	templateDir := "templates/notemplates"
+	require.NoError(t, fs.MkdirAll(templateDir, 0o755))
+	require.NoError(t, fsext.WriteFile(fs, filepath.Join(templateDir, "script.js"), []byte("plain javascript"), 0o644))
+	require.NoError(t, fsext.WriteFile(fs, filepath.Join(templateDir, "data.json"), []byte(`{"key": "value"}`), 0o644))
+
+	tm, err := NewTemplateManager(fs, homeDir)
+	require.NoError(t, err)
+
+	args := TemplateArgs{ScriptName: "test.js", ProjectID: "12345"}
+
+	var output strings.Builder
+	err = tm.CopyTemplateFiles("notemplates", args, false, &output)
+	require.NoError(t, err)
+
+	// Check that files were copied as-is without template processing
+	scriptContent, err := fsext.ReadFile(fs, "script.js")
+	require.NoError(t, err)
+	assert.Equal(t, "plain javascript", string(scriptContent))
+
+	dataContent, err := fsext.ReadFile(fs, "data.json")
+	require.NoError(t, err)
+	assert.Equal(t, `{"key": "value"}`, string(dataContent))
+}
+
+func TestTemplateManager_CopyTemplateFiles_NonDirectoryTemplate(t *testing.T) {
+	t.Parallel()
+
+	fs := fsext.NewMemMapFs()
+	homeDir := "/test/home"
+	require.NoError(t, fs.MkdirAll(homeDir, 0o755))
+
+	tm, err := NewTemplateManager(fs, homeDir)
+	require.NoError(t, err)
+
+	args := TemplateArgs{ScriptName: "test.js", ProjectID: ""}
+
+	var output strings.Builder
+
+	// Test with built-in template (should fail)
+	err = tm.CopyTemplateFiles("minimal", args, false, &output)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "is not a directory-based template")
+
+	// Test with non-existent template (should fail)
+	err = tm.CopyTemplateFiles("nonexistent", args, false, &output)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "is not a directory-based template")
 }

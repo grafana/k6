@@ -77,7 +77,11 @@ func (c *newScriptCmd) run(_ *cobra.Command, args []string) (err error) {
 			if tmpl.Metadata != nil && tmpl.Metadata.Description != "" {
 				fmt.Fprintf(c.gs.Stdout, "  %s - %s\n", tmpl.Name, tmpl.Metadata.Description)
 			} else {
-				fmt.Fprintf(c.gs.Stdout, "  %s (no metadata)\n", tmpl.Name)
+				warning := ""
+				if tmpl.Warning != "" {
+					warning = " ⚠️"
+				}
+				fmt.Fprintf(c.gs.Stdout, "  %s (no metadata)%s\n", tmpl.Name, warning)
 			}
 		}
 		return nil
@@ -88,6 +92,27 @@ func (c *newScriptCmd) run(_ *cobra.Command, args []string) (err error) {
 		target = args[0]
 	}
 
+	// Prepare template arguments
+	argsStruct := templates.TemplateArgs{
+		ScriptName: target,
+		ProjectID:  c.projectID,
+	}
+
+	// Check if this is a directory-based template
+	if tm.IsDirectoryBasedTemplate(c.templateType) {
+		// For directory-based templates, copy all files from the template directory
+		if err := tm.CopyTemplateFiles(c.templateType, argsStruct, c.overwriteFiles, c.gs.Stdout); err != nil {
+			return fmt.Errorf("error copying template files: %w", err)
+		}
+
+		if _, err := fmt.Fprintf(c.gs.Stdout, "New script created from template: %s\n", c.templateType); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	// For file-based templates and built-in templates, use the original single-file approach
 	fileExists, err := fsext.Exists(c.gs.FS, target)
 	if err != nil {
 		return err
@@ -99,12 +124,6 @@ func (c *newScriptCmd) run(_ *cobra.Command, args []string) (err error) {
 	tmpl, err := tm.GetTemplate(c.templateType)
 	if err != nil {
 		return fmt.Errorf("error retrieving template: %w", err)
-	}
-
-	// Prepare template arguments
-	argsStruct := templates.TemplateArgs{
-		ScriptName: target,
-		ProjectID:  c.projectID,
 	}
 
 	// First render the template to a buffer to validate it

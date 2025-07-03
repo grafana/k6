@@ -50,6 +50,7 @@ type TemplateInfo struct {
 	Path      string
 	Metadata  *TemplateMetadata
 	IsBuiltIn bool
+	Warning   string `json:"warning,omitempty"`
 }
 
 // TemplateArgs represents arguments passed to templates
@@ -179,10 +180,17 @@ func (tm *TemplateManager) loadTemplateFromPath(tplPath string) (*template.Templ
 	return tmpl, nil
 }
 
-// isFilePath checks if the given string looks like a file path by detecting path separators
-// We assume that built-in template names don't contain path separators
+// isFilePath checks if the given string looks like a file path by detecting path separators or file extensions
+// We assume that built-in template names don't contain path separators or file extensions
 func isFilePath(path string) bool {
-	return strings.ContainsRune(path, filepath.Separator) || strings.ContainsRune(path, '/')
+	// Check for path separators
+	if strings.ContainsRune(path, filepath.Separator) || strings.ContainsRune(path, '/') {
+		return true
+	}
+
+	// Check for file extensions (files typically have extensions like .js, .json, etc.)
+	// Built-in template names like "minimal", "protocol", "browser", "rest" don't have extensions
+	return strings.Contains(path, ".") && filepath.Ext(path) != ""
 }
 
 // parseTemplateMetadata attempts to parse a k6.template.json file from the given directory
@@ -218,6 +226,7 @@ func (tm *TemplateManager) ListTemplatesWithInfo() ([]TemplateInfo, error) {
 			Path:      "",
 			Metadata:  nil,
 			IsBuiltIn: true,
+			Warning:   "Missing k6.template.json",
 		}
 	}
 
@@ -275,9 +284,14 @@ func (tm *TemplateManager) scanTemplateDirectoryWithInfo(dir string) ([]Template
 			if exists, _ := fsext.Exists(tm.fs, scriptPath); exists {
 				// Try to parse metadata
 				metadata, err := tm.parseTemplateMetadata(templateDir)
+				warning := ""
+
 				if err != nil {
 					// Log warning but continue processing
 					fmt.Printf("Warning: failed to parse metadata for template %s: %v\n", entry.Name(), err)
+					warning = "Invalid k6.template.json"
+				} else if metadata == nil {
+					warning = "Missing k6.template.json"
 				}
 
 				templates = append(templates, TemplateInfo{
@@ -285,6 +299,7 @@ func (tm *TemplateManager) scanTemplateDirectoryWithInfo(dir string) ([]Template
 					Path:      templateDir,
 					Metadata:  metadata,
 					IsBuiltIn: false,
+					Warning:   warning,
 				})
 			}
 		}
@@ -340,6 +355,180 @@ func (tm *TemplateManager) CreateUserTemplate(name, scriptPath string) error {
 	templatePath := filepath.Join(templateDir, "script.js")
 	if err := fsext.WriteFile(tm.fs, templatePath, content, 0o644); err != nil {
 		return fmt.Errorf("failed to write template file %s: %w", templatePath, err)
+	}
+
+	// Create metadata file if it doesn't exist
+	metadataPath := filepath.Join(templateDir, "k6.template.json")
+	metadataExists, err := fsext.Exists(tm.fs, metadataPath)
+	if err != nil {
+		return fmt.Errorf("failed to check metadata file existence: %w", err)
+	}
+
+	if !metadataExists {
+		// Extract the original filename for defaultFilename
+		originalFilename := filepath.Base(scriptPath)
+
+		// Create default metadata
+		defaultMetadata := TemplateMetadata{
+			Name:            name,
+			Description:     "Describe your template here.",
+			Tags:            []string{},
+			Owner:           "",
+			DefaultFilename: originalFilename,
+		}
+
+		metadataJSON, err := json.MarshalIndent(defaultMetadata, "", "  ")
+		if err != nil {
+			return fmt.Errorf("failed to marshal default metadata: %w", err)
+		}
+
+		if err := fsext.WriteFile(tm.fs, metadataPath, metadataJSON, 0o644); err != nil {
+			return fmt.Errorf("failed to write metadata file %s: %w", metadataPath, err)
+		}
+	}
+
+	return nil
+}
+
+// IsDirectoryBasedTemplate checks if a template is directory-based (not built-in or file-based)
+func (tm *TemplateManager) IsDirectoryBasedTemplate(tpl string) bool {
+	// Built-in templates are not directory-based
+	switch tpl {
+	case MinimalTemplate, ProtocolTemplate, BrowserTemplate, RestTemplate:
+		return false
+	}
+
+	// File paths are not directory-based templates
+	if isFilePath(tpl) {
+		return false
+	}
+
+	// Check if this template exists as a directory
+	return tm.getTemplateDirectoryPath(tpl) != ""
+}
+
+// getTemplateDirectoryPath returns the directory path for a directory-based template, or empty string if not found
+func (tm *TemplateManager) getTemplateDirectoryPath(tpl string) string {
+	// Check local templates directory
+	localPath := filepath.Join("templates", tpl)
+	if exists, _ := fsext.Exists(tm.fs, filepath.Join(localPath, "script.js")); exists {
+		return localPath
+	}
+
+	// Check user-global templates directory
+	if tm.homeDir != "" {
+		globalPath := filepath.Join(tm.homeDir, ".k6", "templates", tpl)
+		if exists, _ := fsext.Exists(tm.fs, filepath.Join(globalPath, "script.js")); exists {
+			return globalPath
+		}
+	}
+
+	return ""
+}
+
+// CopyTemplateFiles copies all files from a directory-based template to the current directory
+// Excludes k6.template.json and hidden files, and handles file conflicts
+func (tm *TemplateManager) CopyTemplateFiles(templateName string, args TemplateArgs, overwrite bool, stdout io.Writer) error {
+	templateDir := tm.getTemplateDirectoryPath(templateName)
+	if templateDir == "" {
+		return fmt.Errorf("template %s is not a directory-based template", templateName)
+	}
+
+	return tm.copyDirectoryFiles(templateDir, ".", args, overwrite, stdout)
+}
+
+// copyDirectoryFiles recursively copies files from source to destination directory
+func (tm *TemplateManager) copyDirectoryFiles(srcDir, dstDir string, args TemplateArgs, overwrite bool, stdout io.Writer) error {
+	entries, err := fsext.ReadDir(tm.fs, srcDir)
+	if err != nil {
+		return fmt.Errorf("failed to read template directory %s: %w", srcDir, err)
+	}
+
+	for _, entry := range entries {
+		srcPath := filepath.Join(srcDir, entry.Name())
+		dstPath := filepath.Join(dstDir, entry.Name())
+
+		// Skip metadata file
+		if entry.Name() == "k6.template.json" {
+			continue
+		}
+
+		// Skip hidden files and directories (starting with .)
+		if strings.HasPrefix(entry.Name(), ".") {
+			continue
+		}
+
+		if entry.IsDir() {
+			// Create destination directory if it doesn't exist
+			if err := tm.fs.MkdirAll(dstPath, 0o755); err != nil {
+				return fmt.Errorf("failed to create directory %s: %w", dstPath, err)
+			}
+
+			// Recursively copy directory contents
+			if err := tm.copyDirectoryFiles(srcPath, dstPath, args, overwrite, stdout); err != nil {
+				return err
+			}
+		} else {
+			// Handle file copying
+			if err := tm.copyTemplateFile(srcPath, dstPath, args, overwrite, stdout); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// copyTemplateFile copies a single file from template, applying template processing and handling conflicts
+func (tm *TemplateManager) copyTemplateFile(srcPath, dstPath string, args TemplateArgs, overwrite bool, stdout io.Writer) error {
+	// Check if destination file already exists
+	exists, err := fsext.Exists(tm.fs, dstPath)
+	if err != nil {
+		return fmt.Errorf("failed to check if file exists %s: %w", dstPath, err)
+	}
+
+	if exists && !overwrite {
+		// Print warning and skip the file
+		fmt.Fprintf(stdout, "Warning: File %s already exists, skipping.\n", dstPath)
+		return nil
+	}
+
+	// Read the source file
+	content, err := fsext.ReadFile(tm.fs, srcPath)
+	if err != nil {
+		return fmt.Errorf("failed to read template file %s: %w", srcPath, err)
+	}
+
+	// Get file info to preserve permissions
+	fileInfo, err := tm.fs.Stat(srcPath)
+	if err != nil {
+		return fmt.Errorf("failed to get file info for %s: %w", srcPath, err)
+	}
+
+	// Check if the file is likely a template (contains template syntax)
+	contentStr := string(content)
+	if strings.Contains(contentStr, "{{") && strings.Contains(contentStr, "}}") {
+		// Process as template
+		tmpl, err := template.New(filepath.Base(srcPath)).Parse(contentStr)
+		if err != nil {
+			return fmt.Errorf("failed to parse template file %s: %w", srcPath, err)
+		}
+
+		// Execute template
+		var buf strings.Builder
+		if err := tmpl.Execute(&buf, args); err != nil {
+			return fmt.Errorf("failed to execute template %s: %w", srcPath, err)
+		}
+
+		// Write processed content
+		if err := fsext.WriteFile(tm.fs, dstPath, []byte(buf.String()), fileInfo.Mode()); err != nil {
+			return fmt.Errorf("failed to write file %s: %w", dstPath, err)
+		}
+	} else {
+		// Copy file as-is
+		if err := fsext.WriteFile(tm.fs, dstPath, content, fileInfo.Mode()); err != nil {
+			return fmt.Errorf("failed to write file %s: %w", dstPath, err)
+		}
 	}
 
 	return nil
