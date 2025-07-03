@@ -1114,11 +1114,11 @@ func TestTemplateManager_ScaffoldProject(t *testing.T) {
 
 	// Check success message
 	output := stdout.String()
-	assert.Contains(t, output, "✅ Project scaffolded to ./test-project")
+	assert.Contains(t, output, "✅ Directory scaffolded to ./test-project")
 	assert.Contains(t, output, "Run 'cd test-project && k6 run script.js' to get started")
 }
 
-func TestTemplateManager_ScaffoldProject_DefaultProjectName(t *testing.T) {
+func TestTemplateManager_ScaffoldProject_DefaultFolderName(t *testing.T) {
 	t.Parallel()
 
 	fs := fsext.NewMemMapFs()
@@ -1155,7 +1155,7 @@ func TestTemplateManager_ScaffoldProject_DefaultProjectName(t *testing.T) {
 	err = tm.ScaffoldProject("default-name-test", args, &stdout)
 	require.NoError(t, err)
 
-	// Verify project was created with default name
+	// Verify directory was created with default name
 	projectExists, err := fsext.Exists(fs, "awesome-project")
 	require.NoError(t, err)
 	assert.True(t, projectExists)
@@ -1195,7 +1195,7 @@ func TestTemplateManager_ScaffoldProject_FallbackToTemplateName(t *testing.T) {
 	err = tm.ScaffoldProject("fallback-name-test", args, &stdout)
 	require.NoError(t, err)
 
-	// Verify project was created with template name
+	// Verify directory was created with template name
 	projectExists, err := fsext.Exists(fs, "fallback-name-test")
 	require.NoError(t, err)
 	assert.True(t, projectExists)
@@ -1257,7 +1257,7 @@ func TestTemplateManager_ScaffoldProject_NonDirectoryBasedTemplate(t *testing.T)
 
 	err = tm.ScaffoldProject("minimal", args, &stdout)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), `template "minimal" is not a directory-based template suitable for project scaffolding`)
+	assert.Contains(t, err.Error(), `template "minimal" is not a directory-based template suitable for scaffolding`)
 }
 
 func TestTemplateManager_ListTemplatesWithInfo_IncludesType(t *testing.T) {

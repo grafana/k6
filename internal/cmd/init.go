@@ -22,7 +22,7 @@ func (c *initProjectCmd) flagSet() *pflag.FlagSet {
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
 	flags.SortFlags = false
 	flags.StringVar(&c.orgTemplate, "org-template", "", "name of the directory-based template to use (required)")
-	flags.StringVar(&c.name, "name", "", "name of the project folder to create")
+	flags.StringVar(&c.name, "name", "", "name of the folder to create")
 	flags.StringVar(&c.projectID, "project-id", "", "Grafana Cloud project ID for the test")
 	flags.StringVar(&c.team, "team", "", "specify the team name for template rendering")
 	flags.StringVar(&c.env, "env", "", "specify the environment name for template rendering")
@@ -57,7 +57,7 @@ func (c *initProjectCmd) run(_ *cobra.Command, _ []string) error {
 	// For now, template authors may include these values manually if desired.
 	// This supports future GCk6 use cases like team-level or environment-aware tagging.
 	args := templates.TemplateArgs{
-		ScriptName: "script.js", // Default script name for projects
+		ScriptName: "script.js", // Default script name for scaffolded directories
 		ProjectID:  c.projectID,
 		Project:    c.projectID, // Alias for ProjectID for template compatibility
 		Team:       c.team,
@@ -86,15 +86,15 @@ func getCmdInit(gs *state.GlobalState) *cobra.Command {
     # Scaffold with GCk6 project ID for cloud integration
     $ {{.}} init --org-template full-stack --name e2e-tests --project-id 12345 --team qa --env prod
 
-    # Use template's default project name
+    # Use template's default folder name
     $ {{.}} init --org-template api-template --team backend`[1:])
 
 	initCmd := &cobra.Command{
 		Use:   "init",
-		Short: "Scaffold a full k6 test project from an organizational template",
-		Long: `Scaffold a full k6 test project from an organizational template.
+		Short: "Scaffold a k6 test directory from an organizational template",
+		Long: `Scaffold a k6 test directory from an organizational template.
 
-This command creates a complete project directory structure from a directory-based template,
+This command creates a complete directory structure from a directory-based template,
 including multiple files such as test scripts, configuration files, documentation, and CI setup.
 It's designed for platform teams to provide standardized onboarding experiences.
 
@@ -105,7 +105,7 @@ Templates are searched in the following order:
 
 The --project-id, --team, and --env flags are used only for template rendering
 and are available as template variables ({{ .ProjectID }}, {{ .Team }}, {{ .Env }}, {{ .Name }}).
-These flags do not affect test execution - they only influence the generated project content.
+These flags do not affect test execution - they only influence the generated directory content.
 
 This is the recommended onboarding path for teams adopting GCk6.`,
 		Example: exampleText,

@@ -62,7 +62,7 @@ type TemplateArgs struct {
 	Project    string // Alias for ProjectID for template compatibility
 	Team       string
 	Env        string
-	Name       string // Project name for k6 init command
+	Name       string // Folder name for k6 init command
 }
 
 // TemplateManager manages the pre-parsed templates and template search paths
@@ -610,11 +610,11 @@ func (tm *TemplateManager) ValidateTemplateUsage(templateName, command string) (
 	return "", nil
 }
 
-// ScaffoldProject creates a new project directory from a template
+// ScaffoldProject creates a new directory from a template
 func (tm *TemplateManager) ScaffoldProject(templateName string, args TemplateArgs, stdout io.Writer) error {
 	// Validate that this is a directory-based template
 	if !tm.IsDirectoryBasedTemplate(templateName) {
-		return fmt.Errorf("template %q is not a directory-based template suitable for project scaffolding", templateName)
+		return fmt.Errorf("template %q is not a directory-based template suitable for scaffolding", templateName)
 	}
 
 	templateDir := tm.getTemplateDirectoryPath(templateName)
@@ -622,42 +622,42 @@ func (tm *TemplateManager) ScaffoldProject(templateName string, args TemplateArg
 		return fmt.Errorf("template %q not found", templateName)
 	}
 
-	// Determine project directory name
-	projectName := args.Name
-	if projectName == "" {
+	// Determine directory name
+	folderName := args.Name
+	if folderName == "" {
 		// Try to get default from metadata
 		metadata, err := tm.parseTemplateMetadata(templateDir)
 		if err == nil && metadata != nil && metadata.DefaultFilename != "" {
-			projectName = metadata.DefaultFilename
+			folderName = metadata.DefaultFilename
 		} else {
 			// Fallback to template name
-			projectName = templateName
+			folderName = templateName
 		}
 	}
 
-	// Update args with the determined project name for template processing
-	args.Name = projectName
+	// Update args with the determined folder name for template processing
+	args.Name = folderName
 
-	// Check if project directory already exists
-	if exists, _ := fsext.Exists(tm.fs, projectName); exists {
-		return fmt.Errorf("directory %q already exists", projectName)
+	// Check if directory already exists
+	if exists, _ := fsext.Exists(tm.fs, folderName); exists {
+		return fmt.Errorf("directory %q already exists", folderName)
 	}
 
-	// Create project directory
-	if err := tm.fs.MkdirAll(projectName, 0o755); err != nil {
-		return fmt.Errorf("failed to create project directory %q: %w", projectName, err)
+	// Create directory
+	if err := tm.fs.MkdirAll(folderName, 0o755); err != nil {
+		return fmt.Errorf("failed to create directory %q: %w", folderName, err)
 	}
 
-	// Copy template files to project directory
-	if err := tm.copyDirectoryFiles(templateDir, projectName, args, false, stdout); err != nil {
+	// Copy template files to directory
+	if err := tm.copyDirectoryFiles(templateDir, folderName, args, false, stdout); err != nil {
 		return fmt.Errorf("failed to copy template files: %w", err)
 	}
 
-	if _, err := fmt.Fprintf(stdout, "✅ Project scaffolded to ./%s\n", projectName); err != nil {
+	if _, err := fmt.Fprintf(stdout, "✅ Directory scaffolded to ./%s\n", folderName); err != nil {
 		return err
 	}
 
-	if _, err := fmt.Fprintf(stdout, "Run 'cd %s && k6 run script.js' to get started\n", projectName); err != nil {
+	if _, err := fmt.Fprintf(stdout, "Run 'cd %s && k6 run script.js' to get started\n", folderName); err != nil {
 		return err
 	}
 

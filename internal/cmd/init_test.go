@@ -129,7 +129,7 @@ k6 run script.js
 	assert.Contains(t, output, "Run 'cd my-api-test && k6 run script.js' to get started")
 }
 
-func TestInitProjectCmd_DefaultProjectName(t *testing.T) {
+func TestInitProjectCmd_DefaultFolderName(t *testing.T) {
 	t.Parallel()
 
 	ts := tests.NewGlobalTestState(t)
@@ -154,7 +154,7 @@ func TestInitProjectCmd_DefaultProjectName(t *testing.T) {
 	ts.CmdArgs = []string{"k6", "init", "--org-template", "default-name"}
 	newRootCommand(ts.GlobalState).execute()
 
-	// Verify project was created with default name
+	// Verify directory was created with default name
 	projectExists, err := fsext.Exists(ts.FS, "awesome-project")
 	require.NoError(t, err)
 	assert.True(t, projectExists)
@@ -182,7 +182,7 @@ func TestInitProjectCmd_FallbackToTemplateName(t *testing.T) {
 	ts.CmdArgs = []string{"k6", "init", "--org-template", "fallback-name"}
 	newRootCommand(ts.GlobalState).execute()
 
-	// Verify project was created with template name
+	// Verify directory was created with template name
 	projectExists, err := fsext.Exists(ts.FS, "fallback-name")
 	require.NoError(t, err)
 	assert.True(t, projectExists)
