@@ -345,7 +345,16 @@ func (ds *debugSession) onContinueRequest(request *dap.ContinueRequest) {
 }
 
 func (ds *debugSession) onNextRequest(request *dap.NextRequest) {
-	ds.send(newErrorResponse(request.Seq, request.Command, "NextRequest is not yet supported"))
+	err := ds.dbg.Next()
+	if err != nil {
+		ds.send(newErrorResponse(request.Seq, request.Command, err.Error()))
+	}
+
+	response := &dap.NextResponse{}
+	response.Response = newResponse(request.Seq, request.Command)
+	ds.send(response)
+
+	ds.doContinue()
 }
 
 func (ds *debugSession) onStepInRequest(request *dap.StepInRequest) {

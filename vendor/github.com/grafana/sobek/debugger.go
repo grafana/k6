@@ -30,6 +30,7 @@ type Debugger struct {
 		line       int
 		stackDepth int
 	}
+	next bool
 }
 
 func newDebugger(vm *vm) *Debugger {
@@ -166,20 +167,7 @@ func (dbg *Debugger) StepIn() error {
 }
 
 func (dbg *Debugger) Next() error {
-	// TODO: implement proper error propagation
-	lastLine := dbg.Line()
-	dbg.updateCurrentLine()
-	if dbg.getLastLine() != dbg.Line() {
-		nextLine := dbg.getNextLine()
-		for dbg.safeToRun() && nextLine > 0 && dbg.Line() != nextLine {
-			dbg.updateCurrentLine()
-			dbg.vm.prg.code[dbg.vm.pc].exec(dbg.vm)
-		}
-		dbg.updateLastLine(lastLine)
-	} else if dbg.getNextLine() == 0 {
-		// Step out of functions
-		return errors.New("exhausted")
-	}
+	dbg.next = true
 	return nil
 }
 
