@@ -2,6 +2,7 @@ package modules
 
 import (
 	"fmt"
+	"maps"
 	"net/url"
 	"strings"
 
@@ -37,6 +38,7 @@ type ModuleResolver struct {
 	base      *url.URL
 	usage     *usage.Usage
 	logger    logrus.FieldLogger
+	debug     bool
 }
 
 // NewModuleResolver returns a new module resolution instance that will resolve.
@@ -55,6 +57,32 @@ func NewModuleResolver(
 		base:      base,
 		usage:     u,
 		logger:    logger,
+	}
+}
+
+func (mr *ModuleResolver) DebugCopy() *ModuleResolver {
+	reverse := maps.Clone(mr.reverse)
+	cache := make(map[string]moduleCacheElement, len(mr.cache))
+	for k, v := range mr.cache {
+		switch v.mod.(type) {
+		case *goModule, *basicGoModule:
+			cache[k] = v
+		default:
+			delete(reverse, v.mod)
+		}
+	}
+
+	return &ModuleResolver{
+		goModules: mr.goModules,
+		loadCJS:   mr.loadCJS,
+		compiler:  mr.compiler,
+		locked:    false,
+		base:      mr.base,
+		usage:     mr.usage,
+		logger:    mr.logger,
+		reverse:   reverse,
+		cache:     cache,
+		debug:     true,
 	}
 }
 

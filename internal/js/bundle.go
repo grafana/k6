@@ -328,7 +328,15 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*BundleInstance
 		CWD:              b.pwd,
 	}
 
-	modSys := modules.NewModuleSystem(b.ModuleResolver, vuImpl)
+	moduleResolver := b.ModuleResolver
+	if vuID == 1 {
+		dbg := vuImpl.runtime.AttachDebugger()
+		moduleResolver = moduleResolver.DebugCopy()
+		go func() {
+			server(dbg, "127.0.0.1", "4711")
+		}()
+	}
+	modSys := modules.NewModuleSystem(moduleResolver, vuImpl)
 	b.setInitGlobals(rt, vuImpl, modSys)
 
 	err = registerGlobals(vuImpl)
