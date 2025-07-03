@@ -27,15 +27,15 @@ func server(dbg *sobek.Debugger, rt *sobek.Runtime, host, port string) error {
 		return err
 	}
 	defer listener.Close()
-	log.Println("Started server at", listener.Addr())
+	// log.Println("Started server at", listener.Addr())
 
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			log.Println("Connection failed:", err)
+			// log.Println("Connection failed:", err)
 			continue
 		}
-		log.Println("Accepted connection from", conn.RemoteAddr())
+		// log.Println("Accepted connection from", conn.RemoteAddr())
 		// Handle multiple client connections concurrently
 		go handleConnection(conn, dbg, rt)
 	}
@@ -56,17 +56,17 @@ func handleConnection(conn net.Conn, dbg *sobek.Debugger, rt *sobek.Runtime) {
 		// TODO(polina): check for connection vs decoding error?
 		if err != nil {
 			if err == io.EOF {
-				log.Println("No more data to read:", err)
+				// log.Println("No more data to read:", err)
 				break
 			}
 			// There maybe more messages to process, but
 			// we will start with the strict behavior of only accepting
 			// expected inputs.
-			log.Println("Server error: ", err)
+			// log.Println("Server error: ", err)
 		}
 	}
 
-	log.Println("Closing connection from", conn.RemoteAddr())
+	// log.Println("Closing connection from", conn.RemoteAddr())
 	close(debugSession.stopDebug)
 	debugSession.sendWg.Wait()
 	close(debugSession.sendQueue)
@@ -80,18 +80,18 @@ func (ds *debugSession) send(message dap.Message) {
 func (ds *debugSession) sendFromQueue() {
 	for message := range ds.sendQueue {
 		dap.WriteProtocolMessage(ds.rw.Writer, message)
-		log.Printf("Message sent\n\t%#v\n", message)
+		// log.Printf("Message sent\n\t%#v\n", message)
 		ds.rw.Flush()
 	}
 }
 
 func (ds *debugSession) handleRequest() error {
-	log.Println("Reading request...")
+	// log.Println("Reading request...")
 	request, err := dap.ReadProtocolMessage(ds.rw.Reader)
 	if err != nil {
 		return err
 	}
-	log.Printf("Received request\n\t%#v\n", request)
+	// log.Printf("Received request\n\t%#v\n", request)
 	ds.sendWg.Add(1)
 	go func() {
 		ds.dispatchRequest(request)
@@ -400,8 +400,7 @@ func (ds *debugSession) onVariablesRequest(request *dap.VariablesRequest) {
 	response.Body = dap.VariablesResponseBody{
 		Variables: []dap.Variable{},
 	}
-	variables, err := ds.dbg.GetLocalVariables()
-	fmt.Println(variables, err)
+	variables, _ := ds.dbg.GetLocalVariables()
 	for n, v := range variables {
 		response.Body.Variables = append(response.Body.Variables, dap.Variable{
 			Name:  n,
