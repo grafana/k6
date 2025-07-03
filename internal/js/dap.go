@@ -2,7 +2,6 @@ package js
 
 import (
 	"bufio"
-	"fmt"
 	"io"
 	"log"
 	"net"
