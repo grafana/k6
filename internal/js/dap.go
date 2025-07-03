@@ -342,14 +342,16 @@ func (ds *debugSession) onPauseRequest(request *dap.PauseRequest) {
 }
 
 func (ds *debugSession) onStackTraceRequest(request *dap.StackTraceRequest) {
+	line := ds.dbg.Line()
+	filename := ds.dbg.Filename()
 	response := &dap.StackTraceResponse{}
 	response.Response = newResponse(request.Seq, request.Command)
 	response.Body = dap.StackTraceResponseBody{
 		StackFrames: []dap.StackFrame{
 			{
 				Id:     1000,
-				Source: &dap.Source{Name: "hello.go", Path: "/Users/foo/go/src/hello/hello.go", SourceReference: 0},
-				Line:   5,
+				Source: &dap.Source{Name: filename, Path: filename, SourceReference: 0},
+				Line:   line,
 				Column: 0,
 				Name:   "main.main",
 			},
