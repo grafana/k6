@@ -550,9 +550,12 @@ func ConvertSelectOptionValues(rt *sobek.Runtime, values sobek.Value) ([]any, er
 		for _, item := range sl {
 			switch item := item.(type) {
 			case string:
-				opt := SelectOption{Value: new(string)}
-				*opt.Value = item
-				opts = append(opts, &opt)
+				// Strings will match values or labels
+				valOpt := SelectOption{Value: new(string)}
+				*valOpt.Value = item
+				labelOpt := SelectOption{Label: new(string)}
+				*labelOpt.Label = item
+				opts = append(opts, &valOpt, &labelOpt)
 			case map[string]interface{}:
 				opt, err := extractSelectOptionFromMap(item)
 				if err != nil {
@@ -596,9 +599,12 @@ func ConvertSelectOptionValues(rt *sobek.Runtime, values sobek.Value) ([]any, er
 		}
 		opts = append(opts, &opt)
 	case reflect.String:
-		opt := SelectOption{Value: new(string)}
-		*opt.Value = t.(string) //nolint:forcetypeassert
-		opts = append(opts, &opt)
+		// Strings will match values or labels
+		valOpt := SelectOption{Value: new(string)}
+		*valOpt.Value = t.(string) //nolint:forcetypeassert
+		labelOpt := SelectOption{Label: new(string)}
+		*labelOpt.Label = t.(string) //nolint:forcetypeassert
+		opts = append(opts, &valOpt, &labelOpt)
 	default:
 		return nil, fmt.Errorf("options: unsupported type %T", values)
 	}
