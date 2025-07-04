@@ -187,8 +187,6 @@ func (dbg *Debugger) Exec(expr string) (Value, error) {
 	}
 	val, err := dbg.eval(expr)
 
-	lastLine := dbg.Line()
-	dbg.updateLastLine(lastLine)
 	return val, err
 }
 
