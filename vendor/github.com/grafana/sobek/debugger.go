@@ -30,7 +30,8 @@ type Debugger struct {
 		line       int
 		stackDepth int
 	}
-	next bool
+	next         bool
+	onactivation func(DebuggerActivation)
 }
 
 func newDebugger(vm *vm) *Debugger {
@@ -62,6 +63,11 @@ type DebuggerActivation struct {
 
 var globalBuiltinKeys = map[string]bool{"Object": true, "Function": true, "Array": true, "String": true, "globalThis": true, "NaN": true, "undefined": true, "Infinity": true, "isNaN": true, "parseInt": true, "parseFloat": true, "isFinite": true, "decodeURI": true, "decodeURIComponent": true, "encodeURI": true, "encodeURIComponent": true, "escape": true, "unescape": true, "Number": true, "RegExp": true, "Date": true, "Boolean": true, "Proxy": true, "Reflect": true, "Error": true, "AggregateError": true, "TypeError": true, "ReferenceError": true, "SyntaxError": true, "RangeError": true, "EvalError": true, "URIError": true, "GoError": true, "eval": true, "Math": true, "JSON": true, "ArrayBuffer": true, "DataView": true, "Uint8Array": true, "Uint8ClampedArray": true, "Int8Array": true, "Uint16Array": true, "Int16Array": true, "Uint32Array": true, "Int32Array": true, "Float32Array": true, "Float64Array": true, "Symbol": true, "WeakSet": true, "WeakMap": true, "Map": true, "Set": true, "Promise": true}
 
+func (dbg *Debugger) OnActivation(f func(DebuggerActivation)) {
+	// TODO mutexes
+	dbg.onactivation = f
+}
+
 func (dbg *Debugger) activate(reason ActivationReason, filename string, line int) {
 	dbg.active = true
 	ch := <-dbg.activationCh // get channel from waiter
@@ -73,13 +79,17 @@ func (dbg *Debugger) activate(reason ActivationReason, filename string, line int
 		dbg.breakpointMutex.RUnlock()
 	}
 
-	ch <- DebuggerActivation{
+	activation := DebuggerActivation{
 		Reason:   reason,
 		Filename: filename,
 		Line:     line,
 		ID:       id,
-	} // send what activated it
-	<-ch // wait for deactivation
+	}
+	if dbg.onactivation != nil {
+		dbg.onactivation(activation)
+	}
+	ch <- activation // send what activated it
+	<-ch             // wait for deactivation
 	dbg.active = false
 }
 

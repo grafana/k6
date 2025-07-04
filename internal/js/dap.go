@@ -52,6 +52,18 @@ func handleConnection(conn net.Conn, dbg *sobek.Debugger, rt *sobek.Runtime, can
 		cancel:    cancel,
 	}
 	go debugSession.sendFromQueue()
+	dbg.OnActivation(func(activation sobek.DebuggerActivation) {
+		e := &dap.StoppedEvent{
+			Event: *newEvent("stopped"),
+			Body: dap.StoppedEventBody{
+				Reason:            string(activation.Reason),
+				ThreadId:          1,
+				AllThreadsStopped: true,
+				HitBreakpointIds:  []int{activation.ID},
+			},
+		}
+		debugSession.send(e)
+	})
 
 	for {
 		err := debugSession.handleRequest()
@@ -103,18 +115,7 @@ func (ds *debugSession) handleRequest() error {
 }
 
 func (ds *debugSession) doContinue() {
-	var e dap.Message
-	activation := ds.dbg.Continue()
-	e = &dap.StoppedEvent{
-		Event: *newEvent("stopped"),
-		Body: dap.StoppedEventBody{
-			Reason:            string(activation.Reason),
-			ThreadId:          1,
-			AllThreadsStopped: true,
-			HitBreakpointIds:  []int{activation.ID},
-		},
-	}
-	ds.send(e)
+	ds.dbg.Continue()
 }
 
 func (ds *debugSession) dispatchRequest(request dap.Message) {
@@ -333,14 +334,14 @@ func (ds *debugSession) onConfigurationDoneRequest(request *dap.ConfigurationDon
 	response := &dap.ConfigurationDoneResponse{}
 	response.Response = newResponse(request.Seq, request.Command)
 	ds.send(response)
-	ds.doContinue()
+	ds.dbg.Continue()
 }
 
 func (ds *debugSession) onContinueRequest(request *dap.ContinueRequest) {
 	response := &dap.ContinueResponse{}
 	response.Response = newResponse(request.Seq, request.Command)
 	ds.send(response)
-	ds.doContinue()
+	ds.dbg.Continue()
 }
 
 func (ds *debugSession) onNextRequest(request *dap.NextRequest) {
@@ -353,7 +354,7 @@ func (ds *debugSession) onNextRequest(request *dap.NextRequest) {
 	response.Response = newResponse(request.Seq, request.Command)
 	ds.send(response)
 
-	ds.doContinue()
+	ds.dbg.Continue()
 }
 
 func (ds *debugSession) onStepInRequest(request *dap.StepInRequest) {
@@ -381,7 +382,16 @@ func (ds *debugSession) onGotoRequest(request *dap.GotoRequest) {
 }
 
 func (ds *debugSession) onPauseRequest(request *dap.PauseRequest) {
-	ds.send(newErrorResponse(request.Seq, request.Command, "PauseRequest is not yet supported"))
+	err := ds.dbg.Next()
+	if err != nil {
+		ds.send(newErrorResponse(request.Seq, request.Command, err.Error()))
+	}
+
+	response := &dap.PauseResponse{}
+	response.Response = newResponse(request.Seq, request.Command)
+	ds.send(response)
+
+	ds.dbg.Continue()
 }
 
 func (ds *debugSession) onStackTraceRequest(request *dap.StackTraceRequest) {

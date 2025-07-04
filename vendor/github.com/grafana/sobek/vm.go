@@ -726,7 +726,6 @@ func (vm *vm) debug() {
 						vm.debugger.updateCurrentLine()
 						vm.debugger.activate(BreakpointActivation, vm.debugger.Filename(), vm.debugger.currentLine)
 					}
-
 				}
 			} else {
 				vm.debugger.lastBreakpoint.filename = ""
