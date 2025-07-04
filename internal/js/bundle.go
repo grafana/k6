@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -329,12 +330,13 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*BundleInstance
 	}
 
 	moduleResolver := b.ModuleResolver
-	if vuID == 1 {
+	debuggerHost, ok := os.LookupEnv("K6_DEBUGGER_HOST")
+	if vuID == 1 && ok {
 		dbg := vuImpl.runtime.AttachDebugger()
 		rt := vuImpl.runtime
 		moduleResolver = moduleResolver.DebugCopy()
 		go func() {
-			server(dbg, rt, "127.0.0.1", "4711")
+			server(dbg, rt, debuggerHost, "4722")
 		}()
 	}
 	modSys := modules.NewModuleSystem(moduleResolver, vuImpl)

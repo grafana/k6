@@ -3,6 +3,7 @@ package js
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/google/go-dap"
 	"github.com/grafana/sobek"
+
 	"go.k6.io/k6/errext"
 )
 
@@ -25,26 +27,19 @@ type debugSession struct {
 }
 
 func server(dbg *sobek.Debugger, rt *sobek.Runtime, host, port string) error {
-	var lc net.ListenConfig
+	var d net.Dialer
 	ctx, cancel := context.WithCancel(context.Background())
-	listener, err := lc.Listen(ctx, "tcp", host+":"+port)
+	listener, err := d.DialContext(ctx, "tcp", host+":"+port)
 	if err != nil {
 		cancel()
+		fmt.Println(err)
 		return err
 	}
-	defer listener.Close()
-	// log.Println("Started server at", listener.Addr())
 
-	for {
-		conn, err := listener.Accept()
-		if err != nil {
-			// log.Println("Connection failed:", err)
-			continue
-		}
-		// log.Println("Accepted connection from", conn.RemoteAddr())
-		// Handle multiple client connections concurrently
-		go handleConnection(conn, dbg, rt, cancel)
-	}
+	// log.Println("Accepted connection from", conn.RemoteAddr())
+	// Handle multiple client connections concurrently
+	go handleConnection(listener, dbg, rt, cancel)
+	return nil
 }
 
 func handleConnection(conn net.Conn, dbg *sobek.Debugger, rt *sobek.Runtime, cancel context.CancelFunc) {
