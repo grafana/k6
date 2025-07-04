@@ -466,7 +466,38 @@ func (ds *debugSession) onTerminateThreadsRequest(request *dap.TerminateThreadsR
 }
 
 func (ds *debugSession) onEvaluateRequest(request *dap.EvaluateRequest) {
-	ds.send(newErrorResponse(request.Seq, request.Command, "EvaluateRequest is not yet supported"))
+	v, err := ds.dbg.Exec(request.Arguments.Expression)
+	if err != nil {
+		ds.send(newErrorResponse(request.Seq, request.Command, err.Error()))
+		return
+	}
+
+	response := &dap.EvaluateResponse{}
+
+	switch {
+	case sobek.IsNumber(v):
+		response.Body.Result = v.String()
+		response.Body.Type = "number"
+	case sobek.IsString(v):
+		response.Body.Result = v.String()
+		response.Body.Type = "string"
+	case sobek.IsUndefined(v):
+		response.Body.Result = "undefined"
+	case sobek.IsNull(v):
+		response.Body.Result = "null"
+	case sobek.IsNaN(v):
+		response.Body.Result = "NaN"
+		response.Body.Type = "number"
+	case sobek.IsInfinity(v):
+		response.Body.Result = "Infinity"
+		response.Body.Type = "number"
+	default:
+		response.Body.Result = v.String()
+		response.Body.Type = "object"
+	}
+
+	response.Response = newResponse(request.Seq, request.Command)
+	ds.send(response)
 }
 
 func (ds *debugSession) onStepInTargetsRequest(request *dap.StepInTargetsRequest) {
