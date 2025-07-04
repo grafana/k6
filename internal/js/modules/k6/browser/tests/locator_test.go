@@ -734,6 +734,23 @@ func TestSelectOption(t *testing.T) {
 		if (selectedValue !== 'five') {
 			throw new Error('Expected "five" but got ' + selectedValue);
 		}
+
+		await options.selectOption(['Three']); // Label
+		selectedValue = await options.inputValue();
+		if (selectedValue !== 'three') {
+			throw new Error('Expected "three" but got ' + selectedValue);
+		}
+
+		await options.selectOption('Five'); // Label
+		selectedValue = await options.inputValue();
+		if (selectedValue !== 'five') {
+			throw new Error('Expected "five" but got ' + selectedValue);
+		}
+
+		const results = await options.selectOption(['One', 'two']); // Both label and value
+		if (results.length !== 2 || results[0] !== 'one' || results[1] !== 'two') {
+			throw new Error('Expected "one,two" but got ' + results);
+		}
 	`, tb.staticURL("select_options.html"))
 	assert.Equal(t, sobek.Undefined(), got.Result())
 }
