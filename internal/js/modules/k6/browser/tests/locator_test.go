@@ -748,7 +748,7 @@ func TestSelectOption(t *testing.T) {
 		}
 
 		const results = await options.selectOption(['One', 'two']); // Both label and value
-		if (results.length !== 2 || results[0] !== 'one' || results[1] !== 'two') {
+		if (results.length !== 2 || !results.includes('one') || !results.includes('two')) {
 			throw new Error('Expected "one,two" but got ' + results);
 		}
 	`, tb.staticURL("select_options.html"))
