@@ -1019,7 +1019,8 @@ class InjectedScript {
       if (lastElement !== element) {
         lastElement = element;
         if (!element) {
-          console.log(`  ${selector} did not match any elements`);
+          // assume that the element is not attached.
+          console.debug(`'${selector.selector}' did not match any elements with state '${state}'`);
         } else {
           if (elements.length > 1) {
             if (strict) {

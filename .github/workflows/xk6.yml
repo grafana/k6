@@ -79,6 +79,7 @@ jobs:
             --output ./k6ext \
             --with github.com/grafana/xk6-js-test="$(pwd)/xk6-js-test" \
             --with github.com/grafana/xk6-output-test="$(pwd)/xk6-output-test"
+          export K6_NO_USAGE_REPORT=true
           ./k6ext version
           ./k6ext run --out outputtest=output-results.txt xk6-test.js
 

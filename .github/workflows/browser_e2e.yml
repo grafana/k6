@@ -65,6 +65,7 @@ jobs:
             export K6_BROWSER_EXECUTABLE_PATH=/usr/bin/google-chrome
           fi
           export K6_BROWSER_HEADLESS=true
+          export K6_NO_USAGE_REPORT=true
           for f in examples/browser/*.js; do
             if [ "$f" == "examples/browser/hosts.js" ] && [ "$RUNNER_OS" == "Windows" ]; then
               echo "skipping $f on Windows"
