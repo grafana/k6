@@ -612,6 +612,24 @@ func TestGetByRoleSuccess(t *testing.T) {
 				expected: 1, expectedText: "",
 			},
 			{
+				name:     "not_exact",
+				role:     "button",
+				opts:     &common.GetByRoleOptions{Name: toPtr(`'submit form'`), Exact: toPtr(false)},
+				expected: 1, expectedText: "",
+			},
+			{
+				name:     "exact_no_match",
+				role:     "button",
+				opts:     &common.GetByRoleOptions{Name: toPtr(`'submit form'`), Exact: toPtr(true)},
+				expected: 0, expectedText: "",
+			},
+			{
+				name:     "exact_match",
+				role:     "button",
+				opts:     &common.GetByRoleOptions{Name: toPtr(`'Submit Form'`), Exact: toPtr(true)},
+				expected: 1, expectedText: "",
+			},
+			{
 				name:     "aria_label_as_name",
 				role:     "button",
 				opts:     &common.GetByRoleOptions{Name: toPtr(`'Save Draft'`)},
