@@ -13,6 +13,11 @@ import (
 func mapLocator(vu moduleVU, lo *common.Locator) mapping { //nolint:funlen
 	rt := vu.Runtime()
 	return mapping{
+		"all": func() *sobek.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return lo.All() //nolint:wrapcheck
+			})
+		},
 		"clear": func(opts sobek.Value) (*sobek.Promise, error) {
 			copts := common.NewFrameFillOptions(lo.Timeout())
 			if err := copts.Parse(vu.Context(), opts); err != nil {
