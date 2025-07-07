@@ -161,13 +161,13 @@ func NewRequest(ctx context.Context, logger *log.Logger, rp NewRequestParams) (*
 		wallTime:            ev.WallTime.Time(),
 		offset:              ev.WallTime.Time().Sub(ev.Timestamp.Time()),
 		documentID:          documentID.String(),
-		headers:             make(map[string][]string),
+		headers:             make(map[string][]string, len(ev.Request.Headers)),
 		ctx:                 ctx,
 		vu:                  k6ext.GetVU(ctx),
 	}
 	for n, v := range ev.Request.Headers {
 		if s, ok := v.(string); ok {
-			r.headers[n] = append(r.headers[n], s)
+			r.headers[n] = []string{s}
 		}
 	}
 
@@ -449,7 +449,7 @@ func NewHTTPResponse(
 		status:            resp.Status,
 		statusText:        resp.StatusText,
 		body:              nil,
-		headers:           make(map[string][]string),
+		headers:           make(map[string][]string, len(resp.Headers)),
 		fromDiskCache:     resp.FromDiskCache,
 		fromServiceWorker: resp.FromServiceWorker,
 		fromPrefetchCache: resp.FromPrefetchCache,
@@ -464,7 +464,7 @@ func NewHTTPResponse(
 		if !ok {
 			continue
 		}
-		r.headers[n] = append(r.headers[n], s)
+		r.headers[n] = []string{s}
 	}
 
 	if resp.SecurityDetails != nil {

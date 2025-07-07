@@ -1,20 +1,19 @@
-version: '3.4'
-
 services:
   packager:
     build:
       context: .
       args:
-        - AWSCLI_VERSION=${AWSCLI_VERSION:-2.1.36}
-        - S3CMD_VERSION=${S3CMD_VERSION:-2.1.0}
+        - AWSCLI_VERSION=${AWSCLI_VERSION:-2.26.5}
+        - S3CMD_VERSION=${S3CMD_VERSION:-2.4.0}
     image: ghcr.io/grafana/k6packager:latest
     environment:
       - AWS_ACCESS_KEY_ID
-      - AWS_SECRET_ACCESS_KEY
-      - AWS_DEFAULT_REGION
       - AWS_CF_DISTRIBUTION
+      - AWS_DEFAULT_REGION
+      - AWS_SECRET_ACCESS_KEY
+      - AWS_SESSION_TOKEN
       - PGP_SIGN_KEY_PASSPHRASE
-      - S3_BUCKET=dl.k6.io
+      - S3_BUCKET
     volumes:
       - ../dist:/home/k6/dist
       - ./sign-key.gpg:/home/k6/sign-key.gpg
