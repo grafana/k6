@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/chromedp/cdproto/fetch"
 	"net/url"
 	"strings"
 	"sync"
@@ -81,7 +82,7 @@ type Request struct {
 	resourceType        string
 	isNavigationRequest bool
 	allowInterception   bool
-	interceptionID      string
+	interceptionID      fetch.RequestID
 	fromMemoryCache     bool
 	errorText           string
 	// offset is the difference between the timestamp and wallTime fields.
@@ -107,7 +108,7 @@ type NewRequestParams struct {
 	event             *network.EventRequestWillBeSent
 	frame             *Frame
 	redirectChain     []*Request
-	interceptionID    string
+	interceptionID    fetch.RequestID
 	allowInterception bool
 }
 
@@ -344,10 +345,6 @@ func (r *Request) Size() HTTPMessageSize {
 		Body:    b,
 		Headers: r.headersSize(),
 	}
-}
-
-func (r *Request) SetInterceptionID(interceptionID string) {
-	r.interceptionID = interceptionID
 }
 
 // resourceTiming is the type returned from request.timing.
