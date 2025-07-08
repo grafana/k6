@@ -15,7 +15,16 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping { //nolint:funlen
 	return mapping{
 		"all": func() *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return lo.All() //nolint:wrapcheck
+				all, err := lo.All()
+				if err != nil {
+					return nil, err
+				}
+
+				res := make([]mapping, len(all))
+				for i, el := range all {
+					res[i] = mapLocator(vu, el)
+				}
+				return res, nil
 			})
 		},
 		"clear": func(opts sobek.Value) (*sobek.Promise, error) {
