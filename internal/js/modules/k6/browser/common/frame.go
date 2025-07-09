@@ -1113,16 +1113,7 @@ func (f *Frame) buildAttributeSelector(attrName, attrValue string, opts *GetByBa
 func (f *Frame) GetByAltText(alt string, opts *GetByBaseOptions) *Locator {
 	f.log.Debugf("Frame:GetByAltText", "fid:%s furl:%q alt:%q opts:%+v", f.ID(), f.URL(), alt, opts)
 
-	a := "[alt=" + alt + "]"
-	if isQuotedText(alt) {
-		if opts != nil && opts.Exact != nil && *opts.Exact {
-			a = "[alt=" + alt + "s]"
-		} else {
-			a = "[alt=" + alt + "i]"
-		}
-	}
-
-	return f.Locator("internal:attr="+a, nil)
+	return f.Locator("internal:attr="+f.buildAttributeSelector("alt", alt, opts), nil)
 }
 
 // Locator creates and returns a new locator for this frame.
@@ -1145,16 +1136,7 @@ func (f *Frame) GetByLabel(label string, opts *GetByBaseOptions) *Locator {
 func (f *Frame) GetByPlaceholder(placeholder string, opts *GetByBaseOptions) *Locator {
 	f.log.Debugf("Frame:GetByPlaceholder", "fid:%s furl:%q placeholder:%q opts:%+v", f.ID(), f.URL(), placeholder, opts)
 
-	p := "[placeholder=" + placeholder + "]"
-	if isQuotedText(placeholder) {
-		if opts != nil && opts.Exact != nil && *opts.Exact {
-			p = "[placeholder=" + placeholder + "s]"
-		} else {
-			p = "[placeholder=" + placeholder + "i]"
-		}
-	}
-
-	return f.Locator("internal:attr="+p, nil)
+	return f.Locator("internal:attr="+f.buildAttributeSelector("placeholder", placeholder, opts), nil)
 }
 
 // Referrer returns the referrer of the frame from the network manager
