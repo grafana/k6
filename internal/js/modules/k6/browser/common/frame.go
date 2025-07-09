@@ -1126,6 +1126,22 @@ func (f *Frame) GetByLabel(label string, opts *GetByBaseOptions) *Locator {
 	return f.Locator(l, nil)
 }
 
+// GetByPlaceholder creates and returns a new locator for this frame based on the placeholder attribute.
+func (f *Frame) GetByPlaceholder(placeholder string, opts *GetByBaseOptions) *Locator {
+	f.log.Debugf("Frame:GetByPlaceholder", "fid:%s furl:%q placeholder:%q opts:%+v", f.ID(), f.URL(), placeholder, opts)
+
+	p := "[placeholder=" + placeholder + "]"
+	if isQuotedText(placeholder) {
+		if opts != nil && opts.Exact != nil && *opts.Exact {
+			p = "[placeholder=" + placeholder + "s]"
+		} else {
+			p = "[placeholder=" + placeholder + "i]"
+		}
+	}
+
+	return f.Locator("internal:attr="+p, nil)
+}
+
 // Referrer returns the referrer of the frame from the network manager
 // of the frame's session.
 // It's an internal method not to be exposed as a JS API.
