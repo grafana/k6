@@ -1146,6 +1146,13 @@ func (f *Frame) GetByTitle(title string, opts *GetByBaseOptions) *Locator {
 	return f.Locator("internal:attr="+f.buildAttributeSelector("title", title, opts), nil)
 }
 
+// GetByTestID creates and returns a new locator for this frame based on the data-testid attribute.
+func (f *Frame) GetByTestID(testID string) *Locator {
+	f.log.Debugf("Frame:GetByTestID", "fid:%s furl:%q testID:%q", f.ID(), f.URL(), testID)
+
+	return f.Locator("internal:attr=[data-testid="+testID+"]", nil)
+}
+
 // Referrer returns the referrer of the frame from the network manager
 // of the frame's session.
 // It's an internal method not to be exposed as a JS API.
