@@ -1056,20 +1056,26 @@ func (f *Frame) GetByRole(role string, opts *GetByRoleOptions) *Locator {
 	return f.Locator(builder.String(), nil)
 }
 
+// buildAttributeSelector is a helper method that builds an attribute selector
+// for use with the internal:attr engine. It handles quoted strings and
+// applies the appropriate suffix for exact or case-insensitive matching.
+func (f *Frame) buildAttributeSelector(attrName, attrValue string, opts *GetByBaseOptions) string {
+	selector := "[" + attrName + "=" + attrValue + "]"
+	if len(attrValue) > 0 && attrValue[0] == '\'' && attrValue[len(attrValue)-1] == '\'' {
+		if opts != nil && opts.Exact != nil && *opts.Exact {
+			selector = "[" + attrName + "=" + attrValue + "s]"
+		} else {
+			selector = "[" + attrName + "=" + attrValue + "i]"
+		}
+	}
+	return selector
+}
+
 // Locator creates and returns a new locator for this frame.
 func (f *Frame) GetByAltText(alt string, opts *GetByBaseOptions) *Locator {
 	f.log.Debugf("Frame:GetByAltText", "fid:%s furl:%q alt:%q opts:%+v", f.ID(), f.URL(), alt, opts)
 
-	a := "[alt=" + alt + "]"
-	if len(alt) > 0 && alt[0] == '\'' && alt[len(alt)-1] == '\'' {
-		if opts != nil && opts.Exact != nil && *opts.Exact {
-			a = "[alt=" + alt + "s]"
-		} else {
-			a = "[alt=" + alt + "i]"
-		}
-	}
-
-	return f.Locator("internal:attr="+a, nil)
+	return f.Locator("internal:attr="+f.buildAttributeSelector("alt", alt, opts), nil)
 }
 
 // Locator creates and returns a new locator for this frame.
@@ -1086,6 +1092,13 @@ func (f *Frame) GetByLabel(label string, opts *GetByBaseOptions) *Locator {
 	}
 
 	return f.Locator(l, nil)
+}
+
+// GetByPlaceholder creates and returns a new locator for this frame based on the placeholder attribute.
+func (f *Frame) GetByPlaceholder(placeholder string, opts *GetByBaseOptions) *Locator {
+	f.log.Debugf("Frame:GetByPlaceholder", "fid:%s furl:%q placeholder:%q opts:%+v", f.ID(), f.URL(), placeholder, opts)
+
+	return f.Locator("internal:attr="+f.buildAttributeSelector("placeholder", placeholder, opts), nil)
 }
 
 // Referrer returns the referrer of the frame from the network manager
