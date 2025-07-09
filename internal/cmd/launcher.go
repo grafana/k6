@@ -30,16 +30,16 @@ type commandExecutor interface {
 	run(*state.GlobalState) error
 }
 
-// customBinary runs the requested commands
-// on a different binary on a subprocess passing the original arguments
+// customBinary runs the requested commands on a different binary on a subprocess passing the
+// original arguments
 type customBinary struct {
 	// path represents the local file path
 	// on the file system of the binary
 	path string
 }
 
-// provider defines the interface for provisioning a custom k6 binary for a set of dependencies
-type provider interface {
+// provisioner defines the interface for provisioning a commandExecutor for a set of dependencies
+type provisioner interface {
 	provision(k6deps.Dependencies) (commandExecutor, error)
 }
 
@@ -47,7 +47,7 @@ type provider interface {
 // then if required, it provisions a binary executor to satisfy the requirements.
 type launcher struct {
 	gs              *state.GlobalState
-	provider        provider
+	provider        provisioner
 	commandExecutor commandExecutor
 }
 
@@ -59,11 +59,10 @@ func newLauncher(gs *state.GlobalState) *launcher {
 	}
 }
 
-// launch analyzies the command to be executed and its input (e.g. script)
-// to identify if its dependencies. It it has dependencies tha cannot be satisfied by the
-// current binary, it obtains a custom binary usign the provision function and delegates
-// the execution of the command to this binary. if not, continues with the execution of the
-// command in the current binary.
+// launch analyzies the command to be executed and its input (e.g. script) to identify its dependencies.
+// If it has dependencies that cannot be satisfied by the current binary, it obtains a custom commandExecutor
+// usign the provision function and delegates the execution of the command to this  commandExecutor.
+// On the contrary, continues with the execution of the command in the current binary.
 func (l *launcher) launch(cmd *cobra.Command, args []string) error {
 	if !isAnalysisRequired(cmd) {
 		l.gs.Logger.
@@ -216,7 +215,7 @@ type k6buildProvider struct {
 	gs *state.GlobalState
 }
 
-func newK6BuildProvider(gs *state.GlobalState) provider {
+func newK6BuildProvider(gs *state.GlobalState) provisioner {
 	return &k6buildProvider{gs: gs}
 }
 
@@ -321,6 +320,7 @@ func analyze(gs *state.GlobalState, args []string) (k6deps.Dependencies, error) 
 func isAnalysisRequired(cmd *cobra.Command) bool {
 	switch cmd.Name() {
 	case "run":
+		// exclude `k6 cloud run` command
 		if cmd.Parent() != nil && cmd.Parent().Name() == "cloud" {
 			return true
 		}

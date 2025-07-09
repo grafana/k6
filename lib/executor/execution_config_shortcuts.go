@@ -56,12 +56,12 @@ func DeriveScenariosFromShortcuts(opts lib.Options, logger logrus.FieldLogger) (
 	case opts.Iterations.Valid:
 		if len(opts.Stages) > 0 { // stages isn't nil (not set) and isn't explicitly set to empty
 			return result, ExecutionConflictError(
-				"using multiple execution config shortcuts (`iterations` and `stages`) simultaneously is not allowed",
+				"using `iterations` and `stages` options simultaneously is not allowed",
 			)
 		}
 		if opts.Scenarios != nil {
 			return opts, ExecutionConflictError(
-				"using an execution configuration shortcut (`iterations`) and `scenarios` simultaneously is not allowed",
+				"using `iterations` and `scenarios` options simultaneously is not allowed",
 			)
 		}
 		result.Scenarios = getSharedIterationsScenario(opts.Iterations, opts.Duration, opts.VUs)
@@ -69,18 +69,18 @@ func DeriveScenariosFromShortcuts(opts lib.Options, logger logrus.FieldLogger) (
 	case opts.Duration.Valid:
 		if len(opts.Stages) > 0 { // stages isn't nil (not set) and isn't explicitly set to empty
 			return result, ExecutionConflictError(
-				"using multiple execution config shortcuts (`duration` and `stages`) simultaneously is not allowed",
+				"using `duration` and `stages` options simultaneously is not allowed",
 			)
 		}
 		if opts.Scenarios != nil {
 			return result, ExecutionConflictError(
-				"using an execution configuration shortcut (`duration`) and `scenarios` simultaneously is not allowed",
+				"using `duration` and `scenarios` options simultaneously is not allowed",
 			)
 		}
 		if opts.Duration.Duration <= 0 {
 			// TODO: move this validation to Validate()?
 			return result, ExecutionConflictError(
-				"`duration` should be more than 0, for infinite duration use the externally-controlled executor",
+				"`duration` option should be more than 0, for infinite duration use the externally-controlled executor",
 			)
 		}
 		result.Scenarios = getConstantVUsScenario(opts.Duration, opts.VUs)
@@ -88,7 +88,7 @@ func DeriveScenariosFromShortcuts(opts lib.Options, logger logrus.FieldLogger) (
 	case len(opts.Stages) > 0: // stages isn't nil (not set) and isn't explicitly set to empty
 		if opts.Scenarios != nil {
 			return opts, ExecutionConflictError(
-				"using an execution configuration shortcut (`stages`) and `scenarios` simultaneously is not allowed",
+				"using `stages` and `scenarios` options simultaneously is not allowed",
 			)
 		}
 		result.Scenarios = getRampingVUsScenario(opts.Stages, opts.VUs)
@@ -100,7 +100,7 @@ func DeriveScenariosFromShortcuts(opts lib.Options, logger logrus.FieldLogger) (
 		// Check if we should emit some warnings
 		if opts.VUs.Valid && opts.VUs.Int64 != 1 {
 			logger.Warnf(
-				"the `vus=%d` option will be ignored, it only works in conjunction with `iterations`, `duration`, or `stages`",
+				"`vus=%d` option will be ignored, it only works in conjunction with `iterations`, `duration`, or `stages`",
 				opts.VUs.Int64,
 			)
 		}

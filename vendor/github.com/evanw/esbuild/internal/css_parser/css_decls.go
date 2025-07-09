@@ -223,7 +223,7 @@ func (p *parser) processDeclarations(rules []css_ast.Rule, composesContext *comp
 		case css_ast.DContainerName:
 			p.processContainerName(decl.Value)
 
-			// Animation name
+		// Animation name
 		case css_ast.DAnimation:
 			p.processAnimationShorthand(decl.Value)
 		case css_ast.DAnimationName:
@@ -237,7 +237,7 @@ func (p *parser) processDeclarations(rules []css_ast.Rule, composesContext *comp
 				p.processListStyleType(&decl.Value[0])
 			}
 
-			// Font
+		// Font
 		case css_ast.DFont:
 			if p.options.minifySyntax {
 				decl.Value = p.mangleFont(decl.Value)
@@ -253,7 +253,7 @@ func (p *parser) processDeclarations(rules []css_ast.Rule, composesContext *comp
 				decl.Value[0] = p.mangleFontWeight(decl.Value[0])
 			}
 
-			// Margin
+		// Margin
 		case css_ast.DMargin:
 			if p.options.minifySyntax {
 				margin.mangleSides(rewrittenRules, decl, p.options.minifyWhitespace)
@@ -444,6 +444,13 @@ func (p *parser) insertPrefixedDeclaration(rules []css_ast.Rule, prefix string, 
 		if len(decl.Value) != 1 || decl.Value[0].Kind != css_lexer.TIdent || !strings.EqualFold(decl.Value[0].Text, "sticky") {
 			return rules
 		}
+
+	case css_ast.DWidth, css_ast.DMinWidth, css_ast.DMaxWidth,
+		css_ast.DHeight, css_ast.DMinHeight, css_ast.DMaxHeight:
+		// The prefix is only needed for "width: stretch"
+		if len(decl.Value) != 1 || decl.Value[0].Kind != css_lexer.TIdent || !strings.EqualFold(decl.Value[0].Text, "stretch") {
+			return rules
+		}
 	}
 
 	value := css_ast.CloneTokensWithoutImportRecords(decl.Value)
@@ -454,6 +461,19 @@ func (p *parser) insertPrefixedDeclaration(rules []css_ast.Rule, prefix string, 
 		// The prefix applies to the value, not the property
 		keyText = decl.KeyText
 		value[0].Text = "-webkit-sticky"
+
+	case css_ast.DWidth, css_ast.DMinWidth, css_ast.DMaxWidth,
+		css_ast.DHeight, css_ast.DMinHeight, css_ast.DMaxHeight:
+		// The prefix applies to the value, not the property
+		keyText = decl.KeyText
+
+		// This currently only applies to "stretch" (already checked above)
+		switch prefix {
+		case "-webkit-":
+			value[0].Text = "-webkit-fill-available"
+		case "-moz-":
+			value[0].Text = "-moz-available"
+		}
 
 	case css_ast.DUserSelect:
 		// The prefix applies to the value as well as the property
@@ -477,6 +497,15 @@ func (p *parser) insertPrefixedDeclaration(rules []css_ast.Rule, prefix string, 
 						value[i].Text = "xor"
 					}
 				}
+			}
+		}
+	}
+
+	// If we didn't change the key, manually search for a previous duplicate rule
+	if keyText == decl.KeyText {
+		for _, rule := range rules {
+			if prevDecl, ok := rule.Data.(*css_ast.RDeclaration); ok && prevDecl.KeyText == keyText && css_ast.TokensEqual(prevDecl.Value, value, nil) {
+				return rules
 			}
 		}
 	}

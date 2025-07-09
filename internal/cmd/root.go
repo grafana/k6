@@ -46,12 +46,12 @@ type rootCommand struct {
 	launcher       *launcher
 }
 
-// creates a root command with a default launcher
+// newRootCommand creates a root command with a default launcher
 func newRootCommand(gs *state.GlobalState) *rootCommand {
 	return newRootWithLauncher(gs, newLauncher(gs))
 }
 
-// creates a root command with a launcher. Used to facilitate testing
+// newRootWithLauncher creates a root command with a launcher. Used to facilitate testing
 func newRootWithLauncher(gs *state.GlobalState, l *launcher) *rootCommand {
 	c := &rootCommand{
 		globalState:   gs,

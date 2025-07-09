@@ -540,6 +540,11 @@ type CallHdr struct {
 	PreviousAttempts int // value of grpc-previous-rpc-attempts header to set
 
 	DoneFunc func() // called when the stream is finished
+
+	// Authority is used to explicitly override the `:authority` header. If set,
+	// this value takes precedence over the Host field and will be used as the
+	// value for the `:authority` header.
+	Authority string
 }
 
 // ClientTransport is the common interface for all gRPC client-side transport

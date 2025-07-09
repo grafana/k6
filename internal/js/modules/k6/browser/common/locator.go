@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/grafana/sobek"
@@ -78,6 +79,13 @@ func (l *Locator) Click(opts *FrameClickOptions) error {
 func (l *Locator) click(opts *FrameClickOptions) error {
 	opts.Strict = true
 	return l.frame.click(l.selector, opts)
+}
+
+// Count APIs do not wait for the element to be present. It also does not set
+// strict to true, allowing it to return the total number of elements matching
+// the selector.
+func (l *Locator) Count() (int, error) {
+	return l.frame.count(l.selector)
 }
 
 // Dblclick double clicks on an element using locator's selector with strict mode on.
@@ -325,6 +333,12 @@ func (l *Locator) fill(value string, opts *FrameFillOptions) error {
 	return l.frame.fill(l.selector, value, opts)
 }
 
+// First will return the first child of the element matching the locator's
+// selector.
+func (l *Locator) First() *Locator {
+	return NewLocator(l.ctx, l.selector+" >> nth=0", l.frame, l.log)
+}
+
 // Focus on the element using locator's selector with strict mode on.
 func (l *Locator) Focus(opts sobek.Value) error {
 	l.log.Debugf("Locator:Focus", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
@@ -414,6 +428,18 @@ func (l *Locator) InnerText(opts sobek.Value) (string, error) {
 func (l *Locator) innerText(opts *FrameInnerTextOptions) (string, error) {
 	opts.Strict = true
 	return l.frame.innerText(l.selector, opts)
+}
+
+// Last will return the last child of the element matching the locator's
+// selector.
+func (l *Locator) Last() *Locator {
+	return NewLocator(l.ctx, l.selector+" >> nth=-1", l.frame, l.log)
+}
+
+// Nth will return the nth child of the element matching the locator's
+// selector.
+func (l *Locator) Nth(nth int) *Locator {
+	return NewLocator(l.ctx, l.selector+" >> nth="+strconv.Itoa(nth), l.frame, l.log)
 }
 
 // TextContent returns the element's text content that matches

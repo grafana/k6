@@ -277,7 +277,7 @@ func (e *ExecutionContext) getInjectedScript(apiCtx context.Context) (JSHandleAP
 
 	var (
 		suffix                  = `//# sourceURL=` + evaluationScriptURL
-		source                  = fmt.Sprintf(`(() => {%s; return new InjectedScript();})()`, injectedScriptSource)
+		source                  = `(() => {` + injectedScriptSource + `; return new InjectedScript();})()`
 		expression              = source
 		expressionWithSourceURL = expression
 	)

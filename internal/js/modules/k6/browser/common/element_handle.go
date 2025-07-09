@@ -11,7 +11,6 @@ import (
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/dom"
-	cdppage "github.com/chromedp/cdproto/page"
 	"github.com/grafana/sobek"
 	"go.opentelemetry.io/otel/attribute"
 
@@ -170,14 +169,56 @@ func (h *ElementHandle) clickablePoint() (*Position, error) {
 		return nil, fmt.Errorf("node is either not visible or not an HTMLElement: %w", err)
 	}
 
-	// Filter out quads that have too small area to click into.
-	var layoutViewport *cdppage.LayoutViewport
-	getLayoutMetrics := cdppage.GetLayoutMetrics()
-	if _, _, _, layoutViewport, _, _, err = getLayoutMetrics.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
-		return nil, fmt.Errorf("getting page layout metrics %T: %w", getLayoutMetrics, err)
+	width, height, err := h.evaluateInnerWidthHeight()
+	if err != nil {
+		return nil, fmt.Errorf("evaluating inner width and height: %w", err)
 	}
 
-	return filterQuads(layoutViewport.ClientWidth, layoutViewport.ClientHeight, quads)
+	p, err := filterQuads(width, height, quads)
+	if err != nil {
+		return nil, fmt.Errorf("filtering quads: %w", err)
+	}
+
+	return p, nil
+}
+
+// We are evaluating the inner width and height of the current frame that the
+// element is in in the utility context. Calculating this in the main context
+// causes NPD errors when working with the CDP API cdppage.GetLayoutMetrics.
+//
+// It returns the width and height of the current frame.
+func (h *ElementHandle) evaluateInnerWidthHeight() (int64, int64, error) {
+	h.logger.Debugf("ElementHandle:evaluateInnerWidthHeight", "fid:%s furl:%q", h.frame.ID(), h.frame.URL())
+
+	js := `() => ({ width: innerWidth, height: innerHeight })`
+
+	h.frame.waitForExecutionContext(utilityWorld)
+
+	eopts := evalOptions{
+		forceCallable: true,
+		returnByValue: true,
+	}
+	v, err := h.frame.evaluate(h.ctx, utilityWorld, eopts, js)
+	if err != nil {
+		return 0, 0, fmt.Errorf("getting inner width and height: %w", err)
+	}
+
+	m, ok := v.(map[string]any)
+	if !ok {
+		return 0, 0, fmt.Errorf("unexpected value %q when getting inner width and height", v)
+	}
+
+	width, ok := m["width"].(float64)
+	if !ok {
+		return 0, 0, fmt.Errorf("unexpected value %q when getting inner width", m["width"])
+	}
+
+	height, ok := m["height"].(float64)
+	if !ok {
+		return 0, 0, fmt.Errorf("unexpected value %q when getting inner height", m["height"])
+	}
+
+	return int64(width), int64(height), nil
 }
 
 func filterQuads(viewportWidth, viewportHeight int64, quads []dom.Quad) (*Position, error) {
@@ -755,6 +796,36 @@ func (h *ElementHandle) waitForSelector(
 		return r, nil
 	default:
 		return nil, nil //nolint:nilnil
+	}
+}
+
+func (h *ElementHandle) count(apiCtx context.Context, selector string) (int, error) {
+	parsedSelector, err := NewSelector(selector)
+	if err != nil {
+		return 0, err
+	}
+
+	fn := `
+			(node, injected, selector) => {
+				return injected.count(selector, node);
+			}
+		`
+	eopts := evalOptions{
+		forceCallable: true,
+		returnByValue: true,
+	}
+	result, err := h.evalWithScript(
+		apiCtx,
+		eopts, fn, parsedSelector,
+	)
+	if err != nil {
+		return 0, err
+	}
+	switch r := result.(type) {
+	case float64:
+		return int(r), nil
+	default:
+		return 0, fmt.Errorf("unexpected value %v of type %T", r, r)
 	}
 }
 

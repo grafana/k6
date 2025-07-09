@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Controlled Grafana-like Input Demo</title>
+  <!-- React and ReactDOM via UNPKG -->
+  <script src="react.development.js"></script>
+  <script src="react-dom.development.js"></script>
+  <script>
+    const { useState, useRef } = React;
+
+    function App() {
+      const [value, setValue] = useState('');
+      const inputRef = useRef(null);
+
+      return (
+        React.createElement('div', { style: { padding: '24px', fontFamily: 'sans-serif', maxWidth: '320px' } },
+          React.createElement('h2', null, 'Grafana-like Login Input'),
+          React.createElement('input', {
+            ref: inputRef,
+            type: 'text',
+            placeholder: 'Username or email',
+            value: value,
+            onChange: (e) => setValue(e.target.value),
+            style: { width: '100%', padding: '8px', marginBottom: '12px', fontSize: '16px' }
+          }),
+          React.createElement('p', { id: 'react-state' }, `React state: "${value}"`),
+        )
+      );
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+    });
+  </script>
+</head>
+<body>
+  <div id="root"></div>
+</body>
+</html>

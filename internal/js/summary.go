@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/grafana/sobek"
+
+	"go.k6.io/k6/internal/lib/summary"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/metrics"
@@ -25,6 +27,60 @@ var jslibSummaryLegacyCode string
 
 //go:embed summary-wrapper.js
 var summaryWrapperLambdaCode string
+
+// summarizeReportToObject is a method that makes certain transformations to the given [summary.Summary]
+// in order to make it more suitable for the JS code that prints out the end-of-test summary.
+// That includes, non-exclusively, things like transforming certain Go maps into JS objects to preserve
+// the desired order of their keys (e.g. we want to display group results in the same order as groups are defined
+// in code), as that's one of the characteristics of JS objects while it doesn't apply to Go maps (not preserved).
+// TODO: Map "checks" into a JS object to get rid of "OrderedChecks" and remove that logic from summary.js.
+// TODO: Explore if it's possible to apply the same idea with Thresholds, in order to preserve order from code.
+func summarizeReportToObject(rt *sobek.Runtime, s *summary.Summary) (map[string]interface{}, error) {
+	// We use a JS object to preserve insertion order of groups, so we don't need to pass
+	// an extra array with the order of groups, but just an object.
+	var mapGroups func(groups map[string]summary.Group, sorted []string) (*sobek.Object, error)
+
+	mapGroup := func(g summary.Group) (map[string]interface{}, error) {
+		gGroupsObj, err := mapGroups(g.Groups, g.GroupsOrder)
+		if err != nil {
+			return nil, err
+		}
+
+		groupObj := make(map[string]interface{})
+		groupObj["checks"] = g.Checks
+		groupObj["metrics"] = g.Metrics
+		groupObj["groups"] = gGroupsObj
+		return groupObj, nil
+	}
+
+	mapGroups = func(groups map[string]summary.Group, sorted []string) (*sobek.Object, error) {
+		baseObj := rt.NewObject()
+		for _, gName := range sorted {
+			groupObj, err := mapGroup(groups[gName])
+			if err != nil {
+				return nil, err
+			}
+
+			if err := baseObj.Set(gName, groupObj); err != nil {
+				return nil, err
+			}
+		}
+		return baseObj, nil
+	}
+
+	groups, err := mapGroups(s.Groups, s.GroupsOrder)
+	if err != nil {
+		return nil, err
+	}
+
+	m := make(map[string]interface{})
+	m["thresholds"] = s.Thresholds
+	m["checks"] = s.Checks
+	m["metrics"] = s.Metrics
+	m["groups"] = groups
+	m["scenarios"] = s.Scenarios
+	return m, nil
+}
 
 // TODO: figure out something saner... refactor the sinks and how we deal with
 // metrics in general... so much pain and misery... :sob:

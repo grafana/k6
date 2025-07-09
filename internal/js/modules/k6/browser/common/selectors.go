@@ -65,7 +65,7 @@ func (s *Selector) appendPart(p *SelectorPart, capture bool) error {
 	return nil
 }
 
-//nolint:cyclop
+//nolint:cyclop,funlen
 func (s *Selector) parse() error {
 	parsePart := func(selector string, start, index int) (*SelectorPart, bool) {
 		part := strings.TrimSpace(selector[start:index])
@@ -73,6 +73,9 @@ func (s *Selector) parse() error {
 		var name, body string
 
 		switch {
+		case strings.HasPrefix(part, "nth="):
+			name = "nth"
+			body = part[eqIndex+1:]
 		case eqIndex != -1 && reQueryEngine.Match([]byte(strings.TrimSpace(part[0:eqIndex]))):
 			name = strings.TrimSpace(part[0:eqIndex])
 			body = part[eqIndex+1:]

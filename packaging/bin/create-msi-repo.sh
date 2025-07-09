@@ -9,7 +9,7 @@ set -eEuo pipefail
 #   For generating the index.html of each directory. It's available in the
 #   packaging/bin directory of the k6 repo, and should be in $PATH.
 
-_s3bucket="${S3_BUCKET-dl.k6.io}"
+_s3bucket="${S3_BUCKET}"
 _usage="Usage: $0 <pkgdir> <repodir> [s3bucket=${_s3bucket}]"
 PKGDIR="${1?${_usage}}"  # The directory where .msi files are located
 REPODIR="${2?${_usage}}" # The package repository working directory
@@ -30,7 +30,9 @@ sync_to_s3() {
   s3cmd sync --delete-removed "${REPODIR}/" "s3://${S3PATH}/"
 
   # Set a short cache expiration for index files and the latest MSI package.
-  s3cmd modify --recursive --exclude='*' \
+  # We set --private-acl since we manage ACLs ourselves and don't want
+  # s3cmd to modify them. Otherwise, we receive AccessControlListNotSupported.
+  s3cmd modify --acl-private --recursive --exclude='*' \
     --include='index.html' --include='k6-latest-amd64.msi' \
     --add-header='Cache-Control: max-age=60,must-revalidate' "s3://${S3PATH}/"
 }

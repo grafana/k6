@@ -358,6 +358,7 @@ func TestElementHandleIsChecked(t *testing.T) {
 	require.NoError(t, element.Dispose())
 }
 
+//nolint:tparallel // it doesn't make sense to run the subtests in parallel with separate browsers
 func TestElementHandleQueryAll(t *testing.T) {
 	t.Parallel()
 
@@ -375,9 +376,7 @@ func TestElementHandleQueryAll(t *testing.T) {
   	`, nil)
 	require.NoError(t, err)
 
-	t.Run("element_handle", func(t *testing.T) {
-		t.Parallel()
-
+	t.Run("element_handle", func(t *testing.T) { //nolint:paralleltest
 		el, err := p.Query("#aul")
 		require.NoError(t, err)
 
@@ -386,17 +385,13 @@ func TestElementHandleQueryAll(t *testing.T) {
 
 		assert.Equal(t, wantLiLen, len(els))
 	})
-	t.Run("page", func(t *testing.T) {
-		t.Parallel()
-
+	t.Run("page", func(t *testing.T) { //nolint:paralleltest
 		els, err := p.QueryAll(query)
 		require.NoError(t, err)
 
 		assert.Equal(t, wantLiLen, len(els))
 	})
-	t.Run("frame", func(t *testing.T) {
-		t.Parallel()
-
+	t.Run("frame", func(t *testing.T) { //nolint:paralleltest
 		els, err := p.MainFrame().QueryAll(query)
 		require.NoError(t, err)
 		assert.Equal(t, wantLiLen, len(els))

@@ -2186,6 +2186,7 @@ func TestRequestAndBatchTLS(t *testing.T) {
 	}
 	t.Run("ocsp_stapled_good", func(t *testing.T) {
 		t.Parallel()
+		t.Skip("this started failing on GHA") // see https://github.com/grafana/k6/issues/1275
 		if runtime.GOOS == "windows" {
 			t.Skip("this doesn't work on windows for some reason")
 		}
