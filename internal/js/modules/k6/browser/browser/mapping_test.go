@@ -322,6 +322,7 @@ type pageAPI interface { //nolint:interfacebloat
 	GetByAltText(alt string, opts *common.GetByBaseOptions) *common.Locator
 	GetByLabel(label string, opts *common.GetByBaseOptions) *common.Locator
 	GetByPlaceholder(placeholder string, opts *common.GetByBaseOptions) *common.Locator
+	GetByTitle(title string, opts *common.GetByBaseOptions) *common.Locator
 	GetKeyboard() *common.Keyboard
 	GetMouse() *common.Mouse
 	GetTouchscreen() *common.Touchscreen
