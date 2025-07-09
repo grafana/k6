@@ -1130,6 +1130,13 @@ func (p *Page) GetByTestID(testID string) *Locator {
 	return p.MainFrame().GetByTestID(testID)
 }
 
+// GetByText creates and returns a new locator for this page (main frame) based on text content.
+func (p *Page) GetByText(text string, opts *GetByBaseOptions) *Locator {
+	p.logger.Debugf("Page:GetByText", "sid:%s text: %q opts:%+v", p.sessionID(), text, opts)
+
+	return p.MainFrame().GetByText(text, opts)
+}
+
 // GetKeyboard returns the keyboard for the page.
 func (p *Page) GetKeyboard() *Keyboard {
 	return p.Keyboard
