@@ -1116,6 +1116,13 @@ func (p *Page) GetByPlaceholder(placeholder string, opts *GetByBaseOptions) *Loc
 	return p.MainFrame().GetByPlaceholder(placeholder, opts)
 }
 
+// GetByTitle creates and returns a new locator for this page (main frame) based on the title attribute.
+func (p *Page) GetByTitle(title string, opts *GetByBaseOptions) *Locator {
+	p.logger.Debugf("Page:GetByTitle", "sid:%s title: %q opts:%+v", p.sessionID(), title, opts)
+
+	return p.MainFrame().GetByTitle(title, opts)
+}
+
 // GetKeyboard returns the keyboard for the page.
 func (p *Page) GetKeyboard() *Keyboard {
 	return p.Keyboard
