@@ -1109,6 +1109,13 @@ func (p *Page) GetByLabel(label string, opts *GetByBaseOptions) *Locator {
 	return p.MainFrame().GetByLabel(label, opts)
 }
 
+// GetByPlaceholder creates and returns a new locator for this page (main frame) based on the placeholder attribute.
+func (p *Page) GetByPlaceholder(placeholder string, opts *GetByBaseOptions) *Locator {
+	p.logger.Debugf("Page:GetByPlaceholder", "sid:%s placeholder: %q opts:%+v", p.sessionID(), placeholder, opts)
+
+	return p.MainFrame().GetByPlaceholder(placeholder, opts)
+}
+
 // GetKeyboard returns the keyboard for the page.
 func (p *Page) GetKeyboard() *Keyboard {
 	return p.Keyboard
