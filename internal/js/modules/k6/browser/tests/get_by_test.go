@@ -1186,3 +1186,113 @@ func TestGetByTestIDSuccess(t *testing.T) {
 		})
 	}
 }
+
+func TestGetByTextSuccess(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		text         string
+		opts         *common.GetByBaseOptions
+		expected     int
+		expectedText string
+	}{
+		{
+			"missing_text",
+			"",
+			nil,
+			7,
+			"",
+		},
+		{
+			"simple_text",
+			`"Hello World"`,
+			nil,
+			1,
+			"Hello World",
+		},
+		{
+			"button_text",
+			`"Click me"`,
+			nil,
+			1,
+			"Click me",
+		},
+		{
+			"exact_match",
+			`"Learn more"`,
+			&common.GetByBaseOptions{Exact: toPtr(true)},
+			1,
+			"Learn more",
+		},
+		{
+			"no_exact_match",
+			`"learn more"`,
+			&common.GetByBaseOptions{Exact: toPtr(true)},
+			0,
+			"",
+		},
+		{
+			"case_insensitive_match",
+			`"hello world"`,
+			nil,
+			1,
+			"Hello World",
+		},
+		{
+			"regex_match",
+			`/^[a-z0-9]+$/`,
+			nil,
+			1,
+			"abc123",
+		},
+		{
+			"partial_text_match",
+			`"longer text"`,
+			nil,
+			1,
+			"This is a longer text with multiple words",
+		},
+		{
+			"normalized_whitespace",
+			`"Spaced text"`,
+			nil,
+			1,
+			"Spaced text",
+		},
+		{
+			"label_text",
+			`"Email address"`,
+			nil,
+			1,
+			"Email address",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tb := newTestBrowser(t, withFileServer())
+			p := tb.NewPage(nil)
+			opts := &common.FrameGotoOptions{
+				Timeout: common.DefaultTimeout,
+			}
+			_, err := p.Goto(
+				tb.staticURL("get_by_text.html"),
+				opts,
+			)
+			require.NoError(t, err)
+
+			l := p.GetByText(tt.text, tt.opts)
+			c, err := l.Count()
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expected, c)
+
+			if tt.expected > 0 && tt.expectedText != "" {
+				text, err := l.InnerText(sobek.Undefined())
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedText, text)
+			}
+		})
+	}
+}
