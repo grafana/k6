@@ -13,7 +13,6 @@ import (
 	"github.com/grafana/k6deps"
 	"github.com/grafana/k6provider"
 	"github.com/spf13/cobra"
-	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/internal/build"
 )
@@ -217,20 +216,9 @@ func newK6BuildProvider(gs *state.GlobalState) provisioner {
 }
 
 func (p *k6buildProvider) provision(deps k6deps.Dependencies) (commandExecutor, error) {
-	token, err := extractToken(p.gs)
-	if err != nil {
-		p.gs.Logger.WithError(err).Debug("Failed to get a valid token")
-	}
-
-	if token == "" {
-		return nil, errors.New("k6 cloud token is required when the Binary provisioning feature is enabled." +
-			" Set K6_CLOUD_TOKEN environment variable or execute the `k6 cloud login` command")
-	}
-
 	config := k6provider.Config{
-		BuildServiceURL:  p.gs.Flags.BuildServiceURL,
-		BuildServiceAuth: token,
-		BinaryCacheDir:   p.gs.Flags.BinaryCache,
+		BuildServiceURL: p.gs.Flags.BuildServiceURL,
+		BinaryCacheDir:  p.gs.Flags.BinaryCache,
 	}
 
 	provider, err := k6provider.NewProvider(config)
@@ -255,22 +243,6 @@ func formatDependencies(deps map[string]string) string {
 		fmt.Fprintf(buffer, "%s:%s ", dep, version)
 	}
 	return strings.Trim(buffer.String(), " ")
-}
-
-// extractToken gets the cloud token required to access the build service
-// from the environment or from the config file
-func extractToken(gs *state.GlobalState) (string, error) {
-	diskConfig, err := readDiskConfig(gs)
-	if err != nil {
-		return "", err
-	}
-
-	config, _, err := cloudapi.GetConsolidatedConfig(diskConfig.Collectors["cloud"], gs.Env, "", nil, nil)
-	if err != nil {
-		return "", err
-	}
-
-	return config.Token.String, nil
 }
 
 // analyze returns the dependencies for the command to be executed.
