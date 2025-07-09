@@ -1842,6 +1842,19 @@ function getElementLabels(textCache, element) {
   }
   return [];
 }
+function elementMatchesText(cache, element, matcher) {
+  if (shouldSkipForTextMatching(element))
+    return "none";
+  if (!matcher(elementText(cache, element)))
+    return "none";
+  for (let child = element.firstChild; child; child = child.nextSibling) {
+    if (child.nodeType === Node.ELEMENT_NODE && matcher(elementText(cache, child)))
+      return "selfAndChildren";
+  }
+  if (element.shadowRoot && matcher(elementText(cache, element.shadowRoot)))
+    return "selfAndChildren";
+  return "self";
+}
 
 // packages/injected/src/injectedScript.ts
 function cssUnquote(s) {
@@ -2082,6 +2095,40 @@ class LabelEngine {
   }
 }
 
+class TextEngine {
+  constructor(shadow, internal) {
+    this._evaluator = new SelectorEvaluatorImpl();
+    this._shadow = shadow;
+    this._internal = internal;
+  }
+  queryAll(root, selector) {
+    try {
+      this._evaluator.begin();
+
+      const { matcher, kind } = createTextMatcher(selector, this._internal);
+      const result = [];
+      let lastDidNotMatchSelf = null;
+      const appendElement = (element) => {
+        if (kind === "lax" && lastDidNotMatchSelf && lastDidNotMatchSelf.contains(element))
+          return false;
+        const matches = elementMatchesText(this._evaluator._cacheText, element, matcher);
+        if (matches === "none")
+          lastDidNotMatchSelf = element;
+        if (matches === "self" || matches === "selfAndChildren" && kind === "strict" && !this._internal)
+          result.push(element);
+      };
+      if (root.nodeType === Node.ELEMENT_NODE)
+        appendElement(root);
+      const elements = this._evaluator._queryCSS({ scope: root, pierceShadow: this._shadow }, "*");
+      for (const element of elements)
+        appendElement(element);
+      return result;
+    } finally {
+      this._evaluator.end();
+    }
+  }
+}
+
 // convertToDocument will convert a DocumentFragment into a Document. It does
 // this by creating a new Document and copying the elements from the
 // DocumentFragment to the Document.
@@ -2130,6 +2177,7 @@ class InjectedScript {
       'internal:role': createRoleEngine(true),
       'internal:attr': new AttributeEngine(),
       'internal:label': new LabelEngine(),
+      'internal:text': new TextEngine(true, true),
     };
   }
 
