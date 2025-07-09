@@ -1115,6 +1115,23 @@ func (f *Frame) GetByTestID(testID string) *Locator {
 	return f.Locator("internal:attr=[data-testid="+testID+"]", nil)
 }
 
+// GetByText creates and returns a new locator for this frame based on text content.
+func (f *Frame) GetByText(text string, opts *GetByBaseOptions) *Locator {
+	f.log.Debugf("Frame:GetByText", "fid:%s furl:%q text:%q opts:%+v", f.ID(), f.URL(), text, opts)
+
+	l := "internal:text=" + text
+	// Check for double quotes (as used by text selectors)
+	if len(text) > 0 && text[0] == '"' && text[len(text)-1] == '"' {
+		if opts != nil && opts.Exact != nil && *opts.Exact {
+			l = "internal:text=" + text + "s"
+		} else {
+			l = "internal:text=" + text + "i"
+		}
+	}
+
+	return f.Locator(l, nil)
+}
+
 // Referrer returns the referrer of the frame from the network manager
 // of the frame's session.
 // It's an internal method not to be exposed as a JS API.
