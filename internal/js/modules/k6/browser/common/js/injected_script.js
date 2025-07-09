@@ -14,6 +14,31 @@
  * limitations under the License.
  */
 
+// k6BrowserNative allows accessing native browser objects
+// even if the page under test has overridden them.
+const k6BrowserNative = (() => {
+  const iframe = document.createElement('iframe');
+  // hide it offscreen with zero size
+  iframe.style.position = 'absolute';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = '0';
+  iframe.style.top = '-9999px';
+  iframe.style.left = '-9999px';
+  iframe.style.display = 'none';
+
+  // grab the native browser object
+  document.documentElement.appendChild(iframe);
+  const win = iframe.contentWindow;
+  document.documentElement.removeChild(iframe);
+
+  return {
+    Set: win.Set,
+    Map: win.Map,
+    // Add other native browser objects as needed.
+  }
+})();
+
 // packages/playwright-core/src/utils/isomorphic/stringUtils.ts
 var normalizedWhitespaceCache;
 function normalizeWhiteSpace(text) {
@@ -502,7 +527,7 @@ function getElementAccessibleName(element, includeHidden) {
     if (!elementProhibitsNaming) {
       accessibleName = asFlatString(getTextAlternativeInternal(element, {
         includeHidden,
-        visitedElements: new Set(),
+        visitedElements: new k6BrowserNative.Set(),
         embeddedInTargetElement: "self"
       }));
     }
@@ -885,14 +910,14 @@ var cachePseudoContentAfter;
 var cachesCounter = 0;
 function beginAriaCaches() {
   ++cachesCounter;
-  cacheAccessibleName != null ? cacheAccessibleName : cacheAccessibleName = new Map();
-  cacheAccessibleNameHidden != null ? cacheAccessibleNameHidden : cacheAccessibleNameHidden = new Map();
-  cacheAccessibleDescription != null ? cacheAccessibleDescription : cacheAccessibleDescription = new Map();
-  cacheAccessibleDescriptionHidden != null ? cacheAccessibleDescriptionHidden : cacheAccessibleDescriptionHidden = new Map();
-  cacheAccessibleErrorMessage != null ? cacheAccessibleErrorMessage : cacheAccessibleErrorMessage = new Map();
-  cacheIsHidden != null ? cacheIsHidden : cacheIsHidden = new Map();
-  cachePseudoContentBefore != null ? cachePseudoContentBefore : cachePseudoContentBefore = new Map();
-  cachePseudoContentAfter != null ? cachePseudoContentAfter : cachePseudoContentAfter = new Map();
+  cacheAccessibleName != null ? cacheAccessibleName : cacheAccessibleName = new k6BrowserNative.Map();
+  cacheAccessibleNameHidden != null ? cacheAccessibleNameHidden : cacheAccessibleNameHidden = new k6BrowserNative.Map();
+  cacheAccessibleDescription != null ? cacheAccessibleDescription : cacheAccessibleDescription = new k6BrowserNative.Map();
+  cacheAccessibleDescriptionHidden != null ? cacheAccessibleDescriptionHidden : cacheAccessibleDescriptionHidden = new k6BrowserNative.Map();
+  cacheAccessibleErrorMessage != null ? cacheAccessibleErrorMessage : cacheAccessibleErrorMessage = new k6BrowserNative.Map();
+  cacheIsHidden != null ? cacheIsHidden : cacheIsHidden = new k6BrowserNative.Map();
+  cachePseudoContentBefore != null ? cachePseudoContentBefore : cachePseudoContentBefore = new k6BrowserNative.Map();
+  cachePseudoContentAfter != null ? cachePseudoContentAfter : cachePseudoContentAfter = new k6BrowserNative.Map();
 }
 function endAriaCaches() {
   if (!--cachesCounter) {
@@ -1267,22 +1292,22 @@ function createRoleEngine(internal) {
 }
 
 // packages/playwright-core/src/utils/isomorphic/selectorParser.ts
-var customCSSNames = new Set(["not", "is", "where", "has", "scope", "light", "visible", "text", "text-matches", "text-is", "has-text", "above", "below", "right-of", "left-of", "near", "nth-match"]);
+var customCSSNames = new k6BrowserNative.Set(["not", "is", "where", "has", "scope", "light", "visible", "text", "text-matches", "text-is", "has-text", "above", "below", "right-of", "left-of", "near", "nth-match"]);
 
 // packages/injected/src/selectorEvaluator.ts
 var SelectorEvaluatorImpl = class {
   constructor() {
     this._retainCacheCounter = 0;
-    this._cacheText = new Map();
-    this._cacheQueryCSS = new Map();
-    this._cacheMatches = new Map();
-    this._cacheQuery = new Map();
-    this._cacheMatchesSimple = new Map();
-    this._cacheMatchesParents = new Map();
-    this._cacheCallMatches = new Map();
-    this._cacheCallQuery = new Map();
-    this._cacheQuerySimple = new Map();
-    this._engines = new Map();
+    this._cacheText = new k6BrowserNative.Map();
+    this._cacheQueryCSS = new k6BrowserNative.Map();
+    this._cacheMatches = new k6BrowserNative.Map();
+    this._cacheQuery = new k6BrowserNative.Map();
+    this._cacheMatchesSimple = new k6BrowserNative.Map();
+    this._cacheMatchesParents = new k6BrowserNative.Map();
+    this._cacheCallMatches = new k6BrowserNative.Map();
+    this._cacheCallQuery = new k6BrowserNative.Map();
+    this._cacheQuerySimple = new k6BrowserNative.Map();
+    this._engines = new k6BrowserNative.Map();
     this._engines.set("not", notEngine);
     this._engines.set("is", isEngine);
     this._engines.set("where", isEngine);
@@ -1368,7 +1393,7 @@ var SelectorEvaluatorImpl = class {
         if (this._hasScopeClause(selector))
           context = this._expandContextForScopeMatching(context);
         const previousScoreMap = this._scoreMap;
-        this._scoreMap = new Map();
+        this._scoreMap = new k6BrowserNative.Map();
         let elements = this._querySimple(context, selector.simples[selector.simples.length - 1].selector);
         elements = elements.filter((element) => this._matchesParents(element, selector, selector.simples.length - 2, context));
         if (this._scoreMap.size) {
@@ -1716,7 +1741,7 @@ function previousSiblingInContext(element, context) {
   return element.previousElementSibling || void 0;
 }
 function sortInDOMOrder(elements) {
-  const elementToEntry = new Map();
+  const elementToEntry = new k6BrowserNative.Map();
   const roots = [];
   const result = [];
   function append(element) {
@@ -1741,7 +1766,7 @@ function sortInDOMOrder(elements) {
     if (entry.taken)
       result.push(element);
     if (entry.children.length > 1) {
-      const set = new Set(entry.children);
+      const set = new k6BrowserNative.Set(entry.children);
       entry.children = [];
       let child = element.firstElementChild;
       while (child && entry.children.length < set.size) {
@@ -1762,31 +1787,6 @@ function sortInDOMOrder(elements) {
   return result;
 }
 
-
-// k6BrowserNative allows accessing native browser objects
-// even if the page under test has overridden them.
-const k6BrowserNative = (() => {
-  const iframe = document.createElement('iframe');
-  // hide it offscreen with zero size
-  iframe.style.position = 'absolute';
-  iframe.style.width = '0';
-  iframe.style.height = '0';
-  iframe.style.border = '0';
-  iframe.style.top = '-9999px';
-  iframe.style.left = '-9999px';
-  iframe.style.display = 'none';
-
-  // grab the native browser object
-  document.documentElement.appendChild(iframe);
-  const win = iframe.contentWindow;
-  document.documentElement.removeChild(iframe);
-
-  return {
-    Set: win.Set,
-    Map: win.Map,
-    // Add other native browser objects as needed.
-  }
-})();
 
 const autoClosingTags = new k6BrowserNative.Set([
   "AREA",
