@@ -1099,3 +1099,90 @@ func TestGetByTitleSuccess(t *testing.T) {
 		})
 	}
 }
+
+func TestGetByTestIDSuccess(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		testID       string
+		expected     int
+		expectedText string
+	}{
+		{
+			"submit_button",
+			"'submit-button'",
+			1,
+			"Submit",
+		},
+		{
+			"username_input",
+			"'username-input'",
+			1,
+			"",
+		},
+		{
+			"info_box",
+			"'info-box'",
+			1,
+			"Information",
+		},
+		{
+			"regex_match",
+			`/^[a-z0-9]+$/`,
+			1,
+			"Test span",
+		},
+		{
+			"link_testid",
+			"'my-link'",
+			1,
+			"Link",
+		},
+		{
+			"non_existent_testid",
+			"'does-not-exist'",
+			0,
+			"",
+		},
+		{
+			"missing_testid",
+			"",
+			0,
+			"",
+		},
+		{
+			"empty_string",
+			"''",
+			0,
+			"",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tb := newTestBrowser(t, withFileServer())
+			p := tb.NewPage(nil)
+			opts := &common.FrameGotoOptions{
+				Timeout: common.DefaultTimeout,
+			}
+			_, err := p.Goto(
+				tb.staticURL("get_by_testid.html"),
+				opts,
+			)
+			require.NoError(t, err)
+
+			l := p.GetByTestID(tt.testID)
+			c, err := l.Count()
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expected, c)
+
+			if tt.expected > 0 && tt.expectedText != "" {
+				text, err := l.InnerText(sobek.Undefined())
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedText, text)
+			}
+		})
+	}
+}
