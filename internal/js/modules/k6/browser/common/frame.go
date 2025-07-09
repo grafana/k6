@@ -1139,6 +1139,13 @@ func (f *Frame) GetByPlaceholder(placeholder string, opts *GetByBaseOptions) *Lo
 	return f.Locator("internal:attr="+f.buildAttributeSelector("placeholder", placeholder, opts), nil)
 }
 
+// GetByTitle creates and returns a new locator for this frame based on the title attribute.
+func (f *Frame) GetByTitle(title string, opts *GetByBaseOptions) *Locator {
+	f.log.Debugf("Frame:GetByTitle", "fid:%s furl:%q title:%q opts:%+v", f.ID(), f.URL(), title, opts)
+
+	return f.Locator("internal:attr="+f.buildAttributeSelector("title", title, opts), nil)
+}
+
 // Referrer returns the referrer of the frame from the network manager
 // of the frame's session.
 // It's an internal method not to be exposed as a JS API.
