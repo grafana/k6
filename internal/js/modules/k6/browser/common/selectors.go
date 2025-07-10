@@ -94,6 +94,9 @@ func (s *Selector) parse() error {
 		case strings.HasPrefix(part, "internal:role="):
 			name = "internal:role"
 			body = part
+		case strings.HasPrefix(part, "internal:attr="):
+			name = "internal:attr"
+			body = part
 		default:
 			name = "css"
 			body = part

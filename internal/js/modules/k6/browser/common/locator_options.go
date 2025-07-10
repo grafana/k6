@@ -13,3 +13,9 @@ type GetByRoleOptions struct {
 	Pressed       *bool   `json:"pressed"`
 	Selected      *bool   `json:"selected"`
 }
+
+// GetByAltTextOptions are the optional options for when working with the
+// GetByAltText API.
+type GetByAltTextOptions struct {
+	Exact *bool `json:"exact"`
+}
