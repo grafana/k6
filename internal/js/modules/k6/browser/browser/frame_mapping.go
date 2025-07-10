@@ -2,6 +2,7 @@ package browser
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/grafana/sobek"
 
@@ -421,6 +422,31 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				f.WaitForTimeout(timeout)
 				return nil, nil
 			})
+		},
+		"waitForURL": func(url sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewFrameWaitForURLOptions(f.Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing waitForURL options: %w", err)
+			}
+
+			var val string
+			switch url.ExportType() {
+			case reflect.TypeOf(string("")):
+				val = fmt.Sprintf("'%s'", url.String()) // Strings require quotes
+			default: // JS Regex, CSS, numbers or booleans
+				val = url.String() // No quotes
+			}
+
+			// Inject JS regex checker for URL pattern matching
+			ctx := vu.Context()
+			jsRegexChecker, err := injectRegexMatcherScript(ctx, vu, f.Page().TargetID())
+			if err != nil {
+				return nil, err
+			}
+
+			return k6ext.Promise(ctx, func() (result any, reason error) {
+				return nil, f.WaitForURL(val, popts, jsRegexChecker)
+			}), nil
 		},
 	}
 	maps["$"] = func(selector string) *sobek.Promise {

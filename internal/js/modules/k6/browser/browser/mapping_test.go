@@ -434,6 +434,7 @@ type frameAPI interface { //nolint:interfacebloat
 	WaitForNavigation(opts sobek.Value) (*common.Response, error)
 	WaitForSelector(selector string, opts sobek.Value) (*common.ElementHandle, error)
 	WaitForTimeout(timeout int64)
+	WaitForURL(url string, opts sobek.Value) (*sobek.Promise, error)
 }
 
 // elementHandleAPI is the interface of an in-page DOM element.
