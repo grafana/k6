@@ -36,6 +36,25 @@ func TestLocator(t *testing.T) {
 		do   func(*testBrowser, *common.Page)
 	}{
 		{
+			"All", func(_ *testBrowser, p *common.Page) {
+				locators, err := p.Locator("a", nil).All()
+				require.NoError(t, err)
+				require.Len(t, locators, 3)
+
+				firstText, err := locators[0].InnerText(nil)
+				assert.NoError(t, err)
+				assert.Equal(t, `Click`, firstText)
+
+				secondText, err := locators[1].InnerText(nil)
+				assert.NoError(t, err)
+				assert.Equal(t, `Dblclick`, secondText)
+
+				thirdText, err := locators[2].InnerText(nil)
+				assert.NoError(t, err)
+				assert.Equal(t, `Click`, thirdText)
+			},
+		},
+		{
 			"Check", func(_ *testBrowser, p *common.Page) {
 				check := func() bool {
 					v, err := p.Evaluate(`() => window.check`)

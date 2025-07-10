@@ -517,6 +517,7 @@ type responseAPI interface { //nolint:interfacebloat
 
 // locatorAPI represents a way to find element(s) on a page at any moment.
 type locatorAPI interface { //nolint:interfacebloat
+	All() ([]*common.Locator, error)
 	Clear(opts *common.FrameFillOptions) error
 	Click(opts sobek.Value) error
 	Count() (int, error)
