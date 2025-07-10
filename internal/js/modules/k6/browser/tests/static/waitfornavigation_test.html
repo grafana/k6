@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WaitForNavigation Test</title>
+</head>
+<body>
+    <h1>Navigation Test Page</h1>
+    
+    <div id="links">
+        <a id="page1" href="page1.html">Go to Page 1</a><br>
+        <a id="page2" href="page2.html">Go to Page 2</a><br>
+        <a id="page1-query" href="page1.html?test=true">Page 1 with Query</a><br>
+        <a id="page2-query" href="page2.html?test=true">Page 2 with Query</a><br>
+        <a id="page1-hash" href="page1.html#section">Page 1 with Hash</a><br>
+        <a id="external" href="https://example.com/page">External Link</a><br>
+    </div>
+    
+    <script>
+        // For testing navigation via JavaScript
+        function navigateTo(url) {
+            window.location.href = url;
+        }
+    </script>
+</body>
+</html> 
