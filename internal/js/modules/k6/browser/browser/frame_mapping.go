@@ -422,6 +422,23 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				return nil, nil
 			})
 		},
+		"waitForURL": func(url string, opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewFrameWaitForURLOptions(f.Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing waitForURL options: %w", err)
+			}
+
+			// Inject JS regex checker for URL pattern matching
+			ctx := vu.Context()
+			jsRegexChecker, err := injectURLMatcherScript(ctx, vu, f.Page().TargetID())
+			if err != nil {
+				return nil, err
+			}
+
+			return k6ext.Promise(ctx, func() (result any, reason error) {
+				return nil, f.WaitForURL(url, popts, jsRegexChecker)
+			}), nil
+		},
 	}
 	maps["$"] = func(selector string) *sobek.Promise {
 		return k6ext.Promise(vu.Context(), func() (any, error) {
