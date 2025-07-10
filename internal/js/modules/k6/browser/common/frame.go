@@ -2062,6 +2062,38 @@ func (f *Frame) WaitForTimeout(timeout int64) {
 	}
 }
 
+// WaitForURL waits for the frame to navigate to a URL matching the given pattern.
+// jsRegexChecker should be non-nil to be able to test against a URL pattern.
+func (f *Frame) WaitForURL(urlPattern string, opts *FrameWaitForURLOptions, jsRegexChecker JSRegexChecker) error {
+	f.log.Debugf("Frame:WaitForURL", "fid:%s furl:%q pattern:%s", f.ID(), f.URL(), urlPattern)
+	defer f.log.Debugf("Frame:WaitForURL:return", "fid:%s furl:%q pattern:%s", f.ID(), f.URL(), urlPattern)
+
+	matcher, err := urlMatcher(urlPattern, jsRegexChecker)
+	if err != nil {
+		return fmt.Errorf("parsing URL pattern: %w", err)
+	}
+
+	matched, err := matcher(f.URL())
+	if err != nil {
+		return fmt.Errorf("checking current URL: %w", err)
+	}
+	if matched {
+		// Already at target URL, just wait for load state
+		return f.WaitForLoadState(opts.WaitUntil.String(), &FrameWaitForLoadStateOptions{
+			Timeout: opts.Timeout,
+		})
+	}
+
+	// Wait for navigation to matching URL
+	navOpts := &FrameWaitForNavigationOptions{
+		URL:       urlPattern,
+		Timeout:   opts.Timeout,
+		WaitUntil: opts.WaitUntil,
+	}
+	_, err = f.WaitForNavigation(navOpts, jsRegexChecker)
+	return err
+}
+
 func (f *Frame) adoptBackendNodeID(world executionWorld, id cdp.BackendNodeID) (*ElementHandle, error) {
 	f.log.Debugf("Frame:adoptBackendNodeID", "fid:%s furl:%q world:%s id:%d", f.ID(), f.URL(), world, id)
 
