@@ -77,7 +77,25 @@ func (c console) Error(args ...sobek.Value) {
 	c.log(logrus.ErrorLevel, args...)
 }
 
+const functionLog = "[object Function]"
+
 func (c console) valueString(v sobek.Value) string {
+	if _, isFunction := sobek.AssertFunction(v); isFunction {
+		return functionLog
+	}
+
+	if exported := v.Export(); exported != nil {
+		if err, isError := exported.(error); isError {
+			return err.Error()
+		}
+	}
+
+	if sobekObj, isObj := v.(*sobek.Object); isObj {
+		if sobekObj.ClassName() == "Error" {
+			return v.String()
+		}
+	}
+
 	mv, ok := v.(json.Marshaler)
 	if !ok {
 		return v.String()
