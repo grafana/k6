@@ -388,7 +388,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			}
 
 			return k6ext.Promise(vu.Context(), func() (result any, reason error) {
-				resp, err := f.WaitForNavigation(popts)
+				resp, err := f.WaitForNavigation(popts, nil)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
 				}
