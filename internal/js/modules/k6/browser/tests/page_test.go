@@ -20,10 +20,10 @@ import (
 	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	k6metrics "go.k6.io/k6/metrics"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext/k6test"
+	"go.k6.io/k6/metrics"
 )
 
 type emulateMediaOpts struct {
@@ -248,6 +248,8 @@ func TestPageEvaluateMapping(t *testing.T) {
 				tt.script,
 			)
 			assert.Equal(t, tb.vu.ToSobekValue(tt.want), got.Result())
+			// Test script as string input
+			_ = tb.vu.RunPromise(t, `await p.close()`)
 		})
 	}
 }
@@ -1813,6 +1815,7 @@ func TestShadowDOMAndDocumentFragment(t *testing.T) { //nolint:tparallel
 				});
 
 				const text = await s.innerText();
+				await p.close()
 				return text;
  			`, tb.staticURL("shadow_and_doc_frag.html"), tt.selector)
 			assert.Equal(t, tt.want, got.Result().String())
@@ -2085,7 +2088,7 @@ func TestPageOnMetric(t *testing.T) {
 
 			done := make(chan bool)
 
-			samples := make(chan k6metrics.SampleContainer)
+			samples := make(chan metrics.SampleContainer)
 			// This page will perform many pings with a changing h query parameter.
 			// This URL should be grouped according to how page.on('metric') is used.
 			tb := newTestBrowser(t, withHTTPServer(), withSamples(samples))
