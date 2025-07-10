@@ -670,6 +670,54 @@ func prepK6BrowserRegExChecker(rt *sobek.Runtime) func() error {
 	}
 }
 
+// injectRegexMatcherScript injects a JavaScript regex checker function into the runtime
+// for URL pattern matching. This handles regex patterns only using JavaScript's regex
+// engine for consistency. It returns a function that can be used to check if a URL
+// matches a given pattern in the JS runtime's eventloop.
+func injectRegexMatcherScript(ctx context.Context, vu moduleVU, targetID string) (common.JSRegexChecker, error) {
+	rt := vu.Runtime()
+
+	err := prepK6BrowserRegExChecker(rt)()
+	if err != nil {
+		return nil, fmt.Errorf("preparing k6 browser regex checker: %w", err)
+	}
+
+	return func(pattern, url string) (bool, error) {
+		var (
+			result bool
+			err    error
+		)
+
+		tq := vu.get(ctx, targetID)
+		done := make(chan struct{})
+
+		tq.Queue(func() error {
+			defer close(done)
+
+			// Regex pattern is unquoted string whereas the url needs to be quoted
+			// so that it is treated as a string.
+			js := fmt.Sprintf(`_k6BrowserCheckRegEx(%s, '%s')`, pattern, url)
+
+			val, jsErr := rt.RunString(js)
+			if jsErr != nil {
+				err = fmt.Errorf("evaluating pattern: %w", jsErr)
+				return nil
+			}
+
+			result = val.ToBoolean()
+			return nil
+		})
+
+		select {
+		case <-done:
+		case <-ctx.Done():
+			err = fmt.Errorf("context canceled while evaluating URL pattern")
+		}
+
+		return result, err
+	}, nil
+}
+
 func parseWaitForFunctionArgs(
 	ctx context.Context, timeout time.Duration, pageFunc, opts sobek.Value, gargs ...sobek.Value,
 ) (string, *common.FrameWaitForFunctionOptions, []any, error) {
