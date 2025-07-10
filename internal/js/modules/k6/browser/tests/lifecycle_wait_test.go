@@ -138,7 +138,7 @@ func TestLifecycleWaitForNavigation(t *testing.T) {
 					Timeout:   1000 * time.Millisecond,
 					WaitUntil: common.LifecycleEventNetworkIdle,
 				}
-				_, err = p.WaitForNavigation(opts)
+				_, err = p.WaitForNavigation(opts, nil)
 
 				return err
 			},
@@ -182,7 +182,7 @@ func TestLifecycleWaitForNavigation(t *testing.T) {
 						Timeout:   30000 * time.Millisecond,
 						WaitUntil: tt.waitUntil,
 					}
-					_, err := p.WaitForNavigation(opts)
+					_, err := p.WaitForNavigation(opts, nil)
 					return err
 				}
 				click := func() error {

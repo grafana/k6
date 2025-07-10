@@ -79,6 +79,26 @@ func (s *DOMElementState) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// urlMatcher creates a predicate function that matches URLs based on pattern type.
+// All pattern matching logic is handled by the JavaScript engine to ensure consistency.
+func urlMatcher(pattern string, jsRegexChecker JSRegexChecker) (func(string) (bool, error), error) {
+	if pattern == "" {
+		return func(url string) (bool, error) { return true, nil }, nil
+	}
+
+	if jsRegexChecker == nil {
+		return nil, fmt.Errorf("JavaScript pattern matcher is required for URL matching")
+	}
+
+	return func(url string) (bool, error) {
+		matched, err := jsRegexChecker(pattern, url)
+		if err != nil {
+			return false, fmt.Errorf("URL pattern matching error for pattern %q and URL %q: %w", pattern, url, err)
+		}
+		return matched, nil
+	}, nil
+}
+
 // Frame represents a frame in an HTML document.
 type Frame struct {
 	BaseEventEmitter
@@ -1866,22 +1886,45 @@ func (f *Frame) WaitForLoadState(state string, popts *FrameWaitForLoadStateOptio
 }
 
 // WaitForNavigation waits for the given navigation lifecycle event to happen.
-func (f *Frame) WaitForNavigation(opts *FrameWaitForNavigationOptions) (*Response, error) {
+// jsRegexChecker should be non-nil to be able to test against a URL pattern in the options.
+//
+//nolint:funlen
+func (f *Frame) WaitForNavigation(
+	opts *FrameWaitForNavigationOptions,
+	jsRegexChecker JSRegexChecker,
+) (*Response, error) {
 	f.log.Debugf("Frame:WaitForNavigation",
-		"fid:%s furl:%s", f.ID(), f.URL())
+		"fid:%s furl:%s url:%s", f.ID(), f.URL(), opts.URL)
 	defer f.log.Debugf("Frame:WaitForNavigation:return",
 		"fid:%s furl:%s", f.ID(), f.URL())
 
 	timeoutCtx, timeoutCancel := context.WithTimeout(f.ctx, opts.Timeout)
 
-	navEvtCh, navEvtCancel := createWaitForEventHandler(timeoutCtx, f, []string{EventFrameNavigation},
+	// Create URL matcher based on the pattern
+	matcher, err := urlMatcher(opts.URL, jsRegexChecker)
+	if err != nil {
+		timeoutCancel()
+		return nil, fmt.Errorf("parsing URL pattern: %w", err)
+	}
+
+	navEvtCh, navEvtCancel := createWaitForEventPredicateHandler(timeoutCtx, f, []string{EventFrameNavigation},
 		func(data any) bool {
-			return true // Both successful and failed navigations are considered
+			if navEvt, ok := data.(*NavigationEvent); ok {
+				// Check if the navigation URL matches the pattern
+				matched, err := matcher(navEvt.url)
+				if err != nil {
+					f.log.Error(err)
+					return false
+				}
+				return matched
+			}
+			return false
 		})
 
 	lifecycleEvtCh, lifecycleEvtCancel := createWaitForEventPredicateHandler(
 		timeoutCtx, f, []string{EventFrameAddLifecycle},
 		func(data any) bool {
+			// Wait for the lifecycle event to happen.
 			if le, ok := data.(FrameLifecycleEvent); ok {
 				return le.Event == opts.WaitUntil
 			}
@@ -1895,6 +1938,9 @@ func (f *Frame) WaitForNavigation(opts *FrameWaitForNavigationOptions) (*Respons
 			e := &k6ext.UserFriendlyError{
 				Err:     err,
 				Timeout: opts.Timeout,
+			}
+			if opts.URL != "" {
+				return fmt.Errorf("waiting for navigation to URL matching %q: %w", opts.URL, e)
 			}
 			return fmt.Errorf("waiting for navigation: %w", e)
 		}
