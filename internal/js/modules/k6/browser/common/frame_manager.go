@@ -536,6 +536,7 @@ func (m *FrameManager) requestStarted(req *Request) {
 			return
 		}
 	}
+	route.Continue()
 
 	m.framesMu.Lock()
 	defer m.framesMu.Unlock()

@@ -1,3 +1,4 @@
+import { sleep } from "k6";
 import { browser } from "k6/browser";
 
 export const options = {
@@ -17,11 +18,11 @@ export default async function () {
 	const page = await browser.newPage();
 
 	// registers a handler that logs all requests made by the page
-	page.route("https://quickpizza.grafana.com/api/tools", function (route) {
+	await page.route("https://quickpizza.grafana.com/api/tools", function (route) {
 		console.log(route.request().url());
 		route.abort();
 	});
-
+	
 	page.on("request", function (request) {
 		const url = request.url();
 		if (url.includes("/api/tools")) {

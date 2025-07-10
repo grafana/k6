@@ -337,18 +337,9 @@ func (m *NetworkManager) handleRequestRedirect(
 }
 
 func (m *NetworkManager) initDomains() error {
-	actions := []Action{network.Enable()}
-
-	// Only enable the Fetch domain if necessary, as it has a performance overhead.
-	if m.userReqInterceptionEnabled {
-		actions = append(actions,
-			network.SetCacheDisabled(true),
-			fetch.Enable().WithPatterns([]*fetch.RequestPattern{{URLPattern: "*"}}))
-	}
-	for _, action := range actions {
-		if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-			return fmt.Errorf("initializing networking %T: %w", action, err)
-		}
+	action := network.Enable()
+	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+		return fmt.Errorf("initializing networking %T: %w", action, err)
 	}
 
 	return nil
@@ -404,6 +395,15 @@ func (m *NetworkManager) handleEvents(in <-chan Event) bool {
 
 func (m *NetworkManager) onLoadingFailed(event *network.EventLoadingFailed) {
 	req, ok := m.requestFromID(event.RequestID)
+
+	if !ok {
+		if requestWillBeSent, mapOk := m.reqIDToRequestWillBeSentEvent[event.RequestID]; mapOk {
+			delete(m.reqIDToRequestWillBeSentEvent, event.RequestID)
+			m.onRequest(requestWillBeSent, nil)
+			req, ok = m.requestFromID(event.RequestID)
+		}
+	}
+
 	if !ok {
 		// TODO: add handling of iframe document requests starting in one session and ending up in another
 		return
@@ -488,7 +488,7 @@ func isInternalURL(u *url.URL) bool {
 }
 
 func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, requestPausedEvent *fetch.EventRequestPaused) {
-	m.logger.Infof("NetworkManager:onRequest", "url:%s method:%s type:%s fid:%s Starting onRequest",
+	m.logger.Debugf("NetworkManager:onRequest", "url:%s method:%s type:%s fid:%s Starting onRequest",
 		event.Request.URL, event.Request.Method, event.Initiator.Type, event.FrameID)
 	var redirectChain []*Request = nil
 	if event.RedirectResponse != nil {
@@ -513,6 +513,16 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, reques
 	if !ok && requestPausedEvent != nil && requestPausedEvent.FrameID != "" {
 		frame, ok = m.frameManager.getFrameByID(requestPausedEvent.FrameID)
 	}
+
+	// Check if it's main resource request interception (targetID === main frame id).
+	if !ok && m.frameManager.page != nil && event.FrameID != "" && event.FrameID == cdp.FrameID(m.frameManager.page.targetID) {
+		// Main resource request for the page is being intercepted so the Frame is not created
+		// yet. Precreate it here for the purposes of request interception. It will be updated
+		// later as soon as the request continues and we receive frame tree from the page.
+		m.frameManager.frameAttached(event.FrameID, "")
+		frame, ok = m.frameManager.getFrameByID(event.FrameID)
+	}
+
 	if !ok {
 		m.logger.Debugf("NetworkManager:onRequest", "url:%s method:%s type:%s fid:%s frame is nil",
 			event.Request.URL, event.Request.Method, event.Initiator.Type, event.FrameID)
@@ -572,7 +582,7 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, reques
 }
 
 func (m *NetworkManager) onRequestWillBeSent(event *network.EventRequestWillBeSent) {
-	m.logger.Infof("NetworkManager:onRequest", "url:%s method:%s type:%s fid:%s Starting onRequestWillBeSent",
+	m.logger.Debugf("NetworkManager:onRequest", "url:%s method:%s type:%s fid:%s Starting onRequestWillBeSent",
 		event.Request.URL, event.Request.Method, event.Initiator.Type, event.FrameID)
 
 	// Request interception doesn't happen for data URLs with Network Service.
@@ -590,9 +600,9 @@ func (m *NetworkManager) onRequestWillBeSent(event *network.EventRequestWillBeSe
 }
 
 func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
-	m.logger.Infof("NetworkManager:onRequestPaused",
+	m.logger.Debugf("NetworkManager:onRequestPaused",
 		"url:%v sid:%s", event.Request.URL, m.session.ID())
-	defer m.logger.Infof("NetworkManager:onRequestPaused:return",
+	defer m.logger.Debugf("NetworkManager:onRequestPaused:return",
 		"url:%v sid:%s", event.Request.URL, m.session.ID())
 
 	var failErr error
@@ -618,6 +628,24 @@ func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
 		}
 
 		requestID := event.NetworkID
+		if requestID == "" {
+			// Fetch without networkId means that request was not recognized by inspector, and
+			// it will never receive Network.requestWillBeSent. Continue the request to not affect it.
+			action := fetch.ContinueRequest(event.RequestID)
+			if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+				if errors.Is(err, context.Canceled) {
+					m.logger.Debug("NetworkManager:onRequestPaused", "context canceled continuing request")
+					return
+				}
+				m.logger.Errorf("NetworkManager:onRequestPaused", "continuing request: %s", err)
+			}
+			return
+		}
+
+		if strings.HasPrefix(event.Request.URL, "data:") {
+			return
+		}
+
 		if requestWillBeSentEvent, ok := m.reqIDToRequestWillBeSentEvent[requestID]; ok {
 			m.onRequest(requestWillBeSentEvent, event)
 			delete(m.reqIDToRequestWillBeSentEvent, requestID)
@@ -741,10 +769,20 @@ func (m *NetworkManager) onRequestServedFromCache(event *network.EventRequestSer
 }
 
 func (m *NetworkManager) onResponseReceived(event *network.EventResponseReceived) {
-	req, ok := m.requestFromID(event.RequestID)
+	requestID := event.RequestID
+	req, ok := m.requestFromID(requestID)
+	if !ok && event.Response.FromServiceWorker {
+		if requestWillBeSentEvent, mapOk := m.reqIDToRequestWillBeSentEvent[requestID]; mapOk {
+			delete(m.reqIDToRequestWillBeSentEvent, requestID)
+			m.onRequest(requestWillBeSentEvent, nil)
+			req, ok = m.requestFromID(requestID)
+		}
+	}
+
 	if !ok {
 		return
 	}
+
 	resp := NewHTTPResponse(m.ctx, req, event.Response, event.Timestamp)
 	req.responseMu.Lock()
 	req.response = resp
@@ -786,7 +824,9 @@ func (m *NetworkManager) updateProtocolRequestInterception() error {
 	if enabled == m.protocolReqInterceptionEnabled {
 		return nil
 	}
+
 	m.protocolReqInterceptionEnabled = enabled
+	m.logger.Debugf("NetworkManager:updateProtocolRequestInterception", "updating request interception to %t (session: %s)", enabled, m.session.ID())
 
 	actions := []Action{
 		network.SetCacheDisabled(true),
@@ -833,7 +873,7 @@ func (m *NetworkManager) AbortRequest(request *Request, errorReason string) {
 		m.logger.Errorf("NetworkManager:AbortRequest", "unknown error code: %s", errorReason)
 		return
 	}
-	m.logger.Infof("NetworkManager:AbortRequest", "aborting request (id: %s, errorReason: %s)", request.interceptionID, errorReason)
+	m.logger.Debugf("NetworkManager:AbortRequest", "aborting request (id: %s, errorReason: %s)", request.interceptionID, errorReason)
 
 	action := fetch.FailRequest(request.interceptionID, netErrorReason)
 	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
@@ -844,6 +884,23 @@ func (m *NetworkManager) AbortRequest(request *Request, errorReason string) {
 			m.logger.Debug("NetworkManager:AbortRequest", "context canceled interrupting request")
 		} else {
 			m.logger.Errorf("NetworkManager:AbortRequest", "fail to abort request (id: %s): %s", request.interceptionID, err)
+		}
+		return
+	}
+}
+
+func (m *NetworkManager) ContinueRequest(request *Request) {
+	m.logger.Debugf("NetworkManager:ContinueRequest", "continuing request (id: %s)", request.interceptionID)
+
+	action := fetch.ContinueRequest(request.interceptionID)
+	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+		// Avoid logging as error when context is canceled.
+		// Most probably this happens when trying to fail a site's background request
+		// while the iteration is ending and therefore the browser context is being closed.
+		if errors.Is(err, context.Canceled) {
+			m.logger.Debug("NetworkManager:ContinueRequest", "context canceled continuing request")
+		} else {
+			m.logger.Errorf("NetworkManager:ContinueRequest", "fail to continue request (id: %s): %s", request.interceptionID, err)
 		}
 		return
 	}

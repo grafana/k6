@@ -6,11 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/chromedp/cdproto/fetch"
 	"net/url"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/chromedp/cdproto/fetch"
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/network"
@@ -742,6 +743,16 @@ func (r *Route) Abort(errorCode string) {
 	}
 
 	r.networkManager.AbortRequest(r.request, errorCode)
+}
+
+func (r *Route) Continue() {
+	err := r.startHandling()
+	if err != nil {
+		r.logger.Errorf("Route:Continue", "rurl:%s err:%s", r.request.URL(), err)
+		return
+	}
+
+	r.networkManager.ContinueRequest(r.request)
 }
 
 func (r *Route) startHandling() error {
