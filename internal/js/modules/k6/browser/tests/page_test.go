@@ -1766,11 +1766,6 @@ func TestPageIsHidden(t *testing.T) {
 
 func TestShadowDOMAndDocumentFragment(t *testing.T) { //nolint:tparallel
 	t.Parallel()
-	if runtime.GOOS == "windows" {
-		t.Skip() // timeouts
-	}
-
-	tb := newTestBrowser(t, withFileServer())
 
 	tests := []struct {
 		name     string
@@ -1800,6 +1795,7 @@ func TestShadowDOMAndDocumentFragment(t *testing.T) { //nolint:tparallel
 
 	for _, tt := range tests { //nolint:paralleltest
 		t.Run(tt.name, func(t *testing.T) {
+			tb := newTestBrowser(t, withFileServer())
 			tb.vu.ActivateVU()
 			tb.vu.StartIteration(t)
 			defer tb.vu.EndIteration(t)
