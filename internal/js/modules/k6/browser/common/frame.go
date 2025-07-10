@@ -79,6 +79,34 @@ func (s *DOMElementState) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+func isExactString(s string) bool {
+	return len(s) > 0 && s[0] == '\'' && s[len(s)-1] == '\''
+}
+
+// urlMatcher matches URLs based on pattern type. It can match on exact and regex
+// patterns. If the pattern is empty or a single quote, it matches any URL.
+func urlMatcher(pattern string, jsRegexChecker JSRegexChecker) (func(string) (bool, error), error) {
+	if pattern == "" || pattern == "''" {
+		return func(url string) (bool, error) { return true, nil }, nil
+	}
+
+	if isExactString(pattern) {
+		return func(url string) (bool, error) { return "'"+url+"'" == pattern, nil }, nil
+	}
+
+	if jsRegexChecker == nil {
+		return nil, fmt.Errorf("JavaScript pattern matcher is required for URL matching")
+	}
+
+	return func(url string) (bool, error) {
+		matched, err := jsRegexChecker(pattern, url)
+		if err != nil {
+			return false, fmt.Errorf("URL pattern matching error for pattern %q and URL %q: %w", pattern, url, err)
+		}
+		return matched, nil
+	}, nil
+}
+
 // Frame represents a frame in an HTML document.
 type Frame struct {
 	BaseEventEmitter
