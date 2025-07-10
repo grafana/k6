@@ -30,6 +30,8 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/health"
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/testdata"
 
@@ -71,6 +73,9 @@ func main() {
 	grpcServer := grpc.NewServer(opts...)
 	grpcservice.RegisterRouteGuideServer(grpcServer, grpcservice.NewRouteGuideServer(features...))
 	grpcservice.RegisterFeatureExplorerServer(grpcServer, grpcservice.NewFeatureExplorerServer(features...))
+	healthcheck := health.NewServer()
+	healthpb.RegisterHealthServer(grpcServer, healthcheck)
+	healthcheck.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
 	reflection.Register(grpcServer)
 	grpcServer.Serve(lis)
 }
