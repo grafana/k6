@@ -768,3 +768,37 @@ func parseStrict(ctx context.Context, opts sobek.Value) bool {
 
 	return strict
 }
+
+// FrameWaitForURLOptions are options for Frame.waitForURL and Page.waitForURL.
+type FrameWaitForURLOptions struct {
+	Timeout   time.Duration
+	WaitUntil LifecycleEvent
+}
+
+// NewFrameWaitForURLOptions returns a new FrameWaitForURLOptions.
+func NewFrameWaitForURLOptions(defaultTimeout time.Duration) *FrameWaitForURLOptions {
+	return &FrameWaitForURLOptions{
+		Timeout:   defaultTimeout,
+		WaitUntil: LifecycleEventLoad,
+	}
+}
+
+// Parse parses the frame waitForURL options.
+func (o *FrameWaitForURLOptions) Parse(ctx context.Context, opts sobek.Value) error {
+	rt := k6ext.Runtime(ctx)
+	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
+		opts := opts.ToObject(rt)
+		for _, k := range opts.Keys() {
+			switch k {
+			case "timeout":
+				o.Timeout = time.Duration(opts.Get(k).ToInteger()) * time.Millisecond
+			case "waitUntil":
+				lifeCycle := opts.Get(k).String()
+				if err := o.WaitUntil.UnmarshalText([]byte(lifeCycle)); err != nil {
+					return fmt.Errorf("parsing waitForURL options: %w", err)
+				}
+			}
+		}
+	}
+	return nil
+}
