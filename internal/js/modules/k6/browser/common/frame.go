@@ -1902,7 +1902,7 @@ func (f *Frame) WaitForNavigation(
 	jsRegexChecker JSRegexChecker,
 ) (*Response, error) {
 	f.log.Debugf("Frame:WaitForNavigation",
-		"fid:%s furl:%s", f.ID(), f.URL())
+		"fid:%s furl:%s url:%s", f.ID(), f.URL(), opts.URL)
 	defer f.log.Debugf("Frame:WaitForNavigation:return",
 		"fid:%s furl:%s", f.ID(), f.URL())
 
@@ -1930,6 +1930,9 @@ func (f *Frame) WaitForNavigation(
 			e := &k6ext.UserFriendlyError{
 				Err:     err,
 				Timeout: opts.Timeout,
+			}
+			if opts.URL != "" {
+				return fmt.Errorf("waiting for navigation to URL matching %q: %w", opts.URL, e)
 			}
 			return fmt.Errorf("waiting for navigation: %w", e)
 		}
