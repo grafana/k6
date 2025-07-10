@@ -501,7 +501,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}
 
 			return k6ext.Promise(vu.Context(), func() (result any, reason error) {
-				resp, err := p.WaitForNavigation(popts)
+				resp, err := p.WaitForNavigation(popts, nil)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
 				}
