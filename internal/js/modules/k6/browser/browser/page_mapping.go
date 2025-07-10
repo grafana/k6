@@ -500,8 +500,15 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, fmt.Errorf("parsing page wait for navigation options: %w", err)
 			}
 
-			return k6ext.Promise(vu.Context(), func() (result any, reason error) {
-				resp, err := p.WaitForNavigation(popts, nil)
+			// Inject JS regex checker for URL regex pattern matching
+			ctx := vu.Context()
+			jsRegexChecker, err := injectRegexMatcherScript(ctx, vu, p.TargetID())
+			if err != nil {
+				return nil, err
+			}
+
+			return k6ext.Promise(ctx, func() (result any, reason error) {
+				resp, err := p.WaitForNavigation(popts, jsRegexChecker)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
 				}
