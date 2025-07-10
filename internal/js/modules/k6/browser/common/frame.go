@@ -1894,7 +1894,13 @@ func (f *Frame) WaitForLoadState(state string, popts *FrameWaitForLoadStateOptio
 }
 
 // WaitForNavigation waits for the given navigation lifecycle event to happen.
-func (f *Frame) WaitForNavigation(opts *FrameWaitForNavigationOptions) (*Response, error) {
+// jsRegexChecker should be non-nil to be able to test against a URL pattern in the options.
+//
+//nolint:funlen
+func (f *Frame) WaitForNavigation(
+	opts *FrameWaitForNavigationOptions,
+	jsRegexChecker JSRegexChecker,
+) (*Response, error) {
 	f.log.Debugf("Frame:WaitForNavigation",
 		"fid:%s furl:%s", f.ID(), f.URL())
 	defer f.log.Debugf("Frame:WaitForNavigation:return",
@@ -1910,6 +1916,7 @@ func (f *Frame) WaitForNavigation(opts *FrameWaitForNavigationOptions) (*Respons
 	lifecycleEvtCh, lifecycleEvtCancel := createWaitForEventPredicateHandler(
 		timeoutCtx, f, []string{EventFrameAddLifecycle},
 		func(data any) bool {
+			// Wait for the lifecycle event to happen.
 			if le, ok := data.(FrameLifecycleEvent); ok {
 				return le.Event == opts.WaitUntil
 			}

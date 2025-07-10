@@ -1576,12 +1576,16 @@ func (p *Page) WaitForLoadState(state string, popts *FrameWaitForLoadStateOption
 }
 
 // WaitForNavigation waits for the given navigation lifecycle event to happen.
-func (p *Page) WaitForNavigation(opts *FrameWaitForNavigationOptions) (*Response, error) {
+// jsRegexChecker should be non-nil to be able to test against a URL pattern in the options.
+func (p *Page) WaitForNavigation(
+	opts *FrameWaitForNavigationOptions,
+	jsRegexChecker JSRegexChecker,
+) (*Response, error) {
 	p.logger.Debugf("Page:WaitForNavigation", "sid:%v", p.sessionID())
 	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.waitForNavigation")
 	defer span.End()
 
-	resp, err := p.frameManager.MainFrame().WaitForNavigation(opts)
+	resp, err := p.frameManager.MainFrame().WaitForNavigation(opts, jsRegexChecker)
 	if err != nil {
 		spanRecordError(span, err)
 		return nil, err

@@ -950,8 +950,7 @@ func TestPageWaitForNavigationErrOnCtxDone(t *testing.T) {
 	go b.cancelContext()
 	<-b.context().Done()
 	_, err := p.WaitForNavigation(
-		common.NewFrameWaitForNavigationOptions(p.Timeout()),
-	)
+		common.NewFrameWaitForNavigationOptions(p.Timeout()), nil)
 	require.ErrorContains(t, err, "canceled")
 }
 
