@@ -1908,9 +1908,25 @@ func (f *Frame) WaitForNavigation(
 
 	timeoutCtx, timeoutCancel := context.WithTimeout(f.ctx, opts.Timeout)
 
-	navEvtCh, navEvtCancel := createWaitForEventHandler(timeoutCtx, f, []string{EventFrameNavigation},
+	// Create URL matcher based on the pattern
+	matcher, err := urlMatcher(opts.URL, jsRegexChecker)
+	if err != nil {
+		timeoutCancel()
+		return nil, fmt.Errorf("parsing URL pattern: %w", err)
+	}
+
+	navEvtCh, navEvtCancel := createWaitForEventPredicateHandler(timeoutCtx, f, []string{EventFrameNavigation},
 		func(data any) bool {
-			return true // Both successful and failed navigations are considered
+			if navEvt, ok := data.(*NavigationEvent); ok {
+				// Check if the navigation URL matches the pattern
+				matched, err := matcher(navEvt.url)
+				if err != nil {
+					f.log.Error(err)
+					return false
+				}
+				return matched
+			}
+			return false
 		})
 
 	lifecycleEvtCh, lifecycleEvtCancel := createWaitForEventPredicateHandler(
