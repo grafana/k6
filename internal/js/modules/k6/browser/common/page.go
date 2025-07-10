@@ -1548,17 +1548,7 @@ func (p *Page) Type(selector string, text string, popts *FrameTypeOptions) error
 func (p *Page) URL() (string, error) {
 	p.logger.Debugf("Page:URL", "sid:%v", p.sessionID())
 
-	js := `() => document.location.toString()`
-	v, err := p.Evaluate(js)
-	if err != nil {
-		return "", fmt.Errorf("getting page URL: %w", err)
-	}
-	s, ok := v.(string)
-	if !ok {
-		return "", fmt.Errorf("getting page URL: expected string, got %T", v)
-	}
-
-	return s, nil
+	return p.MainFrame().url, nil
 }
 
 // ViewportSize will return information on the viewport width and height.
