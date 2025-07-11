@@ -191,28 +191,45 @@ type ConsoleMessage struct {
 type PageOnHandler func(PageOnEvent) error
 
 type RouteHandler struct {
+	runtime *sobek.Runtime
+	logger  *log.Logger
+
 	path    string
 	handler RouteHandlerCallback
 }
 
-func NewRouteHandler(path string, handler RouteHandlerCallback) *RouteHandler {
+func NewRouteHandler(rt *sobek.Runtime, logger *log.Logger, path string, handler RouteHandlerCallback) *RouteHandler {
 	return &RouteHandler{
+		runtime: rt,
+		logger:  logger,
 		path:    path,
 		handler: handler,
 	}
 }
 
-func (rh *RouteHandler) Matches(requestURL string) bool {
+func (rh *RouteHandler) Matches(requestURL string) (bool, error) {
 	if requestURL == "" {
-		return true
+		return true, nil
 	}
+
 	if rh.path == requestURL {
-		return true
+		return true, nil
 	}
 
-	// TODO: handle regexp, glob expression and even function?
+	// Regex matching
+	if strings.HasPrefix(rh.path, "/") && strings.HasSuffix(rh.path, "/") {
+		js := fmt.Sprintf(`_k6BrowserCheckRegEx(%s, '%s')`, rh.path, requestURL)
+		rh.logger.Infof("RouteHandler", "trying to match regex: %s", js)
 
-	return false
+		matched, err := rh.runtime.RunString(js)
+		if err != nil {
+			return false, fmt.Errorf("matching url with regex: %w", err)
+		}
+
+		return matched.ToBoolean(), nil
+	}
+
+	return false, nil
 }
 
 type RouteHandlerCallback func(*Route) error
@@ -1255,11 +1272,12 @@ func (p *Page) Referrer() string {
 }
 
 // Route register a handler to be executed for a given request path
-func (p *Page) Route(path string, handlerCallback RouteHandlerCallback) {
-	routeHandler := NewRouteHandler(path, handlerCallback)
+func (p *Page) Route(rt *sobek.Runtime, path string, handlerCallback RouteHandlerCallback) error {
+	p.logger.Infof("Page:Route", "sid:%v path:%s", p.sessionID(), path)
+	routeHandler := NewRouteHandler(rt, p.logger, path, handlerCallback)
 	p.routes = append([]*RouteHandler{routeHandler}, p.routes...)
-	// TODO: improve this?
-	p.mainFrameSession.updateRequestInterception(true)
+
+	return p.mainFrameSession.updateRequestInterception(true)
 }
 
 // NavigationTimeout returns the page's navigation timeout.

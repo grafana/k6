@@ -314,10 +314,15 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		},
 		// TODO: path could also be a regex, a glob expression or a function?
 		"route": func(path string, handler sobek.Callable) (*sobek.Promise, error) {
+
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				ctx := vu.Context()
+				err := prepK6BrowserRegExChecker(rt)()
+				if err != nil {
+					return nil, err
+				}
 
-				// TODO: Is this necessary? 
+				// TODO: Is this necessary?
 				// Run the event handler in the task queue to
 				// ensure that the handler is executed on the event loop.
 				tq := vu.get(ctx, p.TargetID())
@@ -340,8 +345,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 					return nil
 				}
 
-				p.Route(path, routeHandler)
-				return nil, nil
+				return nil, p.Route(rt, path, routeHandler)
 			}), nil
 		},
 		"screenshot": func(opts sobek.Value) (*sobek.Promise, error) {

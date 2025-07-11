@@ -742,7 +742,7 @@ func (r *Route) Abort(errorCode string) {
 		errorCode = "failed"
 	}
 
-	r.networkManager.AbortRequest(r.request, errorCode)
+	r.networkManager.AbortRequest(r.request.interceptionID, errorCode)
 }
 
 func (r *Route) Continue() {
@@ -752,7 +752,7 @@ func (r *Route) Continue() {
 		return
 	}
 
-	r.networkManager.ContinueRequest(r.request)
+	r.networkManager.ContinueRequest(r.request.interceptionID)
 }
 
 func (r *Route) startHandling() error {

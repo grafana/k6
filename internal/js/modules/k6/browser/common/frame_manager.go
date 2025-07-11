@@ -524,20 +524,6 @@ func (m *FrameManager) requestFinished(req *Request) {
 func (m *FrameManager) requestStarted(req *Request) {
 	m.logger.Debugf("FrameManager:requestStarted", "fmid:%d rurl:%s", m.ID(), req.URL())
 
-	// TODO: If the handler doesn't match we return false and perform a route.continue like in https://github.com/microsoft/playwright/blob/main/packages/playwright-core/src/server/frames.ts#L315
-	// TODO: Perform some tests against PW to ensure that the behaviour matches. Where it doesn't create new issues or resolve there and then.
-	route := NewRoute(m.ctx, m.logger, m.page.mainFrameSession.networkManager, req)
-	for _, r := range m.page.routes {
-		if r.Matches(req.URL()) {
-			err := r.handler(route)
-			if err != nil {
-				continue
-			}
-			return
-		}
-	}
-	route.Continue()
-
 	m.framesMu.Lock()
 	defer m.framesMu.Unlock()
 
@@ -554,7 +540,33 @@ func (m *FrameManager) requestStarted(req *Request) {
 		frame.pendingDocument = &DocumentInfo{documentID: req.documentID, request: req}
 		frame.pendingDocumentMu.Unlock()
 	}
-	m.logger.Debugf("FrameManager:requestStarted", "fmid:%d rurl:%s pdoc:nil", m.ID(), req.URL())
+
+	if len(m.page.routes) == 0 {
+		return
+	}
+
+	// TODO: If the handler doesn't match we return false and perform a route.continue like in https://github.com/microsoft/playwright/blob/main/packages/playwright-core/src/server/frames.ts#L315
+	// TODO: Perform some tests against PW to ensure that the behaviour matches. Where it doesn't create new issues or resolve there and then.
+	route := NewRoute(m.ctx, m.logger, m.page.mainFrameSession.networkManager, req)
+	for _, r := range m.page.routes {
+		matched, err := r.Matches(req.URL())
+		if err != nil {
+			m.logger.Errorf("FrameManager:requestStarted",
+				"fmid:%d rurl:%s error matching regex with request URL: %v", m.ID(), req.URL(), err)
+			continue
+		}
+
+		if matched {
+			err := r.handler(route)
+			if err != nil {
+				m.logger.Errorf("FrameManager:requestStarted",
+					"fmid:%d rurl:%s error handling request with route: %v", m.ID(), req.URL(), err)
+				continue
+			}
+			return
+		}
+	}
+	route.Continue()
 }
 
 // Frames returns a list of frames on the page.

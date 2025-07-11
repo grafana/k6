@@ -22,7 +22,12 @@ export default async function () {
 		console.log(route.request().url());
 		route.abort();
 	});
-	
+
+	await page.route(/(\.png$)|(\.jpg$)/, function (route) {
+		console.log(route.request().url());
+		route.abort();
+	});
+
 	page.on("request", function (request) {
 		const url = request.url();
 		if (url.includes("/api/tools")) {
@@ -40,6 +45,8 @@ export default async function () {
 	await page.goto("https://quickpizza.grafana.com/", {
 		waitUntil: "networkidle",
 	});
+
+	sleep(10)
 
 	await page.close();
 }
