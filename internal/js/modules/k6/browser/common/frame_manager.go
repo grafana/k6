@@ -689,6 +689,9 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *Frame
 				resp = req.response
 				req.responseMu.RUnlock()
 			}
+			if e.err != nil {
+				err = e.err
+			}
 		}
 	case <-timeoutCtx.Done():
 		return nil, wrapTimeoutError(timeoutCtx.Err())
@@ -700,7 +703,7 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *Frame
 		return nil, wrapTimeoutError(timeoutCtx.Err())
 	}
 
-	return resp, nil
+	return resp, err
 }
 
 // Page returns the page that this frame manager belongs to.
