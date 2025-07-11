@@ -27,9 +27,15 @@ const (
 	// BinaryProvisioningFeatureFlag defines the environment variable that enables the binary provisioning
 	BinaryProvisioningFeatureFlag = "K6_BINARY_PROVISIONING"
 
-	defaultBuildServiceURL = "https://ingest.k6.io/builder/api/v1"
-	defaultConfigFileName  = "config.json"
-	defaultBinaryCacheDir  = "builds"
+	// DefaultBuildServiceURL defines the URL to the default (grafana hosted) build service
+	DefaultBuildServiceURL = "https://ingest.k6.io/builder/api/v1"
+	// CloudExtensionsCatalog defines the extensions catalog for cloud supported extensions
+	CloudExtensionsCatalog = "cloud"
+	// OSSExtensionsCatalog defines the extensions catalog for community extensions
+	OSSExtensionsCatalog = "oss"
+
+	defaultConfigFileName = "config.json"
+	defaultBinaryCacheDir = "builds"
 )
 
 // GlobalState contains the GlobalFlags and accessors for most of the global
@@ -176,6 +182,7 @@ type GlobalFlags struct {
 	Verbose          bool
 
 	BinaryProvisioning bool
+	ExtensionsCatalog  string
 	BuildServiceURL    string
 	BinaryCache        string
 }
@@ -183,12 +190,13 @@ type GlobalFlags struct {
 // GetDefaultFlags returns the default global flags.
 func GetDefaultFlags(homeDir string, cacheDir string) GlobalFlags {
 	return GlobalFlags{
-		Address:          "localhost:6565",
-		ProfilingEnabled: false,
-		ConfigFilePath:   filepath.Join(homeDir, "k6", defaultConfigFileName),
-		LogOutput:        "stderr",
-		BuildServiceURL:  defaultBuildServiceURL,
-		BinaryCache:      filepath.Join(cacheDir, "k6", defaultBinaryCacheDir),
+		Address:           "localhost:6565",
+		ProfilingEnabled:  false,
+		ConfigFilePath:    filepath.Join(homeDir, "k6", defaultConfigFileName),
+		LogOutput:         "stderr",
+		BuildServiceURL:   DefaultBuildServiceURL,
+		ExtensionsCatalog: CloudExtensionsCatalog,
+		BinaryCache:       filepath.Join(cacheDir, "k6", defaultBinaryCacheDir),
 	}
 }
 
@@ -226,6 +234,9 @@ func getFlags(defaultFlags GlobalFlags, env map[string]string, args []string) Gl
 	}
 	if val, ok := env["K6_BUILD_SERVICE_URL"]; ok {
 		result.BuildServiceURL = val
+	}
+	if val, ok := env["K6_EXTENSIONS_CATALOG"]; ok {
+		result.ExtensionsCatalog = val
 	}
 
 	// check if verbose flag is set

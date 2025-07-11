@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"strings"
@@ -216,8 +217,36 @@ func newK6BuildProvider(gs *state.GlobalState) provisioner {
 }
 
 func (p *k6buildProvider) provision(deps k6deps.Dependencies) (commandExecutor, error) {
+	buildSrv := p.gs.Flags.BuildServiceURL
+	buildSrvUrl, err := url.Parse(buildSrv)
+	if err != nil {
+		return nil, fmt.Errorf("invalid URL to binary provisioning build service: %w", err)
+	}
+
+	// Select the extensions catalog (cloud or oss) and add it to the build service's URL. By default it is cloud.
+	// For now, we only support this for the default (grafana hosted) build service, so if a custom build service URL
+	// is used, we ignore the catalog.
+	if buildSrv == state.DefaultBuildServiceURL {
+		catalog := p.gs.Flags.ExtensionsCatalog
+		// check the catalog is valid
+		if catalog != state.CloudExtensionsCatalog && catalog != state.OSSExtensionsCatalog {
+			return nil, fmt.Errorf(
+				"invalid extensions catalog for binary provisioning: %q. Only %q and %q are supported."+
+					"Set a valid option using the K6_EXTENSIONS_CATALOG environment variable",
+				catalog,
+				state.CloudExtensionsCatalog,
+				state.OSSExtensionsCatalog,
+			)
+		}
+
+		p.gs.Logger.
+			Debugf("using the %q extensions catalog", catalog)
+
+		buildSrv = buildSrvUrl.JoinPath(catalog).String()
+	}
+
 	config := k6provider.Config{
-		BuildServiceURL: p.gs.Flags.BuildServiceURL,
+		BuildServiceURL: buildSrv,
 		BinaryCacheDir:  p.gs.Flags.BinaryCache,
 	}
 
