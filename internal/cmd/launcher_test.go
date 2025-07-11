@@ -289,7 +289,7 @@ func TestIsAnalysisRequired(t *testing.T) {
 		{
 			name:     "run command",
 			args:     []string{"run", "script.js"},
-			expected: false,
+			expected: true,
 		},
 		{
 			name:     "cloud command",
