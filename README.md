@@ -83,6 +83,11 @@ export default function () {
 
 You can run scripts like this on the CLI, or in your CI, or across a Kubernetes cluster.
 
+> [!NOTE]
+> Don't want to write code ?
+> 
+> We got you! Meet [k6 Studio](https://github.com/grafana/k6-studio), a desktop application made to help you generate k6 scripts without having to touch code!
+
 ## Documentation
 
 The docs cover all aspects of using k6. Some highlights include:
