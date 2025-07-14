@@ -3,6 +3,7 @@ package js
 import (
 	"encoding/json"
 	"os"
+	"reflect"
 	"strings"
 
 	"github.com/grafana/sobek"
@@ -79,14 +80,19 @@ func (c console) Error(args ...sobek.Value) {
 
 const functionLog = "[object Function]"
 
+// errorType is used to check if a [sobek.Value] implements the [error] interface.
+var errorType = reflect.TypeOf((*error)(nil)).Elem()
+
 func (c console) valueString(v sobek.Value) string {
 	if _, isFunction := sobek.AssertFunction(v); isFunction {
 		return functionLog
 	}
 
-	if exported := v.Export(); exported != nil {
-		if err, isError := exported.(error); isError {
-			return err.Error()
+	if exportType := v.ExportType(); exportType != nil && exportType.Implements(errorType) {
+		if exported := v.Export(); exported != nil {
+			if err, isError := exported.(error); isError {
+				return err.Error()
+			}
 		}
 	}
 
