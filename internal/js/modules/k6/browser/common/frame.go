@@ -1915,6 +1915,10 @@ func (f *Frame) WaitForNavigation(opts *FrameWaitForNavigationOptions) (*Respons
 	select {
 	case evt := <-navEvtCh:
 		if e, ok := evt.(*NavigationEvent); ok {
+			if e.err != nil {
+				return nil, e.err
+			}
+
 			if e.newDocument == nil {
 				sameDocNav = true
 				break

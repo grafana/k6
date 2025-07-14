@@ -682,6 +682,10 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *Frame
 	select {
 	case evt := <-navEvtCh:
 		if e, ok := evt.(*NavigationEvent); ok {
+			if e.err != nil {
+				return nil, e.err
+			}
+
 			req := e.newDocument.request
 			// Request could be nil in case of navigation to e.g. BlankPage.
 			if req != nil {
