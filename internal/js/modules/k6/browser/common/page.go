@@ -207,32 +207,7 @@ func NewRouteHandler(rt *sobek.Runtime, logger *log.Logger, path string, handler
 	}
 }
 
-func (rh *RouteHandler) Matches(requestURL string) (bool, error) {
-	if requestURL == "" {
-		return true, nil
-	}
-
-	if rh.path == requestURL {
-		return true, nil
-	}
-
-	// Regex matching
-	if strings.HasPrefix(rh.path, "/") && strings.HasSuffix(rh.path, "/") {
-		js := fmt.Sprintf(`_k6BrowserCheckRegEx(%s, '%s')`, rh.path, requestURL)
-		rh.logger.Infof("RouteHandler", "trying to match regex: %s", js)
-
-		matched, err := rh.runtime.RunString(js)
-		if err != nil {
-			return false, fmt.Errorf("matching url with regex: %w", err)
-		}
-
-		return matched.ToBoolean(), nil
-	}
-
-	return false, nil
-}
-
-type RouteHandlerCallback func(*Route) error
+type RouteHandlerCallback func(*Route) (bool, error)
 
 // Page stores Page/tab related context.
 type Page struct {

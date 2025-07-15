@@ -547,22 +547,16 @@ func (m *FrameManager) requestStarted(req *Request) {
 
 	// TODO: If the handler doesn't match we return false and perform a route.continue like in https://github.com/microsoft/playwright/blob/main/packages/playwright-core/src/server/frames.ts#L315
 	// TODO: Perform some tests against PW to ensure that the behaviour matches. Where it doesn't create new issues or resolve there and then.
-	route := NewRoute(m.ctx, m.logger, m.page.mainFrameSession.networkManager, req)
+	route := NewRoute(m.logger, m.page.mainFrameSession.networkManager, m.vu.Runtime(), req)
 	for _, r := range m.page.routes {
-		matched, err := r.Matches(req.URL())
+		continueReq, err := r.handler(route)
 		if err != nil {
 			m.logger.Errorf("FrameManager:requestStarted",
-				"fmid:%d rurl:%s error matching regex with request URL: %v", m.ID(), req.URL(), err)
+				"fmid:%d rurl:%s error handling request with route: %v", m.ID(), req.URL(), err)
 			continue
 		}
 
-		if matched {
-			err := r.handler(route)
-			if err != nil {
-				m.logger.Errorf("FrameManager:requestStarted",
-					"fmid:%d rurl:%s error handling request with route: %v", m.ID(), req.URL(), err)
-				continue
-			}
+		if !continueReq {
 			return
 		}
 	}

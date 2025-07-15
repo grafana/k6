@@ -314,7 +314,6 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		},
 		// TODO: path could also be a regex, a glob expression or a function?
 		"route": func(path string, handler sobek.Callable) (*sobek.Promise, error) {
-
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				ctx := vu.Context()
 				err := prepK6BrowserRegExChecker(rt)()
@@ -322,27 +321,46 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 					return nil, err
 				}
 
-				// TODO: Is this necessary?
 				// Run the event handler in the task queue to
 				// ensure that the handler is executed on the event loop.
 				tq := vu.get(ctx, p.TargetID())
-				routeHandler := func(route *common.Route) error {
-					done := make(chan struct{})
-
+				routeHandler := func(route *common.Route) (bool, error) {
+					done := make(chan bool)
+					continueReq := true
+					var rtnErr error
 					tq.Queue(func() error {
 						defer close(done)
 
-						_, err := handler(
+						matched, err := route.Matches(path)
+						if err != nil {
+							rtnErr = fmt.Errorf("matching route path %q: %w", path, err)
+							return nil
+						}
+
+						if !matched {
+							return nil
+						}
+
+						_, err = handler(
 							sobek.Undefined(),
 							rt.ToValue(route),
 						)
 						if err != nil {
-							return fmt.Errorf("executing page.route('%s') handler: %w", path, err)
+							rtnErr = fmt.Errorf("executing page.route('%s') handler: %w", path, err)
+							return nil
 						}
+						continueReq = false
 
 						return nil
 					})
-					return nil
+
+					select {
+					case <-done:
+					case <-ctx.Done():
+						err = errors.New("iteration ended before route completed")
+					}
+
+					return continueReq, rtnErr
 				}
 
 				return nil, p.Route(rt, path, routeHandler)
