@@ -1084,12 +1084,19 @@ func (f *Frame) GetByRole(role string, opts *GetByRoleOptions) *Locator {
 	return f.Locator(builder.String(), nil)
 }
 
+// isQuotedText returns true if the string is a quoted string.
+// This is used to determine if the string will be used to match
+// a string instead of as a regex in the getBy* APIs.
+func isQuotedText(s string) bool {
+	return len(s) > 0 && s[0] == '\'' && s[len(s)-1] == '\''
+}
+
 // Locator creates and returns a new locator for this frame.
 func (f *Frame) GetByAltText(alt string, opts *GetByAltTextOptions) *Locator {
 	f.log.Debugf("Frame:GetByAltText", "fid:%s furl:%q alt:%q opts:%+v", f.ID(), f.URL(), alt, opts)
 
 	a := "[alt=" + alt + "]"
-	if len(alt) > 0 && alt[0] == '\'' && alt[len(alt)-1] == '\'' {
+	if isQuotedText(alt) {
 		if opts != nil && opts.Exact != nil && *opts.Exact {
 			a = "[alt=" + alt + "s]"
 		} else {
