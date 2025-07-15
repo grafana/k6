@@ -685,7 +685,15 @@ func (o *FrameWaitForNavigationOptions) Parse(ctx context.Context, opts sobek.Va
 		for _, k := range opts.Keys() {
 			switch k {
 			case "url":
-				o.URL = opts.Get(k).String()
+				var val string
+				switch opts.Get(k).ExportType() {
+				case reflect.TypeOf(string("")):
+					val = fmt.Sprintf("'%s'", opts.Get(k).String()) // Strings require quotes
+				default: // JS Regex, CSS, numbers or booleans
+					val = opts.Get(k).String() // No quotes
+				}
+
+				o.URL = val
 			case "timeout":
 				o.Timeout = time.Duration(opts.Get(k).ToInteger()) * time.Millisecond
 			case "waitUntil":
