@@ -582,7 +582,7 @@ func (m *FrameManager) MainFrameURL() string {
 	return m.mainFrame.URL()
 }
 
-// NavigateFrame will navigate specified frame to specified URL.
+// NavigateFrame will navigate a specified frame to specified URL.
 //
 //nolint:funlen
 func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *FrameGotoOptions) (*Response, error) {
@@ -599,14 +599,21 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *Frame
 	timeoutCtx, timeoutCancelFn := context.WithTimeout(m.ctx, parsedOpts.Timeout)
 	defer timeoutCancelFn()
 
-	newDocIDCh := make(chan string, 1)
+	var newDocumentID string
+	newDocIDIsReadyCh := make(chan struct{})
+
 	navEvtCh, navEvtCancel := createWaitForEventHandler(
 		timeoutCtx, frame, []string{EventFrameNavigation},
 		func(data any) bool {
-			newDocID := <-newDocIDCh
+			select {
+			case <-newDocIDIsReadyCh:
+			case <-timeoutCtx.Done():
+				return false
+			}
+
 			if evt, ok := data.(*NavigationEvent); ok {
 				if evt.newDocument != nil {
-					return evt.newDocument.documentID == newDocID
+					return evt.newDocument.documentID == newDocumentID
 				}
 			}
 			return false
@@ -648,20 +655,22 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *Frame
 		// main frame's session.
 		fs = frame.page.mainFrameSession
 	}
-	newDocumentID, err := fs.navigateFrame(frame, url, parsedOpts.Referer)
+
+	var err error
+	newDocumentID, err = fs.navigateFrame(frame, url, parsedOpts.Referer)
 	if err != nil {
 		return nil, fmt.Errorf("navigating to %q: %w", url, err)
 	}
 
 	if newDocumentID == "" {
-		// It's a navigation within the same document (e.g. via anchor links or
+		// It's a navigation within the same document (e.g., via anchor links or
 		// the History API), so don't wait for a response nor any lifecycle
 		// events.
 		return nil, nil //nolint:nilnil
 	}
 
 	// unblock the waiter goroutine
-	newDocIDCh <- newDocumentID
+	close(newDocIDIsReadyCh)
 
 	wrapTimeoutError := func(err error) error {
 		if errors.Is(err, context.DeadlineExceeded) {

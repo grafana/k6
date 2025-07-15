@@ -1078,7 +1078,7 @@ func (f *Frame) Goto(url string, opts *FrameGotoOptions) (*Response, error) {
 	}
 	applySlowMo(f.ctx)
 
-	// Since response will be in an interface, it will never be nil,
+	// Since the response will be in an interface, it will never be nil,
 	// so we need to return nil explicitly.
 	if resp == nil {
 		return nil, nil //nolint:nilnil
