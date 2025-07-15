@@ -10,9 +10,9 @@ require (
 	github.com/Masterminds/semver/v3 v3.3.1
 	github.com/PuerkitoBio/goquery v1.9.2
 	github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
-	github.com/andybalholm/brotli v1.1.1
+	github.com/andybalholm/brotli v1.2.0
 	github.com/chromedp/cdproto v0.0.0-20250509201441-70372ae9ef75
-	github.com/evanw/esbuild v0.25.5
+	github.com/evanw/esbuild v0.25.6
 	github.com/fatih/color v1.18.0
 	github.com/go-json-experiment/json v0.0.0-20250211171154-1ae217ad3535
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible
@@ -22,7 +22,7 @@ require (
 	github.com/grafana/k6deps v0.2.6
 	github.com/grafana/k6provider v0.1.15
 	github.com/grafana/sobek v0.0.0-20250320150027-203dc85b6d98
-	github.com/grafana/xk6-dashboard v0.7.6
+	github.com/grafana/xk6-dashboard v0.7.9
 	github.com/grafana/xk6-redis v0.3.4
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
@@ -55,11 +55,11 @@ require (
 	go.opentelemetry.io/otel/trace v1.36.0
 	go.opentelemetry.io/proto/otlp v1.6.0
 	go.uber.org/goleak v1.3.0
-	golang.org/x/crypto v0.39.0
+	golang.org/x/crypto v0.40.0
 	golang.org/x/crypto/x509roots/fallback v0.0.0-20250414110644-0091fc8e7c69
-	golang.org/x/net v0.41.0
-	golang.org/x/sync v0.15.0
-	golang.org/x/term v0.32.0
+	golang.org/x/net v0.42.0
+	golang.org/x/sync v0.16.0
+	golang.org/x/term v0.33.0
 	golang.org/x/time v0.12.0
 	google.golang.org/grpc v1.73.0
 	google.golang.org/protobuf v1.36.6
@@ -100,8 +100,8 @@ require (
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
-	golang.org/x/sys v0.33.0 // indirect
-	golang.org/x/text v0.26.0 // indirect
+	golang.org/x/sys v0.34.0 // indirect
+	golang.org/x/text v0.27.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250519155744-55703ea1f237 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250519155744-55703ea1f237 // indirect
 	gopkg.in/cenkalti/backoff.v1 v1.1.0 // indirect
