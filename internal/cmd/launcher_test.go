@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -12,11 +14,13 @@ import (
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/cmd/state"
 
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/internal/build"
 	"go.k6.io/k6/internal/cmd/tests"
+	"go.k6.io/k6/lib/fsext"
 )
 
 // mockExecutor mocks commandExecutor
@@ -393,4 +397,24 @@ func TestIsAnalysisRequired(t *testing.T) {
 			assert.Equal(t, tc.expected, actual)
 		})
 	}
+}
+
+func TestBridgeOpen(t *testing.T) {
+	t.Parallel()
+
+	testfs := afero.NewMemMapFs()
+	require.NoError(t, fsext.WriteFile(testfs, "abasicpath/onetwo.txt", []byte(`test123`), 0o644))
+
+	bridge := &iofSBridge{fsext: testfs}
+
+	// it asserts that bridge implements io/fs.FS
+	goiofs := fs.FS(bridge)
+	f, err := goiofs.Open("abasicpath/onetwo.txt")
+	require.NoError(t, err)
+	require.NotNil(t, f)
+
+	content, err := io.ReadAll(f)
+	require.NoError(t, err)
+
+	assert.Equal(t, "test123", string(content))
 }
