@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -19,6 +20,27 @@ import (
 	"go.k6.io/k6/internal/build"
 	"go.k6.io/k6/lib/fsext"
 )
+
+// OFSBridge allows an afero.Fs to implement the Go standard library io/fs.FS.
+type iofSBridge struct {
+	fsext fsext.Fs
+}
+
+// newIofsBridge returns an IOFSBridge from a Fs
+func newIofsBridge(fs fsext.Fs) fs.FS {
+	return &iofSBridge{
+		fsext: fs,
+	}
+}
+
+// Open implements fs.Fs Open
+func (b *iofSBridge) Open(name string) (fs.File, error) {
+	f, err := b.fsext.Open(name)
+	if err != nil {
+		return nil, fmt.Errorf("opening file: %w", err)
+	}
+	return f, nil
+}
 
 // commandExecutor executes the requested k6 command line command.
 // It abstract the execution path from the concrete binary.
@@ -308,7 +330,7 @@ func analyze(gs *state.GlobalState, args []string) (k6deps.Dependencies, error) 
 		}
 		dopts.Script.Name = sourceRootPath
 		dopts.Script.Contents = src.Data
-		dopts.Fs = fsext.NewIOFSBridge(gs.FS)
+		dopts.Fs = newIofsBridge(gs.FS)
 	}
 
 	return k6deps.Analyze(dopts)
