@@ -117,7 +117,6 @@ func call(
 	return result, err
 }
 
-//nolint:gocognit
 func createWaitForEventHandler(
 	ctx context.Context,
 	emitter EventEmitter, events []string,
