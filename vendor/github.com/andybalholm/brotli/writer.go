@@ -121,18 +121,18 @@ type nopCloser struct {
 func (nopCloser) Close() error { return nil }
 
 // NewWriterV2 is like NewWriterLevel, but it uses the new implementation
-// based on the matchfinder package. It currently supports up to level 7;
-// if a higher level is specified, level 7 will be used.
+// based on the matchfinder package. It currently supports up to level 9;
+// if a higher level is specified, level 9 will be used.
 func NewWriterV2(dst io.Writer, level int) *matchfinder.Writer {
 	var mf matchfinder.MatchFinder
 	if level < 2 {
 		mf = matchfinder.M0{Lazy: level == 1}
-	} else {
+	} else if level < 8 {
 		hashLen := 6
 		if level >= 6 {
 			hashLen = 5
 		}
-		chainLen := 64
+		chainLen := 16
 		switch level {
 		case 2:
 			chainLen = 0
@@ -149,7 +149,19 @@ func NewWriterV2(dst io.Writer, level int) *matchfinder.Writer {
 			MaxDistance:     1 << 20,
 			ChainLength:     chainLen,
 			HashLen:         hashLen,
-			DistanceBitCost: 57,
+			DistanceBitCost: 66,
+		}
+	} else {
+		chainLen := 32
+		hashLen := 5
+		if level == 8 {
+			chainLen = 4
+			hashLen = 6
+		}
+		mf = &matchfinder.Pathfinder{
+			MaxDistance: 1 << 20,
+			ChainLength: chainLen,
+			HashLen:     hashLen,
 		}
 	}
 
