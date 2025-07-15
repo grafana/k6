@@ -81,6 +81,8 @@ func (c console) Error(args ...sobek.Value) {
 const functionLog = "[object Function]"
 
 // errorType is used to check if a [sobek.Value] implements the [error] interface.
+//
+//nolint:gochecknoglobals
 var errorType = reflect.TypeOf((*error)(nil)).Elem()
 
 func (c console) valueString(v sobek.Value) string {
