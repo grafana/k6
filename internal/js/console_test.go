@@ -2,6 +2,7 @@ package js
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -228,6 +229,18 @@ func TestConsoleLog(t *testing.T) {
 		{in: `"string","a","b"`, expected: "string a b"},
 		{in: `"string",1,2`, expected: "string 1 2"},
 
+		{in: `true`, expected: "true"},
+
+		{in: `Infinity`, expected: "Infinity"},
+		{in: `1e5`, expected: "100000"},
+		{in: `1.23e-4`, expected: "0.000123"},
+
+		{in: `function() {}`, expected: "[object Function]"},
+		{in: `() => {}`, expected: "[object Function]"},
+
+		{in: `new Date(0)`, expected: `"1970-01-01T00:00:00.000Z"`},
+		{in: `new Error("test error")`, expected: "Error: test error"},
+
 		{in: `["bar", 1, 2]`, expected: `["bar",1,2]`},
 		{in: `"bar", ["bar", 0x01, 2], 1, 2`, expected: `bar ["bar",1,2] 1 2`},
 
@@ -239,8 +252,8 @@ func TestConsoleLog(t *testing.T) {
 		{in: `function() {var a = {foo: {}}; a.foo = a; return a}()`, expected: "[object Object]"},
 	}
 
-	for i, tt := range tests {
-		t.Run(fmt.Sprintf("case%d", i), func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.in, func(t *testing.T) {
 			t.Parallel()
 
 			r, err := getSimpleRunner(t, "/script.js", fmt.Sprintf(
@@ -266,6 +279,61 @@ func TestConsoleLog(t *testing.T) {
 
 			entry := hook.LastEntry()
 
+			require.NotNil(t, entry, "nothing logged")
+			assert.Equal(t, tt.expected, entry.Message)
+			assert.Equal(t, logrus.Fields{"source": "console"}, entry.Data)
+		})
+	}
+}
+
+func TestConsoleLogWithGoValues(t *testing.T) {
+	t.Parallel()
+
+	rt := sobek.New()
+
+	tests := []struct {
+		in       any
+		expected string
+	}{
+		{in: "string", expected: "string"},
+
+		{in: []any{}, expected: `[]`},
+		{in: []string{"a", "b", "c"}, expected: `["a","b","c"]`},
+		{in: []int{1, 2, 3}, expected: `[1,2,3]`},
+		{in: []any{"hello", 42, true, nil}, expected: `["hello",42,true,null]`},
+		{in: []any{[]int{1, 2}, []string{"a", "b"}}, expected: `[[1,2],["a","b"]]`},
+
+		{in: map[string]any{}, expected: "{}"},
+		{in: map[string]any{"outer": map[string]any{"inner": "value"}}, expected: `{"outer":{"inner":"value"}}`},
+
+		{in: struct {
+			Name string
+			Age  int
+		}{"John", 30}, expected: `{"name":"John","age":30}`},
+
+		{in: errors.New("this is an error"), expected: `this is an error`},
+		{in: fmt.Errorf("this is a wrap of: %w", errors.New("error")), expected: `this is a wrap of: error`},
+
+		{in: rt.NewGoError(errors.New("this is a go error")), expected: `GoError: this is a go error`},
+		{in: rt.NewTypeError("type error"), expected: `TypeError: type error`},
+	}
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("%v", tt.in), func(t *testing.T) {
+			t.Parallel()
+
+			rt.SetFieldNameMapper(common.FieldNameMapper{})
+
+			logger, hook := testutils.NewLoggerWithHook(t)
+			c := newConsole(logger)
+
+			// Convert Go in to JavaScript in
+			jsValue := rt.ToValue(tt.in)
+
+			// Call console.log with the converted in
+			c.Log(jsValue)
+
+			entry := hook.LastEntry()
 			require.NotNil(t, entry, "nothing logged")
 			assert.Equal(t, tt.expected, entry.Message)
 			assert.Equal(t, logrus.Fields{"source": "console"}, entry.Data)
@@ -347,10 +415,10 @@ func TestFileConsole(t *testing.T) {
 			Message string
 			Data    logrus.Fields
 		}{
-			`"string"`:         {Message: "string", Data: logrus.Fields{}},
-			`"string","a","b"`: {Message: "string a b", Data: logrus.Fields{}},
-			`"string",1,2`:     {Message: "string 1 2", Data: logrus.Fields{}},
-			`{}`:               {Message: "{}", Data: logrus.Fields{}},
+			`"string"`:           {Message: "string", Data: logrus.Fields{}},
+			`"string", "a", "b"`: {Message: "string a b", Data: logrus.Fields{}},
+			`"string", 1, 2`:     {Message: "string 1 2", Data: logrus.Fields{}},
+			`{}`:                 {Message: "{}", Data: logrus.Fields{}},
 		}
 		preExisting = map[string]bool{
 			"log exists":        false,
