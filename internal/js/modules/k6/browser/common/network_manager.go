@@ -553,6 +553,14 @@ func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
 				m.logger.Debug("NetworkManager:onRequestPaused", "context canceled continuing request")
 				return
 			}
+			// This error message is an internal issue, rather than something that the user can
+			// action on. It's also usually ok to ignore since it means that the page has navigated
+			// away or something has occurred which means that the request is no longer needed and
+			// isn't being tracked by chromium.
+			if strings.Contains(err.Error(), "Invalid InterceptionId") {
+				m.logger.Debugf("NetworkManager:onRequestPaused", "continuing request: %s", err)
+				return
+			}
 			m.logger.Errorf("NetworkManager:onRequestPaused", "continuing request: %s", err)
 		}
 	}()
