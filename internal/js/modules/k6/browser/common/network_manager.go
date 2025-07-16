@@ -540,7 +540,7 @@ func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
 				return
 			}
 			m.logger.Warnf("NetworkManager:onRequestPaused",
-				"request %s %s was interrupted: %s", event.Request.Method, event.Request.URL, failErr)
+				"request %s %s was aborted: %s", event.Request.Method, event.Request.URL, failErr)
 
 			return
 		}
@@ -551,6 +551,14 @@ func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
 			// while the iteration is ending and therefore the browser context is being closed.
 			if errors.Is(err, context.Canceled) {
 				m.logger.Debug("NetworkManager:onRequestPaused", "context canceled continuing request")
+				return
+			}
+			// This error message is an internal issue, rather than something that the user can
+			// action on. It's also usually ok to ignore since it means that the page has navigated
+			// away or something has occurred which means that the request is no longer needed and
+			// isn't being tracked by chromium.
+			if strings.Contains(err.Error(), "Invalid InterceptionId") {
+				m.logger.Debugf("NetworkManager:onRequestPaused", "continuing request: %s", err)
 				return
 			}
 			m.logger.Errorf("NetworkManager:onRequestPaused", "continuing request: %s", err)
@@ -593,7 +601,7 @@ func checkBlockedHosts(host string, blockedHosts *k6types.HostnameTrie) error {
 		return nil
 	}
 	if match, blocked := blockedHosts.Contains(host); blocked {
-		return fmt.Errorf("hostname %s is in a blocked pattern %q", host, match)
+		return fmt.Errorf("hostname %s matches a blocked pattern %q", host, match)
 	}
 	return nil
 }
