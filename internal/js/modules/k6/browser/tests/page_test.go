@@ -2864,3 +2864,24 @@ func TestWaitForNavigationWithURL(t *testing.T) {
 	)
 	assert.Equal(t, sobek.Undefined(), got.Result())
 }
+
+func TestWaitForNavigationWithURL_RegexFailure(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withFileServer())
+	tb.vu.ActivateVU()
+	tb.vu.StartIteration(t)
+
+	_, err := tb.vu.RunAsync(t, `
+		const page = await browser.newPage();
+		await page.goto('%s');
+
+		await Promise.all([
+			page.waitForNavigation({ url: /^.*/my_messages.*$/ }),
+			page.locator('#page2').click()
+		]);
+	`,
+		tb.staticURL("waitfornavigation_test.html"),
+	)
+	assert.ErrorContains(t, err, "Unexpected token *")
+}
