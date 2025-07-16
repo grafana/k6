@@ -40,3 +40,10 @@ updates:
       - dependency-name: "github.com/mstoykov/k6-taskqueue-lib"
       - dependency-name: "github.com/stretchr/testify"
       - dependency-name: "go.opentelemetry.io/*"
+
+  # Update k6packager dependencies
+  - package-ecosystem: "docker"
+    directory: "/packaging"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
