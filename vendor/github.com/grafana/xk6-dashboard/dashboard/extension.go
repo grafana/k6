@@ -9,10 +9,12 @@ package dashboard
 
 import (
 	"fmt"
+	"net/http"
 	"sync/atomic"
 	"time"
 
 	"github.com/pkg/browser"
+	"github.com/sirupsen/logrus"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
@@ -42,6 +44,8 @@ type extension struct {
 	name string
 
 	param *paramData
+
+	logger logrus.FieldLogger
 }
 
 var _ output.Output = (*extension)(nil)
@@ -70,6 +74,7 @@ func newWithAssets(params output.Params, assets *assets) (*extension, error) {
 		proc:        &process{logger: params.Logger, fs: params.FS},
 		options:     opts,
 		name:        params.OutputType,
+		logger:      params.Logger,
 		buffer:      nil,
 		server:      nil,
 		flusher:     nil,
@@ -107,22 +112,8 @@ func (ext *extension) Start() error {
 
 	ext.addEventListener(brf)
 
-	if ext.options.Port >= 0 {
-		ext.server = newWebServer(ext.assets.ui, brf, ext.proc.logger)
-		ext.addEventListener(ext.server)
-
-		addr, err := ext.server.listenAndServe(ext.options.addr())
-		if err != nil {
-			return err
-		}
-
-		if ext.options.Port == 0 {
-			ext.options.Port = addr.Port
-		}
-
-		if ext.options.Open {
-			_ = browser.OpenURL(ext.options.url())
-		}
+	if err := ext.startServer(brf); err != nil {
+		return err
 	}
 
 	ext.cumulative = newMeter(0, time.Now(), ext.options.Tags)
@@ -183,6 +174,32 @@ func (ext *extension) StopWithTestError(testRunErr error) error {
 // AddMetricSamples adds the given metric samples to the internal buffer.
 func (ext *extension) AddMetricSamples(samples []metrics.SampleContainer) {
 	ext.buffer.AddMetricSamples(samples)
+}
+
+func (ext *extension) startServer(handler http.Handler) error {
+	ext.server = newWebServer(ext.assets.ui, handler, ext.proc.logger)
+	ext.addEventListener(ext.server)
+
+	addr, err := ext.server.listenAndServe(ext.options.addr())
+	if err != nil {
+		ext.logger.WithError(err).Warn("Error from Web dashboard")
+
+		if ext.options.Port != defaultPort {
+			return err
+		}
+
+		return nil
+	}
+
+	if ext.options.Port == 0 {
+		ext.options.Port = addr.Port
+	}
+
+	if ext.options.Open {
+		_ = browser.OpenURL(ext.options.url())
+	}
+
+	return nil
 }
 
 func (ext *extension) flush() {
