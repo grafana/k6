@@ -1915,14 +1915,18 @@ func (f *Frame) WaitForNavigation(
 		return nil, fmt.Errorf("parsing URL pattern: %w", err)
 	}
 
+	var matcherErr error
 	navEvtCh, navEvtCancel := createWaitForEventPredicateHandler(timeoutCtx, f, []string{EventFrameNavigation},
 		func(data any) bool {
 			if navEvt, ok := data.(*NavigationEvent); ok {
 				// Check if the navigation URL matches the pattern
 				matched, err := matcher(navEvt.url)
 				if err != nil {
-					f.log.Error(err)
-					return false
+					matcherErr = err
+					// Return true here even though it's not correct and no match
+					// was found. We need this to exit asap so that the error can be
+					// propagated to the caller.
+					return true
 				}
 				return matched
 			}
@@ -1968,6 +1972,9 @@ func (f *Frame) WaitForNavigation(
 	)
 	select {
 	case evt := <-navEvtCh:
+		if matcherErr != nil {
+			return nil, matcherErr
+		}
 		if e, ok := evt.(*NavigationEvent); ok {
 			if e.newDocument == nil {
 				sameDocNav = true
