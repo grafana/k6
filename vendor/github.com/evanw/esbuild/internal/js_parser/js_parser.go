@@ -8614,6 +8614,15 @@ func findIdentifiers(binding js_ast.Binding, identifiers []js_ast.Decl) []js_ast
 	return identifiers
 }
 
+func shouldKeepStmtsInDeadControlFlow(stmts []js_ast.Stmt) bool {
+	for _, child := range stmts {
+		if shouldKeepStmtInDeadControlFlow(child) {
+			return true
+		}
+	}
+	return false
+}
+
 // If this is in a dead branch, then we want to trim as much dead code as we
 // can. Everything can be trimmed except for hoisted declarations ("var" and
 // "function"), which affect the parent scope. For example:
@@ -8650,12 +8659,12 @@ func shouldKeepStmtInDeadControlFlow(stmt js_ast.Stmt) bool {
 		return true
 
 	case *js_ast.SBlock:
-		for _, child := range s.Stmts {
-			if shouldKeepStmtInDeadControlFlow(child) {
-				return true
-			}
-		}
-		return false
+		return shouldKeepStmtsInDeadControlFlow(s.Stmts)
+
+	case *js_ast.STry:
+		return shouldKeepStmtsInDeadControlFlow(s.Block.Stmts) ||
+			(s.Catch != nil && shouldKeepStmtsInDeadControlFlow(s.Catch.Block.Stmts)) ||
+			(s.Finally != nil && shouldKeepStmtsInDeadControlFlow(s.Finally.Block.Stmts))
 
 	case *js_ast.SIf:
 		return shouldKeepStmtInDeadControlFlow(s.Yes) || (s.NoOrNil.Data != nil && shouldKeepStmtInDeadControlFlow(s.NoOrNil))
@@ -9175,7 +9184,7 @@ func (p *parser) mangleStmts(stmts []js_ast.Stmt, kind stmtsKind) []js_ast.Stmt 
 					body = append(body, stmts[i+1:]...)
 
 					// Don't do this transformation if the branch condition could
-					// potentially access symbols declared later on on this scope below.
+					// potentially access symbols declared later on this scope below.
 					// If so, inverting the branch condition and nesting statements after
 					// this in a block would break that access which is a behavior change.
 					//

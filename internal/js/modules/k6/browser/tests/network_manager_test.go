@@ -72,7 +72,7 @@ func TestBlockHostnames(t *testing.T) {
 	require.Nil(t, res)
 	require.Error(t, err)
 	require.ErrorContains(t, err, `navigating frame to "http://host.test/": net::ERR_BLOCKED_BY_CLIENT`)
-	tb.logCache.assertContains(t, "was interrupted: hostname host.test is in a blocked pattern")
+	tb.logCache.assertContains(t, "was aborted: hostname host.test matches a blocked pattern")
 
 	res, err = p.Goto(
 		tb.url("/get"),
@@ -102,7 +102,7 @@ func TestBlockIPs(t *testing.T) {
 	require.Nil(t, res)
 	require.Error(t, err)
 	require.ErrorContains(t, err, `navigating frame to "http://10.0.0.1:8000/": net::ERR_BLOCKED_BY_CLIENT`)
-	tb.logCache.assertContains(t, `was interrupted: IP 10.0.0.1 is in a blacklisted range "10.0.0.0/8"`)
+	tb.logCache.assertContains(t, `was aborted: IP 10.0.0.1 is in a blacklisted range "10.0.0.0/8"`)
 
 	// Ensure other requests go through
 	res, err = p.Goto(
