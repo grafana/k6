@@ -688,15 +688,11 @@ func TestLocatorShadowDOM(t *testing.T) {
 func TestSelectOption(t *testing.T) {
 	t.Parallel()
 
-	tb := newTestBrowser(t,
-		withFileServer(),
-	)
-	defer tb.Close()
+	tb := newTestBrowser(t, withFileServer())
+	tb.vu.ActivateVU()
+	tb.vu.StartIteration(t)
 
-	vu, _, _, cleanUp := startIteration(t)
-	defer cleanUp()
-
-	got := vu.RunPromise(t, `
+	got := tb.vu.RunPromise(t, `
 		const page = await browser.newPage();
 
 		await page.goto('%s');
@@ -737,6 +733,23 @@ func TestSelectOption(t *testing.T) {
 		selectedValue = await options.inputValue();
 		if (selectedValue !== 'five') {
 			throw new Error('Expected "five" but got ' + selectedValue);
+		}
+
+		await options.selectOption(['Three']); // Label
+		selectedValue = await options.inputValue();
+		if (selectedValue !== 'three') {
+			throw new Error('Expected "three" but got ' + selectedValue);
+		}
+
+		await options.selectOption('Five'); // Label
+		selectedValue = await options.inputValue();
+		if (selectedValue !== 'five') {
+			throw new Error('Expected "five" but got ' + selectedValue);
+		}
+
+		const results = await options.selectOption(['One', 'two']); // Both label and value
+		if (results.length !== 2 || !results.includes('one') || !results.includes('two')) {
+			throw new Error('Expected "one,two" but got ' + results);
 		}
 	`, tb.staticURL("select_options.html"))
 	assert.Equal(t, sobek.Undefined(), got.Result())

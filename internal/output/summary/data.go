@@ -13,19 +13,19 @@ import (
 
 type dataModel struct {
 	thresholds
-	aggregatedGroupData
-	scenarios map[string]aggregatedGroupData
+	*aggregatedGroupData
+	scenarios map[string]*aggregatedGroupData
 }
 
 func newDataModel() dataModel {
 	return dataModel{
 		thresholds:          make(map[string]metricThresholds),
 		aggregatedGroupData: newAggregatedGroupData(),
-		scenarios:           make(map[string]aggregatedGroupData),
+		scenarios:           make(map[string]*aggregatedGroupData),
 	}
 }
 
-func (d *dataModel) groupDataFor(scenario string) aggregatedGroupData {
+func (d *dataModel) groupDataFor(scenario string) *aggregatedGroupData {
 	if groupData, exists := d.scenarios[scenario]; exists {
 		return groupData
 	}
@@ -56,29 +56,33 @@ type thresholds map[string]metricThresholds
 type aggregatedGroupData struct {
 	checks            *aggregatedChecksData
 	aggregatedMetrics aggregatedMetricData
-	groupsData        map[string]aggregatedGroupData
+	groupsData        map[string]*aggregatedGroupData
+	groupsOrder       []string
 }
 
-func newAggregatedGroupData() aggregatedGroupData {
-	return aggregatedGroupData{
+func newAggregatedGroupData() *aggregatedGroupData {
+	return &aggregatedGroupData{
 		checks:            newAggregatedChecksData(),
 		aggregatedMetrics: make(map[string]aggregatedMetric),
-		groupsData:        make(map[string]aggregatedGroupData),
+		groupsData:        make(map[string]*aggregatedGroupData),
+		groupsOrder:       make([]string, 0),
 	}
 }
 
-func (a aggregatedGroupData) groupDataFor(group string) aggregatedGroupData {
+func (a *aggregatedGroupData) groupDataFor(group string) *aggregatedGroupData {
 	if groupData, exists := a.groupsData[group]; exists {
 		return groupData
 	}
-	a.groupsData[group] = newAggregatedGroupData()
+	newGroupData := newAggregatedGroupData()
+	a.groupsData[group] = newGroupData
+	a.groupsOrder = append(a.groupsOrder, group)
 	return a.groupsData[group]
 }
 
 // addSample differs from relayAggregatedMetricFrom in that it updates the internally stored metric sink with the
 // sample, which differs from the original metric sink, while relayAggregatedMetricFrom stores the metric and the
 // metric sink from the sample's metric.
-func (a aggregatedGroupData) addSample(sample metrics.Sample) {
+func (a *aggregatedGroupData) addSample(sample metrics.Sample) {
 	a.aggregatedMetrics.addSample(sample)
 
 	checkName, hasCheckTag := sample.Tags.Get(metrics.TagCheck.String())
@@ -161,10 +165,13 @@ func (a *aggregatedChecksData) checkFor(name string) *summary.Check {
 	return check
 }
 
+// populateSummaryGroup populates a [summary.Group], which is the common type for holding groups data to be displayed
+// in the summary, with the data hold by [aggregatedGroupData], which is the type used specifically by this output
+// implementation aimed to collect data that will be displayed in the summary.
 func populateSummaryGroup(
 	summaryMode summary.Mode,
 	summaryGroup *summary.Group,
-	groupData aggregatedGroupData,
+	groupData *aggregatedGroupData,
 	testRunDuration time.Duration,
 	summaryTrendStats []string,
 ) {
@@ -213,6 +220,9 @@ func populateSummaryGroup(
 			summaryTrendStats,
 		)
 	}
+
+	// We also set the groups order, so it's preserved from code.
+	summaryGroup.GroupsOrder = groupData.groupsOrder
 
 	// Finally, we keep moving down the hierarchy and populate the nested groups.
 	for groupName, subGroupData := range groupData.groupsData {
@@ -266,7 +276,7 @@ func summaryThresholds(
 
 func populateSummaryChecks(
 	summaryGroup *summary.Group,
-	groupData aggregatedGroupData,
+	groupData *aggregatedGroupData,
 	testRunDuration time.Duration,
 	summaryTrendStats []string,
 ) {
@@ -296,7 +306,11 @@ func populateSummaryChecks(
 
 	summaryGroup.Checks.Metrics.Fail.Values["passes"] = totalChecks - successChecks
 	summaryGroup.Checks.Metrics.Fail.Values["fails"] = successChecks
-	summaryGroup.Checks.Metrics.Fail.Values["rate"] = (totalChecks - successChecks) / totalChecks
+	if totalChecks > 0 {
+		summaryGroup.Checks.Metrics.Fail.Values["rate"] = (totalChecks - successChecks) / totalChecks
+	} else {
+		summaryGroup.Checks.Metrics.Fail.Values["rate"] = 0
+	}
 
 	summaryGroup.Checks.OrderedChecks = groupData.checks.orderedChecks
 }

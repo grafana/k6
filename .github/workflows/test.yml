@@ -18,7 +18,8 @@ jobs:
       fail-fast: false
       matrix:
         go-version: [1.23.x]
-        platform: [ubuntu-latest, windows-latest]
+        platform: [ubuntu-24.04, ubuntu-24.04-arm,  windows-latest]
+
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout code
@@ -35,6 +36,12 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
           check-latest: true
+      - name: Install chromium
+        # This is only needed on arm images, chromium comes preinstalled on amd64 runner images.
+        if: contains(matrix.platform, 'arm')
+        run: |
+          sudo apt update && sudo apt install chromium-browser
+          chromium --version
       - name: Run tests
         run: |
           set -x
@@ -53,7 +60,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [ubuntu-latest, windows-latest]
+        platform: [ubuntu-24.04, ubuntu-24.04-arm, windows-latest]
     runs-on: ${{ matrix.platform }}
     continue-on-error: true
     steps:
@@ -73,6 +80,12 @@ jobs:
           echo "GOPATH=$HOME/go" >> "$GITHUB_ENV"
           echo "$HOME/go/bin" >> "$GITHUB_PATH"
           echo "$HOME/sdk/gotip/bin" >> "$GITHUB_PATH"
+      - name: Install chromium
+        # This is only needed on arm images, chromium comes preinstalled on amd64 runner images.
+        if: contains(matrix.platform, 'arm')
+        run: |
+          sudo apt update && sudo apt install chromium-browser
+          chromium --version
       - name: Run tests
         run: |
           set -x
@@ -93,7 +106,7 @@ jobs:
       fail-fast: false
       matrix:
         go-version: [1.24.x]
-        platform: [ubuntu-latest, windows-latest]
+        platform: [ubuntu-24.04, ubuntu-24.04-arm, windows-latest]
     permissions: # required for Vault
       id-token: write
       contents: read
@@ -108,6 +121,12 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
           check-latest: true
+      - name: Install chromium
+        # This is only needed on arm images, chromium comes preinstalled on amd64 runner images.
+        if: contains(matrix.platform, 'arm')
+        run: |
+          sudo apt update && sudo apt install chromium-browser
+          chromium --version
       - name: Run tests with code coverage
         run: |
           go version

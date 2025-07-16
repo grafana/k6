@@ -17,7 +17,7 @@ func findMatchLengthWithLimit(s1 []byte, s2 []byte, limit uint) uint {
 	var matched uint = 0
 	_, _ = s1[limit-1], s2[limit-1] // bounds check
 	switch runtime.GOARCH {
-	case "amd64":
+	case "amd64", "arm64":
 		// Compare 8 bytes at at time.
 		for matched+8 <= limit {
 			w1 := binary.LittleEndian.Uint64(s1[matched:])

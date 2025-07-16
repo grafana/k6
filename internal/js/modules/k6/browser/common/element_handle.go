@@ -11,7 +11,6 @@ import (
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/dom"
-	cdppage "github.com/chromedp/cdproto/page"
 	"github.com/grafana/sobek"
 	"go.opentelemetry.io/otel/attribute"
 
@@ -170,14 +169,56 @@ func (h *ElementHandle) clickablePoint() (*Position, error) {
 		return nil, fmt.Errorf("node is either not visible or not an HTMLElement: %w", err)
 	}
 
-	// Filter out quads that have too small area to click into.
-	var layoutViewport *cdppage.LayoutViewport
-	getLayoutMetrics := cdppage.GetLayoutMetrics()
-	if _, _, _, layoutViewport, _, _, err = getLayoutMetrics.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
-		return nil, fmt.Errorf("getting page layout metrics %T: %w", getLayoutMetrics, err)
+	width, height, err := h.evaluateInnerWidthHeight()
+	if err != nil {
+		return nil, fmt.Errorf("evaluating inner width and height: %w", err)
 	}
 
-	return filterQuads(layoutViewport.ClientWidth, layoutViewport.ClientHeight, quads)
+	p, err := filterQuads(width, height, quads)
+	if err != nil {
+		return nil, fmt.Errorf("filtering quads: %w", err)
+	}
+
+	return p, nil
+}
+
+// We are evaluating the inner width and height of the current frame that the
+// element is in in the utility context. Calculating this in the main context
+// causes NPD errors when working with the CDP API cdppage.GetLayoutMetrics.
+//
+// It returns the width and height of the current frame.
+func (h *ElementHandle) evaluateInnerWidthHeight() (int64, int64, error) {
+	h.logger.Debugf("ElementHandle:evaluateInnerWidthHeight", "fid:%s furl:%q", h.frame.ID(), h.frame.URL())
+
+	js := `() => ({ width: innerWidth, height: innerHeight })`
+
+	h.frame.waitForExecutionContext(utilityWorld)
+
+	eopts := evalOptions{
+		forceCallable: true,
+		returnByValue: true,
+	}
+	v, err := h.frame.evaluate(h.ctx, utilityWorld, eopts, js)
+	if err != nil {
+		return 0, 0, fmt.Errorf("getting inner width and height: %w", err)
+	}
+
+	m, ok := v.(map[string]any)
+	if !ok {
+		return 0, 0, fmt.Errorf("unexpected value %q when getting inner width and height", v)
+	}
+
+	width, ok := m["width"].(float64)
+	if !ok {
+		return 0, 0, fmt.Errorf("unexpected value %q when getting inner width", m["width"])
+	}
+
+	height, ok := m["height"].(float64)
+	if !ok {
+		return 0, 0, fmt.Errorf("unexpected value %q when getting inner height", m["height"])
+	}
+
+	return int64(width), int64(height), nil
 }
 
 func filterQuads(viewportWidth, viewportHeight int64, quads []dom.Quad) (*Position, error) {
@@ -509,9 +550,12 @@ func ConvertSelectOptionValues(rt *sobek.Runtime, values sobek.Value) ([]any, er
 		for _, item := range sl {
 			switch item := item.(type) {
 			case string:
-				opt := SelectOption{Value: new(string)}
-				*opt.Value = item
-				opts = append(opts, &opt)
+				// Strings will match values or labels
+				valOpt := SelectOption{Value: new(string)}
+				*valOpt.Value = item
+				labelOpt := SelectOption{Label: new(string)}
+				*labelOpt.Label = item
+				opts = append(opts, &valOpt, &labelOpt)
 			case map[string]interface{}:
 				opt, err := extractSelectOptionFromMap(item)
 				if err != nil {
@@ -555,9 +599,12 @@ func ConvertSelectOptionValues(rt *sobek.Runtime, values sobek.Value) ([]any, er
 		}
 		opts = append(opts, &opt)
 	case reflect.String:
-		opt := SelectOption{Value: new(string)}
-		*opt.Value = t.(string) //nolint:forcetypeassert
-		opts = append(opts, &opt)
+		// Strings will match values or labels
+		valOpt := SelectOption{Value: new(string)}
+		*valOpt.Value = t.(string) //nolint:forcetypeassert
+		labelOpt := SelectOption{Label: new(string)}
+		*labelOpt.Label = t.(string) //nolint:forcetypeassert
+		opts = append(opts, &valOpt, &labelOpt)
 	default:
 		return nil, fmt.Errorf("options: unsupported type %T", values)
 	}

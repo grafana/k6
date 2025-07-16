@@ -241,7 +241,6 @@ class ReportBuilder {
 		if (!groups) return this;
 
 		Object.entries(groups)
-			.sort(([a], [b]) => a.localeCompare(b))
 			.forEach(([groupName, groupData]) => {
 				this.sections.push({
 					title: `GROUP: ${groupName}`,
@@ -385,7 +384,7 @@ class ReportBuilder {
 		return [
 			...this._renderChecks(group.checks, renderContext),
 			...this._renderMetrics(group.metrics, renderContext),
-			...(group.groups ? this._renderNestedGroups(group.groups) : []),
+			...(group.groups ? this._renderNestedGroups(group.groups, renderContext) : []),
 		];
 	}
 
@@ -403,7 +402,7 @@ class ReportBuilder {
 			...this._renderChecks(scenarioData.checks, renderContext),
 			...this._renderMetrics(scenarioData.metrics, renderContext),
 			...(scenarioData.groups
-				? this._renderNestedGroups(scenarioData.groups)
+				? this._renderNestedGroups(scenarioData.groups, renderContext)
 				: []),
 		];
 	}
@@ -420,7 +419,6 @@ class ReportBuilder {
 
 		// Render nested groups recursively
 		return Object.entries(groups)
-			.sort(([a], [b]) => a.localeCompare(b))
 			.flatMap(([groupName, groupData]) => [
 				renderTitle(`GROUP: ${groupName}`, this.formatter, renderContext, {
 					prefix: subtitlePrefix,
