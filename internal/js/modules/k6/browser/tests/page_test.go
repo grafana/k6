@@ -2788,6 +2788,10 @@ func TestPageMustUseNativeJavaScriptObjects(t *testing.T) {
 }
 
 func TestWaitForNavigationWithURL(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipped due to https://github.com/grafana/k6/issues/4937")
+	}
+
 	t.Parallel()
 
 	tb := newTestBrowser(t, withFileServer())
