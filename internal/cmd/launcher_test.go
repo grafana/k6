@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/grafana/k6deps"
-	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -217,7 +216,7 @@ func TestLauncherLaunch(t *testing.T) {
 			ts.CmdArgs = k6Args
 
 			// k6deps uses os package to access files. So we need to use it in the global state
-			ts.FS = afero.NewOsFs()
+			ts.FS = fsext.NewOsFs()
 
 			// NewGlobalTestState does not set the Binary provisioning flag even if we set
 			// the K6_BINARY_PROVISIONING variable in the global state, so we do it manually
@@ -268,7 +267,7 @@ func TestStdin(t *testing.T) {
 	ts.CmdArgs = k6Args
 
 	// k6deps uses os package to access files. So we need to use it in the global state
-	ts.FS = afero.NewOsFs()
+	ts.FS = fsext.NewOsFs()
 
 	// NewGlobalTestState does not set the Binary provisioning flag even if we set
 	// the K6_BINARY_PROVISIONING variable in the global state, so we do it manually
