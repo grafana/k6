@@ -602,7 +602,7 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *Frame
 	var newDocumentID string
 	newDocIDIsReadyCh := make(chan struct{})
 
-	navEvtCh, navEvtCancel := createWaitForEventHandler(
+	navEvtCh, navEvtCancel := createWaitForEventPredicateHandler(
 		timeoutCtx, frame, []string{EventFrameNavigation},
 		func(data any) bool {
 			select {

@@ -129,10 +129,6 @@ func createWaitForEventHandler(
 	ch := make(chan any)
 
 	go func() {
-		defer func() {
-			close(ch)
-			evCancelFn()
-		}()
 		for {
 			select {
 			case <-evCancelCtx.Done():
@@ -144,12 +140,23 @@ func createWaitForEventHandler(
 							select {
 							case ch <- ev.data:
 							case <-evCancelCtx.Done():
+								return
 							}
-							// We wait for one matching event only,
-							// then remove the event handler by cancelling context and stopping goroutine.
+						}
+					} else {
+						select {
+						case ch <- nil:
+						case <-evCancelCtx.Done():
 							return
 						}
 					}
+					close(ch)
+
+					// We wait for one matching event only,
+					// then remove the event handler by cancelling context and stopping goroutine.
+					evCancelFn()
+
+					return
 				}
 			}
 		}
