@@ -19,6 +19,7 @@ import (
 	"go.k6.io/k6/internal/build"
 	"go.k6.io/k6/internal/ui/pb"
 	"go.k6.io/k6/lib"
+	"gopkg.in/guregu/null.v3"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -165,6 +166,25 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Validating script options"))
 	client := cloudapi.NewClient(
 		logger, cloudConfig.Token.String, cloudConfig.Host.String, build.Version, cloudConfig.Timeout.TimeDuration())
+
+	if cloudConfig.ProjectID.Int64 == 0 {
+		projectID, _, err := client.GetDefaultProject(cloudConfig.StackID.Int64)
+		if err != nil {
+			return fmt.Errorf("can't get default projectID for stack %d (%s): %w", cloudConfig.StackID.Int64, cloudConfig.StackSlug.String, err)
+		}
+		tmpCloudConfig["projectID"] = projectID
+
+		b, err := json.Marshal(tmpCloudConfig)
+		if err != nil {
+			return err
+		}
+
+		arc.Options.Cloud = b
+		arc.Options.External[cloudapi.LegacyCloudConfigKey] = b
+
+		cloudConfig.ProjectID = null.IntFrom(projectID)
+	}
+
 	if err = client.ValidateOptions(arc.Options); err != nil {
 		return err
 	}

@@ -103,7 +103,7 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 	switch {
 	case reset.Valid:
 		newCloudConf.Token = null.StringFromPtr(nil)
-		newCloudConf.StackID = null.StringFromPtr(nil)
+		newCloudConf.StackID = null.IntFromPtr(nil)
 		newCloudConf.StackSlug = null.StringFromPtr(nil)
 		printToStdout(c.globalState, "  token and stack info reset\n")
 		return nil
@@ -114,7 +114,7 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 			printToStdout(c.globalState, "  stack-id: <not set>\n")
 			printToStdout(c.globalState, "  stack-slug: <not set>\n")
 		} else {
-			printToStdout(c.globalState, fmt.Sprintf("  stack-id: %s\n", valueColor.Sprint(newCloudConf.StackID.String)))
+			printToStdout(c.globalState, fmt.Sprintf("  stack-id: %s\n", valueColor.Sprint(newCloudConf.StackID.Int64)))
 			printToStdout(c.globalState, fmt.Sprintf("  stack-slug: %s\n", valueColor.Sprint(newCloudConf.StackSlug.String)))
 		}
 		return nil
@@ -125,7 +125,7 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 			newCloudConf.StackSlug = null.StringFrom(normalizedSlug)
 			id, err := resolveStackSlugToID(c.globalState, currentJSONConfigRaw, token.String, normalizedSlug)
 			if err == nil {
-				newCloudConf.StackID = null.StringFrom(fmt.Sprintf("%d", id))
+				newCloudConf.StackID = null.IntFrom(id)
 			} else {
 				return fmt.Errorf("could not resolve stack slug. Are you sure the slug is correct? %w", err)
 			}
@@ -200,7 +200,7 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 		if err != nil {
 			return fmt.Errorf("could not resolve stack slug. Are you sure the slug is correct? %w", err)
 		}
-		newCloudConf.StackID = null.StringFrom(fmt.Sprintf("%d", id))
+		newCloudConf.StackID = null.IntFrom(id)
 	}
 
 	if newCloudConf.Token.Valid {
@@ -230,7 +230,7 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 			printToStdout(c.globalState, fmt.Sprintf("  token: %s\n", valueColor.Sprint(newCloudConf.Token.String)))
 
 			if newCloudConf.StackID.Valid {
-				printToStdout(c.globalState, fmt.Sprintf("  stack-id: %s\n", valueColor.Sprint(newCloudConf.StackID.String)))
+				printToStdout(c.globalState, fmt.Sprintf("  stack-id: %s\n", valueColor.Sprint(newCloudConf.StackID.Int64)))
 			}
 			if newCloudConf.StackSlug.Valid {
 				printToStdout(c.globalState, fmt.Sprintf("  stack-slug: %s\n", valueColor.Sprint(newCloudConf.StackSlug.String)))

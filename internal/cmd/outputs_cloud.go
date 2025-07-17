@@ -118,6 +118,14 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 	apiClient := cloudapi.NewClient(
 		logger, conf.Token.String, conf.Host.String, build.Version, conf.Timeout.TimeDuration())
 
+	if testRun.ProjectID == 0 {
+		projectID, _, err := apiClient.GetDefaultProject(conf.StackID.Int64)
+		if err != nil {
+			return fmt.Errorf("can't get default projectID for stack %d (%s): %w", conf.StackID.Int64, conf.StackSlug.String, err)
+		}
+		testRun.ProjectID = projectID
+	}
+
 	response, err := apiClient.CreateTestRun(testRun)
 	if err != nil {
 		return err
