@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"syscall"
 
 	"github.com/fatih/color"
@@ -59,7 +60,9 @@ the "k6 run -o cloud" command.
 
 	loginCloudCommand.Flags().StringP("token", "t", "", "specify `token` to use")
 	loginCloudCommand.Flags().BoolP("show", "s", false, "display saved token and exit")
-	loginCloudCommand.Flags().BoolP("reset", "r", false, "reset stored token")
+	loginCloudCommand.Flags().BoolP("reset", "r", false, "reset stored token and stack info")
+	loginCloudCommand.Flags().String("stack-id", "", "set stack ID (cannot be used with --stack-slug)")
+	loginCloudCommand.Flags().String("stack-slug", "", "set stack slug (cannot be used with --stack-id)")
 
 	return loginCloudCommand
 }
@@ -92,23 +95,49 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 	show := getNullBool(cmd.Flags(), "show")
 	reset := getNullBool(cmd.Flags(), "reset")
 	token := getNullString(cmd.Flags(), "token")
+	stackIDStr := cmd.Flags().Lookup("stack-id").Value.String()
+	stackSlug := getNullString(cmd.Flags(), "stack-slug")
+
+	var stackIDInt int64
+	var stackIDValid bool
+	if stackIDStr != "" {
+		var parseErr error
+		stackIDInt, parseErr = parseStackID(stackIDStr)
+		if parseErr != nil {
+			return fmt.Errorf("invalid --stack-id: %w", parseErr)
+		}
+		stackIDValid = true
+	}
+	if stackIDValid && stackSlug.Valid {
+		return errors.New("only one of --stack-id or --stack-slug can be specified")
+	}
+
 	switch {
 	case reset.Valid:
 		newCloudConf.Token = null.StringFromPtr(nil)
-		printToStdout(c.globalState, "  token reset\n")
+		newCloudConf.StackID = null.StringFromPtr(nil)
+		newCloudConf.StackSlug = null.StringFromPtr(nil)
+		printToStdout(c.globalState, "  token and stack info reset\n")
+		return nil
 	case show.Bool:
 		valueColor := getColor(c.globalState.Flags.NoColor || !c.globalState.Stdout.IsTTY, color.FgCyan)
 		printToStdout(c.globalState, fmt.Sprintf("  token: %s\n", valueColor.Sprint(newCloudConf.Token.String)))
+		if newCloudConf.StackID.Valid {
+			printToStdout(c.globalState, fmt.Sprintf("  stack-id: %s\n", valueColor.Sprint(newCloudConf.StackID.String)))
+		}
+		if newCloudConf.StackSlug.Valid {
+			printToStdout(c.globalState, fmt.Sprintf("  stack-slug: %s\n", valueColor.Sprint(newCloudConf.StackSlug.String)))
+		}
 		return nil
 	case token.Valid:
 		newCloudConf.Token = token
 	default:
-		form := ui.Form{
+		tokenForm := ui.Form{
 			Banner: "Enter your token to authenticate with Grafana Cloud k6.\n" +
 				"Please, consult the Grafana Cloud k6 documentation for instructions on how to generate one:\n" +
 				"https://grafana.com/docs/grafana-cloud/testing/k6/author-run/tokens-and-cli-authentication",
 			Fields: []ui.Field{
-				ui.PasswordField{
+				ui.StringField{
 					Key:   "Token",
 					Label: "Token",
 				},
@@ -117,12 +146,60 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 		if !term.IsTerminal(int(syscall.Stdin)) { //nolint:unconvert
 			c.globalState.Logger.Warn("Stdin is not a terminal, falling back to plain text input")
 		}
-		var vals map[string]string
-		vals, err = form.Run(c.globalState.Stdin, c.globalState.Stdout)
+		tokenVals, err := tokenForm.Run(c.globalState.Stdin, c.globalState.Stdout)
 		if err != nil {
 			return err
 		}
-		newCloudConf.Token = null.StringFrom(vals["Token"])
+		tokenValue := tokenVals["Token"]
+		newCloudConf.Token = null.StringFrom(tokenValue)
+
+		if newCloudConf.Token.Valid {
+			if err := validateToken(c.globalState, currentJSONConfigRaw, newCloudConf.Token.String); err != nil {
+				return fmt.Errorf("token validation failed: %w", err)
+			}
+		}
+
+		defaultStack := func(token string) string {
+			return "slug"
+		}(tokenValue)
+
+		slugForm := ui.Form{
+			Banner: "\nConfigure the stack where your tests will run by default.\n" +
+				"Please, consult the Grafana Cloud k6 documentation for instructions on how to find your stack slug:\n" +
+				// TODO: Update the link when the documentation is ready
+				"FIXME",
+			Fields: []ui.Field{
+				ui.StringField{
+					Key:     "StackSlug",
+					Label:   "Stack",
+					Default: defaultStack,
+				},
+			},
+		}
+		slugVals, err := slugForm.Run(c.globalState.Stdin, c.globalState.Stdout)
+		if err != nil {
+			return err
+		}
+
+		stackValue := slugVals["StackSlug"]
+		stackSlugInput := null.StringFrom(stackValue)
+
+		if stackSlugInput.Valid {
+			stackSlug = stackSlugInput
+		} else {
+			return errors.New("stack cannot be empty")
+		}
+	}
+
+	if stackIDValid {
+		newCloudConf.StackID = null.StringFrom(fmt.Sprintf("%d", stackIDInt))
+		newCloudConf.StackSlug = null.StringFromPtr(nil)
+	} else if stackSlug.Valid {
+		newCloudConf.StackSlug = stackSlug
+		newCloudConf.StackID = null.StringFromPtr(nil)
+	} else {
+		newCloudConf.StackID = null.StringFromPtr(nil)
+		newCloudConf.StackSlug = null.StringFromPtr(nil)
 	}
 
 	if newCloudConf.Token.Valid {
@@ -144,9 +221,20 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 	}
 
 	if newCloudConf.Token.Valid {
+		valueColor := getColor(c.globalState.Flags.NoColor || !c.globalState.Stdout.IsTTY, color.FgCyan)
 		printToStdout(c.globalState, fmt.Sprintf(
-			"Logged in successfully, token saved in %s\n", c.globalState.Flags.ConfigFilePath,
+			"\nLogged in successfully, token and stack info saved in %s\n", c.globalState.Flags.ConfigFilePath,
 		))
+		if !c.globalState.Flags.Quiet {
+			printToStdout(c.globalState, fmt.Sprintf("  token: %s\n", valueColor.Sprint(newCloudConf.Token.String)))
+
+			if newCloudConf.StackID.Valid {
+				printToStdout(c.globalState, fmt.Sprintf("  stack-id: %s\n", valueColor.Sprint(newCloudConf.StackID.String)))
+			}
+			if newCloudConf.StackSlug.Valid {
+				printToStdout(c.globalState, fmt.Sprintf("  stack-slug: %s\n", valueColor.Sprint(newCloudConf.StackSlug.String)))
+			}
+		}
 	}
 	return nil
 }
@@ -185,4 +273,8 @@ func validateToken(gs *state.GlobalState, jsonRawConf json.RawMessage, token str
 	}
 
 	return nil
+}
+
+func parseStackID(val string) (int64, error) {
+	return strconv.ParseInt(val, 10, 64)
 }

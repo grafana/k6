@@ -18,6 +18,8 @@ const LegacyCloudConfigKey = "loadimpact"
 //nolint:lll
 type Config struct {
 	// TODO: refactor common stuff between cloud execution and output
+	StackID   null.String `json:"stackID,omitempty" envconfig:"K6_CLOUD_STACK_ID"`
+	StackSlug null.String `json:"stackSlug,omitempty" envconfig:"K6_CLOUD_STACK_SLUG"`
 	Token     null.String `json:"token" envconfig:"K6_CLOUD_TOKEN"`
 	ProjectID null.Int    `json:"projectID" envconfig:"K6_CLOUD_PROJECT_ID"`
 	Name      null.String `json:"name" envconfig:"K6_CLOUD_NAME"`
@@ -165,6 +167,14 @@ func (c Config) Apply(cfg Config) Config {
 	}
 	if cfg.AggregationWaitPeriod.Valid {
 		c.AggregationWaitPeriod = cfg.AggregationWaitPeriod
+	}
+	if cfg.StackID.Valid {
+		c.StackID = cfg.StackID
+		c.StackSlug = null.StringFromPtr(nil)
+	}
+	if cfg.StackSlug.Valid {
+		c.StackSlug = cfg.StackSlug
+		c.StackID = null.StringFromPtr(nil)
 	}
 	return c
 }
