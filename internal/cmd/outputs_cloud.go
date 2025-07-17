@@ -124,6 +124,8 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 			return fmt.Errorf("can't get default projectID for stack %d (%s): %w", conf.StackID.Int64, conf.StackSlug.String, err)
 		}
 		testRun.ProjectID = projectID
+
+		gs.Logger.Warn("Warning: no projectID specified, using default project of the stack: " + conf.StackSlug.String)
 	}
 
 	response, err := apiClient.CreateTestRun(testRun)

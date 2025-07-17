@@ -183,6 +183,8 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 		arc.Options.External[cloudapi.LegacyCloudConfigKey] = b
 
 		cloudConfig.ProjectID = null.IntFrom(projectID)
+
+		logger.Warn("Warning: no projectID specified, using default project of the stack: " + cloudConfig.StackSlug.String)
 	}
 
 	if err = client.ValidateOptions(arc.Options); err != nil {
