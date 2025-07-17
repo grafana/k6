@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
 	"syscall"
 
 	"github.com/fatih/color"
@@ -31,16 +30,19 @@ func getCmdCloudLogin(gs *state.GlobalState) *cobra.Command {
 
 	// loginCloudCommand represents the 'cloud login' command
 	exampleText := getExampleText(gs, `
-  # Prompt for a Grafana Cloud k6 token
+  # Authenticate interactively with Grafana Cloud k6
   $ {{.}} cloud login
 
   # Store a token in k6's persistent configuration
   $ {{.}} cloud login -t <YOUR_TOKEN>
 
-  # Display the stored token
+  # Store a token in k6's persistent configuration and set the stack slug
+  $ {{.}} cloud login -t <YOUR_TOKEN> -s <YOUR_STACK_SLUG>
+
+  # Display the stored token and stack info
   $ {{.}} cloud login -s
 
-  # Reset the stored token
+  # Reset the stored token and stack info
   $ {{.}} cloud login -r`[1:])
 
 	loginCloudCommand := &cobra.Command{
@@ -59,10 +61,9 @@ the "k6 run -o cloud" command.
 	}
 
 	loginCloudCommand.Flags().StringP("token", "t", "", "specify `token` to use")
-	loginCloudCommand.Flags().BoolP("show", "s", false, "display saved token and exit")
+	loginCloudCommand.Flags().BoolP("show", "s", false, "display saved token, stack info and exit")
 	loginCloudCommand.Flags().BoolP("reset", "r", false, "reset stored token and stack info")
-	loginCloudCommand.Flags().String("stack-id", "", "set stack ID (cannot be used with --stack-slug)")
-	loginCloudCommand.Flags().String("stack-slug", "", "set stack slug (cannot be used with --stack-id)")
+	loginCloudCommand.Flags().String("stack-slug", "", "specify the stack where commands will run by default")
 
 	return loginCloudCommand
 }
@@ -97,22 +98,7 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 	show := getNullBool(cmd.Flags(), "show")
 	reset := getNullBool(cmd.Flags(), "reset")
 	token := getNullString(cmd.Flags(), "token")
-	stackIDStr := cmd.Flags().Lookup("stack-id").Value.String()
 	stackSlug := getNullString(cmd.Flags(), "stack-slug")
-
-	var stackIDInt int64
-	var stackIDValid bool
-	if stackIDStr != "" {
-		var parseErr error
-		stackIDInt, parseErr = parseStackID(stackIDStr)
-		if parseErr != nil {
-			return fmt.Errorf("invalid --stack-id: %w", parseErr)
-		}
-		stackIDValid = true
-	}
-	if stackIDValid && stackSlug.Valid {
-		return errors.New("only one of --stack-id or --stack-slug can be specified")
-	}
 
 	switch {
 	case reset.Valid:
@@ -124,15 +110,26 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 	case show.Bool:
 		valueColor := getColor(c.globalState.Flags.NoColor || !c.globalState.Stdout.IsTTY, color.FgCyan)
 		printToStdout(c.globalState, fmt.Sprintf("  token: %s\n", valueColor.Sprint(newCloudConf.Token.String)))
-		if newCloudConf.StackID.Valid {
+		if !newCloudConf.StackID.Valid && !newCloudConf.StackSlug.Valid {
+			printToStdout(c.globalState, "  stack-id: <not set>\n")
+			printToStdout(c.globalState, "  stack-slug: <not set>\n")
+		} else {
 			printToStdout(c.globalState, fmt.Sprintf("  stack-id: %s\n", valueColor.Sprint(newCloudConf.StackID.String)))
-		}
-		if newCloudConf.StackSlug.Valid {
 			printToStdout(c.globalState, fmt.Sprintf("  stack-slug: %s\n", valueColor.Sprint(newCloudConf.StackSlug.String)))
 		}
 		return nil
 	case token.Valid:
 		newCloudConf.Token = token
+		if stackSlug.Valid {
+			normalizedSlug := stripGrafanaNetSuffix(stackSlug.String)
+			newCloudConf.StackSlug = null.StringFrom(normalizedSlug)
+			id, err := resolveStackSlugToID(c.globalState, currentJSONConfigRaw, token.String, normalizedSlug)
+			if err == nil {
+				newCloudConf.StackID = null.StringFrom(fmt.Sprintf("%d", id))
+			} else {
+				return fmt.Errorf("could not resolve stack slug. Are you sure the slug is correct? %w", err)
+			}
+		}
 	default:
 		tokenForm := ui.Form{
 			Banner: "Enter your token to authenticate with Grafana Cloud k6.\n" +
@@ -155,10 +152,11 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 		tokenValue := tokenVals["Token"]
 		newCloudConf.Token = null.StringFrom(tokenValue)
 
-		if newCloudConf.Token.Valid {
-			if err := validateToken(c.globalState, currentJSONConfigRaw, newCloudConf.Token.String); err != nil {
-				return fmt.Errorf("token validation failed: %w", err)
-			}
+		if !newCloudConf.Token.Valid {
+			return errors.New("token cannot be empty")
+		}
+		if err := validateToken(c.globalState, currentJSONConfigRaw, newCloudConf.Token.String); err != nil {
+			return fmt.Errorf("token validation failed: %w", err)
 		}
 
 		defaultStack, err := func(token string) (string, error) {
@@ -166,8 +164,6 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 			if err != nil {
 				return "", fmt.Errorf("failed to get default stack slug: %w", err)
 			}
-
-			// TODO: Can we make this better? Picking the first one is not ideal.
 			for slug := range stacks {
 				return slug, nil
 			}
@@ -178,11 +174,11 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 		}
 
 		stackForm := ui.Form{
-			Banner: "\nConfigure the stack where your tests will run by default.\n" +
-				"Please, use the slug from your Grafana Cloud URL, e.g. my-team from https://my-team.grafana.net.\n",
+			Banner: "\nEnter the stack where you want to run k6's commands by default.\n" +
+				"Use the slug from your Grafana Cloud URL, e.g. my-team from https://my-team.grafana.net):",
 			Fields: []ui.Field{
 				ui.StringField{
-					Key:     "Stack",
+					Key:     "StackSlug",
 					Label:   "Stack",
 					Default: defaultStack,
 				},
@@ -193,23 +189,18 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 			return err
 		}
 
-		stackValue := null.StringFrom(stackVals["Stack"])
-		if stackValue.Valid {
-			stackSlug = stackValue
-		} else {
+		stackSlugInput := null.StringFrom(stackVals["StackSlug"])
+		if !stackSlugInput.Valid {
 			return errors.New("stack cannot be empty")
 		}
-	}
+		normalizedSlug := stripGrafanaNetSuffix(stackSlugInput.String)
+		newCloudConf.StackSlug = null.StringFrom(normalizedSlug)
 
-	if stackIDValid {
-		newCloudConf.StackID = null.StringFrom(fmt.Sprintf("%d", stackIDInt))
-		newCloudConf.StackSlug = null.StringFromPtr(nil)
-	} else if stackSlug.Valid {
-		newCloudConf.StackSlug = stackSlug
-		newCloudConf.StackID = null.StringFromPtr(nil)
-	} else {
-		newCloudConf.StackID = null.StringFromPtr(nil)
-		newCloudConf.StackSlug = null.StringFromPtr(nil)
+		id, err := resolveStackSlugToID(c.globalState, currentJSONConfigRaw, tokenValue, normalizedSlug)
+		if err != nil {
+			return fmt.Errorf("could not resolve stack slug. Are you sure the slug is correct? %w", err)
+		}
+		newCloudConf.StackID = null.StringFrom(fmt.Sprintf("%d", id))
 	}
 
 	if newCloudConf.Token.Valid {
@@ -285,6 +276,14 @@ func validateToken(gs *state.GlobalState, jsonRawConf json.RawMessage, token str
 	return nil
 }
 
+func stripGrafanaNetSuffix(s string) string {
+	const suffix = ".grafana.net"
+	if len(s) > len(suffix) && s[len(s)-len(suffix):] == suffix {
+		return s[:len(s)-len(suffix)]
+	}
+	return s
+}
+
 func getStacks(gs *state.GlobalState, jsonRawConf json.RawMessage, token string) (map[string]int, error) {
 	// We want to use this fully consolidated config for things like
 	// host addresses, so users can overwrite them with env vars.
@@ -312,12 +311,21 @@ func getStacks(gs *state.GlobalState, jsonRawConf json.RawMessage, token string)
 
 	stacks := make(map[string]int)
 	for _, organization := range res.Organizations {
-		stacks[organization.GrafanaStackName] = organization.GrafanaStackID
+		stackName := stripGrafanaNetSuffix(organization.GrafanaStackName)
+		stacks[stackName] = organization.GrafanaStackID
 	}
-
 	return stacks, nil
 }
 
-func parseStackID(val string) (int64, error) {
-	return strconv.ParseInt(val, 10, 64)
+func resolveStackSlugToID(gs *state.GlobalState, jsonRawConf json.RawMessage, token, slug string) (int64, error) {
+	slug = stripGrafanaNetSuffix(slug)
+	stacks, err := getStacks(gs, jsonRawConf, token)
+	if err != nil {
+		return 0, err
+	}
+	id, ok := stacks[slug]
+	if !ok {
+		return 0, fmt.Errorf("stack slug %q not found in your Grafana Cloud account", slug)
+	}
+	return int64(id), nil
 }
