@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"syscall"
 
@@ -16,11 +17,6 @@ import (
 	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/internal/build"
-)
-
-var (
-	errScriptNotFound     = errors.New("script not found")
-	errUnsupportedFeature = errors.New("not supported")
 )
 
 // commandExecutor executes the requested k6 command line command.
@@ -123,7 +119,10 @@ func (b *customBinary) run(gs *state.GlobalState) error {
 	// the subprocess detects the type of terminal
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
-	cmd.Stdin = os.Stdin
+
+	// if we are here, it is possible that the analyze function read the stdin to analyse it
+	// and restored the content into gs.Stdin, so we pass it to the command
+	cmd.Stdin = gs.Stdin
 
 	// Copy environment variables to the k6 process and skip binary provisioning feature flag to disable it.
 	// If not disabled, then the executed k6 binary would enter an infinite loop, where it continuously
@@ -283,31 +282,32 @@ func analyze(gs *state.GlobalState, args []string) (k6deps.Dependencies, error) 
 		Manifest:  k6deps.Source{Ignore: true},
 	}
 
-	if len(args) == 0 {
-		gs.Logger.
-			Debug("The command did not receive an input script.")
-		return nil, errScriptNotFound
+	if len(args) < 1 {
+		return nil, fmt.Errorf("the invoked command needs a file path or pass the test via Stdin")
 	}
 
-	scriptname := args[0]
-	if scriptname == "-" {
-		gs.Logger.
-			Debug("Test script provided by Stdin is not yet supported from Binary provisioning feature.")
-		return nil, errUnsupportedFeature
+	sourceRootPath := args[0]
+	gs.Logger.WithField("source", "sourceRootPath").
+		Debug("Launcher is resolving and reading the test")
+	src, _, pwd, err := readSource(gs, sourceRootPath)
+	if err != nil {
+		return nil, fmt.Errorf("reading source for analysis %w", err)
 	}
 
-	if _, err := gs.FS.Stat(scriptname); err != nil {
-		gs.Logger.
-			WithField("path", scriptname).
-			WithError(err).
-			Debug("The requested test script's file is not available on the file system.")
-		return nil, errScriptNotFound
+	// if sourceRooPath is stdin ('-') we need to preserve the content
+	if sourceRootPath == "-" {
+		gs.Stdin = bytes.NewBuffer(src.Data)
 	}
 
-	if strings.HasSuffix(scriptname, ".tar") {
-		dopts.Archive.Name = scriptname
+	if strings.HasSuffix(sourceRootPath, ".tar") {
+		dopts.Archive.Contents = src.Data
 	} else {
-		dopts.Script.Name = scriptname
+		if !filepath.IsAbs(sourceRootPath) {
+			sourceRootPath = filepath.Join(pwd, sourceRootPath)
+		}
+		dopts.Script.Name = sourceRootPath
+		dopts.Script.Contents = src.Data
+		dopts.Fs = gs.FS
 	}
 
 	return k6deps.Analyze(dopts)

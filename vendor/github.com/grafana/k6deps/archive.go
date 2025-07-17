@@ -2,6 +2,7 @@ package k6deps
 
 import (
 	"archive/tar"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"io"
@@ -51,13 +52,8 @@ func processArchive(input io.Reader) (Dependencies, error) {
 		}
 
 		// analize the file content as an script
-		target := filepath.Clean(filepath.FromSlash(header.Name))
-		src := Source{
-			Name:   target,
-			Reader: io.LimitReader(reader, maxFileSize),
-		}
-
-		d, err := scriptAnalyzer(src)()
+		src := io.NopCloser(io.LimitReader(reader, maxFileSize))
+		d, err := newScriptAnalyzer(src).analyze()
 		if err != nil {
 			return nil, err
 		}
@@ -84,12 +80,8 @@ func analizeMetadata(input io.Reader) (Dependencies, error) {
 	}
 
 	if value, found := metadata.Env[EnvDependencies]; found {
-		src := Source{
-			Name:     EnvDependencies,
-			Contents: []byte(value),
-		}
-
-		return envAnalyzer(src)()
+		content := bytes.NewBuffer([]byte(value))
+		return newTextAnalyzer(io.NopCloser(content)).analyze()
 	}
 
 	return Dependencies{}, nil
