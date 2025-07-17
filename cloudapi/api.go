@@ -336,3 +336,33 @@ func (c *Client) ValidateToken() (*ValidateTokenResponse, error) {
 
 	return &vtr, nil
 }
+
+type accountMeRequest struct {
+}
+
+type Organization struct {
+	ID               int    `json:"id"`
+	GrafanaStackName string `json:"grafana_stack_name"`
+	GrafanaStackID   int    `json:"grafana_stack_id"`
+}
+
+type accountMeResponse struct {
+	Organizations []Organization `json:"organizations"`
+}
+
+// AccountMe retrieves the current user's account information.
+func (c *Client) AccountMe() (*accountMeResponse, error) {
+	// TODO: remove this hardcoded URL
+	req, err := c.NewRequest("GET", "https://api.k6.io/v3/account/me", accountMeRequest{})
+	if err != nil {
+		return nil, err
+	}
+
+	amr := accountMeResponse{}
+	err = c.Do(req, &amr)
+	if err != nil {
+		return nil, err
+	}
+
+	return &amr, nil
+}

@@ -159,33 +159,41 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 			}
 		}
 
-		defaultStack := func(token string) string {
-			return "slug"
-		}(tokenValue)
+		defaultStack, err := func(token string) (string, error) {
+			stacks, err := getStacks(c.globalState, currentJSONConfigRaw, token)
+			if err != nil {
+				return "", fmt.Errorf("failed to get default stack slug: %w", err)
+			}
 
-		slugForm := ui.Form{
+			// TODO: Can we make this better? Picking the first one is not ideal.
+			for slug := range stacks {
+				return slug, nil
+			}
+			return "", errors.New("no stacks found for the provided token, please create a stack in Grafana Cloud and initialize GCk6 app")
+		}(tokenValue)
+		if err != nil {
+			return fmt.Errorf("failed to get default stack: %w", err)
+		}
+
+		stackForm := ui.Form{
 			Banner: "\nConfigure the stack where your tests will run by default.\n" +
-				"Please, consult the Grafana Cloud k6 documentation for instructions on how to find your stack slug:\n" +
-				// TODO: Update the link when the documentation is ready
-				"FIXME",
+				"Please, use the slug from your Grafana Cloud URL, e.g. my-team from https://my-team.grafana.net.\n",
 			Fields: []ui.Field{
 				ui.StringField{
-					Key:     "StackSlug",
+					Key:     "Stack",
 					Label:   "Stack",
 					Default: defaultStack,
 				},
 			},
 		}
-		slugVals, err := slugForm.Run(c.globalState.Stdin, c.globalState.Stdout)
+		stackVals, err := stackForm.Run(c.globalState.Stdin, c.globalState.Stdout)
 		if err != nil {
 			return err
 		}
 
-		stackValue := slugVals["StackSlug"]
-		stackSlugInput := null.StringFrom(stackValue)
-
-		if stackSlugInput.Valid {
-			stackSlug = stackSlugInput
+		stackValue := null.StringFrom(stackVals["Stack"])
+		if stackValue.Valid {
+			stackSlug = stackValue
 		} else {
 			return errors.New("stack cannot be empty")
 		}
@@ -273,6 +281,39 @@ func validateToken(gs *state.GlobalState, jsonRawConf json.RawMessage, token str
 	}
 
 	return nil
+}
+
+func getStacks(gs *state.GlobalState, jsonRawConf json.RawMessage, token string) (map[string]int, error) {
+	// We want to use this fully consolidated config for things like
+	// host addresses, so users can overwrite them with env vars.
+	consolidatedCurrentConfig, warn, err := cloudapi.GetConsolidatedConfig(
+		jsonRawConf, gs.Env, "", nil, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if warn != "" {
+		gs.Logger.Warn(warn)
+	}
+	client := cloudapi.NewClient(
+		gs.Logger,
+		token,
+		"",
+		build.Version,
+		consolidatedCurrentConfig.Timeout.TimeDuration(),
+	)
+
+	res, err := client.AccountMe()
+	if err != nil {
+		return nil, fmt.Errorf("can't get account info: %s", err.Error())
+	}
+
+	stacks := make(map[string]int)
+	for _, organization := range res.Organizations {
+		stacks[organization.GrafanaStackName] = organization.GrafanaStackID
+	}
+
+	return stacks, nil
 }
 
 func parseStackID(val string) (int64, error) {
