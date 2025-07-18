@@ -8,7 +8,6 @@ import (
 	"syscall"
 	"text/template"
 
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"gopkg.in/guregu/null.v3"
@@ -153,7 +152,6 @@ func stripGrafanaNetSuffix(s string) string {
 }
 
 func resolveDefaultProjectID(
-	logger *logrus.Logger,
 	gs *state.GlobalState,
 	apiClient *cloudapi.Client,
 	jsonRawConf json.RawMessage,
@@ -174,7 +172,7 @@ func resolveDefaultProjectID(
 			}
 			*stackID = null.IntFrom(id)
 		} else {
-			logger.Error("please specify a projectID in your test or use `k6 cloud login` to set up a default stack")
+			gs.Logger.Error("please specify a projectID in your test or use `k6 cloud login` to set up a default stack")
 			return 0, fmt.Errorf("no projectID specified and no default stack set")
 		}
 	}
@@ -185,6 +183,6 @@ func resolveDefaultProjectID(
 	}
 	*projectID = pid
 
-	logger.Warnf("Warning: no projectID specified, using default project of the stack: %s \n\n", stackSlug.String)
+	gs.Logger.Warnf("Warning: no projectID specified, using default project of the stack: %s \n\n", stackSlug.String)
 	return pid, nil
 }

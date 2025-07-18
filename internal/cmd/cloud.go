@@ -169,7 +169,6 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 
 	if cloudConfig.ProjectID.Int64 == 0 {
 		projectID, err := resolveDefaultProjectID(
-			logger,
 			c.gs,
 			client,
 			test.derivedConfig.Collectors["cloud"],

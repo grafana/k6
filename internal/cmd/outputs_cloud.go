@@ -120,7 +120,6 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 
 	if testRun.ProjectID == 0 {
 		projectID, err := resolveDefaultProjectID(
-			gs.Logger,
 			gs,
 			apiClient,
 			test.derivedConfig.Collectors["cloud"],
