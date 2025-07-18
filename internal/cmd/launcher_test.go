@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"go.k6.io/k6/cmd/state"
+	"go.k6.io/k6/ext"
 
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/internal/build"
@@ -345,6 +346,103 @@ func TestIsAnalysisRequired(t *testing.T) {
 
 			actual := isAnalysisRequired(cmd)
 			assert.Equal(t, tc.expected, actual)
+		})
+	}
+}
+
+func TestIsCustomBuildRequired(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		title     string
+		deps      map[string]string
+		k6Version string
+		exts      []*ext.Extension
+		expect    bool
+	}{
+		{
+			title:     "k6 satisfied",
+			k6Version: "v1.0.0",
+			deps:      map[string]string{"k6": "=v1.0.0"},
+			exts:      []*ext.Extension{},
+			expect:    false,
+		},
+		{
+			title:     "k6 not satisfied",
+			k6Version: "v1.0.0",
+			deps:      map[string]string{"k6": ">v1.0.0"},
+			exts:      []*ext.Extension{},
+			expect:    true,
+		},
+		{
+			title:     "extension not present",
+			k6Version: "v1.0.0",
+			deps:      map[string]string{"k6": "*", "k6/x/faker": "*"},
+			exts:      []*ext.Extension{},
+			expect:    true,
+		},
+		{
+			title:     "extension satisfied",
+			k6Version: "v1.0.0",
+			deps:      map[string]string{"k6/x/faker": "=v0.4.0"},
+			exts: []*ext.Extension{
+				{Name: "k6/x/faker", Module: "github.com/grafana/xk6-faker", Version: "v0.4.0"},
+			},
+			expect: false,
+		},
+		{
+			title:     "extension not satisfied",
+			k6Version: "v1.0.0",
+			deps:      map[string]string{"k6/x/faker": ">v0.4.0"},
+			exts: []*ext.Extension{
+				{Name: "k6/x/faker", Module: "github.com/grafana/xk6-faker", Version: "v0.4.0"},
+			},
+			expect: true,
+		},
+		{
+			title:     "k6 and extension satisfied",
+			k6Version: "v1.0.0",
+			deps:      map[string]string{"k6": "=v1.0.0", "k6/x/faker": "=v0.4.0"},
+			exts: []*ext.Extension{
+				{Name: "k6/x/faker", Module: "github.com/grafana/xk6-faker", Version: "v0.4.0"},
+			},
+			expect: false,
+		},
+		{
+			title:     "k6 satisfied, extension not satisfied",
+			k6Version: "v1.0.0",
+			deps:      map[string]string{"k6": "=v1.0.0", "k6/x/faker": ">v0.4.0"},
+			exts: []*ext.Extension{
+				{Name: "k6/x/faker", Module: "github.com/grafana/xk6-faker", Version: "v0.4.0"},
+			},
+			expect: true,
+		},
+		{
+			title:     "k6 not satisfied, extension satisfied",
+			k6Version: "v1.0.0",
+			deps:      map[string]string{"k6": ">v1.0.0", "k6/x/faker": "=v0.4.0"},
+			exts: []*ext.Extension{
+				{Name: "k6/x/faker", Module: "github.com/grafana/xk6-faker", Version: "v0.4.0"},
+			},
+			expect: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.title, func(t *testing.T) {
+			t.Parallel()
+
+			deps := k6deps.Dependencies{}
+			for name, constrain := range tc.deps {
+				dep, err := k6deps.NewDependency(name, constrain)
+				if err != nil {
+					t.Fatalf("parsing %q dependency %v", name, err)
+				}
+				deps[dep.Name] = dep
+			}
+
+			required := isCustomBuildRequired(deps, tc.k6Version, tc.exts)
+			assert.Equal(t, tc.expect, required)
 		})
 	}
 }
