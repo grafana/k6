@@ -98,7 +98,7 @@ func TestFrameWaitForNavigationOptionsParse(t *testing.T) {
 		err := navOpts.Parse(vu.Context(), opts)
 		require.NoError(t, err)
 
-		assert.Equal(t, "https://example.com/", navOpts.URL)
+		assert.Equal(t, "'https://example.com/'", navOpts.URL)
 		assert.Equal(t, time.Second, navOpts.Timeout)
 		assert.Equal(t, LifecycleEventNetworkIdle, navOpts.WaitUntil)
 	})

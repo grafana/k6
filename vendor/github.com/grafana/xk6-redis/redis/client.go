@@ -352,7 +352,7 @@ func (c *Client) Expire(key string, seconds int) *sobek.Promise {
 
 // Ttl returns the remaining time to live of a key that has a timeout.
 //
-//nolint:revive,stylecheck
+//nolint:revive
 func (c *Client) Ttl(key string) *sobek.Promise {
 	promise, resolve, reject := promises.New(c.vu)
 

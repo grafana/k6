@@ -620,7 +620,7 @@ func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
 				return
 			}
 			m.logger.Warnf("NetworkManager:onRequestPaused",
-				"request %s %s was interrupted: %s", event.Request.Method, event.Request.URL, failErr)
+				"request %s %s was aborted: %s", event.Request.Method, event.Request.URL, failErr)
 
 			return
 		}
@@ -676,7 +676,7 @@ func checkBlockedHosts(host string, blockedHosts *k6types.HostnameTrie) error {
 		return nil
 	}
 	if match, blocked := blockedHosts.Contains(host); blocked {
-		return fmt.Errorf("hostname %s is in a blocked pattern %q", host, match)
+		return fmt.Errorf("hostname %s matches a blocked pattern %q", host, match)
 	}
 	return nil
 }

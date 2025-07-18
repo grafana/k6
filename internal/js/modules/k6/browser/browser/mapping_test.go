@@ -318,6 +318,7 @@ type pageAPI interface { //nolint:interfacebloat
 	Focus(selector string, opts sobek.Value) error
 	Frames() []*common.Frame
 	GetAttribute(selector string, name string, opts sobek.Value) (string, bool, error)
+	GetByRole(role string, opts *common.GetByRoleOptions) (*common.ElementHandle, error)
 	GetKeyboard() *common.Keyboard
 	GetMouse() *common.Mouse
 	GetTouchscreen() *common.Touchscreen
@@ -517,6 +518,7 @@ type responseAPI interface { //nolint:interfacebloat
 
 // locatorAPI represents a way to find element(s) on a page at any moment.
 type locatorAPI interface { //nolint:interfacebloat
+	All() ([]*common.Locator, error)
 	Clear(opts *common.FrameFillOptions) error
 	Click(opts sobek.Value) error
 	Count() (int, error)
