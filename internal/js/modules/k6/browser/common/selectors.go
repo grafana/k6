@@ -82,7 +82,7 @@ func (s *Selector) parse() error {
 		case len(part) > 1 && part[0] == '"' && part[len(part)-1] == '"':
 			name = "text"
 			body = part
-		case len(part) > 1 && part[0] == '\'' && part[len(part)-1] == '\'':
+		case isQuotedText(part):
 			name = "text"
 			body = part
 		case reXPathSelector.Match([]byte(part)) || strings.HasPrefix(part, ".."):
