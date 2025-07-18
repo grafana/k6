@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"syscall"
 
 	"github.com/fatih/color"
@@ -297,6 +298,11 @@ func getStacks(gs *state.GlobalState, jsonRawConf json.RawMessage, token string)
 func getDefaultStack(gs *state.GlobalState, jsonRawConf json.RawMessage, token string) (int64, string, error) {
 	stacks, err := getStacks(gs, jsonRawConf, token)
 	if err != nil {
+		// TODO: Improve handling of this error. This happens when the user uses a Stack tocken instead of a Personal token.
+		if strings.Contains(err.Error(), "Authentication failed") {
+			return 0, "", nil
+		}
+
 		return 0, "", fmt.Errorf("failed to get default stack slug: %w", err)
 	}
 
