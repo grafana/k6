@@ -114,14 +114,14 @@ func Test_Collector_PopAll_DoesNothingWithEmptyData(t *testing.T) {
 
 	// Given
 	data := insights.RequestMetadatas{
-		{
+		insights.RequestMetadata{
 			TraceID:        "test-trace-id-1",
 			Start:          time.Unix(9, 0),
 			End:            time.Unix(10, 0),
 			TestRunLabels:  insights.TestRunLabels{ID: 1337, Scenario: "test-scenario-1", Group: "test-group-1"},
 			ProtocolLabels: insights.ProtocolHTTPLabels{URL: "test-url-1", Method: "test-method-1", StatusCode: 200},
 		},
-		{
+		insights.RequestMetadata{
 			TraceID:        "test-trace-id-2",
 			Start:          time.Unix(19, 0),
 			End:            time.Unix(20, 0),
