@@ -17,6 +17,7 @@ import (
 	protov1 "github.com/golang/protobuf/proto" //nolint:staticcheck,nolintlint // this is the old v1 version
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/metadata"
 	grpcstats "google.golang.org/grpc/stats"
 	"google.golang.org/grpc/status"
@@ -57,6 +58,11 @@ type StreamRequest struct {
 	DiscardResponseMessage bool
 	TagsAndMeta            *metrics.TagsAndMeta
 	Metadata               metadata.MD
+}
+
+// HealthCheckResponse represents a gRPC healthcheck response.
+type HealthCheckResponse struct {
+	Status healthpb.HealthCheckResponse_ServingStatus
 }
 
 type clientConnCloser interface {
@@ -102,6 +108,17 @@ func Dial(ctx context.Context, addr string, options ...grpc.DialOption) (*Conn, 
 func (c *Conn) Reflect(ctx context.Context) (*descriptorpb.FileDescriptorSet, error) {
 	rc := reflectionClient{Conn: c.raw}
 	return rc.Reflect(ctx)
+}
+
+// HealthCheck executes a unary gRPC healthcheck Check call.
+func (c *Conn) HealthCheck(ctx context.Context, svc string) (*HealthCheckResponse, error) {
+	healthClient := healthpb.NewHealthClient(c.raw)
+	res, err := healthClient.Check(ctx, &healthpb.HealthCheckRequest{Service: svc})
+	if err != nil {
+		return nil, err
+	}
+
+	return &HealthCheckResponse{Status: res.GetStatus()}, nil
 }
 
 // Invoke executes a unary gRPC request.
