@@ -541,12 +541,14 @@ func (m *FrameManager) requestStarted(req *Request) {
 		frame.pendingDocumentMu.Unlock()
 	}
 
-	if len(m.page.routes) == 0 {
+	if !m.page.hasRoutes() {
 		return
 	}
 
-	// TODO: If the handler doesn't match we return false and perform a route.continue like in https://github.com/microsoft/playwright/blob/main/packages/playwright-core/src/server/frames.ts#L315
-	// TODO: Perform some tests against PW to ensure that the behaviour matches. Where it doesn't create new issues or resolve there and then.
+	// TODO: If the handler doesn't match we return false and perform a route.continue
+	// like in https://github.com/microsoft/playwright/blob/main/packages/playwright-core/src/server/frames.ts#L315
+	// TODO: Perform some tests against PW to ensure that the behaviour matches.
+	// Where it doesn't create new issues or resolve there and then.
 	route := NewRoute(m.logger, m.page.mainFrameSession.networkManager, m.vu.Runtime(), req)
 	for _, r := range m.page.routes {
 		continueReq, err := r.handler(route)

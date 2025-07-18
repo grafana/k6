@@ -29,23 +29,6 @@ import (
 	"github.com/chromedp/cdproto/network"
 )
 
-var ErrorReasons = map[string]network.ErrorReason{
-	"aborted":              network.ErrorReasonAborted,
-	"accessdenied":         network.ErrorReasonAccessDenied,
-	"addressunreachable":   network.ErrorReasonAddressUnreachable,
-	"blockedbyclient":      network.ErrorReasonBlockedByClient,
-	"blockedbyresponse":    network.ErrorReasonBlockedByResponse,
-	"connectionaborted":    network.ErrorReasonConnectionAborted,
-	"connectionclosed":     network.ErrorReasonConnectionClosed,
-	"connectionfailed":     network.ErrorReasonConnectionFailed,
-	"connectionrefused":    network.ErrorReasonConnectionRefused,
-	"connectionreset":      network.ErrorReasonConnectionReset,
-	"internetdisconnected": network.ErrorReasonInternetDisconnected,
-	"namenotresolved":      network.ErrorReasonNameNotResolved,
-	"timedout":             network.ErrorReasonTimedOut,
-	"failed":               network.ErrorReasonFailed,
-}
-
 // Credentials holds HTTP authentication credentials.
 type Credentials struct {
 	Username string `js:"username"`
@@ -81,6 +64,7 @@ type NetworkManager struct {
 	vu               k6modules.VU
 	customMetrics    *k6ext.CustomMetrics
 	eventInterceptor eventInterceptor
+	errorReasons     map[string]network.ErrorReason
 
 	// TODO: manage inflight requests separately (move them between the two maps
 	// as they transition from inflight -> completed)
@@ -135,6 +119,7 @@ func NewNetworkManager(
 		extraHTTPHeaders:              make(map[string]string),
 		networkProfile:                NewNetworkProfile(),
 		eventInterceptor:              ei,
+		errorReasons:                  errorReasons(),
 	}
 	m.initEvents()
 	if err := m.initDomains(); err != nil {
@@ -142,6 +127,25 @@ func NewNetworkManager(
 	}
 
 	return &m, nil
+}
+
+func errorReasons() map[string]network.ErrorReason {
+	return map[string]network.ErrorReason{
+		"aborted":              network.ErrorReasonAborted,
+		"accessdenied":         network.ErrorReasonAccessDenied,
+		"addressunreachable":   network.ErrorReasonAddressUnreachable,
+		"blockedbyclient":      network.ErrorReasonBlockedByClient,
+		"blockedbyresponse":    network.ErrorReasonBlockedByResponse,
+		"connectionaborted":    network.ErrorReasonConnectionAborted,
+		"connectionclosed":     network.ErrorReasonConnectionClosed,
+		"connectionfailed":     network.ErrorReasonConnectionFailed,
+		"connectionrefused":    network.ErrorReasonConnectionRefused,
+		"connectionreset":      network.ErrorReasonConnectionReset,
+		"internetdisconnected": network.ErrorReasonInternetDisconnected,
+		"namenotresolved":      network.ErrorReasonNameNotResolved,
+		"timedout":             network.ErrorReasonTimedOut,
+		"failed":               network.ErrorReasonFailed,
+	}
 }
 
 // Returns a new Resolver.
@@ -488,8 +492,10 @@ func isInternalURL(u *url.URL) bool {
 	return u.Scheme == "data" || u.Scheme == "blob"
 }
 
-func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, requestPausedEvent *fetch.EventRequestPaused) {
-	m.logger.Debugf("NetworkManager:onRequest", "url:%s method:%s type:%s fid:%s Starting onRequest",
+func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent,
+	requestPausedEvent *fetch.EventRequestPaused,
+) {
+	m.logger.Infof("NetworkManager:onRequest", "url:%s method:%s type:%s fid:%s Starting onRequest",
 		event.Request.URL, event.Request.Method, event.Initiator.Type, event.FrameID)
 	var redirectChain []*Request = nil
 	if event.RedirectResponse != nil {
@@ -538,49 +544,19 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, reques
 	isInterceptedOptionsPreflight := requestPausedEvent != nil &&
 		requestPausedEvent.Request.Method == http.MethodOptions &&
 		event.Initiator.Type == "preflight"
-	if isInterceptedOptionsPreflight && len(m.frameManager.page.routes) > 0 {
-		requestHeaders := requestPausedEvent.Request.Headers
-		headerAllowOriginValue := "*"
-		if value, ok := requestHeaders["Origin"]; ok {
-			valueStr, ok := value.(string)
-			if ok {
-				headerAllowOriginValue = valueStr
-			}
-		}
-		headerAllowMethodsValue := "GET, POST, OPTIONS, DELETE"
-		if value, ok := requestHeaders["Access-Control-Request-Method"]; ok {
-			valueStr, ok := value.(string)
-			if ok {
-				headerAllowMethodsValue = valueStr
-			}
-		}
-
-		responseHeaders := []*fetch.HeaderEntry{
-			{Name: "Access-Control-Allow-Origin", Value: headerAllowOriginValue},
-			{Name: "Access-Control-Allow-Methods", Value: headerAllowMethodsValue},
-			{Name: "Access-Control-Allow-Credentials", Value: "true"},
-		}
-
-		if value, ok := requestHeaders["Access-Control-Request-Headers"]; ok {
-			valueStr, ok := value.(string)
-			if ok {
-				responseHeaders = append(responseHeaders, &fetch.HeaderEntry{
-					Name: "Access-Control-Allow-Headers", Value: valueStr,
-				})
-			}
-		}
-		m.FulfillRequest(requestPausedEvent.RequestID, fetch.FulfillRequestParams{
-			ResponseCode:    204,
-			ResponsePhrase:  "No Content",
-			ResponseHeaders: responseHeaders,
-			Body:            "",
-		})
+	if isInterceptedOptionsPreflight && m.frameManager.page.hasRoutes() {
+		m.handleCORS(requestPausedEvent)
 		return
 	}
 
 	var interceptionID fetch.RequestID
 	if requestPausedEvent != nil {
-		interceptionID = requestPausedEvent.RequestID
+		// We do not support intercepting redirects.
+		if len(redirectChain) > 0 {
+			m.ContinueRequest(requestPausedEvent.RequestID)
+		} else {
+			interceptionID = requestPausedEvent.RequestID
+		}
 	}
 
 	req, err := NewRequest(m.ctx, m.logger, NewRequestParams{
@@ -609,7 +585,7 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, reques
 }
 
 func (m *NetworkManager) onRequestWillBeSent(event *network.EventRequestWillBeSent) {
-	m.logger.Debugf("NetworkManager:onRequest", "url:%s method:%s type:%s fid:%s Starting onRequestWillBeSent",
+	m.logger.Infof("NetworkManager:onRequestWillBeSent", "url:%s method:%s type:%s fid:%s Starting onRequestWillBeSent",
 		event.Request.URL, event.Request.Method, event.Initiator.Type, event.FrameID)
 
 	// Request interception doesn't happen for data URLs with Network Service.
@@ -627,9 +603,9 @@ func (m *NetworkManager) onRequestWillBeSent(event *network.EventRequestWillBeSe
 }
 
 func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
-	m.logger.Debugf("NetworkManager:onRequestPaused",
+	m.logger.Infof("NetworkManager:onRequestPaused",
 		"url:%v sid:%s", event.Request.URL, m.session.ID())
-	defer m.logger.Debugf("NetworkManager:onRequestPaused:return",
+	defer m.logger.Infof("NetworkManager:onRequestPaused:return",
 		"url:%v sid:%s", event.Request.URL, m.session.ID())
 
 	var failErr error
@@ -679,21 +655,21 @@ func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
 			return
 		}
 
-		//	if existingRequest, ok := m.reqIDToRequest[requestID]; ok {
-		//		if event.RedirectedRequestID == "" {
-		//			action := fetch.ContinueRequest(event.RequestID)
-		//			if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-		//				// Avoid logging as error when context is canceled.
-		//				// Most probably this happens when trying to continue a site's background request
-		//				// while the iteration is ending and therefore the browser context is being closed.
-		//				if errors.Is(err, context.Canceled) {
-		//					m.logger.Debug("NetworkManager:onRequestPaused", "context canceled continuing request")
-		//					return
-		//				}
-		//				m.logger.Errorf("NetworkManager:onRequestPaused", "continuing request: %s", err)
-		//			}
-		//		}
-		//	}
+		if _, ok := m.reqIDToRequest[requestID]; ok {
+			if event.RedirectedRequestID == "" {
+				action := fetch.ContinueRequest(event.RequestID)
+				if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+					// Avoid logging as error when context is canceled.
+					// Most probably this happens when trying to continue a site's background request
+					// while the iteration is ending and therefore the browser context is being closed.
+					if errors.Is(err, context.Canceled) {
+						m.logger.Debug("NetworkManager:onRequestPaused", "context canceled continuing request")
+						return
+					}
+					m.logger.Errorf("NetworkManager:onRequestPaused", "continuing request: %s", err)
+				}
+			}
+		}
 
 		m.reqIDToRequestPausedEvent[requestID] = event
 	}()
@@ -748,6 +724,45 @@ func checkBlockedIPs(ip net.IP, blockedIPs []*k6lib.IPNet) error {
 		}
 	}
 	return nil
+}
+
+func (m *NetworkManager) handleCORS(requestPausedEvent *fetch.EventRequestPaused) {
+	requestHeaders := requestPausedEvent.Request.Headers
+	headerAllowOriginValue := "*"
+	if value, ok := requestHeaders["Origin"]; ok {
+		valueStr, ok := value.(string)
+		if ok {
+			headerAllowOriginValue = valueStr
+		}
+	}
+	headerAllowMethodsValue := "GET, POST, OPTIONS, DELETE"
+	if value, ok := requestHeaders["Access-Control-Request-Method"]; ok {
+		valueStr, ok := value.(string)
+		if ok {
+			headerAllowMethodsValue = valueStr
+		}
+	}
+
+	responseHeaders := []*fetch.HeaderEntry{
+		{Name: "Access-Control-Allow-Origin", Value: headerAllowOriginValue},
+		{Name: "Access-Control-Allow-Methods", Value: headerAllowMethodsValue},
+		{Name: "Access-Control-Allow-Credentials", Value: "true"},
+	}
+
+	if value, ok := requestHeaders["Access-Control-Request-Headers"]; ok {
+		valueStr, ok := value.(string)
+		if ok {
+			responseHeaders = append(responseHeaders, &fetch.HeaderEntry{
+				Name: "Access-Control-Allow-Headers", Value: valueStr,
+			})
+		}
+	}
+	m.FulfillRequest(requestPausedEvent.RequestID, fetch.FulfillRequestParams{
+		ResponseCode:    204,
+		ResponsePhrase:  "No Content",
+		ResponseHeaders: responseHeaders,
+		Body:            "",
+	})
 }
 
 func (m *NetworkManager) onAuthRequired(event *fetch.EventAuthRequired) {
@@ -896,7 +911,7 @@ func (m *NetworkManager) Authenticate(credentials Credentials) error {
 }
 
 func (m *NetworkManager) AbortRequest(requestID fetch.RequestID, errorReason string) {
-	netErrorReason, ok := ErrorReasons[errorReason]
+	netErrorReason, ok := m.errorReasons[errorReason]
 	if !ok {
 		m.logger.Errorf("NetworkManager:AbortRequest", "unknown error code: %s", errorReason)
 		return
