@@ -122,6 +122,12 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 		return nil
 	case token.Valid:
 		newCloudConf.Token = token
+
+		err := validateToken(c.globalState, currentJSONConfigRaw, newCloudConf.Token.String)
+		if err != nil {
+			return err
+		}
+
 		if stackSlug.Valid {
 			normalizedSlug := stripGrafanaNetSuffix(stackSlug.String)
 			newCloudConf.StackSlug = null.StringFrom(normalizedSlug)
@@ -133,6 +139,7 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 			}
 		}
 	default:
+		/* Token form */
 		tokenForm := ui.Form{
 			Banner: "Enter your token to authenticate with Grafana Cloud k6.\n" +
 				"Please, consult the Grafana Cloud k6 documentation for instructions on how to generate one:\n" +
@@ -161,29 +168,19 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 			return fmt.Errorf("token validation failed: %w", err)
 		}
 
-		defaultStack, err := func(token string) (string, error) {
-			stacks, err := getStacks(c.globalState, currentJSONConfigRaw, token)
-			if err != nil {
-				return "", fmt.Errorf("failed to get default stack slug: %w", err)
-			}
-			for slug := range stacks {
-				return slug, nil
-			}
-			return "", errors.New("no stacks found for the provided token " +
-				"please create a stack in Grafana Cloud and initialize GCk6 app")
-		}(tokenValue)
+		/* Stack form */
+		_, defaultStackSlug, err := getDefaultStack(c.globalState, currentJSONConfigRaw, newCloudConf.Token.String)
 		if err != nil {
-			return fmt.Errorf("failed to get default stack: %w", err)
+			return fmt.Errorf("failed to get default stack slug: %w", err)
 		}
-
 		stackForm := ui.Form{
 			Banner: "\nEnter the stack where you want to run k6's commands by default.\n" +
 				"Use the slug from your Grafana Cloud URL, e.g. my-team from https://my-team.grafana.net):",
 			Fields: []ui.Field{
 				ui.StringField{
-					Key:     "StackSlug",
+					Key:     "Stack",
 					Label:   "Stack",
-					Default: defaultStack,
+					Default: defaultStackSlug,
 				},
 			},
 		}
@@ -191,26 +188,13 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 		if err != nil {
 			return err
 		}
+		newCloudConf.StackSlug = null.StringFrom(stripGrafanaNetSuffix(stackVals["Stack"]))
 
-		stackSlugInput := null.StringFrom(stackVals["StackSlug"])
-		if !stackSlugInput.Valid {
-			return errors.New("stack cannot be empty")
-		}
-		normalizedSlug := stripGrafanaNetSuffix(stackSlugInput.String)
-		newCloudConf.StackSlug = null.StringFrom(normalizedSlug)
-
-		id, err := resolveStackSlugToID(c.globalState, currentJSONConfigRaw, tokenValue, normalizedSlug)
+		id, err := resolveStackSlugToID(c.globalState, currentJSONConfigRaw, tokenValue, newCloudConf.StackSlug.String)
 		if err != nil {
 			return fmt.Errorf("could not resolve stack slug. Are you sure the slug is correct? %w", err)
 		}
 		newCloudConf.StackID = null.IntFrom(id)
-	}
-
-	if newCloudConf.Token.Valid {
-		err := validateToken(c.globalState, currentJSONConfigRaw, newCloudConf.Token.String)
-		if err != nil {
-			return err
-		}
 	}
 
 	if currentDiskConf.Collectors == nil {
@@ -308,4 +292,21 @@ func getStacks(gs *state.GlobalState, jsonRawConf json.RawMessage, token string)
 		stacks[stackName] = organization.GrafanaStackID
 	}
 	return stacks, nil
+}
+
+func getDefaultStack(gs *state.GlobalState, jsonRawConf json.RawMessage, token string) (int64, string, error) {
+	stacks, err := getStacks(gs, jsonRawConf, token)
+	if err != nil {
+		return 0, "", fmt.Errorf("failed to get default stack slug: %w", err)
+	}
+
+	if len(stacks) == 0 {
+		return 0, "", errors.New("no stacks found for the provided token " +
+			"please create a stack in Grafana Cloud and initialize GCk6 app")
+	}
+
+	for slug, id := range stacks {
+		return int64(id), slug, nil
+	}
+	return 0, "", nil // This should never happen
 }
