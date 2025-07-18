@@ -368,7 +368,7 @@ func (c *Client) AccountMe() (*AccountMeResponse, error) {
 	return &amr, nil
 }
 
-func (c *Client) GetDefaultProject(stack_id int64) (int64, string, error) {
+func (c *Client) GetDefaultProject(stackID int64) (int64, string, error) {
 	// TODO: remove this hardcoded URL
 	req, err := c.NewRequest("GET", "https://api.k6.io/cloud/v6/projects", nil)
 	if err != nil {
@@ -379,7 +379,7 @@ func (c *Client) GetDefaultProject(stack_id int64) (int64, string, error) {
 	q.Add("$orderby", "created")
 	req.URL.RawQuery = q.Encode()
 
-	req.Header.Set("X-Stack-Id", fmt.Sprintf("%d", stack_id))
+	req.Header.Set("X-Stack-Id", fmt.Sprintf("%d", stackID))
 	// TODO: by default the client uses Token instead of Bearer
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.token))
 	req.Header.Set("User-Agent", "Go-http-client")
@@ -418,7 +418,7 @@ func (c *Client) GetDefaultProject(stack_id int64) (int64, string, error) {
 	}
 
 	if len(parsed.Value) == 0 {
-		return 0, "", fmt.Errorf("no projects found for stack ID %d", stack_id)
+		return 0, "", fmt.Errorf("no projects found for stack ID %d", stackID)
 	}
 
 	for _, proj := range parsed.Value {
@@ -427,5 +427,5 @@ func (c *Client) GetDefaultProject(stack_id int64) (int64, string, error) {
 		}
 	}
 
-	return 0, "", fmt.Errorf("no default project found for stack ID %d", stack_id)
+	return 0, "", fmt.Errorf("no default project found for stack ID %d", stackID)
 }
