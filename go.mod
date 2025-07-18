@@ -22,7 +22,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/grafana/k6deps v0.2.6
 	github.com/grafana/k6provider v0.1.15
-	github.com/grafana/sobek v0.0.0-20250703160529-250ffb530335
+	github.com/grafana/sobek v0.0.0-20250718094609-a55ec854dc4e
 	github.com/grafana/xk6-dashboard v0.7.6
 	github.com/grafana/xk6-redis v0.3.3
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
