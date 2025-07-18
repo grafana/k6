@@ -79,10 +79,6 @@ func (s *DOMElementState) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-func isExactString(s string) bool {
-	return len(s) > 0 && s[0] == '\'' && s[len(s)-1] == '\''
-}
-
 // urlMatcher matches URLs based on pattern type. It can match on exact and regex
 // patterns. If the pattern is empty or a single quote, it matches any URL.
 func urlMatcher(pattern string, jsRegexChecker JSRegexChecker) (func(string) (bool, error), error) {
@@ -90,7 +86,7 @@ func urlMatcher(pattern string, jsRegexChecker JSRegexChecker) (func(string) (bo
 		return func(url string) (bool, error) { return true, nil }, nil
 	}
 
-	if isExactString(pattern) {
+	if isQuotedText(pattern) {
 		return func(url string) (bool, error) { return "'"+url+"'" == pattern, nil }, nil
 	}
 
