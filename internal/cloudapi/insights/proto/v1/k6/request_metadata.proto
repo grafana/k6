@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package k6.cloud.insights.proto.v1.k6;
 
-option go_package = "go.k6.io/k6/cloudapi/insights/proto/v1/k6";
+option go_package = "go.k6.io/k6/internal/cloudapi/insights/proto/v1/k6";
 
 import "v1/k6/labels.proto";
 
