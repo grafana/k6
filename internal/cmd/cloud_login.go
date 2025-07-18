@@ -169,7 +169,8 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 			for slug := range stacks {
 				return slug, nil
 			}
-			return "", errors.New("no stacks found for the provided token, please create a stack in Grafana Cloud and initialize GCk6 app")
+			return "", errors.New("no stacks found for the provided token " +
+				"please create a stack in Grafana Cloud and initialize GCk6 app")
 		}(tokenValue)
 		if err != nil {
 			return fmt.Errorf("failed to get default stack: %w", err)
@@ -223,20 +224,18 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	if newCloudConf.Token.Valid {
-		valueColor := getColor(c.globalState.Flags.NoColor || !c.globalState.Stdout.IsTTY, color.FgCyan)
-		printToStdout(c.globalState, fmt.Sprintf(
-			"\nLogged in successfully, token and stack info saved in %s\n", c.globalState.Flags.ConfigFilePath,
-		))
-		if !c.globalState.Flags.Quiet {
-			printToStdout(c.globalState, fmt.Sprintf("  token: %s\n", valueColor.Sprint(newCloudConf.Token.String)))
+	valueColor := getColor(c.globalState.Flags.NoColor || !c.globalState.Stdout.IsTTY, color.FgCyan)
+	printToStdout(c.globalState, fmt.Sprintf(
+		"\nLogged in successfully, token and stack info saved in %s\n", c.globalState.Flags.ConfigFilePath,
+	))
+	if !c.globalState.Flags.Quiet {
+		printToStdout(c.globalState, fmt.Sprintf("  token: %s\n", valueColor.Sprint(newCloudConf.Token.String)))
 
-			if newCloudConf.StackID.Valid {
-				printToStdout(c.globalState, fmt.Sprintf("  stack-id: %s\n", valueColor.Sprint(newCloudConf.StackID.Int64)))
-			}
-			if newCloudConf.StackSlug.Valid {
-				printToStdout(c.globalState, fmt.Sprintf("  stack-slug: %s\n", valueColor.Sprint(newCloudConf.StackSlug.String)))
-			}
+		if newCloudConf.StackID.Valid {
+			printToStdout(c.globalState, fmt.Sprintf("  stack-id: %s\n", valueColor.Sprint(newCloudConf.StackID.Int64)))
+		}
+		if newCloudConf.StackSlug.Valid {
+			printToStdout(c.globalState, fmt.Sprintf("  stack-slug: %s\n", valueColor.Sprint(newCloudConf.StackSlug.String)))
 		}
 	}
 	return nil
