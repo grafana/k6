@@ -172,8 +172,10 @@ func resolveDefaultProjectID(
 			}
 			*stackID = null.IntFrom(id)
 		} else {
-			gs.Logger.Error("please specify a projectID in your test or use `k6 cloud login` to set up a default stack")
-			return 0, fmt.Errorf("no projectID specified and no default stack set")
+			// TODO: do this in the future? But it is a breaking change...
+			// gs.Logger.Error("please specify a projectID in your test or use `k6 cloud login` to set up a default stack")
+			// return 0, fmt.Errorf("no projectID specified and no default stack set")
+			return 0, nil
 		}
 	}
 
