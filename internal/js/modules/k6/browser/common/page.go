@@ -194,20 +194,28 @@ type RouteHandler struct {
 	runtime *sobek.Runtime
 	logger  *log.Logger
 
-	path    string
-	handler RouteHandlerCallback
+	path           string
+	handler        RouteHandlerCallback
+	jsRegexChecker JSRegexChecker
 }
 
-func NewRouteHandler(rt *sobek.Runtime, logger *log.Logger, path string, handler RouteHandlerCallback) *RouteHandler {
+func NewRouteHandler(
+	rt *sobek.Runtime,
+	logger *log.Logger,
+	path string,
+	handler RouteHandlerCallback,
+	jsRegexChecker JSRegexChecker,
+) *RouteHandler {
 	return &RouteHandler{
-		runtime: rt,
-		logger:  logger,
-		path:    path,
-		handler: handler,
+		runtime:        rt,
+		logger:         logger,
+		path:           path,
+		handler:        handler,
+		jsRegexChecker: jsRegexChecker,
 	}
 }
 
-type RouteHandlerCallback func(*Route) (bool, error)
+type RouteHandlerCallback func(*Route) error
 
 // Page stores Page/tab related context.
 type Page struct {
@@ -1254,9 +1262,14 @@ func (p *Page) Referrer() string {
 }
 
 // Route register a handler to be executed for a given request path
-func (p *Page) Route(rt *sobek.Runtime, path string, handlerCallback RouteHandlerCallback) error {
-	p.logger.Infof("Page:Route", "sid:%v path:%s", p.sessionID(), path)
-	routeHandler := NewRouteHandler(rt, p.logger, path, handlerCallback)
+func (p *Page) Route(
+	rt *sobek.Runtime,
+	path string,
+	handlerCallback RouteHandlerCallback,
+	jsRegexChecker JSRegexChecker,
+) error {
+	p.logger.Debugf("Page:Route", "sid:%v path:%s", p.sessionID(), path)
+	routeHandler := NewRouteHandler(rt, p.logger, path, handlerCallback, jsRegexChecker)
 	p.routes = append([]*RouteHandler{routeHandler}, p.routes...)
 
 	return p.mainFrameSession.updateRequestInterception(true)

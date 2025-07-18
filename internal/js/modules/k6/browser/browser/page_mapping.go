@@ -816,33 +816,23 @@ func mapPageRoute(vu moduleVU, p *common.Page) func(path sobek.Value, handler so
 	return func(path sobek.Value, handler sobek.Callable) (*sobek.Promise, error) {
 		return k6ext.Promise(vu.Context(), func() (any, error) {
 			ctx := vu.Context()
-			err := prepK6BrowserRegExChecker(vu.Runtime())()
+			targetID := p.TargetID()
+
+			// Inject JS regex checker for URL regex pattern matching
+			jsRegexChecker, err := injectRegexMatcherScript(ctx, vu, targetID)
 			if err != nil {
 				return nil, err
 			}
-
 			pathStr := parseStringOrRegex(path)
 
 			// Run the event handler in the task queue to
 			// ensure that the handler is executed on the event loop.
-			tq := vu.get(ctx, p.TargetID())
-			routeHandler := func(route *common.Route) (bool, error) {
+			tq := vu.get(ctx, targetID)
+			routeHandler := func(route *common.Route) error {
 				done := make(chan bool)
-				continueReq := true
 				var rtnErr error
 				tq.Queue(func() error {
 					defer close(done)
-
-					// This needs to be executed in the task queue to access the JS function
-					matched, err := route.Matches(pathStr)
-					if err != nil {
-						rtnErr = fmt.Errorf("matching route path %q: %w", path, err)
-						return nil
-					}
-
-					if !matched {
-						return nil
-					}
 
 					_, err = handler(
 						sobek.Undefined(),
@@ -852,7 +842,6 @@ func mapPageRoute(vu moduleVU, p *common.Page) func(path sobek.Value, handler so
 						rtnErr = fmt.Errorf("executing page.route('%s') handler: %w", path, err)
 						return nil
 					}
-					continueReq = false
 
 					return nil
 				})
@@ -863,10 +852,10 @@ func mapPageRoute(vu moduleVU, p *common.Page) func(path sobek.Value, handler so
 					err = errors.New("iteration ended before route completed")
 				}
 
-				return continueReq, rtnErr
+				return rtnErr
 			}
 
-			return nil, p.Route(vu.Runtime(), pathStr, routeHandler)
+			return nil, p.Route(vu.Runtime(), pathStr, routeHandler, jsRegexChecker)
 		}), nil
 	}
 }
