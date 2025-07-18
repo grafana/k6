@@ -168,6 +168,11 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 		logger, cloudConfig.Token.String, cloudConfig.Host.String, build.Version, cloudConfig.Timeout.TimeDuration())
 
 	if cloudConfig.ProjectID.Int64 == 0 {
+		if cloudConfig.StackID.Int64 == 0 {
+			logger.Error("please specify a projectID in your test or use `k6 cloud login` to set up a default stack")
+			return fmt.Errorf("no projectID specified and no default stack set")
+		}
+
 		projectID, _, err := client.GetDefaultProject(cloudConfig.StackID.Int64)
 		if err != nil {
 			return fmt.Errorf("can't get default projectID for stack %d (%s): %w", cloudConfig.StackID.Int64, cloudConfig.StackSlug.String, err)

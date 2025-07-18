@@ -119,6 +119,11 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 		logger, conf.Token.String, conf.Host.String, build.Version, conf.Timeout.TimeDuration())
 
 	if testRun.ProjectID == 0 {
+		if conf.StackID.Int64 == 0 {
+			gs.Logger.Error("please specify a projectID in your test or use `k6 cloud login` to set up a default stack")
+			return fmt.Errorf("no projectID specified and no default stack set")
+		}
+
 		projectID, _, err := apiClient.GetDefaultProject(conf.StackID.Int64)
 		if err != nil {
 			return fmt.Errorf("can't get default projectID for stack %d (%s): %w", conf.StackID.Int64, conf.StackSlug.String, err)
