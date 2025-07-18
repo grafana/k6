@@ -262,6 +262,9 @@ func mergeFromCloudOptionAndExternal(
 	if tmpConfig.StackID.Valid {
 		conf.StackID = tmpConfig.StackID
 	}
+	if tmpConfig.StackSlug.Valid {
+		conf.StackSlug = tmpConfig.StackSlug
+	}
 
 	return nil
 }
