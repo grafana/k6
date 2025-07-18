@@ -18,7 +18,7 @@ syntax = "proto3";
 
 package k6.cloud.insights.proto.v1.common;
 
-option go_package = "go.k6.io/k6/cloudapi/insights/proto/v1/common";
+option go_package = "go.k6.io/k6/internal/cloudapi/insights/proto/v1/common";
 
 // AnyValue is used to represent any type of attribute value. AnyValue may contain a
 // primitive value such as a string or integer or it may contain an arbitrary nested
