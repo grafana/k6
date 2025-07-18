@@ -495,7 +495,7 @@ func isInternalURL(u *url.URL) bool {
 func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent,
 	requestPausedEvent *fetch.EventRequestPaused,
 ) {
-	m.logger.Infof("NetworkManager:onRequest", "url:%s method:%s type:%s fid:%s Starting onRequest",
+	m.logger.Debugf("NetworkManager:onRequest", "url:%s method:%s type:%s fid:%s Starting onRequest",
 		event.Request.URL, event.Request.Method, event.Initiator.Type, event.FrameID)
 	var redirectChain []*Request = nil
 	if event.RedirectResponse != nil {
@@ -551,12 +551,7 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent,
 
 	var interceptionID fetch.RequestID
 	if requestPausedEvent != nil {
-		// We do not support intercepting redirects.
-		if len(redirectChain) > 0 {
-			m.ContinueRequest(requestPausedEvent.RequestID)
-		} else {
-			interceptionID = requestPausedEvent.RequestID
-		}
+		interceptionID = requestPausedEvent.RequestID
 	}
 
 	req, err := NewRequest(m.ctx, m.logger, NewRequestParams{
@@ -585,7 +580,7 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent,
 }
 
 func (m *NetworkManager) onRequestWillBeSent(event *network.EventRequestWillBeSent) {
-	m.logger.Infof("NetworkManager:onRequestWillBeSent", "url:%s method:%s type:%s fid:%s Starting onRequestWillBeSent",
+	m.logger.Debugf("NetworkManager:onRequestWillBeSent", "url:%s method:%s type:%s fid:%s Starting onRequestWillBeSent",
 		event.Request.URL, event.Request.Method, event.Initiator.Type, event.FrameID)
 
 	// Request interception doesn't happen for data URLs with Network Service.
@@ -603,9 +598,9 @@ func (m *NetworkManager) onRequestWillBeSent(event *network.EventRequestWillBeSe
 }
 
 func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
-	m.logger.Infof("NetworkManager:onRequestPaused",
+	m.logger.Debugf("NetworkManager:onRequestPaused",
 		"url:%v sid:%s", event.Request.URL, m.session.ID())
-	defer m.logger.Infof("NetworkManager:onRequestPaused:return",
+	defer m.logger.Debugf("NetworkManager:onRequestPaused:return",
 		"url:%v sid:%s", event.Request.URL, m.session.ID())
 
 	var failErr error
@@ -630,45 +625,16 @@ func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
 			return
 		}
 
+		// If no route was added, continue all requests
+		if m.frameManager.page == nil || !m.frameManager.page.hasRoutes() {
+			m.ContinueRequest(event.RequestID)
+		}
+
 		requestID := event.NetworkID
-		if requestID == "" {
-			// Fetch without networkId means that request was not recognized by inspector, and
-			// it will never receive Network.requestWillBeSent. Continue the request to not affect it.
-			action := fetch.ContinueRequest(event.RequestID)
-			if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-				if errors.Is(err, context.Canceled) {
-					m.logger.Debug("NetworkManager:onRequestPaused", "context canceled continuing request")
-					return
-				}
-				m.logger.Errorf("NetworkManager:onRequestPaused", "continuing request: %s", err)
-			}
-			return
-		}
-
-		if strings.HasPrefix(event.Request.URL, "data:") {
-			return
-		}
-
 		if requestWillBeSentEvent, ok := m.reqIDToRequestWillBeSentEvent[requestID]; ok {
 			m.onRequest(requestWillBeSentEvent, event)
 			delete(m.reqIDToRequestWillBeSentEvent, requestID)
 			return
-		}
-
-		if _, ok := m.reqIDToRequest[requestID]; ok {
-			if event.RedirectedRequestID == "" {
-				action := fetch.ContinueRequest(event.RequestID)
-				if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-					// Avoid logging as error when context is canceled.
-					// Most probably this happens when trying to continue a site's background request
-					// while the iteration is ending and therefore the browser context is being closed.
-					if errors.Is(err, context.Canceled) {
-						m.logger.Debug("NetworkManager:onRequestPaused", "context canceled continuing request")
-						return
-					}
-					m.logger.Errorf("NetworkManager:onRequestPaused", "continuing request: %s", err)
-				}
-			}
 		}
 
 		m.reqIDToRequestPausedEvent[requestID] = event
@@ -943,11 +909,21 @@ func (m *NetworkManager) ContinueRequest(requestID fetch.RequestID) {
 		// while the iteration is ending and therefore the browser context is being closed.
 		if errors.Is(err, context.Canceled) {
 			m.logger.Debug("NetworkManager:ContinueRequest", "context canceled continuing request")
-		} else {
-			m.logger.Errorf("NetworkManager:ContinueRequest", "fail to continue request (id: %s): %s",
-				requestID, err)
+			return
 		}
-		return
+
+		// This error message is an internal issue, rather than something that the user can
+		// action on. It's also usually ok to ignore since it means that the page has navigated
+		// away or something has occurred which means that the request is no longer needed and
+		// isn't being tracked by chromium.
+		if strings.Contains(err.Error(), "Invalid InterceptionId") {
+			m.logger.Debugf("NetworkManager:ContinueRequest", "invalid interception ID (%s) continuing request: %s",
+				requestID, err)
+			return
+		}
+
+		m.logger.Errorf("NetworkManager:ContinueRequest", "fail to continue request (id: %s): %s",
+			requestID, err)
 	}
 }
 
