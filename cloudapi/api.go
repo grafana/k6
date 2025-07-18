@@ -390,7 +390,14 @@ func (c *Client) GetDefaultProject(stack_id int64) (int64, string, error) {
 	if err != nil {
 		return 0, "", fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if resp != nil {
+			_, _ = io.Copy(io.Discard, resp.Body)
+			if cerr := resp.Body.Close(); cerr != nil && err == nil {
+				err = cerr
+			}
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
