@@ -32,7 +32,7 @@ jobs:
             go mod verify
       - name: Check code generation
         run: |
-          go install github.com/alvaroloes/enumer@v1.1.2
+          go install github.com/mstoykov/enumer@v0.0.1
           go install github.com/mailru/easyjson/easyjson@v0.7.7
           test -z "$(go generate ./... && git status --porcelain)"
 

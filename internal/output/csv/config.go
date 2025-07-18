@@ -9,6 +9,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/mstoykov/envconfig"
+
 	"go.k6.io/k6/lib/types"
 )
 
@@ -22,7 +23,7 @@ type Config struct {
 
 // TimeFormat custom enum type
 //
-//go:generate enumer -type=TimeFormat -transform=snake -trimprefix TimeFormat -output time_format_gen.go
+//go:generate go run github.com/dmarkham/enumer@v1.5.11 -type=TimeFormat -transform=snake -trimprefix TimeFormat -output time_format_gen.go
 type TimeFormat uint8
 
 // valid defined values for TimeFormat
