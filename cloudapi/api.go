@@ -368,6 +368,7 @@ func (c *Client) AccountMe() (*AccountMeResponse, error) {
 	return &amr, nil
 }
 
+// GetDefaultProject retrieves the default project for the given stack ID.
 func (c *Client) GetDefaultProject(stackID int64) (int64, string, error) {
 	// TODO: remove this hardcoded URL
 	req, err := c.NewRequest("GET", "https://api.k6.io/cloud/v6/projects", nil)
