@@ -119,26 +119,21 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 		logger, conf.Token.String, conf.Host.String, build.Version, conf.Timeout.TimeDuration())
 
 	if testRun.ProjectID == 0 {
-		if conf.StackID.Int64 == 0 {
-			if conf.StackSlug.Valid && conf.StackSlug.String != "" {
-				id, err := resolveStackSlugToID(gs, test.derivedConfig.Collectors["cloud"], conf.Token.String, conf.StackSlug.String)
-				if err != nil {
-					return fmt.Errorf("could not resolve stack slug %q to stack ID: %w", conf.StackSlug.String, err)
-				}
-				conf.StackID = null.IntFrom(id)
-			} else {
-				logger.Error("please specify a projectID in your test or use `k6 cloud login` to set up a default stack")
-				return fmt.Errorf("no projectID specified and no default stack set")
-			}
-		}
-
-		projectID, _, err := apiClient.GetDefaultProject(conf.StackID.Int64)
+		projectID, err := resolveDefaultProjectID(
+			gs.Logger,
+			gs,
+			apiClient,
+			test.derivedConfig.Collectors["cloud"],
+			conf.Token.String,
+			conf.StackSlug,
+			&conf.StackID,
+			&testRun.ProjectID,
+		)
 		if err != nil {
-			return fmt.Errorf("can't get default projectID for stack %d (%s): %w", conf.StackID.Int64, conf.StackSlug.String, err)
+			return err
 		}
-		testRun.ProjectID = projectID
 
-		gs.Logger.Warn("Warning: no projectID specified, using default project of the stack: " + conf.StackSlug.String)
+		testRun.ProjectID = projectID
 	}
 
 	response, err := apiClient.CreateTestRun(testRun)

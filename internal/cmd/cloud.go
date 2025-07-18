@@ -168,23 +168,20 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 		logger, cloudConfig.Token.String, cloudConfig.Host.String, build.Version, cloudConfig.Timeout.TimeDuration())
 
 	if cloudConfig.ProjectID.Int64 == 0 {
-		if cloudConfig.StackID.Int64 == 0 {
-			if cloudConfig.StackSlug.Valid && cloudConfig.StackSlug.String != "" {
-				id, err := resolveStackSlugToID(c.gs, test.derivedConfig.Collectors["cloud"], cloudConfig.Token.String, cloudConfig.StackSlug.String)
-				if err != nil {
-					return fmt.Errorf("could not resolve stack slug %q to stack ID: %w", cloudConfig.StackSlug.String, err)
-				}
-				cloudConfig.StackID = null.IntFrom(id)
-			} else {
-				logger.Error("please specify a projectID in your test or use `k6 cloud login` to set up a default stack")
-				return fmt.Errorf("no projectID specified and no default stack set")
-			}
+		projectID, err := resolveDefaultProjectID(
+			logger,
+			c.gs,
+			client,
+			test.derivedConfig.Collectors["cloud"],
+			cloudConfig.Token.String,
+			cloudConfig.StackSlug,
+			&cloudConfig.StackID,
+			&cloudConfig.ProjectID.Int64,
+		)
+		if err != nil {
+			return err
 		}
 
-		projectID, _, err := client.GetDefaultProject(cloudConfig.StackID.Int64)
-		if err != nil {
-			return fmt.Errorf("can't get default projectID for stack %d (%s): %w", cloudConfig.StackID.Int64, cloudConfig.StackSlug.String, err)
-		}
 		tmpCloudConfig["projectID"] = projectID
 
 		b, err := json.Marshal(tmpCloudConfig)
@@ -196,8 +193,6 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 		arc.Options.External[cloudapi.LegacyCloudConfigKey] = b
 
 		cloudConfig.ProjectID = null.IntFrom(projectID)
-
-		logger.Warn("Warning: no projectID specified, using default project of the stack: " + cloudConfig.StackSlug.String)
 	}
 
 	if err = client.ValidateOptions(arc.Options); err != nil {

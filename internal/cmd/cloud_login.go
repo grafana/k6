@@ -276,14 +276,6 @@ func validateToken(gs *state.GlobalState, jsonRawConf json.RawMessage, token str
 	return nil
 }
 
-func stripGrafanaNetSuffix(s string) string {
-	const suffix = ".grafana.net"
-	if len(s) > len(suffix) && s[len(s)-len(suffix):] == suffix {
-		return s[:len(s)-len(suffix)]
-	}
-	return s
-}
-
 func getStacks(gs *state.GlobalState, jsonRawConf json.RawMessage, token string) (map[string]int, error) {
 	// We want to use this fully consolidated config for things like
 	// host addresses, so users can overwrite them with env vars.
@@ -315,17 +307,4 @@ func getStacks(gs *state.GlobalState, jsonRawConf json.RawMessage, token string)
 		stacks[stackName] = organization.GrafanaStackID
 	}
 	return stacks, nil
-}
-
-func resolveStackSlugToID(gs *state.GlobalState, jsonRawConf json.RawMessage, token, slug string) (int64, error) {
-	slug = stripGrafanaNetSuffix(slug)
-	stacks, err := getStacks(gs, jsonRawConf, token)
-	if err != nil {
-		return 0, err
-	}
-	id, ok := stacks[slug]
-	if !ok {
-		return 0, fmt.Errorf("stack slug %q not found in your Grafana Cloud account", slug)
-	}
-	return int64(id), nil
 }

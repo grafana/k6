@@ -2,15 +2,18 @@ package cmd
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"syscall"
 	"text/template"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"gopkg.in/guregu/null.v3"
 
+	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/lib/types"
@@ -126,4 +129,62 @@ func handleTestAbortSignals(gs *state.GlobalState, gracefulStopHandler, onHardSt
 		close(done)
 		gs.SignalStop(sigC)
 	}
+}
+
+func resolveStackSlugToID(gs *state.GlobalState, jsonRawConf json.RawMessage, token, slug string) (int64, error) {
+	slug = stripGrafanaNetSuffix(slug)
+	stacks, err := getStacks(gs, jsonRawConf, token)
+	if err != nil {
+		return 0, err
+	}
+	id, ok := stacks[slug]
+	if !ok {
+		return 0, fmt.Errorf("stack slug %q not found in your Grafana Cloud account", slug)
+	}
+	return int64(id), nil
+}
+
+func stripGrafanaNetSuffix(s string) string {
+	const suffix = ".grafana.net"
+	if len(s) > len(suffix) && s[len(s)-len(suffix):] == suffix {
+		return s[:len(s)-len(suffix)]
+	}
+	return s
+}
+
+func resolveDefaultProjectID(
+	logger *logrus.Logger,
+	gs *state.GlobalState,
+	apiClient *cloudapi.Client,
+	jsonRawConf json.RawMessage,
+	token string,
+	stackSlug null.String,
+	stackID *null.Int,
+	projectID *int64,
+) (int64, error) {
+	if *projectID != 0 {
+		return *projectID, nil
+	}
+
+	if stackID.Int64 == 0 {
+		if stackSlug.Valid && stackSlug.String != "" {
+			id, err := resolveStackSlugToID(gs, jsonRawConf, token, stackSlug.String)
+			if err != nil {
+				return 0, fmt.Errorf("could not resolve stack slug %q to stack ID: %w", stackSlug.String, err)
+			}
+			*stackID = null.IntFrom(id)
+		} else {
+			logger.Error("please specify a projectID in your test or use `k6 cloud login` to set up a default stack")
+			return 0, fmt.Errorf("no projectID specified and no default stack set")
+		}
+	}
+
+	pid, _, err := apiClient.GetDefaultProject(stackID.Int64)
+	if err != nil {
+		return 0, fmt.Errorf("can't get default projectID for stack %d (%s): %w", stackID.Int64, stackSlug.String, err)
+	}
+	*projectID = pid
+
+	logger.Warnf("Warning: no projectID specified, using default project of the stack: %s \n\n", stackSlug.String)
+	return pid, nil
 }
