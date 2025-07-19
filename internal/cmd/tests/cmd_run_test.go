@@ -1952,9 +1952,9 @@ func TestUIRenderWebDashboard(t *testing.T) {
 		active    bool
 		expRender string
 	}{
-		{expRender: "web dashboard:"},
-		{env: "false", expRender: "web dashboard:"},
-		{env: "true", active: true, expRender: "web dashboard: http://127.0.0.1:"},
+		{active: true, expRender: "web dashboard: http://127.0.0.1:"},
+		{env: "false", active: true, expRender: "web dashboard: http://127.0.0.1:"},
+		{env: "true", expRender: "web dashboard:"},
 	}
 
 	for _, tc := range tests {
@@ -1963,7 +1963,7 @@ func TestUIRenderWebDashboard(t *testing.T) {
 
 			ts := NewGlobalTestState(t)
 			if tc.env != "" {
-				ts.Env["K6_WEB_DASHBOARD"] = tc.env
+				ts.Env["K6_NO_WEB_DASHBOARD"] = tc.env
 			}
 			ts.Env["K6_WEB_DASHBOARD_PORT"] = "0"
 			ts.CmdArgs = []string{"k6", "run", "--log-output=stdout"}
