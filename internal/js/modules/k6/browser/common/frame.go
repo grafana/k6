@@ -1088,7 +1088,7 @@ func isQuotedText(s string) bool {
 }
 
 // Locator creates and returns a new locator for this frame.
-func (f *Frame) GetByAltText(alt string, opts *GetByAltTextOptions) *Locator {
+func (f *Frame) GetByAltText(alt string, opts *GetByBaseOptions) *Locator {
 	f.log.Debugf("Frame:GetByAltText", "fid:%s furl:%q alt:%q opts:%+v", f.ID(), f.URL(), alt, opts)
 
 	a := "[alt=" + alt + "]"
@@ -1101,6 +1101,22 @@ func (f *Frame) GetByAltText(alt string, opts *GetByAltTextOptions) *Locator {
 	}
 
 	return f.Locator("internal:attr="+a, nil)
+}
+
+// Locator creates and returns a new locator for this frame.
+func (f *Frame) GetByLabel(label string, opts *GetByBaseOptions) *Locator {
+	f.log.Debugf("Frame:GetByLabel", "fid:%s furl:%q label:%q opts:%+v", f.ID(), f.URL(), label, opts)
+
+	l := "internal:label=" + label
+	if len(label) > 0 && label[0] == '"' && label[len(label)-1] == '"' {
+		if opts != nil && opts.Exact != nil && *opts.Exact {
+			l = "internal:label=" + label + "s"
+		} else {
+			l = "internal:label=" + label + "i"
+		}
+	}
+
+	return f.Locator(l, nil)
 }
 
 // Referrer returns the referrer of the frame from the network manager
