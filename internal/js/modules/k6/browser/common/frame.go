@@ -79,10 +79,6 @@ func (s *DOMElementState) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-func isExactString(s string) bool {
-	return len(s) > 0 && s[0] == '\'' && s[len(s)-1] == '\''
-}
-
 // urlMatcher matches URLs based on pattern type. It can match on exact and regex
 // patterns. If the pattern is empty or a single quote, it matches any URL.
 func urlMatcher(pattern string, jsRegexChecker JSRegexChecker) (func(string) (bool, error), error) {
@@ -90,7 +86,7 @@ func urlMatcher(pattern string, jsRegexChecker JSRegexChecker) (func(string) (bo
 		return func(url string) (bool, error) { return true, nil }, nil
 	}
 
-	if isExactString(pattern) {
+	if isQuotedText(pattern) {
 		return func(url string) (bool, error) { return "'"+url+"'" == pattern, nil }, nil
 	}
 
@@ -1062,7 +1058,7 @@ func (f *Frame) GetByRole(role string, opts *GetByRoleOptions) *Locator {
 	}
 	if opts.Name != nil && *opts.Name != "" {
 		// Exact option can only be applied to quoted strings.
-		if (*opts.Name)[0] == '\'' && (*opts.Name)[len(*opts.Name)-1] == '\'' {
+		if isQuotedText(*opts.Name) {
 			if opts.Exact != nil && *opts.Exact {
 				*opts.Name = (*opts.Name) + "s"
 			} else {
@@ -1082,6 +1078,29 @@ func (f *Frame) GetByRole(role string, opts *GetByRoleOptions) *Locator {
 	}
 
 	return f.Locator(builder.String(), nil)
+}
+
+// isQuotedText returns true if the string is a quoted string.
+// This is used to determine if the string will be used to match
+// a string instead of as a regex in the getBy* APIs.
+func isQuotedText(s string) bool {
+	return len(s) > 1 && s[0] == '\'' && s[len(s)-1] == '\''
+}
+
+// Locator creates and returns a new locator for this frame.
+func (f *Frame) GetByAltText(alt string, opts *GetByAltTextOptions) *Locator {
+	f.log.Debugf("Frame:GetByAltText", "fid:%s furl:%q alt:%q opts:%+v", f.ID(), f.URL(), alt, opts)
+
+	a := "[alt=" + alt + "]"
+	if isQuotedText(alt) {
+		if opts != nil && opts.Exact != nil && *opts.Exact {
+			a = "[alt=" + alt + "s]"
+		} else {
+			a = "[alt=" + alt + "i]"
+		}
+	}
+
+	return f.Locator("internal:attr="+a, nil)
 }
 
 // Referrer returns the referrer of the frame from the network manager
