@@ -116,7 +116,7 @@ func TestSetIntervalOrder(t *testing.T) {
 				clearInterval(two);
 				clearInterval(three);
 				clearInterval(last);
-			}, 4);
+			}, 10);
 			var three = setInterval((_) => print("three"), 1);
 			print("outside");
 		`)
