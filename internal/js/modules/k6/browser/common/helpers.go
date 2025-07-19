@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"time"
 
 	cdpruntime "github.com/chromedp/cdproto/runtime"
@@ -116,15 +117,6 @@ func call(
 	return result, err
 }
 
-func stringSliceContains(s []string, e string) bool {
-	for _, a := range s {
-		if a == e {
-			return true
-		}
-	}
-	return false
-}
-
 //nolint:gocognit
 func createWaitForEventHandler(
 	ctx context.Context,
@@ -143,7 +135,7 @@ func createWaitForEventHandler(
 			case <-evCancelCtx.Done():
 				return
 			case ev := <-chEvHandler:
-				if stringSliceContains(events, ev.typ) {
+				if slices.Contains(events, ev.typ) {
 					if predicateFn != nil {
 						if predicateFn(ev.data) {
 							select {
@@ -162,7 +154,7 @@ func createWaitForEventHandler(
 					close(ch)
 
 					// We wait for one matching event only,
-					// then remove event handler by cancelling context and stopping goroutine.
+					// then remove the event handler by cancelling context and stopping goroutine.
 					evCancelFn()
 
 					return
@@ -194,7 +186,7 @@ func createWaitForEventPredicateHandler(
 			case <-evCancelCtx.Done():
 				return
 			case ev := <-chEvHandler:
-				if stringSliceContains(events, ev.typ) &&
+				if slices.Contains(events, ev.typ) &&
 					predicateFn != nil && predicateFn(ev.data) {
 					select {
 					case ch <- ev.data:
