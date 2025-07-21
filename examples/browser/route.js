@@ -17,36 +17,30 @@ export const options = {
 export default async function () {
 	const page = await browser.newPage();
 
-	// registers a handler that logs all requests made by the page
-	await page.route("https://quickpizza.grafana.com/api/tools", function (route) {
-		console.log(route.request().url());
-		route.abort();
-	});
+	await page.route(
+		"https://quickpizza.grafana.com/api/tools",
+		function (route) {
+			route.abort();
+		}
+	);
 
 	await page.route(/(\.png$)|(\.jpg$)/, function (route) {
-		console.log(route.request().url());
 		route.abort();
 	});
 
 	page.on("request", function (request) {
-		const url = request.url();
-		if (url.includes("/api/tools")) {
-			console.log("on request", "request url", request.url());
-		}
+		console.log("on request", "url", request.url());
 	});
 
 	page.on("response", function (response) {
-		const url = response.url();
-		if (url.includes("/api/tools")) {
-			console.log("on response", "response url", response.url());
-		}
+		console.log("on response", "url", response.url());
 	});
 
 	await page.goto("https://quickpizza.grafana.com/", {
 		waitUntil: "networkidle",
 	});
 
-	sleep(10)
+	sleep(10);
 
 	await page.close();
 }

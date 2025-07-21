@@ -191,24 +191,17 @@ type ConsoleMessage struct {
 type PageOnHandler func(PageOnEvent) error
 
 type RouteHandler struct {
-	runtime *sobek.Runtime
-	logger  *log.Logger
-
 	path           string
 	handler        RouteHandlerCallback
 	jsRegexChecker JSRegexChecker
 }
 
 func NewRouteHandler(
-	rt *sobek.Runtime,
-	logger *log.Logger,
 	path string,
 	handler RouteHandlerCallback,
 	jsRegexChecker JSRegexChecker,
 ) *RouteHandler {
 	return &RouteHandler{
-		runtime:        rt,
-		logger:         logger,
 		path:           path,
 		handler:        handler,
 		jsRegexChecker: jsRegexChecker,
@@ -1269,7 +1262,7 @@ func (p *Page) Route(
 	jsRegexChecker JSRegexChecker,
 ) error {
 	p.logger.Debugf("Page:Route", "sid:%v path:%s", p.sessionID(), path)
-	routeHandler := NewRouteHandler(rt, p.logger, path, handlerCallback, jsRegexChecker)
+	routeHandler := NewRouteHandler(path, handlerCallback, jsRegexChecker)
 	p.routes = append([]*RouteHandler{routeHandler}, p.routes...)
 
 	return p.mainFrameSession.updateRequestInterception(true)

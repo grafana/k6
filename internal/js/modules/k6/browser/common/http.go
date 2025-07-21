@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/chromedp/cdproto/fetch"
-	"github.com/grafana/sobek"
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/network"
@@ -714,44 +713,18 @@ func (r *Response) URL() string {
 type Route struct {
 	logger         *log.Logger
 	networkManager *NetworkManager
-	runtime        *sobek.Runtime
 
 	request *Request
 	handled bool
 }
 
-func NewRoute(logger *log.Logger, networkManager *NetworkManager, rt *sobek.Runtime, request *Request) *Route {
+func NewRoute(logger *log.Logger, networkManager *NetworkManager, request *Request) *Route {
 	return &Route{
 		logger:         logger,
 		networkManager: networkManager,
-		runtime:        rt,
 		request:        request,
 		handled:        false,
 	}
-}
-
-func (r *Route) Matches(handlerPath string) (bool, error) {
-	requestURL := r.request.URL()
-	if requestURL == "" {
-		return true, nil
-	}
-
-	if handlerPath == requestURL {
-		return true, nil
-	}
-
-	// Regex matching
-	if strings.HasPrefix(handlerPath, "/") && strings.HasSuffix(handlerPath, "/") {
-		js := fmt.Sprintf(`_k6BrowserCheckRegEx(%s, '%s')`, handlerPath, requestURL)
-		matched, err := r.runtime.RunString(js)
-		if err != nil {
-			return false, fmt.Errorf("matching url with regex: %w", err)
-		}
-
-		return matched.ToBoolean(), nil
-	}
-
-	return false, nil
 }
 
 func (r *Route) Request() *Request { return r.request }

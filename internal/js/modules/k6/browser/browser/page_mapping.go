@@ -849,7 +849,7 @@ func mapPageRoute(vu moduleVU, p *common.Page) func(path sobek.Value, handler so
 				select {
 				case <-done:
 				case <-ctx.Done():
-					err = errors.New("iteration ended before route completed")
+					rtnErr = errors.New("iteration ended before route completed")
 				}
 
 				return rtnErr

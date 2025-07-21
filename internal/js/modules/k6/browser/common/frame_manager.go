@@ -545,7 +545,7 @@ func (m *FrameManager) requestStarted(req *Request) {
 		return
 	}
 
-	route := NewRoute(m.logger, m.page.mainFrameSession.networkManager, m.vu.Runtime(), req)
+	route := NewRoute(m.logger, m.page.mainFrameSession.networkManager, req)
 	for _, r := range m.page.routes {
 		matcher, err := urlMatcher(r.path, r.jsRegexChecker)
 		if err != nil {
