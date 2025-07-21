@@ -179,8 +179,6 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		"getByLabel": func(label sobek.Value, opts sobek.Value) (*sobek.Object, error) {
 			plabel, popts := parseGetByBaseOptions(vu.Context(), label, true, opts)
 
-			fmt.Println("plabel", plabel)
-
 			ml := mapLocator(vu, p.GetByLabel(plabel, popts))
 			return rt.ToValue(ml).ToObject(rt), nil
 		},
@@ -757,14 +755,21 @@ func parseWaitForFunctionArgs(
 	return js, popts, exportArgs(gargs), nil
 }
 
+// Some getBy* APIs work with single quotes and some work with double quotes.
+// This inconsistency seems to stem from the injected code copied from
+// Playwright itself.
+//
+// I would prefer not to change the copied injected script code from Playwright
+// so that it is easier to copy over updates/fixes from Playwright when we need
+// to.
 func parseStringOrRegex(v sobek.Value, doubleQuote bool) string {
 	var a string
 	switch v.ExportType() {
-	case reflect.TypeOf(string("")):
+	case reflect.TypeOf(string("")): // text values require quotes
 		if doubleQuote {
-			a = fmt.Sprintf(`"%s"`, v.String()) // Strings require quotes
+			a = fmt.Sprintf(`"%s"`, v.String())
 		} else {
-			a = fmt.Sprintf("'%s'", v.String()) // Strings require quotes
+			a = fmt.Sprintf("'%s'", v.String())
 		}
 	case reflect.TypeOf(map[string]interface{}(nil)): // JS RegExp
 		a = v.String() // No quotes
