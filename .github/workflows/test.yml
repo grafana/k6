@@ -53,7 +53,7 @@ jobs:
             args[1]="1"
             export GOMAXPROCS=1
           fi
-          if [[ "${{ matrix.platform }}" == *arm; then
+          if [[ "${{ matrix.platform }}" == *arm ]]; then
             args[1]="1" # run only single test binary at a time on arm
           fi
           go test "${args[@]}" -timeout 800s ./...
@@ -101,7 +101,7 @@ jobs:
             args[1]="1"
             export GOMAXPROCS=1
           fi
-          if [[ "${{ matrix.platform }}" == *arm; then
+          if [[ "${{ matrix.platform }}" == *arm ]]; then
             args[1]="1" # run only single test binary at a time on arm
           fi
           go test "${args[@]}" -timeout 800s ./...
@@ -143,7 +143,7 @@ jobs:
             args[1]="1"
             export GOMAXPROCS=1
           fi
-          if [[ "${{ matrix.platform }}" == *arm; then
+          if [[ "${{ matrix.platform }}" == *arm ]]; then
             args[1]="1" # run only single test binary at a time on arm
           fi
           echo "mode: set" > coverage.txt
