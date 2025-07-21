@@ -1094,6 +1094,21 @@ func isQuotedText(s string) bool {
 	return false
 }
 
+// buildAttributeSelector is a helper method that builds an attribute selector
+// for use with the internal:attr engine. It handles quoted strings and
+// applies the appropriate suffix for exact or case-insensitive matching.
+func (f *Frame) buildAttributeSelector(attrName, attrValue string, opts *GetByBaseOptions) string {
+	selector := "[" + attrName + "=" + attrValue + "]"
+	if isQuotedText(attrValue) {
+		if opts != nil && opts.Exact != nil && *opts.Exact {
+			selector = "[" + attrName + "=" + attrValue + "s]"
+		} else {
+			selector = "[" + attrName + "=" + attrValue + "i]"
+		}
+	}
+	return selector
+}
+
 // Locator creates and returns a new locator for this frame.
 func (f *Frame) GetByAltText(alt string, opts *GetByBaseOptions) *Locator {
 	f.log.Debugf("Frame:GetByAltText", "fid:%s furl:%q alt:%q opts:%+v", f.ID(), f.URL(), alt, opts)
