@@ -55,6 +55,7 @@ jobs:
           fi
           if [[ "${{ matrix.platform }}" == *arm ]]; then
             args[1]="1" # run only single test binary at a time on arm
+            export GOMAXPROCS=1
           fi
           go test "${args[@]}" -timeout 800s ./...
 
@@ -103,6 +104,7 @@ jobs:
           fi
           if [[ "${{ matrix.platform }}" == *arm ]]; then
             args[1]="1" # run only single test binary at a time on arm
+            export GOMAXPROCS=1
           fi
           go test "${args[@]}" -timeout 800s ./...
 
@@ -145,6 +147,7 @@ jobs:
           fi
           if [[ "${{ matrix.platform }}" == *arm ]]; then
             args[1]="1" # run only single test binary at a time on arm
+            export GOMAXPROCS=1
           fi
           echo "mode: set" > coverage.txt
           for pkg in $(go list ./... | grep -v vendor); do
