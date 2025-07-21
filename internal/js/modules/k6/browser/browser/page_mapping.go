@@ -855,7 +855,7 @@ func mapPageRoute(vu moduleVU, p *common.Page) func(path sobek.Value, handler so
 				return rtnErr
 			}
 
-			return nil, p.Route(vu.Runtime(), pathStr, routeHandler, jsRegexChecker)
+			return nil, p.Route(pathStr, routeHandler, jsRegexChecker)
 		}), nil
 	}
 }

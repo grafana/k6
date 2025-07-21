@@ -1256,7 +1256,6 @@ func (p *Page) Referrer() string {
 
 // Route register a handler to be executed for a given request path
 func (p *Page) Route(
-	rt *sobek.Runtime,
 	path string,
 	handlerCallback RouteHandlerCallback,
 	jsRegexChecker JSRegexChecker,
