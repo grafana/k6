@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"regexp"
 	"testing"
 	"time"
 
@@ -117,4 +118,126 @@ func TestWaitForFrameNavigation(t *testing.T) {
 	title, err := p.Title()
 	require.NoError(t, err)
 	assert.Equal(t, "Second page", title)
+}
+
+func TestFrameManagerRequestStartedWithRoutes(t *testing.T) {
+	t.Parallel()
+
+	jsRegexCheckerMock := func(pattern, url string) (bool, error) {
+		matched, err := regexp.MatchString(fmt.Sprintf("http://[^/]*%s", pattern), url)
+		if err != nil {
+			return false, fmt.Errorf("error matching regex: %w", err)
+		}
+
+		return matched, nil
+	}
+
+	tests := []struct {
+		name              string
+		routePath         string
+		routeHandler      func(*common.Route)
+		handlerCallsCount int
+	}{
+		{
+			name:              "request_without_routes",
+			handlerCallsCount: 0,
+		},
+		{
+			name:      "request_with_matching_string_route",
+			routePath: "/data/first",
+			routeHandler: func(route *common.Route) {
+				route.Continue()
+			},
+			handlerCallsCount: 1,
+		},
+		{
+			name:      "request_with_non_matching_string_route",
+			routePath: "/data/third",
+			routeHandler: func(route *common.Route) {
+				route.Continue()
+			},
+			handlerCallsCount: 0,
+		},
+		{
+			name:      "request_with_multiple_matching_regex_route",
+			routePath: "/data/.*",
+			routeHandler: func(route *common.Route) {
+				route.Continue()
+			},
+			handlerCallsCount: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tb := newTestBrowser(t, withHTTPServer())
+			p := tb.NewPage(nil)
+
+			// Track route handler calls
+			handlerCalls := 0
+
+			// Set up handlers for test resources
+			tb.withHandler("/test", func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "text/html")
+				_, err := fmt.Fprintf(w, `
+				<html>
+					<head>
+						<title>Test Page</title>
+					</head>
+					<body>
+						<h1>Test</h1>
+						<script type="module">
+							await fetchData();
+							async function fetchData() {
+								await fetch('/data/first');
+								await fetch('/data/second');
+							}
+						</script>
+					</body>
+				</html>
+				`)
+				require.NoError(t, err)
+			})
+
+			tb.withHandler("/data/first", func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, err := fmt.Fprint(w, `{"data": "First data"}`)
+				require.NoError(t, err)
+			})
+
+			tb.withHandler("/data/second", func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, err := fmt.Fprint(w, `{"data": "Second data"}`)
+				require.NoError(t, err)
+			})
+
+			// Set up route if needed
+			if tt.routeHandler != nil {
+				vu := tb.vu
+				routeHandler := func(route *common.Route) error {
+					handlerCalls++
+					tt.routeHandler(route)
+					return nil
+				}
+
+				err := p.Route(vu.Runtime(), tt.routePath, routeHandler, jsRegexCheckerMock)
+				require.NoError(t, err)
+			}
+
+			// Navigate to trigger requests - this will internally call requestStarted
+			opts := &common.FrameGotoOptions{
+				WaitUntil: common.LifecycleEventNetworkIdle,
+				Timeout:   common.DefaultTimeout,
+			}
+
+			// Navigate to main page first to trigger resource requests
+			_, err := p.Goto(tb.url("/test"), opts)
+			require.NoError(t, err)
+
+			// Verify the number of route handler calls
+			require.Equal(t, tt.handlerCallsCount, handlerCalls)
+		})
+	}
 }
