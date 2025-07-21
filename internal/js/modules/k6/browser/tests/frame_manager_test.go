@@ -215,14 +215,13 @@ func TestFrameManagerRequestStartedWithRoutes(t *testing.T) {
 
 			// Set up route if needed
 			if tt.routeHandler != nil {
-				vu := tb.vu
 				routeHandler := func(route *common.Route) error {
 					handlerCalls++
 					tt.routeHandler(route)
 					return nil
 				}
 
-				err := p.Route(vu.Runtime(), tt.routePath, routeHandler, jsRegexCheckerMock)
+				err := p.Route(tt.routePath, routeHandler, jsRegexCheckerMock)
 				require.NoError(t, err)
 			}
 
@@ -232,11 +231,9 @@ func TestFrameManagerRequestStartedWithRoutes(t *testing.T) {
 				Timeout:   common.DefaultTimeout,
 			}
 
-			// Navigate to main page first to trigger resource requests
 			_, err := p.Goto(tb.url("/test"), opts)
 			require.NoError(t, err)
 
-			// Verify the number of route handler calls
 			require.Equal(t, tt.handlerCallsCount, handlerCalls)
 		})
 	}
