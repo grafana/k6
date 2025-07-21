@@ -1082,9 +1082,16 @@ func (f *Frame) GetByRole(role string, opts *GetByRoleOptions) *Locator {
 
 // isQuotedText returns true if the string is a quoted string.
 // This is used to determine if the string will be used to match
-// a string instead of as a regex in the getBy* APIs.
+// a string instead of as a regex in the getBy* APIs. It handles
+// both single and double quotes.
 func isQuotedText(s string) bool {
-	return len(s) > 1 && s[0] == '\'' && s[len(s)-1] == '\''
+	switch {
+	case len(s) > 0 && s[0] == '\'' && s[len(s)-1] == '\'':
+		return true
+	case len(s) > 0 && s[0] == '"' && s[len(s)-1] == '"':
+		return true
+	}
+	return false
 }
 
 // Locator creates and returns a new locator for this frame.
