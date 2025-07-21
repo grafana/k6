@@ -40,7 +40,5 @@ export default async function () {
 		waitUntil: "networkidle",
 	});
 
-	sleep(10);
-
 	await page.close();
 }
