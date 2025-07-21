@@ -32,9 +32,8 @@ jobs:
             go mod verify
       - name: Check code generation
         run: |
-          go install github.com/mstoykov/enumer@v0.0.1
-          go install github.com/mailru/easyjson/easyjson@v0.7.7
-          test -z "$(go generate ./... && git status --porcelain)"
+          make generate
+          test -z "$(git status --porcelain | tee >(cat 1>&2))"
 
   lint:
     runs-on: ubuntu-latest
