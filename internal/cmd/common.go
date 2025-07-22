@@ -185,6 +185,6 @@ func resolveDefaultProjectID(
 	}
 	*projectID = pid
 
-	gs.Logger.Warnf("Warning: no projectID specified, using default project of the stack: %s \n\n", stackSlug.String)
+	gs.Logger.Warnf("Warning: no projectID specified, using default project of the %s stack \n\n", stackSlug.String)
 	return pid, nil
 }
