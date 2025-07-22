@@ -1,4 +1,3 @@
-import { sleep } from "k6";
 import { browser } from "k6/browser";
 
 export const options = {
