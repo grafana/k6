@@ -1943,22 +1943,7 @@ func (f *Frame) WaitForNavigation(
 			return false
 		})
 
-	handleTimeoutError := func(err error) error {
-		f.log.Debugf("Frame:WaitForNavigation",
-			"fid:%v furl:%s timeoutCtx done: %v", f.ID(), f.URL(), err)
-		if err != nil {
-			e := &k6ext.UserFriendlyError{
-				Err:     err,
-				Timeout: opts.Timeout,
-			}
-			if opts.URL != "" {
-				return fmt.Errorf("waiting for navigation to URL matching %q: %w", opts.URL, e)
-			}
-			return fmt.Errorf("waiting for navigation: %w", e)
-		}
-
-		return nil
-	}
+	handleTimeoutError := f.handleWaitForNavigationTimeoutErrorFn(opts)
 
 	defer func() {
 		timeoutCancel()
@@ -2007,13 +1992,32 @@ func (f *Frame) WaitForNavigation(
 		}
 	}
 
-	// Since response will be in an interface, it will never be nil,
+	// Since the response will be in an interface, it will never be nil,
 	// so we need to return nil explicitly.
 	if resp == nil {
 		return nil, nil //nolint:nilnil
 	}
 
 	return resp, nil
+}
+
+func (f *Frame) handleWaitForNavigationTimeoutErrorFn(opts *FrameWaitForNavigationOptions) func(err error) error {
+	return func(err error) error {
+		f.log.Debugf("Frame:WaitForNavigation",
+			"fid:%v furl:%s timeoutCtx done: %v", f.ID(), f.URL(), err)
+		if err != nil {
+			e := &k6ext.UserFriendlyError{
+				Err:     err,
+				Timeout: opts.Timeout,
+			}
+			if opts.URL != "" {
+				return fmt.Errorf("waiting for navigation to URL matching %q: %w", opts.URL, e)
+			}
+			return fmt.Errorf("waiting for navigation: %w", e)
+		}
+
+		return nil
+	}
 }
 
 // WaitForSelector waits for the given selector to match the waiting criteria.
