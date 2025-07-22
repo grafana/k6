@@ -1360,6 +1360,8 @@ func (p *Page) Reload(opts *PageReloadOptions) (*Response, error) { //nolint:fun
 		var ok bool
 		if navigationEvent, ok = event.(*NavigationEvent); !ok {
 			err = fmt.Errorf("unexpected event data type: %T, expected *NavigationEvent", event)
+		} else if navigationEvent != nil && navigationEvent.err != nil {
+			err = navigationEvent.err
 		}
 	}
 	if err != nil {
