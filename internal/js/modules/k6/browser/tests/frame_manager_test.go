@@ -148,7 +148,8 @@ func TestFrameManagerRequestStartedWithRoutes(t *testing.T) {
 			name:      "continue_request_with_matching_string_route",
 			routePath: "/data/first",
 			routeHandler: func(route *common.Route) {
-				route.Continue()
+				err := route.Continue()
+				assert.NoError(t, err)
 			},
 			routeHandlerCallsCount: 1,
 			apiHandlerCallsCount:   2,
@@ -157,7 +158,8 @@ func TestFrameManagerRequestStartedWithRoutes(t *testing.T) {
 			name:      "continue_request_with_non_matching_string_route",
 			routePath: "/data/third",
 			routeHandler: func(route *common.Route) {
-				route.Continue()
+				err := route.Continue()
+				assert.NoError(t, err)
 			},
 			routeHandlerCallsCount: 0,
 			apiHandlerCallsCount:   2,
@@ -166,7 +168,8 @@ func TestFrameManagerRequestStartedWithRoutes(t *testing.T) {
 			name:      "continue_request_with_multiple_matching_regex_route",
 			routePath: "/data/.*",
 			routeHandler: func(route *common.Route) {
-				route.Continue()
+				err := route.Continue()
+				assert.NoError(t, err)
 			},
 			routeHandlerCallsCount: 2,
 			apiHandlerCallsCount:   2,
@@ -175,7 +178,8 @@ func TestFrameManagerRequestStartedWithRoutes(t *testing.T) {
 			name:      "abort_first_request",
 			routePath: "/data/first",
 			routeHandler: func(route *common.Route) {
-				route.Abort("failed")
+				err := route.Abort("failed")
+				assert.NoError(t, err)
 			},
 			routeHandlerCallsCount: 1,
 			apiHandlerCallsCount:   0, // Second API call is not made because the first throws an error
@@ -184,7 +188,8 @@ func TestFrameManagerRequestStartedWithRoutes(t *testing.T) {
 			name:      "abort_second_request",
 			routePath: "/data/second",
 			routeHandler: func(route *common.Route) {
-				route.Abort("failed")
+				err := route.Abort("failed")
+				assert.NoError(t, err)
 			},
 			routeHandlerCallsCount: 1,
 			apiHandlerCallsCount:   1,

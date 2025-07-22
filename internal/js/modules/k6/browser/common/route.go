@@ -26,28 +26,26 @@ func NewRoute(logger *log.Logger, networkManager *NetworkManager, request *Reque
 
 func (r *Route) Request() *Request { return r.request }
 
-func (r *Route) Abort(errorCode string) {
+func (r *Route) Abort(errorCode string) error {
 	err := r.startHandling()
 	if err != nil {
-		r.logger.Errorf("Route:Abort", "rurl:%s err:%s", r.request.URL(), err)
-		return
+		return err
 	}
 
 	if errorCode == "" {
 		errorCode = "failed"
 	}
 
-	r.networkManager.AbortRequest(r.request.interceptionID, errorCode)
+	return r.networkManager.AbortRequest(r.request.interceptionID, errorCode)
 }
 
-func (r *Route) Continue() {
+func (r *Route) Continue() error {
 	err := r.startHandling()
 	if err != nil {
-		r.logger.Errorf("Route:Continue", "rurl:%s err:%s", r.request.URL(), err)
-		return
+		return err
 	}
 
-	r.networkManager.ContinueRequest(r.request.interceptionID)
+	return r.networkManager.ContinueRequest(r.request.interceptionID)
 }
 
 func (r *Route) startHandling() error {
