@@ -146,7 +146,7 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 				"Please, consult the Grafana Cloud k6 documentation for instructions on how to generate one:\n" +
 				"https://grafana.com/docs/grafana-cloud/testing/k6/author-run/tokens-and-cli-authentication",
 			Fields: []ui.Field{
-				ui.StringField{
+				ui.PasswordField{
 					Key:   "Token",
 					Label: "Token",
 				},
