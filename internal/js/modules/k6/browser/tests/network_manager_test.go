@@ -22,21 +22,32 @@ func TestURLSkipRequest(t *testing.T) {
 	tb := newTestBrowser(t, withLogCache())
 	p := tb.NewPage(nil)
 
-	opts := &common.FrameGotoOptions{
-		Timeout: common.DefaultTimeout,
-	}
 	_, err := p.Goto(
 		"data:text/html,hello",
-		opts,
+		&common.FrameGotoOptions{Timeout: common.DefaultTimeout},
 	)
 	require.NoError(t, err)
 	tb.logCache.assertContains(t, "skipping request handling of data URL")
 
+	// In this test, we're checking that the network manager is skipping request handling
+	// of certain URLs, but Browser navigation still happens.
+	//
+	// Under that assumption, it's important to notice that the Blob URL that we use
+	// for this test case isn't valid, and we cannot use a valid one because we lack
+	// general support for Blob and URL WebAPIs.
+	//
+	// So, here the Browser tries to navigate to a non-existing Blob URL, which
+	// doesn't produce any valid NavigationEvent, causing the method to timeout.
+	//
+	// Ideally, we could capture NavigationEvents that navigate to chrome-error://.
+	// However, as that isn't supported yet, and it's not trivial, we just make
+	// the timeout to finish quickly, for the sake of the test.
 	_, err = p.Goto(
 		"blob:something",
-		opts,
+		&common.FrameGotoOptions{Timeout: 200 * time.Millisecond},
 	)
-	require.NoError(t, err)
+	require.Error(t, err)
+	require.ErrorContains(t, err, `navigating frame to "blob:something": navigating to "blob:something": timed out after 200ms`)
 	tb.logCache.assertContains(t, "skipping request handling of blob URL")
 }
 
@@ -58,9 +69,10 @@ func TestBlockHostnames(t *testing.T) {
 		"http://host.test/",
 		opts,
 	)
-	require.NoError(t, err)
 	require.Nil(t, res)
-	tb.logCache.assertContains(t, "was interrupted: hostname host.test is in a blocked pattern")
+	require.Error(t, err)
+	require.ErrorContains(t, err, `navigating frame to "http://host.test/": net::ERR_BLOCKED_BY_CLIENT`)
+	tb.logCache.assertContains(t, "was aborted: hostname host.test matches a blocked pattern")
 
 	res, err = p.Goto(
 		tb.url("/get"),
@@ -87,9 +99,10 @@ func TestBlockIPs(t *testing.T) {
 		"http://10.0.0.1:8000/",
 		opts,
 	)
-	require.NoError(t, err)
 	require.Nil(t, res)
-	tb.logCache.assertContains(t, `was interrupted: IP 10.0.0.1 is in a blacklisted range "10.0.0.0/8"`)
+	require.Error(t, err)
+	require.ErrorContains(t, err, `navigating frame to "http://10.0.0.1:8000/": net::ERR_BLOCKED_BY_CLIENT`)
+	tb.logCache.assertContains(t, `was aborted: IP 10.0.0.1 is in a blacklisted range "10.0.0.0/8"`)
 
 	// Ensure other requests go through
 	res, err = p.Goto(

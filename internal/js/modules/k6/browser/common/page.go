@@ -1087,6 +1087,13 @@ func (p *Page) GetAttribute(selector string, name string, popts *FrameBaseOption
 	return p.MainFrame().GetAttribute(selector, name, popts)
 }
 
+// GetByRole creates and returns a new locator for this page (main frame) based on their ARIA role.
+func (p *Page) GetByRole(role string, opts *GetByRoleOptions) *Locator {
+	p.logger.Debugf("Page:GetByRole", "sid:%s role: %q opts:%+v", p.sessionID(), role, opts)
+
+	return p.MainFrame().GetByRole(role, opts)
+}
+
 // GetKeyboard returns the keyboard for the page.
 func (p *Page) GetKeyboard() *Keyboard {
 	return p.Keyboard
@@ -1353,6 +1360,8 @@ func (p *Page) Reload(opts *PageReloadOptions) (*Response, error) { //nolint:fun
 		var ok bool
 		if navigationEvent, ok = event.(*NavigationEvent); !ok {
 			err = fmt.Errorf("unexpected event data type: %T, expected *NavigationEvent", event)
+		} else if navigationEvent != nil && navigationEvent.err != nil {
+			err = navigationEvent.err
 		}
 	}
 	if err != nil {
@@ -1541,17 +1550,7 @@ func (p *Page) Type(selector string, text string, popts *FrameTypeOptions) error
 func (p *Page) URL() (string, error) {
 	p.logger.Debugf("Page:URL", "sid:%v", p.sessionID())
 
-	js := `() => document.location.toString()`
-	v, err := p.Evaluate(js)
-	if err != nil {
-		return "", fmt.Errorf("getting page URL: %w", err)
-	}
-	s, ok := v.(string)
-	if !ok {
-		return "", fmt.Errorf("getting page URL: expected string, got %T", v)
-	}
-
-	return s, nil
+	return p.MainFrame().url, nil
 }
 
 // ViewportSize will return information on the viewport width and height.
@@ -1579,12 +1578,16 @@ func (p *Page) WaitForLoadState(state string, popts *FrameWaitForLoadStateOption
 }
 
 // WaitForNavigation waits for the given navigation lifecycle event to happen.
-func (p *Page) WaitForNavigation(opts *FrameWaitForNavigationOptions) (*Response, error) {
+// jsRegexChecker should be non-nil to be able to test against a URL pattern in the options.
+func (p *Page) WaitForNavigation(
+	opts *FrameWaitForNavigationOptions,
+	jsRegexChecker JSRegexChecker,
+) (*Response, error) {
 	p.logger.Debugf("Page:WaitForNavigation", "sid:%v", p.sessionID())
 	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.waitForNavigation")
 	defer span.End()
 
-	resp, err := p.frameManager.MainFrame().WaitForNavigation(opts)
+	resp, err := p.frameManager.MainFrame().WaitForNavigation(opts, jsRegexChecker)
 	if err != nil {
 		spanRecordError(span, err)
 		return nil, err

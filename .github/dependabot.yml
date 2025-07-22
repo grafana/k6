@@ -39,9 +39,17 @@ updates:
       - dependency-name: "github.com/mattn/go-colorable"
       - dependency-name: "github.com/mstoykov/k6-taskqueue-lib"
       - dependency-name: "github.com/stretchr/testify"
-      - dependency-name: "go.opentelemetry.io/otel"
-      - dependency-name: "go.opentelemetry.io/otel/exporters/otlp/otlptrace"
-      - dependency-name: "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
-      - dependency-name: "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
-      - dependency-name: "go.opentelemetry.io/otel/sdk"
-      - dependency-name: "go.opentelemetry.io/otel/trace"
+      - dependency-name: "go.opentelemetry.io/*"
+
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      # We don't update immediately. We usually wait for `vX.Y.1` to be out.
+      interval: "quarterly"
+
+  # Update k6packager dependencies
+  - package-ecosystem: "docker"
+    directory: "/packaging"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10

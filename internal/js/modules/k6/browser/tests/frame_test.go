@@ -149,7 +149,7 @@ func TestFrameNoPanicNavigateAndClickOnPageWithIFrames(t *testing.T) {
 		func() error { return p.Click(`a[href="/iframeSignIn"]`, common.NewFrameClickOptions(p.Timeout())) },
 		func() error {
 			_, err := p.WaitForNavigation(
-				common.NewFrameWaitForNavigationOptions(p.Timeout()),
+				common.NewFrameWaitForNavigationOptions(p.Timeout()), nil,
 			)
 			return err
 		},

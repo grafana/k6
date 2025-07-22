@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/grafana/sobek"
@@ -162,6 +163,12 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				}
 				return s, nil
 			}), nil
+		},
+		"getByRole": func(role string, opts sobek.Value) (*sobek.Object, error) {
+			popts := parseGetByRoleOptions(vu.Context(), opts)
+
+			ml := mapLocator(vu, p.GetByRole(role, popts))
+			return rt.ToValue(ml).ToObject(rt), nil
 		},
 		"goto": func(url string, opts sobek.Value) (*sobek.Promise, error) {
 			gopts := common.NewFrameGotoOptions(
@@ -493,8 +500,15 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, fmt.Errorf("parsing page wait for navigation options: %w", err)
 			}
 
-			return k6ext.Promise(vu.Context(), func() (result any, reason error) {
-				resp, err := p.WaitForNavigation(popts)
+			// Inject JS regex checker for URL regex pattern matching
+			ctx := vu.Context()
+			jsRegexChecker, err := injectRegexMatcherScript(ctx, vu, p.TargetID())
+			if err != nil {
+				return nil, err
+			}
+
+			return k6ext.Promise(ctx, func() (result any, reason error) {
+				resp, err := p.WaitForNavigation(popts, jsRegexChecker)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
 				}
@@ -663,6 +677,54 @@ func prepK6BrowserRegExChecker(rt *sobek.Runtime) func() error {
 	}
 }
 
+// injectRegexMatcherScript injects a JavaScript regex checker function into the runtime
+// for URL pattern matching. This handles regex patterns only using JavaScript's regex
+// engine for consistency. It returns a function that can be used to check if a URL
+// matches a given pattern in the JS runtime's eventloop.
+func injectRegexMatcherScript(ctx context.Context, vu moduleVU, targetID string) (common.JSRegexChecker, error) {
+	rt := vu.Runtime()
+
+	err := prepK6BrowserRegExChecker(rt)()
+	if err != nil {
+		return nil, fmt.Errorf("preparing k6 browser regex checker: %w", err)
+	}
+
+	return func(pattern, url string) (bool, error) {
+		var (
+			result bool
+			err    error
+		)
+
+		tq := vu.get(ctx, targetID)
+		done := make(chan struct{})
+
+		tq.Queue(func() error {
+			defer close(done)
+
+			// Regex pattern is unquoted string whereas the url needs to be quoted
+			// so that it is treated as a string.
+			js := fmt.Sprintf(`_k6BrowserCheckRegEx(%s, '%s')`, pattern, url)
+
+			val, jsErr := rt.RunString(js)
+			if jsErr != nil {
+				err = fmt.Errorf("evaluating pattern: %w", jsErr)
+				return nil
+			}
+
+			result = val.ToBoolean()
+			return nil
+		})
+
+		select {
+		case <-done:
+		case <-ctx.Done():
+			err = fmt.Errorf("context canceled while evaluating URL pattern")
+		}
+
+		return result, err
+	}, nil
+}
+
 func parseWaitForFunctionArgs(
 	ctx context.Context, timeout time.Duration, pageFunc, opts sobek.Value, gargs ...sobek.Value,
 ) (string, *common.FrameWaitForFunctionOptions, []any, error) {
@@ -679,4 +741,58 @@ func parseWaitForFunctionArgs(
 	}
 
 	return js, popts, exportArgs(gargs), nil
+}
+
+// parseGetByRoleOptions parses the GetByRole options from the Sobek.Value.
+func parseGetByRoleOptions(ctx context.Context, opts sobek.Value) *common.GetByRoleOptions {
+	if !sobekValueExists(opts) {
+		return nil
+	}
+
+	o := &common.GetByRoleOptions{}
+
+	rt := k6ext.Runtime(ctx)
+
+	obj := opts.ToObject(rt)
+	for _, k := range obj.Keys() {
+		switch k {
+		case "checked":
+			val := obj.Get(k).ToBoolean()
+			o.Checked = &val
+		case "disabled":
+			val := obj.Get(k).ToBoolean()
+			o.Disabled = &val
+		case "exact":
+			val := obj.Get(k).ToBoolean()
+			o.Exact = &val
+		case "expanded":
+			val := obj.Get(k).ToBoolean()
+			o.Expanded = &val
+		case "includeHidden":
+			val := obj.Get(k).ToBoolean()
+			o.IncludeHidden = &val
+		case "level":
+			val := obj.Get(k).ToInteger()
+			o.Level = &val
+		case "name":
+			var val string
+			switch obj.Get(k).ExportType() {
+			case reflect.TypeOf(string("")):
+				val = fmt.Sprintf("'%s'", obj.Get(k).String()) // Strings require quotes
+			case reflect.TypeOf(map[string]interface{}(nil)): // JS RegExp
+				val = obj.Get(k).String() // No quotes
+			default: // CSS, numbers or booleans
+				val = obj.Get(k).String() // No quotes
+			}
+			o.Name = &val
+		case "pressed":
+			val := obj.Get(k).ToBoolean()
+			o.Pressed = &val
+		case "selected":
+			val := obj.Get(k).ToBoolean()
+			o.Selected = &val
+		}
+	}
+
+	return o
 }

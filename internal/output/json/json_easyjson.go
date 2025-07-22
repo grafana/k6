@@ -19,7 +19,7 @@ var (
 	_ easyjson.Marshaler
 )
 
-func easyjson42239ddeDecodeGoK6IoK6OutputJson(in *jlexer.Lexer, out *sampleEnvelope) {
+func easyjson42239ddeDecodeGoK6IoK6InternalOutputJson(in *jlexer.Lexer, out *sampleEnvelope) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -54,7 +54,7 @@ func easyjson42239ddeDecodeGoK6IoK6OutputJson(in *jlexer.Lexer, out *sampleEnvel
 		in.Consumed()
 	}
 }
-func easyjson42239ddeEncodeGoK6IoK6OutputJson(out *jwriter.Writer, in sampleEnvelope) {
+func easyjson42239ddeEncodeGoK6IoK6InternalOutputJson(out *jwriter.Writer, in sampleEnvelope) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -78,12 +78,12 @@ func easyjson42239ddeEncodeGoK6IoK6OutputJson(out *jwriter.Writer, in sampleEnve
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v sampleEnvelope) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjson42239ddeEncodeGoK6IoK6OutputJson(w, v)
+	easyjson42239ddeEncodeGoK6IoK6InternalOutputJson(w, v)
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *sampleEnvelope) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjson42239ddeDecodeGoK6IoK6OutputJson(l, v)
+	easyjson42239ddeDecodeGoK6IoK6InternalOutputJson(l, v)
 }
 func easyjson42239ddeDecode(in *jlexer.Lexer, out *struct {
 	Time     time.Time         `json:"time"`
@@ -204,7 +204,7 @@ func easyjson42239ddeEncode(out *jwriter.Writer, in struct {
 	}
 	out.RawByte('}')
 }
-func easyjson42239ddeDecodeGoK6IoK6OutputJson1(in *jlexer.Lexer, out *metricEnvelope) {
+func easyjson42239ddeDecodeGoK6IoK6InternalOutputJson1(in *jlexer.Lexer, out *metricEnvelope) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -239,7 +239,7 @@ func easyjson42239ddeDecodeGoK6IoK6OutputJson1(in *jlexer.Lexer, out *metricEnve
 		in.Consumed()
 	}
 }
-func easyjson42239ddeEncodeGoK6IoK6OutputJson1(out *jwriter.Writer, in metricEnvelope) {
+func easyjson42239ddeEncodeGoK6IoK6InternalOutputJson1(out *jwriter.Writer, in metricEnvelope) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -263,12 +263,12 @@ func easyjson42239ddeEncodeGoK6IoK6OutputJson1(out *jwriter.Writer, in metricEnv
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v metricEnvelope) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjson42239ddeEncodeGoK6IoK6OutputJson1(w, v)
+	easyjson42239ddeEncodeGoK6IoK6InternalOutputJson1(w, v)
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *metricEnvelope) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjson42239ddeDecodeGoK6IoK6OutputJson1(l, v)
+	easyjson42239ddeDecodeGoK6IoK6InternalOutputJson1(l, v)
 }
 func easyjson42239ddeDecode1(in *jlexer.Lexer, out *struct {
 	Name       string               `json:"name"`

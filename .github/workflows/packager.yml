@@ -13,9 +13,7 @@ jobs:
   publish-packager:
     runs-on: ubuntu-latest
     env:
-      VERSION: 0.0.3
-      AWSCLI_VERSION: 2.1.36
-      S3CMD_VERSION: 2.1.0
+      VERSION: 0.0.4
       DOCKER_IMAGE_ID: ghcr.io/grafana/k6packager
       GITHUB_ACTOR: ${{ github.actor }}
     permissions:
