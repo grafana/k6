@@ -547,14 +547,7 @@ func (m *FrameManager) requestStarted(req *Request) {
 
 	route := NewRoute(m.logger, m.page.mainFrameSession.networkManager, req)
 	for _, r := range m.page.routes {
-		matcher, err := urlMatcher(r.path, r.jsRegexChecker)
-		if err != nil {
-			m.logger.Errorf("FrameManager:requestStarted",
-				"fmid:%d rurl:%s error creating url matcher: %v", m.ID(), req.URL(), err)
-			continue
-		}
-
-		matched, err := matcher(req.URL())
+		matched, err := r.urlMatcher(req.URL())
 		if err != nil {
 			m.logger.Errorf("FrameManager:requestStarted",
 				"fmid:%d rurl:%s error matching url: %v", m.ID(), req.URL(), err)

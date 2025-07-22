@@ -191,20 +191,20 @@ type ConsoleMessage struct {
 type PageOnHandler func(PageOnEvent) error
 
 type RouteHandler struct {
-	path           string
-	handler        RouteHandlerCallback
-	jsRegexChecker JSRegexChecker
+	path       string
+	handler    RouteHandlerCallback
+	urlMatcher URLMatcher
 }
 
 func NewRouteHandler(
 	path string,
 	handler RouteHandlerCallback,
-	jsRegexChecker JSRegexChecker,
+	urlMatcher URLMatcher,
 ) *RouteHandler {
 	return &RouteHandler{
-		path:           path,
-		handler:        handler,
-		jsRegexChecker: jsRegexChecker,
+		path:       path,
+		handler:    handler,
+		urlMatcher: urlMatcher,
 	}
 }
 
@@ -1261,7 +1261,13 @@ func (p *Page) Route(
 	jsRegexChecker JSRegexChecker,
 ) error {
 	p.logger.Debugf("Page:Route", "sid:%v path:%s", p.sessionID(), path)
-	routeHandler := NewRouteHandler(path, handlerCallback, jsRegexChecker)
+
+	matcher, err := urlMatcher(path, jsRegexChecker)
+	if err != nil {
+		return fmt.Errorf("creating url matcher for path %s: %w", path, err)
+	}
+
+	routeHandler := NewRouteHandler(path, handlerCallback, matcher)
 	p.routes = append([]*RouteHandler{routeHandler}, p.routes...)
 
 	return p.mainFrameSession.updateRequestInterception(true)
