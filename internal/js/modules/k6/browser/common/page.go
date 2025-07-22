@@ -1262,6 +1262,13 @@ func (p *Page) Route(
 ) error {
 	p.logger.Debugf("Page:Route", "sid:%v path:%s", p.sessionID(), path)
 
+	if len(p.routes) == 0 {
+		err := p.mainFrameSession.updateRequestInterception(true)
+		if err != nil {
+			return err
+		}
+	}
+
 	matcher, err := urlMatcher(path, jsRegexChecker)
 	if err != nil {
 		return fmt.Errorf("creating url matcher for path %s: %w", path, err)
@@ -1270,7 +1277,7 @@ func (p *Page) Route(
 	routeHandler := NewRouteHandler(path, handlerCallback, matcher)
 	p.routes = append([]*RouteHandler{routeHandler}, p.routes...)
 
-	return p.mainFrameSession.updateRequestInterception(true)
+	return nil
 }
 
 // NavigationTimeout returns the page's navigation timeout.
