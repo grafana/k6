@@ -209,18 +209,20 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	valueColor := getColor(c.globalState.Flags.NoColor || !c.globalState.Stdout.IsTTY, color.FgCyan)
-	printToStdout(c.globalState, fmt.Sprintf(
-		"\nLogged in successfully, token and stack info saved in %s\n", c.globalState.Flags.ConfigFilePath,
-	))
-	if !c.globalState.Flags.Quiet {
-		printToStdout(c.globalState, fmt.Sprintf("  token: %s\n", valueColor.Sprint(newCloudConf.Token.String)))
+	if newCloudConf.Token.Valid {
+		valueColor := getColor(c.globalState.Flags.NoColor || !c.globalState.Stdout.IsTTY, color.FgCyan)
+		printToStdout(c.globalState, fmt.Sprintf(
+			"\nLogged in successfully, token and stack info saved in %s\n", c.globalState.Flags.ConfigFilePath,
+		))
+		if !c.globalState.Flags.Quiet {
+			printToStdout(c.globalState, fmt.Sprintf("  token: %s\n", valueColor.Sprint(newCloudConf.Token.String)))
 
-		if newCloudConf.StackID.Valid {
-			printToStdout(c.globalState, fmt.Sprintf("  stack-id: %s\n", valueColor.Sprint(newCloudConf.StackID.Int64)))
-		}
-		if newCloudConf.StackSlug.Valid {
-			printToStdout(c.globalState, fmt.Sprintf("  stack-slug: %s\n", valueColor.Sprint(newCloudConf.StackSlug.String)))
+			if newCloudConf.StackID.Valid {
+				printToStdout(c.globalState, fmt.Sprintf("  stack-id: %s\n", valueColor.Sprint(newCloudConf.StackID.Int64)))
+			}
+			if newCloudConf.StackSlug.Valid {
+				printToStdout(c.globalState, fmt.Sprintf("  stack-slug: %s\n", valueColor.Sprint(newCloudConf.StackSlug.String)))
+			}
 		}
 	}
 	return nil
