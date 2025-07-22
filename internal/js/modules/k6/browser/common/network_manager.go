@@ -551,7 +551,7 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent,
 		interceptionID:    interceptionID,
 		allowInterception: m.userReqInterceptionEnabled,
 	})
-	m.logger.Errorf("NetworkManager", "request headers: %v", req.Headers())
+	// m.logger.Errorf("NetworkManager", "request headers: %v", req.Headers())
 
 	if err != nil {
 		m.logger.Errorf("NetworkManager", "creating request: %s", err)
@@ -864,7 +864,8 @@ func (m *NetworkManager) ContinueRequest(requestID fetch.RequestID, opts *Contin
 			action = action.WithMethod(opts.Method)
 		}
 		if opts.PostData != "" {
-			action = action.WithPostData(opts.PostData)
+			b64PostData := base64.StdEncoding.EncodeToString([]byte(opts.PostData))
+			action = action.WithPostData(b64PostData)
 		}
 	}
 
