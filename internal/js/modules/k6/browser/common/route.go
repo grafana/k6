@@ -15,6 +15,13 @@ type Route struct {
 	handled bool
 }
 
+type FulfillOptions struct {
+	Body        string
+	ContentType string
+	Headers     []HTTPHeader
+	Status      int64
+}
+
 func NewRoute(logger *log.Logger, networkManager *NetworkManager, request *Request) *Route {
 	return &Route{
 		logger:         logger,
@@ -46,6 +53,15 @@ func (r *Route) Continue() error {
 	}
 
 	return r.networkManager.ContinueRequest(r.request.interceptionID)
+}
+
+func (r *Route) Fulfill(opts *FulfillOptions) error {
+	err := r.startHandling()
+	if err != nil {
+		return err
+	}
+
+	return r.networkManager.FulfillRequest(r.request, opts)
 }
 
 func (r *Route) startHandling() error {

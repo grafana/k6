@@ -2,9 +2,11 @@ package common
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
@@ -909,11 +911,30 @@ func (m *NetworkManager) ContinueRequest(requestID fetch.RequestID) error {
 	return nil
 }
 
-func (m *NetworkManager) FulfillRequest(requestID fetch.RequestID, params fetch.FulfillRequestParams) {
-	action := fetch.FulfillRequest(requestID, params.ResponseCode).
-		WithResponseHeaders(params.ResponseHeaders).
-		WithResponsePhrase(params.ResponsePhrase).
-		WithBody(params.Body)
+func (m *NetworkManager) FulfillRequest(request *Request, opts *FulfillOptions) error {
+	responseCode := int64(http.StatusOK)
+	if opts != nil && opts.Status != 0 {
+		responseCode = opts.Status
+	}
+
+	action := fetch.FulfillRequest(request.interceptionID, responseCode)
+
+	if opts.ContentType != "" {
+		opts.Headers = append(opts.Headers, HTTPHeader{
+			Name:  "Content-Type",
+			Value: opts.ContentType,
+		})
+	}
+
+	headers := toFetchHeaders(opts.Headers)
+	if len(headers) > 0 {
+		action = action.WithResponseHeaders(headers)
+	}
+
+	if opts.Body != "" {
+		b64Body := base64.StdEncoding.EncodeToString([]byte(opts.Body))
+		action = action.WithBody(b64Body)
+	}
 
 	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
 		// Avoid logging as error when context is canceled.
@@ -921,12 +942,29 @@ func (m *NetworkManager) FulfillRequest(requestID fetch.RequestID, params fetch.
 		// while the iteration is ending and therefore the browser context is being closed.
 		if errors.Is(err, context.Canceled) {
 			m.logger.Debug("NetworkManager:FulfillRequest", "context canceled fulfilling request")
-		} else {
-			m.logger.Errorf("NetworkManager:FulfillRequest", "fail to fulfill request (id: %s): %s",
-				requestID, err)
+			return nil
 		}
-		return
+
+		return fmt.Errorf("fail to fulfill request (id: %s): %s",
+			request.interceptionID, err)
 	}
+
+	return nil
+}
+
+func toFetchHeaders(headers []HTTPHeader) []*fetch.HeaderEntry {
+	if len(headers) == 0 {
+		return nil
+	}
+
+	fetchHeaders := make([]*fetch.HeaderEntry, len(headers))
+	for i, header := range headers {
+		fetchHeaders[i] = &fetch.HeaderEntry{
+			Name:  header.Name,
+			Value: header.Value,
+		}
+	}
+	return fetchHeaders
 }
 
 // SetExtraHTTPHeaders sets extra HTTP request headers to be sent with every request.
