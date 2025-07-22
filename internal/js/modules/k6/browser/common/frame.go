@@ -79,6 +79,34 @@ func (s *DOMElementState) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+func isExactString(s string) bool {
+	return len(s) > 0 && s[0] == '\'' && s[len(s)-1] == '\''
+}
+
+// urlMatcher matches URLs based on pattern type. It can match on exact and regex
+// patterns. If the pattern is empty or a single quote, it matches any URL.
+func urlMatcher(pattern string, jsRegexChecker JSRegexChecker) (func(string) (bool, error), error) {
+	if pattern == "" || pattern == "''" {
+		return func(url string) (bool, error) { return true, nil }, nil
+	}
+
+	if isExactString(pattern) {
+		return func(url string) (bool, error) { return "'"+url+"'" == pattern, nil }, nil
+	}
+
+	if jsRegexChecker == nil {
+		return nil, fmt.Errorf("JavaScript pattern matcher is required for URL matching")
+	}
+
+	return func(url string) (bool, error) {
+		matched, err := jsRegexChecker(pattern, url)
+		if err != nil {
+			return false, fmt.Errorf("URL pattern matching error for pattern %q and URL %q: %w", pattern, url, err)
+		}
+		return matched, nil
+	}, nil
+}
+
 // Frame represents a frame in an HTML document.
 type Frame struct {
 	BaseEventEmitter
@@ -1078,7 +1106,7 @@ func (f *Frame) Goto(url string, opts *FrameGotoOptions) (*Response, error) {
 	}
 	applySlowMo(f.ctx)
 
-	// Since response will be in an interface, it will never be nil,
+	// Since the response will be in an interface, it will never be nil,
 	// so we need to return nil explicitly.
 	if resp == nil {
 		return nil, nil //nolint:nilnil
@@ -1866,22 +1894,49 @@ func (f *Frame) WaitForLoadState(state string, popts *FrameWaitForLoadStateOptio
 }
 
 // WaitForNavigation waits for the given navigation lifecycle event to happen.
-func (f *Frame) WaitForNavigation(opts *FrameWaitForNavigationOptions) (*Response, error) {
+// jsRegexChecker should be non-nil to be able to test against a URL pattern in the options.
+//
+//nolint:funlen
+func (f *Frame) WaitForNavigation(
+	opts *FrameWaitForNavigationOptions,
+	jsRegexChecker JSRegexChecker,
+) (*Response, error) {
 	f.log.Debugf("Frame:WaitForNavigation",
-		"fid:%s furl:%s", f.ID(), f.URL())
+		"fid:%s furl:%s url:%s", f.ID(), f.URL(), opts.URL)
 	defer f.log.Debugf("Frame:WaitForNavigation:return",
 		"fid:%s furl:%s", f.ID(), f.URL())
 
 	timeoutCtx, timeoutCancel := context.WithTimeout(f.ctx, opts.Timeout)
 
-	navEvtCh, navEvtCancel := createWaitForEventHandler(timeoutCtx, f, []string{EventFrameNavigation},
+	// Create URL matcher based on the pattern
+	matcher, err := urlMatcher(opts.URL, jsRegexChecker)
+	if err != nil {
+		timeoutCancel()
+		return nil, fmt.Errorf("parsing URL pattern: %w", err)
+	}
+
+	var matcherErr error
+	navEvtCh, navEvtCancel := createWaitForEventPredicateHandler(timeoutCtx, f, []string{EventFrameNavigation},
 		func(data any) bool {
-			return true // Both successful and failed navigations are considered
+			if navEvt, ok := data.(*NavigationEvent); ok {
+				// Check if the navigation URL matches the pattern
+				matched, err := matcher(navEvt.url)
+				if err != nil {
+					matcherErr = err
+					// Return true here even though it's not correct and no match
+					// was found. We need this to exit asap so that the error can be
+					// propagated to the caller.
+					return true
+				}
+				return matched
+			}
+			return false
 		})
 
 	lifecycleEvtCh, lifecycleEvtCancel := createWaitForEventPredicateHandler(
 		timeoutCtx, f, []string{EventFrameAddLifecycle},
 		func(data any) bool {
+			// Wait for the lifecycle event to happen.
 			if le, ok := data.(FrameLifecycleEvent); ok {
 				return le.Event == opts.WaitUntil
 			}
@@ -1895,6 +1950,9 @@ func (f *Frame) WaitForNavigation(opts *FrameWaitForNavigationOptions) (*Respons
 			e := &k6ext.UserFriendlyError{
 				Err:     err,
 				Timeout: opts.Timeout,
+			}
+			if opts.URL != "" {
+				return fmt.Errorf("waiting for navigation to URL matching %q: %w", opts.URL, e)
 			}
 			return fmt.Errorf("waiting for navigation: %w", e)
 		}
@@ -1914,7 +1972,14 @@ func (f *Frame) WaitForNavigation(opts *FrameWaitForNavigationOptions) (*Respons
 	)
 	select {
 	case evt := <-navEvtCh:
+		if matcherErr != nil {
+			return nil, matcherErr
+		}
 		if e, ok := evt.(*NavigationEvent); ok {
+			if e.err != nil {
+				return nil, e.err
+			}
+
 			if e.newDocument == nil {
 				sameDocNav = true
 				break
