@@ -267,7 +267,7 @@ func (o *Output) flushMetrics() {
 		return
 	}
 
-	o.logger.WithField("t", time.Since(start)).Debug("Successfully flushed buffered samples to the cloud")
+	o.logger.WithField("t", time.Since(start)).Trace("Successfully flushed buffered samples to the cloud")
 }
 
 func (o *Output) runFlushRequestMetadatas() {
@@ -304,7 +304,7 @@ func (o *Output) flushRequestMetadatas() {
 		return
 	}
 
-	o.logger.WithField("t", time.Since(start)).Debug("Successfully flushed buffered trace samples to the cloud")
+	o.logger.WithField("t", time.Since(start)).Trace("Successfully flushed buffered trace samples to the cloud")
 }
 
 // handleFlushError handles errors generated from the flushing operation.
