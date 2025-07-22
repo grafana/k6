@@ -573,7 +573,7 @@ func (m *FrameManager) requestStarted(req *Request) {
 		}
 		return
 	}
-	route.Continue()
+	route.Continue(nil)
 }
 
 // Frames returns a list of frames on the page.

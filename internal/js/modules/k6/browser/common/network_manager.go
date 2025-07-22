@@ -2,9 +2,11 @@ package common
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
@@ -549,6 +551,8 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent,
 		interceptionID:    interceptionID,
 		allowInterception: m.userReqInterceptionEnabled,
 	})
+	m.logger.Errorf("NetworkManager", "request headers: %v", req.Headers())
+
 	if err != nil {
 		m.logger.Errorf("NetworkManager", "creating request: %s", err)
 		return
@@ -614,7 +618,11 @@ func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
 
 		// If no route was added, continue all requests
 		if m.frameManager.page == nil || !m.frameManager.page.hasRoutes() {
-			m.ContinueRequest(event.RequestID)
+			err := m.ContinueRequest(event.RequestID, nil, nil)
+			if err != nil {
+				m.logger.Errorf("NetworkManager:onRequestPaused",
+					"continuing request %s %s: %s", event.Request.Method, event.Request.URL, err)
+			}
 		}
 
 		requestID := event.NetworkID
@@ -815,11 +823,10 @@ func (m *NetworkManager) Authenticate(credentials Credentials) error {
 	return nil
 }
 
-func (m *NetworkManager) AbortRequest(requestID fetch.RequestID, errorReason string) {
+func (m *NetworkManager) AbortRequest(requestID fetch.RequestID, errorReason string) error {
 	netErrorReason, ok := m.errorReasons[errorReason]
 	if !ok {
-		m.logger.Errorf("NetworkManager:AbortRequest", "unknown error code: %s", errorReason)
-		return
+		return fmt.Errorf("unknown error code: %s", errorReason)
 	}
 	m.logger.Debugf("NetworkManager:AbortRequest", "aborting request (id: %s, errorReason: %s)",
 		requestID, errorReason)
@@ -832,23 +839,42 @@ func (m *NetworkManager) AbortRequest(requestID fetch.RequestID, errorReason str
 		if errors.Is(err, context.Canceled) {
 			m.logger.Debug("NetworkManager:AbortRequest", "context canceled interrupting request")
 		} else {
-			m.logger.Errorf("NetworkManager:AbortRequest", "fail to abort request (id: %s): %s", requestID, err)
+			return fmt.Errorf("fail to abort request (id: %s): %s", requestID, err)
 		}
-		return
+		return nil
 	}
+
+	return nil
 }
 
-func (m *NetworkManager) ContinueRequest(requestID fetch.RequestID) {
-	m.logger.Debugf("NetworkManager:ContinueRequest", "continuing request (id: %s)", requestID)
+func (m *NetworkManager) ContinueRequest(requestID fetch.RequestID, opts *ContinueOptions, originalHeaders []HTTPHeader) error {
+	m.logger.Infof("NetworkManager:ContinueRequest", "continuing request (id: %s)", requestID)
 
 	action := fetch.ContinueRequest(requestID)
+
+	if opts != nil {
+		allHeaders := mergeHeaders(originalHeaders, opts.Headers)
+		if len(allHeaders) > 0 {
+			action = action.WithHeaders(allHeaders)
+		}
+		if opts.URL != "" {
+			action = action.WithURL(opts.URL)
+		}
+		if opts.Method != "" {
+			action = action.WithMethod(opts.Method)
+		}
+		if opts.PostData != "" {
+			action = action.WithPostData(opts.PostData)
+		}
+	}
+
 	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
 		// Avoid logging as error when context is canceled.
 		// Most probably this happens when trying to fail a site's background request
 		// while the iteration is ending and therefore the browser context is being closed.
 		if errors.Is(err, context.Canceled) {
 			m.logger.Debug("NetworkManager:ContinueRequest", "context canceled continuing request")
-			return
+			return nil
 		}
 
 		// This error message is an internal issue, rather than something that the user can
@@ -856,21 +882,40 @@ func (m *NetworkManager) ContinueRequest(requestID fetch.RequestID) {
 		// away or something has occurred which means that the request is no longer needed and
 		// isn't being tracked by chromium.
 		if strings.Contains(err.Error(), "Invalid InterceptionId") {
-			m.logger.Debugf("NetworkManager:ContinueRequest", "invalid interception ID (%s) continuing request: %s",
+			return fmt.Errorf("invalid interception ID (%s) continuing request: %s",
 				requestID, err)
-			return
 		}
 
-		m.logger.Errorf("NetworkManager:ContinueRequest", "fail to continue request (id: %s): %s",
-			requestID, err)
+		return fmt.Errorf("fail to continue request (id: %s): %w", requestID, err)
 	}
+
+	return nil
 }
 
-func (m *NetworkManager) FulfillRequest(requestID fetch.RequestID, params fetch.FulfillRequestParams) {
-	action := fetch.FulfillRequest(requestID, params.ResponseCode).
-		WithResponseHeaders(params.ResponseHeaders).
-		WithResponsePhrase(params.ResponsePhrase).
-		WithBody(params.Body)
+func (m *NetworkManager) FulfillRequest(request *Request, opts *FulfillOptions) error {
+	responseCode := int64(http.StatusOK)
+	if opts != nil && opts.Status != 0 {
+		responseCode = opts.Status
+	}
+
+	action := fetch.FulfillRequest(request.interceptionID, responseCode)
+
+	if opts.ContentType != "" {
+		opts.Headers = append(opts.Headers, HTTPHeader{
+			Name:  "Content-Type",
+			Value: opts.ContentType,
+		})
+	}
+
+	headers := m.addCORSHeadersIfNeeded(request, opts.Headers)
+	if len(headers) > 0 {
+		action = action.WithResponseHeaders(toFetchHeaders(headers))
+	}
+
+	if opts.Body != "" {
+		b64Body := base64.StdEncoding.EncodeToString([]byte(opts.Body))
+		action = action.WithBody(b64Body)
+	}
 
 	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
 		// Avoid logging as error when context is canceled.
@@ -878,12 +923,108 @@ func (m *NetworkManager) FulfillRequest(requestID fetch.RequestID, params fetch.
 		// while the iteration is ending and therefore the browser context is being closed.
 		if errors.Is(err, context.Canceled) {
 			m.logger.Debug("NetworkManager:FulfillRequest", "context canceled fulfilling request")
-		} else {
-			m.logger.Errorf("NetworkManager:FulfillRequest", "fail to fulfill request (id: %s): %s",
-				requestID, err)
+			return nil
 		}
-		return
+
+		return fmt.Errorf("fail to fulfill request (id: %s): %s",
+			request.interceptionID, err)
 	}
+
+	return nil
+}
+
+func toFetchHeaders(headers []HTTPHeader) []*fetch.HeaderEntry {
+	if len(headers) == 0 {
+		return nil
+	}
+
+	fetchHeaders := make([]*fetch.HeaderEntry, len(headers))
+	for i, header := range headers {
+		fetchHeaders[i] = &fetch.HeaderEntry{
+			Name:  header.Name,
+			Value: header.Value,
+		}
+	}
+	return fetchHeaders
+}
+
+// See https://github.com/microsoft/playwright/issues/12929
+func (m *NetworkManager) addCORSHeadersIfNeeded(request *Request, headers []HTTPHeader) []HTTPHeader {
+	m.logger.Errorf("NetworkManager:addCORSHeadersIfNeeded",
+		"adding CORS headers for request %s %s %v", request.method, request.url, request.HeadersArray())
+	origin, ok := request.HeaderValue("origin")
+	if !ok || origin == "" {
+		return headers
+	}
+
+	requestURL := request.url
+	if strings.HasPrefix(requestURL.Scheme, "http") {
+		return headers
+	}
+
+	m.logger.Errorf("NetworkManager:addCORSHeadersIfNeeded",
+		"2")
+
+	requestOrigin := fmt.Sprintf("%s://%s", requestURL.Scheme, requestURL.Host)
+	if requestOrigin == strings.TrimSpace(origin) {
+		return headers
+	}
+
+	m.logger.Errorf("NetworkManager:addCORSHeadersIfNeeded",
+		"3")
+
+	resHeaders := make([]HTTPHeader, 0, len(headers)+3)
+
+	// Check if the CORS headers are already present
+	if headers != nil {
+		for _, header := range headers {
+			if header.Name == "access-control-allow-origin" {
+				return headers
+			}
+		}
+
+		resHeaders = append(resHeaders, headers...)
+	}
+
+	m.logger.Errorf("NetworkManager:addCORSHeadersIfNeeded",
+		"4")
+
+	resHeaders = append(resHeaders,
+		HTTPHeader{Name: "access-control-allow-origin", Value: origin},
+		HTTPHeader{Name: "access-control-allow-credentials", Value: "true"},
+		HTTPHeader{Name: "vary", Value: "Origin"},
+	)
+	return resHeaders
+}
+
+func mergeHeaders(originalHeaders []HTTPHeader, extraHeaders []HTTPHeader) []*fetch.HeaderEntry {
+	if len(originalHeaders) == 0 {
+		return toFetchHeaders(extraHeaders)
+	}
+	if len(extraHeaders) == 0 {
+		return toFetchHeaders(originalHeaders)
+	}
+
+	headers := make([]*fetch.HeaderEntry, 0, len(originalHeaders)+len(extraHeaders))
+	existingHeaders := make(map[string]bool, len(extraHeaders))
+	for _, header := range extraHeaders {
+		headers = append(headers, &fetch.HeaderEntry{
+			Name:  header.Name,
+			Value: header.Value,
+		})
+		existingHeaders[header.Name] = true
+	}
+
+	for _, header := range originalHeaders {
+		if !existingHeaders[header.Name] {
+			headers = append(headers, &fetch.HeaderEntry{
+				Name:  header.Name,
+				Value: header.Value,
+			})
+		}
+	}
+
+	return headers
 }
 
 // SetExtraHTTPHeaders sets extra HTTP request headers to be sent with every request.
