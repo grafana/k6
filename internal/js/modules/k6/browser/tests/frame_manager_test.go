@@ -133,38 +133,61 @@ func TestFrameManagerRequestStartedWithRoutes(t *testing.T) {
 	}
 
 	tests := []struct {
-		name              string
-		routePath         string
-		routeHandler      func(*common.Route)
-		handlerCallsCount int
+		name                   string
+		routePath              string
+		routeHandler           func(*common.Route)
+		routeHandlerCallsCount int
+		apiHandlerCallsCount   int
 	}{
 		{
-			name:              "request_without_routes",
-			handlerCallsCount: 0,
+			name:                   "request_without_routes",
+			routeHandlerCallsCount: 0,
+			apiHandlerCallsCount:   2,
 		},
 		{
-			name:      "request_with_matching_string_route",
+			name:      "continue_request_with_matching_string_route",
 			routePath: "/data/first",
 			routeHandler: func(route *common.Route) {
 				route.Continue()
 			},
-			handlerCallsCount: 1,
+			routeHandlerCallsCount: 1,
+			apiHandlerCallsCount:   2,
 		},
 		{
-			name:      "request_with_non_matching_string_route",
+			name:      "continue_request_with_non_matching_string_route",
 			routePath: "/data/third",
 			routeHandler: func(route *common.Route) {
 				route.Continue()
 			},
-			handlerCallsCount: 0,
+			routeHandlerCallsCount: 0,
+			apiHandlerCallsCount:   2,
 		},
 		{
-			name:      "request_with_multiple_matching_regex_route",
+			name:      "continue_request_with_multiple_matching_regex_route",
 			routePath: "/data/.*",
 			routeHandler: func(route *common.Route) {
 				route.Continue()
 			},
-			handlerCallsCount: 2,
+			routeHandlerCallsCount: 2,
+			apiHandlerCallsCount:   2,
+		},
+		{
+			name:      "abort_first_request",
+			routePath: "/data/first",
+			routeHandler: func(route *common.Route) {
+				route.Abort("failed")
+			},
+			routeHandlerCallsCount: 1,
+			apiHandlerCallsCount:   0, // Second API call is not made because the first throws an error
+		},
+		{
+			name:      "abort_second_request",
+			routePath: "/data/second",
+			routeHandler: func(route *common.Route) {
+				route.Abort("failed")
+			},
+			routeHandlerCallsCount: 1,
+			apiHandlerCallsCount:   1,
 		},
 	}
 
@@ -175,8 +198,9 @@ func TestFrameManagerRequestStartedWithRoutes(t *testing.T) {
 			tb := newTestBrowser(t, withHTTPServer())
 			p := tb.NewPage(nil)
 
-			// Track route handler calls
-			handlerCalls := 0
+			// Track behavior
+			routeHandlerCalls := 0
+			apiHandlerCalls := 0
 
 			// Set up handlers for test resources
 			tb.withHandler("/test", func(w http.ResponseWriter, r *http.Request) {
@@ -205,18 +229,20 @@ func TestFrameManagerRequestStartedWithRoutes(t *testing.T) {
 				w.Header().Set("Content-Type", "application/json")
 				_, err := fmt.Fprint(w, `{"data": "First data"}`)
 				require.NoError(t, err)
+				apiHandlerCalls++
 			})
 
 			tb.withHandler("/data/second", func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 				_, err := fmt.Fprint(w, `{"data": "Second data"}`)
 				require.NoError(t, err)
+				apiHandlerCalls++
 			})
 
 			// Set up route if needed
 			if tt.routeHandler != nil {
 				routeHandler := func(route *common.Route) error {
-					handlerCalls++
+					routeHandlerCalls++
 					tt.routeHandler(route)
 					return nil
 				}
@@ -234,7 +260,8 @@ func TestFrameManagerRequestStartedWithRoutes(t *testing.T) {
 			_, err := p.Goto(tb.url("/test"), opts)
 			require.NoError(t, err)
 
-			require.Equal(t, tt.handlerCallsCount, handlerCalls)
+			assert.Equal(t, tt.routeHandlerCallsCount, routeHandlerCalls)
+			assert.Equal(t, tt.apiHandlerCallsCount, apiHandlerCalls)
 		})
 	}
 }
