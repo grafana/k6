@@ -574,7 +574,11 @@ func (m *FrameManager) requestStarted(req *Request) {
 
 		return
 	}
-	route.Continue()
+
+	if err := route.Continue(); err != nil {
+		m.logger.Warnf("FrameManager:requestStarted",
+			"fmid:%d rurl:%s error continuing request: %v", m.ID(), req.URL(), err)
+	}
 }
 
 // Frames returns a list of frames on the page.
