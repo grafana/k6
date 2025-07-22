@@ -120,8 +120,8 @@ func (b *customBinary) run(gs *state.GlobalState) error {
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
 
-	// if we are here, it is possible that the analyze function read the stdin to analyse it
-	// and restored the content into gs.Stdin, so we pass it to the command
+	// If stdin was used by the analyze function, the content has been preserved
+	// in `gs.Stdin` and should be passed to the command
 	cmd.Stdin = gs.Stdin
 
 	// Copy environment variables to the k6 process and skip binary provisioning feature flag to disable it.
@@ -284,7 +284,7 @@ func analyze(gs *state.GlobalState, args []string) (k6deps.Dependencies, error) 
 
 	sourceRootPath := args[0]
 	gs.Logger.WithField("source", "sourceRootPath").
-		Debug("Launcher is resolving and reading the test")
+		Debug("Launcher is resolving and reading the test's script")
 	src, _, pwd, err := readSource(gs, sourceRootPath)
 	if err != nil {
 		return nil, fmt.Errorf("reading source for analysis %w", err)
