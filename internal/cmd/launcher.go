@@ -326,7 +326,7 @@ func analyze(gs *state.GlobalState, args []string) (k6deps.Dependencies, error) 
 		}
 		dopts.Script.Name = sourceRootPath
 		dopts.Script.Contents = src.Data
-		dopts.Fs = gs.FS
+		dopts.Fs = newIofsBridge(gs.FS)
 	}
 
 	return k6deps.Analyze(dopts)
