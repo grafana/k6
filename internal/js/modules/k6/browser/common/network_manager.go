@@ -816,13 +816,13 @@ func (m *NetworkManager) Authenticate(credentials Credentials) error {
 }
 
 func (m *NetworkManager) AbortRequest(requestID fetch.RequestID, errorReason string) {
+	m.logger.Debugf("NetworkManager:AbortRequest", "aborting request (id: %s, errorReason: %s)",
+		requestID, errorReason)
 	netErrorReason, ok := m.errorReasons[errorReason]
 	if !ok {
 		m.logger.Errorf("NetworkManager:AbortRequest", "unknown error code: %s", errorReason)
 		return
 	}
-	m.logger.Debugf("NetworkManager:AbortRequest", "aborting request (id: %s, errorReason: %s)",
-		requestID, errorReason)
 
 	action := fetch.FailRequest(requestID, netErrorReason)
 	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
