@@ -194,6 +194,23 @@ func TestFrameManagerRequestStartedWithRoutes(t *testing.T) {
 			routeHandlerCallsCount: 1,
 			apiHandlerCallsCount:   1,
 		},
+		{
+			name:      "fulfill_request",
+			routePath: "/data/first",
+			routeHandler: func(route *common.Route) {
+				err := route.Fulfill(&common.FulfillOptions{
+					Body:        `{"data": "Fulfilled data"}`,
+					ContentType: "application/json",
+					Headers: []common.HTTPHeader{
+						{Name: "Access-Control-Allow-Origin", Value: "*"},
+					},
+					Status: 200,
+				})
+				assert.NoError(t, err)
+			},
+			routeHandlerCallsCount: 1,
+			apiHandlerCallsCount:   1,
+		},
 	}
 
 	for _, tt := range tests {
