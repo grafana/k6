@@ -316,5 +316,8 @@ func getDefaultStack(gs *state.GlobalState, jsonRawConf json.RawMessage, token s
 	for slug, id := range stacks {
 		return int64(id), slug, nil
 	}
-	return 0, "", nil // This should never happen
+
+	// This should never happen
+	return 0, "", errors.New("no stacks found for the provided token " +
+		"please create a stack in Grafana Cloud and initialize GCk6 app")
 }
