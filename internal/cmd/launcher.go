@@ -29,14 +29,6 @@ type commandExecutor interface {
 	run(*state.GlobalState) error
 }
 
-// customBinary runs the requested commands on a different binary on a subprocess passing the
-// original arguments
-type customBinary struct {
-	// path represents the local file path
-	// on the file system of the binary
-	path string
-}
-
 // provisioner defines the interface for provisioning a commandExecutor for a set of dependencies
 type provisioner interface {
 	provision(k6deps.Dependencies) (commandExecutor, error)
@@ -46,15 +38,15 @@ type provisioner interface {
 // then if required, it provisions a binary executor to satisfy the requirements.
 type launcher struct {
 	gs              *state.GlobalState
-	provider        provisioner
+	provisioner     provisioner
 	commandExecutor commandExecutor
 }
 
 // newLauncher creates a new Launcher from a GlobalState using the default provision function
 func newLauncher(gs *state.GlobalState) *launcher {
 	return &launcher{
-		gs:       gs,
-		provider: newK6BuildProvider(gs),
+		gs:          gs,
+		provisioner: newK6BuildProvisioner(gs),
 	}
 }
 
@@ -93,7 +85,7 @@ func (l *launcher) launch(cmd *cobra.Command, args []string) error {
 			" The current k6 binary doesn't satisfy all dependencies, it's required to" +
 			" provision a custom binary.")
 
-	customBinary, err := l.provider.provision(deps)
+	customBinary, err := l.provisioner.provision(deps)
 	if err != nil {
 		l.gs.Logger.
 			WithError(err).
@@ -113,6 +105,14 @@ func (l *launcher) launch(cmd *cobra.Command, args []string) error {
 // runE executes the k6 command using a command executor
 func (l *launcher) runE(_ *cobra.Command, _ []string) error {
 	return l.commandExecutor.run(l.gs)
+}
+
+// customBinary runs the requested commands on a different binary on a subprocess passing the
+// original arguments
+type customBinary struct {
+	// path represents the local file path
+	// on the file system of the binary
+	path string
 }
 
 //nolint:forbidigo
@@ -207,16 +207,16 @@ func isCustomBuildRequired(baseK6Version string, deps k6deps.Dependencies) bool 
 	return !k6Dependency.Constraints.Check(k6Ver)
 }
 
-// k6buildProvider provides a k6 binary that satisfies the dependencies using the k6build service
-type k6buildProvider struct {
+// k6buildProvisioner provisions a k6 binary that satisfies the dependencies using the k6build service
+type k6buildProvisioner struct {
 	gs *state.GlobalState
 }
 
-func newK6BuildProvider(gs *state.GlobalState) provisioner {
-	return &k6buildProvider{gs: gs}
+func newK6BuildProvisioner(gs *state.GlobalState) provisioner {
+	return &k6buildProvisioner{gs: gs}
 }
 
-func (p *k6buildProvider) provision(deps k6deps.Dependencies) (commandExecutor, error) {
+func (p *k6buildProvisioner) provision(deps k6deps.Dependencies) (commandExecutor, error) {
 	token, err := extractToken(p.gs)
 	if err != nil {
 		p.gs.Logger.WithError(err).Debug("Failed to get a valid token")
