@@ -672,6 +672,8 @@ func (s *scope) finaliseVarAlloc(stackOffset int) (stashSize, stackSize int) {
 								*ap = loadThisStash(idx)
 							case initStack:
 								*ap = initStash(idx)
+							case initStackP:
+								*ap = initStashP(idx)
 							case resolveThisStack:
 								*ap = resolveThisStash(idx)
 							case _ret:
@@ -688,6 +690,8 @@ func (s *scope) finaliseVarAlloc(stackOffset int) (stashSize, stackSize int) {
 								*ap = loadStash(idx)
 							case initStack:
 								*ap = initStash(idx)
+							case initStackP:
+								*ap = initStashP(idx)
 							default:
 								s.c.assert(false, s.c.p.sourceOffset(pc), "Unsupported instruction for 'this'")
 							}
@@ -770,6 +774,8 @@ func (s *scope) finaliseVarAlloc(stackOffset int) (stashSize, stackSize int) {
 							case loadStack:
 								*ap = loadThisStack{}
 							case initStack:
+								// no-op
+							case initStackP:
 								// no-op
 							case resolveThisStack:
 								// no-op
