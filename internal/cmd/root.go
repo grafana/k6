@@ -51,7 +51,8 @@ func newRootCommand(gs *state.GlobalState) *rootCommand {
 	return newRootWithLauncher(gs, newLauncher(gs))
 }
 
-// newRootWithLauncher creates a root command with a launcher. Used to facilitate testing
+// newRootWithLauncher creates a root command with a launcher.
+// It facilitates unit testing scenarios.
 func newRootWithLauncher(gs *state.GlobalState, l *launcher) *rootCommand {
 	c := &rootCommand{
 		globalState:   gs,
