@@ -290,6 +290,7 @@ func TestConsoleLogWithGoValues(t *testing.T) { //nolint:tparallel // actually f
 	t.Parallel()
 
 	rt := sobek.New()
+	rt.SetFieldNameMapper(common.FieldNameMapper{})
 
 	tests := []struct {
 		in       any
