@@ -592,6 +592,14 @@ func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
 	var failErr error
 
 	defer func() {
+		requestID := event.NetworkID
+		if requestWillBeSentEvent, ok := m.reqIDToRequestWillBeSentEvent[requestID]; ok {
+			m.onRequest(requestWillBeSentEvent, event)
+			delete(m.reqIDToRequestWillBeSentEvent, requestID)
+		} else {
+			m.reqIDToRequestPausedEvent[requestID] = event
+		}
+
 		if failErr != nil {
 			action := fetch.FailRequest(event.RequestID, network.ErrorReasonBlockedByClient)
 			if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
@@ -615,15 +623,6 @@ func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
 		if m.frameManager.page == nil || !m.frameManager.page.hasRoutes() {
 			m.ContinueRequest(event.RequestID)
 		}
-
-		requestID := event.NetworkID
-		if requestWillBeSentEvent, ok := m.reqIDToRequestWillBeSentEvent[requestID]; ok {
-			m.onRequest(requestWillBeSentEvent, event)
-			delete(m.reqIDToRequestWillBeSentEvent, requestID)
-			return
-		}
-
-		m.reqIDToRequestPausedEvent[requestID] = event
 	}()
 
 	purl, err := url.Parse(event.Request.URL)
