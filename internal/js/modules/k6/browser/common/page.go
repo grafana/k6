@@ -1114,6 +1114,14 @@ func (p *Page) GetByRole(role string, opts *GetByRoleOptions) *Locator {
 	return p.MainFrame().GetByRole(role, opts)
 }
 
+// GetByAltText creates and returns a new locator for this page (main frame)
+// based on the alt attribute text.
+func (p *Page) GetByAltText(alt string, opts *GetByAltTextOptions) *Locator {
+	p.logger.Debugf("Page:GetByAltText", "sid:%s alt: %q opts:%+v", p.sessionID(), alt, opts)
+
+	return p.MainFrame().GetByAltText(alt, opts)
+}
+
 // GetKeyboard returns the keyboard for the page.
 func (p *Page) GetKeyboard() *Keyboard {
 	return p.Keyboard
@@ -1406,6 +1414,8 @@ func (p *Page) Reload(opts *PageReloadOptions) (*Response, error) { //nolint:fun
 		var ok bool
 		if navigationEvent, ok = event.(*NavigationEvent); !ok {
 			err = fmt.Errorf("unexpected event data type: %T, expected *NavigationEvent", event)
+		} else if navigationEvent != nil && navigationEvent.err != nil {
+			err = navigationEvent.err
 		}
 	}
 	if err != nil {

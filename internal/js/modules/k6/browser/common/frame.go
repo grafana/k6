@@ -79,10 +79,6 @@ func (s *DOMElementState) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-func isExactString(s string) bool {
-	return len(s) > 0 && s[0] == '\'' && s[len(s)-1] == '\''
-}
-
 // URLMatcher is a function that matches a URL against a pattern.
 // It relies on JavaScript's regex engine for regex matching.
 type URLMatcher func(string) (bool, error)
@@ -94,7 +90,7 @@ func urlMatcher(pattern string, jsRegexChecker JSRegexChecker) (URLMatcher, erro
 		return func(url string) (bool, error) { return true, nil }, nil
 	}
 
-	if isExactString(pattern) {
+	if isQuotedText(pattern) {
 		return func(url string) (bool, error) { return "'"+url+"'" == pattern, nil }, nil
 	}
 
@@ -1066,7 +1062,7 @@ func (f *Frame) GetByRole(role string, opts *GetByRoleOptions) *Locator {
 	}
 	if opts.Name != nil && *opts.Name != "" {
 		// Exact option can only be applied to quoted strings.
-		if (*opts.Name)[0] == '\'' && (*opts.Name)[len(*opts.Name)-1] == '\'' {
+		if isQuotedText(*opts.Name) {
 			if opts.Exact != nil && *opts.Exact {
 				*opts.Name = (*opts.Name) + "s"
 			} else {
@@ -1086,6 +1082,29 @@ func (f *Frame) GetByRole(role string, opts *GetByRoleOptions) *Locator {
 	}
 
 	return f.Locator(builder.String(), nil)
+}
+
+// isQuotedText returns true if the string is a quoted string.
+// This is used to determine if the string will be used to match
+// a string instead of as a regex in the getBy* APIs.
+func isQuotedText(s string) bool {
+	return len(s) > 1 && s[0] == '\'' && s[len(s)-1] == '\''
+}
+
+// Locator creates and returns a new locator for this frame.
+func (f *Frame) GetByAltText(alt string, opts *GetByAltTextOptions) *Locator {
+	f.log.Debugf("Frame:GetByAltText", "fid:%s furl:%q alt:%q opts:%+v", f.ID(), f.URL(), alt, opts)
+
+	a := "[alt=" + alt + "]"
+	if isQuotedText(alt) {
+		if opts != nil && opts.Exact != nil && *opts.Exact {
+			a = "[alt=" + alt + "s]"
+		} else {
+			a = "[alt=" + alt + "i]"
+		}
+	}
+
+	return f.Locator("internal:attr="+a, nil)
 }
 
 // Referrer returns the referrer of the frame from the network manager
@@ -1110,7 +1129,7 @@ func (f *Frame) Goto(url string, opts *FrameGotoOptions) (*Response, error) {
 	}
 	applySlowMo(f.ctx)
 
-	// Since response will be in an interface, it will never be nil,
+	// Since the response will be in an interface, it will never be nil,
 	// so we need to return nil explicitly.
 	if resp == nil {
 		return nil, nil //nolint:nilnil
@@ -1947,22 +1966,7 @@ func (f *Frame) WaitForNavigation(
 			return false
 		})
 
-	handleTimeoutError := func(err error) error {
-		f.log.Debugf("Frame:WaitForNavigation",
-			"fid:%v furl:%s timeoutCtx done: %v", f.ID(), f.URL(), err)
-		if err != nil {
-			e := &k6ext.UserFriendlyError{
-				Err:     err,
-				Timeout: opts.Timeout,
-			}
-			if opts.URL != "" {
-				return fmt.Errorf("waiting for navigation to URL matching %q: %w", opts.URL, e)
-			}
-			return fmt.Errorf("waiting for navigation: %w", e)
-		}
-
-		return nil
-	}
+	handleTimeoutError := f.handleWaitForNavigationTimeoutErrorFn(opts)
 
 	defer func() {
 		timeoutCancel()
@@ -1980,6 +1984,10 @@ func (f *Frame) WaitForNavigation(
 			return nil, matcherErr
 		}
 		if e, ok := evt.(*NavigationEvent); ok {
+			if e.err != nil {
+				return nil, e.err
+			}
+
 			if e.newDocument == nil {
 				sameDocNav = true
 				break
@@ -2007,13 +2015,32 @@ func (f *Frame) WaitForNavigation(
 		}
 	}
 
-	// Since response will be in an interface, it will never be nil,
+	// Since the response will be in an interface, it will never be nil,
 	// so we need to return nil explicitly.
 	if resp == nil {
 		return nil, nil //nolint:nilnil
 	}
 
 	return resp, nil
+}
+
+func (f *Frame) handleWaitForNavigationTimeoutErrorFn(opts *FrameWaitForNavigationOptions) func(err error) error {
+	return func(err error) error {
+		f.log.Debugf("Frame:WaitForNavigation",
+			"fid:%v furl:%s timeoutCtx done: %v", f.ID(), f.URL(), err)
+		if err != nil {
+			e := &k6ext.UserFriendlyError{
+				Err:     err,
+				Timeout: opts.Timeout,
+			}
+			if opts.URL != "" {
+				return fmt.Errorf("waiting for navigation to URL matching %q: %w", opts.URL, e)
+			}
+			return fmt.Errorf("waiting for navigation: %w", e)
+		}
+
+		return nil
+	}
 }
 
 // WaitForSelector waits for the given selector to match the waiting criteria.

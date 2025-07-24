@@ -5,6 +5,7 @@
 /internal/js/tc39/TestTC39
 /internal/js/modules/k6/experimental/streams/tests/wpt
 /internal/js/modules/k6/webcrypto/tests/wpt/
+/.protoc
 
 .vscode
 *.sublime-workspace

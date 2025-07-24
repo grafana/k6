@@ -1,5 +1,29 @@
 MAKEFLAGS += --silent
 GOLANGCI_LINT_VERSION = $(shell head -n 1 .golangci.yml | tr -d '\# ')
+PROTOC_VERSION := 21.12
+PROTOC_ARCHIVE := protoc-$(PROTOC_VERSION)-linux-x86_64.zip
+PROTOC_DOWNLOAD_URL := https://github.com/protocolbuffers/protobuf/releases/download/v$(PROTOC_VERSION)/$(PROTOC_ARCHIVE)
+
+proto-dependencies:
+	go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.31.0
+	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.3.0
+	@if [ "$$(uname)" != "Linux" ]; then \
+		echo "Error: Can't install protoc on your OS, please install protoc-$(PROTOC_VERSION) manually." >&2; \
+		exit 1; \
+	fi
+	@echo "Downloading $(PROTOC_ARCHIVE)"
+	curl --show-error --fail --no-location -LO $(PROTOC_DOWNLOAD_URL)
+	unzip -o $(PROTOC_ARCHIVE) -d ./.protoc
+	rm $(PROTOC_ARCHIVE)
+
+generate-tools-installs: proto-dependencies
+	go install github.com/mstoykov/enumer@v0.0.1 # TODO figure out if we shouldn't move to a different fork
+	go install mvdan.cc/gofumpt@v0.8.0 # TODO maybe just use go fmt for this case
+	go install github.com/mailru/easyjson/easyjson@v0.7.7 # TODO remove this in the future
+
+generate: generate-tools-installs
+	PATH="$(PWD)/.protoc/bin:$(PATH)" go generate ./...
+
 
 all: clean format tests build
 
