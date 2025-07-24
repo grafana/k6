@@ -758,7 +758,7 @@ func (r *Route) Continue() {
 
 func (r *Route) startHandling() error {
 	if r.handled {
-		return fmt.Errorf("route is already handled")
+		return fmt.Errorf("route %s is already handled", r.request.URL())
 	}
 	r.handled = true
 	return nil
