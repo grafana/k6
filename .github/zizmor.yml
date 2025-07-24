@@ -1,0 +1,10 @@
+# This is also used as the default configuration for the Zizmor reusable
+# workflow.
+
+rules:
+  unpinned-uses:
+    config:
+      policies:
+        actions/*: any # trust GitHub
+        grafana/*: any # trust Grafana
+
