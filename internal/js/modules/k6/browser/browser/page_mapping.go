@@ -171,9 +171,21 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			return rt.ToValue(ml).ToObject(rt), nil
 		},
 		"getByAltText": func(alt sobek.Value, opts sobek.Value) (*sobek.Object, error) {
-			palt, popts := parseGetByAltTextOptions(vu.Context(), alt, opts)
+			palt, popts := parseGetByBaseOptions(vu.Context(), alt, false, opts)
 
 			ml := mapLocator(vu, p.GetByAltText(palt, popts))
+			return rt.ToValue(ml).ToObject(rt), nil
+		},
+		"getByLabel": func(label sobek.Value, opts sobek.Value) (*sobek.Object, error) {
+			plabel, popts := parseGetByBaseOptions(vu.Context(), label, true, opts)
+
+			ml := mapLocator(vu, p.GetByLabel(plabel, popts))
+			return rt.ToValue(ml).ToObject(rt), nil
+		},
+		"getByPlaceholder": func(placeholder sobek.Value, opts sobek.Value) (*sobek.Object, error) {
+			pplaceholder, popts := parseGetByBaseOptions(vu.Context(), placeholder, false, opts)
+
+			ml := mapLocator(vu, p.GetByPlaceholder(pplaceholder, popts))
 			return rt.ToValue(ml).ToObject(rt), nil
 		},
 		"goto": func(url string, opts sobek.Value) (*sobek.Promise, error) {
@@ -752,11 +764,23 @@ func parseWaitForFunctionArgs(
 
 // parseStringOrRegex parses a sobek.Value to return either a quoted string if it was a string,
 // or a raw string if it was a JS RegExp object or another type.
-func parseStringOrRegex(v sobek.Value) string {
+//
+// Some getBy* APIs work with single quotes and some work with double quotes.
+// This inconsistency seems to stem from the injected code copied from
+// Playwright itself.
+//
+// I would prefer not to change the copied injected script code from Playwright
+// so that it is easier to copy over updates/fixes from Playwright when we need
+// to.
+func parseStringOrRegex(v sobek.Value, doubleQuote bool) string {
 	var a string
 	switch v.ExportType() {
-	case reflect.TypeOf(string("")):
-		a = fmt.Sprintf("'%s'", v.String()) // Strings require quotes
+	case reflect.TypeOf(string("")): // text values require quotes
+		if doubleQuote {
+			a = fmt.Sprintf(`"%s"`, v.String())
+		} else {
+			a = fmt.Sprintf("'%s'", v.String())
+		}
 	case reflect.TypeOf(map[string]interface{}(nil)): // JS RegExp
 		a = v.String() // No quotes
 	default: // CSS, numbers or booleans
@@ -797,7 +821,7 @@ func parseGetByRoleOptions(ctx context.Context, opts sobek.Value) *common.GetByR
 			val := obj.Get(k).ToInteger()
 			o.Level = &val
 		case "name":
-			val := parseStringOrRegex(obj.Get(k))
+			val := parseStringOrRegex(obj.Get(k), false)
 			o.Name = &val
 		case "pressed":
 			val := obj.Get(k).ToBoolean()
@@ -811,20 +835,21 @@ func parseGetByRoleOptions(ctx context.Context, opts sobek.Value) *common.GetByR
 	return o
 }
 
-// parseGetByAltTextOptions parses the GetByAltText alt input value and the
-// options from the Sobek.Value.
-func parseGetByAltTextOptions(
+// parseGetByBaseOptions parses the options for the GetBy* APIs and the input
+// text/regex.
+func parseGetByBaseOptions(
 	ctx context.Context,
-	alt sobek.Value,
+	input sobek.Value,
+	doubleQuote bool,
 	opts sobek.Value,
-) (string, *common.GetByAltTextOptions) {
-	a := parseStringOrRegex(alt)
+) (string, *common.GetByBaseOptions) {
+	a := parseStringOrRegex(input, doubleQuote)
 
 	if !sobekValueExists(opts) {
 		return a, nil
 	}
 
-	o := &common.GetByAltTextOptions{}
+	o := &common.GetByBaseOptions{}
 
 	rt := k6ext.Runtime(ctx)
 
@@ -851,7 +876,7 @@ func mapPageRoute(vu moduleVU, p *common.Page) func(path sobek.Value, handler so
 			if err != nil {
 				return nil, err
 			}
-			pathStr := parseStringOrRegex(path)
+			pathStr := parseStringOrRegex(path, false)
 
 			// Run the event handler in the task queue to
 			// ensure that the handler is executed on the event loop.
