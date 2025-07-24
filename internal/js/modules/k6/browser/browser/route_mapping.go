@@ -25,7 +25,9 @@ func mapRoute(vu moduleVU, route *common.Route) mapping {
 				return nil, route.Fulfill(fopts)
 			})
 		},
-		"request": route.Request,
+		"request": func() mapping {
+			return mapRequest(vu, route.Request())
+		},
 	}
 }
 
