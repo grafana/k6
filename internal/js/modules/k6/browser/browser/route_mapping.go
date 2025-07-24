@@ -56,7 +56,6 @@ func parseFulfillOptions(ctx context.Context, opts sobek.Value) *common.FulfillO
 			}
 		case "status":
 			copts.Status = obj.Get(k).ToInteger()
-
 		}
 	}
 
