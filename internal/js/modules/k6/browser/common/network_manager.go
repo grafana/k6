@@ -409,7 +409,6 @@ func (m *NetworkManager) handleEvents(in <-chan Event) bool {
 
 func (m *NetworkManager) onLoadingFailed(event *network.EventLoadingFailed) {
 	req, ok := m.requestFromID(event.RequestID)
-
 	if !ok {
 		// TODO: add handling of iframe document requests starting in one session and ending up in another
 		return
