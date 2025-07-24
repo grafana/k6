@@ -945,7 +945,7 @@ func (m *NetworkManager) FulfillRequest(request *Request, opts *FulfillOptions) 
 			return nil
 		}
 
-		return fmt.Errorf("fail to fulfill request (id: %s): %s",
+		return fmt.Errorf("fail to fulfill request (id: %s): %w",
 			request.interceptionID, err)
 	}
 
