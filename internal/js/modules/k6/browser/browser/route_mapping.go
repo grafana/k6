@@ -2,7 +2,6 @@ package browser
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/grafana/sobek"
 
@@ -21,7 +20,6 @@ func mapRoute(vu moduleVU, route *common.Route) mapping {
 		"fulfill": func(opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				fopts := parseFulfillOptions(vu.Context(), opts)
-				fmt.Printf("Route:Fulfill: %+v\n", fopts)
 				return nil, route.Fulfill(fopts)
 			})
 		},
