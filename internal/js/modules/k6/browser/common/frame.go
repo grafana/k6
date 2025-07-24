@@ -1086,25 +1086,61 @@ func (f *Frame) GetByRole(role string, opts *GetByRoleOptions) *Locator {
 
 // isQuotedText returns true if the string is a quoted string.
 // This is used to determine if the string will be used to match
-// a string instead of as a regex in the getBy* APIs.
+// a string instead of as a regex in the getBy* APIs. It handles
+// both single and double quotes.
 func isQuotedText(s string) bool {
-	return len(s) > 1 && s[0] == '\'' && s[len(s)-1] == '\''
+	switch {
+	case len(s) > 0 && s[0] == '\'' && s[len(s)-1] == '\'':
+		return true
+	case len(s) > 0 && s[0] == '"' && s[len(s)-1] == '"':
+		return true
+	}
+	return false
+}
+
+// buildAttributeSelector is a helper method that builds an attribute selector
+// for use with the internal:attr engine. It handles quoted strings and
+// applies the appropriate suffix for exact or case-insensitive matching.
+func (f *Frame) buildAttributeSelector(attrName, attrValue string, opts *GetByBaseOptions) string {
+	selector := "[" + attrName + "=" + attrValue + "]"
+	if isQuotedText(attrValue) {
+		if opts != nil && opts.Exact != nil && *opts.Exact {
+			selector = "[" + attrName + "=" + attrValue + "s]"
+		} else {
+			selector = "[" + attrName + "=" + attrValue + "i]"
+		}
+	}
+	return selector
 }
 
 // Locator creates and returns a new locator for this frame.
-func (f *Frame) GetByAltText(alt string, opts *GetByAltTextOptions) *Locator {
+func (f *Frame) GetByAltText(alt string, opts *GetByBaseOptions) *Locator {
 	f.log.Debugf("Frame:GetByAltText", "fid:%s furl:%q alt:%q opts:%+v", f.ID(), f.URL(), alt, opts)
 
-	a := "[alt=" + alt + "]"
-	if isQuotedText(alt) {
+	return f.Locator("internal:attr="+f.buildAttributeSelector("alt", alt, opts), nil)
+}
+
+// Locator creates and returns a new locator for this frame.
+func (f *Frame) GetByLabel(label string, opts *GetByBaseOptions) *Locator {
+	f.log.Debugf("Frame:GetByLabel", "fid:%s furl:%q label:%q opts:%+v", f.ID(), f.URL(), label, opts)
+
+	l := "internal:label=" + label
+	if isQuotedText(label) {
 		if opts != nil && opts.Exact != nil && *opts.Exact {
-			a = "[alt=" + alt + "s]"
+			l = "internal:label=" + label + "s"
 		} else {
-			a = "[alt=" + alt + "i]"
+			l = "internal:label=" + label + "i"
 		}
 	}
 
-	return f.Locator("internal:attr="+a, nil)
+	return f.Locator(l, nil)
+}
+
+// GetByPlaceholder creates and returns a new locator for this frame based on the placeholder attribute.
+func (f *Frame) GetByPlaceholder(placeholder string, opts *GetByBaseOptions) *Locator {
+	f.log.Debugf("Frame:GetByPlaceholder", "fid:%s furl:%q placeholder:%q opts:%+v", f.ID(), f.URL(), placeholder, opts)
+
+	return f.Locator("internal:attr="+f.buildAttributeSelector("placeholder", placeholder, opts), nil)
 }
 
 // Referrer returns the referrer of the frame from the network manager
