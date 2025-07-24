@@ -750,6 +750,8 @@ func parseWaitForFunctionArgs(
 	return js, popts, exportArgs(gargs), nil
 }
 
+// parseStringOrRegex parses a sobek.Value to return either a quoted string if it was a string,
+// or a raw string if it was a JS RegExp object or another type.
 func parseStringOrRegex(v sobek.Value) string {
 	var a string
 	switch v.ExportType() {
