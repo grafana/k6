@@ -1094,6 +1094,28 @@ func (p *Page) GetByRole(role string, opts *GetByRoleOptions) *Locator {
 	return p.MainFrame().GetByRole(role, opts)
 }
 
+// GetByAltText creates and returns a new locator for this page (main frame)
+// based on the alt attribute text.
+func (p *Page) GetByAltText(alt string, opts *GetByBaseOptions) *Locator {
+	p.logger.Debugf("Page:GetByAltText", "sid:%s alt: %q opts:%+v", p.sessionID(), alt, opts)
+
+	return p.MainFrame().GetByAltText(alt, opts)
+}
+
+// GetByLabel creates and returns a new locator for this page (main frame) based on the label text.
+func (p *Page) GetByLabel(label string, opts *GetByBaseOptions) *Locator {
+	p.logger.Debugf("Page:GetByLabel", "sid:%s label: %q opts:%+v", p.sessionID(), label, opts)
+
+	return p.MainFrame().GetByLabel(label, opts)
+}
+
+// GetByPlaceholder creates and returns a new locator for this page (main frame) based on the placeholder attribute.
+func (p *Page) GetByPlaceholder(placeholder string, opts *GetByBaseOptions) *Locator {
+	p.logger.Debugf("Page:GetByPlaceholder", "sid:%s placeholder: %q opts:%+v", p.sessionID(), placeholder, opts)
+
+	return p.MainFrame().GetByPlaceholder(placeholder, opts)
+}
+
 // GetKeyboard returns the keyboard for the page.
 func (p *Page) GetKeyboard() *Keyboard {
 	return p.Keyboard

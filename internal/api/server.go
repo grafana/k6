@@ -10,6 +10,7 @@ import (
 	_ "net/http/pprof" //nolint:gosec // Register pprof handlers
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 
 	v1 "go.k6.io/k6/api/v1"
@@ -44,6 +45,7 @@ func injectProfilerHandler(mux *http.ServeMux, profilingEnabled bool) {
 
 	mux.Handle("/debug/pprof/", handler)
 	mux.Handle("/debug/vars/", expvar.Handler())
+	mux.Handle("/metrics", promhttp.Handler())
 }
 
 // GetServer returns a http.Server instance that can serve k6's REST API.
