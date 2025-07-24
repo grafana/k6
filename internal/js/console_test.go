@@ -286,10 +286,11 @@ func TestConsoleLog(t *testing.T) {
 	}
 }
 
-func TestConsoleLogWithGoValues(t *testing.T) {
+func TestConsoleLogWithGoValues(t *testing.T) { //nolint:tparallel // actually faster with parallel and also we need the rt to create some of the testdata
 	t.Parallel()
 
 	rt := sobek.New()
+	rt.SetFieldNameMapper(common.FieldNameMapper{})
 
 	tests := []struct {
 		in       any
@@ -318,12 +319,8 @@ func TestConsoleLogWithGoValues(t *testing.T) {
 		{in: rt.NewTypeError("type error"), expected: `TypeError: type error`},
 	}
 
-	for _, tt := range tests {
+	for _, tt := range tests { //nolint:paralleltest
 		t.Run(fmt.Sprintf("%v", tt.in), func(t *testing.T) {
-			t.Parallel()
-
-			rt.SetFieldNameMapper(common.FieldNameMapper{})
-
 			logger, hook := testutils.NewLoggerWithHook(t)
 			c := newConsole(logger)
 
