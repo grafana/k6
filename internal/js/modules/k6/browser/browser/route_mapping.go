@@ -35,29 +35,29 @@ func parseFulfillOptions(ctx context.Context, opts sobek.Value) *common.FulfillO
 	}
 
 	rt := k6ext.Runtime(ctx)
-	copts := &common.FulfillOptions{}
+	fopts := &common.FulfillOptions{}
 
 	obj := opts.ToObject(rt)
 	for _, k := range obj.Keys() {
 		switch k {
 		case "body":
-			copts.Body = obj.Get(k).String()
+			fopts.Body = obj.Get(k).String()
 		case "contentType":
-			copts.ContentType = obj.Get(k).String()
+			fopts.ContentType = obj.Get(k).String()
 		case "headers":
 			headers := obj.Get(k).ToObject(rt)
 			headersKeys := headers.Keys()
-			copts.Headers = make([]common.HTTPHeader, len(headersKeys))
+			fopts.Headers = make([]common.HTTPHeader, len(headersKeys))
 			for i, hk := range headersKeys {
-				copts.Headers[i] = common.HTTPHeader{
+				fopts.Headers[i] = common.HTTPHeader{
 					Name:  hk,
 					Value: headers.Get(hk).String(),
 				}
 			}
 		case "status":
-			copts.Status = obj.Get(k).ToInteger()
+			fopts.Status = obj.Get(k).ToInteger()
 		}
 	}
 
-	return copts
+	return fopts
 }
