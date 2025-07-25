@@ -254,6 +254,10 @@ func (c *Client) Connect(addr string, params sobek.Value) (bool, error) {
 		opts = append(opts, grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(int(p.MaxSendSize))))
 	}
 
+	if p.Authority != "" {
+		opts = append(opts, grpc.WithAuthority(p.Authority))
+	}
+
 	c.addr = addr
 	c.conn, err = grpcext.Dial(ctx, addr, opts...)
 	if err != nil {
