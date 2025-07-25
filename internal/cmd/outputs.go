@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -100,6 +101,22 @@ func getPossibleIDList(constrs map[string]output.Constructor) string {
 	return strings.Join(res, ", ")
 }
 
+func deriveOutputs(cfg Config) []string {
+	outputs := cfg.Out
+	if cfg.WebDashboard.Bool {
+		outputs = append(outputs, dashboard.OutputName)
+	}
+	// avoid duplicate outputs (including non-consecutive ones).
+	derived := make([]string, 0, len(outputs))
+	for _, out := range outputs {
+		if slices.Contains(derived, out) {
+			continue
+		}
+		derived = append(derived, out)
+	}
+	return derived
+}
+
 func createOutputs(
 	gs *state.GlobalState, test *loadedAndConfiguredTest, executionPlan []lib.ExecutionStep,
 ) ([]output.Output, error) {
@@ -120,13 +137,9 @@ func createOutputs(
 		Usage:          test.preInitState.Usage,
 	}
 
-	outputs := test.derivedConfig.Out
-	if test.derivedConfig.WebDashboard.Bool {
-		outputs = append(outputs, dashboard.OutputName)
-	}
+	outputs := deriveOutputs(test.derivedConfig)
 
 	result := make([]output.Output, 0, len(outputs))
-
 	for _, outputFullArg := range outputs {
 		outputType, outputArg, _ := strings.Cut(outputFullArg, "=")
 		outputConstructor, ok := outputConstructors[outputType]
