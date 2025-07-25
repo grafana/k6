@@ -623,7 +623,7 @@ func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
 
 		// If no route was added, continue all requests
 		if m.frameManager.page == nil || !m.frameManager.page.hasRoutes() {
-			err := m.ContinueRequest(event.RequestID)
+			err := m.ContinueRequest(event.RequestID, nil, nil)
 			if err != nil {
 				m.logger.Errorf("NetworkManager:onRequestPaused",
 					"continuing request %s %s: %s", event.Request.Method, event.Request.URL, err)
@@ -843,10 +843,33 @@ func (m *NetworkManager) AbortRequest(requestID fetch.RequestID, errorReason str
 	return nil
 }
 
-func (m *NetworkManager) ContinueRequest(requestID fetch.RequestID) error {
+func (m *NetworkManager) ContinueRequest(
+	requestID fetch.RequestID,
+	opts *ContinueOptions,
+	originalHeaders []HTTPHeader,
+) error {
 	m.logger.Debugf("NetworkManager:ContinueRequest", "continuing request (id: %s)", requestID)
-
 	action := fetch.ContinueRequest(requestID)
+
+	if opts != nil {
+		m.logger.Infof("NetworkManager:ContinueRequest", "continuing request (id: %s) with options: %+v; and headers %+v",
+			requestID, opts, originalHeaders)
+		allHeaders := mergeHeaders(originalHeaders, opts.Headers)
+		if len(allHeaders) > 0 {
+			action = action.WithHeaders(allHeaders)
+		}
+		if opts.URL != "" {
+			action = action.WithURL(opts.URL)
+		}
+		if opts.Method != "" {
+			action = action.WithMethod(opts.Method)
+		}
+		if opts.PostData != "" {
+			b64PostData := base64.StdEncoding.EncodeToString([]byte(opts.PostData))
+			action = action.WithPostData(b64PostData)
+		}
+	}
+
 	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
 		// Avoid logging as error when context is canceled.
 		// Most probably this happens when trying to fail a site's background request
@@ -880,21 +903,23 @@ func (m *NetworkManager) FulfillRequest(request *Request, opts *FulfillOptions) 
 
 	action := fetch.FulfillRequest(request.interceptionID, responseCode)
 
-	if opts.ContentType != "" {
-		opts.Headers = append(opts.Headers, HTTPHeader{
-			Name:  "Content-Type",
-			Value: opts.ContentType,
-		})
-	}
+	if opts != nil {
+		if opts.ContentType != "" {
+			opts.Headers = append(opts.Headers, HTTPHeader{
+				Name:  "Content-Type",
+				Value: opts.ContentType,
+			})
+		}
 
-	headers := toFetchHeaders(opts.Headers)
-	if len(headers) > 0 {
-		action = action.WithResponseHeaders(headers)
-	}
+		headers := toFetchHeaders(opts.Headers)
+		if len(headers) > 0 {
+			action = action.WithResponseHeaders(headers)
+		}
 
-	if opts.Body != "" {
-		b64Body := base64.StdEncoding.EncodeToString([]byte(opts.Body))
-		action = action.WithBody(b64Body)
+		if opts.Body != "" {
+			b64Body := base64.StdEncoding.EncodeToString([]byte(opts.Body))
+			action = action.WithBody(b64Body)
+		}
 	}
 
 	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
@@ -926,6 +951,36 @@ func toFetchHeaders(headers []HTTPHeader) []*fetch.HeaderEntry {
 		}
 	}
 	return fetchHeaders
+}
+
+func mergeHeaders(originalHeaders []HTTPHeader, extraHeaders []HTTPHeader) []*fetch.HeaderEntry {
+	if len(originalHeaders) == 0 {
+		return toFetchHeaders(extraHeaders)
+	}
+	if len(extraHeaders) == 0 {
+		return toFetchHeaders(originalHeaders)
+	}
+
+	headers := make([]*fetch.HeaderEntry, 0, len(originalHeaders)+len(extraHeaders))
+	existingHeaders := make(map[string]bool, len(extraHeaders))
+	for _, header := range extraHeaders {
+		headers = append(headers, &fetch.HeaderEntry{
+			Name:  header.Name,
+			Value: header.Value,
+		})
+		existingHeaders[header.Name] = true
+	}
+
+	for _, header := range originalHeaders {
+		if !existingHeaders[header.Name] {
+			headers = append(headers, &fetch.HeaderEntry{
+				Name:  header.Name,
+				Value: header.Value,
+			})
+		}
+	}
+
+	return headers
 }
 
 // SetExtraHTTPHeaders sets extra HTTP request headers to be sent with every request.
