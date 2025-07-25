@@ -200,6 +200,12 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			ml := mapLocator(vu, p.GetByTestID(ptestID))
 			return rt.ToValue(ml).ToObject(rt), nil
 		},
+		"getByText": func(text sobek.Value, opts sobek.Value) (*sobek.Object, error) {
+			ptext, popts := parseGetByBaseOptions(vu.Context(), text, true, opts)
+
+			ml := mapLocator(vu, p.GetByText(ptext, popts))
+			return rt.ToValue(ml).ToObject(rt), nil
+		},
 		"goto": func(url string, opts sobek.Value) (*sobek.Promise, error) {
 			gopts := common.NewFrameGotoOptions(
 				p.Referrer(),
