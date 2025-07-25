@@ -283,12 +283,6 @@ func analyze(gs *state.GlobalState, args []string) (k6deps.Dependencies, error) 
 		Manifest:  k6deps.Source{Ignore: true},
 	}
 
-	if len(args) == 0 {
-		gs.Logger.
-			Debug("The command did not receive an input script.")
-		return nil, errScriptNotFound
-	}
-
 	scriptname := args[0]
 	if scriptname == "-" {
 		gs.Logger.
