@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -132,47 +133,79 @@ func TestFrameManagerRequestStartedWithRoutes(t *testing.T) {
 		return matched, nil
 	}
 
+	type callsCount struct {
+		routeHandler int
+		firstApi     int
+		secondApi    int
+	}
 	tests := []struct {
-		name                   string
-		routePath              string
-		routeHandler           func(*common.Route)
-		routeHandlerCallsCount int
-		apiHandlerCallsCount   int
+		name         string
+		routePath    string
+		routeHandler func(*common.Route)
+		callsCount   callsCount
 	}{
 		{
-			name:                   "request_without_routes",
-			routeHandlerCallsCount: 0,
-			apiHandlerCallsCount:   2,
+			name: "request_without_routes",
+			callsCount: callsCount{
+				routeHandler: 0,
+				firstApi:     1,
+				secondApi:    1,
+			},
 		},
 		{
 			name:      "continue_request_with_matching_string_route",
 			routePath: "/data/first",
 			routeHandler: func(route *common.Route) {
-				err := route.Continue()
+				err := route.Continue(nil)
 				assert.NoError(t, err)
 			},
-			routeHandlerCallsCount: 1,
-			apiHandlerCallsCount:   2,
+			callsCount: callsCount{
+				routeHandler: 1,
+				firstApi:     1,
+				secondApi:    1,
+			},
 		},
 		{
 			name:      "continue_request_with_non_matching_string_route",
 			routePath: "/data/third",
 			routeHandler: func(route *common.Route) {
-				err := route.Continue()
+				err := route.Continue(nil)
 				assert.NoError(t, err)
 			},
-			routeHandlerCallsCount: 0,
-			apiHandlerCallsCount:   2,
+			callsCount: callsCount{
+				routeHandler: 0,
+				firstApi:     1,
+				secondApi:    1,
+			},
 		},
 		{
 			name:      "continue_request_with_multiple_matching_regex_route",
 			routePath: "/data/.*",
 			routeHandler: func(route *common.Route) {
-				err := route.Continue()
+				err := route.Continue(nil)
 				assert.NoError(t, err)
 			},
-			routeHandlerCallsCount: 2,
-			apiHandlerCallsCount:   2,
+			callsCount: callsCount{
+				routeHandler: 2,
+				firstApi:     1,
+				secondApi:    1,
+			},
+		},
+		{
+			name:      "continue_request_with_opts",
+			routePath: "/data/first",
+			routeHandler: func(route *common.Route) {
+				newURL := strings.Replace(route.Request().URL(), "/data/first", "/data/second", 1)
+				err := route.Continue(&common.ContinueOptions{
+					URL: newURL,
+				})
+				assert.NoError(t, err)
+			},
+			callsCount: callsCount{
+				routeHandler: 1,
+				firstApi:     0,
+				secondApi:    2,
+			},
 		},
 		{
 			name:      "abort_first_request",
@@ -181,8 +214,11 @@ func TestFrameManagerRequestStartedWithRoutes(t *testing.T) {
 				err := route.Abort("failed")
 				assert.NoError(t, err)
 			},
-			routeHandlerCallsCount: 1,
-			apiHandlerCallsCount:   0, // Second API call is not made because the first throws an error
+			callsCount: callsCount{
+				routeHandler: 1,
+				firstApi:     0,
+				secondApi:    0, // Second API call is not made because the first throws an error
+			},
 		},
 		{
 			name:      "abort_second_request",
@@ -191,8 +227,11 @@ func TestFrameManagerRequestStartedWithRoutes(t *testing.T) {
 				err := route.Abort("failed")
 				assert.NoError(t, err)
 			},
-			routeHandlerCallsCount: 1,
-			apiHandlerCallsCount:   1,
+			callsCount: callsCount{
+				routeHandler: 1,
+				firstApi:     1,
+				secondApi:    0,
+			},
 		},
 		{
 			name:      "fulfill_request",
@@ -208,8 +247,11 @@ func TestFrameManagerRequestStartedWithRoutes(t *testing.T) {
 				})
 				assert.NoError(t, err)
 			},
-			routeHandlerCallsCount: 1,
-			apiHandlerCallsCount:   1,
+			callsCount: callsCount{
+				routeHandler: 1,
+				firstApi:     0,
+				secondApi:    1,
+			},
 		},
 	}
 
@@ -220,9 +262,12 @@ func TestFrameManagerRequestStartedWithRoutes(t *testing.T) {
 			tb := newTestBrowser(t, withHTTPServer())
 			p := tb.NewPage(nil)
 
-			// Track behavior
-			routeHandlerCalls := 0
-			apiHandlerCalls := 0
+			// Track number of calls in each function
+			calls := callsCount{
+				routeHandler: 0,
+				firstApi:     0,
+				secondApi:    0,
+			}
 
 			// Set up handlers for test resources
 			tb.withHandler("/test", func(w http.ResponseWriter, r *http.Request) {
@@ -251,20 +296,20 @@ func TestFrameManagerRequestStartedWithRoutes(t *testing.T) {
 				w.Header().Set("Content-Type", "application/json")
 				_, err := fmt.Fprint(w, `{"data": "First data"}`)
 				require.NoError(t, err)
-				apiHandlerCalls++
+				calls.firstApi++
 			})
 
 			tb.withHandler("/data/second", func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 				_, err := fmt.Fprint(w, `{"data": "Second data"}`)
 				require.NoError(t, err)
-				apiHandlerCalls++
+				calls.secondApi++
 			})
 
 			// Set up route if needed
 			if tt.routeHandler != nil {
 				routeHandler := func(route *common.Route) error {
-					routeHandlerCalls++
+					calls.routeHandler++
 					tt.routeHandler(route)
 					return nil
 				}
@@ -282,8 +327,9 @@ func TestFrameManagerRequestStartedWithRoutes(t *testing.T) {
 			_, err := p.Goto(tb.url("/test"), opts)
 			require.NoError(t, err)
 
-			assert.Equal(t, tt.routeHandlerCallsCount, routeHandlerCalls)
-			assert.Equal(t, tt.apiHandlerCallsCount, apiHandlerCalls)
+			assert.Equal(t, tt.callsCount.routeHandler, calls.routeHandler)
+			assert.Equal(t, tt.callsCount.firstApi, calls.firstApi)
+			assert.Equal(t, tt.callsCount.secondApi, calls.secondApi)
 		})
 	}
 }
