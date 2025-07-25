@@ -562,7 +562,6 @@ func (m *FrameManager) requestStarted(req *Request) {
 		if err != nil {
 			m.logger.Errorf("FrameManager:requestStarted",
 				"fmid:%d rurl:%s error handling request with route: %v", m.ID(), req.URL(), err)
-			return
 		}
 		return
 	}
