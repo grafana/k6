@@ -11,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/chromedp/cdproto/fetch"
+
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/network"
 
@@ -81,7 +83,7 @@ type Request struct {
 	resourceType        string
 	isNavigationRequest bool
 	allowInterception   bool
-	interceptionID      string
+	interceptionID      fetch.RequestID
 	fromMemoryCache     bool
 	errorText           string
 	// offset is the difference between the timestamp and wallTime fields.
@@ -107,7 +109,7 @@ type NewRequestParams struct {
 	event             *network.EventRequestWillBeSent
 	frame             *Frame
 	redirectChain     []*Request
-	interceptionID    string
+	interceptionID    fetch.RequestID
 	allowInterception bool
 }
 
@@ -705,4 +707,59 @@ func (r *Response) Text() (string, error) {
 // URL returns the request URL.
 func (r *Response) URL() string {
 	return r.url
+}
+
+// Route allows to handle a request.
+type Route struct {
+	logger         *log.Logger
+	networkManager *NetworkManager
+
+	request *Request
+	handled bool
+}
+
+// NewRoute creates a new Route that allows to modify a request's behavior.
+func NewRoute(logger *log.Logger, networkManager *NetworkManager, request *Request) *Route {
+	return &Route{
+		logger:         logger,
+		networkManager: networkManager,
+		request:        request,
+		handled:        false,
+	}
+}
+
+func (r *Route) Request() *Request { return r.request }
+
+// Abort aborts the request with the given error code.
+func (r *Route) Abort(errorCode string) {
+	err := r.startHandling()
+	if err != nil {
+		r.logger.Errorf("Route:Abort", "rurl:%s err:%s", r.request.URL(), err)
+		return
+	}
+
+	if errorCode == "" {
+		errorCode = "failed"
+	}
+
+	r.networkManager.AbortRequest(r.request.interceptionID, errorCode)
+}
+
+// Continue continues the request.
+func (r *Route) Continue() {
+	err := r.startHandling()
+	if err != nil {
+		r.logger.Errorf("Route:Continue", "rurl:%s err:%s", r.request.URL(), err)
+		return
+	}
+
+	r.networkManager.ContinueRequest(r.request.interceptionID)
+}
+
+func (r *Route) startHandling() error {
+	if r.handled {
+		return fmt.Errorf("route %s is already handled", r.request.URL())
+	}
+	r.handled = true
+	return nil
 }

@@ -79,9 +79,13 @@ func (s *DOMElementState) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// URLMatcher is a function that matches a URL against a pattern.
+// It relies on JavaScript's regex engine for regex matching.
+type URLMatcher func(string) (bool, error)
+
 // urlMatcher matches URLs based on pattern type. It can match on exact and regex
 // patterns. If the pattern is empty or a single quote, it matches any URL.
-func urlMatcher(pattern string, jsRegexChecker JSRegexChecker) (func(string) (bool, error), error) {
+func urlMatcher(pattern string, jsRegexChecker JSRegexChecker) (URLMatcher, error) {
 	if pattern == "" || pattern == "''" {
 		return func(url string) (bool, error) { return true, nil }, nil
 	}
