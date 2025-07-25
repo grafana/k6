@@ -27,9 +27,15 @@ const (
 	// BinaryProvisioningFeatureFlag defines the environment variable that enables the binary provisioning
 	BinaryProvisioningFeatureFlag = "K6_BINARY_PROVISIONING"
 
-	defaultBuildServiceURL = "https://ingest.k6.io/builder/api/v1"
-	defaultConfigFileName  = "config.json"
-	defaultBinaryCacheDir  = "builds"
+	// DefaultBuildServiceURL defines the URL to the default (grafana hosted) build service
+	DefaultBuildServiceURL = "https://ingest.k6.io/builder/api/v1"
+	// CloudExtensionsCatalog defines the extensions catalog for cloud supported extensions
+	CloudExtensionsCatalog = "cloud"
+	// CommunityExtensionsCatalog defines the extensions catalog for community extensions
+	CommunityExtensionsCatalog = "oss"
+
+	defaultConfigFileName = "config.json"
+	defaultBinaryCacheDir = "builds"
 )
 
 // GlobalState contains the GlobalFlags and accessors for most of the global
@@ -175,20 +181,22 @@ type GlobalFlags struct {
 	LogFormat        string
 	Verbose          bool
 
-	BinaryProvisioning bool
-	BuildServiceURL    string
-	BinaryCache        string
+	BinaryProvisioning        bool
+	BuildServiceURL           string
+	BinaryCache               string
+	EnableCommunityExtensions bool
 }
 
 // GetDefaultFlags returns the default global flags.
 func GetDefaultFlags(homeDir string, cacheDir string) GlobalFlags {
 	return GlobalFlags{
-		Address:          "localhost:6565",
-		ProfilingEnabled: false,
-		ConfigFilePath:   filepath.Join(homeDir, "k6", defaultConfigFileName),
-		LogOutput:        "stderr",
-		BuildServiceURL:  defaultBuildServiceURL,
-		BinaryCache:      filepath.Join(cacheDir, "k6", defaultBinaryCacheDir),
+		Address:                   "localhost:6565",
+		ProfilingEnabled:          false,
+		ConfigFilePath:            filepath.Join(homeDir, "k6", defaultConfigFileName),
+		LogOutput:                 "stderr",
+		BuildServiceURL:           DefaultBuildServiceURL,
+		EnableCommunityExtensions: false,
+		BinaryCache:               filepath.Join(cacheDir, "k6", defaultBinaryCacheDir),
 	}
 }
 
@@ -226,6 +234,12 @@ func getFlags(defaultFlags GlobalFlags, env map[string]string, args []string) Gl
 	}
 	if val, ok := env["K6_BUILD_SERVICE_URL"]; ok {
 		result.BuildServiceURL = val
+	}
+	if v, ok := env["K6_ENABLE_COMMUNITY_EXTENSIONS"]; ok {
+		vb, err := strconv.ParseBool(v)
+		if err == nil {
+			result.EnableCommunityExtensions = vb
+		}
 	}
 
 	// check if verbose flag is set

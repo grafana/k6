@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"strings"
@@ -216,8 +217,23 @@ func newK6BuildProvisioner(gs *state.GlobalState) provisioner {
 }
 
 func (p *k6buildProvisioner) provision(deps k6deps.Dependencies) (commandExecutor, error) {
+	buildSrv := p.gs.Flags.BuildServiceURL
+	buildSrvURL, err := url.Parse(buildSrv)
+	if err != nil {
+		return nil, fmt.Errorf("invalid URL to binary provisioning build service: %w", err)
+	}
+
+	catalog := state.CloudExtensionsCatalog
+	if p.gs.Flags.EnableCommunityExtensions {
+		catalog = state.CommunityExtensionsCatalog
+	}
+	buildSrv = buildSrvURL.JoinPath(catalog).String()
+
+	p.gs.Logger.
+		Debugf("using the %q extensions catalog", catalog)
+
 	config := k6provider.Config{
-		BuildServiceURL: p.gs.Flags.BuildServiceURL,
+		BuildServiceURL: buildSrv,
 		BinaryCacheDir:  p.gs.Flags.BinaryCache,
 	}
 
