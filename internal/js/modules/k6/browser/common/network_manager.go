@@ -70,6 +70,8 @@ type NetworkManager struct {
 	reqIDToRequest map[network.RequestID]*Request
 	reqsMu         sync.RWMutex
 
+	// These two maps are used to store the events so we can call onRequest with both of them,
+	// regardless of the order of the events
 	reqIDToRequestWillBeSentEvent map[network.RequestID]*network.EventRequestWillBeSent
 	reqIDToRequestPausedEvent     map[network.RequestID]*fetch.EventRequestPaused
 
@@ -566,6 +568,10 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent,
 	m.eventInterceptor.onRequest(req)
 }
 
+// onRequestWillBeSent calls the onRequest method:
+// - right away, if request interception is disabled
+// - only if we first received the onRequestPaused event, if request interception is enabled;
+// otherwise, it stores the event in a map to be processed when the onRequestPaused event arrives
 func (m *NetworkManager) onRequestWillBeSent(event *network.EventRequestWillBeSent) {
 	m.logger.Debugf("NetworkManager:onRequestWillBeSent", "url:%s method:%s type:%s fid:%s Starting onRequestWillBeSent",
 		event.Request.URL, event.Request.Method, event.Initiator.Type, event.FrameID)
@@ -583,6 +589,11 @@ func (m *NetworkManager) onRequestWillBeSent(event *network.EventRequestWillBeSe
 	}
 }
 
+// onRequestPaused can send one of these two CDP events:
+// - Fetch.failRequest if the URL is part of the blocked hosts or IPs
+// - Fetch.continueRequest if the request is not blocked and no route is configured
+// In both case, if we first received the onRequestWillBeSent event, we call onRequest
+// otherwise, it stores the event in a map to be processed when the onRequestWillBeSent event arrives
 func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
 	m.logger.Debugf("NetworkManager:onRequestPaused",
 		"url:%v sid:%s", event.Request.URL, m.session.ID())
