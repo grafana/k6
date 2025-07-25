@@ -21,23 +21,23 @@ import (
 	"go.k6.io/k6/lib/fsext"
 )
 
-// OFSBridge allows an afero.Fs to implement the Go standard library io/fs.FS.
-type iofSBridge struct {
+// ioFSBridge allows an afero.Fs to implement the Go standard library io/fs.FS.
+type ioFSBridge struct {
 	fsext fsext.Fs
 }
 
 // newIofsBridge returns an IOFSBridge from a Fs
-func newIofsBridge(fs fsext.Fs) fs.FS {
-	return &iofSBridge{
+func newIOFSBridge(fs fsext.Fs) fs.FS {
+	return &ioFSBridge{
 		fsext: fs,
 	}
 }
 
 // Open implements fs.Fs Open
-func (b *iofSBridge) Open(name string) (fs.File, error) {
+func (b *ioFSBridge) Open(name string) (fs.File, error) {
 	f, err := b.fsext.Open(name)
 	if err != nil {
-		return nil, fmt.Errorf("opening file: %w", err)
+		return nil, fmt.Errorf("opening file via launcher's bridge: %w", err)
 	}
 	return f, nil
 }
@@ -326,7 +326,7 @@ func analyze(gs *state.GlobalState, args []string) (k6deps.Dependencies, error) 
 		}
 		dopts.Script.Name = sourceRootPath
 		dopts.Script.Contents = src.Data
-		dopts.Fs = newIofsBridge(gs.FS)
+		dopts.Fs = newIOFSBridge(gs.FS)
 	}
 
 	return k6deps.Analyze(dopts)

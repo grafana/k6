@@ -405,9 +405,9 @@ func TestBridgeOpen(t *testing.T) {
 	testfs := afero.NewMemMapFs()
 	require.NoError(t, fsext.WriteFile(testfs, "abasicpath/onetwo.txt", []byte(`test123`), 0o644))
 
-	bridge := &iofSBridge{fsext: testfs}
+	bridge := &ioFSBridge{fsext: testfs}
 
-	// it asserts that bridge implements io/fs.FS
+	// It asserts that the bridge implements io/fs.FS
 	goiofs := fs.FS(bridge)
 	f, err := goiofs.Open("abasicpath/onetwo.txt")
 	require.NoError(t, err)
