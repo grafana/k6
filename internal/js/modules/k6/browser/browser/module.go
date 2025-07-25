@@ -9,9 +9,6 @@ package browser
 import (
 	"context"
 	"io"
-	"log"
-	"net/http"
-	_ "net/http/pprof" //nolint:gosec
 	"sync"
 
 	"github.com/grafana/sobek"
@@ -122,9 +119,6 @@ func (m *RootModule) initialize(vu k6modules.VU) {
 	if err != nil {
 		k6ext.Abort(vu.Context(), "parsing browser traces metadata: %v", err)
 	}
-	if _, ok := initEnv.LookupEnv(env.EnableProfiling); ok {
-		go startDebugServer()
-	}
 	m.filePersister, err = newScreenshotPersister(initEnv.LookupEnv)
 	if err != nil {
 		k6ext.Abort(vu.Context(), "failed to create file persister: %v", err)
@@ -132,10 +126,4 @@ func (m *RootModule) initialize(vu k6modules.VU) {
 	if e, ok := initEnv.LookupEnv(env.K6TestRunID); ok && e != "" {
 		m.testRunID = e
 	}
-}
-
-func startDebugServer() {
-	log.Println("Starting http debug server", env.ProfilingServerAddr)
-	log.Println(http.ListenAndServe(env.ProfilingServerAddr, nil)) //nolint:gosec
-	// no linted because we don't need to set timeouts for the debug server.
 }

@@ -2,10 +2,10 @@ package websockets
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"strconv"
-	"unsafe"
 
 	"github.com/grafana/sobek"
 
@@ -15,7 +15,7 @@ import (
 
 type blob struct {
 	typ  string
-	data bytes.Buffer
+	data *bytes.Buffer
 }
 
 func (b *blob) text() string {
@@ -25,7 +25,7 @@ func (b *blob) text() string {
 func (r *WebSocketsAPI) blob(call sobek.ConstructorCall) *sobek.Object {
 	rt := r.vu.Runtime()
 
-	b := &blob{}
+	b := &blob{data: new(bytes.Buffer)}
 	var blobParts []interface{}
 	if len(call.Arguments) > 0 {
 		if err := rt.ExportTo(call.Arguments[0], &blobParts); err != nil {
@@ -90,7 +90,7 @@ func (r *WebSocketsAPI) blob(call sobek.ConstructorCall) *sobek.Object {
 		return rt.ToValue(promise)
 	}))
 	must(rt, obj.Set("stream", func(_ sobek.FunctionCall) sobek.Value {
-		return rt.ToValue(streams.NewReadableStreamFromReader(r.vu, &b.data))
+		return rt.ToValue(streams.NewReadableStreamFromReader(r.vu, b.data))
 	}))
 
 	proto := call.This.Prototype()
@@ -112,7 +112,7 @@ func (r *WebSocketsAPI) fillData(b *blob, blobParts []interface{}, call sobek.Co
 			case []uint8:
 				_, err = b.data.Write(v)
 			case []int8, []int16, []int32, []int64, []uint16, []uint32, []uint64, []float32, []float64:
-				_, err = b.data.Write(toByteSlice(v))
+				err = binary.Write(b.data, binary.LittleEndian, v)
 			case sobek.ArrayBuffer:
 				_, err = b.data.Write(v.Bytes())
 			case *sobek.ArrayBuffer:
@@ -168,34 +168,4 @@ func (r *WebSocketsAPI) slice(call sobek.FunctionCall, b *blob, rt *sobek.Runtim
 	must(rt, err)
 
 	return sliced
-}
-
-// toByteSlice converts a slice of numbers to a slice of bytes.
-//
-//nolint:gosec
-func toByteSlice(data interface{}) []byte {
-	switch v := data.(type) {
-	case []int8:
-		return unsafe.Slice((*byte)(unsafe.Pointer(&v[0])), len(v))
-	case []uint16:
-		return unsafe.Slice((*byte)(unsafe.Pointer(&v[0])), len(v)*2)
-	case []int16:
-		return unsafe.Slice((*byte)(unsafe.Pointer(&v[0])), len(v)*2)
-	case []uint32:
-		return unsafe.Slice((*byte)(unsafe.Pointer(&v[0])), len(v)*4)
-	case []int32:
-		return unsafe.Slice((*byte)(unsafe.Pointer(&v[0])), len(v)*4)
-	case []uint64:
-		return unsafe.Slice((*byte)(unsafe.Pointer(&v[0])), len(v)*8)
-	case []int64:
-		return unsafe.Slice((*byte)(unsafe.Pointer(&v[0])), len(v)*8)
-	case []float32:
-		return unsafe.Slice((*byte)(unsafe.Pointer(&v[0])), len(v)*4)
-	case []float64:
-		return unsafe.Slice((*byte)(unsafe.Pointer(&v[0])), len(v)*8)
-	default:
-		// this should never happen
-		common.Throw(nil, fmt.Errorf("unsupported type: %T", data))
-		return nil
-	}
 }

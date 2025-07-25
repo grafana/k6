@@ -61,9 +61,7 @@ func Untar(t *testing.T, fileSystem fsext.Fs, fileName string, destination strin
 			}
 			defer func() { _ = f.Close() }()
 
-			// as long as this code in a test helper, we can safely
-			// omit G110: Potential DoS vulnerability via decompression bomb
-			if _, err := io.Copy(f, tr); err != nil { //nolint:gosec
+			if _, err := io.CopyN(f, tr, header.Size); err != nil {
 				return err
 			}
 		}
