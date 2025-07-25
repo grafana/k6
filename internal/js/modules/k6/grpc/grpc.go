@@ -10,6 +10,7 @@ import (
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 	"google.golang.org/grpc/codes"
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 )
 
 type (
@@ -69,6 +70,10 @@ func (mi *ModuleInstance) defineConstants() {
 		mi.exports[name] = rt.ToValue(code)
 	}
 
+	mustAddServingStatus := func(name string, status healthpb.HealthCheckResponse_ServingStatus) {
+		mi.exports[name] = rt.ToValue(status)
+	}
+
 	mustAddCode("StatusOK", codes.OK)
 	mustAddCode("StatusCanceled", codes.Canceled)
 	mustAddCode("StatusUnknown", codes.Unknown)
@@ -86,6 +91,11 @@ func (mi *ModuleInstance) defineConstants() {
 	mustAddCode("StatusUnavailable", codes.Unavailable)
 	mustAddCode("StatusDataLoss", codes.DataLoss)
 	mustAddCode("StatusUnauthenticated", codes.Unauthenticated)
+
+	mustAddServingStatus("HealthCheckUnknown", healthpb.HealthCheckResponse_UNKNOWN)
+	mustAddServingStatus("HealthCheckServing", healthpb.HealthCheckResponse_SERVING)
+	mustAddServingStatus("HealthCheckNotServing", healthpb.HealthCheckResponse_NOT_SERVING)
+	mustAddServingStatus("HealthCheckServiceUnkown", healthpb.HealthCheckResponse_SERVICE_UNKNOWN)
 }
 
 // Exports returns the exports of the grpc module.
