@@ -567,7 +567,7 @@ func (m *FrameManager) requestStarted(req *Request) {
 		return
 	}
 
-	if err := route.Continue(); err != nil {
+	if err := route.Continue(nil); err != nil {
 		m.logger.Warnf("FrameManager:requestStarted",
 			"fmid:%d rurl:%s error continuing request: %v", m.ID(), req.URL(), err)
 	}

@@ -718,6 +718,14 @@ type Route struct {
 	handled bool
 }
 
+// ContinueOptions are request fields that can be overridden when continuing a request.
+type ContinueOptions struct {
+	Headers  []HTTPHeader
+	Method   string
+	PostData string
+	URL      string
+}
+
 // FulfillOptions are response fields that can be set when fulfilling a request.
 type FulfillOptions struct {
 	Body        string
@@ -754,13 +762,13 @@ func (r *Route) Abort(errorCode string) error {
 }
 
 // Continue continues the request.
-func (r *Route) Continue() error {
+func (r *Route) Continue(opts *ContinueOptions) error {
 	err := r.startHandling()
 	if err != nil {
 		return err
 	}
 
-	return r.networkManager.ContinueRequest(r.request.interceptionID)
+	return r.networkManager.ContinueRequest(r.request.interceptionID, opts, r.request.HeadersArray())
 }
 
 // Fulfill fulfills the request with the given options for the response.
