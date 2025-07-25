@@ -281,10 +281,10 @@ func TestStdin(t *testing.T) {
 	cmdExecutor := mockExecutor{}
 
 	// use a provider returning the mock command executor
-	provider := mockProvider{executor: &cmdExecutor}
+	provider := mockProvisioner{executor: &cmdExecutor}
 	launcher := &launcher{
-		gs:       ts.GlobalState,
-		provider: &provider,
+		gs:          ts.GlobalState,
+		provisioner: &provider,
 	}
 
 	// override the rootCommand launcher
