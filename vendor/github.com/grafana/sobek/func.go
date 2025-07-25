@@ -293,8 +293,16 @@ func (f *classFuncObject) vmCall(vm *vm, n int) {
 	f.Call(FunctionCall{})
 }
 
+func (f *classFuncObject) exportType() reflect.Type {
+	return reflectTypeCtor
+}
+
+func (f *classFuncObject) Construct(ccall ConstructorCall) *Object {
+	return f.construct(ccall.Arguments, ccall.NewTarget)
+}
+
 func (f *classFuncObject) export(*objectExportCtx) interface{} {
-	return f.Call
+	return f.Construct
 }
 
 func (f *classFuncObject) createInstance(args []Value, newTarget *Object) (instance *Object) {

@@ -53,6 +53,7 @@ var (
 	reflectTypeArrayPtr = reflect.TypeOf((*[]interface{})(nil))
 	reflectTypeString   = reflect.TypeOf("")
 	reflectTypeFunc     = reflect.TypeOf((func(FunctionCall) Value)(nil))
+	reflectTypeCtor     = reflect.TypeOf((func(ConstructorCall) *Object)(nil))
 	reflectTypeError    = reflect.TypeOf((*error)(nil)).Elem()
 )
 
@@ -763,6 +764,8 @@ func (o *Object) baseObject(*Runtime) *Object {
 
 // Export the Object to a plain Go type.
 // If the Object is a wrapped Go value (created using ToValue()) returns the original value.
+//
+// If the Object is a class function, returns func(ConstructorCall) *Object. See the note about exceptions below.
 //
 // If the Object is a function, returns func(FunctionCall) Value. Note that exceptions thrown inside the function
 // result in panics, which can also leave the Runtime in an unusable state. Therefore, these values should only
