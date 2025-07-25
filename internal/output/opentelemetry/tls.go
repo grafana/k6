@@ -15,7 +15,9 @@ func buildTLSConfig(
 	certPath, clientCertPath, clientKeyPath null.String,
 ) (*tls.Config, error) {
 	set := false
-	tlsConfig := &tls.Config{} //nolint:gosec // it's up to the caller
+	tlsConfig := &tls.Config{
+		MinVersion: tls.VersionTLS13,
+	}
 
 	if insecureSkipVerify.Valid {
 		tlsConfig.InsecureSkipVerify = insecureSkipVerify.Bool
