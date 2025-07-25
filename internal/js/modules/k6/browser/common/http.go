@@ -436,7 +436,7 @@ func NewHTTPResponse(
 		ctx: ctx,
 		// TODO: Pass an internal logger instead of basing it on k6's logger?
 		// See https://go.k6.io/k6/js/modules/k6/browser/issues/54
-		logger:            log.New(state.Logger, GetIterationID(ctx)),
+		logger:            log.New(state.Logger),
 		request:           req,
 		remoteAddress:     &RemoteAddress{IPAddress: resp.RemoteIPAddress, Port: resp.RemotePort},
 		securityDetails:   nil,

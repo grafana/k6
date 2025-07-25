@@ -5,12 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math/rand"
 	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/internal/js/modules/k6/browser/env"
@@ -31,7 +29,6 @@ type BrowserType struct {
 	vu           k6modules.VU
 	hooks        *common.Hooks
 	k6Metrics    *k6ext.CustomMetrics
-	randSrc      *rand.Rand
 	envLookupper env.LookupFunc
 }
 
@@ -46,7 +43,6 @@ func NewBrowserType(vu k6modules.VU) *BrowserType {
 		vu:           vu,
 		hooks:        common.NewHooks(),
 		k6Metrics:    k6ext.RegisterCustomMetrics(env.Registry),
-		randSrc:      rand.New(rand.NewSource(time.Now().UnixNano())), //nolint: gosec
 		envLookupper: env.LookupEnv,
 	}
 }
@@ -88,7 +84,6 @@ func (b *BrowserType) initContext(ctx context.Context) context.Context {
 	ctx = k6ext.WithVU(ctx, b.vu)
 	ctx = k6ext.WithCustomMetrics(ctx, b.k6Metrics)
 	ctx = common.WithHooks(ctx, b.hooks)
-	ctx = common.WithIterationID(ctx, fmt.Sprintf("%x", b.randSrc.Uint64()))
 	return ctx
 }
 
@@ -470,7 +465,7 @@ func setFlagsFromK6Options(flags map[string]any, k6opts *k6lib.Options) error {
 func makeLogger(ctx context.Context, envLookup env.LookupFunc) (*log.Logger, error) {
 	var (
 		k6Logger = k6ext.GetVU(ctx).State().Logger
-		logger   = log.New(k6Logger, common.GetIterationID(ctx))
+		logger   = log.New(k6Logger)
 	)
 	if el, ok := envLookup(env.LogLevel); ok {
 		if logger.SetLevel(el) != nil {

@@ -16,7 +16,6 @@ type Logger struct {
 	*logrus.Logger //nolint:forbidigo
 	mu             sync.Mutex
 	lastLogCall    int64
-	iterID         string
 	categoryFilter *regexp.Regexp
 }
 
@@ -25,14 +24,13 @@ type Logger struct {
 func NewNullLogger() *Logger {
 	log := logrus.New()
 	log.SetOutput(io.Discard)
-	return New(log, "")
+	return New(log)
 }
 
 // New creates a new logger.
-func New(logger logrus.FieldLogger, iterID string) *Logger {
+func New(logger logrus.FieldLogger) *Logger {
 	ll := &Logger{
 		Logger: logrus.New(),
-		iterID: iterID,
 	}
 
 	if logger == nil {
@@ -99,9 +97,6 @@ func (l *Logger) Logf(level logrus.Level, category string, msg string, args ...a
 		"source":   "browser",
 		"category": category,
 		"elapsed":  fmt.Sprintf("%d ms", elapsed),
-	}
-	if l.iterID != "" && l.GetLevel() > logrus.InfoLevel {
-		fields["iteration_id"] = l.iterID
 	}
 	entry := l.WithFields(fields)
 	if l.GetLevel() < level {

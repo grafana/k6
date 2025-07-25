@@ -16,7 +16,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/browser"
-	"go.k6.io/k6/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/internal/js/modules/k6/browser/env"
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext/k6test"
@@ -237,35 +236,6 @@ func TestBrowserCrashErr(t *testing.T) {
 		await p.close();
 	`)
 	assert.ErrorContains(t, err, "launching browser: Invalid devtools server port")
-}
-
-func TestBrowserLogIterationID(t *testing.T) {
-	t.Parallel()
-
-	tb := newTestBrowser(t, withLogCache())
-
-	var (
-		iterID     = common.GetIterationID(tb.ctx)
-		tracedEvts int
-	)
-
-	require.NotEmpty(t, iterID)
-
-	tb.logCache.mu.RLock()
-	defer tb.logCache.mu.RUnlock()
-
-	require.NotEmpty(t, tb.logCache.entries)
-
-	for _, evt := range tb.logCache.entries {
-		for k, v := range evt.Data {
-			if k == "iteration_id" {
-				assert.Equal(t, iterID, v)
-				tracedEvts++
-			}
-		}
-	}
-
-	assert.Equal(t, len(tb.logCache.entries), tracedEvts)
 }
 
 //nolint:paralleltest

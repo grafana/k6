@@ -25,17 +25,6 @@ func GetHooks(ctx context.Context) *Hooks {
 	return v.(*Hooks) //nolint:forcetypeassert
 }
 
-// WithIterationID adds an identifier for the current iteration to the context.
-func WithIterationID(ctx context.Context, iterID string) context.Context {
-	return context.WithValue(ctx, ctxKeyIterationID, iterID)
-}
-
-// GetIterationID returns the iteration identifier attached to the context.
-func GetIterationID(ctx context.Context) string {
-	s, _ := ctx.Value(ctxKeyIterationID).(string)
-	return s
-}
-
 // WithBrowserOptions adds the browser options to the context.
 func WithBrowserOptions(ctx context.Context, opts *BrowserOptions) context.Context {
 	return context.WithValue(ctx, ctxKeyBrowserOptions, opts)
