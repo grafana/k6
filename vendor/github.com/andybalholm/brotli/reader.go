@@ -49,6 +49,9 @@ func (r *Reader) Read(p []byte) (n int, err error) {
 	if !decoderHasMoreOutput(r) && len(r.in) == 0 {
 		m, readErr := r.src.Read(r.buf)
 		if m == 0 {
+			if readErr == io.EOF && r.state != stateDone {
+				readErr = io.ErrUnexpectedEOF
+			}
 			// If readErr is `nil`, we just proxy underlying stream behavior.
 			return 0, readErr
 		}

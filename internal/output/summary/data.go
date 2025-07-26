@@ -306,7 +306,11 @@ func populateSummaryChecks(
 
 	summaryGroup.Checks.Metrics.Fail.Values["passes"] = totalChecks - successChecks
 	summaryGroup.Checks.Metrics.Fail.Values["fails"] = successChecks
-	summaryGroup.Checks.Metrics.Fail.Values["rate"] = (totalChecks - successChecks) / totalChecks
+	if totalChecks > 0 {
+		summaryGroup.Checks.Metrics.Fail.Values["rate"] = (totalChecks - successChecks) / totalChecks
+	} else {
+		summaryGroup.Checks.Metrics.Fail.Values["rate"] = 0
+	}
 
 	summaryGroup.Checks.OrderedChecks = groupData.checks.orderedChecks
 }

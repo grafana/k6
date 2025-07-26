@@ -36,6 +36,25 @@ func TestLocator(t *testing.T) {
 		do   func(*testBrowser, *common.Page)
 	}{
 		{
+			"All", func(_ *testBrowser, p *common.Page) {
+				locators, err := p.Locator("a", nil).All()
+				require.NoError(t, err)
+				require.Len(t, locators, 3)
+
+				firstText, err := locators[0].InnerText(nil)
+				assert.NoError(t, err)
+				assert.Equal(t, `Click`, firstText)
+
+				secondText, err := locators[1].InnerText(nil)
+				assert.NoError(t, err)
+				assert.Equal(t, `Dblclick`, secondText)
+
+				thirdText, err := locators[2].InnerText(nil)
+				assert.NoError(t, err)
+				assert.Equal(t, `Click`, thirdText)
+			},
+		},
+		{
 			"Check", func(_ *testBrowser, p *common.Page) {
 				check := func() bool {
 					v, err := p.Evaluate(`() => window.check`)
@@ -733,6 +752,23 @@ func TestSelectOption(t *testing.T) {
 		selectedValue = await options.inputValue();
 		if (selectedValue !== 'five') {
 			throw new Error('Expected "five" but got ' + selectedValue);
+		}
+
+		await options.selectOption(['Three']); // Label
+		selectedValue = await options.inputValue();
+		if (selectedValue !== 'three') {
+			throw new Error('Expected "three" but got ' + selectedValue);
+		}
+
+		await options.selectOption('Five'); // Label
+		selectedValue = await options.inputValue();
+		if (selectedValue !== 'five') {
+			throw new Error('Expected "five" but got ' + selectedValue);
+		}
+
+		const results = await options.selectOption(['One', 'two']); // Both label and value
+		if (results.length !== 2 || !results.includes('one') || !results.includes('two')) {
+			throw new Error('Expected "one,two" but got ' + results);
 		}
 	`, tb.staticURL("select_options.html"))
 	assert.Equal(t, sobek.Undefined(), got.Result())

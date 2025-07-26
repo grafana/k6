@@ -81,6 +81,22 @@ func (l *Locator) click(opts *FrameClickOptions) error {
 	return l.frame.click(l.selector, opts)
 }
 
+func (l *Locator) All() ([]*Locator, error) {
+	l.log.Debugf("Locator:All", "fid:%s furl:%q sel:%q", l.frame.ID(), l.frame.URL(), l.selector)
+
+	count, err := l.Count()
+	if err != nil {
+		return nil, err
+	}
+
+	locators := make([]*Locator, count)
+	for i := 0; i < count; i++ {
+		locators[i] = l.Nth(i)
+	}
+
+	return locators, nil
+}
+
 // Count APIs do not wait for the element to be present. It also does not set
 // strict to true, allowing it to return the total number of elements matching
 // the selector.

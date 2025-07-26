@@ -229,6 +229,8 @@ func storeMetaBlockHeaderBW(len uint, is_uncompressed bool, bw *bitWriter) {
 		nibbles = 4
 	} else if len <= 1<<20 {
 		nibbles = 5
+	} else if len > 1<<24 {
+		panic("metablock too long")
 	}
 
 	bw.writeBits(2, uint64(nibbles)-4)
