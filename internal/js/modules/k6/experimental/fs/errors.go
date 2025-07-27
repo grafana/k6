@@ -18,7 +18,7 @@ func newFsError(k errorKind, message string) *fsError {
 // The tool itself is not tracked as part of the k6 go.mod file, and
 // therefore must be installed manually using `go install github.com/dmarkham/enumer`.
 //
-//go:generate enumer -type=errorKind -output errors_gen.go
+//go:generate go run github.com/dmarkham/enumer@v1.5.11 -type=errorKind -output errors_gen.go
 type errorKind uint8
 
 const (

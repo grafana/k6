@@ -36,6 +36,9 @@ import (
 	v1alphagrpc "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
 	grpcstats "google.golang.org/grpc/stats"
 	"gopkg.in/guregu/null.v3"
+
+	"google.golang.org/grpc/health"
+	healthgrpc "google.golang.org/grpc/health/grpc_health_v1"
 )
 
 func TestClient(t *testing.T) {
@@ -1192,6 +1195,57 @@ func TestClient(t *testing.T) {
 				let respNaN = client.invoke("grpc.wrappers.testing.Service/TestDouble", obj1);
 				`,
 				err: "cyclic reference to an object found",
+			},
+		},
+		{
+			name: "HealthCheckServing",
+			setup: func(hb *httpmultibin.HTTPMultiBin) {
+				grpcHealthSrv := health.NewServer()
+				healthgrpc.RegisterHealthServer(hb.ServerGRPC, grpcHealthSrv)
+				grpcHealthSrv.SetServingStatus("", healthgrpc.HealthCheckResponse_SERVING)
+			},
+			initString: codeBlock{code: `var client = new grpc.Client();`},
+			vuString: codeBlock{
+				code: `
+				client.connect("GRPCBIN_ADDR");
+				var resp = client.healthCheck()
+				if (resp.status !== grpc.HealthCheckServing) {
+					throw new Error("unexpected status: " + resp.status)
+				}`,
+			},
+		},
+		{
+			name: "HealthCheckNotServing",
+			setup: func(hb *httpmultibin.HTTPMultiBin) {
+				grpcHealthSrv := health.NewServer()
+				healthgrpc.RegisterHealthServer(hb.ServerGRPC, grpcHealthSrv)
+				grpcHealthSrv.SetServingStatus("", healthgrpc.HealthCheckResponse_NOT_SERVING)
+			},
+			initString: codeBlock{code: `var client = new grpc.Client();`},
+			vuString: codeBlock{
+				code: `
+				client.connect("GRPCBIN_ADDR");
+				var resp = client.healthCheck()
+				if (resp.status !== grpc.HealthCheckNotServing) {
+					throw new Error("unexpected status: " + resp.status)
+				}`,
+			},
+		},
+		{
+			name: "HealthCheckUnknown",
+			setup: func(hb *httpmultibin.HTTPMultiBin) {
+				grpcHealthSrv := health.NewServer()
+				healthgrpc.RegisterHealthServer(hb.ServerGRPC, grpcHealthSrv)
+				grpcHealthSrv.SetServingStatus("", healthgrpc.HealthCheckResponse_UNKNOWN)
+			},
+			initString: codeBlock{code: `var client = new grpc.Client();`},
+			vuString: codeBlock{
+				code: `
+				client.connect("GRPCBIN_ADDR");
+				var resp = client.healthCheck()
+				if (resp.status !== grpc.HealthCheckUnknown) {
+					throw new Error("unexpected status: " + resp.status)
+				}`,
 			},
 		},
 	}

@@ -13,3 +13,9 @@ type GetByRoleOptions struct {
 	Pressed       *bool   `json:"pressed"`
 	Selected      *bool   `json:"selected"`
 }
+
+// GetByBaseOptions are the optional options for when working with the
+// several GetBy* APIs.
+type GetByBaseOptions struct {
+	Exact *bool `json:"exact"`
+}

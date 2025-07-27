@@ -75,8 +75,7 @@ func TestWebVitalMetric(t *testing.T) {
 		func() error { return page.Click("#clickMe", common.NewFrameClickOptions(page.Timeout())) },
 		func() error {
 			_, err := page.WaitForNavigation(
-				common.NewFrameWaitForNavigationOptions(page.Timeout()),
-			)
+				common.NewFrameWaitForNavigationOptions(page.Timeout()), nil)
 			return err
 		},
 	)

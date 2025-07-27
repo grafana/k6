@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package k6.cloud.insights.proto.v1.ingester;
 
-option go_package = "go.k6.io/k6/cloudapi/insights/proto/v1/ingester";
+option go_package = "go.k6.io/k6/internal/cloudapi/insights/proto/v1/ingester";
 
 import "v1/k6/request_metadata.proto";
 import "v1/trace/span.proto";

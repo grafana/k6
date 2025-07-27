@@ -40,3 +40,16 @@ updates:
       - dependency-name: "github.com/mstoykov/k6-taskqueue-lib"
       - dependency-name: "github.com/stretchr/testify"
       - dependency-name: "go.opentelemetry.io/*"
+
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      # We don't update immediately. We usually wait for `vX.Y.1` to be out.
+      interval: "quarterly"
+
+  # Update k6packager dependencies
+  - package-ecosystem: "docker"
+    directory: "/packaging"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10

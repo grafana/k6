@@ -1094,6 +1094,42 @@ func (p *Page) GetByRole(role string, opts *GetByRoleOptions) *Locator {
 	return p.MainFrame().GetByRole(role, opts)
 }
 
+// GetByAltText creates and returns a new locator for this page (main frame)
+// based on the alt attribute text.
+func (p *Page) GetByAltText(alt string, opts *GetByBaseOptions) *Locator {
+	p.logger.Debugf("Page:GetByAltText", "sid:%s alt: %q opts:%+v", p.sessionID(), alt, opts)
+
+	return p.MainFrame().GetByAltText(alt, opts)
+}
+
+// GetByLabel creates and returns a new locator for this page (main frame) based on the label text.
+func (p *Page) GetByLabel(label string, opts *GetByBaseOptions) *Locator {
+	p.logger.Debugf("Page:GetByLabel", "sid:%s label: %q opts:%+v", p.sessionID(), label, opts)
+
+	return p.MainFrame().GetByLabel(label, opts)
+}
+
+// GetByPlaceholder creates and returns a new locator for this page (main frame) based on the placeholder attribute.
+func (p *Page) GetByPlaceholder(placeholder string, opts *GetByBaseOptions) *Locator {
+	p.logger.Debugf("Page:GetByPlaceholder", "sid:%s placeholder: %q opts:%+v", p.sessionID(), placeholder, opts)
+
+	return p.MainFrame().GetByPlaceholder(placeholder, opts)
+}
+
+// GetByTitle creates and returns a new locator for this page (main frame) based on the title attribute.
+func (p *Page) GetByTitle(title string, opts *GetByBaseOptions) *Locator {
+	p.logger.Debugf("Page:GetByTitle", "sid:%s title: %q opts:%+v", p.sessionID(), title, opts)
+
+	return p.MainFrame().GetByTitle(title, opts)
+}
+
+// GetByTestID creates and returns a new locator for this page (main frame) based on the data-testid attribute.
+func (p *Page) GetByTestID(testID string) *Locator {
+	p.logger.Debugf("Page:GetByTestID", "sid:%s testID: %q", p.sessionID(), testID)
+
+	return p.MainFrame().GetByTestID(testID)
+}
+
 // GetKeyboard returns the keyboard for the page.
 func (p *Page) GetKeyboard() *Keyboard {
 	return p.Keyboard
@@ -1360,6 +1396,8 @@ func (p *Page) Reload(opts *PageReloadOptions) (*Response, error) { //nolint:fun
 		var ok bool
 		if navigationEvent, ok = event.(*NavigationEvent); !ok {
 			err = fmt.Errorf("unexpected event data type: %T, expected *NavigationEvent", event)
+		} else if navigationEvent != nil && navigationEvent.err != nil {
+			err = navigationEvent.err
 		}
 	}
 	if err != nil {
@@ -1576,12 +1614,16 @@ func (p *Page) WaitForLoadState(state string, popts *FrameWaitForLoadStateOption
 }
 
 // WaitForNavigation waits for the given navigation lifecycle event to happen.
-func (p *Page) WaitForNavigation(opts *FrameWaitForNavigationOptions) (*Response, error) {
+// jsRegexChecker should be non-nil to be able to test against a URL pattern in the options.
+func (p *Page) WaitForNavigation(
+	opts *FrameWaitForNavigationOptions,
+	jsRegexChecker JSRegexChecker,
+) (*Response, error) {
 	p.logger.Debugf("Page:WaitForNavigation", "sid:%v", p.sessionID())
 	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.waitForNavigation")
 	defer span.End()
 
-	resp, err := p.frameManager.MainFrame().WaitForNavigation(opts)
+	resp, err := p.frameManager.MainFrame().WaitForNavigation(opts, jsRegexChecker)
 	if err != nil {
 		spanRecordError(span, err)
 		return nil, err

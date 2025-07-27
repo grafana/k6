@@ -170,6 +170,36 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			ml := mapLocator(vu, p.GetByRole(role, popts))
 			return rt.ToValue(ml).ToObject(rt), nil
 		},
+		"getByAltText": func(alt sobek.Value, opts sobek.Value) (*sobek.Object, error) {
+			palt, popts := parseGetByBaseOptions(vu.Context(), alt, false, opts)
+
+			ml := mapLocator(vu, p.GetByAltText(palt, popts))
+			return rt.ToValue(ml).ToObject(rt), nil
+		},
+		"getByLabel": func(label sobek.Value, opts sobek.Value) (*sobek.Object, error) {
+			plabel, popts := parseGetByBaseOptions(vu.Context(), label, true, opts)
+
+			ml := mapLocator(vu, p.GetByLabel(plabel, popts))
+			return rt.ToValue(ml).ToObject(rt), nil
+		},
+		"getByPlaceholder": func(placeholder sobek.Value, opts sobek.Value) (*sobek.Object, error) {
+			pplaceholder, popts := parseGetByBaseOptions(vu.Context(), placeholder, false, opts)
+
+			ml := mapLocator(vu, p.GetByPlaceholder(pplaceholder, popts))
+			return rt.ToValue(ml).ToObject(rt), nil
+		},
+		"getByTitle": func(title sobek.Value, opts sobek.Value) (*sobek.Object, error) {
+			ptitle, popts := parseGetByBaseOptions(vu.Context(), title, false, opts)
+
+			ml := mapLocator(vu, p.GetByTitle(ptitle, popts))
+			return rt.ToValue(ml).ToObject(rt), nil
+		},
+		"getByTestId": func(testID sobek.Value) (*sobek.Object, error) {
+			ptestID := parseStringOrRegex(testID, false)
+
+			ml := mapLocator(vu, p.GetByTestID(ptestID))
+			return rt.ToValue(ml).ToObject(rt), nil
+		},
 		"goto": func(url string, opts sobek.Value) (*sobek.Promise, error) {
 			gopts := common.NewFrameGotoOptions(
 				p.Referrer(),
@@ -500,8 +530,15 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, fmt.Errorf("parsing page wait for navigation options: %w", err)
 			}
 
-			return k6ext.Promise(vu.Context(), func() (result any, reason error) {
-				resp, err := p.WaitForNavigation(popts)
+			// Inject JS regex checker for URL regex pattern matching
+			ctx := vu.Context()
+			jsRegexChecker, err := injectRegexMatcherScript(ctx, vu, p.TargetID())
+			if err != nil {
+				return nil, err
+			}
+
+			return k6ext.Promise(ctx, func() (result any, reason error) {
+				resp, err := p.WaitForNavigation(popts, jsRegexChecker)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
 				}
@@ -670,6 +707,54 @@ func prepK6BrowserRegExChecker(rt *sobek.Runtime) func() error {
 	}
 }
 
+// injectRegexMatcherScript injects a JavaScript regex checker function into the runtime
+// for URL pattern matching. This handles regex patterns only using JavaScript's regex
+// engine for consistency. It returns a function that can be used to check if a URL
+// matches a given pattern in the JS runtime's eventloop.
+func injectRegexMatcherScript(ctx context.Context, vu moduleVU, targetID string) (common.JSRegexChecker, error) {
+	rt := vu.Runtime()
+
+	err := prepK6BrowserRegExChecker(rt)()
+	if err != nil {
+		return nil, fmt.Errorf("preparing k6 browser regex checker: %w", err)
+	}
+
+	return func(pattern, url string) (bool, error) {
+		var (
+			result bool
+			err    error
+		)
+
+		tq := vu.get(ctx, targetID)
+		done := make(chan struct{})
+
+		tq.Queue(func() error {
+			defer close(done)
+
+			// Regex pattern is unquoted string whereas the url needs to be quoted
+			// so that it is treated as a string.
+			js := fmt.Sprintf(`_k6BrowserCheckRegEx(%s, '%s')`, pattern, url)
+
+			val, jsErr := rt.RunString(js)
+			if jsErr != nil {
+				err = fmt.Errorf("evaluating pattern: %w", jsErr)
+				return nil
+			}
+
+			result = val.ToBoolean()
+			return nil
+		})
+
+		select {
+		case <-done:
+		case <-ctx.Done():
+			err = fmt.Errorf("context canceled while evaluating URL pattern")
+		}
+
+		return result, err
+	}, nil
+}
+
 func parseWaitForFunctionArgs(
 	ctx context.Context, timeout time.Duration, pageFunc, opts sobek.Value, gargs ...sobek.Value,
 ) (string, *common.FrameWaitForFunctionOptions, []any, error) {
@@ -686,6 +771,30 @@ func parseWaitForFunctionArgs(
 	}
 
 	return js, popts, exportArgs(gargs), nil
+}
+
+// Some getBy* APIs work with single quotes and some work with double quotes.
+// This inconsistency seems to stem from the injected code copied from
+// Playwright itself.
+//
+// I would prefer not to change the copied injected script code from Playwright
+// so that it is easier to copy over updates/fixes from Playwright when we need
+// to.
+func parseStringOrRegex(v sobek.Value, doubleQuote bool) string {
+	var a string
+	switch v.ExportType() {
+	case reflect.TypeOf(string("")): // text values require quotes
+		if doubleQuote {
+			a = fmt.Sprintf(`"%s"`, v.String())
+		} else {
+			a = fmt.Sprintf("'%s'", v.String())
+		}
+	case reflect.TypeOf(map[string]interface{}(nil)): // JS RegExp
+		a = v.String() // No quotes
+	default: // CSS, numbers or booleans
+		a = v.String() // No quotes
+	}
+	return a
 }
 
 // parseGetByRoleOptions parses the GetByRole options from the Sobek.Value.
@@ -720,15 +829,7 @@ func parseGetByRoleOptions(ctx context.Context, opts sobek.Value) *common.GetByR
 			val := obj.Get(k).ToInteger()
 			o.Level = &val
 		case "name":
-			var val string
-			switch obj.Get(k).ExportType() {
-			case reflect.TypeOf(string("")):
-				val = fmt.Sprintf("'%s'", obj.Get(k).String()) // Strings require quotes
-			case reflect.TypeOf(map[string]interface{}(nil)): // JS RegExp
-				val = obj.Get(k).String() // No quotes
-			default: // CSS, numbers or booleans
-				val = obj.Get(k).String() // No quotes
-			}
+			val := parseStringOrRegex(obj.Get(k), false)
 			o.Name = &val
 		case "pressed":
 			val := obj.Get(k).ToBoolean()
@@ -740,4 +841,33 @@ func parseGetByRoleOptions(ctx context.Context, opts sobek.Value) *common.GetByR
 	}
 
 	return o
+}
+
+// parseGetByBaseOptions parses the options for the GetBy* APIs and the input
+// text/regex.
+func parseGetByBaseOptions(
+	ctx context.Context,
+	input sobek.Value,
+	doubleQuote bool,
+	opts sobek.Value,
+) (string, *common.GetByBaseOptions) {
+	a := parseStringOrRegex(input, doubleQuote)
+
+	if !sobekValueExists(opts) {
+		return a, nil
+	}
+
+	o := &common.GetByBaseOptions{}
+
+	rt := k6ext.Runtime(ctx)
+
+	obj := opts.ToObject(rt)
+	for _, k := range obj.Keys() {
+		if k == "exact" {
+			val := obj.Get(k).ToBoolean()
+			o.Exact = &val
+		}
+	}
+
+	return a, o
 }

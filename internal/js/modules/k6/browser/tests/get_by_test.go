@@ -782,3 +782,407 @@ func TestGetByRoleFailure(t *testing.T) {
 		})
 	}
 }
+
+func TestGetByAltTextSuccess(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		alt      string
+		opts     *common.GetByBaseOptions
+		expected int
+	}{
+		{
+			"missing_alt",
+			"",
+			nil,
+			0,
+		},
+		{
+			// matches on all the elements with an alt attribute.
+			"empty_string",
+			"''",
+			nil,
+			2,
+		},
+		{
+			"no_options",
+			"'World Map'",
+			nil,
+			1,
+		},
+		{
+			"exact_match",
+			"'World Map'",
+			&common.GetByBaseOptions{Exact: toPtr(true)},
+			1,
+		},
+		{
+			"no_exact_match",
+			"'world map'",
+			&common.GetByBaseOptions{Exact: toPtr(true)},
+			0,
+		},
+		{
+			"regex_match",
+			`/^[a-z0-9]+$/`,
+			nil,
+			1,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tb := newTestBrowser(t, withFileServer())
+			p := tb.NewPage(nil)
+			opts := &common.FrameGotoOptions{
+				Timeout: common.DefaultTimeout,
+			}
+			_, err := p.Goto(
+				tb.staticURL("get_by_alt_text.html"),
+				opts,
+			)
+			require.NoError(t, err)
+
+			l := p.GetByAltText(tt.alt, tt.opts)
+			c, err := l.Count()
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expected, c)
+		})
+	}
+}
+
+func TestGetByLabelSuccess(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		label    string
+		opts     *common.GetByBaseOptions
+		expected int
+	}{
+		{
+			// matches on all the elements with a label.
+			"missing_label",
+			"",
+			nil,
+			3,
+		},
+		{
+			// matches on all the elements with a label.
+			"empty_string",
+			`""`,
+			nil,
+			3,
+		},
+		{
+			"aria_label",
+			`"username"`,
+			nil,
+			1,
+		},
+		{
+			"exact_match",
+			`"Password"`,
+			&common.GetByBaseOptions{Exact: toPtr(true)},
+			1,
+		},
+		{
+			"no_exact_match",
+			`"password"`,
+			&common.GetByBaseOptions{Exact: toPtr(true)},
+			0,
+		},
+		{
+			"regex_match",
+			`/^[a-z0-9]+$/`,
+			nil,
+			1,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tb := newTestBrowser(t, withFileServer())
+			p := tb.NewPage(nil)
+			opts := &common.FrameGotoOptions{
+				Timeout: common.DefaultTimeout,
+			}
+			_, err := p.Goto(
+				tb.staticURL("get_by_label.html"),
+				opts,
+			)
+			require.NoError(t, err)
+
+			l := p.GetByLabel(tt.label, tt.opts)
+			c, err := l.Count()
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expected, c)
+		})
+	}
+}
+
+func TestGetByPlaceholderSuccess(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		placeholder string
+		opts        *common.GetByBaseOptions
+		expected    int
+	}{
+		{
+			"missing_placeholder",
+			"",
+			nil,
+			0,
+		},
+		{
+			// matches on all the elements with a placeholder attribute.
+			"empty_string",
+			"''",
+			nil,
+			5,
+		},
+		{
+			"no_options",
+			"'Enter your name'",
+			nil,
+			1,
+		},
+		{
+			"exact_match",
+			"'Email address'",
+			&common.GetByBaseOptions{Exact: toPtr(true)},
+			1,
+		},
+		{
+			"no_exact_match",
+			"'email address'",
+			&common.GetByBaseOptions{Exact: toPtr(true)},
+			0,
+		},
+		{
+			"case_insensitive_match",
+			"'email address'",
+			nil,
+			1,
+		},
+		{
+			"regex_match",
+			`/^[a-z0-9]+$/`,
+			nil,
+			1,
+		},
+		{
+			"textarea_placeholder",
+			"'Enter comments'",
+			nil,
+			1,
+		},
+		{
+			"search_placeholder",
+			"'Search...'",
+			nil,
+			1,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tb := newTestBrowser(t, withFileServer())
+			p := tb.NewPage(nil)
+			opts := &common.FrameGotoOptions{
+				Timeout: common.DefaultTimeout,
+			}
+			_, err := p.Goto(
+				tb.staticURL("get_by_placeholder.html"),
+				opts,
+			)
+			require.NoError(t, err)
+
+			l := p.GetByPlaceholder(tt.placeholder, tt.opts)
+			c, err := l.Count()
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expected, c)
+		})
+	}
+}
+
+func TestGetByTitleSuccess(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		title    string
+		opts     *common.GetByBaseOptions
+		expected int
+	}{
+		{
+			"missing_title",
+			"",
+			nil,
+			0,
+		},
+		{
+			// matches on all the elements with a title attribute.
+			"empty_string",
+			"''",
+			nil,
+			5,
+		},
+		{
+			"no_options",
+			"'Click me'",
+			nil,
+			1,
+		},
+		{
+			"exact_match",
+			"'Link to somewhere'",
+			&common.GetByBaseOptions{Exact: toPtr(true)},
+			1,
+		},
+		{
+			"no_exact_match",
+			"'link to somewhere'",
+			&common.GetByBaseOptions{Exact: toPtr(true)},
+			0,
+		},
+		{
+			"case_insensitive_match",
+			"'link to somewhere'",
+			nil,
+			1,
+		},
+		{
+			"regex_match",
+			`/^[a-z0-9]+$/`,
+			nil,
+			1,
+		},
+		{
+			"image_title",
+			"'Placeholder image'",
+			nil,
+			1,
+		},
+		{
+			"div_title",
+			"'Information box'",
+			nil,
+			1,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tb := newTestBrowser(t, withFileServer())
+			p := tb.NewPage(nil)
+			opts := &common.FrameGotoOptions{
+				Timeout: common.DefaultTimeout,
+			}
+			_, err := p.Goto(
+				tb.staticURL("get_by_title.html"),
+				opts,
+			)
+			require.NoError(t, err)
+
+			l := p.GetByTitle(tt.title, tt.opts)
+			c, err := l.Count()
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expected, c)
+		})
+	}
+}
+
+func TestGetByTestIDSuccess(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		testID       string
+		expected     int
+		expectedText string
+	}{
+		{
+			"submit_button",
+			"'submit-button'",
+			1,
+			"Submit",
+		},
+		{
+			"username_input",
+			"'username-input'",
+			1,
+			"",
+		},
+		{
+			"info_box",
+			"'info-box'",
+			1,
+			"Information",
+		},
+		{
+			"regex_match",
+			`/^[a-z0-9]+$/`,
+			1,
+			"Test span",
+		},
+		{
+			"link_testid",
+			"'my-link'",
+			1,
+			"Link",
+		},
+		{
+			"non_existent_testid",
+			"'does-not-exist'",
+			0,
+			"",
+		},
+		{
+			"missing_testid",
+			"",
+			0,
+			"",
+		},
+		{
+			"empty_string",
+			"''",
+			0,
+			"",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tb := newTestBrowser(t, withFileServer())
+			p := tb.NewPage(nil)
+			opts := &common.FrameGotoOptions{
+				Timeout: common.DefaultTimeout,
+			}
+			_, err := p.Goto(
+				tb.staticURL("get_by_testid.html"),
+				opts,
+			)
+			require.NoError(t, err)
+
+			l := p.GetByTestID(tt.testID)
+			c, err := l.Count()
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expected, c)
+
+			if tt.expected > 0 && tt.expectedText != "" {
+				text, err := l.InnerText(sobek.Undefined())
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedText, text)
+			}
+		})
+	}
+}

@@ -45,7 +45,7 @@ func TestWaitForFrameNavigationWithinDocument(t *testing.T) {
 
 			waitForNav := func() error {
 				opts := &common.FrameWaitForNavigationOptions{Timeout: timeout}
-				_, err := p.WaitForNavigation(opts)
+				_, err := p.WaitForNavigation(opts, nil)
 				return err
 			}
 			click := func() error {
@@ -103,7 +103,7 @@ func TestWaitForFrameNavigation(t *testing.T) {
 		opts := &common.FrameWaitForNavigationOptions{
 			Timeout: 5000 * time.Millisecond,
 		}
-		_, err := p.WaitForNavigation(opts)
+		_, err := p.WaitForNavigation(opts, nil)
 		return err
 	}
 	click := func() error {

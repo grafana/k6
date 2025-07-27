@@ -12,7 +12,7 @@ require (
 	github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
 	github.com/andybalholm/brotli v1.2.0
 	github.com/chromedp/cdproto v0.0.0-20250509201441-70372ae9ef75
-	github.com/evanw/esbuild v0.25.6
+	github.com/evanw/esbuild v0.25.8
 	github.com/fatih/color v1.18.0
 	github.com/go-json-experiment/json v0.0.0-20250211171154-1ae217ad3535
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible
@@ -22,7 +22,7 @@ require (
 	github.com/grafana/k6deps v0.2.6
 	github.com/grafana/k6provider v0.1.15
 	github.com/grafana/sobek v0.0.0-20250320150027-203dc85b6d98
-	github.com/grafana/xk6-dashboard v0.7.9
+	github.com/grafana/xk6-dashboard v0.7.10
 	github.com/grafana/xk6-redis v0.3.4
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
