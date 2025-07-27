@@ -1170,6 +1170,30 @@ func TestClient(t *testing.T) {
 			`,
 			},
 		},
+		{
+			name: "ObjectCyclicReference",
+			initString: codeBlock{
+				code: `
+				var client = new grpc.Client();
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_wrappers_testing/test.proto");`,
+			},
+			setup: func(tb *httpmultibin.HTTPMultiBin) {
+				reflection.Register(tb.ServerGRPC)
+			},
+			vuString: codeBlock{
+				code: `
+				client.connect("GRPCBIN_ADDR");
+
+				let obj1 = {};
+				let obj2 = {};
+				obj1.a = obj2;
+				obj2.b = obj1;
+
+				let respNaN = client.invoke("grpc.wrappers.testing.Service/TestDouble", obj1);
+				`,
+				err: "cyclic reference to an object found",
+			},
+		},
 	}
 
 	for _, tt := range tests {
