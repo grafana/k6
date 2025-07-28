@@ -73,7 +73,9 @@ type NetworkManager struct {
 	// These two maps are used to store the events so we can call onRequest with both of them,
 	// regardless of the order of the events
 	reqIDToRequestWillBeSentEvent map[network.RequestID]*network.EventRequestWillBeSent
+	eventsWillBeSentMu            sync.RWMutex
 	reqIDToRequestPausedEvent     map[network.RequestID]*fetch.EventRequestPaused
+	eventsPausedMu                sync.RWMutex
 
 	attemptedAuth map[fetch.RequestID]bool
 
@@ -578,11 +580,15 @@ func (m *NetworkManager) onRequestWillBeSent(event *network.EventRequestWillBeSe
 
 	if m.protocolReqInterceptionEnabled {
 		requestID := event.RequestID
-		if requestPausedEvent, ok := m.reqIDToRequestPausedEvent[requestID]; ok {
+		if requestPausedEvent, ok := m.pausedEventFromReqID(requestID); ok {
 			m.onRequest(event, requestPausedEvent)
+			m.eventsPausedMu.Lock()
 			delete(m.reqIDToRequestPausedEvent, requestID)
+			m.eventsPausedMu.Unlock()
 		} else {
+			m.eventsWillBeSentMu.Lock()
 			m.reqIDToRequestWillBeSentEvent[requestID] = event
+			m.eventsWillBeSentMu.Unlock()
 		}
 	} else {
 		m.onRequest(event, nil)
@@ -604,11 +610,15 @@ func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
 
 	defer func() {
 		requestID := event.NetworkID
-		if requestWillBeSentEvent, ok := m.reqIDToRequestWillBeSentEvent[requestID]; ok {
+		if requestWillBeSentEvent, ok := m.willBeSentEventFromReqID(requestID); ok {
 			m.onRequest(requestWillBeSentEvent, event)
+			m.eventsWillBeSentMu.Lock()
 			delete(m.reqIDToRequestWillBeSentEvent, requestID)
+			m.eventsWillBeSentMu.Unlock()
 		} else {
+			m.eventsPausedMu.Lock()
 			m.reqIDToRequestPausedEvent[requestID] = event
+			m.eventsPausedMu.Unlock()
 		}
 
 		if failErr != nil {
@@ -756,6 +766,24 @@ func (m *NetworkManager) requestFromID(reqID network.RequestID) (*Request, bool)
 	r, ok := m.reqIDToRequest[reqID]
 
 	return r, ok
+}
+
+func (m *NetworkManager) willBeSentEventFromReqID(reqID network.RequestID) (*network.EventRequestWillBeSent, bool) {
+	m.eventsWillBeSentMu.RLock()
+	defer m.eventsWillBeSentMu.RUnlock()
+
+	e, ok := m.reqIDToRequestWillBeSentEvent[reqID]
+
+	return e, ok
+}
+
+func (m *NetworkManager) pausedEventFromReqID(reqID network.RequestID) (*fetch.EventRequestPaused, bool) {
+	m.eventsPausedMu.RLock()
+	defer m.eventsPausedMu.RUnlock()
+
+	e, ok := m.reqIDToRequestPausedEvent[reqID]
+
+	return e, ok
 }
 
 func (m *NetworkManager) setRequestInterception(value bool) error {
