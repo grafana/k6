@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"reflect"
 	"strings"
 	"time"
 
@@ -407,7 +408,8 @@ func normalizeNumberStrings(v sobek.Value, runtime *sobek.Runtime, stack []*sobe
 	}
 
 	// Handle special float values.
-	if f, ok := v.Export().(float64); ok {
+	if v.ExportType().Kind() == reflect.Float64 {
+		f := v.ToFloat()
 		switch {
 		case math.IsNaN(f):
 			return runtime.ToValue("NaN"), nil
