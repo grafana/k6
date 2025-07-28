@@ -255,6 +255,7 @@ type Page struct {
 	workers          map[target.SessionID]*Worker
 	workersMu        sync.Mutex
 	routes           []*RouteHandler
+	routesMu         sync.RWMutex
 	vu               k6modules.VU
 
 	logger *log.Logger
@@ -785,6 +786,9 @@ func (p *Page) getFrameSession(frameID cdp.FrameID) (*FrameSession, bool) {
 }
 
 func (p *Page) hasRoutes() bool {
+	p.routesMu.RLock()
+	defer p.routesMu.RUnlock()
+
 	return len(p.routes) > 0
 }
 
@@ -1298,7 +1302,7 @@ func (p *Page) Route(
 ) error {
 	p.logger.Debugf("Page:Route", "sid:%v path:%s", p.sessionID(), path)
 
-	if len(p.routes) == 0 {
+	if !p.hasRoutes() {
 		err := p.mainFrameSession.updateRequestInterception(true)
 		if err != nil {
 			return err
@@ -1311,6 +1315,8 @@ func (p *Page) Route(
 	}
 
 	routeHandler := NewRouteHandler(path, handlerCallback, matcher)
+	p.routesMu.Lock()
+	defer p.routesMu.Unlock()
 	p.routes = append([]*RouteHandler{routeHandler}, p.routes...)
 
 	return nil
