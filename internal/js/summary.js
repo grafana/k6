@@ -882,9 +882,9 @@ function renderMetricLine(
 	const fmtIndent = renderContext.indentLevel();
 
 	// Compute the trailing dots:
-	// Use `3` as a spacing offset as per original code.
-	const dotsCount =
-		maxNameWidth - strWidth(displayedName) - strWidth(fmtIndent) + 3;
+	// Ensure longest metric name gets exactly 3 dots, shorter names get more for alignment
+	const currentNameWidth = strWidth(displayedName) + strWidth(fmtIndent);
+	const dotsCount = Math.max(3, maxNameWidth - currentNameWidth + 3);
 	const dottedName =
 		displayedName +
 		formatter.decorate('.'.repeat(dotsCount) + ':', 'white', 'faint');
@@ -1083,7 +1083,7 @@ function computeSummaryInfo(metrics, renderContext, options) {
 	for (const name of metricNames) {
 		const metric = metrics[name];
 		const displayName = renderContext.indent(
-			name + renderMetricDisplayName(name),
+			renderMetricDisplayName(name),
 		);
 		maxNameWidth = Math.max(maxNameWidth, strWidth(displayName));
 
