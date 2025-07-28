@@ -792,6 +792,13 @@ func (p *Page) hasRoutes() bool {
 	return len(p.routes) > 0
 }
 
+func (p *Page) getRoutes() []*RouteHandler {
+	p.routesMu.RLock()
+	defer p.routesMu.RUnlock()
+
+	return p.routes
+}
+
 func (p *Page) resetViewport() error {
 	p.logger.Debugf("Page:resetViewport", "sid:%v", p.sessionID())
 

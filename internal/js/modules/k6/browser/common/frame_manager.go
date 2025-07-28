@@ -546,7 +546,8 @@ func (m *FrameManager) requestStarted(req *Request) {
 	}
 
 	route := NewRoute(m.logger, m.page.mainFrameSession.networkManager, req)
-	for _, r := range m.page.routes {
+	routeHandlers := m.page.getRoutes()
+	for _, r := range routeHandlers {
 		matched, err := r.urlMatcher(req.URL())
 		if err != nil {
 			m.logger.Errorf("FrameManager:requestStarted",
