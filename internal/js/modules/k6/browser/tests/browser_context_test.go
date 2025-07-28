@@ -967,3 +967,28 @@ func TestBrowserContextClearPermissions(t *testing.T) {
 		require.False(t, hasPermission(tb, p, "geolocation"))
 	})
 }
+
+func TestBrowserContextMappingBehavior(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t)
+	tb.vu.ActivateVU()
+	tb.vu.StartIteration(t)
+
+	// By default, `browser.context()` returns a nullish value,
+	// so when using optional chaining (i.e., '?.') to call one of the mapping methods,
+	// it shouldn't panic, as described in https://github.com/grafana/k6/issues/4936.
+	value, err := tb.vu.RunOnEventLoop(t, `browser.context()?.pages() != null`)
+	require.NoError(t, err)
+	require.False(t, value.ToBoolean())
+
+	_, err = tb.vu.RunAsync(t, `await browser.newContext();`)
+	require.NoError(t, err)
+
+	// Now, after having called `browser.newContext()` as above, it should return
+	// a non-null Browser context, so when calling one of the mapping methods, it
+	// should also return a non-null value.
+	value, err = tb.runtime().RunString(`browser.context()?.pages() != null`)
+	require.NoError(t, err)
+	require.True(t, value.ToBoolean())
+}
