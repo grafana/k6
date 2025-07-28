@@ -118,24 +118,20 @@ func (a *archiveAnalizer) analyze() (Dependencies, error) {
 	return processArchive(a.src)
 }
 
-type mergeAnalyzer struct {
-	analyzers []analyzer
-}
+// resolve the overides of the dependencies from multiple analyzers
+func resolveOverrides(src analyzer, overrides ...analyzer) (Dependencies, error) {
+	deps, err := src.analyze()
+	if err != nil {
+		return nil, err
+	}
 
-func newMergeAnalyzer(analyzers ...analyzer) analyzer {
-	return &mergeAnalyzer{analyzers: analyzers}
-}
-
-func (m *mergeAnalyzer) analyze() (Dependencies, error) {
-	deps := make(Dependencies)
-
-	for _, a := range m.analyzers {
+	for _, a := range overrides {
 		dep, err := a.analyze()
 		if err != nil {
 			return nil, err
 		}
 
-		err = deps.Merge(dep)
+		err = deps.Override(dep)
 		if err != nil {
 			return nil, err
 		}
