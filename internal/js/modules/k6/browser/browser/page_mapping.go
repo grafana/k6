@@ -717,6 +717,10 @@ func prepK6BrowserRegExChecker(rt *sobek.Runtime) func() error {
 // for URL pattern matching. This handles regex patterns only using JavaScript's regex
 // engine for consistency. It returns a function that can be used to check if a URL
 // matches a given pattern in the JS runtime's eventloop.
+//
+// Do not call this off the main thread (not even from within a promise). The returned
+// JSRegexChecker can be called from off the main thread (i.e. in a new goroutine) since
+// it will queue up the checker on the event loop.
 func injectRegexMatcherScript(ctx context.Context, vu moduleVU, targetID string) (common.JSRegexChecker, error) {
 	rt := vu.Runtime()
 
@@ -725,13 +729,14 @@ func injectRegexMatcherScript(ctx context.Context, vu moduleVU, targetID string)
 		return nil, fmt.Errorf("preparing k6 browser regex checker: %w", err)
 	}
 
+	tq := vu.get(ctx, targetID)
+
 	return func(pattern, url string) (bool, error) {
 		var (
 			result bool
 			err    error
 		)
 
-		tq := vu.get(ctx, targetID)
 		done := make(chan struct{})
 
 		tq.Queue(func() error {
