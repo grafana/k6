@@ -200,9 +200,6 @@ func decodeTimeout(s string) (time.Duration, error) {
 	if err != nil {
 		return 0, err
 	}
-	if t == 0 {
-		return 0, fmt.Errorf("transport: timeout must be positive: %q", s)
-	}
 	const maxHours = math.MaxInt64 / uint64(time.Hour)
 	if d == time.Hour && t > maxHours {
 		// This timeout would overflow math.MaxInt64; clamp it.
