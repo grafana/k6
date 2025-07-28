@@ -17,7 +17,92 @@ import (
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/dynamicpb"
+
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 )
+
+type healthcheckmock func(in *healthpb.HealthCheckRequest, out *healthpb.HealthCheckResponse, opts ...grpc.CallOption) error
+
+func (im healthcheckmock) Invoke(_ context.Context, _ string, payload, reply any, opts ...grpc.CallOption) error {
+	in, ok := payload.(*healthpb.HealthCheckRequest)
+	if !ok {
+		return fmt.Errorf("unexpected type for payload")
+	}
+	out, ok := reply.(*healthpb.HealthCheckResponse)
+	if !ok {
+		return fmt.Errorf("unexpected type for reply")
+	}
+	return im(in, out, opts...)
+}
+
+func (healthcheckmock) Close() error {
+	return nil
+}
+
+func (healthcheckmock) NewStream(_ context.Context, _ *grpc.StreamDesc, _ string, _ ...grpc.CallOption) (grpc.ClientStream, error) {
+	panic("not implemented")
+}
+
+func TestHealthCheck(t *testing.T) {
+	t.Parallel()
+
+	servingsSvc := "serving-service"
+	notServingSvc := "not-serving-service"
+	healthReply := func(req *healthpb.HealthCheckRequest, out *healthpb.HealthCheckResponse, _ ...grpc.CallOption) error {
+		var status healthpb.HealthCheckResponse_ServingStatus
+		switch req.Service {
+		case "", notServingSvc:
+			status = healthpb.HealthCheckResponse_NOT_SERVING
+		case servingsSvc:
+			status = healthpb.HealthCheckResponse_SERVING
+		default:
+			status = healthpb.HealthCheckResponse_UNKNOWN
+		}
+
+		err := protojson.Unmarshal(fmt.Appendf(nil, `{"status":%d}`, status), out)
+		require.NoError(t, err)
+
+		return nil
+	}
+	c := Conn{raw: healthcheckmock(healthReply)}
+
+	cases := []struct {
+		name           string
+		svc            string
+		expectedStatus healthpb.HealthCheckResponse_ServingStatus
+	}{
+		{
+			name:           "server is not serving",
+			svc:            "",
+			expectedStatus: healthpb.HealthCheckResponse_NOT_SERVING,
+		},
+		{
+			name:           "unknown service",
+			svc:            "unknown-service",
+			expectedStatus: healthpb.HealthCheckResponse_UNKNOWN,
+		},
+		{
+			name:           "serving service",
+			svc:            servingsSvc,
+			expectedStatus: healthpb.HealthCheckResponse_SERVING,
+		},
+		{
+			name:           "not serving service",
+			svc:            notServingSvc,
+			expectedStatus: healthpb.HealthCheckResponse_NOT_SERVING,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			res, err := c.HealthCheck(context.Background(), tc.svc)
+			require.NoError(t, err)
+			assert.Equal(t, tc.expectedStatus, res.Status)
+		})
+	}
+}
 
 func TestInvoke(t *testing.T) {
 	t.Parallel()

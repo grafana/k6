@@ -43,12 +43,21 @@ type rootCommand struct {
 	stopLoggersCh  chan struct{}
 	loggersWg      sync.WaitGroup
 	loggerIsRemote bool
+	launcher       *launcher
 }
 
+// newRootCommand creates a root command with a default launcher
 func newRootCommand(gs *state.GlobalState) *rootCommand {
+	return newRootWithLauncher(gs, newLauncher(gs))
+}
+
+// newRootWithLauncher creates a root command with a launcher.
+// It facilitates unit testing scenarios.
+func newRootWithLauncher(gs *state.GlobalState, l *launcher) *rootCommand {
 	c := &rootCommand{
 		globalState:   gs,
 		stopLoggersCh: make(chan struct{}),
+		launcher:      l,
 	}
 	// the base command when called without any subcommands.
 	rootCmd := &cobra.Command{
@@ -89,13 +98,24 @@ func newRootCommand(gs *state.GlobalState) *rootCommand {
 	return c
 }
 
-func (c *rootCommand) persistentPreRunE(_ *cobra.Command, _ []string) error {
+func (c *rootCommand) persistentPreRunE(cmd *cobra.Command, args []string) error {
 	err := c.setupLoggers(c.stopLoggersCh)
 	if err != nil {
 		return err
 	}
+
 	c.globalState.Logger.Debugf("k6 version: v%s", fullVersion())
-	return nil
+
+	// If binary provisioning is not enabled, continue with the regular k6 execution path
+	if !c.globalState.Flags.BinaryProvisioning {
+		c.globalState.Logger.Debug("Binary Provisioning feature is disabled.")
+		return nil
+	}
+
+	c.globalState.Logger.
+		Debug("Binary Provisioning feature is enabled.")
+
+	return c.launcher.launch(cmd, args)
 }
 
 func (c *rootCommand) execute() {
