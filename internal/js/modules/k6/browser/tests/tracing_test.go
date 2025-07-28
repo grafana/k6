@@ -89,6 +89,8 @@ func TestTracing(t *testing.T) {
 	require.NoError(t, tracer.verifySpans("iteration"))
 	setupTestTracing(t, rt)
 
+	// NOTE: These tests run sequentially, not in parallel. This has been done
+	// on purpose.
 	testCases := []struct {
 		name  string
 		js    string
@@ -133,20 +135,28 @@ func TestTracing(t *testing.T) {
 			},
 		},
 		{
+			// In this test, since we're using waitForNavigation, which uses a
+			// taskqueue, we need to manually clear it by calling page.close.
+			// During normal testing runtime it would be cleared when we receive
+			// a iterationEnd event from k6.
 			name: "page.reload",
 			js: `await Promise.all([
 					page.waitForNavigation(),
 					page.reload(),
-			  	]);`,
+				]);
+				await page.close();`,
 			spans: []string{
 				"page.reload",
 				"page.waitForNavigation",
+				"page.close",
 			},
 		},
 		{
 			name: "page.waitForTimeout",
-			js:   "page.waitForTimeout(10);",
+			js: `page = await browser.context().newPage();
+				 await page.waitForTimeout(10);`,
 			spans: []string{
+				"browserContext.newPage",
 				"page.waitForTimeout",
 			},
 		},
