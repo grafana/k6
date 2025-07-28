@@ -11,9 +11,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/guregu/null.v3"
+
 	"go.k6.io/k6/internal/output/prometheusrw/remote"
 	"go.k6.io/k6/lib/types"
-	"gopkg.in/guregu/null.v3"
 )
 
 func TestConfigApply(t *testing.T) {
@@ -74,6 +75,7 @@ func TestConfigRemoteConfig(t *testing.T) {
 		Timeout: 5 * time.Second,
 		TLSConfig: &tls.Config{
 			InsecureSkipVerify: true, //nolint:gosec
+			MinVersion:         tls.VersionTLS13,
 		},
 		BasicAuth: &remote.BasicAuth{
 			Username: "myuser",
