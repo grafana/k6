@@ -466,6 +466,7 @@ type ServerConfig struct {
 	MaxHeaderListSize     *uint32
 	HeaderTableSize       *uint32
 	BufferPool            mem.BufferPool
+	StaticWindowSize      bool
 }
 
 // ConnectOptions covers all relevant options for communicating with the server.
@@ -504,6 +505,8 @@ type ConnectOptions struct {
 	MaxHeaderListSize *uint32
 	// The mem.BufferPool to use when reading/writing to the wire.
 	BufferPool mem.BufferPool
+	// StaticWindowSize controls whether dynamic window sizing is enabled.
+	StaticWindowSize bool
 }
 
 // WriteOptions provides additional hints and information for message
