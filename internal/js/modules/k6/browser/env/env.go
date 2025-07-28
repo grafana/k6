@@ -43,14 +43,6 @@ const (
 
 // Logging and debugging.
 const (
-	// EnableProfiling is an environment variable that can be used to
-	// enable profiling for the browser. It will start up a debugging
-	// server on ProfilingServerAddr.
-	EnableProfiling = "K6_BROWSER_ENABLE_PPROF"
-
-	// ProfilingServerAddr is the address of the profiling server.
-	ProfilingServerAddr = "localhost:6060"
-
 	// LogCaller is an environment variable that can be used to enable
 	// the caller function information in the browser logs.
 	LogCaller = "K6_BROWSER_LOG_CALLER"

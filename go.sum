@@ -91,8 +91,8 @@ github.com/grafana/k6foundry v0.4.6 h1:fFgR72Pw0dzo8wVWyggu35SGGjdt31Dktil1bDE1M
 github.com/grafana/k6foundry v0.4.6/go.mod h1:eLsr0whhH+5Y1y7YpDxJi3Jv5wHMuf+80vdRyMH10pg=
 github.com/grafana/k6provider v0.1.15 h1:aUStpqDMEnEL9aGCcSKmpcreHRZsr8IELna+ttKMOYI=
 github.com/grafana/k6provider v0.1.15/go.mod h1:tnyPNxenfF0G5JWVXQixk7QUJIn2FbZneDfvgocttNs=
-github.com/grafana/sobek v0.0.0-20250320150027-203dc85b6d98 h1:DqWI8D/A8GABIIjukZVNr0Sj4sBeewK2TmbTyiqUAZk=
-github.com/grafana/sobek v0.0.0-20250320150027-203dc85b6d98/go.mod h1:FmcutBFPLiGgroH42I4/HBahv7GxVjODcVWFTw1ISes=
+github.com/grafana/sobek v0.0.0-20250723111835-dd8a13f0d439 h1:8J9JisdHRtzAApem1KriElKd8mLyPuKkFDMuqI9S95c=
+github.com/grafana/sobek v0.0.0-20250723111835-dd8a13f0d439/go.mod h1:FmcutBFPLiGgroH42I4/HBahv7GxVjODcVWFTw1ISes=
 github.com/grafana/xk6-dashboard v0.7.10 h1:/rPCiXahp8E/Ry0MRVcIs/L4UpKT/ldAXWxKxSal3aM=
 github.com/grafana/xk6-dashboard v0.7.10/go.mod h1:ofJsxGG4TTuzSUvTU8BroyCBy6A44/ksi4x/hUNeiYA=
 github.com/grafana/xk6-redis v0.3.4 h1:IkB9N9YHU4u+BvBU+P0PJkCAZvYCyeXJNlb1XQjYXyU=

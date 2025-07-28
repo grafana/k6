@@ -12,9 +12,10 @@ import (
 
 	"go.k6.io/k6/internal/output/prometheusrw/sigv4"
 
+	"gopkg.in/guregu/null.v3"
+
 	"go.k6.io/k6/internal/output/prometheusrw/remote"
 	"go.k6.io/k6/lib/types"
-	"gopkg.in/guregu/null.v3"
 )
 
 const (
@@ -115,6 +116,7 @@ func (conf Config) RemoteConfig() (*remote.HTTPConfig, error) {
 
 	hc.TLSConfig = &tls.Config{
 		InsecureSkipVerify: conf.InsecureSkipTLSVerify.Bool, //nolint:gosec
+		MinVersion:         tls.VersionTLS13,
 	}
 
 	if conf.ClientCertificate.Valid && conf.ClientCertificateKey.Valid {
