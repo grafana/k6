@@ -259,7 +259,7 @@ func TestLauncherLaunch(t *testing.T) {
 	}
 }
 
-func TestStdin(t *testing.T) {
+func TestLauncherViaStdin(t *testing.T) {
 	t.Parallel()
 
 	k6Args := []string{"k6", "archive", "-"}
@@ -399,7 +399,7 @@ func TestIsAnalysisRequired(t *testing.T) {
 	}
 }
 
-func TestBridgeOpen(t *testing.T) {
+func TestIOFSBridgeOpen(t *testing.T) {
 	t.Parallel()
 
 	testfs := afero.NewMemMapFs()
