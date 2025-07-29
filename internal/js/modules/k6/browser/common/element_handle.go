@@ -79,8 +79,10 @@ func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, point Position)
 	if err != nil {
 		return false, fmt.Errorf("checking hit target at %v: %w", point, err)
 	}
+
+	el := h
 	if frame != nil && frame.parentFrame != nil {
-		el, err := frame.FrameElement()
+		el, err = frame.FrameElement()
 		if err != nil {
 			return false, err
 		}
@@ -91,10 +93,11 @@ func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, point Position)
 		if box == nil {
 			return false, errors.New("missing bounding box of element")
 		}
-		// Translate from viewport coordinates to frame coordinates.
-		point.X -= box.X
-		point.Y -= box.Y
+		// Translate from frame coordinates to page coordinates.
+		point.X += box.X
+		point.Y += box.Y
 	}
+
 	fn := `
 		(node, injected, point) => {
 			return injected.checkHitTargetAt(node, point);
@@ -104,7 +107,7 @@ func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, point Position)
 		forceCallable: true,
 		returnByValue: true,
 	}
-	result, err := h.evalWithScript(h.ctx, opts, fn, point)
+	result, err := el.evalWithScript(el.ctx, opts, fn, point)
 	if err != nil {
 		return false, err
 	}
