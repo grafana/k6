@@ -150,37 +150,17 @@ func (h *ElementHandle) translatePointToPage(apiCtx context.Context, point Posit
 // checkHitTargetAt checks if the element is hit by the pointer at the given point.
 // If the element is in an iframe, we need to translate the point to the page's
 // coordinates as well as work with the iframe during the hit check.
-func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, point Position) (Position, bool, error) {
+func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, point Position) (bool, error) {
 	frame, err := h.ownerFrame(apiCtx)
 	if err != nil {
-		return Position{}, false, fmt.Errorf("checking hit target at %v: %w", point, err)
+		return false, fmt.Errorf("checking hit target at %v: %w", point, err)
 	}
 
 	el := h
 	if frame != nil && frame.parentFrame != nil {
 		el, err = frame.FrameElement()
 		if err != nil {
-			return Position{}, false, err
-		}
-
-		c, err := h.canAccessParent()
-		if err != nil {
-			return Position{}, false, err
-		}
-
-		// If c is false it means the coordinates are relative to the iframe.
-		// Change it so that it is relative to the page.
-		if !c {
-			box, err := el.boundingBox()
-			if err != nil {
-				return Position{}, false, err
-			}
-			if box == nil {
-				return Position{}, false, errors.New("missing bounding box of element")
-			}
-			// Translate from frame coordinates to page coordinates.
-			point.X += box.X
-			point.Y += box.Y
+			return false, err
 		}
 	}
 
@@ -195,7 +175,7 @@ func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, point Position)
 	}
 	result, err := el.evalWithScript(el.ctx, opts, fn, point)
 	if err != nil {
-		return Position{}, false, err
+		return false, err
 	}
 
 	// Either we're done or an error happened (returned as "error:..." from JS)
@@ -208,12 +188,12 @@ func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, point Position)
 		// We just don't interpret what is intercepting with the target element
 		// because we don't need any more functionality from this JS function
 		// right now.
-		return Position{}, false, errorFromDOMError("error:intercept")
+		return false, errorFromDOMError("error:intercept")
 	} else if v != done {
-		return Position{}, false, errorFromDOMError(v)
+		return false, errorFromDOMError(v)
 	}
 
-	return point, true, nil
+	return true, nil
 }
 
 func (h *ElementHandle) checkElementState(_ context.Context, state string) (*bool, error) {
@@ -1728,7 +1708,7 @@ func (h *ElementHandle) newAction(
 	}
 }
 
-//nolint:gocognit
+//nolint:gocognit,funlen
 func (h *ElementHandle) newPointerAction(
 	fn elementHandlePointerActionFunc, opts *ElementHandleBasePointerOptions,
 ) func(apiCtx context.Context, resultCh chan any, errCh chan error) {
@@ -1789,7 +1769,7 @@ func (h *ElementHandle) newPointerAction(
 		// at mouse position in question
 		if !opts.Force {
 			var ok bool
-			if *p, ok, err = h.checkHitTargetAt(apiCtx, *p); !ok {
+			if ok, err = h.checkHitTargetAt(apiCtx, *p); !ok {
 				return nil, fmt.Errorf("checking hit target: %w", err)
 			}
 		}
