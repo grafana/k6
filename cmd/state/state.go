@@ -29,10 +29,6 @@ const (
 
 	// DefaultBuildServiceURL defines the URL to the default (grafana hosted) build service
 	DefaultBuildServiceURL = "https://ingest.k6.io/builder/api/v1"
-	// CloudExtensionsCatalog defines the extensions catalog for cloud supported extensions
-	CloudExtensionsCatalog = "cloud"
-	// CommunityExtensionsCatalog defines the extensions catalog for community extensions
-	CommunityExtensionsCatalog = "oss"
 
 	defaultConfigFileName = "config.json"
 	defaultBinaryCacheDir = "builds"

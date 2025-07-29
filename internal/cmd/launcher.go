@@ -19,6 +19,13 @@ import (
 	"go.k6.io/k6/internal/build"
 )
 
+const (
+	// cloudExtensionsCatalog defines the extensions catalog for cloud supported extensions
+	cloudExtensionsCatalog = "cloud"
+	// communityExtensionsCatalog defines the extensions catalog for community extensions
+	communityExtensionsCatalog = "oss"
+)
+
 var (
 	errScriptNotFound     = errors.New("script not found")
 	errUnsupportedFeature = errors.New("not supported")
@@ -252,9 +259,9 @@ func getBuildServiceURL(flags state.GlobalFlags, logger *logrus.Logger) (string,
 		return "", fmt.Errorf("invalid URL to binary provisioning build service: %w", err)
 	}
 
-	catalog := state.CloudExtensionsCatalog
+	catalog := cloudExtensionsCatalog
 	if flags.EnableCommunityExtensions {
-		catalog = state.CommunityExtensionsCatalog
+		catalog = communityExtensionsCatalog
 	}
 
 	logger.

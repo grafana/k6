@@ -363,17 +363,17 @@ func TestGetBuildServiceURL(t *testing.T) {
 	}{
 		{
 			name:                      "default build service url",
-			buildSrvURL:               state.DefaultBuildServiceURL,
+			buildSrvURL:               "https://build.srv",
 			enableCommunityExtensions: false,
 			expectErr:                 false,
-			expected:                  fmt.Sprintf("%s/%s", state.DefaultBuildServiceURL, state.CloudExtensionsCatalog),
+			expected:                  "https://build.srv/cloud",
 		},
 		{
 			name:                      "enable community extensions",
-			buildSrvURL:               state.DefaultBuildServiceURL,
+			buildSrvURL:               "https://build.srv",
 			enableCommunityExtensions: true,
 			expectErr:                 false,
-			expected:                  fmt.Sprintf("%s/%s", state.DefaultBuildServiceURL, state.CommunityExtensionsCatalog),
+			expected:                  "https://build.srv/oss",
 		},
 		{
 			name:                      "invalid buildServiceURL",
@@ -396,17 +396,11 @@ func TestGetBuildServiceURL(t *testing.T) {
 			}
 
 			buildSrvURL, err := getBuildServiceURL(flags, logger)
-
-			if !tc.expectErr && err != nil {
-				t.Fatalf("unexpected error %v", err)
-			}
-
-			if tc.expectErr && err == nil {
-				t.Fatalf("expected error got none")
-			}
-
-			if !tc.expectErr && buildSrvURL != tc.expected {
-				t.Fatalf("expected buildSrvURL %q got %q", tc.expected, buildSrvURL)
+			if tc.expectErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tc.expected, buildSrvURL)
 			}
 		})
 	}
