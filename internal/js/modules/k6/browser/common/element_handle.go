@@ -100,6 +100,53 @@ func (h *ElementHandle) canAccessParent() (bool, error) {
 	return r, nil
 }
 
+// translatePointToPage translates the point to the page's coordinates if the
+// element is in an iframe and the frame is from a different origin (CORS) to
+// the parent frame.
+func (h *ElementHandle) translatePointToPage(apiCtx context.Context, point Position) (Position, error) {
+	frame, err := h.ownerFrame(apiCtx)
+	if err != nil {
+		return Position{}, fmt.Errorf("checking hit target at %v: %w", point, err)
+	}
+
+	if frame == nil || frame.parentFrame == nil {
+		h.logger.Debugf("ElementHandle:translatePointToPage", "no parent frame")
+		return point, nil
+	}
+
+	c, err := h.canAccessParent()
+	if err != nil {
+		return Position{}, err
+	}
+
+	if c {
+		h.logger.Debugf("ElementHandle:translatePointToPage", "no CORS issues, can access parent")
+		return point, nil
+	}
+
+	// If c is false it means the coordinates are relative to the iframe.
+	// Change it so that it is relative to the page.
+	el, err := frame.FrameElement()
+	if err != nil {
+		return Position{}, err
+	}
+
+	box, err := el.boundingBox()
+	if err != nil {
+		return Position{}, err
+	}
+	if box == nil {
+		return Position{}, errors.New("missing bounding box of element")
+	}
+	// Translate from frame coordinates to page coordinates.
+	point.X += box.X
+	point.Y += box.Y
+
+	h.logger.Debugf("ElementHandle:translatePointToPage", "translated point to page")
+
+	return point, nil
+}
+
 // checkHitTargetAt checks if the element is hit by the pointer at the given point.
 // If the element is in an iframe, we need to translate the point to the page's
 // coordinates as well as work with the iframe during the hit check.
@@ -1731,6 +1778,13 @@ func (h *ElementHandle) newPointerAction(
 		if err != nil {
 			return nil, fmt.Errorf("getting element position: %w", err)
 		}
+
+		// If the element is in an iframe, we need to translate the point to the page's.
+		*p, err = h.translatePointToPage(apiCtx, *p)
+		if err != nil {
+			return nil, fmt.Errorf("translating point to page: %w", err)
+		}
+
 		// Do a final actionability check to see if element can receive events
 		// at mouse position in question
 		if !opts.Force {
