@@ -1324,6 +1324,8 @@ func (p *Page) Route(
 	routeHandler := NewRouteHandler(path, handlerCallback, matcher)
 	p.routesMu.Lock()
 	defer p.routesMu.Unlock()
+	// Append new route at the beginning of the slice as, when several routes match the given pattern,
+	// they will run in the opposite order to their registration.
 	p.routes = append([]*RouteHandler{routeHandler}, p.routes...)
 
 	return nil
