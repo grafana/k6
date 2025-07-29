@@ -252,7 +252,7 @@ func (p *k6buildProvisioner) provision(deps k6deps.Dependencies) (commandExecuto
 }
 
 // return the URL to the build service based on the configuration flags defined
-func getBuildServiceURL(flags state.GlobalFlags, logger *logrus.Logger) (string, error) {
+func getBuildServiceURL(flags state.GlobalFlags, logger *logrus.Logger) (string, error) { //nolint:forbidigo
 	buildSrv := flags.BuildServiceURL
 	buildSrvURL, err := url.Parse(buildSrv)
 	if err != nil {
