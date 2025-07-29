@@ -199,7 +199,7 @@ class ReportBuilder {
 		this.renderContext = renderContext;
 		this.options = options;
 		this.sections = [];
-		this.globalMaxNameWidth = null;
+		this.globalMaxNameWidth = 0;
 	}
 
 	/**
