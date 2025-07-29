@@ -13,6 +13,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/grafana/k6deps"
 	"github.com/grafana/k6provider"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/internal/build"
@@ -217,20 +218,10 @@ func newK6BuildProvisioner(gs *state.GlobalState) provisioner {
 }
 
 func (p *k6buildProvisioner) provision(deps k6deps.Dependencies) (commandExecutor, error) {
-	buildSrv := p.gs.Flags.BuildServiceURL
-	buildSrvURL, err := url.Parse(buildSrv)
+	buildSrv, err := getBuildServiceURL(p.gs.Flags, p.gs.Logger)
 	if err != nil {
-		return nil, fmt.Errorf("invalid URL to binary provisioning build service: %w", err)
+		return nil, err
 	}
-
-	catalog := state.CloudExtensionsCatalog
-	if p.gs.Flags.EnableCommunityExtensions {
-		catalog = state.CommunityExtensionsCatalog
-	}
-	buildSrv = buildSrvURL.JoinPath(catalog).String()
-
-	p.gs.Logger.
-		Debugf("using the %q extensions catalog", catalog)
 
 	config := k6provider.Config{
 		BuildServiceURL: buildSrv,
@@ -251,6 +242,25 @@ func (p *k6buildProvisioner) provision(deps k6deps.Dependencies) (commandExecuto
 		Info("A new k6 binary has been provisioned with version(s): ", formatDependencies(binary.Dependencies))
 
 	return &customBinary{binary.Path}, nil
+}
+
+// return the URL to the build service based on the configuration flags defined
+func getBuildServiceURL(flags state.GlobalFlags, logger *logrus.Logger) (string, error) {
+	buildSrv := flags.BuildServiceURL
+	buildSrvURL, err := url.Parse(buildSrv)
+	if err != nil {
+		return "", fmt.Errorf("invalid URL to binary provisioning build service: %w", err)
+	}
+
+	catalog := state.CloudExtensionsCatalog
+	if flags.EnableCommunityExtensions {
+		catalog = state.CommunityExtensionsCatalog
+	}
+
+	logger.
+		Debugf("using the %q extensions catalog", catalog)
+
+	return buildSrvURL.JoinPath(catalog).String(), nil
 }
 
 func formatDependencies(deps map[string]string) string {

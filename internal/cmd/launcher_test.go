@@ -3,11 +3,13 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/grafana/k6deps"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -345,6 +347,67 @@ func TestIsAnalysisRequired(t *testing.T) {
 
 			actual := isAnalysisRequired(cmd)
 			assert.Equal(t, tc.expected, actual)
+		})
+	}
+}
+
+func TestGetBuildServiceURL(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name                      string
+		buildSrvURL               string
+		enableCommunityExtensions bool
+		expectErr                 bool
+		expected                  string
+	}{
+		{
+			name:                      "default build service url",
+			buildSrvURL:               state.DefaultBuildServiceURL,
+			enableCommunityExtensions: false,
+			expectErr:                 false,
+			expected:                  fmt.Sprintf("%s/%s", state.DefaultBuildServiceURL, state.CloudExtensionsCatalog),
+		},
+		{
+			name:                      "enable community extensions",
+			buildSrvURL:               state.DefaultBuildServiceURL,
+			enableCommunityExtensions: true,
+			expectErr:                 false,
+			expected:                  fmt.Sprintf("%s/%s", state.DefaultBuildServiceURL, state.CommunityExtensionsCatalog),
+		},
+		{
+			name:                      "invalid buildServiceURL",
+			buildSrvURL:               "https://host:port",
+			enableCommunityExtensions: false,
+			expectErr:                 true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			logger := &logrus.Logger{
+				Out: io.Discard,
+			}
+
+			flags := state.GlobalFlags{
+				BinaryProvisioning:        true,
+				BuildServiceURL:           tc.buildSrvURL,
+				EnableCommunityExtensions: tc.enableCommunityExtensions,
+			}
+
+			buildSrvURL, err := getBuildServiceURL(flags, logger)
+
+			if !tc.expectErr && err != nil {
+				t.Fatalf("unexpected error %v", err)
+			}
+
+			if tc.expectErr && err == nil {
+				t.Fatalf("expected error got none")
+			}
+
+			if !tc.expectErr && buildSrvURL != tc.expected {
+				t.Fatalf("expected buildSrvURL %q got %q", tc.expected, buildSrvURL)
+			}
 		})
 	}
 }
