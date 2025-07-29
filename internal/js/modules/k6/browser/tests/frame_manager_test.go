@@ -198,7 +198,7 @@ func TestFrameManagerRequestStartedWithRoutes(t *testing.T) {
 			name:      "fulfill_request",
 			routePath: "/data/first",
 			routeHandler: func(route *common.Route) {
-				err := route.Fulfill(&common.FulfillOptions{
+				err := route.Fulfill(common.FulfillOptions{
 					Body:        `{"data": "Fulfilled data"}`,
 					ContentType: "application/json",
 					Headers: []common.HTTPHeader{

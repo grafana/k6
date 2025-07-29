@@ -764,7 +764,7 @@ func (r *Route) Continue() error {
 }
 
 // Fulfill fulfills the request with the given options for the response.
-func (r *Route) Fulfill(opts *FulfillOptions) error {
+func (r *Route) Fulfill(opts FulfillOptions) error {
 	err := r.startHandling()
 	if err != nil {
 		return err

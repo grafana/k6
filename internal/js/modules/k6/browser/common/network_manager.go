@@ -911,9 +911,9 @@ func (m *NetworkManager) ContinueRequest(requestID fetch.RequestID) error {
 	return nil
 }
 
-func (m *NetworkManager) FulfillRequest(request *Request, opts *FulfillOptions) error {
+func (m *NetworkManager) FulfillRequest(request *Request, opts FulfillOptions) error {
 	responseCode := int64(http.StatusOK)
-	if opts != nil && opts.Status != 0 {
+	if opts.Status != 0 {
 		responseCode = opts.Status
 	}
 

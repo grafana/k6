@@ -18,8 +18,8 @@ func mapRoute(vu moduleVU, route *common.Route) mapping {
 			})
 		},
 		"fulfill": func(opts sobek.Value) *sobek.Promise {
+			fopts := parseFulfillOptions(vu.Context(), opts)
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				fopts := parseFulfillOptions(vu.Context(), opts)
 				return nil, route.Fulfill(fopts)
 			})
 		},
@@ -29,14 +29,13 @@ func mapRoute(vu moduleVU, route *common.Route) mapping {
 	}
 }
 
-func parseFulfillOptions(ctx context.Context, opts sobek.Value) *common.FulfillOptions {
+func parseFulfillOptions(ctx context.Context, opts sobek.Value) common.FulfillOptions {
+	fopts := common.FulfillOptions{}
 	if !sobekValueExists(opts) {
-		return nil
+		return fopts
 	}
 
 	rt := k6ext.Runtime(ctx)
-	fopts := &common.FulfillOptions{}
-
 	obj := opts.ToObject(rt)
 	for _, k := range obj.Keys() {
 		switch k {
