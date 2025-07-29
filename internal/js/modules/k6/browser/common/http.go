@@ -762,7 +762,7 @@ func (r *Route) Abort(errorCode string) error {
 }
 
 // Continue continues the request.
-func (r *Route) Continue(opts *ContinueOptions) error {
+func (r *Route) Continue(opts ContinueOptions) error {
 	err := r.startHandling()
 	if err != nil {
 		return err

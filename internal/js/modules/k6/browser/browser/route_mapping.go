@@ -20,8 +20,8 @@ func mapRoute(vu moduleVU, route *common.Route) mapping {
 			})
 		},
 		"continue": func(opts sobek.Value) *sobek.Promise {
+			copts := parseContinueOptions(vu.Context(), opts)
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				copts := parseContinueOptions(vu.Context(), opts)
 				return nil, route.Continue(copts)
 			})
 		},
@@ -40,14 +40,13 @@ func mapRoute(vu moduleVU, route *common.Route) mapping {
 	}
 }
 
-func parseContinueOptions(ctx context.Context, opts sobek.Value) *common.ContinueOptions {
+func parseContinueOptions(ctx context.Context, opts sobek.Value) common.ContinueOptions {
+	copts := common.ContinueOptions{}
 	if !sobekValueExists(opts) {
-		return nil
+		return copts
 	}
 
 	rt := k6ext.Runtime(ctx)
-	copts := &common.ContinueOptions{}
-
 	obj := opts.ToObject(rt)
 	for _, k := range obj.Keys() {
 		switch k {

@@ -156,7 +156,7 @@ func TestFrameManagerRequestStartedWithRoutes(t *testing.T) {
 			name:      "continue_request_with_matching_string_route",
 			routePath: "/data/first",
 			routeHandler: func(route *common.Route) {
-				err := route.Continue(nil)
+				err := route.Continue(common.ContinueOptions{})
 				assert.NoError(t, err)
 			},
 			callsCount: callsCount{
@@ -169,7 +169,7 @@ func TestFrameManagerRequestStartedWithRoutes(t *testing.T) {
 			name:      "continue_request_with_non_matching_string_route",
 			routePath: "/data/third",
 			routeHandler: func(route *common.Route) {
-				err := route.Continue(nil)
+				err := route.Continue(common.ContinueOptions{})
 				assert.NoError(t, err)
 			},
 			callsCount: callsCount{
@@ -182,7 +182,7 @@ func TestFrameManagerRequestStartedWithRoutes(t *testing.T) {
 			name:      "continue_request_with_multiple_matching_regex_route",
 			routePath: "/data/.*",
 			routeHandler: func(route *common.Route) {
-				err := route.Continue(nil)
+				err := route.Continue(common.ContinueOptions{})
 				assert.NoError(t, err)
 			},
 			callsCount: callsCount{
@@ -196,7 +196,7 @@ func TestFrameManagerRequestStartedWithRoutes(t *testing.T) {
 			routePath: "/data/first",
 			routeHandler: func(route *common.Route) {
 				newURL := strings.Replace(route.Request().URL(), "/data/first", "/data/second", 1)
-				err := route.Continue(&common.ContinueOptions{
+				err := route.Continue(common.ContinueOptions{
 					URL: newURL,
 				})
 				assert.NoError(t, err)
