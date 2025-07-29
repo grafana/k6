@@ -891,9 +891,7 @@ func (m *NetworkManager) ContinueRequest(
 
 	if len(opts.Headers) > 0 {
 		allHeaders := mergeHeaders(originalHeaders, opts.Headers)
-		if len(allHeaders) > 0 {
-			action = action.WithHeaders(allHeaders)
-		}
+		action = action.WithHeaders(allHeaders)
 	}
 	if opts.URL != "" {
 		action = action.WithURL(opts.URL)
