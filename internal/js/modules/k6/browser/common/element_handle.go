@@ -74,6 +74,32 @@ func (h *ElementHandle) boundingBox() (*Rect, error) {
 	return &Rect{X: x + position.X, Y: y + position.Y, Width: width, Height: height}, nil
 }
 
+// canAccessParent returns true if the element can access the parent frame.
+// If it return true, then the frame is from the same origin as the parent frame.
+// If it returns false, then the frame is from a different origin (CORS).
+func (h *ElementHandle) canAccessParent() (bool, error) {
+	fn := `
+	(node, injected) => {
+		return injected.canAccessParent(node);
+	}`
+	opts := evalOptions{
+		forceCallable: true,
+		returnByValue: true,
+	}
+
+	res, err := h.evalWithScript(h.ctx, opts, fn)
+	if err != nil {
+		return false, fmt.Errorf("seeing if we can access parent frame: %w", err)
+	}
+
+	r, ok := res.(bool)
+	if !ok {
+		return false, fmt.Errorf("unexpected result type while trying to access parent frame: %T", res)
+	}
+
+	return r, nil
+}
+
 // checkHitTargetAt checks if the element is hit by the pointer at the given point.
 // If the element is in an iframe, we need to translate the point to the page's
 // coordinates as well as work with the iframe during the hit check.
