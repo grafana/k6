@@ -63,7 +63,8 @@ func newRootWithLauncher(gs *state.GlobalState, l *launcher) *rootCommand {
 	rootCmd := &cobra.Command{
 		Use:               gs.BinaryName,
 		Short:             "a next-generation load generator",
-		Long:              "\n" + getBanner(gs.Flags.NoColor || !gs.Stdout.IsTTY, isTrueColor(gs.Env)),
+		Long: "\n" + getBanner(gs.Flags.NoColor || !gs.Stdout.IsTTY, isTrueColor(gs.Env)) + 
+      		  "\n\nFull CLI documentation available at: https://docs.k6.io/docs/options",
 		SilenceUsage:      true,
 		SilenceErrors:     true,
 		PersistentPreRunE: c.persistentPreRunE,
