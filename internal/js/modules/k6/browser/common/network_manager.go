@@ -876,7 +876,6 @@ func (m *NetworkManager) AbortRequest(requestID fetch.RequestID, errorReason str
 		} else {
 			return fmt.Errorf("fail to abort request (id: %s): %w", requestID, err)
 		}
-		return nil
 	}
 
 	return nil
