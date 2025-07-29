@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package routeguide;
+
+option go_package = "go.k6.io/k6/testutils/grpcservice";
+
+// Interface exported by the server.
+service RouteGuide {
+  // A simple RPC.
+  //
+  // Obtains the feature at a given position.
+  rpc GetFeature(Point) returns (Feature) {}
+}
+
+// A point on the Earth.
+message Point {
+  int32 latitude = 1;
+  int32 longitude = 2;
+}
+
+// A feature names something at a given point.
+message Feature {
+  // The name of the feature.
+  string name = 1;
+
+  // The point where the feature is detected.
+  Point location = 2;
+} 
