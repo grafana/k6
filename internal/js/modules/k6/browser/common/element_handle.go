@@ -115,16 +115,26 @@ func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, point Position)
 		if err != nil {
 			return Position{}, false, err
 		}
-		box, err := el.boundingBox()
+
+		c, err := h.canAccessParent()
 		if err != nil {
 			return Position{}, false, err
 		}
-		if box == nil {
-			return Position{}, false, errors.New("missing bounding box of element")
+
+		// If c is false it means the coordinates are relative to the iframe.
+		// Change it so that it is relative to the page.
+		if !c {
+			box, err := el.boundingBox()
+			if err != nil {
+				return Position{}, false, err
+			}
+			if box == nil {
+				return Position{}, false, errors.New("missing bounding box of element")
+			}
+			// Translate from frame coordinates to page coordinates.
+			point.X += box.X
+			point.Y += box.Y
 		}
-		// Translate from frame coordinates to page coordinates.
-		point.X += box.X
-		point.Y += box.Y
 	}
 
 	fn := `
