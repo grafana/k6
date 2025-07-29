@@ -2425,6 +2425,23 @@ class InjectedScript {
     return element;
   }
 
+  // canAccessParent returns true if the element can access the parent frame.
+  // If it returns false, then the frame is from a different origin (CORS).
+  canAccessParent(element) {
+    try {
+      let win = element.ownerDocument.defaultView;
+      if (win.parent) {
+        void win.parent.frameElement;
+      }
+      return true;
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'SecurityError') {
+        return false;
+      }
+      throw e;
+    }
+  }
+
   dispatchEvent(node, type, eventInit) {
     let event;
     eventInit = {
