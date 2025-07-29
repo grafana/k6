@@ -1181,7 +1181,7 @@ func (fs *FrameSession) updateRequestInterception(enable bool) error {
 		fs.session.ID(),
 		fs.targetID, enable)
 
-	return fs.networkManager.setRequestInterception(enable || fs.page.hasRoutes())
+	return fs.networkManager.setRequestInterception(enable)
 }
 
 func (fs *FrameSession) updateViewport() error {

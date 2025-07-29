@@ -63,11 +63,19 @@ type NetworkManager struct {
 	vu               k6modules.VU
 	customMetrics    *k6ext.CustomMetrics
 	eventInterceptor eventInterceptor
+	errorReasons     map[string]network.ErrorReason
 
 	// TODO: manage inflight requests separately (move them between the two maps
 	// as they transition from inflight -> completed)
 	reqIDToRequest map[network.RequestID]*Request
 	reqsMu         sync.RWMutex
+
+	// These two maps are used to store the events so we can call onRequest with both of them,
+	// regardless of the order of the events
+	reqIDToRequestWillBeSentEvent map[network.RequestID]*network.EventRequestWillBeSent
+	eventsWillBeSentMu            sync.RWMutex
+	reqIDToRequestPausedEvent     map[network.RequestID]*fetch.EventRequestPaused
+	eventsPausedMu                sync.RWMutex
 
 	attemptedAuth map[fetch.RequestID]bool
 
@@ -101,18 +109,21 @@ func NewNetworkManager(
 		ctx:              ctx,
 		// TODO: Pass an internal logger instead of basing it on k6's logger?
 		// See https://go.k6.io/k6/js/modules/k6/browser/issues/54
-		logger:           log.New(state.Logger, GetIterationID(ctx)),
-		session:          s,
-		parent:           parent,
-		frameManager:     fm,
-		resolver:         resolver,
-		vu:               vu,
-		customMetrics:    customMetrics,
-		reqIDToRequest:   make(map[network.RequestID]*Request),
-		attemptedAuth:    make(map[fetch.RequestID]bool),
-		extraHTTPHeaders: make(map[string]string),
-		networkProfile:   NewNetworkProfile(),
-		eventInterceptor: ei,
+		logger:                        log.New(state.Logger, GetIterationID(ctx)),
+		session:                       s,
+		parent:                        parent,
+		frameManager:                  fm,
+		resolver:                      resolver,
+		vu:                            vu,
+		customMetrics:                 customMetrics,
+		reqIDToRequest:                make(map[network.RequestID]*Request),
+		reqIDToRequestWillBeSentEvent: make(map[network.RequestID]*network.EventRequestWillBeSent),
+		reqIDToRequestPausedEvent:     make(map[network.RequestID]*fetch.EventRequestPaused),
+		attemptedAuth:                 make(map[fetch.RequestID]bool),
+		extraHTTPHeaders:              make(map[string]string),
+		networkProfile:                NewNetworkProfile(),
+		eventInterceptor:              ei,
+		errorReasons:                  errorReasons(),
 	}
 	m.initEvents()
 	if err := m.initDomains(); err != nil {
@@ -120,6 +131,25 @@ func NewNetworkManager(
 	}
 
 	return &m, nil
+}
+
+func errorReasons() map[string]network.ErrorReason {
+	return map[string]network.ErrorReason{
+		"aborted":              network.ErrorReasonAborted,
+		"accessdenied":         network.ErrorReasonAccessDenied,
+		"addressunreachable":   network.ErrorReasonAddressUnreachable,
+		"blockedbyclient":      network.ErrorReasonBlockedByClient,
+		"blockedbyresponse":    network.ErrorReasonBlockedByResponse,
+		"connectionaborted":    network.ErrorReasonConnectionAborted,
+		"connectionclosed":     network.ErrorReasonConnectionClosed,
+		"connectionfailed":     network.ErrorReasonConnectionFailed,
+		"connectionrefused":    network.ErrorReasonConnectionRefused,
+		"connectionreset":      network.ErrorReasonConnectionReset,
+		"internetdisconnected": network.ErrorReasonInternetDisconnected,
+		"namenotresolved":      network.ErrorReasonNameNotResolved,
+		"timedout":             network.ErrorReasonTimedOut,
+		"failed":               network.ErrorReasonFailed,
+	}
 }
 
 // Returns a new Resolver.
@@ -367,7 +397,7 @@ func (m *NetworkManager) handleEvents(in <-chan Event) bool {
 		case *network.EventLoadingFinished:
 			m.onLoadingFinished(ev)
 		case *network.EventRequestWillBeSent:
-			m.onRequest(ev, "")
+			m.onRequestWillBeSent(ev)
 		case *network.EventRequestServedFromCache:
 			m.onRequestServedFromCache(ev)
 		case *network.EventResponseReceived:
@@ -466,7 +496,11 @@ func isInternalURL(u *url.URL) bool {
 	return u.Scheme == "data" || u.Scheme == "blob"
 }
 
-func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, interceptionID string) {
+func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent,
+	requestPausedEvent *fetch.EventRequestPaused,
+) {
+	m.logger.Debugf("NetworkManager:onRequest", "url:%s method:%s type:%s fid:%s Starting onRequest",
+		event.Request.URL, event.Request.Method, event.Initiator.Type, event.FrameID)
 	var redirectChain []*Request = nil
 	if event.RedirectResponse != nil {
 		req, ok := m.requestFromID(event.RequestID)
@@ -487,9 +521,28 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, interc
 	if event.FrameID != "" {
 		frame, ok = m.frameManager.getFrameByID(event.FrameID)
 	}
+	if !ok && requestPausedEvent != nil && requestPausedEvent.FrameID != "" {
+		frame, ok = m.frameManager.getFrameByID(requestPausedEvent.FrameID)
+	}
+
+	// Check if it's main resource request interception (targetID === main frame id).
+	if !ok && m.frameManager.page != nil && event.FrameID != "" &&
+		event.FrameID == cdp.FrameID(m.frameManager.page.targetID) {
+		// Main resource request for the page is being intercepted so the Frame is not created
+		// yet. Precreate it here for the purposes of request interception. It will be updated
+		// later as soon as the request continues and we receive frame tree from the page.
+		m.frameManager.frameAttached(event.FrameID, "")
+		frame, ok = m.frameManager.getFrameByID(event.FrameID)
+	}
+
 	if !ok {
 		m.logger.Debugf("NetworkManager:onRequest", "url:%s method:%s type:%s fid:%s frame is nil",
 			event.Request.URL, event.Request.Method, event.Initiator.Type, event.FrameID)
+	}
+
+	var interceptionID fetch.RequestID
+	if requestPausedEvent != nil {
+		interceptionID = requestPausedEvent.RequestID
 	}
 
 	req, err := NewRequest(m.ctx, m.logger, NewRequestParams{
@@ -517,15 +570,57 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, interc
 	m.eventInterceptor.onRequest(req)
 }
 
+// onRequestWillBeSent calls the onRequest method:
+// - right away, if request interception is disabled
+// - only if we first received the onRequestPaused event, if request interception is enabled;
+// otherwise, it stores the event in a map to be processed when the onRequestPaused event arrives
+func (m *NetworkManager) onRequestWillBeSent(event *network.EventRequestWillBeSent) {
+	m.logger.Debugf("NetworkManager:onRequestWillBeSent", "url:%s method:%s type:%s fid:%s Starting onRequestWillBeSent",
+		event.Request.URL, event.Request.Method, event.Initiator.Type, event.FrameID)
+
+	if m.protocolReqInterceptionEnabled {
+		requestID := event.RequestID
+		if requestPausedEvent, ok := m.pausedEventFromReqID(requestID); ok {
+			m.onRequest(event, requestPausedEvent)
+			m.eventsPausedMu.Lock()
+			delete(m.reqIDToRequestPausedEvent, requestID)
+			m.eventsPausedMu.Unlock()
+		} else {
+			m.eventsWillBeSentMu.Lock()
+			m.reqIDToRequestWillBeSentEvent[requestID] = event
+			m.eventsWillBeSentMu.Unlock()
+		}
+	} else {
+		m.onRequest(event, nil)
+	}
+}
+
+// onRequestPaused can send one of these two CDP events:
+// - Fetch.failRequest if the URL is part of the blocked hosts or IPs
+// - Fetch.continueRequest if the request is not blocked and no route is configured
+// In both case, if we first received the onRequestWillBeSent event, we call onRequest
+// otherwise, it stores the event in a map to be processed when the onRequestWillBeSent event arrives
 func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
 	m.logger.Debugf("NetworkManager:onRequestPaused",
-		"sid:%s url:%v", m.session.ID(), event.Request.URL)
+		"url:%v sid:%s", event.Request.URL, m.session.ID())
 	defer m.logger.Debugf("NetworkManager:onRequestPaused:return",
-		"sid:%s url:%v", m.session.ID(), event.Request.URL)
+		"url:%v sid:%s", event.Request.URL, m.session.ID())
 
 	var failErr error
 
 	defer func() {
+		requestID := event.NetworkID
+		if requestWillBeSentEvent, ok := m.willBeSentEventFromReqID(requestID); ok {
+			m.onRequest(requestWillBeSentEvent, event)
+			m.eventsWillBeSentMu.Lock()
+			delete(m.reqIDToRequestWillBeSentEvent, requestID)
+			m.eventsWillBeSentMu.Unlock()
+		} else {
+			m.eventsPausedMu.Lock()
+			m.reqIDToRequestPausedEvent[requestID] = event
+			m.eventsPausedMu.Unlock()
+		}
+
 		if failErr != nil {
 			action := fetch.FailRequest(event.RequestID, network.ErrorReasonBlockedByClient)
 			if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
@@ -544,24 +639,10 @@ func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
 
 			return
 		}
-		action := fetch.ContinueRequest(event.RequestID)
-		if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-			// Avoid logging as error when context is canceled.
-			// Most probably this happens when trying to continue a site's background request
-			// while the iteration is ending and therefore the browser context is being closed.
-			if errors.Is(err, context.Canceled) {
-				m.logger.Debug("NetworkManager:onRequestPaused", "context canceled continuing request")
-				return
-			}
-			// This error message is an internal issue, rather than something that the user can
-			// action on. It's also usually ok to ignore since it means that the page has navigated
-			// away or something has occurred which means that the request is no longer needed and
-			// isn't being tracked by chromium.
-			if strings.Contains(err.Error(), "Invalid InterceptionId") {
-				m.logger.Debugf("NetworkManager:onRequestPaused", "continuing request: %s", err)
-				return
-			}
-			m.logger.Errorf("NetworkManager:onRequestPaused", "continuing request: %s", err)
+
+		// If no route was added, continue all requests
+		if m.frameManager.page == nil || !m.frameManager.page.hasRoutes() {
+			m.ContinueRequest(event.RequestID)
 		}
 	}()
 
@@ -664,6 +745,7 @@ func (m *NetworkManager) onRequestServedFromCache(event *network.EventRequestSer
 
 func (m *NetworkManager) onResponseReceived(event *network.EventResponseReceived) {
 	req, ok := m.requestFromID(event.RequestID)
+
 	if !ok {
 		return
 	}
@@ -684,6 +766,24 @@ func (m *NetworkManager) requestFromID(reqID network.RequestID) (*Request, bool)
 	r, ok := m.reqIDToRequest[reqID]
 
 	return r, ok
+}
+
+func (m *NetworkManager) willBeSentEventFromReqID(reqID network.RequestID) (*network.EventRequestWillBeSent, bool) {
+	m.eventsWillBeSentMu.RLock()
+	defer m.eventsWillBeSentMu.RUnlock()
+
+	e, ok := m.reqIDToRequestWillBeSentEvent[reqID]
+
+	return e, ok
+}
+
+func (m *NetworkManager) pausedEventFromReqID(reqID network.RequestID) (*fetch.EventRequestPaused, bool) {
+	m.eventsPausedMu.RLock()
+	defer m.eventsPausedMu.RUnlock()
+
+	e, ok := m.reqIDToRequestPausedEvent[reqID]
+
+	return e, ok
 }
 
 func (m *NetworkManager) setRequestInterception(value bool) error {
@@ -708,7 +808,10 @@ func (m *NetworkManager) updateProtocolRequestInterception() error {
 	if enabled == m.protocolReqInterceptionEnabled {
 		return nil
 	}
+
 	m.protocolReqInterceptionEnabled = enabled
+	m.logger.Debugf("NetworkManager:updateProtocolRequestInterception",
+		"updating request interception to %t (session: %s)", enabled, m.session.ID())
 
 	actions := []Action{
 		network.SetCacheDisabled(true),
@@ -747,6 +850,77 @@ func (m *NetworkManager) Authenticate(credentials Credentials) error {
 	}
 
 	return nil
+}
+
+func (m *NetworkManager) AbortRequest(requestID fetch.RequestID, errorReason string) {
+	m.logger.Debugf("NetworkManager:AbortRequest", "aborting request (id: %s, errorReason: %s)",
+		requestID, errorReason)
+	netErrorReason, ok := m.errorReasons[errorReason]
+	if !ok {
+		m.logger.Errorf("NetworkManager:AbortRequest", "unknown error code: %s", errorReason)
+		return
+	}
+
+	action := fetch.FailRequest(requestID, netErrorReason)
+	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+		// Avoid logging as error when context is canceled.
+		// Most probably this happens when trying to fail a site's background request
+		// while the iteration is ending and therefore the browser context is being closed.
+		if errors.Is(err, context.Canceled) {
+			m.logger.Debug("NetworkManager:AbortRequest", "context canceled interrupting request")
+		} else {
+			m.logger.Errorf("NetworkManager:AbortRequest", "fail to abort request (id: %s): %s", requestID, err)
+		}
+		return
+	}
+}
+
+func (m *NetworkManager) ContinueRequest(requestID fetch.RequestID) {
+	m.logger.Debugf("NetworkManager:ContinueRequest", "continuing request (id: %s)", requestID)
+
+	action := fetch.ContinueRequest(requestID)
+	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+		// Avoid logging as error when context is canceled.
+		// Most probably this happens when trying to fail a site's background request
+		// while the iteration is ending and therefore the browser context is being closed.
+		if errors.Is(err, context.Canceled) {
+			m.logger.Debug("NetworkManager:ContinueRequest", "context canceled continuing request")
+			return
+		}
+
+		// This error message is an internal issue, rather than something that the user can
+		// action on. It's also usually ok to ignore since it means that the page has navigated
+		// away or something has occurred which means that the request is no longer needed and
+		// isn't being tracked by chromium.
+		if strings.Contains(err.Error(), "Invalid InterceptionId") {
+			m.logger.Debugf("NetworkManager:ContinueRequest", "invalid interception ID (%s) continuing request: %s",
+				requestID, err)
+			return
+		}
+
+		m.logger.Errorf("NetworkManager:ContinueRequest", "fail to continue request (id: %s): %s",
+			requestID, err)
+	}
+}
+
+func (m *NetworkManager) FulfillRequest(requestID fetch.RequestID, params fetch.FulfillRequestParams) {
+	action := fetch.FulfillRequest(requestID, params.ResponseCode).
+		WithResponseHeaders(params.ResponseHeaders).
+		WithResponsePhrase(params.ResponsePhrase).
+		WithBody(params.Body)
+
+	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+		// Avoid logging as error when context is canceled.
+		// Most probably this happens when trying to fail a site's background request
+		// while the iteration is ending and therefore the browser context is being closed.
+		if errors.Is(err, context.Canceled) {
+			m.logger.Debug("NetworkManager:FulfillRequest", "context canceled fulfilling request")
+		} else {
+			m.logger.Errorf("NetworkManager:FulfillRequest", "fail to fulfill request (id: %s): %s",
+				requestID, err)
+		}
+		return
+	}
 }
 
 // SetExtraHTTPHeaders sets extra HTTP request headers to be sent with every request.
