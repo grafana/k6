@@ -2,11 +2,12 @@ package cmd
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
+	"io/fs"
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"syscall"
 
@@ -18,6 +19,7 @@ import (
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/ext"
 	"go.k6.io/k6/internal/build"
+	"go.k6.io/k6/lib/fsext"
 )
 
 const (
@@ -27,10 +29,26 @@ const (
 	communityExtensionsCatalog = "oss"
 )
 
-var (
-	errScriptNotFound     = errors.New("script not found")
-	errUnsupportedFeature = errors.New("not supported")
-)
+// ioFSBridge allows an afero.Fs to implement the Go standard library io/fs.FS.
+type ioFSBridge struct {
+	fsext fsext.Fs
+}
+
+// newIofsBridge returns an IOFSBridge from a Fs
+func newIOFSBridge(fs fsext.Fs) fs.FS {
+	return &ioFSBridge{
+		fsext: fs,
+	}
+}
+
+// Open implements fs.Fs Open
+func (b *ioFSBridge) Open(name string) (fs.File, error) {
+	f, err := b.fsext.Open(name)
+	if err != nil {
+		return nil, fmt.Errorf("opening file via launcher's bridge: %w", err)
+	}
+	return f, nil
+}
 
 // commandExecutor executes the requested k6 command line command.
 // It abstract the execution path from the concrete binary.
@@ -131,7 +149,10 @@ func (b *customBinary) run(gs *state.GlobalState) error {
 	// the subprocess detects the type of terminal
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
-	cmd.Stdin = os.Stdin
+
+	// If stdin was used by the analyze function, the content has been preserved
+	// in `gs.Stdin` and should be passed to the command
+	cmd.Stdin = gs.Stdin
 
 	// Copy environment variables to the k6 process and skip binary provisioning feature flag to disable it.
 	// This avoids unnecessary re-processing of dependencies in the sub-process.
@@ -291,25 +312,28 @@ func analyze(gs *state.GlobalState, args []string) (k6deps.Dependencies, error) 
 		Manifest:  k6deps.Source{Ignore: true},
 	}
 
-	scriptname := args[0]
-	if scriptname == "-" {
-		gs.Logger.
-			Debug("Test script provided by Stdin is not yet supported from Binary provisioning feature.")
-		return nil, errUnsupportedFeature
+	sourceRootPath := args[0]
+	gs.Logger.WithField("source", "sourceRootPath").
+		Debug("Launcher is resolving and reading the test's script")
+	src, _, pwd, err := readSource(gs, sourceRootPath)
+	if err != nil {
+		return nil, fmt.Errorf("reading source for analysis %w", err)
 	}
 
-	if _, err := gs.FS.Stat(scriptname); err != nil {
-		gs.Logger.
-			WithField("path", scriptname).
-			WithError(err).
-			Debug("The requested test script's file is not available on the file system.")
-		return nil, errScriptNotFound
+	// if sourceRooPath is stdin ('-') we need to preserve the content
+	if sourceRootPath == "-" {
+		gs.Stdin = bytes.NewBuffer(src.Data)
 	}
 
-	if strings.HasSuffix(scriptname, ".tar") {
-		dopts.Archive.Name = scriptname
+	if strings.HasSuffix(sourceRootPath, ".tar") {
+		dopts.Archive.Contents = src.Data
 	} else {
-		dopts.Script.Name = scriptname
+		if !filepath.IsAbs(sourceRootPath) {
+			sourceRootPath = filepath.Join(pwd, sourceRootPath)
+		}
+		dopts.Script.Name = sourceRootPath
+		dopts.Script.Contents = src.Data
+		dopts.Fs = newIOFSBridge(gs.FS)
 	}
 
 	return k6deps.Analyze(dopts)

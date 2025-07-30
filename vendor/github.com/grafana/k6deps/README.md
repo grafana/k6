@@ -15,19 +15,10 @@ k6deps is primarily used as a [go library](https://pkg.go.dev/github.com/grafana
 
 The command line tool can be integrated into other command line tools as a subcommand. For this purpose, the library also contains the functionality of the command line tool as a factrory function that returns [cobra.Command](https://pkg.go.dev/github.com/spf13/cobra#Command).
 
-## Install
 
-Precompiled binaries can be downloaded and installed from the [Releases](https://github.com/grafana/k6deps/releases) page.
+## Library Usage
 
-If you have a go development environment, the installation can also be done with the following command:
-
-```
-go install github.com/grafana/k6deps/cmd/k6deps@latest
-```
-
-## Usage
-
-Dependencies can come from three [sources](#sources): k6 test script, manifest file, `K6_DEPENDENCIES` environment variable. Instead of these three sources, a k6 archive can also be specified, which can contain all three sources (currently two actually, because the manifest file is not yet included in the k6 archive).
+Dependencies come from [sources](#sources): k6 test script or k6 archive files. These dependencies are combined with overrides from a manifest file and the `K6_DEPENDENCIES` environment variable. Only dependencies that do not specify a constrain or specify a general "*" constrain are overriden from those sources.
 
 In the simplest use, we only extract the dependencies from the script source.
 
@@ -123,6 +114,16 @@ func ExampleAnalyze_without_pragma() {
 
 ## CLI
 
+## Install
+
+Precompiled binaries can be downloaded and installed from the [Releases](https://github.com/grafana/k6deps/releases) page.
+
+If you have a go development environment, the installation can also be done with the following command:
+
+```
+go install github.com/grafana/k6deps/cmd/k6deps@latest
+```
+
 <!-- #region cli -->
 ## k6deps
 
@@ -134,7 +135,7 @@ Analyze the k6 test script and extract the extensions that the script depends on
 
 ### Sources
 
-Dependencies can come from three sources: k6 test script, manifest file, `K6_DEPENDENCIES` environment variable. Instead of these three sources, a k6 archive can also be specified, which can contain all three sources (currently two actually, because the manifest file is not yet included in the k6 archive). An archive is a tar file, which can be created using the k6 archive command.
+Dependencies come from [sources](#sources): k6 test script or k6 archive files. These dependencies are combined with overrides from a manifest file and the `K6_DEPENDENCIES` environment variable. Only dependencies that do not specify a constrain or specify a general "*" constrain are overriden from those sources.
 
 > *NOTE*: It is assumed that the script and all dependencies are in the archive. No external dependencies are analyzed.
 
@@ -157,6 +158,8 @@ Dependencies and version constraints can also be specified in the so-called mani
 Dependencies and version constraints can also be specified in the `K6_DEPENDENCIES` environment variable. The value of the variable is a list of dependencies in a one-line text format.
 
     k6>0.54;k6/x/faker>0.4.0;k6/x/sql>=v1.0.1
+
+> *NOTE*: dependencies specied in the manifest or environment variables are used only to override the constrains of the dependencies found in the script or achive. If they are not referenced in the source, they are ignored.
 
 ### Format
 
@@ -191,7 +194,6 @@ k6deps [flags] [script-file]
       --format json|text|js   output format, possible values: json,env,script (default json)
   -h, --help                  help for k6deps
       --ignore-manifest       disable package.json detection and processing
-      --ignore-script         disable script processing
       --ingnore-env           ignore K6_DEPENDENCIES environment variable processing
   -i, --input string          input format ('js', 'ts' or 'tar' for archives)
       --manifest string       manifest file to analyze (default 'package.json' nearest to script-file)
@@ -202,5 +204,5 @@ k6deps [flags] [script-file]
 
 ## Contribute
 
-If you want to contribute or help with the development of **k6pack**, start by 
+If you want to contribute or help with the development of **k6deps**, start by 
 reading [CONTRIBUTING.md](CONTRIBUTING.md).
