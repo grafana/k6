@@ -275,6 +275,6 @@ func signatureAlgorithm(value x509.SignatureAlgorithm) string {
 }
 
 func fingerPrint(parsed *x509.Certificate) []byte {
-	bytes := sha1.Sum(parsed.Raw) // #nosec G401
+	bytes := sha1.Sum(parsed.Raw) // #nosec G401 nosemgrep: use-of-sha1
 	return bytes[:]
 }
