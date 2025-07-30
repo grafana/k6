@@ -11,8 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-
-
 const (
 	serverScript = `package main
 
