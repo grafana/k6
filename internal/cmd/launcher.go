@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io/fs"
 	"net/url"
 	"os"
 	"os/exec"
@@ -20,6 +21,18 @@ import (
 	"go.k6.io/k6/ext"
 	"go.k6.io/k6/internal/build"
 	"go.k6.io/k6/lib/fsext"
+)
+
+const (
+	// cloudExtensionsCatalog defines the extensions catalog for cloud supported extensions
+	cloudExtensionsCatalog = "cloud"
+	// communityExtensionsCatalog defines the extensions catalog for community extensions
+	communityExtensionsCatalog = "oss"
+)
+
+var (
+	errScriptNotFound     = errors.New("script not found")
+	errUnsupportedFeature = errors.New("not supported")
 )
 
 // ioFSBridge allows an afero.Fs to implement the Go standard library io/fs.FS.
