@@ -29,7 +29,6 @@ const (
 	communityExtensionsCatalog = "oss"
 )
 
-
 // ioFSBridge allows an afero.Fs to implement the Go standard library io/fs.FS.
 type ioFSBridge struct {
 	fsext fsext.Fs
