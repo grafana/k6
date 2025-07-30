@@ -355,6 +355,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return mapResponse(vu, resp), nil
 			}), nil
 		},
+		"route": mapPageRoute(vu, p),
 		"screenshot": func(opts sobek.Value) (*sobek.Promise, error) {
 			popts := common.NewPageScreenshotOptions()
 			if err := popts.Parse(vu.Context(), opts); err != nil {
@@ -658,7 +659,7 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 
 		ctx := vu.Context()
 
-		// Run the the event handler in the task queue to
+		// Run the event handler in the task queue to
 		// ensure that the handler is executed on the event loop.
 		tq := vu.get(ctx, p.TargetID())
 		eventHandler := func(event common.PageOnEvent) error {
@@ -717,6 +718,10 @@ func prepK6BrowserRegExChecker(rt *sobek.Runtime) func() error {
 // for URL pattern matching. This handles regex patterns only using JavaScript's regex
 // engine for consistency. It returns a function that can be used to check if a URL
 // matches a given pattern in the JS runtime's eventloop.
+//
+// Do not call this off the main thread (not even from within a promise). The returned
+// JSRegexChecker can be called from off the main thread (i.e. in a new goroutine) since
+// it will queue up the checker on the event loop.
 func injectRegexMatcherScript(ctx context.Context, vu moduleVU, targetID string) (common.JSRegexChecker, error) {
 	rt := vu.Runtime()
 
@@ -725,13 +730,14 @@ func injectRegexMatcherScript(ctx context.Context, vu moduleVU, targetID string)
 		return nil, fmt.Errorf("preparing k6 browser regex checker: %w", err)
 	}
 
+	tq := vu.get(ctx, targetID)
+
 	return func(pattern, url string) (bool, error) {
 		var (
 			result bool
 			err    error
 		)
 
-		tq := vu.get(ctx, targetID)
 		done := make(chan struct{})
 
 		tq.Queue(func() error {
@@ -779,6 +785,9 @@ func parseWaitForFunctionArgs(
 	return js, popts, exportArgs(gargs), nil
 }
 
+// parseStringOrRegex parses a sobek.Value to return either a quoted string if it was a string,
+// or a raw string if it was a JS RegExp object or another type.
+//
 // Some getBy* APIs work with single quotes and some work with double quotes.
 // This inconsistency seems to stem from the injected code copied from
 // Playwright itself.
@@ -876,4 +885,51 @@ func parseGetByBaseOptions(
 	}
 
 	return a, o
+}
+
+// mapPageRoute maps the requested page.route event to the Sobek runtime.
+func mapPageRoute(vu moduleVU, p *common.Page) func(path sobek.Value, handler sobek.Callable) (*sobek.Promise, error) {
+	return func(path sobek.Value, handler sobek.Callable) (*sobek.Promise, error) {
+		ctx := vu.Context()
+		targetID := p.TargetID()
+
+		// Inject JS regex checker for URL regex pattern matching
+		jsRegexChecker, err := injectRegexMatcherScript(ctx, vu, targetID)
+		if err != nil {
+			return nil, err
+		}
+		pathStr := parseStringOrRegex(path, false)
+
+		// Run the event handler in the task queue to
+		// ensure that the handler is executed on the event loop.
+		tq := vu.get(ctx, targetID)
+		routeHandler := func(route *common.Route) error {
+			done := make(chan error, 1)
+			tq.Queue(func() error {
+				defer close(done)
+
+				_, err = handler(
+					sobek.Undefined(),
+					vu.Runtime().ToValue(route),
+				)
+				if err != nil {
+					done <- fmt.Errorf("executing page.route('%s') handler: %w", path, err)
+					return nil
+				}
+
+				return nil
+			})
+
+			select {
+			case err := <-done:
+				return err
+			case <-ctx.Done():
+				return errors.New("iteration ended before route completed")
+			}
+		}
+
+		return k6ext.Promise(vu.Context(), func() (any, error) {
+			return nil, p.Route(pathStr, routeHandler, jsRegexChecker)
+		}), nil
+	}
 }
