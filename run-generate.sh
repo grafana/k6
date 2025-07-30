@@ -1,0 +1,3 @@
+#!/bin/bash
+export PATH="$PATH:$HOME/go/bin:/opt/homebrew/opt/protobuf@21/bin"
+go generate ./...

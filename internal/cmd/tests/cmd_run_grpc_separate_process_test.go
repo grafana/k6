@@ -13,7 +13,7 @@ import (
 )
 
 // getFreeBindAddr returns a free port that can be used for binding
-func getFreeBindAddr(t testing.TB) string {
+func getFreeBindAddrLocal(t testing.TB) string {
 	l, err := net.Listen("tcp", "localhost:0")
 	require.NoError(t, err)
 	defer l.Close()
@@ -56,7 +56,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to listen: %%v", err)
 	}
-	
+
 	grpcServer := grpc.NewServer()
 	features := grpcservice.LoadFeatures("")
 	server := grpcservice.NewRouteGuideServer(features...)
@@ -73,7 +73,7 @@ func main() {
 			fmt.Printf("    - %%s\n", method.Name)
 		}
 	}
-	
+
 	fmt.Printf("Server started at %%s\n", addr)
 	if err := grpcServer.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %%v", err)
@@ -158,7 +158,7 @@ func TestGRPCSeparateProcess(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// Get a free port for the gRPC server
-	addr := getFreeBindAddr(t)
+	addr := getFreeBindAddrLocal(t)
 
 	// Create the server program
 	serverFile := filepath.Join(tmpDir, "server.go")
@@ -222,4 +222,4 @@ func TestGRPCSeparateProcess(t *testing.T) {
 	k6Cmd.Stderr = os.Stderr
 	err = k6Cmd.Run()
 	require.NoError(t, err, "k6 test failed")
-} 
+}
