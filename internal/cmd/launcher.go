@@ -16,6 +16,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"go.k6.io/k6/cmd/state"
+	"go.k6.io/k6/ext"
 	"go.k6.io/k6/internal/build"
 )
 
@@ -79,8 +80,7 @@ func (l *launcher) launch(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	//  if the command does not have dependencies nor a custom build is required
-	if !isCustomBuildRequired(build.Version, deps) {
+	if !isCustomBuildRequired(deps, build.Version, ext.GetAll()) {
 		l.gs.Logger.
 			Debug("The current k6 binary already satisfies all the required dependencies," +
 				" it isn't required to provision a new binary.")
@@ -134,10 +134,7 @@ func (b *customBinary) run(gs *state.GlobalState) error {
 	cmd.Stdin = os.Stdin
 
 	// Copy environment variables to the k6 process and skip binary provisioning feature flag to disable it.
-	// If not disabled, then the executed k6 binary would enter an infinite loop, where it continuously
-	// process the input script, detect dependencies, and retrigger provisioning.
-	// This can be avoided by checking if the current binary has already extensions that
-	// satisfies the dependencies. See comment in isCustomBuildRequired function.
+	// This avoids unnecessary re-processing of dependencies in the sub-process.
 	env := []string{}
 	for k, v := range gs.Env {
 		if k == state.BinaryProvisioningFeatureFlag {
@@ -178,41 +175,47 @@ func (b *customBinary) run(gs *state.GlobalState) error {
 	}
 }
 
-// isCustomBuildRequired checks if the build is required
-// it's required if there is one or more dependencies other than k6 itself
-// or if the required k6 version is not satisfied by the current binary's version
-// TODO: get the version of any built-in extension and check if they satisfy the dependencies
-// (see https://github.com/grafana/k6/issues/4697)
-func isCustomBuildRequired(baseK6Version string, deps k6deps.Dependencies) bool {
+// isCustomBuildRequired checks if there is at least one dependency that are not satisfied by the binary
+// considering the version of k6 and any built-in extension
+func isCustomBuildRequired(deps k6deps.Dependencies, k6Version string, exts []*ext.Extension) bool {
+	// return early if there are no dependencies
 	if len(deps) == 0 {
 		return false
 	}
 
-	// Early return if there are multiple dependencies
-	if len(deps) > 1 {
-		return true
+	// collect modules that this binary contain, including k6 itself
+	builtIn := map[string]string{"k6": k6Version}
+	for _, e := range exts {
+		builtIn[e.Name] = e.Version
 	}
 
-	k6Dependency, hasK6 := deps["k6"]
+	for _, dep := range deps {
+		version, provided := builtIn[dep.Name]
+		// if the binary does not contain a required module, we need a custom
+		if !provided {
+			return true
+		}
 
-	// Early return if there's exactly one non-k6 dependency
-	if !hasK6 {
-		return true
+		// If dependency's constrain is null, assume it is "*" and consider it satisfied.
+		// See https://github.com/grafana/k6deps/issues/91
+		if dep.Constraints == nil {
+			continue
+		}
+
+		semver, err := semver.NewVersion(version)
+		if err != nil {
+			// ignore built in module if version is not a valid sem ver (e.g. a development version)
+			// if user wants to use this built-in, must disable binary provisioning
+			return true
+		}
+
+		// if the current version does not satisfies the constrains, binary provisioning is required
+		if !dep.Constraints.Check(semver) {
+			return true
+		}
 	}
 
-	// Ignore k6 dependency if nil
-	if k6Dependency == nil || k6Dependency.Constraints == nil {
-		return false
-	}
-
-	k6Ver, err := semver.NewVersion(baseK6Version)
-	if err != nil {
-		// ignore if baseK6Version is not a valid sem ver (e.g. a development version)
-		return true
-	}
-
-	// if the current version satisfies the constrains, binary provisioning is not required
-	return !k6Dependency.Constraints.Check(k6Ver)
+	return false
 }
 
 // k6buildProvisioner provisions a k6 binary that satisfies the dependencies using the k6build service
