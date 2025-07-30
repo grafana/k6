@@ -3,11 +3,13 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/grafana/k6deps"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -345,6 +347,63 @@ func TestIsAnalysisRequired(t *testing.T) {
 
 			actual := isAnalysisRequired(cmd)
 			assert.Equal(t, tc.expected, actual)
+		})
+	}
+}
+
+func TestGetBuildServiceURL(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name                      string
+		buildSrvURL               string
+		enableCommunityExtensions bool
+		expectErr                 bool
+		expectedURL               string
+	}{
+		{
+			name:                      "default build service url",
+			buildSrvURL:               "https://build.srv",
+			enableCommunityExtensions: false,
+			expectErr:                 false,
+			expectedURL:               "https://build.srv/cloud",
+		},
+		{
+			name:                      "enable community extensions",
+			buildSrvURL:               "https://build.srv",
+			enableCommunityExtensions: true,
+			expectErr:                 false,
+			expectedURL:               "https://build.srv/oss",
+		},
+		{
+			name:                      "invalid buildServiceURL",
+			buildSrvURL:               "https://host:port",
+			enableCommunityExtensions: false,
+			expectErr:                 true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			logger := &logrus.Logger{ //nolint:forbidigo
+				Out: io.Discard,
+			}
+
+			flags := state.GlobalFlags{
+				BinaryProvisioning:        true,
+				BuildServiceURL:           tc.buildSrvURL,
+				EnableCommunityExtensions: tc.enableCommunityExtensions,
+			}
+
+			buildSrvURL, err := getBuildServiceURL(flags, logger)
+			if tc.expectErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tc.expectedURL, buildSrvURL)
+			}
 		})
 	}
 }
