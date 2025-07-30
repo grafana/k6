@@ -470,10 +470,10 @@ func TestGetBuildServiceURL(t *testing.T) {
 			buildSrvURL:               "https://host:port",
 			enableCommunityExtensions: false,
 			expectErr:                 true,
-    },
+		},
 	}
-
-	t.Run(tc.name, func(t *testing.T) {
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
 			logger := &logrus.Logger{ //nolint:forbidigo
