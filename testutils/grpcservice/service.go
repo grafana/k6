@@ -1,28 +1,14 @@
-// Package grpcservice provides a gRPC test service for k6 tests.
+// Package grpcservice provides a thin wrapper around the internal gRPC service for external use.
 package grpcservice
 
-import (
-	"go.k6.io/k6/internal/lib/testutils/grpcservice"
-	"google.golang.org/grpc"
-)
+import "go.k6.io/k6/internal/lib/testutils/grpcservice"
 
-// LoadFeatures loads test features from a JSON file.
-func LoadFeatures(jsonFile string) []*Feature {
-	return grpcservice.LoadFeatures(jsonFile)
-}
-
-// NewRouteGuideServer creates a new RouteGuide server with the given features.
-func NewRouteGuideServer(features ...*Feature) RouteGuideServer {
-	return grpcservice.NewRouteGuideServer(features...)
-}
-
-// RegisterRouteGuideServer registers the RouteGuide server with a gRPC server.
-func RegisterRouteGuideServer(s grpc.ServiceRegistrar, srv RouteGuideServer) {
-	grpcservice.RegisterRouteGuideServer(s, srv)
-}
-
-// Feature represents a geographical feature.
+// Re-export types and functions from internal package
 type Feature = grpcservice.Feature
-
-// RouteGuideServer is the server API for RouteGuide service.
 type RouteGuideServer = grpcservice.RouteGuideServer
+
+var (
+	LoadFeatures           = grpcservice.LoadFeatures
+	NewRouteGuideServer    = grpcservice.NewRouteGuideServer
+	RegisterRouteGuideServer = grpcservice.RegisterRouteGuideServer
+)

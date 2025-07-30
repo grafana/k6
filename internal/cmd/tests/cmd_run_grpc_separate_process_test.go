@@ -2,7 +2,6 @@ package tests
 
 import (
 	"fmt"
-	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,30 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// getFreeBindAddr returns a free port that can be used for binding
-func getFreeBindAddrLocal(t testing.TB) string {
-	l, err := net.Listen("tcp", "localhost:0")
-	require.NoError(t, err)
-	defer l.Close()
-	return l.Addr().String()
-}
 
-// findProjectRoot returns the path to the project root by looking for go.mod
-func findProjectRoot(t testing.TB) string {
-	dir, err := os.Getwd()
-	require.NoError(t, err)
-
-	for {
-		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
-			return dir
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			t.Fatal("Could not find project root")
-		}
-		dir = parent
-	}
-}
 
 const (
 	serverScript = `package main
@@ -158,7 +134,7 @@ func TestGRPCSeparateProcess(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// Get a free port for the gRPC server
-	addr := getFreeBindAddrLocal(t)
+	addr := getFreeBindAddr(t)
 
 	// Create the server program
 	serverFile := filepath.Join(tmpDir, "server.go")
@@ -201,8 +177,21 @@ func TestGRPCSeparateProcess(t *testing.T) {
 	fmt.Printf("Proto file location: %s\n", protoDst)
 	fmt.Printf("Proto file contents:\n%s\n", protoFile)
 
-	// Get project root for k6 binary
-	projectRoot := findProjectRoot(t)
+	// Get project root for k6 binary - walk up to find go.mod
+	projectRoot := func() string {
+		dir, err := os.Getwd()
+		require.NoError(t, err)
+		for {
+			if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+				return dir
+			}
+			parent := filepath.Dir(dir)
+			if parent == dir {
+				t.Fatal("Could not find project root")
+			}
+			dir = parent
+		}
+	}()
 
 	// Build k6
 	k6Bin := filepath.Join(tmpDir, "k6")
