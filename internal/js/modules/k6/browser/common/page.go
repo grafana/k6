@@ -1712,6 +1712,22 @@ func (p *Page) WaitForTimeout(timeout int64) {
 	p.frameManager.MainFrame().WaitForTimeout(timeout)
 }
 
+// WaitForURL waits for the page to navigate to a URL matching the given pattern.
+// jsRegexChecker should be non-nil to be able to test against a URL pattern.
+func (p *Page) WaitForURL(urlPattern string, opts *FrameWaitForURLOptions, jsRegexChecker JSRegexChecker) error {
+	p.logger.Debugf("Page:WaitForURL", "sid:%v pattern:%s", p.sessionID(), urlPattern)
+	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.waitForURL")
+	defer span.End()
+
+	err := p.frameManager.MainFrame().WaitForURL(urlPattern, opts, jsRegexChecker)
+	if err != nil {
+		spanRecordError(span, err)
+		return err
+	}
+
+	return nil
+}
+
 // Workers returns all WebWorkers of page.
 func (p *Page) Workers() []*Worker {
 	p.workersMu.Lock()
