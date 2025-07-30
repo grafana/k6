@@ -127,7 +127,7 @@ func NewGroup(name string, parent *Group) (*Group, error) {
 		return nil, err
 	}
 
-	hash := md5.Sum([]byte(path)) //nolint:gosec
+	hash := md5.Sum([]byte(path)) //nolint:gosec // nosemgrep: use-of-md5 // this ID is just for correlation
 	id := hex.EncodeToString(hash[:])
 
 	return &Group{
@@ -223,7 +223,7 @@ func NewCheck(name string, group *Group) (*Check, error) {
 	}
 
 	path := group.Path + GroupSeparator + name
-	hash := md5.Sum([]byte(path)) //nolint:gosec
+	hash := md5.Sum([]byte(path)) //nolint:gosec // nosemgrep: use-of-md5 // this ID is just for correlation
 	id := hex.EncodeToString(hash[:])
 
 	return &Check{

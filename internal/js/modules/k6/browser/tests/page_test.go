@@ -2891,3 +2891,109 @@ func TestWaitForNavigationWithURL_RegexFailure(t *testing.T) {
 	)
 	assert.ErrorContains(t, err, "Unexpected token *")
 }
+
+func TestWaitForURL(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipped due to https://github.com/grafana/k6/issues/4937")
+	}
+
+	t.Parallel()
+
+	tb := newTestBrowser(t, withFileServer())
+	tb.vu.ActivateVU()
+	tb.vu.StartIteration(t)
+
+	got := tb.vu.RunPromise(t, `
+		const page = await browser.newPage();
+		const testURL = '%s';
+
+		try {
+			// Test when already at matching URL (should just wait for load state)
+			await page.goto('%s');
+			await page.waitForURL(/.*page1\.html$/);
+			let currentURL = page.url();
+			if (!currentURL.endsWith('page1.html')) {
+				throw new Error('Expected to stay at page1.html but got ' + currentURL);
+			}
+
+			// Test exact URL match with navigation
+			await page.goto(testURL);
+			await Promise.all([
+				page.waitForURL('%s'),
+				page.locator('#page1').click()
+			]);
+			currentURL = page.url();
+			if (!currentURL.endsWith('page1.html')) {
+				throw new Error('Expected to navigate to page1.html but got ' + currentURL);
+			}
+
+			// Test regex pattern - matches any page with .html extension
+			await page.goto(testURL);
+			await Promise.all([
+				page.waitForURL(/.*\.html$/),
+				page.locator('#page2').click()
+			]);
+			currentURL = page.url();
+			if (!currentURL.endsWith('.html')) {
+				throw new Error('Expected URL to end with .html but got ' + currentURL);
+			}
+
+			// Test timeout when URL doesn't match
+			await page.goto(testURL);
+			let timedOut = false;
+			try {
+				await Promise.all([
+					page.waitForURL(/.*nonexistent\.html$/, { timeout: 500 }),
+					page.locator('#page1').click()  // This goes to page1.html, not nonexistent.html
+				]);
+			} catch (error) {
+				if (error.toString().includes('waiting for navigation')) {
+					timedOut = true;
+				} else {
+					throw error;
+				}
+			}
+			if (!timedOut) {
+				throw new Error('Expected timeout error when URL does not match');
+			}
+
+			// Test empty pattern (matches any navigation)
+			await page.goto(testURL);
+			await Promise.all([
+				page.waitForURL(''),
+				page.locator('#page2').click()
+			]);
+			currentURL = page.url();
+			if (!currentURL.endsWith('page2.html') && !currentURL.endsWith('waitfornavigation_test.html')) {
+				throw new Error('Expected empty pattern to match any navigation but got ' + currentURL);
+			}
+
+			// Test waitUntil option
+			await page.goto(testURL);
+			await Promise.all([
+				page.waitForURL(/.*page1\.html$/, { waitUntil: 'domcontentloaded' }),
+				page.locator('#page1').click()
+			]);
+			currentURL = page.url();
+			if (!currentURL.endsWith('page1.html')) {
+				throw new Error('Expected to navigate to page1.html with domcontentloaded but got ' + currentURL);
+			}
+
+			// Test when already at URL with regex pattern
+			await page.goto(testURL);
+			await page.waitForURL(/.*\/waitfornavigation_test\.html$/);
+			currentURL = page.url();
+			if (!currentURL.endsWith('waitfornavigation_test.html')) {
+				throw new Error('Expected to stay at waitfornavigation_test.html but got ' + currentURL);
+			}
+		} finally {
+			// Must call close() which will clean up the taskqueue.
+			await page.close();
+		}
+	`,
+		tb.staticURL("waitfornavigation_test.html"),
+		tb.staticURL("page1.html"),
+		tb.staticURL("page1.html"),
+	)
+	assert.Equal(t, sobek.Undefined(), got.Result())
+}

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"math/rand"
+	"math/rand" // nosemgrep: math-random-used // This is being used retry jitter
 	"net/http"
 	"net/url"
 	"strconv"

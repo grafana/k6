@@ -572,6 +572,31 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, nil
 			})
 		},
+		"waitForURL": func(url sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewFrameWaitForURLOptions(p.Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing waitForURL options: %w", err)
+			}
+
+			var val string
+			switch url.ExportType() {
+			case reflect.TypeOf(string("")):
+				val = fmt.Sprintf("'%s'", url.String()) // Strings require quotes
+			default: // JS Regex, CSS, numbers or booleans
+				val = url.String() // No quotes
+			}
+
+			// Inject JS regex checker for URL pattern matching
+			ctx := vu.Context()
+			jsRegexChecker, err := injectRegexMatcherScript(ctx, vu, p.TargetID())
+			if err != nil {
+				return nil, err
+			}
+
+			return k6ext.Promise(ctx, func() (result any, reason error) {
+				return nil, p.WaitForURL(val, popts, jsRegexChecker)
+			}), nil
+		},
 		"workers": func() *sobek.Object {
 			var mws []mapping
 			for _, w := range p.Workers() {
@@ -904,8 +929,7 @@ func mapPageRoute(vu moduleVU, p *common.Page) func(path sobek.Value, handler so
 		// ensure that the handler is executed on the event loop.
 		tq := vu.get(ctx, targetID)
 		routeHandler := func(route *common.Route) error {
-			done := make(chan bool)
-			var rtnErr error
+			done := make(chan error, 1)
 			tq.Queue(func() error {
 				defer close(done)
 
@@ -914,7 +938,7 @@ func mapPageRoute(vu moduleVU, p *common.Page) func(path sobek.Value, handler so
 					vu.Runtime().ToValue(route),
 				)
 				if err != nil {
-					rtnErr = fmt.Errorf("executing page.route('%s') handler: %w", path, err)
+					done <- fmt.Errorf("executing page.route('%s') handler: %w", path, err)
 					return nil
 				}
 
@@ -922,12 +946,11 @@ func mapPageRoute(vu moduleVU, p *common.Page) func(path sobek.Value, handler so
 			})
 
 			select {
-			case <-done:
+			case err := <-done:
+				return err
 			case <-ctx.Done():
-				rtnErr = errors.New("iteration ended before route completed")
+				return errors.New("iteration ended before route completed")
 			}
-
-			return rtnErr
 		}
 
 		return k6ext.Promise(vu.Context(), func() (any, error) {

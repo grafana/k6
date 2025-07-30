@@ -201,6 +201,7 @@ func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	ctx := req.Context()
 	tracer := &Tracer{}
+	// nosemgrep: dynamic-httptrace-clienttrace // this is a false possitive
 	reqWithTracer := req.WithContext(httptrace.WithClientTrace(ctx, tracer.Trace()))
 	resp, err := t.state.Transport.RoundTrip(reqWithTracer)
 

@@ -9,7 +9,7 @@ import (
 	"io"
 	"log"
 	"math"
-	"math/rand"
+	"math/rand" // nosemgrep: math-random-used // used to add random delay in calls
 	"os"
 	sync "sync"
 	"time"

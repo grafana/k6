@@ -1,7 +1,7 @@
 package netext
 
 import (
-	"math/rand"
+	"math/rand" // nosemgrep: math-random-used // used for random TTL on DNS resolve
 	"net"
 	"sync"
 	"time"

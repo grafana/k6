@@ -3,7 +3,7 @@ package k6
 
 import (
 	"errors"
-	"math/rand"
+	"math/rand" // nosemgrep: math-random-used // used to seed the Marh.random of the JS VM that is pseudo random by specification
 	"strings"
 	"time"
 

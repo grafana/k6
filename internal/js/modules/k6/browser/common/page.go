@@ -1324,6 +1324,8 @@ func (p *Page) Route(
 	routeHandler := NewRouteHandler(path, handlerCallback, matcher)
 	p.routesMu.Lock()
 	defer p.routesMu.Unlock()
+	// Append new route at the beginning of the slice as, when several routes match the given pattern,
+	// they will run in the opposite order to their registration.
 	p.routes = append([]*RouteHandler{routeHandler}, p.routes...)
 
 	return nil
@@ -1708,6 +1710,22 @@ func (p *Page) WaitForTimeout(timeout int64) {
 	defer span.End()
 
 	p.frameManager.MainFrame().WaitForTimeout(timeout)
+}
+
+// WaitForURL waits for the page to navigate to a URL matching the given pattern.
+// jsRegexChecker should be non-nil to be able to test against a URL pattern.
+func (p *Page) WaitForURL(urlPattern string, opts *FrameWaitForURLOptions, jsRegexChecker JSRegexChecker) error {
+	p.logger.Debugf("Page:WaitForURL", "sid:%v pattern:%s", p.sessionID(), urlPattern)
+	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.waitForURL")
+	defer span.End()
+
+	err := p.frameManager.MainFrame().WaitForURL(urlPattern, opts, jsRegexChecker)
+	if err != nil {
+		spanRecordError(span, err)
+		return err
+	}
+
+	return nil
 }
 
 // Workers returns all WebWorkers of page.

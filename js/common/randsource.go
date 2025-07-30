@@ -4,7 +4,7 @@ import (
 	crand "crypto/rand"
 	"encoding/binary"
 	"fmt"
-	"math/rand"
+	"math/rand" // nosemgrep: math-random-used // used to seed the Marh.random of the JS VM that is pseudo random by specification
 
 	"github.com/grafana/sobek"
 )

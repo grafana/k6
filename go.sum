@@ -85,8 +85,8 @@ github.com/gorilla/websocket v1.5.3 h1:saDtZ6Pbx/0u+bgYQ3q96pZgCzfhKXGPqt7kZ72aN
 github.com/gorilla/websocket v1.5.3/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
 github.com/grafana/k6build v0.5.11 h1:nuYV5DOMz5PEU8/XFRcDcfgzxUlLujeYNkU7NVEbdfc=
 github.com/grafana/k6build v0.5.11/go.mod h1:SA6/5cnnCLQ99IpFrqVfcuO+SxCRo/yLGtcnj3bfpII=
-github.com/grafana/k6deps v0.2.6 h1:T9t5pGnL4697SJ6fCF36fNCNSFSH/kDBI9Do/W+5TqA=
-github.com/grafana/k6deps v0.2.6/go.mod h1:y+pBsBemOJHML6ObuJFVgcNgO9RSfRvBklltI194aTE=
+github.com/grafana/k6deps v0.4.0 h1:YJ2xJyy3VM8/YWmCeX2vyoWzuq9dwdDTA5qCXIsnS0w=
+github.com/grafana/k6deps v0.4.0/go.mod h1:31pACKFJApQMMcu4hb4N3ti+Kz4s6PomUR63Y6S0bWM=
 github.com/grafana/k6foundry v0.4.6 h1:fFgR72Pw0dzo8wVWyggu35SGGjdt31Dktil1bDE1MCM=
 github.com/grafana/k6foundry v0.4.6/go.mod h1:eLsr0whhH+5Y1y7YpDxJi3Jv5wHMuf+80vdRyMH10pg=
 github.com/grafana/k6provider v0.1.15 h1:aUStpqDMEnEL9aGCcSKmpcreHRZsr8IELna+ttKMOYI=
@@ -335,8 +335,8 @@ google.golang.org/grpc v1.23.0/go.mod h1:Y5yQAOtifL1yxbo5wqy6BxZv8vAUGQwXBOALyac
 google.golang.org/grpc v1.25.1/go.mod h1:c3i+UQWmh7LiEpx4sFZnkU36qjEYZ0imhYfXVyQciAY=
 google.golang.org/grpc v1.27.0/go.mod h1:qbnxyOmOxrQa7FizSgH+ReBfzJrCY1pSN7KXBS8abTk=
 google.golang.org/grpc v1.29.1/go.mod h1:itym6AZVZYACWQqET3MqgPpjcuV5QH3BxFS3IjizoKk=
-google.golang.org/grpc v1.73.0 h1:VIWSmpI2MegBtTuFt5/JWy2oXxtjJ/e89Z70ImfD2ok=
-google.golang.org/grpc v1.73.0/go.mod h1:50sbHOUqWoCQGI8V2HQLJM0B+LMlIUjNSZmow7EVBQc=
+google.golang.org/grpc v1.74.2 h1:WoosgB65DlWVC9FqI82dGsZhWFNBSLjQ84bjROOpMu4=
+google.golang.org/grpc v1.74.2/go.mod h1:CtQ+BGjaAIXHs/5YS3i473GqwBBa1zGQNevxdeBEXrM=
 google.golang.org/protobuf v1.36.6 h1:z1NpPI8ku2WgiWnf+t9wTPsn6eP1L7ksHUlkfLvd9xY=
 google.golang.org/protobuf v1.36.6/go.mod h1:jduwjTPXsFjZGTmRluh+L6NjiWu7pchiJ2/5YcXBHnY=
 gopkg.in/cenkalti/backoff.v1 v1.1.0 h1:Arh75ttbsvlpVA7WtVpH4u9h6Zl46xuptxqLxPiSo4Y=
