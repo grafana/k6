@@ -97,6 +97,10 @@ type webSocket struct {
 	binaryType     string
 	protocol       string
 	extensions     []string
+
+	// fields for `close` event
+	closeCode   int
+	closeReason string
 }
 
 type ping struct {
@@ -494,27 +498,23 @@ func (w *webSocket) readPump(wg *sync.WaitGroup) {
 				data:  data,
 				t:     time.Now(),
 			})
-
 			continue
 		}
 
-		if !websocket.IsUnexpectedCloseError(
-			err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
-			// maybe still log it with debug level?
+		var closeErr *websocket.CloseError
+		if errors.As(err, &closeErr) {
+			w.closeCode = closeErr.Code
+			w.closeReason = closeErr.Text
+		}
+
+		if !websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
 			err = nil
 		}
 
-		if err != nil {
-			w.tq.Queue(func() error {
-				_ = w.conn.Close() // TODO fix this
-				return nil
-			})
-		}
-
 		w.tq.Queue(func() error {
+			_ = w.conn.Close()
 			return w.connectionClosedWithError(err)
 		})
-
 		return
 	}
 }
@@ -731,15 +731,41 @@ func (w *webSocket) assertStateOpen() {
 	common.Throw(w.vu.Runtime(), errors.New("InvalidStateError"))
 }
 
-// TODO support code and reason
+func isValidClientCloseCode(code int) bool {
+	return code == 1000 || (code >= 3000 && code <= 4999)
+}
+
+func isValidCloseReason(reason string) bool {
+	return len([]byte(reason)) <= 123
+}
+
 func (w *webSocket) close(code int, reason string) {
 	if w.readyState == CLOSED || w.readyState == CLOSING {
 		return
 	}
-	w.readyState = CLOSING
+
+	rt := w.vu.Runtime()
+
+	if code != 0 && !isValidClientCloseCode(code) {
+		common.Throw(rt, fmt.Errorf(
+			`InvalidAccessError: Failed to execute 'close' on 'WebSocket': The close code must be either 1000, or between 3000 and 4999. %d is neither`,
+			code,
+		))
+	}
+
+	if !isValidCloseReason(reason) {
+		common.Throw(rt, errors.New(
+			`SyntaxError: Failed to execute 'close' on 'WebSocket': The message must not be greater than 123 bytes`,
+		))
+	}
+
 	if code == 0 {
 		code = websocket.CloseNormalClosure
 	}
+
+	w.readyState = CLOSING
+	w.closeCode = code
+
 	w.writeQueueCh <- message{
 		mtype: websocket.CloseMessage,
 		data:  websocket.FormatCloseMessage(code, reason),
@@ -773,8 +799,11 @@ func (w *webSocket) connectionClosedWithError(err error) error {
 	close(w.done)
 
 	if err != nil {
-		if errList := w.callErrorListeners(err); errList != nil {
-			return errList // TODO ... still call the close listeners ?!?
+		var closeError *websocket.CloseError
+		if !errors.As(err, &closeError) || closeError.Code != websocket.CloseNormalClosure {
+			if errList := w.callErrorListeners(err); errList != nil {
+				return errList
+			}
 		}
 	}
 	return w.callEventListeners(events.CLOSE)
@@ -783,7 +812,7 @@ func (w *webSocket) connectionClosedWithError(err error) error {
 // newEvent return an event implementing "implements" https://dom.spec.whatwg.org/#event
 // needs to be called on the event loop
 // TODO: move to events
-func (w *webSocket) newEvent(eventType string, t time.Time) *sobek.Object {
+func (w *webSocket) newEvent(eventType string, t time.Time, extras ...func(*sobek.Object)) *sobek.Object {
 	rt := w.vu.Runtime()
 	o := rt.NewObject()
 
@@ -805,6 +834,10 @@ func (w *webSocket) newEvent(eventType string, t time.Time) *sobek.Object {
 		return float64(t.UnixNano()) / 1_000_000 // milliseconds as double as per the spec
 		// https://w3c.github.io/hr-time/#dom-domhighrestimestamp
 	}), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
+
+	for _, extra := range extras {
+		extra(o)
+	}
 
 	return o
 }
@@ -836,9 +869,21 @@ func (w *webSocket) callErrorListeners(e error) error { // TODO use the error ev
 }
 
 func (w *webSocket) callEventListeners(eventType string) error {
+	var event *sobek.Object
+	if eventType == events.CLOSE {
+		event = w.newEvent(eventType, time.Now(), func(o *sobek.Object) {
+			rt := w.vu.Runtime()
+			if w.closeCode != 0 {
+				must(rt, o.DefineDataProperty("code", rt.ToValue(w.closeCode), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
+			}
+			must(rt, o.DefineDataProperty("reason", rt.ToValue(w.closeReason), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
+		})
+	} else {
+		event = w.newEvent(eventType, time.Now())
+	}
+
 	for _, listener := range w.eventListeners.all(eventType) {
-		// TODO the event here needs to be different and have an error (figure out it was for the close listeners)
-		if _, err := listener(w.newEvent(eventType, time.Now())); err != nil { // TODO fix timestamp
+		if _, err := listener(event); err != nil {
 			return err
 		}
 	}
