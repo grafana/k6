@@ -1,21 +1,28 @@
 package cmd
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/grafana/k6deps"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/cmd/state"
+	"go.k6.io/k6/ext"
 
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/internal/build"
 	"go.k6.io/k6/internal/cmd/tests"
+	"go.k6.io/k6/lib/fsext"
 )
 
 // mockExecutor mocks commandExecutor
@@ -64,7 +71,7 @@ export default function() {
 `
 
 	requireUnsatisfiedK6Version = `
-"use k6 = v0.99"
+"use k6 = v9.99"
 
 import { sleep, check } from 'k6';
 
@@ -189,16 +196,6 @@ func TestLauncherLaunch(t *testing.T) {
 			expectK6Run:     true,
 			expectOsExit:    108,
 		},
-		{
-			name:            "script in stdin (unsupported)",
-			k6Cmd:           "cloud",
-			k6Args:          []string{"-"},
-			script:          "",
-			expectProvision: false,
-			expectCmdRunE:   false,
-			expectK6Run:     false,
-			expectOsExit:    -1,
-		},
 	}
 
 	for _, tc := range testCases {
@@ -222,7 +219,7 @@ func TestLauncherLaunch(t *testing.T) {
 			ts.CmdArgs = k6Args
 
 			// k6deps uses os package to access files. So we need to use it in the global state
-			ts.FS = afero.NewOsFs()
+			ts.FS = fsext.NewOsFs()
 
 			// NewGlobalTestState does not set the Binary provisioning flag even if we set
 			// the K6_BINARY_PROVISIONING variable in the global state, so we do it manually
@@ -264,6 +261,61 @@ func TestLauncherLaunch(t *testing.T) {
 	}
 }
 
+func TestLauncherViaStdin(t *testing.T) {
+	t.Parallel()
+
+	k6Args := []string{"k6", "archive", "-"}
+
+	ts := tests.NewGlobalTestState(t)
+	ts.CmdArgs = k6Args
+
+	// k6deps uses os package to access files. So we need to use it in the global state
+	ts.FS = fsext.NewOsFs()
+
+	// NewGlobalTestState does not set the Binary provisioning flag even if we set
+	// the K6_BINARY_PROVISIONING variable in the global state, so we do it manually
+	ts.Flags.BinaryProvisioning = true
+
+	// pass script using stdin
+	stdin := bytes.NewBuffer([]byte(requireUnsatisfiedK6Version))
+	ts.Stdin = stdin
+
+	// the exit code is checked by the TestGlobalState when the test ends
+	ts.ExpectedExitCode = 0
+
+	rootCommand := newRootCommand(ts.GlobalState)
+	cmdExecutor := mockExecutor{}
+
+	// use a provider returning the mock command executor
+	provider := mockProvisioner{executor: &cmdExecutor}
+	launcher := &launcher{
+		gs:          ts.GlobalState,
+		provisioner: &provider,
+	}
+
+	// override the rootCommand launcher
+	rootCommand.launcher = launcher
+
+	// find the command to be executed
+	cmd, _, err := rootCommand.cmd.Find(k6Args[1:])
+	if err != nil {
+		t.Fatalf("parsing args %v", err)
+	}
+
+	// replace command's the RunE function by a mock that indicates if the command was executed
+	runECalled := false
+	cmd.RunE = func(_ *cobra.Command, _ []string) error {
+		runECalled = true
+		return nil
+	}
+
+	rootCommand.execute()
+
+	assert.Equal(t, true, provider.invoked)
+	assert.Equal(t, false, runECalled)
+	assert.Equal(t, true, cmdExecutor.invoked)
+}
+
 func TestIsAnalysisRequired(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
@@ -289,7 +341,7 @@ func TestIsAnalysisRequired(t *testing.T) {
 		{
 			name:     "run command",
 			args:     []string{"run", "script.js"},
-			expected: false,
+			expected: true,
 		},
 		{
 			name:     "cloud command",
@@ -345,6 +397,171 @@ func TestIsAnalysisRequired(t *testing.T) {
 
 			actual := isAnalysisRequired(cmd)
 			assert.Equal(t, tc.expected, actual)
+		})
+	}
+}
+
+func TestIsCustomBuildRequired(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		title  string
+		deps   map[string]string
+		exts   []*ext.Extension
+		expect bool
+	}{
+		{
+			title:  "k6 satisfied",
+			deps:   map[string]string{"k6": "=v1.0.0"},
+			exts:   []*ext.Extension{},
+			expect: false,
+		},
+		{
+			title:  "k6 not satisfied",
+			deps:   map[string]string{"k6": ">v1.0.0"},
+			exts:   []*ext.Extension{},
+			expect: true,
+		},
+		{
+			title:  "extension not present",
+			deps:   map[string]string{"k6": "*", "k6/x/faker": "*"},
+			exts:   []*ext.Extension{},
+			expect: true,
+		},
+		{
+			title: "extension satisfied",
+			deps:  map[string]string{"k6/x/faker": "=v0.4.0"},
+			exts: []*ext.Extension{
+				{Name: "k6/x/faker", Module: "github.com/grafana/xk6-faker", Version: "v0.4.0"},
+			},
+			expect: false,
+		},
+		{
+			title: "extension not satisfied",
+			deps:  map[string]string{"k6/x/faker": ">v0.4.0"},
+			exts: []*ext.Extension{
+				{Name: "k6/x/faker", Module: "github.com/grafana/xk6-faker", Version: "v0.4.0"},
+			},
+			expect: true,
+		},
+		{
+			title: "k6 and extension satisfied",
+			deps:  map[string]string{"k6": "=v1.0.0", "k6/x/faker": "=v0.4.0"},
+			exts: []*ext.Extension{
+				{Name: "k6/x/faker", Module: "github.com/grafana/xk6-faker", Version: "v0.4.0"},
+			},
+			expect: false,
+		},
+		{
+			title: "k6 satisfied, extension not satisfied",
+			deps:  map[string]string{"k6": "=v1.0.0", "k6/x/faker": ">v0.4.0"},
+			exts: []*ext.Extension{
+				{Name: "k6/x/faker", Module: "github.com/grafana/xk6-faker", Version: "v0.4.0"},
+			},
+			expect: true,
+		},
+		{
+			title: "k6 not satisfied, extension satisfied",
+			deps:  map[string]string{"k6": ">v1.0.0", "k6/x/faker": "=v0.4.0"},
+			exts: []*ext.Extension{
+				{Name: "k6/x/faker", Module: "github.com/grafana/xk6-faker", Version: "v0.4.0"},
+			},
+			expect: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.title, func(t *testing.T) {
+			t.Parallel()
+
+			deps := k6deps.Dependencies{}
+			for name, constrain := range tc.deps {
+				dep, err := k6deps.NewDependency(name, constrain)
+				if err != nil {
+					t.Fatalf("parsing %q dependency %v", name, err)
+				}
+				deps[dep.Name] = dep
+			}
+
+			k6Version := "v1.0.0"
+			required := isCustomBuildRequired(deps, k6Version, tc.exts)
+			assert.Equal(t, tc.expect, required)
+		})
+	}
+}
+
+func TestIOFSBridgeOpen(t *testing.T) {
+	t.Parallel()
+
+	testfs := afero.NewMemMapFs()
+	require.NoError(t, fsext.WriteFile(testfs, "abasicpath/onetwo.txt", []byte(`test123`), 0o644))
+
+	bridge := &ioFSBridge{fsext: testfs}
+
+	// It asserts that the bridge implements io/fs.FS
+	goiofs := fs.FS(bridge)
+	f, err := goiofs.Open("abasicpath/onetwo.txt")
+	require.NoError(t, err)
+	require.NotNil(t, f)
+
+	content, err := io.ReadAll(f)
+	require.NoError(t, err)
+
+	assert.Equal(t, "test123", string(content))
+}
+
+func TestGetBuildServiceURL(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name                      string
+		buildSrvURL               string
+		enableCommunityExtensions bool
+		expectErr                 bool
+		expectedURL               string
+	}{
+		{
+			name:                      "default build service url",
+			buildSrvURL:               "https://build.srv",
+			enableCommunityExtensions: false,
+			expectErr:                 false,
+			expectedURL:               "https://build.srv/cloud",
+		},
+		{
+			name:                      "enable community extensions",
+			buildSrvURL:               "https://build.srv",
+			enableCommunityExtensions: true,
+			expectErr:                 false,
+			expectedURL:               "https://build.srv/oss",
+		},
+		{
+			name:                      "invalid buildServiceURL",
+			buildSrvURL:               "https://host:port",
+			enableCommunityExtensions: false,
+			expectErr:                 true,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			logger := &logrus.Logger{ //nolint:forbidigo
+				Out: io.Discard,
+			}
+
+			flags := state.GlobalFlags{
+				BinaryProvisioning:        true,
+				BuildServiceURL:           tc.buildSrvURL,
+				EnableCommunityExtensions: tc.enableCommunityExtensions,
+			}
+
+			buildSrvURL, err := getBuildServiceURL(flags, logger)
+			if tc.expectErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tc.expectedURL, buildSrvURL)
+			}
 		})
 	}
 }

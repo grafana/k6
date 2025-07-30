@@ -540,7 +540,41 @@ func (m *FrameManager) requestStarted(req *Request) {
 		frame.pendingDocument = &DocumentInfo{documentID: req.documentID, request: req}
 		frame.pendingDocumentMu.Unlock()
 	}
-	m.logger.Debugf("FrameManager:requestStarted", "fmid:%d rurl:%s pdoc:nil", m.ID(), req.URL())
+
+	if !m.page.hasRoutes() {
+		return
+	}
+
+	route := NewRoute(m.logger, m.page.mainFrameSession.networkManager, req)
+	m.page.routesMu.RLock()
+	defer m.page.routesMu.RUnlock()
+	for _, r := range m.page.routes {
+		matched, err := r.urlMatcher(req.URL())
+		if err != nil {
+			m.logger.Errorf("FrameManager:requestStarted",
+				"fmid:%d rurl:%s error matching url: %v", m.ID(), req.URL(), err)
+			continue
+		}
+
+		if !matched {
+			continue
+		}
+
+		func() {
+			// In case routes are updated in the handler
+			m.page.routesMu.RUnlock()
+			defer m.page.routesMu.RLock()
+
+			err := r.handler(route)
+			if err != nil {
+				m.logger.Errorf("FrameManager:requestStarted",
+					"fmid:%d rurl:%s error handling request with route: %v", m.ID(), req.URL(), err)
+			}
+		}()
+
+		return
+	}
+	route.Continue()
 }
 
 // Frames returns a list of frames on the page.

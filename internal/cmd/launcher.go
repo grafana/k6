@@ -2,26 +2,53 @@ package cmd
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
+	"io/fs"
+	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"syscall"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/grafana/k6deps"
 	"github.com/grafana/k6provider"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/cmd/state"
+	"go.k6.io/k6/ext"
 	"go.k6.io/k6/internal/build"
+	"go.k6.io/k6/lib/fsext"
 )
 
-var (
-	errScriptNotFound     = errors.New("script not found")
-	errUnsupportedFeature = errors.New("not supported")
+const (
+	// cloudExtensionsCatalog defines the extensions catalog for cloud supported extensions
+	cloudExtensionsCatalog = "cloud"
+	// communityExtensionsCatalog defines the extensions catalog for community extensions
+	communityExtensionsCatalog = "oss"
 )
+
+// ioFSBridge allows an afero.Fs to implement the Go standard library io/fs.FS.
+type ioFSBridge struct {
+	fsext fsext.Fs
+}
+
+// newIofsBridge returns an IOFSBridge from a Fs
+func newIOFSBridge(fs fsext.Fs) fs.FS {
+	return &ioFSBridge{
+		fsext: fs,
+	}
+}
+
+// Open implements fs.Fs Open
+func (b *ioFSBridge) Open(name string) (fs.File, error) {
+	f, err := b.fsext.Open(name)
+	if err != nil {
+		return nil, fmt.Errorf("opening file via launcher's bridge: %w", err)
+	}
+	return f, nil
+}
 
 // commandExecutor executes the requested k6 command line command.
 // It abstract the execution path from the concrete binary.
@@ -71,8 +98,7 @@ func (l *launcher) launch(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	//  if the command does not have dependencies nor a custom build is required
-	if !isCustomBuildRequired(build.Version, deps) {
+	if !isCustomBuildRequired(deps, build.Version, ext.GetAll()) {
 		l.gs.Logger.
 			Debug("The current k6 binary already satisfies all the required dependencies," +
 				" it isn't required to provision a new binary.")
@@ -123,13 +149,13 @@ func (b *customBinary) run(gs *state.GlobalState) error {
 	// the subprocess detects the type of terminal
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
-	cmd.Stdin = os.Stdin
+
+	// If stdin was used by the analyze function, the content has been preserved
+	// in `gs.Stdin` and should be passed to the command
+	cmd.Stdin = gs.Stdin
 
 	// Copy environment variables to the k6 process and skip binary provisioning feature flag to disable it.
-	// If not disabled, then the executed k6 binary would enter an infinite loop, where it continuously
-	// process the input script, detect dependencies, and retrigger provisioning.
-	// This can be avoided by checking if the current binary has already extensions that
-	// satisfies the dependencies. See comment in isCustomBuildRequired function.
+	// This avoids unnecessary re-processing of dependencies in the sub-process.
 	env := []string{}
 	for k, v := range gs.Env {
 		if k == state.BinaryProvisioningFeatureFlag {
@@ -170,41 +196,47 @@ func (b *customBinary) run(gs *state.GlobalState) error {
 	}
 }
 
-// isCustomBuildRequired checks if the build is required
-// it's required if there is one or more dependencies other than k6 itself
-// or if the required k6 version is not satisfied by the current binary's version
-// TODO: get the version of any built-in extension and check if they satisfy the dependencies
-// (see https://github.com/grafana/k6/issues/4697)
-func isCustomBuildRequired(baseK6Version string, deps k6deps.Dependencies) bool {
+// isCustomBuildRequired checks if there is at least one dependency that are not satisfied by the binary
+// considering the version of k6 and any built-in extension
+func isCustomBuildRequired(deps k6deps.Dependencies, k6Version string, exts []*ext.Extension) bool {
+	// return early if there are no dependencies
 	if len(deps) == 0 {
 		return false
 	}
 
-	// Early return if there are multiple dependencies
-	if len(deps) > 1 {
-		return true
+	// collect modules that this binary contain, including k6 itself
+	builtIn := map[string]string{"k6": k6Version}
+	for _, e := range exts {
+		builtIn[e.Name] = e.Version
 	}
 
-	k6Dependency, hasK6 := deps["k6"]
+	for _, dep := range deps {
+		version, provided := builtIn[dep.Name]
+		// if the binary does not contain a required module, we need a custom
+		if !provided {
+			return true
+		}
 
-	// Early return if there's exactly one non-k6 dependency
-	if !hasK6 {
-		return true
+		// If dependency's constrain is null, assume it is "*" and consider it satisfied.
+		// See https://github.com/grafana/k6deps/issues/91
+		if dep.Constraints == nil {
+			continue
+		}
+
+		semver, err := semver.NewVersion(version)
+		if err != nil {
+			// ignore built in module if version is not a valid sem ver (e.g. a development version)
+			// if user wants to use this built-in, must disable binary provisioning
+			return true
+		}
+
+		// if the current version does not satisfies the constrains, binary provisioning is required
+		if !dep.Constraints.Check(semver) {
+			return true
+		}
 	}
 
-	// Ignore k6 dependency if nil
-	if k6Dependency == nil || k6Dependency.Constraints == nil {
-		return false
-	}
-
-	k6Ver, err := semver.NewVersion(baseK6Version)
-	if err != nil {
-		// ignore if baseK6Version is not a valid sem ver (e.g. a development version)
-		return true
-	}
-
-	// if the current version satisfies the constrains, binary provisioning is not required
-	return !k6Dependency.Constraints.Check(k6Ver)
+	return false
 }
 
 // k6buildProvisioner provisions a k6 binary that satisfies the dependencies using the k6build service
@@ -217,20 +249,14 @@ func newK6BuildProvisioner(gs *state.GlobalState) provisioner {
 }
 
 func (p *k6buildProvisioner) provision(deps k6deps.Dependencies) (commandExecutor, error) {
-	token, err := extractToken(p.gs)
+	buildSrv, err := getBuildServiceURL(p.gs.Flags, p.gs.Logger)
 	if err != nil {
-		p.gs.Logger.WithError(err).Debug("Failed to get a valid token")
-	}
-
-	if token == "" {
-		return nil, errors.New("k6 cloud token is required when the Binary provisioning feature is enabled." +
-			" Set K6_CLOUD_TOKEN environment variable or execute the `k6 cloud login` command")
+		return nil, err
 	}
 
 	config := k6provider.Config{
-		BuildServiceURL:  p.gs.Flags.BuildServiceURL,
-		BuildServiceAuth: token,
-		BinaryCacheDir:   p.gs.Flags.BinaryCache,
+		BuildServiceURL: buildSrv,
+		BinaryCacheDir:  p.gs.Flags.BinaryCache,
 	}
 
 	provider, err := k6provider.NewProvider(config)
@@ -249,28 +275,31 @@ func (p *k6buildProvisioner) provision(deps k6deps.Dependencies) (commandExecuto
 	return &customBinary{binary.Path}, nil
 }
 
+// return the URL to the build service based on the configuration flags defined
+func getBuildServiceURL(flags state.GlobalFlags, logger *logrus.Logger) (string, error) { //nolint:forbidigo
+	buildSrv := flags.BuildServiceURL
+	buildSrvURL, err := url.Parse(buildSrv)
+	if err != nil {
+		return "", fmt.Errorf("invalid URL to binary provisioning build service: %w", err)
+	}
+
+	catalog := cloudExtensionsCatalog
+	if flags.EnableCommunityExtensions {
+		catalog = communityExtensionsCatalog
+	}
+
+	logger.
+		Debugf("using the %q extensions catalog", catalog)
+
+	return buildSrvURL.JoinPath(catalog).String(), nil
+}
+
 func formatDependencies(deps map[string]string) string {
 	buffer := &bytes.Buffer{}
 	for dep, version := range deps {
 		fmt.Fprintf(buffer, "%s:%s ", dep, version)
 	}
 	return strings.Trim(buffer.String(), " ")
-}
-
-// extractToken gets the cloud token required to access the build service
-// from the environment or from the config file
-func extractToken(gs *state.GlobalState) (string, error) {
-	diskConfig, err := readDiskConfig(gs)
-	if err != nil {
-		return "", err
-	}
-
-	config, _, err := cloudapi.GetConsolidatedConfig(diskConfig.Collectors["cloud"], gs.Env, "", nil, nil)
-	if err != nil {
-		return "", err
-	}
-
-	return config.Token.String, nil
 }
 
 // analyze returns the dependencies for the command to be executed.
@@ -283,25 +312,28 @@ func analyze(gs *state.GlobalState, args []string) (k6deps.Dependencies, error) 
 		Manifest:  k6deps.Source{Ignore: true},
 	}
 
-	scriptname := args[0]
-	if scriptname == "-" {
-		gs.Logger.
-			Debug("Test script provided by Stdin is not yet supported from Binary provisioning feature.")
-		return nil, errUnsupportedFeature
+	sourceRootPath := args[0]
+	gs.Logger.WithField("source", "sourceRootPath").
+		Debug("Launcher is resolving and reading the test's script")
+	src, _, pwd, err := readSource(gs, sourceRootPath)
+	if err != nil {
+		return nil, fmt.Errorf("reading source for analysis %w", err)
 	}
 
-	if _, err := gs.FS.Stat(scriptname); err != nil {
-		gs.Logger.
-			WithField("path", scriptname).
-			WithError(err).
-			Debug("The requested test script's file is not available on the file system.")
-		return nil, errScriptNotFound
+	// if sourceRooPath is stdin ('-') we need to preserve the content
+	if sourceRootPath == "-" {
+		gs.Stdin = bytes.NewBuffer(src.Data)
 	}
 
-	if strings.HasSuffix(scriptname, ".tar") {
-		dopts.Archive.Name = scriptname
+	if strings.HasSuffix(sourceRootPath, ".tar") {
+		dopts.Archive.Contents = src.Data
 	} else {
-		dopts.Script.Name = scriptname
+		if !filepath.IsAbs(sourceRootPath) {
+			sourceRootPath = filepath.Join(pwd, sourceRootPath)
+		}
+		dopts.Script.Name = sourceRootPath
+		dopts.Script.Contents = src.Data
+		dopts.Fs = newIOFSBridge(gs.FS)
 	}
 
 	return k6deps.Analyze(dopts)
@@ -310,16 +342,9 @@ func analyze(gs *state.GlobalState, args []string) (k6deps.Dependencies, error) 
 // isAnalysisRequired returns a boolean indicating if dependency analysis is required for the command
 func isAnalysisRequired(cmd *cobra.Command) bool {
 	switch cmd.Name() {
-	case "run":
-		// exclude `k6 cloud run` command
-		if cmd.Parent() != nil && cmd.Parent().Name() == "cloud" {
-			return true
-		}
-		return false
-	case "archive", "inspect", "upload", "cloud":
+	case "run", "archive", "inspect", "upload", "cloud":
 		return true
 	}
 
-	// not found
 	return false
 }
