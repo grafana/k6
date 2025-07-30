@@ -43,7 +43,7 @@ func TestWebPlatformTestSuite(t *testing.T) {
 				"randomUUID.https.any.js",
 			},
 		},
-		// SubtleCrypto interface tests  
+		// SubtleCrypto interface tests
 		{
 			catalog: "digest",
 			files: []string{
