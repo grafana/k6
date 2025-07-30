@@ -324,6 +324,7 @@ type pageAPI interface { //nolint:interfacebloat
 	GetByPlaceholder(placeholder string, opts *common.GetByBaseOptions) *common.Locator
 	GetByTitle(title string, opts *common.GetByBaseOptions) *common.Locator
 	GetByTestId(testID string) *common.Locator
+	GetByText(text string, opts *common.GetByBaseOptions) *common.Locator
 	GetKeyboard() *common.Keyboard
 	GetMouse() *common.Mouse
 	GetTouchscreen() *common.Touchscreen
@@ -347,6 +348,7 @@ type pageAPI interface { //nolint:interfacebloat
 	Query(selector string) (*common.ElementHandle, error)
 	QueryAll(selector string) ([]*common.ElementHandle, error)
 	Reload(opts sobek.Value) *common.Response
+	Route(path string, handler sobek.Callable)
 	Screenshot(opts sobek.Value) ([]byte, error)
 	SelectOption(selector string, values sobek.Value, opts sobek.Value) ([]string, error)
 	SetChecked(selector string, checked bool, opts sobek.Value) error

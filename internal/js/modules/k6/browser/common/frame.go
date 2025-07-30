@@ -79,9 +79,13 @@ func (s *DOMElementState) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// URLMatcher is a function that matches a URL against a pattern.
+// It relies on JavaScript's regex engine for regex matching.
+type URLMatcher func(string) (bool, error)
+
 // urlMatcher matches URLs based on pattern type. It can match on exact and regex
 // patterns. If the pattern is empty or a single quote, it matches any URL.
-func urlMatcher(pattern string, jsRegexChecker JSRegexChecker) (func(string) (bool, error), error) {
+func urlMatcher(pattern string, jsRegexChecker JSRegexChecker) (URLMatcher, error) {
 	if pattern == "" || pattern == "''" {
 		return func(url string) (bool, error) { return true, nil }, nil
 	}
@@ -1151,6 +1155,22 @@ func (f *Frame) GetByTestID(testID string) *Locator {
 	f.log.Debugf("Frame:GetByTestID", "fid:%s furl:%q testID:%q", f.ID(), f.URL(), testID)
 
 	return f.Locator("internal:attr=[data-testid="+testID+"]", nil)
+}
+
+// GetByText creates and returns a new locator for this frame based on text content.
+func (f *Frame) GetByText(text string, opts *GetByBaseOptions) *Locator {
+	f.log.Debugf("Frame:GetByText", "fid:%s furl:%q text:%q opts:%+v", f.ID(), f.URL(), text, opts)
+
+	l := "internal:text=" + text
+	if isQuotedText(text) {
+		if opts != nil && opts.Exact != nil && *opts.Exact {
+			l = "internal:text=" + text + "s"
+		} else {
+			l = "internal:text=" + text + "i"
+		}
+	}
+
+	return f.Locator(l, nil)
 }
 
 // Referrer returns the referrer of the frame from the network manager

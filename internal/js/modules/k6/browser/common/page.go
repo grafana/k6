@@ -190,6 +190,26 @@ type ConsoleMessage struct {
 
 type PageOnHandler func(PageOnEvent) error
 
+type RouteHandler struct {
+	path       string
+	handler    RouteHandlerCallback
+	urlMatcher URLMatcher
+}
+
+func NewRouteHandler(
+	path string,
+	handler RouteHandlerCallback,
+	urlMatcher URLMatcher,
+) *RouteHandler {
+	return &RouteHandler{
+		path:       path,
+		handler:    handler,
+		urlMatcher: urlMatcher,
+	}
+}
+
+type RouteHandlerCallback func(*Route) error
+
 // Page stores Page/tab related context.
 type Page struct {
 	Keyboard    *Keyboard
@@ -234,7 +254,8 @@ type Page struct {
 	frameSessionsMu  sync.RWMutex
 	workers          map[target.SessionID]*Worker
 	workersMu        sync.Mutex
-	routes           []any // TODO: Implement
+	routes           []*RouteHandler
+	routesMu         sync.RWMutex
 	vu               k6modules.VU
 
 	logger *log.Logger
@@ -765,6 +786,9 @@ func (p *Page) getFrameSession(frameID cdp.FrameID) (*FrameSession, bool) {
 }
 
 func (p *Page) hasRoutes() bool {
+	p.routesMu.RLock()
+	defer p.routesMu.RUnlock()
+
 	return len(p.routes) > 0
 }
 
@@ -1130,6 +1154,13 @@ func (p *Page) GetByTestID(testID string) *Locator {
 	return p.MainFrame().GetByTestID(testID)
 }
 
+// GetByText creates and returns a new locator for this page (main frame) based on text content.
+func (p *Page) GetByText(text string, opts *GetByBaseOptions) *Locator {
+	p.logger.Debugf("Page:GetByText", "sid:%s text: %q opts:%+v", p.sessionID(), text, opts)
+
+	return p.MainFrame().GetByText(text, opts)
+}
+
 // GetKeyboard returns the keyboard for the page.
 func (p *Page) GetKeyboard() *Keyboard {
 	return p.Keyboard
@@ -1268,6 +1299,34 @@ func (p *Page) MainFrame() *Frame {
 func (p *Page) Referrer() string {
 	nm := p.mainFrameSession.getNetworkManager()
 	return nm.extraHTTPHeaders["referer"]
+}
+
+// Route register a handler to be executed for a given request path
+func (p *Page) Route(
+	path string,
+	handlerCallback RouteHandlerCallback,
+	jsRegexChecker JSRegexChecker,
+) error {
+	p.logger.Debugf("Page:Route", "sid:%v path:%s", p.sessionID(), path)
+
+	if !p.hasRoutes() {
+		err := p.mainFrameSession.updateRequestInterception(true)
+		if err != nil {
+			return err
+		}
+	}
+
+	matcher, err := urlMatcher(path, jsRegexChecker)
+	if err != nil {
+		return fmt.Errorf("creating url matcher for path %s: %w", path, err)
+	}
+
+	routeHandler := NewRouteHandler(path, handlerCallback, matcher)
+	p.routesMu.Lock()
+	defer p.routesMu.Unlock()
+	p.routes = append([]*RouteHandler{routeHandler}, p.routes...)
+
+	return nil
 }
 
 // NavigationTimeout returns the page's navigation timeout.

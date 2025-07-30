@@ -61,16 +61,23 @@ func newTestNetworkManager(t *testing.T, k6opts k6lib.Options) (*NetworkManager,
 
 	vu := k6test.NewVU(t)
 	vu.ActivateVU()
+	ctx := vu.Context()
 	st := vu.State()
 	st.Options = k6opts
 	logger := log.New(st.Logger, "")
+	timeoutSettings := NewTimeoutSettings(nil)
+	frameManager := NewFrameManager(ctx, nil, nil, timeoutSettings, logger)
+
 	nm := &NetworkManager{
-		ctx:            vu.Context(),
-		logger:         logger,
-		session:        session,
-		resolver:       mr,
-		vu:             vu,
-		reqIDToRequest: map[network.RequestID]*Request{},
+		ctx:                           ctx,
+		logger:                        logger,
+		session:                       session,
+		frameManager:                  frameManager,
+		resolver:                      mr,
+		vu:                            vu,
+		reqIDToRequest:                map[network.RequestID]*Request{},
+		reqIDToRequestWillBeSentEvent: make(map[network.RequestID]*network.EventRequestWillBeSent),
+		reqIDToRequestPausedEvent:     make(map[network.RequestID]*fetch.EventRequestPaused),
 	}
 
 	return nm, session
