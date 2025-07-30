@@ -359,21 +359,21 @@ func TestGetBuildServiceURL(t *testing.T) {
 		buildSrvURL               string
 		enableCommunityExtensions bool
 		expectErr                 bool
-		expected                  string
+		expectedURL               string
 	}{
 		{
 			name:                      "default build service url",
 			buildSrvURL:               "https://build.srv",
 			enableCommunityExtensions: false,
 			expectErr:                 false,
-			expected:                  "https://build.srv/cloud",
+			expectedURL:               "https://build.srv/cloud",
 		},
 		{
 			name:                      "enable community extensions",
 			buildSrvURL:               "https://build.srv",
 			enableCommunityExtensions: true,
 			expectErr:                 false,
-			expected:                  "https://build.srv/oss",
+			expectedURL:               "https://build.srv/oss",
 		},
 		{
 			name:                      "invalid buildServiceURL",
@@ -402,7 +402,7 @@ func TestGetBuildServiceURL(t *testing.T) {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
-				assert.Equal(t, tc.expected, buildSrvURL)
+				assert.Equal(t, tc.expectedURL, buildSrvURL)
 			}
 		})
 	}
