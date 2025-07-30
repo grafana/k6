@@ -1,39 +1,28 @@
+// Package grpcservice provides a gRPC test service for k6 tests.
 package grpcservice
 
 import (
-	"context"
+	"go.k6.io/k6/internal/lib/testutils/grpcservice"
+	"google.golang.org/grpc"
 )
 
-// RouteGuideServer implements the RouteGuide service
-type routeGuideServer struct {
-	UnimplementedRouteGuideServer
-	features []*Feature
+// LoadFeatures loads test features from a JSON file.
+func LoadFeatures(jsonFile string) []*Feature {
+	return grpcservice.LoadFeatures(jsonFile)
 }
 
-// NewRouteGuideServer creates a new RouteGuide server
+// NewRouteGuideServer creates a new RouteGuide server with the given features.
 func NewRouteGuideServer(features ...*Feature) RouteGuideServer {
-	return &routeGuideServer{features: features}
+	return grpcservice.NewRouteGuideServer(features...)
 }
 
-// GetFeature returns a feature at a given point
-func (s *routeGuideServer) GetFeature(ctx context.Context, point *Point) (*Feature, error) {
-	for _, feature := range s.features {
-		if feature.Location.Latitude == point.Latitude && feature.Location.Longitude == point.Longitude {
-			return feature, nil
-		}
-	}
-	return &Feature{Location: point}, nil
+// RegisterRouteGuideServer registers the RouteGuide server with a gRPC server.
+func RegisterRouteGuideServer(s grpc.ServiceRegistrar, srv RouteGuideServer) {
+	grpcservice.RegisterRouteGuideServer(s, srv)
 }
 
-// LoadFeatures loads test features
-func LoadFeatures(dataPath string) []*Feature {
-	return []*Feature{
-		{
-			Name: "Test Location",
-			Location: &Point{
-				Latitude:  409146138,
-				Longitude: -746188906,
-			},
-		},
-	}
-} 
+// Feature represents a geographical feature.
+type Feature = grpcservice.Feature
+
+// RouteGuideServer is the server API for RouteGuide service.
+type RouteGuideServer = grpcservice.RouteGuideServer
