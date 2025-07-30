@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io/fs"
 	"net/url"
@@ -30,10 +29,6 @@ const (
 	communityExtensionsCatalog = "oss"
 )
 
-var (
-	errScriptNotFound     = errors.New("script not found")
-	errUnsupportedFeature = errors.New("not supported")
-)
 
 // ioFSBridge allows an afero.Fs to implement the Go standard library io/fs.FS.
 type ioFSBridge struct {
