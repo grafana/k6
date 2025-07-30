@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"strings"
@@ -12,11 +13,18 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/grafana/k6deps"
 	"github.com/grafana/k6provider"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/ext"
 	"go.k6.io/k6/internal/build"
+)
+
+const (
+	// cloudExtensionsCatalog defines the extensions catalog for cloud supported extensions
+	cloudExtensionsCatalog = "cloud"
+	// communityExtensionsCatalog defines the extensions catalog for community extensions
+	communityExtensionsCatalog = "oss"
 )
 
 var (
@@ -220,20 +228,14 @@ func newK6BuildProvisioner(gs *state.GlobalState) provisioner {
 }
 
 func (p *k6buildProvisioner) provision(deps k6deps.Dependencies) (commandExecutor, error) {
-	token, err := extractToken(p.gs)
+	buildSrv, err := getBuildServiceURL(p.gs.Flags, p.gs.Logger)
 	if err != nil {
-		p.gs.Logger.WithError(err).Debug("Failed to get a valid token")
-	}
-
-	if token == "" {
-		return nil, errors.New("k6 cloud token is required when the Binary provisioning feature is enabled." +
-			" Set K6_CLOUD_TOKEN environment variable or execute the `k6 cloud login` command")
+		return nil, err
 	}
 
 	config := k6provider.Config{
-		BuildServiceURL:  p.gs.Flags.BuildServiceURL,
-		BuildServiceAuth: token,
-		BinaryCacheDir:   p.gs.Flags.BinaryCache,
+		BuildServiceURL: buildSrv,
+		BinaryCacheDir:  p.gs.Flags.BinaryCache,
 	}
 
 	provider, err := k6provider.NewProvider(config)
@@ -252,28 +254,31 @@ func (p *k6buildProvisioner) provision(deps k6deps.Dependencies) (commandExecuto
 	return &customBinary{binary.Path}, nil
 }
 
+// return the URL to the build service based on the configuration flags defined
+func getBuildServiceURL(flags state.GlobalFlags, logger *logrus.Logger) (string, error) { //nolint:forbidigo
+	buildSrv := flags.BuildServiceURL
+	buildSrvURL, err := url.Parse(buildSrv)
+	if err != nil {
+		return "", fmt.Errorf("invalid URL to binary provisioning build service: %w", err)
+	}
+
+	catalog := cloudExtensionsCatalog
+	if flags.EnableCommunityExtensions {
+		catalog = communityExtensionsCatalog
+	}
+
+	logger.
+		Debugf("using the %q extensions catalog", catalog)
+
+	return buildSrvURL.JoinPath(catalog).String(), nil
+}
+
 func formatDependencies(deps map[string]string) string {
 	buffer := &bytes.Buffer{}
 	for dep, version := range deps {
 		fmt.Fprintf(buffer, "%s:%s ", dep, version)
 	}
 	return strings.Trim(buffer.String(), " ")
-}
-
-// extractToken gets the cloud token required to access the build service
-// from the environment or from the config file
-func extractToken(gs *state.GlobalState) (string, error) {
-	diskConfig, err := readDiskConfig(gs)
-	if err != nil {
-		return "", err
-	}
-
-	config, _, err := cloudapi.GetConsolidatedConfig(diskConfig.Collectors["cloud"], gs.Env, "", nil, nil)
-	if err != nil {
-		return "", err
-	}
-
-	return config.Token.String, nil
 }
 
 // analyze returns the dependencies for the command to be executed.
@@ -313,16 +318,9 @@ func analyze(gs *state.GlobalState, args []string) (k6deps.Dependencies, error) 
 // isAnalysisRequired returns a boolean indicating if dependency analysis is required for the command
 func isAnalysisRequired(cmd *cobra.Command) bool {
 	switch cmd.Name() {
-	case "run":
-		// exclude `k6 cloud run` command
-		if cmd.Parent() != nil && cmd.Parent().Name() == "cloud" {
-			return true
-		}
-		return false
-	case "archive", "inspect", "upload", "cloud":
+	case "run", "archive", "inspect", "upload", "cloud":
 		return true
 	}
 
-	// not found
 	return false
 }
