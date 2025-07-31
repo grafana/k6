@@ -2,10 +2,12 @@ package timers_test
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+
 	"go.k6.io/k6/js/modulestest"
 )
 
@@ -154,14 +156,24 @@ func TestSetTimeoutContextCancel(t *testing.T) {
 		}
 	}))
 
-	for i := 0; i < 2000; i++ {
+	for range 2000 {
 		ctx, cancel := context.WithCancel(context.Background())
 		runtime.CancelContext = cancel
 		runtime.VU.CtxField = ctx //nolint:fatcontext
 		runtime.VU.RuntimeField.ClearInterrupt()
 		const interruptMsg = "definitely an interrupt"
+		wg := sync.WaitGroup{}
+		defer wg.Wait()
+		defer cancel()
+		wg.Add(1)
 		go func() {
-			<-interruptChannel
+			defer wg.Done()
+			select {
+			case <-interruptChannel:
+			case <-ctx.Done():
+				return
+			}
+
 			time.Sleep(time.Millisecond)
 			runtime.CancelContext()
 			runtime.VU.RuntimeField.Interrupt(interruptMsg)
