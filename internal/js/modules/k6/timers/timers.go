@@ -34,12 +34,13 @@ func (*RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 
 // Exports returns the exports of the k6 module.
 func (e *Timers) Exports() modules.Exports {
+	globalThis := e.vu.Runtime().GlobalObject()
 	return modules.Exports{
-		Named: map[string]interface{}{
-			"setTimeout":    e.vu.Runtime().GlobalObject().Get("setTimeout"),
-			"clearTimeout":  e.vu.Runtime().GlobalObject().Get("clearTimeout"),
-			"setInterval":   e.vu.Runtime().GlobalObject().Get("setInterval"),
-			"clearInterval": e.vu.Runtime().GlobalObject().Get("clearInterval"),
+		Named: map[string]any{
+			"setTimeout":    globalThis.Get("setTimeout"),
+			"clearTimeout":  globalThis.Get("clearTimeout"),
+			"setInterval":   globalThis.Get("setInterval"),
+			"clearInterval": globalThis.Get("clearInterval"),
 		},
 	}
 }
