@@ -722,7 +722,7 @@ type Route struct {
 type ContinueOptions struct {
 	Headers  []HTTPHeader
 	Method   string
-	PostData string
+	PostData []byte
 	URL      string
 }
 

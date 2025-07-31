@@ -898,8 +898,8 @@ func (m *NetworkManager) ContinueRequest(
 	if opts.Method != "" {
 		action = action.WithMethod(opts.Method)
 	}
-	if opts.PostData != "" {
-		b64PostData := base64.StdEncoding.EncodeToString([]byte(opts.PostData))
+	if len(opts.PostData) > 0 {
+		b64PostData := base64.StdEncoding.EncodeToString(opts.PostData)
 		action = action.WithPostData(b64PostData)
 	}
 
