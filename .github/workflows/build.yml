@@ -247,7 +247,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install pandoc
-        uses: crazy-max/ghaction-chocolatey@0e015857dd851f84fcb7fb53380eb5c4c8202333 # v3.0.0
+        uses: crazy-max/ghaction-chocolatey@2526f467ccbd337d307fe179959cabbeca0bc8c0 # v3.4.0
         with:
           args: install -y pandoc
       - name: Install wix tools
