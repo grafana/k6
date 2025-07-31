@@ -890,8 +890,7 @@ func (m *NetworkManager) ContinueRequest(
 	action := fetch.ContinueRequest(requestID)
 
 	if len(opts.Headers) > 0 {
-		allHeaders := mergeHeaders(originalHeaders, opts.Headers)
-		action = action.WithHeaders(allHeaders)
+		action = action.WithHeaders(toFetchHeaders(opts.Headers))
 	}
 	if opts.URL != "" {
 		action = action.WithURL(opts.URL)
@@ -983,36 +982,6 @@ func toFetchHeaders(headers []HTTPHeader) []*fetch.HeaderEntry {
 		}
 	}
 	return fetchHeaders
-}
-
-func mergeHeaders(originalHeaders []HTTPHeader, extraHeaders []HTTPHeader) []*fetch.HeaderEntry {
-	if len(originalHeaders) == 0 {
-		return toFetchHeaders(extraHeaders)
-	}
-	if len(extraHeaders) == 0 {
-		return toFetchHeaders(originalHeaders)
-	}
-
-	headers := make([]*fetch.HeaderEntry, 0, len(originalHeaders)+len(extraHeaders))
-	existingHeaders := make(map[string]bool, len(extraHeaders))
-	for _, header := range extraHeaders {
-		headers = append(headers, &fetch.HeaderEntry{
-			Name:  header.Name,
-			Value: header.Value,
-		})
-		existingHeaders[header.Name] = true
-	}
-
-	for _, header := range originalHeaders {
-		if !existingHeaders[header.Name] {
-			headers = append(headers, &fetch.HeaderEntry{
-				Name:  header.Name,
-				Value: header.Value,
-			})
-		}
-	}
-
-	return headers
 }
 
 // SetExtraHTTPHeaders sets extra HTTP request headers to be sent with every request.
