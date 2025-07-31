@@ -1,5 +1,7 @@
-import { check, sleep } from 'k6';
+import { sleep } from 'k6';
 import { browser } from 'k6/browser';
+import { check } from 'https://jslib.k6.io/k6-utils/1.5.0/index.js';
+
 
 export const options = {
   scenarios: {
@@ -31,11 +33,9 @@ export default async function () {
     await page.getByRole('button', { name: 'pizza, please' }).click();
     sleep(1);
 
-    const checkData = await page
-      .locator('//p[text()[contains(., "Name:")]]')
-      .innerText();
-    check(page, {
-      pizzaName: checkData === 'Name: My Pizza',
+    const e = page.getByText('Name:')
+    check(null, {
+      pizzaName: await e.innerText() === 'Name: My Pizza',
     });
   } finally {
     await page.close();
