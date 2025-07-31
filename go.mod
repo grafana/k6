@@ -22,7 +22,7 @@ require (
 	github.com/grafana/k6deps v0.4.0
 	github.com/grafana/k6provider v0.1.15
 	github.com/grafana/sobek v0.0.0-20250723111835-dd8a13f0d439
-	github.com/grafana/xk6-dashboard v0.7.10
+	github.com/grafana/xk6-dashboard v0.7.11
 	github.com/grafana/xk6-redis v0.3.4
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
