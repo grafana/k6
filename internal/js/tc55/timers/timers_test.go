@@ -2,7 +2,6 @@ package timers_test
 
 import (
 	"context"
-	"sync"
 	"testing"
 	"time"
 
@@ -162,12 +161,13 @@ func TestSetTimeoutContextCancel(t *testing.T) {
 		runtime.VU.CtxField = ctx //nolint:fatcontext
 		runtime.VU.RuntimeField.ClearInterrupt()
 		const interruptMsg = "definitely an interrupt"
-		wg := sync.WaitGroup{}
-		defer wg.Wait()
-		defer cancel()
-		wg.Add(1)
+		sync := make(chan struct{})
+		defer func() {
+			cancel()
+			<-sync
+		}()
 		go func() {
-			defer wg.Done()
+			defer close(sync)
 			select {
 			case <-interruptChannel:
 			case <-ctx.Done():
