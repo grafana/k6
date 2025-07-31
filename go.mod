@@ -1,8 +1,8 @@
 module go.k6.io/k6
 
-go 1.23.0
+go 1.24.0
 
-toolchain go1.23.7
+toolchain go1.24.5
 
 require (
 	buf.build/gen/go/prometheus/prometheus/protocolbuffers/go v1.36.5-20240802094132-5b212ab78fb7.1
@@ -19,8 +19,8 @@ require (
 	github.com/golang/protobuf v1.5.4
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
-	github.com/grafana/k6deps v0.4.0
-	github.com/grafana/k6provider v0.1.15
+	github.com/grafana/k6deps v0.5.0
+	github.com/grafana/k6provider v0.1.16
 	github.com/grafana/sobek v0.0.0-20250723111835-dd8a13f0d439
 	github.com/grafana/xk6-dashboard v0.7.10
 	github.com/grafana/xk6-redis v0.3.4
@@ -82,7 +82,7 @@ require (
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/pprof v0.0.0-20230728192033-2ba5b33183c6 // indirect
-	github.com/grafana/k6build v0.5.11 // indirect
+	github.com/grafana/k6build v0.5.14 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.1 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
