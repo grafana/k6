@@ -2,6 +2,7 @@ package state
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"os/signal"
@@ -27,8 +28,11 @@ const (
 	// BinaryProvisioningFeatureFlag defines the environment variable that enables the binary provisioning
 	BinaryProvisioningFeatureFlag = "K6_BINARY_PROVISIONING"
 
-	// DefaultBuildServiceURL defines the URL to the default (grafana hosted) build service
-	DefaultBuildServiceURL = "https://ingest.k6.io/builder/api/v1"
+	// communityExtensionsCatalog defines the catalog for community extensions
+	communityExtensionsCatalog = "oss"
+
+	// defaultBuildServiceURL defines the URL to the default (grafana hosted) build service
+	defaultBuildServiceURL = "https://ingest.k6.io/builder/api/v1"
 
 	defaultConfigFileName = "config.json"
 	defaultBinaryCacheDir = "builds"
@@ -190,7 +194,7 @@ func GetDefaultFlags(homeDir string, cacheDir string) GlobalFlags {
 		ProfilingEnabled:          false,
 		ConfigFilePath:            filepath.Join(homeDir, "k6", defaultConfigFileName),
 		LogOutput:                 "stderr",
-		BuildServiceURL:           DefaultBuildServiceURL,
+		BuildServiceURL:           defaultBuildServiceURL,
 		EnableCommunityExtensions: false,
 		BinaryCache:               filepath.Join(cacheDir, "k6", defaultBinaryCacheDir),
 	}
@@ -236,6 +240,13 @@ func getFlags(defaultFlags GlobalFlags, env map[string]string, args []string) Gl
 		if err == nil {
 			result.EnableCommunityExtensions = vb
 		}
+	}
+
+	// adjust BuildServiceURL if community extensions are enable
+	// community extensions flag only takes effect if the default build service is used
+	// for custom build service URLs it has no effect (because the /oss path may not be implemented)
+	if result.EnableCommunityExtensions && result.BuildServiceURL == defaultBuildServiceURL {
+		result.BuildServiceURL = fmt.Sprintf("%s/%s", defaultBuildServiceURL, communityExtensionsCatalog)
 	}
 
 	// check if verbose flag is set
