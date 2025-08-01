@@ -933,9 +933,10 @@ func mapPageRoute(vu moduleVU, p *common.Page) func(path sobek.Value, handler so
 			tq.Queue(func() error {
 				defer close(done)
 
+				mr := mapRoute(vu, route)
 				_, err = handler(
 					sobek.Undefined(),
-					vu.Runtime().ToValue(route),
+					vu.Runtime().ToValue(mr),
 				)
 				if err != nil {
 					done <- fmt.Errorf("executing page.route('%s') handler: %w", path, err)
