@@ -2,6 +2,7 @@ package browser
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/grafana/sobek"
 
@@ -63,6 +64,9 @@ func parseFulfillOptions(ctx context.Context, opts sobek.Value) (common.FulfillO
 			}
 		case "status":
 			fopts.Status = obj.Get(k).ToInteger()
+		// As we don't support all fields that PW supports, we return an error to inform the user
+		default:
+			return fopts, fmt.Errorf("unsupported fulfill option: '%s'", k)
 		}
 	}
 
