@@ -74,32 +74,6 @@ func (h *ElementHandle) boundingBox() (*Rect, error) {
 	return &Rect{X: x + position.X, Y: y + position.Y, Width: width, Height: height}, nil
 }
 
-// canAccessParent returns true if the element can access the parent frame.
-// If it return true, then the frame is from the same origin as the parent frame.
-// If it returns false, then the frame is from a different origin (CORS).
-func (h *ElementHandle) canAccessParent() (bool, error) {
-	fn := `
-	(node, injected) => {
-		return injected.canAccessParent(node);
-	}`
-	opts := evalOptions{
-		forceCallable: true,
-		returnByValue: true,
-	}
-
-	res, err := h.evalWithScript(h.ctx, opts, fn)
-	if err != nil {
-		return false, fmt.Errorf("seeing if we can access parent frame: %w", err)
-	}
-
-	r, ok := res.(bool)
-	if !ok {
-		return false, fmt.Errorf("unexpected result type while trying to access parent frame: %T", res)
-	}
-
-	return r, nil
-}
-
 // translatePointToPage translates the point to the page's coordinates if the
 // point is relative to the parent frame.
 func (h *ElementHandle) translatePointToPage(apiCtx context.Context, point Position) (Position, error) {
@@ -223,9 +197,9 @@ func (h *ElementHandle) click(p *Position, opts *MouseClickOptions) error {
 // This will get the clickable point of the element relative to the page even
 // when the element is in an iframe. In some cases this isn't the case and we
 // need to translate the point to the page.
-func (h *ElementHandle) clickablePoint() (*Position, error) {
+func (h *ElementHandle) clickablePoint() *Position {
 	r := h.BoundingBox()
-	return &Position{X: r.X + r.Width/2, Y: r.Y + r.Height/2}, nil
+	return &Position{X: r.X + r.Width/2, Y: r.Y + r.Height/2}
 }
 
 func (h *ElementHandle) dblclick(p *Position, opts *MouseClickOptions) error {
@@ -1635,14 +1609,14 @@ func (h *ElementHandle) newPointerAction(
 		// Get the clickable point
 		if p != nil {
 			p, err = h.offsetPosition(apiCtx, opts.Position)
+			if err != nil {
+				return nil, fmt.Errorf("getting element position: %w", err)
+			}
 		} else {
-			p, err = h.clickablePoint()
-		}
-		if err != nil {
-			return nil, fmt.Errorf("getting element position: %w", err)
+			p = h.clickablePoint()
 		}
 
-		// Further transaltion of the point might be necessary if the point
+		// Further translation of the point might be necessary if the point
 		// is still relative to the parent frame it is in and not the page.
 		*p, err = h.translatePointToPage(apiCtx, *p)
 		if err != nil {
