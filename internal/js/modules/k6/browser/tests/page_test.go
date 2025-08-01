@@ -2997,3 +2997,80 @@ func TestWaitForURL(t *testing.T) {
 	)
 	assert.Equal(t, sobek.Undefined(), got.Result())
 }
+
+func TestWaitForResponse(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipped due to https://github.com/grafana/k6/issues/4937")
+	}
+
+	t.Parallel()
+
+	tb := newTestBrowser(t, withFileServer())
+	tb.vu.ActivateVU()
+	tb.vu.StartIteration(t)
+
+	got := tb.vu.RunPromise(t, `
+		const page = await browser.newPage();
+		const testURL = '%s';
+
+		try {
+			await page.goto(testURL);
+
+			// Test exact URL match for response
+			let response = await Promise.all([
+				page.waitForResponse('%s'),
+				page.locator('#page1').click()
+			]);
+			if (!response[0].url().endsWith('page1.html')) {
+				throw new Error('Expected response for page1.html but got ' + response[0].url());
+			}
+
+			// Test regex pattern for response
+			await page.goto(testURL);
+			response = await Promise.all([
+				page.waitForResponse(/.*\.html$/),
+				page.locator('#page2').click()
+			]);
+			if (!response[0].url().endsWith('.html')) {
+				throw new Error('Expected response URL to end with .html but got ' + response[0].url());
+			}
+
+			// Test timeout when response doesn't match
+			await page.goto(testURL);
+			let timedOut = false;
+			try {
+				response = await Promise.all([
+					page.waitForResponse(/.*nonexistent\.html$/, { timeout: 500 }),
+					page.locator('#page1').click()  // This loads page1.html, not nonexistent.html
+				]);
+			} catch (error) {
+				if (error.toString().includes('waiting for response')) {
+					timedOut = true;
+				} else {
+					throw error;
+				}
+			}
+			if (!timedOut) {
+				throw new Error('Expected timeout error when response URL does not match');
+			}
+
+			// Test empty pattern (matches any response)
+			await page.goto(testURL);
+			response = await Promise.all([
+				page.waitForResponse(''),
+				page.locator('#page2').click()
+			]);
+			if (!response[0].url().includes('page2.html') && !response[0].url().includes('waitfornavigation_test.html')) {
+				throw new Error('Expected empty pattern to match any response but got ' + response[0].url());
+			}
+
+		} finally {
+			// Must call close() which will clean up the taskqueue.
+			await page.close();
+		}
+	`,
+		tb.staticURL("waitfornavigation_test.html"),
+		tb.staticURL("page1.html"),
+	)
+	assert.Equal(t, sobek.Undefined(), got.Result())
+}

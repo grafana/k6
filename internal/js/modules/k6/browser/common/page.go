@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -1726,6 +1727,94 @@ func (p *Page) WaitForURL(urlPattern string, opts *FrameWaitForURLOptions, jsReg
 	}
 
 	return nil
+}
+
+// WaitForResponse waits for a response that matches the given URL pattern.
+// jsRegexChecker should be non-nil to be able to test against a URL pattern.
+func (p *Page) WaitForResponse(
+	urlOrRegex string, opts *PageWaitForResponseOptions, jsRegexChecker JSRegexChecker,
+) (*Response, error) {
+	p.logger.Debugf("Page:WaitForResponse", "sid:%v pattern:%s", p.sessionID(), urlOrRegex)
+	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.waitForResponse")
+	defer span.End()
+
+	timeoutCtx, timeoutCancel := context.WithTimeout(p.ctx, opts.Timeout)
+	defer timeoutCancel()
+
+	// Create URL matcher based on the pattern
+	matcher, err := urlMatcher(urlOrRegex, jsRegexChecker)
+	if err != nil {
+		spanRecordError(span, err)
+		return nil, fmt.Errorf("parsing URL pattern: %w", err)
+	}
+
+	// Create a channel to receive matching responses
+	responseCh := make(chan *Response, 1)
+	var matcherErr error
+
+	// Create a handler function that will be registered with the page
+	handler := func(event PageOnEvent) error {
+		if event.Response != nil {
+			matched, err := matcher(event.Response.URL())
+			if err != nil {
+				matcherErr = err
+				select {
+				case responseCh <- nil:
+				default:
+				}
+				return err
+			}
+			if matched {
+				select {
+				case responseCh <- event.Response:
+				default:
+				}
+			}
+		}
+		return nil
+	}
+
+	// Register the handler with the page
+	p.eventHandlersMu.Lock()
+	if p.eventHandlers[EventPageResponseCalled] == nil {
+		p.eventHandlers[EventPageResponseCalled] = make([]PageOnHandler, 0)
+	}
+	p.eventHandlers[EventPageResponseCalled] = append(p.eventHandlers[EventPageResponseCalled], handler)
+	p.eventHandlersMu.Unlock()
+
+	// Clean up handler when done
+	defer func() {
+		p.eventHandlersMu.Lock()
+		handlers := p.eventHandlers[EventPageResponseCalled]
+		for i, h := range handlers {
+			// Compare function pointers to find our handler
+			if reflect.ValueOf(h).Pointer() == reflect.ValueOf(handler).Pointer() {
+				// Remove the handler by replacing it with the last element and shrinking slice
+				handlers[i] = handlers[len(handlers)-1]
+				p.eventHandlers[EventPageResponseCalled] = handlers[:len(handlers)-1]
+				break
+			}
+		}
+		p.eventHandlersMu.Unlock()
+	}()
+
+	select {
+	case resp := <-responseCh:
+		if matcherErr != nil {
+			err := fmt.Errorf("URL pattern matching error: %w", matcherErr)
+			spanRecordError(span, err)
+			return nil, err
+		}
+		return resp, nil
+	case <-timeoutCtx.Done():
+		e := &k6ext.UserFriendlyError{
+			Err:     timeoutCtx.Err(),
+			Timeout: opts.Timeout,
+		}
+		err := fmt.Errorf("waiting for response %q: %w", urlOrRegex, e)
+		spanRecordError(span, err)
+		return nil, err
+	}
 }
 
 // Workers returns all WebWorkers of page.
