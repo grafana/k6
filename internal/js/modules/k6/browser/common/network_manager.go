@@ -930,8 +930,8 @@ func (m *NetworkManager) FulfillRequest(request *Request, opts FulfillOptions) e
 		action = action.WithResponseHeaders(headers)
 	}
 
-	if opts.Body != "" {
-		b64Body := base64.StdEncoding.EncodeToString([]byte(opts.Body))
+	if len(opts.Body) > 0 {
+		b64Body := base64.StdEncoding.EncodeToString(opts.Body)
 		action = action.WithBody(b64Body)
 	}
 

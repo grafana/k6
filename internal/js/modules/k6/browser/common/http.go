@@ -720,7 +720,7 @@ type Route struct {
 
 // FulfillOptions are response fields that can be set when fulfilling a request.
 type FulfillOptions struct {
-	Body        string
+	Body        []byte
 	ContentType string
 	Headers     []HTTPHeader
 	Status      int64

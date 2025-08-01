@@ -199,7 +199,7 @@ func TestFrameManagerRequestStartedWithRoutes(t *testing.T) {
 			routePath: "/data/first",
 			routeHandler: func(route *common.Route) {
 				err := route.Fulfill(common.FulfillOptions{
-					Body:        `{"data": "Fulfilled data"}`,
+					Body:        []byte(`{"data": "Fulfilled data"}`),
 					ContentType: "application/json",
 					Headers: []common.HTTPHeader{
 						{Name: "Access-Control-Allow-Origin", Value: "*"},

@@ -7,6 +7,7 @@ import (
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
+	jsCommon "go.k6.io/k6/js/common"
 )
 
 // mapRoute to the JS module.
@@ -18,8 +19,11 @@ func mapRoute(vu moduleVU, route *common.Route) mapping {
 			})
 		},
 		"fulfill": func(opts sobek.Value) *sobek.Promise {
-			fopts := parseFulfillOptions(vu.Context(), opts)
+			fopts, err := parseFulfillOptions(vu.Context(), opts)
 			return k6ext.Promise(vu.Context(), func() (any, error) {
+				if err != nil {
+					return nil, err
+				}
 				return nil, route.Fulfill(fopts)
 			})
 		},
@@ -29,10 +33,10 @@ func mapRoute(vu moduleVU, route *common.Route) mapping {
 	}
 }
 
-func parseFulfillOptions(ctx context.Context, opts sobek.Value) common.FulfillOptions {
+func parseFulfillOptions(ctx context.Context, opts sobek.Value) (common.FulfillOptions, error) {
 	fopts := common.FulfillOptions{}
 	if !sobekValueExists(opts) {
-		return fopts
+		return fopts, nil
 	}
 
 	rt := k6ext.Runtime(ctx)
@@ -40,7 +44,11 @@ func parseFulfillOptions(ctx context.Context, opts sobek.Value) common.FulfillOp
 	for _, k := range obj.Keys() {
 		switch k {
 		case "body":
-			fopts.Body = obj.Get(k).String()
+			bytesBody, err := jsCommon.ToBytes(obj.Get(k).Export())
+			if err != nil {
+				return fopts, err
+			}
+			fopts.Body = bytesBody
 		case "contentType":
 			fopts.ContentType = obj.Get(k).String()
 		case "headers":
@@ -58,5 +66,5 @@ func parseFulfillOptions(ctx context.Context, opts sobek.Value) common.FulfillOp
 		}
 	}
 
-	return fopts
+	return fopts, nil
 }
