@@ -101,9 +101,10 @@ func (h *ElementHandle) canAccessParent() (bool, error) {
 }
 
 // translatePointToPage translates the point to the page's coordinates if the
-// element is in an iframe and the frame is from a different origin (CORS) to
-// the parent frame.
+// point is relative to the parent frame.
 func (h *ElementHandle) translatePointToPage(apiCtx context.Context, point Position) (Position, error) {
+	h.logger.Debugf("ElementHandle:translatePointToPage", "point before translation: %v", point)
+
 	frame, err := h.ownerFrame(apiCtx)
 	if err != nil {
 		return Position{}, fmt.Errorf("checking hit target at %v: %w", point, err)
@@ -114,35 +115,22 @@ func (h *ElementHandle) translatePointToPage(apiCtx context.Context, point Posit
 		return point, nil
 	}
 
-	c, err := h.canAccessParent()
-	if err != nil {
-		return Position{}, err
-	}
-
-	if c {
-		h.logger.Debugf("ElementHandle:translatePointToPage", "no CORS issues, can access parent")
-		return point, nil
-	}
-
-	// If c is false it means the coordinates are relative to the iframe.
-	// Change it so that it is relative to the page.
 	el, err := frame.FrameElement()
 	if err != nil {
 		return Position{}, err
 	}
 
-	box, err := el.boundingBox()
-	if err != nil {
-		return Position{}, err
+	box := el.BoundingBox()
+	if box.contains(point) {
+		h.logger.Debugf("ElementHandle:translatePointToPage", "point is already in the page")
+		return point, nil
 	}
-	if box == nil {
-		return Position{}, errors.New("missing bounding box of element")
-	}
+
 	// Translate from frame coordinates to page coordinates.
 	point.X += box.X
 	point.Y += box.Y
 
-	h.logger.Debugf("ElementHandle:translatePointToPage", "translated point to page")
+	h.logger.Debugf("ElementHandle:translatePointToPage", "point after translation: %v", point)
 
 	return point, nil
 }
@@ -1647,7 +1635,8 @@ func (h *ElementHandle) newPointerAction(
 			return nil, fmt.Errorf("getting element position: %w", err)
 		}
 
-		// If the element is in an iframe, we need to translate the point to the page's.
+		// Further transaltion of the point might be necessary if the point
+		// is still relative to the parent frame it is in and not the page.
 		*p, err = h.translatePointToPage(apiCtx, *p)
 		if err != nil {
 			return nil, fmt.Errorf("translating point to page: %w", err)
