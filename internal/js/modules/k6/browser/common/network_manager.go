@@ -644,7 +644,7 @@ func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
 
 		// If no route was added, continue all requests
 		if m.frameManager.page == nil || !m.frameManager.page.hasRoutes() {
-			err := m.ContinueRequest(event.RequestID)
+			err := m.ContinueRequest(event.RequestID, ContinueOptions{}, nil)
 			if err != nil {
 				m.logger.Errorf("NetworkManager:onRequestPaused",
 					"continuing request %s %s: %s", event.Request.Method, event.Request.URL, err)
@@ -881,10 +881,28 @@ func (m *NetworkManager) AbortRequest(requestID fetch.RequestID, errorReason str
 	return nil
 }
 
-func (m *NetworkManager) ContinueRequest(requestID fetch.RequestID) error {
+func (m *NetworkManager) ContinueRequest(
+	requestID fetch.RequestID,
+	opts ContinueOptions,
+	originalHeaders []HTTPHeader,
+) error {
 	m.logger.Debugf("NetworkManager:ContinueRequest", "continuing request (id: %s)", requestID)
-
 	action := fetch.ContinueRequest(requestID)
+
+	if len(opts.Headers) > 0 {
+		action = action.WithHeaders(toFetchHeaders(opts.Headers))
+	}
+	if opts.URL != "" {
+		action = action.WithURL(opts.URL)
+	}
+	if opts.Method != "" {
+		action = action.WithMethod(opts.Method)
+	}
+	if len(opts.PostData) > 0 {
+		b64PostData := base64.StdEncoding.EncodeToString(opts.PostData)
+		action = action.WithPostData(b64PostData)
+	}
+
 	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
 		// Avoid logging as error when context is canceled.
 		// Most probably this happens when trying to fail a site's background request
