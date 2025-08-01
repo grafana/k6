@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io/fs"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,19 +13,11 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/grafana/k6deps"
 	"github.com/grafana/k6provider"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/ext"
 	"go.k6.io/k6/internal/build"
 	"go.k6.io/k6/lib/fsext"
-)
-
-const (
-	// cloudExtensionsCatalog defines the extensions catalog for cloud supported extensions
-	cloudExtensionsCatalog = "cloud"
-	// communityExtensionsCatalog defines the extensions catalog for community extensions
-	communityExtensionsCatalog = "oss"
 )
 
 // ioFSBridge allows an afero.Fs to implement the Go standard library io/fs.FS.
@@ -249,13 +240,8 @@ func newK6BuildProvisioner(gs *state.GlobalState) provisioner {
 }
 
 func (p *k6buildProvisioner) provision(deps k6deps.Dependencies) (commandExecutor, error) {
-	buildSrv, err := getBuildServiceURL(p.gs.Flags, p.gs.Logger)
-	if err != nil {
-		return nil, err
-	}
-
 	config := k6provider.Config{
-		BuildServiceURL: buildSrv,
+		BuildServiceURL: p.gs.Flags.BuildServiceURL,
 		BinaryCacheDir:  p.gs.Flags.BinaryCache,
 	}
 
@@ -273,25 +259,6 @@ func (p *k6buildProvisioner) provision(deps k6deps.Dependencies) (commandExecuto
 		Info("A new k6 binary has been provisioned with version(s): ", formatDependencies(binary.Dependencies))
 
 	return &customBinary{binary.Path}, nil
-}
-
-// return the URL to the build service based on the configuration flags defined
-func getBuildServiceURL(flags state.GlobalFlags, logger *logrus.Logger) (string, error) { //nolint:forbidigo
-	buildSrv := flags.BuildServiceURL
-	buildSrvURL, err := url.Parse(buildSrv)
-	if err != nil {
-		return "", fmt.Errorf("invalid URL to binary provisioning build service: %w", err)
-	}
-
-	catalog := cloudExtensionsCatalog
-	if flags.EnableCommunityExtensions {
-		catalog = communityExtensionsCatalog
-	}
-
-	logger.
-		Debugf("using the %q extensions catalog", catalog)
-
-	return buildSrvURL.JoinPath(catalog).String(), nil
 }
 
 func formatDependencies(deps map[string]string) string {
