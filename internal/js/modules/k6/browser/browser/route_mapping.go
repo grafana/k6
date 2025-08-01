@@ -107,14 +107,15 @@ func parseHeaders(headers *sobek.Object) []common.HTTPHeader {
 	headersKeys := headers.Keys()
 	result := make([]common.HTTPHeader, 0, len(headersKeys))
 	for _, hk := range headersKeys {
+		value := headers.Get(hk)
 		// Skip undefined headers
-		if headers.Get(hk).String() == "undefined" {
+		if !sobekValueExists(value) {
 			continue
 		}
 
 		result = append(result, common.HTTPHeader{
 			Name:  hk,
-			Value: headers.Get(hk).String(),
+			Value: value.String(),
 		})
 	}
 	return result
