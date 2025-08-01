@@ -21,7 +21,7 @@ jobs:
     if: github.repository == 'grafana/k6' # avoid running on forks
     steps:
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@22d2755f774d925b191a185b74e782a4b0638a41 # v0.15.0
+        uses: aquasecurity/trivy-action@dc5a429b52fcf669ce959baa2c2dd26090d2a6c4 # v0.32.0
         with:
           image-ref: 'grafana/k6:master'
           format: 'sarif'
