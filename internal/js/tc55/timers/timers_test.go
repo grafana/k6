@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+
 	"go.k6.io/k6/js/modulestest"
 )
 
@@ -154,14 +155,25 @@ func TestSetTimeoutContextCancel(t *testing.T) {
 		}
 	}))
 
-	for i := 0; i < 2000; i++ {
+	for range 2000 {
 		ctx, cancel := context.WithCancel(context.Background())
 		runtime.CancelContext = cancel
 		runtime.VU.CtxField = ctx //nolint:fatcontext
 		runtime.VU.RuntimeField.ClearInterrupt()
 		const interruptMsg = "definitely an interrupt"
+		sync := make(chan struct{})
+		defer func() {
+			cancel()
+			<-sync
+		}()
 		go func() {
-			<-interruptChannel
+			defer close(sync)
+			select {
+			case <-interruptChannel:
+			case <-ctx.Done():
+				return
+			}
+
 			time.Sleep(time.Millisecond)
 			runtime.CancelContext()
 			runtime.VU.RuntimeField.Interrupt(interruptMsg)
