@@ -86,8 +86,10 @@ func (b *BrowserType) initContext(ctx context.Context) context.Context {
 	ctx = k6ext.WithCustomMetrics(ctx, b.k6Metrics)
 	ctx = common.WithHooks(ctx, b.hooks)
 	var buf [8]byte
-	rand.Read(buf[:])
-	ctx = common.WithIterationID(ctx, fmt.Sprintf("%x", buf[:]))
+	_, err := rand.Read(buf[:])
+	if err == nil {
+		ctx = common.WithIterationID(ctx, fmt.Sprintf("%x", buf[:]))
+	}
 	return ctx
 }
 
