@@ -522,17 +522,31 @@ func TestGetBuildServiceURL(t *testing.T) {
 	}{
 		{
 			name:                      "default build service url",
+			buildSrvURL:               state.DefaultBuildServiceURL,
+			enableCommunityExtensions: false,
+			expectErr:                 false,
+			expectedURL:               state.DefaultBuildServiceURL,
+		},
+		{
+			name:                      "custom build service URL",
 			buildSrvURL:               "https://build.srv",
 			enableCommunityExtensions: false,
 			expectErr:                 false,
-			expectedURL:               "https://build.srv/cloud",
+			expectedURL:               "https://build.srv",
 		},
 		{
 			name:                      "enable community extensions",
+			buildSrvURL:               state.DefaultBuildServiceURL,
+			enableCommunityExtensions: true,
+			expectErr:                 false,
+			expectedURL:               fmt.Sprintf("%s/%s", state.DefaultBuildServiceURL, communityExtensionsCatalog),
+		},
+		{
+			name:                      "enable community extensions for custom build service URL",
 			buildSrvURL:               "https://build.srv",
 			enableCommunityExtensions: true,
 			expectErr:                 false,
-			expectedURL:               "https://build.srv/oss",
+			expectedURL:               "https://build.srv",
 		},
 		{
 			name:                      "invalid buildServiceURL",

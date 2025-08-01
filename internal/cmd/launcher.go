@@ -23,8 +23,6 @@ import (
 )
 
 const (
-	// cloudExtensionsCatalog defines the extensions catalog for cloud supported extensions
-	cloudExtensionsCatalog = "cloud"
 	// communityExtensionsCatalog defines the extensions catalog for community extensions
 	communityExtensionsCatalog = "oss"
 )
@@ -283,15 +281,24 @@ func getBuildServiceURL(flags state.GlobalFlags, logger *logrus.Logger) (string,
 		return "", fmt.Errorf("invalid URL to binary provisioning build service: %w", err)
 	}
 
-	catalog := cloudExtensionsCatalog
-	if flags.EnableCommunityExtensions {
-		catalog = communityExtensionsCatalog
+	if !flags.EnableCommunityExtensions {
+		return buildSrv, nil
+	}
+
+	// community extensions flag only takes effect if the default build service is used
+	// for custom build service URLs it has no effect (because the /oss path may not be implemented)
+	if buildSrv != state.DefaultBuildServiceURL {
+		logger.
+			WithField("K6_BUILD_SERVICE_URL", buildSrv).
+			Debug("User specified a custom K6_BUILD_SERVICE_URL." +
+				" The K6_ENABLE_COMMUNITY_EXTENSIONS flag has no effect.")
+		return buildSrv, nil
 	}
 
 	logger.
-		Debugf("using the %q extensions catalog", catalog)
+		Debug("Using the community extensions catalog")
 
-	return buildSrvURL.JoinPath(catalog).String(), nil
+	return buildSrvURL.JoinPath(communityExtensionsCatalog).String(), nil
 }
 
 func formatDependencies(deps map[string]string) string {

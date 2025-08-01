@@ -27,8 +27,8 @@ const (
 	// BinaryProvisioningFeatureFlag defines the environment variable that enables the binary provisioning
 	BinaryProvisioningFeatureFlag = "K6_BINARY_PROVISIONING"
 
-	// defaultBuildServiceURL defines the URL to the default (grafana hosted) build service
-	defaultBuildServiceURL = "https://ingest.k6.io/builder/api/v1"
+	// DefaultBuildServiceURL defines the URL to the default (grafana hosted) build service
+	DefaultBuildServiceURL = "https://ingest.k6.io/builder/api/v1"
 
 	defaultConfigFileName = "config.json"
 	defaultBinaryCacheDir = "builds"
@@ -190,7 +190,7 @@ func GetDefaultFlags(homeDir string, cacheDir string) GlobalFlags {
 		ProfilingEnabled:          false,
 		ConfigFilePath:            filepath.Join(homeDir, "k6", defaultConfigFileName),
 		LogOutput:                 "stderr",
-		BuildServiceURL:           defaultBuildServiceURL,
+		BuildServiceURL:           DefaultBuildServiceURL,
 		EnableCommunityExtensions: false,
 		BinaryCache:               filepath.Join(cacheDir, "k6", defaultBinaryCacheDir),
 	}
