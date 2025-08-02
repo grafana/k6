@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/chromedp/cdproto"
@@ -209,6 +210,102 @@ func NewRouteHandler(
 }
 
 type RouteHandlerCallback func(*Route) error
+
+type ResponseEventHandler struct {
+	mu            sync.RWMutex
+	activeWaiters map[string]*responseWaiter
+	nextWaiterID  int64
+}
+
+type responseWaiter struct {
+	id           string
+	matcher      URLMatcher
+	responseChan chan *Response
+	ctx          context.Context
+	cancel       context.CancelFunc
+}
+
+func NewResponseEventHandler() *ResponseEventHandler {
+	return &ResponseEventHandler{
+		activeWaiters: make(map[string]*responseWaiter),
+	}
+}
+
+func (reh *ResponseEventHandler) addWaiter(waiter *responseWaiter) {
+	reh.mu.Lock()
+	defer reh.mu.Unlock()
+	reh.activeWaiters[waiter.id] = waiter
+}
+
+func (reh *ResponseEventHandler) removeWaiter(id string) {
+	reh.mu.Lock()
+	defer reh.mu.Unlock()
+	delete(reh.activeWaiters, id)
+}
+
+func (reh *ResponseEventHandler) processResponse(response *Response) {
+	if response == nil {
+		return
+	}
+
+	reh.mu.RLock()
+	waitersToNotify := make([]*responseWaiter, 0)
+
+	for _, waiter := range reh.activeWaiters {
+		// Check if the context is still active before processing
+		select {
+		case <-waiter.ctx.Done():
+			continue
+		default:
+		}
+
+		matched, err := waiter.matcher(response.URL())
+		if err == nil && matched {
+			waitersToNotify = append(waitersToNotify, waiter)
+		}
+	}
+	reh.mu.RUnlock()
+
+	for _, waiter := range waitersToNotify {
+		select {
+		case waiter.responseChan <- response:
+		case <-waiter.ctx.Done():
+		}
+	}
+}
+
+func (reh *ResponseEventHandler) generateWaiterID() string {
+	id := atomic.AddInt64(&reh.nextWaiterID, 1)
+	return fmt.Sprintf("waiter_%d", id)
+}
+
+// ResponseEventHandler handles the internal mechanics
+func (reh *ResponseEventHandler) waitForMatch(ctx context.Context, matcher URLMatcher) (*Response, error) {
+	waiterID := reh.generateWaiterID()
+	waiterContext, waiterCancel := context.WithCancel(ctx)
+
+	waiter := &responseWaiter{
+		id:           waiterID,
+		matcher:      matcher,
+		responseChan: make(chan *Response, 1),
+		ctx:          waiterContext,
+		cancel:       waiterCancel,
+	}
+
+	reh.addWaiter(waiter)
+	defer func() {
+		waiterCancel()
+		reh.removeWaiter(waiterID)
+		close(waiter.responseChan)
+	}()
+
+	select {
+	case response := <-waiter.responseChan:
+		return response, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
 
 // Page stores Page/tab related context.
 type Page struct {
