@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math/rand"
+	"math/rand" // nosemgrep: math-random-used // This is used to generate id for easier debugging
 	"os/exec"
 	"path/filepath"
 	"sort"

@@ -1171,7 +1171,7 @@ func (a *csAttempt) recvMsg(m any, payInfo *payloadInfo) (err error) {
 	} else if err != nil {
 		return toRPCErr(err)
 	}
-	return toRPCErr(errors.New("grpc: client streaming protocol violation: get <nil>, want <EOF>"))
+	return status.Errorf(codes.Internal, "cardinality violation: expected <EOF> for non server-streaming RPCs, but received another message")
 }
 
 func (a *csAttempt) finish(err error) {
@@ -1495,7 +1495,7 @@ func (as *addrConnStream) RecvMsg(m any) (err error) {
 	} else if err != nil {
 		return toRPCErr(err)
 	}
-	return toRPCErr(errors.New("grpc: client streaming protocol violation: get <nil>, want <EOF>"))
+	return status.Errorf(codes.Internal, "cardinality violation: expected <EOF> for non server-streaming RPCs, but received another message")
 }
 
 func (as *addrConnStream) finish(err error) {

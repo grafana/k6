@@ -131,6 +131,7 @@ type connectParams struct {
 	MaxReceiveSize        int64
 	MaxSendSize           int64
 	TLS                   map[string]interface{}
+	Authority             string
 }
 
 func newConnectParams(vu modules.VU, input sobek.Value) (*connectParams, error) { //nolint:gocognit
@@ -140,6 +141,7 @@ func newConnectParams(vu modules.VU, input sobek.Value) (*connectParams, error) 
 		Timeout:               time.Minute,
 		MaxReceiveSize:        0,
 		MaxSendSize:           0,
+		Authority:             "",
 		ReflectionMetadata:    metadata.New(nil),
 	}
 
@@ -200,6 +202,12 @@ func newConnectParams(vu modules.VU, input sobek.Value) (*connectParams, error) 
 		case "tls":
 			if err := parseConnectTLSParam(result, v); err != nil {
 				return result, err
+			}
+		case "authority":
+			var ok bool
+			result.Authority, ok = v.(string)
+			if !ok {
+				return result, fmt.Errorf("invalid authority value: '%#v', it needs to be a string", v)
 			}
 		default:
 			return result, fmt.Errorf("unknown connect param: %q", k)

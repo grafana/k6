@@ -348,6 +348,7 @@ type pageAPI interface { //nolint:interfacebloat
 	Query(selector string) (*common.ElementHandle, error)
 	QueryAll(selector string) ([]*common.ElementHandle, error)
 	Reload(opts sobek.Value) *common.Response
+	Route(path string, handler sobek.Callable)
 	Screenshot(opts sobek.Value) ([]byte, error)
 	SelectOption(selector string, values sobek.Value, opts sobek.Value) ([]string, error)
 	SetChecked(selector string, checked bool, opts sobek.Value) error
@@ -371,6 +372,7 @@ type pageAPI interface { //nolint:interfacebloat
 	WaitForNavigation(opts sobek.Value) (*common.Response, error)
 	WaitForSelector(selector string, opts sobek.Value) (*common.ElementHandle, error)
 	WaitForTimeout(timeout int64)
+	WaitForURL(url string, opts sobek.Value) (*sobek.Promise, error)
 	Workers() []*common.Worker
 }
 
@@ -439,6 +441,7 @@ type frameAPI interface { //nolint:interfacebloat
 	WaitForNavigation(opts sobek.Value) (*common.Response, error)
 	WaitForSelector(selector string, opts sobek.Value) (*common.ElementHandle, error)
 	WaitForTimeout(timeout int64)
+	WaitForURL(url string, opts sobek.Value) (*sobek.Promise, error)
 }
 
 // elementHandleAPI is the interface of an in-page DOM element.

@@ -184,12 +184,14 @@ github.com/gorilla/websocket
 github.com/grafana/k6build
 github.com/grafana/k6build/pkg/api
 github.com/grafana/k6build/pkg/client
-# github.com/grafana/k6deps v0.2.6
+# github.com/grafana/k6deps v0.4.0
 ## explicit; go 1.23.0
 github.com/grafana/k6deps
 github.com/grafana/k6deps/internal/pack
+github.com/grafana/k6deps/internal/pack/plugins/file
 github.com/grafana/k6deps/internal/pack/plugins/http
 github.com/grafana/k6deps/internal/pack/plugins/k6
+github.com/grafana/k6deps/internal/rootfs
 # github.com/grafana/k6provider v0.1.15
 ## explicit; go 1.23.0
 github.com/grafana/k6provider
@@ -203,7 +205,7 @@ github.com/grafana/sobek/ftoa/internal/fast
 github.com/grafana/sobek/parser
 github.com/grafana/sobek/token
 github.com/grafana/sobek/unistring
-# github.com/grafana/xk6-dashboard v0.7.10
+# github.com/grafana/xk6-dashboard v0.7.11
 ## explicit; go 1.23.0
 github.com/grafana/xk6-dashboard/dashboard
 # github.com/grafana/xk6-redis v0.3.4
@@ -435,7 +437,7 @@ go.opentelemetry.io/otel/trace
 go.opentelemetry.io/otel/trace/embedded
 go.opentelemetry.io/otel/trace/internal/telemetry
 go.opentelemetry.io/otel/trace/noop
-# go.opentelemetry.io/proto/otlp v1.7.0
+# go.opentelemetry.io/proto/otlp v1.7.1
 ## explicit; go 1.23.0
 go.opentelemetry.io/proto/otlp/collector/metrics/v1
 go.opentelemetry.io/proto/otlp/collector/trace/v1
@@ -498,14 +500,14 @@ golang.org/x/text/unicode/rangetable
 # golang.org/x/time v0.12.0
 ## explicit; go 1.23.0
 golang.org/x/time/rate
-# google.golang.org/genproto/googleapis/api v0.0.0-20250603155806-513f23925822
+# google.golang.org/genproto/googleapis/api v0.0.0-20250728155136-f173205681a0
 ## explicit; go 1.23.0
 google.golang.org/genproto/googleapis/api/httpbody
-# google.golang.org/genproto/googleapis/rpc v0.0.0-20250603155806-513f23925822
+# google.golang.org/genproto/googleapis/rpc v0.0.0-20250728155136-f173205681a0
 ## explicit; go 1.23.0
 google.golang.org/genproto/googleapis/rpc/errdetails
 google.golang.org/genproto/googleapis/rpc/status
-# google.golang.org/grpc v1.73.0
+# google.golang.org/grpc v1.74.2
 ## explicit; go 1.23.0
 google.golang.org/grpc
 google.golang.org/grpc/attributes
