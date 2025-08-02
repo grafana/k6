@@ -191,44 +191,42 @@ func TestRetry(t *testing.T) {
 	})
 }
 
+func logtailHandleFunc(t *testing.T, tb *httpmultibin.HTTPMultiBin, fn func(*websocket.Conn, *http.Request)) {
+	upgrader := websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+	}
+	tb.Mux.HandleFunc("/api/v1/tail", func(w http.ResponseWriter, req *http.Request) {
+		conn, err := upgrader.Upgrade(w, req, nil)
+		require.NoError(t, err)
+
+		fn(conn, req)
+		_ = conn.Close()
+	})
+}
+
+// a basic config with the logtail endpoint set
+func configFromHTTPMultiBin(tb *httpmultibin.HTTPMultiBin) Config {
+	wsurl := strings.TrimPrefix(tb.ServerHTTP.URL, "http://")
+	return Config{
+		LogsTailURL: null.NewString(fmt.Sprintf("ws://%s/api/v1/tail", wsurl), false),
+	}
+}
+
+// get all messages from the mocked logger
+func logLines(hook *testutils.SimpleLogrusHook) (lines []string) {
+	for _, e := range hook.Drain() {
+		lines = append(lines, e.Message)
+	}
+	return
+}
+
+func generateLogline(key string, ts uint64, msg string) string {
+	return fmt.Sprintf(`{"streams":[{"stream":{"key":%q,"level":"warn"},"values":[["%d",%q]]}],"dropped_entities":[]}`, key, ts, msg)
+}
+
 func TestStreamLogsToLogger(t *testing.T) {
 	t.Parallel()
-
-	// It registers an handler for the logtail endpoint
-	// It upgrades as websocket the HTTP handler and invokes the provided callback.
-	logtailHandleFunc := func(tb *httpmultibin.HTTPMultiBin, fn func(*websocket.Conn, *http.Request)) {
-		upgrader := websocket.Upgrader{
-			ReadBufferSize:  1024,
-			WriteBufferSize: 1024,
-		}
-		tb.Mux.HandleFunc("/api/v1/tail", func(w http.ResponseWriter, req *http.Request) {
-			conn, err := upgrader.Upgrade(w, req, nil)
-			require.NoError(t, err)
-
-			fn(conn, req)
-			_ = conn.Close()
-		})
-	}
-
-	// a basic config with the logtail endpoint set
-	configFromHTTPMultiBin := func(tb *httpmultibin.HTTPMultiBin) Config {
-		wsurl := strings.TrimPrefix(tb.ServerHTTP.URL, "http://")
-		return Config{
-			LogsTailURL: null.NewString(fmt.Sprintf("ws://%s/api/v1/tail", wsurl), false),
-		}
-	}
-
-	// get all messages from the mocked logger
-	logLines := func(hook *testutils.SimpleLogrusHook) (lines []string) {
-		for _, e := range hook.Drain() {
-			lines = append(lines, e.Message)
-		}
-		return
-	}
-
-	generateLogline := func(key string, ts uint64, msg string) string {
-		return fmt.Sprintf(`{"streams":[{"stream":{"key":%q,"level":"warn"},"values":[["%d",%q]]}],"dropped_entities":[]}`, key, ts, msg)
-	}
 
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
@@ -237,7 +235,7 @@ func TestStreamLogsToLogger(t *testing.T) {
 		defer cancel()
 
 		tb := httpmultibin.NewHTTPMultiBin(t)
-		logtailHandleFunc(tb, func(conn *websocket.Conn, _ *http.Request) {
+		logtailHandleFunc(t, tb, func(conn *websocket.Conn, _ *http.Request) {
 			rawmsg := json.RawMessage(generateLogline("stream1", 1598282752000000000, "logline1"))
 			err := conn.WriteJSON(rawmsg)
 			require.NoError(t, err)
@@ -282,7 +280,7 @@ func TestStreamLogsToLogger(t *testing.T) {
 		var requestsCount uint64
 
 		tb := httpmultibin.NewHTTPMultiBin(t)
-		logtailHandleFunc(tb, func(conn *websocket.Conn, req *http.Request) {
+		logtailHandleFunc(t, tb, func(conn *websocket.Conn, req *http.Request) {
 			requests := atomic.AddUint64(&requestsCount, 1)
 
 			start, err := startFilter(*req.URL)
@@ -362,24 +360,23 @@ func TestStreamLogsToLogger(t *testing.T) {
 		t0 := time.Now()
 
 		tb := httpmultibin.NewHTTPMultiBin(t)
-		logtailHandleFunc(tb, func(conn *websocket.Conn, req *http.Request) {
+		logtailHandleFunc(t, tb, func(conn *websocket.Conn, req *http.Request) {
 			requests := atomic.AddUint64(&requestsCount, 1)
-
-			start, err := startFilter(*req.URL)
-			require.NoError(t, err)
 
 			if requests <= 1 {
 				// if it's the first attempt then
 				// it generates a failure closing the connection
 				// in a rude way
-				err = conn.Close()
-				require.NoError(t, err)
+				require.NoError(t, conn.Close())
 				return
 			}
 
+			start, err := startFilter(*req.URL)
+			require.NoError(t, err)
+
 			// it asserts that the second attempt
 			// has a `start` after the test run
-			require.True(t, start.After(t0))
+			require.Truef(t, start.After(t0), "start %d, t0: %d", start, t0)
 
 			// send a correct logline so we will able to assert
 			// that the connection is restored as expected
