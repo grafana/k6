@@ -1,0 +1,28 @@
+diff --git a/WebCryptoAPI/getRandomValues.any.js b/WebCryptoAPI/getRandomValues.any.js
+index 574134eb7..eee19abcc 100644
+--- a/WebCryptoAPI/getRandomValues.any.js
++++ b/WebCryptoAPI/getRandomValues.any.js
+@@ -1,13 +1,16 @@
+ // Step 1.
+ test(function() {
+-    assert_throws_dom("TypeMismatchError", function() {
+-        self.crypto.getRandomValues(new Float16Array(6))
+-    }, "Float16Array")
++    // Skip Float16Array tests if not supported in the runtime
++    if (typeof Float16Array !== 'undefined') {
++        assert_throws_dom("TypeMismatchError", function() {
++            self.crypto.getRandomValues(new Float16Array(6))
++        }, "Float16Array")
+ 
+-    assert_throws_dom("TypeMismatchError", function() {
+-        const len = 65536 / Float16Array.BYTES_PER_ELEMENT + 1;
+-        self.crypto.getRandomValues(new Float16Array(len));
+-    }, "Float16Array (too long)")
++        assert_throws_dom("TypeMismatchError", function() {
++            const len = 65536 / Float16Array.BYTES_PER_ELEMENT + 1;
++            self.crypto.getRandomValues(new Float16Array(len));
++        }, "Float16Array (too long)")
++    }
+ }, "Float16 arrays");
+ 
+ test(function() {
