@@ -146,3 +146,15 @@ func (o *PageScreenshotOptions) Parse(ctx context.Context, opts sobek.Value) err
 
 	return nil
 }
+
+// PageWaitForResponseOptions are options for Page.waitForResponse.
+type PageWaitForResponseOptions struct {
+	Timeout time.Duration
+}
+
+// NewPageWaitForResponseOptions returns a new PageWaitForResponseOptions.
+func NewPageWaitForResponseOptions(defaultTimeout time.Duration) *PageWaitForResponseOptions {
+	return &PageWaitForResponseOptions{
+		Timeout: defaultTimeout,
+	}
+}
