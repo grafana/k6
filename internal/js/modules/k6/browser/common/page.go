@@ -342,9 +342,10 @@ type Page struct {
 
 	backgroundPage bool
 
-	eventCh         chan Event
-	eventHandlers   map[PageOnEventName][]PageOnHandler
-	eventHandlersMu sync.RWMutex
+	eventCh              chan Event
+	eventHandlers        map[PageOnEventName][]PageOnHandler
+	eventHandlersMu      sync.RWMutex
+	responseEventHandler *ResponseEventHandler
 
 	mainFrameSession *FrameSession
 	frameSessions    map[cdp.FrameID]*FrameSession
@@ -369,25 +370,26 @@ func NewPage(
 	logger *log.Logger,
 ) (*Page, error) {
 	p := Page{
-		ctx:              ctx,
-		session:          s,
-		browserCtx:       bctx,
-		targetID:         tid,
-		opener:           opener,
-		backgroundPage:   bp,
-		mediaType:        MediaTypeScreen,
-		colorScheme:      bctx.opts.ColorScheme,
-		reducedMotion:    bctx.opts.ReducedMotion,
-		extraHTTPHeaders: bctx.opts.ExtraHTTPHeaders,
-		timeoutSettings:  NewTimeoutSettings(bctx.timeoutSettings),
-		Keyboard:         NewKeyboard(ctx, s),
-		jsEnabled:        true,
-		eventCh:          make(chan Event),
-		eventHandlers:    make(map[PageOnEventName][]PageOnHandler),
-		frameSessions:    make(map[cdp.FrameID]*FrameSession),
-		workers:          make(map[target.SessionID]*Worker),
-		vu:               k6ext.GetVU(ctx),
-		logger:           logger,
+		ctx:                  ctx,
+		session:              s,
+		browserCtx:           bctx,
+		targetID:             tid,
+		opener:               opener,
+		backgroundPage:       bp,
+		mediaType:            MediaTypeScreen,
+		colorScheme:          bctx.opts.ColorScheme,
+		reducedMotion:        bctx.opts.ReducedMotion,
+		extraHTTPHeaders:     bctx.opts.ExtraHTTPHeaders,
+		timeoutSettings:      NewTimeoutSettings(bctx.timeoutSettings),
+		Keyboard:             NewKeyboard(ctx, s),
+		jsEnabled:            true,
+		eventCh:              make(chan Event),
+		eventHandlers:        make(map[PageOnEventName][]PageOnHandler),
+		frameSessions:        make(map[cdp.FrameID]*FrameSession),
+		workers:              make(map[target.SessionID]*Worker),
+		responseEventHandler: NewResponseEventHandler(),
+		vu:                   k6ext.GetVU(ctx),
+		logger:               logger,
 	}
 
 	p.logger.Debugf("Page:NewPage", "sid:%v tid:%v backgroundPage:%t",
@@ -639,6 +641,8 @@ func (p *Page) onRequest(request *Request) {
 // onResponse will call the handlers for the page.on('response') event.
 func (p *Page) onResponse(resp *Response) {
 	p.logger.Debugf("Page:onResponse", "sid:%v url:%v", p.sessionID(), resp.URL())
+
+	p.responseEventHandler.processResponse(resp)
 
 	if !hasPageOnHandler(p, EventPageResponseCalled) {
 		return
@@ -1823,6 +1827,39 @@ func (p *Page) WaitForURL(urlPattern string, opts *FrameWaitForURLOptions, jsReg
 	}
 
 	return nil
+}
+
+// WaitForResponse waits for a response that matches the given URL pattern.
+// jsRegexChecker should be non-nil to be able to test against a URL pattern.
+func (p *Page) WaitForResponse(
+	urlOrRegex string, opts *PageWaitForResponseOptions, jsRegexChecker JSRegexChecker,
+) (*Response, error) {
+	p.logger.Debugf("Page:WaitForResponse", "sid:%v pattern:%s", p.sessionID(), urlOrRegex)
+	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.waitForResponse")
+	defer span.End()
+
+	timeoutCtx, timeoutCancel := context.WithTimeout(p.ctx, opts.Timeout)
+	defer timeoutCancel()
+
+	// Create URL matcher based on the pattern
+	matcher, err := urlMatcher(urlOrRegex, jsRegexChecker)
+	if err != nil {
+		spanRecordError(span, err)
+		return nil, fmt.Errorf("parsing URL pattern: %w", err)
+	}
+
+	// Use the dedicated ResponseEventHandler for clean separation
+	resp, err := p.responseEventHandler.waitForMatch(timeoutCtx, matcher)
+	if err != nil {
+		e := &k6ext.UserFriendlyError{
+			Err:     err,
+			Timeout: opts.Timeout,
+		}
+		err = fmt.Errorf("waiting for response %q: %w", urlOrRegex, e)
+		spanRecordError(span, err)
+		return nil, err
+	}
+	return resp, nil
 }
 
 // Workers returns all WebWorkers of page.
