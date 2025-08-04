@@ -213,12 +213,11 @@ type RouteHandlerCallback func(*Route) error
 
 type ResponseEventHandler struct {
 	mu            sync.RWMutex
-	activeWaiters map[string]*responseWaiter
+	activeWaiters map[int64]*responseWaiter
 	nextWaiterID  int64
 }
 
 type responseWaiter struct {
-	id           string
 	matcher      URLMatcher
 	responseChan chan *Response
 	ctx          context.Context
@@ -227,17 +226,20 @@ type responseWaiter struct {
 
 func NewResponseEventHandler() *ResponseEventHandler {
 	return &ResponseEventHandler{
-		activeWaiters: make(map[string]*responseWaiter),
+		activeWaiters: make(map[int64]*responseWaiter),
 	}
 }
 
-func (reh *ResponseEventHandler) addWaiter(waiter *responseWaiter) {
+func (reh *ResponseEventHandler) addWaiter(waiter *responseWaiter) int64 {
 	reh.mu.Lock()
 	defer reh.mu.Unlock()
-	reh.activeWaiters[waiter.id] = waiter
+
+	id := reh.generateWaiterID()
+	reh.activeWaiters[id] = waiter
+	return id
 }
 
-func (reh *ResponseEventHandler) removeWaiter(id string) {
+func (reh *ResponseEventHandler) removeWaiter(id int64) {
 	reh.mu.Lock()
 	defer reh.mu.Unlock()
 	delete(reh.activeWaiters, id)
@@ -274,25 +276,21 @@ func (reh *ResponseEventHandler) processResponse(response *Response) {
 	}
 }
 
-func (reh *ResponseEventHandler) generateWaiterID() string {
-	id := atomic.AddInt64(&reh.nextWaiterID, 1)
-	return fmt.Sprintf("waiter_%d", id)
+func (reh *ResponseEventHandler) generateWaiterID() int64 {
+	return atomic.AddInt64(&reh.nextWaiterID, 1)
 }
 
-// ResponseEventHandler handles the internal mechanics
 func (reh *ResponseEventHandler) waitForMatch(ctx context.Context, matcher URLMatcher) (*Response, error) {
-	waiterID := reh.generateWaiterID()
 	waiterContext, waiterCancel := context.WithCancel(ctx)
 
 	waiter := &responseWaiter{
-		id:           waiterID,
 		matcher:      matcher,
 		responseChan: make(chan *Response, 1),
 		ctx:          waiterContext,
 		cancel:       waiterCancel,
 	}
 
-	reh.addWaiter(waiter)
+	waiterID := reh.addWaiter(waiter)
 	defer func() {
 		waiterCancel()
 		reh.removeWaiter(waiterID)
