@@ -294,7 +294,6 @@ func (reh *ResponseEventHandler) waitForMatch(ctx context.Context, matcher URLMa
 	defer func() {
 		waiterCancel()
 		reh.removeWaiter(waiterID)
-		close(waiter.responseChan)
 	}()
 
 	select {
