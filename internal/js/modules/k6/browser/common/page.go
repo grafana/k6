@@ -231,10 +231,10 @@ func NewResponseEventHandler() *ResponseEventHandler {
 }
 
 func (reh *ResponseEventHandler) addWaiter(waiter *responseWaiter) int64 {
+	id := reh.generateWaiterID()
 	reh.mu.Lock()
 	defer reh.mu.Unlock()
 
-	id := reh.generateWaiterID()
 	reh.activeWaiters[id] = waiter
 	return id
 }
