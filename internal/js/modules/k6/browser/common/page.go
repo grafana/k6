@@ -639,7 +639,7 @@ func (p *Page) onRequest(request *Request) {
 func (p *Page) onResponse(resp *Response) {
 	p.logger.Debugf("Page:onResponse", "sid:%v url:%v", p.sessionID(), resp.URL())
 
-	p.responseEventHandler.processResponse(resp)
+	go p.responseEventHandler.processResponse(resp)
 
 	if !hasPageOnHandler(p, EventPageResponseCalled) {
 		return
