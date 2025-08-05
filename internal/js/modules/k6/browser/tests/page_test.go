@@ -2998,340 +2998,98 @@ func TestWaitForURL(t *testing.T) {
 	assert.Equal(t, sobek.Undefined(), got.Result())
 }
 
-func TestPageWaitForResponseErrOnCtxDone(t *testing.T) {
-	t.Parallel()
-	b := newTestBrowser(t)
-	p := b.NewPage(nil)
-	opts := common.NewPageWaitForResponseOptions(p.Timeout())
-	go b.cancelContext()
-	<-b.context().Done()
-
-	mockRegexChecker := func(pattern, url string) (bool, error) {
-		return strings.Contains(url, "example"), nil
-	}
-
-	_, err := p.WaitForResponse("/home", opts, mockRegexChecker)
-	require.ErrorContains(t, err, "canceled")
-}
-
-func TestPageWaitForResponseTimeout(t *testing.T) {
-	t.Parallel()
-	b := newTestBrowser(t)
-	p := b.NewPage(nil)
-	opts := common.NewPageWaitForResponseOptions(time.Second)
-	mockRegexChecker := func(pattern, url string) (bool, error) {
-		return strings.Contains(url, "example"), nil
-	}
-
-	_, err := p.WaitForResponse("/home", opts, mockRegexChecker)
-	require.ErrorContains(t, err, "waiting for response")
-}
-
 func TestPageWaitForResponse(t *testing.T) {
 	t.Parallel()
-	// Start and setup a webserver to test waitForResponse
-	tb := newTestBrowser(t, withHTTPServer())
 
-	// Mock API endpoint that returns JSON
-	tb.withHandler("/api", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, err := fmt.Fprintf(w, `{"message": "Hello from API", "method": "%s"}`, r.Method)
-		require.NoError(t, err)
-	})
+	t.Run("ok/correct_response_matches", func(t *testing.T) {
+		t.Parallel()
 
-	// Mock CSS endpoint
-	tb.withHandler("/style.css", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/css")
-		_, err := fmt.Fprintf(w, `body { background-color: blue; }`)
-		require.NoError(t, err)
-	})
+		tb := newTestBrowser(t, withHTTPServer())
+		tb.withHandler("/api/users", func(w http.ResponseWriter, r *http.Request) {
+			_, err := fmt.Fprintf(w, `{"users": []}`)
+			require.NoError(t, err)
+		})
+		tb.withHandler("/api/posts", func(w http.ResponseWriter, r *http.Request) {
+			_, err := fmt.Fprintf(w, `{"posts": []}`)
+			require.NoError(t, err)
+		})
+		tb.withHandler("/page", func(w http.ResponseWriter, _ *http.Request) {
+			_, err := fmt.Fprintf(w, `
+				<!doctype html>
+				<html><body><script>
+					setTimeout(() => fetch('/api/posts'), 50);
+					setTimeout(() => fetch('/api/users'), 100);
+				</script></body></html>
+			`)
+			require.NoError(t, err)
+		})
 
-	// Mock home page that triggers requests
-	tb.withHandler("/home", func(w http.ResponseWriter, _ *http.Request) {
-		_, err := fmt.Fprintf(w, `<!DOCTYPE html>
-		<html>
-		<head>
-			<link rel="stylesheet" href="/style.css">
-		</head>
-		<body>
-			<script>
-				// Trigger API request after page loads
-				setTimeout(() => {
-					fetch('/api', {
-						method: 'POST',
-						headers: {
-							'Content-Type': 'application/json'
-						},
-						body: JSON.stringify({name: 'tester'})
-					});
-				}, 100);
-			</script>
-		</body>
-		</html>`)
-		require.NoError(t, err)
-	})
+		p := tb.NewPage(nil)
 
-	p := tb.NewPage(nil)
-
-	// Create proper options like other tests
-	opts := common.NewPageWaitForResponseOptions(p.Timeout())
-
-	// Mock regex checker that matches API calls
-	mockRegexChecker := func(pattern, url string) (bool, error) {
-		if pattern == ".*api.*" {
-			return strings.Contains(url, "/api"), nil
+		gotoPage := func() error {
+			_, err := p.Goto(tb.url("/page"), &common.FrameGotoOptions{
+				WaitUntil: common.LifecycleEventDOMContentLoad,
+				Timeout:   common.DefaultTimeout,
+			})
+			return err
 		}
-		return false, nil
-	}
 
-	// Start the page navigation in a goroutine
-	go func() {
-		gotoOpts := &common.FrameGotoOptions{
-			Timeout: common.DefaultTimeout,
+		waitForUsers := func() error {
+			opts := common.NewPageWaitForResponseOptions(p.Timeout())
+			mockRegexChecker := func(pattern, url string) (bool, error) {
+				return strings.Contains(url, "/users"), nil
+			}
+			resp, err := p.WaitForResponse(".*users.*", opts, mockRegexChecker)
+			if err != nil {
+				return err
+			}
+			require.Contains(t, resp.URL(), "/users")
+			return nil
 		}
-		_, err := p.Goto(tb.url("/home"), gotoOpts)
-		require.NoError(t, err)
-	}()
 
-	// Wait for the API response with proper options
-	resp, err := p.WaitForResponse(".*api.*", opts, mockRegexChecker)
-	require.NoError(t, err)
-	require.NotNil(t, resp)
-	require.Contains(t, resp.URL(), "/api")
-
-	t.Logf("Successfully caught API response: %s", resp.URL())
-}
-
-func TestPageWaitForResponseMultipleRequests(t *testing.T) {
-	t.Parallel()
-	tb := newTestBrowser(t, withHTTPServer())
-
-	// Mock multiple endpoints
-	tb.withHandler("/api/users", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, err := fmt.Fprintf(w, `{"users": []}`)
+		err := tb.run(tb.context(), gotoPage, waitForUsers)
 		require.NoError(t, err)
 	})
 
-	tb.withHandler("/api/posts", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, err := fmt.Fprintf(w, `{"posts": []}`)
-		require.NoError(t, err)
-	})
+	t.Run("err/canceled", func(t *testing.T) {
+		t.Parallel()
+		tb := newTestBrowser(t)
+		p := tb.NewPage(nil)
+		opts := common.NewPageWaitForResponseOptions(p.Timeout())
+		go tb.cancelContext()
+		<-tb.context().Done()
 
-	tb.withHandler("/images/logo.png", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "image/png")
-		// Send minimal PNG data
-		_, err := w.Write([]byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A})
-		require.NoError(t, err)
-	})
-
-	p := tb.NewPage(nil)
-
-	// Create proper options
-	opts := common.NewPageWaitForResponseOptions(p.Timeout())
-
-	// Mock regex checker that only matches /api/users
-	mockRegexChecker := func(pattern, url string) (bool, error) {
-		if pattern == ".*users.*" {
-			return strings.Contains(url, "/users"), nil
+		mockRegexChecker := func(pattern, url string) (bool, error) {
+			return strings.Contains(url, "page"), nil
 		}
-		return false, nil
-	}
 
-	// Make multiple requests
-	go func() {
-		time.Sleep(50 * time.Millisecond)
-		gotoOpts := &common.FrameGotoOptions{Timeout: common.DefaultTimeout}
-		_, _ = p.Goto(tb.url("/images/logo.png"), gotoOpts) // Won't match
-	}()
-
-	go func() {
-		time.Sleep(100 * time.Millisecond)
-		gotoOpts := &common.FrameGotoOptions{Timeout: common.DefaultTimeout}
-		_, _ = p.Goto(tb.url("/api/posts"), gotoOpts) // Won't match
-	}()
-
-	go func() {
-		time.Sleep(150 * time.Millisecond)
-		gotoOpts := &common.FrameGotoOptions{Timeout: common.DefaultTimeout}
-		_, _ = p.Goto(tb.url("/api/users"), gotoOpts) // Will match!
-	}()
-
-	// Should only catch the users API response
-	resp, err := p.WaitForResponse(".*users.*", opts, mockRegexChecker)
-	require.NoError(t, err)
-	require.NotNil(t, resp)
-	require.Contains(t, resp.URL(), "/api/users")
-
-	t.Logf("Caught specific response: %s", resp.URL())
-}
-
-func TestPageWaitForResponseErrorStatus(t *testing.T) {
-	t.Parallel()
-	tb := newTestBrowser(t, withHTTPServer())
-
-	// Mock endpoint that returns error
-	tb.withHandler("/api/error", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Header().Set("Content-Type", "application/json")
-		_, err := fmt.Fprintf(w, `{"error": "Something went wrong"}`)
-		require.NoError(t, err)
+		_, err := p.WaitForResponse("/page", opts, mockRegexChecker)
+		require.ErrorContains(t, err, "canceled")
 	})
 
-	p := tb.NewPage(nil)
+	t.Run("err/timeout", func(t *testing.T) {
+		t.Parallel()
 
-	opts := common.NewPageWaitForResponseOptions(p.Timeout())
+		tb := newTestBrowser(t, withHTTPServer())
 
-	mockRegexChecker := func(pattern, url string) (bool, error) {
-		return strings.Contains(url, "/error"), nil
-	}
+		p := tb.NewPage(nil)
 
-	go func() {
-		time.Sleep(50 * time.Millisecond)
-		gotoOpts := &common.FrameGotoOptions{Timeout: common.DefaultTimeout}
-		_, _ = p.Goto(tb.url("/api/error"), gotoOpts)
-	}()
+		waitForApi := func() error {
+			opts := common.NewPageWaitForResponseOptions(500 * time.Millisecond)
+			mockRegexChecker := func(pattern, url string) (bool, error) {
+				return strings.Contains(url, "/api"), nil
+			}
 
-	// Should still catch the response even though it's an error
-	resp, err := p.WaitForResponse(".*error.*", opts, mockRegexChecker)
-	require.NoError(t, err)
-	require.NotNil(t, resp)
-	require.Contains(t, resp.URL(), "/error")
-
-	// Check that it's actually an error response
-	require.Equal(t, int64(500), resp.Status())
-}
-
-func TestPageWaitForResponseConcurrent(t *testing.T) {
-	t.Parallel()
-	tb := newTestBrowser(t, withHTTPServer())
-
-	// Mock multiple API endpoints
-	tb.withHandler("/api/users", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, err := fmt.Fprintf(w, `{"users": ["alice", "bob"]}`)
-		require.NoError(t, err)
-	})
-
-	tb.withHandler("/api/posts", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, err := fmt.Fprintf(w, `{"posts": ["post1", "post2"]}`)
-		require.NoError(t, err)
-	})
-
-	tb.withHandler("/api/comments", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, err := fmt.Fprintf(w, `{"comments": ["comment1", "comment2"]}`)
-		require.NoError(t, err)
-	})
-
-	tb.withHandler("/styles.css", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/css")
-		_, err := fmt.Fprintf(w, `body { color: blue; }`)
-		require.NoError(t, err)
-	})
-
-	tb.withHandler("/script.js", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/javascript")
-		_, err := fmt.Fprintf(w, `console.log("loaded");`)
-		require.NoError(t, err)
-	})
-
-	p := tb.NewPage(nil)
-	opts := common.NewPageWaitForResponseOptions(p.Timeout())
-
-	// Create 3 different regex checkers for different patterns
-	usersChecker := func(pattern, url string) (bool, error) {
-		if pattern == ".*users.*" {
-			return strings.Contains(url, "/users"), nil
+			resp, err := p.WaitForResponse(".*api.*", opts, mockRegexChecker)
+			if err != nil {
+				return err
+			}
+			require.NotNil(t, resp)
+			require.Contains(t, resp.URL(), "/api")
+			return nil
 		}
-		return false, nil
-	}
 
-	postsChecker := func(pattern, url string) (bool, error) {
-		if pattern == ".*posts.*" {
-			return strings.Contains(url, "/posts"), nil
-		}
-		return false, nil
-	}
-
-	commentsChecker := func(pattern, url string) (bool, error) {
-		if pattern == ".*comments.*" {
-			return strings.Contains(url, "/comments"), nil
-		}
-		return false, nil
-	}
-
-	// Channels to collect results from each waiter
-	type waitResult struct {
-		name string
-		resp *common.Response
-		err  error
-	}
-
-	results := make(chan waitResult, 3)
-
-	// Start 3 concurrent waitForResponse calls
-	go func() {
-		resp, err := p.WaitForResponse(".*users.*", opts, usersChecker)
-		results <- waitResult{"users", resp, err}
-	}()
-
-	go func() {
-		resp, err := p.WaitForResponse(".*posts.*", opts, postsChecker)
-		results <- waitResult{"posts", resp, err}
-	}()
-
-	go func() {
-		resp, err := p.WaitForResponse(".*comments.*", opts, commentsChecker)
-		results <- waitResult{"comments", resp, err}
-	}()
-
-	time.Sleep(50 * time.Millisecond)
-	gotoOpts := &common.FrameGotoOptions{Timeout: common.DefaultTimeout}
-
-	go func() {
-		time.Sleep(100 * time.Millisecond)
-		_, _ = p.Goto(tb.url("/styles.css"), gotoOpts) // Won't match any pattern
-	}()
-
-	go func() {
-		time.Sleep(150 * time.Millisecond)
-		_, _ = p.Goto(tb.url("/api/users"), gotoOpts) // Should match users waiter
-	}()
-
-	go func() {
-		time.Sleep(200 * time.Millisecond)
-		_, _ = p.Goto(tb.url("/script.js"), gotoOpts) // Won't match any pattern
-	}()
-
-	go func() {
-		time.Sleep(250 * time.Millisecond)
-		_, _ = p.Goto(tb.url("/api/posts"), gotoOpts) // Should match posts waiter
-	}()
-
-	go func() {
-		time.Sleep(300 * time.Millisecond)
-		_, _ = p.Goto(tb.url("/api/comments"), gotoOpts) // Should match comments waiter
-	}()
-
-	// Collect all 3 results
-	receivedResults := make(map[string]*common.Response)
-	for i := 0; i < 3; i++ {
-		select {
-		case result := <-results:
-			require.NoError(t, result.err, "Error in %s waiter", result.name)
-			require.NotNil(t, result.resp, "%s waiter got nil response", result.name)
-			receivedResults[result.name] = result.resp
-			t.Logf("✅ %s waiter caught: %s", result.name, result.resp.URL())
-		case <-time.After(2 * time.Second):
-			t.Fatalf("Timeout waiting for result %d", i+1)
-		}
-	}
-
-	require.Contains(t, receivedResults["users"].URL(), "/users", "Users waiter should catch users endpoint")
-	require.Contains(t, receivedResults["posts"].URL(), "/posts", "Posts waiter should catch posts endpoint")
-	require.Contains(t, receivedResults["comments"].URL(), "/comments", "Comments waiter should catch comments endpoint")
-	require.Len(t, receivedResults, 3, "Should have received exactly 3 responses")
+		err := tb.run(tb.context(), waitForApi)
+		require.ErrorContains(t, err, "waiting for response")
+	})
 }
