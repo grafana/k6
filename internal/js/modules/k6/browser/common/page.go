@@ -251,6 +251,7 @@ func (reh *ResponseEventHandler) processResponse(response *Response) {
 	}
 
 	reh.mu.RLock()
+	defer reh.mu.RUnlock()
 	waitersToNotify := make([]*responseWaiter, 0)
 
 	for _, waiter := range reh.activeWaiters {
@@ -266,7 +267,6 @@ func (reh *ResponseEventHandler) processResponse(response *Response) {
 			waitersToNotify = append(waitersToNotify, waiter)
 		}
 	}
-	reh.mu.RUnlock()
 
 	for _, waiter := range waitersToNotify {
 		select {
@@ -285,7 +285,7 @@ func (reh *ResponseEventHandler) waitForMatch(ctx context.Context, matcher URLMa
 
 	waiter := &responseWaiter{
 		matcher:      matcher,
-		responseChan: make(chan *Response, 1),
+		responseChan: make(chan *Response),
 		ctx:          waiterContext,
 		cancel:       waiterCancel,
 	}
@@ -1838,14 +1838,12 @@ func (p *Page) WaitForResponse(
 	timeoutCtx, timeoutCancel := context.WithTimeout(p.ctx, opts.Timeout)
 	defer timeoutCancel()
 
-	// Create URL matcher based on the pattern
 	matcher, err := urlMatcher(urlOrRegex, jsRegexChecker)
 	if err != nil {
 		spanRecordError(span, err)
 		return nil, fmt.Errorf("parsing URL pattern: %w", err)
 	}
 
-	// Use the dedicated ResponseEventHandler for clean separation
 	resp, err := p.responseEventHandler.waitForMatch(timeoutCtx, matcher)
 	if err != nil {
 		e := &k6ext.UserFriendlyError{
