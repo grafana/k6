@@ -517,7 +517,6 @@ func TestGetProviderConfig(t *testing.T) {
 		name         string
 		token        string
 		expectConfig k6provider.Config
-		expectErr    bool
 	}{
 		{
 			name:  "no token",
@@ -546,11 +545,7 @@ func TestGetProviderConfig(t *testing.T) {
 				ts.GlobalState.Env["K6_CLOUD_TOKEN"] = tc.token
 			}
 
-			config, err := getProviderConfig(ts.GlobalState)
-			if tc.expectErr {
-				assert.Error(t, err)
-				return
-			}
+			config := getProviderConfig(ts.GlobalState)
 
 			assert.Equal(t, tc.expectConfig, config)
 		})

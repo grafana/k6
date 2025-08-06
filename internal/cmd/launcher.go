@@ -242,7 +242,7 @@ func newK6BuildProvisioner(gs *state.GlobalState) provisioner {
 }
 
 func (p *k6buildProvisioner) provision(deps k6deps.Dependencies) (commandExecutor, error) {
-	config, err := getProviderConfig(p.gs)
+	config := getProviderConfig(p.gs)
 
 	provider, err := k6provider.NewProvider(config)
 	if err != nil {
@@ -260,7 +260,7 @@ func (p *k6buildProvisioner) provision(deps k6deps.Dependencies) (commandExecuto
 	return &customBinary{binary.Path}, nil
 }
 
-func getProviderConfig(gs *state.GlobalState) (k6provider.Config, error) {
+func getProviderConfig(gs *state.GlobalState) k6provider.Config {
 	config := k6provider.Config{
 		BuildServiceURL: gs.Flags.BuildServiceURL,
 		BinaryCacheDir:  gs.Flags.BinaryCache,
@@ -275,7 +275,7 @@ func getProviderConfig(gs *state.GlobalState) (k6provider.Config, error) {
 		config.BuildServiceAuth = token
 	}
 
-	return config, nil
+	return config
 }
 
 func formatDependencies(deps map[string]string) string {
