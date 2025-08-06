@@ -586,19 +586,23 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			var val string
 			switch url.ExportType() {
 			case reflect.TypeOf(string("")):
-				val = fmt.Sprintf("'%s'", url.String()) // Strings require quotes
+				val = "'" + url.String() + "'" // Strings require quotes
 			default: // JS Regex, CSS, numbers or booleans
 				val = url.String() // No quotes
 			}
 
 			// Inject JS regex checker for URL pattern matching
-			ctx := vu.Context()
-			jsRegexChecker, err := injectRegexMatcherScript(ctx, vu, p.TargetID())
+			ctx, stopTaskqueue := context.WithCancel(vu.Context())
+			tq := cancelableTaskQueue(ctx, vu.RegisterCallback)
+
+			jsRegexChecker, err := injectRegexMatcherScript(ctx, vu, tq)
 			if err != nil {
+				stopTaskqueue()
 				return nil, err
 			}
 
 			return k6ext.Promise(ctx, func() (result any, reason error) {
+				defer stopTaskqueue()
 				return p.WaitForResponse(val, popts, jsRegexChecker)
 			}), nil
 		},
