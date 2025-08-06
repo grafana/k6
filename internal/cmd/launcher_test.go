@@ -544,7 +544,7 @@ func TestGetProviderConfig(t *testing.T) {
 
 			ts := tests.NewGlobalTestState(t)
 			if tc.token != "" {
-				ts.GlobalState.Env["K6_CLOUD_TOKEN"] = tc.token
+				ts.Env["K6_CLOUD_TOKEN"] = tc.token
 			}
 
 			config := getProviderConfig(ts.GlobalState)
