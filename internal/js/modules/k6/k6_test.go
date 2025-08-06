@@ -1,6 +1,7 @@
 package k6
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -56,7 +57,7 @@ func TestSleep(t *testing.T) {
 		}()
 
 		time.Sleep(1 * time.Second)
-		tc.testRuntime.CancelContext()
+		tc.testRuntime.CancelContext(errors.New("context cancelled after 1s sleep"))
 		d := <-dch
 
 		assert.True(t, d > 500*time.Millisecond, "did not sleep long enough")
@@ -227,7 +228,7 @@ func TestCheckContextDone(t *testing.T) {
 		t.Parallel()
 		tc := testCaseRuntime(t)
 
-		tc.testRuntime.CancelContext()
+		tc.testRuntime.CancelContext(errors.New("context cancelled intentionally"))
 		v, err := tc.testRuntime.RunOnEventLoop(` k6.check(null, {"name": ()=>{ return true }})`)
 		assert.NoError(t, err)
 		assert.Len(t, metrics.GetBufferedSamples(tc.samples), 0)
@@ -237,7 +238,7 @@ func TestCheckContextDone(t *testing.T) {
 		t.Parallel()
 		tc := testCaseRuntime(t)
 
-		tc.testRuntime.CancelContext()
+		tc.testRuntime.CancelContext(errors.New("context cancelled intentionally"))
 		v, err := tc.testRuntime.RunOnEventLoop(`k6.check(null, {"name": ()=>{ return false }})`)
 		assert.NoError(t, err)
 		assert.Len(t, metrics.GetBufferedSamples(tc.samples), 0)

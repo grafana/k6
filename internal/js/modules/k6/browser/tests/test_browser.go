@@ -27,6 +27,10 @@ import (
 
 const testBrowserStaticDir = "static"
 
+// browserTestSemaphore limits concurrent browser launches to prevent resource exhaustion
+// in CI environments, especially on Ubuntu which runs with higher parallelism (-p 2)
+var browserTestSemaphore = make(chan struct{}, 2)
+
 // testBrowser is a test testBrowser for integration testing.
 type testBrowser struct {
 	t testing.TB
@@ -71,6 +75,12 @@ type testBrowser struct {
 //   - withSkipClose: skips closing the browser when the test finishes.
 func newTestBrowser(tb testing.TB, opts ...func(*testBrowser)) *testBrowser {
 	tb.Helper()
+
+	// Acquire semaphore to limit concurrent browser launches and prevent resource exhaustion
+	browserTestSemaphore <- struct{}{}
+	tb.Cleanup(func() {
+		<-browserTestSemaphore
+	})
 
 	tbr := &testBrowser{t: tb}
 	tbr.applyDefaultOptions()
