@@ -3,6 +3,7 @@ package modulestest
 
 import (
 	"context"
+	"errors"
 	"net/url"
 	"testing"
 
@@ -25,7 +26,7 @@ import (
 type Runtime struct {
 	VU             *VU
 	EventLoop      *eventloop.EventLoop
-	CancelContext  func()
+	CancelContext  context.CancelCauseFunc
 	BuiltinMetrics *metrics.BuiltinMetrics
 
 	mr *modules.ModuleResolver
@@ -33,8 +34,10 @@ type Runtime struct {
 
 // NewRuntime will create a new test runtime and will cancel the context on test/benchmark end
 func NewRuntime(t testing.TB) *Runtime {
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
+	ctx, cancel := context.WithCancelCause(context.Background())
+	t.Cleanup(func() {
+		cancel(errors.New("[NewRuntime] 1st cleanup"))
+	})
 	vu := &VU{
 		CtxField:     ctx,
 		RuntimeField: sobek.New(),
@@ -60,7 +63,7 @@ func NewRuntime(t testing.TB) *Runtime {
 	require.NoError(t, timers.SetupGlobally(vu))
 	require.NoError(t, webcrypto.SetupGlobally(vu))
 	// let's cancel again in case it has changed
-	t.Cleanup(func() { result.CancelContext() })
+	t.Cleanup(func() { result.CancelContext(errors.New("[NewRuntime] 2nd cleanup")) })
 	return result
 }
 

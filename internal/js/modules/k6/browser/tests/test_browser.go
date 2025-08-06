@@ -3,6 +3,7 @@ package tests
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -31,7 +32,7 @@ type testBrowser struct {
 	t testing.TB
 
 	ctx    context.Context
-	cancel context.CancelFunc
+	cancel context.CancelCauseFunc
 	vu     *k6test.VU
 
 	browserType *chromium.BrowserType
@@ -100,7 +101,7 @@ func newTestBrowser(tb testing.TB, opts ...func(*testBrowser)) *testBrowser {
 // newTestBrowserVU initializes a new VU for browser testing.
 // It returns the VU and a cancel function to stop the VU.
 // VU contains the context with the custom metrics registry.
-func newTestBrowserVU(tb testing.TB, tbr *testBrowser) (_ *k6test.VU, cancel func()) {
+func newTestBrowserVU(tb testing.TB, tbr *testBrowser) (_ *k6test.VU, cancel context.CancelCauseFunc) {
 	tb.Helper()
 
 	vu := k6test.NewVU(tb, k6test.WithSamples(tbr.samples))
@@ -108,8 +109,10 @@ func newTestBrowserVU(tb testing.TB, tbr *testBrowser) (_ *k6test.VU, cancel fun
 		vu.Context(),
 		k6ext.RegisterCustomMetrics(k6metrics.NewRegistry()),
 	)
-	ctx, cancel := context.WithCancel(metricsCtx)
-	tb.Cleanup(cancel)
+	ctx, cancel := context.WithCancelCause(metricsCtx)
+	tb.Cleanup(func() {
+		cancel(errors.New("[newTestBrowserVU] cleanup"))
+	})
 	vu.CtxField = ctx
 	vu.InitEnvField.LookupEnv = tbr.lookupFunc
 
@@ -281,7 +284,7 @@ func (b *testBrowser) staticURL(path string) string {
 func (b *testBrowser) context() context.Context { return b.ctx }
 
 // cancelContext cancels the testBrowser context.
-func (b *testBrowser) cancelContext() { b.cancel() }
+func (b *testBrowser) cancelContext() { b.cancel(errors.New("[testBrowser] context cancelled")) }
 
 // runtime returns a VU runtime.
 func (b *testBrowser) runtime() *sobek.Runtime { return b.vu.Runtime() }
