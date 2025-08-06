@@ -581,7 +581,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			var val string
 			switch url.ExportType() {
 			case reflect.TypeOf(string("")):
-				val = fmt.Sprintf("'%s'", url.String()) // Strings require quotes
+				val = "'" + url.String() + "'" // Strings require quotes
 			default: // JS Regex, CSS, numbers or booleans
 				val = url.String() // No quotes
 			}
@@ -606,7 +606,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			var val string
 			switch url.ExportType() {
 			case reflect.TypeOf(string("")):
-				val = fmt.Sprintf("'%s'", url.String()) // Strings require quotes
+				val = "'" + url.String() + "'" // Strings require quotes
 			default: // JS Regex, CSS, numbers or booleans
 				val = url.String() // No quotes
 			}
