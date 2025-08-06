@@ -242,19 +242,7 @@ func newK6BuildProvisioner(gs *state.GlobalState) provisioner {
 }
 
 func (p *k6buildProvisioner) provision(deps k6deps.Dependencies) (commandExecutor, error) {
-	config := k6provider.Config{
-		BuildServiceURL: p.gs.Flags.BuildServiceURL,
-		BinaryCacheDir:  p.gs.Flags.BinaryCache,
-	}
-
-	token, err := extractToken(p.gs)
-	if err != nil {
-		p.gs.Logger.WithError(err).Debug("Failed to get cloud token")
-	}
-
-	if token != "" {
-		config.BuildServiceAuth = token
-	}
+	config, err := getProviderConfig(p.gs)
 
 	provider, err := k6provider.NewProvider(config)
 	if err != nil {
@@ -270,6 +258,24 @@ func (p *k6buildProvisioner) provision(deps k6deps.Dependencies) (commandExecuto
 		Info("A new k6 binary has been provisioned with version(s): ", formatDependencies(binary.Dependencies))
 
 	return &customBinary{binary.Path}, nil
+}
+
+func getProviderConfig(gs *state.GlobalState) (k6provider.Config, error) {
+	config := k6provider.Config{
+		BuildServiceURL: gs.Flags.BuildServiceURL,
+		BinaryCacheDir:  gs.Flags.BinaryCache,
+	}
+
+	token, err := extractToken(gs)
+	if err != nil {
+		gs.Logger.WithError(err).Debug("Failed to get cloud token")
+	}
+
+	if token != "" {
+		config.BuildServiceAuth = token
+	}
+
+	return config, nil
 }
 
 func formatDependencies(deps map[string]string) string {
