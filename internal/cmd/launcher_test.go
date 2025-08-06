@@ -540,6 +540,8 @@ func TestGetProviderConfig(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			ts := tests.NewGlobalTestState(t)
 			if tc.token != "" {
 				ts.GlobalState.Env["K6_CLOUD_TOKEN"] = tc.token
