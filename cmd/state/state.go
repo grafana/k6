@@ -194,6 +194,7 @@ func GetDefaultFlags(homeDir string, cacheDir string) GlobalFlags {
 		ProfilingEnabled:          false,
 		ConfigFilePath:            filepath.Join(homeDir, "k6", defaultConfigFileName),
 		LogOutput:                 "stderr",
+		BinaryProvisioning:        true,
 		BuildServiceURL:           defaultBuildServiceURL,
 		EnableCommunityExtensions: false,
 		BinaryCache:               filepath.Join(cacheDir, "k6", defaultBinaryCacheDir),
