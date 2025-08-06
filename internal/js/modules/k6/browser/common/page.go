@@ -230,21 +230,6 @@ func NewResponseEventHandler() *ResponseEventHandler {
 	}
 }
 
-func (reh *ResponseEventHandler) addWaiter(waiter *responseWaiter) int64 {
-	id := reh.generateWaiterID()
-	reh.mu.Lock()
-	defer reh.mu.Unlock()
-
-	reh.activeWaiters[id] = waiter
-	return id
-}
-
-func (reh *ResponseEventHandler) removeWaiter(id int64) {
-	reh.mu.Lock()
-	defer reh.mu.Unlock()
-	delete(reh.activeWaiters, id)
-}
-
 func (reh *ResponseEventHandler) processResponse(response *Response) {
 	if response == nil {
 		return
@@ -252,10 +237,8 @@ func (reh *ResponseEventHandler) processResponse(response *Response) {
 
 	reh.mu.RLock()
 	defer reh.mu.RUnlock()
-	waitersToNotify := make([]*responseWaiter, 0)
 
 	for _, waiter := range reh.activeWaiters {
-		// Check if the context is still active before processing
 		select {
 		case <-waiter.ctx.Done():
 			continue
@@ -264,20 +247,12 @@ func (reh *ResponseEventHandler) processResponse(response *Response) {
 
 		matched, err := waiter.matcher(response.URL())
 		if err == nil && matched {
-			waitersToNotify = append(waitersToNotify, waiter)
+			select {
+			case waiter.responseChan <- response:
+			case <-waiter.ctx.Done():
+			}
 		}
 	}
-
-	for _, waiter := range waitersToNotify {
-		select {
-		case waiter.responseChan <- response:
-		case <-waiter.ctx.Done():
-		}
-	}
-}
-
-func (reh *ResponseEventHandler) generateWaiterID() int64 {
-	return atomic.AddInt64(&reh.nextWaiterID, 1)
 }
 
 func (reh *ResponseEventHandler) waitForMatch(ctx context.Context, matcher URLMatcher) (*Response, error) {
@@ -290,10 +265,18 @@ func (reh *ResponseEventHandler) waitForMatch(ctx context.Context, matcher URLMa
 		cancel:       waiterCancel,
 	}
 
-	waiterID := reh.addWaiter(waiter)
+	// Add waiter
+	id := atomic.AddInt64(&reh.nextWaiterID, 1)
+	reh.mu.Lock()
+	reh.activeWaiters[id] = waiter
+	reh.mu.Unlock()
+
 	defer func() {
 		waiterCancel()
-		reh.removeWaiter(waiterID)
+		// Remove waiter
+		reh.mu.Lock()
+		delete(reh.activeWaiters, id)
+		reh.mu.Unlock()
 	}()
 
 	select {
