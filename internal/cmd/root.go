@@ -61,10 +61,10 @@ func newRootWithLauncher(gs *state.GlobalState, l *launcher) *rootCommand {
 	}
 	// the base command when called without any subcommands.
 	rootCmd := &cobra.Command{
-		Use:               gs.BinaryName,
-		Short:             "a next-generation load generator",
-		Long: "\n" + getBanner(gs.Flags.NoColor || !gs.Stdout.IsTTY, isTrueColor(gs.Env)) + 
-      		"\n\nFull CLI documentation is available at: https://grafana.com/docs/k6",
+		Use:   gs.BinaryName,
+		Short: "a next-generation load generator",
+		Long: "\n" + getBanner(gs.Flags.NoColor || !gs.Stdout.IsTTY, isTrueColor(gs.Env)) +
+			"\n\nFull CLI documentation is available at: https://grafana.com/docs/k6",
 		SilenceUsage:      true,
 		SilenceErrors:     true,
 		PersistentPreRunE: c.persistentPreRunE,
