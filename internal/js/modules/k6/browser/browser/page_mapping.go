@@ -539,6 +539,9 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 
 			ctx := vu.Context()
 
+			// Avoid working with the taskqueue unless the URL option is used.
+			// At the moment the taskqueue needs to be cleaned up manually with
+			// page.close.
 			var jsRegexChecker common.JSRegexChecker
 			if popts.URL != "" {
 				// Inject JS regex checker for URL regex pattern matching
