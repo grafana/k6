@@ -1616,6 +1616,6 @@ func extractTypesFromClientAsSobekValue(t *testing.T, val sobek.Value) *protoreg
 	clientValue := reflect.ValueOf(client).Elem()
 	typesField := clientValue.FieldByName("types")
 
-	typesField = reflect.NewAt(typesField.Type(), unsafe.Pointer(typesField.UnsafeAddr())).Elem()
+	typesField = reflect.NewAt(typesField.Type(), unsafe.Pointer(typesField.UnsafeAddr())).Elem() //nolint:gosec
 	return typesField.Interface().(*protoregistry.Types)
 }
