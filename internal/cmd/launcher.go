@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -24,19 +25,21 @@ import (
 
 // ioFSBridge allows an afero.Fs to implement the Go standard library io/fs.FS.
 type ioFSBridge struct {
+	pwd   string
 	fsext fsext.Fs
 }
 
 // newIofsBridge returns an IOFSBridge from a Fs
-func newIOFSBridge(fs fsext.Fs) fs.FS {
+func newIOFSBridge(fs fsext.Fs, pwd string) fs.FS {
 	return &ioFSBridge{
 		fsext: fs,
+		pwd:   pwd,
 	}
 }
 
 // Open implements fs.Fs Open
 func (b *ioFSBridge) Open(name string) (fs.File, error) {
-	f, err := b.fsext.Open(name)
+	f, err := b.fsext.Open(path.Join(b.pwd, name))
 	if err != nil {
 		return nil, fmt.Errorf("opening file via launcher's bridge: %w", err)
 	}
@@ -300,6 +303,7 @@ func analyze(gs *state.GlobalState, args []string) (k6deps.Dependencies, error) 
 	gs.Logger.WithField("source", "sourceRootPath").
 		Debug("Launcher is resolving and reading the test's script")
 	src, _, pwd, err := readSource(gs, sourceRootPath)
+	dopts.RootDir = pwd
 	if err != nil {
 		return nil, fmt.Errorf("reading source for analysis %w", err)
 	}
@@ -317,7 +321,7 @@ func analyze(gs *state.GlobalState, args []string) (k6deps.Dependencies, error) 
 		}
 		dopts.Script.Name = sourceRootPath
 		dopts.Script.Contents = src.Data
-		dopts.Fs = newIOFSBridge(gs.FS)
+		dopts.Fs = newIOFSBridge(gs.FS, pwd)
 	}
 
 	return k6deps.Analyze(dopts)
