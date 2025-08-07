@@ -1,11 +1,9 @@
 package browser
 
 import (
+	"context"
 	"fmt"
-	"math/rand"
 	"reflect"
-	"strconv"
-	"time"
 
 	"github.com/grafana/sobek"
 	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
@@ -14,11 +12,20 @@ import (
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
 )
 
+func cancelableTaskQueue(ctx context.Context, registerCallback func() func(func() error)) *taskqueue.TaskQueue {
+	tq := taskqueue.New(registerCallback)
+
+	go func() {
+		<-ctx.Done()
+		tq.Close()
+	}()
+	return tq
+}
+
 // mapFrame to the JS module.
 //
 //nolint:funlen,gocognit,cyclop
 func mapFrame(vu moduleVU, f *common.Frame) mapping {
-	randSrc := rand.New(rand.NewSource(time.Now().UnixNano())) //nolint: gosec
 	maps := mapping{
 		"check": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
 			popts := common.NewFrameCheckOptions(f.Timeout())
@@ -399,19 +406,22 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			// At the moment the taskqueue needs to be cleaned up manually with
 			// page.close.
 			var jsRegexChecker common.JSRegexChecker
-			var tq *taskqueue.TaskQueue
+			stopTaskqueue := func() {}
 			if popts.URL != "" {
-				tq = vu.get(ctx, f.Page().TargetID()+"frame.waitForNavigation"+strconv.FormatUint(randSrc.Uint64(), 10))
+				ctx, stopTaskqueue = context.WithCancel(ctx)
+				tq := cancelableTaskQueue(ctx, vu.RegisterCallback)
 
 				// Inject JS regex checker for URL regex pattern matching
 				var err error
 				jsRegexChecker, err = injectRegexMatcherScript(ctx, vu, tq)
 				if err != nil {
+					stopTaskqueue()
 					return nil, err
 				}
 			}
 
 			return k6ext.Promise(ctx, func() (result any, reason error) {
+				defer stopTaskqueue()
 				resp, err := f.WaitForNavigation(popts, jsRegexChecker)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
@@ -454,14 +464,17 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			}
 
 			// Inject JS regex checker for URL pattern matching
-			ctx := vu.Context()
-			tq := vu.get(ctx, f.Page().TargetID()+"frame.waitForURL"+strconv.FormatUint(randSrc.Uint64(), 10))
+			ctx, stopTaskqueue := context.WithCancel(vu.Context())
+			tq := cancelableTaskQueue(ctx, vu.RegisterCallback)
+
 			jsRegexChecker, err := injectRegexMatcherScript(ctx, vu, tq)
 			if err != nil {
+				stopTaskqueue()
 				return nil, err
 			}
 
 			return k6ext.Promise(ctx, func() (result any, reason error) {
+				defer stopTaskqueue()
 				return nil, f.WaitForURL(val, popts, jsRegexChecker)
 			}), nil
 		},
