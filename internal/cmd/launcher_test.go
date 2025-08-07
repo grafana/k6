@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/grafana/k6deps"
+	"github.com/grafana/k6provider"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -507,4 +508,48 @@ func TestIOFSBridgeOpen(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, "test123", string(content))
+}
+
+func TestGetProviderConfig(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name         string
+		token        string
+		expectConfig k6provider.Config
+	}{
+		{
+			name:  "no token",
+			token: "",
+			expectConfig: k6provider.Config{
+				BuildServiceURL:  "https://ingest.k6.io/builder/api/v1",
+				BinaryCacheDir:   filepath.Join(".cache", "k6", "builds"),
+				BuildServiceAuth: "",
+			},
+		},
+		{
+			name:  "K6_CLOUD_TOKEN set",
+			token: "K6CLOUDTOKEN",
+			expectConfig: k6provider.Config{
+				BuildServiceURL:  "https://ingest.k6.io/builder/api/v1",
+				BinaryCacheDir:   filepath.Join(".cache", "k6", "builds"),
+				BuildServiceAuth: "K6CLOUDTOKEN",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			ts := tests.NewGlobalTestState(t)
+			if tc.token != "" {
+				ts.Env["K6_CLOUD_TOKEN"] = tc.token
+			}
+
+			config := getProviderConfig(ts.GlobalState)
+
+			assert.Equal(t, tc.expectConfig, config)
+		})
+	}
 }

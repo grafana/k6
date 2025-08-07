@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
+
 	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/internal/build"
@@ -2405,7 +2406,7 @@ func TestSetupTimeout(t *testing.T) {
 	assert.Contains(t, stderr, "setup() execution timed out after 1 seconds")
 }
 
-func TestTypeScriptSupport(t *testing.T) {
+func TestTypeScriptSupportWithoutBinaryProvisioning(t *testing.T) {
 	t.Parallel()
 	depScript := `
 		export default function(): number {
@@ -2422,6 +2423,37 @@ func TestTypeScriptSupport(t *testing.T) {
 	`
 
 	ts := NewGlobalTestState(t)
+	ts.Flags.BinaryProvisioning = false
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test.ts"), []byte(mainScript), 0o644))
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "bar.ts"), []byte(depScript), 0o644))
+
+	ts.CmdArgs = []string{"k6", "run", "--quiet", "test.ts"}
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stderr := ts.Stderr.String()
+	t.Log(stderr)
+	assert.Contains(t, stderr, `something 42`)
+}
+
+func TestTypeScriptSupportWithBinaryProvisioning(t *testing.T) {
+	t.Parallel()
+	depScript := `
+		export default function(): number {
+			let p: number = 42;
+			return p;
+		}
+	`
+	mainScript := `
+		import bar from "./bar.ts";
+		let s: string = "something";
+		export default function() {
+			console.log(s, bar());
+		};
+	`
+
+	ts := NewGlobalTestState(t)
+	ts.Flags.BinaryProvisioning = true
 	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test.ts"), []byte(mainScript), 0o644))
 	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "bar.ts"), []byte(depScript), 0o644))
 
