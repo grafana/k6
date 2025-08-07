@@ -748,7 +748,8 @@ func (w *webSocket) close(code int, reason string) {
 
 	if code != 0 && !isValidClientCloseCode(code) {
 		common.Throw(rt, fmt.Errorf(
-			`InvalidAccessError: Failed to execute 'close' on 'WebSocket': The close code must be either 1000, or between 3000 and 4999. %d is neither`,
+			"InvalidAccessError: Failed to execute 'close' on 'WebSocket': "+
+				"The close code must be either 1000, or between 3000 and 4999. %d is neither",
 			code,
 		))
 	}
@@ -874,9 +875,11 @@ func (w *webSocket) callEventListeners(eventType string) error {
 		event = w.newEvent(eventType, time.Now(), func(o *sobek.Object) {
 			rt := w.vu.Runtime()
 			if w.closeCode != 0 {
-				must(rt, o.DefineDataProperty("code", rt.ToValue(w.closeCode), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
+				must(rt, o.DefineDataProperty("code",
+					rt.ToValue(w.closeCode), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
 			}
-			must(rt, o.DefineDataProperty("reason", rt.ToValue(w.closeReason), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
+			must(rt, o.DefineDataProperty("reason",
+				rt.ToValue(w.closeReason), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
 		})
 	} else {
 		event = w.newEvent(eventType, time.Now())
