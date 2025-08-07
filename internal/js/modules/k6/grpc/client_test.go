@@ -8,8 +8,10 @@ import (
 	"encoding/pem"
 	"fmt"
 	"math"
+	"reflect"
 	"strings"
 	"testing"
+	"unsafe"
 
 	k6grpc "go.k6.io/k6/internal/js/modules/k6/grpc"
 	"go.k6.io/k6/internal/lib/netext/grpcext"
@@ -19,26 +21,29 @@ import (
 	"go.k6.io/k6/internal/lib/testutils/httpmultibin/grpc_wrappers_testing"
 	"go.k6.io/k6/metrics"
 
+	"github.com/grafana/sobek"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/health"
+	healthgrpc "google.golang.org/grpc/health/grpc_health_v1"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/reflection"
+	v1alphagrpc "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
+	grpcstats "google.golang.org/grpc/stats"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/reflect/protoregistry"
-	"google.golang.org/protobuf/types/known/wrapperspb"
 
 	"github.com/golang/protobuf/ptypes/any"
 	_struct "github.com/golang/protobuf/ptypes/struct"
 	"github.com/golang/protobuf/ptypes/wrappers"
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoregistry"
+	"google.golang.org/protobuf/types/known/wrapperspb"
+
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"google.golang.org/grpc/metadata"
-	v1alphagrpc "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
-	grpcstats "google.golang.org/grpc/stats"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
-
-	"google.golang.org/grpc/health"
-	healthgrpc "google.golang.org/grpc/health/grpc_health_v1"
 )
 
 func TestClient(t *testing.T) {
@@ -1497,7 +1502,8 @@ func TestClientLoadProto(t *testing.T) {
 		initString: codeBlock{
 			code: `
 			var client = new grpc.Client();
-			client.load([], "../../../../lib/testutils/httpmultibin/nested_types/nested_types.proto");`,
+			client.load([], "../../../../lib/testutils/httpmultibin/nested_types/nested_types.proto");
+			client`,
 		},
 	}
 
@@ -1513,8 +1519,9 @@ func TestClientLoadProto(t *testing.T) {
 		"grpc.testdata.nested.types.MeldOuter",
 	}
 
+	types := extractTypesFromClientAsSobekValue(t, val)
 	for _, expected := range expectedTypes {
-		found, err := protoregistry.GlobalTypes.FindMessageByName(protoreflect.FullName(expected))
+		found, err := types.FindMessageByName(protoreflect.FullName(expected))
 
 		assert.NotNil(t, found, "Expected to find the message type %s, but an error occurred", expected)
 		assert.Nil(t, err, "It was not expected that there would be an error, but it got: %v", err)
@@ -1531,7 +1538,8 @@ func TestClientLoadProtoAbsoluteRootWithFile(t *testing.T) {
 		initString: codeBlock{
 			code: `
 			var client = new grpc.Client();
-			client.load(["` + rootPath + `"], "../../lib/testutils/httpmultibin/nested_types/nested_types.proto");`,
+			client.load(["` + rootPath + `"], "../../lib/testutils/httpmultibin/nested_types/nested_types.proto");
+			client`,
 		},
 	}
 
@@ -1547,8 +1555,9 @@ func TestClientLoadProtoAbsoluteRootWithFile(t *testing.T) {
 		"grpc.testdata.nested.types.MeldOuter",
 	}
 
+	types := extractTypesFromClientAsSobekValue(t, val)
 	for _, expected := range expectedTypes {
-		found, err := protoregistry.GlobalTypes.FindMessageByName(protoreflect.FullName(expected))
+		found, err := types.FindMessageByName(protoreflect.FullName(expected))
 
 		assert.NotNil(t, found, "Expected to find the message type %s, but an error occurred", expected)
 		assert.Nil(t, err, "It was not expected that there would be an error, but it got: %v", err)
@@ -1596,4 +1605,17 @@ func TestClientConnectionReflectMetadata(t *testing.T) {
 	}
 
 	assert.True(t, foundReflectionCall, "expected to find a reflection call in the logs, but didn't")
+}
+
+func extractTypesFromClientAsSobekValue(t *testing.T, val sobek.Value) *protoregistry.Types {
+	t.Helper()
+
+	client, ok := val.Export().(*k6grpc.Client)
+	require.True(t, ok, "got: %T, want *k6grpc.Client", client)
+
+	clientValue := reflect.ValueOf(client).Elem()
+	typesField := clientValue.FieldByName("types")
+
+	typesField = reflect.NewAt(typesField.Type(), unsafe.Pointer(typesField.UnsafeAddr())).Elem()
+	return typesField.Interface().(*protoregistry.Types)
 }

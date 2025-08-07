@@ -11,6 +11,7 @@ import (
 	"math"
 	"reflect"
 	"strings"
+	"sync"
 	"time"
 
 	"go.k6.io/k6/internal/lib/netext/grpcext"
@@ -38,6 +39,9 @@ type Client struct {
 	conn *grpcext.Conn
 	vu   modules.VU
 	addr string
+
+	types    *protoregistry.Types
+	typesMtx sync.Mutex
 }
 
 // Load will parse the given proto files and make the file descriptors available to request.
@@ -516,6 +520,13 @@ func (c *Client) convertToMethodInfo(fdset *descriptorpb.FileDescriptorSet) ([]M
 			FullMethod: name,
 		})
 	}
+
+	// We want to avoid concurrent calls to client.load competing
+	// for registering types, as they may end up panicking if they
+	// try to register the same types.
+	c.typesMtx.Lock()
+	defer c.typesMtx.Unlock()
+
 	files.RangeFiles(func(fd protoreflect.FileDescriptor) bool {
 		sds := fd.Services()
 		for i := 0; i < sds.Len(); i++ {
@@ -538,9 +549,9 @@ func (c *Client) convertToMethodInfo(fdset *descriptorpb.FileDescriptorSet) ([]M
 			message := stack[len(stack)-1]
 			stack = stack[:len(stack)-1]
 
-			_, errFind := protoregistry.GlobalTypes.FindMessageByName(message.FullName())
+			_, errFind := c.types.FindMessageByName(message.FullName())
 			if errors.Is(errFind, protoregistry.NotFound) {
-				err = protoregistry.GlobalTypes.RegisterMessage(dynamicpb.NewMessageType(message))
+				err = c.types.RegisterMessage(dynamicpb.NewMessageType(message))
 				if err != nil {
 					return false
 				}

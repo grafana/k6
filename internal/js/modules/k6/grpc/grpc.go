@@ -5,12 +5,15 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/grafana/sobek"
-	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
-	"go.k6.io/k6/js/common"
-	"go.k6.io/k6/js/modules"
 	"google.golang.org/grpc/codes"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
+	"google.golang.org/protobuf/reflect/protoregistry"
+
+	"github.com/grafana/sobek"
+	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
+
+	"go.k6.io/k6/js/common"
+	"go.k6.io/k6/js/modules"
 )
 
 type (
@@ -60,7 +63,7 @@ func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 // NewClient is the JS constructor for the grpc Client.
 func (mi *ModuleInstance) NewClient(_ sobek.ConstructorCall) *sobek.Object {
 	rt := mi.vu.Runtime()
-	return rt.ToValue(&Client{vu: mi.vu}).ToObject(rt)
+	return rt.ToValue(&Client{vu: mi.vu, types: new(protoregistry.Types)}).ToObject(rt)
 }
 
 // defineConstants defines the constant variables of the module.
