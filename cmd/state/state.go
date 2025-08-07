@@ -25,8 +25,8 @@ import (
 )
 
 const (
-	// BinaryProvisioningFeatureFlag defines the environment variable that enables the binary provisioning
-	BinaryProvisioningFeatureFlag = "K6_BINARY_PROVISIONING"
+	// AutoExtensionResolution defines the environment variable that enables using extensions natively
+	AutoExtensionResolution = "K6_AUTO_EXTENSION_RESOLUTION"
 
 	// communityExtensionsCatalog defines the catalog for community extensions
 	communityExtensionsCatalog = "oss"
@@ -181,7 +181,7 @@ type GlobalFlags struct {
 	LogFormat        string
 	Verbose          bool
 
-	BinaryProvisioning        bool
+	AutoExtensionResolution   bool
 	BuildServiceURL           string
 	BinaryCache               string
 	EnableCommunityExtensions bool
@@ -194,7 +194,7 @@ func GetDefaultFlags(homeDir string, cacheDir string) GlobalFlags {
 		ProfilingEnabled:          false,
 		ConfigFilePath:            filepath.Join(homeDir, "k6", defaultConfigFileName),
 		LogOutput:                 "stderr",
-		BinaryProvisioning:        true,
+		AutoExtensionResolution:   true,
 		BuildServiceURL:           defaultBuildServiceURL,
 		EnableCommunityExtensions: false,
 		BinaryCache:               filepath.Join(cacheDir, "k6", defaultBinaryCacheDir),
@@ -227,10 +227,18 @@ func getFlags(defaultFlags GlobalFlags, env map[string]string, args []string) Gl
 	if _, ok := env["K6_PROFILING_ENABLED"]; ok {
 		result.ProfilingEnabled = true
 	}
+	//  old name for the K6_AUTO_EXTENSION_RESOLUTION feature flag
+	//  maintained for backward compatibility to be removed in a future release
 	if v, ok := env["K6_BINARY_PROVISIONING"]; ok {
 		vb, err := strconv.ParseBool(v)
 		if err == nil {
-			result.BinaryProvisioning = vb
+			result.AutoExtensionResolution = vb
+		}
+	}
+	if v, ok := env["K6_AUTO_EXTENSION_RESOLUTION"]; ok {
+		vb, err := strconv.ParseBool(v)
+		if err == nil {
+			result.AutoExtensionResolution = vb
 		}
 	}
 	if val, ok := env["K6_BUILD_SERVICE_URL"]; ok {
