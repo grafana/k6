@@ -4,10 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
 	"reflect"
+	"strconv"
 	"time"
 
 	"github.com/grafana/sobek"
+	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
@@ -18,6 +21,7 @@ import (
 //nolint:funlen
 func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 	rt := vu.Runtime()
+	randSrc := rand.New(rand.NewSource(time.Now().UnixNano())) //nolint: gosec
 	maps := mapping{
 		"bringToFront": func() *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
@@ -543,16 +547,25 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			// At the moment the taskqueue needs to be cleaned up manually with
 			// page.close.
 			var jsRegexChecker common.JSRegexChecker
+			var tq *taskqueue.TaskQueue
 			if popts.URL != "" {
+				tq = vu.get(ctx, p.TargetID()+"page.waitForNavigation"+strconv.FormatUint(randSrc.Uint64(), 10))
+
 				// Inject JS regex checker for URL regex pattern matching
 				var err error
-				jsRegexChecker, err = injectRegexMatcherScript(ctx, vu, p.TargetID())
+				jsRegexChecker, err = injectRegexMatcherScript(ctx, vu, tq)
 				if err != nil {
 					return nil, err
 				}
 			}
 
 			return k6ext.Promise(ctx, func() (result any, reason error) {
+				defer func() {
+					if tq != nil {
+						tq.Close()
+					}
+				}()
+
 				resp, err := p.WaitForNavigation(popts, jsRegexChecker)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
@@ -596,12 +609,14 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 
 			// Inject JS regex checker for URL pattern matching
 			ctx := vu.Context()
-			jsRegexChecker, err := injectRegexMatcherScript(ctx, vu, p.TargetID())
+			tq := vu.get(ctx, p.TargetID()+"page.waitForURL"+strconv.FormatUint(randSrc.Uint64(), 10))
+			jsRegexChecker, err := injectRegexMatcherScript(ctx, vu, tq)
 			if err != nil {
 				return nil, err
 			}
 
 			return k6ext.Promise(ctx, func() (result any, reason error) {
+				defer tq.Close()
 				return nil, p.WaitForURL(val, popts, jsRegexChecker)
 			}), nil
 		},
@@ -755,15 +770,13 @@ func prepK6BrowserRegExChecker(rt *sobek.Runtime) func() error {
 // Do not call this off the main thread (not even from within a promise). The returned
 // JSRegexChecker can be called from off the main thread (i.e. in a new goroutine) since
 // it will queue up the checker on the event loop.
-func injectRegexMatcherScript(ctx context.Context, vu moduleVU, targetID string) (common.JSRegexChecker, error) {
+func injectRegexMatcherScript(ctx context.Context, vu moduleVU, tq *taskqueue.TaskQueue) (common.JSRegexChecker, error) {
 	rt := vu.Runtime()
 
 	err := prepK6BrowserRegExChecker(rt)()
 	if err != nil {
 		return nil, fmt.Errorf("preparing k6 browser regex checker: %w", err)
 	}
-
-	tq := vu.get(ctx, targetID)
 
 	return func(pattern, url string) (bool, error) {
 		var (
@@ -924,10 +937,11 @@ func parseGetByBaseOptions(
 func mapPageRoute(vu moduleVU, p *common.Page) func(path sobek.Value, handler sobek.Callable) (*sobek.Promise, error) {
 	return func(path sobek.Value, handler sobek.Callable) (*sobek.Promise, error) {
 		ctx := vu.Context()
-		targetID := p.TargetID()
+
+		tq := vu.get(ctx, p.TargetID())
 
 		// Inject JS regex checker for URL regex pattern matching
-		jsRegexChecker, err := injectRegexMatcherScript(ctx, vu, targetID)
+		jsRegexChecker, err := injectRegexMatcherScript(ctx, vu, tq)
 		if err != nil {
 			return nil, err
 		}
@@ -935,7 +949,6 @@ func mapPageRoute(vu moduleVU, p *common.Page) func(path sobek.Value, handler so
 
 		// Run the event handler in the task queue to
 		// ensure that the handler is executed on the event loop.
-		tq := vu.get(ctx, targetID)
 		routeHandler := func(route *common.Route) error {
 			done := make(chan error, 1)
 			tq.Queue(func() error {

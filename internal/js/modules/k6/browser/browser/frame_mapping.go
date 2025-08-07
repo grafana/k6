@@ -2,9 +2,13 @@ package browser
 
 import (
 	"fmt"
+	"math/rand"
 	"reflect"
+	"strconv"
+	"time"
 
 	"github.com/grafana/sobek"
+	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
@@ -14,6 +18,7 @@ import (
 //
 //nolint:funlen,gocognit,cyclop
 func mapFrame(vu moduleVU, f *common.Frame) mapping {
+	randSrc := rand.New(rand.NewSource(time.Now().UnixNano())) //nolint: gosec
 	maps := mapping{
 		"check": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
 			popts := common.NewFrameCheckOptions(f.Timeout())
@@ -388,11 +393,22 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				return nil, fmt.Errorf("parsing frame wait for navigation options: %w", err)
 			}
 
-			// Inject JS regex checker for URL regex pattern matching
 			ctx := vu.Context()
-			jsRegexChecker, err := injectRegexMatcherScript(ctx, vu, f.Page().TargetID())
-			if err != nil {
-				return nil, err
+
+			// Avoid working with the taskqueue unless the URL option is used.
+			// At the moment the taskqueue needs to be cleaned up manually with
+			// page.close.
+			var jsRegexChecker common.JSRegexChecker
+			var tq *taskqueue.TaskQueue
+			if popts.URL != "" {
+				tq = vu.get(ctx, f.Page().TargetID()+"frame.waitForNavigation"+strconv.FormatUint(randSrc.Uint64(), 10))
+
+				// Inject JS regex checker for URL regex pattern matching
+				var err error
+				jsRegexChecker, err = injectRegexMatcherScript(ctx, vu, tq)
+				if err != nil {
+					return nil, err
+				}
 			}
 
 			return k6ext.Promise(ctx, func() (result any, reason error) {
@@ -439,7 +455,8 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 
 			// Inject JS regex checker for URL pattern matching
 			ctx := vu.Context()
-			jsRegexChecker, err := injectRegexMatcherScript(ctx, vu, f.Page().TargetID())
+			tq := vu.get(ctx, f.Page().TargetID()+"frame.waitForURL"+strconv.FormatUint(randSrc.Uint64(), 10))
+			jsRegexChecker, err := injectRegexMatcherScript(ctx, vu, tq)
 			if err != nil {
 				return nil, err
 			}
