@@ -83,6 +83,9 @@ func newTestBrowser(tb testing.TB, opts ...func(*testBrowser)) *testBrowser {
 
 	b, pid, err := tbr.browserType.Launch(context.Background(), tbr.vu.Context())
 	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			tb.Fatalf("testBrowser: %v", context.Cause(tbr.vu.CtxField))
+		}
 		tb.Fatalf("testBrowser: %v", err)
 	}
 	tbr.Browser = b
