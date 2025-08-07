@@ -523,7 +523,7 @@ func TestGetProviderConfig(t *testing.T) {
 			token: "",
 			expectConfig: k6provider.Config{
 				BuildServiceURL:  "https://ingest.k6.io/builder/api/v1",
-				BinaryCacheDir:   ".cache/k6/builds",
+				BinaryCacheDir:   filepath.Join(".cache", "k6", "builds"),
 				BuildServiceAuth: "",
 			},
 		},
@@ -532,7 +532,7 @@ func TestGetProviderConfig(t *testing.T) {
 			token: "K6CLOUDTOKEN",
 			expectConfig: k6provider.Config{
 				BuildServiceURL:  "https://ingest.k6.io/builder/api/v1",
-				BinaryCacheDir:   ".cache/k6/builds",
+				BinaryCacheDir:   filepath.Join(".cache", "k6", "builds"),
 				BuildServiceAuth: "K6CLOUDTOKEN",
 			},
 		},
