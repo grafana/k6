@@ -2435,7 +2435,7 @@ func TestTypeScriptSupport(t *testing.T) {
 	assert.Contains(t, stderr, `something 42`)
 }
 
-func TestTypeScriptSupportWithoutBinaryProvisioning(t *testing.T) {
+func TestTypeScriptSupportWithoutAutomaticExtensionResolution(t *testing.T) {
 	t.Parallel()
 	depScript := `
 		export default function(): number {
