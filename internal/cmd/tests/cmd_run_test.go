@@ -2452,7 +2452,7 @@ func TestTypeScriptSupportWithoutBinaryProvisioning(t *testing.T) {
 	`
 
 	ts := NewGlobalTestState(t)
-	ts.Flags.BinaryProvisioning = false
+	ts.Flags.AutoExtensionResolution = false
 	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test.ts"), []byte(mainScript), 0o644))
 	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "bar.ts"), []byte(depScript), 0o644))
 

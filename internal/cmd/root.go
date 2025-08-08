@@ -106,14 +106,14 @@ func (c *rootCommand) persistentPreRunE(cmd *cobra.Command, args []string) error
 
 	c.globalState.Logger.Debugf("k6 version: v%s", fullVersion())
 
-	// If binary provisioning is not enabled, continue with the regular k6 execution path
-	if !c.globalState.Flags.BinaryProvisioning {
-		c.globalState.Logger.Debug("Binary Provisioning feature is disabled.")
+	// If automatic extension resolution is not enabled, continue with the regular k6 execution path
+	if !c.globalState.Flags.AutoExtensionResolution {
+		c.globalState.Logger.Debug("Automatic extension resolution is disabled.")
 		return nil
 	}
 
 	c.globalState.Logger.
-		Debug("Binary Provisioning feature is enabled.")
+		Debug("Automatic extension resolution is enabled.")
 
 	return c.launcher.launch(cmd, args)
 }
