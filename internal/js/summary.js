@@ -173,7 +173,7 @@ class TestReportGenerator {
 		);
 		// Compute global alignment before building sections
 		reportBuilder._computeGlobalMaxNameWidth(report);
-		
+
 		return reportBuilder
 			.addThresholds(report.thresholds)
 			.addTotalResults(report)
@@ -288,7 +288,6 @@ class ReportBuilder {
 		// Collect metrics from total results
 		if (report.metrics) {
 			Object.assign(allMetrics, ...Object.values(report.metrics))
-			});
 		}
 
 		// Collect metrics from groups
@@ -1141,7 +1140,7 @@ function computeSummaryInfo(metrics, renderContext, options, globalMaxNameWidth)
 
 	for (const name of metricNames) {
 		const metric = metrics[name];
-		
+
 		// Only compute maxNameWidth if not provided globally
 		if (!globalMaxNameWidth) {
 			const displayName = renderContext.indent(
