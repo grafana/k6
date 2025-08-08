@@ -91,10 +91,10 @@ func TestConfigEnv(t *testing.T) {
 			"true":  func(c Config) { assert.Equal(t, null.BoolFrom(true), c.NoUsageReport) },
 			"false": func(c Config) { assert.Equal(t, null.BoolFrom(false), c.NoUsageReport) },
 		},
-		{"WebDashboard", "K6_WEB_DASHBOARD"}: {
-			"":      func(c Config) { assert.Equal(t, null.Bool{}, c.WebDashboard) },
-			"true":  func(c Config) { assert.Equal(t, null.BoolFrom(true), c.WebDashboard) },
-			"false": func(c Config) { assert.Equal(t, null.BoolFrom(false), c.WebDashboard) },
+		{"NoWebDashboard", "K6_NO_WEB_DASHBOARD"}: {
+			"":      func(c Config) { assert.Equal(t, null.Bool{}, c.NoWebDashboard) },
+			"true":  func(c Config) { assert.Equal(t, null.BoolFrom(true), c.NoWebDashboard) },
+			"false": func(c Config) { assert.Equal(t, null.BoolFrom(false), c.NoWebDashboard) },
 		},
 		{"Out", "K6_OUT"}: {
 			"":         func(c Config) { assert.Equal(t, []string{}, c.Out) },
@@ -335,7 +335,7 @@ func TestWriteDiskConfigWithDefaultFlags(t *testing.T) {
 		DefaultFlags: defaultFlags,
 	}
 
-	c := Config{WebDashboard: null.BoolFrom(true)}
+	c := Config{NoWebDashboard: null.BoolFrom(true)}
 	err := writeDiskConfig(gs, c)
 	require.NoError(t, err)
 
@@ -359,7 +359,7 @@ func TestWriteDiskConfigOverwrite(t *testing.T) {
 		DefaultFlags: defaultFlags,
 	}
 
-	c := Config{WebDashboard: null.BoolFrom(true)}
+	c := Config{NoWebDashboard: null.BoolFrom(true)}
 	err := writeDiskConfig(gs, c)
 	require.NoError(t, err)
 }
@@ -376,7 +376,7 @@ func TestWriteDiskConfigCustomPath(t *testing.T) {
 	}
 	gs.Flags.ConfigFilePath = "my-custom-path/config.json"
 
-	c := Config{WebDashboard: null.BoolFrom(true)}
+	c := Config{NoWebDashboard: null.BoolFrom(true)}
 	err := writeDiskConfig(gs, c)
 	require.NoError(t, err)
 }
@@ -393,7 +393,7 @@ func TestWriteDiskConfigNoJSONContentError(t *testing.T) {
 	}
 
 	c := Config{
-		WebDashboard: null.BoolFrom(true),
+		NoWebDashboard: null.BoolFrom(true),
 		Options: lib.Options{
 			Cloud: []byte(`invalid-json`),
 		},
