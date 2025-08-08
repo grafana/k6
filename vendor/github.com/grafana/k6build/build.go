@@ -18,14 +18,6 @@ type Dependency struct {
 	Constraints string `json:"constraints,omitempty"`
 }
 
-// Module defines the mapping of a Dependency to a go module that satisfies it
-type Module struct {
-	// Path is the go module path
-	Path string `json:"path,omitempty"`
-	// Version is the go module version
-	Version string `json:"version,omitempty"`
-}
-
 // Artifact defines the metadata of binary that satisfies a set of dependencies
 // including a URL for downloading it.
 type Artifact struct {
@@ -77,4 +69,8 @@ func (a Artifact) toString(details bool, sep string) string {
 type BuildService interface {
 	// Build returns a k6 Artifact that satisfies a set dependencies and version constrains.
 	Build(ctx context.Context, platform string, k6Constrains string, deps []Dependency) (Artifact, error)
+
+	// Resolve returns the versions that satisfy the given dependency constrains or an error if they
+	// cannot be satisfied
+	Resolve(ctx context.Context, k6Constrains string, deps []Dependency) (map[string]string, error)
 }
