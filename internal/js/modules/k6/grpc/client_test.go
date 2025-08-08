@@ -8,10 +8,8 @@ import (
 	"encoding/pem"
 	"fmt"
 	"math"
-	"reflect"
 	"strings"
 	"testing"
-	"unsafe"
 
 	k6grpc "go.k6.io/k6/internal/js/modules/k6/grpc"
 	"go.k6.io/k6/internal/lib/netext/grpcext"
@@ -20,8 +18,6 @@ import (
 	"go.k6.io/k6/internal/lib/testutils/httpmultibin/grpc_testing"
 	"go.k6.io/k6/internal/lib/testutils/httpmultibin/grpc_wrappers_testing"
 	"go.k6.io/k6/metrics"
-
-	"github.com/grafana/sobek"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -37,7 +33,6 @@ import (
 	_struct "github.com/golang/protobuf/ptypes/struct"
 	"github.com/golang/protobuf/ptypes/wrappers"
 	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 
 	"github.com/sirupsen/logrus"
@@ -1510,6 +1505,9 @@ func TestClientLoadProto(t *testing.T) {
 	val, err := ts.Run(tt.initString.code)
 	assertResponse(t, tt.initString, err, val, ts)
 
+	client, ok := val.Export().(*k6grpc.Client)
+	require.True(t, ok, "got: %T, want *k6grpc.Client", client)
+
 	expectedTypes := []string{
 		"grpc.testdata.nested.types.Outer",
 		"grpc.testdata.nested.types.Outer.MiddleAA",
@@ -1519,9 +1517,8 @@ func TestClientLoadProto(t *testing.T) {
 		"grpc.testdata.nested.types.MeldOuter",
 	}
 
-	types := extractTypesFromClientAsSobekValue(t, val)
 	for _, expected := range expectedTypes {
-		found, err := types.FindMessageByName(protoreflect.FullName(expected))
+		found, err := client.Types().FindMessageByName(protoreflect.FullName(expected))
 
 		assert.NotNil(t, found, "Expected to find the message type %s, but an error occurred", expected)
 		assert.Nil(t, err, "It was not expected that there would be an error, but it got: %v", err)
@@ -1546,6 +1543,9 @@ func TestClientLoadProtoAbsoluteRootWithFile(t *testing.T) {
 	val, err := ts.Run(tt.initString.code)
 	assertResponse(t, tt.initString, err, val, ts)
 
+	client, ok := val.Export().(*k6grpc.Client)
+	require.True(t, ok, "got: %T, want *k6grpc.Client", client)
+
 	expectedTypes := []string{
 		"grpc.testdata.nested.types.Outer",
 		"grpc.testdata.nested.types.Outer.MiddleAA",
@@ -1555,9 +1555,8 @@ func TestClientLoadProtoAbsoluteRootWithFile(t *testing.T) {
 		"grpc.testdata.nested.types.MeldOuter",
 	}
 
-	types := extractTypesFromClientAsSobekValue(t, val)
 	for _, expected := range expectedTypes {
-		found, err := types.FindMessageByName(protoreflect.FullName(expected))
+		found, err := client.Types().FindMessageByName(protoreflect.FullName(expected))
 
 		assert.NotNil(t, found, "Expected to find the message type %s, but an error occurred", expected)
 		assert.Nil(t, err, "It was not expected that there would be an error, but it got: %v", err)
@@ -1605,17 +1604,4 @@ func TestClientConnectionReflectMetadata(t *testing.T) {
 	}
 
 	assert.True(t, foundReflectionCall, "expected to find a reflection call in the logs, but didn't")
-}
-
-func extractTypesFromClientAsSobekValue(t *testing.T, val sobek.Value) *protoregistry.Types {
-	t.Helper()
-
-	client, ok := val.Export().(*k6grpc.Client)
-	require.True(t, ok, "got: %T, want *k6grpc.Client", client)
-
-	clientValue := reflect.ValueOf(client).Elem()
-	typesField := clientValue.FieldByName("types")
-
-	typesField = reflect.NewAt(typesField.Type(), unsafe.Pointer(typesField.UnsafeAddr())).Elem() //nolint:gosec
-	return typesField.Interface().(*protoregistry.Types)
 }
