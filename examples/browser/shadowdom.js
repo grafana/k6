@@ -20,22 +20,24 @@ export const options = {
 export default async function() {
   const page = await browser.newPage();
   
-  await page.setContent("<html><head><style></style></head><body>hello!</body></html>")
+  try {
+    await page.setContent("<html><head><style></style></head><body>hello!</body></html>")
 
-  await page.evaluate(() => {
-    const shadowRoot = document.createElement('div');
-    shadowRoot.id = 'shadow-root';
-    shadowRoot.attachShadow({mode: 'open'});
-    shadowRoot.shadowRoot.innerHTML = '<p id="shadow-dom">Shadow DOM</p>';
-    document.body.appendChild(shadowRoot);
-  });
+    await page.evaluate(() => {
+      const shadowRoot = document.createElement('div');
+      shadowRoot.id = 'shadow-root';
+      shadowRoot.attachShadow({mode: 'open'});
+      shadowRoot.shadowRoot.innerHTML = '<p id="shadow-dom">Shadow DOM</p>';
+      document.body.appendChild(shadowRoot);
+    });
 
-  await check(page.locator('#shadow-dom'), {
-    'shadow element exists': e => e !== null,
-    'shadow element text is correct': async e => {
-      return await e.innerText() === 'Shadow DOM';
-    }
-  });
-
-  await page.close();
+    await check(page.locator('#shadow-dom'), {
+      'shadow element exists': e => e !== null,
+      'shadow element text is correct': async e => {
+        return await e.innerText() === 'Shadow DOM';
+      }
+    });
+  } finally {
+    await page.close();
+  }
 }

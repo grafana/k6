@@ -1,4 +1,5 @@
 import { browser } from 'k6/browser';
+import { expect } from "https://jslib.k6.io/k6-testing/0.5.0/index.js";
 
 export const options = {
   scenarios: {
@@ -21,9 +22,10 @@ export default async function() {
   const page = await context.newPage();
 
   try {
-    await page.goto("https://quickpizza.grafana.com/flip_coin.php", {
+    const response = await page.goto("https://quickpizza.grafana.com/flip_coin.php", {
       waitUntil: "networkidle",
-    })
+    });
+    expect(response.status()).toBe(200);
 
     /*
     In this example, we will use two locators, matching a

@@ -29,11 +29,13 @@ export default async function() {
   const page = await context.newPage();
   const page2 = await context.newPage();
 
-  // We await for the page creation events to be processed and the predicate
-  // to pass.
-  await promise
-  console.log('predicate passed')
-
-  await page.close()
-  await page2.close();
+  try {
+    // We await for the page creation events to be processed and the predicate
+    // to pass.
+    await promise
+    console.log('predicate passed')
+  } finally {
+    await page.close()
+    await page2.close();
+  }
 };

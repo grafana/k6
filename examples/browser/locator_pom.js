@@ -1,4 +1,5 @@
 import { browser } from 'k6/browser';
+import { expect } from "https://jslib.k6.io/k6-testing/0.5.0/index.js";
 
 export const options = {
   scenarios: {
@@ -33,8 +34,10 @@ export class Bet {
     this.currentBet = page.locator("//p[starts-with(text(),'Your bet: ')]");
   }
 
-  goto() {
-    return this.page.goto("https://quickpizza.grafana.com/flip_coin.php", { waitUntil: "networkidle" });
+  async goto() {
+    const response = await this.page.goto("https://quickpizza.grafana.com/flip_coin.php", { waitUntil: "networkidle" });
+    expect(response.status()).toBe(200);
+    return response;
   }
 
   heads() {
