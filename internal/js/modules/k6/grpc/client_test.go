@@ -21,24 +21,24 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/health"
+	healthgrpc "google.golang.org/grpc/health/grpc_health_v1"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/reflection"
+	v1alphagrpc "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
+	grpcstats "google.golang.org/grpc/stats"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/reflect/protoregistry"
-	"google.golang.org/protobuf/types/known/wrapperspb"
 
 	"github.com/golang/protobuf/ptypes/any"
 	_struct "github.com/golang/protobuf/ptypes/struct"
 	"github.com/golang/protobuf/ptypes/wrappers"
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/types/known/wrapperspb"
+
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"google.golang.org/grpc/metadata"
-	v1alphagrpc "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
-	grpcstats "google.golang.org/grpc/stats"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
-
-	"google.golang.org/grpc/health"
-	healthgrpc "google.golang.org/grpc/health/grpc_health_v1"
 )
 
 func TestClient(t *testing.T) {
@@ -1497,12 +1497,16 @@ func TestClientLoadProto(t *testing.T) {
 		initString: codeBlock{
 			code: `
 			var client = new grpc.Client();
-			client.load([], "../../../../lib/testutils/httpmultibin/nested_types/nested_types.proto");`,
+			client.load([], "../../../../lib/testutils/httpmultibin/nested_types/nested_types.proto");
+			client`,
 		},
 	}
 
 	val, err := ts.Run(tt.initString.code)
 	assertResponse(t, tt.initString, err, val, ts)
+
+	client, ok := val.Export().(*k6grpc.Client)
+	require.True(t, ok, "got: %T, want *k6grpc.Client", client)
 
 	expectedTypes := []string{
 		"grpc.testdata.nested.types.Outer",
@@ -1514,7 +1518,7 @@ func TestClientLoadProto(t *testing.T) {
 	}
 
 	for _, expected := range expectedTypes {
-		found, err := protoregistry.GlobalTypes.FindMessageByName(protoreflect.FullName(expected))
+		found, err := client.Types().FindMessageByName(protoreflect.FullName(expected))
 
 		assert.NotNil(t, found, "Expected to find the message type %s, but an error occurred", expected)
 		assert.Nil(t, err, "It was not expected that there would be an error, but it got: %v", err)
@@ -1531,12 +1535,16 @@ func TestClientLoadProtoAbsoluteRootWithFile(t *testing.T) {
 		initString: codeBlock{
 			code: `
 			var client = new grpc.Client();
-			client.load(["` + rootPath + `"], "../../lib/testutils/httpmultibin/nested_types/nested_types.proto");`,
+			client.load(["` + rootPath + `"], "../../lib/testutils/httpmultibin/nested_types/nested_types.proto");
+			client`,
 		},
 	}
 
 	val, err := ts.Run(tt.initString.code)
 	assertResponse(t, tt.initString, err, val, ts)
+
+	client, ok := val.Export().(*k6grpc.Client)
+	require.True(t, ok, "got: %T, want *k6grpc.Client", client)
 
 	expectedTypes := []string{
 		"grpc.testdata.nested.types.Outer",
@@ -1548,7 +1556,7 @@ func TestClientLoadProtoAbsoluteRootWithFile(t *testing.T) {
 	}
 
 	for _, expected := range expectedTypes {
-		found, err := protoregistry.GlobalTypes.FindMessageByName(protoreflect.FullName(expected))
+		found, err := client.Types().FindMessageByName(protoreflect.FullName(expected))
 
 		assert.NotNil(t, found, "Expected to find the message type %s, but an error occurred", expected)
 		assert.Nil(t, err, "It was not expected that there would be an error, but it got: %v", err)
