@@ -103,7 +103,7 @@ func (l *launcher) launch(cmd *cobra.Command, args []string) error {
 
 	l.gs.Logger.
 		WithField("deps", deps).
-		Info("Automatic extension resolution is enabled.The current k6 binary doesn't satisfy all dependencies," +
+		Info("Automatic extension resolution is enabled. The current k6 binary doesn't satisfy all dependencies," +
 			" it's required to provision a custom binary.")
 
 	customBinary, err := l.provisioner.provision(deps)
