@@ -3,7 +3,6 @@ package browser
 import (
 	"context"
 	"fmt"
-	"reflect"
 
 	"github.com/grafana/sobek"
 	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
@@ -395,39 +394,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			}), nil
 		},
 		"waitForNavigation": func(opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameWaitForNavigationOptions(f.Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
-				return nil, fmt.Errorf("parsing frame wait for navigation options: %w", err)
-			}
-
-			ctx := vu.Context()
-
-			// Avoid working with the taskqueue unless the URL option is used.
-			// At the moment the taskqueue needs to be cleaned up manually with
-			// page.close.
-			var jsRegexChecker common.JSRegexChecker
-			stopTaskqueue := func() {}
-			if popts.URL != "" {
-				ctx, stopTaskqueue = context.WithCancel(ctx)
-				tq := cancelableTaskQueue(ctx, vu.RegisterCallback)
-
-				// Inject JS regex checker for URL regex pattern matching
-				var err error
-				jsRegexChecker, err = injectRegexMatcherScript(ctx, vu, tq)
-				if err != nil {
-					stopTaskqueue()
-					return nil, err
-				}
-			}
-
-			return k6ext.Promise(ctx, func() (result any, reason error) {
-				defer stopTaskqueue()
-				resp, err := f.WaitForNavigation(popts, jsRegexChecker)
-				if err != nil {
-					return nil, err //nolint:wrapcheck
-				}
-				return mapResponse(vu, resp), nil
-			}), nil
+			return waitForNavigationBodyImpl(vu, f, opts)
 		},
 		"waitForSelector": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
 			popts := common.NewFrameWaitForSelectorOptions(f.Timeout())
@@ -450,33 +417,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			})
 		},
 		"waitForURL": func(url sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameWaitForURLOptions(f.Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
-				return nil, fmt.Errorf("parsing waitForURL options: %w", err)
-			}
-
-			var val string
-			switch url.ExportType() {
-			case reflect.TypeOf(string("")):
-				val = fmt.Sprintf("'%s'", url.String()) // Strings require quotes
-			default: // JS Regex, CSS, numbers or booleans
-				val = url.String() // No quotes
-			}
-
-			// Inject JS regex checker for URL pattern matching
-			ctx, stopTaskqueue := context.WithCancel(vu.Context())
-			tq := cancelableTaskQueue(ctx, vu.RegisterCallback)
-
-			jsRegexChecker, err := injectRegexMatcherScript(ctx, vu, tq)
-			if err != nil {
-				stopTaskqueue()
-				return nil, err
-			}
-
-			return k6ext.Promise(ctx, func() (result any, reason error) {
-				defer stopTaskqueue()
-				return nil, f.WaitForURL(val, popts, jsRegexChecker)
-			}), nil
+			return waitForURLBodyImpl(vu, f, url, opts)
 		},
 	}
 	maps["$"] = func(selector string) *sobek.Promise {
