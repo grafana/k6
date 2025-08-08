@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/chromedp/cdproto"
@@ -210,6 +211,82 @@ func NewRouteHandler(
 
 type RouteHandlerCallback func(*Route) error
 
+type ResponseEventHandler struct {
+	mu            sync.RWMutex
+	activeWaiters map[int64]*responseWaiter
+	nextWaiterID  int64
+}
+
+type responseWaiter struct {
+	matcher      URLMatcher
+	responseChan chan *Response
+	ctx          context.Context
+	cancel       context.CancelFunc
+}
+
+func NewResponseEventHandler() *ResponseEventHandler {
+	return &ResponseEventHandler{
+		activeWaiters: make(map[int64]*responseWaiter),
+	}
+}
+
+func (reh *ResponseEventHandler) processResponse(response *Response) {
+	if response == nil {
+		return
+	}
+
+	reh.mu.RLock()
+	defer reh.mu.RUnlock()
+
+	for _, waiter := range reh.activeWaiters {
+		select {
+		case <-waiter.ctx.Done():
+			continue
+		default:
+		}
+
+		matched, err := waiter.matcher(response.URL())
+		if err == nil && matched {
+			select {
+			case waiter.responseChan <- response:
+			case <-waiter.ctx.Done():
+			}
+		}
+	}
+}
+
+func (reh *ResponseEventHandler) waitForMatch(ctx context.Context, matcher URLMatcher) (*Response, error) {
+	waiterContext, waiterCancel := context.WithCancel(ctx)
+
+	waiter := &responseWaiter{
+		matcher:      matcher,
+		responseChan: make(chan *Response),
+		ctx:          waiterContext,
+		cancel:       waiterCancel,
+	}
+
+	// Add waiter
+	id := atomic.AddInt64(&reh.nextWaiterID, 1)
+	reh.mu.Lock()
+	reh.activeWaiters[id] = waiter
+	reh.mu.Unlock()
+
+	defer func() {
+		waiterCancel()
+		// Remove waiter
+		reh.mu.Lock()
+		delete(reh.activeWaiters, id)
+		reh.mu.Unlock()
+	}()
+
+	select {
+	case response := <-waiter.responseChan:
+		return response, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
 // Page stores Page/tab related context.
 type Page struct {
 	Keyboard    *Keyboard
@@ -245,9 +322,10 @@ type Page struct {
 
 	backgroundPage bool
 
-	eventCh         chan Event
-	eventHandlers   map[PageOnEventName][]PageOnHandler
-	eventHandlersMu sync.RWMutex
+	eventCh              chan Event
+	eventHandlers        map[PageOnEventName][]PageOnHandler
+	eventHandlersMu      sync.RWMutex
+	responseEventHandler *ResponseEventHandler
 
 	mainFrameSession *FrameSession
 	frameSessions    map[cdp.FrameID]*FrameSession
@@ -272,25 +350,26 @@ func NewPage(
 	logger *log.Logger,
 ) (*Page, error) {
 	p := Page{
-		ctx:              ctx,
-		session:          s,
-		browserCtx:       bctx,
-		targetID:         tid,
-		opener:           opener,
-		backgroundPage:   bp,
-		mediaType:        MediaTypeScreen,
-		colorScheme:      bctx.opts.ColorScheme,
-		reducedMotion:    bctx.opts.ReducedMotion,
-		extraHTTPHeaders: bctx.opts.ExtraHTTPHeaders,
-		timeoutSettings:  NewTimeoutSettings(bctx.timeoutSettings),
-		Keyboard:         NewKeyboard(ctx, s),
-		jsEnabled:        true,
-		eventCh:          make(chan Event),
-		eventHandlers:    make(map[PageOnEventName][]PageOnHandler),
-		frameSessions:    make(map[cdp.FrameID]*FrameSession),
-		workers:          make(map[target.SessionID]*Worker),
-		vu:               k6ext.GetVU(ctx),
-		logger:           logger,
+		ctx:                  ctx,
+		session:              s,
+		browserCtx:           bctx,
+		targetID:             tid,
+		opener:               opener,
+		backgroundPage:       bp,
+		mediaType:            MediaTypeScreen,
+		colorScheme:          bctx.opts.ColorScheme,
+		reducedMotion:        bctx.opts.ReducedMotion,
+		extraHTTPHeaders:     bctx.opts.ExtraHTTPHeaders,
+		timeoutSettings:      NewTimeoutSettings(bctx.timeoutSettings),
+		Keyboard:             NewKeyboard(ctx, s),
+		jsEnabled:            true,
+		eventCh:              make(chan Event),
+		eventHandlers:        make(map[PageOnEventName][]PageOnHandler),
+		frameSessions:        make(map[cdp.FrameID]*FrameSession),
+		workers:              make(map[target.SessionID]*Worker),
+		responseEventHandler: NewResponseEventHandler(),
+		vu:                   k6ext.GetVU(ctx),
+		logger:               logger,
 	}
 
 	p.logger.Debugf("Page:NewPage", "sid:%v tid:%v backgroundPage:%t",
@@ -542,6 +621,8 @@ func (p *Page) onRequest(request *Request) {
 // onResponse will call the handlers for the page.on('response') event.
 func (p *Page) onResponse(resp *Response) {
 	p.logger.Debugf("Page:onResponse", "sid:%v url:%v", p.sessionID(), resp.URL())
+
+	go p.responseEventHandler.processResponse(resp)
 
 	if !hasPageOnHandler(p, EventPageResponseCalled) {
 		return
@@ -1726,6 +1807,37 @@ func (p *Page) WaitForURL(urlPattern string, opts *FrameWaitForURLOptions, jsReg
 	}
 
 	return nil
+}
+
+// WaitForResponse waits for a response that matches the given URL pattern.
+// jsRegexChecker should be non-nil to be able to test against a URL pattern.
+func (p *Page) WaitForResponse(
+	urlOrRegex string, opts *PageWaitForResponseOptions, jsRegexChecker JSRegexChecker,
+) (*Response, error) {
+	p.logger.Debugf("Page:WaitForResponse", "sid:%v pattern:%s", p.sessionID(), urlOrRegex)
+	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.waitForResponse")
+	defer span.End()
+
+	timeoutCtx, timeoutCancel := context.WithTimeout(p.ctx, opts.Timeout)
+	defer timeoutCancel()
+
+	matcher, err := urlMatcher(urlOrRegex, jsRegexChecker)
+	if err != nil {
+		spanRecordError(span, err)
+		return nil, fmt.Errorf("parsing URL pattern: %w", err)
+	}
+
+	resp, err := p.responseEventHandler.waitForMatch(timeoutCtx, matcher)
+	if err != nil {
+		e := &k6ext.UserFriendlyError{
+			Err:     err,
+			Timeout: opts.Timeout,
+		}
+		err = fmt.Errorf("waiting for response %q: %w", urlOrRegex, e)
+		spanRecordError(span, err)
+		return nil, err
+	}
+	return resp, nil
 }
 
 // Workers returns all WebWorkers of page.

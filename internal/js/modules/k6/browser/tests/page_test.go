@@ -2997,3 +2997,99 @@ func TestWaitForURL(t *testing.T) {
 	)
 	assert.Equal(t, sobek.Undefined(), got.Result())
 }
+
+func TestPageWaitForResponse(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ok/correct_response_matches", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withHTTPServer())
+		tb.withHandler("/api/users", func(w http.ResponseWriter, r *http.Request) {
+			_, err := fmt.Fprintf(w, `{"users": []}`)
+			require.NoError(t, err)
+		})
+		tb.withHandler("/api/posts", func(w http.ResponseWriter, r *http.Request) {
+			_, err := fmt.Fprintf(w, `{"posts": []}`)
+			require.NoError(t, err)
+		})
+		tb.withHandler("/page", func(w http.ResponseWriter, _ *http.Request) {
+			_, err := fmt.Fprintf(w, `
+				<!doctype html>
+				<html><body><script>
+					setTimeout(() => fetch('/api/posts'), 50);
+					setTimeout(() => fetch('/api/users'), 100);
+				</script></body></html>
+			`)
+			require.NoError(t, err)
+		})
+
+		p := tb.NewPage(nil)
+
+		gotoPage := func() error {
+			_, err := p.Goto(tb.url("/page"), &common.FrameGotoOptions{
+				WaitUntil: common.LifecycleEventDOMContentLoad,
+				Timeout:   common.DefaultTimeout,
+			})
+			return err
+		}
+
+		waitForUsers := func() error {
+			opts := common.NewPageWaitForResponseOptions(p.Timeout())
+			mockRegexChecker := func(pattern, url string) (bool, error) {
+				return strings.Contains(url, "/users"), nil
+			}
+			resp, err := p.WaitForResponse(".*users.*", opts, mockRegexChecker)
+			if err != nil {
+				return err
+			}
+			require.Contains(t, resp.URL(), "/users")
+			return nil
+		}
+
+		err := tb.run(tb.context(), gotoPage, waitForUsers)
+		require.NoError(t, err)
+	})
+
+	t.Run("err/canceled", func(t *testing.T) {
+		t.Parallel()
+		tb := newTestBrowser(t)
+		p := tb.NewPage(nil)
+		opts := common.NewPageWaitForResponseOptions(p.Timeout())
+		go tb.cancelContext()
+		<-tb.context().Done()
+
+		mockRegexChecker := func(pattern, url string) (bool, error) {
+			return strings.Contains(url, "page"), nil
+		}
+
+		_, err := p.WaitForResponse("/page", opts, mockRegexChecker)
+		require.ErrorContains(t, err, "canceled")
+	})
+
+	t.Run("err/timeout", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withHTTPServer())
+
+		p := tb.NewPage(nil)
+
+		waitForApi := func() error {
+			opts := common.NewPageWaitForResponseOptions(500 * time.Millisecond)
+			mockRegexChecker := func(pattern, url string) (bool, error) {
+				return strings.Contains(url, "/api"), nil
+			}
+
+			resp, err := p.WaitForResponse(".*api.*", opts, mockRegexChecker)
+			if err != nil {
+				return err
+			}
+			require.NotNil(t, resp)
+			require.Contains(t, resp.URL(), "/api")
+			return nil
+		}
+
+		err := tb.run(tb.context(), waitForApi)
+		require.ErrorContains(t, err, "waiting for response")
+	})
+}
