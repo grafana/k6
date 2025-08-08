@@ -12,6 +12,7 @@ import (
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
+	k6common "go.k6.io/k6/js/common"
 )
 
 // mapPage to the JS module.
@@ -926,6 +927,9 @@ func waitForURLBodyImpl(vu moduleVU, target interface {
 	WaitForURL(urlPattern string, opts *common.FrameWaitForURLOptions, jsRegexChecker common.JSRegexChecker) error
 }, url sobek.Value, opts sobek.Value,
 ) (*sobek.Promise, error) {
+	if k6common.IsNullish(url) {
+		return nil, errors.New("missing required argument 'url'")
+	}
 	popts := common.NewFrameWaitForURLOptions(target.Timeout())
 	if err := popts.Parse(vu.Context(), opts); err != nil {
 		return nil, fmt.Errorf("parsing waitForURL options: %w", err)
