@@ -742,7 +742,7 @@ func (p *Page) getOwnerFrame(apiCtx context.Context, h *ElementHandle) (cdp.Fram
 	}
 
 	action := dom.DescribeNode().WithObjectID(documentElement.remoteObject.ObjectID)
-	node, err := action.Do(cdp.WithExecutor(p.ctx, p.session))
+	node, err := action.Do(cdp.WithExecutor(p.ctx, h.session))
 	if err != nil {
 		p.logger.Debugf("Page:getOwnerFrame:DescribeNode:return", "sid:%v err:%v", p.sessionID(), err)
 		return "", nil
