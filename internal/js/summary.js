@@ -287,8 +287,7 @@ class ReportBuilder {
 
 		// Collect metrics from total results
 		if (report.metrics) {
-			Object.entries(report.metrics).forEach(([_, sectionMetrics]) => {
-				Object.assign(allMetrics, sectionMetrics);
+			Object.assign(allMetrics, ...Object.values(report.metrics))
 			});
 		}
 
@@ -303,13 +302,9 @@ class ReportBuilder {
 		}
 
 		// Compute the global max name width
-		let maxNameWidth = 0;
-		Object.keys(allMetrics).forEach((name) => {
-			const displayName = renderContext.indent(renderMetricDisplayName(name));
-			maxNameWidth = Math.max(maxNameWidth, strWidth(displayName));
-		});
-
-		this.globalMaxNameWidth = maxNameWidth;
+		this.globalMaxNameWidth = Object.keys(allMetrics).reduce((max, name) => {
+			return Math.max(max, strWidth(renderContext.indent(renderMetricDisplayName(name))));
+		})
 	}
 
 	/**
@@ -322,9 +317,7 @@ class ReportBuilder {
 	_collectMetricsFromGroups(groups, allMetrics) {
 		Object.values(groups).forEach((group) => {
 			if (group.metrics) {
-				Object.entries(group.metrics).forEach(([_, sectionMetrics]) => {
-					Object.assign(allMetrics, sectionMetrics);
-				});
+				Object.assign(allMetrics, ...Object.values(group.metrics))
 			}
 			if (group.groups) {
 				this._collectMetricsFromGroups(group.groups, allMetrics);
