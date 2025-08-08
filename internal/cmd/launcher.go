@@ -89,7 +89,7 @@ func (l *launcher) launch(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		l.gs.Logger.
 			WithError(err).
-			Error("Binary provisioning is enabled but it failed to analyze the dependencies." +
+			Error("Automatic extension resolution is enabled but it failed to analyze the dependencies." +
 				" Please, make sure to report this issue by opening a bug report.")
 		return err
 	}
@@ -103,9 +103,8 @@ func (l *launcher) launch(cmd *cobra.Command, args []string) error {
 
 	l.gs.Logger.
 		WithField("deps", deps).
-		Info("Binary Provisioning experimental feature is enabled." +
-			" The current k6 binary doesn't satisfy all dependencies, it's required to" +
-			" provision a custom binary.")
+		Info("Automatic extension resolution is enabled. The current k6 binary doesn't satisfy all dependencies," +
+			" it's required to provision a custom binary.")
 
 	customBinary, err := l.provisioner.provision(deps)
 	if err != nil {
@@ -150,11 +149,11 @@ func (b *customBinary) run(gs *state.GlobalState) error {
 	// in `gs.Stdin` and should be passed to the command
 	cmd.Stdin = gs.Stdin
 
-	// Copy environment variables to the k6 process and skip binary provisioning feature flag to disable it.
+	// Copy environment variables to the k6 process skipping auto extension resolution feature flag to disable it.
 	// This avoids unnecessary re-processing of dependencies in the sub-process.
 	env := []string{}
 	for k, v := range gs.Env {
-		if k == state.BinaryProvisioningFeatureFlag {
+		if k == state.AutoExtensionResolution {
 			continue
 		}
 		env = append(env, fmt.Sprintf("%s=%s", k, v))
@@ -222,7 +221,7 @@ func isCustomBuildRequired(deps k6deps.Dependencies, k6Version string, exts []*e
 		semver, err := semver.NewVersion(version)
 		if err != nil {
 			// ignore built in module if version is not a valid sem ver (e.g. a development version)
-			// if user wants to use this built-in, must disable binary provisioning
+			// if user wants to use this built-in, must disable the automatic extension resolution
 			return true
 		}
 
