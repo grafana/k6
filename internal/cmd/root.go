@@ -64,7 +64,7 @@ func newRootWithLauncher(gs *state.GlobalState, l *launcher) *rootCommand {
 		Use:   gs.BinaryName,
 		Short: "a next-generation load generator",
 		Long: "\n" + getBanner(gs.Flags.NoColor || !gs.Stdout.IsTTY, isTrueColor(gs.Env)) +
-			"\n\nFull CLI documentation is available at: https://grafana.com/docs/k6",
+			"\n\nFull CLI documentation is available at: https://grafana.com/docs/k6/latest/using-k6/k6-options/reference/",
 		SilenceUsage:      true,
 		SilenceErrors:     true,
 		PersistentPreRunE: c.persistentPreRunE,
