@@ -501,9 +501,9 @@ func TestSubMetricThresholdNoData(t *testing.T) {
 
 	assert.Len(t, ts.LoggerHook.Drain(), 0)
 	assert.Contains(t, ts.Stdout.String(), `
-    one....................................: 0   0/s
-      { tag:xyz }..........................: 0   0/s
-    two....................................: 42`)
+    one..................: 0   0/s
+      { tag:xyz }........: 0   0/s
+    two..................: 42`)
 }
 
 func getTestServer(tb testing.TB, routes map[string]http.Handler) *httptest.Server {
@@ -1750,7 +1750,7 @@ func TestRunWithCloudOutputOverrides(t *testing.T) {
 	t.Log(stdout)
 	assert.Contains(t, stdout, "execution: local")
 	assert.Contains(t, stdout, "output: cloud (https://bogus.url/runs/132), json (results.json)")
-	assert.Contains(t, stdout, "iterations.............................: 1")
+	assert.Contains(t, stdout, "iterations...........: 1")
 }
 
 func TestRunWithCloudOutputCustomConfigAndOverridesLegacyCloudOption(t *testing.T) {
@@ -2608,13 +2608,13 @@ func TestSummaryExport(t *testing.T) {
 			stdout := ts.Stdout.String()
 			t.Log(stdout)
 
-			assert.Contains(t, stdout, "checks_total.......................: 1")
-			assert.Contains(t, stdout, "checks_succeeded...................: 100.00% 1 out of 1")
-			assert.Contains(t, stdout, "checks_failed......................: 0.00%   0 out of 1")
+			assert.Contains(t, stdout, "checks_total.......: 1")
+			assert.Contains(t, stdout, "checks_succeeded...: 100.00% 1 out of 1")
+			assert.Contains(t, stdout, "checks_failed......: 0.00%   0 out of 1")
 
 			assert.Contains(t, stdout, `CUSTOM
-    custom_iterations......................: 1`)
-			assert.Contains(t, stdout, "iterations.............................: 1")
+    custom_iterations....: 1`)
+			assert.Contains(t, stdout, "iterations...........: 1")
 
 			assertSummaryExport(t, ts.FS)
 		})
