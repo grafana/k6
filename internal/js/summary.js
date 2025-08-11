@@ -171,6 +171,9 @@ class TestReportGenerator {
 			this.renderContext,
 			this.options,
 		);
+		// Compute global alignment before building sections
+		reportBuilder._computeGlobalMaxNameWidth(report);
+
 		return reportBuilder
 			.addThresholds(report.thresholds)
 			.addTotalResults(report)
@@ -196,6 +199,7 @@ class ReportBuilder {
 		this.renderContext = renderContext;
 		this.options = options;
 		this.sections = [];
+		this.globalMaxNameWidth = 0;
 	}
 
 	/**
@@ -225,7 +229,7 @@ class ReportBuilder {
 			title: 'TOTAL RESULTS',
 			content: [
 				...this._renderChecks(report.checks),
-				...this._renderMetrics(report.metrics),
+				...this._renderMetrics(report.metrics, this.renderContext, this.globalMaxNameWidth),
 			],
 		});
 		return this;
@@ -268,6 +272,56 @@ class ReportBuilder {
 				});
 			});
 		return this;
+	}
+
+	/**
+	 * Computes the global maximum name width across all metrics in all sections.
+	 * This ensures consistent colon alignment across the entire report.
+	 *
+	 * @param {Report} report - The complete report object
+	 * @returns {void}
+	 */
+	_computeGlobalMaxNameWidth(report) {
+		const allMetrics = {};
+		const renderContext = this.renderContext.indentedContext(1);
+
+		// Collect metrics from total results
+		if (report.metrics) {
+			Object.assign(allMetrics, ...Object.values(report.metrics))
+		}
+
+		// Collect metrics from groups
+		if (report.groups) {
+			this._collectMetricsFromGroups(report.groups, allMetrics);
+		}
+
+		// Collect metrics from scenarios
+		if (report.scenarios) {
+			this._collectMetricsFromGroups(report.scenarios, allMetrics);
+		}
+
+		// Compute the global max name width
+		this.globalMaxNameWidth = Object.keys(allMetrics).reduce((max, name) => {
+			return Math.max(max, strWidth(renderContext.indent(renderMetricDisplayName(name))));
+		})
+	}
+
+	/**
+	 * Recursively collects metrics from groups/scenarios and their nested groups.
+	 *
+	 * @param {Record<string, ReportGroup>} groups - The groups to collect metrics from
+	 * @param {Object} allMetrics - The accumulator object for all metrics
+	 * @returns {void}
+	 */
+	_collectMetricsFromGroups(groups, allMetrics) {
+		Object.values(groups).forEach((group) => {
+			if (group.metrics) {
+				Object.assign(allMetrics, ...Object.values(group.metrics))
+			}
+			if (group.groups) {
+				this._collectMetricsFromGroups(group.groups, allMetrics);
+			}
+		});
 	}
 
 	/**
@@ -326,10 +380,11 @@ class ReportBuilder {
 	/**
 	 * @param {ReportMetrics} metrics - The metrics to render.
 	 * @param {RenderContext} [renderContext] - The render context to use for text rendering.
+	 * @param {number} [globalMaxNameWidth] - Optional global max name width for cross-section alignment.
 	 * @returns {string[]}
 	 * @private
 	 */
-	_renderMetrics(metrics, renderContext) {
+	_renderMetrics(metrics, renderContext, globalMaxNameWidth) {
 		renderContext = renderContext || this.renderContext;
 		renderContext = renderContext.indentedContext(1);
 
@@ -339,11 +394,12 @@ class ReportBuilder {
 			return acc;
 		}, {});
 
-		// Precompute all formatting information
+		// Precompute all formatting information, using global maxNameWidth if provided
 		const summaryInfo = computeSummaryInfo(
 			allMetrics,
 			renderContext,
 			this.options,
+			globalMaxNameWidth || this.globalMaxNameWidth,
 		);
 
 		// Implement metrics rendering logic
@@ -383,7 +439,7 @@ class ReportBuilder {
 		// Implement group content rendering
 		return [
 			...this._renderChecks(group.checks, renderContext),
-			...this._renderMetrics(group.metrics, renderContext),
+			...this._renderMetrics(group.metrics, renderContext, this.globalMaxNameWidth),
 			...(group.groups ? this._renderNestedGroups(group.groups, renderContext) : []),
 		];
 	}
@@ -400,7 +456,7 @@ class ReportBuilder {
 		// Similar to group content rendering
 		return [
 			...this._renderChecks(scenarioData.checks, renderContext),
-			...this._renderMetrics(scenarioData.metrics, renderContext),
+			...this._renderMetrics(scenarioData.metrics, renderContext, this.globalMaxNameWidth),
 			...(scenarioData.groups
 				? this._renderNestedGroups(scenarioData.groups, renderContext)
 				: []),
@@ -882,9 +938,9 @@ function renderMetricLine(
 	const fmtIndent = renderContext.indentLevel();
 
 	// Compute the trailing dots:
-	// Use `3` as a spacing offset as per original code.
-	const dotsCount =
-		maxNameWidth - strWidth(displayedName) - strWidth(fmtIndent) + 3;
+	// Ensure longest metric name gets exactly 3 dots, shorter names get more for alignment
+	const currentNameWidth = strWidth(displayedName) + strWidth(fmtIndent);
+	const dotsCount = Math.max(3, maxNameWidth - currentNameWidth + 3);
 	const dottedName =
 		displayedName +
 		formatter.decorate('.'.repeat(dotsCount) + ':', 'white', 'faint');
@@ -1053,9 +1109,10 @@ function renderTrendValue(value, stat, metric, options) {
  * @param {Record<string, ReportMetric>} metrics - The data object containing metrics.
  * @param {RenderContext} renderContext - The render context to use for text rendering.
  * @param {Options} options - Display options merged with defaultOptions.
+ * @param {number} [globalMaxNameWidth] - Optional global max name width for cross-section alignment.
  * @returns {SummaryInfo}
  */
-function computeSummaryInfo(metrics, renderContext, options) {
+function computeSummaryInfo(metrics, renderContext, options, globalMaxNameWidth) {
 	const trendStats = options.summaryTrendStats;
 	const numTrendColumns = trendStats.length;
 
@@ -1067,7 +1124,8 @@ function computeSummaryInfo(metrics, renderContext, options) {
 	// "trendKeys" is used to store specific aggregation values that aren't part of "trendStats"; mainly for thresholds.
 	const trendKeys = {};
 
-	let maxNameWidth = 0;
+	// Use global maxNameWidth if provided, otherwise compute locally
+	let maxNameWidth = globalMaxNameWidth || 0;
 	let maxNonTrendValueLen = 0;
 	let nonTrendExtraMaxLens = []; // FIXME: "lens"?
 
@@ -1082,10 +1140,14 @@ function computeSummaryInfo(metrics, renderContext, options) {
 
 	for (const name of metricNames) {
 		const metric = metrics[name];
-		const displayName = renderContext.indent(
-			name + renderMetricDisplayName(name),
-		);
-		maxNameWidth = Math.max(maxNameWidth, strWidth(displayName));
+
+		// Only compute maxNameWidth if not provided globally
+		if (!globalMaxNameWidth) {
+			const displayName = renderContext.indent(
+				renderMetricDisplayName(name),
+			);
+			maxNameWidth = Math.max(maxNameWidth, strWidth(displayName));
+		}
 
 		if (metric.type === 'trend') {
 			const keys = Object.keys(metric.values).reduce((acc, key) => {
