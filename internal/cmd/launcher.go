@@ -149,8 +149,7 @@ func (b *customBinary) run(gs *state.GlobalState) error {
 	// in `gs.Stdin` and should be passed to the command
 	cmd.Stdin = gs.Stdin
 
-	// Copy environment variables to the k6 process skipping auto extension resolution feature flag to disable it.
-	// This avoids unnecessary re-processing of dependencies in the sub-process.
+	// Copy environment variables to the k6 process skipping auto extension resolution feature flag.
 	env := []string{}
 	for k, v := range gs.Env {
 		if k == state.AutoExtensionResolution {
@@ -158,6 +157,11 @@ func (b *customBinary) run(gs *state.GlobalState) error {
 		}
 		env = append(env, fmt.Sprintf("%s=%s", k, v))
 	}
+	// If auto extension resolution is enabled then
+	// this avoids unnecessary re-processing of dependencies in the sub-process.
+	env = append(env, state.AutoExtensionResolution+"=false")
+	// legacy envvar used in versions v1.0.x and v1.1.x
+	env = append(env, "K6_BINARY_PROVISIONING=false")
 	cmd.Env = env
 
 	// handle signals
