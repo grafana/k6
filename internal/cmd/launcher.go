@@ -154,6 +154,9 @@ func (b *customBinary) run(gs *state.GlobalState) error {
 	env := []string{}
 	for k, v := range gs.Env {
 		if k == state.AutoExtensionResolution {
+			env = append(env, state.AutoExtensionResolution+"=false")
+			// legacy envvar used in versions v1.0.x and v1.1.x
+			env = append(env, "K6_BINARY_PROVISIONING=false")
 			continue
 		}
 		env = append(env, fmt.Sprintf("%s=%s", k, v))
