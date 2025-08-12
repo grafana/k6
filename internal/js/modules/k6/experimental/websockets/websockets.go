@@ -502,18 +502,25 @@ func (w *webSocket) readPump(wg *sync.WaitGroup) {
 		}
 
 		var closeErr *websocket.CloseError
+		var code int
+		var reason string
 		if errors.As(err, &closeErr) {
-			w.closeCode = closeErr.Code
-			w.closeReason = closeErr.Text
+			code = closeErr.Code
+			reason = closeErr.Text
 		}
 
 		if !websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
 			err = nil
 		}
 
+		errLocal := err
 		w.tq.Queue(func() error {
+			if code != 0 {
+				w.closeCode = code
+				w.closeReason = reason
+			}
 			_ = w.conn.Close()
-			return w.connectionClosedWithError(err)
+			return w.connectionClosedWithError(errLocal)
 		})
 		return
 	}
