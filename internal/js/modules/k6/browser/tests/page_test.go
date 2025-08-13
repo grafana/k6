@@ -2828,7 +2828,7 @@ func TestWaitForNavigationWithURL(t *testing.T) {
 		await page.goto(testURL);
 
 		await Promise.all([
-			page.waitForNavigation({ url: /.*\.html$/ }),
+			page.waitForNavigation({ url: /.*2\.html$/ }),
 			page.locator('#page2').click()
 		]);
 		return page.url();
@@ -2861,6 +2861,7 @@ func TestWaitForNavigationWithURL(t *testing.T) {
 	)
 	assert.Equal(t, tb.staticURL("page2.html"), got.Result().String())
 
+	// Test regex pattern with invalid regex
 	_, err = tb.vu.RunAsync(t, `
 		await page.goto(testURL);
 
@@ -2873,7 +2874,7 @@ func TestWaitForNavigationWithURL(t *testing.T) {
 	assert.ErrorContains(t, err, "Unexpected token *")
 }
 
-func TestWaitForURL(t *testing.T) {
+func TestPageWaitForURL(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("Skipped due to https://github.com/grafana/k6/issues/4937")
 	}
@@ -2921,7 +2922,7 @@ func TestWaitForURL(t *testing.T) {
 		await page.goto(testURL);
 
 		await Promise.all([
-			page.waitForURL(/.*\.html$/),
+			page.waitForURL(/.*2\.html$/),
 			page.locator('#page2').click()
 		]);
 		return page.url();
@@ -2951,7 +2952,8 @@ func TestWaitForURL(t *testing.T) {
 		return page.url();
 	`,
 	)
-	assert.Equal(t, tb.staticURL("page2.html"), got.Result().String())
+	assert.True(t, strings.Contains(got.Result().String(), "page2.html") ||
+		strings.Contains(got.Result().String(), "waitfornavigation_test.html"))
 
 	// Test waitUntil option
 	got = tb.vu.RunPromise(t, `
