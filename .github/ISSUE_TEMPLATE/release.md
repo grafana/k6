@@ -61,7 +61,7 @@ labels: ["release"]
 !!! Update the below when making the issue
 
 ```
-git checkout master && git pull && git checkout -b v1.3.x && git tag v1.3.0 && git push origin v1.3.0
+git checkout master && git pull && git checkout -b v1.3.x && git tag v1.3.0 -m "v1.3.0" && git push origin v1.3.0
 ```
 
 #### Announcements
