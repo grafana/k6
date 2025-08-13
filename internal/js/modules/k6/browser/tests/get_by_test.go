@@ -867,14 +867,14 @@ func TestGetByLabelSuccess(t *testing.T) {
 			"missing_label",
 			"",
 			nil,
-			3,
+			4,
 		},
 		{
 			// matches on all the elements with a label.
 			"empty_string",
 			`""`,
 			nil,
-			3,
+			4,
 		},
 		{
 			"aria_label",
@@ -897,6 +897,12 @@ func TestGetByLabelSuccess(t *testing.T) {
 		{
 			"regex_match",
 			`/^[a-z0-9]+$/`,
+			nil,
+			1,
+		},
+		{
+			"aria_labelledby",
+			`"I agree to the Terms and Conditions."`,
 			nil,
 			1,
 		},
