@@ -2801,15 +2801,21 @@ func TestWaitForNavigationWithURL(t *testing.T) {
 	tb.vu.ActivateVU()
 	tb.vu.StartIteration(t)
 
-	got := tb.vu.RunPromise(t, `
-		const page = await browser.newPage();
-		const testURL = '%s';
+	// Setup
+	tb.vu.SetVar(t, "page", &sobek.Object{})
+	tb.vu.SetVar(t, "testURL", tb.staticURL("waitfornavigation_test.html"))
+	tb.vu.SetVar(t, "page1URL", tb.staticURL("page1.html"))
+	_, err := tb.vu.RunAsync(t, `
+			page = await browser.newPage();
+		`)
+	require.NoError(t, err)
 
+	got := tb.vu.RunPromise(t, `
 		await page.goto(testURL);
 
 		// Test exact URL match
 		await Promise.all([
-			page.waitForNavigation({ url: '%s' }),
+			page.waitForNavigation({ url: page1URL }),
 			page.locator('#page1').click()
 		]);
 		let currentURL = page.url();
@@ -2861,8 +2867,6 @@ func TestWaitForNavigationWithURL(t *testing.T) {
 			throw new Error('Expected empty pattern to match any navigation but got ' + currentURL);
 		}
 	`,
-		tb.staticURL("waitfornavigation_test.html"),
-		tb.staticURL("page1.html"),
 	)
 	assert.Equal(t, sobek.Undefined(), got.Result())
 }
@@ -2899,12 +2903,18 @@ func TestWaitForURL(t *testing.T) {
 	tb.vu.ActivateVU()
 	tb.vu.StartIteration(t)
 
-	got := tb.vu.RunPromise(t, `
-		const page = await browser.newPage();
-		const testURL = '%s';
+	// Setup
+	tb.vu.SetVar(t, "page", &sobek.Object{})
+	tb.vu.SetVar(t, "testURL", tb.staticURL("waitfornavigation_test.html"))
+	tb.vu.SetVar(t, "page1URL", tb.staticURL("page1.html"))
+	_, err := tb.vu.RunAsync(t, `
+			page = await browser.newPage();
+		`)
+	require.NoError(t, err)
 
+	got := tb.vu.RunPromise(t, `
 		// Test when already at matching URL (should just wait for load state)
-		await page.goto('%s');
+		await page.goto(page1URL);
 		await page.waitForURL(/.*page1\.html$/);
 		let currentURL = page.url();
 		if (!currentURL.endsWith('page1.html')) {
@@ -2914,7 +2924,7 @@ func TestWaitForURL(t *testing.T) {
 		// Test exact URL match with navigation
 		await page.goto(testURL);
 		await Promise.all([
-			page.waitForURL('%s'),
+			page.waitForURL(page1URL),
 			page.locator('#page1').click()
 		]);
 		currentURL = page.url();
@@ -2982,9 +2992,6 @@ func TestWaitForURL(t *testing.T) {
 			throw new Error('Expected to stay at waitfornavigation_test.html but got ' + currentURL);
 		}
 	`,
-		tb.staticURL("waitfornavigation_test.html"),
-		tb.staticURL("page1.html"),
-		tb.staticURL("page1.html"),
 	)
 	assert.Equal(t, sobek.Undefined(), got.Result())
 }
