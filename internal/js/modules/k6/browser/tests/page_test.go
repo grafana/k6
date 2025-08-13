@@ -2805,65 +2805,60 @@ func TestWaitForNavigationWithURL(t *testing.T) {
 		const page = await browser.newPage();
 		const testURL = '%s';
 
+		await page.goto(testURL);
+
+		// Test exact URL match
+		await Promise.all([
+			page.waitForNavigation({ url: '%s' }),
+			page.locator('#page1').click()
+		]);
+		let currentURL = page.url();
+		if (!currentURL.endsWith('page1.html')) {
+			throw new Error('Expected to navigate to page1.html but got ' + currentURL);
+		}
+
+		await page.goto(testURL);
+
+		// Test regex pattern - matches any page with .html extension
+		await Promise.all([
+			page.waitForNavigation({ url: /.*\.html$/ }),
+			page.locator('#page2').click()
+		]);
+		currentURL = page.url();
+		if (!currentURL.endsWith('.html')) {
+			throw new Error('Expected URL to end with .html but got ' + currentURL);
+		}
+
+		await page.goto(testURL);
+
+		// Test timeout when URL doesn't match
+		let timedOut = false;
 		try {
-			await page.goto(testURL);
-
-			// Test exact URL match
 			await Promise.all([
-				page.waitForNavigation({ url: '%s' }),
-				page.locator('#page1').click()
+				page.waitForNavigation({ url: /.*nonexistent.html$/, timeout: 500 }),
+				page.locator('#page1').click()  // This goes to page1.html, not nonexistent.html
 			]);
-			let currentURL = page.url();
-			if (!currentURL.endsWith('page1.html')) {
-				throw new Error('Expected to navigate to page1.html but got ' + currentURL);
+		} catch (error) {
+			if (error.toString().includes('waiting for navigation')) {
+				timedOut = true;
+			} else {
+				throw error;
 			}
+		}
+		if (!timedOut) {
+			throw new Error('Expected timeout error when URL does not match');
+		}
 
-			await page.goto(testURL);
+		await page.goto(testURL);
 
-			// Test regex pattern - matches any page with .html extension
-			await Promise.all([
-				page.waitForNavigation({ url: /.*\.html$/ }),
-				page.locator('#page2').click()
-			]);
-			currentURL = page.url();
-			if (!currentURL.endsWith('.html')) {
-				throw new Error('Expected URL to end with .html but got ' + currentURL);
-			}
-
-			await page.goto(testURL);
-
-			// Test timeout when URL doesn't match
-			let timedOut = false;
-			try {
-				await Promise.all([
-					page.waitForNavigation({ url: /.*nonexistent.html$/, timeout: 500 }),
-					page.locator('#page1').click()  // This goes to page1.html, not nonexistent.html
-				]);
-			} catch (error) {
-				if (error.toString().includes('waiting for navigation')) {
-					timedOut = true;
-				} else {
-					throw error;
-				}
-			}
-			if (!timedOut) {
-				throw new Error('Expected timeout error when URL does not match');
-			}
-
-			await page.goto(testURL);
-
-			// Test empty pattern (matches any navigation)
-			await Promise.all([
-				page.waitForNavigation({ url: '' }),
-				page.locator('#page2').click()
-			]);
-			currentURL = page.url();
-			if (!currentURL.endsWith('page2.html')) {
-				throw new Error('Expected empty pattern to match any navigation but got ' + currentURL);
-			}
-		} finally {
-			// Must call close() which will clean up the taskqueue.
-			await page.close();
+		// Test empty pattern (matches any navigation)
+		await Promise.all([
+			page.waitForNavigation({ url: '' }),
+			page.locator('#page2').click()
+		]);
+		currentURL = page.url();
+		if (!currentURL.endsWith('page2.html')) {
+			throw new Error('Expected empty pattern to match any navigation but got ' + currentURL);
 		}
 	`,
 		tb.staticURL("waitfornavigation_test.html"),
@@ -2908,88 +2903,83 @@ func TestWaitForURL(t *testing.T) {
 		const page = await browser.newPage();
 		const testURL = '%s';
 
+		// Test when already at matching URL (should just wait for load state)
+		await page.goto('%s');
+		await page.waitForURL(/.*page1\.html$/);
+		let currentURL = page.url();
+		if (!currentURL.endsWith('page1.html')) {
+			throw new Error('Expected to stay at page1.html but got ' + currentURL);
+		}
+
+		// Test exact URL match with navigation
+		await page.goto(testURL);
+		await Promise.all([
+			page.waitForURL('%s'),
+			page.locator('#page1').click()
+		]);
+		currentURL = page.url();
+		if (!currentURL.endsWith('page1.html')) {
+			throw new Error('Expected to navigate to page1.html but got ' + currentURL);
+		}
+
+		// Test regex pattern - matches any page with .html extension
+		await page.goto(testURL);
+		await Promise.all([
+			page.waitForURL(/.*\.html$/),
+			page.locator('#page2').click()
+		]);
+		currentURL = page.url();
+		if (!currentURL.endsWith('.html')) {
+			throw new Error('Expected URL to end with .html but got ' + currentURL);
+		}
+
+		// Test timeout when URL doesn't match
+		await page.goto(testURL);
+		let timedOut = false;
 		try {
-			// Test when already at matching URL (should just wait for load state)
-			await page.goto('%s');
-			await page.waitForURL(/.*page1\.html$/);
-			let currentURL = page.url();
-			if (!currentURL.endsWith('page1.html')) {
-				throw new Error('Expected to stay at page1.html but got ' + currentURL);
-			}
-
-			// Test exact URL match with navigation
-			await page.goto(testURL);
 			await Promise.all([
-				page.waitForURL('%s'),
-				page.locator('#page1').click()
+				page.waitForURL(/.*nonexistent\.html$/, { timeout: 500 }),
+				page.locator('#page1').click()  // This goes to page1.html, not nonexistent.html
 			]);
-			currentURL = page.url();
-			if (!currentURL.endsWith('page1.html')) {
-				throw new Error('Expected to navigate to page1.html but got ' + currentURL);
+		} catch (error) {
+			if (error.toString().includes('waiting for navigation')) {
+				timedOut = true;
+			} else {
+				throw error;
 			}
+		}
+		if (!timedOut) {
+			throw new Error('Expected timeout error when URL does not match');
+		}
 
-			// Test regex pattern - matches any page with .html extension
-			await page.goto(testURL);
-			await Promise.all([
-				page.waitForURL(/.*\.html$/),
-				page.locator('#page2').click()
-			]);
-			currentURL = page.url();
-			if (!currentURL.endsWith('.html')) {
-				throw new Error('Expected URL to end with .html but got ' + currentURL);
-			}
+		// Test empty pattern (matches any navigation)
+		await page.goto(testURL);
+		await Promise.all([
+			page.waitForURL(''),
+			page.locator('#page2').click()
+		]);
+		currentURL = page.url();
+		if (!currentURL.endsWith('page2.html') && !currentURL.endsWith('waitfornavigation_test.html')) {
+			throw new Error('Expected empty pattern to match any navigation but got ' + currentURL);
+		}
 
-			// Test timeout when URL doesn't match
-			await page.goto(testURL);
-			let timedOut = false;
-			try {
-				await Promise.all([
-					page.waitForURL(/.*nonexistent\.html$/, { timeout: 500 }),
-					page.locator('#page1').click()  // This goes to page1.html, not nonexistent.html
-				]);
-			} catch (error) {
-				if (error.toString().includes('waiting for navigation')) {
-					timedOut = true;
-				} else {
-					throw error;
-				}
-			}
-			if (!timedOut) {
-				throw new Error('Expected timeout error when URL does not match');
-			}
+		// Test waitUntil option
+		await page.goto(testURL);
+		await Promise.all([
+			page.waitForURL(/.*page1\.html$/, { waitUntil: 'domcontentloaded' }),
+			page.locator('#page1').click()
+		]);
+		currentURL = page.url();
+		if (!currentURL.endsWith('page1.html')) {
+			throw new Error('Expected to navigate to page1.html with domcontentloaded but got ' + currentURL);
+		}
 
-			// Test empty pattern (matches any navigation)
-			await page.goto(testURL);
-			await Promise.all([
-				page.waitForURL(''),
-				page.locator('#page2').click()
-			]);
-			currentURL = page.url();
-			if (!currentURL.endsWith('page2.html') && !currentURL.endsWith('waitfornavigation_test.html')) {
-				throw new Error('Expected empty pattern to match any navigation but got ' + currentURL);
-			}
-
-			// Test waitUntil option
-			await page.goto(testURL);
-			await Promise.all([
-				page.waitForURL(/.*page1\.html$/, { waitUntil: 'domcontentloaded' }),
-				page.locator('#page1').click()
-			]);
-			currentURL = page.url();
-			if (!currentURL.endsWith('page1.html')) {
-				throw new Error('Expected to navigate to page1.html with domcontentloaded but got ' + currentURL);
-			}
-
-			// Test when already at URL with regex pattern
-			await page.goto(testURL);
-			await page.waitForURL(/.*\/waitfornavigation_test\.html$/);
-			currentURL = page.url();
-			if (!currentURL.endsWith('waitfornavigation_test.html')) {
-				throw new Error('Expected to stay at waitfornavigation_test.html but got ' + currentURL);
-			}
-		} finally {
-			// Must call close() which will clean up the taskqueue.
-			await page.close();
+		// Test when already at URL with regex pattern
+		await page.goto(testURL);
+		await page.waitForURL(/.*\/waitfornavigation_test\.html$/);
+		currentURL = page.url();
+		if (!currentURL.endsWith('waitfornavigation_test.html')) {
+			throw new Error('Expected to stay at waitfornavigation_test.html but got ' + currentURL);
 		}
 	`,
 		tb.staticURL("waitfornavigation_test.html"),
