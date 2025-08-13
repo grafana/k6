@@ -987,13 +987,7 @@ func waitForURLBodyImpl(vu moduleVU, target interface {
 		return nil, fmt.Errorf("parsing waitForURL options: %w", err)
 	}
 
-	var val string
-	switch url.ExportType() {
-	case reflect.TypeOf(string("")):
-		val = fmt.Sprintf("'%s'", url.String()) // Strings require quotes
-	default: // JS Regex, CSS, numbers or booleans
-		val = url.String() // No quotes
-	}
+	val := parseStringOrRegex(url, false)
 
 	// Inject JS regex checker for URL pattern matching
 	ctx, stopTaskqueue := context.WithCancel(vu.Context())
