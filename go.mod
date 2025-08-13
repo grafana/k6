@@ -105,3 +105,5 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250728155136-f173205681a0 // indirect
 	gopkg.in/cenkalti/backoff.v1 v1.1.0 // indirect
 )
+
+retract v1.2.0 // mistakenly pushed old tag from the old xk6-browser repo before it was merged in k6
