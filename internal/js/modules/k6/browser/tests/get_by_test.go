@@ -1296,3 +1296,53 @@ func TestGetByTextSuccess(t *testing.T) {
 		})
 	}
 }
+
+func TestGetByNullHandling(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withFileServer())
+	tb.vu.ActivateVU()
+	tb.vu.StartIteration(t)
+
+	// Setup
+	tb.vu.SetVar(t, "page", &sobek.Object{})
+	_, err := tb.vu.RunAsync(t, `
+		page = await browser.newPage();
+	`)
+	require.NoError(t, err)
+
+	_, err = tb.vu.RunAsync(t, `
+		await page.getByRole().click();
+	`)
+	require.ErrorContains(t, err, "missing required argument 'role'")
+
+	_, err = tb.vu.RunAsync(t, `
+		await page.getByAltText().click();
+	`)
+	require.ErrorContains(t, err, "missing required argument 'altText'")
+
+	_, err = tb.vu.RunAsync(t, `
+		await page.getByLabel().click();
+	`)
+	require.ErrorContains(t, err, "missing required argument 'label'")
+
+	_, err = tb.vu.RunAsync(t, `
+		await page.getByPlaceholder().click();
+	`)
+	require.ErrorContains(t, err, "missing required argument 'placeholder'")
+
+	_, err = tb.vu.RunAsync(t, `
+		await page.getByTitle().click();
+	`)
+	require.ErrorContains(t, err, "missing required argument 'title'")
+
+	_, err = tb.vu.RunAsync(t, `
+		await page.getByTestId().click();
+	`)
+	require.ErrorContains(t, err, "missing required argument 'testId'")
+
+	_, err = tb.vu.RunAsync(t, `
+		await page.getByText().click();
+	`)
+	require.ErrorContains(t, err, "missing required argument 'text'")
+}

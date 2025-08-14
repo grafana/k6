@@ -166,10 +166,13 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return s, nil
 			}), nil
 		},
-		"getByRole": func(role string, opts sobek.Value) (*sobek.Object, error) {
+		"getByRole": func(role sobek.Value, opts sobek.Value) (*sobek.Object, error) {
+			if k6common.IsNullish(role) {
+				return nil, errors.New("missing required argument 'role'")
+			}
 			popts := parseGetByRoleOptions(vu.Context(), opts)
 
-			ml := mapLocator(vu, p.GetByRole(role, popts))
+			ml := mapLocator(vu, p.GetByRole(role.String(), popts))
 			return rt.ToValue(ml).ToObject(rt), nil
 		},
 		"getByAltText": func(alt sobek.Value, opts sobek.Value) (*sobek.Object, error) {
