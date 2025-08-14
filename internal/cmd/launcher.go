@@ -333,8 +333,21 @@ func analyze(gs *state.GlobalState, args []string) (k6deps.Dependencies, error) 
 // isAnalysisRequired returns a boolean indicating if dependency analysis is required for the command
 func isAnalysisRequired(cmd *cobra.Command) bool {
 	switch cmd.Name() {
-	case "run", "archive", "inspect", "upload", "cloud":
-		return true
+	case "run":
+		if parent := cmd.Parent(); parent != nil {
+			switch parent.Name() {
+			case "k6", "cloud":
+				return true
+			}
+		}
+	case "upload":
+		if parent := cmd.Parent(); parent != nil {
+			return parent.Name() == "cloud"
+		}
+	case "cloud", "archive", "inspect":
+		if parent := cmd.Parent(); parent != nil {
+			return parent.Name() == "k6"
+		}
 	}
 
 	return false
