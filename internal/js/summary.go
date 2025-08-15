@@ -72,13 +72,24 @@ func summarizeReportToObject(rt *sobek.Runtime, s *summary.Summary) (map[string]
 	if err != nil {
 		return nil, err
 	}
+	scenarios := make(map[string]any, len(s.Scenarios))
+	for name, scenario := range s.Scenarios {
+		scenarioObject := make(map[string]any, len(s.Scenarios))
+		scenarioObject["groups"], err = mapGroups(scenario.Groups, scenario.GroupsOrder)
+		if err != nil {
+			return nil, err
+		}
+		scenarioObject["checks"] = scenario.Checks
+		scenarioObject["metrics"] = scenario.Metrics
+		scenarios[name] = scenarioObject
+	}
 
-	m := make(map[string]interface{})
+	m := make(map[string]any)
 	m["thresholds"] = s.Thresholds
 	m["checks"] = s.Checks
 	m["metrics"] = s.Metrics
 	m["groups"] = groups
-	m["scenarios"] = s.Scenarios
+	m["scenarios"] = scenarios
 	return m, nil
 }
 

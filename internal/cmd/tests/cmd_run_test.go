@@ -2769,3 +2769,55 @@ func TestGroupsOrderInFullSummary(t *testing.T) {
 
 	assert.Regexp(t, regexp.MustCompile(expectedGroupsRegex), stdout)
 }
+
+func TestGroupsOrderInFullSummaryWithScenario(t *testing.T) {
+	t.Parallel()
+
+	mainScript := `
+		import { group } from 'k6';
+
+		export const options = {
+		  scenarios: {
+			local: {
+			  executor: "shared-iterations",
+			},
+		  },
+		};
+
+		export default function () {
+			group('E', function () {});
+			group('D', function () {});
+			group('C', function () {
+				group('B', function () {
+					group('A', function () {
+						group('too much nesting', function () {
+						});
+					});
+				});
+			});
+		}
+	`
+
+	ts := NewGlobalTestState(t)
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(mainScript), 0o644))
+
+	ts.CmdArgs = []string{
+		"k6", "run",
+		"--summary-mode=full",
+		"script.js",
+	}
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stdout := ts.Stdout.String()
+	t.Log(stdout)
+
+	expectedGroupsRegex := `↳ GROUP: E\s*
+    ↳ GROUP: D\s*
+    ↳ GROUP: C\s*
+      ↳ GROUP: B\s*
+        ↳ GROUP: A\s*
+          ↳ GROUP: too much nesting\s*`
+
+	assert.Regexp(t, regexp.MustCompile(expectedGroupsRegex), stdout)
+}
