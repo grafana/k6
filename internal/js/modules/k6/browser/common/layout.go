@@ -32,6 +32,11 @@ func (r *Rect) enclosingIntRect() *Rect {
 	return &Rect{X: x, Y: y, Width: x2 - x, Height: y2 - y}
 }
 
+func (r Rect) contains(p Position) bool {
+	return p.X >= r.X && p.X <= r.X+r.Width &&
+		p.Y >= r.Y && p.Y <= r.Y+r.Height
+}
+
 // SelectOption represents a select option.
 type SelectOption struct {
 	Value *string `json:"value"`

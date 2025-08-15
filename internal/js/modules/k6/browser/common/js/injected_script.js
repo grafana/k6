@@ -2386,7 +2386,7 @@ class InjectedScript {
     if (hitElement === element) {
       return "done";
     }
-    const hitTargetDescription = this.previewNode(hitParents[0]);
+    const hitTargetDescription = this.previewNode(hitParents[0] || document.documentElement);
     // Root is the topmost element in the hitTarget's chain that is not in the
     // element's chain. For example, it might be a dialog element that overlays
     // the target.
@@ -2423,6 +2423,23 @@ class InjectedScript {
       container = element.shadowRoot;
     }
     return element;
+  }
+
+  // canAccessParent returns true if the element can access the parent frame.
+  // If it returns false, then the frame is from a different origin (CORS).
+  canAccessParent(element) {
+    try {
+      let win = element.ownerDocument.defaultView;
+      if (win.parent) {
+        void win.parent.frameElement;
+      }
+      return true;
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'SecurityError') {
+        return false;
+      }
+      throw e;
+    }
   }
 
   dispatchEvent(node, type, eventInit) {

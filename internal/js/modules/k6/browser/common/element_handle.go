@@ -74,27 +74,51 @@ func (h *ElementHandle) boundingBox() (*Rect, error) {
 	return &Rect{X: x + position.X, Y: y + position.Y, Width: width, Height: height}, nil
 }
 
-func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, point Position) (bool, error) {
+// translatePointToPage translates the point to the page's coordinates if the
+// point is relative to the parent frame.
+func (h *ElementHandle) translatePointToPage(apiCtx context.Context, point Position) (Position, error) {
+	h.logger.Debugf("ElementHandle:translatePointToPage", "point before translation: %v", point)
+
 	frame, err := h.ownerFrame(apiCtx)
 	if err != nil {
-		return false, fmt.Errorf("checking hit target at %v: %w", point, err)
+		return Position{}, fmt.Errorf("checking hit target at %v: %w", point, err)
 	}
-	if frame != nil && frame.parentFrame != nil {
-		el, err := frame.FrameElement()
-		if err != nil {
-			return false, err
-		}
-		box, err := el.boundingBox()
-		if err != nil {
-			return false, err
-		}
-		if box == nil {
-			return false, errors.New("missing bounding box of element")
-		}
-		// Translate from viewport coordinates to frame coordinates.
-		point.X -= box.X
-		point.Y -= box.Y
+
+	if frame == nil || frame.parentFrame == nil {
+		h.logger.Debugf("ElementHandle:translatePointToPage", "no parent frame")
+		return point, nil
 	}
+
+	el, err := frame.FrameElement()
+	if err != nil {
+		return Position{}, err
+	}
+
+	box := el.BoundingBox()
+	if box.contains(point) {
+		h.logger.Debugf("ElementHandle:translatePointToPage", "point is already in the page")
+		return point, nil
+	}
+
+	// Translate from frame coordinates to page coordinates.
+	point.X += box.X
+	point.Y += box.Y
+
+	h.logger.Debugf("ElementHandle:translatePointToPage", "point after translation: %v", point)
+
+	return point, nil
+}
+
+// checkHitTargetAt checks if the element is hit by the pointer at the given point.
+//
+// It will recurse through frames and iframes to check if the point hits a target
+// when an error:intercept occurs.
+//
+// It will eventually return error:intercept if the point doesn't hit any target. At
+// this point the caller should retry the action after scrolling.
+func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, point Position) (bool, error) {
+	h.logger.Debugf("ElementHandle:checkHitTargetAt", "checking hit target at %v", point)
+
 	fn := `
 		(node, injected, point) => {
 			return injected.checkHitTargetAt(node, point);
@@ -112,14 +136,28 @@ func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, point Position)
 	// Either we're done or an error happened (returned as "error:..." from JS)
 	const done = resultDone
 	if v, ok := result.(string); !ok {
-		// We got a { hitTargetDescription: ... } result
-		// Meaning: Another element is preventing pointer events.
-		//
-		// It's safe to count an object return as an interception.
-		// We just don't interpret what is intercepting with the target element
-		// because we don't need any more functionality from this JS function
-		// right now.
-		return false, errorFromDOMError("error:intercept")
+		frame, err := h.ownerFrame(apiCtx)
+		if err != nil {
+			return false, fmt.Errorf("checking hit target at %v: %w", point, err)
+		}
+
+		if frame == nil {
+			// We got a { hitTargetDescription: ... } result
+			// Meaning: Another element is preventing pointer events.
+			//
+			// It's safe to count an object return as an interception.
+			// We just don't interpret what is intercepting with the target element
+			// because we don't need any more functionality from this JS function
+			// right now.
+			return false, errorFromDOMError("error:intercept")
+		}
+
+		el, err := frame.FrameElement()
+		if err != nil {
+			return false, err
+		}
+
+		return el.checkHitTargetAt(apiCtx, point)
 	} else if v != done {
 		return false, errorFromDOMError(v)
 	}
@@ -156,132 +194,12 @@ func (h *ElementHandle) click(p *Position, opts *MouseClickOptions) error {
 	return h.frame.page.Mouse.click(p.X, p.Y, opts)
 }
 
-func (h *ElementHandle) clickablePoint() (*Position, error) {
-	var (
-		quads []dom.Quad
-		err   error
-	)
-	getContentQuads := dom.GetContentQuads().WithObjectID(h.remoteObject.ObjectID)
-	if quads, err = getContentQuads.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
-		return nil, fmt.Errorf("getting node content quads %T: %w", getContentQuads, err)
-	}
-	if len(quads) == 0 {
-		return nil, fmt.Errorf("node is either not visible or not an HTMLElement: %w", err)
-	}
-
-	width, height, err := h.evaluateInnerWidthHeight()
-	if err != nil {
-		return nil, fmt.Errorf("evaluating inner width and height: %w", err)
-	}
-
-	p, err := filterQuads(width, height, quads)
-	if err != nil {
-		return nil, fmt.Errorf("filtering quads: %w", err)
-	}
-
-	return p, nil
-}
-
-// We are evaluating the inner width and height of the current frame that the
-// element is in in the utility context. Calculating this in the main context
-// causes NPD errors when working with the CDP API cdppage.GetLayoutMetrics.
-//
-// It returns the width and height of the current frame.
-func (h *ElementHandle) evaluateInnerWidthHeight() (int64, int64, error) {
-	h.logger.Debugf("ElementHandle:evaluateInnerWidthHeight", "fid:%s furl:%q", h.frame.ID(), h.frame.URL())
-
-	js := `() => ({ width: innerWidth, height: innerHeight })`
-
-	h.frame.waitForExecutionContext(utilityWorld)
-
-	eopts := evalOptions{
-		forceCallable: true,
-		returnByValue: true,
-	}
-	v, err := h.frame.evaluate(h.ctx, utilityWorld, eopts, js)
-	if err != nil {
-		return 0, 0, fmt.Errorf("getting inner width and height: %w", err)
-	}
-
-	m, ok := v.(map[string]any)
-	if !ok {
-		return 0, 0, fmt.Errorf("unexpected value %q when getting inner width and height", v)
-	}
-
-	width, ok := m["width"].(float64)
-	if !ok {
-		return 0, 0, fmt.Errorf("unexpected value %q when getting inner width", m["width"])
-	}
-
-	height, ok := m["height"].(float64)
-	if !ok {
-		return 0, 0, fmt.Errorf("unexpected value %q when getting inner height", m["height"])
-	}
-
-	return int64(width), int64(height), nil
-}
-
-func filterQuads(viewportWidth, viewportHeight int64, quads []dom.Quad) (*Position, error) {
-	var filteredQuads []dom.Quad
-	for _, q := range quads {
-		// Keep the points within the viewport and positive.
-		nq := q
-		for i := 0; i < len(q); i += 2 {
-			nq[i] = math.Min(math.Max(q[i], 0), float64(viewportWidth))
-			nq[i+1] = math.Min(math.Max(q[i+1], 0), float64(viewportHeight))
-		}
-		// Compute sum of all directed areas of adjacent triangles
-		// https://en.wikipedia.org/wiki/Polygon#Area
-		var area float64
-		for i := 0; i < len(q); i += 2 {
-			p2 := (i + 2) % (len(q) / 2)
-			area += (q[i]*q[p2+1] - q[p2]*q[i+1]) / 2
-		}
-		// We don't want to click on something less than a pixel.
-		if math.Abs(area) > 0.99 {
-			filteredQuads = append(filteredQuads, q)
-		}
-	}
-	if len(filteredQuads) == 0 {
-		return nil, errors.New("node is either not visible or not an HTMLElement")
-	}
-
-	// Return the middle point of the first quad.
-	var (
-		first = filteredQuads[0]
-		l     = len(first)
-		n     = (float64(l) / 2)
-		p     Position
-	)
-	for i := 0; i < l; i += 2 {
-		p.X += first[i] / n
-		p.Y += first[i+1] / n
-	}
-
-	p = compensateHalfIntegerRoundingError(p)
-
-	return &p, nil
-}
-
-// Firefox internally uses integer coordinates, so 8.5 is converted to 9 when clicking.
-//
-// This does not work nicely for small elements. For example, 1x1 square with corners
-// (8;8) and (9;9) is targeted when clicking at (8;8) but not when clicking at (9;9).
-// So, clicking at (8.5;8.5) will effectively click at (9;9) and miss the target.
-//
-// Therefore, we skew half-integer values from the interval (8.49, 8.51) towards
-// (8.47, 8.49) that is rounded towards 8. This means clicking at (8.5;8.5) will
-// be replaced with (8.48;8.48) and will effectively click at (8;8).
-//
-// Other browsers use float coordinates, so this change should not matter.
-func compensateHalfIntegerRoundingError(p Position) Position {
-	if rx := p.X - math.Floor(p.X); rx > 0.49 && rx < 0.51 {
-		p.X -= 0.02
-	}
-	if ry := p.Y - math.Floor(p.Y); ry > 0.49 && ry < 0.51 {
-		p.Y -= 0.02
-	}
-	return p
+// This will get the clickable point of the element relative to the page even
+// when the element is in an iframe. In some cases this isn't the case and we
+// need to translate the point to the page.
+func (h *ElementHandle) clickablePoint() *Position {
+	r := h.BoundingBox()
+	return &Position{X: r.X + r.Width/2, Y: r.Y + r.Height/2}
 }
 
 func (h *ElementHandle) dblclick(p *Position, opts *MouseClickOptions) error {
@@ -1639,7 +1557,7 @@ func (h *ElementHandle) newAction(
 	}
 }
 
-//nolint:gocognit
+//nolint:gocognit,funlen
 func (h *ElementHandle) newPointerAction(
 	fn elementHandlePointerActionFunc, opts *ElementHandleBasePointerOptions,
 ) func(apiCtx context.Context, resultCh chan any, errCh chan error) {
@@ -1650,8 +1568,16 @@ func (h *ElementHandle) newPointerAction(
 	// 4. Enabled
 	// 5. Receives events
 	pointerFn := func(apiCtx context.Context, sopts *ScrollIntoViewOptions) (res any, err error) {
+		err = h.scrollRectIntoViewIfNeeded(apiCtx, nil)
+		if err != nil {
+			return nil, fmt.Errorf("scrolling element into view: %w", err)
+		}
+
 		// Check if we should run actionability checks
 		if !opts.Force {
+			// Issue is that if the element is not visible or stable, the script
+			// will wait here forever. This is why we scrollRectIntoViewIfNeeded
+			// first before performing the actionability checks.
 			states := []string{"visible", "stable", "enabled"}
 			if _, err = h.waitForElementState(apiCtx, states, opts.Timeout); err != nil {
 				return nil, fmt.Errorf("waiting for element state: %w", err)
@@ -1683,16 +1609,25 @@ func (h *ElementHandle) newPointerAction(
 		// Get the clickable point
 		if p != nil {
 			p, err = h.offsetPosition(apiCtx, opts.Position)
+			if err != nil {
+				return nil, fmt.Errorf("getting element position: %w", err)
+			}
 		} else {
-			p, err = h.clickablePoint()
+			p = h.clickablePoint()
 		}
+
+		// Further translation of the point might be necessary if the point
+		// is still relative to the parent frame it is in and not the page.
+		*p, err = h.translatePointToPage(apiCtx, *p)
 		if err != nil {
-			return nil, fmt.Errorf("getting element position: %w", err)
+			return nil, fmt.Errorf("translating point to page: %w", err)
 		}
+
 		// Do a final actionability check to see if element can receive events
 		// at mouse position in question
 		if !opts.Force {
-			if ok, err := h.checkHitTargetAt(apiCtx, *p); !ok {
+			var ok bool
+			if ok, err = h.checkHitTargetAt(apiCtx, *p); !ok {
 				return nil, fmt.Errorf("checking hit target: %w", err)
 			}
 		}
