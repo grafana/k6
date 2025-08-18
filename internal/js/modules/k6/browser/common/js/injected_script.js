@@ -42,6 +42,7 @@ const k6BrowserNative = (() => {
 // packages/playwright-core/src/utils/isomorphic/stringUtils.ts
 var normalizedWhitespaceCache;
 function normalizeWhiteSpace(text) {
+  normalizedWhitespaceCache = normalizedWhitespaceCache || new k6BrowserNative.Map();
   let result = normalizedWhitespaceCache == null ? void 0 : normalizedWhitespaceCache.get(text);
   if (result === void 0) {
     result = text.replace(/[\u200b\u00ad]/g, "").trim().replace(/\s+/g, " ");
