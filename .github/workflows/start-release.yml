@@ -1,0 +1,46 @@
+name: Start a new release
+
+on:
+  workflow_dispatch:
+
+env:
+  MAJOR_VERSION: "1"
+  MINOR_VERSION: "3"
+
+  VERSION_TAG: "v${{ env.MAJOR_VERSION }}.${{ env.MINOR_VERSION }}.0"
+  RELEASE_BRANCH: "v${{ env.MAJOR_VERSION }}.${{ env.MINOR_VERSION }}.x"
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout master branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git and remote URL
+        run: |
+          git remote set-url origin "https://${{ github.actor }}:${{ env.GITHUB_TOKEN }}@github.com/${{ github.repository }}"
+
+      - name: Check if tag already exists
+        id: check_tag
+        run: |
+          TAG_EXISTS=$(git tag -l "${{ env.VERSION_TAG }}")
+          if [ -n "$TAG_EXISTS" ]; then
+            echo "::error::Tag ${{ env.VERSION_TAG }} already exists. Aborting."
+            exit 1
+          fi
+
+      - name: Create and push new release branch
+        run: |
+          git checkout -b "${{ env.RELEASE_BRANCH }}"
+          git push -u origin "${{ env.RELEASE_BRANCH }}"
+          echo "Created and pushed new branch: ${{ env.RELEASE_BRANCH }}"
+
+      - name: Create and push tag
+        run: |
+          git tag "${{ env.VERSION_TAG }}" -m "${{ env.VERSION_TAG }}"
+          git push origin "${{ env.VERSION_TAG }}"
