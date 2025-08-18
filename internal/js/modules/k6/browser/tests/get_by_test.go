@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/grafana/sobek"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/internal/js/modules/k6/browser/common"
 )
@@ -443,13 +442,13 @@ func TestGetByRoleSuccess(t *testing.T) {
 
 				l := p.GetByRole(tt.role, tt.opts)
 				c, err := l.Count()
-				assert.NoError(t, err)
-				assert.Equal(t, tt.expected, c)
+				require.NoError(t, err)
+				require.Equal(t, tt.expected, c)
 
 				if tt.expectedText != "" {
 					text, _, err := l.TextContent(sobek.Undefined())
-					assert.NoError(t, err)
-					assert.Equal(t, tt.expectedText, text)
+					require.NoError(t, err)
+					require.Equal(t, tt.expectedText, text)
 				}
 			})
 		}
@@ -569,13 +568,13 @@ func TestGetByRoleSuccess(t *testing.T) {
 
 				l := p.GetByRole(tt.role, nil)
 				c, err := l.Count()
-				assert.NoError(t, err)
-				assert.Equal(t, tt.expected, c)
+				require.NoError(t, err)
+				require.Equal(t, tt.expected, c)
 
 				if tt.expectedText != "" {
 					text, err := l.InnerText(sobek.Undefined())
-					assert.NoError(t, err)
-					assert.Equal(t, tt.expectedText, text)
+					require.NoError(t, err)
+					require.Equal(t, tt.expectedText, text)
 				}
 			})
 		}
@@ -726,13 +725,13 @@ func TestGetByRoleSuccess(t *testing.T) {
 
 				l := p.GetByRole(tt.role, tt.opts)
 				c, err := l.Count()
-				assert.NoError(t, err)
-				assert.Equal(t, tt.expected, c)
+				require.NoError(t, err)
+				require.Equal(t, tt.expected, c)
 
 				if tt.expectedText != "" {
 					text, err := l.InnerText(sobek.Undefined())
-					assert.NoError(t, err)
-					assert.Equal(t, tt.expectedText, text)
+					require.NoError(t, err)
+					require.Equal(t, tt.expectedText, text)
 				}
 			})
 		}
@@ -778,7 +777,7 @@ func TestGetByRoleFailure(t *testing.T) {
 
 			l := p.GetByRole(tt.role, tt.opts)
 			_, err = l.Count()
-			assert.ErrorContains(t, err, tt.expectedError)
+			require.ErrorContains(t, err, tt.expectedError)
 		})
 	}
 }
@@ -847,8 +846,8 @@ func TestGetByAltTextSuccess(t *testing.T) {
 
 			l := p.GetByAltText(tt.alt, tt.opts)
 			c, err := l.Count()
-			assert.NoError(t, err)
-			assert.Equal(t, tt.expected, c)
+			require.NoError(t, err)
+			require.Equal(t, tt.expected, c)
 		})
 	}
 }
@@ -924,8 +923,8 @@ func TestGetByLabelSuccess(t *testing.T) {
 
 			l := p.GetByLabel(tt.label, tt.opts)
 			c, err := l.Count()
-			assert.NoError(t, err)
-			assert.Equal(t, tt.expected, c)
+			require.NoError(t, err)
+			require.Equal(t, tt.expected, c)
 		})
 	}
 }
@@ -1012,8 +1011,8 @@ func TestGetByPlaceholderSuccess(t *testing.T) {
 
 			l := p.GetByPlaceholder(tt.placeholder, tt.opts)
 			c, err := l.Count()
-			assert.NoError(t, err)
-			assert.Equal(t, tt.expected, c)
+			require.NoError(t, err)
+			require.Equal(t, tt.expected, c)
 		})
 	}
 }
@@ -1100,8 +1099,8 @@ func TestGetByTitleSuccess(t *testing.T) {
 
 			l := p.GetByTitle(tt.title, tt.opts)
 			c, err := l.Count()
-			assert.NoError(t, err)
-			assert.Equal(t, tt.expected, c)
+			require.NoError(t, err)
+			require.Equal(t, tt.expected, c)
 		})
 	}
 }
@@ -1181,13 +1180,13 @@ func TestGetByTestIDSuccess(t *testing.T) {
 
 			l := p.GetByTestID(tt.testID)
 			c, err := l.Count()
-			assert.NoError(t, err)
-			assert.Equal(t, tt.expected, c)
+			require.NoError(t, err)
+			require.Equal(t, tt.expected, c)
 
 			if tt.expected > 0 && tt.expectedText != "" {
 				text, err := l.InnerText(sobek.Undefined())
-				assert.NoError(t, err)
-				assert.Equal(t, tt.expectedText, text)
+				require.NoError(t, err)
+				require.Equal(t, tt.expectedText, text)
 			}
 		})
 	}
@@ -1291,13 +1290,13 @@ func TestGetByTextSuccess(t *testing.T) {
 
 			l := p.GetByText(tt.text, tt.opts)
 			c, err := l.Count()
-			assert.NoError(t, err)
-			assert.Equal(t, tt.expected, c)
+			require.NoError(t, err)
+			require.Equal(t, tt.expected, c)
 
 			if tt.expected > 0 && tt.expectedText != "" {
 				text, err := l.InnerText(sobek.Undefined())
-				assert.NoError(t, err)
-				assert.Equal(t, tt.expectedText, text)
+				require.NoError(t, err)
+				require.Equal(t, tt.expectedText, text)
 			}
 		})
 	}
