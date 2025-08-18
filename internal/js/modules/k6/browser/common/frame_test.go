@@ -195,3 +195,37 @@ func TestBuildAttributeSelector(t *testing.T) {
 		})
 	}
 }
+
+func TestIsQuotedText(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		in   string
+		want bool
+	}{
+		{name: "empty", in: "", want: false},
+		{name: "unquoted", in: "foo", want: false},
+		{name: "single_quoted", in: "'foo'", want: true},
+		{name: "double_quoted", in: "\"foo\"", want: true},
+		{name: "mismatched_quotes_1", in: "'foo\"", want: false},
+		{name: "mismatched_quotes_2", in: "\"foo'", want: false},
+		{name: "just_single_quote", in: "'", want: false},
+		{name: "just_double_quote", in: "\"", want: false},
+		{name: "two_single_quotes", in: "''", want: true},
+		{name: "two_double_quotes", in: "\"\"", want: true},
+		{name: "leading_space_then_quoted", in: " 'foo'", want: true},
+		{name: "trailing_space_after_quoted", in: "'foo' ", want: true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := isQuotedText(tc.in)
+			if got != tc.want {
+				t.Fatalf("isQuotedText(%q) = %v, want %v", tc.in, got, tc.want)
+			}
+		})
+	}
+}
