@@ -110,3 +110,88 @@ func (e *executionContextTestStub) eval( // this needs to be a pointer as otherw
 ) (res any, err error) {
 	return e.evalFn(apiCtx, opts, js, args...)
 }
+
+// toPtr is a helper function to convert a value to a pointer.
+func toPtr[T any](v T) *T {
+	return &v
+}
+
+func TestBuildAttributeSelector(t *testing.T) {
+	t.Parallel()
+
+	f := &Frame{}
+
+	tests := []struct {
+		name      string
+		attrName  string
+		attrValue string
+		opts      *GetByBaseOptions
+		want      string
+	}{
+		{
+			name:      "empty",
+			attrName:  "",
+			attrValue: "",
+			opts:      nil,
+			want:      "[=]",
+		},
+		{
+			name:      "unquoted_no_opts",
+			attrName:  "data-test",
+			attrValue: "foo",
+			opts:      nil,
+			want:      "[data-test=foo]",
+		},
+		{
+			name:      "quoted_single_nil_opts",
+			attrName:  "data-test",
+			attrValue: "'Foo Bar'",
+			opts:      nil,
+			want:      "[data-test='Foo Bar'i]",
+		},
+		{
+			name:      "quoted_single_exact_false",
+			attrName:  "data-test",
+			attrValue: "'Foo Bar'",
+			opts:      &GetByBaseOptions{Exact: toPtr(false)},
+			want:      "[data-test='Foo Bar'i]",
+		},
+		{
+			name:      "quoted_single_exact_true",
+			attrName:  "data-test",
+			attrValue: "'Foo Bar'",
+			opts:      &GetByBaseOptions{Exact: toPtr(true)},
+			want:      "[data-test='Foo Bar's]",
+		},
+		{
+			name:      "quoted_double_exact_true",
+			attrName:  "data-test",
+			attrValue: "\"Foo Bar\"",
+			opts:      &GetByBaseOptions{Exact: toPtr(true)},
+			want:      "[data-test=\"Foo Bar\"s]",
+		},
+		{
+			name:      "quoted_double_exact_false",
+			attrName:  "data-test",
+			attrValue: "\"Foo Bar\"",
+			opts:      &GetByBaseOptions{Exact: toPtr(false)},
+			want:      "[data-test=\"Foo Bar\"i]",
+		},
+		{
+			name:      "quoted_single_exact_nil",
+			attrName:  "data-test",
+			attrValue: "'Foo Bar'",
+			opts:      &GetByBaseOptions{Exact: nil},
+			want:      "[data-test='Foo Bar'i]",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := f.buildAttributeSelector(tc.attrName, tc.attrValue, tc.opts)
+			require.Equal(t, tc.want, got)
+		})
+	}
+}

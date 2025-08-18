@@ -1102,15 +1102,22 @@ func isQuotedText(s string) bool {
 // for use with the internal:attr engine. It handles quoted strings and
 // applies the appropriate suffix for exact or case-insensitive matching.
 func (f *Frame) buildAttributeSelector(attrName, attrValue string, opts *GetByBaseOptions) string {
-	selector := "[" + attrName + "=" + attrValue + "]"
+	var b strings.Builder
+	// [, name, =, value, (i/s)?, ]
+	b.Grow(len(attrName) + len(attrValue) + 5)
+	b.WriteByte('[')
+	b.WriteString(attrName)
+	b.WriteByte('=')
+	b.WriteString(attrValue)
 	if isQuotedText(attrValue) {
 		if opts != nil && opts.Exact != nil && *opts.Exact {
-			selector = "[" + attrName + "=" + attrValue + "s]"
+			b.WriteByte('s')
 		} else {
-			selector = "[" + attrName + "=" + attrValue + "i]"
+			b.WriteByte('i')
 		}
 	}
-	return selector
+	b.WriteByte(']')
+	return b.String()
 }
 
 // Locator creates and returns a new locator for this frame.
