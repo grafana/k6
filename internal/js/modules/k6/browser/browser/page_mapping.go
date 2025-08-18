@@ -833,13 +833,15 @@ func parseWaitForFunctionArgs(
 // so that it is easier to copy over updates/fixes from Playwright when we need
 // to.
 func parseStringOrRegex(v sobek.Value, doubleQuote bool) string {
+	const stringType = string("")
+
 	var a string
 	switch v.ExportType() {
-	case reflect.TypeOf(string("")): // text values require quotes
+	case reflect.TypeOf(stringType): // text values require quotes
 		if doubleQuote {
-			a = fmt.Sprintf(`"%s"`, v.String())
+			a = `"` + v.String() + `"`
 		} else {
-			a = fmt.Sprintf("'%s'", v.String())
+			a = `'` + v.String() + `'`
 		}
 	case reflect.TypeOf(map[string]interface{}(nil)): // JS RegExp
 		a = v.String() // No quotes
