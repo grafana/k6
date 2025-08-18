@@ -1089,10 +1089,15 @@ func (f *Frame) GetByRole(role string, opts *GetByRoleOptions) *Locator {
 // a string instead of as a regex in the getBy* APIs. It handles
 // both single and double quotes.
 func isQuotedText(s string) bool {
+	s = strings.TrimSpace(s)
+	if len(s) <= 1 {
+		return false
+	}
+
 	switch {
-	case len(s) > 0 && s[0] == '\'' && s[len(s)-1] == '\'':
+	case s[0] == '\'' && s[len(s)-1] == '\'':
 		return true
-	case len(s) > 0 && s[0] == '"' && s[len(s)-1] == '"':
+	case s[0] == '"' && s[len(s)-1] == '"':
 		return true
 	}
 	return false
