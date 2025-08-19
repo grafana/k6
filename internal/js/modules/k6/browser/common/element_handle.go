@@ -1557,7 +1557,7 @@ func (h *ElementHandle) newAction(
 	}
 }
 
-//nolint:gocognit
+//nolint:gocognit,funlen
 func (h *ElementHandle) newPointerAction(
 	fn elementHandlePointerActionFunc, opts *ElementHandleBasePointerOptions,
 ) func(apiCtx context.Context, resultCh chan any, errCh chan error) {
@@ -1601,12 +1601,20 @@ func (h *ElementHandle) newPointerAction(
 		// Get the clickable point
 		if p != nil {
 			p, err = h.offsetPosition(apiCtx, opts.Position)
+			if err != nil {
+				return nil, fmt.Errorf("getting element position: %w", err)
+			}
 		} else {
 			p = h.clickablePoint()
 		}
+
+		// Further translation of the point might be necessary if the point
+		// is still relative to the parent frame it is in and not the page.
+		*p, err = h.translatePointToPage(apiCtx, *p)
 		if err != nil {
-			return nil, fmt.Errorf("getting element position: %w", err)
+			return nil, fmt.Errorf("translating point to page: %w", err)
 		}
+
 		// Do a final actionability check to see if element can receive events
 		// at mouse position in question
 		if !opts.Force {
