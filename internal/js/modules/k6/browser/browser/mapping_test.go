@@ -530,6 +530,7 @@ type locatorAPI interface { //nolint:interfacebloat
 	All() ([]*common.Locator, error)
 	Clear(opts *common.FrameFillOptions) error
 	Click(opts sobek.Value) error
+	ContentFrame() *common.FrameLocator
 	Count() (int, error)
 	Dblclick(opts sobek.Value) error
 	SetChecked(checked bool, opts sobek.Value) error
