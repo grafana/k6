@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
 	"go.k6.io/k6/internal/cmd"
 )
 
@@ -31,4 +32,14 @@ func TestRootCommand(t *testing.T) {
 			assert.Contains(t, ts.Stdout.String(), helptxt)
 		})
 	}
+}
+
+func TestLoginCloudNotPanicking(t *testing.T) {
+	t.Parallel()
+
+	ts := NewGlobalTestState(t)
+	ts.CmdArgs = []string{"k6", "login", "cloud"}
+	ts.ExpectedExitCode = -1
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+	assert.Contains(t, ts.Stderr.String(), "Stdin is not a terminal, falling back to plain text input")
 }
