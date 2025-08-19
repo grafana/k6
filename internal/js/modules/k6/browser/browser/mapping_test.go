@@ -151,6 +151,12 @@ func TestMappings(t *testing.T) {
 				return mapElementHandle(moduleVU{VU: vu}, &common.ElementHandle{})
 			},
 		},
+		"frameLocator": {
+			apiInterface: (*frameLocatorAPI)(nil),
+			mapp: func() mapping {
+				return mapFrameLocator(moduleVU{VU: vu}, &common.FrameLocator{})
+			},
+		},
 		"jsHandle": {
 			apiInterface: (*common.JSHandleAPI)(nil),
 			mapp: func() mapping {
@@ -491,6 +497,10 @@ type elementHandleAPI interface { //nolint:interfacebloat
 	Uncheck(opts sobek.Value) error
 	WaitForElementState(state string, opts sobek.Value) error
 	WaitForSelector(selector string, opts sobek.Value) (*common.ElementHandle, error)
+}
+
+type frameLocatorAPI interface {
+	Locator(selector string) *common.Locator
 }
 
 // requestAPI is the interface of an HTTP request.
