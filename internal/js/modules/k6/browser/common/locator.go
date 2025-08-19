@@ -127,6 +127,13 @@ func (l *Locator) All() ([]*Locator, error) {
 	return locators, nil
 }
 
+// ContentFrame creates and returns a new FrameLocator, which is useful when
+// needing to interact with elements in an iframe and the current locator already
+// points to the iframe.
+func (l *Locator) ContentFrame() *FrameLocator {
+	return NewFrameLocator(l.ctx, l.selector, l.frame, l.log)
+}
+
 // Count APIs do not wait for the element to be present. It also does not set
 // strict to true, allowing it to return the total number of elements matching
 // the selector.
