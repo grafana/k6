@@ -114,8 +114,11 @@ func TestConstantArrivalRateRunCorrectRate(t *testing.T) {
 
 //nolint:paralleltest // this is flaky if ran with other tests
 func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
+	// Set timing tolerance based on platform
+	timingTolerance := time.Millisecond * 24
 	if runtime.GOOS == "windows" {
-		t.Skipf("this test is very flaky on the Windows GitHub Action runners...")
+		// Windows has less precise timing, especially on CI runners
+		timingTolerance = time.Millisecond * 100
 	}
 	tests := []struct {
 		segment  string
@@ -188,7 +191,7 @@ func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
 				assert.WithinDuration(t,
 					startTime.Add(expectedTime),
 					time.Now(),
-					time.Millisecond*24,
+					timingTolerance,
 					"%d expectedTime %s", current, expectedTime,
 				)
 
