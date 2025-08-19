@@ -10,6 +10,8 @@ import (
 )
 
 // mapLocator API to the JS module.
+//
+//nolint:gocognit
 func mapLocator(vu moduleVU, lo *common.Locator) mapping { //nolint:funlen
 	rt := vu.Runtime()
 	return mapping{
@@ -126,6 +128,10 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping { //nolint:funlen
 				}
 				return s, nil
 			})
+		},
+		"locator": func(selector string) *sobek.Object {
+			ml := mapLocator(vu, lo.Locator(selector))
+			return rt.ToValue(ml).ToObject(rt)
 		},
 		"innerHTML": func(opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
