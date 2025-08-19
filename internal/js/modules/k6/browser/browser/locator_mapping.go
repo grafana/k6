@@ -59,6 +59,10 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 				return nil, lo.Click(popts) //nolint:wrapcheck
 			}), nil
 		},
+		"contentFrame": func() *sobek.Object {
+			ml := mapFrameLocator(vu, lo.ContentFrame())
+			return rt.ToValue(ml).ToObject(rt)
+		},
 		"count": func() *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return lo.Count() //nolint:wrapcheck
