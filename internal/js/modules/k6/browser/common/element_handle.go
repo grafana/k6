@@ -1568,8 +1568,19 @@ func (h *ElementHandle) newPointerAction(
 	// 4. Enabled
 	// 5. Receives events
 	pointerFn := func(apiCtx context.Context, sopts *ScrollIntoViewOptions) (res any, err error) {
+		// We need to scroll the element into view first, otherwise we can
+		// end up in a situation where the element is not in the correct state
+		// (visible and stable, but could be enabled).
+		err = h.scrollRectIntoViewIfNeeded(apiCtx, nil)
+		if err != nil {
+			return nil, fmt.Errorf("scrolling element into view: %w", err)
+		}
+
 		// Check if we should run actionability checks
 		if !opts.Force {
+			// As mentioned above, if we didn't scroll first, we could end
+			// up stuck waiting indefinitely for the element to be in the
+			// correct state.
 			states := []string{"visible", "stable", "enabled"}
 			if _, err = h.waitForElementState(apiCtx, states, opts.Timeout); err != nil {
 				return nil, fmt.Errorf("waiting for element state: %w", err)
