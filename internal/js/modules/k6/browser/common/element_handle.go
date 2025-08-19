@@ -74,27 +74,16 @@ func (h *ElementHandle) boundingBox() (*Rect, error) {
 	return &Rect{X: x + position.X, Y: y + position.Y, Width: width, Height: height}, nil
 }
 
+// checkHitTargetAt checks if the element is hit by the pointer at the given point.
+//
+// It will recurse through frames and iframes to check if the point hits a target
+// when an error:intercept occurs.
+//
+// It will eventually return error:intercept if the point doesn't hit any target. At
+// this point the caller should retry the action after scrolling.
 func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, point Position) (bool, error) {
-	frame, err := h.ownerFrame(apiCtx)
-	if err != nil {
-		return false, fmt.Errorf("checking hit target at %v: %w", point, err)
-	}
-	if frame != nil && frame.parentFrame != nil {
-		el, err := frame.FrameElement()
-		if err != nil {
-			return false, err
-		}
-		box, err := el.boundingBox()
-		if err != nil {
-			return false, err
-		}
-		if box == nil {
-			return false, errors.New("missing bounding box of element")
-		}
-		// Translate from viewport coordinates to frame coordinates.
-		point.X -= box.X
-		point.Y -= box.Y
-	}
+	h.logger.Debugf("ElementHandle:checkHitTargetAt", "checking hit target at %v", point)
+
 	fn := `
 		(node, injected, point) => {
 			return injected.checkHitTargetAt(node, point);
@@ -112,14 +101,28 @@ func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, point Position)
 	// Either we're done or an error happened (returned as "error:..." from JS)
 	const done = resultDone
 	if v, ok := result.(string); !ok {
-		// We got a { hitTargetDescription: ... } result
-		// Meaning: Another element is preventing pointer events.
-		//
-		// It's safe to count an object return as an interception.
-		// We just don't interpret what is intercepting with the target element
-		// because we don't need any more functionality from this JS function
-		// right now.
-		return false, errorFromDOMError("error:intercept")
+		frame, err := h.ownerFrame(apiCtx)
+		if err != nil {
+			return false, fmt.Errorf("checking hit target at %v: %w", point, err)
+		}
+
+		if frame == nil {
+			// We got a { hitTargetDescription: ... } result
+			// Meaning: Another element is preventing pointer events.
+			//
+			// It's safe to count an object return as an interception.
+			// We just don't interpret what is intercepting with the target element
+			// because we don't need any more functionality from this JS function
+			// right now.
+			return false, errorFromDOMError("error:intercept")
+		}
+
+		el, err := frame.FrameElement()
+		if err != nil {
+			return false, err
+		}
+
+		return el.checkHitTargetAt(apiCtx, point)
 	} else if v != done {
 		return false, errorFromDOMError(v)
 	}
