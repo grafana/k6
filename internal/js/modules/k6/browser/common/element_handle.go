@@ -74,6 +74,41 @@ func (h *ElementHandle) boundingBox() (*Rect, error) {
 	return &Rect{X: x + position.X, Y: y + position.Y, Width: width, Height: height}, nil
 }
 
+// translatePointToPage translates the point to the page's coordinates if the
+// point is relative to the parent frame.
+func (h *ElementHandle) translatePointToPage(apiCtx context.Context, point Position) (Position, error) {
+	h.logger.Debugf("ElementHandle:translatePointToPage", "point before translation: %v", point)
+
+	frame, err := h.ownerFrame(apiCtx)
+	if err != nil {
+		return Position{}, fmt.Errorf("checking hit target at %v: %w", point, err)
+	}
+
+	if frame == nil || frame.parentFrame == nil {
+		h.logger.Debugf("ElementHandle:translatePointToPage", "no parent frame")
+		return point, nil
+	}
+
+	el, err := frame.FrameElement()
+	if err != nil {
+		return Position{}, err
+	}
+
+	box := el.BoundingBox()
+	if box.contains(point) {
+		h.logger.Debugf("ElementHandle:translatePointToPage", "point is already in the page")
+		return point, nil
+	}
+
+	// Translate from frame coordinates to page coordinates.
+	point.X += box.X
+	point.Y += box.Y
+
+	h.logger.Debugf("ElementHandle:translatePointToPage", "point after translation: %v", point)
+
+	return point, nil
+}
+
 // checkHitTargetAt checks if the element is hit by the pointer at the given point.
 //
 // It will recurse through frames and iframes to check if the point hits a target
