@@ -402,6 +402,11 @@ func (l *Locator) getAttribute(name string, opts *FrameBaseOptions) (string, boo
 	return l.frame.getAttribute(l.selector, name, opts)
 }
 
+// Locator creates and returns a new locator chained/relative to the current locator.
+func (l *Locator) Locator(selector string) *Locator {
+	return NewLocator(l.ctx, l.selector+" >> "+selector, l.frame, l.log)
+}
+
 // InnerHTML returns the element's inner HTML that matches
 // the locator's selector with strict mode on.
 func (l *Locator) InnerHTML(opts sobek.Value) (string, error) {
