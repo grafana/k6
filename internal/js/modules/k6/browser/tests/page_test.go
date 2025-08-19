@@ -9,6 +9,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"runtime"
 	"slices"
 	"strconv"
@@ -3092,4 +3093,228 @@ func TestPageWaitForResponse(t *testing.T) {
 		err := tb.run(tb.context(), waitForApi)
 		require.ErrorContains(t, err, "waiting for response")
 	})
+}
+
+// TestClickInNestedFramesCORS tests clicking on buttons within nested frames
+// which are from different origins. At the end of the test the counter in
+// each frame should be "1".
+func TestClickInNestedFramesCORS(t *testing.T) {
+	t.Parallel()
+
+	// Origin C: innermost frame with counter button and nested same-origin iframe
+	originCHTML := `<!DOCTYPE html>
+	<html>
+	<head></head>
+	<body>
+	  <p>Counter: <span id="count">0</span></p>
+	  <button id="increment">Increment Counter</button>
+	  <iframe id="frameD" src="/innerC" width="300" height="100"></iframe>
+	  <script>
+		let count = 0;
+		document.getElementById('increment').addEventListener('click', () => {
+		  count++;
+		  document.getElementById('count').textContent = count;
+		});
+	  </script>
+	</body>
+	</html>`
+
+	// Nested same-origin frame content served at /innerC on origin C
+	innerCHTML := `<!DOCTYPE html>
+	<html>
+	<head></head>
+	<body>
+	  <p>Counter D: <span id="countD">0</span></p>
+	  <button id="incrementD">Increment Counter D</button>
+	  <script>
+		let countD = 0;
+		document.getElementById('incrementD').addEventListener('click', () => {
+		  countD++;
+		  document.getElementById('countD').textContent = countD;
+		});
+	  </script>
+	</body>
+	</html>`
+
+	// Nested same-origin frame content served at /innerA on origin A
+	innerAHTML := `<!DOCTYPE html>
+	<html>
+	<head></head>
+	<body>
+	  <p>Counter A2: <span id="countA2">0</span></p>
+	  <button id="incrementA2">Increment Counter A2</button>
+	  <script>
+		let countA2 = 0;
+		document.getElementById('incrementA2').addEventListener('click', () => {
+		  countA2++;
+		  document.getElementById('countA2').textContent = countA2;
+		});
+	  </script>
+	</body>
+	</html>`
+
+	// Server for origin C
+	muxC := http.NewServeMux()
+	muxC.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, err := w.Write([]byte(originCHTML))
+		require.NoError(t, err)
+	})
+	muxC.HandleFunc("/innerC", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, err := w.Write([]byte(innerCHTML))
+		require.NoError(t, err)
+	})
+	srvC := httptest.NewServer(muxC)
+	defer srvC.Close()
+
+	// Origin B: intermediate frame embedding origin C + own counter (with dynamic C URL)
+	originBHTML := fmt.Sprintf(`<!DOCTYPE html>
+	<html>
+	<head></head>
+	<body>
+	  <p>Counter B: <span id="countB">0</span></p>
+	  <button id="incrementB">Increment Counter B</button>
+	  <iframe id="frameC" src="%s" width="400" height="200"></iframe>
+	  <script>
+		let countB = 0;
+		document.getElementById('incrementB').addEventListener('click', () => {
+		  countB++;
+		  document.getElementById('countB').textContent = countB;
+		});
+	  </script>
+	</body>
+	</html>`, srvC.URL)
+
+	// Server for origin B
+	muxB := http.NewServeMux()
+	muxB.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, err := w.Write([]byte(originBHTML))
+		require.NoError(t, err)
+	})
+	srvB := httptest.NewServer(muxB)
+	defer srvB.Close()
+
+	// Origin A: main page embedding origin B and same-origin frame A (with dynamic B URL)
+	originAHTML := fmt.Sprintf(`<!DOCTYPE html>
+	<html>
+	<head></head>
+	<body>
+	  <p>Counter A: <span id="countA">0</span></p>
+	  <button id="incrementA">Increment Counter A</button>
+	  <iframe id="frameA" src="/innerA" width="300" height="150" style="display: block; margin: 10px auto;"></iframe>
+	  <iframe id="frameB" src="%s" width="450" height="300" style="display: block; margin: 10px auto;"></iframe>
+	  <script>
+		let countA = 0;
+		document.getElementById('incrementA').addEventListener('click', () => {
+		  countA++;
+		  document.getElementById('countA').textContent = countA;
+		});
+	  </script>
+	</body>
+	</html>`, srvB.URL)
+
+	// Server for origin A
+	muxA := http.NewServeMux()
+	muxA.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, err := w.Write([]byte(originAHTML))
+		require.NoError(t, err)
+	})
+	muxA.HandleFunc("/innerA", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, err := w.Write([]byte(innerAHTML))
+		require.NoError(t, err)
+	})
+	srvA := httptest.NewServer(muxA)
+	defer srvA.Close()
+
+	// Use srvA.URL as the entry point in the rest of the test (navigate, click, etc.).
+	page := newTestBrowser(t).NewPage(nil)
+
+	// Navigate to the page that srvA is serving.
+	opts := &common.FrameGotoOptions{
+		Timeout: common.DefaultTimeout,
+	}
+	_, err := page.Goto(srvA.URL, opts)
+	require.NoError(t, err)
+
+	var (
+		clickOpts     = common.NewFrameClickOptions(page.Timeout())
+		expectedCount = "1"
+	)
+
+	// First click on the main frame.
+	err = page.Locator("#incrementA", nil).Click(clickOpts)
+	require.NoError(t, err)
+
+	countA, ok, err := page.Locator("#countA", nil).TextContent(nil)
+	require.NoError(t, err)
+	assert.True(t, ok)
+	assert.Equal(t, expectedCount, countA)
+
+	// Now get the first nested frame.
+	frameA, err := page.Query("#frameA")
+	require.NoError(t, err)
+
+	frameAContent, err := frameA.ContentFrame()
+	require.NoError(t, err)
+
+	// Click on the second nested frame.
+	err = frameAContent.Locator("#incrementA2", nil).Click(clickOpts)
+	require.NoError(t, err)
+
+	countA2, ok, err := frameAContent.Locator("#countA2", nil).TextContent(nil)
+	require.NoError(t, err)
+	assert.True(t, ok)
+	assert.Equal(t, expectedCount, countA2)
+
+	// Now get the second nested frame.
+	frameB, err := page.Query("#frameB")
+	require.NoError(t, err)
+
+	frameBContent, err := frameB.ContentFrame()
+	require.NoError(t, err)
+
+	// Click on the third nested frame.
+	err = frameBContent.Locator("#incrementB", nil).Click(clickOpts)
+	require.NoError(t, err)
+
+	countB, ok, err := frameBContent.Locator("#countB", nil).TextContent(nil)
+	require.NoError(t, err)
+	assert.True(t, ok)
+	assert.Equal(t, expectedCount, countB)
+
+	// Now get the third nested frame.
+	frameC, err := frameBContent.Query("#frameC", false)
+	require.NoError(t, err)
+
+	frameCContent, err := frameC.ContentFrame()
+	require.NoError(t, err)
+
+	// Click on the fourth nested frame.
+	err = frameCContent.Locator("#increment", nil).Click(clickOpts)
+	require.NoError(t, err)
+
+	count, ok, err := frameCContent.Locator("#count", nil).TextContent(nil)
+	require.NoError(t, err)
+	assert.True(t, ok)
+	assert.Equal(t, expectedCount, count)
+
+	// Now get the fourth nested frame.
+	frameD, err := frameCContent.Query("#frameD", false)
+	require.NoError(t, err)
+
+	frameDContent, err := frameD.ContentFrame()
+	require.NoError(t, err)
+
+	// Click on the fifth nested frame.
+	err = frameDContent.Locator("#incrementD", nil).Click(clickOpts)
+	require.NoError(t, err)
+
+	countD, ok, err := frameDContent.Locator("#countD", nil).TextContent(nil)
+	require.NoError(t, err)
+	assert.True(t, ok)
+	assert.Equal(t, expectedCount, countD)
 }
