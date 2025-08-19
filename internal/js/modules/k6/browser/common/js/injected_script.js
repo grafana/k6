@@ -1938,7 +1938,7 @@ class InjectedScript {
     if (hitElement === element) {
       return "done";
     }
-    const hitTargetDescription = this.previewNode(hitParents[0]);
+    const hitTargetDescription = this.previewNode(hitParents[0] || document.documentElement);
     // Root is the topmost element in the hitTarget's chain that is not in the
     // element's chain. For example, it might be a dialog element that overlays
     // the target.
