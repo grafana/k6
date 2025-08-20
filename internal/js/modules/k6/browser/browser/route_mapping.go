@@ -105,12 +105,18 @@ func parseFulfillOptions(ctx context.Context, opts sobek.Value) (common.FulfillO
 
 func parseHeaders(headers *sobek.Object) []common.HTTPHeader {
 	headersKeys := headers.Keys()
-	result := make([]common.HTTPHeader, len(headersKeys))
-	for i, hk := range headersKeys {
-		result[i] = common.HTTPHeader{
-			Name:  hk,
-			Value: headers.Get(hk).String(),
+	result := make([]common.HTTPHeader, 0, len(headersKeys))
+	for _, hk := range headersKeys {
+		value := headers.Get(hk)
+		// Skip undefined headers
+		if !sobekValueExists(value) {
+			continue
 		}
+
+		result = append(result, common.HTTPHeader{
+			Name:  hk,
+			Value: value.String(),
+		})
 	}
 	return result
 }
