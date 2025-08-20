@@ -592,6 +592,26 @@ func (f *Frame) waitFor(
 	return handle, err
 }
 
+func (f *Frame) boundingBox(selector string, opts *FrameBaseOptions) (*Rect, error) {
+	getBoundingBox := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+		return handle.boundingBox()
+	}
+	act := f.newAction(
+		selector, DOMElementStateAttached, opts.Strict, getBoundingBox, []string{}, false, true, opts.Timeout,
+	)
+	v, err := call(f.ctx, act, opts.Timeout)
+	if err != nil {
+		return nil, errorFromDOMError(err)
+	}
+
+	bv, ok := v.(*Rect)
+	if !ok {
+		return nil, fmt.Errorf("getting bounding box of %q: unexpected type %T", selector, v)
+	}
+
+	return bv, nil
+}
+
 // ChildFrames returns a list of child frames.
 func (f *Frame) ChildFrames() []*Frame {
 	f.childFramesMu.RLock()
