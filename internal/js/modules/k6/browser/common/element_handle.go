@@ -800,6 +800,24 @@ func (h *ElementHandle) splitSelectorAtFrame(selector *Selector, frameIndex int)
 	return beforeFrame, afterFrame
 }
 
+// reconstructSelector rebuilds a selector string from selector parts
+func (h *ElementHandle) reconstructSelector(selector *Selector) string {
+	if len(selector.Parts) == 0 {
+		return ""
+	}
+
+	parts := make([]string, len(selector.Parts))
+	for i, part := range selector.Parts {
+		if part.Name == "css" {
+			parts[i] = part.Body
+		} else {
+			parts[i] = part.Name + "=" + part.Body
+		}
+	}
+
+	return strings.Join(parts, " >> ")
+}
+
 // AsElement returns this element handle.
 func (h *ElementHandle) AsElement() *ElementHandle {
 	return h
