@@ -1264,6 +1264,41 @@ func (h *ElementHandle) Query(selector string, strict bool) (_ *ElementHandle, r
 	if err != nil {
 		return nil, fmt.Errorf("parsing selector %q: %w", selector, err)
 	}
+
+	// Check for frame navigation in the selector
+	frameNavIndex := h.findFrameNavigationIndex(parsedSelector)
+	if frameNavIndex != -1 {
+		// Split selector at frame navigation boundary
+		beforeFrame, afterFrame := h.splitSelectorAtFrame(parsedSelector, frameNavIndex)
+
+		// Find the iframe element using the "before frame" selector
+		iframeSelector := h.reconstructSelector(beforeFrame)
+
+		iframeHandle, err := h.waitForSelector(h.ctx, iframeSelector, &FrameWaitForSelectorOptions{
+			State:   DOMElementStateAttached,
+			Timeout: h.frame.defaultTimeout(),
+			Strict:  true,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("finding iframe with selector %q: %w", iframeSelector, err)
+		}
+
+		if iframeHandle == nil {
+			return nil, nil // No iframe found
+		}
+
+		frame, err := iframeHandle.ContentFrame()
+		if err != nil {
+			return nil, fmt.Errorf("getting iframe frame: %w", err)
+		}
+
+		// Query in the iframe using the "after frame" selector
+		afterFrameSelector := h.reconstructSelector(afterFrame)
+
+		return frame.Query(afterFrameSelector, strict)
+	}
+
+	// No frame navigation - proceed with normal Query logic
 	querySelector := `
 		(node, injected, selector, strict) => {
 			return injected.querySelector(selector, strict, node || document);
