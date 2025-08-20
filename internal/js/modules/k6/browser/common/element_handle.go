@@ -773,6 +773,16 @@ func (h *ElementHandle) count(apiCtx context.Context, selector string) (int, err
 	}
 }
 
+// findFrameNavigationIndex finds the index of the first internal:control=enter-frame directive
+func (h *ElementHandle) findFrameNavigationIndex(selector *Selector) int {
+	for i, part := range selector.Parts {
+		if part.Name == "internal:control" && part.Body == "enter-frame" {
+			return i
+		}
+	}
+	return -1
+}
+
 // AsElement returns this element handle.
 func (h *ElementHandle) AsElement() *ElementHandle {
 	return h
