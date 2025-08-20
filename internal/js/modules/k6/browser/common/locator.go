@@ -37,6 +37,12 @@ func NewLocator(ctx context.Context, selector string, f *Frame, l *log.Logger) *
 	}
 }
 
+// BoundingBox will return the bounding box of the element.
+func (l *Locator) BoundingBox(opts *FrameBaseOptions) (*Rect, error) {
+	opts.Strict = true
+	return l.frame.boundingBox(l.selector, opts)
+}
+
 // Clear will clear the input field.
 // This works with the Fill API and fills the input field with an empty string.
 func (l *Locator) Clear(opts *FrameFillOptions) error {
