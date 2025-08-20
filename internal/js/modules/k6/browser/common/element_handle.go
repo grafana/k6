@@ -778,6 +778,42 @@ func (h *ElementHandle) count(apiCtx context.Context, selector string) (int, err
 		return 0, err
 	}
 
+	// Check for frame navigation in the selector
+	frameNavIndex := h.findFrameNavigationIndex(parsedSelector)
+	if frameNavIndex != -1 {
+		// Split selector at frame navigation boundary
+		beforeFrame, afterFrame := h.splitSelectorAtFrame(parsedSelector, frameNavIndex)
+
+		// Find the iframe element using the "before frame" selector
+		iframeSelector := h.reconstructSelector(beforeFrame)
+
+		// TODO: We need to define a new opts outside of count depending on who is calling it (frame vs locator).
+		iframeHandle, err := h.waitForSelector(apiCtx, iframeSelector, &FrameWaitForSelectorOptions{
+			State:   DOMElementStateAttached,
+			Timeout: h.frame.defaultTimeout(),
+			Strict:  true,
+		})
+		if err != nil {
+			return 0, fmt.Errorf("finding iframe with selector %q: %w", iframeSelector, err)
+		}
+
+		if iframeHandle == nil {
+			// TODO: Do we need to correctly handle this?
+			return 0, nil // No iframe found
+		}
+
+		frame, err := iframeHandle.ContentFrame()
+		if err != nil {
+			return 0, fmt.Errorf("getting iframe frame: %w", err)
+		}
+
+		// Count in the iframe document using the "after frame" selector
+		afterFrameSelector := h.reconstructSelector(afterFrame)
+
+		return frame.count(afterFrameSelector)
+	}
+
+	// No frame navigation - proceed with normal count logic
 	fn := `
 			(node, injected, selector) => {
 				return injected.count(selector, node);
