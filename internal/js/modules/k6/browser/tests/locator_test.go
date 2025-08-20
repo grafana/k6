@@ -55,6 +55,18 @@ func TestLocator(t *testing.T) {
 			},
 		},
 		{
+			"BoundingBox", func(_ *testBrowser, p *common.Page) {
+				rect, err := p.Locator("#divHello", nil).BoundingBox(&common.FrameBaseOptions{
+					Timeout: p.Timeout(),
+				})
+				require.NoError(t, err)
+				assert.GreaterOrEqual(t, rect.X, 0.0)
+				assert.GreaterOrEqual(t, rect.Y, 0.0)
+				assert.GreaterOrEqual(t, rect.Width, 0.0)
+				assert.GreaterOrEqual(t, rect.Height, 0.0)
+			},
+		},
+		{
 			"Check", func(_ *testBrowser, p *common.Page) {
 				check := func() bool {
 					v, err := p.Evaluate(`() => window.check`)
@@ -380,6 +392,12 @@ func TestLocator(t *testing.T) {
 		name string
 		do   func(*common.Locator, *testBrowser) error
 	}{
+		{
+			"BoundingBox", func(l *common.Locator, tb *testBrowser) error {
+				_, err := l.BoundingBox(common.NewFrameBaseOptions(100 * time.Millisecond))
+				return err
+			},
+		},
 		{
 			"Check", func(l *common.Locator, tb *testBrowser) error {
 				return l.Check(timeout(tb))
