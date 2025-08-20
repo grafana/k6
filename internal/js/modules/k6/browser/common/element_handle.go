@@ -783,6 +783,23 @@ func (h *ElementHandle) findFrameNavigationIndex(selector *Selector) int {
 	return -1
 }
 
+// splitSelectorAtFrame splits a selector at the frame navigation boundary
+func (h *ElementHandle) splitSelectorAtFrame(selector *Selector, frameIndex int) (*Selector, *Selector) {
+	beforeFrame := &Selector{
+		Selector: selector.Selector, // Keep original for reference
+		Parts:    selector.Parts[:frameIndex],
+		Capture:  selector.Capture,
+	}
+
+	afterFrame := &Selector{
+		Selector: selector.Selector, // Keep original for reference
+		Parts:    selector.Parts[frameIndex+1:],
+		Capture:  selector.Capture,
+	}
+
+	return beforeFrame, afterFrame
+}
+
 // AsElement returns this element handle.
 func (h *ElementHandle) AsElement() *ElementHandle {
 	return h
