@@ -715,6 +715,38 @@ func (h *ElementHandle) waitForSelector(
 	if err != nil {
 		return nil, err
 	}
+
+	// Check for frame navigation in the selector
+	frameNavIndex := h.findFrameNavigationIndex(parsedSelector)
+	if frameNavIndex != -1 {
+		// Split selector at frame navigation boundary
+		beforeFrame, afterFrame := h.splitSelectorAtFrame(parsedSelector, frameNavIndex)
+
+		// Find the iframe element using the "before frame" selector
+		iframeSelector := h.reconstructSelector(beforeFrame)
+
+		iframeHandle, err := h.waitForSelector(apiCtx, iframeSelector, opts)
+		if err != nil {
+			return nil, fmt.Errorf("finding iframe with selector %q: %w", iframeSelector, err)
+		}
+
+		if iframeHandle == nil {
+			// TODO: Do we need to correctly handle this?
+			return nil, nil // No iframe found
+		}
+
+		frame, err := iframeHandle.ContentFrame()
+		if err != nil {
+			return nil, fmt.Errorf("getting iframe frame: %w", err)
+		}
+
+		// Wait for selector in the iframe using the "after frame" selector
+		afterFrameSelector := h.reconstructSelector(afterFrame)
+
+		return frame.waitForSelector(afterFrameSelector, opts)
+	}
+
+	// No frame navigation - proceed with normal waitForSelector logic
 	fn := `
 		(node, injected, selector, strict, state, timeout, ...args) => {
 			return injected.waitForSelector(selector, node, strict, state, 'raf', timeout, ...args);
