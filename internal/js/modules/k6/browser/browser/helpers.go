@@ -9,6 +9,7 @@ import (
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6error"
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
+	"go.k6.io/k6/js/common"
 )
 
 func panicIfFatalError(ctx context.Context, err error) {
@@ -19,7 +20,7 @@ func panicIfFatalError(ctx context.Context, err error) {
 
 // mergeWith merges the Sobek value with the existing Go value.
 func mergeWith[T any](rt *sobek.Runtime, src T, v sobek.Value) error {
-	if !sobekValueExists(v) {
+	if common.IsNullish(v) {
 		return nil
 	}
 	return rt.ExportTo(v, &src) //nolint:wrapcheck
@@ -30,7 +31,7 @@ func mergeWith[T any](rt *sobek.Runtime, src T, v sobek.Value) error {
 // It's caller's responsibility to check for nilness.
 func exportTo[T any](rt *sobek.Runtime, obj sobek.Value) (T, error) {
 	var t T
-	if !sobekValueExists(obj) {
+	if common.IsNullish(obj) {
 		return t, nil
 	}
 	err := rt.ExportTo(obj, &t)
@@ -40,7 +41,7 @@ func exportTo[T any](rt *sobek.Runtime, obj sobek.Value) (T, error) {
 // exportArg exports the value and returns it.
 // It returns nil if the value is undefined or null.
 func exportArg(gv sobek.Value) any {
-	if !sobekValueExists(gv) {
+	if common.IsNullish(gv) {
 		return nil
 	}
 	return gv.Export()
@@ -57,13 +58,7 @@ func exportArgs(gargs []sobek.Value) []any {
 	return args
 }
 
-// sobekValueExists returns true if a given value is not nil and exists
-// (defined and not null) in the sobek runtime.
-func sobekValueExists(v sobek.Value) bool {
-	return v != nil && !sobek.IsUndefined(v) && !sobek.IsNull(v)
-}
-
 // sobekEmptyString returns true if a given value is not nil or an empty string.
 func sobekEmptyString(v sobek.Value) bool {
-	return !sobekValueExists(v) || strings.TrimSpace(v.String()) == ""
+	return common.IsNullish(v) || strings.TrimSpace(v.String()) == ""
 }
