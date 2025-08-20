@@ -11,8 +11,8 @@ import (
 
 // mapLocator API to the JS module.
 //
-//nolint:gocognit
-func mapLocator(vu moduleVU, lo *common.Locator) mapping { //nolint:funlen
+//nolint:gocognit,funlen
+func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 	rt := vu.Runtime()
 	return mapping{
 		"all": func() *sobek.Promise {
