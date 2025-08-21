@@ -35,7 +35,7 @@ func buildParams(state *lib.State, rt *sobek.Runtime, raw sobek.Value) (*wsParam
 
 	parsed.headers.Set("User-Agent", state.Options.UserAgent.String)
 
-	if raw == nil || sobek.IsUndefined(raw) {
+	if common.IsNullish(raw) {
 		return parsed, nil
 	}
 
@@ -44,7 +44,7 @@ func buildParams(state *lib.State, rt *sobek.Runtime, raw sobek.Value) (*wsParam
 		switch k {
 		case "headers":
 			headersV := params.Get(k)
-			if sobek.IsUndefined(headersV) || sobek.IsNull(headersV) {
+			if common.IsNullish(headersV) {
 				continue
 			}
 			headersObj := headersV.ToObject(rt)
@@ -60,7 +60,7 @@ func buildParams(state *lib.State, rt *sobek.Runtime, raw sobek.Value) (*wsParam
 			}
 		case "jar":
 			jarV := params.Get(k)
-			if sobek.IsUndefined(jarV) || sobek.IsNull(jarV) {
+			if common.IsNullish(jarV) {
 				continue
 			}
 			if v, ok := jarV.Export().(*httpModule.CookieJar); ok {
