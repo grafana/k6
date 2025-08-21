@@ -228,12 +228,6 @@ func TrimQuotes(s string) string {
 	return s
 }
 
-// sobekValueExists returns true if a given value is not nil and exists
-// (defined and not null) in the sobek runtime.
-func sobekValueExists(v sobek.Value) bool {
-	return v != nil && !sobek.IsUndefined(v) && !sobek.IsNull(v)
-}
-
 // convert is a helper function to convert any value to a given type.
 // underneath, it uses json.Marshal and json.Unmarshal to do the conversion.
 func convert[T any](from any, to *T) error {

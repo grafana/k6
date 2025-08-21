@@ -861,3 +861,40 @@ func TestReactInput(t *testing.T) {
 		})
 	}
 }
+
+func TestLocatorNesting(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withFileServer())
+
+	p := tb.NewPage(nil)
+
+	opts := &common.FrameGotoOptions{
+		Timeout: common.DefaultTimeout,
+	}
+	_, err := p.Goto(
+		tb.staticURL("locator_nesting.html"),
+		opts,
+	)
+	require.NoError(t, err)
+
+	q, err := p.Locator(`[data-testid="inventory"]`, nil).
+		Locator(`[data-item="apples"]`).
+		Locator(`.qty`).
+		InnerText(nil)
+	require.NoError(t, err)
+	assert.Equal(t, "0", q)
+
+	err = p.Locator(`[data-testid="inventory"]`, nil).
+		Locator(`[data-item="apples"]`).
+		Locator(`button.add`).
+		Click(common.NewFrameClickOptions(common.DefaultTimeout))
+	require.NoError(t, err)
+
+	q, err = p.Locator(`[data-testid="inventory"]`, nil).
+		Locator(`[data-item="apples"]`).
+		Locator(`.qty`).
+		InnerText(nil)
+	require.NoError(t, err)
+	assert.Equal(t, "1", q)
+}

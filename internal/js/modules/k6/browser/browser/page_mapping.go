@@ -851,7 +851,7 @@ func parseStringOrRegex(v sobek.Value, doubleQuote bool) string {
 
 // parseGetByRoleOptions parses the GetByRole options from the Sobek.Value.
 func parseGetByRoleOptions(ctx context.Context, opts sobek.Value) *common.GetByRoleOptions {
-	if !sobekValueExists(opts) {
+	if k6common.IsNullish(opts) {
 		return nil
 	}
 
@@ -905,7 +905,7 @@ func parseGetByBaseOptions(
 ) (string, *common.GetByBaseOptions) {
 	a := parseStringOrRegex(input, doubleQuote)
 
-	if !sobekValueExists(opts) {
+	if k6common.IsNullish(opts) {
 		return a, nil
 	}
 

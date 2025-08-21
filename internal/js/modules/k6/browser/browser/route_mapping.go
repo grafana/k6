@@ -46,7 +46,7 @@ func mapRoute(vu moduleVU, route *common.Route) mapping {
 
 func parseContinueOptions(ctx context.Context, opts sobek.Value) (common.ContinueOptions, error) {
 	copts := common.ContinueOptions{}
-	if !sobekValueExists(opts) {
+	if jsCommon.IsNullish(opts) {
 		return copts, nil
 	}
 
@@ -74,7 +74,7 @@ func parseContinueOptions(ctx context.Context, opts sobek.Value) (common.Continu
 
 func parseFulfillOptions(ctx context.Context, opts sobek.Value) (common.FulfillOptions, error) {
 	fopts := common.FulfillOptions{}
-	if !sobekValueExists(opts) {
+	if jsCommon.IsNullish(opts) {
 		return fopts, nil
 	}
 
@@ -105,12 +105,18 @@ func parseFulfillOptions(ctx context.Context, opts sobek.Value) (common.FulfillO
 
 func parseHeaders(headers *sobek.Object) []common.HTTPHeader {
 	headersKeys := headers.Keys()
-	result := make([]common.HTTPHeader, len(headersKeys))
-	for i, hk := range headersKeys {
-		result[i] = common.HTTPHeader{
-			Name:  hk,
-			Value: headers.Get(hk).String(),
+	result := make([]common.HTTPHeader, 0, len(headersKeys))
+	for _, hk := range headersKeys {
+		value := headers.Get(hk)
+		// Skip undefined headers
+		if jsCommon.IsNullish(value) {
+			continue
 		}
+
+		result = append(result, common.HTTPHeader{
+			Name:  hk,
+			Value: value.String(),
+		})
 	}
 	return result
 }
@@ -119,7 +125,7 @@ func parseWaitForResponseOptions(
 	ctx context.Context, opts sobek.Value, defaultTimeout time.Duration,
 ) (*common.PageWaitForResponseOptions, error) {
 	ropts := common.NewPageWaitForResponseOptions(defaultTimeout)
-	if !sobekValueExists(opts) {
+	if jsCommon.IsNullish(opts) {
 		return ropts, nil
 	}
 

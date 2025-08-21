@@ -11,6 +11,7 @@ import (
 	"github.com/grafana/sobek"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
+	"go.k6.io/k6/js/common"
 )
 
 type FrameBaseOptions struct {
@@ -211,7 +212,7 @@ func NewFrameBaseOptions(defaultTimeout time.Duration) *FrameBaseOptions {
 // Parse parses the frame base options.
 func (o *FrameBaseOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
-	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
+	if !common.IsNullish(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			switch k {
@@ -300,7 +301,7 @@ func NewFrameGotoOptions(defaultReferer string, defaultTimeout time.Duration) *F
 // Parse parses the frame goto options.
 func (o *FrameGotoOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
-	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
+	if !common.IsNullish(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			switch k {
@@ -497,7 +498,7 @@ func NewFrameSetContentOptions(defaultTimeout time.Duration) *FrameSetContentOpt
 func (o *FrameSetContentOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
 
-	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
+	if !common.IsNullish(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			switch k {
@@ -545,7 +546,7 @@ func (o *FrameTapOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	if err := o.ElementHandleBasePointerOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
-	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
+	if !common.IsNullish(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			switch k {
@@ -617,7 +618,7 @@ func NewFrameWaitForFunctionOptions(defaultTimeout time.Duration) *FrameWaitForF
 
 // Parse JavaScript waitForFunction options.
 func (o *FrameWaitForFunctionOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	if !sobekValueExists(opts) {
+	if common.IsNullish(opts) {
 		return nil
 	}
 
@@ -658,7 +659,7 @@ func NewFrameWaitForLoadStateOptions(defaultTimeout time.Duration) *FrameWaitFor
 // Parse parses the frame waitForLoadState options.
 func (o *FrameWaitForLoadStateOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
-	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
+	if !common.IsNullish(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			if k == "timeout" {
@@ -680,7 +681,7 @@ func NewFrameWaitForNavigationOptions(defaultTimeout time.Duration) *FrameWaitFo
 // Parse parses the frame waitForNavigation options.
 func (o *FrameWaitForNavigationOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
-	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
+	if !common.IsNullish(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			switch k {
@@ -719,7 +720,7 @@ func NewFrameWaitForSelectorOptions(defaultTimeout time.Duration) *FrameWaitForS
 func (o *FrameWaitForSelectorOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
 
-	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
+	if !common.IsNullish(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			switch k {
@@ -757,7 +758,7 @@ func parseStrict(ctx context.Context, opts sobek.Value) bool {
 	var strict bool
 
 	rt := k6ext.Runtime(ctx)
-	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
+	if !common.IsNullish(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			if k == "strict" {
@@ -786,7 +787,7 @@ func NewFrameWaitForURLOptions(defaultTimeout time.Duration) *FrameWaitForURLOpt
 // Parse parses the frame waitForURL options.
 func (o *FrameWaitForURLOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
-	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
+	if !common.IsNullish(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			switch k {
