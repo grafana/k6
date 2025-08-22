@@ -16,6 +16,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/ext"
 
@@ -386,6 +387,7 @@ func TestIsAnalysisRequired(t *testing.T) {
 
 			args := append([]string{"k6"}, tc.args...)
 			ts := tests.NewGlobalTestState(t)
+			ts.BinaryName = "somethingelse" // specifically set to not be the default k6
 			ts.CmdArgs = args
 			rootCommand := newRootCommand(ts.GlobalState)
 
