@@ -3196,7 +3196,9 @@ func TestClickInNestedFramesCORS(t *testing.T) {
 		require.NoError(t, err)
 	})
 	srvC := httptest.NewServer(muxC)
-	defer srvC.Close()
+	t.Cleanup(func() {
+		srvC.Close()
+	})
 
 	// Origin B: intermediate frame embedding origin C + own counter (with dynamic C URL)
 	originBHTML := fmt.Sprintf(`<!DOCTYPE html>
@@ -3224,7 +3226,9 @@ func TestClickInNestedFramesCORS(t *testing.T) {
 		require.NoError(t, err)
 	})
 	srvB := httptest.NewServer(muxB)
-	defer srvB.Close()
+	t.Cleanup(func() {
+		srvB.Close()
+	})
 
 	// Origin A: main page embedding origin B and same-origin frame A (with dynamic B URL)
 	originAHTML := fmt.Sprintf(`<!DOCTYPE html>
@@ -3258,93 +3262,99 @@ func TestClickInNestedFramesCORS(t *testing.T) {
 		require.NoError(t, err)
 	})
 	srvA := httptest.NewServer(muxA)
-	defer srvA.Close()
+	t.Cleanup(func() {
+		srvA.Close()
+	})
 
-	// Use srvA.URL as the entry point in the rest of the test (navigate, click, etc.).
-	page := newTestBrowser(t).NewPage(nil)
+	t.Run("ok/click_in_nested_frames", func(t *testing.T) {
+		t.Parallel()
 
-	// Navigate to the page that srvA is serving.
-	opts := &common.FrameGotoOptions{
-		Timeout: common.DefaultTimeout,
-	}
-	_, err := page.Goto(srvA.URL, opts)
-	require.NoError(t, err)
+		// Use srvA.URL as the entry point in the rest of the test (navigate, click, etc.).
+		page := newTestBrowser(t).NewPage(nil)
 
-	var (
-		clickOpts     = common.NewFrameClickOptions(page.Timeout())
-		expectedCount = "1"
-	)
+		// Navigate to the page that srvA is serving.
+		opts := &common.FrameGotoOptions{
+			Timeout: common.DefaultTimeout,
+		}
+		_, err := page.Goto(srvA.URL, opts)
+		require.NoError(t, err)
 
-	// First click on the main frame.
-	err = page.Locator("#incrementA", nil).Click(clickOpts)
-	require.NoError(t, err)
+		var (
+			clickOpts     = common.NewFrameClickOptions(page.Timeout())
+			expectedCount = "1"
+		)
 
-	countA, ok, err := page.Locator("#countA", nil).TextContent(nil)
-	require.NoError(t, err)
-	assert.True(t, ok)
-	assert.Equal(t, expectedCount, countA)
+		// First click on the main frame.
+		err = page.Locator("#incrementA", nil).Click(clickOpts)
+		require.NoError(t, err)
 
-	// Now get the first nested frame.
-	frameA, err := page.Query("#frameA")
-	require.NoError(t, err)
+		countA, ok, err := page.Locator("#countA", nil).TextContent(nil)
+		require.NoError(t, err)
+		assert.True(t, ok)
+		assert.Equal(t, expectedCount, countA)
 
-	frameAContent, err := frameA.ContentFrame()
-	require.NoError(t, err)
+		// Now get the first nested frame.
+		frameA, err := page.Query("#frameA")
+		require.NoError(t, err)
 
-	// Click on the second nested frame.
-	err = frameAContent.Locator("#incrementA2", nil).Click(clickOpts)
-	require.NoError(t, err)
+		frameAContent, err := frameA.ContentFrame()
+		require.NoError(t, err)
 
-	countA2, ok, err := frameAContent.Locator("#countA2", nil).TextContent(nil)
-	require.NoError(t, err)
-	assert.True(t, ok)
-	assert.Equal(t, expectedCount, countA2)
+		// Click on the second nested frame.
+		err = frameAContent.Locator("#incrementA2", nil).Click(clickOpts)
+		require.NoError(t, err)
 
-	// Now get the second nested frame.
-	frameB, err := page.Query("#frameB")
-	require.NoError(t, err)
+		countA2, ok, err := frameAContent.Locator("#countA2", nil).TextContent(nil)
+		require.NoError(t, err)
+		assert.True(t, ok)
+		assert.Equal(t, expectedCount, countA2)
 
-	frameBContent, err := frameB.ContentFrame()
-	require.NoError(t, err)
+		// Now get the second nested frame.
+		frameB, err := page.Query("#frameB")
+		require.NoError(t, err)
 
-	// Click on the third nested frame.
-	err = frameBContent.Locator("#incrementB", nil).Click(clickOpts)
-	require.NoError(t, err)
+		frameBContent, err := frameB.ContentFrame()
+		require.NoError(t, err)
 
-	countB, ok, err := frameBContent.Locator("#countB", nil).TextContent(nil)
-	require.NoError(t, err)
-	assert.True(t, ok)
-	assert.Equal(t, expectedCount, countB)
+		// Click on the third nested frame.
+		err = frameBContent.Locator("#incrementB", nil).Click(clickOpts)
+		require.NoError(t, err)
 
-	// Now get the third nested frame.
-	frameC, err := frameBContent.Query("#frameC", false)
-	require.NoError(t, err)
+		countB, ok, err := frameBContent.Locator("#countB", nil).TextContent(nil)
+		require.NoError(t, err)
+		assert.True(t, ok)
+		assert.Equal(t, expectedCount, countB)
 
-	frameCContent, err := frameC.ContentFrame()
-	require.NoError(t, err)
+		// Now get the third nested frame.
+		frameC, err := frameBContent.Query("#frameC", false)
+		require.NoError(t, err)
 
-	// Click on the fourth nested frame.
-	err = frameCContent.Locator("#increment", nil).Click(clickOpts)
-	require.NoError(t, err)
+		frameCContent, err := frameC.ContentFrame()
+		require.NoError(t, err)
 
-	count, ok, err := frameCContent.Locator("#count", nil).TextContent(nil)
-	require.NoError(t, err)
-	assert.True(t, ok)
-	assert.Equal(t, expectedCount, count)
+		// Click on the fourth nested frame.
+		err = frameCContent.Locator("#increment", nil).Click(clickOpts)
+		require.NoError(t, err)
 
-	// Now get the fourth nested frame.
-	frameD, err := frameCContent.Query("#frameD", false)
-	require.NoError(t, err)
+		count, ok, err := frameCContent.Locator("#count", nil).TextContent(nil)
+		require.NoError(t, err)
+		assert.True(t, ok)
+		assert.Equal(t, expectedCount, count)
 
-	frameDContent, err := frameD.ContentFrame()
-	require.NoError(t, err)
+		// Now get the fourth nested frame.
+		frameD, err := frameCContent.Query("#frameD", false)
+		require.NoError(t, err)
 
-	// Click on the fifth nested frame.
-	err = frameDContent.Locator("#incrementD", nil).Click(clickOpts)
-	require.NoError(t, err)
+		frameDContent, err := frameD.ContentFrame()
+		require.NoError(t, err)
 
-	countD, ok, err := frameDContent.Locator("#countD", nil).TextContent(nil)
-	require.NoError(t, err)
-	assert.True(t, ok)
-	assert.Equal(t, expectedCount, countD)
+		// Click on the fifth nested frame.
+		err = frameDContent.Locator("#incrementD", nil).Click(clickOpts)
+		require.NoError(t, err)
+
+		countD, ok, err := frameDContent.Locator("#countD", nil).TextContent(nil)
+		require.NoError(t, err)
+		assert.True(t, ok)
+		assert.Equal(t, expectedCount, countD)
+	})
 }
