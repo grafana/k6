@@ -11,8 +11,8 @@ import (
 
 // mapLocator API to the JS module.
 //
-//nolint:gocognit
-func mapLocator(vu moduleVU, lo *common.Locator) mapping { //nolint:funlen
+//nolint:gocognit,funlen
+func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 	rt := vu.Runtime()
 	return mapping{
 		"all": func() *sobek.Promise {
@@ -28,6 +28,15 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping { //nolint:funlen
 				}
 				return res, nil
 			})
+		},
+		"boundingBox": func(opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewFrameBaseOptions(lo.Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing locator bounding box options: %w", err)
+			}
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return lo.BoundingBox(popts) //nolint:wrapcheck
+			}), nil
 		},
 		"clear": func(opts sobek.Value) (*sobek.Promise, error) {
 			copts := common.NewFrameFillOptions(lo.Timeout())
