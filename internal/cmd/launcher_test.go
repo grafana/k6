@@ -387,7 +387,10 @@ func TestIsAnalysisRequired(t *testing.T) {
 
 			args := append([]string{"k6"}, tc.args...)
 			ts := tests.NewGlobalTestState(t)
-			ts.BinaryName = "somethingelse" // specifically set to not be the default k6
+			// Specifically set to not be the default k6 name.
+			// It asserts the scenario where a user has a custom name for the binary,
+			// such as k6v1.2.2, which is useful for managing multiple installed versions.
+			ts.BinaryName = "somethingelse"
 			ts.CmdArgs = args
 			rootCommand := newRootCommand(ts.GlobalState)
 
