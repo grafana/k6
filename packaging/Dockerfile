@@ -1,14 +1,11 @@
-FROM debian:buster-20240612
+FROM debian:bullseye-20250811
 
 LABEL maintainer="k6 Developers <developers@k6.io>"
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN sed -i 's|http://deb.debian.org/debian|http://archive.debian.org/debian|g' /etc/apt/sources.list && \
-    sed -i 's|http://security.debian.org/debian-security|http://archive.debian.org/debian-security|g' /etc/apt/sources.list && \
-    echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/99no-check-valid-until && \
-    apt-get update -y && \
-    apt-get install -y apt-utils createrepo curl git gnupg2 python3-pip unzip
+RUN apt-get update -y && \
+    apt-get install -y apt-utils createrepo-c curl git gnupg2 python3-pip unzip
 
 RUN pip3 install "s3cmd==2.4.0"
 

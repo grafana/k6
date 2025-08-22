@@ -2,7 +2,7 @@
 set -eEuo pipefail
 
 # External dependencies:
-# - https://github.com/rpm-software-management/createrepo
+# - https://github.com/rpm-software-management/createrepo_c
 # - https://github.com/s3tools/s3cmd
 #   s3cmd expects AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY to be set in the
 #   environment.
