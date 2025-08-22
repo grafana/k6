@@ -752,29 +752,18 @@ func (h *ElementHandle) waitForSelector(
 	// Check for frame navigation in the selector
 	frameNavIndex := h.findFrameNavigationIndex(parsedSelector)
 	if frameNavIndex != -1 {
-		// Split selector at frame navigation boundary
-		beforeFrame, afterFrame := h.splitSelectorAtFrame(parsedSelector, frameNavIndex)
+		// Strict is true because we assume the user is interested in the element
+		// in the frame and not the frame it is in.
+		opts := &FrameWaitForSelectorOptions{
+			State:   DOMElementStateAttached,
+			Timeout: opts.Timeout,
+			Strict:  true,
+		}
 
-		// Find the iframe element using the "before frame" selector
-		iframeSelector := h.reconstructSelector(beforeFrame)
-
-		iframeHandle, err := h.waitForSelector(apiCtx, iframeSelector, opts)
+		frame, afterFrameSelector, err := h.stepIntoFrame(apiCtx, parsedSelector, frameNavIndex, opts)
 		if err != nil {
-			return nil, fmt.Errorf("finding iframe with selector %q: %w", iframeSelector, err)
+			return nil, err
 		}
-
-		if iframeHandle == nil {
-			// TODO: Do we need to correctly handle this?
-			return nil, nil // No iframe found
-		}
-
-		frame, err := iframeHandle.ContentFrame()
-		if err != nil {
-			return nil, fmt.Errorf("getting iframe frame: %w", err)
-		}
-
-		// Wait for selector in the iframe using the "after frame" selector
-		afterFrameSelector := h.reconstructSelector(afterFrame)
 
 		return frame.waitForSelector(afterFrameSelector, opts)
 	}
@@ -814,34 +803,18 @@ func (h *ElementHandle) count(apiCtx context.Context, selector string) (int, err
 	// Check for frame navigation in the selector
 	frameNavIndex := h.findFrameNavigationIndex(parsedSelector)
 	if frameNavIndex != -1 {
-		// Split selector at frame navigation boundary
-		beforeFrame, afterFrame := h.splitSelectorAtFrame(parsedSelector, frameNavIndex)
-
-		// Find the iframe element using the "before frame" selector
-		iframeSelector := h.reconstructSelector(beforeFrame)
-
-		// TODO: We need to define a new opts outside of count depending on who is calling it (frame vs locator).
-		iframeHandle, err := h.waitForSelector(apiCtx, iframeSelector, &FrameWaitForSelectorOptions{
+		// Strict is true because we assume the user is interested in the element
+		// in the frame and not the frame it is in.
+		opts := &FrameWaitForSelectorOptions{
 			State:   DOMElementStateAttached,
 			Timeout: h.frame.defaultTimeout(),
 			Strict:  true,
-		})
+		}
+
+		frame, afterFrameSelector, err := h.stepIntoFrame(apiCtx, parsedSelector, frameNavIndex, opts)
 		if err != nil {
-			return 0, fmt.Errorf("finding iframe with selector %q: %w", iframeSelector, err)
+			return 0, err
 		}
-
-		if iframeHandle == nil {
-			// TODO: Do we need to correctly handle this?
-			return 0, nil // No iframe found
-		}
-
-		frame, err := iframeHandle.ContentFrame()
-		if err != nil {
-			return 0, fmt.Errorf("getting iframe frame: %w", err)
-		}
-
-		// Count in the iframe document using the "after frame" selector
-		afterFrameSelector := h.reconstructSelector(afterFrame)
 
 		return frame.count(afterFrameSelector)
 	}
@@ -1301,32 +1274,18 @@ func (h *ElementHandle) Query(selector string, strict bool) (_ *ElementHandle, r
 	// Check for frame navigation in the selector
 	frameNavIndex := h.findFrameNavigationIndex(parsedSelector)
 	if frameNavIndex != -1 {
-		// Split selector at frame navigation boundary
-		beforeFrame, afterFrame := h.splitSelectorAtFrame(parsedSelector, frameNavIndex)
-
-		// Find the iframe element using the "before frame" selector
-		iframeSelector := h.reconstructSelector(beforeFrame)
-
-		iframeHandle, err := h.waitForSelector(h.ctx, iframeSelector, &FrameWaitForSelectorOptions{
+		// Strict is true because we assume the user is interested in the element
+		// in the frame and not the frame it is in.
+		opts := &FrameWaitForSelectorOptions{
 			State:   DOMElementStateAttached,
 			Timeout: h.frame.defaultTimeout(),
 			Strict:  true,
-		})
+		}
+
+		frame, afterFrameSelector, err := h.stepIntoFrame(h.ctx, parsedSelector, frameNavIndex, opts)
 		if err != nil {
-			return nil, fmt.Errorf("finding iframe with selector %q: %w", iframeSelector, err)
+			return nil, err
 		}
-
-		if iframeHandle == nil {
-			return nil, nil // No iframe found
-		}
-
-		frame, err := iframeHandle.ContentFrame()
-		if err != nil {
-			return nil, fmt.Errorf("getting iframe frame: %w", err)
-		}
-
-		// Query in the iframe using the "after frame" selector
-		afterFrameSelector := h.reconstructSelector(afterFrame)
 
 		return frame.Query(afterFrameSelector, strict)
 	}
