@@ -332,25 +332,25 @@ func analyze(gs *state.GlobalState, args []string) (k6deps.Dependencies, error) 
 
 // isAnalysisRequired returns a boolean indicating if dependency analysis is required for the command
 func isAnalysisRequired(cmd *cobra.Command) bool {
-	switch cmd.Name() {
-	case "run":
-		parent := cmd.Parent()
-		return isCommandName(parent, "cloud") || isRootCommand(parent)
-	case "upload":
-		return isCommandName(cmd.Parent(), "cloud")
-	case "cloud", "archive", "inspect":
-		return isRootCommand(cmd.Parent())
+	switch stringifyCommand(cmd) {
+	case "k6 run",
+		"k6 cloud",
+		"k6 cloud run",
+		"k6 cloud upload",
+		"k6 upload",
+		"k6 archive",
+		"k6 inspect":
+		return true
 	}
 
 	return false
 }
 
-func isCommandName(cmd *cobra.Command, name string) bool {
-	return cmd != nil && cmd.Name() == name
-}
-
-func isRootCommand(cmd *cobra.Command) bool {
-	return cmd != nil && cmd.Parent() == nil
+func stringifyCommand(cmd *cobra.Command) string {
+	if cmd.Parent() == nil {
+		return "k6"
+	}
+	return stringifyCommand(cmd.Parent()) + " " + cmd.Name()
 }
 
 // extractToken gets the cloud token required to access the build service
