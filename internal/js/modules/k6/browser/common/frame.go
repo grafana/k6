@@ -533,16 +533,20 @@ func (f *Frame) waitForSelector(selector string, opts *FrameWaitForSelectorOptio
 	f.executionContextMu.RLock()
 	defer f.executionContextMu.RUnlock()
 
-	ec := f.executionContexts[mainWorld]
-	if ec == nil {
-		return nil, fmt.Errorf("waiting for selector %q: execution context %q not found", selector, mainWorld)
-	}
+	uec := f.executionContexts[utilityWorld]
 
-	// an element should belong to the current execution context.
-	// otherwise, we should adopt it to this execution context.
+	// An element should belong to the current main world execution context, and
+	// not to the utility world context, otherwise, we should adopt it to the
+	// current world's execution context. This is only valid when the handle
+	// is from the current frame and not part of a nested frame.
 	adopted := handle
-	if ec != handle.execCtx {
-		if adopted, err = ec.adoptElementHandle(handle); err != nil {
+	if uec != nil && uec == handle.execCtx {
+		wec := f.executionContexts[mainWorld]
+		if wec == nil {
+			return nil, fmt.Errorf("waiting for selector %q: execution context %q not found", selector, mainWorld)
+		}
+
+		if adopted, err = wec.adoptElementHandle(handle); err != nil {
 			return nil, fmt.Errorf("waiting for selector %q: adopting element handle: %w", selector, err)
 		}
 
