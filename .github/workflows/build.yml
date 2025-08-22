@@ -256,7 +256,7 @@ jobs:
           Expand-Archive -Path .\wix311-binaries.zip -DestinationPath .\wix311\
           echo "$pwd\wix311" | Out-File -FilePath $env:GITHUB_PATH -Append
       - name: Download binaries
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: binaries
           path: dist
@@ -332,12 +332,12 @@ jobs:
         with:
           persist-credentials: false
       - name: Download binaries
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: binaries
           path: dist
       - name: Download Windows binaries
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: binaries-windows
           path: dist
@@ -378,12 +378,12 @@ jobs:
         with:
           persist-credentials: false
       - name: Download binaries
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: binaries
           path: dist
       - name: Download Windows binaries
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: binaries-windows
           path: dist
