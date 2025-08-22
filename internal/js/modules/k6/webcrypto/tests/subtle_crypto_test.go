@@ -30,6 +30,20 @@ func TestWebPlatformTestSuite(t *testing.T) {
 		// if empty, no function will be called
 		callFn string
 	}{
+		// Crypto interface tests (not subtle.crypto)
+		{
+			catalog: "",
+			files: []string{
+				"getRandomValues.any.js",
+			},
+		},
+		{
+			catalog: "",
+			files: []string{
+				"randomUUID.https.any.js",
+			},
+		},
+		// SubtleCrypto interface tests
 		{
 			catalog: "digest",
 			files: []string{
