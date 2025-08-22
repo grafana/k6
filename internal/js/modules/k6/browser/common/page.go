@@ -823,6 +823,13 @@ func (p *Page) getOwnerFrame(apiCtx context.Context, h *ElementHandle) (cdp.Fram
 	}
 
 	action := dom.DescribeNode().WithObjectID(documentElement.remoteObject.ObjectID)
+	// If the element is in an iframe, then using the page's session will not
+	// contain the element that we're looking for since frames do not
+	// share context between each other due to CORS.
+	//
+	// Instead here we use the element's session to retrieve the description of
+	// itself, which works even when we're handling elements that are not in
+	// an iframe.
 	node, err := action.Do(cdp.WithExecutor(p.ctx, h.session))
 	if err != nil {
 		p.logger.Debugf("Page:getOwnerFrame:DescribeNode:return", "sid:%v err:%v", p.sessionID(), err)
