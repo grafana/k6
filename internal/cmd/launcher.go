@@ -89,7 +89,7 @@ func (l *launcher) launch(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		l.gs.Logger.
 			WithError(err).
-			Error("Automatic extension resolution is enabled but it failed to analyze the dependencies." +
+			Error("Failed to analyze the extensions required." +
 				" Please, make sure to report this issue by opening a bug report.")
 		return err
 	}
@@ -103,8 +103,8 @@ func (l *launcher) launch(cmd *cobra.Command, args []string) error {
 
 	l.gs.Logger.
 		WithField("deps", deps).
-		Info("Automatic extension resolution is enabled. The current k6 binary doesn't satisfy all dependencies," +
-			" it's required to provision a custom binary.")
+		Info("Provisioning a custom binary as the current doesn't satisfy all dependencies," +
+			" may take a few seconds as it needs to download the new one.")
 
 	customBinary, err := l.provisioner.provision(deps)
 	if err != nil {
