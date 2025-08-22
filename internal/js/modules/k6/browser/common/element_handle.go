@@ -708,6 +708,39 @@ func (h *ElementHandle) waitForElementState(
 		"waiting for states %v of element %q", states, reflect.TypeOf(result))
 }
 
+// stepIntoFrame steps into an iframe/frame. Due to CORS, we need to perform this
+// step outside of the browser (chromium). It returns the frame that it has stepped
+// into and the selector to use within that frame.
+func (h *ElementHandle) stepIntoFrame(
+	apiCtx context.Context, parsedSelector *Selector, frameNavIndex int, opts *FrameWaitForSelectorOptions,
+) (*Frame, string, error) {
+	// Split selector at frame navigation boundary
+	beforeFrame, afterFrame := h.splitSelectorAtFrame(parsedSelector, frameNavIndex)
+
+	// Find the iframe element using the "before frame" selector
+	iframeSelector := h.reconstructSelector(beforeFrame)
+
+	iframeHandle, err := h.waitForSelector(apiCtx, iframeSelector, opts)
+	if err != nil {
+		return nil, "", fmt.Errorf("finding iframe with selector %q: %w", iframeSelector, err)
+	}
+
+	if iframeHandle == nil {
+		// TODO: Do we need to correctly handle this?
+		return nil, "", nil // No iframe found
+	}
+
+	frame, err := iframeHandle.ContentFrame()
+	if err != nil {
+		return nil, "", fmt.Errorf("getting iframe frame: %w", err)
+	}
+
+	// Wait for selector in the iframe using the "after frame" selector
+	afterFrameSelector := h.reconstructSelector(afterFrame)
+
+	return frame, afterFrameSelector, nil
+}
+
 func (h *ElementHandle) waitForSelector(
 	apiCtx context.Context, selector string, opts *FrameWaitForSelectorOptions,
 ) (*ElementHandle, error) {
