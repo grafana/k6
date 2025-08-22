@@ -16,6 +16,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/grafana/sobek"
 	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
+
 	"go.k6.io/k6/internal/js/modules/k6/experimental/websockets/events"
 
 	"go.k6.io/k6/js/common"
@@ -154,7 +155,7 @@ func (r *WebSocketsAPI) websocket(c sobek.ConstructorCall) *sobek.Object {
 
 // parseURL parses the url from the first constructor calls argument or returns an error
 func parseURL(urlValue sobek.Value) (*url.URL, error) {
-	if urlValue == nil || sobek.IsUndefined(urlValue) {
+	if common.IsNullish(urlValue) {
 		return nil, errors.New("WebSocket requires a url")
 	}
 
@@ -228,7 +229,7 @@ func defineWebsocket(rt *sobek.Runtime, w *webSocket) {
 				arg := call.Argument(0)
 
 				// it's possible to unset handlers by setting them to null
-				if arg == nil || sobek.IsUndefined(arg) || sobek.IsNull(arg) {
+				if common.IsNullish(arg) {
 					el.setOn(nil)
 
 					return nil

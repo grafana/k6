@@ -621,7 +621,6 @@ func wrapHTTPResponse(httpResponse *http.Response) (*HTTPResponse, error) {
 	return &wsResponse, nil
 }
 
-//nolint:gocognit
 func parseConnectArgs(state *lib.State, rt *sobek.Runtime, args ...sobek.Value) (*wsConnectArgs, error) {
 	// The params argument is optional
 	var callableV, paramsV sobek.Value
@@ -651,7 +650,7 @@ func parseConnectArgs(state *lib.State, rt *sobek.Runtime, args ...sobek.Value) 
 		tagsAndMeta: &tagsAndMeta,
 	}
 
-	if sobek.IsUndefined(paramsV) || sobek.IsNull(paramsV) {
+	if common.IsNullish(paramsV) {
 		return parsedArgs, nil
 	}
 
@@ -661,7 +660,7 @@ func parseConnectArgs(state *lib.State, rt *sobek.Runtime, args ...sobek.Value) 
 		switch k {
 		case "headers":
 			headersV := params.Get(k)
-			if sobek.IsUndefined(headersV) || sobek.IsNull(headersV) {
+			if common.IsNullish(headersV) {
 				continue
 			}
 			headersObj := headersV.ToObject(rt)
@@ -677,7 +676,7 @@ func parseConnectArgs(state *lib.State, rt *sobek.Runtime, args ...sobek.Value) 
 			}
 		case "jar":
 			jarV := params.Get(k)
-			if sobek.IsUndefined(jarV) || sobek.IsNull(jarV) {
+			if common.IsNullish(jarV) {
 				continue
 			}
 			if v, ok := jarV.Export().(*httpModule.CookieJar); ok {

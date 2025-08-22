@@ -207,7 +207,7 @@ func exportGroup(group *lib.Group) map[string]interface{} {
 }
 
 func getSummaryResult(rawResult sobek.Value) (map[string]io.Reader, error) {
-	if sobek.IsNull(rawResult) || sobek.IsUndefined(rawResult) {
+	if common.IsNullish(rawResult) {
 		return nil, nil //nolint:nilnil // this is actually valid result in this case
 	}
 

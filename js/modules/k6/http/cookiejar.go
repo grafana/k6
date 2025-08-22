@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/grafana/sobek"
+
 	"go.k6.io/k6/js/common"
 )
 
@@ -51,7 +52,7 @@ func (j CookieJar) Set(url, name, value string, opts sobek.Value) (bool, error) 
 
 	c := http.Cookie{Name: name, Value: value}
 	paramsV := opts
-	if paramsV != nil && !sobek.IsUndefined(paramsV) && !sobek.IsNull(paramsV) {
+	if !common.IsNullish(paramsV) {
 		params := paramsV.ToObject(rt)
 		for _, k := range params.Keys() {
 			switch strings.ToLower(k) {
