@@ -177,7 +177,7 @@ func (c *Conn) Invoke(
 		Trailers: trailer,
 	}
 
-	marshaler := protojson.MarshalOptions{EmitUnpopulated: true}
+	marshaler := protojson.MarshalOptions{EmitUnpopulated: true, Resolver: c.types}
 
 	if err != nil {
 		sterr := status.Convert(err)
