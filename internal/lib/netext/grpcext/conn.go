@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/metrics"
 
@@ -25,6 +26,7 @@ import (
 	"google.golang.org/protobuf/encoding/prototext"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/dynamicpb"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -72,7 +74,8 @@ type clientConnCloser interface {
 
 // Conn is a gRPC client connection.
 type Conn struct {
-	raw clientConnCloser
+	raw   clientConnCloser
+	types *protoregistry.Types
 }
 
 // DefaultOptions generates an option set
@@ -93,14 +96,15 @@ func DefaultOptions(getState func() *lib.State) []grpc.DialOption {
 }
 
 // Dial establish a gRPC connection.
-func Dial(ctx context.Context, addr string, options ...grpc.DialOption) (*Conn, error) {
+func Dial(ctx context.Context, addr string, types *protoregistry.Types, options ...grpc.DialOption) (*Conn, error) {
 	//nolint:staticcheck // see https://github.com/grafana/k6/issues/3699
 	conn, err := grpc.DialContext(ctx, addr, options...)
 	if err != nil {
 		return nil, err
 	}
 	return &Conn{
-		raw: conn,
+		raw:   conn,
+		types: types,
 	}, nil
 }
 
@@ -147,7 +151,7 @@ func (c *Conn) Invoke(
 	ctx = metadata.NewOutgoingContext(ctx, req.Metadata)
 
 	reqdm := dynamicpb.NewMessage(req.MethodDescriptor.Input())
-	if err := protojson.Unmarshal(req.Message, reqdm); err != nil {
+	if err := (protojson.UnmarshalOptions{Resolver: c.types}).Unmarshal(req.Message, reqdm); err != nil {
 		return nil, fmt.Errorf("unable to serialise request object to protocol buffer: %w", err)
 	}
 
