@@ -8,8 +8,10 @@ import (
 	"encoding/pem"
 	"fmt"
 	"math"
+	"math/rand"
 	"strings"
 	"testing"
+	"time"
 
 	k6grpc "go.k6.io/k6/internal/js/modules/k6/grpc"
 	"go.k6.io/k6/internal/lib/netext/grpcext"
@@ -17,6 +19,7 @@ import (
 	grpcanytesting "go.k6.io/k6/internal/lib/testutils/httpmultibin/grpc_any_testing"
 	"go.k6.io/k6/internal/lib/testutils/httpmultibin/grpc_testing"
 	"go.k6.io/k6/internal/lib/testutils/httpmultibin/grpc_wrappers_testing"
+	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/metrics"
 
 	"google.golang.org/grpc"
@@ -1604,4 +1607,86 @@ func TestClientConnectionReflectMetadata(t *testing.T) {
 	}
 
 	assert.True(t, foundReflectionCall, "expected to find a reflection call in the logs, but didn't")
+}
+
+func TestAnyWithNotCommonTypes(t *testing.T) {
+	t.Parallel()
+	randseed := time.Now().Unix()
+	t.Log("Random seed is", randseed)
+	r := rand.New(rand.NewSource(randseed)) //nolint:gosec
+	words := []string{"sum", "square", "circle", "testing", "some"}
+	// This tests specifically with types that aren't available to the server and are not part of anything precompiled
+	randWord := func() string {
+		return words[r.Int()%len(words)]
+	}
+	packageName := randWord() + "." + randWord() + "." + randWord()
+	anyTypeName := randWord()
+	const testProto = `
+		syntax = "proto3";
+		package %s;
+		import "google/protobuf/any.proto";
+
+		service AnyTestService {
+			rpc Invoke (Request) returns (Empty) {}
+			rpc Stream (stream Request) returns (Empty) {}
+		}
+
+		message Request {
+			google.protobuf.Any data = 1;
+		}
+
+		message %s {
+			int64 a = 1;
+			int64 b = 2;
+		}
+
+		message Empty {}
+	`
+
+	ts := newTestState(t)
+	fs := fsext.NewMemMapFs()
+
+	ts.VU.InitEnvField.FileSystems["file"] = fs
+	err := fsext.WriteFile(fs, "/my_proto.proto", fmt.Appendf(nil, testProto, packageName, anyTypeName), 0x600)
+	require.NoError(t, err)
+
+	// setup necessary environment if needed by a test
+	_, err = ts.Run(`
+				var client = new grpc.Client();
+				client.load(["/"], "/my_proto.proto");
+	`)
+
+	require.NoError(t, err)
+	ts.ToVUContext()
+	sr := strings.NewReplacer("PACKAGENAME", packageName, "TYPENAME", anyTypeName)
+	_, err = ts.RunOnEventLoop(sr.Replace(`
+		client.connect("GRPCBIN_ADDR");
+		var resp = client.invoke("PACKAGENAME.AnyTestService/Invoke",  {
+			data: {
+				"@type": "type.googleapis.com/PACKAGENAME.TYPENAME",
+				"a": 1,
+				"b": 2,
+			},
+		})
+		if (resp.status !== grpc.StatusUnimplemented) {
+			throw new Error("unexpected error: " + JSON.stringify(resp.error) + " or status: " + resp.status)
+		}
+		if (resp.error.message !== "unknown service PACKAGENAME.AnyTestService") {
+			throw new Error("unexpected error: " + JSON.stringify(resp.error) + " or status: " + resp.status)
+		}
+		const stream = new grpc.Stream(client, 'PACKAGENAME.AnyTestService/Stream', null);
+		stream.on("error", (error) => {
+			if (error.message !== "unknown service PACKAGENAME.AnyTestService") {
+			   throw new Error("unexpected error: " + JSON.stringify(error) + " or status: " )
+			}
+		})
+		stream.write({
+			data: {
+				"@type": "type.googleapis.com/PACKAGENAME.TYPENAME",
+				"a": 1,
+				"b": 2,
+			},
+		})
+		`))
+	require.NoError(t, err)
 }

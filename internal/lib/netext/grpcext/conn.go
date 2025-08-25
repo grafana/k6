@@ -231,6 +231,7 @@ func (c *Conn) NewStream(
 		methodDescriptor:       req.MethodDescriptor,
 		discardResponseMessage: req.DiscardResponseMessage,
 		marshaler:              protojson.MarshalOptions{Resolver: c.types, EmitUnpopulated: true},
+		unmarshaler:            protojson.UnmarshalOptions{Resolver: c.types},
 	}, nil
 }
 
