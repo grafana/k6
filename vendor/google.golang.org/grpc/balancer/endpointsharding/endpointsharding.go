@@ -37,6 +37,8 @@ import (
 	"google.golang.org/grpc/resolver"
 )
 
+var randIntN = rand.IntN
+
 // ChildState is the balancer state of a child along with the endpoint which
 // identifies the child balancer.
 type ChildState struct {
@@ -112,6 +114,21 @@ type endpointSharding struct {
 	mu sync.Mutex
 }
 
+// rotateEndpoints returns a slice of all the input endpoints rotated a random
+// amount.
+func rotateEndpoints(es []resolver.Endpoint) []resolver.Endpoint {
+	les := len(es)
+	if les == 0 {
+		return es
+	}
+	r := randIntN(les)
+	// Make a copy to avoid mutating data beyond the end of es.
+	ret := make([]resolver.Endpoint, les)
+	copy(ret, es[r:])
+	copy(ret[les-r:], es[:r])
+	return ret
+}
+
 // UpdateClientConnState creates a child for new endpoints and deletes children
 // for endpoints that are no longer present. It also updates all the children,
 // and sends a single synchronous update of the childrens' aggregated state at
@@ -133,7 +150,7 @@ func (es *endpointSharding) UpdateClientConnState(state balancer.ClientConnState
 	newChildren := resolver.NewEndpointMap[*balancerWrapper]()
 
 	// Update/Create new children.
-	for _, endpoint := range state.ResolverState.Endpoints {
+	for _, endpoint := range rotateEndpoints(state.ResolverState.Endpoints) {
 		if _, ok := newChildren.Get(endpoint); ok {
 			// Endpoint child was already created, continue to avoid duplicate
 			// update.
@@ -279,7 +296,7 @@ func (es *endpointSharding) updateState() {
 	p := &pickerWithChildStates{
 		pickers:     pickers,
 		childStates: childStates,
-		next:        uint32(rand.IntN(len(pickers))),
+		next:        uint32(randIntN(len(pickers))),
 	}
 	es.cc.UpdateState(balancer.State{
 		ConnectivityState: aggState,

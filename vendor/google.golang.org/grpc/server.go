@@ -1598,6 +1598,7 @@ func (s *Server) processStreamingRPC(ctx context.Context, stream *transport.Serv
 		s:                     stream,
 		p:                     &parser{r: stream, bufferPool: s.opts.bufferPool},
 		codec:                 s.getCodec(stream.ContentSubtype()),
+		desc:                  sd,
 		maxReceiveMessageSize: s.opts.maxReceiveMessageSize,
 		maxSendMessageSize:    s.opts.maxSendMessageSize,
 		trInfo:                trInfo,
