@@ -16,6 +16,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/ext"
 
@@ -386,6 +387,10 @@ func TestIsAnalysisRequired(t *testing.T) {
 
 			args := append([]string{"k6"}, tc.args...)
 			ts := tests.NewGlobalTestState(t)
+			// Specifically set to not be the default k6 name.
+			// It asserts the scenario where a user has a custom name for the binary,
+			// such as k6v1.2.2, which is useful for managing multiple installed versions.
+			ts.BinaryName = "somethingelse"
 			ts.CmdArgs = args
 			rootCommand := newRootCommand(ts.GlobalState)
 
