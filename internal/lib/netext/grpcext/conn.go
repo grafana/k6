@@ -230,6 +230,7 @@ func (c *Conn) NewStream(
 		method:                 req.Method,
 		methodDescriptor:       req.MethodDescriptor,
 		discardResponseMessage: req.DiscardResponseMessage,
+		marshaler:              protojson.MarshalOptions{Resolver: c.types, EmitUnpopulated: true},
 	}, nil
 }
 
