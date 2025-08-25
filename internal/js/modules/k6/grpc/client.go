@@ -265,7 +265,7 @@ func (c *Client) Connect(addr string, params sobek.Value) (bool, error) {
 	}
 
 	c.addr = addr
-	c.conn, err = grpcext.Dial(ctx, addr, opts...)
+	c.conn, err = grpcext.Dial(ctx, addr, c.types, opts...)
 	if err != nil {
 		return false, err
 	}
