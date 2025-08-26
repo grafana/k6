@@ -1171,3 +1171,102 @@ func TestLocatorFilter(t *testing.T) {
 		require.Equal(t, 2, count)
 	})
 }
+
+func TestVisibilityWithCORS(t *testing.T) {
+	t.Parallel()
+
+	setupCORS := func(t *testing.T) (*testBrowser, *common.Page) {
+		t.Helper()
+
+		// Origin B: intermediate frame embedding origin C + own counter (with dynamic C URL)
+		originBHTML := `<!DOCTYPE html>
+		<html>
+		<head></head>
+		<body>
+			<button id="visibleButton">Hello</button>
+			<button id="hiddenButton" hidden>World</button>
+		</body>
+		</html>`
+
+		// Server for origin B
+		muxB := http.NewServeMux()
+		muxB.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			_, err := w.Write([]byte(originBHTML))
+			require.NoError(t, err)
+		})
+		srvB := httptest.NewServer(muxB)
+		t.Cleanup(func() {
+			srvB.Close()
+		})
+
+		// Origin A: main page embedding origin B and same-origin frame A (with dynamic B URL)
+		originAHTML := fmt.Sprintf(`<!DOCTYPE html>
+		<html>
+		<head></head>
+		<body>
+			<iframe id="frameB" src="%s"></iframe>
+		</body>
+		</html>`, srvB.URL)
+
+		// Server for origin A
+		muxA := http.NewServeMux()
+		muxA.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			_, err := w.Write([]byte(originAHTML))
+			require.NoError(t, err)
+		})
+		srvA := httptest.NewServer(muxA)
+		t.Cleanup(func() {
+			srvA.Close()
+		})
+
+		tb := newTestBrowser(t)
+
+		p := tb.NewPage(nil)
+		opts := &common.FrameGotoOptions{
+			Timeout: common.DefaultTimeout,
+		}
+		_, err := p.Goto(
+			srvA.URL,
+			opts,
+		)
+		require.NoError(t, err)
+
+		return tb, p
+	}
+
+	tests := []struct {
+		name string
+		do   func(*testBrowser, *common.Page) (bool, error)
+		want bool
+	}{
+		{
+			name: "hidden",
+			do: func(_ *testBrowser, p *common.Page) (bool, error) {
+				frameBContent := p.Locator("#frameB", nil).ContentFrame()
+				return frameBContent.Locator("#hiddenButton").IsHidden()
+			},
+			want: true,
+		},
+		{
+			name: "visible",
+			do: func(_ *testBrowser, p *common.Page) (bool, error) {
+				frameBContent := p.Locator("#frameB", nil).ContentFrame()
+				return frameBContent.Locator("#visibleButton").IsVisible()
+			},
+			want: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tb, p := setupCORS(t)
+
+			got, err := tt.do(tb, p)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
