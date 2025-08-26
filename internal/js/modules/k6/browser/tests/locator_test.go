@@ -795,50 +795,67 @@ func TestSelectOption(t *testing.T) {
 func TestCount(t *testing.T) {
 	t.Parallel()
 
+	setupNonCORS := func(t *testing.T) (*testBrowser, *common.Page) {
+		t.Helper()
+
+		tb := newTestBrowser(t, withFileServer())
+
+		p := tb.NewPage(nil)
+		opts := &common.FrameGotoOptions{
+			Timeout: common.DefaultTimeout,
+		}
+		_, err := p.Goto(
+			tb.staticURL("locators.html"),
+			opts,
+		)
+		require.NoError(t, err)
+
+		return tb, p
+	}
+
 	tests := []struct {
-		name string
-		do   func(*testBrowser, *common.Page)
+		name          string
+		setup         func(*testing.T) (*testBrowser, *common.Page)
+		do            func(*testBrowser, *common.Page) (int, error)
+		expectedCount int
 	}{
 		{
-			"0", func(_ *testBrowser, p *common.Page) {
+			name:  "0",
+			setup: setupNonCORS,
+			do: func(_ *testBrowser, p *common.Page) (int, error) {
 				l := p.Locator("#NOTEXIST", nil)
-				c, err := l.Count()
-				require.NoError(t, err)
-				require.Equal(t, 0, c)
+				return l.Count()
 			},
+			expectedCount: 0,
 		},
 		{
-			"1", func(_ *testBrowser, p *common.Page) {
+			name:  "1",
+			setup: setupNonCORS,
+			do: func(_ *testBrowser, p *common.Page) (int, error) {
 				l := p.Locator("#link", nil)
-				c, err := l.Count()
-				require.NoError(t, err)
-				require.Equal(t, 1, c)
+				return l.Count()
 			},
+			expectedCount: 1,
 		},
 		{
-			"3", func(_ *testBrowser, p *common.Page) {
+			name:  "3",
+			setup: setupNonCORS,
+			do: func(_ *testBrowser, p *common.Page) (int, error) {
 				l := p.Locator("a", nil)
-				c, err := l.Count()
-				require.NoError(t, err)
-				require.Equal(t, 3, c)
+				return l.Count()
 			},
+			expectedCount: 3,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			tb := newTestBrowser(t, withFileServer())
-			p := tb.NewPage(nil)
-			opts := &common.FrameGotoOptions{
-				Timeout: common.DefaultTimeout,
-			}
-			_, err := p.Goto(
-				tb.staticURL("locators.html"),
-				opts,
-			)
-			tt.do(tb, p)
+			tb, p := tt.setup(t)
+
+			c, err := tt.do(tb, p)
 			require.NoError(t, err)
+			assert.Equal(t, tt.expectedCount, c)
 		})
 	}
 }
