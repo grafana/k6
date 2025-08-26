@@ -2874,7 +2874,7 @@ func TestWaitForNavigationWithURL(t *testing.T) {
 	assert.ErrorContains(t, err, "Unexpected token *")
 }
 
-func TestPageWaitForURL(t *testing.T) {
+func TestPageWaitForURLSuccess(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("Skipped due to https://github.com/grafana/k6/issues/4937")
 	}
@@ -2894,96 +2894,136 @@ func TestPageWaitForURL(t *testing.T) {
 		`)
 	require.NoError(t, err)
 
-	// Test when already at matching URL (should just wait for load state)
-	got := tb.vu.RunPromise(t, `
-		await page.goto(page1URL);
+	tests := []struct {
+		name     string
+		code     string
+		expected []string
+	}{
+		{
+			name:     "when_already_at_matching_url",
+			code:     `await page.waitForURL(/.*waitfornavigation_test\.html$/);`,
+			expected: []string{tb.staticURL("waitfornavigation_test.html")},
+		},
+		{
+			name: "exact_url_match",
+			code: `
+				await Promise.all([
+					page.waitForURL(page1URL),
+					page.locator('#page1').click()
+				]);
+			`,
+			expected: []string{tb.staticURL("page1.html")},
+		},
+		{
+			name: "regex_pattern_match",
+			code: `
+				await Promise.all([
+					page.waitForURL(/.*2\.html$/),
+					page.locator('#page2').click()
+				]);
+			`,
+			expected: []string{tb.staticURL("page2.html")},
+		},
+		{
+			name: "empty_pattern_match",
+			code: `
+				await Promise.all([
+					page.waitForURL(''),
+					page.locator('#page2').click()
+				]);
+			`,
+			expected: []string{tb.staticURL("page2.html"), tb.staticURL("waitfornavigation_test.html")},
+		},
+		{
+			name: "waitUntil_domcontentloaded",
+			code: `
+				await Promise.all([
+					page.waitForURL(/.*page1\.html$/, { waitUntil: 'domcontentloaded' }),
+					page.locator('#page1').click()
+				]);
+			`,
+			expected: []string{tb.staticURL("page1.html")},
+		},
+		{
+			name: "already_at_url_with_regex_pattern",
+			code: `
+				await page.waitForURL(/.*\/waitfornavigation_test\.html$/);
+			`,
+			expected: []string{tb.staticURL("waitfornavigation_test.html")},
+		},
+	}
 
-		await page.waitForURL(/.*page1\.html$/);
-		return page.url();
-	`,
-	)
-	assert.Equal(t, tb.staticURL("page1.html"), got.Result().String())
+	//nolint:paralleltest
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			code := fmt.Sprintf(`
+			await page.goto(testURL);
 
-	// Test exact URL match with navigation
-	got = tb.vu.RunPromise(t, `
-		await page.goto(testURL);
+			%s
+			
+			return page.url();`, tt.code)
 
-		await Promise.all([
-			page.waitForURL(page1URL),
-			page.locator('#page1').click()
-		]);
-		return page.url();
-	`,
-	)
-	assert.Equal(t, tb.staticURL("page1.html"), got.Result().String())
+			got := tb.vu.RunPromise(t, code)
+			assert.Contains(t, tt.expected, got.Result().String())
+		})
+	}
+}
 
-	// Test regex pattern - matches any page with .html extension
-	got = tb.vu.RunPromise(t, `
-		await page.goto(testURL);
+func TestPageWaitForURLFailure(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipped due to https://github.com/grafana/k6/issues/4937")
+	}
 
-		await Promise.all([
-			page.waitForURL(/.*2\.html$/),
-			page.locator('#page2').click()
-		]);
-		return page.url();
-	`,
-	)
-	assert.Equal(t, tb.staticURL("page2.html"), got.Result().String())
+	t.Parallel()
 
-	// Test timeout when URL doesn't match
-	_, err = tb.vu.RunAsync(t, `
-		await page.goto(testURL);
+	tb := newTestBrowser(t, withFileServer())
+	tb.vu.ActivateVU()
+	tb.vu.StartIteration(t)
 
-		await Promise.all([
-			page.waitForURL(/.*nonexistent\.html$/, { timeout: 500 }),
-			page.locator('#page1').click()  // This goes to page1.html, not nonexistent.html
-		]);
-	`,
-	)
-	assert.ErrorContains(t, err, "timed out after 500ms")
+	// Setup
+	tb.vu.SetVar(t, "page", &sobek.Object{})
+	tb.vu.SetVar(t, "testURL", tb.staticURL("waitfornavigation_test.html"))
+	_, err := tb.vu.RunAsync(t, `
+			page = await browser.newPage();
+		`)
+	require.NoError(t, err)
 
-	// Test empty pattern (matches any navigation)
-	got = tb.vu.RunPromise(t, `
-		await page.goto(testURL);
-		await Promise.all([
-			page.waitForURL(''),
-			page.locator('#page2').click()
-		]);
-		return page.url();
-	`,
-	)
-	assert.True(t, strings.Contains(got.Result().String(), "page2.html") ||
-		strings.Contains(got.Result().String(), "waitfornavigation_test.html"))
+	tests := []struct {
+		name     string
+		code     string
+		expected string
+	}{
+		{
+			name: "timeout_on_mismatched_url",
+			code: `
+				await Promise.all([
+					page.waitForURL(/.*nonexistent\.html$/, { timeout: 500 }),
+					page.locator('#page1').click()  // This goes to page1.html, not nonexistent.html
+				]);
+			`,
+			expected: "timed out after 500ms",
+		},
+		{
+			name: "missing_required_argument",
+			code: `
+				await page.waitForURL();
+			`,
+			expected: "missing required argument 'url'",
+		},
+	}
 
-	// Test waitUntil option
-	got = tb.vu.RunPromise(t, `
-		await page.goto(testURL);
-		await Promise.all([
-			page.waitForURL(/.*page1\.html$/, { waitUntil: 'domcontentloaded' }),
-			page.locator('#page1').click()
-		]);
-		return page.url();
-	`,
-	)
-	assert.Equal(t, tb.staticURL("page1.html"), got.Result().String())
+	//nolint:paralleltest
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			code := fmt.Sprintf(`
+			await page.goto(testURL);
 
-	// Test when already at URL with regex pattern
-	got = tb.vu.RunPromise(t, `
-		await page.goto(testURL);
-		await page.waitForURL(/.*\/waitfornavigation_test\.html$/);
-		return page.url();
-	`,
-	)
-	assert.Equal(t, tb.staticURL("waitfornavigation_test.html"), got.Result().String())
+			%s`, tt.code)
 
-	// Expect error on null/undefined URL
-	_, err = tb.vu.RunAsync(t, `
-		await page.goto(testURL);
-
-		await page.waitForURL();
-	`,
-	)
-	assert.ErrorContains(t, err, "missing required argument 'url'")
+			_, err := tb.vu.RunAsync(t, code)
+			assert.ErrorContains(t, err, tt.expected)
+		})
+	}
 }
 
 func TestPageWaitForResponse(t *testing.T) {
