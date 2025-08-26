@@ -1410,7 +1410,7 @@ func TestPageWaitForSelector(t *testing.T) {
 			url:  "wait_for.html",
 			// set a timeout smaller than the time
 			// it takes the element to show up
-			customTimeout: time.Millisecond,
+			customTimeout: time.Nanosecond,
 			selector:      "#my-div",
 			errAssert: func(t *testing.T, e error) {
 				t.Helper()
