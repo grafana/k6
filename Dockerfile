@@ -1,37 +1,31 @@
-FROM --platform=$BUILDPLATFORM golang:1.24-alpine3.22 as builder
-WORKDIR $GOPATH/src/go.k6.io/k6
-COPY . .
-ARG TARGETOS TARGETARCH
-RUN apk --no-cache add git=~2
-RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -o /usr/bin/k6
+# --- Build Stage ---
+FROM --platform=$BUILDPLATFORM golang:1.24-alpine3.22 AS builder
 
-# Runtime stage
-FROM alpine:3.22 as release
+WORKDIR /src/k6
+
+COPY . .
+
+ARG TARGETOS
+ARG TARGETARCH
+
+# Required for xk6 and building extensions
+RUN apk --no-cache add git=~2
+
+# xk6 for building k6 with extensions
+RUN go install go.k6.io/xk6/cmd/xk6@latest
+
+RUN xk6 build --output /usr/bin/k6 \
+    --replace go.k6.io/k6=. \
+    --with github.com/szkiba/xk6-top@latest \
+    --with github.com/LeonAdato/xk6-output-statsd@v0.2.1
+
+# --- Runtime Stage ---
+FROM alpine:3.22 AS release
 
 RUN adduser -D -u 12345 -g 12345 k6
 COPY --from=builder /usr/bin/k6 /usr/bin/k6
 
 USER 12345
 WORKDIR /home/k6
-
-ENTRYPOINT ["k6"]
-
-# Browser-enabled bundle
-FROM release as with-browser
-
-USER root
-
-COPY --from=release /usr/bin/k6 /usr/bin/k6
-RUN apk --no-cache add chromium-swiftshader
-
-USER 12345
-
-ENV CHROME_BIN=/usr/bin/chromium-browser
-ENV CHROME_PATH=/usr/lib/chromium/
-
-ENV K6_BROWSER_HEADLESS=true
-# no-sandbox chrome arg is required to run chrome browser in
-# alpine and avoids the usage of SYS_ADMIN Docker capability
-ENV K6_BROWSER_ARGS=no-sandbox
 
 ENTRYPOINT ["k6"]

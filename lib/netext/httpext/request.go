@@ -13,12 +13,17 @@ import (
 	"strings"
 	"time"
 
+	"crypto/tls"
+	"net/url"
+
 	"github.com/Azure/go-ntlmssp"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/metrics"
+
+	"golang.org/x/net/http2"
 )
 
 // HTTPRequestCookie is a representation of a cookie used for request objects
@@ -60,6 +65,15 @@ type ncloser interface {
 
 type readCloser struct {
 	io.Reader
+}
+
+var sharedH2CTransport = &http2.Transport{
+    AllowHTTP: true,
+    DialTLSContext: func(ctx context.Context, network, addr string, _ *tls.Config) (net.Conn, error) {
+        fmt.Println("[h2c] Dialing new connection")  // Tmp logging for when connections are dialed
+		var d net.Dialer
+        return d.DialContext(ctx, network, addr)
+    },
 }
 
 // Close readers with differing Close() implementations
@@ -181,6 +195,18 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 		}
 	}
 
+	parsedURL, err := url.Parse(preq.URL.URL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid request URL: %w", err)
+	}
+	useH2C := parsedURL.Scheme == "http"
+
+	// Note: not adding ability to "switch back" from h2c
+	//       this could prob be implemented better if we care
+	if useH2C && state.Transport != sharedH2CTransport {
+		state.Transport = sharedH2CTransport
+	}
+
 	tracerTransport := newTransport(ctx, state, &preq.TagsAndMeta, preq.ResponseCallback)
 	var transport http.RoundTripper = tracerTransport
 
@@ -296,7 +322,12 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 		resp.URL = res.Request.URL.String()
 		resp.Status = res.StatusCode
 		resp.StatusText = res.Status
-		resp.Proto = res.Proto
+
+		if useH2C {
+			resp.Proto = "h2c"
+		} else {
+			resp.Proto = res.Proto
+		}
 
 		if res.TLS != nil {
 			resp.setTLSInfo(res.TLS)

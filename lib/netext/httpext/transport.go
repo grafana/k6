@@ -9,6 +9,7 @@ import (
 	"net/http/httptrace"
 	"strconv"
 	"sync"
+	"fmt"
 
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/netext"
@@ -61,6 +62,18 @@ func newTransport(
 	tagsAndMeta *metrics.TagsAndMeta,
 	responseCallback func(int) bool,
 ) *transport {
+	// Logging for when connections are dialed
+	if base, ok := state.Transport.(*http.Transport); ok {
+		originalDial := base.DialContext
+		if originalDial == nil {
+			originalDial = (&net.Dialer{}).DialContext
+		}
+		base.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+			fmt.Println("[h1/h2] Dialing new connection")
+			return originalDial(ctx, network, addr)
+		}
+	}
+
 	return &transport{
 		ctx:              ctx,
 		state:            state,
@@ -113,7 +126,14 @@ func (t *transport) measureAndEmitMetrics(unfReq *unfinishedRequest) *finishedRe
 			result.errorCode = errCode(1000 + unfReq.response.StatusCode) //nolint:gosec
 			tagsAndMeta.SetSystemTagOrMetaIfEnabled(enabledTags, metrics.TagErrorCode, strconv.Itoa(int(result.errorCode)))
 		}
-		tagsAndMeta.SetSystemTagOrMetaIfEnabled(enabledTags, metrics.TagProto, unfReq.response.Proto)
+		
+		// We need to special-case h2c, since the net/http library doesn't
+		// differentiate it in the Proto field, it just sets ProtoMajor to 2
+		if unfReq.response.ProtoMajor == 2 && unfReq.request.URL.Scheme == "http" {
+			tagsAndMeta.SetSystemTagOrMetaIfEnabled(enabledTags, metrics.TagProto, "h2c")
+		} else {
+			tagsAndMeta.SetSystemTagOrMetaIfEnabled(enabledTags, metrics.TagProto, unfReq.response.Proto)
+		}
 
 		if unfReq.response.TLS != nil {
 			tlsInfo, oscp := netext.ParseTLSConnState(unfReq.response.TLS)
