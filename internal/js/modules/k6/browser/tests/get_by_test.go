@@ -448,7 +448,7 @@ func TestGetByRoleSuccess(t *testing.T) {
 				}
 
 				for implName, impl := range getByRoleImplementations {
-					t.Run(implName, func(t *testing.T) {
+					t.Run(implName, func(t *testing.T) { //nolint:paralleltest
 						l := impl.GetByRole(tt.role, tt.opts)
 						c, err := l.Count()
 						require.NoError(t, err)
@@ -585,7 +585,7 @@ func TestGetByRoleSuccess(t *testing.T) {
 				}
 
 				for implName, impl := range getByRoleImplementations {
-					t.Run(implName, func(t *testing.T) {
+					t.Run(implName, func(t *testing.T) { //nolint:paralleltest
 						l := impl.GetByRole(tt.role, nil)
 						c, err := l.Count()
 						require.NoError(t, err)
@@ -753,7 +753,7 @@ func TestGetByRoleSuccess(t *testing.T) {
 				}
 
 				for implName, impl := range getByRoleImplementations {
-					t.Run(implName, func(t *testing.T) {
+					t.Run(implName, func(t *testing.T) { //nolint:paralleltest
 						l := impl.GetByRole(tt.role, tt.opts)
 						c, err := l.Count()
 						require.NoError(t, err)
