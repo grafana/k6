@@ -2448,18 +2448,7 @@ class InjectedScript {
     let lastTime = 0;
 
     const predicate = () => {
-      for (const state of states) {
-        if (state !== "stable") {
-          const result = this.checkElementState(node, state);
-          if (typeof result !== "boolean") {
-            return result;
-          }
-          if (!result) {
-            return continuePolling;
-          }
-          continue;
-        }
-
+      if (states.includes("stable")) {
         const element = this._retarget(node, "no-follow-label");
         if (!element) {
           return "error:notconnected";
@@ -2504,6 +2493,20 @@ class InjectedScript {
           return continuePolling;
         }
       }
+
+      for (const state of states) {
+        if (state !== "stable") {
+          const result = this.checkElementState(node, state);
+          if (typeof result !== "boolean") {
+            return result;
+          }
+          if (!result) {
+            return continuePolling;
+          }
+          continue;
+        }
+      }
+
       return true; // All states are good!
     };
 
