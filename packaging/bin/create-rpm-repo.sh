@@ -77,7 +77,7 @@ for arch in $architectures; do
     cp -av "$f" "$PWD/"
     rpm --addsign "${f##*/}"
   done
-  createrepo .
+  createrepo_c .
   cd -
 
   delete_old_pkgs "$arch"
