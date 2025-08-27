@@ -27,6 +27,13 @@ type Locator struct {
 	log *log.Logger
 }
 
+// LocatorOptions allows modifying the [Locator] behavior.
+type LocatorOptions struct {
+	// Matches only elements that contain the specified text.
+	// String or RegExp. Optional.
+	HasText string
+}
+
 // NewLocator creates and returns a new locator.
 func NewLocator(ctx context.Context, selector string, f *Frame, l *log.Logger) *Locator {
 	return &Locator{
