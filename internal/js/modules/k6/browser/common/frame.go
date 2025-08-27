@@ -1145,14 +1145,15 @@ func (f *Frame) buildAttributeSelector(attrName, attrValue string, opts *GetByBa
 	return b.String()
 }
 
-// Locator creates and returns a new locator for this frame.
+// GetByAltText creates and returns a new locator for this frame that allows locating elements by their alt text.
 func (f *Frame) GetByAltText(alt string, opts *GetByBaseOptions) *Locator {
 	f.log.Debugf("Frame:GetByAltText", "fid:%s furl:%q alt:%q opts:%+v", f.ID(), f.URL(), alt, opts)
 
 	return f.Locator("internal:attr="+f.buildAttributeSelector("alt", alt, opts), nil)
 }
 
-// Locator creates and returns a new locator for this frame.
+// GetByLabel creates and returns a new locator for this frame that allows locating input elements by the text
+// of the associated `<label>` or `aria-labelledby` element, or by the `aria-label` attribute.
 func (f *Frame) GetByLabel(label string, opts *GetByBaseOptions) *Locator {
 	f.log.Debugf("Frame:GetByLabel", "fid:%s furl:%q label:%q opts:%+v", f.ID(), f.URL(), label, opts)
 
