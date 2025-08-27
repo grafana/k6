@@ -2,6 +2,7 @@ package browser
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/grafana/sobek"
@@ -9,6 +10,7 @@ import (
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
+	k6common "go.k6.io/k6/js/common"
 )
 
 func cancelableTaskQueue(ctx context.Context, registerCallback func() func(func() error)) *taskqueue.TaskQueue {
@@ -25,6 +27,7 @@ func cancelableTaskQueue(ctx context.Context, registerCallback func() func(func(
 //
 //nolint:funlen,gocognit,cyclop
 func mapFrame(vu moduleVU, f *common.Frame) mapping {
+	rt := vu.Runtime()
 	maps := mapping{
 		"check": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
 			popts := common.NewFrameCheckOptions(f.Timeout())
@@ -142,6 +145,69 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				}
 				return s, nil
 			}), nil
+		},
+		"getByAltText": func(alt sobek.Value, opts sobek.Value) (*sobek.Object, error) {
+			if k6common.IsNullish(alt) {
+				return nil, errors.New("missing required argument 'altText'")
+			}
+			palt, popts := parseGetByBaseOptions(vu.Context(), alt, false, opts)
+
+			ml := mapLocator(vu, f.GetByAltText(palt, popts))
+			return rt.ToValue(ml).ToObject(rt), nil
+		},
+		"getByLabel": func(label sobek.Value, opts sobek.Value) (*sobek.Object, error) {
+			if k6common.IsNullish(label) {
+				return nil, errors.New("missing required argument 'label'")
+			}
+			plabel, popts := parseGetByBaseOptions(vu.Context(), label, true, opts)
+
+			ml := mapLocator(vu, f.GetByLabel(plabel, popts))
+			return rt.ToValue(ml).ToObject(rt), nil
+		},
+		"getByPlaceholder": func(placeholder sobek.Value, opts sobek.Value) (*sobek.Object, error) {
+			if k6common.IsNullish(placeholder) {
+				return nil, errors.New("missing required argument 'placeholder'")
+			}
+			pplaceholder, popts := parseGetByBaseOptions(vu.Context(), placeholder, false, opts)
+
+			ml := mapLocator(vu, f.GetByPlaceholder(pplaceholder, popts))
+			return rt.ToValue(ml).ToObject(rt), nil
+		},
+		"getByRole": func(role sobek.Value, opts sobek.Value) (*sobek.Object, error) {
+			if k6common.IsNullish(role) {
+				return nil, errors.New("missing required argument 'role'")
+			}
+			popts := parseGetByRoleOptions(vu.Context(), opts)
+
+			ml := mapLocator(vu, f.GetByRole(role.String(), popts))
+			return rt.ToValue(ml).ToObject(rt), nil
+		},
+		"getByTestId": func(testID sobek.Value) (*sobek.Object, error) {
+			if k6common.IsNullish(testID) {
+				return nil, errors.New("missing required argument 'testId'")
+			}
+			ptestID := parseStringOrRegex(testID, false)
+
+			ml := mapLocator(vu, f.GetByTestID(ptestID))
+			return rt.ToValue(ml).ToObject(rt), nil
+		},
+		"getByText": func(text sobek.Value, opts sobek.Value) (*sobek.Object, error) {
+			if k6common.IsNullish(text) {
+				return nil, errors.New("missing required argument 'text'")
+			}
+			ptext, popts := parseGetByBaseOptions(vu.Context(), text, true, opts)
+
+			ml := mapLocator(vu, f.GetByText(ptext, popts))
+			return rt.ToValue(ml).ToObject(rt), nil
+		},
+		"getByTitle": func(title sobek.Value, opts sobek.Value) (*sobek.Object, error) {
+			if k6common.IsNullish(title) {
+				return nil, errors.New("missing required argument 'title'")
+			}
+			ptitle, popts := parseGetByBaseOptions(vu.Context(), title, false, opts)
+
+			ml := mapLocator(vu, f.GetByTitle(ptitle, popts))
+			return rt.ToValue(ml).ToObject(rt), nil
 		},
 		"goto": func(url string, opts sobek.Value) (*sobek.Promise, error) {
 			gopts := common.NewFrameGotoOptions(
