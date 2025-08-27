@@ -1690,24 +1690,38 @@ func (h *ElementHandle) newPointerAction(
 func retryPointerAction(
 	apiCtx context.Context, fn retryablePointerActionFunc, opts *ElementHandleBasePointerOptions,
 ) (res any, err error) {
-	// try the default scrolling
-	if res, err = fn(apiCtx, nil); opts.Force || err == nil {
-		return res, err
-	}
-	// try with different scrolling options
-	for _, p := range []ScrollPosition{
-		ScrollPositionStart,
-		ScrollPositionCenter,
-		ScrollPositionEnd,
-		ScrollPositionNearest,
-	} {
-		s := ScrollIntoViewOptions{Block: p, Inline: p}
-		if res, err = fn(apiCtx, &s); err == nil {
-			break
+	for {
+		res, err = fn(apiCtx, nil)
+		if opts.Force || err == nil {
+			return res, err
+		}
+
+		// try with different scrolling options
+		for _, p := range []ScrollPosition{
+			ScrollPositionStart,
+			ScrollPositionCenter,
+			ScrollPositionEnd,
+			ScrollPositionNearest,
+		} {
+			s := ScrollIntoViewOptions{Block: p, Inline: p}
+			if res, err = fn(apiCtx, &s); err == nil {
+				return res, nil
+			}
+		}
+
+		if !strings.Contains(err.Error(), "check if element is visible") &&
+			!strings.Contains(err.Error(), "error:notvisible") {
+			return res, err
+		}
+
+		// Wait with timeout or context cancellation
+		select {
+		case <-apiCtx.Done():
+			return nil, apiCtx.Err()
+		case <-time.After(20 * time.Millisecond):
+			// Continue retrying after delay
 		}
 	}
-
-	return res, err
 }
 
 func errorFromDOMError(v any) error {
