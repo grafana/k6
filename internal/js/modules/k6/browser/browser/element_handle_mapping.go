@@ -2,6 +2,7 @@ package browser
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/grafana/sobek"
 
@@ -15,7 +16,13 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 	maps := mapping{
 		"boundingBox": func() *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return eh.BoundingBox(), nil
+				box, err := eh.BoundingBox()
+				// We want to avoid errors when an element is not visible and instead
+				// opt to return a nil rectangle -- this matches Playwright's behaviour.
+				if err != nil && strings.Contains(err.Error(), "check if element is visible") {
+					return nil, nil
+				}
+				return box, err
 			})
 		},
 		"check": func(opts sobek.Value) (*sobek.Promise, error) {
