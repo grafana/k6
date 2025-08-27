@@ -14,7 +14,6 @@ import (
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/cdproto/runtime"
-	"github.com/grafana/sobek"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
 	"go.k6.io/k6/internal/js/modules/k6/browser/log"
@@ -1612,10 +1611,10 @@ func (f *Frame) ID() string {
 }
 
 // Locator creates and returns a new locator for this frame.
-func (f *Frame) Locator(selector string, opts sobek.Value) *Locator {
+func (f *Frame) Locator(selector string, opts *LocatorOptions) *Locator {
 	f.log.Debugf("Frame:Locator", "fid:%s furl:%q selector:%q opts:%+v", f.ID(), f.URL(), selector, opts)
 
-	return NewLocator(f.ctx, nil /* opts */, selector, f, f.log)
+	return NewLocator(f.ctx, opts, selector, f, f.log)
 }
 
 // LoaderID returns the ID of the frame that loaded this frame.
