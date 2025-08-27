@@ -416,7 +416,10 @@ func (f *Frame) position() (*Position, error) {
 		return nil, err
 	}
 
-	box := element.BoundingBox()
+	box, err := element.BoundingBox()
+	if err != nil {
+		return nil, err
+	}
 
 	return &Position{X: box.X, Y: box.Y}, nil
 }

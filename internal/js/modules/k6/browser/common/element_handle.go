@@ -68,7 +68,7 @@ func (h *ElementHandle) boundingBox() (*Rect, error) {
 
 	position, err := h.frame.position()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("getting position of parent frame: %w", err)
 	}
 
 	return &Rect{X: x + position.X, Y: y + position.Y, Width: width, Height: height}, nil
@@ -94,7 +94,11 @@ func (h *ElementHandle) translatePointToPage(apiCtx context.Context, point Posit
 		return Position{}, err
 	}
 
-	box := el.BoundingBox()
+	box, err := el.BoundingBox()
+	if err != nil {
+		return Position{}, fmt.Errorf("getting bounding box of parent frame: %w", err)
+	}
+
 	if box.contains(point) {
 		h.logger.Debugf("ElementHandle:translatePointToPage", "point is already in the page")
 		return point, nil
@@ -197,9 +201,12 @@ func (h *ElementHandle) click(p *Position, opts *MouseClickOptions) error {
 // This will get the clickable point of the element relative to the page even
 // when the element is in an iframe. In some cases this isn't the case and we
 // need to translate the point to the page.
-func (h *ElementHandle) clickablePoint() *Position {
-	r := h.BoundingBox()
-	return &Position{X: r.X + r.Width/2, Y: r.Y + r.Height/2}
+func (h *ElementHandle) clickablePoint() (*Position, error) {
+	r, err := h.BoundingBox()
+	if err != nil {
+		return nil, err
+	}
+	return &Position{X: r.X + r.Width/2, Y: r.Y + r.Height/2}, nil
 }
 
 func (h *ElementHandle) dblclick(p *Position, opts *MouseClickOptions) error {
@@ -388,7 +395,11 @@ func (h *ElementHandle) offsetPosition(apiCtx context.Context, offset *Position)
 		return nil, fmt.Errorf("converting result (%v of type %t) to border: %w", result, result, err)
 	}
 
-	box := h.BoundingBox()
+	box, err := h.BoundingBox()
+	if err != nil {
+		return nil, err
+	}
+
 	if box == nil || (border.Left == 0 && border.Top == 0) {
 		return nil, errorFromDOMError("error:notvisible")
 	}
@@ -762,12 +773,15 @@ func (h *ElementHandle) AsElement() *ElementHandle {
 }
 
 // BoundingBox returns this element's bounding box.
-func (h *ElementHandle) BoundingBox() *Rect {
+func (h *ElementHandle) BoundingBox() (*Rect, error) {
 	bbox, err := h.boundingBox()
-	if err != nil {
-		return nil // Don't panic here, just return nil
+	if err != nil && strings.Contains(err.Error(), "Could not compute box model") {
+		return nil, fmt.Errorf("check if element is visible: %w", err)
 	}
-	return bbox
+	if err != nil {
+		return nil, fmt.Errorf("getting bounding box: %w", err)
+	}
+	return bbox, nil
 }
 
 // Click scrolls element into view and clicks in the center of the element
@@ -1616,7 +1630,10 @@ func (h *ElementHandle) newPointerAction(
 				return nil, fmt.Errorf("getting element position: %w", err)
 			}
 		} else {
-			p = h.clickablePoint()
+			p, err = h.clickablePoint()
+			if err != nil {
+				return nil, fmt.Errorf("getting clickable point: %w", err)
+			}
 		}
 
 		// Further translation of the point might be necessary if the point
