@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/grafana/sobek"
@@ -416,7 +415,7 @@ func (l *Locator) GetByAltText(alt string, opts *GetByBaseOptions) *Locator {
 		l.frame.ID(), l.frame.URL(), l.selector, alt, opts,
 	)
 
-	return l.Locator("internal:attr=" + l.frame.buildAttributeSelector("alt", alt, opts))
+	return l.Locator(l.frame.buildAttributeSelector("alt", alt, opts))
 }
 
 // GetByLabel creates and returns a new relative locator that allows locating input elements by the text
@@ -427,16 +426,7 @@ func (l *Locator) GetByLabel(label string, opts *GetByBaseOptions) *Locator {
 		l.frame.ID(), l.frame.URL(), l.selector, label, opts,
 	)
 
-	selector := "internal:label=" + label
-	if isQuotedText(label) {
-		if opts != nil && opts.Exact != nil && *opts.Exact {
-			selector = "internal:label=" + label + "s"
-		} else {
-			selector = "internal:label=" + label + "i"
-		}
-	}
-
-	return l.Locator(selector)
+	return l.Locator(l.frame.buildLabelSelector(label, opts))
 }
 
 // GetByPlaceholder creates and returns a new relative locator for this based on the placeholder attribute.
@@ -446,7 +436,7 @@ func (l *Locator) GetByPlaceholder(placeholder string, opts *GetByBaseOptions) *
 		l.frame.ID(), l.frame.URL(), l.selector, placeholder, opts,
 	)
 
-	return l.Locator("internal:attr=" + l.frame.buildAttributeSelector("placeholder", placeholder, opts))
+	return l.Locator(l.frame.buildAttributeSelector("placeholder", placeholder, opts))
 }
 
 // GetByRole creates and returns a new relative locator using the ARIA role and any additional options.
@@ -456,52 +446,7 @@ func (l *Locator) GetByRole(role string, opts *GetByRoleOptions) *Locator {
 		l.frame.ID(), l.frame.URL(), l.selector, role, opts,
 	)
 
-	properties := make(map[string]string)
-
-	if opts == nil {
-		return l.Locator("internal:role=" + role)
-	}
-
-	if opts.Checked != nil {
-		properties["checked"] = strconv.FormatBool(*opts.Checked)
-	}
-	if opts.Disabled != nil {
-		properties["disabled"] = strconv.FormatBool(*opts.Disabled)
-	}
-	if opts.Selected != nil {
-		properties["selected"] = strconv.FormatBool(*opts.Selected)
-	}
-	if opts.Expanded != nil {
-		properties["expanded"] = strconv.FormatBool(*opts.Expanded)
-	}
-	if opts.IncludeHidden != nil {
-		properties["include-hidden"] = strconv.FormatBool(*opts.IncludeHidden)
-	}
-	if opts.Level != nil {
-		properties["level"] = strconv.FormatInt(*opts.Level, 10)
-	}
-	if opts.Name != nil && *opts.Name != "" {
-		// Exact option can only be applied to quoted strings.
-		if isQuotedText(*opts.Name) {
-			if opts.Exact != nil && *opts.Exact {
-				*opts.Name = (*opts.Name) + "s"
-			} else {
-				*opts.Name = (*opts.Name) + "i"
-			}
-		}
-		properties["name"] = *opts.Name
-	}
-	if opts.Pressed != nil {
-		properties["pressed"] = strconv.FormatBool(*opts.Pressed)
-	}
-
-	var builder strings.Builder
-	builder.WriteString("internal:role=" + role)
-	for key, value := range properties {
-		builder.WriteString("[" + key + "=" + value + "]")
-	}
-
-	return l.Locator(builder.String())
+	return l.Locator(l.frame.buildRoleSelector(role, opts))
 }
 
 // GetByTestID creates and returns a new relative locator based on the data-testid attribute.
@@ -511,7 +456,7 @@ func (l *Locator) GetByTestID(testID string) *Locator {
 		l.frame.ID(), l.frame.URL(), l.selector, testID,
 	)
 
-	return l.Locator("internal:attr=[data-testid=" + testID + "]")
+	return l.Locator(l.frame.buildTestIDSelector(testID))
 }
 
 // GetByText creates and returns a new relative locator based on text content.
@@ -521,16 +466,7 @@ func (l *Locator) GetByText(text string, opts *GetByBaseOptions) *Locator {
 		l.frame.ID(), l.frame.URL(), l.selector, text, opts,
 	)
 
-	selector := "internal:text=" + text
-	if isQuotedText(text) {
-		if opts != nil && opts.Exact != nil && *opts.Exact {
-			selector = "internal:text=" + text + "s"
-		} else {
-			selector = "internal:text=" + text + "i"
-		}
-	}
-
-	return l.Locator(selector)
+	return l.Locator(l.frame.buildTextSelector(text, opts))
 }
 
 // GetByTitle creates and returns a new relative locator based on the title attribute.
@@ -540,7 +476,7 @@ func (l *Locator) GetByTitle(title string, opts *GetByBaseOptions) *Locator {
 		l.frame.ID(), l.frame.URL(), l.selector, title, opts,
 	)
 
-	return l.Locator("internal:attr=" + l.frame.buildAttributeSelector("title", title, opts))
+	return l.Locator(l.frame.buildAttributeSelector("title", title, opts))
 }
 
 // Locator creates and returns a new locator chained/relative to the current locator.
