@@ -1,0 +1,32 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>RAF-Toggling Counter Button</title>
+</head>
+<body>
+  <p>Count: <span id="value">0</span></p>
+
+  <button id="incBtn" type="button">+1</button>
+
+  <script>
+    let count = 0;
+    const valueEl = document.getElementById('value');
+    const incBtn = document.getElementById('incBtn');
+
+    incBtn.addEventListener('click', function () {
+      count += 1;
+      valueEl.textContent = count;
+      console.log('click', count);
+    });
+
+    function loop() {
+      // Flip visibility every animation frame (~60 times per second)
+      incBtn.hidden = !incBtn.hidden;
+      requestAnimationFrame(loop);
+    }
+
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>
