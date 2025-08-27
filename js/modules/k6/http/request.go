@@ -287,13 +287,13 @@ func (c *Client) parseRequest(
 
 	// TODO: ditch sobek.Value, reflections and Object and use a simple go map and type assertions?
 	//nolint: nestif
-	if params != nil && !sobek.IsUndefined(params) && !sobek.IsNull(params) {
+	if !common.IsNullish(params) {
 		params := params.ToObject(rt)
 		for _, k := range params.Keys() {
 			switch k {
 			case "cookies":
 				cookiesV := params.Get(k)
-				if sobek.IsUndefined(cookiesV) || sobek.IsNull(cookiesV) {
+				if common.IsNullish(cookiesV) {
 					continue
 				}
 				cookies := cookiesV.ToObject(rt)
@@ -302,7 +302,7 @@ func (c *Client) parseRequest(
 				}
 				for _, key := range cookies.Keys() {
 					cookieV := cookies.Get(key)
-					if sobek.IsUndefined(cookieV) || sobek.IsNull(cookieV) {
+					if common.IsNullish(cookieV) {
 						continue
 					}
 					switch cookieV.ExportType() {
@@ -323,7 +323,7 @@ func (c *Client) parseRequest(
 				}
 			case "headers":
 				headersV := params.Get(k)
-				if sobek.IsUndefined(headersV) || sobek.IsNull(headersV) {
+				if common.IsNullish(headersV) {
 					continue
 				}
 				headers := headersV.ToObject(rt)
@@ -339,7 +339,7 @@ func (c *Client) parseRequest(
 				}
 			case "jar":
 				jarV := params.Get(k)
-				if sobek.IsUndefined(jarV) || sobek.IsNull(jarV) {
+				if common.IsNullish(jarV) {
 					continue
 				}
 				if v, ok := jarV.Export().(*CookieJar); ok {
