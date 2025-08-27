@@ -591,6 +591,9 @@ func (f *Frame) waitFor(
 		if strings.Contains(err.Error(), "Execution context was destroyed") {
 			return f.waitFor(selector, opts, retryCount)
 		}
+		if strings.Contains(err.Error(), "visible") {
+			return f.waitFor(selector, opts, retryCount)
+		}
 	}
 
 	return handle, err
