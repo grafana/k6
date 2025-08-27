@@ -174,7 +174,7 @@ func (mi *ModuleInstance) newTestInfo() (*sobek.Object, error) {
 		"abort": func() interface{} {
 			return func(msg sobek.Value) {
 				reason := errext.AbortTest
-				if msg != nil && !sobek.IsUndefined(msg) {
+				if !common.IsNullish(msg) {
 					reason = fmt.Sprintf("%s: %s", reason, msg.String())
 				}
 				rt.Interrupt(&errext.InterruptError{Reason: reason})
@@ -183,7 +183,7 @@ func (mi *ModuleInstance) newTestInfo() (*sobek.Object, error) {
 		"fail": func() interface{} {
 			return func(msg sobek.Value) {
 				reason := errext.MarkedAsFailedTest
-				if msg != nil && !sobek.IsUndefined(msg) {
+				if !common.IsNullish(msg) {
 					reason = fmt.Sprintf("%s: %s", reason, msg.String())
 				}
 
