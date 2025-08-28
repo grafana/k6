@@ -691,6 +691,40 @@ func (h *ElementHandle) waitForElementState(
 		"waiting for states %v of element %q", states, reflect.TypeOf(result))
 }
 
+// stepIntoFrame steps into an iframe/frame. Due to CORS, we need to perform this
+// step outside of the browser (chromium). It returns the frame that it has stepped
+// into and the selector to use within that frame.
+func (h *ElementHandle) stepIntoFrame(
+	apiCtx context.Context, parsedSelector *Selector, frameNavIndex int, opts *FrameWaitForSelectorOptions,
+) (*Frame, string, error) {
+	// Split selector at frame navigation boundary
+	beforeFrame, afterFrame := h.splitSelectorAtFrame(parsedSelector, frameNavIndex)
+
+	// Find the iframe element using the "before frame" selector
+	iframeSelector := h.reconstructSelector(beforeFrame)
+
+	iframeHandle, err := h.waitForSelector(apiCtx, iframeSelector, opts)
+	if err != nil {
+		return nil, "", fmt.Errorf("finding iframe with selector %q: %w", iframeSelector, err)
+	}
+
+	// This is a valid response from waitForSelector. It means that the element
+	// was either hidden or detached.
+	if iframeHandle == nil {
+		return nil, "", errors.New("check if element is visible")
+	}
+
+	frame, err := iframeHandle.ContentFrame()
+	if err != nil {
+		return nil, "", fmt.Errorf("getting iframe frame: %w", err)
+	}
+
+	// Wait for selector in the iframe using the "after frame" selector
+	afterFrameSelector := h.reconstructSelector(afterFrame)
+
+	return frame, afterFrameSelector, nil
+}
+
 func (h *ElementHandle) waitForSelector(
 	apiCtx context.Context, selector string, opts *FrameWaitForSelectorOptions,
 ) (*ElementHandle, error) {
@@ -698,6 +732,27 @@ func (h *ElementHandle) waitForSelector(
 	if err != nil {
 		return nil, err
 	}
+
+	// Check for frame navigation in the selector
+	frameNavIndex := h.findFrameNavigationIndex(parsedSelector)
+	if frameNavIndex != -1 {
+		// Strict is true because we assume the user is interested in the element
+		// in the frame and not the frame it is in.
+		opts := &FrameWaitForSelectorOptions{
+			State:   DOMElementStateAttached,
+			Timeout: opts.Timeout,
+			Strict:  true,
+		}
+
+		frame, afterFrameSelector, err := h.stepIntoFrame(apiCtx, parsedSelector, frameNavIndex, opts)
+		if err != nil {
+			return nil, err
+		}
+
+		return frame.waitForSelector(afterFrameSelector, opts)
+	}
+
+	// No frame navigation - proceed with normal waitForSelector logic
 	fn := `
 		(node, injected, selector, strict, state, timeout, ...args) => {
 			return injected.waitForSelector(selector, node, strict, state, 'raf', timeout, ...args);
@@ -719,6 +774,8 @@ func (h *ElementHandle) waitForSelector(
 	case *ElementHandle:
 		return r, nil
 	default:
+		// This is a valid response, which means that the element was either
+		// hidden or detached.
 		return nil, nil //nolint:nilnil
 	}
 }
@@ -729,6 +786,26 @@ func (h *ElementHandle) count(apiCtx context.Context, selector string) (int, err
 		return 0, err
 	}
 
+	// Check for frame navigation in the selector
+	frameNavIndex := h.findFrameNavigationIndex(parsedSelector)
+	if frameNavIndex != -1 {
+		// Strict is true because we assume the user is interested in the element
+		// in the frame and not the frame it is in.
+		opts := &FrameWaitForSelectorOptions{
+			State:   DOMElementStateAttached,
+			Timeout: h.frame.defaultTimeout(),
+			Strict:  true,
+		}
+
+		frame, afterFrameSelector, err := h.stepIntoFrame(apiCtx, parsedSelector, frameNavIndex, opts)
+		if err != nil {
+			return 0, err
+		}
+
+		return frame.count(afterFrameSelector)
+	}
+
+	// No frame navigation - proceed with normal count logic
 	fn := `
 			(node, injected, selector) => {
 				return injected.count(selector, node);
@@ -754,6 +831,51 @@ func (h *ElementHandle) count(apiCtx context.Context, selector string) (int, err
 	default:
 		return 0, fmt.Errorf("unexpected value %v of type %T", r, r)
 	}
+}
+
+// findFrameNavigationIndex finds the index of the first internal:control=enter-frame directive
+func (h *ElementHandle) findFrameNavigationIndex(selector *Selector) int {
+	for i, part := range selector.Parts {
+		if part.Name == "internal:control" && part.Body == "enter-frame" {
+			return i
+		}
+	}
+	return -1
+}
+
+// splitSelectorAtFrame splits a selector at the frame navigation boundary
+func (h *ElementHandle) splitSelectorAtFrame(selector *Selector, frameIndex int) (*Selector, *Selector) {
+	beforeFrame := &Selector{
+		Selector: selector.Selector, // Keep original for reference
+		Parts:    selector.Parts[:frameIndex],
+		Capture:  selector.Capture,
+	}
+
+	afterFrame := &Selector{
+		Selector: selector.Selector, // Keep original for reference
+		Parts:    selector.Parts[frameIndex+1:],
+		Capture:  selector.Capture,
+	}
+
+	return beforeFrame, afterFrame
+}
+
+// reconstructSelector rebuilds a selector string from selector parts
+func (h *ElementHandle) reconstructSelector(selector *Selector) string {
+	if len(selector.Parts) == 0 {
+		return ""
+	}
+
+	parts := make([]string, len(selector.Parts))
+	for i, part := range selector.Parts {
+		if part.Name == "css" {
+			parts[i] = part.Body
+		} else {
+			parts[i] = part.Name + "=" + part.Body
+		}
+	}
+
+	return strings.Join(parts, " >> ")
 }
 
 // AsElement returns this element handle.
@@ -1131,6 +1253,27 @@ func (h *ElementHandle) Query(selector string, strict bool) (_ *ElementHandle, r
 	if err != nil {
 		return nil, fmt.Errorf("parsing selector %q: %w", selector, err)
 	}
+
+	// Check for frame navigation in the selector
+	frameNavIndex := h.findFrameNavigationIndex(parsedSelector)
+	if frameNavIndex != -1 {
+		// Strict is true because we assume the user is interested in the element
+		// in the frame and not the frame it is in.
+		opts := &FrameWaitForSelectorOptions{
+			State:   DOMElementStateAttached,
+			Timeout: h.frame.defaultTimeout(),
+			Strict:  true,
+		}
+
+		frame, afterFrameSelector, err := h.stepIntoFrame(h.ctx, parsedSelector, frameNavIndex, opts)
+		if err != nil {
+			return nil, err
+		}
+
+		return frame.Query(afterFrameSelector, strict)
+	}
+
+	// No frame navigation - proceed with normal Query logic
 	querySelector := `
 		(node, injected, selector, strict) => {
 			return injected.querySelector(selector, strict, node || document);
