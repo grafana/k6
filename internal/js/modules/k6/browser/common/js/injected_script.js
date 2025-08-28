@@ -2445,7 +2445,6 @@ class InjectedScript {
     let lastRect = undefined;
     let counter = 0;
     let samePositionCounter = 0;
-    let lastTime = 0;
 
     const predicate = () => {
       if (states.includes("stable")) {
@@ -2460,13 +2459,6 @@ class InjectedScript {
         if (++counter === 1) {
           return continuePolling;
         }
-
-        // Drop frames that are shorter than 16ms - WebKit Win bug.
-        const time = performance.now();
-        if (this._stableRafCount > 1 && time - lastTime < 15) {
-          return continuePolling;
-        }
-        lastTime = time;
 
         const clientRect = element.getBoundingClientRect();
         const rect = {
