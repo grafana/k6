@@ -440,12 +440,9 @@ func TestGetByRoleSuccess(t *testing.T) {
 				)
 				require.NoError(t, err)
 
-				getByRoleImplementations := map[string]interface {
+				getByRoleImplementations := getByImplementationsOf[interface {
 					GetByRole(role string, opts *common.GetByRoleOptions) *common.Locator
-				}{
-					"page":  p,
-					"frame": p.MainFrame(),
-				}
+				}](p)
 
 				for implName, impl := range getByRoleImplementations {
 					t.Run(implName, func(t *testing.T) { //nolint:paralleltest
@@ -577,12 +574,9 @@ func TestGetByRoleSuccess(t *testing.T) {
 				)
 				require.NoError(t, err)
 
-				getByRoleImplementations := map[string]interface {
+				getByRoleImplementations := getByImplementationsOf[interface {
 					GetByRole(role string, opts *common.GetByRoleOptions) *common.Locator
-				}{
-					"page":  p,
-					"frame": p.MainFrame(),
-				}
+				}](p)
 
 				for implName, impl := range getByRoleImplementations {
 					t.Run(implName, func(t *testing.T) { //nolint:paralleltest
@@ -745,12 +739,9 @@ func TestGetByRoleSuccess(t *testing.T) {
 				)
 				require.NoError(t, err)
 
-				getByRoleImplementations := map[string]interface {
+				getByRoleImplementations := getByImplementationsOf[interface {
 					GetByRole(role string, opts *common.GetByRoleOptions) *common.Locator
-				}{
-					"page":  p,
-					"frame": p.MainFrame(),
-				}
+				}](p)
 
 				for implName, impl := range getByRoleImplementations {
 					t.Run(implName, func(t *testing.T) { //nolint:paralleltest
@@ -808,12 +799,9 @@ func TestGetByRoleFailure(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			getByRoleImplementations := map[string]interface {
+			getByRoleImplementations := getByImplementationsOf[interface {
 				GetByRole(role string, opts *common.GetByRoleOptions) *common.Locator
-			}{
-				"page":  p,
-				"frame": p.MainFrame(),
-			}
+			}](p)
 
 			for implName, impl := range getByRoleImplementations {
 				t.Run(implName, func(t *testing.T) {
@@ -888,12 +876,9 @@ func TestGetByAltTextSuccess(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			getByAltTextImplementations := map[string]interface {
+			getByAltTextImplementations := getByImplementationsOf[interface {
 				GetByAltText(alt string, opts *common.GetByBaseOptions) *common.Locator
-			}{
-				"page":  p,
-				"frame": p.MainFrame(),
-			}
+			}](p)
 
 			for implName, impl := range getByAltTextImplementations {
 				t.Run(implName, func(t *testing.T) {
@@ -976,12 +961,9 @@ func TestGetByLabelSuccess(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			getByLabelImplementations := map[string]interface {
+			getByLabelImplementations := getByImplementationsOf[interface {
 				GetByLabel(label string, opts *common.GetByBaseOptions) *common.Locator
-			}{
-				"page":  p,
-				"frame": p.MainFrame(),
-			}
+			}](p)
 
 			for implName, impl := range getByLabelImplementations {
 				t.Run(implName, func(t *testing.T) {
@@ -1075,12 +1057,9 @@ func TestGetByPlaceholderSuccess(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			getByPlaceholderImplementations := map[string]interface {
+			getByPlaceholderImplementations := getByImplementationsOf[interface {
 				GetByPlaceholder(placeholder string, opts *common.GetByBaseOptions) *common.Locator
-			}{
-				"page":  p,
-				"frame": p.MainFrame(),
-			}
+			}](p)
 
 			for implName, impl := range getByPlaceholderImplementations {
 				t.Run(implName, func(t *testing.T) {
@@ -1174,12 +1153,9 @@ func TestGetByTitleSuccess(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			getByTitleImplementations := map[string]interface {
+			getByTitleImplementations := getByImplementationsOf[interface {
 				GetByTitle(title string, opts *common.GetByBaseOptions) *common.Locator
-			}{
-				"page":  p,
-				"frame": p.MainFrame(),
-			}
+			}](p)
 
 			for implName, impl := range getByTitleImplementations {
 				t.Run(implName, func(t *testing.T) {
@@ -1266,12 +1242,9 @@ func TestGetByTestIDSuccess(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			getByTestIDImplementations := map[string]interface {
+			getByTestIDImplementations := getByImplementationsOf[interface {
 				GetByTestID(testID string) *common.Locator
-			}{
-				"page":  p,
-				"frame": p.MainFrame(),
-			}
+			}](p)
 
 			for implName, impl := range getByTestIDImplementations {
 				t.Run(implName, func(t *testing.T) {
@@ -1387,12 +1360,9 @@ func TestGetByTextSuccess(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			getByTextImplementations := map[string]interface {
+			getByTextImplementations := getByImplementationsOf[interface {
 				GetByText(text string, opts *common.GetByBaseOptions) *common.Locator
-			}{
-				"page":  p,
-				"frame": p.MainFrame(),
-			}
+			}](p)
 
 			for implName, impl := range getByTextImplementations {
 				t.Run(implName, func(t *testing.T) {
@@ -1462,5 +1432,12 @@ func TestGetByNullHandling(t *testing.T) {
 		await %s.getByText().click();
 	`, getByImpl)
 		require.ErrorContains(t, err, "missing required argument 'text'")
+	}
+}
+
+func getByImplementationsOf[T any](p *common.Page) map[string]T {
+	return map[string]T{
+		"page":  any(p).(T),
+		"frame": any(p.MainFrame()).(T),
 	}
 }
