@@ -2,7 +2,9 @@ package modules
 
 import (
 	"fmt"
+	"maps"
 	"net/url"
+	"slices"
 	"strings"
 
 	"github.com/grafana/sobek"
@@ -28,15 +30,16 @@ type moduleCacheElement struct {
 
 // ModuleResolver knows how to get base Module that can be initialized
 type ModuleResolver struct {
-	cache     map[string]moduleCacheElement
-	goModules map[string]any
-	loadCJS   FileLoader
-	compiler  *compiler.Compiler
-	locked    bool
-	reverse   map[any]*url.URL // maybe use sobek.ModuleRecord as key
-	base      *url.URL
-	usage     *usage.Usage
-	logger    logrus.FieldLogger
+	cache           map[string]moduleCacheElement
+	goModules       map[string]any
+	loadCJS         FileLoader
+	compiler        *compiler.Compiler
+	locked          bool
+	reverse         map[any]*url.URL // maybe use sobek.ModuleRecord as key
+	base            *url.URL
+	usage           *usage.Usage
+	logger          logrus.FieldLogger
+	unknowndModules map[string]struct{}
 }
 
 // NewModuleResolver returns a new module resolution instance that will resolve.
@@ -47,14 +50,15 @@ func NewModuleResolver(
 	u *usage.Usage, logger logrus.FieldLogger,
 ) *ModuleResolver {
 	return &ModuleResolver{
-		goModules: goModules,
-		cache:     make(map[string]moduleCacheElement),
-		loadCJS:   loadCJS,
-		compiler:  c,
-		reverse:   make(map[any]*url.URL),
-		base:      base,
-		usage:     u,
-		logger:    logger,
+		goModules:       goModules,
+		cache:           make(map[string]moduleCacheElement),
+		loadCJS:         loadCJS,
+		compiler:        c,
+		reverse:         make(map[any]*url.URL),
+		base:            base,
+		usage:           u,
+		logger:          logger,
+		unknowndModules: make(map[string]struct{}),
 	}
 }
 
@@ -66,13 +70,18 @@ func (mr *ModuleResolver) resolveSpecifier(basePWD *url.URL, arg string) (*url.U
 	return specifier, nil
 }
 
+func (mr *ModuleResolver) unknownModules() []string {
+	return slices.Collect(maps.Keys(mr.unknowndModules))
+}
+
 func (mr *ModuleResolver) requireModule(name string) (sobek.ModuleRecord, error) {
 	if mr.locked {
 		return nil, fmt.Errorf(notPreviouslyResolvedModule, name)
 	}
 	mod, ok := mr.goModules[name]
 	if !ok {
-		return nil, fmt.Errorf("unknown module: %s", name)
+		mr.unknowndModules[name] = struct{}{}
+		return &unknownModule{name: name, requested: make(map[string]struct{})}, nil
 	}
 	// we don't want to report extensions and we would have hit cache if this isn't the first time
 	if !strings.HasPrefix(name, "k6/x/") {
@@ -249,8 +258,14 @@ func (ms *ModuleSystem) RunSourceData(source *loader.SourceData) (*RunSourceData
 	}
 	ci, ok := mod.(sobek.CyclicModuleRecord)
 	if !ok {
-		panic("somehow running source data for " + source.URL.String() + " didn't produce a cyclide module record")
+		panic("somehow running source data for " + source.URL.String() + " didn't produce a cyclic module record")
 	}
+	unknownModules := ms.resolver.unknownModules()
+	if len(unknownModules) > 0 {
+		slices.Sort(unknownModules)
+		return nil, unknownModulesError{unknownModules: unknownModules}
+	}
+
 	rt := ms.vu.Runtime()
 	promise := rt.CyclicModuleRecordEvaluate(ci, ms.resolver.sobekModuleResolver)
 
@@ -305,4 +320,15 @@ func ExportGloballyModule(rt *sobek.Runtime, modSys *ModuleSystem, moduleName st
 			panic(fmt.Errorf("failed to set '%s' global object: %w", key, err))
 		}
 	}
+}
+
+// TODO: move it to lib or something so it can be used to figure out what is going on.
+type unknownModulesError struct {
+	unknownModules []string
+}
+
+func (u unknownModulesError) Error() string {
+	return fmt.Sprintf("unknown modules %q were tried to be loaded, but couldn't - "+
+		"this likely means binary provisioning is required or a custom k6 binary with more extenstsions",
+		u.unknownModules)
 }
