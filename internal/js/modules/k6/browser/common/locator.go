@@ -17,7 +17,7 @@ import (
 //
 // See Issue #100 for more details.
 
-// Locator represent a way to find element(s) on the page at any moment.
+// Locator represents a way to find element(s) on the page at any moment.
 type Locator struct {
 	selector string
 
@@ -406,6 +406,77 @@ func (l *Locator) GetAttribute(name string, opts sobek.Value) (string, bool, err
 func (l *Locator) getAttribute(name string, opts *FrameBaseOptions) (string, bool, error) {
 	opts.Strict = true
 	return l.frame.getAttribute(l.selector, name, opts)
+}
+
+// GetByAltText creates and returns a new relative locator that allows locating elements by their alt text.
+func (l *Locator) GetByAltText(alt string, opts *GetByBaseOptions) *Locator {
+	l.log.Debugf(
+		"Locator:GetByAltText", "fid:%s furl:%q selector:%s alt:%q opts:%+v",
+		l.frame.ID(), l.frame.URL(), l.selector, alt, opts,
+	)
+
+	return l.Locator(l.frame.buildAttributeSelector("alt", alt, opts))
+}
+
+// GetByLabel creates and returns a new relative locator that allows locating input elements by the text
+// of the associated `<label>` or `aria-labelledby` element, or by the `aria-label` attribute.
+func (l *Locator) GetByLabel(label string, opts *GetByBaseOptions) *Locator {
+	l.log.Debugf(
+		"Locator:GetByLabel", "fid:%s furl:%q selector:%s label:%q opts:%+v",
+		l.frame.ID(), l.frame.URL(), l.selector, label, opts,
+	)
+
+	return l.Locator(l.frame.buildLabelSelector(label, opts))
+}
+
+// GetByPlaceholder creates and returns a new relative locator for this based on the placeholder attribute.
+func (l *Locator) GetByPlaceholder(placeholder string, opts *GetByBaseOptions) *Locator {
+	l.log.Debugf(
+		"Locator:GetByPlaceholder", "fid:%s furl:%q selector:%s placeholder:%q opts:%+v",
+		l.frame.ID(), l.frame.URL(), l.selector, placeholder, opts,
+	)
+
+	return l.Locator(l.frame.buildAttributeSelector("placeholder", placeholder, opts))
+}
+
+// GetByRole creates and returns a new relative locator using the ARIA role and any additional options.
+func (l *Locator) GetByRole(role string, opts *GetByRoleOptions) *Locator {
+	l.log.Debugf(
+		"Locator:GetByRole", "fid:%s furl:%q selector:%s role:%q opts:%+v",
+		l.frame.ID(), l.frame.URL(), l.selector, role, opts,
+	)
+
+	return l.Locator(l.frame.buildRoleSelector(role, opts))
+}
+
+// GetByTestID creates and returns a new relative locator based on the data-testid attribute.
+func (l *Locator) GetByTestID(testID string) *Locator {
+	l.log.Debugf(
+		"Locator:GetByTestID", "fid:%s furl:%q selector:%s testID:%q",
+		l.frame.ID(), l.frame.URL(), l.selector, testID,
+	)
+
+	return l.Locator(l.frame.buildTestIDSelector(testID))
+}
+
+// GetByText creates and returns a new relative locator based on text content.
+func (l *Locator) GetByText(text string, opts *GetByBaseOptions) *Locator {
+	l.log.Debugf(
+		"Locator:GetByText", "fid:%s furl:%q selector:%s text:%q opts:%+v",
+		l.frame.ID(), l.frame.URL(), l.selector, text, opts,
+	)
+
+	return l.Locator(l.frame.buildTextSelector(text, opts))
+}
+
+// GetByTitle creates and returns a new relative locator based on the title attribute.
+func (l *Locator) GetByTitle(title string, opts *GetByBaseOptions) *Locator {
+	l.log.Debugf(
+		"Locator:GetByTitle", "fid:%s furl:%q selector:%s title:%q opts:%+v",
+		l.frame.ID(), l.frame.URL(), l.selector, title, opts,
+	)
+
+	return l.Locator(l.frame.buildAttributeSelector("title", title, opts))
 }
 
 // Locator creates and returns a new locator chained/relative to the current locator.
