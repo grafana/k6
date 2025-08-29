@@ -1722,6 +1722,7 @@ class InjectedScript {
   constructor() {
     this._replaceRafWithTimeout = false;
     this._stableRafCount = 10;
+    this._evaluator = new SelectorEvaluatorImpl();
     this._queryEngines = {
       css: new CSSQueryEngine(),
       text: new TextQueryEngine(),
