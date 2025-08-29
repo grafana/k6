@@ -2,7 +2,9 @@ package cloudapi
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"strconv"
@@ -335,4 +337,96 @@ func (c *Client) ValidateToken() (*ValidateTokenResponse, error) {
 	}
 
 	return &vtr, nil
+}
+
+// Organization represents a Grafana Cloud k6 organization
+type Organization struct {
+	ID               int    `json:"id"`
+	GrafanaStackName string `json:"grafana_stack_name"`
+	GrafanaStackID   int    `json:"grafana_stack_id"`
+}
+
+// AccountMeResponse represents the response of the /account/me endpoint.
+type AccountMeResponse struct {
+	Organizations []Organization `json:"organizations"`
+}
+
+// AccountMe retrieves the current user's account information.
+func (c *Client) AccountMe() (*AccountMeResponse, error) {
+	// TODO: remove this hardcoded URL
+	req, err := c.NewRequest("GET", "https://api.k6.io/v3/account/me", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	amr := AccountMeResponse{}
+	err = c.Do(req, &amr)
+	if err != nil {
+		return nil, err
+	}
+
+	return &amr, nil
+}
+
+// GetDefaultProject retrieves the default project for the given stack ID.
+func (c *Client) GetDefaultProject(stackID int64) (int64, string, error) {
+	// TODO: remove this hardcoded URL
+	req, err := c.NewRequest("GET", "https://api.k6.io/cloud/v6/projects", nil)
+	if err != nil {
+		return 0, "", err
+	}
+
+	q := req.URL.Query()
+	q.Add("$orderby", "created")
+	req.URL.RawQuery = q.Encode()
+
+	req.Header.Set("X-Stack-Id", fmt.Sprintf("%d", stackID))
+	// TODO: by default the client uses Token instead of Bearer
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.token))
+	req.Header.Set("User-Agent", "Go-http-client")
+
+	// TODO: Can't use c.Do bc it messes up the headers
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return 0, "", fmt.Errorf("request failed: %w", err)
+	}
+	defer func() {
+		if resp != nil {
+			_, _ = io.Copy(io.Discard, resp.Body)
+			if cerr := resp.Body.Close(); cerr != nil && err == nil {
+				err = cerr
+			}
+		}
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return 0, "", fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var parsed struct {
+		Count int64 `json:"@count"`
+		Value []struct {
+			ID        int64  `json:"id"`
+			Name      string `json:"name"`
+			IsDefault bool   `json:"is_default"`
+			FolderUID string `json:"grafana_folder_uid"`
+		} `json:"value"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
+		return 0, "", fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if len(parsed.Value) == 0 {
+		return 0, "", fmt.Errorf("no projects found for stack ID %d", stackID)
+	}
+
+	for _, proj := range parsed.Value {
+		if proj.IsDefault {
+			return proj.ID, proj.Name, nil
+		}
+	}
+
+	return 0, "", fmt.Errorf("no default project found for stack ID %d", stackID)
 }
