@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -245,27 +246,8 @@ func TestFrameSetChecked(t *testing.T) {
 	assert.False(t, checked)
 }
 
-//nolint:tparallel
 func TestFrameWaitForURLSuccess(t *testing.T) {
 	t.Parallel()
-
-	tb := newTestBrowser(t, withFileServer())
-	tb.vu.ActivateVU()
-	tb.vu.StartIteration(t)
-
-	// Setup
-	tb.vu.SetVar(t, "frame", &sobek.Object{})
-	tb.vu.SetVar(t, "testURL", tb.staticURL("waitfornavigation_test.html"))
-	tb.vu.SetVar(t, "page1URL", tb.staticURL("page1.html"))
-	_, err := tb.vu.RunAsync(t, `
-			const page = await browser.newPage();
-
-			await page.setContent('<iframe></iframe>');
-
-			const iframeElement = await page.$('iframe');
-			frame = await iframeElement.contentFrame();
-		`)
-	require.NoError(t, err)
 
 	tests := []struct {
 		name     string
@@ -275,7 +257,7 @@ func TestFrameWaitForURLSuccess(t *testing.T) {
 		{
 			name:     "when_already_at_matching_url",
 			code:     `await frame.waitForURL(/.*waitfornavigation_test\.html$/);`,
-			expected: []string{tb.staticURL("waitfornavigation_test.html")},
+			expected: []string{"waitfornavigation_test.html"},
 		},
 		{
 			name: "exact_url_match",
@@ -285,7 +267,7 @@ func TestFrameWaitForURLSuccess(t *testing.T) {
 					frame.locator('#page1').click()
 				]);
 			`,
-			expected: []string{tb.staticURL("page1.html")},
+			expected: []string{"page1.html"},
 		},
 		{
 			name: "regex_pattern_match",
@@ -295,7 +277,7 @@ func TestFrameWaitForURLSuccess(t *testing.T) {
 					frame.locator('#page2').click()
 				]);
 			`,
-			expected: []string{tb.staticURL("page2.html")},
+			expected: []string{"page2.html"},
 		},
 		{
 			name: "empty_pattern_match",
@@ -305,7 +287,7 @@ func TestFrameWaitForURLSuccess(t *testing.T) {
 					frame.locator('#page2').click()
 				]);
 			`,
-			expected: []string{tb.staticURL("page2.html"), tb.staticURL("waitfornavigation_test.html")},
+			expected: []string{"page2.html", "waitfornavigation_test.html"},
 		},
 		{
 			name: "waitUntil_domcontentloaded",
@@ -315,20 +297,40 @@ func TestFrameWaitForURLSuccess(t *testing.T) {
 					frame.locator('#page1').click()
 				]);
 			`,
-			expected: []string{tb.staticURL("page1.html")},
+			expected: []string{"page1.html"},
 		},
 		{
 			name: "already_at_url_with_regex_pattern",
 			code: `
 				await frame.waitForURL(/.*\/waitfornavigation_test\.html$/);
 			`,
-			expected: []string{tb.staticURL("waitfornavigation_test.html")},
+			expected: []string{"waitfornavigation_test.html"},
 		},
 	}
 
-	//nolint:paralleltest
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Setup
+			tb := newTestBrowser(t, withFileServer())
+			tb.vu.ActivateVU()
+			tb.vu.StartIteration(t)
+
+			tb.vu.SetVar(t, "frame", &sobek.Object{})
+			tb.vu.SetVar(t, "testURL", tb.staticURL("waitfornavigation_test.html"))
+			tb.vu.SetVar(t, "page1URL", tb.staticURL("page1.html"))
+			_, err := tb.vu.RunAsync(t, `
+					const page = await browser.newPage();
+		
+					await page.setContent('<iframe></iframe>');
+		
+					const iframeElement = await page.$('iframe');
+					frame = await iframeElement.contentFrame();
+				`)
+			require.NoError(t, err)
+
+			// Test logic
 			code := fmt.Sprintf(`
 			await frame.goto(testURL);
 
@@ -336,32 +338,15 @@ func TestFrameWaitForURLSuccess(t *testing.T) {
 			
 			return frame.url();`, tt.code)
 
-			got := tb.vu.RunPromise(t, code)
-			assert.Contains(t, tt.expected, got.Result().String())
+			result := tb.vu.RunPromise(t, code)
+			got := strings.ReplaceAll(result.Result().String(), tb.staticURL(""), "")
+			assert.Contains(t, tt.expected, got)
 		})
 	}
 }
 
-//nolint:tparallel
 func TestFrameWaitForURLFailure(t *testing.T) {
 	t.Parallel()
-
-	tb := newTestBrowser(t, withFileServer())
-	tb.vu.ActivateVU()
-	tb.vu.StartIteration(t)
-
-	// Setup
-	tb.vu.SetVar(t, "frame", &sobek.Object{})
-	tb.vu.SetVar(t, "testURL", tb.staticURL("waitfornavigation_test.html"))
-	_, err := tb.vu.RunAsync(t, `
-			const page = await browser.newPage();
-
-			await page.setContent('<iframe></iframe>');
-
-			const iframeElement = await page.$('iframe');
-			frame = await iframeElement.contentFrame();
-		`)
-	require.NoError(t, err)
 
 	tests := []struct {
 		name     string
@@ -387,15 +372,34 @@ func TestFrameWaitForURLFailure(t *testing.T) {
 		},
 	}
 
-	//nolint:paralleltest
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Setup
+			tb := newTestBrowser(t, withFileServer())
+			tb.vu.ActivateVU()
+			tb.vu.StartIteration(t)
+
+			tb.vu.SetVar(t, "frame", &sobek.Object{})
+			tb.vu.SetVar(t, "testURL", tb.staticURL("waitfornavigation_test.html"))
+			_, err := tb.vu.RunAsync(t, `
+					const page = await browser.newPage();
+		
+					await page.setContent('<iframe></iframe>');
+		
+					const iframeElement = await page.$('iframe');
+					frame = await iframeElement.contentFrame();
+				`)
+			require.NoError(t, err)
+
+			// Test logic
 			code := fmt.Sprintf(`
 			await frame.goto(testURL);
 
 			%s`, tt.code)
 
-			_, err := tb.vu.RunAsync(t, code)
+			_, err = tb.vu.RunAsync(t, code)
 			assert.ErrorContains(t, err, tt.expected)
 		})
 	}
