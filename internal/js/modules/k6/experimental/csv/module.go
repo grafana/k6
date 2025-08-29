@@ -21,6 +21,7 @@ import (
 
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
+	"go.k6.io/k6/lib/fsext"
 )
 
 type (
@@ -67,8 +68,9 @@ func (rm *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 func (mi *ModuleInstance) Exports() modules.Exports {
 	return modules.Exports{
 		Named: map[string]any{
-			"parse":  mi.Parse,
-			"Parser": mi.NewParser,
+			"parse":           mi.Parse,
+			"Parser":          mi.NewParser,
+			"StreamingParser": mi.NewStreamingParser,
 		},
 	}
 }
@@ -185,6 +187,120 @@ func (mi *ModuleInstance) NewParser(call sobek.ConstructorCall) *sobek.Object {
 	}
 
 	return rt.ToValue(&parser).ToObject(rt)
+}
+
+// NewStreamingParser creates a new streaming CSV parser instance that doesn't load the entire file into memory.
+//
+// Unlike NewParser, this constructor takes a file path string and opens the file directly
+// from the filesystem using a streaming approach, making it suitable for large CSV files.
+func (mi *ModuleInstance) NewStreamingParser(call sobek.ConstructorCall) *sobek.Object {
+	rt := mi.vu.Runtime()
+
+	if mi.vu.State() != nil {
+		common.Throw(rt, errors.New("csv StreamingParser constructor must be called in the init context"))
+	}
+
+	if len(call.Arguments) < 1 || sobek.IsUndefined(call.Argument(0)) {
+		common.Throw(rt, fmt.Errorf("csv StreamingParser constructor takes at least one non-nil file path argument"))
+	}
+
+	filePathArg := call.Argument(0)
+	if common.IsNullish(filePathArg) {
+		common.Throw(rt, fmt.Errorf("csv StreamingParser constructor takes at least one non-nil file path argument"))
+	}
+
+	filePath := filePathArg.String()
+	if filePath == "" {
+		common.Throw(rt, fmt.Errorf("csv StreamingParser constructor requires a non-empty file path"))
+	}
+
+	options := newDefaultParserOptions()
+	if len(call.Arguments) == 2 && !sobek.IsUndefined(call.Argument(1)) {
+		var err error
+		options, err = newParserOptionsFrom(call.Argument(1).ToObject(rt))
+		if err != nil {
+			common.Throw(rt, fmt.Errorf("encountered an error while interpreting StreamingParser options; reason: %w", err))
+		}
+	}
+
+	// Use OS filesystem directly instead of k6's cached filesystem to avoid memory issues
+	// This bypasses k6's file caching which loads entire files into memory
+	osFs := fsext.NewOsFs()
+
+	// Create a streaming reader that opens the file directly without loading it into memory
+	streamingReader, err := NewStreamingReaderFrom(osFs, filePath, options)
+	if err != nil {
+		common.Throw(rt, fmt.Errorf("failed to create streaming parser; reason: %w", err))
+	}
+
+	// Create a new StreamingParser instance
+	parser := StreamingParser{
+		reader:  streamingReader,
+		options: options,
+		vu:      mi.vu,
+	}
+
+	return rt.ToValue(&parser).ToObject(rt)
+}
+
+// StreamingParser is a streaming CSV parser that doesn't load the entire file into memory.
+type StreamingParser struct {
+	// currentLine holds the current line number being read by the parser.
+	currentLine atomic.Int64
+
+	// reader is the streaming CSV reader that enables reading records from the file
+	// without loading the entire file into memory.
+	reader *StreamingReader
+
+	// options holds the parser's options as provided by the user.
+	options options
+
+	// vu is the VU instance that owns this module instance.
+	vu modules.VU
+}
+
+// Next returns the next row in the CSV file using streaming approach.
+func (p *StreamingParser) Next() *sobek.Promise {
+	promise, resolve, reject := promises.New(p.vu)
+
+	go func() {
+		var record any
+		var done bool
+		var err error
+
+		record, err = p.reader.Read()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				resolve(parseResult{Done: true, Value: []string{}})
+				return
+			}
+
+			reject(err)
+			return
+		}
+
+		p.currentLine.Add(1)
+
+		resolve(parseResult{Done: done, Value: record})
+	}()
+
+	return promise
+}
+
+// Close closes the underlying streaming reader and file.
+func (p *StreamingParser) Close() *sobek.Promise {
+	promise, resolve, reject := promises.New(p.vu)
+
+	go func() {
+		err := p.reader.Close()
+		if err != nil {
+			reject(fmt.Errorf("failed to close streaming parser; reason: %w", err))
+			return
+		}
+		resolve(sobek.Undefined())
+	}()
+
+	return promise
 }
 
 // Next returns the next row in the CSV file.
