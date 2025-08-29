@@ -68,7 +68,7 @@ func TestElementHandleBoundingBoxInvisibleElement(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = element.BoundingBox()
-	require.ErrorContains(t, err, "check if element is visible: getting bounding box model of DOM node: Could not compute box model.")
+	require.ErrorIs(t, err, common.ErrElementNotVisible)
 }
 
 // This test is the same as TestElementHandleBoundingBoxInvisibleElement, but
