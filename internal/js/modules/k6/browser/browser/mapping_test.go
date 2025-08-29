@@ -406,6 +406,13 @@ type frameAPI interface { //nolint:interfacebloat
 	Focus(selector string, opts sobek.Value) error
 	FrameElement() (*common.ElementHandle, error)
 	GetAttribute(selector string, name string, opts sobek.Value) (string, bool, error)
+	GetByAltText(alt string, opts *common.GetByBaseOptions) *common.Locator
+	GetByLabel(label string, opts *common.GetByBaseOptions) *common.Locator
+	GetByPlaceholder(placeholder string, opts *common.GetByBaseOptions) *common.Locator
+	GetByRole(role string, opts *common.GetByRoleOptions) *common.Locator
+	GetByTestId(testID string) *common.Locator
+	GetByText(text string, opts *common.GetByBaseOptions) *common.Locator
+	GetByTitle(title string, opts *common.GetByBaseOptions) *common.Locator
 	Goto(url string, opts sobek.Value) (*common.Response, error)
 	Hover(selector string, opts sobek.Value) error
 	InnerHTML(selector string, opts sobek.Value) (string, error)

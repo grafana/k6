@@ -14,23 +14,12 @@ import (
 func TestGetByRoleSuccess(t *testing.T) {
 	t.Parallel()
 
-	// This test all the implicit roles that are valid for the role based
-	// selector engine that is in the injectd_script.js file. Implicit roles
+	// This test all the implicit roles that are valid for the role-based
+	// selector engine that is in the injected_script.js file. Implicit roles
 	// are roles that are not explicitly defined in the HTML, but are
 	// implied by the context of the element.
 	t.Run("implicit", func(t *testing.T) {
 		t.Parallel()
-
-		tb := newTestBrowser(t, withFileServer())
-		p := tb.NewPage(nil)
-		opts := &common.FrameGotoOptions{
-			Timeout: common.DefaultTimeout,
-		}
-		_, err := p.Goto(
-			tb.staticURL("get_by_role_implicit.html"),
-			opts,
-		)
-		require.NoError(t, err)
 
 		tests := []struct {
 			name         string
@@ -440,37 +429,45 @@ func TestGetByRoleSuccess(t *testing.T) {
 			t.Run(tt.name, func(t *testing.T) {
 				t.Parallel()
 
-				l := p.GetByRole(tt.role, tt.opts)
-				c, err := l.Count()
+				tb := newTestBrowser(t, withFileServer())
+				p := tb.NewPage(nil)
+				opts := &common.FrameGotoOptions{
+					Timeout: common.DefaultTimeout,
+				}
+				_, err := p.Goto(
+					tb.staticURL("get_by_role_implicit.html"),
+					opts,
+				)
 				require.NoError(t, err)
-				require.Equal(t, tt.expected, c)
 
-				if tt.expectedText != "" {
-					text, _, err := l.TextContent(sobek.Undefined())
-					require.NoError(t, err)
-					require.Equal(t, tt.expectedText, text)
+				getByRoleImplementations := getByImplementationsOf[interface {
+					GetByRole(role string, opts *common.GetByRoleOptions) *common.Locator
+				}](p)
+
+				for implName, impl := range getByRoleImplementations {
+					t.Run(implName, func(t *testing.T) { //nolint:paralleltest
+						l := impl.GetByRole(tt.role, tt.opts)
+						c, err := l.Count()
+						require.NoError(t, err)
+						require.Equal(t, tt.expected, c)
+
+						if tt.expectedText != "" {
+							text, _, err := l.TextContent(sobek.Undefined())
+							require.NoError(t, err)
+							require.Equal(t, tt.expectedText, text)
+						}
+					})
 				}
 			})
 		}
 	})
 
-	// This test all the explicit roles that are valid for the role based
-	// selector engine that is in the injectd_script.js file. Explicit roles
+	// This test all the explicit roles that are valid for the role-based
+	// selector engine that is in the injected_script.js file. Explicit roles
 	// are roles that are explicitly defined in the HTML using the correct
 	// role attribute.
 	t.Run("explicit", func(t *testing.T) {
 		t.Parallel()
-
-		tb := newTestBrowser(t, withFileServer())
-		p := tb.NewPage(nil)
-		opts := &common.FrameGotoOptions{
-			Timeout: common.DefaultTimeout,
-		}
-		_, err := p.Goto(
-			tb.staticURL("get_by_role_explicit.html"),
-			opts,
-		)
-		require.NoError(t, err)
 
 		tests := []struct {
 			role         string
@@ -566,36 +563,44 @@ func TestGetByRoleSuccess(t *testing.T) {
 			t.Run(tt.role, func(t *testing.T) {
 				t.Parallel()
 
-				l := p.GetByRole(tt.role, nil)
-				c, err := l.Count()
+				tb := newTestBrowser(t, withFileServer())
+				p := tb.NewPage(nil)
+				opts := &common.FrameGotoOptions{
+					Timeout: common.DefaultTimeout,
+				}
+				_, err := p.Goto(
+					tb.staticURL("get_by_role_explicit.html"),
+					opts,
+				)
 				require.NoError(t, err)
-				require.Equal(t, tt.expected, c)
 
-				if tt.expectedText != "" {
-					text, err := l.InnerText(sobek.Undefined())
-					require.NoError(t, err)
-					require.Equal(t, tt.expectedText, text)
+				getByRoleImplementations := getByImplementationsOf[interface {
+					GetByRole(role string, opts *common.GetByRoleOptions) *common.Locator
+				}](p)
+
+				for implName, impl := range getByRoleImplementations {
+					t.Run(implName, func(t *testing.T) { //nolint:paralleltest
+						l := impl.GetByRole(tt.role, nil)
+						c, err := l.Count()
+						require.NoError(t, err)
+						require.Equal(t, tt.expected, c)
+
+						if tt.expectedText != "" {
+							text, err := l.InnerText(sobek.Undefined())
+							require.NoError(t, err)
+							require.Equal(t, tt.expectedText, text)
+						}
+					})
 				}
 			})
 		}
 	})
 
-	// This tests all the options, and different attributes (such as explicit
+	// This tests all the options and different attributes (such as explicit
 	// aria attributes vs the text value of an element) that can be used in
 	// the DOM with the same role.
 	t.Run("edge_cases", func(t *testing.T) {
 		t.Parallel()
-
-		tb := newTestBrowser(t, withFileServer())
-		p := tb.NewPage(nil)
-		opts := &common.FrameGotoOptions{
-			Timeout: common.DefaultTimeout,
-		}
-		_, err := p.Goto(
-			tb.staticURL("get_by_role_edge_cases.html"),
-			opts,
-		)
-		require.NoError(t, err)
 
 		tests := []struct {
 			name         string
@@ -723,15 +728,34 @@ func TestGetByRoleSuccess(t *testing.T) {
 			t.Run(tt.name, func(t *testing.T) {
 				t.Parallel()
 
-				l := p.GetByRole(tt.role, tt.opts)
-				c, err := l.Count()
+				tb := newTestBrowser(t, withFileServer())
+				p := tb.NewPage(nil)
+				opts := &common.FrameGotoOptions{
+					Timeout: common.DefaultTimeout,
+				}
+				_, err := p.Goto(
+					tb.staticURL("get_by_role_edge_cases.html"),
+					opts,
+				)
 				require.NoError(t, err)
-				require.Equal(t, tt.expected, c)
 
-				if tt.expectedText != "" {
-					text, err := l.InnerText(sobek.Undefined())
-					require.NoError(t, err)
-					require.Equal(t, tt.expectedText, text)
+				getByRoleImplementations := getByImplementationsOf[interface {
+					GetByRole(role string, opts *common.GetByRoleOptions) *common.Locator
+				}](p)
+
+				for implName, impl := range getByRoleImplementations {
+					t.Run(implName, func(t *testing.T) { //nolint:paralleltest
+						l := impl.GetByRole(tt.role, tt.opts)
+						c, err := l.Count()
+						require.NoError(t, err)
+						require.Equal(t, tt.expected, c)
+
+						if tt.expectedText != "" {
+							text, err := l.InnerText(sobek.Undefined())
+							require.NoError(t, err)
+							require.Equal(t, tt.expectedText, text)
+						}
+					})
 				}
 			})
 		}
@@ -775,9 +799,17 @@ func TestGetByRoleFailure(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			l := p.GetByRole(tt.role, tt.opts)
-			_, err = l.Count()
-			require.ErrorContains(t, err, tt.expectedError)
+			getByRoleImplementations := getByImplementationsOf[interface {
+				GetByRole(role string, opts *common.GetByRoleOptions) *common.Locator
+			}](p)
+
+			for implName, impl := range getByRoleImplementations {
+				t.Run(implName, func(t *testing.T) {
+					l := impl.GetByRole(tt.role, tt.opts)
+					_, err = l.Count()
+					require.ErrorContains(t, err, tt.expectedError)
+				})
+			}
 		})
 	}
 }
@@ -844,10 +876,18 @@ func TestGetByAltTextSuccess(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			l := p.GetByAltText(tt.alt, tt.opts)
-			c, err := l.Count()
-			require.NoError(t, err)
-			require.Equal(t, tt.expected, c)
+			getByAltTextImplementations := getByImplementationsOf[interface {
+				GetByAltText(alt string, opts *common.GetByBaseOptions) *common.Locator
+			}](p)
+
+			for implName, impl := range getByAltTextImplementations {
+				t.Run(implName, func(t *testing.T) {
+					l := impl.GetByAltText(tt.alt, tt.opts)
+					c, err := l.Count()
+					require.NoError(t, err)
+					require.Equal(t, tt.expected, c)
+				})
+			}
 		})
 	}
 }
@@ -921,10 +961,18 @@ func TestGetByLabelSuccess(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			l := p.GetByLabel(tt.label, tt.opts)
-			c, err := l.Count()
-			require.NoError(t, err)
-			require.Equal(t, tt.expected, c)
+			getByLabelImplementations := getByImplementationsOf[interface {
+				GetByLabel(label string, opts *common.GetByBaseOptions) *common.Locator
+			}](p)
+
+			for implName, impl := range getByLabelImplementations {
+				t.Run(implName, func(t *testing.T) {
+					l := impl.GetByLabel(tt.label, tt.opts)
+					c, err := l.Count()
+					require.NoError(t, err)
+					require.Equal(t, tt.expected, c)
+				})
+			}
 		})
 	}
 }
@@ -1009,10 +1057,18 @@ func TestGetByPlaceholderSuccess(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			l := p.GetByPlaceholder(tt.placeholder, tt.opts)
-			c, err := l.Count()
-			require.NoError(t, err)
-			require.Equal(t, tt.expected, c)
+			getByPlaceholderImplementations := getByImplementationsOf[interface {
+				GetByPlaceholder(placeholder string, opts *common.GetByBaseOptions) *common.Locator
+			}](p)
+
+			for implName, impl := range getByPlaceholderImplementations {
+				t.Run(implName, func(t *testing.T) {
+					l := impl.GetByPlaceholder(tt.placeholder, tt.opts)
+					c, err := l.Count()
+					require.NoError(t, err)
+					require.Equal(t, tt.expected, c)
+				})
+			}
 		})
 	}
 }
@@ -1097,10 +1153,18 @@ func TestGetByTitleSuccess(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			l := p.GetByTitle(tt.title, tt.opts)
-			c, err := l.Count()
-			require.NoError(t, err)
-			require.Equal(t, tt.expected, c)
+			getByTitleImplementations := getByImplementationsOf[interface {
+				GetByTitle(title string, opts *common.GetByBaseOptions) *common.Locator
+			}](p)
+
+			for implName, impl := range getByTitleImplementations {
+				t.Run(implName, func(t *testing.T) {
+					l := impl.GetByTitle(tt.title, tt.opts)
+					c, err := l.Count()
+					require.NoError(t, err)
+					require.Equal(t, tt.expected, c)
+				})
+			}
 		})
 	}
 }
@@ -1178,15 +1242,23 @@ func TestGetByTestIDSuccess(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			l := p.GetByTestID(tt.testID)
-			c, err := l.Count()
-			require.NoError(t, err)
-			require.Equal(t, tt.expected, c)
+			getByTestIDImplementations := getByImplementationsOf[interface {
+				GetByTestID(testID string) *common.Locator
+			}](p)
 
-			if tt.expected > 0 && tt.expectedText != "" {
-				text, err := l.InnerText(sobek.Undefined())
-				require.NoError(t, err)
-				require.Equal(t, tt.expectedText, text)
+			for implName, impl := range getByTestIDImplementations {
+				t.Run(implName, func(t *testing.T) {
+					l := impl.GetByTestID(tt.testID)
+					c, err := l.Count()
+					require.NoError(t, err)
+					require.Equal(t, tt.expected, c)
+
+					if tt.expected > 0 && tt.expectedText != "" {
+						text, err := l.InnerText(sobek.Undefined())
+						require.NoError(t, err)
+						require.Equal(t, tt.expectedText, text)
+					}
+				})
 			}
 		})
 	}
@@ -1288,15 +1360,23 @@ func TestGetByTextSuccess(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			l := p.GetByText(tt.text, tt.opts)
-			c, err := l.Count()
-			require.NoError(t, err)
-			require.Equal(t, tt.expected, c)
+			getByTextImplementations := getByImplementationsOf[interface {
+				GetByText(text string, opts *common.GetByBaseOptions) *common.Locator
+			}](p)
 
-			if tt.expected > 0 && tt.expectedText != "" {
-				text, err := l.InnerText(sobek.Undefined())
-				require.NoError(t, err)
-				require.Equal(t, tt.expectedText, text)
+			for implName, impl := range getByTextImplementations {
+				t.Run(implName, func(t *testing.T) {
+					l := impl.GetByText(tt.text, tt.opts)
+					c, err := l.Count()
+					require.NoError(t, err)
+					require.Equal(t, tt.expected, c)
+
+					if tt.expected > 0 && tt.expectedText != "" {
+						text, err := l.InnerText(sobek.Undefined())
+						require.NoError(t, err)
+						require.Equal(t, tt.expectedText, text)
+					}
+				})
 			}
 		})
 	}
@@ -1313,41 +1393,51 @@ func TestGetByNullHandling(t *testing.T) {
 	tb.vu.SetVar(t, "page", &sobek.Object{})
 	_, err := tb.vu.RunAsync(t, `
 		page = await browser.newPage();
+		frame = page.mainFrame()
 	`)
 	require.NoError(t, err)
 
-	_, err = tb.vu.RunAsync(t, `
-		await page.getByRole().click();
-	`)
-	require.ErrorContains(t, err, "missing required argument 'role'")
+	for _, getByImpl := range []string{"page", "frame"} {
+		_, err = tb.vu.RunAsync(t, `
+		await %s.getByRole().click();
+	`, getByImpl)
+		require.ErrorContains(t, err, "missing required argument 'role'")
 
-	_, err = tb.vu.RunAsync(t, `
-		await page.getByAltText().click();
-	`)
-	require.ErrorContains(t, err, "missing required argument 'altText'")
+		_, err = tb.vu.RunAsync(t, `
+		await %s.getByAltText().click();
+	`, getByImpl)
+		require.ErrorContains(t, err, "missing required argument 'altText'")
 
-	_, err = tb.vu.RunAsync(t, `
-		await page.getByLabel().click();
-	`)
-	require.ErrorContains(t, err, "missing required argument 'label'")
+		_, err = tb.vu.RunAsync(t, `
+		await %s.getByLabel().click();
+	`, getByImpl)
+		require.ErrorContains(t, err, "missing required argument 'label'")
 
-	_, err = tb.vu.RunAsync(t, `
-		await page.getByPlaceholder().click();
-	`)
-	require.ErrorContains(t, err, "missing required argument 'placeholder'")
+		_, err = tb.vu.RunAsync(t, `
+		await %s.getByPlaceholder().click();
+	`, getByImpl)
+		require.ErrorContains(t, err, "missing required argument 'placeholder'")
 
-	_, err = tb.vu.RunAsync(t, `
-		await page.getByTitle().click();
-	`)
-	require.ErrorContains(t, err, "missing required argument 'title'")
+		_, err = tb.vu.RunAsync(t, `
+		await %s.getByTitle().click();
+	`, getByImpl)
+		require.ErrorContains(t, err, "missing required argument 'title'")
 
-	_, err = tb.vu.RunAsync(t, `
-		await page.getByTestId().click();
-	`)
-	require.ErrorContains(t, err, "missing required argument 'testId'")
+		_, err = tb.vu.RunAsync(t, `
+		await %s.getByTestId().click();
+	`, getByImpl)
+		require.ErrorContains(t, err, "missing required argument 'testId'")
 
-	_, err = tb.vu.RunAsync(t, `
-		await page.getByText().click();
-	`)
-	require.ErrorContains(t, err, "missing required argument 'text'")
+		_, err = tb.vu.RunAsync(t, `
+		await %s.getByText().click();
+	`, getByImpl)
+		require.ErrorContains(t, err, "missing required argument 'text'")
+	}
+}
+
+func getByImplementationsOf[T any](p *common.Page) map[string]T {
+	return map[string]T{
+		"page":  any(p).(T),
+		"frame": any(p.MainFrame()).(T),
+	}
 }
