@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 
 	"go.k6.io/k6/errext/exitcodes"
@@ -138,6 +139,10 @@ func (c *cmdCloudRun) run(cmd *cobra.Command, args []string) error {
 			}
 
 			if err := createCloudTest(c.runCmd.gs, test); err != nil {
+				var uerr UserUnauthenticatedError
+				if errors.As(err, &uerr) {
+					return nil, nil, uerr.DisplayError()
+				}
 				return nil, nil, fmt.Errorf("could not create the cloud test run: %w", err)
 			}
 
@@ -149,7 +154,12 @@ func (c *cmdCloudRun) run(cmd *cobra.Command, args []string) error {
 	// When running the `k6 cloud run` command explicitly disable the usage report.
 	c.noUsageReport = true
 
-	return c.deprecatedCloudCmd.run(cmd, args)
+	err := c.deprecatedCloudCmd.run(cmd, args)
+	var uerr UserUnauthenticatedError
+	if errors.As(err, &uerr) {
+		return uerr.DisplayError()
+	}
+	return err
 }
 
 func (c *cmdCloudRun) flagSet() *pflag.FlagSet {
