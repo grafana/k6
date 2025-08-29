@@ -1733,6 +1733,7 @@ class InjectedScript {
       'internal:label': new LabelEngine(),
       'internal:text': new TextEngine(true, true),
       'internal:has-text': this._createInternalHasTextEngine(),
+      'internal:has-not-text': this._createInternalHasNotTextEngine(),
     };
   }
 
