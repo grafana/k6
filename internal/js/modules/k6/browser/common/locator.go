@@ -33,6 +33,9 @@ type LocatorOptions struct {
 	// Matches only elements that contain the specified text.
 	// String or RegExp. Optional.
 	HasText string
+	// Matches only elements that do not contain the specified text.
+	// String or RegExp. Optional.
+	HasNotText string
 }
 
 // NewLocator creates and returns a new locator.
