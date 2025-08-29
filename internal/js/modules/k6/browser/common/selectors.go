@@ -82,6 +82,9 @@ func (s *Selector) parse() error {
 		case strings.HasPrefix(part, "internal:has-text="):
 			name = "internal:has-text"
 			body = TrimQuotes(part[eqIndex+1:])
+		case strings.HasPrefix(part, "internal:has-not-text="):
+			name = "internal:has-not-text"
+			body = TrimQuotes(part[eqIndex+1:])
 		case strings.HasPrefix(part, "nth="):
 			name = "nth"
 			body = part[eqIndex+1:]
