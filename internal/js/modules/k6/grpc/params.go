@@ -12,6 +12,10 @@ import (
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/metrics"
+
+	"github.com/mostynb/go-grpc-compression/nonclobbering/snappy"
+	"github.com/mostynb/go-grpc-compression/zstd"
+	"google.golang.org/grpc/encoding/gzip"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -132,6 +136,7 @@ type connectParams struct {
 	MaxSendSize           int64
 	TLS                   map[string]interface{}
 	Authority             string
+	Compression           string
 }
 
 func newConnectParams(vu modules.VU, input sobek.Value) (*connectParams, error) { //nolint:gocognit
@@ -143,6 +148,7 @@ func newConnectParams(vu modules.VU, input sobek.Value) (*connectParams, error) 
 		MaxSendSize:           0,
 		Authority:             "",
 		ReflectionMetadata:    metadata.New(nil),
+		Compression:           "",
 	}
 
 	if common.IsNullish(input) {
@@ -209,6 +215,12 @@ func newConnectParams(vu modules.VU, input sobek.Value) (*connectParams, error) 
 			if !ok {
 				return result, fmt.Errorf("invalid authority value: '%#v', it needs to be a string", v)
 			}
+		case "compression":
+			var err error
+			result.Compression, err = getCompressionType(v)
+			if err != nil {
+				return result, fmt.Errorf("invalid compression value: %w", err)
+			}
 		default:
 			return result, fmt.Errorf("unknown connect param: %q", k)
 		}
@@ -255,4 +267,20 @@ func parseConnectTLSParam(params *connectParams, v interface{}) error {
 		}
 	}
 	return nil
+}
+
+func getCompressionType(v interface{}) (string, error) {
+	compressionType, ok := v.(string)
+	if !ok {
+		return "", errors.New("it need to be a string")
+	}
+
+	switch compressionType {
+	case zstd.Name, gzip.Name, snappy.Name:
+		return compressionType, nil
+	case "none":
+		return "", nil
+	default:
+		return "", fmt.Errorf("not supported compression type: %s", compressionType)
+	}
 }
