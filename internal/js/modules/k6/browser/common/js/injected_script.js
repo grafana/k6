@@ -1753,6 +1753,19 @@ class InjectedScript {
     };
   }
 
+  _createInternalHasNotTextEngine() {
+    return {
+      queryAll: (root, selector) => {
+        if (root.nodeType !== 1 /* Node.ELEMENT_NODE */)
+          return [];
+        const element = root;
+        const text = elementText(this._evaluator._cacheText, element);
+        const { matcher } = createTextMatcher(selector, true);
+        return matcher(text) ? [] : [element];
+      }
+    };
+  }
+
   _querySelectorRecursively(roots, selector, index, queryCache) {
     if (index === selector.parts.length) {
       return roots;
