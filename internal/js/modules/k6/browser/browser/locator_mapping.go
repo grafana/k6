@@ -300,6 +300,8 @@ func parseLocatorOptions(rt *sobek.Runtime, opts sobek.Value) *common.LocatorOpt
 		switch k {
 		case "hasText":
 			popts.HasText = obj.Get(k).String()
+		case "hasNotText":
+			popts.HasNotText = obj.Get(k).String()
 		}
 	}
 
