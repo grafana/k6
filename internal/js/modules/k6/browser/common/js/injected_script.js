@@ -1274,6 +1274,7 @@ function queryRole(scope, options, internal) {
   query(scope);
   return result;
 }
+
 function createRoleEngine(internal) {
   return {
     queryAll: (scope, selector) => {
@@ -1736,6 +1737,19 @@ class InjectedScript {
 
   _queryEngineAll(part, root) {
     return this._queryEngines[part.name].queryAll(root, part.body);
+  }
+
+  _createInternalHasTextEngine() {
+    return {
+      queryAll: (root, selector) => {
+        if (root.nodeType !== 1 /* Node.ELEMENT_NODE */)
+          return [];
+        const element = root;
+        const text = elementText(this._evaluator._cacheText, element);
+        const { matcher } = createTextMatcher(selector, true);
+        return matcher(text) ? [element] : [];
+      }
+    };
   }
 
   _querySelectorRecursively(roots, selector, index, queryCache) {
