@@ -25,6 +25,14 @@ import (
 	"github.com/spf13/pflag"
 )
 
+// ErrUserUnauthenticated represents an authentication error when trying to use
+// Grafana Cloud k6 without being logged in or having a valid token.
+//
+//nolint:staticcheck // the error is shown to the user so here punctuation and capital are required
+var ErrUserUnauthenticated = errors.New("To run tests with Grafana Cloud k6, you must first authenticate." +
+	" Run the `cloud login` command, or check the docs" +
+	" https://grafana.com/docs/grafana-cloud/testing/k6/author-run/tokens-and-cli-authentication for additional methods.")
+
 // cmdCloud handles the `k6 cloud` sub-command
 type cmdCloud struct {
 	gs *state.GlobalState
@@ -118,10 +126,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if !cloudConfig.Token.Valid {
-		return errors.New(
-			"not logged in, please login first to the Grafana Cloud k6 " +
-				"using the \"k6 cloud login\" command",
-		)
+		return ErrUserUnauthenticated
 	}
 
 	// Display config warning if needed

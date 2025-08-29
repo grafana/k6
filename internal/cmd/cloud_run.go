@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 
 	"go.k6.io/k6/errext/exitcodes"
@@ -138,6 +139,9 @@ func (c *cmdCloudRun) run(cmd *cobra.Command, args []string) error {
 			}
 
 			if err := createCloudTest(c.runCmd.gs, test); err != nil {
+				if errors.Is(err, ErrUserUnauthenticated) {
+					return nil, nil, err
+				}
 				return nil, nil, fmt.Errorf("could not create the cloud test run: %w", err)
 			}
 
