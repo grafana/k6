@@ -1274,6 +1274,7 @@ function queryRole(scope, options, internal) {
   query(scope);
   return result;
 }
+
 function createRoleEngine(internal) {
   return {
     queryAll: (scope, selector) => {
@@ -1722,6 +1723,7 @@ class InjectedScript {
   constructor() {
     this._replaceRafWithTimeout = false;
     this._stableRafCount = 10;
+    this._evaluator = new SelectorEvaluatorImpl();
     this._queryEngines = {
       css: new CSSQueryEngine(),
       text: new TextQueryEngine(),
@@ -1730,11 +1732,39 @@ class InjectedScript {
       'internal:attr': new AttributeEngine(),
       'internal:label': new LabelEngine(),
       'internal:text': new TextEngine(true, true),
+      'internal:has-text': this._createInternalHasTextEngine(),
+      'internal:has-not-text': this._createInternalHasNotTextEngine(),
     };
   }
 
   _queryEngineAll(part, root) {
     return this._queryEngines[part.name].queryAll(root, part.body);
+  }
+
+  _createInternalHasTextEngine() {
+    return {
+      queryAll: (root, selector) => {
+        if (root.nodeType !== 1 /* Node.ELEMENT_NODE */)
+          return [];
+        const element = root;
+        const text = elementText(this._evaluator._cacheText, element);
+        const { matcher } = createTextMatcher(selector, true);
+        return matcher(text) ? [element] : [];
+      }
+    };
+  }
+
+  _createInternalHasNotTextEngine() {
+    return {
+      queryAll: (root, selector) => {
+        if (root.nodeType !== 1 /* Node.ELEMENT_NODE */)
+          return [];
+        const element = root;
+        const text = elementText(this._evaluator._cacheText, element);
+        const { matcher } = createTextMatcher(selector, true);
+        return matcher(text) ? [] : [element];
+      }
+    };
   }
 
   _querySelectorRecursively(roots, selector, index, queryCache) {

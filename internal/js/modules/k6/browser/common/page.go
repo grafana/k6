@@ -19,7 +19,6 @@ import (
 	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/target"
-	"github.com/grafana/sobek"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
@@ -1361,7 +1360,7 @@ func (p *Page) IsVisible(selector string, opts *FrameIsVisibleOptions) (bool, er
 }
 
 // Locator creates and returns a new locator for this page (main frame).
-func (p *Page) Locator(selector string, opts sobek.Value) *Locator {
+func (p *Page) Locator(selector string, opts *LocatorOptions) *Locator {
 	p.logger.Debugf("Page:Locator", "sid:%s sel: %q opts:%+v", p.sessionID(), selector, opts)
 
 	return p.MainFrame().Locator(selector, opts)

@@ -339,7 +339,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		},
 		"keyboard": mapKeyboard(vu, p.GetKeyboard()),
 		"locator": func(selector string, opts sobek.Value) *sobek.Object {
-			ml := mapLocator(vu, p.Locator(selector, opts))
+			ml := mapLocator(vu, p.Locator(selector, parseLocatorOptions(rt, opts)))
 			return rt.ToValue(ml).ToObject(rt)
 		},
 		"mainFrame": func() *sobek.Object {

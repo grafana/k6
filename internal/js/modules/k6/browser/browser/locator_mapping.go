@@ -7,6 +7,7 @@ import (
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
+	k6common "go.k6.io/k6/js/common"
 )
 
 // mapLocator API to the JS module.
@@ -221,4 +222,24 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			})
 		},
 	}
+}
+
+func parseLocatorOptions(rt *sobek.Runtime, opts sobek.Value) *common.LocatorOptions {
+	if k6common.IsNullish(opts) {
+		return nil
+	}
+
+	var popts common.LocatorOptions
+
+	obj := opts.ToObject(rt)
+	for _, k := range obj.Keys() {
+		switch k {
+		case "hasText":
+			popts.HasText = obj.Get(k).String()
+		case "hasNotText":
+			popts.HasNotText = obj.Get(k).String()
+		}
+	}
+
+	return &popts
 }
