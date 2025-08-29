@@ -2875,24 +2875,11 @@ func TestWaitForNavigationWithURL(t *testing.T) {
 }
 
 func TestPageWaitForURLSuccess(t *testing.T) {
+	t.Parallel()
+
 	if runtime.GOOS == "windows" {
 		t.Skip("Skipped due to https://github.com/grafana/k6/issues/4937")
 	}
-
-	t.Parallel()
-
-	tb := newTestBrowser(t, withFileServer())
-	tb.vu.ActivateVU()
-	tb.vu.StartIteration(t)
-
-	// Setup
-	tb.vu.SetVar(t, "page", &sobek.Object{})
-	tb.vu.SetVar(t, "testURL", tb.staticURL("waitfornavigation_test.html"))
-	tb.vu.SetVar(t, "page1URL", tb.staticURL("page1.html"))
-	_, err := tb.vu.RunAsync(t, `
-			page = await browser.newPage();
-		`)
-	require.NoError(t, err)
 
 	tests := []struct {
 		name     string
@@ -2902,7 +2889,7 @@ func TestPageWaitForURLSuccess(t *testing.T) {
 		{
 			name:     "when_already_at_matching_url",
 			code:     `await page.waitForURL(/.*waitfornavigation_test\.html$/);`,
-			expected: []string{tb.staticURL("waitfornavigation_test.html")},
+			expected: []string{"waitfornavigation_test.html"},
 		},
 		{
 			name: "exact_url_match",
@@ -2912,7 +2899,7 @@ func TestPageWaitForURLSuccess(t *testing.T) {
 					page.locator('#page1').click()
 				]);
 			`,
-			expected: []string{tb.staticURL("page1.html")},
+			expected: []string{"page1.html"},
 		},
 		{
 			name: "regex_pattern_match",
@@ -2922,7 +2909,7 @@ func TestPageWaitForURLSuccess(t *testing.T) {
 					page.locator('#page2').click()
 				]);
 			`,
-			expected: []string{tb.staticURL("page2.html")},
+			expected: []string{"page2.html"},
 		},
 		{
 			name: "empty_pattern_match",
@@ -2932,7 +2919,7 @@ func TestPageWaitForURLSuccess(t *testing.T) {
 					page.locator('#page2').click()
 				]);
 			`,
-			expected: []string{tb.staticURL("page2.html"), tb.staticURL("waitfornavigation_test.html")},
+			expected: []string{"page2.html", "waitfornavigation_test.html"},
 		},
 		{
 			name: "waitUntil_domcontentloaded",
@@ -2942,20 +2929,35 @@ func TestPageWaitForURLSuccess(t *testing.T) {
 					page.locator('#page1').click()
 				]);
 			`,
-			expected: []string{tb.staticURL("page1.html")},
+			expected: []string{"page1.html"},
 		},
 		{
 			name: "already_at_url_with_regex_pattern",
 			code: `
 				await page.waitForURL(/.*\/waitfornavigation_test\.html$/);
 			`,
-			expected: []string{tb.staticURL("waitfornavigation_test.html")},
+			expected: []string{"waitfornavigation_test.html"},
 		},
 	}
 
-	//nolint:paralleltest
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Setup
+			tb := newTestBrowser(t, withFileServer())
+			tb.vu.ActivateVU()
+			tb.vu.StartIteration(t)
+
+			tb.vu.SetVar(t, "page", &sobek.Object{})
+			tb.vu.SetVar(t, "testURL", tb.staticURL("waitfornavigation_test.html"))
+			tb.vu.SetVar(t, "page1URL", tb.staticURL("page1.html"))
+			_, err := tb.vu.RunAsync(t, `
+					page = await browser.newPage();
+				`)
+			require.NoError(t, err)
+
+			// test logic
 			code := fmt.Sprintf(`
 			await page.goto(testURL);
 
@@ -2963,30 +2965,18 @@ func TestPageWaitForURLSuccess(t *testing.T) {
 			
 			return page.url();`, tt.code)
 
-			got := tb.vu.RunPromise(t, code)
-			assert.Contains(t, tt.expected, got.Result().String())
+			result := tb.vu.RunPromise(t, code)
+			got := strings.ReplaceAll(result.Result().String(), tb.staticURL(""), "")
+			assert.Contains(t, tt.expected, got)
 		})
 	}
 }
 
 func TestPageWaitForURLFailure(t *testing.T) {
+	t.Parallel()
 	if runtime.GOOS == "windows" {
 		t.Skip("Skipped due to https://github.com/grafana/k6/issues/4937")
 	}
-
-	t.Parallel()
-
-	tb := newTestBrowser(t, withFileServer())
-	tb.vu.ActivateVU()
-	tb.vu.StartIteration(t)
-
-	// Setup
-	tb.vu.SetVar(t, "page", &sobek.Object{})
-	tb.vu.SetVar(t, "testURL", tb.staticURL("waitfornavigation_test.html"))
-	_, err := tb.vu.RunAsync(t, `
-			page = await browser.newPage();
-		`)
-	require.NoError(t, err)
 
 	tests := []struct {
 		name     string
@@ -3012,15 +3002,28 @@ func TestPageWaitForURLFailure(t *testing.T) {
 		},
 	}
 
-	//nolint:paralleltest
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tb := newTestBrowser(t, withFileServer())
+			tb.vu.ActivateVU()
+			tb.vu.StartIteration(t)
+
+			// Setup
+			tb.vu.SetVar(t, "page", &sobek.Object{})
+			tb.vu.SetVar(t, "testURL", tb.staticURL("waitfornavigation_test.html"))
+			_, err := tb.vu.RunAsync(t, `
+					page = await browser.newPage();
+				`)
+			require.NoError(t, err)
+
 			code := fmt.Sprintf(`
 			await page.goto(testURL);
 
 			%s`, tt.code)
 
-			_, err := tb.vu.RunAsync(t, code)
+			_, err = tb.vu.RunAsync(t, code)
 			assert.ErrorContains(t, err, tt.expected)
 		})
 	}
