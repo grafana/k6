@@ -1732,6 +1732,7 @@ class InjectedScript {
       'internal:attr': new AttributeEngine(),
       'internal:label': new LabelEngine(),
       'internal:text': new TextEngine(true, true),
+      'internal:has-text': this._createInternalHasTextEngine(),
     };
   }
 
