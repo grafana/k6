@@ -20,6 +20,12 @@ import (
 	k6common "go.k6.io/k6/js/common"
 )
 
+// Common error types for element visibility.
+var (
+	// ErrElementNotVisible is returned when an element is not visible for an operation.
+	ErrElementNotVisible = errors.New("element is not visible")
+)
+
 const (
 	resultDone       = "done"
 	resultNeedsInput = "needsinput"
@@ -776,7 +782,7 @@ func (h *ElementHandle) AsElement() *ElementHandle {
 func (h *ElementHandle) BoundingBox() (*Rect, error) {
 	bbox, err := h.boundingBox()
 	if err != nil && strings.Contains(err.Error(), "Could not compute box model") {
-		return nil, fmt.Errorf("check if element is visible: %w", err)
+		return nil, fmt.Errorf("%w: %w", ErrElementNotVisible, err)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("getting bounding box: %w", err)
@@ -1709,7 +1715,7 @@ func retryPointerAction(
 			}
 		}
 
-		if !strings.Contains(err.Error(), "check if element is visible") &&
+		if !errors.Is(err, ErrElementNotVisible) &&
 			!strings.Contains(err.Error(), "error:notvisible") {
 			return res, err
 		}

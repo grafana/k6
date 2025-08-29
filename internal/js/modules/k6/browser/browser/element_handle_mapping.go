@@ -1,8 +1,8 @@
 package browser
 
 import (
+	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/grafana/sobek"
 
@@ -19,7 +19,7 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 				box, err := eh.BoundingBox()
 				// We want to avoid errors when an element is not visible and instead
 				// opt to return a nil rectangle -- this matches Playwright's behaviour.
-				if err != nil && strings.Contains(err.Error(), "check if element is visible") {
+				if errors.Is(err, common.ErrElementNotVisible) {
 					return nil, nil
 				}
 				return box, err
