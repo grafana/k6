@@ -206,6 +206,50 @@ func TestConnectParamsAuthority(t *testing.T) {
 	}
 }
 
+func TestConnectParamsCompression(t *testing.T) {
+	t.Parallel()
+	testCases := []struct {
+		Name                string
+		JSON                string
+		ExpectedCompression string
+	}{
+		{
+			Name:                "EmptyCompression",
+			JSON:                `{}`,
+			ExpectedCompression: "",
+		},
+		{
+			Name:                "NoneCompression",
+			JSON:                `{compression: "none"}`,
+			ExpectedCompression: "",
+		},
+		{
+			Name:                "ZstdCompression",
+			JSON:                `{compression: "zstd"}`,
+			ExpectedCompression: "zstd",
+		},
+		{
+			Name:                "GzipCompression",
+			JSON:                `{compression: "gzip"}`,
+			ExpectedCompression: "gzip",
+		},
+		{
+			Name:                "snappyCompression",
+			JSON:                `{compression: "snappy"}`,
+			ExpectedCompression: "snappy",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			t.Parallel()
+			testRuntime, params := newParamsTestRuntime(t, tc.JSON)
+			p, err := newConnectParams(testRuntime.VU, params)
+			require.NoError(t, err)
+			assert.Equal(t, tc.ExpectedCompression, p.Compression)
+		})
+	}
+}
+
 // newParamsTestRuntime creates a new test runtime
 // that could be used to test the params
 // it also moves to the VU context and creates the params
