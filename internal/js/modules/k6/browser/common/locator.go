@@ -43,6 +43,9 @@ func NewLocator(ctx context.Context, opts *LocatorOptions, selector string, f *F
 	if opts != nil {
 		copts = *opts
 	}
+	if copts.HasText != "" {
+		selector += " >> internal:has-text=" + copts.HasText
+	}
 	return &Locator{
 		selector: selector,
 		opts:     &copts,
