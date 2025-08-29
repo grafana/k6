@@ -916,3 +916,34 @@ func TestLocatorNesting(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "1", q)
 }
+
+// This test ensures that the actionability checks are retried if we receive
+// any visible based errors from chrome. This is done by navigating to a page
+// where a button is hidden and unhidden every animation frame (~60 times per
+// second). We should not be able to click on the button, and if chrome returns
+// an error saying the element is not visible, we should retry. The only error
+// we expect is the timeout error.
+func TestActionabilityRetry(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withFileServer())
+
+	p := tb.NewPage(nil)
+
+	opts := &common.FrameGotoOptions{
+		Timeout: common.DefaultTimeout,
+	}
+	_, err := p.Goto(
+		tb.staticURL("hide_unhide.html"),
+		opts,
+	)
+	require.NoError(t, err)
+
+	lo := p.Locator("#incBtn", nil)
+	err = lo.Click(common.NewFrameClickOptions(1 * time.Second))
+	require.ErrorContains(t, err, "timed out after")
+
+	text, err := p.Locator("#value", nil).InnerText(nil)
+	require.NoError(t, err)
+	require.Equal(t, "0", text)
+}

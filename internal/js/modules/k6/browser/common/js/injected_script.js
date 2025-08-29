@@ -2445,21 +2445,9 @@ class InjectedScript {
     let lastRect = undefined;
     let counter = 0;
     let samePositionCounter = 0;
-    let lastTime = 0;
 
     const predicate = () => {
-      for (const state of states) {
-        if (state !== "stable") {
-          const result = this.checkElementState(node, state);
-          if (typeof result !== "boolean") {
-            return result;
-          }
-          if (!result) {
-            return continuePolling;
-          }
-          continue;
-        }
-
+      if (states.includes("stable")) {
         const element = this._retarget(node, "no-follow-label");
         if (!element) {
           return "error:notconnected";
@@ -2471,13 +2459,6 @@ class InjectedScript {
         if (++counter === 1) {
           return continuePolling;
         }
-
-        // Drop frames that are shorter than 16ms - WebKit Win bug.
-        const time = performance.now();
-        if (this._stableRafCount > 1 && time - lastTime < 15) {
-          return continuePolling;
-        }
-        lastTime = time;
 
         const clientRect = element.getBoundingClientRect();
         const rect = {
@@ -2504,6 +2485,20 @@ class InjectedScript {
           return continuePolling;
         }
       }
+
+      for (const state of states) {
+        if (state !== "stable") {
+          const result = this.checkElementState(node, state);
+          if (typeof result !== "boolean") {
+            return result;
+          }
+          if (!result) {
+            return continuePolling;
+          }
+          continue;
+        }
+      }
+
       return true; // All states are good!
     };
 
