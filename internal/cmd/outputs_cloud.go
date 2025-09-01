@@ -51,7 +51,7 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 	}
 
 	if conf.Token.String == "" {
-		return ErrUserUnauthenticated
+		return errUserUnauthenticated
 	}
 
 	// If not, we continue with some validations and the creation of the test run.

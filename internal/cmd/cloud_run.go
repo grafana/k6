@@ -139,7 +139,7 @@ func (c *cmdCloudRun) run(cmd *cobra.Command, args []string) error {
 			}
 
 			if err := createCloudTest(c.runCmd.gs, test); err != nil {
-				if errors.Is(err, ErrUserUnauthenticated) {
+				if errors.Is(err, errUserUnauthenticated) {
 					return nil, nil, err
 				}
 				return nil, nil, fmt.Errorf("could not create the cloud test run: %w", err)
