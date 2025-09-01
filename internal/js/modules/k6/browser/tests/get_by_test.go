@@ -1393,11 +1393,12 @@ func TestGetByNullHandling(t *testing.T) {
 	tb.vu.SetVar(t, "page", &sobek.Object{})
 	_, err := tb.vu.RunAsync(t, `
 		page = await browser.newPage();
-		frame = page.mainFrame()
+		frame = page.mainFrame();
+		locator = page.locator(':root');
 	`)
 	require.NoError(t, err)
 
-	for _, getByImpl := range []string{"page", "frame"} {
+	for _, getByImpl := range []string{"page", "frame", "locator"} {
 		_, err = tb.vu.RunAsync(t, `
 		await %s.getByRole().click();
 	`, getByImpl)
@@ -1437,7 +1438,8 @@ func TestGetByNullHandling(t *testing.T) {
 
 func getByImplementationsOf[T any](p *common.Page) map[string]T {
 	return map[string]T{
-		"page":  any(p).(T),
-		"frame": any(p.MainFrame()).(T),
+		"page":    any(p).(T),
+		"frame":   any(p.MainFrame()).(T),
+		"locator": any(p.Locator(":root", nil)).(T),
 	}
 }
