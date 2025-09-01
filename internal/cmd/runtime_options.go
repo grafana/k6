@@ -31,7 +31,11 @@ extended: base + sets "global" as alias for "globalThis"
 	flags.StringP("type", "t", "", "override test type, \"js\" or \"archive\"")
 	flags.StringArrayP("env", "e", nil, "add/override environment variable with `VAR=value`")
 	flags.Bool("no-thresholds", false, "don't run thresholds")
+	// TODO(@joanlopez): remove by k6 v2.0.
 	flags.Bool("no-summary", false, "don't show the summary at the end of the test")
+	if err := flags.MarkDeprecated("no-summary", "use --summary-mode=disabled instead"); err != nil {
+		panic(err) // Should never happen
+	}
 	flags.String("summary-mode", summary.ModeCompact.String(), "determine the summary mode,"+
 		" \"compact\", \"full\" or \"legacy\"")
 	flags.String(
