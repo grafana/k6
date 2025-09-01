@@ -280,7 +280,7 @@ jobs:
       # version tag, or manually triggered dev builds, so we have enough
       # assurance that package signing works, but don't sign every PR build.
       - if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' }}
-        uses: grafana/shared-workflows/actions/get-vault-secrets@get-vault-secrets/v1.2.1
+        uses: grafana/shared-workflows/actions/get-vault-secrets@get-vault-secrets/v1.3.0
         with:
           repo_secrets: |
             WIN_SIGN_CERT=winsign:WIN_SIGN_CERT
@@ -393,7 +393,7 @@ jobs:
           mv "dist/k6-$VERSION-windows-amd64.msi" "dist/k6-$VERSION-amd64.msi"
           mv "dist/k6-$VERSION-linux-amd64.rpm" "dist/k6-$VERSION-amd64.rpm"
           mv "dist/k6-$VERSION-linux-amd64.deb" "dist/k6-$VERSION-amd64.deb"
-      - uses: grafana/shared-workflows/actions/get-vault-secrets@get-vault-secrets/v1.2.1
+      - uses: grafana/shared-workflows/actions/get-vault-secrets@get-vault-secrets/v1.3.0
         with:
           repo_secrets: |
             IAM_ROLE_ARN=deploy:packager-iam-role
