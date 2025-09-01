@@ -30,8 +30,9 @@ import (
 //
 //nolint:staticcheck // the error is shown to the user so here punctuation and capital are required
 var errUserUnauthenticated = errors.New("To run tests with Grafana Cloud k6, you must first authenticate." +
-	" Run the `cloud login` command, or check the docs" +
-	" https://grafana.com/docs/grafana-cloud/testing/k6/author-run/tokens-and-cli-authentication for additional authentication methods.")
+	" Run the `k6 cloud login` command, or check the docs" +
+	" https://grafana.com/docs/grafana-cloud/testing/k6/author-run/tokens-and-cli-authentication" +
+	" for additional authentication methods.")
 
 // cmdCloud handles the `k6 cloud` sub-command
 type cmdCloud struct {
