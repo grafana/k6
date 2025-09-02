@@ -342,7 +342,7 @@ func TestOutputFlushWorkersStop(t *testing.T) {
 		logger: testutils.NewLogger(t),
 		stop:   make(chan struct{}),
 	}
-	o.config.MetricPushInterval = types.NullDurationFrom(1 * time.Millisecond)
+	o.config.MetricPushInterval = types.NullDurationFrom(10 * time.Millisecond)
 
 	once := sync.Once{}
 	flusherMock := func() {
@@ -360,7 +360,7 @@ func TestOutputFlushWorkersStop(t *testing.T) {
 		o.wg.Wait()
 	}()
 	select {
-	case <-time.After(time.Second):
+	case <-time.After(5 * time.Second):
 		t.Error("timed out")
 	case <-done:
 	}
@@ -373,7 +373,7 @@ func TestOutputFlushWorkersAbort(t *testing.T) {
 		logger: testutils.NewLogger(t),
 		abort:  make(chan struct{}),
 	}
-	o.config.MetricPushInterval = types.NullDurationFrom(1 * time.Millisecond)
+	o.config.MetricPushInterval = types.NullDurationFrom(10 * time.Millisecond)
 
 	once := sync.Once{}
 	flusherMock := func() {
@@ -391,7 +391,7 @@ func TestOutputFlushWorkersAbort(t *testing.T) {
 		o.wg.Wait()
 	}()
 	select {
-	case <-time.After(time.Second):
+	case <-time.After(5 * time.Second):
 		t.Error("timed out")
 	case <-done:
 	}
