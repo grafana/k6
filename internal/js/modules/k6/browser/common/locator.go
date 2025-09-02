@@ -385,6 +385,11 @@ type LocatorFilterOptions struct {
 	*LocatorOptions
 }
 
+// Filter returns a new [Locator] after applying the options to the current one.
+func (l *Locator) Filter(opts *LocatorFilterOptions) *Locator {
+	return NewLocator(l.ctx, opts.LocatorOptions, l.selector, l.frame, l.log)
+}
+
 // First will return the first child of the element matching the locator's
 // selector.
 func (l *Locator) First() *Locator {
