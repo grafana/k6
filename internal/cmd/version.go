@@ -66,38 +66,25 @@ func versionDetails() map[string]any {
 
 	if buildInfo.Main.Path == mainK6Path {
 		details["version"] = buildInfo.Main.Version
+		for _, s := range buildInfo.Settings {
+			switch s.Key {
+			case "vcs.revision":
+				commitLen := min(len(s.Value), 10)
+				details[commitKey] = s.Value[:commitLen]
+			case "vcs.modified":
+				if s.Value == "true" {
+					details[commitDirtyKey] = true
+				}
+			default:
+			}
+		}
 	} else {
 		for _, dep := range buildInfo.Deps {
 			if dep.Path == mainK6Path {
 				details["version"] = dep.Version
+				break
 			}
 		}
-	}
-
-	var (
-		commit string
-		dirty  bool
-	)
-	for _, s := range buildInfo.Settings {
-		switch s.Key {
-		case "vcs.revision":
-			commitLen := min(len(s.Value), 10)
-			commit = s.Value[:commitLen]
-		case "vcs.modified":
-			if s.Value == "true" {
-				dirty = true
-			}
-		default:
-		}
-	}
-
-	if commit == "" {
-		return details
-	}
-
-	details[commitKey] = commit
-	if dirty {
-		details[commitDirtyKey] = true
 	}
 
 	return details
