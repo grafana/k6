@@ -232,7 +232,6 @@ jobs:
     permissions:
       contents: read
       actions: read
-      id-token: write # Required for Vault
 
     runs-on: windows-latest
     defaults:
@@ -273,37 +272,6 @@ jobs:
           cd .\packaging
           candle.exe -arch x64 "-dVERSION=$env:VERSION" k6.wxs
           light.exe -ext WixUIExtension k6.wixobj
-      
-      # GH secrets are unavailable when building from project forks, so this
-      # will fail for external PRs, even if we wanted to do it. And we don't.
-      # We are only going to sign packages that are built from master or a
-      # version tag, or manually triggered dev builds, so we have enough
-      # assurance that package signing works, but don't sign every PR build.
-      - if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' }}
-        uses: grafana/shared-workflows/actions/get-vault-secrets@get-vault-secrets/v1.3.0
-        with:
-          repo_secrets: |
-            WIN_SIGN_CERT=winsign:WIN_SIGN_CERT
-            WIN_SIGN_PASS=winsign:WIN_SIGN_PASS
-
-      - name: Sign Windows binary and .msi package
-        if: ${{ env.WIN_SIGN_CERT != '' && env.WIN_SIGN_PASS != '' }}
-        run: |
-          # Convert base64 certificate to PFX
-          $bytes = [Convert]::FromBase64String("${{ env.WIN_SIGN_CERT }}")
-          [IO.File]::WriteAllBytes("k6.pfx", $bytes)
-
-          # Get the latest signtool executable
-          $SignTool = Get-ChildItem -Path "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Recurse -Filter signtool.exe | Where-Object { $_.DirectoryName -like "*\x64" } | Sort-Object -Descending | Select-Object -First 1
-
-          # Sign the Windows binary
-          & $SignTool sign /f k6.pfx /p "${{ env.WIN_SIGN_PASS }}" /tr "http://timestamp.digicert.com" /td sha256 /fd sha256 "packaging\k6.exe"
-
-          # Sign the MSI package
-          & $SignTool sign /f k6.pfx /p "${{ env.WIN_SIGN_PASS }}" /tr "http://timestamp.digicert.com" /td sha256 /fd sha256 "packaging\k6.msi"
-
-          # Cleanup signing artifacts
-          del k6.pfx
 
       - name: Rename MSI package
         # To keep it consistent with the other artifacts
@@ -312,117 +280,217 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
+          name: binaries-windows-unsigned
+          path: |
+            packaging/k6-*.msi
+          retention-days: 7
+          if-no-files-found: error
+
+  sign-windows:
+    permissions:
+      actions: read
+      contents: read
+      id-token: write # Required for Vault
+
+    environment:
+      name: azure-trusted-signing
+
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    needs: [package-windows]
+    env:
+      # GH secrets are unavailable when building from project forks, so this
+      # will fail for external PRs, even if we wanted to do it. And we don't.
+      # We are only going to sign packages that are built from the default branch
+      # or a version tag, or manually triggered dev builds, so we have enough
+      # assurance that package signing works, but don't sign every PR build.
+      SIGN_FILES: 'true'
+      # TODO Enable after testing
+      #SIGN_FILES: ${{ github.ref_name == github.event.repository.default_branch || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' }}
+    steps:
+      - name: Download unsigned Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: binaries-windows-unsigned
+          path: packaging
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        if: env.SIGN_FILES == 'true'
+        with:
+          # renovate: datasource=dotnet-version depName=dotnet-sdk
+          dotnet-version: '8.0.413'
+
+      - name: Install Sign CLI tool
+        if: env.SIGN_FILES == 'true'
+        env:
+          # renovate: datasource=nuget depName=sign
+          DOTNET_SIGN_VERSION: '0.9.1-beta.25379.1'
+        run: dotnet tool install --tool-path . sign --version ${env:DOTNET_SIGN_VERSION}
+
+      - name: Get secrets for Azure Trusted Signing
+        uses: grafana/shared-workflows/actions/get-vault-secrets@get-vault-secrets/v1.3.0
+        id: get-signing-secrets
+        if: env.SIGN_FILES == 'true'
+        with:
+          export_env: false
+          repo_secrets: |
+            client-id=azure-trusted-signing:client-id
+            subscription-id=azure-trusted-signing:subscription-id
+            tenant-id=azure-trusted-signing:tenant-id
+
+      - name: Azure log in
+        if: env.SIGN_FILES == 'true'
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
+        with:
+          client-id: ${{ fromJSON(steps.get-signing-secrets.outputs.secrets).client-id }}
+          subscription-id: ${{ fromJSON(steps.get-signing-secrets.outputs.secrets).subscription-id }}
+          tenant-id: ${{ fromJSON(steps.get-signing-secrets.outputs.secrets).tenant-id }}
+
+      - name: Sign Windows binary and .msi package
+        if: env.SIGN_FILES == 'true'
+        env:
+          APPLICATION_DESCRIPTION: 'Grafana k6'
+          PUBLISHER_NAME: 'Grafana Labs'
+          TRUSTED_SIGNING_ACCOUNT: 'grafana-premium-eastus'
+          TRUSTED_SIGNING_ENDPOINT: 'https://eus.codesigning.azure.net/'
+          TRUSTED_SIGNING_PROFILE: 'grafana-production'
+          VERBOSITY: ${{ runner.debug == '1' && 'Debug' || 'Error' }}
+        run: |
+          ./sign code trusted-signing `
+            **/* `
+            --base-directory "${env:GITHUB_WORKSPACE}/packaging" `
+            --application-name ${env:APPLICATION_DESCRIPTION} `
+            --publisher-name ${env:PUBLISHER_NAME} `
+            --description ${env:APPLICATION_DESCRIPTION} `
+            --description-url "${env:GITHUB_SERVER_URL}/${env:GITHUB_REPOSITORY}" `
+            --trusted-signing-account ${env:TRUSTED_SIGNING_ACCOUNT} `
+            --trusted-signing-certificate-profile ${env:TRUSTED_SIGNING_PROFILE} `
+            --trusted-signing-endpoint ${env:TRUSTED_SIGNING_ENDPOINT} `
+            --verbosity "${env:VERBOSITY}"
+          if ($LASTEXITCODE -ne 0) {
+            Write-Output "::error::Failed to sign Windows artifacts"
+            exit 1
+          }
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
           name: binaries-windows
           path: |
             packaging/k6-*.msi
           retention-days: 7
+          if-no-files-found: error
 
-  publish-github:
-    runs-on: ubuntu-latest
-    needs: [configure, build, package-windows]
-    if: ${{ startsWith(github.ref, 'refs/tags/v') && github.event_name != 'workflow_dispatch' }}
-    env:
-      VERSION: ${{ needs.configure.outputs.k6_version }}
-    permissions:
-       actions: read
-       contents: write
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-        with:
-          persist-credentials: false
-      - name: Download binaries
-        uses: actions/download-artifact@v4
-        with:
-          name: binaries
-          path: dist
-      - name: Download Windows binaries
-        uses: actions/download-artifact@v4
-        with:
-          name: binaries-windows
-          path: dist
-      - name: Generate checksum file
-        run: cd dist && sha256sum * > "k6-${VERSION}-checksums.txt"
-      - name: Anchore SBOM Action
-        continue-on-error: true
-        uses: anchore/sbom-action@7b36ad622f042cab6f59a75c2ac24ccb256e9b45 # v0.20.4
-        with:
-          artifact-name: k6-${{ env.VERSION }}-spdx.json
-          upload-release-assets: false
-          output-file: dist/k6-${{ env.VERSION }}-spdx.json
-      - name: Create release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -x
-          assets=()
-          for asset in ./dist/*; do
-            assets+=("$asset")
-          done
-          gh release create "$VERSION" "${assets[@]}" --target "$GITHUB_SHA" -F "./release notes/${VERSION}.md"
+  # TODO Temporarily disabled to avoid accidental publish while testing
+  # publish-github:
+  #   runs-on: ubuntu-latest
+  #   needs: [configure, build, package-windows, sign-windows]
+  #   if: ${{ startsWith(github.ref, 'refs/tags/v') && github.event_name != 'workflow_dispatch' }}
+  #   env:
+  #     VERSION: ${{ needs.configure.outputs.k6_version }}
+  #   permissions:
+  #      actions: read
+  #      contents: write
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v5
+  #       with:
+  #         persist-credentials: false
+  #     - name: Download binaries
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: binaries
+  #         path: dist
+  #     - name: Download Windows binaries
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: binaries-windows
+  #         path: dist
+  #     - name: Generate checksum file
+  #       run: cd dist && sha256sum * > "k6-${VERSION}-checksums.txt"
+  #     - name: Anchore SBOM Action
+  #       continue-on-error: true
+  #       uses: anchore/sbom-action@7b36ad622f042cab6f59a75c2ac24ccb256e9b45 # v0.20.4
+  #       with:
+  #         artifact-name: k6-${{ env.VERSION }}-spdx.json
+  #         upload-release-assets: false
+  #         output-file: dist/k6-${{ env.VERSION }}-spdx.json
+  #     - name: Create release
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #       run: |
+  #         set -x
+  #         assets=()
+  #         for asset in ./dist/*; do
+  #           assets+=("$asset")
+  #         done
+  #         gh release create "$VERSION" "${assets[@]}" --target "$GITHUB_SHA" -F "./release notes/${VERSION}.md"
 
-  publish-packages:
-    runs-on: ubuntu-latest
-    needs: [configure, build, package-windows]
-    if: ${{ startsWith(github.ref, 'refs/tags/v') && github.event_name != 'workflow_dispatch' }}
-    env:
-      VERSION: ${{ needs.configure.outputs.k6_version }}
-    permissions:
-      actions: read
-      contents: read
-      packages: read
-      id-token: write # Required for Vault
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-        with:
-          persist-credentials: false
-      - name: Download binaries
-        uses: actions/download-artifact@v4
-        with:
-          name: binaries
-          path: dist
-      - name: Download Windows binaries
-        uses: actions/download-artifact@v4
-        with:
-          name: binaries-windows
-          path: dist
-      - name: Rename binaries
-        # To be consistent with the filenames used in dl.k6.io
-        run: |
-          mv "dist/k6-$VERSION-windows-amd64.msi" "dist/k6-$VERSION-amd64.msi"
-          mv "dist/k6-$VERSION-linux-amd64.rpm" "dist/k6-$VERSION-amd64.rpm"
-          mv "dist/k6-$VERSION-linux-amd64.deb" "dist/k6-$VERSION-amd64.deb"
-      - uses: grafana/shared-workflows/actions/get-vault-secrets@get-vault-secrets/v1.3.0
-        with:
-          repo_secrets: |
-            IAM_ROLE_ARN=deploy:packager-iam-role
-            AWS_CF_DISTRIBUTION=cloudfront:AWS_CF_DISTRIBUTION
-            PGP_SIGN_KEY_PASSPHRASE=pgp:PGP_SIGN_KEY_PASSPHRASE
-            PGP_SIGN_KEY=pgp:PGP_SIGN_KEY
-            S3_BUCKET=s3:AWS_S3_BUCKET
-      - uses: grafana/shared-workflows/actions/aws-auth@aws-auth/v1.0.2
-        with:
-          aws-region: "us-east-2"
-          role-arn: ${{ env.IAM_ROLE_ARN }}
-          set-creds-in-environment: true
-      - name: Setup docker compose environment
-        run: |
-          cat > packaging/.env <<EOF
-          AWS_ACCESS_KEY_ID=${{ env.AWS_ACCESS_KEY_ID }}
-          AWS_CF_DISTRIBUTION="${{ env.AWS_CF_DISTRIBUTION }}"
-          AWS_DEFAULT_REGION=us-east-2
-          AWS_SECRET_ACCESS_KEY=${{ env.AWS_SECRET_ACCESS_KEY }}
-          AWS_SESSION_TOKEN=${{ env.AWS_SESSION_TOKEN }}
-          PGP_SIGN_KEY_PASSPHRASE=${{ env.PGP_SIGN_KEY_PASSPHRASE }}
-          S3_BUCKET=${{ env.S3_BUCKET }}
-          EOF
-          echo "${{ env.PGP_SIGN_KEY }}" > packaging/sign-key.gpg
-      - name: Publish packages
-        env:
-          GITHUB_ACTOR: ${{ github.actor }}
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login https://ghcr.io -u ${GITHUB_ACTOR} --password-stdin
-          cd packaging
-          docker compose pull packager
-          docker compose run --rm packager
+  # publish-packages:
+  #   runs-on: ubuntu-latest
+  #   needs: [configure, build, package-windows]
+  #   if: ${{ startsWith(github.ref, 'refs/tags/v') && github.event_name != 'workflow_dispatch' }}
+  #   env:
+  #     VERSION: ${{ needs.configure.outputs.k6_version }}
+  #   permissions:
+  #     actions: read
+  #     contents: read
+  #     packages: read
+  #     id-token: write # Required for Vault
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v5
+  #       with:
+  #         persist-credentials: false
+  #     - name: Download binaries
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: binaries
+  #         path: dist
+  #     - name: Download Windows binaries
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: binaries-windows
+  #         path: dist
+  #     - name: Rename binaries
+  #       # To be consistent with the filenames used in dl.k6.io
+  #       run: |
+  #         mv "dist/k6-$VERSION-windows-amd64.msi" "dist/k6-$VERSION-amd64.msi"
+  #         mv "dist/k6-$VERSION-linux-amd64.rpm" "dist/k6-$VERSION-amd64.rpm"
+  #         mv "dist/k6-$VERSION-linux-amd64.deb" "dist/k6-$VERSION-amd64.deb"
+  #     - uses: grafana/shared-workflows/actions/get-vault-secrets@get-vault-secrets/v1.3.0
+  #       with:
+  #         repo_secrets: |
+  #           IAM_ROLE_ARN=deploy:packager-iam-role
+  #           AWS_CF_DISTRIBUTION=cloudfront:AWS_CF_DISTRIBUTION
+  #           PGP_SIGN_KEY_PASSPHRASE=pgp:PGP_SIGN_KEY_PASSPHRASE
+  #           PGP_SIGN_KEY=pgp:PGP_SIGN_KEY
+  #           S3_BUCKET=s3:AWS_S3_BUCKET
+  #     - uses: grafana/shared-workflows/actions/aws-auth@aws-auth/v1.0.2
+  #       with:
+  #         aws-region: "us-east-2"
+  #         role-arn: ${{ env.IAM_ROLE_ARN }}
+  #         set-creds-in-environment: true
+  #     - name: Setup docker compose environment
+  #       run: |
+  #         cat > packaging/.env <<EOF
+  #         AWS_ACCESS_KEY_ID=${{ env.AWS_ACCESS_KEY_ID }}
+  #         AWS_CF_DISTRIBUTION="${{ env.AWS_CF_DISTRIBUTION }}"
+  #         AWS_DEFAULT_REGION=us-east-2
+  #         AWS_SECRET_ACCESS_KEY=${{ env.AWS_SECRET_ACCESS_KEY }}
+  #         AWS_SESSION_TOKEN=${{ env.AWS_SESSION_TOKEN }}
+  #         PGP_SIGN_KEY_PASSPHRASE=${{ env.PGP_SIGN_KEY_PASSPHRASE }}
+  #         S3_BUCKET=${{ env.S3_BUCKET }}
+  #         EOF
+  #         echo "${{ env.PGP_SIGN_KEY }}" > packaging/sign-key.gpg
+  #     - name: Publish packages
+  #       env:
+  #         GITHUB_ACTOR: ${{ github.actor }}
+  #       run: |
+  #         echo "${{ secrets.GITHUB_TOKEN }}" | docker login https://ghcr.io -u ${GITHUB_ACTOR} --password-stdin
+  #         cd packaging
+  #         docker compose pull packager
+  #         docker compose run --rm packager
