@@ -96,7 +96,7 @@ jobs:
             sign_windows_artifacts="true"
           else
             echo "Windows artifacts will not be signed"
-            sign_windows_artifacts="true"
+            sign_windows_artifacts="false"
           fi
           echo "sign_windows_artifacts=${sign_windows_artifacts}" >> ${GITHUB_OUTPUT}
 
