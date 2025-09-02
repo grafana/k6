@@ -507,113 +507,112 @@ jobs:
           retention-days: 7
           if-no-files-found: error
 
-  # TODO Temporarily disabled to avoid accidental publish while testing
-  # publish-github:
-  #   runs-on: ubuntu-latest
-  #   needs: [configure, build, sign-windows-installer]
-  #   if: ${{ startsWith(github.ref, 'refs/tags/v') && github.event_name != 'workflow_dispatch' }}
-  #   env:
-  #     VERSION: ${{ needs.configure.outputs.k6_version }}
-  #   permissions:
-  #      actions: read
-  #      contents: write
-  #   steps:
-  #     - name: Checkout code
-  #       uses: actions/checkout@v5
-  #       with:
-  #         persist-credentials: false
-  #     - name: Download signed binaries
-  #       uses: actions/download-artifact@v4
-  #       with:
-  #         name: binaries-signed
-  #         path: dist
-  #     - name: Download signed Windows binaries
-  #       uses: actions/download-artifact@v4
-  #       with:
-  #         name: binaries-windows-signed
-  #         path: dist
-  #     - name: Generate checksum file
-  #       run: cd dist && sha256sum * > "k6-${VERSION}-checksums.txt"
-  #     - name: Anchore SBOM Action
-  #       continue-on-error: true
-  #       uses: anchore/sbom-action@7b36ad622f042cab6f59a75c2ac24ccb256e9b45 # v0.20.4
-  #       with:
-  #         artifact-name: k6-${{ env.VERSION }}-spdx.json
-  #         upload-release-assets: false
-  #         output-file: dist/k6-${{ env.VERSION }}-spdx.json
-  #     - name: Create release
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  #       run: |
-  #         set -x
-  #         assets=()
-  #         for asset in ./dist/*; do
-  #           assets+=("$asset")
-  #         done
-  #         gh release create "$VERSION" "${assets[@]}" --target "$GITHUB_SHA" -F "./release notes/${VERSION}.md"
+  publish-github:
+    runs-on: ubuntu-latest
+    needs: [configure, build, sign-windows-installer]
+    if: ${{ startsWith(github.ref, 'refs/tags/v') && github.event_name != 'workflow_dispatch' }}
+    env:
+      VERSION: ${{ needs.configure.outputs.k6_version }}
+    permissions:
+       actions: read
+       contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Download signed binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: binaries-signed
+          path: dist
+      - name: Download signed Windows binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: binaries-windows-signed
+          path: dist
+      - name: Generate checksum file
+        run: cd dist && sha256sum * > "k6-${VERSION}-checksums.txt"
+      - name: Anchore SBOM Action
+        continue-on-error: true
+        uses: anchore/sbom-action@7b36ad622f042cab6f59a75c2ac24ccb256e9b45 # v0.20.4
+        with:
+          artifact-name: k6-${{ env.VERSION }}-spdx.json
+          upload-release-assets: false
+          output-file: dist/k6-${{ env.VERSION }}-spdx.json
+      - name: Create release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -x
+          assets=()
+          for asset in ./dist/*; do
+            assets+=("$asset")
+          done
+          gh release create "$VERSION" "${assets[@]}" --target "$GITHUB_SHA" -F "./release notes/${VERSION}.md"
 
-  # publish-packages:
-  #   runs-on: ubuntu-latest
-  #   needs: [configure, build, sign-windows-installer]
-  #   if: ${{ startsWith(github.ref, 'refs/tags/v') && github.event_name != 'workflow_dispatch' }}
-  #   env:
-  #     VERSION: ${{ needs.configure.outputs.k6_version }}
-  #   permissions:
-  #     actions: read
-  #     contents: read
-  #     packages: read
-  #     id-token: write # Required for Vault
-  #   steps:
-  #     - name: Checkout code
-  #       uses: actions/checkout@v5
-  #       with:
-  #         persist-credentials: false
-  #     - name: Download signed binaries
-  #       uses: actions/download-artifact@v4
-  #       with:
-  #         name: binaries-signed
-  #         path: dist
-  #     - name: Download signed Windows binaries
-  #       uses: actions/download-artifact@v4
-  #       with:
-  #         name: binaries-windows-signed
-  #         path: dist
-  #     - name: Rename binaries
-  #       # To be consistent with the filenames used in dl.k6.io
-  #       run: |
-  #         mv "dist/k6-$VERSION-windows-amd64.msi" "dist/k6-$VERSION-amd64.msi"
-  #         mv "dist/k6-$VERSION-linux-amd64.rpm" "dist/k6-$VERSION-amd64.rpm"
-  #         mv "dist/k6-$VERSION-linux-amd64.deb" "dist/k6-$VERSION-amd64.deb"
-  #     - uses: grafana/shared-workflows/actions/get-vault-secrets@get-vault-secrets/v1.3.0
-  #       with:
-  #         repo_secrets: |
-  #           IAM_ROLE_ARN=deploy:packager-iam-role
-  #           AWS_CF_DISTRIBUTION=cloudfront:AWS_CF_DISTRIBUTION
-  #           PGP_SIGN_KEY_PASSPHRASE=pgp:PGP_SIGN_KEY_PASSPHRASE
-  #           PGP_SIGN_KEY=pgp:PGP_SIGN_KEY
-  #           S3_BUCKET=s3:AWS_S3_BUCKET
-  #     - uses: grafana/shared-workflows/actions/aws-auth@aws-auth/v1.0.2
-  #       with:
-  #         aws-region: "us-east-2"
-  #         role-arn: ${{ env.IAM_ROLE_ARN }}
-  #         set-creds-in-environment: true
-  #     - name: Setup docker compose environment
-  #       run: |
-  #         cat > packaging/.env <<EOF
-  #         AWS_ACCESS_KEY_ID=${env.AWS_ACCESS_KEY_ID}
-  #         AWS_CF_DISTRIBUTION="${AWS_CF_DISTRIBUTION}"
-  #         AWS_DEFAULT_REGION=us-east-2
-  #         AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-  #         AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
-  #         PGP_SIGN_KEY_PASSPHRASE=${PGP_SIGN_KEY_PASSPHRASE}
-  #         S3_BUCKET=${S3_BUCKET}
-  #         EOF
-  #         echo "${PGP_SIGN_KEY}" > packaging/sign-key.gpg
-  #     - name: Publish packages
-  #       env:
-  #         GITHUB_ACTOR: ${{ github.actor }}
-  #       run: |
-  #         echo "${{ secrets.GITHUB_TOKEN }}" | docker login https://ghcr.io -u ${GITHUB_ACTOR} --password-stdin
-  #         cd packaging
-  #         docker compose pull packager
-  #         docker compose run --rm packager
+  publish-packages:
+    runs-on: ubuntu-latest
+    needs: [configure, build, sign-windows-installer]
+    if: ${{ startsWith(github.ref, 'refs/tags/v') && github.event_name != 'workflow_dispatch' }}
+    env:
+      VERSION: ${{ needs.configure.outputs.k6_version }}
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+      id-token: write # Required for Vault
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Download signed binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: binaries-signed
+          path: dist
+      - name: Download signed Windows binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: binaries-windows-signed
+          path: dist
+      - name: Rename binaries
+        # To be consistent with the filenames used in dl.k6.io
+        run: |
+          mv "dist/k6-$VERSION-windows-amd64.msi" "dist/k6-$VERSION-amd64.msi"
+          mv "dist/k6-$VERSION-linux-amd64.rpm" "dist/k6-$VERSION-amd64.rpm"
+          mv "dist/k6-$VERSION-linux-amd64.deb" "dist/k6-$VERSION-amd64.deb"
+      - uses: grafana/shared-workflows/actions/get-vault-secrets@get-vault-secrets/v1.3.0
+        with:
+          repo_secrets: |
+            IAM_ROLE_ARN=deploy:packager-iam-role
+            AWS_CF_DISTRIBUTION=cloudfront:AWS_CF_DISTRIBUTION
+            PGP_SIGN_KEY_PASSPHRASE=pgp:PGP_SIGN_KEY_PASSPHRASE
+            PGP_SIGN_KEY=pgp:PGP_SIGN_KEY
+            S3_BUCKET=s3:AWS_S3_BUCKET
+      - uses: grafana/shared-workflows/actions/aws-auth@aws-auth/v1.0.2
+        with:
+          aws-region: "us-east-2"
+          role-arn: ${{ env.IAM_ROLE_ARN }}
+          set-creds-in-environment: true
+      - name: Setup docker compose environment
+        run: |
+          cat > packaging/.env <<EOF
+          AWS_ACCESS_KEY_ID=${env.AWS_ACCESS_KEY_ID}
+          AWS_CF_DISTRIBUTION="${AWS_CF_DISTRIBUTION}"
+          AWS_DEFAULT_REGION=us-east-2
+          AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+          AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
+          PGP_SIGN_KEY_PASSPHRASE=${PGP_SIGN_KEY_PASSPHRASE}
+          S3_BUCKET=${S3_BUCKET}
+          EOF
+          echo "${PGP_SIGN_KEY}" > packaging/sign-key.gpg
+      - name: Publish packages
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login https://ghcr.io -u ${GITHUB_ACTOR} --password-stdin
+          cd packaging
+          docker compose pull packager
+          docker compose run --rm packager
