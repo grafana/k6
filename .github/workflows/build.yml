@@ -354,8 +354,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: signed-windows-binary
-          path: |
-            packaging/k6.exe
+          path: 'packaging/k6-${{ env.VERSION }}-windows-amd64/k6.exe'
           retention-days: 7
           if-no-files-found: error
 
