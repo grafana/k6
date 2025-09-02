@@ -379,6 +379,12 @@ func (l *Locator) fill(value string, opts *FrameFillOptions) error {
 	return l.frame.fill(l.selector, value, opts)
 }
 
+// LocatorFilterOptions allows filtering a [Locator] by various criteria.
+// It's similar to [LocatorOptions] but used for filtering existing locators.
+type LocatorFilterOptions struct {
+	*LocatorOptions
+}
+
 // First will return the first child of the element matching the locator's
 // selector.
 func (l *Locator) First() *Locator {
