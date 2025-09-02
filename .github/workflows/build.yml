@@ -253,6 +253,8 @@ jobs:
             -t $DOCKER_IMAGE_ID:latest-with-browser \
             -t ghcr.io/$GHCR_IMAGE_ID:latest-with-browser .
 
+  # Forks, PRs etc. won't actually sign the binary, but the workflow will run most of the same steps as
+  # GitHub Actions workflows don't support conditional `needs` so we have to run the signing step unconditionally.
   sign-windows-binary:
     permissions:
       actions: read
@@ -338,6 +340,7 @@ jobs:
             exit 1
           }
 
+      # Re-zip the signed Windows binary to replace the original unsigned version
       - name: Zip signed Windows binary
         run: |
           Compress-Archive -Path ".\packaging\*" -DestinationPath ".\dist\k6-${env:VERSION}-windows-amd64.zip" -Force
@@ -387,6 +390,7 @@ jobs:
           Expand-Archive -Path .\wix311-binaries.zip -DestinationPath .\wix311\
           echo "$pwd\wix311" | Out-File -FilePath $env:GITHUB_PATH -Append
 
+      # This artifact might not actually be signed, but it is the one that should be packaged into the installer regardless
       - name: Download signed Windows binary
         uses: actions/download-artifact@v4
         with:
@@ -414,6 +418,8 @@ jobs:
           retention-days: 7
           if-no-files-found: error
 
+  # Forks, PRs etc. won't actually sign the installer, but the workflow will run most of the same steps as
+  # GitHub Actions workflows don't support conditional `needs` so we have to run the signing step unconditionally.
   sign-windows-installer:
     permissions:
       actions: read
