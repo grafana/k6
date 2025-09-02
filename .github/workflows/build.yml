@@ -599,7 +599,7 @@ jobs:
       - name: Setup docker compose environment
         run: |
           cat > packaging/.env <<EOF
-          AWS_ACCESS_KEY_ID=${env.AWS_ACCESS_KEY_ID}
+          AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
           AWS_CF_DISTRIBUTION="${AWS_CF_DISTRIBUTION}"
           AWS_DEFAULT_REGION=us-east-2
           AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
