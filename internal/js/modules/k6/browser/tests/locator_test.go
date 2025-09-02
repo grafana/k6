@@ -947,3 +947,139 @@ func TestActionabilityRetry(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "0", text)
 }
+
+func TestLocatorFilter(t *testing.T) {
+	t.Parallel()
+
+	setupPage := func(t *testing.T) *common.Page {
+		t.Helper()
+
+		tb := newTestBrowser(t)
+		p := tb.NewPage(nil)
+		err := p.SetContent(`
+			<section>
+				<div>
+					<span>hello</span>
+				</div>
+				<div>
+					<span>world</span>
+				</div>
+			</section>`,
+			nil,
+		)
+		require.NoError(t, err)
+		return p
+	}
+
+	t.Run("filter_hasText", func(t *testing.T) {
+		t.Parallel()
+
+		count, err := setupPage(t).
+			Locator("div", nil).
+			Filter(&common.LocatorFilterOptions{
+				LocatorOptions: &common.LocatorOptions{
+					HasText: "hello",
+				},
+			}).
+			Count()
+		require.NoError(t, err)
+		require.Equal(t, 1, count)
+	})
+
+	t.Run("filter_hasText_on_locator_with_hasText", func(t *testing.T) {
+		t.Parallel()
+
+		count, err := setupPage(t).
+			Locator("div", &common.LocatorOptions{
+				HasText: "hello",
+			}).
+			Filter(&common.LocatorFilterOptions{
+				LocatorOptions: &common.LocatorOptions{
+					HasText: "hello",
+				},
+			}).
+			Count()
+		require.NoError(t, err)
+		require.Equal(t, 1, count)
+	})
+
+	t.Run("filter_hasText_different_on_locator_with_hasText", func(t *testing.T) {
+		t.Parallel()
+
+		count, err := setupPage(t).
+			Locator("div", &common.LocatorOptions{
+				HasText: "hello",
+			}).
+			Filter(&common.LocatorFilterOptions{
+				LocatorOptions: &common.LocatorOptions{
+					HasText: "world",
+				},
+			}).
+			Count()
+		require.NoError(t, err)
+		require.Equal(t, 0, count)
+	})
+
+	t.Run("filter_hasText_section_with_world", func(t *testing.T) {
+		t.Parallel()
+
+		count, err := setupPage(t).
+			Locator("section", &common.LocatorOptions{
+				HasText: "hello",
+			}).
+			Filter(&common.LocatorFilterOptions{
+				LocatorOptions: &common.LocatorOptions{
+					HasText: "world",
+				},
+			}).
+			Count()
+		require.NoError(t, err)
+		require.Equal(t, 1, count)
+	})
+
+	t.Run("filter_hasText_nested_locator", func(t *testing.T) {
+		t.Parallel()
+
+		count, err := setupPage(t).
+			Locator("div", nil).
+			Filter(&common.LocatorFilterOptions{
+				LocatorOptions: &common.LocatorOptions{
+					HasText: "hello",
+				},
+			}).
+			Locator("span").
+			Count()
+		require.NoError(t, err)
+		require.Equal(t, 1, count)
+	})
+
+	t.Run("filter_hasNotText_hello", func(t *testing.T) {
+		t.Parallel()
+
+		count, err := setupPage(t).
+			Locator("div", nil).
+			Filter(&common.LocatorFilterOptions{
+				LocatorOptions: &common.LocatorOptions{
+					HasNotText: "hello",
+				},
+			}).
+			Count()
+		require.NoError(t, err)
+		require.Equal(t, 1, count)
+	})
+
+	t.Run("filter_hasNotText_foo", func(t *testing.T) {
+		t.Parallel()
+
+		count, err := setupPage(t).
+			Locator("div", nil).
+			Filter(&common.LocatorFilterOptions{
+				LocatorOptions: &common.LocatorOptions{
+					HasNotText: "foo",
+				},
+			}).
+			Count()
+		require.NoError(t, err)
+		require.Equal(t, 2, count)
+	})
+}
