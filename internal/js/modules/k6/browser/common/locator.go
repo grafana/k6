@@ -516,7 +516,7 @@ func (l *Locator) GetByTitle(title string, opts *GetByBaseOptions) *Locator {
 
 // Locator creates and returns a new locator chained/relative to the current locator.
 func (l *Locator) Locator(selector string) *Locator {
-	return NewLocator(l.ctx, l.opts, l.selector+" >> "+selector, l.frame, l.log)
+	return NewLocator(l.ctx, nil, l.selector+" >> "+selector, l.frame, l.log)
 }
 
 // InnerHTML returns the element's inner HTML that matches
