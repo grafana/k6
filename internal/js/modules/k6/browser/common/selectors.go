@@ -79,6 +79,20 @@ func (s *Selector) parse() error {
 		var name, body string
 
 		switch {
+		// Using TrimQuote prevents issues with selectors like:
+		//
+		//       page.getByRole("listitem >> internal:has-text='Product 2'")
+		//
+		// We'd receive the following error because of the quotes:
+		//
+		//       Uncaught (in promise) getting text content of
+		//       "internal:role=listitem >> internal:has-text='Product 2'
+		//       >> nth=0": SyntaxError: Unexpected token ''', "'Product 2'"
+		//       is not valid JSON
+		//
+		// Selectors, such as, internal:has-text, by their nature, are
+		// exposed to users, even if we don't document it. So, we need to
+		// be able to handle quoted text with internal selectors.
 		case strings.HasPrefix(part, "internal:has-text="):
 			name = "internal:has-text"
 			body = TrimQuotes(part[eqIndex+1:])
