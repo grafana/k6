@@ -79,7 +79,8 @@ func (s *Selector) parse() error {
 		var name, body string
 
 		switch {
-		// Using TrimQuote prevents issues with selectors like:
+		// Using TrimQuote prevents issues with selectors, allowing us to
+		// handle quoted text with internal selectors, such as:
 		//
 		//       page.getByRole("listitem >> internal:has-text='Product 2'")
 		//
@@ -91,8 +92,7 @@ func (s *Selector) parse() error {
 		//       is not valid JSON
 		//
 		// Selectors, such as, internal:has-text, by their nature, are
-		// exposed to users, even if we don't document it. So, we need to
-		// be able to handle quoted text with internal selectors.
+		// exposed to users, even if we don't document their use.
 		case strings.HasPrefix(part, "internal:has-text="):
 			name = "internal:has-text"
 			body = TrimQuotes(part[eqIndex+1:])
