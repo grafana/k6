@@ -42,7 +42,6 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-
       - name: Get the k6 version
         id: get_k6_version
         env:
@@ -61,7 +60,6 @@ jobs:
           fi
           echo "VERSION=${VERSION}"
           echo "k6_version=${VERSION}" >> $GITHUB_OUTPUT
-
       - name: Get the used Go version
         id: get_go_version
         env:
@@ -257,8 +255,8 @@ jobs:
   # GitHub Actions workflows don't support conditional `needs` so we have to run the signing step unconditionally.
   sign-binaries:
     permissions:
-      actions: read
       contents: read
+      actions: read
       id-token: write # Required for Vault
 
     env:
@@ -369,18 +367,15 @@ jobs:
         uses: actions/checkout@v5
         with:
           persist-credentials: false
-
       - name: Install pandoc
         uses: crazy-max/ghaction-chocolatey@0e015857dd851f84fcb7fb53380eb5c4c8202333 # v3.0.0
         with:
           args: install -y pandoc
-
       - name: Install wix tools
         run: |
           curl -Lso wix311-binaries.zip https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip
           Expand-Archive -Path .\wix311-binaries.zip -DestinationPath .\wix311\
           echo "$pwd\wix311" | Out-File -FilePath $env:GITHUB_PATH -Append
-
       - name: Download Windows binary
         uses: actions/download-artifact@v4
         with:
@@ -392,12 +387,12 @@ jobs:
           $env:VERSION = $env:VERSION -replace 'v(\d+\.\d+\.\d+).*','$1'
           pandoc -s -f markdown -t rtf -o packaging\LICENSE.rtf LICENSE.md
           cd .\packaging
-          candle.exe -arch x64 "-dVERSION=$env:VERSION" k6.wxs
+          candle.exe -arch x64 "-dVERSION=${env:VERSION}" k6.wxs
           light.exe -ext WixUIExtension k6.wixobj
 
       - name: Rename MSI package
         # To keep it consistent with the other artifacts
-        run: move "packaging\k6.msi" "packaging\k6-$env:VERSION-windows-amd64.msi"
+        run: move "packaging\k6.msi" "packaging\k6-${env:VERSION}-windows-amd64.msi"
 
       - name: Upload Windows installer
         uses: actions/upload-artifact@v4
