@@ -416,7 +416,10 @@ func (f *Frame) position() (*Position, error) {
 		return nil, err
 	}
 
-	box := element.BoundingBox()
+	box, err := element.BoundingBox()
+	if err != nil {
+		return nil, err
+	}
 
 	return &Position{X: box.X, Y: box.Y}, nil
 }
@@ -533,16 +536,20 @@ func (f *Frame) waitForSelector(selector string, opts *FrameWaitForSelectorOptio
 	f.executionContextMu.RLock()
 	defer f.executionContextMu.RUnlock()
 
-	ec := f.executionContexts[mainWorld]
-	if ec == nil {
-		return nil, fmt.Errorf("waiting for selector %q: execution context %q not found", selector, mainWorld)
-	}
+	uec := f.executionContexts[utilityWorld]
 
-	// an element should belong to the current execution context.
-	// otherwise, we should adopt it to this execution context.
+	// An element should belong to the current main world execution context, and
+	// not to the utility world context, otherwise, we should adopt it to the
+	// current world's execution context. This is only valid when the handle
+	// is from the current frame and not part of a nested frame.
 	adopted := handle
-	if ec != handle.execCtx {
-		if adopted, err = ec.adoptElementHandle(handle); err != nil {
+	if uec != nil && uec == handle.execCtx {
+		wec := f.executionContexts[mainWorld]
+		if wec == nil {
+			return nil, fmt.Errorf("waiting for selector %q: execution context %q not found", selector, mainWorld)
+		}
+
+		if adopted, err = wec.adoptElementHandle(handle); err != nil {
 			return nil, fmt.Errorf("waiting for selector %q: adopting element handle: %w", selector, err)
 		}
 
@@ -1056,52 +1063,7 @@ func (f *Frame) getAttribute(selector, name string, opts *FrameBaseOptions) (str
 func (f *Frame) GetByRole(role string, opts *GetByRoleOptions) *Locator {
 	f.log.Debugf("Frame:GetByRole", "fid:%s furl:%q role:%q opts:%+v", f.ID(), f.URL(), role, opts)
 
-	properties := make(map[string]string)
-
-	if opts == nil {
-		return f.Locator("internal:role="+role, nil)
-	}
-
-	if opts.Checked != nil {
-		properties["checked"] = strconv.FormatBool(*opts.Checked)
-	}
-	if opts.Disabled != nil {
-		properties["disabled"] = strconv.FormatBool(*opts.Disabled)
-	}
-	if opts.Selected != nil {
-		properties["selected"] = strconv.FormatBool(*opts.Selected)
-	}
-	if opts.Expanded != nil {
-		properties["expanded"] = strconv.FormatBool(*opts.Expanded)
-	}
-	if opts.IncludeHidden != nil {
-		properties["include-hidden"] = strconv.FormatBool(*opts.IncludeHidden)
-	}
-	if opts.Level != nil {
-		properties["level"] = strconv.FormatInt(*opts.Level, 10)
-	}
-	if opts.Name != nil && *opts.Name != "" {
-		// Exact option can only be applied to quoted strings.
-		if isQuotedText(*opts.Name) {
-			if opts.Exact != nil && *opts.Exact {
-				*opts.Name = (*opts.Name) + "s"
-			} else {
-				*opts.Name = (*opts.Name) + "i"
-			}
-		}
-		properties["name"] = *opts.Name
-	}
-	if opts.Pressed != nil {
-		properties["pressed"] = strconv.FormatBool(*opts.Pressed)
-	}
-
-	var builder strings.Builder
-	builder.WriteString("internal:role=" + role)
-	for key, value := range properties {
-		builder.WriteString("[" + key + "=" + value + "]")
-	}
-
-	return f.Locator(builder.String(), nil)
+	return f.Locator(f.buildRoleSelector(role, opts), nil)
 }
 
 // isQuotedText returns true if the string is a quoted string.
@@ -1124,12 +1086,11 @@ func isQuotedText(s string) bool {
 }
 
 // buildAttributeSelector is a helper method that builds an attribute selector
-// for use with the internal:attr engine. It handles quoted strings and
+// prefixed with internal:attr. It handles quoted strings and
 // applies the appropriate suffix for exact or case-insensitive matching.
 func (f *Frame) buildAttributeSelector(attrName, attrValue string, opts *GetByBaseOptions) string {
 	var b strings.Builder
-	// [, name, =, value, (i/s)?, ]
-	b.Grow(len(attrName) + len(attrValue) + 5)
+	b.WriteString("internal:attr=")
 	b.WriteByte('[')
 	b.WriteString(attrName)
 	b.WriteByte('=')
@@ -1145,64 +1106,154 @@ func (f *Frame) buildAttributeSelector(attrName, attrValue string, opts *GetByBa
 	return b.String()
 }
 
-// Locator creates and returns a new locator for this frame.
+// buildRoleSelector is a helper method that builds a role selector prefixed with internal:role.
+// It handles quoted strings and applies the appropriate suffix for exact or case-insensitive matching,
+// among the other role-specific options.
+func (f *Frame) buildRoleSelector(role string, opts *GetByRoleOptions) string {
+	var b strings.Builder
+	b.WriteString("internal:role=")
+	b.WriteString(role)
+
+	if opts == nil {
+		return b.String()
+	}
+
+	properties := f.mapGetByRoleOptions(opts)
+	for key, value := range properties {
+		b.WriteString("[" + key + "=" + value + "]")
+	}
+	return b.String()
+}
+
+func (f *Frame) mapGetByRoleOptions(opts *GetByRoleOptions) map[string]string {
+	properties := make(map[string]string)
+
+	if opts.Checked != nil {
+		properties["checked"] = strconv.FormatBool(*opts.Checked)
+	}
+
+	if opts.Disabled != nil {
+		properties["disabled"] = strconv.FormatBool(*opts.Disabled)
+	}
+
+	if opts.Selected != nil {
+		properties["selected"] = strconv.FormatBool(*opts.Selected)
+	}
+
+	if opts.Expanded != nil {
+		properties["expanded"] = strconv.FormatBool(*opts.Expanded)
+	}
+
+	if opts.IncludeHidden != nil {
+		properties["include-hidden"] = strconv.FormatBool(*opts.IncludeHidden)
+	}
+
+	if opts.Level != nil {
+		properties["level"] = strconv.FormatInt(*opts.Level, 10)
+	}
+
+	if opts.Name != nil && *opts.Name != "" {
+		// Exact option can only be applied to quoted strings.
+		if isQuotedText(*opts.Name) {
+			if opts.Exact != nil && *opts.Exact {
+				*opts.Name = (*opts.Name) + "s"
+			} else {
+				*opts.Name = (*opts.Name) + "i"
+			}
+		}
+		properties["name"] = *opts.Name
+	}
+
+	if opts.Pressed != nil {
+		properties["pressed"] = strconv.FormatBool(*opts.Pressed)
+	}
+
+	return properties
+}
+
+// buildLabelSelector is a helper method that builds a label selector prefixed with internal:label.
+// It handles quoted strings and applies the appropriate suffix for exact or case-insensitive matching.
+func (f *Frame) buildLabelSelector(label string, opts *GetByBaseOptions) string {
+	var b strings.Builder
+	b.WriteString("internal:label=")
+	b.WriteString(label)
+	if isQuotedText(label) {
+		if opts != nil && opts.Exact != nil && *opts.Exact {
+			b.WriteByte('s')
+		} else {
+			b.WriteByte('i')
+		}
+	}
+	return b.String()
+}
+
+// buildTestIDSelector is a helper method that builds a data-testid selector.
+// Similar to buildAttributeSelector but without special case-sensitiveness handling.
+func (f *Frame) buildTestIDSelector(testID string) string {
+	var b strings.Builder
+	b.WriteString("internal:attr=[data-testid=")
+	b.WriteString(testID)
+	b.WriteByte(']')
+	return b.String()
+}
+
+// buildTextSelector is a helper method that builds a text selector prefixed with internal:text.
+// It handles quoted strings and applies the appropriate suffix for exact or case-insensitive matching.
+func (f *Frame) buildTextSelector(text string, opts *GetByBaseOptions) string {
+	var b strings.Builder
+	b.WriteString("internal:text=")
+	b.WriteString(text)
+	if isQuotedText(text) {
+		if opts != nil && opts.Exact != nil && *opts.Exact {
+			b.WriteByte('s')
+		} else {
+			b.WriteByte('i')
+		}
+	}
+	return b.String()
+}
+
+// GetByAltText creates and returns a new locator for this frame that allows locating elements by their alt text.
 func (f *Frame) GetByAltText(alt string, opts *GetByBaseOptions) *Locator {
 	f.log.Debugf("Frame:GetByAltText", "fid:%s furl:%q alt:%q opts:%+v", f.ID(), f.URL(), alt, opts)
 
-	return f.Locator("internal:attr="+f.buildAttributeSelector("alt", alt, opts), nil)
+	return f.Locator(f.buildAttributeSelector("alt", alt, opts), nil)
 }
 
-// Locator creates and returns a new locator for this frame.
+// GetByLabel creates and returns a new locator for this frame that allows locating input elements by the text
+// of the associated `<label>` or `aria-labelledby` element, or by the `aria-label` attribute.
 func (f *Frame) GetByLabel(label string, opts *GetByBaseOptions) *Locator {
 	f.log.Debugf("Frame:GetByLabel", "fid:%s furl:%q label:%q opts:%+v", f.ID(), f.URL(), label, opts)
 
-	l := "internal:label=" + label
-	if isQuotedText(label) {
-		if opts != nil && opts.Exact != nil && *opts.Exact {
-			l = "internal:label=" + label + "s"
-		} else {
-			l = "internal:label=" + label + "i"
-		}
-	}
-
-	return f.Locator(l, nil)
+	return f.Locator(f.buildLabelSelector(label, opts), nil)
 }
 
 // GetByPlaceholder creates and returns a new locator for this frame based on the placeholder attribute.
 func (f *Frame) GetByPlaceholder(placeholder string, opts *GetByBaseOptions) *Locator {
 	f.log.Debugf("Frame:GetByPlaceholder", "fid:%s furl:%q placeholder:%q opts:%+v", f.ID(), f.URL(), placeholder, opts)
 
-	return f.Locator("internal:attr="+f.buildAttributeSelector("placeholder", placeholder, opts), nil)
+	return f.Locator(f.buildAttributeSelector("placeholder", placeholder, opts), nil)
 }
 
 // GetByTitle creates and returns a new locator for this frame based on the title attribute.
 func (f *Frame) GetByTitle(title string, opts *GetByBaseOptions) *Locator {
 	f.log.Debugf("Frame:GetByTitle", "fid:%s furl:%q title:%q opts:%+v", f.ID(), f.URL(), title, opts)
 
-	return f.Locator("internal:attr="+f.buildAttributeSelector("title", title, opts), nil)
+	return f.Locator(f.buildAttributeSelector("title", title, opts), nil)
 }
 
 // GetByTestID creates and returns a new locator for this frame based on the data-testid attribute.
 func (f *Frame) GetByTestID(testID string) *Locator {
 	f.log.Debugf("Frame:GetByTestID", "fid:%s furl:%q testID:%q", f.ID(), f.URL(), testID)
 
-	return f.Locator("internal:attr=[data-testid="+testID+"]", nil)
+	return f.Locator(f.buildTestIDSelector(testID), nil)
 }
 
 // GetByText creates and returns a new locator for this frame based on text content.
 func (f *Frame) GetByText(text string, opts *GetByBaseOptions) *Locator {
 	f.log.Debugf("Frame:GetByText", "fid:%s furl:%q text:%q opts:%+v", f.ID(), f.URL(), text, opts)
 
-	l := "internal:text=" + text
-	if isQuotedText(text) {
-		if opts != nil && opts.Exact != nil && *opts.Exact {
-			l = "internal:text=" + text + "s"
-		} else {
-			l = "internal:text=" + text + "i"
-		}
-	}
-
-	return f.Locator(l, nil)
+	return f.Locator(f.buildTextSelector(text, opts), nil)
 }
 
 // Referrer returns the referrer of the frame from the network manager
