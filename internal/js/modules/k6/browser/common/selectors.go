@@ -22,12 +22,6 @@ import (
 	"strings"
 )
 
-// TODO: Reimplement this by looking at:
-// https://github.com/microsoft/playwright/blob/
-// 		35cd6fb279ccf4c91eae4b8094697eceb61426cc/
-// 		packages/playwright-core/src/utils/isomorphic/selectorParser.ts#L154
-// Current implementation is a simplified version of the above and cannot handle all edge cases.
-
 // Matches `name:body`, a query engine name and selector for that engine.
 var reQueryEngine *regexp.Regexp = regexp.MustCompile(`^[a-zA-Z_0-9-+:*]+$`)
 
@@ -71,6 +65,10 @@ func (s *Selector) appendPart(p *SelectorPart, capture bool) error {
 	return nil
 }
 
+// parse splits the selector into parts, separated by `>>`, and identifies
+// the query engine for each part. This implementation is a simplified version
+// of the one in Playwright and don't handle all edge cases (see Issue #5130).
+//
 //nolint:cyclop,funlen
 func (s *Selector) parse() error {
 	parsePart := func(selector string, start, index int) (*SelectorPart, bool) {
