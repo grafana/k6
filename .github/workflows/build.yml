@@ -458,9 +458,7 @@ jobs:
   publish-github:
     runs-on: ubuntu-latest
     needs: [configure, sign-binaries, sign-packages]
-    # TODO Temporarily disabled to avoid accidental release while testing
-    if: false
-    #if: ${{ startsWith(github.ref, 'refs/tags/v') && github.event_name != 'workflow_dispatch' }}
+    if: ${{ startsWith(github.ref, 'refs/tags/v') && github.event_name != 'workflow_dispatch' }}
     env:
       VERSION: ${{ needs.configure.outputs.k6_version }}
     permissions:
@@ -504,9 +502,7 @@ jobs:
   publish-packages:
     runs-on: ubuntu-latest
     needs: [configure, sign-binaries, sign-packages]
-    # TODO Temporarily disabled to avoid accidental release while testing
-    if: false
-    #if: ${{ startsWith(github.ref, 'refs/tags/v') && github.event_name != 'workflow_dispatch' }}
+    if: ${{ startsWith(github.ref, 'refs/tags/v') && github.event_name != 'workflow_dispatch' }}
     env:
       VERSION: ${{ needs.configure.outputs.k6_version }}
     permissions:
