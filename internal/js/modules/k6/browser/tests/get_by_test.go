@@ -493,8 +493,6 @@ func TestGetByRoleSuccess(t *testing.T) {
 			{role: "deletion", expected: 1, expectedText: "Deletion"},
 			{role: "dialog", expected: 1, expectedText: "Dialog"},
 			{role: "directory", expected: 1, expectedText: "Directory"},
-			// The original document plus the one within the html <section>
-			{role: "document", expected: 2, expectedText: ""},
 			{role: "emphasis", expected: 1, expectedText: "Emphasis"},
 			{role: "feed", expected: 1, expectedText: "Feed"},
 			{role: "figure", expected: 1, expectedText: "Figure"},
@@ -594,6 +592,42 @@ func TestGetByRoleSuccess(t *testing.T) {
 				}
 			})
 		}
+
+		// We test the 'document' role independently, because the expectations
+		// for each getByRole implementation (page, frame, locator) are different:
+		t.Run("document", func(t *testing.T) {
+			t.Parallel()
+
+			tb := newTestBrowser(t, withFileServer())
+			p := tb.NewPage(nil)
+			opts := &common.FrameGotoOptions{
+				Timeout: common.DefaultTimeout,
+			}
+			_, err := p.Goto(
+				tb.staticURL("get_by_role_explicit.html"),
+				opts,
+			)
+			require.NoError(t, err)
+
+			getByRoleImplementations := getByImplementationsOf[interface {
+				GetByRole(role string, opts *common.GetByRoleOptions) *common.Locator
+			}](p)
+
+			expectedByImplementation := map[string]int{
+				"page":    2,
+				"frame":   2,
+				"locator": 1,
+			}
+
+			for implName, impl := range getByRoleImplementations {
+				t.Run(implName, func(t *testing.T) { //nolint:paralleltest
+					l := impl.GetByRole("document", nil)
+					c, err := l.Count()
+					require.NoError(t, err)
+					require.Equal(t, expectedByImplementation[implName], c)
+				})
+			}
+		})
 	})
 
 	// This tests all the options and different attributes (such as explicit
@@ -1393,11 +1427,12 @@ func TestGetByNullHandling(t *testing.T) {
 	tb.vu.SetVar(t, "page", &sobek.Object{})
 	_, err := tb.vu.RunAsync(t, `
 		page = await browser.newPage();
-		frame = page.mainFrame()
+		frame = page.mainFrame();
+		locator = page.locator(':root');
 	`)
 	require.NoError(t, err)
 
-	for _, getByImpl := range []string{"page", "frame"} {
+	for _, getByImpl := range []string{"page", "frame", "locator"} {
 		_, err = tb.vu.RunAsync(t, `
 		await %s.getByRole().click();
 	`, getByImpl)
@@ -1437,7 +1472,8 @@ func TestGetByNullHandling(t *testing.T) {
 
 func getByImplementationsOf[T any](p *common.Page) map[string]T {
 	return map[string]T{
-		"page":  any(p).(T),
-		"frame": any(p.MainFrame()).(T),
+		"page":    any(p).(T),
+		"frame":   any(p.MainFrame()).(T),
+		"locator": any(p.Locator(":root", nil)).(T),
 	}
 }
