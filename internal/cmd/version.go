@@ -66,6 +66,10 @@ func versionDetails() map[string]any {
 
 	if buildInfo.Main.Path == mainK6Path {
 		details["version"] = buildInfo.Main.Version
+		if buildInfo.Main.Version == "(devel)" {
+			details["version"] = v
+			details[commitKey] = "devel"
+		}
 		for _, s := range buildInfo.Settings {
 			switch s.Key {
 			case "vcs.revision":
