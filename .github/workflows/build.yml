@@ -274,19 +274,16 @@ jobs:
     steps:
       - name: Download binaries
         uses: actions/download-artifact@v4
-        if: needs.configure.outputs.sign_windows_artifacts == 'true'
         with:
           name: binaries
           path: dist
 
       - name: Unzip Windows binary
-        if: needs.configure.outputs.sign_windows_artifacts == 'true'
         run: |
           Expand-Archive -Path ".\dist\k6-${env:VERSION}-windows-amd64.zip" -DestinationPath .\packaging\
 
-      - name: Upload artifact to sign
+      - name: Upload artifact for Windows installer build
         uses: actions/upload-artifact@v4
-        if: needs.configure.outputs.sign_windows_artifacts == 'true'
         with:
           name: windows-binary
           path: 'packaging/k6-${{ env.VERSION }}-windows-amd64/k6.exe'
