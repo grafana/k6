@@ -273,8 +273,8 @@ jobs:
         shell: pwsh
     needs: [configure, build]
     outputs:
-      binary_artifact_name: ${{ steps.assign-artifact-name.outputs.binary-artifact-name }}
-      windows_binary_artifact_name: ${{ steps.assign-artifact-name.outputs.windows-binary-artifact-name }}
+      binary_artifact_name: ${{ steps.assign-artifact-names.outputs.binary-artifact-name }}
+      windows_binary_artifact_name: ${{ steps.assign-artifact-names.outputs.windows-binary-artifact-name }}
     steps:
       - name: Download binaries
         uses: actions/download-artifact@v4
@@ -344,14 +344,13 @@ jobs:
           if-no-files-found: error
 
       - name: Assign artifact name for Windows binary for installer build
-        id: assign-artifact-name
+        id: assign-artifact-names
         env:
           BINARY_ARTIFACT_NAME: ${{ needs.configure.outputs.sign_windows_artifacts == 'true' && 'binaries-signed' || 'binaries' }}
           WINDOWS_BINARY_ARTIFACT_NAME: ${{ needs.configure.outputs.sign_windows_artifacts == 'true' && steps.sign-artifacts.outputs.artifact-name || 'windows-binary' }}
-        shell: pwsh
         run: |
-          echo "binary-artifact-name=${BINARY_ARTIFACT_NAME}" >> ${GITHUB_OUTPUT}
-          echo "windows-binary-artifact-name=${WINDOWS_BINARY_ARTIFACT_NAME}" >> ${GITHUB_OUTPUT}
+          echo "binary-artifact-name=${env:BINARY_ARTIFACT_NAME}" >> ${env:GITHUB_OUTPUT}
+          echo "windows-binary-artifact-name=${env:WINDOWS_BINARY_ARTIFACT_NAME}" >> ${env:GITHUB_OUTPUT}
 
   package:
     permissions:
@@ -463,9 +462,8 @@ jobs:
         id: assign-artifact-name
         env:
           ARTIFACT_NAME: ${{ needs.configure.outputs.sign_windows_artifacts == 'true' && steps.sign-artifacts.outputs.artifact-name || 'binaries-windows' }}
-        shell: pwsh
         run: |
-          echo "artifact-name=${ARTIFACT_NAME}" >> ${GITHUB_OUTPUT}
+          echo "artifact-name=${env:ARTIFACT_NAME}" >> ${env:GITHUB_OUTPUT}
 
   publish-github:
     runs-on: ubuntu-latest
