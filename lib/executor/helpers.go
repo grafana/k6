@@ -175,7 +175,8 @@ func getDurationContexts(parentCtx context.Context, regularDuration, gracefulSto
 	if gracefulStop == 0 {
 		return startTime, maxDurationCtx, maxDurationCtx, maxDurationCancel
 	}
-	regDurationCtx, _ = context.WithDeadline(maxDurationCtx, startTime.Add(regularDuration)) //nolint:govet
+	regDurationCtx, regDurationCancel := context.WithDeadline(maxDurationCtx, startTime.Add(regularDuration))
+	defer regDurationCancel() // Ensure the cancel function is called to avoid context leak
 	return startTime, maxDurationCtx, regDurationCtx, maxDurationCancel
 }
 
