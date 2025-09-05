@@ -301,7 +301,6 @@ jobs:
             subscription-id=azure-trusted-signing:subscription-id
             tenant-id=azure-trusted-signing:tenant-id
 
-      # TODO Add functionality to allow passing a directory to sign without needing an artifact first
       - name: Sign Windows binary
         uses: grafana/shared-workflows/actions/azure-trusted-signing@azure-trusted-signing/v1.0.0
         id: sign-artifacts
