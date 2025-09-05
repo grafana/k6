@@ -119,6 +119,11 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 				return nil, lo.Fill(value, opts) //nolint:wrapcheck
 			})
 		},
+		"filter": func(opts sobek.Value) mapping {
+			return mapLocator(vu, lo.Filter(&common.LocatorFilterOptions{
+				LocatorOptions: parseLocatorOptions(rt, opts),
+			}))
+		},
 		"first": func() *sobek.Object {
 			ml := mapLocator(vu, lo.First())
 			return rt.ToValue(ml).ToObject(rt)
@@ -286,4 +291,24 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			})
 		},
 	}
+}
+
+func parseLocatorOptions(rt *sobek.Runtime, opts sobek.Value) *common.LocatorOptions {
+	if k6common.IsNullish(opts) {
+		return nil
+	}
+
+	var popts common.LocatorOptions
+
+	obj := opts.ToObject(rt)
+	for _, k := range obj.Keys() {
+		switch k {
+		case "hasText":
+			popts.HasText = obj.Get(k).String()
+		case "hasNotText":
+			popts.HasNotText = obj.Get(k).String()
+		}
+	}
+
+	return &popts
 }

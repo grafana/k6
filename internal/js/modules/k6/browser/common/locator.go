@@ -20,6 +20,7 @@ import (
 // Locator represents a way to find element(s) on the page at any moment.
 type Locator struct {
 	selector string
+	opts     *LocatorOptions
 
 	frame *Frame
 
@@ -27,10 +28,33 @@ type Locator struct {
 	log *log.Logger
 }
 
+// LocatorOptions allows modifying the [Locator] behavior.
+type LocatorOptions struct {
+	// Matches only elements that contain the specified text.
+	// String or RegExp. Optional.
+	HasText string
+	// Matches only elements that do not contain the specified text.
+	// String or RegExp. Optional.
+	HasNotText string
+}
+
 // NewLocator creates and returns a new locator.
-func NewLocator(ctx context.Context, selector string, f *Frame, l *log.Logger) *Locator {
+func NewLocator(ctx context.Context, opts *LocatorOptions, selector string, f *Frame, l *log.Logger) *Locator {
+	// We can create a locator from another. We clone the options
+	// to avoid surprising aliasing effects between locators.
+	var copts LocatorOptions
+	if opts != nil {
+		copts = *opts
+	}
+	if copts.HasText != "" {
+		selector += " >> internal:has-text=" + copts.HasText
+	}
+	if copts.HasNotText != "" {
+		selector += " >> internal:has-not-text=" + copts.HasNotText
+	}
 	return &Locator{
 		selector: selector,
+		opts:     &copts,
 		frame:    f,
 		ctx:      ctx,
 		log:      l,
@@ -355,10 +379,21 @@ func (l *Locator) fill(value string, opts *FrameFillOptions) error {
 	return l.frame.fill(l.selector, value, opts)
 }
 
+// LocatorFilterOptions allows filtering a [Locator] by various criteria.
+// It's similar to [LocatorOptions] but used for filtering existing locators.
+type LocatorFilterOptions struct {
+	*LocatorOptions
+}
+
+// Filter returns a new [Locator] after applying the options to the current one.
+func (l *Locator) Filter(opts *LocatorFilterOptions) *Locator {
+	return NewLocator(l.ctx, opts.LocatorOptions, l.selector, l.frame, l.log)
+}
+
 // First will return the first child of the element matching the locator's
 // selector.
 func (l *Locator) First() *Locator {
-	return NewLocator(l.ctx, l.selector+" >> nth=0", l.frame, l.log)
+	return NewLocator(l.ctx, nil, l.selector+" >> nth=0", l.frame, l.log)
 }
 
 // Focus on the element using locator's selector with strict mode on.
@@ -481,7 +516,7 @@ func (l *Locator) GetByTitle(title string, opts *GetByBaseOptions) *Locator {
 
 // Locator creates and returns a new locator chained/relative to the current locator.
 func (l *Locator) Locator(selector string) *Locator {
-	return NewLocator(l.ctx, l.selector+" >> "+selector, l.frame, l.log)
+	return NewLocator(l.ctx, nil, l.selector+" >> "+selector, l.frame, l.log)
 }
 
 // InnerHTML returns the element's inner HTML that matches
@@ -531,13 +566,13 @@ func (l *Locator) innerText(opts *FrameInnerTextOptions) (string, error) {
 // Last will return the last child of the element matching the locator's
 // selector.
 func (l *Locator) Last() *Locator {
-	return NewLocator(l.ctx, l.selector+" >> nth=-1", l.frame, l.log)
+	return NewLocator(l.ctx, nil, l.selector+" >> nth=-1", l.frame, l.log)
 }
 
 // Nth will return the nth child of the element matching the locator's
 // selector.
 func (l *Locator) Nth(nth int) *Locator {
-	return NewLocator(l.ctx, l.selector+" >> nth="+strconv.Itoa(nth), l.frame, l.log)
+	return NewLocator(l.ctx, nil, l.selector+" >> nth="+strconv.Itoa(nth), l.frame, l.log)
 }
 
 // TextContent returns the element's text content that matches
