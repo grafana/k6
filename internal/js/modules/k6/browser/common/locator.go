@@ -40,21 +40,18 @@ type LocatorOptions struct {
 
 // NewLocator creates and returns a new locator.
 func NewLocator(ctx context.Context, opts *LocatorOptions, selector string, f *Frame, l *log.Logger) *Locator {
-	// We can create a locator from another. We clone the options
-	// to avoid surprising aliasing effects between locators.
-	var copts LocatorOptions
-	if opts != nil {
-		copts = *opts
+	if opts == nil {
+		opts = new(LocatorOptions)
 	}
-	if copts.HasText != "" {
-		selector += " >> internal:has-text=" + copts.HasText
+	if opts.HasText != "" {
+		selector += " >> internal:has-text=" + opts.HasText
 	}
-	if copts.HasNotText != "" {
-		selector += " >> internal:has-not-text=" + copts.HasNotText
+	if opts.HasNotText != "" {
+		selector += " >> internal:has-not-text=" + opts.HasNotText
 	}
 	return &Locator{
 		selector: selector,
-		opts:     &copts,
+		opts:     opts,
 		frame:    f,
 		ctx:      ctx,
 		log:      l,
