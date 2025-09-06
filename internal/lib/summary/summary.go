@@ -13,18 +13,20 @@ type Mode int
 
 // Possible values for SummaryMode.
 const (
-	ModeCompact = Mode(iota) // Compact mode that only displays the total results.
-	ModeFull                 // Extended mode that displays total and  partial results.
-	ModeLegacy               // Legacy mode, used for backwards compatibility.
+	ModeCompact  = Mode(iota) // Compact mode that only displays the total results.
+	ModeFull                  // Extended mode that displays total and partial results.
+	ModeLegacy                // Legacy mode, used for backwards compatibility.
+	ModeDisabled              // Disabled, formerly known as --no-summary.
 )
 
 // ErrInvalidSummaryMode indicates the serialized summary mode is invalid.
 var ErrInvalidSummaryMode = errors.New("invalid summary mode")
 
 const (
-	compactString = "compact"
-	fullString    = "full"
-	legacyString  = "legacy"
+	compactString  = "compact"
+	fullString     = "full"
+	legacyString   = "legacy"
+	disabledString = "disabled"
 )
 
 // MarshalJSON serializes a Mode as a human-readable string.
@@ -45,6 +47,8 @@ func (m Mode) MarshalText() ([]byte, error) {
 		return []byte(fullString), nil
 	case ModeLegacy:
 		return []byte(legacyString), nil
+	case ModeDisabled:
+		return []byte(disabledString), nil
 	default:
 		return nil, ErrInvalidSummaryMode
 	}
@@ -59,6 +63,8 @@ func (m *Mode) UnmarshalText(data []byte) error {
 		*m = ModeFull
 	case legacyString:
 		*m = ModeLegacy
+	case disabledString:
+		*m = ModeDisabled
 	default:
 		return ErrInvalidSummaryMode
 	}
@@ -75,6 +81,8 @@ func (m Mode) String() string {
 		return fullString
 	case ModeLegacy:
 		return legacyString
+	case ModeDisabled:
+		return disabledString
 	default:
 		return "[INVALID]"
 	}

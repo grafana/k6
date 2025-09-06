@@ -154,32 +154,71 @@ func TestStdoutAndStderrAreEmptyWithQuietAndHandleSummary(t *testing.T) {
 func TestStdoutAndStderrAreEmptyWithQuietAndLogsForwarded(t *testing.T) {
 	t.Parallel()
 
-	ts := NewGlobalTestState(t)
+	// TODO(@joanlopez): remove by k6 v2.0, once we completely drop the support of the deprecated --no-summary flag.
+	t.Run("--no-summary", func(t *testing.T) {
+		t.Parallel()
 
-	// TODO: add a test with relative path
-	logFilePath := filepath.Join(ts.Cwd, "test.log")
+		ts := NewGlobalTestState(t)
 
-	ts.CmdArgs = []string{
-		"k6", "--quiet", "--log-output", "file=" + logFilePath,
-		"--log-format", "raw", "run", "--no-summary", "-",
-	}
-	ts.Stdin = bytes.NewBufferString(`
+		// TODO: add a test with relative path
+		logFilePath := filepath.Join(ts.Cwd, "test.log")
+
+		ts.CmdArgs = []string{
+			"k6", "--quiet", "--log-output", "file=" + logFilePath,
+			"--log-format", "raw", "run", "--no-summary", "-",
+		}
+		ts.Stdin = bytes.NewBufferString(`
 		console.log('init');
 		export default function() { console.log('foo'); };
 	`)
-	cmd.ExecuteWithGlobalState(ts.GlobalState)
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
-	// The test state hook still catches this message
-	assert.True(t, testutils.LogContains(ts.LoggerHook.Drain(), logrus.InfoLevel, `foo`))
+		// The test state hook still catches this message
+		assert.True(t, testutils.LogContains(ts.LoggerHook.Drain(), logrus.InfoLevel, `foo`))
 
-	// But it's not shown on stderr or stdout
-	assert.Empty(t, ts.Stderr.Bytes())
-	assert.Empty(t, ts.Stdout.Bytes())
+		// But it's not shown on stderr or stdout
+		assert.Empty(t, ts.Stderr.Bytes())
+		assert.Equal(t,
+			"Flag --no-summary has been deprecated, use --summary-mode=disabled instead\n",
+			ts.Stdout.String(),
+		) // We don't expect it to be completely empty, but to contain the deprecation message for --no-summary.
 
-	// Instead it should be in the log file
-	logContents, err := fsext.ReadFile(ts.FS, logFilePath)
-	require.NoError(t, err)
-	assert.Equal(t, "init\ninit\nfoo\n", string(logContents)) //nolint:dupword
+		// Instead, it should be in the log file
+		logContents, err := fsext.ReadFile(ts.FS, logFilePath)
+		require.NoError(t, err)
+		assert.Equal(t, "init\ninit\nfoo\n", string(logContents)) //nolint:dupword
+	})
+
+	t.Run("--summary-mode=disabled", func(t *testing.T) {
+		t.Parallel()
+
+		ts := NewGlobalTestState(t)
+
+		// TODO: add a test with relative path
+		logFilePath := filepath.Join(ts.Cwd, "test.log")
+
+		ts.CmdArgs = []string{
+			"k6", "--quiet", "--log-output", "file=" + logFilePath,
+			"--log-format", "raw", "run", "--summary-mode=disabled", "-",
+		}
+		ts.Stdin = bytes.NewBufferString(`
+		console.log('init');
+		export default function() { console.log('foo'); };
+	`)
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		// The test state hook still catches this message
+		assert.True(t, testutils.LogContains(ts.LoggerHook.Drain(), logrus.InfoLevel, `foo`))
+
+		// But it's not shown on stderr or stdout
+		assert.Empty(t, ts.Stderr.Bytes())
+		assert.Empty(t, ts.Stdout.Bytes())
+
+		// Instead, it should be in the log file
+		logContents, err := fsext.ReadFile(ts.FS, logFilePath)
+		require.NoError(t, err)
+		assert.Equal(t, "init\ninit\nfoo\n", string(logContents)) //nolint:dupword
+	})
 }
 
 func TestRelativeLogPathWithSetupAndTeardown(t *testing.T) {

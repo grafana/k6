@@ -174,13 +174,15 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		return err
 	}
 
+	summaryMode, summaryEnabled := getSummaryMode(testRunState.RuntimeOptions, logger)
+	thresholdsEnabled := !testRunState.RuntimeOptions.NoThresholds.Bool
+
 	// We'll need to pipe metrics to the MetricsEngine and process them if any
 	// of these are enabled: thresholds, end-of-test summary
-	shouldProcessMetrics := !testRunState.RuntimeOptions.NoSummary.Bool ||
-		!testRunState.RuntimeOptions.NoThresholds.Bool
+	shouldProcessMetrics := summaryEnabled || thresholdsEnabled
 	var metricsIngester *engine.OutputIngester
 	if shouldProcessMetrics {
-		err = metricsEngine.InitSubMetricsAndThresholds(conf.Options, testRunState.RuntimeOptions.NoThresholds.Bool)
+		err = metricsEngine.InitSubMetricsAndThresholds(conf.Options, !thresholdsEnabled)
 		if err != nil {
 			return err
 		}
@@ -191,7 +193,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	executionState := execScheduler.GetState()
-	if !testRunState.RuntimeOptions.NoSummary.Bool { //nolint:nestif
+	if summaryEnabled { //nolint:nestif
 		// Despite having the revamped [summary.Summary], we still keep the use of the
 		// [lib.LegacySummary] for multiple backwards compatibility options,
 		// to be deprecated by v1.0 and likely removed or replaced by v2.0:
@@ -211,15 +213,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 			}
 		}
 
-		sm, err := summary.ValidateMode(testRunState.RuntimeOptions.SummaryMode.String)
-		if err != nil {
-			logger.WithError(err).Warnf(
-				"invalid summary mode %q, falling back to \"compact\" (default)",
-				testRunState.RuntimeOptions.SummaryMode.String,
-			)
-		}
-
-		switch sm {
+		switch summaryMode {
 		// TODO: Remove this code block once we stop supporting the legacy summary, and just leave the default.
 		case summary.ModeLegacy:
 			// At the end of the test run
@@ -347,7 +341,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		stopOutputs(err)
 	}()
 
-	if !testRunState.RuntimeOptions.NoThresholds.Bool {
+	if thresholdsEnabled {
 		finalizeThresholds := metricsEngine.StartThresholdCalculations(
 			metricsIngester, runAbort, executionState.GetCurrentTestRunDuration,
 		)
@@ -502,6 +496,22 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	logger.Debug("Test finished cleanly")
 
 	return nil
+}
+
+func getSummaryMode(runtimeOptions lib.RuntimeOptions, logger logrus.FieldLogger) (summary.Mode, bool) {
+	if runtimeOptions.NoSummary.Bool {
+		return summary.ModeDisabled, false
+	}
+
+	sm, err := summary.ValidateMode(runtimeOptions.SummaryMode.String)
+	if err != nil {
+		logger.WithError(err).Warnf(
+			"invalid summary mode %q, falling back to \"compact\" (default)",
+			runtimeOptions.SummaryMode.String,
+		)
+	}
+
+	return sm, sm != summary.ModeDisabled
 }
 
 func (c *cmdRun) flagSet() *pflag.FlagSet {
