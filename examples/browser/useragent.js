@@ -22,14 +22,18 @@ export default async function() {
     userAgent: 'k6 test user agent',
   })
   let page = await context.newPage();
-  await check(page, {
-    'user agent is set': async p => {
-        const userAgent = await p.evaluate(() => navigator.userAgent);
-        return userAgent.includes('k6 test user agent');
-    }
-  });
-  await page.close();
-  await context.close();
+
+  try {
+    await check(page, {
+      'user agent is set': async p => {
+          const userAgent = await p.evaluate(() => navigator.userAgent);
+          return userAgent.includes('k6 test user agent');
+      }
+    });
+  } finally {
+    await page.close();
+    await context.close();
+  }
 
   context = await browser.newContext();
   check(context.browser(), {
@@ -39,11 +43,14 @@ export default async function() {
   });
 
   page = await context.newPage();
-  await check(page, {
-    'chromium user agent does not contain headless': async p => {
-        const userAgent = await p.evaluate(() => navigator.userAgent);
-        return userAgent.includes('Headless') === false;
-    }
-  });
-  await page.close();
+  try {
+    await check(page, {
+      'chromium user agent does not contain headless': async p => {
+          const userAgent = await p.evaluate(() => navigator.userAgent);
+          return userAgent.includes('Headless') === false;
+      }
+    });
+  } finally {
+    await page.close();
+  }
 }
