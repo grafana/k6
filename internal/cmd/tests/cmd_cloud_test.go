@@ -26,7 +26,7 @@ func TestK6Cloud(t *testing.T) {
 }
 
 func setupK6CloudCmd(cliFlags []string) []string {
-	return append([]string{"k6", "cloud"}, append(cliFlags, "test.js")...)
+	return append([]string{"k6", "cloud", "run"}, append(cliFlags, "test.js")...)
 }
 
 type setupCommandFunc func(cliFlags []string) []string
@@ -221,7 +221,7 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 
 		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "archive.tar"), data, 0o644))
 
-		ts.CmdArgs = []string{"k6", "cloud", "--verbose", "--log-output=stdout", "archive.tar"}
+		ts.CmdArgs = []string{"k6", "cloud", "run", "--verbose", "--log-output=stdout", "archive.tar"}
 		ts.Env["K6_SHOW_CLOUD_LOGS"] = "false" // no mock for the logs yet
 		ts.Env["K6_CLOUD_HOST"] = srv.URL
 		ts.Env["K6_CLOUD_TOKEN"] = "foo" // doesn't matter, we mock the cloud
