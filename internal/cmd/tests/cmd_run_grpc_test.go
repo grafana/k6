@@ -103,10 +103,8 @@ func TestGRPCInputOutput(t *testing.T) {
 			require.NoError(t, err)
 
 			ts := getSingleFileTestState(t, string(script), []string{"-v", "--log-output=stdout", "--no-usage-report"}, 0)
-			ts.Env = map[string]string{
-				"GRPC_ADDR":       tb.Addr,
-				"GRPC_PROTO_PATH": "./proto.proto",
-			}
+			ts.Env["GRPC_ADDR"] = tb.Addr
+			ts.Env["GRPC_PROTO_PATH"] = "./proto.proto"
 			require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "proto.proto"), proto, 0o644))
 
 			cmd.ExecuteWithGlobalState(ts.GlobalState)
