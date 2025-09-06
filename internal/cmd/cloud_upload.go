@@ -12,16 +12,16 @@ const cloudUploadCommandName = "upload"
 type cmdCloudUpload struct {
 	globalState *state.GlobalState
 
-	// deprecatedCloudCmd holds an instance of the k6 cloud command that we store
+	// cloudCmd holds an instance of the k6 cloud command that we store
 	// in order to be able to call its run method to support the cloud upload
 	// feature
-	deprecatedCloudCmd *cmdCloud
+	cloudCmd *cmdCloud
 }
 
 func getCmdCloudUpload(cloudCmd *cmdCloud) *cobra.Command {
 	c := &cmdCloudUpload{
-		globalState:        cloudCmd.gs,
-		deprecatedCloudCmd: cloudCmd,
+		globalState: cloudCmd.gs,
+		cloudCmd:    cloudCmd,
 	}
 
 	// uploadCloudCommand represents the 'cloud upload' command
@@ -50,13 +50,13 @@ Use the "k6 cloud login" command to authenticate.
 }
 
 func (c *cmdCloudUpload) preRun(cmd *cobra.Command, args []string) error {
-	return c.deprecatedCloudCmd.preRun(cmd, args)
+	return c.cloudCmd.preRun(cmd, args)
 }
 
 // run is the code that runs when the user executes `k6 cloud upload`
 func (c *cmdCloudUpload) run(cmd *cobra.Command, args []string) error {
-	c.deprecatedCloudCmd.uploadOnly = true
-	return c.deprecatedCloudCmd.run(cmd, args)
+	c.cloudCmd.uploadOnly = true
+	return c.cloudCmd.run(cmd, args)
 }
 
 func (c *cmdCloudUpload) flagSet() *pflag.FlagSet {

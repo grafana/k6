@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -365,12 +364,6 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 	}
 
 	exampleText := getExampleText(gs, `
-  # [deprecated] Run a k6 script in the Grafana Cloud k6
-  $ {{.}} cloud script.js
-
-  # [deprecated] Run a k6 archive in the Grafana Cloud k6
-  $ {{.}} cloud archive.tar
-
   # Authenticate with Grafana Cloud k6
   $ {{.}} cloud login
 
@@ -378,22 +371,24 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
   $ {{.}} cloud run script.js
 
   # Run a k6 archive in the Grafana Cloud k6
-  $ {{.}} cloud run archive.tar`[1:])
+  $ {{.}} cloud run archive.tar
+
+  # Upload a test script to Grafana Cloud k6
+  $ {{.}} cloud upload script.js`[1:])
 
 	cloudCmd := &cobra.Command{
 		Use:   "cloud",
 		Short: "Run a test on the cloud",
-		Long: `The original behavior of the "k6 cloud" command described below is deprecated.
-In future versions, the "cloud" command will only display a help text and will no longer run tests
-in Grafana Cloud k6. To continue running tests in the cloud, please transition to using the "k6 cloud run" command.
+		Long: `Manage Grafana Cloud k6 tests.
 
-Run a test in the Grafana Cloud k6.
+This command provides subcommands for interacting with Grafana Cloud k6:
+- "run": Run a test in Grafana Cloud k6
+- "login": Authenticate with Grafana Cloud k6
+- "upload": Upload a test script to Grafana Cloud k6 without running it
 
-This will archive test script(s), including all necessary resources, and execute the test in the Grafana Cloud k6
-service. Be sure to run the "k6 cloud login" command prior to authenticate with Grafana Cloud k6.`,
+The direct usage of "k6 cloud script.js" has been removed in v2.0.0.
+Please use "k6 cloud run script.js" instead.`,
 		Args:    exactCloudArgs(),
-		PreRunE: c.preRun,
-		RunE:    c.run,
 		Example: exampleText,
 	}
 
@@ -410,19 +405,19 @@ service. Be sure to run the "k6 cloud login" command prior to authenticate with 
 
 func exactCloudArgs() cobra.PositionalArgs {
 	return func(_ *cobra.Command, args []string) error {
-		const baseErrMsg = `the "k6 cloud" command expects either a subcommand such as "run" or "login", or ` +
-			"a single argument consisting in a path to a script/archive, or the `-` symbol instructing " +
-			"the command to read the test content from stdin"
+		const baseErrMsg = `the "k6 cloud" command requires a subcommand such as "run", "login", or "upload"`
 
 		if len(args) == 0 {
 			return fmt.Errorf(baseErrMsg + "; " + "received no arguments")
 		}
 
-		hasSubcommand := args[0] == "run" || args[0] == "login"
-		if len(args) > 1 && !hasSubcommand {
+		hasSubcommand := args[0] == "run" || args[0] == "login" || args[0] == "upload"
+		if !hasSubcommand {
 			return fmt.Errorf(
-				baseErrMsg+"; "+"received %d arguments %q, and %s is not a valid subcommand",
-				len(args), strings.Join(args, " "), args[0],
+				baseErrMsg+"; "+
+					`direct script execution has been removed in v2.0.0. `+
+					`To run "%s", use: k6 cloud run %s`,
+				args[0], args[0],
 			)
 		}
 
