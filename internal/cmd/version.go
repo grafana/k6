@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/ext"
 	"go.k6.io/k6/internal/build"
@@ -16,6 +17,7 @@ import (
 const (
 	commitKey      = "commit"
 	commitDirtyKey = "commit_dirty"
+	mainK6Path     = "go.k6.io/k6"
 )
 
 // fullVersion returns the maximally full version and build information for
@@ -44,13 +46,13 @@ func fullVersion() string {
 }
 
 // versionDetails returns the structured details about version
-func versionDetails() map[string]interface{} {
+func versionDetails() map[string]any {
 	v := build.Version
 	if !strings.HasPrefix(v, "v") {
 		v = "v" + v
 	}
 
-	details := map[string]interface{}{
+	details := map[string]any{
 		"version":    v,
 		"go_version": runtime.Version(),
 		"go_os":      runtime.GOOS,
@@ -62,33 +64,31 @@ func versionDetails() map[string]interface{} {
 		return details
 	}
 
-	var (
-		commit string
-		dirty  bool
-	)
-	for _, s := range buildInfo.Settings {
-		switch s.Key {
-		case "vcs.revision":
-			commitLen := 10
-			if len(s.Value) < commitLen {
-				commitLen = len(s.Value)
-			}
-			commit = s.Value[:commitLen]
-		case "vcs.modified":
-			if s.Value == "true" {
-				dirty = true
-			}
-		default:
+	if buildInfo.Main.Path == mainK6Path {
+		details["version"] = buildInfo.Main.Version
+		if buildInfo.Main.Version == "(devel)" {
+			details["version"] = v
+			details[commitKey] = "devel"
 		}
-	}
-
-	if commit == "" {
-		return details
-	}
-
-	details[commitKey] = commit
-	if dirty {
-		details[commitDirtyKey] = true
+		for _, s := range buildInfo.Settings {
+			switch s.Key {
+			case "vcs.revision":
+				commitLen := min(len(s.Value), 10)
+				details[commitKey] = s.Value[:commitLen]
+			case "vcs.modified":
+				if s.Value == "true" {
+					details[commitDirtyKey] = true
+				}
+			default:
+			}
+		}
+	} else {
+		for _, dep := range buildInfo.Deps {
+			if dep.Path == mainK6Path {
+				details["version"] = dep.Version
+				break
+			}
+		}
 	}
 
 	return details
