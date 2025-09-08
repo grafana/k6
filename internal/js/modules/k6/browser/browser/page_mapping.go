@@ -1044,3 +1044,26 @@ func waitForNavigationBodyImpl(vu moduleVU, target interface {
 		return mapResponse(vu, resp), nil
 	}), nil
 }
+
+func validateRequiredString(v sobek.Value, name string) (string, error) {
+	var s string
+
+	if k6common.IsNullish(v) {
+		return s, errors.New("missing required argument '" + name + "'")
+	}
+
+	const stringType = string("")
+
+	switch v.ExportType() {
+	case reflect.TypeOf(stringType):
+		s = v.String()
+	default:
+		return s, errors.New("'" + name + "' must be a string")
+	}
+
+	if s == "" {
+		return s, errors.New("'" + name + "' must be a non-empty string")
+	}
+
+	return s, nil
+}
