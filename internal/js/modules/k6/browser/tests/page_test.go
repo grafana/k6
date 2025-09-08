@@ -2958,14 +2958,12 @@ func TestPageWaitForURLSuccess(t *testing.T) {
 			require.NoError(t, err)
 
 			// test logic
-			code := fmt.Sprintf(`
+			result := tb.vu.RunPromise(t, `
 			await page.goto(testURL);
 
 			%s
 			
 			return page.url();`, tt.code)
-
-			result := tb.vu.RunPromise(t, code)
 			got := strings.ReplaceAll(result.Result().String(), tb.staticURL(""), "")
 			assert.Contains(t, tt.expected, got)
 		})
@@ -3018,12 +3016,10 @@ func TestPageWaitForURLFailure(t *testing.T) {
 				`)
 			require.NoError(t, err)
 
-			code := fmt.Sprintf(`
+			_, err = tb.vu.RunAsync(t, `
 			await page.goto(testURL);
 
 			%s`, tt.code)
-
-			_, err = tb.vu.RunAsync(t, code)
 			assert.ErrorContains(t, err, tt.expected)
 		})
 	}

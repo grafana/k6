@@ -5,7 +5,6 @@ package tests
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -331,14 +330,12 @@ func TestFrameWaitForURLSuccess(t *testing.T) {
 			require.NoError(t, err)
 
 			// Test logic
-			code := fmt.Sprintf(`
+			result := tb.vu.RunPromise(t, `
 			await frame.goto(testURL);
 
 			%s
 			
 			return frame.url();`, tt.code)
-
-			result := tb.vu.RunPromise(t, code)
 			got := strings.ReplaceAll(result.Result().String(), tb.staticURL(""), "")
 			assert.Contains(t, tt.expected, got)
 		})
@@ -394,12 +391,10 @@ func TestFrameWaitForURLFailure(t *testing.T) {
 			require.NoError(t, err)
 
 			// Test logic
-			code := fmt.Sprintf(`
+			_, err = tb.vu.RunAsync(t, `
 			await frame.goto(testURL);
 
 			%s`, tt.code)
-
-			_, err = tb.vu.RunAsync(t, code)
 			assert.ErrorContains(t, err, tt.expected)
 		})
 	}
