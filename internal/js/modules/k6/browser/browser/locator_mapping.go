@@ -212,9 +212,14 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			ml := mapLocator(vu, lo.GetByTitle(ptitle, popts))
 			return rt.ToValue(ml).ToObject(rt), nil
 		},
-		"locator": func(selector string) *sobek.Object {
-			ml := mapLocator(vu, lo.Locator(selector))
-			return rt.ToValue(ml).ToObject(rt)
+		"locator": func(selector sobek.Value) (*sobek.Object, error) {
+			s, err := validateRequiredString(selector, "selector")
+			if err != nil {
+				return nil, err
+			}
+
+			ml := mapLocator(vu, lo.Locator(s))
+			return rt.ToValue(ml).ToObject(rt), nil
 		},
 		"innerHTML": func(opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
