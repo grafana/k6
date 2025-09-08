@@ -1170,6 +1170,32 @@ func TestLocatorLocatorOptions(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 5, n)
 	})
+
+	t.Run("options", func(t *testing.T) {
+		t.Parallel()
+
+		// Selects the "moon" and "land" spans.
+		loc := setupPage(t).
+			Locator("div", &common.LocatorOptions{
+				HasText: "good bye",
+			}).
+			Locator("span", &common.LocatorOptions{
+				HasNotText: "good bye",
+			})
+		locs, err := loc.All()
+		require.NoError(t, err)
+		require.Len(t, locs, 2)
+
+		text, ok, err := locs[0].TextContent(nil)
+		require.NoError(t, err)
+		require.True(t, ok)
+		require.Equal(t, "moon", text)
+
+		text, ok, err = locs[1].TextContent(nil)
+		require.NoError(t, err)
+		require.True(t, ok)
+		require.Equal(t, "land", text)
+	})
 }
 
 func TestVisibilityWithCORS(t *testing.T) {
