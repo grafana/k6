@@ -1270,3 +1270,53 @@ func TestVisibilityWithCORS(t *testing.T) {
 		})
 	}
 }
+
+func TestLocatorLocatorEmpty(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		code     string
+		expected string
+	}{
+		{
+			name:     "undefined",
+			code:     "undefined",
+			expected: "missing required argument 'selector'",
+		},
+		{
+			name:     "null",
+			code:     "null",
+			expected: "missing required argument 'selector'",
+		},
+		{
+			name:     "empty",
+			code:     "",
+			expected: "missing required argument 'selector'",
+		},
+		{
+			name:     "empty_string",
+			code:     "''",
+			expected: "'selector' must be a non-empty string",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Setup
+			tb := newTestBrowser(t, withFileServer())
+			tb.vu.ActivateVU()
+			tb.vu.StartIteration(t)
+
+			// test logic
+			code := fmt.Sprintf(`
+				page = await browser.newPage();
+				page.locator('test').locator(%s);`, tt.code)
+
+			_, err := tb.vu.RunAsync(t, code)
+			require.ErrorContains(t, err, tt.expected)
+		})
+	}
+}
