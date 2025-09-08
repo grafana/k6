@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/grafana/sobek"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/http2"
@@ -189,7 +190,10 @@ func (r *Runner) newVU(
 					"deprecation - https://pkg.go.dev/crypto/tls@go1.17#Config.",
 			)
 		})
-		tlsConfig.NameToCertificate = nameToCert //nolint:staticcheck
+		tlsConfig.GetClientCertificate = func(cri *tls.CertificateRequestInfo) (*tls.Certificate, error) {
+			spew.Dump(cri)
+			return &certs[0], nil
+		}
 	}
 	transport := &http.Transport{
 		Proxy:               http.ProxyFromEnvironment,
