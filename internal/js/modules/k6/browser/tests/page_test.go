@@ -780,7 +780,6 @@ func TestPageWaitForFunction(t *testing.T) {
 		tb := newTestBrowser(t, withLogCache())
 		tb.vu.ActivateVU()
 		tb.vu.StartIteration(t)
-		t.Cleanup(func() { tb.vu.EndIteration(t) })
 		require.NoError(t, tb.vu.Runtime().Set("log", func(s string) { tb.vu.State().Logger.Warn(s) }))
 		return tb
 	}
@@ -788,6 +787,7 @@ func TestPageWaitForFunction(t *testing.T) {
 	t.Run("ok_func_raf_default", func(t *testing.T) {
 		t.Parallel()
 		tb := setup(t)
+		defer tb.vu.EndIteration(t)
 
 		tb.vu.SetVar(t, "page", &sobek.Object{})
 		_, err := tb.vu.RunOnEventLoop(t, `fn = () => {
@@ -807,6 +807,7 @@ func TestPageWaitForFunction(t *testing.T) {
 		t.Parallel()
 
 		tb := setup(t)
+		defer tb.vu.EndIteration(t)
 
 		_, err := tb.vu.RunOnEventLoop(t, `fn = arg => {
 			window._arg = arg;
@@ -827,6 +828,7 @@ func TestPageWaitForFunction(t *testing.T) {
 		t.Parallel()
 
 		tb := setup(t)
+		defer tb.vu.EndIteration(t)
 
 		_, err := tb.vu.RunOnEventLoop(t, `fn = (...args) => {
 			window._args = args;
@@ -853,6 +855,7 @@ func TestPageWaitForFunction(t *testing.T) {
 		t.Parallel()
 
 		tb := setup(t)
+		defer tb.vu.EndIteration(t)
 
 		_, err := tb.vu.RunAsync(t, script, "false", "{ polling: 'raf', timeout: 500 }", "null")
 		require.ErrorContains(t, err, "timed out after 500ms")
@@ -862,6 +865,7 @@ func TestPageWaitForFunction(t *testing.T) {
 		t.Parallel()
 
 		tb := setup(t)
+		defer tb.vu.EndIteration(t)
 
 		_, err := tb.vu.RunAsync(t, script, "false", "{ polling: 'blah' }", "null")
 		require.Error(t, err)
@@ -874,6 +878,7 @@ func TestPageWaitForFunction(t *testing.T) {
 		t.Parallel()
 
 		tb := setup(t)
+		defer tb.vu.EndIteration(t)
 		tb.vu.SetVar(t, "page", &sobek.Object{})
 		_, err := tb.vu.RunAsync(t, `
 			page = await browser.newPage();
@@ -903,6 +908,7 @@ func TestPageWaitForFunction(t *testing.T) {
 		t.Parallel()
 
 		tb := setup(t)
+		defer tb.vu.EndIteration(t)
 
 		tb.vu.SetVar(t, "page", &sobek.Object{})
 		_, err := tb.vu.RunAsync(t, `
