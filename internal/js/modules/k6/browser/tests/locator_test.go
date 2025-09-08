@@ -1158,7 +1158,15 @@ func TestFrameLocatorLocatorOptions(t *testing.T) {
 		require.NoError(t, err)
 		return p.Locator("iframe", nil).ContentFrame()
 	}
-	_ = setup
+	t.Run("nil_options", func(t *testing.T) {
+		t.Parallel()
+
+		n, err := setup(t).
+			Locator("div", nil).
+			Count()
+		require.NoError(t, err)
+		require.Equal(t, 2, n)
+	})
 }
 
 func TestLocatorLocatorOptions(t *testing.T) {
