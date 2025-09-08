@@ -871,7 +871,7 @@ func TestCount(t *testing.T) {
 			setup: setupCORS,
 			do: func(_ *testBrowser, p *common.Page) (int, error) {
 				frameBContent := p.Locator("#"+iframeID, nil).ContentFrame()
-				return frameBContent.Locator("#incrementB").Count()
+				return frameBContent.Locator("#incrementB", nil).Count()
 			},
 			expectedCount: 1,
 		},
@@ -1287,7 +1287,7 @@ func TestVisibilityWithCORS(t *testing.T) {
 			name: "hidden",
 			do: func(_ *testBrowser, p *common.Page) (bool, error) {
 				frameBContent := p.Locator("#"+iframeID, nil).ContentFrame()
-				return frameBContent.Locator("#hiddenButton").IsHidden()
+				return frameBContent.Locator("#hiddenButton", nil).IsHidden()
 			},
 			want: true,
 		},
@@ -1295,7 +1295,7 @@ func TestVisibilityWithCORS(t *testing.T) {
 			name: "visible",
 			do: func(_ *testBrowser, p *common.Page) (bool, error) {
 				frameBContent := p.Locator("#"+iframeID, nil).ContentFrame()
-				return frameBContent.Locator("#visibleButton").IsVisible()
+				return frameBContent.Locator("#visibleButton", nil).IsVisible()
 			},
 			want: true,
 		},

@@ -3391,10 +3391,10 @@ func TestClickInNestedFramesCORS(t *testing.T) {
 		frameAContent := page.Locator("#frameA", nil).ContentFrame()
 
 		// Click on the second nested frame.
-		err = frameAContent.Locator("#incrementA2").Click(clickOpts)
+		err = frameAContent.Locator("#incrementA2", nil).Click(clickOpts)
 		require.NoError(t, err)
 
-		countA2, ok, err := frameAContent.Locator("#countA2").TextContent(nil)
+		countA2, ok, err := frameAContent.Locator("#countA2", nil).TextContent(nil)
 		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, expectedCount, countA2)
@@ -3403,34 +3403,34 @@ func TestClickInNestedFramesCORS(t *testing.T) {
 		frameBContent := page.Locator("#frameB", nil).ContentFrame()
 
 		// Click on the third nested frame.
-		err = frameBContent.Locator("#incrementB").Click(clickOpts)
+		err = frameBContent.Locator("#incrementB", nil).Click(clickOpts)
 		require.NoError(t, err)
 
-		countB, ok, err := frameBContent.Locator("#countB").TextContent(nil)
+		countB, ok, err := frameBContent.Locator("#countB", nil).TextContent(nil)
 		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, expectedCount, countB)
 
 		// Now get the third nested frame.
-		frameCContent := frameBContent.Locator("#frameC").ContentFrame()
+		frameCContent := frameBContent.Locator("#frameC", nil).ContentFrame()
 
 		// Click on the fourth nested frame.
-		err = frameCContent.Locator("#increment").Click(clickOpts)
+		err = frameCContent.Locator("#increment", nil).Click(clickOpts)
 		require.NoError(t, err)
 
-		count, ok, err := frameCContent.Locator("#count").TextContent(nil)
+		count, ok, err := frameCContent.Locator("#count", nil).TextContent(nil)
 		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, expectedCount, count)
 
 		// Now get the fourth nested frame.
-		frameDContent := frameCContent.Locator("#frameD").ContentFrame()
+		frameDContent := frameCContent.Locator("#frameD", nil).ContentFrame()
 
 		// Click on the fifth nested frame.
-		err = frameDContent.Locator("#incrementD").Click(clickOpts)
+		err = frameDContent.Locator("#incrementD", nil).Click(clickOpts)
 		require.NoError(t, err)
 
-		countD, ok, err := frameDContent.Locator("#countD").TextContent(nil)
+		countD, ok, err := frameDContent.Locator("#countD", nil).TextContent(nil)
 		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, expectedCount, countD)

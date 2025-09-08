@@ -75,9 +75,8 @@ func mapFrameLocator(vu moduleVU, fl *common.FrameLocator) mapping {
 			ml := mapLocator(vu, fl.GetByTitle(ptitle, popts))
 			return rt.ToValue(ml).ToObject(rt), nil
 		},
-		"locator": func(selector string) *sobek.Object {
-			ml := mapLocator(vu, fl.Locator(selector))
-			return rt.ToValue(ml).ToObject(rt)
+		"locator": func(selector string, opts sobek.Value) mapping {
+			return mapLocator(vu, fl.Locator(selector, parseLocatorOptions(rt, opts)))
 		},
 	}
 }
