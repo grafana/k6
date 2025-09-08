@@ -37,7 +37,7 @@ extended: base + sets "global" as alias for "globalThis"
 		panic(err) // Should never happen
 	}
 	flags.String("summary-mode", summary.ModeCompact.String(), "determine the summary mode,"+
-		" \"compact\", \"full\" or \"legacy\"")
+		" \"compact\", \"full\", \"disabled\" or \"legacy\"")
 	flags.String(
 		"summary-export",
 		"",
