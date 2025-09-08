@@ -1224,6 +1224,34 @@ func TestLocatorLocatorOptions(t *testing.T) {
 		require.True(t, ok)
 		require.Equal(t, "moon", text)
 	})
+
+	t.Run("options_with_filter", func(t *testing.T) {
+		t.Parallel()
+
+		loc := setupPage(t).
+			// Finds the div element with the "good bye" text.
+			Locator("div", &common.LocatorOptions{
+				HasText: "good bye",
+			}).
+			// Filters out child spans with the "good bye" text.
+			Locator("span", &common.LocatorOptions{
+				HasNotText: "good bye",
+			}).
+			// Filters out childs span with the "moon" text.
+			Filter(&common.LocatorFilterOptions{
+				LocatorOptions: &common.LocatorOptions{
+					HasNotText: "moon",
+				},
+			})
+		n, err := loc.Count()
+		require.NoError(t, err)
+		require.Equal(t, 1, n)
+
+		text, ok, err := loc.TextContent(nil)
+		require.NoError(t, err)
+		require.True(t, ok)
+		require.Equal(t, "land", text)
+	})
 }
 
 func TestVisibilityWithCORS(t *testing.T) {
