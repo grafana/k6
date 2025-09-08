@@ -1130,6 +1130,38 @@ func TestLocatorFilter(t *testing.T) {
 	})
 }
 
+func TestLocatorLocatorOptions(t *testing.T) {
+	t.Parallel()
+
+	setupPage := func(t *testing.T) *common.Page {
+		t.Helper()
+
+		tb := newTestBrowser(t)
+		p := tb.NewPage(nil)
+		err := p.SetContent(`
+			<section>
+				<div>
+					<span>hello</span>
+				</div>
+				<div>
+					<span>world</span>
+				</div>
+				<div>
+					<span>good bye</span>
+					<div>
+						<span>moon</span>
+						<span>land</span>
+					</div>
+				</div>
+			</section>`,
+			nil,
+		)
+		require.NoError(t, err)
+		return p
+	}
+	_ = setupPage(t)
+}
+
 func TestVisibilityWithCORS(t *testing.T) {
 	t.Parallel()
 
