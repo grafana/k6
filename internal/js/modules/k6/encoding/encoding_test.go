@@ -1,7 +1,6 @@
 package encoding
 
 import (
-	"context"
 	"testing"
 
 	"github.com/grafana/sobek"
@@ -17,7 +16,7 @@ func makeRuntime(t *testing.T) *sobek.Runtime {
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 	m, ok := New().NewModuleInstance(
 		&modulestest.VU{
-			CtxField:     context.Background(),
+			CtxField:     t.Context(),
 			RuntimeField: rt,
 			InitEnvField: &common.InitEnvironment{},
 			StateField:   nil,

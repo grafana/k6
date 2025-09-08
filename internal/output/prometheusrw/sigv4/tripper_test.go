@@ -1,7 +1,6 @@
 package sigv4
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -38,7 +37,7 @@ func TestTripper_request_includes_required_headers(t *testing.T) {
 	}
 	client.Transport = tripper
 
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, server.URL, nil)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, server.URL, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

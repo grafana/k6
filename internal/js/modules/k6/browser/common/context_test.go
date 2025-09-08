@@ -1,7 +1,6 @@
 package common
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -12,7 +11,7 @@ func TestContextWithDoneChan(t *testing.T) {
 	t.Parallel()
 
 	done := make(chan struct{})
-	ctx := contextWithDoneChan(context.Background(), done)
+	ctx := contextWithDoneChan(t.Context(), done)
 	close(done)
 	select {
 	case <-ctx.Done():

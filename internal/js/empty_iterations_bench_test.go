@@ -18,9 +18,9 @@ func BenchmarkEmptyIteration(b *testing.B) {
 	ch := newDevNullSampleChannel()
 	defer close(ch)
 
-	initVU, err := r.NewVU(context.Background(), 1, 1, ch)
+	initVU, err := r.NewVU(b.Context(), 1, 1, ch)
 	require.NoError(b, err)
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(b.Context())
 	defer cancel()
 	vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 	b.StartTimer()

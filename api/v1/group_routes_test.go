@@ -51,7 +51,7 @@ func getControlSurface(tb testing.TB, testState *lib.TestRunState) *ControlSurfa
 	me, err := engine.NewMetricsEngine(testState.Registry, testState.Logger)
 	require.NoError(tb, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(tb.Context())
 	tb.Cleanup(cancel)
 	ctx, _ = execution.NewTestRunContext(ctx, testState.Logger)
 

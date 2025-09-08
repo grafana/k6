@@ -1,7 +1,6 @@
 package k6test
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
@@ -121,7 +120,7 @@ func (v *VU) iterEvent(tb testing.TB, eventType event.Type, eventName string, op
 		Type: eventType,
 		Data: data,
 	})
-	require.NoError(tb, waitDone(context.Background()), "error waiting on %s done", eventName)
+	require.NoError(tb, waitDone(tb.Context()), "error waiting on %s done", eventName)
 }
 
 // RunOnEventLoop runs the given JavaScript code on the VU's event loop and

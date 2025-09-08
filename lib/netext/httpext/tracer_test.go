@@ -119,7 +119,7 @@ func TestTracer(t *testing.T) { //nolint:tparallel
 			require.NoError(t, err)
 
 			tracer, ct := getTestTracer(t)
-			res, err := transport.RoundTrip(req.WithContext(httptrace.WithClientTrace(context.Background(), ct)))
+			res, err := transport.RoundTrip(req.WithContext(httptrace.WithClientTrace(t.Context(), ct)))
 			require.NoError(t, err)
 
 			_, err = io.Copy(io.Discard, res.Body)
@@ -209,7 +209,7 @@ func TestTracerNegativeHttpSendingValues(t *testing.T) {
 
 	{
 		tracer := &Tracer{}
-		res, err := transport.RoundTrip(req.WithContext(httptrace.WithClientTrace(context.Background(), tracer.Trace())))
+		res, err := transport.RoundTrip(req.WithContext(httptrace.WithClientTrace(t.Context(), tracer.Trace())))
 		require.NoError(t, err)
 		_, err = io.Copy(io.Discard, res.Body)
 		assert.NoError(t, err)
@@ -222,7 +222,7 @@ func TestTracerNegativeHttpSendingValues(t *testing.T) {
 
 	{
 		tracer := &Tracer{}
-		res, err := transport.RoundTrip(req.WithContext(httptrace.WithClientTrace(context.Background(), tracer.Trace())))
+		res, err := transport.RoundTrip(req.WithContext(httptrace.WithClientTrace(t.Context(), tracer.Trace())))
 		require.NoError(t, err)
 		_, err = io.Copy(io.Discard, res.Body)
 		assert.NoError(t, err)
@@ -248,7 +248,7 @@ func TestTracerError(t *testing.T) {
 	_, err = http.DefaultTransport.RoundTrip( //nolint:bodyclose
 		req.WithContext(
 			httptrace.WithClientTrace(
-				context.Background(),
+				t.Context(),
 				tracer.Trace())))
 
 	assert.Error(t, err)
@@ -261,7 +261,7 @@ func TestCancelledRequest(t *testing.T) {
 
 	cancelTest := func(t *testing.T) {
 		tracer := &Tracer{}
-		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, srv.URL+"/delay/1", nil)
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL+"/delay/1", nil)
 		require.NoError(t, err)
 
 		ctx, cancel := context.WithCancel(httptrace.WithClientTrace(req.Context(), tracer.Trace()))

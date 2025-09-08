@@ -1,7 +1,6 @@
 package common
 
 import (
-	"context"
 	"testing"
 
 	"github.com/chromedp/cdproto/cdp"
@@ -13,7 +12,7 @@ import (
 func TestBarrier(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	log := log.NewNullLogger()
 

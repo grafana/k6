@@ -1,7 +1,6 @@
 package common
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -17,12 +16,11 @@ func TestPageLocator(t *testing.T) {
 		wantMainFrameID = "1"
 		wantSelector    = "span"
 	)
-	ctx := context.TODO()
 	p := &Page{
-		ctx: ctx,
+		ctx: t.Context(),
 		frameManager: &FrameManager{
-			ctx:       ctx,
-			mainFrame: &Frame{id: wantMainFrameID, ctx: ctx},
+			ctx:       t.Context(),
+			mainFrame: &Frame{id: wantMainFrameID, ctx: t.Context()},
 		},
 	}
 	l := p.Locator(wantSelector, nil)

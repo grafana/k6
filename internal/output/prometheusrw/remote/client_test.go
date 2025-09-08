@@ -1,7 +1,6 @@
 package remote
 
 import (
-	"context"
 	"io"
 	"math"
 	"net/http"
@@ -85,7 +84,7 @@ func TestClientStore(t *testing.T) {
 			},
 		},
 	}
-	err = c.Store(context.Background(), []*prompb.TimeSeries{data})
+	err = c.Store(t.Context(), []*prompb.TimeSeries{data})
 	assert.NoError(t, err)
 }
 
@@ -105,7 +104,7 @@ func TestClientStoreHTTPError(t *testing.T) {
 		url: u,
 		cfg: &HTTPConfig{},
 	}
-	assert.Error(t, c.Store(context.Background(), nil))
+	assert.Error(t, c.Store(t.Context(), nil))
 }
 
 func TestClientStoreHTTPBasic(t *testing.T) {
@@ -132,7 +131,7 @@ func TestClientStoreHTTPBasic(t *testing.T) {
 			},
 		},
 	}
-	assert.NoError(t, c.Store(context.Background(), nil))
+	assert.NoError(t, c.Store(t.Context(), nil))
 }
 
 func TestClientStoreHeaders(t *testing.T) {
@@ -159,7 +158,7 @@ func TestClientStoreHeaders(t *testing.T) {
 			}),
 		},
 	}
-	assert.NoError(t, c.Store(context.Background(), nil))
+	assert.NoError(t, c.Store(t.Context(), nil))
 }
 
 func TestNewWriteRequestBody(t *testing.T) {

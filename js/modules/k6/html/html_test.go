@@ -70,7 +70,7 @@ func getTestModuleInstance(t testing.TB) (*sobek.Runtime, *ModuleInstance) {
 	rt := sobek.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	t.Cleanup(cancel)
 
 	root := New()

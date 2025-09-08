@@ -81,7 +81,7 @@ func TestCompressionBodyError(t *testing.T) {
 
 func TestMakeRequestError(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	t.Cleanup(cancel)
 
 	t.Run("bad compression algorithm body", func(t *testing.T) {
@@ -114,7 +114,7 @@ func TestMakeRequestError(t *testing.T) {
 			w.WriteHeader(http.StatusSwitchingProtocols)
 		}))
 		defer srv.Close()
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 		logger := logrus.New()
 		logger.Level = logrus.DebugLevel
@@ -187,7 +187,7 @@ func TestResponseStatus(t *testing.T) {
 					TagsAndMeta:  state.Tags.GetCurrentValues(),
 				}
 
-				ctx, cancel := context.WithCancel(context.Background())
+				ctx, cancel := context.WithCancel(t.Context())
 				defer cancel()
 				res, err := MakeRequest(ctx, state, preq)
 				require.NoError(t, err)
@@ -239,7 +239,7 @@ func TestMakeRequestTimeoutInTheMiddle(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 	}))
 	defer srv.Close()
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	samples := make(chan metrics.SampleContainer, 10)
 	logger := logrus.New()
@@ -316,7 +316,7 @@ func TestTrailFailed(t *testing.T) {
 
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithCancel(t.Context())
 			t.Cleanup(cancel)
 
 			samples := make(chan metrics.SampleContainer, 10)
@@ -382,7 +382,7 @@ func TestMakeRequestDialTimeout(t *testing.T) {
 	defer func() {
 		require.NoError(t, ln.Close())
 	}()
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	samples := make(chan metrics.SampleContainer, 10)
 	logger := logrus.New()
@@ -442,7 +442,7 @@ func TestMakeRequestTimeoutInTheBegining(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 	}))
 	defer srv.Close()
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	samples := make(chan metrics.SampleContainer, 10)
 	logger := logrus.New()
@@ -499,7 +499,7 @@ func TestMakeRequestRPSLimit(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	samples := make(chan metrics.SampleContainer, 10)

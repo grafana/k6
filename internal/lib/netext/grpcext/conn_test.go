@@ -97,7 +97,7 @@ func TestHealthCheck(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			res, err := c.HealthCheck(context.Background(), tc.svc)
+			res, err := c.HealthCheck(t.Context(), tc.svc)
 			require.NoError(t, err)
 			assert.Equal(t, tc.expectedStatus, res.Status)
 		})
@@ -121,7 +121,7 @@ func TestInvoke(t *testing.T) {
 		Message:          []byte(`{"greeting":"text request"}`),
 		Metadata:         metadata.New(nil),
 	}
-	res, err := c.Invoke(context.Background(), r)
+	res, err := c.Invoke(t.Context(), r)
 	require.NoError(t, err)
 
 	assert.Equal(t, codes.OK, res.Status)
@@ -144,7 +144,7 @@ func TestInvokeWithCallOptions(t *testing.T) {
 		Message:          []byte(`{}`),
 		Metadata:         metadata.New(nil),
 	}
-	res, err := c.Invoke(context.Background(), r, grpc.UseCompressor("fakeone"))
+	res, err := c.Invoke(t.Context(), r, grpc.UseCompressor("fakeone"))
 	require.NoError(t, err)
 	assert.NotNil(t, res)
 }
@@ -165,7 +165,7 @@ func TestInvokeWithDiscardResponseMessage(t *testing.T) {
 		Message:                []byte(`{}`),
 		Metadata:               metadata.New(nil),
 	}
-	res, err := c.Invoke(context.Background(), r, grpc.UseCompressor("fakeone"))
+	res, err := c.Invoke(t.Context(), r, grpc.UseCompressor("fakeone"))
 	require.NoError(t, err)
 	assert.NotNil(t, res)
 	assert.Nil(t, res.Message)
@@ -185,7 +185,7 @@ func TestInvokeReturnError(t *testing.T) {
 		Message:          []byte(`{"greeting":"text request"}`),
 		Metadata:         metadata.New(nil),
 	}
-	res, err := c.Invoke(context.Background(), r)
+	res, err := c.Invoke(t.Context(), r)
 	require.NoError(t, err)
 
 	assert.Equal(t, codes.Unknown, res.Status)
@@ -198,7 +198,6 @@ func TestConnInvokeInvalid(t *testing.T) {
 
 	var (
 		// valid arguments
-		ctx        = context.Background()
 		url        = "not-empty-url-for-method"
 		md         = metadata.New(nil)
 		methodDesc = methodFromProto("SayHello")
@@ -207,31 +206,26 @@ func TestConnInvokeInvalid(t *testing.T) {
 
 	tests := []struct {
 		name   string
-		ctx    context.Context
 		req    InvokeRequest
 		experr string
 	}{
 		{
 			name:   "EmptyMethod",
-			ctx:    ctx,
 			req:    InvokeRequest{MethodDescriptor: methodDesc, Message: payload, Metadata: md, Method: ""},
 			experr: "url is required",
 		},
 		{
 			name:   "NullMethodDescriptor",
-			ctx:    ctx,
 			req:    InvokeRequest{Message: payload, Metadata: nil, Method: url},
 			experr: "method descriptor is required",
 		},
 		{
 			name:   "NullMessage",
-			ctx:    ctx,
 			req:    InvokeRequest{MethodDescriptor: methodDesc, Metadata: nil, Method: url},
 			experr: "message is required",
 		},
 		{
 			name:   "EmptyMessage",
-			ctx:    ctx,
 			req:    InvokeRequest{MethodDescriptor: methodDesc, Message: []byte{}, Metadata: nil, Method: url},
 			experr: "message is required",
 		},
@@ -242,7 +236,7 @@ func TestConnInvokeInvalid(t *testing.T) {
 			t.Parallel()
 
 			c := Conn{}
-			res, err := c.Invoke(tt.ctx, tt.req)
+			res, err := c.Invoke(t.Context(), tt.req)
 			require.Error(t, err)
 			require.Nil(t, res)
 			assert.Contains(t, err.Error(), tt.experr)

@@ -233,7 +233,7 @@ func TestStreamLogsToLogger(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 		defer cancel()
 
 		tb := httpmultibin.NewHTTPMultiBin(t)
@@ -266,7 +266,7 @@ func TestStreamLogsToLogger(t *testing.T) {
 	t.Run("RestoreConnFromLatestMessage", func(t *testing.T) {
 		t.Parallel()
 
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 		defer cancel()
 
 		startFilter := func(u url.URL) (start time.Time, err error) {
@@ -345,7 +345,7 @@ func TestStreamLogsToLogger(t *testing.T) {
 	t.Run("RestoreConnFromTimeNow", func(t *testing.T) {
 		t.Parallel()
 
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 		defer cancel()
 
 		startFilter := func(u url.URL) (start time.Time, err error) {

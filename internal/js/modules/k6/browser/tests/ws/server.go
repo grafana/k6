@@ -75,7 +75,7 @@ func NewServer(t testing.TB, opts ...func(*Server)) *Server {
 	}
 	require.NoError(t, http2.ConfigureTransport(transport))
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	t.Cleanup(func() {
 		server.Close()
 		cancel()

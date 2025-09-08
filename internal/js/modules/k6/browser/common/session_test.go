@@ -1,7 +1,6 @@
 package common
 
 import (
-	"context"
 	"fmt"
 	"net/url"
 	"testing"
@@ -84,10 +83,9 @@ func TestSessionCreateSession(t *testing.T) {
 	t.Run("send and recv session commands", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := context.Background()
 		url, _ := url.Parse(server.ServerHTTP.URL)
 		wsURL := fmt.Sprintf("ws://%s/cdp", url.Host)
-		conn, err := NewConnection(ctx, wsURL, log.NewNullLogger(), nil)
+		conn, err := NewConnection(t.Context(), wsURL, log.NewNullLogger(), nil)
 
 		if assert.NoError(t, err) {
 			session, err := conn.createSession(&target.Info{
@@ -98,7 +96,7 @@ func TestSessionCreateSession(t *testing.T) {
 
 			if assert.NoError(t, err) {
 				action := cdppage.Enable()
-				err := action.Do(cdp.WithExecutor(ctx, session))
+				err := action.Do(cdp.WithExecutor(t.Context(), session))
 
 				require.NoError(t, err)
 				require.Equal(t, []cdproto.MethodType{

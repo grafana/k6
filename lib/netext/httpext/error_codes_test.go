@@ -226,7 +226,7 @@ func TestX509HostnameError(t *testing.T) {
 		badHostname: *badHost,
 	})
 	require.NoError(t, err)
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, tb.Replacer.Replace("https://"+badHostname+":HTTPSBIN_PORT/get"), nil)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, tb.Replacer.Replace("https://"+badHostname+":HTTPSBIN_PORT/get"), nil)
 	require.NoError(t, err)
 	res, err := client.Do(req) //nolint:bodyclose
 	require.Nil(t, res)
@@ -247,7 +247,7 @@ func TestX509UnknownAuthorityError(t *testing.T) {
 			DialContext: tb.HTTPTransport.DialContext,
 		},
 	}
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, tb.Replacer.Replace("HTTPSBIN_URL/get"), nil)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, tb.Replacer.Replace("HTTPSBIN_URL/get"), nil)
 	require.NoError(t, err)
 	res, err := client.Do(req) //nolint:bodyclose
 	require.Nil(t, res)

@@ -1,7 +1,6 @@
 package crypto
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"testing"
@@ -28,7 +27,7 @@ func makeRuntime(t *testing.T) *sobek.Runtime {
 		&modulestest.VU{
 			RuntimeField: rt,
 			InitEnvField: &common.InitEnvironment{},
-			CtxField:     context.Background(),
+			CtxField:     t.Context(),
 			StateField:   nil,
 		},
 	).(*Crypto)
@@ -80,7 +79,7 @@ func TestCryptoAlgorithms(t *testing.T) {
 			&modulestest.VU{
 				RuntimeField: rt,
 				InitEnvField: &common.InitEnvironment{},
-				CtxField:     context.Background(),
+				CtxField:     t.Context(),
 				StateField:   nil,
 			},
 		).(*Crypto)
@@ -534,7 +533,7 @@ func TestAWSv4(t *testing.T) {
 		&modulestest.VU{
 			RuntimeField: rt,
 			InitEnvField: &common.InitEnvironment{},
-			CtxField:     context.Background(),
+			CtxField:     t.Context(),
 			StateField:   nil,
 		},
 	).(*Crypto)

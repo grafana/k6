@@ -1,7 +1,6 @@
 package common
 
 import (
-	"context"
 	"fmt"
 	"net/url"
 	"testing"
@@ -26,10 +25,9 @@ func TestConnection(t *testing.T) {
 	t.Run("connect", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := context.Background()
 		url, _ := url.Parse(server.ServerHTTP.URL)
 		wsURL := fmt.Sprintf("ws://%s/echo", url.Host)
-		conn, err := NewConnection(ctx, wsURL, log.NewNullLogger(), nil)
+		conn, err := NewConnection(t.Context(), wsURL, log.NewNullLogger(), nil)
 		conn.Close()
 
 		require.NoError(t, err)
@@ -44,14 +42,13 @@ func TestConnectionClosureAbnormal(t *testing.T) {
 	t.Run("closure abnormal", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := context.Background()
 		url, _ := url.Parse(server.ServerHTTP.URL)
 		wsURL := fmt.Sprintf("ws://%s/closure-abnormal", url.Host)
-		conn, err := NewConnection(ctx, wsURL, log.NewNullLogger(), nil)
+		conn, err := NewConnection(t.Context(), wsURL, log.NewNullLogger(), nil)
 
 		if assert.NoError(t, err) {
 			action := target.SetDiscoverTargets(true)
-			err := action.Do(cdp.WithExecutor(ctx, conn))
+			err := action.Do(cdp.WithExecutor(t.Context(), conn))
 			require.ErrorContains(t, err, "websocket: close 1006 (abnormal closure): unexpected EOF")
 		}
 	})
@@ -65,7 +62,7 @@ func TestConnectionSendRecv(t *testing.T) {
 	t.Run("send command with empty reply", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := context.Background()
+		ctx := t.Context()
 		url, _ := url.Parse(server.ServerHTTP.URL)
 		wsURL := fmt.Sprintf("ws://%s/cdp", url.Host)
 		conn, err := NewConnection(ctx, wsURL, log.NewNullLogger(), nil)
@@ -132,7 +129,7 @@ func TestConnectionCreateSession(t *testing.T) {
 	t.Run("create session for target", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := context.Background()
+		ctx := t.Context()
 		url, _ := url.Parse(server.ServerHTTP.URL)
 		wsURL := fmt.Sprintf("ws://%s/cdp", url.Host)
 		conn, err := NewConnection(ctx, wsURL, log.NewNullLogger(), nil)

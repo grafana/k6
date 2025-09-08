@@ -19,9 +19,9 @@ func TestNewBrowserContext(t *testing.T) {
 	t.Run("add_web_vital_js_scripts_to_context", func(t *testing.T) {
 		t.Parallel()
 
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		logger := log.NewNullLogger()
-		b := newBrowser(context.Background(), ctx, cancel, nil, NewLocalBrowserOptions(), logger)
+		b := newBrowser(t.Context(), ctx, cancel, nil, NewLocalBrowserOptions(), logger)
 
 		vu := k6test.NewVU(t)
 		ctx = k6ext.WithVU(ctx, vu)

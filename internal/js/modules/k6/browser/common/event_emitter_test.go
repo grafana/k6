@@ -16,11 +16,10 @@ func TestEventEmitterSpecificEvent(t *testing.T) {
 	t.Run("add event handler", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := context.Background()
-		emitter := NewBaseEventEmitter(ctx)
+		emitter := NewBaseEventEmitter(t.Context())
 		ch := make(chan Event)
 
-		emitter.on(ctx, []string{cdproto.EventTargetTargetCreated}, ch)
+		emitter.on(t.Context(), []string{cdproto.EventTargetTargetCreated}, ch)
 		emitter.sync(func() {
 			require.Len(t, emitter.handlers, 1)
 			require.Contains(t, emitter.handlers, cdproto.EventTargetTargetCreated)
@@ -33,8 +32,7 @@ func TestEventEmitterSpecificEvent(t *testing.T) {
 	t.Run("remove event handler", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := context.Background()
-		cancelCtx, cancelFn := context.WithCancel(ctx)
+		cancelCtx, cancelFn := context.WithCancel(t.Context())
 		emitter := NewBaseEventEmitter(cancelCtx)
 		ch := make(chan Event)
 
@@ -51,11 +49,10 @@ func TestEventEmitterSpecificEvent(t *testing.T) {
 	t.Run("emit event", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := context.Background()
-		emitter := NewBaseEventEmitter(ctx)
+		emitter := NewBaseEventEmitter(t.Context())
 		ch := make(chan Event, 1)
 
-		emitter.on(ctx, []string{cdproto.EventTargetTargetCreated}, ch)
+		emitter.on(t.Context(), []string{cdproto.EventTargetTargetCreated}, ch)
 		emitter.emit(cdproto.EventTargetTargetCreated, "hello world")
 		msg := <-ch
 
@@ -72,11 +69,10 @@ func TestEventEmitterAllEvents(t *testing.T) {
 	t.Run("add catch-all event handler", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := context.Background()
-		emitter := NewBaseEventEmitter(ctx)
+		emitter := NewBaseEventEmitter(t.Context())
 		ch := make(chan Event)
 
-		emitter.onAll(ctx, ch)
+		emitter.onAll(t.Context(), ch)
 
 		emitter.sync(func() {
 			require.Len(t, emitter.handlersAll, 1)
@@ -88,9 +84,8 @@ func TestEventEmitterAllEvents(t *testing.T) {
 	t.Run("remove catch-all event handler", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := context.Background()
-		emitter := NewBaseEventEmitter(ctx)
-		cancelCtx, cancelFn := context.WithCancel(ctx)
+		emitter := NewBaseEventEmitter(t.Context())
+		cancelCtx, cancelFn := context.WithCancel(t.Context())
 		ch := make(chan Event)
 
 		emitter.onAll(cancelCtx, ch)
@@ -105,11 +100,10 @@ func TestEventEmitterAllEvents(t *testing.T) {
 	t.Run("emit event", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := context.Background()
-		emitter := NewBaseEventEmitter(ctx)
+		emitter := NewBaseEventEmitter(t.Context())
 		ch := make(chan Event, 1)
 
-		emitter.onAll(ctx, ch)
+		emitter.onAll(t.Context(), ch)
 		emitter.emit(cdproto.EventTargetTargetCreated, "hello world")
 		msg := <-ch
 
@@ -137,7 +131,7 @@ func TestBaseEventEmitter(t *testing.T) {
 		eventName := "AtomicIntEvent"
 		maxInt := 100
 
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		emitter := NewBaseEventEmitter(ctx)
 		ch := make(chan Event)
 		emitter.on(ctx, []string{eventName}, ch)
@@ -195,7 +189,7 @@ func TestBaseEventEmitter(t *testing.T) {
 		eventName4 := "AtomicIntEvent4"
 		maxInt := 100
 
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		emitter := NewBaseEventEmitter(ctx)
 		ch := make(chan Event)
 		// Calling on twice to ensure that the same queue is used
@@ -258,7 +252,7 @@ func TestBaseEventEmitter(t *testing.T) {
 		eventName2 := "AtomicIntEvent2"
 		maxInt := 100
 
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		emitter := NewBaseEventEmitter(ctx)
 		ch := make(chan Event)
 		emitter.on(ctx, []string{eventName1, eventName2}, ch)

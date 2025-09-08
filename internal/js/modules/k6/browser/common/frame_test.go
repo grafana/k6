@@ -68,16 +68,16 @@ func TestFrameNilDocument(t *testing.T) {
 func TestFrameManagerFrameAbortedNavigationShouldEmitANonNilPendingDocument(t *testing.T) {
 	t.Parallel()
 
-	ctx, log := context.Background(), log.NewNullLogger()
+	log := log.NewNullLogger()
 
 	// add the frame to frame manager
-	fm := NewFrameManager(ctx, nil, nil, NewTimeoutSettings(nil), log)
-	frame := NewFrame(ctx, fm, nil, cdp.FrameID("42"), log)
+	fm := NewFrameManager(t.Context(), nil, nil, NewTimeoutSettings(nil), log)
+	frame := NewFrame(t.Context(), fm, nil, cdp.FrameID("42"), log)
 	fm.frames[frame.id] = frame
 
 	// listen for frame navigation events
 	recv := make(chan Event)
-	frame.on(ctx, []string{EventFrameNavigation}, recv)
+	frame.on(t.Context(), []string{EventFrameNavigation}, recv)
 
 	// emit the navigation event
 	frame.pendingDocument = &DocumentInfo{
