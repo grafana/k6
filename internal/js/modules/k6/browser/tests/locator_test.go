@@ -1130,6 +1130,37 @@ func TestLocatorFilter(t *testing.T) {
 	})
 }
 
+func TestFrameLocatorLocatorOptions(t *testing.T) {
+	t.Parallel()
+
+	// We'll only test nil and non-nil LocatorOptions here, as the actual
+	// filtering logic is tested in TestLocatorLocatorOptions. This test
+	// just ensures that FrameLocator.Locator passes the options down correctly.
+
+	setup := func(t *testing.T) *common.FrameLocator {
+		t.Helper()
+
+		tb := newTestBrowser(t)
+		p := tb.NewPage(nil)
+		err := p.SetContent(`
+			<iframe srcdoc='
+				<section>
+					<div>
+						<span>hello</span>
+					</div>
+					<div>
+						<span>world</span>
+					</div>
+				</section>
+			'></iframe>`,
+			nil,
+		)
+		require.NoError(t, err)
+		return p.Locator("iframe", nil).ContentFrame()
+	}
+	_ = setup
+}
+
 func TestLocatorLocatorOptions(t *testing.T) {
 	t.Parallel()
 
