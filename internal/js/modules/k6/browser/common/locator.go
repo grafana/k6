@@ -17,9 +17,10 @@ import (
 //
 // See Issue #100 for more details.
 
-// Locator represent a way to find element(s) on the page at any moment.
+// Locator represents a way to find element(s) on the page at any moment.
 type Locator struct {
 	selector string
+	opts     *LocatorOptions
 
 	frame *Frame
 
@@ -27,10 +28,33 @@ type Locator struct {
 	log *log.Logger
 }
 
+// LocatorOptions allows modifying the [Locator] behavior.
+type LocatorOptions struct {
+	// Matches only elements that contain the specified text.
+	// String or RegExp. Optional.
+	HasText string
+	// Matches only elements that do not contain the specified text.
+	// String or RegExp. Optional.
+	HasNotText string
+}
+
 // NewLocator creates and returns a new locator.
-func NewLocator(ctx context.Context, selector string, f *Frame, l *log.Logger) *Locator {
+func NewLocator(ctx context.Context, opts *LocatorOptions, selector string, f *Frame, l *log.Logger) *Locator {
+	// We can create a locator from another. We clone the options
+	// to avoid surprising aliasing effects between locators.
+	var copts LocatorOptions
+	if opts != nil {
+		copts = *opts
+	}
+	if copts.HasText != "" {
+		selector += " >> internal:has-text=" + copts.HasText
+	}
+	if copts.HasNotText != "" {
+		selector += " >> internal:has-not-text=" + copts.HasNotText
+	}
 	return &Locator{
 		selector: selector,
+		opts:     &copts,
 		frame:    f,
 		ctx:      ctx,
 		log:      l,
@@ -101,6 +125,13 @@ func (l *Locator) All() ([]*Locator, error) {
 	}
 
 	return locators, nil
+}
+
+// ContentFrame creates and returns a new FrameLocator, which is useful when
+// needing to interact with elements in an iframe and the current locator already
+// points to the iframe.
+func (l *Locator) ContentFrame() *FrameLocator {
+	return NewFrameLocator(l.ctx, l.selector, l.frame, l.log)
 }
 
 // Count APIs do not wait for the element to be present. It also does not set
@@ -355,10 +386,21 @@ func (l *Locator) fill(value string, opts *FrameFillOptions) error {
 	return l.frame.fill(l.selector, value, opts)
 }
 
+// LocatorFilterOptions allows filtering a [Locator] by various criteria.
+// It's similar to [LocatorOptions] but used for filtering existing locators.
+type LocatorFilterOptions struct {
+	*LocatorOptions
+}
+
+// Filter returns a new [Locator] after applying the options to the current one.
+func (l *Locator) Filter(opts *LocatorFilterOptions) *Locator {
+	return NewLocator(l.ctx, opts.LocatorOptions, l.selector, l.frame, l.log)
+}
+
 // First will return the first child of the element matching the locator's
 // selector.
 func (l *Locator) First() *Locator {
-	return NewLocator(l.ctx, l.selector+" >> nth=0", l.frame, l.log)
+	return NewLocator(l.ctx, nil, l.selector+" >> nth=0", l.frame, l.log)
 }
 
 // Focus on the element using locator's selector with strict mode on.
@@ -408,9 +450,80 @@ func (l *Locator) getAttribute(name string, opts *FrameBaseOptions) (string, boo
 	return l.frame.getAttribute(l.selector, name, opts)
 }
 
+// GetByAltText creates and returns a new relative locator that allows locating elements by their alt text.
+func (l *Locator) GetByAltText(alt string, opts *GetByBaseOptions) *Locator {
+	l.log.Debugf(
+		"Locator:GetByAltText", "fid:%s furl:%q selector:%s alt:%q opts:%+v",
+		l.frame.ID(), l.frame.URL(), l.selector, alt, opts,
+	)
+
+	return l.Locator(l.frame.buildAttributeSelector("alt", alt, opts))
+}
+
+// GetByLabel creates and returns a new relative locator that allows locating input elements by the text
+// of the associated `<label>` or `aria-labelledby` element, or by the `aria-label` attribute.
+func (l *Locator) GetByLabel(label string, opts *GetByBaseOptions) *Locator {
+	l.log.Debugf(
+		"Locator:GetByLabel", "fid:%s furl:%q selector:%s label:%q opts:%+v",
+		l.frame.ID(), l.frame.URL(), l.selector, label, opts,
+	)
+
+	return l.Locator(l.frame.buildLabelSelector(label, opts))
+}
+
+// GetByPlaceholder creates and returns a new relative locator for this based on the placeholder attribute.
+func (l *Locator) GetByPlaceholder(placeholder string, opts *GetByBaseOptions) *Locator {
+	l.log.Debugf(
+		"Locator:GetByPlaceholder", "fid:%s furl:%q selector:%s placeholder:%q opts:%+v",
+		l.frame.ID(), l.frame.URL(), l.selector, placeholder, opts,
+	)
+
+	return l.Locator(l.frame.buildAttributeSelector("placeholder", placeholder, opts))
+}
+
+// GetByRole creates and returns a new relative locator using the ARIA role and any additional options.
+func (l *Locator) GetByRole(role string, opts *GetByRoleOptions) *Locator {
+	l.log.Debugf(
+		"Locator:GetByRole", "fid:%s furl:%q selector:%s role:%q opts:%+v",
+		l.frame.ID(), l.frame.URL(), l.selector, role, opts,
+	)
+
+	return l.Locator(l.frame.buildRoleSelector(role, opts))
+}
+
+// GetByTestID creates and returns a new relative locator based on the data-testid attribute.
+func (l *Locator) GetByTestID(testID string) *Locator {
+	l.log.Debugf(
+		"Locator:GetByTestID", "fid:%s furl:%q selector:%s testID:%q",
+		l.frame.ID(), l.frame.URL(), l.selector, testID,
+	)
+
+	return l.Locator(l.frame.buildTestIDSelector(testID))
+}
+
+// GetByText creates and returns a new relative locator based on text content.
+func (l *Locator) GetByText(text string, opts *GetByBaseOptions) *Locator {
+	l.log.Debugf(
+		"Locator:GetByText", "fid:%s furl:%q selector:%s text:%q opts:%+v",
+		l.frame.ID(), l.frame.URL(), l.selector, text, opts,
+	)
+
+	return l.Locator(l.frame.buildTextSelector(text, opts))
+}
+
+// GetByTitle creates and returns a new relative locator based on the title attribute.
+func (l *Locator) GetByTitle(title string, opts *GetByBaseOptions) *Locator {
+	l.log.Debugf(
+		"Locator:GetByTitle", "fid:%s furl:%q selector:%s title:%q opts:%+v",
+		l.frame.ID(), l.frame.URL(), l.selector, title, opts,
+	)
+
+	return l.Locator(l.frame.buildAttributeSelector("title", title, opts))
+}
+
 // Locator creates and returns a new locator chained/relative to the current locator.
 func (l *Locator) Locator(selector string) *Locator {
-	return NewLocator(l.ctx, l.selector+" >> "+selector, l.frame, l.log)
+	return NewLocator(l.ctx, nil, l.selector+" >> "+selector, l.frame, l.log)
 }
 
 // InnerHTML returns the element's inner HTML that matches
@@ -460,13 +573,13 @@ func (l *Locator) innerText(opts *FrameInnerTextOptions) (string, error) {
 // Last will return the last child of the element matching the locator's
 // selector.
 func (l *Locator) Last() *Locator {
-	return NewLocator(l.ctx, l.selector+" >> nth=-1", l.frame, l.log)
+	return NewLocator(l.ctx, nil, l.selector+" >> nth=-1", l.frame, l.log)
 }
 
 // Nth will return the nth child of the element matching the locator's
 // selector.
 func (l *Locator) Nth(nth int) *Locator {
-	return NewLocator(l.ctx, l.selector+" >> nth="+strconv.Itoa(nth), l.frame, l.log)
+	return NewLocator(l.ctx, nil, l.selector+" >> nth="+strconv.Itoa(nth), l.frame, l.log)
 }
 
 // TextContent returns the element's text content that matches

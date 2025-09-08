@@ -5,6 +5,8 @@ package tests
 
 import (
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -795,50 +797,136 @@ func TestSelectOption(t *testing.T) {
 func TestCount(t *testing.T) {
 	t.Parallel()
 
+	setupNonCORS := func(t *testing.T) (*testBrowser, *common.Page) {
+		t.Helper()
+
+		tb := newTestBrowser(t, withFileServer())
+
+		p := tb.NewPage(nil)
+		opts := &common.FrameGotoOptions{
+			Timeout: common.DefaultTimeout,
+		}
+		_, err := p.Goto(
+			tb.staticURL("locators.html"),
+			opts,
+		)
+		require.NoError(t, err)
+
+		return tb, p
+	}
+
+	setupCORS := func(t *testing.T) (*testBrowser, *common.Page) {
+		t.Helper()
+
+		// Origin B: intermediate frame embedding origin C + own counter (with dynamic C URL)
+		originBHTML := `<!DOCTYPE html>
+		<html>
+		<head></head>
+		<body>
+			<button id="incrementB">Increment Counter B</button>
+		</body>
+		</html>`
+
+		// Server for origin B
+		muxB := http.NewServeMux()
+		muxB.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			_, err := w.Write([]byte(originBHTML))
+			require.NoError(t, err)
+		})
+		srvB := httptest.NewServer(muxB)
+		t.Cleanup(func() {
+			srvB.Close()
+		})
+
+		// Origin A: main page embedding origin B and same-origin frame A (with dynamic B URL)
+		originAHTML := fmt.Sprintf(`<!DOCTYPE html>
+		<html>
+		<head></head>
+		<body>
+			<iframe id="frameB" src="%s"></iframe>
+		</body>
+		</html>`, srvB.URL)
+
+		// Server for origin A
+		muxA := http.NewServeMux()
+		muxA.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			_, err := w.Write([]byte(originAHTML))
+			require.NoError(t, err)
+		})
+		srvA := httptest.NewServer(muxA)
+		t.Cleanup(func() {
+			srvA.Close()
+		})
+
+		tb := newTestBrowser(t)
+
+		p := tb.NewPage(nil)
+		opts := &common.FrameGotoOptions{
+			Timeout: common.DefaultTimeout,
+		}
+		_, err := p.Goto(
+			srvA.URL,
+			opts,
+		)
+		require.NoError(t, err)
+
+		return tb, p
+	}
+
 	tests := []struct {
-		name string
-		do   func(*testBrowser, *common.Page)
+		name          string
+		setup         func(*testing.T) (*testBrowser, *common.Page)
+		do            func(*testBrowser, *common.Page) (int, error)
+		expectedCount int
 	}{
 		{
-			"0", func(_ *testBrowser, p *common.Page) {
+			name:  "0",
+			setup: setupNonCORS,
+			do: func(_ *testBrowser, p *common.Page) (int, error) {
 				l := p.Locator("#NOTEXIST", nil)
-				c, err := l.Count()
-				require.NoError(t, err)
-				require.Equal(t, 0, c)
+				return l.Count()
 			},
+			expectedCount: 0,
 		},
 		{
-			"1", func(_ *testBrowser, p *common.Page) {
+			name:  "1",
+			setup: setupNonCORS,
+			do: func(_ *testBrowser, p *common.Page) (int, error) {
 				l := p.Locator("#link", nil)
-				c, err := l.Count()
-				require.NoError(t, err)
-				require.Equal(t, 1, c)
+				return l.Count()
 			},
+			expectedCount: 1,
 		},
 		{
-			"3", func(_ *testBrowser, p *common.Page) {
+			name:  "3",
+			setup: setupNonCORS,
+			do: func(_ *testBrowser, p *common.Page) (int, error) {
 				l := p.Locator("a", nil)
-				c, err := l.Count()
-				require.NoError(t, err)
-				require.Equal(t, 3, c)
+				return l.Count()
 			},
+			expectedCount: 3,
+		},
+		{
+			name:  "CORS",
+			setup: setupCORS,
+			do: func(_ *testBrowser, p *common.Page) (int, error) {
+				frameBContent := p.Locator("#frameB", nil).ContentFrame()
+				return frameBContent.Locator("#incrementB").Count()
+			},
+			expectedCount: 1,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			tb := newTestBrowser(t, withFileServer())
-			p := tb.NewPage(nil)
-			opts := &common.FrameGotoOptions{
-				Timeout: common.DefaultTimeout,
-			}
-			_, err := p.Goto(
-				tb.staticURL("locators.html"),
-				opts,
-			)
-			tt.do(tb, p)
+			tb, p := tt.setup(t)
+
+			c, err := tt.do(tb, p)
 			require.NoError(t, err)
+			assert.Equal(t, tt.expectedCount, c)
 		})
 	}
 }
@@ -915,4 +1003,270 @@ func TestLocatorNesting(t *testing.T) {
 		InnerText(nil)
 	require.NoError(t, err)
 	assert.Equal(t, "1", q)
+}
+
+// This test ensures that the actionability checks are retried if we receive
+// any visible based errors from chrome. This is done by navigating to a page
+// where a button is hidden and unhidden every animation frame (~60 times per
+// second). We should not be able to click on the button, and if chrome returns
+// an error saying the element is not visible, we should retry. The only error
+// we expect is the timeout error.
+func TestActionabilityRetry(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withFileServer())
+
+	p := tb.NewPage(nil)
+
+	opts := &common.FrameGotoOptions{
+		Timeout: common.DefaultTimeout,
+	}
+	_, err := p.Goto(
+		tb.staticURL("hide_unhide.html"),
+		opts,
+	)
+	require.NoError(t, err)
+
+	lo := p.Locator("#incBtn", nil)
+	err = lo.Click(common.NewFrameClickOptions(1 * time.Second))
+	require.ErrorContains(t, err, "timed out after")
+
+	text, err := p.Locator("#value", nil).InnerText(nil)
+	require.NoError(t, err)
+	require.Equal(t, "0", text)
+}
+
+func TestLocatorFilter(t *testing.T) {
+	t.Parallel()
+
+	setupPage := func(t *testing.T) *common.Page {
+		t.Helper()
+
+		tb := newTestBrowser(t)
+		p := tb.NewPage(nil)
+		err := p.SetContent(`
+			<section>
+				<div>
+					<span>hello</span>
+				</div>
+				<div>
+					<span>world</span>
+				</div>
+			</section>`,
+			nil,
+		)
+		require.NoError(t, err)
+		return p
+	}
+
+	t.Run("filter_hasText", func(t *testing.T) {
+		t.Parallel()
+
+		count, err := setupPage(t).
+			Locator("div", nil).
+			Filter(&common.LocatorFilterOptions{
+				LocatorOptions: &common.LocatorOptions{
+					HasText: "hello",
+				},
+			}).
+			Count()
+		require.NoError(t, err)
+		require.Equal(t, 1, count)
+	})
+
+	t.Run("filter_hasText_on_locator_with_hasText", func(t *testing.T) {
+		t.Parallel()
+
+		count, err := setupPage(t).
+			Locator("div", &common.LocatorOptions{
+				HasText: "hello",
+			}).
+			Filter(&common.LocatorFilterOptions{
+				LocatorOptions: &common.LocatorOptions{
+					HasText: "hello",
+				},
+			}).
+			Count()
+		require.NoError(t, err)
+		require.Equal(t, 1, count)
+	})
+
+	t.Run("filter_hasText_different_on_locator_with_hasText", func(t *testing.T) {
+		t.Parallel()
+
+		count, err := setupPage(t).
+			Locator("div", &common.LocatorOptions{
+				HasText: "hello",
+			}).
+			Filter(&common.LocatorFilterOptions{
+				LocatorOptions: &common.LocatorOptions{
+					HasText: "world",
+				},
+			}).
+			Count()
+		require.NoError(t, err)
+		require.Equal(t, 0, count)
+	})
+
+	t.Run("filter_hasText_section_with_world", func(t *testing.T) {
+		t.Parallel()
+
+		count, err := setupPage(t).
+			Locator("section", &common.LocatorOptions{
+				HasText: "hello",
+			}).
+			Filter(&common.LocatorFilterOptions{
+				LocatorOptions: &common.LocatorOptions{
+					HasText: "world",
+				},
+			}).
+			Count()
+		require.NoError(t, err)
+		require.Equal(t, 1, count)
+	})
+
+	t.Run("filter_hasText_nested_locator", func(t *testing.T) {
+		t.Parallel()
+
+		count, err := setupPage(t).
+			Locator("div", nil).
+			Filter(&common.LocatorFilterOptions{
+				LocatorOptions: &common.LocatorOptions{
+					HasText: "hello",
+				},
+			}).
+			Locator("span").
+			Count()
+		require.NoError(t, err)
+		require.Equal(t, 1, count)
+	})
+
+	t.Run("filter_hasNotText_hello", func(t *testing.T) {
+		t.Parallel()
+
+		count, err := setupPage(t).
+			Locator("div", nil).
+			Filter(&common.LocatorFilterOptions{
+				LocatorOptions: &common.LocatorOptions{
+					HasNotText: "hello",
+				},
+			}).
+			Count()
+		require.NoError(t, err)
+		require.Equal(t, 1, count)
+	})
+
+	t.Run("filter_hasNotText_foo", func(t *testing.T) {
+		t.Parallel()
+
+		count, err := setupPage(t).
+			Locator("div", nil).
+			Filter(&common.LocatorFilterOptions{
+				LocatorOptions: &common.LocatorOptions{
+					HasNotText: "foo",
+				},
+			}).
+			Count()
+		require.NoError(t, err)
+		require.Equal(t, 2, count)
+	})
+}
+
+func TestVisibilityWithCORS(t *testing.T) {
+	t.Parallel()
+
+	setupCORS := func(t *testing.T) (*testBrowser, *common.Page) {
+		t.Helper()
+
+		// Origin B: intermediate frame embedding origin C + own counter (with dynamic C URL)
+		originBHTML := `<!DOCTYPE html>
+		<html>
+		<head></head>
+		<body>
+			<button id="visibleButton">Hello</button>
+			<button id="hiddenButton" hidden>World</button>
+		</body>
+		</html>`
+
+		// Server for origin B
+		muxB := http.NewServeMux()
+		muxB.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			_, err := w.Write([]byte(originBHTML))
+			require.NoError(t, err)
+		})
+		srvB := httptest.NewServer(muxB)
+		t.Cleanup(func() {
+			srvB.Close()
+		})
+
+		// Origin A: main page embedding origin B and same-origin frame A (with dynamic B URL)
+		originAHTML := fmt.Sprintf(`<!DOCTYPE html>
+		<html>
+		<head></head>
+		<body>
+			<iframe id="frameB" src="%s"></iframe>
+		</body>
+		</html>`, srvB.URL)
+
+		// Server for origin A
+		muxA := http.NewServeMux()
+		muxA.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			_, err := w.Write([]byte(originAHTML))
+			require.NoError(t, err)
+		})
+		srvA := httptest.NewServer(muxA)
+		t.Cleanup(func() {
+			srvA.Close()
+		})
+
+		tb := newTestBrowser(t)
+
+		p := tb.NewPage(nil)
+		opts := &common.FrameGotoOptions{
+			Timeout: common.DefaultTimeout,
+		}
+		_, err := p.Goto(
+			srvA.URL,
+			opts,
+		)
+		require.NoError(t, err)
+
+		return tb, p
+	}
+
+	tests := []struct {
+		name string
+		do   func(*testBrowser, *common.Page) (bool, error)
+		want bool
+	}{
+		{
+			name: "hidden",
+			do: func(_ *testBrowser, p *common.Page) (bool, error) {
+				frameBContent := p.Locator("#frameB", nil).ContentFrame()
+				return frameBContent.Locator("#hiddenButton").IsHidden()
+			},
+			want: true,
+		},
+		{
+			name: "visible",
+			do: func(_ *testBrowser, p *common.Page) (bool, error) {
+				frameBContent := p.Locator("#frameB", nil).ContentFrame()
+				return frameBContent.Locator("#visibleButton").IsVisible()
+			},
+			want: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tb, p := setupCORS(t)
+
+			got, err := tt.do(tb, p)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }

@@ -22,6 +22,12 @@ import (
 	"strings"
 )
 
+// TODO: Reimplement this by looking at:
+// https://github.com/microsoft/playwright/blob/
+// 		35cd6fb279ccf4c91eae4b8094697eceb61426cc/
+// 		packages/playwright-core/src/utils/isomorphic/selectorParser.ts#L154
+// Current implementation is a simplified version of the above and cannot handle all edge cases.
+
 // Matches `name:body`, a query engine name and selector for that engine.
 var reQueryEngine *regexp.Regexp = regexp.MustCompile(`^[a-zA-Z_0-9-+:*]+$`)
 
@@ -73,6 +79,12 @@ func (s *Selector) parse() error {
 		var name, body string
 
 		switch {
+		case strings.HasPrefix(part, "internal:has-text="):
+			name = "internal:has-text"
+			body = TrimQuotes(part[eqIndex+1:])
+		case strings.HasPrefix(part, "internal:has-not-text="):
+			name = "internal:has-not-text"
+			body = TrimQuotes(part[eqIndex+1:])
 		case strings.HasPrefix(part, "nth="):
 			name = "nth"
 			body = part[eqIndex+1:]
@@ -103,6 +115,9 @@ func (s *Selector) parse() error {
 		case strings.HasPrefix(part, "internal:text="):
 			name = "internal:text"
 			body = part
+		case strings.HasPrefix(part, "internal:control="):
+			name = "internal:control"
+			body = part[eqIndex+1:]
 		default:
 			name = "css"
 			body = part
