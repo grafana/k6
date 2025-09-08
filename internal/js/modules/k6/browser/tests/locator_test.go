@@ -943,21 +943,21 @@ func TestLocatorNesting(t *testing.T) {
 	require.NoError(t, err)
 
 	q, err := p.Locator(`[data-testid="inventory"]`, nil).
-		Locator(`[data-item="apples"]`).
-		Locator(`.qty`).
+		Locator(`[data-item="apples"]`, nil).
+		Locator(`.qty`, nil).
 		InnerText(nil)
 	require.NoError(t, err)
 	assert.Equal(t, "0", q)
 
 	err = p.Locator(`[data-testid="inventory"]`, nil).
-		Locator(`[data-item="apples"]`).
-		Locator(`button.add`).
+		Locator(`[data-item="apples"]`, nil).
+		Locator(`button.add`, nil).
 		Click(common.NewFrameClickOptions(common.DefaultTimeout))
 	require.NoError(t, err)
 
 	q, err = p.Locator(`[data-testid="inventory"]`, nil).
-		Locator(`[data-item="apples"]`).
-		Locator(`.qty`).
+		Locator(`[data-item="apples"]`, nil).
+		Locator(`.qty`, nil).
 		InnerText(nil)
 	require.NoError(t, err)
 	assert.Equal(t, "1", q)
@@ -1093,7 +1093,7 @@ func TestLocatorFilter(t *testing.T) {
 					HasText: "hello",
 				},
 			}).
-			Locator("span").
+			Locator("span", nil).
 			Count()
 		require.NoError(t, err)
 		require.Equal(t, 1, count)

@@ -459,7 +459,7 @@ func (l *Locator) GetByAltText(alt string, opts *GetByBaseOptions) *Locator {
 		l.frame.ID(), l.frame.URL(), l.selector, alt, opts,
 	)
 
-	return l.Locator(l.frame.buildAttributeSelector("alt", alt, opts))
+	return l.Locator(l.frame.buildAttributeSelector("alt", alt, opts), nil)
 }
 
 // GetByLabel creates and returns a new relative locator that allows locating input elements by the text
@@ -470,7 +470,7 @@ func (l *Locator) GetByLabel(label string, opts *GetByBaseOptions) *Locator {
 		l.frame.ID(), l.frame.URL(), l.selector, label, opts,
 	)
 
-	return l.Locator(l.frame.buildLabelSelector(label, opts))
+	return l.Locator(l.frame.buildLabelSelector(label, opts), nil)
 }
 
 // GetByPlaceholder creates and returns a new relative locator for this based on the placeholder attribute.
@@ -480,7 +480,7 @@ func (l *Locator) GetByPlaceholder(placeholder string, opts *GetByBaseOptions) *
 		l.frame.ID(), l.frame.URL(), l.selector, placeholder, opts,
 	)
 
-	return l.Locator(l.frame.buildAttributeSelector("placeholder", placeholder, opts))
+	return l.Locator(l.frame.buildAttributeSelector("placeholder", placeholder, opts), nil)
 }
 
 // GetByRole creates and returns a new relative locator using the ARIA role and any additional options.
@@ -490,7 +490,7 @@ func (l *Locator) GetByRole(role string, opts *GetByRoleOptions) *Locator {
 		l.frame.ID(), l.frame.URL(), l.selector, role, opts,
 	)
 
-	return l.Locator(l.frame.buildRoleSelector(role, opts))
+	return l.Locator(l.frame.buildRoleSelector(role, opts), nil)
 }
 
 // GetByTestID creates and returns a new relative locator based on the data-testid attribute.
@@ -500,7 +500,7 @@ func (l *Locator) GetByTestID(testID string) *Locator {
 		l.frame.ID(), l.frame.URL(), l.selector, testID,
 	)
 
-	return l.Locator(l.frame.buildTestIDSelector(testID))
+	return l.Locator(l.frame.buildTestIDSelector(testID), nil)
 }
 
 // GetByText creates and returns a new relative locator based on text content.
@@ -510,7 +510,7 @@ func (l *Locator) GetByText(text string, opts *GetByBaseOptions) *Locator {
 		l.frame.ID(), l.frame.URL(), l.selector, text, opts,
 	)
 
-	return l.Locator(l.frame.buildTextSelector(text, opts))
+	return l.Locator(l.frame.buildTextSelector(text, opts), nil)
 }
 
 // GetByTitle creates and returns a new relative locator based on the title attribute.
@@ -520,12 +520,12 @@ func (l *Locator) GetByTitle(title string, opts *GetByBaseOptions) *Locator {
 		l.frame.ID(), l.frame.URL(), l.selector, title, opts,
 	)
 
-	return l.Locator(l.frame.buildAttributeSelector("title", title, opts))
+	return l.Locator(l.frame.buildAttributeSelector("title", title, opts), nil)
 }
 
 // Locator creates and returns a new locator chained/relative to the current locator.
-func (l *Locator) Locator(selector string) *Locator {
-	return NewLocator(l.ctx, nil, l.selector+" >> "+selector, l.frame, l.log)
+func (l *Locator) Locator(selector string, opts *LocatorOptions) *Locator {
+	return NewLocator(l.ctx, opts, l.selector+" >> "+selector, l.frame, l.log)
 }
 
 // InnerHTML returns the element's inner HTML that matches
