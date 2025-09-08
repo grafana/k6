@@ -1209,6 +1209,17 @@ func TestFrameLocatorLocatorOptions(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 2, n)
 	})
+	t.Run("options", func(t *testing.T) {
+		t.Parallel()
+
+		n, err := setup(t).
+			Locator("div", &common.LocatorOptions{
+				HasText: "hello",
+			}).
+			Count()
+		require.NoError(t, err)
+		require.Equal(t, 1, n)
+	})
 }
 
 func TestLocatorLocatorOptions(t *testing.T) {
