@@ -1159,7 +1159,17 @@ func TestLocatorLocatorOptions(t *testing.T) {
 		require.NoError(t, err)
 		return p
 	}
-	_ = setupPage(t)
+
+	t.Run("nil_options", func(t *testing.T) {
+		t.Parallel()
+
+		loc := setupPage(t).
+			Locator("div", nil).
+			Locator("span", nil)
+		n, err := loc.Count()
+		require.NoError(t, err)
+		require.Equal(t, 5, n)
+	})
 }
 
 func TestVisibilityWithCORS(t *testing.T) {
