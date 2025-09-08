@@ -5,8 +5,6 @@ package tests
 
 import (
 	"fmt"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -818,8 +816,7 @@ func TestCount(t *testing.T) {
 	setupCORS := func(t *testing.T) (*testBrowser, *common.Page) {
 		t.Helper()
 
-		// Origin B: intermediate frame embedding origin C + own counter (with dynamic C URL)
-		originBHTML := `<!DOCTYPE html>
+		iframeHTML := `<!DOCTYPE html>
 		<html>
 		<head></head>
 		<body>
@@ -827,50 +824,10 @@ func TestCount(t *testing.T) {
 		</body>
 		</html>`
 
-		// Server for origin B
-		muxB := http.NewServeMux()
-		muxB.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			_, err := w.Write([]byte(originBHTML))
-			require.NoError(t, err)
-		})
-		srvB := httptest.NewServer(muxB)
-		t.Cleanup(func() {
-			srvB.Close()
-		})
+		tb := newTestBrowser(t, withHTTPServer())
+		tb.withIframeContent(iframeHTML)
 
-		// Origin A: main page embedding origin B and same-origin frame A (with dynamic B URL)
-		originAHTML := fmt.Sprintf(`<!DOCTYPE html>
-		<html>
-		<head></head>
-		<body>
-			<iframe id="frameB" src="%s"></iframe>
-		</body>
-		</html>`, srvB.URL)
-
-		// Server for origin A
-		muxA := http.NewServeMux()
-		muxA.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			_, err := w.Write([]byte(originAHTML))
-			require.NoError(t, err)
-		})
-		srvA := httptest.NewServer(muxA)
-		t.Cleanup(func() {
-			srvA.Close()
-		})
-
-		tb := newTestBrowser(t)
-
-		p := tb.NewPage(nil)
-		opts := &common.FrameGotoOptions{
-			Timeout: common.DefaultTimeout,
-		}
-		_, err := p.Goto(
-			srvA.URL,
-			opts,
-		)
-		require.NoError(t, err)
+		p := tb.GoToNewPage(tb.url("/iframe"))
 
 		return tb, p
 	}
@@ -1178,8 +1135,7 @@ func TestVisibilityWithCORS(t *testing.T) {
 	setupCORS := func(t *testing.T) (*testBrowser, *common.Page) {
 		t.Helper()
 
-		// Origin B: intermediate frame embedding origin C + own counter (with dynamic C URL)
-		originBHTML := `<!DOCTYPE html>
+		iframeHTML := `<!DOCTYPE html>
 		<html>
 		<head></head>
 		<body>
@@ -1188,50 +1144,10 @@ func TestVisibilityWithCORS(t *testing.T) {
 		</body>
 		</html>`
 
-		// Server for origin B
-		muxB := http.NewServeMux()
-		muxB.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			_, err := w.Write([]byte(originBHTML))
-			require.NoError(t, err)
-		})
-		srvB := httptest.NewServer(muxB)
-		t.Cleanup(func() {
-			srvB.Close()
-		})
+		tb := newTestBrowser(t, withHTTPServer())
+		tb.withIframeContent(iframeHTML)
 
-		// Origin A: main page embedding origin B and same-origin frame A (with dynamic B URL)
-		originAHTML := fmt.Sprintf(`<!DOCTYPE html>
-		<html>
-		<head></head>
-		<body>
-			<iframe id="frameB" src="%s"></iframe>
-		</body>
-		</html>`, srvB.URL)
-
-		// Server for origin A
-		muxA := http.NewServeMux()
-		muxA.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			_, err := w.Write([]byte(originAHTML))
-			require.NoError(t, err)
-		})
-		srvA := httptest.NewServer(muxA)
-		t.Cleanup(func() {
-			srvA.Close()
-		})
-
-		tb := newTestBrowser(t)
-
-		p := tb.NewPage(nil)
-		opts := &common.FrameGotoOptions{
-			Timeout: common.DefaultTimeout,
-		}
-		_, err := p.Goto(
-			srvA.URL,
-			opts,
-		)
-		require.NoError(t, err)
+		p := tb.GoToNewPage(tb.url("/iframe"))
 
 		return tb, p
 	}

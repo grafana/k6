@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
@@ -217,6 +218,26 @@ func withHTTPServer() func(*testBrowser) {
 		tb.vu.StateField.TLSConfig = tb.http.TLSClientConfig
 		tb.vu.StateField.Transport = tb.http.HTTPTransport
 	}
+}
+
+// withIFrameContent sets up a handler for /iframe that serves a page embedding
+// an iframe with the given content.
+func (tb *testBrowser) withIframeContent(iframeHTML string) {
+	tb.t.Helper()
+
+	// Server for origin B
+	muxB := http.NewServeMux()
+	muxB.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, err := w.Write([]byte(iframeHTML))
+		require.NoError(tb.t, err)
+	})
+	srvB := httptest.NewServer(muxB)
+	tb.t.Cleanup(func() {
+		srvB.Close()
+	})
+
+	tb.withIFrameURL(srvB.URL)
 }
 
 // withIFrameURL sets up a handler for /iframe that serves a page embedding
