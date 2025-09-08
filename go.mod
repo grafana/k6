@@ -2,6 +2,8 @@ module go.k6.io/k6
 
 go 1.24.0
 
+toolchain go1.24.7
+
 require (
 	buf.build/gen/go/prometheus/prometheus/protocolbuffers/go v1.36.5-20240802094132-5b212ab78fb7.1
 	github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358
