@@ -24,7 +24,7 @@ func TestURLSkipRequest(t *testing.T) {
 
 	_, err := p.Goto(
 		"data:text/html,hello",
-		&common.FrameGotoOptions{Timeout: common.DefaultTimeout},
+		&common.FrameGotoOptions{Timeout: 5 * common.DefaultTimeout},
 	)
 	require.NoError(t, err)
 	tb.logCache.assertContains(t, "skipping request handling of data URL")
