@@ -2860,3 +2860,24 @@ func TestGroupsOrderInFullSummaryWithScenario(t *testing.T) {
 
 	assert.Regexp(t, regexp.MustCompile(expectedGroupsRegex), stdout)
 }
+
+func TestInvalidSummaryModeAbortsTheExecution(t *testing.T) {
+	t.Parallel()
+
+	ts := NewGlobalTestState(t)
+	ts.CmdArgs = []string{
+		"k6", "run", "--summary-mode=unknown", "-",
+	}
+	ts.Stdin = bytes.NewBufferString(`export default function() {};`)
+
+	// We expect the execution to be aborted by the invalid summary
+	// mode and the exit code to be non-zero.
+	ts.ExpectedExitCode = -1
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	// And the error to be shown on stderr.
+	assert.Contains(t,
+		ts.Stderr.String(),
+		`level=error msg="invalid summary mode"`,
+	)
+}

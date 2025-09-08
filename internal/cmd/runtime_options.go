@@ -124,7 +124,8 @@ func populateRuntimeOptionsFromEnv(opts lib.RuntimeOptions, environment map[stri
 	}
 
 	if _, err := summary.ValidateMode(opts.SummaryMode.String); err != nil {
-		// some early validation
+		// In the case of an invalid summary mode, we early stop
+		// the execution and return the error to the user.
 		return opts, err
 	}
 

@@ -174,7 +174,14 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		return err
 	}
 
-	summaryMode, summaryEnabled := getSummaryMode(testRunState.RuntimeOptions, logger)
+	summaryMode, summaryEnabled, err := getSummaryMode(testRunState.RuntimeOptions)
+	if err != nil {
+		// Theoretically, this should never happen, as we already verify whether the summary
+		// mode is valid while parsing the runtime options, but just in case it happens, we
+		// want to abort the execution anyway.
+		return err
+	}
+
 	thresholdsEnabled := !testRunState.RuntimeOptions.NoThresholds.Bool
 
 	// We'll need to pipe metrics to the MetricsEngine and process them if any
@@ -498,20 +505,17 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	return nil
 }
 
-func getSummaryMode(runtimeOptions lib.RuntimeOptions, logger logrus.FieldLogger) (summary.Mode, bool) {
+func getSummaryMode(runtimeOptions lib.RuntimeOptions) (summary.Mode, bool, error) {
 	if runtimeOptions.NoSummary.Bool {
-		return summary.ModeDisabled, false
+		return summary.ModeDisabled, false, nil
 	}
 
 	sm, err := summary.ValidateMode(runtimeOptions.SummaryMode.String)
 	if err != nil {
-		logger.WithError(err).Warnf(
-			"invalid summary mode %q, falling back to \"compact\" (default)",
-			runtimeOptions.SummaryMode.String,
-		)
+		return summary.ModeDisabled, false, err
 	}
 
-	return sm, sm != summary.ModeDisabled
+	return sm, sm != summary.ModeDisabled, nil
 }
 
 func (c *cmdRun) flagSet() *pflag.FlagSet {
