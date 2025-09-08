@@ -338,9 +338,14 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"keyboard": mapKeyboard(vu, p.GetKeyboard()),
-		"locator": func(selector string, opts sobek.Value) *sobek.Object {
-			ml := mapLocator(vu, p.Locator(selector, parseLocatorOptions(rt, opts)))
-			return rt.ToValue(ml).ToObject(rt)
+		"locator": func(selector sobek.Value, opts sobek.Value) (*sobek.Object, error) {
+			s, err := validateRequiredString(selector, "selector")
+			if err != nil {
+				return nil, err
+			}
+
+			ml := mapLocator(vu, p.Locator(s, parseLocatorOptions(rt, opts)))
+			return rt.ToValue(ml).ToObject(rt), nil
 		},
 		"mainFrame": func() *sobek.Object {
 			mf := mapFrame(vu, p.MainFrame())
