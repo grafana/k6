@@ -11,6 +11,13 @@ import (
 	"go.k6.io/k6/internal/js/modules/k6/browser/common"
 )
 
+const (
+	frameLocatorImpl = "frameLocator"
+	locatorImpl      = "locator"
+	frameImpl        = "frame"
+	pageImpl         = "page"
+)
+
 func TestGetByRoleSuccess(t *testing.T) {
 	t.Parallel()
 
@@ -430,15 +437,9 @@ func TestGetByRoleSuccess(t *testing.T) {
 				t.Parallel()
 
 				tb := newTestBrowser(t, withFileServer())
+				staticURL := tb.staticURL("get_by_role_implicit.html")
+				tb.withIFrameURL(staticURL)
 				p := tb.NewPage(nil)
-				opts := &common.FrameGotoOptions{
-					Timeout: common.DefaultTimeout,
-				}
-				_, err := p.Goto(
-					tb.staticURL("get_by_role_implicit.html"),
-					opts,
-				)
-				require.NoError(t, err)
 
 				getByRoleImplementations := getByImplementationsOf[interface {
 					GetByRole(role string, opts *common.GetByRoleOptions) *common.Locator
@@ -446,6 +447,12 @@ func TestGetByRoleSuccess(t *testing.T) {
 
 				for implName, impl := range getByRoleImplementations {
 					t.Run(implName, func(t *testing.T) { //nolint:paralleltest
+						if implName == frameLocatorImpl {
+							tb.GoToPage(p, tb.url("/iframe"))
+						} else {
+							tb.GoToPage(p, staticURL)
+						}
+
 						l := impl.GetByRole(tt.role, tt.opts)
 						c, err := l.Count()
 						require.NoError(t, err)
@@ -562,15 +569,9 @@ func TestGetByRoleSuccess(t *testing.T) {
 				t.Parallel()
 
 				tb := newTestBrowser(t, withFileServer())
+				staticURL := tb.staticURL("get_by_role_explicit.html")
+				tb.withIFrameURL(staticURL)
 				p := tb.NewPage(nil)
-				opts := &common.FrameGotoOptions{
-					Timeout: common.DefaultTimeout,
-				}
-				_, err := p.Goto(
-					tb.staticURL("get_by_role_explicit.html"),
-					opts,
-				)
-				require.NoError(t, err)
 
 				getByRoleImplementations := getByImplementationsOf[interface {
 					GetByRole(role string, opts *common.GetByRoleOptions) *common.Locator
@@ -578,6 +579,12 @@ func TestGetByRoleSuccess(t *testing.T) {
 
 				for implName, impl := range getByRoleImplementations {
 					t.Run(implName, func(t *testing.T) { //nolint:paralleltest
+						if implName == frameLocatorImpl {
+							tb.GoToPage(p, tb.url("/iframe"))
+						} else {
+							tb.GoToPage(p, staticURL)
+						}
+
 						l := impl.GetByRole(tt.role, nil)
 						c, err := l.Count()
 						require.NoError(t, err)
@@ -599,28 +606,29 @@ func TestGetByRoleSuccess(t *testing.T) {
 			t.Parallel()
 
 			tb := newTestBrowser(t, withFileServer())
+			staticURL := tb.staticURL("get_by_role_explicit.html")
+			tb.withIFrameURL(staticURL)
 			p := tb.NewPage(nil)
-			opts := &common.FrameGotoOptions{
-				Timeout: common.DefaultTimeout,
-			}
-			_, err := p.Goto(
-				tb.staticURL("get_by_role_explicit.html"),
-				opts,
-			)
-			require.NoError(t, err)
 
 			getByRoleImplementations := getByImplementationsOf[interface {
 				GetByRole(role string, opts *common.GetByRoleOptions) *common.Locator
 			}](p)
 
 			expectedByImplementation := map[string]int{
-				"page":    2,
-				"frame":   2,
-				"locator": 1,
+				pageImpl:         2,
+				frameImpl:        2,
+				locatorImpl:      1,
+				frameLocatorImpl: 2,
 			}
 
 			for implName, impl := range getByRoleImplementations {
 				t.Run(implName, func(t *testing.T) { //nolint:paralleltest
+					if implName == frameLocatorImpl {
+						tb.GoToPage(p, tb.url("/iframe"))
+					} else {
+						tb.GoToPage(p, staticURL)
+					}
+
 					l := impl.GetByRole("document", nil)
 					c, err := l.Count()
 					require.NoError(t, err)
@@ -763,15 +771,9 @@ func TestGetByRoleSuccess(t *testing.T) {
 				t.Parallel()
 
 				tb := newTestBrowser(t, withFileServer())
+				staticURL := tb.staticURL("get_by_role_edge_cases.html")
+				tb.withIFrameURL(staticURL)
 				p := tb.NewPage(nil)
-				opts := &common.FrameGotoOptions{
-					Timeout: common.DefaultTimeout,
-				}
-				_, err := p.Goto(
-					tb.staticURL("get_by_role_edge_cases.html"),
-					opts,
-				)
-				require.NoError(t, err)
 
 				getByRoleImplementations := getByImplementationsOf[interface {
 					GetByRole(role string, opts *common.GetByRoleOptions) *common.Locator
@@ -779,6 +781,12 @@ func TestGetByRoleSuccess(t *testing.T) {
 
 				for implName, impl := range getByRoleImplementations {
 					t.Run(implName, func(t *testing.T) { //nolint:paralleltest
+						if implName == frameLocatorImpl {
+							tb.GoToPage(p, tb.url("/iframe"))
+						} else {
+							tb.GoToPage(p, staticURL)
+						}
+
 						l := impl.GetByRole(tt.role, tt.opts)
 						c, err := l.Count()
 						require.NoError(t, err)
@@ -823,15 +831,9 @@ func TestGetByRoleFailure(t *testing.T) {
 			t.Parallel()
 
 			tb := newTestBrowser(t, withFileServer())
+			staticURL := tb.staticURL("get_by_role.html")
+			tb.withIFrameURL(staticURL)
 			p := tb.NewPage(nil)
-			opts := &common.FrameGotoOptions{
-				Timeout: common.DefaultTimeout,
-			}
-			_, err := p.Goto(
-				tb.staticURL("get_by_role.html"),
-				opts,
-			)
-			require.NoError(t, err)
 
 			getByRoleImplementations := getByImplementationsOf[interface {
 				GetByRole(role string, opts *common.GetByRoleOptions) *common.Locator
@@ -839,8 +841,14 @@ func TestGetByRoleFailure(t *testing.T) {
 
 			for implName, impl := range getByRoleImplementations {
 				t.Run(implName, func(t *testing.T) {
+					if implName == frameLocatorImpl {
+						tb.GoToPage(p, tb.url("/iframe"))
+					} else {
+						tb.GoToPage(p, staticURL)
+					}
+
 					l := impl.GetByRole(tt.role, tt.opts)
-					_, err = l.Count()
+					_, err := l.Count()
 					require.ErrorContains(t, err, tt.expectedError)
 				})
 			}
@@ -900,15 +908,9 @@ func TestGetByAltTextSuccess(t *testing.T) {
 			t.Parallel()
 
 			tb := newTestBrowser(t, withFileServer())
+			staticURL := tb.staticURL("get_by_alt_text.html")
+			tb.withIFrameURL(staticURL)
 			p := tb.NewPage(nil)
-			opts := &common.FrameGotoOptions{
-				Timeout: common.DefaultTimeout,
-			}
-			_, err := p.Goto(
-				tb.staticURL("get_by_alt_text.html"),
-				opts,
-			)
-			require.NoError(t, err)
 
 			getByAltTextImplementations := getByImplementationsOf[interface {
 				GetByAltText(alt string, opts *common.GetByBaseOptions) *common.Locator
@@ -916,6 +918,12 @@ func TestGetByAltTextSuccess(t *testing.T) {
 
 			for implName, impl := range getByAltTextImplementations {
 				t.Run(implName, func(t *testing.T) {
+					if implName == frameLocatorImpl {
+						tb.GoToPage(p, tb.url("/iframe"))
+					} else {
+						tb.GoToPage(p, staticURL)
+					}
+
 					l := impl.GetByAltText(tt.alt, tt.opts)
 					c, err := l.Count()
 					require.NoError(t, err)
@@ -985,15 +993,9 @@ func TestGetByLabelSuccess(t *testing.T) {
 			t.Parallel()
 
 			tb := newTestBrowser(t, withFileServer())
+			staticURL := tb.staticURL("get_by_label.html")
+			tb.withIFrameURL(staticURL)
 			p := tb.NewPage(nil)
-			opts := &common.FrameGotoOptions{
-				Timeout: common.DefaultTimeout,
-			}
-			_, err := p.Goto(
-				tb.staticURL("get_by_label.html"),
-				opts,
-			)
-			require.NoError(t, err)
 
 			getByLabelImplementations := getByImplementationsOf[interface {
 				GetByLabel(label string, opts *common.GetByBaseOptions) *common.Locator
@@ -1001,6 +1003,12 @@ func TestGetByLabelSuccess(t *testing.T) {
 
 			for implName, impl := range getByLabelImplementations {
 				t.Run(implName, func(t *testing.T) {
+					if implName == frameLocatorImpl {
+						tb.GoToPage(p, tb.url("/iframe"))
+					} else {
+						tb.GoToPage(p, staticURL)
+					}
+
 					l := impl.GetByLabel(tt.label, tt.opts)
 					c, err := l.Count()
 					require.NoError(t, err)
@@ -1081,15 +1089,9 @@ func TestGetByPlaceholderSuccess(t *testing.T) {
 			t.Parallel()
 
 			tb := newTestBrowser(t, withFileServer())
+			staticURL := tb.staticURL("get_by_placeholder.html")
+			tb.withIFrameURL(staticURL)
 			p := tb.NewPage(nil)
-			opts := &common.FrameGotoOptions{
-				Timeout: common.DefaultTimeout,
-			}
-			_, err := p.Goto(
-				tb.staticURL("get_by_placeholder.html"),
-				opts,
-			)
-			require.NoError(t, err)
 
 			getByPlaceholderImplementations := getByImplementationsOf[interface {
 				GetByPlaceholder(placeholder string, opts *common.GetByBaseOptions) *common.Locator
@@ -1097,6 +1099,12 @@ func TestGetByPlaceholderSuccess(t *testing.T) {
 
 			for implName, impl := range getByPlaceholderImplementations {
 				t.Run(implName, func(t *testing.T) {
+					if implName == frameLocatorImpl {
+						tb.GoToPage(p, tb.url("/iframe"))
+					} else {
+						tb.GoToPage(p, staticURL)
+					}
+
 					l := impl.GetByPlaceholder(tt.placeholder, tt.opts)
 					c, err := l.Count()
 					require.NoError(t, err)
@@ -1177,21 +1185,21 @@ func TestGetByTitleSuccess(t *testing.T) {
 			t.Parallel()
 
 			tb := newTestBrowser(t, withFileServer())
+			staticURL := tb.staticURL("get_by_title.html")
+			tb.withIFrameURL(staticURL)
 			p := tb.NewPage(nil)
-			opts := &common.FrameGotoOptions{
-				Timeout: common.DefaultTimeout,
-			}
-			_, err := p.Goto(
-				tb.staticURL("get_by_title.html"),
-				opts,
-			)
-			require.NoError(t, err)
 
 			getByTitleImplementations := getByImplementationsOf[interface {
 				GetByTitle(title string, opts *common.GetByBaseOptions) *common.Locator
 			}](p)
 
 			for implName, impl := range getByTitleImplementations {
+				if implName == frameLocatorImpl {
+					tb.GoToPage(p, tb.url("/iframe"))
+				} else {
+					tb.GoToPage(p, staticURL)
+				}
+
 				t.Run(implName, func(t *testing.T) {
 					l := impl.GetByTitle(tt.title, tt.opts)
 					c, err := l.Count()
@@ -1266,15 +1274,9 @@ func TestGetByTestIDSuccess(t *testing.T) {
 			t.Parallel()
 
 			tb := newTestBrowser(t, withFileServer())
+			staticURL := tb.staticURL("get_by_testid.html")
+			tb.withIFrameURL(staticURL)
 			p := tb.NewPage(nil)
-			opts := &common.FrameGotoOptions{
-				Timeout: common.DefaultTimeout,
-			}
-			_, err := p.Goto(
-				tb.staticURL("get_by_testid.html"),
-				opts,
-			)
-			require.NoError(t, err)
 
 			getByTestIDImplementations := getByImplementationsOf[interface {
 				GetByTestID(testID string) *common.Locator
@@ -1282,6 +1284,12 @@ func TestGetByTestIDSuccess(t *testing.T) {
 
 			for implName, impl := range getByTestIDImplementations {
 				t.Run(implName, func(t *testing.T) {
+					if implName == frameLocatorImpl {
+						tb.GoToPage(p, tb.url("/iframe"))
+					} else {
+						tb.GoToPage(p, staticURL)
+					}
+
 					l := impl.GetByTestID(tt.testID)
 					c, err := l.Count()
 					require.NoError(t, err)
@@ -1384,15 +1392,9 @@ func TestGetByTextSuccess(t *testing.T) {
 			t.Parallel()
 
 			tb := newTestBrowser(t, withFileServer())
+			staticURL := tb.staticURL("get_by_text.html")
+			tb.withIFrameURL(staticURL)
 			p := tb.NewPage(nil)
-			opts := &common.FrameGotoOptions{
-				Timeout: common.DefaultTimeout,
-			}
-			_, err := p.Goto(
-				tb.staticURL("get_by_text.html"),
-				opts,
-			)
-			require.NoError(t, err)
 
 			getByTextImplementations := getByImplementationsOf[interface {
 				GetByText(text string, opts *common.GetByBaseOptions) *common.Locator
@@ -1400,6 +1402,12 @@ func TestGetByTextSuccess(t *testing.T) {
 
 			for implName, impl := range getByTextImplementations {
 				t.Run(implName, func(t *testing.T) {
+					if implName == frameLocatorImpl {
+						tb.GoToPage(p, tb.url("/iframe"))
+					} else {
+						tb.GoToPage(p, staticURL)
+					}
+
 					l := impl.GetByText(tt.text, tt.opts)
 					c, err := l.Count()
 					require.NoError(t, err)
@@ -1429,10 +1437,11 @@ func TestGetByNullHandling(t *testing.T) {
 		page = await browser.newPage();
 		frame = page.mainFrame();
 		locator = page.locator(':root');
+		frameLocator = page.locator('#frameB').contentFrame();
 	`)
 	require.NoError(t, err)
 
-	for _, getByImpl := range []string{"page", "frame", "locator"} {
+	for _, getByImpl := range []string{pageImpl, frameImpl, locatorImpl, frameLocatorImpl} {
 		_, err = tb.vu.RunAsync(t, `
 		await %s.getByRole().click();
 	`, getByImpl)
@@ -1472,8 +1481,9 @@ func TestGetByNullHandling(t *testing.T) {
 
 func getByImplementationsOf[T any](p *common.Page) map[string]T {
 	return map[string]T{
-		"page":    any(p).(T),
-		"frame":   any(p.MainFrame()).(T),
-		"locator": any(p.Locator(":root", nil)).(T),
+		pageImpl:         any(p).(T),
+		frameImpl:        any(p.MainFrame()).(T),
+		locatorImpl:      any(p.Locator(":root", nil)).(T),
+		frameLocatorImpl: any(p.Locator("#frameB", nil).ContentFrame()).(T),
 	}
 }
