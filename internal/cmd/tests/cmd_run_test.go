@@ -2659,6 +2659,7 @@ func TestSummaryExport(t *testing.T) {
 		})
 	}
 
+	// TODO(@joanlopez): remove by k6 v2.0, once we completely drop the support for --summary-mode=legacy.
 	t.Run("legacy", func(t *testing.T) {
 		t.Parallel()
 
@@ -2681,6 +2682,9 @@ func TestSummaryExport(t *testing.T) {
 		assert.Contains(t, stdout, "checks...............: 100.00% 1 out of 1")
 		assert.Contains(t, stdout, "custom_iterations....: 1")
 		assert.Contains(t, stdout, "iterations...........: 1")
+
+		// As of now, "legacy" has been deprecated.
+		assert.Contains(t, ts.Stderr.String(), "The --summary-mode=legacy has been deprecated, and will be removed by k6 v2.0.")
 
 		assertSummaryExport(t, ts.FS)
 	})
@@ -2706,6 +2710,7 @@ func TestHandleSummary(t *testing.T) {
 	}
 	`
 
+	// TODO(@joanlopez): remove "summary" by k6 v2.0, once we completely drop the support for --summary-mode=legacy.
 	for _, summaryMode := range []string{"compact", "full", "legacy"} {
 		t.Run(summaryMode, func(t *testing.T) {
 			t.Parallel()
