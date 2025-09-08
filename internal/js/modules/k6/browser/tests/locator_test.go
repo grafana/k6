@@ -1196,6 +1196,34 @@ func TestLocatorLocatorOptions(t *testing.T) {
 		require.True(t, ok)
 		require.Equal(t, "land", text)
 	})
+
+	t.Run("nil_options_with_filter", func(t *testing.T) {
+		t.Parallel()
+
+		// Finds the divs, filters to the one with "good bye",
+		// then finds its spans and filters to the one with "moon".
+		loc := setupPage(t).
+			Locator("div", nil).
+			Filter(&common.LocatorFilterOptions{
+				LocatorOptions: &common.LocatorOptions{
+					HasText: "good bye",
+				},
+			}).
+			Locator("span", nil).
+			Filter(&common.LocatorFilterOptions{
+				LocatorOptions: &common.LocatorOptions{
+					HasText: "moon",
+				},
+			})
+		n, err := loc.Count()
+		require.NoError(t, err)
+		require.Equal(t, 1, n)
+
+		text, ok, err := loc.TextContent(nil)
+		require.NoError(t, err)
+		require.True(t, ok)
+		require.Equal(t, "moon", text)
+	})
 }
 
 func TestVisibilityWithCORS(t *testing.T) {
