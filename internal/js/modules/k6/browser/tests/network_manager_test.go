@@ -17,8 +17,6 @@ import (
 )
 
 func TestURLSkipRequest(t *testing.T) {
-	t.Parallel()
-
 	tb := newTestBrowser(t, withLogCache())
 	p := tb.NewPage(nil)
 
