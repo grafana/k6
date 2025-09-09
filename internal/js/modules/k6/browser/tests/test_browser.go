@@ -296,36 +296,30 @@ func withSkipClose() func(*testBrowser) {
 	return func(tb *testBrowser) { tb.skipClose = true }
 }
 
-// GoToNewPage is a wrapper around testBrowser.NewPage and Page.Goto that fails
+// GotoNewPage is a wrapper around testBrowser.NewPage and Page.Goto that fails
 // the test if an error occurs. Added this helper to avoid boilerplate code in tests.
-func (b *testBrowser) GoToNewPage(url string) *common.Page {
+func (b *testBrowser) GotoNewPage(url string) *common.Page {
 	b.t.Helper()
 
 	p := b.NewPage(nil)
 	opts := &common.FrameGotoOptions{
 		Timeout: common.DefaultTimeout,
 	}
-	_, err := p.Goto(
-		url,
-		opts,
-	)
+	_, err := p.Goto(url, opts)
 	require.NoError(b.t, err)
 
 	return p
 }
 
-// GoToPage is a wrapper around Page.Goto that fails the test if an error occurs.
+// GotoPage is a wrapper around Page.Goto that fails the test if an error occurs.
 // Added this helper to avoid boilerplate code in tests.
-func (b *testBrowser) GoToPage(p *common.Page, url string) {
+func (b *testBrowser) GotoPage(p *common.Page, url string) {
 	b.t.Helper()
 
 	opts := &common.FrameGotoOptions{
 		Timeout: common.DefaultTimeout,
 	}
-	_, err := p.Goto(
-		url,
-		opts,
-	)
+	_, err := p.Goto(url, opts)
 	require.NoError(b.t, err)
 }
 

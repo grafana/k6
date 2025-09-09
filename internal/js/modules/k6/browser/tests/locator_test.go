@@ -827,7 +827,7 @@ func TestCount(t *testing.T) {
 		tb := newTestBrowser(t, withHTTPServer())
 		tb.withIframeContent(iframeHTML)
 
-		p := tb.GoToNewPage(tb.url("/iframe"))
+		p := tb.GotoNewPage(tb.url("/iframe"))
 
 		return tb, p
 	}
@@ -1147,7 +1147,7 @@ func TestVisibilityWithCORS(t *testing.T) {
 		tb := newTestBrowser(t, withHTTPServer())
 		tb.withIframeContent(iframeHTML)
 
-		p := tb.GoToNewPage(tb.url("/iframe"))
+		p := tb.GotoNewPage(tb.url("/iframe"))
 
 		return tb, p
 	}

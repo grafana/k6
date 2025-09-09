@@ -448,9 +448,9 @@ func TestGetByRoleSuccess(t *testing.T) {
 				for implName, impl := range getByRoleImplementations {
 					t.Run(implName, func(t *testing.T) { //nolint:paralleltest
 						if implName == frameLocatorImpl {
-							tb.GoToPage(p, tb.url("/iframe"))
+							tb.GotoPage(p, tb.url("/iframe"))
 						} else {
-							tb.GoToPage(p, staticURL)
+							tb.GotoPage(p, staticURL)
 						}
 
 						l := impl.GetByRole(tt.role, tt.opts)
@@ -580,9 +580,9 @@ func TestGetByRoleSuccess(t *testing.T) {
 				for implName, impl := range getByRoleImplementations {
 					t.Run(implName, func(t *testing.T) { //nolint:paralleltest
 						if implName == frameLocatorImpl {
-							tb.GoToPage(p, tb.url("/iframe"))
+							tb.GotoPage(p, tb.url("/iframe"))
 						} else {
-							tb.GoToPage(p, staticURL)
+							tb.GotoPage(p, staticURL)
 						}
 
 						l := impl.GetByRole(tt.role, nil)
@@ -624,9 +624,9 @@ func TestGetByRoleSuccess(t *testing.T) {
 			for implName, impl := range getByRoleImplementations {
 				t.Run(implName, func(t *testing.T) { //nolint:paralleltest
 					if implName == frameLocatorImpl {
-						tb.GoToPage(p, tb.url("/iframe"))
+						tb.GotoPage(p, tb.url("/iframe"))
 					} else {
-						tb.GoToPage(p, staticURL)
+						tb.GotoPage(p, staticURL)
 					}
 
 					l := impl.GetByRole("document", nil)
@@ -782,9 +782,9 @@ func TestGetByRoleSuccess(t *testing.T) {
 				for implName, impl := range getByRoleImplementations {
 					t.Run(implName, func(t *testing.T) { //nolint:paralleltest
 						if implName == frameLocatorImpl {
-							tb.GoToPage(p, tb.url("/iframe"))
+							tb.GotoPage(p, tb.url("/iframe"))
 						} else {
-							tb.GoToPage(p, staticURL)
+							tb.GotoPage(p, staticURL)
 						}
 
 						l := impl.GetByRole(tt.role, tt.opts)
@@ -842,9 +842,9 @@ func TestGetByRoleFailure(t *testing.T) {
 			for implName, impl := range getByRoleImplementations {
 				t.Run(implName, func(t *testing.T) {
 					if implName == frameLocatorImpl {
-						tb.GoToPage(p, tb.url("/iframe"))
+						tb.GotoPage(p, tb.url("/iframe"))
 					} else {
-						tb.GoToPage(p, staticURL)
+						tb.GotoPage(p, staticURL)
 					}
 
 					l := impl.GetByRole(tt.role, tt.opts)
@@ -919,9 +919,9 @@ func TestGetByAltTextSuccess(t *testing.T) {
 			for implName, impl := range getByAltTextImplementations {
 				t.Run(implName, func(t *testing.T) {
 					if implName == frameLocatorImpl {
-						tb.GoToPage(p, tb.url("/iframe"))
+						tb.GotoPage(p, tb.url("/iframe"))
 					} else {
-						tb.GoToPage(p, staticURL)
+						tb.GotoPage(p, staticURL)
 					}
 
 					l := impl.GetByAltText(tt.alt, tt.opts)
@@ -1004,9 +1004,9 @@ func TestGetByLabelSuccess(t *testing.T) {
 			for implName, impl := range getByLabelImplementations {
 				t.Run(implName, func(t *testing.T) {
 					if implName == frameLocatorImpl {
-						tb.GoToPage(p, tb.url("/iframe"))
+						tb.GotoPage(p, tb.url("/iframe"))
 					} else {
-						tb.GoToPage(p, staticURL)
+						tb.GotoPage(p, staticURL)
 					}
 
 					l := impl.GetByLabel(tt.label, tt.opts)
@@ -1100,9 +1100,9 @@ func TestGetByPlaceholderSuccess(t *testing.T) {
 			for implName, impl := range getByPlaceholderImplementations {
 				t.Run(implName, func(t *testing.T) {
 					if implName == frameLocatorImpl {
-						tb.GoToPage(p, tb.url("/iframe"))
+						tb.GotoPage(p, tb.url("/iframe"))
 					} else {
-						tb.GoToPage(p, staticURL)
+						tb.GotoPage(p, staticURL)
 					}
 
 					l := impl.GetByPlaceholder(tt.placeholder, tt.opts)
@@ -1195,9 +1195,9 @@ func TestGetByTitleSuccess(t *testing.T) {
 
 			for implName, impl := range getByTitleImplementations {
 				if implName == frameLocatorImpl {
-					tb.GoToPage(p, tb.url("/iframe"))
+					tb.GotoPage(p, tb.url("/iframe"))
 				} else {
-					tb.GoToPage(p, staticURL)
+					tb.GotoPage(p, staticURL)
 				}
 
 				t.Run(implName, func(t *testing.T) {
@@ -1285,9 +1285,9 @@ func TestGetByTestIDSuccess(t *testing.T) {
 			for implName, impl := range getByTestIDImplementations {
 				t.Run(implName, func(t *testing.T) {
 					if implName == frameLocatorImpl {
-						tb.GoToPage(p, tb.url("/iframe"))
+						tb.GotoPage(p, tb.url("/iframe"))
 					} else {
-						tb.GoToPage(p, staticURL)
+						tb.GotoPage(p, staticURL)
 					}
 
 					l := impl.GetByTestID(tt.testID)
@@ -1403,9 +1403,9 @@ func TestGetByTextSuccess(t *testing.T) {
 			for implName, impl := range getByTextImplementations {
 				t.Run(implName, func(t *testing.T) {
 					if implName == frameLocatorImpl {
-						tb.GoToPage(p, tb.url("/iframe"))
+						tb.GotoPage(p, tb.url("/iframe"))
 					} else {
-						tb.GoToPage(p, staticURL)
+						tb.GotoPage(p, staticURL)
 					}
 
 					l := impl.GetByText(tt.text, tt.opts)
