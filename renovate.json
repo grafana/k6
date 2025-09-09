@@ -9,6 +9,13 @@
 			"managers": ["github-actions"]
 		},
 		{
+			"description": "Update Go versions only when a patch version exists (z > 0 in v1.x.z)",
+			"managers": ["gomod"],
+			"matchPackageNames": ["go"],
+			"allowedVersions": "/^(?:v)?\\d+\\.\\d+\\.[1-9]\\d*$/",
+			"postUpdateOptions": ["gomodTidy", "gomodUpdateImportPaths"]
+		},
+		{
 			"groupName": "golangx",
 			"description": "group golang.org/x packages",
 			"managers": ["gomod"],
