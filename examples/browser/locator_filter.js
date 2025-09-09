@@ -35,7 +35,7 @@ export default async function() {
 
   // Filter the 2nd item by filtering items with the "Product 2" text.
   await check(page, {
-    'Use locator.filter the Add to cart 2 button': async p => {
+    'Filter the Add to cart 2 button': async p => {
       const txt = await p
         .getByRole('listitem')
         .filter({ hasText: 'Product 2' })
@@ -47,7 +47,7 @@ export default async function() {
 
   // Using a regex, filter the 1st item by filtering items without the "Product 2" text.
   await check(page, {
-    'Use locator.filter the Add to cart 1 button': async p => {
+    'Filter the Add to cart 1 button': async p => {
       const txt = await p
         .getByRole('listitem')
         .filter({ hasNotText: /Product 2/ })
@@ -59,7 +59,7 @@ export default async function() {
 
   // Filtering with the locator.locator options instead of the locator.filter method.
   await check(page, {
-    'Use locator.options to filter the Add to cart 1 button': async p => {
+    'Filter the Add to cart 1 button with locator options': async p => {
       const txt = await p
         .getByRole('list')
         .locator('li', { hasText: 'Product' })
