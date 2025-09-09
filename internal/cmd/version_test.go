@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
 	"go.k6.io/k6/internal/build"
 	"go.k6.io/k6/internal/cmd/tests"
 )
@@ -79,4 +80,5 @@ func TestVersionJSONSubCommand(t *testing.T) {
 	assert.Equal(t, runtime.Version(), details["go_version"])
 	assert.Equal(t, runtime.GOOS, details["go_os"])
 	assert.Equal(t, runtime.GOARCH, details["go_arch"])
+	assert.Equal(t, "devel", details[commitKey])
 }
