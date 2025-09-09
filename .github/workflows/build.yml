@@ -27,7 +27,7 @@ env:
   APP_NAME: "k6"
   DOCKER_IMAGE_ID: "grafana/k6"
   GHCR_IMAGE_ID: ${{ github.repository }}
-  DEFAULT_GO_VERSION: "1.24.x"
+  DEFAULT_GO_VERSION: "1.25.x"
 
 jobs:
   configure:
@@ -247,7 +247,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install pandoc
-        uses: crazy-max/ghaction-chocolatey@0e015857dd851f84fcb7fb53380eb5c4c8202333 # v3.0.0
+        uses: crazy-max/ghaction-chocolatey@2526f467ccbd337d307fe179959cabbeca0bc8c0 # v3.4.0
         with:
           args: install -y pandoc
       - name: Install wix tools
@@ -256,7 +256,7 @@ jobs:
           Expand-Archive -Path .\wix311-binaries.zip -DestinationPath .\wix311\
           echo "$pwd\wix311" | Out-File -FilePath $env:GITHUB_PATH -Append
       - name: Download binaries
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: binaries
           path: dist
@@ -332,12 +332,12 @@ jobs:
         with:
           persist-credentials: false
       - name: Download binaries
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: binaries
           path: dist
       - name: Download Windows binaries
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: binaries-windows
           path: dist
@@ -345,7 +345,7 @@ jobs:
         run: cd dist && sha256sum * > "k6-${VERSION}-checksums.txt"
       - name: Anchore SBOM Action
         continue-on-error: true
-        uses: anchore/sbom-action@7b36ad622f042cab6f59a75c2ac24ccb256e9b45 # v0.20.4
+        uses: anchore/sbom-action@da167eac915b4e86f08b264dbdbc867b61be6f0c # v0.20.5
         with:
           artifact-name: k6-${{ env.VERSION }}-spdx.json
           upload-release-assets: false
@@ -378,12 +378,12 @@ jobs:
         with:
           persist-credentials: false
       - name: Download binaries
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: binaries
           path: dist
       - name: Download Windows binaries
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: binaries-windows
           path: dist

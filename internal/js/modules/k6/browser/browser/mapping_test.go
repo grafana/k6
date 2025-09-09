@@ -151,6 +151,12 @@ func TestMappings(t *testing.T) {
 				return mapElementHandle(moduleVU{VU: vu}, &common.ElementHandle{})
 			},
 		},
+		"frameLocator": {
+			apiInterface: (*frameLocatorAPI)(nil),
+			mapp: func() mapping {
+				return mapFrameLocator(moduleVU{VU: vu}, &common.FrameLocator{})
+			},
+		},
 		"jsHandle": {
 			apiInterface: (*common.JSHandleAPI)(nil),
 			mapp: func() mapping {
@@ -493,6 +499,10 @@ type elementHandleAPI interface { //nolint:interfacebloat
 	WaitForSelector(selector string, opts sobek.Value) (*common.ElementHandle, error)
 }
 
+type frameLocatorAPI interface {
+	Locator(selector string) *common.Locator
+}
+
 // requestAPI is the interface of an HTTP request.
 type requestAPI interface { //nolint:interfacebloat
 	AllHeaders() map[string]string
@@ -538,6 +548,7 @@ type locatorAPI interface { //nolint:interfacebloat
 	BoundingBox(opts *common.FrameBaseOptions) (*common.Rect, error)
 	Clear(opts *common.FrameFillOptions) error
 	Click(opts sobek.Value) error
+	ContentFrame() *common.FrameLocator
 	Count() (int, error)
 	Dblclick(opts sobek.Value) error
 	SetChecked(checked bool, opts sobek.Value) error
@@ -550,9 +561,17 @@ type locatorAPI interface { //nolint:interfacebloat
 	IsVisible(opts sobek.Value) (bool, error)
 	IsHidden(opts sobek.Value) (bool, error)
 	Fill(value string, opts sobek.Value) error
+	Filter(opts *common.LocatorFilterOptions) *common.Locator
 	First() *common.Locator
 	Focus(opts sobek.Value) error
 	GetAttribute(name string, opts sobek.Value) (string, bool, error)
+	GetByRole(role string, opts *common.GetByRoleOptions) *common.Locator
+	GetByAltText(alt string, opts *common.GetByBaseOptions) *common.Locator
+	GetByLabel(label string, opts *common.GetByBaseOptions) *common.Locator
+	GetByPlaceholder(placeholder string, opts *common.GetByBaseOptions) *common.Locator
+	GetByTitle(title string, opts *common.GetByBaseOptions) *common.Locator
+	GetByTestId(testID string) *common.Locator
+	GetByText(text string, opts *common.GetByBaseOptions) *common.Locator
 	InnerHTML(opts sobek.Value) (string, error)
 	InnerText(opts sobek.Value) (string, error)
 	TextContent(opts sobek.Value) (string, bool, error)

@@ -318,7 +318,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			}), nil
 		},
 		"locator": func(selector string, opts sobek.Value) mapping {
-			return mapLocator(vu, f.Locator(selector, opts))
+			return mapLocator(vu, f.Locator(selector, parseLocatorOptions(rt, opts)))
 		},
 		"name": f.Name,
 		"page": func() mapping {
@@ -342,7 +342,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				return nil, fmt.Errorf("parsing select option options: %w", err)
 			}
 
-			convValues, err := common.ConvertSelectOptionValues(vu.Runtime(), values)
+			convValues, err := common.ConvertSelectOptionValues(rt, values)
 			if err != nil {
 				return nil, fmt.Errorf("parsing select options values: %w", err)
 			}
