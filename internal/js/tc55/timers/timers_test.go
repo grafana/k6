@@ -67,7 +67,7 @@ func TestSetInterval(t *testing.T) {
 		print("outside setInterval")
 	`)
 	require.NoError(t, err)
-	require.Len(t, len(log), 2)
+	require.Len(t, log, 2)
 	require.Equal(t, "outside setInterval", log[0])
 	for i, l := range log[1:] {
 		require.Equal(t, "in setInterval", l, i)
