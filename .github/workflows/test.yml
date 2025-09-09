@@ -110,7 +110,7 @@ jobs:
       fail-fast: false
       matrix:
         go-version: [1.24.x]
-        platform: [ubuntu-22.04, ubuntu-24.04-arm, windows-latest]
+        platform: [ubuntu-22.04, ubuntu-arm64-large, windows-latest]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout code
