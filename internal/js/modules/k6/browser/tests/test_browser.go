@@ -222,22 +222,29 @@ func withHTTPServer() func(*testBrowser) {
 
 // withIFrameContent sets up a handler for /iframe that serves a page embedding
 // an iframe with the given content.
-func (tb *testBrowser) withIframeContent(iframeHTML string) {
-	tb.t.Helper()
+func withIFrameContent(iframeHTML string) func(*testBrowser) {
+	return func(tb *testBrowser) {
+		if !tb.isBrowserTypeInitialized {
+			return
+		}
+		if tb.http == nil {
+			apply := withHTTPServer()
+			apply(tb)
+		}
 
-	// Server for origin B
-	muxB := http.NewServeMux()
-	muxB.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, err := w.Write([]byte(iframeHTML))
-		require.NoError(tb.t, err)
-	})
-	srvB := httptest.NewServer(muxB)
-	tb.t.Cleanup(func() {
-		srvB.Close()
-	})
+		mux := http.NewServeMux()
+		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			_, err := w.Write([]byte(iframeHTML))
+			require.NoError(tb.t, err)
+		})
+		srv := httptest.NewServer(mux)
+		tb.t.Cleanup(func() {
+			srv.Close()
+		})
 
-	tb.withIFrameURL(srvB.URL)
+		tb.withIFrameURL(srv.URL)
+	}
 }
 
 // withIFrameURL sets up a handler for /iframe that serves a page embedding
@@ -249,8 +256,7 @@ func (tb *testBrowser) withIFrameURL(iframeURL string) {
 		tb.t.Fatalf("You should enable HTTP test server, see: withHTTPServer option")
 	}
 
-	// Origin A: main page embedding origin B and same-origin frame A (with dynamic B URL)
-	originAHTML := fmt.Sprintf(`<!DOCTYPE html>
+	docHTML := fmt.Sprintf(`<!DOCTYPE html>
 		<html>
 		<head></head>
 		<body>
@@ -260,7 +266,7 @@ func (tb *testBrowser) withIFrameURL(iframeURL string) {
 
 	tb.withHandler("/iframe", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, err := w.Write([]byte(originAHTML))
+		_, err := w.Write([]byte(docHTML))
 		require.NoError(tb.t, err)
 	})
 }
