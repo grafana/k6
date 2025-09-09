@@ -67,7 +67,7 @@ func TestSetInterval(t *testing.T) {
 		print("outside setInterval")
 	`)
 	require.NoError(t, err)
-	require.Equal(t, len(log), 2)
+	require.Len(t, len(log), 2)
 	require.Equal(t, "outside setInterval", log[0])
 	for i, l := range log[1:] {
 		require.Equal(t, "in setInterval", l, i)
@@ -124,18 +124,18 @@ func TestSetIntervalOrder(t *testing.T) {
 		require.NoError(t, err)
 		runtime.EventLoop.WaitOnRegistered()
 		require.GreaterOrEqual(t, len(log), 5)
-		require.Equal(t, log[0], "outside")
+		require.Equal(t, "outside", log[0])
 		for i := 1; i < len(log)-1; i += 3 {
 			switch len(log) - i {
 			case 2:
-				require.Equal(t, log[i:i+1], []string{"one"})
+				require.Equal(t, []string{"one"}, log[i:i+1])
 			case 3:
-				require.Equal(t, log[i:i+2], []string{"one", "two"})
+				require.Equal(t, []string{"one", "two"}, log[i:i+2])
 			default:
-				require.Equal(t, log[i:i+3], []string{"one", "two", "three"})
+				require.Equal(t, []string{"one", "two", "three"}, log[i:i+3])
 			}
 		}
-		require.Equal(t, log[len(log)-1], "last")
+		require.Equal(t, "last", log[len(log)-1])
 		log = log[:0]
 	}
 }

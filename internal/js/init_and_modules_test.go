@@ -74,28 +74,28 @@ func TestNewJSRunnerWithCustomModule(t *testing.T) {
 		map[string]fsext.Fs{"file": fsext.NewMemMapFs(), "https": fsext.NewMemMapFs()},
 	)
 	require.NoError(t, err)
-	assert.Equal(t, checkModule.initCtxCalled, 1)
-	assert.Equal(t, checkModule.vuCtxCalled, 0)
+	assert.Equal(t, 1, checkModule.initCtxCalled)
+	assert.Equal(t, 0, checkModule.vuCtxCalled)
 
 	vu, err := runner.NewVU(context.Background(), 1, 1, make(chan metrics.SampleContainer, 100))
 	require.NoError(t, err)
-	assert.Equal(t, checkModule.initCtxCalled, 2)
-	assert.Equal(t, checkModule.vuCtxCalled, 0)
+	assert.Equal(t, 2, checkModule.initCtxCalled)
+	assert.Equal(t, 0, checkModule.vuCtxCalled)
 
 	vuCtx, vuCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer vuCancel()
 
 	activeVU := vu.Activate(&lib.VUActivationParams{RunContext: vuCtx})
 	require.NoError(t, activeVU.RunOnce())
-	assert.Equal(t, checkModule.initCtxCalled, 2)
-	assert.Equal(t, checkModule.vuCtxCalled, 1)
+	assert.Equal(t, 2, checkModule.initCtxCalled)
+	assert.Equal(t, 1, checkModule.vuCtxCalled)
 	require.NoError(t, activeVU.RunOnce())
-	assert.Equal(t, checkModule.initCtxCalled, 2)
-	assert.Equal(t, checkModule.vuCtxCalled, 2)
+	assert.Equal(t, 2, checkModule.initCtxCalled)
+	assert.Equal(t, 2, checkModule.vuCtxCalled)
 
 	arc := runner.MakeArchive()
-	assert.Equal(t, checkModule.initCtxCalled, 2) // shouldn't change, we're not executing the init context again
-	assert.Equal(t, checkModule.vuCtxCalled, 2)
+	assert.Equal(t, 2, checkModule.initCtxCalled) // shouldn't change, we're not executing the init context again
+	assert.Equal(t, 2, checkModule.vuCtxCalled)
 
 	runnerFromArc, err := js.NewFromArchive(
 		&lib.TestPreInitState{
@@ -106,17 +106,17 @@ func TestNewJSRunnerWithCustomModule(t *testing.T) {
 			Usage:          usage.New(),
 		}, arc)
 	require.NoError(t, err)
-	assert.Equal(t, checkModule.initCtxCalled, 3) // changes because we need to get the exported functions
-	assert.Equal(t, checkModule.vuCtxCalled, 2)
+	assert.Equal(t, 3, checkModule.initCtxCalled) // changes because we need to get the exported functions
+	assert.Equal(t, 2, checkModule.vuCtxCalled)
 	vuFromArc, err := runnerFromArc.NewVU(context.Background(), 2, 2, make(chan metrics.SampleContainer, 100))
 	require.NoError(t, err)
-	assert.Equal(t, checkModule.initCtxCalled, 4)
-	assert.Equal(t, checkModule.vuCtxCalled, 2)
+	assert.Equal(t, 4, checkModule.initCtxCalled)
+	assert.Equal(t, 2, checkModule.vuCtxCalled)
 	activeVUFromArc := vuFromArc.Activate(&lib.VUActivationParams{RunContext: vuCtx})
 	require.NoError(t, activeVUFromArc.RunOnce())
-	assert.Equal(t, checkModule.initCtxCalled, 4)
-	assert.Equal(t, checkModule.vuCtxCalled, 3)
+	assert.Equal(t, 4, checkModule.initCtxCalled)
+	assert.Equal(t, 3, checkModule.vuCtxCalled)
 	require.NoError(t, activeVUFromArc.RunOnce())
-	assert.Equal(t, checkModule.initCtxCalled, 4)
-	assert.Equal(t, checkModule.vuCtxCalled, 4)
+	assert.Equal(t, 4, checkModule.initCtxCalled)
+	assert.Equal(t, 4, checkModule.vuCtxCalled)
 }

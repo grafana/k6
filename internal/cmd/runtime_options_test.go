@@ -102,7 +102,7 @@ func testRuntimeOptionsCase(t *testing.T, tc runtimeOptionsTestCase) {
 	for key, val := range tc.expRTOpts.Env {
 		archTest = getRunnerErr(lib.RuntimeOptions{Env: map[string]string{key: "almost " + val}})
 		require.NoError(t, archTest.initializeFirstRunner(ts.GlobalState))
-		assert.Equal(t, archTest.initRunner.MakeArchive().Env[key], "almost "+val)
+		assert.Equal(t, "almost "+val, archTest.initRunner.MakeArchive().Env[key])
 	}
 }
 

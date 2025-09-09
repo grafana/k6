@@ -87,6 +87,6 @@ func TestSetPaused(t *testing.T) {
 		sched.executors = []lib.Executor{pausableExecutor{err: expectedErr}}
 		err = sched.SetPaused(true)
 		require.Error(t, err)
-		require.Equal(t, err, expectedErr)
+		require.Equal(t, expectedErr, err)
 	})
 }

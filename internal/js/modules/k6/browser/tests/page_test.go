@@ -531,17 +531,17 @@ func TestPageInputValue(t *testing.T) {
 	inputValue, err := p.InputValue("input", common.NewFrameInputValueOptions(p.MainFrame().Timeout()))
 	require.NoError(t, err)
 	got, want := inputValue, "hello1"
-	assert.Equal(t, got, want)
+	assert.Equal(t, want, got)
 
 	inputValue, err = p.InputValue("select", common.NewFrameInputValueOptions(p.MainFrame().Timeout()))
 	require.NoError(t, err)
 	got, want = inputValue, "hello2"
-	assert.Equal(t, got, want)
+	assert.Equal(t, want, got)
 
 	inputValue, err = p.InputValue("textarea", common.NewFrameInputValueOptions(p.MainFrame().Timeout()))
 	require.NoError(t, err)
 	got, want = inputValue, "hello3"
-	assert.Equal(t, got, want)
+	assert.Equal(t, want, got)
 }
 
 // test for: https://go.k6.io/k6/js/modules/k6/browser/issues/132
@@ -819,7 +819,7 @@ func TestPageWaitForFunction(t *testing.T) {
 		tb.logCache.contains("ok: null")
 
 		p := tb.vu.RunPromise(t, `return await page.evaluate(() => window._arg);`)
-		require.Equal(t, p.State(), sobek.PromiseStateFulfilled)
+		require.Equal(t, sobek.PromiseStateFulfilled, p.State())
 		assert.Equal(t, "raf_arg", p.Result().String())
 	})
 
@@ -843,7 +843,7 @@ func TestPageWaitForFunction(t *testing.T) {
 		tb.logCache.contains("ok: null")
 
 		p := tb.vu.RunPromise(t, `return await page.evaluate(() => window._args);`)
-		require.Equal(t, p.State(), sobek.PromiseStateFulfilled)
+		require.Equal(t, sobek.PromiseStateFulfilled, p.State())
 		var gotArgs []int
 		_ = tb.vu.Runtime().ExportTo(p.Result(), &gotArgs)
 		assert.Equal(t, args, gotArgs)
