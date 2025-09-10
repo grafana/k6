@@ -68,6 +68,10 @@ func (h *ElementHandle) boundingBox() (*Rect, error) {
 		return nil, fmt.Errorf("getting bounding box model of DOM node: %w", err)
 	}
 
+	if box == nil || box.Border == nil {
+		return nil, ErrElementNotAttachedToDOM
+	}
+
 	quad := box.Border
 	x := math.Min(quad[0], math.Min(quad[2], math.Min(quad[4], quad[6])))
 	y := math.Min(quad[1], math.Min(quad[3], math.Min(quad[5], quad[7])))
