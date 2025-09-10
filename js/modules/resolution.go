@@ -134,6 +134,16 @@ func (mr *ModuleResolver) resolveLoaded(basePWD *url.URL, arg string, data []byt
 	} else {
 		mod, err = cjsModuleFromString(prg)
 	}
+	potentialRequireCalls := findRequireFunctionInAST(prg.Body)
+	if len(potentialRequireCalls) > 0 {
+		mr.logger.Debugf("will try to preload the potential `require` calls from within %q: %q", specifier, potentialRequireCalls)
+	}
+	for _, requireArg := range potentialRequireCalls {
+		_, requireErr := mr.resolve(basePWD, requireArg)
+		if requireErr != nil {
+			mr.logger.WithError(requireErr).Debugf("error while preloading potential require call for %q", requireArg)
+		}
+	}
 	mr.reverse[mod] = specifier
 	mr.cache[specifier.String()] = moduleCacheElement{mod: mod, err: err}
 	return mod, err

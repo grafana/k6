@@ -119,3 +119,68 @@ func cjsModuleFromString(prg *ast.Program) (sobek.ModuleRecord, error) {
 	}
 	return newCjsModule(pgm), nil
 }
+
+// This is helper functiosn to find `require` calls and preload them
+func findRequireFunctionInAST(prg []ast.Statement) []string {
+	result := make([]string, 0)
+	for _, i := range prg {
+		switch t := i.(type) {
+		case *ast.ExpressionStatement:
+			switch e := t.Expression.(type) {
+			case *ast.CallExpression:
+				result = append(result, extractArgumentFromCallExpression(e)...)
+			case *ast.FunctionLiteral:
+				result = append(result, findRequireFunctionInAST(e.Body.List)...)
+			}
+
+		case *ast.BadStatement,
+			*ast.DebuggerStatement,
+			*ast.EmptyStatement,
+			*ast.ExportDeclaration,
+			*ast.ImportDeclaration:
+			continue // we do not have to do anything
+			// TODO the meaining ones below seem to require somethign to happen
+		case *ast.BlockStatement:
+		case *ast.BranchStatement:
+		case *ast.CaseStatement:
+		case *ast.CatchStatement:
+		case *ast.DoWhileStatement:
+		case *ast.ForInStatement:
+		case *ast.ForOfStatement:
+		case *ast.ForStatement:
+		case *ast.IfStatement:
+		case *ast.LabelledStatement:
+		case *ast.ReturnStatement:
+		case *ast.SwitchStatement:
+		case *ast.ThrowStatement:
+		case *ast.TryStatement:
+		case *ast.VariableStatement:
+		case *ast.WhileStatement:
+		case *ast.WithStatement:
+		case *ast.LexicalDeclaration:
+		case *ast.FunctionDeclaration:
+		case *ast.ClassDeclaration:
+		}
+	}
+	return result
+}
+
+func extractArgumentFromCallExpression(e *ast.CallExpression) []string {
+	identifier, ok := e.Callee.(*ast.Identifier)
+	if !ok {
+		return nil
+	}
+	if identifier.Name.String() == "require" {
+		if str, ok := extractStringLiteral(e.ArgumentList[0]); ok {
+			return []string{str}
+		}
+	}
+	return nil
+}
+
+func extractStringLiteral(e ast.Expression) (string, bool) {
+	if str, ok := e.(*ast.StringLiteral); ok {
+		return str.Value.String(), true
+	}
+	return "", false
+}
