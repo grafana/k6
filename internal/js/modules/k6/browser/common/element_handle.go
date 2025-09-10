@@ -24,6 +24,8 @@ import (
 var (
 	// ErrElementNotVisible is returned when an element is not visible for an operation.
 	ErrElementNotVisible = errors.New("element is not visible")
+	// ErrElementNotAttachedToDOM is returned when an element is not attached to the DOM.
+	ErrElementNotAttachedToDOM = errors.New("element is not attached to the DOM")
 )
 
 const (
