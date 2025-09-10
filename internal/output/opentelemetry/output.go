@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel/attribute"
 	otelMetric "go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -53,11 +54,11 @@ func (o *Output) StopWithTestError(_ error) error {
 	o.logger.Debug("Stopping...")
 	defer o.logger.Debug("Stopped!")
 
+	o.periodicFlusher.Stop()
+
 	if err := o.meterProvider.Shutdown(context.Background()); err != nil {
 		o.logger.WithError(err).Error("can't shutdown OpenTelemetry metric provider")
 	}
-
-	o.periodicFlusher.Stop()
 
 	return nil
 }
@@ -173,19 +174,23 @@ func (o *Output) dispatch(entry metrics.Sample) error {
 
 		trend.Record(ctx, entry.Value, attributeSetOpt)
 	case metrics.Rate:
-		nonZero, total, err := o.metricsRegistry.getOrCreateCountersForRate(name)
+		rate, err := o.metricsRegistry.getOrCreateCountersForRate(name)
 		if err != nil {
 			return err
 		}
 
+		var valueType string
 		if entry.Value != 0 {
-			nonZero.Add(ctx, 1, attributeSetOpt)
+			valueType = "nonzero"
+		} else {
+			valueType = "zero"
 		}
-		total.Add(ctx, 1, attributeSetOpt)
-	default:
-		o.logger.Warnf("metric %q has unsupported metric type", entry.Metric.Name)
-	}
+		valset := attribute.NewSet(attribute.String("condition", valueType))
 
+		rate.Add(ctx, 1, attributeSetOpt, otelMetric.WithAttributeSet(valset))
+	default:
+		return fmt.Errorf("metric %q has unsupported metric type", entry.Metric.Name)
+	}
 	return nil
 }
 

@@ -77,40 +77,22 @@ func (r *registry) getOrCreateHistogram(name, unit string) (otelMetric.Float64Hi
 	return h, nil
 }
 
-func (r *registry) getOrCreateCountersForRate(name string) (otelMetric.Int64Counter, otelMetric.Int64Counter, error) {
+func (r *registry) getOrCreateCountersForRate(name string) (otelMetric.Int64Counter, error) {
 	// k6's rate metric tracks how frequently a non-zero value occurs.
-	// so to correctly calculate the rate in a metrics backend
-	// we need to split the rate metric into two counters:
-	// 2. number of non-zero occurrences
-	// 1. the total number of occurrences
+	// To be accurate is a percentage, which is a ratio.
+	// To correctly calculate this metric in a metrics backend,
+	// we need to split the rate metric via a dedicated label.
 
-	nonZeroName := name + ".occurred"
 	totalName := name + ".total"
 
 	var err error
-	var nonZeroCounter, totalCounter otelMetric.Int64Counter
-
-	storedNonZeroCounter, ok := r.rateCounters.Load(nonZeroName)
-	if !ok {
-		nonZeroCounter, err = r.meter.Int64Counter(nonZeroName)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create counter for %q: %w", nonZeroName, err)
-		}
-
-		r.rateCounters.Store(nonZeroName, nonZeroCounter)
-		r.logger.Debugf("registered counter metric %q", nonZeroName)
-	} else {
-		nonZeroCounter, ok = storedNonZeroCounter.(otelMetric.Int64Counter)
-		if !ok {
-			return nil, nil, fmt.Errorf("metric %q stored not as counter", nonZeroName)
-		}
-	}
+	var totalCounter otelMetric.Int64Counter
 
 	storedTotalCounter, ok := r.rateCounters.Load(totalName)
 	if !ok {
 		totalCounter, err = r.meter.Int64Counter(totalName)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create counter for %q: %w", totalName, err)
+			return nil, fmt.Errorf("failed to create counter for %q: %w", totalName, err)
 		}
 
 		r.rateCounters.Store(totalName, totalCounter)
@@ -118,11 +100,11 @@ func (r *registry) getOrCreateCountersForRate(name string) (otelMetric.Int64Coun
 	} else {
 		totalCounter, ok = storedTotalCounter.(otelMetric.Int64Counter)
 		if !ok {
-			return nil, nil, fmt.Errorf("metric %q stored not as counter", totalName)
+			return nil, fmt.Errorf("metric %q stored not as counter", totalName)
 		}
 	}
 
-	return nonZeroCounter, totalCounter, nil
+	return totalCounter, nil
 }
 
 func (r *registry) getOrCreateGauge(name, unit string) (otelMetric.Float64Gauge, error) {
