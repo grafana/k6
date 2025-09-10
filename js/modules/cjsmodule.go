@@ -2,6 +2,7 @@ package modules
 
 import (
 	"errors"
+	"reflect"
 
 	"github.com/grafana/sobek"
 	"github.com/grafana/sobek/ast"
@@ -118,4 +119,142 @@ func cjsModuleFromString(prg *ast.Program) (sobek.ModuleRecord, error) {
 		return nil, err
 	}
 	return newCjsModule(pgm), nil
+}
+
+// This is helper functiosn to find `require` calls and preload them
+func findRequireFunctionInAST(prg []ast.Statement) []string {
+	result := make([]string, 0)
+	for _, i := range prg {
+		result = append(result, findRequireFunctionInStatement(i)...)
+	}
+	return result
+}
+
+func findRequireFunctionInStatement(i ast.Statement) []string { //nolint:cyclop,funlen
+	if i == nil || reflect.ValueOf(i).IsNil() {
+		return nil
+	}
+
+	switch t := i.(type) {
+	case *ast.ExpressionStatement:
+		return findRequireFunctionInExpression(t.Expression)
+	case *ast.BadStatement,
+		*ast.DebuggerStatement,
+		*ast.EmptyStatement,
+		*ast.ImportDeclaration,
+		*ast.BranchStatement:
+		// we do not have to do anything
+		// TODO the meaining ones below seem to require something to happen
+		return nil
+	case *ast.ExportDeclaration:
+		result := findRequireFunctionInExpression(t.AssignExpression)
+		result = append(result, findRequireFunctionInStatement(t.LexicalDeclaration)...)
+		result = append(result, findRequireFunctionInStatement(t.ClassDeclaration)...)
+		if t.HoistableDeclaration != nil {
+			result = append(result, findRequireFunctionInStatement(t.HoistableDeclaration.FunctionDeclaration)...)
+		}
+		return result
+	case *ast.BlockStatement:
+		return findRequireFunctionInAST(t.List)
+	case *ast.CaseStatement:
+		return findRequireFunctionInAST(t.Consequent)
+	case *ast.CatchStatement:
+		return findRequireFunctionInAST(t.Body.List)
+	case *ast.DoWhileStatement:
+		result := findRequireFunctionInExpression(t.Test)
+		result = append(result, findRequireFunctionInStatement(t.Body)...)
+		return result
+	case *ast.ForInStatement:
+		result := findRequireFunctionInExpression(t.Source)
+		result = append(result, findRequireFunctionInStatement(t.Body)...)
+		return result
+	case *ast.ForOfStatement:
+		result := findRequireFunctionInExpression(t.Source)
+		result = append(result, findRequireFunctionInStatement(t.Body)...)
+		return result
+	case *ast.ForStatement:
+		result := findRequireFunctionInExpression(t.Test)
+		result = append(result, findRequireFunctionInStatement(t.Body)...)
+		return result
+	case *ast.IfStatement:
+		result := findRequireFunctionInStatement(t.Consequent)
+		result = append(result, findRequireFunctionInStatement(t.Alternate)...)
+		return result
+	case *ast.LabelledStatement:
+		return findRequireFunctionInStatement(t.Statement)
+	case *ast.ReturnStatement:
+		return findRequireFunctionInExpression(t.Argument)
+	case *ast.SwitchStatement:
+		result := findRequireFunctionInExpression(t.Discriminant)
+		for _, c := range t.Body {
+			result = append(result, findRequireFunctionInStatement(c)...)
+		}
+		return result
+	case *ast.ThrowStatement:
+		return findRequireFunctionInExpression(t.Argument)
+	case *ast.TryStatement:
+		result := findRequireFunctionInStatement(t.Body)
+		result = append(result, findRequireFunctionInStatement(t.Catch)...)
+		result = append(result, findRequireFunctionInStatement(t.Finally)...)
+		return result
+	case *ast.VariableStatement:
+		return findRequireFunctionInBindings(t.List)
+	case *ast.WhileStatement:
+		result := findRequireFunctionInExpression(t.Test)
+		result = append(result, findRequireFunctionInStatement(t.Body)...)
+		return result
+	case *ast.WithStatement:
+		result := findRequireFunctionInExpression(t.Object)
+		result = append(result, findRequireFunctionInStatement(t.Body)...)
+		return result
+	case *ast.LexicalDeclaration:
+		return findRequireFunctionInBindings(t.List)
+	case *ast.FunctionDeclaration:
+		return findRequireFunctionInExpression(t.Function)
+	case *ast.ClassDeclaration:
+		return findRequireFunctionInExpression(t.Class)
+	}
+	return nil
+}
+
+func findRequireFunctionInExpression(i ast.Expression) []string {
+	switch e := i.(type) {
+	case *ast.CallExpression:
+		return extractArgumentFromCallExpression(e)
+	case *ast.FunctionLiteral:
+		return findRequireFunctionInAST(e.Body.List)
+	}
+	return nil
+}
+
+func findRequireFunctionInBindings(bindings []*ast.Binding) []string {
+	result := make([]string, 0)
+	for _, i := range bindings {
+		result = append(result, findRequireFunctionInBinding(i)...)
+	}
+	return result
+}
+
+func findRequireFunctionInBinding(binding *ast.Binding) []string {
+	return findRequireFunctionInExpression(binding.Initializer)
+}
+
+func extractArgumentFromCallExpression(e *ast.CallExpression) []string {
+	identifier, ok := e.Callee.(*ast.Identifier)
+	if !ok {
+		return nil
+	}
+	if identifier.Name.String() == "require" {
+		if str, ok := extractStringLiteral(e.ArgumentList[0]); ok {
+			return []string{str}
+		}
+	}
+	return nil
+}
+
+func extractStringLiteral(e ast.Expression) (string, bool) {
+	if str, ok := e.(*ast.StringLiteral); ok {
+		return str.Value.String(), true
+	}
+	return "", false
 }
