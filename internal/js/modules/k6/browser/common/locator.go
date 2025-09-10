@@ -105,6 +105,7 @@ func (l *Locator) Click(opts *FrameClickOptions) error {
 // error, or applies slow motion.
 func (l *Locator) click(opts *FrameClickOptions) error {
 	opts.Strict = true
+	opts.retry = true
 	return l.frame.click(l.selector, opts)
 }
 

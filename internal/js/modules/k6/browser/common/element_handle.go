@@ -1864,6 +1864,11 @@ func retryPointerAction(
 			}
 		}
 
+		// Only locator based APIs should retry.
+		if !opts.retry {
+			return res, err
+		}
+
 		if !errors.Is(err, ErrElementNotVisible) &&
 			!errors.Is(err, ErrElementNotAttachedToDOM) {
 			return res, err
