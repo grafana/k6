@@ -453,7 +453,7 @@ func (h *ElementHandle) scrollRectIntoViewIfNeeded(apiCtx context.Context, rect 
 			return ErrElementNotVisible
 		}
 		if strings.Contains(err.Error(), "Node is detached from document") {
-			return errorFromDOMError("error:notconnected")
+			return ErrElementNotAttachedToDOM
 		}
 		return err
 	}
@@ -1907,8 +1907,12 @@ func errorFromDOMError(v any) error {
 	if s := "error:expectednode:"; strings.HasPrefix(serr, s) {
 		return fmt.Errorf("expected node but got %s", strings.TrimPrefix(serr, s))
 	}
+
+	if serr == "error:notconnected" {
+		return ErrElementNotAttachedToDOM
+	}
+
 	errs := map[string]string{
-		"error:notconnected":           "element is not attached to the DOM",
 		"error:notelement":             "node is not an element",
 		"error:nothtmlelement":         "not an HTMLElement",
 		"error:notfillableelement":     "element is not an <input>, <textarea> or [contenteditable] element",
