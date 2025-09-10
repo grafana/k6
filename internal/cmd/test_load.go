@@ -6,7 +6,9 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
+	"net/url"
 	"path/filepath"
+	"strings"
 	"sync"
 	"syscall"
 
@@ -140,6 +142,26 @@ func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
 		logger.Debug("Trying to load as a JS test...")
 		moduleResolver := js.NewModuleResolver(pwd, lt.preInitState, lt.fileSystems)
 		err := moduleResolver.LoadMainModule(pwd, specifier, lt.source.Data)
+		for _, imported := range moduleResolver.Imported() {
+			if strings.HasPrefix(imported, "k6") {
+				continue
+			}
+			u, err := url.Parse(imported)
+			if err != nil {
+				panic(err)
+			}
+			// TODO: do not load it like this :shrug:
+			d, err := loader.Load(logger, lt.fileSystems, u, u.String())
+			if err != nil {
+				panic(err)
+			}
+			deps, err := processUseDirectives(d.Data)
+			if err != nil {
+				panic(err)
+			}
+			logger.Debugf("dependencies from %q: %q", imported, deps)
+
+		}
 		if err != nil {
 			return fmt.Errorf("could not load JS test '%s': %w", testPath, err)
 		}
