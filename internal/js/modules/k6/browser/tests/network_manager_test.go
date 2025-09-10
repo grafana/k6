@@ -19,8 +19,7 @@ import (
 func TestURLSkipRequest(t *testing.T) {
 	t.Parallel()
 
-t.Skip("Temporary skip while we work out why test is failing with the latest version of chromium; TODO: https://github.com/grafana/k6/issues/5162")
-	t.Skip("temporary skip while we work out why test is failing with the latest version of chromium")
+	t.Skip(`Temporary skip while we work out why test is failing with the latest version of chromium; FIXME: https://github.com/grafana/k6/issues/5162`)
 
 	tb := newTestBrowser(t, withLogCache())
 	p := tb.NewPage(nil)
