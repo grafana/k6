@@ -29,6 +29,7 @@ import (
 	"go.k6.io/k6/internal/lib/summary"
 	"go.k6.io/k6/internal/loader"
 	"go.k6.io/k6/js/common"
+	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/lib/netext"
@@ -63,8 +64,10 @@ type Runner struct {
 }
 
 // New returns a new Runner for the provided source
-func New(piState *lib.TestPreInitState, src *loader.SourceData, filesystems map[string]fsext.Fs) (*Runner, error) {
-	bundle, err := NewBundle(piState, src, filesystems)
+func New(
+	piState *lib.TestPreInitState, src *loader.SourceData, filesystems map[string]fsext.Fs, mr *modules.ModuleResolver,
+) (*Runner, error) {
+	bundle, err := NewBundle(piState, src, filesystems, mr)
 	if err != nil {
 		return nil, err
 	}
@@ -73,8 +76,8 @@ func New(piState *lib.TestPreInitState, src *loader.SourceData, filesystems map[
 }
 
 // NewFromArchive returns a new Runner from the source in the provided archive
-func NewFromArchive(piState *lib.TestPreInitState, arc *lib.Archive) (*Runner, error) {
-	bundle, err := NewBundleFromArchive(piState, arc)
+func NewFromArchive(piState *lib.TestPreInitState, arc *lib.Archive, mr *modules.ModuleResolver) (*Runner, error) {
+	bundle, err := NewBundleFromArchive(piState, arc, mr)
 	if err != nil {
 		return nil, err
 	}

@@ -210,6 +210,28 @@ func (mr *ModuleResolver) reversePath(referencingScriptOrModule interface{}) *ur
 	return p.JoinPath("..")
 }
 
+// LoadMainModule loads a main module and resolves all it dependencies checking for any linking issues.
+// It does not run any javascript code, just compiling it and resolving module dependencies.
+func (mr *ModuleResolver) LoadMainModule(pwd *url.URL, specifier string, data []byte) error {
+	if _, err := mr.resolveLoaded(pwd, specifier, data); err != nil {
+		return err
+	}
+
+	mod, err := mr.resolve(pwd, specifier)
+	if err != nil {
+		return err
+	}
+	if err = mod.Link(); err != nil {
+		return err
+	}
+	_, ok := mod.(sobek.CyclicModuleRecord)
+	if !ok {
+		panic("somehow running source data for " + specifier + " didn't produce a cyclic module record")
+	}
+
+	return nil
+}
+
 // ModuleSystem is implementing an ESM like module system to resolve js modules for k6 usage
 type ModuleSystem struct {
 	vu            VU
@@ -236,10 +258,10 @@ func NewModuleSystem(resolver *ModuleResolver, vu VU) *ModuleSystem {
 func (ms *ModuleSystem) RunSourceData(source *loader.SourceData) (*RunSourceDataResult, error) {
 	specifier := source.URL.String()
 	pwd := source.URL.JoinPath("../")
-	if _, err := ms.resolver.resolveLoaded(pwd, specifier, source.Data); err != nil {
+	err := ms.resolver.LoadMainModule(pwd, specifier, source.Data)
+	if err != nil {
 		return nil, err
 	}
-
 	mod, err := ms.resolver.resolve(pwd, specifier)
 	if err != nil {
 		return nil, err
