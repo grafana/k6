@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"maps"
 	"net/url"
 	"path/filepath"
 	"runtime"
@@ -142,8 +141,15 @@ func NewBundleFromArchive(piState *lib.TestPreInitState, arc *lib.Archive, modul
 	if arc.Type != "js" {
 		return nil, fmt.Errorf("expected bundle type 'js', got '%s'", arc.Type)
 	}
-
-	piState.RuntimeOptions.Env = maps.Clone(arc.Env)
+	env := arc.Env
+	if env == nil {
+		// Older archives (<=0.20.0) don't have an "env" property
+		env = make(map[string]string)
+	}
+	for k, v := range piState.RuntimeOptions.Env {
+		env[k] = v
+	}
+	piState.RuntimeOptions.Env = env
 
 	return newBundle(piState, &loader.SourceData{
 		Data: arc.Data,
