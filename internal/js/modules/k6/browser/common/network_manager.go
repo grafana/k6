@@ -558,15 +558,16 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent,
 		m.logger.Errorf("NetworkManager", "creating request: %s", err)
 		return
 	}
-	// Skip data and blob URLs, since they're internal to the browser.
-	if isInternalURL(req.url) {
-		m.logger.Debugf("NetworkManager", "skipping request handling of %s URL", req.url.Scheme)
-		return
-	}
+
 	m.reqsMu.Lock()
 	m.reqIDToRequest[event.RequestID] = req
 	m.reqsMu.Unlock()
-	m.emitRequestMetrics(req)
+
+	// Skip data and blob URLs, since they're internal to the browser.
+	if !isInternalURL(req.url) {
+		m.emitRequestMetrics(req)
+	}
+
 	m.frameManager.requestStarted(req)
 
 	m.eventInterceptor.onRequest(req)
