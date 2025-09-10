@@ -13,14 +13,14 @@ import (
 func assertHasHint(t *testing.T, err error, hint string) {
 	var typederr HasHint
 	require.ErrorAs(t, err, &typederr)
-	assert.Equal(t, typederr.Hint(), hint)
+	assert.Equal(t, hint, typederr.Hint())
 	assert.Contains(t, err.Error(), typederr.Error())
 }
 
 func assertHasExitCode(t *testing.T, err error, exitcode exitcodes.ExitCode) {
 	var typederr HasExitCode
 	require.ErrorAs(t, err, &typederr)
-	assert.Equal(t, typederr.ExitCode(), exitcode)
+	assert.Equal(t, exitcode, typederr.ExitCode())
 	assert.Contains(t, err.Error(), typederr.Error())
 }
 
@@ -52,7 +52,7 @@ func TestErrextHelpers(t *testing.T) {
 	assertHasHint(t, errBaseWithThreeHints, "best hint (better hint (test hint))")
 
 	finalErrorMess := fmt.Errorf("woot: %w", errBaseWithThreeHints)
-	assert.Equal(t, finalErrorMess.Error(), "woot: wrapper error: base error")
+	assert.Equal(t, "woot: wrapper error: base error", finalErrorMess.Error())
 	assertHasHint(t, finalErrorMess, "best hint (better hint (test hint))")
 	assertHasExitCode(t, finalErrorMess, testExitCode)
 }

@@ -185,12 +185,12 @@ func TestParseMetricName(t *testing.T) {
 			}
 
 			assert.Equal(t,
-				gotMetricName, tt.wantMetricName,
+				tt.wantMetricName, gotMetricName,
 				"ParseMetricName() gotMetricName = %v, want %v", gotMetricName, tt.wantMetricName,
 			)
 
 			assert.Equal(t,
-				gotTags, tt.wantTags,
+				tt.wantTags, gotTags,
 				"ParseMetricName() gotTags = %v, want %v", gotTags, tt.wantTags,
 			)
 		})

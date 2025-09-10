@@ -265,12 +265,11 @@ func TestStream_ReceiveAllServerResponsesAfterEnd(t *testing.T) {
 
 	assertResponse(t, vuString, err, val, ts)
 
-	assert.Equal(t, ts.callRecorder.Recorded(), []string{
+	assert.Equal(t, []string{
 		"Feature:foo",
 		"Feature:bar",
 		"End called",
-	},
-	)
+	}, ts.callRecorder.Recorded())
 }
 
 func TestStream_ReceiveAllServerResponsesAfterEndWithDiscardedMessages(t *testing.T) {
@@ -531,10 +530,7 @@ func TestStream_Wrappers(t *testing.T) {
 
 	assertResponse(t, vuString, err, val, ts)
 
-	assert.Equal(t, ts.callRecorder.Recorded(), []string{
-		"Result: Hey John",
-	},
-	)
+	assert.Equal(t, []string{"Result: Hey John"}, ts.callRecorder.Recorded())
 }
 
 func TestStream_UndefinedHandler(t *testing.T) {
@@ -660,6 +656,6 @@ func assertTags(t *testing.T, sample metrics.Sample, tags map[string]string) {
 	for k, v := range tags {
 		tag, ok := sample.Tags.Get(k)
 		assert.True(t, ok)
-		assert.Equal(t, tag, v)
+		assert.Equal(t, v, tag)
 	}
 }
