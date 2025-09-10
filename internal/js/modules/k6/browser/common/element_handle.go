@@ -1864,7 +1864,8 @@ func retryPointerAction(
 			}
 		}
 
-		if !errors.Is(err, ErrElementNotVisible) {
+		if !errors.Is(err, ErrElementNotVisible) &&
+			!errors.Is(err, ErrElementNotAttachedToDOM) {
 			return res, err
 		}
 
