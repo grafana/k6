@@ -271,7 +271,7 @@ func TestPathResolution(t *testing.T) {
 				require.Empty(t, logs)
 				return
 			}
-			require.Equal(t, len(logs), len(testCase.expectedLogs))
+			require.Equal(t, len(testCase.expectedLogs), len(logs))
 
 			for i, log := range logs {
 				require.Contains(t, log.Message, testCase.expectedLogs[i], "log line %d", i)
@@ -306,7 +306,7 @@ func TestPathResolution(t *testing.T) {
 				require.Empty(t, logs)
 				return
 			}
-			require.Equal(t, len(logs), len(testCase.expectedLogs))
+			require.Equal(t, len(testCase.expectedLogs), len(logs))
 
 			for i, log := range logs {
 				require.Contains(t, log.Message, testCase.expectedLogs[i], "log line %d", i)
@@ -533,7 +533,7 @@ func TestImportMetaResolve(t *testing.T) {
 				require.Empty(t, logs)
 				return
 			}
-			require.Equal(t, len(logs), len(testCase.expectedLogs))
+			require.Equal(t, len(testCase.expectedLogs), len(logs))
 
 			for i, log := range logs {
 				require.Contains(t, log.Message, testCase.expectedLogs[i], "log line %d", i)

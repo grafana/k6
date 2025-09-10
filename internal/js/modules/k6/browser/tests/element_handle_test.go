@@ -144,7 +144,7 @@ func TestElementHandleClick(t *testing.T) {
 
 	res, err := p.Evaluate(`() => window['result']`)
 	require.NoError(t, err)
-	assert.Equal(t, res, "Clicked")
+	assert.Equal(t, "Clicked", res)
 }
 
 func TestElementHandleClickWithNodeRemoved(t *testing.T) {
@@ -172,7 +172,7 @@ func TestElementHandleClickWithNodeRemoved(t *testing.T) {
 
 	res, err := p.Evaluate(`() => window['result']`)
 	require.NoError(t, err)
-	assert.Equal(t, res, "Clicked")
+	assert.Equal(t, "Clicked", res)
 }
 
 func TestElementHandleClickWithDetachedNode(t *testing.T) {
@@ -342,7 +342,7 @@ func TestElementHandleInputValue(t *testing.T) {
 	value, err := element.InputValue(common.NewElementHandleBaseOptions(element.Timeout()))
 	require.NoError(t, err)
 	require.NoError(t, element.Dispose())
-	assert.Equal(t, value, "hello1", `expected input value "hello1", got %q`, value)
+	assert.Equal(t, "hello1", value, `expected input value "hello1", got %q`, value)
 
 	element, err = p.Query("select")
 	require.NoError(t, err)
@@ -350,7 +350,7 @@ func TestElementHandleInputValue(t *testing.T) {
 	value, err = element.InputValue(common.NewElementHandleBaseOptions(element.Timeout()))
 	require.NoError(t, err)
 	require.NoError(t, element.Dispose())
-	assert.Equal(t, value, "hello2", `expected input value "hello2", got %q`, value)
+	assert.Equal(t, "hello2", value, `expected input value "hello2", got %q`, value)
 
 	element, err = p.Query("textarea")
 	require.NoError(t, err)
@@ -358,7 +358,7 @@ func TestElementHandleInputValue(t *testing.T) {
 	value, err = element.InputValue(common.NewElementHandleBaseOptions(element.Timeout()))
 	require.NoError(t, err)
 	require.NoError(t, element.Dispose())
-	assert.Equal(t, value, "hello3", `expected input value "hello3", got %q`, value)
+	assert.Equal(t, "hello3", value, `expected input value "hello3", got %q`, value)
 }
 
 func TestElementHandleIsChecked(t *testing.T) {

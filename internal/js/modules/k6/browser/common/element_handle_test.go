@@ -163,14 +163,14 @@ func TestQueryAll(t *testing.T) {
 			func(_ context.Context, opts evalOptions, jsFunc string, args ...any) (any, error) {
 				assert.Equal(t, js.QueryAll, jsFunc)
 
-				assert.Equal(t, opts.forceCallable, true)
-				assert.Equal(t, opts.returnByValue, false)
+				assert.Equal(t, true, opts.forceCallable)
+				assert.Equal(t, false, opts.returnByValue)
 
 				assert.NotEmpty(t, args)
 				assert.IsType(t, args[0], &Selector{})
 				sel, ok := args[0].(*Selector)
 				require.True(t, ok)
-				assert.Equal(t, sel.Selector, selector)
+				assert.Equal(t, selector, sel.Selector)
 
 				return nil, nil //nolint:nilnil
 			},

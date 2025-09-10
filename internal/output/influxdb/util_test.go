@@ -57,7 +57,7 @@ func TestFieldKinds(t *testing.T) {
 	fieldKinds, err = MakeFieldKinds(conf)
 	require.NoError(t, err)
 
-	require.Equal(t, fieldKinds["boolField"], Bool)
-	require.Equal(t, fieldKinds["floatField"], Float)
-	require.Equal(t, fieldKinds["intField"], Int)
+	require.Equal(t, Bool, fieldKinds["boolField"])
+	require.Equal(t, Float, fieldKinds["floatField"])
+	require.Equal(t, Int, fieldKinds["intField"])
 }
