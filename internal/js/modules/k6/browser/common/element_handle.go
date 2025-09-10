@@ -407,7 +407,7 @@ func (h *ElementHandle) offsetPosition(apiCtx context.Context, offset *Position)
 	}
 
 	if box == nil || (border.Left == 0 && border.Top == 0) {
-		return nil, errorFromDOMError("error:notvisible")
+		return nil, ErrElementNotVisible
 	}
 
 	// Make point relative to the padding box to align with offsetX/offsetY.
@@ -444,7 +444,7 @@ func (h *ElementHandle) scrollRectIntoViewIfNeeded(apiCtx context.Context, rect 
 	err := action.Do(cdp.WithExecutor(apiCtx, h.session))
 	if err != nil {
 		if strings.Contains(err.Error(), "Node does not have a layout object") {
-			return errorFromDOMError("error:notvisible")
+			return ErrElementNotVisible
 		}
 		if strings.Contains(err.Error(), "Node is detached from document") {
 			return errorFromDOMError("error:notconnected")
@@ -1858,8 +1858,7 @@ func retryPointerAction(
 			}
 		}
 
-		if !errors.Is(err, ErrElementNotVisible) &&
-			!strings.Contains(err.Error(), "error:notvisible") {
+		if !errors.Is(err, ErrElementNotVisible) {
 			return res, err
 		}
 
