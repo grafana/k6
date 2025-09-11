@@ -222,7 +222,7 @@ func withHTTPServer() func(*testBrowser) {
 
 // withIFrameContent sets up a handler for /iframe that serves a page embedding
 // an iframe with the given content.
-func withIFrameContent(iframeHTML string) func(*testBrowser) {
+func withIFrameContent(iframeHTML string, iframeID string) func(*testBrowser) {
 	return func(tb *testBrowser) {
 		if !tb.isBrowserTypeInitialized {
 			return
@@ -243,13 +243,13 @@ func withIFrameContent(iframeHTML string) func(*testBrowser) {
 			srv.Close()
 		})
 
-		tb.withIFrameURL(srv.URL)
+		tb.withIFrameURL(srv.URL, iframeID)
 	}
 }
 
 // withIFrameURL sets up a handler for /iframe that serves a page embedding
 // an iframe with the given URL.
-func (tb *testBrowser) withIFrameURL(iframeURL string) {
+func (tb *testBrowser) withIFrameURL(iframeURL string, iframeID string) {
 	tb.t.Helper()
 
 	if tb.http == nil {
@@ -260,9 +260,9 @@ func (tb *testBrowser) withIFrameURL(iframeURL string) {
 		<html>
 		<head></head>
 		<body>
-			<iframe id="frameB" src="%s"></iframe>
+			<iframe id="%s" src="%s"></iframe>
 		</body>
-		</html>`, iframeURL)
+		</html>`, iframeID, iframeURL)
 
 	tb.withHandler("/iframe", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")

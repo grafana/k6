@@ -795,6 +795,8 @@ func TestSelectOption(t *testing.T) {
 func TestCount(t *testing.T) {
 	t.Parallel()
 
+	iframeID := "frameB"
+
 	setupNonCORS := func(t *testing.T) (*testBrowser, *common.Page) {
 		t.Helper()
 
@@ -824,7 +826,7 @@ func TestCount(t *testing.T) {
 		</body>
 		</html>`
 
-		tb := newTestBrowser(t, withIFrameContent(iframeHTML))
+		tb := newTestBrowser(t, withIFrameContent(iframeHTML, iframeID))
 
 		p := tb.GotoNewPage(tb.url("/iframe"))
 
@@ -868,7 +870,7 @@ func TestCount(t *testing.T) {
 			name:  "CORS",
 			setup: setupCORS,
 			do: func(_ *testBrowser, p *common.Page) (int, error) {
-				frameBContent := p.Locator("#frameB", nil).ContentFrame()
+				frameBContent := p.Locator("#"+iframeID, nil).ContentFrame()
 				return frameBContent.Locator("#incrementB").Count()
 			},
 			expectedCount: 1,
@@ -1131,6 +1133,8 @@ func TestLocatorFilter(t *testing.T) {
 func TestVisibilityWithCORS(t *testing.T) {
 	t.Parallel()
 
+	iframeID := "frameB"
+
 	setupCORS := func(t *testing.T) (*testBrowser, *common.Page) {
 		t.Helper()
 
@@ -1143,7 +1147,7 @@ func TestVisibilityWithCORS(t *testing.T) {
 		</body>
 		</html>`
 
-		tb := newTestBrowser(t, withIFrameContent(iframeHTML))
+		tb := newTestBrowser(t, withIFrameContent(iframeHTML, iframeID))
 
 		p := tb.GotoNewPage(tb.url("/iframe"))
 
@@ -1158,7 +1162,7 @@ func TestVisibilityWithCORS(t *testing.T) {
 		{
 			name: "hidden",
 			do: func(_ *testBrowser, p *common.Page) (bool, error) {
-				frameBContent := p.Locator("#frameB", nil).ContentFrame()
+				frameBContent := p.Locator("#"+iframeID, nil).ContentFrame()
 				return frameBContent.Locator("#hiddenButton").IsHidden()
 			},
 			want: true,
@@ -1166,7 +1170,7 @@ func TestVisibilityWithCORS(t *testing.T) {
 		{
 			name: "visible",
 			do: func(_ *testBrowser, p *common.Page) (bool, error) {
-				frameBContent := p.Locator("#frameB", nil).ContentFrame()
+				frameBContent := p.Locator("#"+iframeID, nil).ContentFrame()
 				return frameBContent.Locator("#visibleButton").IsVisible()
 			},
 			want: true,

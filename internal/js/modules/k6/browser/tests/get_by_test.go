@@ -16,6 +16,7 @@ const (
 	locatorImpl      = "locator"
 	frameImpl        = "frame"
 	pageImpl         = "page"
+	iframeID         = "frameB"
 )
 
 func TestGetByRoleSuccess(t *testing.T) {
@@ -438,7 +439,7 @@ func TestGetByRoleSuccess(t *testing.T) {
 
 				tb := newTestBrowser(t, withFileServer())
 				staticURL := tb.staticURL("get_by_role_implicit.html")
-				tb.withIFrameURL(staticURL)
+				tb.withIFrameURL(staticURL, iframeID)
 				p := tb.NewPage(nil)
 
 				getByRoleImplementations := getByImplementationsOf[interface {
@@ -570,7 +571,7 @@ func TestGetByRoleSuccess(t *testing.T) {
 
 				tb := newTestBrowser(t, withFileServer())
 				staticURL := tb.staticURL("get_by_role_explicit.html")
-				tb.withIFrameURL(staticURL)
+				tb.withIFrameURL(staticURL, iframeID)
 				p := tb.NewPage(nil)
 
 				getByRoleImplementations := getByImplementationsOf[interface {
@@ -607,7 +608,7 @@ func TestGetByRoleSuccess(t *testing.T) {
 
 			tb := newTestBrowser(t, withFileServer())
 			staticURL := tb.staticURL("get_by_role_explicit.html")
-			tb.withIFrameURL(staticURL)
+			tb.withIFrameURL(staticURL, iframeID)
 			p := tb.NewPage(nil)
 
 			getByRoleImplementations := getByImplementationsOf[interface {
@@ -772,7 +773,7 @@ func TestGetByRoleSuccess(t *testing.T) {
 
 				tb := newTestBrowser(t, withFileServer())
 				staticURL := tb.staticURL("get_by_role_edge_cases.html")
-				tb.withIFrameURL(staticURL)
+				tb.withIFrameURL(staticURL, iframeID)
 				p := tb.NewPage(nil)
 
 				getByRoleImplementations := getByImplementationsOf[interface {
@@ -832,7 +833,7 @@ func TestGetByRoleFailure(t *testing.T) {
 
 			tb := newTestBrowser(t, withFileServer())
 			staticURL := tb.staticURL("get_by_role.html")
-			tb.withIFrameURL(staticURL)
+			tb.withIFrameURL(staticURL, iframeID)
 			p := tb.NewPage(nil)
 
 			getByRoleImplementations := getByImplementationsOf[interface {
@@ -909,7 +910,7 @@ func TestGetByAltTextSuccess(t *testing.T) {
 
 			tb := newTestBrowser(t, withFileServer())
 			staticURL := tb.staticURL("get_by_alt_text.html")
-			tb.withIFrameURL(staticURL)
+			tb.withIFrameURL(staticURL, iframeID)
 			p := tb.NewPage(nil)
 
 			getByAltTextImplementations := getByImplementationsOf[interface {
@@ -994,7 +995,7 @@ func TestGetByLabelSuccess(t *testing.T) {
 
 			tb := newTestBrowser(t, withFileServer())
 			staticURL := tb.staticURL("get_by_label.html")
-			tb.withIFrameURL(staticURL)
+			tb.withIFrameURL(staticURL, iframeID)
 			p := tb.NewPage(nil)
 
 			getByLabelImplementations := getByImplementationsOf[interface {
@@ -1090,7 +1091,7 @@ func TestGetByPlaceholderSuccess(t *testing.T) {
 
 			tb := newTestBrowser(t, withFileServer())
 			staticURL := tb.staticURL("get_by_placeholder.html")
-			tb.withIFrameURL(staticURL)
+			tb.withIFrameURL(staticURL, iframeID)
 			p := tb.NewPage(nil)
 
 			getByPlaceholderImplementations := getByImplementationsOf[interface {
@@ -1186,7 +1187,7 @@ func TestGetByTitleSuccess(t *testing.T) {
 
 			tb := newTestBrowser(t, withFileServer())
 			staticURL := tb.staticURL("get_by_title.html")
-			tb.withIFrameURL(staticURL)
+			tb.withIFrameURL(staticURL, iframeID)
 			p := tb.NewPage(nil)
 
 			getByTitleImplementations := getByImplementationsOf[interface {
@@ -1275,7 +1276,7 @@ func TestGetByTestIDSuccess(t *testing.T) {
 
 			tb := newTestBrowser(t, withFileServer())
 			staticURL := tb.staticURL("get_by_testid.html")
-			tb.withIFrameURL(staticURL)
+			tb.withIFrameURL(staticURL, iframeID)
 			p := tb.NewPage(nil)
 
 			getByTestIDImplementations := getByImplementationsOf[interface {
@@ -1393,7 +1394,7 @@ func TestGetByTextSuccess(t *testing.T) {
 
 			tb := newTestBrowser(t, withFileServer())
 			staticURL := tb.staticURL("get_by_text.html")
-			tb.withIFrameURL(staticURL)
+			tb.withIFrameURL(staticURL, iframeID)
 			p := tb.NewPage(nil)
 
 			getByTextImplementations := getByImplementationsOf[interface {
@@ -1437,8 +1438,8 @@ func TestGetByNullHandling(t *testing.T) {
 		page = await browser.newPage();
 		frame = page.mainFrame();
 		locator = page.locator(':root');
-		frameLocator = page.locator('#frameB').contentFrame();
-	`)
+		frameLocator = page.locator('#%s').contentFrame();
+	`, iframeID)
 	require.NoError(t, err)
 
 	for _, getByImpl := range []string{pageImpl, frameImpl, locatorImpl, frameLocatorImpl} {
@@ -1484,6 +1485,6 @@ func getByImplementationsOf[T any](p *common.Page) map[string]T {
 		pageImpl:         any(p).(T),
 		frameImpl:        any(p.MainFrame()).(T),
 		locatorImpl:      any(p.Locator(":root", nil)).(T),
-		frameLocatorImpl: any(p.Locator("#frameB", nil).ContentFrame()).(T),
+		frameLocatorImpl: any(p.Locator("#"+iframeID, nil).ContentFrame()).(T),
 	}
 }
