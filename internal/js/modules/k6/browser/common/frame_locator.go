@@ -27,8 +27,8 @@ func NewFrameLocator(ctx context.Context, selector string, f *Frame, l *log.Logg
 }
 
 // Locator creates and returns a new locator chained/relative to the current FrameLocator.
-func (fl *FrameLocator) Locator(selector string) *Locator {
+func (fl *FrameLocator) Locator(selector string, opts *LocatorOptions) *Locator {
 	// Add frame navigation marker to indicate we need to enter the frame's contentDocument
 	frameNavSelector := fl.selector + " >> internal:control=enter-frame >> " + selector
-	return NewLocator(fl.ctx, nil, frameNavSelector, fl.frame, fl.log)
+	return NewLocator(fl.ctx, opts, frameNavSelector, fl.frame, fl.log)
 }
