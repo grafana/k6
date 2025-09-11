@@ -72,6 +72,11 @@ func (o *Output) Stop() error {
 func (o *Output) Start() error {
 	o.logger.Debug("Starting output...")
 
+	if !o.config.SingleCounterForRate.Bool {
+		o.logger.Warn("Exporting rate metrics as a pair of counters is deprecated" +
+			" and will be removed in future releases. Please migrate to the new format.")
+	}
+
 	exp, err := getExporter(o.config)
 	if err != nil {
 		return fmt.Errorf("failed to create OpenTelemetry exporter: %w", err)
@@ -174,23 +179,57 @@ func (o *Output) dispatch(entry metrics.Sample) error {
 
 		trend.Record(ctx, entry.Value, attributeSetOpt)
 	case metrics.Rate:
-		rate, err := o.metricsRegistry.getOrCreateCountersForRate(name)
+		var err error
+		if o.config.SingleCounterForRate.Bool {
+			err = o.singleCounterForRate(ctx, name, attributeSetOpt, entry)
+		} else {
+			// Deprecated path, remove on k6 1.4.0
+			err = o.pairOfCountersForRate(ctx, name, attributeSetOpt, entry)
+		}
 		if err != nil {
 			return err
 		}
-
-		var valueType string
-		if entry.Value != 0 {
-			valueType = "nonzero"
-		} else {
-			valueType = "zero"
-		}
-		valset := attribute.NewSet(attribute.String("condition", valueType))
-
-		rate.Add(ctx, 1, attributeSetOpt, otelMetric.WithAttributeSet(valset))
 	default:
 		return fmt.Errorf("metric %q has unsupported metric type", entry.Metric.Name)
 	}
+	return nil
+}
+
+func (o *Output) pairOfCountersForRate(
+	ctx context.Context,
+	metricName string,
+	attributeSetOpt otelMetric.MeasurementOption,
+	entry metrics.Sample,
+) error {
+	nonZero, total, err := o.metricsRegistry.getOrCreateCountersForRate(metricName)
+	if err != nil {
+		return fmt.Errorf("get or create counter for Rate metric %q: %w", metricName, err)
+	}
+	if entry.Value != 0 {
+		nonZero.Add(ctx, 1, attributeSetOpt)
+	}
+	total.Add(ctx, 1, attributeSetOpt)
+	return nil
+}
+
+func (o *Output) singleCounterForRate(
+	ctx context.Context,
+	metricName string,
+	attributeSetOpt otelMetric.MeasurementOption,
+	entry metrics.Sample,
+) error {
+	rate, err := o.metricsRegistry.getOrCreateCounterForRate(metricName)
+	if err != nil {
+		return fmt.Errorf("get or create counter for Rate metric %q: %w", metricName, err)
+	}
+	var valueType string
+	if entry.Value != 0 {
+		valueType = "nonzero"
+	} else {
+		valueType = "zero"
+	}
+	valset := attribute.NewSet(attribute.String("condition", valueType))
+	rate.Add(ctx, 1, attributeSetOpt, otelMetric.WithAttributeSet(valset))
 	return nil
 }
 
