@@ -9,13 +9,14 @@ import (
 
 // A Mode specifies the mode of the Summary,
 // which defines how the end-of-test summary will be rendered.
+// TODO(@joanlopez): remove ModeLegacy by k6 v2.0, once we completely drop the support for --summary-mode=legacy.
 type Mode int
 
 // Possible values for SummaryMode.
 const (
 	ModeCompact  = Mode(iota) // Compact mode that only displays the total results.
 	ModeFull                  // Extended mode that displays total and partial results.
-	ModeLegacy                // Legacy mode, used for backwards compatibility.
+	ModeLegacy                // Deprecated. Legacy mode, used for backwards compatibility.
 	ModeDisabled              // Disabled, formerly known as --no-summary.
 )
 
