@@ -26,6 +26,56 @@ func NewFrameLocator(ctx context.Context, selector string, f *Frame, l *log.Logg
 	}
 }
 
+// GetByAltText creates and returns a new locator for this frame locator
+// based on the alt attribute text.
+func (fl *FrameLocator) GetByAltText(alt string, opts *GetByBaseOptions) *Locator {
+	fl.log.Debugf("FrameLocator:GetByAltText", "selector: %q alt: %q opts:%+v", fl.selector, alt, opts)
+
+	return fl.Locator(fl.frame.buildAttributeSelector("alt", alt, opts))
+}
+
+// GetByLabel creates and returns a new locator for this frame locator based on the label text.
+func (fl *FrameLocator) GetByLabel(label string, opts *GetByBaseOptions) *Locator {
+	fl.log.Debugf("FrameLocator:GetByLabel", "selector: %q label: %q opts:%+v", fl.selector, label, opts)
+
+	return fl.Locator(fl.frame.buildLabelSelector(label, opts))
+}
+
+// GetByPlaceholder creates and returns a new locator for this frame locator based on the placeholder attribute.
+func (fl *FrameLocator) GetByPlaceholder(placeholder string, opts *GetByBaseOptions) *Locator {
+	fl.log.Debugf("FrameLocator:GetByPlaceholder", "selector: %q placeholder: %q opts:%+v", fl.selector, placeholder, opts)
+
+	return fl.Locator(fl.frame.buildAttributeSelector("placeholder", placeholder, opts))
+}
+
+// GetByRole creates and returns a new locator for this frame locator based on their ARIA role.
+func (fl *FrameLocator) GetByRole(role string, opts *GetByRoleOptions) *Locator {
+	fl.log.Debugf("FrameLocator:GetByRole", "selector: %q role: %q opts:%+v", fl.selector, role, opts)
+
+	return fl.Locator(fl.frame.buildRoleSelector(role, opts))
+}
+
+// GetByTestID creates and returns a new locator for this frame locator based on the data-testid attribute.
+func (fl *FrameLocator) GetByTestID(testID string) *Locator {
+	fl.log.Debugf("FrameLocator:GetByTestID", "selector: %q testID: %q", fl.selector, testID)
+
+	return fl.Locator(fl.frame.buildTestIDSelector(testID))
+}
+
+// GetByText creates and returns a new locator for this frame locator based on text content.
+func (fl *FrameLocator) GetByText(text string, opts *GetByBaseOptions) *Locator {
+	fl.log.Debugf("FrameLocator:GetByText", "selector: %q text: %q opts:%+v", fl.selector, text, opts)
+
+	return fl.Locator(fl.frame.buildTextSelector(text, opts))
+}
+
+// GetByTitle creates and returns a new locator for this frame locator based on the title attribute.
+func (fl *FrameLocator) GetByTitle(title string, opts *GetByBaseOptions) *Locator {
+	fl.log.Debugf("FrameLocator:GetByTitle", "selector: %q title: %q opts:%+v", fl.selector, title, opts)
+
+	return fl.Locator(fl.frame.buildAttributeSelector("title", title, opts))
+}
+
 // Locator creates and returns a new locator chained/relative to the current FrameLocator.
 func (fl *FrameLocator) Locator(selector string) *Locator {
 	// Add frame navigation marker to indicate we need to enter the frame's contentDocument
