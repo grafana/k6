@@ -338,9 +338,14 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"keyboard": mapKeyboard(vu, p.GetKeyboard()),
-		"locator": func(selector string, opts sobek.Value) *sobek.Object {
-			ml := mapLocator(vu, p.Locator(selector, parseLocatorOptions(rt, opts)))
-			return rt.ToValue(ml).ToObject(rt)
+		"locator": func(selector sobek.Value, opts sobek.Value) (*sobek.Object, error) {
+			s, err := validateRequiredString(selector, "selector")
+			if err != nil {
+				return nil, err
+			}
+
+			ml := mapLocator(vu, p.Locator(s, parseLocatorOptions(rt, opts)))
+			return rt.ToValue(ml).ToObject(rt), nil
 		},
 		"mainFrame": func() *sobek.Object {
 			mf := mapFrame(vu, p.MainFrame())
@@ -1043,4 +1048,27 @@ func waitForNavigationBodyImpl(vu moduleVU, target interface {
 		}
 		return mapResponse(vu, resp), nil
 	}), nil
+}
+
+func validateRequiredString(v sobek.Value, name string) (string, error) {
+	var s string
+
+	if k6common.IsNullish(v) {
+		return s, errors.New("missing required argument '" + name + "'")
+	}
+
+	const stringType = string("")
+
+	switch v.ExportType() {
+	case reflect.TypeOf(stringType):
+		s = v.String()
+	default:
+		return s, errors.New("'" + name + "' must be a string")
+	}
+
+	if s == "" {
+		return s, errors.New("'" + name + "' must be a non-empty string")
+	}
+
+	return s, nil
 }

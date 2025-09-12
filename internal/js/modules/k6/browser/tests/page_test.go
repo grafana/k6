@@ -3436,3 +3436,57 @@ func TestClickInNestedFramesCORS(t *testing.T) {
 		assert.Equal(t, expectedCount, countD)
 	})
 }
+
+func TestPageLocatorEmpty(t *testing.T) {
+	t.Parallel()
+
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipped due to https://github.com/grafana/k6/issues/4937")
+	}
+
+	tests := []struct {
+		name     string
+		code     string
+		expected string
+	}{
+		{
+			name:     "undefined",
+			code:     "undefined",
+			expected: "missing required argument 'selector'",
+		},
+		{
+			name:     "null",
+			code:     "null",
+			expected: "missing required argument 'selector'",
+		},
+		{
+			name:     "empty",
+			code:     "",
+			expected: "missing required argument 'selector'",
+		},
+		{
+			name:     "empty_string",
+			code:     "''",
+			expected: "'selector' must be a non-empty string",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Setup
+			tb := newTestBrowser(t, withFileServer())
+			tb.vu.ActivateVU()
+			tb.vu.StartIteration(t)
+
+			// test logic
+			code := fmt.Sprintf(`
+				page = await browser.newPage();
+				page.locator(%s);`, tt.code)
+
+			_, err := tb.vu.RunAsync(t, code)
+			require.ErrorContains(t, err, tt.expected)
+		})
+	}
+}
