@@ -31,7 +31,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: 1.x
       - name: Install Go tip

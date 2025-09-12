@@ -21,7 +21,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
       - name: Install Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: 1.25.x
           check-latest: true

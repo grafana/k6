@@ -108,7 +108,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Install Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: ${{ needs.configure.outputs.go_version }}
           check-latest: true
