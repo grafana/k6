@@ -87,8 +87,8 @@ func newRootWithLauncher(gs *state.GlobalState, l *launcher) *rootCommand {
 
 	subCommands := []func(*state.GlobalState) *cobra.Command{
 		getCmdArchive, getCmdCloud, getCmdNewScript, getCmdInspect,
-		getCmdLogin, getCmdPause, getCmdResume, getCmdScale, getCmdRun,
-		getCmdStats, getCmdStatus, getCmdVersion,
+		getCmdPause, getCmdResume, getCmdScale, getCmdRun, getCmdStats,
+		getCmdStatus, getCmdVersion,
 	}
 
 	for _, sc := range subCommands {
