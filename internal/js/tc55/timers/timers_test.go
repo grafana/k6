@@ -2,6 +2,7 @@ package timers_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -156,14 +157,14 @@ func TestSetTimeoutContextCancel(t *testing.T) {
 	}))
 
 	for range 2000 {
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancelCause(context.Background())
 		runtime.CancelContext = cancel
 		runtime.VU.CtxField = ctx //nolint:fatcontext
 		runtime.VU.RuntimeField.ClearInterrupt()
 		const interruptMsg = "definitely an interrupt"
 		sync := make(chan struct{})
 		defer func() {
-			cancel()
+			cancel(errors.New("deferred context cancellation"))
 			<-sync
 		}()
 		go func() {
@@ -175,7 +176,7 @@ func TestSetTimeoutContextCancel(t *testing.T) {
 			}
 
 			time.Sleep(time.Millisecond)
-			runtime.CancelContext()
+			runtime.CancelContext(errors.New("context cancelled after 1ms sleep"))
 			runtime.VU.RuntimeField.Interrupt(interruptMsg)
 		}()
 		_, err := runtime.RunOnEventLoop(`
