@@ -221,8 +221,10 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		}
 
 		switch summaryMode {
-		// TODO: Remove this code block once we stop supporting the legacy summary, and just leave the default.
+		// TODO(@joanlopez): remove by k6 v2.0, once we completely drop the support for --summary-mode=legacy.
 		case summary.ModeLegacy:
+			logger.Warn(`The "legacy" summary mode has been deprecated, and will be removed by k6 v2.0. ` +
+				`Please, migrate to either "compact" or "full" as soon as possible.`)
 			// At the end of the test run
 			defer func() {
 				logger.Debug("Generating the end-of-test summary...")
