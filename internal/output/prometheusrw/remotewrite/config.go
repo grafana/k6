@@ -6,15 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
-	"go.k6.io/k6/internal/output/prometheusrw/sigv4"
-
+	"github.com/mstoykov/envconfig"
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/internal/output/prometheusrw/remote"
+	"go.k6.io/k6/internal/output/prometheusrw/sigv4"
 	"go.k6.io/k6/lib/types"
 )
 
@@ -31,56 +30,56 @@ var defaultTrendStats = []string{"p(99)"}
 // Config contains the configuration for the Output.
 type Config struct {
 	// ServerURL contains the absolute ServerURL for the Write endpoint where to flush the time series.
-	ServerURL null.String `json:"url"`
+	ServerURL null.String `json:"url" envconfig:"SERVER_URL"`
 
 	// Headers contains additional headers that should be included in the HTTP requests.
 	Headers map[string]string `json:"headers"`
 
 	// InsecureSkipTLSVerify skips TLS client side checks.
-	InsecureSkipTLSVerify null.Bool `json:"insecureSkipTLSVerify"`
+	InsecureSkipTLSVerify null.Bool `json:"insecureSkipTLSVerify" envconfig:"INSECURE_SKIP_TLS_VERIFY"`
 
 	// Username is the User for Basic Auth.
-	Username null.String `json:"username"`
+	Username null.String `json:"username" envconfig:"USERNAME"`
 
 	// Password is the Password for the Basic Auth.
-	Password null.String `json:"password"`
+	Password null.String `json:"password" envconfig:"PASSWORD"`
 
 	// ClientCertificate is the public key of the SSL certificate.
 	// It is expected the path of the certificate on the file system.
 	// If it is required a dedicated Certifacate Authority then it should be added
 	// to the conventional folders defined by the operating system's registry.
-	ClientCertificate null.String `json:"clientCertificate"`
+	ClientCertificate null.String `json:"clientCertificate" envconfig:"CLIENT_CERTIFICATE"`
 
 	// ClientCertificateKey is the private key of the SSL certificate.
 	// It is expected the path of the certificate on the file system.
-	ClientCertificateKey null.String `json:"clientCertificateKey"`
+	ClientCertificateKey null.String `json:"clientCertificateKey" envconfig:"CLIENT_CERTIFICATE_KEY"`
 
 	// BearerToken if set is the token used for the `Authorization` header.
-	BearerToken null.String `json:"bearerToken"`
+	BearerToken null.String `json:"bearerToken" envconfig:"BEARER_TOKEN"`
 
 	// PushInterval defines the time between flushes. The Output will wait the set time
 	// before push a new set of time series to the endpoint.
-	PushInterval types.NullDuration `json:"pushInterval"`
+	PushInterval types.NullDuration `json:"pushInterval" envconfig:"PUSH_INTERVAL"`
 
 	// TrendAsNativeHistogram defines if the mapping for metrics defined as Trend type
 	// should map to a Prometheus' Native Histogram.
-	TrendAsNativeHistogram null.Bool `json:"trendAsNativeHistogram"`
+	TrendAsNativeHistogram null.Bool `json:"trendAsNativeHistogram" envconfig:"TREND_AS_NATIVE_HISTOGRAM"`
 
 	// TrendStats defines the stats to flush for Trend metrics.
 	//
 	// TODO: should we support K6_SUMMARY_TREND_STATS?
-	TrendStats []string `json:"trendStats"`
+	TrendStats []string `json:"trendStats" envconfig:"K6_PROMETHEUS_RW_TREND_STATS"`
 
-	StaleMarkers null.Bool `json:"staleMarkers"`
+	StaleMarkers null.Bool `json:"staleMarkers" envconfig:"STALE_MARKERS"`
 
 	// SigV4Region is the AWS region where the workspace is.
-	SigV4Region null.String `json:"sigV4Region"`
+	SigV4Region null.String `json:"sigV4Region" envconfig:"SIGV4_REGION"`
 
 	// SigV4AccessKey is the AWS access key.
-	SigV4AccessKey null.String `json:"sigV4AccessKey"`
+	SigV4AccessKey null.String `json:"sigV4AccessKey" envconfig:"SIGV4_ACCESS_KEY"`
 
 	// SigV4SecretKey is the AWS secret key.
-	SigV4SecretKey null.String `json:"sigV4SecretKey"`
+	SigV4SecretKey null.String `json:"sigV4SecretKey" envconfig:"SIGV4_SECRET_KEY"`
 }
 
 // NewConfig creates an Output's configuration.
@@ -265,18 +264,6 @@ func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, _
 	return result, nil
 }
 
-func envBool(env map[string]string, name string) (null.Bool, error) {
-	if v, vDefined := env[name]; vDefined {
-		b, err := strconv.ParseBool(v)
-		if err != nil {
-			return null.NewBool(false, false), err
-		}
-
-		return null.BoolFrom(b), nil
-	}
-	return null.NewBool(false, false), nil
-}
-
 func envMap(env map[string]string, prefix string) map[string]string {
 	result := make(map[string]string)
 	for ek, ev := range env {
@@ -288,48 +275,21 @@ func envMap(env map[string]string, prefix string) map[string]string {
 	return result
 }
 
-// TODO: try to migrate to github.com/mstoykov/envconfig like it's done on other projects?
 func parseEnvs(env map[string]string) (Config, error) { //nolint:funlen
 	c := Config{
 		Headers: make(map[string]string),
 	}
 
-	if pushInterval, pushIntervalDefined := env["K6_PROMETHEUS_RW_PUSH_INTERVAL"]; pushIntervalDefined {
-		if err := c.PushInterval.UnmarshalText([]byte(pushInterval)); err != nil {
-			return c, err
-		}
+	err := envconfig.Process("K6_PROMETHEUS_RW", &c, func(key string) (string, bool) {
+		v, ok := env[key]
+		return v, ok
+	})
+	if err != nil {
+		return Config{}, err
 	}
 
-	if url, urlDefined := env["K6_PROMETHEUS_RW_SERVER_URL"]; urlDefined {
-		c.ServerURL = null.StringFrom(url)
-	}
-
-	if b, err := envBool(env, "K6_PROMETHEUS_RW_INSECURE_SKIP_TLS_VERIFY"); err != nil {
-		return c, err
-	} else if b.Valid {
-		c.InsecureSkipTLSVerify = b
-	}
-
-	if user, userDefined := env["K6_PROMETHEUS_RW_USERNAME"]; userDefined {
-		c.Username = null.StringFrom(user)
-	}
-
-	if password, passwordDefined := env["K6_PROMETHEUS_RW_PASSWORD"]; passwordDefined {
-		c.Password = null.StringFrom(password)
-	}
-
-	if clientCertificate, certDefined := env["K6_PROMETHEUS_RW_CLIENT_CERTIFICATE"]; certDefined {
-		c.ClientCertificate = null.StringFrom(clientCertificate)
-	}
-
-	if clientCertificateKey, certDefined := env["K6_PROMETHEUS_RW_CLIENT_CERTIFICATE_KEY"]; certDefined {
-		c.ClientCertificateKey = null.StringFrom(clientCertificateKey)
-	}
-
-	if token, tokenDefined := env["K6_PROMETHEUS_RW_BEARER_TOKEN"]; tokenDefined {
-		c.BearerToken = null.StringFrom(token)
-	}
-
+	// We don't rely on `envconfig` for headers, as we do use our own logic/syntax with
+	// dynamically-defined header-associated environment variables.
 	envHeaders := envMap(env, "K6_PROMETHEUS_RW_HEADERS_")
 	for k, v := range envHeaders {
 		c.Headers[k] = v
@@ -343,34 +303,6 @@ func parseEnvs(env map[string]string) (Config, error) { //nolint:funlen
 			}
 			c.Headers[header[0]] = header[1]
 		}
-	}
-
-	if sigV4Region, sigV4RegionDefined := env["K6_PROMETHEUS_RW_SIGV4_REGION"]; sigV4RegionDefined {
-		c.SigV4Region = null.StringFrom(sigV4Region)
-	}
-
-	if sigV4AccessKey, sigV4AccessKeyDefined := env["K6_PROMETHEUS_RW_SIGV4_ACCESS_KEY"]; sigV4AccessKeyDefined {
-		c.SigV4AccessKey = null.StringFrom(sigV4AccessKey)
-	}
-
-	if sigV4SecretKey, sigV4SecretKeyDefined := env["K6_PROMETHEUS_RW_SIGV4_SECRET_KEY"]; sigV4SecretKeyDefined {
-		c.SigV4SecretKey = null.StringFrom(sigV4SecretKey)
-	}
-
-	if b, err := envBool(env, "K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM"); err != nil {
-		return c, err
-	} else if b.Valid {
-		c.TrendAsNativeHistogram = b
-	}
-
-	if b, err := envBool(env, "K6_PROMETHEUS_RW_STALE_MARKERS"); err != nil {
-		return c, err
-	} else if b.Valid {
-		c.StaleMarkers = b
-	}
-
-	if trendStats, trendStatsDefined := env["K6_PROMETHEUS_RW_TREND_STATS"]; trendStatsDefined {
-		c.TrendStats = strings.Split(trendStats, ",")
 	}
 
 	return c, nil
