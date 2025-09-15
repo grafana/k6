@@ -275,7 +275,7 @@ func envMap(env map[string]string, prefix string) map[string]string {
 	return result
 }
 
-func parseEnvs(env map[string]string) (Config, error) { //nolint:funlen
+func parseEnvs(env map[string]string) (Config, error) {
 	c := Config{
 		Headers: make(map[string]string),
 	}
