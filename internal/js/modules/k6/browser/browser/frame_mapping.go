@@ -87,16 +87,20 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			if sobekEmptyString(pageFunc) {
 				return nil, fmt.Errorf("evaluate requires a page function")
 			}
+			funcString := pageFunc.String()
+			gopts := exportArgs(gargs)
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return f.Evaluate(pageFunc.String(), exportArgs(gargs)...)
+				return f.Evaluate(funcString, gopts...)
 			}), nil
 		},
 		"evaluateHandle": func(pageFunc sobek.Value, gargs ...sobek.Value) (*sobek.Promise, error) {
 			if sobekEmptyString(pageFunc) {
 				return nil, fmt.Errorf("evaluateHandle requires a page function")
 			}
+			funcString := pageFunc.String()
+			gopts := exportArgs(gargs)
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				jsh, err := f.EvaluateHandle(pageFunc.String(), exportArgs(gargs)...)
+				jsh, err := f.EvaluateHandle(funcString, gopts...)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
 				}
