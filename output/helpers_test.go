@@ -37,16 +37,16 @@ func TestSampleBufferBasics(t *testing.T) {
 	assert.Empty(t, buffer.GetBufferedSamples())
 
 	// Verify some internals
-	assert.Equal(t, cap(buffer.buffer), 5)
+	assert.Equal(t, 5, cap(buffer.buffer))
 	buffer.AddMetricSamples([]metrics.SampleContainer{single, connected})
 	buffer.AddMetricSamples(nil)
 	buffer.AddMetricSamples([]metrics.SampleContainer{})
 	buffer.AddMetricSamples([]metrics.SampleContainer{single})
 	assert.Equal(t, []metrics.SampleContainer{single, connected, single}, buffer.GetBufferedSamples())
-	assert.Equal(t, cap(buffer.buffer), 4)
+	assert.Equal(t, 4, cap(buffer.buffer))
 	buffer.AddMetricSamples([]metrics.SampleContainer{single})
 	assert.Equal(t, []metrics.SampleContainer{single}, buffer.GetBufferedSamples())
-	assert.Equal(t, cap(buffer.buffer), 3)
+	assert.Equal(t, 3, cap(buffer.buffer))
 	assert.Empty(t, buffer.GetBufferedSamples())
 }
 

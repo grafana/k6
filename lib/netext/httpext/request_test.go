@@ -68,14 +68,14 @@ func TestCompressionBodyError(t *testing.T) {
 		t.Parallel()
 		_, _, err := compressBody(algos, io.NopCloser(badReadBody()))
 		require.Error(t, err)
-		require.Equal(t, err.Error(), badReadMsg)
+		require.EqualError(t, err, badReadMsg)
 	})
 
 	t.Run("bad close body", func(t *testing.T) {
 		t.Parallel()
 		_, _, err := compressBody(algos, badCloseBody())
 		require.Error(t, err)
-		require.Equal(t, err.Error(), badCloseMsg)
+		require.EqualError(t, err, badCloseMsg)
 	})
 }
 
@@ -103,7 +103,7 @@ func TestMakeRequestError(t *testing.T) {
 		}
 		_, err = MakeRequest(ctx, state, preq)
 		require.Error(t, err)
-		require.Equal(t, err.Error(), "unknown compressionType CompressionType(13)")
+		require.EqualError(t, err, "unknown compressionType CompressionType(13)")
 	})
 
 	t.Run("invalid upgrade response", func(t *testing.T) {

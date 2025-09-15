@@ -269,7 +269,7 @@ func TestRequest(t *testing.T) {
 
 		t.Run("post body", func(t *testing.T) {
 			tb.Mux.HandleFunc("/post-redirect", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				require.Equal(t, r.Method, "POST")
+				require.Equal(t, http.MethodPost, r.Method)
 				_, _ = io.Copy(io.Discard, r.Body)
 				http.Redirect(w, r, sr("HTTPBIN_URL/post"), http.StatusPermanentRedirect)
 			}))
@@ -1410,7 +1410,7 @@ func TestRequestCompression(t *testing.T) {
 		algos := strings.Split(actualEncoding, ", ")
 		compressedBuf := new(bytes.Buffer)
 		n, err := io.Copy(compressedBuf, r.Body)
-		require.Equal(t, int(n), expectedLength)
+		require.Equal(t, expectedLength, int(n))
 		require.NoError(t, err)
 		var prev io.Reader = compressedBuf
 
@@ -1784,7 +1784,7 @@ func TestErrorCodes(t *testing.T) {
 				require.NoError(t, err)
 			} else {
 				require.Error(t, err)
-				require.Equal(t, err.Error(), testCase.expectedScriptError)
+				require.EqualError(t, err, testCase.expectedScriptError)
 			}
 			cs := metrics.GetBufferedSamples(samples)
 			assert.Len(t, cs, 1+testCase.moreSamples)
@@ -2217,13 +2217,13 @@ func TestDigestAuthWithBody(t *testing.T) {
 	state.Options.Throw = null.BoolFrom(true)
 	state.Options.HTTPDebug = null.StringFrom("full")
 
-	tb.Mux.HandleFunc("/digest-auth-with-post/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, "POST", r.Method)
+	tb.Mux.HandleFunc("/digest-auth-with-post/", func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodPost, r.Method)
 		body, err := io.ReadAll(r.Body)
 		require.NoError(t, err)
 		require.Equal(t, "super secret body", string(body))
 		httpbin.New().DigestAuth(w, r) // this doesn't read the body
-	}))
+	})
 
 	urlWithCreds := tb.Replacer.Replace(
 		"http://testuser:testpwd@HTTPBIN_IP:HTTPBIN_PORT/digest-auth-with-post/auth/testuser/testpwd",

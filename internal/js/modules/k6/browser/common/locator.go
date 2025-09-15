@@ -105,6 +105,7 @@ func (l *Locator) Click(opts *FrameClickOptions) error {
 // error, or applies slow motion.
 func (l *Locator) click(opts *FrameClickOptions) error {
 	opts.Strict = true
+	opts.retry = true
 	return l.frame.click(l.selector, opts)
 }
 
@@ -159,6 +160,7 @@ func (l *Locator) Dblclick(opts sobek.Value) error {
 // error, or applies slow motion.
 func (l *Locator) dblclick(opts *FrameDblclickOptions) error {
 	opts.Strict = true
+	opts.retry = true
 	return l.frame.dblclick(l.selector, opts)
 }
 
@@ -185,6 +187,7 @@ func (l *Locator) SetChecked(checked bool, opts sobek.Value) error {
 
 func (l *Locator) setChecked(checked bool, opts *FrameCheckOptions) error {
 	opts.Strict = true
+	opts.retry = true
 	return l.frame.setChecked(l.selector, checked, opts)
 }
 
@@ -209,6 +212,7 @@ func (l *Locator) Check(opts sobek.Value) error {
 // error, or applies slow motion.
 func (l *Locator) check(opts *FrameCheckOptions) error {
 	opts.Strict = true
+	opts.retry = true
 	return l.frame.check(l.selector, opts)
 }
 
@@ -233,6 +237,7 @@ func (l *Locator) Uncheck(opts sobek.Value) error {
 // an error, or applies slow motion.
 func (l *Locator) uncheck(opts *FrameUncheckOptions) error {
 	opts.Strict = true
+	opts.retry = true
 	return l.frame.uncheck(l.selector, opts)
 }
 
@@ -732,6 +737,7 @@ func (l *Locator) Hover(opts sobek.Value) error {
 
 func (l *Locator) hover(opts *FrameHoverOptions) error {
 	opts.Strict = true
+	opts.retry = true
 	return l.frame.hover(l.selector, opts)
 }
 
@@ -740,6 +746,7 @@ func (l *Locator) Tap(opts *FrameTapOptions) error {
 	l.log.Debugf("Locator:Tap", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
 	opts.Strict = true
+	opts.retry = true
 	if err := l.frame.tap(l.selector, opts); err != nil {
 		return fmt.Errorf("tapping on %q: %w", l.selector, err)
 	}

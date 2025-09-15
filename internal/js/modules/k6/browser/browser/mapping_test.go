@@ -500,6 +500,13 @@ type elementHandleAPI interface { //nolint:interfacebloat
 }
 
 type frameLocatorAPI interface {
+	GetByAltText(alt string, opts *common.GetByBaseOptions) *common.Locator
+	GetByLabel(label string, opts *common.GetByBaseOptions) *common.Locator
+	GetByPlaceholder(placeholder string, opts *common.GetByBaseOptions) *common.Locator
+	GetByRole(role string, opts *common.GetByRoleOptions) *common.Locator
+	GetByTestId(testID string) *common.Locator
+	GetByText(text string, opts *common.GetByBaseOptions) *common.Locator
+	GetByTitle(title string, opts *common.GetByBaseOptions) *common.Locator
 	Locator(selector string) *common.Locator
 }
 

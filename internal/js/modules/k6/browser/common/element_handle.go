@@ -24,6 +24,8 @@ import (
 var (
 	// ErrElementNotVisible is returned when an element is not visible for an operation.
 	ErrElementNotVisible = errors.New("element is not visible")
+	// ErrElementNotAttachedToDOM is returned when an element is not attached to the DOM.
+	ErrElementNotAttachedToDOM = errors.New("element is not attached to the DOM")
 )
 
 const (
@@ -64,6 +66,10 @@ func (h *ElementHandle) boundingBox() (*Rect, error) {
 	action := dom.GetBoxModel().WithObjectID(h.remoteObject.ObjectID)
 	if box, err = action.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
 		return nil, fmt.Errorf("getting bounding box model of DOM node: %w", err)
+	}
+
+	if box == nil || box.Border == nil {
+		return nil, ErrElementNotAttachedToDOM
 	}
 
 	quad := box.Border
@@ -407,7 +413,7 @@ func (h *ElementHandle) offsetPosition(apiCtx context.Context, offset *Position)
 	}
 
 	if box == nil || (border.Left == 0 && border.Top == 0) {
-		return nil, errorFromDOMError("error:notvisible")
+		return nil, ErrElementNotVisible
 	}
 
 	// Make point relative to the padding box to align with offsetX/offsetY.
@@ -444,10 +450,10 @@ func (h *ElementHandle) scrollRectIntoViewIfNeeded(apiCtx context.Context, rect 
 	err := action.Do(cdp.WithExecutor(apiCtx, h.session))
 	if err != nil {
 		if strings.Contains(err.Error(), "Node does not have a layout object") {
-			return errorFromDOMError("error:notvisible")
+			return ErrElementNotVisible
 		}
 		if strings.Contains(err.Error(), "Node is detached from document") {
-			return errorFromDOMError("error:notconnected")
+			return ErrElementNotAttachedToDOM
 		}
 		return err
 	}
@@ -1858,8 +1864,13 @@ func retryPointerAction(
 			}
 		}
 
+		// Only locator based APIs should retry.
+		if !opts.retry {
+			return res, err
+		}
+
 		if !errors.Is(err, ErrElementNotVisible) &&
-			!strings.Contains(err.Error(), "error:notvisible") {
+			!errors.Is(err, ErrElementNotAttachedToDOM) {
 			return res, err
 		}
 
@@ -1901,8 +1912,12 @@ func errorFromDOMError(v any) error {
 	if s := "error:expectednode:"; strings.HasPrefix(serr, s) {
 		return fmt.Errorf("expected node but got %s", strings.TrimPrefix(serr, s))
 	}
+
+	if serr == "error:notconnected" {
+		return ErrElementNotAttachedToDOM
+	}
+
 	errs := map[string]string{
-		"error:notconnected":           "element is not attached to the DOM",
 		"error:notelement":             "node is not an element",
 		"error:nothtmlelement":         "not an HTMLElement",
 		"error:notfillableelement":     "element is not an <input>, <textarea> or [contenteditable] element",
