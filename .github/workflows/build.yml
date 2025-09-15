@@ -273,7 +273,7 @@ jobs:
       windows_binary_artifact_name: ${{ steps.assign-artifact-names.outputs.windows-binary-artifact-name }}
     steps:
       - name: Download binaries
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: binaries
           path: dist
@@ -314,7 +314,7 @@ jobs:
           signed-artifact-name: 'windows-binary-signed'
 
       - name: Download signed Windows binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         if: needs.configure.outputs.sign_windows_artifacts == 'true'
         with:
           name: ${{ steps.sign-artifacts.outputs.artifact-name }}
@@ -418,7 +418,7 @@ jobs:
     needs: [configure, package]
     steps:
       - name: Download Windows artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         if: needs.configure.outputs.sign_windows_artifacts == 'true'
         with:
           name: binaries-windows
