@@ -2684,7 +2684,7 @@ func TestSummaryExport(t *testing.T) {
 		assert.Contains(t, stdout, "iterations...........: 1")
 
 		// As of now, "legacy" has been deprecated.
-		assert.Contains(t, ts.Stderr.String(), "The --summary-mode=legacy has been deprecated, and will be removed by k6 v2.0.")
+		assert.Contains(t, ts.Stderr.String(), `The \"legacy\" summary mode has been deprecated, and will be removed by k6 v2.0.`)
 
 		assertSummaryExport(t, ts.FS)
 	})
