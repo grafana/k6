@@ -62,7 +62,8 @@
 		{
 			"description": "Dockerfiles packaging",
 			"managers": ["docker"],
-			"matchPaths": ["packaging/**"]
+			"matchPaths": ["packaging/**"],
+			"schedule": ["quarterly"]
 		}
 	]
 }
