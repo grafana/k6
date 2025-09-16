@@ -70,7 +70,7 @@ type Config struct {
 	GRPCExporterInsecure null.Bool `json:"grpcExporterInsecure" envconfig:"K6_OTEL_GRPC_EXPORTER_INSECURE"`
 
 	// SingleCounterForRate sets the feature flag defining how to export metrics defined as Rate type.
-	// When it is sets to true, metrics are exported as a single counter.
+	// When it is set to true, metrics are exported as a single counter, using an attribute as discriminator.
 	// When the opposite, the old method is used generating two different counters.
 	SingleCounterForRate null.Bool `json:"singleCounterForRate" envconfig:"K6_OTEL_SINGLE_COUNTER_FOR_RATE"`
 }
