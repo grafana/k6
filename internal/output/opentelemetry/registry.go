@@ -81,7 +81,7 @@ func (r *registry) getOrCreateCounterForRate(name string) (otelMetric.Int64Count
 	// k6's rate metric tracks how frequently a non-zero value occurs.
 	// To be accurate is a percentage, which is a ratio.
 	// To correctly calculate this metric in a metrics backend,
-	// we need to split the rate metric via a dedicated label.
+	// we need to split the rate metric via a dedicated attribute.
 
 	totalName := name + ".total"
 
