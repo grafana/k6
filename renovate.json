@@ -9,52 +9,48 @@
 			"managers": ["github-actions"]
 		},
 		{
-			"description": "Update Go versions only when a patch version exists (z > 0 in v1.x.z)",
+			"description": "Enable gomod updates with common options",
 			"managers": ["gomod"],
-			"matchPackageNames": ["go"],
-			"allowedVersions": "/^(?:v)?\\d+\\.\\d+\\.[1-9]\\d*$/",
+			"enabled": true,
 			"postUpdateOptions": ["gomodTidy", "gomodUpdateImportPaths"]
 		},
 		{
+			"description": "Update Go versions only when a patch version exists (z > 0 in v1.x.z)",
+			"managers": ["gomod"],
+			"matchPackageNames": ["go"],
+			"allowedVersions": "/^(?:v)?\\d+\\.\\d+\\.[1-9]\\d*$/"
+		},
+		{
 			"groupName": "golangx",
-			"description": "group golang.org/x packages",
+			"description": "Group golang.org/x modules",
 			"managers": ["gomod"],
 			"matchPackagePatterns": ["^golang\\.org/x/"]
 		},
 		{
 			"groupName": "googles",
-			"description": "Group google.golang.org packages",
+			"description": "Group google.golang.org modules",
 			"managers": ["gomod"],
 			"matchPackagePatterns": ["^google\\.golang\\.org/"]
 		},
 		{
 			"groupName": "otel",
-			"description": "Group OpenTelemetry packages",
+			"description": "Group OpenTelemetry modules",
 			"managers": ["gomod"],
 			"matchPackagePatterns": ["^go\\.opentelemetry\\.io/"]
 		},
 		{
-			"description": "xk6 experimental modules",
+			"description": "Disable list for frozen Go modules - see Dependencies.md and modtools_frozen.yml",
 			"managers": ["gomod"],
-			"matchPackagePatterns": ["^github\\.com/grafana/xk6-"]
-		},
-		{
-			"description": "Allowlist for specific Go dependencies",
-			"managers": ["gomod"],
+			"enabled": false,
 			"matchPackageNames": [
-				"github.com/PuerkitoBio/goquery",
-				"github.com/andybalholm/brotli",
-				"github.com/evanw/esbuild",
-				"github.com/gorilla/websocket",
-				"github.com/grafana/sobek",
-				"github.com/jhump/protoreflect",
-				"github.com/klauspost/compress",
-				"github.com/tidwall/gjson",
-				"github.com/chromedp/cdproto",
-				"github.com/mailru/easyjson",
-				"github.com/mattn/go-colorable",
-				"github.com/mstoykov/k6-taskqueue-lib",
-				"github.com/stretchr/testify"
+				"github.com/andybalholm/cascadia",
+				"github.com/sirupsen/logrus",
+				"github.com/spf13/afero",
+				"github.com/spf13/cobra",
+				"github.com/spf13/pflag",
+				"github.com/influxdata/influxdb1-client",
+				"gopkg.in/guregu/null.v3",
+				"gopkg.in/yaml.v3"
 			]
 		},
 		{
