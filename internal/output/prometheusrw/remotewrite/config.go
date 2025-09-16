@@ -30,56 +30,56 @@ var defaultTrendStats = []string{"p(99)"}
 // Config contains the configuration for the Output.
 type Config struct {
 	// ServerURL contains the absolute ServerURL for the Write endpoint where to flush the time series.
-	ServerURL null.String `json:"url" envconfig:"SERVER_URL"`
+	ServerURL null.String `json:"url" envconfig:"K6_PROMETHEUS_RW_SERVER_URL"`
 
 	// Headers contains additional headers that should be included in the HTTP requests.
 	Headers map[string]string `json:"headers"`
 
 	// InsecureSkipTLSVerify skips TLS client side checks.
-	InsecureSkipTLSVerify null.Bool `json:"insecureSkipTLSVerify" envconfig:"INSECURE_SKIP_TLS_VERIFY"`
+	InsecureSkipTLSVerify null.Bool `json:"insecureSkipTLSVerify" envconfig:"K6_PROMETHEUS_RW_INSECURE_SKIP_TLS_VERIFY"`
 
 	// Username is the User for Basic Auth.
-	Username null.String `json:"username" envconfig:"USERNAME"`
+	Username null.String `json:"username" envconfig:"K6_PROMETHEUS_RW_USERNAME"`
 
 	// Password is the Password for the Basic Auth.
-	Password null.String `json:"password" envconfig:"PASSWORD"`
+	Password null.String `json:"password" envconfig:"K6_PROMETHEUS_RW_PASSWORD"`
 
 	// ClientCertificate is the public key of the SSL certificate.
 	// It is expected the path of the certificate on the file system.
 	// If it is required a dedicated Certifacate Authority then it should be added
 	// to the conventional folders defined by the operating system's registry.
-	ClientCertificate null.String `json:"clientCertificate" envconfig:"CLIENT_CERTIFICATE"`
+	ClientCertificate null.String `json:"clientCertificate" envconfig:"K6_PROMETHEUS_RW_CLIENT_CERTIFICATE"`
 
 	// ClientCertificateKey is the private key of the SSL certificate.
 	// It is expected the path of the certificate on the file system.
-	ClientCertificateKey null.String `json:"clientCertificateKey" envconfig:"CLIENT_CERTIFICATE_KEY"`
+	ClientCertificateKey null.String `json:"clientCertificateKey" envconfig:"K6_PROMETHEUS_RW_CLIENT_CERTIFICATE_KEY"`
 
 	// BearerToken if set is the token used for the `Authorization` header.
-	BearerToken null.String `json:"bearerToken" envconfig:"BEARER_TOKEN"`
+	BearerToken null.String `json:"bearerToken" envconfig:"K6_PROMETHEUS_RW_BEARER_TOKEN"`
 
 	// PushInterval defines the time between flushes. The Output will wait the set time
 	// before push a new set of time series to the endpoint.
-	PushInterval types.NullDuration `json:"pushInterval" envconfig:"PUSH_INTERVAL"`
+	PushInterval types.NullDuration `json:"pushInterval" envconfig:"K6_PROMETHEUS_RW_PUSH_INTERVAL"`
 
 	// TrendAsNativeHistogram defines if the mapping for metrics defined as Trend type
 	// should map to a Prometheus' Native Histogram.
-	TrendAsNativeHistogram null.Bool `json:"trendAsNativeHistogram" envconfig:"TREND_AS_NATIVE_HISTOGRAM"`
+	TrendAsNativeHistogram null.Bool `json:"trendAsNativeHistogram" envconfig:"K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM"`
 
 	// TrendStats defines the stats to flush for Trend metrics.
 	//
 	// TODO: should we support K6_SUMMARY_TREND_STATS?
 	TrendStats []string `json:"trendStats" envconfig:"K6_PROMETHEUS_RW_TREND_STATS"`
 
-	StaleMarkers null.Bool `json:"staleMarkers" envconfig:"STALE_MARKERS"`
+	StaleMarkers null.Bool `json:"staleMarkers" envconfig:"K6_PROMETHEUS_RW_STALE_MARKERS"`
 
 	// SigV4Region is the AWS region where the workspace is.
-	SigV4Region null.String `json:"sigV4Region" envconfig:"SIGV4_REGION"`
+	SigV4Region null.String `json:"sigV4Region" envconfig:"K6_PROMETHEUS_RW_SIGV4_REGION"`
 
 	// SigV4AccessKey is the AWS access key.
-	SigV4AccessKey null.String `json:"sigV4AccessKey" envconfig:"SIGV4_ACCESS_KEY"`
+	SigV4AccessKey null.String `json:"sigV4AccessKey" envconfig:"K6_PROMETHEUS_RW_SIGV4_ACCESS_KEY"`
 
 	// SigV4SecretKey is the AWS secret key.
-	SigV4SecretKey null.String `json:"sigV4SecretKey" envconfig:"SIGV4_SECRET_KEY"`
+	SigV4SecretKey null.String `json:"sigV4SecretKey" envconfig:"K6_PROMETHEUS_RW_SIGV4_SECRET_KEY"`
 }
 
 // NewConfig creates an Output's configuration.
@@ -280,7 +280,7 @@ func parseEnvs(env map[string]string) (Config, error) {
 		Headers: make(map[string]string),
 	}
 
-	err := envconfig.Process("K6_PROMETHEUS_RW", &c, func(key string) (string, bool) {
+	err := envconfig.Process("", &c, func(key string) (string, bool) {
 		v, ok := env[key]
 		return v, ok
 	})
