@@ -1,69 +1,110 @@
 {
-	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
-	"extends": ["config:best-practices"],
-	"schedule": ["weekly"],
-	"prConcurrentLimit": 50,
-	"packageRules": [
-		{
-			"description": "GitHub Actions",
-			"managers": ["github-actions"]
-		},
-		{
-			"description": "Enable gomod updates with common options",
-			"managers": ["gomod"],
-			"enabled": true,
-			"postUpdateOptions": ["gomodTidy", "gomodUpdateImportPaths"]
-		},
-		{
-			"description": "Update Go versions only when a patch version exists (z > 0 in v1.x.z)",
-			"managers": ["gomod"],
-			"matchPackageNames": ["go"],
-			"allowedVersions": "/^(?:v)?\\d+\\.\\d+\\.[1-9]\\d*$/"
-		},
-		{
-			"groupName": "golangx",
-			"description": "Group golang.org/x modules",
-			"managers": ["gomod"],
-			"matchPackagePatterns": ["^golang\\.org/x/"]
-		},
-		{
-			"groupName": "googles",
-			"description": "Group google.golang.org modules",
-			"managers": ["gomod"],
-			"matchPackagePatterns": ["^google\\.golang\\.org/"]
-		},
-		{
-			"groupName": "otel",
-			"description": "Group OpenTelemetry modules",
-			"managers": ["gomod"],
-			"matchPackagePatterns": ["^go\\.opentelemetry\\.io/"]
-		},
-		{
-			"description": "Disable list for frozen Go modules - see Dependencies.md and modtools_frozen.yml",
-			"managers": ["gomod"],
-			"enabled": false,
-			"matchPackageNames": [
-				"github.com/andybalholm/cascadia",
-				"github.com/sirupsen/logrus",
-				"github.com/spf13/afero",
-				"github.com/spf13/cobra",
-				"github.com/spf13/pflag",
-				"github.com/influxdata/influxdb1-client",
-				"gopkg.in/guregu/null.v3",
-				"gopkg.in/yaml.v3"
-			]
-		},
-		{
-			"description": "Dockerfiles root",
-			"managers": ["docker"],
-			"excludePaths": ["packaging/**"],
-			"schedule": ["quarterly"]
-		},
-		{
-			"description": "Dockerfiles packaging",
-			"managers": ["docker"],
-			"matchPaths": ["packaging/**"],
-			"schedule": ["quarterly"]
-		}
-	]
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:best-practices"
+  ],
+  "schedule": [
+    "weekly"
+  ],
+  "prConcurrentLimit": 50,
+  "packageRules": [
+    {
+      "description": "GitHub Actions",
+      "managers": [
+        "github-actions"
+      ]
+    },
+    {
+      "description": "Enable gomod updates with common options",
+      "managers": [
+        "gomod"
+      ],
+      "enabled": true,
+      "postUpdateOptions": [
+        "gomodTidy",
+        "gomodUpdateImportPaths"
+      ]
+    },
+    {
+      "description": "Update Go versions only when a patch version exists (z > 0 in v1.x.z)",
+      "managers": [
+        "gomod"
+      ],
+      "matchPackageNames": [
+        "go"
+      ],
+      "allowedVersions": "/^(?:v)?\\d+\\.\\d+\\.[1-9]\\d*$/"
+    },
+    {
+      "groupName": "golangx",
+      "description": "Group golang.org/x modules",
+      "managers": [
+        "gomod"
+      ],
+      "matchPackagePatterns": [
+        "^golang\\.org/x/"
+      ]
+    },
+    {
+      "groupName": "googles",
+      "description": "Group google.golang.org modules",
+      "managers": [
+        "gomod"
+      ],
+      "matchPackagePatterns": [
+        "^google\\.golang\\.org/"
+      ]
+    },
+    {
+      "groupName": "otel",
+      "description": "Group OpenTelemetry modules",
+      "managers": [
+        "gomod"
+      ],
+      "matchPackagePatterns": [
+        "^go\\.opentelemetry\\.io/"
+      ]
+    },
+    {
+      "description": "Disable list for frozen Go modules - see Dependencies.md and modtools_frozen.yml",
+      "managers": [
+        "gomod"
+      ],
+      "enabled": false,
+      "matchPackageNames": [
+        "github.com/andybalholm/cascadia",
+        "github.com/sirupsen/logrus",
+        "github.com/spf13/afero",
+        "github.com/spf13/cobra",
+        "github.com/spf13/pflag",
+        "github.com/influxdata/influxdb1-client",
+        "gopkg.in/guregu/null.v3",
+        "gopkg.in/yaml.v3"
+      ]
+    },
+    {
+      "description": "Dockerfiles root",
+      "managers": [
+        "docker"
+      ],
+      "excludePaths": [
+        "packaging/**"
+      ],
+      "schedule": [
+        "quarterly"
+      ]
+    },
+    {
+      "description": "Dockerfiles packaging",
+      "managers": [
+        "docker"
+      ],
+      "matchPaths": [
+        "packaging/**"
+      ],
+      "schedule": [
+        "quarterly"
+      ]
+    }
+  ]
 }
