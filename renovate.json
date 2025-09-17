@@ -1,10 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:best-practices"
-  ],
-  "schedule": [
-    "weekly"
+    "schedule:weekly"
   ],
   "prConcurrentLimit": 50,
   "packageRules": [
@@ -83,27 +80,27 @@
       ]
     },
     {
-      "description": "Dockerfiles root",
+      "description": "k6 dockerfiles",
       "managers": [
         "docker"
       ],
-      "excludePaths": [
+      "ignorePaths": [
         "packaging/**"
       ],
-      "schedule": [
-        "quarterly"
+      "extends": [
+        "schedule:monthly"
       ]
     },
     {
-      "description": "Dockerfiles packaging",
+      "description": "Dockerfiles packaging tool",
       "managers": [
         "docker"
       ],
       "matchPaths": [
         "packaging/**"
       ],
-      "schedule": [
-        "quarterly"
+      "extends": [
+        "schedule:quarterly"
       ]
     }
   ]
