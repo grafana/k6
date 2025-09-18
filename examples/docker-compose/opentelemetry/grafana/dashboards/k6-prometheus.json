@@ -264,7 +264,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg(k6_http_req_failed_occurred{testid=~\"$testid\"}/k6_http_req_failed_total)*100)",
+          "expr": "avg(rate(k6_http_req_failed_total{testid=~\"$testid\", condition=\"nonzero\"}[$__rate_interval]) / rate(k6_http_req_failed_total{testid=~\"$testid\"}[$__rate_interval]) * 100)",
           "hide": true,
           "instant": false,
           "legendFormat": "http_req_failed",
@@ -372,8 +372,7 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "fixedColor": "red",
-            "mode": "fixed"
+            "mode": "thresholds"
           },
           "mappings": [],
           "thresholds": {
@@ -382,6 +381,10 @@
               {
                 "color": "green",
                 "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
               }
             ]
           },
@@ -418,7 +421,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum(k6_http_reqs{testid=~\"$testid\", expected_response=\"false\"})",
+          "expr": "sum(k6_http_req_failed_total{testid=~\"$testid\", condition=\"nonzero\"}) or vector(0)",
           "instant": false,
           "legendFormat": "__auto",
           "range": true,
@@ -1748,7 +1751,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "k6_checks_occurred{testid=~\"$testid\"} / k6_checks_total{testid=~\"$testid\"}",
+          "expr": "rate(k6_checks_total{testid=~\"$testid\", condition=\"nonzero\"}[$__rate_interval]) / rate(k6_checks_total{testid=~\"$testid\"}[$__rate_interval])",
           "format": "table",
           "instant": false,
           "legendFormat": "__auto",
@@ -1903,7 +1906,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg(k6_checks_occurred{testid=~\"$testid\"}/k6_checks_total{testid=~\"$testid\"}*100)",
+          "expr": "avg(rate(k6_checks_total{testid=~\"$testid\", condition=\"nonzero\"}[$__rate_interval]) / rate(k6_checks_total{testid=~\"$testid\"}[$__rate_interval]) * 100)",
           "instant": false,
           "legendFormat": "k6_checks_rate",
           "range": true,

@@ -77,6 +77,38 @@ func (r *registry) getOrCreateHistogram(name, unit string) (otelMetric.Float64Hi
 	return h, nil
 }
 
+func (r *registry) getOrCreateCounterForRate(name string) (otelMetric.Int64Counter, error) {
+	// k6's rate metric tracks how frequently a non-zero value occurs.
+	// To be accurate is a percentage, which is a ratio.
+	// To correctly calculate this metric in a metrics backend,
+	// we need to split the rate metric via a dedicated attribute.
+
+	totalName := name + ".total"
+
+	var err error
+	var totalCounter otelMetric.Int64Counter
+
+	storedTotalCounter, ok := r.rateCounters.Load(totalName)
+	if !ok {
+		totalCounter, err = r.meter.Int64Counter(totalName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create counter for %q: %w", totalName, err)
+		}
+
+		r.rateCounters.Store(totalName, totalCounter)
+		r.logger.Debugf("registered counter metric %q", totalName)
+	} else {
+		totalCounter, ok = storedTotalCounter.(otelMetric.Int64Counter)
+		if !ok {
+			return nil, fmt.Errorf("metric %q stored not as counter", totalName)
+		}
+	}
+
+	return totalCounter, nil
+}
+
+// Deprecated: Metrics of Rate type are now exported using a single counter,
+// we want to remove the support for exporting via the pair of counters on k6 v1.4.0.
 func (r *registry) getOrCreateCountersForRate(name string) (otelMetric.Int64Counter, otelMetric.Int64Counter, error) {
 	// k6's rate metric tracks how frequently a non-zero value occurs.
 	// so to correctly calculate the rate in a metrics backend
