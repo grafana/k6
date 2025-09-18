@@ -2,10 +2,12 @@ package redis
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
 	"strings"
 
+	"github.com/redis/go-redis/v9/internal"
 	"github.com/redis/go-redis/v9/internal/pool"
 	"github.com/redis/go-redis/v9/internal/proto"
 )
@@ -15,11 +17,11 @@ var ErrClosed = pool.ErrClosed
 
 // HasErrorPrefix checks if the err is a Redis error and the message contains a prefix.
 func HasErrorPrefix(err error, prefix string) bool {
-	err, ok := err.(Error)
-	if !ok {
+	var rErr Error
+	if !errors.As(err, &rErr) {
 		return false
 	}
-	msg := err.Error()
+	msg := rErr.Error()
 	msg = strings.TrimPrefix(msg, "ERR ") // KVRocks adds such prefix
 	return strings.HasPrefix(msg, prefix)
 }
@@ -128,7 +130,9 @@ func isMovedError(err error) (moved bool, ask bool, addr string) {
 	if ind == -1 {
 		return false, false, ""
 	}
+
 	addr = s[ind+1:]
+	addr = internal.GetAddr(addr)
 	return
 }
 
