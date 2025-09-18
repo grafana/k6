@@ -7,13 +7,13 @@
   "packageRules": [
     {
       "description": "GitHub Actions",
-      "managers": [
+      "matchManagers": [
         "github-actions"
       ]
     },
     {
       "description": "Enable gomod updates with common options",
-      "managers": [
+      "matchManagers": [
         "gomod"
       ],
       "enabled": true,
@@ -24,7 +24,7 @@
     },
     {
       "description": "Update Go versions only when a patch version exists (z > 0 in v1.x.z)",
-      "managers": [
+      "matchManagers": [
         "gomod"
       ],
       "matchPackageNames": [
@@ -35,36 +35,36 @@
     {
       "groupName": "golangx",
       "description": "Group golang.org/x modules",
-      "managers": [
+      "matchManagers": [
         "gomod"
       ],
-      "matchPackagePatterns": [
-        "^golang\\.org/x/"
+      "matchPackageNames": [
+        "/^golang\\.org/x//"
       ]
     },
     {
       "groupName": "googles",
       "description": "Group google.golang.org modules",
-      "managers": [
+      "matchManagers": [
         "gomod"
       ],
-      "matchPackagePatterns": [
-        "^google\\.golang\\.org/"
+      "matchPackageNames": [
+        "/^google\\.golang\\.org//"
       ]
     },
     {
       "groupName": "otel",
       "description": "Group OpenTelemetry modules",
-      "managers": [
+      "matchManagers": [
         "gomod"
       ],
-      "matchPackagePatterns": [
-        "^go\\.opentelemetry\\.io/"
+      "matchPackageNames": [
+        "/^go\\.opentelemetry\\.io//"
       ]
     },
     {
       "description": "Disable list for frozen Go modules - see Dependencies.md and modtools_frozen.yml",
-      "managers": [
+      "matchManagers": [
         "gomod"
       ],
       "enabled": false,
@@ -81,7 +81,7 @@
     },
     {
       "description": "k6 dockerfiles",
-      "managers": [
+      "matchManagers": [
         "docker"
       ],
       "ignorePaths": [
@@ -93,10 +93,10 @@
     },
     {
       "description": "Dockerfiles packaging tool",
-      "managers": [
+      "matchManagers": [
         "docker"
       ],
-      "matchPaths": [
+      "matchFileNames": [
         "packaging/**"
       ],
       "extends": [
