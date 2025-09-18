@@ -16,7 +16,7 @@ syntax = "proto3";
 
 package main;
 
-option go_package = "./grpcservice";
+option go_package = "go.k6.io/k6/testutils/grpcservice";
 
 // FeatureExplorer is the service for exploring Features.
 // Interface exported by the server.
