@@ -1,8 +1,5 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "schedule:weekly"
-  ],
   "prConcurrentLimit": 50,
   "packageRules": [
     {
@@ -86,9 +83,6 @@
       ],
       "ignorePaths": [
         "packaging/**"
-      ],
-      "extends": [
-        "schedule:monthly"
       ]
     },
     {
@@ -98,9 +92,6 @@
       ],
       "matchPaths": [
         "packaging/**"
-      ],
-      "extends": [
-        "schedule:quarterly"
       ]
     }
   ]
