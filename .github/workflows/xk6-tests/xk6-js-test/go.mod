@@ -16,7 +16,7 @@ require (
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible // indirect
 	github.com/google/pprof v0.0.0-20230728192033-2ba5b33183c6 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/grafana/sobek v0.0.0-20241024150027-d91f02b05e9b // indirect
+	github.com/grafana/sobek v0.0.0-20250723111835-dd8a13f0d439 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.22.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/mailru/easyjson v0.9.0 // indirect
