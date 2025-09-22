@@ -196,3 +196,24 @@ func TestSetTimeoutContextCancel(t *testing.T) {
 		require.Empty(t, log)
 	}
 }
+
+func TestClearFirstTimeoutWhenMultiple(t *testing.T) {
+	t.Parallel()
+
+	runtime := newRuntime(t)
+	rt := runtime.VU.Runtime()
+	var log []time.Time
+
+	start := time.Now()
+	require.NoError(t, rt.Set("time", func() { log = append(log, time.Now()) }))
+	_, err := runtime.RunOnEventLoop(`
+		setTimeout(() => {
+		   time();
+		}, 1000);
+		const cancelTimeout = setTimeout(() => {}, 200);
+		clearTimeout(cancelTimeout);
+	`)
+	require.NoError(t, err)
+	require.Len(t, log, 1)
+	require.Greater(t, log[0].Sub(start), time.Second)
+}
