@@ -38,7 +38,7 @@ jobs:
       sign_windows_artifacts: ${{ steps.determine_windows_signing.outputs.sign_windows_artifacts }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -103,12 +103,12 @@ jobs:
       VERSION: ${{ needs.configure.outputs.k6_version }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
         with:
           fetch-depth: 0
           persist-credentials: false
       - name: Install Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
         with:
           go-version: ${{ needs.configure.outputs.go_version }}
           check-latest: true
@@ -152,7 +152,7 @@ jobs:
           go version
           ./build-release.sh "dist" "${VERSION}"
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: binaries
           path: dist/
@@ -169,7 +169,7 @@ jobs:
       VERSION: ${{ needs.configure.outputs.k6_version }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -273,7 +273,7 @@ jobs:
       windows_binary_artifact_name: ${{ steps.assign-artifact-names.outputs.windows-binary-artifact-name }}
     steps:
       - name: Download binaries
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: binaries
           path: dist
@@ -283,7 +283,7 @@ jobs:
           Expand-Archive -Path ".\dist\k6-${env:VERSION}-windows-amd64.zip" -DestinationPath .\packaging\
 
       - name: Upload artifact for Windows installer build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: windows-binary
           path: 'packaging/k6-${{ env.VERSION }}-windows-amd64/k6.exe'
@@ -291,7 +291,7 @@ jobs:
           if-no-files-found: error
 
       - name: Get secrets for Azure Trusted Signing
-        uses: grafana/shared-workflows/actions/get-vault-secrets@get-vault-secrets/v1.3.0
+        uses: grafana/shared-workflows/actions/get-vault-secrets@a37de51f3d713a30a9e4b21bcdfbd38170020593 # get-vault-secrets/v1.3.0
         id: get-signing-secrets
         if: needs.configure.outputs.sign_windows_artifacts == 'true'
         with:
@@ -302,7 +302,7 @@ jobs:
             tenant-id=azure-trusted-signing:tenant-id
 
       - name: Sign Windows binary
-        uses: grafana/shared-workflows/actions/azure-trusted-signing@azure-trusted-signing/v1.0.0
+        uses: grafana/shared-workflows/actions/azure-trusted-signing@e86cdb1c0a8cf5df57d3078f285261f7c9577174 # azure-trusted-signing/v1.0.0
         id: sign-artifacts
         if: needs.configure.outputs.sign_windows_artifacts == 'true'
         with:
@@ -314,7 +314,7 @@ jobs:
           signed-artifact-name: 'windows-binary-signed'
 
       - name: Download signed Windows binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         if: needs.configure.outputs.sign_windows_artifacts == 'true'
         with:
           name: ${{ steps.sign-artifacts.outputs.artifact-name }}
@@ -327,7 +327,7 @@ jobs:
           Compress-Archive -Path ".\packaging\*" -DestinationPath ".\dist\k6-${env:VERSION}-windows-amd64.zip" -Force
 
       - name: Upload signed artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: needs.configure.outputs.sign_windows_artifacts == 'true'
         with:
           name: binaries-signed
@@ -358,7 +358,7 @@ jobs:
       VERSION: ${{ needs.configure.outputs.k6_version }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
         with:
           persist-credentials: false
       - name: Install pandoc
@@ -371,7 +371,7 @@ jobs:
           Expand-Archive -Path .\wix311-binaries.zip -DestinationPath .\wix311\
           echo "$pwd\wix311" | Out-File -FilePath $env:GITHUB_PATH -Append
       - name: Download Windows binary
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
           name: ${{ needs.sign-binaries.outputs.windows_binary_artifact_name }}
           path: packaging
@@ -389,7 +389,7 @@ jobs:
         run: move "packaging\k6.msi" "packaging\k6-${env:VERSION}-windows-amd64.msi"
 
       - name: Upload Windows installer
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: binaries-windows
           path: |
@@ -418,14 +418,14 @@ jobs:
     needs: [configure, package]
     steps:
       - name: Download Windows artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         if: needs.configure.outputs.sign_windows_artifacts == 'true'
         with:
           name: binaries-windows
           path: packaging
 
       - name: Get secrets for Azure Trusted Signing
-        uses: grafana/shared-workflows/actions/get-vault-secrets@get-vault-secrets/v1.3.0
+        uses: grafana/shared-workflows/actions/get-vault-secrets@a37de51f3d713a30a9e4b21bcdfbd38170020593 # get-vault-secrets/v1.3.0
         id: get-signing-secrets
         if: needs.configure.outputs.sign_windows_artifacts == 'true'
         with:
@@ -436,7 +436,7 @@ jobs:
             tenant-id=azure-trusted-signing:tenant-id
 
       - name: Sign Windows installer
-        uses: grafana/shared-workflows/actions/azure-trusted-signing@azure-trusted-signing/v1.0.0
+        uses: grafana/shared-workflows/actions/azure-trusted-signing@e86cdb1c0a8cf5df57d3078f285261f7c9577174 # azure-trusted-signing/v1.0.0
         id: sign-artifacts
         if: needs.configure.outputs.sign_windows_artifacts == 'true'
         with:
@@ -465,16 +465,16 @@ jobs:
        contents: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
         with:
           persist-credentials: false
       - name: Download binaries
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
           name: ${{ needs.sign-binaries.outputs.binary_artifact_name }}
           path: dist
       - name: Download Windows binaries
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
           name: ${{ needs.sign-packages.outputs.artifact_name }}
           path: dist
@@ -511,16 +511,16 @@ jobs:
       id-token: write # Required for Vault
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
         with:
           persist-credentials: false
       - name: Download binaries
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
           name: ${{ needs.sign-binaries.outputs.binary_artifact_name }}
           path: dist
       - name: Download Windows binaries
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
           name: ${{ needs.sign-packages.outputs.artifact_name }}
           path: dist
@@ -530,7 +530,7 @@ jobs:
           mv "dist/k6-$VERSION-windows-amd64.msi" "dist/k6-$VERSION-amd64.msi"
           mv "dist/k6-$VERSION-linux-amd64.rpm" "dist/k6-$VERSION-amd64.rpm"
           mv "dist/k6-$VERSION-linux-amd64.deb" "dist/k6-$VERSION-amd64.deb"
-      - uses: grafana/shared-workflows/actions/get-vault-secrets@get-vault-secrets/v1.3.0
+      - uses: grafana/shared-workflows/actions/get-vault-secrets@a37de51f3d713a30a9e4b21bcdfbd38170020593 # get-vault-secrets/v1.3.0
         with:
           repo_secrets: |
             IAM_ROLE_ARN=deploy:packager-iam-role
@@ -538,7 +538,7 @@ jobs:
             PGP_SIGN_KEY_PASSPHRASE=pgp:PGP_SIGN_KEY_PASSPHRASE
             PGP_SIGN_KEY=pgp:PGP_SIGN_KEY
             S3_BUCKET=s3:AWS_S3_BUCKET
-      - uses: grafana/shared-workflows/actions/aws-auth@aws-auth/v1.0.2
+      - uses: grafana/shared-workflows/actions/aws-auth@954bcbdf6e64fe612210885b47df771d9d20447b # aws-auth/v1.0.2
         with:
           aws-region: "us-east-2"
           role-arn: ${{ env.IAM_ROLE_ARN }}
