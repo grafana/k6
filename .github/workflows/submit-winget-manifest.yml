@@ -1,0 +1,44 @@
+name: Submit WinGet Manifest
+
+on:
+  release:
+    types: [published]
+
+permissions: {}
+
+jobs:
+  publish:
+    runs-on: windows-2025
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+
+    - name: Install WingetCreate
+      shell: pwsh
+      run: |
+        Import-Module Appx -UseWindowsPowerShell
+        $appxBundleFile = Join-Path ${env:RUNNER_TEMP} "wingetcreate.msixbundle"
+        Invoke-WebRequest https://aka.ms/wingetcreate/latest/msixbundle -OutFile $appxBundleFile
+        Add-AppxPackage $appxBundleFile
+
+    - name: Get WinGet token
+      uses: grafana/shared-workflows/actions/get-vault-secrets@a37de51f3d713a30a9e4b21bcdfbd38170020593 # get-vault-secrets/v1.3.0
+      id: get-token
+      with:
+        export_env: false
+        repo_secrets: |
+          token=winget:token
+
+    - name: Submit WinGet Manifest
+      env:
+        PACKAGE_ID: GrafanaLabs.k6
+        PACKAGE_VERSION: ${{ github.event.release.tag_name }}
+        WINGET_TOKEN: ${{ fromJSON(steps.get-token.outputs.secrets).token }}
+      shell: pwsh
+      run: |
+        wingetcreate ${env:PACKAGE_ID} `
+          --urls "${env:GITHUB_SERVER_URL}/${env:GITHUB_REPOSITORY}/releases/download/${env:PACKAGE_VERSION}/k6-${env:PACKAGE_VERSION}-windows-amd64.msi" `
+          --version ${env:PACKAGE_VERSION}.TrimStart("v") `
+          --submit `
+          --token ${env:WINGET_TOKEN}
