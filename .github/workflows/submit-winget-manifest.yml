@@ -37,7 +37,7 @@ jobs:
         WINGET_TOKEN: ${{ fromJSON(steps.get-token.outputs.secrets).token }}
       shell: pwsh
       run: |
-        wingetcreate ${env:PACKAGE_ID} `
+        wingetcreate update ${env:PACKAGE_ID} `
           --urls "${env:GITHUB_SERVER_URL}/${env:GITHUB_REPOSITORY}/releases/download/${env:PACKAGE_VERSION}/k6-${env:PACKAGE_VERSION}-windows-amd64.msi" `
           --version ${env:PACKAGE_VERSION}.TrimStart("v") `
           --submit `
