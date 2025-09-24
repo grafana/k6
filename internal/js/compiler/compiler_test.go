@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/internal/lib/testutils"
-	"go.k6.io/k6/lib"
 )
 
 func TestCompile(t *testing.T) {
@@ -56,7 +55,6 @@ func TestCompile(t *testing.T) {
 	t.Run("ES6", func(t *testing.T) {
 		t.Parallel()
 		c := New(testutils.NewLogger(t))
-		c.Options.CompatibilityMode = lib.CompatibilityModeExtended
 		prg, code, err := c.Parse(`import "something"`, "script.js", false, true)
 		require.NoError(t, err)
 		assert.Equal(t, `import "something"`, code)
@@ -70,7 +68,6 @@ func TestCompile(t *testing.T) {
 		// This only works with `require` as wrapping means the import/export won't be top level and that is forbidden
 		t.Parallel()
 		c := New(testutils.NewLogger(t))
-		c.Options.CompatibilityMode = lib.CompatibilityModeExtended
 		prg, code, err := c.Parse(`require("something");`, "script.js", true, false)
 		require.NoError(t, err)
 		assert.Equal(t, `(function(module, exports){require("something");
@@ -97,7 +94,6 @@ func TestCompile(t *testing.T) {
 	t.Run("Invalid", func(t *testing.T) {
 		t.Parallel()
 		c := New(testutils.NewLogger(t))
-		c.Options.CompatibilityMode = lib.CompatibilityModeExtended
 		_, _, err := c.Parse(`1+(=>2)()`, "script.js", false, false)
 		assert.IsType(t, parser.ErrorList{}, err)
 		assert.Contains(t, err.Error(), `Line 1:4 Unexpected token =>`)
@@ -149,7 +145,6 @@ func TestMinimalSourceMap(t *testing.T) {
 
 	compiler := New(logger)
 	compiler.Options = Options{
-		CompatibilityMode: lib.CompatibilityModeExtended,
 		SourceMapLoader: func(string) ([]byte, error) {
 			return corruptSourceMap, nil
 		},
