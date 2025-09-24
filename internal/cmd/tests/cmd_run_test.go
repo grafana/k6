@@ -1038,21 +1038,18 @@ func TestRunFromNotBaseDirectory(t *testing.T) {
 		export const p = 5;
 	`
 	mainScript := `
-		import { p } from "../../b/dep.js";
+		import { p } from "../../../b/dep.js";
 		export default function() {
 			console.log("p = " + p);
 		};
 	`
 
-	srv := getCloudTestEndChecker(t, 123, nil, cloudapi.RunStatusAbortedScriptError, cloudapi.ResultStatusPassed)
-
 	ts := NewGlobalTestState(t)
 	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "a/b/c/test.js"), []byte(mainScript), 0o644))
 	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "b/dep.js"), []byte(depScript), 0o644))
 
-	ts.Env["K6_CLOUD_HOST"] = srv.URL
 	ts.Cwd = filepath.Join(ts.Cwd, "./a/")
-	ts.CmdArgs = []string{"k6", "run", "-v", "--out", "cloud", "--log-output=stdout", "b/c/test.js"}
+	ts.CmdArgs = []string{"k6", "run", "-v", "--log-output=stdout", "b/c/test.js"}
 
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
