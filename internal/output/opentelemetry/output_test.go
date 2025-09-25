@@ -13,14 +13,15 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/internal/lib/testutils"
-	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/output"
 	collectormetrics "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	metricpb "go.opentelemetry.io/proto/otlp/metrics/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
+
+	"go.k6.io/k6/internal/lib/testutils"
+	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/output"
 )
 
 type MetricsServer interface {
@@ -82,7 +83,7 @@ type grpcMetricsServer struct {
 }
 
 func newGRPCServer() (*grpcMetricsServer, error) {
-	listener, err := net.Listen("tcp", "localhost:0")
+	listener, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "localhost:0")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create listener: %w", err)
 	}
