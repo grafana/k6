@@ -115,6 +115,9 @@ linters:
       - linters:
           - forbidigo
         text: use of `os\.(SyscallError|Signal|Interrupt)` forbidden
+      - linters:
+          - revive
+        text: avoid meaningless package names
     paths:
       - third_party$
       - builtin$
