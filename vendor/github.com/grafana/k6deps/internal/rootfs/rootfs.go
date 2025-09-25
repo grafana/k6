@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"path"
 	"path/filepath"
 )
 
@@ -44,15 +43,7 @@ func (f *rootFS) Root() string {
 }
 
 func (f *rootFS) Open(filePath string) (fs.File, error) {
-	var err error
-	if filepath.IsAbs(filePath) {
-		filePath, err = filepath.Rel(f.root, filePath)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return f.fs.Open(filepath.ToSlash(path.Clean(filePath)))
+	return f.fs.Open(filePath)
 }
 
 // NewFromFS return a FS from a FS
