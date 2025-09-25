@@ -27,8 +27,8 @@ jobs:
       id: get-token
       with:
         export_env: false
-        repo_secrets: |
-          token=winget:token
+        common_secrets: |
+          token=winget-packages:token
 
     - name: Submit WinGet Manifest
       env:
