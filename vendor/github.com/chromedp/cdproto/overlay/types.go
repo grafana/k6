@@ -283,7 +283,6 @@ const (
 	InspectModeSearchForNode         InspectMode = "searchForNode"
 	InspectModeSearchForUAShadowDOM  InspectMode = "searchForUAShadowDOM"
 	InspectModeCaptureAreaScreenshot InspectMode = "captureAreaScreenshot"
-	InspectModeShowDistances         InspectMode = "showDistances"
 	InspectModeNone                  InspectMode = "none"
 )
 
@@ -299,8 +298,6 @@ func (t *InspectMode) UnmarshalJSON(buf []byte) error {
 		*t = InspectModeSearchForUAShadowDOM
 	case InspectModeCaptureAreaScreenshot:
 		*t = InspectModeCaptureAreaScreenshot
-	case InspectModeShowDistances:
-		*t = InspectModeShowDistances
 	case InspectModeNone:
 		*t = InspectModeNone
 	default:
