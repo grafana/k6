@@ -21,6 +21,7 @@
         "gomod"
       ],
       "enabled": true,
+	  "ignoreDeps": ["indirect"],
       "postUpdateOptions": [
         "gomodTidy",
         "gomodUpdateImportPaths"
