@@ -658,5 +658,5 @@ func (c *Connection) isClosing() (s bool) {
 	default:
 	}
 
-	return
+	return s
 }

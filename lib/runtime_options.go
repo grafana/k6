@@ -60,5 +60,5 @@ func ValidateCompatibilityMode(val string) (cm CompatibilityMode, err error) {
 		err = fmt.Errorf(`invalid compatibility mode "%s". Use: "%s"`,
 			val, strings.Join(compatValues, `", "`))
 	}
-	return
+	return cm, err
 }

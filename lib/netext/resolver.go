@@ -154,7 +154,7 @@ func (r *resolver) applyPolicy(ips []net.IP) (retIPs []net.IP) {
 		retIPs = ips
 	}
 
-	return
+	return retIPs
 }
 
 func groupByVersion(ips []net.IP) (ip4 []net.IP, ip6 []net.IP) {
@@ -166,5 +166,5 @@ func groupByVersion(ips []net.IP) (ip4 []net.IP, ip6 []net.IP) {
 		}
 	}
 
-	return
+	return ip4, ip6
 }

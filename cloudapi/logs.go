@@ -244,5 +244,5 @@ func retry(s sleeper, attempts int, interval, maxDuration time.Duration, do func
 			return nil
 		}
 	}
-	return
+	return err
 }

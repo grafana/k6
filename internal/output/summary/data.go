@@ -441,7 +441,7 @@ func extractPercentileThresholdSource(source string) (agg string, percentile flo
 
 		agg = "p(" + matches[1] + ")"
 		isPercentile = true
-		return
+		return agg, percentile, isPercentile
 	}
 
 	return "", 0, false
