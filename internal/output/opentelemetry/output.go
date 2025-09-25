@@ -183,7 +183,7 @@ func (o *Output) dispatch(entry metrics.Sample) error {
 		if o.config.SingleCounterForRate.Bool {
 			err = o.singleCounterForRate(ctx, name, attributeSetOpt, entry)
 		} else {
-			// Deprecated path, remove on k6 1.4.0
+			// Deprecated path, remove with https://github.com/grafana/k6/issues/5185 
 			err = o.pairOfCountersForRate(ctx, name, attributeSetOpt, entry)
 		}
 		if err != nil {
