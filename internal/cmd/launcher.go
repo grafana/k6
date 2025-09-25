@@ -39,6 +39,7 @@ func newIOFSBridge(fs fsext.Fs, pwd string) fs.FS {
 
 // Open implements fs.Fs Open
 func (b *ioFSBridge) Open(name string) (fs.File, error) {
+	name = filepath.ToSlash(filepath.Clean(name))
 	if !path.IsAbs(name) {
 		name = path.Join(b.pwd, name)
 	}
