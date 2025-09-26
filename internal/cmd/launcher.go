@@ -39,6 +39,10 @@ func newIOFSBridge(fs fsext.Fs, pwd string) fs.FS {
 
 // Open implements fs.Fs Open
 func (b *ioFSBridge) Open(name string) (fs.File, error) {
+	_ = fsext.Walk(b.fsext, "/", func(path string, _ fs.FileInfo, _ error) error {
+		fmt.Println("walk: ", path)
+		return nil
+	})
 	fmt.Println("ioFSBridge.Open", name)
 	name = filepath.ToSlash(filepath.Clean(fsext.FilePathSeparator + name))
 	fmt.Println("ioFSBridge.Open post clean up", name)
