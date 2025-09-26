@@ -7,7 +7,7 @@ const COORD_FACTOR = 1e7;
 // go run -mod=mod examples/grpc_server/*.go
 // (golang should be installed)
 const GRPC_ADDR = __ENV.GRPC_ADDR || '127.0.0.1:10000';
-const GRPC_PROTO_PATH = __ENV.GRPC_PROTO_PATH || '../internal/lib/testutils/grpcservice/route_guide.proto';
+const GRPC_PROTO_PATH = __ENV.GRPC_PROTO_PATH || '../testutils/grpcservice/route_guide.proto';
 
 let client = new Client();
 

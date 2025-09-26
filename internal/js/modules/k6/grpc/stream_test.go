@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"go.k6.io/k6/internal/lib/testutils/grpcservice"
 	"go.k6.io/k6/internal/lib/testutils/httpmultibin/grpc_wrappers_testing"
 	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/testutils/grpcservice"
 
 	"github.com/golang/protobuf/ptypes/wrappers"
 	"github.com/grafana/sobek"
@@ -68,7 +68,7 @@ func TestStream_RequestHeaders(t *testing.T) {
 	initString := codeBlock{
 		code: `
 		var client = new grpc.Client();
-		client.load([], "../../../../lib/testutils/grpcservice/route_guide.proto");`,
+		client.load([], "../../../../../testutils/grpcservice/route_guide.proto");`,
 	}
 	vuString := codeBlock{
 		code: `
@@ -140,7 +140,7 @@ func TestStream_ErrorHandling(t *testing.T) {
 	initString := codeBlock{
 		code: `
 		var client = new grpc.Client();
-		client.load([], "../../../../lib/testutils/grpcservice/route_guide.proto");`,
+		client.load([], "../../../../../testutils/grpcservice/route_guide.proto");`,
 	}
 	vuString := codeBlock{
 		code: `
@@ -229,7 +229,7 @@ func TestStream_ReceiveAllServerResponsesAfterEnd(t *testing.T) {
 	initString := codeBlock{
 		code: `
 		var client = new grpc.Client();
-		client.load([], "../../../../lib/testutils/grpcservice/route_guide.proto");`,
+		client.load([], "../../../../../testutils/grpcservice/route_guide.proto");`,
 	}
 	vuString := codeBlock{
 		code: `
@@ -314,7 +314,7 @@ func TestStream_ReceiveAllServerResponsesAfterEndWithDiscardedMessages(t *testin
 	initString := codeBlock{
 		code: `
 		var client = new grpc.Client();
-		client.load([], "../../../../lib/testutils/grpcservice/route_guide.proto");`,
+		client.load([], "../../../../../testutils/grpcservice/route_guide.proto");`,
 	}
 	vuString := codeBlock{
 		code: `
@@ -399,7 +399,7 @@ func TestStream_ReceiveMetadata(t *testing.T) {
 	initString := codeBlock{
 		code: `
 		var client = new grpc.Client();
-		client.load([], "../../../../lib/testutils/grpcservice/route_guide.proto");`,
+		client.load([], "../../../../../testutils/grpcservice/route_guide.proto");`,
 	}
 	vuString := codeBlock{
 		code: `
@@ -599,7 +599,7 @@ func TestStream_MetricsTagsMetadata(t *testing.T) {
 	initString := codeBlock{
 		code: `
 		var client = new grpc.Client();
-		client.load([], "../../../../lib/testutils/grpcservice/route_guide.proto");`,
+		client.load([], "../../../../../testutils/grpcservice/route_guide.proto");`,
 	}
 	vuString := codeBlock{
 		code: `
