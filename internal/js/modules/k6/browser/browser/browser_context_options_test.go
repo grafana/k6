@@ -21,7 +21,7 @@ func TestBrowserContextOptionsPermissions(t *testing.T) {
 	})))
 	assert.NoError(t, err)
 	assert.Len(t, opts.Permissions, 2)
-	assert.Equal(t, opts.Permissions, []string{"camera", "microphone"})
+	assert.Equal(t, []string{"camera", "microphone"}, opts.Permissions)
 }
 
 func TestBrowserContextSetGeolocation(t *testing.T) {

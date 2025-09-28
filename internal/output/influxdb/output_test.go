@@ -30,7 +30,7 @@ func TestBadConcurrentWrites(t *testing.T) {
 			ConfigArgument: "?concurrentWrites=0",
 		})
 		require.Error(t, err)
-		require.Equal(t, err.Error(), "influxdb's ConcurrentWrites must be a positive number")
+		require.EqualError(t, err, "influxdb's ConcurrentWrites must be a positive number")
 	})
 
 	t.Run("-2", func(t *testing.T) {
@@ -40,7 +40,7 @@ func TestBadConcurrentWrites(t *testing.T) {
 			ConfigArgument: "?concurrentWrites=-2",
 		})
 		require.Error(t, err)
-		require.Equal(t, err.Error(), "influxdb's ConcurrentWrites must be a positive number")
+		require.EqualError(t, err, "influxdb's ConcurrentWrites must be a positive number")
 	})
 
 	t.Run("2", func(t *testing.T) {
@@ -95,7 +95,7 @@ func TestOutput(t *testing.T) {
 
 	var samplesRead int
 	defer func() {
-		require.Equal(t, samplesRead, 20)
+		require.Equal(t, 20, samplesRead)
 	}()
 
 	testOutputCycle(t, func(rw http.ResponseWriter, r *http.Request) {

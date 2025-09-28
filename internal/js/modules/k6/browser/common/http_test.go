@@ -162,7 +162,7 @@ func TestValidateResourceType(t *testing.T) {
 			t.Parallel()
 
 			got := validateResourceType(log.NewNullLogger(), tt.input)
-			assert.Equal(t, got, tt.want)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

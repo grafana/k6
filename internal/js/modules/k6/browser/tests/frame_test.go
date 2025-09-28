@@ -5,10 +5,13 @@ package tests
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -241,4 +244,163 @@ func TestFrameSetChecked(t *testing.T) {
 	checked, err = p.Frames()[0].IsChecked("#el", isopts)
 	require.NoError(t, err)
 	assert.False(t, checked)
+}
+
+func TestFrameWaitForURLSuccess(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		code     string
+		expected []string
+	}{
+		{
+			name:     "when_already_at_matching_url",
+			code:     `await frame.waitForURL(/.*waitfornavigation_test\.html$/);`,
+			expected: []string{"waitfornavigation_test.html"},
+		},
+		{
+			name: "exact_url_match",
+			code: `
+				await Promise.all([
+					frame.waitForURL(page1URL),
+					frame.locator('#page1').click()
+				]);
+			`,
+			expected: []string{"page1.html"},
+		},
+		{
+			name: "regex_pattern_match",
+			code: `
+				await Promise.all([
+					frame.waitForURL(/.*2\.html$/),
+					frame.locator('#page2').click()
+				]);
+			`,
+			expected: []string{"page2.html"},
+		},
+		{
+			name: "empty_pattern_match",
+			code: `
+				await Promise.all([
+					frame.waitForURL(''),
+					frame.locator('#page2').click()
+				]);
+			`,
+			expected: []string{"page2.html", "waitfornavigation_test.html"},
+		},
+		{
+			name: "waitUntil_domcontentloaded",
+			code: `
+				await Promise.all([
+					frame.waitForURL(/.*page1\.html$/, { waitUntil: 'domcontentloaded' }),
+					frame.locator('#page1').click()
+				]);
+			`,
+			expected: []string{"page1.html"},
+		},
+		{
+			name: "already_at_url_with_regex_pattern",
+			code: `
+				await frame.waitForURL(/.*\/waitfornavigation_test\.html$/);
+			`,
+			expected: []string{"waitfornavigation_test.html"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Setup
+			tb := newTestBrowser(t, withFileServer())
+			tb.vu.ActivateVU()
+			tb.vu.StartIteration(t)
+
+			tb.vu.SetVar(t, "frame", &sobek.Object{})
+			tb.vu.SetVar(t, "testURL", tb.staticURL("waitfornavigation_test.html"))
+			tb.vu.SetVar(t, "page1URL", tb.staticURL("page1.html"))
+			_, err := tb.vu.RunAsync(t, `
+					const page = await browser.newPage();
+		
+					await page.setContent('<iframe></iframe>');
+		
+					const iframeElement = await page.$('iframe');
+					frame = await iframeElement.contentFrame();
+				`)
+			require.NoError(t, err)
+
+			// Test logic
+			code := fmt.Sprintf(`
+			await frame.goto(testURL);
+
+			%s
+			
+			return frame.url();`, tt.code)
+
+			result := tb.vu.RunPromise(t, code)
+			got := strings.ReplaceAll(result.Result().String(), tb.staticURL(""), "")
+			assert.Contains(t, tt.expected, got)
+		})
+	}
+}
+
+func TestFrameWaitForURLFailure(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		code     string
+		expected string
+	}{
+		{
+			name: "timeout_on_mismatched_url",
+			code: `
+				await Promise.all([
+					frame.waitForURL(/.*nonexistent\.html$/, { timeout: 500 }),
+					frame.locator('#page1').click()  // This goes to page1.html, not nonexistent.html
+				]);
+			`,
+			expected: "timed out after 500ms",
+		},
+		{
+			name: "missing_required_argument",
+			code: `
+				await frame.waitForURL();
+			`,
+			expected: "missing required argument 'url'",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Setup
+			tb := newTestBrowser(t, withFileServer())
+			tb.vu.ActivateVU()
+			tb.vu.StartIteration(t)
+
+			tb.vu.SetVar(t, "frame", &sobek.Object{})
+			tb.vu.SetVar(t, "testURL", tb.staticURL("waitfornavigation_test.html"))
+			_, err := tb.vu.RunAsync(t, `
+					const page = await browser.newPage();
+		
+					await page.setContent('<iframe></iframe>');
+		
+					const iframeElement = await page.$('iframe');
+					frame = await iframeElement.contentFrame();
+				`)
+			require.NoError(t, err)
+
+			// Test logic
+			code := fmt.Sprintf(`
+			await frame.goto(testURL);
+
+			%s`, tt.code)
+
+			_, err = tb.vu.RunAsync(t, code)
+			assert.ErrorContains(t, err, tt.expected)
+		})
+	}
 }

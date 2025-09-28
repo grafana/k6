@@ -444,8 +444,8 @@ func TestNewBundle(t *testing.T) {
 					export default function() {};
 				`)
 				require.NoError(t, err)
-				assert.Equal(t, b.Options.TLSVersion.Min, lib.TLSVersion(tls.VersionTLS10))
-				assert.Equal(t, b.Options.TLSVersion.Max, lib.TLSVersion(tls.VersionTLS12))
+				assert.Equal(t, lib.TLSVersion(tls.VersionTLS10), b.Options.TLSVersion.Min)
+				assert.Equal(t, lib.TLSVersion(tls.VersionTLS12), b.Options.TLSVersion.Max)
 			})
 			t.Run("String", func(t *testing.T) {
 				t.Parallel()
@@ -456,8 +456,8 @@ func TestNewBundle(t *testing.T) {
 					export default function() {};
 				`)
 				require.NoError(t, err)
-				assert.Equal(t, b.Options.TLSVersion.Min, lib.TLSVersion(tls.VersionTLS10))
-				assert.Equal(t, b.Options.TLSVersion.Max, lib.TLSVersion(tls.VersionTLS10))
+				assert.Equal(t, lib.TLSVersion(tls.VersionTLS10), b.Options.TLSVersion.Min)
+				assert.Equal(t, lib.TLSVersion(tls.VersionTLS10), b.Options.TLSVersion.Max)
 			})
 		})
 		t.Run("Thresholds", func(t *testing.T) {

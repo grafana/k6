@@ -1274,6 +1274,7 @@ function queryRole(scope, options, internal) {
   query(scope);
   return result;
 }
+
 function createRoleEngine(internal) {
   return {
     queryAll: (scope, selector) => {
@@ -1722,6 +1723,7 @@ class InjectedScript {
   constructor() {
     this._replaceRafWithTimeout = false;
     this._stableRafCount = 10;
+    this._evaluator = new SelectorEvaluatorImpl();
     this._queryEngines = {
       css: new CSSQueryEngine(),
       text: new TextQueryEngine(),
@@ -1730,11 +1732,39 @@ class InjectedScript {
       'internal:attr': new AttributeEngine(),
       'internal:label': new LabelEngine(),
       'internal:text': new TextEngine(true, true),
+      'internal:has-text': this._createInternalHasTextEngine(),
+      'internal:has-not-text': this._createInternalHasNotTextEngine(),
     };
   }
 
   _queryEngineAll(part, root) {
     return this._queryEngines[part.name].queryAll(root, part.body);
+  }
+
+  _createInternalHasTextEngine() {
+    return {
+      queryAll: (root, selector) => {
+        if (root.nodeType !== 1 /* Node.ELEMENT_NODE */)
+          return [];
+        const element = root;
+        const text = elementText(this._evaluator._cacheText, element);
+        const { matcher } = createTextMatcher(selector, true);
+        return matcher(text) ? [element] : [];
+      }
+    };
+  }
+
+  _createInternalHasNotTextEngine() {
+    return {
+      queryAll: (root, selector) => {
+        if (root.nodeType !== 1 /* Node.ELEMENT_NODE */)
+          return [];
+        const element = root;
+        const text = elementText(this._evaluator._cacheText, element);
+        const { matcher } = createTextMatcher(selector, true);
+        return matcher(text) ? [] : [element];
+      }
+    };
   }
 
   _querySelectorRecursively(roots, selector, index, queryCache) {
@@ -2445,21 +2475,9 @@ class InjectedScript {
     let lastRect = undefined;
     let counter = 0;
     let samePositionCounter = 0;
-    let lastTime = 0;
 
     const predicate = () => {
-      for (const state of states) {
-        if (state !== "stable") {
-          const result = this.checkElementState(node, state);
-          if (typeof result !== "boolean") {
-            return result;
-          }
-          if (!result) {
-            return continuePolling;
-          }
-          continue;
-        }
-
+      if (states.includes("stable")) {
         const element = this._retarget(node, "no-follow-label");
         if (!element) {
           return "error:notconnected";
@@ -2471,13 +2489,6 @@ class InjectedScript {
         if (++counter === 1) {
           return continuePolling;
         }
-
-        // Drop frames that are shorter than 16ms - WebKit Win bug.
-        const time = performance.now();
-        if (this._stableRafCount > 1 && time - lastTime < 15) {
-          return continuePolling;
-        }
-        lastTime = time;
 
         const clientRect = element.getBoundingClientRect();
         const rect = {
@@ -2504,6 +2515,20 @@ class InjectedScript {
           return continuePolling;
         }
       }
+
+      for (const state of states) {
+        if (state !== "stable") {
+          const result = this.checkElementState(node, state);
+          if (typeof result !== "boolean") {
+            return result;
+          }
+          if (!result) {
+            return continuePolling;
+          }
+          continue;
+        }
+      }
+
       return true; // All states are good!
     };
 

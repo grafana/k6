@@ -795,50 +795,96 @@ func TestSelectOption(t *testing.T) {
 func TestCount(t *testing.T) {
 	t.Parallel()
 
+	iframeID := "frameB"
+
+	setupNonCORS := func(t *testing.T) (*testBrowser, *common.Page) {
+		t.Helper()
+
+		tb := newTestBrowser(t, withFileServer())
+
+		p := tb.NewPage(nil)
+		opts := &common.FrameGotoOptions{
+			Timeout: common.DefaultTimeout,
+		}
+		_, err := p.Goto(
+			tb.staticURL("locators.html"),
+			opts,
+		)
+		require.NoError(t, err)
+
+		return tb, p
+	}
+
+	setupCORS := func(t *testing.T) (*testBrowser, *common.Page) {
+		t.Helper()
+
+		iframeHTML := `<!DOCTYPE html>
+		<html>
+		<head></head>
+		<body>
+			<button id="incrementB">Increment Counter B</button>
+		</body>
+		</html>`
+
+		tb := newTestBrowser(t, withIFrameContent(iframeHTML, iframeID))
+
+		p := tb.GotoNewPage(tb.url("/iframe"))
+
+		return tb, p
+	}
+
 	tests := []struct {
-		name string
-		do   func(*testBrowser, *common.Page)
+		name          string
+		setup         func(*testing.T) (*testBrowser, *common.Page)
+		do            func(*testBrowser, *common.Page) (int, error)
+		expectedCount int
 	}{
 		{
-			"0", func(_ *testBrowser, p *common.Page) {
+			name:  "0",
+			setup: setupNonCORS,
+			do: func(_ *testBrowser, p *common.Page) (int, error) {
 				l := p.Locator("#NOTEXIST", nil)
-				c, err := l.Count()
-				require.NoError(t, err)
-				require.Equal(t, 0, c)
+				return l.Count()
 			},
+			expectedCount: 0,
 		},
 		{
-			"1", func(_ *testBrowser, p *common.Page) {
+			name:  "1",
+			setup: setupNonCORS,
+			do: func(_ *testBrowser, p *common.Page) (int, error) {
 				l := p.Locator("#link", nil)
-				c, err := l.Count()
-				require.NoError(t, err)
-				require.Equal(t, 1, c)
+				return l.Count()
 			},
+			expectedCount: 1,
 		},
 		{
-			"3", func(_ *testBrowser, p *common.Page) {
+			name:  "3",
+			setup: setupNonCORS,
+			do: func(_ *testBrowser, p *common.Page) (int, error) {
 				l := p.Locator("a", nil)
-				c, err := l.Count()
-				require.NoError(t, err)
-				require.Equal(t, 3, c)
+				return l.Count()
 			},
+			expectedCount: 3,
+		},
+		{
+			name:  "CORS",
+			setup: setupCORS,
+			do: func(_ *testBrowser, p *common.Page) (int, error) {
+				frameBContent := p.Locator("#"+iframeID, nil).ContentFrame()
+				return frameBContent.Locator("#incrementB", nil).Count()
+			},
+			expectedCount: 1,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			tb := newTestBrowser(t, withFileServer())
-			p := tb.NewPage(nil)
-			opts := &common.FrameGotoOptions{
-				Timeout: common.DefaultTimeout,
-			}
-			_, err := p.Goto(
-				tb.staticURL("locators.html"),
-				opts,
-			)
-			tt.do(tb, p)
+			tb, p := tt.setup(t)
+
+			c, err := tt.do(tb, p)
 			require.NoError(t, err)
+			assert.Equal(t, tt.expectedCount, c)
 		})
 	}
 }
@@ -897,22 +943,422 @@ func TestLocatorNesting(t *testing.T) {
 	require.NoError(t, err)
 
 	q, err := p.Locator(`[data-testid="inventory"]`, nil).
-		Locator(`[data-item="apples"]`).
-		Locator(`.qty`).
+		Locator(`[data-item="apples"]`, nil).
+		Locator(`.qty`, nil).
 		InnerText(nil)
 	require.NoError(t, err)
 	assert.Equal(t, "0", q)
 
 	err = p.Locator(`[data-testid="inventory"]`, nil).
-		Locator(`[data-item="apples"]`).
-		Locator(`button.add`).
+		Locator(`[data-item="apples"]`, nil).
+		Locator(`button.add`, nil).
 		Click(common.NewFrameClickOptions(common.DefaultTimeout))
 	require.NoError(t, err)
 
 	q, err = p.Locator(`[data-testid="inventory"]`, nil).
-		Locator(`[data-item="apples"]`).
-		Locator(`.qty`).
+		Locator(`[data-item="apples"]`, nil).
+		Locator(`.qty`, nil).
 		InnerText(nil)
 	require.NoError(t, err)
 	assert.Equal(t, "1", q)
+}
+
+// This test ensures that the actionability checks are retried if we receive
+// any visible based errors from chrome. This is done by navigating to a page
+// where a button is hidden and unhidden every animation frame (~60 times per
+// second). We should not be able to click on the button, and if chrome returns
+// an error saying the element is not visible, we should retry. The only error
+// we expect is the timeout error.
+func TestActionabilityRetry(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withFileServer())
+
+	p := tb.NewPage(nil)
+
+	opts := &common.FrameGotoOptions{
+		Timeout: common.DefaultTimeout,
+	}
+	_, err := p.Goto(
+		tb.staticURL("hide_unhide.html"),
+		opts,
+	)
+	require.NoError(t, err)
+
+	lo := p.Locator("#incBtn", nil)
+	err = lo.Click(common.NewFrameClickOptions(1 * time.Second))
+	require.ErrorContains(t, err, "timed out after")
+
+	text, err := p.Locator("#value", nil).InnerText(nil)
+	require.NoError(t, err)
+	require.Equal(t, "0", text)
+}
+
+func TestLocatorFilter(t *testing.T) {
+	t.Parallel()
+
+	setupPage := func(t *testing.T) *common.Page {
+		t.Helper()
+
+		tb := newTestBrowser(t)
+		p := tb.NewPage(nil)
+		err := p.SetContent(`
+			<section>
+				<div>
+					<span>hello</span>
+				</div>
+				<div>
+					<span>world</span>
+				</div>
+			</section>`,
+			nil,
+		)
+		require.NoError(t, err)
+		return p
+	}
+
+	t.Run("filter_hasText", func(t *testing.T) {
+		t.Parallel()
+
+		count, err := setupPage(t).
+			Locator("div", nil).
+			Filter(&common.LocatorFilterOptions{
+				LocatorOptions: &common.LocatorOptions{
+					HasText: "hello",
+				},
+			}).
+			Count()
+		require.NoError(t, err)
+		require.Equal(t, 1, count)
+	})
+
+	t.Run("filter_hasText_on_locator_with_hasText", func(t *testing.T) {
+		t.Parallel()
+
+		count, err := setupPage(t).
+			Locator("div", &common.LocatorOptions{
+				HasText: "hello",
+			}).
+			Filter(&common.LocatorFilterOptions{
+				LocatorOptions: &common.LocatorOptions{
+					HasText: "hello",
+				},
+			}).
+			Count()
+		require.NoError(t, err)
+		require.Equal(t, 1, count)
+	})
+
+	t.Run("filter_hasText_different_on_locator_with_hasText", func(t *testing.T) {
+		t.Parallel()
+
+		count, err := setupPage(t).
+			Locator("div", &common.LocatorOptions{
+				HasText: "hello",
+			}).
+			Filter(&common.LocatorFilterOptions{
+				LocatorOptions: &common.LocatorOptions{
+					HasText: "world",
+				},
+			}).
+			Count()
+		require.NoError(t, err)
+		require.Equal(t, 0, count)
+	})
+
+	t.Run("filter_hasText_section_with_world", func(t *testing.T) {
+		t.Parallel()
+
+		count, err := setupPage(t).
+			Locator("section", &common.LocatorOptions{
+				HasText: "hello",
+			}).
+			Filter(&common.LocatorFilterOptions{
+				LocatorOptions: &common.LocatorOptions{
+					HasText: "world",
+				},
+			}).
+			Count()
+		require.NoError(t, err)
+		require.Equal(t, 1, count)
+	})
+
+	t.Run("filter_hasText_nested_locator", func(t *testing.T) {
+		t.Parallel()
+
+		count, err := setupPage(t).
+			Locator("div", nil).
+			Filter(&common.LocatorFilterOptions{
+				LocatorOptions: &common.LocatorOptions{
+					HasText: "hello",
+				},
+			}).
+			Locator("span", nil).
+			Count()
+		require.NoError(t, err)
+		require.Equal(t, 1, count)
+	})
+
+	t.Run("filter_hasNotText_hello", func(t *testing.T) {
+		t.Parallel()
+
+		count, err := setupPage(t).
+			Locator("div", nil).
+			Filter(&common.LocatorFilterOptions{
+				LocatorOptions: &common.LocatorOptions{
+					HasNotText: "hello",
+				},
+			}).
+			Count()
+		require.NoError(t, err)
+		require.Equal(t, 1, count)
+	})
+
+	t.Run("filter_hasNotText_foo", func(t *testing.T) {
+		t.Parallel()
+
+		count, err := setupPage(t).
+			Locator("div", nil).
+			Filter(&common.LocatorFilterOptions{
+				LocatorOptions: &common.LocatorOptions{
+					HasNotText: "foo",
+				},
+			}).
+			Count()
+		require.NoError(t, err)
+		require.Equal(t, 2, count)
+	})
+}
+
+func TestFrameLocatorLocatorOptions(t *testing.T) {
+	t.Parallel()
+
+	// We'll only test nil and non-nil LocatorOptions here, as the actual
+	// filtering logic is tested in TestLocatorLocatorOptions. This test
+	// just ensures that FrameLocator.Locator passes the options down correctly.
+
+	setup := func(t *testing.T) *common.FrameLocator {
+		t.Helper()
+
+		tb := newTestBrowser(t)
+		p := tb.NewPage(nil)
+		err := p.SetContent(`
+			<iframe srcdoc='
+				<section>
+					<div>
+						<span>hello</span>
+					</div>
+					<div>
+						<span>world</span>
+					</div>
+				</section>
+			'></iframe>`,
+			nil,
+		)
+		require.NoError(t, err)
+		return p.Locator("iframe", nil).ContentFrame()
+	}
+	t.Run("nil_options", func(t *testing.T) {
+		t.Parallel()
+
+		n, err := setup(t).
+			Locator("div", nil).
+			Count()
+		require.NoError(t, err)
+		require.Equal(t, 2, n)
+	})
+	t.Run("options", func(t *testing.T) {
+		t.Parallel()
+
+		n, err := setup(t).
+			Locator("div", &common.LocatorOptions{
+				HasText: "hello",
+			}).
+			Count()
+		require.NoError(t, err)
+		require.Equal(t, 1, n)
+	})
+}
+
+func TestLocatorLocatorOptions(t *testing.T) {
+	t.Parallel()
+
+	setupPage := func(t *testing.T) *common.Page {
+		t.Helper()
+
+		tb := newTestBrowser(t)
+		p := tb.NewPage(nil)
+		err := p.SetContent(`
+			<section>
+				<div>
+					<span>hello</span>
+				</div>
+				<div>
+					<span>world</span>
+				</div>
+				<div>
+					<span>good bye</span>
+					<div>
+						<span>moon</span>
+						<span>land</span>
+					</div>
+				</div>
+			</section>`,
+			nil,
+		)
+		require.NoError(t, err)
+		return p
+	}
+
+	t.Run("nil_options", func(t *testing.T) {
+		t.Parallel()
+
+		loc := setupPage(t).
+			Locator("div", nil).
+			Locator("span", nil)
+		n, err := loc.Count()
+		require.NoError(t, err)
+		require.Equal(t, 5, n)
+	})
+
+	t.Run("options", func(t *testing.T) {
+		t.Parallel()
+
+		// Selects the "moon" and "land" spans.
+		loc := setupPage(t).
+			Locator("div", &common.LocatorOptions{
+				HasText: "good bye",
+			}).
+			Locator("span", &common.LocatorOptions{
+				HasNotText: "good bye",
+			})
+		locs, err := loc.All()
+		require.NoError(t, err)
+		require.Len(t, locs, 2)
+
+		text, ok, err := locs[0].TextContent(nil)
+		require.NoError(t, err)
+		require.True(t, ok)
+		require.Equal(t, "moon", text)
+
+		text, ok, err = locs[1].TextContent(nil)
+		require.NoError(t, err)
+		require.True(t, ok)
+		require.Equal(t, "land", text)
+	})
+
+	t.Run("nil_options_with_filter", func(t *testing.T) {
+		t.Parallel()
+
+		// Finds the divs, filters to the one with "good bye",
+		// then finds its spans and filters to the one with "moon".
+		loc := setupPage(t).
+			Locator("div", nil).
+			Filter(&common.LocatorFilterOptions{
+				LocatorOptions: &common.LocatorOptions{
+					HasText: "good bye",
+				},
+			}).
+			Locator("span", nil).
+			Filter(&common.LocatorFilterOptions{
+				LocatorOptions: &common.LocatorOptions{
+					HasText: "moon",
+				},
+			})
+		n, err := loc.Count()
+		require.NoError(t, err)
+		require.Equal(t, 1, n)
+
+		text, ok, err := loc.TextContent(nil)
+		require.NoError(t, err)
+		require.True(t, ok)
+		require.Equal(t, "moon", text)
+	})
+
+	t.Run("options_with_filter", func(t *testing.T) {
+		t.Parallel()
+
+		loc := setupPage(t).
+			// Finds the div element with the "good bye" text.
+			Locator("div", &common.LocatorOptions{
+				HasText: "good bye",
+			}).
+			// Filters out child spans with the "good bye" text.
+			Locator("span", &common.LocatorOptions{
+				HasNotText: "good bye",
+			}).
+			// Filters out childs span with the "moon" text.
+			Filter(&common.LocatorFilterOptions{
+				LocatorOptions: &common.LocatorOptions{
+					HasNotText: "moon",
+				},
+			})
+		n, err := loc.Count()
+		require.NoError(t, err)
+		require.Equal(t, 1, n)
+
+		text, ok, err := loc.TextContent(nil)
+		require.NoError(t, err)
+		require.True(t, ok)
+		require.Equal(t, "land", text)
+	})
+}
+
+func TestVisibilityWithCORS(t *testing.T) {
+	t.Parallel()
+
+	iframeID := "frameB"
+
+	setupCORS := func(t *testing.T) (*testBrowser, *common.Page) {
+		t.Helper()
+
+		iframeHTML := `<!DOCTYPE html>
+		<html>
+		<head></head>
+		<body>
+			<button id="visibleButton">Hello</button>
+			<button id="hiddenButton" hidden>World</button>
+		</body>
+		</html>`
+
+		tb := newTestBrowser(t, withIFrameContent(iframeHTML, iframeID))
+
+		p := tb.GotoNewPage(tb.url("/iframe"))
+
+		return tb, p
+	}
+
+	tests := []struct {
+		name string
+		do   func(*testBrowser, *common.Page) (bool, error)
+		want bool
+	}{
+		{
+			name: "hidden",
+			do: func(_ *testBrowser, p *common.Page) (bool, error) {
+				frameBContent := p.Locator("#"+iframeID, nil).ContentFrame()
+				return frameBContent.Locator("#hiddenButton", nil).IsHidden()
+			},
+			want: true,
+		},
+		{
+			name: "visible",
+			do: func(_ *testBrowser, p *common.Page) (bool, error) {
+				frameBContent := p.Locator("#"+iframeID, nil).ContentFrame()
+				return frameBContent.Locator("#visibleButton", nil).IsVisible()
+			},
+			want: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tb, p := setupCORS(t)
+
+			got, err := tt.do(tb, p)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }

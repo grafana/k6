@@ -27,7 +27,7 @@ env:
   APP_NAME: "k6"
   DOCKER_IMAGE_ID: "grafana/k6"
   GHCR_IMAGE_ID: ${{ github.repository }}
-  DEFAULT_GO_VERSION: "1.24.x"
+  DEFAULT_GO_VERSION: "1.25.x"
 
 jobs:
   configure:
@@ -35,9 +35,10 @@ jobs:
     outputs:
       k6_version: ${{ steps.get_k6_version.outputs.k6_version }}
       go_version: ${{ steps.get_go_version.outputs.go_version }}
+      sign_windows_artifacts: ${{ steps.determine_windows_signing.outputs.sign_windows_artifacts }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -47,7 +48,7 @@ jobs:
           INPUT_K6_VERSION: ${{ github.event.inputs.k6_version  }}
         run: |
           set -x # Show exactly what commands are executed
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]] && [[ "${INPUT_K6_VERSION}" != "" ]]; then
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]] && [[ "${INPUT_K6_VERSION}" != "" ]]; then
             VERSION="${INPUT_K6_VERSION}"
             echo "Building custom dev build with version '${VERSION}' from manual workflow_dispatch..."
           elif [[ "${GITHUB_REF}" =~ ^refs/tags/v.+$ ]]; then
@@ -65,7 +66,7 @@ jobs:
           INPUT_GO_VERSION: ${{ github.event.inputs.go_version  }}
         run: |
           set -x # Show exactly what commands are executed
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]] && [[ "${INPUT_GO_VERSION}" != "" ]]; then
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]] && [[ "${INPUT_GO_VERSION}" != "" ]]; then
             GO_VERSION="${INPUT_GO_VERSION}"
             echo "Using custom Go version '${GO_VERSION}' from manual workflow_dispatch..."
           else
@@ -75,6 +76,26 @@ jobs:
           echo "GO_VERSION=${GO_VERSION}"
           echo "go_version=${GO_VERSION}" >> $GITHUB_OUTPUT
 
+      # Secrets are unavailable when building from project forks, so this
+      # will fail for external PRs, even if we wanted to do it. And we don't.
+      # We are only going to sign packages that are built from the default branch
+      # or a version tag, or manually triggered dev builds, so we have enough
+      # assurance that package signing works, but don't sign every PR build.
+      - name: Determine whether to sign the Windows artifacts
+        id: determine_windows_signing
+        env:
+          SIGN_FILES: ${{ github.ref_name == github.event.repository.default_branch || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' }}
+        run: |
+          set -x # Show exactly what commands are executed
+          if [[ "${SIGN_FILES}" == "true" ]]; then
+            echo "Windows artifacts will be signed"
+            sign_windows_artifacts="true"
+          else
+            echo "Windows artifacts will not be signed"
+            sign_windows_artifacts="false"
+          fi
+          echo "sign_windows_artifacts=${sign_windows_artifacts}" >> ${GITHUB_OUTPUT}
+
   build:
     runs-on: ubuntu-latest
     needs: [configure]
@@ -82,12 +103,12 @@ jobs:
       VERSION: ${{ needs.configure.outputs.k6_version }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
         with:
           fetch-depth: 0
           persist-credentials: false
       - name: Install Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
         with:
           go-version: ${{ needs.configure.outputs.go_version }}
           check-latest: true
@@ -131,7 +152,7 @@ jobs:
           go version
           ./build-release.sh "dist" "${VERSION}"
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: binaries
           path: dist/
@@ -148,7 +169,7 @@ jobs:
       VERSION: ${{ needs.configure.outputs.k6_version }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -228,26 +249,120 @@ jobs:
             -t $DOCKER_IMAGE_ID:latest-with-browser \
             -t ghcr.io/$GHCR_IMAGE_ID:latest-with-browser .
 
-  package-windows:
+  # Forks, PRs etc. won't actually sign the binary, but the workflow will run most of the same steps as
+  # GitHub Actions workflows don't support conditional `needs` so we have to run the signing step unconditionally.
+  sign-binaries:
     permissions:
       contents: read
       actions: read
       id-token: write # Required for Vault
+
+    env:
+      VERSION: ${{ needs.configure.outputs.k6_version }}
+
+    environment:
+      name: azure-trusted-signing
 
     runs-on: windows-latest
     defaults:
       run:
         shell: pwsh
     needs: [configure, build]
+    outputs:
+      binary_artifact_name: ${{ steps.assign-artifact-names.outputs.binary-artifact-name }}
+      windows_binary_artifact_name: ${{ steps.assign-artifact-names.outputs.windows-binary-artifact-name }}
+    steps:
+      - name: Download binaries
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: binaries
+          path: dist
+
+      - name: Unzip Windows binary
+        run: |
+          Expand-Archive -Path ".\dist\k6-${env:VERSION}-windows-amd64.zip" -DestinationPath .\packaging\
+
+      - name: Upload artifact for Windows installer build
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: windows-binary
+          path: 'packaging/k6-${{ env.VERSION }}-windows-amd64/k6.exe'
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Get secrets for Azure Trusted Signing
+        uses: grafana/shared-workflows/actions/get-vault-secrets@a37de51f3d713a30a9e4b21bcdfbd38170020593 # get-vault-secrets/v1.3.0
+        id: get-signing-secrets
+        if: needs.configure.outputs.sign_windows_artifacts == 'true'
+        with:
+          export_env: false
+          repo_secrets: |
+            client-id=azure-trusted-signing:client-id
+            subscription-id=azure-trusted-signing:subscription-id
+            tenant-id=azure-trusted-signing:tenant-id
+
+      - name: Sign Windows binary
+        uses: grafana/shared-workflows/actions/azure-trusted-signing@e86cdb1c0a8cf5df57d3078f285261f7c9577174 # azure-trusted-signing/v1.0.0
+        id: sign-artifacts
+        if: needs.configure.outputs.sign_windows_artifacts == 'true'
+        with:
+          application-description: 'Grafana k6'
+          artifact-to-sign: 'windows-binary'
+          azure-client-id: ${{ fromJSON(steps.get-signing-secrets.outputs.secrets).client-id }}
+          azure-subscription-id: ${{ fromJSON(steps.get-signing-secrets.outputs.secrets).subscription-id }}
+          azure-tenant-id: ${{ fromJSON(steps.get-signing-secrets.outputs.secrets).tenant-id }}
+          signed-artifact-name: 'windows-binary-signed'
+
+      - name: Download signed Windows binary
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        if: needs.configure.outputs.sign_windows_artifacts == 'true'
+        with:
+          name: ${{ steps.sign-artifacts.outputs.artifact-name }}
+          path: 'packaging/k6-${{ env.VERSION }}-windows-amd64'
+
+      # Re-zip the signed Windows binary to replace the original unsigned version
+      - name: Zip signed Windows binary
+        if: needs.configure.outputs.sign_windows_artifacts == 'true'
+        run: |
+          Compress-Archive -Path ".\packaging\*" -DestinationPath ".\dist\k6-${env:VERSION}-windows-amd64.zip" -Force
+
+      - name: Upload signed artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: needs.configure.outputs.sign_windows_artifacts == 'true'
+        with:
+          name: binaries-signed
+          path: dist/
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Assign artifact name for Windows binary for installer build
+        id: assign-artifact-names
+        env:
+          BINARY_ARTIFACT_NAME: ${{ needs.configure.outputs.sign_windows_artifacts == 'true' && 'binaries-signed' || 'binaries' }}
+          WINDOWS_BINARY_ARTIFACT_NAME: ${{ needs.configure.outputs.sign_windows_artifacts == 'true' && steps.sign-artifacts.outputs.artifact-name || 'windows-binary' }}
+        run: |
+          echo "binary-artifact-name=${env:BINARY_ARTIFACT_NAME}" >> ${env:GITHUB_OUTPUT}
+          echo "windows-binary-artifact-name=${env:WINDOWS_BINARY_ARTIFACT_NAME}" >> ${env:GITHUB_OUTPUT}
+
+  package:
+    permissions:
+      contents: read
+      actions: read
+
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    needs: [configure, build, sign-binaries]
     env:
       VERSION: ${{ needs.configure.outputs.k6_version }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
         with:
           persist-credentials: false
       - name: Install pandoc
-        uses: crazy-max/ghaction-chocolatey@0e015857dd851f84fcb7fb53380eb5c4c8202333 # v3.0.0
+        uses: crazy-max/ghaction-chocolatey@2526f467ccbd337d307fe179959cabbeca0bc8c0 # v3.4.0
         with:
           args: install -y pandoc
       - name: Install wix tools
@@ -255,71 +370,93 @@ jobs:
           curl -Lso wix311-binaries.zip https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip
           Expand-Archive -Path .\wix311-binaries.zip -DestinationPath .\wix311\
           echo "$pwd\wix311" | Out-File -FilePath $env:GITHUB_PATH -Append
-      - name: Download binaries
-        uses: actions/download-artifact@v4
+      - name: Download Windows binary
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
-          name: binaries
-          path: dist
-      - name: Unzip Windows binary
-        run: |
-          Expand-Archive -Path ".\dist\k6-$env:VERSION-windows-amd64.zip" -DestinationPath .\packaging\
-          move .\packaging\k6-$env:VERSION-windows-amd64\k6.exe .\packaging\
-          rmdir .\packaging\k6-$env:VERSION-windows-amd64\
+          name: ${{ needs.sign-binaries.outputs.windows_binary_artifact_name }}
+          path: packaging
 
       - name: Create the MSI package
         run: |
           $env:VERSION = $env:VERSION -replace 'v(\d+\.\d+\.\d+).*','$1'
           pandoc -s -f markdown -t rtf -o packaging\LICENSE.rtf LICENSE.md
           cd .\packaging
-          candle.exe -arch x64 "-dVERSION=$env:VERSION" k6.wxs
+          candle.exe -arch x64 "-dVERSION=${env:VERSION}" k6.wxs
           light.exe -ext WixUIExtension k6.wixobj
-      
-      # GH secrets are unavailable when building from project forks, so this
-      # will fail for external PRs, even if we wanted to do it. And we don't.
-      # We are only going to sign packages that are built from master or a
-      # version tag, or manually triggered dev builds, so we have enough
-      # assurance that package signing works, but don't sign every PR build.
-      - if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' }}
-        uses: grafana/shared-workflows/actions/get-vault-secrets@get-vault-secrets/v1.2.1
-        with:
-          repo_secrets: |
-            WIN_SIGN_CERT=winsign:WIN_SIGN_CERT
-            WIN_SIGN_PASS=winsign:WIN_SIGN_PASS
-
-      - name: Sign Windows binary and .msi package
-        if: ${{ env.WIN_SIGN_CERT != '' && env.WIN_SIGN_PASS != '' }}
-        run: |
-          # Convert base64 certificate to PFX
-          $bytes = [Convert]::FromBase64String("${{ env.WIN_SIGN_CERT }}")
-          [IO.File]::WriteAllBytes("k6.pfx", $bytes)
-
-          # Get the latest signtool executable
-          $SignTool = Get-ChildItem -Path "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Recurse -Filter signtool.exe | Where-Object { $_.DirectoryName -like "*\x64" } | Sort-Object -Descending | Select-Object -First 1
-
-          # Sign the Windows binary
-          & $SignTool sign /f k6.pfx /p "${{ env.WIN_SIGN_PASS }}" /tr "http://timestamp.digicert.com" /td sha256 /fd sha256 "packaging\k6.exe"
-
-          # Sign the MSI package
-          & $SignTool sign /f k6.pfx /p "${{ env.WIN_SIGN_PASS }}" /tr "http://timestamp.digicert.com" /td sha256 /fd sha256 "packaging\k6.msi"
-
-          # Cleanup signing artifacts
-          del k6.pfx
 
       - name: Rename MSI package
         # To keep it consistent with the other artifacts
-        run: move "packaging\k6.msi" "packaging\k6-$env:VERSION-windows-amd64.msi"
+        run: move "packaging\k6.msi" "packaging\k6-${env:VERSION}-windows-amd64.msi"
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: binaries-windows
           path: |
             packaging/k6-*.msi
           retention-days: 7
+          if-no-files-found: error
+
+  # Forks, PRs etc. won't actually sign the installer, but the workflow will run most of the same steps as
+  # GitHub Actions workflows don't support conditional `needs` so we have to run the signing step unconditionally.
+  sign-packages:
+    permissions:
+      actions: read
+      contents: read
+      id-token: write # Required for Vault
+
+    environment:
+      name: azure-trusted-signing
+
+    outputs:
+      artifact_name: ${{ steps.assign-artifact-name.outputs.artifact-name }}
+
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    needs: [configure, package]
+    steps:
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        if: needs.configure.outputs.sign_windows_artifacts == 'true'
+        with:
+          name: binaries-windows
+          path: packaging
+
+      - name: Get secrets for Azure Trusted Signing
+        uses: grafana/shared-workflows/actions/get-vault-secrets@a37de51f3d713a30a9e4b21bcdfbd38170020593 # get-vault-secrets/v1.3.0
+        id: get-signing-secrets
+        if: needs.configure.outputs.sign_windows_artifacts == 'true'
+        with:
+          export_env: false
+          repo_secrets: |
+            client-id=azure-trusted-signing:client-id
+            subscription-id=azure-trusted-signing:subscription-id
+            tenant-id=azure-trusted-signing:tenant-id
+
+      - name: Sign Windows installer
+        uses: grafana/shared-workflows/actions/azure-trusted-signing@e86cdb1c0a8cf5df57d3078f285261f7c9577174 # azure-trusted-signing/v1.0.0
+        id: sign-artifacts
+        if: needs.configure.outputs.sign_windows_artifacts == 'true'
+        with:
+          application-description: 'Grafana k6'
+          artifact-to-sign: 'binaries-windows'
+          azure-client-id: ${{ fromJSON(steps.get-signing-secrets.outputs.secrets).client-id }}
+          azure-subscription-id: ${{ fromJSON(steps.get-signing-secrets.outputs.secrets).subscription-id }}
+          azure-tenant-id: ${{ fromJSON(steps.get-signing-secrets.outputs.secrets).tenant-id }}
+          signed-artifact-name: 'binaries-windows-signed'
+
+      - name: Assign artifact name for Windows installer
+        id: assign-artifact-name
+        env:
+          ARTIFACT_NAME: ${{ needs.configure.outputs.sign_windows_artifacts == 'true' && steps.sign-artifacts.outputs.artifact-name || 'binaries-windows' }}
+        run: |
+          echo "artifact-name=${env:ARTIFACT_NAME}" >> ${env:GITHUB_OUTPUT}
 
   publish-github:
     runs-on: ubuntu-latest
-    needs: [configure, build, package-windows]
+    needs: [configure, sign-binaries, sign-packages]
     if: ${{ startsWith(github.ref, 'refs/tags/v') && github.event_name != 'workflow_dispatch' }}
     env:
       VERSION: ${{ needs.configure.outputs.k6_version }}
@@ -328,24 +465,24 @@ jobs:
        contents: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
         with:
           persist-credentials: false
       - name: Download binaries
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
-          name: binaries
+          name: ${{ needs.sign-binaries.outputs.binary_artifact_name }}
           path: dist
       - name: Download Windows binaries
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
-          name: binaries-windows
+          name: ${{ needs.sign-packages.outputs.artifact_name }}
           path: dist
       - name: Generate checksum file
         run: cd dist && sha256sum * > "k6-${VERSION}-checksums.txt"
       - name: Anchore SBOM Action
         continue-on-error: true
-        uses: anchore/sbom-action@7b36ad622f042cab6f59a75c2ac24ccb256e9b45 # v0.20.4
+        uses: anchore/sbom-action@da167eac915b4e86f08b264dbdbc867b61be6f0c # v0.20.5
         with:
           artifact-name: k6-${{ env.VERSION }}-spdx.json
           upload-release-assets: false
@@ -363,7 +500,7 @@ jobs:
 
   publish-packages:
     runs-on: ubuntu-latest
-    needs: [configure, build, package-windows]
+    needs: [configure, sign-binaries, sign-packages]
     if: ${{ startsWith(github.ref, 'refs/tags/v') && github.event_name != 'workflow_dispatch' }}
     env:
       VERSION: ${{ needs.configure.outputs.k6_version }}
@@ -374,18 +511,18 @@ jobs:
       id-token: write # Required for Vault
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
         with:
           persist-credentials: false
       - name: Download binaries
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
-          name: binaries
+          name: ${{ needs.sign-binaries.outputs.binary_artifact_name }}
           path: dist
       - name: Download Windows binaries
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
-          name: binaries-windows
+          name: ${{ needs.sign-packages.outputs.artifact_name }}
           path: dist
       - name: Rename binaries
         # To be consistent with the filenames used in dl.k6.io
@@ -393,7 +530,7 @@ jobs:
           mv "dist/k6-$VERSION-windows-amd64.msi" "dist/k6-$VERSION-amd64.msi"
           mv "dist/k6-$VERSION-linux-amd64.rpm" "dist/k6-$VERSION-amd64.rpm"
           mv "dist/k6-$VERSION-linux-amd64.deb" "dist/k6-$VERSION-amd64.deb"
-      - uses: grafana/shared-workflows/actions/get-vault-secrets@get-vault-secrets/v1.2.1
+      - uses: grafana/shared-workflows/actions/get-vault-secrets@a37de51f3d713a30a9e4b21bcdfbd38170020593 # get-vault-secrets/v1.3.0
         with:
           repo_secrets: |
             IAM_ROLE_ARN=deploy:packager-iam-role
@@ -401,7 +538,7 @@ jobs:
             PGP_SIGN_KEY_PASSPHRASE=pgp:PGP_SIGN_KEY_PASSPHRASE
             PGP_SIGN_KEY=pgp:PGP_SIGN_KEY
             S3_BUCKET=s3:AWS_S3_BUCKET
-      - uses: grafana/shared-workflows/actions/aws-auth@aws-auth/v1.0.2
+      - uses: grafana/shared-workflows/actions/aws-auth@954bcbdf6e64fe612210885b47df771d9d20447b # aws-auth/v1.0.2
         with:
           aws-region: "us-east-2"
           role-arn: ${{ env.IAM_ROLE_ARN }}
@@ -409,15 +546,15 @@ jobs:
       - name: Setup docker compose environment
         run: |
           cat > packaging/.env <<EOF
-          AWS_ACCESS_KEY_ID=${{ env.AWS_ACCESS_KEY_ID }}
-          AWS_CF_DISTRIBUTION="${{ env.AWS_CF_DISTRIBUTION }}"
+          AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+          AWS_CF_DISTRIBUTION="${AWS_CF_DISTRIBUTION}"
           AWS_DEFAULT_REGION=us-east-2
-          AWS_SECRET_ACCESS_KEY=${{ env.AWS_SECRET_ACCESS_KEY }}
-          AWS_SESSION_TOKEN=${{ env.AWS_SESSION_TOKEN }}
-          PGP_SIGN_KEY_PASSPHRASE=${{ env.PGP_SIGN_KEY_PASSPHRASE }}
-          S3_BUCKET=${{ env.S3_BUCKET }}
+          AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+          AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
+          PGP_SIGN_KEY_PASSPHRASE=${PGP_SIGN_KEY_PASSPHRASE}
+          S3_BUCKET=${S3_BUCKET}
           EOF
-          echo "${{ env.PGP_SIGN_KEY }}" > packaging/sign-key.gpg
+          echo "${PGP_SIGN_KEY}" > packaging/sign-key.gpg
       - name: Publish packages
         env:
           GITHUB_ACTOR: ${{ github.actor }}

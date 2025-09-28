@@ -20,6 +20,14 @@ import (
 	k6common "go.k6.io/k6/js/common"
 )
 
+// Common error types for element visibility.
+var (
+	// ErrElementNotVisible is returned when an element is not visible for an operation.
+	ErrElementNotVisible = errors.New("element is not visible")
+	// ErrElementNotAttachedToDOM is returned when an element is not attached to the DOM.
+	ErrElementNotAttachedToDOM = errors.New("element is not attached to the DOM")
+)
+
 const (
 	resultDone       = "done"
 	resultNeedsInput = "needsinput"
@@ -60,6 +68,10 @@ func (h *ElementHandle) boundingBox() (*Rect, error) {
 		return nil, fmt.Errorf("getting bounding box model of DOM node: %w", err)
 	}
 
+	if box == nil || box.Border == nil {
+		return nil, ErrElementNotAttachedToDOM
+	}
+
 	quad := box.Border
 	x := math.Min(quad[0], math.Min(quad[2], math.Min(quad[4], quad[6])))
 	y := math.Min(quad[1], math.Min(quad[3], math.Min(quad[5], quad[7])))
@@ -68,7 +80,7 @@ func (h *ElementHandle) boundingBox() (*Rect, error) {
 
 	position, err := h.frame.position()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("getting position of parent frame: %w", err)
 	}
 
 	return &Rect{X: x + position.X, Y: y + position.Y, Width: width, Height: height}, nil
@@ -94,7 +106,11 @@ func (h *ElementHandle) translatePointToPage(apiCtx context.Context, point Posit
 		return Position{}, err
 	}
 
-	box := el.BoundingBox()
+	box, err := el.BoundingBox()
+	if err != nil {
+		return Position{}, fmt.Errorf("getting bounding box of parent frame: %w", err)
+	}
+
 	if box.contains(point) {
 		h.logger.Debugf("ElementHandle:translatePointToPage", "point is already in the page")
 		return point, nil
@@ -197,9 +213,12 @@ func (h *ElementHandle) click(p *Position, opts *MouseClickOptions) error {
 // This will get the clickable point of the element relative to the page even
 // when the element is in an iframe. In some cases this isn't the case and we
 // need to translate the point to the page.
-func (h *ElementHandle) clickablePoint() *Position {
-	r := h.BoundingBox()
-	return &Position{X: r.X + r.Width/2, Y: r.Y + r.Height/2}
+func (h *ElementHandle) clickablePoint() (*Position, error) {
+	r, err := h.BoundingBox()
+	if err != nil {
+		return nil, err
+	}
+	return &Position{X: r.X + r.Width/2, Y: r.Y + r.Height/2}, nil
 }
 
 func (h *ElementHandle) dblclick(p *Position, opts *MouseClickOptions) error {
@@ -388,9 +407,13 @@ func (h *ElementHandle) offsetPosition(apiCtx context.Context, offset *Position)
 		return nil, fmt.Errorf("converting result (%v of type %t) to border: %w", result, result, err)
 	}
 
-	box := h.BoundingBox()
+	box, err := h.BoundingBox()
+	if err != nil {
+		return nil, err
+	}
+
 	if box == nil || (border.Left == 0 && border.Top == 0) {
-		return nil, errorFromDOMError("error:notvisible")
+		return nil, ErrElementNotVisible
 	}
 
 	// Make point relative to the padding box to align with offsetX/offsetY.
@@ -427,10 +450,10 @@ func (h *ElementHandle) scrollRectIntoViewIfNeeded(apiCtx context.Context, rect 
 	err := action.Do(cdp.WithExecutor(apiCtx, h.session))
 	if err != nil {
 		if strings.Contains(err.Error(), "Node does not have a layout object") {
-			return errorFromDOMError("error:notvisible")
+			return ErrElementNotVisible
 		}
 		if strings.Contains(err.Error(), "Node is detached from document") {
-			return errorFromDOMError("error:notconnected")
+			return ErrElementNotAttachedToDOM
 		}
 		return err
 	}
@@ -691,6 +714,40 @@ func (h *ElementHandle) waitForElementState(
 		"waiting for states %v of element %q", states, reflect.TypeOf(result))
 }
 
+// stepIntoFrame steps into an iframe/frame. Due to CORS, we need to perform this
+// step outside of the browser (chromium). It returns the frame that it has stepped
+// into and the selector to use within that frame.
+func (h *ElementHandle) stepIntoFrame(
+	apiCtx context.Context, parsedSelector *Selector, frameNavIndex int, opts *FrameWaitForSelectorOptions,
+) (*Frame, string, error) {
+	// Split selector at frame navigation boundary
+	beforeFrame, afterFrame := h.splitSelectorAtFrame(parsedSelector, frameNavIndex)
+
+	// Find the iframe element using the "before frame" selector
+	iframeSelector := h.reconstructSelector(beforeFrame)
+
+	iframeHandle, err := h.waitForSelector(apiCtx, iframeSelector, opts)
+	if err != nil {
+		return nil, "", fmt.Errorf("finding iframe with selector %q: %w", iframeSelector, err)
+	}
+
+	// This is a valid response from waitForSelector. It means that the element
+	// was either hidden or detached.
+	if iframeHandle == nil {
+		return nil, "", errors.New("check if element is visible")
+	}
+
+	frame, err := iframeHandle.ContentFrame()
+	if err != nil {
+		return nil, "", fmt.Errorf("getting iframe frame: %w", err)
+	}
+
+	// Wait for selector in the iframe using the "after frame" selector
+	afterFrameSelector := h.reconstructSelector(afterFrame)
+
+	return frame, afterFrameSelector, nil
+}
+
 func (h *ElementHandle) waitForSelector(
 	apiCtx context.Context, selector string, opts *FrameWaitForSelectorOptions,
 ) (*ElementHandle, error) {
@@ -698,6 +755,27 @@ func (h *ElementHandle) waitForSelector(
 	if err != nil {
 		return nil, err
 	}
+
+	// Check for frame navigation in the selector
+	frameNavIndex := h.findFrameNavigationIndex(parsedSelector)
+	if frameNavIndex != -1 {
+		// Strict is true because we assume the user is interested in the element
+		// in the frame and not the frame it is in.
+		opts := &FrameWaitForSelectorOptions{
+			State:   DOMElementStateAttached,
+			Timeout: opts.Timeout,
+			Strict:  true,
+		}
+
+		frame, afterFrameSelector, err := h.stepIntoFrame(apiCtx, parsedSelector, frameNavIndex, opts)
+		if err != nil {
+			return nil, err
+		}
+
+		return frame.waitForSelector(afterFrameSelector, opts)
+	}
+
+	// No frame navigation - proceed with normal waitForSelector logic
 	fn := `
 		(node, injected, selector, strict, state, timeout, ...args) => {
 			return injected.waitForSelector(selector, node, strict, state, 'raf', timeout, ...args);
@@ -719,6 +797,8 @@ func (h *ElementHandle) waitForSelector(
 	case *ElementHandle:
 		return r, nil
 	default:
+		// This is a valid response, which means that the element was either
+		// hidden or detached.
 		return nil, nil //nolint:nilnil
 	}
 }
@@ -729,6 +809,26 @@ func (h *ElementHandle) count(apiCtx context.Context, selector string) (int, err
 		return 0, err
 	}
 
+	// Check for frame navigation in the selector
+	frameNavIndex := h.findFrameNavigationIndex(parsedSelector)
+	if frameNavIndex != -1 {
+		// Strict is true because we assume the user is interested in the element
+		// in the frame and not the frame it is in.
+		opts := &FrameWaitForSelectorOptions{
+			State:   DOMElementStateAttached,
+			Timeout: h.frame.defaultTimeout(),
+			Strict:  true,
+		}
+
+		frame, afterFrameSelector, err := h.stepIntoFrame(apiCtx, parsedSelector, frameNavIndex, opts)
+		if err != nil {
+			return 0, err
+		}
+
+		return frame.count(afterFrameSelector)
+	}
+
+	// No frame navigation - proceed with normal count logic
 	fn := `
 			(node, injected, selector) => {
 				return injected.count(selector, node);
@@ -756,18 +856,66 @@ func (h *ElementHandle) count(apiCtx context.Context, selector string) (int, err
 	}
 }
 
+// findFrameNavigationIndex finds the index of the first internal:control=enter-frame directive
+func (h *ElementHandle) findFrameNavigationIndex(selector *Selector) int {
+	for i, part := range selector.Parts {
+		if part.Name == "internal:control" && part.Body == "enter-frame" {
+			return i
+		}
+	}
+	return -1
+}
+
+// splitSelectorAtFrame splits a selector at the frame navigation boundary
+func (h *ElementHandle) splitSelectorAtFrame(selector *Selector, frameIndex int) (*Selector, *Selector) {
+	beforeFrame := &Selector{
+		Selector: selector.Selector, // Keep original for reference
+		Parts:    selector.Parts[:frameIndex],
+		Capture:  selector.Capture,
+	}
+
+	afterFrame := &Selector{
+		Selector: selector.Selector, // Keep original for reference
+		Parts:    selector.Parts[frameIndex+1:],
+		Capture:  selector.Capture,
+	}
+
+	return beforeFrame, afterFrame
+}
+
+// reconstructSelector rebuilds a selector string from selector parts
+func (h *ElementHandle) reconstructSelector(selector *Selector) string {
+	if len(selector.Parts) == 0 {
+		return ""
+	}
+
+	parts := make([]string, len(selector.Parts))
+	for i, part := range selector.Parts {
+		if part.Name == "css" {
+			parts[i] = part.Body
+		} else {
+			parts[i] = part.Name + "=" + part.Body
+		}
+	}
+
+	return strings.Join(parts, " >> ")
+}
+
 // AsElement returns this element handle.
 func (h *ElementHandle) AsElement() *ElementHandle {
 	return h
 }
 
 // BoundingBox returns this element's bounding box.
-func (h *ElementHandle) BoundingBox() *Rect {
+func (h *ElementHandle) BoundingBox() (*Rect, error) {
 	bbox, err := h.boundingBox()
-	if err != nil {
-		return nil // Don't panic here, just return nil
+	if err != nil && strings.Contains(err.Error(), "Could not compute box model") {
+		return nil, fmt.Errorf("%w: %w", ErrElementNotVisible, err)
 	}
-	return bbox
+	if err != nil {
+		return nil, fmt.Errorf("getting bounding box: %w", err)
+	}
+	return bbox, nil
 }
 
 // Click scrolls element into view and clicks in the center of the element
@@ -1131,6 +1279,27 @@ func (h *ElementHandle) Query(selector string, strict bool) (_ *ElementHandle, r
 	if err != nil {
 		return nil, fmt.Errorf("parsing selector %q: %w", selector, err)
 	}
+
+	// Check for frame navigation in the selector
+	frameNavIndex := h.findFrameNavigationIndex(parsedSelector)
+	if frameNavIndex != -1 {
+		// Strict is true because we assume the user is interested in the element
+		// in the frame and not the frame it is in.
+		opts := &FrameWaitForSelectorOptions{
+			State:   DOMElementStateAttached,
+			Timeout: h.frame.defaultTimeout(),
+			Strict:  true,
+		}
+
+		frame, afterFrameSelector, err := h.stepIntoFrame(h.ctx, parsedSelector, frameNavIndex, opts)
+		if err != nil {
+			return nil, err
+		}
+
+		return frame.Query(afterFrameSelector, strict)
+	}
+
+	// No frame navigation - proceed with normal Query logic
 	querySelector := `
 		(node, injected, selector, strict) => {
 			return injected.querySelector(selector, strict, node || document);
@@ -1616,7 +1785,10 @@ func (h *ElementHandle) newPointerAction(
 				return nil, fmt.Errorf("getting element position: %w", err)
 			}
 		} else {
-			p = h.clickablePoint()
+			p, err = h.clickablePoint()
+			if err != nil {
+				return nil, fmt.Errorf("getting clickable point: %w", err)
+			}
 		}
 
 		// Further translation of the point might be necessary if the point
@@ -1673,24 +1845,43 @@ func (h *ElementHandle) newPointerAction(
 func retryPointerAction(
 	apiCtx context.Context, fn retryablePointerActionFunc, opts *ElementHandleBasePointerOptions,
 ) (res any, err error) {
-	// try the default scrolling
-	if res, err = fn(apiCtx, nil); opts.Force || err == nil {
-		return res, err
-	}
-	// try with different scrolling options
-	for _, p := range []ScrollPosition{
-		ScrollPositionStart,
-		ScrollPositionCenter,
-		ScrollPositionEnd,
-		ScrollPositionNearest,
-	} {
-		s := ScrollIntoViewOptions{Block: p, Inline: p}
-		if res, err = fn(apiCtx, &s); err == nil {
-			break
+	for {
+		res, err = fn(apiCtx, nil)
+		if opts.Force || err == nil {
+			return res, err
+		}
+
+		// try with different scrolling options
+		for _, p := range []ScrollPosition{
+			ScrollPositionStart,
+			ScrollPositionCenter,
+			ScrollPositionEnd,
+			ScrollPositionNearest,
+		} {
+			s := ScrollIntoViewOptions{Block: p, Inline: p}
+			if res, err = fn(apiCtx, &s); err == nil {
+				return res, nil
+			}
+		}
+
+		// Only locator based APIs should retry.
+		if !opts.retry {
+			return res, err
+		}
+
+		if !errors.Is(err, ErrElementNotVisible) &&
+			!errors.Is(err, ErrElementNotAttachedToDOM) {
+			return res, err
+		}
+
+		// Wait with timeout or context cancellation
+		select {
+		case <-apiCtx.Done():
+			return nil, apiCtx.Err()
+		case <-time.After(20 * time.Millisecond):
+			// Continue retrying after delay
 		}
 	}
-
-	return res, err
 }
 
 func errorFromDOMError(v any) error {
@@ -1721,8 +1912,12 @@ func errorFromDOMError(v any) error {
 	if s := "error:expectednode:"; strings.HasPrefix(serr, s) {
 		return fmt.Errorf("expected node but got %s", strings.TrimPrefix(serr, s))
 	}
+
+	if serr == "error:notconnected" {
+		return ErrElementNotAttachedToDOM
+	}
+
 	errs := map[string]string{
-		"error:notconnected":           "element is not attached to the DOM",
 		"error:notelement":             "node is not an element",
 		"error:nothtmlelement":         "not an HTMLElement",
 		"error:notfillableelement":     "element is not an <input>, <textarea> or [contenteditable] element",

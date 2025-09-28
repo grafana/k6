@@ -31,9 +31,13 @@ extended: base + sets "global" as alias for "globalThis"
 	flags.StringP("type", "t", "", "override test type, \"js\" or \"archive\"")
 	flags.StringArrayP("env", "e", nil, "add/override environment variable with `VAR=value`")
 	flags.Bool("no-thresholds", false, "don't run thresholds")
+	// TODO(@joanlopez): remove by k6 v2.0, once we completely drop the support of the deprecated --no-summary flag.
 	flags.Bool("no-summary", false, "don't show the summary at the end of the test")
+	if err := flags.MarkDeprecated("no-summary", "use --summary-mode=disabled instead"); err != nil {
+		panic(err) // Should never happen
+	}
 	flags.String("summary-mode", summary.ModeCompact.String(), "determine the summary mode,"+
-		" \"compact\", \"full\" or \"legacy\"")
+		" \"compact\", \"full\" or \"disabled\"")
 	flags.String(
 		"summary-export",
 		"",
@@ -120,7 +124,8 @@ func populateRuntimeOptionsFromEnv(opts lib.RuntimeOptions, environment map[stri
 	}
 
 	if _, err := summary.ValidateMode(opts.SummaryMode.String); err != nil {
-		// some early validation
+		// In the case of an invalid summary mode, we early stop
+		// the execution and return the error to the user.
 		return opts, err
 	}
 

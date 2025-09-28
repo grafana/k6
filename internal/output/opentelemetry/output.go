@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel/attribute"
 	otelMetric "go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -53,11 +54,11 @@ func (o *Output) StopWithTestError(_ error) error {
 	o.logger.Debug("Stopping...")
 	defer o.logger.Debug("Stopped!")
 
+	o.periodicFlusher.Stop()
+
 	if err := o.meterProvider.Shutdown(context.Background()); err != nil {
 		o.logger.WithError(err).Error("can't shutdown OpenTelemetry metric provider")
 	}
-
-	o.periodicFlusher.Stop()
 
 	return nil
 }
@@ -70,6 +71,11 @@ func (o *Output) Stop() error {
 // Start performs initialization tasks prior to Engine using the output
 func (o *Output) Start() error {
 	o.logger.Debug("Starting output...")
+
+	if !o.config.SingleCounterForRate.Bool {
+		o.logger.Warn("Exporting rate metrics as a pair of counters is deprecated" +
+			" and will be removed in future releases. Please migrate to the new format.")
+	}
 
 	exp, err := getExporter(o.config)
 	if err != nil {
@@ -173,19 +179,57 @@ func (o *Output) dispatch(entry metrics.Sample) error {
 
 		trend.Record(ctx, entry.Value, attributeSetOpt)
 	case metrics.Rate:
-		nonZero, total, err := o.metricsRegistry.getOrCreateCountersForRate(name)
+		var err error
+		if o.config.SingleCounterForRate.Bool {
+			err = o.singleCounterForRate(ctx, name, attributeSetOpt, entry)
+		} else {
+			// Deprecated path, remove with https://github.com/grafana/k6/issues/5185
+			err = o.pairOfCountersForRate(ctx, name, attributeSetOpt, entry)
+		}
 		if err != nil {
 			return err
 		}
-
-		if entry.Value != 0 {
-			nonZero.Add(ctx, 1, attributeSetOpt)
-		}
-		total.Add(ctx, 1, attributeSetOpt)
 	default:
-		o.logger.Warnf("metric %q has unsupported metric type", entry.Metric.Name)
+		return fmt.Errorf("metric %q has unsupported metric type", entry.Metric.Name)
 	}
+	return nil
+}
 
+func (o *Output) pairOfCountersForRate(
+	ctx context.Context,
+	metricName string,
+	attributeSetOpt otelMetric.MeasurementOption,
+	entry metrics.Sample,
+) error {
+	nonZero, total, err := o.metricsRegistry.getOrCreateCountersForRate(metricName)
+	if err != nil {
+		return fmt.Errorf("get or create counter for Rate metric %q: %w", metricName, err)
+	}
+	if entry.Value != 0 {
+		nonZero.Add(ctx, 1, attributeSetOpt)
+	}
+	total.Add(ctx, 1, attributeSetOpt)
+	return nil
+}
+
+func (o *Output) singleCounterForRate(
+	ctx context.Context,
+	metricName string,
+	attributeSetOpt otelMetric.MeasurementOption,
+	entry metrics.Sample,
+) error {
+	rate, err := o.metricsRegistry.getOrCreateCounterForRate(metricName)
+	if err != nil {
+		return fmt.Errorf("get or create counter for Rate metric %q: %w", metricName, err)
+	}
+	var valueType string
+	if entry.Value != 0 {
+		valueType = "nonzero"
+	} else {
+		valueType = "zero"
+	}
+	valset := attribute.NewSet(attribute.String("condition", valueType))
+	rate.Add(ctx, 1, attributeSetOpt, otelMetric.WithAttributeSet(valset))
 	return nil
 }
 

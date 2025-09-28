@@ -24,20 +24,20 @@ func mapJSHandle(vu moduleVU, jsh common.JSHandleAPI) mapping {
 			if sobekEmptyString(pageFunc) {
 				return nil, fmt.Errorf("evaluate requires a page function")
 			}
+			funcString := pageFunc.String()
+			gopts := exportArgs(gargs)
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				args := make([]any, 0, len(gargs))
-				for _, a := range gargs {
-					args = append(args, exportArg(a))
-				}
-				return jsh.Evaluate(pageFunc.String(), args...)
+				return jsh.Evaluate(funcString, gopts...)
 			}), nil
 		},
 		"evaluateHandle": func(pageFunc sobek.Value, gargs ...sobek.Value) (*sobek.Promise, error) {
 			if sobekEmptyString(pageFunc) {
 				return nil, fmt.Errorf("evaluateHandle requires a page function")
 			}
+			funcString := pageFunc.String()
+			gopts := exportArgs(gargs)
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				h, err := jsh.EvaluateHandle(pageFunc.String(), exportArgs(gargs)...)
+				h, err := jsh.EvaluateHandle(funcString, gopts...)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
 				}
