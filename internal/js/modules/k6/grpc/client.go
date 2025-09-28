@@ -7,6 +7,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	grpccompress "go.k6.io/k6/internal/js/modules/k6/grpc/compression"
 	"io"
 	"math"
 	"reflect"
@@ -264,8 +265,12 @@ func (c *Client) Connect(addr string, params sobek.Value) (bool, error) {
 		opts = append(opts, grpc.WithAuthority(p.Authority))
 	}
 
-	if p.Compression != "" {
-		opts = append(opts, grpc.WithDefaultCallOptions(grpc.UseCompressor(p.Compression)))
+	if p.Compression != nil {
+		plug, err := grpccompress.Configure(*p.Compression)
+		if err != nil {
+			return false, err
+		}
+		opts = append(opts, grpc.WithDefaultCallOptions(plug.CallOption()))
 	}
 
 	c.addr = addr
