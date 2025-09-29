@@ -38,6 +38,7 @@ labels: ["release"]
 - [ ] Share the release notes PR with the k6 open-source teams. Request contributions from all affected teams (k6-chaos, k6-docs, k6-devrel, etc.) and any other stakeholders involved in the new release.
 - [ ] Open a separate PR for bumping [the k6 Go project's version](https://github.com/grafana/k6/blob/master/internal/build/version.go#L6).
 - [ ] Open a PR in the `DefinitelyTyped/DefinitelyTyped` repository using the release branch created in the grafana/k6-DefinitelyTyped fork to update the k6 type definitions for the new release.
+- [ ] Open a PR to add the new k6 version to the extensions registry (similar to [this one](https://github.com/grafana/k6-extension-registry/pull/104) for v1.3.0).
 
 #### ~ 1 day before the release date
 
@@ -47,7 +48,9 @@ labels: ["release"]
 
 #### Documentation
 
-- [ ] Open and merge a PR from `main` in the `k6-docs` repository, copying the current k6's `next` to a folder named with the k6 version (e.g., `v1.3.x`).
+- [ ] Open and merge a PR from `main` in the `k6-docs` repository:
+  - [ ] Creating a new `v{major}.{minor}.0` file in the [next release notes folder](https://github.com/grafana/k6-docs/tree/main/docs/sources/k6/next/release-notes).
+  - [ ] Copying the current k6's `next` (including the newly created release note file) to a folder named with the k6 version (e.g., `v1.3.x`).
 - [ ] Ensure the `k6` repository release notes PR contains the correct links to the docs.
 
 #### In k6 repository
@@ -63,6 +66,11 @@ labels: ["release"]
 ```
 git checkout master && git pull && git checkout -b v1.3.x && git tag v1.3.0 -m "v1.3.0" && git push origin v1.3.0
 ```
+
+#### In k6-extension-registry
+
+- [ ] Merge the PR adding t[he new k6 version](https://github.com/grafana/k6-extension-registry/blob/main/registry.yaml#L8).
+
 
 #### Announcements
 
