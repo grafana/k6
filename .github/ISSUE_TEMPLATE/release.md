@@ -49,7 +49,7 @@ labels: ["release"]
 #### Documentation
 
 - [ ] Open and merge a PR from `main` in the `k6-docs` repository:
-  - [ ] Creating a new `v{major}.{minor}.0` file in the [next release notes folder](https://github.com/grafana/k6-docs/tree/main/docs/sources/k6/next/release-notes).
+  - [ ] Creating a new `v{major}.{minor}.0` file in the [next release notes folder](https://github.com/grafana/k6-docs/tree/main/docs/sources/k6/next/release-notes) and copy/paste the main sections of the release notes (new features, deprecations and roadmap).
   - [ ] Copying the current k6's `next` (including the newly created release note file) to a folder named with the k6 version (e.g., `v1.3.x`).
 - [ ] Ensure the `k6` repository release notes PR contains the correct links to the docs.
 
