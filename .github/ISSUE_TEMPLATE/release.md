@@ -71,7 +71,6 @@ git checkout master && git pull && git checkout -b v1.3.x && git tag v1.3.0 -m "
 
 - [ ] Merge the PR adding t[he new k6 version](https://github.com/grafana/k6-extension-registry/blob/main/registry.yaml#L8).
 
-
 #### Announcements
 
 - [ ] Notify the larger team in the #k6 channel, letting them know that the release is published by linking the release on GitHub.
