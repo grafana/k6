@@ -69,7 +69,7 @@ git checkout master && git pull && git checkout -b v1.3.x && git tag v1.3.0 -m "
 
 #### In k6-extension-registry
 
-- [ ] Merge the PR adding t[he new k6 version](https://github.com/grafana/k6-extension-registry/blob/main/registry.yaml#L8).
+- [ ] Merge the PR adding [the new k6 version](https://github.com/grafana/k6-extension-registry/blob/main/registry.yaml#L8).
 
 #### Announcements
 
