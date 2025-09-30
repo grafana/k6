@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"syscall"
 
@@ -367,4 +368,51 @@ func extractToken(gs *state.GlobalState) (string, error) {
 	}
 
 	return config.Token.String, nil
+}
+
+var (
+	srcName       = `(?P<name>k6|k6/[^/]{2}.*|k6/[^x]/.*|k6/x/[/0-9a-zA-Z_-]+|(@[a-zA-Z0-9-_]+/)?xk6-([a-zA-Z0-9-_]+)((/[a-zA-Z0-9-_]+)*))` //nolint:lll
+	srcConstraint = `=?v?0\.0\.0\+[0-9A-Za-z-]+|[vxX*|,&\^0-9.+-><=, ~]+`
+
+	reUseK6 = regexp.MustCompile(
+		`"use +k6(( with ` + srcName + `( *(?P<constraints>` + srcConstraint + `))?)|(( *(?P<k6Constraints>` + srcConstraint + `)?)))"`) //nolint:lll
+
+	idxUseName          = reUseK6.SubexpIndex("name")
+	idxUseConstraints   = reUseK6.SubexpIndex("constraints")
+	idxUseK6Constraints = reUseK6.SubexpIndex("k6Constraints")
+)
+
+const NameK6 = "k6"
+
+func processUseDirectives(text []byte) (k6deps.Dependencies, error) {
+	deps := make(k6deps.Dependencies)
+	for _, match := range reUseK6.FindAllSubmatch(text, -1) {
+		var dep *k6deps.Dependency
+		var err error
+
+		if constraints := string(match[idxUseK6Constraints]); len(constraints) != 0 {
+			dep, err = k6deps.NewDependency(NameK6, constraints)
+			if err != nil {
+				return deps, err
+			}
+		}
+
+		if extension := string(match[idxUseName]); len(extension) != 0 {
+			constraints := string(match[idxUseConstraints])
+
+			dep, err = k6deps.NewDependency(extension, constraints)
+			if err != nil {
+				return deps, err
+			}
+		}
+
+		if dep != nil {
+			if _, ok := deps[dep.Name]; ok {
+				return deps, fmt.Errorf("Already had a use directivce for %q", dep.Name)
+			}
+			deps[dep.Name] = dep
+		}
+	}
+
+	return deps, nil
 }
