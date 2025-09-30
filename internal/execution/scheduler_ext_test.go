@@ -65,7 +65,7 @@ func newTestScheduler(
 	if runner == nil {
 		runner = &minirunner.MiniRunner{}
 	}
-	ctx, cancel = context.WithCancel(context.Background())
+	ctx, cancel = context.WithCancel(t.Context())
 	newOpts, err := executor.DeriveScenariosFromShortcuts(lib.Options{
 		MetricSamplesBufferSize: null.NewInt(200, false),
 	}.Apply(runner.GetOptions()).Apply(opts), nil)
@@ -146,7 +146,7 @@ func TestSchedulerRunNonDefault(t *testing.T) {
 			execScheduler, err := execution.NewScheduler(testRunState, local.NewController())
 			require.NoError(t, err)
 
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 
 			done := make(chan struct{})
@@ -262,7 +262,7 @@ func TestSchedulerRunEnv(t *testing.T) {
 			execScheduler, err := execution.NewScheduler(testRunState, local.NewController())
 			require.NoError(t, err)
 
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 
 			done := make(chan struct{})
@@ -336,7 +336,7 @@ func TestSchedulerSystemTags(t *testing.T) {
 	execScheduler, err := execution.NewScheduler(testRunState, local.NewController())
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
 	defer cancel()
 
 	samples := make(chan metrics.SampleContainer)
@@ -475,7 +475,7 @@ func TestSchedulerRunCustomTags(t *testing.T) {
 			execScheduler, err := execution.NewScheduler(testRunState, local.NewController())
 			require.NoError(t, err)
 
-			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
 			defer cancel()
 
 			done := make(chan struct{})
@@ -646,7 +646,7 @@ func TestSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 	execScheduler, err := execution.NewScheduler(testRunState, local.NewController())
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
 	defer cancel()
 
 	samples := make(chan metrics.SampleContainer)
@@ -983,7 +983,7 @@ func TestSchedulerEndIterations(t *testing.T) {
 		Options: options,
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	testRunState := getTestRunState(t, getTestPreInitState(t), runner.GetOptions(), runner)
@@ -1202,7 +1202,7 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 	execScheduler, err := execution.NewScheduler(testRunState, local.NewController())
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	done := make(chan struct{})

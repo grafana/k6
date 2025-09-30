@@ -12,7 +12,7 @@ import (
 )
 
 func BenchmarkMeasureAndEmitMetrics(b *testing.B) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(b.Context())
 	defer cancel()
 	samples := make(chan metrics.SampleContainer, 10)
 	defer close(samples)

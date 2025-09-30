@@ -338,7 +338,7 @@ func TestFrameWaitForURLSuccess(t *testing.T) {
 			
 			return frame.url();`, tt.code)
 
-			result := tb.vu.RunPromise(t, code)
+			result := tb.vu.RunPromise(t, "%s", code)
 			got := strings.ReplaceAll(result.Result().String(), tb.staticURL(""), "")
 			assert.Contains(t, tt.expected, got)
 		})
@@ -399,7 +399,7 @@ func TestFrameWaitForURLFailure(t *testing.T) {
 
 			%s`, tt.code)
 
-			_, err = tb.vu.RunAsync(t, code)
+			_, err = tb.vu.RunAsync(t, "%s", code)
 			assert.ErrorContains(t, err, tt.expected)
 		})
 	}

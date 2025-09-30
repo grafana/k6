@@ -77,12 +77,12 @@ func TestNewJSRunnerWithCustomModule(t *testing.T) {
 	assert.Equal(t, 1, checkModule.initCtxCalled)
 	assert.Equal(t, 0, checkModule.vuCtxCalled)
 
-	vu, err := runner.NewVU(context.Background(), 1, 1, make(chan metrics.SampleContainer, 100))
+	vu, err := runner.NewVU(t.Context(), 1, 1, make(chan metrics.SampleContainer, 100))
 	require.NoError(t, err)
 	assert.Equal(t, 2, checkModule.initCtxCalled)
 	assert.Equal(t, 0, checkModule.vuCtxCalled)
 
-	vuCtx, vuCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	vuCtx, vuCancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer vuCancel()
 
 	activeVU := vu.Activate(&lib.VUActivationParams{RunContext: vuCtx})
@@ -108,7 +108,7 @@ func TestNewJSRunnerWithCustomModule(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 3, checkModule.initCtxCalled) // changes because we need to get the exported functions
 	assert.Equal(t, 2, checkModule.vuCtxCalled)
-	vuFromArc, err := runnerFromArc.NewVU(context.Background(), 2, 2, make(chan metrics.SampleContainer, 100))
+	vuFromArc, err := runnerFromArc.NewVU(t.Context(), 2, 2, make(chan metrics.SampleContainer, 100))
 	require.NoError(t, err)
 	assert.Equal(t, 4, checkModule.initCtxCalled)
 	assert.Equal(t, 2, checkModule.vuCtxCalled)

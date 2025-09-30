@@ -82,7 +82,7 @@ func TestCompressionBodyError(t *testing.T) {
 
 func TestMakeRequestError(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	t.Cleanup(cancel)
 
 	t.Run("bad compression algorithm body", func(t *testing.T) {
@@ -115,7 +115,7 @@ func TestMakeRequestError(t *testing.T) {
 			w.WriteHeader(http.StatusSwitchingProtocols)
 		}))
 		defer srv.Close()
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 		logger := logrus.New()
 		logger.Level = logrus.DebugLevel
@@ -176,7 +176,7 @@ func TestResponseStatus(t *testing.T) {
 					BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 					Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 				}
-				req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, server.URL, nil)
+				req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL, nil)
 				require.NoError(t, err)
 
 				preq := &ParsedHTTPRequest{
@@ -188,7 +188,7 @@ func TestResponseStatus(t *testing.T) {
 					TagsAndMeta:  state.Tags.GetCurrentValues(),
 				}
 
-				ctx, cancel := context.WithCancel(context.Background())
+				ctx, cancel := context.WithCancel(t.Context())
 				defer cancel()
 				res, err := MakeRequest(ctx, state, preq)
 				require.NoError(t, err)
@@ -240,7 +240,7 @@ func TestMakeRequestTimeoutInTheMiddle(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 	}))
 	defer srv.Close()
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	samples := make(chan metrics.SampleContainer, 10)
 	logger := logrus.New()
@@ -257,7 +257,7 @@ func TestMakeRequestTimeoutInTheMiddle(t *testing.T) {
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 		Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 	}
-	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, srv.URL, nil)
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL, nil)
 	preq := &ParsedHTTPRequest{
 		Req:              req,
 		URL:              &URL{u: req.URL, URL: srv.URL},
@@ -317,7 +317,7 @@ func TestTrailFailed(t *testing.T) {
 
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithCancel(t.Context())
 			t.Cleanup(cancel)
 
 			samples := make(chan metrics.SampleContainer, 10)
@@ -335,7 +335,7 @@ func TestTrailFailed(t *testing.T) {
 				BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 				Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 			}
-			req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, srv.URL, nil)
+			req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL, nil)
 			preq := &ParsedHTTPRequest{
 				Req:              req,
 				URL:              &URL{u: req.URL, URL: srv.URL},
@@ -375,7 +375,7 @@ func TestMakeRequestDialTimeout(t *testing.T) {
 		t.Skipf("dial timeout doesn't get returned on windows") // or we don't match it correctly
 	}
 	t.Parallel()
-	ln, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "localhost:0")
+	ln, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "localhost:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -383,7 +383,7 @@ func TestMakeRequestDialTimeout(t *testing.T) {
 	defer func() {
 		require.NoError(t, ln.Close())
 	}()
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	samples := make(chan metrics.SampleContainer, 10)
 	logger := logrus.New()
@@ -405,7 +405,7 @@ func TestMakeRequestDialTimeout(t *testing.T) {
 		Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 	}
 
-	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://"+addr.String(), nil)
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://"+addr.String(), nil)
 	preq := &ParsedHTTPRequest{
 		Req:              req,
 		URL:              &URL{u: req.URL, URL: req.URL.String()},
@@ -443,7 +443,7 @@ func TestMakeRequestTimeoutInTheBegining(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 	}))
 	defer srv.Close()
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	samples := make(chan metrics.SampleContainer, 10)
 	logger := logrus.New()
@@ -460,7 +460,7 @@ func TestMakeRequestTimeoutInTheBegining(t *testing.T) {
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 		Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 	}
-	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, srv.URL, nil)
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL, nil)
 	preq := &ParsedHTTPRequest{
 		Req:              req,
 		URL:              &URL{u: req.URL, URL: srv.URL},
@@ -500,7 +500,7 @@ func TestMakeRequestRPSLimit(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	samples := make(chan metrics.SampleContainer, 10)
@@ -541,7 +541,7 @@ func TestMakeRequestRPSLimit(t *testing.T) {
 			assert.InDelta(t, val, 3, 3)
 			return
 		default:
-			req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, ts.URL, nil)
+			req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, ts.URL, nil)
 			preq := &ParsedHTTPRequest{
 				Req:         req,
 				URL:         &URL{u: req.URL, URL: ts.URL, Name: ts.URL},

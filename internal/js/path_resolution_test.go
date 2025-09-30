@@ -1,7 +1,6 @@
 package js
 
 import (
-	"context"
 	"net/url"
 	"testing"
 
@@ -263,7 +262,7 @@ func TestPathResolution(t *testing.T) {
 			}
 			require.NoError(t, err)
 
-			_, err = b.Instantiate(context.Background(), 0)
+			_, err = b.Instantiate(t.Context(), 0)
 			require.NoError(t, err)
 			logs := hook.Drain()
 
@@ -298,7 +297,7 @@ func TestPathResolution(t *testing.T) {
 			}
 			require.NoError(t, err)
 
-			_, err = b.Instantiate(context.Background(), 0)
+			_, err = b.Instantiate(t.Context(), 0)
 			require.NoError(t, err)
 			logs := hook.Drain()
 
@@ -525,7 +524,7 @@ func TestImportMetaResolve(t *testing.T) {
 			}
 			require.NoError(t, err)
 
-			_, err = b.Instantiate(context.Background(), 0)
+			_, err = b.Instantiate(t.Context(), 0)
 			require.NoError(t, err)
 			logs := hook.Drain()
 

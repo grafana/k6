@@ -4,6 +4,8 @@ export const options = {
   scenarios: {
     ui: {
       executor: 'shared-iterations',
+	iterations:200,
+	vus: 5,
       options: {
         browser: {
             type: 'chromium',
@@ -19,7 +21,7 @@ export const options = {
 export default async function() {
   const context = await browser.newContext();
   const page = await context.newPage();
-  
+
   try {
     await page.goto('https://quickpizza.grafana.com/test.k6.io/');
     await page.screenshot({ path: 'screenshot.png' });

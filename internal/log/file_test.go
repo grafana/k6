@@ -128,7 +128,7 @@ func TestFileHookFire(t *testing.T) {
 		levels:   logrus.AllLevels,
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 
 	go hook.Listen(ctx)
 

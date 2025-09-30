@@ -126,7 +126,7 @@ func testMapOfErrorCodes(t *testing.T, testTable map[errCode]error) {
 func TestConnReset(t *testing.T) {
 	t.Parallel()
 	// based on https://gist.github.com/jpittis/4357d817dc425ae99fbf719828ab1800
-	ln, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "localhost:0")
+	ln, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "localhost:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -226,7 +226,7 @@ func TestX509HostnameError(t *testing.T) {
 		badHostname: *badHost,
 	})
 	require.NoError(t, err)
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, tb.Replacer.Replace("https://"+badHostname+":HTTPSBIN_PORT/get"), nil)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, tb.Replacer.Replace("https://"+badHostname+":HTTPSBIN_PORT/get"), nil)
 	require.NoError(t, err)
 	res, err := client.Do(req) //nolint:bodyclose
 	require.Nil(t, res)
@@ -247,7 +247,7 @@ func TestX509UnknownAuthorityError(t *testing.T) {
 			DialContext: tb.HTTPTransport.DialContext,
 		},
 	}
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, tb.Replacer.Replace("HTTPSBIN_URL/get"), nil)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, tb.Replacer.Replace("HTTPSBIN_URL/get"), nil)
 	require.NoError(t, err)
 	res, err := client.Do(req) //nolint:bodyclose
 	require.Nil(t, res)
@@ -261,7 +261,7 @@ func TestX509UnknownAuthorityError(t *testing.T) {
 func TestDefaultTLSError(t *testing.T) {
 	t.Parallel()
 
-	l, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
+	l, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	go func() {
 		conn, err := l.Accept()

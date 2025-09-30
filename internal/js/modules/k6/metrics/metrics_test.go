@@ -1,7 +1,6 @@
 package metrics
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"testing"
@@ -106,7 +105,7 @@ func TestMetrics(t *testing.T) {
 						InitEnvField: &common.InitEnvironment{
 							TestPreInitState: &lib.TestPreInitState{Registry: registry},
 						},
-						CtxField: context.Background(),
+						CtxField: t.Context(),
 					}
 					m, ok := New().NewModuleInstance(mii).(*ModuleInstance)
 					require.True(t, ok)
@@ -173,7 +172,7 @@ func TestMetricGetName(t *testing.T) {
 	mii := &modulestest.VU{
 		RuntimeField: rt,
 		InitEnvField: &common.InitEnvironment{TestPreInitState: &lib.TestPreInitState{Registry: metrics.NewRegistry()}},
-		CtxField:     context.Background(),
+		CtxField:     t.Context(),
 	}
 	m, ok := New().NewModuleInstance(mii).(*ModuleInstance)
 	require.True(t, ok)
@@ -201,7 +200,7 @@ func TestMetricDuplicates(t *testing.T) {
 	mii := &modulestest.VU{
 		RuntimeField: rt,
 		InitEnvField: &common.InitEnvironment{TestPreInitState: &lib.TestPreInitState{Registry: metrics.NewRegistry()}},
-		CtxField:     context.Background(),
+		CtxField:     t.Context(),
 	}
 	m, ok := New().NewModuleInstance(mii).(*ModuleInstance)
 	require.True(t, ok)

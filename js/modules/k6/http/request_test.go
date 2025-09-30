@@ -2373,7 +2373,7 @@ func GetTestServerWithCertificate(t *testing.T, certPem, key []byte, suitesIDs .
 		ResponseHeaderTimeout: time.Second,
 		IdleConnTimeout:       time.Second,
 	}
-	s.Listener, err = (&net.ListenConfig{}).Listen(context.Background(), "tcp", "")
+	s.Listener, err = (&net.ListenConfig{}).Listen(t.Context(), "tcp", "")
 	require.NoError(t, err)
 	s.Listener = tls.NewListener(s.Listener, s.TLS)
 	return s, client

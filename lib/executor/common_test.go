@@ -44,7 +44,7 @@ func getTestRunState(tb testing.TB, options lib.Options, runner lib.Runner) *lib
 func setupExecutor(t testing.TB, config lib.ExecutorConfig, es *lib.ExecutionState) (
 	context.Context, context.CancelFunc, lib.Executor, *testutils.SimpleLogrusHook,
 ) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	engineOut := make(chan metrics.SampleContainer, 100) // TODO: return this for more complicated tests?
 
 	logHook := testutils.NewLogHook(logrus.WarnLevel)

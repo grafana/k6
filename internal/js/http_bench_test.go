@@ -41,7 +41,7 @@ func BenchmarkHTTPRequests(b *testing.B) {
 
 	ch := newDevNullSampleChannel()
 	defer close(ch)
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(b.Context())
 	defer cancel()
 	initVU, err := r.NewVU(ctx, 1, 1, ch)
 	require.NoError(b, err)
@@ -75,7 +75,7 @@ func BenchmarkHTTPRequestsBase(b *testing.B) {
 
 	ch := newDevNullSampleChannel()
 	defer close(ch)
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(b.Context())
 	defer cancel()
 	initVU, err := r.NewVU(ctx, 1, 1, ch)
 	require.NoError(b, err)

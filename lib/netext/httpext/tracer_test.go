@@ -116,7 +116,7 @@ func TestTracer(t *testing.T) { //nolint:tparallel
 		t.Run(fmt.Sprintf("Test #%d", tnum), func(t *testing.T) {
 			// Do not enable parallel testing, test relies on sequential execution
 			tracer, ct := getTestTracer(t)
-			ctx := httptrace.WithClientTrace(context.Background(), ct)
+			ctx := httptrace.WithClientTrace(t.Context(), ct)
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, srv.URL+"/get", nil)
 			require.NoError(t, err)
 
@@ -207,7 +207,7 @@ func TestTracerNegativeHttpSendingValues(t *testing.T) {
 
 	{
 		tracer := &Tracer{}
-		ctx := httptrace.WithClientTrace(context.Background(), tracer.Trace())
+		ctx := httptrace.WithClientTrace(t.Context(), tracer.Trace())
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, srv.URL+"/get", nil)
 		require.NoError(t, err)
 		res, err := transport.RoundTrip(req)
@@ -223,7 +223,7 @@ func TestTracerNegativeHttpSendingValues(t *testing.T) {
 
 	{
 		tracer := &Tracer{}
-		ctx := httptrace.WithClientTrace(context.Background(), tracer.Trace())
+		ctx := httptrace.WithClientTrace(t.Context(), tracer.Trace())
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, srv.URL+"/get", nil)
 		require.NoError(t, err)
 		res, err := transport.RoundTrip(req)
@@ -246,7 +246,7 @@ func TestTracerError(t *testing.T) {
 	defer srv.Close()
 
 	tracer := &Tracer{}
-	ctx := httptrace.WithClientTrace(context.Background(), tracer.Trace())
+	ctx := httptrace.WithClientTrace(t.Context(), tracer.Trace())
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, srv.URL+"/get", nil)
 	require.NoError(t, err)
 
@@ -262,7 +262,7 @@ func TestCancelledRequest(t *testing.T) {
 
 	cancelTest := func(t *testing.T) {
 		tracer := &Tracer{}
-		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, srv.URL+"/delay/1", nil)
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL+"/delay/1", nil)
 		require.NoError(t, err)
 
 		ctx, cancel := context.WithCancel(httptrace.WithClientTrace(req.Context(), tracer.Trace()))

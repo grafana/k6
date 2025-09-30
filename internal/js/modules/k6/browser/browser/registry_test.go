@@ -204,7 +204,7 @@ func TestBrowserRegistry(t *testing.T) {
 
 		var (
 			vu              = k6test.NewVU(t)
-			browserRegistry = newBrowserRegistry(context.Background(), vu, remoteRegistry, &pidRegistry{}, nil)
+			browserRegistry = newBrowserRegistry(t.Context(), vu, remoteRegistry, &pidRegistry{}, nil)
 		)
 
 		vu.ActivateVU()
@@ -237,7 +237,7 @@ func TestBrowserRegistry(t *testing.T) {
 
 		var (
 			vu              = k6test.NewVU(t)
-			browserRegistry = newBrowserRegistry(context.Background(), vu, remoteRegistry, &pidRegistry{}, nil)
+			browserRegistry = newBrowserRegistry(t.Context(), vu, remoteRegistry, &pidRegistry{}, nil)
 		)
 
 		vu.ActivateVU()
@@ -256,7 +256,7 @@ func TestBrowserRegistry(t *testing.T) {
 		waitDone := events.Emit(&k6event.Event{
 			Type: k6event.Exit,
 		})
-		require.NoError(t, waitDone(context.Background()), "error waiting on Exit done")
+		require.NoError(t, waitDone(t.Context()), "error waiting on Exit done")
 
 		// Verify there are no browsers left
 		assert.Equal(t, 0, browserRegistry.browserCount())
@@ -267,7 +267,7 @@ func TestBrowserRegistry(t *testing.T) {
 
 		var (
 			vu              = k6test.NewVU(t)
-			browserRegistry = newBrowserRegistry(context.Background(), vu, remoteRegistry, &pidRegistry{}, nil)
+			browserRegistry = newBrowserRegistry(t.Context(), vu, remoteRegistry, &pidRegistry{}, nil)
 		)
 
 		vu.ActivateVU()
@@ -290,7 +290,7 @@ func TestBrowserRegistry(t *testing.T) {
 		vu := k6test.NewVU(t)
 		var cancel context.CancelFunc
 		vu.CtxField, cancel = context.WithCancel(vu.CtxField)
-		browserRegistry := newBrowserRegistry(context.Background(), vu, remoteRegistry, &pidRegistry{}, nil)
+		browserRegistry := newBrowserRegistry(t.Context(), vu, remoteRegistry, &pidRegistry{}, nil)
 
 		vu.ActivateVU()
 
@@ -312,7 +312,7 @@ func TestBrowserRegistry(t *testing.T) {
 		waitDone := events.Emit(&k6event.Event{
 			Type: k6event.Exit,
 		})
-		require.NoError(t, waitDone(context.Background()), "error waiting on Exit done")
+		require.NoError(t, waitDone(t.Context()), "error waiting on Exit done")
 
 		// Verify there are no browsers left
 		assert.Equal(t, 0, browserRegistry.browserCount())

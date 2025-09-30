@@ -364,7 +364,7 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 	}
 	require.NoError(t, http2.ConfigureTransport(transport))
 
-	ctx, ctxCancel := context.WithCancel(context.Background())
+	ctx, ctxCancel := context.WithCancel(t.Context())
 
 	result := &HTTPMultiBin{
 		Mux:         mux,

@@ -260,7 +260,7 @@ func TestConsoleLog(t *testing.T) {
 				`exports.default = function() { console.log(%s); }`, tt.in))
 			require.NoError(t, err)
 
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			samples := make(chan metrics.SampleContainer, 100)
 			initVU, err := r.newVU(ctx, 1, 1, samples)
@@ -368,7 +368,7 @@ func TestConsoleLevels(t *testing.T) {
 					))
 					require.NoError(t, err)
 
-					ctx, cancel := context.WithCancel(context.Background())
+					ctx, cancel := context.WithCancel(t.Context())
 					defer cancel()
 
 					samples := make(chan metrics.SampleContainer, 100)
@@ -458,7 +458,7 @@ func TestFileConsole(t *testing.T) {
 							})
 							require.NoError(t, err)
 
-							ctx, cancel := context.WithCancel(context.Background())
+							ctx, cancel := context.WithCancel(t.Context())
 							defer cancel()
 
 							samples := make(chan metrics.SampleContainer, 100)
