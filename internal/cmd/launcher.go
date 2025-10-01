@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -21,6 +22,7 @@ import (
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/ext"
 	"go.k6.io/k6/internal/build"
+	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/lib/fsext"
 )
 
@@ -415,4 +417,27 @@ func processUseDirectives(text []byte) (k6deps.Dependencies, error) {
 	}
 
 	return deps, nil
+}
+
+func extractUnknownModules(err error) (k6deps.Dependencies, error) {
+	deps := make(k6deps.Dependencies)
+	if err == nil {
+		return deps, nil
+	}
+
+	var u modules.UnknownModulesError
+
+	if errors.As(err, &u) {
+		for _, name := range u.List() {
+			dep, err := k6deps.NewDependency(name, "")
+			if err != nil { // this is impossible
+				panic(err)
+			}
+
+			deps[name] = dep
+		}
+		return deps, nil
+	}
+
+	return nil, err
 }

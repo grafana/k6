@@ -142,6 +142,10 @@ func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
 		logger.Debug("Trying to load as a JS test...")
 		moduleResolver := js.NewModuleResolver(pwd, lt.preInitState, lt.fileSystems)
 		err := moduleResolver.LoadMainModule(pwd, specifier, lt.source.Data)
+		deps, iErr := extractUnknownModules(err)
+		if iErr != nil {
+			return fmt.Errorf("could not load JS test '%s': %w", testPath, iErr)
+		}
 		for _, imported := range moduleResolver.Imported() {
 			if strings.HasPrefix(imported, "k6") {
 				continue
@@ -155,16 +159,31 @@ func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
 			if err != nil {
 				panic(err)
 			}
-			deps, err := processUseDirectives(d.Data)
+			newdeps, err := processUseDirectives(d.Data)
 			if err != nil {
 				panic(err)
 			}
-			logger.Debugf("dependencies from %q: %q", imported, deps)
+			logger.Debugf("dependencies from %q: %q", imported, newdeps)
+			for _, dep := range newdeps {
+				deps.Update(dep)
+			}
+		}
+		if len(deps) > 0 {
+			provisioner := newK6BuildProvisioner(gs)
+			customBinary, err := provisioner.provision(deps)
+			if err != nil {
+				logger.
+					WithError(err).
+					Error("Failed to provision a k6 binary with required dependencies." +
+						" Please, make sure to report this issue by opening a bug report.")
+				return err
+			}
 
+			customBinary.run(gs)
+
+			logger.WithField("dependency", deps).Fatal("loading dependancies")
 		}
-		if err != nil {
-			return fmt.Errorf("could not load JS test '%s': %w", testPath, err)
-		}
+
 		runner, err := js.New(lt.preInitState, lt.source, lt.fileSystems, moduleResolver)
 		// TODO: should we use common.UnwrapGojaInterruptedError() here?
 		if err != nil {

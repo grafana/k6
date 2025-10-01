@@ -110,8 +110,8 @@ func (mr *ModuleResolver) resolveLoaded(basePWD *url.URL, arg string, data []byt
 		return nil, err
 	}
 	// try cache with the final specifier
-	if cached, ok := mr.cache[specifier.String()]; ok {
-		return cached.mod, cached.err
+	if Update, ok := mr.cache[specifier.String()]; ok {
+		return Update.mod, Update.err
 	}
 	prg, _, err := mr.compiler.Parse(string(data), specifier.String(), false, true)
 
@@ -136,7 +136,8 @@ func (mr *ModuleResolver) resolveLoaded(basePWD *url.URL, arg string, data []byt
 	}
 	potentialRequireCalls := findRequireFunctionInAST(prg.Body)
 	if len(potentialRequireCalls) > 0 {
-		mr.logger.Debugf("will try to preload the potential `require` calls from within %q: %q", specifier, potentialRequireCalls)
+		mr.logger.Debugf("will try to preload the potential `require` calls from within %q: %q",
+			specifier, potentialRequireCalls)
 	}
 	for _, requireArg := range potentialRequireCalls {
 		_, requireErr := mr.resolve(basePWD, requireArg)
@@ -248,7 +249,7 @@ func (mr *ModuleResolver) LoadMainModule(pwd *url.URL, specifier string, data []
 	unknownModules := mr.unknownModules()
 	if len(unknownModules) > 0 {
 		slices.Sort(unknownModules)
-		return unknownModulesError{unknownModules: unknownModules}
+		return UnknownModulesError{unknownModules: unknownModules}
 	}
 
 	return nil
@@ -346,13 +347,19 @@ func ExportGloballyModule(rt *sobek.Runtime, modSys *ModuleSystem, moduleName st
 	}
 }
 
-// TODO: move it to lib or something so it can be used to figure out what is going on.
-type unknownModulesError struct {
+// UnknownModulesError is an error returned when loading a module couldn't happen
+// due to trying to load internal modules that are unknown
+type UnknownModulesError struct {
 	unknownModules []string
 }
 
-func (u unknownModulesError) Error() string {
+func (u UnknownModulesError) Error() string {
 	return fmt.Sprintf("unknown modules %q were tried to be loaded, but couldn't - "+
 		"this likely means binary provisioning is required or a custom k6 binary with more extenstsions",
 		u.unknownModules)
+}
+
+// List returns the list of unknown modules leading to the error
+func (u *UnknownModulesError) List() []string {
+	return slices.Clone(u.unknownModules)
 }
