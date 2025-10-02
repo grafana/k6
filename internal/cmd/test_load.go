@@ -12,6 +12,7 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/grafana/k6deps"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -148,59 +149,9 @@ func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
 		if iErr != nil {
 			return fmt.Errorf("could not load JS test '%s': %w", testPath, iErr)
 		}
-		for _, imported := range moduleResolver.Imported() {
-			if strings.HasPrefix(imported, "k6") {
-				continue
-			}
-			u, err := url.Parse(imported)
-			if err != nil {
-				panic(err)
-			}
-			// TODO: do not load it like this :shrug:
-			d, err := loader.Load(logger, lt.fileSystems, u, u.String())
-			if err != nil {
-				panic(err)
-			}
-			newdeps, err := processUseDirectives(d.Data)
-			if err != nil {
-				panic(err)
-			}
-			logger.Debugf("dependencies from %q: %q", imported, newdeps)
-			for _, dep := range newdeps {
-				err := deps.Update(dep)
-				if err != nil {
-					panic(err)
-				}
-			}
-		}
-		if len(deps) > 0 {
-			if !isCustomBuildRequired(deps, build.Version, ext.GetAll()) {
-				logger.
-					Debug("The current k6 binary already satisfies all the required dependencies," +
-						" it isn't required to provision a new binary.")
-				return nil
-			}
-
-			logger.
-				WithField("deps", deps).
-				Info("Automatic extension resolution is enabled. The current k6 binary doesn't satisfy all dependencies," +
-					" it's required to provision a custom binary.")
-			provisioner := newK6BuildProvisioner(gs)
-			customBinary, err := provisioner.provision(deps)
-			if err != nil {
-				logger.
-					WithError(err).
-					Error("Failed to provision a k6 binary with required dependencies." +
-						" Please, make sure to report this issue by opening a bug report.")
-				return err
-			}
-
-			err = customBinary.run(gs)
-			if err != nil {
-				panic(err)
-			}
-
-			logger.WithField("dependency", deps).Fatal("loading dependencies")
+		err = figureOutAutoExtensionResolution(moduleResolver, logger, lt, deps, gs)
+		if err != nil {
+			return err
 		}
 
 		runner, err := js.New(lt.preInitState, lt.source, lt.fileSystems, moduleResolver)
@@ -227,10 +178,16 @@ func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
 			logger.Debug("Evaluating JS from archive bundle...")
 			specifier := arc.Filename
 			pwd := arc.PwdURL
+			lt.fileSystems = arc.Filesystems // TODO(@mstoykov) probably do not do this
 			moduleResolver := js.NewModuleResolver(pwd, lt.preInitState, arc.Filesystems)
 			err := moduleResolver.LoadMainModule(pwd, specifier, arc.Data)
+			deps, iErr := extractUnknownModules(err)
+			if iErr != nil {
+				return fmt.Errorf("could not load JS test '%s': %w", testPath, iErr)
+			}
+			err = figureOutAutoExtensionResolution(moduleResolver, logger, lt, deps, gs)
 			if err != nil {
-				return fmt.Errorf("could not load JS test '%s': %w", testPath, err)
+				return err
 			}
 			runner, err := js.NewFromArchive(lt.preInitState, arc, moduleResolver)
 			if err != nil {
@@ -245,6 +202,66 @@ func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
 	default:
 		return fmt.Errorf("unknown or unspecified test type '%s' for '%s'", testType, testPath)
 	}
+}
+
+func figureOutAutoExtensionResolution(
+	moduleResolver *modules.ModuleResolver, logger *logrus.Entry, lt *loadedTest, deps k6deps.Dependencies, gs *state.GlobalState,
+) error {
+	for _, imported := range moduleResolver.Imported() {
+		if strings.HasPrefix(imported, "k6") {
+			continue
+		}
+		u, err := url.Parse(imported)
+		if err != nil {
+			panic(err)
+		}
+		// TODO: do not load it like this :shrug:
+		d, err := loader.Load(logger, lt.fileSystems, u, u.String())
+		if err != nil {
+			panic(err)
+		}
+		newdeps, err := processUseDirectives(d.Data)
+		if err != nil {
+			panic(err)
+		}
+		logger.Debugf("dependencies from %q: %q", imported, newdeps)
+		for _, dep := range newdeps {
+			err := deps.Update(dep)
+			if err != nil {
+				panic(err)
+			}
+		}
+	}
+	if len(deps) > 0 {
+		if !isCustomBuildRequired(deps, build.Version, ext.GetAll()) {
+			logger.
+				Debug("The current k6 binary already satisfies all the required dependencies," +
+					" it isn't required to provision a new binary.")
+			return nil
+		}
+
+		logger.
+			WithField("deps", deps).
+			Info("Automatic extension resolution is enabled. The current k6 binary doesn't satisfy all dependencies," +
+				" it's required to provision a custom binary.")
+		provisioner := newK6BuildProvisioner(gs)
+		customBinary, err := provisioner.provision(deps)
+		if err != nil {
+			logger.
+				WithError(err).
+				Error("Failed to provision a k6 binary with required dependencies." +
+					" Please, make sure to report this issue by opening a bug report.")
+			return err
+		}
+
+		err = customBinary.run(gs)
+		if err != nil {
+			panic(err)
+		}
+
+		logger.WithField("dependency", deps).Fatal("loading dependencies")
+	}
+	return nil
 }
 
 // readSource is a small wrapper around loader.ReadSource returning
