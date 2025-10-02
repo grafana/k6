@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"syscall"
@@ -230,7 +231,6 @@ func (b *customBinary) run(gs *state.GlobalState) error {
 // isCustomBuildRequired checks if there is at least one dependency that are not satisfied by the binary
 // considering the version of k6 and any built-in extension
 func isCustomBuildRequired(deps map[string]*semver.Constraints, k6Version string, exts []*ext.Extension) bool {
-	// return early if there are no dependencies
 	if len(deps) == 0 {
 		return false
 	}
@@ -407,4 +407,38 @@ func extractToken(gs *state.GlobalState) (string, error) {
 	}
 
 	return config.Token.String, nil
+}
+
+//nolint:gochecknoglobals
+var (
+	srcName       = `(?P<name>k6|k6/[^/]{2}.*|k6/[^x]/.*|k6/x/[/0-9a-zA-Z_-]+|(@[a-zA-Z0-9-_]+/)?xk6-([a-zA-Z0-9-_]+)((/[a-zA-Z0-9-_]+)*))` //nolint:lll
+	srcConstraint = `=?v?0\.0\.0\+[0-9A-Za-z-]+|[vxX*|,&\^0-9.+-><=, ~]+`
+
+	reUseK6 = regexp.MustCompile(
+		`"use +k6(( with ` + srcName + `( *(?P<constraints>` + srcConstraint + `))?)|(( *(?P<k6Constraints>` + srcConstraint + `)?)))"`) //nolint:lll
+
+	idxUseName          = reUseK6.SubexpIndex("name")
+	idxUseConstraints   = reUseK6.SubexpIndex("constraints")
+	idxUseK6Constraints = reUseK6.SubexpIndex("k6Constraints")
+	nameK6              = "k6"
+)
+
+func processUseDirectives(text []byte) (map[string]string, error) {
+	deps := make(map[string]string)
+	for _, match := range reUseK6.FindAllSubmatch(text, -1) {
+		if constraints := string(match[idxUseK6Constraints]); len(constraints) != 0 {
+			deps[nameK6] = constraints
+		}
+
+		if extension := string(match[idxUseName]); len(extension) != 0 {
+			constraints := string(match[idxUseConstraints])
+
+			if _, ok := deps[extension]; ok {
+				return deps, fmt.Errorf("already had a use directivce for %q", extension)
+			}
+			deps[extension] = constraints
+		}
+	}
+
+	return deps, nil
 }
