@@ -151,6 +151,12 @@ func (c *rootCommand) execute() {
 	if errors.As(err, &ecerr) {
 		exitCode = int(ecerr.ExitCode())
 	}
+	var differentBinaryError runDifferentBinaryError
+
+	if errors.As(err, &differentBinaryError) {
+		differentBinaryError.customBinary.run(c.globalState)
+		return
+	}
 
 	errText, fields := errext.Format(err)
 	c.globalState.Logger.WithFields(fields).Error(errText)

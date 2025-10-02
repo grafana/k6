@@ -254,14 +254,20 @@ func figureOutAutoExtensionResolution(
 			return err
 		}
 
-		err = customBinary.run(gs)
-		if err != nil {
-			panic(err)
+		return runDifferentBinaryError{
+			customBinary: customBinary,
 		}
-
-		logger.WithField("dependency", deps).Fatal("loading dependencies")
 	}
 	return nil
+}
+
+// TODO(@mstoykov) potentially figure out some less "exceptionl workflow" solution
+type runDifferentBinaryError struct {
+	customBinary commandExecutor
+}
+
+func (r runDifferentBinaryError) Error() string {
+	return "a different binary error - this should never be printed, please report it"
 }
 
 // readSource is a small wrapper around loader.ReadSource returning
