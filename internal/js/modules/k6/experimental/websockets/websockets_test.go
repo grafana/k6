@@ -1546,3 +1546,59 @@ func TestReadyStateSwitch(t *testing.T) {
 	logs := hook.Drain()
 	require.Len(t, logs, 0)
 }
+
+func TestSessionPingWithApplicationData(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	sr := tb.Replacer.Replace
+
+	ts := newTestState(t)
+
+	_, err := ts.runtime.RunOnEventLoop(sr(`
+			var ws = new WebSocket("WSBIN_URL/ws-echo")
+			var applicationData = "hello-ping-data";
+			ws.onopen = () => {
+				ws.ping(applicationData)
+			}
+
+			ws.onpong = () => {
+				call("from onpong")
+				ws.close()
+			}
+			ws.onerror = (e) => { throw JSON.stringify(e) }
+		`))
+
+	require.NoError(t, err)
+
+	samplesBuf := metrics.GetBufferedSamples(ts.samples)
+	assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSBIN_URL/ws-echo"), http.StatusSwitchingProtocols, "")
+	assert.Equal(t, []string{"from onpong"}, ts.callRecorder.Recorded())
+}
+
+func TestSessionPingWithNumericApplicationData(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	sr := tb.Replacer.Replace
+
+	ts := newTestState(t)
+
+	_, err := ts.runtime.RunOnEventLoop(sr(`
+			var ws = new WebSocket("WSBIN_URL/ws-echo")
+			var applicationData = "123456-numeric-ping-data";
+			ws.onopen = () => {
+				ws.ping(applicationData)
+			}
+
+			ws.onpong = () => {
+				call("from onpong")
+				ws.close()
+			}
+			ws.onerror = (e) => { throw JSON.stringify(e) }
+		`))
+
+	require.NoError(t, err)
+
+	samplesBuf := metrics.GetBufferedSamples(ts.samples)
+	assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSBIN_URL/ws-echo"), http.StatusSwitchingProtocols, "")
+	assert.Equal(t, []string{"from onpong"}, ts.callRecorder.Recorded())
+}
