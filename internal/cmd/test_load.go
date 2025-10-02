@@ -4,12 +4,16 @@ import (
 	"archive/tar"
 	"bytes"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"path/filepath"
+	"strings"
 	"sync"
 	"syscall"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -17,6 +21,8 @@ import (
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
+	"go.k6.io/k6/ext"
+	"go.k6.io/k6/internal/build"
 	"go.k6.io/k6/internal/js"
 	"go.k6.io/k6/internal/loader"
 	"go.k6.io/k6/js/modules"
@@ -106,7 +112,7 @@ func loadLocalTest(gs *state.GlobalState, cmd *cobra.Command, args []string) (*l
 	return test, nil
 }
 
-func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
+func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error { //nolint:funlen
 	testPath := lt.source.URL.String()
 	logger := gs.Logger.WithField("test_path", testPath)
 
@@ -142,9 +148,11 @@ func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
 		err := errext.WithExitCodeIfNone(
 			moduleResolver.LoadMainModule(pwd, specifier, lt.source.Data),
 			exitcodes.ScriptException)
+		err = figureOutAutoExtensionResolution(err, moduleResolver, logger, lt, gs)
 		if err != nil {
 			return fmt.Errorf("could not load JS test '%s': %w", testPath, err)
 		}
+
 		runner, err := js.New(lt.preInitState, lt.source, lt.fileSystems, moduleResolver)
 		// TODO: should we use common.UnwrapGojaInterruptedError() here?
 		if err != nil {
@@ -170,9 +178,11 @@ func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
 			specifier := arc.Filename
 			pwd := arc.PwdURL
 			moduleResolver := js.NewModuleResolver(pwd, lt.preInitState, arc.Filesystems)
+			lt.fileSystems = arc.Filesystems // TODO(@mstoykov) do better
 			err := errext.WithExitCodeIfNone(
 				moduleResolver.LoadMainModule(pwd, specifier, arc.Data),
 				exitcodes.ScriptException)
+			err = figureOutAutoExtensionResolution(err, moduleResolver, logger, lt, gs)
 			if err != nil {
 				return fmt.Errorf("could not load JS test '%s': %w", testPath, err)
 			}
@@ -189,6 +199,109 @@ func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
 	default:
 		return fmt.Errorf("unknown or unspecified test type '%s' for '%s'", testType, testPath)
 	}
+}
+
+func figureOutAutoExtensionResolution(
+	originalError error,
+	moduleResolver *modules.ModuleResolver, logger *logrus.Entry, lt *loadedTest,
+	gs *state.GlobalState,
+) error {
+	if !gs.Flags.AutoExtensionResolution {
+		fmt.Println("no auto ex")
+		return originalError
+	}
+
+	deps, err := extractUnknownModules(originalError)
+	if err != nil {
+		return err
+	}
+	for _, imported := range moduleResolver.Imported() {
+		if strings.HasPrefix(imported, "k6") {
+			continue
+		}
+		u, err := url.Parse(imported)
+		if err != nil {
+			panic(err)
+		}
+		// TODO: do not load it like this :shrug:
+		d, err := loader.Load(logger, lt.fileSystems, u, u.String())
+		if err != nil {
+			panic(err)
+		}
+		newdeps, err := processUseDirectives(d.Data)
+		if err != nil {
+			panic(err)
+		}
+		logger.Debugf("dependencies from %q: %q", imported, newdeps)
+		for extension, constraintStr := range newdeps {
+			if _, ok := deps[extension]; ok {
+				return fmt.Errorf("already had a use directivce for %q", extension)
+			}
+			constraint, err := semver.NewConstraint(constraintStr)
+			if err != nil {
+				return fmt.Errorf("unparsable constraint %q for %q", constraintStr, extension)
+			}
+			deps[extension] = constraint
+		}
+	}
+	if len(deps) > 0 {
+		if !isCustomBuildRequired(deps, build.Version, ext.GetAll()) {
+			logger.
+				Debug("The current k6 binary already satisfies all the required dependencies," +
+					" it isn't required to provision a new binary.")
+			return nil
+		}
+
+		logger.
+			WithField("deps", deps).
+			Info("Automatic extension resolution is enabled. The current k6 binary doesn't satisfy all dependencies," +
+				" it's required to provision a custom binary.")
+		provisioner := newK6BuildProvisioner(gs)
+		customBinary, err := provisioner.provision(constraintsMapToProvisionDependancy(deps))
+		if err != nil {
+			logger.
+				WithError(err).
+				Error("Failed to provision a k6 binary with required dependencies." +
+					" Please, make sure to report this issue by opening a bug report.")
+			return err
+		}
+
+		if lt.source.URL.Path == "/-" {
+			gs.Stdin = bytes.NewBuffer(lt.source.Data)
+		}
+
+		return runDifferentBinaryError{
+			customBinary: customBinary,
+		}
+	}
+	return nil
+}
+
+func extractUnknownModules(err error) (map[string]*semver.Constraints, error) {
+	deps := make(map[string]*semver.Constraints)
+	if err == nil {
+		return deps, nil
+	}
+
+	var u modules.UnknownModulesError
+
+	if errors.As(err, &u) {
+		for _, name := range u.List() {
+			deps[name] = nil
+		}
+		return deps, nil
+	}
+
+	return nil, err
+}
+
+// TODO(@mstoykov) potentially figure out some less "exceptionl workflow" solution
+type runDifferentBinaryError struct {
+	customBinary commandExecutor
+}
+
+func (r runDifferentBinaryError) Error() string {
+	return "a different binary error - this should never be printed, please report it"
 }
 
 // readSource is a small wrapper around loader.ReadSource returning
