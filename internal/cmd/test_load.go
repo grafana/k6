@@ -145,11 +145,13 @@ func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
 		logger.Debug("Trying to load as a JS test...")
 		moduleResolver := js.NewModuleResolver(pwd, lt.preInitState, lt.fileSystems)
 		err := moduleResolver.LoadMainModule(pwd, specifier, lt.source.Data)
-		deps, iErr := extractUnknownModules(err)
-		if iErr != nil {
-			return fmt.Errorf("could not load JS test '%s': %w", testPath, iErr)
+		if gs.Flags.AutoExtensionResolution {
+			deps, iErr := extractUnknownModules(err)
+			if iErr != nil {
+				return fmt.Errorf("could not load JS test '%s': %w", testPath, iErr)
+			}
+			err = figureOutAutoExtensionResolution(moduleResolver, logger, lt, deps, gs)
 		}
-		err = figureOutAutoExtensionResolution(moduleResolver, logger, lt, deps, gs)
 		if err != nil {
 			return err
 		}
@@ -181,11 +183,13 @@ func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
 			lt.fileSystems = arc.Filesystems // TODO(@mstoykov) probably do not do this
 			moduleResolver := js.NewModuleResolver(pwd, lt.preInitState, arc.Filesystems)
 			err := moduleResolver.LoadMainModule(pwd, specifier, arc.Data)
-			deps, iErr := extractUnknownModules(err)
-			if iErr != nil {
-				return fmt.Errorf("could not load JS test '%s': %w", testPath, iErr)
+			if gs.Flags.AutoExtensionResolution {
+				deps, iErr := extractUnknownModules(err)
+				if iErr != nil {
+					return fmt.Errorf("could not load JS test '%s': %w", testPath, iErr)
+				}
+				err = figureOutAutoExtensionResolution(moduleResolver, logger, lt, deps, gs)
 			}
-			err = figureOutAutoExtensionResolution(moduleResolver, logger, lt, deps, gs)
 			if err != nil {
 				return err
 			}
@@ -205,7 +209,8 @@ func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
 }
 
 func figureOutAutoExtensionResolution(
-	moduleResolver *modules.ModuleResolver, logger *logrus.Entry, lt *loadedTest, deps k6deps.Dependencies, gs *state.GlobalState,
+	moduleResolver *modules.ModuleResolver, logger *logrus.Entry, lt *loadedTest,
+	deps k6deps.Dependencies, gs *state.GlobalState,
 ) error {
 	for _, imported := range moduleResolver.Imported() {
 		if strings.HasPrefix(imported, "k6") {
