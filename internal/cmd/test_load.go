@@ -19,6 +19,8 @@ import (
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
+	"go.k6.io/k6/ext"
+	"go.k6.io/k6/internal/build"
 	"go.k6.io/k6/internal/js"
 	"go.k6.io/k6/internal/loader"
 	"go.k6.io/k6/js/modules"
@@ -165,10 +167,24 @@ func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
 			}
 			logger.Debugf("dependencies from %q: %q", imported, newdeps)
 			for _, dep := range newdeps {
-				deps.Update(dep)
+				err := deps.Update(dep)
+				if err != nil {
+					panic(err)
+				}
 			}
 		}
 		if len(deps) > 0 {
+			if !isCustomBuildRequired(deps, build.Version, ext.GetAll()) {
+				logger.
+					Debug("The current k6 binary already satisfies all the required dependencies," +
+						" it isn't required to provision a new binary.")
+				return nil
+			}
+
+			logger.
+				WithField("deps", deps).
+				Info("Automatic extension resolution is enabled. The current k6 binary doesn't satisfy all dependencies," +
+					" it's required to provision a custom binary.")
 			provisioner := newK6BuildProvisioner(gs)
 			customBinary, err := provisioner.provision(deps)
 			if err != nil {
@@ -179,9 +195,12 @@ func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
 				return err
 			}
 
-			customBinary.run(gs)
+			err = customBinary.run(gs)
+			if err != nil {
+				panic(err)
+			}
 
-			logger.WithField("dependency", deps).Fatal("loading dependancies")
+			logger.WithField("dependency", deps).Fatal("loading dependencies")
 		}
 
 		runner, err := js.New(lt.preInitState, lt.source, lt.fileSystems, moduleResolver)
