@@ -24,6 +24,7 @@ import (
 	"math"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -39,6 +40,7 @@ type Profile struct {
 	Location          []*Location
 	Function          []*Function
 	Comments          []string
+	DocURL            string
 
 	DropFrames string
 	KeepFrames string
@@ -53,6 +55,7 @@ type Profile struct {
 	encodeMu sync.Mutex
 
 	commentX           []int64
+	docURLX            int64
 	dropFramesX        int64
 	keepFramesX        int64
 	stringTable        []string
@@ -145,6 +148,7 @@ type Location struct {
 type Line struct {
 	Function *Function
 	Line     int64
+	Column   int64
 
 	functionIDX uint64
 }
@@ -436,7 +440,7 @@ func (p *Profile) CheckValid() error {
 // Aggregate merges the locations in the profile into equivalence
 // classes preserving the request attributes. It also updates the
 // samples to point to the merged locations.
-func (p *Profile) Aggregate(inlineFrame, function, filename, linenumber, address bool) error {
+func (p *Profile) Aggregate(inlineFrame, function, filename, linenumber, columnnumber, address bool) error {
 	for _, m := range p.Mapping {
 		m.HasInlineFrames = m.HasInlineFrames && inlineFrame
 		m.HasFunctions = m.HasFunctions && function
@@ -458,7 +462,7 @@ func (p *Profile) Aggregate(inlineFrame, function, filename, linenumber, address
 	}
 
 	// Aggregate locations
-	if !inlineFrame || !address || !linenumber {
+	if !inlineFrame || !address || !linenumber || !columnnumber {
 		for _, l := range p.Location {
 			if !inlineFrame && len(l.Line) > 1 {
 				l.Line = l.Line[len(l.Line)-1:]
@@ -466,6 +470,12 @@ func (p *Profile) Aggregate(inlineFrame, function, filename, linenumber, address
 			if !linenumber {
 				for i := range l.Line {
 					l.Line[i].Line = 0
+					l.Line[i].Column = 0
+				}
+			}
+			if !columnnumber {
+				for i := range l.Line {
+					l.Line[i].Column = 0
 				}
 			}
 			if !address {
@@ -548,6 +558,9 @@ func (p *Profile) String() string {
 	for _, c := range p.Comments {
 		ss = append(ss, "Comment: "+c)
 	}
+	if url := p.DocURL; url != "" {
+		ss = append(ss, fmt.Sprintf("Doc: %s", url))
+	}
 	if pt := p.PeriodType; pt != nil {
 		ss = append(ss, fmt.Sprintf("PeriodType: %s %s", pt.Type, pt.Unit))
 	}
@@ -627,10 +640,11 @@ func (l *Location) string() string {
 	for li := range l.Line {
 		lnStr := "??"
 		if fn := l.Line[li].Function; fn != nil {
-			lnStr = fmt.Sprintf("%s %s:%d s=%d",
+			lnStr = fmt.Sprintf("%s %s:%d:%d s=%d",
 				fn.Name,
 				fn.Filename,
 				l.Line[li].Line,
+				l.Line[li].Column,
 				fn.StartLine)
 			if fn.Name != fn.SystemName {
 				lnStr = lnStr + "(" + fn.SystemName + ")"
@@ -721,12 +735,7 @@ func (p *Profile) RemoveLabel(key string) {
 
 // HasLabel returns true if a sample has a label with indicated key and value.
 func (s *Sample) HasLabel(key, value string) bool {
-	for _, v := range s.Label[key] {
-		if v == value {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(s.Label[key], value)
 }
 
 // SetNumLabel sets the specified key to the specified value for all samples in the
@@ -836,10 +845,20 @@ func (p *Profile) HasFileLines() bool {
 
 // Unsymbolizable returns true if a mapping points to a binary for which
 // locations can't be symbolized in principle, at least now. Examples are
-// "[vdso]", [vsyscall]" and some others, see the code.
+// "[vdso]", "[vsyscall]" and some others, see the code.
 func (m *Mapping) Unsymbolizable() bool {
 	name := filepath.Base(m.File)
-	return strings.HasPrefix(name, "[") || strings.HasPrefix(name, "linux-vdso") || strings.HasPrefix(m.File, "/dev/dri/")
+	switch {
+	case strings.HasPrefix(name, "["):
+	case strings.HasPrefix(name, "linux-vdso"):
+	case strings.HasPrefix(m.File, "/dev/dri/"):
+	case m.File == "//anon":
+	case m.File == "":
+	case strings.HasPrefix(m.File, "/memfd:"):
+	default:
+		return false
+	}
+	return true
 }
 
 // Copy makes a fully independent copy of a profile.
