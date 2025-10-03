@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build !goexperiment.jsonv2 || !go1.25
+
 package internal
 
 import "errors"
@@ -19,6 +21,7 @@ var AllowInternalUse NotForPublicUse
 var (
 	ErrCycle           = errors.New("encountered a cycle")
 	ErrNonNilReference = errors.New("value must be passed as a non-nil pointer reference")
+	ErrNilInterface    = errors.New("cannot derive concrete type for nil interface with finite type set")
 )
 
 var (
