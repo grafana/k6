@@ -14,7 +14,7 @@ import (
 
 func panicIfFatalError(ctx context.Context, err error) {
 	if errors.Is(err, k6error.ErrFatal) {
-		k6ext.Abort(ctx, err.Error())
+		k6ext.Abortf(ctx, err.Error())
 	}
 }
 

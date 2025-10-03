@@ -26,7 +26,7 @@ func sumStagesDuration(stages []Stage) (result time.Duration) {
 	for _, s := range stages {
 		result += s.Duration.TimeDuration()
 	}
-	return
+	return result
 }
 
 func getStagesUnscaledMaxTarget(unscaledStartValue int64, stages []Stage) int64 {

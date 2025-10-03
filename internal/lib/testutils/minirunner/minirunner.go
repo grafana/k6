@@ -64,7 +64,7 @@ func (r *MiniRunner) Setup(ctx context.Context, out chan<- metrics.SampleContain
 	if fn := r.SetupFn; fn != nil {
 		r.SetupData, err = fn(ctx, out)
 	}
-	return
+	return err
 }
 
 // GetSetupData returns json representation of the setup data if setup() is
