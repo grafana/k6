@@ -171,6 +171,7 @@ func (e *timers) timerInitialization(
 // Notes: this just takes timers as makes the implementation way easier and we do not currently need
 // most of the functionality provided
 func (e *timers) runAfterTimeout(t *timer) {
+	fmt.Printf("runAfterTimeout> Scheduling timer %s %d\n", t.name, t.id)
 	e.timers[t.id] = t.nextTrigger
 
 	// as we have only one orderingId we have one queue
@@ -188,7 +189,7 @@ func (e *timers) runFirstTask() error {
 	if t == nil {
 		return nil // everything was cleared
 	}
-
+	fmt.Printf("runFirstTask> Running timer %s %d\n", t.name, t.id)
 	err := t.task()
 
 	if e.queue.length() > 0 {

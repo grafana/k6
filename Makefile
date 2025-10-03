@@ -50,7 +50,16 @@ lint: check-linter-version
 
 ## tests: Executes any unit tests.
 tests:
-	go test -race -timeout 210s ./...
+	LOG_LEVEL=debug go test -race -count=1 -timeout 210s ./... 2>&1 | tee tests-$(date +'%H:%M').log
+
+tests-internal:
+	LOG_LEVEL=debug go test -race -count=1 -timeout 120s ./internal/... 2>&1 | tee tests-internal-$(date +'%H:%M').log
+
+tests-js:
+	LOG_LEVEL=debug go test -race -count=1 -timeout 80s ./js/... 2>&1 | tee tests-js-$(date +'%H:%M').log
+
+tests-lib:
+	LOG_LEVEL=debug go test -race -count=1 -timeout 80s ./lib/... 2>&1 | tee tests-lib-$(date +'%H:%M').log
 
 ## check: Runs the linters and tests.
 check: lint tests

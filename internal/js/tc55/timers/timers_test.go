@@ -2,6 +2,7 @@ package timers_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -82,7 +83,7 @@ func TestSetTimeoutOrder(t *testing.T) {
 	var log []string
 	require.NoError(t, rt.Set("print", func(s string) { log = append(log, s) }))
 
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		_, err := runtime.RunOnEventLoop(`
 			setTimeout((_) => print("one"), 1);
 			setTimeout((_) => print("two"), 1);
@@ -93,6 +94,7 @@ func TestSetTimeoutOrder(t *testing.T) {
 			setTimeout((_) => print("six"), 1);
 			print("outside setTimeout");
 		`)
+		fmt.Printf("TestSetTimeoutOrder [%d] logs: %#v\n", i, log)
 		require.NoError(t, err)
 		require.Equal(t, []string{"outside setTimeout", "one", "two", "three", "four", "five", "six", "last"}, log, i)
 		log = log[:0]
@@ -107,7 +109,7 @@ func TestSetIntervalOrder(t *testing.T) {
 	var log []string
 	require.NoError(t, rt.Set("print", func(s string) { log = append(log, s) }))
 
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		_, err := runtime.RunOnEventLoop(`
 			var one = setInterval((_) => print("one"), 1);
 			var two = setInterval((_) => print("two"), 1);
@@ -123,6 +125,7 @@ func TestSetIntervalOrder(t *testing.T) {
 		`)
 		require.NoError(t, err)
 		runtime.EventLoop.WaitOnRegistered()
+		fmt.Printf("TestSetIntervalOrder [%d] logs: %#v\n", i, log)
 		require.GreaterOrEqual(t, len(log), 5)
 		require.Equal(t, "outside", log[0])
 		for i := 1; i < len(log)-1; i += 3 {
