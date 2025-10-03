@@ -2553,7 +2553,7 @@ func TestPageOnResponse(t *testing.T) {
 
 		return JSON.stringify(returnValue, null, 2);
 	`, tb.url("/home"))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	got := k6test.ToPromise(t, gv)
 
