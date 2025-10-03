@@ -1,8 +1,6 @@
 module github.com/grafana/xk6-js-test
 
-go 1.23.0
-
-toolchain go1.23.7
+go 1.24.0
 
 require go.k6.io/k6 v0.57.0
 
@@ -14,7 +12,7 @@ require (
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible // indirect
-	github.com/google/pprof v0.0.0-20230728192033-2ba5b33183c6 // indirect
+	github.com/google/pprof v0.0.0-20251002213607-436353cc1ee6 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/grafana/sobek v0.0.0-20241024150027-d91f02b05e9b // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.22.0 // indirect
