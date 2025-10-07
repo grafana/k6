@@ -287,6 +287,8 @@ func (s *GRPCAnyStub) Sum(ctx context.Context, req *grpcanytesting.SumRequest) (
 //
 //nolint:funlen
 func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
+	t.Helper()
+
 	// Create a http.ServeMux and set the httpbin handler as the default
 	mux := http.NewServeMux()
 	mux.Handle("/brotli", getEncodedHandler(t, "br"))

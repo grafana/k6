@@ -50,16 +50,22 @@ lint: check-linter-version
 
 ## tests: Executes any unit tests.
 tests:
-	LOG_LEVEL=debug go test -race -count=1 -timeout 210s ./... 2>&1 | tee tests-$(date +'%H:%M').log
+	K6_BROWSER_DEBUG=true K6_BROWSER_LOG_CALLER=true K6_BROWSER_LOG=debug LOG_LEVEL=debug go test -race -count=1 -timeout 210s ./... 2>&1 | tee tests-$$(date +'%H:%M-%s').log
 
 tests-internal:
-	LOG_LEVEL=debug go test -race -count=1 -timeout 120s ./internal/... 2>&1 | tee tests-internal-$(date +'%H:%M').log
+	K6_BROWSER_DEBUG=true K6_BROWSER_LOG_CALLER=true K6_BROWSER_LOG=debug LOG_LEVEL=debug go test -race -count=1 -timeout 120s -failfast ./internal/... 2>&1 | tee tests-internal-$$(date +'%H:%M-%s').log
 
-tests-js:
-	LOG_LEVEL=debug go test -race -count=1 -timeout 80s ./js/... 2>&1 | tee tests-js-$(date +'%H:%M').log
+tests-external:
+	K6_BROWSER_DEBUG=true K6_BROWSER_LOG_CALLER=true K6_BROWSER_LOG=debug LOG_LEVEL=debug go test -race -count=1 -timeout 210s -failfast $$(go list ./... | grep -v "internal/") 2>&1 | tee tests-external-$$(date +'%H:%M-%s').log
 
-tests-lib:
-	LOG_LEVEL=debug go test -race -count=1 -timeout 80s ./lib/... 2>&1 | tee tests-lib-$(date +'%H:%M').log
+tests-failfast:
+	K6_BROWSER_DEBUG=true K6_BROWSER_LOG_CALLER=true K6_BROWSER_LOG=debug LOG_LEVEL=debug go test -race -count=1 -timeout 210s -failfast ./... 2>&1 | tee tests-failfast-$$(date +'%H:%M-%s').log
+
+tests-browser:
+	K6_BROWSER_DEBUG=true K6_BROWSER_LOG=debug LOG_LEVEL=debug go test -race -count=1 -parallel=2 -timeout 420s -failfast $$(go list ./... | grep '/browser/tests') 2>&1 | tee tests-browser-$$(date +'%H:%M-%s').log
+
+tests-no-browser:
+	K6_BROWSER_DEBUG=true K6_BROWSER_LOG=debug LOG_LEVEL=debug go test -race -count=1 -parallel=2 -timeout 210s -failfast $$(go list ./... | grep -v '/browser/tests') 2>&1 | tee tests-nobrowser-$$(date +'%H:%M-%s').log
 
 ## check: Runs the linters and tests.
 check: lint tests
