@@ -277,7 +277,6 @@ func executablePath(
 	env env.LookupFunc,
 	lookPath func(file string) (string, error), // os.LookPath
 ) (string, error) {
-	fmt.Printf("executablePath: looking for browser executable: `%q` \n", path)
 	// find the browser executable in the user provided path
 	if path := strings.TrimSpace(path); path != "" {
 		if _, err := lookPath(path); err == nil {

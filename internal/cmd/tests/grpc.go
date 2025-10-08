@@ -22,7 +22,6 @@ func NewGRPC(t testing.TB) *GRPC {
 	grpcServer := grpc.NewServer()
 
 	addr, lis := getFreeBindAddr(t)
-	t.Logf("gRPC server listening on %s", addr)
 
 	features := grpcservice.LoadFeatures("")
 	grpcservice.RegisterRouteGuideServer(grpcServer, grpcservice.NewRouteGuideServer(features...))

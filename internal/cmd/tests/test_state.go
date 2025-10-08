@@ -87,7 +87,6 @@ func NewGlobalTestState(tb testing.TB) *GlobalTestState {
 	outMutex := &sync.Mutex{}
 	defaultFlags := state.GetDefaultFlags(".config", ".cache")
 	defaultFlags.Address, listener = getFreeBindAddr(tb)
-	tb.Logf("API server listening on %s", defaultFlags.Address)
 
 	ts.GlobalState = &state.GlobalState{
 		Ctx:          ctx,

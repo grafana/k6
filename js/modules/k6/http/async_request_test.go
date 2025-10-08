@@ -246,8 +246,8 @@ func TestAsyncRequestErrors(t *testing.T) {
 		ts := newTestCase(t)
 		_, err := ts.runtime.RunOnEventLoop(wrapInAsyncLambda(`
             try {
-                http.asyncRequest("GET", "http://sdafsgdhfjg.com/").catch((e) => globalThis.promiseRejected = e )
-            } catch (e) {
+                http.asyncRequest("GET", "http://sdafsgdhfjg/").catch((e) => globalThis.promiseRejected = e )            
+			} catch (e) {
                 globalThis.exceptionThrown = e
             }`))
 		expErr := "lookup sdafsgdhfjg"

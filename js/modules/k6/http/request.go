@@ -103,12 +103,10 @@ func (c *Client) asyncRequest(method string, url sobek.Value, args ...sobek.Valu
 		}
 		return p, err
 	}
-	fmt.Printf("http.asyncRequest %s %v", method, req)
 
 	callback := c.moduleInstance.vu.RegisterCallback()
 
 	go func() {
-		fmt.Printf("[goroutine] http.asyncRequest doing %s %v", method, req)
 		resp, err := httpext.MakeRequest(c.moduleInstance.vu.Context(), state, req)
 		callback(func() error {
 			if err != nil {
