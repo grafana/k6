@@ -188,6 +188,7 @@ func (e *timers) runFirstTask() error {
 	if t == nil {
 		return nil // everything was cleared
 	}
+
 	err := t.task()
 
 	if e.queue.length() > 0 {
