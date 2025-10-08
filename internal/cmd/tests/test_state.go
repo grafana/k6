@@ -126,13 +126,11 @@ func NewGlobalTestState(tb testing.TB) *GlobalTestState {
 var portRangeStart uint64 = 6565 //nolint:gochecknoglobals
 
 func getFreeBindAddr(tb testing.TB) (string, net.Listener) {
-	var listener net.Listener
-	var err error
 	for range 100 {
 		port := atomic.AddUint64(&portRangeStart, 1)
 		addr := net.JoinHostPort("localhost", strconv.FormatUint(port, 10))
 
-		listener, err = net.Listen("tcp", addr)
+		listener, err := net.Listen("tcp", addr)
 		if err != nil {
 			continue // port was busy for some reason
 		}
