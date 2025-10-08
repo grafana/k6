@@ -404,3 +404,16 @@ func migrateLegacyConfigFileIfAny(gs *state.GlobalState) error {
 	}
 	return nil
 }
+
+// checkIfMigrationCompleted checks if the migration has been done by checking if the new file exists).
+func checkIfMigrationCompleted(gs *state.GlobalState) bool {
+	_, err := gs.FS.Stat(gs.DefaultFlags.ConfigFilePath)
+	if errors.Is(err, fs.ErrNotExist) {
+		return false
+	}
+	if err != nil {
+		gs.Logger.Errorf("Failed to check if the migration has been done: %v", err)
+		return false
+	}
+	return true
+}

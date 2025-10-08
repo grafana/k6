@@ -122,6 +122,23 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 	apiClient := cloudapi.NewClient(
 		logger, conf.Token.String, conf.Host.String, build.Version, conf.Timeout.TimeDuration())
 
+	if testRun.ProjectID == 0 {
+		projectID, err := resolveDefaultProjectID(
+			gs,
+			apiClient,
+			test.derivedConfig.Collectors["cloud"],
+			conf.Token.String,
+			conf.StackSlug,
+			&conf.StackID,
+			&testRun.ProjectID,
+		)
+		if err != nil {
+			return err
+		}
+
+		testRun.ProjectID = projectID
+	}
+
 	response, err := apiClient.CreateTestRun(testRun)
 	if err != nil {
 		return err
