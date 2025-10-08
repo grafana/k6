@@ -1,5 +1,6 @@
 import { browser, devices } from 'k6/browser';
 import { check } from 'https://jslib.k6.io/k6-utils/1.5.0/index.js';
+import { expect } from "https://jslib.k6.io/k6-testing/0.5.0/index.js";
 
 export const options = {
   scenarios: {
@@ -27,7 +28,9 @@ export default async function() {
   const page = await context.newPage();
 
   try {
-    await page.goto('https://quickpizza.grafana.com/test.k6.io/', { waitUntil: 'networkidle' });
+    const response = await page.goto('https://quickpizza.grafana.com/test.k6.io/', { waitUntil: 'networkidle' });
+    expect(response.status()).toBe(200);
+
     const dimensions = await page.evaluate(() => {
       return {
         width: document.documentElement.clientWidth,
