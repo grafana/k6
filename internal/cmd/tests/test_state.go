@@ -83,9 +83,10 @@ func NewGlobalTestState(tb testing.TB) *GlobalTestState {
 		}
 	})
 
+	var listener net.Listener
 	outMutex := &sync.Mutex{}
 	defaultFlags := state.GetDefaultFlags(".config", ".cache")
-	defaultFlags.Address = getFreeBindAddr(tb)
+	defaultFlags.Address, listener = getFreeBindAddr(tb)
 	tb.Logf("API server listening on %s", defaultFlags.Address)
 
 	ts.GlobalState = &state.GlobalState{
@@ -117,6 +118,7 @@ func NewGlobalTestState(tb testing.TB) *GlobalTestState {
 		FallbackLogger: testutils.NewLogger(tb).WithField("fallback", true),
 		Usage:          usage.New(),
 		TestStatus:     lib.NewTestStatus(),
+		Listener:       listener,
 	}
 
 	return ts
@@ -124,21 +126,20 @@ func NewGlobalTestState(tb testing.TB) *GlobalTestState {
 
 var portRangeStart uint64 = 6565 //nolint:gochecknoglobals
 
-func getFreeBindAddr(tb testing.TB) string {
-	for i := 0; i < 100; i++ {
+func getFreeBindAddr(tb testing.TB) (string, net.Listener) {
+	var listener net.Listener
+	var err error
+	for range 100 {
 		port := atomic.AddUint64(&portRangeStart, 1)
 		addr := net.JoinHostPort("localhost", strconv.FormatUint(port, 10))
 
-		listener, err := net.Listen("tcp", addr)
+		listener, err = net.Listen("tcp", addr)
 		if err != nil {
 			continue // port was busy for some reason
 		}
-		defer func() {
-			assert.NoError(tb, listener.Close())
-		}()
-		return addr
+		return addr, listener
 	}
 
 	tb.Fatal("could not get a free port")
-	return ""
+	return "", nil
 }

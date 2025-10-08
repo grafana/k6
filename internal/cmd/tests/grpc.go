@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"net"
 	"strings"
 	"testing"
 
@@ -22,13 +21,8 @@ type GRPC struct {
 func NewGRPC(t testing.TB) *GRPC {
 	grpcServer := grpc.NewServer()
 
-	addr := getFreeBindAddr(t)
+	addr, lis := getFreeBindAddr(t)
 	t.Logf("gRPC server listening on %s", addr)
-
-	lis, err := net.Listen("tcp", addr)
-	if err != nil {
-		t.Fatalf("failed to listen: %v", err)
-	}
 
 	features := grpcservice.LoadFeatures("")
 	grpcservice.RegisterRouteGuideServer(grpcServer, grpcservice.NewRouteGuideServer(features...))

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -78,6 +79,7 @@ type GlobalState struct {
 	SecretsManager *secretsource.Manager
 	Usage          *usage.Usage
 	TestStatus     *lib.TestStatus
+	Listener       net.Listener
 }
 
 // NewGlobalState returns a new GlobalState with the given ctx.
