@@ -22,6 +22,9 @@ func NewGRPC(t testing.TB) *GRPC {
 	grpcServer := grpc.NewServer()
 
 	addr, lis := getFreeBindAddr(t)
+	if lis == nil {
+		t.Fatal("failed to get free bind address")
+	}
 
 	features := grpcservice.LoadFeatures("")
 	grpcservice.RegisterRouteGuideServer(grpcServer, grpcservice.NewRouteGuideServer(features...))
