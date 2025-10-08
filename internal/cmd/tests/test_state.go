@@ -118,7 +118,7 @@ func NewGlobalTestState(tb testing.TB) *GlobalTestState {
 		FallbackLogger: testutils.NewLogger(tb).WithField("fallback", true),
 		Usage:          usage.New(),
 		TestStatus:     lib.NewTestStatus(),
-		Listener:       listener,
+		ServerListener: listener,
 	}
 
 	return ts
