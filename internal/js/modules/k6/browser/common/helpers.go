@@ -210,7 +210,7 @@ func createWaitForEventPredicateHandler(
 //nolint:unused
 func panicOrSlowMo(ctx context.Context, err error) {
 	if err != nil {
-		k6ext.Panic(ctx, "%w", err)
+		k6ext.Panicf(ctx, "%w", err)
 	}
 	applySlowMo(ctx)
 }

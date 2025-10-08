@@ -97,7 +97,7 @@ func ValidateMode(val string) (m Mode, err error) {
 	if err = m.UnmarshalText([]byte(val)); err != nil {
 		return 0, err
 	}
-	return
+	return m, err
 }
 
 // Summary is the data structure that holds all the summary data (thresholds, metrics, checks, etc)

@@ -16,6 +16,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/internal/event"
 	"go.k6.io/k6/internal/lib/testutils"
@@ -130,7 +131,7 @@ func getFreeBindAddr(tb testing.TB) (string, net.Listener) {
 		port := atomic.AddUint64(&portRangeStart, 1)
 		addr := net.JoinHostPort("localhost", strconv.FormatUint(port, 10))
 
-		listener, err := net.Listen("tcp", addr)
+		listener, err := (&net.ListenConfig{}).Listen(tb.Context(), "tcp", addr)
 		if err != nil {
 			continue // port was busy for some reason
 		}
