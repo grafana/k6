@@ -317,11 +317,8 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 			if c.gs.Flags.ProfilingEnabled {
 				logger.Debugf("Profiling exposed on http://%s/debug/pprof/", c.gs.Flags.Address)
 			}
-			if c.gs.Listener != nil {
-				srv.Serve(c.gs.Listener)
-			}
 			if c.gs.Listener == nil {
-				listener, err := net.Listen("tcp", c.gs.Flags.Address)
+				listener, err := (&net.ListenConfig{}).Listen(srvCtx, "tcp", c.gs.Flags.Address)
 				if err != nil {
 					logger.WithError(err).Error("Error starting API server")
 					return
