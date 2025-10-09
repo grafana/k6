@@ -3,6 +3,9 @@
   "extends": [
     "schedule:weekly"
   ],
+  "ignorePaths": [
+    ".github/workflows/xk6-tests/**"
+  ],
   "prConcurrentLimit": 50,
   "packageRules": [
     {
