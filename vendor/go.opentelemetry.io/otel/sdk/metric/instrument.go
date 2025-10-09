@@ -75,7 +75,7 @@ type Instrument struct {
 	nonComparable // nolint: unused
 }
 
-// IsEmpty returns if all Instrument fields are their zero-value.
+// IsEmpty reports whether all Instrument fields are their zero-value.
 func (i Instrument) IsEmpty() bool {
 	return i.Name == "" &&
 		i.Description == "" &&
@@ -204,7 +204,7 @@ func (i *int64Inst) Record(ctx context.Context, val int64, opts ...metric.Record
 	i.aggregate(ctx, val, c.Attributes())
 }
 
-func (i *int64Inst) Enabled(_ context.Context) bool {
+func (i *int64Inst) Enabled(context.Context) bool {
 	return len(i.measures) != 0
 }
 
@@ -245,7 +245,7 @@ func (i *float64Inst) Record(ctx context.Context, val float64, opts ...metric.Re
 	i.aggregate(ctx, val, c.Attributes())
 }
 
-func (i *float64Inst) Enabled(_ context.Context) bool {
+func (i *float64Inst) Enabled(context.Context) bool {
 	return len(i.measures) != 0
 }
 
