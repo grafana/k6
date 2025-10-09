@@ -44,8 +44,7 @@ func (c *Compiler) WithUsage(u *usage.Usage) {
 
 // Options are options to the compiler
 type Options struct {
-	CompatibilityMode lib.CompatibilityMode
-	SourceMapLoader   func(string) ([]byte, error)
+	SourceMapLoader func(string) ([]byte, error)
 }
 
 // parsingState is helper struct to keep the state of a parsing
@@ -70,11 +69,10 @@ func (c *Compiler) Parse(
 	src, filename string, commonJSWrap bool, esm bool,
 ) (prg *ast.Program, finalCode string, err error) {
 	state := &parsingState{
-		loader:            c.Options.SourceMapLoader,
-		compatibilityMode: c.Options.CompatibilityMode,
-		commonJSWrapped:   commonJSWrap,
-		compiler:          c,
-		esm:               esm,
+		loader:          c.Options.SourceMapLoader,
+		commonJSWrapped: commonJSWrap,
+		compiler:        c,
+		esm:             esm,
 	}
 	return state.parseImpl(src, filename, commonJSWrap)
 }
