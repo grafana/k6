@@ -1,8 +1,8 @@
 module go.k6.io/k6
 
-go 1.23.0
+go 1.24.0
 
-toolchain go1.23.7
+toolchain go1.24.8
 
 require (
 	buf.build/gen/go/prometheus/prometheus/protocolbuffers/go v1.36.5-20240802094132-5b212ab78fb7.1
@@ -41,19 +41,19 @@ require (
 	github.com/spf13/afero v1.1.2
 	github.com/spf13/cobra v1.4.0
 	github.com/spf13/pflag v1.0.5
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.1
 	github.com/tidwall/gjson v1.18.0
-	go.opentelemetry.io/otel v1.37.0
-	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.37.0
-	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.37.0
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.37.0
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.37.0
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.37.0
-	go.opentelemetry.io/otel/metric v1.37.0
-	go.opentelemetry.io/otel/sdk v1.37.0
-	go.opentelemetry.io/otel/sdk/metric v1.37.0
-	go.opentelemetry.io/otel/trace v1.37.0
-	go.opentelemetry.io/proto/otlp v1.7.1
+	go.opentelemetry.io/otel v1.38.0
+	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.38.0
+	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.38.0
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.38.0
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.38.0
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.38.0
+	go.opentelemetry.io/otel/metric v1.38.0
+	go.opentelemetry.io/otel/sdk v1.38.0
+	go.opentelemetry.io/otel/sdk/metric v1.38.0
+	go.opentelemetry.io/otel/trace v1.38.0
+	go.opentelemetry.io/proto/otlp v1.8.0
 	go.uber.org/goleak v1.3.0
 	golang.org/x/crypto v0.41.0
 	golang.org/x/crypto/x509roots/fallback v0.0.0-20250414110644-0091fc8e7c69
@@ -67,7 +67,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
-require github.com/cenkalti/backoff/v5 v5.0.2 // indirect
+require github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 
 require (
 	buf.build/gen/go/gogo/protobuf/protocolbuffers/go v1.36.5-20210810001428-4df00b267f94.1 // indirect
@@ -83,7 +83,7 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/pprof v0.0.0-20230728192033-2ba5b33183c6 // indirect
 	github.com/grafana/k6build v0.5.11 // indirect
-	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.1 // indirect
+	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.2 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
@@ -98,11 +98,11 @@ require (
 	github.com/redis/go-redis/v9 v9.6.3 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
-	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
+	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	golang.org/x/sys v0.35.0 // indirect
 	golang.org/x/text v0.28.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20250728155136-f173205681a0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250728155136-f173205681a0 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20250825161204-c5933d9347a5 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250825161204-c5933d9347a5 // indirect
 	gopkg.in/cenkalti/backoff.v1 v1.1.0 // indirect
 )
 
