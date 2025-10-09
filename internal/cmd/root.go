@@ -95,6 +95,10 @@ func newRootWithLauncher(gs *state.GlobalState, l *launcher) *rootCommand {
 		rootCmd.AddCommand(sc(gs))
 	}
 
+	for sc := range extensionSubcommands(gs, rootCmd.Commands()) {
+		rootCmd.AddCommand(sc)
+	}
+
 	c.cmd = rootCmd
 	return c
 }
