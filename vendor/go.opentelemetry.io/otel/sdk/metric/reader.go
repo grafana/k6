@@ -117,7 +117,7 @@ type produceHolder struct {
 type shutdownProducer struct{}
 
 // produce returns an ErrReaderShutdown error.
-func (p shutdownProducer) produce(context.Context, *metricdata.ResourceMetrics) error {
+func (shutdownProducer) produce(context.Context, *metricdata.ResourceMetrics) error {
 	return ErrReaderShutdown
 }
 

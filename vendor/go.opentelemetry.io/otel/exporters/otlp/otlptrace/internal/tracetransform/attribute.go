@@ -6,9 +6,10 @@
 package tracetransform // import "go.opentelemetry.io/otel/exporters/otlp/otlptrace/internal/tracetransform"
 
 import (
+	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
+
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/sdk/resource"
-	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 )
 
 // KeyValues transforms a slice of attribute KeyValues into OTLP key-values.

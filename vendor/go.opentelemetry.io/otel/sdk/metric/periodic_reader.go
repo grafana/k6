@@ -114,7 +114,7 @@ func NewPeriodicReader(exporter Exporter, options ...PeriodicReaderOption) *Peri
 		cancel:   cancel,
 		done:     make(chan struct{}),
 		rmPool: sync.Pool{
-			New: func() interface{} {
+			New: func() any {
 				return &metricdata.ResourceMetrics{}
 			},
 		},
@@ -234,7 +234,7 @@ func (r *PeriodicReader) Collect(ctx context.Context, rm *metricdata.ResourceMet
 }
 
 // collect unwraps p as a produceHolder and returns its produce results.
-func (r *PeriodicReader) collect(ctx context.Context, p interface{}, rm *metricdata.ResourceMetrics) error {
+func (r *PeriodicReader) collect(ctx context.Context, p any, rm *metricdata.ResourceMetrics) error {
 	if p == nil {
 		return ErrReaderNotRegistered
 	}
@@ -349,7 +349,7 @@ func (r *PeriodicReader) Shutdown(ctx context.Context) error {
 }
 
 // MarshalLog returns logging data about the PeriodicReader.
-func (r *PeriodicReader) MarshalLog() interface{} {
+func (r *PeriodicReader) MarshalLog() any {
 	r.mu.Lock()
 	down := r.isShutdown
 	r.mu.Unlock()
