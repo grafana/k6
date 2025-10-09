@@ -81,6 +81,8 @@ func wrapSubcommand(name string, sc subcommand.Subcommand, gs *state.GlobalState
 		}
 	})
 
+	cmd.FParseErrWhitelist.UnknownFlags = true
+
 	return cmd
 }
 
