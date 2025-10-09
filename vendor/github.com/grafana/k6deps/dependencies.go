@@ -41,7 +41,7 @@ var (
 // The key of the map is the name of the dependency.
 type Dependencies map[string]*Dependency
 
-func (deps Dependencies) update(from *Dependency) error {
+func (deps Dependencies) Update(from *Dependency) error {
 	dep, found := deps[from.Name]
 	if !found {
 		deps[from.Name] = from
@@ -59,7 +59,7 @@ func (deps Dependencies) update(from *Dependency) error {
 // an error is generated.
 func (deps Dependencies) Merge(from Dependencies) error {
 	for _, dep := range from {
-		if err := deps.update(dep); err != nil {
+		if err := deps.Update(dep); err != nil {
 			return err
 		}
 	}
@@ -238,7 +238,7 @@ func (deps *Dependencies) UnmarshalText(text []byte) error {
 			return err
 		}
 
-		if err = deps.update(&dep); err != nil {
+		if err = deps.Update(&dep); err != nil {
 			return err
 		}
 
@@ -310,7 +310,7 @@ func (deps *Dependencies) UnmarshalJS(text []byte) error {
 				extension = NameK6
 			}
 
-			_ = deps.update(&Dependency{Name: extension}) // no chance for conflicting
+			_ = deps.Update(&Dependency{Name: extension}) // no chance for conflicting
 		}
 	}
 
@@ -339,7 +339,7 @@ func processUseDirectives(text []byte, deps Dependencies) error {
 		}
 
 		if dep != nil {
-			if err := deps.update(dep); err != nil {
+			if err := deps.Update(dep); err != nil {
 				return err
 			}
 		}

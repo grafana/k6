@@ -59,19 +59,22 @@ func TestNewJSRunnerWithCustomModule(t *testing.T) {
 	rtOptions := lib.RuntimeOptions{CompatibilityMode: null.StringFrom("base")}
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	preInitState := &lib.TestPreInitState{
+		Logger:         logger,
+		BuiltinMetrics: builtinMetrics,
+		Registry:       registry,
+		RuntimeOptions: rtOptions,
+		Usage:          usage.New(),
+	}
+	moduleResolver := js.NewModuleResolver(&url.URL{}, preInitState, nil)
 	runner, err := js.New(
-		&lib.TestPreInitState{
-			Logger:         logger,
-			BuiltinMetrics: builtinMetrics,
-			Registry:       registry,
-			RuntimeOptions: rtOptions,
-			Usage:          usage.New(),
-		},
+		preInitState,
 		&loader.SourceData{
 			URL:  &url.URL{Path: "blah", Scheme: "file"},
 			Data: []byte(script),
 		},
 		map[string]fsext.Fs{"file": fsext.NewMemMapFs(), "https": fsext.NewMemMapFs()},
+		moduleResolver,
 	)
 	require.NoError(t, err)
 	assert.Equal(t, 1, checkModule.initCtxCalled)
@@ -104,7 +107,8 @@ func TestNewJSRunnerWithCustomModule(t *testing.T) {
 			Registry:       registry,
 			RuntimeOptions: rtOptions,
 			Usage:          usage.New(),
-		}, arc)
+		}, arc,
+		moduleResolver) // fix
 	require.NoError(t, err)
 	assert.Equal(t, 3, checkModule.initCtxCalled) // changes because we need to get the exported functions
 	assert.Equal(t, 2, checkModule.vuCtxCalled)
