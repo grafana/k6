@@ -64,7 +64,10 @@ type Runner struct {
 }
 
 // New returns a new Runner for the provided source
-func New(piState *lib.TestPreInitState, src *loader.SourceData, filesystems map[string]fsext.Fs, moduleResolver *modules.ModuleResolver) (*Runner, error) {
+func New(
+	piState *lib.TestPreInitState, src *loader.SourceData,
+	filesystems map[string]fsext.Fs, moduleResolver *modules.ModuleResolver,
+) (*Runner, error) {
 	bundle, err := NewBundle(piState, src, filesystems, moduleResolver)
 	if err != nil {
 		return nil, err
@@ -74,7 +77,10 @@ func New(piState *lib.TestPreInitState, src *loader.SourceData, filesystems map[
 }
 
 // NewFromArchive returns a new Runner from the source in the provided archive
-func NewFromArchive(piState *lib.TestPreInitState, arc *lib.Archive, moduleResolver *modules.ModuleResolver) (*Runner, error) {
+func NewFromArchive(
+	piState *lib.TestPreInitState, arc *lib.Archive,
+	moduleResolver *modules.ModuleResolver,
+) (*Runner, error) {
 	bundle, err := NewBundleFromArchive(piState, arc, moduleResolver)
 	if err != nil {
 		return nil, err

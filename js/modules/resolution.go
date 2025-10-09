@@ -230,6 +230,7 @@ func (mr *ModuleResolver) reversePath(referencingScriptOrModule interface{}) *ur
 	return p.JoinPath("..")
 }
 
+// LoadMainModule is used to preload main module and do all the resolving but not actually run any javascript code.
 func (mr *ModuleResolver) LoadMainModule(pwd *url.URL, specifier string, data []byte) error {
 	if _, err := mr.resolveLoaded(pwd, specifier, data); err != nil {
 		return err

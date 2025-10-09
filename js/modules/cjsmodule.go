@@ -121,6 +121,8 @@ func cjsModuleFromString(prg *ast.Program) (sobek.ModuleRecord, error) {
 }
 
 // This is helper functiosn to find `require` calls and preload them
+//
+//nolint:cyclop
 func findRequireFunctionInAST(prg []ast.Statement) []string {
 	result := make([]string, 0)
 	for _, i := range prg {
@@ -139,7 +141,7 @@ func findRequireFunctionInAST(prg []ast.Statement) []string {
 			*ast.ExportDeclaration,
 			*ast.ImportDeclaration:
 			continue // we do not have to do anything
-			// TODO the meaining ones below seem to require somethign to happen
+			// TODO the meaining ones below seem to require something to happen
 		case *ast.BlockStatement:
 		case *ast.BranchStatement:
 		case *ast.CaseStatement:

@@ -48,7 +48,6 @@ type rootCommand struct {
 
 // newRootCommand creates a root command with a default launcher
 func newRootCommand(gs *state.GlobalState) *rootCommand {
-
 	if gs.Env["OLD_RESOLUTION"] == "true" {
 		return newRootWithLauncher(gs, newLauncher(gs))
 	}
@@ -158,8 +157,10 @@ func (c *rootCommand) execute() {
 	var differentBinaryError runDifferentBinaryError
 
 	if errors.As(err, &differentBinaryError) {
-		differentBinaryError.customBinary.run(c.globalState)
-		return
+		err := differentBinaryError.customBinary.run(c.globalState)
+		if err == nil {
+			return
+		}
 	}
 
 	errText, fields := errext.Format(err)

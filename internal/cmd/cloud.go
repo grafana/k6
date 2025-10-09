@@ -85,7 +85,6 @@ func (c *cmdCloud) preRun(cmd *cobra.Command, _ []string) error {
 //
 //nolint:funlen,gocognit,cyclop
 func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
-
 	test, err := loadAndConfigureLocalTest(c.gs, cmd, args, getPartialConfig)
 	if err != nil {
 		return err

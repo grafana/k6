@@ -79,7 +79,8 @@ func (bi *BundleInstance) getExported(name string) sobek.Value {
 
 // NewBundle creates a new bundle from a source file and a filesystem.
 func NewBundle(
-	piState *lib.TestPreInitState, src *loader.SourceData, filesystems map[string]fsext.Fs, moduleResolver *modules.ModuleResolver,
+	piState *lib.TestPreInitState, src *loader.SourceData,
+	filesystems map[string]fsext.Fs, moduleResolver *modules.ModuleResolver,
 ) (*Bundle, error) {
 	return newBundle(piState, src, filesystems, lib.Options{}, true, moduleResolver)
 }
@@ -137,7 +138,9 @@ func newBundle(
 }
 
 // NewBundleFromArchive creates a new bundle from an lib.Archive.
-func NewBundleFromArchive(piState *lib.TestPreInitState, arc *lib.Archive, modulesResolver *modules.ModuleResolver) (*Bundle, error) {
+func NewBundleFromArchive(
+	piState *lib.TestPreInitState, arc *lib.Archive, modulesResolver *modules.ModuleResolver,
+) (*Bundle, error) {
 	if arc.Type != "js" {
 		return nil, fmt.Errorf("expected bundle type 'js', got '%s'", arc.Type)
 	}

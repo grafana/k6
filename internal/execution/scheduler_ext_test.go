@@ -134,13 +134,13 @@ func TestSchedulerRunNonDefault(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-		piState := getTestPreInitState(t)
-		sourceData := &loader.SourceData{
-			URL: &url.URL{Path: "/script.js"}, Data: []byte(tc.script),
-		}
-		moduleResolver := js.NewModuleResolver(loader.Dir(sourceData.URL), piState, nil)
-		runner, err := js.New(piState, sourceData, nil, moduleResolver)
-		require.NoError(t, err)
+			piState := getTestPreInitState(t)
+			sourceData := &loader.SourceData{
+				URL: &url.URL{Path: "/script.js"}, Data: []byte(tc.script),
+			}
+			moduleResolver := js.NewModuleResolver(loader.Dir(sourceData.URL), piState, nil)
+			runner, err := js.New(piState, sourceData, nil, moduleResolver)
+			require.NoError(t, err)
 
 			testRunState := getTestRunState(t, piState, runner.GetOptions(), runner)
 
@@ -249,15 +249,15 @@ func TestSchedulerRunEnv(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-		piState := getTestPreInitState(t)
-		piState.RuntimeOptions = lib.RuntimeOptions{Env: map[string]string{"TESTVAR": "global"}}
-		sourceData := &loader.SourceData{
-			URL:  &url.URL{Path: "/script.js"},
-			Data: []byte(tc.script),
-		}
-		moduleResolver := js.NewModuleResolver(loader.Dir(sourceData.URL), piState, nil)
-		runner, err := js.New(piState, sourceData, nil, moduleResolver)
-		require.NoError(t, err)
+			piState := getTestPreInitState(t)
+			piState.RuntimeOptions = lib.RuntimeOptions{Env: map[string]string{"TESTVAR": "global"}}
+			sourceData := &loader.SourceData{
+				URL:  &url.URL{Path: "/script.js"},
+				Data: []byte(tc.script),
+			}
+			moduleResolver := js.NewModuleResolver(loader.Dir(sourceData.URL), piState, nil)
+			runner, err := js.New(piState, sourceData, nil, moduleResolver)
+			require.NoError(t, err)
 
 			testRunState := getTestRunState(t, piState, runner.GetOptions(), runner)
 			execScheduler, err := execution.NewScheduler(testRunState, local.NewController())
@@ -464,14 +464,14 @@ func TestSchedulerRunCustomTags(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-		piState := getTestPreInitState(t)
-		sourceData := &loader.SourceData{
-			URL:  &url.URL{Path: "/script.js"},
-			Data: []byte(tc.script),
-		}
-		moduleResolver := js.NewModuleResolver(loader.Dir(sourceData.URL), piState, nil)
-		runner, err := js.New(piState, sourceData, nil, moduleResolver)
-		require.NoError(t, err)
+			piState := getTestPreInitState(t)
+			sourceData := &loader.SourceData{
+				URL:  &url.URL{Path: "/script.js"},
+				Data: []byte(tc.script),
+			}
+			moduleResolver := js.NewModuleResolver(loader.Dir(sourceData.URL), piState, nil)
+			runner, err := js.New(piState, sourceData, nil, moduleResolver)
+			require.NoError(t, err)
 
 			testRunState := getTestRunState(t, piState, runner.GetOptions(), runner)
 			execScheduler, err := execution.NewScheduler(testRunState, local.NewController())

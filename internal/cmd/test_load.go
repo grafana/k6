@@ -111,6 +111,7 @@ func loadLocalTest(gs *state.GlobalState, cmd *cobra.Command, args []string) (*l
 	return test, nil
 }
 
+//nolint:gocognit,funlen
 func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
 	testPath := lt.source.URL.String()
 	logger := gs.Logger.WithField("test_path", testPath)
