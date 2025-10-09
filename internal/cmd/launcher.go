@@ -42,7 +42,18 @@ func newIOFSBridge(fs fsext.Fs, pwd string) fs.FS {
 
 // Open implements fs.Fs Open
 func (b *ioFSBridge) Open(name string) (fs.File, error) {
-	f, err := b.fsext.Open(path.Join(b.pwd, name))
+	_ = fsext.Walk(b.fsext, "/", func(path string, _ fs.FileInfo, _ error) error {
+		fmt.Println("walk: ", path)
+		return nil
+	})
+	fmt.Println("ioFSBridge.Open", name)
+	name = filepath.ToSlash(filepath.Clean(fsext.FilePathSeparator + name))
+	fmt.Println("ioFSBridge.Open post clean up", name)
+	if !path.IsAbs(name) {
+		name = path.Join(b.pwd, name)
+	}
+	fmt.Println("ioFSBridge.Open post isAbs", name)
+	f, err := b.fsext.Open(name)
 	if err != nil {
 		return nil, fmt.Errorf("opening file via launcher's bridge: %w", err)
 	}
@@ -327,7 +338,7 @@ func analyze(gs *state.GlobalState, args []string) (k6deps.Dependencies, error) 
 		}
 		dopts.Script.Name = sourceRootPath
 		dopts.Script.Contents = src.Data
-		dopts.Fs = newIOFSBridge(gs.FS, pwd)
+		dopts.Fs = newIOFSBridge(gs.FS, filepath.ToSlash(pwd))
 	}
 
 	return k6deps.Analyze(dopts)
