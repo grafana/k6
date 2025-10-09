@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -316,7 +317,21 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 			if c.gs.Flags.ProfilingEnabled {
 				logger.Debugf("Profiling exposed on http://%s/debug/pprof/", c.gs.Flags.Address)
 			}
-			if aerr := srv.ListenAndServe(); aerr != nil && !errors.Is(aerr, http.ErrServerClosed) {
+			if c.gs.ServerListener == nil {
+				listener, err := (&net.ListenConfig{}).Listen(srvCtx, "tcp", c.gs.Flags.Address)
+				if err != nil {
+					logger.WithError(err).Error("Error creating API server listener")
+					c.gs.OSExit(int(exitcodes.CannotStartRESTAPI))
+				}
+				c.gs.ServerListener = listener
+			}
+			defer func() {
+				if lerr := c.gs.ServerListener.Close(); lerr != nil {
+					logger.WithError(lerr).Debug("Error closing API server listener")
+				}
+				c.gs.ServerListener = nil
+			}()
+			if aerr := srv.Serve(c.gs.ServerListener); aerr != nil && !errors.Is(aerr, http.ErrServerClosed) {
 				// Only exit k6 if the user has explicitly set the REST API address
 				if cmd.Flags().Lookup("address").Changed {
 					logger.WithError(aerr).Error("Error from API server")
