@@ -134,12 +134,13 @@ func TestSchedulerRunNonDefault(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			piState := getTestPreInitState(t)
-			runner, err := js.New(
-				piState, &loader.SourceData{
-					URL: &url.URL{Path: "/script.js"}, Data: []byte(tc.script),
-				}, nil)
-			require.NoError(t, err)
+		piState := getTestPreInitState(t)
+		sourceData := &loader.SourceData{
+			URL: &url.URL{Path: "/script.js"}, Data: []byte(tc.script),
+		}
+		moduleResolver := js.NewModuleResolver(loader.Dir(sourceData.URL), piState, nil)
+		runner, err := js.New(piState, sourceData, nil, moduleResolver)
+		require.NoError(t, err)
 
 			testRunState := getTestRunState(t, piState, runner.GetOptions(), runner)
 
@@ -248,15 +249,15 @@ func TestSchedulerRunEnv(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			piState := getTestPreInitState(t)
-			piState.RuntimeOptions = lib.RuntimeOptions{Env: map[string]string{"TESTVAR": "global"}}
-			runner, err := js.New(
-				piState, &loader.SourceData{
-					URL:  &url.URL{Path: "/script.js"},
-					Data: []byte(tc.script),
-				}, nil,
-			)
-			require.NoError(t, err)
+		piState := getTestPreInitState(t)
+		piState.RuntimeOptions = lib.RuntimeOptions{Env: map[string]string{"TESTVAR": "global"}}
+		sourceData := &loader.SourceData{
+			URL:  &url.URL{Path: "/script.js"},
+			Data: []byte(tc.script),
+		}
+		moduleResolver := js.NewModuleResolver(loader.Dir(sourceData.URL), piState, nil)
+		runner, err := js.New(piState, sourceData, nil, moduleResolver)
+		require.NoError(t, err)
 
 			testRunState := getTestRunState(t, piState, runner.GetOptions(), runner)
 			execScheduler, err := execution.NewScheduler(testRunState, local.NewController())
@@ -321,11 +322,12 @@ func TestSchedulerSystemTags(t *testing.T) {
 	}`)
 
 	piState := getTestPreInitState(t)
-	runner, err := js.New(
-		piState, &loader.SourceData{
-			URL:  &url.URL{Path: "/script.js"},
-			Data: []byte(script),
-		}, nil)
+	sourceData := &loader.SourceData{
+		URL:  &url.URL{Path: "/script.js"},
+		Data: []byte(script),
+	}
+	moduleResolver := js.NewModuleResolver(loader.Dir(sourceData.URL), piState, nil)
+	runner, err := js.New(piState, sourceData, nil, moduleResolver)
 	require.NoError(t, err)
 
 	require.NoError(t, runner.SetOptions(runner.GetOptions().Apply(lib.Options{
@@ -462,14 +464,14 @@ func TestSchedulerRunCustomTags(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			piState := getTestPreInitState(t)
-			runner, err := js.New(
-				piState, &loader.SourceData{
-					URL:  &url.URL{Path: "/script.js"},
-					Data: []byte(tc.script),
-				}, nil,
-			)
-			require.NoError(t, err)
+		piState := getTestPreInitState(t)
+		sourceData := &loader.SourceData{
+			URL:  &url.URL{Path: "/script.js"},
+			Data: []byte(tc.script),
+		}
+		moduleResolver := js.NewModuleResolver(loader.Dir(sourceData.URL), piState, nil)
+		runner, err := js.New(piState, sourceData, nil, moduleResolver)
+		require.NoError(t, err)
 
 			testRunState := getTestRunState(t, piState, runner.GetOptions(), runner)
 			execScheduler, err := execution.NewScheduler(testRunState, local.NewController())
@@ -633,13 +635,12 @@ func TestSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 
 	piState := getTestPreInitState(t)
 	piState.RuntimeOptions.Env = map[string]string{"TESTGLOBALVAR": "global"}
-	runner, err := js.New(
-		piState, &loader.SourceData{
-			URL:  &url.URL{Path: "/script.js"},
-			Data: []byte(script),
-		},
-		nil,
-	)
+	sourceData := &loader.SourceData{
+		URL:  &url.URL{Path: "/script.js"},
+		Data: []byte(script),
+	}
+	moduleResolver := js.NewModuleResolver(loader.Dir(sourceData.URL), piState, nil)
+	runner, err := js.New(piState, sourceData, nil, moduleResolver)
 	require.NoError(t, err)
 
 	testRunState := getTestRunState(t, piState, runner.GetOptions(), runner)
@@ -1104,16 +1105,17 @@ func TestDNSResolverCache(t *testing.T) {
 
 			registry := metrics.NewRegistry()
 			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-			runner, err := js.New(
-				&lib.TestPreInitState{
-					Logger:         logger,
-					BuiltinMetrics: builtinMetrics,
-					Registry:       registry,
-					Usage:          usage.New(),
-				},
-				&loader.SourceData{
-					URL: &url.URL{Path: "/script.js"}, Data: []byte(script),
-				}, nil)
+			piState := &lib.TestPreInitState{
+				Logger:         logger,
+				BuiltinMetrics: builtinMetrics,
+				Registry:       registry,
+				Usage:          usage.New(),
+			}
+			sourceData := &loader.SourceData{
+				URL: &url.URL{Path: "/script.js"}, Data: []byte(script),
+			}
+			moduleResolver := js.NewModuleResolver(loader.Dir(sourceData.URL), piState, nil)
+			runner, err := js.New(piState, sourceData, nil, moduleResolver)
 			require.NoError(t, err)
 
 			mr := mockresolver.New(map[string][]net.IP{"myhost": {net.ParseIP(sr("HTTPBIN_IP"))}})
@@ -1186,7 +1188,9 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 	}`)
 
 	piState := getTestPreInitState(t)
-	runner, err := js.New(piState, &loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script}, nil)
+	sourceData := &loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script}
+	moduleResolver := js.NewModuleResolver(loader.Dir(sourceData.URL), piState, nil)
+	runner, err := js.New(piState, sourceData, nil, moduleResolver)
 	require.NoError(t, err)
 
 	options, err := executor.DeriveScenariosFromShortcuts(runner.GetOptions().Apply(lib.Options{
@@ -1399,7 +1403,9 @@ func TestNewSchedulerHasWork(t *testing.T) {
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 		Usage:          usage.New(),
 	}
-	runner, err := js.New(piState, &loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script}, nil)
+	sourceData := &loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script}
+	moduleResolver := js.NewModuleResolver(loader.Dir(sourceData.URL), piState, nil)
+	runner, err := js.New(piState, sourceData, nil, moduleResolver)
 	require.NoError(t, err)
 
 	testRunState := getTestRunState(t, piState, runner.GetOptions(), runner)
