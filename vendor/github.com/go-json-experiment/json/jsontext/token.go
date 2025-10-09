@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build !goexperiment.jsonv2 || !go1.25
+
 package jsontext
 
 import (
@@ -31,8 +33,8 @@ var errInvalidToken = errors.New("invalid jsontext.Token")
 //   - a JSON literal (i.e., null, true, or false)
 //   - a JSON string (e.g., "hello, world!")
 //   - a JSON number (e.g., 123.456)
-//   - a start or end delimiter for a JSON object (i.e., { or } )
-//   - a start or end delimiter for a JSON array (i.e., [ or ] )
+//   - a begin or end delimiter for a JSON object (i.e., { or } )
+//   - a begin or end delimiter for a JSON array (i.e., [ or ] )
 //
 // A Token cannot represent entire array or object values, while a [Value] can.
 // There is no Token to represent commas and colons since
@@ -94,10 +96,10 @@ var (
 	False Token = rawToken("false")
 	True  Token = rawToken("true")
 
-	ObjectStart Token = rawToken("{")
-	ObjectEnd   Token = rawToken("}")
-	ArrayStart  Token = rawToken("[")
-	ArrayEnd    Token = rawToken("]")
+	BeginObject Token = rawToken("{")
+	EndObject   Token = rawToken("}")
+	BeginArray  Token = rawToken("[")
+	EndArray    Token = rawToken("]")
 
 	zeroString Token = rawToken(`""`)
 	zeroNumber Token = rawToken(`0`)
@@ -176,14 +178,14 @@ func (t Token) Clone() Token {
 				return False
 			case True.raw:
 				return True
-			case ObjectStart.raw:
-				return ObjectStart
-			case ObjectEnd.raw:
-				return ObjectEnd
-			case ArrayStart.raw:
-				return ArrayStart
-			case ArrayEnd.raw:
-				return ArrayEnd
+			case BeginObject.raw:
+				return BeginObject
+			case EndObject.raw:
+				return EndObject
+			case BeginArray.raw:
+				return BeginArray
+			case EndArray.raw:
+				return EndArray
 			}
 		}
 
@@ -479,9 +481,9 @@ func (t Token) Kind() Kind {
 //   - 't': true
 //   - '"': string
 //   - '0': number
-//   - '{': object start
+//   - '{': object begin
 //   - '}': object end
-//   - '[': array start
+//   - '[': array begin
 //   - ']': array end
 //
 // An invalid kind is usually represented using 0,
