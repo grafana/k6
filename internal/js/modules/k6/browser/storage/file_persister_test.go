@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -61,7 +60,7 @@ func TestLocalFilePersister(t *testing.T) {
 			}
 
 			var l LocalFilePersister
-			err := l.Persist(context.Background(), p, strings.NewReader(tt.data))
+			err := l.Persist(t.Context(), p, strings.NewReader(tt.data))
 			assert.NoError(t, err)
 
 			i, err := os.Stat(p) //nolint:forbidigo
@@ -303,7 +302,7 @@ func TestRemoteFilePersister(t *testing.T) {
 				}))
 
 			r := NewRemoteFilePersister(s.URL+presignedEndpoint, tt.wantPresignedHeaders, basePath)
-			err := r.Persist(context.Background(), tt.path, strings.NewReader(tt.dataToUpload))
+			err := r.Persist(t.Context(), tt.path, strings.NewReader(tt.dataToUpload))
 			if tt.wantError != "" {
 				assert.EqualError(t, err, tt.wantError)
 				return

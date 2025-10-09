@@ -121,7 +121,7 @@ func TestSetupDataMarshalling(t *testing.T) {
 
 	samples := make(chan<- metrics.SampleContainer, 100)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	require.NoError(t, runner.Setup(ctx, samples))
 	initVU, err := runner.NewVU(ctx, 1, 1, samples)

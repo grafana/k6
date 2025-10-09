@@ -23,9 +23,9 @@ func TestBrowserNewPageInContext(t *testing.T) {
 		bc *BrowserContext
 	}
 	newTestCase := func(id cdp.BrowserContextID) *testCase {
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		logger := log.NewNullLogger()
-		b := newBrowser(context.Background(), ctx, cancel, nil, NewLocalBrowserOptions(), logger)
+		b := newBrowser(t.Context(), ctx, cancel, nil, NewLocalBrowserOptions(), logger)
 		// set a new browser context in the browser with `id`, so that newPageInContext can find it.
 		var err error
 		vu := k6test.NewVU(t)

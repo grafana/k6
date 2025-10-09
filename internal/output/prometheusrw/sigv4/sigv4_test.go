@@ -1,7 +1,6 @@
 package sigv4
 
 import (
-	"context"
 	"net/http"
 	"strings"
 	"testing"
@@ -20,7 +19,7 @@ func TestBuildCanonicalHeaders(t *testing.T) {
 	now := time.Now().UTC()
 	iSO8601Date := now.Format(timeFormat)
 
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, endpoint, nil)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, endpoint, nil)
 	if err != nil {
 		t.Fatalf("failed to create request, %v", err)
 	}

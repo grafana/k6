@@ -121,7 +121,7 @@ func TestPatchStatus(t *testing.T) {
 			metricsEngine, err := engine.NewMetricsEngine(testState.Registry, testState.Logger)
 			require.NoError(t, err)
 
-			globalCtx, globalCancel := context.WithCancel(context.Background())
+			globalCtx, globalCancel := context.WithCancel(t.Context())
 			defer globalCancel()
 			runCtx, runAbort := execution.NewTestRunContext(globalCtx, testState.Logger)
 			defer runAbort(fmt.Errorf("unexpected abort"))

@@ -156,7 +156,7 @@ func TestSetTimeoutContextCancel(t *testing.T) {
 	}))
 
 	for range 2000 {
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		runtime.CancelContext = cancel
 		runtime.VU.CtxField = ctx //nolint:fatcontext
 		runtime.VU.RuntimeField.ClearInterrupt()

@@ -2,7 +2,6 @@ package execution
 
 import (
 	"bytes"
-	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -185,7 +184,7 @@ func TestAbortTest(t *testing.T) { //nolint:tparallel
 	var (
 		rt    = sobek.New()
 		state = &lib.State{}
-		ctx   = context.Background()
+		ctx   = t.Context()
 	)
 
 	m, ok := New().NewModuleInstance(
@@ -238,7 +237,7 @@ func TestFailTest(t *testing.T) {
 		module, ok := New().NewModuleInstance(
 			&modulestest.VU{
 				RuntimeField: rt,
-				CtxField:     context.Background(),
+				CtxField:     t.Context(),
 				StateField:   state,
 			},
 		).(*ModuleInstance)
@@ -269,7 +268,7 @@ func TestFailTest(t *testing.T) {
 		module, ok := New().NewModuleInstance(
 			&modulestest.VU{
 				RuntimeField: rt,
-				CtxField:     context.Background(),
+				CtxField:     t.Context(),
 				StateField:   state,
 			},
 		).(*ModuleInstance)
@@ -436,7 +435,7 @@ func TestOptionsTestFull(t *testing.T) {
 				},
 			},
 		}
-		ctx = context.Background()
+		ctx = t.Context()
 	)
 
 	m, ok := New().NewModuleInstance(
@@ -462,7 +461,7 @@ func TestOptionsTestSetPropertyDenied(t *testing.T) {
 	m, ok := New().NewModuleInstance(
 		&modulestest.VU{
 			RuntimeField: rt,
-			CtxField:     context.Background(),
+			CtxField:     t.Context(),
 			StateField: &lib.State{
 				Options: lib.Options{
 					Paused: null.BoolFrom(true),
@@ -487,7 +486,7 @@ func TestScenarioNoAvailableInInitContext(t *testing.T) {
 	m, ok := New().NewModuleInstance(
 		&modulestest.VU{
 			RuntimeField: rt,
-			CtxField:     context.Background(),
+			CtxField:     t.Context(),
 			StateField: &lib.State{
 				Options: lib.Options{
 					Paused: null.BoolFrom(true),
@@ -515,7 +514,7 @@ func TestOptionsNoAvailableInInitContext(t *testing.T) {
 	m, ok := New().NewModuleInstance(
 		&modulestest.VU{
 			RuntimeField: rt,
-			CtxField:     context.Background(),
+			CtxField:     t.Context(),
 		},
 	).(*ModuleInstance)
 	require.True(t, ok)
@@ -532,7 +531,7 @@ func TestVUDefaultDetails(t *testing.T) {
 	m, ok := New().NewModuleInstance(
 		&modulestest.VU{
 			RuntimeField: rt,
-			CtxField:     context.Background(),
+			CtxField:     t.Context(),
 			StateField: &lib.State{
 				Options: lib.Options{
 					Paused: null.BoolFrom(true),

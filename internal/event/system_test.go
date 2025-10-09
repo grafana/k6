@@ -56,7 +56,7 @@ func TestEventSystem(t *testing.T) {
 	t.Run("emit_and_process", func(t *testing.T) {
 		t.Parallel()
 		testTimeout := 5 * time.Second
-		ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+		ctx, cancel := context.WithTimeout(t.Context(), testTimeout)
 		defer cancel()
 		logger := logrus.New()
 		logger.SetOutput(io.Discard)
@@ -135,7 +135,7 @@ func TestEventSystem(t *testing.T) {
 
 	t.Run("emit_and_wait/ok", func(t *testing.T) {
 		t.Parallel()
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 		defer cancel()
 		logger := logrus.New()
 		logger.SetOutput(io.Discard)
@@ -174,7 +174,7 @@ func TestEventSystem(t *testing.T) {
 	// was full and the event would never fully complete and wait indefinitely.
 	t.Run("emit_and_wait/buffer", func(t *testing.T) {
 		t.Parallel()
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 		defer cancel()
 		logger := logrus.New()
 		logger.SetOutput(io.Discard)
@@ -210,7 +210,7 @@ func TestEventSystem(t *testing.T) {
 
 	t.Run("emit_and_wait/error", func(t *testing.T) {
 		t.Parallel()
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 		defer cancel()
 		logger := logrus.New()
 		logger.SetOutput(io.Discard)

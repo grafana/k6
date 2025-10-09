@@ -44,7 +44,7 @@ func TestRequire(t *testing.T) {
 			`)
 			require.NoError(t, err, "bundle error")
 
-			bi, err := b.Instantiate(context.Background(), 0)
+			bi, err := b.Instantiate(t.Context(), 0)
 			assert.NoError(t, err, "instance error")
 
 			_, defaultOk := sobek.AssertFunction(bi.getExported("default"))
@@ -67,7 +67,7 @@ func TestRequire(t *testing.T) {
 				`)
 			require.NoError(t, err)
 
-			bi, err := b.Instantiate(context.Background(), 0)
+			bi, err := b.Instantiate(t.Context(), 0)
 			require.NoError(t, err)
 
 			_, defaultOk := sobek.AssertFunction(bi.getExported("default"))
@@ -168,7 +168,7 @@ func TestRequire(t *testing.T) {
 						b, err := getSimpleBundle(t, "/path/to/script.js", data, fs)
 						require.NoError(t, err)
 
-						_, err = b.Instantiate(context.Background(), 0)
+						_, err = b.Instantiate(t.Context(), 0)
 						require.NoError(t, err)
 					})
 				}
@@ -191,7 +191,7 @@ func TestRequire(t *testing.T) {
 			b, err := getSimpleBundle(t, "/script.js", data, fs)
 			require.NoError(t, err)
 
-			bi, err := b.Instantiate(context.Background(), 0)
+			bi, err := b.Instantiate(t.Context(), 0)
 			require.NoError(t, err)
 			_, err = bi.getCallableExport(consts.DefaultFn)(sobek.Undefined())
 			assert.NoError(t, err)
@@ -220,7 +220,7 @@ func createAndReadFile(t *testing.T, file string, content []byte, expectedLength
 		return nil, err
 	}
 
-	bi, err := b.Instantiate(context.Background(), 0)
+	bi, err := b.Instantiate(t.Context(), 0)
 	if err != nil {
 		return nil, err
 	}
@@ -334,7 +334,7 @@ func TestRequestWithBinaryFile(t *testing.T) {
 			`, srv.URL), fs)
 	require.NoError(t, err)
 
-	bi, err := b.Instantiate(context.Background(), 0)
+	bi, err := b.Instantiate(t.Context(), 0)
 	require.NoError(t, err)
 
 	logger := logrus.New()
@@ -361,7 +361,7 @@ func TestRequestWithBinaryFile(t *testing.T) {
 		Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	bi.moduleVUImpl.ctx = ctx
 
@@ -476,7 +476,7 @@ func TestRequestWithMultipleBinaryFiles(t *testing.T) {
 			`, srv.URL), fs)
 	require.NoError(t, err)
 
-	bi, err := b.Instantiate(context.Background(), 0)
+	bi, err := b.Instantiate(t.Context(), 0)
 	require.NoError(t, err)
 
 	logger := logrus.New()
@@ -503,7 +503,7 @@ func TestRequestWithMultipleBinaryFiles(t *testing.T) {
 		Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	bi.moduleVUImpl.ctx = ctx
 
@@ -522,7 +522,7 @@ func Test__VU(t *testing.T) {
 		export default function() { return vu; }
 	`)
 	require.NoError(t, err)
-	bi, err := b.Instantiate(context.Background(), 5)
+	bi, err := b.Instantiate(t.Context(), 5)
 	require.NoError(t, err)
 	v, err := bi.getCallableExport(consts.DefaultFn)(sobek.Undefined())
 	require.NoError(t, err)
@@ -554,7 +554,7 @@ export default function(){
 	b, err := getSimpleBundle(t, "/script.js", data, fs)
 	require.NoError(t, err)
 
-	bi, err := b.Instantiate(context.Background(), 0)
+	bi, err := b.Instantiate(t.Context(), 0)
 	require.NoError(t, err)
 	_, err = bi.getCallableExport(consts.DefaultFn)(sobek.Undefined())
 	require.Error(t, err)
@@ -588,7 +588,7 @@ export default function(){
 	b, err := getSimpleBundle(t, "/script.js", data, fs)
 	require.NoError(t, err)
 
-	bi, err := b.Instantiate(context.Background(), 0)
+	bi, err := b.Instantiate(t.Context(), 0)
 	require.NoError(t, err)
 	_, err = bi.getCallableExport(consts.DefaultFn)(sobek.Undefined())
 	require.Error(t, err)
@@ -618,7 +618,7 @@ export default function () {
 	b, err := getSimpleBundle(t, "/script.js", data, fs)
 	require.NoError(t, err)
 
-	bi, err := b.Instantiate(context.Background(), 0)
+	bi, err := b.Instantiate(t.Context(), 0)
 	require.NoError(t, err)
 	_, err = bi.getCallableExport(consts.DefaultFn)(sobek.Undefined())
 	require.Error(t, err)
@@ -686,7 +686,7 @@ var script_default = () => {
 	b, err := getSimpleBundle(t, "/script.js", data, fs)
 	require.NoError(t, err)
 
-	bi, err := b.Instantiate(context.Background(), 0)
+	bi, err := b.Instantiate(t.Context(), 0)
 	require.NoError(t, err)
 	_, err = bi.getCallableExport(consts.DefaultFn)(sobek.Undefined())
 	require.Error(t, err)
@@ -723,7 +723,7 @@ func TestImportModificationsAreConsistentBetweenFiles(t *testing.T) {
 `, fs)
 	require.NoError(t, err, "bundle error")
 
-	_, err = b.Instantiate(context.Background(), 0)
+	_, err = b.Instantiate(t.Context(), 0)
 	require.NoError(t, err)
 }
 
@@ -746,6 +746,6 @@ func TestCacheAbsolutePathsNotRelative(t *testing.T) {
 `, fs)
 	require.NoError(t, err, "bundle error")
 
-	_, err = b.Instantiate(context.Background(), 0)
+	_, err = b.Instantiate(t.Context(), 0)
 	require.NoError(t, err)
 }

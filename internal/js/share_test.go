@@ -73,7 +73,7 @@ exports.default = function() {
 	for name, r := range testdata {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 
 			samples := make(chan metrics.SampleContainer, 100)

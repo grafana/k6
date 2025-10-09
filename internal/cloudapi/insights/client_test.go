@@ -99,7 +99,7 @@ func TestClient_Dial_ReturnsNoErrorWithWorkingDialer(t *testing.T) {
 	cli := NewClient(cfg)
 
 	// When
-	err := cli.Dial(context.Background())
+	err := cli.Dial(t.Context())
 
 	// Then
 	require.NoError(t, err)
@@ -121,8 +121,8 @@ func TestClient_Dial_ReturnsErrorWhenCalledTwice(t *testing.T) {
 	cli := NewClient(cfg)
 
 	// When
-	noErr := cli.Dial(context.Background())
-	err := cli.Dial(context.Background())
+	noErr := cli.Dial(t.Context())
+	err := cli.Dial(t.Context())
 
 	// Then
 	require.NoError(t, noErr)
@@ -148,7 +148,7 @@ func TestClient_Dial_ReturnsNoErrorWithFailingDialer(t *testing.T) {
 	cli := NewClient(cfg)
 
 	// When
-	err := cli.Dial(context.Background())
+	err := cli.Dial(t.Context())
 
 	// Then
 	var fatalErr *fatalError
@@ -170,7 +170,7 @@ func TestClient_Dial_ReturnsErrorWithoutRetryableStatusCodes(t *testing.T) {
 	cli := NewClient(cfg)
 
 	// When
-	err := cli.Dial(context.Background())
+	err := cli.Dial(t.Context())
 
 	// Then
 	require.Error(t, err)
@@ -192,7 +192,7 @@ func TestClient_Dial_ReturnsErrorWithInvalidRetryableStatusCodes(t *testing.T) {
 	cli := NewClient(cfg)
 
 	// When
-	err := cli.Dial(context.Background())
+	err := cli.Dial(t.Context())
 
 	// Then
 	require.Error(t, err)
@@ -212,10 +212,10 @@ func TestClient_IngestRequestMetadatasBatch_ReturnsNoErrorWithWorkingServerAndNo
 		RetryConfig:   ClientRetryConfig{RetryableStatusCodes: `"UNKNOWN","INTERNAL","UNAVAILABLE","DEADLINE_EXCEEDED"`},
 	}
 	cli := NewClient(cfg)
-	require.NoError(t, cli.Dial(context.Background()))
+	require.NoError(t, cli.Dial(t.Context()))
 
 	// When
-	err := cli.IngestRequestMetadatasBatch(context.Background(), nil)
+	err := cli.IngestRequestMetadatasBatch(t.Context(), nil)
 
 	// Then
 	require.NoError(t, err)
@@ -237,7 +237,7 @@ func TestClient_IngestRequestMetadatasBatch_ReturnsNoErrorWithWorkingServerAndNo
 		RetryConfig:   ClientRetryConfig{RetryableStatusCodes: `"UNKNOWN","INTERNAL","UNAVAILABLE","DEADLINE_EXCEEDED"`},
 	}
 	cli := NewClient(cfg)
-	require.NoError(t, cli.Dial(context.Background()))
+	require.NoError(t, cli.Dial(t.Context()))
 	data := RequestMetadatas{
 		{
 			TraceID:        "test-trace-id-1",
@@ -256,7 +256,7 @@ func TestClient_IngestRequestMetadatasBatch_ReturnsNoErrorWithWorkingServerAndNo
 	}
 
 	// When
-	err := cli.IngestRequestMetadatasBatch(context.Background(), data)
+	err := cli.IngestRequestMetadatasBatch(t.Context(), data)
 
 	// Then
 	require.NoError(t, err)
@@ -278,8 +278,8 @@ func TestClient_IngestRequestMetadatasBatch_ReturnsErrorWithWorkingServerAndCanc
 		RetryConfig:   ClientRetryConfig{RetryableStatusCodes: `"UNKNOWN","INTERNAL","UNAVAILABLE","DEADLINE_EXCEEDED"`},
 	}
 	cli := NewClient(cfg)
-	require.NoError(t, cli.Dial(context.Background()))
-	ctx, cancel := context.WithCancel(context.Background())
+	require.NoError(t, cli.Dial(t.Context()))
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	data := RequestMetadatas{
 		{
@@ -324,7 +324,7 @@ func TestClient_IngestRequestMetadatasBatch_ReturnsErrorWithUninitializedClient(
 	}
 
 	// When
-	err := cli.IngestRequestMetadatasBatch(context.Background(), data)
+	err := cli.IngestRequestMetadatasBatch(t.Context(), data)
 
 	// Then
 	require.ErrorIs(t, err, ErrClientClosed)
@@ -347,7 +347,7 @@ func TestClient_IngestRequestMetadatasBatch_ReturnsErrorWithFailingServerAndNonC
 		RetryConfig:   ClientRetryConfig{RetryableStatusCodes: `"UNKNOWN","INTERNAL","UNAVAILABLE","DEADLINE_EXCEEDED"`},
 	}
 	cli := NewClient(cfg)
-	require.NoError(t, cli.Dial(context.Background()))
+	require.NoError(t, cli.Dial(t.Context()))
 	data := RequestMetadatas{
 		{
 			TraceID:        "test-trace-id-1",
@@ -359,7 +359,7 @@ func TestClient_IngestRequestMetadatasBatch_ReturnsErrorWithFailingServerAndNonC
 	}
 
 	// When
-	err := cli.IngestRequestMetadatasBatch(context.Background(), data)
+	err := cli.IngestRequestMetadatasBatch(t.Context(), data)
 
 	// Then
 	require.ErrorContains(t, err, testErr.Error())
@@ -386,7 +386,7 @@ func TestClient_IngestRequestMetadatasBatch_ReturnsNoErrorAfterRetrySeveralTimes
 		},
 	}
 	cli := NewClient(cfg)
-	require.NoError(t, cli.Dial(context.Background()))
+	require.NoError(t, cli.Dial(t.Context()))
 	data := RequestMetadatas{
 		{
 			TraceID:        "test-trace-id-1",
@@ -405,7 +405,7 @@ func TestClient_IngestRequestMetadatasBatch_ReturnsNoErrorAfterRetrySeveralTimes
 	}
 
 	// When
-	err := cli.IngestRequestMetadatasBatch(context.Background(), data)
+	err := cli.IngestRequestMetadatasBatch(t.Context(), data)
 
 	// Then
 	require.NoError(t, err)
@@ -435,7 +435,7 @@ func TestClient_IngestRequestMetadatasBatch_ReturnsErrorAfterExhaustingMaxRetryA
 		},
 	}
 	cli := NewClient(cfg)
-	require.NoError(t, cli.Dial(context.Background()))
+	require.NoError(t, cli.Dial(t.Context()))
 	data := RequestMetadatas{
 		{
 			TraceID:        "test-trace-id-1",
@@ -454,7 +454,7 @@ func TestClient_IngestRequestMetadatasBatch_ReturnsErrorAfterExhaustingMaxRetryA
 	}
 
 	// When
-	err := cli.IngestRequestMetadatasBatch(context.Background(), data)
+	err := cli.IngestRequestMetadatasBatch(t.Context(), data)
 
 	// Then
 	require.Error(t, err)
@@ -474,7 +474,7 @@ func TestClient_Close_ReturnsNoErrorWhenClosedOnce(t *testing.T) {
 		RetryConfig:   ClientRetryConfig{RetryableStatusCodes: `"UNKNOWN","INTERNAL","UNAVAILABLE","DEADLINE_EXCEEDED"`},
 	}
 	cli := NewClient(cfg)
-	require.NoError(t, cli.Dial(context.Background()))
+	require.NoError(t, cli.Dial(t.Context()))
 
 	// When
 	err := cli.Close()
@@ -496,7 +496,7 @@ func TestClient_Close_ReturnsNoErrorWhenClosedTwice(t *testing.T) {
 		RetryConfig:   ClientRetryConfig{RetryableStatusCodes: `"UNKNOWN","INTERNAL","UNAVAILABLE","DEADLINE_EXCEEDED"`},
 	}
 	cli := NewClient(cfg)
-	require.NoError(t, cli.Dial(context.Background()))
+	require.NoError(t, cli.Dial(t.Context()))
 
 	// When
 	noErr := cli.Close()

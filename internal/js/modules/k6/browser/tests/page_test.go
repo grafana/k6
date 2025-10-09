@@ -777,6 +777,7 @@ func TestPageWaitForFunction(t *testing.T) {
 		log('ok: '+resp);`
 
 	setup := func(t *testing.T) *testBrowser {
+		t.Helper()
 		tb := newTestBrowser(t, withLogCache())
 		tb.vu.ActivateVU()
 		tb.vu.StartIteration(t)
@@ -2962,10 +2963,10 @@ func TestPageWaitForURLSuccess(t *testing.T) {
 			await page.goto(testURL);
 
 			%s
-			
+
 			return page.url();`, tt.code)
 
-			result := tb.vu.RunPromise(t, code)
+			result := tb.vu.RunPromise(t, "%s", code)
 			got := strings.ReplaceAll(result.Result().String(), tb.staticURL(""), "")
 			assert.Contains(t, tt.expected, got)
 		})
@@ -3023,7 +3024,7 @@ func TestPageWaitForURLFailure(t *testing.T) {
 
 			%s`, tt.code)
 
-			_, err = tb.vu.RunAsync(t, code)
+			_, err = tb.vu.RunAsync(t, "%s", code)
 			assert.ErrorContains(t, err, tt.expected)
 		})
 	}

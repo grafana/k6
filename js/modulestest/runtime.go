@@ -33,7 +33,7 @@ type Runtime struct {
 
 // NewRuntime will create a new test runtime and will cancel the context on test/benchmark end
 func NewRuntime(t testing.TB) *Runtime {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	t.Cleanup(cancel)
 	vu := &VU{
 		CtxField:     ctx,

@@ -24,7 +24,7 @@ func mockNextIterations() (uint64, uint64) {
 // this test is mostly interesting when -race is enabled
 func TestVUHandleRace(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	logHook := testutils.NewLogHook(logrus.DebugLevel)
@@ -113,7 +113,7 @@ func TestVUHandleRace(t *testing.T) {
 // this test is mostly interesting when -race is enabled
 func TestVUHandleStartStopRace(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	logHook := testutils.NewLogHook(logrus.DebugLevel)
@@ -232,7 +232,7 @@ func TestVUHandleSimple(t *testing.T) {
 		// testLog.Level = logrus.DebugLevel
 		logEntry := logrus.NewEntry(testLog)
 		test := &handleVUTest{runner: &minirunner.MiniRunner{}}
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 
 		vuHandle := newStoppedVUHandle(ctx, test.getVU, test.returnVU, mockNextIterations, &BaseConfig{}, logEntry)
@@ -272,7 +272,7 @@ func TestVUHandleSimple(t *testing.T) {
 		// testLog.Level = logrus.DebugLevel
 		logEntry := logrus.NewEntry(testLog)
 		test := &handleVUTest{runner: &minirunner.MiniRunner{}}
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 
 		vuHandle := newStoppedVUHandle(ctx, test.getVU, test.returnVU, mockNextIterations, &BaseConfig{}, logEntry)
@@ -313,7 +313,7 @@ func TestVUHandleSimple(t *testing.T) {
 		// testLog.Level = logrus.DebugLevel
 		logEntry := logrus.NewEntry(testLog)
 		test := &handleVUTest{runner: &minirunner.MiniRunner{}}
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 
 		vuHandle := newStoppedVUHandle(ctx, test.getVU, test.returnVU, mockNextIterations, &BaseConfig{}, logEntry)
@@ -371,7 +371,7 @@ func BenchmarkVUHandleIterations(b *testing.B) {
 		return nil
 	}
 	getVU := func() (lib.InitializedVU, error) {
-		return runner.NewVU(context.Background(), uint64(atomic.AddUint32(&getVUCount, 1)), 0, nil)
+		return runner.NewVU(b.Context(), uint64(atomic.AddUint32(&getVUCount, 1)), 0, nil)
 	}
 
 	returnVU := func(_ lib.InitializedVU) {
@@ -392,7 +392,7 @@ func BenchmarkVUHandleIterations(b *testing.B) {
 	}
 
 	reset()
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(b.Context())
 	defer cancel()
 
 	vuHandle := newStoppedVUHandle(ctx, getVU, returnVU, mockNextIterations, &BaseConfig{}, logEntry)

@@ -16,7 +16,7 @@ func TestEventEmitterSpecificEvent(t *testing.T) {
 	t.Run("add event handler", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := context.Background()
+		ctx := t.Context()
 		emitter := NewBaseEventEmitter(ctx)
 		ch := make(chan Event)
 
@@ -33,7 +33,7 @@ func TestEventEmitterSpecificEvent(t *testing.T) {
 	t.Run("remove event handler", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := context.Background()
+		ctx := t.Context()
 		cancelCtx, cancelFn := context.WithCancel(ctx)
 		emitter := NewBaseEventEmitter(cancelCtx)
 		ch := make(chan Event)
@@ -51,7 +51,7 @@ func TestEventEmitterSpecificEvent(t *testing.T) {
 	t.Run("emit event", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := context.Background()
+		ctx := t.Context()
 		emitter := NewBaseEventEmitter(ctx)
 		ch := make(chan Event, 1)
 
@@ -72,7 +72,7 @@ func TestEventEmitterAllEvents(t *testing.T) {
 	t.Run("add catch-all event handler", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := context.Background()
+		ctx := t.Context()
 		emitter := NewBaseEventEmitter(ctx)
 		ch := make(chan Event)
 
@@ -88,7 +88,7 @@ func TestEventEmitterAllEvents(t *testing.T) {
 	t.Run("remove catch-all event handler", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := context.Background()
+		ctx := t.Context()
 		emitter := NewBaseEventEmitter(ctx)
 		cancelCtx, cancelFn := context.WithCancel(ctx)
 		ch := make(chan Event)
@@ -105,7 +105,7 @@ func TestEventEmitterAllEvents(t *testing.T) {
 	t.Run("emit event", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := context.Background()
+		ctx := t.Context()
 		emitter := NewBaseEventEmitter(ctx)
 		ch := make(chan Event, 1)
 
@@ -137,7 +137,7 @@ func TestBaseEventEmitter(t *testing.T) {
 		eventName := "AtomicIntEvent"
 		maxInt := 100
 
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		emitter := NewBaseEventEmitter(ctx)
 		ch := make(chan Event)
 		emitter.on(ctx, []string{eventName}, ch)
@@ -195,7 +195,7 @@ func TestBaseEventEmitter(t *testing.T) {
 		eventName4 := "AtomicIntEvent4"
 		maxInt := 100
 
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		emitter := NewBaseEventEmitter(ctx)
 		ch := make(chan Event)
 		// Calling on twice to ensure that the same queue is used
@@ -258,7 +258,7 @@ func TestBaseEventEmitter(t *testing.T) {
 		eventName2 := "AtomicIntEvent2"
 		maxInt := 100
 
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		emitter := NewBaseEventEmitter(ctx)
 		ch := make(chan Event)
 		emitter.on(ctx, []string{eventName1, eventName2}, ch)

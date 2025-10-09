@@ -68,7 +68,7 @@ func TestFrameNilDocument(t *testing.T) {
 func TestFrameManagerFrameAbortedNavigationShouldEmitANonNilPendingDocument(t *testing.T) {
 	t.Parallel()
 
-	ctx, log := context.Background(), log.NewNullLogger()
+	ctx, log := t.Context(), log.NewNullLogger()
 
 	// add the frame to frame manager
 	fm := NewFrameManager(ctx, nil, nil, NewTimeoutSettings(nil), log)

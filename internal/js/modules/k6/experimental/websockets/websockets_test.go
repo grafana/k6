@@ -1394,7 +1394,7 @@ func TestSessionPingAdd(t *testing.T) {
 func TestLockingUpWithAThrow(t *testing.T) {
 	t.Parallel()
 	tb := httpmultibin.NewHTTPMultiBin(t)
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	sr := tb.Replacer.Replace
 
@@ -1434,7 +1434,7 @@ func TestLockingUpWithAThrow(t *testing.T) {
 func TestLockingUpWithAJustGeneralCancel(t *testing.T) {
 	t.Parallel()
 	tb := httpmultibin.NewHTTPMultiBin(t)
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	sr := tb.Replacer.Replace
 

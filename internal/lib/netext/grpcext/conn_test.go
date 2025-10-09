@@ -97,7 +97,7 @@ func TestHealthCheck(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			res, err := c.HealthCheck(context.Background(), tc.svc)
+			res, err := c.HealthCheck(t.Context(), tc.svc)
 			require.NoError(t, err)
 			assert.Equal(t, tc.expectedStatus, res.Status)
 		})
@@ -121,7 +121,7 @@ func TestInvoke(t *testing.T) {
 		Message:          []byte(`{"greeting":"text request"}`),
 		Metadata:         metadata.New(nil),
 	}
-	res, err := c.Invoke(context.Background(), r)
+	res, err := c.Invoke(t.Context(), r)
 	require.NoError(t, err)
 
 	assert.Equal(t, codes.OK, res.Status)
@@ -144,7 +144,7 @@ func TestInvokeWithCallOptions(t *testing.T) {
 		Message:          []byte(`{}`),
 		Metadata:         metadata.New(nil),
 	}
-	res, err := c.Invoke(context.Background(), r, grpc.UseCompressor("fakeone"))
+	res, err := c.Invoke(t.Context(), r, grpc.UseCompressor("fakeone"))
 	require.NoError(t, err)
 	assert.NotNil(t, res)
 }
@@ -165,7 +165,7 @@ func TestInvokeWithDiscardResponseMessage(t *testing.T) {
 		Message:                []byte(`{}`),
 		Metadata:               metadata.New(nil),
 	}
-	res, err := c.Invoke(context.Background(), r, grpc.UseCompressor("fakeone"))
+	res, err := c.Invoke(t.Context(), r, grpc.UseCompressor("fakeone"))
 	require.NoError(t, err)
 	assert.NotNil(t, res)
 	assert.Nil(t, res.Message)
@@ -185,7 +185,7 @@ func TestInvokeReturnError(t *testing.T) {
 		Message:          []byte(`{"greeting":"text request"}`),
 		Metadata:         metadata.New(nil),
 	}
-	res, err := c.Invoke(context.Background(), r)
+	res, err := c.Invoke(t.Context(), r)
 	require.NoError(t, err)
 
 	assert.Equal(t, codes.Unknown, res.Status)
@@ -198,7 +198,7 @@ func TestConnInvokeInvalid(t *testing.T) {
 
 	var (
 		// valid arguments
-		ctx        = context.Background()
+		ctx        = t.Context()
 		url        = "not-empty-url-for-method"
 		md         = metadata.New(nil)
 		methodDesc = methodFromProto("SayHello")

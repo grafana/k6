@@ -29,7 +29,7 @@ func TestVUStateTagsSafeConcurrent(t *testing.T) {
 	wg.Add(2)
 	defer wg.Wait()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	stateTags := NewVUStateTags(metrics.NewRegistry().RootTagSet())

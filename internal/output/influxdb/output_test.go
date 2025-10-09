@@ -2,7 +2,6 @@ package influxdb
 
 import (
 	"bytes"
-	"context"
 	"io"
 	"net"
 	"net/http"
@@ -60,14 +59,14 @@ func testOutputCycle(t testing.TB, handler http.HandlerFunc, body func(testing.T
 		MaxHeaderBytes:    1 << 20,
 		ReadHeaderTimeout: time.Second,
 	}
-	l, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
+	l, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	defer func() {
 		_ = l.Close()
 	}()
 
 	defer func() {
-		require.NoError(t, s.Shutdown(context.Background()))
+		require.NoError(t, s.Shutdown(t.Context()))
 	}()
 
 	go func() {

@@ -167,7 +167,7 @@ func TestLokiFlushingOnStop(t *testing.T) {
 	h, err := LokiFromConfigLine(nil, configLine)
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	wg := new(sync.WaitGroup)
 	now := time.Now()
 	wg.Add(1)
@@ -203,7 +203,7 @@ func TestLokiHeaders(t *testing.T) {
 	h, err := LokiFromConfigLine(nil, configLine)
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	wg := new(sync.WaitGroup)
 	now := time.Now()
 	wg.Add(1)

@@ -1,7 +1,6 @@
 package x509
 
 import (
-	"context"
 	gox509 "crypto/x509"
 	"fmt"
 	"testing"
@@ -21,7 +20,7 @@ func makeRuntime(t *testing.T) *sobek.Runtime {
 		&modulestest.VU{
 			RuntimeField: rt,
 			InitEnvField: &common.InitEnvironment{},
-			CtxField:     context.Background(),
+			CtxField:     t.Context(),
 			StateField:   nil,
 		},
 	).(*X509)

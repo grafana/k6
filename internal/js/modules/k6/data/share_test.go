@@ -1,7 +1,6 @@
 package data
 
 import (
-	"context"
 	"errors"
 	"sync"
 	"testing"
@@ -168,7 +167,7 @@ func TestSharedArrayAnotherRuntimeWorking(t *testing.T) {
 	vu := &modulestest.VU{
 		RuntimeField: rt,
 		InitEnvField: &common.InitEnvironment{},
-		CtxField:     context.Background(),
+		CtxField:     t.Context(),
 		StateField:   nil,
 	}
 	m, ok := New().NewModuleInstance(vu).(*Data)
@@ -181,7 +180,7 @@ func TestSharedArrayAnotherRuntimeWorking(t *testing.T) {
 	// create another Runtime with new ctx but keep the initEnv
 	rt = sobek.New()
 	vu.RuntimeField = rt
-	vu.CtxField = context.Background()
+	vu.CtxField = t.Context()
 	require.NoError(t, rt.Set("data", m.Exports().Named))
 
 	_, err = rt.RunString(`var array = new data.SharedArray("shared", function() {throw "wat";});`)

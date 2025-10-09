@@ -1,7 +1,6 @@
 package common
 
 import (
-	"context"
 	"fmt"
 	"net/url"
 	"testing"
@@ -26,7 +25,7 @@ func TestConnection(t *testing.T) {
 	t.Run("connect", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := context.Background()
+		ctx := t.Context()
 		url, _ := url.Parse(server.ServerHTTP.URL)
 		wsURL := fmt.Sprintf("ws://%s/echo", url.Host)
 		conn, err := NewConnection(ctx, wsURL, log.NewNullLogger(), nil)
@@ -44,7 +43,7 @@ func TestConnectionClosureAbnormal(t *testing.T) {
 	t.Run("closure abnormal", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := context.Background()
+		ctx := t.Context()
 		url, _ := url.Parse(server.ServerHTTP.URL)
 		wsURL := fmt.Sprintf("ws://%s/closure-abnormal", url.Host)
 		conn, err := NewConnection(ctx, wsURL, log.NewNullLogger(), nil)
@@ -65,7 +64,7 @@ func TestConnectionSendRecv(t *testing.T) {
 	t.Run("send command with empty reply", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := context.Background()
+		ctx := t.Context()
 		url, _ := url.Parse(server.ServerHTTP.URL)
 		wsURL := fmt.Sprintf("ws://%s/cdp", url.Host)
 		conn, err := NewConnection(ctx, wsURL, log.NewNullLogger(), nil)
@@ -132,7 +131,7 @@ func TestConnectionCreateSession(t *testing.T) {
 	t.Run("create session for target", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := context.Background()
+		ctx := t.Context()
 		url, _ := url.Parse(server.ServerHTTP.URL)
 		wsURL := fmt.Sprintf("ws://%s/cdp", url.Host)
 		conn, err := NewConnection(ctx, wsURL, log.NewNullLogger(), nil)
