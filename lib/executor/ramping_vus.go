@@ -618,7 +618,7 @@ func (rs *rampingVUsRunState) runLoopsIfPossible(ctx context.Context, cancel fun
 		rs.vuHandles[i] = newStoppedVUHandle(
 			ctx, getVU, returnVU, rs.executor.nextIterationCounters,
 			&rs.executor.config.BaseConfig, rs.executor.logger.WithField("vuNum", i))
-		go rs.vuHandles[i].runLoopsIfPossible(rs.runIteration)
+		go rs.vuHandles[i].runLoopsIfPossible(rs.runIteration) //nolint:contextcheck
 	}
 }
 
