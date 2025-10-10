@@ -376,10 +376,22 @@ func (s *Socket) SendBinary(message sobek.Value) {
 }
 
 // Ping sends a ping message over the websocket.
-func (s *Socket) Ping() {
+// It can optionally include application data as per RFC 6455 section 5.5.2.
+func (s *Socket) Ping(args ...sobek.Value) {
 	deadline := time.Now().Add(writeWait)
 	pingID := strconv.Itoa(s.pingSendCounter)
-	data := []byte(pingID)
+
+	var data []byte
+	if len(args) > 0 && !sobek.IsUndefined(args[0]) && !sobek.IsNull(args[0]) {
+		if args[0].String() != "" {
+			// Add the pingID with a delimiter before the application data
+			data = []byte(pingID + "|" + args[0].String())
+		} else {
+			data = []byte(pingID)
+		}
+	} else {
+		data = []byte(pingID)
+	}
 
 	err := s.conn.WriteControl(websocket.PingMessage, data, deadline)
 	if err != nil {
@@ -391,8 +403,27 @@ func (s *Socket) Ping() {
 	s.pingSendCounter++
 }
 
-func (s *Socket) trackPong(pingID string) {
+func (s *Socket) trackPong(pongData string) {
 	pongTimestamp := time.Now()
+
+	var pingID string
+	if parts := strings.SplitN(pongData, "|", 2); len(parts) > 0 {
+		pingID = parts[0]
+	} else {
+		for i, c := range pongData {
+			if c < '0' || c > '9' {
+				pingID = pongData[:i]
+				break
+			}
+			if i == len(pongData)-1 {
+				pingID = pongData
+			}
+		}
+	}
+
+	if pingID == "" {
+		return
+	}
 
 	if _, ok := s.pingSendTimestamps[pingID]; !ok {
 		// We received a pong for a ping we didn't send; ignore

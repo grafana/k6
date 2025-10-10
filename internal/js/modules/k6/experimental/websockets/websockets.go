@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -678,14 +679,27 @@ func isArrayBufferView(rt *sobek.Runtime, v sobek.Value) (bool, error) {
 }
 
 // Ping sends a ping message over the websocket.
-func (w *webSocket) ping() {
+// It can optionally include application data as per RFC 6455 section 5.5.2.
+func (w *webSocket) ping(args ...sobek.Value) {
 	w.assertStateOpen()
 
 	pingID := strconv.Itoa(w.sendPings.counter)
 
+	var data []byte
+	if len(args) > 0 && !sobek.IsUndefined(args[0]) && !sobek.IsNull(args[0]) {
+		if args[0].String() != "" {
+			// Use a special delimiter "|" to separate ping ID from application data
+			data = []byte(pingID + "|" + args[0].String())
+		} else {
+			data = []byte(pingID)
+		}
+	} else {
+		data = []byte(pingID)
+	}
+
 	w.writeQueueCh <- message{
 		mtype: websocket.PingMessage,
-		data:  []byte(pingID),
+		data:  data,
 		t:     time.Now(),
 	}
 
@@ -693,8 +707,29 @@ func (w *webSocket) ping() {
 	w.sendPings.counter++
 }
 
-func (w *webSocket) trackPong(pingID string) {
+func (w *webSocket) trackPong(pongData string) {
 	pongTimestamp := time.Now()
+
+	var pingID string
+	if parts := strings.SplitN(pongData, "|", 2); len(parts) > 0 {
+		pingID = parts[0]
+	} else {
+		for i, c := range pongData {
+			if c < '0' || c > '9' {
+				// Found non-numeric character, extract the ID
+				pingID = pongData[:i]
+				break
+			}
+			if i == len(pongData)-1 {
+				pingID = pongData
+			}
+		}
+	}
+
+	if pingID == "" {
+		w.vu.State().Logger.Warnf("received pong with invalid ping ID format")
+		return
+	}
 
 	pingTimestamp, ok := w.sendPings.timestamps[pingID]
 	if !ok {

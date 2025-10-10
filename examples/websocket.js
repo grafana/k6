@@ -10,6 +10,14 @@ export default function () {
             console.log('connected');
             socket.send(Date.now());
 
+            // Send a regular ping
+            socket.ping();
+            console.log("Sent a ping without application data");
+
+            // Send a ping with application data
+            socket.ping("application-data");
+            console.log("Sent a ping with application data");
+
             socket.setInterval(function timeout() {
                 socket.ping();
                 console.log("Pinging every 1sec (setInterval test)");
