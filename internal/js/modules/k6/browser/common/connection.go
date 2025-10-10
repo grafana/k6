@@ -616,7 +616,7 @@ func (c *Connection) Execute(
 					case <-evCancelCtx.Done():
 						c.logger.Debugf("connection:Execute:<-evCancelCtx.Done()#2", "wsURL:%q err:%v", c.wsURL, evCancelCtx.Err())
 					case ch <- msg:
-						// Stopping goroutine as we expect only one response with the matching message ID,
+						// Stopping goroutine as we expect only one response with the matching message ID
 						return
 					}
 				}
