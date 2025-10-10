@@ -1388,7 +1388,7 @@ func (p *Page) Referrer() string {
 	return nm.extraHTTPHeaders["referer"]
 }
 
-// Route register a handler to be executed for a given request path
+// Route registers a handler to be executed for a given request path
 func (p *Page) Route(
 	path string,
 	handlerCallback RouteHandlerCallback,
@@ -1416,6 +1416,44 @@ func (p *Page) Route(
 	p.routes = append([]*RouteHandler{routeHandler}, p.routes...)
 
 	return nil
+}
+
+// Unroute removes the route(s) for the specified URL pattern.
+// If multiple routes match the same URL pattern, all of them are removed.
+func (p *Page) Unroute(path string) error {
+	p.logger.Debugf("Page:Unroute", "sid:%v path:%s", p.sessionID(), path)
+
+	p.routesMu.Lock()
+	defer p.routesMu.Unlock()
+
+	var filteredRoutes []*RouteHandler
+	for _, route := range p.routes {
+		if route.path != path {
+			filteredRoutes = append(filteredRoutes, route)
+		}
+	}
+
+	p.routes = filteredRoutes
+
+	// If no routes remain, disable request interception
+	if len(p.routes) == 0 {
+		return p.mainFrameSession.updateRequestInterception(false)
+	}
+
+	return nil
+}
+
+// UnrouteAll removes all registered routes.
+func (p *Page) UnrouteAll() error {
+	p.logger.Debugf("Page:UnrouteAll", "sid:%v", p.sessionID())
+
+	p.routesMu.Lock()
+	defer p.routesMu.Unlock()
+
+	p.routes = []*RouteHandler{}
+
+	// Disable request interception when no route is registered
+	return p.mainFrameSession.updateRequestInterception(false)
 }
 
 // NavigationTimeout returns the page's navigation timeout.
