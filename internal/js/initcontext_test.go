@@ -30,8 +30,7 @@ func TestRequire(t *testing.T) {
 		t.Run("Nonexistent", func(t *testing.T) {
 			t.Parallel()
 			_, err := getSimpleBundle(t, "/script.js", `import "k6/NONEXISTENT";`)
-			require.Error(t, err)
-			require.Contains(t, err.Error(), "unknown module: k6/NONEXISTENT")
+			require.ErrorContains(t, err, "GoError: unknown module: k6/NONEXISTENT")
 		})
 
 		t.Run("k6", func(t *testing.T) {
