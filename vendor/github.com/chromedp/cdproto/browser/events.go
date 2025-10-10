@@ -21,8 +21,9 @@ type EventDownloadWillBegin struct {
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Browser#event-downloadProgress
 type EventDownloadProgress struct {
-	GUID          string                `json:"guid"`          // Global unique identifier of the download.
-	TotalBytes    float64               `json:"totalBytes"`    // Total expected bytes to download.
-	ReceivedBytes float64               `json:"receivedBytes"` // Total bytes received.
-	State         DownloadProgressState `json:"state"`         // Download status.
+	GUID          string                `json:"guid"`                        // Global unique identifier of the download.
+	TotalBytes    float64               `json:"totalBytes"`                  // Total expected bytes to download.
+	ReceivedBytes float64               `json:"receivedBytes"`               // Total bytes received.
+	State         DownloadProgressState `json:"state"`                       // Download status.
+	FilePath      string                `json:"filePath,omitempty,omitzero"` // If download is "completed", provides the path of the downloaded file. Depending on the platform, it is not guaranteed to be set, nor the file is guaranteed to exist.
 }

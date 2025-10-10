@@ -132,29 +132,6 @@ func (p *EnableParams) Do(ctx context.Context) (err error) {
 	return cdp.Execute(ctx, CommandEnable, nil, nil)
 }
 
-// InspectWorkerParams [no description].
-type InspectWorkerParams struct {
-	VersionID string `json:"versionId"`
-}
-
-// InspectWorker [no description].
-//
-// See: https://chromedevtools.github.io/devtools-protocol/tot/ServiceWorker#method-inspectWorker
-//
-// parameters:
-//
-//	versionID
-func InspectWorker(versionID string) *InspectWorkerParams {
-	return &InspectWorkerParams{
-		VersionID: versionID,
-	}
-}
-
-// Do executes ServiceWorker.inspectWorker against the provided context.
-func (p *InspectWorkerParams) Do(ctx context.Context) (err error) {
-	return cdp.Execute(ctx, CommandInspectWorker, p, nil)
-}
-
 // SetForceUpdateOnPageLoadParams [no description].
 type SetForceUpdateOnPageLoadParams struct {
 	ForceUpdateOnPageLoad bool `json:"forceUpdateOnPageLoad"`
@@ -315,7 +292,6 @@ const (
 	CommandDispatchSyncEvent         = "ServiceWorker.dispatchSyncEvent"
 	CommandDispatchPeriodicSyncEvent = "ServiceWorker.dispatchPeriodicSyncEvent"
 	CommandEnable                    = "ServiceWorker.enable"
-	CommandInspectWorker             = "ServiceWorker.inspectWorker"
 	CommandSetForceUpdateOnPageLoad  = "ServiceWorker.setForceUpdateOnPageLoad"
 	CommandSkipWaiting               = "ServiceWorker.skipWaiting"
 	CommandStartWorker               = "ServiceWorker.startWorker"

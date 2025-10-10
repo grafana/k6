@@ -216,7 +216,7 @@ type EventWindowOpen struct {
 }
 
 // EventCompilationCacheProduced issued for every compilation cache
-// generated. Is only available if Page.setGenerateCompilationCache is enabled.
+// generated.
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Page#event-compilationCacheProduced
 type EventCompilationCacheProduced struct {

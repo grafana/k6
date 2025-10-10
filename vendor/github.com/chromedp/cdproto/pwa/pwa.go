@@ -58,26 +58,38 @@ func (p *GetOsAppStateParams) Do(ctx context.Context) (badgeCount int64, fileHan
 }
 
 // InstallParams installs the given manifest identity, optionally using the
-// given install_url or IWA bundle location. TODO(crbug.com/337872319) Support
-// IWA to meet the following specific requirement. IWA-specific install
-// description: If the manifest_id is isolated-app://, install_url_or_bundle_url
-// is required, and can be either an http(s) URL or file:// URL pointing to a
-// signed web bundle (.swbn). The .swbn file's signing key must correspond to
-// manifest_id. If Chrome is not in IWA dev mode, the installation will fail,
-// regardless of the state of the allowlist.
+// given installUrlOrBundleUrl IWA-specific install description: manifestId
+// corresponds to isolated-app:// + web_package::SignedWebBundleId File
+// installation mode: The installUrlOrBundleUrl can be either file:// or
+// http(s):// pointing to a signed web bundle (.swbn). In this case
+// SignedWebBundleId must correspond to The .swbn file's signing key. Dev proxy
+// installation mode: installUrlOrBundleUrl must be http(s):// that serves dev
+// mode IWA. web_package::SignedWebBundleId must be of type dev proxy. The
+// advantage of dev proxy mode is that all changes to IWA automatically will be
+// reflected in the running app without reinstallation. To generate bundle id
+// for proxy mode: 1. Generate 32 random bytes. 2. Add a specific suffix 0x00 at
+// the end. 3. Encode the entire sequence using Base32 without padding. If
+// Chrome is not in IWA dev mode, the installation will fail, regardless of the
+// state of the allowlist.
 type InstallParams struct {
 	ManifestID            string `json:"manifestId"`
 	InstallURLOrBundleURL string `json:"installUrlOrBundleUrl,omitempty,omitzero"` // The location of the app or bundle overriding the one derived from the manifestId.
 }
 
 // Install installs the given manifest identity, optionally using the given
-// install_url or IWA bundle location. TODO(crbug.com/337872319) Support IWA to
-// meet the following specific requirement. IWA-specific install description: If
-// the manifest_id is isolated-app://, install_url_or_bundle_url is required,
-// and can be either an http(s) URL or file:// URL pointing to a signed web
-// bundle (.swbn). The .swbn file's signing key must correspond to manifest_id.
-// If Chrome is not in IWA dev mode, the installation will fail, regardless of
-// the state of the allowlist.
+// installUrlOrBundleUrl IWA-specific install description: manifestId
+// corresponds to isolated-app:// + web_package::SignedWebBundleId File
+// installation mode: The installUrlOrBundleUrl can be either file:// or
+// http(s):// pointing to a signed web bundle (.swbn). In this case
+// SignedWebBundleId must correspond to The .swbn file's signing key. Dev proxy
+// installation mode: installUrlOrBundleUrl must be http(s):// that serves dev
+// mode IWA. web_package::SignedWebBundleId must be of type dev proxy. The
+// advantage of dev proxy mode is that all changes to IWA automatically will be
+// reflected in the running app without reinstallation. To generate bundle id
+// for proxy mode: 1. Generate 32 random bytes. 2. Add a specific suffix 0x00 at
+// the end. 3. Encode the entire sequence using Base32 without padding. If
+// Chrome is not in IWA dev mode, the installation will fail, regardless of the
+// state of the allowlist.
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/PWA#method-install
 //

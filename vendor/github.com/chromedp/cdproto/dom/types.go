@@ -214,6 +214,7 @@ func (t GetElementByRelationRelation) String() string {
 const (
 	GetElementByRelationRelationPopoverTarget  GetElementByRelationRelation = "PopoverTarget"
 	GetElementByRelationRelationInterestTarget GetElementByRelationRelation = "InterestTarget"
+	GetElementByRelationRelationCommandFor     GetElementByRelationRelation = "CommandFor"
 )
 
 // UnmarshalJSON satisfies [json.Unmarshaler].
@@ -226,6 +227,8 @@ func (t *GetElementByRelationRelation) UnmarshalJSON(buf []byte) error {
 		*t = GetElementByRelationRelationPopoverTarget
 	case GetElementByRelationRelationInterestTarget:
 		*t = GetElementByRelationRelationInterestTarget
+	case GetElementByRelationRelationCommandFor:
+		*t = GetElementByRelationRelationCommandFor
 	default:
 		return fmt.Errorf("unknown GetElementByRelationRelation value: %v", s)
 	}
