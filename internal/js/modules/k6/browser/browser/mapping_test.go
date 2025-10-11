@@ -593,6 +593,7 @@ type locatorAPI interface { //nolint:interfacebloat
 	Nth(nth int) *common.Locator
 	SelectOption(values sobek.Value, opts sobek.Value) ([]string, error)
 	Press(key string, opts sobek.Value) error
+	PressSequentially(text string, opts sobek.Value) error
 	Type(text string, opts sobek.Value) error
 	Hover(opts sobek.Value) error
 	Tap(opts sobek.Value) error
