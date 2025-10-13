@@ -260,6 +260,9 @@ func figureOutAutoExtensionResolution(
 			return err
 		}
 
+		if lt.source.URL.Path == "/-" {
+			gs.Stdin = bytes.NewBuffer(lt.source.Data)
+		}
 		return runDifferentBinaryError{
 			customBinary: customBinary,
 		}
