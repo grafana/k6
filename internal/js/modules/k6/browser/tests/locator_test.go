@@ -70,27 +70,27 @@ func TestLocator(t *testing.T) {
 				t.Run("check", func(t *testing.T) {
 					l := p.Locator("#inputCheckbox", nil)
 					require.False(t, check(), "should be unchecked first")
-					require.NoError(t, l.Check(nil))
+					require.NoError(t, l.Check(common.NewFrameCheckOptions(l.Timeout())))
 					require.True(t, check(), "cannot not check the input box")
-					require.NoError(t, l.Uncheck(nil))
+					require.NoError(t, l.Uncheck(common.NewFrameUncheckOptions(l.Timeout())))
 					require.False(t, check(), "cannot not uncheck the input box")
 				})
 				t.Run("setChecked", func(t *testing.T) {
 					l := p.Locator("#inputCheckbox", nil)
 					require.False(t, check(), "should be unchecked first")
-					require.NoError(t, l.SetChecked(true, nil))
+					require.NoError(t, l.SetChecked(true, common.NewFrameCheckOptions(l.Timeout())))
 					require.True(t, check(), "cannot not check the input box")
-					require.NoError(t, l.SetChecked(false, nil))
+					require.NoError(t, l.SetChecked(false, common.NewFrameCheckOptions(l.Timeout())))
 					require.False(t, check(), "cannot not uncheck the input box")
 				})
 				t.Run("is_checked", func(t *testing.T) {
 					l := p.Locator("#inputCheckbox", nil)
-					require.NoError(t, l.Check(nil))
+					require.NoError(t, l.Check(common.NewFrameCheckOptions(l.Timeout())))
 					checked, err := l.IsChecked(common.NewFrameIsCheckedOptions(l.Timeout()))
 					require.NoError(t, err)
 					require.True(t, checked)
 
-					require.NoError(t, l.Uncheck(nil))
+					require.NoError(t, l.Uncheck(common.NewFrameUncheckOptions(l.Timeout())))
 					checked, err = l.IsChecked(common.NewFrameIsCheckedOptions(l.Timeout()))
 					require.NoError(t, err)
 					require.False(t, checked)
@@ -396,7 +396,7 @@ func TestLocator(t *testing.T) {
 		},
 		{
 			"Check", func(l *common.Locator, tb *testBrowser) error {
-				return l.Check(timeout(tb))
+				return l.Check(common.NewFrameCheckOptions(100 * time.Millisecond))
 			},
 		},
 		{
@@ -468,7 +468,7 @@ func TestLocator(t *testing.T) {
 		},
 		{
 			"SetChecked", func(l *common.Locator, tb *testBrowser) error {
-				return l.SetChecked(true, timeout(tb))
+				return l.SetChecked(true, common.NewFrameCheckOptions(100*time.Millisecond))
 			},
 		},
 		{
@@ -496,7 +496,7 @@ func TestLocator(t *testing.T) {
 		},
 		{
 			"Uncheck", func(l *common.Locator, tb *testBrowser) error {
-				return l.Uncheck(timeout(tb))
+				return l.Uncheck(common.NewFrameUncheckOptions(100 * time.Millisecond))
 			},
 		},
 		{
