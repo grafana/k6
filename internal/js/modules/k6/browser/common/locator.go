@@ -389,17 +389,13 @@ func (l *Locator) focus(opts *FrameBaseOptions) error {
 
 // GetAttribute of the element using locator's selector with strict mode on.
 // The second return value is true if the attribute exists, and false otherwise.
-func (l *Locator) GetAttribute(name string, opts sobek.Value) (string, bool, error) {
+func (l *Locator) GetAttribute(name string, opts *FrameBaseOptions) (string, bool, error) {
 	l.log.Debugf(
 		"Locator:GetAttribute", "fid:%s furl:%q sel:%q name:%q opts:%+v",
 		l.frame.ID(), l.frame.URL(), l.selector, name, opts,
 	)
 
-	copts := NewFrameBaseOptions(l.frame.defaultTimeout())
-	if err := copts.Parse(l.ctx, opts); err != nil {
-		return "", false, fmt.Errorf("parsing get attribute options: %w", err)
-	}
-	s, ok, err := l.getAttribute(name, copts)
+	s, ok, err := l.getAttribute(name, opts)
 	if err != nil {
 		return "", false, fmt.Errorf("getting attribute %q of %q: %w", name, l.selector, err)
 	}
@@ -540,14 +536,10 @@ func (l *Locator) Nth(nth int) *Locator {
 // the locator's selector with strict mode on. The second return
 // value is true if the returned text content is not null or empty,
 // and false otherwise.
-func (l *Locator) TextContent(opts sobek.Value) (string, bool, error) {
+func (l *Locator) TextContent(opts *FrameTextContentOptions) (string, bool, error) {
 	l.log.Debugf("Locator:TextContent", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	copts := NewFrameTextContentOptions(l.frame.defaultTimeout())
-	if err := copts.Parse(l.ctx, opts); err != nil {
-		return "", false, fmt.Errorf("parsing text context options: %w", err)
-	}
-	s, ok, err := l.textContent(copts)
+	s, ok, err := l.textContent(opts)
 	if err != nil {
 		return "", false, fmt.Errorf("getting text content of %q: %w", l.selector, err)
 	}
@@ -581,18 +573,10 @@ func (l *Locator) inputValue(opts *FrameInputValueOptions) (string, error) {
 // SelectOption filters option values of the first element that matches
 // the locator's selector (with strict mode on), selects the options,
 // and returns the filtered options.
-func (l *Locator) SelectOption(values sobek.Value, opts sobek.Value) ([]string, error) {
+func (l *Locator) SelectOption(values []any, opts *FrameSelectOptionOptions) ([]string, error) {
 	l.log.Debugf("Locator:SelectOption", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	copts := NewFrameSelectOptionOptions(l.frame.defaultTimeout())
-	if err := copts.Parse(l.ctx, opts); err != nil {
-		return nil, fmt.Errorf("parsing select option options: %w", err)
-	}
-	convValues, err := ConvertSelectOptionValues(l.frame.vu.Runtime(), values)
-	if err != nil {
-		return nil, fmt.Errorf("parsing select option values: %w", err)
-	}
-	v, err := l.selectOption(convValues, copts)
+	v, err := l.selectOption(values, opts)
 	if err != nil {
 		return nil, fmt.Errorf("selecting option on %q: %w", l.selector, err)
 	}

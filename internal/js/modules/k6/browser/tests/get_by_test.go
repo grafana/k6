@@ -460,7 +460,7 @@ func TestGetByRoleSuccess(t *testing.T) {
 						require.Equal(t, tt.expected, c)
 
 						if tt.expectedText != "" {
-							text, _, err := l.TextContent(sobek.Undefined())
+							text, _, err := l.TextContent(common.NewFrameTextContentOptions(l.Timeout()))
 							require.NoError(t, err)
 							require.Equal(t, tt.expectedText, text)
 						}
