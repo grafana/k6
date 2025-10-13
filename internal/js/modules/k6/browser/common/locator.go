@@ -140,14 +140,10 @@ func (l *Locator) Count() (int, error) {
 }
 
 // Dblclick double clicks on an element using locator's selector with strict mode on.
-func (l *Locator) Dblclick(opts sobek.Value) error {
+func (l *Locator) Dblclick(opts *FrameDblclickOptions) error {
 	l.log.Debugf("Locator:Dblclick", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	copts := NewFrameDblClickOptions(l.frame.defaultTimeout())
-	if err := copts.Parse(l.ctx, opts); err != nil {
-		return fmt.Errorf("parsing double click options: %w", err)
-	}
-	if err := l.dblclick(copts); err != nil {
+	if err := l.dblclick(opts); err != nil {
 		return fmt.Errorf("double clicking on %q: %w", l.selector, err)
 	}
 
@@ -364,17 +360,13 @@ func (l *Locator) IsHidden() (bool, error) {
 }
 
 // Fill out the element using locator's selector with strict mode on.
-func (l *Locator) Fill(value string, opts sobek.Value) error {
+func (l *Locator) Fill(value string, opts *FrameFillOptions) error {
 	l.log.Debugf(
 		"Locator:Fill", "fid:%s furl:%q sel:%q val:%q opts:%+v",
 		l.frame.ID(), l.frame.URL(), l.selector, value, opts,
 	)
 
-	copts := NewFrameFillOptions(l.frame.defaultTimeout())
-	if err := copts.Parse(l.ctx, opts); err != nil {
-		return fmt.Errorf("parsing fill options: %w", err)
-	}
-	if err := l.fill(value, copts); err != nil {
+	if err := l.fill(value, opts); err != nil {
 		return fmt.Errorf("filling %q with %q: %w", l.selector, value, err)
 	}
 
@@ -406,14 +398,10 @@ func (l *Locator) First() *Locator {
 }
 
 // Focus on the element using locator's selector with strict mode on.
-func (l *Locator) Focus(opts sobek.Value) error {
+func (l *Locator) Focus(opts *FrameBaseOptions) error {
 	l.log.Debugf("Locator:Focus", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	copts := NewFrameBaseOptions(l.frame.defaultTimeout())
-	if err := copts.Parse(l.ctx, opts); err != nil {
-		return fmt.Errorf("parsing focus options: %w", err)
-	}
-	if err := l.focus(copts); err != nil {
+	if err := l.focus(opts); err != nil {
 		return fmt.Errorf("focusing on %q: %w", l.selector, err)
 	}
 
@@ -530,14 +518,10 @@ func (l *Locator) Locator(selector string, opts *LocatorOptions) *Locator {
 
 // InnerHTML returns the element's inner HTML that matches
 // the locator's selector with strict mode on.
-func (l *Locator) InnerHTML(opts sobek.Value) (string, error) {
+func (l *Locator) InnerHTML(opts *FrameInnerHTMLOptions) (string, error) {
 	l.log.Debugf("Locator:InnerHTML", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	copts := NewFrameInnerHTMLOptions(l.frame.defaultTimeout())
-	if err := copts.Parse(l.ctx, opts); err != nil {
-		return "", fmt.Errorf("parsing inner HTML options: %w", err)
-	}
-	s, err := l.innerHTML(copts)
+	s, err := l.innerHTML(opts)
 	if err != nil {
 		return "", fmt.Errorf("getting inner HTML of %q: %w", l.selector, err)
 	}
@@ -552,14 +536,10 @@ func (l *Locator) innerHTML(opts *FrameInnerHTMLOptions) (string, error) {
 
 // InnerText returns the element's inner text that matches
 // the locator's selector with strict mode on.
-func (l *Locator) InnerText(opts sobek.Value) (string, error) {
+func (l *Locator) InnerText(opts *FrameInnerTextOptions) (string, error) {
 	l.log.Debugf("Locator:InnerText", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	copts := NewFrameInnerTextOptions(l.frame.defaultTimeout())
-	if err := copts.Parse(l.ctx, opts); err != nil {
-		return "", fmt.Errorf("parsing inner text options: %w", err)
-	}
-	s, err := l.innerText(copts)
+	s, err := l.innerText(opts)
 	if err != nil {
 		return "", fmt.Errorf("getting inner text of %q: %w", l.selector, err)
 	}
@@ -610,14 +590,10 @@ func (l *Locator) textContent(opts *FrameTextContentOptions) (string, bool, erro
 
 // InputValue returns the element's input value that matches
 // the locator's selector with strict mode on.
-func (l *Locator) InputValue(opts sobek.Value) (string, error) {
+func (l *Locator) InputValue(opts *FrameInputValueOptions) (string, error) {
 	l.log.Debugf("Locator:InputValue", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	copts := NewFrameInputValueOptions(l.frame.defaultTimeout())
-	if err := copts.Parse(l.ctx, opts); err != nil {
-		return "", fmt.Errorf("parsing input value options: %w", err)
-	}
-	v, err := l.inputValue(copts)
+	v, err := l.inputValue(opts)
 	if err != nil {
 		return "", fmt.Errorf("getting input value of %q: %w", l.selector, err)
 	}
@@ -719,14 +695,10 @@ func (l *Locator) typ(text string, opts *FrameTypeOptions) error {
 
 // Hover moves the pointer over the element that matches the locator's
 // selector with strict mode on.
-func (l *Locator) Hover(opts sobek.Value) error {
+func (l *Locator) Hover(opts *FrameHoverOptions) error {
 	l.log.Debugf("Locator:Hover", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	copts := NewFrameHoverOptions(l.frame.defaultTimeout())
-	if err := copts.Parse(l.ctx, opts); err != nil {
-		return fmt.Errorf("parsing hover options: %w", err)
-	}
-	if err := l.hover(copts); err != nil {
+	if err := l.hover(opts); err != nil {
 		return fmt.Errorf("hovering on %q: %w", l.selector, err)
 	}
 
@@ -779,14 +751,10 @@ func (l *Locator) dispatchEvent(typ string, eventInit any, opts *FrameDispatchEv
 }
 
 // WaitFor waits for the element matching the locator's selector with strict mode on.
-func (l *Locator) WaitFor(opts sobek.Value) error {
+func (l *Locator) WaitFor(opts *FrameWaitForSelectorOptions) error {
 	l.log.Debugf("Locator:WaitFor", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	popts := NewFrameWaitForSelectorOptions(l.frame.defaultTimeout())
-	if err := popts.Parse(l.ctx, opts); err != nil {
-		return fmt.Errorf("parsing wait for options: %w", err)
-	}
-	if err := l.waitFor(popts); err != nil {
+	if err := l.waitFor(opts); err != nil {
 		return fmt.Errorf("waiting for %q: %w", l.selector, err)
 	}
 
