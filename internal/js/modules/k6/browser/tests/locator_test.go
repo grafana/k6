@@ -86,12 +86,12 @@ func TestLocator(t *testing.T) {
 				t.Run("is_checked", func(t *testing.T) {
 					l := p.Locator("#inputCheckbox", nil)
 					require.NoError(t, l.Check(nil))
-					checked, err := l.IsChecked(nil)
+					checked, err := l.IsChecked(common.NewFrameIsCheckedOptions(l.Timeout()))
 					require.NoError(t, err)
 					require.True(t, checked)
 
 					require.NoError(t, l.Uncheck(nil))
-					checked, err = l.IsChecked(nil)
+					checked, err = l.IsChecked(common.NewFrameIsCheckedOptions(l.Timeout()))
 					require.NoError(t, err)
 					require.False(t, checked)
 				})
@@ -548,7 +548,7 @@ func TestLocatorElementState(t *testing.T) {
 			"disabled",
 			`() => document.getElementById('inputText').disabled = true`,
 			func(l *common.Locator) (bool, error) {
-				resp, err := l.IsDisabled(nil)
+				resp, err := l.IsDisabled(common.NewFrameIsDisabledOptions(l.Timeout()))
 				return !resp, err
 			},
 		},
@@ -556,7 +556,7 @@ func TestLocatorElementState(t *testing.T) {
 			"enabled",
 			`() => document.getElementById('inputText').disabled = true`,
 			func(l *common.Locator) (bool, error) {
-				resp, err := l.IsEnabled(nil)
+				resp, err := l.IsEnabled(common.NewFrameIsEnabledOptions(l.Timeout()))
 				return resp, err
 			},
 		},
@@ -572,7 +572,7 @@ func TestLocatorElementState(t *testing.T) {
 			"readOnly",
 			`() => document.getElementById('inputText').readOnly = true`,
 			func(l *common.Locator) (bool, error) {
-				resp, err := l.IsEditable(nil)
+				resp, err := l.IsEditable(common.NewFrameIsEditableOptions(l.Timeout()))
 				return resp, err
 			},
 		},
@@ -615,34 +615,31 @@ func TestLocatorElementState(t *testing.T) {
 		})
 	}
 
-	timeout := func(tb *testBrowser) sobek.Value {
-		return tb.toSobekValue(jsFrameBaseOpts{Timeout: "100"})
-	}
 	sanityTests := []struct {
 		name string
 		do   func(*common.Locator, *testBrowser) error
 	}{
 		{
 			"IsChecked", func(l *common.Locator, tb *testBrowser) error {
-				_, err := l.IsChecked(timeout(tb))
+				_, err := l.IsChecked(common.NewFrameIsCheckedOptions(100 * time.Millisecond))
 				return err
 			},
 		},
 		{
 			"IsEditable", func(l *common.Locator, tb *testBrowser) error {
-				_, err := l.IsEditable(timeout(tb))
+				_, err := l.IsEditable(common.NewFrameIsEditableOptions(100 * time.Millisecond))
 				return err
 			},
 		},
 		{
 			"IsEnabled", func(l *common.Locator, tb *testBrowser) error {
-				_, err := l.IsEnabled(timeout(tb))
+				_, err := l.IsEnabled(common.NewFrameIsEnabledOptions(100 * time.Millisecond))
 				return err
 			},
 		},
 		{
 			"IsDisabled", func(l *common.Locator, tb *testBrowser) error {
-				_, err := l.IsDisabled(timeout(tb))
+				_, err := l.IsDisabled(common.NewFrameIsDisabledOptions(100 * time.Millisecond))
 				return err
 			},
 		},

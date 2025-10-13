@@ -239,14 +239,10 @@ func (l *Locator) uncheck(opts *FrameUncheckOptions) error {
 
 // IsChecked returns true if the element matches the locator's
 // selector and is checked. Otherwise, returns false.
-func (l *Locator) IsChecked(opts sobek.Value) (bool, error) {
+func (l *Locator) IsChecked(opts *FrameIsCheckedOptions) (bool, error) {
 	l.log.Debugf("Locator:IsChecked", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	copts := NewFrameIsCheckedOptions(l.frame.defaultTimeout())
-	if err := copts.Parse(l.ctx, opts); err != nil {
-		return false, fmt.Errorf("parsing is checked options: %w", err)
-	}
-	checked, err := l.isChecked(copts)
+	checked, err := l.isChecked(opts)
 	if err != nil {
 		return false, fmt.Errorf("checking is %q checked: %w", l.selector, err)
 	}
@@ -263,14 +259,10 @@ func (l *Locator) isChecked(opts *FrameIsCheckedOptions) (bool, error) {
 
 // IsEditable returns true if the element matches the locator's
 // selector and is Editable. Otherwise, returns false.
-func (l *Locator) IsEditable(opts sobek.Value) (bool, error) {
+func (l *Locator) IsEditable(opts *FrameIsEditableOptions) (bool, error) {
 	l.log.Debugf("Locator:IsEditable", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	copts := NewFrameIsEditableOptions(l.frame.defaultTimeout())
-	if err := copts.Parse(l.ctx, opts); err != nil {
-		return false, fmt.Errorf("parsing is editable options: %w", err)
-	}
-	editable, err := l.isEditable(copts)
+	editable, err := l.isEditable(opts)
 	if err != nil {
 		return false, fmt.Errorf("checking is %q editable: %w", l.selector, err)
 	}
@@ -287,14 +279,10 @@ func (l *Locator) isEditable(opts *FrameIsEditableOptions) (bool, error) {
 
 // IsEnabled returns true if the element matches the locator's
 // selector and is Enabled. Otherwise, returns false.
-func (l *Locator) IsEnabled(opts sobek.Value) (bool, error) {
+func (l *Locator) IsEnabled(opts *FrameIsEnabledOptions) (bool, error) {
 	l.log.Debugf("Locator:IsEnabled", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	copts := NewFrameIsEnabledOptions(l.frame.defaultTimeout())
-	if err := copts.Parse(l.ctx, opts); err != nil {
-		return false, fmt.Errorf("parsing is enabled options: %w", err)
-	}
-	enabled, err := l.isEnabled(copts)
+	enabled, err := l.isEnabled(opts)
 	if err != nil {
 		return false, fmt.Errorf("checking is %q enabled: %w", l.selector, err)
 	}
@@ -311,14 +299,10 @@ func (l *Locator) isEnabled(opts *FrameIsEnabledOptions) (bool, error) {
 
 // IsDisabled returns true if the element matches the locator's
 // selector and is disabled. Otherwise, returns false.
-func (l *Locator) IsDisabled(opts sobek.Value) (bool, error) {
+func (l *Locator) IsDisabled(opts *FrameIsDisabledOptions) (bool, error) {
 	l.log.Debugf("Locator:IsDisabled", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	copts := NewFrameIsDisabledOptions(l.frame.defaultTimeout())
-	if err := copts.Parse(l.ctx, opts); err != nil {
-		return false, fmt.Errorf("parsing is disabled options: %w", err)
-	}
-	disabled, err := l.isDisabled(copts)
+	disabled, err := l.isDisabled(opts)
 	if err != nil {
 		return false, fmt.Errorf("checking is %q disabled: %w", l.selector, err)
 	}
