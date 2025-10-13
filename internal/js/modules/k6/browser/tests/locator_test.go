@@ -334,7 +334,6 @@ func TestLocator(t *testing.T) {
 				require.Equal(t, "some text", value)
 			},
 		},
-
 		{
 			"SelectOption", func(tb *testBrowser, p *common.Page) {
 				l := p.Locator("#selectElement", nil)
