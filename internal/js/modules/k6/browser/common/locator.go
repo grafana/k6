@@ -6,8 +6,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/grafana/sobek"
-
 	"go.k6.io/k6/internal/js/modules/k6/browser/log"
 )
 
@@ -593,17 +591,13 @@ func (l *Locator) selectOption(values []any, opts *FrameSelectOptionOptions) ([]
 
 // Press the given key on the element found that matches the locator's
 // selector with strict mode on.
-func (l *Locator) Press(key string, opts sobek.Value) error {
+func (l *Locator) Press(key string, opts *FramePressOptions) error {
 	l.log.Debugf(
 		"Locator:Press", "fid:%s furl:%q sel:%q key:%q opts:%+v",
 		l.frame.ID(), l.frame.URL(), l.selector, key, opts,
 	)
 
-	copts := NewFramePressOptions(l.frame.defaultTimeout())
-	if err := copts.Parse(l.ctx, opts); err != nil {
-		return fmt.Errorf("parsing press options: %w", err)
-	}
-	if err := l.press(key, copts); err != nil {
+	if err := l.press(key, opts); err != nil {
 		return fmt.Errorf("pressing %q on %q: %w", key, l.selector, err)
 	}
 
@@ -619,7 +613,7 @@ func (l *Locator) press(key string, opts *FramePressOptions) error {
 
 // Type text on the element found that matches the locator's
 // selector with strict mode on.
-func (l *Locator) Type(text string, opts sobek.Value) error {
+func (l *Locator) Type(text string, opts *FrameTypeOptions) error {
 	l.log.Debugf(
 		"Locator:Type", "fid:%s furl:%q sel:%q text:%q opts:%+v",
 		l.frame.ID(), l.frame.URL(), l.selector, text, opts,
@@ -627,13 +621,7 @@ func (l *Locator) Type(text string, opts sobek.Value) error {
 	_, span := TraceAPICall(l.ctx, l.frame.page.targetID.String(), "locator.type")
 	defer span.End()
 
-	copts := NewFrameTypeOptions(l.frame.defaultTimeout())
-	if err := copts.Parse(l.ctx, opts); err != nil {
-		err := fmt.Errorf("parsing type options: %w", err)
-		spanRecordError(span, err)
-		return err
-	}
-	if err := l.typ(text, copts); err != nil {
+	if err := l.typ(text, opts); err != nil {
 		err := fmt.Errorf("typing %q in %q: %w", text, l.selector, err)
 		spanRecordError(span, err)
 		return err

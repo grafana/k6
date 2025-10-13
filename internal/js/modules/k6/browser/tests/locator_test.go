@@ -285,7 +285,7 @@ func TestLocator(t *testing.T) {
 		{
 			"Press", func(_ *testBrowser, p *common.Page) {
 				lo := p.Locator("#inputText", nil)
-				require.NoError(t, lo.Press("x", nil))
+				require.NoError(t, lo.Press("x", common.NewFramePressOptions(lo.Timeout())))
 				inputValue, err := p.InputValue("#inputText", common.NewFrameInputValueOptions(p.MainFrame().Timeout()))
 				require.NoError(t, err)
 				require.Equal(t, "xsomething", inputValue)
@@ -328,7 +328,7 @@ func TestLocator(t *testing.T) {
 		{
 			"Type", func(_ *testBrowser, p *common.Page) {
 				lo := p.Locator("#inputText", nil)
-				require.NoError(t, lo.Type("real ", nil))
+				require.NoError(t, lo.Type("real ", common.NewFrameTypeOptions(lo.Timeout())))
 				inputValue, err := p.InputValue("#inputText", common.NewFrameInputValueOptions(p.MainFrame().Timeout()))
 				require.NoError(t, err)
 				require.Equal(t, "real something", inputValue)
@@ -384,9 +384,6 @@ func TestLocator(t *testing.T) {
 		})
 	}
 
-	timeout := func(tb *testBrowser) sobek.Value {
-		return tb.toSobekValue(jsFrameBaseOpts{Timeout: "100"})
-	}
 	sanityTests := []struct {
 		name string
 		do   func(*common.Locator, *testBrowser) error
@@ -466,7 +463,7 @@ func TestLocator(t *testing.T) {
 		},
 		{
 			"Press", func(l *common.Locator, tb *testBrowser) error {
-				return l.Press("a", timeout(tb))
+				return l.Press("a", common.NewFramePressOptions(100*time.Millisecond))
 			},
 		},
 		{
@@ -488,7 +485,7 @@ func TestLocator(t *testing.T) {
 		},
 		{
 			"Type", func(l *common.Locator, tb *testBrowser) error {
-				return l.Type("a", timeout(tb))
+				return l.Type("a", common.NewFrameTypeOptions(100*time.Millisecond))
 			},
 		},
 		{
@@ -691,9 +688,9 @@ func TestLocatorPress(t *testing.T) {
 
 	l := p.Locator("#text1", nil)
 
-	require.NoError(t, l.Press("Shift+KeyA", nil))
-	require.NoError(t, l.Press("KeyB", nil))
-	require.NoError(t, l.Press("Shift+KeyC", nil))
+	require.NoError(t, l.Press("Shift+KeyA", common.NewFramePressOptions(l.Timeout())))
+	require.NoError(t, l.Press("KeyB", common.NewFramePressOptions(l.Timeout())))
+	require.NoError(t, l.Press("Shift+KeyC", common.NewFramePressOptions(l.Timeout())))
 
 	v, err := l.InputValue(common.NewFrameInputValueOptions(l.Timeout()))
 	require.NoError(t, err)
