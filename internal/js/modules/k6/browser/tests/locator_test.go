@@ -208,7 +208,7 @@ func TestLocator(t *testing.T) {
 		{
 			"GetAttribute", func(_ *testBrowser, p *common.Page) {
 				l := p.Locator("#inputText", nil)
-				v, ok, err := l.GetAttribute("value", nil)
+				v, ok, err := l.GetAttribute("value", common.NewFrameBaseOptions(l.Timeout()))
 				require.NoError(t, err)
 				require.NotNil(t, v)
 				require.True(t, ok)
@@ -294,7 +294,9 @@ func TestLocator(t *testing.T) {
 		{
 			"SelectOption", func(tb *testBrowser, p *common.Page) {
 				l := p.Locator("#selectElement", nil)
-				rv, err := l.SelectOption(tb.toSobekValue(`option text 2`), nil)
+				a, err := common.ConvertSelectOptionValues(tb.vu.Runtime(), tb.toSobekValue(`option text 2`))
+				require.NoError(t, err)
+				rv, err := l.SelectOption(a, common.NewFrameSelectOptionOptions(l.Timeout()))
 				require.NoError(t, err)
 				require.Len(t, rv, 1)
 				require.Equal(t, "option text 2", rv[0])
@@ -316,7 +318,8 @@ func TestLocator(t *testing.T) {
 		},
 		{
 			"TextContent", func(_ *testBrowser, p *common.Page) {
-				text, ok, err := p.Locator("#divHello", nil).TextContent(nil)
+				divHello := p.Locator("#divHello", nil)
+				text, ok, err := divHello.TextContent(common.NewFrameTextContentOptions(divHello.Timeout()))
 				require.NoError(t, err)
 				require.True(t, ok)
 				require.Equal(t, `hello`, text)
@@ -434,7 +437,7 @@ func TestLocator(t *testing.T) {
 		},
 		{
 			"GetAttribute", func(l *common.Locator, tb *testBrowser) error {
-				_, _, err := l.GetAttribute("value", timeout(tb))
+				_, _, err := l.GetAttribute("value", common.NewFrameBaseOptions(100*time.Millisecond))
 				return err
 			},
 		},
@@ -473,7 +476,7 @@ func TestLocator(t *testing.T) {
 		},
 		{
 			"SelectOption", func(l *common.Locator, tb *testBrowser) error {
-				_, err := l.SelectOption(tb.toSobekValue(""), timeout(tb))
+				_, err := l.SelectOption([]any{""}, common.NewFrameSelectOptionOptions(100*time.Millisecond))
 				return err
 			},
 		},
@@ -490,7 +493,7 @@ func TestLocator(t *testing.T) {
 		},
 		{
 			"TextContent", func(l *common.Locator, tb *testBrowser) error {
-				_, _, err := l.TextContent(timeout(tb))
+				_, _, err := l.TextContent(common.NewFrameTextContentOptions(100 * time.Millisecond))
 				return err
 			},
 		},
@@ -1230,12 +1233,12 @@ func TestLocatorLocatorOptions(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, locs, 2)
 
-		text, ok, err := locs[0].TextContent(nil)
+		text, ok, err := locs[0].TextContent(common.NewFrameTextContentOptions(locs[0].Timeout()))
 		require.NoError(t, err)
 		require.True(t, ok)
 		require.Equal(t, "moon", text)
 
-		text, ok, err = locs[1].TextContent(nil)
+		text, ok, err = locs[1].TextContent(common.NewFrameTextContentOptions(locs[1].Timeout()))
 		require.NoError(t, err)
 		require.True(t, ok)
 		require.Equal(t, "land", text)
@@ -1263,7 +1266,7 @@ func TestLocatorLocatorOptions(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 1, n)
 
-		text, ok, err := loc.TextContent(nil)
+		text, ok, err := loc.TextContent(common.NewFrameTextContentOptions(loc.Timeout()))
 		require.NoError(t, err)
 		require.True(t, ok)
 		require.Equal(t, "moon", text)
@@ -1291,7 +1294,7 @@ func TestLocatorLocatorOptions(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 1, n)
 
-		text, ok, err := loc.TextContent(nil)
+		text, ok, err := loc.TextContent(common.NewFrameTextContentOptions(loc.Timeout()))
 		require.NoError(t, err)
 		require.True(t, ok)
 		require.Equal(t, "land", text)
