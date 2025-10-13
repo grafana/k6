@@ -7,14 +7,13 @@ import (
 	"io"
 	"testing"
 
-	"github.com/jhump/protoreflect/desc/protoparse" //nolint:staticcheck // FIXME: #4035
+	"github.com/bufbuild/protocompile"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/dynamicpb"
 
@@ -252,9 +251,9 @@ func TestConnInvokeInvalid(t *testing.T) {
 
 func methodFromProto(method string) protoreflect.MethodDescriptor {
 	path := "any-path"
-	parser := protoparse.Parser{
-		InferImportPaths: false,
-		Accessor: protoparse.FileAccessor(func(filename string) (io.ReadCloser, error) {
+
+	resolver := &protocompile.SourceResolver{
+		Accessor: func(filename string) (io.ReadCloser, error) {
 			// a small hack to make sure we are parsing the right file
 			// otherwise the parser will try to parse "google/protobuf/descriptor.proto"
 			// with exactly the same name as the one we are trying to parse for testing
@@ -286,19 +285,23 @@ message HelloResponse {
 message Empty {
 
 }`
+
 			return io.NopCloser(bytes.NewBufferString(b)), nil
-		}),
+		},
 	}
 
-	fds, err := parser.ParseFiles(path)
+	compiler := protocompile.Compiler{
+		Resolver: resolver,
+	}
+
+	fds, err := compiler.Compile(context.Background(), path)
 	if err != nil {
 		panic(err)
 	}
-
-	fd, err := protodesc.NewFile(fds[0].AsFileDescriptorProto(), nil)
-	if err != nil {
-		panic(err)
+	if len(fds) != 1 {
+		panic("expected exactly one file descriptor")
 	}
+	fd := fds[0]
 
 	services := fd.Services()
 	if services.Len() == 0 {
