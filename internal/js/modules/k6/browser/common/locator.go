@@ -543,6 +543,7 @@ func (l *Locator) PressSequentially(text string, opts *FramePressOptions) error 
 	defer span.End()
 
 	opts.Strict = true
+
 	for _, char := range text {
 		if err := l.frame.press(l.selector, string(char), opts); err != nil {
 			err := fmt.Errorf("pressing character %q sequentially: %w", char, err)
