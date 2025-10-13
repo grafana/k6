@@ -13,7 +13,7 @@ import (
 
 // mapLocator API to the JS module.
 //
-//nolint:gocognit,funlen
+//nolint:gocognit,funlen,cyclop
 func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 	rt := vu.Runtime()
 	return mapping{
@@ -92,25 +92,41 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 				return nil, lo.Uncheck(opts) //nolint:wrapcheck
 			})
 		},
-		"isChecked": func(opts sobek.Value) *sobek.Promise {
+		"isChecked": func(opts sobek.Value) (*sobek.Promise, error) {
+			copts := common.NewFrameIsCheckedOptions(lo.Timeout())
+			if err := copts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing is checked options: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return lo.IsChecked(opts) //nolint:wrapcheck
-			})
+				return lo.IsChecked(copts) //nolint:wrapcheck
+			}), nil
 		},
-		"isEditable": func(opts sobek.Value) *sobek.Promise {
+		"isEditable": func(opts sobek.Value) (*sobek.Promise, error) {
+			copts := common.NewFrameIsEditableOptions(lo.Timeout())
+			if err := copts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing is editable options: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return lo.IsEditable(opts) //nolint:wrapcheck
-			})
+				return lo.IsEditable(copts) //nolint:wrapcheck
+			}), nil
 		},
-		"isEnabled": func(opts sobek.Value) *sobek.Promise {
+		"isEnabled": func(opts sobek.Value) (*sobek.Promise, error) {
+			copts := common.NewFrameIsEnabledOptions(lo.Timeout())
+			if err := copts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing is enabled options: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return lo.IsEnabled(opts) //nolint:wrapcheck
-			})
+				return lo.IsEnabled(copts) //nolint:wrapcheck
+			}), nil
 		},
-		"isDisabled": func(opts sobek.Value) *sobek.Promise {
+		"isDisabled": func(opts sobek.Value) (*sobek.Promise, error) {
+			copts := common.NewFrameIsDisabledOptions(lo.Timeout())
+			if err := copts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing is disabled options: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return lo.IsDisabled(opts) //nolint:wrapcheck
-			})
+				return lo.IsDisabled(copts) //nolint:wrapcheck
+			}), nil
 		},
 		"isVisible": func() *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
