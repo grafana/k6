@@ -592,7 +592,7 @@ func TestGetByRoleSuccess(t *testing.T) {
 						require.Equal(t, tt.expected, c)
 
 						if tt.expectedText != "" {
-							text, err := l.InnerText(sobek.Undefined())
+							text, err := l.InnerText(common.NewFrameInnerTextOptions(l.Timeout()))
 							require.NoError(t, err)
 							require.Equal(t, tt.expectedText, text)
 						}
@@ -794,7 +794,7 @@ func TestGetByRoleSuccess(t *testing.T) {
 						require.Equal(t, tt.expected, c)
 
 						if tt.expectedText != "" {
-							text, err := l.InnerText(sobek.Undefined())
+							text, err := l.InnerText(common.NewFrameInnerTextOptions(l.Timeout()))
 							require.NoError(t, err)
 							require.Equal(t, tt.expectedText, text)
 						}
@@ -1297,7 +1297,7 @@ func TestGetByTestIDSuccess(t *testing.T) {
 					require.Equal(t, tt.expected, c)
 
 					if tt.expected > 0 && tt.expectedText != "" {
-						text, err := l.InnerText(sobek.Undefined())
+						text, err := l.InnerText(common.NewFrameInnerTextOptions(l.Timeout()))
 						require.NoError(t, err)
 						require.Equal(t, tt.expectedText, text)
 					}
@@ -1415,7 +1415,7 @@ func TestGetByTextSuccess(t *testing.T) {
 					require.Equal(t, tt.expected, c)
 
 					if tt.expected > 0 && tt.expectedText != "" {
-						text, err := l.InnerText(sobek.Undefined())
+						text, err := l.InnerText(common.NewFrameInnerTextOptions(l.Timeout()))
 						require.NoError(t, err)
 						require.Equal(t, tt.expectedText, text)
 					}

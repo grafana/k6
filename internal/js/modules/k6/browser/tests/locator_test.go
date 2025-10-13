@@ -22,12 +22,6 @@ import (
 // Note:
 // We skip adding t.Parallel to subtests because sobek or our code might race.
 
-type jsFrameWaitForSelectorOpts struct {
-	jsFrameBaseOpts
-
-	State string
-}
-
 func TestLocator(t *testing.T) {
 	t.Parallel()
 
@@ -41,15 +35,15 @@ func TestLocator(t *testing.T) {
 				require.NoError(t, err)
 				require.Len(t, locators, 3)
 
-				firstText, err := locators[0].InnerText(nil)
+				firstText, err := locators[0].InnerText(common.NewFrameInnerTextOptions(locators[0].Timeout()))
 				assert.NoError(t, err)
 				assert.Equal(t, `Click`, firstText)
 
-				secondText, err := locators[1].InnerText(nil)
+				secondText, err := locators[1].InnerText(common.NewFrameInnerTextOptions(locators[1].Timeout()))
 				assert.NoError(t, err)
 				assert.Equal(t, `Dblclick`, secondText)
 
-				thirdText, err := locators[2].InnerText(nil)
+				thirdText, err := locators[2].InnerText(common.NewFrameInnerTextOptions(locators[2].Timeout()))
 				assert.NoError(t, err)
 				assert.Equal(t, `Click`, thirdText)
 			},
@@ -108,7 +102,7 @@ func TestLocator(t *testing.T) {
 				const value = "fill me up"
 				l := p.Locator("#inputText", nil)
 
-				require.NoError(t, l.Fill(value, nil))
+				require.NoError(t, l.Fill(value, common.NewFrameFillOptions(l.Timeout())))
 				inputValue, err := p.InputValue("#inputText", common.NewFrameInputValueOptions(p.MainFrame().Timeout()))
 				require.NoError(t, err)
 				require.Equal(t, value, inputValue)
@@ -133,7 +127,7 @@ func TestLocator(t *testing.T) {
 		{
 			"Dblclick", func(_ *testBrowser, p *common.Page) {
 				lo := p.Locator("#linkdbl", nil)
-				require.NoError(t, lo.Dblclick(nil))
+				require.NoError(t, lo.Dblclick(common.NewFrameDblClickOptions(lo.Timeout())))
 
 				v, err := p.Evaluate(`() => window.dblclick`)
 				require.NoError(t, err)
@@ -159,7 +153,7 @@ func TestLocator(t *testing.T) {
 			"Fill", func(_ *testBrowser, p *common.Page) {
 				const value = "fill me up"
 				lo := p.Locator("#inputText", nil)
-				require.NoError(t, lo.Fill(value, nil))
+				require.NoError(t, lo.Fill(value, common.NewFrameFillOptions(lo.Timeout())))
 				inputValue, err := p.InputValue("#inputText", common.NewFrameInputValueOptions(p.MainFrame().Timeout()))
 				require.NoError(t, err)
 				require.Equal(t, value, inputValue)
@@ -169,7 +163,7 @@ func TestLocator(t *testing.T) {
 			"FillTextarea", func(_ *testBrowser, p *common.Page) {
 				const value = "fill me up"
 				lo := p.Locator("textarea", nil)
-				require.NoError(t, lo.Fill(value, nil))
+				require.NoError(t, lo.Fill(value, common.NewFrameFillOptions(lo.Timeout())))
 				inputValue, err := p.InputValue("textarea", common.NewFrameInputValueOptions(p.MainFrame().Timeout()))
 				require.NoError(t, err)
 				require.Equal(t, value, inputValue)
@@ -179,18 +173,19 @@ func TestLocator(t *testing.T) {
 			"FillParagraph", func(_ *testBrowser, p *common.Page) {
 				const value = "fill me up"
 				lo := p.Locator("#firstParagraph", nil)
-				require.NoError(t, lo.Fill(value, nil))
+				require.NoError(t, lo.Fill(value, common.NewFrameFillOptions(lo.Timeout())))
 				textContent, ok, err := p.TextContent("#firstParagraph", common.NewFrameTextContentOptions(p.MainFrame().Timeout()))
 				require.NoError(t, err)
 				require.True(t, ok)
 				require.Equal(t, value, textContent)
 				lo = p.Locator("#secondParagraph", nil)
-				require.Error(t, lo.Fill(value, nil))
+				require.Error(t, lo.Fill(value, common.NewFrameFillOptions(lo.Timeout())))
 			},
 		},
 		{
 			"First", func(_ *testBrowser, p *common.Page) {
-				text, err := p.Locator("a", nil).First().InnerText(nil)
+				first := p.Locator("a", nil).First()
+				text, err := first.InnerText(common.NewFrameInnerTextOptions(first.Timeout()))
 				require.NoError(t, err)
 				require.Equal(t, `Click`, text)
 			},
@@ -206,7 +201,7 @@ func TestLocator(t *testing.T) {
 				}
 				lo := p.Locator("#inputText", nil)
 				require.False(t, focused(), "should not be focused first")
-				require.NoError(t, lo.Focus(nil))
+				require.NoError(t, lo.Focus(common.NewFrameBaseOptions(lo.Timeout())))
 				require.True(t, focused(), "should be focused")
 			},
 		},
@@ -229,20 +224,22 @@ func TestLocator(t *testing.T) {
 				}
 				require.False(t, result(), "should not be hovered first")
 				lo := p.Locator("#inputText", nil)
-				require.NoError(t, lo.Hover(nil))
+				require.NoError(t, lo.Hover(common.NewFrameHoverOptions(lo.Timeout())))
 				require.True(t, result(), "should be hovered")
 			},
 		},
 		{
 			"InnerHTML", func(_ *testBrowser, p *common.Page) {
-				html, err := p.Locator("#divHello", nil).InnerHTML(nil)
+				divHello := p.Locator("#divHello", nil)
+				html, err := divHello.InnerHTML(common.NewFrameInnerHTMLOptions(divHello.Timeout()))
 				require.NoError(t, err)
 				require.Equal(t, `<span>hello</span>`, html)
 			},
 		},
 		{
 			"InnerText", func(_ *testBrowser, p *common.Page) {
-				text, err := p.Locator("#divHello > span", nil).InnerText(nil)
+				span := p.Locator("#divHello > span", nil)
+				text, err := span.InnerText(common.NewFrameInnerTextOptions(span.Timeout()))
 				require.NoError(t, err)
 				require.Equal(t, `hello`, text)
 			},
@@ -250,17 +247,20 @@ func TestLocator(t *testing.T) {
 		{
 			"InputValue", func(_ *testBrowser, p *common.Page) {
 				t.Run("input", func(t *testing.T) {
-					v, err := p.Locator("#inputText", nil).InputValue(nil)
+					input := p.Locator("#inputText", nil)
+					v, err := input.InputValue(common.NewFrameInputValueOptions(input.Timeout()))
 					require.NoError(t, err)
 					require.Equal(t, "something", v)
 				})
 				t.Run("textarea", func(t *testing.T) {
-					v, err := p.Locator("textarea", nil).InputValue(nil)
+					textarea := p.Locator("textarea", nil)
+					v, err := textarea.InputValue(common.NewFrameInputValueOptions(textarea.Timeout()))
 					require.NoError(t, err)
 					require.Equal(t, "text area", v)
 				})
 				t.Run("select", func(t *testing.T) {
-					v, err := p.Locator("#selectElement", nil).InputValue(nil)
+					selectElement := p.Locator("#selectElement", nil)
+					v, err := selectElement.InputValue(common.NewFrameInputValueOptions(selectElement.Timeout()))
 					require.NoError(t, err)
 					require.Equal(t, "option text", v)
 				})
@@ -268,14 +268,16 @@ func TestLocator(t *testing.T) {
 		},
 		{
 			"Last", func(_ *testBrowser, p *common.Page) {
-				text, err := p.Locator("div", nil).Last().InnerText(nil)
+				last := p.Locator("div", nil).Last()
+				text, err := last.InnerText(common.NewFrameInnerTextOptions(last.Timeout()))
 				require.NoError(t, err)
 				require.Equal(t, `bye`, text)
 			},
 		},
 		{
 			"Nth", func(_ *testBrowser, p *common.Page) {
-				text, err := p.Locator("a", nil).Nth(0).InnerText(nil)
+				nth := p.Locator("a", nil).Nth(0)
+				text, err := nth.InnerText(common.NewFrameInnerTextOptions(nth.Timeout()))
 				require.NoError(t, err)
 				require.Equal(t, `Click`, text)
 			},
@@ -331,37 +333,31 @@ func TestLocator(t *testing.T) {
 		},
 		{
 			"WaitFor state:visible", func(tb *testBrowser, p *common.Page) {
-				opts := tb.toSobekValue(jsFrameBaseOpts{Timeout: "100"})
+				opts := common.NewFrameWaitForSelectorOptions(100 * time.Millisecond)
 				lo := p.Locator("#link", nil)
 				require.NoError(t, lo.WaitFor(opts))
 			},
 		},
 		{
 			"WaitFor state:attached", func(tb *testBrowser, p *common.Page) {
-				opts := tb.toSobekValue(jsFrameWaitForSelectorOpts{
-					jsFrameBaseOpts: jsFrameBaseOpts{Timeout: "100"},
-					State:           "attached",
-				})
+				opts := common.NewFrameWaitForSelectorOptions(100 * time.Millisecond)
+				opts.State = common.DOMElementStateAttached
 				lo := p.Locator("#link", nil)
 				require.NoError(t, lo.WaitFor(opts))
 			},
 		},
 		{
 			"WaitFor state:hidden", func(tb *testBrowser, p *common.Page) {
-				opts := tb.toSobekValue(jsFrameWaitForSelectorOpts{
-					jsFrameBaseOpts: jsFrameBaseOpts{Timeout: "100"},
-					State:           "hidden",
-				})
+				opts := common.NewFrameWaitForSelectorOptions(100 * time.Millisecond)
+				opts.State = common.DOMElementStateHidden
 				lo := p.Locator("#inputHiddenText", nil)
 				require.NoError(t, lo.WaitFor(opts))
 			},
 		},
 		{
 			"WaitFor state:detached", func(tb *testBrowser, p *common.Page) {
-				opts := tb.toSobekValue(jsFrameWaitForSelectorOpts{
-					jsFrameBaseOpts: jsFrameBaseOpts{Timeout: "100"},
-					State:           "detached",
-				})
+				opts := common.NewFrameWaitForSelectorOptions(100 * time.Millisecond)
+				opts.State = common.DOMElementStateDetached
 				lo := p.Locator("#nonExistingElement", nil)
 				require.NoError(t, lo.WaitFor(opts))
 			},
@@ -417,7 +413,7 @@ func TestLocator(t *testing.T) {
 		},
 		{
 			"Dblclick", func(l *common.Locator, tb *testBrowser) error {
-				return l.Dblclick(timeout(tb))
+				return l.Dblclick(common.NewFrameDblClickOptions(100 * time.Millisecond))
 			},
 		},
 		{
@@ -428,12 +424,12 @@ func TestLocator(t *testing.T) {
 		},
 		{
 			"Focus", func(l *common.Locator, tb *testBrowser) error {
-				return l.Focus(timeout(tb))
+				return l.Focus(common.NewFrameBaseOptions(100 * time.Millisecond))
 			},
 		},
 		{
 			"Fill", func(l *common.Locator, tb *testBrowser) error {
-				return l.Fill("fill me up", timeout(tb))
+				return l.Fill("fill me up", common.NewFrameFillOptions(100*time.Millisecond))
 			},
 		},
 		{
@@ -444,24 +440,24 @@ func TestLocator(t *testing.T) {
 		},
 		{
 			"Hover", func(l *common.Locator, tb *testBrowser) error {
-				return l.Hover(timeout(tb))
+				return l.Hover(common.NewFrameHoverOptions(100 * time.Millisecond))
 			},
 		},
 		{
 			"InnerHTML", func(l *common.Locator, tb *testBrowser) error {
-				_, err := l.InnerHTML(timeout(tb))
+				_, err := l.InnerHTML(common.NewFrameInnerHTMLOptions(100 * time.Millisecond))
 				return err
 			},
 		},
 		{
 			"InnerText", func(l *common.Locator, tb *testBrowser) error {
-				_, err := l.InnerText(timeout(tb))
+				_, err := l.InnerText(common.NewFrameInnerTextOptions(100 * time.Millisecond))
 				return err
 			},
 		},
 		{
 			"InputValue", func(l *common.Locator, tb *testBrowser) error {
-				_, err := l.InputValue(timeout(tb))
+				_, err := l.InputValue(common.NewFrameInputValueOptions(100 * time.Millisecond))
 				return err
 			},
 		},
@@ -505,7 +501,7 @@ func TestLocator(t *testing.T) {
 		},
 		{
 			"WaitFor", func(l *common.Locator, tb *testBrowser) error {
-				return l.WaitFor(timeout(tb))
+				return l.WaitFor(common.NewFrameWaitForSelectorOptions(100 * time.Millisecond))
 			},
 		},
 	}
@@ -699,7 +695,7 @@ func TestLocatorPress(t *testing.T) {
 	require.NoError(t, l.Press("KeyB", nil))
 	require.NoError(t, l.Press("Shift+KeyC", nil))
 
-	v, err := l.InputValue(nil)
+	v, err := l.InputValue(common.NewFrameInputValueOptions(l.Timeout()))
 	require.NoError(t, err)
 	require.Equal(t, "AbC", v)
 }
@@ -900,7 +896,7 @@ func TestReactInput(t *testing.T) {
 			"Fill", func(_ *testBrowser, p *common.Page) {
 				const value = "test@example.com"
 				lo := p.Locator("input[placeholder='Username or email']", nil)
-				require.NoError(t, lo.Fill(value, nil))
+				require.NoError(t, lo.Fill(value, common.NewFrameFillOptions(lo.Timeout())))
 				inputValue, err := p.InnerText("p[id='react-state']", common.NewFrameInnerTextOptions(p.MainFrame().Timeout()))
 				require.NoError(t, err)
 				require.Equal(t, fmt.Sprintf("React state: %q", value), inputValue)
@@ -942,10 +938,10 @@ func TestLocatorNesting(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	q, err := p.Locator(`[data-testid="inventory"]`, nil).
+	qtyLocator := p.Locator(`[data-testid="inventory"]`, nil).
 		Locator(`[data-item="apples"]`, nil).
-		Locator(`.qty`, nil).
-		InnerText(nil)
+		Locator(`.qty`, nil)
+	q, err := qtyLocator.InnerText(common.NewFrameInnerTextOptions(qtyLocator.Timeout()))
 	require.NoError(t, err)
 	assert.Equal(t, "0", q)
 
@@ -955,10 +951,10 @@ func TestLocatorNesting(t *testing.T) {
 		Click(common.NewFrameClickOptions(common.DefaultTimeout))
 	require.NoError(t, err)
 
-	q, err = p.Locator(`[data-testid="inventory"]`, nil).
+	qtyLocator2 := p.Locator(`[data-testid="inventory"]`, nil).
 		Locator(`[data-item="apples"]`, nil).
-		Locator(`.qty`, nil).
-		InnerText(nil)
+		Locator(`.qty`, nil)
+	q, err = qtyLocator2.InnerText(common.NewFrameInnerTextOptions(qtyLocator2.Timeout()))
 	require.NoError(t, err)
 	assert.Equal(t, "1", q)
 }
@@ -989,7 +985,8 @@ func TestActionabilityRetry(t *testing.T) {
 	err = lo.Click(common.NewFrameClickOptions(1 * time.Second))
 	require.ErrorContains(t, err, "timed out after")
 
-	text, err := p.Locator("#value", nil).InnerText(nil)
+	value := p.Locator("#value", nil)
+	text, err := value.InnerText(common.NewFrameInnerTextOptions(value.Timeout()))
 	require.NoError(t, err)
 	require.Equal(t, "0", text)
 }
