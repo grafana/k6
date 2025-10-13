@@ -109,7 +109,7 @@ func (rm *removedModule) NewModuleInstance(vu modules.VU) modules.Instance {
 }
 
 type warnExperimentalModule struct {
-	once *sync.Once
+	once sync.Once
 	msg  string
 	base modules.Module
 }
@@ -118,7 +118,7 @@ func newWarnExperimentalModule(base modules.Module, msg string) modules.Module {
 	return &warnExperimentalModule{
 		msg:  msg,
 		base: base,
-		once: &sync.Once{},
+		once: sync.Once{},
 	}
 }
 
