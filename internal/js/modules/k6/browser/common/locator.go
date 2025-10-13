@@ -70,7 +70,8 @@ func (l *Locator) Clear(opts *FrameFillOptions) error {
 		l.frame.ID(), l.frame.URL(), l.selector, opts,
 	)
 
-	if err := l.fill("", opts); err != nil {
+	opts.Strict = true
+	if err := l.frame.fill(l.selector, "", opts); err != nil {
 		return fmt.Errorf("clearing %q: %w", l.selector, err)
 	}
 
@@ -88,7 +89,9 @@ func (l *Locator) Click(opts *FrameClickOptions) error {
 	_, span := TraceAPICall(l.ctx, l.frame.page.targetID.String(), "locator.click")
 	defer span.End()
 
-	if err := l.click(opts); err != nil {
+	opts.Strict = true
+	opts.retry = true
+	if err := l.frame.click(l.selector, opts); err != nil {
 		err := fmt.Errorf("clicking on %q: %w", l.selector, err)
 		spanRecordError(span, err)
 		return err
@@ -97,14 +100,6 @@ func (l *Locator) Click(opts *FrameClickOptions) error {
 	applySlowMo(l.ctx)
 
 	return nil
-}
-
-// click is like Click but takes parsed options and neither throws an
-// error, or applies slow motion.
-func (l *Locator) click(opts *FrameClickOptions) error {
-	opts.Strict = true
-	opts.retry = true
-	return l.frame.click(l.selector, opts)
 }
 
 func (l *Locator) All() ([]*Locator, error) {
@@ -141,21 +136,15 @@ func (l *Locator) Count() (int, error) {
 func (l *Locator) Dblclick(opts *FrameDblclickOptions) error {
 	l.log.Debugf("Locator:Dblclick", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	if err := l.dblclick(opts); err != nil {
+	opts.Strict = true
+	opts.retry = true
+	if err := l.frame.dblclick(l.selector, opts); err != nil {
 		return fmt.Errorf("double clicking on %q: %w", l.selector, err)
 	}
 
 	applySlowMo(l.ctx)
 
 	return nil
-}
-
-// Dblclick is like Dblclick but takes parsed options and neither throws an
-// error, or applies slow motion.
-func (l *Locator) dblclick(opts *FrameDblclickOptions) error {
-	opts.Strict = true
-	opts.retry = true
-	return l.frame.dblclick(l.selector, opts)
 }
 
 // SetChecked sets the checked state of the element using locator's selector
@@ -166,7 +155,9 @@ func (l *Locator) SetChecked(checked bool, opts *FrameCheckOptions) error {
 		l.frame.ID(), l.frame.URL(), l.selector, checked, opts,
 	)
 
-	if err := l.setChecked(checked, opts); err != nil {
+	opts.Strict = true
+	opts.retry = true
+	if err := l.frame.setChecked(l.selector, checked, opts); err != nil {
 		return fmt.Errorf("setting %q checked to %v: %w", l.selector, checked, err)
 	}
 
@@ -175,17 +166,13 @@ func (l *Locator) SetChecked(checked bool, opts *FrameCheckOptions) error {
 	return nil
 }
 
-func (l *Locator) setChecked(checked bool, opts *FrameCheckOptions) error {
-	opts.Strict = true
-	opts.retry = true
-	return l.frame.setChecked(l.selector, checked, opts)
-}
-
 // Check on an element using locator's selector with strict mode on.
 func (l *Locator) Check(opts *FrameCheckOptions) error {
 	l.log.Debugf("Locator:Check", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	if err := l.check(opts); err != nil {
+	opts.Strict = true
+	opts.retry = true
+	if err := l.frame.check(l.selector, opts); err != nil {
 		return fmt.Errorf("checking %q: %w", l.selector, err)
 	}
 
@@ -194,19 +181,13 @@ func (l *Locator) Check(opts *FrameCheckOptions) error {
 	return nil
 }
 
-// check is like Check but takes parsed options and neither throws an
-// error, or applies slow motion.
-func (l *Locator) check(opts *FrameCheckOptions) error {
-	opts.Strict = true
-	opts.retry = true
-	return l.frame.check(l.selector, opts)
-}
-
 // Uncheck on an element using locator's selector with strict mode on.
 func (l *Locator) Uncheck(opts *FrameUncheckOptions) error {
 	l.log.Debugf("Locator:Uncheck", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	if err := l.uncheck(opts); err != nil {
+	opts.Strict = true
+	opts.retry = true
+	if err := l.frame.uncheck(l.selector, opts); err != nil {
 		return fmt.Errorf("unchecking %q: %w", l.selector, err)
 	}
 
@@ -215,20 +196,13 @@ func (l *Locator) Uncheck(opts *FrameUncheckOptions) error {
 	return nil
 }
 
-// uncheck is like Uncheck but takes parsed options and neither throws
-// an error, or applies slow motion.
-func (l *Locator) uncheck(opts *FrameUncheckOptions) error {
-	opts.Strict = true
-	opts.retry = true
-	return l.frame.uncheck(l.selector, opts)
-}
-
 // IsChecked returns true if the element matches the locator's
 // selector and is checked. Otherwise, returns false.
 func (l *Locator) IsChecked(opts *FrameIsCheckedOptions) (bool, error) {
 	l.log.Debugf("Locator:IsChecked", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	checked, err := l.isChecked(opts)
+	opts.Strict = true
+	checked, err := l.frame.isChecked(l.selector, opts)
 	if err != nil {
 		return false, fmt.Errorf("checking is %q checked: %w", l.selector, err)
 	}
@@ -236,19 +210,13 @@ func (l *Locator) IsChecked(opts *FrameIsCheckedOptions) (bool, error) {
 	return checked, nil
 }
 
-// isChecked is like IsChecked but takes parsed options and does not
-// throw an error.
-func (l *Locator) isChecked(opts *FrameIsCheckedOptions) (bool, error) {
-	opts.Strict = true
-	return l.frame.isChecked(l.selector, opts)
-}
-
 // IsEditable returns true if the element matches the locator's
 // selector and is Editable. Otherwise, returns false.
 func (l *Locator) IsEditable(opts *FrameIsEditableOptions) (bool, error) {
 	l.log.Debugf("Locator:IsEditable", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	editable, err := l.isEditable(opts)
+	opts.Strict = true
+	editable, err := l.frame.isEditable(l.selector, opts)
 	if err != nil {
 		return false, fmt.Errorf("checking is %q editable: %w", l.selector, err)
 	}
@@ -256,19 +224,13 @@ func (l *Locator) IsEditable(opts *FrameIsEditableOptions) (bool, error) {
 	return editable, nil
 }
 
-// isEditable is like IsEditable but takes parsed options and does not
-// throw an error.
-func (l *Locator) isEditable(opts *FrameIsEditableOptions) (bool, error) {
-	opts.Strict = true
-	return l.frame.isEditable(l.selector, opts)
-}
-
 // IsEnabled returns true if the element matches the locator's
 // selector and is Enabled. Otherwise, returns false.
 func (l *Locator) IsEnabled(opts *FrameIsEnabledOptions) (bool, error) {
 	l.log.Debugf("Locator:IsEnabled", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	enabled, err := l.isEnabled(opts)
+	opts.Strict = true
+	enabled, err := l.frame.isEnabled(l.selector, opts)
 	if err != nil {
 		return false, fmt.Errorf("checking is %q enabled: %w", l.selector, err)
 	}
@@ -276,31 +238,18 @@ func (l *Locator) IsEnabled(opts *FrameIsEnabledOptions) (bool, error) {
 	return enabled, nil
 }
 
-// isEnabled is like IsEnabled but takes parsed options and does not
-// throw an error.
-func (l *Locator) isEnabled(opts *FrameIsEnabledOptions) (bool, error) {
-	opts.Strict = true
-	return l.frame.isEnabled(l.selector, opts)
-}
-
 // IsDisabled returns true if the element matches the locator's
 // selector and is disabled. Otherwise, returns false.
 func (l *Locator) IsDisabled(opts *FrameIsDisabledOptions) (bool, error) {
 	l.log.Debugf("Locator:IsDisabled", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	disabled, err := l.isDisabled(opts)
+	opts.Strict = true
+	disabled, err := l.frame.isDisabled(l.selector, opts)
 	if err != nil {
 		return false, fmt.Errorf("checking is %q disabled: %w", l.selector, err)
 	}
 
 	return disabled, nil
-}
-
-// IsDisabled is like IsDisabled but takes parsed options and does not
-// throw an error.
-func (l *Locator) isDisabled(opts *FrameIsDisabledOptions) (bool, error) {
-	opts.Strict = true
-	return l.frame.isDisabled(l.selector, opts)
 }
 
 // IsVisible returns true if the element matches the locator's
@@ -336,18 +285,14 @@ func (l *Locator) Fill(value string, opts *FrameFillOptions) error {
 		l.frame.ID(), l.frame.URL(), l.selector, value, opts,
 	)
 
-	if err := l.fill(value, opts); err != nil {
+	opts.Strict = true
+	if err := l.frame.fill(l.selector, value, opts); err != nil {
 		return fmt.Errorf("filling %q with %q: %w", l.selector, value, err)
 	}
 
 	applySlowMo(l.ctx)
 
 	return nil
-}
-
-func (l *Locator) fill(value string, opts *FrameFillOptions) error {
-	opts.Strict = true
-	return l.frame.fill(l.selector, value, opts)
 }
 
 // LocatorFilterOptions allows filtering a [Locator] by various criteria.
@@ -371,18 +316,14 @@ func (l *Locator) First() *Locator {
 func (l *Locator) Focus(opts *FrameBaseOptions) error {
 	l.log.Debugf("Locator:Focus", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	if err := l.focus(opts); err != nil {
+	opts.Strict = true
+	if err := l.frame.focus(l.selector, opts); err != nil {
 		return fmt.Errorf("focusing on %q: %w", l.selector, err)
 	}
 
 	applySlowMo(l.ctx)
 
 	return nil
-}
-
-func (l *Locator) focus(opts *FrameBaseOptions) error {
-	opts.Strict = true
-	return l.frame.focus(l.selector, opts)
 }
 
 // GetAttribute of the element using locator's selector with strict mode on.
@@ -393,17 +334,13 @@ func (l *Locator) GetAttribute(name string, opts *FrameBaseOptions) (string, boo
 		l.frame.ID(), l.frame.URL(), l.selector, name, opts,
 	)
 
-	s, ok, err := l.getAttribute(name, opts)
+	opts.Strict = true
+	s, ok, err := l.frame.getAttribute(l.selector, name, opts)
 	if err != nil {
 		return "", false, fmt.Errorf("getting attribute %q of %q: %w", name, l.selector, err)
 	}
 
 	return s, ok, nil
-}
-
-func (l *Locator) getAttribute(name string, opts *FrameBaseOptions) (string, bool, error) {
-	opts.Strict = true
-	return l.frame.getAttribute(l.selector, name, opts)
 }
 
 // GetByAltText creates and returns a new relative locator that allows locating elements by their alt text.
@@ -487,7 +424,8 @@ func (l *Locator) Locator(selector string, opts *LocatorOptions) *Locator {
 func (l *Locator) InnerHTML(opts *FrameInnerHTMLOptions) (string, error) {
 	l.log.Debugf("Locator:InnerHTML", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	s, err := l.innerHTML(opts)
+	opts.Strict = true
+	s, err := l.frame.innerHTML(l.selector, opts)
 	if err != nil {
 		return "", fmt.Errorf("getting inner HTML of %q: %w", l.selector, err)
 	}
@@ -495,27 +433,18 @@ func (l *Locator) InnerHTML(opts *FrameInnerHTMLOptions) (string, error) {
 	return s, nil
 }
 
-func (l *Locator) innerHTML(opts *FrameInnerHTMLOptions) (string, error) {
-	opts.Strict = true
-	return l.frame.innerHTML(l.selector, opts)
-}
-
 // InnerText returns the element's inner text that matches
 // the locator's selector with strict mode on.
 func (l *Locator) InnerText(opts *FrameInnerTextOptions) (string, error) {
 	l.log.Debugf("Locator:InnerText", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	s, err := l.innerText(opts)
+	opts.Strict = true
+	s, err := l.frame.innerText(l.selector, opts)
 	if err != nil {
 		return "", fmt.Errorf("getting inner text of %q: %w", l.selector, err)
 	}
 
 	return s, nil
-}
-
-func (l *Locator) innerText(opts *FrameInnerTextOptions) (string, error) {
-	opts.Strict = true
-	return l.frame.innerText(l.selector, opts)
 }
 
 // Last will return the last child of the element matching the locator's
@@ -537,7 +466,8 @@ func (l *Locator) Nth(nth int) *Locator {
 func (l *Locator) TextContent(opts *FrameTextContentOptions) (string, bool, error) {
 	l.log.Debugf("Locator:TextContent", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	s, ok, err := l.textContent(opts)
+	opts.Strict = true
+	s, ok, err := l.frame.textContent(l.selector, opts)
 	if err != nil {
 		return "", false, fmt.Errorf("getting text content of %q: %w", l.selector, err)
 	}
@@ -545,27 +475,18 @@ func (l *Locator) TextContent(opts *FrameTextContentOptions) (string, bool, erro
 	return s, ok, nil
 }
 
-func (l *Locator) textContent(opts *FrameTextContentOptions) (string, bool, error) {
-	opts.Strict = true
-	return l.frame.textContent(l.selector, opts)
-}
-
 // InputValue returns the element's input value that matches
 // the locator's selector with strict mode on.
 func (l *Locator) InputValue(opts *FrameInputValueOptions) (string, error) {
 	l.log.Debugf("Locator:InputValue", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	v, err := l.inputValue(opts)
+	opts.Strict = true
+	v, err := l.frame.inputValue(l.selector, opts)
 	if err != nil {
 		return "", fmt.Errorf("getting input value of %q: %w", l.selector, err)
 	}
 
 	return v, nil
-}
-
-func (l *Locator) inputValue(opts *FrameInputValueOptions) (string, error) {
-	opts.Strict = true
-	return l.frame.inputValue(l.selector, opts)
 }
 
 // SelectOption filters option values of the first element that matches
@@ -574,7 +495,8 @@ func (l *Locator) inputValue(opts *FrameInputValueOptions) (string, error) {
 func (l *Locator) SelectOption(values []any, opts *FrameSelectOptionOptions) ([]string, error) {
 	l.log.Debugf("Locator:SelectOption", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	v, err := l.selectOption(values, opts)
+	opts.Strict = true
+	v, err := l.frame.selectOption(l.selector, values, opts)
 	if err != nil {
 		return nil, fmt.Errorf("selecting option on %q: %w", l.selector, err)
 	}
@@ -582,11 +504,6 @@ func (l *Locator) SelectOption(values []any, opts *FrameSelectOptionOptions) ([]
 	applySlowMo(l.ctx)
 
 	return v, nil
-}
-
-func (l *Locator) selectOption(values []any, opts *FrameSelectOptionOptions) ([]string, error) {
-	opts.Strict = true
-	return l.frame.selectOption(l.selector, values, opts)
 }
 
 // Press the given key on the element found that matches the locator's
@@ -597,18 +514,14 @@ func (l *Locator) Press(key string, opts *FramePressOptions) error {
 		l.frame.ID(), l.frame.URL(), l.selector, key, opts,
 	)
 
-	if err := l.press(key, opts); err != nil {
+	opts.Strict = true
+	if err := l.frame.press(l.selector, key, opts); err != nil {
 		return fmt.Errorf("pressing %q on %q: %w", key, l.selector, err)
 	}
 
 	applySlowMo(l.ctx)
 
 	return nil
-}
-
-func (l *Locator) press(key string, opts *FramePressOptions) error {
-	opts.Strict = true
-	return l.frame.press(l.selector, key, opts)
 }
 
 // Type text on the element found that matches the locator's
@@ -621,7 +534,8 @@ func (l *Locator) Type(text string, opts *FrameTypeOptions) error {
 	_, span := TraceAPICall(l.ctx, l.frame.page.targetID.String(), "locator.type")
 	defer span.End()
 
-	if err := l.typ(text, opts); err != nil {
+	opts.Strict = true
+	if err := l.frame.typ(l.selector, text, opts); err != nil {
 		err := fmt.Errorf("typing %q in %q: %w", text, l.selector, err)
 		spanRecordError(span, err)
 		return err
@@ -632,29 +546,20 @@ func (l *Locator) Type(text string, opts *FrameTypeOptions) error {
 	return nil
 }
 
-func (l *Locator) typ(text string, opts *FrameTypeOptions) error {
-	opts.Strict = true
-	return l.frame.typ(l.selector, text, opts)
-}
-
 // Hover moves the pointer over the element that matches the locator's
 // selector with strict mode on.
 func (l *Locator) Hover(opts *FrameHoverOptions) error {
 	l.log.Debugf("Locator:Hover", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	if err := l.hover(opts); err != nil {
+	opts.Strict = true
+	opts.retry = true
+	if err := l.frame.hover(l.selector, opts); err != nil {
 		return fmt.Errorf("hovering on %q: %w", l.selector, err)
 	}
 
 	applySlowMo(l.ctx)
 
 	return nil
-}
-
-func (l *Locator) hover(opts *FrameHoverOptions) error {
-	opts.Strict = true
-	opts.retry = true
-	return l.frame.hover(l.selector, opts)
 }
 
 // Tap the element found that matches the locator's selector with strict mode on.
@@ -680,7 +585,8 @@ func (l *Locator) DispatchEvent(typ string, eventInit any, opts *FrameDispatchEv
 		l.frame.ID(), l.frame.URL(), l.selector, typ, eventInit, opts,
 	)
 
-	if err := l.dispatchEvent(typ, eventInit, opts); err != nil {
+	opts.Strict = true
+	if err := l.frame.dispatchEvent(l.selector, typ, eventInit, opts); err != nil {
 		return fmt.Errorf("dispatching locator event %q to %q: %w", typ, l.selector, err)
 	}
 
@@ -689,26 +595,17 @@ func (l *Locator) DispatchEvent(typ string, eventInit any, opts *FrameDispatchEv
 	return nil
 }
 
-func (l *Locator) dispatchEvent(typ string, eventInit any, opts *FrameDispatchEventOptions) error {
-	opts.Strict = true
-	return l.frame.dispatchEvent(l.selector, typ, eventInit, opts)
-}
-
 // WaitFor waits for the element matching the locator's selector with strict mode on.
 func (l *Locator) WaitFor(opts *FrameWaitForSelectorOptions) error {
 	l.log.Debugf("Locator:WaitFor", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	if err := l.waitFor(opts); err != nil {
+	opts.Strict = true
+	_, err := l.frame.waitFor(l.selector, opts, 20)
+	if err != nil {
 		return fmt.Errorf("waiting for %q: %w", l.selector, err)
 	}
 
 	return nil
-}
-
-func (l *Locator) waitFor(opts *FrameWaitForSelectorOptions) error {
-	opts.Strict = true
-	_, err := l.frame.waitFor(l.selector, opts, 20)
-	return err
 }
 
 // DefaultTimeout returns the default timeout for the locator.
