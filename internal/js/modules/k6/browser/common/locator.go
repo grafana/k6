@@ -162,17 +162,13 @@ func (l *Locator) dblclick(opts *FrameDblclickOptions) error {
 
 // SetChecked sets the checked state of the element using locator's selector
 // with strict mode on.
-func (l *Locator) SetChecked(checked bool, opts sobek.Value) error {
+func (l *Locator) SetChecked(checked bool, opts *FrameCheckOptions) error {
 	l.log.Debugf(
 		"Locator:SetChecked", "fid:%s furl:%q sel:%q checked:%v opts:%+v",
 		l.frame.ID(), l.frame.URL(), l.selector, checked, opts,
 	)
 
-	copts := NewFrameCheckOptions(l.frame.defaultTimeout())
-	if err := copts.Parse(l.ctx, opts); err != nil {
-		return fmt.Errorf("parsing set checked options: %w", err)
-	}
-	if err := l.setChecked(checked, copts); err != nil {
+	if err := l.setChecked(checked, opts); err != nil {
 		return fmt.Errorf("setting %q checked to %v: %w", l.selector, checked, err)
 	}
 
@@ -188,14 +184,10 @@ func (l *Locator) setChecked(checked bool, opts *FrameCheckOptions) error {
 }
 
 // Check on an element using locator's selector with strict mode on.
-func (l *Locator) Check(opts sobek.Value) error {
+func (l *Locator) Check(opts *FrameCheckOptions) error {
 	l.log.Debugf("Locator:Check", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	copts := NewFrameCheckOptions(l.frame.defaultTimeout())
-	if err := copts.Parse(l.ctx, opts); err != nil {
-		return fmt.Errorf("parsing check options: %w", err)
-	}
-	if err := l.check(copts); err != nil {
+	if err := l.check(opts); err != nil {
 		return fmt.Errorf("checking %q: %w", l.selector, err)
 	}
 
@@ -213,14 +205,10 @@ func (l *Locator) check(opts *FrameCheckOptions) error {
 }
 
 // Uncheck on an element using locator's selector with strict mode on.
-func (l *Locator) Uncheck(opts sobek.Value) error {
+func (l *Locator) Uncheck(opts *FrameUncheckOptions) error {
 	l.log.Debugf("Locator:Uncheck", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	copts := NewFrameUncheckOptions(l.frame.defaultTimeout())
-	if err := copts.Parse(l.ctx, opts); err != nil {
-		return fmt.Errorf("parsing uncheck options: %w", err)
-	}
-	if err := l.uncheck(copts); err != nil {
+	if err := l.uncheck(opts); err != nil {
 		return fmt.Errorf("unchecking %q: %w", l.selector, err)
 	}
 

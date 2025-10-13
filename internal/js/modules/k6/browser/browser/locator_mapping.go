@@ -77,20 +77,32 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 				return nil, lo.Dblclick(copts) //nolint:wrapcheck
 			}), nil
 		},
-		"setChecked": func(checked bool, opts sobek.Value) *sobek.Promise {
+		"setChecked": func(checked bool, opts sobek.Value) (*sobek.Promise, error) {
+			copts := common.NewFrameCheckOptions(lo.Timeout())
+			if err := copts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing set checked options: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return nil, lo.SetChecked(checked, opts) //nolint:wrapcheck
-			})
+				return nil, lo.SetChecked(checked, copts) //nolint:wrapcheck
+			}), nil
 		},
-		"check": func(opts sobek.Value) *sobek.Promise {
+		"check": func(opts sobek.Value) (*sobek.Promise, error) {
+			copts := common.NewFrameCheckOptions(lo.Timeout())
+			if err := copts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing check options: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return nil, lo.Check(opts) //nolint:wrapcheck
-			})
+				return nil, lo.Check(copts) //nolint:wrapcheck
+			}), nil
 		},
-		"uncheck": func(opts sobek.Value) *sobek.Promise {
+		"uncheck": func(opts sobek.Value) (*sobek.Promise, error) {
+			copts := common.NewFrameUncheckOptions(lo.Timeout())
+			if err := copts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing uncheck options: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return nil, lo.Uncheck(opts) //nolint:wrapcheck
-			})
+				return nil, lo.Uncheck(copts) //nolint:wrapcheck
+			}), nil
 		},
 		"isChecked": func(opts sobek.Value) (*sobek.Promise, error) {
 			copts := common.NewFrameIsCheckedOptions(lo.Timeout())
