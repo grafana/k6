@@ -323,15 +323,23 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 				return lo.SelectOption(convValues, copts) //nolint:wrapcheck
 			}), nil
 		},
-		"press": func(key string, opts sobek.Value) *sobek.Promise {
+		"press": func(key string, opts sobek.Value) (*sobek.Promise, error) {
+			copts := common.NewFramePressOptions(lo.Timeout())
+			if err := copts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing press options: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return nil, lo.Press(key, opts) //nolint:wrapcheck
-			})
+				return nil, lo.Press(key, copts) //nolint:wrapcheck
+			}), nil
 		},
-		"type": func(text string, opts sobek.Value) *sobek.Promise {
+		"type": func(text string, opts sobek.Value) (*sobek.Promise, error) {
+			copts := common.NewFrameTypeOptions(lo.Timeout())
+			if err := copts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing type options: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return nil, lo.Type(text, opts) //nolint:wrapcheck
-			})
+				return nil, lo.Type(text, copts) //nolint:wrapcheck
+			}), nil
 		},
 		"hover": func(opts sobek.Value) (*sobek.Promise, error) {
 			copts := common.NewFrameHoverOptions(lo.Timeout())
