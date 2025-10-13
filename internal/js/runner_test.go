@@ -865,7 +865,7 @@ func getTestServerWithCertificate(t *testing.T, certPem, key []byte) *httptest.S
 		},
 		ForceAttemptHTTP2: s.EnableHTTP2,
 	}
-	s.Listener, err = net.Listen("tcp", "")
+	s.Listener, err = (&net.ListenConfig{}).Listen(context.Background(), "tcp", "")
 	require.NoError(t, err)
 	s.Listener = tls.NewListener(s.Listener, s.TLS)
 	s.URL = "https://" + s.Listener.Addr().String()

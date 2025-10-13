@@ -1,4 +1,4 @@
-# v2.1.6
+# v2.5.0
 # Please don't remove the first line. It uses in CI to determine the golangci version
 version: "2"
 linters:
@@ -115,6 +115,9 @@ linters:
       - linters:
           - forbidigo
         text: use of `os\.(SyscallError|Signal|Interrupt)` forbidden
+      - linters:
+          - revive
+        text: avoid meaningless package names
     paths:
       - third_party$
       - builtin$

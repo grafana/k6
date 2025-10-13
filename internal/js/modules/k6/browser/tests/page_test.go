@@ -2553,7 +2553,7 @@ func TestPageOnResponse(t *testing.T) {
 
 		return JSON.stringify(returnValue, null, 2);
 	`, tb.url("/home"))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	got := k6test.ToPromise(t, gv)
 
@@ -2944,7 +2944,6 @@ func TestPageWaitForURLSuccess(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Setup
 			tb := newTestBrowser(t, withFileServer())
 			tb.vu.ActivateVU()
 			tb.vu.StartIteration(t)
@@ -2953,19 +2952,15 @@ func TestPageWaitForURLSuccess(t *testing.T) {
 			tb.vu.SetVar(t, "testURL", tb.staticURL("waitfornavigation_test.html"))
 			tb.vu.SetVar(t, "page1URL", tb.staticURL("page1.html"))
 			_, err := tb.vu.RunAsync(t, `
-					page = await browser.newPage();
-				`)
+				page = await browser.newPage();
+			`)
 			require.NoError(t, err)
 
-			// test logic
-			code := fmt.Sprintf(`
-			await page.goto(testURL);
-
-			%s
-			
-			return page.url();`, tt.code)
-
-			result := tb.vu.RunPromise(t, code)
+			result := tb.vu.RunPromise(t, `
+				await page.goto(testURL);
+				%s
+				return page.url();
+			`, tt.code)
 			got := strings.ReplaceAll(result.Result().String(), tb.staticURL(""), "")
 			assert.Contains(t, tt.expected, got)
 		})
@@ -3010,20 +3005,17 @@ func TestPageWaitForURLFailure(t *testing.T) {
 			tb.vu.ActivateVU()
 			tb.vu.StartIteration(t)
 
-			// Setup
 			tb.vu.SetVar(t, "page", &sobek.Object{})
 			tb.vu.SetVar(t, "testURL", tb.staticURL("waitfornavigation_test.html"))
 			_, err := tb.vu.RunAsync(t, `
-					page = await browser.newPage();
-				`)
+				page = await browser.newPage();
+			`)
 			require.NoError(t, err)
 
-			code := fmt.Sprintf(`
-			await page.goto(testURL);
-
-			%s`, tt.code)
-
-			_, err = tb.vu.RunAsync(t, code)
+			_, err = tb.vu.RunAsync(t, `
+				await page.goto(testURL);
+				%s
+			`, tt.code)
 			assert.ErrorContains(t, err, tt.expected)
 		})
 	}
