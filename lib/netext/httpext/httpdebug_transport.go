@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 
-	uuid "github.com/nu7hatch/gouuid"
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 )
 
@@ -22,7 +22,7 @@ type httpDebugTransport struct {
 //   - https://github.com/k6io/k6/issues/1042
 //   - https://github.com/k6io/k6/issues/774
 func (t httpDebugTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	id, _ := uuid.NewV4()
+	id := uuid.New()
 	t.debugRequest(req, id.String())
 	resp, err := t.originalTransport.RoundTrip(req)
 	t.debugResponse(resp, id.String())
