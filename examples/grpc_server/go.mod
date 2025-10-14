@@ -7,7 +7,7 @@ toolchain go1.24.7
 replace go.k6.io/k6 => ../../
 
 require (
-	go.k6.io/k6 v0.0.0-00010101000000-000000000000
+	go.k6.io/k6 v0.59.0
 	google.golang.org/grpc v1.75.0
 )
 
