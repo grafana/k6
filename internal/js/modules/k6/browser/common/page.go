@@ -189,7 +189,15 @@ type ConsoleMessage struct {
 	Type string
 }
 
+// PageOnHandler is a function type that handles a page on event.
 type PageOnHandler func(PageOnEvent) error
+
+// pageOnHandlerRecord is a registered event on a page.
+// The id field is used to identify the handler in the eventHandlers map.
+type pageOnHandlerRecord struct {
+	id      uint64
+	handler PageOnHandler
+}
 
 type RouteHandler struct {
 	path       string
