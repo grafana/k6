@@ -1457,6 +1457,17 @@ func (p *Page) On(event PageOnEventName, handler PageOnHandler) error {
 	return nil
 }
 
+func (p *Page) addEventHandler(event PageOnEventName, handler PageOnHandler) (id uint64, err error) {
+	p.eventHandlerLastID.Add(1)
+
+	p.eventHandlersMu.Lock()
+	defer p.eventHandlersMu.Unlock()
+
+	p.eventHandlers[event] = append(p.eventHandlers[event], handler)
+
+	return id, nil
+}
+
 // Opener returns the opener of the target.
 func (p *Page) Opener() *Page {
 	return p.opener
