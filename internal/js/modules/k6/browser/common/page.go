@@ -51,6 +51,16 @@ const (
 	EventPageResponseCalled PageOnEventName = "response"
 )
 
+// PageOnHandler is a function type that handles a page on event.
+type PageOnHandler func(PageOnEvent) error
+
+// pageOnHandlerRecord is a registered event on a page.
+// The id field is used to identify the handler in the eventHandlers map.
+type pageOnHandlerRecord struct {
+	id      uint64
+	handler PageOnHandler
+}
+
 // MediaType represents the type of media to emulate.
 type MediaType string
 
@@ -187,16 +197,6 @@ type ConsoleMessage struct {
 	// 'table', 'trace', 'clear', 'startGroup', 'startGroupCollapsed', 'endGroup',
 	// 'assert', 'profile', 'profileEnd', 'count', 'timeEnd'.
 	Type string
-}
-
-// PageOnHandler is a function type that handles a page on event.
-type PageOnHandler func(PageOnEvent) error
-
-// pageOnHandlerRecord is a registered event on a page.
-// The id field is used to identify the handler in the eventHandlers map.
-type pageOnHandlerRecord struct {
-	id      uint64
-	handler PageOnHandler
 }
 
 type RouteHandler struct {
