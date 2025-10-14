@@ -41,7 +41,7 @@ github.com/bufbuild/protocompile/protoutil
 github.com/bufbuild/protocompile/reporter
 github.com/bufbuild/protocompile/sourceinfo
 github.com/bufbuild/protocompile/walk
-# github.com/cenkalti/backoff/v5 v5.0.2
+# github.com/cenkalti/backoff/v5 v5.0.3
 ## explicit; go 1.23
 github.com/cenkalti/backoff/v5
 # github.com/cespare/xxhash/v2 v2.3.0

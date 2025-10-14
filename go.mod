@@ -67,7 +67,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
-require github.com/cenkalti/backoff/v5 v5.0.2 // indirect
+require github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 
 require (
 	buf.build/gen/go/gogo/protobuf/protocolbuffers/go v1.36.5-20210810001428-4df00b267f94.1 // indirect
