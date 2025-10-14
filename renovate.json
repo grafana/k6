@@ -4,6 +4,7 @@
     "schedule:weekly"
   ],
   "ignorePaths": [
+    "**/vendor/**",
     ".github/workflows/xk6-tests/**"
   ],
   "prConcurrentLimit": 50,
