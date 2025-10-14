@@ -2285,6 +2285,46 @@ func (f *Frame) evaluate(
 	return eh, nil
 }
 
+func (f *Frame) evaluateWithSelector(selector string, pageFunc string, args ...any) (any, error) {
+	f.log.Debugf("Frame:evaluateWithSelector", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
+
+	evaluate := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+		return handle.Evaluate(pageFunc, args...)
+	}
+
+	act := f.newAction(
+		selector, DOMElementStateAttached, true, evaluate, []string{}, false, true, f.defaultTimeout(),
+	)
+	v, err := call(f.ctx, act, f.defaultTimeout())
+	if err != nil {
+		return nil, errorFromDOMError(err)
+	}
+	return v, nil
+}
+
+func (f *Frame) evaluateHandleWithSelector(selector string, pageFunc string, args ...any) (JSHandleAPI, error) {
+	f.log.Debugf("Frame:evaluateHandleWithSelector", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
+
+	evaluateHandle := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+		return handle.EvaluateHandle(pageFunc, args...)
+	}
+
+	act := f.newAction(
+		selector, DOMElementStateAttached, true, evaluateHandle, []string{}, false, true, f.defaultTimeout(),
+	)
+	v, err := call(f.ctx, act, f.defaultTimeout())
+	if err != nil {
+		return nil, errorFromDOMError(err)
+	}
+
+	handle, ok := v.(JSHandleAPI)
+	if !ok {
+		return nil, fmt.Errorf("evaluating handle of %q: unexpected type %T", selector, v)
+	}
+
+	return handle, nil
+}
+
 // frameExecutionContext represents a JS execution context that belongs to Frame.
 type frameExecutionContext interface {
 	// adoptBackendNodeID adopts specified backend node into this execution

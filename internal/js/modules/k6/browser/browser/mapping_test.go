@@ -558,6 +558,8 @@ type locatorAPI interface { //nolint:interfacebloat
 	ContentFrame() *common.FrameLocator
 	Count() (int, error)
 	Dblclick(opts sobek.Value) error
+	Evaluate(pageFunc sobek.Value, arg ...sobek.Value) (any, error)
+	EvaluateHandle(pageFunc sobek.Value, arg ...sobek.Value) (common.JSHandleAPI, error)
 	SetChecked(checked bool, opts sobek.Value) error
 	Check(opts sobek.Value) error
 	Uncheck(opts sobek.Value) error
