@@ -336,6 +336,7 @@ type ContainerQuery struct {
 	PhysicalAxes       dom.PhysicalAxes `json:"physicalAxes,omitempty,omitzero"` // Optional physical axes queried for the container.
 	LogicalAxes        dom.LogicalAxes  `json:"logicalAxes,omitempty,omitzero"`  // Optional logical axes queried for the container.
 	QueriesScrollState bool             `json:"queriesScrollState"`              // true if the query contains scroll-state() queries.
+	QueriesAnchored    bool             `json:"queriesAnchored"`                 // true if the query contains anchored() queries.
 }
 
 // Supports CSS Supports at-rule descriptor.

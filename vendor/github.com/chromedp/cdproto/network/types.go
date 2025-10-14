@@ -45,6 +45,7 @@ const (
 	ResourceTypePing               ResourceType = "Ping"
 	ResourceTypeCSPViolationReport ResourceType = "CSPViolationReport"
 	ResourceTypePreflight          ResourceType = "Preflight"
+	ResourceTypeFedCM              ResourceType = "FedCM"
 	ResourceTypeOther              ResourceType = "Other"
 )
 
@@ -88,6 +89,8 @@ func (t *ResourceType) UnmarshalJSON(buf []byte) error {
 		*t = ResourceTypeCSPViolationReport
 	case ResourceTypePreflight:
 		*t = ResourceTypePreflight
+	case ResourceTypeFedCM:
+		*t = ResourceTypeFedCM
 	case ResourceTypeOther:
 		*t = ResourceTypeOther
 	default:
@@ -946,6 +949,7 @@ type Response struct {
 	AlternateProtocolUsage      AlternateProtocolUsage      `json:"alternateProtocolUsage,omitempty,omitzero"`      // The reason why Chrome uses a specific transport protocol for HTTP semantics.
 	SecurityState               security.State              `json:"securityState"`                                  // Security state of the request resource.
 	SecurityDetails             *SecurityDetails            `json:"securityDetails,omitempty,omitzero"`             // Security details for the request.
+	IsIPProtectionUsed          bool                        `json:"isIpProtectionUsed"`                             // Indicates whether the request was sent through IP Protection proxies. If set to true, the request used the IP Protection privacy feature.
 }
 
 // WebSocketRequest webSocket request data.
@@ -1487,6 +1491,7 @@ type SignedExchangeError struct {
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Network#type-SignedExchangeInfo
 type SignedExchangeInfo struct {
 	OuterResponse   *Response              `json:"outerResponse"`                      // The outer response of signed HTTP exchange which was received from network.
+	HasExtraInfo    bool                   `json:"hasExtraInfo"`                       // Whether network response for the signed exchange was accompanied by extra headers.
 	Header          *SignedExchangeHeader  `json:"header,omitempty,omitzero"`          // Information about the signed exchange header.
 	SecurityDetails *SecurityDetails       `json:"securityDetails,omitempty,omitzero"` // Security details for the signed exchange header.
 	Errors          []*SignedExchangeError `json:"errors,omitempty,omitzero"`          // Errors occurred while handling the signed exchange.
@@ -1654,10 +1659,10 @@ func (t IPAddressSpace) String() string {
 
 // IPAddressSpace values.
 const (
-	IPAddressSpaceLocal   IPAddressSpace = "Local"
-	IPAddressSpacePrivate IPAddressSpace = "Private"
-	IPAddressSpacePublic  IPAddressSpace = "Public"
-	IPAddressSpaceUnknown IPAddressSpace = "Unknown"
+	IPAddressSpaceLoopback IPAddressSpace = "Loopback"
+	IPAddressSpaceLocal    IPAddressSpace = "Local"
+	IPAddressSpacePublic   IPAddressSpace = "Public"
+	IPAddressSpaceUnknown  IPAddressSpace = "Unknown"
 )
 
 // UnmarshalJSON satisfies [json.Unmarshaler].
@@ -1666,10 +1671,10 @@ func (t *IPAddressSpace) UnmarshalJSON(buf []byte) error {
 	s = strings.TrimSuffix(strings.TrimPrefix(s, `"`), `"`)
 
 	switch IPAddressSpace(s) {
+	case IPAddressSpaceLoopback:
+		*t = IPAddressSpaceLoopback
 	case IPAddressSpaceLocal:
 		*t = IPAddressSpaceLocal
-	case IPAddressSpacePrivate:
-		*t = IPAddressSpacePrivate
 	case IPAddressSpacePublic:
 		*t = IPAddressSpacePublic
 	case IPAddressSpaceUnknown:
