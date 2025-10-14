@@ -2,12 +2,14 @@ package cmd
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"syscall"
 
@@ -20,6 +22,7 @@ import (
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/ext"
 	"go.k6.io/k6/internal/build"
+	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/lib/fsext"
 )
 
@@ -39,7 +42,18 @@ func newIOFSBridge(fs fsext.Fs, pwd string) fs.FS {
 
 // Open implements fs.Fs Open
 func (b *ioFSBridge) Open(name string) (fs.File, error) {
-	f, err := b.fsext.Open(path.Join(b.pwd, name))
+	_ = fsext.Walk(b.fsext, "/", func(path string, _ fs.FileInfo, _ error) error {
+		fmt.Println("walk: ", path)
+		return nil
+	})
+	fmt.Println("ioFSBridge.Open", name)
+	name = filepath.ToSlash(filepath.Clean(fsext.FilePathSeparator + name))
+	fmt.Println("ioFSBridge.Open post clean up", name)
+	if !path.IsAbs(name) {
+		name = path.Join(b.pwd, name)
+	}
+	fmt.Println("ioFSBridge.Open post isAbs", name)
+	f, err := b.fsext.Open(name)
 	if err != nil {
 		return nil, fmt.Errorf("opening file via launcher's bridge: %w", err)
 	}
@@ -324,7 +338,7 @@ func analyze(gs *state.GlobalState, args []string) (k6deps.Dependencies, error) 
 		}
 		dopts.Script.Name = sourceRootPath
 		dopts.Script.Contents = src.Data
-		dopts.Fs = newIOFSBridge(gs.FS, pwd)
+		dopts.Fs = newIOFSBridge(gs.FS, filepath.ToSlash(pwd))
 	}
 
 	return k6deps.Analyze(dopts)
@@ -367,4 +381,74 @@ func extractToken(gs *state.GlobalState) (string, error) {
 	}
 
 	return config.Token.String, nil
+}
+
+//nolint:gochecknoglobals
+var (
+	srcName       = `(?P<name>k6|k6/[^/]{2}.*|k6/[^x]/.*|k6/x/[/0-9a-zA-Z_-]+|(@[a-zA-Z0-9-_]+/)?xk6-([a-zA-Z0-9-_]+)((/[a-zA-Z0-9-_]+)*))` //nolint:lll
+	srcConstraint = `=?v?0\.0\.0\+[0-9A-Za-z-]+|[vxX*|,&\^0-9.+-><=, ~]+`
+
+	reUseK6 = regexp.MustCompile(
+		`"use +k6(( with ` + srcName + `( *(?P<constraints>` + srcConstraint + `))?)|(( *(?P<k6Constraints>` + srcConstraint + `)?)))"`) //nolint:lll
+
+	idxUseName          = reUseK6.SubexpIndex("name")
+	idxUseConstraints   = reUseK6.SubexpIndex("constraints")
+	idxUseK6Constraints = reUseK6.SubexpIndex("k6Constraints")
+	nameK6              = "k6"
+)
+
+func processUseDirectives(text []byte) (k6deps.Dependencies, error) {
+	deps := make(k6deps.Dependencies)
+	for _, match := range reUseK6.FindAllSubmatch(text, -1) {
+		var dep *k6deps.Dependency
+		var err error
+
+		if constraints := string(match[idxUseK6Constraints]); len(constraints) != 0 {
+			dep, err = k6deps.NewDependency(nameK6, constraints)
+			if err != nil {
+				return deps, err
+			}
+		}
+
+		if extension := string(match[idxUseName]); len(extension) != 0 {
+			constraints := string(match[idxUseConstraints])
+
+			dep, err = k6deps.NewDependency(extension, constraints)
+			if err != nil {
+				return deps, err
+			}
+		}
+
+		if dep != nil {
+			if _, ok := deps[dep.Name]; ok {
+				return deps, fmt.Errorf("already had a use directivce for %q", dep.Name)
+			}
+			deps[dep.Name] = dep
+		}
+	}
+
+	return deps, nil
+}
+
+func extractUnknownModules(err error) (k6deps.Dependencies, error) {
+	deps := make(k6deps.Dependencies)
+	if err == nil {
+		return deps, nil
+	}
+
+	var u modules.UnknownModulesError
+
+	if errors.As(err, &u) {
+		for _, name := range u.List() {
+			dep, err := k6deps.NewDependency(name, "")
+			if err != nil { // this is impossible
+				panic(err)
+			}
+
+			deps[name] = dep
+		}
+		return deps, nil
+	}
+
+	return nil, err
 }
