@@ -465,8 +465,8 @@ func (p *Page) initEvents() {
 func hasPageOnHandler(p *Page, event PageOnEventName) bool {
 	p.eventHandlersMu.RLock()
 	defer p.eventHandlersMu.RUnlock()
-	_, ok := p.eventHandlers[event]
-	return ok
+	handlers, ok := p.eventHandlers[event]
+	return ok && len(handlers) > 0
 }
 
 // MetricEvent is the type that is exported to JS. It is currently only used to
