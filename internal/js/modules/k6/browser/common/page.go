@@ -324,6 +324,7 @@ type Page struct {
 	eventCh              chan Event
 	eventHandlers        map[PageOnEventName][]PageOnHandler
 	eventHandlersMu      sync.RWMutex
+	eventHandlerLastID   atomic.Uint64
 	responseEventHandler *ResponseEventHandler
 
 	mainFrameSession *FrameSession
