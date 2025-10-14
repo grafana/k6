@@ -532,6 +532,31 @@ func (p *SetEmulatedVisionDeficiencyParams) Do(ctx context.Context) (err error) 
 	return cdp.Execute(ctx, CommandSetEmulatedVisionDeficiency, p, nil)
 }
 
+// SetEmulatedOSTextScaleParams emulates the given OS text scale.
+type SetEmulatedOSTextScaleParams struct {
+	Scale float64 `json:"scale,omitempty,omitzero"`
+}
+
+// SetEmulatedOSTextScale emulates the given OS text scale.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Emulation#method-setEmulatedOSTextScale
+//
+// parameters:
+func SetEmulatedOSTextScale() *SetEmulatedOSTextScaleParams {
+	return &SetEmulatedOSTextScaleParams{}
+}
+
+// WithScale [no description].
+func (p SetEmulatedOSTextScaleParams) WithScale(scale float64) *SetEmulatedOSTextScaleParams {
+	p.Scale = scale
+	return &p
+}
+
+// Do executes Emulation.setEmulatedOSTextScale against the provided context.
+func (p *SetEmulatedOSTextScaleParams) Do(ctx context.Context) (err error) {
+	return cdp.Execute(ctx, CommandSetEmulatedOSTextScale, p, nil)
+}
+
 // SetGeolocationOverrideParams overrides the Geolocation Position or Error.
 // Omitting latitude, longitude or accuracy emulates position unavailable.
 type SetGeolocationOverrideParams struct {
@@ -748,7 +773,8 @@ func (p *SetPressureSourceOverrideEnabledParams) Do(ctx context.Context) (err er
 	return cdp.Execute(ctx, CommandSetPressureSourceOverrideEnabled, p, nil)
 }
 
-// SetPressureStateOverrideParams provides a given pressure state that will
+// SetPressureStateOverrideParams tODO: OBSOLETE: To remove when
+// setPressureDataOverride is merged. Provides a given pressure state that will
 // be processed and eventually be delivered to PressureObserver users. |source|
 // must have been previously overridden by setPressureSourceOverrideEnabled.
 type SetPressureStateOverrideParams struct {
@@ -756,8 +782,9 @@ type SetPressureStateOverrideParams struct {
 	State  PressureState  `json:"state"`
 }
 
-// SetPressureStateOverride provides a given pressure state that will be
-// processed and eventually be delivered to PressureObserver users. |source|
+// SetPressureStateOverride tODO: OBSOLETE: To remove when
+// setPressureDataOverride is merged. Provides a given pressure state that will
+// be processed and eventually be delivered to PressureObserver users. |source|
 // must have been previously overridden by setPressureSourceOverrideEnabled.
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Emulation#method-setPressureStateOverride
@@ -776,6 +803,43 @@ func SetPressureStateOverride(source PressureSource, state PressureState) *SetPr
 // Do executes Emulation.setPressureStateOverride against the provided context.
 func (p *SetPressureStateOverrideParams) Do(ctx context.Context) (err error) {
 	return cdp.Execute(ctx, CommandSetPressureStateOverride, p, nil)
+}
+
+// SetPressureDataOverrideParams provides a given pressure data set that will
+// be processed and eventually be delivered to PressureObserver users. |source|
+// must have been previously overridden by setPressureSourceOverrideEnabled.
+type SetPressureDataOverrideParams struct {
+	Source                  PressureSource `json:"source"`
+	State                   PressureState  `json:"state"`
+	OwnContributionEstimate float64        `json:"ownContributionEstimate,omitempty,omitzero"`
+}
+
+// SetPressureDataOverride provides a given pressure data set that will be
+// processed and eventually be delivered to PressureObserver users. |source|
+// must have been previously overridden by setPressureSourceOverrideEnabled.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Emulation#method-setPressureDataOverride
+//
+// parameters:
+//
+//	source
+//	state
+func SetPressureDataOverride(source PressureSource, state PressureState) *SetPressureDataOverrideParams {
+	return &SetPressureDataOverrideParams{
+		Source: source,
+		State:  state,
+	}
+}
+
+// WithOwnContributionEstimate [no description].
+func (p SetPressureDataOverrideParams) WithOwnContributionEstimate(ownContributionEstimate float64) *SetPressureDataOverrideParams {
+	p.OwnContributionEstimate = ownContributionEstimate
+	return &p
+}
+
+// Do executes Emulation.setPressureDataOverride against the provided context.
+func (p *SetPressureDataOverrideParams) Do(ctx context.Context) (err error) {
+	return cdp.Execute(ctx, CommandSetPressureDataOverride, p, nil)
 }
 
 // SetIdleOverrideParams overrides the Idle state.
@@ -1041,6 +1105,35 @@ func (p *SetDisabledImageTypesParams) Do(ctx context.Context) (err error) {
 	return cdp.Execute(ctx, CommandSetDisabledImageTypes, p, nil)
 }
 
+// SetDataSaverOverrideParams override the value of
+// navigator.connection.saveData.
+type SetDataSaverOverrideParams struct {
+	DataSaverEnabled bool `json:"dataSaverEnabled"` // Override value. Omitting the parameter disables the override.
+}
+
+// SetDataSaverOverride override the value of navigator.connection.saveData.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Emulation#method-setDataSaverOverride
+//
+// parameters:
+func SetDataSaverOverride() *SetDataSaverOverrideParams {
+	return &SetDataSaverOverrideParams{
+		DataSaverEnabled: false,
+	}
+}
+
+// WithDataSaverEnabled override value. Omitting the parameter disables the
+// override.
+func (p SetDataSaverOverrideParams) WithDataSaverEnabled(dataSaverEnabled bool) *SetDataSaverOverrideParams {
+	p.DataSaverEnabled = dataSaverEnabled
+	return &p
+}
+
+// Do executes Emulation.setDataSaverOverride against the provided context.
+func (p *SetDataSaverOverrideParams) Do(ctx context.Context) (err error) {
+	return cdp.Execute(ctx, CommandSetDataSaverOverride, p, nil)
+}
+
 // SetHardwareConcurrencyOverrideParams [no description].
 type SetHardwareConcurrencyOverrideParams struct {
 	HardwareConcurrency int64 `json:"hardwareConcurrency"` // Hardware concurrency to report
@@ -1182,12 +1275,14 @@ const (
 	CommandSetEmitTouchEventsForMouse               = "Emulation.setEmitTouchEventsForMouse"
 	CommandSetEmulatedMedia                         = "Emulation.setEmulatedMedia"
 	CommandSetEmulatedVisionDeficiency              = "Emulation.setEmulatedVisionDeficiency"
+	CommandSetEmulatedOSTextScale                   = "Emulation.setEmulatedOSTextScale"
 	CommandSetGeolocationOverride                   = "Emulation.setGeolocationOverride"
 	CommandGetOverriddenSensorInformation           = "Emulation.getOverriddenSensorInformation"
 	CommandSetSensorOverrideEnabled                 = "Emulation.setSensorOverrideEnabled"
 	CommandSetSensorOverrideReadings                = "Emulation.setSensorOverrideReadings"
 	CommandSetPressureSourceOverrideEnabled         = "Emulation.setPressureSourceOverrideEnabled"
 	CommandSetPressureStateOverride                 = "Emulation.setPressureStateOverride"
+	CommandSetPressureDataOverride                  = "Emulation.setPressureDataOverride"
 	CommandSetIdleOverride                          = "Emulation.setIdleOverride"
 	CommandClearIdleOverride                        = "Emulation.clearIdleOverride"
 	CommandSetPageScaleFactor                       = "Emulation.setPageScaleFactor"
@@ -1197,6 +1292,7 @@ const (
 	CommandSetLocaleOverride                        = "Emulation.setLocaleOverride"
 	CommandSetTimezoneOverride                      = "Emulation.setTimezoneOverride"
 	CommandSetDisabledImageTypes                    = "Emulation.setDisabledImageTypes"
+	CommandSetDataSaverOverride                     = "Emulation.setDataSaverOverride"
 	CommandSetHardwareConcurrencyOverride           = "Emulation.setHardwareConcurrencyOverride"
 	CommandSetUserAgentOverride                     = "Emulation.setUserAgentOverride"
 	CommandSetAutomationOverride                    = "Emulation.setAutomationOverride"
