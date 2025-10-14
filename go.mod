@@ -19,7 +19,7 @@ require (
 	github.com/golang/protobuf v1.5.4
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
-	github.com/grafana/k6deps v0.4.0
+	github.com/grafana/k6deps v0.5.1
 	github.com/grafana/k6provider v0.1.15
 	github.com/grafana/sobek v0.0.0-20250723111835-dd8a13f0d439
 	github.com/grafana/xk6-dashboard v0.7.12
