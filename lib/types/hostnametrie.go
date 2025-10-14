@@ -50,7 +50,7 @@ func (d *NullHostnameTrie) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// Source return source hostnames that were used diring the construction
+// Source returns source hostnames that were used during construction.
 func (d *NullHostnameTrie) Source() []string {
 	if d.Trie == nil {
 		return []string{}
@@ -119,8 +119,8 @@ func isValidHostnamePattern(s string) error {
 	return nil
 }
 
-// insert a hostname pattern into the given HostnameTrie. Returns an error
-// if hostname pattern is invalid.
+// insert inserts a hostname pattern into the HostnameTrie. It returns an error
+// if the hostname pattern is invalid.
 func (t *HostnameTrie) insert(s string) error {
 	s = strings.ToLower(s)
 	if err := isValidHostnamePattern(s); err != nil {
