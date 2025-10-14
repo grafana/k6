@@ -331,7 +331,7 @@ type Page struct {
 	backgroundPage bool
 
 	eventCh              chan Event
-	eventHandlers        map[PageOnEventName][]PageOnHandler
+	eventHandlers        map[PageOnEventName][]pageOnHandlerRecord
 	eventHandlersMu      sync.RWMutex
 	eventHandlerLastID   atomic.Uint64
 	responseEventHandler *ResponseEventHandler
@@ -373,7 +373,7 @@ func NewPage(
 		Keyboard:             NewKeyboard(ctx, s),
 		jsEnabled:            true,
 		eventCh:              make(chan Event),
-		eventHandlers:        make(map[PageOnEventName][]PageOnHandler),
+		eventHandlers:        make(map[PageOnEventName][]pageOnHandlerRecord),
 		frameSessions:        make(map[cdp.FrameID]*FrameSession),
 		workers:              make(map[target.SessionID]*Worker),
 		responseEventHandler: NewResponseEventHandler(),
@@ -572,7 +572,7 @@ func (p *Page) urlTagName(url string, method string) (string, bool) {
 
 	p.eventHandlersMu.RLock()
 	defer p.eventHandlersMu.RUnlock()
-	for _, h := range p.eventHandlers[EventPageMetricCalled] {
+	for _, next := range p.eventHandlers[EventPageMetricCalled] {
 		err := func() error {
 			// Handlers can register other handlers, so we need to
 			// unlock the mutex before calling the next handler.
@@ -580,7 +580,7 @@ func (p *Page) urlTagName(url string, method string) (string, bool) {
 			defer p.eventHandlersMu.RLock()
 
 			// Call and wait for the handler to complete.
-			return h(PageOnEvent{
+			return next.handler(PageOnEvent{
 				Metric: em,
 			})
 		}()
@@ -608,7 +608,7 @@ func (p *Page) onRequest(request *Request) {
 
 	p.eventHandlersMu.RLock()
 	defer p.eventHandlersMu.RUnlock()
-	for _, h := range p.eventHandlers[EventPageRequestCalled] {
+	for _, next := range p.eventHandlers[EventPageRequestCalled] {
 		err := func() error {
 			// Handlers can register other handlers, so we need to
 			// unlock the mutex before calling the next handler.
@@ -616,7 +616,7 @@ func (p *Page) onRequest(request *Request) {
 			defer p.eventHandlersMu.RLock()
 
 			// Call and wait for the handler to complete.
-			return h(PageOnEvent{
+			return next.handler(PageOnEvent{
 				Request: request,
 			})
 		}()
@@ -639,7 +639,7 @@ func (p *Page) onResponse(resp *Response) {
 
 	p.eventHandlersMu.RLock()
 	defer p.eventHandlersMu.RUnlock()
-	for _, h := range p.eventHandlers[EventPageResponseCalled] {
+	for _, next := range p.eventHandlers[EventPageResponseCalled] {
 		err := func() error {
 			// Handlers can register other handlers, so we need to
 			// unlock the mutex before calling the next handler.
@@ -647,7 +647,7 @@ func (p *Page) onResponse(resp *Response) {
 			defer p.eventHandlersMu.RLock()
 
 			// Call and wait for the handler to complete.
-			return h(PageOnEvent{
+			return next.handler(PageOnEvent{
 				Response: resp,
 			})
 		}()
@@ -671,8 +671,8 @@ func (p *Page) onConsoleAPICalled(event *runtime.EventConsoleAPICalled) {
 
 	p.eventHandlersMu.RLock()
 	defer p.eventHandlersMu.RUnlock()
-	for _, h := range p.eventHandlers[EventPageConsoleAPICalled] {
-		err := h(PageOnEvent{
+	for _, next := range p.eventHandlers[EventPageConsoleAPICalled] {
+		err := next.handler(PageOnEvent{
 			ConsoleMessage: m,
 		})
 		if err != nil {
@@ -1459,22 +1459,27 @@ func (p *Page) On(event PageOnEventName, handler PageOnHandler) error {
 	defer p.eventHandlersMu.Unlock()
 
 	if _, ok := p.eventHandlers[event]; !ok {
-		p.eventHandlers[event] = make([]PageOnHandler, 0, 1)
+		p.eventHandlers[event] = make([]pageOnHandlerRecord, 0, 1)
 	}
-	p.eventHandlers[event] = append(p.eventHandlers[event], handler)
+	p.eventHandlers[event] = append(p.eventHandlers[event], pageOnHandlerRecord{
+		id:      0,
+		handler: handler,
+	})
 
 	return nil
 }
 
 func (p *Page) addEventHandler(event PageOnEventName, handler PageOnHandler) (id uint64, err error) {
-	p.eventHandlerLastID.Add(1)
-
 	p.eventHandlersMu.Lock()
 	defer p.eventHandlersMu.Unlock()
 
-	p.eventHandlers[event] = append(p.eventHandlers[event], handler)
+	r := pageOnHandlerRecord{
+		id:      p.eventHandlerLastID.Add(1),
+		handler: handler,
+	}
+	p.eventHandlers[event] = append(p.eventHandlers[event], r)
 
-	return id, nil
+	return r.id, nil
 }
 
 func (p *Page) removeEventHandler(event PageOnEventName, id uint64) {
@@ -1485,8 +1490,8 @@ func (p *Page) removeEventHandler(event PageOnEventName, id uint64) {
 	if !ok {
 		return
 	}
-	p.eventHandlers[event] = slices.DeleteFunc(handlers, func(h PageOnHandler) bool {
-		return true
+	p.eventHandlers[event] = slices.DeleteFunc(handlers, func(r pageOnHandlerRecord) bool {
+		return r.id == id
 	})
 	if len(p.eventHandlers[event]) == 0 {
 		delete(p.eventHandlers, event)
