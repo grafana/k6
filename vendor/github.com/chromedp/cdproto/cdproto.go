@@ -158,6 +158,7 @@ const (
 	CommandBrowserGetWindowBounds                                    = browser.CommandGetWindowBounds
 	CommandBrowserGetWindowForTarget                                 = browser.CommandGetWindowForTarget
 	CommandBrowserSetWindowBounds                                    = browser.CommandSetWindowBounds
+	CommandBrowserSetContentsSize                                    = browser.CommandSetContentsSize
 	CommandBrowserSetDockTile                                        = browser.CommandSetDockTile
 	CommandBrowserExecuteBrowserCommand                              = browser.CommandExecuteBrowserCommand
 	CommandBrowserAddPrivacySandboxEnrollmentOverride                = browser.CommandAddPrivacySandboxEnrollmentOverride
@@ -178,6 +179,7 @@ const (
 	CommandCSSGetInlineStylesForNode                                 = css.CommandGetInlineStylesForNode
 	CommandCSSGetAnimatedStylesForNode                               = css.CommandGetAnimatedStylesForNode
 	CommandCSSGetMatchedStylesForNode                                = css.CommandGetMatchedStylesForNode
+	CommandCSSGetEnvironmentVariables                                = css.CommandGetEnvironmentVariables
 	CommandCSSGetMediaQueries                                        = css.CommandGetMediaQueries
 	CommandCSSGetPlatformFontsForNode                                = css.CommandGetPlatformFontsForNode
 	CommandCSSGetStyleSheetText                                      = css.CommandGetStyleSheetText
@@ -267,6 +269,7 @@ const (
 	CommandDOMGetContainerForNode                                    = dom.CommandGetContainerForNode
 	CommandDOMGetQueryingDescendantsForContainer                     = dom.CommandGetQueryingDescendantsForContainer
 	CommandDOMGetAnchorElement                                       = dom.CommandGetAnchorElement
+	CommandDOMForceShowPopover                                       = dom.CommandForceShowPopover
 	EventDOMAttributeModified                                        = "DOM.attributeModified"
 	EventDOMAttributeRemoved                                         = "DOM.attributeRemoved"
 	EventDOMCharacterDataModified                                    = "DOM.characterDataModified"
@@ -364,12 +367,14 @@ const (
 	CommandEmulationSetEmitTouchEventsForMouse                       = emulation.CommandSetEmitTouchEventsForMouse
 	CommandEmulationSetEmulatedMedia                                 = emulation.CommandSetEmulatedMedia
 	CommandEmulationSetEmulatedVisionDeficiency                      = emulation.CommandSetEmulatedVisionDeficiency
+	CommandEmulationSetEmulatedOSTextScale                           = emulation.CommandSetEmulatedOSTextScale
 	CommandEmulationSetGeolocationOverride                           = emulation.CommandSetGeolocationOverride
 	CommandEmulationGetOverriddenSensorInformation                   = emulation.CommandGetOverriddenSensorInformation
 	CommandEmulationSetSensorOverrideEnabled                         = emulation.CommandSetSensorOverrideEnabled
 	CommandEmulationSetSensorOverrideReadings                        = emulation.CommandSetSensorOverrideReadings
 	CommandEmulationSetPressureSourceOverrideEnabled                 = emulation.CommandSetPressureSourceOverrideEnabled
 	CommandEmulationSetPressureStateOverride                         = emulation.CommandSetPressureStateOverride
+	CommandEmulationSetPressureDataOverride                          = emulation.CommandSetPressureDataOverride
 	CommandEmulationSetIdleOverride                                  = emulation.CommandSetIdleOverride
 	CommandEmulationClearIdleOverride                                = emulation.CommandClearIdleOverride
 	CommandEmulationSetPageScaleFactor                               = emulation.CommandSetPageScaleFactor
@@ -379,6 +384,7 @@ const (
 	CommandEmulationSetLocaleOverride                                = emulation.CommandSetLocaleOverride
 	CommandEmulationSetTimezoneOverride                              = emulation.CommandSetTimezoneOverride
 	CommandEmulationSetDisabledImageTypes                            = emulation.CommandSetDisabledImageTypes
+	CommandEmulationSetDataSaverOverride                             = emulation.CommandSetDataSaverOverride
 	CommandEmulationSetHardwareConcurrencyOverride                   = emulation.CommandSetHardwareConcurrencyOverride
 	CommandEmulationSetUserAgentOverride                             = emulation.CommandSetUserAgentOverride
 	CommandEmulationSetAutomationOverride                            = emulation.CommandSetAutomationOverride
@@ -616,7 +622,7 @@ const (
 	CommandPageGetAppManifest                                        = page.CommandGetAppManifest
 	CommandPageGetInstallabilityErrors                               = page.CommandGetInstallabilityErrors
 	CommandPageGetAppID                                              = page.CommandGetAppID
-	CommandPageGetAdScriptAncestryIDs                                = page.CommandGetAdScriptAncestryIDs
+	CommandPageGetAdScriptAncestry                                   = page.CommandGetAdScriptAncestry
 	CommandPageGetFrameTree                                          = page.CommandGetFrameTree
 	CommandPageGetLayoutMetrics                                      = page.CommandGetLayoutMetrics
 	CommandPageGetNavigationHistory                                  = page.CommandGetNavigationHistory
@@ -743,7 +749,6 @@ const (
 	CommandServiceWorkerDispatchSyncEvent                            = serviceworker.CommandDispatchSyncEvent
 	CommandServiceWorkerDispatchPeriodicSyncEvent                    = serviceworker.CommandDispatchPeriodicSyncEvent
 	CommandServiceWorkerEnable                                       = serviceworker.CommandEnable
-	CommandServiceWorkerInspectWorker                                = serviceworker.CommandInspectWorker
 	CommandServiceWorkerSetForceUpdateOnPageLoad                     = serviceworker.CommandSetForceUpdateOnPageLoad
 	CommandServiceWorkerSkipWaiting                                  = serviceworker.CommandSkipWaiting
 	CommandServiceWorkerStartWorker                                  = serviceworker.CommandStartWorker
@@ -799,11 +804,13 @@ const (
 	EventStorageInterestGroupAuctionEventOccurred                    = "Storage.interestGroupAuctionEventOccurred"
 	EventStorageInterestGroupAuctionNetworkRequestCreated            = "Storage.interestGroupAuctionNetworkRequestCreated"
 	EventStorageSharedStorageAccessed                                = "Storage.sharedStorageAccessed"
+	EventStorageSharedStorageWorkletOperationExecutionFinished       = "Storage.sharedStorageWorkletOperationExecutionFinished"
 	EventStorageStorageBucketCreatedOrUpdated                        = "Storage.storageBucketCreatedOrUpdated"
 	EventStorageStorageBucketDeleted                                 = "Storage.storageBucketDeleted"
 	EventStorageAttributionReportingSourceRegistered                 = "Storage.attributionReportingSourceRegistered"
 	EventStorageAttributionReportingTriggerRegistered                = "Storage.attributionReportingTriggerRegistered"
 	EventStorageAttributionReportingReportSent                       = "Storage.attributionReportingReportSent"
+	EventStorageAttributionReportingVerboseDebugReportSent           = "Storage.attributionReportingVerboseDebugReportSent"
 	CommandSystemInfoGetInfo                                         = systeminfo.CommandGetInfo
 	CommandSystemInfoGetFeatureState                                 = systeminfo.CommandGetFeatureState
 	CommandSystemInfoGetProcessInfo                                  = systeminfo.CommandGetProcessInfo
@@ -823,6 +830,7 @@ const (
 	CommandTargetAutoAttachRelated                                   = target.CommandAutoAttachRelated
 	CommandTargetSetDiscoverTargets                                  = target.CommandSetDiscoverTargets
 	CommandTargetSetRemoteLocations                                  = target.CommandSetRemoteLocations
+	CommandTargetOpenDevTools                                        = target.CommandOpenDevTools
 	EventTargetAttachedToTarget                                      = "Target.attachedToTarget"
 	EventTargetDetachedFromTarget                                    = "Target.detachedFromTarget"
 	EventTargetReceivedMessageFromTarget                             = "Target.receivedMessageFromTarget"
@@ -1054,6 +1062,8 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 		v = new(browser.GetWindowForTargetReturns)
 	case CommandBrowserSetWindowBounds:
 		return emptyVal, nil
+	case CommandBrowserSetContentsSize:
+		return emptyVal, nil
 	case CommandBrowserSetDockTile:
 		return emptyVal, nil
 	case CommandBrowserExecuteBrowserCommand:
@@ -1094,6 +1104,8 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 		v = new(css.GetAnimatedStylesForNodeReturns)
 	case CommandCSSGetMatchedStylesForNode:
 		v = new(css.GetMatchedStylesForNodeReturns)
+	case CommandCSSGetEnvironmentVariables:
+		v = new(css.GetEnvironmentVariablesReturns)
 	case CommandCSSGetMediaQueries:
 		v = new(css.GetMediaQueriesReturns)
 	case CommandCSSGetPlatformFontsForNode:
@@ -1272,6 +1284,8 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 		v = new(dom.GetQueryingDescendantsForContainerReturns)
 	case CommandDOMGetAnchorElement:
 		v = new(dom.GetAnchorElementReturns)
+	case CommandDOMForceShowPopover:
+		v = new(dom.ForceShowPopoverReturns)
 	case EventDOMAttributeModified:
 		v = new(dom.EventAttributeModified)
 	case EventDOMAttributeRemoved:
@@ -1466,6 +1480,8 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 		return emptyVal, nil
 	case CommandEmulationSetEmulatedVisionDeficiency:
 		return emptyVal, nil
+	case CommandEmulationSetEmulatedOSTextScale:
+		return emptyVal, nil
 	case CommandEmulationSetGeolocationOverride:
 		return emptyVal, nil
 	case CommandEmulationGetOverriddenSensorInformation:
@@ -1477,6 +1493,8 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 	case CommandEmulationSetPressureSourceOverrideEnabled:
 		return emptyVal, nil
 	case CommandEmulationSetPressureStateOverride:
+		return emptyVal, nil
+	case CommandEmulationSetPressureDataOverride:
 		return emptyVal, nil
 	case CommandEmulationSetIdleOverride:
 		return emptyVal, nil
@@ -1495,6 +1513,8 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 	case CommandEmulationSetTimezoneOverride:
 		return emptyVal, nil
 	case CommandEmulationSetDisabledImageTypes:
+		return emptyVal, nil
+	case CommandEmulationSetDataSaverOverride:
 		return emptyVal, nil
 	case CommandEmulationSetHardwareConcurrencyOverride:
 		return emptyVal, nil
@@ -1970,8 +1990,8 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 		v = new(page.GetInstallabilityErrorsReturns)
 	case CommandPageGetAppID:
 		v = new(page.GetAppIDReturns)
-	case CommandPageGetAdScriptAncestryIDs:
-		v = new(page.GetAdScriptAncestryIDsReturns)
+	case CommandPageGetAdScriptAncestry:
+		v = new(page.GetAdScriptAncestryReturns)
 	case CommandPageGetFrameTree:
 		v = new(page.GetFrameTreeReturns)
 	case CommandPageGetLayoutMetrics:
@@ -2224,8 +2244,6 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 		return emptyVal, nil
 	case CommandServiceWorkerEnable:
 		return emptyVal, nil
-	case CommandServiceWorkerInspectWorker:
-		return emptyVal, nil
 	case CommandServiceWorkerSetForceUpdateOnPageLoad:
 		return emptyVal, nil
 	case CommandServiceWorkerSkipWaiting:
@@ -2336,6 +2354,8 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 		v = new(storage.EventInterestGroupAuctionNetworkRequestCreated)
 	case EventStorageSharedStorageAccessed:
 		v = new(storage.EventSharedStorageAccessed)
+	case EventStorageSharedStorageWorkletOperationExecutionFinished:
+		v = new(storage.EventSharedStorageWorkletOperationExecutionFinished)
 	case EventStorageStorageBucketCreatedOrUpdated:
 		v = new(storage.EventStorageBucketCreatedOrUpdated)
 	case EventStorageStorageBucketDeleted:
@@ -2346,6 +2366,8 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 		v = new(storage.EventAttributionReportingTriggerRegistered)
 	case EventStorageAttributionReportingReportSent:
 		v = new(storage.EventAttributionReportingReportSent)
+	case EventStorageAttributionReportingVerboseDebugReportSent:
+		v = new(storage.EventAttributionReportingVerboseDebugReportSent)
 	case CommandSystemInfoGetInfo:
 		v = new(systeminfo.GetInfoReturns)
 	case CommandSystemInfoGetFeatureState:
@@ -2384,6 +2406,8 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 		return emptyVal, nil
 	case CommandTargetSetRemoteLocations:
 		return emptyVal, nil
+	case CommandTargetOpenDevTools:
+		v = new(target.OpenDevToolsReturns)
 	case EventTargetAttachedToTarget:
 		v = new(target.EventAttachedToTarget)
 	case EventTargetDetachedFromTarget:

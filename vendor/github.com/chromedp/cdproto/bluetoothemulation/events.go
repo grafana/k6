@@ -29,7 +29,7 @@ type EventCharacteristicOperationReceived struct {
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/BluetoothEmulation#event-descriptorOperationReceived
 type EventDescriptorOperationReceived struct {
-	DescriptorID string                      `json:"descriptorId"`
-	Type         CharacteristicOperationType `json:"type"`
-	Data         string                      `json:"data,omitempty,omitzero"`
+	DescriptorID string                  `json:"descriptorId"`
+	Type         DescriptorOperationType `json:"type"`
+	Data         string                  `json:"data,omitempty,omitzero"`
 }
