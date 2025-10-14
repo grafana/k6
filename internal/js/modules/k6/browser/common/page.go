@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -1466,6 +1467,22 @@ func (p *Page) addEventHandler(event PageOnEventName, handler PageOnHandler) (id
 	p.eventHandlers[event] = append(p.eventHandlers[event], handler)
 
 	return id, nil
+}
+
+func (p *Page) removeEventHandler(event PageOnEventName, id uint64) {
+	p.eventHandlersMu.Lock()
+	defer p.eventHandlersMu.Unlock()
+
+	handlers, ok := p.eventHandlers[event]
+	if !ok {
+		return
+	}
+	p.eventHandlers[event] = slices.DeleteFunc(handlers, func(h PageOnHandler) bool {
+		return true
+	})
+	if len(p.eventHandlers[event]) == 0 {
+		delete(p.eventHandlers, event)
+	}
 }
 
 // Opener returns the opener of the target.
