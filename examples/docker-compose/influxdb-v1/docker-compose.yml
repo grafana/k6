@@ -5,7 +5,7 @@ networks:
 
 services:
   influxdb:
-    image: influxdb:1.8
+    image: influxdb:2.7@sha256:674911452ada77ca762662d50dd0594c8823312f59b376500623a4f82c44f9be
     networks:
       - grafana
     ports:
