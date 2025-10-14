@@ -16,7 +16,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"go.k6.io/k6/internal/usage"
-	"go.k6.io/k6/lib"
 )
 
 // A Compiler compiles JavaScript or TypeScript source code into a sobek.Program
@@ -52,12 +51,11 @@ type parsingState struct {
 	// set when we couldn't load external source map so we can try parsing without loading it
 	couldntLoadSourceMap bool
 	// srcMap is the current full sourceMap that has been generated read so far
-	srcMap            []byte
-	srcMapError       error
-	commonJSWrapped   bool // whether the original source is wrapped in a function to make it a CommonJS module
-	compatibilityMode lib.CompatibilityMode
-	compiler          *Compiler
-	esm               bool
+	srcMap          []byte
+	srcMapError     error
+	commonJSWrapped bool // whether the original source is wrapped in a function to make it a CommonJS module
+	compiler        *Compiler
+	esm             bool
 
 	loader func(string) ([]byte, error)
 }
@@ -130,7 +128,6 @@ func (ps *parsingState) parseImpl(src, filename string, commonJSWrap bool) (*ast
 			code += "\n//# sourceMappingURL=" + internalSourceMapURL
 		}
 		ps.commonJSWrapped = false
-		ps.compatibilityMode = lib.CompatibilityModeBase
 		return ps.parseImpl(code, filename, commonJSWrap)
 	}
 	return nil, "", err
