@@ -460,9 +460,9 @@ func (p *Page) initEvents() {
 	}()
 }
 
-// hasPageOnHandler returns true if there is a handler registered
-// for the given page on event.
-func hasPageOnHandler(p *Page, event PageOnEventName) bool {
+// hasPageOnHandler returns true when there is a handler
+// registered for the given page on event name.
+func (p *Page) hasPageOnHandler(event PageOnEventName) bool {
 	p.eventHandlersMu.RLock()
 	defer p.eventHandlersMu.RUnlock()
 	handlers, ok := p.eventHandlers[event]
@@ -559,7 +559,7 @@ func (e *MetricEvent) Tag(matchesRegex K6BrowserCheckRegEx, matches TagMatches) 
 // url regexes and the matching is done from within there. If a match is found,
 // the supplied name is returned back upstream to the caller of urlTagName.
 func (p *Page) urlTagName(url string, method string) (string, bool) {
-	if !hasPageOnHandler(p, EventPageMetricCalled) {
+	if !p.hasPageOnHandler(EventPageMetricCalled) {
 		return "", false
 	}
 
@@ -602,7 +602,7 @@ func (p *Page) urlTagName(url string, method string) (string, bool) {
 }
 
 func (p *Page) onRequest(request *Request) {
-	if !hasPageOnHandler(p, EventPageRequestCalled) {
+	if !p.hasPageOnHandler(EventPageRequestCalled) {
 		return
 	}
 
@@ -633,7 +633,7 @@ func (p *Page) onResponse(resp *Response) {
 
 	go p.responseEventHandler.processResponse(resp)
 
-	if !hasPageOnHandler(p, EventPageResponseCalled) {
+	if !p.hasPageOnHandler(EventPageResponseCalled) {
 		return
 	}
 
@@ -659,7 +659,7 @@ func (p *Page) onResponse(resp *Response) {
 }
 
 func (p *Page) onConsoleAPICalled(event *runtime.EventConsoleAPICalled) {
-	if !hasPageOnHandler(p, EventPageConsoleAPICalled) {
+	if !p.hasPageOnHandler(EventPageConsoleAPICalled) {
 		return
 	}
 
