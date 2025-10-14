@@ -126,7 +126,7 @@ func testMapOfErrorCodes(t *testing.T, testTable map[errCode]error) {
 func TestConnReset(t *testing.T) {
 	t.Parallel()
 	// based on https://gist.github.com/jpittis/4357d817dc425ae99fbf719828ab1800
-	ln, err := net.Listen("tcp", "localhost:0")
+	ln, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "localhost:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -261,7 +261,7 @@ func TestX509UnknownAuthorityError(t *testing.T) {
 func TestDefaultTLSError(t *testing.T) {
 	t.Parallel()
 
-	l, err := net.Listen("tcp", "127.0.0.1:0")
+	l, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	go func() {
 		conn, err := l.Accept()

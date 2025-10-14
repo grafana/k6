@@ -39,7 +39,7 @@ func ParseExtendedDuration(data string) (result time.Duration, err error) {
 	if dPos+1 < len(data) { // case "12d"
 		hours, err = time.ParseDuration(data[dPos+1:])
 		if err != nil {
-			return
+			return result, err
 		}
 		if hours < 0 {
 			return 0, fmt.Errorf("invalid time format '%s'", data[dPos+1:])
@@ -48,7 +48,7 @@ func ParseExtendedDuration(data string) (result time.Duration, err error) {
 
 	days, err := strconv.ParseInt(data[:dPos], 10, 64)
 	if err != nil {
-		return
+		return result, err
 	}
 	if days < 0 {
 		hours = -hours

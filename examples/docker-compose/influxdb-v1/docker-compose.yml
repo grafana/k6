@@ -5,7 +5,7 @@ networks:
 
 services:
   influxdb:
-    image: influxdb:1.8
+    image: influxdb:1.8@sha256:299ebda2c7e308dbef42e26ac9b8fd1d9b3bcb8a0aee80c6509aa0219c1d0290
     networks:
       - grafana
     ports:
@@ -14,7 +14,7 @@ services:
       - INFLUXDB_DB=k6
 
   grafana:
-    image: grafana/grafana:9.3.8
+    image: grafana/grafana:9.3.8@sha256:a49f7d74630f47507e7e1ba92f6204f3c7b525d17108a90d489294030a9d507a
     networks:
       - grafana
     ports:

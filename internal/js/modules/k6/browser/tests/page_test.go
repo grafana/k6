@@ -2554,7 +2554,7 @@ func TestPageOnResponse(t *testing.T) {
 
 		return JSON.stringify(returnValue, null, 2);
 	`, tb.url("/home"))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	got := k6test.ToPromise(t, gv)
 
@@ -2945,7 +2945,6 @@ func TestPageWaitForURLSuccess(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Setup
 			tb := newTestBrowser(t, withFileServer())
 			tb.vu.ActivateVU()
 			tb.vu.StartIteration(t)
@@ -2954,19 +2953,15 @@ func TestPageWaitForURLSuccess(t *testing.T) {
 			tb.vu.SetVar(t, "testURL", tb.staticURL("waitfornavigation_test.html"))
 			tb.vu.SetVar(t, "page1URL", tb.staticURL("page1.html"))
 			_, err := tb.vu.RunAsync(t, `
-					page = await browser.newPage();
-				`)
+				page = await browser.newPage();
+			`)
 			require.NoError(t, err)
 
-			// test logic
-			code := fmt.Sprintf(`
-			await page.goto(testURL);
-
-			%s
-			
-			return page.url();`, tt.code)
-
-			result := tb.vu.RunPromise(t, code)
+			result := tb.vu.RunPromise(t, `
+				await page.goto(testURL);
+				%s
+				return page.url();
+			`, tt.code)
 			got := strings.ReplaceAll(result.Result().String(), tb.staticURL(""), "")
 			assert.Contains(t, tt.expected, got)
 		})
@@ -3011,20 +3006,17 @@ func TestPageWaitForURLFailure(t *testing.T) {
 			tb.vu.ActivateVU()
 			tb.vu.StartIteration(t)
 
-			// Setup
 			tb.vu.SetVar(t, "page", &sobek.Object{})
 			tb.vu.SetVar(t, "testURL", tb.staticURL("waitfornavigation_test.html"))
 			_, err := tb.vu.RunAsync(t, `
-					page = await browser.newPage();
-				`)
+				page = await browser.newPage();
+			`)
 			require.NoError(t, err)
 
-			code := fmt.Sprintf(`
-			await page.goto(testURL);
-
-			%s`, tt.code)
-
-			_, err = tb.vu.RunAsync(t, code)
+			_, err = tb.vu.RunAsync(t, `
+				await page.goto(testURL);
+				%s
+			`, tt.code)
 			assert.ErrorContains(t, err, tt.expected)
 		})
 	}
@@ -3289,7 +3281,8 @@ func TestClickInNestedFramesCORS(t *testing.T) {
 		err = page.Locator("#incrementA", nil).Click(clickOpts)
 		require.NoError(t, err)
 
-		countA, ok, err := page.Locator("#countA", nil).TextContent(nil)
+		la := page.Locator("#countA", nil)
+		countA, ok, err := la.TextContent(common.NewFrameTextContentOptions(la.Timeout()))
 		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, expectedCount, countA)
@@ -3305,7 +3298,8 @@ func TestClickInNestedFramesCORS(t *testing.T) {
 		err = frameAContent.Locator("#incrementA2", nil).Click(clickOpts)
 		require.NoError(t, err)
 
-		countA2, ok, err := frameAContent.Locator("#countA2", nil).TextContent(nil)
+		la2 := frameAContent.Locator("#countA2", nil)
+		countA2, ok, err := la2.TextContent(common.NewFrameTextContentOptions(la2.Timeout()))
 		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, expectedCount, countA2)
@@ -3321,7 +3315,8 @@ func TestClickInNestedFramesCORS(t *testing.T) {
 		err = frameBContent.Locator("#incrementB", nil).Click(clickOpts)
 		require.NoError(t, err)
 
-		countB, ok, err := frameBContent.Locator("#countB", nil).TextContent(nil)
+		lb := frameBContent.Locator("#countB", nil)
+		countB, ok, err := lb.TextContent(common.NewFrameTextContentOptions(lb.Timeout()))
 		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, expectedCount, countB)
@@ -3337,7 +3332,8 @@ func TestClickInNestedFramesCORS(t *testing.T) {
 		err = frameCContent.Locator("#increment", nil).Click(clickOpts)
 		require.NoError(t, err)
 
-		count, ok, err := frameCContent.Locator("#count", nil).TextContent(nil)
+		lc := frameCContent.Locator("#count", nil)
+		count, ok, err := lc.TextContent(common.NewFrameTextContentOptions(lc.Timeout()))
 		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, expectedCount, count)
@@ -3353,7 +3349,8 @@ func TestClickInNestedFramesCORS(t *testing.T) {
 		err = frameDContent.Locator("#incrementD", nil).Click(clickOpts)
 		require.NoError(t, err)
 
-		countD, ok, err := frameDContent.Locator("#countD", nil).TextContent(nil)
+		ld := frameDContent.Locator("#countD", nil)
+		countD, ok, err := ld.TextContent(common.NewFrameTextContentOptions(ld.Timeout()))
 		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, expectedCount, countD)
@@ -3383,7 +3380,8 @@ func TestClickInNestedFramesCORS(t *testing.T) {
 		err = page.Locator("#incrementA", nil).Click(clickOpts)
 		require.NoError(t, err)
 
-		countA, ok, err := page.Locator("#countA", nil).TextContent(nil)
+		la := page.Locator("#countA", nil)
+		countA, ok, err := la.TextContent(common.NewFrameTextContentOptions(la.Timeout()))
 		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, expectedCount, countA)
@@ -3395,7 +3393,8 @@ func TestClickInNestedFramesCORS(t *testing.T) {
 		err = frameAContent.Locator("#incrementA2", nil).Click(clickOpts)
 		require.NoError(t, err)
 
-		countA2, ok, err := frameAContent.Locator("#countA2", nil).TextContent(nil)
+		la2 := frameAContent.Locator("#countA2", nil)
+		countA2, ok, err := la2.TextContent(common.NewFrameTextContentOptions(la2.Timeout()))
 		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, expectedCount, countA2)
@@ -3407,7 +3406,8 @@ func TestClickInNestedFramesCORS(t *testing.T) {
 		err = frameBContent.Locator("#incrementB", nil).Click(clickOpts)
 		require.NoError(t, err)
 
-		countB, ok, err := frameBContent.Locator("#countB", nil).TextContent(nil)
+		lb := frameBContent.Locator("#countB", nil)
+		countB, ok, err := lb.TextContent(common.NewFrameTextContentOptions(lb.Timeout()))
 		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, expectedCount, countB)
@@ -3419,7 +3419,8 @@ func TestClickInNestedFramesCORS(t *testing.T) {
 		err = frameCContent.Locator("#increment", nil).Click(clickOpts)
 		require.NoError(t, err)
 
-		count, ok, err := frameCContent.Locator("#count", nil).TextContent(nil)
+		lc := frameCContent.Locator("#count", nil)
+		count, ok, err := lc.TextContent(common.NewFrameTextContentOptions(lc.Timeout()))
 		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, expectedCount, count)
@@ -3431,7 +3432,8 @@ func TestClickInNestedFramesCORS(t *testing.T) {
 		err = frameDContent.Locator("#incrementD", nil).Click(clickOpts)
 		require.NoError(t, err)
 
-		countD, ok, err := frameDContent.Locator("#countD", nil).TextContent(nil)
+		ld := frameDContent.Locator("#countD", nil)
+		countD, ok, err := ld.TextContent(common.NewFrameTextContentOptions(ld.Timeout()))
 		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, expectedCount, countD)

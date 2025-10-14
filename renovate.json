@@ -3,6 +3,10 @@
   "extends": [
     "schedule:weekly"
   ],
+  "ignorePaths": [
+    "**/vendor/**",
+    ".github/workflows/xk6-tests/**"
+  ],
   "prConcurrentLimit": 50,
   "packageRules": [
     {
@@ -98,6 +102,16 @@
       ],
       "matchFileNames": [
         "packaging/**"
+      ],
+      "extends": [
+        "schedule:quarterly"
+      ]
+    },
+    {
+      "groupName": "examples/",
+      "description": "Grouped updates for examples folder with a low frequency",
+      "matchFileNames": [
+        "examples/**"
       ],
       "extends": [
         "schedule:quarterly"
