@@ -21,11 +21,16 @@
         "gomod"
       ],
       "enabled": true,
-	  "ignoreDeps": ["indirect"],
       "postUpdateOptions": [
         "gomodTidy",
         "gomodUpdateImportPaths"
       ]
+    },
+    {
+      "description": "Do not update indirect dependencies",
+      "matchManagers": ["gomod"],
+      "matchDepTypes": ["indirect"],
+      "enabled": false
     },
     {
       "description": "Update Go versions only when a patch version exists (z > 0 in v1.x.z)",
