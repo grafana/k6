@@ -106,6 +106,16 @@
       "extends": [
         "schedule:quarterly"
       ]
+    },
+    {
+      "groupName": "examples/",
+      "description": "Grouped updates for examples folder with a low frequency",
+      "matchFileNames": [
+        "examples/**"
+      ],
+      "extends": [
+        "schedule:quarterly"
+      ]
     }
   ]
 }
