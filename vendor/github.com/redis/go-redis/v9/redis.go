@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/redis/go-redis/v9/auth"
 	"github.com/redis/go-redis/v9/internal"
 	"github.com/redis/go-redis/v9/internal/hscan"
 	"github.com/redis/go-redis/v9/internal/pool"
@@ -41,7 +42,7 @@ type (
 )
 
 type hooksMixin struct {
-	hooksMu *sync.Mutex
+	hooksMu *sync.RWMutex
 
 	slice   []Hook
 	initial hooks
@@ -49,7 +50,7 @@ type hooksMixin struct {
 }
 
 func (hs *hooksMixin) initHooks(hooks hooks) {
-	hs.hooksMu = new(sync.Mutex)
+	hs.hooksMu = new(sync.RWMutex)
 	hs.initial = hooks
 	hs.chain()
 }
@@ -151,7 +152,7 @@ func (hs *hooksMixin) clone() hooksMixin {
 	clone := *hs
 	l := len(clone.slice)
 	clone.slice = clone.slice[:l:l]
-	clone.hooksMu = new(sync.Mutex)
+	clone.hooksMu = new(sync.RWMutex)
 	return clone
 }
 
@@ -176,9 +177,14 @@ func (hs *hooksMixin) withProcessPipelineHook(
 }
 
 func (hs *hooksMixin) dialHook(ctx context.Context, network, addr string) (net.Conn, error) {
-	hs.hooksMu.Lock()
-	defer hs.hooksMu.Unlock()
-	return hs.current.dial(ctx, network, addr)
+	// Access to hs.current is guarded by a read-only lock since it may be mutated by AddHook(...)
+	// while this dialer is concurrently accessed by the background connection pool population
+	// routine when MinIdleConns > 0.
+	hs.hooksMu.RLock()
+	current := hs.current
+	hs.hooksMu.RUnlock()
+
+	return current.dial(ctx, network, addr)
 }
 
 func (hs *hooksMixin) processHook(ctx context.Context, cmd Cmder) error {
@@ -198,6 +204,7 @@ func (hs *hooksMixin) processTxPipelineHook(ctx context.Context, cmds []Cmder) e
 type baseClient struct {
 	opt      *Options
 	connPool pool.Pooler
+	hooksMixin
 
 	onClose func() error // hook called when client is closed
 }
@@ -277,36 +284,107 @@ func (c *baseClient) _getConn(ctx context.Context) (*pool.Conn, error) {
 	return cn, nil
 }
 
+func (c *baseClient) newReAuthCredentialsListener(poolCn *pool.Conn) auth.CredentialsListener {
+	return auth.NewReAuthCredentialsListener(
+		c.reAuthConnection(poolCn),
+		c.onAuthenticationErr(poolCn),
+	)
+}
+
+func (c *baseClient) reAuthConnection(poolCn *pool.Conn) func(credentials auth.Credentials) error {
+	return func(credentials auth.Credentials) error {
+		var err error
+		username, password := credentials.BasicAuth()
+		ctx := context.Background()
+		connPool := pool.NewSingleConnPool(c.connPool, poolCn)
+		// hooksMixin are intentionally empty here
+		cn := newConn(c.opt, connPool, nil)
+
+		if username != "" {
+			err = cn.AuthACL(ctx, username, password).Err()
+		} else {
+			err = cn.Auth(ctx, password).Err()
+		}
+		return err
+	}
+}
+func (c *baseClient) onAuthenticationErr(poolCn *pool.Conn) func(err error) {
+	return func(err error) {
+		if err != nil {
+			if isBadConn(err, false, c.opt.Addr) {
+				// Close the connection to force a reconnection.
+				err := c.connPool.CloseConn(poolCn)
+				if err != nil {
+					internal.Logger.Printf(context.Background(), "redis: failed to close connection: %v", err)
+					// try to close the network connection directly
+					// so that no resource is leaked
+					err := poolCn.Close()
+					if err != nil {
+						internal.Logger.Printf(context.Background(), "redis: failed to close network connection: %v", err)
+					}
+				}
+			}
+			internal.Logger.Printf(context.Background(), "redis: re-authentication failed: %v", err)
+		}
+	}
+}
+
+func (c *baseClient) wrappedOnClose(newOnClose func() error) func() error {
+	onClose := c.onClose
+	return func() error {
+		var firstErr error
+		err := newOnClose()
+		// Even if we have an error we would like to execute the onClose hook
+		// if it exists. We will return the first error that occurred.
+		// This is to keep error handling consistent with the rest of the code.
+		if err != nil {
+			firstErr = err
+		}
+		if onClose != nil {
+			err = onClose()
+			if err != nil && firstErr == nil {
+				firstErr = err
+			}
+		}
+		return firstErr
+	}
+}
+
 func (c *baseClient) initConn(ctx context.Context, cn *pool.Conn) error {
 	if cn.Inited {
 		return nil
 	}
-	cn.Inited = true
 
 	var err error
-	username, password := c.opt.Username, c.opt.Password
-	if c.opt.CredentialsProviderContext != nil {
-		if username, password, err = c.opt.CredentialsProviderContext(ctx); err != nil {
-			return err
+	cn.Inited = true
+	connPool := pool.NewSingleConnPool(c.connPool, cn)
+	conn := newConn(c.opt, connPool, &c.hooksMixin)
+
+	username, password := "", ""
+	if c.opt.StreamingCredentialsProvider != nil {
+		credentials, unsubscribeFromCredentialsProvider, err := c.opt.StreamingCredentialsProvider.
+			Subscribe(c.newReAuthCredentialsListener(cn))
+		if err != nil {
+			return fmt.Errorf("failed to subscribe to streaming credentials: %w", err)
+		}
+		c.onClose = c.wrappedOnClose(unsubscribeFromCredentialsProvider)
+		cn.SetOnClose(unsubscribeFromCredentialsProvider)
+		username, password = credentials.BasicAuth()
+	} else if c.opt.CredentialsProviderContext != nil {
+		username, password, err = c.opt.CredentialsProviderContext(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get credentials from context provider: %w", err)
 		}
 	} else if c.opt.CredentialsProvider != nil {
 		username, password = c.opt.CredentialsProvider()
-	}
-
-	connPool := pool.NewSingleConnPool(c.connPool, cn)
-	conn := newConn(c.opt, connPool)
-
-	var auth bool
-	protocol := c.opt.Protocol
-	// By default, use RESP3 in current version.
-	if protocol < 2 {
-		protocol = 3
+	} else if c.opt.Username != "" || c.opt.Password != "" {
+		username, password = c.opt.Username, c.opt.Password
 	}
 
 	// for redis-server versions that do not support the HELLO command,
 	// RESP2 will continue to be used.
-	if err = conn.Hello(ctx, protocol, username, password, "").Err(); err == nil {
-		auth = true
+	if err = conn.Hello(ctx, c.opt.Protocol, username, password, c.opt.ClientName).Err(); err == nil {
+		// Authentication successful with HELLO command
 	} else if !isRedisError(err) {
 		// When the server responds with the RESP protocol and the result is not a normal
 		// execution result of the HELLO command, we consider it to be an indication that
@@ -316,17 +394,19 @@ func (c *baseClient) initConn(ctx context.Context, cn *pool.Conn) error {
 		// with different error string results for unsupported commands, making it
 		// difficult to rely on error strings to determine all results.
 		return err
+	} else if password != "" {
+		// Try legacy AUTH command if HELLO failed
+		if username != "" {
+			err = conn.AuthACL(ctx, username, password).Err()
+		} else {
+			err = conn.Auth(ctx, password).Err()
+		}
+		if err != nil {
+			return fmt.Errorf("failed to authenticate: %w", err)
+		}
 	}
 
 	_, err = conn.Pipelined(ctx, func(pipe Pipeliner) error {
-		if !auth && password != "" {
-			if username != "" {
-				pipe.AuthACL(ctx, username, password)
-			} else {
-				pipe.Auth(ctx, password)
-			}
-		}
-
 		if c.opt.DB > 0 {
 			pipe.Select(ctx, c.opt.DB)
 		}
@@ -342,7 +422,7 @@ func (c *baseClient) initConn(ctx context.Context, cn *pool.Conn) error {
 		return nil
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to initialize connection options: %w", err)
 	}
 
 	if !c.opt.DisableIdentity && !c.opt.DisableIndentity {
@@ -364,6 +444,7 @@ func (c *baseClient) initConn(ctx context.Context, cn *pool.Conn) error {
 	if c.opt.OnConnect != nil {
 		return c.opt.OnConnect(ctx, conn)
 	}
+
 	return nil
 }
 
@@ -416,6 +497,19 @@ func (c *baseClient) process(ctx context.Context, cmd Cmder) error {
 	return lastErr
 }
 
+func (c *baseClient) assertUnstableCommand(cmd Cmder) bool {
+	switch cmd.(type) {
+	case *AggregateCmd, *FTInfoCmd, *FTSpellCheckCmd, *FTSearchCmd, *FTSynDumpCmd:
+		if c.opt.UnstableResp3 {
+			return true
+		} else {
+			panic("RESP3 responses for this command are disabled because they may still change. Please set the flag UnstableResp3 .  See the [README](https://github.com/redis/go-redis/blob/master/README.md) and the release notes for guidance.")
+		}
+	default:
+		return false
+	}
+}
+
 func (c *baseClient) _process(ctx context.Context, cmd Cmder, attempt int) (bool, error) {
 	if attempt > 0 {
 		if err := internal.Sleep(ctx, c.retryBackoff(attempt)); err != nil {
@@ -431,8 +525,12 @@ func (c *baseClient) _process(ctx context.Context, cmd Cmder, attempt int) (bool
 			atomic.StoreUint32(&retryTimeout, 1)
 			return err
 		}
-
-		if err := cn.WithReader(c.context(ctx), c.cmdTimeout(cmd), cmd.readReply); err != nil {
+		readReplyFunc := cmd.readReply
+		// Apply unstable RESP3 search module.
+		if c.opt.Protocol != 2 && c.assertUnstableCommand(cmd) {
+			readReplyFunc = cmd.readRawReply
+		}
+		if err := cn.WithReader(c.context(ctx), c.cmdTimeout(cmd), readReplyFunc); err != nil {
 			if cmd.readTimeout() == nil {
 				atomic.StoreUint32(&retryTimeout, 1)
 			} else {
@@ -463,6 +561,16 @@ func (c *baseClient) cmdTimeout(cmd Cmder) time.Duration {
 		return t + 10*time.Second
 	}
 	return c.opt.ReadTimeout
+}
+
+// context returns the context for the current connection.
+// If the context timeout is enabled, it returns the original context.
+// Otherwise, it returns a new background context.
+func (c *baseClient) context(ctx context.Context) context.Context {
+	if c.opt.ContextTimeoutEnabled {
+		return ctx
+	}
+	return context.Background()
 }
 
 // Close closes the client, releasing any open resources.
@@ -522,6 +630,7 @@ func (c *baseClient) generalProcessPipeline(
 			return err
 		})
 		if lastErr == nil || !canRetry || !shouldRetry(lastErr, true) {
+			setCmdsErr(cmds, lastErr)
 			return lastErr
 		}
 	}
@@ -595,9 +704,12 @@ func txPipelineReadQueued(rd *proto.Reader, statusCmd *StatusCmd, cmds []Cmder) 
 	}
 
 	// Parse +QUEUED.
-	for range cmds {
-		if err := statusCmd.readReply(rd); err != nil && !isRedisError(err) {
-			return err
+	for _, cmd := range cmds {
+		if err := statusCmd.readReply(rd); err != nil {
+			cmd.SetErr(err)
+			if !isRedisError(err) {
+				return err
+			}
 		}
 	}
 
@@ -617,13 +729,6 @@ func txPipelineReadQueued(rd *proto.Reader, statusCmd *StatusCmd, cmds []Cmder) 
 	return nil
 }
 
-func (c *baseClient) context(ctx context.Context) context.Context {
-	if c.opt.ContextTimeoutEnabled {
-		return ctx
-	}
-	return context.Background()
-}
-
 //------------------------------------------------------------------------------
 
 // Client is a Redis client representing a pool of zero or more underlying connections.
@@ -634,11 +739,13 @@ func (c *baseClient) context(ctx context.Context) context.Context {
 type Client struct {
 	*baseClient
 	cmdable
-	hooksMixin
 }
 
 // NewClient returns a client to the Redis Server specified by Options.
 func NewClient(opt *Options) *Client {
+	if opt == nil {
+		panic("redis: NewClient nil options")
+	}
 	opt.init()
 
 	c := Client{
@@ -670,14 +777,7 @@ func (c *Client) WithTimeout(timeout time.Duration) *Client {
 }
 
 func (c *Client) Conn() *Conn {
-	return newConn(c.opt, pool.NewStickyConnPool(c.connPool))
-}
-
-// Do create a Cmd from the args and processes the cmd.
-func (c *Client) Do(ctx context.Context, args ...interface{}) *Cmd {
-	cmd := NewCmd(ctx, args...)
-	_ = c.Process(ctx, cmd)
-	return cmd
+	return newConn(c.opt, pool.NewStickyConnPool(c.connPool), &c.hooksMixin)
 }
 
 func (c *Client) Process(ctx context.Context, cmd Cmder) error {
@@ -803,15 +903,21 @@ type Conn struct {
 	baseClient
 	cmdable
 	statefulCmdable
-	hooksMixin
 }
 
-func newConn(opt *Options, connPool pool.Pooler) *Conn {
+// newConn is a helper func to create a new Conn instance.
+// the Conn instance is not thread-safe and should not be shared between goroutines.
+// the parentHooks will be cloned, no need to clone before passing it.
+func newConn(opt *Options, connPool pool.Pooler, parentHooks *hooksMixin) *Conn {
 	c := Conn{
 		baseClient: baseClient{
 			opt:      opt,
 			connPool: connPool,
 		},
+	}
+
+	if parentHooks != nil {
+		c.hooksMixin = parentHooks.clone()
 	}
 
 	c.cmdable = c.Process

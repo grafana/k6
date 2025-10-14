@@ -17,6 +17,55 @@ import (
 	"github.com/redis/go-redis/v9/internal/util"
 )
 
+// keylessCommands contains Redis commands that have empty key specifications (9th slot empty)
+// Only includes core Redis commands, excludes FT.*, ts.*, timeseries.*, search.* and subcommands
+var keylessCommands = map[string]struct{}{
+	"acl":          {},
+	"asking":       {},
+	"auth":         {},
+	"bgrewriteaof": {},
+	"bgsave":       {},
+	"client":       {},
+	"cluster":      {},
+	"config":       {},
+	"debug":        {},
+	"discard":      {},
+	"echo":         {},
+	"exec":         {},
+	"failover":     {},
+	"function":     {},
+	"hello":        {},
+	"latency":      {},
+	"lolwut":       {},
+	"module":       {},
+	"monitor":      {},
+	"multi":        {},
+	"pfselftest":   {},
+	"ping":         {},
+	"psubscribe":   {},
+	"psync":        {},
+	"publish":      {},
+	"pubsub":       {},
+	"punsubscribe": {},
+	"quit":         {},
+	"readonly":     {},
+	"readwrite":    {},
+	"replconf":     {},
+	"replicaof":    {},
+	"role":         {},
+	"save":         {},
+	"script":       {},
+	"select":       {},
+	"shutdown":     {},
+	"slaveof":      {},
+	"slowlog":      {},
+	"subscribe":    {},
+	"swapdb":       {},
+	"sync":         {},
+	"unsubscribe":  {},
+	"unwatch":      {},
+}
+
 type Cmder interface {
 	// command name.
 	// e.g. "set k v ex 10" -> "set", "cluster info" -> "cluster".
@@ -40,7 +89,7 @@ type Cmder interface {
 
 	readTimeout() *time.Duration
 	readReply(rd *proto.Reader) error
-
+	readRawReply(rd *proto.Reader) error
 	SetErr(error)
 	Err() error
 }
@@ -75,12 +124,22 @@ func writeCmd(wr *proto.Writer, cmd Cmder) error {
 	return wr.WriteArgs(cmd.Args())
 }
 
+// cmdFirstKeyPos returns the position of the first key in the command's arguments.
+// If the command does not have a key, it returns 0.
+// TODO: Use the data in CommandInfo to determine the first key position.
 func cmdFirstKeyPos(cmd Cmder) int {
 	if pos := cmd.firstKeyPos(); pos != 0 {
 		return int(pos)
 	}
 
-	switch cmd.Name() {
+	name := cmd.Name()
+
+	// first check if the command is keyless
+	if _, ok := keylessCommands[name]; ok {
+		return 0
+	}
+
+	switch name {
 	case "eval", "evalsha", "eval_ro", "evalsha_ro":
 		if cmd.stringArg(2) != "0" {
 			return 3
@@ -122,11 +181,11 @@ func cmdString(cmd Cmder, val interface{}) string {
 //------------------------------------------------------------------------------
 
 type baseCmd struct {
-	ctx    context.Context
-	args   []interface{}
-	err    error
-	keyPos int8
-
+	ctx          context.Context
+	args         []interface{}
+	err          error
+	keyPos       int8
+	rawVal       interface{}
 	_readTimeout *time.Duration
 }
 
@@ -167,6 +226,8 @@ func (cmd *baseCmd) stringArg(pos int) string {
 	switch v := arg.(type) {
 	case string:
 		return v
+	case []byte:
+		return string(v)
 	default:
 		// TODO: consider using appendArg
 		return fmt.Sprint(v)
@@ -195,6 +256,11 @@ func (cmd *baseCmd) readTimeout() *time.Duration {
 
 func (cmd *baseCmd) setReadTimeout(d time.Duration) {
 	cmd._readTimeout = &d
+}
+
+func (cmd *baseCmd) readRawReply(rd *proto.Reader) (err error) {
+	cmd.rawVal, err = rd.ReadReply()
+	return err
 }
 
 //------------------------------------------------------------------------------
@@ -1398,27 +1464,64 @@ func (cmd *MapStringSliceInterfaceCmd) Val() map[string][]interface{} {
 }
 
 func (cmd *MapStringSliceInterfaceCmd) readReply(rd *proto.Reader) (err error) {
-	n, err := rd.ReadMapLen()
+	readType, err := rd.PeekReplyType()
 	if err != nil {
 		return err
 	}
-	cmd.val = make(map[string][]interface{}, n)
-	for i := 0; i < n; i++ {
-		k, err := rd.ReadString()
+
+	cmd.val = make(map[string][]interface{})
+
+	switch readType {
+	case proto.RespMap:
+		n, err := rd.ReadMapLen()
 		if err != nil {
 			return err
 		}
-		nn, err := rd.ReadArrayLen()
-		if err != nil {
-			return err
-		}
-		cmd.val[k] = make([]interface{}, nn)
-		for j := 0; j < nn; j++ {
-			value, err := rd.ReadReply()
+		for i := 0; i < n; i++ {
+			k, err := rd.ReadString()
 			if err != nil {
 				return err
 			}
-			cmd.val[k][j] = value
+			nn, err := rd.ReadArrayLen()
+			if err != nil {
+				return err
+			}
+			cmd.val[k] = make([]interface{}, nn)
+			for j := 0; j < nn; j++ {
+				value, err := rd.ReadReply()
+				if err != nil {
+					return err
+				}
+				cmd.val[k][j] = value
+			}
+		}
+	case proto.RespArray:
+		// RESP2 response
+		n, err := rd.ReadArrayLen()
+		if err != nil {
+			return err
+		}
+
+		for i := 0; i < n; i++ {
+			// Each entry in this array is itself an array with key details
+			itemLen, err := rd.ReadArrayLen()
+			if err != nil {
+				return err
+			}
+
+			key, err := rd.ReadString()
+			if err != nil {
+				return err
+			}
+			cmd.val[key] = make([]interface{}, 0, itemLen-1)
+			for j := 1; j < itemLen; j++ {
+				// Read the inner array for timestamp-value pairs
+				data, err := rd.ReadReply()
+				if err != nil {
+					return err
+				}
+				cmd.val[key] = append(cmd.val[key], data)
+			}
 		}
 	}
 
@@ -2060,7 +2163,9 @@ type XInfoGroup struct {
 	Pending         int64
 	LastDeliveredID string
 	EntriesRead     int64
-	Lag             int64
+	// Lag represents the number of pending messages in the stream not yet
+	// delivered to this consumer group. Returns -1 when the lag cannot be determined.
+	Lag int64
 }
 
 var _ Cmder = (*XInfoGroupsCmd)(nil)
@@ -2143,8 +2248,11 @@ func (cmd *XInfoGroupsCmd) readReply(rd *proto.Reader) error {
 
 				// lag: the number of entries in the stream that are still waiting to be delivered
 				// to the group's consumers, or a NULL(Nil) when that number can't be determined.
+				// In that case, we return -1.
 				if err != nil && err != Nil {
 					return err
+				} else if err == Nil {
+					group.Lag = -1
 				}
 			default:
 				return fmt.Errorf("redis: unexpected key %q in XINFO GROUPS reply", key)
@@ -3535,15 +3643,14 @@ func (c *cmdsInfoCache) Get(ctx context.Context) (map[string]*CommandInfo, error
 			return err
 		}
 
+		lowerCmds := make(map[string]*CommandInfo, len(cmds))
+
 		// Extensions have cmd names in upper case. Convert them to lower case.
 		for k, v := range cmds {
-			lower := internal.ToLower(k)
-			if lower != k {
-				cmds[lower] = v
-			}
+			lowerCmds[internal.ToLower(k)] = v
 		}
 
-		c.cmds = cmds
+		c.cmds = lowerCmds
 		return nil
 	})
 	return c.cmds, err
@@ -3784,6 +3891,84 @@ func (cmd *MapStringStringSliceCmd) readReply(rd *proto.Reader) error {
 			cmd.val[i][k] = v
 		}
 	}
+	return nil
+}
+
+// -----------------------------------------------------------------------
+
+// MapMapStringInterfaceCmd represents a command that returns a map of strings to interface{}.
+type MapMapStringInterfaceCmd struct {
+	baseCmd
+	val map[string]interface{}
+}
+
+func NewMapMapStringInterfaceCmd(ctx context.Context, args ...interface{}) *MapMapStringInterfaceCmd {
+	return &MapMapStringInterfaceCmd{
+		baseCmd: baseCmd{
+			ctx:  ctx,
+			args: args,
+		},
+	}
+}
+
+func (cmd *MapMapStringInterfaceCmd) String() string {
+	return cmdString(cmd, cmd.val)
+}
+
+func (cmd *MapMapStringInterfaceCmd) SetVal(val map[string]interface{}) {
+	cmd.val = val
+}
+
+func (cmd *MapMapStringInterfaceCmd) Result() (map[string]interface{}, error) {
+	return cmd.val, cmd.err
+}
+
+func (cmd *MapMapStringInterfaceCmd) Val() map[string]interface{} {
+	return cmd.val
+}
+
+// readReply will try to parse the reply from the proto.Reader for both resp2 and resp3
+func (cmd *MapMapStringInterfaceCmd) readReply(rd *proto.Reader) (err error) {
+	data, err := rd.ReadReply()
+	if err != nil {
+		return err
+	}
+	resultMap := map[string]interface{}{}
+
+	switch midResponse := data.(type) {
+	case map[interface{}]interface{}: // resp3 will return map
+		for k, v := range midResponse {
+			stringKey, ok := k.(string)
+			if !ok {
+				return fmt.Errorf("redis: invalid map key %#v", k)
+			}
+			resultMap[stringKey] = v
+		}
+	case []interface{}: // resp2 will return array of arrays
+		n := len(midResponse)
+		for i := 0; i < n; i++ {
+			finalArr, ok := midResponse[i].([]interface{}) // final array that we need to transform to map
+			if !ok {
+				return fmt.Errorf("redis: unexpected response %#v", data)
+			}
+			m := len(finalArr)
+			if m%2 != 0 { // since this should be map, keys should be even number
+				return fmt.Errorf("redis: unexpected response %#v", data)
+			}
+
+			for j := 0; j < m; j += 2 {
+				stringKey, ok := finalArr[j].(string) // the first one
+				if !ok {
+					return fmt.Errorf("redis: invalid map key %#v", finalArr[i])
+				}
+				resultMap[stringKey] = finalArr[j+1] // second one is value
+			}
+		}
+	default:
+		return fmt.Errorf("redis: unexpected response %#v", data)
+	}
+
+	cmd.val = resultMap
 	return nil
 }
 
@@ -5012,6 +5197,10 @@ type ClientInfo struct {
 	OutputListLength   int           // oll, output list length (replies are queued in this list when the buffer is full)
 	OutputMemory       int           // omem, output buffer memory usage
 	TotalMemory        int           // tot-mem, total memory consumed by this client in its various buffers
+	TotalNetIn         int           // tot-net-in, total network input
+	TotalNetOut        int           // tot-net-out, total network output
+	TotalCmds          int           // tot-cmds, total number of commands processed
+	IoThread           int           // io-thread id
 	Events             string        // file descriptor events (see below)
 	LastCmd            string        // cmd, last command played
 	User               string        // the authenticated username of the client
@@ -5176,6 +5365,12 @@ func parseClientInfo(txt string) (info *ClientInfo, err error) {
 			info.OutputMemory, err = strconv.Atoi(val)
 		case "tot-mem":
 			info.TotalMemory, err = strconv.Atoi(val)
+		case "tot-net-in":
+			info.TotalNetIn, err = strconv.Atoi(val)
+		case "tot-net-out":
+			info.TotalNetOut, err = strconv.Atoi(val)
+		case "tot-cmds":
+			info.TotalCmds, err = strconv.Atoi(val)
 		case "events":
 			info.Events = val
 		case "cmd":
@@ -5190,6 +5385,8 @@ func parseClientInfo(txt string) (info *ClientInfo, err error) {
 			info.LibName = val
 		case "lib-ver":
 			info.LibVer = val
+		case "io-thread":
+			info.IoThread, err = strconv.Atoi(val)
 		default:
 			return nil, fmt.Errorf("redis: unexpected client info key(%s)", key)
 		}
@@ -5369,8 +5566,6 @@ func (cmd *InfoCmd) readReply(rd *proto.Reader) error {
 
 	section := ""
 	scanner := bufio.NewScanner(strings.NewReader(val))
-	moduleRe := regexp.MustCompile(`module:name=(.+?),(.+)$`)
-
 	for scanner.Scan() {
 		line := scanner.Text()
 		if strings.HasPrefix(line, "#") {
@@ -5381,6 +5576,7 @@ func (cmd *InfoCmd) readReply(rd *proto.Reader) error {
 			cmd.val[section] = make(map[string]string)
 		} else if line != "" {
 			if section == "Modules" {
+				moduleRe := regexp.MustCompile(`module:name=(.+?),(.+)$`)
 				kv := moduleRe.FindStringSubmatch(line)
 				if len(kv) == 3 {
 					cmd.val[section][kv[1]] = kv[2]
@@ -5490,4 +5686,60 @@ func (cmd *MonitorCmd) Stop() {
 	cmd.mu.Lock()
 	defer cmd.mu.Unlock()
 	cmd.status = monitorStatusStop
+}
+
+type VectorScoreSliceCmd struct {
+	baseCmd
+
+	val []VectorScore
+}
+
+var _ Cmder = (*VectorScoreSliceCmd)(nil)
+
+func NewVectorInfoSliceCmd(ctx context.Context, args ...any) *VectorScoreSliceCmd {
+	return &VectorScoreSliceCmd{
+		baseCmd: baseCmd{
+			ctx:  ctx,
+			args: args,
+		},
+	}
+}
+
+func (cmd *VectorScoreSliceCmd) SetVal(val []VectorScore) {
+	cmd.val = val
+}
+
+func (cmd *VectorScoreSliceCmd) Val() []VectorScore {
+	return cmd.val
+}
+
+func (cmd *VectorScoreSliceCmd) Result() ([]VectorScore, error) {
+	return cmd.val, cmd.err
+}
+
+func (cmd *VectorScoreSliceCmd) String() string {
+	return cmdString(cmd, cmd.val)
+}
+
+func (cmd *VectorScoreSliceCmd) readReply(rd *proto.Reader) error {
+	n, err := rd.ReadMapLen()
+	if err != nil {
+		return err
+	}
+
+	cmd.val = make([]VectorScore, n)
+	for i := 0; i < n; i++ {
+		name, err := rd.ReadString()
+		if err != nil {
+			return err
+		}
+		cmd.val[i].Name = name
+
+		score, err := rd.ReadFloat()
+		if err != nil {
+			return err
+		}
+		cmd.val[i].Score = score
+	}
+	return nil
 }

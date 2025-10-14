@@ -81,6 +81,8 @@ func appendArg(dst []interface{}, arg interface{}) []interface{} {
 		return dst
 	case time.Time, time.Duration, encoding.BinaryMarshaler, net.IP:
 		return append(dst, arg)
+	case nil:
+		return dst
 	default:
 		// scan struct field
 		v := reflect.ValueOf(arg)
@@ -153,6 +155,12 @@ func isEmptyValue(v reflect.Value) bool {
 		return v.Float() == 0
 	case reflect.Interface, reflect.Pointer:
 		return v.IsNil()
+	case reflect.Struct:
+		if v.Type() == reflect.TypeOf(time.Time{}) {
+			return v.IsZero()
+		}
+		// Only supports the struct time.Time,
+		// subsequent iterations will follow the func Scan support decoder.
 	}
 	return false
 }
@@ -211,7 +219,6 @@ type Cmdable interface {
 	ACLCmdable
 	BitMapCmdable
 	ClusterCmdable
-	GearsCmdable
 	GenericCmdable
 	GeoCmdable
 	HashCmdable
@@ -220,12 +227,14 @@ type Cmdable interface {
 	ProbabilisticCmdable
 	PubSubCmdable
 	ScriptingFunctionsCmdable
+	SearchCmdable
 	SetCmdable
 	SortedSetCmdable
 	StringCmdable
 	StreamCmdable
 	TimeseriesCmdable
 	JSONCmdable
+	VectorSetCmdable
 }
 
 type StatefulCmdable interface {
@@ -244,6 +253,7 @@ var (
 	_ Cmdable = (*Tx)(nil)
 	_ Cmdable = (*Ring)(nil)
 	_ Cmdable = (*ClusterClient)(nil)
+	_ Cmdable = (*Pipeline)(nil)
 )
 
 type cmdable func(ctx context.Context, cmd Cmder) error
@@ -330,7 +340,7 @@ func (info LibraryInfo) Validate() error {
 	return nil
 }
 
-// Hello Set the resp protocol used.
+// Hello sets the resp protocol used.
 func (c statefulCmdable) Hello(ctx context.Context,
 	ver int, username, password, clientName string,
 ) *MapStringInterfaceCmd {
@@ -418,6 +428,12 @@ func (c cmdable) Echo(ctx context.Context, message interface{}) *StringCmd {
 
 func (c cmdable) Ping(ctx context.Context) *StatusCmd {
 	cmd := NewStatusCmd(ctx, "ping")
+	_ = c(ctx, cmd)
+	return cmd
+}
+
+func (c cmdable) Do(ctx context.Context, args ...interface{}) *Cmd {
+	cmd := NewCmd(ctx, args...)
 	_ = c(ctx, cmd)
 	return cmd
 }

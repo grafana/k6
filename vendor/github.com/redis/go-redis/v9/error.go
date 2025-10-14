@@ -15,6 +15,19 @@ import (
 // ErrClosed performs any operation on the closed client will return this error.
 var ErrClosed = pool.ErrClosed
 
+// ErrPoolExhausted is returned from a pool connection method
+// when the maximum number of database connections in the pool has been reached.
+var ErrPoolExhausted = pool.ErrPoolExhausted
+
+// ErrPoolTimeout timed out waiting to get a connection from the connection pool.
+var ErrPoolTimeout = pool.ErrPoolTimeout
+
+// ErrCrossSlot is returned when keys are used in the same Redis command and
+// the keys are not in the same hash slot. This error is returned by Redis
+// Cluster and will be returned by the client when TxPipeline or TxPipelined
+// is used on a ClusterClient with keys in different slots.
+var ErrCrossSlot = proto.RedisError("CROSSSLOT Keys in request don't hash to the same slot")
+
 // HasErrorPrefix checks if the err is a Redis error and the message contains a prefix.
 func HasErrorPrefix(err error, prefix string) bool {
 	var rErr Error
@@ -38,12 +51,24 @@ type Error interface {
 
 var _ Error = proto.RedisError("")
 
+func isContextError(err error) bool {
+	switch err {
+	case context.Canceled, context.DeadlineExceeded:
+		return true
+	default:
+		return false
+	}
+}
+
 func shouldRetry(err error, retryTimeout bool) bool {
 	switch err {
 	case io.EOF, io.ErrUnexpectedEOF:
 		return true
 	case nil, context.Canceled, context.DeadlineExceeded:
 		return false
+	case pool.ErrPoolTimeout:
+		// connection pool timeout, increase retries. #3289
+		return true
 	}
 
 	if v, ok := err.(timeoutError); ok {
@@ -61,6 +86,9 @@ func shouldRetry(err error, retryTimeout bool) bool {
 		return true
 	}
 	if strings.HasPrefix(s, "READONLY ") {
+		return true
+	}
+	if strings.HasPrefix(s, "MASTERDOWN ") {
 		return true
 	}
 	if strings.HasPrefix(s, "CLUSTERDOWN ") {

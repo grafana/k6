@@ -4,14 +4,19 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"net"
+	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/redis/go-redis/v9/auth"
 	"github.com/redis/go-redis/v9/internal"
 	"github.com/redis/go-redis/v9/internal/pool"
 	"github.com/redis/go-redis/v9/internal/rand"
+	"github.com/redis/go-redis/v9/internal/util"
 )
 
 //------------------------------------------------------------------------------
@@ -57,7 +62,24 @@ type FailoverOptions struct {
 	Protocol int
 	Username string
 	Password string
-	DB       int
+	// CredentialsProvider allows the username and password to be updated
+	// before reconnecting. It should return the current username and password.
+	CredentialsProvider func() (username string, password string)
+
+	// CredentialsProviderContext is an enhanced parameter of CredentialsProvider,
+	// done to maintain API compatibility. In the future,
+	// there might be a merge between CredentialsProviderContext and CredentialsProvider.
+	// There will be a conflict between them; if CredentialsProviderContext exists, we will ignore CredentialsProvider.
+	CredentialsProviderContext func(ctx context.Context) (username string, password string, err error)
+
+	// StreamingCredentialsProvider is used to retrieve the credentials
+	// for the connection from an external source. Those credentials may change
+	// during the connection lifetime. This is useful for managed identity
+	// scenarios where the credentials are retrieved from an external source.
+	//
+	// Currently, this is a placeholder for the future implementation.
+	StreamingCredentialsProvider auth.StreamingCredentialsProvider
+	DB                           int
 
 	MaxRetries      int
 	MinRetryBackoff time.Duration
@@ -67,6 +89,20 @@ type FailoverOptions struct {
 	ReadTimeout           time.Duration
 	WriteTimeout          time.Duration
 	ContextTimeoutEnabled bool
+
+	// ReadBufferSize is the size of the bufio.Reader buffer for each connection.
+	// Larger buffers can improve performance for commands that return large responses.
+	// Smaller buffers can improve memory usage for larger pools.
+	//
+	// default: 32KiB (32768 bytes)
+	ReadBufferSize int
+
+	// WriteBufferSize is the size of the bufio.Writer buffer for each connection.
+	// Larger buffers can improve performance for large pipelines and commands with many arguments.
+	// Smaller buffers can improve memory usage for larger pools.
+	//
+	// default: 32KiB (32768 bytes)
+	WriteBufferSize int
 
 	PoolFIFO bool
 
@@ -93,6 +129,13 @@ type FailoverOptions struct {
 	DisableIdentity bool
 
 	IdentitySuffix string
+
+	// FailingTimeoutSeconds is the timeout in seconds for marking a cluster node as failing.
+	// When a node is marked as failing, it will be avoided for this duration.
+	// Only applies to failover cluster clients. Default is 15 seconds.
+	FailingTimeoutSeconds int
+
+	UnstableResp3 bool
 }
 
 func (opt *FailoverOptions) clientOptions() *Options {
@@ -103,14 +146,20 @@ func (opt *FailoverOptions) clientOptions() *Options {
 		Dialer:    opt.Dialer,
 		OnConnect: opt.OnConnect,
 
-		DB:       opt.DB,
-		Protocol: opt.Protocol,
-		Username: opt.Username,
-		Password: opt.Password,
+		DB:                           opt.DB,
+		Protocol:                     opt.Protocol,
+		Username:                     opt.Username,
+		Password:                     opt.Password,
+		CredentialsProvider:          opt.CredentialsProvider,
+		CredentialsProviderContext:   opt.CredentialsProviderContext,
+		StreamingCredentialsProvider: opt.StreamingCredentialsProvider,
 
 		MaxRetries:      opt.MaxRetries,
 		MinRetryBackoff: opt.MinRetryBackoff,
 		MaxRetryBackoff: opt.MaxRetryBackoff,
+
+		ReadBufferSize:  opt.ReadBufferSize,
+		WriteBufferSize: opt.WriteBufferSize,
 
 		DialTimeout:           opt.DialTimeout,
 		ReadTimeout:           opt.ReadTimeout,
@@ -130,7 +179,9 @@ func (opt *FailoverOptions) clientOptions() *Options {
 
 		DisableIdentity:  opt.DisableIdentity,
 		DisableIndentity: opt.DisableIndentity,
-		IdentitySuffix:   opt.IdentitySuffix,
+
+		IdentitySuffix: opt.IdentitySuffix,
+		UnstableResp3:  opt.UnstableResp3,
 	}
 }
 
@@ -150,6 +201,10 @@ func (opt *FailoverOptions) sentinelOptions(addr string) *Options {
 		MinRetryBackoff: opt.MinRetryBackoff,
 		MaxRetryBackoff: opt.MaxRetryBackoff,
 
+		// The sentinel client uses a 4KiB read/write buffer size.
+		ReadBufferSize:  4096,
+		WriteBufferSize: 4096,
+
 		DialTimeout:           opt.DialTimeout,
 		ReadTimeout:           opt.ReadTimeout,
 		WriteTimeout:          opt.WriteTimeout,
@@ -168,7 +223,9 @@ func (opt *FailoverOptions) sentinelOptions(addr string) *Options {
 
 		DisableIdentity:  opt.DisableIdentity,
 		DisableIndentity: opt.DisableIndentity,
-		IdentitySuffix:   opt.IdentitySuffix,
+
+		IdentitySuffix: opt.IdentitySuffix,
+		UnstableResp3:  opt.UnstableResp3,
 	}
 }
 
@@ -179,17 +236,24 @@ func (opt *FailoverOptions) clusterOptions() *ClusterOptions {
 		Dialer:    opt.Dialer,
 		OnConnect: opt.OnConnect,
 
-		Protocol: opt.Protocol,
-		Username: opt.Username,
-		Password: opt.Password,
+		Protocol:                     opt.Protocol,
+		Username:                     opt.Username,
+		Password:                     opt.Password,
+		CredentialsProvider:          opt.CredentialsProvider,
+		CredentialsProviderContext:   opt.CredentialsProviderContext,
+		StreamingCredentialsProvider: opt.StreamingCredentialsProvider,
 
 		MaxRedirects: opt.MaxRetries,
 
+		ReadOnly:       opt.ReplicaOnly,
 		RouteByLatency: opt.RouteByLatency,
 		RouteRandomly:  opt.RouteRandomly,
 
 		MinRetryBackoff: opt.MinRetryBackoff,
 		MaxRetryBackoff: opt.MaxRetryBackoff,
+
+		ReadBufferSize:  opt.ReadBufferSize,
+		WriteBufferSize: opt.WriteBufferSize,
 
 		DialTimeout:           opt.DialTimeout,
 		ReadTimeout:           opt.ReadTimeout,
@@ -207,16 +271,166 @@ func (opt *FailoverOptions) clusterOptions() *ClusterOptions {
 
 		TLSConfig: opt.TLSConfig,
 
-		DisableIdentity:  opt.DisableIdentity,
-		DisableIndentity: opt.DisableIndentity,
-		IdentitySuffix:   opt.IdentitySuffix,
+		DisableIdentity:       opt.DisableIdentity,
+		DisableIndentity:      opt.DisableIndentity,
+		IdentitySuffix:        opt.IdentitySuffix,
+		FailingTimeoutSeconds: opt.FailingTimeoutSeconds,
 	}
+}
+
+// ParseFailoverURL parses a URL into FailoverOptions that can be used to connect to Redis.
+// The URL must be in the form:
+//
+//	redis://<user>:<password>@<host>:<port>/<db_number>
+//	or
+//	rediss://<user>:<password>@<host>:<port>/<db_number>
+//
+// To add additional addresses, specify the query parameter, "addr" one or more times. e.g:
+//
+//	redis://<user>:<password>@<host>:<port>/<db_number>?addr=<host2>:<port2>&addr=<host3>:<port3>
+//	or
+//	rediss://<user>:<password>@<host>:<port>/<db_number>?addr=<host2>:<port2>&addr=<host3>:<port3>
+//
+// Most Option fields can be set using query parameters, with the following restrictions:
+//   - field names are mapped using snake-case conversion: to set MaxRetries, use max_retries
+//   - only scalar type fields are supported (bool, int, time.Duration)
+//   - for time.Duration fields, values must be a valid input for time.ParseDuration();
+//     additionally a plain integer as value (i.e. without unit) is interpreted as seconds
+//   - to disable a duration field, use value less than or equal to 0; to use the default
+//     value, leave the value blank or remove the parameter
+//   - only the last value is interpreted if a parameter is given multiple times
+//   - fields "network", "addr", "sentinel_username" and "sentinel_password" can only be set using other
+//     URL attributes (scheme, host, userinfo, resp.), query parameters using these
+//     names will be treated as unknown parameters
+//   - unknown parameter names will result in an error
+//   - use "skip_verify=true" to ignore TLS certificate validation
+//
+// Example:
+//
+//	redis://user:password@localhost:6789?master_name=mymaster&dial_timeout=3&read_timeout=6s&addr=localhost:6790&addr=localhost:6791
+//	is equivalent to:
+//	&FailoverOptions{
+//		MasterName:  "mymaster",
+//		Addr:        ["localhost:6789", "localhost:6790", "localhost:6791"]
+//		DialTimeout: 3 * time.Second, // no time unit = seconds
+//		ReadTimeout: 6 * time.Second,
+//	}
+func ParseFailoverURL(redisURL string) (*FailoverOptions, error) {
+	u, err := url.Parse(redisURL)
+	if err != nil {
+		return nil, err
+	}
+	return setupFailoverConn(u)
+}
+
+func setupFailoverConn(u *url.URL) (*FailoverOptions, error) {
+	o := &FailoverOptions{}
+
+	o.SentinelUsername, o.SentinelPassword = getUserPassword(u)
+
+	h, p := getHostPortWithDefaults(u)
+	o.SentinelAddrs = append(o.SentinelAddrs, net.JoinHostPort(h, p))
+
+	switch u.Scheme {
+	case "rediss":
+		o.TLSConfig = &tls.Config{ServerName: h, MinVersion: tls.VersionTLS12}
+	case "redis":
+		o.TLSConfig = nil
+	default:
+		return nil, fmt.Errorf("redis: invalid URL scheme: %s", u.Scheme)
+	}
+
+	f := strings.FieldsFunc(u.Path, func(r rune) bool {
+		return r == '/'
+	})
+	switch len(f) {
+	case 0:
+		o.DB = 0
+	case 1:
+		var err error
+		if o.DB, err = strconv.Atoi(f[0]); err != nil {
+			return nil, fmt.Errorf("redis: invalid database number: %q", f[0])
+		}
+	default:
+		return nil, fmt.Errorf("redis: invalid URL path: %s", u.Path)
+	}
+
+	return setupFailoverConnParams(u, o)
+}
+
+func setupFailoverConnParams(u *url.URL, o *FailoverOptions) (*FailoverOptions, error) {
+	q := queryOptions{q: u.Query()}
+
+	o.MasterName = q.string("master_name")
+	o.ClientName = q.string("client_name")
+	o.RouteByLatency = q.bool("route_by_latency")
+	o.RouteRandomly = q.bool("route_randomly")
+	o.ReplicaOnly = q.bool("replica_only")
+	o.UseDisconnectedReplicas = q.bool("use_disconnected_replicas")
+	o.Protocol = q.int("protocol")
+	o.Username = q.string("username")
+	o.Password = q.string("password")
+	o.MaxRetries = q.int("max_retries")
+	o.MinRetryBackoff = q.duration("min_retry_backoff")
+	o.MaxRetryBackoff = q.duration("max_retry_backoff")
+	o.DialTimeout = q.duration("dial_timeout")
+	o.ReadTimeout = q.duration("read_timeout")
+	o.WriteTimeout = q.duration("write_timeout")
+	o.ContextTimeoutEnabled = q.bool("context_timeout_enabled")
+	o.PoolFIFO = q.bool("pool_fifo")
+	o.PoolSize = q.int("pool_size")
+	o.MinIdleConns = q.int("min_idle_conns")
+	o.MaxIdleConns = q.int("max_idle_conns")
+	o.MaxActiveConns = q.int("max_active_conns")
+	o.ConnMaxLifetime = q.duration("conn_max_lifetime")
+	o.ConnMaxIdleTime = q.duration("conn_max_idle_time")
+	o.PoolTimeout = q.duration("pool_timeout")
+	o.DisableIdentity = q.bool("disableIdentity")
+	o.IdentitySuffix = q.string("identitySuffix")
+	o.UnstableResp3 = q.bool("unstable_resp3")
+
+	if q.err != nil {
+		return nil, q.err
+	}
+
+	if tmp := q.string("db"); tmp != "" {
+		db, err := strconv.Atoi(tmp)
+		if err != nil {
+			return nil, fmt.Errorf("redis: invalid database number: %w", err)
+		}
+		o.DB = db
+	}
+
+	addrs := q.strings("addr")
+	for _, addr := range addrs {
+		h, p, err := net.SplitHostPort(addr)
+		if err != nil || h == "" || p == "" {
+			return nil, fmt.Errorf("redis: unable to parse addr param: %s", addr)
+		}
+
+		o.SentinelAddrs = append(o.SentinelAddrs, net.JoinHostPort(h, p))
+	}
+
+	if o.TLSConfig != nil && q.has("skip_verify") {
+		o.TLSConfig.InsecureSkipVerify = q.bool("skip_verify")
+	}
+
+	// any parameters left?
+	if r := q.remaining(); len(r) > 0 {
+		return nil, fmt.Errorf("redis: unexpected option: %s", strings.Join(r, ", "))
+	}
+
+	return o, nil
 }
 
 // NewFailoverClient returns a Redis client that uses Redis Sentinel
 // for automatic failover. It's safe for concurrent use by multiple
 // goroutines.
 func NewFailoverClient(failoverOpt *FailoverOptions) *Client {
+	if failoverOpt == nil {
+		panic("redis: NewFailoverClient nil options")
+	}
+
 	if failoverOpt.RouteByLatency {
 		panic("to route commands by latency, use NewFailoverClusterClient")
 	}
@@ -251,7 +465,7 @@ func NewFailoverClient(failoverOpt *FailoverOptions) *Client {
 
 	connPool = newConnPool(opt, rdb.dialHook)
 	rdb.connPool = connPool
-	rdb.onClose = failover.Close
+	rdb.onClose = rdb.wrappedOnClose(failover.Close)
 
 	failover.mu.Lock()
 	failover.onFailover = func(ctx context.Context, addr string) {
@@ -302,10 +516,12 @@ func masterReplicaDialer(
 // SentinelClient is a client for a Redis Sentinel.
 type SentinelClient struct {
 	*baseClient
-	hooksMixin
 }
 
 func NewSentinelClient(opt *Options) *SentinelClient {
+	if opt == nil {
+		panic("redis: NewSentinelClient nil options")
+	}
 	opt.init()
 	c := &SentinelClient{
 		baseClient: &baseClient{
@@ -472,10 +688,10 @@ type sentinelFailover struct {
 	onFailover func(ctx context.Context, addr string)
 	onUpdate   func(ctx context.Context)
 
-	mu          sync.RWMutex
-	_masterAddr string
-	sentinel    *SentinelClient
-	pubsub      *PubSub
+	mu         sync.RWMutex
+	masterAddr string
+	sentinel   *SentinelClient
+	pubsub     *PubSub
 }
 
 func (c *sentinelFailover) Close() error {
@@ -560,29 +776,63 @@ func (c *sentinelFailover) MasterAddr(ctx context.Context) (string, error) {
 		}
 	}
 
+	var (
+		masterAddr string
+		wg         sync.WaitGroup
+		once       sync.Once
+		errCh      = make(chan error, len(c.sentinelAddrs))
+	)
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	for i, sentinelAddr := range c.sentinelAddrs {
-		sentinel := NewSentinelClient(c.opt.sentinelOptions(sentinelAddr))
-
-		masterAddr, err := sentinel.GetMasterAddrByName(ctx, c.opt.MasterName).Result()
-		if err != nil {
-			_ = sentinel.Close()
-			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-				return "", err
+		wg.Add(1)
+		go func(i int, addr string) {
+			defer wg.Done()
+			sentinelCli := NewSentinelClient(c.opt.sentinelOptions(addr))
+			addrVal, err := sentinelCli.GetMasterAddrByName(ctx, c.opt.MasterName).Result()
+			if err != nil {
+				internal.Logger.Printf(ctx, "sentinel: GetMasterAddrByName addr=%s, master=%q failed: %s",
+					addr, c.opt.MasterName, err)
+				_ = sentinelCli.Close()
+				errCh <- err
+				return
 			}
-			internal.Logger.Printf(ctx, "sentinel: GetMasterAddrByName master=%q failed: %s",
-				c.opt.MasterName, err)
-			continue
-		}
-
-		// Push working sentinel to the top.
-		c.sentinelAddrs[0], c.sentinelAddrs[i] = c.sentinelAddrs[i], c.sentinelAddrs[0]
-		c.setSentinel(ctx, sentinel)
-
-		addr := net.JoinHostPort(masterAddr[0], masterAddr[1])
-		return addr, nil
+			once.Do(func() {
+				masterAddr = net.JoinHostPort(addrVal[0], addrVal[1])
+				// Push working sentinel to the top
+				c.sentinelAddrs[0], c.sentinelAddrs[i] = c.sentinelAddrs[i], c.sentinelAddrs[0]
+				c.setSentinel(ctx, sentinelCli)
+				internal.Logger.Printf(ctx, "sentinel: selected addr=%s masterAddr=%s", addr, masterAddr)
+				cancel()
+			})
+		}(i, sentinelAddr)
 	}
 
-	return "", errors.New("redis: all sentinels specified in configuration are unreachable")
+	wg.Wait()
+	close(errCh)
+	if masterAddr != "" {
+		return masterAddr, nil
+	}
+	errs := make([]error, 0, len(errCh))
+	for err := range errCh {
+		errs = append(errs, err)
+	}
+	return "", fmt.Errorf("redis: all sentinels specified in configuration are unreachable: %s", joinErrors(errs))
+}
+
+func joinErrors(errs []error) string {
+	if len(errs) == 1 {
+		return errs[0].Error()
+	}
+
+	b := []byte(errs[0].Error())
+	for _, err := range errs[1:] {
+		b = append(b, '\n')
+		b = append(b, err.Error()...)
+	}
+	return util.BytesToString(b)
 }
 
 func (c *sentinelFailover) replicaAddrs(ctx context.Context, useDisconnected bool) ([]string, error) {
@@ -702,7 +952,7 @@ func parseReplicaAddrs(addrs []map[string]string, keepDisconnected bool) []strin
 
 func (c *sentinelFailover) trySwitchMaster(ctx context.Context, addr string) {
 	c.mu.RLock()
-	currentAddr := c._masterAddr //nolint:ifshort
+	currentAddr := c.masterAddr //nolint:ifshort
 	c.mu.RUnlock()
 
 	if addr == currentAddr {
@@ -712,10 +962,10 @@ func (c *sentinelFailover) trySwitchMaster(ctx context.Context, addr string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if addr == c._masterAddr {
+	if addr == c.masterAddr {
 		return
 	}
-	c._masterAddr = addr
+	c.masterAddr = addr
 
 	internal.Logger.Printf(ctx, "sentinel: new master=%q addr=%q",
 		c.opt.MasterName, addr)
@@ -800,6 +1050,10 @@ func contains(slice []string, str string) bool {
 // NewFailoverClusterClient returns a client that supports routing read-only commands
 // to a replica node.
 func NewFailoverClusterClient(failoverOpt *FailoverOptions) *ClusterClient {
+	if failoverOpt == nil {
+		panic("redis: NewFailoverClusterClient nil options")
+	}
+
 	sentinelAddrs := make([]string, len(failoverOpt.SentinelAddrs))
 	copy(sentinelAddrs, failoverOpt.SentinelAddrs)
 
@@ -809,6 +1063,22 @@ func NewFailoverClusterClient(failoverOpt *FailoverOptions) *ClusterClient {
 	}
 
 	opt := failoverOpt.clusterOptions()
+	if failoverOpt.DB != 0 {
+		onConnect := opt.OnConnect
+
+		opt.OnConnect = func(ctx context.Context, cn *Conn) error {
+			if err := cn.Select(ctx, failoverOpt.DB).Err(); err != nil {
+				return err
+			}
+
+			if onConnect != nil {
+				return onConnect(ctx, cn)
+			}
+
+			return nil
+		}
+	}
+
 	opt.ClusterSlots = func(ctx context.Context) ([]ClusterSlot, error) {
 		masterAddr, err := failover.MasterAddr(ctx)
 		if err != nil {

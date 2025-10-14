@@ -7,7 +7,9 @@ import (
 
 type StreamCmdable interface {
 	XAdd(ctx context.Context, a *XAddArgs) *StringCmd
+	XAckDel(ctx context.Context, stream string, group string, mode string, ids ...string) *SliceCmd
 	XDel(ctx context.Context, stream string, ids ...string) *IntCmd
+	XDelEx(ctx context.Context, stream string, mode string, ids ...string) *SliceCmd
 	XLen(ctx context.Context, stream string) *IntCmd
 	XRange(ctx context.Context, stream, start, stop string) *XMessageSliceCmd
 	XRangeN(ctx context.Context, stream, start, stop string, count int64) *XMessageSliceCmd
@@ -31,8 +33,12 @@ type StreamCmdable interface {
 	XAutoClaimJustID(ctx context.Context, a *XAutoClaimArgs) *XAutoClaimJustIDCmd
 	XTrimMaxLen(ctx context.Context, key string, maxLen int64) *IntCmd
 	XTrimMaxLenApprox(ctx context.Context, key string, maxLen, limit int64) *IntCmd
+	XTrimMaxLenMode(ctx context.Context, key string, maxLen int64, mode string) *IntCmd
+	XTrimMaxLenApproxMode(ctx context.Context, key string, maxLen, limit int64, mode string) *IntCmd
 	XTrimMinID(ctx context.Context, key string, minID string) *IntCmd
 	XTrimMinIDApprox(ctx context.Context, key string, minID string, limit int64) *IntCmd
+	XTrimMinIDMode(ctx context.Context, key string, minID string, mode string) *IntCmd
+	XTrimMinIDApproxMode(ctx context.Context, key string, minID string, limit int64, mode string) *IntCmd
 	XInfoGroups(ctx context.Context, key string) *XInfoGroupsCmd
 	XInfoStream(ctx context.Context, key string) *XInfoStreamCmd
 	XInfoStreamFull(ctx context.Context, key string, count int) *XInfoStreamFullCmd
@@ -54,6 +60,7 @@ type XAddArgs struct {
 	// Approx causes MaxLen and MinID to use "~" matcher (instead of "=").
 	Approx bool
 	Limit  int64
+	Mode   string
 	ID     string
 	Values interface{}
 }
@@ -81,6 +88,11 @@ func (c cmdable) XAdd(ctx context.Context, a *XAddArgs) *StringCmd {
 	if a.Limit > 0 {
 		args = append(args, "limit", a.Limit)
 	}
+
+	if a.Mode != "" {
+		args = append(args, a.Mode)
+	}
+
 	if a.ID != "" {
 		args = append(args, a.ID)
 	} else {
@@ -93,12 +105,32 @@ func (c cmdable) XAdd(ctx context.Context, a *XAddArgs) *StringCmd {
 	return cmd
 }
 
+func (c cmdable) XAckDel(ctx context.Context, stream string, group string, mode string, ids ...string) *SliceCmd {
+	args := []interface{}{"xackdel", stream, group, mode, "ids", len(ids)}
+	for _, id := range ids {
+		args = append(args, id)
+	}
+	cmd := NewSliceCmd(ctx, args...)
+	_ = c(ctx, cmd)
+	return cmd
+}
+
 func (c cmdable) XDel(ctx context.Context, stream string, ids ...string) *IntCmd {
 	args := []interface{}{"xdel", stream}
 	for _, id := range ids {
 		args = append(args, id)
 	}
 	cmd := NewIntCmd(ctx, args...)
+	_ = c(ctx, cmd)
+	return cmd
+}
+
+func (c cmdable) XDelEx(ctx context.Context, stream string, mode string, ids ...string) *SliceCmd {
+	args := []interface{}{"xdelex", stream, mode, "ids", len(ids)}
+	for _, id := range ids {
+		args = append(args, id)
+	}
+	cmd := NewSliceCmd(ctx, args...)
 	_ = c(ctx, cmd)
 	return cmd
 }
@@ -375,6 +407,8 @@ func xClaimArgs(a *XClaimArgs) []interface{} {
 	return args
 }
 
+// TODO: refactor xTrim, xTrimMode and the wrappers over the functions
+
 // xTrim If approx is true, add the "~" parameter, otherwise it is the default "=" (redis default).
 // example:
 //
@@ -416,6 +450,42 @@ func (c cmdable) XTrimMinID(ctx context.Context, key string, minID string) *IntC
 
 func (c cmdable) XTrimMinIDApprox(ctx context.Context, key string, minID string, limit int64) *IntCmd {
 	return c.xTrim(ctx, key, "minid", true, minID, limit)
+}
+
+func (c cmdable) xTrimMode(
+	ctx context.Context, key, strategy string,
+	approx bool, threshold interface{}, limit int64,
+	mode string,
+) *IntCmd {
+	args := make([]interface{}, 0, 7)
+	args = append(args, "xtrim", key, strategy)
+	if approx {
+		args = append(args, "~")
+	}
+	args = append(args, threshold)
+	if limit > 0 {
+		args = append(args, "limit", limit)
+	}
+	args = append(args, mode)
+	cmd := NewIntCmd(ctx, args...)
+	_ = c(ctx, cmd)
+	return cmd
+}
+
+func (c cmdable) XTrimMaxLenMode(ctx context.Context, key string, maxLen int64, mode string) *IntCmd {
+	return c.xTrimMode(ctx, key, "maxlen", false, maxLen, 0, mode)
+}
+
+func (c cmdable) XTrimMaxLenApproxMode(ctx context.Context, key string, maxLen, limit int64, mode string) *IntCmd {
+	return c.xTrimMode(ctx, key, "maxlen", true, maxLen, limit, mode)
+}
+
+func (c cmdable) XTrimMinIDMode(ctx context.Context, key string, minID string, mode string) *IntCmd {
+	return c.xTrimMode(ctx, key, "minid", false, minID, 0, mode)
+}
+
+func (c cmdable) XTrimMinIDApproxMode(ctx context.Context, key string, minID string, limit int64, mode string) *IntCmd {
+	return c.xTrimMode(ctx, key, "minid", true, minID, limit, mode)
 }
 
 func (c cmdable) XInfoConsumers(ctx context.Context, key string, group string) *XInfoConsumersCmd {

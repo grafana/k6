@@ -5,7 +5,6 @@ import (
 	"context"
 	"net"
 	"sync/atomic"
-	"syscall"
 	"time"
 
 	"github.com/redis/go-redis/v9/internal/proto"
@@ -17,9 +16,6 @@ type Conn struct {
 	usedAt  int64 // atomic
 	netConn net.Conn
 
-	// for checking the health status of the connection, it may be nil.
-	sysConn syscall.Conn
-
 	rd *proto.Reader
 	bw *bufio.Writer
 	wr *proto.Writer
@@ -27,18 +23,35 @@ type Conn struct {
 	Inited    bool
 	pooled    bool
 	createdAt time.Time
+
+	onClose func() error
 }
 
 func NewConn(netConn net.Conn) *Conn {
+	return NewConnWithBufferSize(netConn, proto.DefaultBufferSize, proto.DefaultBufferSize)
+}
+
+func NewConnWithBufferSize(netConn net.Conn, readBufSize, writeBufSize int) *Conn {
 	cn := &Conn{
 		netConn:   netConn,
 		createdAt: time.Now(),
 	}
-	cn.rd = proto.NewReader(netConn)
-	cn.bw = bufio.NewWriter(netConn)
+
+	// Use specified buffer sizes, or fall back to 32KiB defaults if 0
+	if readBufSize > 0 {
+		cn.rd = proto.NewReaderSize(netConn, readBufSize)
+	} else {
+		cn.rd = proto.NewReader(netConn) // Uses 32KiB default
+	}
+
+	if writeBufSize > 0 {
+		cn.bw = bufio.NewWriterSize(netConn, writeBufSize)
+	} else {
+		cn.bw = bufio.NewWriterSize(netConn, proto.DefaultBufferSize)
+	}
+
 	cn.wr = proto.NewWriter(cn.bw)
 	cn.SetUsedAt(time.Now())
-	cn.setSysConn()
 	return cn
 }
 
@@ -51,23 +64,14 @@ func (cn *Conn) SetUsedAt(tm time.Time) {
 	atomic.StoreInt64(&cn.usedAt, tm.Unix())
 }
 
+func (cn *Conn) SetOnClose(fn func() error) {
+	cn.onClose = fn
+}
+
 func (cn *Conn) SetNetConn(netConn net.Conn) {
 	cn.netConn = netConn
 	cn.rd.Reset(netConn)
 	cn.bw.Reset(netConn)
-	cn.setSysConn()
-}
-
-func (cn *Conn) setSysConn() {
-	cn.sysConn = nil
-	conn := cn.netConn
-	if conn == nil {
-		return
-	}
-
-	if sysConn, ok := conn.(syscall.Conn); ok {
-		cn.sysConn = sysConn
-	}
 }
 
 func (cn *Conn) Write(b []byte) (int, error) {
@@ -113,6 +117,10 @@ func (cn *Conn) WithWriter(
 }
 
 func (cn *Conn) Close() error {
+	if cn.onClose != nil {
+		// ignore error
+		_ = cn.onClose()
+	}
 	return cn.netConn.Close()
 }
 

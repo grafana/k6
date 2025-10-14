@@ -60,7 +60,7 @@ type JSONArrTrimArgs struct {
 type JSONCmd struct {
 	baseCmd
 	val      string
-	expanded []interface{}
+	expanded interface{}
 }
 
 var _ Cmder = (*JSONCmd)(nil)
@@ -82,6 +82,7 @@ func (cmd *JSONCmd) SetVal(val string) {
 	cmd.val = val
 }
 
+// Val returns the result of the JSON.GET command as a string.
 func (cmd *JSONCmd) Val() string {
 	if len(cmd.val) == 0 && cmd.expanded != nil {
 		val, err := json.Marshal(cmd.expanded)
@@ -100,11 +101,12 @@ func (cmd *JSONCmd) Result() (string, error) {
 	return cmd.Val(), cmd.Err()
 }
 
-func (cmd JSONCmd) Expanded() (interface{}, error) {
+// Expanded returns the result of the JSON.GET command as unmarshalled JSON.
+func (cmd *JSONCmd) Expanded() (interface{}, error) {
 	if len(cmd.val) != 0 && cmd.expanded == nil {
 		err := json.Unmarshal([]byte(cmd.val), &cmd.expanded)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 	}
 
@@ -113,9 +115,15 @@ func (cmd JSONCmd) Expanded() (interface{}, error) {
 
 func (cmd *JSONCmd) readReply(rd *proto.Reader) error {
 	// nil response from JSON.(M)GET (cmd.baseCmd.err will be "redis: nil")
+	// This happens when the key doesn't exist
 	if cmd.baseCmd.Err() == Nil {
 		cmd.val = ""
 		return Nil
+	}
+
+	// Handle other base command errors
+	if cmd.baseCmd.Err() != nil {
+		return cmd.baseCmd.Err()
 	}
 
 	if readType, err := rd.PeekReplyType(); err != nil {
@@ -125,6 +133,13 @@ func (cmd *JSONCmd) readReply(rd *proto.Reader) error {
 		size, err := rd.ReadArrayLen()
 		if err != nil {
 			return err
+		}
+
+		// Empty array means no results found for JSON path, but key exists
+		// This should return "[]", not an error
+		if size == 0 {
+			cmd.val = "[]"
+			return nil
 		}
 
 		expanded := make([]interface{}, size)
@@ -141,6 +156,7 @@ func (cmd *JSONCmd) readReply(rd *proto.Reader) error {
 			return err
 		} else if str == "" || err == Nil {
 			cmd.val = ""
+			return Nil
 		} else {
 			cmd.val = str
 		}
@@ -494,7 +510,7 @@ func (c cmdable) JSONMSet(ctx context.Context, params ...interface{}) *StatusCmd
 }
 
 // JSONNumIncrBy increments the number value stored at the specified path by the provided number.
-// For more information, see https://redis.io/commands/json.numincreby
+// For more information, see https://redis.io/docs/latest/commands/json.numincrby/
 func (c cmdable) JSONNumIncrBy(ctx context.Context, key, path string, value float64) *JSONCmd {
 	args := []interface{}{"JSON.NUMINCRBY", key, path, value}
 	cmd := newJSONCmd(ctx, args...)

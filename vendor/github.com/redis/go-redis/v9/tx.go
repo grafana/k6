@@ -19,16 +19,15 @@ type Tx struct {
 	baseClient
 	cmdable
 	statefulCmdable
-	hooksMixin
 }
 
 func (c *Client) newTx() *Tx {
 	tx := Tx{
 		baseClient: baseClient{
-			opt:      c.opt,
-			connPool: pool.NewStickyConnPool(c.connPool),
+			opt:        c.opt,
+			connPool:   pool.NewStickyConnPool(c.connPool),
+			hooksMixin: c.hooksMixin.clone(),
 		},
-		hooksMixin: c.hooksMixin.clone(),
 	}
 	tx.init()
 	return &tx
