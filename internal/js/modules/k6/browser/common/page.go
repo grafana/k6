@@ -1455,18 +1455,8 @@ type PageOnEvent struct {
 // passing in the ConsoleMessage associated with the event.
 // The only accepted event value is 'console'.
 func (p *Page) On(event PageOnEventName, handler PageOnHandler) error {
-	p.eventHandlersMu.Lock()
-	defer p.eventHandlersMu.Unlock()
-
-	if _, ok := p.eventHandlers[event]; !ok {
-		p.eventHandlers[event] = make([]pageOnHandlerRecord, 0, 1)
-	}
-	p.eventHandlers[event] = append(p.eventHandlers[event], pageOnHandlerRecord{
-		id:      0,
-		handler: handler,
-	})
-
-	return nil
+	_, err := p.addEventHandler(event, handler)
+	return err
 }
 
 func (p *Page) addEventHandler(event PageOnEventName, handler PageOnHandler) (id uint64, err error) {
