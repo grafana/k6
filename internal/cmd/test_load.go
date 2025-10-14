@@ -6,16 +6,22 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
+	"net/url"
 	"path/filepath"
+	"strings"
 	"sync"
 	"syscall"
 
+	"github.com/grafana/k6deps"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
+	"go.k6.io/k6/ext"
+	"go.k6.io/k6/internal/build"
 	"go.k6.io/k6/internal/js"
 	"go.k6.io/k6/internal/loader"
 	"go.k6.io/k6/js/modules"
@@ -67,7 +73,7 @@ func loadLocalTest(gs *state.GlobalState, cmd *cobra.Command, args []string) (*l
 	}
 
 	if runtimeOptions.CompatibilityMode.String == lib.CompatibilityModeExperimentalEnhanced.String() {
-		gs.Logger.Warnf("ComaptibilityMode %[1]q is deprecated. Types are stripped by default for `.ts` files. "+
+		gs.Logger.Warnf("CompatibilityMode %[1]q is deprecated. Types are stripped by default for `.ts` files. "+
 			"Please move to using %[2]q instead as %[1]q will be removed in the future",
 			lib.CompatibilityModeExperimentalEnhanced.String(), lib.CompatibilityModeBase.String())
 	}
@@ -105,6 +111,7 @@ func loadLocalTest(gs *state.GlobalState, cmd *cobra.Command, args []string) (*l
 	return test, nil
 }
 
+//nolint:gocognit,funlen
 func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
 	testPath := lt.source.URL.String()
 	logger := gs.Logger.WithField("test_path", testPath)
@@ -134,8 +141,23 @@ func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
 	}
 	switch testType {
 	case testTypeJS:
+		specifier := lt.source.URL.String()
+		pwd := lt.source.URL.JoinPath("../")
 		logger.Debug("Trying to load as a JS test...")
-		runner, err := js.New(lt.preInitState, lt.source, lt.fileSystems)
+		moduleResolver := js.NewModuleResolver(pwd, lt.preInitState, lt.fileSystems)
+		err := moduleResolver.LoadMainModule(pwd, specifier, lt.source.Data)
+		if gs.Flags.AutoExtensionResolution {
+			deps, iErr := extractUnknownModules(err)
+			if iErr != nil {
+				return fmt.Errorf("could not load JS test '%s': %w", testPath, iErr)
+			}
+			err = figureOutAutoExtensionResolution(moduleResolver, logger, lt, deps, gs)
+		}
+		if err != nil {
+			return err
+		}
+
+		runner, err := js.New(lt.preInitState, lt.source, lt.fileSystems, moduleResolver)
 		// TODO: should we use common.UnwrapGojaInterruptedError() here?
 		if err != nil {
 			return fmt.Errorf("could not load JS test '%s': %w", testPath, err)
@@ -157,7 +179,22 @@ func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
 		switch arc.Type {
 		case testTypeJS:
 			logger.Debug("Evaluating JS from archive bundle...")
-			runner, err := js.NewFromArchive(lt.preInitState, arc)
+			specifier := arc.Filename
+			pwd := arc.PwdURL
+			lt.fileSystems = arc.Filesystems // TODO(@mstoykov) probably do not do this
+			moduleResolver := js.NewModuleResolver(pwd, lt.preInitState, arc.Filesystems)
+			err := moduleResolver.LoadMainModule(pwd, specifier, arc.Data)
+			if gs.Flags.AutoExtensionResolution {
+				deps, iErr := extractUnknownModules(err)
+				if iErr != nil {
+					return fmt.Errorf("could not load JS test '%s': %w", testPath, iErr)
+				}
+				err = figureOutAutoExtensionResolution(moduleResolver, logger, lt, deps, gs)
+			}
+			if err != nil {
+				return err
+			}
+			runner, err := js.NewFromArchive(lt.preInitState, arc, moduleResolver)
 			if err != nil {
 				return fmt.Errorf("could not load JS from test archive bundle '%s': %w", testPath, err)
 			}
@@ -170,6 +207,76 @@ func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
 	default:
 		return fmt.Errorf("unknown or unspecified test type '%s' for '%s'", testType, testPath)
 	}
+}
+
+func figureOutAutoExtensionResolution(
+	moduleResolver *modules.ModuleResolver, logger *logrus.Entry, lt *loadedTest,
+	deps k6deps.Dependencies, gs *state.GlobalState,
+) error {
+	for _, imported := range moduleResolver.Imported() {
+		if strings.HasPrefix(imported, "k6") {
+			continue
+		}
+		u, err := url.Parse(imported)
+		if err != nil {
+			panic(err)
+		}
+		// TODO: do not load it like this :shrug:
+		d, err := loader.Load(logger, lt.fileSystems, u, u.String())
+		if err != nil {
+			panic(err)
+		}
+		newdeps, err := processUseDirectives(d.Data)
+		if err != nil {
+			panic(err)
+		}
+		logger.Debugf("dependencies from %q: %q", imported, newdeps)
+		for _, dep := range newdeps {
+			err := deps.Update(dep)
+			if err != nil {
+				panic(err)
+			}
+		}
+	}
+	if len(deps) > 0 {
+		if !isCustomBuildRequired(deps, build.Version, ext.GetAll()) {
+			logger.
+				Debug("The current k6 binary already satisfies all the required dependencies," +
+					" it isn't required to provision a new binary.")
+			return nil
+		}
+
+		logger.
+			WithField("deps", deps).
+			Info("Automatic extension resolution is enabled. The current k6 binary doesn't satisfy all dependencies," +
+				" it's required to provision a custom binary.")
+		provisioner := newK6BuildProvisioner(gs)
+		customBinary, err := provisioner.provision(deps)
+		if err != nil {
+			logger.
+				WithError(err).
+				Error("Failed to provision a k6 binary with required dependencies." +
+					" Please, make sure to report this issue by opening a bug report.")
+			return err
+		}
+
+		if lt.source.URL.Path == "/-" {
+			gs.Stdin = bytes.NewBuffer(lt.source.Data)
+		}
+		return runDifferentBinaryError{
+			customBinary: customBinary,
+		}
+	}
+	return nil
+}
+
+// TODO(@mstoykov) potentially figure out some less "exceptionl workflow" solution
+type runDifferentBinaryError struct {
+	customBinary commandExecutor
+}
+
+func (r runDifferentBinaryError) Error() string {
+	return "a different binary error - this should never be printed, please report it"
 }
 
 // readSource is a small wrapper around loader.ReadSource returning

@@ -99,17 +99,15 @@ func TestSetupDataMarshalling(t *testing.T) {
 
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	runner, err := js.New(
-		&lib.TestPreInitState{
-			Logger:         testutils.NewLogger(t),
-			BuiltinMetrics: builtinMetrics,
-			Registry:       registry,
-			Usage:          usage.New(),
-		},
-
-		&loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script},
-		nil,
-	)
+	piState := &lib.TestPreInitState{
+		Logger:         testutils.NewLogger(t),
+		BuiltinMetrics: builtinMetrics,
+		Registry:       registry,
+		Usage:          usage.New(),
+	}
+	sourceData := &loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script}
+	moduleResolver := js.NewModuleResolver(loader.Dir(sourceData.URL), piState, nil)
+	runner, err := js.New(piState, sourceData, nil, moduleResolver)
 
 	require.NoError(t, err)
 
