@@ -26,4 +26,4 @@ Josh Baker [@tidwall](http://twitter.com/tidwall)
 
 ## License
 
-Redcon source code is available under the MIT [License](/LICENSE).
+Match source code is available under the MIT [License](/LICENSE).

@@ -10,18 +10,30 @@ import (
 // and '?' matches on any one character.
 //
 // pattern:
-// 	{ term }
-// term:
-// 	'*'         matches any sequence of non-Separator characters
-// 	'?'         matches any single non-Separator character
-// 	c           matches character c (c != '*', '?', '\\')
-// 	'\\' c      matches character c
 //
+//	{ term }
+//
+// term:
+//
+//	'*'         matches any sequence of non-Separator characters
+//	'?'         matches any single non-Separator character
+//	c           matches character c (c != '*', '?', '\\')
+//	'\\' c      matches character c
 func Match(str, pattern string) bool {
+	return match0(str, pattern, false)
+}
+
+// MatchNoCase is the same as Match but performs a case-insensitive match.
+// Such that string "Hello World" with match with lower case pattern "hello*"
+func MatchNoCase(str, pattern string) bool {
+	return match0(str, pattern, true)
+}
+
+func match0(str, pattern string, nocase bool) bool {
 	if pattern == "*" {
 		return true
 	}
-	return match(str, pattern, 0, nil, -1) == rMatch
+	return match(str, pattern, 0, nil, -1, nocase) == rMatch
 }
 
 // MatchLimit is the same as Match but will limit the complexity of the match
@@ -34,11 +46,21 @@ func Match(str, pattern string) bool {
 // Everytime it calls itself a counter is incremented.
 // The operation is stopped when counter > maxcomp*len(str).
 func MatchLimit(str, pattern string, maxcomp int) (matched, stopped bool) {
+	return matchLimit0(str, pattern, maxcomp, false)
+}
+
+func MatchLimitNoCase(str, pattern string, maxcomp int,
+) (matched, stopped bool) {
+	return matchLimit0(str, pattern, maxcomp, true)
+}
+
+func matchLimit0(str, pattern string, maxcomp int, nocase bool,
+) (matched, stopped bool) {
 	if pattern == "*" {
 		return true, false
 	}
 	counter := 0
-	r := match(str, pattern, len(str), &counter, maxcomp)
+	r := match(str, pattern, len(str), &counter, maxcomp, nocase)
 	if r == rStop {
 		return false, true
 	}
@@ -53,7 +75,15 @@ const (
 	rStop
 )
 
-func match(str, pat string, slen int, counter *int, maxcomp int) result {
+func tolower(r rune) rune {
+	if r >= 'A' && r <= 'Z' {
+		return r + 32
+	}
+	return r
+}
+
+func match(str, pat string, slen int, counter *int, maxcomp int, nocase bool,
+) result {
 	// check complexity limit
 	if maxcomp > -1 {
 		if *counter > slen*maxcomp {
@@ -94,7 +124,7 @@ func match(str, pat string, slen int, counter *int, maxcomp int) result {
 
 			// Match and trim any non-wildcard suffix characters.
 			var ok bool
-			str, pat, ok = matchTrimSuffix(str, pat)
+			str, pat, ok = matchTrimSuffix(str, pat, nocase)
 			if !ok {
 				return rNoMatch
 			}
@@ -105,7 +135,7 @@ func match(str, pat string, slen int, counter *int, maxcomp int) result {
 			}
 
 			// Perform recursive wildcard search.
-			r := match(str, pat[1:], slen, counter, maxcomp)
+			r := match(str, pat[1:], slen, counter, maxcomp, nocase)
 			if r != rNoMatch {
 				return r
 			}
@@ -123,6 +153,9 @@ func match(str, pat string, slen int, counter *int, maxcomp int) result {
 				if ps == 0 {
 					return rNoMatch
 				}
+			}
+			if nocase {
+				sc, pc = tolower(sc), tolower(pc)
 			}
 			if sc != pc {
 				return rNoMatch
@@ -150,7 +183,7 @@ func match(str, pat string, slen int, counter *int, maxcomp int) result {
 //
 // Any matched characters will be trimmed from both the target
 // string and the pattern.
-func matchTrimSuffix(str, pat string) (string, string, bool) {
+func matchTrimSuffix(str, pat string, nocase bool) (string, string, bool) {
 	// It's expected that the pattern has at least two bytes and the first byte
 	// is a wildcard star '*'
 	match := true
@@ -171,6 +204,9 @@ func matchTrimSuffix(str, pat string) (string, string, bool) {
 			break
 		}
 		sc, ss := utf8.DecodeLastRuneInString(str)
+		if nocase {
+			pc, sc = tolower(pc), tolower(sc)
+		}
 		if !((pc == '?' && !esc) || pc == sc) {
 			match = false
 			break
