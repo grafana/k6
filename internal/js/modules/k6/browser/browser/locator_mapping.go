@@ -315,7 +315,7 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			if err := copts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing select option options: %w", err)
 			}
-			convValues, err := common.ConvertSelectOptionValues(vu.Runtime(), values)
+			convValues, err := ConvertSelectOptionValues(vu.Runtime(), values)
 			if err != nil {
 				return nil, fmt.Errorf("parsing select option values: %w", err)
 			}
