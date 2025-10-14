@@ -205,7 +205,7 @@ github.com/grafana/sobek/ftoa/internal/fast
 github.com/grafana/sobek/parser
 github.com/grafana/sobek/token
 github.com/grafana/sobek/unistring
-# github.com/grafana/xk6-dashboard v0.7.12
+# github.com/grafana/xk6-dashboard v0.7.13
 ## explicit; go 1.23.0
 github.com/grafana/xk6-dashboard/dashboard
 # github.com/grafana/xk6-redis v0.3.4
@@ -290,7 +290,7 @@ github.com/mstoykov/k6-taskqueue-lib/taskqueue
 github.com/nu7hatch/gouuid
 # github.com/nxadm/tail v1.4.11
 ## explicit; go 1.13
-# github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8
+# github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
 ## explicit; go 1.14
 github.com/pkg/browser
 # github.com/pmezard/go-difflib v1.0.0
