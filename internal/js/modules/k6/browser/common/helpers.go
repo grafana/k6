@@ -274,3 +274,14 @@ func newPatternMatcher(pattern string, rc JSRegexChecker) (patternMatcherFunc, e
 		return ok, nil
 	}, nil
 }
+
+// matchPattern is a helper function that matches the string against
+// the pattern using the provided [JSRegexChecker] for regex patterns.
+// The matcher is behavior is determined by [newPatternMatcher].
+func matchPattern(rc JSRegexChecker, pattern, s string) (bool, error) {
+	m, err := newPatternMatcher(pattern, rc)
+	if err != nil {
+		return false, fmt.Errorf("matching %q against pattern %q: %w", s, pattern, err)
+	}
+	return m(s)
+}
