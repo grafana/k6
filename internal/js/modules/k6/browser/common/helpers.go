@@ -279,10 +279,9 @@ func newPatternMatcher(pattern string, rm RegExMatcher) (patternMatcherFunc, err
 	}, nil
 }
 
-// matchPattern is a helper function that matches the string against
-// the pattern using the provided [RegExMatcher] for regex patterns.
-// The matcher is behavior is determined by [newPatternMatcher].
-func matchPattern(rm RegExMatcher, pattern, s string) (bool, error) {
+// Match evaluates the supplied string against the given pattern using the provided
+// [RegExMatcher] for regex patterns. The matcher behavior is determined by [newPatternMatcher].
+func (rm RegExMatcher) Match(pattern, s string) (bool, error) {
 	m, err := newPatternMatcher(pattern, rm)
 	if err != nil {
 		return false, fmt.Errorf("matching %q against pattern %q: %w", s, pattern, err)
