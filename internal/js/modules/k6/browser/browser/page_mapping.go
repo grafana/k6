@@ -667,8 +667,7 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 
 		pageOnEvents := map[common.PageOnEventName]struct {
 			mapp func(vu moduleVU, event common.PageOnEvent) mapping
-			init func() error // If set, runs before the event handler.
-			wait bool         // Whether to wait for the handler to complete.
+			wait bool // Whether to wait for the handler to complete.
 		}{
 			common.EventPageConsoleAPICalled: {
 				mapp: mapConsoleMessage,
@@ -690,13 +689,6 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 		pageOnEvent, ok := pageOnEvents[eventName]
 		if !ok {
 			return fmt.Errorf("unknown page on event: %q", eventName)
-		}
-
-		// Initializes the environment for the event handler if necessary.
-		if pageOnEvent.init != nil {
-			if err := pageOnEvent.init(); err != nil {
-				return fmt.Errorf("initiating page.on('%s'): %w", eventName, err)
-			}
 		}
 
 		ctx := vu.Context()
