@@ -81,27 +81,25 @@ func (s *DOMElementState) UnmarshalJSON(b []byte) error {
 // patternMatcherFunc is a function that matches a string against a pattern.
 type patternMatcherFunc func(string) (bool, error)
 
-// urlMatcher matches URLs based on pattern type. It can match on exact and regex
-// patterns. If the pattern is empty or a single quote, it matches any URL.
-func urlMatcher(pattern string, jsRegexChecker JSRegexChecker) (patternMatcherFunc, error) {
+// newPatternMatcher returns a [patternMatcherFunc] that uses string matching for
+// quoted strings, and ECMAScript (Sobek) regex matching for others. If the pattern
+// is empty or a single quote, it matches any string.
+func newPatternMatcher(pattern string, rc JSRegexChecker) (patternMatcherFunc, error) {
 	if pattern == "" || pattern == "''" {
-		return func(url string) (bool, error) { return true, nil }, nil
+		return func(s string) (bool, error) { return true, nil }, nil
 	}
-
 	if isQuotedText(pattern) {
-		return func(url string) (bool, error) { return "'"+url+"'" == pattern, nil }, nil
+		return func(s string) (bool, error) { return "'"+s+"'" == pattern, nil }, nil
 	}
-
-	if jsRegexChecker == nil {
-		return nil, fmt.Errorf("JavaScript pattern matcher is required for URL matching")
+	if rc == nil {
+		return nil, fmt.Errorf("regex matcher must be provided")
 	}
-
-	return func(url string) (bool, error) {
-		matched, err := jsRegexChecker(pattern, url)
+	return func(s string) (bool, error) {
+		ok, err := rc(pattern, s)
 		if err != nil {
-			return false, fmt.Errorf("URL pattern matching error for pattern %q and URL %q: %w", pattern, url, err)
+			return false, fmt.Errorf("matching %q against pattern %q: %w", s, pattern, err)
 		}
-		return matched, nil
+		return ok, nil
 	}, nil
 }
 
@@ -2082,7 +2080,7 @@ func (f *Frame) WaitForNavigation(
 	timeoutCtx, timeoutCancel := context.WithTimeout(f.ctx, opts.Timeout)
 
 	// Create URL matcher based on the pattern
-	matcher, err := urlMatcher(opts.URL, jsRegexChecker)
+	matcher, err := newPatternMatcher(opts.URL, jsRegexChecker)
 	if err != nil {
 		timeoutCancel()
 		return nil, fmt.Errorf("parsing URL pattern: %w", err)
@@ -2222,7 +2220,7 @@ func (f *Frame) WaitForURL(urlPattern string, opts *FrameWaitForURLOptions, jsRe
 	f.log.Debugf("Frame:WaitForURL", "fid:%s furl:%q pattern:%s", f.ID(), f.URL(), urlPattern)
 	defer f.log.Debugf("Frame:WaitForURL:return", "fid:%s furl:%q pattern:%s", f.ID(), f.URL(), urlPattern)
 
-	matcher, err := urlMatcher(urlPattern, jsRegexChecker)
+	matcher, err := newPatternMatcher(urlPattern, jsRegexChecker)
 	if err != nil {
 		return fmt.Errorf("parsing URL pattern: %w", err)
 	}
