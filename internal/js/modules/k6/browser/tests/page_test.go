@@ -2,6 +2,7 @@ package tests
 
 import (
 	"bytes"
+	"context"
 	_ "embed"
 	"encoding/json"
 	"fmt"
@@ -3088,7 +3089,7 @@ func TestPageWaitForResponse(t *testing.T) {
 		}
 
 		_, err := p.WaitForResponse("/page", opts, mockRegexChecker)
-		require.ErrorContains(t, err, "canceled")
+		require.ErrorIs(t, err, context.Canceled)
 	})
 
 	t.Run("err/timeout", func(t *testing.T) {
@@ -3114,7 +3115,7 @@ func TestPageWaitForResponse(t *testing.T) {
 		}
 
 		err := tb.run(tb.context(), waitForApi)
-		require.ErrorContains(t, err, "waiting for response")
+		require.ErrorIs(t, err, context.DeadlineExceeded)
 	})
 }
 

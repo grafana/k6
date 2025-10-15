@@ -1926,26 +1926,17 @@ func (p *Page) WaitForResponse(
 	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.waitForResponse")
 	defer span.End()
 
-	timeoutCtx, timeoutCancel := context.WithTimeout(p.ctx, opts.Timeout)
-	defer timeoutCancel()
+	ctx, cancel := context.WithTimeout(p.ctx, opts.Timeout)
+	defer cancel()
 
-	matcher, err := newPatternMatcher(urlPattern, rm)
+	ev, err := p.waitForEvent(ctx, EventPageResponseCalled, func(e PageOnEvent) (bool, error) {
+		return rm.Match(urlPattern, e.Response.URL())
+	})
 	if err != nil {
+		err = &k6ext.UserFriendlyError{Err: err, Timeout: opts.Timeout}
 		spanRecordError(span, err)
-		return nil, fmt.Errorf("parsing URL pattern: %w", err)
 	}
-
-	resp, err := p.responseEventHandler.waitForMatch(timeoutCtx, matcher)
-	if err != nil {
-		e := &k6ext.UserFriendlyError{
-			Err:     err,
-			Timeout: opts.Timeout,
-		}
-		err = fmt.Errorf("waiting for response %q: %w", urlPattern, e)
-		spanRecordError(span, err)
-		return nil, err
-	}
-	return resp, nil
+	return ev.Response, err
 }
 
 // Workers returns all WebWorkers of page.
