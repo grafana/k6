@@ -2,16 +2,23 @@
 
 k6build builds custom k6 binaries with extensions.
 
-
 ## API
 
-`k6build` defines an [API](build.go) for building custom k6 binaries.
+`k6build` defines an [API](build.go) for building custom k6 binaries that satisfies a given list of [dependencies with their constrains](#dependency-resolution).
 
-The API returns the metadata of the custom binary, including an URL for downloading it,
+### Build
+
+The `Build` operation returns the metadata of the custom binary, including an URL for downloading it,
 but does not return the binary itself.
 
-The request for building a binary specifies the target platform (required) and the dependencies,
-including k6.
+The request for building a binary specifies the target platform (required) and the dependencies, including k6.
+
+## Resolve
+
+The `Resolve` operation returns the versions that satisfy the given [depedency constrains](#dependency-resolution) or
+an error if they cannot be satisfied.
+
+### Dependency resolution
 
 The dependencies specify the import path (as used in the k6 script) and the semantic version 
 constrains.
@@ -21,9 +28,17 @@ also defines the available versions.
 
 If a dependency doesn't specify a constrains, the latest version (according to the catalog) is used.
 
-See [k6catalog](http://github.com/grafana/k6catalog) for more details on defining a catalog.
+See [k6catalog](pkg/catalog/catalog.go) for more details on defining a catalog.
 
 The default catalog is defined at https://registry.k6.io/catalog.json
+
+## Server
+
+The [build server](cmd/server/server.go) exposes the [build API](build.go) as a [REST API](pkg/api/api.go).
+
+## Client
+
+The [client package](pkg/client/client.go) implements a client for the [build REST API](pkg/api/api.go).
 
 ## Metrics
 
