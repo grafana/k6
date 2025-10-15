@@ -1390,11 +1390,7 @@ func (p *Page) Referrer() string {
 }
 
 // Route registers a handler to be executed for a given request path
-func (p *Page) Route(
-	path string,
-	handlerCallback RouteHandlerCallback,
-	jsRegexChecker JSRegexChecker,
-) error {
+func (p *Page) Route(path string, cb RouteHandlerCallback, rm RegExMatcher) error {
 	p.logger.Debugf("Page:Route", "sid:%v path:%s", p.sessionID(), path)
 
 	if !p.hasRoutes() {
@@ -1404,12 +1400,12 @@ func (p *Page) Route(
 		}
 	}
 
-	matcher, err := newPatternMatcher(path, jsRegexChecker)
+	matcher, err := newPatternMatcher(path, rm)
 	if err != nil {
 		return fmt.Errorf("creating url matcher for path %s: %w", path, err)
 	}
 
-	routeHandler := NewRouteHandler(path, handlerCallback, matcher)
+	routeHandler := NewRouteHandler(path, cb, matcher)
 	p.routesMu.Lock()
 	defer p.routesMu.Unlock()
 	// Append new route at the beginning of the slice as, when several routes match the given pattern,
@@ -1828,16 +1824,13 @@ func (p *Page) WaitForLoadState(state string, popts *FrameWaitForLoadStateOption
 }
 
 // WaitForNavigation waits for the given navigation lifecycle event to happen.
-// jsRegexChecker should be non-nil to be able to test against a URL pattern in the options.
-func (p *Page) WaitForNavigation(
-	opts *FrameWaitForNavigationOptions,
-	jsRegexChecker JSRegexChecker,
-) (*Response, error) {
+// RegExMatcher should be non-nil to be able to test against a URL pattern in the options.
+func (p *Page) WaitForNavigation(opts *FrameWaitForNavigationOptions, rm RegExMatcher) (*Response, error) {
 	p.logger.Debugf("Page:WaitForNavigation", "sid:%v", p.sessionID())
 	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.waitForNavigation")
 	defer span.End()
 
-	resp, err := p.frameManager.MainFrame().WaitForNavigation(opts, jsRegexChecker)
+	resp, err := p.frameManager.MainFrame().WaitForNavigation(opts, rm)
 	if err != nil {
 		spanRecordError(span, err)
 		return nil, err
@@ -1866,13 +1859,13 @@ func (p *Page) WaitForTimeout(timeout int64) {
 }
 
 // WaitForURL waits for the page to navigate to a URL matching the given pattern.
-// jsRegexChecker should be non-nil to be able to test against a URL pattern.
-func (p *Page) WaitForURL(urlPattern string, opts *FrameWaitForURLOptions, jsRegexChecker JSRegexChecker) error {
+// RegExMatcher should be non-nil to be able to test against a URL pattern.
+func (p *Page) WaitForURL(urlPattern string, opts *FrameWaitForURLOptions, rm RegExMatcher) error {
 	p.logger.Debugf("Page:WaitForURL", "sid:%v pattern:%s", p.sessionID(), urlPattern)
 	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.waitForURL")
 	defer span.End()
 
-	err := p.frameManager.MainFrame().WaitForURL(urlPattern, opts, jsRegexChecker)
+	err := p.frameManager.MainFrame().WaitForURL(urlPattern, opts, rm)
 	if err != nil {
 		spanRecordError(span, err)
 		return err
@@ -1882,18 +1875,18 @@ func (p *Page) WaitForURL(urlPattern string, opts *FrameWaitForURLOptions, jsReg
 }
 
 // WaitForResponse waits for a response that matches the given URL pattern.
-// jsRegexChecker should be non-nil to be able to test against a URL pattern.
+// RegExMatcher should be non-nil to be able to test against a URL pattern.
 func (p *Page) WaitForResponse(
-	urlOrRegex string, opts *PageWaitForResponseOptions, jsRegexChecker JSRegexChecker,
+	urlPattern string, opts *PageWaitForResponseOptions, rm RegExMatcher,
 ) (*Response, error) {
-	p.logger.Debugf("Page:WaitForResponse", "sid:%v pattern:%s", p.sessionID(), urlOrRegex)
+	p.logger.Debugf("Page:WaitForResponse", "sid:%v pattern:%s", p.sessionID(), urlPattern)
 	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.waitForResponse")
 	defer span.End()
 
 	timeoutCtx, timeoutCancel := context.WithTimeout(p.ctx, opts.Timeout)
 	defer timeoutCancel()
 
-	matcher, err := newPatternMatcher(urlOrRegex, jsRegexChecker)
+	matcher, err := newPatternMatcher(urlPattern, rm)
 	if err != nil {
 		spanRecordError(span, err)
 		return nil, fmt.Errorf("parsing URL pattern: %w", err)
@@ -1905,7 +1898,7 @@ func (p *Page) WaitForResponse(
 			Err:     err,
 			Timeout: opts.Timeout,
 		}
-		err = fmt.Errorf("waiting for response %q: %w", urlOrRegex, e)
+		err = fmt.Errorf("waiting for response %q: %w", urlPattern, e)
 		spanRecordError(span, err)
 		return nil, err
 	}
