@@ -253,21 +253,25 @@ func escapesSobekValues(args ...any) bool {
 // patternMatcherFunc is a function that matches a string against a pattern.
 type patternMatcherFunc func(string) (bool, error)
 
+// RegExMatcher is a function that matches a pattern against
+// a string and returns true if they match, false otherwise.
+type RegExMatcher func(pattern, str string) (bool, error)
+
 // newPatternMatcher returns a [patternMatcherFunc] that uses string matching for
 // quoted strings, and ECMAScript (Sobek) regex matching for others. If the pattern
 // is empty or a single quote, it matches any string.
-func newPatternMatcher(pattern string, rc JSRegexChecker) (patternMatcherFunc, error) {
+func newPatternMatcher(pattern string, rm RegExMatcher) (patternMatcherFunc, error) {
 	if pattern == "" || pattern == "''" {
 		return func(s string) (bool, error) { return true, nil }, nil
 	}
 	if isQuotedText(pattern) {
 		return func(s string) (bool, error) { return "'"+s+"'" == pattern, nil }, nil
 	}
-	if rc == nil {
+	if rm == nil {
 		return nil, fmt.Errorf("regex matcher must be provided")
 	}
 	return func(s string) (bool, error) {
-		ok, err := rc(pattern, s)
+		ok, err := rm(pattern, s)
 		if err != nil {
 			return false, fmt.Errorf("matching %q against pattern %q: %w", s, pattern, err)
 		}
@@ -276,10 +280,10 @@ func newPatternMatcher(pattern string, rc JSRegexChecker) (patternMatcherFunc, e
 }
 
 // matchPattern is a helper function that matches the string against
-// the pattern using the provided [JSRegexChecker] for regex patterns.
+// the pattern using the provided [RegExMatcher] for regex patterns.
 // The matcher is behavior is determined by [newPatternMatcher].
-func matchPattern(rc JSRegexChecker, pattern, s string) (bool, error) {
-	m, err := newPatternMatcher(pattern, rc)
+func matchPattern(rm RegExMatcher, pattern, s string) (bool, error) {
+	m, err := newPatternMatcher(pattern, rm)
 	if err != nil {
 		return false, fmt.Errorf("matching %q against pattern %q: %w", s, pattern, err)
 	}
