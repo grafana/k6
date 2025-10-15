@@ -1870,6 +1870,53 @@ func (p *Page) WaitForURL(urlPattern string, opts *FrameWaitForURLOptions, rm Re
 	return nil
 }
 
+// waitForEvent subscribes to the given event and resolves once the predicate
+// determines an event should complete the wait or terminate with an error.
+func (p *Page) waitForEvent(
+	ctx context.Context,
+	eventName PageOnEventName,
+	predicate func(PageOnEvent) (bool, error),
+) (_ PageOnEvent, rerr error) {
+	defer func() {
+		if rerr != nil {
+			rerr = fmt.Errorf("waiting for %s event: %w", eventName, rerr)
+		}
+	}()
+
+	type pageEventWaitResult struct {
+		event PageOnEvent
+		err   error
+	}
+
+	var (
+		once   sync.Once
+		result = make(chan pageEventWaitResult, 1)
+	)
+	id, err := p.addEventHandler(eventName, func(event PageOnEvent) error {
+		ok, perr := predicate(event)
+		if perr == nil && !ok {
+			return nil
+		}
+		// We don't want to deadlock if another event frequently happens.
+		// Although the channel is buffered and we remove the handler once we get
+		// the first event, another event could happen before we remove the handler.
+		once.Do(func() { result <- pageEventWaitResult{event: event, err: perr} })
+		return perr
+	})
+	if err != nil {
+		return PageOnEvent{}, err
+	}
+	// Avoids dangling event handlers after we're done.
+	defer p.removeEventHandler(eventName, id)
+
+	select {
+	case r := <-result:
+		return r.event, r.err
+	case <-ctx.Done():
+		return PageOnEvent{}, ctx.Err()
+	}
+}
+
 // WaitForResponse waits for a response that matches the given URL pattern.
 // RegExMatcher should be non-nil to be able to test against a URL pattern.
 func (p *Page) WaitForResponse(
