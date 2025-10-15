@@ -249,3 +249,28 @@ func escapesSobekValues(args ...any) bool {
 	}
 	return false
 }
+
+// patternMatcherFunc is a function that matches a string against a pattern.
+type patternMatcherFunc func(string) (bool, error)
+
+// newPatternMatcher returns a [patternMatcherFunc] that uses string matching for
+// quoted strings, and ECMAScript (Sobek) regex matching for others. If the pattern
+// is empty or a single quote, it matches any string.
+func newPatternMatcher(pattern string, rc JSRegexChecker) (patternMatcherFunc, error) {
+	if pattern == "" || pattern == "''" {
+		return func(s string) (bool, error) { return true, nil }, nil
+	}
+	if isQuotedText(pattern) {
+		return func(s string) (bool, error) { return "'"+s+"'" == pattern, nil }, nil
+	}
+	if rc == nil {
+		return nil, fmt.Errorf("regex matcher must be provided")
+	}
+	return func(s string) (bool, error) {
+		ok, err := rc(pattern, s)
+		if err != nil {
+			return false, fmt.Errorf("matching %q against pattern %q: %w", s, pattern, err)
+		}
+		return ok, nil
+	}, nil
+}
