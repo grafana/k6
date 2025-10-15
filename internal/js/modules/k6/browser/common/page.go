@@ -1469,6 +1469,7 @@ func (p *Page) removeEventHandler(event PageOnEventName, id uint64) {
 
 	handlers, ok := p.eventHandlers[event]
 	if !ok {
+		p.logger.Debugf("Page:removeEventHandler", "sid:%v event:%s not found", p.sessionID(), event)
 		return
 	}
 	p.eventHandlers[event] = slices.DeleteFunc(handlers, func(r pageOnHandlerRecord) bool {
