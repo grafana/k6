@@ -7,7 +7,7 @@ import (
 )
 
 // mapMetricEvent to the JS module.
-func mapMetricEvent(vu moduleVU, event common.PageOnEvent) mapping {
+func mapMetricEvent(vu moduleVU, event common.PageEvent) mapping {
 	rt := vu.Runtime()
 	em := event.Metric
 
