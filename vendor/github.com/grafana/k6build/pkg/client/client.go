@@ -251,7 +251,9 @@ func shouldRetry(err error, resp *http.Response) bool {
 		return false
 	}
 
-	if resp.StatusCode == http.StatusServiceUnavailable || resp.StatusCode == http.StatusBadGateway {
+	if resp.StatusCode == http.StatusServiceUnavailable ||
+		resp.StatusCode == http.StatusBadGateway ||
+		resp.StatusCode == http.StatusGatewayTimeout {
 		return true
 	}
 

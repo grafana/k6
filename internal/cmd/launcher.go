@@ -54,7 +54,7 @@ type commandExecutor interface {
 
 // provisioner defines the interface for provisioning a commandExecutor for a set of dependencies
 type provisioner interface {
-	provision(k6deps.Dependencies) (commandExecutor, error)
+	provision(map[string]string) (commandExecutor, error)
 }
 
 // launcher is a k6 launcher. It analyses the requirements of a k6 execution,
@@ -85,13 +85,22 @@ func (l *launcher) launch(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	deps, err := analyze(l.gs, args)
+	oldDeps, err := analyze(l.gs, args)
 	if err != nil {
 		l.gs.Logger.
 			WithError(err).
 			Error("Automatic extension resolution is enabled but it failed to analyze the dependencies." +
 				" Please, make sure to report this issue by opening a bug report.")
 		return err
+	}
+
+	deps := make(map[string]string, len(oldDeps))
+	for n, dep := range oldDeps {
+		if dep.Constraints == nil {
+			deps[n] = "*"
+			continue
+		}
+		deps[n] = dep.Constraints.String()
 	}
 
 	if !isCustomBuildRequired(deps, build.Version, ext.GetAll()) {
@@ -197,7 +206,7 @@ func (b *customBinary) run(gs *state.GlobalState) error {
 
 // isCustomBuildRequired checks if there is at least one dependency that are not satisfied by the binary
 // considering the version of k6 and any built-in extension
-func isCustomBuildRequired(deps k6deps.Dependencies, k6Version string, exts []*ext.Extension) bool {
+func isCustomBuildRequired(deps map[string]string, k6Version string, exts []*ext.Extension) bool {
 	// return early if there are no dependencies
 	if len(deps) == 0 {
 		return false
@@ -209,8 +218,8 @@ func isCustomBuildRequired(deps k6deps.Dependencies, k6Version string, exts []*e
 		builtIn[e.Name] = e.Version
 	}
 
-	for _, dep := range deps {
-		version, provided := builtIn[dep.Name]
+	for name, constraints := range deps {
+		version, provided := builtIn[name]
 		// if the binary does not contain a required module, we need a custom
 		if !provided {
 			return true
@@ -218,10 +227,15 @@ func isCustomBuildRequired(deps k6deps.Dependencies, k6Version string, exts []*e
 
 		// If dependency's constrain is null, assume it is "*" and consider it satisfied.
 		// See https://github.com/grafana/k6deps/issues/91
-		if dep.Constraints == nil {
+		if constraints == "*" {
 			continue
 		}
 
+		contraintsSemver, err := semver.NewConstraint(constraints)
+		if err != nil {
+			// Let it fail from the k6provider
+			return true
+		}
 		semver, err := semver.NewVersion(version)
 		if err != nil {
 			// ignore built in module if version is not a valid sem ver (e.g. a development version)
@@ -230,7 +244,7 @@ func isCustomBuildRequired(deps k6deps.Dependencies, k6Version string, exts []*e
 		}
 
 		// if the current version does not satisfies the constrains, binary provisioning is required
-		if !dep.Constraints.Check(semver) {
+		if !contraintsSemver.Check(semver) {
 			return true
 		}
 	}
@@ -247,7 +261,7 @@ func newK6BuildProvisioner(gs *state.GlobalState) provisioner {
 	return &k6buildProvisioner{gs: gs}
 }
 
-func (p *k6buildProvisioner) provision(deps k6deps.Dependencies) (commandExecutor, error) {
+func (p *k6buildProvisioner) provision(deps map[string]string) (commandExecutor, error) {
 	config := getProviderConfig(p.gs)
 
 	provider, err := k6provider.NewProvider(config)

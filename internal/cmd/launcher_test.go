@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/grafana/k6deps"
 	"github.com/grafana/k6provider"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
@@ -44,7 +44,7 @@ type mockProvisioner struct {
 	err      error
 }
 
-func (m *mockProvisioner) provision(_ k6deps.Dependencies) (commandExecutor, error) {
+func (m *mockProvisioner) provision(_ map[string]string) (commandExecutor, error) {
 	m.invoked = true
 	return m.executor, m.err
 }
@@ -479,14 +479,7 @@ func TestIsCustomBuildRequired(t *testing.T) {
 		t.Run(tc.title, func(t *testing.T) {
 			t.Parallel()
 
-			deps := k6deps.Dependencies{}
-			for name, constrain := range tc.deps {
-				dep, err := k6deps.NewDependency(name, constrain)
-				if err != nil {
-					t.Fatalf("parsing %q dependency %v", name, err)
-				}
-				deps[dep.Name] = dep
-			}
+			deps := maps.Clone(tc.deps)
 
 			k6Version := "v1.0.0"
 			required := isCustomBuildRequired(deps, k6Version, tc.exts)
