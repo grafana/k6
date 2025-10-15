@@ -2040,13 +2040,10 @@ func (f *Frame) WaitForLoadState(state string, popts *FrameWaitForLoadStateOptio
 }
 
 // WaitForNavigation waits for the given navigation lifecycle event to happen.
-// jsRegexChecker should be non-nil to be able to test against a URL pattern in the options.
+// RegExMatcher should be non-nil to be able to test against a URL pattern in the options.
 //
 //nolint:funlen
-func (f *Frame) WaitForNavigation(
-	opts *FrameWaitForNavigationOptions,
-	jsRegexChecker JSRegexChecker,
-) (*Response, error) {
+func (f *Frame) WaitForNavigation(opts *FrameWaitForNavigationOptions, rm RegExMatcher) (*Response, error) {
 	f.log.Debugf("Frame:WaitForNavigation",
 		"fid:%s furl:%s url:%s", f.ID(), f.URL(), opts.URL)
 	defer f.log.Debugf("Frame:WaitForNavigation:return",
@@ -2055,7 +2052,7 @@ func (f *Frame) WaitForNavigation(
 	timeoutCtx, timeoutCancel := context.WithTimeout(f.ctx, opts.Timeout)
 
 	// Create URL matcher based on the pattern
-	matcher, err := newPatternMatcher(opts.URL, jsRegexChecker)
+	matcher, err := newPatternMatcher(opts.URL, rm)
 	if err != nil {
 		timeoutCancel()
 		return nil, fmt.Errorf("parsing URL pattern: %w", err)
@@ -2190,12 +2187,12 @@ func (f *Frame) WaitForTimeout(timeout int64) {
 }
 
 // WaitForURL waits for the frame to navigate to a URL matching the given pattern.
-// jsRegexChecker should be non-nil to be able to test against a URL pattern.
-func (f *Frame) WaitForURL(urlPattern string, opts *FrameWaitForURLOptions, rc JSRegexChecker) error {
+// RegExMatcher should be non-nil to be able to test against a URL pattern.
+func (f *Frame) WaitForURL(urlPattern string, opts *FrameWaitForURLOptions, rm RegExMatcher) error {
 	f.log.Debugf("Frame:WaitForURL", "fid:%s furl:%q pattern:%s", f.ID(), f.URL(), urlPattern)
 	defer f.log.Debugf("Frame:WaitForURL:return", "fid:%s furl:%q pattern:%s", f.ID(), f.URL(), urlPattern)
 
-	matched, err := matchPattern(rc, urlPattern, f.URL())
+	matched, err := matchPattern(rm, urlPattern, f.URL())
 	if err != nil {
 		return fmt.Errorf("waiting for URL %q: %w", urlPattern, err)
 	}
@@ -2212,7 +2209,7 @@ func (f *Frame) WaitForURL(urlPattern string, opts *FrameWaitForURLOptions, rc J
 		Timeout:   opts.Timeout,
 		WaitUntil: opts.WaitUntil,
 	}
-	_, err = f.WaitForNavigation(navOpts, rc)
+	_, err = f.WaitForNavigation(navOpts, rm)
 
 	return err
 }
