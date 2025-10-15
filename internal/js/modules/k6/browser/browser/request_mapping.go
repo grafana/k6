@@ -7,7 +7,7 @@ import (
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
 )
 
-func mapRequestEvent(vu moduleVU, event common.PageOnEvent) mapping {
+func mapRequestEvent(vu moduleVU, event common.PageEvent) mapping {
 	r := event.Request
 
 	return mapRequest(vu, r)
