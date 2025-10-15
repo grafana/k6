@@ -588,7 +588,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			})
 		},
 		"waitForURL": func(url sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
-			return waitForURLBodyImpl(vu, p, url, opts)
+			return waitForURLBody(vu, p, url, opts)
 		},
 		"waitForResponse": func(url sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
 			popts, err := parseWaitForResponseOptions(vu.Context(), opts, p.Timeout())
@@ -608,7 +608,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			ctx, stopTaskqueue := context.WithCancel(vu.Context())
 			tq := cancelableTaskQueue(ctx, vu.RegisterCallback)
 
-			jsRegexChecker, err := injectRegexMatcherScript(ctx, vu, tq)
+			rm, err := injectRegexMatcherScript(ctx, vu, tq)
 			if err != nil {
 				stopTaskqueue()
 				return nil, err
@@ -616,7 +616,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 
 			return k6ext.Promise(ctx, func() (result any, reason error) {
 				defer stopTaskqueue()
-				return p.WaitForResponse(val, popts, jsRegexChecker)
+				return p.WaitForResponse(val, popts, rm)
 			}), nil
 		},
 		"workers": func() *sobek.Object {
@@ -767,11 +767,11 @@ func prepK6BrowserRegExChecker(rt *sobek.Runtime) func() error {
 // matches a given pattern in the JS runtime's eventloop.
 //
 // Do not call this off the main thread (not even from within a promise). The returned
-// JSRegexChecker can be called from off the main thread (i.e. in a new goroutine) since
+// RegExMatcher can be called from off the main thread (i.e. in a new goroutine) since
 // it will queue up the checker on the event loop.
 func injectRegexMatcherScript(
 	ctx context.Context, vu moduleVU, tq *taskqueue.TaskQueue,
-) (common.JSRegexChecker, error) {
+) (common.RegExMatcher, error) {
 	rt := vu.Runtime()
 
 	err := prepK6BrowserRegExChecker(rt)()
@@ -944,7 +944,7 @@ func mapPageRoute(vu moduleVU, p *common.Page) func(path sobek.Value, handler so
 		tq := vu.get(ctx, p.TargetID())
 
 		// Inject JS regex checker for URL regex pattern matching
-		jsRegexChecker, err := injectRegexMatcherScript(ctx, vu, tq)
+		rm, err := injectRegexMatcherScript(ctx, vu, tq)
 		if err != nil {
 			return nil, err
 		}
@@ -979,14 +979,14 @@ func mapPageRoute(vu moduleVU, p *common.Page) func(path sobek.Value, handler so
 		}
 
 		return k6ext.Promise(vu.Context(), func() (any, error) {
-			return nil, p.Route(pathStr, routeHandler, jsRegexChecker)
+			return nil, p.Route(pathStr, routeHandler, rm)
 		}), nil
 	}
 }
 
-func waitForURLBodyImpl(vu moduleVU, target interface {
+func waitForURLBody(vu moduleVU, target interface {
 	Timeout() time.Duration
-	WaitForURL(urlPattern string, opts *common.FrameWaitForURLOptions, jsRegexChecker common.JSRegexChecker) error
+	WaitForURL(urlPattern string, opts *common.FrameWaitForURLOptions, rm common.RegExMatcher) error
 }, url sobek.Value, opts sobek.Value,
 ) (*sobek.Promise, error) {
 	if k6common.IsNullish(url) {
@@ -1003,7 +1003,7 @@ func waitForURLBodyImpl(vu moduleVU, target interface {
 	ctx, stopTaskqueue := context.WithCancel(vu.Context())
 	tq := cancelableTaskQueue(ctx, vu.RegisterCallback)
 
-	jsRegexChecker, err := injectRegexMatcherScript(ctx, vu, tq)
+	rm, err := injectRegexMatcherScript(ctx, vu, tq)
 	if err != nil {
 		stopTaskqueue()
 		return nil, err
@@ -1011,13 +1011,13 @@ func waitForURLBodyImpl(vu moduleVU, target interface {
 
 	return k6ext.Promise(ctx, func() (result any, reason error) {
 		defer stopTaskqueue()
-		return nil, target.WaitForURL(val, popts, jsRegexChecker)
+		return nil, target.WaitForURL(val, popts, rm)
 	}), nil
 }
 
 func waitForNavigationBodyImpl(vu moduleVU, target interface {
 	Timeout() time.Duration
-	WaitForNavigation(*common.FrameWaitForNavigationOptions, common.JSRegexChecker) (*common.Response, error)
+	WaitForNavigation(*common.FrameWaitForNavigationOptions, common.RegExMatcher) (*common.Response, error)
 }, opts sobek.Value,
 ) (*sobek.Promise, error) {
 	popts := common.NewFrameWaitForNavigationOptions(target.Timeout())
@@ -1030,7 +1030,7 @@ func waitForNavigationBodyImpl(vu moduleVU, target interface {
 	// Avoid working with the taskqueue unless the URL option is used.
 	// At the moment the taskqueue needs to be cleaned up manually with
 	// page.close.
-	var jsRegexChecker common.JSRegexChecker
+	var rm common.RegExMatcher
 	stopTaskqueue := func() {}
 	if popts.URL != "" {
 		ctx, stopTaskqueue = context.WithCancel(ctx)
@@ -1038,7 +1038,7 @@ func waitForNavigationBodyImpl(vu moduleVU, target interface {
 
 		// Inject JS regex checker for URL regex pattern matching
 		var err error
-		jsRegexChecker, err = injectRegexMatcherScript(ctx, vu, tq)
+		rm, err = injectRegexMatcherScript(ctx, vu, tq)
 		if err != nil {
 			stopTaskqueue()
 			return nil, err
@@ -1047,7 +1047,7 @@ func waitForNavigationBodyImpl(vu moduleVU, target interface {
 
 	return k6ext.Promise(ctx, func() (result any, reason error) {
 		defer stopTaskqueue()
-		resp, err := target.WaitForNavigation(popts, jsRegexChecker)
+		resp, err := target.WaitForNavigation(popts, rm)
 		if err != nil {
 			return nil, err //nolint:wrapcheck
 		}
