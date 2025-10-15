@@ -2192,7 +2192,7 @@ func (f *Frame) WaitForURL(urlPattern string, opts *FrameWaitForURLOptions, rm R
 	f.log.Debugf("Frame:WaitForURL", "fid:%s furl:%q pattern:%s", f.ID(), f.URL(), urlPattern)
 	defer f.log.Debugf("Frame:WaitForURL:return", "fid:%s furl:%q pattern:%s", f.ID(), f.URL(), urlPattern)
 
-	matched, err := matchPattern(rm, urlPattern, f.URL())
+	matched, err := rm.Match(urlPattern, f.URL())
 	if err != nil {
 		return fmt.Errorf("waiting for URL %q: %w", urlPattern, err)
 	}
