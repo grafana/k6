@@ -202,13 +202,13 @@ type ConsoleMessage struct {
 type RouteHandler struct {
 	path       string
 	handler    RouteHandlerCallback
-	urlMatcher URLMatcher
+	urlMatcher patternMatcherFunc
 }
 
 func NewRouteHandler(
 	path string,
 	handler RouteHandlerCallback,
-	urlMatcher URLMatcher,
+	urlMatcher patternMatcherFunc,
 ) *RouteHandler {
 	return &RouteHandler{
 		path:       path,
@@ -226,7 +226,7 @@ type ResponseEventHandler struct {
 }
 
 type responseWaiter struct {
-	matcher      URLMatcher
+	matcher      patternMatcherFunc
 	responseChan chan *Response
 	ctx          context.Context
 	cancel       context.CancelFunc
@@ -263,7 +263,7 @@ func (reh *ResponseEventHandler) processResponse(response *Response) {
 	}
 }
 
-func (reh *ResponseEventHandler) waitForMatch(ctx context.Context, matcher URLMatcher) (*Response, error) {
+func (reh *ResponseEventHandler) waitForMatch(ctx context.Context, matcher patternMatcherFunc) (*Response, error) {
 	waiterContext, waiterCancel := context.WithCancel(ctx)
 
 	waiter := &responseWaiter{
