@@ -1404,7 +1404,7 @@ func (p *Page) Route(
 		}
 	}
 
-	matcher, err := urlMatcher(path, jsRegexChecker)
+	matcher, err := newPatternMatcher(path, jsRegexChecker)
 	if err != nil {
 		return fmt.Errorf("creating url matcher for path %s: %w", path, err)
 	}
@@ -1893,7 +1893,7 @@ func (p *Page) WaitForResponse(
 	timeoutCtx, timeoutCancel := context.WithTimeout(p.ctx, opts.Timeout)
 	defer timeoutCancel()
 
-	matcher, err := urlMatcher(urlOrRegex, jsRegexChecker)
+	matcher, err := newPatternMatcher(urlOrRegex, jsRegexChecker)
 	if err != nil {
 		spanRecordError(span, err)
 		return nil, fmt.Errorf("parsing URL pattern: %w", err)
