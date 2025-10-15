@@ -494,13 +494,9 @@ type Match struct {
 	Method string `js:"method"`
 }
 
-// K6BrowserCheckRegEx is a function that will be used to check the URL tag
-// against the user defined regexes in the Sobek runtime.
-type K6BrowserCheckRegEx func(pattern, url string) (bool, error)
-
 // Tag will find the first match given the URLTagPatterns and the URL from
 // the metric tag and update the name field.
-func (e *MetricEvent) Tag(matchesRegex K6BrowserCheckRegEx, matches TagMatches) error {
+func (e *MetricEvent) Tag(rm RegExMatcher, matches TagMatches) error {
 	name := strings.TrimSpace(matches.TagName)
 	if name == "" {
 		return fmt.Errorf("name %q is invalid", matches.TagName)
@@ -525,7 +521,7 @@ func (e *MetricEvent) Tag(matchesRegex K6BrowserCheckRegEx, matches TagMatches) 
 
 		// matchesRegex is a function that will perform the regex test in the Sobek
 		// runtime.
-		matched, err := matchesRegex(m.URLRegEx, e.url)
+		matched, err := rm(m.URLRegEx, e.url)
 		if err != nil {
 			return err
 		}
