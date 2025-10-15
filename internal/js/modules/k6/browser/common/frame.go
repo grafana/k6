@@ -2191,18 +2191,13 @@ func (f *Frame) WaitForTimeout(timeout int64) {
 
 // WaitForURL waits for the frame to navigate to a URL matching the given pattern.
 // jsRegexChecker should be non-nil to be able to test against a URL pattern.
-func (f *Frame) WaitForURL(urlPattern string, opts *FrameWaitForURLOptions, jsRegexChecker JSRegexChecker) error {
+func (f *Frame) WaitForURL(urlPattern string, opts *FrameWaitForURLOptions, rc JSRegexChecker) error {
 	f.log.Debugf("Frame:WaitForURL", "fid:%s furl:%q pattern:%s", f.ID(), f.URL(), urlPattern)
 	defer f.log.Debugf("Frame:WaitForURL:return", "fid:%s furl:%q pattern:%s", f.ID(), f.URL(), urlPattern)
 
-	matcher, err := newPatternMatcher(urlPattern, jsRegexChecker)
+	matched, err := matchPattern(rc, urlPattern, f.URL())
 	if err != nil {
-		return fmt.Errorf("parsing URL pattern: %w", err)
-	}
-
-	matched, err := matcher(f.URL())
-	if err != nil {
-		return fmt.Errorf("checking current URL: %w", err)
+		return fmt.Errorf("waiting for URL %q: %w", urlPattern, err)
 	}
 	if matched {
 		// Already at target URL, just wait for load state
@@ -2217,7 +2212,8 @@ func (f *Frame) WaitForURL(urlPattern string, opts *FrameWaitForURLOptions, jsRe
 		Timeout:   opts.Timeout,
 		WaitUntil: opts.WaitUntil,
 	}
-	_, err = f.WaitForNavigation(navOpts, jsRegexChecker)
+	_, err = f.WaitForNavigation(navOpts, rc)
+
 	return err
 }
 
