@@ -196,7 +196,7 @@ func TestMappings(t *testing.T) {
 		"mapConsoleMessage": {
 			apiInterface: (*consoleMessageAPI)(nil),
 			mapp: func() mapping {
-				return mapConsoleMessage(moduleVU{VU: vu}, common.PageOnEvent{
+				return mapConsoleMessage(moduleVU{VU: vu}, common.PageEvent{
 					ConsoleMessage: &common.ConsoleMessage{},
 				})
 			},
@@ -204,7 +204,7 @@ func TestMappings(t *testing.T) {
 		"mapMetricEvent": {
 			apiInterface: (*metricEventAPI)(nil),
 			mapp: func() mapping {
-				return mapMetricEvent(moduleVU{VU: vu}, common.PageOnEvent{
+				return mapMetricEvent(moduleVU{VU: vu}, common.PageEvent{
 					Metric: &common.MetricEvent{},
 				})
 			},
@@ -348,7 +348,7 @@ type pageAPI interface { //nolint:interfacebloat
 	IsVisible(selector string, opts sobek.Value) (bool, error)
 	Locator(selector string, opts sobek.Value) *common.Locator
 	MainFrame() *common.Frame
-	On(event common.PageOnEventName, handler func(common.PageOnEvent) error) error
+	On(event common.PageEventName, handler func(common.PageEvent) error) error
 	Opener() pageAPI
 	Press(selector string, key string, opts sobek.Value) error
 	Query(selector string) (*common.ElementHandle, error)

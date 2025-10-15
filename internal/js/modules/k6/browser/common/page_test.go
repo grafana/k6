@@ -36,27 +36,27 @@ func TestPageEventHandlersLifecycle(t *testing.T) {
 	t.Parallel()
 
 	p := &Page{
-		eventHandlers: make(map[PageOnEventName][]pageOnHandlerRecord),
+		eventHandlers: make(map[PageEventName][]pageEventHandlerRecord),
 	}
 
 	// Add some handlers to the page event handling system.
-	handler := func(PageOnEvent) error { return nil }
-	id1, err := p.addEventHandler(EventPageRequestCalled, handler)
+	handler := func(PageEvent) error { return nil }
+	id1, err := p.addEventHandler(PageEventRequest, handler)
 	assert.NoError(t, err)
-	id2, err := p.addEventHandler(EventPageRequestCalled, handler)
+	id2, err := p.addEventHandler(PageEventRequest, handler)
 	assert.NoError(t, err)
-	id3, err := p.addEventHandler(EventPageResponseCalled, handler)
+	id3, err := p.addEventHandler(PageEventResponse, handler)
 	assert.NoError(t, err)
 
 	// Check if the handlers are registered correctly.
-	assert.True(t, p.hasPageOnHandler(EventPageRequestCalled))
-	assert.True(t, p.hasPageOnHandler(EventPageResponseCalled))
-	assert.False(t, p.hasPageOnHandler(EventPageConsoleAPICalled))
+	assert.True(t, p.hasEventHandler(PageEventRequest))
+	assert.True(t, p.hasEventHandler(PageEventResponse))
+	assert.False(t, p.hasEventHandler(PageEventConsole))
 
 	// Remove the handlers and check if they are removed correctly.
-	p.removeEventHandler(EventPageRequestCalled, id1)
-	p.removeEventHandler(EventPageRequestCalled, id2)
-	assert.False(t, p.hasPageOnHandler(EventPageRequestCalled))
-	p.removeEventHandler(EventPageResponseCalled, id3)
-	assert.False(t, p.hasPageOnHandler(EventPageResponseCalled))
+	p.removeEventHandler(PageEventRequest, id1)
+	p.removeEventHandler(PageEventRequest, id2)
+	assert.False(t, p.hasEventHandler(PageEventRequest))
+	p.removeEventHandler(PageEventResponse, id3)
+	assert.False(t, p.hasEventHandler(PageEventResponse))
 }

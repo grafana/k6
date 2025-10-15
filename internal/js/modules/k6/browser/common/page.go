@@ -32,33 +32,33 @@ import (
 // BlankPage represents a blank page.
 const BlankPage = "about:blank"
 
-// PageOnEventName represents the name of the page.on event.
-type PageOnEventName string
+// PageEventName represents the name of the page event.
+type PageEventName string
 
 const webVitalBinding = "k6browserSendWebVitalMetric"
 
 const (
-	// EventPageConsoleAPICalled represents the page.on('console') event.
-	EventPageConsoleAPICalled PageOnEventName = "console"
+	// PageEventConsole represents the page console event.
+	PageEventConsole PageEventName = "console"
 
-	// EventPageMetricCalled represents the page.on('metric') event.
-	EventPageMetricCalled PageOnEventName = "metric"
+	// PageEventMetric represents the page metric event.
+	PageEventMetric PageEventName = "metric"
 
-	// EventPageRequestCalled represents the page.on('request') event.
-	EventPageRequestCalled PageOnEventName = "request"
+	// PageEventRequest represents the page request event.
+	PageEventRequest PageEventName = "request"
 
-	// EventPageResponseCalled represents the page.on('response') event.
-	EventPageResponseCalled PageOnEventName = "response"
+	// PageEventResponse represents the page response event.
+	PageEventResponse PageEventName = "response"
 )
 
-// PageOnHandler is a function type that handles a page on event.
-type PageOnHandler func(PageOnEvent) error
+// PageEventHandler is a function type that handles a page on event.
+type PageEventHandler func(PageEvent) error
 
-// pageOnHandlerRecord is a registered event on a page.
+// pageEventHandlerRecord is a registered event on a page.
 // The id field is used to identify the handler in the eventHandlers map.
-type pageOnHandlerRecord struct {
+type pageEventHandlerRecord struct {
 	id      uint64
-	handler PageOnHandler
+	handler PageEventHandler
 }
 
 // MediaType represents the type of media to emulate.
@@ -255,7 +255,7 @@ type Page struct {
 	backgroundPage bool
 
 	eventCh            chan Event
-	eventHandlers      map[PageOnEventName][]pageOnHandlerRecord
+	eventHandlers      map[PageEventName][]pageEventHandlerRecord
 	eventHandlersMu    sync.RWMutex
 	eventHandlerLastID atomic.Uint64
 
@@ -296,7 +296,7 @@ func NewPage(
 		Keyboard:         NewKeyboard(ctx, s),
 		jsEnabled:        true,
 		eventCh:          make(chan Event),
-		eventHandlers:    make(map[PageOnEventName][]pageOnHandlerRecord),
+		eventHandlers:    make(map[PageEventName][]pageEventHandlerRecord),
 		frameSessions:    make(map[cdp.FrameID]*FrameSession),
 		workers:          make(map[target.SessionID]*Worker),
 		vu:               k6ext.GetVU(ctx),
@@ -468,7 +468,7 @@ func (e *MetricEvent) Tag(rm RegExMatcher, matches TagMatches) error {
 // url regexes and the matching is done from within there. If a match is found,
 // the supplied name is returned back upstream to the caller of urlTagName.
 func (p *Page) urlTagName(url string, method string) (string, bool) {
-	if !p.hasPageOnHandler(EventPageMetricCalled) {
+	if !p.hasEventHandler(PageEventMetric) {
 		return "", false
 	}
 
@@ -481,7 +481,7 @@ func (p *Page) urlTagName(url string, method string) (string, bool) {
 
 	p.eventHandlersMu.RLock()
 	defer p.eventHandlersMu.RUnlock()
-	for _, next := range p.eventHandlers[EventPageMetricCalled] {
+	for _, next := range p.eventHandlers[PageEventMetric] {
 		err := func() error {
 			// Handlers can register other handlers, so we need to
 			// unlock the mutex before calling the next handler.
@@ -489,7 +489,7 @@ func (p *Page) urlTagName(url string, method string) (string, bool) {
 			defer p.eventHandlersMu.RLock()
 
 			// Call and wait for the handler to complete.
-			return next.handler(PageOnEvent{
+			return next.handler(PageEvent{
 				Metric: em,
 			})
 		}()
@@ -511,13 +511,13 @@ func (p *Page) urlTagName(url string, method string) (string, bool) {
 }
 
 func (p *Page) onRequest(request *Request) {
-	if !p.hasPageOnHandler(EventPageRequestCalled) {
+	if !p.hasEventHandler(PageEventRequest) {
 		return
 	}
 
 	p.eventHandlersMu.RLock()
 	defer p.eventHandlersMu.RUnlock()
-	for _, next := range p.eventHandlers[EventPageRequestCalled] {
+	for _, next := range p.eventHandlers[PageEventRequest] {
 		err := func() error {
 			// Handlers can register other handlers, so we need to
 			// unlock the mutex before calling the next handler.
@@ -525,7 +525,7 @@ func (p *Page) onRequest(request *Request) {
 			defer p.eventHandlersMu.RLock()
 
 			// Call and wait for the handler to complete.
-			return next.handler(PageOnEvent{
+			return next.handler(PageEvent{
 				Request: request,
 			})
 		}()
@@ -540,13 +540,13 @@ func (p *Page) onRequest(request *Request) {
 func (p *Page) onResponse(resp *Response) {
 	p.logger.Debugf("Page:onResponse", "sid:%v url:%v", p.sessionID(), resp.URL())
 
-	if !p.hasPageOnHandler(EventPageResponseCalled) {
+	if !p.hasEventHandler(PageEventResponse) {
 		return
 	}
 
 	p.eventHandlersMu.RLock()
 	defer p.eventHandlersMu.RUnlock()
-	for _, next := range p.eventHandlers[EventPageResponseCalled] {
+	for _, next := range p.eventHandlers[PageEventResponse] {
 		err := func() error {
 			// Handlers can register other handlers, so we need to
 			// unlock the mutex before calling the next handler.
@@ -554,7 +554,7 @@ func (p *Page) onResponse(resp *Response) {
 			defer p.eventHandlersMu.RLock()
 
 			// Call and wait for the handler to complete.
-			return next.handler(PageOnEvent{
+			return next.handler(PageEvent{
 				Response: resp,
 			})
 		}()
@@ -566,7 +566,7 @@ func (p *Page) onResponse(resp *Response) {
 }
 
 func (p *Page) onConsoleAPICalled(event *runtime.EventConsoleAPICalled) {
-	if !p.hasPageOnHandler(EventPageConsoleAPICalled) {
+	if !p.hasEventHandler(PageEventConsole) {
 		return
 	}
 
@@ -578,8 +578,8 @@ func (p *Page) onConsoleAPICalled(event *runtime.EventConsoleAPICalled) {
 
 	p.eventHandlersMu.RLock()
 	defer p.eventHandlersMu.RUnlock()
-	for _, next := range p.eventHandlers[EventPageConsoleAPICalled] {
-		err := next.handler(PageOnEvent{
+	for _, next := range p.eventHandlers[PageEventConsole] {
+		err := next.handler(PageEvent{
 			ConsoleMessage: m,
 		})
 		if err != nil {
@@ -1370,9 +1370,9 @@ func (p *Page) NavigationTimeout() time.Duration {
 	return p.frameManager.timeoutSettings.navigationTimeout()
 }
 
-// PageOnEvent represents a generic page event.
+// PageEvent represents a generic page event.
 // Use one of the fields to get the specific event data.
-type PageOnEvent struct {
+type PageEvent struct {
 	// ConsoleMessage is the console message event.
 	ConsoleMessage *ConsoleMessage
 
@@ -1390,16 +1390,16 @@ type PageOnEvent struct {
 // On subscribes to a page event for which the given handler will be executed
 // passing in the ConsoleMessage associated with the event.
 // The only accepted event value is 'console'.
-func (p *Page) On(event PageOnEventName, handler PageOnHandler) error {
+func (p *Page) On(event PageEventName, handler PageEventHandler) error {
 	_, err := p.addEventHandler(event, handler)
 	return err
 }
 
-func (p *Page) addEventHandler(event PageOnEventName, handler PageOnHandler) (id uint64, err error) {
+func (p *Page) addEventHandler(event PageEventName, handler PageEventHandler) (id uint64, err error) {
 	p.eventHandlersMu.Lock()
 	defer p.eventHandlersMu.Unlock()
 
-	r := pageOnHandlerRecord{
+	r := pageEventHandlerRecord{
 		id:      p.eventHandlerLastID.Add(1),
 		handler: handler,
 	}
@@ -1408,7 +1408,7 @@ func (p *Page) addEventHandler(event PageOnEventName, handler PageOnHandler) (id
 	return r.id, nil
 }
 
-func (p *Page) removeEventHandler(event PageOnEventName, id uint64) {
+func (p *Page) removeEventHandler(event PageEventName, id uint64) {
 	p.eventHandlersMu.Lock()
 	defer p.eventHandlersMu.Unlock()
 
@@ -1417,7 +1417,7 @@ func (p *Page) removeEventHandler(event PageOnEventName, id uint64) {
 		p.logger.Debugf("Page:removeEventHandler", "sid:%v event:%s not found", p.sessionID(), event)
 		return
 	}
-	p.eventHandlers[event] = slices.DeleteFunc(handlers, func(r pageOnHandlerRecord) bool {
+	p.eventHandlers[event] = slices.DeleteFunc(handlers, func(r pageEventHandlerRecord) bool {
 		return r.id == id
 	})
 	if len(p.eventHandlers[event]) == 0 {
@@ -1425,9 +1425,9 @@ func (p *Page) removeEventHandler(event PageOnEventName, id uint64) {
 	}
 }
 
-// hasPageOnHandler returns true if there is a handler
+// hasEventHandler returns true if there is a handler
 // registered for the given page on event name.
-func (p *Page) hasPageOnHandler(event PageOnEventName) bool {
+func (p *Page) hasEventHandler(event PageEventName) bool {
 	p.eventHandlersMu.RLock()
 	defer p.eventHandlersMu.RUnlock()
 	handlers, ok := p.eventHandlers[event]
@@ -1794,17 +1794,17 @@ func (p *Page) WaitForURL(urlPattern string, opts *FrameWaitForURLOptions, rm Re
 // determines an event should complete the wait or terminate with an error.
 func (p *Page) waitForEvent(
 	ctx context.Context,
-	eventName PageOnEventName,
-	predicate func(PageOnEvent) (bool, error),
-) (_ PageOnEvent, rerr error) {
+	eventName PageEventName,
+	predicate func(PageEvent) (bool, error),
+) (_ PageEvent, rerr error) {
 	defer func() {
 		if rerr != nil {
-			rerr = fmt.Errorf("waiting for %s event: %w", eventName, rerr)
+			rerr = fmt.Errorf("waiting for page %s event: %w", eventName, rerr)
 		}
 	}()
 
 	type pageEventWaitResult struct {
-		event PageOnEvent
+		event PageEvent
 		err   error
 	}
 
@@ -1812,7 +1812,7 @@ func (p *Page) waitForEvent(
 		once   sync.Once
 		result = make(chan pageEventWaitResult, 1)
 	)
-	id, err := p.addEventHandler(eventName, func(event PageOnEvent) error {
+	id, err := p.addEventHandler(eventName, func(event PageEvent) error {
 		ok, perr := predicate(event)
 		if perr == nil && !ok {
 			return nil
@@ -1824,7 +1824,7 @@ func (p *Page) waitForEvent(
 		return perr
 	})
 	if err != nil {
-		return PageOnEvent{}, err
+		return PageEvent{}, err
 	}
 	// Avoids dangling event handlers after we're done.
 	defer p.removeEventHandler(eventName, id)
@@ -1833,7 +1833,7 @@ func (p *Page) waitForEvent(
 	case r := <-result:
 		return r.event, r.err
 	case <-ctx.Done():
-		return PageOnEvent{}, ctx.Err()
+		return PageEvent{}, ctx.Err()
 	}
 }
 
@@ -1849,7 +1849,7 @@ func (p *Page) WaitForResponse(
 	ctx, cancel := context.WithTimeout(p.ctx, opts.Timeout)
 	defer cancel()
 
-	ev, err := p.waitForEvent(ctx, EventPageResponseCalled, func(e PageOnEvent) (bool, error) {
+	ev, err := p.waitForEvent(ctx, PageEventResponse, func(e PageEvent) (bool, error) {
 		return rm.Match(urlPattern, e.Response.URL())
 	})
 	if err != nil {

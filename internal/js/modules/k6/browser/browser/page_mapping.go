@@ -659,34 +659,34 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 	return maps
 }
 
-// mapPageOn maps the requested page.on event to the Sobek runtime.
-// It generalizes the handling of page.on events.
-func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.Callable) error {
-	return func(eventName common.PageOnEventName, handleEvent sobek.Callable) error {
+// mapPageOn enables using various page.on event handlers with the page.on method.
+// It provides a generic way to map different event types to their respective handler functions.
+func mapPageOn(vu moduleVU, p *common.Page) func(common.PageEventName, sobek.Callable) error {
+	return func(eventName common.PageEventName, handleEvent sobek.Callable) error {
 		rt := vu.Runtime()
 
-		pageOnEvents := map[common.PageOnEventName]struct {
-			mapp func(vu moduleVU, event common.PageOnEvent) mapping
+		pageEvents := map[common.PageEventName]struct {
+			mapp func(vu moduleVU, event common.PageEvent) mapping
 			wait bool // Whether to wait for the handler to complete.
 		}{
-			common.EventPageConsoleAPICalled: {
+			common.PageEventConsole: {
 				mapp: mapConsoleMessage,
 				wait: false,
 			},
-			common.EventPageMetricCalled: {
+			common.PageEventMetric: {
 				mapp: mapMetricEvent,
 				wait: true,
 			},
-			common.EventPageRequestCalled: {
+			common.PageEventRequest: {
 				mapp: mapRequestEvent,
 				wait: false,
 			},
-			common.EventPageResponseCalled: {
+			common.PageEventResponse: {
 				mapp: mapResponseEvent,
 				wait: false,
 			},
 		}
-		pageOnEvent, ok := pageOnEvents[eventName]
+		pageEvent, ok := pageEvents[eventName]
 		if !ok {
 			return fmt.Errorf("unknown page on event: %q", eventName)
 		}
@@ -696,8 +696,8 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 		// Run the event handler in the task queue to
 		// ensure that the handler is executed on the event loop.
 		tq := vu.get(ctx, p.TargetID())
-		eventHandler := func(event common.PageOnEvent) error {
-			mapping := pageOnEvent.mapp(vu, event)
+		eventHandler := func(event common.PageEvent) error {
+			mapping := pageEvent.mapp(vu, event)
 
 			done := make(chan struct{})
 
@@ -715,7 +715,7 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 				return nil
 			})
 
-			if pageOnEvent.wait {
+			if pageEvent.wait {
 				select {
 				case <-done:
 				case <-ctx.Done():
