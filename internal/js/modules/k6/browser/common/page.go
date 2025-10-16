@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -1426,14 +1427,9 @@ func (p *Page) Unroute(path string) error {
 	p.routesMu.Lock()
 	defer p.routesMu.Unlock()
 
-	var filteredRoutes []*RouteHandler
-	for _, route := range p.routes {
-		if route.path != path {
-			filteredRoutes = append(filteredRoutes, route)
-		}
-	}
-
-	p.routes = filteredRoutes
+	p.routes = slices.DeleteFunc(p.routes, func(rh *RouteHandler) bool {
+		return rh.path == path
+	})
 
 	// If no routes remain, disable request interception
 	if len(p.routes) == 0 {
