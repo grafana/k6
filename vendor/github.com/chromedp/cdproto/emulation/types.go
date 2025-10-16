@@ -116,6 +116,7 @@ type UserAgentMetadata struct {
 	Mobile          bool                     `json:"mobile"`
 	Bitness         string                   `json:"bitness,omitempty,omitzero"`
 	Wow64           bool                     `json:"wow64"`
+	FormFactors     []string                 `json:"formFactors,omitempty,omitzero"` // Used to specify User Agent form-factor values. See https://wicg.github.io/ua-client-hints/#sec-ch-ua-form-factors
 }
 
 // SensorType used to specify sensor types to emulate. See
