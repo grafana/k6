@@ -13,6 +13,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
@@ -67,7 +68,7 @@ func loadLocalTest(gs *state.GlobalState, cmd *cobra.Command, args []string) (*l
 	}
 
 	if runtimeOptions.CompatibilityMode.String == lib.CompatibilityModeExperimentalEnhanced.String() {
-		gs.Logger.Warnf("ComaptibilityMode %[1]q is deprecated. Types are stripped by default for `.ts` files. "+
+		gs.Logger.Warnf("CompatibilityMode %[1]q is deprecated. Types are stripped by default for `.ts` files. "+
 			"Please move to using %[2]q instead as %[1]q will be removed in the future",
 			lib.CompatibilityModeExperimentalEnhanced.String(), lib.CompatibilityModeBase.String())
 	}
@@ -134,8 +135,15 @@ func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
 	}
 	switch testType {
 	case testTypeJS:
+		specifier := lt.source.URL.String()
+		pwd := lt.source.URL.JoinPath("../")
 		logger.Debug("Trying to load as a JS test...")
-		runner, err := js.New(lt.preInitState, lt.source, lt.fileSystems)
+		moduleResolver := js.NewModuleResolver(pwd, lt.preInitState, lt.fileSystems)
+		err := moduleResolver.LoadMainModule(pwd, specifier, lt.source.Data)
+		if err != nil {
+			return fmt.Errorf("could not load JS test '%s': %w", testPath, err)
+		}
+		runner, err := js.New(lt.preInitState, lt.source, lt.fileSystems, moduleResolver)
 		// TODO: should we use common.UnwrapGojaInterruptedError() here?
 		if err != nil {
 			return fmt.Errorf("could not load JS test '%s': %w", testPath, err)
@@ -157,7 +165,14 @@ func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
 		switch arc.Type {
 		case testTypeJS:
 			logger.Debug("Evaluating JS from archive bundle...")
-			runner, err := js.NewFromArchive(lt.preInitState, arc)
+			specifier := arc.Filename
+			pwd := arc.PwdURL
+			moduleResolver := js.NewModuleResolver(pwd, lt.preInitState, arc.Filesystems)
+			err := moduleResolver.LoadMainModule(pwd, specifier, arc.Data)
+			if err != nil {
+				return fmt.Errorf("could not load JS test '%s': %w", testPath, err)
+			}
+			runner, err := js.NewFromArchive(lt.preInitState, arc, moduleResolver)
 			if err != nil {
 				return fmt.Errorf("could not load JS from test archive bundle '%s': %w", testPath, err)
 			}

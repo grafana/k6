@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 )
 
@@ -120,9 +121,19 @@ func (a *archiveAnalizer) analyze() (Dependencies, error) {
 
 // resolve the overides of the dependencies from multiple analyzers
 func resolveOverrides(src analyzer, overrides ...analyzer) (Dependencies, error) {
+	var err error
 	deps, err := src.analyze()
 	if err != nil {
 		return nil, err
+	}
+
+	// if k6 is not defined as a dependency in the source, add it
+	if deps[NameK6] == nil {
+		k6Dep, err := NewDependency(NameK6, "*")
+		if err != nil {
+			return nil, fmt.Errorf("creating default k6 dependency: %w", err)
+		}
+		deps[NameK6] = k6Dep
 	}
 
 	for _, a := range overrides {

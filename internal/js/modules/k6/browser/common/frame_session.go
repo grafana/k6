@@ -621,7 +621,7 @@ func (fs *FrameSession) navigateFrame(frame *Frame, url, referrer string) (strin
 		fs.session.ID(), frame.ID(), fs.targetID, url, referrer)
 
 	action := cdppage.Navigate(url).WithReferrer(referrer).WithFrameID(cdp.FrameID(frame.ID()))
-	_, documentID, errorText, err := action.Do(cdp.WithExecutor(fs.ctx, fs.session))
+	_, documentID, errorText, _, err := action.Do(cdp.WithExecutor(fs.ctx, fs.session))
 	if err != nil {
 		if errorText == "" {
 			err = fmt.Errorf("%w", err)
