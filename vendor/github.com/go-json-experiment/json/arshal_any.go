@@ -2,10 +2,13 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build !goexperiment.jsonv2 || !go1.25
+
 package json
 
 import (
 	"cmp"
+	"math"
 	"reflect"
 	"strconv"
 
@@ -33,20 +36,23 @@ func marshalValueAny(enc *jsontext.Encoder, val any, mo *jsonopts.Struct) error 
 	case string:
 		return enc.WriteToken(jsontext.String(val))
 	case float64:
+		if math.IsNaN(val) || math.IsInf(val, 0) {
+			break // use default logic below
+		}
 		return enc.WriteToken(jsontext.Float(val))
 	case map[string]any:
 		return marshalObjectAny(enc, val, mo)
 	case []any:
 		return marshalArrayAny(enc, val, mo)
-	default:
-		v := newAddressableValue(reflect.TypeOf(val))
-		v.Set(reflect.ValueOf(val))
-		marshal := lookupArshaler(v.Type()).marshal
-		if mo.Marshalers != nil {
-			marshal, _ = mo.Marshalers.(*Marshalers).lookup(marshal, v.Type())
-		}
-		return marshal(enc, v, mo)
 	}
+
+	v := newAddressableValue(reflect.TypeOf(val))
+	v.Set(reflect.ValueOf(val))
+	marshal := lookupArshaler(v.Type()).marshal
+	if mo.Marshalers != nil {
+		marshal, _ = mo.Marshalers.(*Marshalers).lookup(marshal, v.Type())
+	}
+	return marshal(enc, v, mo)
 }
 
 // unmarshalValueAny unmarshals a JSON value as a Go any.
@@ -102,7 +108,7 @@ func marshalObjectAny(enc *jsontext.Encoder, obj map[string]any, mo *jsonopts.St
 	if xe.Tokens.Depth() > startDetectingCyclesAfter {
 		v := reflect.ValueOf(obj)
 		if err := visitPointer(&xe.SeenPointers, v); err != nil {
-			return newMarshalErrorBefore(enc, anyType, err)
+			return newMarshalErrorBefore(enc, mapStringAnyType, err)
 		}
 		defer leavePointer(&xe.SeenPointers, v)
 	}
@@ -123,7 +129,7 @@ func marshalObjectAny(enc *jsontext.Encoder, obj map[string]any, mo *jsonopts.St
 		}
 	}
 
-	if err := enc.WriteToken(jsontext.ObjectStart); err != nil {
+	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
 		return err
 	}
 	// A Go map guarantees that each entry has a unique key
@@ -158,7 +164,7 @@ func marshalObjectAny(enc *jsontext.Encoder, obj map[string]any, mo *jsonopts.St
 		}
 		putStrings(names)
 	}
-	if err := enc.WriteToken(jsontext.ObjectEnd); err != nil {
+	if err := enc.WriteToken(jsontext.EndObject); err != nil {
 		return err
 	}
 	return nil
@@ -239,7 +245,7 @@ func marshalArrayAny(enc *jsontext.Encoder, arr []any, mo *jsonopts.Struct) erro
 		}
 	}
 
-	if err := enc.WriteToken(jsontext.ArrayStart); err != nil {
+	if err := enc.WriteToken(jsontext.BeginArray); err != nil {
 		return err
 	}
 	for _, val := range arr {
@@ -247,7 +253,7 @@ func marshalArrayAny(enc *jsontext.Encoder, arr []any, mo *jsonopts.Struct) erro
 			return err
 		}
 	}
-	if err := enc.WriteToken(jsontext.ArrayEnd); err != nil {
+	if err := enc.WriteToken(jsontext.EndArray); err != nil {
 		return err
 	}
 	return nil

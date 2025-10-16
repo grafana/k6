@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build !goexperiment.jsonv2 || !go1.25
+
 package json
 
 import (
@@ -75,9 +77,7 @@ type Options = jsonopts.Options
 // Properties set in later options override the value of previously set properties.
 func JoinOptions(srcs ...Options) Options {
 	var dst jsonopts.Struct
-	for _, src := range srcs {
-		dst.Join(src)
-	}
+	dst.Join(srcs...)
 	return &dst
 }
 
@@ -257,7 +257,7 @@ func (*unmarshalersOption) JSONOptions(internal.NotForPublicUse) {}
 
 // Inject support into "jsonopts" to handle these types.
 func init() {
-	jsonopts.GetUnknownOption = func(src *jsonopts.Struct, zero jsonopts.Options) (any, bool) {
+	jsonopts.GetUnknownOption = func(src jsonopts.Struct, zero jsonopts.Options) (any, bool) {
 		switch zero.(type) {
 		case *marshalersOption:
 			if !src.Flags.Has(jsonflags.Marshalers) {
@@ -273,7 +273,7 @@ func init() {
 			panic(fmt.Sprintf("unknown option %T", zero))
 		}
 	}
-	jsonopts.JoinUnknownOption = func(dst *jsonopts.Struct, src jsonopts.Options) {
+	jsonopts.JoinUnknownOption = func(dst jsonopts.Struct, src jsonopts.Options) jsonopts.Struct {
 		switch src := src.(type) {
 		case *marshalersOption:
 			dst.Flags.Set(jsonflags.Marshalers | 1)
@@ -284,5 +284,6 @@ func init() {
 		default:
 			panic(fmt.Sprintf("unknown option %T", src))
 		}
+		return dst
 	}
 }
