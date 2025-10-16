@@ -85,22 +85,13 @@ func (l *launcher) launch(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	oldDeps, err := analyze(l.gs, args)
+	deps, err := analyze(l.gs, args)
 	if err != nil {
 		l.gs.Logger.
 			WithError(err).
 			Error("Automatic extension resolution is enabled but it failed to analyze the dependencies." +
 				" Please, make sure to report this issue by opening a bug report.")
 		return err
-	}
-
-	deps := make(map[string]string, len(oldDeps))
-	for n, dep := range oldDeps {
-		if dep.Constraints == nil {
-			deps[n] = "*"
-			continue
-		}
-		deps[n] = dep.Constraints.String()
 	}
 
 	if !isCustomBuildRequired(deps, build.Version, ext.GetAll()) {
@@ -310,7 +301,7 @@ func formatDependencies(deps map[string]string) string {
 // Presently, only the k6 input script or archive (if any) is passed to k6deps for scanning.
 // TODO: if k6 receives the input from stdin, it is not used for scanning because we don't know
 // if it is a script or an archive
-func analyze(gs *state.GlobalState, args []string) (k6deps.Dependencies, error) {
+func analyze(gs *state.GlobalState, args []string) (map[string]string, error) {
 	dopts := &k6deps.Options{
 		LookupEnv: func(key string) (string, bool) { v, ok := gs.Env[key]; return v, ok },
 		Manifest:  k6deps.Source{Ignore: true},
@@ -341,7 +332,19 @@ func analyze(gs *state.GlobalState, args []string) (k6deps.Dependencies, error) 
 		dopts.Fs = newIOFSBridge(gs.FS, pwd)
 	}
 
-	return k6deps.Analyze(dopts)
+	deps, err := k6deps.Analyze(dopts)
+	if err != nil {
+		return nil, err
+	}
+	result := make(map[string]string, len(deps))
+	for n, dep := range deps {
+		if dep.Constraints == nil {
+			result[n] = "*"
+			continue
+		}
+		result[n] = dep.Constraints.String()
+	}
+	return result, nil
 }
 
 // isAnalysisRequired returns a boolean indicating if dependency analysis is required for the command
