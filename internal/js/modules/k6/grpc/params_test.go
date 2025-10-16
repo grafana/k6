@@ -1,6 +1,7 @@
 package grpc
 
 import (
+	grpccompress "go.k6.io/k6/internal/js/modules/k6/grpc/compression"
 	"io"
 	"testing"
 	"time"
@@ -202,6 +203,60 @@ func TestConnectParamsAuthority(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, tc.ExpectedAuthority, p.Authority)
+		})
+	}
+}
+
+func TestConnectParamsCompression(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		Name                string
+		JSON                string
+		ExpectedCompression *grpccompress.Spec
+	}{
+		{
+			Name:                "MissingCompression",
+			JSON:                `{}`,
+			ExpectedCompression: nil,
+		},
+		{
+			Name:                "EmptyCompression",
+			JSON:                `{compression: ""}`,
+			ExpectedCompression: nil,
+		},
+		{
+			Name:                "NoneCompression",
+			JSON:                `{compression: "none"}`,
+			ExpectedCompression: nil,
+		},
+		{
+			Name: "zstdDefaultCompression",
+			JSON: `{compression: "zstd"}`,
+			ExpectedCompression: &grpccompress.Spec{
+				Name: "zstd",
+			},
+		},
+		{
+			Name: "zstdCustomCompression",
+			JSON: `{compression: {name: "zstd", params: {"level": 1}}}`,
+			ExpectedCompression: &grpccompress.Spec{
+				Name:    "zstd",
+				Options: map[string]interface{}{"level": int64(1)},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			t.Parallel()
+
+			testRuntime, params := newParamsTestRuntime(t, tc.JSON)
+
+			p, err := newConnectParams(testRuntime.VU, params)
+
+			require.NoError(t, err)
+			assert.Equal(t, tc.ExpectedCompression, p.Compression)
 		})
 	}
 }
