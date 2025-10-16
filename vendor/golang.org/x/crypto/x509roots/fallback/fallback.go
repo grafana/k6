@@ -18,23 +18,28 @@
 // available.
 package fallback
 
-import "crypto/x509"
+import (
+	"crypto/x509"
+
+	"golang.org/x/crypto/x509roots/fallback/bundle"
+)
 
 func init() {
+	x509.SetFallbackRoots(newFallbackCertPool())
+}
+
+func newFallbackCertPool() *x509.CertPool {
 	p := x509.NewCertPool()
-	for _, c := range parsedCertificates {
-		if len(c.constraints) == 0 {
-			p.AddCert(c.cert)
+	for c := range bundle.Roots() {
+		cert, err := x509.ParseCertificate(c.Certificate)
+		if err != nil {
+			panic(err)
+		}
+		if c.Constraint == nil {
+			p.AddCert(cert)
 		} else {
-			p.AddCertWithConstraint(c.cert, func(chain []*x509.Certificate) error {
-				for _, constraint := range c.constraints {
-					if err := constraint(chain); err != nil {
-						return err
-					}
-				}
-				return nil
-			})
+			p.AddCertWithConstraint(cert, c.Constraint)
 		}
 	}
-	x509.SetFallbackRoots(p)
+	return p
 }

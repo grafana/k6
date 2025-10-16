@@ -199,7 +199,7 @@ jobs:
             docker run $DOCKER_IMAGE_ID resume --help
       - name: Login to DockerHub
         if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') }}
-        uses: grafana/shared-workflows/actions/dockerhub-login@13fb504e3bfe323c1188bf244970d94b2d336e86 # dockerhub-login-v1.0.1
+        uses: grafana/shared-workflows/actions/dockerhub-login@c6d954f7cd9c0022018982e01268de6cb75b913c # dockerhub-login/v1.0.2
       - name: Login to ghcr.io
         env:
           GITHUB_ACTOR: ${{ github.actor }}
@@ -575,7 +575,7 @@ jobs:
             PGP_SIGN_KEY_PASSPHRASE=pgp:PGP_SIGN_KEY_PASSPHRASE
             PGP_SIGN_KEY=pgp:PGP_SIGN_KEY
             S3_BUCKET=s3:AWS_S3_BUCKET
-      - uses: grafana/shared-workflows/actions/aws-auth@954bcbdf6e64fe612210885b47df771d9d20447b # aws-auth/v1.0.2
+      - uses: grafana/shared-workflows/actions/aws-auth@85022085ed5314601c05d10e846de56bdd71e369 # aws-auth/v1.0.3
         with:
           aws-region: "us-east-2"
           role-arn: ${{ env.IAM_ROLE_ARN }}
