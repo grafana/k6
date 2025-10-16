@@ -7,7 +7,9 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
+	"time"
 )
 
 // K6BrowserDataDirPattern is the pattern used to create the
@@ -77,5 +79,16 @@ func (d *Dir) Cleanup() error {
 		d.fsRemoveAll = os.RemoveAll //nolint:forbidigo
 	}
 
-	return d.fsRemoveAll(d.Dir)
+	if err := d.fsRemoveAll(d.Dir); err != nil {
+		// On Windows, we may need to retry the removal after a delay to ensure all Chromium processes are terminated.
+		// See https://github.com/grafana/k6/issues/4364
+		if runtime.GOOS == "windows" {
+			time.Sleep(200 * time.Millisecond)
+			return d.fsRemoveAll(d.Dir)
+		}
+
+		return err
+	}
+
+	return nil
 }
