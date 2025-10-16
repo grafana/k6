@@ -41,6 +41,7 @@ type GlobalTestState struct {
 // NewGlobalTestState returns an initialized GlobalTestState, mocking all
 // GlobalState fields for use in tests.
 func NewGlobalTestState(tb testing.TB) *GlobalTestState {
+	tb.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	tb.Cleanup(cancel)
 

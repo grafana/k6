@@ -68,20 +68,25 @@ func getSimpleRunner(tb testing.TB, filename, data string, opts ...interface{}) 
 	}
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	filenameURL := &url.URL{Path: filename, Scheme: "file"}
+
+	preInitState := &lib.TestPreInitState{
+		Logger:         logger,
+		RuntimeOptions: rtOpts,
+		BuiltinMetrics: builtinMetrics,
+		Registry:       registry,
+		LookupEnv:      func(_ string) (val string, ok bool) { return "", false },
+		Usage:          usage.New(),
+	}
+	moduleResolver := NewModuleResolver(loader.Dir(filenameURL), preInitState, fsResolvers)
 	return New(
-		&lib.TestPreInitState{
-			Logger:         logger,
-			RuntimeOptions: rtOpts,
-			BuiltinMetrics: builtinMetrics,
-			Registry:       registry,
-			LookupEnv:      func(_ string) (val string, ok bool) { return "", false },
-			Usage:          usage.New(),
-		},
+		preInitState,
 		&loader.SourceData{
-			URL:  &url.URL{Path: filename, Scheme: "file"},
+			URL:  filenameURL,
 			Data: []byte(data),
 		},
 		fsResolvers,
+		moduleResolver,
 	)
 }
 
@@ -107,14 +112,15 @@ func getSimpleArchiveRunner(tb testing.TB, arc *lib.Archive, opts ...interface{}
 	}
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	return NewFromArchive(
-		&lib.TestPreInitState{
-			Logger:         logger,
-			RuntimeOptions: rtOpts,
-			BuiltinMetrics: builtinMetrics,
-			Registry:       registry,
-			Usage:          usage.New(),
-		}, arc)
+	preInitState := &lib.TestPreInitState{
+		Logger:         logger,
+		RuntimeOptions: rtOpts,
+		BuiltinMetrics: builtinMetrics,
+		Registry:       registry,
+		Usage:          usage.New(),
+	}
+	moduleResolver := NewModuleResolver(arc.PwdURL, preInitState, arc.Filesystems)
+	return NewFromArchive(preInitState, arc, moduleResolver)
 }
 
 // TODO: remove the need for this function, see https://github.com/grafana/k6/issues/2968

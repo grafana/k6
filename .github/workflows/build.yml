@@ -108,7 +108,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Install Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
         with:
           go-version: ${{ needs.configure.outputs.go_version }}
           check-latest: true
@@ -199,7 +199,7 @@ jobs:
             docker run $DOCKER_IMAGE_ID resume --help
       - name: Login to DockerHub
         if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') }}
-        uses: grafana/shared-workflows/actions/dockerhub-login@13fb504e3bfe323c1188bf244970d94b2d336e86 # dockerhub-login-v1.0.1
+        uses: grafana/shared-workflows/actions/dockerhub-login@c6d954f7cd9c0022018982e01268de6cb75b913c # dockerhub-login/v1.0.2
       - name: Login to ghcr.io
         env:
           GITHUB_ACTOR: ${{ github.actor }}
@@ -273,7 +273,7 @@ jobs:
       windows_binary_artifact_name: ${{ steps.assign-artifact-names.outputs.windows-binary-artifact-name }}
     steps:
       - name: Download binaries
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
           name: binaries
           path: dist
@@ -314,7 +314,7 @@ jobs:
           signed-artifact-name: 'windows-binary-signed'
 
       - name: Download signed Windows binary
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         if: needs.configure.outputs.sign_windows_artifacts == 'true'
         with:
           name: ${{ steps.sign-artifacts.outputs.artifact-name }}
@@ -418,7 +418,7 @@ jobs:
     needs: [configure, package]
     steps:
       - name: Download Windows artifacts
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         if: needs.configure.outputs.sign_windows_artifacts == 'true'
         with:
           name: binaries-windows
@@ -482,7 +482,7 @@ jobs:
         run: cd dist && sha256sum * > "k6-${VERSION}-checksums.txt"
       - name: Anchore SBOM Action
         continue-on-error: true
-        uses: anchore/sbom-action@da167eac915b4e86f08b264dbdbc867b61be6f0c # v0.20.5
+        uses: anchore/sbom-action@f8bdd1d8ac5e901a77a92f111440fdb1b593736b # v0.20.6
         with:
           artifact-name: k6-${{ env.VERSION }}-spdx.json
           upload-release-assets: false
@@ -497,6 +497,43 @@ jobs:
             assets+=("$asset")
           done
           gh release create "$VERSION" "${assets[@]}" --target "$GITHUB_SHA" -F "./release notes/${VERSION}.md"
+
+  submit-winget-manifest:
+    needs: [configure, publish-github]
+    runs-on: windows-2025
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+
+    - name: Install WingetCreate
+      shell: pwsh
+      run: |
+        Import-Module Appx -UseWindowsPowerShell
+        $appxBundleFile = Join-Path ${env:RUNNER_TEMP} "wingetcreate.msixbundle"
+        Invoke-WebRequest https://aka.ms/wingetcreate/latest/msixbundle -OutFile $appxBundleFile
+        Add-AppxPackage $appxBundleFile
+
+    - name: Get WinGet token
+      uses: grafana/shared-workflows/actions/get-vault-secrets@a37de51f3d713a30a9e4b21bcdfbd38170020593 # get-vault-secrets/v1.3.0
+      id: get-token
+      with:
+        export_env: false
+        common_secrets: |
+          token=winget-packages:token
+
+    - name: Submit WinGet Manifest
+      env:
+        PACKAGE_ID: GrafanaLabs.k6
+        PACKAGE_VERSION: ${{ needs.configure.outputs.k6_version }}
+        WINGET_CREATE_GITHUB_TOKEN: ${{ fromJSON(steps.get-token.outputs.secrets).token }}
+      shell: pwsh
+      run: |
+        wingetcreate token --store
+        wingetcreate update ${env:PACKAGE_ID} `
+          --urls "${env:GITHUB_SERVER_URL}/${env:GITHUB_REPOSITORY}/releases/download/${env:PACKAGE_VERSION}/k6-${env:PACKAGE_VERSION}-windows-amd64.msi" `
+          --version ${env:PACKAGE_VERSION}.TrimStart("v") `
+          --submit
 
   publish-packages:
     runs-on: ubuntu-latest
@@ -538,7 +575,7 @@ jobs:
             PGP_SIGN_KEY_PASSPHRASE=pgp:PGP_SIGN_KEY_PASSPHRASE
             PGP_SIGN_KEY=pgp:PGP_SIGN_KEY
             S3_BUCKET=s3:AWS_S3_BUCKET
-      - uses: grafana/shared-workflows/actions/aws-auth@954bcbdf6e64fe612210885b47df771d9d20447b # aws-auth/v1.0.2
+      - uses: grafana/shared-workflows/actions/aws-auth@85022085ed5314601c05d10e846de56bdd71e369 # aws-auth/v1.0.3
         with:
           aws-region: "us-east-2"
           role-arn: ${{ env.IAM_ROLE_ARN }}
