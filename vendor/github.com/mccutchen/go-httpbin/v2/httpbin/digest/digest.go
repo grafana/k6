@@ -70,8 +70,8 @@ func Challenge(realm string, algorithm digestAlgorithm) string {
 // sanitizeRealm tries to ensure that a given realm does not include any
 // characters that will trip up our extremely simplistic header parser.
 func sanitizeRealm(realm string) string {
-	realm = strings.Replace(realm, `"`, "", -1)
-	realm = strings.Replace(realm, ",", "", -1)
+	realm = strings.ReplaceAll(realm, `"`, "")
+	realm = strings.ReplaceAll(realm, ",", "")
 	return realm
 }
 

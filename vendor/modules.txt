@@ -271,7 +271,7 @@ github.com/mattn/go-isatty
 # github.com/matttproud/golang_protobuf_extensions v1.0.4
 ## explicit; go 1.9
 github.com/matttproud/golang_protobuf_extensions/pbutil
-# github.com/mccutchen/go-httpbin/v2 v2.18.1
+# github.com/mccutchen/go-httpbin/v2 v2.18.3
 ## explicit; go 1.22.0
 github.com/mccutchen/go-httpbin/v2/httpbin
 github.com/mccutchen/go-httpbin/v2/httpbin/digest
