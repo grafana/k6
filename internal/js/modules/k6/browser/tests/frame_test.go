@@ -394,3 +394,49 @@ func TestFrameWaitForURLFailure(t *testing.T) {
 		})
 	}
 }
+
+
+
+
+func TestFrameElementIsInViewport(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t)
+	p := tb.NewPage(nil)
+
+	// Set up HTML content with an anchor link and a target element pushed way down the page
+	err := p.SetContent(`
+		<a id="top-link" href="#bottom-div">Go to Bottom</a>
+		<div id="bottom-div" style="margin-top: 2000px;">I am at the bottom</div>
+	`, nil)
+	require.NoError(t, err)
+
+	mainFrame := p.MainFrame()
+
+	// Get the element at the bottom
+	bottomElement, err := mainFrame.Query("#bottom-div", false)
+	require.NoError(t, err)
+	require.NotNil(t, bottomElement)
+
+	// 1. First, check that the element is NOT in the viewport
+	inViewport, err := bottomElement.IsInViewport()
+	require.NoError(t, err)
+	require.False(t, inViewport, "the bottom element should not be in the viewport initially")
+
+	// Get the link at the top
+	topLink, err := mainFrame.Query("#top-link", false)
+	require.NoError(t, err)
+	require.NotNil(t, topLink)
+
+	// 2. Click the link to scroll the page
+	err = topLink.Click(common.NewElementHandleClickOptions(mainFrame.Timeout()))
+	require.NoError(t, err)
+
+	// It can take a moment for the scroll to complete, so we wait briefly.
+	time.Sleep(500 * time.Millisecond)
+
+	// 3. Now, check that the element IS in the viewport
+	inViewport, err = bottomElement.IsInViewport()
+	require.NoError(t, err)
+	require.True(t, inViewport, "the bottom element should be in the viewport after clicking the anchor link")
+}
