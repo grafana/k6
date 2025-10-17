@@ -371,6 +371,8 @@ type pageAPI interface { //nolint:interfacebloat
 	Title() (string, error)
 	Type(selector string, text string, opts sobek.Value) error
 	Uncheck(selector string, opts sobek.Value) error
+	Unroute(url string) error
+	UnrouteAll() error
 	URL() (string, error)
 	ViewportSize() map[string]float64
 	WaitForFunction(fn, opts sobek.Value, args ...sobek.Value) (any, error)

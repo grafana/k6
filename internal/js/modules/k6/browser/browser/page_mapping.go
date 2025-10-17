@@ -530,6 +530,16 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, p.Uncheck(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
+		"unroute": func(url string) (*sobek.Promise, error) {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return nil, p.Unroute(url)
+			}), nil
+		},
+		"unrouteAll": func() (*sobek.Promise, error) {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return nil, p.UnrouteAll()
+			}), nil
+		},
 		"url":          p.URL,
 		"viewportSize": p.ViewportSize,
 		"waitForFunction": func(pageFunc, opts sobek.Value, args ...sobek.Value) (*sobek.Promise, error) {
