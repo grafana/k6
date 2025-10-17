@@ -77,6 +77,30 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 				return nil, lo.Dblclick(copts) //nolint:wrapcheck
 			}), nil
 		},
+		"evaluate": func(pageFunc sobek.Value, gargs ...sobek.Value) (*sobek.Promise, error) {
+			if sobekEmptyString(pageFunc) {
+				return nil, fmt.Errorf("evaluate requires a page function")
+			}
+			funcString := pageFunc.String()
+			gopts := exportArgs(gargs)
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return lo.Evaluate(funcString, gopts...)
+			}), nil
+		},
+		"evaluateHandle": func(pageFunc sobek.Value, gargs ...sobek.Value) (*sobek.Promise, error) {
+			if sobekEmptyString(pageFunc) {
+				return nil, fmt.Errorf("evaluateHandle requires a page function")
+			}
+			funcString := pageFunc.String()
+			gopts := exportArgs(gargs)
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				jsh, err := lo.EvaluateHandle(funcString, gopts...)
+				if err != nil {
+					return nil, err //nolint:wrapcheck
+				}
+				return mapJSHandle(vu, jsh), nil
+			}), nil
+		},
 		"setChecked": func(checked bool, opts sobek.Value) (*sobek.Promise, error) {
 			copts := common.NewFrameCheckOptions(lo.Timeout())
 			if err := copts.Parse(vu.Context(), opts); err != nil {

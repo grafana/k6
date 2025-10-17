@@ -147,6 +147,14 @@ func (l *Locator) Dblclick(opts *FrameDblclickOptions) error {
 	return nil
 }
 
+func (l *Locator) Evaluate(pageFunc string, args ...any) (any, error) {
+	return l.frame.evaluateWithSelector(l.selector, pageFunc, args...)
+}
+
+func (l *Locator) EvaluateHandle(pageFunc string, args ...any) (JSHandleAPI, error) {
+	return l.frame.evaluateHandleWithSelector(l.selector, pageFunc, args...)
+}
+
 // SetChecked sets the checked state of the element using locator's selector
 // with strict mode on.
 func (l *Locator) SetChecked(checked bool, opts *FrameCheckOptions) error {
