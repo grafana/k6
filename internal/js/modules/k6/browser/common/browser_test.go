@@ -18,45 +18,33 @@ import (
 func TestBrowserNewPageInContext(t *testing.T) {
 	t.Parallel()
 
-	type testCase struct {
-		b  *Browser
-		bc *BrowserContext
-	}
-	newTestCase := func(id cdp.BrowserContextID) *testCase {
-		ctx, cancel := context.WithCancel(context.Background())
-		logger := log.NewNullLogger()
-		b := newBrowser(context.Background(), ctx, cancel, nil, NewLocalBrowserOptions(), logger)
-		// set a new browser context in the browser with `id`, so that newPageInContext can find it.
-		var err error
-		vu := k6test.NewVU(t)
-		ctx = k6ext.WithVU(ctx, vu)
-		b.context, err = NewBrowserContext(ctx, b, id, nil, nil)
-		require.NoError(t, err)
-		return &testCase{
-			b:  b,
-			bc: b.context,
-		}
-	}
-
 	const (
 		// default IDs to be used in tests.
 		browserContextID cdp.BrowserContextID = "42"
 		targetID         target.ID            = "84"
 	)
 
-	t.Run("happy_path", func(t *testing.T) {
-		t.Parallel()
+	type testCase struct {
+		b  *Browser
+		bc *BrowserContext
+	}
 
-		// newPageInContext will look for this browser context.
-		tc := newTestCase(browserContextID)
+	newTestCase := func(id cdp.BrowserContextID) *testCase {
+		ctx, cancel := context.WithCancel(context.Background())
+		b := newBrowser(context.Background(), ctx, cancel, nil, NewLocalBrowserOptions(), log.NewNullLogger())
+
+		// set a new browser context in the browser with `id`, so that newPageInContext can find it.
+		var err error
+		b.context, err = NewBrowserContext(k6ext.WithVU(ctx, k6test.NewVU(t)), b, id, nil, nil)
+		b.defaultContext = b.context // always happens when a new browser is connected
+		require.NoError(t, err)
+
+		tc := &testCase{b: b, bc: b.context}
 
 		// newPageInContext will return this page by searching it by its targetID in the wait event handler.
 		tc.b.pages[targetID] = &Page{targetID: targetID}
-
 		tc.b.conn = fakeConn{
-			execute: func(
-				ctx context.Context, method string, params, res any,
-			) error {
+			execute: func(ctx context.Context, method string, params, res any) error {
 				require.Equal(t, target.CommandCreateTarget, method)
 				require.IsType(t, params, &target.CreateTargetParams{})
 				tp, _ := params.(*target.CreateTargetParams)
@@ -79,6 +67,14 @@ func TestBrowserNewPageInContext(t *testing.T) {
 				return nil
 			},
 		}
+		return tc
+	}
+
+	t.Run("happy_path", func(t *testing.T) {
+		t.Parallel()
+
+		// newPageInContext will look for this browser context.
+		tc := newTestCase(browserContextID)
 
 		page, err := tc.b.newPageInContext(browserContextID)
 		require.NoError(t, err)
