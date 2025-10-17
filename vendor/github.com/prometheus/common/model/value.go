@@ -21,14 +21,12 @@ import (
 	"strings"
 )
 
-var (
-	// ZeroSample is the pseudo zero-value of Sample used to signal a
-	// non-existing sample. It is a Sample with timestamp Earliest, value 0.0,
-	// and metric nil. Note that the natural zero value of Sample has a timestamp
-	// of 0, which is possible to appear in a real Sample and thus not suitable
-	// to signal a non-existing Sample.
-	ZeroSample = Sample{Timestamp: Earliest}
-)
+// ZeroSample is the pseudo zero-value of Sample used to signal a
+// non-existing sample. It is a Sample with timestamp Earliest, value 0.0,
+// and metric nil. Note that the natural zero value of Sample has a timestamp
+// of 0, which is possible to appear in a real Sample and thus not suitable
+// to signal a non-existing Sample.
+var ZeroSample = Sample{Timestamp: Earliest}
 
 // Sample is a sample pair associated with a metric. A single sample must either
 // define Value or Histogram but not both. Histogram == nil implies the Value
@@ -193,7 +191,8 @@ func (ss SampleStream) String() string {
 }
 
 func (ss SampleStream) MarshalJSON() ([]byte, error) {
-	if len(ss.Histograms) > 0 && len(ss.Values) > 0 {
+	switch {
+	case len(ss.Histograms) > 0 && len(ss.Values) > 0:
 		v := struct {
 			Metric     Metric                `json:"metric"`
 			Values     []SamplePair          `json:"values"`
@@ -204,7 +203,7 @@ func (ss SampleStream) MarshalJSON() ([]byte, error) {
 			Histograms: ss.Histograms,
 		}
 		return json.Marshal(&v)
-	} else if len(ss.Histograms) > 0 {
+	case len(ss.Histograms) > 0:
 		v := struct {
 			Metric     Metric                `json:"metric"`
 			Histograms []SampleHistogramPair `json:"histograms"`
@@ -213,7 +212,7 @@ func (ss SampleStream) MarshalJSON() ([]byte, error) {
 			Histograms: ss.Histograms,
 		}
 		return json.Marshal(&v)
-	} else {
+	default:
 		v := struct {
 			Metric Metric       `json:"metric"`
 			Values []SamplePair `json:"values"`
@@ -260,7 +259,7 @@ func (s Scalar) String() string {
 // MarshalJSON implements json.Marshaler.
 func (s Scalar) MarshalJSON() ([]byte, error) {
 	v := strconv.FormatFloat(float64(s.Value), 'f', -1, 64)
-	return json.Marshal([...]interface{}{s.Timestamp, string(v)})
+	return json.Marshal([...]interface{}{s.Timestamp, v})
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -274,7 +273,7 @@ func (s *Scalar) UnmarshalJSON(b []byte) error {
 
 	value, err := strconv.ParseFloat(f, 64)
 	if err != nil {
-		return fmt.Errorf("error parsing sample value: %s", err)
+		return fmt.Errorf("error parsing sample value: %w", err)
 	}
 	s.Value = SampleValue(value)
 	return nil
@@ -351,9 +350,9 @@ func (m Matrix) Len() int           { return len(m) }
 func (m Matrix) Less(i, j int) bool { return m[i].Metric.Before(m[j].Metric) }
 func (m Matrix) Swap(i, j int)      { m[i], m[j] = m[j], m[i] }
 
-func (mat Matrix) String() string {
-	matCp := make(Matrix, len(mat))
-	copy(matCp, mat)
+func (m Matrix) String() string {
+	matCp := make(Matrix, len(m))
+	copy(matCp, m)
 	sort.Sort(matCp)
 
 	strs := make([]string, len(matCp))
