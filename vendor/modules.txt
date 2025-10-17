@@ -179,7 +179,7 @@ github.com/google/uuid
 # github.com/gorilla/websocket v1.5.3
 ## explicit; go 1.12
 github.com/gorilla/websocket
-# github.com/grafana/k6build v0.5.14
+# github.com/grafana/k6build v0.5.15
 ## explicit; go 1.24.0
 github.com/grafana/k6build
 github.com/grafana/k6build/pkg/api
@@ -192,7 +192,7 @@ github.com/grafana/k6deps/internal/pack/plugins/file
 github.com/grafana/k6deps/internal/pack/plugins/http
 github.com/grafana/k6deps/internal/pack/plugins/k6
 github.com/grafana/k6deps/internal/rootfs
-# github.com/grafana/k6provider v0.1.16
+# github.com/grafana/k6provider v0.2.0
 ## explicit; go 1.24.0
 github.com/grafana/k6provider
 # github.com/grafana/sobek v0.0.0-20250723111835-dd8a13f0d439

@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/grafana/k6deps"
 	"github.com/grafana/k6provider"
 	"github.com/spf13/afero"
@@ -44,7 +45,7 @@ type mockProvisioner struct {
 	err      error
 }
 
-func (m *mockProvisioner) provision(_ k6deps.Dependencies) (commandExecutor, error) {
+func (m *mockProvisioner) provision(_ map[string]string) (commandExecutor, error) {
 	m.invoked = true
 	return m.executor, m.err
 }
@@ -479,13 +480,13 @@ func TestIsCustomBuildRequired(t *testing.T) {
 		t.Run(tc.title, func(t *testing.T) {
 			t.Parallel()
 
-			deps := k6deps.Dependencies{}
+			deps := make(map[string]*semver.Constraints)
 			for name, constrain := range tc.deps {
 				dep, err := k6deps.NewDependency(name, constrain)
 				if err != nil {
 					t.Fatalf("parsing %q dependency %v", name, err)
 				}
-				deps[dep.Name] = dep
+				deps[dep.Name] = dep.Constraints
 			}
 
 			k6Version := "v1.0.0"
