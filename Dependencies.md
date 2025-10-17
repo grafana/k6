@@ -43,6 +43,19 @@ List (as of March 2022):
 
 ## How to do it
 
+As of 2025-10-09
+
+Now that we have Renovate we should work with it to update the dependencies:
+1. Go to the renovate dashboard: https://github.com/grafana/k6/issues/5190
+1. Trigger updates for forcing the rate-limited pull requests
+1. Go over the Renovate's pull requests and merge them if they are fine
+    1. If some requires adjustment distribute across the team
+1. If Renovate config requires adjustments then change the renovate.json file
+1. Do not merge pull requests triggered by indirect deps update
+    1. We should escalate to the team to investigate why this is happening as this is not expected. Probably a security vulnerability on the indirect dep.
+
+## How to do it (OLD)
+
 For updating dependencies we recommend to use [modtools](https://github.com/dop251/modtools).
 
 Running `modtools check --direct-only` will give you a list of packages that aren't frozen (the ones above in the exceptions). Alternatively just running `go get <dependency>` for each direct dependency, which also will tell you if there was an update.
