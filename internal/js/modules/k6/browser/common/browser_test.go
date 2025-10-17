@@ -24,14 +24,12 @@ func TestBrowserNewPageInContext(t *testing.T) {
 	}
 	newTestCase := func(id cdp.BrowserContextID) *testCase {
 		ctx, cancel := context.WithCancel(context.Background())
-		logger := log.NewNullLogger()
-		b := newBrowser(context.Background(), ctx, cancel, nil, NewLocalBrowserOptions(), logger)
+		b := newBrowser(context.Background(), ctx, cancel, nil, NewLocalBrowserOptions(), log.NewNullLogger())
 		// set a new browser context in the browser with `id`, so that newPageInContext can find it.
-		var err error
-		vu := k6test.NewVU(t)
-		ctx = k6ext.WithVU(ctx, vu)
-		b.context, err = NewBrowserContext(ctx, b, id, nil, nil)
+		bc, err := NewBrowserContext(k6ext.WithVU(ctx, k6test.NewVU(t)), b, id, nil, nil)
 		require.NoError(t, err)
+		b.defaultContext = bc
+		b.context = bc // this always happens when the browser connects.
 		return &testCase{
 			b:  b,
 			bc: b.context,
@@ -118,6 +116,30 @@ func TestBrowserNewPageInContext(t *testing.T) {
 		require.NotNil(t, err)
 		require.Contains(t, err.Error(), wantErr)
 		require.Nil(t, page)
+	})
+
+	t.Run("missing_browser_context_without_current_context", func(t *testing.T) {
+		t.Parallel()
+
+		ctx, cancel := context.WithCancel(context.Background())
+		t.Cleanup(cancel)
+
+		logger := log.NewNullLogger()
+		b := newBrowser(context.Background(), ctx, cancel, nil, NewLocalBrowserOptions(), logger)
+
+		// Use a VU-backed context to create a default browser context.
+		vu := k6test.NewVU(t)
+		vuCtx := k6ext.WithVU(context.Background(), vu)
+
+		defaultCtx, err := NewBrowserContext(vuCtx, b, browserContextID, nil, nil)
+		require.NoError(t, err)
+		b.defaultContext = defaultCtx
+
+		require.NotPanics(t, func() {
+			page, err := b.newPageInContext(browserContextID)
+			require.Error(t, err)
+			require.Nil(t, page)
+		})
 	})
 
 	t.Run("timeout", func(t *testing.T) {
