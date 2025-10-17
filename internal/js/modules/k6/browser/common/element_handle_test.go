@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"errors"
+	"strconv"
 	"testing"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/common/js"
@@ -152,6 +153,46 @@ func TestQueryAll(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("return_in_document_order", func(t *testing.T) {
+		t.Parallel()
+
+		const numElements = 15
+
+		elems := make([]*ElementHandle, numElements)
+		handles := map[string]JSHandleAPI{
+			// non-numeric keys that should be filtered out
+			"length":  &jsHandleStub{asElementFn: nilHandle},
+			"forEach": &jsHandleStub{asElementFn: nilHandle},
+			"item":    &jsHandleStub{asElementFn: nilHandle},
+		}
+		for i := range numElements {
+			elems[i] = &ElementHandle{}
+			key := strconv.FormatInt(int64(i), 10)
+			handles[key] = &jsHandleStub{
+				asElementFn: func(idx int) func() *ElementHandle {
+					return func() *ElementHandle { return elems[idx] }
+				}(i),
+			}
+		}
+
+		returnHandle := &jsHandleStub{
+			getPropertiesFn: func() (map[string]JSHandleAPI, error) {
+				return handles, nil
+			},
+		}
+
+		evalFunc := func(_ context.Context, _ evalOptions, _ string, _ ...any) (any, error) {
+			return returnHandle, nil
+		}
+
+		results, err := (&ElementHandle{}).queryAll("*", evalFunc)
+		require.NoError(t, err)
+		require.Len(t, results, numElements)
+		for i := range numElements {
+			assert.Same(t, elems[i], results[i], "element at index %d should match", i)
+		}
+	})
 
 	t.Run("eval_call", func(t *testing.T) {
 		t.Parallel()
