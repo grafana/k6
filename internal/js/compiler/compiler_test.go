@@ -98,6 +98,19 @@ func TestCompile(t *testing.T) {
 		assert.IsType(t, parser.ErrorList{}, err)
 		assert.Contains(t, err.Error(), `Line 1:4 Unexpected token =>`)
 	})
+
+	t.Run("Stdin TS", func(t *testing.T) {
+		t.Parallel()
+		c := New(testutils.NewLogger(t))
+		src := `1 + (((): number => 2)());`
+		prg, _, err := c.Parse(src, "file:///-", false, false)
+		require.NoError(t, err)
+		pgm, err := sobek.CompileAST(prg, true)
+		require.NoError(t, err)
+		v, err := sobek.New().RunProgram(pgm)
+		require.NoError(t, err)
+		assert.Equal(t, int64(3), v.Export())
+	})
 }
 
 func TestCorruptSourceMap(t *testing.T) {

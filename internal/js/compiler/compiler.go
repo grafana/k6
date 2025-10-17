@@ -115,22 +115,28 @@ func (ps *parsingState) parseImpl(src, filename string, commonJSWrap bool) (*ast
 		return prg, code, nil
 	}
 
-	if strings.HasSuffix(filename, ".ts") {
+	isTsExtensionFile := strings.HasSuffix(filename, ".ts")
+	isStdin := filename == "file:///-"
+	if !isTsExtensionFile && !isStdin {
+		return nil, "", err
+	}
+
+	if isTsExtensionFile {
 		if err := ps.compiler.usage.Uint64(usageParsedTSFilesKey, 1); err != nil {
 			ps.compiler.logger.WithError(err).Warn("couldn't report usage for " + usageParsedTSFilesKey)
 		}
-		code, ps.srcMap, err = StripTypes(src, filename)
-		if err != nil {
-			return nil, "", err
-		}
-		if ps.loader != nil {
-			// This hack is required for the source map to work
-			code += "\n//# sourceMappingURL=" + internalSourceMapURL
-		}
-		ps.commonJSWrapped = false
-		return ps.parseImpl(code, filename, commonJSWrap)
 	}
-	return nil, "", err
+
+	code, ps.srcMap, err = StripTypes(src, filename)
+	if err != nil {
+		return nil, "", err
+	}
+	if ps.loader != nil {
+		// This hack is required for the source map to work
+		code += "\n//# sourceMappingURL=" + internalSourceMapURL
+	}
+	ps.commonJSWrapped = false
+	return ps.parseImpl(code, filename, commonJSWrap)
 }
 
 func (ps *parsingState) wrap(code, filename string) string {
