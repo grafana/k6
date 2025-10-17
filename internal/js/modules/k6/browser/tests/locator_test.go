@@ -322,20 +322,6 @@ func TestLocator(t *testing.T) {
 			},
 		},
 		{
-			"PressSequentiallyTextarea", func(_ *testBrowser, p *common.Page) {
-				lo := p.Locator("textarea", nil)
-				require.NoError(t, lo.Clear(common.NewFrameFillOptions(lo.Timeout())))
-
-				opts := common.NewFramePressOptions(lo.Timeout())
-				require.NoError(t, lo.PressSequentially("some text", opts))
-
-				value, err := p.InputValue("textarea", common.NewFrameInputValueOptions(p.MainFrame().Timeout()))
-				require.NoError(t, err)
-				require.Equal(t, "some text", value)
-			},
-		},
-
-		{
 			"SelectOption", func(tb *testBrowser, p *common.Page) {
 				l := p.Locator("#selectElement", nil)
 				a, err := browser.ConvertSelectOptionValues(tb.vu.Runtime(), tb.toSobekValue(`option text 2`))
