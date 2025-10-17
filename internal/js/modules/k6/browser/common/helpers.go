@@ -205,16 +205,6 @@ func createWaitForEventPredicateHandler(
 	return ch, evCancelFn
 }
 
-// panicOrSlowMo panics if err is not nil, otherwise applies slow motion.
-//
-//nolint:unused
-func panicOrSlowMo(ctx context.Context, err error) {
-	if err != nil {
-		k6ext.Panicf(ctx, "%w", err)
-	}
-	applySlowMo(ctx)
-}
-
 // TrimQuotes removes surrounding single or double quotes from s.
 // We're not using strings.Trim() to avoid trimming unbalanced values,
 // e.g. `"'arg` shouldn't change.

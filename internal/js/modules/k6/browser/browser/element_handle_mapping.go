@@ -197,7 +197,7 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			}), nil
 		},
 		"selectOption": func(values sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
-			convValues, err := common.ConvertSelectOptionValues(vu.Runtime(), values)
+			convValues, err := ConvertSelectOptionValues(vu.Runtime(), values)
 			if err != nil {
 				return nil, fmt.Errorf("parsing select options values: %w", err)
 			}

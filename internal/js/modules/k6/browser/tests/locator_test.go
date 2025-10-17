@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"go.k6.io/k6/internal/js/modules/k6/browser/browser"
 	"go.k6.io/k6/internal/js/modules/k6/browser/common"
 )
 
@@ -294,7 +295,7 @@ func TestLocator(t *testing.T) {
 		{
 			"SelectOption", func(tb *testBrowser, p *common.Page) {
 				l := p.Locator("#selectElement", nil)
-				a, err := common.ConvertSelectOptionValues(tb.vu.Runtime(), tb.toSobekValue(`option text 2`))
+				a, err := browser.ConvertSelectOptionValues(tb.vu.Runtime(), tb.toSobekValue(`option text 2`))
 				require.NoError(t, err)
 				rv, err := l.SelectOption(a, common.NewFrameSelectOptionOptions(l.Timeout()))
 				require.NoError(t, err)
