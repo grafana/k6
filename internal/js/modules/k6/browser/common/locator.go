@@ -532,7 +532,10 @@ func (l *Locator) Press(key string, opts *FramePressOptions) error {
 	return nil
 }
 
-// Press Sequentially focuses the element and then sends a keydown, keypress/input, and keyup event for each character in the text.
+// Press Sequentially focuses the element and then sends a keydown, keypress/input,
+//
+// and keyup event for each character in the text.
+//
 // for special keys -- locator.press() should be used
 func (l *Locator) PressSequentially(text string, opts *FramePressOptions) error {
 	l.log.Debugf(
