@@ -301,8 +301,8 @@ github.com/pmezard/go-difflib/difflib
 github.com/prometheus/client_golang/prometheus
 github.com/prometheus/client_golang/prometheus/internal
 github.com/prometheus/client_golang/prometheus/promhttp
-# github.com/prometheus/client_model v0.4.0
-## explicit; go 1.18
+# github.com/prometheus/client_model v0.6.2
+## explicit; go 1.22.0
 github.com/prometheus/client_model/go
 # github.com/prometheus/common v0.42.0
 ## explicit; go 1.18
