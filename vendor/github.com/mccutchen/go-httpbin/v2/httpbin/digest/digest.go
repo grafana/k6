@@ -12,10 +12,10 @@ package digest
 
 import (
 	"crypto/md5"
+	crypto_rand "crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
 	"fmt"
-	"math/rand"
 	"net/http"
 	"strings"
 	"time"
@@ -55,7 +55,7 @@ func Check(req *http.Request, username, password string) bool {
 // algorithm. If an invalid realm or an unsupported algorithm is given
 func Challenge(realm string, algorithm digestAlgorithm) string {
 	entropy := make([]byte, 32)
-	rand.Read(entropy)
+	crypto_rand.Read(entropy)
 
 	opaqueVal := entropy[:16]
 	nonceVal := fmt.Sprintf("%s:%x", time.Now(), entropy[16:31])
@@ -70,8 +70,8 @@ func Challenge(realm string, algorithm digestAlgorithm) string {
 // sanitizeRealm tries to ensure that a given realm does not include any
 // characters that will trip up our extremely simplistic header parser.
 func sanitizeRealm(realm string) string {
-	realm = strings.Replace(realm, `"`, "", -1)
-	realm = strings.Replace(realm, ",", "", -1)
+	realm = strings.ReplaceAll(realm, `"`, "")
+	realm = strings.ReplaceAll(realm, ",", "")
 	return realm
 }
 
@@ -92,15 +92,15 @@ type authorization struct {
 // parseAuthorizationHeader parses an Authorization header into an
 // Authorization struct, given a an authorization header like:
 //
-//    Authorization: Digest username="Mufasa",
-//                         realm="testrealm@host.com",
-//                         nonce="dcd98b7102dd2f0e8b11d0f600bfb0c093",
-//                         uri="/dir/index.html",
-//                         qop=auth,
-//                         nc=00000001,
-//                         cnonce="0a4f113b",
-//                         response="6629fae49393a05397450978507c4ef1",
-//                         opaque="5ccc069c403ebaf9f0171e9517f40e41"
+//	Authorization: Digest username="Mufasa",
+//	                     realm="testrealm@host.com",
+//	                     nonce="dcd98b7102dd2f0e8b11d0f600bfb0c093",
+//	                     uri="/dir/index.html",
+//	                     qop=auth,
+//	                     nc=00000001,
+//	                     cnonce="0a4f113b",
+//	                     response="6629fae49393a05397450978507c4ef1",
+//	                     opaque="5ccc069c403ebaf9f0171e9517f40e41"
 //
 // If the given value does not contain a Digest authorization header, or is in
 // some other way malformed, nil is returned.
@@ -174,7 +174,7 @@ func hash(data []byte, algorithm digestAlgorithm) string {
 
 // makeHA1 returns the HA1 hash, where
 //
-//     HA1 = H(A1) = H(username:realm:password)
+//	HA1 = H(A1) = H(username:realm:password)
 //
 // and H is one of MD5 or SHA256.
 func makeHA1(realm, username, password string, algorithm digestAlgorithm) string {
@@ -184,7 +184,7 @@ func makeHA1(realm, username, password string, algorithm digestAlgorithm) string
 
 // makeHA2 returns the HA2 hash, where
 //
-//     HA2 = H(A2) = H(method:digestURI)
+//	HA2 = H(A2) = H(method:digestURI)
 //
 // and H is one of MD5 or SHA256.
 func makeHA2(auth *authorization, method, uri string) string {
@@ -195,11 +195,11 @@ func makeHA2(auth *authorization, method, uri string) string {
 // Response calculates the correct digest auth response. If the qop directive's
 // value is "auth" or "auth-int" , then compute the response as
 //
-//    RESPONSE = H(HA1:nonce:nonceCount:clientNonce:qop:HA2)
+//	RESPONSE = H(HA1:nonce:nonceCount:clientNonce:qop:HA2)
 //
 // and if the qop directive is unspecified, then compute the response as
 //
-//    RESPONSE = H(HA1:nonce:HA2)
+//	RESPONSE = H(HA1:nonce:HA2)
 //
 // where H is one of MD5 or SHA256.
 func response(auth *authorization, password, method, uri string) string {

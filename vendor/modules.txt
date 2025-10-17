@@ -271,11 +271,11 @@ github.com/mattn/go-isatty
 # github.com/matttproud/golang_protobuf_extensions v1.0.4
 ## explicit; go 1.9
 github.com/matttproud/golang_protobuf_extensions/pbutil
-# github.com/mccutchen/go-httpbin v1.1.2-0.20190116014521-c5cb2f4802fa
-## explicit
-github.com/mccutchen/go-httpbin/httpbin
-github.com/mccutchen/go-httpbin/httpbin/assets
-github.com/mccutchen/go-httpbin/httpbin/digest
+# github.com/mccutchen/go-httpbin/v2 v2.18.3
+## explicit; go 1.22.0
+github.com/mccutchen/go-httpbin/v2/httpbin
+github.com/mccutchen/go-httpbin/v2/httpbin/digest
+github.com/mccutchen/go-httpbin/v2/httpbin/websocket
 # github.com/mstoykov/atlas v0.0.0-20220811071828-388f114305dd
 ## explicit; go 1.18
 github.com/mstoykov/atlas
