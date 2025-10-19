@@ -82,17 +82,19 @@ func (c *cmdRun) serve(cmd *cobra.Command, srv *http.Server, shutdown func()) fu
 				logger.WithError(err).Error("Error from API server")
 				c.gs.OSExit(int(exitcodes.CannotStartRESTAPI))
 			}
-		} else {
-			if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-				// Only exit k6 if the user has explicitly set the REST API address
-				if cmd.Flags().Lookup("address").Changed {
-					logger.WithError(err).Error("Error from API server")
-					c.gs.OSExit(int(exitcodes.CannotStartRESTAPI))
-				} else {
-					logger.WithError(err).Warn("Error from API server")
-				}
+			return
+		}
+		
+	    if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			// Only exit k6 if the user has explicitly set the REST API address
+			if cmd.Flags().Lookup("address").Changed {
+				logger.WithError(err).Error("Error from API server")
+				c.gs.OSExit(int(exitcodes.CannotStartRESTAPI))
+			} else {
+				logger.WithError(err).Warn("Error from API server")
 			}
 		}
+	}
 	}()
 
 	go func() {
