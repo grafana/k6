@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"runtime"
 	"slices"
 	"strconv"
@@ -3280,7 +3281,8 @@ func TestClickInNestedFramesCORS(t *testing.T) {
 		err = page.Locator("#incrementA", nil).Click(clickOpts)
 		require.NoError(t, err)
 
-		countA, ok, err := page.Locator("#countA", nil).TextContent(nil)
+		la := page.Locator("#countA", nil)
+		countA, ok, err := la.TextContent(common.NewFrameTextContentOptions(la.Timeout()))
 		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, expectedCount, countA)
@@ -3296,7 +3298,8 @@ func TestClickInNestedFramesCORS(t *testing.T) {
 		err = frameAContent.Locator("#incrementA2", nil).Click(clickOpts)
 		require.NoError(t, err)
 
-		countA2, ok, err := frameAContent.Locator("#countA2", nil).TextContent(nil)
+		la2 := frameAContent.Locator("#countA2", nil)
+		countA2, ok, err := la2.TextContent(common.NewFrameTextContentOptions(la2.Timeout()))
 		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, expectedCount, countA2)
@@ -3312,7 +3315,8 @@ func TestClickInNestedFramesCORS(t *testing.T) {
 		err = frameBContent.Locator("#incrementB", nil).Click(clickOpts)
 		require.NoError(t, err)
 
-		countB, ok, err := frameBContent.Locator("#countB", nil).TextContent(nil)
+		lb := frameBContent.Locator("#countB", nil)
+		countB, ok, err := lb.TextContent(common.NewFrameTextContentOptions(lb.Timeout()))
 		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, expectedCount, countB)
@@ -3328,7 +3332,8 @@ func TestClickInNestedFramesCORS(t *testing.T) {
 		err = frameCContent.Locator("#increment", nil).Click(clickOpts)
 		require.NoError(t, err)
 
-		count, ok, err := frameCContent.Locator("#count", nil).TextContent(nil)
+		lc := frameCContent.Locator("#count", nil)
+		count, ok, err := lc.TextContent(common.NewFrameTextContentOptions(lc.Timeout()))
 		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, expectedCount, count)
@@ -3344,7 +3349,8 @@ func TestClickInNestedFramesCORS(t *testing.T) {
 		err = frameDContent.Locator("#incrementD", nil).Click(clickOpts)
 		require.NoError(t, err)
 
-		countD, ok, err := frameDContent.Locator("#countD", nil).TextContent(nil)
+		ld := frameDContent.Locator("#countD", nil)
+		countD, ok, err := ld.TextContent(common.NewFrameTextContentOptions(ld.Timeout()))
 		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, expectedCount, countD)
@@ -3374,7 +3380,8 @@ func TestClickInNestedFramesCORS(t *testing.T) {
 		err = page.Locator("#incrementA", nil).Click(clickOpts)
 		require.NoError(t, err)
 
-		countA, ok, err := page.Locator("#countA", nil).TextContent(nil)
+		la := page.Locator("#countA", nil)
+		countA, ok, err := la.TextContent(common.NewFrameTextContentOptions(la.Timeout()))
 		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, expectedCount, countA)
@@ -3386,7 +3393,8 @@ func TestClickInNestedFramesCORS(t *testing.T) {
 		err = frameAContent.Locator("#incrementA2", nil).Click(clickOpts)
 		require.NoError(t, err)
 
-		countA2, ok, err := frameAContent.Locator("#countA2", nil).TextContent(nil)
+		la2 := frameAContent.Locator("#countA2", nil)
+		countA2, ok, err := la2.TextContent(common.NewFrameTextContentOptions(la2.Timeout()))
 		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, expectedCount, countA2)
@@ -3398,7 +3406,8 @@ func TestClickInNestedFramesCORS(t *testing.T) {
 		err = frameBContent.Locator("#incrementB", nil).Click(clickOpts)
 		require.NoError(t, err)
 
-		countB, ok, err := frameBContent.Locator("#countB", nil).TextContent(nil)
+		lb := frameBContent.Locator("#countB", nil)
+		countB, ok, err := lb.TextContent(common.NewFrameTextContentOptions(lb.Timeout()))
 		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, expectedCount, countB)
@@ -3410,7 +3419,8 @@ func TestClickInNestedFramesCORS(t *testing.T) {
 		err = frameCContent.Locator("#increment", nil).Click(clickOpts)
 		require.NoError(t, err)
 
-		count, ok, err := frameCContent.Locator("#count", nil).TextContent(nil)
+		lc := frameCContent.Locator("#count", nil)
+		count, ok, err := lc.TextContent(common.NewFrameTextContentOptions(lc.Timeout()))
 		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, expectedCount, count)
@@ -3422,9 +3432,287 @@ func TestClickInNestedFramesCORS(t *testing.T) {
 		err = frameDContent.Locator("#incrementD", nil).Click(clickOpts)
 		require.NoError(t, err)
 
-		countD, ok, err := frameDContent.Locator("#countD", nil).TextContent(nil)
+		ld := frameDContent.Locator("#countD", nil)
+		countD, ok, err := ld.TextContent(common.NewFrameTextContentOptions(ld.Timeout()))
 		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, expectedCount, countD)
 	})
+}
+
+func TestPageUnroute(t *testing.T) {
+	t.Parallel()
+
+	jsRegexCheckerMock := func(pattern, url string) (bool, error) {
+		matched, err := regexp.MatchString(fmt.Sprintf("http://[^/]*%s", pattern), url)
+		if err != nil {
+			return false, fmt.Errorf("error matching regex: %w", err)
+		}
+		return matched, nil
+	}
+
+	t.Run("unroute_single_route", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withHTTPServer())
+		p := tb.NewPage(nil)
+
+		routeHandlerCalls := 0
+		routeHandler := func(route *common.Route) error {
+			routeHandlerCalls++
+			return route.Continue(common.ContinueOptions{})
+		}
+
+		tb.withHandler("/test", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "text/html")
+			_, err := fmt.Fprintf(w, `
+			<html>
+				<body>
+					<script>
+						fetch('/api/data');
+					</script>
+				</body>
+			</html>
+			`)
+			require.NoError(t, err)
+		})
+
+		tb.withHandler("/api/data", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, err := fmt.Fprint(w, `{"data": "test"}`)
+			require.NoError(t, err)
+		})
+
+		// Add route
+		err := p.Route("/api/data", routeHandler, jsRegexCheckerMock)
+		require.NoError(t, err)
+
+		opts := &common.FrameGotoOptions{
+			WaitUntil: common.LifecycleEventNetworkIdle,
+			Timeout:   common.DefaultTimeout,
+		}
+		_, err = p.Goto(tb.url("/test"), opts)
+		require.NoError(t, err)
+
+		assert.Equal(t, 1, routeHandlerCalls)
+
+		// Remove the route
+		routeHandlerCalls = 0
+		err = p.Unroute("/api/data")
+		require.NoError(t, err)
+
+		_, err = p.Goto(tb.url("/test"), opts)
+		require.NoError(t, err)
+
+		assert.Equal(t, 0, routeHandlerCalls, "Route handler should not be called after unroute")
+	})
+
+	t.Run("unroute_multiple_matching_routes", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withHTTPServer())
+		p := tb.NewPage(nil)
+
+		handler1Calls := 0
+		handler2Calls := 0
+
+		routeHandler1 := func(route *common.Route) error {
+			handler1Calls++
+			return route.Continue(common.ContinueOptions{})
+		}
+
+		routeHandler2 := func(route *common.Route) error {
+			handler2Calls++
+			return route.Continue(common.ContinueOptions{})
+		}
+
+		tb.withHandler("/test", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "text/html")
+			_, err := fmt.Fprintf(w, `
+			<html>
+				<body>
+					<script>
+						fetch('/api/data');
+					</script>
+				</body>
+			</html>
+			`)
+			require.NoError(t, err)
+		})
+
+		tb.withHandler("/api/data", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, err := fmt.Fprint(w, `{"data": "test"}`)
+			require.NoError(t, err)
+		})
+
+		// Add multiple routes for the same path
+		err := p.Route("/api/data", routeHandler1, jsRegexCheckerMock)
+		require.NoError(t, err)
+		err = p.Route("/api/data", routeHandler2, jsRegexCheckerMock)
+		require.NoError(t, err)
+
+		opts := &common.FrameGotoOptions{
+			WaitUntil: common.LifecycleEventNetworkIdle,
+			Timeout:   common.DefaultTimeout,
+		}
+		_, err = p.Goto(tb.url("/test"), opts)
+		require.NoError(t, err)
+
+		// Only the most recently added handler should be called
+		assert.Equal(t, 0, handler1Calls, "First handler should not be called when second handler is present")
+		assert.Equal(t, 1, handler2Calls, "Second handler should be called")
+
+		// Remove all routes for this path
+		handler1Calls = 0
+		handler2Calls = 0
+
+		err = p.Unroute("/api/data")
+		require.NoError(t, err)
+
+		// Second navigation should not trigger any route handlers
+		_, err = p.Goto(tb.url("/test"), opts)
+		require.NoError(t, err)
+
+		assert.Equal(t, 0, handler1Calls, "First handler should not be called after unroute")
+		assert.Equal(t, 0, handler2Calls, "Second handler should not be called after unroute")
+	})
+
+	t.Run("unroute_nonexistent_route", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withHTTPServer())
+		p := tb.NewPage(nil)
+
+		routeHandlerCalls := 0
+		routeHandler := func(route *common.Route) error {
+			routeHandlerCalls++
+			return route.Continue(common.ContinueOptions{})
+		}
+
+		tb.withHandler("/test", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "text/html")
+			_, err := fmt.Fprintf(w, `
+			<html>
+				<body>
+					<script>
+						fetch('/api/data');
+					</script>
+				</body>
+			</html>
+			`)
+			require.NoError(t, err)
+		})
+
+		tb.withHandler("/api/data", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, err := fmt.Fprint(w, `{"data": "data"}`)
+			require.NoError(t, err)
+		})
+
+		err := p.Route("/api/data", routeHandler, jsRegexCheckerMock)
+		require.NoError(t, err)
+
+		opts := &common.FrameGotoOptions{
+			WaitUntil: common.LifecycleEventNetworkIdle,
+			Timeout:   common.DefaultTimeout,
+		}
+		_, err = p.Goto(tb.url("/test"), opts)
+		require.NoError(t, err)
+
+		assert.Equal(t, 1, routeHandlerCalls)
+
+		// Remove a non-existent route - this should be a no-op and not affect existing route
+		routeHandlerCalls = 0
+		err = p.Unroute("/unknown")
+		require.NoError(t, err)
+
+		_, err = p.Goto(tb.url("/test"), opts)
+		require.NoError(t, err)
+
+		assert.Equal(t, 1, routeHandlerCalls, "Route handler should still be active")
+	})
+}
+
+func TestPageUnrouteAll(t *testing.T) {
+	t.Parallel()
+
+	jsRegexCheckerMock := func(pattern, url string) (bool, error) {
+		matched, err := regexp.MatchString(fmt.Sprintf("http://[^/]*%s", pattern), url)
+		if err != nil {
+			return false, fmt.Errorf("error matching regex: %w", err)
+		}
+		return matched, nil
+	}
+
+	tb := newTestBrowser(t, withHTTPServer())
+	p := tb.NewPage(nil)
+
+	route1Calls := 0
+	route2Calls := 0
+
+	routeHandler1 := func(route *common.Route) error {
+		route1Calls++
+		return route.Continue(common.ContinueOptions{})
+	}
+
+	routeHandler2 := func(route *common.Route) error {
+		route2Calls++
+		return route.Continue(common.ContinueOptions{})
+	}
+
+	tb.withHandler("/test", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, err := fmt.Fprintf(w, `
+			<html>
+				<body>
+					<script>
+						fetch('/api/first');
+						fetch('/api/second');
+					</script>
+				</body>
+			</html>
+			`)
+		require.NoError(t, err)
+	})
+
+	tb.withHandler("/api/first", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, err := fmt.Fprint(w, `{"data": "first"}`)
+		require.NoError(t, err)
+	})
+
+	tb.withHandler("/api/second", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, err := fmt.Fprint(w, `{"data": "second"}`)
+		require.NoError(t, err)
+	})
+
+	// Add multiple routes
+	err := p.Route("/api/first", routeHandler1, jsRegexCheckerMock)
+	require.NoError(t, err)
+	err = p.Route("/api/second", routeHandler2, jsRegexCheckerMock)
+	require.NoError(t, err)
+
+	opts := &common.FrameGotoOptions{
+		WaitUntil: common.LifecycleEventNetworkIdle,
+		Timeout:   common.DefaultTimeout,
+	}
+	_, err = p.Goto(tb.url("/test"), opts)
+	require.NoError(t, err)
+
+	assert.Equal(t, 1, route1Calls)
+	assert.Equal(t, 1, route2Calls)
+
+	// Remove all routes - no route handler should be triggered
+	route1Calls = 0
+	route2Calls = 0
+	err = p.UnrouteAll()
+	require.NoError(t, err)
+
+	_, err = p.Goto(tb.url("/test"), opts)
+	require.NoError(t, err)
+
+	assert.Equal(t, 0, route1Calls, "First route should be removed")
+	assert.Equal(t, 0, route2Calls, "Second route should be removed")
 }

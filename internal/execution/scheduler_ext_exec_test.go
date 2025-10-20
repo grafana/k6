@@ -70,19 +70,18 @@ func TestExecutionInfoVUSharing(t *testing.T) {
 
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	runner, err := js.New(
-		&lib.TestPreInitState{
-			Logger:         logger,
-			BuiltinMetrics: builtinMetrics,
-			Registry:       registry,
-			Usage:          usage.New(),
-		},
-		&loader.SourceData{
-			URL:  &url.URL{Path: "/script.js"},
-			Data: script,
-		},
-		nil,
-	)
+	piState := &lib.TestPreInitState{
+		Logger:         logger,
+		BuiltinMetrics: builtinMetrics,
+		Registry:       registry,
+		Usage:          usage.New(),
+	}
+	sourceData := &loader.SourceData{
+		URL:  &url.URL{Path: "/script.js"},
+		Data: script,
+	}
+	moduleResolver := js.NewModuleResolver(loader.Dir(sourceData.URL), piState, nil)
+	runner, err := js.New(piState, sourceData, nil, moduleResolver)
 	require.NoError(t, err)
 
 	ctx, cancel, execScheduler, samples := newTestScheduler(t, runner, logger, lib.Options{})
@@ -184,19 +183,18 @@ func TestExecutionInfoScenarioIter(t *testing.T) {
 
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	runner, err := js.New(
-		&lib.TestPreInitState{
-			Logger:         logger,
-			BuiltinMetrics: builtinMetrics,
-			Registry:       registry,
-			Usage:          usage.New(),
-		},
-		&loader.SourceData{
-			URL:  &url.URL{Path: "/script.js"},
-			Data: script,
-		},
-		nil,
-	)
+	piState := &lib.TestPreInitState{
+		Logger:         logger,
+		BuiltinMetrics: builtinMetrics,
+		Registry:       registry,
+		Usage:          usage.New(),
+	}
+	sourceData := &loader.SourceData{
+		URL:  &url.URL{Path: "/script.js"},
+		Data: script,
+	}
+	moduleResolver := js.NewModuleResolver(loader.Dir(sourceData.URL), piState, nil)
+	runner, err := js.New(piState, sourceData, nil, moduleResolver)
 	require.NoError(t, err)
 
 	ctx, cancel, execScheduler, samples := newTestScheduler(t, runner, logger, lib.Options{})
@@ -267,19 +265,18 @@ func TestSharedIterationsStable(t *testing.T) {
 
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	runner, err := js.New(
-		&lib.TestPreInitState{
-			Logger:         logger,
-			BuiltinMetrics: builtinMetrics,
-			Registry:       registry,
-			Usage:          usage.New(),
-		},
-		&loader.SourceData{
-			URL:  &url.URL{Path: "/script.js"},
-			Data: script,
-		},
-		nil,
-	)
+	piState := &lib.TestPreInitState{
+		Logger:         logger,
+		BuiltinMetrics: builtinMetrics,
+		Registry:       registry,
+		Usage:          usage.New(),
+	}
+	sourceData := &loader.SourceData{
+		URL:  &url.URL{Path: "/script.js"},
+		Data: script,
+	}
+	moduleResolver := js.NewModuleResolver(loader.Dir(sourceData.URL), piState, nil)
+	runner, err := js.New(piState, sourceData, nil, moduleResolver)
 	require.NoError(t, err)
 
 	ctx, cancel, execScheduler, samples := newTestScheduler(t, runner, logger, lib.Options{})
@@ -402,17 +399,18 @@ func TestExecutionInfoAll(t *testing.T) {
 
 			registry := metrics.NewRegistry()
 			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-			runner, err := js.New(
-				&lib.TestPreInitState{
-					Logger:         logger,
-					BuiltinMetrics: builtinMetrics,
-					Registry:       registry,
-					Usage:          usage.New(),
-				},
-				&loader.SourceData{
-					URL:  &url.URL{Path: "/script.js"},
-					Data: []byte(tc.script),
-				}, nil)
+			piState := &lib.TestPreInitState{
+				Logger:         logger,
+				BuiltinMetrics: builtinMetrics,
+				Registry:       registry,
+				Usage:          usage.New(),
+			}
+			sourceData := &loader.SourceData{
+				URL:  &url.URL{Path: "/script.js"},
+				Data: []byte(tc.script),
+			}
+			moduleResolver := js.NewModuleResolver(loader.Dir(sourceData.URL), piState, nil)
+			runner, err := js.New(piState, sourceData, nil, moduleResolver)
 			require.NoError(t, err)
 
 			ctx, cancel, execScheduler, samples := newTestScheduler(t, runner, logger, lib.Options{})

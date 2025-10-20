@@ -847,8 +847,8 @@ func (h *ElementHandle) count(apiCtx context.Context, selector string) (int, err
 	}
 	switch r := result.(type) {
 	case float64:
-		if r < float64(math.MinInt) || r > float64(math.MaxInt) {
-			return 0, fmt.Errorf("value %v out of range for int type", r)
+		if r < float64(math.MinInt32) || r > float64(math.MaxInt32) {
+			return 0, fmt.Errorf("value %v out of range for int32 type", r)
 		}
 		return int(r), nil
 	default:

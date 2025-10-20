@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/grafana/k6deps"
 	"github.com/grafana/k6provider"
 	"github.com/spf13/afero"
@@ -44,7 +45,7 @@ type mockProvisioner struct {
 	err      error
 }
 
-func (m *mockProvisioner) provision(_ k6deps.Dependencies) (commandExecutor, error) {
+func (m *mockProvisioner) provision(_ map[string]string) (commandExecutor, error) {
 	m.invoked = true
 	return m.executor, m.err
 }
@@ -83,7 +84,7 @@ export default function() {
 }
 `
 	// FIXME: when the build version is a prerelease (e.g v1.0.0-rc1), k6deps fails to parse this pragma
-	// and creates an invalid constrain that is ignored by the test.
+	// and creates an invalid constraint that is ignored by the test.
 	// see https://github.com/grafana/k6deps/issues/91
 	requireSatisfiedK6Version = `
 "use k6 = v` + build.Version + `";
@@ -479,13 +480,13 @@ func TestIsCustomBuildRequired(t *testing.T) {
 		t.Run(tc.title, func(t *testing.T) {
 			t.Parallel()
 
-			deps := k6deps.Dependencies{}
-			for name, constrain := range tc.deps {
-				dep, err := k6deps.NewDependency(name, constrain)
+			deps := make(map[string]*semver.Constraints)
+			for name, constraint := range tc.deps {
+				dep, err := k6deps.NewDependency(name, constraint)
 				if err != nil {
 					t.Fatalf("parsing %q dependency %v", name, err)
 				}
-				deps[dep.Name] = dep
+				deps[dep.Name] = dep.Constraints
 			}
 
 			k6Version := "v1.0.0"

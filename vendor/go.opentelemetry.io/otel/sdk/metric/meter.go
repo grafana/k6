@@ -12,7 +12,6 @@ import (
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/metric/embedded"
 	"go.opentelemetry.io/otel/sdk/instrumentation"
-
 	"go.opentelemetry.io/otel/sdk/metric/internal/aggregate"
 )
 
@@ -423,7 +422,7 @@ func (m *meter) Float64ObservableGauge(
 }
 
 func validateInstrumentName(name string) error {
-	if len(name) == 0 {
+	if name == "" {
 		return fmt.Errorf("%w: %s: is empty", ErrInstrumentName, name)
 	}
 	if len(name) > 255 {

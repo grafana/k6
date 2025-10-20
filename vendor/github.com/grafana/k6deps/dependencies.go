@@ -23,7 +23,7 @@ var (
 
 	srcModule  = strings.ReplaceAll(srcName, "name", "module")
 	srcRequire = `require\("` + srcName + `"\)`
-	srcImport  = `import (.* from )?["']` + srcModule + `["'](;|$)`
+	srcImport  = `import\s+(?:[^'"]*\s+from\s+)?['"]` + srcModule + `["'](;|$)`
 
 	reRequireOrImport        = regexp.MustCompile("(?m:" + srcRequire + "|" + srcImport + ")")
 	idxRequireOrImportName   = reRequireOrImport.SubexpIndex("name")
@@ -291,6 +291,9 @@ func (deps Dependencies) marshalJS(w io.Writer) error {
 // in the format used by MarshalJS.
 func (deps *Dependencies) UnmarshalJS(text []byte) error {
 	*deps = make(Dependencies)
+
+	// normalize end of line sequence to linux style
+	text = bytes.ReplaceAll(text, []byte("\r\n"), []byte("\n")) // windows
 
 	// clean multiline comments
 	clean := reMultiLineComment.ReplaceAll(text, []byte(""))
