@@ -469,46 +469,27 @@ func (e *MetricEvent) Tag(rm RegExMatcher, matches TagMatches) error {
 // url regexes and the matching is done from within there. If a match is found,
 // the supplied name is returned back upstream to the caller of urlTagName.
 func (p *Page) urlTagName(url string, method string) (string, bool) {
-	if !p.hasEventHandler(PageEventMetric) {
-		return "", false
-	}
+	var (
+		tag         string
+		matched     bool
+		metricEvent = &MetricEvent{url: url, method: method}
+	)
 
-	var newTagName string
-	var urlMatched bool
-	em := &MetricEvent{
-		url:    url,
-		method: method,
-	}
-
-	p.eventHandlersMu.RLock()
-	defer p.eventHandlersMu.RUnlock()
-	for _, next := range p.eventHandlers[PageEventMetric] {
-		err := func() error {
-			// Handlers can register other handlers, so we need to
-			// unlock the mutex before calling the next handler.
-			p.eventHandlersMu.RUnlock()
-			defer p.eventHandlersMu.RLock()
-
-			// Call and wait for the handler to complete.
-			return next.handler(PageEvent{
-				Metric: em,
-			})
-		}()
-		if err != nil {
+	for handle := range p.eventHandlersByName(PageEventMetric) {
+		if err := handle(PageEvent{Metric: metricEvent}); err != nil {
 			p.logger.Debugf("urlTagName", "handler returned an error: %v", err)
 			return "", false
 		}
 	}
 
 	// If a match was found then the name field in em will have been updated.
-	if em.isUserURLTagNameExist {
-		newTagName = em.userProvidedURLTagName
-		urlMatched = true
+	if metricEvent.isUserURLTagNameExist {
+		tag = metricEvent.userProvidedURLTagName
+		matched = true
 	}
+	p.logger.Debugf("urlTagName", "name: %q nameChanged: %v", tag, matched)
 
-	p.logger.Debugf("urlTagName", "name: %q nameChanged: %v", newTagName, urlMatched)
-
-	return newTagName, urlMatched
+	return tag, matched
 }
 
 func (p *Page) onRequest(request *Request) {
