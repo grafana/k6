@@ -1045,7 +1045,6 @@ func TestAbortedByUnknownModules(t *testing.T) {
 	`
 
 	ts := NewGlobalTestState(t)
-	ts.DefaultFlags.AutoExtensionResolution = false
 	ts.Flags.AutoExtensionResolution = false
 	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test.js"), []byte(mainScript), 0o644))
 	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "a.js"), []byte(depScript), 0o644))
@@ -1058,7 +1057,7 @@ func TestAbortedByUnknownModules(t *testing.T) {
 	stdout := ts.Stdout.String()
 	t.Log(stdout)
 
-	assert.Contains(t, stdout, `unknown modules [\"k6/x/anotherone\" \"k6/x/somethinghere\"] were tried to be loaded,`)
+	assert.Contains(t, stdout, `unknown modules [\"k6/x/anotherone\", \"k6/x/somethinghere\"] were tried to be loaded,`)
 }
 
 func runTestWithNoLinger(_ *testing.T, ts *GlobalTestState) {

@@ -5,6 +5,7 @@ import (
 	"maps"
 	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/grafana/sobek"
@@ -71,6 +72,9 @@ func (mr *ModuleResolver) resolveSpecifier(basePWD *url.URL, arg string) (*url.U
 }
 
 func (mr *ModuleResolver) unknownModules() []string {
+	if len(mr.unknowndModules) == 0 {
+		return nil
+	}
 	return slices.Collect(maps.Keys(mr.unknowndModules))
 }
 
@@ -359,12 +363,20 @@ func newUnknownModulesError(list []string) UnknownModulesError {
 }
 
 func (u UnknownModulesError) Error() string {
-	return fmt.Sprintf("unknown modules %q were tried to be loaded, but couldn't - "+
-		"this likely means binary provisioning is required or a custom k6 binary with more extensions",
-		u.unknownModules)
+	return fmt.Sprintf("unknown modules [%s] were tried to be loaded, but couldn't - "+
+		"this likely means automatic extension resolution is required or a custom k6 binary with the required extensions",
+		u.formatList())
 }
 
 // List returns the list of unknown modules that lead to the error
 func (u UnknownModulesError) List() []string {
 	return slices.Clone(u.unknownModules)
+}
+
+func (u UnknownModulesError) formatList() string {
+	list := make([]string, len(u.unknownModules))
+	for i, m := range u.unknownModules {
+		list[i] = strconv.Quote(m)
+	}
+	return strings.Join(list, ", ")
 }
