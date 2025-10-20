@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"iter"
 	"net/http"
 	"slices"
 	"strings"
@@ -1784,6 +1785,30 @@ func (p *Page) WaitForURL(urlPattern string, opts *FrameWaitForURLOptions, rm Re
 	}
 
 	return nil
+}
+
+// eventHandlersByName returns a single-use iterator that yields all event handlers
+// registered for the given event name. If there are no handlers registered, it
+// returns an empty iterator. The iterator is safe for concurrent use.
+func (p *Page) eventHandlersByName(evn PageEventName) iter.Seq[PageEventHandler] {
+	return func(yield func(PageEventHandler) bool) {
+		if !p.hasEventHandler(evn) {
+			return
+		}
+		p.eventHandlersMu.RLock()
+		defer p.eventHandlersMu.RUnlock()
+
+		for _, next := range p.eventHandlers[evn] {
+			// Handlers can register other handlers, so we need to
+			// unlock the mutex before calling the next handler.
+			p.eventHandlersMu.RUnlock()
+			if !yield(next.handler) {
+				p.eventHandlersMu.RLock()
+				return
+			}
+			p.eventHandlersMu.RLock()
+		}
+	}
 }
 
 // waitForEvent subscribes to the given event and resolves once the predicate
