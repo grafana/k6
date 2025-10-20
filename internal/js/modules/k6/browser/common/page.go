@@ -504,27 +504,8 @@ func (p *Page) onRequest(request *Request) {
 
 // onResponse will call the handlers for the page.on('response') event.
 func (p *Page) onResponse(resp *Response) {
-	p.logger.Debugf("Page:onResponse", "sid:%v url:%v", p.sessionID(), resp.URL())
-
-	if !p.hasEventHandler(PageEventResponse) {
-		return
-	}
-
-	p.eventHandlersMu.RLock()
-	defer p.eventHandlersMu.RUnlock()
-	for _, next := range p.eventHandlers[PageEventResponse] {
-		err := func() error {
-			// Handlers can register other handlers, so we need to
-			// unlock the mutex before calling the next handler.
-			p.eventHandlersMu.RUnlock()
-			defer p.eventHandlersMu.RLock()
-
-			// Call and wait for the handler to complete.
-			return next.handler(PageEvent{
-				Response: resp,
-			})
-		}()
-		if err != nil {
+	for handle := range p.eventHandlersByName(PageEventResponse) {
+		if err := handle(PageEvent{Response: resp}); err != nil {
 			p.logger.Warnf("onResponse", "handler returned an error: %v", err)
 			return
 		}
