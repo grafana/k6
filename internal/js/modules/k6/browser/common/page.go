@@ -516,20 +516,13 @@ func (p *Page) onConsoleAPICalled(event *runtime.EventConsoleAPICalled) {
 	if !p.hasEventHandler(PageEventConsole) {
 		return
 	}
-
-	m, err := p.consoleMsgFromConsoleEvent(event)
+	cm, err := p.consoleMsgFromConsoleEvent(event)
 	if err != nil {
 		p.logger.Errorf("Page:onConsoleAPICalled", "building console message: %v", err)
 		return
 	}
-
-	p.eventHandlersMu.RLock()
-	defer p.eventHandlersMu.RUnlock()
-	for _, next := range p.eventHandlers[PageEventConsole] {
-		err := next.handler(PageEvent{
-			ConsoleMessage: m,
-		})
-		if err != nil {
+	for handle := range p.eventHandlersByName(PageEventConsole) {
+		if err := handle(PageEvent{ConsoleMessage: cm}); err != nil {
 			p.logger.Debugf("onConsoleAPICalled", "handler returned an error: %v", err)
 			return
 		}
