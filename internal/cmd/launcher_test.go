@@ -84,7 +84,7 @@ export default function() {
 }
 `
 	// FIXME: when the build version is a prerelease (e.g v1.0.0-rc1), k6deps fails to parse this pragma
-	// and creates an invalid constrain that is ignored by the test.
+	// and creates an invalid constraint that is ignored by the test.
 	// see https://github.com/grafana/k6deps/issues/91
 	requireSatisfiedK6Version = `
 "use k6 = v` + build.Version + `";
@@ -481,8 +481,8 @@ func TestIsCustomBuildRequired(t *testing.T) {
 			t.Parallel()
 
 			deps := make(map[string]*semver.Constraints)
-			for name, constrain := range tc.deps {
-				dep, err := k6deps.NewDependency(name, constrain)
+			for name, constraint := range tc.deps {
+				dep, err := k6deps.NewDependency(name, constraint)
 				if err != nil {
 					t.Fatalf("parsing %q dependency %v", name, err)
 				}

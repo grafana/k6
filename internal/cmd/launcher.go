@@ -106,7 +106,7 @@ func (l *launcher) launch(cmd *cobra.Command, args []string) error {
 		Info("Automatic extension resolution is enabled. The current k6 binary doesn't satisfy all dependencies," +
 			" it's required to provision a custom binary.")
 
-	customBinary, err := l.provisioner.provision(constraintsMapToProvisionDependancy(deps))
+	customBinary, err := l.provisioner.provision(constraintsMapToProvisionDependency(deps))
 	if err != nil {
 		l.gs.Logger.
 			WithError(err).
@@ -123,7 +123,7 @@ func (l *launcher) launch(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func constraintsMapToProvisionDependancy(deps map[string]*semver.Constraints) k6provider.Dependencies {
+func constraintsMapToProvisionDependency(deps map[string]*semver.Constraints) k6provider.Dependencies {
 	result := make(k6provider.Dependencies)
 	for name, constraint := range deps {
 		if constraint == nil {
