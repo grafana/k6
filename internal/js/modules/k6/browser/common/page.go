@@ -492,26 +492,10 @@ func (p *Page) urlTagName(url string, method string) (string, bool) {
 	return tag, matched
 }
 
+// onRequest calls [PageEventRequest] handlers after each request is made.
 func (p *Page) onRequest(request *Request) {
-	if !p.hasEventHandler(PageEventRequest) {
-		return
-	}
-
-	p.eventHandlersMu.RLock()
-	defer p.eventHandlersMu.RUnlock()
-	for _, next := range p.eventHandlers[PageEventRequest] {
-		err := func() error {
-			// Handlers can register other handlers, so we need to
-			// unlock the mutex before calling the next handler.
-			p.eventHandlersMu.RUnlock()
-			defer p.eventHandlersMu.RLock()
-
-			// Call and wait for the handler to complete.
-			return next.handler(PageEvent{
-				Request: request,
-			})
-		}()
-		if err != nil {
+	for handle := range p.eventHandlersByName(PageEventRequest) {
+		if err := handle(PageEvent{Request: request}); err != nil {
 			p.logger.Warnf("onRequest", "handler returned an error: %v", err)
 			return
 		}
