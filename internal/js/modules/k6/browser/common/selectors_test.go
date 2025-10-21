@@ -1,6 +1,7 @@
 package common
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 )
@@ -21,7 +22,15 @@ func TestSelectorParse(t *testing.T) {
 		input         string
 		expectedParts []*SelectorPart
 		expectedCap   *int
+		expectedError error
 	}{
+		{
+			name:          "Empty selector",
+			input:         "",
+			expectedParts: nil,
+			expectedCap:   nil,
+			expectedError: ErrEmptySelector,
+		},
 		{
 			name:  "Escaped quotes in text",
 			input: `text="Click the \"Submit\" button"`,
@@ -89,6 +98,19 @@ func TestSelectorParse(t *testing.T) {
 			t.Parallel()
 
 			sel, err := NewSelector(tc.input)
+
+			if tc.expectedError != nil {
+				if err == nil {
+					t.Fatalf("Expected error: %v, got nil", tc.expectedError)
+				}
+
+				if !errors.Is(err, tc.expectedError) {
+					t.Fatalf("Unexpected error: %v", err)
+				}
+
+				return
+			}
+
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}

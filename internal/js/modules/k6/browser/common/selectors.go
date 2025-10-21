@@ -28,6 +28,9 @@ var reQueryEngine *regexp.Regexp = regexp.MustCompile(`^[a-zA-Z_0-9-+:*]+$`)
 // Matches start of XPath query.
 var reXPathSelector *regexp.Regexp = regexp.MustCompile(`^\(*//`)
 
+// ErrEmptySelector is returned when a selector string is empty.
+var ErrEmptySelector = errors.New("provided selector is empty")
+
 type SelectorPart struct {
 	Name string `json:"name"`
 	Body string `json:"body"`
@@ -44,6 +47,10 @@ type Selector struct {
 }
 
 func NewSelector(selector string) (*Selector, error) {
+	if selector == "" {
+		return nil, ErrEmptySelector
+	}
+
 	s := Selector{
 		Selector: selector,
 		Parts:    make([]*SelectorPart, 0, 1),
@@ -66,8 +73,7 @@ func (s *Selector) appendPart(p *SelectorPart, capture bool) error {
 }
 
 // parse splits the selector into parts, separated by `>>`, and identifies
-// the query engine for each part. This implementation is a simplified version
-// of the one in Playwright and don't handle all edge cases (see Issue #5130).
+// the query engine for each part.
 //
 //nolint:cyclop,funlen
 func (s *Selector) parse() error {
