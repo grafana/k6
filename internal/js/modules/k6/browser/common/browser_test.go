@@ -97,6 +97,18 @@ func TestBrowserNewPageInContext(t *testing.T) {
 			"should have returned the missing browser context ID in the error message")
 	})
 
+	t.Run("uses_default_browser_context", func(t *testing.T) {
+		t.Parallel()
+
+		tc := newTestCase(browserContextID)
+		tc.b.context = nil // should use default context if there is no current context
+
+		require.NotPanics(t, func() {
+			_, err := tc.b.newPageInContext(browserContextID)
+			require.NoError(t, err)
+		})
+	})
+
 	// should return the error returned from the executor.
 	t.Run("error_in_create_target_action", func(t *testing.T) {
 		t.Parallel()
