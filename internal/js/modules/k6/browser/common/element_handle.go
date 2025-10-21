@@ -1394,7 +1394,10 @@ func (h *ElementHandle) queryAll(selector string, eval evalFunc) (_ []*ElementHa
 		if el := prop.AsElement(); el != nil {
 			// DOM elements are stored with numeric indices ("0", "1", "2", ...)
 			// per JavaScript's array-like object specification.
-			idx, _ := strconv.Atoi(key)
+			idx, err := strconv.Atoi(key)
+			if err != nil {
+				return nil, fmt.Errorf("parsing element index %q for selector %q: %w", key, selector, err)
+			}
 			indexedElems = append(indexedElems, indexedElem{index: idx, elem: el})
 		} else if err := prop.Dispose(); err != nil {
 			return nil, fmt.Errorf("disposing property while querying all selectors %q: %w", selector, err)
