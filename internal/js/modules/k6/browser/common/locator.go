@@ -5,11 +5,8 @@ import (
 	"fmt"
 	"strconv"
 	"time"
-<<<<<<< HEAD
-=======
 	"strings"
 	"github.com/grafana/sobek"
->>>>>>> 8ea4cb8ad (refactor(browser): address PR feedback for isInViewport)
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/log"
 )
