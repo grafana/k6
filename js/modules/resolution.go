@@ -2,7 +2,6 @@ package modules
 
 import (
 	"fmt"
-	"maps"
 	"net/url"
 	"slices"
 	"strconv"
@@ -31,16 +30,16 @@ type moduleCacheElement struct {
 
 // ModuleResolver knows how to get base Module that can be initialized
 type ModuleResolver struct {
-	cache           map[string]moduleCacheElement
-	goModules       map[string]any
-	loadCJS         FileLoader
-	compiler        *compiler.Compiler
-	locked          bool
-	reverse         map[any]*url.URL // maybe use sobek.ModuleRecord as key
-	base            *url.URL
-	usage           *usage.Usage
-	logger          logrus.FieldLogger
-	unknowndModules map[string]struct{}
+	cache          map[string]moduleCacheElement
+	goModules      map[string]any
+	loadCJS        FileLoader
+	compiler       *compiler.Compiler
+	locked         bool
+	reverse        map[any]*url.URL // maybe use sobek.ModuleRecord as key
+	base           *url.URL
+	usage          *usage.Usage
+	logger         logrus.FieldLogger
+	unknownModules []string
 }
 
 // NewModuleResolver returns a new module resolution instance that will resolve.
@@ -51,15 +50,14 @@ func NewModuleResolver(
 	u *usage.Usage, logger logrus.FieldLogger,
 ) *ModuleResolver {
 	return &ModuleResolver{
-		goModules:       goModules,
-		cache:           make(map[string]moduleCacheElement),
-		loadCJS:         loadCJS,
-		compiler:        c,
-		reverse:         make(map[any]*url.URL),
-		base:            base,
-		usage:           u,
-		logger:          logger,
-		unknowndModules: make(map[string]struct{}),
+		goModules: goModules,
+		cache:     make(map[string]moduleCacheElement),
+		loadCJS:   loadCJS,
+		compiler:  c,
+		reverse:   make(map[any]*url.URL),
+		base:      base,
+		usage:     u,
+		logger:    logger,
 	}
 }
 
@@ -71,20 +69,13 @@ func (mr *ModuleResolver) resolveSpecifier(basePWD *url.URL, arg string) (*url.U
 	return specifier, nil
 }
 
-func (mr *ModuleResolver) unknownModules() []string {
-	if len(mr.unknowndModules) == 0 {
-		return nil
-	}
-	return slices.Collect(maps.Keys(mr.unknowndModules))
-}
-
-func (mr *ModuleResolver) requireModule(name string) (sobek.ModuleRecord, error) {
+func (mr *ModuleResolver) initializeGoModule(name string) (sobek.ModuleRecord, error) {
 	if mr.locked {
 		return nil, fmt.Errorf(notPreviouslyResolvedModule, name)
 	}
 	mod, ok := mr.goModules[name]
 	if !ok {
-		mr.unknowndModules[name] = struct{}{}
+		mr.unknownModules = append(mr.unknownModules, name)
 		return &unknownModule{name: name, requested: make(map[string]struct{})}, nil
 	}
 	// we don't want to report extensions and we would have hit cache if this isn't the first time
@@ -163,7 +154,7 @@ func (mr *ModuleResolver) resolve(basePWD *url.URL, arg string) (sobek.ModuleRec
 		if cached, ok := mr.cache[arg]; ok {
 			return cached.mod, cached.err
 		}
-		mod, err := mr.requireModule(arg)
+		mod, err := mr.initializeGoModule(arg)
 		mr.cache[arg] = moduleCacheElement{mod: mod, err: err}
 		return mod, err
 	default:
@@ -242,9 +233,8 @@ func (mr *ModuleResolver) LoadMainModule(pwd *url.URL, specifier string, data []
 		panic("somehow running source data for " + specifier + " didn't produce a cyclic module record")
 	}
 
-	unknownModules := mr.unknownModules()
-	if len(unknownModules) > 0 {
-		return newUnknownModulesError(unknownModules)
+	if len(mr.unknownModules) > 0 {
+		return newUnknownModulesError(mr.unknownModules)
 	}
 	return nil
 }
@@ -291,10 +281,6 @@ func (ms *ModuleSystem) RunSourceData(source *loader.SourceData) (*RunSourceData
 		panic("somehow running source data for " + source.URL.String() + " didn't produce a cyclic module record")
 	}
 
-	unknownModules := ms.resolver.unknownModules()
-	if len(unknownModules) > 0 {
-		return nil, newUnknownModulesError(unknownModules)
-	}
 	rt := ms.vu.Runtime()
 	promise := rt.CyclicModuleRecordEvaluate(ci, ms.resolver.sobekModuleResolver)
 
