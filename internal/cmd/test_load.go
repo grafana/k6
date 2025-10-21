@@ -139,7 +139,9 @@ func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
 		pwd := lt.source.URL.JoinPath("../")
 		logger.Debug("Trying to load as a JS test...")
 		moduleResolver := js.NewModuleResolver(pwd, lt.preInitState, lt.fileSystems)
-		err := moduleResolver.LoadMainModule(pwd, specifier, lt.source.Data)
+		err := errext.WithExitCodeIfNone(
+			moduleResolver.LoadMainModule(pwd, specifier, lt.source.Data),
+			exitcodes.ScriptException)
 		if err != nil {
 			return fmt.Errorf("could not load JS test '%s': %w", testPath, err)
 		}
@@ -168,7 +170,9 @@ func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
 			specifier := arc.Filename
 			pwd := arc.PwdURL
 			moduleResolver := js.NewModuleResolver(pwd, lt.preInitState, arc.Filesystems)
-			err := moduleResolver.LoadMainModule(pwd, specifier, arc.Data)
+			err := errext.WithExitCodeIfNone(
+				moduleResolver.LoadMainModule(pwd, specifier, arc.Data),
+				exitcodes.ScriptException)
 			if err != nil {
 				return fmt.Errorf("could not load JS test '%s': %w", testPath, err)
 			}
