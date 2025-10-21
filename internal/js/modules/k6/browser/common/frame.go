@@ -1577,6 +1577,36 @@ func (f *Frame) isVisible(selector string, opts *FrameIsVisibleOptions) (bool, e
 	return v, nil
 }
 
+
+// isInViewport finds the element specified by the selector and checks if it's in the viewport.
+func (f *Frame) isInViewport(selector string, strict bool) (bool, error) {
+	isInViewportAction := func(ctx context.Context, handle *ElementHandle) (any, error) {
+		script := `(function() {
+			if (!this) return false;
+			const rect = this.getBoundingClientRect();
+			return (
+				rect.top >= 0 &&
+				rect.left >= 0 &&
+				rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
+				rect.right <= (window.innerWidth || document.documentElement.clientWidth)
+			);
+		})()`
+
+		opts := evalOptions{
+			forceCallable: true,
+			returnByValue: true,
+		}
+		return handle.eval(ctx, opts, script)
+	}
+
+	v, err := f.runActionOnSelector(f.ctx, selector, strict, isInViewportAction, func() bool { return false })
+	if err != nil {
+		return false, err
+	}
+
+	return v, nil
+}
+
 // ID returns the frame id.
 func (f *Frame) ID() string {
 	f.propertiesMu.RLock()

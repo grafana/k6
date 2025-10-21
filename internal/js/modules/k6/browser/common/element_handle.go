@@ -1204,36 +1204,6 @@ func (h *ElementHandle) IsVisible() (bool, error) {
 	return ok, nil
 }
 
-// IsInViewport checks if the element is visible in the browser's viewport.
-func (h *ElementHandle) IsInViewport() (bool, error) {
-	script := `(function() {
-		const rect = this.getBoundingClientRect();
-		return (
-			rect.top >= 0 &&
-			rect.left >= 0 &&
-			rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
-			rect.right <= (window.innerWidth || document.documentElement.clientWidth)
-		);
-	})()`
-
-	// CORRECTED LINE: Call the lowercase 'eval' method and provide the required options.
-	result, err := h.eval(
-		h.ctx,
-		evalOptions{forceCallable: true, returnByValue: true},
-		script,
-	)
-	if err != nil {
-		return false, err
-	}
-
-	visible, ok := result.(bool)
-	if !ok {
-		return false, fmt.Errorf("unexpected result type from JS: %T", result)
-	}
-
-	return visible, nil
-}
-
 // OwnerFrame returns the frame containing this element.
 func (h *ElementHandle) OwnerFrame() (_ *Frame, rerr error) {
 	fn := `

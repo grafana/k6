@@ -5,6 +5,11 @@ import (
 	"fmt"
 	"strconv"
 	"time"
+<<<<<<< HEAD
+=======
+	"strings"
+	"github.com/grafana/sobek"
+>>>>>>> 8ea4cb8ad (refactor(browser): address PR feedback for isInViewport)
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/log"
 )
@@ -273,7 +278,23 @@ func (l *Locator) IsVisible() (bool, error) {
 	return visible, nil
 }
 
-// IsHidden returns true if the element matches the locator's
+
+
+
+func (l *Locator) IsInViewport() (bool, error) {
+	l.log.Debugf("Locator:IsInViewport", "fid:%s furl:%q sel:%q", l.frame.ID(), l.frame.URL(), l.selector)
+
+	visible, err := l.frame.isInViewport(l.selector, true)
+	if err != nil {
+		if strings.Contains(err.Error(), "failed to find element") || strings.Contains(err.Error(), "strict mode violation") {
+			return false, nil
+		}
+		return false, fmt.Errorf("checking is %q in viewport: %w", l.selector, err)
+	}
+
+	return visible, nil
+}
+
 // selector and is hidden. Otherwise, returns false.
 func (l *Locator) IsHidden() (bool, error) {
 	l.log.Debugf("Locator:IsHidden", "fid:%s furl:%q sel:%q", l.frame.ID(), l.frame.URL(), l.selector)
