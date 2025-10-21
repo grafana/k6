@@ -126,15 +126,20 @@ func (mr *ModuleResolver) resolveLoaded(basePWD *url.URL, arg string, data []byt
 		mod, err = cjsModuleFromString(prg)
 	}
 	// TODO(@mstoykov): put this behind a flag
-	potentialRequireCalls := findRequireFunctionInAST(prg.Body)
-	if len(potentialRequireCalls) > 0 {
-		mr.logger.Debugf("will try to preload the potential `require` calls from within %q: %q",
-			specifier, potentialRequireCalls)
-	}
-	for _, requireArg := range potentialRequireCalls {
-		_, requireErr := mr.resolve(basePWD, requireArg)
-		if requireErr != nil {
-			mr.logger.WithError(requireErr).Debugf("error while preloading potential require call for %q", requireArg)
+	if err != nil {
+		potentialRequireCalls := findRequireFunctionInAST(prg.Body)
+		if len(potentialRequireCalls) > 0 {
+			mr.logger.Debugf("will try to preload the potential `require` calls from within %q: %q",
+				specifier, potentialRequireCalls)
+		}
+		for _, requireArg := range potentialRequireCalls {
+			_, requireErr := mr.resolve(basePWD, requireArg)
+			if requireErr != nil {
+				mr.logger.WithError(requireErr).Debugf("error while preloading potential require call for %q", requireArg)
+			}
+			if err := mr.usage.Uint64("usage/requirePreload", 1); err != nil {
+				mr.logger.WithError(err).Warn("couldn't report require preloading usage for " + requireArg)
+			}
 		}
 	}
 	mr.reverse[mod] = specifier
