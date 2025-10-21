@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"strings"
 	"time"
 
 	"github.com/grafana/sobek"
@@ -41,13 +40,6 @@ const (
 	ScrollPositionEnd ScrollPosition = "end"
 	// ScrollPositionNearest scrolls an element at the nearest position of its parent.
 	ScrollPositionNearest ScrollPosition = "nearest"
-)
-
-const (
-	optionButton     = "button"
-	optionDelay      = "delay"
-	optionClickCount = "clickCount"
-	optionModifiers  = "modifiers"
 )
 
 // ScrollIntoViewOptions change the behavior of ScrollIntoView.
@@ -147,26 +139,6 @@ func NewElementHandleBaseOptions(defaultTimeout time.Duration) *ElementHandleBas
 	}
 }
 
-// Parse parses the ElementHandleBaseOptions from the given opts.
-func (o *ElementHandleBaseOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	if common.IsNullish(opts) {
-		return nil
-	}
-	gopts := opts.ToObject(k6ext.Runtime(ctx))
-	for _, k := range gopts.Keys() {
-		switch k {
-		case "force":
-			o.Force = gopts.Get(k).ToBoolean()
-		case "noWaitAfter":
-			o.NoWaitAfter = gopts.Get(k).ToBoolean()
-		case "timeout":
-			o.Timeout = time.Duration(gopts.Get(k).ToInteger()) * time.Millisecond
-		}
-	}
-
-	return nil
-}
-
 func NewElementHandleBasePointerOptions(defaultTimeout time.Duration) *ElementHandleBasePointerOptions {
 	return &ElementHandleBasePointerOptions{
 		ElementHandleBaseOptions: *NewElementHandleBaseOptions(defaultTimeout),
@@ -175,40 +147,10 @@ func NewElementHandleBasePointerOptions(defaultTimeout time.Duration) *ElementHa
 	}
 }
 
-// Parse parses the ElementHandleBasePointerOptions from the given opts.
-func (o *ElementHandleBasePointerOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	rt := k6ext.Runtime(ctx)
-	if err := o.ElementHandleBaseOptions.Parse(ctx, opts); err != nil {
-		return err
-	}
-	if !common.IsNullish(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			switch k {
-			case "position":
-				var p map[string]float64
-				o.Position = &Position{}
-				if rt.ExportTo(opts.Get(k), &p) != nil {
-					o.Position.X = p["x"]
-					o.Position.Y = p["y"]
-				}
-			case "trial":
-				o.Trial = opts.Get(k).ToBoolean()
-			}
-		}
-	}
-	return nil
-}
-
 func NewElementHandleCheckOptions(defaultTimeout time.Duration) *ElementHandleCheckOptions {
 	return &ElementHandleCheckOptions{
 		ElementHandleBasePointerOptions: *NewElementHandleBasePointerOptions(defaultTimeout),
 	}
-}
-
-// Parse parses the ElementHandleCheckOptions from the given opts.
-func (o *ElementHandleCheckOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	return o.ElementHandleBasePointerOptions.Parse(ctx, opts)
 }
 
 // NewElementHandleSetInputFilesOptions creates a new ElementHandleSetInputFilesOption.
@@ -263,15 +205,6 @@ func (f *Files) Parse(ctx context.Context, files sobek.Value) error {
 	return nil
 }
 
-// Parse parses the ElementHandleSetInputFilesOption from the given opts.
-func (o *ElementHandleSetInputFilesOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	if err := o.ElementHandleBaseOptions.Parse(ctx, opts); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func NewElementHandleClickOptions(defaultTimeout time.Duration) *ElementHandleClickOptions {
 	return &ElementHandleClickOptions{
 		ElementHandleBasePointerOptions: *NewElementHandleBasePointerOptions(defaultTimeout),
@@ -280,38 +213,6 @@ func NewElementHandleClickOptions(defaultTimeout time.Duration) *ElementHandleCl
 		Delay:                           0,
 		Modifiers:                       []string{},
 	}
-}
-
-// Parse parses the ElementHandleClickOptions from the given opts.
-func (o *ElementHandleClickOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	if err := o.ElementHandleBasePointerOptions.Parse(ctx, opts); err != nil {
-		return err
-	}
-
-	if common.IsNullish(opts) {
-		return nil
-	}
-
-	rt := k6ext.Runtime(ctx)
-	obj := opts.ToObject(rt)
-	for _, k := range obj.Keys() {
-		switch k {
-		case optionButton:
-			o.Button = obj.Get(k).String()
-		case optionClickCount:
-			o.ClickCount = obj.Get(k).ToInteger()
-		case optionDelay:
-			o.Delay = obj.Get(k).ToInteger()
-		case optionModifiers:
-			var m []string
-			if err := rt.ExportTo(obj.Get(k), &m); err != nil {
-				return fmt.Errorf("parsing element handle click option modifiers: %w", err)
-			}
-			o.Modifiers = m
-		}
-	}
-
-	return nil
 }
 
 func (o *ElementHandleClickOptions) ToMouseClickOptions() *MouseClickOptions {
@@ -331,32 +232,6 @@ func NewElementHandleDblclickOptions(defaultTimeout time.Duration) *ElementHandl
 	}
 }
 
-// Parse parses the ElementHandleDblclickOptions from the given opts.
-func (o *ElementHandleDblclickOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	rt := k6ext.Runtime(ctx)
-	if err := o.ElementHandleBasePointerOptions.Parse(ctx, opts); err != nil {
-		return err
-	}
-	if !common.IsNullish(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			switch k {
-			case "button":
-				o.Button = opts.Get(k).String()
-			case "delay":
-				o.Delay = opts.Get(k).ToInteger()
-			case "modifiers":
-				var m []string
-				if err := rt.ExportTo(opts.Get(k), &m); err != nil {
-					return err
-				}
-				o.Modifiers = m
-			}
-		}
-	}
-	return nil
-}
-
 func (o *ElementHandleDblclickOptions) ToMouseClickOptions() *MouseClickOptions {
 	o2 := NewMouseClickOptions()
 	o2.Button = o.Button
@@ -372,52 +247,12 @@ func NewElementHandleHoverOptions(defaultTimeout time.Duration) *ElementHandleHo
 	}
 }
 
-// Parse parses the ElementHandleHoverOptions from the given opts.
-func (o *ElementHandleHoverOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	rt := k6ext.Runtime(ctx)
-	if err := o.ElementHandleBasePointerOptions.Parse(ctx, opts); err != nil {
-		return err
-	}
-	if !common.IsNullish(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			if k == "modifiers" {
-				var m []string
-				if err := rt.ExportTo(opts.Get(k), &m); err != nil {
-					return err
-				}
-				o.Modifiers = m
-			}
-		}
-	}
-	return nil
-}
-
 func NewElementHandlePressOptions(defaultTimeout time.Duration) *ElementHandlePressOptions {
 	return &ElementHandlePressOptions{
 		Delay:       0,
 		NoWaitAfter: false,
 		Timeout:     defaultTimeout,
 	}
-}
-
-// Parse parses the ElementHandlePressOptions from the given opts.
-func (o *ElementHandlePressOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	rt := k6ext.Runtime(ctx)
-	if !common.IsNullish(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			switch k {
-			case "delay":
-				o.Delay = opts.Get(k).ToInteger()
-			case "noWaitAfter":
-				o.NoWaitAfter = opts.Get(k).ToBoolean()
-			case "timeout":
-				o.Timeout = time.Duration(opts.Get(k).ToInteger()) * time.Millisecond
-			}
-		}
-	}
-	return nil
 }
 
 func (o *ElementHandlePressOptions) ToBaseOptions() *ElementHandleBaseOptions {
@@ -438,67 +273,11 @@ func NewElementHandleScreenshotOptions(defaultTimeout time.Duration) *ElementHan
 	}
 }
 
-// Parse parses the ElementHandleScreenshotOptions from the given opts.
-func (o *ElementHandleScreenshotOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	if common.IsNullish(opts) {
-		return nil
-	}
-
-	rt := k6ext.Runtime(ctx)
-	formatSpecified := false
-	obj := opts.ToObject(rt)
-	for _, k := range obj.Keys() {
-		switch k {
-		case "omitBackground":
-			o.OmitBackground = obj.Get(k).ToBoolean()
-		case "path":
-			o.Path = obj.Get(k).String()
-		case "quality":
-			o.Quality = obj.Get(k).ToInteger()
-		case "type":
-			if f, ok := imageFormatToID[obj.Get(k).String()]; ok {
-				o.Format = f
-				formatSpecified = true
-			}
-		case "timeout":
-			o.Timeout = time.Duration(obj.Get(k).ToInteger()) * time.Millisecond
-		}
-	}
-
-	// Infer file format by path if format not explicitly specified (default is PNG)
-	if o.Path != "" && !formatSpecified {
-		if strings.HasSuffix(o.Path, ".jpg") || strings.HasSuffix(o.Path, ".jpeg") {
-			o.Format = ImageFormatJPEG
-		}
-	}
-
-	return nil
-}
-
 func NewElementHandleSetCheckedOptions(defaultTimeout time.Duration) *ElementHandleSetCheckedOptions {
 	return &ElementHandleSetCheckedOptions{
 		ElementHandleBasePointerOptions: *NewElementHandleBasePointerOptions(defaultTimeout),
 		Strict:                          false,
 	}
-}
-
-// Parse parses the ElementHandleSetCheckedOptions from the given opts.
-func (o *ElementHandleSetCheckedOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	rt := k6ext.Runtime(ctx)
-
-	if err := o.ElementHandleBasePointerOptions.Parse(ctx, opts); err != nil {
-		return err
-	}
-
-	if !common.IsNullish(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			if k == "strict" {
-				o.Strict = opts.Get(k).ToBoolean()
-			}
-		}
-	}
-	return nil
 }
 
 func NewElementHandleTapOptions(defaultTimeout time.Duration) *ElementHandleTapOptions {
@@ -508,52 +287,12 @@ func NewElementHandleTapOptions(defaultTimeout time.Duration) *ElementHandleTapO
 	}
 }
 
-// Parse parses the ElementHandleTapOptions from the given opts.
-func (o *ElementHandleTapOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	rt := k6ext.Runtime(ctx)
-	if err := o.ElementHandleBasePointerOptions.Parse(ctx, opts); err != nil {
-		return err
-	}
-	if !common.IsNullish(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			if k == "modifiers" {
-				var m []string
-				if err := rt.ExportTo(opts.Get(k), &m); err != nil {
-					return err
-				}
-				o.Modifiers = m
-			}
-		}
-	}
-	return nil
-}
-
 func NewElementHandleTypeOptions(defaultTimeout time.Duration) *ElementHandleTypeOptions {
 	return &ElementHandleTypeOptions{
 		Delay:       0,
 		NoWaitAfter: false,
 		Timeout:     defaultTimeout,
 	}
-}
-
-// Parse parses the ElementHandleTypeOptions from the given opts.
-func (o *ElementHandleTypeOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	rt := k6ext.Runtime(ctx)
-	if !common.IsNullish(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			switch k {
-			case "delay":
-				o.Delay = opts.Get(k).ToInteger()
-			case "noWaitAfter":
-				o.NoWaitAfter = opts.Get(k).ToBoolean()
-			case "timeout":
-				o.Timeout = time.Duration(opts.Get(k).ToInteger()) * time.Millisecond
-			}
-		}
-	}
-	return nil
 }
 
 func (o *ElementHandleTypeOptions) ToBaseOptions() *ElementHandleBaseOptions {
@@ -568,20 +307,6 @@ func NewElementHandleWaitForElementStateOptions(defaultTimeout time.Duration) *E
 	return &ElementHandleWaitForElementStateOptions{
 		Timeout: defaultTimeout,
 	}
-}
-
-// Parse parses the ElementHandleWaitForElementStateOptions from the given opts.
-func (o *ElementHandleWaitForElementStateOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	rt := k6ext.Runtime(ctx)
-	if !common.IsNullish(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			if k == "timeout" {
-				o.Timeout = time.Duration(opts.Get(k).ToInteger()) * time.Millisecond
-			}
-		}
-	}
-	return nil
 }
 
 // ElementHandleDispatchEventOptions are options for ElementHandle.dispatchEvent.

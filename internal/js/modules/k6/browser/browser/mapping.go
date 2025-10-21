@@ -1,13 +1,9 @@
 package browser
 
 import (
-	"context"
 	"fmt"
-	"time"
 
 	"github.com/grafana/sobek"
-
-	"go.k6.io/k6/internal/js/modules/k6/browser/common"
 
 	k6common "go.k6.io/k6/js/common"
 )
@@ -34,14 +30,4 @@ func mapBrowserToSobek(vu moduleVU) *sobek.Object {
 	}
 
 	return obj
-}
-
-func parseFrameClickOptions(
-	ctx context.Context, opts sobek.Value, defaultTimeout time.Duration,
-) (*common.FrameClickOptions, error) {
-	copts := common.NewFrameClickOptions(defaultTimeout)
-	if err := copts.Parse(ctx, opts); err != nil {
-		return nil, fmt.Errorf("parsing click options: %w", err)
-	}
-	return copts, nil
 }
