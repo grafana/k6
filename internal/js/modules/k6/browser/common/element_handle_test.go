@@ -3,7 +3,6 @@ package common
 import (
 	"context"
 	"errors"
-	"strconv"
 	"testing"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/common/js"
@@ -157,33 +156,42 @@ func TestQueryAll(t *testing.T) {
 	t.Run("return_in_document_order", func(t *testing.T) {
 		t.Parallel()
 
-		const numElements = 15
-
+		const numElements = 11
 		elems := make([]*ElementHandle, numElements)
+		for i := range numElements {
+			elems[i] = &ElementHandle{}
+		}
+		asElementFn := func(elem *ElementHandle) func() *ElementHandle {
+			{
+				return func() *ElementHandle { return elem }
+			}
+		}
+
 		handles := map[string]JSHandleAPI{
+			// numeric keys
+			"0":  &jsHandleStub{asElementFn: asElementFn(elems[0])},
+			"1":  &jsHandleStub{asElementFn: asElementFn(elems[1])},
+			"2":  &jsHandleStub{asElementFn: asElementFn(elems[2])},
+			"3":  &jsHandleStub{asElementFn: asElementFn(elems[3])},
+			"4":  &jsHandleStub{asElementFn: asElementFn(elems[4])},
+			"5":  &jsHandleStub{asElementFn: asElementFn(elems[5])},
+			"6":  &jsHandleStub{asElementFn: asElementFn(elems[6])},
+			"7":  &jsHandleStub{asElementFn: asElementFn(elems[7])},
+			"8":  &jsHandleStub{asElementFn: asElementFn(elems[8])},
+			"9":  &jsHandleStub{asElementFn: asElementFn(elems[9])},
+			"10": &jsHandleStub{asElementFn: asElementFn(elems[10])},
 			// non-numeric keys that should be filtered out
 			"length":  &jsHandleStub{asElementFn: nilHandle},
 			"forEach": &jsHandleStub{asElementFn: nilHandle},
 			"item":    &jsHandleStub{asElementFn: nilHandle},
 		}
-		for i := range numElements {
-			elems[i] = &ElementHandle{}
-			key := strconv.FormatInt(int64(i), 10)
-			handles[key] = &jsHandleStub{
-				asElementFn: func(idx int) func() *ElementHandle {
-					return func() *ElementHandle { return elems[idx] }
-				}(i),
-			}
-		}
-
-		returnHandle := &jsHandleStub{
-			getPropertiesFn: func() (map[string]JSHandleAPI, error) {
-				return handles, nil
-			},
-		}
 
 		evalFunc := func(_ context.Context, _ evalOptions, _ string, _ ...any) (any, error) {
-			return returnHandle, nil
+			return &jsHandleStub{
+				getPropertiesFn: func() (map[string]JSHandleAPI, error) {
+					return handles, nil
+				},
+			}, nil
 		}
 
 		results, err := (&ElementHandle{}).queryAll("*", evalFunc)

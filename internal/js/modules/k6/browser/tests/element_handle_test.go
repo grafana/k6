@@ -8,7 +8,6 @@ import (
 	"image/png"
 	"io"
 	"runtime"
-	"strconv"
 	"testing"
 	"time"
 
@@ -406,6 +405,14 @@ func TestElementHandleQueryAll(t *testing.T) {
   	`, nil)
 	require.NoError(t, err)
 
+	assertElement := func(t *testing.T, e *common.ElementHandle, wantContent string) {
+		t.Helper()
+		text, ok, err := e.TextContent()
+		require.NoError(t, err)
+		require.True(t, ok)
+		assert.Equal(t, wantContent, text)
+	}
+
 	t.Run("element_handle", func(t *testing.T) { //nolint:paralleltest
 		el, err := p.Query("#aul")
 		require.NoError(t, err)
@@ -413,34 +420,25 @@ func TestElementHandleQueryAll(t *testing.T) {
 		els, err := el.QueryAll(query)
 		require.NoError(t, err)
 		require.Len(t, els, wantLiLen)
-		for i, e := range els {
-			text, ok, err := e.TextContent()
-			require.NoError(t, err)
-			require.True(t, ok)
-			assert.Equal(t, strconv.FormatInt(int64(i+1), 10), text)
-		}
+		assertElement(t, els[0], "1")
+		assertElement(t, els[1], "2")
+		assertElement(t, els[2], "3")
 	})
 	t.Run("page", func(t *testing.T) { //nolint:paralleltest
 		els, err := p.QueryAll(query)
 		require.NoError(t, err)
 		require.Len(t, els, wantLiLen)
-		for i, e := range els {
-			text, ok, err := e.TextContent()
-			require.NoError(t, err)
-			require.True(t, ok)
-			assert.Equal(t, strconv.FormatInt(int64(i+1), 10), text)
-		}
+		assertElement(t, els[0], "1")
+		assertElement(t, els[1], "2")
+		assertElement(t, els[2], "3")
 	})
 	t.Run("frame", func(t *testing.T) { //nolint:paralleltest
 		els, err := p.MainFrame().QueryAll(query)
 		require.NoError(t, err)
 		require.Len(t, els, wantLiLen)
-		for i, e := range els {
-			text, ok, err := e.TextContent()
-			require.NoError(t, err)
-			require.True(t, ok)
-			assert.Equal(t, strconv.FormatInt(int64(i+1), 10), text)
-		}
+		assertElement(t, els[0], "1")
+		assertElement(t, els[1], "2")
+		assertElement(t, els[2], "3")
 	})
 }
 
