@@ -121,16 +121,17 @@ func (ps *parsingState) parseImpl(src, filename string, commonJSWrap bool) (*ast
 		return nil, "", err
 	}
 
-	if isTsExtensionFile {
-		if err := ps.compiler.usage.Uint64(usageParsedTSFilesKey, 1); err != nil {
-			ps.compiler.logger.WithError(err).Warn("couldn't report usage for " + usageParsedTSFilesKey)
-		}
-	}
-
 	code, ps.srcMap, err = StripTypes(src, filename)
 	if err != nil {
 		return nil, "", err
 	}
+
+	// At this point we have stripped types successfully, no matter whether it was a .ts file
+	// or a script from stdin, and so we can report that a TS file been parsed successfully.
+	if err := ps.compiler.usage.Uint64(usageParsedTSFilesKey, 1); err != nil {
+		ps.compiler.logger.WithError(err).Warn("couldn't report usage for " + usageParsedTSFilesKey)
+	}
+
 	if ps.loader != nil {
 		// This hack is required for the source map to work
 		code += "\n//# sourceMappingURL=" + internalSourceMapURL
