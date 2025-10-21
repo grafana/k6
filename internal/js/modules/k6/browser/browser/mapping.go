@@ -1,14 +1,11 @@
 package browser
 
 import (
-	"context"
 	"fmt"
 	"reflect"
 	"time"
 
 	"github.com/grafana/sobek"
-
-	"go.k6.io/k6/internal/js/modules/k6/browser/common"
 
 	k6common "go.k6.io/k6/js/common"
 )
@@ -36,6 +33,7 @@ func mapBrowserToSobek(vu moduleVU) *sobek.Object {
 
 	return obj
 }
+<<<<<<< HEAD
 
 func parseFrameClickOptions(
 	ctx context.Context, opts sobek.Value, defaultTimeout time.Duration,
@@ -165,3 +163,5 @@ func extractSelectOptionFromMap(v map[string]interface{}) (*common.SelectOption,
 
 	return opt, nil
 }
+=======
+>>>>>>> df02a1dfa (Moved Element options and some Frame options to mapping layer)
