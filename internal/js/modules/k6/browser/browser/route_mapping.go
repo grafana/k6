@@ -143,7 +143,7 @@ func parsePageWaitForResponseOptions(
 	return ropts, nil
 }
 
-func parseWaitForRequestOptions(
+func parsePageWaitForRequestOptions(
 	ctx context.Context, opts sobek.Value, defaultTimeout time.Duration,
 ) (*common.PageWaitForRequestOptions, error) {
 	ropts := common.PageWaitForRequestOptions{
