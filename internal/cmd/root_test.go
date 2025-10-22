@@ -1,15 +1,23 @@
 package cmd
 
 import (
+	"sync"
 	"testing"
 
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
+	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/internal/cmd/tests"
+	"go.k6.io/k6/subcommand"
 )
 
 func TestRootCommandHelpDisplayCommands(t *testing.T) {
 	t.Parallel()
+
+	registerTestSubcommandExtensionsOnce.Do(func() {
+		registerTestSubcommandExtensions(t)
+	})
 
 	testCases := []struct {
 		name                  string
@@ -70,6 +78,14 @@ func TestRootCommandHelpDisplayCommands(t *testing.T) {
 			name:               "should have version command",
 			wantStdoutContains: "  version     Show application version",
 		},
+		{
+			name:               "should have test-cmd-1 command",
+			wantStdoutContains: "  test-cmd-1  Test command 1",
+		},
+		{
+			name:               "should have test-cmd-2 command",
+			wantStdoutContains: "  test-cmd-2  Test command 2",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -85,4 +101,26 @@ func TestRootCommandHelpDisplayCommands(t *testing.T) {
 			}
 		})
 	}
+}
+
+var registerTestSubcommandExtensionsOnce sync.Once //nolint:gochecknoglobals
+
+func registerTestSubcommandExtensions(t *testing.T) {
+	t.Helper()
+
+	subcommand.RegisterExtension("test-cmd-1", func(_ *state.GlobalState) *cobra.Command {
+		return &cobra.Command{
+			Use:   "test-cmd-1",
+			Short: "Test command 1",
+			Run:   func(_ *cobra.Command, _ []string) {},
+		}
+	})
+
+	subcommand.RegisterExtension("test-cmd-2", func(_ *state.GlobalState) *cobra.Command {
+		return &cobra.Command{
+			Use:   "test-cmd-2",
+			Short: "Test command 2",
+			Run:   func(_ *cobra.Command, _ []string) {},
+		}
+	})
 }
