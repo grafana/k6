@@ -615,6 +615,31 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return p.WaitForResponse(val, popts, rm)
 			}), nil
 		},
+		"waitForRequest": func(url sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
+			popts, err := parsePageWaitForRequestOptions(vu.Context(), opts, p.Timeout())
+			if err != nil {
+				return nil, fmt.Errorf("parsing waitForRequest options: %w", err)
+			}
+
+			var val string
+			switch url.ExportType() {
+			case reflect.TypeOf(string("")):
+				val = "'" + url.String() + "'" // Strings require quotes
+			default: // JS Regex, CSS, numbers or booleans
+				val = url.String() // No quotes
+			}
+
+			// Use RegEx matcher for regex pattern matching
+			ctx, stopTaskqueue := context.WithCancel(vu.Context())
+			tq := cancelableTaskQueue(ctx, vu.RegisterCallback)
+
+			rm := newRegExMatcher(ctx, vu, tq)
+
+			return k6ext.Promise(ctx, func() (result any, reason error) {
+				defer stopTaskqueue()
+				return p.WaitForRequest(val, popts, rm)
+			}), nil
+		},
 		"workers": func() *sobek.Object {
 			var mws []mapping
 			for _, w := range p.Workers() {
