@@ -3,7 +3,6 @@ package browser
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/grafana/sobek"
 
@@ -119,50 +118,4 @@ func parseHeaders(headers *sobek.Object) []common.HTTPHeader {
 		})
 	}
 	return result
-}
-
-func parsePageWaitForResponseOptions(
-	ctx context.Context, opts sobek.Value, defaultTimeout time.Duration,
-) (*common.PageWaitForResponseOptions, error) {
-	ropts := common.NewPageWaitForResponseOptions(defaultTimeout)
-	if k6common.IsNullish(opts) {
-		return ropts, nil
-	}
-
-	rt := k6ext.Runtime(ctx)
-	obj := opts.ToObject(rt)
-	for _, k := range obj.Keys() {
-		switch k {
-		case "timeout":
-			ropts.Timeout = time.Duration(obj.Get(k).ToInteger()) * time.Millisecond
-		default:
-			return ropts, fmt.Errorf("unsupported waitForResponse option: '%s'", k)
-		}
-	}
-
-	return ropts, nil
-}
-
-func parsePageWaitForRequestOptions(
-	ctx context.Context, opts sobek.Value, defaultTimeout time.Duration,
-) (*common.PageWaitForRequestOptions, error) {
-	ropts := common.PageWaitForRequestOptions{
-		Timeout: defaultTimeout,
-	}
-
-	if k6common.IsNullish(opts) {
-		return &ropts, nil
-	}
-
-	obj := opts.ToObject(k6ext.Runtime(ctx))
-	for _, k := range obj.Keys() {
-		switch k {
-		case "timeout":
-			ropts.Timeout = time.Duration(obj.Get(k).ToInteger()) * time.Millisecond
-		default:
-			return &ropts, fmt.Errorf("unsupported waitForRequest option: '%s'", k)
-		}
-	}
-
-	return &ropts, nil
 }
