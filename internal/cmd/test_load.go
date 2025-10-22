@@ -148,7 +148,7 @@ func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
 		err := errext.WithExitCodeIfNone(
 			moduleResolver.LoadMainModule(pwd, specifier, lt.source.Data),
 			exitcodes.ScriptException)
-		err = figureOutAutoExtensionResolution(err, moduleResolver.Imported(), logger, lt.fileSystems, lt.source, gs)
+		err = tryResolveModulesExtensions(err, moduleResolver.Imported(), logger, lt.fileSystems, lt.source, gs)
 		if err != nil {
 			return fmt.Errorf("could not load JS test '%s': %w", testPath, err)
 		}
@@ -180,7 +180,7 @@ func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
 			err := errext.WithExitCodeIfNone(
 				moduleResolver.LoadMainModule(pwd, specifier, arc.Data),
 				exitcodes.ScriptException)
-			err = figureOutAutoExtensionResolution(err, moduleResolver.Imported(), logger, arc.Filesystems, lt.source, gs)
+			err = tryResolveModulesExtensions(err, moduleResolver.Imported(), logger, arc.Filesystems, lt.source, gs)
 			if err != nil {
 				return fmt.Errorf("could not load JS test '%s': %w", testPath, err)
 			}
@@ -199,7 +199,7 @@ func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
 	}
 }
 
-func figureOutAutoExtensionResolution(
+func tryResolveModulesExtensions(
 	originalError error, imports []string, logger logrus.FieldLogger,
 	fileSystems map[string]fsext.Fs, source *loader.SourceData, gs *state.GlobalState,
 ) error {
