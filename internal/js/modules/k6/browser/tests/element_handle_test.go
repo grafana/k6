@@ -405,7 +405,7 @@ func TestElementHandleQueryAll(t *testing.T) {
   	`, nil)
 	require.NoError(t, err)
 
-	assertElement := func(t *testing.T, e *common.ElementHandle, wantContent string) {
+	assertTextContent := func(t *testing.T, e *common.ElementHandle, wantContent string) {
 		t.Helper()
 		text, ok, err := e.TextContent()
 		require.NoError(t, err)
@@ -420,25 +420,25 @@ func TestElementHandleQueryAll(t *testing.T) {
 		els, err := el.QueryAll(query)
 		require.NoError(t, err)
 		require.Len(t, els, wantLiLen)
-		assertElement(t, els[0], "1")
-		assertElement(t, els[1], "2")
-		assertElement(t, els[2], "3")
+		assertTextContent(t, els[0], "1")
+		assertTextContent(t, els[1], "2")
+		assertTextContent(t, els[2], "3")
 	})
 	t.Run("page", func(t *testing.T) { //nolint:paralleltest
 		els, err := p.QueryAll(query)
 		require.NoError(t, err)
 		require.Len(t, els, wantLiLen)
-		assertElement(t, els[0], "1")
-		assertElement(t, els[1], "2")
-		assertElement(t, els[2], "3")
+		assertTextContent(t, els[0], "1")
+		assertTextContent(t, els[1], "2")
+		assertTextContent(t, els[2], "3")
 	})
 	t.Run("frame", func(t *testing.T) { //nolint:paralleltest
 		els, err := p.MainFrame().QueryAll(query)
 		require.NoError(t, err)
 		require.Len(t, els, wantLiLen)
-		assertElement(t, els[0], "1")
-		assertElement(t, els[1], "2")
-		assertElement(t, els[2], "3")
+		assertTextContent(t, els[0], "1")
+		assertTextContent(t, els[1], "2")
+		assertTextContent(t, els[2], "3")
 	})
 }
 

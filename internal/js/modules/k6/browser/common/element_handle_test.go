@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/common/js"
@@ -161,25 +162,23 @@ func TestQueryAll(t *testing.T) {
 		for i := range numElements {
 			elems[i] = &ElementHandle{}
 		}
-		asElementFn := func(elem *ElementHandle) func() *ElementHandle {
-			{
-				return func() *ElementHandle { return elem }
-			}
+		jsHandleAPI := func(elem *ElementHandle) JSHandleAPI {
+			return &jsHandleStub{asElementFn: func() *ElementHandle { return elem }}
 		}
 
 		handles := map[string]JSHandleAPI{
 			// numeric keys
-			"0":  &jsHandleStub{asElementFn: asElementFn(elems[0])},
-			"1":  &jsHandleStub{asElementFn: asElementFn(elems[1])},
-			"2":  &jsHandleStub{asElementFn: asElementFn(elems[2])},
-			"3":  &jsHandleStub{asElementFn: asElementFn(elems[3])},
-			"4":  &jsHandleStub{asElementFn: asElementFn(elems[4])},
-			"5":  &jsHandleStub{asElementFn: asElementFn(elems[5])},
-			"6":  &jsHandleStub{asElementFn: asElementFn(elems[6])},
-			"7":  &jsHandleStub{asElementFn: asElementFn(elems[7])},
-			"8":  &jsHandleStub{asElementFn: asElementFn(elems[8])},
-			"9":  &jsHandleStub{asElementFn: asElementFn(elems[9])},
-			"10": &jsHandleStub{asElementFn: asElementFn(elems[10])},
+			"0":  jsHandleAPI(elems[0]),
+			"1":  jsHandleAPI(elems[1]),
+			"2":  jsHandleAPI(elems[2]),
+			"3":  jsHandleAPI(elems[3]),
+			"4":  jsHandleAPI(elems[4]),
+			"5":  jsHandleAPI(elems[5]),
+			"6":  jsHandleAPI(elems[6]),
+			"7":  jsHandleAPI(elems[7]),
+			"8":  jsHandleAPI(elems[8]),
+			"9":  jsHandleAPI(elems[9]),
+			"10": jsHandleAPI(elems[10]),
 			// non-numeric keys that should be filtered out
 			"length":  &jsHandleStub{asElementFn: nilHandle},
 			"forEach": &jsHandleStub{asElementFn: nilHandle},
@@ -197,9 +196,7 @@ func TestQueryAll(t *testing.T) {
 		results, err := (&ElementHandle{}).queryAll("*", evalFunc)
 		require.NoError(t, err)
 		require.Len(t, results, numElements)
-		for i := range numElements {
-			assert.Same(t, elems[i], results[i], "element at index %d should match", i)
-		}
+		assert.True(t, slices.Equal(elems, results), "elements must be sorted in document order")
 	})
 
 	t.Run("eval_call", func(t *testing.T) {
