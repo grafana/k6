@@ -3204,6 +3204,29 @@ func TestPageWaitForRequest(t *testing.T) {
 		require.ErrorIs(t, err, context.Canceled)
 		require.Nil(t, req)
 	})
+
+	t.Run("err/timeout", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t)
+
+		var req *common.Request
+		err := tb.run(tb.context(), func() error {
+			var werr error
+			req, werr = tb.NewPage(nil).WaitForRequest(
+				"/does-not-exist",
+				&common.PageWaitForRequestOptions{
+					Timeout: 500 * time.Millisecond,
+				},
+				func(pattern, url string) (bool, error) {
+					return true, nil
+				},
+			)
+			return werr
+		})
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+		require.Nil(t, req)
+	})
 }
 
 // TestClickInNestedFramesCORS tests clicking on buttons within nested frames
