@@ -3184,6 +3184,26 @@ func TestPageWaitForRequest(t *testing.T) {
 		require.ErrorIs(t, err, patternFuncError)
 		tb.logCache.assertContains(t, patternFuncError.Error())
 	})
+
+	t.Run("err/canceled", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t)
+		p := tb.NewPage(nil)
+
+		go tb.cancelContext()
+		<-tb.context().Done()
+
+		req, err := p.WaitForRequest(
+			"/does-not-matter",
+			&common.PageWaitForRequestOptions{Timeout: p.Timeout()},
+			func(pattern, url string) (bool, error) {
+				return true, nil
+			},
+		)
+		require.ErrorIs(t, err, context.Canceled)
+		require.Nil(t, req)
+	})
 }
 
 // TestClickInNestedFramesCORS tests clicking on buttons within nested frames
