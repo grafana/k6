@@ -142,3 +142,27 @@ func parseWaitForResponseOptions(
 
 	return ropts, nil
 }
+
+func parseWaitForRequestOptions(
+	ctx context.Context, opts sobek.Value, defaultTimeout time.Duration,
+) (*common.PageWaitForRequestOptions, error) {
+	ropts := common.PageWaitForRequestOptions{
+		Timeout: defaultTimeout,
+	}
+
+	if k6common.IsNullish(opts) {
+		return &ropts, nil
+	}
+
+	obj := opts.ToObject(k6ext.Runtime(ctx))
+	for _, k := range obj.Keys() {
+		switch k {
+		case "timeout":
+			ropts.Timeout = time.Duration(obj.Get(k).ToInteger()) * time.Millisecond
+		default:
+			return &ropts, fmt.Errorf("unsupported waitForRequest option: '%s'", k)
+		}
+	}
+
+	return &ropts, nil
+}
