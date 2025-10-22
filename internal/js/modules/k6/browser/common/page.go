@@ -1859,6 +1859,12 @@ func (p *Page) WaitForResponse(
 	return ev.Response, err
 }
 
+// PageWaitForRequestOptions are options for [Page.WaitForRequest].
+type PageWaitForRequestOptions struct {
+	// Timeout is the maximum time to wait for the request.
+	Timeout time.Duration
+}
+
 // Workers returns all WebWorkers of page.
 func (p *Page) Workers() []*Worker {
 	p.workersMu.Lock()
