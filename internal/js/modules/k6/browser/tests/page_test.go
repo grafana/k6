@@ -3119,6 +3119,49 @@ func TestPageWaitForResponse(t *testing.T) {
 	})
 }
 
+func TestPageWaitForRequest(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ok/waits_for_request", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withFileServer())
+		p := tb.GotoNewPage(tb.staticURL("/usual.html"))
+
+		var req *common.Request
+		err := tb.run(tb.context(),
+			// We make three requests for detecting edge cases,
+			// such as if WaitForRequest stops at the first match,
+			// or misses requests made in quick succession.
+			func() error {
+				_, err := p.Evaluate(`() => {
+					fetch('fetch-request-1');
+					fetch('fetch-request-2');
+					fetch('fetch-request-3');
+				}`, nil)
+				return err
+			},
+			// Waits until the request we're looking for is made.
+			func() error {
+				var werr error
+				req, werr = p.WaitForRequest(
+					"fetch-request-2",
+					&common.PageWaitForRequestOptions{
+						Timeout: p.Timeout(),
+					},
+					func(pattern, url string) (bool, error) {
+						return strings.Contains(url, pattern), nil
+					},
+				)
+				return werr
+			},
+		)
+		require.NoError(t, err)
+		require.NotNilf(t, req, "must have returned the request")
+		require.Contains(t, req.URL(), "fetch-request-2", "must return the correct request")
+	})
+}
+
 // TestClickInNestedFramesCORS tests clicking on buttons within nested frames
 // which are from different origins. At the end of the test the counter in
 // each frame should be "1".
