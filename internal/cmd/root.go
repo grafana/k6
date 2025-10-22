@@ -48,7 +48,7 @@ type rootCommand struct {
 
 // newRootCommand creates a root command with a default launcher
 func newRootCommand(gs *state.GlobalState) *rootCommand {
-	if gs.Env["OLD_RESOLUTION"] == "true" {
+	if gs.Env["K6_OLD_RESOLUTION"] == "true" {
 		return newRootWithLauncher(gs, newLauncher(gs))
 	}
 	return newRootWithLauncher(gs, nil)
