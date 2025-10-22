@@ -308,7 +308,7 @@ type runDifferentBinaryError struct {
 }
 
 func (r runDifferentBinaryError) Error() string {
-	return "a different binary error - this should never be printed, please report it"
+	panic("a different binary error - this should never be printed, please report it")
 }
 
 // readSource is a small wrapper around loader.ReadSource returning
