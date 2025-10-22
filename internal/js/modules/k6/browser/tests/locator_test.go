@@ -329,9 +329,10 @@ func TestLocator(t *testing.T) {
 				opts := common.NewFramePressOptions(lo.Timeout())
 				require.NoError(t, lo.PressSequentially("some text", opts))
 
-				value, err := p.InputValue("textarea", common.NewFrameInputValueOptions(p.MainFrame().Timeout()))
-				require.NoError(t, err)
-				require.Equal(t, "some text", value)
+				require.Eventually(t, func() bool {
+					value, err := p.InputValue("textarea", common.NewFrameInputValueOptions(p.MainFrame().Timeout()))
+					return err == nil && value == "some text"
+				}, time.Second*2, time.Millisecond*100)
 			},
 		},
 		{
