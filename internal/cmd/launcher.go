@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"syscall"
 
@@ -101,12 +103,13 @@ func (l *launcher) launch(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	constraintsMap := constraintsMapToProvisionDependency(deps)
 	l.gs.Logger.
-		WithField("deps", deps).
+		WithField("deps", constraintsMapToStringForLogs(constraintsMap)).
 		Info("Automatic extension resolution is enabled. The current k6 binary doesn't satisfy all dependencies," +
 			" it's required to provision a custom binary.")
 
-	customBinary, err := l.provisioner.provision(constraintsMapToProvisionDependency(deps))
+	customBinary, err := l.provisioner.provision(constraintsMap)
 	if err != nil {
 		l.gs.Logger.
 			WithError(err).
@@ -121,6 +124,20 @@ func (l *launcher) launch(cmd *cobra.Command, args []string) error {
 	cmd.RunE = l.runE
 
 	return nil
+}
+
+func constraintsMapToStringForLogs(deps k6provider.Dependencies) string {
+	var buf bytes.Buffer
+
+	for idx, depName := range slices.Sorted(maps.Keys(deps)) {
+		if idx > 0 {
+			_ = buf.WriteByte(';')
+		}
+
+		buf.WriteString(depName)
+		buf.WriteString(deps[depName])
+	}
+	return buf.String()
 }
 
 func constraintsMapToProvisionDependency(deps map[string]*semver.Constraints) k6provider.Dependencies {
