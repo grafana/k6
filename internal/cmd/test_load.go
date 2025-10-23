@@ -204,7 +204,6 @@ func tryResolveModulesExtensions(
 	fileSystems map[string]fsext.Fs, source *loader.SourceData, gs *state.GlobalState,
 ) error {
 	if !gs.Flags.AutoExtensionResolution {
-		fmt.Println("no auto ex")
 		return originalError
 	}
 
