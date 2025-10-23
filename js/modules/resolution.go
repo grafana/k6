@@ -129,13 +129,12 @@ func (mr *ModuleResolver) resolveLoaded(basePWD *url.URL, arg string, data []byt
 	if err != nil {
 		potentialRequireCalls := findRequireFunctionInAST(prg.Body)
 		if len(potentialRequireCalls) > 0 {
-			mr.logger.Debugf("will try to preload the potential `require` calls from within %q: %q",
 				specifier, potentialRequireCalls)
 		}
 		for _, requireArg := range potentialRequireCalls {
 			_, requireErr := mr.resolve(basePWD, requireArg)
 			if requireErr != nil {
-				mr.logger.WithError(requireErr).Debugf("error while preloading potential require call for %q", requireArg)
+				mr.logger.WithError(requireErr).Debugf("failed preloading %q call for %q", "require", requireArg)
 			}
 			if err := mr.usage.Uint64("usage/requirePreload", 1); err != nil {
 				mr.logger.WithError(err).Warn("couldn't report require preloading usage for " + requireArg)
