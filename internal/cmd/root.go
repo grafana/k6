@@ -154,12 +154,28 @@ func (c *rootCommand) execute() {
 	if errors.As(err, &ecerr) {
 		exitCode = int(ecerr.ExitCode())
 	}
-	var differentBinaryError runDifferentBinaryError
+
+	var differentBinaryError binaryIsNotSatisfyingDependenciesError
 
 	if errors.As(err, &differentBinaryError) {
-		err = differentBinaryError.customBinary.run(c.globalState)
-		if err == nil {
-			return
+		deps := differentBinaryError.deps
+		c.globalState.Logger.
+			WithField("deps", deps).
+			Info("Automatic extension resolution is enabled. The current k6 binary doesn't satisfy all dependencies," +
+				" it's required to provision a custom binary.")
+		provisioner := newK6BuildProvisioner(c.globalState)
+		var customBinary commandExecutor
+		customBinary, err = provisioner.provision(constraintsMapToProvisionDependency(deps))
+		if err != nil {
+			c.globalState.Logger.
+				WithError(err).
+				Error("Failed to provision a k6 binary with required dependencies." +
+					" Please, make sure to report this issue by opening a bug report.")
+		} else {
+			err = customBinary.run(c.globalState)
+			if err == nil {
+				return
+			}
 		}
 	}
 

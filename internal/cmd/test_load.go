@@ -226,26 +226,12 @@ func tryResolveModulesExtensions(
 		return nil
 	}
 
-	logger.
-		WithField("deps", deps).
-		Info("Automatic extension resolution is enabled. The current k6 binary doesn't satisfy all dependencies," +
-			" it's required to provision a custom binary.")
-	provisioner := newK6BuildProvisioner(gs)
-	customBinary, err := provisioner.provision(constraintsMapToProvisionDependency(deps))
-	if err != nil {
-		logger.
-			WithError(err).
-			Error("Failed to provision a k6 binary with required dependencies." +
-				" Please, make sure to report this issue by opening a bug report.")
-		return err
-	}
-
 	if source.URL.Path == "/-" {
 		gs.Stdin = bytes.NewBuffer(source.Data)
 	}
 
-	return runDifferentBinaryError{
-		customBinary: customBinary,
+	return binaryIsNotSatisfyingDependenciesError{
+		deps: deps,
 	}
 }
 
@@ -303,12 +289,13 @@ func extractUnknownModules(err error) (map[string]*semver.Constraints, error) {
 }
 
 // TODO(@mstoykov) potentially figure out some less "exceptionl workflow" solution
-type runDifferentBinaryError struct {
-	customBinary commandExecutor
+type binaryIsNotSatisfyingDependenciesError struct {
+	deps map[string]*semver.Constraints
 }
 
-func (r runDifferentBinaryError) Error() string {
-	panic("a different binary error - this should never be printed, please report it")
+func (r binaryIsNotSatisfyingDependenciesError) Error() string {
+	// TODO(@mstoykov) fix this for #5327 before merge
+	return fmt.Sprintf("binary does not satisfy dependencies %q", r.deps)
 }
 
 // readSource is a small wrapper around loader.ReadSource returning
