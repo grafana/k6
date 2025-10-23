@@ -2,17 +2,11 @@ package common
 
 import (
 	"errors"
-	"reflect"
 	"testing"
-)
 
-func partsToValues(parts []*SelectorPart) []SelectorPart {
-	out := make([]SelectorPart, len(parts))
-	for i, p := range parts {
-		out[i] = *p
-	}
-	return out
-}
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
 
 func TestSelectorParse(t *testing.T) {
 	t.Parallel()
@@ -91,6 +85,15 @@ func TestSelectorParse(t *testing.T) {
 			},
 			expectedCap: nil,
 		},
+		{
+			name:  "Space between >>",
+			input: `css="div" >> >> text="item"`,
+			expectedParts: []*SelectorPart{
+				{Name: "css", Body: `"div"`},
+				{Name: "text", Body: `"item"`},
+			},
+			expectedCap: nil,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -111,18 +114,9 @@ func TestSelectorParse(t *testing.T) {
 				return
 			}
 
-			if err != nil {
-				t.Fatalf("Unexpected error: %v", err)
-			}
-
-			if !reflect.DeepEqual(sel.Parts, tc.expectedParts) {
-				t.Errorf("Parts mismatch.\nGot: %#v\nExpected: %#v", partsToValues(sel.Parts), partsToValues(tc.expectedParts))
-			}
-
-			if (sel.Capture == nil) != (tc.expectedCap == nil) ||
-				(sel.Capture != nil && tc.expectedCap != nil && *sel.Capture != *tc.expectedCap) {
-				t.Errorf("Capture mismatch.\nGot: %#v\nExpected: %#v", sel.Capture, tc.expectedCap)
-			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.expectedParts, sel.Parts, "Parts mismatch")
+			assert.EqualValues(t, tc.expectedCap, sel.Capture, "Capture mismatch")
 		})
 	}
 }

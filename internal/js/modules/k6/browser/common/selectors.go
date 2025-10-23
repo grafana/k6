@@ -28,6 +28,9 @@ var reQueryEngine *regexp.Regexp = regexp.MustCompile(`^[a-zA-Z_0-9-+:*]+$`)
 // Matches start of XPath query.
 var reXPathSelector *regexp.Regexp = regexp.MustCompile(`^\(*//`)
 
+// Matches the text selectors of the form text=<value>
+var reTextSelector *regexp.Regexp = regexp.MustCompile(`^\s*text\s*=\s*(.*)$`)
+
 // ErrEmptySelector is returned when a selector string is empty.
 var ErrEmptySelector = errors.New("provided selector is empty")
 
@@ -117,37 +120,37 @@ func (s *Selector) parse() error {
 		return &SelectorPart{Name: name, Body: body}, capture
 	}
 
-	start := 0
-	index := 0
-	var quote rune
-	selector := s.Selector
+	var (
+		start, index int
+		quote        rune
+	)
 
 	appendPart := func(start, end int) error {
-		part := selector[start:end]
-		p, capture := parsePart(part)
+		p, capture := parsePart(s.Selector[start:end])
+		// Skip empty segments between `>>`, e.g., when there are consecutive `>>` or leading/trailing `>>`.
 		if p == nil {
 			return nil
 		}
 		return s.appendPart(p, capture)
 	}
 
-	if !strings.Contains(selector, ">>") {
-		return appendPart(0, len(selector))
+	if !strings.Contains(s.Selector, ">>") {
+		return appendPart(0, len(s.Selector))
 	}
 
 	shouldIgnoreTextSelectorQuote := func(start, end int) bool {
-		prefix := selector[start:end]
-		if match := regexp.MustCompile(`^\s*text\s*=(.*)$`).FindStringSubmatch(prefix); match != nil && match[1] != "" {
+		prefix := s.Selector[start:end]
+		if match := reTextSelector.FindStringSubmatch(prefix); match != nil && match[1] != "" {
 			return true
 		}
 		return false
 	}
 
-	for index < len(selector) {
-		c := rune(selector[index])
+	for index < len(s.Selector) {
+		c := rune(s.Selector[index])
 
 		switch {
-		case c == '\\' && index+1 < len(selector):
+		case c == '\\' && index+1 < len(s.Selector):
 			index += 2
 		case c == quote:
 			quote = 0
@@ -155,7 +158,7 @@ func (s *Selector) parse() error {
 		case quote == 0 && (c == '"' || c == '\'' || c == '`') && !shouldIgnoreTextSelectorQuote(start, index):
 			quote = c
 			index++
-		case quote == 0 && c == '>' && index+1 < len(selector) && selector[index+1] == '>':
+		case quote == 0 && c == '>' && index+1 < len(s.Selector) && s.Selector[index+1] == '>':
 			if err := appendPart(start, index); err != nil {
 				return err
 			}
