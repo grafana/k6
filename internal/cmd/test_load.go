@@ -250,7 +250,7 @@ func analyseUseContraints(
 		if err != nil {
 			panic(err)
 		}
-		newdeps, err := processUseDirectives(d.Data)
+		newdeps, err := processUseDirectives(imported, d.Data)
 		if err != nil {
 			panic(err)
 		}

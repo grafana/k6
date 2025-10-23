@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strings"
 	"syscall"
@@ -17,6 +16,9 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/grafana/k6deps"
 	"github.com/grafana/k6provider"
+	"github.com/grafana/sobek"
+	"github.com/grafana/sobek/ast"
+	"github.com/grafana/sobek/parser"
 	"github.com/spf13/cobra"
 
 	"go.k6.io/k6/cloudapi"
@@ -409,36 +411,66 @@ func extractToken(gs *state.GlobalState) (string, error) {
 	return config.Token.String, nil
 }
 
-//nolint:gochecknoglobals
-var (
-	srcName       = `(?P<name>k6|k6/[^/]{2}.*|k6/[^x]/.*|k6/x/[/0-9a-zA-Z_-]+|(@[a-zA-Z0-9-_]+/)?xk6-([a-zA-Z0-9-_]+)((/[a-zA-Z0-9-_]+)*))` //nolint:lll
-	srcConstraint = `=?v?0\.0\.0\+[0-9A-Za-z-]+|[vxX*|,&\^0-9.+-><=, ~]+`
-
-	reUseK6 = regexp.MustCompile(
-		`"use +k6(( with ` + srcName + `( *(?P<constraints>` + srcConstraint + `))?)|(( *(?P<k6Constraints>` + srcConstraint + `)?)))"`) //nolint:lll
-
-	idxUseName          = reUseK6.SubexpIndex("name")
-	idxUseConstraints   = reUseK6.SubexpIndex("constraints")
-	idxUseK6Constraints = reUseK6.SubexpIndex("k6Constraints")
-	nameK6              = "k6"
-)
-
-func processUseDirectives(text []byte) (map[string]string, error) {
+func processUseDirectives(name string, text []byte) (map[string]string, error) {
 	deps := make(map[string]string)
-	for _, match := range reUseK6.FindAllSubmatch(text, -1) {
-		if constraints := string(match[idxUseK6Constraints]); len(constraints) != 0 {
-			deps[nameK6] = constraints
+	// TODO In theory this will be super easy to parse even with comments and special cases such as #! at the beginning
+	// of the file, but using sobek.Parse is likely *a lot* more sure to work correctly.
+	m, err := sobek.Parse(name, string(text), parser.IsModule, parser.WithDisableSourceMaps)
+	if err != nil {
+		return nil, err
+	}
+	updateDep := func(dep, constraint string) error {
+		// TODO: We could actually do constraint comparison here and get the more specific one
+		oldConstraint, ok := deps[dep]
+		if !ok || oldConstraint == "" { // either nothing or it didn't have constraint
+			deps[dep] = constraint
+			return nil
 		}
+		if constraint == oldConstraint || constraint == "" {
+			return nil
+		}
+		return fmt.Errorf("already have constraint for %q, when parsing %q in %q", dep, constraint, name)
+	}
 
-		if extension := string(match[idxUseName]); len(extension) != 0 {
-			constraints := string(match[idxUseConstraints])
-
-			if _, ok := deps[extension]; ok {
-				return deps, fmt.Errorf("already had a use directivce for %q", extension)
+	directives := findDirectives(m.Body)
+	for _, directive := range directives {
+		// normalize spaces
+		directive = strings.ReplaceAll(directive, "  ", " ")
+		if !strings.HasPrefix(directive, "use k6") {
+			continue
+		}
+		directive = strings.TrimSpace(strings.TrimPrefix(directive, "use k6"))
+		if !strings.HasPrefix(directive, "with k6/x/") {
+			err := updateDep("k6", directive)
+			if err != nil {
+				return nil, err
 			}
-			deps[extension] = constraints
+			continue
+		}
+		directive = strings.TrimSpace(strings.TrimPrefix(directive, "with "))
+		dep, constraint, _ := strings.Cut(directive, " ")
+		err := updateDep(dep, constraint)
+		if err != nil {
+			return nil, err
 		}
 	}
 
 	return deps, nil
+}
+
+// TODO(@mstoykov): in a future RP make this more generic
+func findDirectives(list []ast.Statement) []string {
+	var result []string
+	for _, st := range list {
+		if st, ok := st.(*ast.ExpressionStatement); ok {
+			if e, ok := st.Expression.(*ast.StringLiteral); ok {
+				result = append(result, e.Value.String())
+			} else {
+				break
+			}
+		} else {
+			break
+		}
+	}
+	return result
 }

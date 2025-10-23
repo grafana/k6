@@ -567,3 +567,109 @@ func TestGetProviderConfig(t *testing.T) {
 		})
 	}
 }
+
+func TestProcessUseDirectives(t *testing.T) {
+	t.Parallel()
+	tests := map[string]struct {
+		input          string
+		expectedOutput map[string]string
+		expectedError  string
+	}{
+		"nothing": {
+			input:          "export default function() {}",
+			expectedOutput: map[string]string{},
+		},
+		"nothing really": {
+			input: `"use k6"`,
+			expectedOutput: map[string]string{
+				"k6": "",
+			},
+		},
+		"k6 pinning": {
+			input: `"use k6 > 1.4.0"`,
+			expectedOutput: map[string]string{
+				"k6": "> 1.4.0",
+			},
+		},
+		"a extension": {
+			input: `"use k6 with k6/x/sql"`,
+			expectedOutput: map[string]string{
+				"k6/x/sql": "",
+			},
+		},
+		"an extension with constraint": {
+			input: `"use k6 with k6/x/sql > 1.4.0"`,
+			expectedOutput: map[string]string{
+				"k6/x/sql": "> 1.4.0",
+			},
+		},
+		"complex": {
+			input: `
+				// something here
+				"use k6 with k6/x/A"
+				function a (){
+					"use k6 with k6/x/B"
+					let s = JSON.stringify( "use k6 with k6/x/C")
+					"use k6 with k6/x/D"
+
+					return s
+				}
+
+				export const b = "use k6 with k6/x/E"
+				"use k6 with k6/x/F"
+
+				// Here for esbuild and k6 warnings
+				a()
+				export default function(){}
+				`,
+			expectedOutput: map[string]string{
+				"k6/x/A": "",
+			},
+		},
+
+		"repeat": {
+			input: `
+				"use k6 with k6/x/A"
+				"use k6 with k6/x/A"
+				`,
+			expectedOutput: map[string]string{
+				"k6/x/A": "",
+			},
+		},
+		"repeat with constraint first": {
+			input: `
+				"use k6 with k6/x/A > 1.4.0"
+				"use k6 with k6/x/A"
+				`,
+			expectedOutput: map[string]string{
+				"k6/x/A": "> 1.4.0",
+			},
+		},
+		"constraint difference": {
+			input: `
+				"use k6 > 1.4.0"
+				"use k6 = 1.2.3"
+				`,
+			expectedError: `already have constraint for "k6", when parsing "= 1.2.3" in "name.js"`,
+		},
+		"constraint difference for extensions": {
+			input: `
+				"use k6 with k6/x/A > 1.4.0"
+				"use k6 with k6/x/A = 1.2.3"
+				`,
+			expectedError: `already have constraint for "k6/x/A", when parsing "= 1.2.3" in "name.js"`,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			m, err := processUseDirectives("name.js", []byte(test.input))
+			assert.EqualValues(t, test.expectedOutput, m)
+			if len(test.expectedError) > 0 {
+				assert.ErrorContains(t, err, test.expectedError)
+			}
+		})
+	}
+}
