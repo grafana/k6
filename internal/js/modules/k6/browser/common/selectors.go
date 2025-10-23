@@ -31,9 +31,6 @@ var reXPathSelector *regexp.Regexp = regexp.MustCompile(`^\(*//`)
 // Matches the text selectors of the form text=<value>
 var reTextSelector *regexp.Regexp = regexp.MustCompile(`^\s*text\s*=\s*(.*)$`)
 
-// ErrEmptySelector is returned when a selector string is empty.
-var ErrEmptySelector = errors.New("provided selector is empty")
-
 type SelectorPart struct {
 	Name string `json:"name"`
 	Body string `json:"body"`
@@ -51,7 +48,7 @@ type Selector struct {
 
 func NewSelector(selector string) (*Selector, error) {
 	if selector == "" {
-		return nil, ErrEmptySelector
+		return nil, errors.New("provided selector is empty")
 	}
 
 	s := Selector{
@@ -93,19 +90,15 @@ func (s *Selector) parse() error {
 		case eqIndex != -1 && reQueryEngine.MatchString(strings.TrimSpace(part[:eqIndex])):
 			name = strings.TrimSpace(part[:eqIndex])
 			body = part[eqIndex+1:]
-
 		case len(part) > 1 && part[0] == '"' && part[len(part)-1] == '"':
 			name = "text"
 			body = part
-
 		case len(part) > 1 && part[0] == '\'' && part[len(part)-1] == '\'':
 			name = "text"
 			body = part
-
 		case reXPathSelector.MatchString(part) || strings.HasPrefix(part, ".."):
 			name = "xpath"
 			body = part
-
 		default:
 			name = "css"
 			body = part
@@ -148,7 +141,6 @@ func (s *Selector) parse() error {
 
 	for index < len(s.Selector) {
 		c := rune(s.Selector[index])
-
 		switch {
 		case c == '\\' && index+1 < len(s.Selector):
 			index += 2

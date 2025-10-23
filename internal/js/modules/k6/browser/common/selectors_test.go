@@ -1,7 +1,6 @@
 package common
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,14 +15,14 @@ func TestSelectorParse(t *testing.T) {
 		input         string
 		expectedParts []*SelectorPart
 		expectedCap   *int
-		expectedError error
+		expectedError string
 	}{
 		{
 			name:          "Empty selector",
 			input:         "",
 			expectedParts: nil,
 			expectedCap:   nil,
-			expectedError: ErrEmptySelector,
+			expectedError: "provided selector is empty",
 		},
 		{
 			name:  "Escaped quotes in text",
@@ -102,15 +101,9 @@ func TestSelectorParse(t *testing.T) {
 
 			sel, err := NewSelector(tc.input)
 
-			if tc.expectedError != nil {
-				if err == nil {
-					t.Fatalf("Expected error: %v, got nil", tc.expectedError)
-				}
-
-				if !errors.Is(err, tc.expectedError) {
-					t.Fatalf("Unexpected error: %v", err)
-				}
-
+			if tc.expectedError != "" {
+				require.Error(t, err)
+				require.ErrorContains(t, err, tc.expectedError)
 				return
 			}
 
