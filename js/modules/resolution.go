@@ -125,12 +125,9 @@ func (mr *ModuleResolver) resolveLoaded(basePWD *url.URL, arg string, data []byt
 	} else {
 		mod, err = cjsModuleFromString(prg)
 	}
-	// TODO(@mstoykov): put this behind a flag
+	// TODO(@mstoykov): put the whole preloading behind a flag, maybe auto extension resolution one, or one dependent
 	if err != nil {
 		potentialRequireCalls := findRequireFunctionInAST(prg.Body)
-		if len(potentialRequireCalls) > 0 {
-				specifier, potentialRequireCalls)
-		}
 		for _, requireArg := range potentialRequireCalls {
 			_, requireErr := mr.resolve(basePWD, requireArg)
 			if requireErr != nil {
