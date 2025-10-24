@@ -416,7 +416,7 @@ func TestPageInnerHTML(t *testing.T) {
 		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
 		_, err := p.InnerHTML("", common.NewFrameInnerHTMLOptions(p.Context().Timeout()))
-		require.ErrorContains(t, err, "The provided selector is empty")
+		require.ErrorContains(t, err, "provided selector is empty")
 	})
 
 	t.Run("err_wrong_selector", func(t *testing.T) {
@@ -453,7 +453,7 @@ func TestPageInnerText(t *testing.T) {
 		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
 		_, err := p.InnerText("", common.NewFrameInnerTextOptions(p.MainFrame().Timeout()))
-		require.ErrorContains(t, err, "The provided selector is empty")
+		require.ErrorContains(t, err, "provided selector is empty")
 	})
 
 	t.Run("err_wrong_selector", func(t *testing.T) {
@@ -492,7 +492,7 @@ func TestPageTextContent(t *testing.T) {
 		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
 		_, _, err := p.TextContent("", common.NewFrameTextContentOptions(p.MainFrame().Timeout()))
-		require.ErrorContains(t, err, "The provided selector is empty")
+		require.ErrorContains(t, err, "provided selector is empty")
 	})
 
 	t.Run("err_wrong_selector", func(t *testing.T) {
