@@ -21,6 +21,8 @@ const (
 	optionModifiers  = "modifiers"
 )
 
+const noWaitAfterOption = "noWaitAfter"
+
 var imageFormatToID = map[string]common.ImageFormat{ //nolint:gochecknoglobals
 	"jpeg": common.ImageFormatJPEG,
 	"png":  common.ImageFormatPNG,
@@ -356,9 +358,10 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 	return maps
 }
 
-// parseElementHandleBaseOptions parses ElementHandleBaseOptions from opts
+//nolint:unparam // keeping error for consistency with other parse functions
 func parseElementHandleBaseOptions(ctx context.Context, opts sobek.Value) (*common.ElementHandleBaseOptions, error) {
 	if k6common.IsNullish(opts) {
+		//nolint:nilnil // returning (nil, nil) intentionally means "no options provided"
 		return nil, nil
 	}
 
@@ -373,7 +376,7 @@ func parseElementHandleBaseOptions(ctx context.Context, opts sobek.Value) (*comm
 		switch k {
 		case "force":
 			parsed.Force = obj.Get(k).ToBoolean()
-		case "noWaitAfter":
+		case noWaitAfterOption:
 			parsed.NoWaitAfter = obj.Get(k).ToBoolean()
 		case "timeout":
 			parsed.Timeout = time.Duration(obj.Get(k).ToInteger()) * time.Millisecond
@@ -383,7 +386,6 @@ func parseElementHandleBaseOptions(ctx context.Context, opts sobek.Value) (*comm
 	return parsed, nil
 }
 
-// parseElementHandleBasePointerOptions parses ElementHandleBasePointerOptions from opts
 func parseElementHandleBasePointerOptions(
 	ctx context.Context,
 	opts sobek.Value,
@@ -419,7 +421,6 @@ func parseElementHandleBasePointerOptions(
 	return o, nil
 }
 
-// parseElementHandleSetInputFilesOptions parses ElementHandleSetInputFilesOptions from opts.
 func parseElementHandleSetInputFilesOptions(
 	ctx context.Context,
 	opts sobek.Value,
@@ -429,6 +430,7 @@ func parseElementHandleSetInputFilesOptions(
 		return nil, err
 	}
 	if baseOpts == nil {
+		//nolint:nilnil // returning (nil, nil) intentionally means "no options provided"
 		return nil, nil
 	}
 
@@ -439,9 +441,9 @@ func parseElementHandleSetInputFilesOptions(
 	return o, nil
 }
 
-// parseElementHandleClickOptions parses ElementHandleClickOptions from opts
 func parseElementHandleClickOptions(ctx context.Context, opts sobek.Value) (*common.ElementHandleClickOptions, error) {
 	if k6common.IsNullish(opts) {
+		//nolint:nilnil // returning (nil, nil) intentionally means "no options provided"
 		return nil, nil
 	}
 	basePointer, err := parseElementHandleBasePointerOptions(ctx, opts)
@@ -474,7 +476,6 @@ func parseElementHandleClickOptions(ctx context.Context, opts sobek.Value) (*com
 	return o, nil
 }
 
-// parseElementHandleDblclickOptions parses ElementHandleDblclickOptions from opts
 func parseElementHandleDblclickOptions(
 	ctx context.Context,
 	opts sobek.Value,
@@ -511,7 +512,6 @@ func parseElementHandleDblclickOptions(
 	return o, nil
 }
 
-// parseElementHandleHoverOptions parses ElementHandleHoverOptions from opts
 func parseElementHandleHoverOptions(ctx context.Context, opts sobek.Value) (*common.ElementHandleHoverOptions, error) {
 	o := &common.ElementHandleHoverOptions{}
 
@@ -539,7 +539,6 @@ func parseElementHandleHoverOptions(ctx context.Context, opts sobek.Value) (*com
 	return o, nil
 }
 
-// parseElementHandleSetCheckedOptions parses ElementHandleSetCheckedOptions from opts.
 func parseElementHandleSetCheckedOptions(
 	ctx context.Context,
 	opts sobek.Value,
@@ -566,7 +565,6 @@ func parseElementHandleSetCheckedOptions(
 	return o, nil
 }
 
-// parseElementHandleTapOptions parses ElementHandleTapOptions from opts.
 func parseElementHandleTapOptions(ctx context.Context, opts sobek.Value) (*common.ElementHandleTapOptions, error) {
 	o := &common.ElementHandleTapOptions{}
 
@@ -595,7 +593,7 @@ func parseElementHandleTapOptions(ctx context.Context, opts sobek.Value) (*commo
 	return o, nil
 }
 
-// parseElementHandlePressOptions parses ElementHandlePressOptions from opts.
+//nolint:unparam // keeping error for consistency with other parse functions
 func parseElementHandlePressOptions(ctx context.Context, opts sobek.Value) (*common.ElementHandlePressOptions, error) {
 	o := &common.ElementHandlePressOptions{}
 	rt := k6ext.Runtime(ctx)
@@ -605,7 +603,7 @@ func parseElementHandlePressOptions(ctx context.Context, opts sobek.Value) (*com
 			switch k {
 			case "delay":
 				o.Delay = obj.Get(k).ToInteger()
-			case "noWaitAfter":
+			case noWaitAfterOption:
 				o.NoWaitAfter = obj.Get(k).ToBoolean()
 			case "timeout":
 				o.Timeout = time.Duration(obj.Get(k).ToInteger()) * time.Millisecond
@@ -616,7 +614,7 @@ func parseElementHandlePressOptions(ctx context.Context, opts sobek.Value) (*com
 	return o, nil
 }
 
-// parseElementHandleScreenshotOptions parses ElementHandleScreenshotOptions from opts.
+//nolint:unparam // keeping error for consistency with other parse functions
 func parseElementHandleScreenshotOptions(
 	ctx context.Context,
 	opts sobek.Value,
@@ -657,7 +655,7 @@ func parseElementHandleScreenshotOptions(
 	return o, nil
 }
 
-// parseElementHandleTypeOptions parses ElementHandleTypeOptions from opts.
+//nolint:unparam // keeping error for consistency with other parse functions
 func parseElementHandleTypeOptions(ctx context.Context, opts sobek.Value) (*common.ElementHandleTypeOptions, error) {
 	o := &common.ElementHandleTypeOptions{}
 	rt := k6ext.Runtime(ctx)
@@ -667,7 +665,7 @@ func parseElementHandleTypeOptions(ctx context.Context, opts sobek.Value) (*comm
 			switch k {
 			case "delay":
 				o.Delay = obj.Get(k).ToInteger()
-			case "noWaitAfter":
+			case noWaitAfterOption:
 				o.NoWaitAfter = obj.Get(k).ToBoolean()
 			case "timeout":
 				o.Timeout = time.Duration(obj.Get(k).ToInteger()) * time.Millisecond
@@ -678,7 +676,7 @@ func parseElementHandleTypeOptions(ctx context.Context, opts sobek.Value) (*comm
 	return o, nil
 }
 
-// parseElementHandleWaitForElementStateOptions parses ElementHandleWaitForElementStateOptions from opts.
+//nolint:unparam // keeping error for consistency with other parse functions
 func parseElementHandleWaitForElementStateOptions(
 	ctx context.Context,
 	opts sobek.Value,
