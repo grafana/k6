@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io/fs"
 	"maps"
@@ -22,6 +23,8 @@ import (
 
 	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/cmd/state"
+	"go.k6.io/k6/errext"
+	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/ext"
 	"go.k6.io/k6/internal/build"
 	"go.k6.io/k6/lib/fsext"
@@ -220,6 +223,10 @@ func (b *customBinary) run(gs *state.GlobalState) error {
 	for {
 		select {
 		case err := <-done:
+			var exitError *exec.ExitError
+			if errors.As(err, &exitError) {
+				return errext.WithExitCodeIfNone(errAlreadyReported, exitcodes.ExitCode(exitError.ExitCode())) //nolint:gosec
+			}
 			return err
 		case sig := <-sigC:
 			gs.Logger.
@@ -228,6 +235,9 @@ func (b *customBinary) run(gs *state.GlobalState) error {
 		}
 	}
 }
+
+// used just to signal we shouldn't print error again
+var errAlreadyReported = fmt.Errorf("already reported error")
 
 // isCustomBuildRequired checks if there is at least one dependency that are not satisfied by the binary
 // considering the version of k6 and any built-in extension
