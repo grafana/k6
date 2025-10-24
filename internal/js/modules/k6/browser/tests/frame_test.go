@@ -394,3 +394,40 @@ func TestFrameWaitForURLFailure(t *testing.T) {
 		})
 	}
 }
+
+
+
+func TestFrameElementIsInViewport(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t)
+	p := tb.NewPage(nil)
+
+	err := p.SetContent(`
+		<a id="top-link" href="#bottom-div">Go to Bottom</a>
+		<div id="bottom-div" style="margin-top: 2000px;">I am at the bottom</div>
+	`, nil)
+	require.NoError(t, err)
+
+	mainFrame := p.MainFrame()
+
+	bottomLocator := mainFrame.Locator("#bottom-div")
+
+	inViewport, err := bottomLocator.IsInViewport()
+	require.NoError(t, err)
+	require.False(t, inViewport, "the bottom element should not be in the viewport initially")
+
+	topLocator := mainFrame.Locator("#top-link")
+
+	clickOpts := common.NewFrameClickOptions(mainFrame.Timeout())
+	err = topLocator.Click(clickOpts)
+	require.NoError(t, err)
+
+	waitOpts := common.NewFrameWaitForSelectorOptions(mainFrame.Timeout(), common.DOMElementStateVisible)
+	_, err = mainFrame.WaitForSelector("#bottom-div", waitOpts)
+	require.NoError(t, err, "waiting for #bottom-div to become visible after scroll")
+
+	inViewport, err = bottomLocator.IsInViewport()
+	require.NoError(t, err)
+	require.True(t, inViewport, "the bottom element should be in the viewport after clicking the anchor link")
+}
