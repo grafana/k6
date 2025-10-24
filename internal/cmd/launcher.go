@@ -410,9 +410,7 @@ func extractToken(gs *state.GlobalState) (string, error) {
 	return config.Token.String, nil
 }
 
-func processUseDirectives(name string, text []byte) (dependencies, error) {
-	deps := make(dependencies)
-
+func processUseDirectives(name string, text []byte, deps dependencies) error {
 	directives := findDirectives(text)
 
 	for _, directive := range directives {
@@ -425,7 +423,7 @@ func processUseDirectives(name string, text []byte) (dependencies, error) {
 		if !strings.HasPrefix(directive, "with k6/x/") {
 			err := deps.update("k6", directive)
 			if err != nil {
-				return nil, fmt.Errorf("error while parsing use directives in %q: %w", name, err)
+				return fmt.Errorf("error while parsing use directives in %q: %w", name, err)
 			}
 			continue
 		}
@@ -433,11 +431,11 @@ func processUseDirectives(name string, text []byte) (dependencies, error) {
 		dep, constraint, _ := strings.Cut(directive, " ")
 		err := deps.update(dep, constraint)
 		if err != nil {
-			return nil, fmt.Errorf("error while parsing use directives in %q: %w", name, err)
+			return fmt.Errorf("error while parsing use directives in %q: %w", name, err)
 		}
 	}
 
-	return deps, nil
+	return nil
 }
 
 func findDirectives(text []byte) []string {

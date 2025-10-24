@@ -673,10 +673,12 @@ func TestProcessUseDirectives(t *testing.T) {
 				deps = nil
 			}
 
-			m, err := processUseDirectives("name.js", []byte(test.input))
-			assert.EqualValues(t, deps, m)
+			m := make(dependencies)
+			err := processUseDirectives("name.js", []byte(test.input), m)
 			if len(test.expectedError) > 0 {
-				assert.ErrorContains(t, err, test.expectedError)
+				require.ErrorContains(t, err, test.expectedError)
+			} else {
+				require.EqualValues(t, deps, m)
 			}
 		})
 	}

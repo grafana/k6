@@ -247,19 +247,16 @@ func analyseUseContraints(imports []string, fileSystems map[string]fsext.Fs, dep
 		}
 		// We always have URLs here with scheme and everything
 		_, path, _ := strings.Cut(imported, "://")
+		if u.Scheme == "https" {
+			path = "/" + path
+		}
 		data, err := fsext.ReadFile(fileSystems[u.Scheme], path)
 		if err != nil {
 			panic(err)
 		}
-		newdeps, err := processUseDirectives(imported, data)
+		err = processUseDirectives(imported, data, deps)
 		if err != nil {
 			panic(err)
-		}
-		for dep, constraint := range newdeps {
-			err := deps.update(dep, constraint.String())
-			if err != nil {
-				return fmt.Errorf("error while parsing use directives in %q: %w", imported, err)
-			}
 		}
 	}
 	return nil
@@ -297,7 +294,10 @@ func (d dependencies) String() string {
 		}
 
 		buf.WriteString(depName)
-		buf.WriteString(d[depName].String())
+		constraint := d[depName]
+		if constraint != nil {
+			buf.WriteString(constraint.String())
+		}
 	}
 	return buf.String()
 }
