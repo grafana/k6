@@ -12,13 +12,12 @@ import (
 	"slices"
 	"strings"
 	"syscall"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/grafana/k6deps"
 	"github.com/grafana/k6provider"
-	"github.com/grafana/sobek"
-	"github.com/grafana/sobek/ast"
-	"github.com/grafana/sobek/parser"
 	"github.com/spf13/cobra"
 
 	"go.k6.io/k6/cloudapi"
@@ -413,12 +412,7 @@ func extractToken(gs *state.GlobalState) (string, error) {
 
 func processUseDirectives(name string, text []byte) (map[string]string, error) {
 	deps := make(map[string]string)
-	// TODO In theory this will be super easy to parse even with comments and special cases such as #! at the beginning
-	// of the file, but using sobek.Parse is likely *a lot* more sure to work correctly.
-	m, err := sobek.Parse(name, string(text), parser.IsModule, parser.WithDisableSourceMaps)
-	if err != nil {
-		return nil, err
-	}
+
 	updateDep := func(dep, constraint string) error {
 		// TODO: We could actually do constraint comparison here and get the more specific one
 		oldConstraint, ok := deps[dep]
@@ -432,7 +426,8 @@ func processUseDirectives(name string, text []byte) (map[string]string, error) {
 		return fmt.Errorf("already have constraint for %q, when parsing %q in %q", dep, constraint, name)
 	}
 
-	directives := findDirectives(m.Body)
+	directives := findDirectives(text)
+
 	for _, directive := range directives {
 		// normalize spaces
 		directive = strings.ReplaceAll(directive, "  ", " ")
@@ -458,18 +453,40 @@ func processUseDirectives(name string, text []byte) (map[string]string, error) {
 	return deps, nil
 }
 
-// TODO(@mstoykov): in a future RP make this more generic
-func findDirectives(list []ast.Statement) []string {
+func findDirectives(text []byte) []string {
+	// parse #! at beginning of file
+	if bytes.HasPrefix(text, []byte("#!")) {
+		_, text, _ = bytes.Cut(text, []byte("\n"))
+	}
+
 	var result []string
-	for _, st := range list {
-		if st, ok := st.(*ast.ExpressionStatement); ok {
-			if e, ok := st.Expression.(*ast.StringLiteral); ok {
-				result = append(result, e.Value.String())
-			} else {
-				break
+
+	for i := 0; i < len(text); {
+		r, width := utf8.DecodeRune(text[i:])
+		switch {
+		case unicode.IsSpace(r) || r == rune(';'): // skip all spaces and ;
+			i += width
+		case r == '"' || r == '\'': // string literals
+			idx := bytes.IndexRune(text[i+width:], r)
+			if idx < 0 {
+				return result
 			}
-		} else {
-			break
+			result = append(result, string(text[i+width:i+width+idx]))
+			i += width + idx + 1
+		case bytes.HasPrefix(text[i:], []byte("//")):
+			idx := bytes.IndexRune(text[i+width:], '\n')
+			if idx < 0 {
+				return result
+			}
+			i += width + idx + 1
+		case bytes.HasPrefix(text[i:], []byte("/*")):
+			idx := bytes.Index(text[i+width:], []byte("*/"))
+			if idx < 0 {
+				return result
+			}
+			i += width + idx + 2
+		default:
+			return result
 		}
 	}
 	return result

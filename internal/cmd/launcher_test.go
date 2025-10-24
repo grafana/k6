@@ -673,3 +673,57 @@ func TestProcessUseDirectives(t *testing.T) {
 		})
 	}
 }
+
+func TestFindDirectives(t *testing.T) {
+	t.Parallel()
+	tests := map[string]struct {
+		input          string
+		expectedOutput []string
+	}{
+		"nothing": {
+			input:          "export default function() {}",
+			expectedOutput: nil,
+		},
+		"nothing really": {
+			input:          `"use k6"`,
+			expectedOutput: []string{"use k6"},
+		},
+		"multiline": {
+			input: `
+			"use k6 with k6/x/sql"
+			"something"
+			`,
+			expectedOutput: []string{"use k6 with k6/x/sql", "something"},
+		},
+		"multiline start at beginning": {
+			input: `
+"use k6 with k6/x/sql"
+"something"
+			`,
+			expectedOutput: []string{"use k6 with k6/x/sql", "something"},
+		},
+		"multiline comments": {
+			input: `#!/bin/sh
+			// here comment "hello"
+"use k6 with k6/x/sql";
+			/*
+			"something else here as well"
+			*/
+	;
+"something";
+const l = 5
+"more"
+			`,
+			expectedOutput: []string{"use k6 with k6/x/sql", "something"},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			m := findDirectives([]byte(test.input))
+			assert.EqualValues(t, test.expectedOutput, m)
+		})
+	}
+}
