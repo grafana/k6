@@ -5,6 +5,7 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"image/png"
 	"io"
@@ -3159,6 +3160,29 @@ func TestPageWaitForRequest(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNilf(t, req, "must have returned the request")
 		require.Contains(t, req.URL(), "fetch-request-2", "must return the correct request")
+	})
+
+	t.Run("err/pattern-func-error", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withFileServer(), withLogCache())
+		p := tb.GotoNewPage(tb.staticURL("/usual.html"))
+
+		patternFuncError := errors.New("pattern func error")
+		err := tb.run(tb.context(), func() error {
+			_, werr := p.WaitForRequest(
+				"usual.html",
+				&common.PageWaitForRequestOptions{
+					Timeout: p.Timeout(),
+				},
+				func(pattern, url string) (bool, error) {
+					return false, patternFuncError
+				},
+			)
+			return werr
+		})
+		require.ErrorIs(t, err, patternFuncError)
+		tb.logCache.assertContains(t, patternFuncError.Error())
 	})
 }
 
