@@ -27,7 +27,7 @@ type HTTPRequestCookie struct {
 	Replace     bool
 }
 
-// Request represent an http request
+// Request represents an HTTP request.
 type Request struct {
 	Method  string                          `json:"method"`
 	URL     string                          `json:"url"`
@@ -36,7 +36,7 @@ type Request struct {
 	Cookies map[string][]*HTTPRequestCookie `json:"cookies"`
 }
 
-// ParsedHTTPRequest a represantion of a request after it has been parsed from a user script
+// ParsedHTTPRequest is a representation of a request after it has been parsed from a user script.
 type ParsedHTTPRequest struct {
 	URL              *URL
 	Body             *bytes.Buffer
@@ -53,7 +53,7 @@ type ParsedHTTPRequest struct {
 	TagsAndMeta      metrics.TagsAndMeta
 }
 
-// Matches non-compliant io.Closer implementations (e.g. zstd.Decoder)
+// ncloser matches non-compliant io.Closer implementations (e.g. zstd.Decoder).
 type ncloser interface {
 	Close()
 }
@@ -62,7 +62,7 @@ type readCloser struct {
 	io.Reader
 }
 
-// Close readers with differing Close() implementations
+// Close closes readers with differing Close() implementations.
 func (r readCloser) Close() error {
 	var err error
 	switch v := r.Reader.(type) {
@@ -106,7 +106,7 @@ func updateK6Response(k6Response *Response, finishedReq *finishedRequest) {
 	}
 }
 
-// MakeRequest makes http request for tor the provided ParsedHTTPRequest.
+// MakeRequest makes an HTTP request for the provided ParsedHTTPRequest.
 //
 // TODO: split apart...
 //

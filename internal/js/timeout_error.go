@@ -27,7 +27,7 @@ func newTimeoutError(place string, d time.Duration) timeoutError {
 	return timeoutError{place: place, d: d}
 }
 
-// String returns the timeout error in human readable format.
+// Error returns the timeout error in human readable format.
 func (t timeoutError) Error() string {
 	return fmt.Sprintf("%s() execution timed out after %.f seconds", t.place, t.d.Seconds())
 }
