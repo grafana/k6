@@ -107,7 +107,7 @@ func (c *rootCommand) persistentPreRunE(cmd *cobra.Command, args []string) error
 
 	c.globalState.Logger.Debugf("k6 version: v%s", fullVersion())
 	if c.globalState.Env["K6_OLD_RESOLUTION"] != "true" {
-		// do not use hte old resolution, let k6 handle it all
+		// do not use the old resolution, let k6 handle it all
 		return nil
 	}
 
