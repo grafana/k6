@@ -55,6 +55,68 @@ const (
 	waitForTracerProviderStopTimeout = 3 * time.Minute
 )
 
+// serve starts the REST API server and ensures it is properly shut down when
+// the srvCtx is done. It returns a function that can be waited on to ensure
+// the server has fully stopped.
+func (c *cmdRun) serve(globalCtx context.Context, srv *http.Server, addrSetByUser bool) func() {
+	var logger logrus.FieldLogger = c.gs.Logger
+
+	srvCtx, srvCancel := context.WithCancel(globalCtx)
+
+	// We cannot use backgroundProcesses here, since we need the REST API to
+	// be down before we can close the samples channel above and finish the
+	// processing the metrics pipeline.
+	apiWG := &sync.WaitGroup{}
+	apiWG.Add(2)
+
+	go func() {
+		defer apiWG.Done()
+		logger.Debugf("Starting the REST API server on %s", c.gs.Flags.Address)
+		if c.gs.Flags.ProfilingEnabled {
+			logger.Debugf("Profiling exposed on http://%s/debug/pprof/", c.gs.Flags.Address)
+		}
+
+		// ServerListener is set up in tests
+		if c.gs.ServerListener != nil {
+			if err := srv.Serve(c.gs.ServerListener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				if addrSetByUser {
+					logger.WithError(err).Error("Error from API server")
+					c.gs.OSExit(int(exitcodes.CannotStartRESTAPI))
+				} else {
+					logger.WithError(err).Warn("Error from API server")
+				}
+			}
+			return
+		}
+
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			// Only exit k6 if the user has explicitly set the REST API address
+			if addrSetByUser {
+				logger.WithError(err).Error("Error from API server")
+				c.gs.OSExit(int(exitcodes.CannotStartRESTAPI))
+			} else {
+				logger.WithError(err).Warn("Error from API server")
+			}
+		}
+	}()
+
+	go func() {
+		defer apiWG.Done()
+		<-srvCtx.Done()
+		shutdCtx, shutdCancel := context.WithTimeout(globalCtx, 1*time.Second)
+		defer shutdCancel()
+		if aerr := srv.Shutdown(shutdCtx); aerr != nil {
+			logger.WithError(aerr).Debug("REST API server did not shut down correctly")
+		}
+	}()
+
+	return func() {
+		// Cancel the server context before shutdown to avoid the deadlocks
+		srvCancel()
+		apiWG.Wait()
+	}
+}
+
 // TODO: split apart some more
 //
 //nolint:funlen,gocognit,gocyclo,cyclop
@@ -289,18 +351,8 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	})
 	samples := make(chan metrics.SampleContainer, test.derivedConfig.MetricSamplesBufferSize.Int64)
 	// Spin up the REST API server, if not disabled.
-	if c.gs.Flags.Address != "" { //nolint:nestif
+	if c.gs.Flags.Address != "" {
 		initBar.Modify(pb.WithConstProgress(0, "Init API server"))
-
-		// We cannot use backgroundProcesses here, since we need the REST API to
-		// be down before we can close the samples channel above and finish the
-		// processing the metrics pipeline.
-		apiWG := &sync.WaitGroup{}
-		apiWG.Add(2)
-		defer apiWG.Wait()
-
-		srvCtx, srvCancel := context.WithCancel(globalCtx)
-		defer srvCancel()
 
 		srv := api.GetServer(
 			runCtx,
@@ -310,31 +362,8 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 			metricsEngine,
 			execScheduler,
 		)
-		go func() {
-			defer apiWG.Done()
-			logger.Debugf("Starting the REST API server on %s", c.gs.Flags.Address)
-			if c.gs.Flags.ProfilingEnabled {
-				logger.Debugf("Profiling exposed on http://%s/debug/pprof/", c.gs.Flags.Address)
-			}
-			if aerr := srv.ListenAndServe(); aerr != nil && !errors.Is(aerr, http.ErrServerClosed) {
-				// Only exit k6 if the user has explicitly set the REST API address
-				if cmd.Flags().Lookup("address").Changed {
-					logger.WithError(aerr).Error("Error from API server")
-					c.gs.OSExit(int(exitcodes.CannotStartRESTAPI))
-				} else {
-					logger.WithError(aerr).Warn("Error from API server")
-				}
-			}
-		}()
-		go func() {
-			defer apiWG.Done()
-			<-srvCtx.Done()
-			shutdCtx, shutdCancel := context.WithTimeout(globalCtx, 1*time.Second)
-			defer shutdCancel()
-			if aerr := srv.Shutdown(shutdCtx); aerr != nil {
-				logger.WithError(aerr).Debug("REST API server did not shut down correctly")
-			}
-		}()
+		srvWait := c.serve(globalCtx, srv, cmd.Flags().Lookup("address").Changed)
+		defer srvWait()
 	}
 
 	waitOutputsFlushed, stopOutputs, err := outputManager.Start(samples)

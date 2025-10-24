@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"net"
 	"strings"
 	"testing"
 
@@ -22,11 +21,9 @@ type GRPC struct {
 func NewGRPC(t testing.TB) *GRPC {
 	grpcServer := grpc.NewServer()
 
-	addr := getFreeBindAddr(t)
-
-	lis, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", addr)
-	if err != nil {
-		t.Fatalf("failed to listen: %v", err)
+	addr, lis := getFreeBindAddr(t)
+	if lis == nil {
+		t.Fatal("failed to get free bind address")
 	}
 
 	features := grpcservice.LoadFeatures("")
