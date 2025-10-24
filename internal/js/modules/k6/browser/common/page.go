@@ -1859,6 +1859,33 @@ func (p *Page) WaitForResponse(
 	return ev.Response, err
 }
 
+// PageWaitForRequestOptions are options for [Page.WaitForRequest].
+type PageWaitForRequestOptions struct {
+	// Timeout is the maximum time to wait for the request.
+	Timeout time.Duration
+}
+
+// WaitForRequest waits for a request that matches the given URL pattern.
+func (p *Page) WaitForRequest(
+	urlPattern string, opts *PageWaitForRequestOptions, rm RegExMatcher,
+) (*Request, error) {
+	p.logger.Debugf("Page:waitForRequest", "sid:%v pattern:%s", p.sessionID(), urlPattern)
+	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.waitForRequest")
+	defer span.End()
+
+	ctx, cancel := context.WithTimeout(p.ctx, opts.Timeout)
+	defer cancel()
+
+	ev, err := p.waitForEvent(ctx, PageEventRequest, func(e PageEvent) (bool, error) {
+		return rm.Match(urlPattern, e.Request.URL())
+	})
+	if err != nil {
+		err = &k6ext.UserFriendlyError{Err: err, Timeout: opts.Timeout}
+		spanRecordError(span, err)
+	}
+	return ev.Request, err
+}
+
 // Workers returns all WebWorkers of page.
 func (p *Page) Workers() []*Worker {
 	p.workersMu.Lock()

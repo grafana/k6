@@ -5,6 +5,7 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"image/png"
 	"io"
@@ -3116,6 +3117,115 @@ func TestPageWaitForResponse(t *testing.T) {
 
 		err := tb.run(tb.context(), waitForApi)
 		require.ErrorIs(t, err, context.DeadlineExceeded)
+	})
+}
+
+func TestPageWaitForRequest(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ok/waits_for_request", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withFileServer())
+		p := tb.GotoNewPage(tb.staticURL("/usual.html"))
+
+		var req *common.Request
+		err := tb.run(tb.context(),
+			// We make three requests for detecting edge cases,
+			// such as if WaitForRequest stops at the first match,
+			// or misses requests made in quick succession.
+			func() error {
+				_, err := p.Evaluate(`() => {
+					fetch('fetch-request-1');
+					fetch('fetch-request-2');
+					fetch('fetch-request-3');
+				}`, nil)
+				return err
+			},
+			// Waits until the request we're looking for is made.
+			func() error {
+				var werr error
+				req, werr = p.WaitForRequest(
+					"fetch-request-2",
+					&common.PageWaitForRequestOptions{
+						Timeout: p.Timeout(),
+					},
+					func(pattern, url string) (bool, error) {
+						return strings.Contains(url, pattern), nil
+					},
+				)
+				return werr
+			},
+		)
+		require.NoError(t, err)
+		require.NotNilf(t, req, "must have returned the request")
+		require.Contains(t, req.URL(), "fetch-request-2", "must return the correct request")
+	})
+
+	t.Run("err/pattern-func-error", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withFileServer(), withLogCache())
+		p := tb.GotoNewPage(tb.staticURL("/usual.html"))
+
+		patternFuncError := errors.New("pattern func error")
+		err := tb.run(tb.context(), func() error {
+			_, werr := p.WaitForRequest(
+				"usual.html",
+				&common.PageWaitForRequestOptions{
+					Timeout: p.Timeout(),
+				},
+				func(pattern, url string) (bool, error) {
+					return false, patternFuncError
+				},
+			)
+			return werr
+		})
+		require.ErrorIs(t, err, patternFuncError)
+		tb.logCache.assertContains(t, patternFuncError.Error())
+	})
+
+	t.Run("err/canceled", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t)
+		p := tb.NewPage(nil)
+
+		go tb.cancelContext()
+		<-tb.context().Done()
+
+		req, err := p.WaitForRequest(
+			"/does-not-matter",
+			&common.PageWaitForRequestOptions{Timeout: p.Timeout()},
+			func(pattern, url string) (bool, error) {
+				return true, nil
+			},
+		)
+		require.ErrorIs(t, err, context.Canceled)
+		require.Nil(t, req)
+	})
+
+	t.Run("err/timeout", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t)
+
+		var req *common.Request
+		err := tb.run(tb.context(), func() error {
+			var werr error
+			req, werr = tb.NewPage(nil).WaitForRequest(
+				"/does-not-exist",
+				&common.PageWaitForRequestOptions{
+					Timeout: 500 * time.Millisecond,
+				},
+				func(pattern, url string) (bool, error) {
+					return true, nil
+				},
+			)
+			return werr
+		})
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+		require.Nil(t, req)
 	})
 }
 

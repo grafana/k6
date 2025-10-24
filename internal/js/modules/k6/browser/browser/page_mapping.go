@@ -591,7 +591,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			return waitForURLBody(vu, p, url, opts)
 		},
 		"waitForResponse": func(url sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
-			popts, err := parseWaitForResponseOptions(vu.Context(), opts, p.Timeout())
+			popts, err := parsePageWaitForResponseOptions(vu.Context(), opts, p.Timeout())
 			if err != nil {
 				return nil, fmt.Errorf("parsing waitForResponse options: %w", err)
 			}
@@ -613,6 +613,31 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			return k6ext.Promise(ctx, func() (result any, reason error) {
 				defer stopTaskqueue()
 				return p.WaitForResponse(val, popts, rm)
+			}), nil
+		},
+		"waitForRequest": func(url sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
+			popts, err := parsePageWaitForRequestOptions(vu.Context(), opts, p.Timeout())
+			if err != nil {
+				return nil, fmt.Errorf("parsing waitForRequest options: %w", err)
+			}
+
+			var val string
+			switch url.ExportType() {
+			case reflect.TypeOf(string("")):
+				val = "'" + url.String() + "'" // Strings require quotes
+			default: // JS Regex, CSS, numbers or booleans
+				val = url.String() // No quotes
+			}
+
+			// Use RegEx matcher for regex pattern matching
+			ctx, stopTaskqueue := context.WithCancel(vu.Context())
+			tq := cancelableTaskQueue(ctx, vu.RegisterCallback)
+
+			rm := newRegExMatcher(ctx, vu, tq)
+
+			return k6ext.Promise(ctx, func() (result any, reason error) {
+				defer stopTaskqueue()
+				return p.WaitForRequest(val, popts, rm)
 			}), nil
 		},
 		"workers": func() *sobek.Object {
@@ -998,4 +1023,50 @@ func waitForNavigationBodyImpl(vu moduleVU, target interface {
 		}
 		return mapResponse(vu, resp), nil
 	}), nil
+}
+
+func parsePageWaitForResponseOptions(
+	ctx context.Context, opts sobek.Value, defaultTimeout time.Duration,
+) (*common.PageWaitForResponseOptions, error) {
+	ropts := common.NewPageWaitForResponseOptions(defaultTimeout)
+	if k6common.IsNullish(opts) {
+		return ropts, nil
+	}
+
+	rt := k6ext.Runtime(ctx)
+	obj := opts.ToObject(rt)
+	for _, k := range obj.Keys() {
+		switch k {
+		case "timeout":
+			ropts.Timeout = time.Duration(obj.Get(k).ToInteger()) * time.Millisecond
+		default:
+			return ropts, fmt.Errorf("unsupported waitForResponse option: '%s'", k)
+		}
+	}
+
+	return ropts, nil
+}
+
+func parsePageWaitForRequestOptions(
+	ctx context.Context, opts sobek.Value, defaultTimeout time.Duration,
+) (*common.PageWaitForRequestOptions, error) {
+	ropts := common.PageWaitForRequestOptions{
+		Timeout: defaultTimeout,
+	}
+
+	if k6common.IsNullish(opts) {
+		return &ropts, nil
+	}
+
+	obj := opts.ToObject(k6ext.Runtime(ctx))
+	for _, k := range obj.Keys() {
+		switch k {
+		case "timeout":
+			ropts.Timeout = time.Duration(obj.Get(k).ToInteger()) * time.Millisecond
+		default:
+			return &ropts, fmt.Errorf("unsupported waitForRequest option: '%s'", k)
+		}
+	}
+
+	return &ropts, nil
 }

@@ -11,7 +11,7 @@ import (
 	"go.k6.io/k6/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6error"
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
-	jsCommon "go.k6.io/k6/js/common"
+	k6common "go.k6.io/k6/js/common"
 )
 
 // mapBrowserContext to the JS module.
@@ -29,7 +29,7 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 		},
 		"addInitScript": func(script sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				if jsCommon.IsNullish(script) {
+				if k6common.IsNullish(script) {
 					return nil, nil
 				}
 
@@ -209,7 +209,7 @@ func parseWaitForEventOptions(
 		Timeout: defaultTime,
 	}
 
-	if jsCommon.IsNullish(optsOrPredicate) {
+	if k6common.IsNullish(optsOrPredicate) {
 		return w, nil
 	}
 	var isCallable bool
