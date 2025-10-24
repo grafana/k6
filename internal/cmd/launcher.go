@@ -231,7 +231,7 @@ func (b *customBinary) run(gs *state.GlobalState) error {
 
 // isCustomBuildRequired checks if there is at least one dependency that are not satisfied by the binary
 // considering the version of k6 and any built-in extension
-func isCustomBuildRequired(deps map[string]*semver.Constraints, k6Version string, exts []*ext.Extension) bool {
+func isCustomBuildRequired(deps dependencies, k6Version string, exts []*ext.Extension) bool {
 	if len(deps) == 0 {
 		return false
 	}
@@ -329,7 +329,7 @@ func formatDependencies(deps map[string]string) string {
 // Presently, only the k6 input script or archive (if any) is passed to k6deps for scanning.
 // TODO: if k6 receives the input from stdin, it is not used for scanning because we don't know
 // if it is a script or an archive
-func analyze(gs *state.GlobalState, args []string) (map[string]*semver.Constraints, error) {
+func analyze(gs *state.GlobalState, args []string) (dependencies, error) {
 	dopts := &k6deps.Options{
 		LookupEnv: func(key string) (string, bool) { v, ok := gs.Env[key]; return v, ok },
 		Manifest:  k6deps.Source{Ignore: true},
@@ -364,7 +364,7 @@ func analyze(gs *state.GlobalState, args []string) (map[string]*semver.Constrain
 	if err != nil {
 		return nil, err
 	}
-	result := make(map[string]*semver.Constraints, len(deps))
+	result := make(dependencies, len(deps))
 	for n, dep := range deps {
 		result[n] = dep.Constraints
 	}
