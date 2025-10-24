@@ -576,8 +576,7 @@ func TestProcessUseDirectives(t *testing.T) {
 		expectedError  string
 	}{
 		"nothing": {
-			input:          "export default function() {}",
-			expectedOutput: map[string]string{},
+			input: "export default function() {}",
 		},
 		"nothing really": {
 			input: `"use k6"`,
@@ -650,23 +649,30 @@ func TestProcessUseDirectives(t *testing.T) {
 				"use k6 > 1.4.0"
 				"use k6 = 1.2.3"
 				`,
-			expectedError: `already have constraint for "k6", when parsing "= 1.2.3" in "name.js"`,
+			expectedError: `error while parsing use directives in "name.js": already have constraint for "k6", when parsing "=1.2.3"`,
 		},
 		"constraint difference for extensions": {
 			input: `
 				"use k6 with k6/x/A > 1.4.0"
 				"use k6 with k6/x/A = 1.2.3"
 				`,
-			expectedError: `already have constraint for "k6/x/A", when parsing "= 1.2.3" in "name.js"`,
+			expectedError: `error while parsing use directives in "name.js": already have constraint for "k6/x/A", when parsing "=1.2.3"`,
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
+			deps := make(dependencies)
+			for k, v := range test.expectedOutput {
+				require.NoError(t, deps.update(k, v))
+			}
+			if len(test.expectedError) > 0 {
+				deps = nil
+			}
 
 			m, err := processUseDirectives("name.js", []byte(test.input))
-			assert.EqualValues(t, test.expectedOutput, m)
+			assert.EqualValues(t, deps, m)
 			if len(test.expectedError) > 0 {
 				assert.ErrorContains(t, err, test.expectedError)
 			}

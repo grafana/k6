@@ -40,7 +40,7 @@ func TestAnalyseUseConstraints(t *testing.T) {
 	})
 	deps := make(map[string]*semver.Constraints)
 
-	err := analyseUseContraints([]string{"file:///script.js", "file:///faker.js"}, testutils.NewLogger(t), map[string]fsext.Fs{"file": fs}, deps)
+	err := analyseUseContraints([]string{"file:///script.js", "file:///faker.js"}, map[string]fsext.Fs{"file": fs}, deps)
 
 	require.NoError(t, err)
 	require.Len(t, deps, 1)

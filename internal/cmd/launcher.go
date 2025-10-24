@@ -410,21 +410,8 @@ func extractToken(gs *state.GlobalState) (string, error) {
 	return config.Token.String, nil
 }
 
-func processUseDirectives(name string, text []byte) (map[string]string, error) {
-	deps := make(map[string]string)
-
-	updateDep := func(dep, constraint string) error {
-		// TODO: We could actually do constraint comparison here and get the more specific one
-		oldConstraint, ok := deps[dep]
-		if !ok || oldConstraint == "" { // either nothing or it didn't have constraint
-			deps[dep] = constraint
-			return nil
-		}
-		if constraint == oldConstraint || constraint == "" {
-			return nil
-		}
-		return fmt.Errorf("already have constraint for %q, when parsing %q in %q", dep, constraint, name)
-	}
+func processUseDirectives(name string, text []byte) (dependencies, error) {
+	deps := make(dependencies)
 
 	directives := findDirectives(text)
 
@@ -436,17 +423,17 @@ func processUseDirectives(name string, text []byte) (map[string]string, error) {
 		}
 		directive = strings.TrimSpace(strings.TrimPrefix(directive, "use k6"))
 		if !strings.HasPrefix(directive, "with k6/x/") {
-			err := updateDep("k6", directive)
+			err := deps.update("k6", directive)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("error while parsing use directives in %q: %w", name, err)
 			}
 			continue
 		}
 		directive = strings.TrimSpace(strings.TrimPrefix(directive, "with "))
 		dep, constraint, _ := strings.Cut(directive, " ")
-		err := updateDep(dep, constraint)
+		err := deps.update(dep, constraint)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error while parsing use directives in %q: %w", name, err)
 		}
 	}
 

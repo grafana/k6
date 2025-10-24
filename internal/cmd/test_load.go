@@ -7,8 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/url"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -211,7 +213,7 @@ func tryResolveModulesExtensions(
 	if err != nil {
 		return err
 	}
-	err = analyseUseContraints(imports, logger, fileSystems, deps)
+	err = analyseUseContraints(imports, fileSystems, deps)
 	if err != nil {
 		return err
 	}
@@ -234,9 +236,7 @@ func tryResolveModulesExtensions(
 	}
 }
 
-func analyseUseContraints(
-	imports []string, logger logrus.FieldLogger, fileSystems map[string]fsext.Fs, deps map[string]*semver.Constraints,
-) error {
+func analyseUseContraints(imports []string, fileSystems map[string]fsext.Fs, deps dependencies) error {
 	for _, imported := range imports {
 		if strings.HasPrefix(imported, "k6") {
 			continue
@@ -245,28 +245,61 @@ func analyseUseContraints(
 		if err != nil {
 			panic(err)
 		}
-		// TODO: do not load it like this :shrug:
-		d, err := loader.Load(logger, fileSystems, u, u.String())
+		// We always have URLs here with scheme and everything
+		_, path, _ := strings.Cut(imported, "://")
+		data, err := fsext.ReadFile(fileSystems[u.Scheme], path)
 		if err != nil {
 			panic(err)
 		}
-		newdeps, err := processUseDirectives(imported, d.Data)
+		newdeps, err := processUseDirectives(imported, data)
 		if err != nil {
 			panic(err)
 		}
-		logger.Debugf("dependencies from %q: %q", imported, newdeps)
-		for extension, constraintStr := range newdeps {
-			if _, ok := deps[extension]; ok {
-				return fmt.Errorf("already had a use directivce for %q", extension)
-			}
-			constraint, err := semver.NewConstraint(constraintStr)
+		for dep, constraint := range newdeps {
+			err := deps.update(dep, constraint.String())
 			if err != nil {
-				return fmt.Errorf("unparsable constraint %q for %q", constraintStr, extension)
+				return fmt.Errorf("error while parsing use directives in %q: %w", imported, err)
 			}
-			deps[extension] = constraint
 		}
 	}
 	return nil
+}
+
+type dependencies map[string]*semver.Constraints
+
+func (d dependencies) update(dep, constraintStr string) error {
+	var constraint *semver.Constraints
+	var err error
+	if len(constraintStr) > 0 {
+		constraint, err = semver.NewConstraint(constraintStr)
+		if err != nil {
+			return fmt.Errorf("unparsable constraint %q for %q", constraintStr, dep)
+		}
+	}
+	// TODO: We could actually do constraint comparison here and get the more specific one
+	oldConstraint, ok := d[dep]
+	if !ok || oldConstraint == nil { // either nothing or it didn't have constraint
+		d[dep] = constraint
+		return nil
+	}
+	if constraint == oldConstraint || constraint == nil {
+		return nil
+	}
+	return fmt.Errorf("already have constraint for %q, when parsing %q", dep, constraint)
+}
+
+func (d dependencies) String() string {
+	var buf bytes.Buffer
+
+	for idx, depName := range slices.Sorted(maps.Keys(d)) {
+		if idx > 0 {
+			_ = buf.WriteByte(';')
+		}
+
+		buf.WriteString(depName)
+		buf.WriteString(d[depName].String())
+	}
+	return buf.String()
 }
 
 func extractUnknownModules(err error) (map[string]*semver.Constraints, error) {
@@ -289,7 +322,7 @@ func extractUnknownModules(err error) (map[string]*semver.Constraints, error) {
 
 // TODO(@mstoykov) potentially figure out some less "exceptionl workflow" solution
 type binaryIsNotSatisfyingDependenciesError struct {
-	deps map[string]*semver.Constraints
+	deps dependencies
 }
 
 func (r binaryIsNotSatisfyingDependenciesError) Error() string {
