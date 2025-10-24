@@ -33,17 +33,6 @@ func mapBrowserToSobek(vu moduleVU) *sobek.Object {
 
 	return obj
 }
-<<<<<<< HEAD
-
-func parseFrameClickOptions(
-	ctx context.Context, opts sobek.Value, defaultTimeout time.Duration,
-) (*common.FrameClickOptions, error) {
-	copts := common.NewFrameClickOptions(defaultTimeout)
-	if err := copts.Parse(ctx, opts); err != nil {
-		return nil, fmt.Errorf("parsing click options: %w", err)
-	}
-	return copts, nil
-}
 
 func ConvertSelectOptionValues(rt *sobek.Runtime, values sobek.Value) ([]any, error) {
 	if k6common.IsNullish(values) {
@@ -163,5 +152,3 @@ func extractSelectOptionFromMap(v map[string]interface{}) (*common.SelectOption,
 
 	return opt, nil
 }
-=======
->>>>>>> df02a1dfa (Moved Element options and some Frame options to mapping layer)

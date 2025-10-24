@@ -537,7 +537,6 @@ func parseStrict(ctx context.Context, opts sobek.Value) bool {
 	return strict
 }
 
-// parseFrameCheckOptions parses FrameCheckOptions from opts.
 func parseFrameCheckOptions(ctx context.Context, opts sobek.Value) (*common.FrameCheckOptions, error) {
 	basePointerOpts, err := parseElementHandleBasePointerOptions(ctx, opts)
 	if err != nil {
@@ -554,7 +553,6 @@ func parseFrameCheckOptions(ctx context.Context, opts sobek.Value) (*common.Fram
 	return o, nil
 }
 
-// parseFrameClickOptions parses FrameClickOptions from opts.
 func parseFrameClickOptions(ctx context.Context, opts sobek.Value) (*common.FrameClickOptions, error) {
 	clickOpts, err := parseElementHandleClickOptions(ctx, opts)
 	if err != nil {
@@ -571,7 +569,6 @@ func parseFrameClickOptions(ctx context.Context, opts sobek.Value) (*common.Fram
 	return o, nil
 }
 
-// parseFrameDblClickOptions parses FrameDblClickOptions from opts.
 func parseFrameDblClickOptions(ctx context.Context, opts sobek.Value) (*common.FrameDblclickOptions, error) {
 	dblclickOpts, err := parseElementHandleDblclickOptions(ctx, opts)
 	if err != nil {
@@ -588,7 +585,6 @@ func parseFrameDblClickOptions(ctx context.Context, opts sobek.Value) (*common.F
 	return o, nil
 }
 
-// parseFrameFillOptions parses FrameFillOptions from opts.
 func parseFrameFillOptions(ctx context.Context, opts sobek.Value) (*common.FrameFillOptions, error) {
 	baseOpts, err := parseElementHandleBaseOptions(ctx, opts)
 	if err != nil {
@@ -605,7 +601,6 @@ func parseFrameFillOptions(ctx context.Context, opts sobek.Value) (*common.Frame
 	return o, nil
 }
 
-// parseFrameHoverOptions parses FrameHoverOptions from opts.
 func parseFrameHoverOptions(ctx context.Context, opts sobek.Value) (*common.FrameHoverOptions, error) {
 	hoverOpts, err := parseElementHandleHoverOptions(ctx, opts)
 	if err != nil {
@@ -622,7 +617,6 @@ func parseFrameHoverOptions(ctx context.Context, opts sobek.Value) (*common.Fram
 	return o, nil
 }
 
-// parseFrameSelectOptionOptions parses FrameSelectOptionOptions from opts.
 func parseFrameSelectOptionOptions(ctx context.Context, opts sobek.Value) (*common.FrameSelectOptionOptions, error) {
 	baseOpts, err := parseElementHandleBaseOptions(ctx, opts)
 	if err != nil {
@@ -639,7 +633,6 @@ func parseFrameSelectOptionOptions(ctx context.Context, opts sobek.Value) (*comm
 	return o, nil
 }
 
-// parseFrameSetInputFilesOptions parses FrameSetInputFilesOptions from opts.
 func parseFrameSetInputFilesOptions(ctx context.Context, opts sobek.Value) (*common.FrameSetInputFilesOptions, error) {
 	inputOpts, err := parseElementHandleSetInputFilesOptions(ctx, opts)
 	if err != nil {
@@ -650,10 +643,10 @@ func parseFrameSetInputFilesOptions(ctx context.Context, opts sobek.Value) (*com
 			ElementHandleSetInputFilesOptions: *inputOpts,
 		}, nil
 	}
+	//nolint:nilnil // returning (nil, nil) intentionally means "no options provided"
 	return nil, nil
 }
 
-// parseFrameTapOptions parses FrameTapOptions from opts.
 func parseFrameTapOptions(ctx context.Context, opts sobek.Value) (*common.FrameTapOptions, error) {
 	basePointerOpts, err := parseElementHandleBasePointerOptions(ctx, opts)
 	if err != nil {
@@ -684,7 +677,6 @@ func parseFrameTapOptions(ctx context.Context, opts sobek.Value) (*common.FrameT
 	return o, nil
 }
 
-// parseFrameUncheckOptions parses FrameUncheckOptions from opts.
 func parseFrameUncheckOptions(ctx context.Context, opts sobek.Value) (*common.FrameUncheckOptions, error) {
 	basePointerOpts, err := parseElementHandleBasePointerOptions(ctx, opts)
 	if err != nil {
@@ -701,6 +693,7 @@ func parseFrameUncheckOptions(ctx context.Context, opts sobek.Value) (*common.Fr
 	return o, nil
 }
 
+//nolint:unparam // keeping error for consistency with other parse functions
 func parseFrameTypeOptions(ctx context.Context, opts sobek.Value) (*common.FrameTypeOptions, error) {
 	o := &common.FrameTypeOptions{
 		ElementHandleTypeOptions: common.ElementHandleTypeOptions{}, // embed base struct
@@ -729,7 +722,7 @@ func parseFrameTypeOptions(ctx context.Context, opts sobek.Value) (*common.Frame
 	return o, nil
 }
 
-// parseFramePressOptions parses FramePressOptions from opts.
+//nolint:unparam // keeping error for consistency with other parse functions
 func parseFramePressOptions(ctx context.Context, opts sobek.Value) (*common.FramePressOptions, error) {
 	o := &common.FramePressOptions{
 		ElementHandlePressOptions: common.ElementHandlePressOptions{},
