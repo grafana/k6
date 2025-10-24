@@ -1060,6 +1060,61 @@ func TestAbortedByUnknownModules(t *testing.T) {
 	assert.Contains(t, stdout, `unknown modules [\"k6/x/anotherone\", \"k6/x/somethinghere\"] were tried to be loaded,`)
 }
 
+func TestRunFromNotBaseDirectory(t *testing.T) {
+	t.Parallel()
+	depScript := `
+		export const p = 5;
+	`
+	mainScript := `
+		import { p } from "../../../b/dep.js";
+		export default function() {
+			console.log("p = " + p);
+		};
+	`
+
+	ts := NewGlobalTestState(t)
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "a/b/c/test.js"), []byte(mainScript), 0o644))
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "b/dep.js"), []byte(depScript), 0o644))
+
+	ts.Cwd = filepath.Join(ts.Cwd, "./a/")
+	ts.CmdArgs = []string{"k6", "run", "-v", "--log-output=stdout", "b/c/test.js"}
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stdout := ts.Stdout.String()
+	t.Log(stdout)
+	require.Contains(t, stdout, `p = 5`)
+}
+
+func TestRunFromSeparateDriveWindows(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS != "windows" {
+		t.Skip("test only for windows")
+	}
+	depScript := `
+		export const p = 5;
+	`
+	mainScript := `
+		import { p } from "../../../b/dep.js";
+		export default function() {
+			console.log("p = " + p);
+		};
+	`
+
+	ts := NewGlobalTestState(t)
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "a/b/c/test.js"), []byte(mainScript), 0o644))
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "b/dep.js"), []byte(depScript), 0o644))
+
+	ts.Cwd = "f:\\something somewhere\\and another\\"
+	ts.CmdArgs = []string{"k6", "run", "-v", "--log-output=stdout", "c:\\test\\a\\b\\c\\test.js"}
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stdout := ts.Stdout.String()
+	t.Log(stdout)
+	require.Contains(t, stdout, `p = 5`)
+}
+
 func runTestWithNoLinger(_ *testing.T, ts *GlobalTestState) {
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 }
