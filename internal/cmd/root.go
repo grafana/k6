@@ -48,10 +48,7 @@ type rootCommand struct {
 
 // newRootCommand creates a root command with a default launcher
 func newRootCommand(gs *state.GlobalState) *rootCommand {
-	if gs.Env["K6_OLD_RESOLUTION"] == "true" {
-		return newRootWithLauncher(gs, newLauncher(gs))
-	}
-	return newRootWithLauncher(gs, nil)
+	return newRootWithLauncher(gs, newLauncher(gs))
 }
 
 // newRootWithLauncher creates a root command with a launcher.
@@ -109,9 +106,13 @@ func (c *rootCommand) persistentPreRunE(cmd *cobra.Command, args []string) error
 	}
 
 	c.globalState.Logger.Debugf("k6 version: v%s", fullVersion())
+	if c.globalState.Env["K6_OLD_RESOLUTION"] != "true" {
+		// do not use hte old resolution, let k6 handle it all
+		return nil
+	}
 
 	// If automatic extension resolution is not enabled, continue with the regular k6 execution path
-	if !c.globalState.Flags.AutoExtensionResolution || c.launcher == nil {
+	if !c.globalState.Flags.AutoExtensionResolution {
 		c.globalState.Logger.Debug("Automatic extension resolution is disabled.")
 		return nil
 	}

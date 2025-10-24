@@ -210,6 +210,7 @@ func TestLauncherLaunch(t *testing.T) {
 			t.Parallel()
 
 			ts := tests.NewGlobalTestState(t)
+			ts.Env["K6_OLD_RESOLUTION"] = "true"
 
 			k6Args := append([]string{"k6"}, tc.k6Cmd)
 			k6Args = append(k6Args, tc.k6Args...)
@@ -277,6 +278,7 @@ func TestLauncherViaStdin(t *testing.T) {
 	k6Args := []string{"k6", "archive", "-"}
 
 	ts := tests.NewGlobalTestState(t)
+	ts.Env["K6_OLD_RESOLUTION"] = "true"
 	ts.CmdArgs = k6Args
 
 	// k6deps uses os package to access files. So we need to use it in the global state
