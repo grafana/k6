@@ -1,11 +1,14 @@
 package common
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"math"
 	"reflect"
+	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -1259,13 +1262,33 @@ func (h *ElementHandle) queryAll(selector string, eval evalFunc) (_ []*ElementHa
 		return nil, err //nolint:wrapcheck
 	}
 
-	els := make([]*ElementHandle, 0, len(props))
-	for _, prop := range props {
+	type indexedElem struct {
+		index int
+		elem  *ElementHandle
+	}
+
+	indexedElems := make([]indexedElem, 0, len(props))
+	for key, prop := range props {
 		if el := prop.AsElement(); el != nil {
-			els = append(els, el)
+			// DOM elements are stored with numeric indices ("0", "1", "2", ...)
+			// per JavaScript's array-like object specification.
+			idx, err := strconv.Atoi(key)
+			if err != nil {
+				return nil, fmt.Errorf("parsing element index %q for selector %q: %w", key, selector, err)
+			}
+			indexedElems = append(indexedElems, indexedElem{index: idx, elem: el})
 		} else if err := prop.Dispose(); err != nil {
 			return nil, fmt.Errorf("disposing property while querying all selectors %q: %w", selector, err)
 		}
+	}
+
+	slices.SortFunc(indexedElems, func(a, b indexedElem) int {
+		return cmp.Compare(a.index, b.index)
+	})
+
+	els := make([]*ElementHandle, 0, len(indexedElems))
+	for _, ie := range indexedElems {
+		els = append(els, ie.elem)
 	}
 
 	return els, nil
