@@ -7,11 +7,11 @@ import (
 	"strings"
 )
 
-const _builtinOutputName = "cloudcsvdatadogexperimental-prometheus-rwinfluxdbjsonkafkastatsdexperimental-opentelemetrysummary"
+const _builtinOutputName = "cloudcsvdatadogexperimental-prometheus-rwinfluxdbjsonkafkastatsdexperimental-opentelemetryopentelemetrysummary"
 
-var _builtinOutputIndex = [...]uint8{0, 5, 8, 15, 41, 49, 53, 58, 64, 90, 97}
+var _builtinOutputIndex = [...]uint8{0, 5, 8, 15, 41, 49, 53, 58, 64, 90, 103, 110}
 
-const _builtinOutputLowerName = "cloudcsvdatadogexperimental-prometheus-rwinfluxdbjsonkafkastatsdexperimental-opentelemetrysummary"
+const _builtinOutputLowerName = "cloudcsvdatadogexperimental-prometheus-rwinfluxdbjsonkafkastatsdexperimental-opentelemetryopentelemetrysummary"
 
 func (i builtinOutput) String() string {
 	if i >= builtinOutput(len(_builtinOutputIndex)-1) {
@@ -33,32 +33,35 @@ func _builtinOutputNoOp() {
 	_ = x[builtinOutputKafka-(6)]
 	_ = x[builtinOutputStatsd-(7)]
 	_ = x[builtinOutputExperimentalOpentelemetry-(8)]
-	_ = x[builtinOutputSummary-(9)]
+	_ = x[builtinOutputOpentelemetry-(9)]
+	_ = x[builtinOutputSummary-(10)]
 }
 
-var _builtinOutputValues = []builtinOutput{builtinOutputCloud, builtinOutputCSV, builtinOutputDatadog, builtinOutputExperimentalPrometheusRW, builtinOutputInfluxdb, builtinOutputJSON, builtinOutputKafka, builtinOutputStatsd, builtinOutputExperimentalOpentelemetry, builtinOutputSummary}
+var _builtinOutputValues = []builtinOutput{builtinOutputCloud, builtinOutputCSV, builtinOutputDatadog, builtinOutputExperimentalPrometheusRW, builtinOutputInfluxdb, builtinOutputJSON, builtinOutputKafka, builtinOutputStatsd, builtinOutputExperimentalOpentelemetry, builtinOutputOpentelemetry, builtinOutputSummary}
 
 var _builtinOutputNameToValueMap = map[string]builtinOutput{
-	_builtinOutputName[0:5]:        builtinOutputCloud,
-	_builtinOutputLowerName[0:5]:   builtinOutputCloud,
-	_builtinOutputName[5:8]:        builtinOutputCSV,
-	_builtinOutputLowerName[5:8]:   builtinOutputCSV,
-	_builtinOutputName[8:15]:       builtinOutputDatadog,
-	_builtinOutputLowerName[8:15]:  builtinOutputDatadog,
-	_builtinOutputName[15:41]:      builtinOutputExperimentalPrometheusRW,
-	_builtinOutputLowerName[15:41]: builtinOutputExperimentalPrometheusRW,
-	_builtinOutputName[41:49]:      builtinOutputInfluxdb,
-	_builtinOutputLowerName[41:49]: builtinOutputInfluxdb,
-	_builtinOutputName[49:53]:      builtinOutputJSON,
-	_builtinOutputLowerName[49:53]: builtinOutputJSON,
-	_builtinOutputName[53:58]:      builtinOutputKafka,
-	_builtinOutputLowerName[53:58]: builtinOutputKafka,
-	_builtinOutputName[58:64]:      builtinOutputStatsd,
-	_builtinOutputLowerName[58:64]: builtinOutputStatsd,
-	_builtinOutputName[64:90]:      builtinOutputExperimentalOpentelemetry,
-	_builtinOutputLowerName[64:90]: builtinOutputExperimentalOpentelemetry,
-	_builtinOutputName[90:97]:      builtinOutputSummary,
-	_builtinOutputLowerName[90:97]: builtinOutputSummary,
+	_builtinOutputName[0:5]:          builtinOutputCloud,
+	_builtinOutputLowerName[0:5]:     builtinOutputCloud,
+	_builtinOutputName[5:8]:          builtinOutputCSV,
+	_builtinOutputLowerName[5:8]:     builtinOutputCSV,
+	_builtinOutputName[8:15]:         builtinOutputDatadog,
+	_builtinOutputLowerName[8:15]:    builtinOutputDatadog,
+	_builtinOutputName[15:41]:        builtinOutputExperimentalPrometheusRW,
+	_builtinOutputLowerName[15:41]:   builtinOutputExperimentalPrometheusRW,
+	_builtinOutputName[41:49]:        builtinOutputInfluxdb,
+	_builtinOutputLowerName[41:49]:   builtinOutputInfluxdb,
+	_builtinOutputName[49:53]:        builtinOutputJSON,
+	_builtinOutputLowerName[49:53]:   builtinOutputJSON,
+	_builtinOutputName[53:58]:        builtinOutputKafka,
+	_builtinOutputLowerName[53:58]:   builtinOutputKafka,
+	_builtinOutputName[58:64]:        builtinOutputStatsd,
+	_builtinOutputLowerName[58:64]:   builtinOutputStatsd,
+	_builtinOutputName[64:90]:        builtinOutputExperimentalOpentelemetry,
+	_builtinOutputLowerName[64:90]:   builtinOutputExperimentalOpentelemetry,
+	_builtinOutputName[90:103]:       builtinOutputOpentelemetry,
+	_builtinOutputLowerName[90:103]:  builtinOutputOpentelemetry,
+	_builtinOutputName[103:110]:      builtinOutputSummary,
+	_builtinOutputLowerName[103:110]: builtinOutputSummary,
 }
 
 var _builtinOutputNames = []string{
@@ -71,7 +74,8 @@ var _builtinOutputNames = []string{
 	_builtinOutputName[53:58],
 	_builtinOutputName[58:64],
 	_builtinOutputName[64:90],
-	_builtinOutputName[90:97],
+	_builtinOutputName[90:103],
+	_builtinOutputName[103:110],
 }
 
 // builtinOutputString retrieves an enum value from the enum constants string name.
