@@ -129,6 +129,19 @@ func (mr *ModuleResolver) resolveLoaded(basePWD *url.URL, arg string, data []byt
 	} else {
 		mod, err = cjsModuleFromString(prg)
 	}
+	// TODO(@mstoykov): put the whole preloading behind a flag, maybe auto extension resolution one, or one dependent
+	if err != nil {
+		potentialRequireCalls := findRequireFunctionInAST(prg.Body)
+		for _, requireArg := range potentialRequireCalls {
+			_, requireErr := mr.resolve(basePWD, requireArg)
+			if requireErr != nil {
+				mr.logger.WithError(requireErr).Debugf("failed preloading %q call for %q", "require", requireArg)
+			}
+			if err := mr.usage.Uint64("usage/requirePreload", 1); err != nil {
+				mr.logger.WithError(err).Warn("couldn't report require preloading usage for " + requireArg)
+			}
+		}
+	}
 	mr.reverse[mod] = specifier
 	mr.cache[specifier.String()] = moduleCacheElement{mod: mod, err: err}
 	return mod, err
