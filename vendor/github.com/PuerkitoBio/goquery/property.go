@@ -1,7 +1,6 @@
 package goquery
 
 import (
-	"bytes"
 	"regexp"
 	"strings"
 
@@ -60,14 +59,14 @@ func (s *Selection) SetAttr(attrName, val string) *Selection {
 // Text gets the combined text contents of each element in the set of matched
 // elements, including their descendants.
 func (s *Selection) Text() string {
-	var buf bytes.Buffer
+	var builder strings.Builder
 
 	// Slightly optimized vs calling Each: no single selection object created
 	var f func(*html.Node)
 	f = func(n *html.Node) {
 		if n.Type == html.TextNode {
 			// Keep newlines and spaces, like jQuery
-			buf.WriteString(n.Data)
+			builder.WriteString(n.Data)
 		}
 		if n.FirstChild != nil {
 			for c := n.FirstChild; c != nil; c = c.NextSibling {
@@ -79,7 +78,7 @@ func (s *Selection) Text() string {
 		f(n)
 	}
 
-	return buf.String()
+	return builder.String()
 }
 
 // Size is an alias for Length.
@@ -97,16 +96,16 @@ func (s *Selection) Length() int {
 func (s *Selection) Html() (ret string, e error) {
 	// Since there is no .innerHtml, the HTML content must be re-created from
 	// the nodes using html.Render.
-	var buf bytes.Buffer
+	var builder strings.Builder
 
 	if len(s.Nodes) > 0 {
 		for c := s.Nodes[0].FirstChild; c != nil; c = c.NextSibling {
-			e = html.Render(&buf, c)
+			e = html.Render(&builder, c)
 			if e != nil {
 				return
 			}
 		}
-		ret = buf.String()
+		ret = builder.String()
 	}
 
 	return
