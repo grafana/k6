@@ -18,8 +18,16 @@ if ! command -v cog >/dev/null 2>&1; then
     exit 1
 fi
 
+# We use Go templates file extension convention to avoid issues with the linter,
+# as `cog` templates have invalid Go syntax (i.e. templating syntax).
+# But looks like `cog` expects `.go` files, so we rename them right before code-generation.
+find "$SCRIPT_DIR/cog-templates/" -name "*.go.tmpl" -exec bash -c 'mv "$1" "${1%.go.tmpl}.go"' _ {} \;
+
 # Run `cog` to generate the source code from the checked out schemas.
 cog generate --config "$SCRIPT_DIR/cog.yaml"
+
+# Then we leave the `cog` templates back to their original state.
+find "$SCRIPT_DIR/cog-templates/" -name "*.go" -exec bash -c 'mv "$1" "$1.tmpl"' _ {} \;
 
 # Move the Go files from the package directory to root (cwd)
 SRC_DIR="$SCRIPT_DIR/summary"
