@@ -25,8 +25,6 @@ import (
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
 	"go.k6.io/k6/internal/js/modules/k6/browser/log"
-
-	k6modules "go.k6.io/k6/js/modules"
 )
 
 // BlankPage represents a blank page.
@@ -266,7 +264,6 @@ type Page struct {
 	workersMu        sync.Mutex
 	routes           []*RouteHandler
 	routesMu         sync.RWMutex
-	vu               k6modules.VU
 
 	logger *log.Logger
 }
@@ -299,7 +296,6 @@ func NewPage(
 		eventHandlers:    make(map[PageEventName][]pageEventHandlerRecord),
 		frameSessions:    make(map[cdp.FrameID]*FrameSession),
 		workers:          make(map[target.SessionID]*Worker),
-		vu:               k6ext.GetVU(ctx),
 		logger:           logger,
 	}
 
