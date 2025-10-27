@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"go.k6.io/k6/internal/js/modules/k6/browser/browser"
 	"go.k6.io/k6/internal/js/modules/k6/browser/common"
 )
 
@@ -294,7 +295,7 @@ func TestLocator(t *testing.T) {
 		{
 			"SelectOption", func(tb *testBrowser, p *common.Page) {
 				l := p.Locator("#selectElement", nil)
-				a, err := common.ConvertSelectOptionValues(tb.vu.Runtime(), tb.toSobekValue(`option text 2`))
+				a, err := browser.ConvertSelectOptionValues(tb.vu.Runtime(), tb.toSobekValue(`option text 2`))
 				require.NoError(t, err)
 				rv, err := l.SelectOption(a, common.NewFrameSelectOptionOptions(l.Timeout()))
 				require.NoError(t, err)
@@ -1353,6 +1354,101 @@ func TestVisibilityWithCORS(t *testing.T) {
 			got, err := tt.do(tb, p)
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestLocatorEvaluate(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		pageFunc string
+		args     []any
+		expected string
+	}{
+		{
+			name:     "no_args",
+			pageFunc: `handle => handle.innerText`,
+			args:     nil,
+			expected: "Some title",
+		},
+		{
+			name: "with_args",
+			pageFunc: `(handle, a, b) => {
+				const c = a + b;
+				return handle.innerText + " " + c
+			}`,
+			args:     []any{1, 2},
+			expected: "Some title 3",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tb := newTestBrowser(t)
+			p := tb.NewPage(nil)
+
+			err := p.SetContent(`<html><head><title data-testid="title">Some title</title></head></html>`, nil)
+			require.NoError(t, err)
+
+			result := p.GetByTestID("'title'")
+			require.NotNil(t, result)
+
+			got, err := result.Evaluate(tt.pageFunc, tt.args...)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, got)
+		})
+	}
+}
+
+func TestLocatorEvaluateHandle(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		pageFunc string
+		args     []any
+		expected string
+	}{
+		{
+			name: "no_args",
+			pageFunc: `handle => {
+				return {"innerText": handle.innerText};
+			}`,
+			args:     nil,
+			expected: `{"innerText":"Some title"}`,
+		},
+		{
+			name: "with_args",
+			pageFunc: `(handle, a, b) => {
+				return {"innerText": handle.innerText, "sum": a + b};
+			}`,
+			args:     []any{1, 2},
+			expected: `{"innerText":"Some title","sum":3}`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tb := newTestBrowser(t)
+			p := tb.NewPage(nil)
+
+			err := p.SetContent(`<html><head><title data-testid="title">Some title</title></head></html>`, nil)
+			require.NoError(t, err)
+
+			result := p.GetByTestID("'title'")
+			require.NotNil(t, result)
+
+			got, err := result.EvaluateHandle(tt.pageFunc, tt.args...)
+			require.NoError(t, err)
+			assert.NotNil(t, got)
+
+			j, err := got.JSONValue()
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, j)
 		})
 	}
 }

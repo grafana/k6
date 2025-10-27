@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/grafana/k6deps"
 	"github.com/grafana/k6provider"
 	"github.com/spf13/afero"
@@ -44,7 +45,7 @@ type mockProvisioner struct {
 	err      error
 }
 
-func (m *mockProvisioner) provision(_ k6deps.Dependencies) (commandExecutor, error) {
+func (m *mockProvisioner) provision(_ map[string]string) (commandExecutor, error) {
 	m.invoked = true
 	return m.executor, m.err
 }
@@ -83,7 +84,7 @@ export default function() {
 }
 `
 	// FIXME: when the build version is a prerelease (e.g v1.0.0-rc1), k6deps fails to parse this pragma
-	// and creates an invalid constrain that is ignored by the test.
+	// and creates an invalid constraint that is ignored by the test.
 	// see https://github.com/grafana/k6deps/issues/91
 	requireSatisfiedK6Version = `
 "use k6 = v` + build.Version + `";
@@ -101,17 +102,18 @@ func TestLauncherLaunch(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
-		name            string
-		script          string
-		disableAER      bool
-		k6Cmd           string
-		k6Args          []string
-		expectProvision bool
-		provisionError  error
-		expectCmdRunE   bool
-		expectK6Run     bool
-		k6ExecutorErr   error
-		expectOsExit    int
+		name               string
+		script             string
+		disableAER         bool
+		k6Cmd              string
+		k6Args             []string
+		expectProvision    bool
+		provisionError     error
+		expectCmdRunE      bool
+		expectK6Run        bool
+		k6ExecutorErr      error
+		expectOsExit       int
+		expectedDepsString string
 	}{
 		{
 			name:            "disable automatic extension resolution",
@@ -124,23 +126,25 @@ func TestLauncherLaunch(t *testing.T) {
 			expectOsExit:    0,
 		},
 		{
-			name:            "execute binary provisioned",
-			k6Cmd:           "cloud",
-			script:          fakerTest,
-			expectProvision: true,
-			expectCmdRunE:   false,
-			expectK6Run:     true,
-			expectOsExit:    0,
+			name:               "execute binary provisioned",
+			k6Cmd:              "cloud",
+			script:             fakerTest,
+			expectProvision:    true,
+			expectCmdRunE:      false,
+			expectK6Run:        true,
+			expectOsExit:       0,
+			expectedDepsString: "k6*;k6/x/faker*",
 		},
 		{
-			name:            "require unsatisfied k6 version",
-			k6Cmd:           "cloud",
-			script:          requireUnsatisfiedK6Version,
-			expectProvision: true,
-			expectCmdRunE:   false,
-			expectK6Run:     false,
-			provisionError:  fmt.Errorf("unsatisfied version"),
-			expectOsExit:    -1,
+			name:               "require unsatisfied k6 version",
+			k6Cmd:              "cloud",
+			script:             requireUnsatisfiedK6Version,
+			expectProvision:    true,
+			expectCmdRunE:      false,
+			expectK6Run:        false,
+			provisionError:     fmt.Errorf("unsatisfied version"),
+			expectOsExit:       -1,
+			expectedDepsString: "k6=v9.99",
 		},
 		{
 			name:            "require satisfied k6 version",
@@ -178,24 +182,26 @@ func TestLauncherLaunch(t *testing.T) {
 			expectOsExit:    0,
 		},
 		{
-			name:            "failed binary provisioning",
-			k6Cmd:           "cloud",
-			script:          fakerTest,
-			provisionError:  errors.New("test error"),
-			expectProvision: true,
-			expectCmdRunE:   false,
-			expectK6Run:     false,
-			expectOsExit:    -1,
+			name:               "failed binary provisioning",
+			k6Cmd:              "cloud",
+			script:             fakerTest,
+			provisionError:     errors.New("test error"),
+			expectProvision:    true,
+			expectCmdRunE:      false,
+			expectK6Run:        false,
+			expectOsExit:       -1,
+			expectedDepsString: "k6*;k6/x/faker*",
 		},
 		{
-			name:            "failed k6 execution",
-			k6Cmd:           "cloud",
-			script:          fakerTest,
-			k6ExecutorErr:   errext.WithExitCodeIfNone(errors.New("execution failed"), 108),
-			expectProvision: true,
-			expectCmdRunE:   false,
-			expectK6Run:     true,
-			expectOsExit:    108,
+			name:               "failed k6 execution",
+			k6Cmd:              "cloud",
+			script:             fakerTest,
+			k6ExecutorErr:      errext.WithExitCodeIfNone(errors.New("execution failed"), 108),
+			expectProvision:    true,
+			expectCmdRunE:      false,
+			expectK6Run:        true,
+			expectOsExit:       108,
+			expectedDepsString: "k6*;k6/x/faker*",
 		},
 	}
 
@@ -258,6 +264,9 @@ func TestLauncherLaunch(t *testing.T) {
 			assert.Equal(t, tc.expectProvision, provisioner.invoked)
 			assert.Equal(t, tc.expectCmdRunE, runECalled)
 			assert.Equal(t, tc.expectK6Run, cmdExecutor.invoked)
+			if tc.expectK6Run {
+				assert.Contains(t, ts.Stderr.String(), "deps=\""+tc.expectedDepsString+"\"")
+			}
 		})
 	}
 }
@@ -479,13 +488,13 @@ func TestIsCustomBuildRequired(t *testing.T) {
 		t.Run(tc.title, func(t *testing.T) {
 			t.Parallel()
 
-			deps := k6deps.Dependencies{}
-			for name, constrain := range tc.deps {
-				dep, err := k6deps.NewDependency(name, constrain)
+			deps := make(map[string]*semver.Constraints)
+			for name, constraint := range tc.deps {
+				dep, err := k6deps.NewDependency(name, constraint)
 				if err != nil {
 					t.Fatalf("parsing %q dependency %v", name, err)
 				}
-				deps[dep.Name] = dep
+				deps[dep.Name] = dep.Constraints
 			}
 
 			k6Version := "v1.0.0"

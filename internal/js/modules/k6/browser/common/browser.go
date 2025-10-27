@@ -453,8 +453,9 @@ func (b *Browser) onDetachedFromTarget(ev *target.EventDetachedFromTarget) {
 }
 
 func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
-	if b.context == nil || b.context.id != id {
-		return nil, fmt.Errorf("missing browser context %s, current context is %s", id, b.context.id)
+	bc := b.getDefaultBrowserContextOrMatchedID(id)
+	if bc.id != id {
+		return nil, fmt.Errorf("missing browser context %s, current context is %s", id, bc.id)
 	}
 
 	ctx, cancel := context.WithTimeout(b.vuCtx, b.browserOpts.Timeout)
@@ -466,7 +467,7 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 
 	waitForPage, removeEventHandler := createWaitForEventHandler(
 		ctx,
-		b.context, // browser context will emit the following event:
+		bc, // browser context will emit the following event:
 		[]string{EventBrowserContextPage},
 		func(e any) bool {
 			tid := <-targetID

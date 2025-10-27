@@ -55,7 +55,9 @@ func (s *lastValue[N]) measure(ctx context.Context, value N, fltrAttr attribute.
 	s.values[attr.Equivalent()] = d
 }
 
-func (s *lastValue[N]) delta(dest *metricdata.Aggregation) int {
+func (s *lastValue[N]) delta(
+	dest *metricdata.Aggregation, //nolint:gocritic // The pointer is needed for the ComputeAggregation interface
+) int {
 	t := now()
 	// Ignore if dest is not a metricdata.Gauge. The chance for memory reuse of
 	// the DataPoints is missed (better luck next time).
@@ -75,7 +77,9 @@ func (s *lastValue[N]) delta(dest *metricdata.Aggregation) int {
 	return n
 }
 
-func (s *lastValue[N]) cumulative(dest *metricdata.Aggregation) int {
+func (s *lastValue[N]) cumulative(
+	dest *metricdata.Aggregation, //nolint:gocritic // The pointer is needed for the ComputeAggregation interface
+) int {
 	t := now()
 	// Ignore if dest is not a metricdata.Gauge. The chance for memory reuse of
 	// the DataPoints is missed (better luck next time).
@@ -126,7 +130,9 @@ type precomputedLastValue[N int64 | float64] struct {
 	*lastValue[N]
 }
 
-func (s *precomputedLastValue[N]) delta(dest *metricdata.Aggregation) int {
+func (s *precomputedLastValue[N]) delta(
+	dest *metricdata.Aggregation, //nolint:gocritic // The pointer is needed for the ComputeAggregation interface
+) int {
 	t := now()
 	// Ignore if dest is not a metricdata.Gauge. The chance for memory reuse of
 	// the DataPoints is missed (better luck next time).
@@ -146,7 +152,9 @@ func (s *precomputedLastValue[N]) delta(dest *metricdata.Aggregation) int {
 	return n
 }
 
-func (s *precomputedLastValue[N]) cumulative(dest *metricdata.Aggregation) int {
+func (s *precomputedLastValue[N]) cumulative(
+	dest *metricdata.Aggregation, //nolint:gocritic // The pointer is needed for the ComputeAggregation interface
+) int {
 	t := now()
 	// Ignore if dest is not a metricdata.Gauge. The chance for memory reuse of
 	// the DataPoints is missed (better luck next time).

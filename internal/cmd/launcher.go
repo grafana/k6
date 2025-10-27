@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"syscall"
 
@@ -54,7 +56,7 @@ type commandExecutor interface {
 
 // provisioner defines the interface for provisioning a commandExecutor for a set of dependencies
 type provisioner interface {
-	provision(k6deps.Dependencies) (commandExecutor, error)
+	provision(map[string]string) (commandExecutor, error)
 }
 
 // launcher is a k6 launcher. It analyses the requirements of a k6 execution,
@@ -101,12 +103,13 @@ func (l *launcher) launch(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	constraintsMap := constraintsMapToProvisionDependency(deps)
 	l.gs.Logger.
-		WithField("deps", deps).
+		WithField("deps", constraintsMapToStringForLogs(constraintsMap)).
 		Info("Automatic extension resolution is enabled. The current k6 binary doesn't satisfy all dependencies," +
 			" it's required to provision a custom binary.")
 
-	customBinary, err := l.provisioner.provision(deps)
+	customBinary, err := l.provisioner.provision(constraintsMap)
 	if err != nil {
 		l.gs.Logger.
 			WithError(err).
@@ -121,6 +124,35 @@ func (l *launcher) launch(cmd *cobra.Command, args []string) error {
 	cmd.RunE = l.runE
 
 	return nil
+}
+
+func constraintsMapToStringForLogs(deps k6provider.Dependencies) string {
+	var buf bytes.Buffer
+
+	for idx, depName := range slices.Sorted(maps.Keys(deps)) {
+		if idx > 0 {
+			_ = buf.WriteByte(';')
+		}
+
+		buf.WriteString(depName)
+		buf.WriteString(deps[depName])
+	}
+	return buf.String()
+}
+
+func constraintsMapToProvisionDependency(deps map[string]*semver.Constraints) k6provider.Dependencies {
+	result := make(k6provider.Dependencies)
+	for name, constraint := range deps {
+		if constraint == nil {
+			// If dependency's constraint is nil, assume it is "*" and consider it satisfied.
+			// See https://github.com/grafana/k6deps/issues/91
+			result[name] = "*"
+			continue
+		}
+		result[name] = constraint.String()
+	}
+
+	return result
 }
 
 // runE executes the k6 command using a command executor
@@ -197,7 +229,7 @@ func (b *customBinary) run(gs *state.GlobalState) error {
 
 // isCustomBuildRequired checks if there is at least one dependency that are not satisfied by the binary
 // considering the version of k6 and any built-in extension
-func isCustomBuildRequired(deps k6deps.Dependencies, k6Version string, exts []*ext.Extension) bool {
+func isCustomBuildRequired(deps map[string]*semver.Constraints, k6Version string, exts []*ext.Extension) bool {
 	// return early if there are no dependencies
 	if len(deps) == 0 {
 		return false
@@ -209,16 +241,16 @@ func isCustomBuildRequired(deps k6deps.Dependencies, k6Version string, exts []*e
 		builtIn[e.Name] = e.Version
 	}
 
-	for _, dep := range deps {
-		version, provided := builtIn[dep.Name]
+	for name, constraint := range deps {
+		version, provided := builtIn[name]
 		// if the binary does not contain a required module, we need a custom
 		if !provided {
 			return true
 		}
 
-		// If dependency's constrain is null, assume it is "*" and consider it satisfied.
+		// If dependency's constraint is null, assume it is "*" and consider it satisfied.
 		// See https://github.com/grafana/k6deps/issues/91
-		if dep.Constraints == nil {
+		if constraint == nil {
 			continue
 		}
 
@@ -230,7 +262,7 @@ func isCustomBuildRequired(deps k6deps.Dependencies, k6Version string, exts []*e
 		}
 
 		// if the current version does not satisfies the constrains, binary provisioning is required
-		if !dep.Constraints.Check(semver) {
+		if !constraint.Check(semver) {
 			return true
 		}
 	}
@@ -247,7 +279,7 @@ func newK6BuildProvisioner(gs *state.GlobalState) provisioner {
 	return &k6buildProvisioner{gs: gs}
 }
 
-func (p *k6buildProvisioner) provision(deps k6deps.Dependencies) (commandExecutor, error) {
+func (p *k6buildProvisioner) provision(deps map[string]string) (commandExecutor, error) {
 	config := getProviderConfig(p.gs)
 
 	provider, err := k6provider.NewProvider(config)
@@ -296,7 +328,7 @@ func formatDependencies(deps map[string]string) string {
 // Presently, only the k6 input script or archive (if any) is passed to k6deps for scanning.
 // TODO: if k6 receives the input from stdin, it is not used for scanning because we don't know
 // if it is a script or an archive
-func analyze(gs *state.GlobalState, args []string) (k6deps.Dependencies, error) {
+func analyze(gs *state.GlobalState, args []string) (map[string]*semver.Constraints, error) {
 	dopts := &k6deps.Options{
 		LookupEnv: func(key string) (string, bool) { v, ok := gs.Env[key]; return v, ok },
 		Manifest:  k6deps.Source{Ignore: true},
@@ -327,7 +359,15 @@ func analyze(gs *state.GlobalState, args []string) (k6deps.Dependencies, error) 
 		dopts.Fs = newIOFSBridge(gs.FS, pwd)
 	}
 
-	return k6deps.Analyze(dopts)
+	deps, err := k6deps.Analyze(dopts)
+	if err != nil {
+		return nil, err
+	}
+	result := make(map[string]*semver.Constraints, len(deps))
+	for n, dep := range deps {
+		result[n] = dep.Constraints
+	}
+	return result, nil
 }
 
 // isAnalysisRequired returns a boolean indicating if dependency analysis is required for the command
