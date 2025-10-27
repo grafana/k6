@@ -97,4 +97,28 @@ func TestPageEventHandlerIterator(t *testing.T) {
 		}
 		assert.Truef(t, called, "did not call the registered handler")
 	})
+
+	t.Run("multiple_handlers", func(t *testing.T) {
+		t.Parallel()
+
+		var called []int
+
+		p := newPage()
+		_, err := p.addEventHandler(PageEventResponse, func(event PageEvent) error {
+			called = append(called, 1)
+			return nil
+		})
+		require.NoError(t, err)
+		_, err = p.addEventHandler(PageEventResponse, func(event PageEvent) error {
+			called = append(called, 2)
+			return nil
+		})
+		require.NoError(t, err)
+
+		for handle := range p.eventHandlersByName(PageEventResponse) {
+			_ = handle(PageEvent{})
+		}
+		assert.Lenf(t, called, 2, "must call all registered handlers")
+		assert.Equal(t, []int{1, 2}, called, "must call handlers in order of registration")
+	})
 }
