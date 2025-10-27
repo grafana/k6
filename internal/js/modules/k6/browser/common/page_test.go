@@ -60,3 +60,23 @@ func TestPageEventHandlersLifecycle(t *testing.T) {
 	p.removeEventHandler(PageEventResponse, id3)
 	assert.False(t, p.hasEventHandler(PageEventResponse))
 }
+
+func TestPageEventHandlerIterator(t *testing.T) {
+	t.Parallel()
+
+	newPage := func() *Page {
+		return &Page{
+			eventHandlers: make(map[PageEventName][]pageEventHandlerRecord),
+		}
+	}
+
+	t.Run("zero", func(t *testing.T) {
+		t.Parallel()
+
+		n := 0
+		for range newPage().eventHandlersByName(PageEventConsole) {
+			n++
+		}
+		assert.Zero(t, n, "must not yield any handlers")
+	})
+}
