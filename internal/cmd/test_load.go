@@ -326,7 +326,6 @@ type binaryIsNotSatisfyingDependenciesError struct {
 }
 
 func (r binaryIsNotSatisfyingDependenciesError) Error() string {
-	// TODO(@mstoykov) fix this for #5327 before merge
 	return fmt.Sprintf("binary does not satisfy dependencies %q", r.deps)
 }
 
