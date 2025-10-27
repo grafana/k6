@@ -1795,18 +1795,18 @@ func (p *Page) eventHandlersByName(evn PageEventName) iter.Seq[PageEventHandler]
 		if !p.hasEventHandler(evn) {
 			return
 		}
-		p.eventHandlersMu.RLock()
-		defer p.eventHandlersMu.RUnlock()
 
-		for _, next := range p.eventHandlers[evn] {
-			// Handlers can register other handlers, so we need to
-			// unlock the mutex before calling the next handler.
-			p.eventHandlersMu.RUnlock()
+		// Avoid holding locks while running handlers (which might
+		// register/unregister handlers and thus attempt to acquire the
+		// write lock), and prevents concurrent modification issues.
+		p.eventHandlersMu.RLock()
+		handlers := slices.Clone(p.eventHandlers[evn])
+		p.eventHandlersMu.RUnlock()
+
+		for _, next := range handlers {
 			if !yield(next.handler) {
-				p.eventHandlersMu.RLock()
 				return
 			}
-			p.eventHandlersMu.RLock()
 		}
 	}
 }
