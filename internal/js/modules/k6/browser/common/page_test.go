@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -120,5 +121,21 @@ func TestPageEventHandlerIterator(t *testing.T) {
 		}
 		assert.Lenf(t, called, 2, "must call all registered handlers")
 		assert.Equal(t, []int{1, 2}, called, "must call handlers in order of registration")
+	})
+
+	t.Run("handler_error", func(t *testing.T) {
+		t.Parallel()
+
+		handlerError := errors.New("handler error")
+
+		page := newPage()
+		_, err := page.addEventHandler(PageEventRequest, func(event PageEvent) error {
+			return handlerError
+		})
+		require.NoError(t, err)
+
+		for handle := range page.eventHandlersByName(PageEventRequest) {
+			assert.ErrorIs(t, handle(PageEvent{}), handlerError)
+		}
 	})
 }
