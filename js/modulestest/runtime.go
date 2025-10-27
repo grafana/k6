@@ -8,6 +8,7 @@ import (
 
 	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/require"
+
 	"go.k6.io/k6/internal/js/compiler"
 	"go.k6.io/k6/internal/js/eventloop"
 	"go.k6.io/k6/internal/js/tc55/timers"
@@ -79,6 +80,7 @@ func (r *Runtime) SetupModuleSystem(goModules map[string]any, loader modules.Fil
 
 	r.mr = modules.NewModuleResolver(
 		goModules, loader, c, r.VU.InitEnvField.CWD, r.VU.InitEnvField.Usage, r.VU.InitEnvField.Logger)
+	r.mr.SetExperimentalRequirePreload(r.VU.InitEnvField.RuntimeOptions.ExperimentalRequirePreload.Bool)
 	return r.innerSetupModuleSystem()
 }
 

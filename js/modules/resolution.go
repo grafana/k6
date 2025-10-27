@@ -37,6 +37,8 @@ type ModuleResolver struct {
 	base      *url.URL
 	usage     *usage.Usage
 	logger    logrus.FieldLogger
+
+	experimentalPreloadRequire bool
 }
 
 // NewModuleResolver returns a new module resolution instance that will resolve.
@@ -56,6 +58,14 @@ func NewModuleResolver(
 		usage:     u,
 		logger:    logger,
 	}
+}
+
+// SetExperimentalRequirePreload sets whether or not to preload `require` calls it can detect in each file as it is
+// doing the standard ESM resolution. This helps with finding `require` calls before running the code.
+// This especially relevant for Auto Extension Resolution which otherwise won't take `require` calls into account.
+// Deprecated: this is only available until k6 v2
+func (mr *ModuleResolver) SetExperimentalRequirePreload(enable bool) {
+	mr.experimentalPreloadRequire = enable
 }
 
 func (mr *ModuleResolver) resolveSpecifier(basePWD *url.URL, arg string) (*url.URL, error) {
@@ -125,8 +135,7 @@ func (mr *ModuleResolver) resolveLoaded(basePWD *url.URL, arg string, data []byt
 	} else {
 		mod, err = cjsModuleFromString(prg)
 	}
-	// TODO(@mstoykov): put the whole preloading behind a flag, maybe auto extension resolution one, or one dependent
-	if err == nil {
+	if err == nil && mr.experimentalPreloadRequire {
 		potentialRequireCalls := findRequireFunctionInAST(prg.Body)
 		for _, requireArg := range potentialRequireCalls {
 			_, requireErr := mr.resolve(basePWD, requireArg)

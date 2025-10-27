@@ -45,6 +45,9 @@ type RuntimeOptions struct {
 	SummaryExport null.String `json:"summaryExport"`
 	KeyWriter     null.String `json:"-"`
 	TracesOutput  null.String `json:"tracesOutput"`
+
+	// Temporarily
+	ExperimentalRequirePreload null.Bool `json:"experimentalRequirePreload"`
 }
 
 // ValidateCompatibilityMode checks if the provided val is a valid compatibility mode

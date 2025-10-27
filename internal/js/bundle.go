@@ -553,6 +553,8 @@ func generateFileLoad(logger logrus.FieldLogger, filesystems map[string]fsext.Fs
 func NewModuleResolver(pwd *url.URL, preInitState *lib.TestPreInitState, filesystems map[string]fsext.Fs,
 ) *modules.ModuleResolver {
 	c := newCompiler(preInitState, filesystems)
-	return modules.NewModuleResolver(
+	mr := modules.NewModuleResolver(
 		getJSModules(), generateFileLoad(preInitState.Logger, filesystems), c, pwd, preInitState.Usage, preInitState.Logger)
+	mr.SetExperimentalRequirePreload(preInitState.RuntimeOptions.ExperimentalRequirePreload.Bool)
+	return mr
 }

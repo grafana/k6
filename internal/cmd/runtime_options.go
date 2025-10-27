@@ -36,6 +36,9 @@ extended: base + sets "global" as alias for "globalThis"
 	if err := flags.MarkDeprecated("no-summary", "use --summary-mode=disabled instead"); err != nil {
 		panic(err) // Should never happen
 	}
+	// TODO(@mstoykov): remove by k6 v2.0, check if there is considerable usage
+	flags.Bool("experimental-require-preloading", false, "try to and load `require` calls during parsing, "+
+		"which then will make Auto Extension Resolution take `require` calls into account")
 	flags.String("summary-mode", summary.ModeCompact.String(), "determine the summary mode,"+
 		" \"compact\", \"full\" or \"disabled\"")
 	flags.String(
@@ -87,6 +90,8 @@ func runtimeOptionsFromFlags(flags *pflag.FlagSet) lib.RuntimeOptions {
 		SummaryExport:        getNullString(flags, "summary-export"),
 		TracesOutput:         getNullString(flags, "traces-output"),
 		Env:                  make(map[string]string),
+
+		ExperimentalRequirePreload: getNullBool(flags, "experimental-require-preloading"),
 	}
 	return opts
 }
@@ -116,6 +121,11 @@ func populateRuntimeOptionsFromEnv(opts lib.RuntimeOptions, environment map[stri
 	}
 
 	if err := saveBoolFromEnv(environment, "K6_NO_SUMMARY", &opts.NoSummary); err != nil {
+		return opts, err
+	}
+	if err := saveBoolFromEnv(
+		environment, "K6_EXPERIMENTAL_REQUIRE_PRELOADING", &opts.ExperimentalRequirePreload,
+	); err != nil {
 		return opts, err
 	}
 
