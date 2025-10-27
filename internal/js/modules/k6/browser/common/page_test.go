@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestPageLocator can be removed later on when we add integration
@@ -78,5 +79,22 @@ func TestPageEventHandlerIterator(t *testing.T) {
 			n++
 		}
 		assert.Zero(t, n, "must not yield any handlers")
+	})
+
+	t.Run("single_handler", func(t *testing.T) {
+		t.Parallel()
+
+		var called bool
+
+		page := newPage()
+		_, err := page.addEventHandler(PageEventConsole, func(event PageEvent) error {
+			called = true
+			return nil
+		})
+		require.NoError(t, err)
+		for handle := range page.eventHandlersByName(PageEventConsole) {
+			_ = handle(PageEvent{})
+		}
+		assert.Truef(t, called, "did not call the registered handler")
 	})
 }
