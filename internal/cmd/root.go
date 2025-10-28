@@ -106,6 +106,10 @@ func (c *rootCommand) persistentPreRunE(cmd *cobra.Command, args []string) error
 	}
 
 	c.globalState.Logger.Debugf("k6 version: v%s", fullVersion())
+	if c.globalState.Env["K6_OLD_RESOLUTION"] != "true" {
+		// do not use the old resolution, let k6 handle it all
+		return nil
+	}
 
 	// If automatic extension resolution is not enabled, continue with the regular k6 execution path
 	if !c.globalState.Flags.AutoExtensionResolution {
@@ -147,9 +151,20 @@ func (c *rootCommand) execute() {
 		return
 	}
 
+	newExitCode, err := handleUnsatisfiedDependencies(err, c)
+
+	if err == nil {
+		exitCode = int(newExitCode)
+		return
+	}
+
 	var ecerr errext.HasExitCode
 	if errors.As(err, &ecerr) {
 		exitCode = int(ecerr.ExitCode())
+	}
+
+	if errors.Is(err, errAlreadyReported) {
+		return
 	}
 
 	errText, fields := errext.Format(err)
@@ -157,6 +172,39 @@ func (c *rootCommand) execute() {
 	if c.loggerIsRemote {
 		c.globalState.FallbackLogger.WithFields(fields).Error(errText)
 	}
+}
+
+func handleUnsatisfiedDependencies(err error, c *rootCommand) (exitcodes.ExitCode, error) {
+	var unsatisfiedDependenciesErr binaryIsNotSatisfyingDependenciesError
+
+	if !errors.As(err, &unsatisfiedDependenciesErr) {
+		return 0, err
+	}
+	deps := unsatisfiedDependenciesErr.deps
+	c.globalState.Logger.
+		WithField("deps", deps).
+		Info("Automatic extension resolution is enabled. The current k6 binary doesn't satisfy all dependencies," +
+			" it's required to provision a custom binary.")
+	provisioner := newK6BuildProvisioner(c.globalState)
+	var customBinary commandExecutor
+	customBinary, err = provisioner.provision(constraintsMapToProvisionDependency(deps))
+	if err != nil {
+		err = errext.WithExitCodeIfNone(err, exitcodes.ScriptException)
+		c.globalState.Logger.
+			WithError(err).
+			Error("Failed to provision a k6 binary with required dependencies." +
+				" Please, make sure to report this issue by opening a bug report.")
+		return 0, err
+	}
+
+	err = customBinary.run(c.globalState)
+	// this only happens if we actually ran the binary and it exited afterwads, in which case we propagate the exit code
+	var ecerr errext.HasExitCode
+	if errors.As(err, &ecerr) {
+		return ecerr.ExitCode(), err
+	}
+
+	return 0, err
 }
 
 func (c *rootCommand) stopLoggers() {

@@ -2,8 +2,6 @@
 
 A library for providing custom k6 binaries that satisfy a given set of dependencies.
 
-Dependencies are specified using [k6deps.Dependencies](https://pkg.go.dev/github.com/grafana/k6deps#Dependencies).
-
 The binary is obtained from a [k6build service](https://github.com/grafana/k6build).
 
 See the the configuration options in the [package documentation](https://pkg.go.dev/github.com/grafana/k6provider).
@@ -23,7 +21,6 @@ import (
 	"fmt"
 	"os/exec"
 
-	"github.com/grafana/k6deps"
 	"github.com/grafana/k6provider"
 )
 
@@ -35,11 +32,7 @@ func main() {
 	}
 
 	// create dependencies for k6 version v0.52.0
-	deps := make(k6deps.Dependencies)
-	err = deps.UnmarshalText([]byte("k6=v0.52.0"))
-	if err != nil {
-		panic(err)
-	}
+	deps := k6provider.Dependencies{"k6", "=v0.52.0"}
 
 	// obtain binary from the build service
 	k6binary, err := provider.GetBinary(context.TODO(), deps)

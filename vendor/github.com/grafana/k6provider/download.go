@@ -92,7 +92,6 @@ func newDownloader(config DownloadConfig) (*downloader, error) {
 	}, nil
 }
 
-//nolint:funlen
 func (d *downloader) download(ctx context.Context, from string, path string, checksum string) error {
 	downloadBin := path + ".download"
 	dest, err := os.OpenFile( //nolint:gosec
