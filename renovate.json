@@ -3,6 +3,10 @@
   "extends": [
     "schedule:weekly"
   ],
+  "ignorePaths": [
+    "**/vendor/**",
+    ".github/workflows/xk6-tests/**"
+  ],
   "prConcurrentLimit": 50,
   "packageRules": [
     {
@@ -21,6 +25,12 @@
         "gomodTidy",
         "gomodUpdateImportPaths"
       ]
+    },
+    {
+      "description": "Do not update indirect dependencies",
+      "matchManagers": ["gomod"],
+      "matchDepTypes": ["indirect"],
+      "enabled": false
     },
     {
       "description": "Update Go versions only when a patch version exists (z > 0 in v1.x.z)",
@@ -98,6 +108,16 @@
       ],
       "matchFileNames": [
         "packaging/**"
+      ],
+      "extends": [
+        "schedule:quarterly"
+      ]
+    },
+    {
+      "groupName": "examples/",
+      "description": "Grouped updates for examples folder with a low frequency",
+      "matchFileNames": [
+        "examples/**"
       ],
       "extends": [
         "schedule:quarterly"

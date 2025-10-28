@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mccutchen/go-httpbin/httpbin"
+	"github.com/mccutchen/go-httpbin/v2/httpbin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -115,11 +115,12 @@ func TestTracer(t *testing.T) { //nolint:tparallel
 	for tnum, isReuse := range []bool{false, true, true} { //nolint:paralleltest
 		t.Run(fmt.Sprintf("Test #%d", tnum), func(t *testing.T) {
 			// Do not enable parallel testing, test relies on sequential execution
-			req, err := http.NewRequest(http.MethodGet, srv.URL+"/get", nil)
+			tracer, ct := getTestTracer(t)
+			ctx := httptrace.WithClientTrace(context.Background(), ct)
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, srv.URL+"/get", nil)
 			require.NoError(t, err)
 
-			tracer, ct := getTestTracer(t)
-			res, err := transport.RoundTrip(req.WithContext(httptrace.WithClientTrace(context.Background(), ct)))
+			res, err := transport.RoundTrip(req)
 			require.NoError(t, err)
 
 			_, err = io.Copy(io.Discard, res.Body)
@@ -204,12 +205,12 @@ func TestTracerNegativeHttpSendingValues(t *testing.T) {
 		return connection, err
 	}
 
-	req, err := http.NewRequest(http.MethodGet, srv.URL+"/get", nil)
-	require.NoError(t, err)
-
 	{
 		tracer := &Tracer{}
-		res, err := transport.RoundTrip(req.WithContext(httptrace.WithClientTrace(context.Background(), tracer.Trace())))
+		ctx := httptrace.WithClientTrace(context.Background(), tracer.Trace())
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, srv.URL+"/get", nil)
+		require.NoError(t, err)
+		res, err := transport.RoundTrip(req)
 		require.NoError(t, err)
 		_, err = io.Copy(io.Discard, res.Body)
 		assert.NoError(t, err)
@@ -222,7 +223,10 @@ func TestTracerNegativeHttpSendingValues(t *testing.T) {
 
 	{
 		tracer := &Tracer{}
-		res, err := transport.RoundTrip(req.WithContext(httptrace.WithClientTrace(context.Background(), tracer.Trace())))
+		ctx := httptrace.WithClientTrace(context.Background(), tracer.Trace())
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, srv.URL+"/get", nil)
+		require.NoError(t, err)
+		res, err := transport.RoundTrip(req)
 		require.NoError(t, err)
 		_, err = io.Copy(io.Discard, res.Body)
 		assert.NoError(t, err)
@@ -242,14 +246,11 @@ func TestTracerError(t *testing.T) {
 	defer srv.Close()
 
 	tracer := &Tracer{}
-	req, err := http.NewRequest(http.MethodGet, srv.URL+"/get", nil)
+	ctx := httptrace.WithClientTrace(context.Background(), tracer.Trace())
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, srv.URL+"/get", nil)
 	require.NoError(t, err)
 
-	_, err = http.DefaultTransport.RoundTrip( //nolint:bodyclose
-		req.WithContext(
-			httptrace.WithClientTrace(
-				context.Background(),
-				tracer.Trace())))
+	_, err = http.DefaultTransport.RoundTrip(req) //nolint:bodyclose
 
 	assert.Error(t, err)
 }

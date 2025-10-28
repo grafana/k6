@@ -14,14 +14,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mccutchen/go-httpbin/httpbin"
+	"github.com/mccutchen/go-httpbin/v2/httpbin"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/metrics"
 	"golang.org/x/time/rate"
 	"gopkg.in/guregu/null.v3"
+
+	"go.k6.io/k6/lib"
+	"go.k6.io/k6/metrics"
 )
 
 type reader func([]byte) (int, error)
@@ -86,7 +87,7 @@ func TestMakeRequestError(t *testing.T) {
 
 	t.Run("bad compression algorithm body", func(t *testing.T) {
 		t.Parallel()
-		req, err := http.NewRequest(http.MethodGet, "https://wont.be.used", nil)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://wont.be.used", nil)
 
 		require.NoError(t, err)
 		badCompressionType := CompressionType(13)
@@ -123,7 +124,7 @@ func TestMakeRequestError(t *testing.T) {
 			Logger:    logger,
 			Tags:      lib.NewVUStateTags(metrics.NewRegistry().RootTagSet()),
 		}
-		req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
+		req, _ := http.NewRequestWithContext(ctx, http.MethodGet, srv.URL, nil)
 		preq := &ParsedHTTPRequest{
 			Req:         req,
 			URL:         &URL{u: req.URL},
@@ -175,7 +176,7 @@ func TestResponseStatus(t *testing.T) {
 					BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 					Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 				}
-				req, err := http.NewRequest(http.MethodGet, server.URL, nil)
+				req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, server.URL, nil)
 				require.NoError(t, err)
 
 				preq := &ParsedHTTPRequest{
@@ -256,7 +257,7 @@ func TestMakeRequestTimeoutInTheMiddle(t *testing.T) {
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 		Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 	}
-	req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
+	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, srv.URL, nil)
 	preq := &ParsedHTTPRequest{
 		Req:              req,
 		URL:              &URL{u: req.URL, URL: srv.URL},
@@ -334,7 +335,7 @@ func TestTrailFailed(t *testing.T) {
 				BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 				Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 			}
-			req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
+			req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, srv.URL, nil)
 			preq := &ParsedHTTPRequest{
 				Req:              req,
 				URL:              &URL{u: req.URL, URL: srv.URL},
@@ -374,7 +375,7 @@ func TestMakeRequestDialTimeout(t *testing.T) {
 		t.Skipf("dial timeout doesn't get returned on windows") // or we don't match it correctly
 	}
 	t.Parallel()
-	ln, err := net.Listen("tcp", "localhost:0")
+	ln, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "localhost:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -404,7 +405,7 @@ func TestMakeRequestDialTimeout(t *testing.T) {
 		Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 	}
 
-	req, _ := http.NewRequest(http.MethodGet, "http://"+addr.String(), nil)
+	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://"+addr.String(), nil)
 	preq := &ParsedHTTPRequest{
 		Req:              req,
 		URL:              &URL{u: req.URL, URL: req.URL.String()},
@@ -459,7 +460,7 @@ func TestMakeRequestTimeoutInTheBegining(t *testing.T) {
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 		Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 	}
-	req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
+	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, srv.URL, nil)
 	preq := &ParsedHTTPRequest{
 		Req:              req,
 		URL:              &URL{u: req.URL, URL: srv.URL},
@@ -540,7 +541,7 @@ func TestMakeRequestRPSLimit(t *testing.T) {
 			assert.InDelta(t, val, 3, 3)
 			return
 		default:
-			req, _ := http.NewRequest(http.MethodGet, ts.URL, nil)
+			req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, ts.URL, nil)
 			preq := &ParsedHTTPRequest{
 				Req:         req,
 				URL:         &URL{u: req.URL, URL: ts.URL, Name: ts.URL},

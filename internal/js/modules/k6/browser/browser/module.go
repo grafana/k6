@@ -113,15 +113,15 @@ func (m *RootModule) initialize(vu k6modules.VU) {
 	)
 	m.remoteRegistry, err = newRemoteRegistry(initEnv.LookupEnv)
 	if err != nil {
-		k6ext.Abort(vu.Context(), "failed to create remote registry: %v", err)
+		k6ext.Abortf(vu.Context(), "failed to create remote registry: %v", err)
 	}
 	m.tracesMetadata, err = parseTracesMetadata(initEnv.LookupEnv)
 	if err != nil {
-		k6ext.Abort(vu.Context(), "parsing browser traces metadata: %v", err)
+		k6ext.Abortf(vu.Context(), "parsing browser traces metadata: %v", err)
 	}
 	m.filePersister, err = newScreenshotPersister(initEnv.LookupEnv)
 	if err != nil {
-		k6ext.Abort(vu.Context(), "failed to create file persister: %v", err)
+		k6ext.Abortf(vu.Context(), "failed to create file persister: %v", err)
 	}
 	if e, ok := initEnv.LookupEnv(env.K6TestRunID); ok && e != "" {
 		m.testRunID = e

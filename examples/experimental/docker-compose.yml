@@ -2,7 +2,7 @@ version: '3.3'
 
 services:
   k6-experimental-redis:
-    image: 'redis:alpine'
+    image: 'redis:alpine@sha256:59b6e694653476de2c992937ebe1c64182af4728e54bb49e9b7a6c26614d8933'
     ports:
       - '6379:6379'
     command: redis-server

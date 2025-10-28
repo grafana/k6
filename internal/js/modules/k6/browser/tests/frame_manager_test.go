@@ -124,7 +124,7 @@ func TestWaitForFrameNavigation(t *testing.T) {
 func TestFrameManagerRequestStartedWithRoutes(t *testing.T) {
 	t.Parallel()
 
-	jsRegexCheckerMock := func(pattern, url string) (bool, error) {
+	fakeRegExMatcher := func(pattern, url string) (bool, error) {
 		matched, err := regexp.MatchString(fmt.Sprintf("http://[^/]*%s", pattern), url)
 		if err != nil {
 			return false, fmt.Errorf("error matching regex: %w", err)
@@ -314,7 +314,7 @@ func TestFrameManagerRequestStartedWithRoutes(t *testing.T) {
 					return nil
 				}
 
-				err := p.Route(tt.routePath, routeHandler, jsRegexCheckerMock)
+				err := p.Route(tt.routePath, routeHandler, fakeRegExMatcher)
 				require.NoError(t, err)
 			}
 

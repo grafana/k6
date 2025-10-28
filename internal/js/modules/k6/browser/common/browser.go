@@ -235,7 +235,7 @@ func (b *Browser) initEvents() error {
 				if ev, ok := event.data.(*target.EventAttachedToTarget); ok {
 					b.logger.Debugf("Browser:initEvents:onAttachedToTarget", "sid:%v tid:%v", ev.SessionID, ev.TargetInfo.TargetID)
 					if err := b.onAttachedToTarget(ev); err != nil {
-						k6ext.Panic(b.vuCtx, "browser is attaching to target: %w", err)
+						k6ext.Panicf(b.vuCtx, "browser is attaching to target: %w", err)
 					}
 				} else if ev, ok := event.data.(*target.EventDetachedFromTarget); ok {
 					b.logger.Debugf("Browser:initEvents:onDetachedFromTarget", "sid:%v", ev.SessionID)
@@ -453,8 +453,9 @@ func (b *Browser) onDetachedFromTarget(ev *target.EventDetachedFromTarget) {
 }
 
 func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
-	if b.context == nil || b.context.id != id {
-		return nil, fmt.Errorf("missing browser context %s, current context is %s", id, b.context.id)
+	bc := b.getDefaultBrowserContextOrMatchedID(id)
+	if bc.id != id {
+		return nil, fmt.Errorf("missing browser context %s, current context is %s", id, bc.id)
 	}
 
 	ctx, cancel := context.WithTimeout(b.vuCtx, b.browserOpts.Timeout)
@@ -466,7 +467,7 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 
 	waitForPage, removeEventHandler := createWaitForEventHandler(
 		ctx,
-		b.context, // browser context will emit the following event:
+		bc, // browser context will emit the following event:
 		[]string{EventBrowserContextPage},
 		func(e any) bool {
 			tid := <-targetID

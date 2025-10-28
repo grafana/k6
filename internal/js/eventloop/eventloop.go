@@ -149,7 +149,7 @@ func (e *EventLoop) popAll() (queue []func() error, awaiting bool) {
 	e.queue = make([]func() error, 0, len(queue))
 	awaiting = e.registeredCallbacks != 0
 	e.lock.Unlock()
-	return
+	return queue, awaiting
 }
 
 func (e *EventLoop) putInfront(queue []func() error) {

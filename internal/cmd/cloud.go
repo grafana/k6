@@ -85,14 +85,6 @@ func (c *cmdCloud) preRun(cmd *cobra.Command, _ []string) error {
 //
 //nolint:funlen,gocognit,cyclop
 func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
-	printBanner(c.gs)
-
-	progressBar := pb.New(
-		pb.WithConstLeft("Init"),
-		pb.WithConstProgress(0, "Loading test script..."),
-	)
-	printBar(c.gs, progressBar)
-
 	test, err := loadAndConfigureLocalTest(c.gs, cmd, args, getPartialConfig)
 	if err != nil {
 		return err
@@ -111,6 +103,13 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	// TODO: validate for usage of execution segment
 	// TODO: validate for externally controlled executor (i.e. executors that aren't distributable)
 	// TODO: move those validations to a separate function and reuse validateConfig()?
+	printBanner(c.gs)
+
+	progressBar := pb.New(
+		pb.WithConstLeft("Init"),
+		pb.WithConstProgress(0, "Loading test script..."),
+	)
+	printBar(c.gs, progressBar)
 
 	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Building the archive..."))
 	arc := testRunState.Runner.MakeArchive()

@@ -14,11 +14,11 @@ import (
 	k6common "go.k6.io/k6/js/common"
 )
 
-// Abort will shutdown the whole test run. This should
+// Abortf will shutdown the whole test run. This should
 // only be used from the sobek mapping layer. It is only
 // to be used when an error will occur in all iterations,
 // so it's permanent.
-func Abort(ctx context.Context, format string, a ...any) {
+func Abortf(ctx context.Context, format string, a ...any) {
 	failFunc := func(rt *sobek.Runtime, a ...any) {
 		reason := fmt.Errorf(format, a...).Error()
 		rt.Interrupt(&errext.InterruptError{Reason: reason})
@@ -26,11 +26,11 @@ func Abort(ctx context.Context, format string, a ...any) {
 	sharedPanic(ctx, failFunc, a...)
 }
 
-// Panic will cause a panic with the given error which will stop
+// Panicf will cause a panic with the given error which will stop
 // the current iteration. Before panicking, it will find the
 // browser process from the context and kill it if it still exists.
 // TODO: test.
-func Panic(ctx context.Context, format string, a ...any) {
+func Panicf(ctx context.Context, format string, a ...any) {
 	failFunc := func(rt *sobek.Runtime, a ...any) {
 		k6common.Throw(rt, fmt.Errorf(format, a...))
 	}

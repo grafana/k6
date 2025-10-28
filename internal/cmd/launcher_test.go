@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/grafana/k6deps"
 	"github.com/grafana/k6provider"
 	"github.com/spf13/afero"
@@ -44,7 +45,7 @@ type mockProvisioner struct {
 	err      error
 }
 
-func (m *mockProvisioner) provision(_ k6deps.Dependencies) (commandExecutor, error) {
+func (m *mockProvisioner) provision(_ map[string]string) (commandExecutor, error) {
 	m.invoked = true
 	return m.executor, m.err
 }
@@ -83,7 +84,7 @@ export default function() {
 }
 `
 	// FIXME: when the build version is a prerelease (e.g v1.0.0-rc1), k6deps fails to parse this pragma
-	// and creates an invalid constrain that is ignored by the test.
+	// and creates an invalid constraint that is ignored by the test.
 	// see https://github.com/grafana/k6deps/issues/91
 	requireSatisfiedK6Version = `
 "use k6 = v` + build.Version + `";
@@ -101,17 +102,18 @@ func TestLauncherLaunch(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
-		name            string
-		script          string
-		disableAER      bool
-		k6Cmd           string
-		k6Args          []string
-		expectProvision bool
-		provisionError  error
-		expectCmdRunE   bool
-		expectK6Run     bool
-		k6ExecutorErr   error
-		expectOsExit    int
+		name               string
+		script             string
+		disableAER         bool
+		k6Cmd              string
+		k6Args             []string
+		expectProvision    bool
+		provisionError     error
+		expectCmdRunE      bool
+		expectK6Run        bool
+		k6ExecutorErr      error
+		expectOsExit       int
+		expectedDepsString string
 	}{
 		{
 			name:            "disable automatic extension resolution",
@@ -124,23 +126,25 @@ func TestLauncherLaunch(t *testing.T) {
 			expectOsExit:    0,
 		},
 		{
-			name:            "execute binary provisioned",
-			k6Cmd:           "cloud",
-			script:          fakerTest,
-			expectProvision: true,
-			expectCmdRunE:   false,
-			expectK6Run:     true,
-			expectOsExit:    0,
+			name:               "execute binary provisioned",
+			k6Cmd:              "cloud",
+			script:             fakerTest,
+			expectProvision:    true,
+			expectCmdRunE:      false,
+			expectK6Run:        true,
+			expectOsExit:       0,
+			expectedDepsString: "k6*;k6/x/faker*",
 		},
 		{
-			name:            "require unsatisfied k6 version",
-			k6Cmd:           "cloud",
-			script:          requireUnsatisfiedK6Version,
-			expectProvision: true,
-			expectCmdRunE:   false,
-			expectK6Run:     false,
-			provisionError:  fmt.Errorf("unsatisfied version"),
-			expectOsExit:    -1,
+			name:               "require unsatisfied k6 version",
+			k6Cmd:              "cloud",
+			script:             requireUnsatisfiedK6Version,
+			expectProvision:    true,
+			expectCmdRunE:      false,
+			expectK6Run:        false,
+			provisionError:     fmt.Errorf("unsatisfied version"),
+			expectOsExit:       -1,
+			expectedDepsString: "k6=v9.99",
 		},
 		{
 			name:            "require satisfied k6 version",
@@ -178,24 +182,26 @@ func TestLauncherLaunch(t *testing.T) {
 			expectOsExit:    0,
 		},
 		{
-			name:            "failed binary provisioning",
-			k6Cmd:           "cloud",
-			script:          fakerTest,
-			provisionError:  errors.New("test error"),
-			expectProvision: true,
-			expectCmdRunE:   false,
-			expectK6Run:     false,
-			expectOsExit:    -1,
+			name:               "failed binary provisioning",
+			k6Cmd:              "cloud",
+			script:             fakerTest,
+			provisionError:     errors.New("test error"),
+			expectProvision:    true,
+			expectCmdRunE:      false,
+			expectK6Run:        false,
+			expectOsExit:       -1,
+			expectedDepsString: "k6*;k6/x/faker*",
 		},
 		{
-			name:            "failed k6 execution",
-			k6Cmd:           "cloud",
-			script:          fakerTest,
-			k6ExecutorErr:   errext.WithExitCodeIfNone(errors.New("execution failed"), 108),
-			expectProvision: true,
-			expectCmdRunE:   false,
-			expectK6Run:     true,
-			expectOsExit:    108,
+			name:               "failed k6 execution",
+			k6Cmd:              "cloud",
+			script:             fakerTest,
+			k6ExecutorErr:      errext.WithExitCodeIfNone(errors.New("execution failed"), 108),
+			expectProvision:    true,
+			expectCmdRunE:      false,
+			expectK6Run:        true,
+			expectOsExit:       108,
+			expectedDepsString: "k6*;k6/x/faker*",
 		},
 	}
 
@@ -204,6 +210,7 @@ func TestLauncherLaunch(t *testing.T) {
 			t.Parallel()
 
 			ts := tests.NewGlobalTestState(t)
+			ts.Env["K6_OLD_RESOLUTION"] = "true"
 
 			k6Args := append([]string{"k6"}, tc.k6Cmd)
 			k6Args = append(k6Args, tc.k6Args...)
@@ -258,6 +265,9 @@ func TestLauncherLaunch(t *testing.T) {
 			assert.Equal(t, tc.expectProvision, provisioner.invoked)
 			assert.Equal(t, tc.expectCmdRunE, runECalled)
 			assert.Equal(t, tc.expectK6Run, cmdExecutor.invoked)
+			if tc.expectK6Run {
+				assert.Contains(t, ts.Stderr.String(), "deps=\""+tc.expectedDepsString+"\"")
+			}
 		})
 	}
 }
@@ -268,6 +278,7 @@ func TestLauncherViaStdin(t *testing.T) {
 	k6Args := []string{"k6", "archive", "-"}
 
 	ts := tests.NewGlobalTestState(t)
+	ts.Env["K6_OLD_RESOLUTION"] = "true"
 	ts.CmdArgs = k6Args
 
 	// k6deps uses os package to access files. So we need to use it in the global state
@@ -479,13 +490,13 @@ func TestIsCustomBuildRequired(t *testing.T) {
 		t.Run(tc.title, func(t *testing.T) {
 			t.Parallel()
 
-			deps := k6deps.Dependencies{}
-			for name, constrain := range tc.deps {
-				dep, err := k6deps.NewDependency(name, constrain)
+			deps := make(map[string]*semver.Constraints)
+			for name, constraint := range tc.deps {
+				dep, err := k6deps.NewDependency(name, constraint)
 				if err != nil {
 					t.Fatalf("parsing %q dependency %v", name, err)
 				}
-				deps[dep.Name] = dep
+				deps[dep.Name] = dep.Constraints
 			}
 
 			k6Version := "v1.0.0"
@@ -555,6 +566,174 @@ func TestGetProviderConfig(t *testing.T) {
 			config := getProviderConfig(ts.GlobalState)
 
 			assert.Equal(t, tc.expectConfig, config)
+		})
+	}
+}
+
+func TestProcessUseDirectives(t *testing.T) {
+	t.Parallel()
+	tests := map[string]struct {
+		input          string
+		expectedOutput map[string]string
+		expectedError  string
+	}{
+		"nothing": {
+			input: "export default function() {}",
+		},
+		"nothing really": {
+			input: `"use k6"`,
+			expectedOutput: map[string]string{
+				"k6": "",
+			},
+		},
+		"k6 pinning": {
+			input: `"use k6 > 1.4.0"`,
+			expectedOutput: map[string]string{
+				"k6": "> 1.4.0",
+			},
+		},
+		"a extension": {
+			input: `"use k6 with k6/x/sql"`,
+			expectedOutput: map[string]string{
+				"k6/x/sql": "",
+			},
+		},
+		"an extension with constraint": {
+			input: `"use k6 with k6/x/sql > 1.4.0"`,
+			expectedOutput: map[string]string{
+				"k6/x/sql": "> 1.4.0",
+			},
+		},
+		"complex": {
+			input: `
+				// something here
+				"use k6 with k6/x/A"
+				function a (){
+					"use k6 with k6/x/B"
+					let s = JSON.stringify( "use k6 with k6/x/C")
+					"use k6 with k6/x/D"
+
+					return s
+				}
+
+				export const b = "use k6 with k6/x/E"
+				"use k6 with k6/x/F"
+
+				// Here for esbuild and k6 warnings
+				a()
+				export default function(){}
+				`,
+			expectedOutput: map[string]string{
+				"k6/x/A": "",
+			},
+		},
+
+		"repeat": {
+			input: `
+				"use k6 with k6/x/A"
+				"use k6 with k6/x/A"
+				`,
+			expectedOutput: map[string]string{
+				"k6/x/A": "",
+			},
+		},
+		"repeat with constraint first": {
+			input: `
+				"use k6 with k6/x/A > 1.4.0"
+				"use k6 with k6/x/A"
+				`,
+			expectedOutput: map[string]string{
+				"k6/x/A": "> 1.4.0",
+			},
+		},
+		"constraint difference": {
+			input: `
+				"use k6 > 1.4.0"
+				"use k6 = 1.2.3"
+				`,
+			expectedError: `error while parsing use directives in "name.js": already have constraint for "k6", when parsing "=1.2.3"`,
+		},
+		"constraint difference for extensions": {
+			input: `
+				"use k6 with k6/x/A > 1.4.0"
+				"use k6 with k6/x/A = 1.2.3"
+				`,
+			expectedError: `error while parsing use directives in "name.js": already have constraint for "k6/x/A", when parsing "=1.2.3"`,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			deps := make(dependencies)
+			for k, v := range test.expectedOutput {
+				require.NoError(t, deps.update(k, v))
+			}
+			if len(test.expectedError) > 0 {
+				deps = nil
+			}
+
+			m := make(dependencies)
+			err := processUseDirectives("name.js", []byte(test.input), m)
+			if len(test.expectedError) > 0 {
+				require.ErrorContains(t, err, test.expectedError)
+			} else {
+				require.EqualValues(t, deps, m)
+			}
+		})
+	}
+}
+
+func TestFindDirectives(t *testing.T) {
+	t.Parallel()
+	tests := map[string]struct {
+		input          string
+		expectedOutput []string
+	}{
+		"nothing": {
+			input:          "export default function() {}",
+			expectedOutput: nil,
+		},
+		"nothing really": {
+			input:          `"use k6"`,
+			expectedOutput: []string{"use k6"},
+		},
+		"multiline": {
+			input: `
+			"use k6 with k6/x/sql"
+			"something"
+			`,
+			expectedOutput: []string{"use k6 with k6/x/sql", "something"},
+		},
+		"multiline start at beginning": {
+			input: `
+"use k6 with k6/x/sql"
+"something"
+			`,
+			expectedOutput: []string{"use k6 with k6/x/sql", "something"},
+		},
+		"multiline comments": {
+			input: `#!/bin/sh
+			// here comment "hello"
+"use k6 with k6/x/sql";
+			/*
+			"something else here as well"
+			*/
+	;
+"something";
+const l = 5
+"more"
+			`,
+			expectedOutput: []string{"use k6 with k6/x/sql", "something"},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			m := findDirectives([]byte(test.input))
+			assert.EqualValues(t, test.expectedOutput, m)
 		})
 	}
 }

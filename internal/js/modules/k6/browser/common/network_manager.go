@@ -1041,7 +1041,7 @@ func (m *NetworkManager) ThrottleNetwork(networkProfile NetworkProfile) error {
 func (m *NetworkManager) SetUserAgent(userAgent string) {
 	action := emulation.SetUserAgentOverride(userAgent)
 	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-		k6ext.Panic(m.ctx, "setting user agent: %w", err)
+		k6ext.Panicf(m.ctx, "setting user agent: %w", err)
 	}
 }
 
@@ -1049,6 +1049,6 @@ func (m *NetworkManager) SetUserAgent(userAgent string) {
 func (m *NetworkManager) SetCacheEnabled(enabled bool) {
 	m.userCacheDisabled = !enabled
 	if err := m.updateProtocolCacheDisabled(); err != nil {
-		k6ext.Panic(m.ctx, "%v", err)
+		k6ext.Panicf(m.ctx, "%v", err)
 	}
 }
