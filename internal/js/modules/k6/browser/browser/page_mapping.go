@@ -410,7 +410,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, fmt.Errorf("parsing select option options: %w", err)
 			}
 
-			convValues, err := common.ConvertSelectOptionValues(vu.Runtime(), values)
+			convValues, err := ConvertSelectOptionValues(vu.Runtime(), values)
 			if err != nil {
 				return nil, fmt.Errorf("parsing select options values: %w", err)
 			}
@@ -591,7 +591,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			return waitForURLBody(vu, p, url, opts)
 		},
 		"waitForResponse": func(url sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
-			popts, err := parseWaitForResponseOptions(vu.Context(), opts, p.Timeout())
+			popts, err := parsePageWaitForResponseOptions(vu.Context(), opts, p.Timeout())
 			if err != nil {
 				return nil, fmt.Errorf("parsing waitForResponse options: %w", err)
 			}
@@ -613,6 +613,31 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			return k6ext.Promise(ctx, func() (result any, reason error) {
 				defer stopTaskqueue()
 				return p.WaitForResponse(val, popts, rm)
+			}), nil
+		},
+		"waitForRequest": func(url sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
+			popts, err := parsePageWaitForRequestOptions(vu.Context(), opts, p.Timeout())
+			if err != nil {
+				return nil, fmt.Errorf("parsing waitForRequest options: %w", err)
+			}
+
+			var val string
+			switch url.ExportType() {
+			case reflect.TypeOf(string("")):
+				val = "'" + url.String() + "'" // Strings require quotes
+			default: // JS Regex, CSS, numbers or booleans
+				val = url.String() // No quotes
+			}
+
+			// Use RegEx matcher for regex pattern matching
+			ctx, stopTaskqueue := context.WithCancel(vu.Context())
+			tq := cancelableTaskQueue(ctx, vu.RegisterCallback)
+
+			rm := newRegExMatcher(ctx, vu, tq)
+
+			return k6ext.Promise(ctx, func() (result any, reason error) {
+				defer stopTaskqueue()
+				return p.WaitForRequest(val, popts, rm)
 			}), nil
 		},
 		"workers": func() *sobek.Object {
@@ -659,34 +684,34 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 	return maps
 }
 
-// mapPageOn maps the requested page.on event to the Sobek runtime.
-// It generalizes the handling of page.on events.
-func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.Callable) error {
-	return func(eventName common.PageOnEventName, handleEvent sobek.Callable) error {
+// mapPageOn enables using various page.on event handlers with the page.on method.
+// It provides a generic way to map different event types to their respective handler functions.
+func mapPageOn(vu moduleVU, p *common.Page) func(common.PageEventName, sobek.Callable) error {
+	return func(eventName common.PageEventName, handleEvent sobek.Callable) error {
 		rt := vu.Runtime()
 
-		pageOnEvents := map[common.PageOnEventName]struct {
-			mapp func(vu moduleVU, event common.PageOnEvent) mapping
+		pageEvents := map[common.PageEventName]struct {
+			mapp func(vu moduleVU, event common.PageEvent) mapping
 			wait bool // Whether to wait for the handler to complete.
 		}{
-			common.EventPageConsoleAPICalled: {
+			common.PageEventConsole: {
 				mapp: mapConsoleMessage,
 				wait: false,
 			},
-			common.EventPageMetricCalled: {
+			common.PageEventMetric: {
 				mapp: mapMetricEvent,
 				wait: true,
 			},
-			common.EventPageRequestCalled: {
+			common.PageEventRequest: {
 				mapp: mapRequestEvent,
 				wait: false,
 			},
-			common.EventPageResponseCalled: {
+			common.PageEventResponse: {
 				mapp: mapResponseEvent,
 				wait: false,
 			},
 		}
-		pageOnEvent, ok := pageOnEvents[eventName]
+		pageEvent, ok := pageEvents[eventName]
 		if !ok {
 			return fmt.Errorf("unknown page on event: %q", eventName)
 		}
@@ -696,8 +721,8 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 		// Run the event handler in the task queue to
 		// ensure that the handler is executed on the event loop.
 		tq := vu.get(ctx, p.TargetID())
-		eventHandler := func(event common.PageOnEvent) error {
-			mapping := pageOnEvent.mapp(vu, event)
+		eventHandler := func(event common.PageEvent) error {
+			mapping := pageEvent.mapp(vu, event)
 
 			done := make(chan struct{})
 
@@ -715,7 +740,7 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 				return nil
 			})
 
-			if pageOnEvent.wait {
+			if pageEvent.wait {
 				select {
 				case <-done:
 				case <-ctx.Done():
@@ -998,4 +1023,50 @@ func waitForNavigationBodyImpl(vu moduleVU, target interface {
 		}
 		return mapResponse(vu, resp), nil
 	}), nil
+}
+
+func parsePageWaitForResponseOptions(
+	ctx context.Context, opts sobek.Value, defaultTimeout time.Duration,
+) (*common.PageWaitForResponseOptions, error) {
+	ropts := common.NewPageWaitForResponseOptions(defaultTimeout)
+	if k6common.IsNullish(opts) {
+		return ropts, nil
+	}
+
+	rt := k6ext.Runtime(ctx)
+	obj := opts.ToObject(rt)
+	for _, k := range obj.Keys() {
+		switch k {
+		case "timeout":
+			ropts.Timeout = time.Duration(obj.Get(k).ToInteger()) * time.Millisecond
+		default:
+			return ropts, fmt.Errorf("unsupported waitForResponse option: '%s'", k)
+		}
+	}
+
+	return ropts, nil
+}
+
+func parsePageWaitForRequestOptions(
+	ctx context.Context, opts sobek.Value, defaultTimeout time.Duration,
+) (*common.PageWaitForRequestOptions, error) {
+	ropts := common.PageWaitForRequestOptions{
+		Timeout: defaultTimeout,
+	}
+
+	if k6common.IsNullish(opts) {
+		return &ropts, nil
+	}
+
+	obj := opts.ToObject(k6ext.Runtime(ctx))
+	for _, k := range obj.Keys() {
+		switch k {
+		case "timeout":
+			ropts.Timeout = time.Duration(obj.Get(k).ToInteger()) * time.Millisecond
+		default:
+			return &ropts, fmt.Errorf("unsupported waitForRequest option: '%s'", k)
+		}
+	}
+
+	return &ropts, nil
 }

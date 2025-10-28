@@ -346,7 +346,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				return nil, fmt.Errorf("parsing select option options: %w", err)
 			}
 
-			convValues, err := common.ConvertSelectOptionValues(rt, values)
+			convValues, err := ConvertSelectOptionValues(rt, values)
 			if err != nil {
 				return nil, fmt.Errorf("parsing select options values: %w", err)
 			}
