@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"iter"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -24,31 +26,39 @@ import (
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
 	"go.k6.io/k6/internal/js/modules/k6/browser/log"
-
-	k6modules "go.k6.io/k6/js/modules"
 )
 
 // BlankPage represents a blank page.
 const BlankPage = "about:blank"
 
-// PageOnEventName represents the name of the page.on event.
-type PageOnEventName string
+// PageEventName represents the name of the page event.
+type PageEventName string
 
 const webVitalBinding = "k6browserSendWebVitalMetric"
 
 const (
-	// EventPageConsoleAPICalled represents the page.on('console') event.
-	EventPageConsoleAPICalled PageOnEventName = "console"
+	// PageEventConsole represents the page console event.
+	PageEventConsole PageEventName = "console"
 
-	// EventPageMetricCalled represents the page.on('metric') event.
-	EventPageMetricCalled PageOnEventName = "metric"
+	// PageEventMetric represents the page metric event.
+	PageEventMetric PageEventName = "metric"
 
-	// EventPageRequestCalled represents the page.on('request') event.
-	EventPageRequestCalled PageOnEventName = "request"
+	// PageEventRequest represents the page request event.
+	PageEventRequest PageEventName = "request"
 
-	// EventPageResponseCalled represents the page.on('response') event.
-	EventPageResponseCalled PageOnEventName = "response"
+	// PageEventResponse represents the page response event.
+	PageEventResponse PageEventName = "response"
 )
+
+// PageEventHandler is a function type that handles a page on event.
+type PageEventHandler func(PageEvent) error
+
+// pageEventHandlerRecord is a registered event on a page.
+// The id field is used to identify the handler in the eventHandlers map.
+type pageEventHandlerRecord struct {
+	id      uint64
+	handler PageEventHandler
+}
 
 // MediaType represents the type of media to emulate.
 type MediaType string
@@ -188,18 +198,16 @@ type ConsoleMessage struct {
 	Type string
 }
 
-type PageOnHandler func(PageOnEvent) error
-
 type RouteHandler struct {
 	path       string
 	handler    RouteHandlerCallback
-	urlMatcher URLMatcher
+	urlMatcher patternMatcherFunc
 }
 
 func NewRouteHandler(
 	path string,
 	handler RouteHandlerCallback,
-	urlMatcher URLMatcher,
+	urlMatcher patternMatcherFunc,
 ) *RouteHandler {
 	return &RouteHandler{
 		path:       path,
@@ -209,82 +217,6 @@ func NewRouteHandler(
 }
 
 type RouteHandlerCallback func(*Route) error
-
-type ResponseEventHandler struct {
-	mu            sync.RWMutex
-	activeWaiters map[int64]*responseWaiter
-	nextWaiterID  int64
-}
-
-type responseWaiter struct {
-	matcher      URLMatcher
-	responseChan chan *Response
-	ctx          context.Context
-	cancel       context.CancelFunc
-}
-
-func NewResponseEventHandler() *ResponseEventHandler {
-	return &ResponseEventHandler{
-		activeWaiters: make(map[int64]*responseWaiter),
-	}
-}
-
-func (reh *ResponseEventHandler) processResponse(response *Response) {
-	if response == nil {
-		return
-	}
-
-	reh.mu.RLock()
-	defer reh.mu.RUnlock()
-
-	for _, waiter := range reh.activeWaiters {
-		select {
-		case <-waiter.ctx.Done():
-			continue
-		default:
-		}
-
-		matched, err := waiter.matcher(response.URL())
-		if err == nil && matched {
-			select {
-			case waiter.responseChan <- response:
-			case <-waiter.ctx.Done():
-			}
-		}
-	}
-}
-
-func (reh *ResponseEventHandler) waitForMatch(ctx context.Context, matcher URLMatcher) (*Response, error) {
-	waiterContext, waiterCancel := context.WithCancel(ctx)
-
-	waiter := &responseWaiter{
-		matcher:      matcher,
-		responseChan: make(chan *Response),
-		ctx:          waiterContext,
-		cancel:       waiterCancel,
-	}
-
-	// Add waiter
-	id := atomic.AddInt64(&reh.nextWaiterID, 1)
-	reh.mu.Lock()
-	reh.activeWaiters[id] = waiter
-	reh.mu.Unlock()
-
-	defer func() {
-		waiterCancel()
-		// Remove waiter
-		reh.mu.Lock()
-		delete(reh.activeWaiters, id)
-		reh.mu.Unlock()
-	}()
-
-	select {
-	case response := <-waiter.responseChan:
-		return response, nil
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	}
-}
 
 // Page stores Page/tab related context.
 type Page struct {
@@ -321,10 +253,10 @@ type Page struct {
 
 	backgroundPage bool
 
-	eventCh              chan Event
-	eventHandlers        map[PageOnEventName][]PageOnHandler
-	eventHandlersMu      sync.RWMutex
-	responseEventHandler *ResponseEventHandler
+	eventCh            chan Event
+	eventHandlers      map[PageEventName][]pageEventHandlerRecord
+	eventHandlersMu    sync.RWMutex
+	eventHandlerLastID atomic.Uint64
 
 	mainFrameSession *FrameSession
 	frameSessions    map[cdp.FrameID]*FrameSession
@@ -333,7 +265,6 @@ type Page struct {
 	workersMu        sync.Mutex
 	routes           []*RouteHandler
 	routesMu         sync.RWMutex
-	vu               k6modules.VU
 
 	logger *log.Logger
 }
@@ -349,26 +280,24 @@ func NewPage(
 	logger *log.Logger,
 ) (*Page, error) {
 	p := Page{
-		ctx:                  ctx,
-		session:              s,
-		browserCtx:           bctx,
-		targetID:             tid,
-		opener:               opener,
-		backgroundPage:       bp,
-		mediaType:            MediaTypeScreen,
-		colorScheme:          bctx.opts.ColorScheme,
-		reducedMotion:        bctx.opts.ReducedMotion,
-		extraHTTPHeaders:     bctx.opts.ExtraHTTPHeaders,
-		timeoutSettings:      NewTimeoutSettings(bctx.timeoutSettings),
-		Keyboard:             NewKeyboard(ctx, s),
-		jsEnabled:            true,
-		eventCh:              make(chan Event),
-		eventHandlers:        make(map[PageOnEventName][]PageOnHandler),
-		frameSessions:        make(map[cdp.FrameID]*FrameSession),
-		workers:              make(map[target.SessionID]*Worker),
-		responseEventHandler: NewResponseEventHandler(),
-		vu:                   k6ext.GetVU(ctx),
-		logger:               logger,
+		ctx:              ctx,
+		session:          s,
+		browserCtx:       bctx,
+		targetID:         tid,
+		opener:           opener,
+		backgroundPage:   bp,
+		mediaType:        MediaTypeScreen,
+		colorScheme:      bctx.opts.ColorScheme,
+		reducedMotion:    bctx.opts.ReducedMotion,
+		extraHTTPHeaders: bctx.opts.ExtraHTTPHeaders,
+		timeoutSettings:  NewTimeoutSettings(bctx.timeoutSettings),
+		Keyboard:         NewKeyboard(ctx, s),
+		jsEnabled:        true,
+		eventCh:          make(chan Event),
+		eventHandlers:    make(map[PageEventName][]pageEventHandlerRecord),
+		frameSessions:    make(map[cdp.FrameID]*FrameSession),
+		workers:          make(map[target.SessionID]*Worker),
+		logger:           logger,
 	}
 
 	p.logger.Debugf("Page:NewPage", "sid:%v tid:%v backgroundPage:%t",
@@ -450,15 +379,6 @@ func (p *Page) initEvents() {
 	}()
 }
 
-// hasPageOnHandler returns true if there is a handler registered
-// for the given page on event.
-func hasPageOnHandler(p *Page, event PageOnEventName) bool {
-	p.eventHandlersMu.RLock()
-	defer p.eventHandlersMu.RUnlock()
-	_, ok := p.eventHandlers[event]
-	return ok
-}
-
 // MetricEvent is the type that is exported to JS. It is currently only used to
 // match on the urlTag and return a name when a match is found.
 type MetricEvent struct {
@@ -493,13 +413,9 @@ type Match struct {
 	Method string `js:"method"`
 }
 
-// K6BrowserCheckRegEx is a function that will be used to check the URL tag
-// against the user defined regexes in the Sobek runtime.
-type K6BrowserCheckRegEx func(pattern, url string) (bool, error)
-
 // Tag will find the first match given the URLTagPatterns and the URL from
 // the metric tag and update the name field.
-func (e *MetricEvent) Tag(matchesRegex K6BrowserCheckRegEx, matches TagMatches) error {
+func (e *MetricEvent) Tag(rm RegExMatcher, matches TagMatches) error {
 	name := strings.TrimSpace(matches.TagName)
 	if name == "" {
 		return fmt.Errorf("name %q is invalid", matches.TagName)
@@ -524,7 +440,7 @@ func (e *MetricEvent) Tag(matchesRegex K6BrowserCheckRegEx, matches TagMatches) 
 
 		// matchesRegex is a function that will perform the regex test in the Sobek
 		// runtime.
-		matched, err := matchesRegex(m.URLRegEx, e.url)
+		matched, err := rm(m.URLRegEx, e.url)
 		if err != nil {
 			return err
 		}
@@ -549,68 +465,33 @@ func (e *MetricEvent) Tag(matchesRegex K6BrowserCheckRegEx, matches TagMatches) 
 // url regexes and the matching is done from within there. If a match is found,
 // the supplied name is returned back upstream to the caller of urlTagName.
 func (p *Page) urlTagName(url string, method string) (string, bool) {
-	if !hasPageOnHandler(p, EventPageMetricCalled) {
-		return "", false
-	}
+	var (
+		tag         string
+		matched     bool
+		metricEvent = &MetricEvent{url: url, method: method}
+	)
 
-	var newTagName string
-	var urlMatched bool
-	em := &MetricEvent{
-		url:    url,
-		method: method,
-	}
-
-	p.eventHandlersMu.RLock()
-	defer p.eventHandlersMu.RUnlock()
-	for _, h := range p.eventHandlers[EventPageMetricCalled] {
-		err := func() error {
-			// Handlers can register other handlers, so we need to
-			// unlock the mutex before calling the next handler.
-			p.eventHandlersMu.RUnlock()
-			defer p.eventHandlersMu.RLock()
-
-			// Call and wait for the handler to complete.
-			return h(PageOnEvent{
-				Metric: em,
-			})
-		}()
-		if err != nil {
+	for handle := range p.eventHandlersByName(PageEventMetric) {
+		if err := handle(PageEvent{Metric: metricEvent}); err != nil {
 			p.logger.Debugf("urlTagName", "handler returned an error: %v", err)
 			return "", false
 		}
 	}
 
 	// If a match was found then the name field in em will have been updated.
-	if em.isUserURLTagNameExist {
-		newTagName = em.userProvidedURLTagName
-		urlMatched = true
+	if metricEvent.isUserURLTagNameExist {
+		tag = metricEvent.userProvidedURLTagName
+		matched = true
 	}
+	p.logger.Debugf("urlTagName", "name: %q nameChanged: %v", tag, matched)
 
-	p.logger.Debugf("urlTagName", "name: %q nameChanged: %v", newTagName, urlMatched)
-
-	return newTagName, urlMatched
+	return tag, matched
 }
 
+// onRequest calls [PageEventRequest] handlers after each request is made.
 func (p *Page) onRequest(request *Request) {
-	if !hasPageOnHandler(p, EventPageRequestCalled) {
-		return
-	}
-
-	p.eventHandlersMu.RLock()
-	defer p.eventHandlersMu.RUnlock()
-	for _, h := range p.eventHandlers[EventPageRequestCalled] {
-		err := func() error {
-			// Handlers can register other handlers, so we need to
-			// unlock the mutex before calling the next handler.
-			p.eventHandlersMu.RUnlock()
-			defer p.eventHandlersMu.RLock()
-
-			// Call and wait for the handler to complete.
-			return h(PageOnEvent{
-				Request: request,
-			})
-		}()
-		if err != nil {
+	for handle := range p.eventHandlersByName(PageEventRequest) {
+		if err := handle(PageEvent{Request: request}); err != nil {
 			p.logger.Warnf("onRequest", "handler returned an error: %v", err)
 			return
 		}
@@ -619,29 +500,8 @@ func (p *Page) onRequest(request *Request) {
 
 // onResponse will call the handlers for the page.on('response') event.
 func (p *Page) onResponse(resp *Response) {
-	p.logger.Debugf("Page:onResponse", "sid:%v url:%v", p.sessionID(), resp.URL())
-
-	go p.responseEventHandler.processResponse(resp)
-
-	if !hasPageOnHandler(p, EventPageResponseCalled) {
-		return
-	}
-
-	p.eventHandlersMu.RLock()
-	defer p.eventHandlersMu.RUnlock()
-	for _, h := range p.eventHandlers[EventPageResponseCalled] {
-		err := func() error {
-			// Handlers can register other handlers, so we need to
-			// unlock the mutex before calling the next handler.
-			p.eventHandlersMu.RUnlock()
-			defer p.eventHandlersMu.RLock()
-
-			// Call and wait for the handler to complete.
-			return h(PageOnEvent{
-				Response: resp,
-			})
-		}()
-		if err != nil {
+	for handle := range p.eventHandlersByName(PageEventResponse) {
+		if err := handle(PageEvent{Response: resp}); err != nil {
 			p.logger.Warnf("onResponse", "handler returned an error: %v", err)
 			return
 		}
@@ -649,23 +509,16 @@ func (p *Page) onResponse(resp *Response) {
 }
 
 func (p *Page) onConsoleAPICalled(event *runtime.EventConsoleAPICalled) {
-	if !hasPageOnHandler(p, EventPageConsoleAPICalled) {
+	if !p.hasEventHandler(PageEventConsole) {
 		return
 	}
-
-	m, err := p.consoleMsgFromConsoleEvent(event)
+	cm, err := p.consoleMsgFromConsoleEvent(event)
 	if err != nil {
 		p.logger.Errorf("Page:onConsoleAPICalled", "building console message: %v", err)
 		return
 	}
-
-	p.eventHandlersMu.RLock()
-	defer p.eventHandlersMu.RUnlock()
-	for _, h := range p.eventHandlers[EventPageConsoleAPICalled] {
-		err := h(PageOnEvent{
-			ConsoleMessage: m,
-		})
-		if err != nil {
+	for handle := range p.eventHandlersByName(PageEventConsole) {
+		if err := handle(PageEvent{ConsoleMessage: cm}); err != nil {
 			p.logger.Debugf("onConsoleAPICalled", "handler returned an error: %v", err)
 			return
 		}
@@ -1388,12 +1241,8 @@ func (p *Page) Referrer() string {
 	return nm.extraHTTPHeaders["referer"]
 }
 
-// Route register a handler to be executed for a given request path
-func (p *Page) Route(
-	path string,
-	handlerCallback RouteHandlerCallback,
-	jsRegexChecker JSRegexChecker,
-) error {
+// Route registers a handler to be executed for a given request path
+func (p *Page) Route(path string, cb RouteHandlerCallback, rm RegExMatcher) error {
 	p.logger.Debugf("Page:Route", "sid:%v path:%s", p.sessionID(), path)
 
 	if !p.hasRoutes() {
@@ -1403,12 +1252,12 @@ func (p *Page) Route(
 		}
 	}
 
-	matcher, err := urlMatcher(path, jsRegexChecker)
+	matcher, err := newPatternMatcher(path, rm)
 	if err != nil {
 		return fmt.Errorf("creating url matcher for path %s: %w", path, err)
 	}
 
-	routeHandler := NewRouteHandler(path, handlerCallback, matcher)
+	routeHandler := NewRouteHandler(path, cb, matcher)
 	p.routesMu.Lock()
 	defer p.routesMu.Unlock()
 	// Append new route at the beginning of the slice as, when several routes match the given pattern,
@@ -1418,15 +1267,48 @@ func (p *Page) Route(
 	return nil
 }
 
+// Unroute removes the route(s) for the specified URL pattern.
+// If multiple routes match the same URL pattern, all of them are removed.
+func (p *Page) Unroute(path string) error {
+	p.logger.Debugf("Page:Unroute", "sid:%v path:%s", p.sessionID(), path)
+
+	p.routesMu.Lock()
+	defer p.routesMu.Unlock()
+
+	p.routes = slices.DeleteFunc(p.routes, func(rh *RouteHandler) bool {
+		return rh.path == path
+	})
+
+	// If no routes remain, disable request interception
+	if len(p.routes) == 0 {
+		return p.mainFrameSession.updateRequestInterception(false)
+	}
+
+	return nil
+}
+
+// UnrouteAll removes all registered routes.
+func (p *Page) UnrouteAll() error {
+	p.logger.Debugf("Page:UnrouteAll", "sid:%v", p.sessionID())
+
+	p.routesMu.Lock()
+	defer p.routesMu.Unlock()
+
+	p.routes = []*RouteHandler{}
+
+	// Disable request interception when no route is registered
+	return p.mainFrameSession.updateRequestInterception(false)
+}
+
 // NavigationTimeout returns the page's navigation timeout.
 // It's an internal method not to be exposed as a JS API.
 func (p *Page) NavigationTimeout() time.Duration {
 	return p.frameManager.timeoutSettings.navigationTimeout()
 }
 
-// PageOnEvent represents a generic page event.
+// PageEvent represents a generic page event.
 // Use one of the fields to get the specific event data.
-type PageOnEvent struct {
+type PageEvent struct {
 	// ConsoleMessage is the console message event.
 	ConsoleMessage *ConsoleMessage
 
@@ -1444,16 +1326,48 @@ type PageOnEvent struct {
 // On subscribes to a page event for which the given handler will be executed
 // passing in the ConsoleMessage associated with the event.
 // The only accepted event value is 'console'.
-func (p *Page) On(event PageOnEventName, handler PageOnHandler) error {
+func (p *Page) On(event PageEventName, handler PageEventHandler) error {
+	_, err := p.addEventHandler(event, handler)
+	return err
+}
+
+func (p *Page) addEventHandler(event PageEventName, handler PageEventHandler) (id uint64, err error) {
 	p.eventHandlersMu.Lock()
 	defer p.eventHandlersMu.Unlock()
 
-	if _, ok := p.eventHandlers[event]; !ok {
-		p.eventHandlers[event] = make([]PageOnHandler, 0, 1)
+	r := pageEventHandlerRecord{
+		id:      p.eventHandlerLastID.Add(1),
+		handler: handler,
 	}
-	p.eventHandlers[event] = append(p.eventHandlers[event], handler)
+	p.eventHandlers[event] = append(p.eventHandlers[event], r)
 
-	return nil
+	return r.id, nil
+}
+
+func (p *Page) removeEventHandler(event PageEventName, id uint64) {
+	p.eventHandlersMu.Lock()
+	defer p.eventHandlersMu.Unlock()
+
+	handlers, ok := p.eventHandlers[event]
+	if !ok {
+		p.logger.Debugf("Page:removeEventHandler", "sid:%v event:%s not found", p.sessionID(), event)
+		return
+	}
+	p.eventHandlers[event] = slices.DeleteFunc(handlers, func(r pageEventHandlerRecord) bool {
+		return r.id == id
+	})
+	if len(p.eventHandlers[event]) == 0 {
+		delete(p.eventHandlers, event)
+	}
+}
+
+// hasEventHandler returns true if there is a handler
+// registered for the given page on event name.
+func (p *Page) hasEventHandler(event PageEventName) bool {
+	p.eventHandlersMu.RLock()
+	defer p.eventHandlersMu.RUnlock()
+	handlers, ok := p.eventHandlers[event]
+	return ok && len(handlers) > 0
 }
 
 // Opener returns the opener of the target.
@@ -1762,16 +1676,13 @@ func (p *Page) WaitForLoadState(state string, popts *FrameWaitForLoadStateOption
 }
 
 // WaitForNavigation waits for the given navigation lifecycle event to happen.
-// jsRegexChecker should be non-nil to be able to test against a URL pattern in the options.
-func (p *Page) WaitForNavigation(
-	opts *FrameWaitForNavigationOptions,
-	jsRegexChecker JSRegexChecker,
-) (*Response, error) {
+// RegExMatcher should be non-nil to be able to test against a URL pattern in the options.
+func (p *Page) WaitForNavigation(opts *FrameWaitForNavigationOptions, rm RegExMatcher) (*Response, error) {
 	p.logger.Debugf("Page:WaitForNavigation", "sid:%v", p.sessionID())
 	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.waitForNavigation")
 	defer span.End()
 
-	resp, err := p.frameManager.MainFrame().WaitForNavigation(opts, jsRegexChecker)
+	resp, err := p.frameManager.MainFrame().WaitForNavigation(opts, rm)
 	if err != nil {
 		spanRecordError(span, err)
 		return nil, err
@@ -1800,13 +1711,13 @@ func (p *Page) WaitForTimeout(timeout int64) {
 }
 
 // WaitForURL waits for the page to navigate to a URL matching the given pattern.
-// jsRegexChecker should be non-nil to be able to test against a URL pattern.
-func (p *Page) WaitForURL(urlPattern string, opts *FrameWaitForURLOptions, jsRegexChecker JSRegexChecker) error {
+// RegExMatcher should be non-nil to be able to test against a URL pattern.
+func (p *Page) WaitForURL(urlPattern string, opts *FrameWaitForURLOptions, rm RegExMatcher) error {
 	p.logger.Debugf("Page:WaitForURL", "sid:%v pattern:%s", p.sessionID(), urlPattern)
 	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.waitForURL")
 	defer span.End()
 
-	err := p.frameManager.MainFrame().WaitForURL(urlPattern, opts, jsRegexChecker)
+	err := p.frameManager.MainFrame().WaitForURL(urlPattern, opts, rm)
 	if err != nil {
 		spanRecordError(span, err)
 		return err
@@ -1815,35 +1726,124 @@ func (p *Page) WaitForURL(urlPattern string, opts *FrameWaitForURLOptions, jsReg
 	return nil
 }
 
+// eventHandlersByName returns a single-use iterator that yields all event handlers
+// registered for the given event name. If there are no handlers registered, it
+// returns an empty iterator. The iterator is safe for concurrent use.
+func (p *Page) eventHandlersByName(evn PageEventName) iter.Seq[PageEventHandler] {
+	return func(yield func(PageEventHandler) bool) {
+		if !p.hasEventHandler(evn) {
+			return
+		}
+
+		// Avoid holding locks while running handlers (which might
+		// register/unregister handlers and thus attempt to acquire the
+		// write lock), and prevents concurrent modification issues.
+		p.eventHandlersMu.RLock()
+		handlers := slices.Clone(p.eventHandlers[evn])
+		p.eventHandlersMu.RUnlock()
+
+		for _, next := range handlers {
+			if !yield(next.handler) {
+				return
+			}
+		}
+	}
+}
+
+// waitForEvent subscribes to the given event and resolves once the predicate
+// determines an event should complete the wait or terminate with an error.
+func (p *Page) waitForEvent(
+	ctx context.Context,
+	eventName PageEventName,
+	predicate func(PageEvent) (bool, error),
+) (_ PageEvent, rerr error) {
+	defer func() {
+		if rerr != nil {
+			rerr = fmt.Errorf("waiting for page %s event: %w", eventName, rerr)
+		}
+	}()
+
+	type pageEventWaitResult struct {
+		event PageEvent
+		err   error
+	}
+
+	var (
+		once   sync.Once
+		result = make(chan pageEventWaitResult, 1)
+	)
+	id, err := p.addEventHandler(eventName, func(event PageEvent) error {
+		ok, perr := predicate(event)
+		if perr == nil && !ok {
+			return nil
+		}
+		// We don't want to deadlock if another event frequently happens.
+		// Although the channel is buffered and we remove the handler once we get
+		// the first event, another event could happen before we remove the handler.
+		once.Do(func() { result <- pageEventWaitResult{event: event, err: perr} })
+		return perr
+	})
+	if err != nil {
+		return PageEvent{}, err
+	}
+	// Avoids dangling event handlers after we're done.
+	defer p.removeEventHandler(eventName, id)
+
+	select {
+	case r := <-result:
+		return r.event, r.err
+	case <-ctx.Done():
+		return PageEvent{}, ctx.Err()
+	}
+}
+
 // WaitForResponse waits for a response that matches the given URL pattern.
-// jsRegexChecker should be non-nil to be able to test against a URL pattern.
+// RegExMatcher should be non-nil to be able to test against a URL pattern.
 func (p *Page) WaitForResponse(
-	urlOrRegex string, opts *PageWaitForResponseOptions, jsRegexChecker JSRegexChecker,
+	urlPattern string, opts *PageWaitForResponseOptions, rm RegExMatcher,
 ) (*Response, error) {
-	p.logger.Debugf("Page:WaitForResponse", "sid:%v pattern:%s", p.sessionID(), urlOrRegex)
+	p.logger.Debugf("Page:WaitForResponse", "sid:%v pattern:%s", p.sessionID(), urlPattern)
 	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.waitForResponse")
 	defer span.End()
 
-	timeoutCtx, timeoutCancel := context.WithTimeout(p.ctx, opts.Timeout)
-	defer timeoutCancel()
+	ctx, cancel := context.WithTimeout(p.ctx, opts.Timeout)
+	defer cancel()
 
-	matcher, err := urlMatcher(urlOrRegex, jsRegexChecker)
+	ev, err := p.waitForEvent(ctx, PageEventResponse, func(e PageEvent) (bool, error) {
+		return rm.Match(urlPattern, e.Response.URL())
+	})
 	if err != nil {
+		err = &k6ext.UserFriendlyError{Err: err, Timeout: opts.Timeout}
 		spanRecordError(span, err)
-		return nil, fmt.Errorf("parsing URL pattern: %w", err)
 	}
+	return ev.Response, err
+}
 
-	resp, err := p.responseEventHandler.waitForMatch(timeoutCtx, matcher)
+// PageWaitForRequestOptions are options for [Page.WaitForRequest].
+type PageWaitForRequestOptions struct {
+	// Timeout is the maximum time to wait for the request.
+	Timeout time.Duration
+}
+
+// WaitForRequest waits for a request that matches the given URL pattern.
+func (p *Page) WaitForRequest(
+	urlPattern string, opts *PageWaitForRequestOptions, rm RegExMatcher,
+) (*Request, error) {
+	p.logger.Debugf("Page:waitForRequest", "sid:%v pattern:%s", p.sessionID(), urlPattern)
+	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.waitForRequest")
+	defer span.End()
+
+	ctx, cancel := context.WithTimeout(p.ctx, opts.Timeout)
+	defer cancel()
+
+	ev, err := p.waitForEvent(ctx, PageEventRequest, func(e PageEvent) (bool, error) {
+		return rm.Match(urlPattern, e.Request.URL())
+	})
 	if err != nil {
-		e := &k6ext.UserFriendlyError{
-			Err:     err,
-			Timeout: opts.Timeout,
-		}
-		err = fmt.Errorf("waiting for response %q: %w", urlOrRegex, e)
+		err = &k6ext.UserFriendlyError{Err: err, Timeout: opts.Timeout}
 		spanRecordError(span, err)
-		return nil, err
 	}
-	return resp, nil
+	return ev.Request, err
 }
 
 // Workers returns all WebWorkers of page.

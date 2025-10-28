@@ -83,7 +83,7 @@ func TestElementHandleBoundingBoxInvisibleElementWithMapper(t *testing.T) {
 
 	got := tb.vu.RunPromise(t, `
 		const p = await browser.newPage();
-		
+
 		await p.setContent('<div style="display:none">hello</div>');
 
 		const element = await p.$("div");
@@ -391,7 +391,7 @@ func TestElementHandleQueryAll(t *testing.T) {
 	t.Parallel()
 
 	const (
-		wantLiLen = 2
+		wantLiLen = 3
 		query     = "li.ali"
 	)
 
@@ -400,9 +400,18 @@ func TestElementHandleQueryAll(t *testing.T) {
 		<ul id="aul">
 			<li class="ali">1</li>
 			<li class="ali">2</li>
+			<li class="ali">3</li>
 		</ul>
   	`, nil)
 	require.NoError(t, err)
+
+	assertTextContent := func(t *testing.T, e *common.ElementHandle, wantContent string) {
+		t.Helper()
+		text, ok, err := e.TextContent()
+		require.NoError(t, err)
+		require.True(t, ok)
+		assert.Equal(t, wantContent, text)
+	}
 
 	t.Run("element_handle", func(t *testing.T) { //nolint:paralleltest
 		el, err := p.Query("#aul")
@@ -410,19 +419,26 @@ func TestElementHandleQueryAll(t *testing.T) {
 
 		els, err := el.QueryAll(query)
 		require.NoError(t, err)
-
-		assert.Equal(t, wantLiLen, len(els))
+		require.Len(t, els, wantLiLen)
+		assertTextContent(t, els[0], "1")
+		assertTextContent(t, els[1], "2")
+		assertTextContent(t, els[2], "3")
 	})
 	t.Run("page", func(t *testing.T) { //nolint:paralleltest
 		els, err := p.QueryAll(query)
 		require.NoError(t, err)
-
-		assert.Equal(t, wantLiLen, len(els))
+		require.Len(t, els, wantLiLen)
+		assertTextContent(t, els[0], "1")
+		assertTextContent(t, els[1], "2")
+		assertTextContent(t, els[2], "3")
 	})
 	t.Run("frame", func(t *testing.T) { //nolint:paralleltest
 		els, err := p.MainFrame().QueryAll(query)
 		require.NoError(t, err)
-		assert.Equal(t, wantLiLen, len(els))
+		require.Len(t, els, wantLiLen)
+		assertTextContent(t, els[0], "1")
+		assertTextContent(t, els[1], "2")
+		assertTextContent(t, els[2], "3")
 	})
 }
 

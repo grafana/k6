@@ -185,28 +185,31 @@ jobs:
             -t $DOCKER_IMAGE_ID .
       - name: Check
         run: |
-            docker buildx build --load -t $DOCKER_IMAGE_ID .
-            # Assert that simple cases works for the new built image
-            docker run $DOCKER_IMAGE_ID version
-            docker run $DOCKER_IMAGE_ID --help
-            docker run $DOCKER_IMAGE_ID help
-            docker run $DOCKER_IMAGE_ID run --help
-            docker run $DOCKER_IMAGE_ID inspect --help
-            docker run $DOCKER_IMAGE_ID status --help
-            docker run $DOCKER_IMAGE_ID stats --help
-            docker run $DOCKER_IMAGE_ID scale --help
-            docker run $DOCKER_IMAGE_ID pause --help
-            docker run $DOCKER_IMAGE_ID resume --help
+          docker buildx build --load -t $DOCKER_IMAGE_ID .
+          # Assert that simple cases works for the new built image
+          docker run $DOCKER_IMAGE_ID version
+          docker run $DOCKER_IMAGE_ID --help
+          docker run $DOCKER_IMAGE_ID help
+          docker run $DOCKER_IMAGE_ID run --help
+          docker run $DOCKER_IMAGE_ID inspect --help
+          docker run $DOCKER_IMAGE_ID status --help
+          docker run $DOCKER_IMAGE_ID stats --help
+          docker run $DOCKER_IMAGE_ID scale --help
+          docker run $DOCKER_IMAGE_ID pause --help
+          docker run $DOCKER_IMAGE_ID resume --help
       - name: Login to DockerHub
         if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') }}
         uses: grafana/shared-workflows/actions/dockerhub-login@c6d954f7cd9c0022018982e01268de6cb75b913c # dockerhub-login/v1.0.2
-      - name: Login to ghcr.io
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
         env:
           GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          registry: ghcr.io
+          username: ${{ env.GITHUB_ACTOR }}
+          password: ${{ env.GITHUB_TOKEN }}
         if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') }}
-        run: |
-          # Log into GitHub Container Registry
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login https://ghcr.io -u ${GITHUB_ACTOR} --password-stdin
       - name: Publish k6:master images
         if: ${{ github.ref == 'refs/heads/master' }}
         run: |
@@ -592,11 +595,14 @@ jobs:
           S3_BUCKET=${S3_BUCKET}
           EOF
           echo "${PGP_SIGN_KEY}" > packaging/sign-key.gpg
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ env.GITHUB_ACTOR }}
+          password: ${{ env.GITHUB_TOKEN }}
       - name: Publish packages
-        env:
-          GITHUB_ACTOR: ${{ github.actor }}
         run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login https://ghcr.io -u ${GITHUB_ACTOR} --password-stdin
           cd packaging
           docker compose pull packager
           docker compose run --rm packager

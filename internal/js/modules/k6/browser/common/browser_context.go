@@ -16,10 +16,7 @@ import (
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/common/js"
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6error"
-	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
 	"go.k6.io/k6/internal/js/modules/k6/browser/log"
-
-	k6modules "go.k6.io/k6/js/modules"
 )
 
 // waitForEventType represents the event types that can be used when working
@@ -81,7 +78,6 @@ type BrowserContext struct {
 	opts            *BrowserContextOptions
 	timeoutSettings *TimeoutSettings
 	logger          *log.Logger
-	vu              k6modules.VU
 
 	evaluateOnNewDocumentSources []string
 
@@ -141,7 +137,6 @@ func NewBrowserContext(
 		id:               id,
 		opts:             opts,
 		logger:           logger,
-		vu:               k6ext.GetVU(ctx),
 		timeoutSettings:  NewTimeoutSettings(nil),
 	}
 

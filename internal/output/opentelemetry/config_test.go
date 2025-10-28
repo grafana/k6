@@ -25,7 +25,7 @@ func TestConfig(t *testing.T) {
 			expectedConfig: Config{
 				ServiceName:          null.StringFrom("k6"),
 				ServiceVersion:       null.StringFrom(build.Version),
-				ExporterType:         null.StringFrom(grpcExporterType),
+				ExporterProtocol:     null.NewString(grpcExporterProtocol, false),
 				HTTPExporterInsecure: null.BoolFrom(false),
 				HTTPExporterEndpoint: null.StringFrom("localhost:4318"),
 				HTTPExporterURLPath:  null.StringFrom("/v1/metrics"),
@@ -42,7 +42,7 @@ func TestConfig(t *testing.T) {
 			expectedConfig: Config{
 				ServiceName:          null.StringFrom("k6"),
 				ServiceVersion:       null.StringFrom(build.Version),
-				ExporterType:         null.StringFrom(grpcExporterType),
+				ExporterProtocol:     null.NewString(grpcExporterProtocol, false),
 				HTTPExporterInsecure: null.NewBool(false, true),
 				HTTPExporterEndpoint: null.StringFrom("localhost:4318"),
 				HTTPExporterURLPath:  null.StringFrom("/v1/metrics"),
@@ -59,6 +59,7 @@ func TestConfig(t *testing.T) {
 				"K6_OTEL_SERVICE_NAME":             "foo",
 				"K6_OTEL_SERVICE_VERSION":          "v0.0.99",
 				"K6_OTEL_EXPORTER_TYPE":            "http",
+				"K6_OTEL_EXPORTER_PROTOCOL":        "http/protobuf",
 				"K6_OTEL_EXPORT_INTERVAL":          "4ms",
 				"K6_OTEL_HTTP_EXPORTER_INSECURE":   "true",
 				"K6_OTEL_HTTP_EXPORTER_ENDPOINT":   "localhost:5555",
@@ -77,6 +78,7 @@ func TestConfig(t *testing.T) {
 				ServiceName:           null.StringFrom("foo"),
 				ServiceVersion:        null.StringFrom("v0.0.99"),
 				ExporterType:          null.StringFrom(httpExporterType),
+				ExporterProtocol:      null.StringFrom(httpExporterProtocol),
 				ExportInterval:        types.NullDurationFrom(4 * time.Millisecond),
 				HTTPExporterInsecure:  null.NewBool(true, true),
 				HTTPExporterEndpoint:  null.StringFrom("localhost:5555"),
@@ -100,7 +102,7 @@ func TestConfig(t *testing.T) {
 			expectedConfig: Config{
 				ServiceName:          null.StringFrom("otel-service"),
 				ServiceVersion:       null.StringFrom(build.Version),
-				ExporterType:         null.StringFrom(grpcExporterType),
+				ExporterProtocol:     null.NewString(grpcExporterProtocol, false),
 				HTTPExporterInsecure: null.NewBool(false, true),
 				HTTPExporterEndpoint: null.StringFrom("localhost:4318"),
 				HTTPExporterURLPath:  null.StringFrom("/v1/metrics"),
@@ -118,6 +120,7 @@ func TestConfig(t *testing.T) {
 					`"serviceName":"bar",` +
 					`"serviceVersion":"v2.0.99",` +
 					`"exporterType":"http",` +
+					`"exporterProtocol":"http/protobuf",` +
 					`"exportInterval":"15ms",` +
 					`"httpExporterInsecure":true,` +
 					`"httpExporterEndpoint":"localhost:5555",` +
@@ -137,6 +140,7 @@ func TestConfig(t *testing.T) {
 				ServiceName:           null.StringFrom("bar"),
 				ServiceVersion:        null.StringFrom("v2.0.99"),
 				ExporterType:          null.StringFrom(httpExporterType),
+				ExporterProtocol:      null.StringFrom(httpExporterProtocol),
 				ExportInterval:        types.NullDurationFrom(15 * time.Millisecond),
 				HTTPExporterInsecure:  null.NewBool(true, true),
 				HTTPExporterEndpoint:  null.StringFrom("localhost:5555"),
@@ -154,11 +158,12 @@ func TestConfig(t *testing.T) {
 		},
 
 		"JSON success merge": {
-			jsonRaw: json.RawMessage(`{"exporterType":"http","httpExporterEndpoint":"localhost:5566","httpExporterURLPath":"/lorem/ipsum", "exportInterval":"15ms"}`),
+			jsonRaw: json.RawMessage(`{"exporterType":"http","httpExporterEndpoint":"localhost:5566","httpExporterURLPath":"/lorem/ipsum","exportInterval":"15ms"}`),
 			expectedConfig: Config{
 				ServiceName:          null.StringFrom("k6"),
 				ServiceVersion:       null.StringFrom(build.Version),
 				ExporterType:         null.StringFrom(httpExporterType),
+				ExporterProtocol:     null.NewString(grpcExporterType, false),
 				HTTPExporterInsecure: null.NewBool(false, true),
 				HTTPExporterEndpoint: null.StringFrom("localhost:5566"),
 				HTTPExporterURLPath:  null.StringFrom("/lorem/ipsum"),
@@ -169,7 +174,12 @@ func TestConfig(t *testing.T) {
 				SingleCounterForRate: null.BoolFrom(true),
 			},
 		},
-		"no scheme in http exporter": {
+		"no scheme in http exporter protocol": {
+			jsonRaw: json.RawMessage(`{"exporterProtocol":"http/protobuf","httpExporterEndpoint":"http://localhost:5566","httpExporterURLPath":"/lorem/ipsum", "exportInterval":"15ms"}`),
+			err:     `config: HTTP exporter endpoint must only be host and port, no scheme`,
+		},
+
+		"no scheme in http exporter type": {
 			jsonRaw: json.RawMessage(`{"exporterType":"http","httpExporterEndpoint":"http://localhost:5566","httpExporterURLPath":"/lorem/ipsum", "exportInterval":"15ms"}`),
 			err:     `config: HTTP exporter endpoint must only be host and port, no scheme`,
 		},
@@ -184,9 +194,14 @@ func TestConfig(t *testing.T) {
 			err:     `time: unknown unit "something" in duration "4something"`,
 		},
 
-		"unsupported receiver type": {
+		"unsupported exporter type": {
 			env: map[string]string{"K6_OTEL_GRPC_EXPORTER_ENDPOINT": "else", "K6_OTEL_EXPORT_INTERVAL": "4m", "K6_OTEL_EXPORTER_TYPE": "socket"},
-			err: `error validating OpenTelemetry output config: unsupported exporter type "socket", currently only "grpc" and "http" are supported`,
+			err: `error validating OpenTelemetry output config: unsupported exporter type "socket", only "grpc" and "http" are supported`,
+		},
+
+		"unsupported exporter protocol": {
+			env: map[string]string{"K6_OTEL_GRPC_EXPORTER_ENDPOINT": "else", "K6_OTEL_EXPORT_INTERVAL": "4m", "K6_OTEL_EXPORTER_PROTOCOL": "socket"},
+			err: `error validating OpenTelemetry output config: unsupported exporter protocol "socket", only "grpc" and "http/protobuf" are supported`,
 		},
 
 		"missing required": {
