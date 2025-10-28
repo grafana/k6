@@ -545,15 +545,35 @@ func (l *Locator) PressSequentially(text string, opts *FramePressOptions) error 
 
 	opts.Strict = true
 
-	for _, char := range text {
+	focusOpts := NewFrameBaseOptions(l.frame.defaultTimeout())
+	if opts.Timeout != 0 {
+		focusOpts.Timeout = opts.Timeout
+	}
+
+	if err := l.Focus(focusOpts); err != nil {
+		err := fmt.Errorf("focusing before typing: %w", err)
+		spanRecordError(span, err)
+		return err
+	}
+
+	for i, char := range text {
+		select {
+		case <-l.ctx.Done():
+			err := fmt.Errorf("cancelled at char %d/%d: %w", i+1, len(text), l.ctx.Err())
+			spanRecordError(span, err)
+			return err
+		default:
+		}
+
 		if err := l.frame.press(l.selector, string(char), opts); err != nil {
-			err := fmt.Errorf("pressing character %q sequentially: %w", char, err)
+			err := fmt.Errorf("pressing %q at %d/%d: %w", char, i+1, len(text), err)
 			spanRecordError(span, err)
 			return err
 		}
+
 		applySlowMo(l.ctx)
 	}
-
+	time.Sleep(200 * time.Millisecond)
 	return nil
 }
 
