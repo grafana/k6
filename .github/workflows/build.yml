@@ -207,8 +207,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           registry: ghcr.io
-          username: ${ GITHUB_ACTOR }
-          password: ${ GITHUB_TOKEN }
+          username: ${{ env.GITHUB_ACTOR }}
+          password: ${{ env.GITHUB_TOKEN }}
         if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') }}
       - name: Publish k6:master images
         if: ${{ github.ref == 'refs/heads/master' }}
@@ -599,8 +599,8 @@ jobs:
         uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
         with:
           registry: ghcr.io
-          username: ${ GITHUB_ACTOR }
-          password: ${ GITHUB_TOKEN }
+          username: ${{ env.GITHUB_ACTOR }}
+          password: ${{ env.GITHUB_TOKEN }}
       - name: Publish packages
         run: |
           cd packaging
