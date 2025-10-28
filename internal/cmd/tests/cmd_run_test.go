@@ -2249,14 +2249,14 @@ func TestEventSystemError(t *testing.T) {
 					test.abort('oops!');
 				}
 		`, expLog: []string{
-				"got event Init with data '<nil>'",
-				"got event TestStart with data '<nil>'",
-				"got event IterStart with data '{Iteration:0 VUID:1 ScenarioName:default Error:<nil>}'",
-				"got event IterEnd with data '{Iteration:0 VUID:1 ScenarioName:default Error:test aborted: oops! at default (file:///-:11:16(5))}'",
-				"got event TestEnd with data '<nil>'",
-				"got event Exit with data '&{Error:test aborted: oops! at default (file:///-:11:16(5))}'",
-				"test aborted: oops! at default (file:///-:11:16(5))",
-			},
+			"got event Init with data '<nil>'",
+			"got event TestStart with data '<nil>'",
+			"got event IterStart with data '{Iteration:0 VUID:1 ScenarioName:default Error:<nil>}'",
+			"got event IterEnd with data '{Iteration:0 VUID:1 ScenarioName:default Error:test aborted: oops! at default (file:///-:11:16(5))}'",
+			"got event TestEnd with data '<nil>'",
+			"got event Exit with data '&{Error:test aborted: oops! at default (file:///-:11:16(5))}'",
+			"test aborted: oops! at default (file:///-:11:16(5))",
+		},
 			expExitCode: exitcodes.ScriptAborted,
 		},
 		{
@@ -2281,17 +2281,17 @@ func TestEventSystemError(t *testing.T) {
 					throw new Error('oops!');
 				}
 		`, expLog: []string{
-				"got event Init with data '<nil>'",
-				"got event TestStart with data '<nil>'",
-				"got event IterStart with data '{Iteration:0 VUID:1 ScenarioName:default Error:<nil>}'",
-				"got event IterEnd with data '{Iteration:0 VUID:1 ScenarioName:default Error:Error: oops!\n\tat default (file:///-:9:12(3))\n}'",
-				"Error: oops!\n\tat default (file:///-:9:12(3))\n",
-				"got event IterStart with data '{Iteration:1 VUID:1 ScenarioName:default Error:<nil>}'",
-				"got event IterEnd with data '{Iteration:1 VUID:1 ScenarioName:default Error:Error: oops!\n\tat default (file:///-:9:12(3))\n}'",
-				"Error: oops!\n\tat default (file:///-:9:12(3))\n",
-				"got event TestEnd with data '<nil>'",
-				"got event Exit with data '&{Error:<nil>}'",
-			},
+			"got event Init with data '<nil>'",
+			"got event TestStart with data '<nil>'",
+			"got event IterStart with data '{Iteration:0 VUID:1 ScenarioName:default Error:<nil>}'",
+			"got event IterEnd with data '{Iteration:0 VUID:1 ScenarioName:default Error:Error: oops!\n\tat default (file:///-:9:12(3))\n}'",
+			"Error: oops!\n\tat default (file:///-:9:12(3))\n",
+			"got event IterStart with data '{Iteration:1 VUID:1 ScenarioName:default Error:<nil>}'",
+			"got event IterEnd with data '{Iteration:1 VUID:1 ScenarioName:default Error:Error: oops!\n\tat default (file:///-:9:12(3))\n}'",
+			"Error: oops!\n\tat default (file:///-:9:12(3))\n",
+			"got event TestEnd with data '<nil>'",
+			"got event Exit with data '&{Error:<nil>}'",
+		},
 			expExitCode: 0,
 		},
 	}
@@ -2998,7 +2998,7 @@ func TestMachineReadableSummary(t *testing.T) {
 
 		// Metadata block: generated_at is dynamic.
 		metadataPattern := `"metadata": \{
-        "generated_at": "\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+[+-]\d{2}:\d{2}",
+        "generated_at": "\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+(Z|[+-]\d{2}:\d{2})",
         "k6_version": "` + regexp.QuoteMeta(build.Version) + `"
     \}`
 		assert.Regexp(t, regexp.MustCompile(metadataPattern), out)
