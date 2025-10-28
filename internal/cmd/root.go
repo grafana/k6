@@ -151,7 +151,7 @@ func (c *rootCommand) execute() {
 		return
 	}
 
-	newExitCode, err := handleNotSatisfiedDependancies(err, c)
+	newExitCode, err := handleUnsatisfiedDependencies(err, c)
 
 	if err == nil {
 		exitCode = int(newExitCode)
@@ -174,7 +174,7 @@ func (c *rootCommand) execute() {
 	}
 }
 
-func handleNotSatisfiedDependancies(err error, c *rootCommand) (exitcodes.ExitCode, error) {
+func handleUnsatisfiedDependencies(err error, c *rootCommand) (exitcodes.ExitCode, error) {
 	var unsatisfiedDependenciesErr binaryIsNotSatisfyingDependenciesError
 
 	if !errors.As(err, &unsatisfiedDependenciesErr) {
