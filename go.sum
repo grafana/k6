@@ -86,8 +86,6 @@ github.com/gorilla/websocket v1.5.3 h1:saDtZ6Pbx/0u+bgYQ3q96pZgCzfhKXGPqt7kZ72aN
 github.com/gorilla/websocket v1.5.3/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
 github.com/grafana/k6build v0.5.15 h1:4I5dkAWSMvXsElS1OpLbHj6ZXnebXZGnmwDXy5vcwSQ=
 github.com/grafana/k6build v0.5.15/go.mod h1:Sk7SUiCnx2AgkirG3PrCtmJKYL+a8EeRdTzFfbxP0X8=
-github.com/grafana/k6deps v0.5.1 h1:ms0aYBtKn9RDPoe5wtDz+aWCFlztTXmYaRy0vSNsuz4=
-github.com/grafana/k6deps v0.5.1/go.mod h1:p3W43yCKahrtuGXMK3S6QFrv0oEzGxzTSVrcnoOcACI=
 github.com/grafana/k6foundry v0.4.7 h1:1YXkTBwO/2dSx0pqJrraJATsFlsIX0vEpaEjV7E35w4=
 github.com/grafana/k6foundry v0.4.7/go.mod h1:eLsr0whhH+5Y1y7YpDxJi3Jv5wHMuf+80vdRyMH10pg=
 github.com/grafana/k6provider v0.2.0 h1:Zu8FBnk6cJyTTkpCA+y+Ravc2YFeAQjsIfPpcbZtfB0=
