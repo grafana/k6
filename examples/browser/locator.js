@@ -39,10 +39,10 @@ export default async function() {
     locator across frame navigations. Let's create two locators;
     each locates a button on the page.
     */
-    const heads = page.locator("input[value='Bet on heads!']");
-    const tails = page.locator("input[value='Bet on tails!']");
+    const heads = page.getByRole("button", { name: "Bet on heads!" });
+    const tails = page.getByRole("button", { name: "Bet on tails!" });
 
-    const currentBet = page.locator("//p[starts-with(text(),'Your bet: ')]");
+    const currentBet = page.getByText(/Your bet\: .*/);
 
     // In the following Promise.all the tails locator clicks
     // on the tails button by using the locator's selector.

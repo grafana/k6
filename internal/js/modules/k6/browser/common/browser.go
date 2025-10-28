@@ -370,7 +370,7 @@ func (b *Browser) isAttachedPageValid(ev *target.EventAttachedToTarget, browserC
 	}
 	pageType := targetPage.Type
 	if pageType != "page" && pageType != "background_page" {
-		b.logger.Warnf(
+		b.logger.Debugf(
 			"Browser:isAttachedPageValid", "sid:%v tid:%v bctxid:%v bctx nil:%t, unknown target type: %q",
 			ev.SessionID, targetPage.TargetID, targetPage.BrowserContextID, browserCtx == nil, targetPage.Type)
 		return false

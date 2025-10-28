@@ -174,13 +174,22 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		return err
 	}
 
+	summaryMode, summaryEnabled, err := getSummaryMode(testRunState.RuntimeOptions)
+	if err != nil {
+		// Theoretically, this should never happen, as we already verify whether the summary
+		// mode is valid while parsing the runtime options, but just in case it happens, we
+		// want to abort the execution anyway.
+		return err
+	}
+
+	thresholdsEnabled := !testRunState.RuntimeOptions.NoThresholds.Bool
+
 	// We'll need to pipe metrics to the MetricsEngine and process them if any
 	// of these are enabled: thresholds, end-of-test summary
-	shouldProcessMetrics := !testRunState.RuntimeOptions.NoSummary.Bool ||
-		!testRunState.RuntimeOptions.NoThresholds.Bool
+	shouldProcessMetrics := summaryEnabled || thresholdsEnabled
 	var metricsIngester *engine.OutputIngester
 	if shouldProcessMetrics {
-		err = metricsEngine.InitSubMetricsAndThresholds(conf.Options, testRunState.RuntimeOptions.NoThresholds.Bool)
+		err = metricsEngine.InitSubMetricsAndThresholds(conf.Options, !thresholdsEnabled)
 		if err != nil {
 			return err
 		}
@@ -191,7 +200,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	executionState := execScheduler.GetState()
-	if !testRunState.RuntimeOptions.NoSummary.Bool { //nolint:nestif
+	if summaryEnabled { //nolint:nestif
 		// Despite having the revamped [summary.Summary], we still keep the use of the
 		// [lib.LegacySummary] for multiple backwards compatibility options,
 		// to be deprecated by v1.0 and likely removed or replaced by v2.0:
@@ -211,17 +220,11 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 			}
 		}
 
-		sm, err := summary.ValidateMode(testRunState.RuntimeOptions.SummaryMode.String)
-		if err != nil {
-			logger.WithError(err).Warnf(
-				"invalid summary mode %q, falling back to \"compact\" (default)",
-				testRunState.RuntimeOptions.SummaryMode.String,
-			)
-		}
-
-		switch sm {
-		// TODO: Remove this code block once we stop supporting the legacy summary, and just leave the default.
+		switch summaryMode {
+		// TODO(@joanlopez): remove by k6 v2.0, once we completely drop the support for --summary-mode=legacy.
 		case summary.ModeLegacy:
+			logger.Warn(`The "legacy" summary mode has been deprecated, and will be removed by k6 v2.0. ` +
+				`Please, migrate to either "compact" or "full" as soon as possible.`)
 			// At the end of the test run
 			defer func() {
 				logger.Debug("Generating the end-of-test summary...")
@@ -347,7 +350,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		stopOutputs(err)
 	}()
 
-	if !testRunState.RuntimeOptions.NoThresholds.Bool {
+	if thresholdsEnabled {
 		finalizeThresholds := metricsEngine.StartThresholdCalculations(
 			metricsIngester, runAbort, executionState.GetCurrentTestRunDuration,
 		)
@@ -502,6 +505,19 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	logger.Debug("Test finished cleanly")
 
 	return nil
+}
+
+func getSummaryMode(runtimeOptions lib.RuntimeOptions) (summary.Mode, bool, error) {
+	if runtimeOptions.NoSummary.Bool {
+		return summary.ModeDisabled, false, nil
+	}
+
+	sm, err := summary.ValidateMode(runtimeOptions.SummaryMode.String)
+	if err != nil {
+		return summary.ModeDisabled, false, err
+	}
+
+	return sm, sm != summary.ModeDisabled, nil
 }
 
 func (c *cmdRun) flagSet() *pflag.FlagSet {

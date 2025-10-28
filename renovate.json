@@ -1,0 +1,107 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "schedule:weekly"
+  ],
+  "prConcurrentLimit": 50,
+  "packageRules": [
+    {
+      "description": "GitHub Actions",
+      "matchManagers": [
+        "github-actions"
+      ]
+    },
+    {
+      "description": "Enable gomod updates with common options",
+      "matchManagers": [
+        "gomod"
+      ],
+      "enabled": true,
+      "postUpdateOptions": [
+        "gomodTidy",
+        "gomodUpdateImportPaths"
+      ]
+    },
+    {
+      "description": "Update Go versions only when a patch version exists (z > 0 in v1.x.z)",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchPackageNames": [
+        "go"
+      ],
+      "allowedVersions": "/^(?:v)?\\d+\\.\\d+\\.[1-9]\\d*$/"
+    },
+    {
+      "groupName": "golangx",
+      "description": "Group golang.org/x modules",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchPackageNames": [
+        "/^golang\\.org/x//"
+      ]
+    },
+    {
+      "groupName": "googles",
+      "description": "Group google.golang.org modules",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchPackageNames": [
+        "/^google\\.golang\\.org//"
+      ]
+    },
+    {
+      "groupName": "otel",
+      "description": "Group OpenTelemetry modules",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchPackageNames": [
+        "/^go\\.opentelemetry\\.io//"
+      ]
+    },
+    {
+      "description": "Disable list for frozen Go modules - see Dependencies.md and modtools_frozen.yml",
+      "matchManagers": [
+        "gomod"
+      ],
+      "enabled": false,
+      "matchPackageNames": [
+        "github.com/andybalholm/cascadia",
+        "github.com/sirupsen/logrus",
+        "github.com/spf13/afero",
+        "github.com/spf13/cobra",
+        "github.com/spf13/pflag",
+        "github.com/influxdata/influxdb1-client",
+        "gopkg.in/guregu/null.v3",
+        "gopkg.in/yaml.v3"
+      ]
+    },
+    {
+      "description": "k6 dockerfiles",
+      "matchManagers": [
+        "docker"
+      ],
+      "ignorePaths": [
+        "packaging/**"
+      ],
+      "extends": [
+        "schedule:monthly"
+      ]
+    },
+    {
+      "description": "Dockerfiles packaging tool",
+      "matchManagers": [
+        "docker"
+      ],
+      "matchFileNames": [
+        "packaging/**"
+      ],
+      "extends": [
+        "schedule:quarterly"
+      ]
+    }
+  ]
+}

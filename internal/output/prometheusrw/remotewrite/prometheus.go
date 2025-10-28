@@ -1,7 +1,8 @@
 package remotewrite
 
 import (
-	"sort"
+	"cmp"
+	"slices"
 
 	prompb "buf.build/gen/go/prometheus/prometheus/protocolbuffers/go"
 	"github.com/mstoykov/atlas"
@@ -45,8 +46,8 @@ func MapSeries(series metrics.TimeSeries, suffix string) []*prompb.Label {
 		Name:  namelbl,
 		Value: v,
 	})
-	sort.Slice(lbls, func(i int, j int) bool {
-		return lbls[i].Name < lbls[j].Name
+	slices.SortStableFunc(lbls, func(i, j *prompb.Label) int {
+		return cmp.Compare(i.Name, j.Name)
 	})
 	return lbls
 }

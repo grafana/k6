@@ -67,15 +67,29 @@ func TestOutputConvertToPbSeries(t *testing.T) {
 			Time:  time.Date(2022, time.September, 1, 0, 0, 0, 0, time.UTC),
 			Value: 7,
 		},
+		metrics.Sample{
+			TimeSeries: metrics.TimeSeries{
+				Metric: registry.MustNewMetric("metric4", metrics.Trend),
+				Tags: registry.RootTagSet().WithTagsFromMap(tagset.Map()).
+					With("We_need", "value").
+					With("a_long", "value").
+					With("list_of", "value").
+					With("tags_to", "value").
+					With("reproduce_5175", "value"),
+			},
+			Time:  time.Date(2022, time.September, 1, 0, 0, 0, 0, time.UTC),
+			Value: 55,
+		},
 	}
 
 	o := Output{
 		tsdb: make(map[metrics.TimeSeries]*seriesWithMeasure),
 	}
+	require.NoError(t, o.setTrendStatsResolver([]string{"p(90)", "p(95)", "max"}))
 
 	pbseries := o.convertToPbSeries(samples)
-	require.Len(t, pbseries, 3)
-	require.Len(t, o.tsdb, 3)
+	require.Len(t, pbseries, 6)
+	require.Len(t, o.tsdb, 4)
 
 	unix1sept := int64(1661990400 * 1000) // in ms
 	exp := []*prompb.TimeSeries{
@@ -104,6 +118,48 @@ func TestOutputConvertToPbSeries(t *testing.T) {
 			},
 			Samples: []*prompb.Sample{
 				{Value: 1, Timestamp: unix1sept},
+			},
+		},
+		{
+			Labels: []*prompb.Label{
+				{Name: "We_need", Value: "value"},
+				{Name: "__name__", Value: "k6_metric4_max"},
+				{Name: "a_long", Value: "value"},
+				{Name: "list_of", Value: "value"},
+				{Name: "reproduce_5175", Value: "value"},
+				{Name: "tagk1", Value: "tagv1"},
+				{Name: "tags_to", Value: "value"},
+			},
+			Samples: []*prompb.Sample{
+				{Value: 55, Timestamp: unix1sept},
+			},
+		},
+		{
+			Labels: []*prompb.Label{
+				{Name: "We_need", Value: "value"},
+				{Name: "__name__", Value: "k6_metric4_p90"},
+				{Name: "a_long", Value: "value"},
+				{Name: "list_of", Value: "value"},
+				{Name: "reproduce_5175", Value: "value"},
+				{Name: "tagk1", Value: "tagv1"},
+				{Name: "tags_to", Value: "value"},
+			},
+			Samples: []*prompb.Sample{
+				{Value: 55, Timestamp: unix1sept},
+			},
+		},
+		{
+			Labels: []*prompb.Label{
+				{Name: "We_need", Value: "value"},
+				{Name: "__name__", Value: "k6_metric4_p95"},
+				{Name: "a_long", Value: "value"},
+				{Name: "list_of", Value: "value"},
+				{Name: "reproduce_5175", Value: "value"},
+				{Name: "tagk1", Value: "tagv1"},
+				{Name: "tags_to", Value: "value"},
+			},
+			Samples: []*prompb.Sample{
+				{Value: 55, Timestamp: unix1sept},
 			},
 		},
 	}

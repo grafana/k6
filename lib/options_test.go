@@ -163,8 +163,8 @@ func TestOptions(t *testing.T) {
 		opts := Options{}.Apply(Options{TLSVersion: &versions})
 
 		assert.NotNil(t, opts.TLSVersion)
-		assert.Equal(t, opts.TLSVersion.Min, TLSVersion(tls.VersionSSL30)) //nolint:staticcheck
-		assert.Equal(t, opts.TLSVersion.Max, TLSVersion(tls.VersionTLS12))
+		assert.Equal(t, TLSVersion(tls.VersionSSL30), opts.TLSVersion.Min) //nolint:staticcheck
+		assert.Equal(t, TLSVersion(tls.VersionTLS12), opts.TLSVersion.Max)
 
 		t.Run("JSON", func(t *testing.T) {
 			t.Parallel()

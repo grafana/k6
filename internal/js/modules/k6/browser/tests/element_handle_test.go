@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -65,7 +66,32 @@ func TestElementHandleBoundingBoxInvisibleElement(t *testing.T) {
 	require.NoError(t, err)
 	element, err := p.Query("div")
 	require.NoError(t, err)
-	require.Nil(t, element.BoundingBox())
+
+	_, err = element.BoundingBox()
+	require.ErrorIs(t, err, common.ErrElementNotVisible)
+}
+
+// This test is the same as TestElementHandleBoundingBoxInvisibleElement, but
+// uses the mapper to test the behaviour to ensure we get a null result when
+// an element is not visible.
+func TestElementHandleBoundingBoxInvisibleElementWithMapper(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withFileServer())
+	tb.vu.ActivateVU()
+	tb.vu.StartIteration(t)
+
+	got := tb.vu.RunPromise(t, `
+		const p = await browser.newPage();
+		
+		await p.setContent('<div style="display:none">hello</div>');
+
+		const element = await p.$("div");
+
+		return await element.boundingBox();
+	`,
+	)
+	assert.Equal(t, sobek.Null(), got.Result())
 }
 
 func TestElementHandleBoundingBoxSVG(t *testing.T) {
@@ -84,7 +110,9 @@ func TestElementHandleBoundingBoxSVG(t *testing.T) {
 	element, err := p.Query("#therect")
 	require.NoError(t, err)
 
-	bbox := element.BoundingBox()
+	bbox, err := element.BoundingBox()
+	require.NoError(t, err)
+
 	pageFn := `e => {
         const rect = e.getBoundingClientRect();
         return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
@@ -116,7 +144,7 @@ func TestElementHandleClick(t *testing.T) {
 
 	res, err := p.Evaluate(`() => window['result']`)
 	require.NoError(t, err)
-	assert.Equal(t, res, "Clicked")
+	assert.Equal(t, "Clicked", res)
 }
 
 func TestElementHandleClickWithNodeRemoved(t *testing.T) {
@@ -144,7 +172,7 @@ func TestElementHandleClickWithNodeRemoved(t *testing.T) {
 
 	res, err := p.Evaluate(`() => window['result']`)
 	require.NoError(t, err)
-	assert.Equal(t, res, "Clicked")
+	assert.Equal(t, "Clicked", res)
 }
 
 func TestElementHandleClickWithDetachedNode(t *testing.T) {
@@ -314,7 +342,7 @@ func TestElementHandleInputValue(t *testing.T) {
 	value, err := element.InputValue(common.NewElementHandleBaseOptions(element.Timeout()))
 	require.NoError(t, err)
 	require.NoError(t, element.Dispose())
-	assert.Equal(t, value, "hello1", `expected input value "hello1", got %q`, value)
+	assert.Equal(t, "hello1", value, `expected input value "hello1", got %q`, value)
 
 	element, err = p.Query("select")
 	require.NoError(t, err)
@@ -322,7 +350,7 @@ func TestElementHandleInputValue(t *testing.T) {
 	value, err = element.InputValue(common.NewElementHandleBaseOptions(element.Timeout()))
 	require.NoError(t, err)
 	require.NoError(t, element.Dispose())
-	assert.Equal(t, value, "hello2", `expected input value "hello2", got %q`, value)
+	assert.Equal(t, "hello2", value, `expected input value "hello2", got %q`, value)
 
 	element, err = p.Query("textarea")
 	require.NoError(t, err)
@@ -330,7 +358,7 @@ func TestElementHandleInputValue(t *testing.T) {
 	value, err = element.InputValue(common.NewElementHandleBaseOptions(element.Timeout()))
 	require.NoError(t, err)
 	require.NoError(t, element.Dispose())
-	assert.Equal(t, value, "hello3", `expected input value "hello3", got %q`, value)
+	assert.Equal(t, "hello3", value, `expected input value "hello3", got %q`, value)
 }
 
 func TestElementHandleIsChecked(t *testing.T) {

@@ -50,6 +50,10 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 		gs.Logger.Warn(warn)
 	}
 
+	if conf.Token.String == "" {
+		return errUserUnauthenticated
+	}
+
 	// If not, we continue with some validations and the creation of the test run.
 	if err := validateRequiredSystemTags(test.derivedConfig.SystemTags); err != nil {
 		return err

@@ -58,7 +58,7 @@ func TestCreateTestRun(t *testing.T) {
 		})
 		assert.NoError(t, err)
 
-		assert.Equal(t, resp.ReferenceID, "1")
+		assert.Equal(t, "1", resp.ReferenceID)
 		assert.NotNil(t, resp.ConfigOverride)
 		assert.True(t, resp.ConfigOverride.AggregationPeriod.Valid)
 		assert.Equal(t, types.Duration(2*time.Second), resp.ConfigOverride.AggregationPeriod.Duration)
@@ -126,7 +126,7 @@ func TestCreateTestRun(t *testing.T) {
 		})
 		assert.NoError(t, err)
 
-		assert.Equal(t, resp.ReferenceID, "1")
+		assert.Equal(t, "1", resp.ReferenceID)
 		assert.NotNil(t, resp.ConfigOverride)
 		assert.True(t, resp.ConfigOverride.AggregationPeriod.Valid)
 		assert.Equal(t, types.Duration(2*time.Second), resp.ConfigOverride.AggregationPeriod.Duration)
