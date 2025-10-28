@@ -210,6 +210,7 @@ func TestLauncherLaunch(t *testing.T) {
 			t.Parallel()
 
 			ts := tests.NewGlobalTestState(t)
+			ts.Env["K6_OLD_RESOLUTION"] = "true"
 
 			k6Args := append([]string{"k6"}, tc.k6Cmd)
 			k6Args = append(k6Args, tc.k6Args...)
@@ -277,6 +278,7 @@ func TestLauncherViaStdin(t *testing.T) {
 	k6Args := []string{"k6", "archive", "-"}
 
 	ts := tests.NewGlobalTestState(t)
+	ts.Env["K6_OLD_RESOLUTION"] = "true"
 	ts.CmdArgs = k6Args
 
 	// k6deps uses os package to access files. So we need to use it in the global state
@@ -564,6 +566,174 @@ func TestGetProviderConfig(t *testing.T) {
 			config := getProviderConfig(ts.GlobalState)
 
 			assert.Equal(t, tc.expectConfig, config)
+		})
+	}
+}
+
+func TestProcessUseDirectives(t *testing.T) {
+	t.Parallel()
+	tests := map[string]struct {
+		input          string
+		expectedOutput map[string]string
+		expectedError  string
+	}{
+		"nothing": {
+			input: "export default function() {}",
+		},
+		"nothing really": {
+			input: `"use k6"`,
+			expectedOutput: map[string]string{
+				"k6": "",
+			},
+		},
+		"k6 pinning": {
+			input: `"use k6 > 1.4.0"`,
+			expectedOutput: map[string]string{
+				"k6": "> 1.4.0",
+			},
+		},
+		"a extension": {
+			input: `"use k6 with k6/x/sql"`,
+			expectedOutput: map[string]string{
+				"k6/x/sql": "",
+			},
+		},
+		"an extension with constraint": {
+			input: `"use k6 with k6/x/sql > 1.4.0"`,
+			expectedOutput: map[string]string{
+				"k6/x/sql": "> 1.4.0",
+			},
+		},
+		"complex": {
+			input: `
+				// something here
+				"use k6 with k6/x/A"
+				function a (){
+					"use k6 with k6/x/B"
+					let s = JSON.stringify( "use k6 with k6/x/C")
+					"use k6 with k6/x/D"
+
+					return s
+				}
+
+				export const b = "use k6 with k6/x/E"
+				"use k6 with k6/x/F"
+
+				// Here for esbuild and k6 warnings
+				a()
+				export default function(){}
+				`,
+			expectedOutput: map[string]string{
+				"k6/x/A": "",
+			},
+		},
+
+		"repeat": {
+			input: `
+				"use k6 with k6/x/A"
+				"use k6 with k6/x/A"
+				`,
+			expectedOutput: map[string]string{
+				"k6/x/A": "",
+			},
+		},
+		"repeat with constraint first": {
+			input: `
+				"use k6 with k6/x/A > 1.4.0"
+				"use k6 with k6/x/A"
+				`,
+			expectedOutput: map[string]string{
+				"k6/x/A": "> 1.4.0",
+			},
+		},
+		"constraint difference": {
+			input: `
+				"use k6 > 1.4.0"
+				"use k6 = 1.2.3"
+				`,
+			expectedError: `error while parsing use directives in "name.js": already have constraint for "k6", when parsing "=1.2.3"`,
+		},
+		"constraint difference for extensions": {
+			input: `
+				"use k6 with k6/x/A > 1.4.0"
+				"use k6 with k6/x/A = 1.2.3"
+				`,
+			expectedError: `error while parsing use directives in "name.js": already have constraint for "k6/x/A", when parsing "=1.2.3"`,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			deps := make(dependencies)
+			for k, v := range test.expectedOutput {
+				require.NoError(t, deps.update(k, v))
+			}
+			if len(test.expectedError) > 0 {
+				deps = nil
+			}
+
+			m := make(dependencies)
+			err := processUseDirectives("name.js", []byte(test.input), m)
+			if len(test.expectedError) > 0 {
+				require.ErrorContains(t, err, test.expectedError)
+			} else {
+				require.EqualValues(t, deps, m)
+			}
+		})
+	}
+}
+
+func TestFindDirectives(t *testing.T) {
+	t.Parallel()
+	tests := map[string]struct {
+		input          string
+		expectedOutput []string
+	}{
+		"nothing": {
+			input:          "export default function() {}",
+			expectedOutput: nil,
+		},
+		"nothing really": {
+			input:          `"use k6"`,
+			expectedOutput: []string{"use k6"},
+		},
+		"multiline": {
+			input: `
+			"use k6 with k6/x/sql"
+			"something"
+			`,
+			expectedOutput: []string{"use k6 with k6/x/sql", "something"},
+		},
+		"multiline start at beginning": {
+			input: `
+"use k6 with k6/x/sql"
+"something"
+			`,
+			expectedOutput: []string{"use k6 with k6/x/sql", "something"},
+		},
+		"multiline comments": {
+			input: `#!/bin/sh
+			// here comment "hello"
+"use k6 with k6/x/sql";
+			/*
+			"something else here as well"
+			*/
+	;
+"something";
+const l = 5
+"more"
+			`,
+			expectedOutput: []string{"use k6 with k6/x/sql", "something"},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			m := findDirectives([]byte(test.input))
+			assert.EqualValues(t, test.expectedOutput, m)
 		})
 	}
 }
