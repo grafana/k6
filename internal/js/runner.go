@@ -357,12 +357,13 @@ func (r *Runner) IsExecutable(name string) bool {
 func (r *Runner) HandleSummary(
 	ctx context.Context,
 	legacy *lib.LegacySummary,
-	summary *summary.Summary,
+	s *summary.Summary,
+	meta summary.Meta,
 ) (map[string]io.Reader, error) {
 	out := make(chan metrics.SampleContainer, 100)
 	defer close(out)
 
-	go func() { // discard all metrics
+	go func() {         // discard all metrics
 		for range out { //nolint:revive
 		}
 	}()
@@ -380,14 +381,24 @@ func (r *Runner) HandleSummary(
 	})
 	vu.moduleVUImpl.ctx = summaryCtx
 
-	noColor, enableColors, legacyData, summaryData, summaryCode, err := prepareHandleSummaryCall(
-		r, vu.Runtime, legacy, summary,
-	)
+	noColor, enableColors, newMachineReadableSummary, legacyData, summaryData, summaryCode, err :=
+		prepareHandleSummaryCall(
+			r, vu.Runtime, legacy, s,
+		)
 	if err != nil {
 		return nil, err
 	}
 
 	handleSummaryDataAsValue := vu.Runtime.ToValue(legacyData)
+	if newMachineReadableSummary {
+		summaryExportData, err := summary.ToMachineReadable(s, meta)
+		if err != nil {
+			return nil, err
+		}
+
+		handleSummaryDataAsValue = vu.Runtime.ToValue(summaryExportData)
+	}
+
 	callbackResult, err := runUserProvidedHandleSummaryCallback(summaryCtx, vu, handleSummaryDataAsValue)
 	if err != nil {
 		return nil, err
@@ -404,7 +415,9 @@ func (r *Runner) HandleSummary(
 	}
 
 	wrapperArgs := prepareHandleWrapperArgs(
-		vu, noColor, enableColors, callbackResult, handleSummaryDataAsValue, vu.Runtime.ToValue(summaryData))
+		vu, noColor, enableColors, newMachineReadableSummary, callbackResult, handleSummaryDataAsValue,
+		vu.Runtime.ToValue(summaryData),
+	)
 	rawResult, _, _, err := vu.runFn(summaryCtx, false, handleSummaryWrapper, nil, wrapperArgs...)
 
 	if deadlineError := r.checkDeadline(summaryCtx, consts.HandleSummaryFn, rawResult, err); deadlineError != nil {
@@ -423,18 +436,20 @@ func prepareHandleSummaryCall(
 	rt *sobek.Runtime,
 	legacy *lib.LegacySummary,
 	summary *summary.Summary,
-) (bool, bool, interface{}, interface{}, string, error) {
+) (bool, bool, bool, interface{}, interface{}, string, error) {
 	var (
-		noColor          bool
-		enableColors     bool
-		legacyDataForJS  interface{}
-		summaryDataForJS interface{}
-		summaryCode      string
-		err              error
+		noColor                   bool
+		enableColors              bool
+		newMachineReadableSummary bool
+		legacyDataForJS           interface{}
+		summaryDataForJS          interface{}
+		summaryCode               string
+		err                       error
 	)
 	if summary != nil {
 		noColor = summary.NoColor
 		enableColors = summary.EnableColors
+		newMachineReadableSummary = summary.NewMachineReadableSummary
 		legacyDataForJS = summarizeMetricsToObject(legacy, r.Bundle.Options, r.setupData)
 		summaryDataForJS, err = summarizeReportToObject(rt, summary)
 		summaryCode = jslibSummaryCode
@@ -446,7 +461,7 @@ func prepareHandleSummaryCall(
 		summaryCode = jslibSummaryLegacyCode
 	}
 
-	return noColor, enableColors, legacyDataForJS, summaryDataForJS, summaryCode, err
+	return noColor, enableColors, newMachineReadableSummary, legacyDataForJS, summaryDataForJS, summaryCode, err
 }
 
 func runUserProvidedHandleSummaryCallback(
@@ -477,15 +492,16 @@ func runUserProvidedHandleSummaryCallback(
 
 func prepareHandleWrapperArgs(
 	vu *VU,
-	noColor bool, enableColors bool,
+	noColor, enableColors, newMachineReadableSummary bool,
 	callbackResult, handleSummaryDataAsValue, summaryDataAsValue sobek.Value,
 ) []sobek.Value {
 	options := map[string]interface{}{
 		// TODO: improve when we can easily export all option values, including defaults?
-		"summaryTrendStats": vu.Runner.Bundle.Options.SummaryTrendStats,
-		"summaryTimeUnit":   vu.Runner.Bundle.Options.SummaryTimeUnit.String,
-		"noColor":           noColor, // TODO: move to the (runtime) options
-		"enableColors":      enableColors,
+		"summaryTrendStats":         vu.Runner.Bundle.Options.SummaryTrendStats,
+		"summaryTimeUnit":           vu.Runner.Bundle.Options.SummaryTimeUnit.String,
+		"noColor":                   noColor, // TODO: move to the (runtime) options
+		"enableColors":              enableColors,
+		"newMachineReadableSummary": newMachineReadableSummary,
 	}
 
 	wrapperArgs := []sobek.Value{
