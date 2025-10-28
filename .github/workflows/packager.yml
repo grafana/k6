@@ -34,8 +34,8 @@ jobs:
         uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
         with:
           registry: ghcr.io
-          username: ${ GITHUB_ACTOR }
-          password: ${ GITHUB_TOKEN }
+          username: ${{ env.GITHUB_ACTOR }}
+          password: ${{ env.GITHUB_TOKEN }}
       - name: Publish
         run: |
           docker push "${DOCKER_IMAGE_ID}:latest"
