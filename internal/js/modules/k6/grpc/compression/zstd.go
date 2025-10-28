@@ -14,9 +14,10 @@ const name = "zstd"
 
 type plugin struct{}
 
+//nolint:gochecknoglobals
 var (
 	registerOnce sync.Once
-	encOpts      atomic.Value // []kz.EOption
+	encOpts      atomic.Value
 )
 
 func (plugin) Name() string { return name }
@@ -58,8 +59,13 @@ type zstdCompressor struct{}
 
 func (zstdCompressor) Name() string { return name }
 func (zstdCompressor) Compress(w io.Writer) (io.WriteCloser, error) {
-	return kz.NewWriter(w, encOpts.Load().([]kz.EOption)...)
+	v, ok := encOpts.Load().([]kz.EOption)
+	if !ok || v == nil {
+		return kz.NewWriter(w)
+	}
+	return kz.NewWriter(w, v...)
 }
+
 func (zstdCompressor) Decompress(r io.Reader) (io.Reader, error) {
 	dec, err := kz.NewReader(r, kz.WithDecoderConcurrency(1))
 	if err != nil {

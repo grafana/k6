@@ -7,7 +7,6 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	grpccompress "go.k6.io/k6/internal/js/modules/k6/grpc/compression"
 	"io"
 	"math"
 	"reflect"
@@ -15,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	grpccompress "go.k6.io/k6/internal/js/modules/k6/grpc/compression"
 	"go.k6.io/k6/internal/lib/netext/grpcext"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
@@ -265,7 +265,7 @@ func (c *Client) Connect(addr string, params sobek.Value) (bool, error) {
 		opts = append(opts, grpc.WithAuthority(p.Authority))
 	}
 
-	if p.Compression != nil {
+	if p.Compression.Name != "" {
 		plug, err := grpccompress.Configure(*p.Compression)
 		if err != nil {
 			return false, err

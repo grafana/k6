@@ -170,9 +170,6 @@ github.com/golang/protobuf/proto
 github.com/golang/protobuf/ptypes/any
 github.com/golang/protobuf/ptypes/struct
 github.com/golang/protobuf/ptypes/wrappers
-# github.com/golang/snappy v0.0.4
-## explicit
-github.com/golang/snappy
 # github.com/google/pprof v0.0.0-20230728192033-2ba5b33183c6
 ## explicit; go 1.19
 github.com/google/pprof/profile

@@ -3,11 +3,11 @@ package grpc
 import (
 	"errors"
 	"fmt"
-	grpccompress "go.k6.io/k6/internal/js/modules/k6/grpc/compression"
 	"strings"
 	"time"
 
 	"github.com/grafana/sobek"
+	grpccompress "go.k6.io/k6/internal/js/modules/k6/grpc/compression"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/lib"
@@ -137,18 +137,20 @@ type connectParams struct {
 	Compression           *grpccompress.Spec
 }
 
-func newConnectParams(vu modules.VU, input sobek.Value) (*connectParams, error) { //nolint:gocognit
-	result := &connectParams{
-		IsPlaintext:           false,
-		UseReflectionProtocol: false,
-		Timeout:               time.Minute,
-		MaxReceiveSize:        0,
-		MaxSendSize:           0,
-		Authority:             "",
-		ReflectionMetadata:    metadata.New(nil),
-		Compression:           nil,
-	}
+//nolint:gochecknoglobals
+var defaultConnectParams = &connectParams{
+	IsPlaintext:           false,
+	UseReflectionProtocol: false,
+	Timeout:               time.Minute,
+	MaxReceiveSize:        0,
+	MaxSendSize:           0,
+	Authority:             "",
+	ReflectionMetadata:    metadata.New(nil),
+	Compression:           nil,
+}
 
+func newConnectParams(vu modules.VU, input sobek.Value) (*connectParams, error) { //nolint:gocognit
+	result := defaultConnectParams
 	if common.IsNullish(input) {
 		return result, nil
 	}
@@ -217,13 +219,14 @@ func newConnectParams(vu modules.VU, input sobek.Value) (*connectParams, error) 
 			spec, err := getCompressionSpec(v)
 			if err != nil {
 				return result, fmt.Errorf("invalid compression value: %w", err)
+			} else if spec.Name == "" {
+				spec = nil
 			}
 			result.Compression = spec
 		default:
 			return result, fmt.Errorf("unknown connect param: %q", k)
 		}
 	}
-
 	return result, nil
 }
 
@@ -272,7 +275,7 @@ func getCompressionSpec(v any) (*grpccompress.Spec, error) {
 	case string:
 		name := strings.ToLower(strings.TrimSpace(x))
 		if name == "" || name == "none" {
-			return nil, nil
+			return &grpccompress.Spec{Name: ""}, nil
 		}
 		return &grpccompress.Spec{Name: name}, nil
 	case map[string]any:
@@ -284,7 +287,7 @@ func getCompressionSpec(v any) (*grpccompress.Spec, error) {
 		if !ok {
 			return nil, fmt.Errorf("compression.name must be a non-empty string")
 		} else if name == "" || name == "none" {
-			return nil, nil
+			return &grpccompress.Spec{Name: ""}, nil
 		}
 
 		spec := &grpccompress.Spec{Name: strings.ToLower(strings.TrimSpace(name))}

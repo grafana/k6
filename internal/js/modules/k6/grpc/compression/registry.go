@@ -1,3 +1,5 @@
+// Package grpccompress provides a minimal plugin registry for gRPC message compression.
+// It allows registering compression plugins and constructing writers at runtime.
 package grpccompress
 
 import (
@@ -8,11 +10,14 @@ import (
 	"google.golang.org/grpc"
 )
 
+// Spec describes the compression plugin to use and its configuration.
 type Spec struct {
 	Name    string
 	Options map[string]any
 }
 
+// Plugin represents a compression implementation that can produce writers
+// and be configured with a map-based configuration.
 type Plugin interface {
 	Name() string
 	EnsureRegistered() error
@@ -21,16 +26,18 @@ type Plugin interface {
 }
 
 var (
-	regMu    sync.RWMutex
-	registry = map[string]Plugin{}
+	regMu    sync.RWMutex          //nolint:gochecknoglobals
+	registry = map[string]Plugin{} //nolint:gochecknoglobals
 )
 
+// Register adds a compression plugin to the global registry.
 func Register(p Plugin) {
 	regMu.Lock()
 	defer regMu.Unlock()
 	registry[strings.ToLower(p.Name())] = p
 }
 
+// Configure resolves a plugin by name and applies the compression options.
 func Configure(spec Spec) (Plugin, error) {
 	name := strings.ToLower(spec.Name)
 	regMu.RLock()

@@ -1,7 +1,6 @@
 package grpc
 
 import (
-	grpccompress "go.k6.io/k6/internal/js/modules/k6/grpc/compression"
 	"io"
 	"testing"
 	"time"
@@ -10,6 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	grpccompress "go.k6.io/k6/internal/js/modules/k6/grpc/compression"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modulestest"
 	"go.k6.io/k6/lib"
