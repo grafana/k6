@@ -22,7 +22,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 	rt := vu.Runtime()
 	maps := mapping{
 		"bringToFront": func() *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, p.BringToFront() //nolint:wrapcheck
 			})
 		},
@@ -31,7 +31,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing new frame check options: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, p.Check(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -41,15 +41,15 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, err
 			}
 
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				err := p.Click(selector, popts)
 				return nil, err //nolint:wrapcheck
 			}), nil
 		},
 		"close": func(opts sobek.Value) *sobek.Promise {
-			// TODO when opts are implemented for this function pares them here before calling k6ext.Promise and doing it
+			// TODO when opts are implemented for this function pares them here before calling promise vu doing it
 			// in a goroutine off the event loop. As that will race with anything running on the event loop.
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				// It's safe to close the taskqueue for this targetID (if one
 				// exists).
 				vu.close(p.TargetID())
@@ -58,7 +58,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			})
 		},
 		"content": func() *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return p.Content() //nolint:wrapcheck
 			})
 		},
@@ -70,7 +70,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing double click options: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, p.Dblclick(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -80,7 +80,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, fmt.Errorf("parsing page dispatch event options: %w", err)
 			}
 			earg := exportArg(eventInit)
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, p.DispatchEvent(selector, typ, earg, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -89,12 +89,12 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing emulateMedia options: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, p.EmulateMedia(popts) //nolint:wrapcheck
 			}), nil
 		},
 		"emulateVisionDeficiency": func(typ string) *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, p.EmulateVisionDeficiency(typ) //nolint:wrapcheck
 			})
 		},
@@ -104,7 +104,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}
 			funcString := pageFunc.String()
 			gopts := exportArgs(gargs)
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return p.Evaluate(funcString, gopts...)
 			}), nil
 		},
@@ -114,7 +114,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}
 			funcString := pageFunc.String()
 			gopts := exportArgs(gargs)
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				jsh, err := p.EvaluateHandle(funcString, gopts...)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
@@ -127,7 +127,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing fill options: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, p.Fill(selector, value, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -136,7 +136,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing focus options: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, p.Focus(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -155,7 +155,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing getAttribute options: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				s, ok, err := p.GetAttribute(selector, name, popts)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
@@ -237,7 +237,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			if err := gopts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing page navigation options to %q: %w", url, err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				resp, err := p.Goto(url, gopts)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
@@ -251,7 +251,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing hover options: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, p.Hover(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -260,7 +260,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing inner HTML options: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return p.InnerHTML(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -269,7 +269,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing inner text options: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return p.InnerText(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -278,7 +278,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing input value options: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return p.InputValue(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -287,7 +287,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parse isChecked options of selector %q: %w", selector, err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return p.IsChecked(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -297,7 +297,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parse isDisabled options of selector %q: %w", selector, err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return p.IsDisabled(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -306,7 +306,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parse isEditabled options of selector %q: %w", selector, err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return p.IsEditable(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -315,7 +315,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parse isEnabled options of selector %q: %w", selector, err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return p.IsEnabled(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -324,7 +324,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parse isHidden options of selector %q: %w", selector, err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return p.IsHidden(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -333,7 +333,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing isVisible options of selector %q: %w", selector, err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return p.IsVisible(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -349,7 +349,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		"mouse": mapMouse(vu, p.GetMouse()),
 		"on":    mapPageOn(vu, p),
 		"opener": func() *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return p.Opener(), nil
 			})
 		},
@@ -358,7 +358,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing press options of selector %q: %w", selector, err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, p.Press(selector, key, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -367,7 +367,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing reload options: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				resp, err := p.Reload(popts)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
@@ -414,7 +414,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			if err != nil {
 				return nil, fmt.Errorf("parsing select options values: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return p.SelectOption(selector, convValues, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -424,7 +424,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, fmt.Errorf("parsing frame set check options: %w", err)
 			}
 
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, p.SetChecked(selector, checked, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -433,14 +433,14 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing setContent options: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, p.SetContent(html, popts) //nolint:wrapcheck
 			}), nil
 		},
 		"setDefaultNavigationTimeout": p.SetDefaultNavigationTimeout,
 		"setDefaultTimeout":           p.SetDefaultTimeout,
 		"setExtraHTTPHeaders": func(headers map[string]string) *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, p.SetExtraHTTPHeaders(headers) //nolint:wrapcheck
 			})
 		},
@@ -455,7 +455,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, fmt.Errorf("parsing setInputFiles parameter: %w", err)
 			}
 
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, p.SetInputFiles(selector, pfiles, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -464,7 +464,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			if err := s.Parse(vu.Context(), viewportSize); err != nil {
 				return nil, fmt.Errorf("parsing viewport size: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, p.SetViewportSize(s) //nolint:wrapcheck
 			}), nil
 		},
@@ -473,7 +473,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing page tap options: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, p.Tap(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -483,7 +483,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, fmt.Errorf("parsing text content options: %w", err)
 			}
 
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				s, ok, err := p.TextContent(selector, popts)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
@@ -495,17 +495,17 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"throttleCPU": func(cpuProfile common.CPUProfile) *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, p.ThrottleCPU(cpuProfile) //nolint:wrapcheck
 			})
 		},
 		"throttleNetwork": func(networkProfile common.NetworkProfile) *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, p.ThrottleNetwork(networkProfile) //nolint:wrapcheck
 			})
 		},
 		"title": func() *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return p.Title() //nolint:wrapcheck
 			})
 		},
@@ -516,7 +516,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, fmt.Errorf("parsing type options: %w", err)
 			}
 
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, p.Type(selector, text, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -526,17 +526,17 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, fmt.Errorf("parsing frame uncheck options %q: %w", selector, err)
 			}
 
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, p.Uncheck(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
 		"unroute": func(url string) (*sobek.Promise, error) {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, p.Unroute(url)
 			}), nil
 		},
 		"unrouteAll": func() (*sobek.Promise, error) {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, p.UnrouteAll()
 			}), nil
 		},
@@ -550,7 +550,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, fmt.Errorf("page waitForFunction: %w", err)
 			}
 
-			return k6ext.Promise(vu.Context(), func() (result any, reason error) {
+			return promise(vu, func() (result any, reason error) {
 				return p.WaitForFunction(js, popts, pargs...) //nolint:wrapcheck
 			}), nil
 		},
@@ -560,7 +560,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, fmt.Errorf("parsing waitForLoadState %q options: %w", state, err)
 			}
 
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, p.WaitForLoadState(state, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -573,7 +573,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, fmt.Errorf("parsing wait for selector %q options: %w", selector, err)
 			}
 
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				eh, err := p.WaitForSelector(selector, popts)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
@@ -582,7 +582,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"waitForTimeout": func(timeout int64) *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				p.WaitForTimeout(timeout)
 				return nil, nil
 			})
@@ -610,7 +610,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 
 			rm := newRegExMatcher(ctx, vu, tq)
 
-			return k6ext.Promise(ctx, func() (result any, reason error) {
+			return promise(vu, func() (result any, reason error) {
 				defer stopTaskqueue()
 				return p.WaitForResponse(val, popts, rm)
 			}), nil
@@ -635,7 +635,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 
 			rm := newRegExMatcher(ctx, vu, tq)
 
-			return k6ext.Promise(ctx, func() (result any, reason error) {
+			return promise(vu, func() (result any, reason error) {
 				defer stopTaskqueue()
 				return p.WaitForRequest(val, popts, rm)
 			}), nil
@@ -650,7 +650,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		},
 	}
 	maps["$"] = func(selector string) *sobek.Promise {
-		return k6ext.Promise(vu.Context(), func() (any, error) {
+		return promise(vu, func() (any, error) {
 			eh, err := p.Query(selector)
 			if err != nil {
 				return nil, err //nolint:wrapcheck
@@ -667,7 +667,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		})
 	}
 	maps["$$"] = func(selector string) *sobek.Promise {
-		return k6ext.Promise(vu.Context(), func() (any, error) {
+		return promise(vu, func() (any, error) {
 			ehs, err := p.QueryAll(selector)
 			if err != nil {
 				return nil, err //nolint:wrapcheck
@@ -957,7 +957,7 @@ func mapPageRoute(vu moduleVU, p *common.Page) func(path sobek.Value, handler so
 			}
 		}
 
-		return k6ext.Promise(vu.Context(), func() (any, error) {
+		return promise(vu, func() (any, error) {
 			return nil, p.Route(pathStr, routeHandler, rm)
 		}), nil
 	}
@@ -984,7 +984,7 @@ func waitForURLBody(vu moduleVU, target interface {
 
 	rm := newRegExMatcher(ctx, vu, tq)
 
-	return k6ext.Promise(ctx, func() (result any, reason error) {
+	return promise(vu, func() (result any, reason error) {
 		defer stopTaskqueue()
 		return nil, target.WaitForURL(val, popts, rm)
 	}), nil
@@ -1015,7 +1015,7 @@ func waitForNavigationBodyImpl(vu moduleVU, target interface {
 		rm = newRegExMatcher(ctx, vu, tq)
 	}
 
-	return k6ext.Promise(ctx, func() (result any, reason error) {
+	return promise(vu, func() (result any, reason error) {
 		defer stopTaskqueue()
 		resp, err := target.WaitForNavigation(popts, rm)
 		if err != nil {
