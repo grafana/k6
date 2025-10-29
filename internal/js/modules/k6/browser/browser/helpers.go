@@ -3,9 +3,11 @@ package browser
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/grafana/sobek"
+	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6error"
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
@@ -79,4 +81,34 @@ func promise(vu moduleVU, fn func() (result any, reason error)) *sobek.Promise {
 		resolve(v)
 	}()
 	return p
+}
+
+// queueTask queues the given function fn to run on the given task queue tq.
+// The returned future blocks until the task is done and returns the result
+// of fn or an error if the context is done before fn completes. It's safe
+// not to call the future if you're not interested in the result of fn.
+func queueTask[T any](
+	ctx context.Context,
+	tq *taskqueue.TaskQueue,
+	fn func() (T, error),
+) (future func() (T, error)) {
+	var (
+		result T
+		err    error
+		done   = make(chan struct{})
+	)
+	tq.Queue(func() error {
+		defer close(done)
+		result, err = fn()
+		return err
+	})
+	return func() (T, error) {
+		select {
+		case <-done:
+			return result, err
+		case <-ctx.Done():
+			var zero T
+			return zero, fmt.Errorf("running on task queue: %w", ctx.Err())
+		}
+	}
 }
