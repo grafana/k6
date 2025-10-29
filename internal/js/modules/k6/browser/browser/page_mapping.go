@@ -684,71 +684,38 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 // mapPageOn enables using various page.on event handlers with the page.on method.
 // It provides a generic way to map different event types to their respective handler functions.
 func mapPageOn(vu moduleVU, p *common.Page) func(common.PageEventName, sobek.Callable) error {
-	return func(eventName common.PageEventName, handleEvent sobek.Callable) error {
-		rt := vu.Runtime()
-
+	return func(eventName common.PageEventName, handle sobek.Callable) error {
 		pageEvents := map[common.PageEventName]struct {
 			mapp func(vu moduleVU, event common.PageEvent) mapping
 			wait bool // Whether to wait for the handler to complete.
 		}{
-			common.PageEventConsole: {
-				mapp: mapConsoleMessage,
-				wait: false,
-			},
-			common.PageEventMetric: {
-				mapp: mapMetricEvent,
-				wait: true,
-			},
-			common.PageEventRequest: {
-				mapp: mapRequestEvent,
-				wait: false,
-			},
-			common.PageEventResponse: {
-				mapp: mapResponseEvent,
-				wait: false,
-			},
+			common.PageEventConsole:  {mapp: mapConsoleMessage},
+			common.PageEventMetric:   {mapp: mapMetricEvent, wait: true},
+			common.PageEventRequest:  {mapp: mapRequestEvent},
+			common.PageEventResponse: {mapp: mapResponseEvent},
 		}
 		pageEvent, ok := pageEvents[eventName]
 		if !ok {
 			return fmt.Errorf("unknown page on event: %q", eventName)
 		}
 
-		ctx := vu.Context()
+		tq := vu.get(vu.Context(), p.TargetID())
 
-		// Run the event handler in the task queue to
-		// ensure that the handler is executed on the event loop.
-		tq := vu.get(ctx, p.TargetID())
-		eventHandler := func(event common.PageEvent) error {
-			mapping := pageEvent.mapp(vu, event)
-
-			done := make(chan struct{})
-
-			tq.Queue(func() error {
-				defer close(done)
-
-				_, err := handleEvent(
-					sobek.Undefined(),
-					rt.ToValue(mapping),
-				)
+		return p.On(eventName, func(event common.PageEvent) error {
+			wait := queueTask(vu.Context(), tq, func() (sobek.Value, error) {
+				_, err := handle(sobek.Undefined(), vu.Runtime().ToValue(pageEvent.mapp(vu, event)))
 				if err != nil {
-					return fmt.Errorf("executing page.on('%s') handler: %w", eventName, err)
+					return nil, fmt.Errorf("executing page.on('%s') handler: %w", eventName, err)
 				}
-
-				return nil
+				return nil, nil
 			})
-
 			if pageEvent.wait {
-				select {
-				case <-done:
-				case <-ctx.Done():
+				if _, err := wait(); errors.Is(err, context.Canceled) {
 					return errors.New("iteration ended before page.on handler completed executing")
 				}
 			}
-
 			return nil
-		}
-
-		return p.On(eventName, eventHandler) //nolint:wrapcheck
+		})
 	}
 }
 
