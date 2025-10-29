@@ -363,7 +363,7 @@ func (r *Runner) HandleSummary(
 	out := make(chan metrics.SampleContainer, 100)
 	defer close(out)
 
-	go func() {         // discard all metrics
+	go func() { // discard all metrics
 		for range out { //nolint:revive
 		}
 	}()
@@ -381,25 +381,16 @@ func (r *Runner) HandleSummary(
 	})
 	vu.moduleVUImpl.ctx = summaryCtx
 
-	noColor, enableColors, newMachineReadableSummary, legacyData, summaryData, summaryCode, err :=
-		prepareHandleSummaryCall(
-			r, vu.Runtime, legacy, s,
-		)
+	noColor, enableColors, newMachineReadableSummary,
+		summaryCode, summaryData, handleSummaryData,
+		err := prepareHandleSummaryCall(
+		r, vu.Runtime, legacy, s, meta,
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	handleSummaryDataAsValue := vu.Runtime.ToValue(legacyData)
-	if newMachineReadableSummary {
-		summaryExportData, err := summary.ToMachineReadable(s, meta)
-		if err != nil {
-			return nil, err
-		}
-
-		handleSummaryDataAsValue = vu.Runtime.ToValue(summaryExportData)
-	}
-
-	callbackResult, err := runUserProvidedHandleSummaryCallback(summaryCtx, vu, handleSummaryDataAsValue)
+	callbackResult, err := runUserProvidedHandleSummaryCallback(summaryCtx, vu, handleSummaryData)
 	if err != nil {
 		return nil, err
 	}
@@ -415,8 +406,7 @@ func (r *Runner) HandleSummary(
 	}
 
 	wrapperArgs := prepareHandleWrapperArgs(
-		vu, noColor, enableColors, newMachineReadableSummary, callbackResult, handleSummaryDataAsValue,
-		vu.Runtime.ToValue(summaryData),
+		vu, noColor, enableColors, newMachineReadableSummary, callbackResult, handleSummaryData, summaryData,
 	)
 	rawResult, _, _, err := vu.runFn(summaryCtx, false, handleSummaryWrapper, nil, wrapperArgs...)
 
@@ -435,39 +425,50 @@ func prepareHandleSummaryCall(
 	r *Runner,
 	rt *sobek.Runtime,
 	legacy *lib.LegacySummary,
-	summary *summary.Summary,
-) (bool, bool, bool, interface{}, interface{}, string, error) {
+	s *summary.Summary,
+	meta summary.Meta,
+) (bool, bool, bool, string, sobek.Value, sobek.Value, error) {
 	var (
 		noColor                   bool
 		enableColors              bool
 		newMachineReadableSummary bool
-		legacyDataForJS           interface{}
-		summaryDataForJS          interface{}
 		summaryCode               string
+		summaryData               sobek.Value
+		handleSummaryData         sobek.Value
 		err                       error
 	)
-	if summary != nil {
-		noColor = summary.NoColor
-		enableColors = summary.EnableColors
-		newMachineReadableSummary = summary.NewMachineReadableSummary
-		legacyDataForJS = summarizeMetricsToObject(legacy, r.Bundle.Options, r.setupData)
-		summaryDataForJS, err = summarizeReportToObject(rt, summary)
+	// TODO(@joanlopez): Drop this if-else once we stop supporting the legacy summary. Summary wouldn't be nil by then.
+	if s != nil {
+		noColor = s.NoColor
+		enableColors = s.EnableColors
+		newMachineReadableSummary = s.NewMachineReadableSummary
 		summaryCode = jslibSummaryCode
-	} else { // TODO: Remove this code block once we stop supporting the legacy summary.
+
+		summaryReport, srErr := summarizeReportToObject(rt, s)
+		summaryData = rt.ToValue(summaryReport)
+
+		if s.NewMachineReadableSummary {
+			mrSummary, mrsErr := summary.ToMachineReadable(s, meta)
+			handleSummaryData = rt.ToValue(mrSummary)
+			err = errors.Join(srErr, mrsErr)
+		} else {
+			handleSummaryData = rt.ToValue(summarizeMetricsToObject(legacy, r.Bundle.Options, r.setupData))
+		}
+	} else {
 		noColor = legacy.NoColor
 		enableColors = !legacy.NoColor && legacy.UIState.IsStdOutTTY
-		legacyDataForJS = summarizeMetricsToObject(legacy, r.Bundle.Options, r.setupData)
-		summaryDataForJS = legacyDataForJS
 		summaryCode = jslibSummaryLegacyCode
+		summaryData = rt.ToValue(summarizeMetricsToObject(legacy, r.Bundle.Options, r.setupData))
+		handleSummaryData = summaryData
 	}
 
-	return noColor, enableColors, newMachineReadableSummary, legacyDataForJS, summaryDataForJS, summaryCode, err
+	return noColor, enableColors, newMachineReadableSummary, summaryCode, summaryData, handleSummaryData, err
 }
 
 func runUserProvidedHandleSummaryCallback(
 	summaryCtx context.Context,
 	vu *VU,
-	summaryData sobek.Value,
+	handleSummaryData sobek.Value,
 ) (sobek.Value, error) {
 	fn := vu.getExported(consts.HandleSummaryFn)
 	if fn == nil {
@@ -479,13 +480,13 @@ func runUserProvidedHandleSummaryCallback(
 		return nil, fmt.Errorf("exported identifier %s must be a function", consts.HandleSummaryFn)
 	}
 
-	callbackResult, _, _, err := vu.runFn(summaryCtx, false, handleSummaryFn, nil, summaryData)
+	callbackResult, _, _, err := vu.runFn(summaryCtx, false, handleSummaryFn, nil, handleSummaryData)
 	if err != nil {
 		errText, fields := errext.Format(err)
 		vu.Runner.preInitState.Logger.WithFields(fields).Error(errText)
 	}
 
-	// In case of err, we only want to log it,
+	// In case of error, we only want to log it
 	// but still proceed with the built-in summary handler, so we return nil.
 	return callbackResult, nil
 }
@@ -493,7 +494,7 @@ func runUserProvidedHandleSummaryCallback(
 func prepareHandleWrapperArgs(
 	vu *VU,
 	noColor, enableColors, newMachineReadableSummary bool,
-	callbackResult, handleSummaryDataAsValue, summaryDataAsValue sobek.Value,
+	callbackResult, handleSummaryData, summaryData sobek.Value,
 ) []sobek.Value {
 	options := map[string]interface{}{
 		// TODO: improve when we can easily export all option values, including defaults?
@@ -507,8 +508,8 @@ func prepareHandleWrapperArgs(
 	wrapperArgs := []sobek.Value{
 		callbackResult,
 		vu.Runtime.ToValue(vu.Runner.Bundle.preInitState.RuntimeOptions.SummaryExport.String),
-		handleSummaryDataAsValue,
-		summaryDataAsValue,
+		handleSummaryData,
+		summaryData,
 		vu.Runtime.ToValue(options),
 	}
 
