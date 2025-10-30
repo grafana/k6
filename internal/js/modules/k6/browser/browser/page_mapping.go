@@ -604,7 +604,6 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				val = url.String() // No quotes
 			}
 
-			// Use RegEx matcher for regex pattern matching
 			ctx, stopTaskqueue := context.WithCancel(vu.Context())
 			tq := cancelableTaskQueue(ctx, vu.RegisterCallback)
 
@@ -629,7 +628,6 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				val = url.String() // No quotes
 			}
 
-			// Use RegEx matcher for regex pattern matching
 			ctx, stopTaskqueue := context.WithCancel(vu.Context())
 			tq := cancelableTaskQueue(ctx, vu.RegisterCallback)
 
@@ -758,41 +756,17 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageEventName, sobek.Cal
 // newRegExMatcher returns a function that runs in the JS runtime's event loop
 // for pattern matching. It uses ECMAScript RegEx engine for consistency.
 //
-// Do not call this off the main thread (not even from within a promise). The returned
-// RegExMatcher can be called from off the main thread (i.e. in a new goroutine) since
-// it will queue up the checker on the event loop.
+// It's safe to call this function off of the event loop since the returned
+// function gets run in the task queue, ensuring it runs on the event loop.
 func newRegExMatcher(ctx context.Context, vu moduleVU, tq *taskqueue.TaskQueue) common.RegExMatcher {
-	rt := vu.Runtime()
-	return func(pattern, url string) (bool, error) {
-		var (
-			result bool
-			err    error
-		)
-
-		done := make(chan struct{})
-
-		tq.Queue(func() error {
-			defer close(done)
-
-			// Regex pattern is unquoted string whereas the url needs to be quoted
-			// so that it is treated as a string.
-			val, jsErr := rt.RunString(pattern + `.test('` + url + `')`)
-			if jsErr != nil {
-				err = fmt.Errorf("evaluating pattern: %w", jsErr)
-				return nil
+	return func(pattern, str string) (bool, error) {
+		return queueTask(ctx, tq, func() (bool, error) {
+			v, err := vu.Runtime().RunString(pattern + `.test('` + str + `')`)
+			if err != nil {
+				return false, fmt.Errorf("evaluating pattern: %w", err)
 			}
-
-			result = val.ToBoolean()
-			return nil
-		})
-
-		select {
-		case <-done:
-		case <-ctx.Done():
-			err = fmt.Errorf("context canceled while evaluating URL pattern")
-		}
-
-		return result, err
+			return v.ToBoolean(), nil
+		})()
 	}
 }
 
@@ -978,10 +952,8 @@ func waitForURLBody(vu moduleVU, target interface {
 
 	val := parseStringOrRegex(url, false)
 
-	// Use RegEx matcher for regex pattern matching
 	ctx, stopTaskqueue := context.WithCancel(vu.Context())
 	tq := cancelableTaskQueue(ctx, vu.RegisterCallback)
-
 	rm := newRegExMatcher(ctx, vu, tq)
 
 	return promise(vu, func() (result any, reason error) {
@@ -1000,9 +972,6 @@ func waitForNavigationBodyImpl(vu moduleVU, target interface {
 		return nil, fmt.Errorf("parsing frame wait for navigation options: %w", err)
 	}
 
-	// Avoid working with the taskqueue unless the URL option is used.
-	// At the moment the taskqueue needs to be cleaned up manually with
-	// page.close.
 	var (
 		rm            common.RegExMatcher
 		stopTaskqueue = func() {}
@@ -1011,8 +980,6 @@ func waitForNavigationBodyImpl(vu moduleVU, target interface {
 		var ctx context.Context
 		ctx, stopTaskqueue = context.WithCancel(vu.Context())
 		tq := cancelableTaskQueue(ctx, vu.RegisterCallback)
-
-		// Use RegEx matcher for regex pattern matching
 		rm = newRegExMatcher(ctx, vu, tq)
 	}
 
