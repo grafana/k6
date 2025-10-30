@@ -842,46 +842,26 @@ func parseGetByBaseOptions(
 }
 
 // mapPageRoute maps the requested page.route event to the Sobek runtime.
-func mapPageRoute(vu moduleVU, p *common.Page) func(path sobek.Value, handler sobek.Callable) (*sobek.Promise, error) {
-	return func(path sobek.Value, handler sobek.Callable) (*sobek.Promise, error) {
-		ctx := vu.Context()
+func mapPageRoute(vu moduleVU, p *common.Page) func(sobek.Value, sobek.Callable) (*sobek.Promise, error) {
+	return func(path sobek.Value, cb sobek.Callable) (*sobek.Promise, error) {
+		ppath := parseStringOrRegex(path, false)
+		tq := vu.get(vu.Context(), p.TargetID())
 
-		tq := vu.get(ctx, p.TargetID())
-
-		// Use RegEx matcher for regex pattern matching
-		rm := newRegExMatcher(ctx, vu, tq)
-		pathStr := parseStringOrRegex(path, false)
-
-		// Run the event handler in the task queue to
-		// ensure that the handler is executed on the event loop.
-		routeHandler := func(route *common.Route) error {
-			done := make(chan error, 1)
-			tq.Queue(func() error {
-				defer close(done)
-
-				mr := mapRoute(vu, route)
-				_, err := handler(
-					sobek.Undefined(),
-					vu.Runtime().ToValue(mr),
-				)
-				if err != nil {
-					done <- fmt.Errorf("executing page.route('%s') handler: %w", path, err)
-					return nil
-				}
-
-				return nil
-			})
-
-			select {
-			case err := <-done:
-				return err
-			case <-ctx.Done():
-				return errors.New("iteration ended before route completed")
+		route := func(r *common.Route) error {
+			_, err := queueTask(vu.Context(), tq, func() (any, error) {
+				return cb(sobek.Undefined(), vu.Runtime().ToValue(mapRoute(vu, r)))
+			})()
+			if errors.Is(err, context.Canceled) {
+				return fmt.Errorf("page.route('%s'): iteration ended before route completed", path)
 			}
+			if err != nil {
+				return fmt.Errorf("page.route('%s'): %w", path, err)
+			}
+			return nil
 		}
 
 		return promise(vu, func() (any, error) {
-			return nil, p.Route(pathStr, routeHandler, rm)
+			return nil, p.Route(ppath, route, newRegExMatcher(vu.Context(), vu, tq))
 		}), nil
 	}
 }
