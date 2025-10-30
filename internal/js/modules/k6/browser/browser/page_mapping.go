@@ -47,7 +47,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"close": func(opts sobek.Value) *sobek.Promise {
-			// TODO when opts are implemented for this function pares them here before calling promise vu doing it
+			// TODO when opts are implemented for this function, parse them here before calling promise()
 			// in a goroutine off the event loop. As that will race with anything running on the event loop.
 			return promise(vu, func() (any, error) {
 				// It's safe to close the taskqueue for this targetID (if one
@@ -1000,15 +1000,16 @@ func waitForNavigationBodyImpl(vu moduleVU, target interface {
 		return nil, fmt.Errorf("parsing frame wait for navigation options: %w", err)
 	}
 
-	ctx := vu.Context()
-
 	// Avoid working with the taskqueue unless the URL option is used.
 	// At the moment the taskqueue needs to be cleaned up manually with
 	// page.close.
-	var rm common.RegExMatcher
-	stopTaskqueue := func() {}
+	var (
+		rm            common.RegExMatcher
+		stopTaskqueue = func() {}
+	)
 	if popts.URL != "" {
-		ctx, stopTaskqueue = context.WithCancel(ctx)
+		var ctx context.Context
+		ctx, stopTaskqueue = context.WithCancel(vu.Context())
 		tq := cancelableTaskQueue(ctx, vu.RegisterCallback)
 
 		// Use RegEx matcher for regex pattern matching
