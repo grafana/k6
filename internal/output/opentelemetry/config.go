@@ -120,21 +120,21 @@ func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string) (
 // newDefaultConfig creates a new default config with default values
 func newDefaultConfig() Config {
 	return Config{
-		ServiceName:      null.StringFrom("k6"),
-		ServiceVersion:   null.StringFrom(build.Version),
+		ServiceName:      null.NewString("k6", false),
+		ServiceVersion:   null.NewString(build.Version, false),
 		ExporterProtocol: null.NewString(grpcExporterProtocol, false),
 
-		HTTPExporterInsecure: null.BoolFrom(false),
-		HTTPExporterEndpoint: null.StringFrom("localhost:4318"),
-		HTTPExporterURLPath:  null.StringFrom("/v1/metrics"),
+		HTTPExporterInsecure: null.NewBool(false, false),
+		HTTPExporterEndpoint: null.NewString("localhost:4318", false),
+		HTTPExporterURLPath:  null.NewString("/v1/metrics", false),
 
-		GRPCExporterInsecure: null.BoolFrom(false),
-		GRPCExporterEndpoint: null.StringFrom("localhost:4317"),
+		GRPCExporterInsecure: null.NewBool(false, false),
+		GRPCExporterEndpoint: null.NewString("localhost:4317", false),
 
-		ExportInterval: types.NullDurationFrom(10 * time.Second),
-		FlushInterval:  types.NullDurationFrom(1 * time.Second),
+		ExportInterval: types.NewNullDuration(10*time.Second, false),
+		FlushInterval:  types.NewNullDuration(1*time.Second, false),
 
-		SingleCounterForRate: null.BoolFrom(true),
+		SingleCounterForRate: null.NewBool(true, false),
 	}
 }
 
