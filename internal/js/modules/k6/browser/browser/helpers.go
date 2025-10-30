@@ -112,3 +112,14 @@ func queueTask[T any](
 		}
 	}
 }
+
+// cancelableTaskQueue returns a new task queue that is closed when
+// the context is done. It's safe to close the task queue multiple times.
+func cancelableTaskQueue(ctx context.Context, cb func() func(func() error)) *taskqueue.TaskQueue {
+	tq := taskqueue.New(cb)
+	go func() {
+		<-ctx.Done()
+		tq.Close()
+	}()
+	return tq
+}

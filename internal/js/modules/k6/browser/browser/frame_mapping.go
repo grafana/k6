@@ -1,26 +1,14 @@
 package browser
 
 import (
-	"context"
 	"errors"
 	"fmt"
 
 	"github.com/grafana/sobek"
-	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/common"
 	k6common "go.k6.io/k6/js/common"
 )
-
-func cancelableTaskQueue(ctx context.Context, registerCallback func() func(func() error)) *taskqueue.TaskQueue {
-	tq := taskqueue.New(registerCallback)
-
-	go func() {
-		<-ctx.Done()
-		tq.Close()
-	}()
-	return tq
-}
 
 // mapFrame to the JS module.
 //
