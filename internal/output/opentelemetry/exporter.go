@@ -38,17 +38,35 @@ func getExporter(cfg Config) (metric.Exporter, error) {
 		}
 	}
 
-	exporterType := cfg.ExporterType.String
+	// TODO: drop the merge when the deprecated exporter type is fully removed
+	protocol := mergeExporterTypeAndProtocol(cfg)
 
-	if exporterType == grpcExporterType {
+	switch protocol {
+	case grpcExporterProtocol:
 		return buildGRPCExporter(ctx, cfg, tlsConfig, headers)
-	}
-
-	if exporterType == httpExporterType {
+	case httpExporterProtocol:
 		return buildHTTPExporter(ctx, cfg, tlsConfig, headers)
+	default:
+		return nil, errors.New("unsupported exporter protocol " + cfg.ExporterProtocol.String)
 	}
+}
 
-	return nil, errors.New("unsupported exporter type " + exporterType + " specified")
+func mergeExporterTypeAndProtocol(cfg Config) string {
+	if cfg.ExporterProtocol.Valid {
+		return cfg.ExporterProtocol.String
+	}
+	if cfg.ExporterType.Valid {
+		switch cfg.ExporterType.String {
+		case httpExporterType:
+			return httpExporterProtocol
+		case grpcExporterType:
+			return grpcExporterProtocol
+		default:
+			return cfg.ExporterType.String
+		}
+	}
+	// return the default value
+	return cfg.ExporterProtocol.String
 }
 
 func buildHTTPExporter(

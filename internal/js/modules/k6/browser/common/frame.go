@@ -17,8 +17,6 @@ import (
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
 	"go.k6.io/k6/internal/js/modules/k6/browser/log"
-
-	k6modules "go.k6.io/k6/js/modules"
 )
 
 // maxRetry controls how many times to retry if an action fails.
@@ -96,7 +94,6 @@ type Frame struct {
 	name         string
 	url          string
 	detached     bool
-	vu           k6modules.VU
 
 	// A life cycle event is only considered triggered for a frame if the entire
 	// frame subtree has also had the life cycle event triggered.
@@ -155,7 +152,6 @@ func NewFrame(
 		parentFrame:       parentFrame,
 		childFrames:       make(map[*Frame]bool),
 		id:                frameID,
-		vu:                k6ext.GetVU(ctx),
 		lifecycleEvents:   make(map[LifecycleEvent]bool),
 		inflightRequests:  make(map[network.RequestID]bool),
 		executionContexts: make(map[executionWorld]frameExecutionContext),
