@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/mstoykov/envconfig"
+	"github.com/sirupsen/logrus"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/internal/build"
@@ -50,7 +52,7 @@ type Config struct {
 	// ExportInterval configures the intervening time between metrics exports
 	ExportInterval types.NullDuration `json:"exportInterval" envconfig:"K6_OTEL_EXPORT_INTERVAL"`
 
-	// Headers in W3C Correlation-Context format without additional semi-colon delimited metadata (i.e. "k1=v1,k2=v2")
+	// Headers in W3C Correlation-Context format without additional semicolon-delimited metadata (i.e. "k1=v1,k2=v2")
 	Headers null.String `json:"headers" envconfig:"K6_OTEL_HEADERS"`
 
 	// TLSInsecureSkipVerify disables verification of the server's certificate chain
@@ -88,13 +90,27 @@ type Config struct {
 // GetConsolidatedConfig combines the options' values from the different sources
 // and returns the merged options. The Order of precedence used is documented
 // in the k6 Documentation https://grafana.com/docs/k6/latest/using-k6/k6-options/how-to/#order-of-precedence.
-func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string) (Config, error) {
+func GetConsolidatedConfig(
+	jsonRawConf json.RawMessage,
+	env map[string]string,
+	logger logrus.FieldLogger,
+) (Config, error) {
+	// We start from the defaults.
 	cfg := newDefaultConfig()
+
+	// Then, we apply the OTLP exporter environment variables. So, these are used as the "defaults", if defined,
+	// while the k6-specific configuration options / environment variables remain with higher precedence, as follows.
+	cfg, err := applyOTELEnvVars(cfg, env)
+	if err != nil {
+		return cfg, fmt.Errorf("parse standard OTEL environment variables options failed: %w", err)
+	}
+
 	if jsonRawConf != nil {
 		jsonConf, err := parseJSON(jsonRawConf)
 		if err != nil {
 			return cfg, fmt.Errorf("parse JSON options failed: %w", err)
 		}
+		warnIfConfigMismatch(jsonConf, logger)
 		cfg = cfg.Apply(jsonConf)
 	}
 
@@ -103,11 +119,11 @@ func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string) (
 		if err != nil {
 			return cfg, fmt.Errorf("parse environment variables options failed: %w", err)
 		}
+		warnIfConfigMismatch(envConf, logger)
 		cfg = cfg.Apply(envConf)
 	}
 
 	if err := cfg.Validate(); err != nil {
-		// TODO: check why k6's still exiting with 255
 		return cfg, errext.WithExitCodeIfNone(
 			fmt.Errorf("error validating OpenTelemetry output config: %w", err),
 			exitcodes.InvalidConfig,
@@ -328,14 +344,93 @@ func parseJSON(data json.RawMessage) (Config, error) {
 func parseEnvs(env map[string]string) (Config, error) {
 	cfg := Config{}
 
-	if serviceName, ok := env["OTEL_SERVICE_NAME"]; ok {
-		cfg.ServiceName = null.StringFrom(serviceName)
-	}
-
 	err := envconfig.Process("K6_OTEL_", &cfg, func(key string) (string, bool) {
 		v, ok := env[key]
 		return v, ok
 	})
 
 	return cfg, err
+}
+
+// applyOTELEnvVars applies the OTLP exporter environment variables, if defined, to the supplied Config.
+// It only considers their general version (e.g., OTEL_EXPORTER_OTLP_PROTOCOL) rather than their
+// signal-specific ones (e.g., OTEL_EXPORTER_OTLP_METRICS_PROTOCOL).
+// In the future we might consider parsing also the `_METRICS_` ones.
+func applyOTELEnvVars(defaultCfg Config, env map[string]string) (Config, error) {
+	stdCfg := Config{}
+
+	if serviceName, ok := env["OTEL_SERVICE_NAME"]; ok {
+		stdCfg.ServiceName = null.StringFrom(serviceName)
+	}
+
+	if exporterProtocol, ok := env["OTEL_EXPORTER_OTLP_PROTOCOL"]; ok {
+		stdCfg.ExporterProtocol = null.StringFrom(exporterProtocol)
+	}
+
+	if exportInterval, ok := env["OTEL_METRIC_EXPORT_INTERVAL"]; ok {
+		exportIntervalDuration, err := types.ParseExtendedDuration(exportInterval)
+		if err != nil {
+			return Config{}, err
+		}
+		stdCfg.ExportInterval = types.NullDurationFrom(exportIntervalDuration)
+	}
+
+	if exporterHeaders, ok := env["OTEL_EXPORTER_OTLP_HEADERS"]; ok {
+		stdCfg.Headers = null.StringFrom(exporterHeaders)
+	}
+
+	if exporterCertificate, ok := env["OTEL_EXPORTER_OTLP_CERTIFICATE"]; ok {
+		stdCfg.TLSCertificate = null.StringFrom(exporterCertificate)
+	}
+
+	if exporterClientCertificate, ok := env["OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE"]; ok {
+		stdCfg.TLSClientCertificate = null.StringFrom(exporterClientCertificate)
+	}
+
+	if exporterClientKey, ok := env["OTEL_EXPORTER_OTLP_CLIENT_KEY"]; ok {
+		stdCfg.TLSClientKey = null.StringFrom(exporterClientKey)
+	}
+
+	if exporterInsecure, ok := env["OTEL_EXPORTER_OTLP_INSECURE"]; ok {
+		exporterInsecureBool, err := strconv.ParseBool(exporterInsecure)
+		if err != nil {
+			return Config{}, err
+		}
+
+		stdCfg.GRPCExporterInsecure = null.BoolFrom(exporterInsecureBool)
+		stdCfg.HTTPExporterInsecure = null.BoolFrom(exporterInsecureBool)
+	}
+
+	if exporterEndpoint, ok := env["OTEL_EXPORTER_OTLP_ENDPOINT"]; ok {
+		stdCfg.GRPCExporterEndpoint = null.StringFrom(exporterEndpoint)
+		stdCfg.HTTPExporterEndpoint = null.StringFrom(exporterEndpoint)
+	}
+
+	return defaultCfg.Apply(stdCfg), nil
+}
+
+// warnIfConfigMismatch writes a warning log message in case of discrepancies between the configured
+// Config.ExporterProtocol and other configuration attributes. E.g., in case the user explicitly configured
+// Config.HTTPExporterEndpoint while the chosen protocol is `grpc`.
+func warnIfConfigMismatch(cfg Config, logger logrus.FieldLogger) {
+	exporterProtocol := cfg.ExporterProtocol.String
+	switch {
+	case exporterProtocol == grpcExporterProtocol && anyHTTPOptionSet(cfg):
+		logger.Warn("Configuration mismatch detected: the gRPC exporter type is set, but also some HTTP " +
+			"configuration options")
+	case exporterProtocol == httpExporterProtocol && anyGRPCOptionSet(cfg):
+		logger.Warn("Configuration mismatch detected: the HTTP exporter type is set, but also some gRPC " +
+			"configuration options")
+	}
+}
+
+func anyHTTPOptionSet(cfg Config) bool {
+	return cfg.HTTPExporterInsecure.Valid ||
+		cfg.HTTPExporterEndpoint.Valid ||
+		cfg.HTTPExporterURLPath.Valid
+}
+
+func anyGRPCOptionSet(cfg Config) bool {
+	return cfg.GRPCExporterInsecure.Valid ||
+		cfg.GRPCExporterEndpoint.Valid
 }

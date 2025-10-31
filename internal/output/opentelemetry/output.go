@@ -33,7 +33,7 @@ var _ output.WithStopWithTestError = new(Output)
 
 // New creates an instance of the collector
 func New(p output.Params) (*Output, error) {
-	conf, err := GetConsolidatedConfig(p.JSONConfig, p.Environment)
+	conf, err := GetConsolidatedConfig(p.JSONConfig, p.Environment, p.Logger)
 	if err != nil {
 		return nil, err
 	}
