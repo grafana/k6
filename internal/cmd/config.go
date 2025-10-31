@@ -42,10 +42,10 @@ func configFlagSet() *pflag.FlagSet {
 type Config struct {
 	lib.Options
 
-	Out           []string  `json:"out" envconfig:"K6_OUT"`
-	Linger        null.Bool `json:"linger" envconfig:"K6_LINGER"`
-	NoUsageReport null.Bool `json:"noUsageReport" envconfig:"K6_NO_USAGE_REPORT"`
-	WebDashboard  null.Bool `json:"webDashboard" envconfig:"K6_WEB_DASHBOARD"`
+	Out            []string  `json:"out" envconfig:"K6_OUT"`
+	Linger         null.Bool `json:"linger" envconfig:"K6_LINGER"`
+	NoUsageReport  null.Bool `json:"noUsageReport" envconfig:"K6_NO_USAGE_REPORT"`
+	NoWebDashboard null.Bool `json:"noWebDashboard" envconfig:"K6_NO_WEB_DASHBOARD"`
 
 	// NoArchiveUpload is an option that is only used when running in local-execution mode with the cloud run
 	// command.
@@ -79,8 +79,8 @@ func (c Config) Apply(cfg Config) Config {
 	if cfg.NoUsageReport.Valid {
 		c.NoUsageReport = cfg.NoUsageReport
 	}
-	if cfg.WebDashboard.Valid {
-		c.WebDashboard = cfg.WebDashboard
+	if cfg.NoWebDashboard.Valid {
+		c.NoWebDashboard = cfg.NoWebDashboard
 	}
 	if cfg.NoArchiveUpload.Valid {
 		c.NoArchiveUpload = cfg.NoArchiveUpload
