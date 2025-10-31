@@ -131,13 +131,16 @@ func queueTask[T any](
 	}
 }
 
-// cancelableTaskQueue returns a new task queue that is closed when
-// the context is done. It's safe to close the task queue multiple times.
-func cancelableTaskQueue(ctx context.Context, cb func() func(func() error)) *taskqueue.TaskQueue {
-	tq := taskqueue.New(cb)
+// newTaskQueue returns a new [taskqueue.TaskQueue] that is closed after
+// the returned cancel function is called or when the VU's context is done.
+//
+// Do not call this function off of the event loop.
+func newTaskQueue(vu moduleVU) (*taskqueue.TaskQueue, context.Context, context.CancelFunc) {
+	ctx, cancel := context.WithCancel(vu.Context())
+	tq := taskqueue.New(vu.RegisterCallback)
 	go func() {
 		<-ctx.Done()
 		tq.Close()
 	}()
-	return tq
+	return tq, ctx, cancel
 }
