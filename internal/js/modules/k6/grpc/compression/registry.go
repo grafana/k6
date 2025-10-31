@@ -3,11 +3,17 @@
 package grpccompress
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
 
 	"google.golang.org/grpc"
+)
+
+var (
+	errUnsupportedCompression = errors.New("unsupported compression")
+	errDuplicateRegistration  = errors.New("duplicate compressor registration")
 )
 
 // Spec describes the compression plugin to use and its configuration.
@@ -25,26 +31,47 @@ type Plugin interface {
 	CallOption() grpc.CallOption
 }
 
-var (
-	regMu    sync.RWMutex          //nolint:gochecknoglobals
-	registry = map[string]Plugin{} //nolint:gochecknoglobals
-)
+// Registry is a threadsafe plugin registry.
+type Registry struct {
+	mu      sync.RWMutex
+	plugins map[string]Plugin // key: lowercased plugin name
+}
 
-// Register adds a compression plugin to the global registry.
-func Register(p Plugin) {
-	regMu.Lock()
-	defer regMu.Unlock()
-	registry[strings.ToLower(p.Name())] = p
+// NewRegistry creates an empty registry.
+func NewRegistry() *Registry {
+	return &Registry{plugins: make(map[string]Plugin)}
+}
+
+// Register adds a compression plugin to the registry.
+// It lowercases the name and rejects duplicates.
+func (r *Registry) Register(p Plugin) error {
+	if p == nil {
+		return fmt.Errorf("nil plugin")
+	}
+	key := strings.ToLower(strings.TrimSpace(p.Name()))
+	if key == "" {
+		return fmt.Errorf("plugin name is empty")
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if _, exists := r.plugins[key]; exists {
+		return fmt.Errorf("%w: %q", errDuplicateRegistration, key)
+	}
+	r.plugins[key] = p
+	return nil
 }
 
 // Configure resolves a plugin by name and applies the compression options.
-func Configure(spec Spec) (Plugin, error) {
-	name := strings.ToLower(spec.Name)
-	regMu.RLock()
-	p, ok := registry[name]
-	regMu.RUnlock()
+// Returns the configured Plugin so callers can obtain CallOption().
+func (r *Registry) Configure(spec Spec) (Plugin, error) {
+	name := strings.ToLower(strings.TrimSpace(spec.Name))
+	r.mu.RLock()
+	p, ok := r.plugins[name]
+	r.mu.RUnlock()
 	if !ok {
-		return nil, fmt.Errorf("unsupported compression: %q", spec.Name)
+		return nil, fmt.Errorf("%w: %q", errUnsupportedCompression, spec.Name)
 	}
 	if err := p.EnsureRegistered(); err != nil {
 		return nil, err

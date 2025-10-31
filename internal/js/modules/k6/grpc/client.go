@@ -266,7 +266,8 @@ func (c *Client) Connect(addr string, params sobek.Value) (bool, error) {
 	}
 
 	if p.Compression != nil && p.Compression.Name != "" {
-		plug, err := grpccompress.Configure(*p.Compression)
+		registry := grpccompress.NewRegistry()
+		plug, err := registry.Configure(*p.Compression)
 		if err != nil {
 			return false, err
 		}

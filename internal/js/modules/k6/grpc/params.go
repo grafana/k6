@@ -137,20 +137,17 @@ type connectParams struct {
 	Compression           *grpccompress.Spec
 }
 
-//nolint:gochecknoglobals
-var defaultConnectParams = &connectParams{
-	IsPlaintext:           false,
-	UseReflectionProtocol: false,
-	Timeout:               time.Minute,
-	MaxReceiveSize:        0,
-	MaxSendSize:           0,
-	Authority:             "",
-	ReflectionMetadata:    metadata.New(nil),
-	Compression:           nil,
-}
-
-func newConnectParams(vu modules.VU, input sobek.Value) (*connectParams, error) { //nolint:gocognit
-	result := defaultConnectParams
+func newConnectParams(vu modules.VU, input sobek.Value) (*connectParams, error) { //nolint:gocognit,funlen
+	result := &connectParams{
+		IsPlaintext:           false,
+		UseReflectionProtocol: false,
+		Timeout:               time.Minute,
+		MaxReceiveSize:        0,
+		MaxSendSize:           0,
+		Authority:             "",
+		ReflectionMetadata:    metadata.New(nil),
+		Compression:           nil,
+	}
 	if common.IsNullish(input) {
 		return result, nil
 	}

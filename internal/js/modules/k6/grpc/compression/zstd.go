@@ -12,25 +12,25 @@ import (
 
 const name = "zstd"
 
-type plugin struct{}
+type plugin struct {
+	once sync.Once
+	opts atomic.Pointer[[]kz.EOption]
+}
 
-//nolint:gochecknoglobals
-var (
-	registerOnce sync.Once
-	encOpts      atomic.Value
-)
+func (p *plugin) Name() string { return name }
 
-func (plugin) Name() string { return name }
-
-func (plugin) EnsureRegistered() error {
-	registerOnce.Do(func() {
-		encOpts.Store([]kz.EOption{kz.WithEncoderLevel(kz.SpeedDefault), kz.WithEncoderConcurrency(1)})
-		encoding.RegisterCompressor(zstdCompressor{})
+func (p *plugin) EnsureRegistered() error {
+	p.once.Do(func() {
+		p.opts.Store(&[]kz.EOption{
+			kz.WithEncoderLevel(kz.EncoderLevelFromZstd(1)),
+			kz.WithEncoderConcurrency(1),
+		})
+		encoding.RegisterCompressor(zstdCompressor{p: p})
 	})
 	return nil
 }
 
-func (plugin) Configure(m map[string]any) error {
+func (p *plugin) Configure(m map[string]any) error {
 	opts := []kz.EOption{}
 	if v, ok := m["level"].(int); ok && v > 0 {
 		opts = append(opts, kz.WithEncoderLevel(kz.EncoderLevelFromZstd(v)))
@@ -49,24 +49,28 @@ func (plugin) Configure(m map[string]any) error {
 	if len(opts) == 0 {
 		opts = append(opts, kz.WithEncoderLevel(kz.SpeedDefault), kz.WithEncoderConcurrency(1))
 	}
-	encOpts.Store(opts)
+	p.opts.Store(&opts)
 	return nil
 }
 
-func (plugin) CallOption() grpc.CallOption { return grpc.UseCompressor(name) }
+func (p *plugin) CallOption() grpc.CallOption { return grpc.UseCompressor(name) }
 
-type zstdCompressor struct{}
+type zstdCompressor struct{ p *plugin }
 
-func (zstdCompressor) Name() string { return name }
-func (zstdCompressor) Compress(w io.Writer) (io.WriteCloser, error) {
-	v, ok := encOpts.Load().([]kz.EOption)
-	if !ok || v == nil {
-		return kz.NewWriter(w)
+func (z zstdCompressor) Name() string { return name }
+func (z zstdCompressor) Compress(w io.Writer) (io.WriteCloser, error) {
+	opts := z.p.opts.Load()
+	if opts == nil {
+		z.p.opts.Store(&[]kz.EOption{
+			kz.WithEncoderLevel(kz.EncoderLevelFromZstd(1)),
+			kz.WithEncoderConcurrency(1),
+		})
+		opts = z.p.opts.Load()
 	}
-	return kz.NewWriter(w, v...)
+	return kz.NewWriter(w, *opts...)
 }
 
-func (zstdCompressor) Decompress(r io.Reader) (io.Reader, error) {
+func (z zstdCompressor) Decompress(r io.Reader) (io.Reader, error) {
 	dec, err := kz.NewReader(r, kz.WithDecoderConcurrency(1))
 	if err != nil {
 		return nil, err
@@ -74,4 +78,6 @@ func (zstdCompressor) Decompress(r io.Reader) (io.Reader, error) {
 	return struct{ io.ReadCloser }{dec.IOReadCloser()}, nil // EOF 시 Close()
 }
 
-func init() { Register(plugin{}) }
+func init() {
+	_ = NewRegistry().Register(&plugin{})
+}
