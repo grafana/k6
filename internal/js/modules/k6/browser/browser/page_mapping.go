@@ -564,7 +564,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"waitForNavigation": func(opts sobek.Value) (*sobek.Promise, error) {
-			return waitForNavigationBodyImpl(vu, p, opts)
+			return mapWaitForNavigation(vu, p, opts)
 		},
 		"waitForSelector": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
 			popts := common.NewFrameWaitForSelectorOptions(p.MainFrame().Timeout())
@@ -587,7 +587,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			})
 		},
 		"waitForURL": func(url sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
-			return waitForURLBody(vu, p, url, opts)
+			return mapWaitForURL(vu, p, url, opts)
 		},
 		"waitForResponse": func(url sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
 			popts, err := parsePageWaitForResponseOptions(vu.Context(), opts, p.Timeout())
@@ -603,14 +603,11 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				val = url.String() // No quotes
 			}
 
-			ctx, stopTaskqueue := context.WithCancel(vu.Context())
-			tq := cancelableTaskQueue(ctx, vu.RegisterCallback)
-
-			rm := newRegExMatcher(ctx, vu, tq)
+			tq, ctx, stop := newTaskQueue(vu)
 
 			return promise(vu, func() (result any, reason error) {
-				defer stopTaskqueue()
-				return p.WaitForResponse(val, popts, rm)
+				defer stop()
+				return p.WaitForResponse(val, popts, newRegExMatcher(ctx, vu, tq))
 			}), nil
 		},
 		"waitForRequest": func(url sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
@@ -627,14 +624,11 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				val = url.String() // No quotes
 			}
 
-			ctx, stopTaskqueue := context.WithCancel(vu.Context())
-			tq := cancelableTaskQueue(ctx, vu.RegisterCallback)
-
-			rm := newRegExMatcher(ctx, vu, tq)
+			tq, ctx, stop := newTaskQueue(vu)
 
 			return promise(vu, func() (result any, reason error) {
-				defer stopTaskqueue()
-				return p.WaitForRequest(val, popts, rm)
+				defer stop()
+				return p.WaitForRequest(val, popts, newRegExMatcher(ctx, vu, tq))
 			}), nil
 		},
 		"workers": func() *sobek.Object {
@@ -866,7 +860,7 @@ func mapPageRoute(vu moduleVU, p *common.Page) func(sobek.Value, sobek.Callable)
 	}
 }
 
-func waitForURLBody(vu moduleVU, target interface {
+func mapWaitForURL(vu moduleVU, target interface {
 	Timeout() time.Duration
 	WaitForURL(urlPattern string, opts *common.FrameWaitForURLOptions, rm common.RegExMatcher) error
 }, url sobek.Value, opts sobek.Value,
@@ -879,19 +873,16 @@ func waitForURLBody(vu moduleVU, target interface {
 		return nil, fmt.Errorf("parsing waitForURL options: %w", err)
 	}
 
-	val := parseStringOrRegex(url, false)
-
-	ctx, stopTaskqueue := context.WithCancel(vu.Context())
-	tq := cancelableTaskQueue(ctx, vu.RegisterCallback)
-	rm := newRegExMatcher(ctx, vu, tq)
+	purl := parseStringOrRegex(url, false)
+	tq, ctx, stop := newTaskQueue(vu)
 
 	return promise(vu, func() (result any, reason error) {
-		defer stopTaskqueue()
-		return nil, target.WaitForURL(val, popts, rm)
+		defer stop()
+		return nil, target.WaitForURL(purl, popts, newRegExMatcher(ctx, vu, tq))
 	}), nil
 }
 
-func waitForNavigationBodyImpl(vu moduleVU, target interface {
+func mapWaitForNavigation(vu moduleVU, target interface {
 	Timeout() time.Duration
 	WaitForNavigation(*common.FrameWaitForNavigationOptions, common.RegExMatcher) (*common.Response, error)
 }, opts sobek.Value,
@@ -901,19 +892,18 @@ func waitForNavigationBodyImpl(vu moduleVU, target interface {
 		return nil, fmt.Errorf("parsing frame wait for navigation options: %w", err)
 	}
 
-	var (
-		rm            common.RegExMatcher
-		stopTaskqueue = func() {}
-	)
-	if popts.URL != "" {
-		var ctx context.Context
-		ctx, stopTaskqueue = context.WithCancel(vu.Context())
-		tq := cancelableTaskQueue(ctx, vu.RegisterCallback)
-		rm = newRegExMatcher(ctx, vu, tq)
-	}
+	// Only use task queue and RegExMatcher if a URL is specified.
+	rm, stop := func() (common.RegExMatcher, func()) {
+		if popts.URL == "" {
+			return nil, func() {}
+		}
+		tq, ctx, stop := newTaskQueue(vu)
+		return newRegExMatcher(ctx, vu, tq), stop
+	}()
 
-	return promise(vu, func() (result any, reason error) {
-		defer stopTaskqueue()
+	return promise(vu, func() (any, error) {
+		defer stop()
+
 		resp, err := target.WaitForNavigation(popts, rm)
 		if err != nil {
 			return nil, err //nolint:wrapcheck
