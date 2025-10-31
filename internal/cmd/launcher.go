@@ -4,54 +4,22 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io/fs"
-	"maps"
 	"os"
 	"os/exec"
-	"path"
-	"path/filepath"
-	"slices"
 	"strings"
 	"syscall"
 	"unicode"
 	"unicode/utf8"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/grafana/k6deps"
 	"github.com/grafana/k6provider"
-	"github.com/spf13/cobra"
 
 	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/ext"
-	"go.k6.io/k6/internal/build"
-	"go.k6.io/k6/lib/fsext"
 )
-
-// ioFSBridge allows an afero.Fs to implement the Go standard library io/fs.FS.
-type ioFSBridge struct {
-	pwd   string
-	fsext fsext.Fs
-}
-
-// newIofsBridge returns an IOFSBridge from a Fs
-func newIOFSBridge(fs fsext.Fs, pwd string) fs.FS {
-	return &ioFSBridge{
-		fsext: fs,
-		pwd:   pwd,
-	}
-}
-
-// Open implements fs.Fs Open
-func (b *ioFSBridge) Open(name string) (fs.File, error) {
-	f, err := b.fsext.Open(path.Join(b.pwd, name))
-	if err != nil {
-		return nil, fmt.Errorf("opening file via launcher's bridge: %w", err)
-	}
-	return f, nil
-}
 
 // commandExecutor executes the requested k6 command line command.
 // It abstract the execution path from the concrete binary.
@@ -62,87 +30,6 @@ type commandExecutor interface {
 // provisioner defines the interface for provisioning a commandExecutor for a set of dependencies
 type provisioner interface {
 	provision(map[string]string) (commandExecutor, error)
-}
-
-// launcher is a k6 launcher. It analyses the requirements of a k6 execution,
-// then if required, it provisions a binary executor to satisfy the requirements.
-type launcher struct {
-	gs              *state.GlobalState
-	provisioner     provisioner
-	commandExecutor commandExecutor
-}
-
-// newLauncher creates a new Launcher from a GlobalState using the default provision function
-func newLauncher(gs *state.GlobalState) *launcher {
-	return &launcher{
-		gs:          gs,
-		provisioner: newK6BuildProvisioner(gs),
-	}
-}
-
-// launch analyzies the command to be executed and its input (e.g. script) to identify its dependencies.
-// If it has dependencies that cannot be satisfied by the current binary, it obtains a custom commandExecutor
-// usign the provision function and delegates the execution of the command to this  commandExecutor.
-// On the contrary, continues with the execution of the command in the current binary.
-func (l *launcher) launch(cmd *cobra.Command, args []string) error {
-	if !isAnalysisRequired(cmd) {
-		l.gs.Logger.
-			WithField("command", cmd.Name()).
-			Debug("command does not require dependency analysis")
-		return nil
-	}
-
-	deps, err := analyze(l.gs, args)
-	if err != nil {
-		l.gs.Logger.
-			WithError(err).
-			Error("Automatic extension resolution is enabled but it failed to analyze the dependencies." +
-				" Please, make sure to report this issue by opening a bug report.")
-		return err
-	}
-
-	if !isCustomBuildRequired(deps, build.Version, ext.GetAll()) {
-		l.gs.Logger.
-			Debug("The current k6 binary already satisfies all the required dependencies," +
-				" it isn't required to provision a new binary.")
-		return nil
-	}
-
-	constraintsMap := constraintsMapToProvisionDependency(deps)
-	l.gs.Logger.
-		WithField("deps", constraintsMapToStringForLogs(constraintsMap)).
-		Info("Automatic extension resolution is enabled. The current k6 binary doesn't satisfy all dependencies," +
-			" it's required to provision a custom binary.")
-
-	customBinary, err := l.provisioner.provision(constraintsMap)
-	if err != nil {
-		l.gs.Logger.
-			WithError(err).
-			Error("Failed to provision a k6 binary with required dependencies." +
-				" Please, make sure to report this issue by opening a bug report.")
-		return err
-	}
-
-	l.commandExecutor = customBinary
-
-	// override command's RunE method to be processed by the command executor
-	cmd.RunE = l.runE
-
-	return nil
-}
-
-func constraintsMapToStringForLogs(deps k6provider.Dependencies) string {
-	var buf bytes.Buffer
-
-	for idx, depName := range slices.Sorted(maps.Keys(deps)) {
-		if idx > 0 {
-			_ = buf.WriteByte(';')
-		}
-
-		buf.WriteString(depName)
-		buf.WriteString(deps[depName])
-	}
-	return buf.String()
 }
 
 func constraintsMapToProvisionDependency(deps map[string]*semver.Constraints) k6provider.Dependencies {
@@ -158,11 +45,6 @@ func constraintsMapToProvisionDependency(deps map[string]*semver.Constraints) k6
 	}
 
 	return result
-}
-
-// runE executes the k6 command using a command executor
-func (l *launcher) runE(_ *cobra.Command, _ []string) error {
-	return l.commandExecutor.run(l.gs)
 }
 
 // customBinary runs the requested commands on a different binary on a subprocess passing the
@@ -333,75 +215,6 @@ func formatDependencies(deps map[string]string) string {
 		fmt.Fprintf(buffer, "%s:%s ", dep, version)
 	}
 	return strings.Trim(buffer.String(), " ")
-}
-
-// analyze returns the dependencies for the command to be executed.
-// Presently, only the k6 input script or archive (if any) is passed to k6deps for scanning.
-// TODO: if k6 receives the input from stdin, it is not used for scanning because we don't know
-// if it is a script or an archive
-func analyze(gs *state.GlobalState, args []string) (dependencies, error) {
-	dopts := &k6deps.Options{
-		LookupEnv: func(key string) (string, bool) { v, ok := gs.Env[key]; return v, ok },
-		Manifest:  k6deps.Source{Ignore: true},
-	}
-
-	sourceRootPath := args[0]
-	gs.Logger.WithField("source", "sourceRootPath").
-		Debug("Launcher is resolving and reading the test's script")
-	src, _, pwd, err := readSource(gs, sourceRootPath)
-	dopts.RootDir = pwd
-	if err != nil {
-		return nil, fmt.Errorf("reading source for analysis %w", err)
-	}
-
-	// if sourceRooPath is stdin ('-') we need to preserve the content
-	if sourceRootPath == "-" {
-		gs.Stdin = bytes.NewBuffer(src.Data)
-	}
-
-	if strings.HasSuffix(sourceRootPath, ".tar") {
-		dopts.Archive.Contents = src.Data
-	} else {
-		if !filepath.IsAbs(sourceRootPath) {
-			sourceRootPath = filepath.Join(pwd, sourceRootPath)
-		}
-		dopts.Script.Name = sourceRootPath
-		dopts.Script.Contents = src.Data
-		dopts.Fs = newIOFSBridge(gs.FS, pwd)
-	}
-
-	deps, err := k6deps.Analyze(dopts)
-	if err != nil {
-		return nil, err
-	}
-	result := make(dependencies, len(deps))
-	for n, dep := range deps {
-		result[n] = dep.Constraints
-	}
-	return result, nil
-}
-
-// isAnalysisRequired returns a boolean indicating if dependency analysis is required for the command
-func isAnalysisRequired(cmd *cobra.Command) bool {
-	switch stringifyCommand(cmd) {
-	case "k6 run",
-		"k6 cloud",
-		"k6 cloud run",
-		"k6 cloud upload",
-		"k6 upload",
-		"k6 archive",
-		"k6 inspect":
-		return true
-	}
-
-	return false
-}
-
-func stringifyCommand(cmd *cobra.Command) string {
-	if cmd.Parent() == nil {
-		return "k6"
-	}
-	return stringifyCommand(cmd.Parent()) + " " + cmd.Name()
 }
 
 // extractToken gets the cloud token required to access the build service
