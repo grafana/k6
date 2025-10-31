@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/grafana/sobek"
-	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
@@ -750,23 +749,6 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageEventName, sobek.Cal
 		}
 
 		return p.On(eventName, eventHandler) //nolint:wrapcheck
-	}
-}
-
-// newRegExMatcher returns a function that runs in the JS runtime's event loop
-// for pattern matching. It uses ECMAScript RegEx engine for consistency.
-//
-// It's safe to call this function off of the event loop since the returned
-// function gets run in the task queue, ensuring it runs on the event loop.
-func newRegExMatcher(ctx context.Context, vu moduleVU, tq *taskqueue.TaskQueue) common.RegExMatcher {
-	return func(pattern, str string) (bool, error) {
-		return queueTask(ctx, tq, func() (bool, error) {
-			v, err := vu.Runtime().RunString(pattern + `.test('` + str + `')`)
-			if err != nil {
-				return false, fmt.Errorf("evaluating pattern: %w", err)
-			}
-			return v.ToBoolean(), nil
-		})()
 	}
 }
 
