@@ -50,7 +50,12 @@ func machineReadableSummaryResultsBuilder(s *Summary) *machinereadable.SummarySu
 }
 
 func machineReadableSummaryResultsChecksBuilder(s *Summary) *machinereadable.SummarySummaryResultsChecksBuilder {
-	return machinereadable.NewSummarySummaryResultsChecksBuilder().
+	builder := machinereadable.NewSummarySummaryResultsChecksBuilder()
+	if s.Checks == nil {
+		return builder
+	}
+
+	return builder.
 		Metrics([]cog.Builder[machinereadable.Metric]{
 			machineReadableMetricBuilder(s.Checks.Metrics.Total),
 			machineReadableMetricBuilder(s.Checks.Metrics.Fail),
