@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"iter"
 	"net/http"
 	"slices"
 	"strings"
@@ -25,8 +26,6 @@ import (
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
 	"go.k6.io/k6/internal/js/modules/k6/browser/log"
-
-	k6modules "go.k6.io/k6/js/modules"
 )
 
 // BlankPage represents a blank page.
@@ -266,7 +265,6 @@ type Page struct {
 	workersMu        sync.Mutex
 	routes           []*RouteHandler
 	routesMu         sync.RWMutex
-	vu               k6modules.VU
 
 	logger *log.Logger
 }
@@ -299,7 +297,6 @@ func NewPage(
 		eventHandlers:    make(map[PageEventName][]pageEventHandlerRecord),
 		frameSessions:    make(map[cdp.FrameID]*FrameSession),
 		workers:          make(map[target.SessionID]*Worker),
-		vu:               k6ext.GetVU(ctx),
 		logger:           logger,
 	}
 
@@ -468,68 +465,33 @@ func (e *MetricEvent) Tag(rm RegExMatcher, matches TagMatches) error {
 // url regexes and the matching is done from within there. If a match is found,
 // the supplied name is returned back upstream to the caller of urlTagName.
 func (p *Page) urlTagName(url string, method string) (string, bool) {
-	if !p.hasEventHandler(PageEventMetric) {
-		return "", false
-	}
+	var (
+		tag         string
+		matched     bool
+		metricEvent = &MetricEvent{url: url, method: method}
+	)
 
-	var newTagName string
-	var urlMatched bool
-	em := &MetricEvent{
-		url:    url,
-		method: method,
-	}
-
-	p.eventHandlersMu.RLock()
-	defer p.eventHandlersMu.RUnlock()
-	for _, next := range p.eventHandlers[PageEventMetric] {
-		err := func() error {
-			// Handlers can register other handlers, so we need to
-			// unlock the mutex before calling the next handler.
-			p.eventHandlersMu.RUnlock()
-			defer p.eventHandlersMu.RLock()
-
-			// Call and wait for the handler to complete.
-			return next.handler(PageEvent{
-				Metric: em,
-			})
-		}()
-		if err != nil {
+	for handle := range p.eventHandlersByName(PageEventMetric) {
+		if err := handle(PageEvent{Metric: metricEvent}); err != nil {
 			p.logger.Debugf("urlTagName", "handler returned an error: %v", err)
 			return "", false
 		}
 	}
 
 	// If a match was found then the name field in em will have been updated.
-	if em.isUserURLTagNameExist {
-		newTagName = em.userProvidedURLTagName
-		urlMatched = true
+	if metricEvent.isUserURLTagNameExist {
+		tag = metricEvent.userProvidedURLTagName
+		matched = true
 	}
+	p.logger.Debugf("urlTagName", "name: %q nameChanged: %v", tag, matched)
 
-	p.logger.Debugf("urlTagName", "name: %q nameChanged: %v", newTagName, urlMatched)
-
-	return newTagName, urlMatched
+	return tag, matched
 }
 
+// onRequest calls [PageEventRequest] handlers after each request is made.
 func (p *Page) onRequest(request *Request) {
-	if !p.hasEventHandler(PageEventRequest) {
-		return
-	}
-
-	p.eventHandlersMu.RLock()
-	defer p.eventHandlersMu.RUnlock()
-	for _, next := range p.eventHandlers[PageEventRequest] {
-		err := func() error {
-			// Handlers can register other handlers, so we need to
-			// unlock the mutex before calling the next handler.
-			p.eventHandlersMu.RUnlock()
-			defer p.eventHandlersMu.RLock()
-
-			// Call and wait for the handler to complete.
-			return next.handler(PageEvent{
-				Request: request,
-			})
-		}()
-		if err != nil {
+	for handle := range p.eventHandlersByName(PageEventRequest) {
+		if err := handle(PageEvent{Request: request}); err != nil {
 			p.logger.Warnf("onRequest", "handler returned an error: %v", err)
 			return
 		}
@@ -538,27 +500,8 @@ func (p *Page) onRequest(request *Request) {
 
 // onResponse will call the handlers for the page.on('response') event.
 func (p *Page) onResponse(resp *Response) {
-	p.logger.Debugf("Page:onResponse", "sid:%v url:%v", p.sessionID(), resp.URL())
-
-	if !p.hasEventHandler(PageEventResponse) {
-		return
-	}
-
-	p.eventHandlersMu.RLock()
-	defer p.eventHandlersMu.RUnlock()
-	for _, next := range p.eventHandlers[PageEventResponse] {
-		err := func() error {
-			// Handlers can register other handlers, so we need to
-			// unlock the mutex before calling the next handler.
-			p.eventHandlersMu.RUnlock()
-			defer p.eventHandlersMu.RLock()
-
-			// Call and wait for the handler to complete.
-			return next.handler(PageEvent{
-				Response: resp,
-			})
-		}()
-		if err != nil {
+	for handle := range p.eventHandlersByName(PageEventResponse) {
+		if err := handle(PageEvent{Response: resp}); err != nil {
 			p.logger.Warnf("onResponse", "handler returned an error: %v", err)
 			return
 		}
@@ -569,20 +512,13 @@ func (p *Page) onConsoleAPICalled(event *runtime.EventConsoleAPICalled) {
 	if !p.hasEventHandler(PageEventConsole) {
 		return
 	}
-
-	m, err := p.consoleMsgFromConsoleEvent(event)
+	cm, err := p.consoleMsgFromConsoleEvent(event)
 	if err != nil {
 		p.logger.Errorf("Page:onConsoleAPICalled", "building console message: %v", err)
 		return
 	}
-
-	p.eventHandlersMu.RLock()
-	defer p.eventHandlersMu.RUnlock()
-	for _, next := range p.eventHandlers[PageEventConsole] {
-		err := next.handler(PageEvent{
-			ConsoleMessage: m,
-		})
-		if err != nil {
+	for handle := range p.eventHandlersByName(PageEventConsole) {
+		if err := handle(PageEvent{ConsoleMessage: cm}); err != nil {
 			p.logger.Debugf("onConsoleAPICalled", "handler returned an error: %v", err)
 			return
 		}
@@ -1788,6 +1724,30 @@ func (p *Page) WaitForURL(urlPattern string, opts *FrameWaitForURLOptions, rm Re
 	}
 
 	return nil
+}
+
+// eventHandlersByName returns a single-use iterator that yields all event handlers
+// registered for the given event name. If there are no handlers registered, it
+// returns an empty iterator. The iterator is safe for concurrent use.
+func (p *Page) eventHandlersByName(evn PageEventName) iter.Seq[PageEventHandler] {
+	return func(yield func(PageEventHandler) bool) {
+		if !p.hasEventHandler(evn) {
+			return
+		}
+
+		// Avoid holding locks while running handlers (which might
+		// register/unregister handlers and thus attempt to acquire the
+		// write lock), and prevents concurrent modification issues.
+		p.eventHandlersMu.RLock()
+		handlers := slices.Clone(p.eventHandlers[evn])
+		p.eventHandlersMu.RUnlock()
+
+		for _, next := range handlers {
+			if !yield(next.handler) {
+				return
+			}
+		}
+	}
 }
 
 // waitForEvent subscribes to the given event and resolves once the predicate

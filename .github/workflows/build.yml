@@ -152,7 +152,7 @@ jobs:
           go version
           ./build-release.sh "dist" "${VERSION}"
       - name: Upload artifacts
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: binaries
           path: dist/
@@ -185,28 +185,31 @@ jobs:
             -t $DOCKER_IMAGE_ID .
       - name: Check
         run: |
-            docker buildx build --load -t $DOCKER_IMAGE_ID .
-            # Assert that simple cases works for the new built image
-            docker run $DOCKER_IMAGE_ID version
-            docker run $DOCKER_IMAGE_ID --help
-            docker run $DOCKER_IMAGE_ID help
-            docker run $DOCKER_IMAGE_ID run --help
-            docker run $DOCKER_IMAGE_ID inspect --help
-            docker run $DOCKER_IMAGE_ID status --help
-            docker run $DOCKER_IMAGE_ID stats --help
-            docker run $DOCKER_IMAGE_ID scale --help
-            docker run $DOCKER_IMAGE_ID pause --help
-            docker run $DOCKER_IMAGE_ID resume --help
+          docker buildx build --load -t $DOCKER_IMAGE_ID .
+          # Assert that simple cases works for the new built image
+          docker run $DOCKER_IMAGE_ID version
+          docker run $DOCKER_IMAGE_ID --help
+          docker run $DOCKER_IMAGE_ID help
+          docker run $DOCKER_IMAGE_ID run --help
+          docker run $DOCKER_IMAGE_ID inspect --help
+          docker run $DOCKER_IMAGE_ID status --help
+          docker run $DOCKER_IMAGE_ID stats --help
+          docker run $DOCKER_IMAGE_ID scale --help
+          docker run $DOCKER_IMAGE_ID pause --help
+          docker run $DOCKER_IMAGE_ID resume --help
       - name: Login to DockerHub
         if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') }}
         uses: grafana/shared-workflows/actions/dockerhub-login@c6d954f7cd9c0022018982e01268de6cb75b913c # dockerhub-login/v1.0.2
-      - name: Login to ghcr.io
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
         env:
           GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          registry: ghcr.io
+          username: ${{ env.GITHUB_ACTOR }}
+          password: ${{ env.GITHUB_TOKEN }}
         if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') }}
-        run: |
-          # Log into GitHub Container Registry
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login https://ghcr.io -u ${GITHUB_ACTOR} --password-stdin
       - name: Publish k6:master images
         if: ${{ github.ref == 'refs/heads/master' }}
         run: |
@@ -273,7 +276,7 @@ jobs:
       windows_binary_artifact_name: ${{ steps.assign-artifact-names.outputs.windows-binary-artifact-name }}
     steps:
       - name: Download binaries
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
           name: binaries
           path: dist
@@ -283,7 +286,7 @@ jobs:
           Expand-Archive -Path ".\dist\k6-${env:VERSION}-windows-amd64.zip" -DestinationPath .\packaging\
 
       - name: Upload artifact for Windows installer build
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: windows-binary
           path: 'packaging/k6-${{ env.VERSION }}-windows-amd64/k6.exe'
@@ -314,7 +317,7 @@ jobs:
           signed-artifact-name: 'windows-binary-signed'
 
       - name: Download signed Windows binary
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         if: needs.configure.outputs.sign_windows_artifacts == 'true'
         with:
           name: ${{ steps.sign-artifacts.outputs.artifact-name }}
@@ -327,7 +330,7 @@ jobs:
           Compress-Archive -Path ".\packaging\*" -DestinationPath ".\dist\k6-${env:VERSION}-windows-amd64.zip" -Force
 
       - name: Upload signed artifacts
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         if: needs.configure.outputs.sign_windows_artifacts == 'true'
         with:
           name: binaries-signed
@@ -371,7 +374,7 @@ jobs:
           Expand-Archive -Path .\wix311-binaries.zip -DestinationPath .\wix311\
           echo "$pwd\wix311" | Out-File -FilePath $env:GITHUB_PATH -Append
       - name: Download Windows binary
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
           name: ${{ needs.sign-binaries.outputs.windows_binary_artifact_name }}
           path: packaging
@@ -389,7 +392,7 @@ jobs:
         run: move "packaging\k6.msi" "packaging\k6-${env:VERSION}-windows-amd64.msi"
 
       - name: Upload Windows installer
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: binaries-windows
           path: |
@@ -418,7 +421,7 @@ jobs:
     needs: [configure, package]
     steps:
       - name: Download Windows artifacts
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         if: needs.configure.outputs.sign_windows_artifacts == 'true'
         with:
           name: binaries-windows
@@ -469,12 +472,12 @@ jobs:
         with:
           persist-credentials: false
       - name: Download binaries
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
           name: ${{ needs.sign-binaries.outputs.binary_artifact_name }}
           path: dist
       - name: Download Windows binaries
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
           name: ${{ needs.sign-packages.outputs.artifact_name }}
           path: dist
@@ -552,12 +555,12 @@ jobs:
         with:
           persist-credentials: false
       - name: Download binaries
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
           name: ${{ needs.sign-binaries.outputs.binary_artifact_name }}
           path: dist
       - name: Download Windows binaries
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
           name: ${{ needs.sign-packages.outputs.artifact_name }}
           path: dist
@@ -592,11 +595,14 @@ jobs:
           S3_BUCKET=${S3_BUCKET}
           EOF
           echo "${PGP_SIGN_KEY}" > packaging/sign-key.gpg
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ env.GITHUB_ACTOR }}
+          password: ${{ env.GITHUB_TOKEN }}
       - name: Publish packages
-        env:
-          GITHUB_ACTOR: ${{ github.actor }}
         run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login https://ghcr.io -u ${GITHUB_ACTOR} --password-stdin
           cd packaging
           docker compose pull packager
           docker compose run --rm packager

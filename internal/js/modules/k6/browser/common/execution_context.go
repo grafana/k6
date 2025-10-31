@@ -8,10 +8,7 @@ import (
 	"regexp"
 	"sync"
 
-	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
 	"go.k6.io/k6/internal/js/modules/k6/browser/log"
-
-	k6modules "go.k6.io/k6/js/modules"
 
 	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/cdp"
@@ -55,7 +52,6 @@ type ExecutionContext struct {
 	id             runtime.ExecutionContextID
 	isMutex        sync.RWMutex
 	injectedScript JSHandleAPI
-	vu             k6modules.VU
 
 	// Used for logging
 	sid  target.SessionID // Session ID
@@ -74,7 +70,6 @@ func NewExecutionContext(
 		frame:          f,
 		id:             id,
 		injectedScript: nil,
-		vu:             k6ext.GetVU(ctx),
 		logger:         l,
 	}
 	if s != nil {
