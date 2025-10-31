@@ -361,7 +361,7 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			if err := copts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing locator press sequentially options: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, lo.PressSequentially(text, copts) //nolint:wrapcheck
 			}), nil
 		},
