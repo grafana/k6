@@ -119,45 +119,28 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 				return nil, fmt.Errorf("parsing wait for event options: %w", err)
 			}
 
-			ctx := vu.Context()
-			return promise(vu, func() (result any, reason error) {
-				var runInTaskQueue func(p *common.Page) (bool, error)
-				if popts.PredicateFn != nil {
-					runInTaskQueue = func(p *common.Page) (bool, error) {
-						tq := vu.get(ctx, p.TargetID())
-
-						var rtn bool
-						var err error
-						// The function on the taskqueue runs in its own goroutine
-						// so we need to use a channel to wait for it to complete
-						// before returning the result to the caller.
-						c := make(chan bool)
-						tq.Queue(func() error {
-							var resp sobek.Value
-							resp, err = popts.PredicateFn(vu.Runtime().ToValue(p))
-							rtn = resp.ToBoolean()
-							close(c)
-							return nil
-						})
-
-						select {
-						case <-c:
-						case <-ctx.Done():
-							err = errors.New("iteration ended before waitForEvent completed")
-						}
-
-						return rtn, err //nolint:wrapcheck
+			predicate := func(p *common.Page) (bool, error) {
+				return queueTask(vu.Context(), vu.get(vu.Context(), p.TargetID()), func() (bool, error) {
+					v, err := popts.PredicateFn(vu.Runtime().ToValue(p))
+					if err != nil {
+						return false, err
 					}
-				}
+					return v.ToBoolean(), nil
+				})()
+			}
 
-				resp, err := bc.WaitForEvent(event, runInTaskQueue, popts.Timeout)
-				panicIfFatalError(ctx, err)
+			if popts.PredicateFn == nil {
+				predicate = nil
+			}
+
+			return promise(vu, func() (result any, reason error) {
+				v, err := bc.WaitForEvent(event, predicate, popts.Timeout)
 				if err != nil {
-					return nil, err //nolint:wrapcheck
+					return nil, err
 				}
-				p, ok := resp.(*common.Page)
+				p, ok := v.(*common.Page)
 				if !ok {
-					panicIfFatalError(ctx, fmt.Errorf("response object is not a page: %w", k6error.ErrFatal))
+					panicIfFatalError(vu.Context(), fmt.Errorf("response object is not a page: %w", k6error.ErrFatal))
 				}
 
 				return mapPage(vu, p), nil
