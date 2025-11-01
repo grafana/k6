@@ -635,13 +635,17 @@ func (w *webSocket) send(msg sobek.Value) {
 			common.Throw(rt, fmt.Errorf("unsupported send type %T", o))
 		}
 
-		buffer := msg.ToObject(rt).Get("buffer")
-		ab, ok := buffer.Export().(sobek.ArrayBuffer)
-		if !ok {
+		var b []byte
+		err = rt.ExportTo(msg, &b)
+		if err != nil {
 			common.Throw(rt,
-				fmt.Errorf("buffer of an ArrayBufferView was not an ArrayBuffer but %T", buffer.Export()))
+				fmt.Errorf("got error while trying to export ArrayBufferView to bytes: %w", err))
 		}
-		w.sendArrayBuffer(ab)
+		w.writeQueueCh <- message{
+			mtype: websocket.BinaryMessage,
+			data:  b,
+			t:     time.Now(),
+		}
 	}
 }
 

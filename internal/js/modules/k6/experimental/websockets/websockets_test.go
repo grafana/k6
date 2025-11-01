@@ -427,6 +427,35 @@ func TestBinaryType_ArrayBuffer(t *testing.T) {
 	require.Len(t, logs, 0)
 }
 
+func TestBinaryType_ArrayBuffer_issue_5226(t *testing.T) {
+	t.Parallel()
+	ts := newTestState(t)
+	logger, hook := testutils.NewLoggerWithHook(t, logrus.WarnLevel)
+	ts.runtime.VU.StateField.Logger = logger
+	_, err := ts.runtime.RunOnEventLoop(ts.tb.Replacer.Replace(`
+		var ws = new WebSocket("WSBIN_URL/ws-echo")
+		ws.binaryType = "arraybuffer"
+		ws.addEventListener("open", () => {
+			const sent = new Uint8Array(1024)
+			ws.send(sent.subarray(0, 1))
+			ws.onmessage = (e) => {
+				if (!(e.data instanceof ArrayBuffer)) {
+					throw new Error("Wrong event.data type; expected: ArrayBuffer, got: "+ typeof e.data);
+				}
+
+				if (e.data.byteLength != 1) {
+					throw new Error("The data received isn't equal to the data sent "  + e.data.byteLength);
+				}
+
+				ws.close();
+			}
+		})
+	`))
+	require.NoError(t, err)
+	logs := hook.Drain()
+	require.Len(t, logs, 0)
+}
+
 func TestExceptionDontPanic(t *testing.T) {
 	t.Parallel()
 	cases := map[string]struct {
@@ -1050,7 +1079,7 @@ func TestCookiesDefaultJar(t *testing.T) {
 
 	ts.runtime.VU.StateField.CookieJar, _ = cookiejar.New(nil)
 	_, err = ts.runtime.RunOnEventLoop(sr(`
-		http.cookieJar().set("HTTPBIN_URL/ws-echo-someheader", "someheader", "defaultjar")		
+		http.cookieJar().set("HTTPBIN_URL/ws-echo-someheader", "someheader", "defaultjar")
 
 		var ws = new WebSocket("WSBIN_URL/ws-echo-someheader", null)
 		ws.onopen = () => {
@@ -1372,7 +1401,7 @@ func TestSessionPingAdd(t *testing.T) {
 	ts := newTestState(t)
 
 	_, err := ts.runtime.RunOnEventLoop(sr(`
-			var ws = new WebSocket("WSBIN_URL/ws-echo")			
+			var ws = new WebSocket("WSBIN_URL/ws-echo")
 			ws.addEventListener("open", () => {
 				ws.ping()
 			})
