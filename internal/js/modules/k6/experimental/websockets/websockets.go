@@ -746,25 +746,23 @@ func isValidCloseReason(reason string) bool {
 	return len([]byte(reason)) <= 123
 }
 
-func (w *webSocket) close(code int, reason string) {
+func (w *webSocket) close(code int, reason string) error {
 	if w.readyState == CLOSED || w.readyState == CLOSING {
-		return
+		return nil
 	}
 
-	rt := w.vu.Runtime()
-
 	if code != 0 && !isValidClientCloseCode(code) {
-		common.Throw(rt, fmt.Errorf(
+		return fmt.Errorf(
 			"InvalidAccessError: Failed to execute 'close' on 'WebSocket': "+
 				"The close code must be either 1000, or between 3000 and 4999. %d is neither",
 			code,
-		))
+		)
 	}
 
 	if !isValidCloseReason(reason) {
-		common.Throw(rt, errors.New(
+		return errors.New(
 			`SyntaxError: Failed to execute 'close' on 'WebSocket': The message must not be greater than 123 bytes`,
-		))
+		)
 	}
 
 	if code == 0 {
@@ -779,12 +777,13 @@ func (w *webSocket) close(code int, reason string) {
 		data:  websocket.FormatCloseMessage(code, reason),
 		t:     time.Now(),
 	}
+
+	return nil
 }
 
 func (w *webSocket) queueClose() {
 	w.tq.Queue(func() error {
-		w.close(websocket.CloseNormalClosure, "")
-		return nil
+		return w.close(websocket.CloseNormalClosure, "")
 	})
 }
 
