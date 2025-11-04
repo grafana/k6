@@ -147,7 +147,7 @@ func echoHandler(t testing.TB, closePrematurely bool) http.Handler {
 			closeReceived := make(chan struct{})
 			defaultCloseHandler := conn.CloseHandler()
 			conn.SetCloseHandler(func(code int, text string) error {
-				once.Do(func() { close(closeReceived) })
+				close(closeReceived);
 				return defaultCloseHandler(code, text)
 			})
 
