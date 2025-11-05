@@ -353,9 +353,8 @@ func parseEnvs(env map[string]string) (Config, error) {
 }
 
 // applyOTELEnvVars applies the OTLP exporter environment variables, if defined, to the supplied Config.
-// It only considers their general version (e.g., OTEL_EXPORTER_OTLP_PROTOCOL) rather than their
-// signal-specific ones (e.g., OTEL_EXPORTER_OTLP_METRICS_PROTOCOL).
-// In the future we might consider parsing also the `_METRICS_` ones.
+// As per OTLP Exporter configuration specification, signal-specific variables (e.g.,
+// OTEL_EXPORTER_OTLP_METRICS_PROTOCOL) take precedence over general ones (e.g., OTEL_EXPORTER_OTLP_PROTOCOL).
 func applyOTELEnvVars(defaultCfg Config, env map[string]string) (Config, error) {
 	stdCfg := Config{}
 
@@ -363,7 +362,9 @@ func applyOTELEnvVars(defaultCfg Config, env map[string]string) (Config, error) 
 		stdCfg.ServiceName = null.StringFrom(serviceName)
 	}
 
-	if exporterProtocol, ok := env["OTEL_EXPORTER_OTLP_PROTOCOL"]; ok {
+	if exporterProtocol, ok := env["OTEL_EXPORTER_OTLP_METRICS_PROTOCOL"]; ok {
+		stdCfg.ExporterProtocol = null.StringFrom(exporterProtocol)
+	} else if exporterProtocol, ok := env["OTEL_EXPORTER_OTLP_PROTOCOL"]; ok {
 		stdCfg.ExporterProtocol = null.StringFrom(exporterProtocol)
 	}
 
@@ -375,24 +376,39 @@ func applyOTELEnvVars(defaultCfg Config, env map[string]string) (Config, error) 
 		stdCfg.ExportInterval = types.NullDurationFrom(exportIntervalDuration)
 	}
 
-	if exporterHeaders, ok := env["OTEL_EXPORTER_OTLP_HEADERS"]; ok {
+	if exporterHeaders, ok := env["OTEL_EXPORTER_OTLP_METRICS_HEADERS"]; ok {
+		stdCfg.Headers = null.StringFrom(exporterHeaders)
+	} else if exporterHeaders, ok := env["OTEL_EXPORTER_OTLP_HEADERS"]; ok {
 		stdCfg.Headers = null.StringFrom(exporterHeaders)
 	}
 
-	if exporterCertificate, ok := env["OTEL_EXPORTER_OTLP_CERTIFICATE"]; ok {
+	if exporterCertificate, ok := env["OTEL_EXPORTER_OTLP_METRICS_CERTIFICATE"]; ok {
+		stdCfg.TLSCertificate = null.StringFrom(exporterCertificate)
+	} else if exporterCertificate, ok := env["OTEL_EXPORTER_OTLP_CERTIFICATE"]; ok {
 		stdCfg.TLSCertificate = null.StringFrom(exporterCertificate)
 	}
 
-	if exporterClientCertificate, ok := env["OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE"]; ok {
+	if exporterClientCertificate, ok := env["OTEL_EXPORTER_OTLP_METRICS_CLIENT_CERTIFICATE"]; ok {
+		stdCfg.TLSClientCertificate = null.StringFrom(exporterClientCertificate)
+	} else if exporterClientCertificate, ok := env["OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE"]; ok {
 		stdCfg.TLSClientCertificate = null.StringFrom(exporterClientCertificate)
 	}
 
-	if exporterClientKey, ok := env["OTEL_EXPORTER_OTLP_CLIENT_KEY"]; ok {
+	if exporterClientKey, ok := env["OTEL_EXPORTER_OTLP_METRICS_CLIENT_KEY"]; ok {
+		stdCfg.TLSClientKey = null.StringFrom(exporterClientKey)
+	} else if exporterClientKey, ok := env["OTEL_EXPORTER_OTLP_CLIENT_KEY"]; ok {
 		stdCfg.TLSClientKey = null.StringFrom(exporterClientKey)
 	}
 
-	if exporterInsecure, ok := env["OTEL_EXPORTER_OTLP_INSECURE"]; ok {
-		exporterInsecureBool, err := strconv.ParseBool(exporterInsecure)
+	var exporterInsecureBoolVar string
+	if exporterInsecure, ok := env["OTEL_EXPORTER_OTLP_METRICS_INSECURE"]; ok {
+		exporterInsecureBoolVar = exporterInsecure
+	} else if exporterInsecure, ok := env["OTEL_EXPORTER_OTLP_INSECURE"]; ok {
+		exporterInsecureBoolVar = exporterInsecure
+	}
+
+	if exporterInsecureBoolVar != "" {
+		exporterInsecureBool, err := strconv.ParseBool(exporterInsecureBoolVar)
 		if err != nil {
 			return Config{}, err
 		}
@@ -401,7 +417,10 @@ func applyOTELEnvVars(defaultCfg Config, env map[string]string) (Config, error) 
 		stdCfg.HTTPExporterInsecure = null.BoolFrom(exporterInsecureBool)
 	}
 
-	if exporterEndpoint, ok := env["OTEL_EXPORTER_OTLP_ENDPOINT"]; ok {
+	if exporterEndpoint, ok := env["OTEL_EXPORTER_OTLP_METRICS_ENDPOINT"]; ok {
+		stdCfg.GRPCExporterEndpoint = null.StringFrom(exporterEndpoint)
+		stdCfg.HTTPExporterEndpoint = null.StringFrom(exporterEndpoint)
+	} else if exporterEndpoint, ok := env["OTEL_EXPORTER_OTLP_ENDPOINT"]; ok {
 		stdCfg.GRPCExporterEndpoint = null.StringFrom(exporterEndpoint)
 		stdCfg.HTTPExporterEndpoint = null.StringFrom(exporterEndpoint)
 	}
