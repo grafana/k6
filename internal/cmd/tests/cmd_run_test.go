@@ -3115,7 +3115,7 @@ func TestMachineReadableSummary(t *testing.T) {
 		ts.CmdArgs = []string{
 			"k6", "run",
 			"--summary-export=summary.json",
-			"--disable-new-machine-readable-summary=false",
+			"--new-machine-readable-summary=true",
 			"script.js",
 		}
 
@@ -3155,7 +3155,7 @@ func TestMachineReadableSummary(t *testing.T) {
 
 		ts.CmdArgs = []string{
 			"k6", "run",
-			"--disable-new-machine-readable-summary=false",
+			"--new-machine-readable-summary=true",
 			"script.js",
 		}
 

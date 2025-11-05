@@ -47,7 +47,7 @@ type RuntimeOptions struct {
 	TracesOutput  null.String `json:"tracesOutput"`
 
 	// Until v2
-	DisableNewMachineReadableSummary null.Bool `json:"disableNewMachineReadableSummary"`
+	NewMachineReadableSummary null.Bool `json:"newMachineReadableSummary"`
 }
 
 // ValidateCompatibilityMode checks if the provided val is a valid compatibility mode

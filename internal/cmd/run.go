@@ -272,8 +272,8 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 				// likely as an additional argument like options.
 				summary.NoColor = c.gs.Flags.NoColor
 				summary.EnableColors = !summary.NoColor && c.gs.Stdout.IsTTY
-				summary.NewMachineReadableSummary = testRunState.RuntimeOptions.DisableNewMachineReadableSummary.Valid &&
-					!testRunState.RuntimeOptions.DisableNewMachineReadableSummary.Bool
+				summary.NewMachineReadableSummary = testRunState.RuntimeOptions.NewMachineReadableSummary.Valid &&
+					testRunState.RuntimeOptions.NewMachineReadableSummary.Bool
 
 				summaryResult, hsErr := test.initRunner.HandleSummary(globalCtx, legacySummary(), summary, summaryMeta)
 				if hsErr == nil {
