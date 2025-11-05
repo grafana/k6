@@ -4,7 +4,6 @@ import (
 	"github.com/grafana/sobek"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/common"
-	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
 )
 
 func mapResponseEvent(vu moduleVU, event common.PageEvent) mapping {
@@ -20,7 +19,7 @@ func mapResponse(vu moduleVU, r *common.Response) mapping {
 	}
 	maps := mapping{
 		"allHeaders": func() *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return r.AllHeaders(), nil
 			})
 		},
@@ -47,7 +46,7 @@ func mapResponse(vu moduleVU, r *common.Response) mapping {
 			return mapFrame(vu, r.Frame())
 		},
 		"headerValue": func(name string) *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				v, ok := r.HeaderValue(name)
 				if !ok {
 					return nil, nil
@@ -56,18 +55,18 @@ func mapResponse(vu moduleVU, r *common.Response) mapping {
 			})
 		},
 		"headerValues": func(name string) *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return r.HeaderValues(name), nil
 			})
 		},
 		"headers": r.Headers,
 		"headersArray": func() *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return r.HeadersArray(), nil
 			})
 		},
 		"json": func() *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return r.JSON() //nolint: wrapcheck
 			})
 		},
@@ -76,17 +75,17 @@ func mapResponse(vu moduleVU, r *common.Response) mapping {
 			return mapRequest(vu, r.Request())
 		},
 		"securityDetails": func() *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return r.SecurityDetails(), nil
 			})
 		},
 		"serverAddr": func() *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return r.ServerAddr(), nil
 			})
 		},
 		"size": func() *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return r.Size(), nil
 			})
 		},
@@ -94,7 +93,7 @@ func mapResponse(vu moduleVU, r *common.Response) mapping {
 		"statusText": r.StatusText,
 		"url":        r.URL,
 		"text": func() *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return r.Text() //nolint:wrapcheck
 			})
 		},
