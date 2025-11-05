@@ -57,6 +57,26 @@ const (
 	waitForTracerProviderStopTimeout = 3 * time.Minute
 )
 
+// serve starts the REST API server
+func (c *cmdRun) serve(srv *http.Server, addrSetByUser bool) {
+	var logger logrus.FieldLogger = c.gs.Logger
+
+	logger.Debugf("Starting the REST API server on %s", c.gs.Flags.Address)
+	if c.gs.Flags.ProfilingEnabled {
+		logger.Debugf("Profiling exposed on http://%s/debug/pprof/", c.gs.Flags.Address)
+	}
+
+	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		// Only exit k6 if the user has explicitly set the REST API address
+		if addrSetByUser {
+			logger.WithError(err).Error("Error from API server")
+			c.gs.OSExit(int(exitcodes.CannotStartRESTAPI))
+		} else {
+			logger.WithError(err).Warn("Error from API server")
+		}
+	}
+}
+
 // TODO: split apart some more
 //
 //nolint:funlen,gocognit,gocyclo,cyclop
@@ -301,7 +321,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	})
 	samples := make(chan metrics.SampleContainer, test.derivedConfig.MetricSamplesBufferSize.Int64)
 	// Spin up the REST API server, if not disabled.
-	if c.gs.Flags.Address != "" { //nolint:nestif
+	if c.gs.Flags.Address != "" {
 		initBar.Modify(pb.WithConstProgress(0, "Init API server"))
 
 		// We cannot use backgroundProcesses here, since we need the REST API to
@@ -324,19 +344,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		)
 		go func() {
 			defer apiWG.Done()
-			logger.Debugf("Starting the REST API server on %s", c.gs.Flags.Address)
-			if c.gs.Flags.ProfilingEnabled {
-				logger.Debugf("Profiling exposed on http://%s/debug/pprof/", c.gs.Flags.Address)
-			}
-			if aerr := srv.ListenAndServe(); aerr != nil && !errors.Is(aerr, http.ErrServerClosed) {
-				// Only exit k6 if the user has explicitly set the REST API address
-				if cmd.Flags().Lookup("address").Changed {
-					logger.WithError(aerr).Error("Error from API server")
-					c.gs.OSExit(int(exitcodes.CannotStartRESTAPI))
-				} else {
-					logger.WithError(aerr).Warn("Error from API server")
-				}
-			}
+			c.serve(srv, cmd.Flags().Lookup("address").Changed)
 		}()
 		go func() {
 			defer apiWG.Done()
