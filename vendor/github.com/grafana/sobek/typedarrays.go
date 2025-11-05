@@ -994,7 +994,7 @@ func (a *typedArrayObject) iterateStringKeys() iterNextFunc {
 
 func (a *typedArrayObject) exportToArrayOrSlice(dst reflect.Value, typ reflect.Type, ctx *objectExportCtx) error {
 	if typ == typeBytes {
-		dst.Set(reflect.ValueOf(a.viewedArrayBuf.data))
+		dst.Set(reflect.ValueOf(a.viewedArrayBuf.data[a.offset*a.elemSize : (a.offset+a.length)*a.elemSize]))
 		return nil
 	}
 	return a.baseObject.exportToArrayOrSlice(dst, typ, ctx)
@@ -1010,7 +1010,7 @@ func (a *typedArrayObject) exportType() reflect.Type {
 
 func (o *dataViewObject) exportToArrayOrSlice(dst reflect.Value, typ reflect.Type, ctx *objectExportCtx) error {
 	if typ == typeBytes {
-		dst.Set(reflect.ValueOf(o.viewedArrayBuf.data))
+		dst.Set(reflect.ValueOf(o.viewedArrayBuf.data[o.byteOffset : o.byteOffset+o.byteLen]))
 		return nil
 	}
 	return o.baseObject.exportToArrayOrSlice(dst, typ, ctx)

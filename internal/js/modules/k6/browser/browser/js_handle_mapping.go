@@ -6,7 +6,6 @@ import (
 	"github.com/grafana/sobek"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/common"
-	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
 )
 
 // mapJSHandle to the JS module.
@@ -16,7 +15,7 @@ func mapJSHandle(vu moduleVU, jsh common.JSHandleAPI) mapping {
 			return mapElementHandle(vu, jsh.AsElement())
 		},
 		"dispose": func() *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, jsh.Dispose()
 			})
 		},
@@ -26,7 +25,7 @@ func mapJSHandle(vu moduleVU, jsh common.JSHandleAPI) mapping {
 			}
 			funcString := pageFunc.String()
 			gopts := exportArgs(gargs)
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return jsh.Evaluate(funcString, gopts...)
 			}), nil
 		},
@@ -36,7 +35,7 @@ func mapJSHandle(vu moduleVU, jsh common.JSHandleAPI) mapping {
 			}
 			funcString := pageFunc.String()
 			gopts := exportArgs(gargs)
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				h, err := jsh.EvaluateHandle(funcString, gopts...)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
@@ -45,7 +44,7 @@ func mapJSHandle(vu moduleVU, jsh common.JSHandleAPI) mapping {
 			}), nil
 		},
 		"getProperties": func() *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				props, err := jsh.GetProperties()
 				if err != nil {
 					return nil, err //nolint:wrapcheck
@@ -59,7 +58,7 @@ func mapJSHandle(vu moduleVU, jsh common.JSHandleAPI) mapping {
 			})
 		},
 		"jsonValue": func() *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return jsh.JSONValue() //nolint:wrapcheck
 			})
 		},

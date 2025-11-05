@@ -10,7 +10,6 @@ import (
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6error"
-	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
 	k6common "go.k6.io/k6/js/common"
 )
 
@@ -23,12 +22,12 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 	rt := vu.Runtime()
 	return mapping{
 		"addCookies": func(cookies []*common.Cookie) *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, bc.AddCookies(cookies) //nolint:wrapcheck
 			})
 		},
 		"addInitScript": func(script sobek.Value) *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				if k6common.IsNullish(script) {
 					return nil, nil
 				}
@@ -61,22 +60,22 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 			return mapBrowser(vu)
 		},
 		"clearCookies": func() *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, bc.ClearCookies() //nolint:wrapcheck
 			})
 		},
 		"clearPermissions": func() *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, bc.ClearPermissions() //nolint:wrapcheck
 			})
 		},
 		"close": func() *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, bc.Close() //nolint:wrapcheck
 			})
 		},
 		"cookies": func(urls ...string) *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return bc.Cookies(urls...) //nolint:wrapcheck
 			})
 		},
@@ -85,7 +84,7 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 			if err != nil {
 				return nil, fmt.Errorf("parsing grant permission options: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, bc.GrantPermissions(permissions, popts)
 			}), nil
 		},
@@ -96,7 +95,7 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 			if err != nil {
 				return nil, fmt.Errorf("parsing geo location: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, bc.SetGeolocation(&gl)
 			}), nil
 		},
@@ -105,12 +104,12 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 			if err != nil {
 				return nil, fmt.Errorf("parsing HTTP credentials: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, bc.SetHTTPCredentials(creds) //nolint:staticcheck
 			}), nil
 		},
 		"setOffline": func(offline bool) *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, bc.SetOffline(offline) //nolint:wrapcheck
 			})
 		},
@@ -121,7 +120,7 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 			}
 
 			ctx := vu.Context()
-			return k6ext.Promise(ctx, func() (result any, reason error) {
+			return promise(vu, func() (result any, reason error) {
 				var runInTaskQueue func(p *common.Page) (bool, error)
 				if popts.PredicateFn != nil {
 					runInTaskQueue = func(p *common.Page) (bool, error) {
@@ -180,7 +179,7 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 			return rt.ToValue(mpages).ToObject(rt)
 		},
 		"newPage": func() *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				page, err := bc.NewPage()
 				if err != nil {
 					return nil, err //nolint:wrapcheck
