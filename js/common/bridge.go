@@ -15,7 +15,7 @@ var fieldNameExceptions = map[string]string{
 	"OCSP": "ocsp",
 }
 
-// FieldName Returns the JS name for an exported struct field. The name is snake_cased, with respect for
+// FieldName returns the JS name for an exported struct field. The name is snake_cased, with respect for
 // certain common initialisms (URL, ID, HTTP, etc).
 func FieldName(_ reflect.Type, f reflect.StructField) string {
 	// PkgPath is non-empty for unexported fields.
@@ -51,7 +51,7 @@ var methodNameExceptions = map[string]string{
 	"OCSP": "ocsp",
 }
 
-// MethodName Returns the JS name for an exported method. The first letter of the method's name is
+// MethodName returns the JS name for an exported method. The first letter of the method's name is
 // lowercased, otherwise it is unaltered.
 func MethodName(_ reflect.Type, m reflect.Method) string {
 	// A field with a name beginning with an X is a constructor, and just gets the prefix stripped.
