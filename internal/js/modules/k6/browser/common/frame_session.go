@@ -949,7 +949,7 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 	switch ti.Type {
 	case "iframe":
 		err = fs.attachIFrameToTarget(ti, session)
-	case "worker":
+	case "worker", "shared_worker":
 		err = fs.attachWorkerToTarget(ti, session)
 	default:
 		// Just unblock (debugger continue) these targets and detach from them.
