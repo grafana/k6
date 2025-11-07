@@ -114,35 +114,40 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 			})
 		},
 		"waitForEvent": func(event string, optsOrPredicate sobek.Value) (*sobek.Promise, error) {
-			popts, err := parseWaitForEventOptions(vu.Runtime(), optsOrPredicate, bc.Timeout())
+			rt := vu.Runtime()
+			ctx := vu.Context()
+
+			popts, err := parseWaitForEventOptions(rt, optsOrPredicate, bc.Timeout())
 			if err != nil {
 				return nil, fmt.Errorf("parsing wait for event options: %w", err)
 			}
 
-			predicate := func(p *common.Page) (bool, error) {
-				return queueTask(vu.Context(), vu.get(vu.Context(), p.TargetID()), func() (bool, error) {
-					v, err := popts.PredicateFn(vu.Runtime().ToValue(p))
-					if err != nil {
-						return false, err
-					}
-					return v.ToBoolean(), nil
-				})()
-			}
+			// Waits until the first event if no predicate is specified.
+			var pred func(p *common.Page) (bool, error)
 
-			if popts.PredicateFn == nil {
-				predicate = nil
+			// Waits until the event that satisfies the predicate.
+			if popts.PredicateFn != nil {
+				pred = func(p *common.Page) (bool, error) {
+					return queueTask(ctx, vu.get(ctx, p.TargetID()), func() (bool, error) {
+						v, err := popts.PredicateFn(rt.ToValue(p))
+						if err != nil {
+							return false, err
+						}
+						return v.ToBoolean(), nil
+					})()
+				}
 			}
 
 			return promise(vu, func() (result any, reason error) {
-				v, err := bc.WaitForEvent(event, predicate, popts.Timeout)
+				v, err := bc.WaitForEvent(event, pred, popts.Timeout)
 				if err != nil {
+					panicIfFatalError(ctx, err)
 					return nil, err
 				}
 				p, ok := v.(*common.Page)
 				if !ok {
-					panicIfFatalError(vu.Context(), fmt.Errorf("response object is not a page: %w", k6error.ErrFatal))
+					panicIfFatalError(ctx, fmt.Errorf("response object is not a page: %w", k6error.ErrFatal))
 				}
-
 				return mapPage(vu, p), nil
 			}), nil
 		},

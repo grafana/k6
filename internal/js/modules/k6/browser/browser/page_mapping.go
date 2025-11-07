@@ -693,10 +693,11 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageEventName, sobek.Cal
 			return fmt.Errorf("unknown page on event: %q", eventName)
 		}
 
-		tq := vu.get(vu.Context(), p.TargetID())
+		ctx := vu.Context()
+		tq := vu.get(ctx, p.TargetID())
 
 		return p.On(eventName, func(event common.PageEvent) error {
-			wait := queueTask(vu.Context(), tq, func() (sobek.Value, error) {
+			wait := queueTask(ctx, tq, func() (sobek.Value, error) {
 				_, err := handle(sobek.Undefined(), vu.Runtime().ToValue(pageEvent.mapp(vu, event)))
 				if err != nil {
 					return nil, fmt.Errorf("executing page.on('%s') handler: %w", eventName, err)
@@ -838,11 +839,13 @@ func parseGetByBaseOptions(
 // mapPageRoute maps the requested page.route event to the Sobek runtime.
 func mapPageRoute(vu moduleVU, p *common.Page) func(sobek.Value, sobek.Callable) (*sobek.Promise, error) {
 	return func(path sobek.Value, cb sobek.Callable) (*sobek.Promise, error) {
+		ctx := vu.Context()
+
 		ppath := parseStringOrRegex(path, false)
-		tq := vu.get(vu.Context(), p.TargetID())
+		tq := vu.get(ctx, p.TargetID())
 
 		route := func(r *common.Route) error {
-			_, err := queueTask(vu.Context(), tq, func() (any, error) {
+			_, err := queueTask(ctx, tq, func() (any, error) {
 				return cb(sobek.Undefined(), vu.Runtime().ToValue(mapRoute(vu, r)))
 			})()
 			if errors.Is(err, context.Canceled) {
@@ -855,7 +858,7 @@ func mapPageRoute(vu moduleVU, p *common.Page) func(sobek.Value, sobek.Callable)
 		}
 
 		return promise(vu, func() (any, error) {
-			return nil, p.Route(ppath, route, newRegExMatcher(vu.Context(), vu, tq))
+			return nil, p.Route(ppath, route, newRegExMatcher(ctx, vu, tq))
 		}), nil
 	}
 }
