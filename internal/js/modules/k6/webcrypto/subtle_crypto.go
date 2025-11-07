@@ -3,9 +3,7 @@ package webcrypto
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"hash"
-	"strings"
 
 	"github.com/grafana/sobek"
 	"go.k6.io/k6/js/common"
@@ -579,7 +577,7 @@ func (sc *SubtleCrypto) GenerateKey(
 // function: for example, for PBKDF2 it might be a password, imported as a `SubtleCrypto.CryptoKey`
 // using `SubtleCrypto.ImportKey`.
 //
-// The `derivedKeyAlgorithm` parameter should be one of:
+// The `derivedKeyType` parameter should be one of:
 //   - an `SubtleCrypto.HMACKeyGenParams` object
 //   - For AES-CTR, AES-CBC, AES-GCM, AES-KW: pass an `SubtleCrypto.AESKeyGenParams`
 //
@@ -592,12 +590,100 @@ func (sc *SubtleCrypto) GenerateKey(
 func (sc *SubtleCrypto) DeriveKey(
 	algorithm sobek.Value,
 	baseKey sobek.Value,
-	derivedKeyAlgorithm sobek.Value,
+	derivedKeyType sobek.Value,
 	extractable bool,
 	keyUsages []CryptoKeyUsage,
-) *sobek.Promise {
-	// TODO: implementation
-	return nil
+) (*sobek.Promise, error) {
+	rt := sc.vu.Runtime()
+
+	var (
+		deriver KeyDeriver
+		ki      KeyImporter
+		kgl     KeyGetLengther
+	)
+
+	err := func() error {
+		normalized, err := normalizeAlgorithm(rt, algorithm, OperationIdentifierDeriveKey)
+		if err != nil {
+			return err
+		}
+
+		deriver, err = newKeyDeriver(rt, normalized, algorithm)
+		if err != nil {
+			return err
+		}
+
+		normalizedDerivedKeyAlgorithmImport, err := normalizeAlgorithm(rt, derivedKeyType, OperationIdentifierImportKey)
+		if err != nil {
+			return err
+		}
+
+		if !isAesAlgorithm(normalizedDerivedKeyAlgorithmImport.Name) && !isHMACAlgorithm(normalizedDerivedKeyAlgorithmImport.Name) {
+			return NewError(NotSupportedError, "derive key function doesn't support algorithm "+normalizedDerivedKeyAlgorithmImport.Name)
+		}
+
+		ki, err = newKeyImporter(rt, normalizedDerivedKeyAlgorithmImport, derivedKeyType)
+		if err != nil {
+			return err
+		}
+
+		normalizedDerivedKeyAlgorithmLength, err := normalizeAlgorithm(rt, derivedKeyType, OperationIdentifierGetKeyLength)
+		if err != nil {
+			return err
+		}
+
+		kgl, err = newKeyGetLengther(rt, normalizedDerivedKeyAlgorithmLength, derivedKeyType)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}()
+
+	promise, resolve, reject := rt.NewPromise()
+	if err != nil {
+		err := reject(err)
+		return promise, err
+	}
+
+	callback := sc.vu.RegisterCallback()
+	go func() {
+		result, err := func() (*CryptoKey, error) {
+			result, err := deriver.DeriveKey(
+				rt,
+				baseKey,
+				derivedKeyType,
+				ki,
+				kgl,
+				keyUsages,
+				extractable,
+			)
+			if err != nil {
+				return nil, err
+			}
+
+			isSecretKey := result.Type == SecretCryptoKeyType
+			isPrivateKey := result.Type == PrivateCryptoKeyType
+			isUsagesEmpty := len(keyUsages) == 0
+			if (isSecretKey || isPrivateKey) && isUsagesEmpty {
+				return nil, NewError(SyntaxError, "usages cannot not be empty for a secret or private CryptoKey")
+			}
+
+			result.Extractable = extractable
+			result.Usages = keyUsages
+
+			return result, nil
+		}()
+
+		callback(func() error {
+			if err != nil {
+				return reject(err)
+			}
+			return resolve(result)
+		})
+	}()
+
+	return promise, nil
 }
 
 // DeriveBits derives an array of bits from a base key.
@@ -633,77 +719,15 @@ func (sc *SubtleCrypto) DeriveBits( //nolint:funlen,gocognit // we have a lot of
 ) (*sobek.Promise, error) {
 	rt := sc.vu.Runtime()
 
-	var (
-		publicKey, privateKey CryptoKey
-		deriver               bitsDeriver
-	)
+	var deriver BitsDeriver
 
 	err := func() error {
-		if err := rt.ExportTo(baseKey, &privateKey); err != nil {
-			return NewError(InvalidAccessError, "provided baseKey is not a valid CryptoKey")
-		}
-		if err := privateKey.Validate(); err != nil {
-			return NewError(InvalidAccessError, "provided baseKey is not a valid CryptoKey: "+err.Error())
-		}
-
-		if privateKey.Type != PrivateCryptoKeyType {
-			return NewError(InvalidAccessError, fmt.Sprintf("provided baseKey is not a private key: %v", privateKey))
-		}
-
-		if !privateKey.ContainsUsage(DeriveBitsCryptoKeyUsage) {
-			return NewError(InvalidAccessError, "provided baseKey does not contain the 'deriveBits' usage")
-		}
-
-		alg := algorithm.ToObject(rt)
-		if common.IsNullish(alg) {
-			return NewError(InvalidAccessError, "algorithm is not an object")
-		}
-
-		pcValue := alg.Get("public")
-		if common.IsNullish(pcValue) {
-			return NewError(TypeError, "algorithm does not contain a public key")
-		}
-		if err := rt.ExportTo(pcValue, &publicKey); err != nil {
-			return NewError(TypeError, "algorithm's public is not a valid CryptoKey: "+err.Error())
-		}
-		if err := publicKey.Validate(); err != nil {
-			return NewError(TypeError, "algorithm's public key is not a valid CryptoKey: "+err.Error())
-		}
-
-		if publicKey.Type != PublicCryptoKeyType {
-			return NewError(InvalidAccessError, "algorithm's public key is not a public key")
-		}
-
-		algName := alg.Get("name")
-		if common.IsNullish(algName) {
-			return NewError(TypeError, "algorithm does not contain a name property")
-		}
-		normalizeAlgorithmName := strings.ToUpper(algName.String())
-
-		keyAlgorithmNameValue, err := traverseObject(rt, pcValue, "algorithm", "name")
+		normalized, err := normalizeAlgorithm(rt, algorithm, OperationIdentifierDeriveBits)
 		if err != nil {
 			return err
 		}
 
-		if normalizeAlgorithmName != keyAlgorithmNameValue.String() {
-			return NewError(
-				InvalidAccessError,
-				"algorithm name does not match public key's algorithm name: "+
-					normalizeAlgorithmName+" != "+keyAlgorithmNameValue.String(),
-			)
-		}
-
-		if err := ensureKeysUseSameCurve(privateKey, publicKey); err != nil {
-			return NewError(InvalidAccessError, err.Error())
-		}
-
-		// currently we don't support lengths that are not multiples of 8
-		// https://github.com/grafana/xk6-webcrypto/issues/80
-		if length%8 != 0 {
-			return NewError(NotSupportedError, "currently only multiples of 8 are supported for length")
-		}
-
-		deriver, err = newBitsDeriver(normalizeAlgorithmName)
+		deriver, err = newBitsDeriver(rt, normalized, algorithm)
 		if err != nil {
 			return err
 		}
@@ -719,21 +743,24 @@ func (sc *SubtleCrypto) DeriveBits( //nolint:funlen,gocognit // we have a lot of
 
 	callback := sc.vu.RegisterCallback()
 	go func() {
+
 		result, err := func() ([]byte, error) {
-			b, err := deriver(privateKey, publicKey)
+			if length == 0 {
+				return nil, nil
+			}
+
+			// currently we don't support lengths that are not multiples of 8
+			// https://github.com/grafana/xk6-webcrypto/issues/80
+			if length%8 != 0 {
+				return nil, NewError(NotSupportedError, "currently only multiples of 8 are supported for length")
+			}
+
+			b, err := deriver.DeriveBits(rt, baseKey, length)
 			if err != nil {
 				return nil, NewError(OperationError, err.Error())
 			}
 
-			if length == 0 {
-				return b, nil
-			}
-
-			if len(b) < length/8 {
-				return nil, NewError(OperationError, "length is too large")
-			}
-
-			return b[:length/8], nil
+			return b, nil
 		}()
 
 		callback(func() error {
@@ -821,7 +848,7 @@ func (sc *SubtleCrypto) ImportKey( //nolint:funlen // we have a lot of error han
 	callback := sc.vu.RegisterCallback()
 	go func() {
 		result, err := func() (*CryptoKey, error) {
-			result, err := ki.ImportKey(format, keyBytes, keyUsages)
+			result, err := ki.ImportKey(format, keyBytes, keyUsages, extractable)
 			if err != nil {
 				return nil, err
 			}
