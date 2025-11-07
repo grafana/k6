@@ -746,18 +746,18 @@ func (sc *SubtleCrypto) DeriveBits( //nolint:funlen,gocognit // we have a lot of
 
 		result, err := func() ([]byte, error) {
 			if length == 0 {
-				return nil, nil
+				return nil, NewError(OperationError, "length can not be 0")
 			}
 
 			// currently we don't support lengths that are not multiples of 8
 			// https://github.com/grafana/xk6-webcrypto/issues/80
 			if length%8 != 0 {
-				return nil, NewError(NotSupportedError, "currently only multiples of 8 are supported for length")
+				return nil, NewError(OperationError, "currently only multiples of 8 are supported for length")
 			}
 
 			b, err := deriver.DeriveBits(rt, baseKey, length)
 			if err != nil {
-				return nil, NewError(OperationError, err.Error())
+				return b, err
 			}
 
 			return b, nil

@@ -202,7 +202,7 @@ func validateBaseKey(rt *sobek.Runtime, baseKey sobek.Value, usage CryptoKeyUsag
 
 	pk, ok := password.handle.([]byte)
 	if !ok {
-		return nil, NewError(OperationError, "provided baseKey is not a valid PBKDF2 Crypto Key")
+		return nil, NewError(InvalidAccessError, "provided baseKey is not a valid PBKDF2 Crypto Key")
 	}
 
 	return pk, nil
