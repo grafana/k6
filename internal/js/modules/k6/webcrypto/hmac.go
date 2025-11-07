@@ -287,7 +287,7 @@ func (hip *HMACImportParams) ImportKey(
 	format KeyFormat,
 	keyData []byte,
 	keyUsages []CryptoKeyUsage,
-	extractable bool,
+	_ bool,
 ) (*CryptoKey, error) {
 	// 2.
 	for _, usage := range keyUsages {

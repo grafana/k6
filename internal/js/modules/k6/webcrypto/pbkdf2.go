@@ -7,19 +7,27 @@ import (
 	"go.k6.io/k6/js/common"
 )
 
-// PBKDF2ImportParams represents the object that should be passed as the algorithm parameter
+// PBKDF2KeyImportParams represents the object that should be passed as the algorithm parameter
 // into `SubtleCrypto.ImportKey`, when generating any password based key: that is, when the
 // algorithm is identified as PBKDF2.
 type PBKDF2KeyImportParams struct {
 	Algorithm
 }
 
-func newPBKDF2ImportParams(normalized Algorithm) (*PBKDF2KeyImportParams, error) {
+func newPBKDF2ImportParams(normalized Algorithm) *PBKDF2KeyImportParams {
 	return &PBKDF2KeyImportParams{
 		Algorithm: normalized,
-	}, nil
+	}
 }
 
+// Ensure that PBKDF2ImportParams implements the KeyImporter interface.
+var (
+	_ KeyImporter = &PBKDF2KeyImportParams{}
+	_ BitsDeriver = &PBKDF2Params{}
+	_ KeyDeriver  = &PBKDF2Params{}
+)
+
+// ImportKey represents the PBKDF2 function that imports the PBKDF2 password as a CryptoSecret
 func (keyParams PBKDF2KeyImportParams) ImportKey(
 	format KeyFormat,
 	keyData []byte,
@@ -49,11 +57,6 @@ func (keyParams PBKDF2KeyImportParams) ImportKey(
 		handle:    keyData,
 	}, nil
 }
-
-// Ensure that PBKDF2ImportParams implements the KeyImporter interface.
-var _ KeyImporter = &PBKDF2KeyImportParams{}
-var _ BitsDeriver = &PBKDF2Params{}
-var _ KeyDeriver = &PBKDF2Params{}
 
 func newPBKDF2DeriveParams(rt *sobek.Runtime, normalized Algorithm, params sobek.Value) (*PBKDF2Params, error) {
 	hashValue, err := traverseObject(rt, params, "hash")
@@ -94,12 +97,12 @@ func newPBKDF2DeriveParams(rt *sobek.Runtime, normalized Algorithm, params sobek
 	}, nil
 }
 
+// DeriveBits represents the PBKDF2 function that derives the key as bits from PBKDF2 params
 func (keyParams PBKDF2Params) DeriveBits(
 	rt *sobek.Runtime,
 	baseKey sobek.Value,
 	length int,
 ) ([]byte, error) {
-
 	pk, err := validateBaseKey(rt, baseKey, OperationIdentifierDeriveBits)
 	if err != nil {
 		return nil, err
@@ -116,7 +119,9 @@ func (keyParams PBKDF2Params) DeriveBits(
 	}
 
 	if keyAlgName.String() != keyParams.Name {
-		return nil, NewError(OperationError, "provided basekey algorithm and deriveKey algorithm name dont match "+keyAlgName.String()+"!="+keyParams.Name)
+		return nil, NewError(OperationError,
+			"provided basekey algorithm and deriveKey algorithm name dont match "+keyAlgName.String()+"!="+keyParams.Name,
+		)
 	}
 
 	keyLen := length / 8
@@ -129,6 +134,7 @@ func (keyParams PBKDF2Params) DeriveBits(
 	return dk, nil
 }
 
+// DeriveKey represents the PBKDF2 function that derives a key from the PBKDF2 Parms
 func (keyParams PBKDF2Params) DeriveKey(
 	rt *sobek.Runtime,
 	baseKey sobek.Value,
@@ -154,7 +160,9 @@ func (keyParams PBKDF2Params) DeriveKey(
 	}
 
 	if keyAlgName.String() != keyParams.Name {
-		return nil, NewError(InvalidAccessError, "provided basekey algorithm and deriveKey algorithm name dont match "+keyAlgName.String()+"!="+keyParams.Name)
+		return nil, NewError(InvalidAccessError,
+			"provided basekey algorithm and deriveKey algorithm name dont match "+keyAlgName.String()+"!="+keyParams.Name,
+		)
 	}
 
 	keyLengthBits, err := kgl.GetKeyLength(rt, derivedKeyType)

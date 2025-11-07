@@ -60,7 +60,7 @@ func (e *EcKeyImportParams) ImportKey(
 	format KeyFormat,
 	keyData []byte,
 	_ []CryptoKeyUsage,
-	extractable bool,
+	_ bool,
 ) (*CryptoKey, error) {
 	var importFn func(curve EllipticCurveKind, keyData []byte) (any, CryptoKeyType, error)
 
@@ -533,6 +533,7 @@ func newECDHKeyDeriveParams(rt *sobek.Runtime, normalized Algorithm, params sobe
 	}, nil
 }
 
+// DeriveBits represents the EC function that derives the key as bits from EC params
 func (keyParams ECDHKeyDeriveParams) DeriveBits(rt *sobek.Runtime, baseKey sobek.Value, length int) ([]byte, error) {
 	var privateKey *CryptoKey
 

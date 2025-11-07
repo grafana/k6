@@ -585,8 +585,6 @@ func (sc *SubtleCrypto) GenerateKey(
 // using `SubtleCrypto.ExportKey` or `SubtleCrypto.WrapKey`.
 //
 // The `keyUsages` parameter is an array of strings indicating what the key can be used for.
-//
-//nolint:revive // remove the nolint directive when the method is implemented
 func (sc *SubtleCrypto) DeriveKey(
 	algorithm sobek.Value,
 	baseKey sobek.Value,
@@ -600,39 +598,11 @@ func (sc *SubtleCrypto) DeriveKey(
 		deriver KeyDeriver
 		ki      KeyImporter
 		kgl     KeyGetLengther
+		err     error
 	)
 
-	err := func() error {
-		normalized, err := normalizeAlgorithm(rt, algorithm, OperationIdentifierDeriveKey)
-		if err != nil {
-			return err
-		}
-
-		deriver, err = newKeyDeriver(rt, normalized, algorithm)
-		if err != nil {
-			return err
-		}
-
-		normalizedDerivedKeyAlgorithmImport, err := normalizeAlgorithm(rt, derivedKeyType, OperationIdentifierImportKey)
-		if err != nil {
-			return err
-		}
-
-		if !isAesAlgorithm(normalizedDerivedKeyAlgorithmImport.Name) && !isHMACAlgorithm(normalizedDerivedKeyAlgorithmImport.Name) {
-			return NewError(NotSupportedError, "derive key function doesn't support algorithm "+normalizedDerivedKeyAlgorithmImport.Name)
-		}
-
-		ki, err = newKeyImporter(rt, normalizedDerivedKeyAlgorithmImport, derivedKeyType)
-		if err != nil {
-			return err
-		}
-
-		normalizedDerivedKeyAlgorithmLength, err := normalizeAlgorithm(rt, derivedKeyType, OperationIdentifierGetKeyLength)
-		if err != nil {
-			return err
-		}
-
-		kgl, err = newKeyGetLengther(rt, normalizedDerivedKeyAlgorithmLength, derivedKeyType)
+	err = func() error {
+		deriver, ki, kgl, err = getKeyInteractors(rt, algorithm, derivedKeyType)
 		if err != nil {
 			return err
 		}
@@ -686,6 +656,51 @@ func (sc *SubtleCrypto) DeriveKey(
 	return promise, nil
 }
 
+func getKeyInteractors(
+	rt *sobek.Runtime,
+	algorithm sobek.Value,
+	derivedKeyType sobek.Value,
+) (KeyDeriver, KeyImporter, KeyGetLengther, error) {
+	normalized, err := normalizeAlgorithm(rt, algorithm, OperationIdentifierDeriveKey)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	normalizedDerivedKeyAlgorithmImport, err := normalizeAlgorithm(rt, derivedKeyType, OperationIdentifierImportKey)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	normalizedDerivedKeyAlgorithmLength, err := normalizeAlgorithm(rt, derivedKeyType, OperationIdentifierGetKeyLength)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	deriver, err := newKeyDeriver(rt, normalized, algorithm)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	if !isAesAlgorithm(normalizedDerivedKeyAlgorithmImport.Name) &&
+		!isHMACAlgorithm(normalizedDerivedKeyAlgorithmImport.Name) {
+		return nil, nil, nil, NewError(NotSupportedError,
+			"derive key function doesn't support algorithm "+normalizedDerivedKeyAlgorithmImport.Name,
+		)
+	}
+
+	ki, err := newKeyImporter(rt, normalizedDerivedKeyAlgorithmImport, derivedKeyType)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	kgl, err := newKeyGetLengther(normalizedDerivedKeyAlgorithmLength)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	return deriver, ki, kgl, nil
+}
+
 // DeriveBits derives an array of bits from a base key.
 //
 // It takes as its arguments the base key, the derivation algorithm to use, and the length of the bit string to derive.
@@ -712,7 +727,7 @@ func (sc *SubtleCrypto) DeriveKey(
 // using `SubtleCrypto.ImportKey`.
 //
 // The `length` parameter is the number of bits to derive. The number should be a multiple of 8.
-func (sc *SubtleCrypto) DeriveBits( //nolint:funlen,gocognit // we have a lot of error handling
+func (sc *SubtleCrypto) DeriveBits(
 	algorithm sobek.Value,
 	baseKey sobek.Value,
 	length int,
@@ -743,7 +758,6 @@ func (sc *SubtleCrypto) DeriveBits( //nolint:funlen,gocognit // we have a lot of
 
 	callback := sc.vu.RegisterCallback()
 	go func() {
-
 		result, err := func() ([]byte, error) {
 			if length == 0 {
 				return nil, NewError(OperationError, "length can not be 0")

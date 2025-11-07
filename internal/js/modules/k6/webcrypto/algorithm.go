@@ -120,7 +120,7 @@ const (
 	// OperationIdentifierDigest represents the digest operation.
 	OperationIdentifierDigest OperationIdentifier = "digest"
 
-	// OperationIdentiifierGetKeyLength represents a getKeyLength operation
+	// OperationIdentifierGetKeyLength represents a getKeyLength operation
 	OperationIdentifierGetKeyLength = "getKeyLength"
 )
 

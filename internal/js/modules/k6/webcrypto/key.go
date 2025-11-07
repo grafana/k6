@@ -207,6 +207,7 @@ func newKeyGenerator(rt *sobek.Runtime, normalized Algorithm, params sobek.Value
 	return kg, nil
 }
 
+// KeyDeriver is the interface implemented by the algorithms used to derive keys
 type KeyDeriver interface {
 	DeriveKey(rt *sobek.Runtime,
 		baseKey sobek.Value,
@@ -242,7 +243,7 @@ type KeyGetLengther interface {
 	GetKeyLength(rt *sobek.Runtime, params sobek.Value) (int, error)
 }
 
-func newKeyGetLengther(rt *sobek.Runtime, normalized Algorithm, params sobek.Value) (KeyGetLengther, error) {
+func newKeyGetLengther(normalized Algorithm) (KeyGetLengther, error) {
 	var kgi KeyGetLengther
 	var err error
 
@@ -280,7 +281,7 @@ func newKeyImporter(rt *sobek.Runtime, normalized Algorithm, params sobek.Value)
 	case RSASsaPkcs1v15, RSAPss, RSAOaep:
 		ki, err = newRsaHashedImportParams(rt, normalized, params)
 	case PBKDF2:
-		ki, err = newPBKDF2ImportParams(normalized)
+		ki = newPBKDF2ImportParams(normalized)
 	default:
 		return nil, errors.New("key import not implemented for algorithm " + normalized.Name)
 	}
