@@ -108,6 +108,54 @@ func versionString() string {
 	return v
 }
 
+// versionDetailsWithExtensions returns the structured details about version including extensions
+func versionDetailsWithExtensions(exts []*ext.Extension) map[string]any {
+	details := versionDetails()
+
+	if len(exts) == 0 {
+		return details
+	}
+
+	// extInfo represents the JSON structure for an extension in the version details
+	// modeled after k6 extension registry structure
+	type extInfo struct {
+		Module  string   `json:"module"`
+		Version string   `json:"version"`
+		Imports []string `json:"imports,omitempty"`
+		Outputs []string `json:"outputs,omitempty"`
+	}
+
+	infoList := make([]*extInfo, 0, len(exts))
+	infoMap := make(map[string]*extInfo)
+
+	for _, e := range exts {
+		key := e.Path + "@" + e.Version
+
+		info, found := infoMap[key]
+		if !found {
+			info = &extInfo{
+				Module:  e.Path,
+				Version: e.Version,
+			}
+
+			infoMap[key] = info
+			infoList = append(infoList, info)
+		}
+
+		if e.Type == ext.OutputExtension {
+			info.Outputs = append(info.Outputs, e.Name)
+		}
+
+		if e.Type == ext.JSExtension {
+			info.Imports = append(info.Imports, e.Name)
+		}
+	}
+
+	details["extensions"] = infoList
+
+	return details
+}
+
 type versionCmd struct {
 	gs     *state.GlobalState
 	isJSON bool
@@ -121,43 +169,7 @@ func (c *versionCmd) run(cmd *cobra.Command, _ []string) error {
 		return nil
 	}
 
-	details := versionDetails()
-	if exts := ext.GetAll(); len(exts) > 0 {
-		type extInfo struct {
-			Module  string   `json:"module"`
-			Version string   `json:"version"`
-			Imports []string `json:"imports,omitempty"`
-			Outputs []string `json:"outputs,omitempty"`
-		}
-
-		infoList := make([]*extInfo, 0, len(exts))
-		infoMap := make(map[string]*extInfo)
-
-		for _, e := range exts {
-			key := e.Path + "@" + e.Version
-
-			info, found := infoMap[key]
-			if !found {
-				info = &extInfo{
-					Module:  e.Path,
-					Version: e.Version,
-				}
-
-				infoMap[key] = info
-				infoList = append(infoList, info)
-			}
-
-			if e.Type == ext.OutputExtension {
-				info.Outputs = append(info.Outputs, e.Name)
-			}
-
-			if e.Type == ext.JSExtension {
-				info.Imports = append(info.Imports, e.Name)
-			}
-		}
-
-		details["extensions"] = infoList
-	}
+	details := versionDetailsWithExtensions(ext.GetAll())
 
 	if err := json.NewEncoder(c.gs.Stdout).Encode(details); err != nil {
 		return fmt.Errorf("failed to encode/output version details: %w", err)
