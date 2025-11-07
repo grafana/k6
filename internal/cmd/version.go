@@ -126,32 +126,37 @@ func (c *versionCmd) run(cmd *cobra.Command, _ []string) error {
 		type extInfo struct {
 			Module  string   `json:"module"`
 			Version string   `json:"version"`
-			Imports []string `json:"imports"`
+			Imports []string `json:"imports,omitempty"`
+			Outputs []string `json:"outputs,omitempty"`
 		}
 
-		ext := make(map[string]extInfo)
+		infoList := make([]*extInfo, 0, len(exts))
+		infoMap := make(map[string]*extInfo)
+
 		for _, e := range exts {
 			key := e.Path + "@" + e.Version
 
-			if v, ok := ext[key]; ok {
-				v.Imports = append(v.Imports, e.Name)
-				ext[key] = v
-				continue
+			info, found := infoMap[key]
+			if !found {
+				info = &extInfo{
+					Module:  e.Path,
+					Version: e.Version,
+				}
+
+				infoMap[key] = info
+				infoList = append(infoList, info)
 			}
 
-			ext[key] = extInfo{
-				Module:  e.Path,
-				Version: e.Version,
-				Imports: []string{e.Name},
+			if e.Type == ext.OutputExtension {
+				info.Outputs = append(info.Outputs, e.Name)
+			}
+
+			if e.Type == ext.JSExtension {
+				info.Imports = append(info.Imports, e.Name)
 			}
 		}
 
-		list := make([]extInfo, 0, len(ext))
-		for _, v := range ext {
-			list = append(list, v)
-		}
-
-		details["extensions"] = list
+		details["extensions"] = infoList
 	}
 
 	if err := json.NewEncoder(c.gs.Stdout).Encode(details); err != nil {
