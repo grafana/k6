@@ -223,7 +223,7 @@ func TestStreamLogsToLogger(t *testing.T) {
 		for _, e := range hook.Drain() {
 			lines = append(lines, e.Message)
 		}
-		return
+		return lines
 	}
 
 	generateLogline := func(key string, ts uint64, msg string) string {
@@ -276,7 +276,7 @@ func TestStreamLogsToLogger(t *testing.T) {
 			}
 
 			start = time.Unix(0, rawstart)
-			return
+			return start, err
 		}
 
 		var requestsCount uint64
@@ -355,7 +355,7 @@ func TestStreamLogsToLogger(t *testing.T) {
 			}
 
 			start = time.Unix(0, rawstart)
-			return
+			return start, err
 		}
 
 		var requestsCount uint64

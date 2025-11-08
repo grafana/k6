@@ -17,8 +17,6 @@ import (
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
 	"go.k6.io/k6/internal/js/modules/k6/browser/log"
-
-	k6modules "go.k6.io/k6/js/modules"
 )
 
 // maxRetry controls how many times to retry if an action fails.
@@ -78,34 +76,6 @@ func (s *DOMElementState) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// URLMatcher is a function that matches a URL against a pattern.
-// It relies on JavaScript's regex engine for regex matching.
-type URLMatcher func(string) (bool, error)
-
-// urlMatcher matches URLs based on pattern type. It can match on exact and regex
-// patterns. If the pattern is empty or a single quote, it matches any URL.
-func urlMatcher(pattern string, jsRegexChecker JSRegexChecker) (URLMatcher, error) {
-	if pattern == "" || pattern == "''" {
-		return func(url string) (bool, error) { return true, nil }, nil
-	}
-
-	if isQuotedText(pattern) {
-		return func(url string) (bool, error) { return "'"+url+"'" == pattern, nil }, nil
-	}
-
-	if jsRegexChecker == nil {
-		return nil, fmt.Errorf("JavaScript pattern matcher is required for URL matching")
-	}
-
-	return func(url string) (bool, error) {
-		matched, err := jsRegexChecker(pattern, url)
-		if err != nil {
-			return false, fmt.Errorf("URL pattern matching error for pattern %q and URL %q: %w", pattern, url, err)
-		}
-		return matched, nil
-	}, nil
-}
-
 // Frame represents a frame in an HTML document.
 type Frame struct {
 	BaseEventEmitter
@@ -124,7 +94,6 @@ type Frame struct {
 	name         string
 	url          string
 	detached     bool
-	vu           k6modules.VU
 
 	// A life cycle event is only considered triggered for a frame if the entire
 	// frame subtree has also had the life cycle event triggered.
@@ -183,7 +152,6 @@ func NewFrame(
 		parentFrame:       parentFrame,
 		childFrames:       make(map[*Frame]bool),
 		id:                frameID,
-		vu:                k6ext.GetVU(ctx),
 		lifecycleEvents:   make(map[LifecycleEvent]bool),
 		inflightRequests:  make(map[network.RequestID]bool),
 		executionContexts: make(map[executionWorld]frameExecutionContext),
@@ -591,6 +559,9 @@ func (f *Frame) waitFor(
 			return f.waitFor(selector, opts, retryCount)
 		}
 		if strings.Contains(err.Error(), "Execution context was destroyed") {
+			return f.waitFor(selector, opts, retryCount)
+		}
+		if strings.Contains(err.Error(), "visible") {
 			return f.waitFor(selector, opts, retryCount)
 		}
 	}
@@ -2065,13 +2036,10 @@ func (f *Frame) WaitForLoadState(state string, popts *FrameWaitForLoadStateOptio
 }
 
 // WaitForNavigation waits for the given navigation lifecycle event to happen.
-// jsRegexChecker should be non-nil to be able to test against a URL pattern in the options.
+// RegExMatcher should be non-nil to be able to test against a URL pattern in the options.
 //
 //nolint:funlen
-func (f *Frame) WaitForNavigation(
-	opts *FrameWaitForNavigationOptions,
-	jsRegexChecker JSRegexChecker,
-) (*Response, error) {
+func (f *Frame) WaitForNavigation(opts *FrameWaitForNavigationOptions, rm RegExMatcher) (*Response, error) {
 	f.log.Debugf("Frame:WaitForNavigation",
 		"fid:%s furl:%s url:%s", f.ID(), f.URL(), opts.URL)
 	defer f.log.Debugf("Frame:WaitForNavigation:return",
@@ -2080,7 +2048,7 @@ func (f *Frame) WaitForNavigation(
 	timeoutCtx, timeoutCancel := context.WithTimeout(f.ctx, opts.Timeout)
 
 	// Create URL matcher based on the pattern
-	matcher, err := urlMatcher(opts.URL, jsRegexChecker)
+	matcher, err := newPatternMatcher(opts.URL, rm)
 	if err != nil {
 		timeoutCancel()
 		return nil, fmt.Errorf("parsing URL pattern: %w", err)
@@ -2215,19 +2183,14 @@ func (f *Frame) WaitForTimeout(timeout int64) {
 }
 
 // WaitForURL waits for the frame to navigate to a URL matching the given pattern.
-// jsRegexChecker should be non-nil to be able to test against a URL pattern.
-func (f *Frame) WaitForURL(urlPattern string, opts *FrameWaitForURLOptions, jsRegexChecker JSRegexChecker) error {
+// RegExMatcher should be non-nil to be able to test against a URL pattern.
+func (f *Frame) WaitForURL(urlPattern string, opts *FrameWaitForURLOptions, rm RegExMatcher) error {
 	f.log.Debugf("Frame:WaitForURL", "fid:%s furl:%q pattern:%s", f.ID(), f.URL(), urlPattern)
 	defer f.log.Debugf("Frame:WaitForURL:return", "fid:%s furl:%q pattern:%s", f.ID(), f.URL(), urlPattern)
 
-	matcher, err := urlMatcher(urlPattern, jsRegexChecker)
+	matched, err := rm.Match(urlPattern, f.URL())
 	if err != nil {
-		return fmt.Errorf("parsing URL pattern: %w", err)
-	}
-
-	matched, err := matcher(f.URL())
-	if err != nil {
-		return fmt.Errorf("checking current URL: %w", err)
+		return fmt.Errorf("waiting for URL %q: %w", urlPattern, err)
 	}
 	if matched {
 		// Already at target URL, just wait for load state
@@ -2242,7 +2205,8 @@ func (f *Frame) WaitForURL(urlPattern string, opts *FrameWaitForURLOptions, jsRe
 		Timeout:   opts.Timeout,
 		WaitUntil: opts.WaitUntil,
 	}
-	_, err = f.WaitForNavigation(navOpts, jsRegexChecker)
+	_, err = f.WaitForNavigation(navOpts, rm)
+
 	return err
 }
 
@@ -2280,6 +2244,46 @@ func (f *Frame) evaluate(
 	}
 
 	return eh, nil
+}
+
+func (f *Frame) evaluateWithSelector(selector string, pageFunc string, args ...any) (any, error) {
+	f.log.Debugf("Frame:evaluateWithSelector", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
+
+	evaluate := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+		return handle.Evaluate(pageFunc, args...)
+	}
+
+	act := f.newAction(
+		selector, DOMElementStateAttached, true, evaluate, []string{}, false, true, f.defaultTimeout(),
+	)
+	v, err := call(f.ctx, act, f.defaultTimeout())
+	if err != nil {
+		return nil, errorFromDOMError(err)
+	}
+	return v, nil
+}
+
+func (f *Frame) evaluateHandleWithSelector(selector string, pageFunc string, args ...any) (JSHandleAPI, error) {
+	f.log.Debugf("Frame:evaluateHandleWithSelector", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
+
+	evaluateHandle := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+		return handle.EvaluateHandle(pageFunc, args...)
+	}
+
+	act := f.newAction(
+		selector, DOMElementStateAttached, true, evaluateHandle, []string{}, false, true, f.defaultTimeout(),
+	)
+	v, err := call(f.ctx, act, f.defaultTimeout())
+	if err != nil {
+		return nil, errorFromDOMError(err)
+	}
+
+	handle, ok := v.(JSHandleAPI)
+	if !ok {
+		return nil, fmt.Errorf("evaluating handle of %q: unexpected type %T", selector, v)
+	}
+
+	return handle, nil
 }
 
 // frameExecutionContext represents a JS execution context that belongs to Frame.

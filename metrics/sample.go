@@ -117,11 +117,11 @@ func GetBufferedSamples(input <-chan SampleContainer) (result []SampleContainer)
 		select {
 		case val, ok := <-input:
 			if !ok {
-				return
+				return result
 			}
 			result = append(result, val)
 		default:
-			return
+			return result
 		}
 	}
 }

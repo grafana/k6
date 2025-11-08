@@ -28,9 +28,9 @@ the Page Object Model pattern in locator.js.
 export class Bet {
   constructor(page) {
     this.page = page;
-    this.headsButton = page.locator("input[value='Bet on heads!']");
-    this.tailsButton = page.locator("input[value='Bet on tails!']");
-    this.currentBet = page.locator("//p[starts-with(text(),'Your bet: ')]");
+    this.headsButton = page.getByRole("button", { name: "Bet on heads!" });
+    this.tailsButton = page.getByRole("button", { name: "Bet on tails!" });
+    this.currentBet = page.getByText(/Your bet\: .*/);
   }
 
   goto() {

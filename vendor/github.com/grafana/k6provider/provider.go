@@ -16,7 +16,6 @@ import (
 
 	"github.com/grafana/k6build"
 	"github.com/grafana/k6build/pkg/client"
-	"github.com/grafana/k6deps"
 )
 
 const (
@@ -145,6 +144,10 @@ type Config struct {
 	DownloadConfig DownloadConfig
 }
 
+// Dependencies defines a group of dependencies with their version constrains
+// For example, {"k6": "*", "k6/x/sql", ">v0.4.0"}
+type Dependencies map[string]string
+
 // Provider implements an interface for providing custom k6 binaries
 // from a [k6build] service.
 //
@@ -269,7 +272,7 @@ type Artifact struct {
 // it's useful if you want to get the artifact without downloading the binary.
 func (p *Provider) GetArtifact(
 	ctx context.Context,
-	deps k6deps.Dependencies,
+	deps Dependencies,
 ) (Artifact, error) {
 	k6Constrains, buildDeps := buildDeps(deps)
 
@@ -326,9 +329,9 @@ func (p *Provider) GetArtifact(
 // defined in the k6provider packaged. Using errors.Unwrap will return its cause.
 func (p *Provider) GetBinary(
 	ctx context.Context,
-	deps k6deps.Dependencies,
+	constrains Dependencies,
 ) (K6Binary, error) {
-	artifact, err := p.GetArtifact(ctx, deps)
+	artifact, err := p.GetArtifact(ctx, constrains)
 	if err != nil {
 		return K6Binary{}, err
 	}
@@ -391,21 +394,21 @@ func (p *Provider) GetBinary(
 // buildDeps takes a set of k6 dependencies and returns a string representing
 // the version constraints for the k6 and a slice of k6build.Dependencies
 // representing the extension dependencies. The default k6 constrain is "*".
-func buildDeps(deps k6deps.Dependencies) (string, []k6build.Dependency) {
+func buildDeps(deps Dependencies) (string, []k6build.Dependency) {
 	bdeps := make([]k6build.Dependency, 0, len(deps))
 	k6constraint := "*"
 
-	for _, dep := range deps {
-		if dep.Name == k6Module {
-			k6constraint = dep.GetConstraints().String()
+	for dep, constrains := range deps {
+		if dep == k6Module {
+			k6constraint = constrains
 			continue
 		}
 
 		bdeps = append(
 			bdeps,
 			k6build.Dependency{
-				Name:        dep.Name,
-				Constraints: dep.GetConstraints().String(),
+				Name:        dep,
+				Constraints: constrains,
 			},
 		)
 	}

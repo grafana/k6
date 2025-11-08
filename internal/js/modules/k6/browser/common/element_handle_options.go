@@ -23,6 +23,10 @@ type ElementHandleBasePointerOptions struct {
 	ElementHandleBaseOptions
 	Position *Position `json:"position"`
 	Trial    bool      `json:"trial"`
+
+	// We don't want to export this field. Internal use only to determine if we
+	// should retry when using locator based APIs.
+	retry bool
 }
 
 // ScrollPosition is a parameter for scrolling an element.

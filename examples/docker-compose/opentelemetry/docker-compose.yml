@@ -1,11 +1,9 @@
-version: '3.8'
-
 networks:
   k6:
 
 services:
   prometheus:
-    image: prom/prometheus:v3.2.0
+    image: prom/prometheus:v3.5.0@sha256:63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996
     command:
       - --web.enable-remote-write-receiver
       - --enable-feature=native-histograms
@@ -16,7 +14,7 @@ services:
       - "9090:9090"
 
   alloy:
-    image: grafana/alloy:v1.6.1
+    image: grafana/alloy:v1.10.2@sha256:bcf27f18c4402869af112fb39e35e1db3804a404686f4caa20bdf77814219223
     networks:
       - k6
     volumes:
@@ -37,7 +35,7 @@ services:
       - "4318:4318" # HTTP receiver
 
   grafana:
-    image: grafana/grafana:11.5.2
+    image: grafana/grafana:12.1.1@sha256:a1701c2180249361737a99a01bc770db39381640e4d631825d38ff4535efa47d
     networks:
       - k6
     ports:

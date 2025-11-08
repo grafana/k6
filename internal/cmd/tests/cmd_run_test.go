@@ -154,32 +154,71 @@ func TestStdoutAndStderrAreEmptyWithQuietAndHandleSummary(t *testing.T) {
 func TestStdoutAndStderrAreEmptyWithQuietAndLogsForwarded(t *testing.T) {
 	t.Parallel()
 
-	ts := NewGlobalTestState(t)
+	// TODO(@joanlopez): remove by k6 v2.0, once we completely drop the support of the deprecated --no-summary flag.
+	t.Run("--no-summary", func(t *testing.T) {
+		t.Parallel()
 
-	// TODO: add a test with relative path
-	logFilePath := filepath.Join(ts.Cwd, "test.log")
+		ts := NewGlobalTestState(t)
 
-	ts.CmdArgs = []string{
-		"k6", "--quiet", "--log-output", "file=" + logFilePath,
-		"--log-format", "raw", "run", "--no-summary", "-",
-	}
-	ts.Stdin = bytes.NewBufferString(`
+		// TODO: add a test with relative path
+		logFilePath := filepath.Join(ts.Cwd, "test.log")
+
+		ts.CmdArgs = []string{
+			"k6", "--quiet", "--log-output", "file=" + logFilePath,
+			"--log-format", "raw", "run", "--no-summary", "-",
+		}
+		ts.Stdin = bytes.NewBufferString(`
 		console.log('init');
 		export default function() { console.log('foo'); };
 	`)
-	cmd.ExecuteWithGlobalState(ts.GlobalState)
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
-	// The test state hook still catches this message
-	assert.True(t, testutils.LogContains(ts.LoggerHook.Drain(), logrus.InfoLevel, `foo`))
+		// The test state hook still catches this message
+		assert.True(t, testutils.LogContains(ts.LoggerHook.Drain(), logrus.InfoLevel, `foo`))
 
-	// But it's not shown on stderr or stdout
-	assert.Empty(t, ts.Stderr.Bytes())
-	assert.Empty(t, ts.Stdout.Bytes())
+		// But it's not shown on stderr or stdout
+		assert.Empty(t, ts.Stderr.Bytes())
+		assert.Equal(t,
+			"Flag --no-summary has been deprecated, use --summary-mode=disabled instead\n",
+			ts.Stdout.String(),
+		) // We don't expect it to be completely empty, but to contain the deprecation message for --no-summary.
 
-	// Instead it should be in the log file
-	logContents, err := fsext.ReadFile(ts.FS, logFilePath)
-	require.NoError(t, err)
-	assert.Equal(t, "init\ninit\nfoo\n", string(logContents)) //nolint:dupword
+		// Instead, it should be in the log file
+		logContents, err := fsext.ReadFile(ts.FS, logFilePath)
+		require.NoError(t, err)
+		assert.Equal(t, "init\ninit\nfoo\n", string(logContents)) //nolint:dupword
+	})
+
+	t.Run("--summary-mode=disabled", func(t *testing.T) {
+		t.Parallel()
+
+		ts := NewGlobalTestState(t)
+
+		// TODO: add a test with relative path
+		logFilePath := filepath.Join(ts.Cwd, "test.log")
+
+		ts.CmdArgs = []string{
+			"k6", "--quiet", "--log-output", "file=" + logFilePath,
+			"--log-format", "raw", "run", "--summary-mode=disabled", "-",
+		}
+		ts.Stdin = bytes.NewBufferString(`
+		console.log('init');
+		export default function() { console.log('foo'); };
+	`)
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		// The test state hook still catches this message
+		assert.True(t, testutils.LogContains(ts.LoggerHook.Drain(), logrus.InfoLevel, `foo`))
+
+		// But it's not shown on stderr or stdout
+		assert.Empty(t, ts.Stderr.Bytes())
+		assert.Empty(t, ts.Stdout.Bytes())
+
+		// Instead, it should be in the log file
+		logContents, err := fsext.ReadFile(ts.FS, logFilePath)
+		require.NoError(t, err)
+		assert.Equal(t, "init\ninit\nfoo\n", string(logContents)) //nolint:dupword
+	})
 }
 
 func TestRelativeLogPathWithSetupAndTeardown(t *testing.T) {
@@ -991,6 +1030,89 @@ func TestAbortedByScriptSetupErrorWithDependency(t *testing.T) {
 		rootPath+`test/bar.js:3:7(3))\n\tat setup (`+rootPath+`test/test.js:5:7(8))\n" hint="script exception"`)
 	assert.Contains(t, stdout, `level=debug msg="Sending test finished" output=cloud ref=123 run_status=7 tainted=false`)
 	assert.Contains(t, stdout, "bogus summary")
+}
+
+func TestAbortedByUnknownModules(t *testing.T) {
+	t.Parallel()
+	depScript := `
+		import { something } from "k6/x/somethinghere"
+		import { another } from "k6/x/anotherone"
+	`
+	mainScript := `
+		import { something } from "k6/x/somethinghere"
+		import "./a.js"
+		export default function () { }
+	`
+
+	ts := NewGlobalTestState(t)
+	ts.Flags.AutoExtensionResolution = false
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test.js"), []byte(mainScript), 0o644))
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "a.js"), []byte(depScript), 0o644))
+
+	ts.CmdArgs = []string{"k6", "run", "-v", "--log-output=stdout", "test.js"}
+	ts.ExpectedExitCode = int(exitcodes.ScriptException)
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stdout := ts.Stdout.String()
+	t.Log(stdout)
+
+	assert.Contains(t, stdout, `unknown modules [\"k6/x/anotherone\", \"k6/x/somethinghere\"] were tried to be loaded,`)
+}
+
+func TestRunFromNotBaseDirectory(t *testing.T) {
+	t.Parallel()
+	depScript := `
+		export const p = 5;
+	`
+	mainScript := `
+		import { p } from "../../../b/dep.js";
+		export default function() {
+			console.log("p = " + p);
+		};
+	`
+
+	ts := NewGlobalTestState(t)
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "a/b/c/test.js"), []byte(mainScript), 0o644))
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "b/dep.js"), []byte(depScript), 0o644))
+
+	ts.Cwd = filepath.Join(ts.Cwd, "./a/")
+	ts.CmdArgs = []string{"k6", "run", "-v", "--log-output=stdout", "b/c/test.js"}
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stdout := ts.Stdout.String()
+	t.Log(stdout)
+	require.Contains(t, stdout, `p = 5`)
+}
+
+func TestRunFromSeparateDriveWindows(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS != "windows" {
+		t.Skip("test only for windows")
+	}
+	depScript := `
+		export const p = 5;
+	`
+	mainScript := `
+		import { p } from "../../../b/dep.js";
+		export default function() {
+			console.log("p = " + p);
+		};
+	`
+
+	ts := NewGlobalTestState(t)
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "a/b/c/test.js"), []byte(mainScript), 0o644))
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "b/dep.js"), []byte(depScript), 0o644))
+
+	ts.Cwd = "f:\\something somewhere\\and another\\"
+	ts.CmdArgs = []string{"k6", "run", "-v", "--log-output=stdout", "c:\\test\\a\\b\\c\\test.js"}
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stdout := ts.Stdout.String()
+	t.Log(stdout)
+	require.Contains(t, stdout, `p = 5`)
 }
 
 func runTestWithNoLinger(_ *testing.T, ts *GlobalTestState) {
@@ -2620,6 +2742,7 @@ func TestSummaryExport(t *testing.T) {
 		})
 	}
 
+	// TODO(@joanlopez): remove by k6 v2.0, once we completely drop the support for --summary-mode=legacy.
 	t.Run("legacy", func(t *testing.T) {
 		t.Parallel()
 
@@ -2642,6 +2765,9 @@ func TestSummaryExport(t *testing.T) {
 		assert.Contains(t, stdout, "checks...............: 100.00% 1 out of 1")
 		assert.Contains(t, stdout, "custom_iterations....: 1")
 		assert.Contains(t, stdout, "iterations...........: 1")
+
+		// As of now, "legacy" has been deprecated.
+		assert.Contains(t, ts.Stderr.String(), `The \"legacy\" summary mode has been deprecated, and will be removed by k6 v2.0.`)
 
 		assertSummaryExport(t, ts.FS)
 	})
@@ -2667,6 +2793,7 @@ func TestHandleSummary(t *testing.T) {
 	}
 	`
 
+	// TODO(@joanlopez): remove "summary" by k6 v2.0, once we completely drop the support for --summary-mode=legacy.
 	for _, summaryMode := range []string{"compact", "full", "legacy"} {
 		t.Run(summaryMode, func(t *testing.T) {
 			t.Parallel()
@@ -2820,4 +2947,25 @@ func TestGroupsOrderInFullSummaryWithScenario(t *testing.T) {
           ↳ GROUP: too much nesting\s*`
 
 	assert.Regexp(t, regexp.MustCompile(expectedGroupsRegex), stdout)
+}
+
+func TestInvalidSummaryModeAbortsTheExecution(t *testing.T) {
+	t.Parallel()
+
+	ts := NewGlobalTestState(t)
+	ts.CmdArgs = []string{
+		"k6", "run", "--summary-mode=unknown", "-",
+	}
+	ts.Stdin = bytes.NewBufferString(`export default function() {};`)
+
+	// We expect the execution to be aborted by the invalid summary
+	// mode and the exit code to be non-zero.
+	ts.ExpectedExitCode = -1
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	// And the error to be shown on stderr.
+	assert.Contains(t,
+		ts.Stderr.String(),
+		`level=error msg="invalid summary mode"`,
+	)
 }

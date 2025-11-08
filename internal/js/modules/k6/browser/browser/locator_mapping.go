@@ -7,18 +7,17 @@ import (
 	"github.com/grafana/sobek"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/common"
-	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
 	k6common "go.k6.io/k6/js/common"
 )
 
 // mapLocator API to the JS module.
 //
-//nolint:gocognit,funlen
+//nolint:gocognit,funlen,cyclop
 func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 	rt := vu.Runtime()
 	return mapping{
 		"all": func() *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				all, err := lo.All()
 				if err != nil {
 					return nil, err
@@ -36,7 +35,7 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing locator bounding box options: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return lo.BoundingBox(popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -45,7 +44,7 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			if err := copts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing clear options: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, lo.Clear(copts) //nolint:wrapcheck
 			}), nil
 		},
@@ -55,69 +54,133 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 				return nil, err
 			}
 
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, lo.Click(popts) //nolint:wrapcheck
 			}), nil
 		},
+		"contentFrame": func() *sobek.Object {
+			ml := mapFrameLocator(vu, lo.ContentFrame())
+			return rt.ToValue(ml).ToObject(rt)
+		},
 		"count": func() *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return lo.Count() //nolint:wrapcheck
 			})
 		},
-		"dblclick": func(opts sobek.Value) *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return nil, lo.Dblclick(opts) //nolint:wrapcheck
-			})
+		"dblclick": func(opts sobek.Value) (*sobek.Promise, error) {
+			copts := common.NewFrameDblClickOptions(lo.Timeout())
+			if err := copts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing double click options: %w", err)
+			}
+			return promise(vu, func() (any, error) {
+				return nil, lo.Dblclick(copts) //nolint:wrapcheck
+			}), nil
 		},
-		"setChecked": func(checked bool, opts sobek.Value) *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return nil, lo.SetChecked(checked, opts) //nolint:wrapcheck
-			})
+		"evaluate": func(pageFunc sobek.Value, gargs ...sobek.Value) (*sobek.Promise, error) {
+			if sobekEmptyString(pageFunc) {
+				return nil, fmt.Errorf("evaluate requires a page function")
+			}
+			funcString := pageFunc.String()
+			gopts := exportArgs(gargs)
+			return promise(vu, func() (any, error) {
+				return lo.Evaluate(funcString, gopts...)
+			}), nil
 		},
-		"check": func(opts sobek.Value) *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return nil, lo.Check(opts) //nolint:wrapcheck
-			})
+		"evaluateHandle": func(pageFunc sobek.Value, gargs ...sobek.Value) (*sobek.Promise, error) {
+			if sobekEmptyString(pageFunc) {
+				return nil, fmt.Errorf("evaluateHandle requires a page function")
+			}
+			funcString := pageFunc.String()
+			gopts := exportArgs(gargs)
+			return promise(vu, func() (any, error) {
+				jsh, err := lo.EvaluateHandle(funcString, gopts...)
+				if err != nil {
+					return nil, err //nolint:wrapcheck
+				}
+				return mapJSHandle(vu, jsh), nil
+			}), nil
 		},
-		"uncheck": func(opts sobek.Value) *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return nil, lo.Uncheck(opts) //nolint:wrapcheck
-			})
+		"setChecked": func(checked bool, opts sobek.Value) (*sobek.Promise, error) {
+			copts := common.NewFrameCheckOptions(lo.Timeout())
+			if err := copts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing set checked options: %w", err)
+			}
+			return promise(vu, func() (any, error) {
+				return nil, lo.SetChecked(checked, copts) //nolint:wrapcheck
+			}), nil
 		},
-		"isChecked": func(opts sobek.Value) *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return lo.IsChecked(opts) //nolint:wrapcheck
-			})
+		"check": func(opts sobek.Value) (*sobek.Promise, error) {
+			copts := common.NewFrameCheckOptions(lo.Timeout())
+			if err := copts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing check options: %w", err)
+			}
+			return promise(vu, func() (any, error) {
+				return nil, lo.Check(copts) //nolint:wrapcheck
+			}), nil
 		},
-		"isEditable": func(opts sobek.Value) *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return lo.IsEditable(opts) //nolint:wrapcheck
-			})
+		"uncheck": func(opts sobek.Value) (*sobek.Promise, error) {
+			copts := common.NewFrameUncheckOptions(lo.Timeout())
+			if err := copts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing uncheck options: %w", err)
+			}
+			return promise(vu, func() (any, error) {
+				return nil, lo.Uncheck(copts) //nolint:wrapcheck
+			}), nil
 		},
-		"isEnabled": func(opts sobek.Value) *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return lo.IsEnabled(opts) //nolint:wrapcheck
-			})
+		"isChecked": func(opts sobek.Value) (*sobek.Promise, error) {
+			copts := common.NewFrameIsCheckedOptions(lo.Timeout())
+			if err := copts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing is checked options: %w", err)
+			}
+			return promise(vu, func() (any, error) {
+				return lo.IsChecked(copts) //nolint:wrapcheck
+			}), nil
 		},
-		"isDisabled": func(opts sobek.Value) *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return lo.IsDisabled(opts) //nolint:wrapcheck
-			})
+		"isEditable": func(opts sobek.Value) (*sobek.Promise, error) {
+			copts := common.NewFrameIsEditableOptions(lo.Timeout())
+			if err := copts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing is editable options: %w", err)
+			}
+			return promise(vu, func() (any, error) {
+				return lo.IsEditable(copts) //nolint:wrapcheck
+			}), nil
+		},
+		"isEnabled": func(opts sobek.Value) (*sobek.Promise, error) {
+			copts := common.NewFrameIsEnabledOptions(lo.Timeout())
+			if err := copts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing is enabled options: %w", err)
+			}
+			return promise(vu, func() (any, error) {
+				return lo.IsEnabled(copts) //nolint:wrapcheck
+			}), nil
+		},
+		"isDisabled": func(opts sobek.Value) (*sobek.Promise, error) {
+			copts := common.NewFrameIsDisabledOptions(lo.Timeout())
+			if err := copts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing is disabled options: %w", err)
+			}
+			return promise(vu, func() (any, error) {
+				return lo.IsDisabled(copts) //nolint:wrapcheck
+			}), nil
 		},
 		"isVisible": func() *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return lo.IsVisible() //nolint:wrapcheck
 			})
 		},
 		"isHidden": func() *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return lo.IsHidden() //nolint:wrapcheck
 			})
 		},
-		"fill": func(value string, opts sobek.Value) *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return nil, lo.Fill(value, opts) //nolint:wrapcheck
-			})
+		"fill": func(value string, opts sobek.Value) (*sobek.Promise, error) {
+			copts := common.NewFrameFillOptions(lo.Timeout())
+			if err := copts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing fill options: %w", err)
+			}
+			return promise(vu, func() (any, error) {
+				return nil, lo.Fill(value, copts) //nolint:wrapcheck
+			}), nil
 		},
 		"filter": func(opts sobek.Value) mapping {
 			return mapLocator(vu, lo.Filter(&common.LocatorFilterOptions{
@@ -128,14 +191,22 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			ml := mapLocator(vu, lo.First())
 			return rt.ToValue(ml).ToObject(rt)
 		},
-		"focus": func(opts sobek.Value) *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return nil, lo.Focus(opts) //nolint:wrapcheck
-			})
+		"focus": func(opts sobek.Value) (*sobek.Promise, error) {
+			copts := common.NewFrameBaseOptions(lo.Timeout())
+			if err := copts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing focus options: %w", err)
+			}
+			return promise(vu, func() (any, error) {
+				return nil, lo.Focus(copts) //nolint:wrapcheck
+			}), nil
 		},
-		"getAttribute": func(name string, opts sobek.Value) *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
-				s, ok, err := lo.GetAttribute(name, opts)
+		"getAttribute": func(name string, opts sobek.Value) (*sobek.Promise, error) {
+			copts := common.NewFrameBaseOptions(lo.Timeout())
+			if err := copts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing get attribute options: %w", err)
+			}
+			return promise(vu, func() (any, error) {
+				s, ok, err := lo.GetAttribute(name, copts)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
 				}
@@ -143,7 +214,7 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 					return nil, nil
 				}
 				return s, nil
-			})
+			}), nil
 		},
 		"getByAltText": func(alt sobek.Value, opts sobek.Value) (*sobek.Object, error) {
 			if k6common.IsNullish(alt) {
@@ -208,19 +279,26 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			ml := mapLocator(vu, lo.GetByTitle(ptitle, popts))
 			return rt.ToValue(ml).ToObject(rt), nil
 		},
-		"locator": func(selector string) *sobek.Object {
-			ml := mapLocator(vu, lo.Locator(selector))
-			return rt.ToValue(ml).ToObject(rt)
+		"locator": func(selector string, opts sobek.Value) mapping {
+			return mapLocator(vu, lo.Locator(selector, parseLocatorOptions(rt, opts)))
 		},
-		"innerHTML": func(opts sobek.Value) *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return lo.InnerHTML(opts) //nolint:wrapcheck
-			})
+		"innerHTML": func(opts sobek.Value) (*sobek.Promise, error) {
+			copts := common.NewFrameInnerHTMLOptions(lo.Timeout())
+			if err := copts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing inner HTML options: %w", err)
+			}
+			return promise(vu, func() (any, error) {
+				return lo.InnerHTML(copts) //nolint:wrapcheck
+			}), nil
 		},
-		"innerText": func(opts sobek.Value) *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return lo.InnerText(opts) //nolint:wrapcheck
-			})
+		"innerText": func(opts sobek.Value) (*sobek.Promise, error) {
+			copts := common.NewFrameInnerTextOptions(lo.Timeout())
+			if err := copts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing inner text options: %w", err)
+			}
+			return promise(vu, func() (any, error) {
+				return lo.InnerText(copts) //nolint:wrapcheck
+			}), nil
 		},
 		"last": func() *sobek.Object {
 			ml := mapLocator(vu, lo.Last())
@@ -230,9 +308,13 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			ml := mapLocator(vu, lo.Nth(nth))
 			return rt.ToValue(ml).ToObject(rt)
 		},
-		"textContent": func(opts sobek.Value) *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
-				s, ok, err := lo.TextContent(opts)
+		"textContent": func(opts sobek.Value) (*sobek.Promise, error) {
+			copts := common.NewFrameTextContentOptions(lo.Timeout())
+			if err := copts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing text content options: %w", err)
+			}
+			return promise(vu, func() (any, error) {
+				s, ok, err := lo.TextContent(copts)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
 				}
@@ -240,39 +322,63 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 					return nil, nil
 				}
 				return s, nil
-			})
+			}), nil
 		},
-		"inputValue": func(opts sobek.Value) *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return lo.InputValue(opts) //nolint:wrapcheck
-			})
+		"inputValue": func(opts sobek.Value) (*sobek.Promise, error) {
+			copts := common.NewFrameInputValueOptions(lo.Timeout())
+			if err := copts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing input value options: %w", err)
+			}
+			return promise(vu, func() (any, error) {
+				return lo.InputValue(copts) //nolint:wrapcheck
+			}), nil
 		},
-		"selectOption": func(values sobek.Value, opts sobek.Value) *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return lo.SelectOption(values, opts) //nolint:wrapcheck
-			})
+		"selectOption": func(values sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
+			copts := common.NewFrameSelectOptionOptions(lo.Timeout())
+			if err := copts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing select option options: %w", err)
+			}
+			convValues, err := ConvertSelectOptionValues(vu.Runtime(), values)
+			if err != nil {
+				return nil, fmt.Errorf("parsing select option values: %w", err)
+			}
+			return promise(vu, func() (any, error) {
+				return lo.SelectOption(convValues, copts) //nolint:wrapcheck
+			}), nil
 		},
-		"press": func(key string, opts sobek.Value) *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return nil, lo.Press(key, opts) //nolint:wrapcheck
-			})
+		"press": func(key string, opts sobek.Value) (*sobek.Promise, error) {
+			copts := common.NewFramePressOptions(lo.Timeout())
+			if err := copts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing press options: %w", err)
+			}
+			return promise(vu, func() (any, error) {
+				return nil, lo.Press(key, copts) //nolint:wrapcheck
+			}), nil
 		},
-		"type": func(text string, opts sobek.Value) *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return nil, lo.Type(text, opts) //nolint:wrapcheck
-			})
+		"type": func(text string, opts sobek.Value) (*sobek.Promise, error) {
+			copts := common.NewFrameTypeOptions(lo.Timeout())
+			if err := copts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing type options: %w", err)
+			}
+			return promise(vu, func() (any, error) {
+				return nil, lo.Type(text, copts) //nolint:wrapcheck
+			}), nil
 		},
-		"hover": func(opts sobek.Value) *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return nil, lo.Hover(opts) //nolint:wrapcheck
-			})
+		"hover": func(opts sobek.Value) (*sobek.Promise, error) {
+			copts := common.NewFrameHoverOptions(lo.Timeout())
+			if err := copts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing hover options: %w", err)
+			}
+			return promise(vu, func() (any, error) {
+				return nil, lo.Hover(copts) //nolint:wrapcheck
+			}), nil
 		},
 		"tap": func(opts sobek.Value) (*sobek.Promise, error) {
 			copts := common.NewFrameTapOptions(lo.DefaultTimeout())
 			if err := copts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing locator tap options: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, lo.Tap(copts) //nolint:wrapcheck
 			}), nil
 		},
@@ -281,14 +387,18 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing locator dispatch event options: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, lo.DispatchEvent(typ, exportArg(eventInit), popts) //nolint:wrapcheck
 			}), nil
 		},
-		"waitFor": func(opts sobek.Value) *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return nil, lo.WaitFor(opts) //nolint:wrapcheck
-			})
+		"waitFor": func(opts sobek.Value) (*sobek.Promise, error) {
+			copts := common.NewFrameWaitForSelectorOptions(lo.Timeout())
+			if err := copts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing wait for options: %w", err)
+			}
+			return promise(vu, func() (any, error) {
+				return nil, lo.WaitFor(copts) //nolint:wrapcheck
+			}), nil
 		},
 	}
 }

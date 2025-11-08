@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/common/js"
@@ -20,7 +21,7 @@ func TestErrorFromDOMError(t *testing.T) {
 		want     error
 	}{
 		{in: "timed out", want: ErrTimedOut, sentinel: true},
-		{in: "error:notconnected", want: errors.New("element is not attached to the DOM")},
+		{in: "error:notconnected", want: ErrElementNotAttachedToDOM},
 		{in: "error:expectednode:anything", want: errors.New("expected node but got anything")},
 		{in: "nonexistent error", want: errors.New("nonexistent error")},
 	} {
@@ -153,6 +154,51 @@ func TestQueryAll(t *testing.T) {
 		})
 	}
 
+	t.Run("return_in_document_order", func(t *testing.T) {
+		t.Parallel()
+
+		const numElements = 11
+		elems := make([]*ElementHandle, numElements)
+		for i := range numElements {
+			elems[i] = &ElementHandle{}
+		}
+		jsHandleAPI := func(elem *ElementHandle) JSHandleAPI {
+			return &jsHandleStub{asElementFn: func() *ElementHandle { return elem }}
+		}
+
+		handles := map[string]JSHandleAPI{
+			// numeric keys
+			"0":  jsHandleAPI(elems[0]),
+			"1":  jsHandleAPI(elems[1]),
+			"2":  jsHandleAPI(elems[2]),
+			"3":  jsHandleAPI(elems[3]),
+			"4":  jsHandleAPI(elems[4]),
+			"5":  jsHandleAPI(elems[5]),
+			"6":  jsHandleAPI(elems[6]),
+			"7":  jsHandleAPI(elems[7]),
+			"8":  jsHandleAPI(elems[8]),
+			"9":  jsHandleAPI(elems[9]),
+			"10": jsHandleAPI(elems[10]),
+			// non-numeric keys that should be filtered out
+			"length":  &jsHandleStub{asElementFn: nilHandle},
+			"forEach": &jsHandleStub{asElementFn: nilHandle},
+			"item":    &jsHandleStub{asElementFn: nilHandle},
+		}
+
+		evalFunc := func(_ context.Context, _ evalOptions, _ string, _ ...any) (any, error) {
+			return &jsHandleStub{
+				getPropertiesFn: func() (map[string]JSHandleAPI, error) {
+					return handles, nil
+				},
+			}, nil
+		}
+
+		results, err := (&ElementHandle{}).queryAll("*", evalFunc)
+		require.NoError(t, err)
+		require.Len(t, results, numElements)
+		assert.True(t, slices.Equal(elems, results), "elements must be sorted in document order")
+	})
+
 	t.Run("eval_call", func(t *testing.T) {
 		t.Parallel()
 
@@ -163,14 +209,14 @@ func TestQueryAll(t *testing.T) {
 			func(_ context.Context, opts evalOptions, jsFunc string, args ...any) (any, error) {
 				assert.Equal(t, js.QueryAll, jsFunc)
 
-				assert.Equal(t, opts.forceCallable, true)
-				assert.Equal(t, opts.returnByValue, false)
+				assert.Equal(t, true, opts.forceCallable)
+				assert.Equal(t, false, opts.returnByValue)
 
 				assert.NotEmpty(t, args)
 				assert.IsType(t, args[0], &Selector{})
 				sel, ok := args[0].(*Selector)
 				require.True(t, ok)
-				assert.Equal(t, sel.Selector, selector)
+				assert.Equal(t, selector, sel.Selector)
 
 				return nil, nil //nolint:nilnil
 			},

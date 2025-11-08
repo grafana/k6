@@ -26,7 +26,7 @@ export default async function() {
     await page.goto('https://quickpizza.grafana.com/test.k6.io/', { waitUntil: 'networkidle' });
     await Promise.all([
       page.waitForNavigation(),
-      page.locator('a[href="/my_messages.php"]').click(),
+      page.getByRole('link', {name: '/my_messages.php'}).click(),
     ]);
 
     // Enter login credentials and login
@@ -38,7 +38,7 @@ export default async function() {
     // to resolve.
     await Promise.all([
       page.waitForNavigation(),
-      page.locator('input[type="submit"]').click(),
+      page.getByText('Go!').click(),
     ]);
 
     await check(page.locator('h2'), {

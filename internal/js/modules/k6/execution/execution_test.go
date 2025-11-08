@@ -206,7 +206,7 @@ func TestAbortTest(t *testing.T) { //nolint:tparallel
 		assert.ErrorAs(t, err, &x)
 		v, ok := x.Value().(*errext.InterruptError)
 		require.True(t, ok)
-		require.Equal(t, v.Reason, reason)
+		require.Equal(t, reason, v.Reason)
 	}
 
 	t.Run("default reason", func(t *testing.T) { //nolint:paralleltest
@@ -564,7 +564,7 @@ func TestTagsDynamicObjectGet(t *testing.T) {
 	}
 	val := tdo.Get("vu")
 	require.NotNil(t, val)
-	assert.Equal(t, val.ToInteger(), int64(42))
+	assert.Equal(t, int64(42), val.ToInteger())
 }
 
 func TestTagsDynamicObjectSet(t *testing.T) {
@@ -580,5 +580,5 @@ func TestTagsDynamicObjectSet(t *testing.T) {
 
 	val := tdo.Get("k1")
 	require.NotNil(t, val)
-	assert.Equal(t, val.String(), "v1")
+	assert.Equal(t, "v1", val.String())
 }

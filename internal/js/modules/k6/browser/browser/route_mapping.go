@@ -3,26 +3,25 @@ package browser
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/grafana/sobek"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
-	jsCommon "go.k6.io/k6/js/common"
+	k6common "go.k6.io/k6/js/common"
 )
 
 // mapRoute to the JS module.
 func mapRoute(vu moduleVU, route *common.Route) mapping {
 	return mapping{
 		"abort": func(reason string) *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, route.Abort(reason)
 			})
 		},
 		"continue": func(opts sobek.Value) *sobek.Promise {
 			copts, err := parseContinueOptions(vu.Context(), opts)
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				if err != nil {
 					return nil, err
 				}
@@ -31,7 +30,7 @@ func mapRoute(vu moduleVU, route *common.Route) mapping {
 		},
 		"fulfill": func(opts sobek.Value) *sobek.Promise {
 			fopts, err := parseFulfillOptions(vu.Context(), opts)
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				if err != nil {
 					return nil, err
 				}
@@ -46,7 +45,7 @@ func mapRoute(vu moduleVU, route *common.Route) mapping {
 
 func parseContinueOptions(ctx context.Context, opts sobek.Value) (common.ContinueOptions, error) {
 	copts := common.ContinueOptions{}
-	if jsCommon.IsNullish(opts) {
+	if k6common.IsNullish(opts) {
 		return copts, nil
 	}
 
@@ -59,7 +58,7 @@ func parseContinueOptions(ctx context.Context, opts sobek.Value) (common.Continu
 		case "method":
 			copts.Method = obj.Get(k).String()
 		case "postData":
-			bytesData, err := jsCommon.ToBytes(obj.Get(k).Export())
+			bytesData, err := k6common.ToBytes(obj.Get(k).Export())
 			if err != nil {
 				return copts, err
 			}
@@ -74,7 +73,7 @@ func parseContinueOptions(ctx context.Context, opts sobek.Value) (common.Continu
 
 func parseFulfillOptions(ctx context.Context, opts sobek.Value) (common.FulfillOptions, error) {
 	fopts := common.FulfillOptions{}
-	if jsCommon.IsNullish(opts) {
+	if k6common.IsNullish(opts) {
 		return fopts, nil
 	}
 
@@ -83,7 +82,7 @@ func parseFulfillOptions(ctx context.Context, opts sobek.Value) (common.FulfillO
 	for _, k := range obj.Keys() {
 		switch k {
 		case "body":
-			bytesBody, err := jsCommon.ToBytes(obj.Get(k).Export())
+			bytesBody, err := k6common.ToBytes(obj.Get(k).Export())
 			if err != nil {
 				return fopts, err
 			}
@@ -109,7 +108,7 @@ func parseHeaders(headers *sobek.Object) []common.HTTPHeader {
 	for _, hk := range headersKeys {
 		value := headers.Get(hk)
 		// Skip undefined headers
-		if jsCommon.IsNullish(value) {
+		if k6common.IsNullish(value) {
 			continue
 		}
 
@@ -119,26 +118,4 @@ func parseHeaders(headers *sobek.Object) []common.HTTPHeader {
 		})
 	}
 	return result
-}
-
-func parseWaitForResponseOptions(
-	ctx context.Context, opts sobek.Value, defaultTimeout time.Duration,
-) (*common.PageWaitForResponseOptions, error) {
-	ropts := common.NewPageWaitForResponseOptions(defaultTimeout)
-	if jsCommon.IsNullish(opts) {
-		return ropts, nil
-	}
-
-	rt := k6ext.Runtime(ctx)
-	obj := opts.ToObject(rt)
-	for _, k := range obj.Keys() {
-		switch k {
-		case "timeout":
-			ropts.Timeout = time.Duration(obj.Get(k).ToInteger()) * time.Millisecond
-		default:
-			return ropts, fmt.Errorf("unsupported waitForResponse option: '%s'", k)
-		}
-	}
-
-	return ropts, nil
 }

@@ -10,11 +10,12 @@ import (
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6error"
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
 	"go.k6.io/k6/js/common"
+	"go.k6.io/k6/js/promises"
 )
 
 func panicIfFatalError(ctx context.Context, err error) {
 	if errors.Is(err, k6error.ErrFatal) {
-		k6ext.Abort(ctx, err.Error())
+		k6ext.Abortf(ctx, err.Error())
 	}
 }
 
@@ -61,4 +62,21 @@ func exportArgs(gargs []sobek.Value) []any {
 // sobekEmptyString returns true if a given value is not nil or an empty string.
 func sobekEmptyString(v sobek.Value) bool {
 	return common.IsNullish(v) || strings.TrimSpace(v.String()) == ""
+}
+
+// promise runs fn in a goroutine and returns a new sobek.Promise.
+//   - If fn returns a nil error, resolves the promise with the
+//     first result value fn returns.
+//   - Otherwise, rejects the promise with the error fn returns.
+func promise(vu moduleVU, fn func() (result any, reason error)) *sobek.Promise {
+	p, resolve, reject := promises.New(vu)
+	go func() {
+		v, err := fn()
+		if err != nil {
+			reject(err)
+			return
+		}
+		resolve(v)
+	}()
+	return p
 }

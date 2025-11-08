@@ -13,14 +13,15 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/internal/lib/testutils"
-	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/output"
 	collectormetrics "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	metricpb "go.opentelemetry.io/proto/otlp/metrics/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
+
+	"go.k6.io/k6/internal/lib/testutils"
+	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/output"
 )
 
 type MetricsServer interface {
@@ -82,7 +83,7 @@ type grpcMetricsServer struct {
 }
 
 func newGRPCServer() (*grpcMetricsServer, error) {
-	listener, err := net.Listen("tcp", "localhost:0")
+	listener, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "localhost:0")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create listener: %w", err)
 	}
@@ -183,6 +184,14 @@ func TestOutput(t *testing.T) {
 			validate: validateCounterMetric,
 		},
 		{
+			name: "rate_metric",
+			metric: struct {
+				typ   metrics.MetricType
+				value float64
+			}{metrics.Rate, 6.0},
+			validate: validateRateMetric,
+		},
+		{
 			name: "trend_metric",
 			metric: struct {
 				typ   metrics.MetricType
@@ -195,6 +204,7 @@ func TestOutput(t *testing.T) {
 	for _, proto := range testProtocols {
 		t.Run(fmt.Sprintf("%s collector", proto), func(t *testing.T) {
 			t.Parallel()
+			registry := metrics.NewRegistry()
 			for _, tc := range testCases {
 				t.Run(tc.name, func(t *testing.T) {
 					t.Parallel()
@@ -204,14 +214,11 @@ func TestOutput(t *testing.T) {
 
 					config := createTestConfig(proto, server.Endpoint())
 					output := setupOutput(t, config)
-					defer func() {
-						if err := output.Stop(); err != nil {
-							t.Errorf("failed to stop output: %v", err)
-						}
-					}()
 
-					sample := createTestSample(t, tc.metric.typ, tc.metric.value)
+					sample := createTestSample(t, registry, tc.metric.typ, tc.metric.value)
 					output.AddMetricSamples([]metrics.SampleContainer{metrics.Samples([]metrics.Sample{sample})})
+
+					require.NoError(t, output.Stop())
 
 					time.Sleep(300 * time.Millisecond)
 					validateMetrics(t, server.LastMetrics(), tc.validate)
@@ -252,8 +259,7 @@ func setupOutput(t *testing.T, config map[string]string) *Output {
 	return o
 }
 
-func createTestSample(t *testing.T, metricType metrics.MetricType, value float64) metrics.Sample {
-	registry := metrics.NewRegistry()
+func createTestSample(t *testing.T, registry *metrics.Registry, metricType metrics.MetricType, value float64) metrics.Sample {
 	metricName := metricType.String() + "_metric"
 	metric, err := registry.NewMetric(metricName, metricType)
 	require.NoError(t, err)
@@ -297,6 +303,16 @@ func validateCounterMetric(t *testing.T, mr *collectormetrics.ExportMetricsServi
 	require.Len(t, sum.DataPoints, 1)
 	assert.Equal(t, 10.0, sum.DataPoints[0].GetAsDouble())
 	assertHasAttribute(t, sum.DataPoints[0].Attributes, "tag1", "value1")
+}
+
+func validateRateMetric(t *testing.T, mr *collectormetrics.ExportMetricsServiceRequest) {
+	metric := findMetric(mr, "test.rate_metric.total")
+	require.NotNil(t, metric, "rate metric not found")
+	sum := metric.GetSum()
+	require.Len(t, sum.DataPoints, 1)
+	assert.Equal(t, int64(1), sum.DataPoints[0].GetAsInt())
+	assertHasAttribute(t, sum.DataPoints[0].Attributes, "tag1", "value1")
+	assertHasAttribute(t, sum.DataPoints[0].Attributes, "condition", "nonzero")
 }
 
 func validateTrendMetric(t *testing.T, mr *collectormetrics.ExportMetricsServiceRequest) {

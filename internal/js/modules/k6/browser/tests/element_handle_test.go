@@ -83,7 +83,7 @@ func TestElementHandleBoundingBoxInvisibleElementWithMapper(t *testing.T) {
 
 	got := tb.vu.RunPromise(t, `
 		const p = await browser.newPage();
-		
+
 		await p.setContent('<div style="display:none">hello</div>');
 
 		const element = await p.$("div");
@@ -144,7 +144,7 @@ func TestElementHandleClick(t *testing.T) {
 
 	res, err := p.Evaluate(`() => window['result']`)
 	require.NoError(t, err)
-	assert.Equal(t, res, "Clicked")
+	assert.Equal(t, "Clicked", res)
 }
 
 func TestElementHandleClickWithNodeRemoved(t *testing.T) {
@@ -172,7 +172,7 @@ func TestElementHandleClickWithNodeRemoved(t *testing.T) {
 
 	res, err := p.Evaluate(`() => window['result']`)
 	require.NoError(t, err)
-	assert.Equal(t, res, "Clicked")
+	assert.Equal(t, "Clicked", res)
 }
 
 func TestElementHandleClickWithDetachedNode(t *testing.T) {
@@ -342,7 +342,7 @@ func TestElementHandleInputValue(t *testing.T) {
 	value, err := element.InputValue(common.NewElementHandleBaseOptions(element.Timeout()))
 	require.NoError(t, err)
 	require.NoError(t, element.Dispose())
-	assert.Equal(t, value, "hello1", `expected input value "hello1", got %q`, value)
+	assert.Equal(t, "hello1", value, `expected input value "hello1", got %q`, value)
 
 	element, err = p.Query("select")
 	require.NoError(t, err)
@@ -350,7 +350,7 @@ func TestElementHandleInputValue(t *testing.T) {
 	value, err = element.InputValue(common.NewElementHandleBaseOptions(element.Timeout()))
 	require.NoError(t, err)
 	require.NoError(t, element.Dispose())
-	assert.Equal(t, value, "hello2", `expected input value "hello2", got %q`, value)
+	assert.Equal(t, "hello2", value, `expected input value "hello2", got %q`, value)
 
 	element, err = p.Query("textarea")
 	require.NoError(t, err)
@@ -358,7 +358,7 @@ func TestElementHandleInputValue(t *testing.T) {
 	value, err = element.InputValue(common.NewElementHandleBaseOptions(element.Timeout()))
 	require.NoError(t, err)
 	require.NoError(t, element.Dispose())
-	assert.Equal(t, value, "hello3", `expected input value "hello3", got %q`, value)
+	assert.Equal(t, "hello3", value, `expected input value "hello3", got %q`, value)
 }
 
 func TestElementHandleIsChecked(t *testing.T) {
@@ -391,7 +391,7 @@ func TestElementHandleQueryAll(t *testing.T) {
 	t.Parallel()
 
 	const (
-		wantLiLen = 2
+		wantLiLen = 3
 		query     = "li.ali"
 	)
 
@@ -400,9 +400,18 @@ func TestElementHandleQueryAll(t *testing.T) {
 		<ul id="aul">
 			<li class="ali">1</li>
 			<li class="ali">2</li>
+			<li class="ali">3</li>
 		</ul>
   	`, nil)
 	require.NoError(t, err)
+
+	assertTextContent := func(t *testing.T, e *common.ElementHandle, wantContent string) {
+		t.Helper()
+		text, ok, err := e.TextContent()
+		require.NoError(t, err)
+		require.True(t, ok)
+		assert.Equal(t, wantContent, text)
+	}
 
 	t.Run("element_handle", func(t *testing.T) { //nolint:paralleltest
 		el, err := p.Query("#aul")
@@ -410,19 +419,26 @@ func TestElementHandleQueryAll(t *testing.T) {
 
 		els, err := el.QueryAll(query)
 		require.NoError(t, err)
-
-		assert.Equal(t, wantLiLen, len(els))
+		require.Len(t, els, wantLiLen)
+		assertTextContent(t, els[0], "1")
+		assertTextContent(t, els[1], "2")
+		assertTextContent(t, els[2], "3")
 	})
 	t.Run("page", func(t *testing.T) { //nolint:paralleltest
 		els, err := p.QueryAll(query)
 		require.NoError(t, err)
-
-		assert.Equal(t, wantLiLen, len(els))
+		require.Len(t, els, wantLiLen)
+		assertTextContent(t, els[0], "1")
+		assertTextContent(t, els[1], "2")
+		assertTextContent(t, els[2], "3")
 	})
 	t.Run("frame", func(t *testing.T) { //nolint:paralleltest
 		els, err := p.MainFrame().QueryAll(query)
 		require.NoError(t, err)
-		assert.Equal(t, wantLiLen, len(els))
+		require.Len(t, els, wantLiLen)
+		assertTextContent(t, els[0], "1")
+		assertTextContent(t, els[1], "2")
+		assertTextContent(t, els[2], "3")
 	})
 }
 

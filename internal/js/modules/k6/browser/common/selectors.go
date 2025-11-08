@@ -22,17 +22,14 @@ import (
 	"strings"
 )
 
-// TODO: Reimplement this by looking at:
-// https://github.com/microsoft/playwright/blob/
-// 		35cd6fb279ccf4c91eae4b8094697eceb61426cc/
-// 		packages/playwright-core/src/utils/isomorphic/selectorParser.ts#L154
-// Current implementation is a simplified version of the above and cannot handle all edge cases.
-
 // Matches `name:body`, a query engine name and selector for that engine.
 var reQueryEngine *regexp.Regexp = regexp.MustCompile(`^[a-zA-Z_0-9-+:*]+$`)
 
 // Matches start of XPath query.
 var reXPathSelector *regexp.Regexp = regexp.MustCompile(`^\(*//`)
+
+// Matches the text selectors of the form text=<value>
+var reTextSelector *regexp.Regexp = regexp.MustCompile(`^\s*text\s*=\s*(.*)$`)
 
 type SelectorPart struct {
 	Name string `json:"name"`
@@ -50,6 +47,10 @@ type Selector struct {
 }
 
 func NewSelector(selector string) (*Selector, error) {
+	if selector == "" {
+		return nil, errors.New("provided selector is empty")
+	}
+
 	s := Selector{
 		Selector: selector,
 		Parts:    make([]*SelectorPart, 0, 1),
@@ -71,49 +72,32 @@ func (s *Selector) appendPart(p *SelectorPart, capture bool) error {
 	return nil
 }
 
+// parse splits the selector into parts, separated by `>>`, and identifies
+// the query engine for each part.
+//
 //nolint:cyclop,funlen
 func (s *Selector) parse() error {
-	parsePart := func(selector string, start, index int) (*SelectorPart, bool) {
-		part := strings.TrimSpace(selector[start:index])
+	parsePart := func(part string) (*SelectorPart, bool) {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			return nil, false
+		}
+
 		eqIndex := strings.Index(part, "=")
 		var name, body string
 
 		switch {
-		case strings.HasPrefix(part, "internal:has-text="):
-			name = "internal:has-text"
-			body = TrimQuotes(part[eqIndex+1:])
-		case strings.HasPrefix(part, "internal:has-not-text="):
-			name = "internal:has-not-text"
-			body = TrimQuotes(part[eqIndex+1:])
-		case strings.HasPrefix(part, "nth="):
-			name = "nth"
-			body = part[eqIndex+1:]
-		case eqIndex != -1 && reQueryEngine.Match([]byte(strings.TrimSpace(part[0:eqIndex]))):
-			name = strings.TrimSpace(part[0:eqIndex])
+		case eqIndex != -1 && reQueryEngine.MatchString(strings.TrimSpace(part[:eqIndex])):
+			name = strings.TrimSpace(part[:eqIndex])
 			body = part[eqIndex+1:]
 		case len(part) > 1 && part[0] == '"' && part[len(part)-1] == '"':
 			name = "text"
 			body = part
-		case isQuotedText(part):
+		case len(part) > 1 && part[0] == '\'' && part[len(part)-1] == '\'':
 			name = "text"
 			body = part
-		case reXPathSelector.Match([]byte(part)) || strings.HasPrefix(part, ".."):
-			// If selector starts with '//' or '//' prefixed with multiple opening
-			// parenthesis, consider xpath. @see https://github.com/microsoft/playwright/issues/817
-			// If selector starts with '..', consider xpath as well.
+		case reXPathSelector.MatchString(part) || strings.HasPrefix(part, ".."):
 			name = "xpath"
-			body = part
-		case strings.HasPrefix(part, "internal:role="):
-			name = "internal:role"
-			body = part
-		case strings.HasPrefix(part, "internal:attr="):
-			name = "internal:attr"
-			body = part
-		case strings.HasPrefix(part, "internal:label="):
-			name = "internal:label"
-			body = part
-		case strings.HasPrefix(part, "internal:text="):
-			name = "internal:text"
 			body = part
 		default:
 			name = "css"
@@ -121,7 +105,7 @@ func (s *Selector) parse() error {
 		}
 
 		capture := false
-		if name[0] == '*' {
+		if strings.HasPrefix(name, "*") {
 			capture = true
 			name = name[1:]
 		}
@@ -129,34 +113,45 @@ func (s *Selector) parse() error {
 		return &SelectorPart{Name: name, Body: body}, capture
 	}
 
-	if !strings.Contains(s.Selector, ">>") {
-		part, capture := parsePart(s.Selector, 0, len(s.Selector))
-		err := s.appendPart(part, capture)
-		if err != nil {
-			return err
+	var (
+		start, index int
+		quote        rune
+	)
+
+	appendPart := func(start, end int) error {
+		p, capture := parsePart(s.Selector[start:end])
+		// Skip empty segments between `>>`, e.g., when there are consecutive `>>` or leading/trailing `>>`.
+		if p == nil {
+			return nil
 		}
-		return nil
+		return s.appendPart(p, capture)
 	}
 
-	start := 0
-	index := 0
-	var quote byte
+	if !strings.Contains(s.Selector, ">>") {
+		return appendPart(0, len(s.Selector))
+	}
+
+	shouldIgnoreTextSelectorQuote := func(start, end int) bool {
+		prefix := s.Selector[start:end]
+		if match := reTextSelector.FindStringSubmatch(prefix); match != nil && match[1] != "" {
+			return true
+		}
+		return false
+	}
 
 	for index < len(s.Selector) {
-		c := s.Selector[index]
+		c := rune(s.Selector[index])
 		switch {
 		case c == '\\' && index+1 < len(s.Selector):
 			index += 2
 		case c == quote:
-			quote = byte(0)
+			quote = 0
 			index++
-		case quote == 0 && (c == '"' || c == '\'' || c == '`'):
+		case quote == 0 && (c == '"' || c == '\'' || c == '`') && !shouldIgnoreTextSelectorQuote(start, index):
 			quote = c
 			index++
-		case quote == 0 && c == '>' && s.Selector[index+1] == '>':
-			part, capture := parsePart(s.Selector, start, index)
-			err := s.appendPart(part, capture)
-			if err != nil {
+		case quote == 0 && c == '>' && index+1 < len(s.Selector) && s.Selector[index+1] == '>':
+			if err := appendPart(start, index); err != nil {
 				return err
 			}
 			index += 2
@@ -166,10 +161,5 @@ func (s *Selector) parse() error {
 		}
 	}
 
-	part, capture := parsePart(s.Selector, start, index)
-	err := s.appendPart(part, capture)
-	if err != nil {
-		return err
-	}
-	return nil
+	return appendPart(start, index)
 }
