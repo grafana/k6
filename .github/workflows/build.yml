@@ -9,6 +9,7 @@ on:
         description: 'Go version for building binaries'
         default: '1.x'
         required: true
+  pull_request:
 
 defaults:
   run:
