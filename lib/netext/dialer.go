@@ -69,6 +69,31 @@ func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn,
 	return conn, err
 }
 
+// ResolveAddr looks up the IP address for the given host.
+// It uses the same logic as DialContext to resolve the host address.
+func (d *Dialer) ResolveAddr(addr string) (net.IP, int, error) {
+	remote, err := d.getDialAddr(addr)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	host, portStr, err := net.SplitHostPort(remote)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	port := 0
+
+	if portStr != "" {
+		port, err = strconv.Atoi(portStr)
+		if err != nil {
+			return nil, 0, err
+		}
+	}
+
+	return net.ParseIP(host), port, nil
+}
+
 // IOSamples returns samples for data send and received since it last call and zeros out.
 // It uses the provided time as the sample time and tags and builtinMetrics to build the samples.
 func (d *Dialer) IOSamples(
