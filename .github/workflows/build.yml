@@ -3,11 +3,11 @@ on:
   workflow_dispatch:
     inputs:
       k6_version:
-        description: 'The version of the release, it must use the semantic versioning format with the v prefix. It is a development release so it is suggested to append a build metadata (e.g. v0.38.0-dev).'
+        description: "The version of the release, it must use the semantic versioning format with the v prefix. It is a development release so it is suggested to append a build metadata (e.g. v0.38.0-dev)."
         required: true
       go_version:
-        description: 'Go version for building binaries'
-        default: '1.x'
+        description: "Go version for building binaries"
+        default: "1.x"
         required: true
   pull_request:
 
@@ -55,6 +55,7 @@ jobs:
           set-creds-in-environment: true
       - name: Setup docker compose environment
         run: |
+          mkdir -p packaging
           cat > packaging/.env <<EOF
           AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
           AWS_CF_DISTRIBUTION="${AWS_CF_DISTRIBUTION}"
