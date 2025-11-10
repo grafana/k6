@@ -32,8 +32,6 @@ env:
 jobs:
   publish-packages:
     runs-on: ubuntu-latest
-    env:
-      VERSION: 
     permissions:
       actions: read
       contents: read
