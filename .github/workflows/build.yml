@@ -9,12 +9,6 @@ on:
         description: 'Go version for building binaries'
         default: '1.x'
         required: true
-  push:
-    branches:
-      - master
-    tags:
-      - v*
-  pull_request:
 
 defaults:
   run:
