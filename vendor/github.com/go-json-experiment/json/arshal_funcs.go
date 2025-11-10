@@ -2,11 +2,14 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build !goexperiment.jsonv2 || !go1.25
+
 package json
 
 import (
 	"errors"
 	"fmt"
+	"io"
 	"reflect"
 	"sync"
 
@@ -175,7 +178,8 @@ func MarshalFunc[T any](fn func(T) ([]byte, error)) *Marshalers {
 	typFnc := typedMarshaler{
 		typ: t,
 		fnc: func(enc *jsontext.Encoder, va addressableValue, mo *jsonopts.Struct) error {
-			val, err := fn(va.castTo(t).Interface().(T))
+			v, _ := reflect.TypeAssert[T](va.castTo(t))
+			val, err := fn(v)
 			if err != nil {
 				err = wrapSkipFunc(err, "marshal function of type func(T) ([]byte, error)")
 				if mo.Flags.Get(jsonflags.ReportErrorsWithLegacySemantics) {
@@ -209,9 +213,9 @@ func MarshalFunc[T any](fn func(T) ([]byte, error)) *Marshalers {
 // on the provided encoder. It may return [SkipFunc] such that marshaling can
 // move on to the next marshal function. However, no mutable method calls may
 // be called on the encoder if [SkipFunc] is returned.
-// The pointer to [jsontext.Encoder], the value of T, and the [Options] value
+// The pointer to [jsontext.Encoder] and the value of T
 // must not be retained outside the function call.
-func MarshalToFunc[T any](fn func(*jsontext.Encoder, T, Options) error) *Marshalers {
+func MarshalToFunc[T any](fn func(*jsontext.Encoder, T) error) *Marshalers {
 	t := reflect.TypeFor[T]()
 	assertCastableTo(t, true)
 	typFnc := typedMarshaler{
@@ -220,7 +224,8 @@ func MarshalToFunc[T any](fn func(*jsontext.Encoder, T, Options) error) *Marshal
 			xe := export.Encoder(enc)
 			prevDepth, prevLength := xe.Tokens.DepthLength()
 			xe.Flags.Set(jsonflags.WithinArshalCall | 1)
-			err := fn(enc, va.castTo(t).Interface().(T), mo)
+			v, _ := reflect.TypeAssert[T](va.castTo(t))
+			err := fn(enc, v)
 			xe.Flags.Set(jsonflags.WithinArshalCall | 0)
 			currDepth, currLength := xe.Tokens.DepthLength()
 			if err == nil && (prevDepth != currDepth || prevLength+1 != currLength) {
@@ -267,7 +272,8 @@ func UnmarshalFunc[T any](fn func([]byte, T) error) *Unmarshalers {
 			if err != nil {
 				return err // must be a syntactic or I/O error
 			}
-			err = fn(val, va.castTo(t).Interface().(T))
+			v, _ := reflect.TypeAssert[T](va.castTo(t))
+			err = fn(val, v)
 			if err != nil {
 				err = wrapSkipFunc(err, "unmarshal function of type func([]byte, T) error")
 				if uo.Flags.Get(jsonflags.ReportErrorsWithLegacySemantics) {
@@ -291,9 +297,9 @@ func UnmarshalFunc[T any](fn func([]byte, T) error) *Unmarshalers {
 // on the provided decoder. It may return [SkipFunc] such that unmarshaling can
 // move on to the next unmarshal function. However, no mutable method calls may
 // be called on the decoder if [SkipFunc] is returned.
-// The pointer to [jsontext.Decoder], the value of T, and [Options] value
+// The pointer to [jsontext.Decoder] and the value of T
 // must not be retained outside the function call.
-func UnmarshalFromFunc[T any](fn func(*jsontext.Decoder, T, Options) error) *Unmarshalers {
+func UnmarshalFromFunc[T any](fn func(*jsontext.Decoder, T) error) *Unmarshalers {
 	t := reflect.TypeFor[T]()
 	assertCastableTo(t, false)
 	typFnc := typedUnmarshaler{
@@ -301,8 +307,12 @@ func UnmarshalFromFunc[T any](fn func(*jsontext.Decoder, T, Options) error) *Unm
 		fnc: func(dec *jsontext.Decoder, va addressableValue, uo *jsonopts.Struct) error {
 			xd := export.Decoder(dec)
 			prevDepth, prevLength := xd.Tokens.DepthLength()
+			if prevDepth == 1 && xd.AtEOF() {
+				return io.EOF // check EOF early to avoid fn reporting an EOF
+			}
 			xd.Flags.Set(jsonflags.WithinArshalCall | 1)
-			err := fn(dec, va.castTo(t).Interface().(T), uo)
+			v, _ := reflect.TypeAssert[T](va.castTo(t))
+			err := fn(dec, v)
 			xd.Flags.Set(jsonflags.WithinArshalCall | 0)
 			currDepth, currLength := xd.Tokens.DepthLength()
 			if err == nil && (prevDepth != currDepth || prevLength+1 != currLength) {
