@@ -129,7 +129,6 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 			logger.WithError(err).Debug("Everything has finished, exiting k6 with an error!")
 		}
 	}()
-	printBanner(c.gs)
 
 	globalCtx, globalCancel := context.WithCancel(c.gs.Ctx)
 	defer globalCancel()
@@ -168,6 +167,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	if err != nil {
 		return err
 	}
+	printBanner(c.gs)
 	if test.keyLogger != nil {
 		defer func() {
 			if klErr := test.keyLogger.Close(); klErr != nil {

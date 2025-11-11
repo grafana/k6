@@ -10,8 +10,7 @@ import (
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6error"
-	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
-	jsCommon "go.k6.io/k6/js/common"
+	k6common "go.k6.io/k6/js/common"
 )
 
 // mapBrowserContext to the JS module.
@@ -23,13 +22,13 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 	rt := vu.Runtime()
 	return mapping{
 		"addCookies": func(cookies []*common.Cookie) *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, bc.AddCookies(cookies) //nolint:wrapcheck
 			})
 		},
 		"addInitScript": func(script sobek.Value) *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
-				if jsCommon.IsNullish(script) {
+			return promise(vu, func() (any, error) {
+				if k6common.IsNullish(script) {
 					return nil, nil
 				}
 
@@ -61,22 +60,22 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 			return mapBrowser(vu)
 		},
 		"clearCookies": func() *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, bc.ClearCookies() //nolint:wrapcheck
 			})
 		},
 		"clearPermissions": func() *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, bc.ClearPermissions() //nolint:wrapcheck
 			})
 		},
 		"close": func() *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, bc.Close() //nolint:wrapcheck
 			})
 		},
 		"cookies": func(urls ...string) *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return bc.Cookies(urls...) //nolint:wrapcheck
 			})
 		},
@@ -85,7 +84,7 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 			if err != nil {
 				return nil, fmt.Errorf("parsing grant permission options: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, bc.GrantPermissions(permissions, popts)
 			}), nil
 		},
@@ -96,7 +95,7 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 			if err != nil {
 				return nil, fmt.Errorf("parsing geo location: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, bc.SetGeolocation(&gl)
 			}), nil
 		},
@@ -105,62 +104,50 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 			if err != nil {
 				return nil, fmt.Errorf("parsing HTTP credentials: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, bc.SetHTTPCredentials(creds) //nolint:staticcheck
 			}), nil
 		},
 		"setOffline": func(offline bool) *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, bc.SetOffline(offline) //nolint:wrapcheck
 			})
 		},
 		"waitForEvent": func(event string, optsOrPredicate sobek.Value) (*sobek.Promise, error) {
-			popts, err := parseWaitForEventOptions(vu.Runtime(), optsOrPredicate, bc.Timeout())
+			rt := vu.Runtime()
+			ctx := vu.Context()
+
+			popts, err := parseWaitForEventOptions(rt, optsOrPredicate, bc.Timeout())
 			if err != nil {
 				return nil, fmt.Errorf("parsing wait for event options: %w", err)
 			}
 
-			ctx := vu.Context()
-			return k6ext.Promise(ctx, func() (result any, reason error) {
-				var runInTaskQueue func(p *common.Page) (bool, error)
-				if popts.PredicateFn != nil {
-					runInTaskQueue = func(p *common.Page) (bool, error) {
-						tq := vu.get(ctx, p.TargetID())
+			// Waits until the first event if no predicate is specified.
+			var pred func(p *common.Page) (bool, error)
 
-						var rtn bool
-						var err error
-						// The function on the taskqueue runs in its own goroutine
-						// so we need to use a channel to wait for it to complete
-						// before returning the result to the caller.
-						c := make(chan bool)
-						tq.Queue(func() error {
-							var resp sobek.Value
-							resp, err = popts.PredicateFn(vu.Runtime().ToValue(p))
-							rtn = resp.ToBoolean()
-							close(c)
-							return nil
-						})
-
-						select {
-						case <-c:
-						case <-ctx.Done():
-							err = errors.New("iteration ended before waitForEvent completed")
+			// Waits until the event that satisfies the predicate.
+			if popts.PredicateFn != nil {
+				pred = func(p *common.Page) (bool, error) {
+					return queueTask(ctx, vu.get(ctx, p.TargetID()), func() (bool, error) {
+						v, err := popts.PredicateFn(rt.ToValue(p))
+						if err != nil {
+							return false, err
 						}
-
-						return rtn, err //nolint:wrapcheck
-					}
+						return v.ToBoolean(), nil
+					})()
 				}
+			}
 
-				resp, err := bc.WaitForEvent(event, runInTaskQueue, popts.Timeout)
-				panicIfFatalError(ctx, err)
+			return promise(vu, func() (result any, reason error) {
+				v, err := bc.WaitForEvent(event, pred, popts.Timeout)
 				if err != nil {
-					return nil, err //nolint:wrapcheck
+					panicIfFatalError(ctx, err)
+					return nil, err
 				}
-				p, ok := resp.(*common.Page)
+				p, ok := v.(*common.Page)
 				if !ok {
 					panicIfFatalError(ctx, fmt.Errorf("response object is not a page: %w", k6error.ErrFatal))
 				}
-
 				return mapPage(vu, p), nil
 			}), nil
 		},
@@ -180,7 +167,7 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 			return rt.ToValue(mpages).ToObject(rt)
 		},
 		"newPage": func() *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				page, err := bc.NewPage()
 				if err != nil {
 					return nil, err //nolint:wrapcheck
@@ -209,7 +196,7 @@ func parseWaitForEventOptions(
 		Timeout: defaultTime,
 	}
 
-	if jsCommon.IsNullish(optsOrPredicate) {
+	if k6common.IsNullish(optsOrPredicate) {
 		return w, nil
 	}
 	var isCallable bool

@@ -16,6 +16,7 @@ jobs:
       VERSION: 0.0.4
       DOCKER_IMAGE_ID: ghcr.io/grafana/k6packager
       GITHUB_ACTOR: ${{ github.actor }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     permissions:
       contents: read
       id-token: write
@@ -29,9 +30,14 @@ jobs:
         run: |
           cd packaging
           docker compose build packager
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ env.GITHUB_ACTOR }}
+          password: ${{ env.GITHUB_TOKEN }}
       - name: Publish
         run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login https://ghcr.io -u ${GITHUB_ACTOR} --password-stdin
           docker push "${DOCKER_IMAGE_ID}:latest"
           docker tag "${DOCKER_IMAGE_ID}" "${DOCKER_IMAGE_ID}:${VERSION}"
           docker push "${DOCKER_IMAGE_ID}:${VERSION}"
