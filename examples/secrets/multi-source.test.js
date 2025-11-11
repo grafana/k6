@@ -8,5 +8,4 @@ export default async () => {
 	console.log("Secret from default source ", my_secret)
 	console.log("Secret from another source ", my_other_secret)
 	console.log("Are they equal? ", my_other_secret== my_secret)
-
 }
