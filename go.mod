@@ -20,7 +20,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/grafana/k6provider v0.2.0
-	github.com/grafana/sobek v0.0.0-20251030131753-d05c9166857d
+	github.com/grafana/sobek v0.0.0-20251103154147-6b40183f38e5
 	github.com/grafana/xk6-dashboard v0.7.13
 	github.com/grafana/xk6-redis v0.3.4
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
