@@ -42,10 +42,7 @@ func encodeBlockBest(dst, src []byte, dict *Dict) (d int) {
 	if len(src) < minNonLiteralBlockSize {
 		return 0
 	}
-	sLimitDict := len(src) - inputMargin
-	if sLimitDict > MaxDictSrcOffset-inputMargin {
-		sLimitDict = MaxDictSrcOffset - inputMargin
-	}
+	sLimitDict := min(len(src)-inputMargin, MaxDictSrcOffset-inputMargin)
 
 	var lTable [maxLTableSize]uint64
 	var sTable [maxSTableSize]uint64
