@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strings"
 	"sync"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/log"
@@ -215,6 +216,13 @@ func (e *ExecutionContext) eval(
 	if remoteObject, exceptionDetails, err = action.Do(cdp.WithExecutor(apiCtx, e.session)); err != nil {
 		var cdpe *cdproto.Error
 		if errors.As(err, &cdpe) && cdpe.Code == devToolsServerErrorCode {
+			// Navigation can invalidate the execution context mid-evaluation.
+			// This is expected when the evaluation triggers navigation (e.g. history.back).
+			// Treat it as success since the evaluation DID execute.
+			if strings.Contains(cdpe.Message, "Inspected target navigated or closed") {
+				e.logger.Debug("ExecutionContext:eval", cdpe.Message)
+				return nil, nil //nolint:nilnil
+			}
 			// By creating a new error instead of reusing it, we're removing the
 			// chromium specific error code.
 			return nil, errors.New(cdpe.Message)
