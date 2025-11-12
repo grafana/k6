@@ -1,7 +1,7 @@
 # buf.build/gen/go/gogo/protobuf/protocolbuffers/go v1.36.10-20240617172848-e1dbca2775a7.1
 ## explicit; go 1.23
 buf.build/gen/go/gogo/protobuf/protocolbuffers/go/gogoproto
-# buf.build/gen/go/prometheus/prometheus/protocolbuffers/go v1.36.10-20251006115534-cbd485bd5afd.1
+# buf.build/gen/go/prometheus/prometheus/protocolbuffers/go v1.36.10-20251020175938-0eada6ecf0b9.1
 ## explicit; go 1.23
 buf.build/gen/go/prometheus/prometheus/protocolbuffers/go
 # github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358
@@ -187,7 +187,7 @@ github.com/grafana/k6build/pkg/client
 # github.com/grafana/k6provider v0.2.0
 ## explicit; go 1.24.0
 github.com/grafana/k6provider
-# github.com/grafana/sobek v0.0.0-20251030131753-d05c9166857d
+# github.com/grafana/sobek v0.0.0-20251103154147-6b40183f38e5
 ## explicit; go 1.20
 github.com/grafana/sobek
 github.com/grafana/sobek/ast
@@ -233,8 +233,8 @@ github.com/jhump/protoreflect/internal
 # github.com/josharian/intern v1.0.0
 ## explicit; go 1.5
 github.com/josharian/intern
-# github.com/klauspost/compress v1.18.0
-## explicit; go 1.22
+# github.com/klauspost/compress v1.18.1
+## explicit; go 1.23
 github.com/klauspost/compress
 github.com/klauspost/compress/flate
 github.com/klauspost/compress/fse
@@ -448,7 +448,7 @@ go.uber.org/goleak/internal/stack
 golang.org/x/crypto/md4
 golang.org/x/crypto/ocsp
 golang.org/x/crypto/ripemd160
-# golang.org/x/crypto/x509roots/fallback v0.0.0-20251009181029-0b7aa0cfb07b
+# golang.org/x/crypto/x509roots/fallback v0.0.0-20251028130051-c0531f9c3451
 ## explicit; go 1.24.0
 golang.org/x/crypto/x509roots/fallback
 golang.org/x/crypto/x509roots/fallback/bundle
@@ -464,7 +464,7 @@ golang.org/x/net/idna
 golang.org/x/net/internal/httpcommon
 golang.org/x/net/internal/timeseries
 golang.org/x/net/trace
-# golang.org/x/sync v0.17.0
+# golang.org/x/sync v0.18.0
 ## explicit; go 1.24.0
 golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore
