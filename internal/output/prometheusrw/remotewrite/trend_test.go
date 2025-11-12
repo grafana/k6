@@ -54,7 +54,7 @@ func TestExtendedTrendSinkMapPrompb(t *testing.T) {
 	st, err := newExtendedTrendSink(resolver)
 	require.NoError(t, err)
 	st.Add(sample)
-	require.Equal(t, st.Count(), uint64(1))
+	require.Equal(t, uint64(1), st.Count())
 
 	ts := st.MapPrompb(sample.TimeSeries, sample.Time)
 	require.Len(t, ts, 8)

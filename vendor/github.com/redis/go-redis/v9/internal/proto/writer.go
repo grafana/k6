@@ -65,34 +65,65 @@ func (w *Writer) WriteArg(v interface{}) error {
 		return w.string("")
 	case string:
 		return w.string(v)
+	case *string:
+		return w.string(*v)
 	case []byte:
 		return w.bytes(v)
 	case int:
 		return w.int(int64(v))
+	case *int:
+		return w.int(int64(*v))
 	case int8:
 		return w.int(int64(v))
+	case *int8:
+		return w.int(int64(*v))
 	case int16:
 		return w.int(int64(v))
+	case *int16:
+		return w.int(int64(*v))
 	case int32:
 		return w.int(int64(v))
+	case *int32:
+		return w.int(int64(*v))
 	case int64:
 		return w.int(v)
+	case *int64:
+		return w.int(*v)
 	case uint:
 		return w.uint(uint64(v))
+	case *uint:
+		return w.uint(uint64(*v))
 	case uint8:
 		return w.uint(uint64(v))
+	case *uint8:
+		return w.uint(uint64(*v))
 	case uint16:
 		return w.uint(uint64(v))
+	case *uint16:
+		return w.uint(uint64(*v))
 	case uint32:
 		return w.uint(uint64(v))
+	case *uint32:
+		return w.uint(uint64(*v))
 	case uint64:
 		return w.uint(v)
+	case *uint64:
+		return w.uint(*v)
 	case float32:
 		return w.float(float64(v))
+	case *float32:
+		return w.float(float64(*v))
 	case float64:
 		return w.float(v)
+	case *float64:
+		return w.float(*v)
 	case bool:
 		if v {
+			return w.int(1)
+		}
+		return w.int(0)
+	case *bool:
+		if *v {
 			return w.int(1)
 		}
 		return w.int(0)

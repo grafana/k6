@@ -140,23 +140,23 @@ func TestRampingArrivalRateRunUnplannedVUs(t *testing.T) {
 	engineOut := make(chan metrics.SampleContainer, 1000)
 	test.state.SetInitVUFunc(func(ctx context.Context, _ *logrus.Entry) (lib.InitializedVU, error) {
 		cur := atomic.LoadInt64(&count)
-		require.Equal(t, cur, int64(1))
+		require.Equal(t, int64(1), cur)
 		time.Sleep(time.Second / 2)
 
 		close(ch)
 		time.Sleep(time.Millisecond * 150)
 
 		cur = atomic.LoadInt64(&count)
-		require.Equal(t, cur, int64(2))
+		require.Equal(t, int64(2), cur)
 
 		time.Sleep(time.Millisecond * 150)
 		cur = atomic.LoadInt64(&count)
-		require.Equal(t, cur, int64(2))
+		require.Equal(t, int64(2), cur)
 
 		close(ch2)
 		time.Sleep(time.Millisecond * 200)
 		cur = atomic.LoadInt64(&count)
-		require.NotEqual(t, cur, int64(2))
+		require.NotEqual(t, int64(2), cur)
 		idl, idg := test.state.GetUniqueVUIdentifiers()
 		return runner.NewVU(ctx, idl, idg, engineOut)
 	})
@@ -201,12 +201,12 @@ func TestRampingArrivalRateRunCorrectRateWithSlowRate(t *testing.T) {
 	test.state.SetInitVUFunc(func(ctx context.Context, _ *logrus.Entry) (lib.InitializedVU, error) {
 		t.Log("init")
 		cur := atomic.LoadInt64(&count)
-		require.Equal(t, cur, int64(1))
+		require.Equal(t, int64(1), cur)
 		time.Sleep(time.Millisecond * 200)
 		close(ch)
 		time.Sleep(time.Millisecond * 200)
 		cur = atomic.LoadInt64(&count)
-		require.NotEqual(t, cur, int64(1))
+		require.NotEqual(t, int64(1), cur)
 
 		idl, idg := test.state.GetUniqueVUIdentifiers()
 		return runner.NewVU(ctx, idl, idg, engineOut)

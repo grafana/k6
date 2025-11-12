@@ -120,7 +120,7 @@ func TestEventLoopAllCallbacksGetCalled(t *testing.T) {
 		require.Greater(t, time.Millisecond*50, took)
 		require.Less(t, sleepTime, took2)
 		require.Greater(t, sleepTime+time.Millisecond*100, took2)
-		require.EqualValues(t, called, 99)
+		require.EqualValues(t, 99, called)
 	}
 }
 

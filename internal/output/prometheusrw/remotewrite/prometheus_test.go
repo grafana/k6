@@ -1,7 +1,8 @@
 package remotewrite
 
 import (
-	"sort"
+	"cmp"
+	"slices"
 	"testing"
 	"time"
 
@@ -71,11 +72,20 @@ func assertTimeSeriesEqual(t *testing.T, expected []*prompb.TimeSeries, actual [
 	}
 }
 
-// sortByLabelName sorts a slice of time series by Name label.
-//
-// TODO: remove the assumption that Name label is the first.
+// sortByLabelName sorts a slice of time series by __name__ label.
 func sortByNameLabel(s []*prompb.TimeSeries) {
-	sort.Slice(s, func(i, j int) bool {
-		return s[i].Labels[0].Value <= s[j].Labels[0].Value
+	slices.SortStableFunc(s, func(i, j *prompb.TimeSeries) int {
+		return cmp.Compare(findNameLabel(i.Labels), findNameLabel(j.Labels))
 	})
+}
+
+// sortByLabelName sorts a slice of time series by __name__ label.
+func findNameLabel(labels []*prompb.Label) string {
+	for _, l := range labels {
+		if l.Name == namelbl {
+			return l.Value
+		}
+	}
+	// This should never happen whenever we use this test helper.
+	panic("__name__ label must be present")
 }

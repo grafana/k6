@@ -33,6 +33,7 @@ import (
 const isWindows = runtime.GOOS == "windows"
 
 func getTestPreInitState(tb testing.TB, logger logrus.FieldLogger, rtOpts *lib.RuntimeOptions) *lib.TestPreInitState {
+	tb.Helper()
 	if logger == nil {
 		logger = testutils.NewLogger(tb)
 	}
@@ -50,6 +51,7 @@ func getTestPreInitState(tb testing.TB, logger logrus.FieldLogger, rtOpts *lib.R
 }
 
 func getSimpleBundle(tb testing.TB, filename, data string, opts ...interface{}) (*Bundle, error) {
+	tb.Helper()
 	fs := fsext.NewMemMapFs()
 	var rtOpts *lib.RuntimeOptions
 	var logger logrus.FieldLogger
@@ -65,18 +67,46 @@ func getSimpleBundle(tb testing.TB, filename, data string, opts ...interface{}) 
 			tb.Fatalf("unknown test option %q", opt)
 		}
 	}
+	preInitState := getTestPreInitState(tb, logger, rtOpts)
 
+	filenameURL := &url.URL{Path: filename, Scheme: "file"}
+
+	fss := map[string]fsext.Fs{"file": fs, "https": fsext.NewMemMapFs()}
+	moduleResolver := NewModuleResolver(loader.Dir(filenameURL), preInitState, fss)
 	return NewBundle(
-		getTestPreInitState(tb, logger, rtOpts),
+		preInitState,
 		&loader.SourceData{
-			URL:  &url.URL{Path: filename, Scheme: "file"},
+			URL:  filenameURL,
 			Data: []byte(data),
 		},
-		map[string]fsext.Fs{"file": fs, "https": fsext.NewMemMapFs()},
+		fss,
+		moduleResolver,
 	)
 }
 
+func getSimpleBundleFromArchive(tb testing.TB, arc *lib.Archive, opts ...interface{}) (*Bundle, error) {
+	tb.Helper()
+	var rtOpts *lib.RuntimeOptions
+	var logger logrus.FieldLogger
+	for _, o := range opts {
+		switch opt := o.(type) {
+		case lib.RuntimeOptions:
+			rtOpts = &opt
+		case logrus.FieldLogger:
+			logger = opt
+		default:
+			tb.Fatalf("unknown test option %q", opt)
+		}
+	}
+	preInitState := getTestPreInitState(tb, logger, rtOpts)
+
+	fss := arc.Filesystems
+	moduleResolver := NewModuleResolver(arc.PwdURL, preInitState, fss)
+	return NewBundleFromArchive(preInitState, arc, moduleResolver)
+}
+
 func getSimpleBundleStdin(tb testing.TB, pwd *url.URL, data string, opts ...interface{}) (*Bundle, error) {
+	tb.Helper()
 	fs := fsext.NewMemMapFs()
 	var rtOpts *lib.RuntimeOptions
 	var logger logrus.FieldLogger
@@ -93,14 +123,21 @@ func getSimpleBundleStdin(tb testing.TB, pwd *url.URL, data string, opts ...inte
 		}
 	}
 
+	preInitState := getTestPreInitState(tb, logger, rtOpts)
+
+	filenameURL := &url.URL{Path: "/-", Scheme: "file"}
+
+	fss := map[string]fsext.Fs{"file": fs, "https": fsext.NewMemMapFs()}
+	moduleResolver := NewModuleResolver(pwd, preInitState, fss)
 	return NewBundle(
-		getTestPreInitState(tb, logger, rtOpts),
+		preInitState,
 		&loader.SourceData{
-			URL:  &url.URL{Path: "/-", Scheme: "file"},
+			URL:  filenameURL,
 			Data: []byte(data),
 			PWD:  pwd,
 		},
-		map[string]fsext.Fs{"file": fs, "https": fsext.NewMemMapFs()},
+		fss,
+		moduleResolver,
 	)
 }
 
@@ -444,8 +481,8 @@ func TestNewBundle(t *testing.T) {
 					export default function() {};
 				`)
 				require.NoError(t, err)
-				assert.Equal(t, b.Options.TLSVersion.Min, lib.TLSVersion(tls.VersionTLS10))
-				assert.Equal(t, b.Options.TLSVersion.Max, lib.TLSVersion(tls.VersionTLS12))
+				assert.Equal(t, lib.TLSVersion(tls.VersionTLS10), b.Options.TLSVersion.Min)
+				assert.Equal(t, lib.TLSVersion(tls.VersionTLS12), b.Options.TLSVersion.Max)
 			})
 			t.Run("String", func(t *testing.T) {
 				t.Parallel()
@@ -456,8 +493,8 @@ func TestNewBundle(t *testing.T) {
 					export default function() {};
 				`)
 				require.NoError(t, err)
-				assert.Equal(t, b.Options.TLSVersion.Min, lib.TLSVersion(tls.VersionTLS10))
-				assert.Equal(t, b.Options.TLSVersion.Max, lib.TLSVersion(tls.VersionTLS10))
+				assert.Equal(t, lib.TLSVersion(tls.VersionTLS10), b.Options.TLSVersion.Min)
+				assert.Equal(t, lib.TLSVersion(tls.VersionTLS10), b.Options.TLSVersion.Max)
 			})
 		})
 		t.Run("Thresholds", func(t *testing.T) {
@@ -530,7 +567,7 @@ func TestNewBundleFromArchive(t *testing.T) {
 	}
 
 	checkArchive := func(t *testing.T, arc *lib.Archive, rtOpts lib.RuntimeOptions, expError string) {
-		b, err := NewBundleFromArchive(getTestPreInitState(t, logger, &rtOpts), arc)
+		b, err := getSimpleBundleFromArchive(t, arc, rtOpts, logger)
 		if expError != "" {
 			require.Error(t, err)
 			require.Contains(t, err.Error(), expError)
@@ -588,10 +625,8 @@ func TestNewBundleFromArchive(t *testing.T) {
 		t.Parallel()
 		arc, err := getArchive(t, es6Code, extCompatModeRtOpts)
 		require.NoError(t, err)
-		arc.CompatibilityMode = "blah"                                           // intentionally break the archive
-		checkArchive(t, arc, lib.RuntimeOptions{}, "invalid compatibility mode") // fails when it uses the archive one
-		checkArchive(t, arc, extCompatModeRtOpts, "")                            // works when I force the compat mode
-		checkArchive(t, arc, baseCompatModeRtOpts, "")                           // still works as even base compatibility supports ESM
+		checkArchive(t, arc, extCompatModeRtOpts, "")  // works when I force the compat mode
+		checkArchive(t, arc, baseCompatModeRtOpts, "") // still works as even base compatibility supports ESM
 	})
 
 	t.Run("script_options_dont_overwrite_metadata", func(t *testing.T) {
@@ -606,7 +641,7 @@ func TestNewBundleFromArchive(t *testing.T) {
 			PwdURL:      &url.URL{Scheme: "file", Path: "/"},
 			Filesystems: nil,
 		}
-		b, err := NewBundleFromArchive(getTestPreInitState(t, logger, nil), arc)
+		b, err := getSimpleBundleFromArchive(t, arc, logger)
 		require.NoError(t, err)
 		bi, err := b.Instantiate(context.Background(), 0)
 		require.NoError(t, err)
@@ -749,7 +784,7 @@ func TestOpen(t *testing.T) {
 					}
 					require.NoError(t, err)
 
-					arcBundle, err := NewBundleFromArchive(getTestPreInitState(t, logger, nil), sourceBundle.makeArchive())
+					arcBundle, err := getSimpleBundleFromArchive(t, sourceBundle.makeArchive(), logger)
 
 					require.NoError(t, err)
 
@@ -847,7 +882,7 @@ func TestBundleEnv(t *testing.T) {
 	require.NoError(t, err)
 
 	logger := testutils.NewLogger(t)
-	b2, err := NewBundleFromArchive(getTestPreInitState(t, logger, nil), b1.makeArchive())
+	b2, err := getSimpleBundleFromArchive(t, b1.makeArchive(), logger)
 	require.NoError(t, err)
 
 	bundles := map[string]*Bundle{"Source": b1, "Archive": b2}
@@ -883,7 +918,7 @@ func TestBundleNotSharable(t *testing.T) {
 	require.NoError(t, err)
 	logger := testutils.NewLogger(t)
 
-	b2, err := NewBundleFromArchive(getTestPreInitState(t, logger, nil), b1.makeArchive())
+	b2, err := getSimpleBundleFromArchive(t, b1.makeArchive(), logger)
 	require.NoError(t, err)
 
 	bundles := map[string]*Bundle{"Source": b1, "Archive": b2}
@@ -985,7 +1020,7 @@ func TestGlobalTimers(t *testing.T) {
 	require.NoError(t, err)
 	logger := testutils.NewLogger(t)
 
-	b2, err := NewBundleFromArchive(getTestPreInitState(t, logger, nil), b1.makeArchive())
+	b2, err := getSimpleBundleFromArchive(t, b1.makeArchive(), logger)
 	require.NoError(t, err)
 
 	bundles := map[string]*Bundle{"Source": b1, "Archive": b2}

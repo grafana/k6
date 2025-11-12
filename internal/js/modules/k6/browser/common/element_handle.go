@@ -1,23 +1,31 @@
 package common
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"math"
 	"reflect"
+	"slices"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/dom"
-	"github.com/grafana/sobek"
 	"go.opentelemetry.io/otel/attribute"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/common/js"
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
+)
 
-	k6common "go.k6.io/k6/js/common"
+// Common error types for element visibility.
+var (
+	// ErrElementNotVisible is returned when an element is not visible for an operation.
+	ErrElementNotVisible = errors.New("element is not visible")
+	// ErrElementNotAttachedToDOM is returned when an element is not attached to the DOM.
+	ErrElementNotAttachedToDOM = errors.New("element is not attached to the DOM")
 )
 
 const (
@@ -60,6 +68,10 @@ func (h *ElementHandle) boundingBox() (*Rect, error) {
 		return nil, fmt.Errorf("getting bounding box model of DOM node: %w", err)
 	}
 
+	if box == nil || box.Border == nil {
+		return nil, ErrElementNotAttachedToDOM
+	}
+
 	quad := box.Border
 	x := math.Min(quad[0], math.Min(quad[2], math.Min(quad[4], quad[6])))
 	y := math.Min(quad[1], math.Min(quad[3], math.Min(quad[5], quad[7])))
@@ -68,33 +80,61 @@ func (h *ElementHandle) boundingBox() (*Rect, error) {
 
 	position, err := h.frame.position()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("getting position of parent frame: %w", err)
 	}
 
 	return &Rect{X: x + position.X, Y: y + position.Y, Width: width, Height: height}, nil
 }
 
-func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, point Position) (bool, error) {
+// translatePointToPage translates the point to the page's coordinates if the
+// point is relative to the parent frame.
+func (h *ElementHandle) translatePointToPage(apiCtx context.Context, point Position) (Position, error) {
+	h.logger.Debugf("ElementHandle:translatePointToPage", "point before translation: %v", point)
+
 	frame, err := h.ownerFrame(apiCtx)
 	if err != nil {
-		return false, fmt.Errorf("checking hit target at %v: %w", point, err)
+		return Position{}, fmt.Errorf("checking hit target at %v: %w", point, err)
 	}
-	if frame != nil && frame.parentFrame != nil {
-		el, err := frame.FrameElement()
-		if err != nil {
-			return false, err
-		}
-		box, err := el.boundingBox()
-		if err != nil {
-			return false, err
-		}
-		if box == nil {
-			return false, errors.New("missing bounding box of element")
-		}
-		// Translate from viewport coordinates to frame coordinates.
-		point.X -= box.X
-		point.Y -= box.Y
+
+	if frame == nil || frame.parentFrame == nil {
+		h.logger.Debugf("ElementHandle:translatePointToPage", "no parent frame")
+		return point, nil
 	}
+
+	el, err := frame.FrameElement()
+	if err != nil {
+		return Position{}, err
+	}
+
+	box, err := el.BoundingBox()
+	if err != nil {
+		return Position{}, fmt.Errorf("getting bounding box of parent frame: %w", err)
+	}
+
+	if box.contains(point) {
+		h.logger.Debugf("ElementHandle:translatePointToPage", "point is already in the page")
+		return point, nil
+	}
+
+	// Translate from frame coordinates to page coordinates.
+	point.X += box.X
+	point.Y += box.Y
+
+	h.logger.Debugf("ElementHandle:translatePointToPage", "point after translation: %v", point)
+
+	return point, nil
+}
+
+// checkHitTargetAt checks if the element is hit by the pointer at the given point.
+//
+// It will recurse through frames and iframes to check if the point hits a target
+// when an error:intercept occurs.
+//
+// It will eventually return error:intercept if the point doesn't hit any target. At
+// this point the caller should retry the action after scrolling.
+func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, point Position) (bool, error) {
+	h.logger.Debugf("ElementHandle:checkHitTargetAt", "checking hit target at %v", point)
+
 	fn := `
 		(node, injected, point) => {
 			return injected.checkHitTargetAt(node, point);
@@ -112,14 +152,28 @@ func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, point Position)
 	// Either we're done or an error happened (returned as "error:..." from JS)
 	const done = resultDone
 	if v, ok := result.(string); !ok {
-		// We got a { hitTargetDescription: ... } result
-		// Meaning: Another element is preventing pointer events.
-		//
-		// It's safe to count an object return as an interception.
-		// We just don't interpret what is intercepting with the target element
-		// because we don't need any more functionality from this JS function
-		// right now.
-		return false, errorFromDOMError("error:intercept")
+		frame, err := h.ownerFrame(apiCtx)
+		if err != nil {
+			return false, fmt.Errorf("checking hit target at %v: %w", point, err)
+		}
+
+		if frame == nil {
+			// We got a { hitTargetDescription: ... } result
+			// Meaning: Another element is preventing pointer events.
+			//
+			// It's safe to count an object return as an interception.
+			// We just don't interpret what is intercepting with the target element
+			// because we don't need any more functionality from this JS function
+			// right now.
+			return false, errorFromDOMError("error:intercept")
+		}
+
+		el, err := frame.FrameElement()
+		if err != nil {
+			return false, err
+		}
+
+		return el.checkHitTargetAt(apiCtx, point)
 	} else if v != done {
 		return false, errorFromDOMError(v)
 	}
@@ -156,132 +210,15 @@ func (h *ElementHandle) click(p *Position, opts *MouseClickOptions) error {
 	return h.frame.page.Mouse.click(p.X, p.Y, opts)
 }
 
+// This will get the clickable point of the element relative to the page even
+// when the element is in an iframe. In some cases this isn't the case and we
+// need to translate the point to the page.
 func (h *ElementHandle) clickablePoint() (*Position, error) {
-	var (
-		quads []dom.Quad
-		err   error
-	)
-	getContentQuads := dom.GetContentQuads().WithObjectID(h.remoteObject.ObjectID)
-	if quads, err = getContentQuads.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
-		return nil, fmt.Errorf("getting node content quads %T: %w", getContentQuads, err)
-	}
-	if len(quads) == 0 {
-		return nil, fmt.Errorf("node is either not visible or not an HTMLElement: %w", err)
-	}
-
-	width, height, err := h.evaluateInnerWidthHeight()
+	r, err := h.BoundingBox()
 	if err != nil {
-		return nil, fmt.Errorf("evaluating inner width and height: %w", err)
+		return nil, err
 	}
-
-	p, err := filterQuads(width, height, quads)
-	if err != nil {
-		return nil, fmt.Errorf("filtering quads: %w", err)
-	}
-
-	return p, nil
-}
-
-// We are evaluating the inner width and height of the current frame that the
-// element is in in the utility context. Calculating this in the main context
-// causes NPD errors when working with the CDP API cdppage.GetLayoutMetrics.
-//
-// It returns the width and height of the current frame.
-func (h *ElementHandle) evaluateInnerWidthHeight() (int64, int64, error) {
-	h.logger.Debugf("ElementHandle:evaluateInnerWidthHeight", "fid:%s furl:%q", h.frame.ID(), h.frame.URL())
-
-	js := `() => ({ width: innerWidth, height: innerHeight })`
-
-	h.frame.waitForExecutionContext(utilityWorld)
-
-	eopts := evalOptions{
-		forceCallable: true,
-		returnByValue: true,
-	}
-	v, err := h.frame.evaluate(h.ctx, utilityWorld, eopts, js)
-	if err != nil {
-		return 0, 0, fmt.Errorf("getting inner width and height: %w", err)
-	}
-
-	m, ok := v.(map[string]any)
-	if !ok {
-		return 0, 0, fmt.Errorf("unexpected value %q when getting inner width and height", v)
-	}
-
-	width, ok := m["width"].(float64)
-	if !ok {
-		return 0, 0, fmt.Errorf("unexpected value %q when getting inner width", m["width"])
-	}
-
-	height, ok := m["height"].(float64)
-	if !ok {
-		return 0, 0, fmt.Errorf("unexpected value %q when getting inner height", m["height"])
-	}
-
-	return int64(width), int64(height), nil
-}
-
-func filterQuads(viewportWidth, viewportHeight int64, quads []dom.Quad) (*Position, error) {
-	var filteredQuads []dom.Quad
-	for _, q := range quads {
-		// Keep the points within the viewport and positive.
-		nq := q
-		for i := 0; i < len(q); i += 2 {
-			nq[i] = math.Min(math.Max(q[i], 0), float64(viewportWidth))
-			nq[i+1] = math.Min(math.Max(q[i+1], 0), float64(viewportHeight))
-		}
-		// Compute sum of all directed areas of adjacent triangles
-		// https://en.wikipedia.org/wiki/Polygon#Area
-		var area float64
-		for i := 0; i < len(q); i += 2 {
-			p2 := (i + 2) % (len(q) / 2)
-			area += (q[i]*q[p2+1] - q[p2]*q[i+1]) / 2
-		}
-		// We don't want to click on something less than a pixel.
-		if math.Abs(area) > 0.99 {
-			filteredQuads = append(filteredQuads, q)
-		}
-	}
-	if len(filteredQuads) == 0 {
-		return nil, errors.New("node is either not visible or not an HTMLElement")
-	}
-
-	// Return the middle point of the first quad.
-	var (
-		first = filteredQuads[0]
-		l     = len(first)
-		n     = (float64(l) / 2)
-		p     Position
-	)
-	for i := 0; i < l; i += 2 {
-		p.X += first[i] / n
-		p.Y += first[i+1] / n
-	}
-
-	p = compensateHalfIntegerRoundingError(p)
-
-	return &p, nil
-}
-
-// Firefox internally uses integer coordinates, so 8.5 is converted to 9 when clicking.
-//
-// This does not work nicely for small elements. For example, 1x1 square with corners
-// (8;8) and (9;9) is targeted when clicking at (8;8) but not when clicking at (9;9).
-// So, clicking at (8.5;8.5) will effectively click at (9;9) and miss the target.
-//
-// Therefore, we skew half-integer values from the interval (8.49, 8.51) towards
-// (8.47, 8.49) that is rounded towards 8. This means clicking at (8.5;8.5) will
-// be replaced with (8.48;8.48) and will effectively click at (8;8).
-//
-// Other browsers use float coordinates, so this change should not matter.
-func compensateHalfIntegerRoundingError(p Position) Position {
-	if rx := p.X - math.Floor(p.X); rx > 0.49 && rx < 0.51 {
-		p.X -= 0.02
-	}
-	if ry := p.Y - math.Floor(p.Y); ry > 0.49 && ry < 0.51 {
-		p.Y -= 0.02
-	}
-	return p
+	return &Position{X: r.X + r.Width/2, Y: r.Y + r.Height/2}, nil
 }
 
 func (h *ElementHandle) dblclick(p *Position, opts *MouseClickOptions) error {
@@ -470,9 +407,13 @@ func (h *ElementHandle) offsetPosition(apiCtx context.Context, offset *Position)
 		return nil, fmt.Errorf("converting result (%v of type %t) to border: %w", result, result, err)
 	}
 
-	box := h.BoundingBox()
+	box, err := h.BoundingBox()
+	if err != nil {
+		return nil, err
+	}
+
 	if box == nil || (border.Left == 0 && border.Top == 0) {
-		return nil, errorFromDOMError("error:notvisible")
+		return nil, ErrElementNotVisible
 	}
 
 	// Make point relative to the padding box to align with offsetX/offsetY.
@@ -509,10 +450,10 @@ func (h *ElementHandle) scrollRectIntoViewIfNeeded(apiCtx context.Context, rect 
 	err := action.Do(cdp.WithExecutor(apiCtx, h.session))
 	if err != nil {
 		if strings.Contains(err.Error(), "Node does not have a layout object") {
-			return errorFromDOMError("error:notvisible")
+			return ErrElementNotVisible
 		}
 		if strings.Contains(err.Error(), "Node is detached from document") {
-			return errorFromDOMError("error:notconnected")
+			return ErrElementNotAttachedToDOM
 		}
 		return err
 	}
@@ -529,87 +470,6 @@ func (h *ElementHandle) press(apiCtx context.Context, key string, opts KeyboardO
 		return err
 	}
 	return nil
-}
-
-func ConvertSelectOptionValues(rt *sobek.Runtime, values sobek.Value) ([]any, error) {
-	if k6common.IsNullish(values) {
-		return nil, nil
-	}
-
-	var (
-		opts []any
-		t    = values.Export()
-	)
-	switch values.ExportType().Kind() {
-	case reflect.Slice:
-		var sl []interface{}
-		if err := rt.ExportTo(values, &sl); err != nil {
-			return nil, fmt.Errorf("options: expected array, got %T", values)
-		}
-
-		for _, item := range sl {
-			switch item := item.(type) {
-			case string:
-				// Strings will match values or labels
-				valOpt := SelectOption{Value: new(string)}
-				*valOpt.Value = item
-				labelOpt := SelectOption{Label: new(string)}
-				*labelOpt.Label = item
-				opts = append(opts, &valOpt, &labelOpt)
-			case map[string]interface{}:
-				opt, err := extractSelectOptionFromMap(item)
-				if err != nil {
-					return nil, err
-				}
-
-				opts = append(opts, opt)
-			default:
-				return nil, fmt.Errorf("options: expected string or object, got %T", item)
-			}
-		}
-	case reflect.Map:
-		var raw map[string]interface{}
-		if err := rt.ExportTo(values, &raw); err != nil {
-			return nil, fmt.Errorf("options: expected object, got %T", values)
-		}
-
-		opt, err := extractSelectOptionFromMap(raw)
-		if err != nil {
-			return nil, err
-		}
-
-		opts = append(opts, opt)
-	case reflect.TypeOf(&ElementHandle{}).Kind():
-		opts = append(opts, t.(*ElementHandle)) //nolint:forcetypeassert
-	case reflect.TypeOf(sobek.Object{}).Kind():
-		obj := values.ToObject(rt)
-		opt := SelectOption{}
-		for _, k := range obj.Keys() {
-			switch k {
-			case "value":
-				opt.Value = new(string)
-				*opt.Value = obj.Get(k).String()
-			case "label":
-				opt.Label = new(string)
-				*opt.Label = obj.Get(k).String()
-			case "index":
-				opt.Index = new(int64)
-				*opt.Index = obj.Get(k).ToInteger()
-			}
-		}
-		opts = append(opts, &opt)
-	case reflect.String:
-		// Strings will match values or labels
-		valOpt := SelectOption{Value: new(string)}
-		*valOpt.Value = t.(string) //nolint:forcetypeassert
-		labelOpt := SelectOption{Label: new(string)}
-		*labelOpt.Label = t.(string) //nolint:forcetypeassert
-		opts = append(opts, &valOpt, &labelOpt)
-	default:
-		return nil, fmt.Errorf("options: unsupported type %T", values)
-	}
-
-	return opts, nil
 }
 
 func (h *ElementHandle) selectOption(apiCtx context.Context, values []any) (any, error) {
@@ -633,44 +493,6 @@ func (h *ElementHandle) selectOption(apiCtx context.Context, values []any) (any,
 		}
 	}
 	return result, nil
-}
-
-func extractSelectOptionFromMap(v map[string]interface{}) (*SelectOption, error) {
-	opt := &SelectOption{}
-	for k, raw := range v {
-		switch k {
-		case "value":
-			opt.Value = new(string)
-
-			v, ok := raw.(string)
-			if !ok {
-				return nil, fmt.Errorf("options[%v]: expected string, got %T", k, raw)
-			}
-
-			*opt.Value = v
-		case "label":
-			opt.Label = new(string)
-
-			v, ok := raw.(string)
-			if !ok {
-				return nil, fmt.Errorf("options[%v]: expected string, got %T", k, raw)
-			}
-			*opt.Label = v
-		case "index":
-			opt.Index = new(int64)
-
-			switch raw := raw.(type) {
-			case int:
-				*opt.Index = int64(raw)
-			case int64:
-				*opt.Index = raw
-			default:
-				return nil, fmt.Errorf("options[%v]: expected int, got %T", k, raw)
-			}
-		}
-	}
-
-	return opt, nil
 }
 
 func (h *ElementHandle) selectText(apiCtx context.Context) error {
@@ -773,6 +595,40 @@ func (h *ElementHandle) waitForElementState(
 		"waiting for states %v of element %q", states, reflect.TypeOf(result))
 }
 
+// stepIntoFrame steps into an iframe/frame. Due to CORS, we need to perform this
+// step outside of the browser (chromium). It returns the frame that it has stepped
+// into and the selector to use within that frame.
+func (h *ElementHandle) stepIntoFrame(
+	apiCtx context.Context, parsedSelector *Selector, frameNavIndex int, opts *FrameWaitForSelectorOptions,
+) (*Frame, string, error) {
+	// Split selector at frame navigation boundary
+	beforeFrame, afterFrame := h.splitSelectorAtFrame(parsedSelector, frameNavIndex)
+
+	// Find the iframe element using the "before frame" selector
+	iframeSelector := h.reconstructSelector(beforeFrame)
+
+	iframeHandle, err := h.waitForSelector(apiCtx, iframeSelector, opts)
+	if err != nil {
+		return nil, "", fmt.Errorf("finding iframe with selector %q: %w", iframeSelector, err)
+	}
+
+	// This is a valid response from waitForSelector. It means that the element
+	// was either hidden or detached.
+	if iframeHandle == nil {
+		return nil, "", errors.New("check if element is visible")
+	}
+
+	frame, err := iframeHandle.ContentFrame()
+	if err != nil {
+		return nil, "", fmt.Errorf("getting iframe frame: %w", err)
+	}
+
+	// Wait for selector in the iframe using the "after frame" selector
+	afterFrameSelector := h.reconstructSelector(afterFrame)
+
+	return frame, afterFrameSelector, nil
+}
+
 func (h *ElementHandle) waitForSelector(
 	apiCtx context.Context, selector string, opts *FrameWaitForSelectorOptions,
 ) (*ElementHandle, error) {
@@ -780,6 +636,27 @@ func (h *ElementHandle) waitForSelector(
 	if err != nil {
 		return nil, err
 	}
+
+	// Check for frame navigation in the selector
+	frameNavIndex := h.findFrameNavigationIndex(parsedSelector)
+	if frameNavIndex != -1 {
+		// Strict is true because we assume the user is interested in the element
+		// in the frame and not the frame it is in.
+		opts := &FrameWaitForSelectorOptions{
+			State:   DOMElementStateAttached,
+			Timeout: opts.Timeout,
+			Strict:  true,
+		}
+
+		frame, afterFrameSelector, err := h.stepIntoFrame(apiCtx, parsedSelector, frameNavIndex, opts)
+		if err != nil {
+			return nil, err
+		}
+
+		return frame.waitForSelector(afterFrameSelector, opts)
+	}
+
+	// No frame navigation - proceed with normal waitForSelector logic
 	fn := `
 		(node, injected, selector, strict, state, timeout, ...args) => {
 			return injected.waitForSelector(selector, node, strict, state, 'raf', timeout, ...args);
@@ -801,6 +678,8 @@ func (h *ElementHandle) waitForSelector(
 	case *ElementHandle:
 		return r, nil
 	default:
+		// This is a valid response, which means that the element was either
+		// hidden or detached.
 		return nil, nil //nolint:nilnil
 	}
 }
@@ -811,6 +690,26 @@ func (h *ElementHandle) count(apiCtx context.Context, selector string) (int, err
 		return 0, err
 	}
 
+	// Check for frame navigation in the selector
+	frameNavIndex := h.findFrameNavigationIndex(parsedSelector)
+	if frameNavIndex != -1 {
+		// Strict is true because we assume the user is interested in the element
+		// in the frame and not the frame it is in.
+		opts := &FrameWaitForSelectorOptions{
+			State:   DOMElementStateAttached,
+			Timeout: h.frame.defaultTimeout(),
+			Strict:  true,
+		}
+
+		frame, afterFrameSelector, err := h.stepIntoFrame(apiCtx, parsedSelector, frameNavIndex, opts)
+		if err != nil {
+			return 0, err
+		}
+
+		return frame.count(afterFrameSelector)
+	}
+
+	// No frame navigation - proceed with normal count logic
 	fn := `
 			(node, injected, selector) => {
 				return injected.count(selector, node);
@@ -829,13 +728,58 @@ func (h *ElementHandle) count(apiCtx context.Context, selector string) (int, err
 	}
 	switch r := result.(type) {
 	case float64:
-		if r < float64(math.MinInt) || r > float64(math.MaxInt) {
-			return 0, fmt.Errorf("value %v out of range for int type", r)
+		if r < float64(math.MinInt32) || r > float64(math.MaxInt32) {
+			return 0, fmt.Errorf("value %v out of range for int32 type", r)
 		}
 		return int(r), nil
 	default:
 		return 0, fmt.Errorf("unexpected value %v of type %T", r, r)
 	}
+}
+
+// findFrameNavigationIndex finds the index of the first internal:control=enter-frame directive
+func (h *ElementHandle) findFrameNavigationIndex(selector *Selector) int {
+	for i, part := range selector.Parts {
+		if part.Name == "internal:control" && part.Body == "enter-frame" {
+			return i
+		}
+	}
+	return -1
+}
+
+// splitSelectorAtFrame splits a selector at the frame navigation boundary
+func (h *ElementHandle) splitSelectorAtFrame(selector *Selector, frameIndex int) (*Selector, *Selector) {
+	beforeFrame := &Selector{
+		Selector: selector.Selector, // Keep original for reference
+		Parts:    selector.Parts[:frameIndex],
+		Capture:  selector.Capture,
+	}
+
+	afterFrame := &Selector{
+		Selector: selector.Selector, // Keep original for reference
+		Parts:    selector.Parts[frameIndex+1:],
+		Capture:  selector.Capture,
+	}
+
+	return beforeFrame, afterFrame
+}
+
+// reconstructSelector rebuilds a selector string from selector parts
+func (h *ElementHandle) reconstructSelector(selector *Selector) string {
+	if len(selector.Parts) == 0 {
+		return ""
+	}
+
+	parts := make([]string, len(selector.Parts))
+	for i, part := range selector.Parts {
+		if part.Name == "css" {
+			parts[i] = part.Body
+		} else {
+			parts[i] = part.Name + "=" + part.Body
+		}
+	}
+
+	return strings.Join(parts, " >> ")
 }
 
 // AsElement returns this element handle.
@@ -844,12 +788,15 @@ func (h *ElementHandle) AsElement() *ElementHandle {
 }
 
 // BoundingBox returns this element's bounding box.
-func (h *ElementHandle) BoundingBox() *Rect {
+func (h *ElementHandle) BoundingBox() (*Rect, error) {
 	bbox, err := h.boundingBox()
-	if err != nil {
-		return nil // Don't panic here, just return nil
+	if err != nil && strings.Contains(err.Error(), "Could not compute box model") {
+		return nil, fmt.Errorf("%w: %w", ErrElementNotVisible, err)
 	}
-	return bbox
+	if err != nil {
+		return nil, fmt.Errorf("getting bounding box: %w", err)
+	}
+	return bbox, nil
 }
 
 // Click scrolls element into view and clicks in the center of the element
@@ -1213,6 +1160,27 @@ func (h *ElementHandle) Query(selector string, strict bool) (_ *ElementHandle, r
 	if err != nil {
 		return nil, fmt.Errorf("parsing selector %q: %w", selector, err)
 	}
+
+	// Check for frame navigation in the selector
+	frameNavIndex := h.findFrameNavigationIndex(parsedSelector)
+	if frameNavIndex != -1 {
+		// Strict is true because we assume the user is interested in the element
+		// in the frame and not the frame it is in.
+		opts := &FrameWaitForSelectorOptions{
+			State:   DOMElementStateAttached,
+			Timeout: h.frame.defaultTimeout(),
+			Strict:  true,
+		}
+
+		frame, afterFrameSelector, err := h.stepIntoFrame(h.ctx, parsedSelector, frameNavIndex, opts)
+		if err != nil {
+			return nil, err
+		}
+
+		return frame.Query(afterFrameSelector, strict)
+	}
+
+	// No frame navigation - proceed with normal Query logic
 	querySelector := `
 		(node, injected, selector, strict) => {
 			return injected.querySelector(selector, strict, node || document);
@@ -1294,13 +1262,33 @@ func (h *ElementHandle) queryAll(selector string, eval evalFunc) (_ []*ElementHa
 		return nil, err //nolint:wrapcheck
 	}
 
-	els := make([]*ElementHandle, 0, len(props))
-	for _, prop := range props {
+	type indexedElem struct {
+		index int
+		elem  *ElementHandle
+	}
+
+	indexedElems := make([]indexedElem, 0, len(props))
+	for key, prop := range props {
 		if el := prop.AsElement(); el != nil {
-			els = append(els, el)
+			// DOM elements are stored with numeric indices ("0", "1", "2", ...)
+			// per JavaScript's array-like object specification.
+			idx, err := strconv.Atoi(key)
+			if err != nil {
+				return nil, fmt.Errorf("parsing element index %q for selector %q: %w", key, selector, err)
+			}
+			indexedElems = append(indexedElems, indexedElem{index: idx, elem: el})
 		} else if err := prop.Dispose(); err != nil {
 			return nil, fmt.Errorf("disposing property while querying all selectors %q: %w", selector, err)
 		}
+	}
+
+	slices.SortFunc(indexedElems, func(a, b indexedElem) int {
+		return cmp.Compare(a.index, b.index)
+	})
+
+	els := make([]*ElementHandle, 0, len(indexedElems))
+	for _, ie := range indexedElems {
+		els = append(els, ie.elem)
 	}
 
 	return els, nil
@@ -1639,7 +1627,7 @@ func (h *ElementHandle) newAction(
 	}
 }
 
-//nolint:gocognit
+//nolint:gocognit,funlen
 func (h *ElementHandle) newPointerAction(
 	fn elementHandlePointerActionFunc, opts *ElementHandleBasePointerOptions,
 ) func(apiCtx context.Context, resultCh chan any, errCh chan error) {
@@ -1650,8 +1638,19 @@ func (h *ElementHandle) newPointerAction(
 	// 4. Enabled
 	// 5. Receives events
 	pointerFn := func(apiCtx context.Context, sopts *ScrollIntoViewOptions) (res any, err error) {
+		// We need to scroll the element into view first, otherwise we can
+		// end up in a situation where the element is not in the correct state
+		// (visible and stable, but could be enabled).
+		err = h.scrollRectIntoViewIfNeeded(apiCtx, nil)
+		if err != nil {
+			return nil, fmt.Errorf("scrolling element into view: %w", err)
+		}
+
 		// Check if we should run actionability checks
 		if !opts.Force {
+			// As mentioned above, if we didn't scroll first, we could end
+			// up stuck waiting indefinitely for the element to be in the
+			// correct state.
 			states := []string{"visible", "stable", "enabled"}
 			if _, err = h.waitForElementState(apiCtx, states, opts.Timeout); err != nil {
 				return nil, fmt.Errorf("waiting for element state: %w", err)
@@ -1683,12 +1682,23 @@ func (h *ElementHandle) newPointerAction(
 		// Get the clickable point
 		if p != nil {
 			p, err = h.offsetPosition(apiCtx, opts.Position)
+			if err != nil {
+				return nil, fmt.Errorf("getting element position: %w", err)
+			}
 		} else {
 			p, err = h.clickablePoint()
+			if err != nil {
+				return nil, fmt.Errorf("getting clickable point: %w", err)
+			}
 		}
+
+		// Further translation of the point might be necessary if the point
+		// is still relative to the parent frame it is in and not the page.
+		*p, err = h.translatePointToPage(apiCtx, *p)
 		if err != nil {
-			return nil, fmt.Errorf("getting element position: %w", err)
+			return nil, fmt.Errorf("translating point to page: %w", err)
 		}
+
 		// Do a final actionability check to see if element can receive events
 		// at mouse position in question
 		if !opts.Force {
@@ -1736,24 +1746,43 @@ func (h *ElementHandle) newPointerAction(
 func retryPointerAction(
 	apiCtx context.Context, fn retryablePointerActionFunc, opts *ElementHandleBasePointerOptions,
 ) (res any, err error) {
-	// try the default scrolling
-	if res, err = fn(apiCtx, nil); opts.Force || err == nil {
-		return res, err
-	}
-	// try with different scrolling options
-	for _, p := range []ScrollPosition{
-		ScrollPositionStart,
-		ScrollPositionCenter,
-		ScrollPositionEnd,
-		ScrollPositionNearest,
-	} {
-		s := ScrollIntoViewOptions{Block: p, Inline: p}
-		if res, err = fn(apiCtx, &s); err == nil {
-			break
+	for {
+		res, err = fn(apiCtx, nil)
+		if opts.Force || err == nil {
+			return res, err
+		}
+
+		// try with different scrolling options
+		for _, p := range []ScrollPosition{
+			ScrollPositionStart,
+			ScrollPositionCenter,
+			ScrollPositionEnd,
+			ScrollPositionNearest,
+		} {
+			s := ScrollIntoViewOptions{Block: p, Inline: p}
+			if res, err = fn(apiCtx, &s); err == nil {
+				return res, nil
+			}
+		}
+
+		// Only locator based APIs should retry.
+		if !opts.retry {
+			return res, err
+		}
+
+		if !errors.Is(err, ErrElementNotVisible) &&
+			!errors.Is(err, ErrElementNotAttachedToDOM) {
+			return res, err
+		}
+
+		// Wait with timeout or context cancellation
+		select {
+		case <-apiCtx.Done():
+			return nil, apiCtx.Err()
+		case <-time.After(20 * time.Millisecond):
+			// Continue retrying after delay
 		}
 	}
-
-	return res, err
 }
 
 func errorFromDOMError(v any) error {
@@ -1784,8 +1813,12 @@ func errorFromDOMError(v any) error {
 	if s := "error:expectednode:"; strings.HasPrefix(serr, s) {
 		return fmt.Errorf("expected node but got %s", strings.TrimPrefix(serr, s))
 	}
+
+	if serr == "error:notconnected" {
+		return ErrElementNotAttachedToDOM
+	}
+
 	errs := map[string]string{
-		"error:notconnected":           "element is not attached to the DOM",
 		"error:notelement":             "node is not an element",
 		"error:nothtmlelement":         "not an HTMLElement",
 		"error:notfillableelement":     "element is not an <input>, <textarea> or [contenteditable] element",

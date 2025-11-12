@@ -119,7 +119,7 @@ func TestUnknownPrefix(t *testing.T) {
 
 	_, err = ReadArchive(buf)
 	require.Error(t, err)
-	require.Equal(t, err.Error(),
+	require.EqualError(t, err,
 		"unknown file prefix `strange` for file `strange/something`")
 }
 

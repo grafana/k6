@@ -21,7 +21,7 @@ import (
 func TestK6CloudUpload(t *testing.T) {
 	t.Parallel()
 
-	t.Run("TestCloudUploadNotLoggedIn", func(t *testing.T) {
+	t.Run("TestCloudUploadUserNotAuthenticated", func(t *testing.T) {
 		t.Parallel()
 
 		ts := getSimpleCloudTestState(t, nil, setupK6CloudUploadCmd, nil, nil, nil)
@@ -31,7 +31,7 @@ func TestK6CloudUpload(t *testing.T) {
 
 		stdout := ts.Stdout.String()
 		t.Log(stdout)
-		assert.Contains(t, stdout, `not logged in`)
+		assert.Contains(t, stdout, `must first authenticate`)
 	})
 
 	t.Run("TestCloudUploadWithScript", func(t *testing.T) {

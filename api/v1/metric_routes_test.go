@@ -70,7 +70,7 @@ func TestGetMetrics(t *testing.T) {
 
 		resMetrics := envelop.Metrics()
 		assert.Len(t, resMetrics, 1)
-		assert.Equal(t, resMetrics[0].Name, "my_metric")
+		assert.Equal(t, "my_metric", resMetrics[0].Name)
 	})
 }
 

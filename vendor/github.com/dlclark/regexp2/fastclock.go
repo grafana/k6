@@ -50,8 +50,20 @@ func makeDeadline(d time.Duration) fasttime {
 
 	// Start or extend clock if necessary.
 	if end > fast.clockEnd.read() {
+		// If time.Since(last use) > timeout, there's a chance that
+		// fast.current will no longer be updated, which can lead to
+		// incorrect 'end' calculations that can trigger a false timeout
+		fast.mu.Lock()
+		if !fast.running && !fast.start.IsZero() {
+			// update fast.current
+			fast.current.write(durationToTicks(time.Since(fast.start)))
+			// recalculate our end value
+			end = fast.current.read() + durationToTicks(d+clockPeriod)
+		}
+		fast.mu.Unlock()
 		extendClock(end)
 	}
+
 	return end
 }
 

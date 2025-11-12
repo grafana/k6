@@ -452,7 +452,7 @@ func TestResponseCallbackInActionWithoutPassedTag(t *testing.T) {
 	}
 	assertRequestMetricsEmittedSingle(t, bufSamples[0], tags, allHTTPMetrics, func(sample metrics.Sample) {
 		if sample.Metric.Name == metrics.HTTPReqFailedName {
-			require.EqualValues(t, sample.Value, 1)
+			require.EqualValues(t, 1, sample.Value)
 		}
 	})
 	tags["url"] = sr("HTTPBIN_URL/get")
@@ -460,7 +460,7 @@ func TestResponseCallbackInActionWithoutPassedTag(t *testing.T) {
 	tags["status"] = "200"
 	assertRequestMetricsEmittedSingle(t, bufSamples[1], tags, allHTTPMetrics, func(sample metrics.Sample) {
 		if sample.Metric.Name == metrics.HTTPReqFailedName {
-			require.EqualValues(t, sample.Value, 0)
+			require.EqualValues(t, 0, sample.Value)
 		}
 	})
 }
@@ -521,14 +521,14 @@ func TestDigestWithResponseCallback(t *testing.T) {
 	}
 	assertRequestMetricsEmittedSingle(t, bufSamples[0], tags, allHTTPMetrics, func(sample metrics.Sample) {
 		if sample.Metric.Name == metrics.HTTPReqFailedName {
-			require.EqualValues(t, sample.Value, 0)
+			require.EqualValues(t, 0, sample.Value)
 		}
 	})
 	tags["status"] = "200"
 	delete(tags, "error_code")
 	assertRequestMetricsEmittedSingle(t, bufSamples[1], tags, allHTTPMetrics, func(sample metrics.Sample) {
 		if sample.Metric.Name == metrics.HTTPReqFailedName {
-			require.EqualValues(t, sample.Value, 0)
+			require.EqualValues(t, 0, sample.Value)
 		}
 	})
 }

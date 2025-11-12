@@ -3505,7 +3505,12 @@ func (p *parser) parsePrefix(level js_ast.L, errors *deferredErrors, flags exprF
 			p.allowIn = true
 
 			value := p.parseExpr(js_ast.LLowest)
-			p.markExprAsParenthesized(value, loc, false)
+
+			// Don't consider the "@(...)" decorator syntax to be important parentheses to preserve
+			if (flags & exprFlagDecorator) == 0 {
+				p.markExprAsParenthesized(value, loc, false)
+			}
+
 			p.lexer.Expect(js_lexer.TCloseParen)
 
 			p.allowIn = oldAllowIn
@@ -5151,7 +5156,8 @@ func (p *parser) parseJSXTag() (logger.Range, string, js_ast.Expr) {
 	tag := js_ast.Expr{Loc: loc, Data: &js_ast.EIdentifier{Ref: p.storeNameInRef(tagName)}}
 
 	// Parse a member expression chain
-	chain := tagName.String
+	var chain strings.Builder
+	chain.WriteString(tagName.String)
 	for p.lexer.Token == js_lexer.TDot {
 		p.lexer.NextInsideJSXElement()
 		memberRange := p.lexer.Range()
@@ -5166,12 +5172,12 @@ func (p *parser) parseJSXTag() (logger.Range, string, js_ast.Expr) {
 			panic(js_lexer.LexerPanic{})
 		}
 
-		chain += "." + member.String
+		chain.WriteString("." + member.String)
 		tag = js_ast.Expr{Loc: loc, Data: p.dotOrMangledPropParse(tag, member, memberRange.Loc, js_ast.OptionalChainNone, wasOriginallyDot)}
 		tagRange.Len = memberRange.Loc.Start + memberRange.Len - tagRange.Loc.Start
 	}
 
-	return tagRange, chain, tag
+	return tagRange, chain.String(), tag
 }
 
 func (p *parser) parseJSXElement(loc logger.Loc) js_ast.Expr {
@@ -11670,6 +11676,10 @@ func (p *parser) markExprAsParenthesized(value js_ast.Expr, openParenLoc logger.
 		e.IsParenthesized = true
 	case *js_ast.EObject:
 		e.IsParenthesized = true
+	case *js_ast.EFunction:
+		e.IsParenthesized = true
+	case *js_ast.EArrow:
+		e.IsParenthesized = true
 	}
 }
 
@@ -14987,7 +14997,12 @@ func (p *parser) visitExprInOut(expr js_ast.Expr, in exprIn) (js_ast.Expr, exprO
 			storeThisArgForParentOptionalChain: e.OptionalChain == js_ast.OptionalChainStart || isParenthesizedOptionalChain,
 		})
 		e.Target = target
-		p.warnAboutImportNamespaceCall(e.Target, exprKindCall)
+		p.warnAboutImportNamespaceCall(target, exprKindCall)
+
+		// Automatically mark immediately-invoked function expressions for eager compilation
+		if fn, ok := target.Data.(*js_ast.EFunction); ok {
+			fn.IsParenthesized = true
+		}
 
 		hasSpread := false
 		oldIsControlFlowDead := p.isControlFlowDead

@@ -2333,6 +2333,9 @@ func (p *printer) printExpr(expr js_ast.Expr, level js_ast.L, flags printExprFla
 				if _, ok := arg.Data.(*js_ast.ESpread); !ok {
 					if (flags & exprResultIsUnused) != 0 {
 						arg = p.astHelpers.SimplifyUnusedExpr(arg, p.options.UnsupportedFeatures)
+						if arg.Data == nil {
+							arg.Data = js_ast.EUndefinedShared
+						}
 					}
 					p.printExpr(p.guardAgainstBehaviorChangeDueToSubstitution(arg, flags), level, flags)
 					break
@@ -2710,7 +2713,7 @@ func (p *printer) printExpr(expr js_ast.Expr, level js_ast.L, flags printExprFla
 		}
 
 	case *js_ast.EArrow:
-		wrap := level >= js_ast.LAssign
+		wrap := e.IsParenthesized || level >= js_ast.LAssign
 
 		if wrap {
 			p.print("(")
@@ -2738,8 +2741,12 @@ func (p *printer) printExpr(expr js_ast.Expr, level js_ast.L, flags printExprFla
 		wasPrinted := false
 		if len(e.Body.Block.Stmts) == 1 && e.PreferExpr {
 			if s, ok := e.Body.Block.Stmts[0].Data.(*js_ast.SReturn); ok && s.ValueOrNil.Data != nil {
+				var nestedFlags printExprFlags
+				if (flags&forbidIn) != 0 && !wrap {
+					nestedFlags |= forbidIn
+				}
 				p.arrowExprStart = len(p.js)
-				p.printExprWithoutLeadingNewline(s.ValueOrNil, js_ast.LComma, flags&forbidIn)
+				p.printExprWithoutLeadingNewline(s.ValueOrNil, js_ast.LComma, nestedFlags)
 				wasPrinted = true
 			}
 		}
@@ -2752,7 +2759,7 @@ func (p *printer) printExpr(expr js_ast.Expr, level js_ast.L, flags printExprFla
 
 	case *js_ast.EFunction:
 		n := len(p.js)
-		wrap := p.stmtStart == n || p.exportDefaultStart == n ||
+		wrap := e.IsParenthesized || p.stmtStart == n || p.exportDefaultStart == n ||
 			((flags&isPropertyAccessTarget) != 0 && p.options.UnsupportedFeatures.Has(compat.FunctionOrClassPropertyAccess))
 		if wrap {
 			p.print("(")

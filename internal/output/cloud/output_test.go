@@ -68,7 +68,7 @@ func TestNewOutputNameResolution(t *testing.T) {
 				ScriptPath: testCase.url,
 			})
 			require.NoError(t, err)
-			require.Equal(t, out.config.Name.String, testCase.expected)
+			require.Equal(t, testCase.expected, out.config.Name.String)
 		})
 	}
 }

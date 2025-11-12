@@ -208,7 +208,7 @@ func NewClient(target string, opts ...DialOption) (conn *ClientConn, err error) 
 	channelz.Infof(logger, cc.channelz, "Channel authority set to %q", cc.authority)
 
 	cc.csMgr = newConnectivityStateManager(cc.ctx, cc.channelz)
-	cc.pickerWrapper = newPickerWrapper(cc.dopts.copts.StatsHandlers)
+	cc.pickerWrapper = newPickerWrapper()
 
 	cc.metricsRecorderList = stats.NewMetricsRecorderList(cc.dopts.copts.StatsHandlers)
 
@@ -1076,13 +1076,6 @@ func (cc *ClientConn) healthCheckConfig() *healthCheckConfig {
 	return cc.sc.healthCheckConfig
 }
 
-func (cc *ClientConn) getTransport(ctx context.Context, failfast bool, method string) (transport.ClientTransport, balancer.PickResult, error) {
-	return cc.pickerWrapper.pick(ctx, failfast, balancer.PickInfo{
-		Ctx:            ctx,
-		FullMethodName: method,
-	})
-}
-
 func (cc *ClientConn) applyServiceConfigAndBalancer(sc *ServiceConfig, configSelector iresolver.ConfigSelector) {
 	if sc == nil {
 		// should never reach here.
@@ -1831,7 +1824,7 @@ func (cc *ClientConn) initAuthority() error {
 	} else if auth, ok := cc.resolverBuilder.(resolver.AuthorityOverrider); ok {
 		cc.authority = auth.OverrideAuthority(cc.parsedTarget)
 	} else if strings.HasPrefix(endpoint, ":") {
-		cc.authority = "localhost" + endpoint
+		cc.authority = "localhost" + encodeAuthority(endpoint)
 	} else {
 		cc.authority = encodeAuthority(endpoint)
 	}

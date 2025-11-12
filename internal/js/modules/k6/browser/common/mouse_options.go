@@ -6,6 +6,7 @@ import (
 	"github.com/grafana/sobek"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
+	"go.k6.io/k6/js/common"
 )
 
 type MouseClickOptions struct {
@@ -39,7 +40,7 @@ func NewMouseClickOptions() *MouseClickOptions {
 // Parse parses the mouse click options.
 func (o *MouseClickOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
-	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
+	if !common.IsNullish(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			switch k {
@@ -72,7 +73,7 @@ func NewMouseDblClickOptions() *MouseDblClickOptions {
 // Parse parses the mouse double click options.
 func (o *MouseDblClickOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
-	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
+	if !common.IsNullish(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			switch k {
@@ -105,7 +106,7 @@ func NewMouseDownUpOptions() *MouseDownUpOptions {
 // Parse parses the mouse down/up options.
 func (o *MouseDownUpOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
-	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
+	if !common.IsNullish(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			switch k {
@@ -128,7 +129,7 @@ func NewMouseMoveOptions() *MouseMoveOptions {
 // Parse parses the mouse move options.
 func (o *MouseMoveOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
-	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
+	if !common.IsNullish(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			if k == "steps" {

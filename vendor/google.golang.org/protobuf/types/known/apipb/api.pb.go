@@ -52,6 +52,11 @@ import (
 // sometimes simply referred to as "APIs" in other contexts, such as the name of
 // this message itself. See https://cloud.google.com/apis/design/glossary for
 // detailed terminology.
+//
+// New usages of this message as an alternative to ServiceDescriptorProto are
+// strongly discouraged. This message does not reliability preserve all
+// information necessary to model the schema and preserve semantics. Instead
+// make use of FileDescriptorSet which preserves the necessary information.
 type Api struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The fully qualified name of this interface, including package name
@@ -87,7 +92,9 @@ type Api struct {
 	// Included interfaces. See [Mixin][].
 	Mixins []*Mixin `protobuf:"bytes,6,rep,name=mixins,proto3" json:"mixins,omitempty"`
 	// The source syntax of the service.
-	Syntax        typepb.Syntax `protobuf:"varint,7,opt,name=syntax,proto3,enum=google.protobuf.Syntax" json:"syntax,omitempty"`
+	Syntax typepb.Syntax `protobuf:"varint,7,opt,name=syntax,proto3,enum=google.protobuf.Syntax" json:"syntax,omitempty"`
+	// The source edition string, only valid when syntax is SYNTAX_EDITIONS.
+	Edition       string `protobuf:"bytes,8,opt,name=edition,proto3" json:"edition,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -171,7 +178,19 @@ func (x *Api) GetSyntax() typepb.Syntax {
 	return typepb.Syntax(0)
 }
 
+func (x *Api) GetEdition() string {
+	if x != nil {
+		return x.Edition
+	}
+	return ""
+}
+
 // Method represents a method of an API interface.
+//
+// New usages of this message as an alternative to MethodDescriptorProto are
+// strongly discouraged. This message does not reliability preserve all
+// information necessary to model the schema and preserve semantics. Instead
+// make use of FileDescriptorSet which preserves the necessary information.
 type Method struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The simple name of this method.
@@ -187,7 +206,19 @@ type Method struct {
 	// Any metadata attached to the method.
 	Options []*typepb.Option `protobuf:"bytes,6,rep,name=options,proto3" json:"options,omitempty"`
 	// The source syntax of this method.
-	Syntax        typepb.Syntax `protobuf:"varint,7,opt,name=syntax,proto3,enum=google.protobuf.Syntax" json:"syntax,omitempty"`
+	//
+	// This field should be ignored, instead the syntax should be inherited from
+	// Api. This is similar to Field and EnumValue.
+	//
+	// Deprecated: Marked as deprecated in google/protobuf/api.proto.
+	Syntax typepb.Syntax `protobuf:"varint,7,opt,name=syntax,proto3,enum=google.protobuf.Syntax" json:"syntax,omitempty"`
+	// The source edition string, only valid when syntax is SYNTAX_EDITIONS.
+	//
+	// This field should be ignored, instead the edition should be inherited from
+	// Api. This is similar to Field and EnumValue.
+	//
+	// Deprecated: Marked as deprecated in google/protobuf/api.proto.
+	Edition       string `protobuf:"bytes,8,opt,name=edition,proto3" json:"edition,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -264,11 +295,20 @@ func (x *Method) GetOptions() []*typepb.Option {
 	return nil
 }
 
+// Deprecated: Marked as deprecated in google/protobuf/api.proto.
 func (x *Method) GetSyntax() typepb.Syntax {
 	if x != nil {
 		return x.Syntax
 	}
 	return typepb.Syntax(0)
+}
+
+// Deprecated: Marked as deprecated in google/protobuf/api.proto.
+func (x *Method) GetEdition() string {
+	if x != nil {
+		return x.Edition
+	}
+	return ""
 }
 
 // Declares an API Interface to be included in this interface. The including
@@ -408,7 +448,7 @@ var File_google_protobuf_api_proto protoreflect.FileDescriptor
 
 const file_google_protobuf_api_proto_rawDesc = "" +
 	"\n" +
-	"\x19google/protobuf/api.proto\x12\x0fgoogle.protobuf\x1a$google/protobuf/source_context.proto\x1a\x1agoogle/protobuf/type.proto\"\xc1\x02\n" +
+	"\x19google/protobuf/api.proto\x12\x0fgoogle.protobuf\x1a$google/protobuf/source_context.proto\x1a\x1agoogle/protobuf/type.proto\"\xdb\x02\n" +
 	"\x03Api\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x121\n" +
 	"\amethods\x18\x02 \x03(\v2\x17.google.protobuf.MethodR\amethods\x121\n" +
@@ -416,15 +456,17 @@ const file_google_protobuf_api_proto_rawDesc = "" +
 	"\aversion\x18\x04 \x01(\tR\aversion\x12E\n" +
 	"\x0esource_context\x18\x05 \x01(\v2\x1e.google.protobuf.SourceContextR\rsourceContext\x12.\n" +
 	"\x06mixins\x18\x06 \x03(\v2\x16.google.protobuf.MixinR\x06mixins\x12/\n" +
-	"\x06syntax\x18\a \x01(\x0e2\x17.google.protobuf.SyntaxR\x06syntax\"\xb2\x02\n" +
+	"\x06syntax\x18\a \x01(\x0e2\x17.google.protobuf.SyntaxR\x06syntax\x12\x18\n" +
+	"\aedition\x18\b \x01(\tR\aedition\"\xd4\x02\n" +
 	"\x06Method\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12(\n" +
 	"\x10request_type_url\x18\x02 \x01(\tR\x0erequestTypeUrl\x12+\n" +
 	"\x11request_streaming\x18\x03 \x01(\bR\x10requestStreaming\x12*\n" +
 	"\x11response_type_url\x18\x04 \x01(\tR\x0fresponseTypeUrl\x12-\n" +
 	"\x12response_streaming\x18\x05 \x01(\bR\x11responseStreaming\x121\n" +
-	"\aoptions\x18\x06 \x03(\v2\x17.google.protobuf.OptionR\aoptions\x12/\n" +
-	"\x06syntax\x18\a \x01(\x0e2\x17.google.protobuf.SyntaxR\x06syntax\"/\n" +
+	"\aoptions\x18\x06 \x03(\v2\x17.google.protobuf.OptionR\aoptions\x123\n" +
+	"\x06syntax\x18\a \x01(\x0e2\x17.google.protobuf.SyntaxB\x02\x18\x01R\x06syntax\x12\x1c\n" +
+	"\aedition\x18\b \x01(\tB\x02\x18\x01R\aedition\"/\n" +
 	"\x05Mixin\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04root\x18\x02 \x01(\tR\x04rootBv\n" +

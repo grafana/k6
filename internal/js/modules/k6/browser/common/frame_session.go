@@ -621,7 +621,7 @@ func (fs *FrameSession) navigateFrame(frame *Frame, url, referrer string) (strin
 		fs.session.ID(), frame.ID(), fs.targetID, url, referrer)
 
 	action := cdppage.Navigate(url).WithReferrer(referrer).WithFrameID(cdp.FrameID(frame.ID()))
-	_, documentID, errorText, err := action.Do(cdp.WithExecutor(fs.ctx, fs.session))
+	_, documentID, errorText, _, err := action.Do(cdp.WithExecutor(fs.ctx, fs.session))
 	if err != nil {
 		if errorText == "" {
 			err = fmt.Errorf("%w", err)
@@ -682,7 +682,7 @@ func (fs *FrameSession) onExecutionContextCreated(event *cdpruntime.EventExecuti
 		Type      string      `json:"type"`
 	}
 	if err := json.Unmarshal(auxData, &i); err != nil {
-		k6ext.Panic(fs.ctx, "unmarshaling executionContextCreated event JSON: %w", err)
+		k6ext.Panicf(fs.ctx, "unmarshaling executionContextCreated event JSON: %w", err)
 	}
 
 	frame, ok := fs.manager.getFrameByID(i.FrameID)
@@ -767,7 +767,7 @@ func (fs *FrameSession) onFrameDetached(frameID cdp.FrameID, reason cdppage.Fram
 		fs.session.ID(), fs.targetID, frameID, reason)
 
 	if err := fs.manager.frameDetached(frameID, reason); err != nil {
-		k6ext.Panic(fs.ctx, "handling frameDetached event: %w", err)
+		k6ext.Panicf(fs.ctx, "handling frameDetached event: %w", err)
 	}
 }
 
@@ -780,7 +780,7 @@ func (fs *FrameSession) onFrameNavigated(frame *cdp.Frame, initial bool) {
 		frame.ID, frame.ParentID, frame.LoaderID.String(),
 		frame.Name, frame.URL+frame.URLFragment, initial)
 	if err != nil {
-		k6ext.Panic(fs.ctx, "handling frameNavigated event to %q: %w",
+		k6ext.Panicf(fs.ctx, "handling frameNavigated event to %q: %w",
 			frame.URL+frame.URLFragment, err)
 	}
 
@@ -855,7 +855,7 @@ func (fs *FrameSession) onFrameRequestedNavigation(event *cdppage.EventFrameRequ
 	if event.Disposition == "currentTab" {
 		err := fs.manager.frameRequestedNavigation(event.FrameID, event.URL, "")
 		if err != nil {
-			k6ext.Panic(fs.ctx, "handling frameRequestedNavigation event to %q: %w", event.URL, err)
+			k6ext.Panicf(fs.ctx, "handling frameRequestedNavigation event to %q: %w", event.URL, err)
 		}
 	}
 }
@@ -995,7 +995,7 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 			return // ignore
 		}
 		reason = "fatal"
-		k6ext.Panic(fs.ctx, "attaching %v: %w", ti.Type, err)
+		k6ext.Panicf(fs.ctx, "attaching %v: %w", ti.Type, err)
 	}
 }
 
@@ -1064,7 +1064,7 @@ func (fs *FrameSession) onTargetCrashed() {
 	// TODO:?
 	s, ok := fs.session.(*Session)
 	if !ok {
-		k6ext.Panic(fs.ctx, "unexpected type %T", fs.session)
+		k6ext.Panicf(fs.ctx, "unexpected type %T", fs.session)
 	}
 	s.markAsCrashed()
 }

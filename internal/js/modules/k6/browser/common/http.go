@@ -101,7 +101,6 @@ type Request struct {
 	timestamp         time.Time
 	wallTime          time.Time
 	responseEndTiming float64
-	vu                k6modules.VU
 }
 
 // NewRequestParams are input parameters for NewRequest.
@@ -165,7 +164,6 @@ func NewRequest(ctx context.Context, logger *log.Logger, rp NewRequestParams) (*
 		documentID:          documentID.String(),
 		headers:             make(map[string][]string, len(ev.Request.Headers)),
 		ctx:                 ctx,
-		vu:                  k6ext.GetVU(ctx),
 	}
 	for n, v := range ev.Request.Headers {
 		if s, ok := v.(string); ok {

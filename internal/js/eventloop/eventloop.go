@@ -6,6 +6,8 @@ import (
 	"sync"
 
 	"github.com/grafana/sobek"
+
+	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 )
 
@@ -147,7 +149,7 @@ func (e *EventLoop) popAll() (queue []func() error, awaiting bool) {
 	e.queue = make([]func() error, 0, len(queue))
 	awaiting = e.registeredCallbacks != 0
 	e.lock.Unlock()
-	return
+	return queue, awaiting
 }
 
 func (e *EventLoop) putInfront(queue []func() error) {
@@ -185,7 +187,7 @@ func (e *EventLoop) Start(firstCallback func() error) error {
 		// But that seems to be the case in other tools as well so it seems to not be that big of a problem.
 		for promise := range e.pendingPromiseRejections {
 			value := promise.Result()
-			if !sobek.IsNull(value) && !sobek.IsUndefined(value) {
+			if !common.IsNullish(value) {
 				if o := value.ToObject(e.vu.Runtime()); o != nil {
 					if stack := o.Get("stack"); stack != nil {
 						value = stack

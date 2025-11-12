@@ -3,6 +3,8 @@ package modules
 import (
 	"fmt"
 	"net/url"
+	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/grafana/sobek"
@@ -28,15 +30,16 @@ type moduleCacheElement struct {
 
 // ModuleResolver knows how to get base Module that can be initialized
 type ModuleResolver struct {
-	cache     map[string]moduleCacheElement
-	goModules map[string]any
-	loadCJS   FileLoader
-	compiler  *compiler.Compiler
-	locked    bool
-	reverse   map[any]*url.URL // maybe use sobek.ModuleRecord as key
-	base      *url.URL
-	usage     *usage.Usage
-	logger    logrus.FieldLogger
+	cache          map[string]moduleCacheElement
+	goModules      map[string]any
+	loadCJS        FileLoader
+	compiler       *compiler.Compiler
+	locked         bool
+	reverse        map[any]*url.URL // maybe use sobek.ModuleRecord as key
+	base           *url.URL
+	usage          *usage.Usage
+	logger         logrus.FieldLogger
+	unknownModules []string
 }
 
 // NewModuleResolver returns a new module resolution instance that will resolve.
@@ -66,13 +69,14 @@ func (mr *ModuleResolver) resolveSpecifier(basePWD *url.URL, arg string) (*url.U
 	return specifier, nil
 }
 
-func (mr *ModuleResolver) requireModule(name string) (sobek.ModuleRecord, error) {
+func (mr *ModuleResolver) initializeGoModule(name string) (sobek.ModuleRecord, error) {
 	if mr.locked {
 		return nil, fmt.Errorf(notPreviouslyResolvedModule, name)
 	}
 	mod, ok := mr.goModules[name]
 	if !ok {
-		return nil, fmt.Errorf("unknown module: %s", name)
+		mr.unknownModules = append(mr.unknownModules, name)
+		return &unknownModule{name: name, requested: make(map[string]struct{})}, nil
 	}
 	// we don't want to report extensions and we would have hit cache if this isn't the first time
 	if !strings.HasPrefix(name, "k6/x/") {
@@ -150,7 +154,7 @@ func (mr *ModuleResolver) resolve(basePWD *url.URL, arg string) (sobek.ModuleRec
 		if cached, ok := mr.cache[arg]; ok {
 			return cached.mod, cached.err
 		}
-		mod, err := mr.requireModule(arg)
+		mod, err := mr.initializeGoModule(arg)
 		mr.cache[arg] = moduleCacheElement{mod: mod, err: err}
 		return mod, err
 	default:
@@ -210,6 +214,31 @@ func (mr *ModuleResolver) reversePath(referencingScriptOrModule interface{}) *ur
 	return p.JoinPath("..")
 }
 
+// LoadMainModule loads a main module and resolves all it dependencies checking for any linking issues.
+// It does not run any javascript code, just compiling it and resolving module dependencies.
+func (mr *ModuleResolver) LoadMainModule(pwd *url.URL, specifier string, data []byte) error {
+	if _, err := mr.resolveLoaded(pwd, specifier, data); err != nil {
+		return err
+	}
+
+	mod, err := mr.resolve(pwd, specifier)
+	if err != nil {
+		return err
+	}
+	if err = mod.Link(); err != nil {
+		return err
+	}
+	_, ok := mod.(sobek.CyclicModuleRecord)
+	if !ok {
+		panic("somehow running source data for " + specifier + " didn't produce a cyclic module record")
+	}
+
+	if len(mr.unknownModules) > 0 {
+		return newUnknownModulesError(mr.unknownModules)
+	}
+	return nil
+}
+
 // ModuleSystem is implementing an ESM like module system to resolve js modules for k6 usage
 type ModuleSystem struct {
 	vu            VU
@@ -236,10 +265,10 @@ func NewModuleSystem(resolver *ModuleResolver, vu VU) *ModuleSystem {
 func (ms *ModuleSystem) RunSourceData(source *loader.SourceData) (*RunSourceDataResult, error) {
 	specifier := source.URL.String()
 	pwd := source.URL.JoinPath("../")
-	if _, err := ms.resolver.resolveLoaded(pwd, specifier, source.Data); err != nil {
+	err := ms.resolver.LoadMainModule(pwd, specifier, source.Data)
+	if err != nil {
 		return nil, err
 	}
-
 	mod, err := ms.resolver.resolve(pwd, specifier)
 	if err != nil {
 		return nil, err
@@ -249,8 +278,9 @@ func (ms *ModuleSystem) RunSourceData(source *loader.SourceData) (*RunSourceData
 	}
 	ci, ok := mod.(sobek.CyclicModuleRecord)
 	if !ok {
-		panic("somehow running source data for " + source.URL.String() + " didn't produce a cyclide module record")
+		panic("somehow running source data for " + source.URL.String() + " didn't produce a cyclic module record")
 	}
+
 	rt := ms.vu.Runtime()
 	promise := rt.CyclicModuleRecordEvaluate(ci, ms.resolver.sobekModuleResolver)
 
@@ -305,4 +335,34 @@ func ExportGloballyModule(rt *sobek.Runtime, modSys *ModuleSystem, moduleName st
 			panic(fmt.Errorf("failed to set '%s' global object: %w", key, err))
 		}
 	}
+}
+
+// UnknownModulesError is returned when loading a module was not possbile due to one or more of dependencies
+// that couldn't be resolved.
+type UnknownModulesError struct {
+	unknownModules []string
+}
+
+func newUnknownModulesError(list []string) UnknownModulesError {
+	slices.Sort(list)
+	return UnknownModulesError{unknownModules: list}
+}
+
+func (u UnknownModulesError) Error() string {
+	return fmt.Sprintf("unknown modules [%s] were tried to be loaded, but couldn't - "+
+		"this likely means automatic extension resolution is required or a custom k6 binary with the required extensions",
+		u.formatList())
+}
+
+// List returns the list of unknown modules that lead to the error
+func (u UnknownModulesError) List() []string {
+	return slices.Clone(u.unknownModules)
+}
+
+func (u UnknownModulesError) formatList() string {
+	list := make([]string, len(u.unknownModules))
+	for i, m := range u.unknownModules {
+		list[i] = strconv.Quote(m)
+	}
+	return strings.Join(list, ", ")
 }

@@ -23,6 +23,7 @@ type Stream struct {
 	discardResponseMessage bool
 	raw                    grpc.ClientStream
 	marshaler              protojson.MarshalOptions
+	unmarshaler            protojson.UnmarshalOptions
 }
 
 // ErrCanceled canceled by client (k6)
@@ -31,7 +32,7 @@ var ErrCanceled = errors.New("canceled by client (k6)")
 // ReceiveConverted receives a converted message from the stream
 // if the stream has been closed successfully, it returns io.EOF
 // if the stream has been cancelled, it returns ErrCanceled
-func (s *Stream) ReceiveConverted() (interface{}, error) {
+func (s *Stream) ReceiveConverted() (any, error) {
 	raw, err := s.receive()
 	if err != nil && !errors.Is(err, io.EOF) {
 		return nil, err
@@ -89,7 +90,7 @@ func (s *Stream) receive() (msg *dynamicpb.Message, err error) {
 // {"x":6,"y":4}
 // rather than the desired:
 // {"x":6,"y":4,"z":0}
-func convert(marshaler protojson.MarshalOptions, msg *dynamicpb.Message) (interface{}, error) {
+func convert(marshaler protojson.MarshalOptions, msg *dynamicpb.Message) (any, error) {
 	// TODO(olegbespalov): add the test that checks that message is not nil
 
 	raw, err := marshaler.Marshal(msg)
@@ -97,7 +98,7 @@ func convert(marshaler protojson.MarshalOptions, msg *dynamicpb.Message) (interf
 		return nil, fmt.Errorf("failed to marshal the message: %w", err)
 	}
 
-	var back interface{}
+	var back any
 
 	err = json.Unmarshal(raw, &back)
 	if err != nil {
@@ -115,7 +116,7 @@ func (s *Stream) CloseSend() error {
 // BuildMessage builds a message from the input
 func (s *Stream) buildMessage(b []byte) (*dynamicpb.Message, error) {
 	msg := dynamicpb.NewMessage(s.methodDescriptor.Input())
-	if err := protojson.Unmarshal(b, msg); err != nil {
+	if err := s.unmarshaler.Unmarshal(b, msg); err != nil {
 		return nil, fmt.Errorf("can't serialise request object to protocol buffer: %w", err)
 	}
 

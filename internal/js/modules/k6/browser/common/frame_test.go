@@ -110,3 +110,122 @@ func (e *executionContextTestStub) eval( // this needs to be a pointer as otherw
 ) (res any, err error) {
 	return e.evalFn(apiCtx, opts, js, args...)
 }
+
+// toPtr is a helper function to convert a value to a pointer.
+func toPtr[T any](v T) *T {
+	return &v
+}
+
+func TestBuildAttributeSelector(t *testing.T) {
+	t.Parallel()
+
+	f := &Frame{}
+
+	tests := []struct {
+		name      string
+		attrName  string
+		attrValue string
+		opts      *GetByBaseOptions
+		want      string
+	}{
+		{
+			name:      "empty",
+			attrName:  "",
+			attrValue: "",
+			opts:      nil,
+			want:      "internal:attr=[=]",
+		},
+		{
+			name:      "unquoted_no_opts",
+			attrName:  "data-test",
+			attrValue: "foo",
+			opts:      nil,
+			want:      "internal:attr=[data-test=foo]",
+		},
+		{
+			name:      "quoted_single_nil_opts",
+			attrName:  "data-test",
+			attrValue: "'Foo Bar'",
+			opts:      nil,
+			want:      "internal:attr=[data-test='Foo Bar'i]",
+		},
+		{
+			name:      "quoted_single_exact_false",
+			attrName:  "data-test",
+			attrValue: "'Foo Bar'",
+			opts:      &GetByBaseOptions{Exact: toPtr(false)},
+			want:      "internal:attr=[data-test='Foo Bar'i]",
+		},
+		{
+			name:      "quoted_single_exact_true",
+			attrName:  "data-test",
+			attrValue: "'Foo Bar'",
+			opts:      &GetByBaseOptions{Exact: toPtr(true)},
+			want:      "internal:attr=[data-test='Foo Bar's]",
+		},
+		{
+			name:      "quoted_double_exact_true",
+			attrName:  "data-test",
+			attrValue: "\"Foo Bar\"",
+			opts:      &GetByBaseOptions{Exact: toPtr(true)},
+			want:      "internal:attr=[data-test=\"Foo Bar\"s]",
+		},
+		{
+			name:      "quoted_double_exact_false",
+			attrName:  "data-test",
+			attrValue: "\"Foo Bar\"",
+			opts:      &GetByBaseOptions{Exact: toPtr(false)},
+			want:      "internal:attr=[data-test=\"Foo Bar\"i]",
+		},
+		{
+			name:      "quoted_single_exact_nil",
+			attrName:  "data-test",
+			attrValue: "'Foo Bar'",
+			opts:      &GetByBaseOptions{Exact: nil},
+			want:      "internal:attr=[data-test='Foo Bar'i]",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := f.buildAttributeSelector(tc.attrName, tc.attrValue, tc.opts)
+			require.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func TestIsQuotedText(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		in   string
+		want bool
+	}{
+		{name: "empty", in: "", want: false},
+		{name: "unquoted", in: "foo", want: false},
+		{name: "single_quoted", in: "'foo'", want: true},
+		{name: "double_quoted", in: "\"foo\"", want: true},
+		{name: "mismatched_quotes_1", in: "'foo\"", want: false},
+		{name: "mismatched_quotes_2", in: "\"foo'", want: false},
+		{name: "just_single_quote", in: "'", want: false},
+		{name: "just_double_quote", in: "\"", want: false},
+		{name: "two_single_quotes", in: "''", want: true},
+		{name: "two_double_quotes", in: "\"\"", want: true},
+		{name: "leading_space_then_quoted", in: " 'foo'", want: true},
+		{name: "trailing_space_after_quoted", in: "'foo' ", want: true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := isQuotedText(tc.in)
+			if got != tc.want {
+				t.Fatalf("isQuotedText(%q) = %v, want %v", tc.in, got, tc.want)
+			}
+		})
+	}
+}

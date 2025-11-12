@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
@@ -219,6 +220,57 @@ func withHTTPServer() func(*testBrowser) {
 	}
 }
 
+// withIFrameContent sets up a handler for /iframe that serves a page embedding
+// an iframe with the given content.
+func withIFrameContent(iframeHTML string, iframeID string) func(*testBrowser) {
+	return func(tb *testBrowser) {
+		if !tb.isBrowserTypeInitialized {
+			return
+		}
+		if tb.http == nil {
+			apply := withHTTPServer()
+			apply(tb)
+		}
+
+		mux := http.NewServeMux()
+		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			_, err := w.Write([]byte(iframeHTML))
+			require.NoError(tb.t, err)
+		})
+		srv := httptest.NewServer(mux)
+		tb.t.Cleanup(func() {
+			srv.Close()
+		})
+
+		tb.withIFrameURL(srv.URL, iframeID)
+	}
+}
+
+// withIFrameURL sets up a handler for /iframe that serves a page embedding
+// an iframe with the given URL.
+func (tb *testBrowser) withIFrameURL(iframeURL string, iframeID string) {
+	tb.t.Helper()
+
+	if tb.http == nil {
+		tb.t.Fatalf("You should enable HTTP test server, see: withHTTPServer option")
+	}
+
+	docHTML := fmt.Sprintf(`<!DOCTYPE html>
+		<html>
+		<head></head>
+		<body>
+			<iframe id="%s" src="%s"></iframe>
+		</body>
+		</html>`, iframeID, iframeURL)
+
+	tb.withHandler("/iframe", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, err := w.Write([]byte(docHTML))
+		require.NoError(tb.t, err)
+	})
+}
+
 // withLogCache enables the log cache.
 //
 // example:
@@ -248,6 +300,33 @@ func withSamples(sc chan k6metrics.SampleContainer) func(*testBrowser) {
 //	b := TestBrowser(t, withSkipClose())
 func withSkipClose() func(*testBrowser) {
 	return func(tb *testBrowser) { tb.skipClose = true }
+}
+
+// GotoNewPage is a wrapper around testBrowser.NewPage and Page.Goto that fails
+// the test if an error occurs. Added this helper to avoid boilerplate code in tests.
+func (b *testBrowser) GotoNewPage(url string) *common.Page {
+	b.t.Helper()
+
+	p := b.NewPage(nil)
+	opts := &common.FrameGotoOptions{
+		Timeout: common.DefaultTimeout,
+	}
+	_, err := p.Goto(url, opts)
+	require.NoError(b.t, err)
+
+	return p
+}
+
+// GotoPage is a wrapper around Page.Goto that fails the test if an error occurs.
+// Added this helper to avoid boilerplate code in tests.
+func (b *testBrowser) GotoPage(p *common.Page, url string) {
+	b.t.Helper()
+
+	opts := &common.FrameGotoOptions{
+		Timeout: common.DefaultTimeout,
+	}
+	_, err := p.Goto(url, opts)
+	require.NoError(b.t, err)
 }
 
 // NewPage is a wrapper around Browser.NewPage that fails the test if an

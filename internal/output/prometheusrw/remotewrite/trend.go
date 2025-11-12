@@ -1,8 +1,9 @@
 package remotewrite
 
 import (
+	"cmp"
 	"fmt"
-	"sort"
+	"slices"
 	"time"
 
 	prompb "buf.build/gen/go/prometheus/prometheus/protocolbuffers/go"
@@ -108,12 +109,10 @@ func (tg *trendAsGauges) CacheNameIndex() {
 
 	// in the case __name__ is not the first
 	// then search for its position
-
-	i := sort.Search(len(tg.labels), func(i int) bool {
-		return tg.labels[i].Name == namelbl
+	i, found := slices.BinarySearchFunc(tg.labels, namelbl, func(lbl *prompb.Label, key string) int {
+		return cmp.Compare(lbl.Name, key)
 	})
-
-	if i < len(tg.labels) && tg.labels[i].Name == namelbl {
+	if found {
 		tg.ixname = uint16(i) //nolint:gosec
 	}
 }

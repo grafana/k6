@@ -10,6 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/grafana/sobek"
+
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 )
@@ -91,6 +92,13 @@ func (e *timers) clearTimeout(id uint64) {
 	}
 	delete(e.timers, id)
 
+	first := e.queue.first()
+	if first != nil && first.id == id && e.queue.length() > 1 {
+		// if this is the first in queue we need to reset the first timer
+		// but only if there are more tasks in the queue
+		// and we need to do it after we remove this one, so we are deferring it
+		defer e.setupTaskTimeout()
+	}
 	e.queue.remove(id)
 	e.freeEventLoopIfPossible()
 }

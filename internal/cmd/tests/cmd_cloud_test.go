@@ -32,7 +32,7 @@ func setupK6CloudCmd(cliFlags []string) []string {
 type setupCommandFunc func(cliFlags []string) []string
 
 func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
-	t.Run("TestCloudNotLoggedIn", func(t *testing.T) {
+	t.Run("TestCloudUserNotAuthenticated", func(t *testing.T) {
 		t.Parallel()
 
 		ts := getSimpleCloudTestState(t, nil, setupCmd, nil, nil, nil)
@@ -42,7 +42,7 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 
 		stdout := ts.Stdout.String()
 		t.Log(stdout)
-		assert.Contains(t, stdout, `not logged in`)
+		assert.Contains(t, stdout, `must first authenticate`)
 	})
 
 	t.Run("TestCloudLoggedInWithScriptToken", func(t *testing.T) {

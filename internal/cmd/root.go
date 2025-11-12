@@ -43,21 +43,13 @@ type rootCommand struct {
 	stopLoggersCh  chan struct{}
 	loggersWg      sync.WaitGroup
 	loggerIsRemote bool
-	launcher       *launcher
 }
 
 // newRootCommand creates a root command with a default launcher
 func newRootCommand(gs *state.GlobalState) *rootCommand {
-	return newRootWithLauncher(gs, newLauncher(gs))
-}
-
-// newRootWithLauncher creates a root command with a launcher.
-// It facilitates unit testing scenarios.
-func newRootWithLauncher(gs *state.GlobalState, l *launcher) *rootCommand {
 	c := &rootCommand{
 		globalState:   gs,
 		stopLoggersCh: make(chan struct{}),
-		launcher:      l,
 	}
 	// the base command when called without any subcommands.
 	rootCmd := &cobra.Command{
@@ -99,7 +91,7 @@ func newRootWithLauncher(gs *state.GlobalState, l *launcher) *rootCommand {
 	return c
 }
 
-func (c *rootCommand) persistentPreRunE(cmd *cobra.Command, args []string) error {
+func (c *rootCommand) persistentPreRunE(_ *cobra.Command, _ []string) error {
 	err := c.setupLoggers(c.stopLoggersCh)
 	if err != nil {
 		return err
@@ -107,16 +99,7 @@ func (c *rootCommand) persistentPreRunE(cmd *cobra.Command, args []string) error
 
 	c.globalState.Logger.Debugf("k6 version: v%s", fullVersion())
 
-	// If automatic extension resolution is not enabled, continue with the regular k6 execution path
-	if !c.globalState.Flags.AutoExtensionResolution {
-		c.globalState.Logger.Debug("Automatic extension resolution is disabled.")
-		return nil
-	}
-
-	c.globalState.Logger.
-		Debug("Automatic extension resolution is enabled.")
-
-	return c.launcher.launch(cmd, args)
+	return nil
 }
 
 func (c *rootCommand) execute() {
@@ -147,9 +130,20 @@ func (c *rootCommand) execute() {
 		return
 	}
 
+	newExitCode, err := handleUnsatisfiedDependencies(err, c)
+
+	if err == nil {
+		exitCode = int(newExitCode)
+		return
+	}
+
 	var ecerr errext.HasExitCode
 	if errors.As(err, &ecerr) {
 		exitCode = int(ecerr.ExitCode())
+	}
+
+	if errors.Is(err, errAlreadyReported) {
+		return
 	}
 
 	errText, fields := errext.Format(err)
@@ -157,6 +151,39 @@ func (c *rootCommand) execute() {
 	if c.loggerIsRemote {
 		c.globalState.FallbackLogger.WithFields(fields).Error(errText)
 	}
+}
+
+func handleUnsatisfiedDependencies(err error, c *rootCommand) (exitcodes.ExitCode, error) {
+	var unsatisfiedDependenciesErr binaryIsNotSatisfyingDependenciesError
+
+	if !errors.As(err, &unsatisfiedDependenciesErr) {
+		return 0, err
+	}
+	deps := unsatisfiedDependenciesErr.deps
+	c.globalState.Logger.
+		WithField("deps", deps).
+		Info("Automatic extension resolution is enabled. The current k6 binary doesn't satisfy all dependencies," +
+			" it's required to provision a custom binary.")
+	provisioner := newK6BuildProvisioner(c.globalState)
+	var customBinary commandExecutor
+	customBinary, err = provisioner.provision(constraintsMapToProvisionDependency(deps))
+	if err != nil {
+		err = errext.WithExitCodeIfNone(err, exitcodes.ScriptException)
+		c.globalState.Logger.
+			WithError(err).
+			Error("Failed to provision a k6 binary with required dependencies." +
+				" Please, make sure to report this issue by opening a bug report.")
+		return 0, err
+	}
+
+	err = customBinary.run(c.globalState)
+	// this only happens if we actually ran the binary and it exited afterwads, in which case we propagate the exit code
+	var ecerr errext.HasExitCode
+	if errors.As(err, &ecerr) {
+		return ecerr.ExitCode(), err
+	}
+
+	return 0, err
 }
 
 func (c *rootCommand) stopLoggers() {

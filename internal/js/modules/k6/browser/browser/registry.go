@@ -281,7 +281,7 @@ func (r *browserRegistry) handleIterEvents(
 
 		if data, ok = e.Data.(k6event.IterData); !ok {
 			e.Done()
-			k6ext.Abort(vuCtx, "unexpected iteration event data format: %v", e.Data)
+			k6ext.Abortf(vuCtx, "unexpected iteration event data format: %v", e.Data)
 			// Continue so we don't block the k6 event system producer.
 			// Test will be aborted by k6, which will previously send the
 			// 'Exit' event so browser resources cleanup can be guaranteed.
@@ -306,7 +306,7 @@ func (r *browserRegistry) handleIterEvents(
 			b, err := r.buildFn(ctx, tracedCtx)
 			if err != nil {
 				e.Done()
-				k6ext.Abort(vuCtx, "error building browser on IterStart: %v", err)
+				k6ext.Abortf(vuCtx, "error building browser on IterStart: %v", err)
 				// Continue so we don't block the k6 event system producer.
 				// Test will be aborted by k6, which will previously send the
 				// 'Exit' event so browser resources cleanup can be guaranteed.

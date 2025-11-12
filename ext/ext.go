@@ -136,12 +136,12 @@ func extractModuleInfo(mod interface{}) (path, version string) {
 	case reflect.Func:
 		path = runtime.FuncForPC(reflect.ValueOf(mod).Pointer()).Name()
 	default:
-		return
+		return path, version
 	}
 
 	buildInfo, ok := debug.ReadBuildInfo()
 	if !ok {
-		return
+		return path, version
 	}
 
 	for _, dep := range buildInfo.Deps {
@@ -154,7 +154,7 @@ func extractModuleInfo(mod interface{}) (path, version string) {
 		}
 	}
 
-	return
+	return path, version
 }
 
 func init() {

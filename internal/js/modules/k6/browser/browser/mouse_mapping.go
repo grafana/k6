@@ -6,7 +6,6 @@ import (
 	"github.com/grafana/sobek"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/common"
-	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
 )
 
 func mapMouse(vu moduleVU, m *common.Mouse) mapping {
@@ -16,7 +15,7 @@ func mapMouse(vu moduleVU, m *common.Mouse) mapping {
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing mouse click options: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, m.Click(x, y, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -25,7 +24,7 @@ func mapMouse(vu moduleVU, m *common.Mouse) mapping {
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing double click options: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, m.DblClick(x, y, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -34,7 +33,7 @@ func mapMouse(vu moduleVU, m *common.Mouse) mapping {
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing mouse down options: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, m.Down(popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -43,7 +42,7 @@ func mapMouse(vu moduleVU, m *common.Mouse) mapping {
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing mouse up options: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, m.Up(popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -52,7 +51,7 @@ func mapMouse(vu moduleVU, m *common.Mouse) mapping {
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing mouse move options: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, m.Move(x, y, popts) //nolint:wrapcheck
 			}), nil
 		},

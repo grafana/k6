@@ -14,12 +14,9 @@ import (
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/cdproto/runtime"
-	"github.com/grafana/sobek"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
 	"go.k6.io/k6/internal/js/modules/k6/browser/log"
-
-	k6modules "go.k6.io/k6/js/modules"
 )
 
 // maxRetry controls how many times to retry if an action fails.
@@ -79,34 +76,6 @@ func (s *DOMElementState) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// URLMatcher is a function that matches a URL against a pattern.
-// It relies on JavaScript's regex engine for regex matching.
-type URLMatcher func(string) (bool, error)
-
-// urlMatcher matches URLs based on pattern type. It can match on exact and regex
-// patterns. If the pattern is empty or a single quote, it matches any URL.
-func urlMatcher(pattern string, jsRegexChecker JSRegexChecker) (URLMatcher, error) {
-	if pattern == "" || pattern == "''" {
-		return func(url string) (bool, error) { return true, nil }, nil
-	}
-
-	if isQuotedText(pattern) {
-		return func(url string) (bool, error) { return "'"+url+"'" == pattern, nil }, nil
-	}
-
-	if jsRegexChecker == nil {
-		return nil, fmt.Errorf("JavaScript pattern matcher is required for URL matching")
-	}
-
-	return func(url string) (bool, error) {
-		matched, err := jsRegexChecker(pattern, url)
-		if err != nil {
-			return false, fmt.Errorf("URL pattern matching error for pattern %q and URL %q: %w", pattern, url, err)
-		}
-		return matched, nil
-	}, nil
-}
-
 // Frame represents a frame in an HTML document.
 type Frame struct {
 	BaseEventEmitter
@@ -125,7 +94,6 @@ type Frame struct {
 	name         string
 	url          string
 	detached     bool
-	vu           k6modules.VU
 
 	// A life cycle event is only considered triggered for a frame if the entire
 	// frame subtree has also had the life cycle event triggered.
@@ -184,7 +152,6 @@ func NewFrame(
 		parentFrame:       parentFrame,
 		childFrames:       make(map[*Frame]bool),
 		id:                frameID,
-		vu:                k6ext.GetVU(ctx),
 		lifecycleEvents:   make(map[LifecycleEvent]bool),
 		inflightRequests:  make(map[network.RequestID]bool),
 		executionContexts: make(map[executionWorld]frameExecutionContext),
@@ -416,7 +383,10 @@ func (f *Frame) position() (*Position, error) {
 		return nil, err
 	}
 
-	box := element.BoundingBox()
+	box, err := element.BoundingBox()
+	if err != nil {
+		return nil, err
+	}
 
 	return &Position{X: box.X, Y: box.Y}, nil
 }
@@ -533,16 +503,20 @@ func (f *Frame) waitForSelector(selector string, opts *FrameWaitForSelectorOptio
 	f.executionContextMu.RLock()
 	defer f.executionContextMu.RUnlock()
 
-	ec := f.executionContexts[mainWorld]
-	if ec == nil {
-		return nil, fmt.Errorf("waiting for selector %q: execution context %q not found", selector, mainWorld)
-	}
+	uec := f.executionContexts[utilityWorld]
 
-	// an element should belong to the current execution context.
-	// otherwise, we should adopt it to this execution context.
+	// An element should belong to the current main world execution context, and
+	// not to the utility world context, otherwise, we should adopt it to the
+	// current world's execution context. This is only valid when the handle
+	// is from the current frame and not part of a nested frame.
 	adopted := handle
-	if ec != handle.execCtx {
-		if adopted, err = ec.adoptElementHandle(handle); err != nil {
+	if uec != nil && uec == handle.execCtx {
+		wec := f.executionContexts[mainWorld]
+		if wec == nil {
+			return nil, fmt.Errorf("waiting for selector %q: execution context %q not found", selector, mainWorld)
+		}
+
+		if adopted, err = wec.adoptElementHandle(handle); err != nil {
 			return nil, fmt.Errorf("waiting for selector %q: adopting element handle: %w", selector, err)
 		}
 
@@ -587,9 +561,32 @@ func (f *Frame) waitFor(
 		if strings.Contains(err.Error(), "Execution context was destroyed") {
 			return f.waitFor(selector, opts, retryCount)
 		}
+		if strings.Contains(err.Error(), "visible") {
+			return f.waitFor(selector, opts, retryCount)
+		}
 	}
 
 	return handle, err
+}
+
+func (f *Frame) boundingBox(selector string, opts *FrameBaseOptions) (*Rect, error) {
+	getBoundingBox := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+		return handle.boundingBox()
+	}
+	act := f.newAction(
+		selector, DOMElementStateAttached, opts.Strict, getBoundingBox, []string{}, false, true, opts.Timeout,
+	)
+	v, err := call(f.ctx, act, opts.Timeout)
+	if err != nil {
+		return nil, errorFromDOMError(err)
+	}
+
+	bv, ok := v.(*Rect)
+	if !ok {
+		return nil, fmt.Errorf("getting bounding box of %q: unexpected type %T", selector, v)
+	}
+
+	return bv, nil
 }
 
 // ChildFrames returns a list of child frames.
@@ -1036,30 +1033,95 @@ func (f *Frame) getAttribute(selector, name string, opts *FrameBaseOptions) (str
 func (f *Frame) GetByRole(role string, opts *GetByRoleOptions) *Locator {
 	f.log.Debugf("Frame:GetByRole", "fid:%s furl:%q role:%q opts:%+v", f.ID(), f.URL(), role, opts)
 
-	properties := make(map[string]string)
+	return f.Locator(f.buildRoleSelector(role, opts), nil)
+}
+
+// isQuotedText returns true if the string is a quoted string.
+// This is used to determine if the string will be used to match
+// a string instead of as a regex in the getBy* APIs. It handles
+// both single and double quotes.
+func isQuotedText(s string) bool {
+	s = strings.TrimSpace(s)
+	if len(s) <= 1 {
+		return false
+	}
+
+	switch {
+	case s[0] == '\'' && s[len(s)-1] == '\'':
+		return true
+	case s[0] == '"' && s[len(s)-1] == '"':
+		return true
+	}
+	return false
+}
+
+// buildAttributeSelector is a helper method that builds an attribute selector
+// prefixed with internal:attr. It handles quoted strings and
+// applies the appropriate suffix for exact or case-insensitive matching.
+func (f *Frame) buildAttributeSelector(attrName, attrValue string, opts *GetByBaseOptions) string {
+	var b strings.Builder
+	b.WriteString("internal:attr=")
+	b.WriteByte('[')
+	b.WriteString(attrName)
+	b.WriteByte('=')
+	b.WriteString(attrValue)
+	if isQuotedText(attrValue) {
+		if opts != nil && opts.Exact != nil && *opts.Exact {
+			b.WriteByte('s')
+		} else {
+			b.WriteByte('i')
+		}
+	}
+	b.WriteByte(']')
+	return b.String()
+}
+
+// buildRoleSelector is a helper method that builds a role selector prefixed with internal:role.
+// It handles quoted strings and applies the appropriate suffix for exact or case-insensitive matching,
+// among the other role-specific options.
+func (f *Frame) buildRoleSelector(role string, opts *GetByRoleOptions) string {
+	var b strings.Builder
+	b.WriteString("internal:role=")
+	b.WriteString(role)
 
 	if opts == nil {
-		return f.Locator("internal:role="+role, nil)
+		return b.String()
 	}
+
+	properties := f.mapGetByRoleOptions(opts)
+	for key, value := range properties {
+		b.WriteString("[" + key + "=" + value + "]")
+	}
+	return b.String()
+}
+
+func (f *Frame) mapGetByRoleOptions(opts *GetByRoleOptions) map[string]string {
+	properties := make(map[string]string)
 
 	if opts.Checked != nil {
 		properties["checked"] = strconv.FormatBool(*opts.Checked)
 	}
+
 	if opts.Disabled != nil {
 		properties["disabled"] = strconv.FormatBool(*opts.Disabled)
 	}
+
 	if opts.Selected != nil {
 		properties["selected"] = strconv.FormatBool(*opts.Selected)
 	}
+
 	if opts.Expanded != nil {
 		properties["expanded"] = strconv.FormatBool(*opts.Expanded)
 	}
+
 	if opts.IncludeHidden != nil {
 		properties["include-hidden"] = strconv.FormatBool(*opts.IncludeHidden)
 	}
+
 	if opts.Level != nil {
 		properties["level"] = strconv.FormatInt(*opts.Level, 10)
 	}
+
 	if opts.Name != nil && *opts.Name != "" {
 		// Exact option can only be applied to quoted strings.
 		if isQuotedText(*opts.Name) {
@@ -1071,106 +1133,97 @@ func (f *Frame) GetByRole(role string, opts *GetByRoleOptions) *Locator {
 		}
 		properties["name"] = *opts.Name
 	}
+
 	if opts.Pressed != nil {
 		properties["pressed"] = strconv.FormatBool(*opts.Pressed)
 	}
 
-	var builder strings.Builder
-	builder.WriteString("internal:role=" + role)
-	for key, value := range properties {
-		builder.WriteString("[" + key + "=" + value + "]")
-	}
-
-	return f.Locator(builder.String(), nil)
+	return properties
 }
 
-// isQuotedText returns true if the string is a quoted string.
-// This is used to determine if the string will be used to match
-// a string instead of as a regex in the getBy* APIs. It handles
-// both single and double quotes.
-func isQuotedText(s string) bool {
-	switch {
-	case len(s) > 0 && s[0] == '\'' && s[len(s)-1] == '\'':
-		return true
-	case len(s) > 0 && s[0] == '"' && s[len(s)-1] == '"':
-		return true
-	}
-	return false
-}
-
-// buildAttributeSelector is a helper method that builds an attribute selector
-// for use with the internal:attr engine. It handles quoted strings and
-// applies the appropriate suffix for exact or case-insensitive matching.
-func (f *Frame) buildAttributeSelector(attrName, attrValue string, opts *GetByBaseOptions) string {
-	selector := "[" + attrName + "=" + attrValue + "]"
-	if isQuotedText(attrValue) {
+// buildLabelSelector is a helper method that builds a label selector prefixed with internal:label.
+// It handles quoted strings and applies the appropriate suffix for exact or case-insensitive matching.
+func (f *Frame) buildLabelSelector(label string, opts *GetByBaseOptions) string {
+	var b strings.Builder
+	b.WriteString("internal:label=")
+	b.WriteString(label)
+	if isQuotedText(label) {
 		if opts != nil && opts.Exact != nil && *opts.Exact {
-			selector = "[" + attrName + "=" + attrValue + "s]"
+			b.WriteByte('s')
 		} else {
-			selector = "[" + attrName + "=" + attrValue + "i]"
+			b.WriteByte('i')
 		}
 	}
-	return selector
+	return b.String()
 }
 
-// Locator creates and returns a new locator for this frame.
+// buildTestIDSelector is a helper method that builds a data-testid selector.
+// Similar to buildAttributeSelector but without special case-sensitiveness handling.
+func (f *Frame) buildTestIDSelector(testID string) string {
+	var b strings.Builder
+	b.WriteString("internal:attr=[data-testid=")
+	b.WriteString(testID)
+	b.WriteByte(']')
+	return b.String()
+}
+
+// buildTextSelector is a helper method that builds a text selector prefixed with internal:text.
+// It handles quoted strings and applies the appropriate suffix for exact or case-insensitive matching.
+func (f *Frame) buildTextSelector(text string, opts *GetByBaseOptions) string {
+	var b strings.Builder
+	b.WriteString("internal:text=")
+	b.WriteString(text)
+	if isQuotedText(text) {
+		if opts != nil && opts.Exact != nil && *opts.Exact {
+			b.WriteByte('s')
+		} else {
+			b.WriteByte('i')
+		}
+	}
+	return b.String()
+}
+
+// GetByAltText creates and returns a new locator for this frame that allows locating elements by their alt text.
 func (f *Frame) GetByAltText(alt string, opts *GetByBaseOptions) *Locator {
 	f.log.Debugf("Frame:GetByAltText", "fid:%s furl:%q alt:%q opts:%+v", f.ID(), f.URL(), alt, opts)
 
-	return f.Locator("internal:attr="+f.buildAttributeSelector("alt", alt, opts), nil)
+	return f.Locator(f.buildAttributeSelector("alt", alt, opts), nil)
 }
 
-// Locator creates and returns a new locator for this frame.
+// GetByLabel creates and returns a new locator for this frame that allows locating input elements by the text
+// of the associated `<label>` or `aria-labelledby` element, or by the `aria-label` attribute.
 func (f *Frame) GetByLabel(label string, opts *GetByBaseOptions) *Locator {
 	f.log.Debugf("Frame:GetByLabel", "fid:%s furl:%q label:%q opts:%+v", f.ID(), f.URL(), label, opts)
 
-	l := "internal:label=" + label
-	if isQuotedText(label) {
-		if opts != nil && opts.Exact != nil && *opts.Exact {
-			l = "internal:label=" + label + "s"
-		} else {
-			l = "internal:label=" + label + "i"
-		}
-	}
-
-	return f.Locator(l, nil)
+	return f.Locator(f.buildLabelSelector(label, opts), nil)
 }
 
 // GetByPlaceholder creates and returns a new locator for this frame based on the placeholder attribute.
 func (f *Frame) GetByPlaceholder(placeholder string, opts *GetByBaseOptions) *Locator {
 	f.log.Debugf("Frame:GetByPlaceholder", "fid:%s furl:%q placeholder:%q opts:%+v", f.ID(), f.URL(), placeholder, opts)
 
-	return f.Locator("internal:attr="+f.buildAttributeSelector("placeholder", placeholder, opts), nil)
+	return f.Locator(f.buildAttributeSelector("placeholder", placeholder, opts), nil)
 }
 
 // GetByTitle creates and returns a new locator for this frame based on the title attribute.
 func (f *Frame) GetByTitle(title string, opts *GetByBaseOptions) *Locator {
 	f.log.Debugf("Frame:GetByTitle", "fid:%s furl:%q title:%q opts:%+v", f.ID(), f.URL(), title, opts)
 
-	return f.Locator("internal:attr="+f.buildAttributeSelector("title", title, opts), nil)
+	return f.Locator(f.buildAttributeSelector("title", title, opts), nil)
 }
 
 // GetByTestID creates and returns a new locator for this frame based on the data-testid attribute.
 func (f *Frame) GetByTestID(testID string) *Locator {
 	f.log.Debugf("Frame:GetByTestID", "fid:%s furl:%q testID:%q", f.ID(), f.URL(), testID)
 
-	return f.Locator("internal:attr=[data-testid="+testID+"]", nil)
+	return f.Locator(f.buildTestIDSelector(testID), nil)
 }
 
 // GetByText creates and returns a new locator for this frame based on text content.
 func (f *Frame) GetByText(text string, opts *GetByBaseOptions) *Locator {
 	f.log.Debugf("Frame:GetByText", "fid:%s furl:%q text:%q opts:%+v", f.ID(), f.URL(), text, opts)
 
-	l := "internal:text=" + text
-	if isQuotedText(text) {
-		if opts != nil && opts.Exact != nil && *opts.Exact {
-			l = "internal:text=" + text + "s"
-		} else {
-			l = "internal:text=" + text + "i"
-		}
-	}
-
-	return f.Locator(l, nil)
+	return f.Locator(f.buildTextSelector(text, opts), nil)
 }
 
 // Referrer returns the referrer of the frame from the network manager
@@ -1529,10 +1582,10 @@ func (f *Frame) ID() string {
 }
 
 // Locator creates and returns a new locator for this frame.
-func (f *Frame) Locator(selector string, opts sobek.Value) *Locator {
+func (f *Frame) Locator(selector string, opts *LocatorOptions) *Locator {
 	f.log.Debugf("Frame:Locator", "fid:%s furl:%q selector:%q opts:%+v", f.ID(), f.URL(), selector, opts)
 
-	return NewLocator(f.ctx, selector, f, f.log)
+	return NewLocator(f.ctx, opts, selector, f, f.log)
 }
 
 // LoaderID returns the ID of the frame that loaded this frame.
@@ -1983,13 +2036,10 @@ func (f *Frame) WaitForLoadState(state string, popts *FrameWaitForLoadStateOptio
 }
 
 // WaitForNavigation waits for the given navigation lifecycle event to happen.
-// jsRegexChecker should be non-nil to be able to test against a URL pattern in the options.
+// RegExMatcher should be non-nil to be able to test against a URL pattern in the options.
 //
 //nolint:funlen
-func (f *Frame) WaitForNavigation(
-	opts *FrameWaitForNavigationOptions,
-	jsRegexChecker JSRegexChecker,
-) (*Response, error) {
+func (f *Frame) WaitForNavigation(opts *FrameWaitForNavigationOptions, rm RegExMatcher) (*Response, error) {
 	f.log.Debugf("Frame:WaitForNavigation",
 		"fid:%s furl:%s url:%s", f.ID(), f.URL(), opts.URL)
 	defer f.log.Debugf("Frame:WaitForNavigation:return",
@@ -1998,7 +2048,7 @@ func (f *Frame) WaitForNavigation(
 	timeoutCtx, timeoutCancel := context.WithTimeout(f.ctx, opts.Timeout)
 
 	// Create URL matcher based on the pattern
-	matcher, err := urlMatcher(opts.URL, jsRegexChecker)
+	matcher, err := newPatternMatcher(opts.URL, rm)
 	if err != nil {
 		timeoutCancel()
 		return nil, fmt.Errorf("parsing URL pattern: %w", err)
@@ -2133,19 +2183,14 @@ func (f *Frame) WaitForTimeout(timeout int64) {
 }
 
 // WaitForURL waits for the frame to navigate to a URL matching the given pattern.
-// jsRegexChecker should be non-nil to be able to test against a URL pattern.
-func (f *Frame) WaitForURL(urlPattern string, opts *FrameWaitForURLOptions, jsRegexChecker JSRegexChecker) error {
+// RegExMatcher should be non-nil to be able to test against a URL pattern.
+func (f *Frame) WaitForURL(urlPattern string, opts *FrameWaitForURLOptions, rm RegExMatcher) error {
 	f.log.Debugf("Frame:WaitForURL", "fid:%s furl:%q pattern:%s", f.ID(), f.URL(), urlPattern)
 	defer f.log.Debugf("Frame:WaitForURL:return", "fid:%s furl:%q pattern:%s", f.ID(), f.URL(), urlPattern)
 
-	matcher, err := urlMatcher(urlPattern, jsRegexChecker)
+	matched, err := rm.Match(urlPattern, f.URL())
 	if err != nil {
-		return fmt.Errorf("parsing URL pattern: %w", err)
-	}
-
-	matched, err := matcher(f.URL())
-	if err != nil {
-		return fmt.Errorf("checking current URL: %w", err)
+		return fmt.Errorf("waiting for URL %q: %w", urlPattern, err)
 	}
 	if matched {
 		// Already at target URL, just wait for load state
@@ -2160,7 +2205,8 @@ func (f *Frame) WaitForURL(urlPattern string, opts *FrameWaitForURLOptions, jsRe
 		Timeout:   opts.Timeout,
 		WaitUntil: opts.WaitUntil,
 	}
-	_, err = f.WaitForNavigation(navOpts, jsRegexChecker)
+	_, err = f.WaitForNavigation(navOpts, rm)
+
 	return err
 }
 
@@ -2198,6 +2244,46 @@ func (f *Frame) evaluate(
 	}
 
 	return eh, nil
+}
+
+func (f *Frame) evaluateWithSelector(selector string, pageFunc string, args ...any) (any, error) {
+	f.log.Debugf("Frame:evaluateWithSelector", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
+
+	evaluate := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+		return handle.Evaluate(pageFunc, args...)
+	}
+
+	act := f.newAction(
+		selector, DOMElementStateAttached, true, evaluate, []string{}, false, true, f.defaultTimeout(),
+	)
+	v, err := call(f.ctx, act, f.defaultTimeout())
+	if err != nil {
+		return nil, errorFromDOMError(err)
+	}
+	return v, nil
+}
+
+func (f *Frame) evaluateHandleWithSelector(selector string, pageFunc string, args ...any) (JSHandleAPI, error) {
+	f.log.Debugf("Frame:evaluateHandleWithSelector", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
+
+	evaluateHandle := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+		return handle.EvaluateHandle(pageFunc, args...)
+	}
+
+	act := f.newAction(
+		selector, DOMElementStateAttached, true, evaluateHandle, []string{}, false, true, f.defaultTimeout(),
+	)
+	v, err := call(f.ctx, act, f.defaultTimeout())
+	if err != nil {
+		return nil, errorFromDOMError(err)
+	}
+
+	handle, ok := v.(JSHandleAPI)
+	if !ok {
+		return nil, fmt.Errorf("evaluating handle of %q: unexpected type %T", selector, v)
+	}
+
+	return handle, nil
 }
 
 // frameExecutionContext represents a JS execution context that belongs to Frame.

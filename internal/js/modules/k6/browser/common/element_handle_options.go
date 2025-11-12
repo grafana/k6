@@ -10,6 +10,7 @@ import (
 	"github.com/grafana/sobek"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
+	"go.k6.io/k6/js/common"
 )
 
 type ElementHandleBaseOptions struct {
@@ -22,6 +23,10 @@ type ElementHandleBasePointerOptions struct {
 	ElementHandleBaseOptions
 	Position *Position `json:"position"`
 	Trial    bool      `json:"trial"`
+
+	// We don't want to export this field. Internal use only to determine if we
+	// should retry when using locator based APIs.
+	retry bool
 }
 
 // ScrollPosition is a parameter for scrolling an element.
@@ -144,7 +149,7 @@ func NewElementHandleBaseOptions(defaultTimeout time.Duration) *ElementHandleBas
 
 // Parse parses the ElementHandleBaseOptions from the given opts.
 func (o *ElementHandleBaseOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	if !sobekValueExists(opts) {
+	if common.IsNullish(opts) {
 		return nil
 	}
 	gopts := opts.ToObject(k6ext.Runtime(ctx))
@@ -176,7 +181,7 @@ func (o *ElementHandleBasePointerOptions) Parse(ctx context.Context, opts sobek.
 	if err := o.ElementHandleBaseOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
-	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
+	if !common.IsNullish(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			switch k {
@@ -215,7 +220,7 @@ func NewElementHandleSetInputFilesOptions(defaultTimeout time.Duration) *Element
 
 // addFile to the struct. Input value can only be a file descriptor object.
 func (f *Files) addFile(ctx context.Context, file sobek.Value) error {
-	if !sobekValueExists(file) {
+	if common.IsNullish(file) {
 		return nil
 	}
 	rt := k6ext.Runtime(ctx)
@@ -237,7 +242,7 @@ func (f *Files) addFile(ctx context.Context, file sobek.Value) error {
 // Parse parses the Files struct from the given sobek.Value.
 func (f *Files) Parse(ctx context.Context, files sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
-	if !sobekValueExists(files) {
+	if common.IsNullish(files) {
 		return nil
 	}
 
@@ -283,7 +288,7 @@ func (o *ElementHandleClickOptions) Parse(ctx context.Context, opts sobek.Value)
 		return err
 	}
 
-	if !sobekValueExists(opts) {
+	if common.IsNullish(opts) {
 		return nil
 	}
 
@@ -332,7 +337,7 @@ func (o *ElementHandleDblclickOptions) Parse(ctx context.Context, opts sobek.Val
 	if err := o.ElementHandleBasePointerOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
-	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
+	if !common.IsNullish(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			switch k {
@@ -373,7 +378,7 @@ func (o *ElementHandleHoverOptions) Parse(ctx context.Context, opts sobek.Value)
 	if err := o.ElementHandleBasePointerOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
-	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
+	if !common.IsNullish(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			if k == "modifiers" {
@@ -399,7 +404,7 @@ func NewElementHandlePressOptions(defaultTimeout time.Duration) *ElementHandlePr
 // Parse parses the ElementHandlePressOptions from the given opts.
 func (o *ElementHandlePressOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
-	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
+	if !common.IsNullish(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			switch k {
@@ -435,7 +440,7 @@ func NewElementHandleScreenshotOptions(defaultTimeout time.Duration) *ElementHan
 
 // Parse parses the ElementHandleScreenshotOptions from the given opts.
 func (o *ElementHandleScreenshotOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	if !sobekValueExists(opts) {
+	if common.IsNullish(opts) {
 		return nil
 	}
 
@@ -485,7 +490,7 @@ func (o *ElementHandleSetCheckedOptions) Parse(ctx context.Context, opts sobek.V
 		return err
 	}
 
-	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
+	if !common.IsNullish(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			if k == "strict" {
@@ -509,7 +514,7 @@ func (o *ElementHandleTapOptions) Parse(ctx context.Context, opts sobek.Value) e
 	if err := o.ElementHandleBasePointerOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
-	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
+	if !common.IsNullish(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			if k == "modifiers" {
@@ -535,7 +540,7 @@ func NewElementHandleTypeOptions(defaultTimeout time.Duration) *ElementHandleTyp
 // Parse parses the ElementHandleTypeOptions from the given opts.
 func (o *ElementHandleTypeOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
-	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
+	if !common.IsNullish(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			switch k {
@@ -568,7 +573,7 @@ func NewElementHandleWaitForElementStateOptions(defaultTimeout time.Duration) *E
 // Parse parses the ElementHandleWaitForElementStateOptions from the given opts.
 func (o *ElementHandleWaitForElementStateOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
-	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
+	if !common.IsNullish(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			if k == "timeout" {

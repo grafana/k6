@@ -289,12 +289,12 @@ func TestRemoteFilePersister(t *testing.T) {
 						_ = file.Close()
 					})
 					cd := header.Header.Get("Content-Disposition")
-					assert.Equal(t, cd, `form-data; name="file"; filename="`+basePath+`/`+tt.path+`"`)
+					assert.Equal(t, `form-data; name="file"; filename="`+basePath+`/`+tt.path+`"`, cd)
 
 					// Does the file content match the expected data?
 					bb, err := io.ReadAll(file)
 					require.NoError(t, err)
-					assert.Equal(t, string(bb), tt.dataToUpload)
+					assert.Equal(t, tt.dataToUpload, string(bb))
 
 					// Is the content type set correctly to the binary data?
 					assert.Equal(t, "application/octet-stream", header.Header.Get("Content-Type"))

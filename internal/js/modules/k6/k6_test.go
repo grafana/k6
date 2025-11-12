@@ -94,13 +94,13 @@ func TestGroup(t *testing.T) {
 		require.NoError(t, tc.testRuntime.VU.Runtime().Set("fn", func() {
 			groupTag, ok := state.Tags.GetCurrentValues().Tags.Get("group")
 			require.True(t, ok)
-			assert.Equal(t, groupTag, "::my group")
+			assert.Equal(t, "::my group", groupTag)
 		}))
 		_, err := tc.testRuntime.RunOnEventLoop(`k6.group("my group", fn)`)
 		assert.NoError(t, err)
 		groupTag, ok := state.Tags.GetCurrentValues().Tags.Get("group")
 		require.True(t, ok)
-		assert.Equal(t, groupTag, "")
+		assert.Equal(t, "", groupTag)
 	})
 
 	t.Run("Invalid", func(t *testing.T) {

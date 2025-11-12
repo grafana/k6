@@ -67,7 +67,7 @@ func TestRampingVUsConfigValidation(t *testing.T) {
 		}
 
 		errs := c.Validate()
-		require.Equal(t, 2, len(errs))
+		require.Len(t, errs, 2)
 		assert.Contains(t, errs[0].Error(), "the startVUs exceed max limit of")
 
 		assert.Contains(t, errs[1].Error(), "target for stage 1 exceeds max limit of")

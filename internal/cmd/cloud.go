@@ -25,6 +25,15 @@ import (
 	"github.com/spf13/pflag"
 )
 
+// errUserUnauthenticated represents an authentication error when trying to use
+// Grafana Cloud k6 without being logged in or having a valid token.
+//
+//nolint:staticcheck // the error is shown to the user so here punctuation and capital are required
+var errUserUnauthenticated = errors.New("To run tests with Grafana Cloud k6, you must first authenticate." +
+	" Run the `k6 cloud login` command, or check the docs" +
+	" https://grafana.com/docs/grafana-cloud/testing/k6/author-run/tokens-and-cli-authentication" +
+	" for additional authentication methods.")
+
 // cmdCloud handles the `k6 cloud` sub-command
 type cmdCloud struct {
 	gs *state.GlobalState
@@ -76,14 +85,6 @@ func (c *cmdCloud) preRun(cmd *cobra.Command, _ []string) error {
 //
 //nolint:funlen,gocognit,cyclop
 func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
-	printBanner(c.gs)
-
-	progressBar := pb.New(
-		pb.WithConstLeft("Init"),
-		pb.WithConstProgress(0, "Loading test script..."),
-	)
-	printBar(c.gs, progressBar)
-
 	test, err := loadAndConfigureLocalTest(c.gs, cmd, args, getPartialConfig)
 	if err != nil {
 		return err
@@ -102,6 +103,13 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	// TODO: validate for usage of execution segment
 	// TODO: validate for externally controlled executor (i.e. executors that aren't distributable)
 	// TODO: move those validations to a separate function and reuse validateConfig()?
+	printBanner(c.gs)
+
+	progressBar := pb.New(
+		pb.WithConstLeft("Init"),
+		pb.WithConstProgress(0, "Loading test script..."),
+	)
+	printBar(c.gs, progressBar)
 
 	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Building the archive..."))
 	arc := testRunState.Runner.MakeArchive()
@@ -118,10 +126,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if !cloudConfig.Token.Valid {
-		return errors.New(
-			"not logged in, please login first to the Grafana Cloud k6 " +
-				"using the \"k6 cloud login\" command",
-		)
+		return errUserUnauthenticated
 	}
 
 	// Display config warning if needed

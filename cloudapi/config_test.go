@@ -57,7 +57,7 @@ func TestGetConsolidatedConfig(t *testing.T) {
 	t.Parallel()
 	config, warn, err := GetConsolidatedConfig(json.RawMessage(`{"token":"jsonraw"}`), nil, "", nil, nil)
 	require.NoError(t, err)
-	require.Equal(t, config.Token.String, "jsonraw")
+	require.Equal(t, "jsonraw", config.Token.String)
 	require.Empty(t, warn)
 
 	config, warn, err = GetConsolidatedConfig(
@@ -68,7 +68,7 @@ func TestGetConsolidatedConfig(t *testing.T) {
 		nil,
 	)
 	require.NoError(t, err)
-	require.Equal(t, config.Token.String, "ext")
+	require.Equal(t, "ext", config.Token.String)
 	require.Empty(t, warn)
 
 	config, warn, err = GetConsolidatedConfig(
@@ -79,7 +79,7 @@ func TestGetConsolidatedConfig(t *testing.T) {
 		nil,
 	)
 	require.NoError(t, err)
-	require.Equal(t, config.Token.String, "envvalue")
+	require.Equal(t, "envvalue", config.Token.String)
 	require.Empty(t, warn)
 }
 
@@ -89,13 +89,13 @@ func TestGetConsolidatedConfig_WithLegacyOnly(t *testing.T) {
 	config, warn, err := GetConsolidatedConfig(json.RawMessage(`{"token":"jsonraw"}`), nil, "", nil,
 		map[string]json.RawMessage{"loadimpact": json.RawMessage(`{"token":"ext"}`)})
 	require.NoError(t, err)
-	require.Equal(t, config.Token.String, "ext")
+	require.Equal(t, "ext", config.Token.String)
 	require.NotEmpty(t, warn)
 
 	config, warn, err = GetConsolidatedConfig(json.RawMessage(`{"token":"jsonraw"}`), map[string]string{"K6_CLOUD_TOKEN": "envvalue"}, "", nil,
 		map[string]json.RawMessage{"loadimpact": json.RawMessage(`{"token":"ext"}`)})
 	require.NoError(t, err)
-	require.Equal(t, config.Token.String, "envvalue")
+	require.Equal(t, "envvalue", config.Token.String)
 	require.NotEmpty(t, warn)
 }
 
@@ -111,7 +111,7 @@ func TestGetConsolidatedConfig_LegacyHasLowerPriority(t *testing.T) {
 	)
 
 	require.NoError(t, err)
-	require.Equal(t, config.Token.String, "cloud")
+	require.Equal(t, "cloud", config.Token.String)
 	require.Empty(t, warn)
 }
 
@@ -127,6 +127,6 @@ func TestGetConsolidatedConfig_EnvHasHigherPriority(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	require.Equal(t, config.Token.String, "envvalue")
+	require.Equal(t, "envvalue", config.Token.String)
 	require.Empty(t, warn)
 }

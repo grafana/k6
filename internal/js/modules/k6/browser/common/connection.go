@@ -513,6 +513,7 @@ func (c *Connection) send(
 		case res != nil:
 			return jsonv2.Unmarshal(msg.Result, res, defaultJSONV2Options)
 		}
+		return nil
 	case err := <-c.errorCh:
 		c.logger.Debugf("Connection:send:<-c.errorCh #2", "sid:%v tid:%v wsURL:%q, err:%v", msg.SessionID, tid, c.wsURL, err)
 		return err
@@ -615,9 +616,7 @@ func (c *Connection) Execute(
 					case <-evCancelCtx.Done():
 						c.logger.Debugf("connection:Execute:<-evCancelCtx.Done()#2", "wsURL:%q err:%v", c.wsURL, evCancelCtx.Err())
 					case ch <- msg:
-						// We expect only one response with the matching message ID,
-						// then remove event handler by cancelling context and stopping goroutine.
-						evCancelFn()
+						// Stopping goroutine as we expect only one response with the matching message ID
 						return
 					}
 				}
@@ -657,6 +656,5 @@ func (c *Connection) isClosing() (s bool) {
 		s = true
 	default:
 	}
-
-	return
+	return s
 }

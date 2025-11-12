@@ -5,7 +5,7 @@ import (
 )
 
 // mapConsoleMessage to the JS module.
-func mapConsoleMessage(vu moduleVU, event common.PageOnEvent) mapping {
+func mapConsoleMessage(vu moduleVU, event common.PageEvent) mapping {
 	cm := event.ConsoleMessage
 
 	return mapping{

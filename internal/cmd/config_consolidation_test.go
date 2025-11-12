@@ -182,7 +182,7 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 			verifySharedIters(I(1), I(6))(t, c)
 			sharedIterConfig, ok := c.Scenarios[lib.DefaultScenarioName].(executor.SharedIterationsConfig)
 			require.True(t, ok)
-			assert.Equal(t, sharedIterConfig.MaxDuration.TimeDuration(), 10*time.Second)
+			assert.Equal(t, 10*time.Second, sharedIterConfig.MaxDuration.TimeDuration())
 		}},
 		// This should get a validation error since VUs are more than the shared iterations
 		{opts{cli: []string{"--vus", "10", "-i", "6"}}, exp{validationErrors: true}, verifySharedIters(I(10), I(6))},

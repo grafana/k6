@@ -27,7 +27,7 @@ func TestChangePathFs(t *testing.T) {
 			return name[len(prefix):], nil
 		}))
 
-		require.Equal(t, c.Name(), "ChangePathFs")
+		require.Equal(t, "ChangePathFs", c.Name())
 		f, err := c.Create(filePath)
 		require.NoError(t, err)
 		require.Equal(t, filePath, f.Name())

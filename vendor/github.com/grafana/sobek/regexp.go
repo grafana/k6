@@ -2,13 +2,15 @@ package sobek
 
 import (
 	"fmt"
-	"github.com/dlclark/regexp2"
-	"github.com/grafana/sobek/unistring"
 	"io"
 	"regexp"
 	"sort"
 	"strings"
 	"unicode/utf16"
+
+	"github.com/dlclark/regexp2"
+
+	"github.com/grafana/sobek/unistring"
 )
 
 type regexp2MatchCache struct {
@@ -538,33 +540,21 @@ func (r *regexpObject) getLastIndex() int64 {
 	return lastIndex
 }
 
-func (r *regexpObject) updateLastIndex(index int64, firstResult, lastResult []int) bool {
-	if r.pattern.sticky {
-		if firstResult == nil || int64(firstResult[0]) != index {
-			r.setOwnStr("lastIndex", intToValue(0), true)
-			return false
-		}
-	} else {
-		if firstResult == nil {
-			if r.pattern.global {
-				r.setOwnStr("lastIndex", intToValue(0), true)
-			}
-			return false
-		}
-	}
-
-	if r.pattern.global || r.pattern.sticky {
-		r.setOwnStr("lastIndex", intToValue(int64(lastResult[1])), true)
-	}
-	return true
-}
-
 func (r *regexpObject) execRegexp(target String) (match bool, result []int) {
 	index := r.getLastIndex()
 	if index >= 0 && index <= int64(target.Length()) {
 		result = r.pattern.findSubmatchIndex(target, int(index))
 	}
-	match = r.updateLastIndex(index, result, result)
+	match = len(result) > 0 && (!r.pattern.sticky || int64(result[0]) == index)
+
+	if r.pattern.global || r.pattern.sticky {
+		var newLastIndex int64
+		if match {
+			newLastIndex = int64(result[1])
+		}
+		r.setOwnStr("lastIndex", intToValue(newLastIndex), true)
+	}
+
 	return
 }
 

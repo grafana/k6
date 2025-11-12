@@ -16,7 +16,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"go.k6.io/k6/internal/usage"
-	"go.k6.io/k6/lib"
 )
 
 // A Compiler compiles JavaScript or TypeScript source code into a sobek.Program
@@ -44,8 +43,7 @@ func (c *Compiler) WithUsage(u *usage.Usage) {
 
 // Options are options to the compiler
 type Options struct {
-	CompatibilityMode lib.CompatibilityMode
-	SourceMapLoader   func(string) ([]byte, error)
+	SourceMapLoader func(string) ([]byte, error)
 }
 
 // parsingState is helper struct to keep the state of a parsing
@@ -53,12 +51,11 @@ type parsingState struct {
 	// set when we couldn't load external source map so we can try parsing without loading it
 	couldntLoadSourceMap bool
 	// srcMap is the current full sourceMap that has been generated read so far
-	srcMap            []byte
-	srcMapError       error
-	commonJSWrapped   bool // whether the original source is wrapped in a function to make it a CommonJS module
-	compatibilityMode lib.CompatibilityMode
-	compiler          *Compiler
-	esm               bool
+	srcMap          []byte
+	srcMapError     error
+	commonJSWrapped bool // whether the original source is wrapped in a function to make it a CommonJS module
+	compiler        *Compiler
+	esm             bool
 
 	loader func(string) ([]byte, error)
 }
@@ -70,11 +67,10 @@ func (c *Compiler) Parse(
 	src, filename string, commonJSWrap bool, esm bool,
 ) (prg *ast.Program, finalCode string, err error) {
 	state := &parsingState{
-		loader:            c.Options.SourceMapLoader,
-		compatibilityMode: c.Options.CompatibilityMode,
-		commonJSWrapped:   commonJSWrap,
-		compiler:          c,
-		esm:               esm,
+		loader:          c.Options.SourceMapLoader,
+		commonJSWrapped: commonJSWrap,
+		compiler:        c,
+		esm:             esm,
 	}
 	return state.parseImpl(src, filename, commonJSWrap)
 }
@@ -119,23 +115,29 @@ func (ps *parsingState) parseImpl(src, filename string, commonJSWrap bool) (*ast
 		return prg, code, nil
 	}
 
-	if strings.HasSuffix(filename, ".ts") {
-		if err := ps.compiler.usage.Uint64(usageParsedTSFilesKey, 1); err != nil {
-			ps.compiler.logger.WithError(err).Warn("couldn't report usage for " + usageParsedTSFilesKey)
-		}
-		code, ps.srcMap, err = StripTypes(src, filename)
-		if err != nil {
-			return nil, "", err
-		}
-		if ps.loader != nil {
-			// This hack is required for the source map to work
-			code += "\n//# sourceMappingURL=" + internalSourceMapURL
-		}
-		ps.commonJSWrapped = false
-		ps.compatibilityMode = lib.CompatibilityModeBase
-		return ps.parseImpl(code, filename, commonJSWrap)
+	isTsExtensionFile := strings.HasSuffix(filename, ".ts")
+	isStdin := filename == "file:///-"
+	if !isTsExtensionFile && !isStdin {
+		return nil, "", err
 	}
-	return nil, "", err
+
+	code, ps.srcMap, err = StripTypes(src, filename)
+	if err != nil {
+		return nil, "", err
+	}
+
+	// At this point we have stripped types successfully, no matter whether it was a .ts file
+	// or a script from stdin, and so we can report that a TS file been parsed successfully.
+	if err := ps.compiler.usage.Uint64(usageParsedTSFilesKey, 1); err != nil {
+		ps.compiler.logger.WithError(err).Warn("couldn't report usage for " + usageParsedTSFilesKey)
+	}
+
+	if ps.loader != nil {
+		// This hack is required for the source map to work
+		code += "\n//# sourceMappingURL=" + internalSourceMapURL
+	}
+	ps.commonJSWrapped = false
+	return ps.parseImpl(code, filename, commonJSWrap)
 }
 
 func (ps *parsingState) wrap(code, filename string) string {

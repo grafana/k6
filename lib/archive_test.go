@@ -268,7 +268,7 @@ func TestUsingCacheFromCacheOnReadFs(t *testing.T) {
 
 	data, err := fsext.ReadFile(newArc.Filesystems["file"], "/correct")
 	require.NoError(t, err)
-	require.Equal(t, string(data), "test")
+	require.Equal(t, "test", string(data))
 
 	data, err = fsext.ReadFile(newArc.Filesystems["file"], "/wrong")
 	require.Error(t, err)
@@ -301,7 +301,7 @@ func TestMalformedMetadata(t *testing.T) {
 	require.NoError(t, err)
 	_, err = ReadArchive(b)
 	require.Error(t, err)
-	require.Equal(t, err.Error(), `invalid character ',' looking for beginning of object key string`)
+	require.EqualError(t, err, `invalid character ',' looking for beginning of object key string`)
 }
 
 func TestStrangePaths(t *testing.T) {
@@ -378,5 +378,5 @@ func TestStdinArchive(t *testing.T) {
 
 	data, err := fsext.ReadFile(newArc.Filesystems["file"], "/-")
 	require.NoError(t, err)
-	require.Equal(t, string(data), "test")
+	require.Equal(t, "test", string(data))
 }

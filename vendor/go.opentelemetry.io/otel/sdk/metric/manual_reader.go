@@ -129,7 +129,7 @@ func (mr *ManualReader) Collect(ctx context.Context, rm *metricdata.ResourceMetr
 }
 
 // MarshalLog returns logging data about the ManualReader.
-func (r *ManualReader) MarshalLog() interface{} {
+func (r *ManualReader) MarshalLog() any {
 	r.mu.Lock()
 	down := r.isShutdown
 	r.mu.Unlock()

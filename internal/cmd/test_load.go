@@ -4,18 +4,27 @@ import (
 	"archive/tar"
 	"bytes"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"io"
+	"maps"
+	"net/url"
 	"path/filepath"
+	"slices"
+	"strings"
 	"sync"
 	"syscall"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
+	"go.k6.io/k6/ext"
+	"go.k6.io/k6/internal/build"
 	"go.k6.io/k6/internal/js"
 	"go.k6.io/k6/internal/loader"
 	"go.k6.io/k6/js/modules"
@@ -67,7 +76,7 @@ func loadLocalTest(gs *state.GlobalState, cmd *cobra.Command, args []string) (*l
 	}
 
 	if runtimeOptions.CompatibilityMode.String == lib.CompatibilityModeExperimentalEnhanced.String() {
-		gs.Logger.Warnf("ComaptibilityMode %[1]q is deprecated. Types are stripped by default for `.ts` files. "+
+		gs.Logger.Warnf("CompatibilityMode %[1]q is deprecated. Types are stripped by default for `.ts` files. "+
 			"Please move to using %[2]q instead as %[1]q will be removed in the future",
 			lib.CompatibilityModeExperimentalEnhanced.String(), lib.CompatibilityModeBase.String())
 	}
@@ -134,8 +143,18 @@ func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
 	}
 	switch testType {
 	case testTypeJS:
+		specifier := lt.source.URL.String()
+		pwd := lt.source.URL.JoinPath("../")
 		logger.Debug("Trying to load as a JS test...")
-		runner, err := js.New(lt.preInitState, lt.source, lt.fileSystems)
+		moduleResolver := js.NewModuleResolver(pwd, lt.preInitState, lt.fileSystems)
+		err := errext.WithExitCodeIfNone(
+			moduleResolver.LoadMainModule(pwd, specifier, lt.source.Data),
+			exitcodes.ScriptException)
+		err = tryResolveModulesExtensions(err, moduleResolver.Imported(), logger, lt.fileSystems, lt.source, gs)
+		if err != nil {
+			return fmt.Errorf("could not load JS test '%s': %w", testPath, err)
+		}
+		runner, err := js.New(lt.preInitState, lt.source, lt.fileSystems, moduleResolver)
 		// TODO: should we use common.UnwrapGojaInterruptedError() here?
 		if err != nil {
 			return fmt.Errorf("could not load JS test '%s': %w", testPath, err)
@@ -157,7 +176,17 @@ func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
 		switch arc.Type {
 		case testTypeJS:
 			logger.Debug("Evaluating JS from archive bundle...")
-			runner, err := js.NewFromArchive(lt.preInitState, arc)
+			specifier := arc.Filename
+			pwd := arc.PwdURL
+			moduleResolver := js.NewModuleResolver(pwd, lt.preInitState, arc.Filesystems)
+			err := errext.WithExitCodeIfNone(
+				moduleResolver.LoadMainModule(pwd, specifier, arc.Data),
+				exitcodes.ScriptException)
+			err = tryResolveModulesExtensions(err, moduleResolver.Imported(), logger, arc.Filesystems, lt.source, gs)
+			if err != nil {
+				return fmt.Errorf("could not load JS test '%s': %w", testPath, err)
+			}
+			runner, err := js.NewFromArchive(lt.preInitState, arc, moduleResolver)
 			if err != nil {
 				return fmt.Errorf("could not load JS from test archive bundle '%s': %w", testPath, err)
 			}
@@ -170,6 +199,134 @@ func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
 	default:
 		return fmt.Errorf("unknown or unspecified test type '%s' for '%s'", testType, testPath)
 	}
+}
+
+func tryResolveModulesExtensions(
+	originalError error, imports []string, logger logrus.FieldLogger,
+	fileSystems map[string]fsext.Fs, source *loader.SourceData, gs *state.GlobalState,
+) error {
+	if !gs.Flags.AutoExtensionResolution {
+		return originalError
+	}
+
+	deps, err := extractUnknownModules(originalError)
+	if err != nil {
+		return err
+	}
+	err = analyseUseContraints(imports, fileSystems, deps)
+	if err != nil {
+		return err
+	}
+	if len(deps) == 0 {
+		return nil
+	}
+	if !isCustomBuildRequired(deps, build.Version, ext.GetAll()) {
+		logger.
+			Debug("The current k6 binary already satisfies all the required dependencies," +
+				" it isn't required to provision a new binary.")
+		return nil
+	}
+
+	if source.URL.Path == "/-" {
+		gs.Stdin = bytes.NewBuffer(source.Data)
+	}
+
+	return binaryIsNotSatisfyingDependenciesError{
+		deps: deps,
+	}
+}
+
+func analyseUseContraints(imports []string, fileSystems map[string]fsext.Fs, deps dependencies) error {
+	for _, imported := range imports {
+		if strings.HasPrefix(imported, "k6") {
+			continue
+		}
+		u, err := url.Parse(imported)
+		if err != nil {
+			panic(err)
+		}
+		// We always have URLs here with scheme and everything
+		_, path, _ := strings.Cut(imported, "://")
+		if u.Scheme == "https" {
+			path = "/" + path
+		}
+		data, err := fsext.ReadFile(fileSystems[u.Scheme], path)
+		if err != nil {
+			panic(err)
+		}
+		err = processUseDirectives(imported, data, deps)
+		if err != nil {
+			panic(err)
+		}
+	}
+	return nil
+}
+
+type dependencies map[string]*semver.Constraints
+
+func (d dependencies) update(dep, constraintStr string) error {
+	var constraint *semver.Constraints
+	var err error
+	if len(constraintStr) > 0 {
+		constraint, err = semver.NewConstraint(constraintStr)
+		if err != nil {
+			return fmt.Errorf("unparsable constraint %q for %q", constraintStr, dep)
+		}
+	}
+	// TODO: We could actually do constraint comparison here and get the more specific one
+	oldConstraint, ok := d[dep]
+	if !ok || oldConstraint == nil { // either nothing or it didn't have constraint
+		d[dep] = constraint
+		return nil
+	}
+	if constraint == oldConstraint || constraint == nil {
+		return nil
+	}
+	return fmt.Errorf("already have constraint for %q, when parsing %q", dep, constraint)
+}
+
+func (d dependencies) String() string {
+	var buf bytes.Buffer
+
+	for idx, depName := range slices.Sorted(maps.Keys(d)) {
+		if idx > 0 {
+			_ = buf.WriteByte(';')
+		}
+
+		buf.WriteString(depName)
+		constraint := d[depName]
+		if constraint != nil {
+			buf.WriteString(constraint.String())
+		}
+	}
+	return buf.String()
+}
+
+func extractUnknownModules(err error) (map[string]*semver.Constraints, error) {
+	deps := make(map[string]*semver.Constraints)
+	if err == nil {
+		return deps, nil
+	}
+
+	var u modules.UnknownModulesError
+
+	if errors.As(err, &u) {
+		for _, name := range u.List() {
+			deps[name] = nil
+		}
+		return deps, nil
+	}
+
+	return nil, err
+}
+
+// TODO(@mstoykov) potentially figure out some less "exceptionl workflow" solution
+type binaryIsNotSatisfyingDependenciesError struct {
+	deps dependencies
+}
+
+func (r binaryIsNotSatisfyingDependenciesError) Error() string {
+	return fmt.Sprintf("binary does not satisfy dependencies %q", r.deps)
 }
 
 // readSource is a small wrapper around loader.ReadSource returning

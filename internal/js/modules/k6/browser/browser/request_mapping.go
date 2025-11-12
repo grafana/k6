@@ -4,10 +4,9 @@ import (
 	"github.com/grafana/sobek"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/common"
-	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
 )
 
-func mapRequestEvent(vu moduleVU, event common.PageOnEvent) mapping {
+func mapRequestEvent(vu moduleVU, event common.PageEvent) mapping {
 	r := event.Request
 
 	return mapRequest(vu, r)
@@ -18,7 +17,7 @@ func mapRequest(vu moduleVU, r *common.Request) mapping {
 	rt := vu.Runtime()
 	maps := mapping{
 		"allHeaders": func() *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return r.AllHeaders(), nil
 			})
 		},
@@ -27,7 +26,7 @@ func mapRequest(vu moduleVU, r *common.Request) mapping {
 			return rt.ToValue(mf).ToObject(rt)
 		},
 		"headerValue": func(name string) *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				v, ok := r.HeaderValue(name)
 				if !ok {
 					return nil, nil
@@ -38,7 +37,7 @@ func mapRequest(vu moduleVU, r *common.Request) mapping {
 		},
 		"headers": r.Headers,
 		"headersArray": func() *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return r.HeadersArray(), nil
 			})
 		},
@@ -60,7 +59,7 @@ func mapRequest(vu moduleVU, r *common.Request) mapping {
 		},
 		"resourceType": r.ResourceType,
 		"response": func() *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				resp := r.Response()
 				if resp == nil {
 					return nil, nil

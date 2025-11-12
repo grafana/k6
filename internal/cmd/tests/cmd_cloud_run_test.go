@@ -208,6 +208,7 @@ func makeTestState(tb testing.TB, script string, cliFlags []string, expExitCode 
 	require.NoError(tb, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test.js"), []byte(script), 0o644))
 	ts.CmdArgs = append(append([]string{"k6", "cloud", "run"}, cliFlags...), "test.js")
 	ts.ExpectedExitCode = int(expExitCode)
+	ts.Env["K6_CLOUD_TOKEN"] = "foo" // doesn't matter, we mock the cloud
 
 	return ts
 }

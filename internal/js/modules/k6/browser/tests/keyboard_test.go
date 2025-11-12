@@ -105,7 +105,8 @@ func TestKeyboardPress(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Make sure the h1 header is "Page 1"
-		text, err := p.Locator("h1", nil).InnerText(nil)
+		h1 := p.Locator("h1", nil)
+		text, err := h1.InnerText(common.NewFrameInnerTextOptions(h1.Timeout()))
 		assert.NoError(t, err)
 		assert.Equal(t, "Page 1", text)
 
@@ -147,7 +148,8 @@ func TestKeyboardPress(t *testing.T) {
 		assert.NoError(t, newTab.WaitForLoadState("load", common.NewFrameWaitForLoadStateOptions(p.MainFrame().Timeout())))
 
 		// Make sure the newTab has a different h1 heading.
-		text, err = newTab.Locator("h1", nil).InnerText(nil)
+		h1 = newTab.Locator("h1", nil)
+		text, err = h1.InnerText(common.NewFrameInnerTextOptions(h1.Timeout()))
 		assert.NoError(t, err)
 		assert.Equal(t, "Page 2", text)
 

@@ -14,7 +14,7 @@ import (
 
 // FixedSizeReservoirProvider returns a provider of [FixedSizeReservoir].
 func FixedSizeReservoirProvider(k int) ReservoirProvider {
-	return func(_ attribute.Set) Reservoir {
+	return func(attribute.Set) Reservoir {
 		return NewFixedSizeReservoir(k)
 	}
 }
@@ -56,7 +56,7 @@ func newFixedSizeReservoir(s *storage) *FixedSizeReservoir {
 
 // randomFloat64 returns, as a float64, a uniform pseudo-random number in the
 // open interval (0.0,1.0).
-func (r *FixedSizeReservoir) randomFloat64() float64 {
+func (*FixedSizeReservoir) randomFloat64() float64 {
 	// TODO: Use an algorithm that avoids rejection sampling. For example:
 	//
 	//   const precision = 1 << 53 // 2^53
@@ -125,13 +125,11 @@ func (r *FixedSizeReservoir) Offer(ctx context.Context, t time.Time, n Value, a 
 
 	if int(r.count) < cap(r.store) {
 		r.store[r.count] = newMeasurement(ctx, t, n, a)
-	} else {
-		if r.count == r.next {
-			// Overwrite a random existing measurement with the one offered.
-			idx := int(rand.Int64N(int64(cap(r.store))))
-			r.store[idx] = newMeasurement(ctx, t, n, a)
-			r.advance()
-		}
+	} else if r.count == r.next {
+		// Overwrite a random existing measurement with the one offered.
+		idx := int(rand.Int64N(int64(cap(r.store))))
+		r.store[idx] = newMeasurement(ctx, t, n, a)
+		r.advance()
 	}
 	r.count++
 }

@@ -456,43 +456,43 @@ func (p *GetAppIDParams) Do(ctx context.Context) (appID string, recommendedID st
 	return res.AppID, res.RecommendedID, nil
 }
 
-// GetAdScriptAncestryIDsParams [no description].
-type GetAdScriptAncestryIDsParams struct {
+// GetAdScriptAncestryParams [no description].
+type GetAdScriptAncestryParams struct {
 	FrameID cdp.FrameID `json:"frameId"`
 }
 
-// GetAdScriptAncestryIDs [no description].
+// GetAdScriptAncestry [no description].
 //
-// See: https://chromedevtools.github.io/devtools-protocol/tot/Page#method-getAdScriptAncestryIds
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Page#method-getAdScriptAncestry
 //
 // parameters:
 //
 //	frameID
-func GetAdScriptAncestryIDs(frameID cdp.FrameID) *GetAdScriptAncestryIDsParams {
-	return &GetAdScriptAncestryIDsParams{
+func GetAdScriptAncestry(frameID cdp.FrameID) *GetAdScriptAncestryParams {
+	return &GetAdScriptAncestryParams{
 		FrameID: frameID,
 	}
 }
 
-// GetAdScriptAncestryIDsReturns return values.
-type GetAdScriptAncestryIDsReturns struct {
-	AdScriptAncestryIDs []*AdScriptID `json:"adScriptAncestryIds,omitempty,omitzero"` // The ancestry chain of ad script identifiers leading to this frame's creation, ordered from the most immediate script (in the frame creation stack) to more distant ancestors (that created the immediately preceding script). Only sent if frame is labelled as an ad and ids are available.
+// GetAdScriptAncestryReturns return values.
+type GetAdScriptAncestryReturns struct {
+	AdScriptAncestry *AdScriptAncestry `json:"adScriptAncestry,omitempty,omitzero"` // The ancestry chain of ad script identifiers leading to this frame's creation, along with the root script's filterlist rule. The ancestry chain is ordered from the most immediate script (in the frame creation stack) to more distant ancestors (that created the immediately preceding script). Only sent if frame is labelled as an ad and ids are available.
 }
 
-// Do executes Page.getAdScriptAncestryIds against the provided context.
+// Do executes Page.getAdScriptAncestry against the provided context.
 //
 // returns:
 //
-//	adScriptAncestryIDs - The ancestry chain of ad script identifiers leading to this frame's creation, ordered from the most immediate script (in the frame creation stack) to more distant ancestors (that created the immediately preceding script). Only sent if frame is labelled as an ad and ids are available.
-func (p *GetAdScriptAncestryIDsParams) Do(ctx context.Context) (adScriptAncestryIDs []*AdScriptID, err error) {
+//	adScriptAncestry - The ancestry chain of ad script identifiers leading to this frame's creation, along with the root script's filterlist rule. The ancestry chain is ordered from the most immediate script (in the frame creation stack) to more distant ancestors (that created the immediately preceding script). Only sent if frame is labelled as an ad and ids are available.
+func (p *GetAdScriptAncestryParams) Do(ctx context.Context) (adScriptAncestry *AdScriptAncestry, err error) {
 	// execute
-	var res GetAdScriptAncestryIDsReturns
-	err = cdp.Execute(ctx, CommandGetAdScriptAncestryIDs, p, &res)
+	var res GetAdScriptAncestryReturns
+	err = cdp.Execute(ctx, CommandGetAdScriptAncestry, p, &res)
 	if err != nil {
 		return nil, err
 	}
 
-	return res.AdScriptAncestryIDs, nil
+	return res.AdScriptAncestry, nil
 }
 
 // GetFrameTreeParams returns present frame tree structure.
@@ -785,9 +785,10 @@ func (p NavigateParams) WithReferrerPolicy(referrerPolicy ReferrerPolicy) *Navig
 
 // NavigateReturns return values.
 type NavigateReturns struct {
-	FrameID   cdp.FrameID  `json:"frameId,omitempty,omitzero"`   // Frame id that has navigated (or failed to navigate)
-	LoaderID  cdp.LoaderID `json:"loaderId,omitempty,omitzero"`  // Loader identifier. This is omitted in case of same-document navigation, as the previously committed loaderId would not change.
-	ErrorText string       `json:"errorText,omitempty,omitzero"` // User friendly error message, present if and only if navigation has failed.
+	FrameID    cdp.FrameID  `json:"frameId,omitempty,omitzero"`   // Frame id that has navigated (or failed to navigate)
+	LoaderID   cdp.LoaderID `json:"loaderId,omitempty,omitzero"`  // Loader identifier. This is omitted in case of same-document navigation, as the previously committed loaderId would not change.
+	ErrorText  string       `json:"errorText,omitempty,omitzero"` // User friendly error message, present if and only if navigation has failed.
+	IsDownload bool         `json:"isDownload"`                   // Whether the navigation resulted in a download.
 }
 
 // Do executes Page.navigate against the provided context.
@@ -797,15 +798,16 @@ type NavigateReturns struct {
 //	frameID - Frame id that has navigated (or failed to navigate)
 //	loaderID - Loader identifier. This is omitted in case of same-document navigation, as the previously committed loaderId would not change.
 //	errorText - User friendly error message, present if and only if navigation has failed.
-func (p *NavigateParams) Do(ctx context.Context) (frameID cdp.FrameID, loaderID cdp.LoaderID, errorText string, err error) {
+//	isDownload - Whether the navigation resulted in a download.
+func (p *NavigateParams) Do(ctx context.Context) (frameID cdp.FrameID, loaderID cdp.LoaderID, errorText string, isDownload bool, err error) {
 	// execute
 	var res NavigateReturns
 	err = cdp.Execute(ctx, CommandNavigate, p, &res)
 	if err != nil {
-		return "", "", "", err
+		return "", "", "", false, err
 	}
 
-	return res.FrameID, res.LoaderID, res.ErrorText, nil
+	return res.FrameID, res.LoaderID, res.ErrorText, res.IsDownload, nil
 }
 
 // NavigateToHistoryEntryParams navigates current page to the given history
@@ -1625,7 +1627,7 @@ func (p *ClearCompilationCacheParams) Do(ctx context.Context) (err error) {
 // transaction mode.
 // https://w3c.github.io/secure-payment-confirmation/#sctn-automation-set-spc-transaction-mode.
 type SetSPCTransactionModeParams struct {
-	Mode AutoResponseMode `json:"mode"`
+	Mode SetSPCTransactionModeMode `json:"mode"`
 }
 
 // SetSPCTransactionMode sets the Secure Payment Confirmation transaction
@@ -1637,7 +1639,7 @@ type SetSPCTransactionModeParams struct {
 // parameters:
 //
 //	mode
-func SetSPCTransactionMode(mode AutoResponseMode) *SetSPCTransactionModeParams {
+func SetSPCTransactionMode(mode SetSPCTransactionModeMode) *SetSPCTransactionModeParams {
 	return &SetSPCTransactionModeParams{
 		Mode: mode,
 	}
@@ -1651,7 +1653,7 @@ func (p *SetSPCTransactionModeParams) Do(ctx context.Context) (err error) {
 // SetRPHRegistrationModeParams extensions for Custom Handlers API:
 // https://html.spec.whatwg.org/multipage/system-state.html#rph-automation.
 type SetRPHRegistrationModeParams struct {
-	Mode AutoResponseMode `json:"mode"`
+	Mode SetRPHRegistrationModeMode `json:"mode"`
 }
 
 // SetRPHRegistrationMode extensions for Custom Handlers API:
@@ -1662,7 +1664,7 @@ type SetRPHRegistrationModeParams struct {
 // parameters:
 //
 //	mode
-func SetRPHRegistrationMode(mode AutoResponseMode) *SetRPHRegistrationModeParams {
+func SetRPHRegistrationMode(mode SetRPHRegistrationModeMode) *SetRPHRegistrationModeParams {
 	return &SetRPHRegistrationModeParams{
 		Mode: mode,
 	}
@@ -1802,7 +1804,7 @@ const (
 	CommandGetAppManifest                      = "Page.getAppManifest"
 	CommandGetInstallabilityErrors             = "Page.getInstallabilityErrors"
 	CommandGetAppID                            = "Page.getAppId"
-	CommandGetAdScriptAncestryIDs              = "Page.getAdScriptAncestryIds"
+	CommandGetAdScriptAncestry                 = "Page.getAdScriptAncestry"
 	CommandGetFrameTree                        = "Page.getFrameTree"
 	CommandGetLayoutMetrics                    = "Page.getLayoutMetrics"
 	CommandGetNavigationHistory                = "Page.getNavigationHistory"

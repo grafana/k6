@@ -265,7 +265,7 @@ func (c *Client) Connect(addr string, params sobek.Value) (bool, error) {
 	}
 
 	c.addr = addr
-	c.conn, err = grpcext.Dial(ctx, addr, opts...)
+	c.conn, err = grpcext.Dial(ctx, addr, c.types, opts...)
 	if err != nil {
 		return false, err
 	}
@@ -411,7 +411,7 @@ func (c *Client) buildInvokeRequest(
 // string representations for proper JSON serialization.
 func normalizeNumberStrings(v sobek.Value, runtime *sobek.Runtime, stack []*sobek.Object) (sobek.Value, error) {
 	// If v is a primitive (not an object or array), handle it directly.
-	if v == nil || sobek.IsNull(v) || sobek.IsUndefined(v) {
+	if common.IsNullish(v) {
 		return v, nil
 	}
 

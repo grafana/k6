@@ -994,6 +994,16 @@ type NumberDataPoint struct {
 	// where this point belongs. The list may be empty (may contain 0 elements).
 	// Attribute keys MUST be unique (it is not allowed to have more than one
 	// attribute with the same key).
+	//
+	// The attribute values SHOULD NOT contain empty values.
+	// The attribute values SHOULD NOT contain bytes values.
+	// The attribute values SHOULD NOT contain array values different than array of string values, bool values, int values,
+	// double values.
+	// The attribute values SHOULD NOT contain kvlist values.
+	// The behavior of software that receives attributes containing such values can be unpredictable.
+	// These restrictions can change in a minor release.
+	// The restrictions take origin from the OpenTelemetry specification:
+	// https://github.com/open-telemetry/opentelemetry-specification/blob/v1.47.0/specification/common/README.md#attribute.
 	Attributes []*v11.KeyValue `protobuf:"bytes,7,rep,name=attributes,proto3" json:"attributes,omitempty"`
 	// StartTimeUnixNano is optional but strongly encouraged, see the
 	// the detailed comments above Metric.
@@ -1144,6 +1154,16 @@ type HistogramDataPoint struct {
 	// where this point belongs. The list may be empty (may contain 0 elements).
 	// Attribute keys MUST be unique (it is not allowed to have more than one
 	// attribute with the same key).
+	//
+	// The attribute values SHOULD NOT contain empty values.
+	// The attribute values SHOULD NOT contain bytes values.
+	// The attribute values SHOULD NOT contain array values different than array of string values, bool values, int values,
+	// double values.
+	// The attribute values SHOULD NOT contain kvlist values.
+	// The behavior of software that receives attributes containing such values can be unpredictable.
+	// These restrictions can change in a minor release.
+	// The restrictions take origin from the OpenTelemetry specification:
+	// https://github.com/open-telemetry/opentelemetry-specification/blob/v1.47.0/specification/common/README.md#attribute.
 	Attributes []*v11.KeyValue `protobuf:"bytes,9,rep,name=attributes,proto3" json:"attributes,omitempty"`
 	// StartTimeUnixNano is optional but strongly encouraged, see the
 	// the detailed comments above Metric.
@@ -1331,6 +1351,16 @@ type ExponentialHistogramDataPoint struct {
 	// where this point belongs. The list may be empty (may contain 0 elements).
 	// Attribute keys MUST be unique (it is not allowed to have more than one
 	// attribute with the same key).
+	//
+	// The attribute values SHOULD NOT contain empty values.
+	// The attribute values SHOULD NOT contain bytes values.
+	// The attribute values SHOULD NOT contain array values different than array of string values, bool values, int values,
+	// double values.
+	// The attribute values SHOULD NOT contain kvlist values.
+	// The behavior of software that receives attributes containing such values can be unpredictable.
+	// These restrictions can change in a minor release.
+	// The restrictions take origin from the OpenTelemetry specification:
+	// https://github.com/open-telemetry/opentelemetry-specification/blob/v1.47.0/specification/common/README.md#attribute.
 	Attributes []*v11.KeyValue `protobuf:"bytes,1,rep,name=attributes,proto3" json:"attributes,omitempty"`
 	// StartTimeUnixNano is optional but strongly encouraged, see the
 	// the detailed comments above Metric.
@@ -1546,6 +1576,16 @@ type SummaryDataPoint struct {
 	// where this point belongs. The list may be empty (may contain 0 elements).
 	// Attribute keys MUST be unique (it is not allowed to have more than one
 	// attribute with the same key).
+	//
+	// The attribute values SHOULD NOT contain empty values.
+	// The attribute values SHOULD NOT contain bytes values.
+	// The attribute values SHOULD NOT contain array values different than array of string values, bool values, int values,
+	// double values.
+	// The attribute values SHOULD NOT contain kvlist values.
+	// The behavior of software that receives attributes containing such values can be unpredictable.
+	// These restrictions can change in a minor release.
+	// The restrictions take origin from the OpenTelemetry specification:
+	// https://github.com/open-telemetry/opentelemetry-specification/blob/v1.47.0/specification/common/README.md#attribute.
 	Attributes []*v11.KeyValue `protobuf:"bytes,7,rep,name=attributes,proto3" json:"attributes,omitempty"`
 	// StartTimeUnixNano is optional but strongly encouraged, see the
 	// the detailed comments above Metric.

@@ -67,21 +67,21 @@ var (
 	disconnectionsMetric = expstats.RegisterInt64Count(expstats.MetricDescriptor{
 		Name:        "grpc.lb.pick_first.disconnections",
 		Description: "EXPERIMENTAL. Number of times the selected subchannel becomes disconnected.",
-		Unit:        "disconnection",
+		Unit:        "{disconnection}",
 		Labels:      []string{"grpc.target"},
 		Default:     false,
 	})
 	connectionAttemptsSucceededMetric = expstats.RegisterInt64Count(expstats.MetricDescriptor{
 		Name:        "grpc.lb.pick_first.connection_attempts_succeeded",
 		Description: "EXPERIMENTAL. Number of successful connection attempts.",
-		Unit:        "attempt",
+		Unit:        "{attempt}",
 		Labels:      []string{"grpc.target"},
 		Default:     false,
 	})
 	connectionAttemptsFailedMetric = expstats.RegisterInt64Count(expstats.MetricDescriptor{
 		Name:        "grpc.lb.pick_first.connection_attempts_failed",
 		Description: "EXPERIMENTAL. Number of failed connection attempts.",
-		Unit:        "attempt",
+		Unit:        "{attempt}",
 		Labels:      []string{"grpc.target"},
 		Default:     false,
 	})

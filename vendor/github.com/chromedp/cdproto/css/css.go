@@ -19,6 +19,7 @@ import (
 	"context"
 
 	"github.com/chromedp/cdproto/cdp"
+	"github.com/go-json-experiment/json/jsontext"
 )
 
 // AddRuleParams inserts a new rule with the given ruleText in a stylesheet
@@ -620,6 +621,39 @@ func (p *GetMatchedStylesForNodeParams) Do(ctx context.Context) (inlineStyle *St
 	}
 
 	return res.InlineStyle, res.AttributesStyle, res.MatchedCSSRules, res.PseudoElements, res.Inherited, res.InheritedPseudoElements, res.CSSKeyframesRules, res.CSSPositionTryRules, res.ActivePositionFallbackIndex, res.CSSPropertyRules, res.CSSPropertyRegistrations, res.CSSFontPaletteValuesRule, res.ParentLayoutNodeID, res.CSSFunctionRules, nil
+}
+
+// GetEnvironmentVariablesParams returns the values of the default UA-defined
+// environment variables used in env().
+type GetEnvironmentVariablesParams struct{}
+
+// GetEnvironmentVariables returns the values of the default UA-defined
+// environment variables used in env().
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/CSS#method-getEnvironmentVariables
+func GetEnvironmentVariables() *GetEnvironmentVariablesParams {
+	return &GetEnvironmentVariablesParams{}
+}
+
+// GetEnvironmentVariablesReturns return values.
+type GetEnvironmentVariablesReturns struct {
+	EnvironmentVariables jsontext.Value `json:"environmentVariables,omitempty,omitzero"`
+}
+
+// Do executes CSS.getEnvironmentVariables against the provided context.
+//
+// returns:
+//
+//	environmentVariables
+func (p *GetEnvironmentVariablesParams) Do(ctx context.Context) (environmentVariables jsontext.Value, err error) {
+	// execute
+	var res GetEnvironmentVariablesReturns
+	err = cdp.Execute(ctx, CommandGetEnvironmentVariables, nil, &res)
+	if err != nil {
+		return nil, err
+	}
+
+	return res.EnvironmentVariables, nil
 }
 
 // GetMediaQueriesParams returns all media queries parsed by the rendering
@@ -1497,6 +1531,7 @@ const (
 	CommandGetInlineStylesForNode           = "CSS.getInlineStylesForNode"
 	CommandGetAnimatedStylesForNode         = "CSS.getAnimatedStylesForNode"
 	CommandGetMatchedStylesForNode          = "CSS.getMatchedStylesForNode"
+	CommandGetEnvironmentVariables          = "CSS.getEnvironmentVariables"
 	CommandGetMediaQueries                  = "CSS.getMediaQueries"
 	CommandGetPlatformFontsForNode          = "CSS.getPlatformFontsForNode"
 	CommandGetStyleSheetText                = "CSS.getStyleSheetText"

@@ -1,0 +1,25 @@
+<html>
+
+<div id="inventory" data-testid="inventory">
+  <div class="item" data-item="bananas">
+    <span class="name">Bananas</span>
+    <span class="qty" aria-live="polite">0</span>
+    <button class="add" type="button">Add</button>
+  </div>
+  <div class="item" data-item="apples">
+    <span class="name">Apples</span>
+    <span class="qty" aria-live="polite">0</span>
+    <button class="add" type="button">Add</button>
+  </div>
+</div>
+
+<script>
+  // Increment only the clicked row’s qty
+  document.getElementById('inventory').addEventListener('click', e => {
+    const btn = e.target.closest('button.add');
+    if (!btn) return;
+    const row = btn.closest('.item');
+    const qty = row.querySelector('.qty');
+    qty.textContent = String((parseInt(qty.textContent || '0', 10) || 0) + 1);
+  });
+</script>

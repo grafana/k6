@@ -10,6 +10,7 @@ import (
 	"github.com/grafana/sobek"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
+	"go.k6.io/k6/js/common"
 )
 
 type PageEmulateMediaOptions struct {
@@ -43,7 +44,7 @@ func NewPageEmulateMediaOptions(from *Page) *PageEmulateMediaOptions {
 // Parse parses the page emulate media options.
 func (o *PageEmulateMediaOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
-	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
+	if !common.IsNullish(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			switch k {
@@ -69,7 +70,7 @@ func NewPageReloadOptions(defaultWaitUntil LifecycleEvent, defaultTimeout time.D
 // Parse parses the page reload options.
 func (o *PageReloadOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
-	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
+	if !common.IsNullish(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			switch k {
@@ -101,7 +102,7 @@ func NewPageScreenshotOptions() *PageScreenshotOptions {
 
 // Parse parses the page screenshot options.
 func (o *PageScreenshotOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	if !sobekValueExists(opts) {
+	if common.IsNullish(opts) {
 		return nil
 	}
 

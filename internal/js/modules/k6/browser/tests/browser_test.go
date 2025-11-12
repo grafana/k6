@@ -282,7 +282,7 @@ func TestMultiBrowserPanic(t *testing.T) {
 
 		func() {
 			defer func() { _ = recover() }()
-			k6ext.Panic(b1.ctx, "forcing a panic")
+			k6ext.Panicf(b1.ctx, "forcing a panic")
 		}()
 	})
 

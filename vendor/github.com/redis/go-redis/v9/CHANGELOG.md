@@ -1,3 +1,12 @@
+## Unreleased
+
+### Changed
+
+* `go-redis` won't skip span creation if the parent spans is not recording. ([#2980](https://github.com/redis/go-redis/issues/2980))
+  Users can use the OpenTelemetry sampler to control the sampling behavior.
+  For instance, you can use the `ParentBased(NeverSample())` sampler from `go.opentelemetry.io/otel/sdk/trace` to keep
+  a similar behavior (drop orphan spans) of `go-redis` as before.
+
 ## [9.0.5](https://github.com/redis/go-redis/compare/v9.0.4...v9.0.5) (2023-05-29)
 
 

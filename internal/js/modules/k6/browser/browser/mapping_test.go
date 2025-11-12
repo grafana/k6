@@ -151,6 +151,12 @@ func TestMappings(t *testing.T) {
 				return mapElementHandle(moduleVU{VU: vu}, &common.ElementHandle{})
 			},
 		},
+		"frameLocator": {
+			apiInterface: (*frameLocatorAPI)(nil),
+			mapp: func() mapping {
+				return mapFrameLocator(moduleVU{VU: vu}, &common.FrameLocator{})
+			},
+		},
 		"jsHandle": {
 			apiInterface: (*common.JSHandleAPI)(nil),
 			mapp: func() mapping {
@@ -190,7 +196,7 @@ func TestMappings(t *testing.T) {
 		"mapConsoleMessage": {
 			apiInterface: (*consoleMessageAPI)(nil),
 			mapp: func() mapping {
-				return mapConsoleMessage(moduleVU{VU: vu}, common.PageOnEvent{
+				return mapConsoleMessage(moduleVU{VU: vu}, common.PageEvent{
 					ConsoleMessage: &common.ConsoleMessage{},
 				})
 			},
@@ -198,7 +204,7 @@ func TestMappings(t *testing.T) {
 		"mapMetricEvent": {
 			apiInterface: (*metricEventAPI)(nil),
 			mapp: func() mapping {
-				return mapMetricEvent(moduleVU{VU: vu}, common.PageOnEvent{
+				return mapMetricEvent(moduleVU{VU: vu}, common.PageEvent{
 					Metric: &common.MetricEvent{},
 				})
 			},
@@ -342,7 +348,7 @@ type pageAPI interface { //nolint:interfacebloat
 	IsVisible(selector string, opts sobek.Value) (bool, error)
 	Locator(selector string, opts sobek.Value) *common.Locator
 	MainFrame() *common.Frame
-	On(event common.PageOnEventName, handler func(common.PageOnEvent) error) error
+	On(event common.PageEventName, handler func(common.PageEvent) error) error
 	Opener() pageAPI
 	Press(selector string, key string, opts sobek.Value) error
 	Query(selector string) (*common.ElementHandle, error)
@@ -365,6 +371,8 @@ type pageAPI interface { //nolint:interfacebloat
 	Title() (string, error)
 	Type(selector string, text string, opts sobek.Value) error
 	Uncheck(selector string, opts sobek.Value) error
+	Unroute(url string) error
+	UnrouteAll() error
 	URL() (string, error)
 	ViewportSize() map[string]float64
 	WaitForFunction(fn, opts sobek.Value, args ...sobek.Value) (any, error)
@@ -374,6 +382,7 @@ type pageAPI interface { //nolint:interfacebloat
 	WaitForTimeout(timeout int64)
 	WaitForURL(url string, opts sobek.Value) (*sobek.Promise, error)
 	WaitForResponse(url string, opts sobek.Value) (*sobek.Promise, error)
+	WaitForRequest(url string, opts sobek.Value) (*sobek.Promise, error)
 	Workers() []*common.Worker
 }
 
@@ -387,7 +396,7 @@ type consoleMessageAPI interface {
 
 // metricEventAPI is the interface of a metric event.
 type metricEventAPI interface {
-	Tag(matchesRegex common.K6BrowserCheckRegEx, patterns common.TagMatches) error
+	Tag(rm common.RegExMatcher, patterns common.TagMatches) error
 }
 
 // frameAPI is the interface of a CDP target frame.
@@ -406,6 +415,13 @@ type frameAPI interface { //nolint:interfacebloat
 	Focus(selector string, opts sobek.Value) error
 	FrameElement() (*common.ElementHandle, error)
 	GetAttribute(selector string, name string, opts sobek.Value) (string, bool, error)
+	GetByAltText(alt string, opts *common.GetByBaseOptions) *common.Locator
+	GetByLabel(label string, opts *common.GetByBaseOptions) *common.Locator
+	GetByPlaceholder(placeholder string, opts *common.GetByBaseOptions) *common.Locator
+	GetByRole(role string, opts *common.GetByRoleOptions) *common.Locator
+	GetByTestId(testID string) *common.Locator
+	GetByText(text string, opts *common.GetByBaseOptions) *common.Locator
+	GetByTitle(title string, opts *common.GetByBaseOptions) *common.Locator
 	Goto(url string, opts sobek.Value) (*common.Response, error)
 	Hover(selector string, opts sobek.Value) error
 	InnerHTML(selector string, opts sobek.Value) (string, error)
@@ -486,6 +502,17 @@ type elementHandleAPI interface { //nolint:interfacebloat
 	WaitForSelector(selector string, opts sobek.Value) (*common.ElementHandle, error)
 }
 
+type frameLocatorAPI interface {
+	GetByAltText(alt string, opts *common.GetByBaseOptions) *common.Locator
+	GetByLabel(label string, opts *common.GetByBaseOptions) *common.Locator
+	GetByPlaceholder(placeholder string, opts *common.GetByBaseOptions) *common.Locator
+	GetByRole(role string, opts *common.GetByRoleOptions) *common.Locator
+	GetByTestId(testID string) *common.Locator
+	GetByText(text string, opts *common.GetByBaseOptions) *common.Locator
+	GetByTitle(title string, opts *common.GetByBaseOptions) *common.Locator
+	Locator(selector string) *common.Locator
+}
+
 // requestAPI is the interface of an HTTP request.
 type requestAPI interface { //nolint:interfacebloat
 	AllHeaders() map[string]string
@@ -528,10 +555,14 @@ type responseAPI interface { //nolint:interfacebloat
 // locatorAPI represents a way to find element(s) on a page at any moment.
 type locatorAPI interface { //nolint:interfacebloat
 	All() ([]*common.Locator, error)
+	BoundingBox(opts *common.FrameBaseOptions) (*common.Rect, error)
 	Clear(opts *common.FrameFillOptions) error
 	Click(opts sobek.Value) error
+	ContentFrame() *common.FrameLocator
 	Count() (int, error)
 	Dblclick(opts sobek.Value) error
+	Evaluate(pageFunc sobek.Value, arg ...sobek.Value) (any, error)
+	EvaluateHandle(pageFunc sobek.Value, arg ...sobek.Value) (common.JSHandleAPI, error)
 	SetChecked(checked bool, opts sobek.Value) error
 	Check(opts sobek.Value) error
 	Uncheck(opts sobek.Value) error
@@ -542,13 +573,22 @@ type locatorAPI interface { //nolint:interfacebloat
 	IsVisible(opts sobek.Value) (bool, error)
 	IsHidden(opts sobek.Value) (bool, error)
 	Fill(value string, opts sobek.Value) error
+	Filter(opts *common.LocatorFilterOptions) *common.Locator
 	First() *common.Locator
 	Focus(opts sobek.Value) error
 	GetAttribute(name string, opts sobek.Value) (string, bool, error)
+	GetByRole(role string, opts *common.GetByRoleOptions) *common.Locator
+	GetByAltText(alt string, opts *common.GetByBaseOptions) *common.Locator
+	GetByLabel(label string, opts *common.GetByBaseOptions) *common.Locator
+	GetByPlaceholder(placeholder string, opts *common.GetByBaseOptions) *common.Locator
+	GetByTitle(title string, opts *common.GetByBaseOptions) *common.Locator
+	GetByTestId(testID string) *common.Locator
+	GetByText(text string, opts *common.GetByBaseOptions) *common.Locator
 	InnerHTML(opts sobek.Value) (string, error)
 	InnerText(opts sobek.Value) (string, error)
 	TextContent(opts sobek.Value) (string, bool, error)
 	InputValue(opts sobek.Value) (string, error)
+	Locator(selector string) *common.Locator
 	Last() *common.Locator
 	Nth(nth int) *common.Locator
 	SelectOption(values sobek.Value, opts sobek.Value) ([]string, error)

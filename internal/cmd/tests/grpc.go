@@ -24,7 +24,7 @@ func NewGRPC(t testing.TB) *GRPC {
 
 	addr := getFreeBindAddr(t)
 
-	lis, err := net.Listen("tcp", addr)
+	lis, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", addr)
 	if err != nil {
 		t.Fatalf("failed to listen: %v", err)
 	}

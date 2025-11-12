@@ -28,7 +28,8 @@ func TestMouseActions(t *testing.T) {
 		require.NoError(t, err)
 
 		// Simulate a click at the button coordinates
-		box := button.BoundingBox()
+		box, err := button.BoundingBox()
+		require.NoError(t, err)
 		require.NoError(t, m.Click(box.X, box.Y, common.NewMouseClickOptions()))
 
 		// Verify the button's text changed
@@ -59,7 +60,8 @@ func TestMouseActions(t *testing.T) {
 		require.NoError(t, err)
 
 		// Get the button's bounding box for accurate clicking
-		box := button.BoundingBox()
+		box, err := button.BoundingBox()
+		require.NoError(t, err)
 
 		// Simulate a double click at the button coordinates
 		require.NoError(t, m.DblClick(box.X, box.Y, common.NewMouseDblClickOptions()))
@@ -99,7 +101,8 @@ func TestMouseActions(t *testing.T) {
 		require.NoError(t, err)
 
 		// Simulate mouse move within the div
-		box := area.BoundingBox()
+		box, err := area.BoundingBox()
+		require.NoError(t, err)
 		require.NoError(t, m.Move(box.X+50, box.Y+50, common.NewMouseMoveOptions())) // Move to the center of the div
 		text, ok, err := area.TextContent()
 		require.NoError(t, err)
@@ -126,7 +129,8 @@ func TestMouseActions(t *testing.T) {
 		button, err := p.Query("button")
 		require.NoError(t, err)
 
-		box := button.BoundingBox()
+		box, err := button.BoundingBox()
+		require.NoError(t, err)
 		require.NoError(t, m.Move(box.X, box.Y, common.NewMouseMoveOptions()))
 		require.NoError(t, m.Down(common.NewMouseDownUpOptions()))
 		text, ok, err := button.TextContent()

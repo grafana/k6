@@ -8,6 +8,7 @@ import (
 	"github.com/grafana/sobek"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
+	"go.k6.io/k6/js/common"
 )
 
 // Position represents a position.
@@ -30,6 +31,11 @@ func (r *Rect) enclosingIntRect() *Rect {
 	x2 := math.Ceil(r.X + r.Width - 1e-3)
 	y2 := math.Ceil(r.Y + r.Height - 1e-3)
 	return &Rect{X: x, Y: y, Width: x2 - x, Height: y2 - y}
+}
+
+func (r Rect) contains(p Position) bool {
+	return p.X >= r.X && p.X <= r.X+r.Width &&
+		p.Y >= r.Y && p.Y <= r.Y+r.Height
 }
 
 // SelectOption represents a select option.
@@ -55,7 +61,7 @@ func (s Size) enclosingIntSize() *Size {
 // Parse size details from a given sobek viewport value.
 func (s *Size) Parse(ctx context.Context, viewport sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
-	if viewport != nil && !sobek.IsUndefined(viewport) && !sobek.IsNull(viewport) {
+	if !common.IsNullish(viewport) {
 		viewport := viewport.ToObject(rt)
 		for _, k := range viewport.Keys() {
 			switch k {

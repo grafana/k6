@@ -45,6 +45,9 @@ type RuntimeOptions struct {
 	SummaryExport null.String `json:"summaryExport"`
 	KeyWriter     null.String `json:"-"`
 	TracesOutput  null.String `json:"tracesOutput"`
+
+	// Until v2
+	NewMachineReadableSummary null.Bool `json:"newMachineReadableSummary"`
 }
 
 // ValidateCompatibilityMode checks if the provided val is a valid compatibility mode
@@ -60,5 +63,5 @@ func ValidateCompatibilityMode(val string) (cm CompatibilityMode, err error) {
 		err = fmt.Errorf(`invalid compatibility mode "%s". Use: "%s"`,
 			val, strings.Join(compatValues, `", "`))
 	}
-	return
+	return cm, err
 }

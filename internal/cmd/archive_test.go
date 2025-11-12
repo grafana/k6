@@ -171,10 +171,10 @@ func TestArchiveContainsLegacyCloudSettings(t *testing.T) {
 	require.NoError(t, json.Unmarshal(data, &metadata))
 	require.Len(t, metadata.Options.Ext.LoadImpact.Distribution, 2)
 
-	require.Equal(t, metadata.Options.Ext.LoadImpact.Distribution["one"].LoadZone, "amazon:us:ashburn")
-	require.Equal(t, metadata.Options.Ext.LoadImpact.Distribution["one"].Percent, 30.)
-	require.Equal(t, metadata.Options.Ext.LoadImpact.Distribution["two"].LoadZone, "amazon:ie:dublin")
-	require.Equal(t, metadata.Options.Ext.LoadImpact.Distribution["two"].Percent, 70.)
+	require.Equal(t, "amazon:us:ashburn", metadata.Options.Ext.LoadImpact.Distribution["one"].LoadZone)
+	require.Equal(t, 30., metadata.Options.Ext.LoadImpact.Distribution["one"].Percent)
+	require.Equal(t, "amazon:ie:dublin", metadata.Options.Ext.LoadImpact.Distribution["two"].LoadZone)
+	require.Equal(t, 70., metadata.Options.Ext.LoadImpact.Distribution["two"].Percent)
 }
 
 func TestArchiveContainsCloudSettings(t *testing.T) {
@@ -221,10 +221,10 @@ func TestArchiveContainsCloudSettings(t *testing.T) {
 	require.NoError(t, json.Unmarshal(data, &metadata))
 	require.Len(t, metadata.Options.Cloud.Distribution, 2)
 
-	require.Equal(t, metadata.Options.Cloud.Distribution["one"].LoadZone, "amazon:us:ashburn")
-	require.Equal(t, metadata.Options.Cloud.Distribution["one"].Percent, 30.)
-	require.Equal(t, metadata.Options.Cloud.Distribution["two"].LoadZone, "amazon:ie:dublin")
-	require.Equal(t, metadata.Options.Cloud.Distribution["two"].Percent, 70.)
+	require.Equal(t, "amazon:us:ashburn", metadata.Options.Cloud.Distribution["one"].LoadZone)
+	require.Equal(t, 30., metadata.Options.Cloud.Distribution["one"].Percent)
+	require.Equal(t, "amazon:ie:dublin", metadata.Options.Cloud.Distribution["two"].LoadZone)
+	require.Equal(t, 70., metadata.Options.Cloud.Distribution["two"].Percent)
 }
 
 func TestArchiveNotContainsEnv(t *testing.T) {

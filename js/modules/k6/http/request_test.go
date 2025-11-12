@@ -30,7 +30,7 @@ import (
 
 	"github.com/andybalholm/brotli"
 	"github.com/klauspost/compress/zstd"
-	"github.com/mccutchen/go-httpbin/httpbin"
+	"github.com/mccutchen/go-httpbin/v2/httpbin"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -269,16 +269,16 @@ func TestRequest(t *testing.T) {
 
 		t.Run("post body", func(t *testing.T) {
 			tb.Mux.HandleFunc("/post-redirect", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				require.Equal(t, r.Method, "POST")
+				require.Equal(t, http.MethodPost, r.Method)
 				_, _ = io.Copy(io.Discard, r.Body)
 				http.Redirect(w, r, sr("HTTPBIN_URL/post"), http.StatusPermanentRedirect)
 			}))
 			_, err := rt.RunString(sr(`
-			var res = http.post("HTTPBIN_URL/post-redirect", "pesho", {redirects: 1});
+				var res = http.post("HTTPBIN_URL/post-redirect", "pesho", {redirects: 1, headers: {"Content-Type": "text"}});
 
 			if (res.status != 200) { throw new Error("wrong status: " + res.status) }
 			if (res.url != "HTTPBIN_URL/post") { throw new Error("incorrect URL: " + res.url) }
-			if (res.json().data != "pesho") { throw new Error("incorrect data : " + res.json().data) }
+			if (res.json().data != "data:text;base64,cGVzaG8=") { throw new Error("incorrect data : " + res.json().data) }
 			`))
 			assert.NoError(t, err)
 		})
@@ -1074,13 +1074,13 @@ func TestRequest(t *testing.T) {
 			})
 
 			t.Run("name/template", func(t *testing.T) {
-				_, err := rt.RunString("http.get(http.url`" + sr(`HTTPBIN_URL/anything/${1+1}`) + "`);")
+				_, err := rt.RunString("http.get(http.url`" + sr(`HTTPBIN_URL/anythingwrong/${1+1}`) + "`);")
 				assert.NoError(t, err)
-				// There's no /anything endpoint in the go-httpbin library we're using, hence the 404,
+				// There's no /anythingwrong endpoint in the go-httpbin library we're using, hence the 404,
 				// but it doesn't matter for this test.
 				//
 				// Setting name will overwrite both name and url tags
-				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/anything/${}"), 404, "")
+				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/anythingwrong/${}"), 404, "")
 			})
 
 			t.Run("object", func(t *testing.T) {
@@ -1169,7 +1169,6 @@ func TestRequest(t *testing.T) {
 		var res = http.head("HTTPBIN_URL/get?a=1&b=2", {headers: {"X-We-Want-This": "value"}});
 		if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 		if (res.body.length != 0) { throw new Error("HEAD responses shouldn't have a body"); }
-		if (!res.headers["Content-Length"]) { throw new Error("Missing or invalid Content-Length header!"); }
 		if (res.request.headers["X-We-Want-This"] != "value") { throw new Error("Missing or invalid X-We-Want-This header!"); }
 		`))
 		assert.NoError(t, err)
@@ -1212,7 +1211,8 @@ func TestRequest(t *testing.T) {
 			_, err := rt.RunString(fmt.Sprintf(sr(`
 				var res = http.%s("HTTPBIN_URL/%s", "data", {headers: {"X-We-Want-This": "value"}});
 				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
-				if (res.json().data != "data") { throw new Error("wrong data: " + res.json().data); }
+				var expectedData = "data:application/octet-stream;base64,ZGF0YQ=="
+				if (res.json().data != expectedData) { throw new Error("wrong data: " + res.json().data); }
 				if (res.json().headers["Content-Type"]) { throw new Error("content type set: " + res.json().headers["Content-Type"]); }
 				if (res.request.headers["X-We-Want-This"] != "value") { throw new Error("Missing or invalid X-We-Want-This header!"); }
 				`), fn, strings.ToLower(method)))
@@ -1410,7 +1410,7 @@ func TestRequestCompression(t *testing.T) {
 		algos := strings.Split(actualEncoding, ", ")
 		compressedBuf := new(bytes.Buffer)
 		n, err := io.Copy(compressedBuf, r.Body)
-		require.Equal(t, int(n), expectedLength)
+		require.Equal(t, expectedLength, int(n))
 		require.NoError(t, err)
 		var prev io.Reader = compressedBuf
 
@@ -1784,7 +1784,7 @@ func TestErrorCodes(t *testing.T) {
 				require.NoError(t, err)
 			} else {
 				require.Error(t, err)
-				require.Equal(t, err.Error(), testCase.expectedScriptError)
+				require.EqualError(t, err, testCase.expectedScriptError)
 			}
 			cs := metrics.GetBufferedSamples(samples)
 			assert.Len(t, cs, 1+testCase.moreSamples)
@@ -2217,8 +2217,8 @@ func TestDigestAuthWithBody(t *testing.T) {
 	state.Options.Throw = null.BoolFrom(true)
 	state.Options.HTTPDebug = null.StringFrom("full")
 
-	tb.Mux.HandleFunc("/digest-auth-with-post/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, "POST", r.Method)
+	tb.Mux.HandleFunc("/digest-auth-with-post/{qop}/{user}/{password}", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodPost, r.Method)
 		body, err := io.ReadAll(r.Body)
 		require.NoError(t, err)
 		require.Equal(t, "super secret body", string(body))
@@ -2373,7 +2373,7 @@ func GetTestServerWithCertificate(t *testing.T, certPem, key []byte, suitesIDs .
 		ResponseHeaderTimeout: time.Second,
 		IdleConnTimeout:       time.Second,
 	}
-	s.Listener, err = net.Listen("tcp", "")
+	s.Listener, err = (&net.ListenConfig{}).Listen(context.Background(), "tcp", "")
 	require.NoError(t, err)
 	s.Listener = tls.NewListener(s.Listener, s.TLS)
 	return s, client
