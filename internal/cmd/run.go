@@ -58,7 +58,7 @@ const (
 )
 
 // serve starts the REST API server
-func (c *cmdRun) serve(srv *http.Server, addrSetByUser bool) {
+func (c *cmdRun) serveHTTP(srv *http.Server, addrSetByUser bool) {
 	var logger logrus.FieldLogger = c.gs.Logger
 
 	logger.Debugf("Starting the REST API server on %s", c.gs.Flags.Address)
@@ -72,7 +72,7 @@ func (c *cmdRun) serve(srv *http.Server, addrSetByUser bool) {
 			logger.WithError(err).Error("Error from API server")
 			c.gs.OSExit(int(exitcodes.CannotStartRESTAPI))
 		} else {
-			logger.WithError(err).Warn("Error from API server")
+			logger.WithError(err).Warn("Error from HTTP API server")
 		}
 	}
 }
