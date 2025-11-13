@@ -34,6 +34,10 @@ func TestParseStringOrRegex(t *testing.T) {
 		{name: "null", input: mk(`null`), doubleQuote: false, want: `null`},
 		{name: "undefined", input: mk(`undefined`), doubleQuote: false, want: `undefined`},
 		{name: "undefined", input: mk(``), doubleQuote: false, want: `undefined`},
+		{name: "string_with_single_quote", input: mk(`'abc\''`), doubleQuote: false, want: `'abc\''`},
+		{name: "string_with_single_quote", input: mk(`'abc\''`), doubleQuote: true, want: `"abc'"`},
+		{name: "string_with_double_quote", input: mk(`'abc"'`), doubleQuote: false, want: `'abc"'`},
+		{name: "string_with_double_quote", input: mk(`'abc"'`), doubleQuote: true, want: `"abc\""`},
 	}
 
 	for _, tc := range tests {
