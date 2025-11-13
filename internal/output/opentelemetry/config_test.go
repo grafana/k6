@@ -1,13 +1,16 @@
 package opentelemetry
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"testing"
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"go.k6.io/k6/internal/build"
 	"go.k6.io/k6/lib/types"
 	"gopkg.in/guregu/null.v3"
@@ -329,4 +332,52 @@ func TestConfig(t *testing.T) {
 			require.Equal(t, testCase.expectedConfig, config)
 		})
 	}
+}
+
+func TestConfig_warnIfConfigMismatch(t *testing.T) {
+	t.Parallel()
+
+	t.Run("none", func(t *testing.T) {
+		var logsBuffer bytes.Buffer
+		logger := logrus.New()
+		logger.SetOutput(&logsBuffer)
+
+		_, err := GetConsolidatedConfig(json.RawMessage(`
+{
+  "exporterProtocol": "grpc",
+  "grpcExporterInsecure":true
+}`), nil, logger)
+		require.NoError(t, err)
+
+		assert.NotContains(t, logsBuffer.String(), "Configuration mismatch detected")
+	})
+
+	t.Run("json", func(t *testing.T) {
+		var logsBuffer bytes.Buffer
+		logger := logrus.New()
+		logger.SetOutput(&logsBuffer)
+
+		_, err := GetConsolidatedConfig(json.RawMessage(`
+{
+  "exporterProtocol": "grpc",
+  "httpExporterInsecure":true
+}`), nil, logger)
+		require.NoError(t, err)
+
+		assert.Contains(t, logsBuffer.String(), "Configuration mismatch detected: the gRPC exporter type is set, but also some HTTP configuration options")
+	})
+
+	t.Run("env", func(t *testing.T) {
+		var logsBuffer bytes.Buffer
+		logger := logrus.New()
+		logger.SetOutput(&logsBuffer)
+
+		_, err := GetConsolidatedConfig(nil, map[string]string{
+			"K6_OTEL_EXPORTER_PROTOCOL":      "http/protobuf",
+			"K6_OTEL_GRPC_EXPORTER_INSECURE": "true",
+		}, logger)
+		require.NoError(t, err)
+
+		assert.Contains(t, logsBuffer.String(), "Configuration mismatch detected: the HTTP exporter type is set, but also some gRPC configuration options")
+	})
 }
