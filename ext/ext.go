@@ -26,6 +26,7 @@ const (
 	JSExtension ExtensionType = iota + 1
 	OutputExtension
 	SecretSourceExtension
+	SubcommandExtension
 )
 
 func (e ExtensionType) String() string {
@@ -37,6 +38,8 @@ func (e ExtensionType) String() string {
 		s = "output"
 	case SecretSourceExtension:
 		s = "secret-source"
+	case SubcommandExtension:
+		s = "subcommand"
 	}
 	return s
 }
@@ -161,4 +164,5 @@ func init() {
 	extensions[JSExtension] = make(map[string]*Extension)
 	extensions[OutputExtension] = make(map[string]*Extension)
 	extensions[SecretSourceExtension] = make(map[string]*Extension)
+	extensions[SubcommandExtension] = make(map[string]*Extension)
 }
