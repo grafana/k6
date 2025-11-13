@@ -72,7 +72,9 @@
         // and if not, log an error and generate the default summary?
 
         if (jsonSummaryPath != '') {
-            result[jsonSummaryPath] = oldJSONSummary(legacyData);
+	        result[jsonSummaryPath] = (options.newMachineReadableSummary)
+	            ? JSON.stringify(legacyData, null, 4)
+				: oldJSONSummary(legacyData);
         }
 
         return result;
