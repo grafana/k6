@@ -338,6 +338,8 @@ func TestConfig_warnIfConfigMismatch(t *testing.T) {
 	t.Parallel()
 
 	t.Run("none", func(t *testing.T) {
+		t.Parallel()
+
 		var logsBuffer bytes.Buffer
 		logger := logrus.New()
 		logger.SetOutput(&logsBuffer)
@@ -353,6 +355,8 @@ func TestConfig_warnIfConfigMismatch(t *testing.T) {
 	})
 
 	t.Run("json", func(t *testing.T) {
+		t.Parallel()
+
 		var logsBuffer bytes.Buffer
 		logger := logrus.New()
 		logger.SetOutput(&logsBuffer)
@@ -368,6 +372,8 @@ func TestConfig_warnIfConfigMismatch(t *testing.T) {
 	})
 
 	t.Run("env", func(t *testing.T) {
+		t.Parallel()
+
 		var logsBuffer bytes.Buffer
 		logger := logrus.New()
 		logger.SetOutput(&logsBuffer)

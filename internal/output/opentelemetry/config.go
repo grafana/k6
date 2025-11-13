@@ -356,6 +356,8 @@ func parseEnvs(env map[string]string) (Config, error) {
 // applyOTELEnvVars applies the OTLP exporter environment variables, if defined, to the supplied Config.
 // As per OTLP Exporter configuration specification, signal-specific variables (e.g.,
 // OTEL_EXPORTER_OTLP_METRICS_PROTOCOL) take precedence over general ones (e.g., OTEL_EXPORTER_OTLP_PROTOCOL).
+//
+//nolint:gocognit,cyclop,funlen
 func applyOTELEnvVars(defaultCfg Config, env map[string]string) (Config, error) {
 	stdCfg := Config{}
 
