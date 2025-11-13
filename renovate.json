@@ -1,6 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
+    "github>grafana/grafana-renovate-config//presets/k6/k6-engine-base.json",
     "schedule:weekly"
   ],
   "ignorePaths": [
@@ -33,16 +34,6 @@
       "enabled": false
     },
     {
-      "description": "Update Go versions only when a patch version exists (z > 0 in v1.x.z)",
-      "matchManagers": [
-        "gomod"
-      ],
-      "matchPackageNames": [
-        "go"
-      ],
-      "allowedVersions": "/^(?:v)?\\d+\\.\\d+\\.[1-9]\\d*$/"
-    },
-    {
       "groupName": "golangx",
       "description": "Group golang.org/x modules",
       "matchManagers": [
@@ -60,16 +51,6 @@
       ],
       "matchPackageNames": [
         "/^google\\.golang\\.org//"
-      ]
-    },
-    {
-      "groupName": "otel",
-      "description": "Group OpenTelemetry modules",
-      "matchManagers": [
-        "gomod"
-      ],
-      "matchPackageNames": [
-        "/^go\\.opentelemetry\\.io//"
       ]
     },
     {
