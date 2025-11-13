@@ -1,7 +1,6 @@
 package js
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
+	"go.k6.io/k6/internal/lib/summary"
 	"go.k6.io/k6/internal/lib/testutils"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/metrics"
@@ -61,7 +61,7 @@ func TestTextSummary(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			result, err := runner.HandleSummary(context.Background(), legacySummary, nil)
+			result, err := runner.HandleSummary(t.Context(), legacySummary, nil, summary.Meta{})
 			require.NoError(t, err)
 
 			require.Len(t, result, 1)
@@ -115,7 +115,7 @@ func TestTextSummaryWithSubMetrics(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	result, err := runner.HandleSummary(context.Background(), legacySummary, nil)
+	result, err := runner.HandleSummary(t.Context(), legacySummary, nil, summary.Meta{})
 	require.NoError(t, err)
 
 	require.Len(t, result, 1)
@@ -306,7 +306,7 @@ func TestOldJSONExport(t *testing.T) {
 	require.NoError(t, err)
 
 	legacySummary := createTestLegacySummary(t)
-	result, err := runner.HandleSummary(context.Background(), legacySummary, nil)
+	result, err := runner.HandleSummary(t.Context(), legacySummary, nil, summary.Meta{})
 	require.NoError(t, err)
 
 	require.Len(t, result, 2)
@@ -576,7 +576,7 @@ func TestRawHandleSummaryData(t *testing.T) {
 	require.NoError(t, err)
 
 	legacySummary := createTestLegacySummary(t)
-	result, err := runner.HandleSummary(context.Background(), legacySummary, nil)
+	result, err := runner.HandleSummary(t.Context(), legacySummary, nil, summary.Meta{})
 	require.NoError(t, err)
 
 	require.Len(t, result, 2)
@@ -611,7 +611,7 @@ func TestRawHandleSummaryDataWithSetupData(t *testing.T) {
 	runner.SetSetupData([]byte("5"))
 
 	legacySummary := createTestLegacySummary(t)
-	result, err := runner.HandleSummary(context.Background(), legacySummary, nil)
+	result, err := runner.HandleSummary(t.Context(), legacySummary, nil, summary.Meta{})
 	require.NoError(t, err)
 	dataWithSetup, err := io.ReadAll(result["dataWithSetup.json"])
 	require.NoError(t, err)
@@ -634,7 +634,7 @@ func TestRawHandleSummaryPromise(t *testing.T) {
 	runner.SetSetupData([]byte("5"))
 
 	legacySummary := createTestLegacySummary(t)
-	result, err := runner.HandleSummary(context.Background(), legacySummary, nil)
+	result, err := runner.HandleSummary(t.Context(), legacySummary, nil, summary.Meta{})
 	require.NoError(t, err)
 	dataWithSetup, err := io.ReadAll(result["dataWithSetup.json"])
 	require.NoError(t, err)
@@ -658,7 +658,7 @@ func TestWrongSummaryHandlerExportTypes(t *testing.T) {
 			require.NoError(t, err)
 
 			legacySummary := createTestLegacySummary(t)
-			_, err = runner.HandleSummary(context.Background(), legacySummary, nil)
+			_, err = runner.HandleSummary(t.Context(), legacySummary, nil, summary.Meta{})
 			require.Error(t, err)
 		})
 	}
@@ -683,7 +683,7 @@ func TestExceptionInHandleSummaryFallsBackToTextSummary(t *testing.T) {
 	require.NoError(t, err)
 
 	legacySummary := createTestLegacySummary(t)
-	result, err := runner.HandleSummary(context.Background(), legacySummary, nil)
+	result, err := runner.HandleSummary(t.Context(), legacySummary, nil, summary.Meta{})
 	require.NoError(t, err)
 
 	require.Len(t, result, 1)
