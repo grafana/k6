@@ -547,7 +547,7 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
+      packages: write
       id-token: write # Required for Vault
     steps:
       - name: Checkout code
