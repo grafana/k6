@@ -263,7 +263,13 @@ func TestNavigationSpanCreation(t *testing.T) {
 				await Promise.all([
 					page.waitForNavigation(),
 					page.evaluate(() => window.history.back()),
-				]);
+				]).catch(e => {
+					// only throw exception if it's not related to navigational
+					// race condition, which can happen in slow machines.
+					if (!e.toString().includes('Inspected target navigated or closed')) {
+						throw e;
+					}
+				});
 				page.close();
 				`, ts.URL),
 			expected: []string{
