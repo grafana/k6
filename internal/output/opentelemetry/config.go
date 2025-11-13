@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -400,6 +401,8 @@ func applyOTELEnvVars(defaultCfg Config, env map[string]string) (Config, error) 
 		stdCfg.TLSClientKey = null.StringFrom(exporterClientKey)
 	}
 
+	isHTTP := stdCfg.ExporterProtocol.Valid && stdCfg.ExporterProtocol.String == httpExporterProtocol
+
 	var exporterInsecureBoolVar string
 	if exporterInsecure, ok := env["OTEL_EXPORTER_OTLP_METRICS_INSECURE"]; ok {
 		exporterInsecureBoolVar = exporterInsecure
@@ -413,19 +416,94 @@ func applyOTELEnvVars(defaultCfg Config, env map[string]string) (Config, error) 
 			return Config{}, err
 		}
 
-		stdCfg.GRPCExporterInsecure = null.BoolFrom(exporterInsecureBool)
-		stdCfg.HTTPExporterInsecure = null.BoolFrom(exporterInsecureBool)
+		if isHTTP {
+			stdCfg.HTTPExporterInsecure = null.BoolFrom(exporterInsecureBool)
+		} else {
+			stdCfg.GRPCExporterInsecure = null.BoolFrom(exporterInsecureBool)
+		}
 	}
 
-	if exporterEndpoint, ok := env["OTEL_EXPORTER_OTLP_METRICS_ENDPOINT"]; ok {
-		stdCfg.GRPCExporterEndpoint = null.StringFrom(exporterEndpoint)
-		stdCfg.HTTPExporterEndpoint = null.StringFrom(exporterEndpoint)
-	} else if exporterEndpoint, ok := env["OTEL_EXPORTER_OTLP_ENDPOINT"]; ok {
-		stdCfg.GRPCExporterEndpoint = null.StringFrom(exporterEndpoint)
-		stdCfg.HTTPExporterEndpoint = null.StringFrom(exporterEndpoint)
+	var (
+		exporterEndpointVar    string
+		exporterEndpointString string
+	)
+	if exporterEndpointVal, ok := env["OTEL_EXPORTER_OTLP_METRICS_ENDPOINT"]; ok {
+		exporterEndpointVar = "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT"
+		exporterEndpointString = exporterEndpointVal
+	} else if exporterEndpointVal, ok := env["OTEL_EXPORTER_OTLP_ENDPOINT"]; ok {
+		exporterEndpointVar = "OTEL_EXPORTER_OTLP_ENDPOINT"
+		exporterEndpointString = exporterEndpointVal
+	}
+
+	if exporterEndpointString != "" {
+		exporterEndpoint, insecure, err := parseOTELEndpoint(exporterEndpointString, isHTTP)
+		if err != nil {
+			return Config{}, fmt.Errorf("failed to parse %s: %w", exporterEndpointVar, err)
+		}
+
+		if isHTTP {
+			stdCfg.HTTPExporterEndpoint = exporterEndpoint
+			stdCfg.HTTPExporterInsecure = insecure
+		} else {
+			stdCfg.GRPCExporterEndpoint = exporterEndpoint
+		}
+
+		if !isHTTP && insecure.Valid {
+			stdCfg.GRPCExporterInsecure = insecure
+		}
 	}
 
 	return defaultCfg.Apply(stdCfg), nil
+}
+
+// parseOTELEndpoint tries to parse the given string as an OTEL endpoint URL, extracts the endpoint and whether the
+// connection should be secure or not. It honors what's said in the OTEL exporter docs:
+// https://opentelemetry.io/docs/specs/otel/protocol/exporter/.
+//
+// IMPORTANT: Meant to be used only for parsing OTEL_EXPORTER_OTLP_ENDPOINT-like environment variables, not for k6
+// configuration options, as Config.HTTPExporterEndpoint, for instance, doesn't accept a scheme on the URLs, while
+// the OTEL exporter configuration requires it (for HTTP) or accepts it (for gRPC).
+func parseOTELEndpoint(endpoint string, isHTTP bool) (null.String, null.Bool, error) {
+	isHTTPScheme := strings.HasPrefix(endpoint, "http://")
+	isHTTPSScheme := strings.HasPrefix(endpoint, "https://")
+
+	// For HTTP/S, the scheme is required. For gRPC, it's optional.
+	if !isHTTPScheme && !isHTTPSScheme {
+		if isHTTP {
+			return null.String{}, null.Bool{}, errors.New("endpoint must contain the scheme (http or https)")
+		}
+		// gRPC accepts any form allowed by the underlying client, so use as-is.
+		return null.StringFrom(endpoint), null.Bool{}, nil
+	}
+
+	// Parse the URL to extract components.
+	parsedURL, err := url.Parse(endpoint)
+	if err != nil {
+		return null.String{}, null.Bool{}, err
+	}
+
+	host := parsedURL.Host
+	port := parsedURL.Port()
+
+	if host == "" {
+		return null.String{}, null.Bool{}, errors.New("endpoint must contain a host")
+	}
+
+	// HTTP requires a port, gRPC doesn't.
+	if isHTTP && port == "" {
+		return null.String{}, null.Bool{}, errors.New("endpoint must contain host and port")
+	}
+
+	// From OTEL docs: A scheme of "https" indicates a secure connection and takes precedence over the insecure
+	// configuration setting. The same applies to "http", but indicating insecure connection.
+	var insecure null.Bool
+	if isHTTPSScheme {
+		insecure = null.BoolFrom(false)
+	} else {
+		insecure = null.BoolFrom(true)
+	}
+
+	return null.StringFrom(host), insecure, nil
 }
 
 // warnIfConfigMismatch writes a warning log message in case of discrepancies between the configured
