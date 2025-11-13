@@ -15,9 +15,7 @@ import (
 func TestRootCommandHelpDisplayCommands(t *testing.T) {
 	t.Parallel()
 
-	registerTestSubcommandExtensionsOnce.Do(func() {
-		registerTestSubcommandExtensions(t)
-	})
+	registerTestSubcommandExtensions(t)
 
 	testCases := []struct {
 		name                  string
@@ -86,6 +84,10 @@ func TestRootCommandHelpDisplayCommands(t *testing.T) {
 			name:               "should have test-cmd-2 command",
 			wantStdoutContains: "  test-cmd-2  Test command 2",
 		},
+		{
+			name:               "should have test-cmd-3 command",
+			wantStdoutContains: "  test-cmd-3  Test command 3",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -108,19 +110,29 @@ var registerTestSubcommandExtensionsOnce sync.Once //nolint:gochecknoglobals
 func registerTestSubcommandExtensions(t *testing.T) {
 	t.Helper()
 
-	subcommand.RegisterExtension("test-cmd-1", func(_ *state.GlobalState) *cobra.Command {
-		return &cobra.Command{
-			Use:   "test-cmd-1",
-			Short: "Test command 1",
-			Run:   func(_ *cobra.Command, _ []string) {},
-		}
-	})
+	registerTestSubcommandExtensionsOnce.Do(func() {
+		subcommand.RegisterExtension("test-cmd-1", func(_ *state.GlobalState) *cobra.Command {
+			return &cobra.Command{
+				Use:   "test-cmd-1",
+				Short: "Test command 1",
+				Run:   func(_ *cobra.Command, _ []string) {},
+			}
+		})
 
-	subcommand.RegisterExtension("test-cmd-2", func(_ *state.GlobalState) *cobra.Command {
-		return &cobra.Command{
-			Use:   "test-cmd-2",
-			Short: "Test command 2",
-			Run:   func(_ *cobra.Command, _ []string) {},
-		}
+		subcommand.RegisterExtension("test-cmd-2", func(_ *state.GlobalState) *cobra.Command {
+			return &cobra.Command{
+				Use:   "test-cmd-2",
+				Short: "Test command 2",
+				Run:   func(_ *cobra.Command, _ []string) {},
+			}
+		})
+
+		subcommand.RegisterExtension("test-cmd-3", func(_ *state.GlobalState) *cobra.Command {
+			return &cobra.Command{
+				Use:   "test-cmd-3",
+				Short: "Test command 3",
+				Run:   func(_ *cobra.Command, _ []string) {},
+			}
+		})
 	})
 }
