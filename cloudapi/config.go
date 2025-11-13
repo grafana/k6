@@ -18,6 +18,8 @@ const LegacyCloudConfigKey = "loadimpact"
 //nolint:lll
 type Config struct {
 	// TODO: refactor common stuff between cloud execution and output
+	StackID   null.Int    `json:"stackID,omitempty" envconfig:"K6_CLOUD_STACK_ID"`
+	StackSlug null.String `json:"stackSlug,omitempty" envconfig:"K6_CLOUD_STACK_SLUG"`
 	Token     null.String `json:"token" envconfig:"K6_CLOUD_TOKEN"`
 	ProjectID null.Int    `json:"projectID" envconfig:"K6_CLOUD_PROJECT_ID"`
 	Name      null.String `json:"name" envconfig:"K6_CLOUD_NAME"`
@@ -103,6 +105,12 @@ func NewConfig() Config {
 //
 //nolint:cyclop
 func (c Config) Apply(cfg Config) Config {
+	if cfg.StackID.Valid {
+		c.StackID = cfg.StackID
+	}
+	if cfg.StackSlug.Valid {
+		c.StackSlug = cfg.StackSlug
+	}
 	if cfg.Token.Valid {
 		c.Token = cfg.Token
 	}
@@ -240,7 +248,8 @@ func mergeFromCloudOptionAndExternal(
 	if err := json.Unmarshal(source, &tmpConfig); err != nil {
 		return err
 	}
-	// Only take out the ProjectID, Name and Token from the options.cloud (or legacy loadimpact struct) map:
+
+	// Only take out the ProjectID, Name, Token and StackID from the options.cloud (or legacy loadimpact struct) map:
 	if tmpConfig.ProjectID.Valid {
 		conf.ProjectID = tmpConfig.ProjectID
 	}
@@ -249,6 +258,12 @@ func mergeFromCloudOptionAndExternal(
 	}
 	if tmpConfig.Token.Valid {
 		conf.Token = tmpConfig.Token
+	}
+	if tmpConfig.StackID.Valid {
+		conf.StackID = tmpConfig.StackID
+	}
+	if tmpConfig.StackSlug.Valid {
+		conf.StackSlug = tmpConfig.StackSlug
 	}
 
 	return nil
