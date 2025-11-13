@@ -135,6 +135,71 @@ func BenchmarkDialerHosts(b *testing.B) {
 	}
 }
 
+func TestDialerResolveAddr(t *testing.T) {
+	t.Parallel()
+	dialer := NewDialer(net.Dialer{}, newResolver())
+	hosts, err := types.NewHosts(
+		map[string]types.Host{
+			"example.com":                {IP: net.ParseIP("3.4.5.6")},
+			"example.com:443":            {IP: net.ParseIP("3.4.5.6"), Port: 8443},
+			"example.com:8080":           {IP: net.ParseIP("3.4.5.6"), Port: 9090},
+			"example-deny-host.com":      {IP: net.ParseIP("8.9.10.11")},
+			"example-ipv6.com":           {IP: net.ParseIP("2001:db8::68")},
+			"example-ipv6.com:443":       {IP: net.ParseIP("2001:db8::68"), Port: 8443},
+			"example-ipv6-deny-host.com": {IP: net.ParseIP("::1")},
+		})
+	require.NoError(t, err)
+	dialer.Hosts = hosts
+
+	ipNet, err := lib.ParseCIDR("8.9.10.0/24")
+	require.NoError(t, err)
+
+	ipV6Net, err := lib.ParseCIDR("::1/24")
+	require.NoError(t, err)
+
+	dialer.Blacklist = []*lib.IPNet{ipNet, ipV6Net}
+
+	testCases := []struct {
+		address string
+		expIP   string
+		expPort int
+		expErr  string
+	}{
+		// IPv4
+		{"example-resolver.com:80", "1.2.3.4", 80, ""},
+		{"example.com:80", "3.4.5.6", 80, ""},
+		{"example.com:443", "3.4.5.6", 8443, ""},
+		{"example.com:8080", "3.4.5.6", 9090, ""},
+		{"1.2.3.4:80", "1.2.3.4", 80, ""},
+		{"1.2.3.4", "", 0, "address 1.2.3.4: missing port in address"},
+		{"example-deny-resolver.com:80", "", 0, "IP (8.9.10.11) is in a blacklisted range (8.9.10.0/24)"},
+		{"example-deny-host.com:80", "", 0, "IP (8.9.10.11) is in a blacklisted range (8.9.10.0/24)"},
+		{"no-such-host.com:80", "", 0, "lookup no-such-host.com: no such host"},
+
+		// IPv6
+		{"example-ipv6.com:443", "2001:db8::68", 8443, ""},
+		{"[2001:db8:aaaa:1::100]:443", "2001:db8:aaaa:1::100", 443, ""},
+		{"[::1.2.3.4]", "", 0, "address [::1.2.3.4]: missing port in address"},
+		{"example-ipv6-deny-resolver.com:80", "", 0, "IP (::1) is in a blacklisted range (::/24)"},
+		{"example-ipv6-deny-host.com:80", "", 0, "IP (::1) is in a blacklisted range (::/24)"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.address, func(t *testing.T) {
+			t.Parallel()
+			ip, port, err := dialer.ResolveAddr(tc.address)
+
+			if tc.expErr != "" {
+				require.EqualError(t, err, tc.expErr)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tc.expIP, ip.String())
+				require.Equal(t, tc.expPort, port)
+			}
+		})
+	}
+}
+
 func newResolver() *mockresolver.MockResolver {
 	return mockresolver.New(
 		map[string][]net.IP{

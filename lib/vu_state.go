@@ -19,6 +19,11 @@ import (
 // DialContexter is an interface that can dial with a context
 type DialContexter interface {
 	DialContext(ctx context.Context, network, addr string) (net.Conn, error)
+
+	// ResolveAddr looks up the IP address for the given host using the same logic as DialContext.
+	// The address is expected in the form "host:port" or just "host".
+	// It returns the resolved IP, the port (0 if not specified), and an error if any.
+	ResolveAddr(addr string) (net.IP, int, error)
 }
 
 // TracerProvider provides methods for OTEL tracers initialization.
