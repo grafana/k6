@@ -344,7 +344,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		)
 		go func() {
 			defer apiWG.Done()
-			c.serve(srv, cmd.Flags().Lookup("address").Changed)
+			c.serveHTTP(srv, cmd.Flags().Lookup("address").Changed)
 		}()
 		go func() {
 			defer apiWG.Done()
