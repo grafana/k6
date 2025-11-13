@@ -14,6 +14,7 @@
 package expfmt
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"math"
@@ -21,8 +22,8 @@ import (
 	"net/http"
 
 	dto "github.com/prometheus/client_model/go"
+	"google.golang.org/protobuf/encoding/protodelim"
 
-	"github.com/matttproud/golang_protobuf_extensions/pbutil"
 	"github.com/prometheus/common/model"
 )
 
@@ -69,28 +70,45 @@ func ResponseFormat(h http.Header) Format {
 	return FmtUnknown
 }
 
-// NewDecoder returns a new decoder based on the given input format.
-// If the input format does not imply otherwise, a text format decoder is returned.
+// NewDecoder returns a new decoder based on the given input format. Metric
+// names are validated based on the provided Format -- if the format requires
+// escaping, raditional Prometheues validity checking is used. Otherwise, names
+// are checked for UTF-8 validity. Supported formats include delimited protobuf
+// and Prometheus text format.  For historical reasons, this decoder fallbacks
+// to classic text decoding for any other format. This decoder does not fully
+// support OpenMetrics although it may often succeed due to the similarities
+// between the formats. This decoder may not support the latest features of
+// Prometheus text format and is not intended for high-performance applications.
+// See: https://github.com/prometheus/common/issues/812
 func NewDecoder(r io.Reader, format Format) Decoder {
-	switch format {
-	case FmtProtoDelim:
-		return &protoDecoder{r: r}
+	scheme := model.LegacyValidation
+	if format.ToEscapingScheme() == model.NoEscaping {
+		scheme = model.UTF8Validation
 	}
-	return &textDecoder{r: r}
+	switch format.FormatType() {
+	case TypeProtoDelim:
+		return &protoDecoder{r: bufio.NewReader(r), s: scheme}
+	case TypeProtoText, TypeProtoCompact:
+		return &errDecoder{err: fmt.Errorf("format %s not supported for decoding", format)}
+	}
+	return &textDecoder{r: r, s: scheme}
 }
 
 // protoDecoder implements the Decoder interface for protocol buffers.
 type protoDecoder struct {
-	r io.Reader
+	r protodelim.Reader
+	s model.ValidationScheme
 }
 
 // Decode implements the Decoder interface.
 func (d *protoDecoder) Decode(v *dto.MetricFamily) error {
-	_, err := pbutil.ReadDelimited(d.r, v)
-	if err != nil {
+	opts := protodelim.UnmarshalOptions{
+		MaxSize: -1,
+	}
+	if err := opts.UnmarshalFrom(d.r, v); err != nil {
 		return err
 	}
-	if !model.IsValidMetricName(model.LabelValue(v.GetName())) {
+	if !d.s.IsValidMetricName(v.GetName()) {
 		return fmt.Errorf("invalid metric name %q", v.GetName())
 	}
 	for _, m := range v.GetMetric() {
@@ -104,7 +122,7 @@ func (d *protoDecoder) Decode(v *dto.MetricFamily) error {
 			if !model.LabelValue(l.GetValue()).IsValid() {
 				return fmt.Errorf("invalid label value %q", l.GetValue())
 			}
-			if !model.LabelName(l.GetName()).IsValid() {
+			if !d.s.IsValidLabelName(l.GetName()) {
 				return fmt.Errorf("invalid label name %q", l.GetName())
 			}
 		}
@@ -112,10 +130,20 @@ func (d *protoDecoder) Decode(v *dto.MetricFamily) error {
 	return nil
 }
 
+// errDecoder is an error-state decoder that always returns the same error.
+type errDecoder struct {
+	err error
+}
+
+func (d *errDecoder) Decode(*dto.MetricFamily) error {
+	return d.err
+}
+
 // textDecoder implements the Decoder interface for the text protocol.
 type textDecoder struct {
 	r    io.Reader
 	fams map[string]*dto.MetricFamily
+	s    model.ValidationScheme
 	err  error
 }
 
@@ -123,7 +151,7 @@ type textDecoder struct {
 func (d *textDecoder) Decode(v *dto.MetricFamily) error {
 	if d.err == nil {
 		// Read all metrics in one shot.
-		var p TextParser
+		p := NewTextParser(d.s)
 		d.fams, d.err = p.TextToMetricFamilies(d.r)
 		// If we don't get an error, store io.EOF for the end.
 		if d.err == nil {
@@ -132,7 +160,10 @@ func (d *textDecoder) Decode(v *dto.MetricFamily) error {
 	}
 	// Pick off one MetricFamily per Decode until there's nothing left.
 	for key, fam := range d.fams {
-		*v = *fam
+		v.Name = fam.Name
+		v.Help = fam.Help
+		v.Type = fam.Type
+		v.Metric = fam.Metric
 		delete(d.fams, key)
 		return nil
 	}
