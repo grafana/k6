@@ -229,7 +229,12 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 		transport = ntlmssp.Negotiator{RoundTripper: transport}
 	}
 
-	resp := &Response{URL: preq.URL.URL, Request: respReq}
+	resp := &Response{
+		URL:     preq.URL.URL,
+		Request: respReq,
+		Headers: make(map[string]string),
+		Cookies: make(map[string][]*HTTPCookie),
+	}
 	client := http.Client{
 		Transport: transport,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {

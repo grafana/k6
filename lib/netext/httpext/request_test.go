@@ -492,6 +492,51 @@ func TestMakeRequestTimeoutInTheBegining(t *testing.T) {
 	}
 }
 
+func TestMakeRequestFailedHostInitializesHeadersAndCookies(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	samples := make(chan metrics.SampleContainer, 10)
+	logger := logrus.New()
+	logger.Level = logrus.DebugLevel
+	registry := metrics.NewRegistry()
+	state := &lib.State{
+		Options: lib.Options{
+			SystemTags: &metrics.DefaultSystemTagSet,
+		},
+		Transport:      http.DefaultTransport,
+		Samples:        samples,
+		Logger:         logger,
+		BufferPool:     lib.NewBufferPool(),
+		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
+		Tags:           lib.NewVUStateTags(registry.RootTagSet()),
+	}
+
+	invalidURL := "https://test.k6.i"
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, invalidURL, nil)
+	require.NoError(t, err)
+
+	preq := &ParsedHTTPRequest{
+		Req:         req,
+		URL:         &URL{u: req.URL, URL: invalidURL},
+		Body:        new(bytes.Buffer),
+		Timeout:     10 * time.Second,
+		TagsAndMeta: state.Tags.GetCurrentValues(),
+	}
+
+	res, err := MakeRequest(ctx, state, preq)
+	require.NoError(t, err)
+	require.NotNil(t, res)
+
+	assert.NotNil(t, res.Headers, "Headers map should be initialized even for failed requests")
+	assert.NotNil(t, res.Cookies, "Cookies map should be initialized even for failed requests")
+
+	res.Headers["test-key"] = "test-value"
+	res.Cookies["test-cookie"] = []*HTTPCookie{{Name: "test", Value: "value"}}
+	assert.Equal(t, "test-value", res.Headers["test-key"])
+	assert.Equal(t, "test", res.Cookies["test-cookie"][0].Name)
+}
+
 func TestMakeRequestRPSLimit(t *testing.T) {
 	t.Parallel()
 	var requests int64
