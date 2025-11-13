@@ -44,18 +44,9 @@ type Resource struct {
 	// Set of attributes that describe the resource.
 	// Attribute keys MUST be unique (it is not allowed to have more than one
 	// attribute with the same key).
-	//
-	// The attribute values SHOULD NOT contain empty values.
-	// The attribute values SHOULD NOT contain bytes values.
-	// The attribute values SHOULD NOT contain array values different than array of string values, bool values, int values,
-	// double values.
-	// The attribute values SHOULD NOT contain kvlist values.
-	// The behavior of software that receives attributes containing such values can be unpredictable.
-	// These restrictions can change in a minor release.
-	// The restrictions take origin from the OpenTelemetry specification:
-	// https://github.com/open-telemetry/opentelemetry-specification/blob/v1.47.0/specification/common/README.md#attribute.
+	// The behavior of software that receives duplicated keys can be unpredictable.
 	Attributes []*v1.KeyValue `protobuf:"bytes,1,rep,name=attributes,proto3" json:"attributes,omitempty"`
-	// dropped_attributes_count is the number of dropped attributes. If the value is 0, then
+	// The number of dropped attributes. If the value is 0, then
 	// no attributes were dropped.
 	DroppedAttributesCount uint32 `protobuf:"varint,2,opt,name=dropped_attributes_count,json=droppedAttributesCount,proto3" json:"dropped_attributes_count,omitempty"`
 	// Set of entities that participate in this Resource.
