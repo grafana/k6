@@ -4,7 +4,7 @@ import "github.com/grafana/sobek"
 
 // BitsDeriver is the interface implemented by the parameters used to derive bits
 type BitsDeriver interface {
-	DeriveBits(rt *sobek.Runtime, baseKey sobek.Value, length int) ([]byte, error)
+	DeriveBits(privateKey *CryptoKey, length int) ([]byte, error)
 }
 
 func newBitsDeriver(rt *sobek.Runtime, normalized Algorithm, algorithm sobek.Value) (BitsDeriver, error) {

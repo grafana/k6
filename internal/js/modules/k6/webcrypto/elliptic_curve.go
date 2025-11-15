@@ -534,12 +534,7 @@ func newECDHKeyDeriveParams(rt *sobek.Runtime, normalized Algorithm, params sobe
 }
 
 // DeriveBits represents the EC function that derives the key as bits from EC params
-func (keyParams ECDHKeyDeriveParams) DeriveBits(rt *sobek.Runtime, baseKey sobek.Value, length int) ([]byte, error) {
-	var privateKey *CryptoKey
-
-	if err := rt.ExportTo(baseKey, &privateKey); err != nil {
-		return nil, NewError(InvalidAccessError, "provided baseKey is not a valid CryptoKey")
-	}
+func (keyParams ECDHKeyDeriveParams) DeriveBits(privateKey *CryptoKey, length int) ([]byte, error) {
 	if err := privateKey.Validate(); err != nil {
 		return nil, NewError(InvalidAccessError, "provided baseKey is not a valid CryptoKey: "+err.Error())
 	}

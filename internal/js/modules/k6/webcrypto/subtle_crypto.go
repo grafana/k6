@@ -595,14 +595,26 @@ func (sc *SubtleCrypto) DeriveKey(
 	rt := sc.vu.Runtime()
 
 	var (
-		deriver KeyDeriver
-		ki      KeyImporter
-		kgl     KeyGetLengther
-		err     error
+		deriver       KeyDeriver
+		ki            KeyImporter
+		kgl           KeyGetLengther
+		err           error
+		privateKey    *CryptoKey
+		keyLengthBits int
 	)
 
 	err = func() error {
 		deriver, ki, kgl, err = getKeyInteractors(rt, algorithm, derivedKeyType)
+		if err != nil {
+			return err
+		}
+
+		err = rt.ExportTo(baseKey, &privateKey)
+		if err != nil {
+			return err
+		}
+
+		keyLengthBits, err = kgl.GetKeyLength(rt, derivedKeyType)
 		if err != nil {
 			return err
 		}
@@ -620,11 +632,9 @@ func (sc *SubtleCrypto) DeriveKey(
 	go func() {
 		result, err := func() (*CryptoKey, error) {
 			result, err := deriver.DeriveKey(
-				rt,
-				baseKey,
-				derivedKeyType,
+				privateKey,
+				keyLengthBits,
 				ki,
-				kgl,
 				keyUsages,
 				extractable,
 			)
@@ -734,7 +744,10 @@ func (sc *SubtleCrypto) DeriveBits(
 ) (*sobek.Promise, error) {
 	rt := sc.vu.Runtime()
 
-	var deriver BitsDeriver
+	var (
+		deriver    BitsDeriver
+		privateKey *CryptoKey
+	)
 
 	err := func() error {
 		normalized, err := normalizeAlgorithm(rt, algorithm, OperationIdentifierDeriveBits)
@@ -747,6 +760,11 @@ func (sc *SubtleCrypto) DeriveBits(
 			return err
 		}
 
+		err = rt.ExportTo(baseKey, &privateKey)
+		if err != nil {
+			return err
+		}
+
 		return nil
 	}()
 
@@ -755,7 +773,6 @@ func (sc *SubtleCrypto) DeriveBits(
 		err := reject(err)
 		return promise, err
 	}
-
 	callback := sc.vu.RegisterCallback()
 	go func() {
 		result, err := func() ([]byte, error) {
@@ -769,7 +786,7 @@ func (sc *SubtleCrypto) DeriveBits(
 				return nil, NewError(OperationError, "currently only multiples of 8 are supported for length")
 			}
 
-			b, err := deriver.DeriveBits(rt, baseKey, length)
+			b, err := deriver.DeriveBits(privateKey, length)
 			if err != nil {
 				return b, err
 			}

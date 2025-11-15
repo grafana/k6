@@ -209,11 +209,10 @@ func newKeyGenerator(rt *sobek.Runtime, normalized Algorithm, params sobek.Value
 
 // KeyDeriver is the interface implemented by the algorithms used to derive keys
 type KeyDeriver interface {
-	DeriveKey(rt *sobek.Runtime,
-		baseKey sobek.Value,
-		derivedKeyType sobek.Value,
+	DeriveKey(
+		privateKey *CryptoKey,
+		keyLengthBits int,
 		ki KeyImporter,
-		kgl KeyGetLengther,
 		keyUsages []CryptoKeyUsage,
 		extractable bool,
 	) (*CryptoKey, error)
