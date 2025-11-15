@@ -162,24 +162,24 @@ func exportAESKey(key *CryptoKey, format KeyFormat) (interface{}, error) {
 // AESGetLengthParams is the parameters required for algorithms to run the GetLength Operation
 type AESGetLengthParams struct {
 	Algorithm
+	Length int
 }
 
-func newAESGetLengthParams(normalized Algorithm) *AESGetLengthParams {
+func newAESGetLengthParams(rt *sobek.Runtime, normalized Algorithm, params sobek.Value) (*AESGetLengthParams, error) {
+	length, err := traverseObject(rt, params, "length")
+	if err != nil {
+		return nil, NewError(OperationError, "aes length parameter not specified")
+	}
+
 	return &AESGetLengthParams{
 		Algorithm: normalized,
-	}
+		Length:    int(length.ToInteger()),
+	}, nil
 }
 
 // GetKeyLength represents the AES function that get the key length from the AES params
-func (AESGetLengthParams) GetKeyLength(rt *sobek.Runtime, params sobek.Value) (int, error) {
-	length, err := traverseObject(rt, params, "length")
-	if err != nil {
-		return 0, err
-	}
-
-	keyLengthInt := length.ToInteger()
-
-	return int(keyLengthInt), nil
+func (kgl AESGetLengthParams) GetKeyLength() int {
+	return kgl.Length
 }
 
 // AESImportParams is an internal placeholder struct for AES import parameters.

@@ -59,11 +59,9 @@ func (keyParams PBKDF2KeyImportParams) ImportKey(
 	}
 
 	return &CryptoKey{
-		Algorithm: PBKDF2KeyAlgorithm{
-			keyParams.Algorithm,
-		},
-		Type:   SecretCryptoKeyType,
-		handle: keyData,
+		Algorithm: PBKDF2KeyAlgorithm(keyParams),
+		Type:      SecretCryptoKeyType,
+		handle:    keyData,
 	}, nil
 }
 
@@ -120,9 +118,15 @@ func (keyParams PBKDF2Params) DeriveBits(
 	if !ok {
 		return nil, NewError(NotSupportedError, "hash function not supported")
 	}
-	if privateKey.Algorithm.(PBKDF2KeyAlgorithm).Name != keyParams.Name {
+
+	alg, ok := privateKey.Algorithm.(PBKDF2KeyAlgorithm)
+	if !ok {
+		return nil, NewError(OperationError, "provided baseKey is not a valid algorithm")
+	}
+
+	if alg.Name != keyParams.Name {
 		return nil, NewError(OperationError,
-			"provided basekey algorithm and deriveKey algorithm name dont match "+privateKey.Algorithm.(PBKDF2KeyAlgorithm).Name+"!="+keyParams.Name,
+			"provided basekey algorithm and deriveKey algorithm name dont match "+alg.Name+"!="+keyParams.Name,
 		)
 	}
 
@@ -138,13 +142,9 @@ func (keyParams PBKDF2Params) DeriveBits(
 
 // DeriveKey represents the PBKDF2 function that derives a key from the PBKDF2 Parms
 func (keyParams PBKDF2Params) DeriveKey(
-	// rt *sobek.Runtime,
-	// baseKey sobek.Value,
-	// derivedKeyType sobek.Value,
 	privateKey *CryptoKey,
-	keyLengthBits int,
 	ki KeyImporter,
-	// kgl KeyGetLengther,
+	kgl KeyGetLengther,
 	keyUsages []CryptoKeyUsage,
 	extractable bool,
 ) (*CryptoKey, error) {
@@ -158,11 +158,18 @@ func (keyParams PBKDF2Params) DeriveKey(
 		return nil, NewError(NotSupportedError, "hash function not supported")
 	}
 
-	if privateKey.Algorithm.(PBKDF2KeyAlgorithm).Name != keyParams.Name {
-		return nil, NewError(InvalidAccessError,
-			"provided basekey algorithm and deriveKey algorithm name dont match "+privateKey.Algorithm.(PBKDF2KeyAlgorithm).Name+"!="+keyParams.Name,
+	alg, ok := privateKey.Algorithm.(PBKDF2KeyAlgorithm)
+	if !ok {
+		return nil, NewError(OperationError, "provided baseKey is not a valid algorithm")
+	}
+
+	if alg.Name != keyParams.Name {
+		return nil, NewError(OperationError,
+			"provided basekey algorithm and deriveKey algorithm name dont match "+alg.Name+"!="+keyParams.Name,
 		)
 	}
+
+	keyLengthBits := kgl.GetKeyLength()
 
 	if keyLengthBits%8 != 0 {
 		return nil, NewError(InvalidAccessError, "provided length of key must be a multiple of 8")

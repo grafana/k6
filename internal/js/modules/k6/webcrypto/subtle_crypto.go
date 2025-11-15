@@ -595,12 +595,11 @@ func (sc *SubtleCrypto) DeriveKey(
 	rt := sc.vu.Runtime()
 
 	var (
-		deriver       KeyDeriver
-		ki            KeyImporter
-		kgl           KeyGetLengther
-		err           error
-		privateKey    *CryptoKey
-		keyLengthBits int
+		deriver    KeyDeriver
+		ki         KeyImporter
+		kgl        KeyGetLengther
+		err        error
+		privateKey *CryptoKey
 	)
 
 	err = func() error {
@@ -610,11 +609,6 @@ func (sc *SubtleCrypto) DeriveKey(
 		}
 
 		err = rt.ExportTo(baseKey, &privateKey)
-		if err != nil {
-			return err
-		}
-
-		keyLengthBits, err = kgl.GetKeyLength(rt, derivedKeyType)
 		if err != nil {
 			return err
 		}
@@ -633,8 +627,8 @@ func (sc *SubtleCrypto) DeriveKey(
 		result, err := func() (*CryptoKey, error) {
 			result, err := deriver.DeriveKey(
 				privateKey,
-				keyLengthBits,
 				ki,
+				kgl,
 				keyUsages,
 				extractable,
 			)
@@ -703,7 +697,7 @@ func getKeyInteractors(
 		return nil, nil, nil, err
 	}
 
-	kgl, err := newKeyGetLengther(normalizedDerivedKeyAlgorithmLength)
+	kgl, err := newKeyGetLengther(rt, normalizedDerivedKeyAlgorithmLength, derivedKeyType)
 	if err != nil {
 		return nil, nil, nil, err
 	}

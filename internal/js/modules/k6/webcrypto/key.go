@@ -211,8 +211,8 @@ func newKeyGenerator(rt *sobek.Runtime, normalized Algorithm, params sobek.Value
 type KeyDeriver interface {
 	DeriveKey(
 		privateKey *CryptoKey,
-		keyLengthBits int,
 		ki KeyImporter,
+		kgl KeyGetLengther,
 		keyUsages []CryptoKeyUsage,
 		extractable bool,
 	) (*CryptoKey, error)
@@ -239,16 +239,16 @@ func newKeyDeriver(rt *sobek.Runtime, normalized Algorithm, params sobek.Value) 
 // KeyGetLengther is the interface implemented by the parameters used to
 // get the key length of cryptographic keys
 type KeyGetLengther interface {
-	GetKeyLength(rt *sobek.Runtime, params sobek.Value) (int, error)
+	GetKeyLength() int
 }
 
-func newKeyGetLengther(normalized Algorithm) (KeyGetLengther, error) {
+func newKeyGetLengther(rt *sobek.Runtime, normalized Algorithm, params sobek.Value) (KeyGetLengther, error) {
 	var kgi KeyGetLengther
 	var err error
 
 	switch normalized.Name {
 	case AESCbc, AESCtr, AESGcm, AESKw:
-		kgi = newAESGetLengthParams(normalized)
+		kgi, err = newAESGetLengthParams(rt, normalized, params)
 	default:
 		return nil, errors.New("key get length not implemented for algorithm " + normalized.Name)
 	}
