@@ -80,6 +80,7 @@ type WithIteration = int64
 //   - WithIteration: sets the iteration (default 0).
 func (v *VU) StartIteration(tb testing.TB, opts ...any) {
 	tb.Helper()
+	tb.Cleanup(func() { v.EndIteration(tb) }) // this prevents leaks. there are no sideeffects if this is done before.
 	v.iterEvent(tb, event.IterStart, "IterStart", opts...)
 }
 
