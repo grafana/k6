@@ -2,12 +2,18 @@ MAKEFLAGS += --silent
 GOLANGCI_LINT_VERSION = $(shell head -n 1 .golangci.yml | tr -d '\# ')
 PROTOC_VERSION := 21.12
 
-# Detect OS and set appropriate protoc archive
-UNAME_S := $(shell uname -s)
-ifeq ($(UNAME_S),Linux)
-    PROTOC_ARCHIVE := protoc-$(PROTOC_VERSION)-linux-x86_64.zip
-else ifeq ($(UNAME_S),Darwin)
-    PROTOC_ARCHIVE := protoc-$(PROTOC_VERSION)-osx-universal_binary.zip
+ifeq ($(OS),Windows_NT)
+    DETECTED_OS := Windows
+    PROTOC_ARCHIVE := protoc-$(PROTOC_VERSION)-win64.zip
+else
+    UNAME := $(shell uname)
+    ifeq ($(UNAME),Linux)
+        DETECTED_OS := Linux
+        PROTOC_ARCHIVE := protoc-$(PROTOC_VERSION)-linux-x86_64.zip
+    else ifeq ($(UNAME),Darwin)
+        DETECTED_OS := Darwin
+        PROTOC_ARCHIVE := protoc-$(PROTOC_VERSION)-osx-universal_binary.zip
+    endif
 endif
 
 PROTOC_DOWNLOAD_URL := https://github.com/protocolbuffers/protobuf/releases/download/v$(PROTOC_VERSION)/$(PROTOC_ARCHIVE)
@@ -15,7 +21,7 @@ PROTOC_DOWNLOAD_URL := https://github.com/protocolbuffers/protobuf/releases/down
 proto-dependencies:
 	go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.31.0
 	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.3.0
-	@if [ "$$(uname)" != "Linux" ] && [ "$$(uname)" != "Darwin" ]; then \
+	@if [ -z "$(DETECTED_OS)" ]; then \
 		echo "Error: Can't install protoc on your OS, please install protoc-$(PROTOC_VERSION) manually." >&2; \
 		exit 1; \
 	fi
