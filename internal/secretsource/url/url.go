@@ -169,13 +169,8 @@ func (us *urlSecrets) Get(key string) (string, error) {
 			return statusErr
 		}
 
-		body, err := io.ReadAll(response.Body)
-		if err != nil {
-			return &retryableError{err: fmt.Errorf("failed to read response: %w", err), statusCode: 0}
-		}
-
 		// Extract secret value from response
-		extractedSecret, err := extractSecretFromResponse(body, us.config.ResponsePath)
+		extractedSecret, err := extractSecretFromResponse(response.Body, us.config.ResponsePath)
 		if err != nil {
 			// Extraction errors are not retryable (indicates config issue)
 			return fmt.Errorf("failed to extract secret: %w", err)
@@ -206,13 +201,18 @@ func newLimiter(requestsPerMinuteLimit, requestsBurst int) *rate.Limiter {
 	return rate.NewLimiter(rate.Every(tokenReplenishInterval), requestsBurst)
 }
 
-func extractSecretFromResponse(body []byte, responsePath string) (string, error) {
-	if responsePath == "" {
-		// If no path specified, assume response body is the secret
-		return string(body), nil
+func extractSecretFromResponse(body io.Reader, responsePath string) (string, error) {
+	data, err := io.ReadAll(body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	result := gjson.GetBytes(body, responsePath)
+	if responsePath == "" {
+		// If no path specified, assume response body is the secret
+		return string(data), nil
+	}
+
+	result := gjson.GetBytes(data, responsePath)
 
 	if !result.Exists() {
 		return "", fmt.Errorf("path %q not found in response", responsePath)

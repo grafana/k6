@@ -1,6 +1,7 @@
 package url
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -130,7 +131,7 @@ func TestExtractSecretFromResponse(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result, err := extractSecretFromResponse(tt.body, tt.responsePath)
+			result, err := extractSecretFromResponse(bytes.NewReader(tt.body), tt.responsePath)
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
