@@ -414,7 +414,12 @@ service. Be sure to run the "k6 cloud login" command prior to authenticate with 
 	return cloudCmd
 }
 
-func resolveAndSetProjectID(gs *state.GlobalState, cloudConfig *cloudapi.Config, tmpCloudConfig map[string]interface{}, arc *lib.Archive) error {
+func resolveAndSetProjectID(
+	gs *state.GlobalState,
+	cloudConfig *cloudapi.Config,
+	tmpCloudConfig map[string]interface{},
+	arc *lib.Archive,
+) error {
 	projectID, err := resolveDefaultProjectID(gs, cloudConfig)
 	if err != nil {
 		return err
