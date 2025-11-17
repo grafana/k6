@@ -192,11 +192,10 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 			arc.Options.External[cloudapi.LegacyCloudConfigKey] = b
 
 			cloudConfig.ProjectID = null.IntFrom(projectID)
-		} else {
-			if !cloudConfig.StackID.Valid || cloudConfig.StackID.Int64 == 0 {
-				c.gs.Logger.Warn("Warning: no projectID or default stack specified. Falling back to the first available stack.")
-				c.gs.Logger.Warn("Consider setting a default stack via the `k6 cloud login` command.")
-			}
+		}
+		if projectID == 0 && (!cloudConfig.StackID.Valid || cloudConfig.StackID.Int64 == 0) {
+			c.gs.Logger.Warn("Warning: no projectID or default stack specified. Falling back to the first available stack.")
+			c.gs.Logger.Warn("Consider setting a default stack via the `k6 cloud login` command.")
 		}
 	}
 

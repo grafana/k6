@@ -20,7 +20,11 @@ import (
 
 // validateAndResolveStack validates a stack URL/slug and returns the normalized URL, stack ID, and default project ID.
 // The stackInput can be either a full URL (e.g., https://my-team.grafana.net) or just a slug (e.g., my-team).
-func validateAndResolveStack(gs *state.GlobalState, jsonRawConf json.RawMessage, token, stackInput string) (stackURL string, stackID int64, defaultProjectID int64, err error) {
+func validateAndResolveStack(
+	gs *state.GlobalState,
+	jsonRawConf json.RawMessage,
+	token, stackInput string,
+) (stackURL string, stackID int64, defaultProjectID int64, err error) {
 	consolidatedCurrentConfig, warn, err := cloudapi.GetConsolidatedConfig(
 		jsonRawConf, gs.Env, "", nil, nil)
 	if err != nil {
@@ -178,7 +182,8 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 				printToStdout(c.globalState, fmt.Sprintf("  stack-url: %s\n", valueColor.Sprint(newCloudConf.StackURL.String)))
 			}
 			if newCloudConf.DefaultProjectID.Valid {
-				printToStdout(c.globalState, fmt.Sprintf("  default-project-id: %s\n", valueColor.Sprint(newCloudConf.DefaultProjectID.Int64)))
+				printToStdout(c.globalState, fmt.Sprintf("  default-project-id: %s\n",
+					valueColor.Sprint(newCloudConf.DefaultProjectID.Int64)))
 			}
 		}
 		return nil
@@ -194,7 +199,11 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 			stackURL, stackID, defaultProjectID, err := validateAndResolveStack(
 				c.globalState, currentJSONConfigRaw, token.String, stackInput.String)
 			if err != nil {
-				return fmt.Errorf("your stack is invalid - please, consult the Grafana Cloud k6 documentation for instructions on how to get yours: https://grafana.com/docs/grafana-cloud/testing/k6/author-run/something-stack: %w", err)
+				return fmt.Errorf(
+					"your stack is invalid - please, consult the Grafana Cloud k6 documentation "+
+						"for instructions on how to get yours: "+
+						"https://grafana.com/docs/grafana-cloud/testing/k6/author-run/something-stack: %w",
+					err)
 			}
 			newCloudConf.StackURL = null.StringFrom(stackURL)
 			newCloudConf.StackID = null.IntFrom(stackID)
@@ -251,7 +260,11 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 			stackURL, stackID, defaultProjectID, err := validateAndResolveStack(
 				c.globalState, currentJSONConfigRaw, tokenValue, stackValue)
 			if err != nil {
-				return fmt.Errorf("your stack is invalid - please, consult the Grafana Cloud k6 documentation for instructions on how to get yours: https://grafana.com/docs/grafana-cloud/testing/k6/author-run/something-stack: %w", err)
+				return fmt.Errorf(
+					"your stack is invalid - please, consult the Grafana Cloud k6 documentation "+
+						"for instructions on how to get yours: "+
+						"https://grafana.com/docs/grafana-cloud/testing/k6/author-run/something-stack: %w",
+					err)
 			}
 			newCloudConf.StackURL = null.StringFrom(stackURL)
 			newCloudConf.StackID = null.IntFrom(stackID)
@@ -270,6 +283,7 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
+	//nolint:nestif
 	if newCloudConf.Token.Valid {
 		valueColor := getColor(c.globalState.Flags.NoColor || !c.globalState.Stdout.IsTTY, color.FgCyan)
 		printToStdout(c.globalState, fmt.Sprintf(
@@ -285,7 +299,8 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 				printToStdout(c.globalState, fmt.Sprintf("  stack-url: %s\n", valueColor.Sprint(newCloudConf.StackURL.String)))
 			}
 			if newCloudConf.DefaultProjectID.Valid {
-				printToStdout(c.globalState, fmt.Sprintf("  default-project-id: %s\n", valueColor.Sprint(newCloudConf.DefaultProjectID.Int64)))
+				printToStdout(c.globalState, fmt.Sprintf("  default-project-id: %s\n",
+					valueColor.Sprint(newCloudConf.DefaultProjectID.Int64)))
 			}
 		}
 	}

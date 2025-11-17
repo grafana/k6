@@ -146,7 +146,9 @@ func resolveDefaultProjectID(
 			gs.Logger.Warnf("Warning: no projectID specified, using default project of the %s stack\n\n", stackName)
 			return cloudConfig.DefaultProjectID.Int64, nil
 		}
-		return 0, fmt.Errorf("default stack configured but default project ID not available - please run `k6 cloud login` to refresh your configuration")
+		return 0, fmt.Errorf(
+			"default stack configured but default project ID not available - " +
+				"please run `k6 cloud login` to refresh your configuration")
 	}
 
 	// Return 0 to let the backend pick the project (old behavior)
