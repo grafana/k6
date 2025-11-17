@@ -13,6 +13,8 @@ import (
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/guregu/null.v3"
+
 	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/lib/types"
 )
@@ -166,9 +168,9 @@ func TestGetConfig(t *testing.T) {
 		assert.Equal(t, config.Headers, result.Headers)
 		assert.Equal(t, config.Method, result.Method)
 		assert.Equal(t, config.ResponsePath, result.ResponsePath)
-		assert.Equal(t, defaultRequestsPerMinuteLimit, *result.RequestsPerMinuteLimit)
-		assert.Equal(t, defaultRequestsBurst, *result.RequestsBurst)
-		assert.Equal(t, defaultTimeout, time.Duration(result.Timeout.Duration))
+		assert.Equal(t, int64(300), result.RequestsPerMinuteLimit.Int64)
+		assert.Equal(t, int64(10), result.RequestsBurst.Int64)
+		assert.Equal(t, 30*time.Second, time.Duration(result.Timeout.Duration))
 	})
 
 	t.Run("custom rate limits", func(t *testing.T) {
@@ -180,8 +182,8 @@ func TestGetConfig(t *testing.T) {
 		customTimeout := types.NullDurationFrom(60 * time.Second)
 		config := extConfig{
 			URLTemplate:            "https://api.example.com/secrets/{key}",
-			RequestsPerMinuteLimit: &customLimit,
-			RequestsBurst:          &customBurst,
+			RequestsPerMinuteLimit: null.IntFrom(int64(customLimit)),
+			RequestsBurst:          null.IntFrom(int64(customBurst)),
 			Timeout:                customTimeout,
 		}
 
@@ -192,8 +194,8 @@ func TestGetConfig(t *testing.T) {
 
 		result, err := getConfig("config="+testConfigFile, fs)
 		require.NoError(t, err)
-		assert.Equal(t, customLimit, *result.RequestsPerMinuteLimit)
-		assert.Equal(t, customBurst, *result.RequestsBurst)
+		assert.Equal(t, int64(customLimit), result.RequestsPerMinuteLimit.Int64)
+		assert.Equal(t, int64(customBurst), result.RequestsBurst.Int64)
 		assert.Equal(t, customTimeout.Duration, result.Timeout.Duration)
 	})
 
@@ -223,7 +225,7 @@ func TestGetConfig(t *testing.T) {
 		invalidLimit := -1
 		config := extConfig{
 			URLTemplate:            "https://api.example.com/secrets/{key}",
-			RequestsPerMinuteLimit: &invalidLimit,
+			RequestsPerMinuteLimit: null.IntFrom(int64(invalidLimit)),
 		}
 
 		configData, err := json.Marshal(config)
@@ -232,7 +234,7 @@ func TestGetConfig(t *testing.T) {
 		require.NoError(t, err)
 
 		_, err = getConfig("config="+testConfigFile, fs)
-		assert.ErrorIs(t, err, errInvalidRequestsPerMinuteLimit)
+		assert.ErrorContains(t, err, "requestsPerMinuteLimit must be greater than 0")
 	})
 
 	t.Run("nonexistent config file", func(t *testing.T) {
@@ -270,7 +272,7 @@ func TestURLSecrets_Get(t *testing.T) {
 				Method:       "GET",
 				ResponsePath: "",
 				Timeout:      types.NullDurationFrom(time.Duration(timeout) * time.Second),
-				MaxRetries:   &maxRetries,
+				MaxRetries:   null.IntFrom(int64(maxRetries)),
 				RetryBackoff: types.NullDurationFrom(time.Duration(retryBackoff) * time.Second),
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
@@ -300,7 +302,7 @@ func TestURLSecrets_Get(t *testing.T) {
 				Method:       "GET",
 				ResponsePath: "data.value",
 				Timeout:      types.NullDurationFrom(time.Duration(timeout) * time.Second),
-				MaxRetries:   &maxRetries,
+				MaxRetries:   null.IntFrom(int64(maxRetries)),
 				RetryBackoff: types.NullDurationFrom(time.Duration(retryBackoff) * time.Second),
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
@@ -326,7 +328,7 @@ func TestURLSecrets_Get(t *testing.T) {
 			config: extConfig{
 				URLTemplate:  server.URL + "/secrets/{key}",
 				Timeout:      types.NullDurationFrom(time.Duration(timeout) * time.Second),
-				MaxRetries:   &maxRetries,
+				MaxRetries:   null.IntFrom(int64(maxRetries)),
 				RetryBackoff: types.NullDurationFrom(time.Duration(retryBackoff) * time.Second),
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
@@ -345,7 +347,7 @@ func TestURLSecrets_Get(t *testing.T) {
 		retryBackoff := 1
 		us := &urlSecrets{
 			config: extConfig{
-				MaxRetries:   &maxRetries,
+				MaxRetries:   null.IntFrom(int64(maxRetries)),
 				RetryBackoff: types.NullDurationFrom(time.Duration(retryBackoff) * time.Second),
 			},
 			httpClient: &http.Client{},
@@ -376,7 +378,7 @@ func TestURLSecrets_Get(t *testing.T) {
 			config: extConfig{
 				URLTemplate:  server.URL + "/secrets/{key}",
 				Timeout:      types.NullDurationFrom(time.Duration(timeout) * time.Second),
-				MaxRetries:   &maxRetries,
+				MaxRetries:   null.IntFrom(int64(maxRetries)),
 				RetryBackoff: types.NullDurationFrom(time.Duration(retryBackoff) * time.Second),
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
@@ -427,7 +429,7 @@ func TestURLSecrets_Get_Retry(t *testing.T) {
 			config: extConfig{
 				URLTemplate:  server.URL + "/secrets/{key}",
 				Timeout:      types.NullDurationFrom(time.Duration(timeout) * time.Second),
-				MaxRetries:   &maxRetries,
+				MaxRetries:   null.IntFrom(int64(maxRetries)),
 				RetryBackoff: types.NullDurationFrom(time.Duration(retryBackoff) * time.Second),
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
@@ -473,7 +475,7 @@ func TestURLSecrets_Get_Retry(t *testing.T) {
 			config: extConfig{
 				URLTemplate:  server.URL + "/secrets/{key}",
 				Timeout:      types.NullDurationFrom(time.Duration(timeout) * time.Second),
-				MaxRetries:   &maxRetries,
+				MaxRetries:   null.IntFrom(int64(maxRetries)),
 				RetryBackoff: types.NullDurationFrom(time.Duration(retryBackoff) * time.Second),
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
@@ -511,7 +513,7 @@ func TestURLSecrets_Get_Retry(t *testing.T) {
 			config: extConfig{
 				URLTemplate:  server.URL + "/secrets/{key}",
 				Timeout:      types.NullDurationFrom(time.Duration(timeout) * time.Second),
-				MaxRetries:   &maxRetries,
+				MaxRetries:   null.IntFrom(int64(maxRetries)),
 				RetryBackoff: types.NullDurationFrom(time.Duration(retryBackoff) * time.Second),
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
@@ -549,7 +551,7 @@ func TestURLSecrets_Get_Retry(t *testing.T) {
 			config: extConfig{
 				URLTemplate:  server.URL + "/secrets/{key}",
 				Timeout:      types.NullDurationFrom(time.Duration(timeout) * time.Second),
-				MaxRetries:   &maxRetries,
+				MaxRetries:   null.IntFrom(int64(maxRetries)),
 				RetryBackoff: types.NullDurationFrom(time.Duration(retryBackoff) * time.Second),
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
@@ -587,7 +589,7 @@ func TestURLSecrets_Get_Retry(t *testing.T) {
 			config: extConfig{
 				URLTemplate:  server.URL + "/secrets/{key}",
 				Timeout:      types.NullDurationFrom(time.Duration(timeout) * time.Second),
-				MaxRetries:   &maxRetries,
+				MaxRetries:   null.IntFrom(int64(maxRetries)),
 				RetryBackoff: types.NullDurationFrom(time.Duration(retryBackoff) * time.Second),
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
@@ -625,7 +627,7 @@ func TestURLSecrets_Get_Retry(t *testing.T) {
 			config: extConfig{
 				URLTemplate:  server.URL + "/secrets/{key}",
 				Timeout:      types.NullDurationFrom(time.Duration(timeout) * time.Second),
-				MaxRetries:   &maxRetries,
+				MaxRetries:   null.IntFrom(int64(maxRetries)),
 				RetryBackoff: types.NullDurationFrom(time.Duration(retryBackoff) * time.Second),
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
@@ -670,7 +672,7 @@ func TestURLSecrets_Get_Retry(t *testing.T) {
 			config: extConfig{
 				URLTemplate:  server.URL + "/secrets/{key}",
 				Timeout:      types.NullDurationFrom(time.Duration(timeout) * time.Second),
-				MaxRetries:   &maxRetries,
+				MaxRetries:   null.IntFrom(int64(maxRetries)),
 				RetryBackoff: types.NullDurationFrom(time.Duration(retryBackoff) * time.Second),
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
@@ -709,13 +711,13 @@ func TestURLSecrets_Get_Retry(t *testing.T) {
 		defer server.Close()
 
 		timeout := 5
-		maxRetries := defaultMaxRetries
+		maxRetries := 3
 		us := &urlSecrets{
 			config: extConfig{
 				URLTemplate:  server.URL + "/secrets/{key}",
 				Timeout:      types.NullDurationFrom(time.Duration(timeout) * time.Second),
-				MaxRetries:   &maxRetries,
-				RetryBackoff: types.NullDurationFrom(defaultRetryBackoff),
+				MaxRetries:   null.IntFrom(int64(maxRetries)),
+				RetryBackoff: types.NullDurationFrom(1 * time.Second),
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
 			limiter:    &mockLimiter{},
@@ -751,8 +753,8 @@ func TestGetConfig_Retry(t *testing.T) {
 
 		result, err := getConfig("config="+testConfigFile, fs)
 		require.NoError(t, err)
-		assert.Equal(t, defaultMaxRetries, *result.MaxRetries)
-		assert.Equal(t, defaultRetryBackoff, time.Duration(result.RetryBackoff.Duration))
+		assert.Equal(t, int64(3), result.MaxRetries.Int64)
+		assert.Equal(t, 1*time.Second, time.Duration(result.RetryBackoff.Duration))
 	})
 
 	t.Run("custom retry config values", func(t *testing.T) {
@@ -763,7 +765,7 @@ func TestGetConfig_Retry(t *testing.T) {
 		customBackoff := types.NullDurationFrom(2 * time.Second)
 		config := extConfig{
 			URLTemplate:  "https://api.example.com/secrets/{key}",
-			MaxRetries:   &customRetries,
+			MaxRetries:   null.IntFrom(int64(customRetries)),
 			RetryBackoff: customBackoff,
 		}
 
@@ -774,7 +776,7 @@ func TestGetConfig_Retry(t *testing.T) {
 
 		result, err := getConfig("config="+testConfigFile, fs)
 		require.NoError(t, err)
-		assert.Equal(t, customRetries, *result.MaxRetries)
+		assert.Equal(t, int64(customRetries), result.MaxRetries.Int64)
 		assert.Equal(t, customBackoff.Duration, result.RetryBackoff.Duration)
 	})
 
@@ -785,7 +787,7 @@ func TestGetConfig_Retry(t *testing.T) {
 		invalidRetries := -1
 		config := extConfig{
 			URLTemplate: "https://api.example.com/secrets/{key}",
-			MaxRetries:  &invalidRetries,
+			MaxRetries:  null.IntFrom(int64(invalidRetries)),
 		}
 
 		configData, err := json.Marshal(config)
@@ -794,7 +796,7 @@ func TestGetConfig_Retry(t *testing.T) {
 		require.NoError(t, err)
 
 		_, err = getConfig("config="+testConfigFile, fs)
-		assert.ErrorIs(t, err, errInvalidMaxRetries)
+		assert.ErrorContains(t, err, "maxRetries must be non-negative")
 	})
 
 	t.Run("invalid retryBackoff zero value", func(t *testing.T) {
@@ -813,7 +815,7 @@ func TestGetConfig_Retry(t *testing.T) {
 		require.NoError(t, err)
 
 		_, err = getConfig("config="+testConfigFile, fs)
-		assert.ErrorIs(t, err, errInvalidRetryBackoff)
+		assert.ErrorContains(t, err, "retryBackoff must be greater than 0")
 	})
 
 	t.Run("maxRetries=0 is valid (disables retries)", func(t *testing.T) {
@@ -823,7 +825,7 @@ func TestGetConfig_Retry(t *testing.T) {
 		zeroRetries := 0
 		config := extConfig{
 			URLTemplate: "https://api.example.com/secrets/{key}",
-			MaxRetries:  &zeroRetries,
+			MaxRetries:  null.IntFrom(int64(zeroRetries)),
 		}
 
 		configData, err := json.Marshal(config)
@@ -833,7 +835,7 @@ func TestGetConfig_Retry(t *testing.T) {
 
 		result, err := getConfig("config="+testConfigFile, fs)
 		require.NoError(t, err)
-		assert.Equal(t, 0, *result.MaxRetries)
+		assert.Equal(t, int64(0), result.MaxRetries.Int64)
 	})
 }
 
@@ -902,7 +904,7 @@ func TestURLSecrets_GSM_Integration(t *testing.T) {
 				Method:       "GET",
 				ResponsePath: "plaintext",
 				Timeout:      types.NullDurationFrom(time.Duration(timeout) * time.Second),
-				MaxRetries:   &maxRetries,
+				MaxRetries:   null.IntFrom(int64(maxRetries)),
 				RetryBackoff: types.NullDurationFrom(time.Duration(retryBackoff) * time.Second),
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
@@ -966,7 +968,7 @@ func TestURLSecrets_GSM_Integration(t *testing.T) {
 				},
 				ResponsePath: "plaintext",
 				Timeout:      types.NullDurationFrom(time.Duration(timeout) * time.Second),
-				MaxRetries:   &maxRetries,
+				MaxRetries:   null.IntFrom(int64(maxRetries)),
 				RetryBackoff: types.NullDurationFrom(time.Duration(retryBackoff) * time.Second),
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
@@ -1016,7 +1018,7 @@ func TestURLSecrets_GSM_Integration(t *testing.T) {
 				URLTemplate:  server.URL + "/secrets/{key}/decrypt",
 				ResponsePath: "plaintext",
 				Timeout:      types.NullDurationFrom(time.Duration(timeout) * time.Second),
-				MaxRetries:   &maxRetries,
+				MaxRetries:   null.IntFrom(int64(maxRetries)),
 				RetryBackoff: types.NullDurationFrom(time.Duration(retryBackoff) * time.Second),
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
@@ -1056,7 +1058,7 @@ func TestURLSecrets_GSM_Integration(t *testing.T) {
 				URLTemplate:  server.URL + "/secrets/{key}/decrypt",
 				ResponsePath: "plaintext",
 				Timeout:      types.NullDurationFrom(time.Duration(timeout) * time.Second),
-				MaxRetries:   &maxRetries,
+				MaxRetries:   null.IntFrom(int64(maxRetries)),
 				RetryBackoff: types.NullDurationFrom(time.Duration(retryBackoff) * time.Second),
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
