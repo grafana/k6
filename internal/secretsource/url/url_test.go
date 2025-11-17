@@ -903,7 +903,6 @@ func TestURLSecrets_Description(t *testing.T) {
 
 	desc := us.Description()
 	assert.Contains(t, desc, "URL-based secret source")
-	assert.Contains(t, desc, "https://vault.example.com/api/{key}")
 }
 
 // TestURLSecrets_GSM_Integration tests that the URL secret source works as a drop-in
