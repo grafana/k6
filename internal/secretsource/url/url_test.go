@@ -258,15 +258,19 @@ func TestURLSecrets_Get(t *testing.T) {
 		defer server.Close()
 
 		timeout := 5
+		maxRetries := 3
+		retryBackoff := 1
 		us := &urlSecrets{
 			config: extConfig{
 				URLTemplate: server.URL + "/secrets/{key}",
 				Headers: map[string]string{
 					"Authorization": "Bearer token123",
 				},
-				Method:         "GET",
-				ResponsePath:   "",
-				TimeoutSeconds: &timeout,
+				Method:              "GET",
+				ResponsePath:        "",
+				TimeoutSeconds:      &timeout,
+				MaxRetries:          &maxRetries,
+				RetryBackoffSeconds: &retryBackoff,
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
 			limiter:    &mockLimiter{},
@@ -287,12 +291,16 @@ func TestURLSecrets_Get(t *testing.T) {
 		defer server.Close()
 
 		timeout := 5
+		maxRetries := 3
+		retryBackoff := 1
 		us := &urlSecrets{
 			config: extConfig{
-				URLTemplate:    server.URL + "/api/secrets/{key}",
-				Method:         "GET",
-				ResponsePath:   "data.value",
-				TimeoutSeconds: &timeout,
+				URLTemplate:         server.URL + "/api/secrets/{key}",
+				Method:              "GET",
+				ResponsePath:        "data.value",
+				TimeoutSeconds:      &timeout,
+				MaxRetries:          &maxRetries,
+				RetryBackoffSeconds: &retryBackoff,
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
 			limiter:    &mockLimiter{},
@@ -311,10 +319,14 @@ func TestURLSecrets_Get(t *testing.T) {
 		defer server.Close()
 
 		timeout := 5
+		maxRetries := 3
+		retryBackoff := 1
 		us := &urlSecrets{
 			config: extConfig{
-				URLTemplate:    server.URL + "/secrets/{key}",
-				TimeoutSeconds: &timeout,
+				URLTemplate:         server.URL + "/secrets/{key}",
+				TimeoutSeconds:      &timeout,
+				MaxRetries:          &maxRetries,
+				RetryBackoffSeconds: &retryBackoff,
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
 			limiter:    &mockLimiter{},
@@ -328,8 +340,13 @@ func TestURLSecrets_Get(t *testing.T) {
 
 	t.Run("rate limiter error", func(t *testing.T) {
 		t.Parallel()
+		maxRetries := 3
+		retryBackoff := 1
 		us := &urlSecrets{
-			config:     extConfig{},
+			config: extConfig{
+				MaxRetries:          &maxRetries,
+				RetryBackoffSeconds: &retryBackoff,
+			},
 			httpClient: &http.Client{},
 			limiter:    &mockLimiter{shouldError: true},
 		}
@@ -352,10 +369,14 @@ func TestURLSecrets_Get(t *testing.T) {
 		defer server.Close()
 
 		timeout := 5
+		maxRetries := 3
+		retryBackoff := 1
 		us := &urlSecrets{
 			config: extConfig{
-				URLTemplate:    server.URL + "/secrets/{key}",
-				TimeoutSeconds: &timeout,
+				URLTemplate:         server.URL + "/secrets/{key}",
+				TimeoutSeconds:      &timeout,
+				MaxRetries:          &maxRetries,
+				RetryBackoffSeconds: &retryBackoff,
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
 			limiter:    &mockLimiter{},
@@ -370,6 +391,449 @@ func TestURLSecrets_Get(t *testing.T) {
 		}
 
 		assert.Equal(t, keys, requestedKeys)
+	})
+}
+
+func TestURLSecrets_Get_Retry(t *testing.T) {
+	t.Parallel()
+
+	t.Run("retry on 500 error then succeed", func(t *testing.T) {
+		t.Parallel()
+		attemptCount := 0
+		var mu sync.Mutex
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			mu.Lock()
+			attemptCount++
+			currentAttempt := attemptCount
+			mu.Unlock()
+
+			// Fail first 2 attempts with 500, then succeed
+			if currentAttempt <= 2 {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("secret-after-retry"))
+		}))
+		defer server.Close()
+
+		timeout := 5
+		maxRetries := 3
+		retryBackoff := 1
+		us := &urlSecrets{
+			config: extConfig{
+				URLTemplate:         server.URL + "/secrets/{key}",
+				TimeoutSeconds:      &timeout,
+				MaxRetries:          &maxRetries,
+				RetryBackoffSeconds: &retryBackoff,
+			},
+			httpClient: &http.Client{Timeout: 5 * time.Second},
+			limiter:    &mockLimiter{},
+		}
+
+		secret, err := us.Get("test-key")
+		require.NoError(t, err)
+		assert.Equal(t, "secret-after-retry", secret)
+
+		mu.Lock()
+		defer mu.Unlock()
+		assert.Equal(t, 3, attemptCount, "should have made 3 attempts (2 failures + 1 success)")
+	})
+
+	t.Run("retry on 429 rate limit then succeed", func(t *testing.T) {
+		t.Parallel()
+		attemptCount := 0
+		var mu sync.Mutex
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			mu.Lock()
+			attemptCount++
+			currentAttempt := attemptCount
+			mu.Unlock()
+
+			// Return 429 on first attempt, then succeed
+			if currentAttempt == 1 {
+				w.WriteHeader(http.StatusTooManyRequests)
+				_, _ = w.Write([]byte(`{"error":"rate limit exceeded"}`))
+				return
+			}
+
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("secret-after-rate-limit"))
+		}))
+		defer server.Close()
+
+		timeout := 5
+		maxRetries := 3
+		retryBackoff := 1
+		us := &urlSecrets{
+			config: extConfig{
+				URLTemplate:         server.URL + "/secrets/{key}",
+				TimeoutSeconds:      &timeout,
+				MaxRetries:          &maxRetries,
+				RetryBackoffSeconds: &retryBackoff,
+			},
+			httpClient: &http.Client{Timeout: 5 * time.Second},
+			limiter:    &mockLimiter{},
+		}
+
+		secret, err := us.Get("test-key")
+		require.NoError(t, err)
+		assert.Equal(t, "secret-after-rate-limit", secret)
+
+		mu.Lock()
+		defer mu.Unlock()
+		assert.Equal(t, 2, attemptCount, "should have made 2 attempts (1 rate limit + 1 success)")
+	})
+
+	t.Run("no retry on 401 unauthorized error", func(t *testing.T) {
+		t.Parallel()
+		attemptCount := 0
+		var mu sync.Mutex
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			mu.Lock()
+			attemptCount++
+			mu.Unlock()
+
+			w.WriteHeader(http.StatusUnauthorized)
+			_, _ = w.Write([]byte(`{"error":"unauthorized"}`))
+		}))
+		defer server.Close()
+
+		timeout := 5
+		maxRetries := 3
+		retryBackoff := 1
+		us := &urlSecrets{
+			config: extConfig{
+				URLTemplate:         server.URL + "/secrets/{key}",
+				TimeoutSeconds:      &timeout,
+				MaxRetries:          &maxRetries,
+				RetryBackoffSeconds: &retryBackoff,
+			},
+			httpClient: &http.Client{Timeout: 5 * time.Second},
+			limiter:    &mockLimiter{},
+		}
+
+		_, err := us.Get("test-key")
+		assert.Error(t, err)
+		assert.ErrorIs(t, err, errFailedToGetSecret)
+		assert.Contains(t, err.Error(), "401")
+
+		mu.Lock()
+		defer mu.Unlock()
+		assert.Equal(t, 1, attemptCount, "should only attempt once for 401 error (no retry)")
+	})
+
+	t.Run("no retry on 404 not found error", func(t *testing.T) {
+		t.Parallel()
+		attemptCount := 0
+		var mu sync.Mutex
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			mu.Lock()
+			attemptCount++
+			mu.Unlock()
+
+			w.WriteHeader(http.StatusNotFound)
+		}))
+		defer server.Close()
+
+		timeout := 5
+		maxRetries := 3
+		retryBackoff := 1
+		us := &urlSecrets{
+			config: extConfig{
+				URLTemplate:         server.URL + "/secrets/{key}",
+				TimeoutSeconds:      &timeout,
+				MaxRetries:          &maxRetries,
+				RetryBackoffSeconds: &retryBackoff,
+			},
+			httpClient: &http.Client{Timeout: 5 * time.Second},
+			limiter:    &mockLimiter{},
+		}
+
+		_, err := us.Get("test-key")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "404")
+
+		mu.Lock()
+		defer mu.Unlock()
+		assert.Equal(t, 1, attemptCount, "should only attempt once for 404 error (no retry)")
+	})
+
+	t.Run("exhaust all retries with 503 errors", func(t *testing.T) {
+		t.Parallel()
+		attemptCount := 0
+		var mu sync.Mutex
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			mu.Lock()
+			attemptCount++
+			mu.Unlock()
+
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte("service unavailable"))
+		}))
+		defer server.Close()
+
+		timeout := 5
+		maxRetries := 2
+		retryBackoff := 1
+		us := &urlSecrets{
+			config: extConfig{
+				URLTemplate:         server.URL + "/secrets/{key}",
+				TimeoutSeconds:      &timeout,
+				MaxRetries:          &maxRetries,
+				RetryBackoffSeconds: &retryBackoff,
+			},
+			httpClient: &http.Client{Timeout: 5 * time.Second},
+			limiter:    &mockLimiter{},
+		}
+
+		_, err := us.Get("test-key")
+		assert.Error(t, err)
+		assert.ErrorIs(t, err, errFailedToGetSecret)
+		assert.Contains(t, err.Error(), "503")
+
+		mu.Lock()
+		defer mu.Unlock()
+		assert.Equal(t, 3, attemptCount, "should have made 3 attempts (maxRetries=2 means 2 retries + 1 initial = 3 total)")
+	})
+
+	t.Run("maxRetries=0 means no retries", func(t *testing.T) {
+		t.Parallel()
+		attemptCount := 0
+		var mu sync.Mutex
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			mu.Lock()
+			attemptCount++
+			mu.Unlock()
+
+			w.WriteHeader(http.StatusInternalServerError)
+		}))
+		defer server.Close()
+
+		timeout := 5
+		maxRetries := 0
+		retryBackoff := 1
+		us := &urlSecrets{
+			config: extConfig{
+				URLTemplate:         server.URL + "/secrets/{key}",
+				TimeoutSeconds:      &timeout,
+				MaxRetries:          &maxRetries,
+				RetryBackoffSeconds: &retryBackoff,
+			},
+			httpClient: &http.Client{Timeout: 5 * time.Second},
+			limiter:    &mockLimiter{},
+		}
+
+		_, err := us.Get("test-key")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "500")
+
+		mu.Lock()
+		defer mu.Unlock()
+		assert.Equal(t, 1, attemptCount, "should only attempt once when maxRetries=0")
+	})
+
+	t.Run("retry with 502 bad gateway then succeed", func(t *testing.T) {
+		t.Parallel()
+		attemptCount := 0
+		var mu sync.Mutex
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			mu.Lock()
+			attemptCount++
+			currentAttempt := attemptCount
+			mu.Unlock()
+
+			// Fail first attempt with 502, then succeed
+			if currentAttempt == 1 {
+				w.WriteHeader(http.StatusBadGateway)
+				return
+			}
+
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("secret-after-502"))
+		}))
+		defer server.Close()
+
+		timeout := 5
+		maxRetries := 3
+		retryBackoff := 1
+		us := &urlSecrets{
+			config: extConfig{
+				URLTemplate:         server.URL + "/secrets/{key}",
+				TimeoutSeconds:      &timeout,
+				MaxRetries:          &maxRetries,
+				RetryBackoffSeconds: &retryBackoff,
+			},
+			httpClient: &http.Client{Timeout: 5 * time.Second},
+			limiter:    &mockLimiter{},
+		}
+
+		secret, err := us.Get("test-key")
+		require.NoError(t, err)
+		assert.Equal(t, "secret-after-502", secret)
+
+		mu.Lock()
+		defer mu.Unlock()
+		assert.Equal(t, 2, attemptCount, "should have made 2 attempts (1 failure + 1 success)")
+	})
+
+	t.Run("uses default retry config when not specified", func(t *testing.T) {
+		t.Parallel()
+		attemptCount := 0
+		var mu sync.Mutex
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			mu.Lock()
+			attemptCount++
+			currentAttempt := attemptCount
+			mu.Unlock()
+
+			// Fail first 2 attempts, then succeed
+			if currentAttempt <= 2 {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("secret-with-defaults"))
+		}))
+		defer server.Close()
+
+		timeout := 5
+		maxRetries := defaultMaxRetries
+		retryBackoff := defaultRetryBackoffSeconds
+		us := &urlSecrets{
+			config: extConfig{
+				URLTemplate:         server.URL + "/secrets/{key}",
+				TimeoutSeconds:      &timeout,
+				MaxRetries:          &maxRetries,
+				RetryBackoffSeconds: &retryBackoff,
+			},
+			httpClient: &http.Client{Timeout: 5 * time.Second},
+			limiter:    &mockLimiter{},
+		}
+
+		secret, err := us.Get("test-key")
+		require.NoError(t, err)
+		assert.Equal(t, "secret-with-defaults", secret)
+
+		mu.Lock()
+		defer mu.Unlock()
+		// Default maxRetries is 3, so should attempt up to 4 times (3 retries + 1 initial)
+		assert.GreaterOrEqual(t, attemptCount, 2, "should have retried at least once with defaults")
+		assert.LessOrEqual(t, attemptCount, 4, "should not exceed default maxRetries")
+	})
+}
+
+func TestGetConfig_Retry(t *testing.T) {
+	t.Parallel()
+
+	t.Run("default retry config values", func(t *testing.T) {
+		t.Parallel()
+		fs := fsext.NewMemMapFs()
+
+		config := extConfig{
+			URLTemplate: "https://api.example.com/secrets/{key}",
+		}
+
+		configData, err := json.Marshal(config)
+		require.NoError(t, err)
+		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
+		require.NoError(t, err)
+
+		result, err := getConfig("config="+testConfigFile, fs)
+		require.NoError(t, err)
+		assert.Equal(t, defaultMaxRetries, *result.MaxRetries)
+		assert.Equal(t, defaultRetryBackoffSeconds, *result.RetryBackoffSeconds)
+	})
+
+	t.Run("custom retry config values", func(t *testing.T) {
+		t.Parallel()
+		fs := fsext.NewMemMapFs()
+
+		customRetries := 5
+		customBackoff := 2
+		config := extConfig{
+			URLTemplate:         "https://api.example.com/secrets/{key}",
+			MaxRetries:          &customRetries,
+			RetryBackoffSeconds: &customBackoff,
+		}
+
+		configData, err := json.Marshal(config)
+		require.NoError(t, err)
+		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
+		require.NoError(t, err)
+
+		result, err := getConfig("config="+testConfigFile, fs)
+		require.NoError(t, err)
+		assert.Equal(t, customRetries, *result.MaxRetries)
+		assert.Equal(t, customBackoff, *result.RetryBackoffSeconds)
+	})
+
+	t.Run("invalid maxRetries negative value", func(t *testing.T) {
+		t.Parallel()
+		fs := fsext.NewMemMapFs()
+
+		invalidRetries := -1
+		config := extConfig{
+			URLTemplate: "https://api.example.com/secrets/{key}",
+			MaxRetries:  &invalidRetries,
+		}
+
+		configData, err := json.Marshal(config)
+		require.NoError(t, err)
+		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
+		require.NoError(t, err)
+
+		_, err = getConfig("config="+testConfigFile, fs)
+		assert.ErrorIs(t, err, errInvalidMaxRetries)
+	})
+
+	t.Run("invalid retryBackoffSeconds zero value", func(t *testing.T) {
+		t.Parallel()
+		fs := fsext.NewMemMapFs()
+
+		invalidBackoff := 0
+		config := extConfig{
+			URLTemplate:         "https://api.example.com/secrets/{key}",
+			RetryBackoffSeconds: &invalidBackoff,
+		}
+
+		configData, err := json.Marshal(config)
+		require.NoError(t, err)
+		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
+		require.NoError(t, err)
+
+		_, err = getConfig("config="+testConfigFile, fs)
+		assert.ErrorIs(t, err, errInvalidRetryBackoff)
+	})
+
+	t.Run("maxRetries=0 is valid (disables retries)", func(t *testing.T) {
+		t.Parallel()
+		fs := fsext.NewMemMapFs()
+
+		zeroRetries := 0
+		config := extConfig{
+			URLTemplate: "https://api.example.com/secrets/{key}",
+			MaxRetries:  &zeroRetries,
+		}
+
+		configData, err := json.Marshal(config)
+		require.NoError(t, err)
+		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
+		require.NoError(t, err)
+
+		result, err := getConfig("config="+testConfigFile, fs)
+		require.NoError(t, err)
+		assert.Equal(t, 0, *result.MaxRetries)
 	})
 }
 
@@ -427,15 +891,19 @@ func TestURLSecrets_GSM_Integration(t *testing.T) {
 
 		// Configure URL secret source to match GSM format
 		timeout := 5
+		maxRetries := 3
+		retryBackoff := 1
 		us := &urlSecrets{
 			config: extConfig{
 				URLTemplate: server.URL + "/secrets/{key}/decrypt",
 				Headers: map[string]string{
 					"Authorization": "Bearer test-token",
 				},
-				Method:         "GET",
-				ResponsePath:   "plaintext",
-				TimeoutSeconds: &timeout,
+				Method:              "GET",
+				ResponsePath:        "plaintext",
+				TimeoutSeconds:      &timeout,
+				MaxRetries:          &maxRetries,
+				RetryBackoffSeconds: &retryBackoff,
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
 			limiter:    &mockLimiter{},
@@ -488,14 +956,18 @@ func TestURLSecrets_GSM_Integration(t *testing.T) {
 		defer server.Close()
 
 		timeout := 5
+		maxRetries := 3
+		retryBackoff := 1
 		us := &urlSecrets{
 			config: extConfig{
 				URLTemplate: server.URL + "/secrets/{key}/decrypt",
 				Headers: map[string]string{
 					"Authorization": "Bearer gsm-token",
 				},
-				ResponsePath:   "plaintext",
-				TimeoutSeconds: &timeout,
+				ResponsePath:        "plaintext",
+				TimeoutSeconds:      &timeout,
+				MaxRetries:          &maxRetries,
+				RetryBackoffSeconds: &retryBackoff,
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
 			limiter:    &mockLimiter{},
@@ -537,11 +1009,15 @@ func TestURLSecrets_GSM_Integration(t *testing.T) {
 		defer server.Close()
 
 		timeout := 5
+		maxRetries := 3
+		retryBackoff := 1
 		us := &urlSecrets{
 			config: extConfig{
-				URLTemplate:    server.URL + "/secrets/{key}/decrypt",
-				ResponsePath:   "plaintext",
-				TimeoutSeconds: &timeout,
+				URLTemplate:         server.URL + "/secrets/{key}/decrypt",
+				ResponsePath:        "plaintext",
+				TimeoutSeconds:      &timeout,
+				MaxRetries:          &maxRetries,
+				RetryBackoffSeconds: &retryBackoff,
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
 			limiter:    &mockLimiter{},
@@ -572,12 +1048,16 @@ func TestURLSecrets_GSM_Integration(t *testing.T) {
 		defer server.Close()
 
 		timeout := 5
+		maxRetries := 3
+		retryBackoff := 1
 		us := &urlSecrets{
 			config: extConfig{
 				// Format matching: https://gsm.proxy-lb:8080/secrets/%s/decrypt
-				URLTemplate:    server.URL + "/secrets/{key}/decrypt",
-				ResponsePath:   "plaintext",
-				TimeoutSeconds: &timeout,
+				URLTemplate:         server.URL + "/secrets/{key}/decrypt",
+				ResponsePath:        "plaintext",
+				TimeoutSeconds:      &timeout,
+				MaxRetries:          &maxRetries,
+				RetryBackoffSeconds: &retryBackoff,
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
 			limiter:    &mockLimiter{},

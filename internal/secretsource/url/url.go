@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
+	"math/rand" // nosemgrep: math-random-used // This is being used for retry jitter
 	"net/http"
 	"strings"
 	"time"
@@ -23,7 +25,26 @@ var (
 	errFailedToGetSecret             = errors.New("failed to get secret")
 	errInvalidRequestsPerMinuteLimit = errors.New("requestsPerMinuteLimit must be greater than 0")
 	errInvalidRequestsBurst          = errors.New("requestsBurst must be greater than 0")
+	errInvalidMaxRetries             = errors.New("maxRetries must be greater than or equal to 0")
+	errInvalidRetryBackoff           = errors.New("retryBackoffSeconds must be greater than 0")
 )
+
+// retryableError wraps an error with HTTP status code information to determine if it should be retried.
+type retryableError struct {
+	err        error
+	statusCode int
+}
+
+func (re *retryableError) Error() string {
+	if re.statusCode > 0 {
+		return fmt.Sprintf("HTTP %d: %v", re.statusCode, re.err)
+	}
+	return re.err.Error()
+}
+
+func (re *retryableError) Unwrap() error {
+	return re.err
+}
 
 // extConfig holds the configuration for URL-based secrets.
 type extConfig struct {
@@ -50,6 +71,15 @@ type extConfig struct {
 
 	// Timeout for HTTP requests in seconds (defaults to 30)
 	TimeoutSeconds *int `json:"timeoutSeconds"`
+
+	// MaxRetries sets the maximum number of retry attempts for failed requests
+	// Only retries on transient errors (5xx, timeouts, network errors, 429)
+	// Does not retry on 4xx errors (except 429)
+	MaxRetries *int `json:"maxRetries"`
+
+	// RetryBackoffSeconds sets the base backoff duration in seconds for retries
+	// Uses exponential backoff: wait = (base ^ attempt) + jitter
+	RetryBackoffSeconds *int `json:"retryBackoffSeconds"`
 }
 
 const (
@@ -62,6 +92,8 @@ const (
 	defaultRequestsPerMinuteLimit = 300 // 300 requests per minute is one request every 200 ms
 	defaultRequestsBurst          = 10  // Allow a burst of 10 requests
 	defaultTimeoutSeconds         = 30  // 30 seconds timeout
+	defaultMaxRetries             = 3   // 3 retry attempts for transient failures
+	defaultRetryBackoffSeconds    = 1   // 1 second base for exponential backoff
 )
 
 //nolint:gochecknoinits // This is how k6 secret source registration works.
@@ -101,43 +133,65 @@ func (us *urlSecrets) Get(key string) (string, error) {
 		return "", fmt.Errorf("rate limiter error: %w", err)
 	}
 
-	// Replace {key} placeholder in URL template
-	url := strings.ReplaceAll(us.config.URLTemplate, "{key}", key)
+	var secret string
+	maxAttempts := *us.config.MaxRetries + 1 // MaxRetries is the number of retries, so total attempts = retries + 1
+	backoff := time.Duration(*us.config.RetryBackoffSeconds) * time.Second
 
-	method := us.config.Method
-	if method == "" {
-		method = http.MethodGet
-	}
+	err := retry(ctx, maxAttempts, backoff, func() error {
+		// Replace {key} placeholder in URL template
+		url := strings.ReplaceAll(us.config.URLTemplate, "{key}", key)
 
-	req, err := http.NewRequestWithContext(ctx, method, url, nil)
+		method := us.config.Method
+		if method == "" {
+			method = http.MethodGet
+		}
+
+		req, err := http.NewRequestWithContext(ctx, method, url, nil)
+		if err != nil {
+			return &retryableError{err: fmt.Errorf("failed to create request: %w", err), statusCode: 0}
+		}
+
+		// Add headers
+		for k, v := range us.config.Headers {
+			req.Header.Set(k, v)
+		}
+
+		response, err := us.httpClient.Do(req)
+		if err != nil {
+			// Network errors are retryable
+			return &retryableError{err: fmt.Errorf("failed to get secret: %w", err), statusCode: 0}
+		}
+		defer func() { _ = response.Body.Close() }()
+
+		if response.StatusCode != http.StatusOK {
+			statusErr := fmt.Errorf("status code %d: %w", response.StatusCode, errFailedToGetSecret)
+
+			// Check if this is a retryable status code
+			if isRetryableError(response.StatusCode, nil) {
+				return &retryableError{err: statusErr, statusCode: response.StatusCode}
+			}
+
+			// Non-retryable error (4xx except 429)
+			return statusErr
+		}
+
+		body, err := io.ReadAll(response.Body)
+		if err != nil {
+			return &retryableError{err: fmt.Errorf("failed to read response: %w", err), statusCode: 0}
+		}
+
+		// Extract secret value from response
+		extractedSecret, err := extractSecretFromResponse(body, us.config.ResponsePath)
+		if err != nil {
+			// Extraction errors are not retryable (indicates config issue)
+			return fmt.Errorf("failed to extract secret: %w", err)
+		}
+
+		secret = extractedSecret
+		return nil
+	})
 	if err != nil {
-		return "", fmt.Errorf("failed to create request: %w", err)
-	}
-
-	// Add headers
-	for k, v := range us.config.Headers {
-		req.Header.Set(k, v)
-	}
-
-	response, err := us.httpClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("failed to get secret: %w", err)
-	}
-	defer func() { _ = response.Body.Close() }()
-
-	if response.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("status code %d: %w", response.StatusCode, errFailedToGetSecret)
-	}
-
-	body, err := io.ReadAll(response.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to read response: %w", err)
-	}
-
-	// Extract secret value from response
-	secret, err := extractSecretFromResponse(body, us.config.ResponsePath)
-	if err != nil {
-		return "", fmt.Errorf("failed to extract secret: %w", err)
+		return "", err
 	}
 
 	return secret, nil
@@ -190,6 +244,71 @@ func extractSecretFromResponse(body []byte, responsePath string) (string, error)
 	}
 
 	return "", fmt.Errorf("secret value at path %q is not a string", responsePath)
+}
+
+// isRetryableError determines if an HTTP status code or error should trigger a retry.
+// Retries on:
+// - Network errors (connection failures, timeouts)
+// - 5xx server errors (server-side issues)
+// - 429 Too Many Requests (rate limiting)
+// Does NOT retry on:
+// - 4xx client errors (except 429) - these indicate issues with the request itself
+func isRetryableError(statusCode int, err error) bool {
+	// Network errors should be retried
+	if err != nil {
+		return true
+	}
+
+	// Retry on server errors and rate limiting
+	if statusCode >= 500 || statusCode == http.StatusTooManyRequests {
+		return true
+	}
+
+	return false
+}
+
+// retry retries to execute a provided function until it succeeds or the maximum
+// number of attempts is hit. It waits with exponential backoff between attempts.
+// The backoff calculation is: wait = (base ^ attempt) + random jitter up to 1 second.
+// Only retries errors that are of type *retryableError.
+func retry(ctx context.Context, attempts int, baseBackoff time.Duration, do func() error) error {
+	r := rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec
+
+	var lastErr error
+	for i := 0; i < attempts; i++ {
+		if i > 0 {
+			// Calculate exponential backoff: base^attempt + jitter
+			wait := time.Duration(math.Pow(baseBackoff.Seconds(), float64(i))) * time.Second
+			jitter := time.Duration(r.Int63n(1000)) * time.Millisecond
+			wait += jitter
+
+			// Wait with context cancellation support
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(wait):
+			}
+		}
+
+		lastErr = do()
+		if lastErr == nil {
+			return nil
+		}
+
+		// Check if this error should be retried
+		var retryErr *retryableError
+		if !errors.As(lastErr, &retryErr) {
+			// Not a retryable error, fail immediately
+			return lastErr
+		}
+
+		// If this is the last attempt, return the error
+		if i == attempts-1 {
+			return lastErr
+		}
+	}
+
+	return lastErr
 }
 
 func parseConfigArgument(configArg string) (string, error) {
@@ -250,6 +369,24 @@ func getConfig(arg string, fs fsext.Fs) (extConfig, error) {
 
 	if *config.RequestsBurst <= 0 {
 		return config, errInvalidRequestsBurst
+	}
+
+	if config.MaxRetries == nil {
+		maxRetries := defaultMaxRetries
+		config.MaxRetries = &maxRetries
+	}
+
+	if config.RetryBackoffSeconds == nil {
+		retryBackoffSeconds := defaultRetryBackoffSeconds
+		config.RetryBackoffSeconds = &retryBackoffSeconds
+	}
+
+	if *config.MaxRetries < 0 {
+		return config, errInvalidMaxRetries
+	}
+
+	if *config.RetryBackoffSeconds <= 0 {
+		return config, errInvalidRetryBackoff
 	}
 
 	return config, nil
