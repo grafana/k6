@@ -106,13 +106,16 @@ func GetAll() []*Extension {
 	mx.RLock()
 	defer mx.RUnlock()
 
-	js, out := extensions[JSExtension], extensions[OutputExtension]
-	result := make([]*Extension, 0, len(js)+len(out))
+	js, out, subcommand := extensions[JSExtension], extensions[OutputExtension], extensions[SubcommandExtension]
+	result := make([]*Extension, 0, len(js)+len(out)+len(subcommand))
 
 	for _, e := range js {
 		result = append(result, e)
 	}
 	for _, e := range out {
+		result = append(result, e)
+	}
+	for _, e := range subcommand {
 		result = append(result, e)
 	}
 
