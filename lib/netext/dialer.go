@@ -61,7 +61,7 @@ func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn,
 	if err != nil {
 		return nil, err
 	}
-	conn, err := d.Dialer.DialContext(ctx, proto, dialAddr)
+	conn, err := d.Dialer.DialContext(ctx, proto, dialAddr.String())
 	if err != nil {
 		return nil, err
 	}
@@ -98,19 +98,19 @@ func (d *Dialer) IOSamples(
 	})
 }
 
-func (d *Dialer) getDialAddr(addr string) (string, error) {
+func (d *Dialer) getDialAddr(addr string) (*types.Host, error) {
 	remote, err := d.findRemote(addr)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	for _, ipnet := range d.Blacklist {
 		if ipnet.Contains(remote.IP) {
-			return "", BlackListedIPError{ip: remote.IP, net: ipnet}
+			return nil, BlackListedIPError{ip: remote.IP, net: ipnet}
 		}
 	}
 
-	return remote.String(), nil
+	return remote, nil
 }
 
 func (d *Dialer) findRemote(addr string) (*types.Host, error) {

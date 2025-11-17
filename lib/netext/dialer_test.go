@@ -66,7 +66,7 @@ func TestDialerAddr(t *testing.T) {
 				require.EqualError(t, err, tc.expErr)
 			} else {
 				require.NoError(t, err)
-				require.Equal(t, tc.expAddress, addr)
+				require.Equal(t, tc.expAddress, addr.String())
 			}
 		})
 	}
@@ -103,7 +103,7 @@ func TestDialerAddrBlockHostnamesStar(t *testing.T) {
 				require.EqualError(t, err, tc.expErr)
 			} else {
 				require.NoError(t, err)
-				require.Equal(t, tc.expAddress, addr)
+				require.Equal(t, tc.expAddress, addr.String())
 			}
 		})
 	}
