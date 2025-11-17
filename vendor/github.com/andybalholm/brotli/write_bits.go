@@ -10,24 +10,21 @@ import "encoding/binary"
 
 /* Write bits into a byte array. */
 
-/*
-This function writes bits into bytes in increasing addresses, and within
+/* This function writes bits into bytes in increasing addresses, and within
+   a byte least-significant-bit first.
 
-	a byte least-significant-bit first.
+   The function can write up to 56 bits in one go with WriteBits
+   Example: let's assume that 3 bits (Rs below) have been written already:
 
-	The function can write up to 56 bits in one go with WriteBits
-	Example: let's assume that 3 bits (Rs below) have been written already:
+   BYTE-0     BYTE+1       BYTE+2
 
-	BYTE-0     BYTE+1       BYTE+2
+   0000 0RRR    0000 0000    0000 0000
 
-	0000 0RRR    0000 0000    0000 0000
+   Now, we could write 5 or less bits in MSB by just sifting by 3
+   and OR'ing to BYTE-0.
 
-	Now, we could write 5 or less bits in MSB by just sifting by 3
-	and OR'ing to BYTE-0.
-
-	For n bits, we take the last 5 bits, OR that with high bits in BYTE-0,
-	and locate the rest in BYTE+1, BYTE+2, etc.
-*/
+   For n bits, we take the last 5 bits, OR that with high bits in BYTE-0,
+   and locate the rest in BYTE+1, BYTE+2, etc. */
 func writeBits(n_bits uint, bits uint64, pos *uint, array []byte) {
 	/* This branch of the code can write up to 56 bits at a time,
 	   7 bits are lost by being perhaps already in *p and at least

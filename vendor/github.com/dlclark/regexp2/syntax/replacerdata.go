@@ -19,7 +19,7 @@ const (
 	replaceWholeString  = -4
 )
 
-// ErrReplacementError is a general error during parsing the replacement text
+//ErrReplacementError is a general error during parsing the replacement text
 var ErrReplacementError = errors.New("Replacement pattern error.")
 
 // NewReplacerData will populate a reusable replacer data struct based on the given replacement string

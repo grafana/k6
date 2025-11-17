@@ -2,8 +2,8 @@
 // easyjson_nounsafe nor appengine build tag is set. See README notes
 // for more details.
 
-//go:build !easyjson_nounsafe && !appengine
-// +build !easyjson_nounsafe,!appengine
+//+build !easyjson_nounsafe
+//+build !appengine
 
 package jlexer
 

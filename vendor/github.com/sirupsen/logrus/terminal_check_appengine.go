@@ -1,4 +1,3 @@
-//go:build appengine
 // +build appengine
 
 package logrus

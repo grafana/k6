@@ -40,7 +40,7 @@ func decideMultiByteStatsLevel(pos uint, len uint, mask uint, data []byte) uint 
 func estimateBitCostsForLiteralsUTF8(pos uint, len uint, mask uint, data []byte, cost []float32) {
 	var max_utf8 uint = decideMultiByteStatsLevel(pos, uint(len), mask, data)
 	/* Bootstrap histograms. */
-	var histogram = [3][256]uint{{0}}
+	var histogram = [3][256]uint{[256]uint{0}}
 	var window_half uint = 495
 	var in_window uint = brotli_min_size_t(window_half, uint(len))
 	var in_window_utf8 = [3]uint{0}
