@@ -162,8 +162,9 @@ func (us *urlSecrets) Get(key string) (string, error) {
 		if response.StatusCode != http.StatusOK {
 			statusErr := fmt.Errorf("status code %d: %w", response.StatusCode, errFailedToGetSecret)
 
-			// Check if this is a retryable status code
-			if isRetryableError(response.StatusCode, nil) {
+			// Retry on server errors (5xx) and rate limiting (429)
+			// Don't retry on client errors (4xx except 429)
+			if response.StatusCode >= 500 || response.StatusCode == http.StatusTooManyRequests {
 				return &retryableError{err: statusErr, statusCode: response.StatusCode}
 			}
 
@@ -233,27 +234,6 @@ func extractSecretFromResponse(body io.Reader, responsePath string) (string, err
 	}
 
 	return result.String(), nil
-}
-
-// isRetryableError determines if an HTTP status code or error should trigger a retry.
-// Retries on:
-// - Network errors (connection failures, timeouts)
-// - 5xx server errors (server-side issues)
-// - 429 Too Many Requests (rate limiting)
-// Does NOT retry on:
-// - 4xx client errors (except 429) - these indicate issues with the request itself
-func isRetryableError(statusCode int, err error) bool {
-	// Network errors should be retried
-	if err != nil {
-		return true
-	}
-
-	// Retry on server errors and rate limiting
-	if statusCode >= 500 || statusCode == http.StatusTooManyRequests {
-		return true
-	}
-
-	return false
 }
 
 // retry retries to execute a provided function until it succeeds or the maximum
