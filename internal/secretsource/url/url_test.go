@@ -166,8 +166,8 @@ func TestGetConfig(t *testing.T) {
 			Headers: map[string]string{
 				"Authorization": "Bearer token123",
 			},
-			Method:       "GET",
-			ResponsePath: "data.value",
+			Method:       null.StringFrom("GET"),
+			ResponsePath: null.StringFrom("data.value"),
 		}
 
 		configData, err := json.Marshal(config)
@@ -179,8 +179,8 @@ func TestGetConfig(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, config.URLTemplate, result.URLTemplate)
 		assert.Equal(t, config.Headers, result.Headers)
-		assert.Equal(t, config.Method, result.Method)
-		assert.Equal(t, config.ResponsePath, result.ResponsePath)
+		assert.Equal(t, config.Method.String, result.Method.String)
+		assert.Equal(t, config.ResponsePath.String, result.ResponsePath.String)
 		assert.Equal(t, int64(300), result.RequestsPerMinuteLimit.Int64)
 		assert.Equal(t, int64(10), result.RequestsBurst.Int64)
 		assert.Equal(t, 30*time.Second, time.Duration(result.Timeout.Duration))
@@ -335,8 +335,8 @@ func TestURLSecrets_Get(t *testing.T) {
 				Headers: map[string]string{
 					"Authorization": "Bearer token123",
 				},
-				Method:       "GET",
-				ResponsePath: "",
+				Method:       null.StringFrom("GET"),
+				ResponsePath: null.StringFrom(""),
 				Timeout:      types.NullDurationFrom(time.Duration(timeout) * time.Second),
 				MaxRetries:   null.IntFrom(int64(maxRetries)),
 				RetryBackoff: types.NullDurationFrom(time.Duration(retryBackoff) * time.Second),
@@ -365,8 +365,8 @@ func TestURLSecrets_Get(t *testing.T) {
 		us := &urlSecrets{
 			config: extConfig{
 				URLTemplate:  server.URL + "/api/secrets/{key}",
-				Method:       "GET",
-				ResponsePath: "data.value",
+				Method:       null.StringFrom("GET"),
+				ResponsePath: null.StringFrom("data.value"),
 				Timeout:      types.NullDurationFrom(time.Duration(timeout) * time.Second),
 				MaxRetries:   null.IntFrom(int64(maxRetries)),
 				RetryBackoff: types.NullDurationFrom(time.Duration(retryBackoff) * time.Second),
@@ -966,8 +966,8 @@ func TestURLSecrets_GSM_Integration(t *testing.T) {
 				Headers: map[string]string{
 					"Authorization": "Bearer test-token",
 				},
-				Method:       "GET",
-				ResponsePath: "plaintext",
+				Method:       null.StringFrom("GET"),
+				ResponsePath: null.StringFrom("plaintext"),
 				Timeout:      types.NullDurationFrom(time.Duration(timeout) * time.Second),
 				MaxRetries:   null.IntFrom(int64(maxRetries)),
 				RetryBackoff: types.NullDurationFrom(time.Duration(retryBackoff) * time.Second),
@@ -1031,7 +1031,7 @@ func TestURLSecrets_GSM_Integration(t *testing.T) {
 				Headers: map[string]string{
 					"Authorization": "Bearer gsm-token",
 				},
-				ResponsePath: "plaintext",
+				ResponsePath: null.StringFrom("plaintext"),
 				Timeout:      types.NullDurationFrom(time.Duration(timeout) * time.Second),
 				MaxRetries:   null.IntFrom(int64(maxRetries)),
 				RetryBackoff: types.NullDurationFrom(time.Duration(retryBackoff) * time.Second),
@@ -1081,7 +1081,7 @@ func TestURLSecrets_GSM_Integration(t *testing.T) {
 		us := &urlSecrets{
 			config: extConfig{
 				URLTemplate:  server.URL + "/secrets/{key}/decrypt",
-				ResponsePath: "plaintext",
+				ResponsePath: null.StringFrom("plaintext"),
 				Timeout:      types.NullDurationFrom(time.Duration(timeout) * time.Second),
 				MaxRetries:   null.IntFrom(int64(maxRetries)),
 				RetryBackoff: types.NullDurationFrom(time.Duration(retryBackoff) * time.Second),
@@ -1121,7 +1121,7 @@ func TestURLSecrets_GSM_Integration(t *testing.T) {
 			config: extConfig{
 				// Format matching: https://gsm.proxy-lb:8080/secrets/%s/decrypt
 				URLTemplate:  server.URL + "/secrets/{key}/decrypt",
-				ResponsePath: "plaintext",
+				ResponsePath: null.StringFrom("plaintext"),
 				Timeout:      types.NullDurationFrom(time.Duration(timeout) * time.Second),
 				MaxRetries:   null.IntFrom(int64(maxRetries)),
 				RetryBackoff: types.NullDurationFrom(time.Duration(retryBackoff) * time.Second),

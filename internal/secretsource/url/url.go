@@ -56,13 +56,13 @@ type extConfig struct {
 	// Headers to include in the request (e.g., Authorization headers)
 	Headers map[string]string `json:"headers"`
 
-	// Method is the HTTP method to use (defaults to GET)
-	Method string `json:"method"`
+	// Method is the HTTP method to use (default: GET)
+	Method null.String `json:"method"`
 
 	// ResponsePath is a JSON path to extract the secret value from the response
 	// Use dot notation for nested fields (e.g., "data.value")
 	// If empty, the entire response body is treated as the secret
-	ResponsePath string `json:"responsePath"`
+	ResponsePath null.String `json:"responsePath"`
 
 	// RequestsPerMinuteLimit sets the maximum requests per minute (default: 300)
 	RequestsPerMinuteLimit null.Int `json:"requestsPerMinuteLimit"`
@@ -88,7 +88,8 @@ type extConfig struct {
 // newConfig creates a new extConfig instance with default values.
 func newConfig() extConfig {
 	return extConfig{
-		Method:                 http.MethodGet,                               // GET method
+		Method:                 null.NewString(http.MethodGet, false),        // GET method
+		ResponsePath:           null.NewString("", false),                    // Empty response path (use entire response)
 		RequestsPerMinuteLimit: null.NewInt(300, false),                      // 300 requests per minute
 		RequestsBurst:          null.NewInt(10, false),                       // Allow a burst of 10 requests
 		Timeout:                types.NewNullDuration(30*time.Second, false), // 30 seconds timeout
@@ -142,7 +143,7 @@ func (us *urlSecrets) Get(key string) (string, error) {
 		escapedKey := url.PathEscape(key)
 		url := strings.ReplaceAll(us.config.URLTemplate, "{key}", escapedKey)
 
-		req, err := http.NewRequestWithContext(ctx, us.config.Method, url, nil)
+		req, err := http.NewRequestWithContext(ctx, us.config.Method.String, url, nil)
 		if err != nil {
 			return &retryableError{err: fmt.Errorf("failed to create request: %w", err), statusCode: 0}
 		}
@@ -173,7 +174,7 @@ func (us *urlSecrets) Get(key string) (string, error) {
 		}
 
 		// Extract secret value from response
-		extractedSecret, err := extractSecretFromResponse(response.Body, us.config.ResponsePath)
+		extractedSecret, err := extractSecretFromResponse(response.Body, us.config.ResponsePath.String)
 		if err != nil {
 			// Extraction errors are not retryable (indicates config issue)
 			return fmt.Errorf("failed to extract secret: %w", err)
@@ -331,8 +332,12 @@ func getConfig(arg string, fs fsext.Fs) (extConfig, error) {
 	}
 
 	// Apply defaults for fields that weren't set by the user
-	if config.Method == "" {
-		config.Method = http.MethodGet
+	if !config.Method.Valid {
+		config.Method = null.StringFrom(http.MethodGet)
+	}
+
+	if !config.ResponsePath.Valid {
+		config.ResponsePath = null.StringFrom("")
 	}
 
 	if !config.RequestsPerMinuteLimit.Valid {
