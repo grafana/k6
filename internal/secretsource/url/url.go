@@ -139,7 +139,8 @@ func (us *urlSecrets) Get(key string) (string, error) {
 
 	err := retry(ctx, maxAttempts, backoff, func() error {
 		// Replace {key} placeholder in URL template
-		url := strings.ReplaceAll(us.config.URLTemplate, "{key}", key)
+		escapedKey := url.PathEscape(key)
+		url := strings.ReplaceAll(us.config.URLTemplate, "{key}", escapedKey)
 
 		req, err := http.NewRequestWithContext(ctx, us.config.Method, url, nil)
 		if err != nil {
