@@ -232,7 +232,7 @@ func extractSecretFromResponse(body []byte, responsePath string) (string, error)
 			}
 			current = val
 		} else {
-			return "", fmt.Errorf("cannot traverse path at %q: not a JSON object", part)
+			return "", fmt.Errorf("cannot traverse path at %q: not a JSON object (got %T)", part, current)
 		}
 	}
 
@@ -240,7 +240,7 @@ func extractSecretFromResponse(body []byte, responsePath string) (string, error)
 		return secret, nil
 	}
 
-	return "", fmt.Errorf("secret value at path %q is not a string", responsePath)
+	return "", fmt.Errorf("secret value at path %q is not a string (got %T)", responsePath, current)
 }
 
 // isRetryableError determines if an HTTP status code or error should trigger a retry.
