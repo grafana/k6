@@ -32,7 +32,7 @@ const (
 // and to populate the Cloud configuration back in case the Cloud API returned some overrides,
 // as expected by the Cloud output.
 //
-//nolint:funlen,gocognit
+//nolint:funlen,gocognit,cyclop
 func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error {
 	// Otherwise, we continue normally with the creation of the test run in the k6 Cloud backend services.
 	conf, warn, err := cloudapi.GetConsolidatedConfig(
