@@ -11,7 +11,7 @@ import secrets from "k6/secrets";
 export default async () => {
 	// Get secret from URL source
 	const mySecret = await secrets.get("my-secret-key");
-	console.log("Retrieved secret (value redacted)");
+	console.log(`Retrieved secret ${mySecret}`);
 
 	// Use the secret in your test
 	// Example: http.get("https://api.example.com", {
