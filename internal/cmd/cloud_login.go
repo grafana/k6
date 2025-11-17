@@ -166,7 +166,6 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 		newCloudConf.StackURL = null.StringFromPtr(nil)
 		newCloudConf.DefaultProjectID = null.IntFromPtr(nil)
 		printToStdout(c.globalState, "  token and stack info reset\n")
-		return nil
 	case show.Bool:
 		valueColor := getColor(c.globalState.Flags.NoColor || !c.globalState.Stdout.IsTTY, color.FgCyan)
 		printToStdout(c.globalState, fmt.Sprintf("  token: %s\n", valueColor.Sprint(newCloudConf.Token.String)))
