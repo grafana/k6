@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/tidwall/gjson"
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/lib/fsext"
@@ -215,32 +216,17 @@ func extractSecretFromResponse(body []byte, responsePath string) (string, error)
 		return string(body), nil
 	}
 
-	var data map[string]interface{}
-	if err := json.Unmarshal(body, &data); err != nil {
-		return "", fmt.Errorf("failed to decode JSON response: %w", err)
+	result := gjson.GetBytes(body, responsePath)
+
+	if !result.Exists() {
+		return "", fmt.Errorf("path %q not found in response", responsePath)
 	}
 
-	// Simple JSON path traversal for nested keys like "data.value"
-	parts := strings.Split(responsePath, ".")
-	current := interface{}(data)
-
-	for _, part := range parts {
-		if m, ok := current.(map[string]interface{}); ok {
-			val, exists := m[part]
-			if !exists {
-				return "", fmt.Errorf("path component %q not found in response", part)
-			}
-			current = val
-		} else {
-			return "", fmt.Errorf("cannot traverse path at %q: not a JSON object (got %T)", part, current)
-		}
+	if result.Type != gjson.String {
+		return "", fmt.Errorf("secret value at path %q is not a string (got %s)", responsePath, result.Type)
 	}
 
-	if secret, ok := current.(string); ok {
-		return secret, nil
-	}
-
-	return "", fmt.Errorf("secret value at path %q is not a string (got %T)", responsePath, current)
+	return result.String(), nil
 }
 
 // isRetryableError determines if an HTTP status code or error should trigger a retry.
