@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
+	"go.k6.io/k6/internal/lib/testutils"
 	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/lib/types"
 )
@@ -343,6 +344,7 @@ func TestURLSecrets_Get(t *testing.T) {
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
 			limiter:    &mockLimiter{},
+			logger:     testutils.NewLogger(t),
 		}
 
 		secret, err := us.Get("my-key")
@@ -373,6 +375,7 @@ func TestURLSecrets_Get(t *testing.T) {
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
 			limiter:    &mockLimiter{},
+			logger:     testutils.NewLogger(t),
 		}
 
 		secret, err := us.Get("api-key")
@@ -399,6 +402,7 @@ func TestURLSecrets_Get(t *testing.T) {
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
 			limiter:    &mockLimiter{},
+			logger:     testutils.NewLogger(t),
 		}
 
 		_, err := us.Get("nonexistent")
@@ -418,6 +422,7 @@ func TestURLSecrets_Get(t *testing.T) {
 			},
 			httpClient: &http.Client{},
 			limiter:    &mockLimiter{shouldError: true},
+			logger:     testutils.NewLogger(t),
 		}
 
 		_, err := us.Get("any-key")
@@ -449,6 +454,7 @@ func TestURLSecrets_Get(t *testing.T) {
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
 			limiter:    &mockLimiter{},
+			logger:     testutils.NewLogger(t),
 		}
 
 		// Request multiple keys
@@ -500,6 +506,7 @@ func TestURLSecrets_Get_Retry(t *testing.T) {
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
 			limiter:    &mockLimiter{},
+			logger:     testutils.NewLogger(t),
 		}
 
 		secret, err := us.Get("test-key")
@@ -546,6 +553,7 @@ func TestURLSecrets_Get_Retry(t *testing.T) {
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
 			limiter:    &mockLimiter{},
+			logger:     testutils.NewLogger(t),
 		}
 
 		secret, err := us.Get("test-key")
@@ -584,6 +592,7 @@ func TestURLSecrets_Get_Retry(t *testing.T) {
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
 			limiter:    &mockLimiter{},
+			logger:     testutils.NewLogger(t),
 		}
 
 		_, err := us.Get("test-key")
@@ -622,6 +631,7 @@ func TestURLSecrets_Get_Retry(t *testing.T) {
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
 			limiter:    &mockLimiter{},
+			logger:     testutils.NewLogger(t),
 		}
 
 		_, err := us.Get("test-key")
@@ -660,6 +670,7 @@ func TestURLSecrets_Get_Retry(t *testing.T) {
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
 			limiter:    &mockLimiter{},
+			logger:     testutils.NewLogger(t),
 		}
 
 		_, err := us.Get("test-key")
@@ -698,6 +709,7 @@ func TestURLSecrets_Get_Retry(t *testing.T) {
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
 			limiter:    &mockLimiter{},
+			logger:     testutils.NewLogger(t),
 		}
 
 		_, err := us.Get("test-key")
@@ -743,6 +755,7 @@ func TestURLSecrets_Get_Retry(t *testing.T) {
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
 			limiter:    &mockLimiter{},
+			logger:     testutils.NewLogger(t),
 		}
 
 		secret, err := us.Get("test-key")
@@ -787,6 +800,7 @@ func TestURLSecrets_Get_Retry(t *testing.T) {
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
 			limiter:    &mockLimiter{},
+			logger:     testutils.NewLogger(t),
 		}
 
 		secret, err := us.Get("test-key")
@@ -974,6 +988,7 @@ func TestURLSecrets_GSM_Integration(t *testing.T) {
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
 			limiter:    &mockLimiter{},
+			logger:     testutils.NewLogger(t),
 		}
 
 		// Test fetching a secret
@@ -1038,6 +1053,7 @@ func TestURLSecrets_GSM_Integration(t *testing.T) {
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
 			limiter:    &mockLimiter{},
+			logger:     testutils.NewLogger(t),
 		}
 
 		// Fetch multiple secrets
@@ -1088,6 +1104,7 @@ func TestURLSecrets_GSM_Integration(t *testing.T) {
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
 			limiter:    &mockLimiter{},
+			logger:     testutils.NewLogger(t),
 		}
 
 		_, err := us.Get("nonexistent-secret")
@@ -1128,6 +1145,7 @@ func TestURLSecrets_GSM_Integration(t *testing.T) {
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
 			limiter:    &mockLimiter{},
+			logger:     testutils.NewLogger(t),
 		}
 
 		secret, err := us.Get("test-secret-123")

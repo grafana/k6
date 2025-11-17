@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 	"gopkg.in/guregu/null.v3"
 
@@ -29,23 +30,6 @@ var (
 	errMissingURLTemplate = errors.New("urlTemplate is required in config file")
 	errFailedToGetSecret  = errors.New("failed to get secret")
 )
-
-// retryableError wraps an error with HTTP status code information to determine if it should be retried.
-type retryableError struct {
-	err        error
-	statusCode int
-}
-
-func (re *retryableError) Error() string {
-	if re.statusCode > 0 {
-		return fmt.Sprintf("HTTP %d: %v", re.statusCode, re.err)
-	}
-	return re.err.Error()
-}
-
-func (re *retryableError) Unwrap() error {
-	return re.err
-}
 
 // extConfig holds the configuration for URL-based secrets.
 type extConfig struct {
@@ -112,6 +96,7 @@ func init() {
 				Timeout: time.Duration(config.Timeout.Duration),
 			},
 			limiter: newLimiter(int(config.RequestsPerMinuteLimit.Int64), int(config.RequestsBurst.Int64)),
+			logger:  params.Logger,
 		}, nil
 	})
 }
@@ -120,6 +105,7 @@ type urlSecrets struct {
 	config     extConfig
 	httpClient *http.Client
 	limiter    limiter
+	logger     logrus.FieldLogger
 }
 
 func (us *urlSecrets) Description() string {
@@ -138,14 +124,14 @@ func (us *urlSecrets) Get(key string) (string, error) {
 	maxAttempts := int(us.config.MaxRetries.Int64) + 1
 	backoff := time.Duration(us.config.RetryBackoff.Duration)
 
-	err := retry(ctx, maxAttempts, backoff, func() error {
+	err := retry(ctx, maxAttempts, backoff, us.logger, func() (error, bool) {
 		// Replace {key} placeholder in URL template
 		escapedKey := url.PathEscape(key)
 		url := strings.ReplaceAll(us.config.URLTemplate, "{key}", escapedKey)
 
 		req, err := http.NewRequestWithContext(ctx, us.config.Method.String, url, nil)
 		if err != nil {
-			return &retryableError{err: fmt.Errorf("failed to create request: %w", err), statusCode: 0}
+			return fmt.Errorf("failed to create request: %w", err), true
 		}
 
 		// Add headers
@@ -156,7 +142,7 @@ func (us *urlSecrets) Get(key string) (string, error) {
 		response, err := us.httpClient.Do(req)
 		if err != nil {
 			// Network errors are retryable
-			return &retryableError{err: fmt.Errorf("failed to get secret: %w", err), statusCode: 0}
+			return fmt.Errorf("failed to get secret: %w", err), true
 		}
 		defer func() { _ = response.Body.Close() }()
 
@@ -165,23 +151,19 @@ func (us *urlSecrets) Get(key string) (string, error) {
 
 			// Retry on server errors (5xx) and rate limiting (429)
 			// Don't retry on client errors (4xx except 429)
-			if response.StatusCode >= 500 || response.StatusCode == http.StatusTooManyRequests {
-				return &retryableError{err: statusErr, statusCode: response.StatusCode}
-			}
-
-			// Non-retryable error (4xx except 429)
-			return statusErr
+			retryable := response.StatusCode >= 500 || response.StatusCode == http.StatusTooManyRequests
+			return statusErr, retryable
 		}
 
 		// Extract secret value from response
 		extractedSecret, err := extractSecretFromResponse(response.Body, us.config.ResponsePath.String)
 		if err != nil {
 			// Extraction errors are not retryable (indicates config issue)
-			return fmt.Errorf("failed to extract secret: %w", err)
+			return fmt.Errorf("failed to extract secret: %w", err), false
 		}
 
 		secret = extractedSecret
-		return nil
+		return nil, false
 	})
 	if err != nil {
 		return "", err
@@ -240,8 +222,14 @@ func extractSecretFromResponse(body io.Reader, responsePath string) (string, err
 // retry retries to execute a provided function until it succeeds or the maximum
 // number of attempts is hit. It waits with exponential backoff between attempts.
 // The backoff calculation is: wait = (base ^ attempt) + random jitter up to 1 second.
-// Only retries errors that are of type *retryableError.
-func retry(ctx context.Context, attempts int, baseBackoff time.Duration, do func() error) error {
+// The do function returns an error and a boolean indicating if the error is retryable.
+func retry(
+	ctx context.Context,
+	attempts int,
+	baseBackoff time.Duration,
+	logger logrus.FieldLogger,
+	do func() (error, bool),
+) error {
 	r := rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec
 
 	var lastErr error
@@ -252,6 +240,13 @@ func retry(ctx context.Context, attempts int, baseBackoff time.Duration, do func
 			jitter := time.Duration(r.Int63n(1000)) * time.Millisecond
 			wait += jitter
 
+			logger.WithFields(logrus.Fields{
+				"attempt": i + 1,
+				"max":     attempts,
+				"wait":    wait,
+				"error":   lastErr,
+			}).Debug("Retrying secret fetch after error")
+
 			// Wait with context cancellation support
 			select {
 			case <-ctx.Done():
@@ -260,18 +255,26 @@ func retry(ctx context.Context, attempts int, baseBackoff time.Duration, do func
 			}
 		}
 
-		lastErr = do()
-		if lastErr == nil {
+		err, retryable := do()
+		if err == nil {
 			return nil
 		}
 
-		// Check if this error should be retried
-		var retryErr *retryableError
-		if !errors.As(lastErr, &retryErr) {
+		lastErr = err
+		if !retryable {
 			// Not a retryable error, fail immediately
+			logger.WithFields(logrus.Fields{
+				"attempt": i + 1,
+				"error":   lastErr,
+			}).Debug("Non-retryable error encountered, failing immediately")
 			return lastErr
 		}
 	}
+
+	logger.WithFields(logrus.Fields{
+		"attempts": attempts,
+		"error":    lastErr,
+	}).Debug("Max retry attempts reached")
 
 	return lastErr
 }
