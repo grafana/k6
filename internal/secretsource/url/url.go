@@ -204,9 +204,17 @@ func newLimiter(requestsPerMinuteLimit, requestsBurst int) *rate.Limiter {
 }
 
 func extractSecretFromResponse(body io.Reader, responsePath string) (string, error) {
-	data, err := io.ReadAll(body)
+	const maxSecretSize = 24 * 1024
+
+	// Limit reading to prevent memory exhaustion from large responses
+	limitedReader := io.LimitReader(body, maxSecretSize+1)
+	data, err := io.ReadAll(limitedReader)
 	if err != nil {
 		return "", fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if len(data) > maxSecretSize {
+		return "", fmt.Errorf("secret response exceeds maximum size of %d bytes", maxSecretSize)
 	}
 
 	if responsePath == "" {

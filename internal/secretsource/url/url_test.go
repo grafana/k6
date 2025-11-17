@@ -76,6 +76,7 @@ func TestExtractSecretFromResponse(t *testing.T) {
 		responsePath string
 		expected     string
 		expectError  bool
+		errorMsg     string
 	}{
 		{
 			name:         "plain text response",
@@ -126,6 +127,14 @@ func TestExtractSecretFromResponse(t *testing.T) {
 			expected:     "",
 			expectError:  true,
 		},
+		{
+			name:         "response exceeds size limit",
+			body:         bytes.Repeat([]byte("x"), 25*1024), // 25KB
+			responsePath: "",
+			expected:     "",
+			expectError:  true,
+			errorMsg:     "exceeds maximum size",
+		},
 	}
 
 	for _, tt := range tests {
@@ -134,6 +143,9 @@ func TestExtractSecretFromResponse(t *testing.T) {
 			result, err := extractSecretFromResponse(bytes.NewReader(tt.body), tt.responsePath)
 			if tt.expectError {
 				assert.Error(t, err)
+				if tt.errorMsg != "" {
+					assert.ErrorContains(t, err, tt.errorMsg)
+				}
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, tt.expected, result)
