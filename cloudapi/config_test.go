@@ -25,6 +25,7 @@ func TestConfigApply(t *testing.T) {
 
 	full := Config{
 		Token:                 null.NewString("Token", true),
+		StackID:               null.NewInt(1, true),
 		ProjectID:             null.NewInt(1, true),
 		Name:                  null.NewString("Name", true),
 		Host:                  null.NewString("Host", true),

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"syscall"
 
 	"github.com/fatih/color"
@@ -16,6 +17,58 @@ import (
 	"go.k6.io/k6/internal/build"
 	"go.k6.io/k6/internal/ui"
 )
+
+// validateAndResolveStack validates a stack URL/slug and returns the normalized URL, stack ID, and default project ID.
+// The stackInput can be either a full URL (e.g., https://my-team.grafana.net) or just a slug (e.g., my-team).
+func validateAndResolveStack(gs *state.GlobalState, jsonRawConf json.RawMessage, token, stackInput string) (stackURL string, stackID int64, defaultProjectID int64, err error) {
+	consolidatedCurrentConfig, warn, err := cloudapi.GetConsolidatedConfig(
+		jsonRawConf, gs.Env, "", nil, nil)
+	if err != nil {
+		return "", 0, 0, err
+	}
+
+	if warn != "" {
+		gs.Logger.Warn(warn)
+	}
+
+	normalizedURL := normalizeStackURL(stackInput)
+
+	client := cloudapi.NewClient(
+		gs.Logger,
+		token,
+		consolidatedCurrentConfig.Host.String,
+		build.Version,
+		consolidatedCurrentConfig.Timeout.TimeDuration(),
+	)
+
+	authResp, err := client.ValidateAuth(normalizedURL)
+	if err != nil {
+		return "", 0, 0, err
+	}
+
+	return normalizedURL, authResp.StackID, authResp.DefaultProjectID, nil
+}
+
+// normalizeStackURL converts a stack slug to a full URL if needed.
+// The stackInput can be either a full URL (e.g., https://my-team.grafana.net) or just a slug (e.g., my-team).
+func normalizeStackURL(stackInput string) string {
+	// If it's already a full URL, return it as is
+	if strings.HasPrefix(stackInput, "http://") || strings.HasPrefix(stackInput, "https://") {
+		return stackInput
+	}
+	// Otherwise, treat it as a slug and construct the URL
+	slug := stripGrafanaNetSuffix(stackInput)
+	return fmt.Sprintf("https://%s.grafana.net", slug)
+}
+
+// stripGrafanaNetSuffix removes .grafana.net suffix if present.
+func stripGrafanaNetSuffix(s string) string {
+	const suffix = ".grafana.net"
+	if len(s) > len(suffix) && s[len(s)-len(suffix):] == suffix {
+		return s[:len(s)-len(suffix)]
+	}
+	return s
+}
 
 const cloudLoginCommandName = "login"
 
@@ -30,16 +83,19 @@ func getCmdCloudLogin(gs *state.GlobalState) *cobra.Command {
 
 	// loginCloudCommand represents the 'cloud login' command
 	exampleText := getExampleText(gs, `
-  # Prompt for a Grafana Cloud k6 token
+  # Authenticate interactively with Grafana Cloud k6
   $ {{.}} cloud login
 
   # Store a token in k6's persistent configuration
   $ {{.}} cloud login -t <YOUR_TOKEN>
 
-  # Display the stored token
+  # Store a token in k6's persistent configuration and set the stack
+  $ {{.}} cloud login -t <YOUR_TOKEN> --stack <YOUR_STACK_URL_OR_SLUG>
+
+  # Display the stored token and stack info
   $ {{.}} cloud login -s
 
-  # Reset the stored token
+  # Reset the stored token and stack info
   $ {{.}} cloud login -r`[1:])
 
 	loginCloudCommand := &cobra.Command{
@@ -58,17 +114,22 @@ the "k6 run -o cloud" command.
 	}
 
 	loginCloudCommand.Flags().StringP("token", "t", "", "specify `token` to use")
-	loginCloudCommand.Flags().BoolP("show", "s", false, "display saved token and exit")
-	loginCloudCommand.Flags().BoolP("reset", "r", false, "reset stored token")
+	loginCloudCommand.Flags().BoolP("show", "s", false, "display saved token, stack info and exit")
+	loginCloudCommand.Flags().BoolP("reset", "r", false, "reset stored token and stack info")
+	loginCloudCommand.Flags().String("stack", "", "specify the stack (URL or slug) where commands will run by default")
 
 	return loginCloudCommand
 }
 
 // run is the code that runs when the user executes `k6 cloud login`
+//
+//nolint:funlen,gocognit,cyclop
 func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
-	err := migrateLegacyConfigFileIfAny(c.globalState)
-	if err != nil {
-		return err
+	if !checkIfMigrationCompleted(c.globalState) {
+		err := migrateLegacyConfigFileIfAny(c.globalState)
+		if err != nil {
+			return err
+		}
 	}
 
 	currentDiskConf, err := readDiskConfig(c.globalState)
@@ -92,18 +153,56 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 	show := getNullBool(cmd.Flags(), "show")
 	reset := getNullBool(cmd.Flags(), "reset")
 	token := getNullString(cmd.Flags(), "token")
+	stackInput := getNullString(cmd.Flags(), "stack")
+
 	switch {
 	case reset.Valid:
 		newCloudConf.Token = null.StringFromPtr(nil)
-		printToStdout(c.globalState, "  token reset\n")
+		newCloudConf.StackID = null.IntFromPtr(nil)
+		newCloudConf.StackURL = null.StringFromPtr(nil)
+		newCloudConf.DefaultProjectID = null.IntFromPtr(nil)
+		printToStdout(c.globalState, "  token and stack info reset\n")
+		return nil
 	case show.Bool:
 		valueColor := getColor(c.globalState.Flags.NoColor || !c.globalState.Stdout.IsTTY, color.FgCyan)
 		printToStdout(c.globalState, fmt.Sprintf("  token: %s\n", valueColor.Sprint(newCloudConf.Token.String)))
+		if !newCloudConf.StackID.Valid && !newCloudConf.StackURL.Valid {
+			printToStdout(c.globalState, "  stack-id: <not set>\n")
+			printToStdout(c.globalState, "  stack-url: <not set>\n")
+			printToStdout(c.globalState, "  default-project-id: <not set>\n")
+		} else {
+			if newCloudConf.StackID.Valid {
+				printToStdout(c.globalState, fmt.Sprintf("  stack-id: %s\n", valueColor.Sprint(newCloudConf.StackID.Int64)))
+			}
+			if newCloudConf.StackURL.Valid {
+				printToStdout(c.globalState, fmt.Sprintf("  stack-url: %s\n", valueColor.Sprint(newCloudConf.StackURL.String)))
+			}
+			if newCloudConf.DefaultProjectID.Valid {
+				printToStdout(c.globalState, fmt.Sprintf("  default-project-id: %s\n", valueColor.Sprint(newCloudConf.DefaultProjectID.Int64)))
+			}
+		}
 		return nil
 	case token.Valid:
 		newCloudConf.Token = token
+
+		err := validateToken(c.globalState, currentJSONConfigRaw, newCloudConf.Token.String)
+		if err != nil {
+			return err
+		}
+
+		if stackInput.Valid && stackInput.String != "" {
+			stackURL, stackID, defaultProjectID, err := validateAndResolveStack(
+				c.globalState, currentJSONConfigRaw, token.String, stackInput.String)
+			if err != nil {
+				return fmt.Errorf("your stack is invalid - please, consult the Grafana Cloud k6 documentation for instructions on how to get yours: https://grafana.com/docs/grafana-cloud/testing/k6/author-run/something-stack: %w", err)
+			}
+			newCloudConf.StackURL = null.StringFrom(stackURL)
+			newCloudConf.StackID = null.IntFrom(stackID)
+			newCloudConf.DefaultProjectID = null.IntFrom(defaultProjectID)
+		}
 	default:
-		form := ui.Form{
+		/* Token form */
+		tokenForm := ui.Form{
 			Banner: "Enter your token to authenticate with Grafana Cloud k6.\n" +
 				"Please, consult the Grafana Cloud k6 documentation for instructions on how to generate one:\n" +
 				"https://grafana.com/docs/grafana-cloud/testing/k6/author-run/tokens-and-cli-authentication",
@@ -117,18 +216,46 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 		if !term.IsTerminal(int(syscall.Stdin)) { //nolint:unconvert
 			c.globalState.Logger.Warn("Stdin is not a terminal, falling back to plain text input")
 		}
-		var vals map[string]string
-		vals, err = form.Run(c.globalState.Stdin, c.globalState.Stdout)
+		tokenVals, err := tokenForm.Run(c.globalState.Stdin, c.globalState.Stdout)
 		if err != nil {
 			return err
 		}
-		newCloudConf.Token = null.StringFrom(vals["Token"])
-	}
+		tokenValue := tokenVals["Token"]
+		newCloudConf.Token = null.StringFrom(tokenValue)
 
-	if newCloudConf.Token.Valid {
-		err := validateToken(c.globalState, currentJSONConfigRaw, newCloudConf.Token.String)
+		if !newCloudConf.Token.Valid {
+			return errors.New("token cannot be empty")
+		}
+		if err := validateToken(c.globalState, currentJSONConfigRaw, newCloudConf.Token.String); err != nil {
+			return fmt.Errorf("token validation failed: %w", err)
+		}
+
+		/* Stack form */
+		stackForm := ui.Form{
+			Banner: "\nEnter the stack where you want to run k6's commands by default.\n" +
+				"You can enter a full URL (e.g. https://my-team.grafana.net) or just the slug (e.g. my-team):",
+			Fields: []ui.Field{
+				ui.StringField{
+					Key:     "Stack",
+					Label:   "Stack",
+					Default: "None",
+				},
+			},
+		}
+		stackVals, err := stackForm.Run(c.globalState.Stdin, c.globalState.Stdout)
 		if err != nil {
 			return err
+		}
+		stackValue := strings.TrimSpace(stackVals["Stack"])
+		if stackValue != "" && stackValue != "None" {
+			stackURL, stackID, defaultProjectID, err := validateAndResolveStack(
+				c.globalState, currentJSONConfigRaw, tokenValue, stackValue)
+			if err != nil {
+				return fmt.Errorf("your stack is invalid - please, consult the Grafana Cloud k6 documentation for instructions on how to get yours: https://grafana.com/docs/grafana-cloud/testing/k6/author-run/something-stack: %w", err)
+			}
+			newCloudConf.StackURL = null.StringFrom(stackURL)
+			newCloudConf.StackID = null.IntFrom(stackID)
+			newCloudConf.DefaultProjectID = null.IntFrom(defaultProjectID)
 		}
 	}
 
@@ -144,9 +271,23 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 	}
 
 	if newCloudConf.Token.Valid {
+		valueColor := getColor(c.globalState.Flags.NoColor || !c.globalState.Stdout.IsTTY, color.FgCyan)
 		printToStdout(c.globalState, fmt.Sprintf(
-			"Logged in successfully, token saved in %s\n", c.globalState.Flags.ConfigFilePath,
+			"\nLogged in successfully, token and stack info saved in %s\n", c.globalState.Flags.ConfigFilePath,
 		))
+		if !c.globalState.Flags.Quiet {
+			printToStdout(c.globalState, fmt.Sprintf("  token: %s\n", valueColor.Sprint(newCloudConf.Token.String)))
+
+			if newCloudConf.StackID.Valid {
+				printToStdout(c.globalState, fmt.Sprintf("  stack-id: %s\n", valueColor.Sprint(newCloudConf.StackID.Int64)))
+			}
+			if newCloudConf.StackURL.Valid {
+				printToStdout(c.globalState, fmt.Sprintf("  stack-url: %s\n", valueColor.Sprint(newCloudConf.StackURL.String)))
+			}
+			if newCloudConf.DefaultProjectID.Valid {
+				printToStdout(c.globalState, fmt.Sprintf("  default-project-id: %s\n", valueColor.Sprint(newCloudConf.DefaultProjectID.Int64)))
+			}
+		}
 	}
 	return nil
 }
