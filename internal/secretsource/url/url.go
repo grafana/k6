@@ -282,11 +282,6 @@ func retry(ctx context.Context, attempts int, baseBackoff time.Duration, do func
 			// Not a retryable error, fail immediately
 			return lastErr
 		}
-
-		// If this is the last attempt, return the error
-		if i == attempts-1 {
-			return lastErr
-		}
 	}
 
 	return lastErr
