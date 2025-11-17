@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"go.k6.io/k6/lib/fsext"
+	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/secretsource"
 	"golang.org/x/time/rate"
 )
@@ -26,7 +27,8 @@ var (
 	errInvalidRequestsPerMinuteLimit = errors.New("requestsPerMinuteLimit must be greater than 0")
 	errInvalidRequestsBurst          = errors.New("requestsBurst must be greater than 0")
 	errInvalidMaxRetries             = errors.New("maxRetries must be greater than or equal to 0")
-	errInvalidRetryBackoff           = errors.New("retryBackoffSeconds must be greater than 0")
+	errInvalidRetryBackoff           = errors.New("retryBackoff must be greater than 0")
+	errInvalidTimeout                = errors.New("timeout must be greater than 0")
 )
 
 // retryableError wraps an error with HTTP status code information to determine if it should be retried.
@@ -69,17 +71,19 @@ type extConfig struct {
 	// RequestsBurst allows a burst of requests above the rate limit
 	RequestsBurst *int `json:"requestsBurst"`
 
-	// Timeout for HTTP requests in seconds (defaults to 30)
-	TimeoutSeconds *int `json:"timeoutSeconds"`
+	// Timeout for HTTP requests (defaults to 30s)
+	// Accepts duration strings like "30s", "1m", "500ms"
+	Timeout types.NullDuration `json:"timeout"`
 
 	// MaxRetries sets the maximum number of retry attempts for failed requests
 	// Only retries on transient errors (5xx, timeouts, network errors, 429)
 	// Does not retry on 4xx errors (except 429)
 	MaxRetries *int `json:"maxRetries"`
 
-	// RetryBackoffSeconds sets the base backoff duration in seconds for retries
+	// RetryBackoff sets the base backoff duration for retries (defaults to 1s)
 	// Uses exponential backoff: wait = (base ^ attempt) + jitter
-	RetryBackoffSeconds *int `json:"retryBackoffSeconds"`
+	// Accepts duration strings like "1s", "500ms", "2s"
+	RetryBackoff types.NullDuration `json:"retryBackoff"`
 }
 
 const (
@@ -89,11 +93,11 @@ const (
 	// will be slowed down. This allows a client to ask for a bunch of
 	// secrets at the start of a script, and then it slows it down to a
 	// reasonable pace.
-	defaultRequestsPerMinuteLimit = 300 // 300 requests per minute is one request every 200 ms
-	defaultRequestsBurst          = 10  // Allow a burst of 10 requests
-	defaultTimeoutSeconds         = 30  // 30 seconds timeout
-	defaultMaxRetries             = 3   // 3 retry attempts for transient failures
-	defaultRetryBackoffSeconds    = 1   // 1 second base for exponential backoff
+	defaultRequestsPerMinuteLimit = 300              // 300 requests per minute is one request every 200 ms
+	defaultRequestsBurst          = 10               // Allow a burst of 10 requests
+	defaultTimeout                = 30 * time.Second // 30 seconds timeout
+	defaultMaxRetries             = 3                // 3 retry attempts for transient failures
+	defaultRetryBackoff           = 1 * time.Second  // 1 second base for exponential backoff
 )
 
 //nolint:gochecknoinits // This is how k6 secret source registration works.
@@ -104,12 +108,10 @@ func init() {
 			return nil, fmt.Errorf("missing or invalid config: %w", err)
 		}
 
-		timeout := time.Duration(*config.TimeoutSeconds) * time.Second
-
 		return &urlSecrets{
 			config: config,
 			httpClient: &http.Client{
-				Timeout: timeout,
+				Timeout: time.Duration(config.Timeout.Duration),
 			},
 			limiter: newLimiter(*config.RequestsPerMinuteLimit, *config.RequestsBurst),
 		}, nil
@@ -135,7 +137,7 @@ func (us *urlSecrets) Get(key string) (string, error) {
 
 	var secret string
 	maxAttempts := *us.config.MaxRetries + 1 // MaxRetries is the number of retries, so total attempts = retries + 1
-	backoff := time.Duration(*us.config.RetryBackoffSeconds) * time.Second
+	backoff := time.Duration(us.config.RetryBackoff.Duration)
 
 	err := retry(ctx, maxAttempts, backoff, func() error {
 		// Replace {key} placeholder in URL template
@@ -358,9 +360,12 @@ func getConfig(arg string, fs fsext.Fs) (extConfig, error) {
 		config.RequestsBurst = &requestsBurst
 	}
 
-	if config.TimeoutSeconds == nil {
-		timeoutSeconds := defaultTimeoutSeconds
-		config.TimeoutSeconds = &timeoutSeconds
+	if !config.Timeout.Valid {
+		config.Timeout = types.NullDurationFrom(defaultTimeout)
+	}
+
+	if config.Timeout.Duration <= 0 {
+		return config, errInvalidTimeout
 	}
 
 	if *config.RequestsPerMinuteLimit <= 0 {
@@ -376,16 +381,15 @@ func getConfig(arg string, fs fsext.Fs) (extConfig, error) {
 		config.MaxRetries = &maxRetries
 	}
 
-	if config.RetryBackoffSeconds == nil {
-		retryBackoffSeconds := defaultRetryBackoffSeconds
-		config.RetryBackoffSeconds = &retryBackoffSeconds
-	}
-
 	if *config.MaxRetries < 0 {
 		return config, errInvalidMaxRetries
 	}
 
-	if *config.RetryBackoffSeconds <= 0 {
+	if !config.RetryBackoff.Valid {
+		config.RetryBackoff = types.NullDurationFrom(defaultRetryBackoff)
+	}
+
+	if config.RetryBackoff.Duration <= 0 {
 		return config, errInvalidRetryBackoff
 	}
 

@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/lib/fsext"
+	"go.k6.io/k6/lib/types"
 )
 
 const testConfigFile = "/config.json"
@@ -167,7 +168,7 @@ func TestGetConfig(t *testing.T) {
 		assert.Equal(t, config.ResponsePath, result.ResponsePath)
 		assert.Equal(t, defaultRequestsPerMinuteLimit, *result.RequestsPerMinuteLimit)
 		assert.Equal(t, defaultRequestsBurst, *result.RequestsBurst)
-		assert.Equal(t, defaultTimeoutSeconds, *result.TimeoutSeconds)
+		assert.Equal(t, defaultTimeout, time.Duration(result.Timeout.Duration))
 	})
 
 	t.Run("custom rate limits", func(t *testing.T) {
@@ -176,12 +177,12 @@ func TestGetConfig(t *testing.T) {
 
 		customLimit := 100
 		customBurst := 5
-		customTimeout := 60
+		customTimeout := types.NullDurationFrom(60 * time.Second)
 		config := extConfig{
 			URLTemplate:            "https://api.example.com/secrets/{key}",
 			RequestsPerMinuteLimit: &customLimit,
 			RequestsBurst:          &customBurst,
-			TimeoutSeconds:         &customTimeout,
+			Timeout:                customTimeout,
 		}
 
 		configData, err := json.Marshal(config)
@@ -193,7 +194,7 @@ func TestGetConfig(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, customLimit, *result.RequestsPerMinuteLimit)
 		assert.Equal(t, customBurst, *result.RequestsBurst)
-		assert.Equal(t, customTimeout, *result.TimeoutSeconds)
+		assert.Equal(t, customTimeout.Duration, result.Timeout.Duration)
 	})
 
 	t.Run("missing URL template", func(t *testing.T) {
@@ -266,11 +267,11 @@ func TestURLSecrets_Get(t *testing.T) {
 				Headers: map[string]string{
 					"Authorization": "Bearer token123",
 				},
-				Method:              "GET",
-				ResponsePath:        "",
-				TimeoutSeconds:      &timeout,
-				MaxRetries:          &maxRetries,
-				RetryBackoffSeconds: &retryBackoff,
+				Method:       "GET",
+				ResponsePath: "",
+				Timeout:      types.NullDurationFrom(time.Duration(timeout) * time.Second),
+				MaxRetries:   &maxRetries,
+				RetryBackoff: types.NullDurationFrom(time.Duration(retryBackoff) * time.Second),
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
 			limiter:    &mockLimiter{},
@@ -295,12 +296,12 @@ func TestURLSecrets_Get(t *testing.T) {
 		retryBackoff := 1
 		us := &urlSecrets{
 			config: extConfig{
-				URLTemplate:         server.URL + "/api/secrets/{key}",
-				Method:              "GET",
-				ResponsePath:        "data.value",
-				TimeoutSeconds:      &timeout,
-				MaxRetries:          &maxRetries,
-				RetryBackoffSeconds: &retryBackoff,
+				URLTemplate:  server.URL + "/api/secrets/{key}",
+				Method:       "GET",
+				ResponsePath: "data.value",
+				Timeout:      types.NullDurationFrom(time.Duration(timeout) * time.Second),
+				MaxRetries:   &maxRetries,
+				RetryBackoff: types.NullDurationFrom(time.Duration(retryBackoff) * time.Second),
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
 			limiter:    &mockLimiter{},
@@ -323,10 +324,10 @@ func TestURLSecrets_Get(t *testing.T) {
 		retryBackoff := 1
 		us := &urlSecrets{
 			config: extConfig{
-				URLTemplate:         server.URL + "/secrets/{key}",
-				TimeoutSeconds:      &timeout,
-				MaxRetries:          &maxRetries,
-				RetryBackoffSeconds: &retryBackoff,
+				URLTemplate:  server.URL + "/secrets/{key}",
+				Timeout:      types.NullDurationFrom(time.Duration(timeout) * time.Second),
+				MaxRetries:   &maxRetries,
+				RetryBackoff: types.NullDurationFrom(time.Duration(retryBackoff) * time.Second),
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
 			limiter:    &mockLimiter{},
@@ -344,8 +345,8 @@ func TestURLSecrets_Get(t *testing.T) {
 		retryBackoff := 1
 		us := &urlSecrets{
 			config: extConfig{
-				MaxRetries:          &maxRetries,
-				RetryBackoffSeconds: &retryBackoff,
+				MaxRetries:   &maxRetries,
+				RetryBackoff: types.NullDurationFrom(time.Duration(retryBackoff) * time.Second),
 			},
 			httpClient: &http.Client{},
 			limiter:    &mockLimiter{shouldError: true},
@@ -373,10 +374,10 @@ func TestURLSecrets_Get(t *testing.T) {
 		retryBackoff := 1
 		us := &urlSecrets{
 			config: extConfig{
-				URLTemplate:         server.URL + "/secrets/{key}",
-				TimeoutSeconds:      &timeout,
-				MaxRetries:          &maxRetries,
-				RetryBackoffSeconds: &retryBackoff,
+				URLTemplate:  server.URL + "/secrets/{key}",
+				Timeout:      types.NullDurationFrom(time.Duration(timeout) * time.Second),
+				MaxRetries:   &maxRetries,
+				RetryBackoff: types.NullDurationFrom(time.Duration(retryBackoff) * time.Second),
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
 			limiter:    &mockLimiter{},
@@ -424,10 +425,10 @@ func TestURLSecrets_Get_Retry(t *testing.T) {
 		retryBackoff := 1
 		us := &urlSecrets{
 			config: extConfig{
-				URLTemplate:         server.URL + "/secrets/{key}",
-				TimeoutSeconds:      &timeout,
-				MaxRetries:          &maxRetries,
-				RetryBackoffSeconds: &retryBackoff,
+				URLTemplate:  server.URL + "/secrets/{key}",
+				Timeout:      types.NullDurationFrom(time.Duration(timeout) * time.Second),
+				MaxRetries:   &maxRetries,
+				RetryBackoff: types.NullDurationFrom(time.Duration(retryBackoff) * time.Second),
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
 			limiter:    &mockLimiter{},
@@ -470,10 +471,10 @@ func TestURLSecrets_Get_Retry(t *testing.T) {
 		retryBackoff := 1
 		us := &urlSecrets{
 			config: extConfig{
-				URLTemplate:         server.URL + "/secrets/{key}",
-				TimeoutSeconds:      &timeout,
-				MaxRetries:          &maxRetries,
-				RetryBackoffSeconds: &retryBackoff,
+				URLTemplate:  server.URL + "/secrets/{key}",
+				Timeout:      types.NullDurationFrom(time.Duration(timeout) * time.Second),
+				MaxRetries:   &maxRetries,
+				RetryBackoff: types.NullDurationFrom(time.Duration(retryBackoff) * time.Second),
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
 			limiter:    &mockLimiter{},
@@ -508,10 +509,10 @@ func TestURLSecrets_Get_Retry(t *testing.T) {
 		retryBackoff := 1
 		us := &urlSecrets{
 			config: extConfig{
-				URLTemplate:         server.URL + "/secrets/{key}",
-				TimeoutSeconds:      &timeout,
-				MaxRetries:          &maxRetries,
-				RetryBackoffSeconds: &retryBackoff,
+				URLTemplate:  server.URL + "/secrets/{key}",
+				Timeout:      types.NullDurationFrom(time.Duration(timeout) * time.Second),
+				MaxRetries:   &maxRetries,
+				RetryBackoff: types.NullDurationFrom(time.Duration(retryBackoff) * time.Second),
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
 			limiter:    &mockLimiter{},
@@ -546,10 +547,10 @@ func TestURLSecrets_Get_Retry(t *testing.T) {
 		retryBackoff := 1
 		us := &urlSecrets{
 			config: extConfig{
-				URLTemplate:         server.URL + "/secrets/{key}",
-				TimeoutSeconds:      &timeout,
-				MaxRetries:          &maxRetries,
-				RetryBackoffSeconds: &retryBackoff,
+				URLTemplate:  server.URL + "/secrets/{key}",
+				Timeout:      types.NullDurationFrom(time.Duration(timeout) * time.Second),
+				MaxRetries:   &maxRetries,
+				RetryBackoff: types.NullDurationFrom(time.Duration(retryBackoff) * time.Second),
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
 			limiter:    &mockLimiter{},
@@ -584,10 +585,10 @@ func TestURLSecrets_Get_Retry(t *testing.T) {
 		retryBackoff := 1
 		us := &urlSecrets{
 			config: extConfig{
-				URLTemplate:         server.URL + "/secrets/{key}",
-				TimeoutSeconds:      &timeout,
-				MaxRetries:          &maxRetries,
-				RetryBackoffSeconds: &retryBackoff,
+				URLTemplate:  server.URL + "/secrets/{key}",
+				Timeout:      types.NullDurationFrom(time.Duration(timeout) * time.Second),
+				MaxRetries:   &maxRetries,
+				RetryBackoff: types.NullDurationFrom(time.Duration(retryBackoff) * time.Second),
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
 			limiter:    &mockLimiter{},
@@ -622,10 +623,10 @@ func TestURLSecrets_Get_Retry(t *testing.T) {
 		retryBackoff := 1
 		us := &urlSecrets{
 			config: extConfig{
-				URLTemplate:         server.URL + "/secrets/{key}",
-				TimeoutSeconds:      &timeout,
-				MaxRetries:          &maxRetries,
-				RetryBackoffSeconds: &retryBackoff,
+				URLTemplate:  server.URL + "/secrets/{key}",
+				Timeout:      types.NullDurationFrom(time.Duration(timeout) * time.Second),
+				MaxRetries:   &maxRetries,
+				RetryBackoff: types.NullDurationFrom(time.Duration(retryBackoff) * time.Second),
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
 			limiter:    &mockLimiter{},
@@ -667,10 +668,10 @@ func TestURLSecrets_Get_Retry(t *testing.T) {
 		retryBackoff := 1
 		us := &urlSecrets{
 			config: extConfig{
-				URLTemplate:         server.URL + "/secrets/{key}",
-				TimeoutSeconds:      &timeout,
-				MaxRetries:          &maxRetries,
-				RetryBackoffSeconds: &retryBackoff,
+				URLTemplate:  server.URL + "/secrets/{key}",
+				Timeout:      types.NullDurationFrom(time.Duration(timeout) * time.Second),
+				MaxRetries:   &maxRetries,
+				RetryBackoff: types.NullDurationFrom(time.Duration(retryBackoff) * time.Second),
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
 			limiter:    &mockLimiter{},
@@ -709,13 +710,12 @@ func TestURLSecrets_Get_Retry(t *testing.T) {
 
 		timeout := 5
 		maxRetries := defaultMaxRetries
-		retryBackoff := defaultRetryBackoffSeconds
 		us := &urlSecrets{
 			config: extConfig{
-				URLTemplate:         server.URL + "/secrets/{key}",
-				TimeoutSeconds:      &timeout,
-				MaxRetries:          &maxRetries,
-				RetryBackoffSeconds: &retryBackoff,
+				URLTemplate:  server.URL + "/secrets/{key}",
+				Timeout:      types.NullDurationFrom(time.Duration(timeout) * time.Second),
+				MaxRetries:   &maxRetries,
+				RetryBackoff: types.NullDurationFrom(defaultRetryBackoff),
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
 			limiter:    &mockLimiter{},
@@ -752,7 +752,7 @@ func TestGetConfig_Retry(t *testing.T) {
 		result, err := getConfig("config="+testConfigFile, fs)
 		require.NoError(t, err)
 		assert.Equal(t, defaultMaxRetries, *result.MaxRetries)
-		assert.Equal(t, defaultRetryBackoffSeconds, *result.RetryBackoffSeconds)
+		assert.Equal(t, defaultRetryBackoff, time.Duration(result.RetryBackoff.Duration))
 	})
 
 	t.Run("custom retry config values", func(t *testing.T) {
@@ -760,11 +760,11 @@ func TestGetConfig_Retry(t *testing.T) {
 		fs := fsext.NewMemMapFs()
 
 		customRetries := 5
-		customBackoff := 2
+		customBackoff := types.NullDurationFrom(2 * time.Second)
 		config := extConfig{
-			URLTemplate:         "https://api.example.com/secrets/{key}",
-			MaxRetries:          &customRetries,
-			RetryBackoffSeconds: &customBackoff,
+			URLTemplate:  "https://api.example.com/secrets/{key}",
+			MaxRetries:   &customRetries,
+			RetryBackoff: customBackoff,
 		}
 
 		configData, err := json.Marshal(config)
@@ -775,7 +775,7 @@ func TestGetConfig_Retry(t *testing.T) {
 		result, err := getConfig("config="+testConfigFile, fs)
 		require.NoError(t, err)
 		assert.Equal(t, customRetries, *result.MaxRetries)
-		assert.Equal(t, customBackoff, *result.RetryBackoffSeconds)
+		assert.Equal(t, customBackoff.Duration, result.RetryBackoff.Duration)
 	})
 
 	t.Run("invalid maxRetries negative value", func(t *testing.T) {
@@ -797,14 +797,14 @@ func TestGetConfig_Retry(t *testing.T) {
 		assert.ErrorIs(t, err, errInvalidMaxRetries)
 	})
 
-	t.Run("invalid retryBackoffSeconds zero value", func(t *testing.T) {
+	t.Run("invalid retryBackoff zero value", func(t *testing.T) {
 		t.Parallel()
 		fs := fsext.NewMemMapFs()
 
-		invalidBackoff := 0
+		invalidBackoff := types.NullDurationFrom(0)
 		config := extConfig{
-			URLTemplate:         "https://api.example.com/secrets/{key}",
-			RetryBackoffSeconds: &invalidBackoff,
+			URLTemplate:  "https://api.example.com/secrets/{key}",
+			RetryBackoff: invalidBackoff,
 		}
 
 		configData, err := json.Marshal(config)
@@ -899,11 +899,11 @@ func TestURLSecrets_GSM_Integration(t *testing.T) {
 				Headers: map[string]string{
 					"Authorization": "Bearer test-token",
 				},
-				Method:              "GET",
-				ResponsePath:        "plaintext",
-				TimeoutSeconds:      &timeout,
-				MaxRetries:          &maxRetries,
-				RetryBackoffSeconds: &retryBackoff,
+				Method:       "GET",
+				ResponsePath: "plaintext",
+				Timeout:      types.NullDurationFrom(time.Duration(timeout) * time.Second),
+				MaxRetries:   &maxRetries,
+				RetryBackoff: types.NullDurationFrom(time.Duration(retryBackoff) * time.Second),
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
 			limiter:    &mockLimiter{},
@@ -964,10 +964,10 @@ func TestURLSecrets_GSM_Integration(t *testing.T) {
 				Headers: map[string]string{
 					"Authorization": "Bearer gsm-token",
 				},
-				ResponsePath:        "plaintext",
-				TimeoutSeconds:      &timeout,
-				MaxRetries:          &maxRetries,
-				RetryBackoffSeconds: &retryBackoff,
+				ResponsePath: "plaintext",
+				Timeout:      types.NullDurationFrom(time.Duration(timeout) * time.Second),
+				MaxRetries:   &maxRetries,
+				RetryBackoff: types.NullDurationFrom(time.Duration(retryBackoff) * time.Second),
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
 			limiter:    &mockLimiter{},
@@ -1013,11 +1013,11 @@ func TestURLSecrets_GSM_Integration(t *testing.T) {
 		retryBackoff := 1
 		us := &urlSecrets{
 			config: extConfig{
-				URLTemplate:         server.URL + "/secrets/{key}/decrypt",
-				ResponsePath:        "plaintext",
-				TimeoutSeconds:      &timeout,
-				MaxRetries:          &maxRetries,
-				RetryBackoffSeconds: &retryBackoff,
+				URLTemplate:  server.URL + "/secrets/{key}/decrypt",
+				ResponsePath: "plaintext",
+				Timeout:      types.NullDurationFrom(time.Duration(timeout) * time.Second),
+				MaxRetries:   &maxRetries,
+				RetryBackoff: types.NullDurationFrom(time.Duration(retryBackoff) * time.Second),
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
 			limiter:    &mockLimiter{},
@@ -1053,11 +1053,11 @@ func TestURLSecrets_GSM_Integration(t *testing.T) {
 		us := &urlSecrets{
 			config: extConfig{
 				// Format matching: https://gsm.proxy-lb:8080/secrets/%s/decrypt
-				URLTemplate:         server.URL + "/secrets/{key}/decrypt",
-				ResponsePath:        "plaintext",
-				TimeoutSeconds:      &timeout,
-				MaxRetries:          &maxRetries,
-				RetryBackoffSeconds: &retryBackoff,
+				URLTemplate:  server.URL + "/secrets/{key}/decrypt",
+				ResponsePath: "plaintext",
+				Timeout:      types.NullDurationFrom(time.Duration(timeout) * time.Second),
+				MaxRetries:   &maxRetries,
+				RetryBackoff: types.NullDurationFrom(time.Duration(retryBackoff) * time.Second),
 			},
 			httpClient: &http.Client{Timeout: 5 * time.Second},
 			limiter:    &mockLimiter{},
