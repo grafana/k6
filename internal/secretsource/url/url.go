@@ -87,6 +87,7 @@ type extConfig struct {
 // newConfig creates a new extConfig instance with default values.
 func newConfig() extConfig {
 	return extConfig{
+		Method:                 http.MethodGet,                               // GET method
 		RequestsPerMinuteLimit: null.NewInt(300, false),                      // 300 requests per minute
 		RequestsBurst:          null.NewInt(10, false),                       // Allow a burst of 10 requests
 		Timeout:                types.NewNullDuration(30*time.Second, false), // 30 seconds timeout
@@ -139,12 +140,7 @@ func (us *urlSecrets) Get(key string) (string, error) {
 		// Replace {key} placeholder in URL template
 		url := strings.ReplaceAll(us.config.URLTemplate, "{key}", key)
 
-		method := us.config.Method
-		if method == "" {
-			method = http.MethodGet
-		}
-
-		req, err := http.NewRequestWithContext(ctx, method, url, nil)
+		req, err := http.NewRequestWithContext(ctx, us.config.Method, url, nil)
 		if err != nil {
 			return &retryableError{err: fmt.Errorf("failed to create request: %w", err), statusCode: 0}
 		}
@@ -330,6 +326,10 @@ func getConfig(arg string, fs fsext.Fs) (extConfig, error) {
 	}
 
 	// Apply defaults for fields that weren't set by the user
+	if config.Method == "" {
+		config.Method = http.MethodGet
+	}
+
 	if !config.RequestsPerMinuteLimit.Valid {
 		config.RequestsPerMinuteLimit = null.IntFrom(300)
 	}
