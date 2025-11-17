@@ -122,7 +122,7 @@ type urlSecrets struct {
 }
 
 func (us *urlSecrets) Description() string {
-	return fmt.Sprintf("URL-based secret source")
+	return "URL-based secret source"
 }
 
 func (us *urlSecrets) Get(key string) (string, error) {
