@@ -11,6 +11,7 @@ import (
 	"math"
 	"math/rand" // nosemgrep: math-random-used // This is being used for retry jitter
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -299,6 +300,22 @@ func parseConfigArgument(configArg string) (string, error) {
 	return configPath, nil
 }
 
+func validateURLTemplate(urlTemplate string) error {
+	// Replace {key} placeholder with a dummy value for validation
+	testURL := strings.ReplaceAll(urlTemplate, "{key}", "test")
+	parsedURL, err := url.Parse(testURL)
+	if err != nil {
+		return fmt.Errorf("urlTemplate is not a valid URL: %w", err)
+	}
+
+	// Require absolute URL with scheme
+	if parsedURL.Scheme == "" {
+		return errors.New("urlTemplate must be an absolute URL with a scheme (e.g., https://...)")
+	}
+
+	return nil
+}
+
 func getConfig(arg string, fs fsext.Fs) (extConfig, error) {
 	// Start with default values
 	config := newConfig()
@@ -353,6 +370,10 @@ func getConfig(arg string, fs fsext.Fs) (extConfig, error) {
 	// Validate required fields and value constraints
 	if config.URLTemplate == "" {
 		return config, errMissingURLTemplate
+	}
+
+	if err := validateURLTemplate(config.URLTemplate); err != nil {
+		return config, err
 	}
 
 	if config.Timeout.Duration <= 0 {

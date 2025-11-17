@@ -245,6 +245,59 @@ func TestGetConfig(t *testing.T) {
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to open config file")
 	})
+
+	t.Run("invalid URL format", func(t *testing.T) {
+		t.Parallel()
+		fs := fsext.NewMemMapFs()
+
+		config := extConfig{
+			URLTemplate: "not a valid url",
+		}
+
+		configData, err := json.Marshal(config)
+		require.NoError(t, err)
+		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
+		require.NoError(t, err)
+
+		_, err = getConfig("config="+testConfigFile, fs)
+		assert.ErrorContains(t, err, "urlTemplate must be an absolute URL with a scheme")
+	})
+
+	t.Run("http scheme is valid", func(t *testing.T) {
+		t.Parallel()
+		fs := fsext.NewMemMapFs()
+
+		config := extConfig{
+			URLTemplate: "http://api.example.com/secrets/{key}",
+		}
+
+		configData, err := json.Marshal(config)
+		require.NoError(t, err)
+		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
+		require.NoError(t, err)
+
+		result, err := getConfig("config="+testConfigFile, fs)
+		require.NoError(t, err)
+		assert.Equal(t, "http://api.example.com/secrets/{key}", result.URLTemplate)
+	})
+
+	t.Run("https scheme is valid", func(t *testing.T) {
+		t.Parallel()
+		fs := fsext.NewMemMapFs()
+
+		config := extConfig{
+			URLTemplate: "https://api.example.com/secrets/{key}",
+		}
+
+		configData, err := json.Marshal(config)
+		require.NoError(t, err)
+		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
+		require.NoError(t, err)
+
+		result, err := getConfig("config="+testConfigFile, fs)
+		require.NoError(t, err)
+		assert.Equal(t, "https://api.example.com/secrets/{key}", result.URLTemplate)
+	})
 }
 
 func TestURLSecrets_Get(t *testing.T) {
