@@ -30,12 +30,15 @@ type slot struct {
 	next  uint16
 }
 
-/* A (forgetful) hash table to the data seen by the compressor, to
-   help create backward references to previous data.
+/*
+A (forgetful) hash table to the data seen by the compressor, to
 
-   Hashes are stored in chains which are bucketed to groups. Group of chains
-   share a storage "bank". When more than "bank size" chain nodes are added,
-   oldest nodes are replaced; this way several chains may share a tail. */
+	help create backward references to previous data.
+
+	Hashes are stored in chains which are bucketed to groups. Group of chains
+	share a storage "bank". When more than "bank size" chain nodes are added,
+	oldest nodes are replaced; this way several chains may share a tail.
+*/
 type hashForgetfulChain struct {
 	hasherCommon
 
@@ -105,8 +108,11 @@ func (h *hashForgetfulChain) Prepare(one_shot bool, input_size uint, data []byte
 	}
 }
 
-/* Look at 4 bytes at &data[ix & mask]. Compute a hash from these, and prepend
-   node to corresponding chain; also update tiny_hash for current position. */
+/*
+Look at 4 bytes at &data[ix & mask]. Compute a hash from these, and prepend
+
+	node to corresponding chain; also update tiny_hash for current position.
+*/
 func (h *hashForgetfulChain) Store(data []byte, mask uint, ix uint) {
 	var key uint = h.HashBytes(data[ix&mask:])
 	var bank uint = key & (h.numBanks - 1)
@@ -145,17 +151,20 @@ func (h *hashForgetfulChain) PrepareDistanceCache(distance_cache []int) {
 	prepareDistanceCache(distance_cache, h.numLastDistancesToCheck)
 }
 
-/* Find a longest backward match of &data[cur_ix] up to the length of
-   max_length and stores the position cur_ix in the hash table.
+/*
+Find a longest backward match of &data[cur_ix] up to the length of
 
-   REQUIRES: PrepareDistanceCachehashForgetfulChain must be invoked for current distance cache
-             values; if this method is invoked repeatedly with the same distance
-             cache values, it is enough to invoke PrepareDistanceCachehashForgetfulChain once.
+	max_length and stores the position cur_ix in the hash table.
 
-   Does not look for matches longer than max_length.
-   Does not look for matches further away than max_backward.
-   Writes the best match into |out|.
-   |out|->score is updated only if a better match is found. */
+	REQUIRES: PrepareDistanceCachehashForgetfulChain must be invoked for current distance cache
+	          values; if this method is invoked repeatedly with the same distance
+	          cache values, it is enough to invoke PrepareDistanceCachehashForgetfulChain once.
+
+	Does not look for matches longer than max_length.
+	Does not look for matches further away than max_backward.
+	Writes the best match into |out|.
+	|out|->score is updated only if a better match is found.
+*/
 func (h *hashForgetfulChain) FindLongestMatch(dictionary *encoderDictionary, data []byte, ring_buffer_mask uint, distance_cache []int, cur_ix uint, max_length uint, max_backward uint, gap uint, max_distance uint, out *hasherSearchResult) {
 	var cur_ix_masked uint = cur_ix & ring_buffer_mask
 	var min_score uint = out.score

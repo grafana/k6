@@ -8,12 +8,15 @@ import "encoding/binary"
    See file LICENSE for detail or copy at https://opensource.org/licenses/MIT
 */
 
-/* A (forgetful) hash table to the data seen by the compressor, to
-   help create backward references to previous data.
+/*
+A (forgetful) hash table to the data seen by the compressor, to
 
-   This is a hash map of fixed size (bucket_size_) to a ring buffer of
-   fixed size (block_size_). The ring buffer contains the last block_size_
-   index positions of the given hash key in the compressed data. */
+	help create backward references to previous data.
+
+	This is a hash map of fixed size (bucket_size_) to a ring buffer of
+	fixed size (block_size_). The ring buffer contains the last block_size_
+	index positions of the given hash key in the compressed data.
+*/
 func (*h6) HashTypeLength() uint {
 	return 8
 }
@@ -69,8 +72,11 @@ func (h *h6) Prepare(one_shot bool, input_size uint, data []byte) {
 	}
 }
 
-/* Look at 4 bytes at &data[ix & mask].
-   Compute a hash from these, and store the value of ix at that position. */
+/*
+Look at 4 bytes at &data[ix & mask].
+
+	Compute a hash from these, and store the value of ix at that position.
+*/
 func (h *h6) Store(data []byte, mask uint, ix uint) {
 	var num []uint16 = h.num
 	var key uint32 = hashBytesH6(data[ix&mask:], h.hash_mask_, h.hash_shift_)
@@ -102,17 +108,20 @@ func (h *h6) PrepareDistanceCache(distance_cache []int) {
 	prepareDistanceCache(distance_cache, h.params.num_last_distances_to_check)
 }
 
-/* Find a longest backward match of &data[cur_ix] up to the length of
-   max_length and stores the position cur_ix in the hash table.
+/*
+Find a longest backward match of &data[cur_ix] up to the length of
 
-   REQUIRES: PrepareDistanceCacheH6 must be invoked for current distance cache
-             values; if this method is invoked repeatedly with the same distance
-             cache values, it is enough to invoke PrepareDistanceCacheH6 once.
+	max_length and stores the position cur_ix in the hash table.
 
-   Does not look for matches longer than max_length.
-   Does not look for matches further away than max_backward.
-   Writes the best match into |out|.
-   |out|->score is updated only if a better match is found. */
+	REQUIRES: PrepareDistanceCacheH6 must be invoked for current distance cache
+	          values; if this method is invoked repeatedly with the same distance
+	          cache values, it is enough to invoke PrepareDistanceCacheH6 once.
+
+	Does not look for matches longer than max_length.
+	Does not look for matches further away than max_backward.
+	Writes the best match into |out|.
+	|out|->score is updated only if a better match is found.
+*/
 func (h *h6) FindLongestMatch(dictionary *encoderDictionary, data []byte, ring_buffer_mask uint, distance_cache []int, cur_ix uint, max_length uint, max_backward uint, gap uint, max_distance uint, out *hasherSearchResult) {
 	var num []uint16 = h.num
 	var buckets []uint32 = h.buckets

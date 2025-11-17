@@ -16,7 +16,7 @@ import (
 	"regexp"
 )
 
-// The UUID reserved variants. 
+// The UUID reserved variants.
 const (
 	ReservedNCS       byte = 0x80
 	ReservedRFC4122   byte = 0x40
@@ -49,10 +49,9 @@ type UUID [16]byte
 // representation. Function accepts UUID string in following
 // formats:
 //
-//     uuid.ParseHex("6ba7b814-9dad-11d1-80b4-00c04fd430c8")
-//     uuid.ParseHex("{6ba7b814-9dad-11d1-80b4-00c04fd430c8}")
-//     uuid.ParseHex("urn:uuid:6ba7b814-9dad-11d1-80b4-00c04fd430c8")
-//
+//	uuid.ParseHex("6ba7b814-9dad-11d1-80b4-00c04fd430c8")
+//	uuid.ParseHex("{6ba7b814-9dad-11d1-80b4-00c04fd430c8}")
+//	uuid.ParseHex("urn:uuid:6ba7b814-9dad-11d1-80b4-00c04fd430c8")
 func ParseHex(s string) (u *UUID, err error) {
 	md := re.FindStringSubmatch(s)
 	if md == nil {

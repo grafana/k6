@@ -214,7 +214,7 @@ func (q *M4) FindMatches(dst []Match, src []byte) []Match {
 			matches = [3]absoluteMatch{
 				matches[0],
 				matches[2],
-				absoluteMatch{},
+				{},
 			}
 
 		case matches[0].Start < matches[2].End+q.MinLength:
@@ -223,8 +223,8 @@ func (q *M4) FindMatches(dst []Match, src []byte) []Match {
 			e.emit(matches[2])
 			matches = [3]absoluteMatch{
 				matches[0],
-				absoluteMatch{},
-				absoluteMatch{},
+				{},
+				{},
 			}
 
 		default:

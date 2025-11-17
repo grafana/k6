@@ -10,13 +10,15 @@ import (
 // and '?' matches on any one character.
 //
 // pattern:
-// 	{ term }
-// term:
-// 	'*'         matches any sequence of non-Separator characters
-// 	'?'         matches any single non-Separator character
-// 	c           matches character c (c != '*', '?', '\\')
-// 	'\\' c      matches character c
 //
+//	{ term }
+//
+// term:
+//
+//	'*'         matches any sequence of non-Separator characters
+//	'?'         matches any single non-Separator character
+//	c           matches character c (c != '*', '?', '\\')
+//	'\\' c      matches character c
 func Match(str, pattern string) bool {
 	if pattern == "*" {
 		return true

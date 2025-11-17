@@ -269,7 +269,7 @@ func (m *MemMapFs) RemoveAll(path string) error {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	for p, _ := range m.getData() {
+	for p := range m.getData() {
 		if strings.HasPrefix(p, path) {
 			m.mu.RUnlock()
 			m.mu.Lock()

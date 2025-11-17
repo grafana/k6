@@ -51,9 +51,12 @@ func refineEntropyCodesDistance(data []uint16, length uint, stride uint, num_his
 	}
 }
 
-/* Assigns a block id from the range [0, num_histograms) to each data element
-   in data[0..length) and fills in block_id[0..length) with the assigned values.
-   Returns the number of blocks, i.e. one plus the number of block switches. */
+/*
+Assigns a block id from the range [0, num_histograms) to each data element
+
+	in data[0..length) and fills in block_id[0..length) with the assigned values.
+	Returns the number of blocks, i.e. one plus the number of block switches.
+*/
 func findBlocksDistance(data []uint16, length uint, block_switch_bitcost float64, num_histograms uint, histograms []histogramDistance, insert_cost []float64, cost []float64, switch_signal []byte, block_id []byte) uint {
 	var data_size uint = histogramDataSizeDistance()
 	var bitmaplen uint = (num_histograms + 7) >> 3

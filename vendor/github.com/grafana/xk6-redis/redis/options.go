@@ -226,7 +226,7 @@ func toUniversalOptions(options interface{}) (*redis.UniversalOptions, error) {
 // previously set values are consistent with the new values. This validates that
 // multiple node options set when using cluster mode are consistent with each other.
 // TODO: Break apart, simplify?
-//nolint: gocognit,cyclop,funlen,gofmt,gofumpt,goimports
+// nolint: gocognit,cyclop,funlen,gofmt,gofumpt,goimports
 func setConsistentOptions(uopts *redis.UniversalOptions, opts *redis.Options) error {
 	uopts.Addrs = append(uopts.Addrs, opts.Addr)
 

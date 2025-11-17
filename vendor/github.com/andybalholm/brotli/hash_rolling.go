@@ -13,9 +13,12 @@ const kRollingHashMul32 uint32 = 69069
 
 const kInvalidPosHashRolling uint32 = 0xffffffff
 
-/* This hasher uses a longer forward length, but returning a higher value here
-   will hurt compression by the main hasher when combined with a composite
-   hasher. The hasher tests for forward itself instead. */
+/*
+This hasher uses a longer forward length, but returning a higher value here
+
+	will hurt compression by the main hasher when combined with a composite
+	hasher. The hasher tests for forward itself instead.
+*/
 func (*hashRolling) HashTypeLength() uint {
 	return 4
 }
@@ -24,8 +27,11 @@ func (*hashRolling) StoreLookahead() uint {
 	return 4
 }
 
-/* Computes a code from a single byte. A lookup table of 256 values could be
-   used, but simply adding 1 works about as good. */
+/*
+Computes a code from a single byte. A lookup table of 256 values could be
+
+	used, but simply adding 1 works about as good.
+*/
 func (*hashRolling) HashByte(b byte) uint32 {
 	return uint32(b) + 1
 }
@@ -38,8 +44,11 @@ func (h *hashRolling) HashRollingFunction(state uint32, add byte, rem byte, fact
 	return uint32(factor*state + h.HashByte(add) - factor_remove*h.HashByte(rem))
 }
 
-/* Rolling hash for long distance long string matches. Stores one position
-   per bucket, bucket key is computed over a long region. */
+/*
+Rolling hash for long distance long string matches. Stores one position
+
+	per bucket, bucket key is computed over a long region.
+*/
 type hashRolling struct {
 	hasherCommon
 

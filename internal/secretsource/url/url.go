@@ -297,6 +297,10 @@ func parseConfigArgument(configArg string) (string, error) {
 }
 
 func validateURLTemplate(urlTemplate string) error {
+	if urlTemplate == "" {
+		return errMissingURLTemplate
+	}
+
 	// Replace {key} placeholder with a dummy value for validation
 	testURL := strings.ReplaceAll(urlTemplate, "{key}", "test")
 	parsedURL, err := url.Parse(testURL)
@@ -364,10 +368,6 @@ func getConfig(arg string, fs fsext.Fs) (extConfig, error) {
 	}
 
 	// Validate required fields and value constraints
-	if config.URLTemplate == "" {
-		return config, errMissingURLTemplate
-	}
-
 	if err := validateURLTemplate(config.URLTemplate); err != nil {
 		return config, err
 	}

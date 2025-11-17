@@ -17,10 +17,13 @@ func log2FloorNonZero(n uint) uint32 {
 	return uint32(bits.Len(n)) - 1
 }
 
-/* A lookup table for small values of log2(int) to be used in entropy
-   computation.
+/*
+A lookup table for small values of log2(int) to be used in entropy
 
-   ", ".join(["%.16ff" % x for x in [0.0]+[log2(x) for x in range(1, 256)]]) */
+	computation.
+
+	", ".join(["%.16ff" % x for x in [0.0]+[log2(x) for x in range(1, 256)]])
+*/
 var kLog2Table = []float32{
 	0.0000000000000000,
 	0.0000000000000000,
