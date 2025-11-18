@@ -931,16 +931,16 @@ func TestURLSecrets_Description(t *testing.T) {
 	assert.Contains(t, desc, "URL-based secret source")
 }
 
-// TestURLSecrets_GSM_Integration tests that the URL secret source works as a drop-in
-// replacement for the GSM (Grafana Secrets Manager) extension.
-func TestURLSecrets_GSM_Integration(t *testing.T) {
+// TestURLSecrets_JSONResponseIntegration tests that the URL secret source works
+// with various JSON response formats from external secret management systems.
+func TestURLSecrets_JSONResponseIntegration(t *testing.T) {
 	t.Parallel()
 
-	t.Run("GSM decrypt endpoint with plaintext response", func(t *testing.T) {
+	t.Run("JSON API endpoint with nested plaintext field", func(t *testing.T) {
 		t.Parallel()
-		// Mock GSM server that returns DecryptedSecret response
+		// Mock secret management API that returns a structured JSON response
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			// Verify the request matches GSM's DecryptSecretById format
+			// Verify the request format
 			assert.Equal(t, "GET", req.Method)
 			assert.Equal(t, "Bearer test-token", req.Header.Get("Authorization"))
 
@@ -948,7 +948,7 @@ func TestURLSecrets_GSM_Integration(t *testing.T) {
 			expectedPath := "/secrets/my-secret-id/decrypt"
 			assert.Equal(t, expectedPath, req.URL.Path)
 
-			// Return a response matching GSM's DecryptedSecret format
+			// Return a structured JSON response with metadata and the secret value
 			response := map[string]interface{}{
 				"uuid":        "550e8400-e29b-41d4-a716-446655440000",
 				"name":        "my-secret",
@@ -970,7 +970,7 @@ func TestURLSecrets_GSM_Integration(t *testing.T) {
 		}))
 		defer server.Close()
 
-		// Configure URL secret source to match GSM format
+		// Configure URL secret source to extract the plaintext field from JSON response
 		timeout := 5
 		maxRetries := 3
 		retryBackoff := 1
@@ -997,7 +997,7 @@ func TestURLSecrets_GSM_Integration(t *testing.T) {
 		assert.Equal(t, "super-secret-value", secret)
 	})
 
-	t.Run("GSM with multiple secret IDs", func(t *testing.T) {
+	t.Run("multiple secret IDs with dynamic path substitution", func(t *testing.T) {
 		t.Parallel()
 		// Track which secrets were requested
 		requestedSecrets := make(map[string]bool)
@@ -1044,7 +1044,7 @@ func TestURLSecrets_GSM_Integration(t *testing.T) {
 			config: extConfig{
 				URLTemplate: server.URL + "/secrets/{key}/decrypt",
 				Headers: map[string]string{
-					"Authorization": "Bearer gsm-token",
+					"Authorization": "Bearer api-token",
 				},
 				ResponsePath: null.StringFrom("plaintext"),
 				Timeout:      types.NullDurationFrom(time.Duration(timeout) * time.Second),
@@ -1077,10 +1077,10 @@ func TestURLSecrets_GSM_Integration(t *testing.T) {
 		assert.True(t, requestedSecrets["jwt-secret"])
 	})
 
-	t.Run("GSM error responses", func(t *testing.T) {
+	t.Run("API error responses", func(t *testing.T) {
 		t.Parallel()
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			// Simulate GSM error (e.g., secret not found)
+			// Simulate API error (e.g., secret not found)
 			w.WriteHeader(http.StatusNotFound)
 			response := map[string]string{
 				"code":    "not_found",
@@ -1113,16 +1113,16 @@ func TestURLSecrets_GSM_Integration(t *testing.T) {
 		assert.Contains(t, err.Error(), "404")
 	})
 
-	t.Run("GSM complete URL format", func(t *testing.T) {
+	t.Run("complete URL format with path template", func(t *testing.T) {
 		t.Parallel()
-		// Test with the exact GSM URL format specified by the user
+		// Test with URL template that includes path segments after the key placeholder
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			// The URL should be in format: /secrets/{id}/decrypt
 			assert.True(t, strings.HasPrefix(req.URL.Path, "/secrets/"))
 			assert.True(t, strings.HasSuffix(req.URL.Path, "/decrypt"))
 
 			response := map[string]interface{}{
-				"plaintext": "secret-from-gsm",
+				"plaintext": "secret-from-api",
 			}
 
 			w.Header().Set("Content-Type", "application/json")
@@ -1136,7 +1136,7 @@ func TestURLSecrets_GSM_Integration(t *testing.T) {
 		retryBackoff := 1
 		us := &urlSecrets{
 			config: extConfig{
-				// Format matching: https://gsm.proxy-lb:8080/secrets/%s/decrypt
+				// URL template with key placeholder in the middle of the path
 				URLTemplate:  server.URL + "/secrets/{key}/decrypt",
 				ResponsePath: null.StringFrom("plaintext"),
 				Timeout:      types.NullDurationFrom(time.Duration(timeout) * time.Second),
@@ -1150,7 +1150,7 @@ func TestURLSecrets_GSM_Integration(t *testing.T) {
 
 		secret, err := us.Get("test-secret-123")
 		require.NoError(t, err)
-		assert.Equal(t, "secret-from-gsm", secret)
+		assert.Equal(t, "secret-from-api", secret)
 	})
 }
 

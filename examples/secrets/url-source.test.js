@@ -1,10 +1,10 @@
 // Example: Using URL-based secret source
 //
-// For generic API:
+// Basic configuration:
 // k6 run --secret-source=url=config=examples/secrets/url-config.json examples/secrets/url-source.test.js
 //
-// For Grafana Secrets Manager (GSM):
-// k6 run --secret-source=url=config=examples/secrets/url-gsm-config.json examples/secrets/url-source.test.js
+// With local mock server and custom retry configuration:
+// k6 run --secret-source=url=config=examples/secrets/url-local.json examples/secrets/url-source.test.js
 
 import secrets from "k6/secrets";
 
