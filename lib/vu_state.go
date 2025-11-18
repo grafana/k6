@@ -29,9 +29,11 @@ type TracerProvider interface {
 // AddrResolver is an interface for DNS resolution.
 type AddrResolver interface {
 	// ResolveAddr looks up the IP address for the given host and optionally port.
-	// The address is expected in the form "host:port" or just "host".
-	// It returns the resolved IP, the port (0 if not specified), and an error if any.
-	ResolveAddr(addr string) (net.IP, error)
+	// It uses the same DNS resolution logic as DialContext, respecting the
+	// DNS, Hosts, Blacklist IP, and Block hostnames options.
+	// The address can be in the form "host:port" or just "host".
+	// It returns the resolved IP, the port (0 if not specified), and an error if resolution fails.
+	ResolveAddr(addr string) (net.IP, int, error)
 }
 
 // State provides the volatile state for a VU.
@@ -100,8 +102,7 @@ type State struct {
 	TestStatus *TestStatus
 }
 
-// GetAddrResolver returns the AddrResolver implementation used by the Dialer.
-// It returns nil if the Dialer doesn't implement AddrResolver.
+// GetAddrResolver returns the AddrResolver implementation or nil if not available.
 func (s *State) GetAddrResolver() AddrResolver {
 	resolver, ok := s.Dialer.(AddrResolver)
 	if !ok {

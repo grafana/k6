@@ -16,8 +16,8 @@ func (m *mockDialerWithResolver) DialContext(_ context.Context, _, _ string) (ne
 	return nil, errors.ErrUnsupported
 }
 
-func (m *mockDialerWithResolver) ResolveAddr(_ string) (net.IP, error) {
-	return nil, errors.ErrUnsupported
+func (m *mockDialerWithResolver) ResolveAddr(_ string) (net.IP, int, error) {
+	return nil, 0, errors.ErrUnsupported
 }
 
 // mockDialerWithoutResolver is a mock that only implements DialContexter
