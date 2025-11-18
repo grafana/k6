@@ -264,7 +264,7 @@ func TestGetConfig(t *testing.T) {
 		fs := fsext.NewMemMapFs()
 
 		config := extConfig{
-			URLTemplate: "not a valid url",
+			URLTemplate: "not a valid url {key}",
 		}
 
 		configData, err := json.Marshal(config)
@@ -310,6 +310,23 @@ func TestGetConfig(t *testing.T) {
 		result, err := getConfig("config="+testConfigFile, fs)
 		require.NoError(t, err)
 		assert.Equal(t, "https://api.example.com/secrets/{key}", result.URLTemplate)
+	})
+
+	t.Run("missing {key} placeholder", func(t *testing.T) {
+		t.Parallel()
+		fs := fsext.NewMemMapFs()
+
+		config := extConfig{
+			URLTemplate: "https://api.example.com/secrets/static-value",
+		}
+
+		configData, err := json.Marshal(config)
+		require.NoError(t, err)
+		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
+		require.NoError(t, err)
+
+		_, err = getConfig("config="+testConfigFile, fs)
+		assert.ErrorContains(t, err, "must contain {key} placeholder")
 	})
 }
 

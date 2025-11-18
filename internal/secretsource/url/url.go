@@ -292,6 +292,11 @@ func validateURLTemplate(urlTemplate string) error {
 		return errMissingURLTemplate
 	}
 
+	// Require {key} placeholder to differentiate between secrets
+	if !strings.Contains(urlTemplate, "{key}") {
+		return errors.New("urlTemplate must contain {key} placeholder")
+	}
+
 	// Replace {key} placeholder with a dummy value for validation
 	testURL := strings.ReplaceAll(urlTemplate, "{key}", "test")
 	parsedURL, err := url.Parse(testURL)
