@@ -23,49 +23,107 @@ import (
 
 const testConfigFile = "/config.json"
 
-func TestParseConfigArgument(t *testing.T) {
+func TestInlineConfig(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name        string
-		arg         string
-		expected    string
-		expectedErr error
-	}{
-		{
-			name:        "valid config argument",
-			arg:         "config=/path/to/config.json",
-			expected:    "/path/to/config.json",
-			expectedErr: nil,
-		},
-		{
-			name:        "missing config key",
-			arg:         "/path/to/config.json",
-			expected:    "",
-			expectedErr: errInvalidConfig,
-		},
-		{
-			name:        "wrong key",
-			arg:         "file=/path/to/config.json",
-			expected:    "",
-			expectedErr: errInvalidConfig,
-		},
-		{
-			name:        "empty argument",
-			arg:         "",
-			expected:    "",
-			expectedErr: errInvalidConfig,
-		},
-	}
+	t.Run("inline urlTemplate only", func(t *testing.T) {
+		t.Parallel()
+		fs := fsext.NewMemMapFs()
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			result, err := parseConfigArgument(tt.arg)
-			assert.Equal(t, tt.expected, result)
-			assert.ErrorIs(t, err, tt.expectedErr)
-		})
-	}
+		result, err := parseInlineConfig("urlTemplate=https://api.example.com/secrets/{key}", fs)
+		require.NoError(t, err)
+		assert.Equal(t, "https://api.example.com/secrets/{key}", result.URLTemplate)
+		assert.Equal(t, "GET", result.Method.String)
+		assert.Equal(t, int64(300), result.RequestsPerMinuteLimit.Int64)
+	})
+
+	t.Run("inline config with multiple options", func(t *testing.T) {
+		t.Parallel()
+		fs := fsext.NewMemMapFs()
+
+		config := "urlTemplate=https://api.example.com/{key},method=POST,timeout=60s,maxRetries=5"
+		result, err := parseInlineConfig(config, fs)
+		require.NoError(t, err)
+		assert.Equal(t, "https://api.example.com/{key}", result.URLTemplate)
+		assert.Equal(t, "POST", result.Method.String)
+		assert.Equal(t, 60*time.Second, time.Duration(result.Timeout.Duration))
+		assert.Equal(t, int64(5), result.MaxRetries.Int64)
+	})
+
+	t.Run("inline config with headers", func(t *testing.T) {
+		t.Parallel()
+		fs := fsext.NewMemMapFs()
+
+		config := "urlTemplate=https://api.example.com/{key},headers.Authorization=Bearer token123,headers.X-Custom=value"
+		result, err := parseInlineConfig(config, fs)
+		require.NoError(t, err)
+		assert.Equal(t, "https://api.example.com/{key}", result.URLTemplate)
+		assert.Equal(t, "Bearer token123", result.Headers["Authorization"])
+		assert.Equal(t, "value", result.Headers["X-Custom"])
+	})
+
+	t.Run("mixed file and inline config", func(t *testing.T) {
+		t.Parallel()
+		fs := fsext.NewMemMapFs()
+
+		// Create a base config file
+		baseConfig := extConfig{
+			URLTemplate: "https://base.example.com/{key}",
+			Method:      null.StringFrom("GET"),
+			Timeout:     types.NullDurationFrom(30 * time.Second),
+		}
+		configData, err := json.Marshal(baseConfig)
+		require.NoError(t, err)
+		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
+		require.NoError(t, err)
+
+		// Load from file and override with inline config
+		config := "config=" + testConfigFile + ",timeout=60s,maxRetries=10"
+		result, err := parseInlineConfig(config, fs)
+		require.NoError(t, err)
+		assert.Equal(t, "https://base.example.com/{key}", result.URLTemplate)
+		assert.Equal(t, 60*time.Second, time.Duration(result.Timeout.Duration))
+		assert.Equal(t, int64(10), result.MaxRetries.Int64)
+	})
+
+	t.Run("invalid config format", func(t *testing.T) {
+		t.Parallel()
+		fs := fsext.NewMemMapFs()
+
+		_, err := parseInlineConfig("invalid-no-equals", fs)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "expected key=value")
+	})
+
+	t.Run("unknown config key", func(t *testing.T) {
+		t.Parallel()
+		fs := fsext.NewMemMapFs()
+
+		_, err := parseInlineConfig("urlTemplate=https://api.example.com/{key},unknownKey=value", fs)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "unknown configuration key")
+	})
+
+	t.Run("invalid timeout format", func(t *testing.T) {
+		t.Parallel()
+		fs := fsext.NewMemMapFs()
+
+		_, err := parseInlineConfig("urlTemplate=https://api.example.com/{key},timeout=invalid", fs)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid timeout")
+	})
+
+	t.Run("all numeric options", func(t *testing.T) {
+		t.Parallel()
+		fs := fsext.NewMemMapFs()
+
+		config := "urlTemplate=https://api.example.com/{key},requestsPerMinuteLimit=100,requestsBurst=20,maxRetries=2"
+		result, err := parseInlineConfig(config, fs)
+		require.NoError(t, err)
+		assert.Equal(t, int64(100), result.RequestsPerMinuteLimit.Int64)
+		assert.Equal(t, int64(20), result.RequestsBurst.Int64)
+		assert.Equal(t, int64(2), result.MaxRetries.Int64)
+	})
 }
 
 func TestExtractSecretFromResponse(t *testing.T) {

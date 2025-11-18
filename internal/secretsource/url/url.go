@@ -26,8 +26,7 @@ import (
 )
 
 var (
-	errInvalidConfig      = errors.New("config parameter is required in format 'config=path/to/config'")
-	errMissingURLTemplate = errors.New("urlTemplate is required in config file")
+	errMissingURLTemplate = errors.New("urlTemplate is required")
 	errFailedToGetSecret  = errors.New("failed to get secret")
 )
 
@@ -320,13 +319,116 @@ func retry(
 	return lastErr
 }
 
-func parseConfigArgument(configArg string) (string, error) {
-	configKey, configPath, ok := strings.Cut(configArg, "=")
-	if !ok || configKey != "config" {
-		return "", errInvalidConfig
+func parseInlineConfig(configArg string, fs fsext.Fs) (extConfig, error) {
+	// Start with default values
+	defaultCfg := newConfig()
+	var fileCfg extConfig
+	var inlineCfg extConfig
+
+	// Split by comma to parse key=value pairs
+	parts := strings.Split(configArg, ",")
+	for _, part := range parts {
+		key, value, ok := strings.Cut(part, "=")
+		if !ok {
+			return extConfig{}, fmt.Errorf("invalid config format %q, expected key=value", part)
+		}
+
+		if key == "config" {
+			// Load from file
+			var err error
+			fileCfg, err = loadConfigFromFile(value, fs)
+			if err != nil {
+				return extConfig{}, err
+			}
+			continue
+		}
+
+		if err := parseInlineConfigOption(key, value, &inlineCfg); err != nil {
+			return extConfig{}, err
+		}
 	}
 
-	return configPath, nil
+	// Apply configs in order: defaults -> file -> inline
+	// This allows inline config to override file config
+	config := defaultCfg.Apply(fileCfg).Apply(inlineCfg)
+
+	return config, nil
+}
+
+func parseInlineConfigOption(key, value string, cfg *extConfig) error {
+	switch key {
+	case "urlTemplate":
+		cfg.URLTemplate = value
+	case "method":
+		cfg.Method = null.StringFrom(value)
+	case "responsePath":
+		cfg.ResponsePath = null.StringFrom(value)
+	case "timeout":
+		return parseDurationOption(value, &cfg.Timeout, "timeout")
+	case "requestsPerMinuteLimit":
+		return parseIntOption(value, &cfg.RequestsPerMinuteLimit, "requestsPerMinuteLimit")
+	case "requestsBurst":
+		return parseIntOption(value, &cfg.RequestsBurst, "requestsBurst")
+	case "maxRetries":
+		return parseIntOption(value, &cfg.MaxRetries, "maxRetries")
+	case "retryBackoff":
+		return parseDurationOption(value, &cfg.RetryBackoff, "retryBackoff")
+	default:
+		return parseHeaderOption(key, value, cfg)
+	}
+	return nil
+}
+
+func parseIntOption(value string, target *null.Int, optionName string) error {
+	var intValue int64
+	_, err := fmt.Sscanf(value, "%d", &intValue)
+	if err != nil {
+		return fmt.Errorf("invalid %s: %w", optionName, err)
+	}
+	*target = null.IntFrom(intValue)
+	return nil
+}
+
+func parseDurationOption(value string, target *types.NullDuration, optionName string) error {
+	duration, err := time.ParseDuration(value)
+	if err != nil {
+		return fmt.Errorf("invalid %s: %w", optionName, err)
+	}
+	*target = types.NullDurationFrom(duration)
+	return nil
+}
+
+func parseHeaderOption(key, value string, cfg *extConfig) error {
+	if !strings.HasPrefix(key, "headers.") {
+		return fmt.Errorf("unknown configuration key: %q", key)
+	}
+
+	headerName := strings.TrimPrefix(key, "headers.")
+	if cfg.Headers == nil {
+		cfg.Headers = make(map[string]string)
+	}
+	cfg.Headers[headerName] = value
+	return nil
+}
+
+func loadConfigFromFile(configPath string, fs fsext.Fs) (extConfig, error) {
+	file, err := fs.Open(configPath)
+	if err != nil {
+		return extConfig{}, fmt.Errorf("failed to open config file: %w", err)
+	}
+	defer func() { _ = file.Close() }()
+
+	configData, err := io.ReadAll(file)
+	if err != nil {
+		return extConfig{}, fmt.Errorf("failed to read config file: %w", err)
+	}
+
+	var fileCfg extConfig
+	if err := json.Unmarshal(configData, &fileCfg); err != nil {
+		return extConfig{}, fmt.Errorf("failed to parse JSON config: %w", err)
+	}
+
+	return fileCfg, nil
 }
 
 func validateURLTemplate(urlTemplate string) error {
@@ -355,34 +457,11 @@ func validateURLTemplate(urlTemplate string) error {
 }
 
 func getConfig(arg string, fs fsext.Fs) (extConfig, error) {
-	// Start with default values
-	defaultCfg := newConfig()
-
-	// Parse the ConfigArgument to get the config file path
-	configPath, err := parseConfigArgument(arg)
+	// Parse inline config (may include file-based config via config=path)
+	config, err := parseInlineConfig(arg, fs)
 	if err != nil {
 		return extConfig{}, err
 	}
-
-	file, err := fs.Open(configPath)
-	if err != nil {
-		return extConfig{}, fmt.Errorf("failed to open config file: %w", err)
-	}
-	defer func() { _ = file.Close() }()
-
-	configData, err := io.ReadAll(file)
-	if err != nil {
-		return extConfig{}, fmt.Errorf("failed to read config file: %w", err)
-	}
-
-	// Read file config into a fresh struct
-	var fileCfg extConfig
-	if err := json.Unmarshal(configData, &fileCfg); err != nil {
-		return extConfig{}, fmt.Errorf("failed to parse JSON config: %w", err)
-	}
-
-	// Apply file config on top of defaults
-	config := defaultCfg.Apply(fileCfg)
 
 	// Validate the final config
 	if err := validateConfig(config); err != nil {
