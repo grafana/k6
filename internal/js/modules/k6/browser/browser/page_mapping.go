@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/grafana/sobek"
@@ -749,9 +750,9 @@ func parseStringOrRegex(v sobek.Value, doubleQuote bool) string {
 	switch v.ExportType() {
 	case reflect.TypeOf(stringType): // text values require quotes
 		if doubleQuote {
-			a = `"` + v.String() + `"`
+			a = `"` + strings.ReplaceAll(v.String(), `"`, `\"`) + `"`
 		} else {
-			a = `'` + v.String() + `'`
+			a = `'` + strings.ReplaceAll(v.String(), `'`, `\'`) + `'`
 		}
 	case reflect.TypeOf(map[string]interface{}(nil)): // JS RegExp
 		a = v.String() // No quotes
