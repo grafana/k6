@@ -379,10 +379,10 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		{opts{cli: []string{"--summary-trend-stats", ""}}, exp{}, func(t *testing.T, c Config) {
 			assert.Equal(t, []string{}, c.SummaryTrendStats)
 		}},
-		{opts{cli: []string{"--summary-trend-stats", "coun"}}, exp{consolidationError: true}, nil},
-		{opts{cli: []string{"--summary-trend-stats", "med,avg,p("}}, exp{consolidationError: true}, nil},
-		{opts{cli: []string{"--summary-trend-stats", "med,avg,p(-1)"}}, exp{consolidationError: true}, nil},
-		{opts{cli: []string{"--summary-trend-stats", "med,avg,p(101)"}}, exp{consolidationError: true}, nil},
+		{opts{cli: []string{"--summary-trend-stats", "coun"}}, exp{cliReadError: true}, nil},
+		{opts{cli: []string{"--summary-trend-stats", "med,avg,p("}}, exp{cliReadError: true}, nil},
+		{opts{cli: []string{"--summary-trend-stats", "med,avg,p(-1)"}}, exp{cliReadError: true}, nil},
+		{opts{cli: []string{"--summary-trend-stats", "med,avg,p(101)"}}, exp{cliReadError: true}, nil},
 		{opts{cli: []string{"--summary-trend-stats", "med,avg,p(99.999)"}}, exp{}, func(t *testing.T, c Config) {
 			assert.Equal(t, []string{"med", "avg", "p(99.999)"}, c.SummaryTrendStats)
 		}},

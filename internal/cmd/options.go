@@ -193,7 +193,7 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		if errSts != nil {
 			return opts, errSts
 		}
-		if _, errSts = metrics.GetResolversForTrendColumns(trendStats); err != nil {
+		if _, errSts = metrics.GetResolversForTrendColumns(trendStats); errSts != nil {
 			return opts, errSts
 		}
 		opts.SummaryTrendStats = trendStats
