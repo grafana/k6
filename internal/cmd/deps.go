@@ -42,11 +42,11 @@ func getCmdDeps(gs *state.GlobalState) *cobra.Command {
 			slices.Sort(imports)
 
 			result := struct {
-				Dependencies        map[string]string `json:"dependencies"`
+				BuildDependancies   map[string]string `json:"buildDependancies"`
 				Imports             []string          `json:"imports"`
 				CustomBuildRequired bool              `json:"customBuildRequired"`
 			}{
-				Dependencies:        depsMap,
+				BuildDependancies:   depsMap,
 				Imports:             imports,
 				CustomBuildRequired: isCustomBuildRequired(deps, build.Version, ext.GetAll()),
 			}
