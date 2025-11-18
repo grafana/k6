@@ -109,11 +109,12 @@ func versionString() string {
 }
 
 // versionDetailsWithExtensions returns the structured details about version including extensions
-func versionDetailsWithExtensions(exts []*ext.Extension) map[string]any {
+// returns error if there are unhandled extension types
+func versionDetailsWithExtensions(exts []*ext.Extension) (map[string]any, error) {
 	details := versionDetails()
 
 	if len(exts) == 0 {
-		return details
+		return details, nil
 	}
 
 	// extInfo represents the JSON structure for an extension in the version details
@@ -142,18 +143,22 @@ func versionDetailsWithExtensions(exts []*ext.Extension) map[string]any {
 			infoList = append(infoList, info)
 		}
 
-		if e.Type == ext.OutputExtension {
+		switch e.Type {
+		case ext.OutputExtension:
 			info.Outputs = append(info.Outputs, e.Name)
-		}
-
-		if e.Type == ext.JSExtension {
+		case ext.JSExtension:
 			info.Imports = append(info.Imports, e.Name)
+		case ext.SecretSourceExtension:
+			// currently, no special handling is needed for secret source extensions
+		default:
+			// report unhandled extension type for future proofing
+			return details, fmt.Errorf("unhandled extension type: %s", e.Type)
 		}
 	}
 
 	details["extensions"] = infoList
 
-	return details
+	return details, nil
 }
 
 type versionCmd struct {
@@ -169,7 +174,10 @@ func (c *versionCmd) run(cmd *cobra.Command, _ []string) error {
 		return nil
 	}
 
-	details := versionDetailsWithExtensions(ext.GetAll())
+	details, err := versionDetailsWithExtensions(ext.GetAll())
+	if err != nil {
+		return fmt.Errorf("failed to get version details with extensions: %w", err)
+	}
 
 	if err := json.NewEncoder(c.gs.Stdout).Encode(details); err != nil {
 		return fmt.Errorf("failed to encode/output version details: %w", err)

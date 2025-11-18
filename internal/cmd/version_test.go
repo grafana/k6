@@ -89,9 +89,10 @@ func TestVersionDetailsWithExtensions(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name     string
-		exts     []*ext.Extension
-		expected func(t *testing.T, details map[string]any)
+		name        string
+		exts        []*ext.Extension
+		expected    func(t *testing.T, details map[string]any)
+		expectError bool
 	}{
 		{
 			name: "no extensions",
@@ -282,22 +283,72 @@ func TestVersionDetailsWithExtensions(t *testing.T) {
 				require.True(t, versions["v2.0.0"])
 			},
 		},
+		{
+			name: "unhandled extension type",
+			exts: []*ext.Extension{
+				{
+					Name:    "unknown",
+					Path:    "github.com/example/xk6-unknown",
+					Version: "v1.0.0",
+					Type:    100, // Unknown/unhandled type
+				},
+			},
+			expected: func(_ *testing.T, _ map[string]any) {
+				// Should not be called when expectError is true
+			},
+			expectError: true,
+		},
+		{
+			name: "mixed handled and unhandled extensions",
+			exts: []*ext.Extension{
+				{
+					Name:    "k6/x/test",
+					Path:    "github.com/example/xk6-test",
+					Version: "v1.0.0",
+					Type:    ext.JSExtension,
+				},
+				{
+					Name:    "unknown",
+					Path:    "github.com/example/xk6-unknown",
+					Version: "v1.0.0",
+					Type:    100, // Unknown/unhandled type
+				},
+				{
+					Name:    "output1",
+					Path:    "github.com/example/xk6-output1",
+					Version: "v2.0.0",
+					Type:    ext.OutputExtension,
+				},
+			},
+			expected: func(_ *testing.T, _ map[string]any) {
+				// Should not be called when expectError is true
+			},
+			expectError: true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			details := versionDetailsWithExtensions(tt.exts)
+			details, err := versionDetailsWithExtensions(tt.exts)
+
+			if tt.expectError {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), "unhandled extension type")
+				return
+			}
+
+			require.NoError(t, err)
 
 			// Convert to map[string]any for easier testing
 			// (the actual function returns this type but nested structures need conversion)
-			jsonBytes, err := json.Marshal(details)
-			require.NoError(t, err)
+			jsonBytes, jsonErr := json.Marshal(details)
+			require.NoError(t, jsonErr)
 
 			var result map[string]any
-			err = json.Unmarshal(jsonBytes, &result)
-			require.NoError(t, err)
+			jsonErr = json.Unmarshal(jsonBytes, &result)
+			require.NoError(t, jsonErr)
 
 			tt.expected(t, result)
 		})
