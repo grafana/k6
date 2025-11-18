@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/grafana/sobek"
-	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
@@ -565,7 +564,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"waitForNavigation": func(opts sobek.Value) (*sobek.Promise, error) {
-			return waitForNavigationBodyImpl(vu, p, opts)
+			return mapWaitForNavigation(vu, p, opts)
 		},
 		"waitForSelector": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
 			popts := common.NewFrameWaitForSelectorOptions(p.MainFrame().Timeout())
@@ -588,7 +587,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			})
 		},
 		"waitForURL": func(url sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
-			return waitForURLBody(vu, p, url, opts)
+			return mapWaitForURL(vu, p, url, opts)
 		},
 		"waitForResponse": func(url sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
 			popts, err := parsePageWaitForResponseOptions(vu.Context(), opts, p.Timeout())
@@ -604,15 +603,11 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				val = url.String() // No quotes
 			}
 
-			// Use RegEx matcher for regex pattern matching
-			ctx, stopTaskqueue := context.WithCancel(vu.Context())
-			tq := cancelableTaskQueue(ctx, vu.RegisterCallback)
-
-			rm := newRegExMatcher(ctx, vu, tq)
+			tq, ctx, stop := newTaskQueue(vu)
 
 			return promise(vu, func() (result any, reason error) {
-				defer stopTaskqueue()
-				return p.WaitForResponse(val, popts, rm)
+				defer stop()
+				return p.WaitForResponse(val, popts, newRegExMatcher(ctx, vu, tq))
 			}), nil
 		},
 		"waitForRequest": func(url sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
@@ -629,15 +624,11 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				val = url.String() // No quotes
 			}
 
-			// Use RegEx matcher for regex pattern matching
-			ctx, stopTaskqueue := context.WithCancel(vu.Context())
-			tq := cancelableTaskQueue(ctx, vu.RegisterCallback)
-
-			rm := newRegExMatcher(ctx, vu, tq)
+			tq, ctx, stop := newTaskQueue(vu)
 
 			return promise(vu, func() (result any, reason error) {
-				defer stopTaskqueue()
-				return p.WaitForRequest(val, popts, rm)
+				defer stop()
+				return p.WaitForRequest(val, popts, newRegExMatcher(ctx, vu, tq))
 			}), nil
 		},
 		"workers": func() *sobek.Object {
@@ -687,29 +678,15 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 // mapPageOn enables using various page.on event handlers with the page.on method.
 // It provides a generic way to map different event types to their respective handler functions.
 func mapPageOn(vu moduleVU, p *common.Page) func(common.PageEventName, sobek.Callable) error {
-	return func(eventName common.PageEventName, handleEvent sobek.Callable) error {
-		rt := vu.Runtime()
-
+	return func(eventName common.PageEventName, handle sobek.Callable) error {
 		pageEvents := map[common.PageEventName]struct {
 			mapp func(vu moduleVU, event common.PageEvent) mapping
 			wait bool // Whether to wait for the handler to complete.
 		}{
-			common.PageEventConsole: {
-				mapp: mapConsoleMessage,
-				wait: false,
-			},
-			common.PageEventMetric: {
-				mapp: mapMetricEvent,
-				wait: true,
-			},
-			common.PageEventRequest: {
-				mapp: mapRequestEvent,
-				wait: false,
-			},
-			common.PageEventResponse: {
-				mapp: mapResponseEvent,
-				wait: false,
-			},
+			common.PageEventConsole:  {mapp: mapConsoleMessage},
+			common.PageEventMetric:   {mapp: mapMetricEvent, wait: true},
+			common.PageEventRequest:  {mapp: mapRequestEvent},
+			common.PageEventResponse: {mapp: mapResponseEvent},
 		}
 		pageEvent, ok := pageEvents[eventName]
 		if !ok {
@@ -717,82 +694,23 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageEventName, sobek.Cal
 		}
 
 		ctx := vu.Context()
-
-		// Run the event handler in the task queue to
-		// ensure that the handler is executed on the event loop.
 		tq := vu.get(ctx, p.TargetID())
-		eventHandler := func(event common.PageEvent) error {
-			mapping := pageEvent.mapp(vu, event)
 
-			done := make(chan struct{})
-
-			tq.Queue(func() error {
-				defer close(done)
-
-				_, err := handleEvent(
-					sobek.Undefined(),
-					rt.ToValue(mapping),
-				)
+		return p.On(eventName, func(event common.PageEvent) error {
+			wait := queueTask(ctx, tq, func() (sobek.Value, error) {
+				_, err := handle(sobek.Undefined(), vu.Runtime().ToValue(pageEvent.mapp(vu, event)))
 				if err != nil {
-					return fmt.Errorf("executing page.on('%s') handler: %w", eventName, err)
+					return nil, fmt.Errorf("executing page.on('%s') handler: %w", eventName, err)
 				}
-
-				return nil
+				return nil, nil
 			})
-
 			if pageEvent.wait {
-				select {
-				case <-done:
-				case <-ctx.Done():
+				if _, err := wait(); errors.Is(err, context.Canceled) {
 					return errors.New("iteration ended before page.on handler completed executing")
 				}
 			}
-
-			return nil
-		}
-
-		return p.On(eventName, eventHandler) //nolint:wrapcheck
-	}
-}
-
-// newRegExMatcher returns a function that runs in the JS runtime's event loop
-// for pattern matching. It uses ECMAScript RegEx engine for consistency.
-//
-// Do not call this off the main thread (not even from within a promise). The returned
-// RegExMatcher can be called from off the main thread (i.e. in a new goroutine) since
-// it will queue up the checker on the event loop.
-func newRegExMatcher(ctx context.Context, vu moduleVU, tq *taskqueue.TaskQueue) common.RegExMatcher {
-	rt := vu.Runtime()
-	return func(pattern, url string) (bool, error) {
-		var (
-			result bool
-			err    error
-		)
-
-		done := make(chan struct{})
-
-		tq.Queue(func() error {
-			defer close(done)
-
-			// Regex pattern is unquoted string whereas the url needs to be quoted
-			// so that it is treated as a string.
-			val, jsErr := rt.RunString(pattern + `.test('` + url + `')`)
-			if jsErr != nil {
-				err = fmt.Errorf("evaluating pattern: %w", jsErr)
-				return nil
-			}
-
-			result = val.ToBoolean()
 			return nil
 		})
-
-		select {
-		case <-done:
-		case <-ctx.Done():
-			err = fmt.Errorf("context canceled while evaluating URL pattern")
-		}
-
-		return result, err
 	}
 }
 
@@ -919,51 +837,33 @@ func parseGetByBaseOptions(
 }
 
 // mapPageRoute maps the requested page.route event to the Sobek runtime.
-func mapPageRoute(vu moduleVU, p *common.Page) func(path sobek.Value, handler sobek.Callable) (*sobek.Promise, error) {
-	return func(path sobek.Value, handler sobek.Callable) (*sobek.Promise, error) {
+func mapPageRoute(vu moduleVU, p *common.Page) func(sobek.Value, sobek.Callable) (*sobek.Promise, error) {
+	return func(path sobek.Value, cb sobek.Callable) (*sobek.Promise, error) {
 		ctx := vu.Context()
 
+		ppath := parseStringOrRegex(path, false)
 		tq := vu.get(ctx, p.TargetID())
 
-		// Use RegEx matcher for regex pattern matching
-		rm := newRegExMatcher(ctx, vu, tq)
-		pathStr := parseStringOrRegex(path, false)
-
-		// Run the event handler in the task queue to
-		// ensure that the handler is executed on the event loop.
-		routeHandler := func(route *common.Route) error {
-			done := make(chan error, 1)
-			tq.Queue(func() error {
-				defer close(done)
-
-				mr := mapRoute(vu, route)
-				_, err := handler(
-					sobek.Undefined(),
-					vu.Runtime().ToValue(mr),
-				)
-				if err != nil {
-					done <- fmt.Errorf("executing page.route('%s') handler: %w", path, err)
-					return nil
-				}
-
-				return nil
-			})
-
-			select {
-			case err := <-done:
-				return err
-			case <-ctx.Done():
-				return errors.New("iteration ended before route completed")
+		route := func(r *common.Route) error {
+			_, err := queueTask(ctx, tq, func() (any, error) {
+				return cb(sobek.Undefined(), vu.Runtime().ToValue(mapRoute(vu, r)))
+			})()
+			if errors.Is(err, context.Canceled) {
+				return fmt.Errorf("page.route('%s'): iteration ended before route completed", path)
 			}
+			if err != nil {
+				return fmt.Errorf("page.route('%s'): %w", path, err)
+			}
+			return nil
 		}
 
 		return promise(vu, func() (any, error) {
-			return nil, p.Route(pathStr, routeHandler, rm)
+			return nil, p.Route(ppath, route, newRegExMatcher(ctx, vu, tq))
 		}), nil
 	}
 }
 
-func waitForURLBody(vu moduleVU, target interface {
+func mapWaitForURL(vu moduleVU, target interface {
 	Timeout() time.Duration
 	WaitForURL(urlPattern string, opts *common.FrameWaitForURLOptions, rm common.RegExMatcher) error
 }, url sobek.Value, opts sobek.Value,
@@ -976,21 +876,16 @@ func waitForURLBody(vu moduleVU, target interface {
 		return nil, fmt.Errorf("parsing waitForURL options: %w", err)
 	}
 
-	val := parseStringOrRegex(url, false)
-
-	// Use RegEx matcher for regex pattern matching
-	ctx, stopTaskqueue := context.WithCancel(vu.Context())
-	tq := cancelableTaskQueue(ctx, vu.RegisterCallback)
-
-	rm := newRegExMatcher(ctx, vu, tq)
+	purl := parseStringOrRegex(url, false)
+	tq, ctx, stop := newTaskQueue(vu)
 
 	return promise(vu, func() (result any, reason error) {
-		defer stopTaskqueue()
-		return nil, target.WaitForURL(val, popts, rm)
+		defer stop()
+		return nil, target.WaitForURL(purl, popts, newRegExMatcher(ctx, vu, tq))
 	}), nil
 }
 
-func waitForNavigationBodyImpl(vu moduleVU, target interface {
+func mapWaitForNavigation(vu moduleVU, target interface {
 	Timeout() time.Duration
 	WaitForNavigation(*common.FrameWaitForNavigationOptions, common.RegExMatcher) (*common.Response, error)
 }, opts sobek.Value,
@@ -1000,24 +895,18 @@ func waitForNavigationBodyImpl(vu moduleVU, target interface {
 		return nil, fmt.Errorf("parsing frame wait for navigation options: %w", err)
 	}
 
-	// Avoid working with the taskqueue unless the URL option is used.
-	// At the moment the taskqueue needs to be cleaned up manually with
-	// page.close.
-	var (
-		rm            common.RegExMatcher
-		stopTaskqueue = func() {}
-	)
-	if popts.URL != "" {
-		var ctx context.Context
-		ctx, stopTaskqueue = context.WithCancel(vu.Context())
-		tq := cancelableTaskQueue(ctx, vu.RegisterCallback)
+	// Only use task queue and RegExMatcher if a URL is specified.
+	rm, stop := func() (common.RegExMatcher, func()) {
+		if popts.URL == "" {
+			return nil, func() {}
+		}
+		tq, ctx, stop := newTaskQueue(vu)
+		return newRegExMatcher(ctx, vu, tq), stop
+	}()
 
-		// Use RegEx matcher for regex pattern matching
-		rm = newRegExMatcher(ctx, vu, tq)
-	}
+	return promise(vu, func() (any, error) {
+		defer stop()
 
-	return promise(vu, func() (result any, reason error) {
-		defer stopTaskqueue()
 		resp, err := target.WaitForNavigation(popts, rm)
 		if err != nil {
 			return nil, err //nolint:wrapcheck
