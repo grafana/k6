@@ -93,7 +93,7 @@ func (c *Client) handleLogEntriesFromCloud(ctrr CreateTestRunResponse) {
 // CreateTestRun is used when a test run is being executed locally, while the
 // results are streamed to the cloud, i.e. `k6 cloud run --local-execution` or `k6 run --out cloud script.js`.
 func (c *Client) CreateTestRun(testRun *TestRun) (*CreateTestRunResponse, error) {
-	url := fmt.Sprintf("%s/tests", c.baseURL)
+	url := fmt.Sprintf("%s/tests", c.BaseURL(c.apiVersion))
 
 	// Because the kind of request we make can vary depending on the test run configuration, we delegate
 	// its creation to a helper.
@@ -194,7 +194,7 @@ func (c *Client) UploadTestOnly(name string, projectID int64, arc *lib.Archive) 
 }
 
 func (c *Client) uploadArchive(fields [][2]string, arc *lib.Archive) (*CreateTestRunResponse, error) {
-	requestURL := fmt.Sprintf("%s/archive-upload", c.baseURL)
+	requestURL := fmt.Sprintf("%s/archive-upload", c.BaseURL(c.apiVersion))
 
 	var buf bytes.Buffer
 	mp := multipart.NewWriter(&buf)
@@ -236,7 +236,7 @@ func (c *Client) uploadArchive(fields [][2]string, arc *lib.Archive) (*CreateTes
 // TestFinished sends the result and run status values to the cloud, along with
 // information for the test thresholds, and marks the test run as finished.
 func (c *Client) TestFinished(referenceID string, thresholds ThresholdResult, tained bool, runStatus RunStatus) error {
-	url := fmt.Sprintf("%s/tests/%s", c.baseURL, referenceID)
+	url := fmt.Sprintf("%s/tests/%s", c.BaseURL(c.apiVersion), referenceID)
 
 	resultStatus := ResultStatusPassed
 	if tained {
@@ -263,7 +263,7 @@ func (c *Client) TestFinished(referenceID string, thresholds ThresholdResult, ta
 
 // GetTestProgress for the provided referenceID.
 func (c *Client) GetTestProgress(referenceID string) (*TestProgressResponse, error) {
-	req, err := c.NewRequest(http.MethodGet, c.baseURL+"/test-progress/"+referenceID, nil)
+	req, err := c.NewRequest(http.MethodGet, c.BaseURL(c.apiVersion)+"/test-progress/"+referenceID, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -279,7 +279,7 @@ func (c *Client) GetTestProgress(referenceID string) (*TestProgressResponse, err
 
 // StopCloudTestRun tells the cloud to stop the test with the provided referenceID.
 func (c *Client) StopCloudTestRun(referenceID string) error {
-	req, err := c.NewRequest("POST", c.baseURL+"/tests/"+referenceID+"/stop", nil)
+	req, err := c.NewRequest("POST", c.BaseURL(c.apiVersion)+"/tests/"+referenceID+"/stop", nil)
 	if err != nil {
 		return err
 	}
@@ -294,7 +294,7 @@ type validateOptionsRequest struct {
 // ValidateOptions sends the provided options to the cloud for validation.
 func (c *Client) ValidateOptions(options lib.Options) error {
 	data := validateOptionsRequest{Options: options}
-	req, err := c.NewRequest("POST", c.baseURL+"/validate-options", data)
+	req, err := c.NewRequest("POST", c.BaseURL(c.apiVersion)+"/validate-options", data)
 	if err != nil {
 		return err
 	}
@@ -310,7 +310,7 @@ type loginRequest struct {
 // Login the user with the specified email and password.
 func (c *Client) Login(email string, password string) (*LoginResponse, error) {
 	data := loginRequest{Email: email, Password: password}
-	req, err := c.NewRequest("POST", c.baseURL+"/login", data)
+	req, err := c.NewRequest("POST", c.BaseURL(c.apiVersion)+"/login", data)
 	if err != nil {
 		return nil, err
 	}
@@ -331,7 +331,7 @@ type validateTokenRequest struct {
 // ValidateToken calls the endpoint to validate the Client's token and returns the result.
 func (c *Client) ValidateToken() (*ValidateTokenResponse, error) {
 	data := validateTokenRequest{Token: c.token}
-	req, err := c.NewRequest("POST", c.baseURL+"/validate-token", data)
+	req, err := c.NewRequest("POST", c.BaseURL(c.apiVersion)+"/validate-token", data)
 	if err != nil {
 		return nil, err
 	}
@@ -348,7 +348,8 @@ func (c *Client) ValidateToken() (*ValidateTokenResponse, error) {
 // ValidateAuth validates a token and stack URL, returning the stack ID and default project ID.
 // The stackURL must be a normalized full URL (e.g., https://my-team.grafana.net).
 func (c *Client) ValidateAuth(stackURL string) (*AuthenticationResponse, error) {
-	req, err := http.NewRequest(http.MethodGet, "https://api.k6.io/cloud/v6/auth", nil) //nolint:noctx
+	authURL := fmt.Sprintf("%s/auth", c.BaseURL(APIVersion6))
+	req, err := http.NewRequest(http.MethodGet, authURL, nil) //nolint:noctx
 	if err != nil {
 		return nil, err
 	}
