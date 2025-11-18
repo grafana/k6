@@ -51,7 +51,7 @@ require (
 	go.opentelemetry.io/otel/sdk v1.38.0
 	go.opentelemetry.io/otel/sdk/metric v1.38.0
 	go.opentelemetry.io/otel/trace v1.38.0
-	go.opentelemetry.io/proto/otlp v1.8.0
+	go.opentelemetry.io/proto/otlp v1.9.0
 	go.uber.org/goleak v1.3.0
 	golang.org/x/crypto v0.43.0
 	golang.org/x/crypto/x509roots/fallback v0.0.0-20251028130051-c0531f9c3451
@@ -59,7 +59,7 @@ require (
 	golang.org/x/sync v0.18.0
 	golang.org/x/term v0.36.0
 	golang.org/x/time v0.14.0
-	google.golang.org/grpc v1.75.0
+	google.golang.org/grpc v1.75.1
 	google.golang.org/protobuf v1.36.10
 	gopkg.in/guregu/null.v3 v3.3.0
 	gopkg.in/yaml.v3 v3.0.1
