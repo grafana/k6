@@ -72,14 +72,56 @@ type extConfig struct {
 // newConfig creates a new extConfig instance with default values.
 func newConfig() extConfig {
 	return extConfig{
-		Method:                 null.NewString(http.MethodGet, false),        // GET method
-		ResponsePath:           null.NewString("", false),                    // Empty response path (use entire response)
-		RequestsPerMinuteLimit: null.NewInt(300, false),                      // 300 requests per minute
-		RequestsBurst:          null.NewInt(10, false),                       // Allow a burst of 10 requests
-		Timeout:                types.NewNullDuration(30*time.Second, false), // 30 seconds timeout
-		MaxRetries:             null.NewInt(3, false),                        // 3 retry attempts
-		RetryBackoff:           types.NewNullDuration(1*time.Second, false),  // 1 second base backoff
+		Method:                 null.StringFrom(http.MethodGet),          // GET method
+		ResponsePath:           null.StringFrom(""),                      // Empty response path (use entire response)
+		RequestsPerMinuteLimit: null.IntFrom(300),                        // 300 requests per minute
+		RequestsBurst:          null.IntFrom(10),                         // Allow a burst of 10 requests
+		Timeout:                types.NullDurationFrom(30 * time.Second), // 30 seconds timeout
+		MaxRetries:             null.IntFrom(3),                          // 3 retry attempts
+		RetryBackoff:           types.NullDurationFrom(1 * time.Second),  // 1 second base backoff
 	}
+}
+
+func (c extConfig) Apply(cfg extConfig) extConfig {
+	result := c
+
+	if cfg.URLTemplate != "" {
+		result.URLTemplate = cfg.URLTemplate
+	}
+
+	if cfg.Headers != nil {
+		result.Headers = cfg.Headers
+	}
+
+	if cfg.Method.Valid {
+		result.Method = cfg.Method
+	}
+
+	if cfg.ResponsePath.Valid {
+		result.ResponsePath = cfg.ResponsePath
+	}
+
+	if cfg.RequestsPerMinuteLimit.Valid {
+		result.RequestsPerMinuteLimit = cfg.RequestsPerMinuteLimit
+	}
+
+	if cfg.RequestsBurst.Valid {
+		result.RequestsBurst = cfg.RequestsBurst
+	}
+
+	if cfg.Timeout.Valid {
+		result.Timeout = cfg.Timeout
+	}
+
+	if cfg.MaxRetries.Valid {
+		result.MaxRetries = cfg.MaxRetries
+	}
+
+	if cfg.RetryBackoff.Valid {
+		result.RetryBackoff = cfg.RetryBackoff
+	}
+
+	return result
 }
 
 //nolint:gochecknoinits // This is how k6 secret source registration works.
@@ -314,83 +356,67 @@ func validateURLTemplate(urlTemplate string) error {
 
 func getConfig(arg string, fs fsext.Fs) (extConfig, error) {
 	// Start with default values
-	config := newConfig()
+	defaultCfg := newConfig()
 
 	// Parse the ConfigArgument to get the config file path
 	configPath, err := parseConfigArgument(arg)
 	if err != nil {
-		return config, err
+		return extConfig{}, err
 	}
 
 	file, err := fs.Open(configPath)
 	if err != nil {
-		return config, fmt.Errorf("failed to open config file: %w", err)
+		return extConfig{}, fmt.Errorf("failed to open config file: %w", err)
 	}
 	defer func() { _ = file.Close() }()
 
 	configData, err := io.ReadAll(file)
 	if err != nil {
-		return config, fmt.Errorf("failed to read config file: %w", err)
+		return extConfig{}, fmt.Errorf("failed to read config file: %w", err)
 	}
 
-	// Unmarshal will override defaults with user-provided values
-	if err := json.Unmarshal(configData, &config); err != nil {
-		return config, fmt.Errorf("failed to parse JSON config: %w", err)
+	// Read file config into a fresh struct
+	var fileCfg extConfig
+	if err := json.Unmarshal(configData, &fileCfg); err != nil {
+		return extConfig{}, fmt.Errorf("failed to parse JSON config: %w", err)
 	}
 
-	// Apply defaults for fields that weren't set by the user
-	if !config.Method.Valid {
-		config.Method = null.StringFrom(http.MethodGet)
-	}
+	// Apply file config on top of defaults
+	config := defaultCfg.Apply(fileCfg)
 
-	if !config.ResponsePath.Valid {
-		config.ResponsePath = null.StringFrom("")
-	}
-
-	if !config.RequestsPerMinuteLimit.Valid {
-		config.RequestsPerMinuteLimit = null.IntFrom(300)
-	}
-
-	if !config.RequestsBurst.Valid {
-		config.RequestsBurst = null.IntFrom(10)
-	}
-
-	if !config.Timeout.Valid {
-		config.Timeout = types.NullDurationFrom(30 * time.Second)
-	}
-
-	if !config.MaxRetries.Valid {
-		config.MaxRetries = null.IntFrom(3)
-	}
-
-	if !config.RetryBackoff.Valid {
-		config.RetryBackoff = types.NullDurationFrom(1 * time.Second)
-	}
-
-	// Validate required fields and value constraints
-	if err := validateURLTemplate(config.URLTemplate); err != nil {
-		return config, err
-	}
-
-	if config.Timeout.Duration <= 0 {
-		return config, errors.New("timeout must be greater than 0")
-	}
-
-	if config.RequestsPerMinuteLimit.Int64 <= 0 {
-		return config, errors.New("requestsPerMinuteLimit must be greater than 0")
-	}
-
-	if config.RequestsBurst.Int64 <= 0 {
-		return config, errors.New("requestsBurst must be greater than 0")
-	}
-
-	if config.MaxRetries.Int64 < 0 {
-		return config, errors.New("maxRetries must be non-negative")
-	}
-
-	if config.RetryBackoff.Duration <= 0 {
-		return config, errors.New("retryBackoff must be greater than 0")
+	// Validate the final config
+	if err := validateConfig(config); err != nil {
+		return extConfig{}, err
 	}
 
 	return config, nil
+}
+
+func validateConfig(config extConfig) error {
+	// Validate required fields and value constraints
+	if err := validateURLTemplate(config.URLTemplate); err != nil {
+		return err
+	}
+
+	if config.Timeout.Duration <= 0 {
+		return errors.New("timeout must be greater than 0")
+	}
+
+	if config.RequestsPerMinuteLimit.Int64 <= 0 {
+		return errors.New("requestsPerMinuteLimit must be greater than 0")
+	}
+
+	if config.RequestsBurst.Int64 <= 0 {
+		return errors.New("requestsBurst must be greater than 0")
+	}
+
+	if config.MaxRetries.Int64 < 0 {
+		return errors.New("maxRetries must be non-negative")
+	}
+
+	if config.RetryBackoff.Duration <= 0 {
+		return errors.New("retryBackoff must be greater than 0")
+	}
+
+	return nil
 }
