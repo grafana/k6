@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -298,4 +299,33 @@ func findDirectives(text []byte) []string {
 		}
 	}
 	return result
+}
+
+func mergeManifest(deps map[string]string, manifestString string) (map[string]string, error) {
+	if manifestString == "" {
+		return deps, nil
+	}
+
+	manifest := make(map[string]string)
+	if err := json.Unmarshal([]byte(manifestString), &manifest); err != nil {
+		return nil, fmt.Errorf("invalid dependencies manifest %w", err)
+	}
+
+	result := make(map[string]string)
+	for dep, constraint := range deps {
+		result[dep] = constraint
+
+		// if deps has a non default constrain, keep ip
+		if constraint != "" && constraint != "*" {
+			continue
+		}
+
+		// check if there's an override in the manifest
+		manifestConstrain := manifest[dep]
+		if manifestConstrain != "" && manifestConstrain != "*" {
+			result[dep] = manifestConstrain
+		}
+	}
+
+	return result, nil
 }
