@@ -40,6 +40,12 @@ func getCmdDeps(gs *state.GlobalState) *cobra.Command {
 				}
 				depsMap[name] = constraint.String()
 			}
+
+			depsMap, err = mergeManifest(depsMap, gs.Flags.DependenciesManifest)
+			if err != nil {
+				return err
+			}
+
 			imports := test.Imports()
 			slices.Sort(imports)
 
