@@ -117,13 +117,13 @@ export default function () {
 			require.NoError(t, cmd.Execute())
 
 			var output struct {
-				BuildDependancies   map[string]string `json:"buildDependancies"`
+				BuildDependencies   map[string]string `json:"buildDependencies"`
 				Imports             []string          `json:"imports"`
 				CustomBuildRequired bool              `json:"customBuildRequired"`
 			}
 			require.NoError(t, json.Unmarshal(ts.Stdout.Bytes(), &output))
 
-			require.Equal(t, tc.expectedDeps, output.BuildDependancies)
+			require.Equal(t, tc.expectedDeps, output.BuildDependencies)
 
 			require.Equal(t, tc.expectCustomBuild, output.CustomBuildRequired)
 

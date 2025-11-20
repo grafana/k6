@@ -172,7 +172,7 @@ func (lt *loadedTest) prepareFirstRunner(gs *state.GlobalState) error {
 			moduleResolver.LoadMainModule(pwd, specifier, lt.source.Data),
 			exitcodes.ScriptException)
 		lt.imports = moduleResolver.Imported()
-		deps, depErr := resolveModulesDependancies(err, lt.imports, logger, lt.fileSystems, lt.source, gs)
+		deps, depErr := resolveModulesDependencies(err, lt.imports, logger, lt.fileSystems, lt.source, gs)
 		lt.dependencies = deps
 		if depErr != nil {
 			return fmt.Errorf("could not load JS test '%s': %w", testPath, depErr)
@@ -205,7 +205,7 @@ func (lt *loadedTest) prepareFirstRunner(gs *state.GlobalState) error {
 				moduleResolver.LoadMainModule(pwd, specifier, arc.Data),
 				exitcodes.ScriptException)
 			lt.imports = moduleResolver.Imported()
-			deps, depErr := resolveModulesDependancies(loadErr, lt.imports, logger, arc.Filesystems, lt.source, gs)
+			deps, depErr := resolveModulesDependencies(loadErr, lt.imports, logger, arc.Filesystems, lt.source, gs)
 			lt.dependencies = deps
 			if depErr != nil {
 				return fmt.Errorf("could not load JS test '%s': %w", testPath, depErr)
@@ -255,7 +255,7 @@ func (lt *loadedTest) Imports() []string {
 	return append([]string(nil), lt.imports...)
 }
 
-func resolveModulesDependancies(
+func resolveModulesDependencies(
 	originalError error, imports []string, logger logrus.FieldLogger,
 	fileSystems map[string]fsext.Fs, source *loader.SourceData, gs *state.GlobalState,
 ) (dependencies, error) {
