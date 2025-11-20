@@ -53,7 +53,13 @@ jobs:
             echo "Building custom dev build with version '${VERSION}' from manual workflow_dispatch..."
           elif [[ "${GITHUB_REF}" =~ ^refs/tags/v.+$ ]]; then
             VERSION="${GITHUB_REF##*/}"
-            echo "Building real version tag '${GITHUB_REF}', parsed '${VERSION}' as the actual version..."
+            # Strip -release[-N] suffix if present (e.g., v1.4.1-release or v1.4.1-release-1 -> v1.4.1)
+            if [[ "${VERSION}" =~ ^(v[0-9]+\.[0-9]+\.[0-9]+)-release(-[0-9]+)?$ ]]; then
+              VERSION="${BASH_REMATCH[1]}"
+              echo "Detected temporary release tag '${GITHUB_REF##*/}', using '${VERSION}' as the actual version..."
+            else
+              echo "Building real version tag '${GITHUB_REF}', parsed '${VERSION}' as the actual version..."
+            fi
           else
             VERSION="$(git describe --tags --always --long --dirty)"
             echo "Building a non-version ref '${GITHUB_REF}', use '${VERSION}' as the version instead..."
