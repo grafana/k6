@@ -18,7 +18,7 @@ func getCmdDeps(gs *state.GlobalState) *cobra.Command {
 		Use:   "deps",
 		Short: "Resolve dependencies of a test",
 		Long: `Resolve dependencies of a test including automatic extenstion resolution.` +
-			`And outputs all dependencies for the test and whether custom build is required.`,
+			`And outputs all dependencies for the test and whether a custom build is required.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			test, err := loadLocalTestWithoutRunner(gs, cmd, args)
