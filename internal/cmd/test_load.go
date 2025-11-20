@@ -243,20 +243,25 @@ func analyseUseContraints(imports []string, fileSystems map[string]fsext.Fs, dep
 		}
 		u, err := url.Parse(imported)
 		if err != nil {
-			panic(err)
+			return err
 		}
 		// We always have URLs here with scheme and everything
 		_, path, _ := strings.Cut(imported, "://")
 		if u.Scheme == "https" {
 			path = "/" + path
 		}
+		path, err = url.PathUnescape(filepath.FromSlash(path))
+		if err != nil {
+			return err
+		}
+
 		data, err := fsext.ReadFile(fileSystems[u.Scheme], path)
 		if err != nil {
-			panic(err)
+			return err
 		}
 		err = processUseDirectives(imported, data, deps)
 		if err != nil {
-			panic(err)
+			return err
 		}
 	}
 	return nil
