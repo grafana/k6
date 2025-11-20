@@ -5,7 +5,6 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
-	"regexp"
 	"sync"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/log"
@@ -21,8 +20,6 @@ const evaluationScriptURL = "__xk6_browser_evaluation_script__"
 
 // This error code originates from chromium.
 const devToolsServerErrorCode = -32000
-
-var sourceURLRegex = regexp.MustCompile(`(?s)[\040\t]*//[@#] sourceURL=\s*(\S*?)\s*$`)
 
 type executionWorld string
 
@@ -177,7 +174,7 @@ func (e *ExecutionContext) eval(
 	}
 
 	if !opts.forceCallable {
-		if !sourceURLRegex.MatchString(js) {
+		if !hasSourceURL(js) {
 			js += "\n" + suffix
 		}
 

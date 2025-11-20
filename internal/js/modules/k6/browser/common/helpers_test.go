@@ -231,3 +231,36 @@ func TestConvertArgument(t *testing.T) {
 		require.Empty(t, arg.UnserializableValue)
 	})
 }
+
+func TestHasSourceURL(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		js     string
+		result bool
+	}{
+		"empty": {
+			js:     "",
+			result: false,
+		},
+		"simple": {
+			js:     "something;\n//# sourceURL=somethingher",
+			result: true,
+		},
+		"simple without": {
+			js:     "something",
+			result: false,
+		},
+		"only sourceURL": {
+			js:     "//# sourceURL=somethinghere",
+			result: true,
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			require.Equal(t, c.result, hasSourceURL(c.js))
+		})
+	}
+}
