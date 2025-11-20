@@ -350,7 +350,10 @@ func (fs *FrameSession) parseAndEmitWebVitalMetric(object string) error {
 
 	if wv.Name == "FID" {
 		fidDeprecationWarningOnce.Do(func() {
-			fs.logger.Warnf("MetricDeprecation", "browser_web_vital_fid has been deprecated and superseded by browser_web_vital_inp")
+			fs.logger.Warnf(
+				"MetricDeprecation",
+				"browser_web_vital_fid has been deprecated and superseded by browser_web_vital_inp",
+			)
 		})
 	}
 
