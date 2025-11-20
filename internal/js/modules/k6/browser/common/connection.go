@@ -331,16 +331,14 @@ func (c *Connection) findTargetIDForLog(id target.SessionID) target.ID {
 func (c *Connection) recvLoop() {
 	c.logger.Debugf("Connection:recvLoop", "wsURL:%q", c.wsURL)
 	for {
-		_, buf, err := c.conn.ReadMessage()
+		_, reader, err := c.conn.NextReader()
 		if err != nil {
 			c.handleIOError(err)
 			return
 		}
 
-		c.logger.Tracef("cdp:recv", "<- %s", buf)
-
 		var msg cdproto.Message
-		err = jsonv2.Unmarshal(buf, &msg, defaultJSONV2Options)
+		err = jsonv2.UnmarshalRead(reader, &msg, defaultJSONV2Options)
 		if err != nil {
 			select {
 			case c.errorCh <- err:
