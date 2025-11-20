@@ -326,6 +326,9 @@ func (fs *FrameSession) onEventBindingCalled(event *cdpruntime.EventBindingCalle
 	}
 }
 
+//nolint:gochecknoglobals
+var fidDeprecationWarningOnce sync.Once
+
 func (fs *FrameSession) parseAndEmitWebVitalMetric(object string) error {
 	fs.logger.Debugf("FrameSession:parseAndEmitWebVitalMetric", "object:%s", object)
 
@@ -343,6 +346,12 @@ func (fs *FrameSession) parseAndEmitWebVitalMetric(object string) error {
 
 	if err := json.Unmarshal([]byte(object), &wv); err != nil {
 		return fmt.Errorf("json couldn't be parsed: %w", err)
+	}
+
+	if wv.Name == "FID" {
+		fidDeprecationWarningOnce.Do(func() {
+			fs.logger.Warnf("MetricDeprecation", "browser_web_vital_fid has been deprecated and superseded by browser_web_vital_inp")
+		})
 	}
 
 	metric, ok := fs.k6Metrics.WebVitals[wv.Name]
