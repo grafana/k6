@@ -22,7 +22,7 @@ const evaluationScriptURL = "__xk6_browser_evaluation_script__"
 // This error code originates from chromium.
 const devToolsServerErrorCode = -32000
 
-var sourceURLRegex = regexp.MustCompile(`^(?s)[\040\t]*//[@#] sourceURL=\s*(\S*?)\s*$`)
+var sourceURLRegex = regexp.MustCompile(`(?s)[\040\t]*//[@#] sourceURL=\s*(\S*?)\s*$`)
 
 type executionWorld string
 
@@ -177,7 +177,7 @@ func (e *ExecutionContext) eval(
 	}
 
 	if !opts.forceCallable {
-		if !sourceURLRegex.Match([]byte(js)) {
+		if !sourceURLRegex.MatchString(js) {
 			js += "\n" + suffix
 		}
 
