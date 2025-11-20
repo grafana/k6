@@ -7,11 +7,13 @@ import (
 	"time"
 
 	"github.com/grafana/sobek"
+	grpccompress "go.k6.io/k6/internal/js/modules/k6/grpc/compression"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/metrics"
+
 	"google.golang.org/grpc/metadata"
 )
 
@@ -132,9 +134,10 @@ type connectParams struct {
 	MaxSendSize           int64
 	TLS                   map[string]interface{}
 	Authority             string
+	Compression           *grpccompress.Spec
 }
 
-func newConnectParams(vu modules.VU, input sobek.Value) (*connectParams, error) { //nolint:gocognit
+func newConnectParams(vu modules.VU, input sobek.Value) (*connectParams, error) { //nolint:gocognit,funlen
 	result := &connectParams{
 		IsPlaintext:           false,
 		UseReflectionProtocol: false,
@@ -143,8 +146,8 @@ func newConnectParams(vu modules.VU, input sobek.Value) (*connectParams, error) 
 		MaxSendSize:           0,
 		Authority:             "",
 		ReflectionMetadata:    metadata.New(nil),
+		Compression:           nil,
 	}
-
 	if common.IsNullish(input) {
 		return result, nil
 	}
@@ -209,11 +212,18 @@ func newConnectParams(vu modules.VU, input sobek.Value) (*connectParams, error) 
 			if !ok {
 				return result, fmt.Errorf("invalid authority value: '%#v', it needs to be a string", v)
 			}
+		case "compression":
+			spec, err := getCompressionSpec(v)
+			if err != nil {
+				return result, fmt.Errorf("invalid compression value: %w", err)
+			} else if spec.Name == "" {
+				spec = nil
+			}
+			result.Compression = spec
 		default:
 			return result, fmt.Errorf("unknown connect param: %q", k)
 		}
 	}
-
 	return result, nil
 }
 
@@ -255,4 +265,38 @@ func parseConnectTLSParam(params *connectParams, v interface{}) error {
 		}
 	}
 	return nil
+}
+
+func getCompressionSpec(v any) (*grpccompress.Spec, error) {
+	switch x := v.(type) {
+	case string:
+		name := strings.ToLower(strings.TrimSpace(x))
+		if name == "" || name == "none" {
+			return &grpccompress.Spec{Name: ""}, nil
+		}
+		return &grpccompress.Spec{Name: name}, nil
+	case map[string]any:
+		rawName, ok := x["name"]
+		if !ok {
+			return nil, fmt.Errorf("compression.name is required")
+		}
+		name, ok := rawName.(string)
+		if !ok {
+			return nil, fmt.Errorf("compression.name must be a non-empty string")
+		} else if name == "" || name == "none" {
+			return &grpccompress.Spec{Name: ""}, nil
+		}
+
+		spec := &grpccompress.Spec{Name: strings.ToLower(strings.TrimSpace(name))}
+		if p, ok := x["params"]; ok && p != nil {
+			mp, ok := p.(map[string]any)
+			if !ok {
+				return nil, fmt.Errorf("compression.params must be an object")
+			}
+			spec.Options = mp
+		}
+		return spec, nil
+	default:
+		return nil, fmt.Errorf("unsupported compression type: %T", v)
+	}
 }
