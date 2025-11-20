@@ -255,6 +255,10 @@ func (e *ExecutionContext) eval(
 //go:embed js/injected_script.js
 var injectedScriptSource string
 
+//nolint:gochecknoglobals
+var injectedScriptSourceWithSourceURL = `(() => {` + injectedScriptSource + `; return new InjectedScript();})()` +
+	"\n//# sourceURL=" + evaluationScriptURL
+
 // getInjectedScript returns a JS handle to the injected script of helper functions.
 func (e *ExecutionContext) getInjectedScript(apiCtx context.Context) (JSHandleAPI, error) {
 	e.logger.Debugf(
@@ -270,19 +274,10 @@ func (e *ExecutionContext) getInjectedScript(apiCtx context.Context) (JSHandleAP
 	}
 	e.isMutex.RUnlock()
 
-	var (
-		suffix                  = `//# sourceURL=` + evaluationScriptURL
-		source                  = `(() => {` + injectedScriptSource + `; return new InjectedScript();})()`
-		expression              = source
-		expressionWithSourceURL = expression
-	)
-	if !sourceURLRegex.Match([]byte(expression)) {
-		expressionWithSourceURL = expression + "\n" + suffix
-	}
 	handle, err := e.eval(
 		apiCtx,
 		evalOptions{forceCallable: false, returnByValue: false},
-		expressionWithSourceURL,
+		injectedScriptSourceWithSourceURL,
 	)
 	if err != nil {
 		return nil, err
