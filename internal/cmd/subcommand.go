@@ -11,6 +11,18 @@ import (
 	"go.k6.io/k6/subcommand"
 )
 
+func getX(_ *state.GlobalState) *cobra.Command {
+	return &cobra.Command{
+		Use:   "x",
+		Short: "Extension subcommands",
+		Long: `Namespace for extension-provided subcommands.
+
+This command serves as a parent for subcommands registered by k6 extensions,
+allowing them to extend k6's functionality with custom commands.
+`,
+	}
+}
+
 // extensionSubcommands returns an iterator over all registered subcommand extensions
 // that are not already defined in the given slice of commands.
 func extensionSubcommands(gs *state.GlobalState, defined []*cobra.Command) iter.Seq[*cobra.Command] {

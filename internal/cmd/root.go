@@ -87,8 +87,15 @@ func newRootCommand(gs *state.GlobalState) *rootCommand {
 		rootCmd.AddCommand(sc(gs))
 	}
 
-	for sc := range extensionSubcommands(gs, rootCmd.Commands()) {
-		rootCmd.AddCommand(sc)
+	xCmd := getX(gs)
+
+	// Add extension subcommands
+	for sc := range extensionSubcommands(gs, xCmd.Commands()) {
+		xCmd.AddCommand(sc)
+	}
+
+	if len(xCmd.Commands()) > 0 {
+		rootCmd.AddCommand(xCmd)
 	}
 
 	c.cmd = rootCmd
