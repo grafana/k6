@@ -539,26 +539,13 @@ func (c *Connection) sendLoop() {
 	for {
 		select {
 		case msg := <-c.sendCh:
-			buf, err := jsonv2.Marshal(msg, defaultJSONV2Options)
-			if err != nil {
-				sid := msg.SessionID
-				tid := c.findTargetIDForLog(sid)
-				select {
-				case c.errorCh <- err:
-					c.logger.Debugf("Connection:sendLoop:c.errorCh <- err", "sid:%v tid:%v wsURL:%q err:%v", sid, tid, c.wsURL, err)
-				case <-c.done:
-					c.logger.Debugf("Connection:sendLoop:<-c.done", "sid:%v tid:%v wsURL:%q", sid, tid, c.wsURL)
-					return
-				}
-			}
-
-			c.logger.Tracef("cdp:send", "-> %s", buf)
 			writer, err := c.conn.NextWriter(websocket.TextMessage)
 			if err != nil {
 				c.handleIOError(err)
 				return
 			}
-			if _, err := writer.Write(buf); err != nil {
+			err = jsonv2.MarshalWrite(writer, msg, defaultJSONV2Options)
+			if err != nil {
 				c.handleIOError(err)
 				return
 			}
