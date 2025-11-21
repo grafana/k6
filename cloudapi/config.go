@@ -18,9 +18,12 @@ const LegacyCloudConfigKey = "loadimpact"
 //nolint:lll
 type Config struct {
 	// TODO: refactor common stuff between cloud execution and output
-	Token     null.String `json:"token" envconfig:"K6_CLOUD_TOKEN"`
-	ProjectID null.Int    `json:"projectID" envconfig:"K6_CLOUD_PROJECT_ID"`
-	Name      null.String `json:"name" envconfig:"K6_CLOUD_NAME"`
+	StackID          null.Int    `json:"stackID,omitempty" envconfig:"K6_CLOUD_STACK_ID"`
+	StackURL         null.String `json:"stackURL,omitempty" envconfig:"K6_CLOUD_STACK"`
+	DefaultProjectID null.Int    `json:"defaultProjectID,omitempty"`
+	Token            null.String `json:"token" envconfig:"K6_CLOUD_TOKEN"`
+	ProjectID        null.Int    `json:"projectID" envconfig:"K6_CLOUD_PROJECT_ID"`
+	Name             null.String `json:"name" envconfig:"K6_CLOUD_NAME"`
 
 	Host    null.String        `json:"host" envconfig:"K6_CLOUD_HOST"`
 	Timeout types.NullDuration `json:"timeout" envconfig:"K6_CLOUD_TIMEOUT"`
@@ -103,6 +106,15 @@ func NewConfig() Config {
 //
 //nolint:cyclop
 func (c Config) Apply(cfg Config) Config {
+	if cfg.StackID.Valid {
+		c.StackID = cfg.StackID
+	}
+	if cfg.StackURL.Valid && !c.StackURL.Valid {
+		c.StackURL = cfg.StackURL
+	}
+	if cfg.DefaultProjectID.Valid {
+		c.DefaultProjectID = cfg.DefaultProjectID
+	}
 	if cfg.Token.Valid {
 		c.Token = cfg.Token
 	}
@@ -240,7 +252,9 @@ func mergeFromCloudOptionAndExternal(
 	if err := json.Unmarshal(source, &tmpConfig); err != nil {
 		return err
 	}
-	// Only take out the ProjectID, Name and Token from the options.cloud (or legacy loadimpact struct) map:
+
+	// Only merge ProjectID, Name, Token, and StackID from options.
+	// StackURL and DefaultProjectID can only be set via login.
 	if tmpConfig.ProjectID.Valid {
 		conf.ProjectID = tmpConfig.ProjectID
 	}
@@ -249,6 +263,9 @@ func mergeFromCloudOptionAndExternal(
 	}
 	if tmpConfig.Token.Valid {
 		conf.Token = tmpConfig.Token
+	}
+	if tmpConfig.StackID.Valid {
+		conf.StackID = tmpConfig.StackID
 	}
 
 	return nil
