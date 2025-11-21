@@ -61,12 +61,30 @@ func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn,
 	if err != nil {
 		return nil, err
 	}
-	conn, err := d.Dialer.DialContext(ctx, proto, dialAddr)
+	conn, err := d.Dialer.DialContext(ctx, proto, dialAddr.String())
 	if err != nil {
 		return nil, err
 	}
 	conn = &Conn{conn, &d.BytesRead, &d.BytesWritten}
 	return conn, err
+}
+
+// ResolveAddr looks up the IP address for the given host and optionally port.
+// The address is expected in the form "host:port" or just "host".
+// It returns the resolved IP, and an error if any.
+func (d *Dialer) ResolveAddr(addr string) (net.IP, int, error) {
+	// Check if the address has a port, if not add a dummy port for parsing
+	if _, _, err := net.SplitHostPort(addr); err != nil {
+		// Address doesn't have a port, add a dummy one
+		addr = net.JoinHostPort(addr, "0")
+	}
+
+	remote, err := d.getDialAddr(addr)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return remote.IP, remote.Port, nil
 }
 
 // IOSamples returns samples for data send and received since it last call and zeros out.
@@ -98,19 +116,19 @@ func (d *Dialer) IOSamples(
 	})
 }
 
-func (d *Dialer) getDialAddr(addr string) (string, error) {
+func (d *Dialer) getDialAddr(addr string) (*types.Host, error) {
 	remote, err := d.findRemote(addr)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	for _, ipnet := range d.Blacklist {
 		if ipnet.Contains(remote.IP) {
-			return "", BlackListedIPError{ip: remote.IP, net: ipnet}
+			return nil, BlackListedIPError{ip: remote.IP, net: ipnet}
 		}
 	}
 
-	return remote.String(), nil
+	return remote, nil
 }
 
 func (d *Dialer) findRemote(addr string) (*types.Host, error) {
