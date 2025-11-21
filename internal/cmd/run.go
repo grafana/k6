@@ -69,10 +69,10 @@ func (c *cmdRun) serveHTTP(srv *http.Server, addrSetByUser bool) {
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		// Only exit k6 if the user has explicitly set the REST API address
 		if addrSetByUser {
-			logger.WithError(err).Error("Error from API server")
+			logger.WithError(err).Error("Error starting REST API server")
 			c.gs.OSExit(int(exitcodes.CannotStartRESTAPI))
 		} else {
-			logger.WithError(err).Warn("Error from HTTP API server")
+			logger.WithError(err).Warn("Error starting REST API server")
 		}
 	}
 }
