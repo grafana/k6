@@ -12,6 +12,7 @@ import (
 	"go.k6.io/k6/internal/js/modules/k6/encoding"
 	"go.k6.io/k6/internal/js/modules/k6/execution"
 	"go.k6.io/k6/internal/js/modules/k6/experimental/csv"
+	expencoding "go.k6.io/k6/internal/js/modules/k6/experimental/encoding"
 	"go.k6.io/k6/internal/js/modules/k6/experimental/fs"
 	"go.k6.io/k6/internal/js/modules/k6/experimental/streams"
 	expws "go.k6.io/k6/internal/js/modules/k6/experimental/websockets"
@@ -48,6 +49,7 @@ func getInternalJSModules() map[string]interface{} {
 
 		// Experimental modules
 		"k6/experimental/csv":        csv.New(),
+		"k6/experimental/encoding":   expencoding.New(),
 		"k6/experimental/fs":         fs.New(),
 		"k6/experimental/redis":      redis.New(),
 		"k6/experimental/streams":    streams.New(),
