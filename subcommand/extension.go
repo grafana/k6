@@ -15,6 +15,10 @@ import (
 // It receives a GlobalState instance that provides access to configuration, logging,
 // file system, and other shared k6 runtime state. The returned Command will be
 // integrated into k6's CLI as a subcommand.
+//
+// WARNING: The GlobalState parameter is read-only and must not be modified or altered
+// in any way. Modifying the GlobalState can make k6 core unstable and lead to
+// unpredictable behavior.
 type Constructor func(*state.GlobalState) *cobra.Command
 
 // RegisterExtension registers a subcommand extension with the given name and constructor function.
