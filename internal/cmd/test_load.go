@@ -317,6 +317,11 @@ func analyseUseContraints(imports []string, fileSystems map[string]fsext.Fs, dep
 		if u.Scheme == "https" {
 			path = "/" + path
 		}
+		path, err = url.PathUnescape(filepath.FromSlash(path))
+		if err != nil {
+			return err
+		}
+
 		data, err := fsext.ReadFile(fileSystems[u.Scheme], path)
 		if err != nil {
 			return err

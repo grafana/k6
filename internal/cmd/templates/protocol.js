@@ -1,7 +1,6 @@
 import http from "k6/http";
 import exec from 'k6/execution';
-import { sleep } from "k6";
-import { expect } from "https://jslib.k6.io/k6-testing/0.5.0/index.js";
+import { check, sleep } from "k6";
 
 const BASE_URL = __ENV.BASE_URL || 'https://quickpizza.grafana.com';
 
@@ -23,7 +22,9 @@ export const options = {
 
 export function setup() {
   let res = http.get(BASE_URL);
-  expect(res.status, `Got unexpected status code ${res.status} when trying to setup. Exiting.`).toBe(200);
+  if (res.status !== 200) {
+    exec.test.abort(`Got unexpected status code ${res.status} when trying to setup. Exiting.`);
+  }
 }
 
 export default function() {
@@ -43,7 +44,7 @@ export default function() {
     },
   });
 
-  expect.soft(res.status).toBe(200);
+  check(res, { "status is 200": (res) => res.status === 200 });
   console.log(res.json().pizza.name + " (" + res.json().pizza.ingredients.length + " ingredients)");
   sleep(1);
 }

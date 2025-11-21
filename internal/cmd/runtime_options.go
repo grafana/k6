@@ -43,6 +43,9 @@ extended: base + sets "global" as alias for "globalThis"
 		"",
 		"output the end-of-test summary report to JSON file",
 	)
+	// TODO(@joanlopez): remove by k6 v2.0, once the new summary model is the default and the only one.
+	flags.Bool("new-machine-readable-summary", false, "enables the new machine-readable summary, "+
+		"which is used for summary exports and as handleSummary() argument")
 	flags.String("traces-output", "none",
 		"set the output for k6 traces, possible values are none,otel[=host:port]")
 	return flags
@@ -78,15 +81,16 @@ func getRuntimeOptions(
 
 func runtimeOptionsFromFlags(flags *pflag.FlagSet) lib.RuntimeOptions {
 	opts := lib.RuntimeOptions{
-		TestType:             getNullString(flags, "type"),
-		IncludeSystemEnvVars: getNullBool(flags, "include-system-env-vars"),
-		CompatibilityMode:    getNullString(flags, "compatibility-mode"),
-		NoThresholds:         getNullBool(flags, "no-thresholds"),
-		NoSummary:            getNullBool(flags, "no-summary"),
-		SummaryMode:          getNullString(flags, "summary-mode"),
-		SummaryExport:        getNullString(flags, "summary-export"),
-		TracesOutput:         getNullString(flags, "traces-output"),
-		Env:                  make(map[string]string),
+		TestType:                  getNullString(flags, "type"),
+		IncludeSystemEnvVars:      getNullBool(flags, "include-system-env-vars"),
+		CompatibilityMode:         getNullString(flags, "compatibility-mode"),
+		NoThresholds:              getNullBool(flags, "no-thresholds"),
+		NoSummary:                 getNullBool(flags, "no-summary"),
+		SummaryMode:               getNullString(flags, "summary-mode"),
+		SummaryExport:             getNullString(flags, "summary-export"),
+		NewMachineReadableSummary: getNullBool(flags, "new-machine-readable-summary"),
+		TracesOutput:              getNullString(flags, "traces-output"),
+		Env:                       make(map[string]string),
 	}
 	return opts
 }
@@ -131,6 +135,12 @@ func populateRuntimeOptionsFromEnv(opts lib.RuntimeOptions, environment map[stri
 
 	if envVar, ok := environment["K6_SUMMARY_EXPORT"]; !opts.SummaryExport.Valid && ok {
 		opts.SummaryExport = null.StringFrom(envVar)
+	}
+
+	if err := saveBoolFromEnv(
+		environment, "K6_NEW_MACHINE_READABLE_SUMMARY", &opts.NewMachineReadableSummary,
+	); err != nil {
+		return opts, err
 	}
 
 	if envVar, ok := environment["SSLKEYLOGFILE"]; !opts.KeyWriter.Valid && ok {
