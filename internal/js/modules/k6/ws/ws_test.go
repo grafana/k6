@@ -1226,3 +1226,63 @@ func TestWSConnectDisableThrowErrorOption(t *testing.T) {
 	entries := logHook.Drain()
 	assert.Empty(t, entries)
 }
+
+func TestSessionPingWithApplicationData(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	sr := tb.Replacer.Replace
+
+	test := newTestState(t)
+	_, err := test.VU.Runtime().RunString(sr(`
+		var pongReceived = false;
+		var applicationData = "hello-ping-data";
+		var res = ws.connect("WSBIN_URL/ws-echo", function(socket){
+			socket.on("open", function(data) {
+				// Send ping with application data
+				socket.ping(applicationData);
+			});
+			socket.on("pong", function() {
+				pongReceived = true;
+				socket.close();
+			});
+			socket.setTimeout(function (){socket.close();}, 3000);
+		});
+		if (!pongReceived) {
+			throw new Error ("sent ping with application data but didn't get pong back");
+		}
+		`))
+	require.NoError(t, err)
+	samplesBuf := metrics.GetBufferedSamples(test.samples)
+	assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSBIN_URL/ws-echo"), statusProtocolSwitch, "")
+	assertMetricEmittedCount(t, metrics.WSPingName, samplesBuf, sr("WSBIN_URL/ws-echo"), 1)
+}
+
+func TestSessionPingWithNumericApplicationData(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	sr := tb.Replacer.Replace
+
+	test := newTestState(t)
+	_, err := test.VU.Runtime().RunString(sr(`
+		var pongReceived = false;
+		var applicationData = "123456-numeric-ping-data";
+		var res = ws.connect("WSBIN_URL/ws-echo", function(socket){
+			socket.on("open", function(data) {
+				// Send ping with application data that starts with numbers
+				socket.ping(applicationData);
+			});
+			socket.on("pong", function() {
+				pongReceived = true;
+				socket.close();
+			});
+			socket.setTimeout(function (){socket.close();}, 3000);
+		});
+		if (!pongReceived) {
+			throw new Error ("sent ping with numeric application data but didn't get pong back");
+		}
+		`))
+	require.NoError(t, err)
+	samplesBuf := metrics.GetBufferedSamples(test.samples)
+	assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSBIN_URL/ws-echo"), statusProtocolSwitch, "")
+	assertMetricEmittedCount(t, metrics.WSPingName, samplesBuf, sr("WSBIN_URL/ws-echo"), 1)
+}
