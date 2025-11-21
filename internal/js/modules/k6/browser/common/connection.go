@@ -140,6 +140,8 @@ type Connection struct {
 	onTargetAttachedToTarget func(*target.EventAttachedToTarget) bool
 }
 
+var globalPool = new(sync.Pool) //nolint:gochecknoglobals
+
 // NewConnection creates a new browser.
 func NewConnection(
 	ctx context.Context,
@@ -155,6 +157,7 @@ func NewConnection(
 		TLSClientConfig:  tlsConfig,
 		WriteBufferSize:  wsWriteBufferSize,
 		ReadBufferSize:   wsWriteBufferSize,
+		WriteBufferPool:  globalPool,
 	}
 
 	ctx, cancelCtx := context.WithCancel(ctx)
