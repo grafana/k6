@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"iter"
 
 	"github.com/sirupsen/logrus"
@@ -39,16 +40,14 @@ func extensionSubcommands(gs *state.GlobalState, defined []*cobra.Command) iter.
 func getCmdForExtension(extension *ext.Extension, gs *state.GlobalState) *cobra.Command {
 	ctor, ok := extension.Module.(subcommand.Constructor)
 	if !ok {
-		gs.Logger.WithFields(logrus.Fields{"name": extension.Name, "path": extension.Path}).
-			Fatalf("subcommand's constructor does not implement the subcommand.Constructor")
+		panic(fmt.Sprintf("invalid subcommand constructor: name: %s path: %s", extension.Name, extension.Path))
 	}
 
 	cmd := ctor(gs)
 
 	// Validate that the command's name matches the extension name.
 	if cmd.Name() != extension.Name {
-		gs.Logger.WithFields(logrus.Fields{"name": extension.Name, "path": extension.Path}).
-			Fatalf("subcommand's command name (%s) does not match the extension name (%s)", cmd.Name(), extension.Name)
+		panic(fmt.Sprintf("subcommand name mismatch: command name: %s extension name: %s", cmd.Name(), extension.Name))
 	}
 
 	return cmd
