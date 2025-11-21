@@ -1,0 +1,77 @@
+name: Release
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., v1.4.1)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  create-release-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Validate version format
+        env:
+          VERSION: ${{ github.event.inputs.version }}
+        run: |
+          if [[ ! "${VERSION}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$ ]]; then
+            echo "ERROR: Version must follow semver format (e.g., v1.4.1 or v1.4.1-rc1)"
+            exit 1
+          fi
+          echo "Version format is valid: ${VERSION}"
+
+      - name: Validate version.go matches input
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          CODE_VERSION=$(grep -oP 'const Version = "\K[^"]+' internal/build/version.go)
+          INPUT_VERSION="${INPUT_VERSION#v}"
+
+          echo "Version in version.go: ${CODE_VERSION}"
+          echo "Version from input: ${INPUT_VERSION}"
+
+          if [[ "${CODE_VERSION}" != "${INPUT_VERSION}" ]]; then
+            echo ""
+            echo "ERROR: Version mismatch!"
+            echo "  version.go has: ${CODE_VERSION}"
+            echo "  Input version: ${INPUT_VERSION}"
+            echo ""
+            echo "Please update internal/build/version.go to match ${INPUT_VERSION}"
+            exit 1
+          fi
+
+          echo "✓ Version check passed: ${CODE_VERSION}"
+
+      - name: Check if tag already exists
+        env:
+          VERSION: ${{ github.event.inputs.version }}
+        run: |
+          if git rev-parse "${VERSION}" >/dev/null 2>&1; then
+            echo "ERROR: Tag ${VERSION} already exists"
+            exit 1
+          fi
+          echo "✓ Tag ${VERSION} does not exist yet"
+
+      - name: Create and push tag
+        env:
+          VERSION: ${{ github.event.inputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git tag -a "${VERSION}" -m "Release ${VERSION}"
+          git push origin "${VERSION}"
+
+          echo "✓ Tag ${VERSION} created and pushed successfully"
+          echo "The build workflow will now automatically start"
+
