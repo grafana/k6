@@ -1,4 +1,4 @@
-name: Web Platform Tests
+name: Release
 on:
   workflow_dispatch:
     inputs:
