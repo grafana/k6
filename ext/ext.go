@@ -26,6 +26,7 @@ const (
 	JSExtension ExtensionType = iota + 1
 	OutputExtension
 	SecretSourceExtension
+	SubcommandExtension
 )
 
 func (e ExtensionType) String() string {
@@ -37,6 +38,8 @@ func (e ExtensionType) String() string {
 		s = "output"
 	case SecretSourceExtension:
 		s = "secret-source"
+	case SubcommandExtension:
+		s = "subcommand"
 	}
 	return s
 }
@@ -103,13 +106,16 @@ func GetAll() []*Extension {
 	mx.RLock()
 	defer mx.RUnlock()
 
-	js, out := extensions[JSExtension], extensions[OutputExtension]
-	result := make([]*Extension, 0, len(js)+len(out))
+	js, out, subcommand := extensions[JSExtension], extensions[OutputExtension], extensions[SubcommandExtension]
+	result := make([]*Extension, 0, len(js)+len(out)+len(subcommand))
 
 	for _, e := range js {
 		result = append(result, e)
 	}
 	for _, e := range out {
+		result = append(result, e)
+	}
+	for _, e := range subcommand {
 		result = append(result, e)
 	}
 
@@ -161,4 +167,5 @@ func init() {
 	extensions[JSExtension] = make(map[string]*Extension)
 	extensions[OutputExtension] = make(map[string]*Extension)
 	extensions[SecretSourceExtension] = make(map[string]*Extension)
+	extensions[SubcommandExtension] = make(map[string]*Extension)
 }

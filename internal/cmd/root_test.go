@@ -11,6 +11,8 @@ import (
 func TestRootCommandHelpDisplayCommands(t *testing.T) {
 	t.Parallel()
 
+	registerTestSubcommandExtensions(t)
+
 	testCases := []struct {
 		name                  string
 		extraArgs             []string
@@ -69,6 +71,10 @@ func TestRootCommandHelpDisplayCommands(t *testing.T) {
 		{
 			name:               "should have version command",
 			wantStdoutContains: "  version     Show application version",
+		},
+		{
+			name:               "should have x command",
+			wantStdoutContains: "  x           Extension subcommands",
 		},
 	}
 
