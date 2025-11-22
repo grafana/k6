@@ -390,4 +390,15 @@ func TestResponse(t *testing.T) {
 			assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/get"), 200, "")
 		})
 	})
+
+	t.Run("FailedRequestHeadersAndCookiesAssignment", func(t *testing.T) {
+		_, err := rt.RunString(`
+			var res = http.get("https://test.k6.i", { throw: false });
+			res.headers["custom-key"] = "custom-value";
+			if (res.headers["custom-key"] !== "custom-value") {
+				throw new Error("Failed to assign to headers on failed request");
+			}
+		`)
+		assert.NoError(t, err)
+	})
 }
