@@ -235,6 +235,7 @@ func (rhkip *RSAHashedImportParams) ImportKey(
 	format KeyFormat,
 	keyData []byte,
 	usages []CryptoKeyUsage,
+	_ bool,
 ) (*CryptoKey, error) {
 	var importFn func(keyData []byte) (any, CryptoKeyType, int, error)
 
