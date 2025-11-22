@@ -3170,3 +3170,32 @@ func TestMachineReadableSummary(t *testing.T) {
 		assertSummaryExport(t, string(summaryExport))
 	})
 }
+
+func TestSpaceInPath(t *testing.T) {
+	t.Parallel()
+	depScript := `
+		export default function() {
+			let p = 42;
+			return p;
+		}
+	`
+	mainScript := `
+		import bar from "./foo bar.js";
+		let s = "something";
+		export default function() {
+			console.log(s, bar());
+		};
+	`
+
+	ts := NewGlobalTestState(t)
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test me.js"), []byte(mainScript), 0o644))
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "foo bar.js"), []byte(depScript), 0o644))
+
+	ts.CmdArgs = []string{"k6", "run", "--quiet", "test me.js"}
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stderr := ts.Stderr.String()
+	t.Log(stderr)
+	assert.Contains(t, stderr, `something 42`)
+}

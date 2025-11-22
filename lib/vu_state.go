@@ -26,6 +26,16 @@ type TracerProvider interface {
 	Tracer(name string, options ...trace.TracerOption) trace.Tracer
 }
 
+// AddrResolver is an interface for DNS resolution.
+type AddrResolver interface {
+	// ResolveAddr looks up the IP address for the given host and optionally port.
+	// It uses the same DNS resolution logic as DialContext, respecting the
+	// DNS, Hosts, Blacklist IP, and Block hostnames options.
+	// The address can be in the form "host:port" or just "host".
+	// It returns the resolved IP, the port (0 if not specified), and an error if resolution fails.
+	ResolveAddr(addr string) (net.IP, int, error)
+}
+
 // State provides the volatile state for a VU.
 //
 // TODO: rename to VUState or, better yet, move to some other Go package outside
@@ -90,6 +100,16 @@ type State struct {
 	// in a thread-safe manner. It is used to ensure that the test status is only
 	// marked as failed once, even if multiple VUs or goroutines, try to mark it at the same time.
 	TestStatus *TestStatus
+}
+
+// GetAddrResolver returns the AddrResolver implementation or nil if not available.
+func (s *State) GetAddrResolver() AddrResolver {
+	resolver, ok := s.Dialer.(AddrResolver)
+	if !ok {
+		return nil
+	}
+
+	return resolver
 }
 
 // VUStateTags wraps the current VU's tags and ensures a thread-safe way to
