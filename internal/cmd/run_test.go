@@ -6,11 +6,14 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net"
+	"net/http"
 	"os"
 	"path"
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 
 	"go.k6.io/k6/errext"
 
@@ -111,6 +114,48 @@ func TestHandleSummaryResultError(t *testing.T) {
 	files := getFiles(t, fs)
 	assertEqual(t, "file summary 1", files[filePath1])
 	assertEqual(t, "file summary 2", files[filePath2])
+}
+
+func TestServeHTTP(t *testing.T) {
+	t.Parallel()
+	testCases := []struct {
+		name       string
+		addressSet bool
+	}{
+		{
+			name:       "address set",
+			addressSet: true,
+		},
+		{
+			name:       "address not set",
+			addressSet: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			ts := tests.NewGlobalTestState(t)
+			cmd := &cmdRun{
+				gs: ts.GlobalState,
+			}
+			if tc.addressSet {
+				ts.ExpectedExitCode = int(exitcodes.CannotStartRESTAPI)
+			}
+
+			lis, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", ts.Flags.Address)
+			require.NoError(t, err)
+			t.Cleanup(func() {
+				require.NoError(t, lis.Close())
+			})
+
+			srv := &http.Server{
+				Addr:              lis.Addr().String(),
+				ReadHeaderTimeout: time.Millisecond,
+			}
+			cmd.serveHTTP(srv, tc.addressSet)
+		})
+	}
 }
 
 func TestRunScriptErrorsAndAbort(t *testing.T) {
