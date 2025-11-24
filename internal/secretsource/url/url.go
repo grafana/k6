@@ -126,7 +126,7 @@ func (c extConfig) Apply(cfg extConfig) extConfig {
 //nolint:gochecknoinits // This is how k6 secret source registration works.
 func init() {
 	secretsource.RegisterExtension("url", func(params secretsource.Params) (secretsource.Source, error) {
-		config, err := getConfig(params.ConfigArgument, params.FS)
+		config, err := getConfig(params.ConfigArgument, params.FS, params.Environment)
 		if err != nil {
 			return nil, fmt.Errorf("missing or invalid config: %w", err)
 		}
@@ -411,6 +411,88 @@ func parseHeaderOption(key, value string, cfg *extConfig) error {
 	return nil
 }
 
+// parseEnvConfig reads configuration from environment variables.
+// It looks for variables with the prefix K6_URL_SECRET_.
+// Example environment variables:
+//   - K6_URL_SECRET_URL_TEMPLATE
+//   - K6_URL_SECRET_HEADER_AUTHORIZATION
+//   - K6_URL_SECRET_METHOD
+//   - K6_URL_SECRET_RESPONSE_PATH
+//   - K6_URL_SECRET_TIMEOUT
+//   - K6_URL_SECRET_MAX_RETRIES
+//   - K6_URL_SECRET_RETRY_BACKOFF
+//   - K6_URL_SECRET_REQUESTS_PER_MINUTE_LIMIT
+//   - K6_URL_SECRET_REQUESTS_BURST
+//
+//nolint:gocognit // Function parses multiple env vars, each adding to complexity
+func parseEnvConfig(env map[string]string) (extConfig, error) {
+	var cfg extConfig
+
+	// Read URL template (required)
+	if urlTemplate, ok := env["K6_URL_SECRET_URL_TEMPLATE"]; ok && urlTemplate != "" {
+		cfg.URLTemplate = urlTemplate
+	}
+
+	// Read method
+	if method, ok := env["K6_URL_SECRET_METHOD"]; ok && method != "" {
+		cfg.Method = null.StringFrom(method)
+	}
+
+	// Read response path
+	if responsePath, ok := env["K6_URL_SECRET_RESPONSE_PATH"]; ok && responsePath != "" {
+		cfg.ResponsePath = null.StringFrom(responsePath)
+	}
+
+	// Read timeout
+	if timeoutStr, ok := env["K6_URL_SECRET_TIMEOUT"]; ok && timeoutStr != "" {
+		if err := parseDurationOption(timeoutStr, &cfg.Timeout, "timeout"); err != nil {
+			return extConfig{}, err
+		}
+	}
+
+	// Read max retries
+	if maxRetriesStr, ok := env["K6_URL_SECRET_MAX_RETRIES"]; ok && maxRetriesStr != "" {
+		if err := parseIntOption(maxRetriesStr, &cfg.MaxRetries, "maxRetries"); err != nil {
+			return extConfig{}, err
+		}
+	}
+
+	// Read retry backoff
+	if retryBackoffStr, ok := env["K6_URL_SECRET_RETRY_BACKOFF"]; ok && retryBackoffStr != "" {
+		if err := parseDurationOption(retryBackoffStr, &cfg.RetryBackoff, "retryBackoff"); err != nil {
+			return extConfig{}, err
+		}
+	}
+
+	// Read requests per minute limit
+	if rpmStr, ok := env["K6_URL_SECRET_REQUESTS_PER_MINUTE_LIMIT"]; ok && rpmStr != "" {
+		if err := parseIntOption(rpmStr, &cfg.RequestsPerMinuteLimit, "requestsPerMinuteLimit"); err != nil {
+			return extConfig{}, err
+		}
+	}
+
+	// Read requests burst
+	if burstStr, ok := env["K6_URL_SECRET_REQUESTS_BURST"]; ok && burstStr != "" {
+		if err := parseIntOption(burstStr, &cfg.RequestsBurst, "requestsBurst"); err != nil {
+			return extConfig{}, err
+		}
+	}
+
+	// Read headers - iterate through all environment variables
+	// Headers are prefixed with K6_URL_SECRET_HEADER_
+	for key, value := range env {
+		if strings.HasPrefix(key, "K6_URL_SECRET_HEADER_") {
+			headerName := strings.TrimPrefix(key, "K6_URL_SECRET_HEADER_")
+			if cfg.Headers == nil {
+				cfg.Headers = make(map[string]string)
+			}
+			cfg.Headers[headerName] = value
+		}
+	}
+
+	return cfg, nil
+}
+
 func loadConfigFromFile(configPath string, fs fsext.Fs) (extConfig, error) {
 	file, err := fs.Open(configPath)
 	if err != nil {
@@ -456,11 +538,27 @@ func validateURLTemplate(urlTemplate string) error {
 	return nil
 }
 
-func getConfig(arg string, fs fsext.Fs) (extConfig, error) {
-	// Parse inline config (may include file-based config via config=path)
-	config, err := parseInlineConfig(arg, fs)
-	if err != nil {
-		return extConfig{}, err
+func getConfig(arg string, fs fsext.Fs, env map[string]string) (extConfig, error) {
+	var config extConfig
+	var err error
+
+	// Check if we're using environment variable configuration
+	if arg == "env" {
+		// Load from environment variables
+		envCfg, err := parseEnvConfig(env)
+		if err != nil {
+			return extConfig{}, err
+		}
+
+		// Apply defaults and then env config
+		defaultCfg := newConfig()
+		config = defaultCfg.Apply(envCfg)
+	} else {
+		// Parse inline config (may include file-based config via config=path)
+		config, err = parseInlineConfig(arg, fs)
+		if err != nil {
+			return extConfig{}, err
+		}
 	}
 
 	// Validate the final config

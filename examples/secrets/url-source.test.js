@@ -45,6 +45,15 @@
 //     timeout=60s,\
 //     maxRetries=5' \
 //   examples/secrets/url-source.test.js
+//
+// Option 6: Environment variable configuration
+// ---------------------------------------------
+// export K6_URL_SECRET_URL_TEMPLATE="http://localhost:8888/secrets/{key}/decrypt"
+// export K6_URL_SECRET_HEADER_AUTHORIZATION="Bearer YOUR_API_TOKEN_HERE"
+// export K6_URL_SECRET_RESPONSE_PATH="plaintext"
+// k6 run --secret-source=url=env examples/secrets/url-source.test.js
+//
+// See url-env-source.test.js for more examples using environment variables
 
 import secrets from "k6/secrets";
 import { check } from "k6";

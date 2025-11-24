@@ -234,7 +234,7 @@ func TestGetConfig(t *testing.T) {
 		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
 		require.NoError(t, err)
 
-		result, err := getConfig("config="+testConfigFile, fs)
+		result, err := getConfig("config="+testConfigFile, fs, nil)
 		require.NoError(t, err)
 		assert.Equal(t, config.URLTemplate, result.URLTemplate)
 		assert.Equal(t, config.Headers, result.Headers)
@@ -264,7 +264,7 @@ func TestGetConfig(t *testing.T) {
 		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
 		require.NoError(t, err)
 
-		result, err := getConfig("config="+testConfigFile, fs)
+		result, err := getConfig("config="+testConfigFile, fs, nil)
 		require.NoError(t, err)
 		assert.Equal(t, int64(customLimit), result.RequestsPerMinuteLimit.Int64)
 		assert.Equal(t, int64(customBurst), result.RequestsBurst.Int64)
@@ -286,7 +286,7 @@ func TestGetConfig(t *testing.T) {
 		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
 		require.NoError(t, err)
 
-		_, err = getConfig("config="+testConfigFile, fs)
+		_, err = getConfig("config="+testConfigFile, fs, nil)
 		assert.ErrorIs(t, err, errMissingURLTemplate)
 	})
 
@@ -305,14 +305,14 @@ func TestGetConfig(t *testing.T) {
 		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
 		require.NoError(t, err)
 
-		_, err = getConfig("config="+testConfigFile, fs)
+		_, err = getConfig("config="+testConfigFile, fs, nil)
 		assert.ErrorContains(t, err, "requestsPerMinuteLimit must be greater than 0")
 	})
 
 	t.Run("nonexistent config file", func(t *testing.T) {
 		t.Parallel()
 		fs := fsext.NewMemMapFs()
-		_, err := getConfig("config=/nonexistent/file.json", fs)
+		_, err := getConfig("config=/nonexistent/file.json", fs, nil)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to open config file")
 	})
@@ -330,7 +330,7 @@ func TestGetConfig(t *testing.T) {
 		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
 		require.NoError(t, err)
 
-		_, err = getConfig("config="+testConfigFile, fs)
+		_, err = getConfig("config="+testConfigFile, fs, nil)
 		assert.ErrorContains(t, err, "urlTemplate must be an absolute URL with a scheme")
 	})
 
@@ -347,7 +347,7 @@ func TestGetConfig(t *testing.T) {
 		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
 		require.NoError(t, err)
 
-		result, err := getConfig("config="+testConfigFile, fs)
+		result, err := getConfig("config="+testConfigFile, fs, nil)
 		require.NoError(t, err)
 		assert.Equal(t, "http://api.example.com/secrets/{key}", result.URLTemplate)
 	})
@@ -365,7 +365,7 @@ func TestGetConfig(t *testing.T) {
 		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
 		require.NoError(t, err)
 
-		result, err := getConfig("config="+testConfigFile, fs)
+		result, err := getConfig("config="+testConfigFile, fs, nil)
 		require.NoError(t, err)
 		assert.Equal(t, "https://api.example.com/secrets/{key}", result.URLTemplate)
 	})
@@ -383,7 +383,7 @@ func TestGetConfig(t *testing.T) {
 		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
 		require.NoError(t, err)
 
-		_, err = getConfig("config="+testConfigFile, fs)
+		_, err = getConfig("config="+testConfigFile, fs, nil)
 		assert.ErrorContains(t, err, "must contain {key} placeholder")
 	})
 }
@@ -906,7 +906,7 @@ func TestGetConfig_Retry(t *testing.T) {
 		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
 		require.NoError(t, err)
 
-		result, err := getConfig("config="+testConfigFile, fs)
+		result, err := getConfig("config="+testConfigFile, fs, nil)
 		require.NoError(t, err)
 		assert.Equal(t, int64(3), result.MaxRetries.Int64)
 		assert.Equal(t, 1*time.Second, time.Duration(result.RetryBackoff.Duration))
@@ -929,7 +929,7 @@ func TestGetConfig_Retry(t *testing.T) {
 		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
 		require.NoError(t, err)
 
-		result, err := getConfig("config="+testConfigFile, fs)
+		result, err := getConfig("config="+testConfigFile, fs, nil)
 		require.NoError(t, err)
 		assert.Equal(t, int64(customRetries), result.MaxRetries.Int64)
 		assert.Equal(t, customBackoff.Duration, result.RetryBackoff.Duration)
@@ -950,7 +950,7 @@ func TestGetConfig_Retry(t *testing.T) {
 		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
 		require.NoError(t, err)
 
-		_, err = getConfig("config="+testConfigFile, fs)
+		_, err = getConfig("config="+testConfigFile, fs, nil)
 		assert.ErrorContains(t, err, "maxRetries must be non-negative")
 	})
 
@@ -969,7 +969,7 @@ func TestGetConfig_Retry(t *testing.T) {
 		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
 		require.NoError(t, err)
 
-		_, err = getConfig("config="+testConfigFile, fs)
+		_, err = getConfig("config="+testConfigFile, fs, nil)
 		assert.ErrorContains(t, err, "retryBackoff must be greater than 0")
 	})
 
@@ -988,7 +988,7 @@ func TestGetConfig_Retry(t *testing.T) {
 		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
 		require.NoError(t, err)
 
-		result, err := getConfig("config="+testConfigFile, fs)
+		result, err := getConfig("config="+testConfigFile, fs, nil)
 		require.NoError(t, err)
 		assert.Equal(t, int64(0), result.MaxRetries.Int64)
 	})
@@ -1256,4 +1256,216 @@ func (m *mockLimiter) Wait(_ context.Context) error {
 		return context.Canceled
 	}
 	return nil
+}
+
+func TestEnvConfig(t *testing.T) {
+	t.Parallel()
+
+	t.Run("basic env config with urlTemplate only", func(t *testing.T) {
+		t.Parallel()
+		// Set up environment variables
+		env := map[string]string{
+			"K6_URL_SECRET_URL_TEMPLATE": "https://api.example.com/secrets/{key}",
+		}
+
+		fs := fsext.NewMemMapFs()
+		result, err := getConfig("env", fs, env)
+		require.NoError(t, err)
+		assert.Equal(t, "https://api.example.com/secrets/{key}", result.URLTemplate)
+		assert.Equal(t, "GET", result.Method.String)
+		assert.Equal(t, int64(300), result.RequestsPerMinuteLimit.Int64)
+	})
+
+	t.Run("env config with all options", func(t *testing.T) {
+		t.Parallel()
+		// Set up environment variables
+		env := map[string]string{
+			"K6_URL_SECRET_URL_TEMPLATE":              "https://api.example.com/{key}",
+			"K6_URL_SECRET_METHOD":                    "POST",
+			"K6_URL_SECRET_RESPONSE_PATH":             "data.value",
+			"K6_URL_SECRET_TIMEOUT":                   "60s",
+			"K6_URL_SECRET_MAX_RETRIES":               "5",
+			"K6_URL_SECRET_RETRY_BACKOFF":             "2s",
+			"K6_URL_SECRET_REQUESTS_PER_MINUTE_LIMIT": "100",
+			"K6_URL_SECRET_REQUESTS_BURST":            "20",
+		}
+
+		fs := fsext.NewMemMapFs()
+		result, err := getConfig("env", fs, env)
+		require.NoError(t, err)
+		assert.Equal(t, "https://api.example.com/{key}", result.URLTemplate)
+		assert.Equal(t, "POST", result.Method.String)
+		assert.Equal(t, "data.value", result.ResponsePath.String)
+		assert.Equal(t, 60*time.Second, time.Duration(result.Timeout.Duration))
+		assert.Equal(t, int64(5), result.MaxRetries.Int64)
+		assert.Equal(t, 2*time.Second, time.Duration(result.RetryBackoff.Duration))
+		assert.Equal(t, int64(100), result.RequestsPerMinuteLimit.Int64)
+		assert.Equal(t, int64(20), result.RequestsBurst.Int64)
+	})
+
+	t.Run("env config with headers", func(t *testing.T) {
+		t.Parallel()
+		// Set up environment variables
+		env := map[string]string{
+			"K6_URL_SECRET_URL_TEMPLATE":         "https://api.example.com/{key}",
+			"K6_URL_SECRET_HEADER_AUTHORIZATION": "Bearer token123",
+			"K6_URL_SECRET_HEADER_X-Custom":      "custom-value",
+		}
+
+		fs := fsext.NewMemMapFs()
+		result, err := getConfig("env", fs, env)
+		require.NoError(t, err)
+		assert.Equal(t, "https://api.example.com/{key}", result.URLTemplate)
+		assert.Equal(t, "Bearer token123", result.Headers["AUTHORIZATION"])
+		assert.Equal(t, "custom-value", result.Headers["X-Custom"])
+	})
+
+	t.Run("env config missing urlTemplate", func(t *testing.T) {
+		t.Parallel()
+		// Don't set K6_URL_SECRET_URL_TEMPLATE
+		env := map[string]string{}
+
+		fs := fsext.NewMemMapFs()
+		_, err := getConfig("env", fs, env)
+		assert.ErrorIs(t, err, errMissingURLTemplate)
+	})
+
+	t.Run("env config with invalid timeout", func(t *testing.T) {
+		t.Parallel()
+		// Set up environment variables
+		env := map[string]string{
+			"K6_URL_SECRET_URL_TEMPLATE": "https://api.example.com/{key}",
+			"K6_URL_SECRET_TIMEOUT":      "invalid",
+		}
+
+		fs := fsext.NewMemMapFs()
+		_, err := getConfig("env", fs, env)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid timeout")
+	})
+
+	t.Run("env config with invalid maxRetries", func(t *testing.T) {
+		t.Parallel()
+		// Set up environment variables
+		env := map[string]string{
+			"K6_URL_SECRET_URL_TEMPLATE": "https://api.example.com/{key}",
+			"K6_URL_SECRET_MAX_RETRIES":  "not-a-number",
+		}
+
+		fs := fsext.NewMemMapFs()
+		_, err := getConfig("env", fs, env)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid maxRetries")
+	})
+
+	t.Run("env config with negative maxRetries", func(t *testing.T) {
+		t.Parallel()
+		// Set up environment variables
+		env := map[string]string{
+			"K6_URL_SECRET_URL_TEMPLATE": "https://api.example.com/{key}",
+			"K6_URL_SECRET_MAX_RETRIES":  "-1",
+		}
+
+		fs := fsext.NewMemMapFs()
+		_, err := getConfig("env", fs, env)
+		assert.ErrorContains(t, err, "maxRetries must be non-negative")
+	})
+
+	t.Run("env config with invalid URL format", func(t *testing.T) {
+		t.Parallel()
+		// Set up environment variables
+		env := map[string]string{
+			"K6_URL_SECRET_URL_TEMPLATE": "not a valid url {key}",
+		}
+
+		fs := fsext.NewMemMapFs()
+		_, err := getConfig("env", fs, env)
+		assert.ErrorContains(t, err, "urlTemplate must be an absolute URL with a scheme")
+	})
+
+	t.Run("env config missing {key} placeholder", func(t *testing.T) {
+		t.Parallel()
+		// Set up environment variables
+		env := map[string]string{
+			"K6_URL_SECRET_URL_TEMPLATE": "https://api.example.com/secrets/static-value",
+		}
+
+		fs := fsext.NewMemMapFs()
+		_, err := getConfig("env", fs, env)
+		assert.ErrorContains(t, err, "must contain {key} placeholder")
+	})
+}
+
+func TestURLSecrets_Get_WithEnvConfig(t *testing.T) {
+	t.Parallel()
+
+	t.Run("successful request with env config", func(t *testing.T) {
+		t.Parallel()
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			assert.Equal(t, "/secrets/my-key", req.URL.Path)
+			assert.Equal(t, "GET", req.Method)
+			assert.Equal(t, "Bearer env-token", req.Header.Get("Authorization"))
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("my-secret-value"))
+		}))
+		defer server.Close()
+
+		// Set up environment variables
+		env := map[string]string{
+			"K6_URL_SECRET_URL_TEMPLATE":         server.URL + "/secrets/{key}",
+			"K6_URL_SECRET_HEADER_AUTHORIZATION": "Bearer env-token",
+			"K6_URL_SECRET_TIMEOUT":              "5s",
+			"K6_URL_SECRET_MAX_RETRIES":          "3",
+			"K6_URL_SECRET_RETRY_BACKOFF":        "1s",
+		}
+
+		fs := fsext.NewMemMapFs()
+		config, err := getConfig("env", fs, env)
+		require.NoError(t, err)
+
+		us := &urlSecrets{
+			config:     config,
+			httpClient: &http.Client{Timeout: 5 * time.Second},
+			limiter:    &mockLimiter{},
+			logger:     testutils.NewLogger(t),
+		}
+
+		secret, err := us.Get("my-key")
+		require.NoError(t, err)
+		assert.Equal(t, "my-secret-value", secret)
+	})
+
+	t.Run("successful request with env config and JSON response", func(t *testing.T) {
+		t.Parallel()
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			assert.Equal(t, "/api/secrets/api-key", req.URL.Path)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"data":{"value":"secret-from-json"}}`))
+		}))
+		defer server.Close()
+
+		// Set up environment variables
+		env := map[string]string{
+			"K6_URL_SECRET_URL_TEMPLATE":  server.URL + "/api/secrets/{key}",
+			"K6_URL_SECRET_RESPONSE_PATH": "data.value",
+			"K6_URL_SECRET_TIMEOUT":       "5s",
+			"K6_URL_SECRET_MAX_RETRIES":   "3",
+			"K6_URL_SECRET_RETRY_BACKOFF": "1s",
+		}
+
+		fs := fsext.NewMemMapFs()
+		config, err := getConfig("env", fs, env)
+		require.NoError(t, err)
+
+		us := &urlSecrets{
+			config:     config,
+			httpClient: &http.Client{Timeout: 5 * time.Second},
+			limiter:    &mockLimiter{},
+			logger:     testutils.NewLogger(t),
+		}
+
+		secret, err := us.Get("api-key")
+		require.NoError(t, err)
+		assert.Equal(t, "secret-from-json", secret)
+	})
 }
