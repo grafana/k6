@@ -342,3 +342,29 @@ func TestInterrupt(t *testing.T) {
     // err is of type *InterruptError and its Value() method returns whatever has been passed to vm.Interrupt()
 }
 ```
+
+Step-by-step Guide on Merging Goja back into Sobek
+--------------------------------------------------
+
+Since Sobek is a fork of Goja, we need to update Sobek when changes are made in Goja. The steps below will help you through how we bring those changes from Goja into Sobek.
+
+1. Since you're working in the Sobek repo, the assumption is that the remote is pointing to https://github.com/grafana/sobek.git as `origin`. So first we need to add Goja as a remote too, but we will call it `goja` since sobek is set to `origin`. Do this with:
+    `git remote add goja https://github.com/dop251/goja.git`
+
+2. to confirm the change run `git remote -v`
+
+    which should result in:
+
+    ```shell
+    goja    https://github.com/dop251/goja.git (fetch)
+    goja    https://github.com/dop251/goja.git (push)
+    origin  https://github.com/grafana/sobek.git (fetch)
+    origin  https://github.com/grafana/sobek.git (push)
+    ```
+3. Make sure you're on `main` with `git checkout main`
+4. Run `git fetch --all` to fetch all changes from all remotes.
+5. Create a new branch for the merge with `git checkout -b merge-goja-master`
+6. Merge goja/master into your branch with `git merge goja/master`
+7. Review the changes and run tests
+8. Push the branch to `origin` and create a new PR with `git push`
+9. **Important: Use MERGE (not rebase or squash) in the PR** -- This preserves history and helps avoid future merge conflicts
