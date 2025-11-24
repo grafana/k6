@@ -1265,7 +1265,7 @@ func TestEnvConfig(t *testing.T) {
 		t.Parallel()
 		// Set up environment variables
 		env := map[string]string{
-			"K6_URL_SECRET_URL_TEMPLATE": "https://api.example.com/secrets/{key}",
+			"K6_SECRET_SOURCE_URL_URL_TEMPLATE": "https://api.example.com/secrets/{key}",
 		}
 
 		fs := fsext.NewMemMapFs()
@@ -1280,14 +1280,14 @@ func TestEnvConfig(t *testing.T) {
 		t.Parallel()
 		// Set up environment variables
 		env := map[string]string{
-			"K6_URL_SECRET_URL_TEMPLATE":              "https://api.example.com/{key}",
-			"K6_URL_SECRET_METHOD":                    "POST",
-			"K6_URL_SECRET_RESPONSE_PATH":             "data.value",
-			"K6_URL_SECRET_TIMEOUT":                   "60s",
-			"K6_URL_SECRET_MAX_RETRIES":               "5",
-			"K6_URL_SECRET_RETRY_BACKOFF":             "2s",
-			"K6_URL_SECRET_REQUESTS_PER_MINUTE_LIMIT": "100",
-			"K6_URL_SECRET_REQUESTS_BURST":            "20",
+			"K6_SECRET_SOURCE_URL_URL_TEMPLATE":              "https://api.example.com/{key}",
+			"K6_SECRET_SOURCE_URL_METHOD":                    "POST",
+			"K6_SECRET_SOURCE_URL_RESPONSE_PATH":             "data.value",
+			"K6_SECRET_SOURCE_URL_TIMEOUT":                   "60s",
+			"K6_SECRET_SOURCE_URL_MAX_RETRIES":               "5",
+			"K6_SECRET_SOURCE_URL_RETRY_BACKOFF":             "2s",
+			"K6_SECRET_SOURCE_URL_REQUESTS_PER_MINUTE_LIMIT": "100",
+			"K6_SECRET_SOURCE_URL_REQUESTS_BURST":            "20",
 		}
 
 		fs := fsext.NewMemMapFs()
@@ -1307,9 +1307,9 @@ func TestEnvConfig(t *testing.T) {
 		t.Parallel()
 		// Set up environment variables
 		env := map[string]string{
-			"K6_URL_SECRET_URL_TEMPLATE":         "https://api.example.com/{key}",
-			"K6_URL_SECRET_HEADER_AUTHORIZATION": "Bearer token123",
-			"K6_URL_SECRET_HEADER_X-Custom":      "custom-value",
+			"K6_SECRET_SOURCE_URL_URL_TEMPLATE":         "https://api.example.com/{key}",
+			"K6_SECRET_SOURCE_URL_HEADER_AUTHORIZATION": "Bearer token123",
+			"K6_SECRET_SOURCE_URL_HEADER_X-Custom":      "custom-value",
 		}
 
 		fs := fsext.NewMemMapFs()
@@ -1322,7 +1322,7 @@ func TestEnvConfig(t *testing.T) {
 
 	t.Run("env config missing urlTemplate", func(t *testing.T) {
 		t.Parallel()
-		// Don't set K6_URL_SECRET_URL_TEMPLATE
+		// Don't set K6_SECRET_SOURCE_URL_URL_TEMPLATE
 		env := map[string]string{}
 
 		fs := fsext.NewMemMapFs()
@@ -1334,8 +1334,8 @@ func TestEnvConfig(t *testing.T) {
 		t.Parallel()
 		// Set up environment variables
 		env := map[string]string{
-			"K6_URL_SECRET_URL_TEMPLATE": "https://api.example.com/{key}",
-			"K6_URL_SECRET_TIMEOUT":      "invalid",
+			"K6_SECRET_SOURCE_URL_URL_TEMPLATE": "https://api.example.com/{key}",
+			"K6_SECRET_SOURCE_URL_TIMEOUT":      "invalid",
 		}
 
 		fs := fsext.NewMemMapFs()
@@ -1348,8 +1348,8 @@ func TestEnvConfig(t *testing.T) {
 		t.Parallel()
 		// Set up environment variables
 		env := map[string]string{
-			"K6_URL_SECRET_URL_TEMPLATE": "https://api.example.com/{key}",
-			"K6_URL_SECRET_MAX_RETRIES":  "not-a-number",
+			"K6_SECRET_SOURCE_URL_URL_TEMPLATE": "https://api.example.com/{key}",
+			"K6_SECRET_SOURCE_URL_MAX_RETRIES":  "not-a-number",
 		}
 
 		fs := fsext.NewMemMapFs()
@@ -1362,8 +1362,8 @@ func TestEnvConfig(t *testing.T) {
 		t.Parallel()
 		// Set up environment variables
 		env := map[string]string{
-			"K6_URL_SECRET_URL_TEMPLATE": "https://api.example.com/{key}",
-			"K6_URL_SECRET_MAX_RETRIES":  "-1",
+			"K6_SECRET_SOURCE_URL_URL_TEMPLATE": "https://api.example.com/{key}",
+			"K6_SECRET_SOURCE_URL_MAX_RETRIES":  "-1",
 		}
 
 		fs := fsext.NewMemMapFs()
@@ -1375,7 +1375,7 @@ func TestEnvConfig(t *testing.T) {
 		t.Parallel()
 		// Set up environment variables
 		env := map[string]string{
-			"K6_URL_SECRET_URL_TEMPLATE": "not a valid url {key}",
+			"K6_SECRET_SOURCE_URL_URL_TEMPLATE": "not a valid url {key}",
 		}
 
 		fs := fsext.NewMemMapFs()
@@ -1387,7 +1387,7 @@ func TestEnvConfig(t *testing.T) {
 		t.Parallel()
 		// Set up environment variables
 		env := map[string]string{
-			"K6_URL_SECRET_URL_TEMPLATE": "https://api.example.com/secrets/static-value",
+			"K6_SECRET_SOURCE_URL_URL_TEMPLATE": "https://api.example.com/secrets/static-value",
 		}
 
 		fs := fsext.NewMemMapFs()
@@ -1412,11 +1412,11 @@ func TestURLSecrets_Get_WithEnvConfig(t *testing.T) {
 
 		// Set up environment variables
 		env := map[string]string{
-			"K6_URL_SECRET_URL_TEMPLATE":         server.URL + "/secrets/{key}",
-			"K6_URL_SECRET_HEADER_AUTHORIZATION": "Bearer env-token",
-			"K6_URL_SECRET_TIMEOUT":              "5s",
-			"K6_URL_SECRET_MAX_RETRIES":          "3",
-			"K6_URL_SECRET_RETRY_BACKOFF":        "1s",
+			"K6_SECRET_SOURCE_URL_URL_TEMPLATE":         server.URL + "/secrets/{key}",
+			"K6_SECRET_SOURCE_URL_HEADER_AUTHORIZATION": "Bearer env-token",
+			"K6_SECRET_SOURCE_URL_TIMEOUT":              "5s",
+			"K6_SECRET_SOURCE_URL_MAX_RETRIES":          "3",
+			"K6_SECRET_SOURCE_URL_RETRY_BACKOFF":        "1s",
 		}
 
 		fs := fsext.NewMemMapFs()
@@ -1446,11 +1446,11 @@ func TestURLSecrets_Get_WithEnvConfig(t *testing.T) {
 
 		// Set up environment variables
 		env := map[string]string{
-			"K6_URL_SECRET_URL_TEMPLATE":  server.URL + "/api/secrets/{key}",
-			"K6_URL_SECRET_RESPONSE_PATH": "data.value",
-			"K6_URL_SECRET_TIMEOUT":       "5s",
-			"K6_URL_SECRET_MAX_RETRIES":   "3",
-			"K6_URL_SECRET_RETRY_BACKOFF": "1s",
+			"K6_SECRET_SOURCE_URL_URL_TEMPLATE":  server.URL + "/api/secrets/{key}",
+			"K6_SECRET_SOURCE_URL_RESPONSE_PATH": "data.value",
+			"K6_SECRET_SOURCE_URL_TIMEOUT":       "5s",
+			"K6_SECRET_SOURCE_URL_MAX_RETRIES":   "3",
+			"K6_SECRET_SOURCE_URL_RETRY_BACKOFF": "1s",
 		}
 
 		fs := fsext.NewMemMapFs()
