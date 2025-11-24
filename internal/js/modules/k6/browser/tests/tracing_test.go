@@ -183,33 +183,35 @@ func TestTracing(t *testing.T) {
 // and they are created in the correct order.
 func TestNavigationSpanCreation(t *testing.T) {
 	t.Parallel()
+	setup := func(t *testing.T) (*mockTracer, *httptest.Server, *k6test.VU) {
+		t.Helper()
+		tracer := &mockTracer{
+			spans: make(map[string]struct{}),
+		}
+		tp := &mockTracerProvider{
+			tracer: tracer,
+		}
+		// Start test server
+		ts := httptest.NewServer(http.HandlerFunc(
+			func(w http.ResponseWriter, r *http.Request) {
+				_, err := fmt.Fprint(w, html)
+				require.NoError(t, err)
+			},
+		))
+		t.Cleanup(ts.Close)
 
-	// Init tracing mocks
-	tracer := &mockTracer{
-		spans: make(map[string]struct{}),
+		// Initialize VU and browser module
+		vu := k6test.NewVU(t, k6test.WithTracerProvider(tp))
+
+		rt := vu.Runtime()
+		root := browser.New()
+		mod := root.NewModuleInstance(vu)
+		jsMod, ok := mod.Exports().Default.(*browser.JSModule)
+		require.Truef(t, ok, "unexpected default mod export type %T", mod.Exports().Default)
+		require.NoError(t, rt.Set("browser", jsMod.Browser))
+		vu.ActivateVU()
+		return tracer, ts, vu
 	}
-	tp := &mockTracerProvider{
-		tracer: tracer,
-	}
-	// Start test server
-	ts := httptest.NewServer(http.HandlerFunc(
-		func(w http.ResponseWriter, r *http.Request) {
-			_, err := fmt.Fprint(w, html)
-			require.NoError(t, err)
-		},
-	))
-	defer ts.Close()
-
-	// Initialize VU and browser module
-	vu := k6test.NewVU(t, k6test.WithTracerProvider(tp))
-
-	rt := vu.Runtime()
-	root := browser.New()
-	mod := root.NewModuleInstance(vu)
-	jsMod, ok := mod.Exports().Default.(*browser.JSModule)
-	require.Truef(t, ok, "unexpected default mod export type %T", mod.Exports().Default)
-	require.NoError(t, rt.Set("browser", jsMod.Browser))
-	vu.ActivateVU()
 
 	testCases := []struct {
 		name     string
@@ -218,11 +220,11 @@ func TestNavigationSpanCreation(t *testing.T) {
 	}{
 		{
 			name: "goto",
-			js: fmt.Sprintf(`
+			js: `
 				page = await browser.newPage();
 				await page.goto('%s', {waitUntil:'networkidle'});
-				page.close();
-				`, ts.URL),
+				await page.close();
+				`,
 			expected: []string{
 				"iteration",
 				"browser.newPage",
@@ -236,12 +238,12 @@ func TestNavigationSpanCreation(t *testing.T) {
 		},
 		{
 			name: "reload",
-			js: fmt.Sprintf(`
+			js: `
 				page = await browser.newPage();
 				await page.goto('%s', {waitUntil:'networkidle'});
 				await page.reload({waitUntil:'networkidle'});
-				page.close();
-				`, ts.URL),
+				await page.close();
+				`,
 			expected: []string{
 				"iteration",
 				"browser.newPage",
@@ -257,15 +259,21 @@ func TestNavigationSpanCreation(t *testing.T) {
 		},
 		{
 			name: "go_back",
-			js: fmt.Sprintf(`
+			js: `
 				page = await browser.newPage();
 				await page.goto('%s', {waitUntil:'networkidle'});
 				await Promise.all([
 					page.waitForNavigation(),
 					page.evaluate(() => window.history.back()),
-				]);
-				page.close();
-				`, ts.URL),
+				]).catch(e => {
+					// only throw exception if it's not related to navigational
+					// race condition, which can happen in slow machines.
+					if (!e.toString().includes('Inspected target navigated or closed')) {
+						throw e;
+					}
+				});
+				await page.close();
+				`,
 			expected: []string{
 				"iteration",
 				"browser.newPage",
@@ -281,15 +289,15 @@ func TestNavigationSpanCreation(t *testing.T) {
 		},
 		{
 			name: "same_page_navigation",
-			js: fmt.Sprintf(`
+			js: `
 				page = await browser.newPage();
 				await page.goto('%s', {waitUntil:'networkidle'});
 				await Promise.all([
 					page.waitForNavigation(),
 					page.locator('a[id=\"top\"]').click(),
 				]);
-				page.close();
-				`, ts.URL),
+				await page.close();
+				`,
 			expected: []string{
 				"iteration",
 				"browser.newPage",
@@ -307,22 +315,23 @@ func TestNavigationSpanCreation(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		// Cannot create new VUs that do not depend on each other due to the
-		// sync.Once in mod.NewModuleInstance, so we can't parallelize these
-		// subtests.
-		func() {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Init tracing mocks
+			tracer, ts, vu := setup(t)
 			// Run the test
 			vu.StartIteration(t)
 			defer vu.EndIteration(t)
 
-			assertJSInEventLoop(t, vu, tc.js)
+			assertJSInEventLoop(t, vu, fmt.Sprintf(tc.js, ts.URL))
 
 			got := tracer.cloneOrderedSpans()
 			// We can't use assert.Equal since the order of the span creation
 			// changes slightly on every test run. Instead we're going to make
 			// sure that the slice matches but not the order.
 			assert.ElementsMatch(t, tc.expected, got, fmt.Sprintf("%s failed", tc.name))
-		}()
+		})
 	}
 }
 

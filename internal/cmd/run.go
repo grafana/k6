@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -26,6 +27,7 @@ import (
 	"go.k6.io/k6/internal/lib/summary"
 	"go.k6.io/k6/internal/lib/trace"
 	"go.k6.io/k6/internal/metrics/engine"
+	"go.k6.io/k6/internal/output/cloud"
 	summaryoutput "go.k6.io/k6/internal/output/summary"
 	"go.k6.io/k6/internal/ui/pb"
 	"go.k6.io/k6/js/common"
@@ -220,6 +222,14 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 			}
 		}
 
+		summaryMeta := summary.Meta{
+			Script: string(test.source.Data),
+			IsCloud: slices.ContainsFunc(outputs, func(o output.Output) bool {
+				_, isCloud := o.(*cloud.Output)
+				return isCloud
+			}),
+		}
+
 		switch summaryMode {
 		// TODO(@joanlopez): remove by k6 v2.0, once we completely drop the support for --summary-mode=legacy.
 		case summary.ModeLegacy:
@@ -229,7 +239,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 			defer func() {
 				logger.Debug("Generating the end-of-test summary...")
 
-				summaryResult, hsErr := test.initRunner.HandleSummary(globalCtx, legacySummary(), nil)
+				summaryResult, hsErr := test.initRunner.HandleSummary(globalCtx, legacySummary(), nil, summaryMeta)
 				if hsErr == nil {
 					hsErr = handleSummaryResult(c.gs.FS, c.gs.Stdout, c.gs.Stderr, summaryResult)
 				}
@@ -262,8 +272,10 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 				// likely as an additional argument like options.
 				summary.NoColor = c.gs.Flags.NoColor
 				summary.EnableColors = !summary.NoColor && c.gs.Stdout.IsTTY
+				summary.NewMachineReadableSummary = testRunState.RuntimeOptions.NewMachineReadableSummary.Valid &&
+					testRunState.RuntimeOptions.NewMachineReadableSummary.Bool
 
-				summaryResult, hsErr := test.initRunner.HandleSummary(globalCtx, legacySummary(), summary)
+				summaryResult, hsErr := test.initRunner.HandleSummary(globalCtx, legacySummary(), summary, summaryMeta)
 				if hsErr == nil {
 					hsErr = handleSummaryResult(c.gs.FS, c.gs.Stdout, c.gs.Stderr, summaryResult)
 				}

@@ -72,7 +72,7 @@ func (i *Index) add(compressedOffset, uncompressedOffset int64) error {
 			return fmt.Errorf("internal error: Earlier uncompressed received (%d > %d)", latest.uncompressedOffset, uncompressedOffset)
 		}
 		if latest.compressedOffset > compressedOffset {
-			return fmt.Errorf("internal error: Earlier compressed received (%d > %d)", latest.uncompressedOffset, uncompressedOffset)
+			return fmt.Errorf("internal error: Earlier compressed received (%d > %d)", latest.compressedOffset, compressedOffset)
 		}
 		if latest.uncompressedOffset+minIndexDist > uncompressedOffset {
 			// Only add entry if distance is large enough.

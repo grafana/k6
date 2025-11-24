@@ -914,10 +914,7 @@ func encodeBlockBetterDict(dst, src []byte, dict *Dict) (d int) {
 		debug = false
 	)
 
-	sLimit := len(src) - inputMargin
-	if sLimit > MaxDictSrcOffset-maxAhead {
-		sLimit = MaxDictSrcOffset - maxAhead
-	}
+	sLimit := min(len(src)-inputMargin, MaxDictSrcOffset-maxAhead)
 	if len(src) < minNonLiteralBlockSize {
 		return 0
 	}
