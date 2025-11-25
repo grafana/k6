@@ -52,8 +52,6 @@
 // export K6_SECRET_SOURCE_URL_HEADER_AUTHORIZATION="Bearer YOUR_API_TOKEN_HERE"
 // export K6_SECRET_SOURCE_URL_RESPONSE_PATH="plaintext"
 // k6 run --secret-source=url=env examples/secrets/url-source.test.js
-//
-// See url-env-source.test.js for more examples using environment variables
 
 import secrets from "k6/secrets";
 import { check } from "k6";
