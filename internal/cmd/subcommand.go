@@ -2,17 +2,15 @@ package cmd
 
 import (
 	"fmt"
-	"iter"
 
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/ext"
 	"go.k6.io/k6/subcommand"
 )
 
-func getX(_ *state.GlobalState) *cobra.Command {
-	return &cobra.Command{
+func getX(gs *state.GlobalState) *cobra.Command {
+	cmd := &cobra.Command{
 		Use:   "x",
 		Short: "Extension subcommands",
 		Long: `Namespace for extension-provided subcommands.
@@ -21,31 +19,21 @@ This command serves as a parent for subcommands registered by k6 extensions,
 allowing them to extend k6's functionality with custom commands.
 `,
 	}
+
+	cmd.AddCommand(extensionSubcommands(gs)...)
+
+	return cmd
 }
 
-// extensionSubcommands returns an iterator over all registered subcommand extensions
-// that are not already defined in the given slice of commands.
-func extensionSubcommands(gs *state.GlobalState, defined []*cobra.Command) iter.Seq[*cobra.Command] {
-	already := make(map[string]struct{}, len(defined))
-	for _, cmd := range defined {
-		already[cmd.Name()] = struct{}{}
+// extensionSubcommands retrieves all subcommands provided by extensions.
+func extensionSubcommands(gs *state.GlobalState) []*cobra.Command {
+	commands := make([]*cobra.Command, 0)
+
+	for _, extension := range ext.Get(ext.SubcommandExtension) {
+		commands = append(commands, getCmdForExtension(extension, gs))
 	}
 
-	return func(yield func(*cobra.Command) bool) {
-		for _, extension := range ext.Get(ext.SubcommandExtension) {
-			if _, exists := already[extension.Name]; exists {
-				gs.Logger.WithFields(logrus.Fields{"name": extension.Name, "path": extension.Path}).
-					Warnf("subcommand already exists")
-				continue
-			}
-
-			already[extension.Name] = struct{}{}
-
-			if !yield(getCmdForExtension(extension, gs)) {
-				break
-			}
-		}
-	}
+	return commands
 }
 
 // getCmdForExtension gets a *cobra.Command for the given subcommand extension.
