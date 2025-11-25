@@ -298,8 +298,7 @@ func TestLocator(t *testing.T) {
 				lo := p.Locator("#inputText", nil)
 				require.NoError(t, lo.Clear(common.NewFrameFillOptions(lo.Timeout())))
 
-				opts := common.NewFramePressOptions(lo.Timeout())
-				require.NoError(t, lo.PressSequentially("hello", opts))
+				require.NoError(t, lo.PressSequentially("hello", common.NewFrameTypeOptions(lo.Timeout())))
 
 				value, err := p.InputValue("#inputText", common.NewFrameInputValueOptions(p.MainFrame().Timeout()))
 				require.NoError(t, err)
@@ -311,7 +310,7 @@ func TestLocator(t *testing.T) {
 				lo := p.Locator("#inputText", nil)
 				require.NoError(t, lo.Clear(common.NewFrameFillOptions(lo.Timeout())))
 
-				opts := common.NewFramePressOptions(lo.Timeout())
+				opts := common.NewFrameTypeOptions(lo.Timeout())
 				opts.Delay = 100
 
 				require.NoError(t, lo.PressSequentially("text", opts))
@@ -326,8 +325,7 @@ func TestLocator(t *testing.T) {
 				lo := p.Locator("textarea", nil)
 				require.NoError(t, lo.Clear(common.NewFrameFillOptions(lo.Timeout())))
 
-				opts := common.NewFramePressOptions(lo.Timeout())
-				require.NoError(t, lo.PressSequentially("some text", opts))
+				require.NoError(t, lo.PressSequentially("some text", common.NewFrameTypeOptions(lo.Timeout())))
 
 				value, err := lo.InputValue(common.NewFrameInputValueOptions(lo.Timeout()))
 				require.NoError(t, err)
@@ -511,8 +509,7 @@ func TestLocator(t *testing.T) {
 		},
 		{
 			"PressSequentially", func(l *common.Locator, tb *testBrowser) error {
-				opts := common.NewFramePressOptions(100 * time.Millisecond)
-				return l.PressSequentially("text", opts)
+				return l.PressSequentially("text", common.NewFrameTypeOptions(100*time.Millisecond))
 			},
 		},
 		{

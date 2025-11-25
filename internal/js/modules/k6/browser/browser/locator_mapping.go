@@ -357,7 +357,7 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 		},
 
 		"pressSequentially": func(text string, opts sobek.Value) (*sobek.Promise, error) {
-			copts := common.NewFramePressOptions(lo.Timeout())
+			copts := common.NewFrameTypeOptions(lo.Timeout())
 			if err := copts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing locator press sequentially options: %w", err)
 			}

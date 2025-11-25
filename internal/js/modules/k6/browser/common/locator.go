@@ -534,46 +534,11 @@ func (l *Locator) Press(key string, opts *FramePressOptions) error {
 
 // PressSequentially focuses on the element and sequentially sends a keydown,
 // keypress, and keyup events for each character in the provided string.
-// For handling special keys, use the Locator.Press method.
-func (l *Locator) PressSequentially(text string, opts *FramePressOptions) error {
-	l.log.Debugf(
-		"Locator:PressSequentially", "fid:%s furl:%q sel:%q text:%q opts:%+v",
-		l.frame.ID(), l.frame.URL(), l.selector, text, opts,
-	)
-	_, span := TraceAPICall(l.ctx, l.frame.page.targetID.String(), "locator.pressSequentially")
-	defer span.End()
-
-	opts.Strict = true
-
-	focusOpts := NewFrameBaseOptions(l.frame.defaultTimeout())
-	if opts.Timeout != 0 {
-		focusOpts.Timeout = opts.Timeout
+// For handling special keys, use the [Locator.Press] method.
+func (l *Locator) PressSequentially(text string, opts *FrameTypeOptions) error {
+	if err := l.Type(text, opts); err != nil {
+		return fmt.Errorf("pressing sequentially %q on %q: %w", text, l.selector, err)
 	}
-
-	if err := l.Focus(focusOpts); err != nil {
-		err := fmt.Errorf("focusing before typing: %w", err)
-		spanRecordError(span, err)
-		return err
-	}
-
-	for i, char := range text {
-		select {
-		case <-l.ctx.Done():
-			err := fmt.Errorf("cancelled at char %d/%d: %w", i+1, len(text), l.ctx.Err())
-			spanRecordError(span, err)
-			return err
-		default:
-		}
-
-		if err := l.frame.press(l.selector, string(char), opts); err != nil {
-			err := fmt.Errorf("pressing %q at %d/%d: %w", char, i+1, len(text), err)
-			spanRecordError(span, err)
-			return err
-		}
-
-		applySlowMo(l.ctx)
-	}
-	time.Sleep(200 * time.Millisecond)
 	return nil
 }
 
