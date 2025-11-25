@@ -320,8 +320,6 @@ func retry(
 }
 
 func parseInlineConfig(configArg string, fs fsext.Fs) (extConfig, error) {
-	// Start with default values
-	defaultCfg := newConfig()
 	var fileCfg extConfig
 	var inlineCfg extConfig
 
@@ -348,9 +346,9 @@ func parseInlineConfig(configArg string, fs fsext.Fs) (extConfig, error) {
 		}
 	}
 
-	// Apply configs in order: defaults -> file -> inline
+	// Apply configs in order: file -> inline
 	// This allows inline config to override file config
-	config := defaultCfg.Apply(fileCfg).Apply(inlineCfg)
+	config := fileCfg.Apply(inlineCfg)
 
 	return config, nil
 }
@@ -539,26 +537,28 @@ func validateURLTemplate(urlTemplate string) error {
 }
 
 func getConfig(arg string, fs fsext.Fs, env map[string]string) (extConfig, error) {
-	var config extConfig
-	var err error
+	// Start with defaults
+	config := newConfig()
 
-	// Check if we're using environment variable configuration
-	if arg == "env" {
-		// Load from environment variables
-		envCfg, err := parseEnvConfig(env)
+	// Apply environment variables
+	// Order of precedence (lowest to highest):
+	// 1. Defaults
+	// 2. Environment variables
+	// 3. Config file (if specified)
+	// 4. Inline CLI flags
+	envCfg, err := parseEnvConfig(env)
+	if err != nil {
+		return extConfig{}, err
+	}
+	config = config.Apply(envCfg)
+
+	// If arg is provided and not empty, parse it (file-based or inline config)
+	if arg != "" {
+		explicitCfg, err := parseInlineConfig(arg, fs)
 		if err != nil {
 			return extConfig{}, err
 		}
-
-		// Apply defaults and then env config
-		defaultCfg := newConfig()
-		config = defaultCfg.Apply(envCfg)
-	} else {
-		// Parse inline config (may include file-based config via config=path)
-		config, err = parseInlineConfig(arg, fs)
-		if err != nil {
-			return extConfig{}, err
-		}
+		config = config.Apply(explicitCfg)
 	}
 
 	// Validate the final config

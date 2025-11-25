@@ -373,7 +373,14 @@ func createSecretSources(gs *state.GlobalState) (map[string]secretsource.Source,
 	for _, line := range gs.Flags.SecretSource {
 		t, config, ok := strings.Cut(line, "=")
 		if !ok {
-			return nil, fmt.Errorf("couldn't parse secret source configuration %q", line)
+			// Special case: allow --secret-source=url without explicit config
+			// (it will use environment variables + defaults)
+			if line == "url" {
+				t = line
+				config = ""
+			} else {
+				return nil, fmt.Errorf("couldn't parse secret source configuration %q", line)
+			}
 		}
 		secretSources := ext.Get(ext.SecretSourceExtension)
 		found, ok := secretSources[t]

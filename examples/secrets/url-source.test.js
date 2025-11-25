@@ -48,10 +48,24 @@
 //
 // Option 6: Environment variable configuration
 // ---------------------------------------------
+// Environment variables are ALWAYS considered and follow k6's order of precedence:
+// 1. Defaults (lowest priority)
+// 2. Environment variables (K6_SECRET_SOURCE_URL_*)
+// 3. Config file (if specified with config=path)
+// 4. Inline CLI flags (highest priority)
+//
+// To use ONLY environment variables (no config file or inline flags):
 // export K6_SECRET_SOURCE_URL_URL_TEMPLATE="http://localhost:8888/secrets/{key}/decrypt"
 // export K6_SECRET_SOURCE_URL_HEADER_AUTHORIZATION="Bearer YOUR_API_TOKEN_HERE"
 // export K6_SECRET_SOURCE_URL_RESPONSE_PATH="plaintext"
-// k6 run --secret-source=url=env examples/secrets/url-source.test.js
+// k6 run --secret-source=url examples/secrets/url-source.test.js
+//
+// You can also combine environment variables with other options:
+// export K6_SECRET_SOURCE_URL_URL_TEMPLATE="http://localhost:8888/secrets/{key}/decrypt"
+// export K6_SECRET_SOURCE_URL_RESPONSE_PATH="plaintext"
+// k6 run --secret-source='url=headers.Authorization=Bearer YOUR_API_TOKEN_HERE' \
+//   examples/secrets/url-source.test.js
+// (The Authorization header from CLI will override the env var if set)
 
 import secrets from "k6/secrets";
 import { check } from "k6";

@@ -33,8 +33,10 @@ func TestInlineConfig(t *testing.T) {
 		result, err := parseInlineConfig("urlTemplate=https://api.example.com/secrets/{key}", fs)
 		require.NoError(t, err)
 		assert.Equal(t, "https://api.example.com/secrets/{key}", result.URLTemplate)
-		assert.Equal(t, "GET", result.Method.String)
-		assert.Equal(t, int64(300), result.RequestsPerMinuteLimit.Int64)
+		// parseInlineConfig doesn't apply defaults; only parses explicit config
+		// Defaults are applied at the getConfig level
+		assert.False(t, result.Method.Valid)
+		assert.False(t, result.RequestsPerMinuteLimit.Valid)
 	})
 
 	t.Run("inline config with multiple options", func(t *testing.T) {
@@ -1269,7 +1271,7 @@ func TestEnvConfig(t *testing.T) {
 		}
 
 		fs := fsext.NewMemMapFs()
-		result, err := getConfig("env", fs, env)
+		result, err := getConfig("", fs, env)
 		require.NoError(t, err)
 		assert.Equal(t, "https://api.example.com/secrets/{key}", result.URLTemplate)
 		assert.Equal(t, "GET", result.Method.String)
@@ -1291,7 +1293,7 @@ func TestEnvConfig(t *testing.T) {
 		}
 
 		fs := fsext.NewMemMapFs()
-		result, err := getConfig("env", fs, env)
+		result, err := getConfig("", fs, env)
 		require.NoError(t, err)
 		assert.Equal(t, "https://api.example.com/{key}", result.URLTemplate)
 		assert.Equal(t, "POST", result.Method.String)
@@ -1313,7 +1315,7 @@ func TestEnvConfig(t *testing.T) {
 		}
 
 		fs := fsext.NewMemMapFs()
-		result, err := getConfig("env", fs, env)
+		result, err := getConfig("", fs, env)
 		require.NoError(t, err)
 		assert.Equal(t, "https://api.example.com/{key}", result.URLTemplate)
 		assert.Equal(t, "Bearer token123", result.Headers["AUTHORIZATION"])
@@ -1326,7 +1328,7 @@ func TestEnvConfig(t *testing.T) {
 		env := map[string]string{}
 
 		fs := fsext.NewMemMapFs()
-		_, err := getConfig("env", fs, env)
+		_, err := getConfig("", fs, env)
 		assert.ErrorIs(t, err, errMissingURLTemplate)
 	})
 
@@ -1339,7 +1341,7 @@ func TestEnvConfig(t *testing.T) {
 		}
 
 		fs := fsext.NewMemMapFs()
-		_, err := getConfig("env", fs, env)
+		_, err := getConfig("", fs, env)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid timeout")
 	})
@@ -1353,7 +1355,7 @@ func TestEnvConfig(t *testing.T) {
 		}
 
 		fs := fsext.NewMemMapFs()
-		_, err := getConfig("env", fs, env)
+		_, err := getConfig("", fs, env)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid maxRetries")
 	})
@@ -1367,7 +1369,7 @@ func TestEnvConfig(t *testing.T) {
 		}
 
 		fs := fsext.NewMemMapFs()
-		_, err := getConfig("env", fs, env)
+		_, err := getConfig("", fs, env)
 		assert.ErrorContains(t, err, "maxRetries must be non-negative")
 	})
 
@@ -1379,7 +1381,7 @@ func TestEnvConfig(t *testing.T) {
 		}
 
 		fs := fsext.NewMemMapFs()
-		_, err := getConfig("env", fs, env)
+		_, err := getConfig("", fs, env)
 		assert.ErrorContains(t, err, "urlTemplate must be an absolute URL with a scheme")
 	})
 
@@ -1391,7 +1393,7 @@ func TestEnvConfig(t *testing.T) {
 		}
 
 		fs := fsext.NewMemMapFs()
-		_, err := getConfig("env", fs, env)
+		_, err := getConfig("", fs, env)
 		assert.ErrorContains(t, err, "must contain {key} placeholder")
 	})
 }
@@ -1420,7 +1422,7 @@ func TestURLSecrets_Get_WithEnvConfig(t *testing.T) {
 		}
 
 		fs := fsext.NewMemMapFs()
-		config, err := getConfig("env", fs, env)
+		config, err := getConfig("", fs, env)
 		require.NoError(t, err)
 
 		us := &urlSecrets{
@@ -1454,7 +1456,7 @@ func TestURLSecrets_Get_WithEnvConfig(t *testing.T) {
 		}
 
 		fs := fsext.NewMemMapFs()
-		config, err := getConfig("env", fs, env)
+		config, err := getConfig("", fs, env)
 		require.NoError(t, err)
 
 		us := &urlSecrets{
