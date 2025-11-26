@@ -229,6 +229,7 @@ func getVUActivationParams(
 		RunContext:               ctx,
 		Scenario:                 conf.Name,
 		Exec:                     conf.GetExec(),
+		UserInit:                 conf.GetUserInit(),
 		Env:                      conf.GetEnv(),
 		Tags:                     conf.GetTags(),
 		DeactivateCallback:       deactivateCallback,

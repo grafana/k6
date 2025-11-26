@@ -73,10 +73,6 @@ const asyncFunctionNotSupportedMsg = "SharedArray constructor does not support a
 func (d *Data) sharedArray(call sobek.ConstructorCall) *sobek.Object {
 	rt := d.vu.Runtime()
 
-	if d.vu.State() != nil {
-		common.Throw(rt, errors.New("new SharedArray must be called in the init context"))
-	}
-
 	name := call.Argument(0).String()
 	if name == "" {
 		common.Throw(rt, errors.New("empty name provided to SharedArray's constructor"))

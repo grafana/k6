@@ -750,6 +750,10 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 	if params.Exec == "" {
 		params.Exec = consts.DefaultFn
 	}
+	// This case actually never happens in normal operation but only in tests.
+	if params.UserInit == "" {
+		params.UserInit = consts.UserInitFn
+	}
 
 	// Override the preset global env with any custom env vars
 	env := make(map[string]string, len(u.env)+len(params.Env))
@@ -817,7 +821,17 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 			params.DeactivateCallback(u)
 		}
 	})
-
+	userInit := avu.getCallableExport(params.UserInit)
+	if userInit != nil {
+		_, err := userInit(sobek.Undefined()) // Actually run the JS script
+		if err != nil {
+			u.state.Logger.Errorf("error running userInit: %s", err)
+		} else {
+			u.state.Logger.Debug("userInit ran successfully")
+		}
+	} else {
+		u.state.Logger.Debug("no userInit function found")
+	}
 	return avu
 }
 

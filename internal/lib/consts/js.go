@@ -8,4 +8,5 @@ const (
 	SetupFn         = "setup"
 	TeardownFn      = "teardown"
 	HandleSummaryFn = "handleSummary"
+	UserInitFn      = "userInit"
 )

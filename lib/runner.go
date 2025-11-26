@@ -34,7 +34,7 @@ type VUActivationParams struct {
 	RunContext               context.Context
 	DeactivateCallback       func(InitializedVU)
 	Env, Tags                map[string]string
-	Exec, Scenario           string
+	Exec, Scenario, UserInit string
 	GetNextIterationCounters func() (uint64, uint64)
 }
 
