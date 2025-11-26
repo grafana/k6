@@ -139,3 +139,30 @@ func TestPageEventHandlerIterator(t *testing.T) {
 		}
 	})
 }
+
+func TestPageOn(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil handler", func(t *testing.T) {
+		t.Parallel()
+
+		p := &Page{}
+
+		err := p.On("metric", nil)
+		assert.Error(t, err)
+		assert.ErrorContains(t, err, `"handler" argument cannot be nil`)
+	})
+
+	t.Run("valid handler", func(t *testing.T) {
+		t.Parallel()
+
+		p := &Page{
+			eventHandlers: make(map[PageEventName][]pageEventHandlerRecord),
+		}
+		handler := func(PageEvent) error { return nil }
+
+		err := p.On("metric", handler)
+		assert.NoError(t, err)
+		assert.Len(t, p.eventHandlers[("metric")], 1)
+	})
+}
