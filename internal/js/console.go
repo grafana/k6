@@ -86,10 +86,11 @@ const defaultAssertMsg = "Assertion failed"
 //
 // Spec pseudo code:
 //
-// 1. If condition is true, return.
-// 2. Let message be a string without any formatting specifiers indicating generically an assertion failure (such as "Assertion failed").
-// 3. If data is empty, append message to data.
-// 4. Otherwise:
+//  1. If condition is true, return.
+//  2. Let message be a string without any formatting specifiers indicating generically
+//     an assertion failure (such as "Assertion failed").
+//  3. If data is empty, append message to data.
+//  4. Otherwise:
 //  1. Let first be data[0].
 //  2. If first is not a String, then prepend message to data.
 //  3. Otherwise:
