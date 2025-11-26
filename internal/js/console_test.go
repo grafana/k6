@@ -344,6 +344,152 @@ func TestConsoleLogWithGoValues(t *testing.T) { //nolint:tparallel // actually f
 	}
 }
 
+func TestConsoleAssert(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		assertion     string
+		args          string
+		shouldLog     bool
+		expectedMsg   string
+		expectedLevel logrus.Level
+	}{
+		{
+			name:        "true assertion does not log",
+			assertion:   "true",
+			args:        "",
+			shouldLog:   false,
+			expectedMsg: "",
+		},
+		{
+			name:          "false assertion logs default message",
+			assertion:     "false",
+			args:          "",
+			shouldLog:     true,
+			expectedMsg:   "Assertion failed",
+			expectedLevel: logrus.ErrorLevel,
+		},
+		{
+			name:          "false assertion with string message",
+			assertion:     "false",
+			args:          `, "custom message"`,
+			shouldLog:     true,
+			expectedMsg:   "Assertion failed: custom message",
+			expectedLevel: logrus.ErrorLevel,
+		},
+		{
+			name:          "false assertion with multiple args",
+			assertion:     "false",
+			args:          `, "Expected:", 200, "Got:", 404`,
+			shouldLog:     true,
+			expectedMsg:   "Assertion failed: Expected: 200 Got: 404",
+			expectedLevel: logrus.ErrorLevel,
+		},
+		{
+			name:          "false assertion with non-string first arg",
+			assertion:     "false",
+			args:          `, 42, "is the answer"`,
+			shouldLog:     true,
+			expectedMsg:   "Assertion failed 42 is the answer",
+			expectedLevel: logrus.ErrorLevel,
+		},
+		{
+			name:          "false assertion with object",
+			assertion:     "false",
+			args:          `, {status: 404}`,
+			shouldLog:     true,
+			expectedMsg:   `Assertion failed {"status":404}`,
+			expectedLevel: logrus.ErrorLevel,
+		},
+		{
+			name:        "truthy value (non-zero number) does not log",
+			assertion:   "42",
+			args:        "",
+			shouldLog:   false,
+			expectedMsg: "",
+		},
+		{
+			name:          "falsy value (zero) logs",
+			assertion:     "0",
+			args:          "",
+			shouldLog:     true,
+			expectedMsg:   "Assertion failed",
+			expectedLevel: logrus.ErrorLevel,
+		},
+		{
+			name:        "truthy value (non-empty string) does not log",
+			assertion:   `"hello"`,
+			args:        "",
+			shouldLog:   false,
+			expectedMsg: "",
+		},
+		{
+			name:          "falsy value (empty string) logs",
+			assertion:     `""`,
+			args:          "",
+			shouldLog:     true,
+			expectedMsg:   "Assertion failed",
+			expectedLevel: logrus.ErrorLevel,
+		},
+		{
+			name:          "falsy value (null) logs",
+			assertion:     "null",
+			args:          "",
+			shouldLog:     true,
+			expectedMsg:   "Assertion failed",
+			expectedLevel: logrus.ErrorLevel,
+		},
+		{
+			name:          "falsy value (undefined) logs",
+			assertion:     "undefined",
+			args:          "",
+			shouldLog:     true,
+			expectedMsg:   "Assertion failed",
+			expectedLevel: logrus.ErrorLevel,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			r, err := getSimpleRunner(t, "/script.js", fmt.Sprintf(
+				`exports.default = function() { console.assert(%s%s); }`,
+				tt.assertion, tt.args))
+			require.NoError(t, err)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			samples := make(chan metrics.SampleContainer, 100)
+			initVU, err := r.newVU(ctx, 1, 1, samples)
+			require.NoError(t, err)
+
+			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+
+			logger := extractLogger(vu)
+			logger.Out = io.Discard
+			logger.Level = logrus.DebugLevel
+			hook := logtest.NewLocal(logger)
+
+			err = vu.RunOnce()
+			require.NoError(t, err)
+
+			entry := hook.LastEntry()
+
+			if tt.shouldLog {
+				require.NotNil(t, entry, "expected log entry but nothing was logged")
+				require.Equal(t, tt.expectedLevel, entry.Level)
+				require.Equal(t, tt.expectedMsg, entry.Message)
+				require.Equal(t, logrus.Fields{"source": "console"}, entry.Data)
+			} else {
+				require.Nil(t, entry, "expected no log entry but got one")
+			}
+		})
+	}
+}
+
 func TestConsoleLevels(t *testing.T) {
 	t.Parallel()
 	levels := map[string]logrus.Level{
