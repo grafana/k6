@@ -87,6 +87,11 @@ func newRootCommand(gs *state.GlobalState) *rootCommand {
 		rootCmd.AddCommand(sc(gs))
 	}
 
+	// Add the "x" command only if there are registered subcommand extensions.
+	if xCmd := getX(gs); len(xCmd.Commands()) > 0 {
+		rootCmd.AddCommand(xCmd)
+	}
+
 	c.cmd = rootCmd
 	return c
 }
@@ -373,7 +378,14 @@ func createSecretSources(gs *state.GlobalState) (map[string]secretsource.Source,
 	for _, line := range gs.Flags.SecretSource {
 		t, config, ok := strings.Cut(line, "=")
 		if !ok {
-			return nil, fmt.Errorf("couldn't parse secret source configuration %q", line)
+			// Special case: allow --secret-source=url without explicit config
+			// (it will use environment variables + defaults)
+			if line == "url" {
+				t = line
+				config = ""
+			} else {
+				return nil, fmt.Errorf("couldn't parse secret source configuration %q", line)
+			}
 		}
 		secretSources := ext.Get(ext.SecretSourceExtension)
 		found, ok := secretSources[t]
