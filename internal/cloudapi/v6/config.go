@@ -239,7 +239,7 @@ func mergeFromCloudOption(
 // GetTemporaryCloudConfig returns a temporary cloud config.
 // Original comment
 // TODO: Fix this
-// We reuse cloud.Config for parsing options.cloud (or legacy loadimpact struct), but this probably shouldn't be
+// We reuse cloud.Config for parsing options.cloud, but this probably shouldn't be
 // done, as the idea of options.ext is that they are extensible without touching k6. But in
 // order for this to happen, we shouldn't actually marshal cloud.Config on top of it, because
 // it will be missing some fields that aren't actually mentioned in the struct.

@@ -56,6 +56,7 @@ func NewClient(logger logrus.FieldLogger, token, host, version string, timeout t
 	return c
 }
 
+// SetStackID sets the stack ID for the client.
 func (c *Client) SetStackID(stackID int64) {
 	c.stackID = stackID
 }
