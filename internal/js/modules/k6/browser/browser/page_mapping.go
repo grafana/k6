@@ -680,6 +680,10 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 // It provides a generic way to map different event types to their respective handler functions.
 func mapPageOn(vu moduleVU, p *common.Page) func(common.PageEventName, sobek.Callable) error {
 	return func(eventName common.PageEventName, handle sobek.Callable) error {
+		if handle == nil {
+			panic(vu.Runtime().NewTypeError(`The "listener" argument must be a function`))
+		}
+
 		pageEvents := map[common.PageEventName]struct {
 			mapp func(vu moduleVU, event common.PageEvent) mapping
 			wait bool // Whether to wait for the handler to complete.
