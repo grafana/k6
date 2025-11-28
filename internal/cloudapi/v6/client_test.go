@@ -12,6 +12,8 @@ import (
 )
 
 func TestCheckResponse(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name                string
 		response            *http.Response
@@ -25,13 +27,13 @@ func TestCheckResponse(t *testing.T) {
 		},
 		{
 			name:          "successful response 200",
-			response:      &http.Response{StatusCode: 200},
+			response:      &http.Response{StatusCode: http.StatusOK},
 			expectedError: "",
 		},
 		{
 			name: "unauthorized 401 with invalid JSON",
 			response: &http.Response{
-				StatusCode: 401,
+				StatusCode: http.StatusUnauthorized,
 				Body:       io.NopCloser(strings.NewReader("invalid json")),
 			},
 			expectedError: errNotAuthenticated.Error(),
@@ -39,7 +41,7 @@ func TestCheckResponse(t *testing.T) {
 		{
 			name: "forbidden 403 with invalid JSON",
 			response: &http.Response{
-				StatusCode: 403,
+				StatusCode: http.StatusForbidden,
 				Body:       io.NopCloser(strings.NewReader("invalid json")),
 			},
 			expectedError: errNotAuthorized.Error(),
@@ -47,7 +49,7 @@ func TestCheckResponse(t *testing.T) {
 		{
 			name: "server error 500 with invalid JSON",
 			response: &http.Response{
-				StatusCode: 500,
+				StatusCode: http.StatusInternalServerError,
 				Body:       io.NopCloser(strings.NewReader("invalid json")),
 				Request:    &http.Request{URL: mustParseURL(t, "https://api.k6.io/test")},
 			},
@@ -56,7 +58,7 @@ func TestCheckResponse(t *testing.T) {
 		{
 			name: "error with valid JSON payload",
 			response: &http.Response{
-				StatusCode: 400,
+				StatusCode: http.StatusBadRequest,
 				Body: io.NopCloser(strings.NewReader(`{
 					"error": {
 						"message": "validation failed",
@@ -71,6 +73,8 @@ func TestCheckResponse(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			err := CheckResponse(tt.response)
 
 			if tt.expectedError == "" && !tt.expectResponseError {

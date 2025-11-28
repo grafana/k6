@@ -9,6 +9,8 @@ import (
 )
 
 func TestResponseError_Error(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		respErr  ResponseError
@@ -56,7 +58,7 @@ func TestResponseError_Error(t *testing.T) {
 		{
 			name: "error with HTTP response and API code",
 			respErr: ResponseError{
-				Response: &http.Response{StatusCode: 400},
+				Response: &http.Response{StatusCode: http.StatusBadRequest},
 				APIError: k6cloud.ErrorApiModel{
 					Message: "bad request",
 					Code:    "error",
@@ -68,6 +70,8 @@ func TestResponseError_Error(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			result := tt.respErr.Error()
 			assert.Equal(t, tt.expected, result)
 		})

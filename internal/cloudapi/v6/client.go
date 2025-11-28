@@ -43,6 +43,7 @@ func NewClient(logger logrus.FieldLogger, token, host, version string, timeout t
 			},
 		},
 		OperationServers: map[string]k6cloud.ServerConfigurations{},
+		HTTPClient:       &http.Client{Timeout: timeout},
 	}
 
 	c := &Client{

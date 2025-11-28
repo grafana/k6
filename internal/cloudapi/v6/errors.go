@@ -35,7 +35,6 @@ func (e ResponseError) Error() string {
 		if v.Target.IsSet() {
 			details[i] += " (target: '" + *v.Target.Get() + "')"
 		}
-
 	}
 
 	if len(details) > 0 {
