@@ -49,7 +49,7 @@ func TestCheckResponse(t *testing.T) {
 			response: &http.Response{
 				StatusCode: 500,
 				Body:       io.NopCloser(strings.NewReader("invalid json")),
-				Request:    &http.Request{URL: mustParseURL("https://api.k6.io/test")},
+				Request:    &http.Request{URL: mustParseURL(t, "https://api.k6.io/test")},
 			},
 			expectedError: "unexpected HTTP error from https://api.k6.io/test: 500 Internal Server Error",
 		},
@@ -63,7 +63,7 @@ func TestCheckResponse(t *testing.T) {
 						"code": "error"
 					}
 				}`)),
-				Request: &http.Request{URL: mustParseURL("https://api.k6.io/test")},
+				Request: &http.Request{URL: mustParseURL(t, "https://api.k6.io/test")},
 			},
 			expectResponseError: true,
 		},
@@ -91,10 +91,10 @@ func TestCheckResponse(t *testing.T) {
 	}
 }
 
-func mustParseURL(rawURL string) *url.URL {
+func mustParseURL(t *testing.T, rawURL string) *url.URL {
 	u, err := url.Parse(rawURL)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	return u
 }
