@@ -139,6 +139,7 @@ func TestServeHTTP(t *testing.T) {
 			cmd := &cmdRun{
 				gs: ts.GlobalState,
 			}
+			// In case of addressSetByUser=true, it exits with an error code
 			if tc.addressSet {
 				ts.ExpectedExitCode = int(exitcodes.CannotStartRESTAPI)
 			}
@@ -153,6 +154,7 @@ func TestServeHTTP(t *testing.T) {
 				Addr:              lis.Addr().String(),
 				ReadHeaderTimeout: time.Millisecond,
 			}
+			// Try to start the server, though it will always fail due to port already in use
 			cmd.serveHTTP(srv, tc.addressSet)
 		})
 	}
