@@ -259,6 +259,18 @@ func TestConsoleLog(t *testing.T) {
 		{in: `{a: 1, fn: function(){}, b: "two"}`, expected: `{"a":1,"b":"two","fn":"[object Function]"}`},
 		{in: `{nested: {fn: function(){}}}`, expected: `{"nested":{"fn":"[object Function]"}}`},
 		{in: `[function(){}, 1, "two"]`, expected: `["[object Function]",1,"two"]`},
+		{
+			in: `{
+				obj: {
+					'a': 'foo', 'b': {
+						'c': { 'd': 123 }
+					}
+				},
+				arr: [1, 2],
+				str: 'hi'
+			}`,
+			expected: `{"obj":{"a":"foo","b":{"c":{"d":123}}},"arr":[1,2],"str":"hi"}`,
+		},
 
 		// TODO: the ideal output for a circular object should be like `{a: [Circular]}`
 		{in: `function() {var a = {foo: {}}; a.foo = a; return a}()`, expected: "[object Object]"},
