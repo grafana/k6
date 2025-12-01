@@ -255,22 +255,31 @@ func TestConsoleLog(t *testing.T) {
 		{in: `["test1", 2]`, expected: `["test1",2]`},
 
 		{in: `{fn: function(){}}`, expected: `{"fn":"[object Function]"}`},
+		{in: `{fn: function(){}, dt: new Date(0)}`, expected: `{"dt":"1970-01-01T00:00:00.000Z","fn":"[object Function]"}`},
 		{in: `{fn: () => {}}`, expected: `{"fn":"[object Function]"}`},
 		{in: `{a: 1, fn: function(){}, b: "two"}`, expected: `{"a":1,"b":"two","fn":"[object Function]"}`},
 		{in: `{nested: {fn: function(){}}}`, expected: `{"nested":{"fn":"[object Function]"}}`},
 		{in: `[function(){}, 1, "two"]`, expected: `["[object Function]",1,"two"]`},
 		{
 			in: `{
+				arr: [1, 2],
 				obj: {
 					'a': 'foo', 'b': {
 						'c': { 'd': 123 }
 					}
 				},
-				arr: [1, 2],
 				str: 'hi'
 			}`,
-			expected: `{"obj":{"a":"foo","b":{"c":{"d":123}}},"arr":[1,2],"str":"hi"}`,
+			expected: `{"arr":[1,2],"obj":{"a":"foo","b":{"c":{"d":123}}},"str":"hi"}`,
 		},
+
+		{in: `[null, undefined, 1]`, expected: `[null,null,1]`},
+		{in: `[1, , 3]`, expected: `[1,null,3]`}, // sparse arrays (holes in arrays)
+		{in: `[[function(){}], [1, 2]]`, expected: `[["[object Function]"],[1,2]]`},
+		{in: `new RegExp("test")`, expected: `{}`}, // JSON. stringify of RegExp is {}
+		{in: `{[Symbol("test")]: "value", a: 1}`, expected: `{"a":1}`},
+		{in: `Object.defineProperty({}, 'x', {get: function() { throw new Error(); }})`, expected: `{}`},
+		{in: `Object.create({inherited: 1}, {own: {value: 2, enumerable: true}})`, expected: `{"own":2}`},
 
 		// TODO: the ideal output for a circular object should be like `{a: [Circular]}`
 		{in: `function() {var a = {foo: {}}; a.foo = a; return a}()`, expected: "[object Object]"},
@@ -334,7 +343,7 @@ func TestConsoleLogWithGoValues(t *testing.T) { //nolint:tparallel // actually f
 		{in: struct {
 			Name string
 			Age  int
-		}{"John", 30}, expected: `{"name":"John","age":30}`},
+		}{"John", 30}, expected: `{"age":30,"name":"John"}`},
 
 		{in: errors.New("this is an error"), expected: `this is an error`},
 		{in: fmt.Errorf("this is a wrap of: %w", errors.New("error")), expected: `this is a wrap of: error`},
