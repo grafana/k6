@@ -901,9 +901,7 @@ func (p *Page) Close() error {
 
 	add := runtime.RemoveBinding(webVitalBinding)
 	if err := add.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-		err := fmt.Errorf("internal error while removing binding from page: %w", err)
-		spanRecordError(span, err)
-		return err
+		return spanRecordErrorf(span, "internal error while removing binding from page: %w", err)
 	}
 
 	action := target.CloseTarget(p.targetID)
@@ -922,9 +920,7 @@ func (p *Page) Close() error {
 			return nil
 		}
 
-		err := fmt.Errorf("closing a page: %w", err)
-		spanRecordError(span, err)
-		return err
+		return spanRecordErrorf(span, "closing a page: %w", err)
 	}
 
 	return nil
@@ -1129,8 +1125,7 @@ func (p *Page) Goto(url string, opts *FrameGotoOptions) (*Response, error) {
 
 	resp, err := p.MainFrame().Goto(url, opts)
 	if err != nil {
-		spanRecordError(span, err)
-		return nil, err
+		return nil, spanRecordErrorf(span, "%w", err)
 	}
 
 	return resp, nil
@@ -1431,9 +1426,7 @@ func (p *Page) Reload(opts *PageReloadOptions) (*Response, error) { //nolint:fun
 
 	reloadAction := page.Reload()
 	if err := reloadAction.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-		err := fmt.Errorf("reloading page: %w", err)
-		spanRecordError(span, err)
-		return nil, err
+		return nil, spanRecordErrorf(span, "reloading page: %w", err)
 	}
 
 	wrapTimeoutError := func(err error) error {
@@ -1467,8 +1460,7 @@ func (p *Page) Reload(opts *PageReloadOptions) (*Response, error) { //nolint:fun
 		}
 	}
 	if err != nil {
-		spanRecordError(span, err)
-		return nil, err
+		return nil, spanRecordErrorf(span, "%w", err)
 	}
 
 	var resp *Response
@@ -1485,9 +1477,7 @@ func (p *Page) Reload(opts *PageReloadOptions) (*Response, error) { //nolint:fun
 	select {
 	case <-waitForLifecycleEvent:
 	case <-timeoutCtx.Done():
-		err := wrapTimeoutError(timeoutCtx.Err())
-		spanRecordError(span, err)
-		return nil, err
+		return nil, spanRecordErrorf(span, "%w", wrapTimeoutError(timeoutCtx.Err()))
 	}
 
 	applySlowMo(p.ctx)
@@ -1505,9 +1495,7 @@ func (p *Page) Screenshot(opts *PageScreenshotOptions, sp ScreenshotPersister) (
 	s := newScreenshotter(spanCtx, sp, p.logger)
 	buf, err := s.screenshotPage(p, opts)
 	if err != nil {
-		err := fmt.Errorf("taking screenshot of page: %w", err)
-		spanRecordError(span, err)
-		return nil, err
+		return nil, spanRecordErrorf(span, "taking screenshot of page: %w", err)
 	}
 
 	return buf, err
@@ -1688,8 +1676,7 @@ func (p *Page) WaitForNavigation(opts *FrameWaitForNavigationOptions, rm RegExMa
 
 	resp, err := p.frameManager.MainFrame().WaitForNavigation(opts, rm)
 	if err != nil {
-		spanRecordError(span, err)
-		return nil, err
+		return nil, spanRecordErrorf(span, "%w", err)
 	}
 
 	return resp, err
@@ -1723,8 +1710,7 @@ func (p *Page) WaitForURL(urlPattern string, opts *FrameWaitForURLOptions, rm Re
 
 	err := p.frameManager.MainFrame().WaitForURL(urlPattern, opts, rm)
 	if err != nil {
-		spanRecordError(span, err)
-		return err
+		return spanRecordErrorf(span, "%w", err)
 	}
 
 	return nil
@@ -1817,10 +1803,10 @@ func (p *Page) WaitForResponse(
 		return rm.Match(urlPattern, e.Response.URL())
 	})
 	if err != nil {
-		err = &k6ext.UserFriendlyError{Err: err, Timeout: opts.Timeout}
-		spanRecordError(span, err)
+		return nil, spanRecordErrorf(span, "%w", &k6ext.UserFriendlyError{Err: err, Timeout: opts.Timeout})
 	}
-	return ev.Response, err
+
+	return ev.Response, nil
 }
 
 // PageWaitForRequestOptions are options for [Page.WaitForRequest].
@@ -1844,10 +1830,9 @@ func (p *Page) WaitForRequest(
 		return rm.Match(urlPattern, e.Request.URL())
 	})
 	if err != nil {
-		err = &k6ext.UserFriendlyError{Err: err, Timeout: opts.Timeout}
-		spanRecordError(span, err)
+		return nil, spanRecordErrorf(span, "%w", &k6ext.UserFriendlyError{Err: err, Timeout: opts.Timeout})
 	}
-	return ev.Request, err
+	return ev.Request, nil
 }
 
 // Workers returns all WebWorkers of page.
