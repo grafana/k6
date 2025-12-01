@@ -536,9 +536,22 @@ func (l *Locator) Press(key string, opts *FramePressOptions) error {
 // keypress, and keyup events for each character in the provided string.
 // For handling special keys, use the [Locator.Press] method.
 func (l *Locator) PressSequentially(text string, opts *FrameTypeOptions) error {
+	l.log.Debugf(
+		"Locator:PressSequentially", "fid:%s furl:%q sel:%q text:%q opts:%+v",
+		l.frame.ID(), l.frame.URL(), l.selector, text, opts,
+	)
+	_, span := TraceAPICall(l.ctx, l.frame.page.targetID.String(), "locator.pressSequentially")
+	defer span.End()
+
 	if err := l.Type(text, opts); err != nil {
-		return fmt.Errorf("pressing sequentially %q on %q: %w", text, l.selector, err)
+		err := fmt.Errorf("pressing sequentially %q on %q: %w", text, l.selector, err)
+		spanRecordError(span, err)
+		return err
 	}
+
+	// slowMo is already applied in Type method.
+	// So we don't need to apply it again here.
+
 	return nil
 }
 
