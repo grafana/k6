@@ -4,4 +4,5 @@ package secretsource
 import (
 	_ "go.k6.io/k6/internal/secretsource/file" // import them for init
 	_ "go.k6.io/k6/internal/secretsource/mock" // import them for init
+	_ "go.k6.io/k6/internal/secretsource/url"  // import them for init
 )

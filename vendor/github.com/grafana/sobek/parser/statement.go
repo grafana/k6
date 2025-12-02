@@ -337,7 +337,7 @@ func (self *_parser) parseArrowFunctionBody(async bool) (ast.ConciseBody, []*ast
 }
 
 func (self *_parser) parseClass(declaration bool) *ast.ClassLiteral {
-	if !self.scope.allowLet && self.token == token.CLASS {
+	if declaration && !self.scope.allowLet && self.token == token.CLASS {
 		self.errorUnexpectedToken(token.CLASS)
 	}
 
