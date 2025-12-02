@@ -543,14 +543,14 @@ func (l *Locator) PressSequentially(text string, opts *FrameTypeOptions) error {
 	_, span := TraceAPICall(l.ctx, l.frame.page.targetID.String(), "locator.pressSequentially")
 	defer span.End()
 
-	if err := l.Type(text, opts); err != nil {
+	opts.Strict = true
+	if err := l.frame.typ(l.selector, text, opts); err != nil {
 		err := fmt.Errorf("pressing sequentially %q on %q: %w", text, l.selector, err)
 		spanRecordError(span, err)
 		return err
 	}
 
-	// slowMo is already applied in Type method.
-	// So we don't need to apply it again here.
+	applySlowMo(l.ctx)
 
 	return nil
 }
