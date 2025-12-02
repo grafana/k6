@@ -543,9 +543,7 @@ func (l *Locator) PressSequentially(text string, opts *FrameTypeOptions) error {
 
 	opts.Strict = true
 	if err := l.frame.typ(l.selector, text, opts); err != nil {
-		err := fmt.Errorf("pressing sequentially %q on %q: %w", text, l.selector, err)
-		spanRecordError(span, err)
-		return err
+		return spanRecordErrorf(span, "pressing sequentially %q on %q: %w", text, l.selector, err)
 	}
 
 	applySlowMo(l.ctx)

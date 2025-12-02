@@ -1125,7 +1125,7 @@ func (p *Page) Goto(url string, opts *FrameGotoOptions) (*Response, error) {
 
 	resp, err := p.MainFrame().Goto(url, opts)
 	if err != nil {
-		return nil, spanRecordErrorf(span, "%w", err)
+		return nil, spanRecordErrorf(span, "navigating page: %w", err)
 	}
 
 	return resp, nil
@@ -1396,10 +1396,15 @@ func (p *Page) QueryAll(selector string) ([]*ElementHandle, error) {
 }
 
 // Reload will reload the current page.
-func (p *Page) Reload(opts *PageReloadOptions) (*Response, error) { //nolint:funlen
+func (p *Page) Reload(opts *PageReloadOptions) (_ *Response, rerr error) { //nolint:funlen
 	p.logger.Debugf("Page:Reload", "sid:%v", p.sessionID())
 	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.reload")
 	defer span.End()
+	defer func() {
+		if rerr != nil {
+			rerr = spanRecordErrorf(span, "reloading page: %w", rerr)
+		}
+	}()
 
 	timeoutCtx, timeoutCancelFn := context.WithTimeout(p.ctx, opts.Timeout)
 	defer timeoutCancelFn()
@@ -1426,7 +1431,7 @@ func (p *Page) Reload(opts *PageReloadOptions) (*Response, error) { //nolint:fun
 
 	reloadAction := page.Reload()
 	if err := reloadAction.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-		return nil, spanRecordErrorf(span, "reloading page: %w", err)
+		return nil, err
 	}
 
 	wrapTimeoutError := func(err error) error {
@@ -1435,11 +1440,11 @@ func (p *Page) Reload(opts *PageReloadOptions) (*Response, error) { //nolint:fun
 				Err:     err,
 				Timeout: opts.Timeout,
 			}
-			return fmt.Errorf("reloading page: %w", err)
+			return err
 		}
 		p.logger.Debugf("Page:Reload", "timeoutCtx done: %v", err)
 
-		return fmt.Errorf("reloading page: %w", err)
+		return err
 	}
 
 	var (
@@ -1448,7 +1453,7 @@ func (p *Page) Reload(opts *PageReloadOptions) (*Response, error) { //nolint:fun
 	)
 	select {
 	case <-p.ctx.Done():
-		err = fmt.Errorf("reloading page: %w", p.ctx.Err())
+		err = p.ctx.Err()
 	case <-timeoutCtx.Done():
 		err = wrapTimeoutError(timeoutCtx.Err())
 	case event := <-waitForFrameNavigation:
@@ -1460,7 +1465,7 @@ func (p *Page) Reload(opts *PageReloadOptions) (*Response, error) { //nolint:fun
 		}
 	}
 	if err != nil {
-		return nil, spanRecordErrorf(span, "%w", err)
+		return nil, err
 	}
 
 	var resp *Response
@@ -1477,7 +1482,7 @@ func (p *Page) Reload(opts *PageReloadOptions) (*Response, error) { //nolint:fun
 	select {
 	case <-waitForLifecycleEvent:
 	case <-timeoutCtx.Done():
-		return nil, spanRecordErrorf(span, "%w", wrapTimeoutError(timeoutCtx.Err()))
+		return nil, wrapTimeoutError(timeoutCtx.Err())
 	}
 
 	applySlowMo(p.ctx)
@@ -1676,7 +1681,7 @@ func (p *Page) WaitForNavigation(opts *FrameWaitForNavigationOptions, rm RegExMa
 
 	resp, err := p.frameManager.MainFrame().WaitForNavigation(opts, rm)
 	if err != nil {
-		return nil, spanRecordErrorf(span, "%w", err)
+		return nil, spanRecordError(span, err)
 	}
 
 	return resp, err
@@ -1710,7 +1715,7 @@ func (p *Page) WaitForURL(urlPattern string, opts *FrameWaitForURLOptions, rm Re
 
 	err := p.frameManager.MainFrame().WaitForURL(urlPattern, opts, rm)
 	if err != nil {
-		return spanRecordErrorf(span, "%w", err)
+		return spanRecordError(span, err)
 	}
 
 	return nil
@@ -1803,7 +1808,9 @@ func (p *Page) WaitForResponse(
 		return rm.Match(urlPattern, e.Response.URL())
 	})
 	if err != nil {
-		return nil, spanRecordErrorf(span, "%w", &k6ext.UserFriendlyError{Err: err, Timeout: opts.Timeout})
+		return nil, spanRecordErrorf(span, "waiting for response: %w", &k6ext.UserFriendlyError{
+			Err: err, Timeout: opts.Timeout,
+		})
 	}
 
 	return ev.Response, nil
@@ -1830,7 +1837,9 @@ func (p *Page) WaitForRequest(
 		return rm.Match(urlPattern, e.Request.URL())
 	})
 	if err != nil {
-		return nil, spanRecordErrorf(span, "%w", &k6ext.UserFriendlyError{Err: err, Timeout: opts.Timeout})
+		return nil, spanRecordErrorf(span, "waiting for request: %w", &k6ext.UserFriendlyError{
+			Err: err, Timeout: opts.Timeout,
+		})
 	}
 	return ev.Request, nil
 }
