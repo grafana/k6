@@ -80,7 +80,10 @@ func (c console) Error(args ...sobek.Value) {
 	c.log(logrus.ErrorLevel, args...)
 }
 
-const functionLog = "[object Function]"
+const (
+	functionLog = "[object Function]"
+	circularLog = "[Circular]"
+)
 
 // errorType is used to check if a [sobek.Value] implements the [error] interface.
 //
@@ -100,26 +103,14 @@ func (c console) valueString(v sobek.Value) string {
 		}
 	}
 
-	var (
-		mv any // either marshal from Sobek or Go
-		ok bool
-	)
 	obj, isObj := v.(*sobek.Object)
-	if isObj {
-		if obj.ClassName() == "Error" {
-			return v.String()
-		}
-		if mv, ok = c.traverseValue(obj, make(map[*sobek.Object]bool)); !ok {
-			// We can't marshal circular references.
-			return v.String()
-		}
-	}
 	if !isObj {
-		if mv, ok = v.(json.Marshaler); !ok {
-			return v.String()
-		}
+		return v.String()
 	}
-	b, err := json.Marshal(mv)
+	if obj.ClassName() == "Error" {
+		return v.String()
+	}
+	b, err := json.Marshal(c.traverseValue(obj, make(map[*sobek.Object]bool)))
 	if err != nil {
 		return v.String()
 	}
@@ -129,26 +120,28 @@ func (c console) valueString(v sobek.Value) string {
 
 // traverseValue recursively traverses a [sobek.Value], tries to convert it
 // into native Go types suitable for JSON marshaling. It returns the converted
-// value and a boolean indicating whether the traversal should continue. If a circular
-// reference is detected, the boolean is false and the value should not be marshaled.
-func (c console) traverseValue(v sobek.Value, seen map[*sobek.Object]bool) (any, bool) {
+// value, or the original value if conversion is not possible. For functions, it
+// returns [functionLog], and for circular references, it returns [circularLog].
+//
+// It prevents circular references by keeping track of seen objects.
+func (c console) traverseValue(v sobek.Value, seen map[*sobek.Object]bool) any {
 	// Handles null and sparse values in arrays.
 	if common.IsNullish(v) {
-		return nil, true
+		return nil
 	}
 
 	// Represent functions as a fixed string.
 	if _, isFunc := sobek.AssertFunction(v); isFunc {
-		return functionLog, true
+		return functionLog
 	}
 	// Skip non-object values.
 	obj, ok := v.(*sobek.Object)
 	if !ok {
-		return v, true
+		return v
 	}
 	// Prevent circular references.
 	if seen[obj] {
-		return nil, false
+		return circularLog
 	}
 	seen[obj] = true
 	defer delete(seen, obj)
@@ -158,29 +151,21 @@ func (c console) traverseValue(v sobek.Value, seen map[*sobek.Object]bool) (any,
 		length := obj.Get("length").ToInteger()
 		arr := make([]any, length)
 		for i := range length {
-			val, ok := c.traverseValue(obj.Get(strconv.FormatInt(i, 10)), seen)
-			if !ok {
-				return nil, false
-			}
-			arr[i] = val
+			arr[i] = c.traverseValue(obj.Get(strconv.FormatInt(i, 10)), seen)
 		}
-		return arr, true
+		return arr
 	}
 
 	keys := obj.Keys()
 	// Fast path for empty objects and other JS types with no enumerable properties.
 	if len(keys) == 0 {
-		return obj, true
+		return obj
 	}
 	// Handle objects key-by-key, recursively.
 	m := make(map[string]any, len(keys))
 	for _, key := range keys {
-		val, ok := c.traverseValue(obj.Get(key), seen)
-		if !ok {
-			return nil, false
-		}
-		m[key] = val
+		m[key] = c.traverseValue(obj.Get(key), seen)
 	}
 
-	return m, true
+	return m
 }

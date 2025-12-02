@@ -282,10 +282,10 @@ func TestConsoleLog(t *testing.T) {
 		{in: `Object.create({inherited: 1}, {own: {value: 2, enumerable: true}})`, expected: `{"own":2}`},
 
 		// circular reference AND function (both code paths)
-		{in: `function() {var a = {fn: function(){}, foo: {}}; a.foo = a; return a}()`, expected: "[object Object]"},
-
-		// TODO: the ideal output for a circular object should be like `{a: [Circular]}`
-		{in: `function() {var a = {foo: {}}; a.foo = a; return a}()`, expected: "[object Object]"},
+		{
+			in:       `function() {var a = {fn: function(){}, foo: {}}; a.foo = a; return a}()`,
+			expected: `{"fn":"[object Function]","foo":"[Circular]"}`,
+		},
 	}
 
 	for _, tt := range tests {
