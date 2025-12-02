@@ -632,7 +632,7 @@ func (b *Browser) NewContext(opts *BrowserContextOptions) (*BrowserContext, erro
 
 	browserCtx, err := NewBrowserContext(b.vuCtx, b, browserContextID, opts, b.logger)
 	if err != nil {
-		return nil, spanRecordErrorf(span, "new context: %w", err)
+		return nil, spanRecordErrorf(span, "new browser context: %w", err)
 	}
 	b.runOnClose = append(b.runOnClose, browserCtx.cleanup)
 
@@ -655,7 +655,7 @@ func (b *Browser) NewPage(opts *BrowserContextOptions) (*Page, error) {
 
 	page, err := browserCtx.NewPage()
 	if err != nil {
-		return nil, spanRecordErrorf(span, "%w", err)
+		return nil, spanRecordError(span, err)
 	}
 
 	return page, nil
