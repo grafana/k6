@@ -2,13 +2,26 @@ package fs
 
 import "go.k6.io/k6/js/common"
 
+const fsErrorConstructorName = "FSError"
+
+// fsError represents a custom error object emitted by the fs module.
+type fsError struct {
+	*common.JSError
+
+	// kind contains the kind of error that has occurred.
+	kind errorKind
+}
+
 // newFsError creates a new Error object of the provided kind and with the
 // provided message.
 func newFsError(k errorKind, message string) *fsError {
 	return &fsError{
-		Name:    k.String(),
-		Message: message,
-		kind:    k,
+		JSError: common.NewJSError(common.JSErrorConfig{
+			Constructor: fsErrorConstructorName,
+			Name:        k.String(),
+			Message:     message,
+		}),
+		kind: k,
 	}
 }
 
@@ -40,29 +53,6 @@ const (
 	// EOFError is emitted when the end of a file has been reached.
 	EOFError
 )
-
-// fsError represents a custom error object emitted by the fs module.
-//
-// It is used to provide a more detailed error message to the user, and
-// provide a concrete error type that can be used to differentiate between
-// different types of errors.
-//
-// Exposing error types to the user in a way that's compatible with some
-// JavaScript error handling constructs such as `instanceof` is still non-trivial
-// in Go. See the [dedicated goja issue] with have opened for more details.
-//
-// [dedicated goja issue]: https://github.com/dop251/goja/issues/529
-type fsError struct {
-	// Name contains the name of the error as formalized by the [ErrorKind]
-	// type.
-	Name string `json:"name"`
-
-	// Message contains the error message as presented to the user.
-	Message string `json:"message"`
-
-	// kind contains the kind of error that has occurred.
-	kind errorKind
-}
 
 // Ensure that the Error type implements the Go `error` interface.
 var (
