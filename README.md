@@ -45,7 +45,7 @@ Its core features are:
 - **A full-featured API.** The scripting API is packed with features that help you simulate real application traffic.
 - **An embedded JavaScript engine.** The performance of Go, the scripting familiarity of JavaScript.
 - **Multiple Protocol support**. HTTP, WebSockets, gRPC, Browser, and more.
-- **Large extension ecosystem.** You can extend k6 to support your needs. And many people have already shared their extensions with the community!
+- **Large extension ecosystem.** You can extend k6 to support your needs. And many people have already shared their extensions with the community! [Explore](https://grafana.com/docs/k6/latest/extensions/explore) the available extensions.
 - **Flexible metrics storage and visualization**. Summary statistics or granular metrics, exported to the service of your choice.
 - **Native integration with Grafana cloud**. [SaaS solution](https://grafana.com/products/cloud/k6/) for test execution, metrics correlation, data analysis, and more.
 
