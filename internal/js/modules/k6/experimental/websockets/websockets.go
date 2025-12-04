@@ -819,7 +819,7 @@ func (w *webSocket) connectionClosedWithError(err error) error {
 // newEvent return an event implementing "implements" https://dom.spec.whatwg.org/#event
 // needs to be called on the event loop
 // TODO: move to events
-func (w *webSocket) newEvent(eventType string, t time.Time, extras ...func(*sobek.Object)) *sobek.Object {
+func (w *webSocket) newEvent(eventType string, t time.Time, funcOptions ...func(*sobek.Object)) *sobek.Object {
 	rt := w.vu.Runtime()
 	o := rt.NewObject()
 
