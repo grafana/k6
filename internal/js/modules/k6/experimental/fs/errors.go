@@ -1,5 +1,7 @@
 package fs
 
+import "go.k6.io/k6/js/common"
+
 // newFsError creates a new Error object of the provided kind and with the
 // provided message.
 func newFsError(k errorKind, message string) *fsError {
@@ -63,9 +65,7 @@ type fsError struct {
 }
 
 // Ensure that the Error type implements the Go `error` interface.
-var _ error = (*fsError)(nil)
-
-// Error implements the Go `error` interface.
-func (e *fsError) Error() string {
-	return e.Name + ": " + e.Message
-}
+var (
+	_ error              = (*fsError)(nil)
+	_ common.JSException = (*fsError)(nil)
+)
