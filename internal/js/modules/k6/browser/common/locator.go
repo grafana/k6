@@ -92,9 +92,7 @@ func (l *Locator) Click(opts *FrameClickOptions) error {
 	opts.Strict = true
 	opts.retry = true
 	if err := l.frame.click(l.selector, opts); err != nil {
-		err := fmt.Errorf("clicking on %q: %w", l.selector, err)
-		spanRecordError(span, err)
-		return err
+		return spanRecordErrorf(span, "clicking on %q: %w", l.selector, err)
 	}
 
 	applySlowMo(l.ctx)
@@ -545,9 +543,7 @@ func (l *Locator) PressSequentially(text string, opts *FrameTypeOptions) error {
 
 	opts.Strict = true
 	if err := l.frame.typ(l.selector, text, opts); err != nil {
-		err := fmt.Errorf("pressing sequentially %q on %q: %w", text, l.selector, err)
-		spanRecordError(span, err)
-		return err
+		return spanRecordErrorf(span, "pressing sequentially %q on %q: %w", text, l.selector, err)
 	}
 
 	applySlowMo(l.ctx)
@@ -567,9 +563,7 @@ func (l *Locator) Type(text string, opts *FrameTypeOptions) error {
 
 	opts.Strict = true
 	if err := l.frame.typ(l.selector, text, opts); err != nil {
-		err := fmt.Errorf("typing %q in %q: %w", text, l.selector, err)
-		spanRecordError(span, err)
-		return err
+		return spanRecordErrorf(span, "typing %q in %q: %w", text, l.selector, err)
 	}
 
 	applySlowMo(l.ctx)
