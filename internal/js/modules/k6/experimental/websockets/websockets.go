@@ -809,7 +809,7 @@ func (w *webSocket) connectionClosedWithError(err error) error {
 		var closeError *websocket.CloseError
 		if !errors.As(err, &closeError) || closeError.Code != websocket.CloseNormalClosure {
 			if errList := w.callErrorListeners(err); errList != nil {
-				return errList
+				return errList // TODO ... still call the close listeners ?!?
 			}
 		}
 	}
@@ -842,8 +842,8 @@ func (w *webSocket) newEvent(eventType string, t time.Time, funcOptions ...func(
 		// https://w3c.github.io/hr-time/#dom-domhighrestimestamp
 	}), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
 
-	for _, extra := range extras {
-		extra(o)
+	for _, funcOption := range funcOptions {
+		funcOption(o)
 	}
 
 	return o
@@ -877,6 +877,8 @@ func (w *webSocket) callErrorListeners(e error) error { // TODO use the error ev
 
 func (w *webSocket) callEventListeners(eventType string) error {
 	var event *sobek.Object
+	// TODO fix timestamp
+	// TODO: Add 'wasClean' boolean to close events per spec
 	if eventType == events.CLOSE {
 		event = w.newEvent(eventType, time.Now(), func(o *sobek.Object) {
 			rt := w.vu.Runtime()
