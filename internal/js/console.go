@@ -5,6 +5,7 @@ import (
 	"os"
 	"reflect"
 	"strings"
+	"unicode/utf16"
 
 	"github.com/grafana/sobek"
 	"github.com/sirupsen/logrus"
@@ -76,6 +77,54 @@ func (c console) Warn(args ...sobek.Value) {
 
 func (c console) Error(args ...sobek.Value) {
 	c.log(logrus.ErrorLevel, args...)
+}
+
+const defaultAssertMsg = "Assertion failed"
+
+// Assert logs an error message if the assertion is false.
+// https://console.spec.whatwg.org/#assert
+//
+// Spec pseudo code:
+//
+//  1. If condition is true, return.
+//  2. Let message be a string without any formatting specifiers indicating generically
+//     an assertion failure (such as "Assertion failed").
+//  3. If data is empty, append message to data.
+//  4. Otherwise:
+//  1. Let first be data[0].
+//  2. If first is not a String, then prepend message to data.
+//  3. Otherwise:
+//  1. Let concat be the concatenation of message, ':', SPACE, and first.
+//  2. Set data[0] to concat.
+//
+// 5. Perform Logger("assert", data).
+//
+// Since logrus doesn't support "assert" level, we log at Error level.
+func (c console) Assert(condition bool, data ...sobek.Value) {
+	if condition {
+		return
+	}
+
+	toString := func(s string) sobek.String {
+		return sobek.StringFromUTF16(utf16.Encode([]rune(s)))
+	}
+
+	msg := defaultAssertMsg
+
+	if len(data) == 0 {
+		data = append(data, toString(msg))
+	} else {
+		first := data[0]
+
+		if sobek.IsString(first) {
+			msg += ": " + first.String()
+			data[0] = toString(msg)
+		} else {
+			data = append([]sobek.Value{toString(msg)}, data...)
+		}
+	}
+
+	c.log(logrus.ErrorLevel, data...)
 }
 
 const functionLog = "[object Function]"
