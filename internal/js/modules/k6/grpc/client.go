@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	grpccompress "go.k6.io/k6/internal/js/modules/k6/grpc/compression"
 	"go.k6.io/k6/internal/lib/netext/grpcext"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
@@ -262,6 +263,15 @@ func (c *Client) Connect(addr string, params sobek.Value) (bool, error) {
 
 	if p.Authority != "" {
 		opts = append(opts, grpc.WithAuthority(p.Authority))
+	}
+
+	if p.Compression != nil && p.Compression.Name != "" {
+		registry := grpccompress.NewRegistry()
+		plug, err := registry.Configure(*p.Compression)
+		if err != nil {
+			return false, err
+		}
+		opts = append(opts, grpc.WithDefaultCallOptions(plug.CallOption()))
 	}
 
 	c.addr = addr
