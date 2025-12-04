@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 
 	k6cloud "github.com/grafana/k6-cloud-openapi-client-go/k6"
@@ -25,11 +26,7 @@ func (c *Client) CreateCloudTest(name string, projectID int64, arc *lib.Archive)
 		XStackId(int32(c.stackID))
 
 	loadTest, httpRes, err := reqCreate.Execute()
-	if err != nil {
-		return nil, err
-	}
-
-	if err := CheckResponse(httpRes); err != nil {
+	if err := CheckResponse(httpRes, err); err != nil {
 		return nil, err
 	}
 
@@ -37,20 +34,61 @@ func (c *Client) CreateCloudTest(name string, projectID int64, arc *lib.Archive)
 }
 
 // StartCloudTestRun creates and starts a new cloud test run with the provided name and script archive.
-func (c *Client) StartCloudTestRun(name string, projectID int64, arc *lib.Archive) (*k6cloud.TestRunApiModel, error) {
+func (c *Client) StartCloudTestRun(loadTestId int32) (*k6cloud.TestRunApiModel, error) {
+	ctx := context.WithValue(context.Background(), k6cloud.ContextAccessToken, c.token)
+	reqStart := c.apiClient.LoadTestsAPI.LoadTestsStart(ctx, loadTestId).XStackId(int32(c.stackID))
+	loadTestRun, httpRes, err := reqStart.Execute()
+	if err := CheckResponse(httpRes, err); err != nil {
+		return nil, err
+	}
+
+	return loadTestRun, nil
+}
+
+// GetCloudTestByName retrieves a cloud test by its name within the specified project.
+func (c *Client) GetCloudTestByName(name string, projectID int64) (*k6cloud.LoadTestApiModel, error) {
+	ctx := context.WithValue(context.Background(), k6cloud.ContextAccessToken, c.token)
+	// TODO: Replace with ProjectLoadTestsList(ctx, int32(projectID)) when name filter is added to the endpoint
+	req := c.apiClient.LoadTestsAPI.LoadTestsList(ctx).
+		XStackId(int32(c.stackID)).
+		Name(name)
+
+	loadTests, httpRes, err := req.Execute()
+	if err := CheckResponse(httpRes, err); err != nil {
+		return nil, err
+	}
+
+	for _, lt := range loadTests.Value {
+		if lt.Name == name {
+			return &lt, nil
+		}
+	}
+
+	return nil, nil
+}
+
+// CreateAndStartCloudTestRun creates a new cloud test (or retrieve it if it already exists) and starts a new test run.
+func (c *Client) CreateAndStartCloudTestRun(name string, projectID int64, arc *lib.Archive) (*k6cloud.TestRunApiModel, error) {
 	loadTest, err := c.CreateCloudTest(name, projectID, arc)
 	if err != nil {
-		return nil, err
+		var rErr ResponseError
+		// Test with the same name already exists
+		if !errors.As(err, &rErr) || rErr.Response.StatusCode != 409 {
+			return nil, err
+		}
+
+		test, err := c.GetCloudTestByName(name, projectID)
+		if err != nil {
+			return nil, err
+		}
+		if test == nil {
+			return nil, fmt.Errorf("failed to retrieve existing test with name %q", name)
+		}
+		loadTest = test
 	}
 
-	ctx := context.WithValue(context.Background(), k6cloud.ContextAccessToken, c.token)
-	reqStart := c.apiClient.LoadTestsAPI.LoadTestsStart(ctx, loadTest.Id).XStackId(int32(c.stackID))
-	loadTestRun, httpRes, err := reqStart.Execute()
+	loadTestRun, err := c.StartCloudTestRun(loadTest.Id)
 	if err != nil {
-		return nil, err
-	}
-
-	if err := CheckResponse(httpRes); err != nil {
 		return nil, err
 	}
 
@@ -63,11 +101,7 @@ func (c *Client) StopCloudTestRun(testRunID int64) error {
 
 	req := c.apiClient.TestRunsAPI.TestRunsAbort(ctx, int32(testRunID)).XStackId(int32(c.stackID))
 	httpRes, err := req.Execute()
-	if err != nil {
-		return err
-	}
-
-	if err := CheckResponse(httpRes); err != nil {
+	if err := CheckResponse(httpRes, err); err != nil {
 		return err
 	}
 
@@ -97,11 +131,7 @@ func (c *Client) ValidateOptions(projectID int64, options lib.Options) error {
 
 	req := c.apiClient.LoadTestsAPI.ValidateOptions(ctx).ValidateOptionsRequest(validateOptions)
 	_, httpRes, err := req.Execute()
-	if err != nil {
-		return err
-	}
-
-	if err := CheckResponse(httpRes); err != nil {
+	if err := CheckResponse(httpRes, err); err != nil {
 		return err
 	}
 
@@ -126,14 +156,7 @@ func (c *Client) ValidateToken(stackURL string) (*k6cloud.AuthenticationResponse
 		}
 	}()
 
-	if err != nil {
-		var apiErr *k6cloud.GenericOpenAPIError
-		if !errors.As(err, &apiErr) {
-			return nil, err
-		}
-	}
-
-	if err := CheckResponse(httpRes); err != nil {
+	if err := CheckResponse(httpRes, err); err != nil {
 		return nil, err
 	}
 

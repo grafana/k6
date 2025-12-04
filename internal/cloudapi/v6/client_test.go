@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	k6cloud "github.com/grafana/k6-cloud-openapi-client-go/k6"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,6 +18,7 @@ func TestCheckResponse(t *testing.T) {
 	tests := []struct {
 		name                string
 		response            *http.Response
+		err                 error
 		expectResponseError bool
 		expectedError       string
 	}{
@@ -69,13 +71,28 @@ func TestCheckResponse(t *testing.T) {
 			},
 			expectResponseError: true,
 		},
+		{
+			name: "GenericOpenAPIError error with response error with valid JSON payload",
+			response: &http.Response{
+				StatusCode: http.StatusBadRequest,
+				Body: io.NopCloser(strings.NewReader(`{
+					"error": {
+						"message": "validation failed",
+						"code": "error"
+					}
+				}`)),
+				Request: &http.Request{URL: mustParseURL(t, "https://api.k6.io/test")},
+			},
+			err:                 &k6cloud.GenericOpenAPIError{},
+			expectResponseError: true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := CheckResponse(tt.response)
+			err := CheckResponse(tt.response, tt.err)
 
 			if tt.expectedError == "" && !tt.expectResponseError {
 				assert.NoError(t, err)
