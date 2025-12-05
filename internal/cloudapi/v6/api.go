@@ -3,6 +3,7 @@ package cloudapi
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 
 	k6cloud "github.com/grafana/k6-cloud-openapi-client-go/k6"
@@ -29,12 +30,12 @@ func (c *Client) ValidateToken(stackURL string) (*k6cloud.AuthenticationResponse
 	if err != nil {
 		var apiErr *k6cloud.GenericOpenAPIError
 		if !errors.As(err, &apiErr) {
-			return nil, err
+			return nil, fmt.Errorf("failed to validate token: %w", err)
 		}
 	}
 
 	if err := CheckResponse(httpRes); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to validate token: %w", err)
 	}
 
 	return resp, nil
