@@ -143,6 +143,15 @@ func TestWebPlatformTestSuite(t *testing.T) {
 			},
 			callFn: "define_tests",
 		},
+		{
+			catalog: "derive_bits_keys",
+			files: []string{
+				"pbkdf2.js",
+				"pbkdf2_vectors.js",
+				"pbkdf2.https.any.js",
+			},
+			callFn: "define_tests",
+		},
 	}
 
 	for _, tt := range tests {
