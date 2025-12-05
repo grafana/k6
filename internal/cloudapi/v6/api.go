@@ -72,11 +72,11 @@ func (c *Client) CreateAndStartCloudTestRun(name string, projectID int64, arc *l
 	loadTest, err := c.CreateCloudTest(name, projectID, arc)
 	if err != nil {
 		var rErr ResponseError
-		// Test with the same name already exists
 		if !errors.As(err, &rErr) || rErr.Response.StatusCode != 409 {
 			return nil, err
 		}
 
+		// Test with the same name already exists
 		test, err := c.GetCloudTestByName(name, projectID)
 		if err != nil {
 			return nil, err
