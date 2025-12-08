@@ -1327,6 +1327,10 @@ type PageEvent struct {
 // passing in the ConsoleMessage associated with the event.
 // The only accepted event value is 'console'.
 func (p *Page) On(event PageEventName, handler PageEventHandler) error {
+	if handler == nil {
+		return errors.New(`"handler" argument cannot be nil`)
+	}
+
 	_, err := p.addEventHandler(event, handler)
 	return err
 }

@@ -1036,6 +1036,74 @@ func TestPageClose(t *testing.T) {
 func TestPageOn(t *testing.T) {
 	t.Parallel()
 
+	tests := map[string]struct {
+		fun     string
+		wantErr string
+	}{
+		"nil on('console') handler": {
+			fun:     `page.on('console')`,
+			wantErr: `TypeError: The "listener" argument must be a function`,
+		},
+		"valid on('console') handler": {
+			fun: `page.on('console', () => {})`,
+		},
+		"nil on('metric') handler": {
+			fun:     `page.on('metric')`,
+			wantErr: `TypeError: The "listener" argument must be a function`,
+		},
+		"valid on('metric') handler": {
+			fun: `page.on('metric', () => {})`,
+		},
+		"nil on('request') handler": {
+			fun:     `page.on('request')`,
+			wantErr: `TypeError: The "listener" argument must be a function`,
+		},
+		"valid on('request') handler": {
+			fun: `page.on('request', () => {})`,
+		},
+		"nil on('response') handler": {
+			fun:     `page.on('response')`,
+			wantErr: `TypeError: The "listener" argument must be a function`,
+		},
+		"valid on('response') handler": {
+			fun: `page.on('response', () => {})`,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
+
+			tb.vu.ActivateVU()
+			tb.vu.StartIteration(t)
+			defer tb.vu.EndIteration(t)
+
+			gv, err := tb.vu.RunAsync(t, `
+				const page = await browser.newPage();
+				try {
+					%s        // e.g. page.on('console', handler);
+				} finally {
+					await page.close();
+				}
+ 			`, tt.fun)
+
+			got := k6test.ToPromise(t, gv)
+
+			if tt.wantErr != "" {
+				assert.ErrorContains(t, err, tt.wantErr)
+				assert.Equal(t, sobek.PromiseStateRejected, got.State())
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, sobek.PromiseStateFulfilled, got.State())
+			}
+		})
+	}
+}
+
+func TestPageOnConsole(t *testing.T) {
+	t.Parallel()
+
 	const blankPage = "about:blank"
 
 	testCases := []struct {
