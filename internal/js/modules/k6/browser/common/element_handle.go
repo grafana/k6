@@ -1771,7 +1771,8 @@ func retryPointerAction(
 		}
 
 		if !errors.Is(err, ErrElementNotVisible) &&
-			!errors.Is(err, ErrElementNotAttachedToDOM) {
+			!errors.Is(err, ErrElementNotAttachedToDOM) &&
+			!strings.Contains(err.Error(), "frame has been detached") {
 			return res, err
 		}
 
