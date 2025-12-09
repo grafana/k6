@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/grafana/sobek"
 	"github.com/sirupsen/logrus"
+	"go.k6.io/k6/js/common"
 )
 
 // console represents a JS console implemented as a logrus.FieldLogger.
@@ -78,7 +80,10 @@ func (c console) Error(args ...sobek.Value) {
 	c.log(logrus.ErrorLevel, args...)
 }
 
-const functionLog = "[object Function]"
+const (
+	functionLog = "[object Function]"
+	circularLog = "[Circular]"
+)
 
 // errorType is used to check if a [sobek.Value] implements the [error] interface.
 //
@@ -98,20 +103,69 @@ func (c console) valueString(v sobek.Value) string {
 		}
 	}
 
-	if sobekObj, isObj := v.(*sobek.Object); isObj {
-		if sobekObj.ClassName() == "Error" {
-			return v.String()
-		}
-	}
-
-	mv, ok := v.(json.Marshaler)
-	if !ok {
+	obj, isObj := v.(*sobek.Object)
+	if !isObj {
 		return v.String()
 	}
-
-	b, err := json.Marshal(mv)
+	if obj.ClassName() == "Error" {
+		return v.String()
+	}
+	b, err := json.Marshal(c.traverseValue(obj, make(map[*sobek.Object]bool)))
 	if err != nil {
 		return v.String()
 	}
+
 	return string(b)
+}
+
+// traverseValue recursively traverses a [sobek.Value], tries to convert it
+// into native Go types suitable for JSON marshaling. It returns the converted
+// value, or the original value if conversion is not possible. For functions, it
+// returns [functionLog], and for circular references, it returns [circularLog].
+//
+// It prevents circular references by keeping track of seen objects.
+func (c console) traverseValue(v sobek.Value, seen map[*sobek.Object]bool) any {
+	// Handles null and sparse values in arrays.
+	if common.IsNullish(v) {
+		return nil
+	}
+
+	// Represent functions as a fixed string.
+	if _, isFunc := sobek.AssertFunction(v); isFunc {
+		return functionLog
+	}
+	// Skip non-object values.
+	obj, ok := v.(*sobek.Object)
+	if !ok {
+		return v
+	}
+	// Prevent circular references.
+	if seen[obj] {
+		return circularLog
+	}
+	seen[obj] = true
+	defer delete(seen, obj)
+
+	// Handle arrays element-by-element, recursively.
+	if obj.ClassName() == "Array" {
+		length := obj.Get("length").ToInteger()
+		arr := make([]any, length)
+		for i := range length {
+			arr[i] = c.traverseValue(obj.Get(strconv.FormatInt(i, 10)), seen)
+		}
+		return arr
+	}
+
+	keys := obj.Keys()
+	// Fast path for empty objects and other JS types with no enumerable properties.
+	if len(keys) == 0 {
+		return obj
+	}
+	// Handle objects key-by-key, recursively.
+	m := make(map[string]any, len(keys))
+	for _, key := range keys {
+		m[key] = c.traverseValue(obj.Get(key), seen)
+	}
+
+	return m
 }
