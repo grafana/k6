@@ -1844,6 +1844,12 @@ func (p *Page) WaitForRequest(
 	return ev.Request, nil
 }
 
+// PageWaitForEventOptions are options for [Page.WaitForEvent].
+type PageWaitForEventOptions struct {
+	// Timeout is the maximum time to wait for the event.
+	Timeout time.Duration
+}
+
 // Workers returns all WebWorkers of page.
 func (p *Page) Workers() []*Worker {
 	p.workersMu.Lock()
