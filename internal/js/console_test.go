@@ -286,6 +286,66 @@ func TestConsoleLog(t *testing.T) {
 			in:       `function() {var a = {fn: function(){}, foo: {}}; a.foo = a; return a}()`,
 			expected: `{"fn":"[object Function]","foo":"[Circular]"}`,
 		},
+
+		// TypedArray and ArrayBuffer formatting
+		{in: `new Int8Array([1, -2, 127, -128])`, expected: `Int8Array(4) [ 1, -2, 127, -128 ]`},
+		{in: `new Uint8Array([0, 128, 255])`, expected: `Uint8Array(3) [ 0, 128, 255 ]`},
+		{in: `new Uint8ClampedArray([0, 128, 255])`, expected: `Uint8Array(3) [ 0, 128, 255 ]`}, // shows as Uint8Array
+		{in: `new Int16Array([100, -100, 32767])`, expected: `Int16Array(3) [ 100, -100, 32767 ]`},
+		{in: `new Uint16Array([0, 32768, 65535])`, expected: `Uint16Array(3) [ 0, 32768, 65535 ]`},
+		{in: `new Int32Array([4, 2, -2147483648])`, expected: `Int32Array(3) [ 4, 2, -2147483648 ]`},
+		{in: `new Uint32Array([0, 2147483648, 4294967295])`, expected: `Uint32Array(3) [ 0, 2147483648, 4294967295 ]`},
+		{in: `new Float32Array([1.5, -2.5])`, expected: `Float32Array(2) [ 1.5, -2.5 ]`},
+		{in: `new Float64Array([3.141592653589793, 2.718281828459045])`, expected: `Float64Array(2) [ 3.141592653589793, 2.718281828459045 ]`},
+		{in: `new BigInt64Array([BigInt(1), BigInt(-1)])`, expected: `BigInt64Array(2) [ 1, -1 ]`},
+		{in: `new BigUint64Array([BigInt(0), BigInt(1)])`, expected: `BigUint64Array(2) [ 0, 1 ]`},
+
+		{in: `new Int8Array(0)`, expected: `Int8Array(0) []`},
+		{in: `new Uint8Array(0)`, expected: `Uint8Array(0) []`},
+		{in: `new Float64Array([])`, expected: `Float64Array(0) []`},
+		{in: `new Int32Array([0])`, expected: `Int32Array(1) [ 0 ]`},
+
+		{in: `new ArrayBuffer(0)`, expected: `ArrayBuffer { [Uint8Contents]: <>, byteLength: 0 }`},
+		{in: `new ArrayBuffer(4)`, expected: `ArrayBuffer { [Uint8Contents]: <00 00 00 00>, byteLength: 4 }`},
+		{in: `new ArrayBuffer(8)`, expected: `ArrayBuffer { [Uint8Contents]: <00 00 00 00 00 00 00 00>, byteLength: 8 }`},
+		{
+			in: `function() {
+				var buf = new ArrayBuffer(8);
+				var view = new Int32Array(buf);
+				view[0] = 4;
+				view[1] = 2;
+				return buf;
+			}()`,
+			expected: `ArrayBuffer { [Uint8Contents]: <04 00 00 00 02 00 00 00>, byteLength: 8 }`,
+		},
+
+		{in: `{v: new Int32Array([4, 2])}`, expected: `{"v":"Int32Array(2) [ 4, 2 ]"}`},
+		{in: `{b: new ArrayBuffer(4)}`, expected: `{"b":"ArrayBuffer { [Uint8Contents]: <00 00 00 00>, byteLength: 4 }"}`},
+		{in: `{arr: new Int8Array([1, 2]), buf: new ArrayBuffer(2)}`, expected: `{"arr":"Int8Array(2) [ 1, 2 ]","buf":"ArrayBuffer { [Uint8Contents]: <00 00>, byteLength: 2 }"}`},
+
+		{in: `[new Int8Array([1, 2])]`, expected: `["Int8Array(2) [ 1, 2 ]"]`},
+		{in: `[new ArrayBuffer(2), new ArrayBuffer(4)]`, expected: `["ArrayBuffer { [Uint8Contents]: <00 00>, byteLength: 2 }","ArrayBuffer { [Uint8Contents]: <00 00 00 00>, byteLength: 4 }"]`},
+
+		{in: `{count: 2, name: "test", data: new Int8Array([1, 2])}`, expected: `{"count":2,"data":"Int8Array(2) [ 1, 2 ]","name":"test"}`},
+		{in: `{fn: function(){}, arr: new Uint8Array([255])}`, expected: `{"arr":"Uint8Array(1) [ 255 ]","fn":"[object Function]"}`},
+		{in: `{buf: new ArrayBuffer(4), items: [1, 2, 3]}`, expected: `{"buf":"ArrayBuffer { [Uint8Contents]: <00 00 00 00>, byteLength: 4 }","items":[1,2,3]}`},
+		{in: `{err: new Error("test"), data: new Int8Array([1])}`, expected: `{"data":"Int8Array(1) [ 1 ]","err":"Error: test"}`},
+
+		{in: `{outer: {inner: new Int32Array([100])}}`, expected: `{"outer":{"inner":"Int32Array(1) [ 100 ]"}}`},
+		{in: `{a: {b: {c: new ArrayBuffer(2)}}}`, expected: `{"a":{"b":{"c":"ArrayBuffer { [Uint8Contents]: <00 00>, byteLength: 2 }"}}}`},
+		{in: `{level1: {level2: {level3: {data: new Float32Array([1.5])}}}}`, expected: `{"level1":{"level2":{"level3":{"data":"Float32Array(1) [ 1.5 ]"}}}}`},
+
+		{in: `[1, new Int8Array([2]), "three"]`, expected: `[1,"Int8Array(1) [ 2 ]","three"]`},
+		{in: `[new ArrayBuffer(2), null, new Int16Array([100])]`, expected: `["ArrayBuffer { [Uint8Contents]: <00 00>, byteLength: 2 }",null,"Int16Array(1) [ 100 ]"]`},
+
+		{in: `{users: [{name: "a", scores: new Int32Array([10, 20])}]}`, expected: `{"users":[{"name":"a","scores":"Int32Array(2) [ 10, 20 ]"}]}`},
+		{in: `[[new Int8Array([1])], [new Int8Array([2])]]`, expected: `[["Int8Array(1) [ 1 ]"],["Int8Array(1) [ 2 ]"]]`},
+		{in: `{matrix: [[new Int8Array([1, 2])], [new Int8Array([3, 4])]]}`, expected: `{"matrix":[["Int8Array(2) [ 1, 2 ]"],["Int8Array(2) [ 3, 4 ]"]]}`},
+		{in: `{buffers: {a: new ArrayBuffer(2), b: new ArrayBuffer(4)}}`, expected: `{"buffers":{"a":"ArrayBuffer { [Uint8Contents]: <00 00>, byteLength: 2 }","b":"ArrayBuffer { [Uint8Contents]: <00 00 00 00>, byteLength: 4 }"}}`},
+		{in: `[{arr: new Int8Array([1])}, {arr: new Int8Array([2])}]`, expected: `[{"arr":"Int8Array(1) [ 1 ]"},{"arr":"Int8Array(1) [ 2 ]"}]`},
+		{in: `{data: {nums: [1, 2], typed: new Float64Array([3.14])}}`, expected: `{"data":{"nums":[1,2],"typed":"Float64Array(1) [ 3.14 ]"}}`},
+		{in: `{config: {enabled: true, buffer: new ArrayBuffer(4), name: "test"}}`, expected: `{"config":{"buffer":"ArrayBuffer { [Uint8Contents]: <00 00 00 00>, byteLength: 4 }","enabled":true,"name":"test"}}`},
+		{in: `{items: [{id: 1, data: new Uint8Array([255])}, {id: 2, data: new Uint8Array([128])}]}`, expected: `{"items":[{"data":"Uint8Array(1) [ 255 ]","id":1},{"data":"Uint8Array(1) [ 128 ]","id":2}]}`},
 	}
 
 	for _, tt := range tests {

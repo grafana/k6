@@ -1,7 +1,9 @@
 package js
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"reflect"
 	"strconv"
@@ -110,12 +112,18 @@ func (c console) valueString(v sobek.Value) string {
 	if obj.ClassName() == "Error" {
 		return v.String()
 	}
-	b, err := json.Marshal(c.traverseValue(obj, make(map[*sobek.Object]bool)))
-	if err != nil {
-		return v.String()
+	// check for TypedArray and Array Buffer
+	if isBinaryData(obj) {
+		return formatBinaryData(obj)
 	}
 
-	return string(b)
+	var buf bytes.Buffer
+	encoder := json.NewEncoder(&buf)
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(c.traverseValue(obj, make(map[*sobek.Object]bool))); err != nil {
+		return v.String()
+	}
+	return strings.TrimSuffix(buf.String(), "\n")
 }
 
 // traverseValue recursively traverses a [sobek.Value], tries to convert it
@@ -146,6 +154,15 @@ func (c console) traverseValue(v sobek.Value, seen map[*sobek.Object]bool) any {
 	seen[obj] = true
 	defer delete(seen, obj)
 
+	if obj.ClassName() == "Error" {
+		return v.String()
+	}
+
+	// check for TypedArray and Array Buffer
+	if isBinaryData(obj) {
+		return formatBinaryData(obj)
+	}
+
 	// Handle arrays element-by-element, recursively.
 	if obj.ClassName() == "Array" {
 		length := obj.Get("length").ToInteger()
@@ -168,4 +185,91 @@ func (c console) traverseValue(v sobek.Value, seen map[*sobek.Object]bool) any {
 	}
 
 	return m
+}
+
+// checks for TypedArray and Array Buffer
+func isBinaryData(obj *sobek.Object) bool {
+	exportType := obj.ExportType()
+	if exportType == nil {
+		return false
+	}
+
+	if _, ok := obj.Export().(sobek.ArrayBuffer); ok {
+		return true
+	}
+
+	if exportType.Kind() != reflect.Slice {
+		return false
+	}
+	switch exportType.Elem().Kind() {
+	case reflect.Int8, reflect.Uint8,
+		reflect.Int16, reflect.Uint16,
+		reflect.Int32, reflect.Uint32,
+		reflect.Float32, reflect.Float64,
+		reflect.Int64, reflect.Uint64:
+		return true
+	default:
+		return false
+	}
+}
+
+func formatBinaryData(obj *sobek.Object) string {
+	// ArrayBuffer
+	if ab, ok := obj.Export().(sobek.ArrayBuffer); ok {
+		bytes := ab.Bytes()
+		hexParts := make([]string, len(bytes))
+		for i, b := range bytes {
+			hexParts[i] = fmt.Sprintf("%02x", b)
+		}
+		hexStr := strings.Join(hexParts, " ")
+		return fmt.Sprintf("ArrayBuffer { [Uint8Contents]: <%s>, byteLength: %d }", hexStr, len(bytes))
+	}
+
+	// Typed Array
+	exportType := obj.ExportType()
+	if exportType != nil && exportType.Kind() == reflect.Slice {
+		typeName := typedArrayName(exportType)
+		length := obj.Get("length").ToInteger()
+		if length == 0 {
+			return fmt.Sprintf("%s(0) []", typeName)
+		}
+		values := make([]string, length)
+		for i := int64(0); i < length; i++ {
+			val := obj.Get(strconv.FormatInt(i, 10))
+			values[i] = val.String()
+		}
+		valuesStr := strings.Join(values, ", ")
+		return fmt.Sprintf("%s(%d) [ %s ]", typeName, length, valuesStr)
+	}
+
+	return obj.String()
+}
+
+// Maps Go reflect.Kind -> TypedArray name
+func typedArrayName(exportType reflect.Type) string {
+	// Note: Can't distinguish Uint8ClampedArray this way
+	switch exportType.Elem().Kind() {
+	case reflect.Int8:
+		return "Int8Array"
+	case reflect.Uint8:
+		return "Uint8Array"
+	case reflect.Int16:
+		return "Int16Array"
+	case reflect.Uint16:
+		return "Uint16Array"
+	case reflect.Int32:
+		return "Int32Array"
+	case reflect.Uint32:
+		return "Uint32Array"
+	case reflect.Float32:
+		return "Float32Array"
+	case reflect.Float64:
+		return "Float64Array"
+	case reflect.Int64:
+		return "BigInt64Array"
+	case reflect.Uint64:
+		return "BigUint64Array"
+	default:
+		return "TypedArray"
+	}
 }
