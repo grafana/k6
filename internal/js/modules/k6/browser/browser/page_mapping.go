@@ -965,3 +965,39 @@ func parsePageWaitForRequestOptions(
 
 	return &ropts, nil
 }
+
+func parsePageWaitForEventOptions(
+	ctx context.Context, opts sobek.Value, defaultTimeout time.Duration,
+) (*common.PageWaitForEventOptions, sobek.Callable, error) {
+	ropts := &common.PageWaitForEventOptions{
+		Timeout: defaultTimeout,
+	}
+
+	if k6common.IsNullish(opts) {
+		return ropts, nil, nil
+	}
+
+	if fn, ok := sobek.AssertFunction(opts); ok {
+		return ropts, fn, nil
+	}
+
+	obj := opts.ToObject(k6ext.Runtime(ctx))
+
+	var pred sobek.Callable
+	for _, k := range obj.Keys() {
+		switch k {
+		case "timeout":
+			ropts.Timeout = time.Duration(obj.Get(k).ToInteger()) * time.Millisecond
+		case "predicate":
+			fn, ok := sobek.AssertFunction(obj.Get(k))
+			if !ok {
+				return nil, nil, fmt.Errorf("predicate must be a function")
+			}
+			pred = fn
+		default:
+			return nil, nil, fmt.Errorf("waitForEvent does not support option: '%s'", k)
+		}
+	}
+
+	return ropts, pred, nil
+}
