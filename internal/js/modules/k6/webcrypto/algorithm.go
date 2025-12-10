@@ -191,19 +191,19 @@ func isRegisteredAlgorithm(algorithmName string, forOperation string) bool {
 		// FIXME: the presence of the hash algorithm here is for HMAC support and should be handled separately
 		return isAesAlgorithm(algorithmName) ||
 			isHashAlgorithm(algorithmName) ||
-			algorithmName == HMAC ||
+			isHMACAlgorithm(algorithmName) ||
 			isEllipticCurve(algorithmName) ||
 			isRSAAlgorithm(algorithmName)
 	case OperationIdentifierExportKey, OperationIdentifierImportKey:
 		return isAesAlgorithm(algorithmName) ||
-			algorithmName == HMAC ||
+			isHMACAlgorithm(algorithmName) ||
 			isEllipticCurve(algorithmName) ||
 			isRSAAlgorithm(algorithmName) ||
 			isPBKDF2Algorithm(algorithmName)
 	case OperationIdentifierEncrypt, OperationIdentifierDecrypt:
 		return isAesAlgorithm(algorithmName) || algorithmName == RSAOaep
 	case OperationIdentifierSign, OperationIdentifierVerify:
-		return algorithmName == HMAC || algorithmName == ECDSA || algorithmName == RSAPss || algorithmName == RSASsaPkcs1v15
+		return isHMACAlgorithm(algorithmName) || algorithmName == ECDSA || algorithmName == RSAPss || algorithmName == RSASsaPkcs1v15
 	case OperationIdentifierDeriveBits:
 		return isHashAlgorithm(algorithmName) || isPBKDF2Algorithm(algorithmName) || isECDHAlgorithm(algorithmName)
 	case OperationIdentifierDeriveKey:
