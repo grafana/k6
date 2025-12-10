@@ -632,6 +632,56 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return p.WaitForRequest(val, popts, newRegExMatcher(ctx, vu, tq))
 			}), nil
 		},
+		"waitForEvent": func(event common.PageEventName, opts sobek.Value) (*sobek.Promise, error) {
+			// AVOID using a default case to force handling new event types explicitly
+			// so that the linter can catch unhandled event types as non-exhaustive switch.
+			// Otherwise, we might miss mapping new [PageEvent] types added in the future.
+			// This is for keeping events in sync between waitForEvent and page.on.
+			mapPageEvent := func(vu moduleVU, pe common.PageEvent) (mapping, error) {
+				switch event {
+				case common.PageEventConsole:
+					return mapConsoleMessage(vu, pe), nil
+				case common.PageEventRequest:
+					return mapRequestEvent(vu, pe), nil
+				case common.PageEventResponse:
+					return mapResponseEvent(vu, pe), nil
+				case common.PageEventMetric:
+					// intentionally left blank
+				}
+				return nil, fmt.Errorf("waitForEvent does not support mapping for event: %q", event)
+			}
+
+			popts, fn, err := parsePageWaitForEventOptions(vu.Context(), opts, p.Timeout())
+			if err != nil {
+				return nil, fmt.Errorf("parsing waitForEvent options: %w", err)
+			}
+
+			ctx := vu.Context()
+			tq := vu.get(ctx, p.TargetID())
+
+			return promise(vu, func() (any, error) {
+				rpe, err := p.WaitForEvent(event, popts, func(pe common.PageEvent) (bool, error) {
+					if fn == nil {
+						return true, nil
+					}
+					return queueTask(ctx, tq, func() (bool, error) {
+						m, err := mapPageEvent(vu, pe)
+						if err != nil {
+							return false, err
+						}
+						v, err := fn(sobek.Undefined(), vu.Runtime().ToValue(m))
+						if err != nil {
+							return false, fmt.Errorf("executing waitForEvent predicate: %w", err)
+						}
+						return v.ToBoolean(), nil
+					})()
+				})
+				if err != nil {
+					return nil, fmt.Errorf("waiting for page event %q: %w", event, err)
+				}
+				return mapPageEvent(vu, rpe)
+			}), nil
+		},
 		"workers": func() *sobek.Object {
 			var mws []mapping
 			for _, w := range p.Workers() {
