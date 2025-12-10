@@ -136,16 +136,47 @@ func (e *BaseEventEmitter) emit(event string, data any) {
 		// the read queue until that is again depleted.
 		if len(eh.queue.read) == 0 {
 			eh.queue.writeMutex.Lock()
-			// Clear the read slice before swapping to prevent keeping references
-			eh.queue.read = make([]Event, 0)
+			// Clear all data references in the old read slice to help GC
+			for i := range eh.queue.read {
+				eh.queue.read[i].data = nil
+			}
+			// Use nil instead of make([]Event, 0) to allow GC to reclaim the underlying array
+			eh.queue.read = nil
 			eh.queue.read, eh.queue.write = eh.queue.write, eh.queue.read
+			// Ensure read is a valid slice (not nil) after swap, even if write was empty
+			if eh.queue.read == nil {
+				eh.queue.read = make([]Event, 0)
+			}
+			// If write queue capacity is much larger than length, shrink it to reduce memory
+			if cap(eh.queue.write) > 64 && cap(eh.queue.write) > len(eh.queue.write)*4 {
+				// Reallocate with smaller capacity to allow GC to reclaim memory
+				oldWrite := eh.queue.write
+				eh.queue.write = make([]Event, len(oldWrite), len(oldWrite)*2)
+				copy(eh.queue.write, oldWrite)
+			}
 			eh.queue.writeMutex.Unlock()
+		}
+
+		// If read is still empty after swap, nothing to emit
+		if len(eh.queue.read) == 0 {
+			return
 		}
 
 		select {
 		case eh.ch <- eh.queue.read[0]:
+			// Explicitly clear data reference to help GC before removing from slice
+			eh.queue.read[0].data = nil
 			eh.queue.read[0] = Event{}
 			eh.queue.read = eh.queue.read[1:]
+			// Shrink read slice capacity if it's much larger than length to reduce memory
+			if len(eh.queue.read) == 0 && cap(eh.queue.read) > 64 {
+				eh.queue.read = nil
+			} else if cap(eh.queue.read) > 64 && cap(eh.queue.read) > len(eh.queue.read)*4 {
+				// Reallocate with smaller capacity
+				oldRead := eh.queue.read
+				eh.queue.read = make([]Event, len(oldRead), len(oldRead)*2)
+				copy(eh.queue.read, oldRead)
+			}
 		case <-eh.ctx.Done():
 			// TODO: handle the error
 		}
