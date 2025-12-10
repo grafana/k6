@@ -57,7 +57,7 @@ func getInternalJSModules() map[string]interface{} {
 		"k6/experimental/redis": newWarnExperimentalModule(redis.New(),
 			"k6/experimental/redis has been deprecated and will be removed in future versions."+
 				" Please migrate to the new version by changing your import to 'k6/x/redis'."+
-				" Read more here: https://grafana.com/docs/k6/latest/javascript-api/k6-x/redis"),
+				" Read more here: https://grafana.com/docs/k6/latest/javascript-api/k6-x-redis"),
 
 		// Removed modules
 		"k6/experimental/browser": newRemovedModule(
@@ -118,7 +118,6 @@ func newWarnExperimentalModule(base modules.Module, msg string) modules.Module {
 	return &warnExperimentalModule{
 		msg:  msg,
 		base: base,
-		once: sync.Once{},
 	}
 }
 
