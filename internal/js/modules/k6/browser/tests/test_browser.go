@@ -271,6 +271,18 @@ func (tb *testBrowser) withIFrameURL(iframeURL string, iframeID string) {
 	})
 }
 
+// newPageWithIFrameSrcdoc creates a new page with an inline iframe using srcdoc.
+func (b *testBrowser) newPageWithIFrameSrcdoc(iframeContent string) *common.Page {
+	b.t.Helper()
+
+	p := b.NewPage(nil)
+	html := fmt.Sprintf(`<iframe srcdoc='%s'></iframe>`, iframeContent)
+	err := p.SetContent(html, nil)
+	require.NoError(b.t, err)
+
+	return p
+}
+
 // withLogCache enables the log cache.
 //
 // example:

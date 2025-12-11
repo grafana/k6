@@ -1181,21 +1181,17 @@ func TestFrameLocatorLocatorOptions(t *testing.T) {
 		t.Helper()
 
 		tb := newTestBrowser(t)
-		p := tb.NewPage(nil)
-		err := p.SetContent(`
-			<iframe srcdoc='
-				<section>
-					<div>
-						<span>hello</span>
-					</div>
-					<div>
-						<span>world</span>
-					</div>
-				</section>
-			'></iframe>`,
-			nil,
-		)
-		require.NoError(t, err)
+		iframeContent := `
+			<section>
+				<div>
+					<span>hello</span>
+				</div>
+				<div>
+					<span>world</span>
+				</div>
+			</section>
+		`
+		p := tb.newPageWithIFrameSrcdoc(iframeContent)
 		return p.Locator("iframe", nil).ContentFrame()
 	}
 	t.Run("nil_options", func(t *testing.T) {
