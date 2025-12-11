@@ -243,6 +243,7 @@ func (p *devToolsURLParser) scan() bool {
 	const urlPrefix = "DevTools listening on "
 
 	line := p.sc.Text()
+	fmt.Println(line)
 	if strings.HasPrefix(line, urlPrefix) {
 		p.url = strings.TrimPrefix(strings.TrimSpace(line), urlPrefix)
 	}
