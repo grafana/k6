@@ -688,10 +688,11 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageEventName, sobek.Cal
 			mapp func(vu moduleVU, event common.PageEvent) mapping
 			wait bool // Whether to wait for the handler to complete.
 		}{
-			common.PageEventConsole:  {mapp: mapConsoleMessage},
-			common.PageEventMetric:   {mapp: mapMetricEvent, wait: true},
-			common.PageEventRequest:  {mapp: mapRequestEvent},
-			common.PageEventResponse: {mapp: mapResponseEvent},
+			common.PageEventConsole:         {mapp: mapConsoleMessage},
+			common.PageEventMetric:          {mapp: mapMetricEvent, wait: true},
+			common.PageEventRequest:         {mapp: mapRequestEvent},
+			common.PageEventResponse:        {mapp: mapResponseEvent},
+			common.PageEventRequestFinished: {mapp: mapRequestEvent},
 		}
 		pageEvent, ok := pageEvents[eventName]
 		if !ok {
