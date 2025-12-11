@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/url"
 	"testing"
 	"time"
 
@@ -222,6 +223,86 @@ func (m *EventInterceptorMock) urlTagName(_ string, _ string) (string, bool) {
 func (m *EventInterceptorMock) onRequest(_ *Request) {}
 
 func (m *EventInterceptorMock) onResponse(_ *Response) {}
+
+func (m *EventInterceptorMock) onRequestFailed(_ *Request) {}
+
+// TrackingEventInterceptorMock tracks calls to event interceptor methods for testing.
+type TrackingEventInterceptorMock struct {
+	RequestFailedCalled  bool
+	RequestFailedRequest *Request
+}
+
+func (m *TrackingEventInterceptorMock) urlTagName(_ string, _ string) (string, bool) {
+	return "", false
+}
+
+func (m *TrackingEventInterceptorMock) onRequest(_ *Request) {}
+
+func (m *TrackingEventInterceptorMock) onResponse(_ *Response) {}
+
+func (m *TrackingEventInterceptorMock) onRequestFailed(req *Request) {
+	m.RequestFailedCalled = true
+	m.RequestFailedRequest = req
+}
+
+func TestOnLoadingFailedCallsEventInterceptor(t *testing.T) {
+	t.Parallel()
+
+	createTestRequest := func(reqID network.RequestID) *Request {
+		u, _ := url.Parse("http://test.example.com/path")
+		return &Request{
+			requestID: reqID,
+			url:       u,
+			timestamp: time.Now(),
+		}
+	}
+
+	t.Run("calls onRequestFailed with correct request and error text", func(t *testing.T) {
+		t.Parallel()
+
+		nm, _ := newTestNetworkManager(t, k6lib.Options{})
+		interceptor := &TrackingEventInterceptorMock{}
+		nm.eventInterceptor = interceptor
+
+		reqID := network.RequestID("test-request-123")
+		req := createTestRequest(reqID)
+		nm.reqIDToRequest[reqID] = req
+
+		now := time.Now()
+		event := &network.EventLoadingFailed{
+			RequestID: reqID,
+			Timestamp: (*cdp.MonotonicTime)(&now),
+			ErrorText: "net::ERR_NAME_NOT_RESOLVED",
+			Canceled:  false,
+		}
+
+		nm.onLoadingFailed(event)
+
+		assert.True(t, interceptor.RequestFailedCalled)
+		assert.Equal(t, req, interceptor.RequestFailedRequest)
+		assert.Equal(t, "net::ERR_NAME_NOT_RESOLVED", interceptor.RequestFailedRequest.errorText)
+	})
+
+	t.Run("does not call onRequestFailed when request not found", func(t *testing.T) {
+		t.Parallel()
+
+		nm, _ := newTestNetworkManager(t, k6lib.Options{})
+		interceptor := &TrackingEventInterceptorMock{}
+		nm.eventInterceptor = interceptor
+
+		now := time.Now()
+		event := &network.EventLoadingFailed{
+			RequestID: network.RequestID("non-existent-request"),
+			Timestamp: (*cdp.MonotonicTime)(&now),
+			ErrorText: "net::ERR_CONNECTION_REFUSED",
+			Canceled:  false,
+		}
+
+		nm.onLoadingFailed(event)
+
+		assert.False(t, interceptor.RequestFailedCalled)
+	})
+}
 
 func TestNetworkManagerEmitRequestResponseMetricsTimingSkew(t *testing.T) {
 	t.Parallel()
