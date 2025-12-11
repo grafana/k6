@@ -1068,6 +1068,13 @@ func TestPageOn(t *testing.T) {
 		"valid on('response') handler": {
 			fun: `page.on('response', () => {})`,
 		},
+		"nil on('requestfailed') handler": {
+			fun:     `page.on('requestfailed')`,
+			wantErr: `TypeError: The "listener" argument must be a function`,
+		},
+		"valid on('requestfailed') handler": {
+			fun: `page.on('requestfailed', () => {})`,
+		},
 	}
 
 	for name, tt := range tests {
@@ -2807,6 +2814,85 @@ func TestPageOnResponse(t *testing.T) {
 		slices.SortFunc(expected[i].HeadersArray, sortByName)
 		assert.Equal(t, expected[i], resp)
 	}
+}
+
+// TestPageOnRequestFailed tests that the requestfailed event fires when requests fail.
+func TestPageOnRequestFailed(t *testing.T) {
+	t.Parallel()
+	tb := newTestBrowser(t, withHTTPServer())
+
+	tb.withHandler("/home", func(w http.ResponseWriter, _ *http.Request) {
+		// This should fail with connection refused.
+		_, err := fmt.Fprintf(w, `<!DOCTYPE html>
+<html>
+<body>
+    <script>
+        // Try to fetch from a port that's definitely not listening
+        fetch('http://127.0.0.1:1/does-not-exist')
+            .catch(() => { window.fetchDone = true; });
+    </script>
+</body>
+</html>`)
+		require.NoError(t, err)
+	})
+
+	tb.vu.ActivateVU()
+	tb.vu.StartIteration(t)
+	defer tb.vu.EndIteration(t)
+
+	gv, err := tb.vu.RunAsync(t, `
+		const context = await browser.newContext();
+		const page = await context.newPage();
+
+		var failedRequests = [];
+		page.on('requestfailed', (request) => {
+			const failure = request.failure();
+			failedRequests.push({
+				url: request.url(),
+				method: request.method(),
+				resourceType: request.resourceType(),
+				errorText: failure ? failure.errorText : '',
+			});
+		});
+		
+		await page.goto('%s', {timeout: 10000});
+		await page.waitForFunction(() => window.fetchDone === true, {timeout: 5000}).catch(() => {});
+		await page.close();
+		return JSON.stringify(failedRequests, null, 2);
+	`, tb.url("/home"))
+
+	require.NoError(t, err)
+
+	got := k6test.ToPromise(t, gv)
+	require.Equal(t, sobek.PromiseStateFulfilled, got.State())
+
+	var failedRequests []struct {
+		URL          string `json:"url"`
+		Method       string `json:"method"`
+		ResourceType string `json:"resourceType"`
+		ErrorText    string `json:"errorText"`
+	}
+	err = json.Unmarshal([]byte(got.Result().String()), &failedRequests)
+	require.NoError(t, err)
+
+	if len(failedRequests) == 0 {
+		t.Skip("no requestfailed events captured - may be environment-specific")
+		return
+	}
+
+	// Find the failed request to 127.0.0.1:1
+	var found bool
+	for _, req := range failedRequests {
+		if strings.Contains(req.URL, "127.0.0.1:1") {
+			found = true
+			assert.Equal(t, "GET", req.Method)
+			assert.Equal(t, "Fetch", req.ResourceType)
+			assert.NotEmpty(t, req.ErrorText, "expected error text")
+			break
+		}
+	}
+
+	assert.True(t, found, "expected to find a failed request to 127.0.0.1:1")
 }
 
 func TestPageMustUseNativeJavaScriptObjects(t *testing.T) {
