@@ -3895,3 +3895,95 @@ func TestPageUnrouteAll(t *testing.T) {
 	assert.Equal(t, 0, route1Calls, "First route should be removed")
 	assert.Equal(t, 0, route2Calls, "Second route should be removed")
 }
+
+func TestPageGoBackForward(t *testing.T) {
+	t.Parallel()
+
+	t.Run("go_back_and_forward", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withFileServer())
+		p := tb.NewPage(nil)
+
+		// Navigate to first page
+		url1 := tb.staticURL("empty.html")
+		opts := &common.FrameGotoOptions{Timeout: common.DefaultTimeout}
+		_, err := p.Goto(url1, opts)
+		require.NoError(t, err)
+		currentURL, err := p.URL()
+		require.NoError(t, err)
+		require.Equal(t, url1, currentURL)
+
+		// Navigate to second page
+		url2 := tb.staticURL("link.html")
+		_, err = p.Goto(url2, opts)
+		require.NoError(t, err)
+		currentURL, err = p.URL()
+		require.NoError(t, err)
+		require.Equal(t, url2, currentURL)
+
+		// Go back to first page
+		backOpts := common.NewPageGoBackForwardOptions(common.LifecycleEventLoad, common.DefaultTimeout)
+		_, err = p.GoBack(backOpts)
+		require.NoError(t, err)
+		currentURL, err = p.URL()
+		require.NoError(t, err)
+		assert.Equal(t, url1, currentURL, "expected to be back on first page")
+
+		// Go forward to second page
+		forwardOpts := common.NewPageGoBackForwardOptions(common.LifecycleEventLoad, common.DefaultTimeout)
+		_, err = p.GoForward(forwardOpts)
+		require.NoError(t, err)
+		currentURL, err = p.URL()
+		require.NoError(t, err)
+		assert.Equal(t, url2, currentURL, "expected to be forward on second page")
+	})
+
+	t.Run("go_back_to_about_blank", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withFileServer())
+		p := tb.NewPage(nil)
+
+		// Navigate to first page
+		url1 := tb.staticURL("empty.html")
+		opts := &common.FrameGotoOptions{Timeout: common.DefaultTimeout}
+		_, err := p.Goto(url1, opts)
+		require.NoError(t, err)
+
+		// Go back to about:blank
+		backOpts := common.NewPageGoBackForwardOptions(common.LifecycleEventLoad, common.DefaultTimeout)
+		_, err = p.GoBack(backOpts)
+		require.NoError(t, err)
+		currentURL, err := p.URL()
+		require.NoError(t, err)
+		assert.Equal(t, common.BlankPage, currentURL, "expected to be back on about:blank")
+
+		// Now try to go back again
+		resp, err := p.GoBack(backOpts)
+		require.NoError(t, err)
+		assert.Nil(t, resp, "expected nil response when can't go back")
+	})
+
+	t.Run("go_forward_returns_nil_at_boundary", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withFileServer())
+		p := tb.NewPage(nil)
+
+		// Navigate to first page
+		url1 := tb.staticURL("empty.html")
+		opts := &common.FrameGotoOptions{Timeout: common.DefaultTimeout}
+		_, err := p.Goto(url1, opts)
+		require.NoError(t, err)
+
+		// Try to go forward
+		forwardOpts := common.NewPageGoBackForwardOptions(common.LifecycleEventLoad, common.DefaultTimeout)
+		resp, err := p.GoForward(forwardOpts)
+		require.NoError(t, err)
+		assert.Nil(t, resp, "expected nil response when can't go forward")
+		currentURL, err := p.URL()
+		require.NoError(t, err)
+		assert.Equal(t, url1, currentURL, "URL should not change when can't go forward")
+	})
+}

@@ -33,6 +33,10 @@ type PageScreenshotOptions struct {
 	Quality        int64          `json:"quality"`
 }
 
+// PageGoBackForwardOptions is an alias for PageReloadOptions
+// since both have identical fields (WaitUntil, Timeout).
+type PageGoBackForwardOptions = PageReloadOptions
+
 func NewPageEmulateMediaOptions(from *Page) *PageEmulateMediaOptions {
 	return &PageEmulateMediaOptions{
 		ColorScheme:   from.colorScheme,
@@ -65,6 +69,13 @@ func NewPageReloadOptions(defaultWaitUntil LifecycleEvent, defaultTimeout time.D
 		WaitUntil: defaultWaitUntil,
 		Timeout:   defaultTimeout,
 	}
+}
+
+func NewPageGoBackForwardOptions(
+	defaultWaitUntil LifecycleEvent,
+	defaultTimeout time.Duration,
+) *PageGoBackForwardOptions {
+	return NewPageReloadOptions(defaultWaitUntil, defaultTimeout)
 }
 
 // Parse parses the page reload options.

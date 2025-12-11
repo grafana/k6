@@ -378,6 +378,38 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return mapResponse(vu, resp), nil
 			}), nil
 		},
+		"goBack": func(opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewPageGoBackForwardOptions(common.LifecycleEventLoad, p.NavigationTimeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing goBack options: %w", err)
+			}
+			return promise(vu, func() (any, error) {
+				resp, err := p.GoBack(popts)
+				if err != nil {
+					return nil, err //nolint:wrapcheck
+				}
+				if resp == nil {
+					return nil, nil //nolint:nilnil
+				}
+				return mapResponse(vu, resp), nil
+			}), nil
+		},
+		"goForward": func(opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewPageGoBackForwardOptions(common.LifecycleEventLoad, p.NavigationTimeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing goForward options: %w", err)
+			}
+			return promise(vu, func() (any, error) {
+				resp, err := p.GoForward(popts)
+				if err != nil {
+					return nil, err //nolint:wrapcheck
+				}
+				if resp == nil {
+					return nil, nil //nolint:nilnil
+				}
+				return mapResponse(vu, resp), nil
+			}), nil
+		},
 		"route": mapPageRoute(vu, p),
 		"screenshot": func(opts sobek.Value) (*sobek.Promise, error) {
 			popts := common.NewPageScreenshotOptions()
