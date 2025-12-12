@@ -382,7 +382,7 @@ type pageAPI interface { //nolint:interfacebloat
 	WaitForSelector(selector string, opts sobek.Value) (*common.ElementHandle, error)
 	WaitForTimeout(timeout int64)
 	WaitForURL(url string, opts sobek.Value) (*sobek.Promise, error)
-	WaitForEvent(event string, opts sobek.Value) (*sobek.Promise, error)
+	WaitForEvent(event common.PageEventName, opts sobek.Value) (*sobek.Promise, error)
 	WaitForResponse(url string, opts sobek.Value) (*sobek.Promise, error)
 	WaitForRequest(url string, opts sobek.Value) (*sobek.Promise, error)
 	Workers() []*common.Worker
