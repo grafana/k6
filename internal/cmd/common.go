@@ -67,6 +67,7 @@ func getNullString(flags *pflag.FlagSet, key string) null.String {
 	return null.NewString(v, flags.Changed(key))
 }
 
+//nolint:unparam // this is only currently used with 1 as its first argument
 func exactArgsWithMsg(n int, msg string) cobra.PositionalArgs {
 	return func(_ *cobra.Command, args []string) error {
 		if len(args) != n {

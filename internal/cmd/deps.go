@@ -17,9 +17,11 @@ func getCmdDeps(gs *state.GlobalState) *cobra.Command {
 	depsCmd := &cobra.Command{
 		Use:   "deps",
 		Short: "Resolve and list the dependencies of a test",
-		Long: `deps command provides users a clear overview of all dependencies needed for running a script. By analyzing imports (excluding `require` calls), the command ensures to accurately evaluate project's dependencies.` +
-			` Additionally, it tells whether a custom build is required to run the script.`,
-		Args: cobra.ExactArgs(1),
+		Long: "deps command provides users a clear overview of all dependencies needed for running a script. " +
+			"By analyzing imports (excluding `require` calls), the command resolves and lists the test's dependencies." +
+			" Additionally, it tells whether a custom build is required to run the script.",
+		Args:    exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
+		Example: getExampleText(gs, `  {{.}} deps script.js`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			test, err := loadLocalTestWithoutRunner(gs, cmd, args)
 			if err != nil {
