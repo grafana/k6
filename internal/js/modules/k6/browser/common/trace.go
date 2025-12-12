@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"fmt"
 
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
@@ -58,10 +59,17 @@ func TraceEvent(
 	return ctx, browsertrace.NoopSpan{}
 }
 
-// spanRecordError will set the status of the span to error and record the
-// error on the span. Check the documentation for trace.SetStatus and
-// trace.RecordError for more details.
-func spanRecordError(span trace.Span, err error) {
+// spanRecordErrorf creates a formatted error, sets the status of the span
+// to the error and records the error on the span. It then returns the
+// created error for convenience to avoid boilerplate code.
+func spanRecordErrorf(span trace.Span, format string, a ...any) error {
+	return spanRecordError(span, fmt.Errorf(format, a...))
+}
+
+// spanRecordError is like [spanRecordErrorf] but takes an error
+// value directly instead of creating a new error value.
+func spanRecordError(span trace.Span, err error) error {
 	span.SetStatus(codes.Error, err.Error())
 	span.RecordError(err)
+	return err
 }

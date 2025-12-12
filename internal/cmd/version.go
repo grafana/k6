@@ -150,6 +150,8 @@ func versionDetailsWithExtensions(exts []*ext.Extension) (map[string]any, error)
 			info.Imports = append(info.Imports, e.Name)
 		case ext.SecretSourceExtension:
 			// currently, no special handling is needed for secret source extensions
+		case ext.SubcommandExtension:
+			// currently, no special handling is needed for subcommand extensions
 		default:
 			// report unhandled extension type for future proofing
 			return details, fmt.Errorf("unhandled extension type: %s", e.Type)
