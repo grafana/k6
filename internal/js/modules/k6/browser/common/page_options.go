@@ -35,7 +35,7 @@ type PageScreenshotOptions struct {
 
 // PageGoBackForwardOptions are options for Page.GoBack and Page.GoForward.
 type PageGoBackForwardOptions struct {
-	WaitUntil LifecycleEvent `json:"waitUntil" js:"waitUntil"`
+	WaitUntil LifecycleEvent `json:"waitUntil"`
 	Timeout   time.Duration  `json:"timeout"`
 }
 
@@ -86,23 +86,25 @@ func NewPageGoBackForwardOptions(
 
 // Parse parses the page go back/forward options.
 func (o *PageGoBackForwardOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	rt := k6ext.Runtime(ctx)
-	if !common.IsNullish(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			switch k {
-			case "waitUntil":
-				lifeCycle := opts.Get(k).String()
-				if l, ok := lifecycleEventToID[lifeCycle]; ok {
-					o.WaitUntil = l
-				} else {
-					return fmt.Errorf("%q is not a valid lifecycle", lifeCycle)
-				}
-			case "timeout":
-				o.Timeout = time.Duration(opts.Get(k).ToInteger()) * time.Millisecond
+	if common.IsNullish(opts) {
+		return nil
+	}
+
+	obj := opts.ToObject(k6ext.Runtime(ctx))
+	for _, k := range obj.Keys() {
+		switch k {
+		case "waitUntil":
+			lifeCycle := obj.Get(k).String()
+			if l, ok := lifecycleEventToID[lifeCycle]; ok {
+				o.WaitUntil = l
+			} else {
+				return fmt.Errorf("%q is not a valid lifecycle", lifeCycle)
 			}
+		case "timeout":
+			o.Timeout = time.Duration(obj.Get(k).ToInteger()) * time.Millisecond
 		}
 	}
+
 	return nil
 }
 
