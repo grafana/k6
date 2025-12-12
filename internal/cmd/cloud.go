@@ -19,6 +19,7 @@ import (
 	"go.k6.io/k6/internal/build"
 	"go.k6.io/k6/internal/ui/pb"
 	"go.k6.io/k6/lib"
+	"gopkg.in/guregu/null.v3"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -172,6 +173,12 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 		logger, cloudConfig.Token.String, cloudConfig.Host.String, build.Version, cloudConfig.Timeout.TimeDuration())
 	if err = client.ValidateOptions(arc.Options); err != nil {
 		return err
+	}
+
+	if cloudConfig.ProjectID.Int64 == 0 {
+		if err := resolveAndSetProjectID(c.gs, &cloudConfig, tmpCloudConfig, arc); err != nil {
+			return err
+		}
 	}
 
 	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Uploading archive"))
@@ -405,6 +412,36 @@ service. Be sure to run the "k6 cloud login" command prior to authenticate with 
 	cloudCmd.Flags().AddFlagSet(c.flagSet())
 
 	return cloudCmd
+}
+
+func resolveAndSetProjectID(
+	gs *state.GlobalState,
+	cloudConfig *cloudapi.Config,
+	tmpCloudConfig map[string]interface{},
+	arc *lib.Archive,
+) error {
+	projectID, err := resolveDefaultProjectID(gs, cloudConfig)
+	if err != nil {
+		return err
+	}
+	if projectID > 0 {
+		tmpCloudConfig["projectID"] = projectID
+
+		b, err := json.Marshal(tmpCloudConfig)
+		if err != nil {
+			return err
+		}
+
+		arc.Options.Cloud = b
+		arc.Options.External[cloudapi.LegacyCloudConfigKey] = b
+
+		cloudConfig.ProjectID = null.IntFrom(projectID)
+	}
+	if projectID == 0 && (!cloudConfig.StackID.Valid || cloudConfig.StackID.Int64 == 0) {
+		gs.Logger.Warn("Warning: no projectID or default stack specified. Falling back to the first available stack.")
+		gs.Logger.Warn("Consider setting a default stack via the `k6 cloud login` command.")
+	}
+	return nil
 }
 
 func exactCloudArgs() cobra.PositionalArgs {
