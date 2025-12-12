@@ -1490,6 +1490,148 @@ func (p *Page) Reload(opts *PageReloadOptions) (_ *Response, rerr error) { //nol
 	return resp, nil
 }
 
+// GoBack navigates to the previous page in history.
+func (p *Page) GoBack(opts *PageGoBackForwardOptions) (_ *Response, rerr error) {
+	p.logger.Debugf("Page:GoBack", "sid:%v", p.sessionID())
+	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.goBack")
+	defer span.End()
+	defer func() {
+		if rerr != nil {
+			rerr = spanRecordErrorf(span, "page going back: %w", rerr)
+		}
+	}()
+
+	currentIndex, entries, err := page.GetNavigationHistory().Do(cdp.WithExecutor(p.ctx, p.session))
+	if err != nil {
+		return nil, err
+	}
+
+	if currentIndex == 0 {
+		return nil, nil //nolint:nilnil
+	}
+
+	targetIndex := currentIndex - 1
+	historyEntryID := entries[targetIndex].ID
+	targetURL := entries[targetIndex].URL
+
+	timeoutCtx, timeoutCancelFn := context.WithTimeout(p.ctx, opts.Timeout)
+	defer timeoutCancelFn()
+
+	navAction := page.NavigateToHistoryEntry(historyEntryID)
+	if err := navAction.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
+		return nil, fmt.Errorf("navigating to history entry %d: %w", historyEntryID, err)
+	}
+
+	wrapTimeoutError := func(err error) error {
+		if errors.Is(err, context.DeadlineExceeded) {
+			err = &k6ext.UserFriendlyError{
+				Err:     err,
+				Timeout: opts.Timeout,
+			}
+		}
+		p.logger.Debugf("Page:GoBack", "timeoutCtx done: %v", err)
+		return fmt.Errorf("navigating back to history entry %d: %w", historyEntryID, err)
+	}
+
+	// Poll for URL change, don't rely on lifecycle events since bfcache
+	// restorations don't re-fire them.
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-p.ctx.Done():
+			return nil, p.ctx.Err()
+		case <-timeoutCtx.Done():
+			return nil, wrapTimeoutError(timeoutCtx.Err())
+		case <-ticker.C:
+			mainFrame := p.frameManager.MainFrame()
+			if mainFrame == nil {
+				continue
+			}
+			currentURL := mainFrame.URL()
+			p.logger.Debugf("Page:GoBack", "polling: currentURL=%s targetURL=%s", currentURL, targetURL)
+
+			if currentURL == targetURL {
+				p.logger.Debugf("Page:GoBack", "navigation complete to %s", targetURL)
+				applySlowMo(p.ctx)
+				return nil, nil //nolint:nilnil
+			}
+		}
+	}
+}
+
+// GoForward navigates to the next page in history.
+func (p *Page) GoForward(opts *PageGoBackForwardOptions) (_ *Response, rerr error) {
+	p.logger.Debugf("Page:GoForward", "sid:%v", p.sessionID())
+	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.goForward")
+	defer span.End()
+	defer func() {
+		if rerr != nil {
+			rerr = spanRecordErrorf(span, "page going forward: %w", rerr)
+		}
+	}()
+
+	currentIndex, entries, err := page.GetNavigationHistory().Do(cdp.WithExecutor(p.ctx, p.session))
+	if err != nil {
+		return nil, err
+	}
+
+	if currentIndex >= int64(len(entries))-1 {
+		return nil, nil //nolint:nilnil
+	}
+
+	targetIndex := currentIndex + 1
+	historyEntryID := entries[targetIndex].ID
+	targetURL := entries[targetIndex].URL
+
+	timeoutCtx, timeoutCancelFn := context.WithTimeout(p.ctx, opts.Timeout)
+	defer timeoutCancelFn()
+
+	navAction := page.NavigateToHistoryEntry(historyEntryID)
+	if err := navAction.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
+		return nil, fmt.Errorf("navigating to history entry %d: %w", historyEntryID, err)
+	}
+
+	wrapTimeoutError := func(err error) error {
+		if errors.Is(err, context.DeadlineExceeded) {
+			err = &k6ext.UserFriendlyError{
+				Err:     err,
+				Timeout: opts.Timeout,
+			}
+		}
+		p.logger.Debugf("Page:GoForward", "timeoutCtx done: %v", err)
+		return fmt.Errorf("navigating forward to history entry %d: %w", historyEntryID, err)
+	}
+
+	// Poll for URL change, don't rely on lifecycle events since bfcache
+	// restorations don't re-fire them.
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-p.ctx.Done():
+			return nil, p.ctx.Err()
+		case <-timeoutCtx.Done():
+			return nil, wrapTimeoutError(timeoutCtx.Err())
+		case <-ticker.C:
+			mainFrame := p.frameManager.MainFrame()
+			if mainFrame == nil {
+				continue
+			}
+			currentURL := mainFrame.URL()
+			p.logger.Debugf("Page:GoForward", "polling: currentURL=%s targetURL=%s", currentURL, targetURL)
+
+			if currentURL == targetURL {
+				p.logger.Debugf("Page:GoForward", "navigation complete to %s", targetURL)
+				applySlowMo(p.ctx)
+				return nil, nil //nolint:nilnil
+			}
+		}
+	}
+}
+
 // Screenshot will instruct Chrome to save a screenshot of the current page and save it to specified file.
 func (p *Page) Screenshot(opts *PageScreenshotOptions, sp ScreenshotPersister) ([]byte, error) {
 	spanCtx, span := TraceAPICall(p.ctx, p.targetID.String(), "page.screenshot")
