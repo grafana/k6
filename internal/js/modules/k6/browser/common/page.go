@@ -1491,57 +1491,35 @@ func (p *Page) Reload(opts *PageReloadOptions) (_ *Response, rerr error) { //nol
 }
 
 // GoBack navigates to the previous page in history.
-func (p *Page) GoBack(opts *PageGoBackForwardOptions) (_ *Response, rerr error) { //nolint:funlen
+func (p *Page) GoBack(opts *PageGoBackForwardOptions) (_ *Response, rerr error) {
 	p.logger.Debugf("Page:GoBack", "sid:%v", p.sessionID())
 	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.goBack")
 	defer span.End()
 	defer func() {
 		if rerr != nil {
-			rerr = spanRecordErrorf(span, "going back: %w", rerr)
+			rerr = spanRecordErrorf(span, "page going back: %w", rerr)
 		}
 	}()
 
-	// Get Navigation History
-	currentIndex, entries, histErr := page.GetNavigationHistory().Do(cdp.WithExecutor(p.ctx, p.session))
-	if histErr != nil {
-		return nil, histErr
+	currentIndex, entries, err := page.GetNavigationHistory().Do(cdp.WithExecutor(p.ctx, p.session))
+	if err != nil {
+		return nil, err
 	}
 
-	// check if we can goBack
 	if currentIndex == 0 {
 		return nil, nil //nolint:nilnil
 	}
 
+	targetIndex := currentIndex - 1
+	historyEntryID := entries[targetIndex].ID
+	targetURL := entries[targetIndex].URL
+
 	timeoutCtx, timeoutCancelFn := context.WithTimeout(p.ctx, opts.Timeout)
 	defer timeoutCancelFn()
 
-	waitForFrameNavigation, cancelWaitingForFrameNavigation := createWaitForEventHandler(
-		timeoutCtx, p.frameManager.MainFrame(),
-		[]string{EventFrameNavigation},
-		func(_ any) bool {
-			return true
-		},
-	)
-	defer cancelWaitingForFrameNavigation()
-
-	waitForLifecycleEvent, cancelWaitingForLifecycleEvent := createWaitForEventPredicateHandler(
-		timeoutCtx, p.frameManager.MainFrame(),
-		[]string{EventFrameAddLifecycle},
-		func(data any) bool {
-			if le, ok := data.(FrameLifecycleEvent); ok {
-				return le.Event == opts.WaitUntil
-			}
-			return false
-		})
-	defer cancelWaitingForLifecycleEvent()
-
-	// calculate targetIndex and corresponding entryID
-	targetIndex := currentIndex - 1
-	targetEntryID := entries[targetIndex].ID
-
-	navAction := page.NavigateToHistoryEntry(targetEntryID)
+	navAction := page.NavigateToHistoryEntry(historyEntryID)
 	if err := navAction.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("navigating to history entry %d: %w", historyEntryID, err)
 	}
 
 	wrapTimeoutError := func(err error) error {
@@ -1550,105 +1528,69 @@ func (p *Page) GoBack(opts *PageGoBackForwardOptions) (_ *Response, rerr error) 
 				Err:     err,
 				Timeout: opts.Timeout,
 			}
-			return err
 		}
 		p.logger.Debugf("Page:GoBack", "timeoutCtx done: %v", err)
-		return err
+		return fmt.Errorf("navigating back to history entry %d: %w", historyEntryID, err)
 	}
 
-	var (
-		navigationEvent *NavigationEvent
-		err             error
-	)
-	select {
-	case <-p.ctx.Done():
-		err = p.ctx.Err()
-	case <-timeoutCtx.Done():
-		err = wrapTimeoutError(timeoutCtx.Err())
-	case event := <-waitForFrameNavigation:
-		var ok bool
-		if navigationEvent, ok = event.(*NavigationEvent); !ok {
-			err = fmt.Errorf("unexpected event data type: %T, expected *NavigationEvent", event)
-		} else if navigationEvent != nil && navigationEvent.err != nil {
-			err = navigationEvent.err
+	// Poll for URL change, don't rely on lifecycle events since bfcache
+	// restorations don't re-fire them.
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-p.ctx.Done():
+			return nil, p.ctx.Err()
+		case <-timeoutCtx.Done():
+			return nil, wrapTimeoutError(timeoutCtx.Err())
+		case <-ticker.C:
+			mainFrame := p.frameManager.MainFrame()
+			if mainFrame == nil {
+				continue
+			}
+			currentURL := mainFrame.URL()
+			p.logger.Debugf("Page:GoBack", "polling: currentURL=%s targetURL=%s", currentURL, targetURL)
+
+			if currentURL == targetURL {
+				p.logger.Debugf("Page:GoBack", "navigation complete to %s", targetURL)
+				applySlowMo(p.ctx)
+				return nil, nil //nolint:nilnil
+			}
 		}
 	}
-	if err != nil {
-		return nil, err
-	}
-
-	var resp *Response
-	newDocument := navigationEvent.newDocument
-	if newDocument != nil && newDocument.request != nil {
-		req := newDocument.request
-		req.responseMu.RLock()
-		resp = req.response
-		req.responseMu.RUnlock()
-	}
-
-	select {
-	case <-waitForLifecycleEvent:
-	case <-timeoutCtx.Done():
-		return nil, wrapTimeoutError(timeoutCtx.Err())
-	}
-
-	applySlowMo(p.ctx)
-
-	return resp, nil
 }
 
 // GoForward navigates to the next page in history.
-func (p *Page) GoForward(opts *PageGoBackForwardOptions) (_ *Response, rerr error) { //nolint:funlen
+func (p *Page) GoForward(opts *PageGoBackForwardOptions) (_ *Response, rerr error) {
 	p.logger.Debugf("Page:GoForward", "sid:%v", p.sessionID())
 	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.goForward")
 	defer span.End()
 	defer func() {
 		if rerr != nil {
-			rerr = spanRecordErrorf(span, "going forward: %w", rerr)
+			rerr = spanRecordErrorf(span, "page going forward: %w", rerr)
 		}
 	}()
 
-	// Get Navigation History
-	currentIndex, entries, histErr := page.GetNavigationHistory().Do(cdp.WithExecutor(p.ctx, p.session))
-	if histErr != nil {
-		return nil, histErr
+	currentIndex, entries, err := page.GetNavigationHistory().Do(cdp.WithExecutor(p.ctx, p.session))
+	if err != nil {
+		return nil, err
 	}
 
-	// check if we can GoForward
 	if currentIndex >= int64(len(entries))-1 {
 		return nil, nil //nolint:nilnil
 	}
 
+	targetIndex := currentIndex + 1
+	historyEntryID := entries[targetIndex].ID
+	targetURL := entries[targetIndex].URL
+
 	timeoutCtx, timeoutCancelFn := context.WithTimeout(p.ctx, opts.Timeout)
 	defer timeoutCancelFn()
 
-	waitForFrameNavigation, cancelWaitingForFrameNavigation := createWaitForEventHandler(
-		timeoutCtx, p.frameManager.MainFrame(),
-		[]string{EventFrameNavigation},
-		func(_ any) bool {
-			return true // Both successful and failed navigations are considered
-		},
-	)
-	defer cancelWaitingForFrameNavigation()
-
-	waitForLifecycleEvent, cancelWaitingForLifecycleEvent := createWaitForEventPredicateHandler(
-		timeoutCtx, p.frameManager.MainFrame(),
-		[]string{EventFrameAddLifecycle},
-		func(data any) bool {
-			if le, ok := data.(FrameLifecycleEvent); ok {
-				return le.Event == opts.WaitUntil
-			}
-			return false
-		})
-	defer cancelWaitingForLifecycleEvent()
-
-	// calculate targetIndex and corresponding entryID
-	targetIndex := currentIndex + 1
-	targetEntryID := entries[targetIndex].ID
-
-	navAction := page.NavigateToHistoryEntry(targetEntryID)
+	navAction := page.NavigateToHistoryEntry(historyEntryID)
 	if err := navAction.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("navigating to history entry %d: %w", historyEntryID, err)
 	}
 
 	wrapTimeoutError := func(err error) error {
@@ -1657,51 +1599,37 @@ func (p *Page) GoForward(opts *PageGoBackForwardOptions) (_ *Response, rerr erro
 				Err:     err,
 				Timeout: opts.Timeout,
 			}
-			return err
 		}
 		p.logger.Debugf("Page:GoForward", "timeoutCtx done: %v", err)
-		return err
+		return fmt.Errorf("navigating forward to history entry %d: %w", historyEntryID, err)
 	}
 
-	var (
-		navigationEvent *NavigationEvent
-		err             error
-	)
-	select {
-	case <-p.ctx.Done():
-		err = p.ctx.Err()
-	case <-timeoutCtx.Done():
-		err = wrapTimeoutError(timeoutCtx.Err())
-	case event := <-waitForFrameNavigation:
-		var ok bool
-		if navigationEvent, ok = event.(*NavigationEvent); !ok {
-			err = fmt.Errorf("unexpected event data type: %T, expected *NavigationEvent", event)
-		} else if navigationEvent != nil && navigationEvent.err != nil {
-			err = navigationEvent.err
+	// Poll for URL change, don't rely on lifecycle events since bfcache
+	// restorations don't re-fire them.
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-p.ctx.Done():
+			return nil, p.ctx.Err()
+		case <-timeoutCtx.Done():
+			return nil, wrapTimeoutError(timeoutCtx.Err())
+		case <-ticker.C:
+			mainFrame := p.frameManager.MainFrame()
+			if mainFrame == nil {
+				continue
+			}
+			currentURL := mainFrame.URL()
+			p.logger.Debugf("Page:GoForward", "polling: currentURL=%s targetURL=%s", currentURL, targetURL)
+
+			if currentURL == targetURL {
+				p.logger.Debugf("Page:GoForward", "navigation complete to %s", targetURL)
+				applySlowMo(p.ctx)
+				return nil, nil //nolint:nilnil
+			}
 		}
 	}
-	if err != nil {
-		return nil, err
-	}
-
-	var resp *Response
-	newDocument := navigationEvent.newDocument
-	if newDocument != nil && newDocument.request != nil {
-		req := newDocument.request
-		req.responseMu.RLock()
-		resp = req.response
-		req.responseMu.RUnlock()
-	}
-
-	select {
-	case <-waitForLifecycleEvent:
-	case <-timeoutCtx.Done():
-		return nil, wrapTimeoutError(timeoutCtx.Err())
-	}
-
-	applySlowMo(p.ctx)
-
-	return resp, nil
 }
 
 // Screenshot will instruct Chrome to save a screenshot of the current page and save it to specified file.

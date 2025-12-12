@@ -3905,24 +3905,18 @@ func TestPageGoBackForward(t *testing.T) {
 		tb := newTestBrowser(t, withFileServer())
 		p := tb.NewPage(nil)
 
-		// Navigate to first page
-		url1 := tb.staticURL("empty.html")
-		opts := &common.FrameGotoOptions{Timeout: common.DefaultTimeout}
-		_, err := p.Goto(url1, opts)
-		require.NoError(t, err)
+		url1 := tb.staticURL("page1.html")
+		tb.GotoPage(p, url1)
 		currentURL, err := p.URL()
 		require.NoError(t, err)
 		require.Equal(t, url1, currentURL)
 
-		// Navigate to second page
-		url2 := tb.staticURL("link.html")
-		_, err = p.Goto(url2, opts)
-		require.NoError(t, err)
+		url2 := tb.staticURL("page2.html")
+		tb.GotoPage(p, url2)
 		currentURL, err = p.URL()
 		require.NoError(t, err)
 		require.Equal(t, url2, currentURL)
 
-		// Go back to first page
 		backOpts := common.NewPageGoBackForwardOptions(common.LifecycleEventLoad, common.DefaultTimeout)
 		_, err = p.GoBack(backOpts)
 		require.NoError(t, err)
@@ -3930,7 +3924,6 @@ func TestPageGoBackForward(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, url1, currentURL, "expected to be back on first page")
 
-		// Go forward to second page
 		forwardOpts := common.NewPageGoBackForwardOptions(common.LifecycleEventLoad, common.DefaultTimeout)
 		_, err = p.GoForward(forwardOpts)
 		require.NoError(t, err)
@@ -3945,21 +3938,16 @@ func TestPageGoBackForward(t *testing.T) {
 		tb := newTestBrowser(t, withFileServer())
 		p := tb.NewPage(nil)
 
-		// Navigate to first page
-		url1 := tb.staticURL("empty.html")
-		opts := &common.FrameGotoOptions{Timeout: common.DefaultTimeout}
-		_, err := p.Goto(url1, opts)
-		require.NoError(t, err)
+		url1 := tb.staticURL("page1.html")
+		tb.GotoPage(p, url1)
 
-		// Go back to about:blank
 		backOpts := common.NewPageGoBackForwardOptions(common.LifecycleEventLoad, common.DefaultTimeout)
-		_, err = p.GoBack(backOpts)
+		_, err := p.GoBack(backOpts)
 		require.NoError(t, err)
 		currentURL, err := p.URL()
 		require.NoError(t, err)
 		assert.Equal(t, common.BlankPage, currentURL, "expected to be back on about:blank")
 
-		// Now try to go back again
 		resp, err := p.GoBack(backOpts)
 		require.NoError(t, err)
 		assert.Nil(t, resp, "expected nil response when can't go back")
@@ -3971,13 +3959,9 @@ func TestPageGoBackForward(t *testing.T) {
 		tb := newTestBrowser(t, withFileServer())
 		p := tb.NewPage(nil)
 
-		// Navigate to first page
-		url1 := tb.staticURL("empty.html")
-		opts := &common.FrameGotoOptions{Timeout: common.DefaultTimeout}
-		_, err := p.Goto(url1, opts)
-		require.NoError(t, err)
+		url1 := tb.staticURL("page1.html")
+		tb.GotoPage(p, url1)
 
-		// Try to go forward
 		forwardOpts := common.NewPageGoBackForwardOptions(common.LifecycleEventLoad, common.DefaultTimeout)
 		resp, err := p.GoForward(forwardOpts)
 		require.NoError(t, err)
@@ -3985,5 +3969,66 @@ func TestPageGoBackForward(t *testing.T) {
 		currentURL, err := p.URL()
 		require.NoError(t, err)
 		assert.Equal(t, url1, currentURL, "URL should not change when can't go forward")
+	})
+
+	t.Run("go_back_and_forward_with_iframe_page", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withFileServer())
+		p := tb.NewPage(nil)
+		opts := common.NewPageGoBackForwardOptions(common.LifecycleEventLoad, common.DefaultTimeout)
+
+		url1 := tb.staticURL("page1.html")
+		url2 := tb.staticURL("page_with_iframe.html")
+		url3 := tb.staticURL("page2.html")
+
+		tb.GotoPage(p, url1)
+		tb.GotoPage(p, url2)
+		tb.GotoPage(p, url3)
+		tb.GotoPage(p, url1)
+
+		currentURL, err := p.URL()
+		require.NoError(t, err)
+		require.Equal(t, url1, currentURL)
+
+		_, err = p.GoBack(opts)
+		require.NoError(t, err)
+		currentURL, err = p.URL()
+		require.NoError(t, err)
+		assert.Equal(t, url3, currentURL, "first goBack should land on page2")
+
+		_, err = p.GoBack(opts)
+		require.NoError(t, err)
+		currentURL, err = p.URL()
+		require.NoError(t, err)
+		assert.Equal(t, url2, currentURL, "second goBack should land on iframe page")
+
+		_, err = p.GoBack(opts)
+		require.NoError(t, err)
+		currentURL, err = p.URL()
+		require.NoError(t, err)
+		assert.Equal(t, url1, currentURL, "third goBack should land on page1")
+
+		_, err = p.GoForward(opts)
+		require.NoError(t, err)
+		currentURL, err = p.URL()
+		require.NoError(t, err)
+		assert.Equal(t, url2, currentURL, "first goForward should land on iframe page")
+
+		_, err = p.GoForward(opts)
+		require.NoError(t, err)
+		currentURL, err = p.URL()
+		require.NoError(t, err)
+		assert.Equal(t, url3, currentURL, "second goForward should land on page2")
+
+		for i := 0; i < 3; i++ {
+			_, err = p.GoBack(opts)
+			require.NoError(t, err)
+			_, err = p.GoForward(opts)
+			require.NoError(t, err)
+		}
+		currentURL, err = p.URL()
+		require.NoError(t, err)
+		assert.Equal(t, url3, currentURL, "after rapid navigation should still be on page2")
 	})
 }

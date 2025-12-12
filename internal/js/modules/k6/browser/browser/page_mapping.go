@@ -381,7 +381,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		"goBack": func(opts sobek.Value) (*sobek.Promise, error) {
 			popts := common.NewPageGoBackForwardOptions(common.LifecycleEventLoad, p.NavigationTimeout())
 			if err := popts.Parse(vu.Context(), opts); err != nil {
-				return nil, fmt.Errorf("parsing goBack options: %w", err)
+				return nil, fmt.Errorf("parsing page go back options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
 				resp, err := p.GoBack(popts)
@@ -397,7 +397,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		"goForward": func(opts sobek.Value) (*sobek.Promise, error) {
 			popts := common.NewPageGoBackForwardOptions(common.LifecycleEventLoad, p.NavigationTimeout())
 			if err := popts.Parse(vu.Context(), opts); err != nil {
-				return nil, fmt.Errorf("parsing goForward options: %w", err)
+				return nil, fmt.Errorf("parsing page go forward options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
 				resp, err := p.GoForward(popts)

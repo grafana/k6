@@ -33,9 +33,11 @@ type PageScreenshotOptions struct {
 	Quality        int64          `json:"quality"`
 }
 
-// PageGoBackForwardOptions is an alias for PageReloadOptions
-// since both have identical fields (WaitUntil, Timeout).
-type PageGoBackForwardOptions = PageReloadOptions
+// PageGoBackForwardOptions are options for Page.GoBack and Page.GoForward.
+type PageGoBackForwardOptions struct {
+	WaitUntil LifecycleEvent `json:"waitUntil" js:"waitUntil"`
+	Timeout   time.Duration  `json:"timeout"`
+}
 
 func NewPageEmulateMediaOptions(from *Page) *PageEmulateMediaOptions {
 	return &PageEmulateMediaOptions{
@@ -71,11 +73,37 @@ func NewPageReloadOptions(defaultWaitUntil LifecycleEvent, defaultTimeout time.D
 	}
 }
 
+// NewPageGoBackForwardOptions returns a new PageGoBackForwardOptions.
 func NewPageGoBackForwardOptions(
 	defaultWaitUntil LifecycleEvent,
 	defaultTimeout time.Duration,
 ) *PageGoBackForwardOptions {
-	return NewPageReloadOptions(defaultWaitUntil, defaultTimeout)
+	return &PageGoBackForwardOptions{
+		WaitUntil: defaultWaitUntil,
+		Timeout:   defaultTimeout,
+	}
+}
+
+// Parse parses the page go back/forward options.
+func (o *PageGoBackForwardOptions) Parse(ctx context.Context, opts sobek.Value) error {
+	rt := k6ext.Runtime(ctx)
+	if !common.IsNullish(opts) {
+		opts := opts.ToObject(rt)
+		for _, k := range opts.Keys() {
+			switch k {
+			case "waitUntil":
+				lifeCycle := opts.Get(k).String()
+				if l, ok := lifecycleEventToID[lifeCycle]; ok {
+					o.WaitUntil = l
+				} else {
+					return fmt.Errorf("%q is not a valid lifecycle", lifeCycle)
+				}
+			case "timeout":
+				o.Timeout = time.Duration(opts.Get(k).ToInteger()) * time.Millisecond
+			}
+		}
+	}
+	return nil
 }
 
 // Parse parses the page reload options.
