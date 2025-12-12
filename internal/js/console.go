@@ -1,7 +1,7 @@
 package js
 
 import (
-	"encoding/json"
+	"fmt"
 	"os"
 	"reflect"
 	"strconv"
@@ -110,35 +110,36 @@ func (c console) valueString(v sobek.Value) string {
 	if obj.ClassName() == "Error" {
 		return v.String()
 	}
-	b, err := json.Marshal(c.traverseValue(obj, make(map[*sobek.Object]bool)))
-	if err != nil {
-		return v.String()
+
+	if isBinaryData(obj) {
+		return formatBinaryData(obj)
 	}
 
-	return string(b)
+	return c.traverseValue(obj, make(map[*sobek.Object]bool))
 }
 
-// traverseValue recursively traverses a [sobek.Value], tries to convert it
-// into native Go types suitable for JSON marshaling. It returns the converted
-// value, or the original value if conversion is not possible. For functions, it
-// returns [functionLog], and for circular references, it returns [circularLog].
+// traverseValue recursively traverses a [sobek.Value] and returns a formatted
+// string representation. For functions, it returns [functionLog], and for
+// circular references, it returns [circularLog].
 //
 // It prevents circular references by keeping track of seen objects.
-func (c console) traverseValue(v sobek.Value, seen map[*sobek.Object]bool) any {
+func (c console) traverseValue(v sobek.Value, seen map[*sobek.Object]bool) string {
 	// Handles null and sparse values in arrays.
 	if common.IsNullish(v) {
-		return nil
+		return "null"
 	}
 
 	// Represent functions as a fixed string.
 	if _, isFunc := sobek.AssertFunction(v); isFunc {
 		return functionLog
 	}
-	// Skip non-object values.
+
+	// Handle non-object values.
 	obj, ok := v.(*sobek.Object)
 	if !ok {
-		return v
+		return formatPrimitive(v)
 	}
+
 	// Prevent circular references.
 	if seen[obj] {
 		return circularLog
@@ -146,26 +147,149 @@ func (c console) traverseValue(v sobek.Value, seen map[*sobek.Object]bool) any {
 	seen[obj] = true
 	defer delete(seen, obj)
 
+	if obj.ClassName() == "Error" {
+		return v.String()
+	}
+
+	// Check for TypedArray and ArrayBuffer.
+	if isBinaryData(obj) {
+		return formatBinaryData(obj)
+	}
+
 	// Handle arrays element-by-element, recursively.
 	if obj.ClassName() == "Array" {
 		length := obj.Get("length").ToInteger()
-		arr := make([]any, length)
-		for i := range length {
-			arr[i] = c.traverseValue(obj.Get(strconv.FormatInt(i, 10)), seen)
+		if length == 0 {
+			return "[]"
 		}
-		return arr
+		elements := make([]string, length)
+		for i := range length {
+			elements[i] = c.traverseValue(obj.Get(strconv.FormatInt(i, 10)), seen)
+		}
+		return "[ " + strings.Join(elements, ", ") + " ]"
 	}
 
 	keys := obj.Keys()
-	// Fast path for empty objects and other JS types with no enumerable properties.
+	// for empty objects and other JS types with no enumerable properties.
 	if len(keys) == 0 {
-		return obj
-	}
-	// Handle objects key-by-key, recursively.
-	m := make(map[string]any, len(keys))
-	for _, key := range keys {
-		m[key] = c.traverseValue(obj.Get(key), seen)
+		// Date objects have no enumerable keys but should display as ISO string.
+		if obj.ClassName() == "Date" {
+			return formatDate(obj)
+		}
+		return "{}"
 	}
 
-	return m
+	// Handle objects key-by-key, recursively.
+	pairs := make([]string, len(keys))
+	for i, key := range keys {
+		pairs[i] = key + ": " + c.traverseValue(obj.Get(key), seen)
+	}
+	return "{ " + strings.Join(pairs, ", ") + " }"
+}
+
+// formatDate formats a Date object as a quoted ISO string.
+func formatDate(obj *sobek.Object) string {
+	if toISOString, ok := sobek.AssertFunction(obj.Get("toISOString")); ok {
+		if result, err := toISOString(obj); err == nil {
+			return fmt.Sprintf("%q", result.String())
+		}
+	}
+	return "{}"
+}
+
+// formatPrimitive formats a primitive JS value as a string.
+func formatPrimitive(v sobek.Value) string {
+	switch v.ExportType().Kind() {
+	case reflect.String:
+		return fmt.Sprintf("%q", v.String())
+	default:
+		return v.String()
+	}
+}
+
+// checks for TypedArray and Array Buffer
+func isBinaryData(obj *sobek.Object) bool {
+	exportType := obj.ExportType()
+	if exportType == nil {
+		return false
+	}
+
+	if _, ok := obj.Export().(sobek.ArrayBuffer); ok {
+		return true
+	}
+
+	if exportType.Kind() != reflect.Slice {
+		return false
+	}
+	switch exportType.Elem().Kind() {
+	case reflect.Int8, reflect.Uint8,
+		reflect.Int16, reflect.Uint16,
+		reflect.Int32, reflect.Uint32,
+		reflect.Float32, reflect.Float64,
+		reflect.Int64, reflect.Uint64:
+		return true
+	default:
+		return false
+	}
+}
+
+func formatBinaryData(obj *sobek.Object) string {
+	// ArrayBuffer
+	if ab, ok := obj.Export().(sobek.ArrayBuffer); ok {
+		bytes := ab.Bytes()
+		hexParts := make([]string, len(bytes))
+		for i, b := range bytes {
+			hexParts[i] = fmt.Sprintf("%02x", b)
+		}
+		hexStr := strings.Join(hexParts, " ")
+		return fmt.Sprintf("ArrayBuffer { [Uint8Contents]: <%s>, byteLength: %d }", hexStr, len(bytes))
+	}
+
+	// Typed Array
+	exportType := obj.ExportType()
+	if exportType != nil && exportType.Kind() == reflect.Slice {
+		typeName := typedArrayName(exportType)
+		length := obj.Get("length").ToInteger()
+		if length == 0 {
+			return fmt.Sprintf("%s(0) []", typeName)
+		}
+		values := make([]string, length)
+		for i := int64(0); i < length; i++ {
+			val := obj.Get(strconv.FormatInt(i, 10))
+			values[i] = val.String()
+		}
+		valuesStr := strings.Join(values, ", ")
+		return fmt.Sprintf("%s(%d) [ %s ]", typeName, length, valuesStr)
+	}
+
+	return obj.String()
+}
+
+// Maps Go reflect.Kind -> TypedArray name
+func typedArrayName(exportType reflect.Type) string {
+	// Note: Can't distinguish Uint8ClampedArray this way
+	switch exportType.Elem().Kind() {
+	case reflect.Int8:
+		return "Int8Array"
+	case reflect.Uint8:
+		return "Uint8Array"
+	case reflect.Int16:
+		return "Int16Array"
+	case reflect.Uint16:
+		return "Uint16Array"
+	case reflect.Int32:
+		return "Int32Array"
+	case reflect.Uint32:
+		return "Uint32Array"
+	case reflect.Float32:
+		return "Float32Array"
+	case reflect.Float64:
+		return "Float64Array"
+	case reflect.Int64:
+		return "BigInt64Array"
+	case reflect.Uint64:
+		return "BigUint64Array"
+	default:
+		return "TypedArray"
+	}
 }
