@@ -111,62 +111,71 @@ func (c console) valueString(v sobek.Value) string {
 		return v.String()
 	}
 
-	if isBinaryData(obj) {
-		return formatBinaryData(obj)
-	}
-
-	return c.traverseValue(obj, make(map[*sobek.Object]bool))
+	var sb strings.Builder
+	c.traverseValue(&sb, obj, make(map[*sobek.Object]bool))
+	return sb.String()
 }
 
-// traverseValue recursively traverses a [sobek.Value] and returns a formatted
-// string representation. For functions, it returns [functionLog], and for
-// circular references, it returns [circularLog].
+// traverseValue recursively traverses a [sobek.Value] and writes a formatted
+// string representation to the provided strings.Builder. For functions, it writes
+// [functionLog], and for circular references, it writes [circularLog].
 //
 // It prevents circular references by keeping track of seen objects.
-func (c console) traverseValue(v sobek.Value, seen map[*sobek.Object]bool) string {
+func (c console) traverseValue(sb *strings.Builder, v sobek.Value, seen map[*sobek.Object]bool) {
 	// Handles null and sparse values in arrays.
 	if common.IsNullish(v) {
-		return "null"
+		sb.WriteString("null")
+		return
 	}
 
 	// Represent functions as a fixed string.
 	if _, isFunc := sobek.AssertFunction(v); isFunc {
-		return functionLog
+		sb.WriteString(functionLog)
+		return
 	}
 
 	// Handle non-object values.
 	obj, ok := v.(*sobek.Object)
 	if !ok {
-		return formatPrimitive(v)
+		formatPrimitive(sb, v)
+		return
 	}
 
 	// Prevent circular references.
 	if seen[obj] {
-		return circularLog
+		sb.WriteString(circularLog)
+		return
 	}
 	seen[obj] = true
 	defer delete(seen, obj)
 
 	if obj.ClassName() == "Error" {
-		return v.String()
+		sb.WriteString(v.String())
+		return
 	}
 
 	// Check for TypedArray and ArrayBuffer.
 	if isBinaryData(obj) {
-		return formatBinaryData(obj)
+		formatBinaryData(sb, obj)
+		return
 	}
 
 	// Handle arrays element-by-element, recursively.
 	if obj.ClassName() == "Array" {
 		length := obj.Get("length").ToInteger()
 		if length == 0 {
-			return "[]"
+			sb.WriteString("[]")
+			return
 		}
-		elements := make([]string, length)
-		for i := range length {
-			elements[i] = c.traverseValue(obj.Get(strconv.FormatInt(i, 10)), seen)
+		sb.WriteString("[ ")
+		for i := int64(0); i < length; i++ {
+			if i > 0 {
+				sb.WriteString(", ")
+			}
+			c.traverseValue(sb, obj.Get(strconv.FormatInt(i, 10)), seen)
 		}
-		return "[ " + strings.Join(elements, ", ") + " ]"
+		sb.WriteString(" ]")
+		return
 	}
 
 	keys := obj.Keys()
@@ -174,40 +183,52 @@ func (c console) traverseValue(v sobek.Value, seen map[*sobek.Object]bool) strin
 	if len(keys) == 0 {
 		// Date objects have no enumerable keys but should display as ISO string.
 		if obj.ClassName() == "Date" {
-			return formatDate(obj)
+			formatDate(sb, obj)
+			return
 		}
-		return "{}"
+		sb.WriteString("{}")
+		return
 	}
 
 	// Handle objects key-by-key, recursively.
-	pairs := make([]string, len(keys))
+	sb.WriteString("{ ")
 	for i, key := range keys {
-		pairs[i] = key + ": " + c.traverseValue(obj.Get(key), seen)
+		if i > 0 {
+			sb.WriteString(", ")
+		}
+		sb.WriteString(key)
+		sb.WriteString(": ")
+		c.traverseValue(sb, obj.Get(key), seen)
 	}
-	return "{ " + strings.Join(pairs, ", ") + " }"
+	sb.WriteString(" }")
 }
 
-// formatDate formats a Date object as a quoted ISO string.
-func formatDate(obj *sobek.Object) string {
+// formatDate writes a Date object as a quoted ISO string to the builder.
+func formatDate(sb *strings.Builder, obj *sobek.Object) {
 	if toISOString, ok := sobek.AssertFunction(obj.Get("toISOString")); ok {
 		if result, err := toISOString(obj); err == nil {
-			return fmt.Sprintf("%q", result.String())
+			sb.WriteByte('"')
+			sb.WriteString(result.String())
+			sb.WriteByte('"')
+			return
 		}
 	}
-	return "{}"
+	sb.WriteString("{}")
 }
 
-// formatPrimitive formats a primitive JS value as a string.
-func formatPrimitive(v sobek.Value) string {
+// formatPrimitive writes a primitive JS value to the builder.
+func formatPrimitive(sb *strings.Builder, v sobek.Value) {
 	switch v.ExportType().Kind() {
 	case reflect.String:
-		return fmt.Sprintf("%q", v.String())
+		sb.WriteByte('"')
+		sb.WriteString(v.String())
+		sb.WriteByte('"')
 	default:
-		return v.String()
+		sb.WriteString(v.String())
 	}
 }
 
-// checks for TypedArray and Array Buffer
+// isBinaryData checks for TypedArray and ArrayBuffer.
 func isBinaryData(obj *sobek.Object) bool {
 	exportType := obj.ExportType()
 	if exportType == nil {
@@ -233,39 +254,55 @@ func isBinaryData(obj *sobek.Object) bool {
 	}
 }
 
-func formatBinaryData(obj *sobek.Object) string {
+// formatBinaryData writes the formatted representation of TypedArray or ArrayBuffer to the builder.
+func formatBinaryData(sb *strings.Builder, obj *sobek.Object) {
 	// ArrayBuffer
 	if ab, ok := obj.Export().(sobek.ArrayBuffer); ok {
 		bytes := ab.Bytes()
-		hexParts := make([]string, len(bytes))
+		sb.WriteString("ArrayBuffer { [Uint8Contents]: <")
 		for i, b := range bytes {
-			hexParts[i] = fmt.Sprintf("%02x", b)
+			if i > 0 {
+				sb.WriteByte(' ')
+			}
+			fmt.Fprintf(sb, "%02x", b)
 		}
-		hexStr := strings.Join(hexParts, " ")
-		return fmt.Sprintf("ArrayBuffer { [Uint8Contents]: <%s>, byteLength: %d }", hexStr, len(bytes))
+		sb.WriteString(">, byteLength: ")
+		sb.WriteString(strconv.Itoa(len(bytes)))
+		sb.WriteString(" }")
+		return
 	}
 
-	// Typed Array
+	// TypedArray
 	exportType := obj.ExportType()
 	if exportType != nil && exportType.Kind() == reflect.Slice {
 		typeName := typedArrayName(exportType)
 		length := obj.Get("length").ToInteger()
+
+		sb.WriteString(typeName)
+		sb.WriteByte('(')
+		sb.WriteString(strconv.FormatInt(length, 10))
+		sb.WriteByte(')')
+
 		if length == 0 {
-			return fmt.Sprintf("%s(0) []", typeName)
+			sb.WriteString(" []")
+			return
 		}
-		values := make([]string, length)
+
+		sb.WriteString(" [ ")
 		for i := int64(0); i < length; i++ {
-			val := obj.Get(strconv.FormatInt(i, 10))
-			values[i] = val.String()
+			if i > 0 {
+				sb.WriteString(", ")
+			}
+			sb.WriteString(obj.Get(strconv.FormatInt(i, 10)).String())
 		}
-		valuesStr := strings.Join(values, ", ")
-		return fmt.Sprintf("%s(%d) [ %s ]", typeName, length, valuesStr)
+		sb.WriteString(" ]")
+		return
 	}
 
-	return obj.String()
+	sb.WriteString(obj.String())
 }
 
-// Maps Go reflect.Kind -> TypedArray name
+// typedArrayName maps Go reflect.Kind -> TypedArray name.
 func typedArrayName(exportType reflect.Type) string {
 	// Note: Can't distinguish Uint8ClampedArray this way
 	switch exportType.Elem().Kind() {
