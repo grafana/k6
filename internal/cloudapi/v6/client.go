@@ -32,7 +32,11 @@ type Client struct {
 }
 
 // NewClient return a new client for the cloud API
-func NewClient(logger logrus.FieldLogger, token, host, version string, timeout time.Duration) *Client {
+func NewClient(logger logrus.FieldLogger, token, host, version string, timeout time.Duration) (*Client, error) {
+	if token == "" {
+		return nil, fmt.Errorf("token is required to create cloud API client")
+	}
+
 	cfg := &k6cloud.Configuration{
 		DefaultHeader: make(map[string]string),
 		UserAgent:     "k6cloud/" + version,
@@ -54,7 +58,7 @@ func NewClient(logger logrus.FieldLogger, token, host, version string, timeout t
 		retryInterval: RetryInterval,
 		logger:        logger,
 	}
-	return c
+	return c, nil
 }
 
 // SetStackID sets the stack ID for the client.
