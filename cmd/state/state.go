@@ -28,6 +28,9 @@ const (
 	// AutoExtensionResolution defines the environment variable that enables using extensions natively
 	AutoExtensionResolution = "K6_AUTO_EXTENSION_RESOLUTION"
 
+	// DependenciesManifest defines the default values for dependency resolution
+	DependenciesManifest = "K6_DEPENDENCIES_MANIFEST"
+
 	// communityExtensionsCatalog defines the catalog for community extensions
 	communityExtensionsCatalog = "oss"
 
@@ -185,6 +188,7 @@ type GlobalFlags struct {
 	BuildServiceURL           string
 	BinaryCache               string
 	EnableCommunityExtensions bool
+	DependenciesManifest      string
 }
 
 // GetDefaultFlags returns the default global flags.
@@ -249,6 +253,9 @@ func getFlags(defaultFlags GlobalFlags, env map[string]string, args []string) Gl
 		if err == nil {
 			result.EnableCommunityExtensions = vb
 		}
+	}
+	if val, ok := env["K6_DEPENDENCIES_MANIFEST"]; ok {
+		result.DependenciesManifest = val
 	}
 
 	// adjust BuildServiceURL if community extensions are enable

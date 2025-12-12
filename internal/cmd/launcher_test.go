@@ -314,3 +314,77 @@ const l = 5
 		})
 	}
 }
+
+func TestMergeManifest(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		deps          map[string]string
+		manifest      string
+		expected      map[string]string
+		expectedError string
+	}{
+		{
+			name:     "default constrain with no manifest",
+			deps:     map[string]string{"k6/x/dep": "*"},
+			manifest: "",
+			expected: map[string]string{"k6/x/dep": "*"},
+		},
+		{
+			name:     "empty constrain with no manifest",
+			deps:     map[string]string{"k6/x/dep": ""},
+			manifest: "",
+			expected: map[string]string{"k6/x/dep": ""},
+		},
+		{
+			name:     "default constrain with empty manifest",
+			deps:     map[string]string{"k6/x/dep": "*"},
+			manifest: "{}",
+			expected: map[string]string{"k6/x/dep": "*"},
+		},
+		{
+			name:     "default constrain with manifest overrides",
+			deps:     map[string]string{"k6/x/dep": "*"},
+			manifest: `{"k6/x/dep": "=v0.0.0"}`,
+			expected: map[string]string{"k6/x/dep": "=v0.0.0"},
+		},
+		{
+			name:     "dependency with version constraint",
+			deps:     map[string]string{"k6/x/dep": "=v0.0.1"},
+			manifest: `{"k6/x/dep": "=v0.0.0"}`,
+			expected: map[string]string{"k6/x/dep": "=v0.0.1"},
+		},
+		{
+			name:     "manifest with different dependency",
+			deps:     map[string]string{"k6/x/dep": "*"},
+			manifest: `{"k6/x/another": "=v0.0.0"}`,
+			expected: map[string]string{"k6/x/dep": "*"},
+		},
+		{
+			name:     "no dependencies",
+			deps:     map[string]string{},
+			manifest: `{"k6/x/dep": "=v0.0.0"}`,
+			expected: map[string]string{},
+		},
+		{
+			name:          "malformed manifest",
+			deps:          map[string]string{"k6/x/dep": "*"},
+			manifest:      `{"k6/x/dep": }`,
+			expectedError: "invalid dependencies manifest",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			merged, err := mergeManifest(test.deps, test.manifest)
+
+			if len(test.expectedError) > 0 {
+				require.ErrorContains(t, err, test.expectedError)
+			} else {
+				require.EqualValues(t, test.expected, merged)
+			}
+		})
+	}
+}
