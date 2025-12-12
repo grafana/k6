@@ -3896,6 +3896,129 @@ func TestPageUnrouteAll(t *testing.T) {
 	assert.Equal(t, 0, route2Calls, "Second route should be removed")
 }
 
+func TestPageWaitForEvent(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ok/waits_for_console_event", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withHTTPServer())
+		tb.withHandler("/page", func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = fmt.Fprintf(w, `
+				<!doctype html>
+				<html><body><script>
+					setTimeout(() => console.log("hello world"), 50);
+				</script></body></html>
+			`)
+		})
+
+		p := tb.NewPage(nil)
+
+		gotoPage := func() error {
+			_, err := p.Goto(tb.url("/page"), &common.FrameGotoOptions{
+				WaitUntil: common.LifecycleEventDOMContentLoad,
+				Timeout:   common.DefaultTimeout,
+			})
+			return err
+		}
+
+		var ev common.PageEvent
+		waitForConsole := func() error {
+			var err error
+			ev, err = p.WaitForEvent(
+				common.PageEventConsole,
+				&common.PageWaitForEventOptions{Timeout: p.Timeout()},
+				nil,
+			)
+			return err
+		}
+
+		err := tb.run(tb.context(), gotoPage, waitForConsole)
+		require.NoError(t, err)
+		require.NotNil(t, ev.ConsoleMessage)
+		require.Equal(t, "hello world", ev.ConsoleMessage.Text)
+	})
+
+	t.Run("ok/waits_for_response_event", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withHTTPServer())
+		tb.withHandler("/api/data", func(w http.ResponseWriter, r *http.Request) {
+			_, _ = fmt.Fprintf(w, `{"data": "test"}`)
+		})
+		tb.withHandler("/page", func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = fmt.Fprintf(w, `
+				<!doctype html>
+				<html><body><script>
+					setTimeout(() => fetch('/api/data'), 50);
+				</script></body></html>
+			`)
+		})
+
+		p := tb.NewPage(nil)
+
+		gotoPage := func() error {
+			_, err := p.Goto(tb.url("/page"), &common.FrameGotoOptions{
+				WaitUntil: common.LifecycleEventDOMContentLoad,
+				Timeout:   common.DefaultTimeout,
+			})
+			return err
+		}
+
+		var ev common.PageEvent
+		waitForResponse := func() error {
+			var err error
+			ev, err = p.WaitForEvent(
+				common.PageEventResponse,
+				&common.PageWaitForEventOptions{Timeout: p.Timeout()},
+				func(pe common.PageEvent) (bool, error) {
+					return strings.Contains(pe.Response.URL(), "/api/data"), nil
+				},
+			)
+			return err
+		}
+
+		err := tb.run(tb.context(), gotoPage, waitForResponse)
+		require.NoError(t, err)
+		require.NotNil(t, ev.Response)
+		require.Contains(t, ev.Response.URL(), "/api/data")
+	})
+
+	t.Run("err/canceled", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t)
+		p := tb.NewPage(nil)
+
+		go tb.cancelContext()
+		<-tb.context().Done()
+
+		_, err := p.WaitForEvent(
+			common.PageEventConsole,
+			&common.PageWaitForEventOptions{Timeout: p.Timeout()},
+			nil,
+		)
+		require.ErrorIs(t, err, context.Canceled)
+	})
+
+	t.Run("err/timeout", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t)
+		p := tb.NewPage(nil)
+
+		err := tb.run(tb.context(), func() error {
+			_, werr := p.WaitForEvent(
+				common.PageEventConsole,
+				&common.PageWaitForEventOptions{Timeout: 500 * time.Millisecond},
+				nil,
+			)
+			return werr
+		})
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+	})
+}
+
 func TestPageGoBackForward(t *testing.T) {
 	t.Parallel()
 
@@ -3999,5 +4122,5 @@ func TestPageGoBackForward(t *testing.T) {
 			require.NoError(t, err)
 		}
 		tb.AssertURL(p, url3, "after rapid navigation should still be on page2")
-	})
+  })
 }

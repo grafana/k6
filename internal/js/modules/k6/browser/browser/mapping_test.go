@@ -303,7 +303,7 @@ type browserContextAPI interface { //nolint:interfacebloat
 	SetGeolocation(geolocation *common.Geolocation) error
 	SetHTTPCredentials(httpCredentials common.Credentials) error
 	SetOffline(offline bool) error
-	WaitForEvent(event string, optsOrPredicate sobek.Value) (any, error)
+	WaitForEvent(event common.PageEventName, optsOrPredicate sobek.Value) (any, error)
 }
 
 // pageAPI is the interface of a single browser tab.
@@ -383,6 +383,7 @@ type pageAPI interface { //nolint:interfacebloat
 	WaitForSelector(selector string, opts sobek.Value) (*common.ElementHandle, error)
 	WaitForTimeout(timeout int64)
 	WaitForURL(url string, opts sobek.Value) (*sobek.Promise, error)
+	WaitForEvent(event string, opts sobek.Value) (*sobek.Promise, error)
 	WaitForResponse(url string, opts sobek.Value) (*sobek.Promise, error)
 	WaitForRequest(url string, opts sobek.Value) (*sobek.Promise, error)
 	Workers() []*common.Worker
