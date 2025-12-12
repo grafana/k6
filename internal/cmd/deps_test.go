@@ -112,7 +112,7 @@ export default function () {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			ts := tests.NewGlobalTestState(t)
-			ts.FS = testutils.MakeMemMapFs(t, fixFiles(ts.Cwd, tc.files))
+			ts.FS = testutils.MakeMemMapFs(t, prependCWDToFileMap(ts.Cwd, tc.files))
 
 			cmd := getCmdDeps(ts.GlobalState)
 			cmd.SetArgs([]string{"main.js"})
@@ -141,7 +141,7 @@ export default function () {
 	}
 }
 
-func fixFiles(cwd string, files map[string][]byte) map[string][]byte {
+func prependCWDToFileMap(cwd string, files map[string][]byte) map[string][]byte {
 	result := make(map[string][]byte, len(files))
 	for n, b := range files {
 		result[cwd+n] = b
