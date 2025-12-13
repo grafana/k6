@@ -67,9 +67,10 @@ func mapRequest(vu moduleVU, r *common.Request) mapping {
 				return mapResponse(vu, resp), nil
 			})
 		},
-		"size":   r.Size,
-		"timing": r.Timing,
-		"url":    r.URL,
+		"size":    r.Size,
+		"timing":  r.Timing,
+		"url":     r.URL,
+		"failure": r.Failure,
 	}
 
 	return maps
