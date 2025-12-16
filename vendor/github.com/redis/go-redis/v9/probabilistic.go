@@ -319,36 +319,68 @@ func (cmd *BFInfoCmd) Result() (BFInfo, error) {
 }
 
 func (cmd *BFInfoCmd) readReply(rd *proto.Reader) (err error) {
-	n, err := rd.ReadMapLen()
+	result := BFInfo{}
+
+	// Create a mapping from key names to pointers of struct fields
+	respMapping := map[string]*int64{
+		"Capacity":                 &result.Capacity,
+		"CAPACITY":                 &result.Capacity,
+		"Size":                     &result.Size,
+		"SIZE":                     &result.Size,
+		"Number of filters":        &result.Filters,
+		"FILTERS":                  &result.Filters,
+		"Number of items inserted": &result.ItemsInserted,
+		"ITEMS":                    &result.ItemsInserted,
+		"Expansion rate":           &result.ExpansionRate,
+		"EXPANSION":                &result.ExpansionRate,
+	}
+
+	// Helper function to read and assign a value based on the key
+	readAndAssignValue := func(key string) error {
+		fieldPtr, exists := respMapping[key]
+		if !exists {
+			return fmt.Errorf("redis: BLOOM.INFO unexpected key %s", key)
+		}
+
+		// Read the integer and assign to the field via pointer dereferencing
+		val, err := rd.ReadInt()
+		if err != nil {
+			return err
+		}
+		*fieldPtr = val
+		return nil
+	}
+
+	readType, err := rd.PeekReplyType()
 	if err != nil {
 		return err
 	}
 
-	var key string
-	var result BFInfo
-	for f := 0; f < n; f++ {
-		key, err = rd.ReadString()
+	if len(cmd.args) > 2 && readType == proto.RespArray {
+		n, err := rd.ReadArrayLen()
 		if err != nil {
 			return err
 		}
-
-		switch key {
-		case "Capacity":
-			result.Capacity, err = rd.ReadInt()
-		case "Size":
-			result.Size, err = rd.ReadInt()
-		case "Number of filters":
-			result.Filters, err = rd.ReadInt()
-		case "Number of items inserted":
-			result.ItemsInserted, err = rd.ReadInt()
-		case "Expansion rate":
-			result.ExpansionRate, err = rd.ReadInt()
-		default:
-			return fmt.Errorf("redis: BLOOM.INFO unexpected key %s", key)
+		if key, ok := cmd.args[2].(string); ok && n == 1 {
+			if err := readAndAssignValue(key); err != nil {
+				return err
+			}
+		} else {
+			return fmt.Errorf("redis: BLOOM.INFO invalid argument key type")
 		}
-
+	} else {
+		n, err := rd.ReadMapLen()
 		if err != nil {
 			return err
+		}
+		for i := 0; i < n; i++ {
+			key, err := rd.ReadString()
+			if err != nil {
+				return err
+			}
+			if err := readAndAssignValue(key); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -1084,17 +1116,13 @@ func (c cmdable) TopKListWithCount(ctx context.Context, key string) *MapStringIn
 // Returns OK on success or an error if the operation could not be completed.
 // For more information - https://redis.io/commands/tdigest.add/
 func (c cmdable) TDigestAdd(ctx context.Context, key string, elements ...float64) *StatusCmd {
-	args := make([]interface{}, 2, 2+len(elements))
+	args := make([]interface{}, 2+len(elements))
 	args[0] = "TDIGEST.ADD"
 	args[1] = key
 
-	// Convert floatSlice to []interface{}
-	interfaceSlice := make([]interface{}, len(elements))
 	for i, v := range elements {
-		interfaceSlice[i] = v
+		args[2+i] = v
 	}
-
-	args = append(args, interfaceSlice...)
 
 	cmd := NewStatusCmd(ctx, args...)
 	_ = c(ctx, cmd)
@@ -1106,17 +1134,13 @@ func (c cmdable) TDigestAdd(ctx context.Context, key string, elements ...float64
 // Returns an array of floats representing the values at the specified ranks or an error if the operation could not be completed.
 // For more information - https://redis.io/commands/tdigest.byrank/
 func (c cmdable) TDigestByRank(ctx context.Context, key string, rank ...uint64) *FloatSliceCmd {
-	args := make([]interface{}, 2, 2+len(rank))
+	args := make([]interface{}, 2+len(rank))
 	args[0] = "TDIGEST.BYRANK"
 	args[1] = key
 
-	// Convert uint slice to []interface{}
-	interfaceSlice := make([]interface{}, len(rank))
-	for i, v := range rank {
-		interfaceSlice[i] = v
+	for i, r := range rank {
+		args[2+i] = r
 	}
-
-	args = append(args, interfaceSlice...)
 
 	cmd := NewFloatSliceCmd(ctx, args...)
 	_ = c(ctx, cmd)
@@ -1128,17 +1152,13 @@ func (c cmdable) TDigestByRank(ctx context.Context, key string, rank ...uint64) 
 // Returns an array of floats representing the values at the specified ranks or an error if the operation could not be completed.
 // For more information - https://redis.io/commands/tdigest.byrevrank/
 func (c cmdable) TDigestByRevRank(ctx context.Context, key string, rank ...uint64) *FloatSliceCmd {
-	args := make([]interface{}, 2, 2+len(rank))
+	args := make([]interface{}, 2+len(rank))
 	args[0] = "TDIGEST.BYREVRANK"
 	args[1] = key
 
-	// Convert uint slice to []interface{}
-	interfaceSlice := make([]interface{}, len(rank))
-	for i, v := range rank {
-		interfaceSlice[i] = v
+	for i, r := range rank {
+		args[2+i] = r
 	}
-
-	args = append(args, interfaceSlice...)
 
 	cmd := NewFloatSliceCmd(ctx, args...)
 	_ = c(ctx, cmd)
@@ -1150,17 +1170,13 @@ func (c cmdable) TDigestByRevRank(ctx context.Context, key string, rank ...uint6
 // Returns an array of floats representing the CDF values for each element or an error if the operation could not be completed.
 // For more information - https://redis.io/commands/tdigest.cdf/
 func (c cmdable) TDigestCDF(ctx context.Context, key string, elements ...float64) *FloatSliceCmd {
-	args := make([]interface{}, 2, 2+len(elements))
+	args := make([]interface{}, 2+len(elements))
 	args[0] = "TDIGEST.CDF"
 	args[1] = key
 
-	// Convert floatSlice to []interface{}
-	interfaceSlice := make([]interface{}, len(elements))
 	for i, v := range elements {
-		interfaceSlice[i] = v
+		args[2+i] = v
 	}
-
-	args = append(args, interfaceSlice...)
 
 	cmd := NewFloatSliceCmd(ctx, args...)
 	_ = c(ctx, cmd)
@@ -1344,17 +1360,13 @@ func (c cmdable) TDigestMin(ctx context.Context, key string) *FloatCmd {
 // Returns an array of floats representing the quantile values for each element or an error if the operation could not be completed.
 // For more information - https://redis.io/commands/tdigest.quantile/
 func (c cmdable) TDigestQuantile(ctx context.Context, key string, elements ...float64) *FloatSliceCmd {
-	args := make([]interface{}, 2, 2+len(elements))
+	args := make([]interface{}, 2+len(elements))
 	args[0] = "TDIGEST.QUANTILE"
 	args[1] = key
 
-	// Convert floatSlice to []interface{}
-	interfaceSlice := make([]interface{}, len(elements))
 	for i, v := range elements {
-		interfaceSlice[i] = v
+		args[2+i] = v
 	}
-
-	args = append(args, interfaceSlice...)
 
 	cmd := NewFloatSliceCmd(ctx, args...)
 	_ = c(ctx, cmd)
@@ -1366,17 +1378,13 @@ func (c cmdable) TDigestQuantile(ctx context.Context, key string, elements ...fl
 // Returns an array of integers representing the rank values for each element or an error if the operation could not be completed.
 // For more information - https://redis.io/commands/tdigest.rank/
 func (c cmdable) TDigestRank(ctx context.Context, key string, values ...float64) *IntSliceCmd {
-	args := make([]interface{}, 2, 2+len(values))
+	args := make([]interface{}, 2+len(values))
 	args[0] = "TDIGEST.RANK"
 	args[1] = key
 
-	// Convert floatSlice to []interface{}
-	interfaceSlice := make([]interface{}, len(values))
 	for i, v := range values {
-		interfaceSlice[i] = v
+		args[i+2] = v
 	}
-
-	args = append(args, interfaceSlice...)
 
 	cmd := NewIntSliceCmd(ctx, args...)
 	_ = c(ctx, cmd)
@@ -1399,17 +1407,13 @@ func (c cmdable) TDigestReset(ctx context.Context, key string) *StatusCmd {
 // Returns an array of integers representing the reverse rank values for each element or an error if the operation could not be completed.
 // For more information - https://redis.io/commands/tdigest.revrank/
 func (c cmdable) TDigestRevRank(ctx context.Context, key string, values ...float64) *IntSliceCmd {
-	args := make([]interface{}, 2, 2+len(values))
+	args := make([]interface{}, 2+len(values))
 	args[0] = "TDIGEST.REVRANK"
 	args[1] = key
 
-	// Convert floatSlice to []interface{}
-	interfaceSlice := make([]interface{}, len(values))
 	for i, v := range values {
-		interfaceSlice[i] = v
+		args[2+i] = v
 	}
-
-	args = append(args, interfaceSlice...)
 
 	cmd := NewIntSliceCmd(ctx, args...)
 	_ = c(ctx, cmd)
