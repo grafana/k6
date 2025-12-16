@@ -189,7 +189,6 @@ func TestSetInputFiles(t *testing.T) {
 				t.Parallel()
 
 				tb := newTestBrowser(t)
-				defer tb.Close()
 				page := tb.NewPage(nil)
 
 				err := page.SetContent(pageContent, nil)
