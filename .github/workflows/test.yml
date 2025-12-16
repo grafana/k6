@@ -19,7 +19,7 @@ jobs:
       fail-fast: false
       matrix:
         go-version: [1.24.x]
-        platform: [ubuntu-22.04, ubuntu-24.04-arm, github-hosted-windows-x64-large]
+        platform: [ubuntu-22.04, ubuntu-arm64-large, github-hosted-windows-x64-large]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout code
@@ -48,13 +48,11 @@ jobs:
           go version
           export GOMAXPROCS=2
           args=("-p" "2" "-race")
-          # Run with less concurrency on Windows/ARM to minimize flakiness.
-          if [[ "${{ matrix.platform }}" == windows* || "${{ matrix.platform }}" == *arm ]]; then
+          # Run with less concurrency on Ubuntu 22.04 to minimize flakiness.
+          if [[ "${{ matrix.platform }}" == ubuntu-22.04 ]]; then
             args[1]="1"
             export GOMAXPROCS=1
-            if [[ "${{ matrix.platform }}" == windows* ]]; then
-              unset args[2]
-            fi
+            unset args[2]
           fi
           go test "${args[@]}" -timeout 800s ./...
 
@@ -62,7 +60,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [ubuntu-22.04, ubuntu-24.04-arm, github-hosted-windows-x64-large]
+        platform: [ubuntu-22.04, ubuntu-arm64-large, github-hosted-windows-x64-large]
     runs-on: ${{ matrix.platform }}
     continue-on-error: true
     steps:
@@ -95,13 +93,11 @@ jobs:
           go version
           export GOMAXPROCS=2
           args=("-p" "2" "-race")
-          # Run with less concurrency on Windows/ARM to minimize flakiness.
-          if [[ "${{ matrix.platform }}" == windows* || "${{ matrix.platform }}" == *arm ]]; then
+          # Run with less concurrency on Ubuntu 22.04 to minimize flakiness.
+          if [[ "${{ matrix.platform }}" == ubuntu-22.04 ]]; then
             args[1]="1"
             export GOMAXPROCS=1
-            if [[ "${{ matrix.platform }}" == windows* ]]; then
-              unset args[2]
-            fi
+            unset args[2]
           fi
           go test "${args[@]}" -timeout 800s ./...
 
@@ -110,7 +106,7 @@ jobs:
       fail-fast: false
       matrix:
         go-version: [1.25.x]
-        platform: [ubuntu-22.04, ubuntu-24.04-arm, github-hosted-windows-x64-large]
+        platform: [ubuntu-22.04, ubuntu-arm64-large, github-hosted-windows-x64-large]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout code
@@ -134,12 +130,10 @@ jobs:
           go version
           export GOMAXPROCS=2
           args=("-p" "2" "-race")
-          # Run with less concurrency on Windows/ARM to minimize flakiness.
-          if [[ "${{ matrix.platform }}" == windows* || "${{ matrix.platform }}" == *arm ]]; then
+          # Run with less concurrency on Ubuntu 22.04 to minimize flakiness.
+          if [[ "${{ matrix.platform }}" == ubuntu-22.04 ]]; then
             args[1]="1"
             export GOMAXPROCS=1
-            if [[ "${{ matrix.platform }}" == windows* ]]; then
-              unset args[2]
-            fi
+            unset args[2]
           fi
           go test "${args[@]}" -timeout 800s ./...
