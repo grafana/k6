@@ -2,12 +2,13 @@
 package csv
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"strconv"
 	"sync/atomic"
-	"time"
 
 	"go.k6.io/k6/internal/js/modules/k6/data"
 
@@ -122,9 +123,13 @@ func (mi *ModuleInstance) Parse(file sobek.Value, options sobek.Value) *sobek.Pr
 		return promise
 	}
 
-	go func() {
-		underlyingSharedArrayName := parseSharedArrayNamePrefix + strconv.Itoa(time.Now().Nanosecond())
+	underlyingSharedArrayName, err := buildSharedArrayName(fileObj, parserOptions)
+	if err != nil {
+		reject(fmt.Errorf("failed to derive shared array name; reason: %w", err))
+		return promise
+	}
 
+	go func() {
 		// Because we rely on the data module to create the shared array, we need to
 		// make sure that the data module is initialized before we can proceed, and that we don't instantiate
 		// it multiple times.
@@ -213,6 +218,32 @@ func (p *Parser) Next() *sobek.Promise {
 	}()
 
 	return promise
+}
+
+func buildSharedArrayName(file fs.File, opts options) (string, error) {
+	delimiter := string(opts.Delimiter)
+	if delimiter == "" {
+		delimiter = ","
+	}
+
+	payload := map[string]any{
+		"path": file.Path,
+		"options": map[string]any{
+			"delimiter":     delimiter,
+			"skipFirstLine": opts.SkipFirstLine,
+			"fromLine":      opts.FromLine,
+			"toLine":        opts.ToLine,
+			"asObjects":     opts.AsObjects,
+		},
+	}
+
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return "", err
+	}
+
+	sum := sha256.Sum256(raw)
+	return parseSharedArrayNamePrefix + hex.EncodeToString(sum[:]), nil
 }
 
 // parseResult holds the result of a CSV parser's parsing operation such
