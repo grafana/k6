@@ -258,7 +258,7 @@ func TestPageEvaluateMapping(t *testing.T) {
 	}
 }
 
-func TestPageEvaluateMappingError(t *testing.T) { //nolint:tparallel
+func TestPageEvaluateMappingError(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
