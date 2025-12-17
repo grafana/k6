@@ -200,8 +200,8 @@ github.com/grafana/sobek/unistring
 # github.com/grafana/xk6-dashboard v0.7.13
 ## explicit; go 1.23.0
 github.com/grafana/xk6-dashboard/dashboard
-# github.com/grafana/xk6-redis v0.3.4
-## explicit; go 1.23.0
+# github.com/grafana/xk6-redis v0.3.6
+## explicit; go 1.24.0
 github.com/grafana/xk6-redis/redis
 # github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 ## explicit; go 1.14
@@ -309,16 +309,22 @@ github.com/prometheus/procfs/internal/util
 # github.com/r3labs/sse/v2 v2.10.0
 ## explicit; go 1.13
 github.com/r3labs/sse/v2
-# github.com/redis/go-redis/v9 v9.6.3
+# github.com/redis/go-redis/v9 v9.17.2
 ## explicit; go 1.18
 github.com/redis/go-redis/v9
+github.com/redis/go-redis/v9/auth
 github.com/redis/go-redis/v9/internal
+github.com/redis/go-redis/v9/internal/auth/streaming
 github.com/redis/go-redis/v9/internal/hashtag
 github.com/redis/go-redis/v9/internal/hscan
+github.com/redis/go-redis/v9/internal/interfaces
+github.com/redis/go-redis/v9/internal/maintnotifications/logs
 github.com/redis/go-redis/v9/internal/pool
 github.com/redis/go-redis/v9/internal/proto
 github.com/redis/go-redis/v9/internal/rand
 github.com/redis/go-redis/v9/internal/util
+github.com/redis/go-redis/v9/maintnotifications
+github.com/redis/go-redis/v9/push
 # github.com/serenize/snaker v0.0.0-20201027110005-a7ad2135616e
 ## explicit
 github.com/serenize/snaker
