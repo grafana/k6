@@ -261,7 +261,6 @@ func TestPageEvaluateMapping(t *testing.T) {
 func TestPageEvaluateMappingError(t *testing.T) { //nolint:tparallel
 	t.Parallel()
 
-	tb := newTestBrowser(t)
 	tests := []struct {
 		name    string
 		script  string
@@ -284,8 +283,11 @@ func TestPageEvaluateMappingError(t *testing.T) { //nolint:tparallel
 		},
 	}
 
-	for _, tt := range tests { //nolint:paralleltest
+	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tb := newTestBrowser(t)
 			tb.vu.ActivateVU()
 			tb.vu.StartIteration(t)
 			defer tb.vu.EndIteration(t)
