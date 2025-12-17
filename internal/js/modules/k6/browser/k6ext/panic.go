@@ -11,7 +11,6 @@ import (
 	"github.com/grafana/sobek"
 
 	"go.k6.io/k6/errext"
-	k6common "go.k6.io/k6/js/common"
 )
 
 // Abortf will shutdown the whole test run. This should
@@ -32,7 +31,7 @@ func Abortf(ctx context.Context, format string, a ...any) {
 // TODO: test.
 func Panicf(ctx context.Context, format string, a ...any) {
 	failFunc := func(rt *sobek.Runtime, a ...any) {
-		k6common.Throw(rt, fmt.Errorf(format, a...))
+		panic(rt.NewTypeError(fmt.Errorf(format, a...)))
 	}
 	sharedPanic(ctx, failFunc, a...)
 }
