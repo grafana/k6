@@ -226,14 +226,33 @@ func buildSharedArrayName(file fs.File, opts options) (string, error) {
 		delimiter = ","
 	}
 
-	payload := map[string]any{
-		"path": file.Path,
-		"options": map[string]any{
-			"delimiter":     delimiter,
-			"skipFirstLine": opts.SkipFirstLine,
-			"fromLine":      opts.FromLine,
-			"toLine":        opts.ToLine,
-			"asObjects":     opts.AsObjects,
+	// Use anonymous structs with explicit field ordering instead of maps to ensure
+	// deterministic JSON marshaling. While encoding/json currently sorts map keys
+	// alphabetically, this is an implementation detail not guaranteed by the Go
+	// specification. Structs provide guaranteed field ordering across all Go versions.
+	payload := struct {
+		Path    string `json:"path"`
+		Options struct {
+			AsObjects     null.Bool `json:"asObjects"`
+			Delimiter     string    `json:"delimiter"`
+			FromLine      null.Int  `json:"fromLine"`
+			SkipFirstLine bool      `json:"skipFirstLine"`
+			ToLine        null.Int  `json:"toLine"`
+		} `json:"options"`
+	}{
+		Path: file.Path,
+		Options: struct {
+			AsObjects     null.Bool `json:"asObjects"`
+			Delimiter     string    `json:"delimiter"`
+			FromLine      null.Int  `json:"fromLine"`
+			SkipFirstLine bool      `json:"skipFirstLine"`
+			ToLine        null.Int  `json:"toLine"`
+		}{
+			AsObjects:     opts.AsObjects,
+			Delimiter:     delimiter,
+			FromLine:      opts.FromLine,
+			SkipFirstLine: opts.SkipFirstLine,
+			ToLine:        opts.ToLine,
 		},
 	}
 
