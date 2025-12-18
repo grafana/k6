@@ -1428,55 +1428,66 @@ func TestGetByTextSuccess(t *testing.T) {
 func TestGetByNullHandling(t *testing.T) {
 	t.Parallel()
 
-	tb := newTestBrowser(t, withFileServer())
-	tb.vu.ActivateVU()
-	tb.vu.StartIteration(t)
+	tests := []struct {
+		name        string
+		getByImpl   string
+		method      string
+		expectedErr string
+	}{
+		{name: "page_getByRole", getByImpl: pageImpl, method: "getByRole", expectedErr: "missing required argument 'role'"},
+		{name: "page_getByAltText", getByImpl: pageImpl, method: "getByAltText", expectedErr: "missing required argument 'altText'"},
+		{name: "page_getByLabel", getByImpl: pageImpl, method: "getByLabel", expectedErr: "missing required argument 'label'"},
+		{name: "page_getByPlaceholder", getByImpl: pageImpl, method: "getByPlaceholder", expectedErr: "missing required argument 'placeholder'"},
+		{name: "page_getByTitle", getByImpl: pageImpl, method: "getByTitle", expectedErr: "missing required argument 'title'"},
+		{name: "page_getByTestId", getByImpl: pageImpl, method: "getByTestId", expectedErr: "missing required argument 'testId'"},
+		{name: "page_getByText", getByImpl: pageImpl, method: "getByText", expectedErr: "missing required argument 'text'"},
+		{name: "frame_getByRole", getByImpl: frameImpl, method: "getByRole", expectedErr: "missing required argument 'role'"},
+		{name: "frame_getByAltText", getByImpl: frameImpl, method: "getByAltText", expectedErr: "missing required argument 'altText'"},
+		{name: "frame_getByLabel", getByImpl: frameImpl, method: "getByLabel", expectedErr: "missing required argument 'label'"},
+		{name: "frame_getByPlaceholder", getByImpl: frameImpl, method: "getByPlaceholder", expectedErr: "missing required argument 'placeholder'"},
+		{name: "frame_getByTitle", getByImpl: frameImpl, method: "getByTitle", expectedErr: "missing required argument 'title'"},
+		{name: "frame_getByTestId", getByImpl: frameImpl, method: "getByTestId", expectedErr: "missing required argument 'testId'"},
+		{name: "frame_getByText", getByImpl: frameImpl, method: "getByText", expectedErr: "missing required argument 'text'"},
+		{name: "locator_getByRole", getByImpl: locatorImpl, method: "getByRole", expectedErr: "missing required argument 'role'"},
+		{name: "locator_getByAltText", getByImpl: locatorImpl, method: "getByAltText", expectedErr: "missing required argument 'altText'"},
+		{name: "locator_getByLabel", getByImpl: locatorImpl, method: "getByLabel", expectedErr: "missing required argument 'label'"},
+		{name: "locator_getByPlaceholder", getByImpl: locatorImpl, method: "getByPlaceholder", expectedErr: "missing required argument 'placeholder'"},
+		{name: "locator_getByTitle", getByImpl: locatorImpl, method: "getByTitle", expectedErr: "missing required argument 'title'"},
+		{name: "locator_getByTestId", getByImpl: locatorImpl, method: "getByTestId", expectedErr: "missing required argument 'testId'"},
+		{name: "locator_getByText", getByImpl: locatorImpl, method: "getByText", expectedErr: "missing required argument 'text'"},
+		{name: "frameLocator_getByRole", getByImpl: frameLocatorImpl, method: "getByRole", expectedErr: "missing required argument 'role'"},
+		{name: "frameLocator_getByAltText", getByImpl: frameLocatorImpl, method: "getByAltText", expectedErr: "missing required argument 'altText'"},
+		{name: "frameLocator_getByLabel", getByImpl: frameLocatorImpl, method: "getByLabel", expectedErr: "missing required argument 'label'"},
+		{name: "frameLocator_getByPlaceholder", getByImpl: frameLocatorImpl, method: "getByPlaceholder", expectedErr: "missing required argument 'placeholder'"},
+		{name: "frameLocator_getByTitle", getByImpl: frameLocatorImpl, method: "getByTitle", expectedErr: "missing required argument 'title'"},
+		{name: "frameLocator_getByTestId", getByImpl: frameLocatorImpl, method: "getByTestId", expectedErr: "missing required argument 'testId'"},
+		{name: "frameLocator_getByText", getByImpl: frameLocatorImpl, method: "getByText", expectedErr: "missing required argument 'text'"},
+	}
 
-	// Setup
-	tb.vu.SetVar(t, "page", &sobek.Object{})
-	_, err := tb.vu.RunAsync(t, `
-		page = await browser.newPage();
-		frame = page.mainFrame();
-		locator = page.locator(':root');
-		frameLocator = page.locator('#%s').contentFrame();
-	`, iframeID)
-	require.NoError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	for _, getByImpl := range []string{pageImpl, frameImpl, locatorImpl, frameLocatorImpl} {
-		_, err = tb.vu.RunAsync(t, `
-		await %s.getByRole().click();
-	`, getByImpl)
-		require.ErrorContains(t, err, "missing required argument 'role'")
+			tb := newTestBrowser(t, withFileServer())
+			tb.vu.ActivateVU()
+			tb.vu.StartIteration(t)
+			defer tb.vu.EndIteration(t)
 
-		_, err = tb.vu.RunAsync(t, `
-		await %s.getByAltText().click();
-	`, getByImpl)
-		require.ErrorContains(t, err, "missing required argument 'altText'")
+			// Setup
+			tb.vu.SetVar(t, "page", &sobek.Object{})
+			_, err := tb.vu.RunAsync(t, `
+				page = await browser.newPage();
+				frame = page.mainFrame();
+				locator = page.locator(':root');
+				frameLocator = page.locator('#%s').contentFrame();
+			`, iframeID)
+			require.NoError(t, err)
 
-		_, err = tb.vu.RunAsync(t, `
-		await %s.getByLabel().click();
-	`, getByImpl)
-		require.ErrorContains(t, err, "missing required argument 'label'")
-
-		_, err = tb.vu.RunAsync(t, `
-		await %s.getByPlaceholder().click();
-	`, getByImpl)
-		require.ErrorContains(t, err, "missing required argument 'placeholder'")
-
-		_, err = tb.vu.RunAsync(t, `
-		await %s.getByTitle().click();
-	`, getByImpl)
-		require.ErrorContains(t, err, "missing required argument 'title'")
-
-		_, err = tb.vu.RunAsync(t, `
-		await %s.getByTestId().click();
-	`, getByImpl)
-		require.ErrorContains(t, err, "missing required argument 'testId'")
-
-		_, err = tb.vu.RunAsync(t, `
-		await %s.getByText().click();
-	`, getByImpl)
-		require.ErrorContains(t, err, "missing required argument 'text'")
+			_, err = tb.vu.RunAsync(t, `
+				await %s.%s().click();
+			`, tt.getByImpl, tt.method)
+			require.ErrorContains(t, err, tt.expectedErr)
+		})
 	}
 }
 
