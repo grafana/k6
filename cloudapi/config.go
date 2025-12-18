@@ -19,7 +19,7 @@ const LegacyCloudConfigKey = "loadimpact"
 type Config struct {
 	// TODO: refactor common stuff between cloud execution and output
 	StackID          null.Int    `json:"stackID,omitempty" envconfig:"K6_CLOUD_STACK_ID"`
-	StackURL         null.String `json:"stackURL,omitempty" envconfig:"K6_CLOUD_STACK"`
+	StackURL         null.String `json:"stackURL,omitempty" envconfig:"K6_CLOUD_STACK_URL"`
 	DefaultProjectID null.Int    `json:"defaultProjectID,omitempty"`
 	Token            null.String `json:"token" envconfig:"K6_CLOUD_TOKEN"`
 	ProjectID        null.Int    `json:"projectID" envconfig:"K6_CLOUD_PROJECT_ID"`
