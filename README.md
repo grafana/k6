@@ -45,7 +45,7 @@ Its core features are:
 - **A full-featured API.** The scripting API is packed with features that help you simulate real application traffic.
 - **An embedded JavaScript engine.** The performance of Go, the scripting familiarity of JavaScript.
 - **Multiple Protocol support**. HTTP, WebSockets, gRPC, Browser, and more.
-- **Large extension ecosystem.** You can extend k6 to support your needs. And many people have already shared their extensions with the community!
+- **Large extension ecosystem.** You can extend k6 to support your needs. And many people have already shared their extensions with the community! [Explore](https://grafana.com/docs/k6/latest/extensions/explore) the available extensions.
 - **Flexible metrics storage and visualization**. Summary statistics or granular metrics, exported to the service of your choice.
 - **Native integration with Grafana cloud**. [SaaS solution](https://grafana.com/products/cloud/k6/) for test execution, metrics correlation, data analysis, and more.
 
@@ -117,7 +117,7 @@ It's worth mentioning that we consider [upvotes (thumbs-up)](https://github.com/
 
 If you want to contribute or help with the development of k6, start by reading [CONTRIBUTING.md](CONTRIBUTING.md). Before you start coding, it might be a good idea to first discuss your plans and implementation details with the k6 maintainers—especially when it comes to big changes and features. You can do this in the [GitHub issue](https://github.com/grafana/k6/issues) for the problem you're solving (create one if it doesn't exist).
 
-> **Note:** To disclose security issues, refer to [SECURITY.md](SECURITY.md).
+> **Note:** To disclose security issues, refer to [SECURITY.md](https://github.com/grafana/k6?tab=security-ov-file).
 
 ## Support
 

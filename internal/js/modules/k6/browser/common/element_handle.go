@@ -1363,9 +1363,7 @@ func (h *ElementHandle) Screenshot(
 	s := newScreenshotter(spanCtx, sp, h.logger)
 	buf, err := s.screenshotElement(h, opts)
 	if err != nil {
-		err := fmt.Errorf("taking screenshot of elementHandle: %w", err)
-		spanRecordError(span, err)
-		return nil, err
+		return nil, spanRecordErrorf(span, "taking screenshot of elementHandle: %w", err)
 	}
 
 	return buf, err
@@ -1771,7 +1769,8 @@ func retryPointerAction(
 		}
 
 		if !errors.Is(err, ErrElementNotVisible) &&
-			!errors.Is(err, ErrElementNotAttachedToDOM) {
+			!errors.Is(err, ErrElementNotAttachedToDOM) &&
+			!strings.Contains(err.Error(), "frame has been detached") {
 			return res, err
 		}
 

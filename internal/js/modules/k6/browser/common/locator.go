@@ -92,9 +92,7 @@ func (l *Locator) Click(opts *FrameClickOptions) error {
 	opts.Strict = true
 	opts.retry = true
 	if err := l.frame.click(l.selector, opts); err != nil {
-		err := fmt.Errorf("clicking on %q: %w", l.selector, err)
-		spanRecordError(span, err)
-		return err
+		return spanRecordErrorf(span, "clicking on %q: %w", l.selector, err)
 	}
 
 	applySlowMo(l.ctx)
@@ -532,6 +530,27 @@ func (l *Locator) Press(key string, opts *FramePressOptions) error {
 	return nil
 }
 
+// PressSequentially focuses on the element and sequentially sends a keydown,
+// keypress, and keyup events for each character in the provided string.
+// For handling special keys, use the [Locator.Press] method.
+func (l *Locator) PressSequentially(text string, opts *FrameTypeOptions) error {
+	l.log.Debugf(
+		"Locator:PressSequentially", "fid:%s furl:%q sel:%q text:%q opts:%+v",
+		l.frame.ID(), l.frame.URL(), l.selector, text, opts,
+	)
+	_, span := TraceAPICall(l.ctx, l.frame.page.targetID.String(), "locator.pressSequentially")
+	defer span.End()
+
+	opts.Strict = true
+	if err := l.frame.typ(l.selector, text, opts); err != nil {
+		return spanRecordErrorf(span, "pressing sequentially %q on %q: %w", text, l.selector, err)
+	}
+
+	applySlowMo(l.ctx)
+
+	return nil
+}
+
 // Type text on the element found that matches the locator's
 // selector with strict mode on.
 func (l *Locator) Type(text string, opts *FrameTypeOptions) error {
@@ -544,9 +563,7 @@ func (l *Locator) Type(text string, opts *FrameTypeOptions) error {
 
 	opts.Strict = true
 	if err := l.frame.typ(l.selector, text, opts); err != nil {
-		err := fmt.Errorf("typing %q in %q: %w", text, l.selector, err)
-		spanRecordError(span, err)
-		return err
+		return spanRecordErrorf(span, "typing %q in %q: %w", text, l.selector, err)
 	}
 
 	applySlowMo(l.ctx)

@@ -292,6 +292,46 @@ func TestLocator(t *testing.T) {
 				require.Equal(t, "xsomething", inputValue)
 			},
 		},
+
+		{
+			"PressSequentially", func(_ *testBrowser, p *common.Page) {
+				lo := p.Locator("#inputText", nil)
+				require.NoError(t, lo.Clear(common.NewFrameFillOptions(lo.Timeout())))
+
+				require.NoError(t, lo.PressSequentially("hello", common.NewFrameTypeOptions(lo.Timeout())))
+
+				value, err := p.InputValue("#inputText", common.NewFrameInputValueOptions(p.MainFrame().Timeout()))
+				require.NoError(t, err)
+				require.Equal(t, "hello", value)
+			},
+		},
+		{
+			"PressSequentiallyWithDelayOption", func(_ *testBrowser, p *common.Page) {
+				lo := p.Locator("#inputText", nil)
+				require.NoError(t, lo.Clear(common.NewFrameFillOptions(lo.Timeout())))
+
+				opts := common.NewFrameTypeOptions(lo.Timeout())
+				opts.Delay = 100
+
+				require.NoError(t, lo.PressSequentially("text", opts))
+
+				value, err := p.InputValue("#inputText", common.NewFrameInputValueOptions(p.MainFrame().Timeout()))
+				require.NoError(t, err)
+				require.Equal(t, "text", value)
+			},
+		},
+		{
+			"PressSequentiallyTextarea", func(_ *testBrowser, p *common.Page) {
+				lo := p.Locator("textarea", nil)
+				require.NoError(t, lo.Clear(common.NewFrameFillOptions(lo.Timeout())))
+
+				require.NoError(t, lo.PressSequentially("some text", common.NewFrameTypeOptions(lo.Timeout())))
+
+				value, err := lo.InputValue(common.NewFrameInputValueOptions(lo.Timeout()))
+				require.NoError(t, err)
+				require.Equal(t, "some text", value)
+			},
+		},
 		{
 			"SelectOption", func(tb *testBrowser, p *common.Page) {
 				l := p.Locator("#selectElement", nil)
@@ -465,6 +505,11 @@ func TestLocator(t *testing.T) {
 		{
 			"Press", func(l *common.Locator, tb *testBrowser) error {
 				return l.Press("a", common.NewFramePressOptions(100*time.Millisecond))
+			},
+		},
+		{
+			"PressSequentially", func(l *common.Locator, tb *testBrowser) error {
+				return l.PressSequentially("text", common.NewFrameTypeOptions(100*time.Millisecond))
 			},
 		},
 		{

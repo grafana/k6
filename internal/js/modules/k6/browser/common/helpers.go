@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"regexp"
 	"slices"
+	"strings"
 	"time"
 
 	cdpruntime "github.com/chromedp/cdproto/runtime"
@@ -277,4 +279,26 @@ func (rm RegExMatcher) Match(pattern, s string) (bool, error) {
 		return false, fmt.Errorf("matching %q against pattern %q: %w", s, pattern, err)
 	}
 	return m(s)
+}
+
+var sourceURLRegex = regexp.MustCompile(`(?s)[\040\t]*//[@#] sourceURL=\s*(\S*?)\s*$`)
+
+func hasSourceURL(js string) bool {
+	lastNotEmptyIndex := strings.LastIndexFunc(js, func(r rune) bool {
+		switch r {
+		case '\n', '\r', ' ', '\t':
+			return false
+		default:
+			return true
+		}
+	})
+	lastNewLineBeforeLastLineIndex := 0 // default to going through the whole string
+	if lastNotEmptyIndex != -1 {        // if there are no new lines - go through the whole string
+		lastNewLineBeforeLastLineIndex = strings.LastIndex(js[:lastNotEmptyIndex], "\n")
+		if lastNewLineBeforeLastLineIndex == -1 { // reset to zero again
+			lastNewLineBeforeLastLineIndex = 0
+		}
+	}
+
+	return sourceURLRegex.MatchString(js[lastNewLineBeforeLastLineIndex:])
 }
