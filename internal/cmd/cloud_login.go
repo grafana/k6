@@ -41,7 +41,7 @@ func validateAndResolveStack(
 	client, err := v6cloudapi.NewClient(
 		gs.Logger,
 		token,
-		consolidatedCurrentConfig.Host.String,
+		consolidatedCurrentConfig.Hostv6.String,
 		build.Version,
 		consolidatedCurrentConfig.Timeout.TimeDuration(),
 	)

@@ -33,7 +33,7 @@ func newMetricsClient(c *cloudapi.Client, testRunID string) (*metricsClient, err
 	// A versioned client would be better but it would require a breaking change
 	// and considering that other services (e.g. k6-operator) depend on it,
 	// we want to stabilize the API before.
-	u := c.BaseURL(cloudapi.APIVersion1)
+	u := c.BaseURL()
 	if !strings.HasSuffix(u, "/v1") {
 		return nil, errors.New("a /v1 suffix is expected in the Cloud service's BaseURL path")
 	}

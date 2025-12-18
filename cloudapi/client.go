@@ -23,25 +23,12 @@ const (
 	k6IdempotencyKeyHeader = "K6-Idempotency-Key"
 )
 
-// APIVersion represents the Cloud API version.
-type APIVersion string
-
-const (
-	// APIVersion1 represents the v1 API.
-	APIVersion1 APIVersion = "v1"
-	// APIVersion4 represents the v4 API (used by PLZ endpoints).
-	APIVersion4 APIVersion = "v4"
-	// APIVersion6 represents the v6 API.
-	APIVersion6 APIVersion = "v6"
-)
-
 // Client handles communication with the k6 Cloud API.
 type Client struct {
-	client     *http.Client
-	token      string
-	host       string
-	apiVersion APIVersion
-	version    string
+	client  *http.Client
+	token   string
+	baseURL string
+	version string
 
 	logger logrus.FieldLogger
 
@@ -51,16 +38,10 @@ type Client struct {
 
 // NewClient return a new client for the cloud API
 func NewClient(logger logrus.FieldLogger, token, host, version string, timeout time.Duration) *Client {
-	return NewClientWithAPIVersion(logger, token, host, version, APIVersion1, timeout)
-}
-
-// NewClientWithAPIVersion returns a new client for the cloud API with a specific API version.
-func NewClientWithAPIVersion(logger logrus.FieldLogger, token, host, version string, apiVersion APIVersion, timeout time.Duration) *Client {
 	c := &Client{
 		client:        &http.Client{Timeout: timeout},
 		token:         token,
-		host:          host,
-		apiVersion:    apiVersion,
+		baseURL:       fmt.Sprintf("%s/v1", host),
 		version:       version,
 		retries:       MaxRetries,
 		retryInterval: RetryInterval,
@@ -69,20 +50,9 @@ func NewClientWithAPIVersion(logger logrus.FieldLogger, token, host, version str
 	return c
 }
 
-// BaseURL returns the fully qualified base URL for the specified API version.
-// It returns:
-//   - "{client.host}/v1" for APIVersion1
-//   - "{client.host}/v4" for APIVersion4
-//   - "https://api.k6.io/cloud/v6" for APIVersion6
-func (c *Client) BaseURL(apiVersion APIVersion) string {
-	switch apiVersion {
-	case APIVersion6:
-		return "https://api.k6.io/cloud/v6"
-	case APIVersion4:
-		return fmt.Sprintf("%s/v4", c.host)
-	default:
-		return fmt.Sprintf("%s/v1", c.host)
-	}
+// BaseURL returns configured host.
+func (c *Client) BaseURL() string {
+	return c.baseURL
 }
 
 // NewRequest creates new HTTP request.

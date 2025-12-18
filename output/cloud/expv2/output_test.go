@@ -47,7 +47,7 @@ func TestNewWithConfigOverwritten(t *testing.T) {
 	o, err := New(logger, conf, c)
 	require.NoError(t, err)
 	require.NotNil(t, o)
-	assert.Equal(t, "the-new-host/v1", o.cloudClient.BaseURL(cloudapi.APIVersion1))
+	assert.Equal(t, "the-new-host/v1", o.cloudClient.BaseURL())
 }
 
 func TestOutputSetTestRunID(t *testing.T) {

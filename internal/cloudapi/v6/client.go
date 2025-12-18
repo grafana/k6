@@ -42,7 +42,7 @@ func NewClient(logger logrus.FieldLogger, token, host, version string, timeout t
 		UserAgent:     "k6cloud/" + version,
 		Servers: k6cloud.ServerConfigurations{
 			{
-				URL:         "https://api.k6.io",
+				URL:         host,
 				Description: "Global k6 Cloud API.",
 			},
 		},
@@ -53,7 +53,7 @@ func NewClient(logger logrus.FieldLogger, token, host, version string, timeout t
 	c := &Client{
 		apiClient:     k6cloud.NewAPIClient(cfg),
 		token:         token,
-		baseURL:       fmt.Sprintf("%s/cloud/v6", host),
+		baseURL:       host,
 		retries:       MaxRetries,
 		retryInterval: RetryInterval,
 		logger:        logger,
