@@ -147,7 +147,7 @@ func resolveDefaultProjectID(
 			return cloudConfig.DefaultProjectID.Int64, nil
 		}
 		return 0, fmt.Errorf(
-			"default stack configured but default project ID not available - " +
+			"default stack configured but the default project ID is not available - " +
 				"please run `k6 cloud login` to refresh your configuration")
 	}
 
