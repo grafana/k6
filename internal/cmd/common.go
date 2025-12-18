@@ -143,7 +143,7 @@ func resolveDefaultProjectID(
 			if !cloudConfig.StackURL.Valid {
 				stackName = fmt.Sprintf("stack-%d", cloudConfig.StackID.Int64)
 			}
-			gs.Logger.Warnf("Warning: no projectID specified, using default project of the %s stack\n\n", stackName)
+			gs.Logger.Warnf("No projectID specified, using default project of the %s stack\n\n", stackName)
 			return cloudConfig.DefaultProjectID.Int64, nil
 		}
 		return 0, fmt.Errorf(
