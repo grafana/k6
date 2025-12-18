@@ -42,7 +42,7 @@ func NewClient(logger logrus.FieldLogger, token, host, version string, timeout t
 		UserAgent:     "k6cloud/" + version,
 		Servers: k6cloud.ServerConfigurations{
 			{
-				URL:         host,
+				URL:         "https://api.k6.io",
 				Description: "Global k6 Cloud API.",
 			},
 		},

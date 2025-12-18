@@ -2,9 +2,7 @@ package cloudapi
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
-	"io"
 	"mime/multipart"
 	"net/http"
 	"strconv"
@@ -70,12 +68,6 @@ type ValidateTokenResponse struct {
 	IsValid bool   `json:"is_valid"`
 	Message string `json:"message"`
 	Token   string `json:"token-info"`
-}
-
-// AuthenticationResponse represents the response from the /cloud/v6/auth endpoint.
-type AuthenticationResponse struct {
-	StackID          int64 `json:"stack_id"`
-	DefaultProjectID int64 `json:"default_project_id"`
 }
 
 func (c *Client) handleLogEntriesFromCloud(ctrr CreateTestRunResponse) {
@@ -343,42 +335,4 @@ func (c *Client) ValidateToken() (*ValidateTokenResponse, error) {
 	}
 
 	return &vtr, nil
-}
-
-// ValidateAuth validates a token and stack URL, returning the stack ID and default project ID.
-// The stackURL must be a normalized full URL (e.g., https://my-team.grafana.net).
-func (c *Client) ValidateAuth(stackURL string) (*AuthenticationResponse, error) {
-	authURL := fmt.Sprintf("%s/auth", c.BaseURL(APIVersion6))
-	req, err := http.NewRequest(http.MethodGet, authURL, nil) //nolint:noctx
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("X-Stack-Url", stackURL)
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.token))
-	req.Header.Set("User-Agent", "k6cloud/"+c.version)
-
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("request failed: %w", err)
-	}
-	defer func() {
-		if resp != nil {
-			_, _ = io.Copy(io.Discard, resp.Body)
-			if cerr := resp.Body.Close(); cerr != nil && err == nil {
-				err = cerr
-			}
-		}
-	}()
-
-	if err := CheckResponse(resp); err != nil {
-		return nil, err
-	}
-
-	authResp := AuthenticationResponse{}
-	if err := json.NewDecoder(resp.Body).Decode(&authResp); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
-	}
-
-	return &authResp, nil
 }

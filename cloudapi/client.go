@@ -29,6 +29,8 @@ type APIVersion string
 const (
 	// APIVersion1 represents the v1 API.
 	APIVersion1 APIVersion = "v1"
+	// APIVersion4 represents the v4 API (used by PLZ endpoints).
+	APIVersion4 APIVersion = "v4"
 	// APIVersion6 represents the v6 API.
 	APIVersion6 APIVersion = "v6"
 )
@@ -70,11 +72,14 @@ func NewClientWithAPIVersion(logger logrus.FieldLogger, token, host, version str
 // BaseURL returns the fully qualified base URL for the specified API version.
 // It returns:
 //   - "{client.host}/v1" for APIVersion1
+//   - "{client.host}/v4" for APIVersion4
 //   - "https://api.k6.io/cloud/v6" for APIVersion6
 func (c *Client) BaseURL(apiVersion APIVersion) string {
 	switch apiVersion {
 	case APIVersion6:
 		return "https://api.k6.io/cloud/v6"
+	case APIVersion4:
+		return fmt.Sprintf("%s/v4", c.host)
 	default:
 		return fmt.Sprintf("%s/v1", c.host)
 	}

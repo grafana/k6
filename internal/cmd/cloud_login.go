@@ -15,6 +15,7 @@ import (
 	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/internal/build"
+	v6cloudapi "go.k6.io/k6/internal/cloudapi/v6"
 	"go.k6.io/k6/internal/ui"
 )
 
@@ -37,20 +38,23 @@ func validateAndResolveStack(
 
 	normalizedURL := normalizeStackURL(stackInput)
 
-	client := cloudapi.NewClient(
+	client, err := v6cloudapi.NewClient(
 		gs.Logger,
 		token,
 		consolidatedCurrentConfig.Host.String,
 		build.Version,
 		consolidatedCurrentConfig.Timeout.TimeDuration(),
 	)
-
-	authResp, err := client.ValidateAuth(normalizedURL)
 	if err != nil {
 		return "", 0, 0, err
 	}
 
-	return normalizedURL, authResp.StackID, authResp.DefaultProjectID, nil
+	authResp, err := client.ValidateToken(normalizedURL)
+	if err != nil {
+		return "", 0, 0, err
+	}
+
+	return normalizedURL, int64(authResp.StackId), int64(authResp.DefaultProjectId), nil
 }
 
 // normalizeStackURL converts a stack slug to a full URL if needed.
@@ -201,7 +205,8 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 				return fmt.Errorf(
 					"your stack is invalid - please, consult the Grafana Cloud k6 documentation "+
 						"for instructions on how to get yours: "+
-						"https://grafana.com/docs/grafana-cloud/testing/k6/author-run/something-stack: %w",
+						"https://grafana.com/docs/grafana-cloud/testing/k6/author-run/configure-stack. "+
+						"Error details: %w",
 					err)
 			}
 			newCloudConf.StackURL = null.StringFrom(stackURL)
@@ -262,7 +267,8 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 				return fmt.Errorf(
 					"your stack is invalid - please, consult the Grafana Cloud k6 documentation "+
 						"for instructions on how to get yours: "+
-						"https://grafana.com/docs/grafana-cloud/testing/k6/author-run/something-stack: %w",
+						"https://grafana.com/docs/grafana-cloud/testing/k6/author-run/configure-stack. "+
+						"Error details: %w",
 					err)
 			}
 			newCloudConf.StackURL = null.StringFrom(stackURL)
