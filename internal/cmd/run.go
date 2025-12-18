@@ -103,11 +103,11 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		c.gs.Events.UnsubscribeAll()
 	}()
 
-	printBanner(c.gs)
 	test, controller, err := c.loadConfiguredTest(cmd, args)
 	if err != nil {
 		return err
 	}
+	printBanner(c.gs)
 	if test.keyLogger != nil {
 		defer func() {
 			if klErr := test.keyLogger.Close(); klErr != nil {
