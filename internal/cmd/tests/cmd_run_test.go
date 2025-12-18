@@ -503,7 +503,7 @@ func TestExecutionTestOptionsDefaultValues(t *testing.T) {
 		import exec from 'k6/execution';
 
 		export default function () {
-			console.log(exec.test.options)
+			console.log(JSON.stringify(exec.test.options))
 		}
 	`
 
