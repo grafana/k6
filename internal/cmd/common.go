@@ -11,7 +11,6 @@ import (
 	"github.com/spf13/pflag"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/lib/types"
@@ -127,30 +126,4 @@ func handleTestAbortSignals(gs *state.GlobalState, gracefulStopHandler, onHardSt
 		close(done)
 		gs.SignalStop(sigC)
 	}
-}
-
-func resolveDefaultProjectID(
-	gs *state.GlobalState,
-	cloudConfig *cloudapi.Config,
-) (int64, error) {
-	// Priority: projectID -> default stack from config
-	if cloudConfig.ProjectID.Valid && cloudConfig.ProjectID.Int64 > 0 {
-		return cloudConfig.ProjectID.Int64, nil
-	}
-	if cloudConfig.StackID.Valid && cloudConfig.StackID.Int64 != 0 {
-		if cloudConfig.DefaultProjectID.Valid && cloudConfig.DefaultProjectID.Int64 > 0 {
-			stackName := cloudConfig.StackURL.String
-			if !cloudConfig.StackURL.Valid {
-				stackName = fmt.Sprintf("stack-%d", cloudConfig.StackID.Int64)
-			}
-			gs.Logger.Warnf("No projectID specified, using default project of the %s stack\n\n", stackName)
-			return cloudConfig.DefaultProjectID.Int64, nil
-		}
-		return 0, fmt.Errorf(
-			"default stack configured but the default project ID is not available - " +
-				"please run `k6 cloud login` to refresh your configuration")
-	}
-
-	// Return 0 to let the backend pick the project (old behavior)
-	return 0, nil
 }
