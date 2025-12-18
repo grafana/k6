@@ -8,7 +8,7 @@ Before you begin, make sure to familiarize yourself with the [Code of Conduct](C
 
 If you want to chat with the team or the community, you can [join our community forums](https://community.k6.io/).
 
-> **Note:** To disclose security issues, refer to [SECURITY.md](https://github.com/grafana/.github/blob/main/SECURITY.md).
+> **Note:** To disclose security issues, refer to [SECURITY.md](https://github.com/grafana/k6?tab=security-ov-file).
 
 ## Filing issues
 
