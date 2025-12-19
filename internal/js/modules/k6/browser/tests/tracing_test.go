@@ -262,16 +262,7 @@ func TestNavigationSpanCreation(t *testing.T) {
 			js: `
 				page = await browser.newPage();
 				await page.goto('%s', {waitUntil:'networkidle'});
-				await Promise.all([
-					page.waitForNavigation(),
-					page.evaluate(() => window.history.back()),
-				]).catch(e => {
-					// only throw exception if it's not related to navigational
-					// race condition, which can happen in slow machines.
-					if (!e.toString().includes('Inspected target navigated or closed')) {
-						throw e;
-					}
-				});
+				await page.goBack();
 				await page.close();
 				`,
 			expected: []string{
@@ -282,7 +273,7 @@ func TestNavigationSpanCreation(t *testing.T) {
 				"navigation", // created when a new page is created
 				"page.goto",
 				"navigation", // created when a navigation occurs after goto
-				"page.waitForNavigation",
+				"page.goBack",
 				"navigation", // created when going back to the previous page
 				"page.close",
 			},
