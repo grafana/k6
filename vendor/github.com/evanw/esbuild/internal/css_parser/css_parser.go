@@ -30,7 +30,7 @@ type parser struct {
 	globalScope       map[string]ast.LocRef
 	nestingWarnings   map[logger.Loc]struct{}
 	tracker           logger.LineColumnTracker
-	enclosingAtMedia  [][]css_ast.Token
+	enclosingAtMedia  [][]css_ast.MediaQuery
 	layersPreImport   [][]string
 	layersPostImport  [][]string
 	enclosingLayer    []string
@@ -626,6 +626,11 @@ next:
 				continue
 			}
 
+		case *css_ast.RAtMedia:
+			if len(r.Rules) == 0 {
+				continue
+			}
+
 			// Unwrap "@media" rules that duplicate conditions from a parent "@media"
 			// rule. This is unlikely to be authored manually but can be automatically
 			// generated when using a CSS framework such as Tailwind.
@@ -653,12 +658,10 @@ next:
 			//   }
 			//
 			// Which can then be mangled further.
-			if strings.EqualFold(r.AtToken, "media") {
-				for _, prelude := range p.enclosingAtMedia {
-					if css_ast.TokensEqualIgnoringWhitespace(r.Prelude, prelude) {
-						mangledRules = append(mangledRules, r.Rules...)
-						continue next
-					}
+			for _, queries := range p.enclosingAtMedia {
+				if css_ast.MediaQueriesEqual(r.Queries, queries, nil) {
+					mangledRules = append(mangledRules, r.Rules...)
+					continue next
 				}
 			}
 
@@ -702,8 +705,8 @@ next:
 	// Mangle non-top-level rules using a back-to-front pass. Top-level rules
 	// will be mangled by the linker instead for cross-file rule mangling.
 	if !isTopLevel {
-		remover := MakeDuplicateRuleMangler(ast.SymbolMap{})
-		mangledRules = remover.RemoveDuplicateRulesInPlace(p.source.Index, mangledRules, p.importRecords)
+		remover := MakeDeadRuleMangler(ast.SymbolMap{})
+		mangledRules = remover.RemoveDeadRulesInPlace(p.source.Index, mangledRules, p.importRecords)
 	}
 
 	return mangledRules
@@ -723,20 +726,20 @@ type callEntry struct {
 	sourceIndex   uint32
 }
 
-type DuplicateRuleRemover struct {
+type DeadRuleRemover struct {
 	entries map[uint32]hashEntry
 	calls   []callEntry
 	check   css_ast.CrossFileEqualityCheck
 }
 
-func MakeDuplicateRuleMangler(symbols ast.SymbolMap) DuplicateRuleRemover {
-	return DuplicateRuleRemover{
+func MakeDeadRuleMangler(symbols ast.SymbolMap) DeadRuleRemover {
+	return DeadRuleRemover{
 		entries: make(map[uint32]hashEntry),
 		check:   css_ast.CrossFileEqualityCheck{Symbols: symbols},
 	}
 }
 
-func (remover *DuplicateRuleRemover) RemoveDuplicateRulesInPlace(sourceIndex uint32, rules []css_ast.Rule, importRecords []ast.ImportRecord) []css_ast.Rule {
+func (remover *DeadRuleRemover) RemoveDeadRulesInPlace(sourceIndex uint32, rules []css_ast.Rule, importRecords []ast.ImportRecord) []css_ast.Rule {
 	// The caller may call this function multiple times, each with a different
 	// set of import records. Remember each set of import records for equality
 	// checks later.
@@ -754,6 +757,11 @@ func (remover *DuplicateRuleRemover) RemoveDuplicateRulesInPlace(sourceIndex uin
 skipRule:
 	for i := n - 1; i >= 0; i-- {
 		rule := rules[i]
+
+		// Remove rules with selectors that don't apply to anything (e.g. ":is()")
+		if r, ok := rule.Data.(*css_ast.RSelector); ok && allSelectorsAreDead(r.Selectors) {
+			continue skipRule
+		}
 
 		// For duplicate rules, omit all but the last copy
 		if hash, ok := rule.Data.Hash(); ok {
@@ -790,6 +798,28 @@ skipRule:
 	}
 
 	return rules[start:]
+}
+
+func containsDeadSelectors(selectors []css_ast.CompoundSelector) bool {
+	for _, sel := range selectors {
+		for _, ss := range sel.SubclassSelectors {
+			if pseudo, ok := ss.Data.(*css_ast.SSPseudoClassWithSelectorList); ok && len(pseudo.Selectors) == 0 &&
+				(pseudo.Kind == css_ast.PseudoClassIs || pseudo.Kind == css_ast.PseudoClassWhere) {
+				// ":is()" and ":where()" never match anything when empty
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func allSelectorsAreDead(selectors []css_ast.ComplexSelector) bool {
+	for _, sel := range selectors {
+		if !containsDeadSelectors(sel.Selectors) {
+			return false
+		}
+	}
+	return true
 }
 
 // Reference: https://developer.mozilla.org/en-US/docs/Web/HTML/Element
@@ -1106,6 +1136,10 @@ var specialAtRules = map[string]atRuleKind{
 	// Anchor Positioning
 	// Reference: https://drafts.csswg.org/css-anchor-position-1/#at-ruledef-position-try
 	"position-try": atRuleDeclarations,
+
+	// @view-transition
+	// Reference: https://drafts.csswg.org/css-view-transitions-2/#view-transition-rule
+	"view-transition": atRuleDeclarations,
 }
 
 var atKnownRuleCanBeRemovedIfEmpty = map[string]bool{
@@ -1215,48 +1249,46 @@ abortRuleParser:
 			if path, r, ok := p.expectURLOrString(); ok {
 				var conditions css_ast.ImportConditions
 				importConditionsStart := p.index
-				for {
-					if kind := p.current().Kind; kind == css_lexer.TSemicolon || kind == css_lexer.TOpenBrace ||
-						kind == css_lexer.TCloseBrace || kind == css_lexer.TEndOfFile {
-						break
-					}
+
+				// Parse the optional "layer()"
+				p.eat(css_lexer.TWhitespace)
+				if (p.peek(css_lexer.TIdent) || p.peek(css_lexer.TFunction)) && strings.EqualFold(p.decoded(), "layer") {
 					p.parseComponentValue()
-				}
-				if p.current().Kind == css_lexer.TOpenBrace {
-					break // Avoid parsing an invalid "@import" rule
-				}
-				conditions.Media = p.convertTokens(p.tokens[importConditionsStart:p.index])
-
-				// Insert or remove whitespace before the first token
-				var importConditions *css_ast.ImportConditions
-				if len(conditions.Media) > 0 {
-					importConditions = &conditions
-
-					// Handle "layer()"
-					if t := conditions.Media[0]; (t.Kind == css_lexer.TIdent || t.Kind == css_lexer.TFunction) && strings.EqualFold(t.Text, "layer") {
-						conditions.Layers = conditions.Media[:1]
-						conditions.Media = conditions.Media[1:]
-					}
-
-					// Handle "supports()"
-					if len(conditions.Media) > 0 {
-						if t := conditions.Media[0]; t.Kind == css_lexer.TFunction && strings.EqualFold(t.Text, "supports") {
-							conditions.Supports = conditions.Media[:1]
-							conditions.Media = conditions.Media[1:]
-						}
-					}
+					conditions.Layers = p.convertTokens(p.tokens[importConditionsStart:p.index])
+					importConditionsStart = p.index
 
 					// Remove leading and trailing whitespace
 					if len(conditions.Layers) > 0 {
 						conditions.Layers[0].Whitespace &= ^(css_ast.WhitespaceBefore | css_ast.WhitespaceAfter)
 					}
+				}
+
+				// Parse the optional "supports()"
+				p.eat(css_lexer.TWhitespace)
+				if p.peek(css_lexer.TFunction) && strings.EqualFold(p.decoded(), "supports") {
+					p.parseComponentValue()
+					conditions.Supports = p.convertTokens(p.tokens[importConditionsStart:p.index])
+					importConditionsStart = p.index
+
+					// Remove leading and trailing whitespace
 					if len(conditions.Supports) > 0 {
 						conditions.Supports[0].Whitespace &= ^(css_ast.WhitespaceBefore | css_ast.WhitespaceAfter)
 					}
-					if n := len(conditions.Media); n > 0 {
-						conditions.Media[0].Whitespace &= ^css_ast.WhitespaceBefore
-						conditions.Media[n-1].Whitespace &= ^css_ast.WhitespaceAfter
-					}
+				}
+
+				// Parse the optional media query list
+				conditions.Queries = p.parseMediaQueryListUntil(func(kind css_lexer.T) bool {
+					return kind == css_lexer.TSemicolon || kind == css_lexer.TOpenBrace ||
+						kind == css_lexer.TCloseBrace || kind == css_lexer.TEndOfFile
+				})
+				if p.peek(css_lexer.TOpenBrace) {
+					break // Avoid parsing an invalid "@import" rule
+				}
+
+				// Check whether any import conditions are present
+				var importConditions *css_ast.ImportConditions
+				if len(conditions.Layers) > 0 || len(conditions.Supports) > 0 || len(conditions.Queries) > 0 {
+					importConditions = &conditions
 				}
 
 				p.expect(css_lexer.TSemicolon)
@@ -1523,6 +1555,42 @@ abortRuleParser:
 			p.unexpected()
 		}
 
+	case "media":
+		queries := p.parseMediaQueryListUntil(func(kind css_lexer.T) bool {
+			return kind == css_lexer.TOpenBrace
+		})
+
+		// Expect a block after the query
+		matchingLoc := p.current().Range.Loc
+		if !p.expect(css_lexer.TOpenBrace) {
+			break
+		}
+		var rules []css_ast.Rule
+
+		// Push the "@media" conditions
+		p.enclosingAtMedia = append(p.enclosingAtMedia, queries)
+
+		// Parse the block for this rule
+		if context.isDeclarationList {
+			rules = p.parseListOfDeclarations(listOfDeclarationsOpts{
+				canInlineNoOpNesting: context.canInlineNoOpNesting,
+			})
+		} else {
+			rules = p.parseListOfRules(ruleContext{
+				parseSelectors: true,
+			})
+		}
+
+		// Pop the "@media" conditions
+		p.enclosingAtMedia = p.enclosingAtMedia[:len(p.enclosingAtMedia)-1]
+
+		closeBraceLoc := p.current().Range.Loc
+		if !p.expectWithMatchingLoc(css_lexer.TCloseBrace, matchingLoc) {
+			closeBraceLoc = logger.Loc{}
+		}
+
+		return css_ast.Rule{Loc: atRange.Loc, Data: &css_ast.RAtMedia{Queries: queries, Rules: rules, CloseBraceLoc: closeBraceLoc}}
+
 	default:
 		if kind == atRuleUnknown && lowerAtToken == "namespace" {
 			// CSS namespaces are a weird feature that appears to only really be
@@ -1613,12 +1681,6 @@ prelude:
 		p.expect(css_lexer.TOpenBrace)
 		var rules []css_ast.Rule
 
-		// Push the "@media" conditions
-		isAtMedia := lowerAtToken == "media"
-		if isAtMedia {
-			p.enclosingAtMedia = append(p.enclosingAtMedia, prelude)
-		}
-
 		// Parse the block for this rule
 		if context.isDeclarationList {
 			rules = p.parseListOfDeclarations(listOfDeclarationsOpts{
@@ -1628,11 +1690,6 @@ prelude:
 			rules = p.parseListOfRules(ruleContext{
 				parseSelectors: true,
 			})
-		}
-
-		// Pop the "@media" conditions
-		if isAtMedia {
-			p.enclosingAtMedia = p.enclosingAtMedia[:len(p.enclosingAtMedia)-1]
 		}
 
 		closeBraceLoc := p.current().Range.Loc
