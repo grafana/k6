@@ -86,6 +86,7 @@ const (
 	ExportStarAs
 	ForAwait
 	ForOf
+	FromBase64
 	FunctionNameConfigurable
 	FunctionOrClassPropertyAccess
 	Generator
@@ -149,6 +150,7 @@ var StringToJSFeature = map[string]JSFeature{
 	"export-star-as":                    ExportStarAs,
 	"for-await":                         ForAwait,
 	"for-of":                            ForOf,
+	"from-base64":                       FromBase64,
 	"function-name-configurable":        FunctionNameConfigurable,
 	"function-or-class-property-access": FunctionOrClassPropertyAccess,
 	"generator":                         Generator,
@@ -529,6 +531,16 @@ var jsTable = map[JSFeature]map[Engine][]versionRange{
 		Opera:   {{start: v{38, 0, 0}}},
 		Safari:  {{start: v{10, 0, 0}}},
 	},
+	FromBase64: {
+		Chrome:  {{start: v{140, 0, 0}}},
+		Deno:    {{start: v{2, 5, 0}}},
+		Edge:    {{start: v{140, 0, 0}}},
+		Firefox: {{start: v{133, 0, 0}}},
+		IOS:     {{start: v{18, 2, 0}}},
+		Node:    {{start: v{25, 0, 0}}},
+		Opera:   {{start: v{124, 0, 0}}},
+		Safari:  {{start: v{18, 2, 0}}},
+	},
 	FunctionNameConfigurable: {
 		// Note: The latest version of "IE" failed this test: function "name" property: isn't writable, is configurable
 		Chrome:  {{start: v{43, 0, 0}}},
@@ -825,11 +837,11 @@ var jsTable = map[JSFeature]map[Engine][]versionRange{
 		// Note: The latest version of "Firefox" failed this test: RegExp Unicode Property Escapes: Unicode 17.0
 		// Note: The latest version of "Hermes" failed 8 tests including: RegExp Unicode Property Escapes: Unicode 11
 		// Note: The latest version of "IE" failed 8 tests including: RegExp Unicode Property Escapes: Unicode 11
-		// Note: The latest version of "IOS" failed this test: RegExp Unicode Property Escapes: Unicode 16.0
+		// Note: The latest version of "IOS" failed this test: RegExp Unicode Property Escapes: Unicode 17.0
+		// Note: The latest version of "Node" failed this test: RegExp Unicode Property Escapes: Unicode 17.0
 		// Note: The latest version of "Rhino" failed 9 tests including: RegExp Unicode Property Escapes: Unicode 11
 		// Note: The latest version of "Safari" failed this test: RegExp Unicode Property Escapes: Unicode 17.0
-		ES:   {{start: v{2018, 0, 0}}},
-		Node: {{start: v{20, 19, 0}, end: v{21, 0, 0}}, {start: v{22, 12, 0}, end: v{23, 0, 0}}, {start: v{23, 3, 0}}},
+		ES: {{start: v{2018, 0, 0}}},
 	},
 	RestArgument: {
 		// Note: The latest version of "Hermes" failed this test: rest parameters: function 'length' property
