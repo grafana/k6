@@ -12,6 +12,10 @@ type BitMapCmdable interface {
 	BitOpAnd(ctx context.Context, destKey string, keys ...string) *IntCmd
 	BitOpOr(ctx context.Context, destKey string, keys ...string) *IntCmd
 	BitOpXor(ctx context.Context, destKey string, keys ...string) *IntCmd
+	BitOpDiff(ctx context.Context, destKey string, keys ...string) *IntCmd
+	BitOpDiff1(ctx context.Context, destKey string, keys ...string) *IntCmd
+	BitOpAndOr(ctx context.Context, destKey string, keys ...string) *IntCmd
+	BitOpOne(ctx context.Context, destKey string, keys ...string) *IntCmd
 	BitOpNot(ctx context.Context, destKey string, key string) *IntCmd
 	BitPos(ctx context.Context, key string, bit int64, pos ...int64) *IntCmd
 	BitPosSpan(ctx context.Context, key string, bit int8, start, end int64, span string) *IntCmd
@@ -78,20 +82,48 @@ func (c cmdable) bitOp(ctx context.Context, op, destKey string, keys ...string) 
 	return cmd
 }
 
+// BitOpAnd creates a new bitmap in which users are members of all given bitmaps
 func (c cmdable) BitOpAnd(ctx context.Context, destKey string, keys ...string) *IntCmd {
 	return c.bitOp(ctx, "and", destKey, keys...)
 }
 
+// BitOpOr creates a new bitmap in which users are member of at least one given bitmap
 func (c cmdable) BitOpOr(ctx context.Context, destKey string, keys ...string) *IntCmd {
 	return c.bitOp(ctx, "or", destKey, keys...)
 }
 
+// BitOpXor creates a new bitmap in which users are the result of XORing all given bitmaps
 func (c cmdable) BitOpXor(ctx context.Context, destKey string, keys ...string) *IntCmd {
 	return c.bitOp(ctx, "xor", destKey, keys...)
 }
 
+// BitOpNot creates a new bitmap in which users are not members of a given bitmap
 func (c cmdable) BitOpNot(ctx context.Context, destKey string, key string) *IntCmd {
 	return c.bitOp(ctx, "not", destKey, key)
+}
+
+// BitOpDiff creates a new bitmap in which users are members of bitmap X but not of any of bitmaps Y1, Y2, …
+// Introduced with Redis 8.2
+func (c cmdable) BitOpDiff(ctx context.Context, destKey string, keys ...string) *IntCmd {
+	return c.bitOp(ctx, "diff", destKey, keys...)
+}
+
+// BitOpDiff1 creates a new bitmap in which users are members of one or more of bitmaps Y1, Y2, … but not members of bitmap X
+// Introduced with Redis 8.2
+func (c cmdable) BitOpDiff1(ctx context.Context, destKey string, keys ...string) *IntCmd {
+	return c.bitOp(ctx, "diff1", destKey, keys...)
+}
+
+// BitOpAndOr creates a new bitmap in which users are members of bitmap X and also members of one or more of bitmaps Y1, Y2, …
+// Introduced with Redis 8.2
+func (c cmdable) BitOpAndOr(ctx context.Context, destKey string, keys ...string) *IntCmd {
+	return c.bitOp(ctx, "andor", destKey, keys...)
+}
+
+// BitOpOne creates a new bitmap in which users are members of exactly one of the given bitmaps
+// Introduced with Redis 8.2
+func (c cmdable) BitOpOne(ctx context.Context, destKey string, keys ...string) *IntCmd {
+	return c.bitOp(ctx, "one", destKey, keys...)
 }
 
 // BitPos is an API before Redis version 7.0, cmd: bitpos key bit start end
@@ -109,7 +141,9 @@ func (c cmdable) BitPos(ctx context.Context, key string, bit int64, pos ...int64
 		args[3] = pos[0]
 		args[4] = pos[1]
 	default:
-		panic("too many arguments")
+		cmd := NewIntCmd(ctx)
+		cmd.SetErr(errors.New("too many arguments"))
+		return cmd
 	}
 	cmd := NewIntCmd(ctx, args...)
 	_ = c(ctx, cmd)
@@ -150,7 +184,9 @@ func (c cmdable) BitFieldRO(ctx context.Context, key string, values ...interface
 	args[0] = "BITFIELD_RO"
 	args[1] = key
 	if len(values)%2 != 0 {
-		panic("BitFieldRO: invalid number of arguments, must be even")
+		c := NewIntSliceCmd(ctx)
+		c.SetErr(errors.New("BitFieldRO: invalid number of arguments, must be even"))
+		return c
 	}
 	for i := 0; i < len(values); i += 2 {
 		args = append(args, "GET", values[i], values[i+1])
