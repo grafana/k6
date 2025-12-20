@@ -286,8 +286,8 @@ func newHMACImportParams(rt *sobek.Runtime, normalized Algorithm, params sobek.V
 func (hip *HMACImportParams) ImportKey(
 	format KeyFormat,
 	keyData []byte,
-	keyUsages []CryptoKeyUsage,
 	_ bool,
+	keyUsages []CryptoKeyUsage,
 ) (*CryptoKey, error) {
 	// 2.
 	for _, usage := range keyUsages {

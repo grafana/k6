@@ -38,8 +38,8 @@ var (
 func (keyParams PBKDF2KeyImportParams) ImportKey(
 	format KeyFormat,
 	keyData []byte,
-	keyUsages []CryptoKeyUsage,
 	extractable bool,
+	keyUsages []CryptoKeyUsage,
 ) (*CryptoKey, error) {
 	if format != RawKeyFormat {
 		return nil, NewError(NotSupportedError, "invalid format: "+format)
@@ -106,10 +106,10 @@ func newPBKDF2DeriveParams(rt *sobek.Runtime, normalized Algorithm, params sobek
 
 // DeriveBits represents the PBKDF2 function that derives the key as bits from PBKDF2 params
 func (keyParams PBKDF2Params) DeriveBits(
-	privateKey *CryptoKey,
+	baseKey *CryptoKey,
 	length int,
 ) ([]byte, error) {
-	pk, err := validateBaseKey(privateKey, OperationIdentifierDeriveBits)
+	pk, err := validateBaseKey(baseKey, OperationIdentifierDeriveBits)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +119,7 @@ func (keyParams PBKDF2Params) DeriveBits(
 		return nil, NewError(NotSupportedError, "hash function not supported")
 	}
 
-	alg, ok := privateKey.Algorithm.(PBKDF2KeyAlgorithm)
+	alg, ok := baseKey.Algorithm.(PBKDF2KeyAlgorithm)
 	if !ok {
 		return nil, NewError(OperationError, "provided baseKey is not a valid algorithm")
 	}
@@ -142,13 +142,13 @@ func (keyParams PBKDF2Params) DeriveBits(
 
 // DeriveKey represents the PBKDF2 function that derives a key from the PBKDF2 Parms
 func (keyParams PBKDF2Params) DeriveKey(
-	privateKey *CryptoKey,
+	baseKey *CryptoKey,
 	ki KeyImporter,
 	kgl KeyGetLengther,
 	keyUsages []CryptoKeyUsage,
 	extractable bool,
 ) (*CryptoKey, error) {
-	pk, err := validateBaseKey(privateKey, OperationIdentifierDeriveKey)
+	pk, err := validateBaseKey(baseKey, OperationIdentifierDeriveKey)
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +158,7 @@ func (keyParams PBKDF2Params) DeriveKey(
 		return nil, NewError(NotSupportedError, "hash function not supported")
 	}
 
-	alg, ok := privateKey.Algorithm.(PBKDF2KeyAlgorithm)
+	alg, ok := baseKey.Algorithm.(PBKDF2KeyAlgorithm)
 	if !ok {
 		return nil, NewError(OperationError, "provided baseKey is not a valid algorithm")
 	}
@@ -180,7 +180,7 @@ func (keyParams PBKDF2Params) DeriveKey(
 		return nil, err
 	}
 
-	derivedKey, err := ki.ImportKey("raw", dk, keyUsages, extractable)
+	derivedKey, err := ki.ImportKey("raw", dk, extractable, keyUsages)
 	if err != nil {
 		return nil, err
 	}
@@ -188,21 +188,21 @@ func (keyParams PBKDF2Params) DeriveKey(
 	return derivedKey, nil
 }
 
-func validateBaseKey(privateKey *CryptoKey, usage CryptoKeyUsage) ([]byte, error) {
-	err := privateKey.Validate()
+func validateBaseKey(baseKey *CryptoKey, usage CryptoKeyUsage) ([]byte, error) {
+	err := baseKey.Validate()
 	if err != nil {
 		return nil, err
 	}
 
-	if privateKey.Type != SecretCryptoKeyType {
+	if baseKey.Type != SecretCryptoKeyType {
 		return nil, NewError(InvalidAccessError, "algorithm's password key is not a secret key")
 	}
 
-	if !privateKey.ContainsUsage(usage) {
+	if !baseKey.ContainsUsage(usage) {
 		return nil, NewError(InvalidAccessError, "provided baseKey doesn't contain `"+usage+"` usage")
 	}
 
-	pk, ok := privateKey.handle.([]byte)
+	pk, ok := baseKey.handle.([]byte)
 	if !ok {
 		return nil, NewError(InvalidAccessError, "provided baseKey is not a valid PBKDF2 Crypto Key")
 	}

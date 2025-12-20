@@ -873,7 +873,7 @@ func (sc *SubtleCrypto) ImportKey( //nolint:funlen // we have a lot of error han
 	callback := sc.vu.RegisterCallback()
 	go func() {
 		result, err := func() (*CryptoKey, error) {
-			result, err := ki.ImportKey(format, keyBytes, keyUsages, extractable)
+			result, err := ki.ImportKey(format, keyBytes, extractable, keyUsages)
 			if err != nil {
 				return nil, err
 			}

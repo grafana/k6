@@ -263,7 +263,7 @@ func newKeyGetLengther(rt *sobek.Runtime, normalized Algorithm, params sobek.Val
 // KeyImporter is the interface implemented by the parameters used to import
 // cryptographic keys.
 type KeyImporter interface {
-	ImportKey(format KeyFormat, keyData []byte, keyUsages []CryptoKeyUsage, extractable bool) (*CryptoKey, error)
+	ImportKey(format KeyFormat, keyData []byte, extractable bool, keyUsages []CryptoKeyUsage) (*CryptoKey, error)
 }
 
 func newKeyImporter(rt *sobek.Runtime, normalized Algorithm, params sobek.Value) (KeyImporter, error) {

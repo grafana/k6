@@ -200,8 +200,8 @@ func newAESImportParams(normalized Algorithm) *AESImportParams {
 func (aip *AESImportParams) ImportKey(
 	format KeyFormat,
 	keyData []byte,
-	keyUsages []CryptoKeyUsage,
 	_ bool,
+	keyUsages []CryptoKeyUsage,
 ) (*CryptoKey, error) {
 	for _, usage := range keyUsages {
 		switch usage {

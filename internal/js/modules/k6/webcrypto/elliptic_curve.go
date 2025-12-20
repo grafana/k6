@@ -59,8 +59,8 @@ var _ KeyImporter = &EcKeyImportParams{}
 func (e *EcKeyImportParams) ImportKey(
 	format KeyFormat,
 	keyData []byte,
-	_ []CryptoKeyUsage,
 	_ bool,
+	_ []CryptoKeyUsage,
 ) (*CryptoKey, error) {
 	var importFn func(curve EllipticCurveKind, keyData []byte) (any, CryptoKeyType, error)
 
