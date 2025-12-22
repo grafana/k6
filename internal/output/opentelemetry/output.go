@@ -95,6 +95,41 @@ func (o *Output) Start() error {
 		return fmt.Errorf("failed to create OpenTelemetry resource: %w", err)
 	}
 
+	// Define custom histogram buckets: 50ms to 60s
+	// Buckets in milliseconds: 50, 75, 100, 150, 200, 300, 500, 750, 1000, 1500, 2000, 3000, 5000, 7500, 10000, 15000, 20000, 30000, 45000, 60000
+	histogramBuckets := []float64{
+		50, 75, 100, 150, 200, 300, 500, 750,
+		1000, 1500, 2000, 3000, 5000, 7500,
+		10000, 15000, 20000, 30000, 45000, 60000,
+	}
+
+	// Create histogram aggregation with custom buckets
+	histogramAggregation := metric.AggregationExplicitBucketHistogram{
+		Boundaries: histogramBuckets,
+		NoMinMax:   false,
+	}
+
+	// Create a view function that matches any histogram and applies custom buckets
+	histogramViewFunc := func(i metric.Instrument) (metric.Stream, bool) {
+		// Only apply to histogram instruments
+		if i.Kind != metric.InstrumentKindHistogram {
+			return metric.Stream{}, false
+		}
+
+		o.logger.Debugf("Applying custom histogram buckets to instrument: %s (kind: %v)", i.Name, i.Kind)
+
+		// Return the stream with custom aggregation for all histograms
+		return metric.Stream{
+			Name:        i.Name,
+			Description: i.Description,
+			Unit:        i.Unit,
+			Aggregation: histogramAggregation,
+		}, true
+	}
+
+	o.logger.Debugf("Created histogram view with %d custom boundaries ranging from %.0fms to %.0fms",
+		len(histogramBuckets), histogramBuckets[0], histogramBuckets[len(histogramBuckets)-1])
+
 	meterProvider := metric.NewMeterProvider(
 		metric.WithResource(res),
 		metric.WithReader(
@@ -103,8 +138,8 @@ func (o *Output) Start() error {
 				metric.WithInterval(o.config.ExportInterval.TimeDuration()),
 			),
 		),
+		metric.WithView(histogramViewFunc),
 	)
-
 	pf, err := output.NewPeriodicFlusher(o.config.FlushInterval.TimeDuration(), o.flushMetrics)
 	if err != nil {
 		return err
