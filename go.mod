@@ -21,7 +21,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/grafana/k6provider v0.2.0
 	github.com/grafana/sobek v0.0.0-20251124090928-9a028a30ff58
-	github.com/grafana/xk6-dashboard v0.7.13
+	github.com/grafana/xk6-dashboard v0.8.0
 	github.com/grafana/xk6-redis v0.3.6
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
@@ -64,6 +64,8 @@ require (
 	gopkg.in/guregu/null.v3 v3.3.0
 	gopkg.in/yaml.v3 v3.0.1
 )
+
+require github.com/grafana/xk6-dashboard-assets v0.1.1 // indirect
 
 require (
 	buf.build/gen/go/gogo/protobuf/protocolbuffers/go v1.36.10-20240617172848-e1dbca2775a7.1 // indirect
