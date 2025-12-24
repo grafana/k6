@@ -75,7 +75,8 @@ func testRuntimeOptionsCase(t *testing.T, tc runtimeOptionsTestCase) {
 		},
 	}
 
-	require.NoError(t, test.initializeFirstRunner(ts.GlobalState))
+	require.NoError(t, test.prepareFirstRunner(ts.GlobalState))
+	require.NoError(t, test.continueInitialization(ts.GlobalState))
 
 	archive := test.initRunner.MakeArchive()
 	archiveBuf := &bytes.Buffer{}
@@ -97,11 +98,13 @@ func testRuntimeOptionsCase(t *testing.T, tc runtimeOptionsTestCase) {
 	}
 
 	archTest := getRunnerErr(lib.RuntimeOptions{})
-	require.NoError(t, archTest.initializeFirstRunner(ts.GlobalState))
+	require.NoError(t, archTest.prepareFirstRunner(ts.GlobalState))
+	require.NoError(t, archTest.continueInitialization(ts.GlobalState))
 
 	for key, val := range tc.expRTOpts.Env {
 		archTest = getRunnerErr(lib.RuntimeOptions{Env: map[string]string{key: "almost " + val}})
-		require.NoError(t, archTest.initializeFirstRunner(ts.GlobalState))
+		require.NoError(t, archTest.prepareFirstRunner(ts.GlobalState))
+		require.NoError(t, archTest.continueInitialization(ts.GlobalState))
 		assert.Equal(t, "almost "+val, archTest.initRunner.MakeArchive().Env[key])
 	}
 }
