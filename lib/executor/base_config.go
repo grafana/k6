@@ -30,7 +30,8 @@ type BaseConfig struct {
 	StartTime    types.NullDuration   `json:"startTime"`
 	GracefulStop types.NullDuration   `json:"gracefulStop"`
 	Env          map[string]string    `json:"env"`
-	Exec         null.String          `json:"exec"` // function name, externally validated
+	Exec         null.String          `json:"exec"`     // function name, externally validated
+	UserInit     null.String          `json:"userInit"` // function name, externally validated
 	Tags         map[string]string    `json:"tags"`
 	Options      *lib.ScenarioOptions `json:"options,omitempty"`
 
@@ -111,6 +112,15 @@ func (bc BaseConfig) GetExec() string {
 		exec = consts.DefaultFn
 	}
 	return exec
+}
+
+// GetUserInit returns the configured custom userInit value, or the default consts.UserInitFn.
+func (bc BaseConfig) GetUserInit() string {
+	userInitFn := bc.UserInit.ValueOrZero()
+	if userInitFn == "" {
+		userInitFn = consts.UserInitFn
+	}
+	return userInitFn
 }
 
 // GetScenarioOptions returns the options specific to a scenario.
