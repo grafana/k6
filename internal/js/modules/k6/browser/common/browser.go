@@ -237,7 +237,7 @@ func (b *Browser) initEvents() error {
 					if err := b.onAttachedToTarget(ev); err != nil {
 						if errors.Is(err, context.Canceled) ||
 							errors.Is(err, context.DeadlineExceeded) {
-							return
+							continue
 						}
 						k6ext.Panicf(b.vuCtx, "browser is attaching to target: %w", err)
 					}
