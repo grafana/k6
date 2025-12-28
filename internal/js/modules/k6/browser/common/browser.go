@@ -235,6 +235,10 @@ func (b *Browser) initEvents() error {
 				if ev, ok := event.data.(*target.EventAttachedToTarget); ok {
 					b.logger.Debugf("Browser:initEvents:onAttachedToTarget", "sid:%v tid:%v", ev.SessionID, ev.TargetInfo.TargetID)
 					if err := b.onAttachedToTarget(ev); err != nil {
+						if errors.Is(err, context.Canceled) ||
+							errors.Is(err, context.DeadlineExceeded) {
+							return
+						}
 						k6ext.Panicf(b.vuCtx, "browser is attaching to target: %w", err)
 					}
 				} else if ev, ok := event.data.(*target.EventDetachedFromTarget); ok {
