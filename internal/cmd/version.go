@@ -108,6 +108,61 @@ func versionString() string {
 	return v
 }
 
+// versionDetailsWithExtensions returns the structured details about version including extensions
+// returns error if there are unhandled extension types
+func versionDetailsWithExtensions(exts []*ext.Extension) (map[string]any, error) {
+	details := versionDetails()
+
+	if len(exts) == 0 {
+		return details, nil
+	}
+
+	// extInfo represents the JSON structure for an extension in the version details
+	// modeled after k6 extension registry structure
+	type extInfo struct {
+		Module  string   `json:"module"`
+		Version string   `json:"version"`
+		Imports []string `json:"imports,omitempty"`
+		Outputs []string `json:"outputs,omitempty"`
+	}
+
+	infoList := make([]*extInfo, 0, len(exts))
+	infoMap := make(map[string]*extInfo)
+
+	for _, e := range exts {
+		key := e.Path + "@" + e.Version
+
+		info, found := infoMap[key]
+		if !found {
+			info = &extInfo{
+				Module:  e.Path,
+				Version: e.Version,
+			}
+
+			infoMap[key] = info
+			infoList = append(infoList, info)
+		}
+
+		switch e.Type {
+		case ext.OutputExtension:
+			info.Outputs = append(info.Outputs, e.Name)
+		case ext.JSExtension:
+			info.Imports = append(info.Imports, e.Name)
+		case ext.SecretSourceExtension:
+			// currently, no special handling is needed for secret source extensions
+		case ext.SubcommandExtension:
+			// currently, no special handling is needed for subcommand extensions
+		default:
+			// report unhandled extension type for future proofing
+			return details, fmt.Errorf("unhandled extension type: %s", e.Type)
+		}
+	}
+
+	details["extensions"] = infoList
+
+	return details, nil
+}
+
 type versionCmd struct {
 	gs     *state.GlobalState
 	isJSON bool
@@ -121,37 +176,9 @@ func (c *versionCmd) run(cmd *cobra.Command, _ []string) error {
 		return nil
 	}
 
-	details := versionDetails()
-	if exts := ext.GetAll(); len(exts) > 0 {
-		type extInfo struct {
-			Module  string   `json:"module"`
-			Version string   `json:"version"`
-			Imports []string `json:"imports"`
-		}
-
-		ext := make(map[string]extInfo)
-		for _, e := range exts {
-			key := e.Path + "@" + e.Version
-
-			if v, ok := ext[key]; ok {
-				v.Imports = append(v.Imports, e.Name)
-				ext[key] = v
-				continue
-			}
-
-			ext[key] = extInfo{
-				Module:  e.Path,
-				Version: e.Version,
-				Imports: []string{e.Name},
-			}
-		}
-
-		list := make([]extInfo, 0, len(ext))
-		for _, v := range ext {
-			list = append(list, v)
-		}
-
-		details["extensions"] = list
+	details, err := versionDetailsWithExtensions(ext.GetAll())
+	if err != nil {
+		return fmt.Errorf("failed to get version details with extensions: %w", err)
 	}
 
 	if err := json.NewEncoder(c.gs.Stdout).Encode(details); err != nil {

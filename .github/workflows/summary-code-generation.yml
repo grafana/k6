@@ -1,0 +1,68 @@
+name: Summary code generation
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: read
+
+jobs:
+  check-generated-code:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+
+      - name: Install cog
+        run: |
+          COG_VERSION="v0.0.46"
+          curl -sSL "https://github.com/grafana/cog/releases/download/${COG_VERSION}/cog_Linux_x86_64.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin
+          cog --version
+
+      - name: Checkout schemas
+        run: |
+          ./internal/lib/summary/machinereadable/checkout.sh
+
+      - name: Generate code
+        run: |
+          ./internal/lib/summary/machinereadable/generate.sh
+
+      - name: Check for uncommitted changes
+        run: |
+          # Check if there are any changes in the Git working directory
+          if ! git diff --exit-code; then
+            echo "❌ Generated code is not up-to-date!"
+            echo ""
+            echo "The following files have uncommitted changes:"
+            git diff --name-only
+            echo ""
+            echo "Please run the following commands to update the generated code:"
+            echo "  ./internal/lib/summary/machinereadable/checkout.sh"
+            echo "  ./internal/lib/summary/machinereadable/generate.sh"
+            echo ""
+            echo "Then commit the changes."
+            exit 1
+          fi
+
+          # Also check for untracked files
+          if [ -n "$(git ls-files --others --exclude-standard internal/lib/summary/machinereadable/ | grep -v k6-summary/)" ]; then
+            echo "❌ There are untracked generated files!"
+            echo ""
+            echo "Untracked files:"
+            git ls-files --others --exclude-standard internal/lib/summary/machinereadable/ | grep -v k6-summary/
+            echo ""
+            echo "Please run the generation scripts and commit all generated files."
+            exit 1
+          fi
+
+          echo "✅ Generated code is up-to-date!"

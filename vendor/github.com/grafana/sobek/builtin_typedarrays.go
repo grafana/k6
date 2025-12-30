@@ -1060,8 +1060,8 @@ func (r *Runtime) typedArrayProto_set(call FunctionCall) Value {
 			}
 			for i := 0; i < srcLen; i++ {
 				val := nilSafe(srcObj.self.getIdx(valueInt(i), nil))
-				if ta.isValidIntegerIndex(i) {
-					ta.typedArray.set(targetOffset+i, val)
+				if ta.isValidIntegerIndex(targetOffset + i) {
+					ta.typedArray.set(ta.offset+targetOffset+i, val)
 				}
 			}
 		}

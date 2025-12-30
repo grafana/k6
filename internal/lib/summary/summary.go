@@ -107,9 +107,10 @@ type Summary struct {
 	Group      `js:"root_group"`
 	Scenarios  map[string]Group
 
-	TestRunDuration time.Duration
-	NoColor         bool // TODO: drop this when noColor is part of the (runtime) options
-	EnableColors    bool
+	TestRunDuration           time.Duration
+	NoColor                   bool // TODO: drop this when noColor is part of the (runtime) options
+	EnableColors              bool
+	NewMachineReadableSummary bool
 }
 
 // New instantiates a new empty Summary.
@@ -263,4 +264,11 @@ func NewGroup() Group {
 		Groups:      make(map[string]Group),
 		GroupsOrder: make([]string, 0),
 	}
+}
+
+// Meta holds some metadata associated with the Summary
+// but isn't strictly part of it, like the script.
+type Meta struct {
+	Script  string
+	IsCloud bool
 }

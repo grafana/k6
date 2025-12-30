@@ -355,6 +355,17 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 				return nil, lo.Press(key, copts) //nolint:wrapcheck
 			}), nil
 		},
+
+		"pressSequentially": func(text string, opts sobek.Value) (*sobek.Promise, error) {
+			copts := common.NewFrameTypeOptions(lo.Timeout())
+			if err := copts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing locator press sequentially options: %w", err)
+			}
+			return promise(vu, func() (any, error) {
+				return nil, lo.PressSequentially(text, copts) //nolint:wrapcheck
+			}), nil
+		},
+
 		"type": func(text string, opts sobek.Value) (*sobek.Promise, error) {
 			copts := common.NewFrameTypeOptions(lo.Timeout())
 			if err := copts.Parse(vu.Context(), opts); err != nil {

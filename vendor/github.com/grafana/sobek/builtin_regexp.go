@@ -1,12 +1,15 @@
 package sobek
 
 import (
+	"errors"
 	"fmt"
-	"github.com/grafana/sobek/parser"
 	"regexp"
+	"regexp/syntax"
 	"strings"
 	"unicode/utf16"
 	"unicode/utf8"
+
+	"github.com/grafana/sobek/parser"
 )
 
 func (r *Runtime) newRegexpObject(proto *Object) *regexpObject {
@@ -241,8 +244,8 @@ func compileRegexp(patternStr, flags string) (p *regexpPattern, err error) {
 		patternStr = convertRegexpToUtf16(patternStr)
 	}
 
-	re2Str, err1 := parser.TransformRegExp(patternStr, dotAll, unicode)
-	if err1 == nil {
+	re2Str, err := parser.TransformRegExp(patternStr, dotAll, unicode)
+	if err == nil {
 		re2flags := ""
 		if multiline {
 			re2flags += "m"
@@ -259,15 +262,22 @@ func compileRegexp(patternStr, flags string) (p *regexpPattern, err error) {
 
 		pattern, err1 := regexp.Compile(re2Str)
 		if err1 != nil {
-			err = fmt.Errorf("Invalid regular expression (re2): %s (%v)", re2Str, err1)
-			return
+			var syntaxError *syntax.Error
+			if !errors.As(err1, &syntaxError) || syntaxError.Code != syntax.ErrInvalidRepeatSize {
+				err = fmt.Errorf("Invalid regular expression (re2): %s (%v)", re2Str, err1)
+				return
+			}
+		} else {
+			wrapper = (*regexpWrapper)(pattern)
 		}
-		wrapper = (*regexpWrapper)(pattern)
 	} else {
-		if _, incompat := err1.(parser.RegexpErrorIncompatible); !incompat {
-			err = err1
+		var incompat parser.RegexpErrorIncompatible
+		if !errors.As(err, &incompat) {
 			return
 		}
+	}
+
+	if wrapper == nil {
 		wrapper2, err = compileRegexp2(patternStr, multiline, dotAll, ignoreCase, unicode)
 		if err != nil {
 			err = fmt.Errorf("Invalid regular expression (regexp2): %s (%v)", patternStr, err)
@@ -762,16 +772,15 @@ func (r *Runtime) regexpproto_stdMatcher(call FunctionCall) Value {
 		return r.regexpproto_stdMatcherGeneric(thisObj, s)
 	}
 	if rx.pattern.global {
+		rx.setOwnStr("lastIndex", intToValue(0), true)
 		res := rx.pattern.findAllSubmatchIndex(s, 0, -1, rx.pattern.sticky)
 		if len(res) == 0 {
-			rx.setOwnStr("lastIndex", intToValue(0), true)
 			return _null
 		}
 		a := make([]Value, 0, len(res))
 		for _, result := range res {
 			a = append(a, s.Substring(result[0], result[1]))
 		}
-		rx.setOwnStr("lastIndex", intToValue(int64(res[len(res)-1][1])), true)
 		return r.newArrayValues(a)
 	} else {
 		return rx.exec(s)
@@ -1226,17 +1235,16 @@ func (r *Runtime) regexpproto_stdReplacer(call FunctionCall) Value {
 	find := 1
 	if rx.pattern.global {
 		find = -1
-		rx.setOwnStr("lastIndex", intToValue(0), true)
 	} else {
 		index = rx.getLastIndex()
 	}
 	found := rx.pattern.findAllSubmatchIndex(s, toIntStrict(index), find, rx.pattern.sticky)
-	if len(found) > 0 {
-		if !rx.updateLastIndex(index, found[0], found[len(found)-1]) {
-			found = nil
+	if rx.pattern.global || rx.pattern.sticky {
+		var newLastIndex int64
+		if !rx.pattern.global && len(found) > 0 {
+			newLastIndex = int64(found[len(found)-1][1])
 		}
-	} else {
-		rx.updateLastIndex(index, nil, nil)
+		rx.setOwnStr("lastIndex", intToValue(newLastIndex), true)
 	}
 
 	return stringReplace(s, found, replaceStr, rcall)

@@ -427,6 +427,35 @@ func TestBinaryType_ArrayBuffer(t *testing.T) {
 	require.Len(t, logs, 0)
 }
 
+func TestBinaryType_ArrayBuffer_issue_5226(t *testing.T) {
+	t.Parallel()
+	ts := newTestState(t)
+	logger, hook := testutils.NewLoggerWithHook(t, logrus.WarnLevel)
+	ts.runtime.VU.StateField.Logger = logger
+	_, err := ts.runtime.RunOnEventLoop(ts.tb.Replacer.Replace(`
+		var ws = new WebSocket("WSBIN_URL/ws-echo")
+		ws.binaryType = "arraybuffer"
+		ws.addEventListener("open", () => {
+			const sent = new Uint8Array(1024)
+			ws.send(sent.subarray(0, 1))
+			ws.onmessage = (e) => {
+				if (!(e.data instanceof ArrayBuffer)) {
+					throw new Error("Wrong event.data type; expected: ArrayBuffer, got: "+ typeof e.data);
+				}
+
+				if (e.data.byteLength != 1) {
+					throw new Error("The data received isn't equal to the data sent "  + e.data.byteLength);
+				}
+
+				ws.close();
+			}
+		})
+	`))
+	require.NoError(t, err)
+	logs := hook.Drain()
+	require.Len(t, logs, 0)
+}
+
 func TestExceptionDontPanic(t *testing.T) {
 	t.Parallel()
 	cases := map[string]struct {
@@ -1050,7 +1079,7 @@ func TestCookiesDefaultJar(t *testing.T) {
 
 	ts.runtime.VU.StateField.CookieJar, _ = cookiejar.New(nil)
 	_, err = ts.runtime.RunOnEventLoop(sr(`
-		http.cookieJar().set("HTTPBIN_URL/ws-echo-someheader", "someheader", "defaultjar")		
+		http.cookieJar().set("HTTPBIN_URL/ws-echo-someheader", "someheader", "defaultjar")
 
 		var ws = new WebSocket("WSBIN_URL/ws-echo-someheader", null)
 		ws.onopen = () => {
@@ -1372,7 +1401,7 @@ func TestSessionPingAdd(t *testing.T) {
 	ts := newTestState(t)
 
 	_, err := ts.runtime.RunOnEventLoop(sr(`
-			var ws = new WebSocket("WSBIN_URL/ws-echo")			
+			var ws = new WebSocket("WSBIN_URL/ws-echo")
 			ws.addEventListener("open", () => {
 				ws.ping()
 			})
@@ -1545,4 +1574,110 @@ func TestReadyStateSwitch(t *testing.T) {
 	require.NoError(t, err)
 	logs := hook.Drain()
 	require.Len(t, logs, 0)
+}
+
+func TestCloseWithCode(t *testing.T) {
+	t.Parallel()
+	ts := newTestState(t)
+	sr := ts.tb.Replacer.Replace
+	_, err := ts.runtime.RunOnEventLoop(sr(`
+		var ws = new WebSocket("WSBIN_URL/ws-echo")
+		ws.addEventListener("open", () => {
+			ws.send("something")
+			ws.close(1000)
+		})
+		ws.addEventListener("close", (event) => {
+			if (event.code !== 1000) {
+				throw "Expected code 1000, instead got: " + event.code
+			}
+		})
+	`))
+	require.NoError(t, err)
+	samples := metrics.GetBufferedSamples(ts.samples)
+	assertSessionMetricsEmitted(t, samples, "", sr("WSBIN_URL/ws-echo"), http.StatusSwitchingProtocols, "")
+}
+
+func TestCloseWithCodeAndReason(t *testing.T) {
+	t.Parallel()
+	ts := newTestState(t)
+	sr := ts.tb.Replacer.Replace
+	_, err := ts.runtime.RunOnEventLoop(sr(`
+		var ws = new WebSocket("WSBIN_URL/ws-echo")
+		ws.addEventListener("open", () => {
+			ws.send("something")
+			ws.close(1000, "a really good reason")
+		})
+		ws.addEventListener("close", (event) => {
+			if (event.code !== 1000) {
+				throw "Expected code 1000, instead got: " + event.code
+			}
+
+			if (event.reason !== "") {
+				throw "Expected empty reason when calling close from client, instead got: " + event.reason
+			}
+		})
+	`))
+	require.NoError(t, err)
+	samples := metrics.GetBufferedSamples(ts.samples)
+	assertSessionMetricsEmitted(t, samples, "", sr("WSBIN_URL/ws-echo"), http.StatusSwitchingProtocols, "")
+}
+
+func TestCloseWithDisallowedCode(t *testing.T) {
+	t.Parallel()
+	ts := newTestState(t)
+	sr := ts.tb.Replacer.Replace
+	_, err := ts.runtime.RunOnEventLoop(sr(`
+		var ws = new WebSocket("WSBIN_URL/ws-echo")
+		ws.addEventListener("open", () => {
+			ws.send("something")
+			ws.close(1001)
+		})
+	`))
+	require.ErrorContains(t, err, "InvalidAccessError: Failed to execute 'close' on 'WebSocket': The close code must be either 1000, or between 3000 and 4999")
+	samples := metrics.GetBufferedSamples(ts.samples)
+	assertSessionMetricsEmitted(t, samples, "", sr("WSBIN_URL/ws-echo"), http.StatusSwitchingProtocols, "")
+}
+
+func TestCloseWithReasonTooLong(t *testing.T) {
+	t.Parallel()
+	ts := newTestState(t)
+	sr := ts.tb.Replacer.Replace
+	_, err := ts.runtime.RunOnEventLoop(sr(`
+		var ws = new WebSocket("WSBIN_URL/ws-echo")
+		ws.addEventListener("open", () => {
+			ws.send("something")
+			ws.close(1000, "a really really long reason about why we are closing this connection, which is clearly over the top and too long, long enough to be longer than the allowed amount of 123 bytes")
+		})
+	`))
+	require.ErrorContains(t, err, "SyntaxError: Failed to execute 'close' on 'WebSocket': The message must not be greater than 123 bytes")
+	samples := metrics.GetBufferedSamples(ts.samples)
+	assertSessionMetricsEmitted(t, samples, "", sr("WSBIN_URL/ws-echo"), http.StatusSwitchingProtocols, "")
+}
+
+func TestRemoteCloseWithCodeAndReason(t *testing.T) {
+	t.Parallel()
+	ts := newTestState(t)
+	sr := ts.tb.Replacer.Replace
+
+	ts.addHandler("/ws-remote-close", nil, &testMessage{
+		kind: websocket.CloseMessage,
+		data: websocket.FormatCloseMessage(1001, "closed by server"),
+	})
+
+	_, err := ts.runtime.RunOnEventLoop(sr(`
+		var ws = new WebSocket("WSBIN_URL/ws-remote-close");
+		ws.onclose = (event) => {
+			if (event.code !== 1001) {
+				throw new Error("Expected code 1001, got: " + event.code);
+			}
+			if (event.reason !== "closed by server") {
+				throw new Error("Expected reason 'closed by server', got: " + event.reason);
+			}
+			call("remote closed");
+		};
+	`))
+	require.NoError(t, err)
+	samples := metrics.GetBufferedSamples(ts.samples)
+	assertSessionMetricsEmitted(t, samples, "", sr("WSBIN_URL/ws-remote-close"), http.StatusSwitchingProtocols, "")
+	assert.Equal(t, []string{"remote closed"}, ts.callRecorder.Recorded())
 }

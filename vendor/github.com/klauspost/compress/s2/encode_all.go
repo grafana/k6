@@ -903,10 +903,7 @@ func encodeBlockDictGo(dst, src []byte, dict *Dict) (d int) {
 	// sLimit is when to stop looking for offset/length copies. The inputMargin
 	// lets us use a fast path for emitLiteral in the main loop, while we are
 	// looking for copies.
-	sLimit := len(src) - inputMargin
-	if sLimit > MaxDictSrcOffset-maxAhead {
-		sLimit = MaxDictSrcOffset - maxAhead
-	}
+	sLimit := min(len(src)-inputMargin, MaxDictSrcOffset-maxAhead)
 
 	// Bail if we can't compress to at least this.
 	dstLimit := len(src) - len(src)>>5 - 5

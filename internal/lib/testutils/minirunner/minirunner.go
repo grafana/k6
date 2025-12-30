@@ -113,6 +113,7 @@ func (r *MiniRunner) HandleSummary(
 	ctx context.Context,
 	legacy *lib.LegacySummary,
 	summary *summary.Summary,
+	_ summary.Meta,
 ) (map[string]io.Reader, error) {
 	if r.HandleSummaryFn != nil {
 		return r.HandleSummaryFn(ctx, legacy, summary)

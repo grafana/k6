@@ -1036,6 +1036,74 @@ func TestPageClose(t *testing.T) {
 func TestPageOn(t *testing.T) {
 	t.Parallel()
 
+	tests := map[string]struct {
+		fun     string
+		wantErr string
+	}{
+		"nil on('console') handler": {
+			fun:     `page.on('console')`,
+			wantErr: `TypeError: The "listener" argument must be a function`,
+		},
+		"valid on('console') handler": {
+			fun: `page.on('console', () => {})`,
+		},
+		"nil on('metric') handler": {
+			fun:     `page.on('metric')`,
+			wantErr: `TypeError: The "listener" argument must be a function`,
+		},
+		"valid on('metric') handler": {
+			fun: `page.on('metric', () => {})`,
+		},
+		"nil on('request') handler": {
+			fun:     `page.on('request')`,
+			wantErr: `TypeError: The "listener" argument must be a function`,
+		},
+		"valid on('request') handler": {
+			fun: `page.on('request', () => {})`,
+		},
+		"nil on('response') handler": {
+			fun:     `page.on('response')`,
+			wantErr: `TypeError: The "listener" argument must be a function`,
+		},
+		"valid on('response') handler": {
+			fun: `page.on('response', () => {})`,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
+
+			tb.vu.ActivateVU()
+			tb.vu.StartIteration(t)
+			defer tb.vu.EndIteration(t)
+
+			gv, err := tb.vu.RunAsync(t, `
+				const page = await browser.newPage();
+				try {
+					%s        // e.g. page.on('console', handler);
+				} finally {
+					await page.close();
+				}
+ 			`, tt.fun)
+
+			got := k6test.ToPromise(t, gv)
+
+			if tt.wantErr != "" {
+				assert.ErrorContains(t, err, tt.wantErr)
+				assert.Equal(t, sobek.PromiseStateRejected, got.State())
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, sobek.PromiseStateFulfilled, got.State())
+			}
+		})
+	}
+}
+
+func TestPageOnConsole(t *testing.T) {
+	t.Parallel()
+
 	const blankPage = "about:blank"
 
 	testCases := []struct {
@@ -3826,4 +3894,127 @@ func TestPageUnrouteAll(t *testing.T) {
 
 	assert.Equal(t, 0, route1Calls, "First route should be removed")
 	assert.Equal(t, 0, route2Calls, "Second route should be removed")
+}
+
+func TestPageWaitForEvent(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ok/waits_for_console_event", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withHTTPServer())
+		tb.withHandler("/page", func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = fmt.Fprintf(w, `
+				<!doctype html>
+				<html><body><script>
+					setTimeout(() => console.log("hello world"), 50);
+				</script></body></html>
+			`)
+		})
+
+		p := tb.NewPage(nil)
+
+		gotoPage := func() error {
+			_, err := p.Goto(tb.url("/page"), &common.FrameGotoOptions{
+				WaitUntil: common.LifecycleEventDOMContentLoad,
+				Timeout:   common.DefaultTimeout,
+			})
+			return err
+		}
+
+		var ev common.PageEvent
+		waitForConsole := func() error {
+			var err error
+			ev, err = p.WaitForEvent(
+				common.PageEventConsole,
+				&common.PageWaitForEventOptions{Timeout: p.Timeout()},
+				nil,
+			)
+			return err
+		}
+
+		err := tb.run(tb.context(), gotoPage, waitForConsole)
+		require.NoError(t, err)
+		require.NotNil(t, ev.ConsoleMessage)
+		require.Equal(t, "hello world", ev.ConsoleMessage.Text)
+	})
+
+	t.Run("ok/waits_for_response_event", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withHTTPServer())
+		tb.withHandler("/api/data", func(w http.ResponseWriter, r *http.Request) {
+			_, _ = fmt.Fprintf(w, `{"data": "test"}`)
+		})
+		tb.withHandler("/page", func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = fmt.Fprintf(w, `
+				<!doctype html>
+				<html><body><script>
+					setTimeout(() => fetch('/api/data'), 50);
+				</script></body></html>
+			`)
+		})
+
+		p := tb.NewPage(nil)
+
+		gotoPage := func() error {
+			_, err := p.Goto(tb.url("/page"), &common.FrameGotoOptions{
+				WaitUntil: common.LifecycleEventDOMContentLoad,
+				Timeout:   common.DefaultTimeout,
+			})
+			return err
+		}
+
+		var ev common.PageEvent
+		waitForResponse := func() error {
+			var err error
+			ev, err = p.WaitForEvent(
+				common.PageEventResponse,
+				&common.PageWaitForEventOptions{Timeout: p.Timeout()},
+				func(pe common.PageEvent) (bool, error) {
+					return strings.Contains(pe.Response.URL(), "/api/data"), nil
+				},
+			)
+			return err
+		}
+
+		err := tb.run(tb.context(), gotoPage, waitForResponse)
+		require.NoError(t, err)
+		require.NotNil(t, ev.Response)
+		require.Contains(t, ev.Response.URL(), "/api/data")
+	})
+
+	t.Run("err/canceled", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t)
+		p := tb.NewPage(nil)
+
+		go tb.cancelContext()
+		<-tb.context().Done()
+
+		_, err := p.WaitForEvent(
+			common.PageEventConsole,
+			&common.PageWaitForEventOptions{Timeout: p.Timeout()},
+			nil,
+		)
+		require.ErrorIs(t, err, context.Canceled)
+	})
+
+	t.Run("err/timeout", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t)
+		p := tb.NewPage(nil)
+
+		err := tb.run(tb.context(), func() error {
+			_, werr := p.WaitForEvent(
+				common.PageEventConsole,
+				&common.PageWaitForEventOptions{Timeout: 500 * time.Millisecond},
+				nil,
+			)
+			return werr
+		})
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+	})
 }
