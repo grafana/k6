@@ -23,6 +23,7 @@ func TestConfigApply(t *testing.T) {
 	fullConfig := Config{
 		ServerURL:             null.StringFrom("some-url"),
 		InsecureSkipTLSVerify: null.BoolFrom(false),
+		EnableTLS12:           null.BoolFrom(false),
 		Username:              null.StringFrom("user"),
 		Password:              null.StringFrom("pass"),
 		PushInterval:          types.NullDurationFrom(10 * time.Second),
@@ -121,6 +122,7 @@ func TestGetConsolidatedConfig(t *testing.T) {
 			config: Config{
 				ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
 				InsecureSkipTLSVerify: null.BoolFrom(false),
+				EnableTLS12:           null.BoolFrom(false),
 				Username:              null.NewString("", false),
 				Password:              null.NewString("", false),
 				PushInterval:          types.NullDurationFrom(5 * time.Second),
@@ -134,6 +136,7 @@ func TestGetConsolidatedConfig(t *testing.T) {
 			config: Config{
 				ServerURL:             null.StringFrom(u.String()),
 				InsecureSkipTLSVerify: null.BoolFrom(false),
+				EnableTLS12:           null.BoolFrom(false),
 				Username:              null.NewString("", false),
 				Password:              null.NewString("", false),
 				PushInterval:          types.NullDurationFrom(defaultPushInterval),
@@ -152,6 +155,7 @@ func TestGetConsolidatedConfig(t *testing.T) {
 			config: Config{
 				ServerURL:             null.StringFrom(u.String()),
 				InsecureSkipTLSVerify: null.BoolFrom(false),
+				EnableTLS12:           null.BoolFrom(false),
 				Username:              null.NewString("u", true),
 				Password:              null.NewString("", false),
 				PushInterval:          types.NullDurationFrom(defaultPushInterval),
@@ -170,6 +174,7 @@ func TestGetConsolidatedConfig(t *testing.T) {
 			config: Config{
 				ServerURL:             null.StringFrom("http://json:9090"),
 				InsecureSkipTLSVerify: null.BoolFrom(false),
+				EnableTLS12:           null.BoolFrom(false),
 				Username:              null.StringFrom("env"),
 				Password:              null.StringFrom("env"),
 				PushInterval:          types.NullDurationFrom(defaultPushInterval),
@@ -246,6 +251,7 @@ func TestOptionServerURL(t *testing.T) {
 	expconfig := Config{
 		ServerURL:             null.StringFrom("http://prometheus:9090/api/v1/write"),
 		InsecureSkipTLSVerify: null.BoolFrom(false),
+		EnableTLS12:           null.BoolFrom(false),
 		Username:              null.NewString("", false),
 		Password:              null.NewString("", false),
 		PushInterval:          types.NullDurationFrom(5 * time.Second),
@@ -288,6 +294,7 @@ func TestOptionHeaders(t *testing.T) {
 	expconfig := Config{
 		ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
 		InsecureSkipTLSVerify: null.BoolFrom(false),
+		EnableTLS12:           null.BoolFrom(false),
 		PushInterval:          types.NullDurationFrom(5 * time.Second),
 		Headers: map[string]string{
 			"X-MY-HEADER1":   "hval1",
@@ -327,6 +334,41 @@ func TestOptionInsecureSkipTLSVerify(t *testing.T) {
 	expconfig := Config{
 		ServerURL:             null.StringFrom(defaultServerURL),
 		InsecureSkipTLSVerify: null.BoolFrom(true),
+		EnableTLS12:           null.BoolFrom(false),
+		PushInterval:          types.NullDurationFrom(defaultPushInterval),
+		Headers:               make(map[string]string),
+		TrendStats:            []string{"p(99)"},
+		StaleMarkers:          null.BoolFrom(false),
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			c, err := GetConsolidatedConfig(
+				tc.jsonRaw, tc.env, tc.arg)
+			require.NoError(t, err)
+			assert.Equal(t, expconfig, c)
+		})
+	}
+}
+
+func TestOptionEnableTLS12(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		arg     string
+		env     map[string]string
+		jsonRaw json.RawMessage
+	}{
+		"JSON": {jsonRaw: json.RawMessage(`{"enableTLS12":true}`)},
+		"Env":  {env: map[string]string{"K6_PROMETHEUS_RW_ENABLE_TLS_12": "true"}},
+		//nolint:gocritic
+		//"Arg":  {arg: "enableTLS12=false"},
+	}
+
+	expconfig := Config{
+		ServerURL:             null.StringFrom(defaultServerURL),
+		InsecureSkipTLSVerify: null.BoolFrom(false),
+		EnableTLS12:           null.BoolFrom(true),
 		PushInterval:          types.NullDurationFrom(defaultPushInterval),
 		Headers:               make(map[string]string),
 		TrendStats:            []string{"p(99)"},
@@ -360,6 +402,7 @@ func TestOptionBasicAuth(t *testing.T) {
 	expconfig := Config{
 		ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
 		InsecureSkipTLSVerify: null.BoolFrom(false),
+		EnableTLS12:           null.BoolFrom(false),
 		Username:              null.StringFrom("user1"),
 		Password:              null.StringFrom("pass1"),
 		PushInterval:          types.NullDurationFrom(5 * time.Second),
@@ -394,6 +437,7 @@ func TestOptionBearerToken(t *testing.T) {
 	expconfig := Config{
 		ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
 		InsecureSkipTLSVerify: null.BoolFrom(false),
+		EnableTLS12:           null.BoolFrom(false),
 		BearerToken:           null.StringFrom("my-bearer-token"),
 		PushInterval:          types.NullDurationFrom(5 * time.Second),
 		Headers:               make(map[string]string),
@@ -427,6 +471,7 @@ func TestOptionClientCertificate(t *testing.T) {
 	expconfig := Config{
 		ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
 		InsecureSkipTLSVerify: null.BoolFrom(false),
+		EnableTLS12:           null.BoolFrom(false),
 		PushInterval:          types.NullDurationFrom(5 * time.Second),
 		Headers:               make(map[string]string),
 		TrendStats:            []string{"p(99)"},
@@ -463,6 +508,7 @@ func TestOptionTrendAsNativeHistogram(t *testing.T) {
 	expconfig := Config{
 		ServerURL:              null.StringFrom("http://localhost:9090/api/v1/write"),
 		InsecureSkipTLSVerify:  null.BoolFrom(false),
+		EnableTLS12:           null.BoolFrom(false),
 		Username:               null.NewString("", false),
 		Password:               null.NewString("", false),
 		PushInterval:           types.NullDurationFrom(5 * time.Second),
@@ -498,6 +544,7 @@ func TestOptionPushInterval(t *testing.T) {
 	expconfig := Config{
 		ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
 		InsecureSkipTLSVerify: null.BoolFrom(false),
+		EnableTLS12:           null.BoolFrom(false),
 		Username:              null.NewString("", false),
 		Password:              null.NewString("", false),
 		PushInterval:          types.NullDurationFrom((1 * time.Minute) + (2 * time.Second)),
@@ -535,6 +582,7 @@ func TestConfigTrendStats(t *testing.T) {
 	expconfig := Config{
 		ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
 		InsecureSkipTLSVerify: null.BoolFrom(false),
+		EnableTLS12:           null.BoolFrom(false),
 		PushInterval:          types.NullDurationFrom(5 * time.Second),
 		Headers:               make(map[string]string),
 		TrendStats:            []string{"max", "p(95)"},
@@ -567,6 +615,7 @@ func TestOptionStaleMarker(t *testing.T) {
 	expconfig := Config{
 		ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
 		InsecureSkipTLSVerify: null.BoolFrom(false),
+		EnableTLS12:           null.BoolFrom(false),
 		PushInterval:          types.NullDurationFrom(5 * time.Second),
 		Headers:               make(map[string]string),
 		TrendStats:            []string{"p(99)"},
@@ -594,7 +643,7 @@ func TestOptionSigV4(t *testing.T) {
 	}{
 		"JSON": {jsonRaw: json.RawMessage(`
 {
-  "sigV4Region":"us-east-2", 
+  "sigV4Region":"us-east-2",
   "sigV4AccessKey":"ASIAUZABC123456",
   "sigV4SecretKey":"5wfFi0FEaaaaacccc1111111111111"
 }
@@ -609,6 +658,7 @@ func TestOptionSigV4(t *testing.T) {
 	expconfig := Config{
 		ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
 		InsecureSkipTLSVerify: null.BoolFrom(false),
+		EnableTLS12:           null.BoolFrom(false),
 		PushInterval:          types.NullDurationFrom(5 * time.Second),
 		Headers:               make(map[string]string),
 		TrendStats:            []string{"p(99)"},
