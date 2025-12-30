@@ -38,6 +38,9 @@ type Config struct {
 	// InsecureSkipTLSVerify skips TLS client side checks.
 	InsecureSkipTLSVerify null.Bool `json:"insecureSkipTLSVerify" envconfig:"K6_PROMETHEUS_RW_INSECURE_SKIP_TLS_VERIFY"`
 
+	// EnableTLS12 enables TLS version 1.2.
+	EnableTLS12 null.Bool `json:"enableTLS12" envconfig:"K6_PROMETHEUS_RW_ENABLE_TLS_12"`
+
 	// Username is the User for Basic Auth.
 	Username null.String `json:"username" envconfig:"K6_PROMETHEUS_RW_USERNAME"`
 
@@ -87,6 +90,7 @@ func NewConfig() Config {
 	return Config{
 		ServerURL:             null.StringFrom(defaultServerURL),
 		InsecureSkipTLSVerify: null.BoolFrom(false),
+		EnableTLS12:		   null.BoolFrom(false),
 		Username:              null.NewString("", false),
 		Password:              null.NewString("", false),
 		PushInterval:          types.NullDurationFrom(defaultPushInterval),
@@ -113,9 +117,14 @@ func (conf Config) RemoteConfig() (*remote.HTTPConfig, error) {
 		}
 	}
 
+	tlsMinVersion := tls.VersionTLS13
+	if conf.EnableTLS12.Bool {
+		tlsMinVersion = tls.VersionTLS12
+	}
+
 	hc.TLSConfig = &tls.Config{
 		InsecureSkipVerify: conf.InsecureSkipTLSVerify.Bool, //nolint:gosec
-		MinVersion:         tls.VersionTLS13,
+		MinVersion:         uint16(tlsMinVersion),
 	}
 
 	if conf.ClientCertificate.Valid && conf.ClientCertificateKey.Valid {
@@ -167,6 +176,10 @@ func (conf Config) Apply(applied Config) Config {
 
 	if applied.InsecureSkipTLSVerify.Valid {
 		conf.InsecureSkipTLSVerify = applied.InsecureSkipTLSVerify
+	}
+
+	if applied.EnableTLS12.Valid {
+		conf.EnableTLS12 = applied.EnableTLS12
 	}
 
 	if applied.Username.Valid {
@@ -332,6 +345,10 @@ func parseArg(text string) (Config, error) {
 		case "insecureSkipTLSVerify":
 			if err := c.InsecureSkipTLSVerify.UnmarshalText([]byte(v)); err != nil {
 				return c, fmt.Errorf("insecureSkipTLSVerify value must be true or false, not %q", v)
+			}
+		case "enableTLS12":
+			if err := c.EnableTLS12.UnmarshalText([]byte(v)); err != nil {
+				return c, fmt.Errorf("enableTLS12 value must be true or false, not %q", v)
 			}
 		case "username":
 			c.Username = null.StringFrom(v)
