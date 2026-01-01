@@ -1,15 +1,150 @@
-diff --git a/WebCryptoAPI/sign_verify/rsa_pss_vectors.js b/WebCryptoAPI/sign_verify/rsa_pss_vectors.js
-index c3ce77960..0dd34723e 100644
---- a/WebCryptoAPI/sign_verify/rsa_pss_vectors.js
-+++ b/WebCryptoAPI/sign_verify/rsa_pss_vectors.js
-@@ -143,5 +143,9 @@ function getTestVectors() {
-         }
-     ];
+diff --git a/WebCryptoAPI/sign_verify/rsa.js b/WebCryptoAPI/sign_verify/rsa.js
+index 5abadd3d4..32a2e2851 100644
+--- a/WebCryptoAPI/sign_verify/rsa.js
++++ b/WebCryptoAPI/sign_verify/rsa.js
+@@ -13,13 +13,22 @@ function run_test() {
  
--    return vectors;
-+    // k6 RSA-PSS uses standard Golang SDK that doesn't support salt length=0
-+    // Filter out test vectors with salt length 0 to avoid test failures
-+    return vectors.filter(function(vector) {
-+        return !(vector.algorithm && vector.algorithm.name === "RSA-PSS" && vector.algorithm.saltLength === 0);
-+    });
- }
+     // Test verification first, because signing tests rely on that working
+     testVectors.forEach(function(vector) {
++        // k6/Go throws error for RSA-PSS with saltLength=0
++        const expectsGoError = vector.algorithm.name === "RSA-PSS" && vector.algorithm.saltLength === 0;
+         var promise = importVectorKeys(vector, ["verify"], ["sign"])
+         .then(function(vectors) {
+             promise_test(function(test) {
+                 var operation = subtle.verify(vector.algorithm, vector.publicKey, vector.signature, vector.plaintext)
+                 .then(function(is_verified) {
++                    if (expectsGoError) {
++                        assert_unreached("Expected Go error for RSA-PSS saltLength=0, but verify succeeded for " + vector.name);
++                    }
+                     assert_true(is_verified, "Signature verified");
+                 }, function(err) {
++                    if (expectsGoError) {
++                        assert_equals(err.name, "ImplementationError", "Go throws ImplementationError for RSA-PSS saltLength=0");
++                        return;
++                    }
+                     assert_unreached("Verification should not throw error " + vector.name + ": " + err.message + "'");
+                 });
+ 
+@@ -39,14 +48,22 @@ function run_test() {
+ 
+     // Test verification with an altered buffer after call
+     testVectors.forEach(function(vector) {
++        const expectsGoError = vector.algorithm.name === "RSA-PSS" && vector.algorithm.saltLength === 0;
+         var promise = importVectorKeys(vector, ["verify"], ["sign"])
+         .then(function(vectors) {
+             promise_test(function(test) {
+                 var signature = copyBuffer(vector.signature);
+                 var operation = subtle.verify(vector.algorithm, vector.publicKey, signature, vector.plaintext)
+                 .then(function(is_verified) {
++                    if (expectsGoError) {
++                        assert_unreached("Expected Go error for RSA-PSS saltLength=0, but verify succeeded for " + vector.name);
++                    }
+                     assert_true(is_verified, "Signature verified");
+                 }, function(err) {
++                    if (expectsGoError) {
++                        assert_equals(err.name, "ImplementationError", "Go throws ImplementationError for RSA-PSS saltLength=0");
++                        return;
++                    }
+                     assert_unreached("Verification should not throw error " + vector.name + ": " + err.message + "'");
+                 });
+ 
+@@ -64,14 +81,22 @@ function run_test() {
+ 
+     // Check for successful verification even if plaintext is altered after call.
+     testVectors.forEach(function(vector) {
++        const expectsGoError = vector.algorithm.name === "RSA-PSS" && vector.algorithm.saltLength === 0;
+         var promise = importVectorKeys(vector, ["verify"], ["sign"])
+         .then(function(vectors) {
+             promise_test(function(test) {
+                 var plaintext = copyBuffer(vector.plaintext);
+                 var operation = subtle.verify(vector.algorithm, vector.publicKey, vector.signature, plaintext)
+                 .then(function(is_verified) {
++                    if (expectsGoError) {
++                        assert_unreached("Expected Go error for RSA-PSS saltLength=0, but verify succeeded for " + vector.name);
++                    }
+                     assert_true(is_verified, "Signature verified");
+                 }, function(err) {
++                    if (expectsGoError) {
++                        assert_equals(err.name, "ImplementationError", "Go throws ImplementationError for RSA-PSS saltLength=0");
++                        return;
++                    }
+                     assert_unreached("Verification should not throw error " + vector.name + ": " + err.message + "'");
+                 });
+ 
+@@ -157,11 +182,16 @@ function run_test() {
+     testVectors.forEach(function(vector) {
+         // RSA signing is deterministic with PKCS#1 v1.5, or PSS with zero-length salts.
+         const isDeterministic = !("saltLength" in vector.algorithm) || vector.algorithm.saltLength == 0;
++        // k6/Go throws error for RSA-PSS with saltLength=0
++        const expectsGoError = vector.algorithm.name === "RSA-PSS" && vector.algorithm.saltLength === 0;
+         var promise = importVectorKeys(vector, ["verify"], ["sign"])
+         .then(function(vectors) {
+             promise_test(function(test) {
+                 return subtle.sign(vector.algorithm, vector.privateKey, vector.plaintext)
+                 .then(function(signature) {
++                    if (expectsGoError) {
++                        assert_unreached("Expected Go error for RSA-PSS saltLength=0, but signing succeeded for " + vector.name);
++                    }
+                     if (isDeterministic) {
+                         // If deterministic, we can check the output matches. Otherwise, we can only check it verifies.
+                         assert_true(equalBuffers(signature, vector.signature), "Signing did not give the expected output");
+@@ -188,6 +218,11 @@ function run_test() {
+                         assert_unreached("second time verify error for test " + vector.name + ": '" + err.message + "'");
+                     });
+                 }, function(err) {
++                    // For RSA-PSS with saltLength=0, Go throws ImplementationError - expected
++                    if (expectsGoError) {
++                        assert_equals(err.name, "ImplementationError", "Go throws ImplementationError for RSA-PSS saltLength=0");
++                        return;
++                    }
+                     assert_unreached("sign error for test " + vector.name + ": '" + err.message + "'");
+                 });
+             }, vector.name + " round trip");
+@@ -280,6 +315,7 @@ function run_test() {
+ 
+     // Verification should fail with wrong signature
+     testVectors.forEach(function(vector) {
++        const expectsGoError = vector.algorithm.name === "RSA-PSS" && vector.algorithm.saltLength === 0;
+         var promise = importVectorKeys(vector, ["verify"], ["sign"])
+         .then(function(vectors) {
+             promise_test(function(test) {
+@@ -287,8 +323,15 @@ function run_test() {
+                 signature[0] = 255 - signature[0];
+                 var operation = subtle.verify(vector.algorithm, vector.publicKey, signature, vector.plaintext)
+                 .then(function(is_verified) {
++                    if (expectsGoError) {
++                        assert_unreached("Expected Go error for RSA-PSS saltLength=0, but verify succeeded for " + vector.name);
++                    }
+                     assert_false(is_verified, "Signature NOT verified");
+                 }, function(err) {
++                    if (expectsGoError) {
++                        assert_equals(err.name, "ImplementationError", "Go throws ImplementationError for RSA-PSS saltLength=0");
++                        return;
++                    }
+                     assert_unreached("Verification should not throw error " + vector.name + ": " + err.message + "'");
+                 });
+ 
+@@ -337,6 +380,7 @@ function run_test() {
+ 
+     // Verification should fail with wrong plaintext
+     testVectors.forEach(function(vector) {
++        const expectsGoError = vector.algorithm.name === "RSA-PSS" && vector.algorithm.saltLength === 0;
+         var promise = importVectorKeys(vector, ["verify"], ["sign"])
+         .then(function(vectors) {
+             promise_test(function(test) {
+@@ -344,8 +388,15 @@ function run_test() {
+                 plaintext[0] = 255 - plaintext[0];
+                 var operation = subtle.verify(vector.algorithm, vector.publicKey, vector.signature, plaintext)
+                 .then(function(is_verified) {
++                    if (expectsGoError) {
++                        assert_unreached("Expected Go error for RSA-PSS saltLength=0, but verify succeeded for " + vector.name);
++                    }
+                     assert_false(is_verified, "Signature NOT verified");
+                 }, function(err) {
++                    if (expectsGoError) {
++                        assert_equals(err.name, "ImplementationError", "Go throws ImplementationError for RSA-PSS saltLength=0");
++                        return;
++                    }
+                     assert_unreached("Verification should not throw error " + vector.name + ": " + err.message + "'");
+                 });
+ 
