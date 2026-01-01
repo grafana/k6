@@ -22,7 +22,7 @@ require (
 	github.com/grafana/k6provider v0.2.0
 	github.com/grafana/sobek v0.0.0-20251124090928-9a028a30ff58
 	github.com/grafana/xk6-dashboard v0.7.13
-	github.com/grafana/xk6-redis v0.3.4
+	github.com/grafana/xk6-redis v0.3.6
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
 	github.com/jhump/protoreflect v1.17.0
@@ -93,7 +93,7 @@ require (
 	github.com/prometheus/common v0.42.0 // indirect
 	github.com/prometheus/procfs v0.10.1 // indirect
 	github.com/r3labs/sse/v2 v2.10.0 // indirect
-	github.com/redis/go-redis/v9 v9.6.3 // indirect
+	github.com/redis/go-redis/v9 v9.17.2 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
