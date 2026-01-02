@@ -97,15 +97,8 @@ jobs:
           set -x
           which go
           go version
-          export GOMAXPROCS=2
-          args=("-p" "2" "-race")
-          # Run with less concurrency on Ubuntu 22.04 to minimize flakiness.
-          if [[ "${{ matrix.platform }}" == ubuntu-22.04 ]]; then
-            args[1]="1"
-            export GOMAXPROCS=1
-            unset args[2]
-          fi
-          go test "${args[@]}" -timeout 800s ./...
+          export GOMAXPROCS=1
+          go test -p 1 -timeout 800s ./...
 
   test-latest:
     strategy:
@@ -134,12 +127,5 @@ jobs:
         run: |
           set -x
           go version
-          export GOMAXPROCS=2
-          args=("-p" "2" "-race")
-          # Run with less concurrency on Ubuntu 22.04 to minimize flakiness.
-          if [[ "${{ matrix.platform }}" == ubuntu-22.04 ]]; then
-            args[1]="1"
-            export GOMAXPROCS=1
-            unset args[2]
-          fi
-          go test "${args[@]}" -timeout 800s ./...
+          export GOMAXPROCS=1
+          go test -p 1 -timeout 800s ./...
