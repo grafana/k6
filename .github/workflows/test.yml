@@ -60,7 +60,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [ubuntu-22.04, ubuntu-arm64-large, github-hosted-windows-x64-large]
+        include:
+        - platform: ubuntu-22.04
+          gotip_tag: ubuntu-22.04
+        - platform: ubuntu-arm64-large
+          gotip_tag: ubuntu-24.04-arm
+        - platform: github-hosted-windows-x64-large
+          gotip_tag: windows-latest
     runs-on: ${{ matrix.platform }}
     continue-on-error: true
     steps:
@@ -72,7 +78,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release download ${{ matrix.platform }} --repo grafana/gotip --pattern 'go.zip'
+          gh release download ${{ matrix.gotip_tag }} --repo grafana/gotip --pattern 'go.zip'
       - name: Install Go tip
         run: |
           unzip go.zip -d $HOME/sdk
