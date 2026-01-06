@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -18,6 +19,26 @@ func getX(gs *state.GlobalState) *cobra.Command {
 This command serves as a parent for subcommands registered by k6 extensions,
 allowing them to extend k6's functionality with custom commands.
 `,
+		FParseErrWhitelist: cobra.FParseErrWhitelist{
+			UnknownFlags: true,
+		},
+
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			needs, subcommand, err := needsProvisioning(cmd, args)
+			if err != nil {
+				return err
+			}
+
+			if needs {
+				gs.Logger.WithField("subcommand", subcommand).Info("provisioning")
+			}
+
+			return nil
+		},
+
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return cmd.Help()
+		},
 	}
 
 	cmd.AddCommand(extensionSubcommands(gs)...)
@@ -51,4 +72,38 @@ func getCmdForExtension(extension *ext.Extension, gs *state.GlobalState) *cobra.
 	}
 
 	return cmd
+}
+
+func needsProvisioning(cmd *cobra.Command, args []string) (bool, string, error) {
+	var (
+		xCmd   *cobra.Command
+		extCmd *cobra.Command
+	)
+
+	for c := cmd; c != nil; c = c.Parent() {
+		if c.Name() == "x" {
+			xCmd = c
+			break
+		}
+
+		extCmd = c
+	}
+
+	// should not happen, only called from 'x' command PersistentPreRunE
+	if xCmd == nil {
+		return false, "", errors.New("'x' command not found in parent chain")
+	}
+
+	if cmd == xCmd {
+		// x command itself is being run
+		if len(args) == 0 {
+			return false, "", nil
+		}
+
+		// provision args[0] required
+		return true, args[0], nil
+	}
+
+	// nothing to do, already provisioned subcommand is being run
+	return false, extCmd.Name(), nil
 }
