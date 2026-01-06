@@ -7,6 +7,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -81,18 +84,22 @@ func newTestBrowser(tb testing.TB, opts ...func(*testBrowser)) *testBrowser {
 	tbr.isBrowserTypeInitialized = true // some option require the browser type to be initialized.
 	tbr.applyOptions(opts...)           // apply post-init stage options.
 
+	logSystemResources(tb, "before browser launch")
 	b, pid, err := tbr.browserType.Launch(context.Background(), tbr.vu.Context())
 	if err != nil {
+		logSystemResources(tb, "after browser launch failure")
 		tb.Fatalf("testBrowser: %v", err)
 	}
 	tbr.Browser = b
 	tbr.ctx = tbr.browserType.Ctx
 	tbr.pid = pid
 	tbr.wsURL = b.WsURL()
+	logSystemResources(tb, "after browser launch")
 	tb.Cleanup(func() {
 		if !tbr.skipClose {
 			b.Close()
 		}
+		logSystemResources(tb, "after browser close")
 	})
 
 	return tbr
@@ -334,8 +341,13 @@ func (b *testBrowser) GotoPage(p *common.Page, url string) {
 func (b *testBrowser) NewPage(opts *common.BrowserContextOptions) *common.Page {
 	b.t.Helper()
 
+	logSystemResources(b.t, "before NewPage")
 	p, err := b.Browser.NewPage(opts)
-	require.NoError(b.t, err)
+	if err != nil {
+		logSystemResources(b.t, "after NewPage failure")
+		require.NoError(b.t, err)
+	}
+	logSystemResources(b.t, "after NewPage success")
 
 	return p
 }
@@ -364,6 +376,12 @@ func (b *testBrowser) cancelContext() { b.cancel() }
 
 // runtime returns a VU runtime.
 func (b *testBrowser) runtime() *sobek.Runtime { return b.vu.Runtime() }
+
+// LogSystemResources logs CPU and RAM usage information.
+// This can be called manually from tests to log resources at specific points.
+func (b *testBrowser) LogSystemResources(label string) {
+	logSystemResources(b.t, label)
+}
 
 // toSobekValue converts a value to sobek value.
 func (b *testBrowser) toSobekValue(i any) sobek.Value { return b.runtime().ToValue(i) }
@@ -461,4 +479,133 @@ func asString(tb testing.TB, v any) string {
 // toPtr is a helper function to convert a value to a pointer.
 func toPtr[T any](v T) *T {
 	return &v
+}
+
+// logSystemResources logs CPU and RAM usage information to help diagnose resource constraints.
+// This is useful for debugging test failures related to resource exhaustion.
+// Logging is enabled when K6_BROWSER_TEST_LOG_RESOURCES environment variable is set to "1" or "true".
+func logSystemResources(tb testing.TB, label string) {
+	tb.Helper()
+
+	// Only log if explicitly enabled via environment variable
+	if os.Getenv("K6_BROWSER_TEST_LOG_RESOURCES") != "1" && os.Getenv("K6_BROWSER_TEST_LOG_RESOURCES") != "true" {
+		return
+	}
+
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+
+	tb.Logf("=== System Resources [%s] ===", label)
+	tb.Logf("Go Runtime Memory:")
+	tb.Logf("  Alloc: %d MB (allocated heap objects)", memStats.Alloc/1024/1024)
+	tb.Logf("  TotalAlloc: %d MB (total bytes allocated)", memStats.TotalAlloc/1024/1024)
+	tb.Logf("  Sys: %d MB (total memory obtained from OS)", memStats.Sys/1024/1024)
+	tb.Logf("  NumGC: %d (number of GC cycles)", memStats.NumGC)
+	tb.Logf("  NumGoroutine: %d", runtime.NumGoroutine())
+
+	// Log system-wide memory and CPU usage
+	switch runtime.GOOS {
+	case "linux":
+		logLinuxResources(tb)
+	case "darwin":
+		logDarwinResources(tb)
+	case "windows":
+		logWindowsResources(tb)
+	default:
+		tb.Logf("System resources: OS %s not supported for detailed resource logging", runtime.GOOS)
+	}
+	tb.Logf("=== End System Resources [%s] ===", label)
+}
+
+func logLinuxResources(tb testing.TB) {
+	tb.Helper()
+
+	// Get memory info from /proc/meminfo
+	if data, err := os.ReadFile("/proc/meminfo"); err == nil {
+		lines := strings.Split(string(data), "\n")
+		for _, line := range lines {
+			if strings.HasPrefix(line, "MemTotal:") ||
+				strings.HasPrefix(line, "MemAvailable:") ||
+				strings.HasPrefix(line, "MemFree:") {
+				tb.Logf("  %s", strings.TrimSpace(line))
+			}
+		}
+	}
+
+	// Get CPU load average
+	if data, err := os.ReadFile("/proc/loadavg"); err == nil {
+		tb.Logf("  Load Average: %s", strings.TrimSpace(string(data)))
+	}
+
+	// Try to get top output for current process CPU usage
+	if cmd := exec.Command("top", "-bn1", "-p", fmt.Sprintf("%d", os.Getpid())); cmd != nil {
+		if output, err := cmd.Output(); err == nil {
+			lines := strings.Split(string(output), "\n")
+			for _, line := range lines {
+				if strings.Contains(line, "%CPU") || strings.Contains(line, fmt.Sprintf("%d", os.Getpid())) {
+					tb.Logf("  %s", strings.TrimSpace(line))
+				}
+			}
+		}
+	}
+}
+
+func logDarwinResources(tb testing.TB) {
+	tb.Helper()
+
+	// Get memory info using vm_stat
+	if cmd := exec.Command("vm_stat"); cmd != nil {
+		if output, err := cmd.Output(); err == nil {
+			lines := strings.Split(string(output), "\n")
+			for _, line := range lines {
+				if strings.Contains(line, "Pages free") ||
+					strings.Contains(line, "Pages active") ||
+					strings.Contains(line, "Pages inactive") ||
+					strings.Contains(line, "Pages speculative") {
+					tb.Logf("  %s", strings.TrimSpace(line))
+				}
+			}
+		}
+	}
+
+	// Get CPU info using top
+	if cmd := exec.Command("top", "-l", "1", "-pid", fmt.Sprintf("%d", os.Getpid())); cmd != nil {
+		if output, err := cmd.Output(); err == nil {
+			lines := strings.Split(string(output), "\n")
+			for _, line := range lines {
+				if strings.Contains(line, "CPU usage") || strings.Contains(line, fmt.Sprintf("%d", os.Getpid())) {
+					tb.Logf("  %s", strings.TrimSpace(line))
+				}
+			}
+		}
+	}
+}
+
+func logWindowsResources(tb testing.TB) {
+	tb.Helper()
+
+	// Get memory info using wmic
+	if cmd := exec.Command("wmic", "OS", "get", "TotalVisibleMemorySize,FreePhysicalMemory", "/format:list"); cmd != nil {
+		if output, err := cmd.Output(); err == nil {
+			lines := strings.Split(string(output), "\n")
+			for _, line := range lines {
+				if strings.Contains(line, "TotalVisibleMemorySize") ||
+					strings.Contains(line, "FreePhysicalMemory") {
+					tb.Logf("  %s", strings.TrimSpace(line))
+				}
+			}
+		}
+	}
+
+	// Get CPU info using wmic
+	if cmd := exec.Command("wmic", "cpu", "get", "LoadPercentage", "/format:list"); cmd != nil {
+		if output, err := cmd.Output(); err == nil {
+			lines := strings.Split(string(output), "\n")
+			for _, line := range lines {
+				if strings.Contains(line, "LoadPercentage") {
+					tb.Logf("  %s", strings.TrimSpace(line))
+				}
+			}
+		}
+	}
 }
