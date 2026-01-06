@@ -87,10 +87,7 @@ func newRootCommand(gs *state.GlobalState) *rootCommand {
 		rootCmd.AddCommand(sc(gs))
 	}
 
-	// Add the "x" command only if there are registered subcommand extensions.
-	if xCmd := getX(gs); len(xCmd.Commands()) > 0 {
-		rootCmd.AddCommand(xCmd)
-	}
+	rootCmd.AddCommand(getX(gs))
 
 	c.cmd = rootCmd
 	return c
