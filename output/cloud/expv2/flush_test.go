@@ -287,21 +287,35 @@ func TestFlushMaxSeriesInBatch(t *testing.T) {
 
 	require.Len(t, collected, 2)
 
-	require.Len(t, collected[0].Metrics, 1)
+	// Find batches by their content since order is non-deterministic due to concurrent processing
+	batchWithVal1Val2Found := false
+	batchWithVal3Found := false
+	for _, ms := range collected {
+		require.Len(t, ms.Metrics, 1)
+		ts := ms.Metrics[0].TimeSeries
+		if len(ts) == 2 {
+			// This should be the batch with val1 and val2
+			require.Len(t, ts[0].Labels, 1)
+			assert.Equal(t, "key1", ts[0].Labels[0].Name)
+			assert.Equal(t, "val1", ts[0].Labels[0].Value)
+		
+			require.Len(t, ts[1].Labels, 1)
+			assert.Equal(t, "key1", ts[1].Labels[0].Name)
+			assert.Equal(t, "val2", ts[1].Labels[0].Value)
 
-	ts := collected[0].Metrics[0].TimeSeries
-	require.Len(t, ts[0].Labels, 1)
-	assert.Equal(t, "key1", ts[0].Labels[0].Name)
-	assert.Equal(t, "val1", ts[0].Labels[0].Value)
+			batchWithVal1Val2Found = true
+		} else if len(ts) == 1 {
+			// This should be the batch with val3
+			require.Len(t, ts[0].Labels, 1)
+			assert.Equal(t, "key1", ts[0].Labels[0].Name)
+			assert.Equal(t, "val3", ts[0].Labels[0].Value)
 
-	require.Len(t, ts[1].Labels, 1)
-	assert.Equal(t, "key1", ts[1].Labels[0].Name)
-	assert.Equal(t, "val2", ts[1].Labels[0].Value)
+			batchWithVal3Found = true
+		}
+	}
 
-	ts = collected[1].Metrics[0].TimeSeries
-	require.Len(t, ts[0].Labels, 1)
-	assert.Equal(t, "key1", ts[0].Labels[0].Name)
-	assert.Equal(t, "val3", ts[0].Labels[0].Value)
+	assert.True(t, batchWithVal1Val2Found)
+	assert.True(t, batchWithVal3Found)
 }
 
 type pusherMock struct {
