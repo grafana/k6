@@ -43,6 +43,8 @@ jobs:
           sudo apt update && sudo apt install chromium-browser
           chromium --version
       - name: Run tests
+        env:
+          K6_BROWSER_TEST_LOG_RESOURCES: "1"
         run: |
           set -x
           go version
@@ -89,6 +91,8 @@ jobs:
           sudo apt update && sudo apt install chromium-browser
           chromium --version
       - name: Run tests
+        env:
+          K6_BROWSER_TEST_LOG_RESOURCES: "1"
         run: |
           set -x
           which go
@@ -129,6 +133,8 @@ jobs:
           sudo apt update && sudo apt install chromium-browser
           chromium --version
       - name: Run tests
+        env:
+          K6_BROWSER_TEST_LOG_RESOURCES: "1"
         run: |
           set -x
           go version
