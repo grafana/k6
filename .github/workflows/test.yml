@@ -48,16 +48,33 @@ jobs:
         run: |
           set -x
           go version
-          export GOMAXPROCS=2
+          # Detect number of CPUs available and set GOMAXPROCS accordingly
+          if [[ "${{ matrix.platform }}" == windows* ]]; then
+            # Windows: use PowerShell to get CPU count, fallback to 2
+            NUM_CPUS=$(powershell -Command "(Get-CimInstance Win32_ComputerSystem).NumberOfLogicalProcessors" 2>/dev/null || echo "2")
+          elif [[ "${{ matrix.platform }}" == *macos* ]]; then
+            # macOS: use sysctl
+            NUM_CPUS=$(sysctl -n hw.ncpu || echo "2")
+          else
+            # Linux: use nproc
+            NUM_CPUS=$(nproc || echo "2")
+          fi
+          # Set GOMAXPROCS based on platform
+          if [[ "${{ matrix.platform }}" == windows* || "${{ matrix.platform }}" == *arm ]]; then
+            export GOMAXPROCS=1
+          else
+            # Use actual CPU count
+            export GOMAXPROCS=$NUM_CPUS
+          fi
           args=("-p" "2" "-race")
           # Run with less concurrency on Windows/ARM to minimize flakiness.
           if [[ "${{ matrix.platform }}" == windows* || "${{ matrix.platform }}" == *arm ]]; then
             args[1]="1"
-            export GOMAXPROCS=1
             if [[ "${{ matrix.platform }}" == windows* ]]; then
               unset args[2]
             fi
           fi
+          echo "Detected CPUs: $NUM_CPUS, Using GOMAXPROCS=$GOMAXPROCS, Test parallelism=${args[1]}"
           go test "${args[@]}" -timeout 800s ./...
 
   test-tip:
@@ -97,16 +114,33 @@ jobs:
           set -x
           which go
           go version
-          export GOMAXPROCS=2
+          # Detect number of CPUs available and set GOMAXPROCS accordingly
+          if [[ "${{ matrix.platform }}" == windows* ]]; then
+            # Windows: use PowerShell to get CPU count, fallback to 2
+            NUM_CPUS=$(powershell -Command "(Get-CimInstance Win32_ComputerSystem).NumberOfLogicalProcessors" 2>/dev/null || echo "2")
+          elif [[ "${{ matrix.platform }}" == *macos* ]]; then
+            # macOS: use sysctl
+            NUM_CPUS=$(sysctl -n hw.ncpu || echo "2")
+          else
+            # Linux: use nproc
+            NUM_CPUS=$(nproc || echo "2")
+          fi
+          # Set GOMAXPROCS based on platform
+          if [[ "${{ matrix.platform }}" == windows* || "${{ matrix.platform }}" == *arm ]]; then
+            export GOMAXPROCS=1
+          else
+            # Use actual CPU count
+            export GOMAXPROCS=$NUM_CPUS
+          fi
           args=("-p" "2" "-race")
           # Run with less concurrency on Windows/ARM to minimize flakiness.
           if [[ "${{ matrix.platform }}" == windows* || "${{ matrix.platform }}" == *arm ]]; then
             args[1]="1"
-            export GOMAXPROCS=1
             if [[ "${{ matrix.platform }}" == windows* ]]; then
               unset args[2]
             fi
           fi
+          echo "Detected CPUs: $NUM_CPUS, Using GOMAXPROCS=$GOMAXPROCS, Test parallelism=${args[1]}"
           go test "${args[@]}" -timeout 800s ./...
 
   test-latest:
@@ -138,14 +172,31 @@ jobs:
         run: |
           set -x
           go version
-          export GOMAXPROCS=2
+          # Detect number of CPUs available and set GOMAXPROCS accordingly
+          if [[ "${{ matrix.platform }}" == windows* ]]; then
+            # Windows: use PowerShell to get CPU count, fallback to 2
+            NUM_CPUS=$(powershell -Command "(Get-CimInstance Win32_ComputerSystem).NumberOfLogicalProcessors" 2>/dev/null || echo "2")
+          elif [[ "${{ matrix.platform }}" == *macos* ]]; then
+            # macOS: use sysctl
+            NUM_CPUS=$(sysctl -n hw.ncpu || echo "2")
+          else
+            # Linux: use nproc
+            NUM_CPUS=$(nproc || echo "2")
+          fi
+          # Set GOMAXPROCS based on platform
+          if [[ "${{ matrix.platform }}" == windows* || "${{ matrix.platform }}" == *arm ]]; then
+            export GOMAXPROCS=1
+          else
+            # Use actual CPU count
+            export GOMAXPROCS=$NUM_CPUS
+          fi
           args=("-p" "2" "-race")
           # Run with less concurrency on Windows/ARM to minimize flakiness.
           if [[ "${{ matrix.platform }}" == windows* || "${{ matrix.platform }}" == *arm ]]; then
             args[1]="1"
-            export GOMAXPROCS=1
             if [[ "${{ matrix.platform }}" == windows* ]]; then
               unset args[2]
             fi
           fi
+          echo "Detected CPUs: $NUM_CPUS, Using GOMAXPROCS=$GOMAXPROCS, Test parallelism=${args[1]}"
           go test "${args[@]}" -timeout 800s ./...
