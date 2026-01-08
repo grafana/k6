@@ -234,11 +234,16 @@ func (b *Browser) initEvents() error {
 			case event := <-chHandler:
 				if ev, ok := event.data.(*target.EventAttachedToTarget); ok {
 					b.logger.Debugf("Browser:initEvents:onAttachedToTarget", "sid:%v tid:%v", ev.SessionID, ev.TargetInfo.TargetID)
-					if err := b.onAttachedToTarget(ev); err != nil {
-						if errors.Is(err, context.Canceled) ||
-							errors.Is(err, context.DeadlineExceeded) {
-							continue
-						}
+					err := b.onAttachedToTarget(ev)
+					if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+						b.logger.Debugf(
+							"Browser:initEvents:onAttachedToTarget:suppressed",
+							"sid:%v tid:%v err:%v",
+							ev.SessionID, ev.TargetInfo.TargetID, err,
+						)
+						continue
+					}
+					if err != nil {
 						k6ext.Panicf(b.vuCtx, "browser is attaching to target: %w", err)
 					}
 				} else if ev, ok := event.data.(*target.EventDetachedFromTarget); ok {
