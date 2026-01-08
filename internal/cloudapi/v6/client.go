@@ -53,7 +53,7 @@ func NewClient(logger logrus.FieldLogger, token, host, version string, timeout t
 	c := &Client{
 		apiClient:     k6cloud.NewAPIClient(cfg),
 		token:         token,
-		baseURL:       host,
+		baseURL:       fmt.Sprintf("%s/cloud/v6", host),
 		retries:       MaxRetries,
 		retryInterval: RetryInterval,
 		logger:        logger,
