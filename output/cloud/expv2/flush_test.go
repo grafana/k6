@@ -298,7 +298,7 @@ func TestFlushMaxSeriesInBatch(t *testing.T) {
 			require.Len(t, ts[0].Labels, 1)
 			assert.Equal(t, "key1", ts[0].Labels[0].Name)
 			assert.Equal(t, "val1", ts[0].Labels[0].Value)
-		
+
 			require.Len(t, ts[1].Labels, 1)
 			assert.Equal(t, "key1", ts[1].Labels[0].Name)
 			assert.Equal(t, "val2", ts[1].Labels[0].Value)
