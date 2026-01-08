@@ -2809,6 +2809,115 @@ func TestPageOnResponse(t *testing.T) {
 	}
 }
 
+// TestPageOnRequestFinished tests that the requestfinished event fires when requests complete successfully.
+func TestPageOnRequestFinished(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withHTTPServer())
+	tb.withHandler("/home", func(w http.ResponseWriter, _ *http.Request) {
+		_, err := fmt.Fprintf(w, `<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <script>fetch('/api', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({name: 'tester'})
+    })</script>
+</body>
+</html>`)
+		require.NoError(t, err)
+	})
+	tb.withHandler("/api", func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		defer require.NoError(t, r.Body.Close())
+
+		var data struct {
+			Name string `json:"name"`
+		}
+		err = json.Unmarshal(body, &data)
+		require.NoError(t, err)
+
+		w.Header().Set("Content-Type", "application/json")
+		_, err = fmt.Fprintf(w, `{"message": "Hello %s!"}`, data.Name)
+		require.NoError(t, err)
+	})
+	tb.withHandler("/style.css", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/css")
+		_, err := fmt.Fprintf(w, `body { background-color: #f0f0f0; }`)
+		require.NoError(t, err)
+	})
+
+	tb.vu.ActivateVU()
+	tb.vu.StartIteration(t)
+	defer tb.vu.EndIteration(t)
+
+	gv, err := tb.vu.RunAsync(t, `
+		const context = await browser.newContext();
+		const page = await context.newPage();
+
+		var finishedRequests = [];
+		page.on('requestfinished', (request) => {
+			finishedRequests.push({
+				url: request.url(),
+				method: request.method(),
+				resourceType: request.resourceType(),
+				isNavigationRequest: request.isNavigationRequest(),
+			});
+		});
+
+		await page.goto('%s', {waitUntil: 'networkidle'});
+		await page.close();
+		return JSON.stringify(finishedRequests, null, 2);
+	`, tb.url("/home"))
+	require.NoError(t, err)
+
+	got := k6test.ToPromise(t, gv)
+	require.Equal(t, sobek.PromiseStateFulfilled, got.State())
+
+	var finishedRequests []struct {
+		URL                 string `json:"url"`
+		Method              string `json:"method"`
+		ResourceType        string `json:"resourceType"`
+		IsNavigationRequest bool   `json:"isNavigationRequest"`
+	}
+	err = json.Unmarshal([]byte(got.Result().String()), &finishedRequests)
+	require.NoError(t, err)
+
+	// Verify we captured some finished requests
+	require.NotEmpty(t, finishedRequests, "expected to capture at least one finished request")
+
+	var foundHome, foundAPI, foundCSS bool
+	for _, req := range finishedRequests {
+		switch {
+		case strings.HasSuffix(req.URL, "/home"):
+			foundHome = true
+			assert.Equal(t, "GET", req.Method)
+			assert.Equal(t, "Document", req.ResourceType)
+			assert.True(t, req.IsNavigationRequest)
+		case strings.HasSuffix(req.URL, "/api"):
+			foundAPI = true
+			assert.Equal(t, "POST", req.Method)
+			assert.Equal(t, "Fetch", req.ResourceType)
+			assert.False(t, req.IsNavigationRequest)
+		case strings.HasSuffix(req.URL, "/style.css"):
+			foundCSS = true
+			assert.Equal(t, "GET", req.Method)
+			assert.Equal(t, "Stylesheet", req.ResourceType)
+			assert.False(t, req.IsNavigationRequest)
+		}
+	}
+
+	assert.True(t, foundHome, "expected to find /home request in finished requests")
+	assert.True(t, foundAPI, "expected to find /api request in finished requests")
+	assert.True(t, foundCSS, "expected to find /style.css request in finished requests")
+}
+
 func TestPageMustUseNativeJavaScriptObjects(t *testing.T) {
 	t.Parallel()
 
