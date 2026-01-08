@@ -26,7 +26,7 @@ export default async function () {
       {
         name: "PBKDF2",
         salt,
-        iterations: 25384,
+        iterations: 310000,
         hash: "SHA-256"
       },
       importedKey,

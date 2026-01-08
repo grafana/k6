@@ -96,6 +96,10 @@ func newPBKDF2DeriveParams(rt *sobek.Runtime, normalized Algorithm, params sobek
 		return nil, err
 	}
 
+	if len(byteSalt) < 16 {
+		return nil, NewError(OperationError, "salt must be at least 16 bytes")
+	}
+
 	return &PBKDF2Params{
 		Name:       normalized.Name,
 		Hash:       normalizedHash.Name,
