@@ -47,6 +47,7 @@ const (
 	ExecutionStatusTeardown
 	ExecutionStatusEnded
 	ExecutionStatusInterrupted
+	ExecutionStatusMarkedAsFailed
 )
 
 // ExecutionState contains a few different things:

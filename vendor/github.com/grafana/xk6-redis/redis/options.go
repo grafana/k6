@@ -226,7 +226,8 @@ func toUniversalOptions(options interface{}) (*redis.UniversalOptions, error) {
 // previously set values are consistent with the new values. This validates that
 // multiple node options set when using cluster mode are consistent with each other.
 // TODO: Break apart, simplify?
-//nolint: gocognit,cyclop,funlen,gofmt,gofumpt,goimports
+//
+//nolint:gocognit,cyclop,funlen
 func setConsistentOptions(uopts *redis.UniversalOptions, opts *redis.Options) error {
 	uopts.Addrs = append(uopts.Addrs, opts.Addr)
 
@@ -337,7 +338,7 @@ func setSocketOptions(opts *redis.Options, sopts *socketOptions) error {
 	opts.ConnMaxIdleTime = time.Duration(sopts.IdleTimeout) * time.Millisecond
 
 	if sopts.TLS != nil {
-		//nolint: gosec // ignore G402: TLS MinVersion too low
+		//#nosec G402
 		tlsCfg := &tls.Config{}
 		if len(sopts.TLS.CA) > 0 {
 			caCertPool := x509.NewCertPool()

@@ -162,7 +162,7 @@ func (s *Session) Execute(
 		Method:    cdproto.MethodType(method),
 		Params:    buf,
 	}
-	return s.conn.send(contextWithDoneChan(ctx, s.done), msg, ch, res)
+	return s.conn.send(contextWithDoneChan(evCancelCtx, s.done), msg, ch, res)
 }
 
 func (s *Session) ExecuteWithoutExpectationOnReply(
@@ -207,6 +207,10 @@ func (s *Session) ExecuteWithoutExpectationOnReply(
 		Method:    cdproto.MethodType(method),
 		Params:    buf,
 	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	return s.conn.send(contextWithDoneChan(ctx, s.done), msg, nil, res)
 }
 

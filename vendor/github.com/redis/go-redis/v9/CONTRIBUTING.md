@@ -32,20 +32,33 @@ Here's how to get started with your code contribution:
 
 1.  Create your own fork of go-redis
 2.  Do the changes in your fork
-3.  If you need a development environment, run `make test`. Note: this clones and builds the latest release of [redis](https://redis.io). You also need a redis-stack-server docker, in order to run the capabilities tests. This can be started by running:
-    ```docker run -p 6379:6379 -it redis/redis-stack-server:edge```
-4.  While developing, make sure the tests pass by running `make tests`
+3.  If you need a development environment, run `make docker.start`.
+ 
+> Note: this clones and builds the docker containers specified in `docker-compose.yml`, to understand more about
+> the infrastructure that will be started you can check the `docker-compose.yml`. You also have the possiblity
+> to specify the redis image that will be pulled with the env variable `CLIENT_LIBS_TEST_IMAGE`.
+> By default the docker image that will be pulled and started is `redislabs/client-libs-test:8.2.1-pre`.
+> If you want to test with newer Redis version, using a newer version of `redislabs/client-libs-test` should work out of the box.
+
+4.  While developing, make sure the tests pass by running `make test` (if you have the docker containers running, `make test.ci` may be sufficient).
+> Note: `make test` will try to start all containers, run the tests with `make test.ci` and then stop all containers.
 5.  If you like the change and think the project could use it, send a
     pull request
 
 To see what else is part of the automation, run `invoke -l`
 
+
 ## Testing
 
-Call `make test` to run all tests, including linters.
+### Setting up Docker
+To run the tests, you need to have Docker installed and running. If you are using a host OS that does not support
+docker host networks out of the box (e.g. Windows, OSX), you need to set up a docker desktop and enable docker host networks.
+
+### Running tests
+Call `make test` to run all tests.
 
 Continuous Integration uses these same wrappers to run all of these
-tests against multiple versions of python. Feel free to test your
+tests against multiple versions of redis. Feel free to test your
 changes against all the go versions supported, as declared by the
 [build.yml](./.github/workflows/build.yml) file.
 
@@ -99,3 +112,7 @@ The core team regularly looks at pull requests. We will provide
 feedback as soon as possible. After receiving our feedback, please respond
 within two weeks. After that time, we may close your PR if it isn't
 showing any activity.
+
+## Support
+
+Maintainers can provide limited support to contributors on discord: https://discord.gg/W4txy5AeKM
