@@ -228,8 +228,6 @@ github.com/influxdata/influxdb1-client/v2
 ## explicit; go 1.21
 github.com/jhump/protoreflect/desc
 github.com/jhump/protoreflect/desc/internal
-github.com/jhump/protoreflect/desc/protoparse
-github.com/jhump/protoreflect/desc/protoparse/ast
 github.com/jhump/protoreflect/desc/sourceinfo
 github.com/jhump/protoreflect/grpcreflect
 github.com/jhump/protoreflect/internal
