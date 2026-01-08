@@ -2,7 +2,7 @@ module go.k6.io/k6
 
 go 1.24.0
 
-toolchain go1.24.9
+toolchain go1.24.11
 
 require (
 	buf.build/gen/go/prometheus/prometheus/protocolbuffers/go v1.36.10-20251118093737-4105057cc7d4.1
@@ -26,7 +26,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
 	github.com/jhump/protoreflect v1.17.0
-	github.com/klauspost/compress v1.18.1
+	github.com/klauspost/compress v1.18.2
 	github.com/mailru/easyjson v0.9.0
 	github.com/mattn/go-colorable v0.1.14
 	github.com/mattn/go-isatty v0.0.20
@@ -65,6 +65,8 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
+require gopkg.in/validator.v2 v2.0.1 // indirect
+
 require (
 	buf.build/gen/go/gogo/protobuf/protocolbuffers/go v1.36.10-20240617172848-e1dbca2775a7.1 // indirect
 	github.com/andybalholm/cascadia v1.3.3 // indirect
@@ -79,6 +81,7 @@ require (
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/pprof v0.0.0-20230728192033-2ba5b33183c6 // indirect
+	github.com/grafana/k6-cloud-openapi-client-go v0.0.0-20251103103337-5e94fff86cd6
 	github.com/grafana/k6build v0.5.15 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.2 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect

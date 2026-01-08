@@ -388,6 +388,10 @@ func (rsasv *RSAPssParams) Sign(key CryptoKey, data []byte) ([]byte, error) {
 	hashedData := hash.New()
 	hashedData.Write(data)
 
+	if rsasv.SaltLength == 0 {
+		return nil, NewError(ImplementationError, "k6 RSA-PSS uses standard Golang SDK that doesn't support"+
+			"salt length=0 but generates salt with maximum length . Sign result might be different.")
+	}
 	signature, err := rsa.SignPSS(rand.Reader, rsaKey, hash, hashedData.Sum(nil), &rsa.PSSOptions{
 		SaltLength: rsasv.SaltLength,
 	})
@@ -413,6 +417,10 @@ func (rsasv *RSAPssParams) Verify(key CryptoKey, signature []byte, data []byte) 
 	hashedData := hash.New()
 	hashedData.Write(data)
 
+	if rsasv.SaltLength == 0 {
+		return false, NewError(ImplementationError, "k6 RSA-PSS uses standard Golang SDK that doesn't support"+
+			"salt length=0 but tries to auto-detect salt length if 0 is used. Verify result might be different.")
+	}
 	err = rsa.VerifyPSS(rsaKey, hash, hashedData.Sum(nil), signature, &rsa.PSSOptions{
 		SaltLength: rsasv.SaltLength,
 	})
