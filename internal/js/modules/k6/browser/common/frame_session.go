@@ -830,7 +830,7 @@ func (fs *FrameSession) processNavigationSpan(id cdp.FrameID) {
 		js := fmt.Sprintf("window.k6SpanId = '%s';", spanID)
 		err := newFrame.EvaluateGlobal(fs.ctx, js)
 		if err != nil {
-			fs.logger.Errorf(
+			fs.logger.Debugf(
 				"FrameSession:onFrameNavigated", "error on evaluating window.k6SpanId: %v", err,
 			)
 		}
