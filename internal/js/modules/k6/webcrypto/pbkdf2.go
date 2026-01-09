@@ -96,10 +96,6 @@ func newPBKDF2DeriveParams(rt *sobek.Runtime, normalized Algorithm, params sobek
 		return nil, err
 	}
 
-	if len(byteSalt) < 16 {
-		return nil, NewError(OperationError, "salt must be at least 16 bytes")
-	}
-
 	return &PBKDF2Params{
 		Name:       normalized.Name,
 		Hash:       normalizedHash.Name,
@@ -134,9 +130,11 @@ func (keyParams PBKDF2Params) DeriveBits(
 		)
 	}
 
-	keyLen := length / 8
+	if length%8 != 0 {
+		return nil, NewError(InvalidAccessError, "provided length of key must be a multiple of 8")
+	}
 
-	dk, err := pbkdf2.Key(hashFn, string(pk), keyParams.Salt, keyParams.Iterations, keyLen)
+	dk, err := pbkdf2.Key(hashFn, string(pk), keyParams.Salt, keyParams.Iterations, length/8)
 	if err != nil {
 		return nil, err
 	}
