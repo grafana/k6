@@ -112,7 +112,7 @@ func writeResponse(w http.ResponseWriter, status int, contentType string, body [
 	w.Write(body)
 }
 
-func mustMarshalJSON(w io.Writer, val interface{}) {
+func mustMarshalJSON(w io.Writer, val any) {
 	encoder := json.NewEncoder(w)
 	encoder.SetEscapeHTML(false)
 	encoder.SetIndent("", "  ")
@@ -121,7 +121,7 @@ func mustMarshalJSON(w io.Writer, val interface{}) {
 	}
 }
 
-func writeJSON(status int, w http.ResponseWriter, val interface{}) {
+func writeJSON(status int, w http.ResponseWriter, val any) {
 	w.Header().Set("Content-Type", jsonContentType)
 	w.WriteHeader(status)
 	mustMarshalJSON(w, val)
