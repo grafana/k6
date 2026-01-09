@@ -52,6 +52,9 @@ const (
 
 	// ECDH represents the ECDH algorithm.
 	ECDH = "ECDH"
+
+	// PBKDF2 represents the PBKDF2 algorithm
+	PBKDF2 = "PBKDF2"
 )
 
 // HashAlgorithmIdentifier represents the name of a hash algorithm.
@@ -116,6 +119,9 @@ const (
 
 	// OperationIdentifierDigest represents the digest operation.
 	OperationIdentifierDigest OperationIdentifier = "digest"
+
+	// OperationIdentifierGetKeyLength represents a getKeyLength operation
+	OperationIdentifierGetKeyLength = "getKeyLength"
 )
 
 // normalizeAlgorithm normalizes the given algorithm following the
@@ -185,18 +191,28 @@ func isRegisteredAlgorithm(algorithmName string, forOperation string) bool {
 		// FIXME: the presence of the hash algorithm here is for HMAC support and should be handled separately
 		return isAesAlgorithm(algorithmName) ||
 			isHashAlgorithm(algorithmName) ||
-			algorithmName == HMAC ||
+			isHMACAlgorithm(algorithmName) ||
 			isEllipticCurve(algorithmName) ||
 			isRSAAlgorithm(algorithmName)
 	case OperationIdentifierExportKey, OperationIdentifierImportKey:
 		return isAesAlgorithm(algorithmName) ||
-			algorithmName == HMAC ||
+			isHMACAlgorithm(algorithmName) ||
 			isEllipticCurve(algorithmName) ||
-			isRSAAlgorithm(algorithmName)
+			isRSAAlgorithm(algorithmName) ||
+			isPBKDF2Algorithm(algorithmName)
 	case OperationIdentifierEncrypt, OperationIdentifierDecrypt:
 		return isAesAlgorithm(algorithmName) || algorithmName == RSAOaep
 	case OperationIdentifierSign, OperationIdentifierVerify:
-		return algorithmName == HMAC || algorithmName == ECDSA || algorithmName == RSAPss || algorithmName == RSASsaPkcs1v15
+		return isHMACAlgorithm(algorithmName) ||
+			algorithmName == ECDSA ||
+			algorithmName == RSAPss ||
+			algorithmName == RSASsaPkcs1v15
+	case OperationIdentifierDeriveBits:
+		return isHashAlgorithm(algorithmName) || isPBKDF2Algorithm(algorithmName) || isECDHAlgorithm(algorithmName)
+	case OperationIdentifierDeriveKey:
+		return isHashAlgorithm(algorithmName) || isPBKDF2Algorithm(algorithmName)
+	case OperationIdentifierGetKeyLength:
+		return isAesAlgorithm(algorithmName)
 	default:
 		return false
 	}
@@ -212,6 +228,18 @@ func isHashAlgorithm(algorithmName string) bool {
 
 func isRSAAlgorithm(algorithmName string) bool {
 	return algorithmName == RSASsaPkcs1v15 || algorithmName == RSAPss || algorithmName == RSAOaep
+}
+
+func isPBKDF2Algorithm(algorithmName string) bool {
+	return algorithmName == PBKDF2
+}
+
+func isECDHAlgorithm(algorithmName string) bool {
+	return algorithmName == ECDH
+}
+
+func isHMACAlgorithm(algorithmName string) bool {
+	return algorithmName == HMAC
 }
 
 // hasAlg an internal interface that helps us to identify
