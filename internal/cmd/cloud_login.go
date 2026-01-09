@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/fatih/color"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 	"gopkg.in/guregu/null.v3"
@@ -18,65 +19,6 @@ import (
 	v6cloudapi "go.k6.io/k6/internal/cloudapi/v6"
 	"go.k6.io/k6/internal/ui"
 )
-
-// validateAndResolveStack validates a stack URL/slug and returns the normalized URL, stack ID, and default project ID.
-// The stackInput can be either a full URL (e.g., https://my-team.grafana.net) or just a slug (e.g., my-team).
-func validateAndResolveStack(
-	gs *state.GlobalState,
-	jsonRawConf json.RawMessage,
-	token, stackInput string,
-) (stackURL string, stackID int64, defaultProjectID int64, err error) {
-	consolidatedCurrentConfig, warn, err := cloudapi.GetConsolidatedConfig(
-		jsonRawConf, gs.Env, "", nil, nil)
-	if err != nil {
-		return "", 0, 0, err
-	}
-
-	if warn != "" {
-		gs.Logger.Warn(warn)
-	}
-
-	normalizedURL := normalizeStackURL(stackInput)
-
-	client, err := v6cloudapi.NewClient(
-		gs.Logger,
-		token,
-		consolidatedCurrentConfig.Hostv6.String,
-		build.Version,
-		consolidatedCurrentConfig.Timeout.TimeDuration(),
-	)
-	if err != nil {
-		return "", 0, 0, err
-	}
-
-	authResp, err := client.ValidateToken(normalizedURL)
-	if err != nil {
-		return "", 0, 0, err
-	}
-
-	return normalizedURL, int64(authResp.StackId), int64(authResp.DefaultProjectId), nil
-}
-
-// normalizeStackURL converts a stack slug to a full URL if needed.
-// The stackInput can be either a full URL (e.g., https://my-team.grafana.net) or just a slug (e.g., my-team).
-func normalizeStackURL(stackInput string) string {
-	// If it's already a full URL, return it as is
-	if strings.HasPrefix(stackInput, "http://") || strings.HasPrefix(stackInput, "https://") {
-		return stackInput
-	}
-	// Otherwise, treat it as a slug and construct the URL
-	slug := stripGrafanaNetSuffix(stackInput)
-	return fmt.Sprintf("https://%s.grafana.net", slug)
-}
-
-// stripGrafanaNetSuffix removes .grafana.net suffix if present.
-func stripGrafanaNetSuffix(s string) string {
-	const suffix = ".grafana.net"
-	if len(s) > len(suffix) && s[len(s)-len(suffix):] == suffix {
-		return s[:len(s)-len(suffix)]
-	}
-	return s
-}
 
 const cloudLoginCommandName = "login"
 
@@ -192,15 +134,19 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 		return nil
 	case token.Valid:
 		newCloudConf.Token = token
-
-		err := validateToken(c.globalState, currentJSONConfigRaw, newCloudConf.Token.String)
+		gs := c.globalState
+		consolidatedCurrentConfig, warn, err := cloudapi.GetConsolidatedConfig(
+			currentJSONConfigRaw, gs.Env, "", nil, nil)
 		if err != nil {
 			return err
 		}
+		if warn != "" {
+			gs.Logger.Warn(warn)
+		}
 
 		if stackInput.Valid && stackInput.String != "" {
-			stackURL, stackID, defaultProjectID, err := validateAndResolveStack(
-				c.globalState, currentJSONConfigRaw, token.String, stackInput.String)
+			stackURL, stackID, defaultProjectID, err := validateTokenAndResolveStack(
+				gs.Logger, consolidatedCurrentConfig, token.String, stackInput.String)
 			if err != nil {
 				return fmt.Errorf(
 					"your stack is invalid - please, consult the Grafana Cloud k6 documentation "+
@@ -212,8 +158,23 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 			newCloudConf.StackURL = null.StringFrom(stackURL)
 			newCloudConf.StackID = null.IntFrom(stackID)
 			newCloudConf.DefaultProjectID = null.IntFrom(defaultProjectID)
+		} else {
+			err = validateToken(gs.Logger, consolidatedCurrentConfig, newCloudConf.Token.String)
+			if err != nil {
+				return err
+			}
 		}
 	default:
+		gs := c.globalState
+		consolidatedCurrentConfig, warn, err := cloudapi.GetConsolidatedConfig(
+			currentJSONConfigRaw, gs.Env, "", nil, nil)
+		if err != nil {
+			return err
+		}
+		if warn != "" {
+			gs.Logger.Warn(warn)
+		}
+
 		/* Token form */
 		tokenForm := ui.Form{
 			Banner: "Enter your token to authenticate with Grafana Cloud k6.\n" +
@@ -239,9 +200,6 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 		if !newCloudConf.Token.Valid {
 			return errors.New("token cannot be empty")
 		}
-		if err := validateToken(c.globalState, currentJSONConfigRaw, newCloudConf.Token.String); err != nil {
-			return fmt.Errorf("token validation failed: %w", err)
-		}
 
 		/* Stack form */
 		stackForm := ui.Form{
@@ -261,8 +219,8 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 		}
 		stackValue := strings.TrimSpace(stackVals["Stack"])
 		if stackValue != "" && stackValue != "None" {
-			stackURL, stackID, defaultProjectID, err := validateAndResolveStack(
-				c.globalState, currentJSONConfigRaw, tokenValue, stackValue)
+			stackURL, stackID, defaultProjectID, err := validateTokenAndResolveStack(
+				gs.Logger, consolidatedCurrentConfig, tokenValue, stackValue)
 			if err != nil {
 				return fmt.Errorf(
 					"your stack is invalid - please, consult the Grafana Cloud k6 documentation "+
@@ -274,6 +232,11 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 			newCloudConf.StackURL = null.StringFrom(stackURL)
 			newCloudConf.StackID = null.IntFrom(stackID)
 			newCloudConf.DefaultProjectID = null.IntFrom(defaultProjectID)
+		} else {
+			err = validateToken(gs.Logger, consolidatedCurrentConfig, newCloudConf.Token.String)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -288,53 +251,44 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	//nolint:nestif
-	if newCloudConf.Token.Valid {
-		valueColor := getColor(c.globalState.Flags.NoColor || !c.globalState.Stdout.IsTTY, color.FgCyan)
-		printToStdout(c.globalState, fmt.Sprintf(
-			"\nLogged in successfully, token and stack info saved in %s\n", c.globalState.Flags.ConfigFilePath,
-		))
-		if !c.globalState.Flags.Quiet {
-			printToStdout(c.globalState, fmt.Sprintf("  token: %s\n", valueColor.Sprint(newCloudConf.Token.String)))
+	if !newCloudConf.Token.Valid {
+		return nil
+	}
 
-			if newCloudConf.StackID.Valid {
-				printToStdout(c.globalState, fmt.Sprintf("  stack-id: %s\n", valueColor.Sprint(newCloudConf.StackID.Int64)))
-			}
-			if newCloudConf.StackURL.Valid {
-				printToStdout(c.globalState, fmt.Sprintf("  stack-url: %s\n", valueColor.Sprint(newCloudConf.StackURL.String)))
-			}
-			if newCloudConf.DefaultProjectID.Valid {
-				printToStdout(c.globalState, fmt.Sprintf("  default-project-id: %s\n",
-					valueColor.Sprint(newCloudConf.DefaultProjectID.Int64)))
-			}
+	valueColor := getColor(c.globalState.Flags.NoColor || !c.globalState.Stdout.IsTTY, color.FgCyan)
+	printToStdout(c.globalState, fmt.Sprintf(
+		"\nLogged in successfully, token and stack info saved in %s\n", c.globalState.Flags.ConfigFilePath,
+	))
+	if !c.globalState.Flags.Quiet {
+		printToStdout(c.globalState, fmt.Sprintf("  token: %s\n", valueColor.Sprint(newCloudConf.Token.String)))
+
+		if newCloudConf.StackID.Valid {
+			printToStdout(c.globalState, fmt.Sprintf("  stack-id: %s\n", valueColor.Sprint(newCloudConf.StackID.Int64)))
+		}
+		if newCloudConf.StackURL.Valid {
+			printToStdout(c.globalState, fmt.Sprintf("  stack-url: %s\n", valueColor.Sprint(newCloudConf.StackURL.String)))
+		}
+		if newCloudConf.DefaultProjectID.Valid {
+			printToStdout(c.globalState, fmt.Sprintf("  default-project-id: %s\n",
+				valueColor.Sprint(newCloudConf.DefaultProjectID.Int64)))
 		}
 	}
+
 	return nil
 }
 
-func validateToken(gs *state.GlobalState, jsonRawConf json.RawMessage, token string) error {
-	// We want to use this fully consolidated config for things like
-	// host addresses, so users can overwrite them with env vars.
-	consolidatedCurrentConfig, warn, err := cloudapi.GetConsolidatedConfig(
-		jsonRawConf, gs.Env, "", nil, nil)
-	if err != nil {
-		return err
-	}
-
-	if warn != "" {
-		gs.Logger.Warn(warn)
-	}
-
+// validateToken validates a token using v1 cloud API.
+// DEPRECATED: this function will be removed in the future along with v1 API support (use validateAndResolveStack instead).
+func validateToken(logger *logrus.Logger, config cloudapi.Config, token string) error {
 	client := cloudapi.NewClient(
-		gs.Logger,
+		logger,
 		token,
-		consolidatedCurrentConfig.Host.String,
+		config.Host.String,
 		build.Version,
-		consolidatedCurrentConfig.Timeout.TimeDuration(),
+		config.Timeout.TimeDuration(),
 	)
 
-	var res *cloudapi.ValidateTokenResponse
-	res, err = client.ValidateToken()
+	res, err := client.ValidateToken()
 	if err != nil {
 		return fmt.Errorf("can't validate the API token: %s", err.Error())
 	}
@@ -346,4 +300,53 @@ func validateToken(gs *state.GlobalState, jsonRawConf json.RawMessage, token str
 	}
 
 	return nil
+}
+
+// validateTokenAndResolveStack validates a token and a stack URL/slug and returns the normalized URL, stack ID, and default project ID.
+// The stackInput can be either a full URL (e.g., https://my-team.grafana.net) or just a slug (e.g., my-team).
+func validateTokenAndResolveStack(
+	logger *logrus.Logger,
+	config cloudapi.Config,
+	token, stackInput string,
+) (stackURL string, stackID int64, defaultProjectID int64, err error) {
+	normalizedURL := normalizeStackURL(stackInput)
+
+	client, err := v6cloudapi.NewClient(
+		logger,
+		token,
+		v6cloudapi.DEFAULT_HOST,
+		build.Version,
+		config.Timeout.TimeDuration(),
+	)
+	if err != nil {
+		return "", 0, 0, err
+	}
+
+	authResp, err := client.ValidateToken(normalizedURL)
+	if err != nil {
+		return "", 0, 0, err
+	}
+
+	return normalizedURL, int64(authResp.StackId), int64(authResp.DefaultProjectId), nil
+}
+
+// normalizeStackURL converts a stack slug to a full URL if needed.
+// The stackInput can be either a full URL (e.g., https://my-team.grafana.net) or just a slug (e.g., my-team).
+func normalizeStackURL(stackInput string) string {
+	// If it's already a full URL, return it as is
+	if strings.HasPrefix(stackInput, "http://") || strings.HasPrefix(stackInput, "https://") {
+		return stackInput
+	}
+	// Otherwise, treat it as a slug and construct the URL
+	slug := stripGrafanaNetSuffix(stackInput)
+	return fmt.Sprintf("https://%s.grafana.net", slug)
+}
+
+// stripGrafanaNetSuffix removes .grafana.net suffix if present.
+func stripGrafanaNetSuffix(s string) string {
+	const suffix = ".grafana.net"
+	if len(s) > len(suffix) && s[len(s)-len(suffix):] == suffix {
+		return s[:len(s)-len(suffix)]
+	}
+	return s
 }

@@ -26,7 +26,6 @@ type Config struct {
 	Name             null.String `json:"name" envconfig:"K6_CLOUD_NAME"`
 
 	Host    null.String        `json:"host" envconfig:"K6_CLOUD_HOST"`
-	Hostv6  null.String        `json:"hostv6" envconfig:"K6_CLOUD_HOST_V6"`
 	Timeout types.NullDuration `json:"timeout" envconfig:"K6_CLOUD_TIMEOUT"`
 
 	LogsTailURL    null.String `json:"-" envconfig:"K6_CLOUD_LOGS_TAIL_URL"`
@@ -75,7 +74,6 @@ func NewConfig() Config {
 	return Config{
 		APIVersion:            null.NewInt(2, false),
 		Host:                  null.NewString("https://ingest.k6.io", false),
-		Hostv6:                null.NewString("https://api.k6.io", false),
 		LogsTailURL:           null.NewString("wss://cloudlogs.k6.io/api/v1/tail", false),
 		WebAppURL:             null.NewString("https://app.k6.io", false),
 		MetricPushInterval:    types.NewNullDuration(1*time.Second, false),
@@ -128,9 +126,6 @@ func (c Config) Apply(cfg Config) Config {
 	}
 	if cfg.Host.Valid && cfg.Host.String != "" {
 		c.Host = cfg.Host
-	}
-	if cfg.Hostv6.Valid && cfg.Hostv6.String != "" {
-		c.Hostv6 = cfg.Hostv6
 	}
 	if cfg.LogsTailURL.Valid && cfg.LogsTailURL.String != "" {
 		c.LogsTailURL = cfg.LogsTailURL
