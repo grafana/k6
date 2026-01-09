@@ -38,7 +38,7 @@ type Config struct {
 	// InsecureSkipTLSVerify skips TLS client side checks.
 	InsecureSkipTLSVerify null.Bool `json:"insecureSkipTLSVerify" envconfig:"K6_PROMETHEUS_RW_INSECURE_SKIP_TLS_VERIFY"`
 
-	// EnableTLS12 enables TLS version 1.2.
+	// EnableTLS12 changes the min version for TLS handshake from 1.3 (default) to 1.2
 	EnableTLS12 null.Bool `json:"enableTLS12" envconfig:"K6_PROMETHEUS_RW_ENABLE_TLS_12"`
 
 	// Username is the User for Basic Auth.
