@@ -56,7 +56,9 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 
 	// Show warning early if no projectID and no default stack
 	if !conf.ProjectID.Valid && (!conf.StackID.Valid || conf.StackID.Int64 == 0) {
-		gs.Logger.Warn("No projectID or default stack specified. Using the first available stack. Consider setting a default stack via the `k6 cloud login` command.")
+		gs.Logger.Warn(
+			"No projectID or default stack specified. Using the first available stack. " +
+				"Consider setting a default stack via the `k6 cloud login` command.")
 	}
 
 	// If not, we continue with some validations and the creation of the test run.

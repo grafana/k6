@@ -8,7 +8,6 @@ import (
 	"syscall"
 
 	"github.com/fatih/color"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 	"gopkg.in/guregu/null.v3"
@@ -146,7 +145,7 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 
 		if stackInput.Valid && stackInput.String != "" {
 			stackURL, stackID, defaultProjectID, err := validateTokenAndResolveStack(
-				gs.Logger, consolidatedCurrentConfig, token.String, stackInput.String)
+				gs, consolidatedCurrentConfig, token.String, stackInput.String)
 			if err != nil {
 				return fmt.Errorf(
 					"your stack is invalid - please, consult the Grafana Cloud k6 documentation "+
@@ -159,7 +158,7 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 			newCloudConf.StackID = null.IntFrom(stackID)
 			newCloudConf.DefaultProjectID = null.IntFrom(defaultProjectID)
 		} else {
-			err = validateToken(gs.Logger, consolidatedCurrentConfig, newCloudConf.Token.String)
+			err = validateToken(gs, consolidatedCurrentConfig, newCloudConf.Token.String)
 			if err != nil {
 				return err
 			}
@@ -188,9 +187,9 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 			},
 		}
 		if !term.IsTerminal(int(syscall.Stdin)) { //nolint:unconvert
-			c.globalState.Logger.Warn("Stdin is not a terminal, falling back to plain text input")
+			gs.Logger.Warn("Stdin is not a terminal, falling back to plain text input")
 		}
-		tokenVals, err := tokenForm.Run(c.globalState.Stdin, c.globalState.Stdout)
+		tokenVals, err := tokenForm.Run(gs.Stdin, gs.Stdout)
 		if err != nil {
 			return err
 		}
@@ -213,14 +212,14 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 				},
 			},
 		}
-		stackVals, err := stackForm.Run(c.globalState.Stdin, c.globalState.Stdout)
+		stackVals, err := stackForm.Run(gs.Stdin, gs.Stdout)
 		if err != nil {
 			return err
 		}
 		stackValue := strings.TrimSpace(stackVals["Stack"])
 		if stackValue != "" && stackValue != "None" {
 			stackURL, stackID, defaultProjectID, err := validateTokenAndResolveStack(
-				gs.Logger, consolidatedCurrentConfig, tokenValue, stackValue)
+				gs, consolidatedCurrentConfig, tokenValue, stackValue)
 			if err != nil {
 				return fmt.Errorf(
 					"your stack is invalid - please, consult the Grafana Cloud k6 documentation "+
@@ -233,7 +232,7 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 			newCloudConf.StackID = null.IntFrom(stackID)
 			newCloudConf.DefaultProjectID = null.IntFrom(defaultProjectID)
 		} else {
-			err = validateToken(gs.Logger, consolidatedCurrentConfig, newCloudConf.Token.String)
+			err = validateToken(gs, consolidatedCurrentConfig, newCloudConf.Token.String)
 			if err != nil {
 				return err
 			}
@@ -278,10 +277,10 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 }
 
 // validateToken validates a token using v1 cloud API.
-// DEPRECATED: this function will be removed in the future along with v1 API support (use validateAndResolveStack instead).
-func validateToken(logger *logrus.Logger, config cloudapi.Config, token string) error {
+// Deprecated: use validateTokenAndResolveStack instead if a stack name is provided.
+func validateToken(gs *state.GlobalState, config cloudapi.Config, token string) error {
 	client := cloudapi.NewClient(
-		logger,
+		gs.Logger,
 		token,
 		config.Host.String,
 		build.Version,
@@ -302,19 +301,20 @@ func validateToken(logger *logrus.Logger, config cloudapi.Config, token string) 
 	return nil
 }
 
-// validateTokenAndResolveStack validates a token and a stack URL/slug and returns the normalized URL, stack ID, and default project ID.
+// validateTokenAndResolveStack validates a token and a stack URL/slug and returns the normalized URL, stack ID,
+// and default project ID.
 // The stackInput can be either a full URL (e.g., https://my-team.grafana.net) or just a slug (e.g., my-team).
 func validateTokenAndResolveStack(
-	logger *logrus.Logger,
+	gs *state.GlobalState,
 	config cloudapi.Config,
 	token, stackInput string,
 ) (stackURL string, stackID int64, defaultProjectID int64, err error) {
 	normalizedURL := normalizeStackURL(stackInput)
 
 	client, err := v6cloudapi.NewClient(
-		logger,
+		gs.Logger,
 		token,
-		v6cloudapi.DEFAULT_HOST,
+		v6cloudapi.DefaultHost,
 		build.Version,
 		config.Timeout.TimeDuration(),
 	)

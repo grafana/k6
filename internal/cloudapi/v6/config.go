@@ -10,7 +10,8 @@ import (
 	"gopkg.in/guregu/null.v3"
 )
 
-const DEFAULT_HOST = "https://api.k6.io"
+// DefaultHost is the default k6 Cloud API host.
+const DefaultHost = "https://api.k6.io"
 
 // Config holds all the necessary data and options for sending metrics to the k6 Cloud.
 //
@@ -71,7 +72,7 @@ func NewConfig() Config {
 	return Config{
 		StackID:               null.NewInt(0, false),
 		APIVersion:            null.NewInt(2, false),
-		Host:                  null.NewString(DEFAULT_HOST, false),
+		Host:                  null.NewString(DefaultHost, false),
 		LogsTailURL:           null.NewString("wss://cloudlogs.k6.io/api/v1/tail", false),
 		WebAppURL:             null.NewString("https://app.k6.io", false),
 		MetricPushInterval:    types.NewNullDuration(1*time.Second, false),
