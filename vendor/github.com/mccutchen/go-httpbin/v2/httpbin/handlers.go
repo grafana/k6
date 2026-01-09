@@ -188,7 +188,7 @@ func createSpecialCases(prefix string) map[int]*statusCase {
   ]
 }
 `)
-	statusHTTP300body := []byte(fmt.Sprintf(`<!doctype html>
+	statusHTTP300body := fmt.Appendf(nil, `<!doctype html>
 <head>
 <title>Multiple Choices</title>
 </head>
@@ -198,15 +198,15 @@ func createSpecialCases(prefix string) map[int]*statusCase {
 <li><a href="%[1]s/image/png">/image/png</a></li>
 <li><a href="%[1]s/image/svg">/image/svg</a></li>
 </body>
-</html>`, prefix))
+</html>`, prefix)
 
-	statusHTTP308Body := []byte(fmt.Sprintf(`<!doctype html>
+	statusHTTP308Body := fmt.Appendf(nil, `<!doctype html>
 <head>
 <title>Permanent Redirect</title>
 </head>
 <body>Permanently redirected to <a href="%[1]s/image/jpeg">%[1]s/image/jpeg</a>
 </body>
-</html>`, prefix))
+</html>`, prefix)
 
 	return map[int]*statusCase{
 		300: {
@@ -1004,7 +1004,7 @@ func (h *HTTPBin) doLinksPage(w http.ResponseWriter, _ *http.Request, n int, off
 	w.WriteHeader(http.StatusOK)
 
 	w.Write([]byte("<html><head><title>Links</title></head><body>"))
-	for i := 0; i < n; i++ {
+	for i := range n {
 		if i == offset {
 			fmt.Fprintf(w, "%d ", i)
 		} else {
