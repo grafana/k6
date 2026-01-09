@@ -200,9 +200,12 @@ github.com/grafana/sobek/ftoa/internal/fast
 github.com/grafana/sobek/parser
 github.com/grafana/sobek/token
 github.com/grafana/sobek/unistring
-# github.com/grafana/xk6-dashboard v0.7.13
-## explicit; go 1.23.0
+# github.com/grafana/xk6-dashboard v0.8.0
+## explicit; go 1.24.0
 github.com/grafana/xk6-dashboard/dashboard
+# github.com/grafana/xk6-dashboard-assets v0.1.1
+## explicit; go 1.24
+github.com/grafana/xk6-dashboard-assets
 # github.com/grafana/xk6-redis v0.3.6
 ## explicit; go 1.24.0
 github.com/grafana/xk6-redis/redis
