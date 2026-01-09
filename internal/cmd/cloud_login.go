@@ -314,7 +314,7 @@ func validateTokenAndResolveStack(
 	client, err := v6cloudapi.NewClient(
 		gs.Logger,
 		token,
-		v6cloudapi.DefaultHost,
+		config.Hostv6.String,
 		build.Version,
 		config.Timeout.TimeDuration(),
 	)
