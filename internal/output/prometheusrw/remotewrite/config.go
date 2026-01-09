@@ -38,6 +38,9 @@ type Config struct {
 	// InsecureSkipTLSVerify skips TLS client side checks.
 	InsecureSkipTLSVerify null.Bool `json:"insecureSkipTLSVerify" envconfig:"K6_PROMETHEUS_RW_INSECURE_SKIP_TLS_VERIFY"`
 
+	// MinTLSVersion defines the lowest allowed TLS version for the client (default is 1.3).
+	MinTLSVersion null.String `json:"minTLSVersion" envconfig:"K6_PROMETHEUS_RW_MINIMUM_TLS_VERSION"`
+
 	// Username is the User for Basic Auth.
 	Username null.String `json:"username" envconfig:"K6_PROMETHEUS_RW_USERNAME"`
 
@@ -87,6 +90,7 @@ func NewConfig() Config {
 	return Config{
 		ServerURL:             null.StringFrom(defaultServerURL),
 		InsecureSkipTLSVerify: null.BoolFrom(false),
+		MinTLSVersion:         null.NewString("", false),
 		Username:              null.NewString("", false),
 		Password:              null.NewString("", false),
 		PushInterval:          types.NullDurationFrom(defaultPushInterval),
@@ -113,9 +117,17 @@ func (conf Config) RemoteConfig() (*remote.HTTPConfig, error) {
 		}
 	}
 
+	minTLSVersion := uint16(tls.VersionTLS13)
+	if conf.MinTLSVersion.Valid {
+		switch conf.MinTLSVersion.String {
+		case "1.2":
+			minTLSVersion = tls.VersionTLS12
+		}
+	}
+
 	hc.TLSConfig = &tls.Config{
 		InsecureSkipVerify: conf.InsecureSkipTLSVerify.Bool, //nolint:gosec
-		MinVersion:         tls.VersionTLS13,
+		MinVersion:         minTLSVersion,
 	}
 
 	if conf.ClientCertificate.Valid && conf.ClientCertificateKey.Valid {
@@ -167,6 +179,10 @@ func (conf Config) Apply(applied Config) Config {
 
 	if applied.InsecureSkipTLSVerify.Valid {
 		conf.InsecureSkipTLSVerify = applied.InsecureSkipTLSVerify
+	}
+
+	if applied.MinTLSVersion.Valid {
+		conf.MinTLSVersion = applied.MinTLSVersion
 	}
 
 	if applied.Username.Valid {
@@ -333,6 +349,8 @@ func parseArg(text string) (Config, error) {
 			if err := c.InsecureSkipTLSVerify.UnmarshalText([]byte(v)); err != nil {
 				return c, fmt.Errorf("insecureSkipTLSVerify value must be true or false, not %q", v)
 			}
+		case "minTLSVersion":
+			c.MinTLSVersion = null.StringFrom(v)
 		case "username":
 			c.Username = null.StringFrom(v)
 		case "password":
