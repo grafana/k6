@@ -261,7 +261,7 @@ github.com/mattn/go-colorable
 # github.com/mattn/go-isatty v0.0.20
 ## explicit; go 1.15
 github.com/mattn/go-isatty
-# github.com/mccutchen/go-httpbin/v2 v2.18.3
+# github.com/mccutchen/go-httpbin/v2 v2.20.0
 ## explicit; go 1.22.0
 github.com/mccutchen/go-httpbin/v2/httpbin
 github.com/mccutchen/go-httpbin/v2/httpbin/digest
