@@ -130,8 +130,8 @@ github.com/mattn/go-colorable v0.1.14 h1:9A9LHSqF/7dyVVX6g0U9cwm9pG3kP9gSzcuIPHP
 github.com/mattn/go-colorable v0.1.14/go.mod h1:6LmQG8QLFO4G5z1gPvYEzlUgJ2wF+stgPZH1UqBm1s8=
 github.com/mattn/go-isatty v0.0.20 h1:xfD0iDuEKnDkl03q4limB+vH+GxLEtL/jb4xVJSWWEY=
 github.com/mattn/go-isatty v0.0.20/go.mod h1:W+V8PltTTMOvKvAeJH7IuucS94S2C6jfK/D7dTCTo3Y=
-github.com/mccutchen/go-httpbin/v2 v2.18.3 h1:DyckIScjHLJtmlSju+rgjqqI1nL8AdMZHsLSljlbnMU=
-github.com/mccutchen/go-httpbin/v2 v2.18.3/go.mod h1:GBy5I7XwZ4ZLhT3hcq39I4ikwN9x4QUt6EAxNiR8Jus=
+github.com/mccutchen/go-httpbin/v2 v2.20.0 h1:iMUzhdbAcjo9hepfG5W3hz1yWAyxiYlJMzKQtwyGDms=
+github.com/mccutchen/go-httpbin/v2 v2.20.0/go.mod h1:GBy5I7XwZ4ZLhT3hcq39I4ikwN9x4QUt6EAxNiR8Jus=
 github.com/mstoykov/atlas v0.0.0-20220811071828-388f114305dd h1:AC3N94irbx2kWGA8f/2Ks7EQl2LxKIRQYuT9IJDwgiI=
 github.com/mstoykov/atlas v0.0.0-20220811071828-388f114305dd/go.mod h1:9vRHVuLCjoFfE3GT06X0spdOAO+Zzo4AMjdIwUHBvAk=
 github.com/mstoykov/envconfig v1.5.0 h1:E2FgWf73BQt0ddgn7aoITkQHmgwAcHup1s//MsS5/f8=
