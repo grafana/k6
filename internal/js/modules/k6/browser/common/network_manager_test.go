@@ -223,6 +223,8 @@ func (m *EventInterceptorMock) onRequest(_ *Request) {}
 
 func (m *EventInterceptorMock) onResponse(_ *Response) {}
 
+func (m *EventInterceptorMock) onRequestFailed(_ *Request) {}
+
 func TestNetworkManagerEmitRequestResponseMetricsTimingSkew(t *testing.T) {
 	t.Parallel()
 
