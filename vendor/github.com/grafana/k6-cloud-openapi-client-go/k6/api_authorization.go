@@ -3,7 +3,7 @@ Grafana Cloud k6
 
 HTTP API for interacting with Grafana Cloud k6.
 
-API version: 1.7.0
+API version: 1.7.1
 Contact: info@grafana.com
 */
 
@@ -39,9 +39,9 @@ func (r *ApiAuthRequest) Execute() (*AuthenticationResponse, *http.Response, err
 }
 
 /*
-Auth Validate k6 Cloud API token and access to the stack.
+Auth Validate a Grafana Cloud k6 API token and access to the stack.
 
-Validate Personal k6 Cloud API token or Stack k6 Cloud API token and access to the stack.
+Validate a Grafana Cloud k6 Personal API token or Stack API token and access to the stack.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@return *ApiAuthRequest
