@@ -29,6 +29,7 @@ func TestConfigApply(t *testing.T) {
 		ProjectID:             null.NewInt(1, true),
 		Name:                  null.NewString("Name", true),
 		Host:                  null.NewString("Host", true),
+		Hostv6:                null.NewString("Hostv6", true),
 		Timeout:               types.NewNullDuration(5*time.Second, true),
 		LogsTailURL:           null.NewString("LogsTailURL", true),
 		PushRefID:             null.NewString("PushRefID", true),
