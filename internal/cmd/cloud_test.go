@@ -19,11 +19,11 @@ func TestResolveDefaultProjectID(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
-		name            string
-		cloudConfig     *cloudapi.Config
+		name              string
+		cloudConfig       *cloudapi.Config
 		expectedProjectID int64
-		expectedError   string
-		logContains     string
+		expectedError     string
+		logContains       string
 	}{
 		{
 			name: "returns ProjectID when valid and greater than 0",
@@ -31,7 +31,7 @@ func TestResolveDefaultProjectID(t *testing.T) {
 				ProjectID: null.IntFrom(123),
 			},
 			expectedProjectID: 123,
-			expectedError:   "",
+			expectedError:     "",
 		},
 		{
 			name: "returns DefaultProjectID when ProjectID is 0 but StackID and DefaultProjectID are valid",
@@ -42,8 +42,8 @@ func TestResolveDefaultProjectID(t *testing.T) {
 				StackURL:         null.StringFrom("test-stack"),
 			},
 			expectedProjectID: 789,
-			expectedError:   "",
-			logContains:     "test-stack",
+			expectedError:     "",
+			logContains:       "test-stack",
 		},
 		{
 			name: "uses generated stack name when StackURL is not valid",
@@ -54,8 +54,8 @@ func TestResolveDefaultProjectID(t *testing.T) {
 				StackURL:         null.String{},
 			},
 			expectedProjectID: 789,
-			expectedError:   "",
-			logContains:     "stack-456",
+			expectedError:     "",
+			logContains:       "stack-456",
 		},
 		{
 			name: "returns error when StackID is valid but DefaultProjectID is not available",
@@ -65,7 +65,7 @@ func TestResolveDefaultProjectID(t *testing.T) {
 				DefaultProjectID: null.Int{},
 			},
 			expectedProjectID: 0,
-			expectedError:   "default stack configured but the default project ID is not available",
+			expectedError:     "default stack configured but the default project ID is not available",
 		},
 		{
 			name: "returns 0 when nothing is configured",
@@ -73,7 +73,7 @@ func TestResolveDefaultProjectID(t *testing.T) {
 				ProjectID: null.IntFrom(0),
 			},
 			expectedProjectID: 0,
-			expectedError:   "",
+			expectedError:     "",
 		},
 		{
 			name: "returns 0 when StackID is 0",
@@ -83,7 +83,7 @@ func TestResolveDefaultProjectID(t *testing.T) {
 				DefaultProjectID: null.IntFrom(789),
 			},
 			expectedProjectID: 0,
-			expectedError:   "",
+			expectedError:     "",
 		},
 	}
 
@@ -115,28 +115,28 @@ func TestResolveAndSetProjectID(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
-		name                string
-		cloudConfig         *cloudapi.Config
-		expectedError       string
-		expectedProjectID   int64
-		logContains         string
+		name              string
+		cloudConfig       *cloudapi.Config
+		expectedError     string
+		expectedProjectID int64
+		logContains       string
 	}{
 		{
 			name: "sets projectID in all places when projectID > 0",
 			cloudConfig: &cloudapi.Config{
-				ProjectID:        null.IntFrom(123),
+				ProjectID: null.IntFrom(123),
 			},
-			expectedError:      "",
-			expectedProjectID:  123,
+			expectedError:     "",
+			expectedProjectID: 123,
 		},
 		{
 			name: "logs warnings when projectID is 0 and no StackID",
 			cloudConfig: &cloudapi.Config{
 				ProjectID: null.IntFrom(0),
 			},
-			expectedError:       "",
-			expectedProjectID:   0,
-			logContains:        "no projectID or default stack specified",
+			expectedError:     "",
+			expectedProjectID: 0,
+			logContains:       "no projectID or default stack specified",
 		},
 		{
 			name: "propagates error from resolveDefaultProjectID",
@@ -145,8 +145,8 @@ func TestResolveAndSetProjectID(t *testing.T) {
 				StackID:          null.IntFrom(456),
 				DefaultProjectID: null.Int{}, // Invalid - should cause error
 			},
-			expectedError:      "default stack configured but the default project ID is not available",
-			expectedProjectID:  0,
+			expectedError:     "default stack configured but the default project ID is not available",
+			expectedProjectID: 0,
 		},
 	}
 

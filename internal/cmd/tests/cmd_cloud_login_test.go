@@ -14,11 +14,13 @@ import (
 	"go.k6.io/k6/internal/cmd"
 )
 
-const validToken = "valid-token"
-const validStackID = 1234
-const validStack = "valid-stack"
-const validStackURL = "https://valid-stack.grafana.net"
-const defaultProjectID = 5678
+const (
+	validToken       = "valid-token"
+	validStackID     = 1234
+	validStack       = "valid-stack"
+	validStackURL    = "https://valid-stack.grafana.net"
+	defaultProjectID = 5678
+)
 
 func TestCloudLoginWithArgs(t *testing.T) {
 	t.Parallel()

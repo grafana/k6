@@ -106,7 +106,7 @@ func NewConfig() Config {
 
 // Apply saves config non-zero config values from the passed config in the receiver.
 //
-//nolint:cyclop
+//nolint:cyclop,gocognit
 func (c Config) Apply(cfg Config) Config {
 	if cfg.StackID.Valid {
 		c.StackID = cfg.StackID
