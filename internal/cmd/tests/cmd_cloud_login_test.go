@@ -15,7 +15,7 @@ import (
 )
 
 const validToken = "valid-token"
-const validStackId = 1234
+const validStackID = 1234
 const validStack = "valid-stack"
 const validStackURL = "https://valid-stack.grafana.net"
 const defaultProjectID = 5678
@@ -47,7 +47,7 @@ func TestCloudLoginWithArgs(t *testing.T) {
 			wantStdoutContains: []string{
 				"Logged in successfully",
 				fmt.Sprintf("token: %s", validToken),
-				fmt.Sprintf("stack-id: %d", validStackId),
+				fmt.Sprintf("stack-id: %d", validStackID),
 				fmt.Sprintf("stack-url: %s", validStackURL),
 				fmt.Sprintf("default-project-id: %d", defaultProjectID),
 			},
@@ -135,10 +135,12 @@ func mockValidateTokenServer(t *testing.T) *httptest.Server {
 
 			assert.Contains(t, payload, "token")
 			if payload["token"] == validToken {
-				fmt.Fprintf(w, `{"is_valid": true, "message": "Token is valid"}`)
+				_, err = fmt.Fprintf(w, `{"is_valid": true, "message": "Token is valid"}`)
+				require.NoError(t, err)
 				return
 			}
-			fmt.Fprintf(w, `{"is_valid": false, "message": "Token is invalid"}`)
+			_, err = fmt.Fprintf(w, `{"is_valid": false, "message": "Token is invalid"}`)
+			require.NoError(t, err)
 
 		// v6 path to validate token and stack
 		case "/cloud/v6/auth":
@@ -146,7 +148,8 @@ func mockValidateTokenServer(t *testing.T) *httptest.Server {
 			stackHeader := req.Header.Get("X-Stack-Url")
 			if authHeader == fmt.Sprintf("Bearer %s", validToken) && stackHeader == validStackURL {
 				w.Header().Set("Content-Type", "application/json")
-				fmt.Fprintf(w, `{"stack_id": %d, "default_project_id": %d}`, validStackId, defaultProjectID)
+				_, err := fmt.Fprintf(w, `{"stack_id": %d, "default_project_id": %d}`, validStackID, defaultProjectID)
+				require.NoError(t, err)
 				return
 			}
 			w.WriteHeader(http.StatusUnauthorized)

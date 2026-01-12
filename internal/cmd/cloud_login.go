@@ -183,7 +183,7 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 
 		err = validateInputs(gs, &newCloudConf, currentJSONConfigRaw, tokenInput, stackInput)
 		if err != nil {
-			return nil
+			return err
 		}
 	}
 
