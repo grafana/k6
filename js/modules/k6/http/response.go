@@ -118,15 +118,25 @@ func checkErrorInJSON(input []byte, offset int, err error) error {
 	line := 1
 	character := 0
 
+	// SyntaxError.Offset is the number of bytes read (1-based).
+	if offset > 0 {
+		offset--
+	}
+
 	for i, b := range str {
+		if i > offset {
+			break
+		}
 		if b == lf {
 			line++
 			character = 0
+			continue
 		}
 		character++
-		if i == offset {
-			break
-		}
+	}
+
+	if character == 0 {
+		character = 1
 	}
 
 	return jsonError{line: line, character: character, err: err}
