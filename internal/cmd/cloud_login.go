@@ -132,47 +132,12 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 		}
 		return nil
 	case token.Valid:
-		newCloudConf.Token = token
-		gs := c.globalState
-		consolidatedCurrentConfig, warn, err := cloudapi.GetConsolidatedConfig(
-			currentJSONConfigRaw, gs.Env, "", nil, nil)
+		err := validateInputs(c.globalState, &newCloudConf, currentJSONConfigRaw, token, stackInput)
 		if err != nil {
 			return err
-		}
-		if warn != "" {
-			gs.Logger.Warn(warn)
-		}
-
-		if stackInput.Valid && stackInput.String != "" {
-			stackURL, stackID, defaultProjectID, err := validateTokenAndResolveStack(
-				gs, consolidatedCurrentConfig, token.String, stackInput.String)
-			if err != nil {
-				return fmt.Errorf(
-					"your stack is invalid - please, consult the Grafana Cloud k6 documentation "+
-						"for instructions on how to get yours: "+
-						"https://grafana.com/docs/grafana-cloud/testing/k6/author-run/configure-stack. "+
-						"Error details: %w",
-					err)
-			}
-			newCloudConf.StackURL = null.StringFrom(stackURL)
-			newCloudConf.StackID = null.IntFrom(stackID)
-			newCloudConf.DefaultProjectID = null.IntFrom(defaultProjectID)
-		} else {
-			err = validateToken(gs, consolidatedCurrentConfig, newCloudConf.Token.String)
-			if err != nil {
-				return err
-			}
 		}
 	default:
 		gs := c.globalState
-		consolidatedCurrentConfig, warn, err := cloudapi.GetConsolidatedConfig(
-			currentJSONConfigRaw, gs.Env, "", nil, nil)
-		if err != nil {
-			return err
-		}
-		if warn != "" {
-			gs.Logger.Warn(warn)
-		}
 
 		/* Token form */
 		tokenForm := ui.Form{
@@ -193,10 +158,8 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 		if err != nil {
 			return err
 		}
-		tokenValue := tokenVals["Token"]
-		newCloudConf.Token = null.StringFrom(tokenValue)
-
-		if !newCloudConf.Token.Valid {
+		tokenInput := null.StringFrom(tokenVals["Token"])
+		if !tokenInput.Valid {
 			return errors.New("token cannot be empty")
 		}
 
@@ -216,26 +179,11 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 		if err != nil {
 			return err
 		}
-		stackValue := strings.TrimSpace(stackVals["Stack"])
-		if stackValue != "" && stackValue != "None" {
-			stackURL, stackID, defaultProjectID, err := validateTokenAndResolveStack(
-				gs, consolidatedCurrentConfig, tokenValue, stackValue)
-			if err != nil {
-				return fmt.Errorf(
-					"your stack is invalid - please, consult the Grafana Cloud k6 documentation "+
-						"for instructions on how to get yours: "+
-						"https://grafana.com/docs/grafana-cloud/testing/k6/author-run/configure-stack. "+
-						"Error details: %w",
-					err)
-			}
-			newCloudConf.StackURL = null.StringFrom(stackURL)
-			newCloudConf.StackID = null.IntFrom(stackID)
-			newCloudConf.DefaultProjectID = null.IntFrom(defaultProjectID)
-		} else {
-			err = validateToken(gs, consolidatedCurrentConfig, newCloudConf.Token.String)
-			if err != nil {
-				return err
-			}
+		stackInput := null.StringFrom(strings.TrimSpace(stackVals["Stack"]))
+
+		err = validateInputs(gs, &newCloudConf, currentJSONConfigRaw, tokenInput, stackInput)
+		if err != nil {
+			return nil
 		}
 	}
 
@@ -276,9 +224,52 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 	return nil
 }
 
-// validateToken validates a token using v1 cloud API.
-// Deprecated: use validateTokenAndResolveStack instead if a stack name is provided.
-func validateToken(gs *state.GlobalState, config cloudapi.Config, token string) error {
+// validateInputs validates a token and a stack if provided
+// and update the config with the given inputs
+func validateInputs(
+	gs *state.GlobalState,
+	config *cloudapi.Config,
+	rawConfig json.RawMessage,
+	token, stackInput null.String,
+) error {
+	config.Token = token
+	consolidatedCurrentConfig, warn, err := cloudapi.GetConsolidatedConfig(
+		rawConfig, gs.Env, "", nil, nil)
+	if err != nil {
+		return err
+	}
+	if warn != "" {
+		gs.Logger.Warn(warn)
+	}
+
+	stackValue := stackInput.String
+	if stackInput.Valid && stackValue != "" && stackValue != "None" {
+		stackURL, stackID, defaultProjectID, err := validateTokenV6(
+			gs, consolidatedCurrentConfig, token.String, stackValue)
+		if err != nil {
+			return fmt.Errorf(
+				"your stack is invalid - please, consult the Grafana Cloud k6 documentation "+
+					"for instructions on how to get yours: "+
+					"https://grafana.com/docs/grafana-cloud/testing/k6/author-run/configure-stack. "+
+					"Error details: %w",
+				err)
+		}
+		config.StackURL = null.StringFrom(stackURL)
+		config.StackID = null.IntFrom(stackID)
+		config.DefaultProjectID = null.IntFrom(defaultProjectID)
+	} else {
+		err = validateTokenV1(gs, consolidatedCurrentConfig, config.Token.String)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// validateTokenV1 validates a token using v1 cloud API.
+// Deprecated: use validateTokenV6 instead if a stack name is provided.
+func validateTokenV1(gs *state.GlobalState, config cloudapi.Config, token string) error {
 	client := cloudapi.NewClient(
 		gs.Logger,
 		token,
@@ -301,10 +292,10 @@ func validateToken(gs *state.GlobalState, config cloudapi.Config, token string) 
 	return nil
 }
 
-// validateTokenAndResolveStack validates a token and a stack URL/slug and returns the normalized URL, stack ID,
+// validateTokenV6 validates a token and a stack URL/slug and returns the normalized URL, stack ID,
 // and default project ID.
 // The stackInput can be either a full URL (e.g., https://my-team.grafana.net) or just a slug (e.g., my-team).
-func validateTokenAndResolveStack(
+func validateTokenV6(
 	gs *state.GlobalState,
 	config cloudapi.Config,
 	token, stackInput string,

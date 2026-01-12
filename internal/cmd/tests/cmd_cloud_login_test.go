@@ -14,14 +14,14 @@ import (
 	"go.k6.io/k6/internal/cmd"
 )
 
+const validToken = "valid-token"
+const validStackId = 1234
+const validStack = "valid-stack"
+const validStackURL = "https://valid-stack.grafana.net"
+const defaultProjectID = 5678
+
 func TestCloudLoginWithArgs(t *testing.T) {
 	t.Parallel()
-
-	const validToken = "valid-token"
-	const validStackId = 1234
-	const validStack = "valid-stack"
-	const validStackURL = "https://valid-stack.grafana.net"
-	const defaultProjectID = 5678
 
 	testCases := []struct {
 		name               string
@@ -53,6 +53,16 @@ func TestCloudLoginWithArgs(t *testing.T) {
 			},
 		},
 		{
+			name:    "valid token and 'None' stack",
+			token:   validToken,
+			stack:   "None",
+			wantErr: false,
+			wantStdoutContains: []string{
+				"Logged in successfully",
+				fmt.Sprintf("token: %s", validToken),
+			},
+		},
+		{
 			name:               "invalid token",
 			token:              "invalid-token",
 			wantErr:            true,
@@ -71,39 +81,7 @@ func TestCloudLoginWithArgs(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				switch req.URL.Path {
-				// v1 path to validate token only
-				case "/v1/validate-token":
-					body, err := io.ReadAll(req.Body)
-					require.NoError(t, err)
-
-					var payload map[string]interface{}
-					err = json.Unmarshal(body, &payload)
-					require.NoError(t, err)
-
-					assert.Contains(t, payload, "token")
-					if payload["token"] == validToken {
-						fmt.Fprintf(w, `{"is_valid": true, "message": "Token is valid"}`)
-						return
-					}
-					fmt.Fprintf(w, `{"is_valid": false, "message": "Token is invalid"}`)
-
-					// v6 path to validate token and stack
-				case "/cloud/v6/auth":
-					authHeader := req.Header.Get("Authorization")
-					stackHeader := req.Header.Get("X-Stack-Url")
-					if authHeader == fmt.Sprintf("Bearer %s", validToken) && stackHeader == validStackURL {
-						// w.WriteHeader(http.StatusOK)
-						w.Header().Set("Content-Type", "application/json")
-						fmt.Fprintf(w, `{"stack_id": %d, "default_project_id": %d}`, validStackId, defaultProjectID)
-						return
-					}
-					w.WriteHeader(http.StatusUnauthorized)
-				default:
-					w.WriteHeader(http.StatusNotFound)
-				}
-			}))
+			srv := mockValidateTokenServer(t)
 			defer srv.Close()
 
 			ts := NewGlobalTestState(t)
@@ -118,7 +96,6 @@ func TestCloudLoginWithArgs(t *testing.T) {
 			ts.Env["K6_CLOUD_HOST"] = srv.URL
 			ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
 
-			// Set expected exit code
 			if tc.wantErr {
 				ts.ExpectedExitCode = -1
 			} else {
@@ -140,4 +117,41 @@ func TestCloudLoginWithArgs(t *testing.T) {
 			}
 		})
 	}
+}
+
+func mockValidateTokenServer(t *testing.T) *httptest.Server {
+	t.Helper()
+
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		switch req.URL.Path {
+		// v1 path to validate token only
+		case "/v1/validate-token":
+			body, err := io.ReadAll(req.Body)
+			require.NoError(t, err)
+
+			var payload map[string]interface{}
+			err = json.Unmarshal(body, &payload)
+			require.NoError(t, err)
+
+			assert.Contains(t, payload, "token")
+			if payload["token"] == validToken {
+				fmt.Fprintf(w, `{"is_valid": true, "message": "Token is valid"}`)
+				return
+			}
+			fmt.Fprintf(w, `{"is_valid": false, "message": "Token is invalid"}`)
+
+		// v6 path to validate token and stack
+		case "/cloud/v6/auth":
+			authHeader := req.Header.Get("Authorization")
+			stackHeader := req.Header.Get("X-Stack-Url")
+			if authHeader == fmt.Sprintf("Bearer %s", validToken) && stackHeader == validStackURL {
+				w.Header().Set("Content-Type", "application/json")
+				fmt.Fprintf(w, `{"stack_id": %d, "default_project_id": %d}`, validStackId, defaultProjectID)
+				return
+			}
+			w.WriteHeader(http.StatusUnauthorized)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
 }
