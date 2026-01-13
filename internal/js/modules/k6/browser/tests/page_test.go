@@ -4122,5 +4122,5 @@ func TestPageGoBackForward(t *testing.T) {
 			require.NoError(t, err)
 		}
 		tb.AssertURL(p, url3, "after rapid navigation should still be on page2")
-  })
+	})
 }
