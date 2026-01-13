@@ -169,7 +169,23 @@ func (s *Session) Execute(
 		Method:    cdproto.MethodType(method),
 		Params:    buf,
 	}
-	return s.conn.send(contextWithDoneChan(evCancelCtx, s.done), msg, ch, res)
+	err := s.conn.send(contextWithDoneChan(evCancelCtx, s.done), msg, ch, res)
+	if err != nil {
+		return err
+	}
+
+	select {
+	case <-s.sessionCtx.Done():
+		cause := context.Cause(s.sessionCtx)
+		s.logger.Debugf("Session:Execute", "sid:%v tid:%v method:%q, session context cancelled with cause: %v",
+			s.id, s.targetID, method, cause)
+		if cause != nil {
+			return fmt.Errorf("session context cancelled: %w", cause)
+		}
+		return s.sessionCtx.Err()
+	default:
+		return nil
+	}
 }
 
 func (s *Session) ExecuteWithoutExpectationOnReply(
