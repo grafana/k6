@@ -71,8 +71,6 @@ func (ce Elem) ctype() ceType {
 		}
 		return ceDecompose
 	}
-	panic("should not reach here")
-	return ceType(-1)
 }
 
 // For normal collation elements, we assume that a collation element either has
