@@ -203,10 +203,10 @@ func (s *sharedArrays) ensureSlot(name string) *sharedArraySlot {
 		return slot
 	}
 
-	slot = &sharedArraySlot{}
 	if s.slots == nil {
 		s.slots = make(map[string]*sharedArraySlot)
 	}
+	slot = &sharedArraySlot{}
 	s.slots[name] = slot
 	return slot
 }
