@@ -118,7 +118,7 @@ type Connection struct {
 	BaseEventEmitter
 
 	ctx          context.Context
-	cancelCtx    context.CancelFunc
+	cancelCtx    context.CancelCauseFunc
 	wsURL        string
 	logger       *log.Logger
 	conn         *websocket.Conn
@@ -157,7 +157,7 @@ func NewConnection(
 		ReadBufferSize:   wsWriteBufferSize,
 	}
 
-	ctx, cancelCtx := context.WithCancel(ctx)
+	ctx, cancelCtx := context.WithCancelCause(ctx)
 
 	conn, response, connErr := wsd.DialContext(ctx, wsURL, header)
 	if response != nil {
@@ -166,7 +166,7 @@ func NewConnection(
 		}()
 	}
 	if connErr != nil {
-		cancelCtx()
+		cancelCtx(fmt.Errorf("failed to dial websocket at %s: %w", wsURL, connErr))
 		return nil, connErr
 	}
 
@@ -197,7 +197,9 @@ func NewConnection(
 func (c *Connection) close(code int) error {
 	c.logger.Debugf("Connection:close", "code:%d", code)
 
-	defer c.cancelCtx()
+	defer func() {
+		c.cancelCtx(fmt.Errorf("connection closed with websocket code: %d", code))
+	}()
 
 	var err error
 	c.shutdownOnce.Do(func() {
