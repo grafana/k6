@@ -7,7 +7,7 @@ labels: ["release"]
 
 **Release Date**:
 
-25th May 2025 **<- WRITE HERE THE UPDATED RELEASE DATE**
+25th May 2026 **<- WRITE HERE THE UPDATED RELEASE DATE**
 
 ## Release Activities
 
@@ -73,11 +73,11 @@ git checkout master && git pull && git checkout -b v1.3.x && git tag v1.3.0 -m "
 
 #### Announcements
 
-- [ ] Notify the larger team in the #k6 channel, letting them know that the release is published by linking the release on GitHub.
-- [ ] Publish a link to the #k6 channel's post in the #k6-changelog channel.
+- [ ] Notify the larger team in the #k6 and #k6-changelog channels, letting them know that the release is published by linking the release on GitHub.
 - [ ] Close the release's milestone.
 
 ## Wrapping Release
 
 - [ ] Ensure the `DefinitelyTyped/DefinitelyTyped` PR(s) are merged.
+- [ ] Ensure to sync `grafana/k6-DefinitelyTyped` fork with the latest changes from the `DefinitelyTyped/DefinitelyTyped` repository.
 - [ ] Update the k6 repository's `.github/ISSUE_TEMPLATE/release.md` in the event steps from this checklist were incorrect or missing.

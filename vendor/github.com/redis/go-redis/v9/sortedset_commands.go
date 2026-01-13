@@ -2,8 +2,11 @@ package redis
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
+
+	"github.com/redis/go-redis/v9/internal/hashtag"
 )
 
 type SortedSetCmdable interface {
@@ -257,16 +260,15 @@ func (c cmdable) ZInterWithScores(ctx context.Context, store *ZStore) *ZSliceCmd
 }
 
 func (c cmdable) ZInterCard(ctx context.Context, limit int64, keys ...string) *IntCmd {
-	args := make([]interface{}, 4+len(keys))
+	numKeys := len(keys)
+	args := make([]interface{}, 4+numKeys)
 	args[0] = "zintercard"
-	numkeys := int64(0)
+	args[1] = numKeys
 	for i, key := range keys {
 		args[2+i] = key
-		numkeys++
 	}
-	args[1] = numkeys
-	args[2+numkeys] = "limit"
-	args[3+numkeys] = limit
+	args[2+numKeys] = "limit"
+	args[3+numKeys] = limit
 	cmd := NewIntCmd(ctx, args...)
 	_ = c(ctx, cmd)
 	return cmd
@@ -312,7 +314,9 @@ func (c cmdable) ZPopMax(ctx context.Context, key string, count ...int64) *ZSlic
 	case 1:
 		args = append(args, count[0])
 	default:
-		panic("too many arguments")
+		cmd := NewZSliceCmd(ctx)
+		cmd.SetErr(errors.New("too many arguments"))
+		return cmd
 	}
 
 	cmd := NewZSliceCmd(ctx, args...)
@@ -332,7 +336,9 @@ func (c cmdable) ZPopMin(ctx context.Context, key string, count ...int64) *ZSlic
 	case 1:
 		args = append(args, count[0])
 	default:
-		panic("too many arguments")
+		cmd := NewZSliceCmd(ctx)
+		cmd.SetErr(errors.New("too many arguments"))
+		return cmd
 	}
 
 	cmd := NewZSliceCmd(ctx, args...)
@@ -720,6 +726,9 @@ func (c cmdable) ZScan(ctx context.Context, key string, cursor uint64, match str
 		args = append(args, "count", count)
 	}
 	cmd := NewScanCmd(ctx, c, args...)
+	if hashtag.Present(match) {
+		cmd.SetFirstKeyPos(4)
+	}
 	_ = c(ctx, cmd)
 	return cmd
 }

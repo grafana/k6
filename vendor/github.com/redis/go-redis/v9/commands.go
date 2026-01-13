@@ -81,6 +81,8 @@ func appendArg(dst []interface{}, arg interface{}) []interface{} {
 		return dst
 	case time.Time, time.Duration, encoding.BinaryMarshaler, net.IP:
 		return append(dst, arg)
+	case nil:
+		return dst
 	default:
 		// scan struct field
 		v := reflect.ValueOf(arg)
@@ -153,6 +155,12 @@ func isEmptyValue(v reflect.Value) bool {
 		return v.Float() == 0
 	case reflect.Interface, reflect.Pointer:
 		return v.IsNil()
+	case reflect.Struct:
+		if v.Type() == reflect.TypeOf(time.Time{}) {
+			return v.IsZero()
+		}
+		// Only supports the struct time.Time,
+		// subsequent iterations will follow the func Scan support decoder.
 	}
 	return false
 }
@@ -185,6 +193,7 @@ type Cmdable interface {
 	ClientID(ctx context.Context) *IntCmd
 	ClientUnblock(ctx context.Context, id int64) *IntCmd
 	ClientUnblockWithError(ctx context.Context, id int64) *IntCmd
+	ClientMaintNotifications(ctx context.Context, enabled bool, endpointType string) *StatusCmd
 	ConfigGet(ctx context.Context, parameter string) *MapStringStringCmd
 	ConfigResetStat(ctx context.Context) *StatusCmd
 	ConfigSet(ctx context.Context, parameter, value string) *StatusCmd
@@ -202,16 +211,19 @@ type Cmdable interface {
 	ShutdownNoSave(ctx context.Context) *StatusCmd
 	SlaveOf(ctx context.Context, host, port string) *StatusCmd
 	SlowLogGet(ctx context.Context, num int64) *SlowLogCmd
+	SlowLogLen(ctx context.Context) *IntCmd
+	SlowLogReset(ctx context.Context) *StatusCmd
 	Time(ctx context.Context) *TimeCmd
 	DebugObject(ctx context.Context, key string) *StringCmd
 	MemoryUsage(ctx context.Context, key string, samples ...int) *IntCmd
+	Latency(ctx context.Context) *LatencyCmd
+	LatencyReset(ctx context.Context, events ...interface{}) *StatusCmd
 
 	ModuleLoadex(ctx context.Context, conf *ModuleLoadexConfig) *StringCmd
 
 	ACLCmdable
 	BitMapCmdable
 	ClusterCmdable
-	GearsCmdable
 	GenericCmdable
 	GeoCmdable
 	HashCmdable
@@ -220,12 +232,14 @@ type Cmdable interface {
 	ProbabilisticCmdable
 	PubSubCmdable
 	ScriptingFunctionsCmdable
+	SearchCmdable
 	SetCmdable
 	SortedSetCmdable
 	StringCmdable
 	StreamCmdable
 	TimeseriesCmdable
 	JSONCmdable
+	VectorSetCmdable
 }
 
 type StatefulCmdable interface {
@@ -244,6 +258,7 @@ var (
 	_ Cmdable = (*Tx)(nil)
 	_ Cmdable = (*Ring)(nil)
 	_ Cmdable = (*ClusterClient)(nil)
+	_ Cmdable = (*Pipeline)(nil)
 )
 
 type cmdable func(ctx context.Context, cmd Cmder) error
@@ -330,7 +345,7 @@ func (info LibraryInfo) Validate() error {
 	return nil
 }
 
-// Hello Set the resp protocol used.
+// Hello sets the resp protocol used.
 func (c statefulCmdable) Hello(ctx context.Context,
 	ver int, username, password, clientName string,
 ) *MapStringInterfaceCmd {
@@ -422,6 +437,12 @@ func (c cmdable) Ping(ctx context.Context) *StatusCmd {
 	return cmd
 }
 
+func (c cmdable) Do(ctx context.Context, args ...interface{}) *Cmd {
+	cmd := NewCmd(ctx, args...)
+	_ = c(ctx, cmd)
+	return cmd
+}
+
 func (c cmdable) Quit(_ context.Context) *StatusCmd {
 	panic("not implemented")
 }
@@ -499,6 +520,23 @@ func (c cmdable) ClientUnblockWithError(ctx context.Context, id int64) *IntCmd {
 
 func (c cmdable) ClientInfo(ctx context.Context) *ClientInfoCmd {
 	cmd := NewClientInfoCmd(ctx, "client", "info")
+	_ = c(ctx, cmd)
+	return cmd
+}
+
+// ClientMaintNotifications enables or disables maintenance notifications for maintenance upgrades.
+// When enabled, the client will receive push notifications about Redis maintenance events.
+func (c cmdable) ClientMaintNotifications(ctx context.Context, enabled bool, endpointType string) *StatusCmd {
+	args := []interface{}{"client", "maint_notifications"}
+	if enabled {
+		if endpointType == "" {
+			endpointType = "none"
+		}
+		args = append(args, "on", "moving-endpoint-type", endpointType)
+	} else {
+		args = append(args, "off")
+	}
+	cmd := NewStatusCmd(ctx, args...)
 	_ = c(ctx, cmd)
 	return cmd
 }
@@ -639,6 +677,34 @@ func (c cmdable) SlowLogGet(ctx context.Context, num int64) *SlowLogCmd {
 	return cmd
 }
 
+func (c cmdable) SlowLogLen(ctx context.Context) *IntCmd {
+	cmd := NewIntCmd(ctx, "slowlog", "len")
+	_ = c(ctx, cmd)
+	return cmd
+}
+
+func (c cmdable) SlowLogReset(ctx context.Context) *StatusCmd {
+	cmd := NewStatusCmd(ctx, "slowlog", "reset")
+	_ = c(ctx, cmd)
+	return cmd
+}
+
+func (c cmdable) Latency(ctx context.Context) *LatencyCmd {
+	cmd := NewLatencyCmd(ctx, "latency", "latest")
+	_ = c(ctx, cmd)
+	return cmd
+}
+
+func (c cmdable) LatencyReset(ctx context.Context, events ...interface{}) *StatusCmd {
+	args := make([]interface{}, 2+len(events))
+	args[0] = "latency"
+	args[1] = "reset"
+	copy(args[2:], events)
+	cmd := NewStatusCmd(ctx, args...)
+	_ = c(ctx, cmd)
+	return cmd
+}
+
 func (c cmdable) Sync(_ context.Context) {
 	panic("not implemented")
 }
@@ -659,7 +725,9 @@ func (c cmdable) MemoryUsage(ctx context.Context, key string, samples ...int) *I
 	args := []interface{}{"memory", "usage", key}
 	if len(samples) > 0 {
 		if len(samples) != 1 {
-			panic("MemoryUsage expects single sample count")
+			cmd := NewIntCmd(ctx)
+			cmd.SetErr(errors.New("MemoryUsage expects single sample count"))
+			return cmd
 		}
 		args = append(args, "SAMPLES", samples[0])
 	}
