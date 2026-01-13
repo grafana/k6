@@ -2819,80 +2819,184 @@ func TestPageOnResponse(t *testing.T) {
 // TestPageOnRequestFailed tests that the requestfailed event fires when requests fail.
 func TestPageOnRequestFailed(t *testing.T) {
 	t.Parallel()
-	tb := newTestBrowser(t, withHTTPServer())
 
-	tb.withHandler("/home", func(w http.ResponseWriter, _ *http.Request) {
-		// This should fail with connection refused.
-		_, err := fmt.Fprintf(w, `<!DOCTYPE html>
+	fakeRegExMatcher := func(pattern, url string) (bool, error) {
+		matched, err := regexp.MatchString(fmt.Sprintf("http://[^/]*%s", pattern), url)
+		if err != nil {
+			return false, fmt.Errorf("error matching regex: %w", err)
+		}
+		return matched, nil
+	}
+
+	t.Run("aborted_request_triggers_requestfailed_event", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withHTTPServer())
+
+		tb.withHandler("/home", func(w http.ResponseWriter, _ *http.Request) {
+			_, err := fmt.Fprintf(w, `<!DOCTYPE html>
 <html>
 <body>
+    <h1>Test Page</h1>
     <script>
-        // Try to fetch from a port that's definitely not listening
-        fetch('http://127.0.0.1:1/does-not-exist')
-            .catch(() => { window.fetchDone = true; });
+        fetch('/api/data')
+            .then(() => { window.fetchResult = 'success'; })
+            .catch(() => { window.fetchResult = 'failed'; });
     </script>
 </body>
 </html>`)
+			require.NoError(t, err)
+		})
+
+		tb.withHandler("/api/data", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, err := fmt.Fprint(w, `{"data": "test"}`)
+			require.NoError(t, err)
+		})
+
+		p := tb.NewPage(nil)
+
+		routeHandler := func(route *common.Route) error {
+			return route.Abort("failed")
+		}
+		err := p.Route("/api/data", routeHandler, fakeRegExMatcher)
 		require.NoError(t, err)
+
+		var failedRequests []map[string]string
+		err = p.On(common.PageEventRequestFailed, func(ev common.PageEvent) error {
+			req := ev.Request
+			failure := req.Failure()
+			errorText := ""
+			if failure != nil {
+				errorText = failure.ErrorText
+			}
+			failedRequests = append(failedRequests, map[string]string{
+				"url":          req.URL(),
+				"method":       req.Method(),
+				"resourceType": req.ResourceType(),
+				"errorText":    errorText,
+			})
+			return nil
+		})
+		require.NoError(t, err)
+
+		opts := &common.FrameGotoOptions{
+			WaitUntil: common.LifecycleEventNetworkIdle,
+			Timeout:   common.DefaultTimeout,
+		}
+		_, err = p.Goto(tb.url("/home"), opts)
+		require.NoError(t, err)
+
+		require.Len(t, failedRequests, 1, "expected exactly one failed request")
+
+		failedReq := failedRequests[0]
+		assert.Contains(t, failedReq["url"], "/api/data", "failed request URL should contain /api/data")
+		assert.Equal(t, "GET", failedReq["method"], "failed request method should be GET")
+		assert.Equal(t, "Fetch", failedReq["resourceType"], "failed request resourceType should be Fetch")
+		assert.NotEmpty(t, failedReq["errorText"], "failed request should have error text")
 	})
 
-	tb.vu.ActivateVU()
-	tb.vu.StartIteration(t)
-	defer tb.vu.EndIteration(t)
+	t.Run("multiple_aborted_requests", func(t *testing.T) {
+		t.Parallel()
 
-	gv, err := tb.vu.RunAsync(t, `
-		const context = await browser.newContext();
-		const page = await context.newPage();
+		tb := newTestBrowser(t, withHTTPServer())
 
-		var failedRequests = [];
-		page.on('requestfailed', (request) => {
-			const failure = request.failure();
-			failedRequests.push({
-				url: request.url(),
-				method: request.method(),
-				resourceType: request.resourceType(),
-				errorText: failure ? failure.errorText : '',
-			});
-		});
-		
-		await page.goto('%s', {timeout: 10000});
-		await page.waitForFunction(() => window.fetchDone === true, {timeout: 5000}).catch(() => {});
-		await page.close();
-		return JSON.stringify(failedRequests, null, 2);
-	`, tb.url("/home"))
+		tb.withHandler("/home", func(w http.ResponseWriter, _ *http.Request) {
+			_, err := fmt.Fprintf(w, `<!DOCTYPE html>
+<html>
+<body>
+    <script>
+        Promise.allSettled([
+            fetch('/api/first'),
+            fetch('/api/second')
+        ]).then(() => { window.allDone = true; });
+    </script>
+</body>
+</html>`)
+			require.NoError(t, err)
+		})
 
-	require.NoError(t, err)
+		p := tb.NewPage(nil)
 
-	got := k6test.ToPromise(t, gv)
-	require.Equal(t, sobek.PromiseStateFulfilled, got.State())
-
-	var failedRequests []struct {
-		URL          string `json:"url"`
-		Method       string `json:"method"`
-		ResourceType string `json:"resourceType"`
-		ErrorText    string `json:"errorText"`
-	}
-	err = json.Unmarshal([]byte(got.Result().String()), &failedRequests)
-	require.NoError(t, err)
-
-	if len(failedRequests) == 0 {
-		t.Skip("no requestfailed events captured - may be environment-specific")
-		return
-	}
-
-	// Find the failed request to 127.0.0.1:1
-	var found bool
-	for _, req := range failedRequests {
-		if strings.Contains(req.URL, "127.0.0.1:1") {
-			found = true
-			assert.Equal(t, "GET", req.Method)
-			assert.Equal(t, "Fetch", req.ResourceType)
-			assert.NotEmpty(t, req.ErrorText, "expected error text")
-			break
+		routeHandler := func(route *common.Route) error {
+			return route.Abort("connectionrefused")
 		}
-	}
+		err := p.Route("/api/.*", routeHandler, fakeRegExMatcher)
+		require.NoError(t, err)
 
-	assert.True(t, found, "expected to find a failed request to 127.0.0.1:1")
+		var failedRequests []string
+		err = p.On(common.PageEventRequestFailed, func(ev common.PageEvent) error {
+			failedRequests = append(failedRequests, ev.Request.URL())
+			return nil
+		})
+		require.NoError(t, err)
+
+		opts := &common.FrameGotoOptions{
+			WaitUntil: common.LifecycleEventNetworkIdle,
+			Timeout:   common.DefaultTimeout,
+		}
+		_, err = p.Goto(tb.url("/home"), opts)
+		require.NoError(t, err)
+
+		// Verify that both requests failed
+		require.Len(t, failedRequests, 2, "expected two failed requests")
+
+		var hasFirst, hasSecond bool
+		for _, url := range failedRequests {
+			if strings.Contains(url, "/api/first") {
+				hasFirst = true
+			}
+			if strings.Contains(url, "/api/second") {
+				hasSecond = true
+			}
+		}
+		assert.True(t, hasFirst, "expected /api/first to be in failed requests")
+		assert.True(t, hasSecond, "expected /api/second to be in failed requests")
+	})
+
+	t.Run("failure_error_text_is_populated", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withHTTPServer())
+
+		tb.withHandler("/home", func(w http.ResponseWriter, _ *http.Request) {
+			_, err := fmt.Fprintf(w, `<!DOCTYPE html>
+<html>
+<body>
+    <script>
+        fetch('/api/test').catch(() => { window.done = true; });
+    </script>
+</body>
+</html>`)
+			require.NoError(t, err)
+		})
+
+		p := tb.NewPage(nil)
+
+		routeHandler := func(route *common.Route) error {
+			return route.Abort("connectionrefused")
+		}
+		err := p.Route("/api/test", routeHandler, fakeRegExMatcher)
+		require.NoError(t, err)
+
+		var capturedErrorText string
+		err = p.On(common.PageEventRequestFailed, func(ev common.PageEvent) error {
+			if failure := ev.Request.Failure(); failure != nil {
+				capturedErrorText = failure.ErrorText
+			}
+			return nil
+		})
+		require.NoError(t, err)
+
+		opts := &common.FrameGotoOptions{
+			WaitUntil: common.LifecycleEventNetworkIdle,
+			Timeout:   common.DefaultTimeout,
+		}
+		_, err = p.Goto(tb.url("/home"), opts)
+		require.NoError(t, err)
+
+		assert.NotEmpty(t, capturedErrorText, "request.failure().errorText should be populated")
+	})
 }
 
 func TestPageMustUseNativeJavaScriptObjects(t *testing.T) {
