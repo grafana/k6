@@ -124,19 +124,19 @@ func checkErrorInJSON(input []byte, offset int, err error) error {
 	}
 
 	for i, b := range str {
-		if i > offset {
-			break
-		}
 		if b == lf {
 			line++
 			character = 0
-			continue
+		} else {
+			character++
 		}
-		character++
-	}
 
-	if character == 0 {
-		character = 1
+		if i >= offset {
+			if b == lf {
+				character = 1
+			}
+			break
+		}
 	}
 
 	return jsonError{line: line, character: character, err: err}

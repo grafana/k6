@@ -2,6 +2,7 @@ package http
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -102,6 +103,15 @@ func invalidJSONHandler(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(body)))
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(body)
+}
+
+func TestCheckErrorInJSON_NewlineOffset(t *testing.T) {
+	err := checkErrorInJSON([]byte("a\nb"), 2, errors.New("boom"))
+
+	var jsonErr jsonError
+	require.ErrorAs(t, err, &jsonErr)
+	assert.Equal(t, 2, jsonErr.line)
+	assert.Equal(t, 1, jsonErr.character)
 }
 
 func TestResponse(t *testing.T) {
