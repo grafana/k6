@@ -2820,15 +2820,7 @@ func TestPageOnResponse(t *testing.T) {
 func TestPageOnRequestFailed(t *testing.T) {
 	t.Parallel()
 
-	fakeRegExMatcher := func(pattern, url string) (bool, error) {
-		matched, err := regexp.MatchString(fmt.Sprintf("http://[^/]*%s", pattern), url)
-		if err != nil {
-			return false, fmt.Errorf("error matching regex: %w", err)
-		}
-		return matched, nil
-	}
-
-	t.Run("aborted_request_triggers_requestfailed_event", func(t *testing.T) {
+	t.Run("server_aborted_request", func(t *testing.T) {
 		t.Parallel()
 
 		tb := newTestBrowser(t, withHTTPServer())
@@ -2849,21 +2841,13 @@ func TestPageOnRequestFailed(t *testing.T) {
 		})
 
 		tb.withHandler("/api/data", func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			_, err := fmt.Fprint(w, `{"data": "test"}`)
-			require.NoError(t, err)
+			panic(http.ErrAbortHandler)
 		})
 
 		p := tb.NewPage(nil)
 
-		routeHandler := func(route *common.Route) error {
-			return route.Abort("failed")
-		}
-		err := p.Route("/api/data", routeHandler, fakeRegExMatcher)
-		require.NoError(t, err)
-
 		var failedRequests []map[string]string
-		err = p.On(common.PageEventRequestFailed, func(ev common.PageEvent) error {
+		err := p.On(common.PageEventRequestFailed, func(ev common.PageEvent) error {
 			req := ev.Request
 			failure := req.Failure()
 			errorText := ""
@@ -2896,7 +2880,7 @@ func TestPageOnRequestFailed(t *testing.T) {
 		assert.NotEmpty(t, failedReq["errorText"], "failed request should have error text")
 	})
 
-	t.Run("multiple_aborted_requests", func(t *testing.T) {
+	t.Run("server_aborted_multiple_requests", func(t *testing.T) {
 		t.Parallel()
 
 		tb := newTestBrowser(t, withHTTPServer())
@@ -2916,16 +2900,18 @@ func TestPageOnRequestFailed(t *testing.T) {
 			require.NoError(t, err)
 		})
 
+		tb.withHandler("/api/first", func(w http.ResponseWriter, _ *http.Request) {
+			panic(http.ErrAbortHandler)
+		})
+
+		tb.withHandler("/api/second", func(w http.ResponseWriter, _ *http.Request) {
+			panic(http.ErrAbortHandler)
+		})
+
 		p := tb.NewPage(nil)
 
-		routeHandler := func(route *common.Route) error {
-			return route.Abort("connectionrefused")
-		}
-		err := p.Route("/api/.*", routeHandler, fakeRegExMatcher)
-		require.NoError(t, err)
-
 		var failedRequests []string
-		err = p.On(common.PageEventRequestFailed, func(ev common.PageEvent) error {
+		err := p.On(common.PageEventRequestFailed, func(ev common.PageEvent) error {
 			failedRequests = append(failedRequests, ev.Request.URL())
 			return nil
 		})
@@ -2952,50 +2938,6 @@ func TestPageOnRequestFailed(t *testing.T) {
 		}
 		assert.True(t, hasFirst, "expected /api/first to be in failed requests")
 		assert.True(t, hasSecond, "expected /api/second to be in failed requests")
-	})
-
-	t.Run("failure_error_text_is_populated", func(t *testing.T) {
-		t.Parallel()
-
-		tb := newTestBrowser(t, withHTTPServer())
-
-		tb.withHandler("/home", func(w http.ResponseWriter, _ *http.Request) {
-			_, err := fmt.Fprintf(w, `<!DOCTYPE html>
-<html>
-<body>
-    <script>
-        fetch('/api/test').catch(() => { window.done = true; });
-    </script>
-</body>
-</html>`)
-			require.NoError(t, err)
-		})
-
-		p := tb.NewPage(nil)
-
-		routeHandler := func(route *common.Route) error {
-			return route.Abort("connectionrefused")
-		}
-		err := p.Route("/api/test", routeHandler, fakeRegExMatcher)
-		require.NoError(t, err)
-
-		var capturedErrorText string
-		err = p.On(common.PageEventRequestFailed, func(ev common.PageEvent) error {
-			if failure := ev.Request.Failure(); failure != nil {
-				capturedErrorText = failure.ErrorText
-			}
-			return nil
-		})
-		require.NoError(t, err)
-
-		opts := &common.FrameGotoOptions{
-			WaitUntil: common.LifecycleEventNetworkIdle,
-			Timeout:   common.DefaultTimeout,
-		}
-		_, err = p.Goto(tb.url("/home"), opts)
-		require.NoError(t, err)
-
-		assert.NotEmpty(t, capturedErrorText, "request.failure().errorText should be populated")
 	})
 }
 
