@@ -97,7 +97,8 @@ func (d *Data) sharedArray(call sobek.ConstructorCall) *sobek.Object {
 		common.Throw(rt, errors.New("a function is expected as the second argument of SharedArray's constructor"))
 	}
 
-	array := d.shared.get(rt, name, fn)
+	builder := func() sharedArray { return getSharedArrayFromCall(rt, fn) }
+	array := d.shared.loadOrStore(name, builder)
 	return array.wrap(rt).ToObject(rt)
 }
 
@@ -180,7 +181,7 @@ func (s *sharedArrays) loadOrStore(name string, builder func() sharedArray) shar
 func (s *sharedArrays) get(rt *sobek.Runtime, name string, call sobek.Callable) sharedArray {
 	slot := s.ensureSlot(name)
 	slot.once.Do(func() {
-		slot.arr = getShareArrayFromCall(rt, call)
+		slot.arr = getSharedArrayFromCall(rt, call)
 	})
 	return slot.arr
 }
@@ -211,7 +212,7 @@ func (s *sharedArrays) ensureSlot(name string) *sharedArraySlot {
 	return slot
 }
 
-func getShareArrayFromCall(rt *sobek.Runtime, call sobek.Callable) sharedArray {
+func getSharedArrayFromCall(rt *sobek.Runtime, call sobek.Callable) sharedArray {
 	sobekValue, err := call(sobek.Undefined())
 	if err != nil {
 		common.Throw(rt, err)
