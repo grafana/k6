@@ -172,20 +172,6 @@ func (s *sharedArrays) loadOrStore(name string, builder func() sharedArray) shar
 	return slot.arr
 }
 
-// get returns the shared array associated with the given name. If no array exists
-// for that name, it invokes the provided JS callable to create one and stores it.
-//
-// This method is thread-safe. The callable is guaranteed to be invoked at most once
-// for each unique name, even if multiple goroutines call get concurrently with the
-// same name.
-func (s *sharedArrays) get(rt *sobek.Runtime, name string, call sobek.Callable) sharedArray {
-	slot := s.ensureSlot(name)
-	slot.once.Do(func() {
-		slot.arr = getSharedArrayFromCall(rt, call)
-	})
-	return slot.arr
-}
-
 // ensureSlot returns the slot for the given name, creating one if it does not exist.
 //
 // This method uses double-checked locking to minimize contention: it first attempts
