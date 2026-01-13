@@ -286,7 +286,6 @@ func TestSharedArraysLoadOrStoreBuildsOnce(t *testing.T) {
 	var buildsCount atomic.Int32
 	builder := func() sharedArray {
 		buildsCount.Add(1)
-		time.Sleep(5 * time.Millisecond)
 		return sharedArray{arr: []string{"v"}}
 	}
 
