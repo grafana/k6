@@ -85,7 +85,7 @@ require (
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/pprof v0.0.0-20230728192033-2ba5b33183c6 // indirect
-	github.com/grafana/k6-cloud-openapi-client-go v0.0.0-20251103103337-5e94fff86cd6
+	github.com/grafana/k6-cloud-openapi-client-go v0.0.0-20260106090513-285631296b5d
 	github.com/grafana/k6build v0.5.15 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.2 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
