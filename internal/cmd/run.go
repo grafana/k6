@@ -328,6 +328,19 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 			if c.gs.Flags.ProfilingEnabled {
 				logger.Debugf("Profiling exposed on http://%s/debug/pprof/", c.gs.Flags.Address)
 			}
+
+			if c.gs.ServerListener != nil {
+				if aerr := srv.Serve(c.gs.ServerListener); aerr != nil && !errors.Is(aerr, http.ErrServerClosed) {
+					if cmd.Flags().Lookup("address").Changed {
+						logger.WithError(aerr).Error("Error from API server")
+						c.gs.OSExit(int(exitcodes.CannotStartRESTAPI))
+					} else {
+						logger.WithError(aerr).Warn("Error from API server")
+					}
+				}
+				return
+			}
+
 			if aerr := srv.ListenAndServe(); aerr != nil && !errors.Is(aerr, http.ErrServerClosed) {
 				// Only exit k6 if the user has explicitly set the REST API address
 				if cmd.Flags().Lookup("address").Changed {
