@@ -2,7 +2,6 @@ package http
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -105,13 +104,44 @@ func invalidJSONHandler(w http.ResponseWriter, _ *http.Request) {
 	_, _ = w.Write(body)
 }
 
-func TestCheckErrorInJSON_NewlineOffset(t *testing.T) {
-	err := checkErrorInJSON([]byte("a\nb"), 2, errors.New("boom"))
+func TestCheckErrorInJSON_Offsets(t *testing.T) {
+	testCases := []struct {
+		name     string
+		input    string
+		wantLine int
+		wantChar int
+	}{
+		{
+			name:     "invalid-first-byte",
+			input:    "a\nb",
+			wantLine: 1,
+			wantChar: 1,
+		},
+		{
+			name:     "invalid-after-newline",
+			input:    "true\nx",
+			wantLine: 2,
+			wantChar: 1,
+		},
+	}
 
-	var jsonErr jsonError
-	require.ErrorAs(t, err, &jsonErr)
-	assert.Equal(t, 2, jsonErr.line)
-	assert.Equal(t, 1, jsonErr.character)
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			var v interface{}
+			err := json.Unmarshal([]byte(testCase.input), &v)
+			require.Error(t, err)
+
+			var syntaxError *json.SyntaxError
+			require.ErrorAs(t, err, &syntaxError)
+
+			jsonErr := checkErrorInJSON([]byte(testCase.input), int(syntaxError.Offset), err)
+
+			var parsed jsonError
+			require.ErrorAs(t, jsonErr, &parsed)
+			assert.Equal(t, testCase.wantLine, parsed.line)
+			assert.Equal(t, testCase.wantChar, parsed.character)
+		})
+	}
 }
 
 func TestResponse(t *testing.T) {
