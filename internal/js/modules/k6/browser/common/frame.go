@@ -2029,7 +2029,7 @@ func (f *Frame) WaitForLoadState(state string, popts *FrameWaitForLoadStateOptio
 	select {
 	case <-lifecycleEvent:
 	case <-timeoutCtx.Done():
-		return fmt.Errorf("waiting for load state %q: %w", state, timeoutCtx.Err())
+		return fmt.Errorf("waiting for load state %q: %w", state, ContextErr(timeoutCtx))
 	}
 
 	return nil
@@ -2117,7 +2117,7 @@ func (f *Frame) WaitForNavigation(opts *FrameWaitForNavigationOptions, rm RegExM
 			}
 		}
 	case <-timeoutCtx.Done():
-		return nil, handleTimeoutError(timeoutCtx.Err())
+		return nil, handleTimeoutError(ContextErr(timeoutCtx))
 	}
 
 	// A lifecycle event won't be received when navigating within the same
@@ -2127,7 +2127,7 @@ func (f *Frame) WaitForNavigation(opts *FrameWaitForNavigationOptions, rm RegExM
 		select {
 		case <-lifecycleEvtCh:
 		case <-timeoutCtx.Done():
-			return nil, handleTimeoutError(timeoutCtx.Err())
+			return nil, handleTimeoutError(ContextErr(timeoutCtx))
 		}
 	}
 

@@ -109,7 +109,7 @@ func call(
 	select {
 	case <-ctx.Done():
 		err = &k6ext.UserFriendlyError{
-			Err:     ctx.Err(),
+			Err:     ContextErr(ctx),
 			Timeout: timeout,
 		}
 	case result = <-resultCh:

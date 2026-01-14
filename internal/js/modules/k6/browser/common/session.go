@@ -17,15 +17,14 @@ import (
 type Session struct {
 	BaseEventEmitter
 
-	conn     *Connection
-	id       target.SessionID
-	targetID target.ID
-	msgIDGen msgIDGenerator
-	readCh   chan *cdproto.Message
-	done     chan struct{}
-	closed   bool
-	crashed  bool
-	sessionCtx    context.Context
+	conn          *Connection
+	id            target.SessionID
+	targetID      target.ID
+	msgIDGen      msgIDGenerator
+	readCh        chan *cdproto.Message
+	done          chan struct{}
+	closed        bool
+	crashed       bool
 	sessionCancel context.CancelCauseFunc
 
 	logger *log.Logger
@@ -44,7 +43,6 @@ func NewSession(
 		readCh:           make(chan *cdproto.Message),
 		done:             make(chan struct{}),
 		msgIDGen:         msgIDGen,
-		sessionCtx:       sessionCtx,
 		sessionCancel:    sessionCancel,
 
 		logger: logger,
@@ -169,23 +167,7 @@ func (s *Session) Execute(
 		Method:    cdproto.MethodType(method),
 		Params:    buf,
 	}
-	err := s.conn.send(contextWithDoneChan(evCancelCtx, s.done), msg, ch, res)
-	if err != nil {
-		return err
-	}
-
-	select {
-	case <-s.sessionCtx.Done():
-		cause := context.Cause(s.sessionCtx)
-		s.logger.Debugf("Session:Execute", "sid:%v tid:%v method:%q, session context cancelled with cause: %v",
-			s.id, s.targetID, method, cause)
-		if cause != nil {
-			return fmt.Errorf("session context cancelled: %w", cause)
-		}
-		return s.sessionCtx.Err()
-	default:
-		return nil
-	}
+	return s.conn.send(contextWithDoneChan(evCancelCtx, s.done), msg, ch, res)
 }
 
 func (s *Session) ExecuteWithoutExpectationOnReply(

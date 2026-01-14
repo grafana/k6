@@ -483,13 +483,8 @@ func (c *Connection) send(
 		_ = c.close(code)
 		return fmt.Errorf("closing communication with browser: %w", &websocket.CloseError{Code: code})
 	case <-ctx.Done():
-		c.logger.Debugf("Connection:send:<-ctx.Done()", "sid:%v wsURL:%q err:%v",
-			msg.SessionID, c.wsURL, c.ctx.Err())
-		cause := context.Cause(ctx)
-		if cause != nil {
-			return fmt.Errorf("context cancelled while waiting for response: %w", cause)
-		}
-		return ctx.Err()
+		c.logger.Debugf("Connection:send:<-ctx.Done", "wsURL:%q sid:%v err:%v", c.wsURL, msg.SessionID, c.ctx.Err())
+		return ContextErr(ctx)
 	case <-c.done:
 		c.logger.Debugf("Connection:send:<-c.done", "wsURL:%q sid:%v", c.wsURL, msg.SessionID)
 		return nil
@@ -532,15 +527,11 @@ func (c *Connection) send(
 	case <-ctx.Done():
 		c.logger.Debugf("Connection:send:<-ctx.Done()", "sid:%v tid:%v wsURL:%q err:%v",
 			msg.SessionID, tid, c.wsURL, c.ctx.Err())
-		return ctx.Err()
+		return ContextErr(ctx)
 	case <-c.ctx.Done():
-		c.logger.Debugf("Connection:send:<-c.ctx.Done()", "sid:%v tid:%v wsURL:%q err:%v cause:%v",
-			msg.SessionID, tid, c.wsURL, c.ctx.Err(), context.Cause(c.ctx))
-		cause := context.Cause(c.ctx)
-		if cause != nil {
-			return fmt.Errorf("connection context cancelled: %w", cause)
-		}
-		return c.ctx.Err()
+		c.logger.Debugf("Connection:send:<-c.ctx.Done()", "sid:%v tid:%v wsURL:%q err:%v",
+			msg.SessionID, tid, c.wsURL, c.ctx.Err())
+		return ContextErr(c.ctx)
 	}
 	return nil
 }
@@ -572,11 +563,7 @@ func (c *Connection) sendLoop() {
 			c.logger.Debugf("Connection:sendLoop:<-c.done#2", "wsURL:%q", c.wsURL)
 			return
 		case <-c.ctx.Done():
-			cause := context.Cause(c.ctx)
-			c.logger.Debugf("connection:sendLoop", "returning, ctx.Err: %q cause: %v", c.ctx.Err(), cause)
-			if cause != nil {
-				c.logger.Debugf("connection:sendLoop", "context cancelled with cause: %v", cause)
-			}
+			c.logger.Debugf("connection:sendLoop", "returning, ctx.Err: %q", c.ctx.Err())
 			return
 		}
 	}
