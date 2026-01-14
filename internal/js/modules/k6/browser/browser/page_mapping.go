@@ -384,7 +384,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, fmt.Errorf("parsing page go back options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
-				resp, err := p.GoBack(popts)
+				resp, err := p.GoBackForward(-1, popts)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
 				}
@@ -400,7 +400,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, fmt.Errorf("parsing page go forward options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
-				resp, err := p.GoForward(popts)
+				resp, err := p.GoBackForward(+1, popts)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
 				}

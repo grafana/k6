@@ -1490,14 +1490,22 @@ func (p *Page) Reload(opts *PageReloadOptions) (_ *Response, rerr error) { //nol
 	return resp, nil
 }
 
-// GoBack navigates to the previous page in history.
-func (p *Page) GoBack(opts *PageGoBackForwardOptions) (_ *Response, rerr error) {
-	p.logger.Debugf("Page:GoBack", "sid:%v", p.sessionID())
-	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.goBack")
+// GoBackForward navigates through the browser's session history.
+// Use delta = -1 for going back and delta = +1 for going forward.
+func (p *Page) GoBackForward(delta int, opts *PageGoBackForwardOptions) (_ *Response, rerr error) {
+	direction := "back"
+	spanName := "page.goBack"
+	if delta > 0 {
+		direction = "forward"
+		spanName = "page.goForward"
+	}
+
+	p.logger.Debugf("Page:GoBackForward", "sid:%v direction:%s", p.sessionID(), direction)
+	_, span := TraceAPICall(p.ctx, p.targetID.String(), spanName)
 	defer span.End()
 	defer func() {
 		if rerr != nil {
-			rerr = spanRecordErrorf(span, "page going back: %w", rerr)
+			rerr = spanRecordErrorf(span, "page going %s: %w", direction, rerr)
 		}
 	}()
 
@@ -1506,11 +1514,13 @@ func (p *Page) GoBack(opts *PageGoBackForwardOptions) (_ *Response, rerr error) 
 		return nil, err
 	}
 
-	if currentIndex == 0 {
+	targetIndex := currentIndex + int64(delta)
+
+	// Check boundaries
+	if targetIndex < 0 || targetIndex >= int64(len(entries)) {
 		return nil, nil //nolint:nilnil
 	}
 
-	targetIndex := currentIndex - 1
 	historyEntryID := entries[targetIndex].ID
 	targetURL := entries[targetIndex].URL
 
@@ -1529,8 +1539,8 @@ func (p *Page) GoBack(opts *PageGoBackForwardOptions) (_ *Response, rerr error) 
 				Timeout: opts.Timeout,
 			}
 		}
-		p.logger.Debugf("Page:GoBack", "timeoutCtx done: %v", err)
-		return fmt.Errorf("navigating back to history entry %d: %w", historyEntryID, err)
+		p.logger.Debugf("Page:GoBackForward", "timeoutCtx done: %v", err)
+		return fmt.Errorf("navigating %s to history entry %d: %w", direction, historyEntryID, err)
 	}
 
 	// Poll for URL change, don't rely on lifecycle events since bfcache
@@ -1550,81 +1560,10 @@ func (p *Page) GoBack(opts *PageGoBackForwardOptions) (_ *Response, rerr error) 
 				continue
 			}
 			currentURL := mainFrame.URL()
-			p.logger.Debugf("Page:GoBack", "polling: currentURL=%s targetURL=%s", currentURL, targetURL)
+			p.logger.Debugf("Page:GoBackForward", "polling: currentURL=%s targetURL=%s", currentURL, targetURL)
 
 			if currentURL == targetURL {
-				p.logger.Debugf("Page:GoBack", "navigation complete to %s", targetURL)
-				applySlowMo(p.ctx)
-				return nil, nil //nolint:nilnil
-			}
-		}
-	}
-}
-
-// GoForward navigates to the next page in history.
-func (p *Page) GoForward(opts *PageGoBackForwardOptions) (_ *Response, rerr error) {
-	p.logger.Debugf("Page:GoForward", "sid:%v", p.sessionID())
-	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.goForward")
-	defer span.End()
-	defer func() {
-		if rerr != nil {
-			rerr = spanRecordErrorf(span, "page going forward: %w", rerr)
-		}
-	}()
-
-	currentIndex, entries, err := page.GetNavigationHistory().Do(cdp.WithExecutor(p.ctx, p.session))
-	if err != nil {
-		return nil, err
-	}
-
-	if currentIndex >= int64(len(entries))-1 {
-		return nil, nil //nolint:nilnil
-	}
-
-	targetIndex := currentIndex + 1
-	historyEntryID := entries[targetIndex].ID
-	targetURL := entries[targetIndex].URL
-
-	timeoutCtx, timeoutCancelFn := context.WithTimeout(p.ctx, opts.Timeout)
-	defer timeoutCancelFn()
-
-	navAction := page.NavigateToHistoryEntry(historyEntryID)
-	if err := navAction.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-		return nil, fmt.Errorf("navigating to history entry %d: %w", historyEntryID, err)
-	}
-
-	wrapTimeoutError := func(err error) error {
-		if errors.Is(err, context.DeadlineExceeded) {
-			err = &k6ext.UserFriendlyError{
-				Err:     err,
-				Timeout: opts.Timeout,
-			}
-		}
-		p.logger.Debugf("Page:GoForward", "timeoutCtx done: %v", err)
-		return fmt.Errorf("navigating forward to history entry %d: %w", historyEntryID, err)
-	}
-
-	// Poll for URL change, don't rely on lifecycle events since bfcache
-	// restorations don't re-fire them.
-	ticker := time.NewTicker(50 * time.Millisecond)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-p.ctx.Done():
-			return nil, p.ctx.Err()
-		case <-timeoutCtx.Done():
-			return nil, wrapTimeoutError(timeoutCtx.Err())
-		case <-ticker.C:
-			mainFrame := p.frameManager.MainFrame()
-			if mainFrame == nil {
-				continue
-			}
-			currentURL := mainFrame.URL()
-			p.logger.Debugf("Page:GoForward", "polling: currentURL=%s targetURL=%s", currentURL, targetURL)
-
-			if currentURL == targetURL {
-				p.logger.Debugf("Page:GoForward", "navigation complete to %s", targetURL)
+				p.logger.Debugf("Page:GoBackForward", "navigation complete to %s", targetURL)
 				applySlowMo(p.ctx)
 				return nil, nil //nolint:nilnil
 			}
