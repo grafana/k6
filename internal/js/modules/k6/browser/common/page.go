@@ -1485,9 +1485,9 @@ func (p *Page) Reload(opts *PageReloadOptions) (_ *Response, rerr error) { //nol
 	)
 	select {
 	case <-p.ctx.Done():
-		err = p.ctx.Err()
+		err = ContextErr(p.ctx)
 	case <-timeoutCtx.Done():
-		err = wrapTimeoutError(timeoutCtx.Err())
+		err = wrapTimeoutError(ContextErr(timeoutCtx))
 	case event := <-waitForFrameNavigation:
 		var ok bool
 		if navigationEvent, ok = event.(*NavigationEvent); !ok {
@@ -1820,7 +1820,7 @@ func (p *Page) waitForEvent(
 	case r := <-result:
 		return r.event, r.err
 	case <-ctx.Done():
-		return PageEvent{}, ctx.Err()
+		return PageEvent{}, ContextErr(ctx)
 	}
 }
 
