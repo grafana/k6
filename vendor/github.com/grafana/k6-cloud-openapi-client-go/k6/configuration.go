@@ -3,7 +3,7 @@ Grafana Cloud k6
 
 HTTP API for interacting with Grafana Cloud k6.
 
-API version: 1.7.0
+API version: 1.7.1
 Contact: info@grafana.com
 */
 
@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 )
 
 // contextKeys are used to identify the type of value in the context.
@@ -84,6 +85,8 @@ type Configuration struct {
 	Servers          ServerConfigurations
 	OperationServers map[string]ServerConfigurations
 	HTTPClient       *http.Client
+	MaxRetries       int
+	RetryInterval    time.Duration
 }
 
 // NewConfiguration returns a new Configuration object
