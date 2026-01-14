@@ -251,3 +251,116 @@ func TestSharedArrayRaceInInitialization(t *testing.T) {
 		}
 	}
 }
+
+func TestSharedArrayBoundsChecking(t *testing.T) {
+	t.Parallel()
+
+	runtime, err := newConfiguredRuntime(t)
+	require.NoError(t, err)
+
+	_, err = runtime.VU.Runtime().RunString(`
+		var arr = new data.SharedArray("bounds-test", function() { 
+			return [1, 2, 3]; 
+		});
+		
+		if (arr[-1] !== undefined) {
+			throw new Error("Expected undefined for negative index, got " + arr[-1]);
+		}
+		if (arr[100] !== undefined) {
+			throw new Error("Expected undefined for out-of-bounds index, got " + arr[100]);
+		}
+		if (arr[3] !== undefined) {
+			throw new Error("Expected undefined for index === length, got " + arr[3]);
+		}
+	`)
+	require.NoError(t, err)
+}
+
+func TestSharedArrayEmpty(t *testing.T) {
+	t.Parallel()
+
+	runtime, err := newConfiguredRuntime(t)
+	require.NoError(t, err)
+
+	_, err = runtime.VU.Runtime().RunString(`
+		var arr = new data.SharedArray("empty-test", function() { 
+			return []; 
+		});
+		
+		if (arr.length !== 0) {
+			throw new Error("Expected length 0, got " + arr.length);
+		}
+		if (arr[0] !== undefined) {
+			throw new Error("Expected undefined for index 0 on empty array");
+		}
+		
+		var count = 0;
+		for (var v of arr) {
+			count++;
+		}
+		if (count !== 0) {
+			throw new Error("Expected 0 iterations, got " + count);
+		}
+	`)
+	require.NoError(t, err)
+}
+
+func TestSharedArrayDeepFreezeNestedObjects(t *testing.T) {
+	t.Parallel()
+
+	runtime, err := newConfiguredRuntime(t)
+	require.NoError(t, err)
+
+	_, err = runtime.VU.Runtime().RunString(`
+		'use strict';
+		var arr = new data.SharedArray("nested-freeze", function() { 
+			return [{ a: { b: { c: 1 } } }]; 
+		});
+		
+		// Verify nested objects are frozen
+		var item = arr[0];
+		try {
+			item.a.b.c = 2;
+			throw new Error("Expected error when modifying deeply nested property");
+		} catch (e) {
+			if (!e.message.includes("Cannot assign to read only property")) {
+				throw e;
+			}
+		}
+		
+		try {
+			item.a.b.newProp = "test";
+			throw new Error("Expected error when adding property to frozen nested object");
+		} catch (e) {
+			if (!e.message.includes("not extensible")) {
+				throw e;
+			}
+		}
+	`)
+	require.NoError(t, err)
+}
+
+func TestSharedArrayDeepFreezeWithNulls(t *testing.T) {
+	t.Parallel()
+
+	runtime, err := newConfiguredRuntime(t)
+	require.NoError(t, err)
+
+	// This should not panic - null values should be handled gracefully
+	_, err = runtime.VU.Runtime().RunString(`
+		var arr = new data.SharedArray("null-test", function() { 
+			return [null, { a: null }, [null, 1]]; 
+		});
+		
+		if (arr[0] !== null) {
+			throw new Error("Expected null at index 0");
+		}
+		if (arr[1].a !== null) {
+			throw new Error("Expected null for nested property");
+		}
+		if (arr[2][0] !== null) {
+			throw new Error("Expected null in nested array");
+		}
+	`)
+	require.NoError(t, err)
+}
