@@ -48,6 +48,9 @@ const (
 
 	// PageEventResponse represents the page response event.
 	PageEventResponse PageEventName = "response"
+
+	// PageEventRequestFinished represents the page request finished event.
+	PageEventRequestFinished PageEventName = "requestfinished"
 )
 
 // PageEventHandler is a function type that handles a page on event.
@@ -503,6 +506,16 @@ func (p *Page) onResponse(resp *Response) {
 	for handle := range p.eventHandlersByName(PageEventResponse) {
 		if err := handle(PageEvent{Response: resp}); err != nil {
 			p.logger.Warnf("onResponse", "handler returned an error: %v", err)
+			return
+		}
+	}
+}
+
+// onRequestFinished calls [PageEventRequestFinished] handlers when a request completes successfully.
+func (p *Page) onRequestFinished(request *Request) {
+	for handle := range p.eventHandlersByName(PageEventRequestFinished) {
+		if err := handle(PageEvent{Request: request}); err != nil {
+			p.logger.Warnf("onRequestFinished", "handler returned an error: %v", err)
 			return
 		}
 	}
@@ -1849,6 +1862,39 @@ func (p *Page) WaitForRequest(
 		})
 	}
 	return ev.Request, nil
+}
+
+// PageWaitForEventOptions are options for [Page.WaitForEvent].
+type PageWaitForEventOptions struct {
+	// Timeout is the maximum time to wait for the event.
+	Timeout time.Duration
+}
+
+// WaitForEvent waits for the specified event to be emitted.
+func (p *Page) WaitForEvent(
+	eventName PageEventName,
+	opts *PageWaitForEventOptions,
+	fn func(PageEvent) (bool, error),
+) (PageEvent, error) {
+	p.logger.Debugf("Page:WaitForEvent", "sid:%v event:%s", p.sessionID(), eventName)
+	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.waitForEvent")
+	defer span.End()
+
+	ctx, cancel := context.WithTimeout(p.ctx, opts.Timeout)
+	defer cancel()
+
+	// If no predicate is provided, match the first event.
+	if fn == nil {
+		fn = func(PageEvent) (bool, error) { return true, nil }
+	}
+
+	ev, err := p.waitForEvent(ctx, eventName, fn)
+	if err != nil {
+		return PageEvent{}, spanRecordErrorf(span, "waiting for page event %q: %w", eventName, &k6ext.UserFriendlyError{
+			Err: err, Timeout: opts.Timeout,
+		})
+	}
+	return ev, nil
 }
 
 // Workers returns all WebWorkers of page.

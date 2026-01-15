@@ -56,6 +56,18 @@ func Key(key string) string {
 	return key
 }
 
+func Present(key string) bool {
+	if key == "" {
+		return false
+	}
+	if s := strings.IndexByte(key, '{'); s > -1 {
+		if e := strings.IndexByte(key[s+1:], '}'); e > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 func RandomSlot() int {
 	return rand.Intn(slotNumber)
 }
