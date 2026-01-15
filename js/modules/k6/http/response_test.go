@@ -123,11 +123,20 @@ func TestCheckErrorInJSON_Offsets(t *testing.T) {
 			wantLine: 2,
 			wantChar: 1,
 		},
+		{
+			name: "invalid-middle",
+			input: "{\n" +
+				"  \"a\": 1,\n" +
+				"  \"b\": [1, 2, 3,, 4]\n" +
+				"}",
+			wantLine: 3,
+			wantChar: 17,
+		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			var v interface{}
+			var v any
 			err := json.Unmarshal([]byte(testCase.input), &v)
 			require.Error(t, err)
 
