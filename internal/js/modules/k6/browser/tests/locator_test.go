@@ -1525,6 +1525,10 @@ func TestFrameLocator(t *testing.T) {
 
 		err = buttonLocator.Click(common.NewFrameClickOptions(buttonLocator.Timeout()))
 		require.NoError(t, err)
+
+		clicked, err := buttonLocator.Evaluate("el => window.buttonClicked")
+		require.NoError(t, err)
+		assert.True(t, clicked.(bool), "buttonClicked should be true after click")
 	})
 
 	t.Run("frame_frameLocator", func(t *testing.T) {
@@ -1552,6 +1556,10 @@ func TestFrameLocator(t *testing.T) {
 
 		err = buttonLocator.Click(common.NewFrameClickOptions(buttonLocator.Timeout()))
 		require.NoError(t, err)
+
+		clicked, err := buttonLocator.Evaluate("el => window.buttonClicked")
+		require.NoError(t, err)
+		assert.True(t, clicked.(bool), "buttonClicked should be true after click")
 	})
 
 	t.Run("locator_frameLocator", func(t *testing.T) {
@@ -1578,6 +1586,10 @@ func TestFrameLocator(t *testing.T) {
 
 		err = buttonLocator.Click(common.NewFrameClickOptions(buttonLocator.Timeout()))
 		require.NoError(t, err)
+
+		clicked, err := buttonLocator.Evaluate("el => window.buttonClicked")
+		require.NoError(t, err)
+		assert.True(t, clicked.(bool), "buttonClicked should be true after click")
 	})
 
 	t.Run("comparison_with_contentFrame", func(t *testing.T) {

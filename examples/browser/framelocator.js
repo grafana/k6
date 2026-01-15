@@ -2,27 +2,27 @@ import { browser } from 'k6/browser';
 import { check } from 'k6';
 
 export const options = {
-    scenarios: {
-        ui: {
-            executor: 'shared-iterations',
-            options: {
-                browser: {
-                    type: 'chromium',
-                },
-            },
+  scenarios: {
+    ui: {
+      executor: 'shared-iterations',
+      options: {
+        browser: {
+          type: 'chromium',
         },
+      },
     },
-    thresholds: {
-        checks: ["rate==1.0"]
-    }
+  },
+  thresholds: {
+    checks: ["rate==1.0"]
+  }
 }
 
 export default async function () {
-    const page = await browser.newPage();
+  const page = await browser.newPage();
 
-    try {
-        // create a page with an iframe
-        await page.setContent(`
+  try {
+    // create a page with an iframe
+    await page.setContent(`
       <html>
         <body>
           <h1>Main Page</h1>
@@ -38,33 +38,34 @@ export default async function () {
       </html>
     `);
 
-        /*
-        The frameLocator() method is equivalent to locator(selector).contentFrame()
-    
-        OLD WAY:
-          const frame = page.locator('#my-iframe').contentFrame();
-          const button = frame.locator('#submit-btn');
-    
-        NEW WAY:
-          const button = page.frameLocator('#my-iframe').locator('#submit-btn');
-        */
+    /*
+    The frameLocator() method is a shorthand for locator(selector).contentFrame().
+    Both approaches are equivalent:
 
-        const button = page.frameLocator('#my-iframe').locator('#submit-btn');
-        const buttonText = await button.textContent();
-        console.log(`Button text: ${buttonText}`);
+      // Using frameLocator():
+      const button = page.frameLocator('#my-iframe').locator('#submit-btn');
 
-        check(buttonText, {
-            'found button inside iframe': (text) => text === 'Submit',
-        });
+      // Using locator().contentFrame():
+      const frame = page.locator('#my-iframe').contentFrame();
+      const button = frame.locator('#submit-btn');
+    */
 
-        const heading = await page.frameLocator('#my-iframe').getByRole('heading').textContent();
-        console.log(`Heading inside iframe: ${heading}`);
+    const button = page.frameLocator('#my-iframe').locator('#submit-btn');
+    const buttonText = await button.textContent();
+    console.log(`Button text: ${buttonText}`);
 
-        check(heading, {
-            'found heading inside iframe': (text) => text === 'Inside iframe',
-        });
+    check(buttonText, {
+      'found button inside iframe': (text) => text === 'Submit',
+    });
 
-    } finally {
-        await page.close();
-    }
+    const heading = await page.frameLocator('#my-iframe').getByRole('heading').textContent();
+    console.log(`Heading inside iframe: ${heading}`);
+
+    check(heading, {
+      'found heading inside iframe': (text) => text === 'Inside iframe',
+    });
+
+  } finally {
+    await page.close();
+  }
 }
