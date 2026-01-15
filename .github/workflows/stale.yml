@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Run stale action
-        uses: actions/stale@v4
+        uses: actions/stale@v10
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           operations-per-run: 50
