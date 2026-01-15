@@ -4,6 +4,7 @@ package promises
 import (
 	"github.com/grafana/sobek"
 
+	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 )
 
@@ -40,6 +41,9 @@ func New(vu modules.VU) (p *sobek.Promise, resolve func(result any), reject func
 
 	reject = func(reason any) {
 		callback(func() error {
+			if jsErr, ok := reason.(common.JSException); ok {
+				return rejectFunc(jsErr.JSValue(vu.Runtime()))
+			}
 			return rejectFunc(reason)
 		})
 	}
