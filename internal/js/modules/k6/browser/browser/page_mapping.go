@@ -645,6 +645,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 					return mapRequestEvent(vu, pe), nil
 				case common.PageEventResponse:
 					return mapResponseEvent(vu, pe), nil
+				case common.PageEventRequestFailed:
+					return mapRequestEvent(vu, pe), nil
 				case common.PageEventMetric:
 					// intentionally left blank
 				}
