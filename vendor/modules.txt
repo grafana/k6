@@ -179,7 +179,7 @@ github.com/google/uuid
 # github.com/gorilla/websocket v1.5.3
 ## explicit; go 1.12
 github.com/gorilla/websocket
-# github.com/grafana/k6-cloud-openapi-client-go v0.0.0-20251103103337-5e94fff86cd6
+# github.com/grafana/k6-cloud-openapi-client-go v0.0.0-20260106090513-285631296b5d
 ## explicit; go 1.23.4
 github.com/grafana/k6-cloud-openapi-client-go/k6
 # github.com/grafana/k6build v0.5.15
@@ -261,7 +261,7 @@ github.com/mattn/go-colorable
 # github.com/mattn/go-isatty v0.0.20
 ## explicit; go 1.15
 github.com/mattn/go-isatty
-# github.com/mccutchen/go-httpbin/v2 v2.18.3
+# github.com/mccutchen/go-httpbin/v2 v2.20.0
 ## explicit; go 1.22.0
 github.com/mccutchen/go-httpbin/v2/httpbin
 github.com/mccutchen/go-httpbin/v2/httpbin/digest
@@ -454,7 +454,7 @@ go.uber.org/goleak/internal/stack
 # go.yaml.in/yaml/v2 v2.4.2
 ## explicit; go 1.15
 go.yaml.in/yaml/v2
-# golang.org/x/crypto v0.45.0
+# golang.org/x/crypto v0.46.0
 ## explicit; go 1.24.0
 golang.org/x/crypto/md4
 golang.org/x/crypto/ocsp
@@ -463,7 +463,7 @@ golang.org/x/crypto/ripemd160
 ## explicit; go 1.24.0
 golang.org/x/crypto/x509roots/fallback
 golang.org/x/crypto/x509roots/fallback/bundle
-# golang.org/x/net v0.47.0
+# golang.org/x/net v0.48.0
 ## explicit; go 1.24.0
 golang.org/x/net/context
 golang.org/x/net/html
@@ -475,20 +475,20 @@ golang.org/x/net/idna
 golang.org/x/net/internal/httpcommon
 golang.org/x/net/internal/timeseries
 golang.org/x/net/trace
-# golang.org/x/sync v0.18.0
+# golang.org/x/sync v0.19.0
 ## explicit; go 1.24.0
 golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore
-# golang.org/x/sys v0.38.0
+# golang.org/x/sys v0.40.0
 ## explicit; go 1.24.0
 golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
-# golang.org/x/term v0.37.0
+# golang.org/x/term v0.39.0
 ## explicit; go 1.24.0
 golang.org/x/term
-# golang.org/x/text v0.31.0
+# golang.org/x/text v0.32.0
 ## explicit; go 1.24.0
 golang.org/x/text/cases
 golang.org/x/text/collate

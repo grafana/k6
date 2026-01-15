@@ -645,6 +645,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 					return mapRequestEvent(vu, pe), nil
 				case common.PageEventResponse:
 					return mapResponseEvent(vu, pe), nil
+				case common.PageEventRequestFinished:
+					return mapRequestEvent(vu, pe), nil
 				case common.PageEventRequestFailed:
 					return mapRequestEvent(vu, pe), nil
 				case common.PageEventMetric:
@@ -740,11 +742,12 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageEventName, sobek.Cal
 			mapp func(vu moduleVU, event common.PageEvent) mapping
 			wait bool // Whether to wait for the handler to complete.
 		}{
-			common.PageEventConsole:       {mapp: mapConsoleMessage},
-			common.PageEventMetric:        {mapp: mapMetricEvent, wait: true},
-			common.PageEventRequest:       {mapp: mapRequestEvent},
-			common.PageEventResponse:      {mapp: mapResponseEvent},
-			common.PageEventRequestFailed: {mapp: mapRequestEvent},
+			common.PageEventConsole:         {mapp: mapConsoleMessage},
+			common.PageEventMetric:          {mapp: mapMetricEvent, wait: true},
+			common.PageEventRequest:         {mapp: mapRequestEvent},
+			common.PageEventResponse:        {mapp: mapResponseEvent},
+			common.PageEventRequestFinished: {mapp: mapRequestEvent},
+			common.PageEventRequestFailed:   {mapp: mapRequestEvent},
 		}
 		pageEvent, ok := pageEvents[eventName]
 		if !ok {

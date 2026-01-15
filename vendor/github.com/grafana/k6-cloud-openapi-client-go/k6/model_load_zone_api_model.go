@@ -3,7 +3,7 @@ Grafana Cloud k6
 
 HTTP API for interacting with Grafana Cloud k6.
 
-API version: 1.7.0
+API version: 1.7.1
 Contact: info@grafana.com
 */
 

@@ -49,6 +49,7 @@ type eventInterceptor interface {
 	urlTagName(urlTag string, method string) (string, bool)
 	onRequest(request *Request)
 	onResponse(response *Response)
+	onRequestFinished(request *Request)
 	onRequestFailed(request *Request)
 }
 
@@ -438,6 +439,7 @@ func (m *NetworkManager) onLoadingFinished(event *network.EventLoadingFinished) 
 	req.responseEndTiming = float64(event.Timestamp.Time().Unix()-req.timestamp.Unix()) * 1000
 	m.deleteRequestByID(event.RequestID)
 	m.frameManager.requestFinished(req)
+	m.eventInterceptor.onRequestFinished(req)
 
 	// Skip data and blob URLs when emitting metrics, since they're internal to the browser.
 	if isInternalURL(req.url) {
