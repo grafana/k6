@@ -90,7 +90,6 @@ func NewConfig() Config {
 	return Config{
 		ServerURL:             null.StringFrom(defaultServerURL),
 		InsecureSkipTLSVerify: null.BoolFrom(false),
-		MinTLSVersion:         null.NewString("", false),
 		Username:              null.NewString("", false),
 		Password:              null.NewString("", false),
 		PushInterval:          types.NullDurationFrom(defaultPushInterval),
@@ -118,11 +117,8 @@ func (conf Config) RemoteConfig() (*remote.HTTPConfig, error) {
 	}
 
 	minTLSVersion := uint16(tls.VersionTLS13)
-	if conf.MinTLSVersion.Valid {
-		switch conf.MinTLSVersion.String {
-		case "1.2":
-			minTLSVersion = tls.VersionTLS12
-		}
+	if conf.MinTLSVersion.Valid && conf.MinTLSVersion.String == "1.2" {
+		minTLSVersion = tls.VersionTLS12
 	}
 
 	hc.TLSConfig = &tls.Config{
