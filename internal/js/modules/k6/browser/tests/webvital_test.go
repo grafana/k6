@@ -93,6 +93,10 @@ func TestWebVitalMetric(t *testing.T) {
 func TestWebVitalMetricNoInteraction(t *testing.T) {
 	t.Parallel()
 
+	if runtime.GOOS == "windows" {
+		t.Skip("skipped due to never being able to collect all metrics")
+	}
+
 	var (
 		samples  = make(chan k6metrics.SampleContainer)
 		browser  = newTestBrowser(t, withFileServer(), withSamples(samples))
