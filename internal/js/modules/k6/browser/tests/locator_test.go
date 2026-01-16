@@ -1497,3 +1497,127 @@ func TestLocatorEvaluateHandle(t *testing.T) {
 		})
 	}
 }
+
+func TestFrameLocator(t *testing.T) {
+	t.Parallel()
+
+	t.Run("page_frameLocator", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withFileServer())
+		p := tb.NewPage(nil)
+
+		opts := &common.FrameGotoOptions{
+			Timeout: common.DefaultTimeout,
+		}
+		_, err := p.Goto(tb.staticURL("iframe_test_main.html"), opts)
+		require.NoError(t, err)
+
+		// Test the new frameLocator() method on Page
+		fl := p.FrameLocator("#iframe1")
+		require.NotNil(t, fl)
+
+		nestedFL := fl.FrameLocator("#iframe2")
+		require.NotNil(t, nestedFL)
+
+		buttonLocator := nestedFL.Locator("#button1", nil)
+		require.NotNil(t, buttonLocator)
+
+		err = buttonLocator.Click(common.NewFrameClickOptions(buttonLocator.Timeout()))
+		require.NoError(t, err)
+
+		clicked, err := buttonLocator.Evaluate("el => window.buttonClicked")
+		require.NoError(t, err)
+		assert.True(t, clicked.(bool), "buttonClicked should be true after click")
+	})
+
+	t.Run("frame_frameLocator", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withFileServer())
+		p := tb.NewPage(nil)
+
+		opts := &common.FrameGotoOptions{
+			Timeout: common.DefaultTimeout,
+		}
+		_, err := p.Goto(tb.staticURL("iframe_test_main.html"), opts)
+		require.NoError(t, err)
+
+		// Test the new frameLocator() method on Frame
+		mainFrame := p.MainFrame()
+		fl := mainFrame.FrameLocator("#iframe1")
+		require.NotNil(t, fl)
+
+		nestedFL := fl.FrameLocator("#iframe2")
+		require.NotNil(t, nestedFL)
+
+		buttonLocator := nestedFL.Locator("#button1", nil)
+		require.NotNil(t, buttonLocator)
+
+		err = buttonLocator.Click(common.NewFrameClickOptions(buttonLocator.Timeout()))
+		require.NoError(t, err)
+
+		clicked, err := buttonLocator.Evaluate("el => window.buttonClicked")
+		require.NoError(t, err)
+		assert.True(t, clicked.(bool), "buttonClicked should be true after click")
+	})
+
+	t.Run("locator_frameLocator", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withFileServer())
+		p := tb.NewPage(nil)
+
+		opts := &common.FrameGotoOptions{
+			Timeout: common.DefaultTimeout,
+		}
+		_, err := p.Goto(tb.staticURL("iframe_test_main.html"), opts)
+		require.NoError(t, err)
+
+		bodyLocator := p.Locator("body", nil)
+		fl := bodyLocator.FrameLocator("#iframe1")
+		require.NotNil(t, fl)
+
+		nestedFL := fl.FrameLocator("#iframe2")
+		require.NotNil(t, nestedFL)
+
+		buttonLocator := nestedFL.Locator("#button1", nil)
+		require.NotNil(t, buttonLocator)
+
+		err = buttonLocator.Click(common.NewFrameClickOptions(buttonLocator.Timeout()))
+		require.NoError(t, err)
+
+		clicked, err := buttonLocator.Evaluate("el => window.buttonClicked")
+		require.NoError(t, err)
+		assert.True(t, clicked.(bool), "buttonClicked should be true after click")
+	})
+
+	t.Run("comparison_with_contentFrame", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withFileServer())
+		p := tb.NewPage(nil)
+
+		opts := &common.FrameGotoOptions{
+			Timeout: common.DefaultTimeout,
+		}
+		_, err := p.Goto(tb.staticURL("iframe_test_main.html"), opts)
+		require.NoError(t, err)
+
+		// compare old and new
+		oldWay := p.Locator("#iframe1", nil).ContentFrame()
+		require.NotNil(t, oldWay)
+
+		newWay := p.FrameLocator("#iframe1")
+		require.NotNil(t, newWay)
+
+		oldNested := oldWay.FrameLocator("#iframe2")
+		newNested := newWay.FrameLocator("#iframe2")
+
+		oldButton := oldNested.Locator("#button1", nil)
+		newButton := newNested.Locator("#button1", nil)
+
+		require.NotNil(t, oldButton)
+		require.NotNil(t, newButton)
+	})
+}

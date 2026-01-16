@@ -342,6 +342,10 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			ml := mapLocator(vu, p.Locator(selector, parseLocatorOptions(rt, opts)))
 			return rt.ToValue(ml).ToObject(rt)
 		},
+		"frameLocator": func(selector string) *sobek.Object {
+			mfl := mapFrameLocator(vu, p.FrameLocator(selector))
+			return rt.ToValue(mfl).ToObject(rt)
+		},
 		"mainFrame": func() *sobek.Object {
 			mf := mapFrame(vu, p.MainFrame())
 			return rt.ToValue(mf).ToObject(rt)

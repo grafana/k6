@@ -311,6 +311,10 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 		"locator": func(selector string, opts sobek.Value) mapping {
 			return mapLocator(vu, f.Locator(selector, parseLocatorOptions(rt, opts)))
 		},
+		"frameLocator": func(selector string) *sobek.Object {
+			mfl := mapFrameLocator(vu, f.FrameLocator(selector))
+			return rt.ToValue(mfl).ToObject(rt)
+		},
 		"name": f.Name,
 		"page": func() mapping {
 			return mapPage(vu, f.Page())
