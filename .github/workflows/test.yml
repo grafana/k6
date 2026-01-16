@@ -19,7 +19,7 @@ jobs:
       fail-fast: false
       matrix:
         go-version: [1.24.x]
-        platform: [ubuntu-22.04, ubuntu-24.04-arm, windows-latest]
+        platform: [ubuntu-22.04, ubuntu-arm64-large, github-hosted-windows-x64-large]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout code
@@ -46,23 +46,20 @@ jobs:
         run: |
           set -x
           go version
-          export GOMAXPROCS=2
-          args=("-p" "2" "-race")
-          # Run with less concurrency on Windows/ARM to minimize flakiness.
-          if [[ "${{ matrix.platform }}" == windows* || "${{ matrix.platform }}" == *arm ]]; then
-            args[1]="1"
-            export GOMAXPROCS=1
-            if [[ "${{ matrix.platform }}" == windows* ]]; then
-              unset args[2]
-            fi
-          fi
-          go test "${args[@]}" -timeout 800s ./...
+          export GOMAXPROCS=1
+          go test -p 1 -timeout 800s ./...
 
   test-tip:
     strategy:
       fail-fast: false
       matrix:
-        platform: [ubuntu-22.04, ubuntu-24.04-arm, windows-latest]
+        include:
+        - platform: ubuntu-22.04
+          gotip_tag: ubuntu-22.04
+        - platform: ubuntu-arm64-large
+          gotip_tag: ubuntu-24.04-arm
+        - platform: github-hosted-windows-x64-large
+          gotip_tag: windows-latest
     runs-on: ${{ matrix.platform }}
     continue-on-error: true
     steps:
@@ -74,7 +71,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release download ${{ matrix.platform }} --repo grafana/gotip --pattern 'go.zip'
+          gh release download ${{ matrix.gotip_tag }} --repo grafana/gotip --pattern 'go.zip'
       - name: Install Go tip
         run: |
           unzip go.zip -d $HOME/sdk
@@ -91,26 +88,16 @@ jobs:
       - name: Run tests
         run: |
           set -x
-          which go
           go version
-          export GOMAXPROCS=2
-          args=("-p" "2" "-race")
-          # Run with less concurrency on Windows/ARM to minimize flakiness.
-          if [[ "${{ matrix.platform }}" == windows* || "${{ matrix.platform }}" == *arm ]]; then
-            args[1]="1"
-            export GOMAXPROCS=1
-            if [[ "${{ matrix.platform }}" == windows* ]]; then
-              unset args[2]
-            fi
-          fi
-          go test "${args[@]}" -timeout 800s ./...
+          export GOMAXPROCS=1
+          go test -p 1 -timeout 800s ./...
 
   test-latest:
     strategy:
       fail-fast: false
       matrix:
         go-version: [1.25.x]
-        platform: [ubuntu-22.04, ubuntu-24.04-arm, windows-latest]
+        platform: [ubuntu-22.04, ubuntu-arm64-large, github-hosted-windows-x64-large]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout code
@@ -132,14 +119,5 @@ jobs:
         run: |
           set -x
           go version
-          export GOMAXPROCS=2
-          args=("-p" "2" "-race")
-          # Run with less concurrency on Windows/ARM to minimize flakiness.
-          if [[ "${{ matrix.platform }}" == windows* || "${{ matrix.platform }}" == *arm ]]; then
-            args[1]="1"
-            export GOMAXPROCS=1
-            if [[ "${{ matrix.platform }}" == windows* ]]; then
-              unset args[2]
-            fi
-          fi
-          go test "${args[@]}" -timeout 800s ./...
+          export GOMAXPROCS=1
+          go test -p 1 -timeout 800s ./...
