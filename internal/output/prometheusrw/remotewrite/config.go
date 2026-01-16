@@ -118,11 +118,8 @@ func (conf Config) RemoteConfig() (*remote.HTTPConfig, error) {
 	}
 
 	minTLSVersion := uint16(tls.VersionTLS13)
-	if conf.MinTLSVersion.Valid {
-		switch conf.MinTLSVersion.String {
-		case "1.2":
-			minTLSVersion = tls.VersionTLS12
-		}
+	if conf.MinTLSVersion.Valid && conf.MinTLSVersion.String == "1.2" {
+		minTLSVersion = tls.VersionTLS12
 	}
 
 	hc.TLSConfig = &tls.Config{
