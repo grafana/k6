@@ -50,6 +50,7 @@ type eventInterceptor interface {
 	onRequest(request *Request)
 	onResponse(response *Response)
 	onRequestFinished(request *Request)
+	onRequestFailed(request *Request)
 }
 
 // NetworkManager manages all frames in HTML document.
@@ -423,6 +424,7 @@ func (m *NetworkManager) onLoadingFailed(event *network.EventLoadingFailed) {
 
 	req.setErrorText(event.ErrorText)
 	req.responseEndTiming = float64(event.Timestamp.Time().Unix()-req.timestamp.Unix()) * 1000
+	m.eventInterceptor.onRequestFailed(req)
 	m.deleteRequestByID(event.RequestID)
 	m.frameManager.requestFailed(req, event.Canceled)
 }

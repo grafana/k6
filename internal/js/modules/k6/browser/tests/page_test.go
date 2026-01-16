@@ -1068,6 +1068,13 @@ func TestPageOn(t *testing.T) {
 		"valid on('response') handler": {
 			fun: `page.on('response', () => {})`,
 		},
+		"nil on('requestfailed') handler": {
+			fun:     `page.on('requestfailed')`,
+			wantErr: `TypeError: The "listener" argument must be a function`,
+		},
+		"valid on('requestfailed') handler": {
+			fun: `page.on('requestfailed', () => {})`,
+		},
 	}
 
 	for name, tt := range tests {
@@ -2916,6 +2923,131 @@ func TestPageOnRequestFinished(t *testing.T) {
 	assert.True(t, foundHome, "expected to find /home request in finished requests")
 	assert.True(t, foundAPI, "expected to find /api request in finished requests")
 	assert.True(t, foundCSS, "expected to find /style.css request in finished requests")
+}
+
+// TestPageOnRequestFailed tests that the requestfailed event fires when requests fail.
+func TestPageOnRequestFailed(t *testing.T) {
+	t.Parallel()
+
+	t.Run("server_aborted_request", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withHTTPServer())
+
+		tb.withHandler("/home", func(w http.ResponseWriter, _ *http.Request) {
+			_, err := fmt.Fprintf(w, `<!DOCTYPE html>
+<html>
+<body>
+    <h1>Test Page</h1>
+    <script>
+        fetch('/api/data')
+            .then(() => { window.fetchResult = 'success'; })
+            .catch(() => { window.fetchResult = 'failed'; });
+    </script>
+</body>
+</html>`)
+			require.NoError(t, err)
+		})
+
+		tb.withHandler("/api/data", func(w http.ResponseWriter, _ *http.Request) {
+			panic(http.ErrAbortHandler)
+		})
+
+		p := tb.NewPage(nil)
+
+		var failedRequests []map[string]string
+		err := p.On(common.PageEventRequestFailed, func(ev common.PageEvent) error {
+			req := ev.Request
+			failure := req.Failure()
+			errorText := ""
+			if failure != nil {
+				errorText = failure.ErrorText
+			}
+			failedRequests = append(failedRequests, map[string]string{
+				"url":          req.URL(),
+				"method":       req.Method(),
+				"resourceType": req.ResourceType(),
+				"errorText":    errorText,
+			})
+			return nil
+		})
+		require.NoError(t, err)
+
+		opts := &common.FrameGotoOptions{
+			WaitUntil: common.LifecycleEventNetworkIdle,
+			Timeout:   common.DefaultTimeout,
+		}
+		_, err = p.Goto(tb.url("/home"), opts)
+		require.NoError(t, err)
+
+		require.Len(t, failedRequests, 1, "expected exactly one failed request")
+
+		failedReq := failedRequests[0]
+		assert.Contains(t, failedReq["url"], "/api/data", "failed request URL should contain /api/data")
+		assert.Equal(t, "GET", failedReq["method"], "failed request method should be GET")
+		assert.Equal(t, "Fetch", failedReq["resourceType"], "failed request resourceType should be Fetch")
+		assert.NotEmpty(t, failedReq["errorText"], "failed request should have error text")
+	})
+
+	t.Run("server_aborted_multiple_requests", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withHTTPServer())
+
+		tb.withHandler("/home", func(w http.ResponseWriter, _ *http.Request) {
+			_, err := fmt.Fprintf(w, `<!DOCTYPE html>
+<html>
+<body>
+    <script>
+        Promise.allSettled([
+            fetch('/api/first'),
+            fetch('/api/second')
+        ]).then(() => { window.allDone = true; });
+    </script>
+</body>
+</html>`)
+			require.NoError(t, err)
+		})
+
+		tb.withHandler("/api/first", func(w http.ResponseWriter, _ *http.Request) {
+			panic(http.ErrAbortHandler)
+		})
+
+		tb.withHandler("/api/second", func(w http.ResponseWriter, _ *http.Request) {
+			panic(http.ErrAbortHandler)
+		})
+
+		p := tb.NewPage(nil)
+
+		var failedRequests []string
+		err := p.On(common.PageEventRequestFailed, func(ev common.PageEvent) error {
+			failedRequests = append(failedRequests, ev.Request.URL())
+			return nil
+		})
+		require.NoError(t, err)
+
+		opts := &common.FrameGotoOptions{
+			WaitUntil: common.LifecycleEventNetworkIdle,
+			Timeout:   common.DefaultTimeout,
+		}
+		_, err = p.Goto(tb.url("/home"), opts)
+		require.NoError(t, err)
+
+		// Verify that both requests failed
+		require.Len(t, failedRequests, 2, "expected two failed requests")
+
+		var hasFirst, hasSecond bool
+		for _, url := range failedRequests {
+			if strings.Contains(url, "/api/first") {
+				hasFirst = true
+			}
+			if strings.Contains(url, "/api/second") {
+				hasSecond = true
+			}
+		}
+		assert.True(t, hasFirst, "expected /api/first to be in failed requests")
+		assert.True(t, hasSecond, "expected /api/second to be in failed requests")
+	})
 }
 
 func TestPageMustUseNativeJavaScriptObjects(t *testing.T) {
