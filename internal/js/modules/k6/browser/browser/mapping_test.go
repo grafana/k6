@@ -520,6 +520,7 @@ type frameLocatorAPI interface {
 // requestAPI is the interface of an HTTP request.
 type requestAPI interface { //nolint:interfacebloat
 	AllHeaders() map[string]string
+	Failure() *common.RequestFailure
 	Frame() *common.Frame
 	HeaderValue(string) sobek.Value
 	Headers() map[string]string
