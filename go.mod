@@ -5,7 +5,7 @@ go 1.24.0
 toolchain go1.24.11
 
 require (
-	buf.build/gen/go/prometheus/prometheus/protocolbuffers/go v1.36.10-20251118093737-4105057cc7d4.1
+	buf.build/gen/go/prometheus/prometheus/protocolbuffers/go v1.36.11-20251118093737-4105057cc7d4.1
 	github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/PuerkitoBio/goquery v1.11.0
@@ -61,7 +61,7 @@ require (
 	golang.org/x/term v0.39.0
 	golang.org/x/time v0.14.0
 	google.golang.org/grpc v1.77.0
-	google.golang.org/protobuf v1.36.10
+	google.golang.org/protobuf v1.36.11
 	gopkg.in/guregu/null.v3 v3.3.0
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -73,7 +73,7 @@ require (
 )
 
 require (
-	buf.build/gen/go/gogo/protobuf/protocolbuffers/go v1.36.10-20240617172848-e1dbca2775a7.1 // indirect
+	buf.build/gen/go/gogo/protobuf/protocolbuffers/go v1.36.11-20240617172848-e1dbca2775a7.1 // indirect
 	github.com/andybalholm/cascadia v1.3.3 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
