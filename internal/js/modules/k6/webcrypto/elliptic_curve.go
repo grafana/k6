@@ -59,6 +59,7 @@ var _ KeyImporter = &EcKeyImportParams{}
 func (e *EcKeyImportParams) ImportKey(
 	format KeyFormat,
 	keyData []byte,
+	_ bool,
 	_ []CryptoKeyUsage,
 ) (*CryptoKey, error) {
 	var importFn func(curve EllipticCurveKind, keyData []byte) (any, CryptoKeyType, error)
@@ -485,17 +486,90 @@ func extractPublicKeyBytes(alg string, handle any) ([]byte, error) {
 	return nil, errors.New("unsupported algorithm " + alg)
 }
 
-func deriveBitsECDH(privateKey CryptoKey, publicKey CryptoKey) ([]byte, error) {
+// ECDHKeyDeriveParams represents the object that should be passed as the algorithm parameter
+// into `SubtleCrypto.DeriveBits` or `SubtleCrypto.DeriveKey` when generating any elliptic-curve-based
+// key: that is, when the algorithm is identified as ECDH.
+type ECDHKeyDeriveParams struct {
+	Algorithm
+	Public *CryptoKey
+}
+
+var _ BitsDeriver = &ECDHKeyDeriveParams{}
+
+func newECDHKeyDeriveParams(rt *sobek.Runtime, normalized Algorithm, params sobek.Value) (*ECDHKeyDeriveParams, error) {
+	var publicKey *CryptoKey
+
+	pcValue, err := traverseObject(rt, params, "public")
+	if err != nil {
+		return nil, NewError(TypeError, "algorithm does not contain a public key")
+	}
+	if err := rt.ExportTo(pcValue, &publicKey); err != nil {
+		return nil, NewError(TypeError, "algorithm's public is not a valid CryptoKey: "+err.Error())
+	}
+	if err := publicKey.Validate(); err != nil {
+		return nil, NewError(TypeError, "algorithm's public key is not a valid CryptoKey: "+err.Error())
+	}
+
+	if publicKey.Type != PublicCryptoKeyType {
+		return nil, NewError(InvalidAccessError, "algorithm's public key is not a public key")
+	}
+
+	keyAlgorithmNameValue, err := traverseObject(rt, pcValue, "algorithm", "name")
+	if err != nil {
+		return nil, err
+	}
+
+	if normalized.Name != keyAlgorithmNameValue.String() {
+		return nil, NewError(
+			InvalidAccessError,
+			"algorithm name does not match public key's algorithm name: "+
+				normalized.Name+" != "+keyAlgorithmNameValue.String(),
+		)
+	}
+
+	return &ECDHKeyDeriveParams{
+		Algorithm: normalized,
+		Public:    publicKey,
+	}, nil
+}
+
+// DeriveBits represents the EC function that derives the key as bits from EC params
+func (keyParams ECDHKeyDeriveParams) DeriveBits(privateKey *CryptoKey, length int) ([]byte, error) {
+	if err := privateKey.Validate(); err != nil {
+		return nil, NewError(InvalidAccessError, "provided baseKey is not a valid CryptoKey: "+err.Error())
+	}
+
+	if privateKey.Type != PrivateCryptoKeyType {
+		return nil, NewError(InvalidAccessError, fmt.Sprintf("provided baseKey is not a private key: %v", privateKey))
+	}
+
+	if !privateKey.ContainsUsage(DeriveBitsCryptoKeyUsage) {
+		return nil, NewError(InvalidAccessError, "provided baseKey does not contain the 'deriveBits' usage")
+	}
+
+	if err := ensureKeysUseSameCurve(*privateKey, *keyParams.Public); err != nil {
+		return nil, NewError(InvalidAccessError, err.Error())
+	}
+
 	pk, ok := privateKey.handle.(*ecdh.PrivateKey)
 	if !ok {
 		return nil, NewError(InvalidAccessError, "key is not a valid ECDH private key")
 	}
-	pc, ok := publicKey.handle.(*ecdh.PublicKey)
+	pc, ok := keyParams.Public.handle.(*ecdh.PublicKey)
 	if !ok {
 		return nil, NewError(InvalidAccessError, "key is not a valid ECDH public key")
 	}
 
-	return pk.ECDH(pc)
+	b, err := pk.ECDH(pc)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(b) < length/8 {
+		return nil, NewError(OperationError, "length is too large")
+	}
+
+	return b[:length/8], nil
 }
 
 // The ECDSAParams represents the object that should be passed as the algorithm

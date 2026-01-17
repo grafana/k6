@@ -1,0 +1,32 @@
+name: Close stale PRs
+
+on:
+  schedule:
+    - cron: "0 8 * * 1" # once per week, at 08:00 on Mondays
+
+permissions:
+  pull-requests: write
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run stale action
+        uses: actions/stale@v10
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          operations-per-run: 50
+          ascending: true # process oldest PRs first
+
+          days-before-pr-stale: 61
+          days-before-pr-close: 7
+
+          stale-pr-label: stale
+          exempt-pr-labels: "wip"
+
+          stale-pr-message: |
+            This pull request has been automatically marked as stale because it has not had
+            activity in the last two months. It will be closed in one week if no further activity occurs. Please
+            feel free to give a status update or ping for review. Thank you for your contributions!
+          close-pr-message: |
+            Closing this pull request due to two months of inactivity after being marked stale. Thank you for your contributions!

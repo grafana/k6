@@ -48,6 +48,12 @@ const (
 
 	// PageEventResponse represents the page response event.
 	PageEventResponse PageEventName = "response"
+
+	// PageEventRequestFinished represents the page request finished event.
+	PageEventRequestFinished PageEventName = "requestfinished"
+
+	// PageEventRequestFailed represents the page requestfailed event.
+	PageEventRequestFailed PageEventName = "requestfailed"
 )
 
 // PageEventHandler is a function type that handles a page on event.
@@ -504,6 +510,25 @@ func (p *Page) onResponse(resp *Response) {
 		if err := handle(PageEvent{Response: resp}); err != nil {
 			p.logger.Warnf("onResponse", "handler returned an error: %v", err)
 			return
+		}
+	}
+}
+
+// onRequestFinished calls [PageEventRequestFinished] handlers when a request completes successfully.
+func (p *Page) onRequestFinished(request *Request) {
+	for handle := range p.eventHandlersByName(PageEventRequestFinished) {
+		if err := handle(PageEvent{Request: request}); err != nil {
+			p.logger.Warnf("onRequestFinished", "handler returned an error: %v", err)
+			return
+		}
+	}
+}
+
+// onRequestFailed will call the handlers for the page.on('requestfailed') event.
+func (p *Page) onRequestFailed(request *Request) {
+	for handle := range p.eventHandlersByName(PageEventRequestFailed) {
+		if err := handle(PageEvent{Request: request}); err != nil {
+			p.logger.Warnf("onRequestFailed", "handler returned an error: %v", err)
 		}
 	}
 }
