@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/cdp"
@@ -16,14 +17,15 @@ import (
 type Session struct {
 	BaseEventEmitter
 
-	conn     *Connection
-	id       target.SessionID
-	targetID target.ID
-	msgIDGen msgIDGenerator
-	readCh   chan *cdproto.Message
-	done     chan struct{}
-	closed   bool
-	crashed  bool
+	conn          *Connection
+	id            target.SessionID
+	targetID      target.ID
+	msgIDGen      msgIDGenerator
+	readCh        chan *cdproto.Message
+	done          chan struct{}
+	closed        bool
+	crashed       bool
+	sessionCancel context.CancelCauseFunc
 
 	logger *log.Logger
 }
@@ -32,14 +34,16 @@ type Session struct {
 func NewSession(
 	ctx context.Context, conn *Connection, id target.SessionID, tid target.ID, logger *log.Logger, msgIDGen msgIDGenerator,
 ) *Session {
+	sessionCtx, sessionCancel := context.WithCancelCause(ctx)
 	s := Session{
-		BaseEventEmitter: NewBaseEventEmitter(ctx),
+		BaseEventEmitter: NewBaseEventEmitter(sessionCtx),
 		conn:             conn,
 		id:               id,
 		targetID:         tid,
 		readCh:           make(chan *cdproto.Message),
 		done:             make(chan struct{}),
 		msgIDGen:         msgIDGen,
+		sessionCancel:    sessionCancel,
 
 		logger: logger,
 	}
@@ -65,7 +69,7 @@ func (s *Session) close() {
 		return
 	}
 
-	// Stop the read loop
+	s.sessionCancel(fmt.Errorf("session closed: sid:%v tid:%v", s.id, s.targetID))
 	close(s.done)
 	s.closed = true
 }
@@ -73,6 +77,7 @@ func (s *Session) close() {
 func (s *Session) markAsCrashed() {
 	s.logger.Debugf("Session:markAsCrashed", "sid:%v tid:%v", s.id, s.targetID)
 	s.crashed = true
+	s.sessionCancel(fmt.Errorf("session crashed: sid:%v tid:%v", s.id, s.targetID))
 }
 
 // Wraps conn.ReadMessage in a channel.

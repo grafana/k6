@@ -377,7 +377,7 @@ func (b *BrowserContext) waitForEvent(
 
 	select {
 	case <-b.ctx.Done():
-		return nil, b.ctx.Err() //nolint:wrapcheck
+		return nil, ContextErr(b.ctx) //nolint:wrapcheck
 	case <-time.After(timeout):
 		b.logger.Debugf("BrowserContext:WaitForEvent:timeout", "bctxid:%v event:%q", b.id, event)
 		return nil, fmt.Errorf("waitForEvent timed out after %v", timeout)

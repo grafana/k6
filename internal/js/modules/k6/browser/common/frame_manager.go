@@ -737,13 +737,13 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *Frame
 			}
 		}
 	case <-timeoutCtx.Done():
-		return nil, wrapTimeoutError(timeoutCtx.Err())
+		return nil, wrapTimeoutError(ContextErr(timeoutCtx))
 	}
 
 	select {
 	case <-lifecycleEvtCh:
 	case <-timeoutCtx.Done():
-		return nil, wrapTimeoutError(timeoutCtx.Err())
+		return nil, wrapTimeoutError(ContextErr(timeoutCtx))
 	}
 
 	return resp, nil

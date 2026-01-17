@@ -118,7 +118,7 @@ type Connection struct {
 	BaseEventEmitter
 
 	ctx          context.Context
-	cancelCtx    context.CancelFunc
+	cancelCtx    context.CancelCauseFunc
 	wsURL        string
 	logger       *log.Logger
 	conn         *websocket.Conn
@@ -157,7 +157,7 @@ func NewConnection(
 		ReadBufferSize:   wsWriteBufferSize,
 	}
 
-	ctx, cancelCtx := context.WithCancel(ctx)
+	ctx, cancelCtx := context.WithCancelCause(ctx)
 
 	conn, response, connErr := wsd.DialContext(ctx, wsURL, header)
 	if response != nil {
@@ -166,7 +166,7 @@ func NewConnection(
 		}()
 	}
 	if connErr != nil {
-		cancelCtx()
+		cancelCtx(fmt.Errorf("failed to dial websocket at %s: %w", wsURL, connErr))
 		return nil, connErr
 	}
 
@@ -197,7 +197,9 @@ func NewConnection(
 func (c *Connection) close(code int) error {
 	c.logger.Debugf("Connection:close", "code:%d", code)
 
-	defer c.cancelCtx()
+	defer func() {
+		c.cancelCtx(fmt.Errorf("connection closed with websocket code: %d", code))
+	}()
 
 	var err error
 	c.shutdownOnce.Do(func() {
@@ -482,7 +484,7 @@ func (c *Connection) send(
 		return fmt.Errorf("closing communication with browser: %w", &websocket.CloseError{Code: code})
 	case <-ctx.Done():
 		c.logger.Debugf("Connection:send:<-ctx.Done", "wsURL:%q sid:%v err:%v", c.wsURL, msg.SessionID, c.ctx.Err())
-		return nil
+		return ContextErr(ctx)
 	case <-c.done:
 		c.logger.Debugf("Connection:send:<-c.done", "wsURL:%q sid:%v", c.wsURL, msg.SessionID)
 		return nil
@@ -525,11 +527,11 @@ func (c *Connection) send(
 	case <-ctx.Done():
 		c.logger.Debugf("Connection:send:<-ctx.Done()", "sid:%v tid:%v wsURL:%q err:%v",
 			msg.SessionID, tid, c.wsURL, c.ctx.Err())
-		return ctx.Err()
+		return ContextErr(ctx)
 	case <-c.ctx.Done():
 		c.logger.Debugf("Connection:send:<-c.ctx.Done()", "sid:%v tid:%v wsURL:%q err:%v",
 			msg.SessionID, tid, c.wsURL, c.ctx.Err())
-		return c.ctx.Err()
+		return ContextErr(c.ctx)
 	}
 	return nil
 }
