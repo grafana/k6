@@ -723,3 +723,10 @@ func (fl *FrameLocator) Locator(selector string, opts *LocatorOptions) *Locator 
 	frameNavSelector := fl.selector + " >> internal:control=enter-frame >> " + selector
 	return NewLocator(fl.ctx, opts, frameNavSelector, fl.frame, fl.log)
 }
+
+// FrameLocator creates a nested frame locator for an iframe matching the given
+func (fl *FrameLocator) FrameLocator(selector string) *FrameLocator {
+	fl.log.Debugf("FrameLocator:FrameLocator", "selector:%q childSelector:%q", fl.selector, selector)
+
+	return fl.Locator(selector, nil).ContentFrame()
+}
