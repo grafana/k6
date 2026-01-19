@@ -287,21 +287,31 @@ func TestFlushMaxSeriesInBatch(t *testing.T) {
 
 	require.Len(t, collected, 2)
 
-	require.Len(t, collected[0].Metrics, 1)
+	// Collect all label values across all batches (order-independent)
+	// to avoid flakiness from concurrent batch pushing
+	allLabelValues := make(map[string]struct{})
+	batchSizes := make([]int, 0, len(collected))
 
-	ts := collected[0].Metrics[0].TimeSeries
-	require.Len(t, ts[0].Labels, 1)
-	assert.Equal(t, "key1", ts[0].Labels[0].Name)
-	assert.Equal(t, "val1", ts[0].Labels[0].Value)
+	for _, ms := range collected {
+		require.Len(t, ms.Metrics, 1)
+		ts := ms.Metrics[0].TimeSeries
+		batchSizes = append(batchSizes, len(ts))
 
-	require.Len(t, ts[1].Labels, 1)
-	assert.Equal(t, "key1", ts[1].Labels[0].Name)
-	assert.Equal(t, "val2", ts[1].Labels[0].Value)
+		for _, series := range ts {
+			require.Len(t, series.Labels, 1)
+			assert.Equal(t, "key1", series.Labels[0].Name)
+			allLabelValues[series.Labels[0].Value] = struct{}{}
+		}
+	}
 
-	ts = collected[1].Metrics[0].TimeSeries
-	require.Len(t, ts[0].Labels, 1)
-	assert.Equal(t, "key1", ts[0].Labels[0].Name)
-	assert.Equal(t, "val3", ts[0].Labels[0].Value)
+	// Verify all expected values were flushed
+	assert.Contains(t, allLabelValues, "val1")
+	assert.Contains(t, allLabelValues, "val2")
+	assert.Contains(t, allLabelValues, "val3")
+	assert.Len(t, allLabelValues, 3)
+
+	// Verify batch sizes: one batch with 2 series, one with 1 series
+	assert.ElementsMatch(t, []int{2, 1}, batchSizes)
 }
 
 type pusherMock struct {
