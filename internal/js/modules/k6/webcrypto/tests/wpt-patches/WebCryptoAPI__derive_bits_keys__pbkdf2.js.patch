@@ -1,0 +1,130 @@
+diff --git a/WebCryptoAPI/derive_bits_keys/pbkdf2.js b/WebCryptoAPI/derive_bits_keys/pbkdf2.js
+index 090806ceb..b65728d7f 100644
+--- a/WebCryptoAPI/derive_bits_keys/pbkdf2.js
++++ b/WebCryptoAPI/derive_bits_keys/pbkdf2.js
+@@ -33,7 +33,7 @@ function define_tests() {
+                         var testName = passwordSize + " password, " + saltSize + " salt, " + hashName + ", with " + iterations + " iterations";
+ 
+                         // Check for correct deriveBits result
+-                        subsetTest(promise_test, function(test) {
++                        promise_test(function(test) {
+                             return subtle.deriveBits({name: "PBKDF2", salt: salts[saltSize], hash: hashName, iterations: parseInt(iterations)}, baseKeys[passwordSize], 256)
+                             .then(function(derivation) {
+                                 assert_true(equalBuffers(derivation, derivations[passwordSize][saltSize][hashName][iterations]), "Derived correct key");
+@@ -52,7 +52,7 @@ function define_tests() {
+                             testName += " using " + passwordSize + " password, " + saltSize + " salt, " + hashName + ", with " + iterations + " iterations";
+ 
+                             // Test the particular key derivation.
+-                            subsetTest(promise_test, function(test) {
++                            promise_test(function(test) {
+                                 return subtle.deriveKey({name: "PBKDF2", salt: salts[saltSize], hash: hashName, iterations: parseInt(iterations)}, baseKeys[passwordSize], derivedKeyType.algorithm, true, derivedKeyType.usages)
+                                 .then(function(key) {
+                                     // Need to export the key to see that the correct bits were set.
+@@ -72,7 +72,7 @@ function define_tests() {
+ 
+                             // - illegal name for hash algorithm (NotSupportedError)
+                             var badHash = hashName.substring(0, 3) + hashName.substring(4);
+-                            subsetTest(promise_test, function(test) {
++                            promise_test(function(test) {
+                                 return subtle.deriveKey({name: "PBKDF2", salt: salts[saltSize], hash: badHash, iterations: parseInt(iterations)}, baseKeys[passwordSize], derivedKeyType.algorithm, true, derivedKeyType.usages)
+                                 .then(function(key) {
+                                     assert_unreached("bad hash name should have thrown an NotSupportedError");
+@@ -82,7 +82,7 @@ function define_tests() {
+                             }, testName + " with bad hash name " + badHash);
+ 
+                             // - baseKey usages missing "deriveKey" (InvalidAccessError)
+-                            subsetTest(promise_test, function(test) {
++                            promise_test(function(test) {
+                                 return subtle.deriveKey({name: "PBKDF2", salt: salts[saltSize], hash: hashName, iterations: parseInt(iterations)}, noKey[passwordSize], derivedKeyType.algorithm, true, derivedKeyType.usages)
+                                 .then(function(key) {
+                                     assert_unreached("missing deriveKey usage should have thrown an InvalidAccessError");
+@@ -92,7 +92,7 @@ function define_tests() {
+                             }, testName + " with missing deriveKey usage");
+ 
+                             // - baseKey algorithm does not match PBKDF2 (InvalidAccessError)
+-                            subsetTest(promise_test, function(test) {
++                            promise_test(function(test) {
+                                 return subtle.deriveKey({name: "PBKDF2", salt: salts[saltSize], hash: hashName, iterations: parseInt(iterations)}, wrongKey, derivedKeyType.algorithm, true, derivedKeyType.usages)
+                                 .then(function(key) {
+                                     assert_unreached("wrong (ECDH) key should have thrown an InvalidAccessError");
+@@ -104,7 +104,7 @@ function define_tests() {
+                         });
+ 
+                         // 0 length (OperationError)
+-                        subsetTest(promise_test, function(test) {
++                        promise_test(function(test) {
+                             return subtle.deriveBits({name: "PBKDF2", salt: salts[saltSize], hash: hashName, iterations: parseInt(iterations)}, baseKeys[passwordSize], 0)
+                             .then(function(derivation) {
+                                 assert_unreached("0 length should have thrown an OperationError");
+@@ -114,7 +114,7 @@ function define_tests() {
+                         }, testName + " with 0 length");
+ 
+                         // length not multiple of 8 (OperationError)
+-                        subsetTest(promise_test, function(test) {
++                        promise_test(function(test) {
+                             return subtle.deriveBits({name: "PBKDF2", salt: salts[saltSize], hash: hashName, iterations: parseInt(iterations)}, baseKeys[passwordSize], 44)
+                             .then(function(derivation) {
+                                 assert_unreached("non-multiple of 8 length should have thrown an OperationError");
+@@ -125,7 +125,7 @@ function define_tests() {
+ 
+                         // - illegal name for hash algorithm (NotSupportedError)
+                         var badHash = hashName.substring(0, 3) + hashName.substring(4);
+-                        subsetTest(promise_test, function(test) {
++                        promise_test(function(test) {
+                             return subtle.deriveBits({name: "PBKDF2", salt: salts[saltSize], hash: badHash, iterations: parseInt(iterations)}, baseKeys[passwordSize], 256)
+                             .then(function(derivation) {
+                                 assert_unreached("bad hash name should have thrown an NotSupportedError");
+@@ -135,7 +135,7 @@ function define_tests() {
+                         }, testName + " with bad hash name " + badHash);
+ 
+                         // - baseKey usages missing "deriveBits" (InvalidAccessError)
+-                        subsetTest(promise_test, function(test) {
++                        promise_test(function(test) {
+                             return subtle.deriveBits({name: "PBKDF2", salt: salts[saltSize], hash: hashName, iterations: parseInt(iterations)}, noBits[passwordSize], 256)
+                             .then(function(derivation) {
+                                 assert_unreached("missing deriveBits usage should have thrown an InvalidAccessError");
+@@ -145,7 +145,7 @@ function define_tests() {
+                         }, testName + " with missing deriveBits usage");
+ 
+                         // - baseKey algorithm does not match PBKDF2 (InvalidAccessError)
+-                        subsetTest(promise_test, function(test) {
++                        promise_test(function(test) {
+                             return subtle.deriveBits({name: "PBKDF2", salt: salts[saltSize], hash: hashName, iterations: parseInt(iterations)}, wrongKey, 256)
+                             .then(function(derivation) {
+                                 assert_unreached("wrong (ECDH) key should have thrown an InvalidAccessError");
+@@ -156,7 +156,7 @@ function define_tests() {
+                     });
+ 
+                     // Check that 0 iterations throws proper error
+-                    subsetTest(promise_test, function(test) {
++                    promise_test(function(test) {
+                         return subtle.deriveBits({name: "PBKDF2", salt: salts[saltSize], hash: hashName, iterations: 0}, baseKeys[passwordSize], 256)
+                         .then(function(derivation) {
+                             assert_unreached("0 iterations should have thrown an error");
+@@ -172,7 +172,7 @@ function define_tests() {
+                         });
+                         testName += " using " + passwordSize + " password, " + saltSize + " salt, " + hashName + ", with 0 iterations";
+ 
+-                        subsetTest(promise_test, function(test) {
++                        promise_test(function(test) {
+                             return subtle.deriveKey({name: "PBKDF2", salt: salts[saltSize], hash: hashName, iterations: 0}, baseKeys[passwordSize], derivedKeyType.algorithm, true, derivedKeyType.usages)
+                             .then(function(derivation) {
+                                 assert_unreached("0 iterations should have thrown an error");
+@@ -188,7 +188,7 @@ function define_tests() {
+                 [1, 1000, 100000].forEach(function(iterations) {
+                     var testName = passwordSize + " password, " + saltSize + " salt, " + nonDigestHash + ", with " + iterations + " iterations";
+ 
+-                    subsetTest(promise_test, function(test) {
++                    promise_test(function(test) {
+                         return subtle.deriveBits({name: "PBKDF2", salt: salts[saltSize], hash: nonDigestHash, iterations: parseInt(iterations)}, baseKeys[passwordSize], 256)
+                         .then(function(derivation) {
+                             assert_unreached("non-digest algorithm should have thrown an NotSupportedError");
+@@ -204,7 +204,7 @@ function define_tests() {
+                         });
+                         testName += " using " + passwordSize + " password, " + saltSize + " salt, " + nonDigestHash + ", with " + iterations + " iterations";
+ 
+-                        subsetTest(promise_test, function(test) {
++                        promise_test(function(test) {
+                             return subtle.deriveKey({name: "PBKDF2", salt: salts[saltSize], hash: nonDigestHash, iterations: parseInt(iterations)}, baseKeys[passwordSize], derivedKeyType.algorithm, true, derivedKeyType.usages)
+                             .then(function(derivation) {
+                                 assert_unreached("non-digest algorithm should have thrown an NotSupportedError");
