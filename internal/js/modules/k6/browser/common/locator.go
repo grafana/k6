@@ -425,6 +425,14 @@ func (l *Locator) Locator(selector string, opts *LocatorOptions) *Locator {
 	return NewLocator(l.ctx, opts, l.selector+" >> "+selector, l.frame, l.log)
 }
 
+// FrameLocator creates a frame locator for an iframe matching the given selector
+// within the current locator's scope.
+func (l *Locator) FrameLocator(selector string) *FrameLocator {
+	l.log.Debugf("Locator:FrameLocator", "selector:%q childSelector:%q", l.selector, selector)
+
+	return l.Locator(selector, nil).ContentFrame()
+}
+
 // InnerHTML returns the element's inner HTML that matches
 // the locator's selector with strict mode on.
 func (l *Locator) InnerHTML(opts *FrameInnerHTMLOptions) (string, error) {

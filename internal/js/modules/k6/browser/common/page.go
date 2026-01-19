@@ -1239,6 +1239,13 @@ func (p *Page) Locator(selector string, opts *LocatorOptions) *Locator {
 	return p.MainFrame().Locator(selector, opts)
 }
 
+// FrameLocator creates a frame locator for an iframe matching the given selector.
+func (p *Page) FrameLocator(selector string) *FrameLocator {
+	p.logger.Debugf("Page:FrameLocator", "sid:%s selector:%q", p.sessionID(), selector)
+
+	return p.Locator(selector, nil).ContentFrame()
+}
+
 // MainFrame returns the main frame on the page.
 func (p *Page) MainFrame() *Frame {
 	mf := p.frameManager.MainFrame()
