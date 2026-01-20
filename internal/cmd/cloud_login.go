@@ -66,9 +66,11 @@ the "k6 run -o cloud" command.
 
 // run is the code that runs when the user executes `k6 cloud login`
 func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
-	err := migrateLegacyConfigFileIfAny(c.globalState)
-	if err != nil {
-		return err
+	if !checkIfMigrationCompleted(c.globalState) {
+		err := migrateLegacyConfigFileIfAny(c.globalState)
+		if err != nil {
+			return err
+		}
 	}
 
 	currentDiskConf, err := readDiskConfig(c.globalState)
