@@ -65,6 +65,8 @@ the "k6 run -o cloud" command.
 }
 
 // run is the code that runs when the user executes `k6 cloud login`
+//
+//nolint:funlen
 func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 	if !checkIfMigrationCompleted(c.globalState) {
 		err := migrateLegacyConfigFileIfAny(c.globalState)
