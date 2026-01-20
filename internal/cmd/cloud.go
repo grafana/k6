@@ -428,7 +428,7 @@ func resolveDefaultProjectID(
 			if !cloudConfig.StackURL.Valid {
 				stackName = fmt.Sprintf("stack-%d", cloudConfig.StackID.Int64)
 			}
-			gs.Logger.Warnf("No projectID specified, using default project of the %s stack\n\n", stackName)
+			gs.Logger.Warnf("No projectID specified, using default project of the %s stack\n", stackName)
 			return cloudConfig.DefaultProjectID.Int64, nil
 		}
 		return 0, fmt.Errorf(
@@ -464,8 +464,8 @@ func resolveAndSetProjectID(
 		cloudConfig.ProjectID = null.IntFrom(projectID)
 	}
 	if projectID == 0 && (!cloudConfig.StackID.Valid || cloudConfig.StackID.Int64 == 0) {
-		gs.Logger.Warn("No projectID or default stack specified. Falling back to the first available stack.")
-		gs.Logger.Warn("Consider setting a default stack via the `k6 cloud login` command.")
+		gs.Logger.Warn("No projectID or default stack specified. Falling back to the first available stack. " +
+			"Consider setting a default stack via the `k6 cloud login` command.")
 	}
 	return nil
 }
