@@ -72,13 +72,11 @@ the "k6 run -o cloud" command.
 
 // run is the code that runs when the user executes `k6 cloud login`
 //
-//nolint:funlen,gocognit,cyclop
+//nolint:funlen
 func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
-	if !checkIfMigrationCompleted(c.globalState) {
-		err := migrateLegacyConfigFileIfAny(c.globalState)
-		if err != nil {
-			return err
-		}
+	err := migrateLegacyConfigFileIfAny(c.globalState)
+	if err != nil {
+		return err
 	}
 
 	currentDiskConf, err := readDiskConfig(c.globalState)
@@ -112,24 +110,7 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 		newCloudConf.DefaultProjectID = null.IntFromPtr(nil)
 		printToStdout(c.globalState, "  token and stack info reset\n")
 	case show.Bool:
-		valueColor := getColor(c.globalState.Flags.NoColor || !c.globalState.Stdout.IsTTY, color.FgCyan)
-		printToStdout(c.globalState, fmt.Sprintf("  token: %s\n", valueColor.Sprint(newCloudConf.Token.String)))
-		if !newCloudConf.StackID.Valid && !newCloudConf.StackURL.Valid {
-			printToStdout(c.globalState, "  stack-id: <not set>\n")
-			printToStdout(c.globalState, "  stack-url: <not set>\n")
-			printToStdout(c.globalState, "  default-project-id: <not set>\n")
-		} else {
-			if newCloudConf.StackID.Valid {
-				printToStdout(c.globalState, fmt.Sprintf("  stack-id: %s\n", valueColor.Sprint(newCloudConf.StackID.Int64)))
-			}
-			if newCloudConf.StackURL.Valid {
-				printToStdout(c.globalState, fmt.Sprintf("  stack-url: %s\n", valueColor.Sprint(newCloudConf.StackURL.String)))
-			}
-			if newCloudConf.DefaultProjectID.Valid {
-				printToStdout(c.globalState, fmt.Sprintf("  default-project-id: %s\n",
-					valueColor.Sprint(newCloudConf.DefaultProjectID.Int64)))
-			}
-		}
+		printConfig(c.globalState, newCloudConf)
 		return nil
 	case token.Valid:
 		err := validateInputs(c.globalState, &newCloudConf, currentJSONConfigRaw, token, stackInput)
@@ -202,26 +183,38 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 		return nil
 	}
 
-	valueColor := getColor(c.globalState.Flags.NoColor || !c.globalState.Stdout.IsTTY, color.FgCyan)
 	printToStdout(c.globalState, fmt.Sprintf(
 		"\nLogged in successfully, token and stack info saved in %s\n", c.globalState.Flags.ConfigFilePath,
 	))
 	if !c.globalState.Flags.Quiet {
-		printToStdout(c.globalState, fmt.Sprintf("  token: %s\n", valueColor.Sprint(newCloudConf.Token.String)))
-
-		if newCloudConf.StackID.Valid {
-			printToStdout(c.globalState, fmt.Sprintf("  stack-id: %s\n", valueColor.Sprint(newCloudConf.StackID.Int64)))
-		}
-		if newCloudConf.StackURL.Valid {
-			printToStdout(c.globalState, fmt.Sprintf("  stack-url: %s\n", valueColor.Sprint(newCloudConf.StackURL.String)))
-		}
-		if newCloudConf.DefaultProjectID.Valid {
-			printToStdout(c.globalState, fmt.Sprintf("  default-project-id: %s\n",
-				valueColor.Sprint(newCloudConf.DefaultProjectID.Int64)))
-		}
+		printConfig(c.globalState, newCloudConf)
 	}
 
 	return nil
+}
+
+func printConfig(gs *state.GlobalState, cloudConf cloudapi.Config) {
+	valueColor := getColor(gs.Flags.NoColor || !gs.Stdout.IsTTY, color.FgCyan)
+	printToStdout(gs, fmt.Sprintf("  token: %s\n", valueColor.Sprint(cloudConf.Token.String)))
+
+	if !cloudConf.StackID.Valid && !cloudConf.StackURL.Valid {
+		printToStdout(gs, "  stack-id: <not set>\n")
+		printToStdout(gs, "  stack-url: <not set>\n")
+		printToStdout(gs, "  default-project-id: <not set>\n")
+
+		return
+	}
+
+	if cloudConf.StackID.Valid {
+		printToStdout(gs, fmt.Sprintf("  stack-id: %s\n", valueColor.Sprint(cloudConf.StackID.Int64)))
+	}
+	if cloudConf.StackURL.Valid {
+		printToStdout(gs, fmt.Sprintf("  stack-url: %s\n", valueColor.Sprint(cloudConf.StackURL.String)))
+	}
+	if cloudConf.DefaultProjectID.Valid {
+		printToStdout(gs, fmt.Sprintf("  default-project-id: %s\n",
+			valueColor.Sprint(cloudConf.DefaultProjectID.Int64)))
+	}
 }
 
 // validateInputs validates a token and a stack if provided
