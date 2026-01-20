@@ -464,7 +464,7 @@ func resolveAndSetProjectID(
 		cloudConfig.ProjectID = null.IntFrom(projectID)
 	}
 	if projectID == 0 && (!cloudConfig.StackID.Valid || cloudConfig.StackID.Int64 == 0) {
-		gs.Logger.Warn("Warning: no projectID or default stack specified. Falling back to the first available stack.")
+		gs.Logger.Warn("No projectID or default stack specified. Falling back to the first available stack.")
 		gs.Logger.Warn("Consider setting a default stack via the `k6 cloud login` command.")
 	}
 	return nil
