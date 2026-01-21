@@ -102,7 +102,7 @@ func (p *BrowserProcess) handleClose(ctx context.Context) {
 	select {
 	case <-p.processIsGracefullyClosing:
 	default:
-		p.cancel(fmt.Errorf("browser process lost connection: wsURL:%q", p.wsURL))
+		p.cancel(fmt.Errorf("lost connection while closing the browser (websocket url: %s)", p.wsURL))
 	}
 }
 
