@@ -244,16 +244,22 @@ func processUseDirectives(name string, text []byte, deps dependencies) error {
 			continue
 		}
 		directive = strings.TrimSpace(strings.TrimPrefix(directive, "use k6"))
-		if !strings.HasPrefix(directive, "with k6/x/") {
-			err := deps.update("k6", directive)
-			if err != nil {
-				return fmt.Errorf("error while parsing use directives in %q: %w", name, err)
-			}
-			continue
+		dep := "k6"
+		constraint := directive
+		if strings.HasPrefix(directive, "with k6/x/") {
+			directive = strings.TrimSpace(strings.TrimPrefix(directive, "with "))
+			dep, constraint, _ = strings.Cut(directive, " ")
 		}
-		directive = strings.TrimSpace(strings.TrimPrefix(directive, "with "))
-		dep, constraint, _ := strings.Cut(directive, " ")
-		err := deps.update(dep, constraint)
+		var con *semver.Constraints
+		var err error
+		if len(constraint) > 0 {
+			con, err = semver.NewConstraint(constraint)
+			if err != nil {
+				return fmt.Errorf("error while parsing use directives constraing %q for %q: %w", constraint, name, err)
+			}
+		}
+
+		err = deps.update(dep, con)
 		if err != nil {
 			return fmt.Errorf("error while parsing use directives in %q: %w", name, err)
 		}
@@ -301,31 +307,14 @@ func findDirectives(text []byte) []string {
 	return result
 }
 
-func mergeManifest(deps map[string]string, manifestString string) (map[string]string, error) {
+func parseManifest(manifestString string) (dependencies, error) {
 	if manifestString == "" {
-		return deps, nil
+		return nil, nil //nolint:nilnil
 	}
 
-	manifest := make(map[string]string)
-	if err := json.Unmarshal([]byte(manifestString), &manifest); err != nil {
+	manifestMap := make(map[string]string)
+	if err := json.Unmarshal([]byte(manifestString), &manifestMap); err != nil {
 		return nil, fmt.Errorf("invalid dependencies manifest %w", err)
 	}
-
-	result := make(map[string]string)
-	for dep, constraint := range deps {
-		result[dep] = constraint
-
-		// if deps has a non default constrain, keep ip
-		if constraint != "" && constraint != "*" {
-			continue
-		}
-
-		// check if there's an override in the manifest
-		manifestConstrain := manifest[dep]
-		if manifestConstrain != "" && manifestConstrain != "*" {
-			result[dep] = manifestConstrain
-		}
-	}
-
-	return result, nil
+	return dependenciesFromMap(manifestMap)
 }

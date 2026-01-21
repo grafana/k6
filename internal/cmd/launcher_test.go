@@ -242,20 +242,19 @@ func TestProcessUseDirectives(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			deps := make(dependencies)
-			for k, v := range test.expectedOutput {
-				require.NoError(t, deps.update(k, v))
-			}
+			deps, err := dependenciesFromMap(test.expectedOutput)
+			require.NoError(t, err)
+			expected := constraintsMapToProvisionDependency(deps)
 			if len(test.expectedError) > 0 {
-				deps = nil
+				expected = nil
 			}
 
 			m := make(dependencies)
-			err := processUseDirectives("name.js", []byte(test.input), m)
+			err = processUseDirectives("name.js", []byte(test.input), m)
 			if len(test.expectedError) > 0 {
 				require.ErrorContains(t, err, test.expectedError)
 			} else {
-				require.EqualValues(t, deps, m)
+				require.EqualValues(t, expected, constraintsMapToProvisionDependency(m))
 			}
 		})
 	}
@@ -315,7 +314,7 @@ const l = 5
 	}
 }
 
-func TestMergeManifest(t *testing.T) {
+func TestDependenciesApplyManifest(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -378,12 +377,22 @@ func TestMergeManifest(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			merged, err := mergeManifest(test.deps, test.manifest)
-
+			var err error
+			deps := make(dependencies)
+			for k, v := range test.deps {
+				if v == "" {
+					deps[k] = nil
+					return
+				}
+				deps[k], _ = semver.NewConstraint(v)
+				require.NoError(t, err)
+			}
+			depsMan, err := parseManifest(test.manifest)
+			require.NoError(t, deps.applyManifest(depsMan))
 			if len(test.expectedError) > 0 {
 				require.ErrorContains(t, err, test.expectedError)
 			} else {
-				require.EqualValues(t, test.expected, merged)
+				require.EqualValues(t, test.expected, (map[string]string)(constraintsMapToProvisionDependency(deps)))
 			}
 		})
 	}

@@ -171,20 +171,7 @@ func handleUnsatisfiedDependencies(err error, c *rootCommand) (exitcodes.ExitCod
 			" it's required to provision a custom binary.")
 	provisioner := newK6BuildProvisioner(c.globalState)
 	var customBinary commandExecutor
-
-	// merge the script dependencies with the dependencies manifest, if specified
-	manifest := c.globalState.Flags.DependenciesManifest
-	depsMap, err := mergeManifest(constraintsMapToProvisionDependency(deps), manifest)
-	if err != nil {
-		c.globalState.Logger.
-			WithField("deps", deps).
-			WithField("manifest", manifest).
-			WithError(err).
-			Error("Failed to process the dependecies manifest for automatic dependency resolution")
-		return 0, err
-	}
-
-	customBinary, err = provisioner.provision(depsMap)
+	customBinary, err = provisioner.provision(constraintsMapToProvisionDependency(deps))
 	if err != nil {
 		err = errext.WithExitCodeIfNone(err, exitcodes.ScriptException)
 		c.globalState.Logger.
