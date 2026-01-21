@@ -12,192 +12,208 @@ import (
 func TestParseMouseClickOptions(t *testing.T) {
 	t.Parallel()
 
-	t.Run("null_returns_defaults", func(t *testing.T) {
-		t.Parallel()
-		vu := k6test.NewVU(t)
-		v, err := vu.Runtime().RunString(`null`)
-		require.NoError(t, err)
+	tests := []struct {
+		name        string
+		input       string
+		wantButton  string
+		wantClick   int64
+		wantDelay   int64
+		wantErr     string
+	}{
+		{
+			name:       "defaults_on_null",
+			input:      `null`,
+			wantButton: "left",
+			wantClick:  1,
+			wantDelay:  0,
+		},
+		{
+			name:       "all_options",
+			input:      `({button: "right", clickCount: 3, delay: 100})`,
+			wantButton: "right",
+			wantClick:  3,
+			wantDelay:  100,
+		},
+		{
+			name:    "invalid_clickCount",
+			input:   `({clickCount: "invalid"})`,
+			wantErr: "clickCount must be a number",
+		},
+		{
+			name:    "invalid_delay",
+			input:   `({delay: true})`,
+			wantErr: "delay must be a number",
+		},
+	}
 
-		opts, err := parseMouseClickOptions(vu.Runtime(), v)
-		require.NoError(t, err)
-		assert.Equal(t, "left", opts.Button)
-		assert.Equal(t, int64(1), opts.ClickCount)
-		assert.Equal(t, int64(0), opts.Delay)
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	t.Run("undefined_returns_defaults", func(t *testing.T) {
-		t.Parallel()
-		vu := k6test.NewVU(t)
-		v, err := vu.Runtime().RunString(`undefined`)
-		require.NoError(t, err)
+			vu := k6test.NewVU(t)
+			v, err := vu.Runtime().RunString(tt.input)
+			require.NoError(t, err)
 
-		opts, err := parseMouseClickOptions(vu.Runtime(), v)
-		require.NoError(t, err)
-		assert.Equal(t, "left", opts.Button)
-		assert.Equal(t, int64(1), opts.ClickCount)
-		assert.Equal(t, int64(0), opts.Delay)
-	})
+			opts, err := parseMouseClickOptions(vu.Runtime(), v)
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+				return
+			}
 
-	t.Run("parses_all_options", func(t *testing.T) {
-		t.Parallel()
-		vu := k6test.NewVU(t)
-		v, err := vu.Runtime().RunString(`({button: "right", clickCount: 3, delay: 100})`)
-		require.NoError(t, err)
-
-		opts, err := parseMouseClickOptions(vu.Runtime(), v)
-		require.NoError(t, err)
-		assert.Equal(t, "right", opts.Button)
-		assert.Equal(t, int64(3), opts.ClickCount)
-		assert.Equal(t, int64(100), opts.Delay)
-	})
-
-	t.Run("parses_partial_options", func(t *testing.T) {
-		t.Parallel()
-		vu := k6test.NewVU(t)
-		v, err := vu.Runtime().RunString(`({button: "middle"})`)
-		require.NoError(t, err)
-
-		opts, err := parseMouseClickOptions(vu.Runtime(), v)
-		require.NoError(t, err)
-		assert.Equal(t, "middle", opts.Button)
-		assert.Equal(t, int64(1), opts.ClickCount)
-		assert.Equal(t, int64(0), opts.Delay)
-	})
-
-	t.Run("invalid_clickCount_type_returns_error", func(t *testing.T) {
-		t.Parallel()
-		vu := k6test.NewVU(t)
-		v, err := vu.Runtime().RunString(`({clickCount: "invalid"})`)
-		require.NoError(t, err)
-
-		_, err = parseMouseClickOptions(vu.Runtime(), v)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "clickCount must be a number")
-	})
-
-	t.Run("invalid_delay_type_returns_error", func(t *testing.T) {
-		t.Parallel()
-		vu := k6test.NewVU(t)
-		v, err := vu.Runtime().RunString(`({delay: true})`)
-		require.NoError(t, err)
-
-		_, err = parseMouseClickOptions(vu.Runtime(), v)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "delay must be a number")
-	})
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantButton, opts.Button)
+			assert.Equal(t, tt.wantClick, opts.ClickCount)
+			assert.Equal(t, tt.wantDelay, opts.Delay)
+		})
+	}
 }
 
 func TestParseMouseDblClickOptions(t *testing.T) {
 	t.Parallel()
 
-	t.Run("null_returns_defaults", func(t *testing.T) {
-		t.Parallel()
-		vu := k6test.NewVU(t)
-		v, err := vu.Runtime().RunString(`null`)
-		require.NoError(t, err)
+	tests := []struct {
+		name       string
+		input      string
+		wantButton string
+		wantDelay  int64
+		wantErr    string
+	}{
+		{
+			name:       "defaults_on_null",
+			input:      `null`,
+			wantButton: "left",
+			wantDelay:  0,
+		},
+		{
+			name:       "all_options",
+			input:      `({button: "right", delay: 50})`,
+			wantButton: "right",
+			wantDelay:  50,
+		},
+		{
+			name:    "invalid_delay",
+			input:   `({delay: "slow"})`,
+			wantErr: "delay must be a number",
+		},
+	}
 
-		opts, err := parseMouseDblClickOptions(vu.Runtime(), v)
-		require.NoError(t, err)
-		assert.Equal(t, "left", opts.Button)
-		assert.Equal(t, int64(0), opts.Delay)
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	t.Run("parses_all_options", func(t *testing.T) {
-		t.Parallel()
-		vu := k6test.NewVU(t)
-		v, err := vu.Runtime().RunString(`({button: "right", delay: 50})`)
-		require.NoError(t, err)
+			vu := k6test.NewVU(t)
+			v, err := vu.Runtime().RunString(tt.input)
+			require.NoError(t, err)
 
-		opts, err := parseMouseDblClickOptions(vu.Runtime(), v)
-		require.NoError(t, err)
-		assert.Equal(t, "right", opts.Button)
-		assert.Equal(t, int64(50), opts.Delay)
-	})
+			opts, err := parseMouseDblClickOptions(vu.Runtime(), v)
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+				return
+			}
 
-	t.Run("invalid_delay_type_returns_error", func(t *testing.T) {
-		t.Parallel()
-		vu := k6test.NewVU(t)
-		v, err := vu.Runtime().RunString(`({delay: "slow"})`)
-		require.NoError(t, err)
-
-		_, err = parseMouseDblClickOptions(vu.Runtime(), v)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "delay must be a number")
-	})
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantButton, opts.Button)
+			assert.Equal(t, tt.wantDelay, opts.Delay)
+		})
+	}
 }
 
 func TestParseMouseDownUpOptions(t *testing.T) {
 	t.Parallel()
 
-	t.Run("null_returns_defaults", func(t *testing.T) {
-		t.Parallel()
-		vu := k6test.NewVU(t)
-		v, err := vu.Runtime().RunString(`null`)
-		require.NoError(t, err)
+	tests := []struct {
+		name       string
+		input      string
+		wantButton string
+		wantClick  int64
+		wantErr    string
+	}{
+		{
+			name:       "defaults_on_null",
+			input:      `null`,
+			wantButton: "left",
+			wantClick:  1,
+		},
+		{
+			name:       "all_options",
+			input:      `({button: "middle", clickCount: 2})`,
+			wantButton: "middle",
+			wantClick:  2,
+		},
+		{
+			name:    "invalid_clickCount",
+			input:   `({clickCount: []})`,
+			wantErr: "clickCount must be a number",
+		},
+	}
 
-		opts, err := parseMouseDownUpOptions(vu.Runtime(), v)
-		require.NoError(t, err)
-		assert.Equal(t, "left", opts.Button)
-		assert.Equal(t, int64(1), opts.ClickCount)
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	t.Run("parses_all_options", func(t *testing.T) {
-		t.Parallel()
-		vu := k6test.NewVU(t)
-		v, err := vu.Runtime().RunString(`({button: "middle", clickCount: 2})`)
-		require.NoError(t, err)
+			vu := k6test.NewVU(t)
+			v, err := vu.Runtime().RunString(tt.input)
+			require.NoError(t, err)
 
-		opts, err := parseMouseDownUpOptions(vu.Runtime(), v)
-		require.NoError(t, err)
-		assert.Equal(t, "middle", opts.Button)
-		assert.Equal(t, int64(2), opts.ClickCount)
-	})
+			opts, err := parseMouseDownUpOptions(vu.Runtime(), v)
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+				return
+			}
 
-	t.Run("invalid_clickCount_type_returns_error", func(t *testing.T) {
-		t.Parallel()
-		vu := k6test.NewVU(t)
-		v, err := vu.Runtime().RunString(`({clickCount: []})`)
-		require.NoError(t, err)
-
-		_, err = parseMouseDownUpOptions(vu.Runtime(), v)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "clickCount must be a number")
-	})
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantButton, opts.Button)
+			assert.Equal(t, tt.wantClick, opts.ClickCount)
+		})
+	}
 }
 
 func TestParseMouseMoveOptions(t *testing.T) {
 	t.Parallel()
 
-	t.Run("null_returns_defaults", func(t *testing.T) {
-		t.Parallel()
-		vu := k6test.NewVU(t)
-		v, err := vu.Runtime().RunString(`null`)
-		require.NoError(t, err)
+	tests := []struct {
+		name      string
+		input     string
+		wantSteps int64
+		wantErr   string
+	}{
+		{
+			name:      "defaults_on_null",
+			input:     `null`,
+			wantSteps: 1,
+		},
+		{
+			name:      "custom_steps",
+			input:     `({steps: 10})`,
+			wantSteps: 10,
+		},
+		{
+			name:    "invalid_steps",
+			input:   `({steps: {}})`,
+			wantErr: "steps must be a number",
+		},
+	}
 
-		opts, err := parseMouseMoveOptions(vu.Runtime(), v)
-		require.NoError(t, err)
-		assert.Equal(t, int64(1), opts.Steps)
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	t.Run("parses_steps_option", func(t *testing.T) {
-		t.Parallel()
-		vu := k6test.NewVU(t)
-		v, err := vu.Runtime().RunString(`({steps: 10})`)
-		require.NoError(t, err)
+			vu := k6test.NewVU(t)
+			v, err := vu.Runtime().RunString(tt.input)
+			require.NoError(t, err)
 
-		opts, err := parseMouseMoveOptions(vu.Runtime(), v)
-		require.NoError(t, err)
-		assert.Equal(t, int64(10), opts.Steps)
-	})
+			opts, err := parseMouseMoveOptions(vu.Runtime(), v)
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+				return
+			}
 
-	t.Run("invalid_steps_type_returns_error", func(t *testing.T) {
-		t.Parallel()
-		vu := k6test.NewVU(t)
-		v, err := vu.Runtime().RunString(`({steps: {}})`)
-		require.NoError(t, err)
-
-		_, err = parseMouseMoveOptions(vu.Runtime(), v)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "steps must be a number")
-	})
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantSteps, opts.Steps)
+		})
+	}
 }
