@@ -526,11 +526,11 @@ func (c *Connection) send(
 		c.logger.Debugf("Connection:send:<-c.done #2", "sid:%v tid:%v wsURL:%q", msg.SessionID, tid, c.wsURL)
 	case <-ctx.Done():
 		c.logger.Debugf("Connection:send:<-ctx.Done()", "sid:%v tid:%v wsURL:%q err:%v",
-			msg.SessionID, tid, c.wsURL, c.ctx.Err())
+			msg.SessionID, tid, c.wsURL, ContextErr(c.ctx))
 		return ContextErr(ctx)
 	case <-c.ctx.Done():
 		c.logger.Debugf("Connection:send:<-c.ctx.Done()", "sid:%v tid:%v wsURL:%q err:%v",
-			msg.SessionID, tid, c.wsURL, c.ctx.Err())
+			msg.SessionID, tid, c.wsURL, ContextErr(c.ctx))
 		return ContextErr(c.ctx)
 	}
 	return nil
