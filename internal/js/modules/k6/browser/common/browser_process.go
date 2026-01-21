@@ -180,7 +180,7 @@ func execute(
 		return command{}, fmt.Errorf("%w", err)
 	}
 	if ctx.Err() != nil {
-		return command{}, fmt.Errorf("%w", ContextErr(ctx))
+		return command{}, ContextErr(ctx)
 	}
 
 	done := make(chan struct{})
