@@ -322,10 +322,10 @@ func applyDefault(conf Config) Config {
 }
 
 func deriveAndValidateConfig(
-	conf Config, isExecutable func(string) bool, logger logrus.FieldLogger,
+	conf Config, isExecutable func(string) bool, importedModules []string, logger logrus.FieldLogger,
 ) (result Config, err error) {
 	result = conf
-	result.Options, err = executor.DeriveScenariosFromShortcuts(conf.Options, logger)
+	result.Options, err = executor.DeriveScenariosFromShortcuts(conf.Options, importedModules, logger)
 	if err == nil {
 		err = validateConfig(result, isExecutable)
 	}

@@ -551,7 +551,7 @@ func runTestCase(t *testing.T, testCase configConsolidationTestCase, subCmd stri
 	require.NoError(t, err)
 
 	derivedConfig := consolidatedConfig
-	derivedConfig.Options, err = executor.DeriveScenariosFromShortcuts(consolidatedConfig.Options, ts.Logger)
+	derivedConfig.Options, err = executor.DeriveScenariosFromShortcuts(consolidatedConfig.Options, nil, ts.Logger)
 	if testCase.expected.derivationError {
 		require.Error(t, err)
 		return

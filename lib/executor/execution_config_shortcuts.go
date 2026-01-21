@@ -49,7 +49,7 @@ func getSharedIterationsScenario(iters null.Int, duration types.NullDuration, vu
 // DeriveScenariosFromShortcuts checks for conflicting options and turns any
 // shortcut options (i.e. duration, iterations, stages) into the proper
 // long-form scenario/executor configuration in the scenarios property.
-func DeriveScenariosFromShortcuts(opts lib.Options, logger logrus.FieldLogger) (lib.Options, error) {
+func DeriveScenariosFromShortcuts(opts lib.Options, importedModules []string, logger logrus.FieldLogger) (lib.Options, error) {
 	result := opts
 
 	switch {
@@ -116,6 +116,34 @@ func DeriveScenariosFromShortcuts(opts lib.Options, logger logrus.FieldLogger) (
 		// with 1 VU and 1 iteration.
 		result.Scenarios = lib.ScenarioConfigs{
 			lib.DefaultScenarioName: NewPerVUIterationsConfig(lib.DefaultScenarioName),
+		}
+	}
+
+	// Check if k6/browser is imported
+	hasBrowserImport := false
+	for _, mod := range importedModules {
+		if mod == "k6/browser" {
+			hasBrowserImport = true
+			break
+		}
+	}
+	if hasBrowserImport {
+		if config, ok := result.Scenarios[lib.DefaultScenarioName]; ok {
+			browserOpts := &lib.ScenarioOptions{Browser: map[string]any{"type": "chromium"}}
+			switch cfg := config.(type) {
+			case SharedIterationsConfig:
+				cfg.Options = browserOpts
+				result.Scenarios[lib.DefaultScenarioName] = cfg
+			case ConstantVUsConfig:
+				cfg.Options = browserOpts
+				result.Scenarios[lib.DefaultScenarioName] = cfg
+			case RampingVUsConfig:
+				cfg.Options = browserOpts
+				result.Scenarios[lib.DefaultScenarioName] = cfg
+			case PerVUIterationsConfig:
+				cfg.Options = browserOpts
+				result.Scenarios[lib.DefaultScenarioName] = cfg
+			}
 		}
 	}
 
