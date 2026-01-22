@@ -1514,7 +1514,7 @@ func (p *Page) Reload(opts *PageReloadOptions) (_ *Response, rerr error) { //nol
 	select {
 	case <-waitForLifecycleEvent:
 	case <-timeoutCtx.Done():
-		return nil, wrapTimeoutError(timeoutCtx.Err())
+		return nil, wrapTimeoutError(ContextErr(timeoutCtx))
 	}
 
 	applySlowMo(p.ctx)
