@@ -80,6 +80,8 @@ type NetworkManager struct {
 	eventsWillBeSentMu            sync.RWMutex
 	reqIDToRequestPausedEvent     map[network.RequestID]*fetch.EventRequestPaused
 	eventsPausedMu                sync.RWMutex
+	reqIDToRequestExtraHeaders    map[network.RequestID]map[string][]string
+	extraHeadersMu                sync.RWMutex
 
 	attemptedAuth map[fetch.RequestID]bool
 
@@ -123,6 +125,7 @@ func NewNetworkManager(
 		reqIDToRequest:                make(map[network.RequestID]*Request),
 		reqIDToRequestWillBeSentEvent: make(map[network.RequestID]*network.EventRequestWillBeSent),
 		reqIDToRequestPausedEvent:     make(map[network.RequestID]*fetch.EventRequestPaused),
+		reqIDToRequestExtraHeaders:    make(map[network.RequestID]map[string][]string),
 		attemptedAuth:                 make(map[fetch.RequestID]bool),
 		extraHTTPHeaders:              make(map[string]string),
 		networkProfile:                NewNetworkProfile(),
@@ -373,6 +376,7 @@ func (m *NetworkManager) initEvents() {
 		cdproto.EventNetworkLoadingFailed,
 		cdproto.EventNetworkLoadingFinished,
 		cdproto.EventNetworkRequestWillBeSent,
+		cdproto.EventNetworkRequestWillBeSentExtraInfo,
 		cdproto.EventNetworkRequestServedFromCache,
 		cdproto.EventNetworkResponseReceived,
 		cdproto.EventFetchRequestPaused,
@@ -402,6 +406,8 @@ func (m *NetworkManager) handleEvents(in <-chan Event) bool {
 			m.onLoadingFinished(ev)
 		case *network.EventRequestWillBeSent:
 			m.onRequestWillBeSent(ev)
+		case *network.EventRequestWillBeSentExtraInfo:
+			m.onRequestWillBeSentExtraInfo(ev)
 		case *network.EventRequestServedFromCache:
 			m.onRequestServedFromCache(ev)
 		case *network.EventResponseReceived:
@@ -562,6 +568,9 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent,
 		m.logger.Errorf("NetworkManager", "creating request: %s", err)
 		return
 	}
+	if extra := m.takeRequestExtraHeaders(event.RequestID); len(extra) > 0 {
+		req.addExtraHeaders(extra)
+	}
 	// Skip data and blob URLs, since they're internal to the browser.
 	if isInternalURL(req.url) {
 		m.logger.Debugf("NetworkManager", "skipping request handling of %s URL", req.url.Scheme)
@@ -599,6 +608,18 @@ func (m *NetworkManager) onRequestWillBeSent(event *network.EventRequestWillBeSe
 	} else {
 		m.onRequest(event, nil)
 	}
+}
+
+func (m *NetworkManager) onRequestWillBeSentExtraInfo(event *network.EventRequestWillBeSentExtraInfo) {
+	extra := parseExtraHeaders(event.Headers)
+	if len(extra) == 0 {
+		return
+	}
+	if req, ok := m.requestFromID(event.RequestID); ok {
+		req.addExtraHeaders(extra)
+		return
+	}
+	m.storeRequestExtraHeaders(event.RequestID, extra)
 }
 
 // onRequestPaused can send one of these two CDP events:
@@ -794,6 +815,20 @@ func (m *NetworkManager) pausedEventFromReqID(reqID network.RequestID) (*fetch.E
 	e, ok := m.reqIDToRequestPausedEvent[reqID]
 
 	return e, ok
+}
+
+func (m *NetworkManager) storeRequestExtraHeaders(reqID network.RequestID, headers map[string][]string) {
+	m.extraHeadersMu.Lock()
+	defer m.extraHeadersMu.Unlock()
+	m.reqIDToRequestExtraHeaders[reqID] = mergeHeaderMaps(m.reqIDToRequestExtraHeaders[reqID], headers)
+}
+
+func (m *NetworkManager) takeRequestExtraHeaders(reqID network.RequestID) map[string][]string {
+	m.extraHeadersMu.Lock()
+	defer m.extraHeadersMu.Unlock()
+	headers := m.reqIDToRequestExtraHeaders[reqID]
+	delete(m.reqIDToRequestExtraHeaders, reqID)
+	return headers
 }
 
 func (m *NetworkManager) setRequestInterception(value bool) error {

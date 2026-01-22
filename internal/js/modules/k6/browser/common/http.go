@@ -80,6 +80,7 @@ type Request struct {
 	url           *url.URL
 	method        string
 	headers       map[string][]string
+	extraHeaders  map[string][]string
 	// For now we're only going to work with the 0th entry of postDataEntries.
 	// We've not been able to reproduce a situation where more than one entry
 	// occupies the slice. Once we have a better idea of when more than one
@@ -179,6 +180,94 @@ func NewRequest(ctx context.Context, logger *log.Logger, rp NewRequestParams) (*
 	return &r, nil
 }
 
+func parseExtraHeaders(headers network.Headers) map[string][]string {
+	if len(headers) == 0 {
+		return nil
+	}
+	parsed := make(map[string][]string, len(headers))
+	for name, value := range headers {
+		switch v := value.(type) {
+		case string:
+			parsed[name] = splitHeaderValues(v)
+		case []string:
+			parsed[name] = append([]string{}, v...)
+		case []any:
+			values := make([]string, 0, len(v))
+			for _, item := range v {
+				if s, ok := item.(string); ok {
+					values = append(values, s)
+				}
+			}
+			if len(values) > 0 {
+				parsed[name] = values
+			}
+		}
+	}
+	if len(parsed) == 0 {
+		return nil
+	}
+	return parsed
+}
+
+func splitHeaderValues(value string) []string {
+	return []string{value}
+}
+
+type headerValues struct {
+	name   string
+	values []string
+}
+
+func mergeHeaderValues(base map[string][]string, extra map[string][]string) map[string]headerValues {
+	merged := make(map[string]headerValues)
+	add := func(name string, values []string) {
+		if len(values) == 0 {
+			return
+		}
+		key := strings.ToLower(name)
+		current := merged[key]
+		if current.name == "" {
+			current.name = name
+		}
+		for _, v := range values {
+			if !containsString(current.values, v) {
+				current.values = append(current.values, v)
+			}
+		}
+		merged[key] = current
+	}
+	for name, values := range base {
+		add(name, values)
+	}
+	for name, values := range extra {
+		add(name, values)
+	}
+	return merged
+}
+
+func containsString(values []string, value string) bool {
+	for _, v := range values {
+		if v == value {
+			return true
+		}
+	}
+	return false
+}
+
+func mergeHeaderMaps(base map[string][]string, extra map[string][]string) map[string][]string {
+	if len(base) == 0 && len(extra) == 0 {
+		return nil
+	}
+	merged := make(map[string][]string)
+	for _, header := range mergeHeaderValues(base, extra) {
+		merged[header.name] = header.values
+	}
+	if len(merged) == 0 {
+		return nil
+	}
+	return merged
+}
+
 // validateResourceType will validate network.ResourceType string values against our own
 // ResourceType string values.
 //   - If a new network.ResourceType is added, this will log a warn and return
@@ -235,6 +324,13 @@ func (r *Request) headersSize() int64 {
 		size += len(n) + len(strings.Join(v, "")) + 4 // 4 = ': ' + '\r\n'
 	}
 	return int64(size)
+}
+
+func (r *Request) addExtraHeaders(extra map[string][]string) {
+	if len(extra) == 0 {
+		return
+	}
+	r.extraHeaders = mergeHeaderMaps(r.extraHeaders, extra)
 }
 
 func (r *Request) setErrorText(errorText string) {
