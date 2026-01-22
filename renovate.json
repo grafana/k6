@@ -11,12 +11,6 @@
   "prConcurrentLimit": 50,
   "packageRules": [
     {
-      "description": "GitHub Actions",
-      "matchManagers": [
-        "github-actions"
-      ]
-    },
-    {
       "description": "Enable gomod updates with common options",
       "matchManagers": [
         "gomod"

@@ -38,7 +38,7 @@ jobs:
       sign_windows_artifacts: ${{ steps.determine_windows_signing.outputs.sign_windows_artifacts }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -103,7 +103,7 @@ jobs:
       VERSION: ${{ needs.configure.outputs.k6_version }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -169,7 +169,7 @@ jobs:
       VERSION: ${{ needs.configure.outputs.k6_version }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -199,7 +199,7 @@ jobs:
           docker run $DOCKER_IMAGE_ID resume --help
       - name: Login to DockerHub
         if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') }}
-        uses: grafana/shared-workflows/actions/dockerhub-login@c6d954f7cd9c0022018982e01268de6cb75b913c # dockerhub-login/v1.0.2
+        uses: grafana/shared-workflows/actions/dockerhub-login@081a366728379fd0426b9cfef190e9a21c2d5418 # dockerhub-login/v1.0.3
       - name: Login to GitHub Container Registry
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
         env:
@@ -361,7 +361,7 @@ jobs:
       VERSION: ${{ needs.configure.outputs.k6_version }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
         with:
           persist-credentials: false
       - name: Install pandoc
@@ -468,7 +468,7 @@ jobs:
        contents: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
         with:
           persist-credentials: false
       - name: Download binaries
@@ -485,7 +485,7 @@ jobs:
         run: cd dist && sha256sum * > "k6-${VERSION}-checksums.txt"
       - name: Anchore SBOM Action
         continue-on-error: true
-        uses: anchore/sbom-action@8e94d75ddd33f69f691467e42275782e4bfefe84 # v0.20.9
+        uses: anchore/sbom-action@0b82b0b1a22399a1c542d4d656f70cd903571b5c # v0.21.1
         with:
           artifact-name: k6-${{ env.VERSION }}-spdx.json
           upload-release-assets: false
@@ -547,11 +547,11 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
+      packages: write
       id-token: write # Required for Vault
     steps:
       - name: Checkout code
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
         with:
           persist-credentials: false
       - name: Download binaries
@@ -597,6 +597,9 @@ jobs:
           echo "${PGP_SIGN_KEY}" > packaging/sign-key.gpg
       - name: Login to GitHub Container Registry
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           registry: ghcr.io
           username: ${{ env.GITHUB_ACTOR }}

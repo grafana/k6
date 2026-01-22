@@ -48,6 +48,12 @@ const (
 
 	// PageEventResponse represents the page response event.
 	PageEventResponse PageEventName = "response"
+
+	// PageEventRequestFinished represents the page request finished event.
+	PageEventRequestFinished PageEventName = "requestfinished"
+
+	// PageEventRequestFailed represents the page requestfailed event.
+	PageEventRequestFailed PageEventName = "requestfailed"
 )
 
 // PageEventHandler is a function type that handles a page on event.
@@ -508,6 +514,25 @@ func (p *Page) onResponse(resp *Response) {
 	}
 }
 
+// onRequestFinished calls [PageEventRequestFinished] handlers when a request completes successfully.
+func (p *Page) onRequestFinished(request *Request) {
+	for handle := range p.eventHandlersByName(PageEventRequestFinished) {
+		if err := handle(PageEvent{Request: request}); err != nil {
+			p.logger.Warnf("onRequestFinished", "handler returned an error: %v", err)
+			return
+		}
+	}
+}
+
+// onRequestFailed will call the handlers for the page.on('requestfailed') event.
+func (p *Page) onRequestFailed(request *Request) {
+	for handle := range p.eventHandlersByName(PageEventRequestFailed) {
+		if err := handle(PageEvent{Request: request}); err != nil {
+			p.logger.Warnf("onRequestFailed", "handler returned an error: %v", err)
+		}
+	}
+}
+
 func (p *Page) onConsoleAPICalled(event *runtime.EventConsoleAPICalled) {
 	if !p.hasEventHandler(PageEventConsole) {
 		return
@@ -901,9 +926,7 @@ func (p *Page) Close() error {
 
 	add := runtime.RemoveBinding(webVitalBinding)
 	if err := add.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-		err := fmt.Errorf("internal error while removing binding from page: %w", err)
-		spanRecordError(span, err)
-		return err
+		return spanRecordErrorf(span, "internal error while removing binding from page: %w", err)
 	}
 
 	action := target.CloseTarget(p.targetID)
@@ -922,9 +945,7 @@ func (p *Page) Close() error {
 			return nil
 		}
 
-		err := fmt.Errorf("closing a page: %w", err)
-		spanRecordError(span, err)
-		return err
+		return spanRecordErrorf(span, "closing a page: %w", err)
 	}
 
 	return nil
@@ -1129,8 +1150,7 @@ func (p *Page) Goto(url string, opts *FrameGotoOptions) (*Response, error) {
 
 	resp, err := p.MainFrame().Goto(url, opts)
 	if err != nil {
-		spanRecordError(span, err)
-		return nil, err
+		return nil, spanRecordErrorf(span, "navigating page: %w", err)
 	}
 
 	return resp, nil
@@ -1217,6 +1237,13 @@ func (p *Page) Locator(selector string, opts *LocatorOptions) *Locator {
 	p.logger.Debugf("Page:Locator", "sid:%s sel: %q opts:%+v", p.sessionID(), selector, opts)
 
 	return p.MainFrame().Locator(selector, opts)
+}
+
+// FrameLocator creates a frame locator for an iframe matching the given selector.
+func (p *Page) FrameLocator(selector string) *FrameLocator {
+	p.logger.Debugf("Page:FrameLocator", "sid:%s selector:%q", p.sessionID(), selector)
+
+	return p.Locator(selector, nil).ContentFrame()
 }
 
 // MainFrame returns the main frame on the page.
@@ -1327,6 +1354,10 @@ type PageEvent struct {
 // passing in the ConsoleMessage associated with the event.
 // The only accepted event value is 'console'.
 func (p *Page) On(event PageEventName, handler PageEventHandler) error {
+	if handler == nil {
+		return errors.New(`"handler" argument cannot be nil`)
+	}
+
 	_, err := p.addEventHandler(event, handler)
 	return err
 }
@@ -1397,10 +1428,15 @@ func (p *Page) QueryAll(selector string) ([]*ElementHandle, error) {
 }
 
 // Reload will reload the current page.
-func (p *Page) Reload(opts *PageReloadOptions) (*Response, error) { //nolint:funlen
+func (p *Page) Reload(opts *PageReloadOptions) (_ *Response, rerr error) { //nolint:funlen
 	p.logger.Debugf("Page:Reload", "sid:%v", p.sessionID())
 	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.reload")
 	defer span.End()
+	defer func() {
+		if rerr != nil {
+			rerr = spanRecordErrorf(span, "reloading page: %w", rerr)
+		}
+	}()
 
 	timeoutCtx, timeoutCancelFn := context.WithTimeout(p.ctx, opts.Timeout)
 	defer timeoutCancelFn()
@@ -1427,8 +1463,6 @@ func (p *Page) Reload(opts *PageReloadOptions) (*Response, error) { //nolint:fun
 
 	reloadAction := page.Reload()
 	if err := reloadAction.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-		err := fmt.Errorf("reloading page: %w", err)
-		spanRecordError(span, err)
 		return nil, err
 	}
 
@@ -1438,11 +1472,11 @@ func (p *Page) Reload(opts *PageReloadOptions) (*Response, error) { //nolint:fun
 				Err:     err,
 				Timeout: opts.Timeout,
 			}
-			return fmt.Errorf("reloading page: %w", err)
+			return err
 		}
 		p.logger.Debugf("Page:Reload", "timeoutCtx done: %v", err)
 
-		return fmt.Errorf("reloading page: %w", err)
+		return err
 	}
 
 	var (
@@ -1451,7 +1485,7 @@ func (p *Page) Reload(opts *PageReloadOptions) (*Response, error) { //nolint:fun
 	)
 	select {
 	case <-p.ctx.Done():
-		err = fmt.Errorf("reloading page: %w", p.ctx.Err())
+		err = p.ctx.Err()
 	case <-timeoutCtx.Done():
 		err = wrapTimeoutError(timeoutCtx.Err())
 	case event := <-waitForFrameNavigation:
@@ -1463,7 +1497,6 @@ func (p *Page) Reload(opts *PageReloadOptions) (*Response, error) { //nolint:fun
 		}
 	}
 	if err != nil {
-		spanRecordError(span, err)
 		return nil, err
 	}
 
@@ -1481,9 +1514,7 @@ func (p *Page) Reload(opts *PageReloadOptions) (*Response, error) { //nolint:fun
 	select {
 	case <-waitForLifecycleEvent:
 	case <-timeoutCtx.Done():
-		err := wrapTimeoutError(timeoutCtx.Err())
-		spanRecordError(span, err)
-		return nil, err
+		return nil, wrapTimeoutError(timeoutCtx.Err())
 	}
 
 	applySlowMo(p.ctx)
@@ -1501,9 +1532,7 @@ func (p *Page) Screenshot(opts *PageScreenshotOptions, sp ScreenshotPersister) (
 	s := newScreenshotter(spanCtx, sp, p.logger)
 	buf, err := s.screenshotPage(p, opts)
 	if err != nil {
-		err := fmt.Errorf("taking screenshot of page: %w", err)
-		spanRecordError(span, err)
-		return nil, err
+		return nil, spanRecordErrorf(span, "taking screenshot of page: %w", err)
 	}
 
 	return buf, err
@@ -1684,8 +1713,7 @@ func (p *Page) WaitForNavigation(opts *FrameWaitForNavigationOptions, rm RegExMa
 
 	resp, err := p.frameManager.MainFrame().WaitForNavigation(opts, rm)
 	if err != nil {
-		spanRecordError(span, err)
-		return nil, err
+		return nil, spanRecordError(span, err)
 	}
 
 	return resp, err
@@ -1719,8 +1747,7 @@ func (p *Page) WaitForURL(urlPattern string, opts *FrameWaitForURLOptions, rm Re
 
 	err := p.frameManager.MainFrame().WaitForURL(urlPattern, opts, rm)
 	if err != nil {
-		spanRecordError(span, err)
-		return err
+		return spanRecordError(span, err)
 	}
 
 	return nil
@@ -1813,10 +1840,12 @@ func (p *Page) WaitForResponse(
 		return rm.Match(urlPattern, e.Response.URL())
 	})
 	if err != nil {
-		err = &k6ext.UserFriendlyError{Err: err, Timeout: opts.Timeout}
-		spanRecordError(span, err)
+		return nil, spanRecordErrorf(span, "waiting for response: %w", &k6ext.UserFriendlyError{
+			Err: err, Timeout: opts.Timeout,
+		})
 	}
-	return ev.Response, err
+
+	return ev.Response, nil
 }
 
 // PageWaitForRequestOptions are options for [Page.WaitForRequest].
@@ -1840,10 +1869,44 @@ func (p *Page) WaitForRequest(
 		return rm.Match(urlPattern, e.Request.URL())
 	})
 	if err != nil {
-		err = &k6ext.UserFriendlyError{Err: err, Timeout: opts.Timeout}
-		spanRecordError(span, err)
+		return nil, spanRecordErrorf(span, "waiting for request: %w", &k6ext.UserFriendlyError{
+			Err: err, Timeout: opts.Timeout,
+		})
 	}
-	return ev.Request, err
+	return ev.Request, nil
+}
+
+// PageWaitForEventOptions are options for [Page.WaitForEvent].
+type PageWaitForEventOptions struct {
+	// Timeout is the maximum time to wait for the event.
+	Timeout time.Duration
+}
+
+// WaitForEvent waits for the specified event to be emitted.
+func (p *Page) WaitForEvent(
+	eventName PageEventName,
+	opts *PageWaitForEventOptions,
+	fn func(PageEvent) (bool, error),
+) (PageEvent, error) {
+	p.logger.Debugf("Page:WaitForEvent", "sid:%v event:%s", p.sessionID(), eventName)
+	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.waitForEvent")
+	defer span.End()
+
+	ctx, cancel := context.WithTimeout(p.ctx, opts.Timeout)
+	defer cancel()
+
+	// If no predicate is provided, match the first event.
+	if fn == nil {
+		fn = func(PageEvent) (bool, error) { return true, nil }
+	}
+
+	ev, err := p.waitForEvent(ctx, eventName, fn)
+	if err != nil {
+		return PageEvent{}, spanRecordErrorf(span, "waiting for page event %q: %w", eventName, &k6ext.UserFriendlyError{
+			Err: err, Timeout: opts.Timeout,
+		})
+	}
+	return ev, nil
 }
 
 // Workers returns all WebWorkers of page.

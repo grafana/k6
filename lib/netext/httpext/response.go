@@ -74,7 +74,9 @@ type Response struct {
 // NewResponse returns an empty Response instance.
 func NewResponse() *Response {
 	return &Response{
-		Body: []byte{},
+		Headers: make(map[string]string),
+		Cookies: make(map[string][]*HTTPCookie),
+		Body:    []byte{},
 	}
 }
 

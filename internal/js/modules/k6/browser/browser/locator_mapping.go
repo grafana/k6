@@ -282,6 +282,10 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 		"locator": func(selector string, opts sobek.Value) mapping {
 			return mapLocator(vu, lo.Locator(selector, parseLocatorOptions(rt, opts)))
 		},
+		"frameLocator": func(selector string) *sobek.Object {
+			mfl := mapFrameLocator(vu, lo.FrameLocator(selector))
+			return rt.ToValue(mfl).ToObject(rt)
+		},
 		"innerHTML": func(opts sobek.Value) (*sobek.Promise, error) {
 			copts := common.NewFrameInnerHTMLOptions(lo.Timeout())
 			if err := copts.Parse(vu.Context(), opts); err != nil {
@@ -355,6 +359,17 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 				return nil, lo.Press(key, copts) //nolint:wrapcheck
 			}), nil
 		},
+
+		"pressSequentially": func(text string, opts sobek.Value) (*sobek.Promise, error) {
+			copts := common.NewFrameTypeOptions(lo.Timeout())
+			if err := copts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing locator press sequentially options: %w", err)
+			}
+			return promise(vu, func() (any, error) {
+				return nil, lo.PressSequentially(text, copts) //nolint:wrapcheck
+			}), nil
+		},
+
 		"type": func(text string, opts sobek.Value) (*sobek.Promise, error) {
 			copts := common.NewFrameTypeOptions(lo.Timeout())
 			if err := copts.Parse(vu.Context(), opts); err != nil {
