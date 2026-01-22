@@ -323,6 +323,9 @@ func (r *Request) headersSize() int64 {
 	for n, v := range r.headers {
 		size += len(n) + len(strings.Join(v, "")) + 4 // 4 = ': ' + '\r\n'
 	}
+	for n, v := range r.extraHeaders {
+		size += len(n) + len(strings.Join(v, "")) + 4 // 4 = ': ' + '\r\n'
+	}
 	return int64(size)
 }
 
