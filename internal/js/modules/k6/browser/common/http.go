@@ -752,6 +752,11 @@ func (r *Response) HeadersArray() []HTTPHeader {
 			headers = append(headers, HTTPHeader{Name: n, Value: v})
 		}
 	}
+	for n, vals := range r.extraHeaders {
+		for _, v := range vals {
+			headers = append(headers, HTTPHeader{Name: n, Value: v})
+		}
+	}
 	return headers
 }
 
