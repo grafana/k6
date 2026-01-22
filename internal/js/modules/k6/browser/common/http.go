@@ -357,7 +357,6 @@ func (r *Request) setLoadedFromCache(fromMemoryCache bool) {
 
 // AllHeaders returns all the request headers.
 func (r *Request) AllHeaders() map[string]string {
-	// TODO: fix this data to include "ExtraInfo" header data
 	headers := make(map[string]string)
 	for n, v := range r.headers {
 		headers[strings.ToLower(n)] = strings.Join(v, ",")
@@ -669,7 +668,6 @@ func (r *Response) headersSize() int64 {
 
 // AllHeaders returns all the response headers.
 func (r *Response) AllHeaders() map[string]string {
-	// TODO: fix this data to include "ExtraInfo" header data
 	headers := make(map[string]string)
 	for n, v := range r.headers {
 		headers[strings.ToLower(n)] = strings.Join(v, ",")
