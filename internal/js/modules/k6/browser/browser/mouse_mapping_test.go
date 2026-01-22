@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"go.k6.io/k6/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext/k6test"
 )
 
@@ -13,26 +14,20 @@ func TestParseMouseClickOptions(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name        string
-		input       string
-		wantButton  string
-		wantClick   int64
-		wantDelay   int64
-		wantErr     string
+		name    string
+		input   string
+		want    *common.MouseClickOptions
+		wantErr string
 	}{
 		{
-			name:       "defaults_on_null",
-			input:      `null`,
-			wantButton: "left",
-			wantClick:  1,
-			wantDelay:  0,
+			name:  "defaults_on_null",
+			input: `null`,
+			want:  &common.MouseClickOptions{Button: "left", ClickCount: 1, Delay: 0},
 		},
 		{
-			name:       "all_options",
-			input:      `({button: "right", clickCount: 3, delay: 100})`,
-			wantButton: "right",
-			wantClick:  3,
-			wantDelay:  100,
+			name:  "all_options",
+			input: `({button: "right", clickCount: 3, delay: 100})`,
+			want:  &common.MouseClickOptions{Button: "right", ClickCount: 3, Delay: 100},
 		},
 		{
 			name:    "invalid_clickCount",
@@ -62,9 +57,7 @@ func TestParseMouseClickOptions(t *testing.T) {
 			}
 
 			require.NoError(t, err)
-			assert.Equal(t, tt.wantButton, opts.Button)
-			assert.Equal(t, tt.wantClick, opts.ClickCount)
-			assert.Equal(t, tt.wantDelay, opts.Delay)
+			assert.Equal(t, tt.want, opts)
 		})
 	}
 }
@@ -73,23 +66,20 @@ func TestParseMouseDblClickOptions(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name       string
-		input      string
-		wantButton string
-		wantDelay  int64
-		wantErr    string
+		name    string
+		input   string
+		want    *common.MouseDblClickOptions
+		wantErr string
 	}{
 		{
-			name:       "defaults_on_null",
-			input:      `null`,
-			wantButton: "left",
-			wantDelay:  0,
+			name:  "defaults_on_null",
+			input: `null`,
+			want:  &common.MouseDblClickOptions{Button: "left", Delay: 0},
 		},
 		{
-			name:       "all_options",
-			input:      `({button: "right", delay: 50})`,
-			wantButton: "right",
-			wantDelay:  50,
+			name:  "all_options",
+			input: `({button: "right", delay: 50})`,
+			want:  &common.MouseDblClickOptions{Button: "right", Delay: 50},
 		},
 		{
 			name:    "invalid_delay",
@@ -114,8 +104,7 @@ func TestParseMouseDblClickOptions(t *testing.T) {
 			}
 
 			require.NoError(t, err)
-			assert.Equal(t, tt.wantButton, opts.Button)
-			assert.Equal(t, tt.wantDelay, opts.Delay)
+			assert.Equal(t, tt.want, opts)
 		})
 	}
 }
@@ -124,23 +113,20 @@ func TestParseMouseDownUpOptions(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name       string
-		input      string
-		wantButton string
-		wantClick  int64
-		wantErr    string
+		name    string
+		input   string
+		want    *common.MouseDownUpOptions
+		wantErr string
 	}{
 		{
-			name:       "defaults_on_null",
-			input:      `null`,
-			wantButton: "left",
-			wantClick:  1,
+			name:  "defaults_on_null",
+			input: `null`,
+			want:  &common.MouseDownUpOptions{Button: "left", ClickCount: 1},
 		},
 		{
-			name:       "all_options",
-			input:      `({button: "middle", clickCount: 2})`,
-			wantButton: "middle",
-			wantClick:  2,
+			name:  "all_options",
+			input: `({button: "middle", clickCount: 2})`,
+			want:  &common.MouseDownUpOptions{Button: "middle", ClickCount: 2},
 		},
 		{
 			name:    "invalid_clickCount",
@@ -165,8 +151,7 @@ func TestParseMouseDownUpOptions(t *testing.T) {
 			}
 
 			require.NoError(t, err)
-			assert.Equal(t, tt.wantButton, opts.Button)
-			assert.Equal(t, tt.wantClick, opts.ClickCount)
+			assert.Equal(t, tt.want, opts)
 		})
 	}
 }
@@ -175,20 +160,20 @@ func TestParseMouseMoveOptions(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name      string
-		input     string
-		wantSteps int64
-		wantErr   string
+		name    string
+		input   string
+		want    *common.MouseMoveOptions
+		wantErr string
 	}{
 		{
-			name:      "defaults_on_null",
-			input:     `null`,
-			wantSteps: 1,
+			name:  "defaults_on_null",
+			input: `null`,
+			want:  &common.MouseMoveOptions{Steps: 1},
 		},
 		{
-			name:      "custom_steps",
-			input:     `({steps: 10})`,
-			wantSteps: 10,
+			name:  "custom_steps",
+			input: `({steps: 10})`,
+			want:  &common.MouseMoveOptions{Steps: 10},
 		},
 		{
 			name:    "invalid_steps",
@@ -213,7 +198,7 @@ func TestParseMouseMoveOptions(t *testing.T) {
 			}
 
 			require.NoError(t, err)
-			assert.Equal(t, tt.wantSteps, opts.Steps)
+			assert.Equal(t, tt.want, opts)
 		})
 	}
 }
