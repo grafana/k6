@@ -2816,6 +2816,99 @@ func TestPageOnResponse(t *testing.T) {
 	}
 }
 
+func TestPageOnRequestAllHeadersExtraInfo(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withHTTPServer())
+	tb.withHandler("/set-cookie", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Add("Set-Cookie", "test_cookie_name=test_cookie_value; Path=/")
+		_, err := fmt.Fprint(w, "ok")
+		require.NoError(t, err)
+	})
+
+	p := tb.NewPage(nil)
+
+	opts := &common.FrameGotoOptions{
+		WaitUntil: common.LifecycleEventNetworkIdle,
+		Timeout:   common.DefaultTimeout,
+	}
+	// This will tell the browser to store the cookie
+	_, err := p.Goto(tb.url("/set-cookie"), opts)
+	require.NoError(t, err)
+
+	// The cookie in the browser store is sent as a header in the request
+	gotoPage := func() error {
+		_, err := p.Goto(tb.url("/set-cookie"), opts)
+		return err
+	}
+
+	// We are only guaranteed to have the extra headers when the requestfinished
+	// event is fired. Trying to retrieve the extra headers on anyother event will
+	// be racey and may not be present.
+	var ev common.PageEvent
+	waitForRequestFinished := func() error {
+		var err error
+		ev, err = p.WaitForEvent(
+			common.PageEventRequestFinished,
+			&common.PageWaitForEventOptions{Timeout: p.Timeout()},
+			func(pe common.PageEvent) (bool, error) {
+				return strings.Contains(pe.Request.URL(), "/set-cookie"), nil
+			},
+		)
+		return err
+	}
+
+	err = tb.run(tb.context(), gotoPage, waitForRequestFinished)
+	require.NoError(t, err)
+	require.NotNil(t, ev.Request)
+
+	assert.Contains(t, ev.Request.AllHeaders()["cookie"], "test_cookie_name=test_cookie_value")
+}
+
+func TestPageOnResponseAllHeadersExtraInfo(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withHTTPServer())
+	tb.withHandler("/set-cookie", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Add("Set-Cookie", "test_cookie_name=test_cookie_value; Path=/")
+		_, err := fmt.Fprint(w, "ok")
+		require.NoError(t, err)
+	})
+
+	p := tb.NewPage(nil)
+
+	opts := &common.FrameGotoOptions{
+		WaitUntil: common.LifecycleEventNetworkIdle,
+		Timeout:   common.DefaultTimeout,
+	}
+	gotoPage := func() error {
+		_, err := p.Goto(tb.url("/set-cookie"), opts)
+		return err
+	}
+
+	// We are only guaranteed to have the extra headers when the requestfinished
+	// event is fired. Trying to retrieve the extra headers on anyother event will
+	// be racey and may not be present.
+	var ev common.PageEvent
+	waitForRequestFinished := func() error {
+		var err error
+		ev, err = p.WaitForEvent(
+			common.PageEventRequestFinished,
+			&common.PageWaitForEventOptions{Timeout: p.Timeout()},
+			func(pe common.PageEvent) (bool, error) {
+				return strings.Contains(pe.Request.URL(), "/set-cookie"), nil
+			},
+		)
+		return err
+	}
+
+	err := tb.run(tb.context(), gotoPage, waitForRequestFinished)
+	require.NoError(t, err)
+	require.NotNil(t, ev.Request)
+
+	assert.Contains(t, ev.Request.Response().AllHeaders()["set-cookie"], "test_cookie_name=test_cookie_value")
+}
+
 // TestPageOnRequestFinished tests that the requestfinished event fires when requests complete successfully.
 func TestPageOnRequestFinished(t *testing.T) {
 	t.Parallel()
