@@ -389,15 +389,25 @@ func (r *Request) Headers() map[string]string {
 // HeadersArray returns the request headers as an array of objects.
 func (r *Request) HeadersArray() []HTTPHeader {
 	headers := make([]HTTPHeader, 0)
-	for n, vals := range r.headers {
-		for _, v := range vals {
-			headers = append(headers, HTTPHeader{Name: n, Value: v})
+	seen := make(map[string]map[string]bool)
+	add := func(name string, values []string) {
+		key := strings.ToLower(name)
+		if _, ok := seen[key]; !ok {
+			seen[key] = make(map[string]bool)
+		}
+		for _, v := range values {
+			if seen[key][v] {
+				continue
+			}
+			seen[key][v] = true
+			headers = append(headers, HTTPHeader{Name: name, Value: v})
 		}
 	}
+	for n, vals := range r.headers {
+		add(n, vals)
+	}
 	for n, vals := range r.extraHeaders {
-		for _, v := range vals {
-			headers = append(headers, HTTPHeader{Name: n, Value: v})
-		}
+		add(n, vals)
 	}
 	return headers
 }
@@ -747,15 +757,25 @@ func (r *Response) Headers() map[string]string {
 // HeadersArray returns the response headers as an array of objects.
 func (r *Response) HeadersArray() []HTTPHeader {
 	headers := make([]HTTPHeader, 0)
-	for n, vals := range r.headers {
-		for _, v := range vals {
-			headers = append(headers, HTTPHeader{Name: n, Value: v})
+	seen := make(map[string]map[string]bool)
+	add := func(name string, values []string) {
+		key := strings.ToLower(name)
+		if _, ok := seen[key]; !ok {
+			seen[key] = make(map[string]bool)
+		}
+		for _, v := range values {
+			if seen[key][v] {
+				continue
+			}
+			seen[key][v] = true
+			headers = append(headers, HTTPHeader{Name: name, Value: v})
 		}
 	}
+	for n, vals := range r.headers {
+		add(n, vals)
+	}
 	for n, vals := range r.extraHeaders {
-		for _, v := range vals {
-			headers = append(headers, HTTPHeader{Name: n, Value: v})
-		}
+		add(n, vals)
 	}
 	return headers
 }
