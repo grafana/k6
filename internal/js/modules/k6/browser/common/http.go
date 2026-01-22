@@ -210,6 +210,9 @@ func parseExtraHeaders(headers network.Headers) map[string][]string {
 }
 
 func splitHeaderValues(value string) []string {
+	if strings.Contains(value, "\n") {
+		return strings.Split(value, "\n")
+	}
 	return []string{value}
 }
 
