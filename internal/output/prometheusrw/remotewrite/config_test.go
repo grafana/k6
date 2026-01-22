@@ -343,7 +343,7 @@ func TestOptionInsecureSkipTLSVerify(t *testing.T) {
 	}
 }
 
-func TestMinTLSVersion(t *testing.T) {
+func TestTLSMinVersion(t *testing.T) {
 	t.Parallel()
 
 	cases := map[string]struct {
@@ -354,12 +354,12 @@ func TestMinTLSVersion(t *testing.T) {
 		expconfig  Config
 	}{
 		"JSON": {
-			jsonRaw:    json.RawMessage(`{"minTLSVersion":"1.2"}`),
+			jsonRaw:    json.RawMessage(`{"tlsMinVersion":"1.2"}`),
 			wantRccTLS: tls.VersionTLS12,
 			expconfig: Config{
 				ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
 				InsecureSkipTLSVerify: null.BoolFrom(false),
-				MinTLSVersion:         null.NewString("1.2", true), // depends on test case
+				TLSMinVersion:         null.NewString("1.2", true), // depends on test case
 				PushInterval:          types.NullDurationFrom(5 * time.Second),
 				Headers:               make(map[string]string),
 				TrendStats:            []string{"p(99)"},
@@ -367,12 +367,12 @@ func TestMinTLSVersion(t *testing.T) {
 			},
 		},
 		"JSON incorrect": {
-			jsonRaw:    json.RawMessage(`{"minTLSVersion":""}`),
+			jsonRaw:    json.RawMessage(`{"tlsMinVersion":""}`),
 			wantRccTLS: tls.VersionTLS13,
 			expconfig: Config{
 				ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
 				InsecureSkipTLSVerify: null.BoolFrom(false),
-				MinTLSVersion:         null.NewString("", true), // depends on test case
+				TLSMinVersion:         null.NewString("", true), // depends on test case
 				PushInterval:          types.NullDurationFrom(5 * time.Second),
 				Headers:               make(map[string]string),
 				TrendStats:            []string{"p(99)"},
@@ -380,12 +380,12 @@ func TestMinTLSVersion(t *testing.T) {
 			},
 		},
 		"Env": {
-			env:        map[string]string{"K6_PROMETHEUS_RW_MINIMUM_TLS_VERSION": "1.2"},
+			env:        map[string]string{"K6_PROMETHEUS_RW_TLS_MINIMUM_VERSION": "1.2"},
 			wantRccTLS: tls.VersionTLS12,
 			expconfig: Config{
 				ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
 				InsecureSkipTLSVerify: null.BoolFrom(false),
-				MinTLSVersion:         null.NewString("1.2", true), // depends on test case
+				TLSMinVersion:         null.NewString("1.2", true), // depends on test case
 				PushInterval:          types.NullDurationFrom(5 * time.Second),
 				Headers:               make(map[string]string),
 				TrendStats:            []string{"p(99)"},
@@ -393,12 +393,12 @@ func TestMinTLSVersion(t *testing.T) {
 			},
 		},
 		"Env incorrect": {
-			env:        map[string]string{"K6_PROMETHEUS_RW_MINIMUM_TLS_VERSION": "0.0"},
+			env:        map[string]string{"K6_PROMETHEUS_RW_TLS_MINIMUM_VERSION": "0.0"},
 			wantRccTLS: tls.VersionTLS13,
 			expconfig: Config{
 				ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
 				InsecureSkipTLSVerify: null.BoolFrom(false),
-				MinTLSVersion:         null.NewString("0.0", true), // depends on test case
+				TLSMinVersion:         null.NewString("0.0", true), // depends on test case
 				PushInterval:          types.NullDurationFrom(5 * time.Second),
 				Headers:               make(map[string]string),
 				TrendStats:            []string{"p(99)"},
@@ -410,7 +410,7 @@ func TestMinTLSVersion(t *testing.T) {
 			expconfig: Config{
 				ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
 				InsecureSkipTLSVerify: null.BoolFrom(false),
-				MinTLSVersion:         null.NewString("", false), // depends on test case
+				TLSMinVersion:         null.NewString("", false), // depends on test case
 				PushInterval:          types.NullDurationFrom(5 * time.Second),
 				Headers:               make(map[string]string),
 				TrendStats:            []string{"p(99)"},
