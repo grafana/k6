@@ -25,6 +25,9 @@ func (s *secretsHook) Levels() []logrus.Level { return logrus.AllLevels }
 func (s *secretsHook) add(secret string) {
 	s.mx.Lock()
 	defer s.mx.Unlock()
+	if secret == "" {
+		return
+	}
 	s.secrets = append(s.secrets, secret, "***SECRET_REDACTED***")
 	s.replacer = strings.NewReplacer(s.secrets...)
 }
