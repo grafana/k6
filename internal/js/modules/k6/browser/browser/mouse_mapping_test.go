@@ -37,12 +37,12 @@ func TestParseMouseClickOptions(t *testing.T) {
 		{
 			name:    "invalid_clickCount",
 			input:   `({clickCount: "invalid"})`,
-			wantErr: "clickCount must be a number",
+			wantErr: "clickCount must be an integer",
 		},
 		{
 			name:    "invalid_delay",
 			input:   `({delay: true})`,
-			wantErr: "delay must be a number",
+			wantErr: "delay must be an integer",
 		},
 	}
 
@@ -94,7 +94,7 @@ func TestParseMouseDblClickOptions(t *testing.T) {
 		{
 			name:    "invalid_delay",
 			input:   `({delay: "slow"})`,
-			wantErr: "delay must be a number",
+			wantErr: "delay must be an integer",
 		},
 	}
 
@@ -145,7 +145,7 @@ func TestParseMouseDownUpOptions(t *testing.T) {
 		{
 			name:    "invalid_clickCount",
 			input:   `({clickCount: []})`,
-			wantErr: "clickCount must be a number",
+			wantErr: "clickCount must be an integer",
 		},
 	}
 
@@ -193,7 +193,7 @@ func TestParseMouseMoveOptions(t *testing.T) {
 		{
 			name:    "invalid_steps",
 			input:   `({steps: {}})`,
-			wantErr: "steps must be a number",
+			wantErr: "steps must be an integer",
 		},
 	}
 

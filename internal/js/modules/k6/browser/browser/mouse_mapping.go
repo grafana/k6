@@ -76,17 +76,17 @@ func parseMouseClickOptions(rt *sobek.Runtime, opts sobek.Value) (*common.MouseC
 			popts.Button = v.String()
 		case "clickCount":
 			switch v.ExportType().Kind() {
-			case reflect.Int64, reflect.Float64:
+			case reflect.Int64:
 				popts.ClickCount = v.ToInteger()
 			default:
-				return nil, fmt.Errorf("clickCount must be a number, got %s", v.ExportType().Kind())
+				return nil, fmt.Errorf("clickCount must be an integer, got %s", v.ExportType().Kind())
 			}
 		case "delay":
 			switch v.ExportType().Kind() {
-			case reflect.Int64, reflect.Float64:
+			case reflect.Int64:
 				popts.Delay = v.ToInteger()
 			default:
-				return nil, fmt.Errorf("delay must be a number, got %s", v.ExportType().Kind())
+				return nil, fmt.Errorf("delay must be an integer, got %s", v.ExportType().Kind())
 			}
 		}
 	}
@@ -109,10 +109,10 @@ func parseMouseDblClickOptions(rt *sobek.Runtime, opts sobek.Value) (*common.Mou
 			popts.Button = v.String()
 		case "delay":
 			switch v.ExportType().Kind() {
-			case reflect.Int64, reflect.Float64:
+			case reflect.Int64:
 				popts.Delay = v.ToInteger()
 			default:
-				return nil, fmt.Errorf("delay must be a number, got %s", v.ExportType().Kind())
+				return nil, fmt.Errorf("delay must be an integer, got %s", v.ExportType().Kind())
 			}
 		}
 	}
@@ -135,10 +135,10 @@ func parseMouseDownUpOptions(rt *sobek.Runtime, opts sobek.Value) (*common.Mouse
 			popts.Button = v.String()
 		case "clickCount":
 			switch v.ExportType().Kind() {
-			case reflect.Int64, reflect.Float64:
+			case reflect.Int64:
 				popts.ClickCount = v.ToInteger()
 			default:
-				return nil, fmt.Errorf("clickCount must be a number, got %s", v.ExportType().Kind())
+				return nil, fmt.Errorf("clickCount must be an integer, got %s", v.ExportType().Kind())
 			}
 		}
 	}
@@ -158,10 +158,10 @@ func parseMouseMoveOptions(rt *sobek.Runtime, opts sobek.Value) (*common.MouseMo
 		if k == "steps" {
 			v := obj.Get(k)
 			switch v.ExportType().Kind() {
-			case reflect.Int64, reflect.Float64:
+			case reflect.Int64:
 				popts.Steps = v.ToInteger()
 			default:
-				return nil, fmt.Errorf("steps must be a number, got %s", v.ExportType().Kind())
+				return nil, fmt.Errorf("steps must be an integer, got %s", v.ExportType().Kind())
 			}
 		}
 	}
