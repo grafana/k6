@@ -381,7 +381,7 @@ func (r *Request) HeaderValue(name string) (string, bool) {
 func (r *Request) Headers() map[string]string {
 	headers := make(map[string]string)
 	for n, v := range r.headers {
-		headers[n] = strings.Join(v, ",")
+		headers[strings.ToLower(n)] = strings.Join(v, ",")
 	}
 	return headers
 }
@@ -739,7 +739,7 @@ func (r *Response) FromServiceWorker() bool {
 func (r *Response) Headers() map[string]string {
 	headers := make(map[string]string)
 	for n, v := range r.headers {
-		headers[n] = strings.Join(v, ",")
+		headers[strings.ToLower(n)] = strings.Join(v, ",")
 	}
 	return headers
 }
