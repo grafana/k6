@@ -209,6 +209,7 @@ func parseExtraHeaders(headers network.Headers) map[string][]string {
 	return parsed
 }
 
+// CDP concatenates duplicate header values with newlines; split to match Playwright.
 func splitHeaderValues(value string) []string {
 	if strings.Contains(value, "\n") {
 		return strings.Split(value, "\n")
