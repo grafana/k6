@@ -323,11 +323,10 @@ func (r *Request) headersSize() int64 {
 	size += len(r.method)
 	size += len(r.url.Path)
 	size += 8 // httpVersion
-	for n, v := range r.headers {
-		size += len(n) + len(strings.Join(v, "")) + 4 // 4 = ': ' + '\r\n'
-	}
-	for n, v := range r.extraHeaders {
-		size += len(n) + len(strings.Join(v, "")) + 4 // 4 = ': ' + '\r\n'
+	for _, header := range mergeHeaderValues(r.headers, r.extraHeaders) {
+		for _, value := range header.values {
+			size += len(header.name) + len(value) + 4 // 4 = ': ' + '\r\n'
+		}
 	}
 	return int64(size)
 }
@@ -658,11 +657,10 @@ func (r *Response) headersSize() int64 {
 	size += 8 // httpVersion
 	size += 3 // statusCode
 	size += len(r.statusText)
-	for n, v := range r.headers {
-		size += len(n) + len(strings.Join(v, "")) + 4 // 4 = ': ' + '\r\n'
-	}
-	for n, v := range r.extraHeaders {
-		size += len(n) + len(strings.Join(v, "")) + 4 // 4 = ': ' + '\r\n'
+	for _, header := range mergeHeaderValues(r.headers, r.extraHeaders) {
+		for _, value := range header.values {
+			size += len(header.name) + len(value) + 4 // 4 = ': ' + '\r\n'
+		}
 	}
 	size += 2 // '\r\n'
 	return int64(size)
