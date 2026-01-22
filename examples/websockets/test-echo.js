@@ -1,4 +1,4 @@
-import { WebSocket } from "k6/experimental/websockets"
+import { WebSocket } from "k6/websockets"
 
 const CLOSED_STATE = 3
 
