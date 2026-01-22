@@ -359,6 +359,9 @@ func (r *Request) AllHeaders() map[string]string {
 	for n, v := range r.headers {
 		headers[strings.ToLower(n)] = strings.Join(v, ",")
 	}
+	for n, v := range r.extraHeaders {
+		headers[strings.ToLower(n)] = strings.Join(v, ",")
+	}
 	return headers
 }
 
