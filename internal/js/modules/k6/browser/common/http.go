@@ -648,6 +648,9 @@ func (r *Response) headersSize() int64 {
 	for n, v := range r.headers {
 		size += len(n) + len(strings.Join(v, "")) + 4 // 4 = ': ' + '\r\n'
 	}
+	for n, v := range r.extraHeaders {
+		size += len(n) + len(strings.Join(v, "")) + 4 // 4 = ': ' + '\r\n'
+	}
 	size += 2 // '\r\n'
 	return int64(size)
 }
