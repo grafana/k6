@@ -45,15 +45,18 @@ func getInternalJSModules() map[string]interface{} {
 		"k6/metrics":     metrics.New(),
 		"k6/secrets":     secrets.New(),
 		"k6/timers":      timers.New(),
+		"k6/websockets":  expws.New(),
 		"k6/ws":          ws.New(),
 
 		// Experimental modules
-		"k6/experimental/csv":        csv.New(),
-		"k6/experimental/fs":         fs.New(),
-		"k6/experimental/streams":    streams.New(),
-		"k6/experimental/websockets": expws.New(),
+		"k6/experimental/csv":     csv.New(),
+		"k6/experimental/fs":      fs.New(),
+		"k6/experimental/streams": streams.New(),
 
 		// Deprecated modules
+		"k6/experimental/websockets": newWarnExperimentalModule(expws.New(),
+			"k6/experimental/websockets is deprecated and will be removed in a future release."+
+				" Please use k6/websockets instead."),
 		"k6/experimental/redis": newWarnExperimentalModule(redis.New(),
 			"k6/experimental/redis has been deprecated and will be removed in future versions."+
 				" Please migrate to the new version by changing your import to 'k6/x/redis'."+
