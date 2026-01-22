@@ -207,10 +207,63 @@ func newKeyGenerator(rt *sobek.Runtime, normalized Algorithm, params sobek.Value
 	return kg, nil
 }
 
+// KeyDeriver is the interface implemented by the algorithms used to derive keys
+type KeyDeriver interface {
+	DeriveKey(
+		privateKey *CryptoKey,
+		ki KeyImporter,
+		kgl KeyGetLengther,
+		keyUsages []CryptoKeyUsage,
+		extractable bool,
+	) (*CryptoKey, error)
+}
+
+func newKeyDeriver(rt *sobek.Runtime, normalized Algorithm, params sobek.Value) (KeyDeriver, error) {
+	var kd KeyDeriver
+	var err error
+
+	switch normalized.Name {
+	case PBKDF2:
+		kd, err = newPBKDF2DeriveParams(rt, normalized, params)
+	default:
+		return nil, errors.New("key derivation not implemented for algorithm " + normalized.Name)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return kd, nil
+}
+
+// KeyGetLengther is the interface implemented by the parameters used to
+// get the key length of cryptographic keys
+type KeyGetLengther interface {
+	GetKeyLength() int
+}
+
+func newKeyGetLengther(rt *sobek.Runtime, normalized Algorithm, params sobek.Value) (KeyGetLengther, error) {
+	var kgi KeyGetLengther
+	var err error
+
+	switch normalized.Name {
+	case AESCbc, AESCtr, AESGcm, AESKw:
+		kgi, err = newAESGetLengthParams(rt, normalized, params)
+	default:
+		return nil, errors.New("key get length not implemented for algorithm " + normalized.Name)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return kgi, nil
+}
+
 // KeyImporter is the interface implemented by the parameters used to import
 // cryptographic keys.
 type KeyImporter interface {
-	ImportKey(format KeyFormat, keyData []byte, keyUsages []CryptoKeyUsage) (*CryptoKey, error)
+	ImportKey(format KeyFormat, keyData []byte, extractable bool, keyUsages []CryptoKeyUsage) (*CryptoKey, error)
 }
 
 func newKeyImporter(rt *sobek.Runtime, normalized Algorithm, params sobek.Value) (KeyImporter, error) {
@@ -226,6 +279,8 @@ func newKeyImporter(rt *sobek.Runtime, normalized Algorithm, params sobek.Value)
 		ki, err = newEcKeyImportParams(rt, normalized, params)
 	case RSASsaPkcs1v15, RSAPss, RSAOaep:
 		ki, err = newRsaHashedImportParams(rt, normalized, params)
+	case PBKDF2:
+		ki = newPBKDF2ImportParams(normalized)
 	default:
 		return nil, errors.New("key import not implemented for algorithm " + normalized.Name)
 	}
