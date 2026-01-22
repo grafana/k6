@@ -70,17 +70,18 @@ type RequestFailure struct {
 
 // Request represents a browser HTTP request.
 type Request struct {
-	ctx           context.Context
-	frame         *Frame
-	responseMu    sync.RWMutex
-	response      *Response
-	redirectChain []*Request
-	requestID     network.RequestID
-	documentID    string
-	url           *url.URL
-	method        string
-	headers       map[string][]string
-	extraHeaders  map[string][]string
+	ctx            context.Context
+	frame          *Frame
+	responseMu     sync.RWMutex
+	response       *Response
+	redirectChain  []*Request
+	requestID      network.RequestID
+	documentID     string
+	url            *url.URL
+	method         string
+	headers        map[string][]string
+	extraHeaders   map[string][]string
+	extraHeadersMu sync.RWMutex
 	// For now we're only going to work with the 0th entry of postDataEntries.
 	// We've not been able to reproduce a situation where more than one entry
 	// occupies the slice. Once we have a better idea of when more than one
@@ -324,11 +325,13 @@ func (r *Request) headersSize() int64 {
 	size += len(r.method)
 	size += len(r.url.Path)
 	size += 8 // httpVersion
+	r.extraHeadersMu.RLock()
 	for _, header := range mergeHeaderValues(r.headers, r.extraHeaders) {
 		for _, value := range header.values {
 			size += len(header.name) + len(value) + 4 // 4 = ': ' + '\r\n'
 		}
 	}
+	r.extraHeadersMu.RUnlock()
 	return int64(size)
 }
 
@@ -336,7 +339,9 @@ func (r *Request) addExtraHeaders(extra map[string][]string) {
 	if len(extra) == 0 {
 		return
 	}
+	r.extraHeadersMu.Lock()
 	r.extraHeaders = mergeHeaderMaps(r.extraHeaders, extra)
+	r.extraHeadersMu.Unlock()
 }
 
 func (r *Request) setErrorText(errorText string) {
@@ -361,9 +366,11 @@ func (r *Request) AllHeaders() map[string]string {
 	for n, v := range r.headers {
 		headers[strings.ToLower(n)] = strings.Join(v, ",")
 	}
+	r.extraHeadersMu.RLock()
 	for n, v := range r.extraHeaders {
 		headers[strings.ToLower(n)] = strings.Join(v, ",")
 	}
+	r.extraHeadersMu.RUnlock()
 	return headers
 }
 
@@ -408,9 +415,11 @@ func (r *Request) HeadersArray() []HTTPHeader {
 	for n, vals := range r.headers {
 		add(n, vals)
 	}
+	r.extraHeadersMu.RLock()
 	for n, vals := range r.extraHeaders {
 		add(n, vals)
 	}
+	r.extraHeadersMu.RUnlock()
 	return headers
 }
 
@@ -548,6 +557,7 @@ type Response struct {
 	body              []byte
 	headers           map[string][]string
 	extraHeaders      map[string][]string
+	extraHeadersMu    sync.RWMutex
 	fromDiskCache     bool
 	fromServiceWorker bool
 	fromPrefetchCache bool
@@ -657,11 +667,13 @@ func (r *Response) headersSize() int64 {
 	size += 8 // httpVersion
 	size += 3 // statusCode
 	size += len(r.statusText)
+	r.extraHeadersMu.RLock()
 	for _, header := range mergeHeaderValues(r.headers, r.extraHeaders) {
 		for _, value := range header.values {
 			size += len(header.name) + len(value) + 4 // 4 = ': ' + '\r\n'
 		}
 	}
+	r.extraHeadersMu.RUnlock()
 	size += 2 // '\r\n'
 	return int64(size)
 }
@@ -672,9 +684,11 @@ func (r *Response) AllHeaders() map[string]string {
 	for n, v := range r.headers {
 		headers[strings.ToLower(n)] = strings.Join(v, ",")
 	}
+	r.extraHeadersMu.RLock()
 	for n, v := range r.extraHeaders {
 		headers[strings.ToLower(n)] = strings.Join(v, ",")
 	}
+	r.extraHeadersMu.RUnlock()
 	return headers
 }
 
@@ -774,9 +788,11 @@ func (r *Response) HeadersArray() []HTTPHeader {
 	for n, vals := range r.headers {
 		add(n, vals)
 	}
+	r.extraHeadersMu.RLock()
 	for n, vals := range r.extraHeaders {
 		add(n, vals)
 	}
+	r.extraHeadersMu.RUnlock()
 	return headers
 }
 
@@ -784,7 +800,9 @@ func (r *Response) addExtraHeaders(extra map[string][]string) {
 	if len(extra) == 0 {
 		return
 	}
+	r.extraHeadersMu.Lock()
 	r.extraHeaders = mergeHeaderMaps(r.extraHeaders, extra)
+	r.extraHeadersMu.Unlock()
 }
 
 // JSON returns the response body as JSON data.
