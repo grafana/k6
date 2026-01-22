@@ -39,8 +39,6 @@ jobs:
           echo "Running tests on '${GITHUB_REF}' with '$(git describe --tags --always --long --dirty)' checked out..."
       - name: Run tests
         uses: ./.github/actions/test-browser
-        with:
-          platform: ${{ matrix.platform }}
 
   test-tip:
     strategy:
@@ -69,7 +67,6 @@ jobs:
         uses: ./.github/actions/test-browser
         with:
           use_gotip: "true"
-          platform: ${{ matrix.platform }}
 
   test-latest:
     strategy:
@@ -91,5 +88,3 @@ jobs:
           platform: ${{ matrix.platform }}
       - name: Run tests
         uses: ./.github/actions/test-browser
-        with:
-          platform: ${{ matrix.platform }}
