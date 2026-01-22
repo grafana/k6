@@ -535,6 +535,7 @@ type Response struct {
 	bodyMu            sync.RWMutex
 	body              []byte
 	headers           map[string][]string
+	extraHeaders      map[string][]string
 	fromDiskCache     bool
 	fromServiceWorker bool
 	fromPrefetchCache bool
@@ -746,6 +747,13 @@ func (r *Response) HeadersArray() []HTTPHeader {
 		}
 	}
 	return headers
+}
+
+func (r *Response) addExtraHeaders(extra map[string][]string) {
+	if len(extra) == 0 {
+		return
+	}
+	r.extraHeaders = mergeHeaderMaps(r.extraHeaders, extra)
 }
 
 // JSON returns the response body as JSON data.
