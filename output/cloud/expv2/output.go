@@ -58,17 +58,16 @@ type Output struct {
 
 // New creates a new cloud output.
 func New(logger logrus.FieldLogger, conf cloudapi.Config, _ *cloudapi.Client) (*Output, error) {
+	// TODO: move this creation operation to the centralized output. Reducing the probability to
+	// break the logic for the config overwriting.
+	//
+	// It creates a new client because in the case the backend has overwritten
+	// the config we need to use the new set.
 	return &Output{
 		config: conf,
 		logger: logger.WithField("output", "cloudv2"),
 		abort:  make(chan struct{}),
 		stop:   make(chan struct{}),
-
-		// TODO: move this creation operation to the centralized output. Reducing the probability to
-		// break the logic for the config overwriting.
-		//
-		// It creates a new client because in the case the backend has overwritten
-		// the config we need to use the new set.
 		cloudClient: cloudapi.NewClient(
 			logger, conf.Token.String, conf.Host.String, build.Version, conf.Timeout.TimeDuration()),
 	}, nil

@@ -1,4 +1,4 @@
-name: Test
+name: Browser tests
 on:
   push:
     branches:
@@ -19,7 +19,8 @@ jobs:
       fail-fast: false
       matrix:
         go-version: [1.24.x]
-        platform: [ubuntu-22.04, ubuntu-24.04-arm, windows-latest]
+        platform:
+          [ubuntu-22.04, ubuntu-arm64-large, github-hosted-windows-x64-large]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout code
@@ -37,15 +38,19 @@ jobs:
         run: |
           echo "Running tests on '${GITHUB_REF}' with '$(git describe --tags --always --long --dirty)' checked out..."
       - name: Run tests
-        uses: ./.github/actions/test
-        with:
-          platform: ${{ matrix.platform }}
+        uses: ./.github/actions/test-browser
 
   test-tip:
     strategy:
       fail-fast: false
       matrix:
-        platform: [ubuntu-22.04, ubuntu-24.04-arm, windows-latest]
+        include:
+          - platform: ubuntu-22.04
+            gotip_platform: ubuntu-22.04
+          - platform: ubuntu-arm64-large
+            gotip_platform: ubuntu-24.04-arm
+          - platform: github-hosted-windows-x64-large
+            gotip_platform: windows-latest
     runs-on: ${{ matrix.platform }}
     continue-on-error: true
     steps:
@@ -57,19 +62,19 @@ jobs:
         uses: ./.github/actions/test-common
         with:
           go_version: "gotip"
-          platform: ${{ matrix.platform }}
+          platform: ${{ matrix.gotip_platform }}
       - name: Run tests
-        uses: ./.github/actions/test
+        uses: ./.github/actions/test-browser
         with:
           use_gotip: "true"
-          platform: ${{ matrix.platform }}
-  
+
   test-latest:
     strategy:
       fail-fast: false
       matrix:
         go-version: [1.25.x]
-        platform: [ubuntu-22.04, ubuntu-24.04-arm, windows-latest]
+        platform:
+          [ubuntu-22.04, ubuntu-arm64-large, github-hosted-windows-x64-large]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout code
@@ -82,6 +87,4 @@ jobs:
           go_version: ${{ matrix.go-version }}
           platform: ${{ matrix.platform }}
       - name: Run tests
-        uses: ./.github/actions/test
-        with:
-          platform: ${{ matrix.platform }}
+        uses: ./.github/actions/test-browser
