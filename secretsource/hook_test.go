@@ -33,7 +33,7 @@ func TestSecretsHookAddIgnoresEmptySecrets(t *testing.T) {
 	assert.NotContains(t, entry.Message, "***SECRET_REDACTED***T***SECRET_REDACTED***h***SECRET_REDACTED***")
 }
 
-func TestSecretsHook_OnlyEmptySecret(t *testing.T) {
+func TestSecretsHookFireWithNoSecretsLeavesMessageUnchanged(t *testing.T) {
 	t.Parallel()
 
 	hook := &secretsHook{}
