@@ -363,14 +363,12 @@ func (r *Request) setLoadedFromCache(fromMemoryCache bool) {
 // AllHeaders returns all the request headers.
 func (r *Request) AllHeaders() map[string]string {
 	headers := make(map[string]string)
-	for n, v := range r.headers {
-		headers[strings.ToLower(n)] = strings.Join(v, ",")
-	}
 	r.extraHeadersMu.RLock()
-	for n, v := range r.extraHeaders {
-		headers[strings.ToLower(n)] = strings.Join(v, ",")
-	}
+	merged := mergeHeaderValues(r.headers, r.extraHeaders)
 	r.extraHeadersMu.RUnlock()
+	for _, header := range merged {
+		headers[strings.ToLower(header.name)] = strings.Join(header.values, "\n")
+	}
 	return headers
 }
 
@@ -681,14 +679,12 @@ func (r *Response) headersSize() int64 {
 // AllHeaders returns all the response headers.
 func (r *Response) AllHeaders() map[string]string {
 	headers := make(map[string]string)
-	for n, v := range r.headers {
-		headers[strings.ToLower(n)] = strings.Join(v, ",")
-	}
 	r.extraHeadersMu.RLock()
-	for n, v := range r.extraHeaders {
-		headers[strings.ToLower(n)] = strings.Join(v, ",")
-	}
+	merged := mergeHeaderValues(r.headers, r.extraHeaders)
 	r.extraHeadersMu.RUnlock()
+	for _, header := range merged {
+		headers[strings.ToLower(header.name)] = strings.Join(header.values, "\n")
+	}
 	return headers
 }
 
