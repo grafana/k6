@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSecretsHook_EmptySecret(t *testing.T) {
+func TestSecretsHookAddIgnoresEmptySecrets(t *testing.T) {
 	t.Parallel()
 
 	hook := &secretsHook{}
