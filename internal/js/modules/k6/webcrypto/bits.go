@@ -1,11 +1,28 @@
 package webcrypto
 
-type bitsDeriver func(CryptoKey, CryptoKey) ([]byte, error)
+import "github.com/grafana/sobek"
 
-func newBitsDeriver(algName string) (bitsDeriver, error) {
-	if algName == ECDH {
-		return deriveBitsECDH, nil
+// BitsDeriver is the interface implemented by the parameters used to derive bits
+type BitsDeriver interface {
+	DeriveBits(privateKey *CryptoKey, length int) ([]byte, error)
+}
+
+func newBitsDeriver(rt *sobek.Runtime, normalized Algorithm, algorithm sobek.Value) (BitsDeriver, error) {
+	var deriver BitsDeriver
+	var err error
+
+	switch normalized.Name {
+	case ECDH:
+		deriver, err = newECDHKeyDeriveParams(rt, normalized, algorithm)
+	case PBKDF2:
+		deriver, err = newPBKDF2DeriveParams(rt, normalized, algorithm)
+	default:
+		return nil, NewError(NotSupportedError, "unsupported algorithm for derive bits: "+normalized.Name)
 	}
 
-	return nil, NewError(NotSupportedError, "unsupported algorithm for derive bits: "+algName)
+	if err != nil {
+		return nil, err
+	}
+
+	return deriver, nil
 }

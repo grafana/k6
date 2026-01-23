@@ -1,13 +1,15 @@
 package js
 
 import (
-	"encoding/json"
+	"fmt"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/grafana/sobek"
 	"github.com/sirupsen/logrus"
+	"go.k6.io/k6/js/common"
 )
 
 // console represents a JS console implemented as a logrus.FieldLogger.
@@ -78,7 +80,10 @@ func (c console) Error(args ...sobek.Value) {
 	c.log(logrus.ErrorLevel, args...)
 }
 
-const functionLog = "[object Function]"
+const (
+	functionLog = "[object Function]"
+	circularLog = "[Circular]"
+)
 
 // errorType is used to check if a [sobek.Value] implements the [error] interface.
 //
@@ -98,20 +103,230 @@ func (c console) valueString(v sobek.Value) string {
 		}
 	}
 
-	if sobekObj, isObj := v.(*sobek.Object); isObj {
-		if sobekObj.ClassName() == "Error" {
-			return v.String()
+	obj, isObj := v.(*sobek.Object)
+	if !isObj {
+		return v.String()
+	}
+	if obj.ClassName() == "Error" {
+		return v.String()
+	}
+
+	var sb strings.Builder
+	c.traverseValue(&sb, obj, make(map[*sobek.Object]bool))
+	return sb.String()
+}
+
+// traverseValue recursively traverses a [sobek.Value] and writes a formatted
+// string representation to the provided strings.Builder. For functions, it writes
+// [functionLog], and for circular references, it writes [circularLog].
+//
+// It prevents circular references by keeping track of seen objects.
+func (c console) traverseValue(sb *strings.Builder, v sobek.Value, seen map[*sobek.Object]bool) {
+	// Handles null and sparse values in arrays.
+	if common.IsNullish(v) {
+		sb.WriteString("null")
+		return
+	}
+
+	// Represent functions as a fixed string.
+	if _, isFunc := sobek.AssertFunction(v); isFunc {
+		sb.WriteString(functionLog)
+		return
+	}
+
+	// Handle non-object values.
+	obj, ok := v.(*sobek.Object)
+	if !ok {
+		formatPrimitive(sb, v)
+		return
+	}
+
+	// Prevent circular references.
+	if seen[obj] {
+		sb.WriteString(circularLog)
+		return
+	}
+	seen[obj] = true
+	defer delete(seen, obj)
+
+	if obj.ClassName() == "Error" {
+		sb.WriteString(v.String())
+		return
+	}
+
+	// Check for TypedArray and ArrayBuffer.
+	if isBinaryData(obj) {
+		formatBinaryData(sb, obj)
+		return
+	}
+
+	// Handle arrays element-by-element, recursively.
+	if obj.ClassName() == "Array" {
+		length := obj.Get("length").ToInteger()
+		if length == 0 {
+			sb.WriteString("[]")
+			return
+		}
+		sb.WriteString("[ ")
+		for i := int64(0); i < length; i++ {
+			if i > 0 {
+				sb.WriteString(", ")
+			}
+			c.traverseValue(sb, obj.Get(strconv.FormatInt(i, 10)), seen)
+		}
+		sb.WriteString(" ]")
+		return
+	}
+
+	keys := obj.Keys()
+	// for empty objects and other JS types with no enumerable properties.
+	if len(keys) == 0 {
+		// Date objects have no enumerable keys but should display as ISO string.
+		if obj.ClassName() == "Date" {
+			formatDate(sb, obj)
+			return
+		}
+		sb.WriteString("{}")
+		return
+	}
+
+	// Handle objects key-by-key, recursively.
+	sb.WriteString("{ ")
+	for i, key := range keys {
+		if i > 0 {
+			sb.WriteString(", ")
+		}
+		sb.WriteString(key)
+		sb.WriteString(": ")
+		c.traverseValue(sb, obj.Get(key), seen)
+	}
+	sb.WriteString(" }")
+}
+
+// formatDate writes a Date object as a quoted ISO string to the builder.
+func formatDate(sb *strings.Builder, obj *sobek.Object) {
+	if toISOString, ok := sobek.AssertFunction(obj.Get("toISOString")); ok {
+		if result, err := toISOString(obj); err == nil {
+			sb.WriteByte('"')
+			sb.WriteString(result.String())
+			sb.WriteByte('"')
+			return
 		}
 	}
+	sb.WriteString("{}")
+}
 
-	mv, ok := v.(json.Marshaler)
-	if !ok {
-		return v.String()
+// formatPrimitive writes a primitive JS value to the builder.
+func formatPrimitive(sb *strings.Builder, v sobek.Value) {
+	switch v.ExportType().Kind() {
+	case reflect.String:
+		sb.WriteByte('"')
+		sb.WriteString(v.String())
+		sb.WriteByte('"')
+	default:
+		sb.WriteString(v.String())
+	}
+}
+
+// isBinaryData checks for TypedArray and ArrayBuffer.
+func isBinaryData(obj *sobek.Object) bool {
+	exportType := obj.ExportType()
+	if exportType == nil {
+		return false
 	}
 
-	b, err := json.Marshal(mv)
-	if err != nil {
-		return v.String()
+	if _, ok := obj.Export().(sobek.ArrayBuffer); ok {
+		return true
 	}
-	return string(b)
+
+	if exportType.Kind() != reflect.Slice {
+		return false
+	}
+	switch exportType.Elem().Kind() {
+	case reflect.Int8, reflect.Uint8,
+		reflect.Int16, reflect.Uint16,
+		reflect.Int32, reflect.Uint32,
+		reflect.Float32, reflect.Float64,
+		reflect.Int64, reflect.Uint64:
+		return true
+	default:
+		return false
+	}
+}
+
+// formatBinaryData writes the formatted representation of TypedArray or ArrayBuffer to the builder.
+func formatBinaryData(sb *strings.Builder, obj *sobek.Object) {
+	// ArrayBuffer
+	if ab, ok := obj.Export().(sobek.ArrayBuffer); ok {
+		bytes := ab.Bytes()
+		sb.WriteString("ArrayBuffer { [Uint8Contents]: <")
+		for i, b := range bytes {
+			if i > 0 {
+				sb.WriteByte(' ')
+			}
+			fmt.Fprintf(sb, "%02x", b)
+		}
+		sb.WriteString(">, byteLength: ")
+		sb.WriteString(strconv.Itoa(len(bytes)))
+		sb.WriteString(" }")
+		return
+	}
+
+	// TypedArray
+	exportType := obj.ExportType()
+	if exportType != nil && exportType.Kind() == reflect.Slice {
+		typeName := typedArrayName(exportType)
+		length := obj.Get("length").ToInteger()
+
+		sb.WriteString(typeName)
+		sb.WriteByte('(')
+		sb.WriteString(strconv.FormatInt(length, 10))
+		sb.WriteByte(')')
+
+		if length == 0 {
+			sb.WriteString(" []")
+			return
+		}
+
+		sb.WriteString(" [ ")
+		for i := int64(0); i < length; i++ {
+			if i > 0 {
+				sb.WriteString(", ")
+			}
+			sb.WriteString(obj.Get(strconv.FormatInt(i, 10)).String())
+		}
+		sb.WriteString(" ]")
+		return
+	}
+
+	sb.WriteString(obj.String())
+}
+
+// typedArrayName maps Go reflect.Kind -> TypedArray name.
+func typedArrayName(exportType reflect.Type) string {
+	// Note: Can't distinguish Uint8ClampedArray this way
+	switch exportType.Elem().Kind() {
+	case reflect.Int8:
+		return "Int8Array"
+	case reflect.Uint8:
+		return "Uint8Array"
+	case reflect.Int16:
+		return "Int16Array"
+	case reflect.Uint16:
+		return "Uint16Array"
+	case reflect.Int32:
+		return "Int32Array"
+	case reflect.Uint32:
+		return "Uint32Array"
+	case reflect.Float32:
+		return "Float32Array"
+	case reflect.Float64:
+		return "Float64Array"
+	case reflect.Int64:
+		return "BigInt64Array"
+	case reflect.Uint64:
+		return "BigUint64Array"
+	default:
+		return "TypedArray"
+	}
 }

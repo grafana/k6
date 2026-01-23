@@ -1152,7 +1152,7 @@ func (c *Client) upgradeDialerToTLS(dialer lib.DialContexter, config *tls.Config
 
 		// Upgrade the connection to TLS if needed
 		tlsConn := tls.Client(rawConn, config)
-		err = tlsConn.Handshake()
+		err = tlsConn.HandshakeContext(ctx)
 		if err != nil {
 			if closeErr := rawConn.Close(); closeErr != nil {
 				return nil, fmt.Errorf("failed to close connection after TLS handshake error: %w", closeErr)

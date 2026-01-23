@@ -292,6 +292,46 @@ func TestLocator(t *testing.T) {
 				require.Equal(t, "xsomething", inputValue)
 			},
 		},
+
+		{
+			"PressSequentially", func(_ *testBrowser, p *common.Page) {
+				lo := p.Locator("#inputText", nil)
+				require.NoError(t, lo.Clear(common.NewFrameFillOptions(lo.Timeout())))
+
+				require.NoError(t, lo.PressSequentially("hello", common.NewFrameTypeOptions(lo.Timeout())))
+
+				value, err := p.InputValue("#inputText", common.NewFrameInputValueOptions(p.MainFrame().Timeout()))
+				require.NoError(t, err)
+				require.Equal(t, "hello", value)
+			},
+		},
+		{
+			"PressSequentiallyWithDelayOption", func(_ *testBrowser, p *common.Page) {
+				lo := p.Locator("#inputText", nil)
+				require.NoError(t, lo.Clear(common.NewFrameFillOptions(lo.Timeout())))
+
+				opts := common.NewFrameTypeOptions(lo.Timeout())
+				opts.Delay = 100
+
+				require.NoError(t, lo.PressSequentially("text", opts))
+
+				value, err := p.InputValue("#inputText", common.NewFrameInputValueOptions(p.MainFrame().Timeout()))
+				require.NoError(t, err)
+				require.Equal(t, "text", value)
+			},
+		},
+		{
+			"PressSequentiallyTextarea", func(_ *testBrowser, p *common.Page) {
+				lo := p.Locator("textarea", nil)
+				require.NoError(t, lo.Clear(common.NewFrameFillOptions(lo.Timeout())))
+
+				require.NoError(t, lo.PressSequentially("some text", common.NewFrameTypeOptions(lo.Timeout())))
+
+				value, err := lo.InputValue(common.NewFrameInputValueOptions(lo.Timeout()))
+				require.NoError(t, err)
+				require.Equal(t, "some text", value)
+			},
+		},
 		{
 			"SelectOption", func(tb *testBrowser, p *common.Page) {
 				l := p.Locator("#selectElement", nil)
@@ -465,6 +505,11 @@ func TestLocator(t *testing.T) {
 		{
 			"Press", func(l *common.Locator, tb *testBrowser) error {
 				return l.Press("a", common.NewFramePressOptions(100*time.Millisecond))
+			},
+		},
+		{
+			"PressSequentially", func(l *common.Locator, tb *testBrowser) error {
+				return l.PressSequentially("text", common.NewFrameTypeOptions(100*time.Millisecond))
 			},
 		},
 		{
@@ -1451,4 +1496,128 @@ func TestLocatorEvaluateHandle(t *testing.T) {
 			assert.Equal(t, tt.expected, j)
 		})
 	}
+}
+
+func TestFrameLocator(t *testing.T) {
+	t.Parallel()
+
+	t.Run("page_frameLocator", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withFileServer())
+		p := tb.NewPage(nil)
+
+		opts := &common.FrameGotoOptions{
+			Timeout: common.DefaultTimeout,
+		}
+		_, err := p.Goto(tb.staticURL("iframe_test_main.html"), opts)
+		require.NoError(t, err)
+
+		// Test the new frameLocator() method on Page
+		fl := p.FrameLocator("#iframe1")
+		require.NotNil(t, fl)
+
+		nestedFL := fl.FrameLocator("#iframe2")
+		require.NotNil(t, nestedFL)
+
+		buttonLocator := nestedFL.Locator("#button1", nil)
+		require.NotNil(t, buttonLocator)
+
+		err = buttonLocator.Click(common.NewFrameClickOptions(buttonLocator.Timeout()))
+		require.NoError(t, err)
+
+		clicked, err := buttonLocator.Evaluate("el => window.buttonClicked")
+		require.NoError(t, err)
+		assert.True(t, clicked.(bool), "buttonClicked should be true after click")
+	})
+
+	t.Run("frame_frameLocator", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withFileServer())
+		p := tb.NewPage(nil)
+
+		opts := &common.FrameGotoOptions{
+			Timeout: common.DefaultTimeout,
+		}
+		_, err := p.Goto(tb.staticURL("iframe_test_main.html"), opts)
+		require.NoError(t, err)
+
+		// Test the new frameLocator() method on Frame
+		mainFrame := p.MainFrame()
+		fl := mainFrame.FrameLocator("#iframe1")
+		require.NotNil(t, fl)
+
+		nestedFL := fl.FrameLocator("#iframe2")
+		require.NotNil(t, nestedFL)
+
+		buttonLocator := nestedFL.Locator("#button1", nil)
+		require.NotNil(t, buttonLocator)
+
+		err = buttonLocator.Click(common.NewFrameClickOptions(buttonLocator.Timeout()))
+		require.NoError(t, err)
+
+		clicked, err := buttonLocator.Evaluate("el => window.buttonClicked")
+		require.NoError(t, err)
+		assert.True(t, clicked.(bool), "buttonClicked should be true after click")
+	})
+
+	t.Run("locator_frameLocator", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withFileServer())
+		p := tb.NewPage(nil)
+
+		opts := &common.FrameGotoOptions{
+			Timeout: common.DefaultTimeout,
+		}
+		_, err := p.Goto(tb.staticURL("iframe_test_main.html"), opts)
+		require.NoError(t, err)
+
+		bodyLocator := p.Locator("body", nil)
+		fl := bodyLocator.FrameLocator("#iframe1")
+		require.NotNil(t, fl)
+
+		nestedFL := fl.FrameLocator("#iframe2")
+		require.NotNil(t, nestedFL)
+
+		buttonLocator := nestedFL.Locator("#button1", nil)
+		require.NotNil(t, buttonLocator)
+
+		err = buttonLocator.Click(common.NewFrameClickOptions(buttonLocator.Timeout()))
+		require.NoError(t, err)
+
+		clicked, err := buttonLocator.Evaluate("el => window.buttonClicked")
+		require.NoError(t, err)
+		assert.True(t, clicked.(bool), "buttonClicked should be true after click")
+	})
+
+	t.Run("comparison_with_contentFrame", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withFileServer())
+		p := tb.NewPage(nil)
+
+		opts := &common.FrameGotoOptions{
+			Timeout: common.DefaultTimeout,
+		}
+		_, err := p.Goto(tb.staticURL("iframe_test_main.html"), opts)
+		require.NoError(t, err)
+
+		// compare old and new
+		oldWay := p.Locator("#iframe1", nil).ContentFrame()
+		require.NotNil(t, oldWay)
+
+		newWay := p.FrameLocator("#iframe1")
+		require.NotNil(t, newWay)
+
+		oldNested := oldWay.FrameLocator("#iframe2")
+		newNested := newWay.FrameLocator("#iframe2")
+
+		oldButton := oldNested.Locator("#button1", nil)
+		newButton := newNested.Locator("#button1", nil)
+
+		require.NotNil(t, oldButton)
+		require.NotNil(t, newButton)
+	})
 }

@@ -1155,6 +1155,7 @@ func (p *parser) lowerForAwaitLoop(loc logger.Loc, loop *js_ast.SForOf, stmts []
 		BlockLoc: loc,
 		Block: js_ast.SBlock{
 			Stmts: []js_ast.Stmt{{Loc: loc, Data: &js_ast.SFor{
+				IsLoweredForAwait: true,
 				InitOrNil: js_ast.Stmt{Loc: loc, Data: &js_ast.SLocal{Kind: js_ast.LocalVar, Decls: []js_ast.Decl{
 					{Binding: js_ast.Binding{Loc: loc, Data: &js_ast.BIdentifier{Ref: iterRef}},
 						ValueOrNil: p.callRuntime(loc, "__forAwait", []js_ast.Expr{loop.Value})},
@@ -2123,26 +2124,4 @@ func (p *parser) lowerUsingDeclarationInForOf(loc logger.Loc, init *js_ast.SLoca
 	block.Stmts = ctx.finalize(p, blockStmts, p.willWrapModuleInTryCatchForUsing && p.currentScope.Parent == nil)
 	init.Kind = js_ast.LocalVar
 	id.Ref = tempRef
-}
-
-// If this returns "nil", then no lowering needed to be done
-func (p *parser) maybeLowerUsingDeclarationsInSwitch(loc logger.Loc, s *js_ast.SSwitch) []js_ast.Stmt {
-	// Check for a "using" declaration in any case
-	shouldLower := false
-	for _, c := range s.Cases {
-		if p.shouldLowerUsingDeclarations(c.Body) {
-			shouldLower = true
-			break
-		}
-	}
-	if !shouldLower {
-		return nil
-	}
-
-	// If we find one, lower all cases together
-	ctx := p.lowerUsingDeclarationContext()
-	for _, c := range s.Cases {
-		ctx.scanStmts(p, c.Body)
-	}
-	return ctx.finalize(p, []js_ast.Stmt{{Loc: loc, Data: s}}, false)
 }

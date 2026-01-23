@@ -35,10 +35,10 @@ func TestValidateToken(t *testing.T) {
 		}))
 		defer server.Close()
 
-		client := NewClient(testutils.NewLogger(t), "test-token", server.URL, "1.0", 1*time.Second)
+		client, err := NewClient(testutils.NewLogger(t), "test-token", server.URL, "1.0", 1*time.Second)
+		require.NoError(t, err)
 
 		resp, err := client.ValidateToken("https://stack.grafana.net")
-
 		require.NoError(t, err)
 		require.NotNil(t, resp)
 		assert.Equal(t, int32(123), resp.StackId)
@@ -59,10 +59,10 @@ func TestValidateToken(t *testing.T) {
 		}))
 		defer server.Close()
 
-		client := NewClient(testutils.NewLogger(t), "invalid-token", server.URL, "1.0", 1*time.Second)
+		client, err := NewClient(testutils.NewLogger(t), "invalid-token", server.URL, "1.0", 1*time.Second)
+		require.NoError(t, err)
 
 		resp, err := client.ValidateToken("https://stack.grafana.net")
-
 		assert.Error(t, err)
 		assert.Nil(t, resp)
 		assert.Contains(t, err.Error(), "(401/error) Invalid token")
@@ -71,12 +71,34 @@ func TestValidateToken(t *testing.T) {
 	t.Run("network error should fail", func(t *testing.T) {
 		t.Parallel()
 		// Use an invalid URL to simulate network error
-		client := NewClient(testutils.NewLogger(t), "test-token", "http://invalid-url-that-does-not-exist", "1.0", 1*time.Second)
+		client, err := NewClient(testutils.NewLogger(t), "test-token", "http://invalid-url-that-does-not-exist", "1.0", 1*time.Second)
+		require.NoError(t, err)
 
 		resp, err := client.ValidateToken("https://stack.grafana.net")
-
 		assert.Error(t, err)
 		assert.Nil(t, resp)
+	})
+
+	t.Run("missing stack URL should fail", func(t *testing.T) {
+		t.Parallel()
+		client, err := NewClient(testutils.NewLogger(t), "test-token", "http://example.com", "1.0", 1*time.Second)
+		require.NoError(t, err)
+
+		resp, err := client.ValidateToken("")
+		assert.Error(t, err)
+		assert.Nil(t, resp)
+		assert.Equal(t, "stack URL is required to validate token", err.Error())
+	})
+
+	t.Run("invalid stack URL should fail", func(t *testing.T) {
+		t.Parallel()
+		client, err := NewClient(testutils.NewLogger(t), "test-token", "http://example.com", "1.0", 1*time.Second)
+		require.NoError(t, err)
+
+		resp, err := client.ValidateToken("://invalid-url")
+		assert.Error(t, err)
+		assert.Nil(t, resp)
+		assert.Contains(t, err.Error(), "invalid stack URL")
 	})
 }
 

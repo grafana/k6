@@ -1,0 +1,29 @@
+name: "Test browser"
+description: "Run only tests in browser/tests package without parallel execution"
+
+inputs:
+  use_gotip:
+    description: "whether to set up gotip env variables or not"
+    required: false
+    default: "false"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Run tests
+      shell: bash
+      env:
+        USE_GOTIP: ${{ inputs.use_gotip }}
+      run: |
+        set -x
+
+        if [[ ${USE_GOTIP} == 'true' ]]; then
+          export GOROOT="$HOME/sdk/gotip"
+          export GOPATH="$HOME/go"
+          export PATH="$HOME/sdk/gotip/bin:$HOME/go/bin:$PATH" > /dev/null
+        fi
+
+        which go
+        go version
+        export GOMAXPROCS=1
+        go test -p 1 -timeout 800s ./internal/js/modules/k6/browser/tests/...

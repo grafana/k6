@@ -404,6 +404,7 @@ func (b *Browser) isPageAttachmentErrorIgnorable(ev *target.EventAttachedToTarge
 			ev.SessionID, targetPage.TargetID, targetPage.Type, err)
 		return true
 	}
+
 	// No need to register the page if the test run is over.
 	select {
 	case <-b.vuCtx.Done():
@@ -412,6 +413,12 @@ func (b *Browser) isPageAttachmentErrorIgnorable(ev *target.EventAttachedToTarge
 			ev.SessionID, targetPage.TargetID, targetPage.Type, b.vuCtx.Err())
 		return true
 	default:
+	}
+	// No need to register the page if the context is already done.
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		b.logger.Debugf("Browser:isPageAttachmentErrorIgnorable:return:context.Done",
+			"sid:%v tid:%v pageType:%s err:%v", ev.SessionID, targetPage.TargetID, targetPage.Type, err)
+		return true
 	}
 	// Another VU or instance closed the page, and the session is closed.
 	// This can happen if the page is closed before the attachedToTarget
@@ -620,25 +627,19 @@ func (b *Browser) NewContext(opts *BrowserContextOptions) (*BrowserContext, erro
 	defer span.End()
 
 	if b.context != nil {
-		err := errors.New("existing browser context must be closed before creating a new one")
-		spanRecordError(span, err)
-		return nil, err
+		return nil, spanRecordErrorf(span, "existing browser context must be closed before creating a new one")
 	}
 
 	action := target.CreateBrowserContext().WithDisposeOnDetach(true)
 	browserContextID, err := action.Do(cdp.WithExecutor(b.vuCtx, b.conn))
 	b.logger.Debugf("Browser:NewContext", "bctxid:%v", browserContextID)
 	if err != nil {
-		err := fmt.Errorf("creating browser context ID %s: %w", browserContextID, err)
-		spanRecordError(span, err)
-		return nil, err
+		return nil, spanRecordErrorf(span, "creating browser context ID %s: %w", browserContextID, err)
 	}
 
 	browserCtx, err := NewBrowserContext(b.vuCtx, b, browserContextID, opts, b.logger)
 	if err != nil {
-		err := fmt.Errorf("new context: %w", err)
-		spanRecordError(span, err)
-		return nil, err
+		return nil, spanRecordErrorf(span, "new browser context: %w", err)
 	}
 	b.runOnClose = append(b.runOnClose, browserCtx.cleanup)
 
@@ -656,15 +657,12 @@ func (b *Browser) NewPage(opts *BrowserContextOptions) (*Page, error) {
 
 	browserCtx, err := b.NewContext(opts)
 	if err != nil {
-		err := fmt.Errorf("new page: %w", err)
-		spanRecordError(span, err)
-		return nil, err
+		return nil, spanRecordErrorf(span, "new page: %w", err)
 	}
 
 	page, err := browserCtx.NewPage()
 	if err != nil {
-		spanRecordError(span, err)
-		return nil, err
+		return nil, spanRecordError(span, err)
 	}
 
 	return page, nil

@@ -63,6 +63,11 @@ func (s HTTPMessageSize) Total() int64 {
 	return s.Headers + s.Body
 }
 
+// RequestFailure contains information about a failed request.
+type RequestFailure struct {
+	ErrorText string `js:"errorText"`
+}
+
 // Request represents a browser HTTP request.
 type Request struct {
 	ctx           context.Context
@@ -234,6 +239,14 @@ func (r *Request) headersSize() int64 {
 
 func (r *Request) setErrorText(errorText string) {
 	r.errorText = errorText
+}
+
+// Failure returns the error text if the request failed, otherwise nil.
+func (r *Request) Failure() *RequestFailure {
+	if r.errorText == "" {
+		return nil
+	}
+	return &RequestFailure{ErrorText: r.errorText}
 }
 
 func (r *Request) setLoadedFromCache(fromMemoryCache bool) {
