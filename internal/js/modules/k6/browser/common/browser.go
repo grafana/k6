@@ -234,16 +234,7 @@ func (b *Browser) initEvents() error {
 			case event := <-chHandler:
 				if ev, ok := event.data.(*target.EventAttachedToTarget); ok {
 					b.logger.Debugf("Browser:initEvents:onAttachedToTarget", "sid:%v tid:%v", ev.SessionID, ev.TargetInfo.TargetID)
-					err := b.onAttachedToTarget(ev)
-					if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-						b.logger.Debugf(
-							"Browser:initEvents:onAttachedToTarget:suppressed",
-							"sid:%v tid:%v err:%v",
-							ev.SessionID, ev.TargetInfo.TargetID, err,
-						)
-						continue
-					}
-					if err != nil {
+					if err := b.onAttachedToTarget(ev); err != nil {
 						k6ext.Panicf(b.vuCtx, "browser is attaching to target: %w", err)
 					}
 				} else if ev, ok := event.data.(*target.EventDetachedFromTarget); ok {
@@ -413,6 +404,7 @@ func (b *Browser) isPageAttachmentErrorIgnorable(ev *target.EventAttachedToTarge
 			ev.SessionID, targetPage.TargetID, targetPage.Type, err)
 		return true
 	}
+
 	// No need to register the page if the test run is over.
 	select {
 	case <-b.vuCtx.Done():
@@ -421,6 +413,12 @@ func (b *Browser) isPageAttachmentErrorIgnorable(ev *target.EventAttachedToTarge
 			ev.SessionID, targetPage.TargetID, targetPage.Type, b.vuCtx.Err())
 		return true
 	default:
+	}
+	// No need to register the page if the context is already done.
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		b.logger.Debugf("Browser:isPageAttachmentErrorIgnorable:return:context.Done",
+			"sid:%v tid:%v pageType:%s err:%v", ev.SessionID, targetPage.TargetID, targetPage.Type, err)
+		return true
 	}
 	// Another VU or instance closed the page, and the session is closed.
 	// This can happen if the page is closed before the attachedToTarget

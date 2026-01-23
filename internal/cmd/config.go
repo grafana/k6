@@ -226,7 +226,7 @@ func loadConfigFile(gs *state.GlobalState) (Config, error) {
 		// a legacy file has been found
 		if legacyErr == nil {
 			gs.Logger.Warnf("The configuration file has been found on the old default path (%q). "+
-				"Please, run `k6 cloud login` or `k6 login` to migrate to the new default path.\n\n",
+				"Please, run again `k6 cloud login` or `k6 login` commands to migrate to the new default path.\n\n",
 				legacyConfigFilePath(gs))
 			return legacyConf, nil
 		}
