@@ -74,9 +74,11 @@ the "k6 run -o cloud" command.
 //
 //nolint:funlen
 func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
-	err := migrateLegacyConfigFileIfAny(c.globalState)
-	if err != nil {
-		return err
+	if !checkIfMigrationCompleted(c.globalState) {
+		err := migrateLegacyConfigFileIfAny(c.globalState)
+		if err != nil {
+			return err
+		}
 	}
 
 	currentDiskConf, err := readDiskConfig(c.globalState)
