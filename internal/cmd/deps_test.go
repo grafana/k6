@@ -124,9 +124,7 @@ export default function () {
 				CustomBuildRequired bool              `json:"customBuildRequired"`
 			}
 			require.NoError(t, json.Unmarshal(ts.Stdout.Bytes(), &output))
-
 			require.Equal(t, tc.expectedDeps, output.BuildDependencies)
-
 			require.Equal(t, tc.expectCustomBuild, output.CustomBuildRequired)
 
 			expectedImports := slices.Clone(tc.expectedImports)

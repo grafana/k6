@@ -33,7 +33,7 @@ func getCmdDeps(gs *state.GlobalState) *cobra.Command {
 
 			deps := test.Dependencies()
 			depsMap := map[string]string{}
-			for name, constraint := range deps {
+			for name, constraint := range test.Dependencies() {
 				if constraint == nil {
 					depsMap[name] = "*"
 					continue
