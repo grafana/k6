@@ -115,7 +115,7 @@ export default function () {
 			ts.FS = testutils.MakeMemMapFs(t, prependCWDToFileMap(ts.Cwd, tc.files))
 
 			cmd := getCmdDeps(ts.GlobalState)
-			cmd.SetArgs([]string{"main.js"})
+			cmd.SetArgs([]string{"--json", "main.js"})
 			require.NoError(t, cmd.Execute())
 
 			var output struct {
@@ -137,6 +137,35 @@ export default function () {
 			require.EqualValues(t, expectedImports, output.Imports)
 		})
 	}
+}
+
+func TestGetCmdDepsHumanReadable(t *testing.T) {
+	t.Parallel()
+	ts := tests.NewGlobalTestState(t)
+	ts.FS = testutils.MakeMemMapFs(t, prependCWDToFileMap(ts.Cwd, map[string][]byte{
+		"/main.js": []byte(`import http from "k6/http";
+import foo from "k6/x/foo";
+
+export default function () {
+  http.get("https://example.com");
+  foo();
+}
+`),
+	}))
+
+	cmd := getCmdDeps(ts.GlobalState)
+	cmd.SetArgs([]string{"main.js"})
+	require.NoError(t, cmd.Execute())
+
+	output := ts.Stdout.String()
+	// Verify human-readable format
+	require.Contains(t, output, "Build Dependencies:")
+	require.Contains(t, output, "k6/x/foo: *")
+	require.Contains(t, output, "Imports:")
+	require.Contains(t, output, "Custom Build Required:")
+	// Should not contain JSON structure
+	require.NotContains(t, output, `"buildDependencies"`)
+	require.NotContains(t, output, `"customBuildRequired"`)
 }
 
 func prependCWDToFileMap(cwd string, files map[string][]byte) map[string][]byte {
