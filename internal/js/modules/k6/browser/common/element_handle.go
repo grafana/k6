@@ -615,7 +615,7 @@ func (h *ElementHandle) stepIntoFrame(
 	// This is a valid response from waitForSelector. It means that the element
 	// was either hidden or detached.
 	if iframeHandle == nil {
-		return nil, "", errors.New("check if element is visible")
+		return nil, "", ErrElementNotVisible
 	}
 
 	frame, err := iframeHandle.ContentFrame()
