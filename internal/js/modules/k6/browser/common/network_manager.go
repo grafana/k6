@@ -672,6 +672,11 @@ func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
 	if failErr != nil {
 		return
 	}
+	// Check if hostname is allowed (if allowlist is configured)
+	failErr = checkAllowedHosts(host, state.Options.AllowedHostnames.Trie)
+	if failErr != nil {
+		return
+	}
 
 	// Do one last check of the resolved IP
 	ip, err = m.resolver.LookupIP(host)
@@ -689,6 +694,16 @@ func checkBlockedHosts(host string, blockedHosts *k6types.HostnameTrie) error {
 	}
 	if match, blocked := blockedHosts.Contains(host); blocked {
 		return fmt.Errorf("hostname %s matches a blocked pattern %q", host, match)
+	}
+	return nil
+}
+
+func checkAllowedHosts(host string, allowedHosts *k6types.HostnameTrie) error {
+	if allowedHosts == nil {
+		return nil
+	}
+	if _, allowed := allowedHosts.Contains(host); !allowed {
+		return fmt.Errorf("hostname %s is not in the allowed hostnames list", host)
 	}
 	return nil
 }
