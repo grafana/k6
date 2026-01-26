@@ -342,6 +342,10 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			ml := mapLocator(vu, p.Locator(selector, parseLocatorOptions(rt, opts)))
 			return rt.ToValue(ml).ToObject(rt)
 		},
+		"frameLocator": func(selector string) *sobek.Object {
+			mfl := mapFrameLocator(vu, p.FrameLocator(selector))
+			return rt.ToValue(mfl).ToObject(rt)
+		},
 		"mainFrame": func() *sobek.Object {
 			mf := mapFrame(vu, p.MainFrame())
 			return rt.ToValue(mf).ToObject(rt)
@@ -632,6 +636,60 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return p.WaitForRequest(val, popts, newRegExMatcher(ctx, vu, tq))
 			}), nil
 		},
+		"waitForEvent": func(event common.PageEventName, opts sobek.Value) (*sobek.Promise, error) {
+			// AVOID using a default case to force handling new event types explicitly
+			// so that the linter can catch unhandled event types as non-exhaustive switch.
+			// Otherwise, we might miss mapping new [PageEvent] types added in the future.
+			// This is for keeping events in sync between waitForEvent and page.on.
+			mapPageEvent := func(vu moduleVU, pe common.PageEvent) (mapping, error) {
+				switch event {
+				case common.PageEventConsole:
+					return mapConsoleMessage(vu, pe), nil
+				case common.PageEventRequest:
+					return mapRequestEvent(vu, pe), nil
+				case common.PageEventResponse:
+					return mapResponseEvent(vu, pe), nil
+				case common.PageEventRequestFinished:
+					return mapRequestEvent(vu, pe), nil
+				case common.PageEventRequestFailed:
+					return mapRequestEvent(vu, pe), nil
+				case common.PageEventMetric:
+					// intentionally left blank
+				}
+				return nil, fmt.Errorf("waitForEvent does not support mapping for event: %q", event)
+			}
+
+			popts, fn, err := parsePageWaitForEventOptions(vu.Context(), opts, p.Timeout())
+			if err != nil {
+				return nil, fmt.Errorf("parsing waitForEvent options: %w", err)
+			}
+
+			ctx := vu.Context()
+			tq := vu.get(ctx, p.TargetID())
+
+			return promise(vu, func() (any, error) {
+				rpe, err := p.WaitForEvent(event, popts, func(pe common.PageEvent) (bool, error) {
+					if fn == nil {
+						return true, nil
+					}
+					return queueTask(ctx, tq, func() (bool, error) {
+						m, err := mapPageEvent(vu, pe)
+						if err != nil {
+							return false, err
+						}
+						v, err := fn(sobek.Undefined(), vu.Runtime().ToValue(m))
+						if err != nil {
+							return false, fmt.Errorf("executing waitForEvent predicate: %w", err)
+						}
+						return v.ToBoolean(), nil
+					})()
+				})
+				if err != nil {
+					return nil, fmt.Errorf("waiting for page event %q: %w", event, err)
+				}
+				return mapPageEvent(vu, rpe)
+			}), nil
+		},
 		"workers": func() *sobek.Object {
 			var mws []mapping
 			for _, w := range p.Workers() {
@@ -688,10 +746,12 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageEventName, sobek.Cal
 			mapp func(vu moduleVU, event common.PageEvent) mapping
 			wait bool // Whether to wait for the handler to complete.
 		}{
-			common.PageEventConsole:  {mapp: mapConsoleMessage},
-			common.PageEventMetric:   {mapp: mapMetricEvent, wait: true},
-			common.PageEventRequest:  {mapp: mapRequestEvent},
-			common.PageEventResponse: {mapp: mapResponseEvent},
+			common.PageEventConsole:         {mapp: mapConsoleMessage},
+			common.PageEventMetric:          {mapp: mapMetricEvent, wait: true},
+			common.PageEventRequest:         {mapp: mapRequestEvent},
+			common.PageEventResponse:        {mapp: mapResponseEvent},
+			common.PageEventRequestFinished: {mapp: mapRequestEvent},
+			common.PageEventRequestFailed:   {mapp: mapRequestEvent},
 		}
 		pageEvent, ok := pageEvents[eventName]
 		if !ok {
@@ -964,4 +1024,40 @@ func parsePageWaitForRequestOptions(
 	}
 
 	return &ropts, nil
+}
+
+func parsePageWaitForEventOptions(
+	ctx context.Context, opts sobek.Value, defaultTimeout time.Duration,
+) (*common.PageWaitForEventOptions, sobek.Callable, error) {
+	ropts := &common.PageWaitForEventOptions{
+		Timeout: defaultTimeout,
+	}
+
+	if k6common.IsNullish(opts) {
+		return ropts, nil, nil
+	}
+
+	if fn, ok := sobek.AssertFunction(opts); ok {
+		return ropts, fn, nil
+	}
+
+	obj := opts.ToObject(k6ext.Runtime(ctx))
+
+	var pred sobek.Callable
+	for _, k := range obj.Keys() {
+		switch k {
+		case "timeout":
+			ropts.Timeout = time.Duration(obj.Get(k).ToInteger()) * time.Millisecond
+		case "predicate":
+			fn, ok := sobek.AssertFunction(obj.Get(k))
+			if !ok {
+				return nil, nil, fmt.Errorf("predicate must be a function")
+			}
+			pred = fn
+		default:
+			return nil, nil, fmt.Errorf("waitForEvent does not support option: '%s'", k)
+		}
+	}
+
+	return ropts, pred, nil
 }
