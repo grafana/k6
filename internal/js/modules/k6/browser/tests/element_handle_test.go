@@ -454,13 +454,7 @@ func TestElementHandleScreenshot(t *testing.T) {
 	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
-	viewportSize := tb.toSobekValue(struct {
-		Width  float64 `js:"width"`
-		Height float64 `js:"height"`
-	}{Width: 800, Height: 600})
-	s := new(common.Size)
-	require.NoError(t, s.Parse(tb.context(), viewportSize))
-
+	s := &common.Size{Width: 800, Height: 600}
 	err := p.SetViewportSize(s)
 	require.NoError(t, err)
 
