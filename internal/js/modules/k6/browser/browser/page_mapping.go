@@ -1104,6 +1104,9 @@ func parseSize(rt *sobek.Runtime, opts sobek.Value) (*common.Size, error) {
 	obj := opts.ToObject(rt)
 	for _, k := range obj.Keys() {
 		v := obj.Get(k)
+		if k6common.IsNullish(v) {
+			continue
+		}
 		switch k {
 		case "width":
 			switch v.ExportType().Kind() {

@@ -83,6 +83,16 @@ func TestParseSize(t *testing.T) {
 			want:  &common.Size{Width: 1920.5, Height: 1080.5},
 		},
 		{
+			name:  "null_width",
+			input: `({width: null, height: 1080})`,
+			want:  &common.Size{Width: 0, Height: 1080},
+		},
+		{
+			name:  "undefined_width",
+			input: `({width: undefined, height: 1080})`,
+			want:  &common.Size{Width: 0, Height: 1080},
+		},
+		{
 			name:    "invalid_width_string",
 			input:   `({width: "1920", height: 1080})`,
 			wantErr: "width must be a number",
