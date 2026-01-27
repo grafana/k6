@@ -1588,6 +1588,13 @@ func (f *Frame) Locator(selector string, opts *LocatorOptions) *Locator {
 	return NewLocator(f.ctx, opts, selector, f, f.log)
 }
 
+// FrameLocator is a convenience method equivalent to frame.locator(selector).contentFrame().
+func (f *Frame) FrameLocator(selector string) *FrameLocator {
+	f.log.Debugf("Frame:FrameLocator", "fid:%s furl:%q selector:%q", f.ID(), f.URL(), selector)
+
+	return f.Locator(selector, nil).ContentFrame()
+}
+
 // LoaderID returns the ID of the frame that loaded this frame.
 func (f *Frame) LoaderID() string {
 	f.propertiesMu.RLock()

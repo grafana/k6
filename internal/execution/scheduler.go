@@ -451,6 +451,11 @@ func (e *Scheduler) Run(globalCtx, runCtx context.Context, samplesOut chan<- met
 	e.initProgress.Modify(pb.WithConstProgress(1, "Starting test..."))
 	e.state.MarkStarted()
 	defer func() {
+		if e.state.Test.TestStatus != nil && e.state.Test.TestStatus.Failed() {
+			e.state.SetExecutionStatus(lib.ExecutionStatusMarkedAsFailed)
+			return
+		}
+
 		isAborted := GetCancelReasonIfTestAborted(runCtx) != nil
 		if !isAborted {
 			e.state.MarkEnded()
