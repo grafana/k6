@@ -130,7 +130,10 @@ func (c *Client) ValidateOptions(projectID int64, options lib.Options) error {
 		},
 	}
 
-	req := c.apiClient.LoadTestsAPI.ValidateOptions(ctx).ValidateOptionsRequest(validateOptions)
+	req := c.apiClient.LoadTestsAPI.
+		ValidateOptions(ctx).
+		ValidateOptionsRequest(validateOptions).
+		XStackId(int32(c.stackID))
 	_, httpRes, err := req.Execute()
 	if err := CheckResponse(httpRes, err); err != nil {
 		return err
@@ -164,14 +167,7 @@ func (c *Client) ValidateToken(stackURL string) (_ *k6cloud.AuthenticationRespon
 		}
 	}()
 
-	if rerr != nil {
-		var apiErr *k6cloud.GenericOpenAPIError
-		if !errors.As(rerr, &apiErr) {
-			return nil, fmt.Errorf("failed to validate token: %w", rerr)
-		}
-	}
-
-	if err := CheckResponse(httpRes); err != nil {
+	if err := CheckResponse(httpRes, rerr); err != nil {
 		return nil, fmt.Errorf("failed to validate token: %w", err)
 	}
 
