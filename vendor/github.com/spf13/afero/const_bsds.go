@@ -11,7 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// +build darwin openbsd freebsd netbsd dragonfly
+// +build darwin openbsd freebsd netbsd dragonfly zos
 
 package afero
 
