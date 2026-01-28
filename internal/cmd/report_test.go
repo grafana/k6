@@ -23,7 +23,7 @@ func TestCreateReport(t *testing.T) {
 	opts, err := executor.DeriveScenariosFromShortcuts(lib.Options{
 		VUs:        null.IntFrom(10),
 		Iterations: null.IntFrom(170),
-	}, logger)
+	}, nil, logger)
 	require.NoError(t, err)
 
 	initSchedulerWithEnv := func(lookupEnv func(string) (string, bool)) (*execution.Scheduler, error) {

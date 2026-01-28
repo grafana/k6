@@ -68,7 +68,7 @@ func newTestScheduler(
 	ctx, cancel = context.WithCancel(context.Background())
 	newOpts, err := executor.DeriveScenariosFromShortcuts(lib.Options{
 		MetricSamplesBufferSize: null.NewInt(200, false),
-	}.Apply(runner.GetOptions()).Apply(opts), nil)
+	}.Apply(runner.GetOptions()).Apply(opts), nil, nil)
 	require.NoError(t, err)
 
 	testRunState := getTestRunState(t, getTestPreInitState(t), newOpts, runner)
@@ -963,7 +963,7 @@ func TestSchedulerEndIterations(t *testing.T) {
 	options, err := executor.DeriveScenariosFromShortcuts(lib.Options{
 		VUs:        null.IntFrom(1),
 		Iterations: null.IntFrom(100),
-	}, nil)
+	}, nil, nil)
 	require.NoError(t, err)
 	require.Empty(t, options.Validate())
 
@@ -1199,7 +1199,7 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 		SystemTags:      &metrics.DefaultSystemTagSet,
 		SetupTimeout:    types.NullDurationFrom(4 * time.Second),
 		TeardownTimeout: types.NullDurationFrom(4 * time.Second),
-	}), nil)
+	}), nil, nil)
 	require.NoError(t, err)
 
 	testRunState := getTestRunState(t, piState, options, runner)
