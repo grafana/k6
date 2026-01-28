@@ -335,6 +335,8 @@ type pageAPI interface { //nolint:interfacebloat
 	GetMouse() *common.Mouse
 	GetTouchscreen() *common.Touchscreen
 	Goto(url string, opts sobek.Value) (*common.Response, error)
+	GoBack(opts sobek.Value) (*common.Response, error)
+	GoForward(opts sobek.Value) (*common.Response, error)
 	Hover(selector string, opts sobek.Value) error
 	InnerHTML(selector string, opts sobek.Value) (string, error)
 	InnerText(selector string, opts sobek.Value) (string, error)
