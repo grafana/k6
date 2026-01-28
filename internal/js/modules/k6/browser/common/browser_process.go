@@ -17,7 +17,7 @@ import (
 
 type BrowserProcess struct {
 	ctx    context.Context
-	cancel context.CancelFunc
+	cancel context.CancelCauseFunc
 
 	meta browserProcessMeta
 
@@ -35,8 +35,12 @@ type BrowserProcess struct {
 // NewLocalBrowserProcess starts a local browser process and
 // returns a new BrowserProcess instance to interact with it.
 func NewLocalBrowserProcess(
-	ctx context.Context, path string, args []string, dataDir *storage.Dir,
-	ctxCancel context.CancelFunc, logger *log.Logger,
+	ctx context.Context,
+	path string,
+	args []string,
+	dataDir *storage.Dir,
+	ctxCancel context.CancelCauseFunc,
+	logger *log.Logger,
 ) (*BrowserProcess, error) {
 	cmd, err := execute(ctx, path, args, dataDir, logger)
 	if err != nil {
@@ -69,7 +73,7 @@ func NewLocalBrowserProcess(
 // NewRemoteBrowserProcess returns a new BrowserProcess instance
 // which references a remote browser process.
 func NewRemoteBrowserProcess(
-	ctx context.Context, wsURL string, ctxCancel context.CancelFunc, logger *log.Logger,
+	ctx context.Context, wsURL string, ctxCancel context.CancelCauseFunc, logger *log.Logger,
 ) (*BrowserProcess, error) {
 	p := BrowserProcess{
 		ctx:                        ctx,
@@ -98,7 +102,7 @@ func (p *BrowserProcess) handleClose(ctx context.Context) {
 	select {
 	case <-p.processIsGracefullyClosing:
 	default:
-		p.cancel()
+		p.cancel(fmt.Errorf("lost connection while closing the browser (websocket url: %s)", p.wsURL))
 	}
 }
 
@@ -125,7 +129,7 @@ func (p *BrowserProcess) GracefulClose() {
 // Terminate triggers the termination of the browser process.
 func (p *BrowserProcess) Terminate() {
 	p.logger.Debugf("Browser:Close", "browserProc terminate")
-	p.cancel()
+	p.cancel(errors.New("browser process terminated"))
 }
 
 // WsURL returns the Websocket URL that the browser is listening on for CDP clients.
@@ -176,7 +180,7 @@ func execute(
 		return command{}, fmt.Errorf("%w", err)
 	}
 	if ctx.Err() != nil {
-		return command{}, fmt.Errorf("%w", ctx.Err())
+		return command{}, ContextErr(ctx)
 	}
 
 	done := make(chan struct{})
@@ -216,7 +220,7 @@ func parseDevToolsURL(ctx context.Context, cmd command) (_ string, err error) {
 		case <-done:
 			err = parser.err()
 		case <-ctx.Done():
-			err = ctx.Err()
+			err = ContextErr(ctx)
 		case <-cmd.done:
 			err = errors.New("browser process ended unexpectedly")
 		}

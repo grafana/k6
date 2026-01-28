@@ -1777,7 +1777,7 @@ func retryPointerAction(
 		// Wait with timeout or context cancellation
 		select {
 		case <-apiCtx.Done():
-			return nil, apiCtx.Err()
+			return nil, ContextErr(apiCtx)
 		case <-time.After(20 * time.Millisecond):
 			// Continue retrying after delay
 		}
