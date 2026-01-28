@@ -73,19 +73,22 @@ type BaseEventEmitter struct {
 
 	queues map[chan Event]*queue
 
-	syncCh chan syncFunc
-	ctx    context.Context
+	// syncCh chan syncFunc
+	ctx context.Context
+
+	mu *sync.Mutex
 }
 
 // NewBaseEventEmitter creates a new instance of a base event emitter.
 func NewBaseEventEmitter(ctx context.Context) BaseEventEmitter {
 	bem := BaseEventEmitter{
 		handlers: make(map[string][]*eventHandler),
-		syncCh:   make(chan syncFunc),
-		ctx:      ctx,
-		queues:   make(map[chan Event]*queue),
+		// syncCh:   make(chan syncFunc),
+		ctx:    ctx,
+		queues: make(map[chan Event]*queue),
+		mu:     &sync.Mutex{},
 	}
-	go bem.syncAll(ctx)
+	// go bem.syncAll(ctx)
 	return bem
 }
 
@@ -93,33 +96,33 @@ func NewBaseEventEmitter(ctx context.Context) BaseEventEmitter {
 // and processes them one at a time for synchronization.
 //
 // It returns when the BaseEventEmitter context is done.
-func (e *BaseEventEmitter) syncAll(ctx context.Context) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case fn := <-e.syncCh:
-			// run the function and signal when it's done
-			done := fn()
-			done <- struct{}{}
-		}
-	}
-}
+// func (e *BaseEventEmitter) syncAll(ctx context.Context) {
+// 	for {
+// 		select {
+// 		case <-ctx.Done():
+// 			return
+// 		case fn := <-e.syncCh:
+// 			// run the function and signal when it's done
+// 			done := fn()
+// 			done <- struct{}{}
+// 		}
+// 	}
+// }
 
-// sync is a helper for sychronized access to the BaseEventEmitter.
-func (e *BaseEventEmitter) sync(fn func()) {
-	done := make(chan struct{})
-	select {
-	case <-e.ctx.Done():
-		return
-	case e.syncCh <- func() chan struct{} {
-		fn()
-		return done
-	}:
-	}
-	// wait for the function to return
-	<-done
-}
+// // sync is a helper for sychronized access to the BaseEventEmitter.
+// func (e *BaseEventEmitter) sync(fn func()) {
+// 	done := make(chan struct{})
+// 	select {
+// 	case <-e.ctx.Done():
+// 		return
+// 	case e.syncCh <- func() chan struct{} {
+// 		fn()
+// 		return done
+// 	}:
+// 	}
+// 	// wait for the function to return
+// 	<-done
+// }
 
 func (e *BaseEventEmitter) emit(event string, data any) {
 	emitEvent := func(eh *eventHandler) {
@@ -168,36 +171,45 @@ func (e *BaseEventEmitter) emit(event string, data any) {
 		}
 		return handlers
 	}
-	e.sync(func() {
-		e.handlers[event] = emitTo(e.handlers[event])
-		e.handlersAll = emitTo(e.handlersAll)
-	})
+	// e.sync(func() {
+	// 	e.handlers[event] = emitTo(e.handlers[event])
+	// 	e.handlersAll = emitTo(e.handlersAll)
+	// })
+
+	e.mu.Lock()
+	e.handlers[event] = emitTo(e.handlers[event])
+	e.handlersAll = emitTo(e.handlersAll)
+	e.mu.Unlock()
 }
 
 // On registers a handler for a specific event.
 func (e *BaseEventEmitter) on(ctx context.Context, events []string, ch chan Event) {
-	e.sync(func() {
-		q, ok := e.queues[ch]
-		if !ok {
-			q = &queue{}
-			e.queues[ch] = q
-		}
+	// e.sync(func() {
+	e.mu.Lock()
+	q, ok := e.queues[ch]
+	if !ok {
+		q = &queue{}
+		e.queues[ch] = q
+	}
 
-		for _, event := range events {
-			e.handlers[event] = append(e.handlers[event], &eventHandler{ctx: ctx, ch: ch, queue: q})
-		}
-	})
+	for _, event := range events {
+		e.handlers[event] = append(e.handlers[event], &eventHandler{ctx: ctx, ch: ch, queue: q})
+	}
+	e.mu.Unlock()
+	// })
 }
 
 // OnAll registers a handler for all events.
 func (e *BaseEventEmitter) onAll(ctx context.Context, ch chan Event) {
-	e.sync(func() {
-		q, ok := e.queues[ch]
-		if !ok {
-			q = &queue{}
-			e.queues[ch] = q
-		}
+	// e.sync(func() {
+	e.mu.Lock()
+	q, ok := e.queues[ch]
+	if !ok {
+		q = &queue{}
+		e.queues[ch] = q
+	}
 
-		e.handlersAll = append(e.handlersAll, &eventHandler{ctx: ctx, ch: ch, queue: q})
-	})
+	e.handlersAll = append(e.handlersAll, &eventHandler{ctx: ctx, ch: ch, queue: q})
+	e.mu.Unlock()
+	// })
 }
