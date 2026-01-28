@@ -177,10 +177,6 @@ func (s *sharedArrays) loadOrStore(name string, builder func() sharedArray) shar
 		return arr
 	}
 
-	// Create and initialize the array
-	if s.data == nil {
-		s.data = make(map[string]sharedArray)
-	}
 	arr = builder()
 	s.data[name] = arr
 	return arr
