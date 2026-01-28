@@ -344,7 +344,7 @@ func wait(ctx context.Context, delay int64) error {
 		if !t.Stop() {
 			<-t.C
 		}
-		return fmt.Errorf("%w", ctx.Err())
+		return fmt.Errorf("%w", ContextErr(ctx))
 	case <-t.C:
 	}
 

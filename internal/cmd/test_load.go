@@ -49,10 +49,14 @@ type loadedTest struct {
 	preInitState   *lib.TestPreInitState
 	initRunner     lib.Runner // TODO: rename to something more appropriate
 	keyLogger      io.Closer
-	moduleResolver *modules.ModuleResolver
+
+	dependencies       dependencies
+	imports            []string
+	runnerContinuation func() (lib.Runner, error)
+	dependencyErr      error
 }
 
-func loadLocalTest(gs *state.GlobalState, cmd *cobra.Command, args []string) (*loadedTest, error) {
+func loadLocalTestWithoutRunner(gs *state.GlobalState, cmd *cobra.Command, args []string) (*loadedTest, error) {
 	if len(args) < 1 {
 		return nil, fmt.Errorf("k6 needs at least one argument to load the test")
 	}
@@ -106,15 +110,32 @@ func loadLocalTest(gs *state.GlobalState, cmd *cobra.Command, args []string) (*l
 		preInitState:   state,
 	}
 
-	gs.Logger.Debugf("Initializing k6 runner for '%s' (%s)...", sourceRootPath, resolvedPath)
-	if err := test.initializeFirstRunner(gs); err != nil {
-		return nil, fmt.Errorf("could not initialize '%s': %w", sourceRootPath, err)
+	if err := test.prepareFirstRunner(gs); err != nil {
+		return test, fmt.Errorf("could not initialize '%s': %w", sourceRootPath, err)
 	}
-	gs.Logger.Debug("Runner successfully initialized!")
+
 	return test, nil
 }
 
-func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
+func loadLocalTest(gs *state.GlobalState, cmd *cobra.Command, args []string) (*loadedTest, error) {
+	test, err := loadLocalTestWithoutRunner(gs, cmd, args)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := test.continueInitialization(gs); err != nil {
+		return nil, fmt.Errorf("could not initialize '%s': %w", test.sourceRootPath, err)
+	}
+
+	return test, nil
+}
+
+//nolint:funlen
+func (lt *loadedTest) prepareFirstRunner(gs *state.GlobalState) error {
+	if lt.initRunner != nil || lt.runnerContinuation != nil {
+		return nil
+	}
+
 	testPath := lt.source.URL.String()
 	logger := gs.Logger.WithField("test_path", testPath)
 
@@ -150,23 +171,24 @@ func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
 		err := errext.WithExitCodeIfNone(
 			moduleResolver.LoadMainModule(pwd, specifier, lt.source.Data),
 			exitcodes.ScriptException)
-		err = tryResolveModulesExtensions(err, moduleResolver.Imported(), logger, lt.fileSystems, lt.source, gs)
-		if err != nil {
-			return fmt.Errorf("could not load JS test '%s': %w", testPath, err)
+		lt.imports = moduleResolver.Imported()
+		deps, depErr := resolveModulesDependencies(err, lt.imports, logger, lt.fileSystems, lt.source, gs)
+		lt.dependencies = deps
+		if depErr != nil {
+			return fmt.Errorf("could not load JS test '%s': %w", testPath, depErr)
 		}
-		runner, err := js.New(lt.preInitState, lt.source, lt.fileSystems, moduleResolver)
-		// TODO: should we use common.UnwrapGojaInterruptedError() here?
-		if err != nil {
-			return fmt.Errorf("could not load JS test '%s': %w", testPath, err)
+		lt.runnerContinuation = func() (lib.Runner, error) {
+			runner, err := js.New(lt.preInitState, lt.source, lt.fileSystems, moduleResolver)
+			if err != nil {
+				return nil, fmt.Errorf("could not load JS test '%s': %w", testPath, err)
+			}
+			return runner, nil
 		}
-		lt.initRunner = runner
-		lt.moduleResolver = runner.Bundle.ModuleResolver
 		return nil
 
 	case testTypeArchive:
 		logger.Debug("Trying to load test as an archive bundle...")
 
-		var arc *lib.Archive
 		arc, err := lib.ReadArchive(bytes.NewReader(lt.source.Data))
 		if err != nil {
 			return fmt.Errorf("could not load test archive bundle '%s': %w", testPath, err)
@@ -179,19 +201,22 @@ func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
 			specifier := arc.Filename
 			pwd := arc.PwdURL
 			moduleResolver := js.NewModuleResolver(pwd, lt.preInitState, arc.Filesystems)
-			err := errext.WithExitCodeIfNone(
+			loadErr := errext.WithExitCodeIfNone(
 				moduleResolver.LoadMainModule(pwd, specifier, arc.Data),
 				exitcodes.ScriptException)
-			err = tryResolveModulesExtensions(err, moduleResolver.Imported(), logger, arc.Filesystems, lt.source, gs)
-			if err != nil {
-				return fmt.Errorf("could not load JS test '%s': %w", testPath, err)
+			lt.imports = moduleResolver.Imported()
+			deps, depErr := resolveModulesDependencies(loadErr, lt.imports, logger, arc.Filesystems, lt.source, gs)
+			lt.dependencies = deps
+			if depErr != nil {
+				return fmt.Errorf("could not load JS test '%s': %w", testPath, depErr)
 			}
-			runner, err := js.NewFromArchive(lt.preInitState, arc, moduleResolver)
-			if err != nil {
-				return fmt.Errorf("could not load JS from test archive bundle '%s': %w", testPath, err)
+			lt.runnerContinuation = func() (lib.Runner, error) {
+				runner, err := js.NewFromArchive(lt.preInitState, arc, moduleResolver)
+				if err != nil {
+					return nil, fmt.Errorf("could not load JS from test archive bundle '%s': %w", testPath, err)
+				}
+				return runner, nil
 			}
-			lt.initRunner = runner
-			lt.moduleResolver = runner.Bundle.ModuleResolver
 			return nil
 		default:
 			return fmt.Errorf("archive '%s' has an unsupported test type '%s'", testPath, arc.Type)
@@ -201,39 +226,81 @@ func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
 	}
 }
 
-func tryResolveModulesExtensions(
-	originalError error, imports []string, logger logrus.FieldLogger,
-	fileSystems map[string]fsext.Fs, source *loader.SourceData, gs *state.GlobalState,
-) error {
-	if !gs.Flags.AutoExtensionResolution {
-		return originalError
+func (lt *loadedTest) continueInitialization(gs *state.GlobalState) error {
+	if lt.dependencyErr != nil {
+		return lt.dependencyErr
+	}
+	if lt.runnerContinuation == nil {
+		return fmt.Errorf("runner initialization was not prepared")
 	}
 
-	deps, err := extractUnknownModules(originalError)
+	resolvedPath := lt.source.URL.String()
+	gs.Logger.Debugf("Initializing k6 runner for '%s' (%s)...", lt.sourceRootPath, resolvedPath)
+	runner, err := lt.runnerContinuation()
 	if err != nil {
 		return err
 	}
-	err = analyseUseContraints(imports, fileSystems, deps)
+
+	lt.initRunner = runner
+	lt.runnerContinuation = nil
+	gs.Logger.Debug("Runner successfully initialized!")
+	return nil
+}
+
+func (lt *loadedTest) Dependencies() dependencies {
+	return lt.dependencies
+}
+
+func (lt *loadedTest) Imports() []string {
+	return append([]string(nil), lt.imports...)
+}
+
+func resolveModulesDependencies(
+	originalError error, imports []string, logger logrus.FieldLogger,
+	fileSystems map[string]fsext.Fs, source *loader.SourceData, gs *state.GlobalState,
+) (dependencies, error) {
+	deps, err := collectTestDependencies(originalError, imports, fileSystems)
 	if err != nil {
-		return err
+		return nil, err
 	}
+
+	if !gs.Flags.AutoExtensionResolution {
+		return deps, originalError
+	}
+
 	if len(deps) == 0 {
-		return nil
+		return deps, nil
 	}
+
 	if !isCustomBuildRequired(deps, build.Version, ext.GetAll()) {
 		logger.
 			Debug("The current k6 binary already satisfies all the required dependencies," +
 				" it isn't required to provision a new binary.")
-		return nil
+		return deps, nil
 	}
 
 	if source.URL.Path == "/-" {
 		gs.Stdin = bytes.NewBuffer(source.Data)
 	}
 
-	return binaryIsNotSatisfyingDependenciesError{
+	return deps, binaryIsNotSatisfyingDependenciesError{
 		deps: deps,
 	}
+}
+
+func collectTestDependencies(
+	originalError error, imports []string, fileSystems map[string]fsext.Fs,
+) (dependencies, error) {
+	deps, err := extractUnknownModules(originalError)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := analyseUseContraints(imports, fileSystems, deps); err != nil {
+		return nil, err
+	}
+
+	return deps, nil
 }
 
 func analyseUseContraints(imports []string, fileSystems map[string]fsext.Fs, deps dependencies) error {
@@ -243,20 +310,25 @@ func analyseUseContraints(imports []string, fileSystems map[string]fsext.Fs, dep
 		}
 		u, err := url.Parse(imported)
 		if err != nil {
-			panic(err)
+			return err
 		}
 		// We always have URLs here with scheme and everything
 		_, path, _ := strings.Cut(imported, "://")
 		if u.Scheme == "https" {
 			path = "/" + path
 		}
+		path, err = url.PathUnescape(filepath.FromSlash(path))
+		if err != nil {
+			return err
+		}
+
 		data, err := fsext.ReadFile(fileSystems[u.Scheme], path)
 		if err != nil {
-			panic(err)
+			return err
 		}
 		err = processUseDirectives(imported, data, deps)
 		if err != nil {
-			panic(err)
+			return err
 		}
 	}
 	return nil

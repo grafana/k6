@@ -117,8 +117,10 @@ func EstimateBlockSize(src []byte) (d int) {
 func EncodeBetter(dst, src []byte) []byte {
 	if n := MaxEncodedLen(len(src)); n < 0 {
 		panic(ErrTooLarge)
-	} else if len(dst) < n {
+	} else if cap(dst) < n {
 		dst = make([]byte, n)
+	} else {
+		dst = dst[:n]
 	}
 
 	// The block starts with the varint-encoded length of the decompressed bytes.
@@ -159,8 +161,10 @@ func EncodeBetter(dst, src []byte) []byte {
 func EncodeBest(dst, src []byte) []byte {
 	if n := MaxEncodedLen(len(src)); n < 0 {
 		panic(ErrTooLarge)
-	} else if len(dst) < n {
+	} else if cap(dst) < n {
 		dst = make([]byte, n)
+	} else {
+		dst = dst[:n]
 	}
 
 	// The block starts with the varint-encoded length of the decompressed bytes.

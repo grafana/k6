@@ -1,26 +1,14 @@
 package browser
 
 import (
-	"context"
 	"errors"
 	"fmt"
 
 	"github.com/grafana/sobek"
-	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/common"
 	k6common "go.k6.io/k6/js/common"
 )
-
-func cancelableTaskQueue(ctx context.Context, registerCallback func() func(func() error)) *taskqueue.TaskQueue {
-	tq := taskqueue.New(registerCallback)
-
-	go func() {
-		<-ctx.Done()
-		tq.Close()
-	}()
-	return tq
-}
 
 // mapFrame to the JS module.
 //
@@ -323,6 +311,10 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 		"locator": func(selector string, opts sobek.Value) mapping {
 			return mapLocator(vu, f.Locator(selector, parseLocatorOptions(rt, opts)))
 		},
+		"frameLocator": func(selector string) *sobek.Object {
+			mfl := mapFrameLocator(vu, f.FrameLocator(selector))
+			return rt.ToValue(mfl).ToObject(rt)
+		},
 		"name": f.Name,
 		"page": func() mapping {
 			return mapPage(vu, f.Page())
@@ -463,7 +455,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			}), nil
 		},
 		"waitForNavigation": func(opts sobek.Value) (*sobek.Promise, error) {
-			return waitForNavigationBodyImpl(vu, f, opts)
+			return mapWaitForNavigation(vu, f, opts)
 		},
 		"waitForSelector": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
 			popts := common.NewFrameWaitForSelectorOptions(f.Timeout())
@@ -486,7 +478,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			})
 		},
 		"waitForURL": func(url sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
-			return waitForURLBody(vu, f, url, opts)
+			return mapWaitForURL(vu, f, url, opts)
 		},
 	}
 	maps["$"] = func(selector string) *sobek.Promise {

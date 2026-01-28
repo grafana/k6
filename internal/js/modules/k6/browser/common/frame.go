@@ -1588,6 +1588,13 @@ func (f *Frame) Locator(selector string, opts *LocatorOptions) *Locator {
 	return NewLocator(f.ctx, opts, selector, f, f.log)
 }
 
+// FrameLocator is a convenience method equivalent to frame.locator(selector).contentFrame().
+func (f *Frame) FrameLocator(selector string) *FrameLocator {
+	f.log.Debugf("Frame:FrameLocator", "fid:%s furl:%q selector:%q", f.ID(), f.URL(), selector)
+
+	return f.Locator(selector, nil).ContentFrame()
+}
+
 // LoaderID returns the ID of the frame that loaded this frame.
 func (f *Frame) LoaderID() string {
 	f.propertiesMu.RLock()
@@ -2029,7 +2036,7 @@ func (f *Frame) WaitForLoadState(state string, popts *FrameWaitForLoadStateOptio
 	select {
 	case <-lifecycleEvent:
 	case <-timeoutCtx.Done():
-		return fmt.Errorf("waiting for load state %q: %w", state, timeoutCtx.Err())
+		return fmt.Errorf("waiting for load state %q: %w", state, ContextErr(timeoutCtx))
 	}
 
 	return nil
@@ -2117,7 +2124,7 @@ func (f *Frame) WaitForNavigation(opts *FrameWaitForNavigationOptions, rm RegExM
 			}
 		}
 	case <-timeoutCtx.Done():
-		return nil, handleTimeoutError(timeoutCtx.Err())
+		return nil, handleTimeoutError(ContextErr(timeoutCtx))
 	}
 
 	// A lifecycle event won't be received when navigating within the same
@@ -2127,7 +2134,7 @@ func (f *Frame) WaitForNavigation(opts *FrameWaitForNavigationOptions, rm RegExM
 		select {
 		case <-lifecycleEvtCh:
 		case <-timeoutCtx.Done():
-			return nil, handleTimeoutError(timeoutCtx.Err())
+			return nil, handleTimeoutError(ContextErr(timeoutCtx))
 		}
 	}
 

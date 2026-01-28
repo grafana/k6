@@ -1,0 +1,42 @@
+name: "Test"
+description: "Run all tests except ones in browser/tests package"
+
+inputs:
+  platform:
+    description: "matrix.platform value (used for windows/arm detection)."
+    required: true
+  use_gotip:
+    description: "whether to set up gotip env variables or not"
+    required: false
+    default: "false"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Run tests
+      shell: bash
+      env:
+        PLATFORM: ${{ inputs.platform }}
+        USE_GOTIP: ${{ inputs.use_gotip }}
+      run: |
+        set -x
+
+        if [[ ${USE_GOTIP} == 'true' ]]; then
+          export GOROOT="$HOME/sdk/gotip"
+          export GOPATH="$HOME/go"
+          export PATH="$HOME/sdk/gotip/bin:$HOME/go/bin:$PATH" > /dev/null
+        fi
+
+        which go
+        go version
+        export GOMAXPROCS=2
+        args=("-p" "2" "-race")
+        # Run with less concurrency on Windows/ARM to minimize flakiness.
+        if [[ "${PLATFORM}" == windows* || "${PLATFORM}" == *arm ]]; then
+          args[1]="1"
+          export GOMAXPROCS=1
+          if [[ "${PLATFORM}" == windows* ]]; then
+            unset args[2]
+          fi
+        fi
+        go test "${args[@]}" -timeout 800s `go list ./... | grep -v browser/tests`

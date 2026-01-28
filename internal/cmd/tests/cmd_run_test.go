@@ -503,7 +503,7 @@ func TestExecutionTestOptionsDefaultValues(t *testing.T) {
 		import exec from 'k6/execution';
 
 		export default function () {
-			console.log(exec.test.options)
+			console.log(JSON.stringify(exec.test.options))
 		}
 	`
 
@@ -2968,4 +2968,234 @@ func TestInvalidSummaryModeAbortsTheExecution(t *testing.T) {
 		ts.Stderr.String(),
 		`level=error msg="invalid summary mode"`,
 	)
+}
+
+func TestMachineReadableSummary(t *testing.T) {
+	t.Parallel()
+
+	mainScript := `
+		import { check } from "k6";
+		import { Counter } from 'k6/metrics';
+
+		const customIter = new Counter("custom_iterations");
+
+		export default function () {
+			customIter.add(1);
+			check(true, { "TRUE is TRUE": (r) => r });
+		};
+	`
+
+	assertSummaryExport := func(t *testing.T, out string) {
+		t.Helper()
+
+		// Configuration block: duration is dynamic.
+		configPattern := `"config": \{
+        "duration": [\d.]+,
+        "execution": "local",
+        "script": "(?:[^"\\]|\\.)*"
+    \}`
+		assert.Regexp(t, regexp.MustCompile(configPattern), out)
+
+		// Metadata block: generated_at is dynamic.
+		metadataPattern := `"metadata": \{
+        "generated_at": "\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+(Z|[+-]\d{2}:\d{2})",
+        "k6_version": "` + regexp.QuoteMeta(build.Version) + `"
+    \}`
+		assert.Regexp(t, regexp.MustCompile(metadataPattern), out)
+
+		// Checks block: checks.metrics preserve the order.
+		checksPattern := `"checks": \{
+            "metrics": \[
+                \{
+                    "contains": "default",
+                    "name": "checks_total",
+                    "type": "counter",
+                    "values": \{
+                        "count": 1
+                    \}
+                \},
+                \{
+                    "contains": "default",
+                    "name": "checks_failed",
+                    "type": "rate",
+                    "values": \{
+                        "matches": 0,
+                        "rate": 0,
+                        "total": 1
+                    \}
+                \},
+                \{
+                    "contains": "default",
+                    "name": "checks_succeeded",
+                    "type": "rate",
+                    "values": \{
+                        "matches": 1,
+                        "rate": 1,
+                        "total": 1
+                    \}
+                \}
+            \],
+            "results": \[
+                \{
+                    "fails": 0,
+                    "name": "TRUE is TRUE",
+                    "passes": 1
+                \}
+            \]
+        \}`
+		assert.Regexp(t, regexp.MustCompile(checksPattern), out)
+
+		// Metrics block: asserted individual because order may vary between executions.
+		iterationDurationPattern := `\{
+                "contains": "time",
+                "name": "iteration_duration",
+                "type": "trend",
+                "values": \{
+                    "avg": [\d.]+,
+                    "max": [\d.]+,
+                    "med": [\d.]+,
+                    "min": [\d.]+,
+                    "p90": [\d.]+,
+                    "p95": [\d.]+
+                \}
+            \}`
+		assert.Regexp(t, regexp.MustCompile(iterationDurationPattern), out)
+
+		iterationsPattern := `\{
+                "contains": "default",
+                "name": "iterations",
+                "type": "counter",
+                "values": \{
+                    "count": 1
+                \}
+            \}`
+		assert.Regexp(t, regexp.MustCompile(iterationsPattern), out)
+
+		dataSentPattern := `\{
+                "contains": "data",
+                "name": "data_sent",
+                "type": "counter",
+                "values": \{
+                    "count": 0
+                \}
+            \}`
+		assert.Regexp(t, regexp.MustCompile(dataSentPattern), out)
+
+		dataReceivedPattern := `\{
+                "contains": "data",
+                "name": "data_received",
+                "type": "counter",
+                "values": \{
+                    "count": 0
+                \}
+            \}`
+		assert.Regexp(t, regexp.MustCompile(dataReceivedPattern), out)
+
+		customIterationsPattern := `\{
+                "contains": "default",
+                "name": "custom_iterations",
+                "type": "counter",
+                "values": \{
+                    "count": 1
+                \}
+            \}`
+		assert.Regexp(t, regexp.MustCompile(customIterationsPattern), out)
+
+		// Schema version: statically defined, as changes in the schema will likely require changes in code.
+		versionPattern := `"version": "1\.0\.0"`
+		assert.Regexp(t, regexp.MustCompile(versionPattern), out)
+	}
+
+	t.Run("--summary-export", func(t *testing.T) {
+		t.Parallel()
+
+		ts := NewGlobalTestState(t)
+		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(mainScript), 0o644))
+
+		ts.CmdArgs = []string{
+			"k6", "run",
+			"--summary-export=summary.json",
+			"--new-machine-readable-summary=true",
+			"script.js",
+		}
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stdout := ts.Stdout.String()
+		t.Log(stdout)
+
+		assert.Contains(t, stdout, "checks_total.......: 1")
+		assert.Contains(t, stdout, "checks_succeeded...: 100.00% 1 out of 1")
+		assert.Contains(t, stdout, "checks_failed......: 0.00%   0 out of 1")
+
+		assert.Contains(t, stdout, `CUSTOM
+    custom_iterations....: 1`)
+		assert.Contains(t, stdout, "iterations...........: 1")
+
+		summaryExport, err := fsext.ReadFile(ts.FS, "summary.json")
+		require.NoError(t, err)
+
+		assertSummaryExport(t, string(summaryExport))
+	})
+
+	t.Run("handleSummary()", func(t *testing.T) {
+		t.Parallel()
+
+		mainScript := mainScript + `
+
+		export function handleSummary(data) {
+			return {
+			  'summary.json': JSON.stringify(data, null, 4),
+			};
+		}
+`
+
+		ts := NewGlobalTestState(t)
+		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(mainScript), 0o644))
+
+		ts.CmdArgs = []string{
+			"k6", "run",
+			"--new-machine-readable-summary=true",
+			"script.js",
+		}
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stdout := ts.Stdout.String()
+		t.Log(stdout)
+
+		summaryExport, err := fsext.ReadFile(ts.FS, "summary.json")
+		require.NoError(t, err)
+
+		assertSummaryExport(t, string(summaryExport))
+	})
+}
+
+func TestSpaceInPath(t *testing.T) {
+	t.Parallel()
+	depScript := `
+		export default function() {
+			let p = 42;
+			return p;
+		}
+	`
+	mainScript := `
+		import bar from "./foo bar.js";
+		let s = "something";
+		export default function() {
+			console.log(s, bar());
+		};
+	`
+
+	ts := NewGlobalTestState(t)
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test me.js"), []byte(mainScript), 0o644))
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "foo bar.js"), []byte(depScript), 0o644))
+
+	ts.CmdArgs = []string{"k6", "run", "--quiet", "test me.js"}
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stderr := ts.Stderr.String()
+	t.Log(stderr)
+	assert.Contains(t, stderr, `something 42`)
 }

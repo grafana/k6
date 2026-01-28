@@ -118,7 +118,7 @@ type Connection struct {
 	BaseEventEmitter
 
 	ctx          context.Context
-	cancelCtx    context.CancelFunc
+	cancelCtx    context.CancelCauseFunc
 	wsURL        string
 	logger       *log.Logger
 	conn         *websocket.Conn
@@ -157,7 +157,7 @@ func NewConnection(
 		ReadBufferSize:   wsWriteBufferSize,
 	}
 
-	ctx, cancelCtx := context.WithCancel(ctx)
+	ctx, cancelCtx := context.WithCancelCause(ctx)
 
 	conn, response, connErr := wsd.DialContext(ctx, wsURL, header)
 	if response != nil {
@@ -166,7 +166,7 @@ func NewConnection(
 		}()
 	}
 	if connErr != nil {
-		cancelCtx()
+		cancelCtx(fmt.Errorf("failed to dial websocket at %s: %w", wsURL, connErr))
 		return nil, connErr
 	}
 
@@ -197,7 +197,9 @@ func NewConnection(
 func (c *Connection) close(code int) error {
 	c.logger.Debugf("Connection:close", "code:%d", code)
 
-	defer c.cancelCtx()
+	defer func() {
+		c.cancelCtx(fmt.Errorf("connection closed with websocket code: %d", code))
+	}()
 
 	var err error
 	c.shutdownOnce.Do(func() {
@@ -331,16 +333,14 @@ func (c *Connection) findTargetIDForLog(id target.SessionID) target.ID {
 func (c *Connection) recvLoop() {
 	c.logger.Debugf("Connection:recvLoop", "wsURL:%q", c.wsURL)
 	for {
-		_, buf, err := c.conn.ReadMessage()
+		_, reader, err := c.conn.NextReader()
 		if err != nil {
 			c.handleIOError(err)
 			return
 		}
 
-		c.logger.Tracef("cdp:recv", "<- %s", buf)
-
 		var msg cdproto.Message
-		err = jsonv2.Unmarshal(buf, &msg, defaultJSONV2Options)
+		err = jsonv2.UnmarshalRead(reader, &msg, defaultJSONV2Options)
 		if err != nil {
 			select {
 			case c.errorCh <- err:
@@ -526,12 +526,12 @@ func (c *Connection) send(
 		c.logger.Debugf("Connection:send:<-c.done #2", "sid:%v tid:%v wsURL:%q", msg.SessionID, tid, c.wsURL)
 	case <-ctx.Done():
 		c.logger.Debugf("Connection:send:<-ctx.Done()", "sid:%v tid:%v wsURL:%q err:%v",
-			msg.SessionID, tid, c.wsURL, c.ctx.Err())
-		return ctx.Err()
+			msg.SessionID, tid, c.wsURL, ContextErr(c.ctx))
+		return ContextErr(ctx)
 	case <-c.ctx.Done():
 		c.logger.Debugf("Connection:send:<-c.ctx.Done()", "sid:%v tid:%v wsURL:%q err:%v",
-			msg.SessionID, tid, c.wsURL, c.ctx.Err())
-		return c.ctx.Err()
+			msg.SessionID, tid, c.wsURL, ContextErr(c.ctx))
+		return ContextErr(c.ctx)
 	}
 	return nil
 }
@@ -541,26 +541,13 @@ func (c *Connection) sendLoop() {
 	for {
 		select {
 		case msg := <-c.sendCh:
-			buf, err := jsonv2.Marshal(msg, defaultJSONV2Options)
-			if err != nil {
-				sid := msg.SessionID
-				tid := c.findTargetIDForLog(sid)
-				select {
-				case c.errorCh <- err:
-					c.logger.Debugf("Connection:sendLoop:c.errorCh <- err", "sid:%v tid:%v wsURL:%q err:%v", sid, tid, c.wsURL, err)
-				case <-c.done:
-					c.logger.Debugf("Connection:sendLoop:<-c.done", "sid:%v tid:%v wsURL:%q", sid, tid, c.wsURL)
-					return
-				}
-			}
-
-			c.logger.Tracef("cdp:send", "-> %s", buf)
 			writer, err := c.conn.NextWriter(websocket.TextMessage)
 			if err != nil {
 				c.handleIOError(err)
 				return
 			}
-			if _, err := writer.Write(buf); err != nil {
+			err = jsonv2.MarshalWrite(writer, msg, defaultJSONV2Options)
+			if err != nil {
 				c.handleIOError(err)
 				return
 			}

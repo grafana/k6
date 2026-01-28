@@ -29,7 +29,7 @@ type Browser struct {
 	// These are internal contexts which control the lifecycle of the connection
 	// and eventLoop. It is shutdown when browser.close() is called.
 	browserCtx      context.Context
-	browserCancelFn context.CancelFunc
+	browserCancelFn context.CancelCauseFunc
 
 	vuCtx         context.Context
 	vuCtxCancelFn context.CancelFunc
@@ -122,7 +122,7 @@ func newBrowser(
 	// the connection too early. The connection and subprocess need to be
 	// shutdown at around the same time to allow for any last minute CDP
 	// cleanup messages to be sent to chromium.
-	ctx, cancelFn := context.WithCancel(ctx)
+	ctx, cancelFn := context.WithCancelCause(ctx)
 
 	return &Browser{
 		browserCtx:          ctx,
@@ -404,6 +404,7 @@ func (b *Browser) isPageAttachmentErrorIgnorable(ev *target.EventAttachedToTarge
 			ev.SessionID, targetPage.TargetID, targetPage.Type, err)
 		return true
 	}
+
 	// No need to register the page if the test run is over.
 	select {
 	case <-b.vuCtx.Done():
@@ -412,6 +413,12 @@ func (b *Browser) isPageAttachmentErrorIgnorable(ev *target.EventAttachedToTarge
 			ev.SessionID, targetPage.TargetID, targetPage.Type, b.vuCtx.Err())
 		return true
 	default:
+	}
+	// No need to register the page if the context is already done.
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		b.logger.Debugf("Browser:isPageAttachmentErrorIgnorable:return:context.Done",
+			"sid:%v tid:%v pageType:%s err:%v", ev.SessionID, targetPage.TargetID, targetPage.Type, err)
+		return true
 	}
 	// Another VU or instance closed the page, and the session is closed.
 	// This can happen if the page is closed before the attachedToTarget
@@ -500,9 +507,9 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 		b.logger.Debugf("Browser:newPageInContext:<-ctx.Done", "tid:%v bctxid:%v err:%v", tid, id, ctx.Err())
 	}
 
-	if err = ctx.Err(); err != nil {
+	if err = ContextErr(ctx); err != nil {
 		err = &k6ext.UserFriendlyError{
-			Err:     ctx.Err(),
+			Err:     err,
 			Timeout: b.browserOpts.Timeout,
 		}
 	}
@@ -520,7 +527,7 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 func (b *Browser) Close() {
 	// This will help with some cleanup in the connection and event loop above in
 	// initEvents().
-	defer b.browserCancelFn()
+	defer b.browserCancelFn(errors.New("browser closed"))
 
 	if b.closed {
 		b.logger.Warnf(
@@ -620,25 +627,19 @@ func (b *Browser) NewContext(opts *BrowserContextOptions) (*BrowserContext, erro
 	defer span.End()
 
 	if b.context != nil {
-		err := errors.New("existing browser context must be closed before creating a new one")
-		spanRecordError(span, err)
-		return nil, err
+		return nil, spanRecordErrorf(span, "existing browser context must be closed before creating a new one")
 	}
 
 	action := target.CreateBrowserContext().WithDisposeOnDetach(true)
 	browserContextID, err := action.Do(cdp.WithExecutor(b.vuCtx, b.conn))
 	b.logger.Debugf("Browser:NewContext", "bctxid:%v", browserContextID)
 	if err != nil {
-		err := fmt.Errorf("creating browser context ID %s: %w", browserContextID, err)
-		spanRecordError(span, err)
-		return nil, err
+		return nil, spanRecordErrorf(span, "creating browser context ID %s: %w", browserContextID, err)
 	}
 
 	browserCtx, err := NewBrowserContext(b.vuCtx, b, browserContextID, opts, b.logger)
 	if err != nil {
-		err := fmt.Errorf("new context: %w", err)
-		spanRecordError(span, err)
-		return nil, err
+		return nil, spanRecordErrorf(span, "new browser context: %w", err)
 	}
 	b.runOnClose = append(b.runOnClose, browserCtx.cleanup)
 
@@ -656,15 +657,12 @@ func (b *Browser) NewPage(opts *BrowserContextOptions) (*Page, error) {
 
 	browserCtx, err := b.NewContext(opts)
 	if err != nil {
-		err := fmt.Errorf("new page: %w", err)
-		spanRecordError(span, err)
-		return nil, err
+		return nil, spanRecordErrorf(span, "new page: %w", err)
 	}
 
 	page, err := browserCtx.NewPage()
 	if err != nil {
-		spanRecordError(span, err)
-		return nil, err
+		return nil, spanRecordError(span, err)
 	}
 
 	return page, nil
@@ -681,7 +679,7 @@ func (b *Browser) On(event string) (bool, error) {
 	case <-b.browserProc.lostConnection:
 		return true, nil
 	case <-b.vuCtx.Done():
-		return false, fmt.Errorf("browser.on promise rejected: %w", b.vuCtx.Err())
+		return false, fmt.Errorf("browser.on promise rejected: %w", ContextErr(b.vuCtx))
 	}
 }
 

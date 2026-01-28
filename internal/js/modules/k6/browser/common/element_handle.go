@@ -615,7 +615,7 @@ func (h *ElementHandle) stepIntoFrame(
 	// This is a valid response from waitForSelector. It means that the element
 	// was either hidden or detached.
 	if iframeHandle == nil {
-		return nil, "", errors.New("check if element is visible")
+		return nil, "", ErrElementNotVisible
 	}
 
 	frame, err := iframeHandle.ContentFrame()
@@ -1363,9 +1363,7 @@ func (h *ElementHandle) Screenshot(
 	s := newScreenshotter(spanCtx, sp, h.logger)
 	buf, err := s.screenshotElement(h, opts)
 	if err != nil {
-		err := fmt.Errorf("taking screenshot of elementHandle: %w", err)
-		spanRecordError(span, err)
-		return nil, err
+		return nil, spanRecordErrorf(span, "taking screenshot of elementHandle: %w", err)
 	}
 
 	return buf, err
@@ -1771,14 +1769,15 @@ func retryPointerAction(
 		}
 
 		if !errors.Is(err, ErrElementNotVisible) &&
-			!errors.Is(err, ErrElementNotAttachedToDOM) {
+			!errors.Is(err, ErrElementNotAttachedToDOM) &&
+			!strings.Contains(err.Error(), "frame has been detached") {
 			return res, err
 		}
 
 		// Wait with timeout or context cancellation
 		select {
 		case <-apiCtx.Done():
-			return nil, apiCtx.Err()
+			return nil, ContextErr(apiCtx)
 		case <-time.After(20 * time.Millisecond):
 			// Continue retrying after delay
 		}

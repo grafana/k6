@@ -159,7 +159,7 @@ func TestConsoleLogWithSobekNativeObject(t *testing.T) {
 
 	entry := hook.LastEntry()
 	require.NotNil(t, entry, "nothing logged")
-	require.JSONEq(t, `{"text":"nativeObject"}`, entry.Message)
+	require.Equal(t, `{ text: "nativeObject" }`, entry.Message)
 }
 
 func TestConsoleLogObjectsWithGoTypes(t *testing.T) {
@@ -179,21 +179,21 @@ func TestConsoleLogObjectsWithGoTypes(t *testing.T) {
 			in: value{
 				Text: "test1",
 			},
-			exp: `{"text":"test1"}`,
+			exp: `{ text: "test1" }`,
 		},
 		{
 			name: "StructPointer",
 			in: &value{
 				Text: "test2",
 			},
-			exp: `{"text":"test2"}`,
+			exp: `{ text: "test2" }`,
 		},
 		{
 			name: "Map",
 			in: map[string]interface{}{
 				"text": "test3",
 			},
-			exp: `{"text":"test3"}`,
+			exp: `{ text: "test3" }`,
 		},
 	}
 
@@ -213,7 +213,7 @@ func TestConsoleLogObjectsWithGoTypes(t *testing.T) {
 
 			entry := hook.LastEntry()
 			require.NotNil(t, entry, "nothing logged")
-			assert.JSONEq(t, tt.exp, entry.Message)
+			assert.Equal(t, tt.exp, entry.Message)
 			assert.Equal(t, expFields, entry.Data)
 		})
 	}
@@ -247,15 +247,105 @@ func TestConsoleLog(t *testing.T) {
 		{in: `new Date(0)`, expected: `"1970-01-01T00:00:00.000Z"`},
 		{in: `new Error("test error")`, expected: "Error: test error"},
 
-		{in: `["bar", 1, 2]`, expected: `["bar",1,2]`},
-		{in: `"bar", ["bar", 0x01, 2], 1, 2`, expected: `bar ["bar",1,2] 1 2`},
+		{in: `["bar", 1, 2]`, expected: `[ "bar", 1, 2 ]`},
+		{in: `"bar", ["bar", 0x01, 2], 1, 2`, expected: `bar [ "bar", 1, 2 ] 1 2`},
 
 		{in: `{}`, expected: "{}"},
-		{in: `{foo:"bar"}`, expected: `{"foo":"bar"}`},
-		{in: `["test1", 2]`, expected: `["test1",2]`},
+		{in: `{foo:"bar"}`, expected: `{ foo: "bar" }`},
+		{in: `["test1", 2]`, expected: `[ "test1", 2 ]`},
 
-		// TODO: the ideal output for a circular object should be like `{a: [Circular]}`
-		{in: `function() {var a = {foo: {}}; a.foo = a; return a}()`, expected: "[object Object]"},
+		{in: `{fn: function(){}}`, expected: `{ fn: [object Function] }`},
+		{in: `{fn: function(){}, dt: new Date(0)}`, expected: `{ fn: [object Function], dt: "1970-01-01T00:00:00.000Z" }`},
+		{in: `{fn: () => {}}`, expected: `{ fn: [object Function] }`},
+		{in: `{a: 1, fn: function(){}, b: "two"}`, expected: `{ a: 1, fn: [object Function], b: "two" }`},
+		{in: `{nested: {fn: function(){}}}`, expected: `{ nested: { fn: [object Function] } }`},
+		{in: `[function(){}, 1, "two"]`, expected: `[ [object Function], 1, "two" ]`},
+		{
+			in: `{
+				arr: [1, 2],
+				obj: {
+					'a': 'foo', 'b': {
+						'c': { 'd': 123 }
+					}
+				},
+				str: 'hi'
+			}`,
+			expected: `{ arr: [ 1, 2 ], obj: { a: "foo", b: { c: { d: 123 } } }, str: "hi" }`,
+		},
+
+		{in: `[null, undefined, 1]`, expected: `[ null, null, 1 ]`},
+		{in: `[1, , 3]`, expected: `[ 1, null, 3 ]`}, // sparse arrays (holes in arrays)
+		{in: `[[function(){}], [1, 2]]`, expected: `[ [ [object Function] ], [ 1, 2 ] ]`},
+		{in: `new RegExp("test")`, expected: `{}`}, // JSON.stringify of RegExp is {}
+		{in: `{[Symbol("test")]: "value", a: 1}`, expected: `{ a: 1 }`},
+		{in: `Object.defineProperty({}, 'x', {get: function() { throw new Error(); }})`, expected: `{}`},
+		{in: `Object.create({inherited: 1}, {own: {value: 2, enumerable: true}})`, expected: `{ own: 2 }`},
+
+		// circular reference AND function (both code paths)
+		{
+			in:       `function() {var a = {fn: function(){}, foo: {}}; a.foo = a; return a}()`,
+			expected: `{ fn: [object Function], foo: [Circular] }`,
+		},
+
+		// TypedArray and ArrayBuffer formatting
+		{in: `new Int8Array([1, -2, 127, -128])`, expected: `Int8Array(4) [ 1, -2, 127, -128 ]`},
+		{in: `new Uint8Array([0, 128, 255])`, expected: `Uint8Array(3) [ 0, 128, 255 ]`},
+		{in: `new Uint8ClampedArray([0, 128, 255])`, expected: `Uint8Array(3) [ 0, 128, 255 ]`}, // shows as Uint8Array
+		{in: `new Int16Array([100, -100, 32767])`, expected: `Int16Array(3) [ 100, -100, 32767 ]`},
+		{in: `new Uint16Array([0, 32768, 65535])`, expected: `Uint16Array(3) [ 0, 32768, 65535 ]`},
+		{in: `new Int32Array([4, 2, -2147483648])`, expected: `Int32Array(3) [ 4, 2, -2147483648 ]`},
+		{in: `new Uint32Array([0, 2147483648, 4294967295])`, expected: `Uint32Array(3) [ 0, 2147483648, 4294967295 ]`},
+		{in: `new Float32Array([1.5, -2.5])`, expected: `Float32Array(2) [ 1.5, -2.5 ]`},
+		{in: `new Float64Array([3.141592653589793, 2.718281828459045])`, expected: `Float64Array(2) [ 3.141592653589793, 2.718281828459045 ]`},
+		{in: `new BigInt64Array([BigInt(1), BigInt(-1)])`, expected: `BigInt64Array(2) [ 1, -1 ]`},
+		{in: `new BigUint64Array([BigInt(0), BigInt(1)])`, expected: `BigUint64Array(2) [ 0, 1 ]`},
+
+		{in: `new Int8Array(0)`, expected: `Int8Array(0) []`},
+		{in: `new Uint8Array(0)`, expected: `Uint8Array(0) []`},
+		{in: `new Float64Array([])`, expected: `Float64Array(0) []`},
+		{in: `new Int32Array([0])`, expected: `Int32Array(1) [ 0 ]`},
+
+		{in: `new ArrayBuffer(0)`, expected: `ArrayBuffer { [Uint8Contents]: <>, byteLength: 0 }`},
+		{in: `new ArrayBuffer(4)`, expected: `ArrayBuffer { [Uint8Contents]: <00 00 00 00>, byteLength: 4 }`},
+		{in: `new ArrayBuffer(8)`, expected: `ArrayBuffer { [Uint8Contents]: <00 00 00 00 00 00 00 00>, byteLength: 8 }`},
+		{
+			in: `function() {
+				var buf = new ArrayBuffer(8);
+				var view = new Int32Array(buf);
+				view[0] = 4;
+				view[1] = 2;
+				return buf;
+			}()`,
+			expected: `ArrayBuffer { [Uint8Contents]: <04 00 00 00 02 00 00 00>, byteLength: 8 }`,
+		},
+
+		{in: `{v: new Int32Array([4, 2])}`, expected: `{ v: Int32Array(2) [ 4, 2 ] }`},
+		{in: `{b: new ArrayBuffer(4)}`, expected: `{ b: ArrayBuffer { [Uint8Contents]: <00 00 00 00>, byteLength: 4 } }`},
+		{in: `{arr: new Int8Array([1, 2]), buf: new ArrayBuffer(2)}`, expected: `{ arr: Int8Array(2) [ 1, 2 ], buf: ArrayBuffer { [Uint8Contents]: <00 00>, byteLength: 2 } }`},
+
+		{in: `[new Int8Array([1, 2])]`, expected: `[ Int8Array(2) [ 1, 2 ] ]`},
+		{in: `[new ArrayBuffer(2), new ArrayBuffer(4)]`, expected: `[ ArrayBuffer { [Uint8Contents]: <00 00>, byteLength: 2 }, ArrayBuffer { [Uint8Contents]: <00 00 00 00>, byteLength: 4 } ]`},
+
+		{in: `{count: 2, name: "test", data: new Int8Array([1, 2])}`, expected: `{ count: 2, name: "test", data: Int8Array(2) [ 1, 2 ] }`},
+		{in: `{fn: function(){}, arr: new Uint8Array([255])}`, expected: `{ fn: [object Function], arr: Uint8Array(1) [ 255 ] }`},
+		{in: `{buf: new ArrayBuffer(4), items: [1, 2, 3]}`, expected: `{ buf: ArrayBuffer { [Uint8Contents]: <00 00 00 00>, byteLength: 4 }, items: [ 1, 2, 3 ] }`},
+		{in: `{err: new Error("test"), data: new Int8Array([1])}`, expected: `{ err: Error: test, data: Int8Array(1) [ 1 ] }`},
+
+		{in: `{outer: {inner: new Int32Array([100])}}`, expected: `{ outer: { inner: Int32Array(1) [ 100 ] } }`},
+		{in: `{a: {b: {c: new ArrayBuffer(2)}}}`, expected: `{ a: { b: { c: ArrayBuffer { [Uint8Contents]: <00 00>, byteLength: 2 } } } }`},
+		{in: `{level1: {level2: {level3: {data: new Float32Array([1.5])}}}}`, expected: `{ level1: { level2: { level3: { data: Float32Array(1) [ 1.5 ] } } } }`},
+
+		{in: `[1, new Int8Array([2]), "three"]`, expected: `[ 1, Int8Array(1) [ 2 ], "three" ]`},
+		{in: `[new ArrayBuffer(2), null, new Int16Array([100])]`, expected: `[ ArrayBuffer { [Uint8Contents]: <00 00>, byteLength: 2 }, null, Int16Array(1) [ 100 ] ]`},
+
+		{in: `{users: [{name: "a", scores: new Int32Array([10, 20])}]}`, expected: `{ users: [ { name: "a", scores: Int32Array(2) [ 10, 20 ] } ] }`},
+		{in: `[[new Int8Array([1])], [new Int8Array([2])]]`, expected: `[ [ Int8Array(1) [ 1 ] ], [ Int8Array(1) [ 2 ] ] ]`},
+		{in: `{matrix: [[new Int8Array([1, 2])], [new Int8Array([3, 4])]]}`, expected: `{ matrix: [ [ Int8Array(2) [ 1, 2 ] ], [ Int8Array(2) [ 3, 4 ] ] ] }`},
+		{in: `{buffers: {a: new ArrayBuffer(2), b: new ArrayBuffer(4)}}`, expected: `{ buffers: { a: ArrayBuffer { [Uint8Contents]: <00 00>, byteLength: 2 }, b: ArrayBuffer { [Uint8Contents]: <00 00 00 00>, byteLength: 4 } } }`},
+		{in: `[{arr: new Int8Array([1])}, {arr: new Int8Array([2])}]`, expected: `[ { arr: Int8Array(1) [ 1 ] }, { arr: Int8Array(1) [ 2 ] } ]`},
+		{in: `{data: {nums: [1, 2], typed: new Float64Array([3.14])}}`, expected: `{ data: { nums: [ 1, 2 ], typed: Float64Array(1) [ 3.14 ] } }`},
+		{in: `{config: {enabled: true, buffer: new ArrayBuffer(4), name: "test"}}`, expected: `{ config: { enabled: true, buffer: ArrayBuffer { [Uint8Contents]: <00 00 00 00>, byteLength: 4 }, name: "test" } }`},
+		{in: `{items: [{id: 1, data: new Uint8Array([255])}, {id: 2, data: new Uint8Array([128])}]}`, expected: `{ items: [ { id: 1, data: Uint8Array(1) [ 255 ] }, { id: 2, data: Uint8Array(1) [ 128 ] } ] }`},
 	}
 
 	for _, tt := range tests {
@@ -305,18 +395,18 @@ func TestConsoleLogWithGoValues(t *testing.T) { //nolint:tparallel // actually f
 		{in: "string", expected: "string"},
 
 		{in: []any{}, expected: `[]`},
-		{in: []string{"a", "b", "c"}, expected: `["a","b","c"]`},
-		{in: []int{1, 2, 3}, expected: `[1,2,3]`},
-		{in: []any{"hello", 42, true, nil}, expected: `["hello",42,true,null]`},
-		{in: []any{[]int{1, 2}, []string{"a", "b"}}, expected: `[[1,2],["a","b"]]`},
+		{in: []string{"a", "b", "c"}, expected: `[ "a", "b", "c" ]`},
+		{in: []int{1, 2, 3}, expected: `[ 1, 2, 3 ]`},
+		{in: []any{"hello", 42, true, nil}, expected: `[ "hello", 42, true, null ]`},
+		{in: []any{[]int{1, 2}, []string{"a", "b"}}, expected: `[ [ 1, 2 ], [ "a", "b" ] ]`},
 
 		{in: map[string]any{}, expected: "{}"},
-		{in: map[string]any{"outer": map[string]any{"inner": "value"}}, expected: `{"outer":{"inner":"value"}}`},
+		{in: map[string]any{"outer": map[string]any{"inner": "value"}}, expected: `{ outer: { inner: "value" } }`},
 
 		{in: struct {
 			Name string
 			Age  int
-		}{"John", 30}, expected: `{"name":"John","age":30}`},
+		}{"John", 30}, expected: `{ name: "John", age: 30 }`},
 
 		{in: errors.New("this is an error"), expected: `this is an error`},
 		{in: fmt.Errorf("this is a wrap of: %w", errors.New("error")), expected: `this is a wrap of: error`},
@@ -359,7 +449,7 @@ func TestConsoleLevels(t *testing.T) {
 	}{
 		{in: `"string"`, exp: "string"},
 		{in: `{}`, exp: "{}"},
-		{in: `{foo:"bar"}`, exp: `{"foo":"bar"}`},
+		{in: `{foo:"bar"}`, exp: `{ foo: "bar" }`},
 	}
 	for name, level := range levels {
 		t.Run(name, func(t *testing.T) {

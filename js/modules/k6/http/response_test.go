@@ -104,6 +104,55 @@ func invalidJSONHandler(w http.ResponseWriter, _ *http.Request) {
 	_, _ = w.Write(body)
 }
 
+func TestCheckErrorInJSON_Offsets(t *testing.T) {
+	testCases := []struct {
+		name     string
+		input    string
+		wantLine int
+		wantChar int
+	}{
+		{
+			name:     "invalid-first-byte",
+			input:    "a\nb",
+			wantLine: 1,
+			wantChar: 1,
+		},
+		{
+			name:     "invalid-after-newline",
+			input:    "true\nx",
+			wantLine: 2,
+			wantChar: 1,
+		},
+		{
+			name: "invalid-middle",
+			input: "{\n" +
+				"  \"a\": 1,\n" +
+				"  \"b\": [1, 2, 3,, 4]\n" +
+				"}",
+			wantLine: 3,
+			wantChar: 17,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			var v any
+			err := json.Unmarshal([]byte(testCase.input), &v)
+			require.Error(t, err)
+
+			var syntaxError *json.SyntaxError
+			require.ErrorAs(t, err, &syntaxError)
+
+			jsonErr := checkErrorInJSON([]byte(testCase.input), int(syntaxError.Offset), err)
+
+			var parsed jsonError
+			require.ErrorAs(t, jsonErr, &parsed)
+			assert.Equal(t, testCase.wantLine, parsed.line)
+			assert.Equal(t, testCase.wantChar, parsed.character)
+		})
+	}
+}
+
 func TestResponse(t *testing.T) {
 	ts := newTestCase(t)
 	tb := ts.tb
@@ -186,12 +235,12 @@ func TestResponse(t *testing.T) {
 
 		t.Run("Invalid", func(t *testing.T) {
 			_, err := rt.RunString(sr(`http.request("GET", "HTTPBIN_URL/html").json();`))
-			assert.Contains(t, err.Error(), "cannot parse json due to an error at line 1, character 2 , error: invalid character '<' looking for beginning of value")
+			assert.Contains(t, err.Error(), "cannot parse json due to an error at line 1, character 1 , error: invalid character '<' looking for beginning of value")
 		})
 
 		t.Run("Invalid", func(t *testing.T) {
 			_, err := rt.RunString(sr(`http.request("GET", "HTTPBIN_URL/invalidjson").json();`))
-			assert.Contains(t, err.Error(), "cannot parse json due to an error at line 3, character 9 , error: invalid character 'e' in literal true (expecting 'r')")
+			assert.Contains(t, err.Error(), "cannot parse json due to an error at line 3, character 7 , error: invalid character 'e' in literal true (expecting 'r')")
 		})
 
 		t.Run("NoResponseBody", func(t *testing.T) {
@@ -389,5 +438,16 @@ func TestResponse(t *testing.T) {
 			assert.NoError(t, err)
 			assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/get"), 200, "")
 		})
+	})
+
+	t.Run("FailedRequestHeadersAndCookiesAssignment", func(t *testing.T) {
+		_, err := rt.RunString(`
+			var res = http.get("https://test.k6.i", { throw: false });
+			res.headers["custom-key"] = "custom-value";
+			if (res.headers["custom-key"] !== "custom-value") {
+				throw new Error("Failed to assign to headers on failed request");
+			}
+		`)
+		assert.NoError(t, err)
 	})
 }

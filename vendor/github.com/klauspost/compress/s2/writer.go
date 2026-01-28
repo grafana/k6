@@ -47,7 +47,7 @@ func NewWriter(w io.Writer, opts ...WriterOption) *Writer {
 	w2.obufLen = obufHeaderLen + MaxEncodedLen(w2.blockSize)
 	w2.paramsOK = true
 	w2.ibuf = make([]byte, 0, w2.blockSize)
-	w2.buffers.New = func() interface{} {
+	w2.buffers.New = func() any {
 		return make([]byte, w2.obufLen)
 	}
 	w2.Reset(w)

@@ -211,7 +211,9 @@ func (w *huffmanBitWriter) flush() {
 		n++
 	}
 	w.bits = 0
-	w.write(w.bytes[:n])
+	if n > 0 {
+		w.write(w.bytes[:n])
+	}
 	w.nbytes = 0
 }
 
@@ -303,10 +305,7 @@ func (w *huffmanBitWriter) generateCodegen(numLiterals int, numOffsets int, litE
 			w.codegenFreq[size]++
 			count--
 			for count >= 3 {
-				n := 6
-				if n > count {
-					n = count
-				}
+				n := min(6, count)
 				codegen[outIndex] = 16
 				outIndex++
 				codegen[outIndex] = uint8(n - 3)
@@ -316,10 +315,7 @@ func (w *huffmanBitWriter) generateCodegen(numLiterals int, numOffsets int, litE
 			}
 		} else {
 			for count >= 11 {
-				n := 138
-				if n > count {
-					n = count
-				}
+				n := min(138, count)
 				codegen[outIndex] = 18
 				outIndex++
 				codegen[outIndex] = uint8(n - 11)
@@ -438,8 +434,8 @@ func (w *huffmanBitWriter) writeOutBits() {
 	w.nbits -= 48
 	n := w.nbytes
 
-	// We over-write, but faster...
-	le.Store64(w.bytes[n:], bits)
+	// We overwrite, but faster...
+	le.Store64(w.bytes[:], n, bits)
 	n += 6
 
 	if n >= bufferFlushSize {
@@ -472,7 +468,7 @@ func (w *huffmanBitWriter) writeDynamicHeader(numLiterals int, numOffsets int, n
 	w.writeBits(int32(numOffsets-1), 5)
 	w.writeBits(int32(numCodegens-4), 4)
 
-	for i := 0; i < numCodegens; i++ {
+	for i := range numCodegens {
 		value := uint(w.codegenEncoding.codes[codegenOrder[i]].len())
 		w.writeBits(int32(value), 3)
 	}
@@ -650,7 +646,7 @@ func (w *huffmanBitWriter) writeBlockDynamic(tokens *tokens, eof bool, input []b
 		w.lastHeader = 0
 	}
 
-	numLiterals, numOffsets := w.indexTokens(tokens, !sync)
+	numLiterals, numOffsets := w.indexTokens(tokens, true)
 	extraBits := 0
 	ssize, storable := w.storedSize(input)
 
@@ -785,7 +781,7 @@ func (w *huffmanBitWriter) fillTokens() {
 // literalFreq and offsetFreq, and generates literalEncoding
 // and offsetEncoding.
 // The number of literal and offset tokens is returned.
-func (w *huffmanBitWriter) indexTokens(t *tokens, filled bool) (numLiterals, numOffsets int) {
+func (w *huffmanBitWriter) indexTokens(t *tokens, alwaysEOB bool) (numLiterals, numOffsets int) {
 	//copy(w.literalFreq[:], t.litHist[:])
 	*(*[256]uint16)(w.literalFreq[:]) = t.litHist
 	//copy(w.literalFreq[256:], t.extraHist[:])
@@ -795,9 +791,10 @@ func (w *huffmanBitWriter) indexTokens(t *tokens, filled bool) (numLiterals, num
 	if t.n == 0 {
 		return
 	}
-	if filled {
-		return maxNumLit, maxNumDist
+	if alwaysEOB {
+		w.literalFreq[endBlockMarker] = 1
 	}
+
 	// get the number of literals
 	numLiterals = len(w.literalFreq)
 	for w.literalFreq[numLiterals-1] == 0 {
@@ -855,8 +852,7 @@ func (w *huffmanBitWriter) writeTokens(tokens []token, leCodes, oeCodes []hcode)
 			bits |= c.code64() << (nbits & 63)
 			nbits += c.len()
 			if nbits >= 48 {
-				le.Store64(w.bytes[nbytes:], bits)
-				//*(*uint64)(unsafe.Pointer(&w.bytes[nbytes])) = bits
+				le.Store64(w.bytes[:], nbytes, bits)
 				bits >>= 48
 				nbits -= 48
 				nbytes += 6
@@ -883,8 +879,7 @@ func (w *huffmanBitWriter) writeTokens(tokens []token, leCodes, oeCodes []hcode)
 			bits |= c.code64() << (nbits & 63)
 			nbits += c.len()
 			if nbits >= 48 {
-				le.Store64(w.bytes[nbytes:], bits)
-				//*(*uint64)(unsafe.Pointer(&w.bytes[nbytes])) = bits
+				le.Store64(w.bytes[:], nbytes, bits)
 				bits >>= 48
 				nbits -= 48
 				nbytes += 6
@@ -906,8 +901,7 @@ func (w *huffmanBitWriter) writeTokens(tokens []token, leCodes, oeCodes []hcode)
 			bits |= uint64(extraLength) << (nbits & 63)
 			nbits += extraLengthBits
 			if nbits >= 48 {
-				le.Store64(w.bytes[nbytes:], bits)
-				//*(*uint64)(unsafe.Pointer(&w.bytes[nbytes])) = bits
+				le.Store64(w.bytes[:], nbytes, bits)
 				bits >>= 48
 				nbits -= 48
 				nbytes += 6
@@ -932,8 +926,7 @@ func (w *huffmanBitWriter) writeTokens(tokens []token, leCodes, oeCodes []hcode)
 			bits |= c.code64() << (nbits & 63)
 			nbits += c.len()
 			if nbits >= 48 {
-				le.Store64(w.bytes[nbytes:], bits)
-				//*(*uint64)(unsafe.Pointer(&w.bytes[nbytes])) = bits
+				le.Store64(w.bytes[:], nbytes, bits)
 				bits >>= 48
 				nbits -= 48
 				nbytes += 6
@@ -954,8 +947,7 @@ func (w *huffmanBitWriter) writeTokens(tokens []token, leCodes, oeCodes []hcode)
 			bits |= uint64((offset-(offsetComb>>8))&matchOffsetOnlyMask) << (nbits & 63)
 			nbits += uint8(offsetComb)
 			if nbits >= 48 {
-				le.Store64(w.bytes[nbytes:], bits)
-				//*(*uint64)(unsafe.Pointer(&w.bytes[nbytes])) = bits
+				le.Store64(w.bytes[:], nbytes, bits)
 				bits >>= 48
 				nbits -= 48
 				nbytes += 6
@@ -1108,7 +1100,7 @@ func (w *huffmanBitWriter) writeBlockHuff(eof bool, input []byte, sync bool) {
 		// We must have at least 48 bits free.
 		if nbits >= 8 {
 			n := nbits >> 3
-			le.Store64(w.bytes[nbytes:], bits)
+			le.Store64(w.bytes[:], nbytes, bits)
 			bits >>= (n * 8) & 63
 			nbits -= n * 8
 			nbytes += n
@@ -1137,8 +1129,7 @@ func (w *huffmanBitWriter) writeBlockHuff(eof bool, input []byte, sync bool) {
 	// Remaining...
 	for _, t := range input {
 		if nbits >= 48 {
-			le.Store64(w.bytes[nbytes:], bits)
-			//*(*uint64)(unsafe.Pointer(&w.bytes[nbytes])) = bits
+			le.Store64(w.bytes[:], nbytes, bits)
 			bits >>= 48
 			nbits -= 48
 			nbytes += 6

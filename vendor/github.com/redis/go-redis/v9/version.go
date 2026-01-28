@@ -2,5 +2,5 @@ package redis
 
 // Version is the current release version.
 func Version() string {
-	return "9.6.3"
+	return "9.17.2"
 }
