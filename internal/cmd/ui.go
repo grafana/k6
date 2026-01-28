@@ -122,6 +122,7 @@ func printExecutionDescription(
 	valueColor := getColor(noColor, color.FgCyan)
 
 	buf := &strings.Builder{}
+	fmt.Fprintln(buf)
 	fmt.Fprintf(buf, "     execution: %s\n", valueColor.Sprint(execution))
 	fmt.Fprintf(buf, "        script: %s\n", valueColor.Sprint(filename))
 

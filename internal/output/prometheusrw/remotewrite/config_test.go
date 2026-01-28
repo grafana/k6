@@ -343,6 +343,104 @@ func TestOptionInsecureSkipTLSVerify(t *testing.T) {
 	}
 }
 
+func TestTLSMinVersion(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		arg        string
+		env        map[string]string
+		jsonRaw    json.RawMessage
+		wantRccTLS uint16
+		expconfig  Config
+	}{
+		"JSON": {
+			jsonRaw:    json.RawMessage(`{"tlsMinVersion":"1.2"}`),
+			wantRccTLS: tls.VersionTLS12,
+			expconfig: Config{
+				ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
+				InsecureSkipTLSVerify: null.BoolFrom(false),
+				TLSMinVersion:         null.NewString("1.2", true), // depends on test case
+				PushInterval:          types.NullDurationFrom(5 * time.Second),
+				Headers:               make(map[string]string),
+				TrendStats:            []string{"p(99)"},
+				StaleMarkers:          null.BoolFrom(false),
+			},
+		},
+		"JSON incorrect": {
+			jsonRaw:    json.RawMessage(`{"tlsMinVersion":""}`),
+			wantRccTLS: tls.VersionTLS13,
+			expconfig: Config{
+				ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
+				InsecureSkipTLSVerify: null.BoolFrom(false),
+				TLSMinVersion:         null.NewString("", true), // depends on test case
+				PushInterval:          types.NullDurationFrom(5 * time.Second),
+				Headers:               make(map[string]string),
+				TrendStats:            []string{"p(99)"},
+				StaleMarkers:          null.BoolFrom(false),
+			},
+		},
+		"Env": {
+			env:        map[string]string{"K6_PROMETHEUS_RW_TLS_MINIMUM_VERSION": "1.2"},
+			wantRccTLS: tls.VersionTLS12,
+			expconfig: Config{
+				ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
+				InsecureSkipTLSVerify: null.BoolFrom(false),
+				TLSMinVersion:         null.NewString("1.2", true), // depends on test case
+				PushInterval:          types.NullDurationFrom(5 * time.Second),
+				Headers:               make(map[string]string),
+				TrendStats:            []string{"p(99)"},
+				StaleMarkers:          null.BoolFrom(false),
+			},
+		},
+		"Env incorrect": {
+			env:        map[string]string{"K6_PROMETHEUS_RW_TLS_MINIMUM_VERSION": "0.0"},
+			wantRccTLS: tls.VersionTLS13,
+			expconfig: Config{
+				ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
+				InsecureSkipTLSVerify: null.BoolFrom(false),
+				TLSMinVersion:         null.NewString("0.0", true), // depends on test case
+				PushInterval:          types.NullDurationFrom(5 * time.Second),
+				Headers:               make(map[string]string),
+				TrendStats:            []string{"p(99)"},
+				StaleMarkers:          null.BoolFrom(false),
+			},
+		},
+		"version not set": {
+			wantRccTLS: tls.VersionTLS13,
+			expconfig: Config{
+				ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
+				InsecureSkipTLSVerify: null.BoolFrom(false),
+				TLSMinVersion:         null.NewString("", false), // depends on test case
+				PushInterval:          types.NullDurationFrom(5 * time.Second),
+				Headers:               make(map[string]string),
+				TrendStats:            []string{"p(99)"},
+				StaleMarkers:          null.BoolFrom(false),
+			},
+		},
+		// should `ParseArgs` function (for CLI flags) be implemented, add "Arg" test case(-s)
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			c, err := GetConsolidatedConfig(tc.jsonRaw, tc.env, tc.arg)
+			require.NoError(t, err)
+			assert.Equal(t, tc.expconfig, c)
+
+			exprcc := &remote.HTTPConfig{
+				Timeout: 5 * time.Second,
+				TLSConfig: &tls.Config{ //nolint:gosec
+					InsecureSkipVerify: false,
+					MinVersion:         tc.wantRccTLS,
+				},
+			}
+			rcc, err := c.RemoteConfig()
+			require.NoError(t, err)
+			assert.Equal(t, exprcc, rcc)
+		})
+	}
+}
+
 func TestOptionBasicAuth(t *testing.T) {
 	t.Parallel()
 
@@ -594,7 +692,7 @@ func TestOptionSigV4(t *testing.T) {
 	}{
 		"JSON": {jsonRaw: json.RawMessage(`
 {
-  "sigV4Region":"us-east-2", 
+  "sigV4Region":"us-east-2",
   "sigV4AccessKey":"ASIAUZABC123456",
   "sigV4SecretKey":"5wfFi0FEaaaaacccc1111111111111"
 }

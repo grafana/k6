@@ -15,11 +15,11 @@ import (
 	"go.k6.io/k6/internal/js/modules/k6/experimental/csv"
 	"go.k6.io/k6/internal/js/modules/k6/experimental/fs"
 	"go.k6.io/k6/internal/js/modules/k6/experimental/streams"
-	expws "go.k6.io/k6/internal/js/modules/k6/experimental/websockets"
 	"go.k6.io/k6/internal/js/modules/k6/grpc"
 	"go.k6.io/k6/internal/js/modules/k6/metrics"
 	"go.k6.io/k6/internal/js/modules/k6/secrets"
 	"go.k6.io/k6/internal/js/modules/k6/timers"
+	"go.k6.io/k6/internal/js/modules/k6/websockets"
 	"go.k6.io/k6/internal/js/modules/k6/ws"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
@@ -45,15 +45,18 @@ func getInternalJSModules() map[string]interface{} {
 		"k6/metrics":     metrics.New(),
 		"k6/secrets":     secrets.New(),
 		"k6/timers":      timers.New(),
+		"k6/websockets":  websockets.New(),
 		"k6/ws":          ws.New(),
 
 		// Experimental modules
-		"k6/experimental/csv":        csv.New(),
-		"k6/experimental/fs":         fs.New(),
-		"k6/experimental/streams":    streams.New(),
-		"k6/experimental/websockets": expws.New(),
+		"k6/experimental/csv":     csv.New(),
+		"k6/experimental/fs":      fs.New(),
+		"k6/experimental/streams": streams.New(),
 
 		// Deprecated modules
+		"k6/experimental/websockets": newWarnExperimentalModule(websockets.New(),
+			"k6/experimental/websockets is deprecated and will be removed in a future release."+
+				" Please use k6/websockets instead."),
 		"k6/experimental/redis": newWarnExperimentalModule(redis.New(),
 			"k6/experimental/redis has been deprecated and will be removed in future versions."+
 				" Please migrate to the new version by changing your import to 'k6/x/redis'."+

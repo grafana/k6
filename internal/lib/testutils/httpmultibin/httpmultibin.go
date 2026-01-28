@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -140,18 +141,19 @@ func echoHandler(t testing.TB, closePrematurely bool) http.Handler {
 		// closePrematurely=true mimics an invalid WS server that doesn't
 		// send a close control frame before closing the connection.
 		if !closePrematurely {
+			var once sync.Once
 			// Closing is delegated to the client,
 			// it waits the control message for closing.
 			closeReceived := make(chan struct{})
 			defaultCloseHandler := conn.CloseHandler()
 			conn.SetCloseHandler(func(code int, text string) error {
-				close(closeReceived)
+				once.Do(func() { close(closeReceived) })
 				return defaultCloseHandler(code, text)
 			})
 
 			for {
-				_, _, e := conn.ReadMessage()
-				if e != nil {
+				if _, _, err := conn.ReadMessage(); err != nil {
+					once.Do(func() { close(closeReceived) })
 					break
 				}
 			}
