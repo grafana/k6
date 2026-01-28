@@ -147,10 +147,10 @@ func (b *BrowserType) link(
 	ctx context.Context,
 	wsURL string, logger *log.Logger,
 ) (*common.BrowserProcess, error) {
-	bProcCtx, bProcCtxCancel := context.WithCancel(ctx)
+	bProcCtx, bProcCtxCancel := context.WithCancelCause(ctx)
 	p, err := common.NewRemoteBrowserProcess(bProcCtx, wsURL, bProcCtxCancel, logger)
 	if err != nil {
-		bProcCtxCancel()
+		bProcCtxCancel(fmt.Errorf("failed to connect to remote browser process: %w", err))
 		return nil, err //nolint:wrapcheck
 	}
 
@@ -244,10 +244,10 @@ func (b *BrowserType) allocate(
 	flags map[string]any, dataDir *storage.Dir,
 	logger *log.Logger,
 ) (_ *common.BrowserProcess, rerr error) {
-	bProcCtx, bProcCtxCancel := context.WithCancel(ctx)
+	bProcCtx, bProcCtxCancel := context.WithCancelCause(ctx)
 	defer func() {
 		if rerr != nil {
-			bProcCtxCancel()
+			bProcCtxCancel(errors.New("local browser process init failed"))
 		}
 	}()
 

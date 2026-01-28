@@ -391,7 +391,7 @@ func (b *testBrowser) run(ctx context.Context, fs ...func() error) error {
 			case err := <-errc:
 				return err
 			case <-ctx.Done():
-				if err := ctx.Err(); err != nil {
+				if err := common.ContextErr(ctx); err != nil {
 					return fmt.Errorf("while running %T: %w", f, err)
 				}
 			}
