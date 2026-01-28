@@ -237,25 +237,30 @@ func TestProcessUseDirectives(t *testing.T) {
 				`,
 			expectedError: `error while parsing use directives in "name.js": already have constraint for "k6/x/A", when parsing "=1.2.3"`,
 		},
+		"constraint bad format": {
+			input: `
+				"use k6 with k6/x/A +1.4.0"
+				`,
+			expectedError: `error while parsing use directives constraint "+1.4.0" for "k6/x/A" in "name.js": improper constraint: +1.4.0`,
+		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			deps := make(dependencies)
-			for k, v := range test.expectedOutput {
-				require.NoError(t, deps.update(k, v))
-			}
+			deps, err := dependenciesFromMap(test.expectedOutput)
+			require.NoError(t, err)
+			expected := constraintsMapToProvisionDependency(deps)
 			if len(test.expectedError) > 0 {
-				deps = nil
+				expected = nil
 			}
 
 			m := make(dependencies)
-			err := processUseDirectives("name.js", []byte(test.input), m)
+			err = processUseDirectives("name.js", []byte(test.input), m)
 			if len(test.expectedError) > 0 {
 				require.ErrorContains(t, err, test.expectedError)
 			} else {
-				require.EqualValues(t, deps, m)
+				require.EqualValues(t, expected, constraintsMapToProvisionDependency(m))
 			}
 		})
 	}
@@ -311,6 +316,90 @@ const l = 5
 
 			m := findDirectives([]byte(test.input))
 			assert.EqualValues(t, test.expectedOutput, m)
+		})
+	}
+}
+
+func TestDependenciesApplyManifest(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		deps          map[string]string
+		manifest      string
+		expected      map[string]string
+		expectedError string
+	}{
+		{
+			name:     "default constraint with no manifest",
+			deps:     map[string]string{"k6/x/dep": "*"},
+			manifest: "",
+			expected: map[string]string{"k6/x/dep": "*"},
+		},
+		{
+			name:     "empty constraint with no manifest",
+			deps:     map[string]string{"k6/x/dep": ""},
+			manifest: "",
+			expected: map[string]string{"k6/x/dep": ""},
+		},
+		{
+			name:     "default constraint with empty manifest",
+			deps:     map[string]string{"k6/x/dep": "*"},
+			manifest: "{}",
+			expected: map[string]string{"k6/x/dep": "*"},
+		},
+		{
+			name:     "default constraint with manifest overrides",
+			deps:     map[string]string{"k6/x/dep": "*"},
+			manifest: `{"k6/x/dep": "=v0.0.0"}`,
+			expected: map[string]string{"k6/x/dep": "=v0.0.0"},
+		},
+		{
+			name:     "dependency with version constraint",
+			deps:     map[string]string{"k6/x/dep": "=v0.0.1"},
+			manifest: `{"k6/x/dep": "=v0.0.0"}`,
+			expected: map[string]string{"k6/x/dep": "=v0.0.1"},
+		},
+		{
+			name:     "manifest with different dependency",
+			deps:     map[string]string{"k6/x/dep": "*"},
+			manifest: `{"k6/x/another": "=v0.0.0"}`,
+			expected: map[string]string{"k6/x/dep": "*"},
+		},
+		{
+			name:     "no dependencies",
+			deps:     map[string]string{},
+			manifest: `{"k6/x/dep": "=v0.0.0"}`,
+			expected: map[string]string{},
+		},
+		{
+			name:          "malformed manifest",
+			deps:          map[string]string{"k6/x/dep": "*"},
+			manifest:      `{"k6/x/dep": }`,
+			expectedError: "invalid dependencies manifest",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			var err error
+			deps := make(dependencies)
+			for k, v := range test.deps {
+				if v == "" {
+					deps[k] = nil
+					return
+				}
+				deps[k], _ = semver.NewConstraint(v)
+				require.NoError(t, err)
+			}
+			depsMan, err := parseManifest(test.manifest)
+			require.NoError(t, deps.applyManifest(depsMan))
+			if len(test.expectedError) > 0 {
+				require.ErrorContains(t, err, test.expectedError)
+			} else {
+				require.EqualValues(t, test.expected, (map[string]string)(constraintsMapToProvisionDependency(deps)))
+			}
 		})
 	}
 }

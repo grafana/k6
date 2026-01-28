@@ -259,7 +259,7 @@ func resolveModulesDependencies(
 	originalError error, imports []string, logger logrus.FieldLogger,
 	fileSystems map[string]fsext.Fs, source *loader.SourceData, gs *state.GlobalState,
 ) (dependencies, error) {
-	deps, err := collectTestDependencies(originalError, imports, fileSystems)
+	deps, err := collectTestDependencies(originalError, imports, fileSystems, gs.Flags.DependenciesManifest)
 	if err != nil {
 		return nil, err
 	}
@@ -289,7 +289,7 @@ func resolveModulesDependencies(
 }
 
 func collectTestDependencies(
-	originalError error, imports []string, fileSystems map[string]fsext.Fs,
+	originalError error, imports []string, fileSystems map[string]fsext.Fs, manifest string,
 ) (dependencies, error) {
 	deps, err := extractUnknownModules(originalError)
 	if err != nil {
@@ -297,6 +297,15 @@ func collectTestDependencies(
 	}
 
 	if err := analyseUseContraints(imports, fileSystems, deps); err != nil {
+		return nil, err
+	}
+
+	m, err := parseManifest(manifest)
+	if err != nil {
+		return nil, err
+	}
+	err = deps.applyManifest(m)
+	if err != nil {
 		return nil, err
 	}
 
@@ -336,18 +345,10 @@ func analyseUseContraints(imports []string, fileSystems map[string]fsext.Fs, dep
 
 type dependencies map[string]*semver.Constraints
 
-func (d dependencies) update(dep, constraintStr string) error {
-	var constraint *semver.Constraints
-	var err error
-	if len(constraintStr) > 0 {
-		constraint, err = semver.NewConstraint(constraintStr)
-		if err != nil {
-			return fmt.Errorf("unparsable constraint %q for %q", constraintStr, dep)
-		}
-	}
+func (d dependencies) update(dep string, constraint *semver.Constraints) error {
 	// TODO: We could actually do constraint comparison here and get the more specific one
 	oldConstraint, ok := d[dep]
-	if !ok || oldConstraint == nil { // either nothing or it didn't have constraint
+	if !ok || oldConstraint == nil || oldConstraint.String() == "*" { // either nothing or it didn't have constraint
 		d[dep] = constraint
 		return nil
 	}
@@ -355,6 +356,23 @@ func (d dependencies) update(dep, constraintStr string) error {
 		return nil
 	}
 	return fmt.Errorf("already have constraint for %q, when parsing %q", dep, constraint)
+}
+
+func (d dependencies) applyManifest(manifest dependencies) error {
+	for m, k := range d {
+		if k != nil && k.String() != "*" { // if there is constraint skip it
+			continue
+		}
+		c, ok := manifest[m]
+		if !ok { // skip anything not in the manifest
+			continue
+		}
+		err := d.update(m, c)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (d dependencies) String() string {
@@ -374,8 +392,24 @@ func (d dependencies) String() string {
 	return buf.String()
 }
 
-func extractUnknownModules(err error) (map[string]*semver.Constraints, error) {
-	deps := make(map[string]*semver.Constraints)
+func dependenciesFromMap(input map[string]string) (dependencies, error) {
+	result := make(dependencies)
+	for k, v := range input {
+		if len(v) == 0 {
+			result[k] = nil
+			continue
+		}
+		con, err := semver.NewConstraint(v)
+		if err != nil {
+			return nil, err
+		}
+		result[k] = con
+	}
+	return result, nil
+}
+
+func extractUnknownModules(err error) (dependencies, error) {
+	deps := make(dependencies)
 	if err == nil {
 		return deps, nil
 	}
