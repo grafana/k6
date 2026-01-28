@@ -33,7 +33,6 @@ proto-dependencies:
 generate-tools-installs: proto-dependencies
 	go install github.com/mstoykov/enumer@v0.0.1 # TODO figure out if we shouldn't move to a different fork
 	go install mvdan.cc/gofumpt@v0.8.0 # TODO maybe just use go fmt for this case
-	go install github.com/mailru/easyjson/easyjson@v0.7.7 # TODO remove this in the future
 
 generate: generate-tools-installs
 	PATH="$(PWD)/.protoc/bin:$(PATH)" go generate ./...
