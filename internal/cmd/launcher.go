@@ -255,7 +255,7 @@ func processUseDirectives(name string, text []byte, deps dependencies) error {
 		if len(constraint) > 0 {
 			con, err = semver.NewConstraint(constraint)
 			if err != nil {
-				return fmt.Errorf("error while parsing use directives constraing %q for %q: %w", constraint, name, err)
+				return fmt.Errorf("error while parsing use directives constraint %q for %q in %q: %w", constraint, dep, name, err)
 			}
 		}
 

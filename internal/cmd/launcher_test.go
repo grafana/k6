@@ -237,6 +237,12 @@ func TestProcessUseDirectives(t *testing.T) {
 				`,
 			expectedError: `error while parsing use directives in "name.js": already have constraint for "k6/x/A", when parsing "=1.2.3"`,
 		},
+		"constraint bad format": {
+			input: `
+				"use k6 with k6/x/A +1.4.0"
+				`,
+			expectedError: `error while parsing use directives constraint "+1.4.0" for "k6/x/A" in "name.js": improper constraint: +1.4.0`,
+		},
 	}
 
 	for name, test := range tests {
@@ -325,25 +331,25 @@ func TestDependenciesApplyManifest(t *testing.T) {
 		expectedError string
 	}{
 		{
-			name:     "default constrain with no manifest",
+			name:     "default constraint with no manifest",
 			deps:     map[string]string{"k6/x/dep": "*"},
 			manifest: "",
 			expected: map[string]string{"k6/x/dep": "*"},
 		},
 		{
-			name:     "empty constrain with no manifest",
+			name:     "empty constraint with no manifest",
 			deps:     map[string]string{"k6/x/dep": ""},
 			manifest: "",
 			expected: map[string]string{"k6/x/dep": ""},
 		},
 		{
-			name:     "default constrain with empty manifest",
+			name:     "default constraint with empty manifest",
 			deps:     map[string]string{"k6/x/dep": "*"},
 			manifest: "{}",
 			expected: map[string]string{"k6/x/dep": "*"},
 		},
 		{
-			name:     "default constrain with manifest overrides",
+			name:     "default constraint with manifest overrides",
 			deps:     map[string]string{"k6/x/dep": "*"},
 			manifest: `{"k6/x/dep": "=v0.0.0"}`,
 			expected: map[string]string{"k6/x/dep": "=v0.0.0"},
