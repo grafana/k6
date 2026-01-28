@@ -126,7 +126,7 @@ func queueTask[T any](
 			return result, err
 		case <-ctx.Done():
 			var zero T
-			return zero, fmt.Errorf("running on task queue: %w", ctx.Err())
+			return zero, fmt.Errorf("running on task queue: %w", common.ContextErr(ctx))
 		}
 	}
 }

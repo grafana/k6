@@ -1,7 +1,7 @@
-# buf.build/gen/go/gogo/protobuf/protocolbuffers/go v1.36.10-20240617172848-e1dbca2775a7.1
+# buf.build/gen/go/gogo/protobuf/protocolbuffers/go v1.36.11-20240617172848-e1dbca2775a7.1
 ## explicit; go 1.23
 buf.build/gen/go/gogo/protobuf/protocolbuffers/go/gogoproto
-# buf.build/gen/go/prometheus/prometheus/protocolbuffers/go v1.36.10-20251118093737-4105057cc7d4.1
+# buf.build/gen/go/prometheus/prometheus/protocolbuffers/go v1.36.11-20251118093737-4105057cc7d4.1
 ## explicit; go 1.23
 buf.build/gen/go/prometheus/prometheus/protocolbuffers/go
 # github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358
@@ -190,7 +190,7 @@ github.com/grafana/k6build/pkg/client
 # github.com/grafana/k6provider v0.2.0
 ## explicit; go 1.24.0
 github.com/grafana/k6provider
-# github.com/grafana/sobek v0.0.0-20251124090928-9a028a30ff58
+# github.com/grafana/sobek v0.0.0-20260121195222-d8d9202018c5
 ## explicit; go 1.20
 github.com/grafana/sobek
 github.com/grafana/sobek/ast
@@ -454,16 +454,16 @@ go.uber.org/goleak/internal/stack
 # go.yaml.in/yaml/v2 v2.4.2
 ## explicit; go 1.15
 go.yaml.in/yaml/v2
-# golang.org/x/crypto v0.46.0
+# golang.org/x/crypto v0.47.0
 ## explicit; go 1.24.0
 golang.org/x/crypto/md4
 golang.org/x/crypto/ocsp
 golang.org/x/crypto/ripemd160
-# golang.org/x/crypto/x509roots/fallback v0.0.0-20251028130051-c0531f9c3451
+# golang.org/x/crypto/x509roots/fallback v0.0.0-20260113154411-7d0074ccc6f1
 ## explicit; go 1.24.0
 golang.org/x/crypto/x509roots/fallback
 golang.org/x/crypto/x509roots/fallback/bundle
-# golang.org/x/net v0.48.0
+# golang.org/x/net v0.49.0
 ## explicit; go 1.24.0
 golang.org/x/net/context
 golang.org/x/net/html
@@ -488,7 +488,7 @@ golang.org/x/sys/windows/registry
 # golang.org/x/term v0.39.0
 ## explicit; go 1.24.0
 golang.org/x/term
-# golang.org/x/text v0.32.0
+# golang.org/x/text v0.33.0
 ## explicit; go 1.24.0
 golang.org/x/text/cases
 golang.org/x/text/collate
@@ -583,7 +583,7 @@ google.golang.org/grpc/stats
 google.golang.org/grpc/status
 google.golang.org/grpc/tap
 google.golang.org/grpc/test/bufconn
-# google.golang.org/protobuf v1.36.10
+# google.golang.org/protobuf v1.36.11
 ## explicit; go 1.23
 google.golang.org/protobuf/encoding/protodelim
 google.golang.org/protobuf/encoding/protojson

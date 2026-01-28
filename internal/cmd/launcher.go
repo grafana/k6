@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -243,16 +244,22 @@ func processUseDirectives(name string, text []byte, deps dependencies) error {
 			continue
 		}
 		directive = strings.TrimSpace(strings.TrimPrefix(directive, "use k6"))
-		if !strings.HasPrefix(directive, "with k6/x/") {
-			err := deps.update("k6", directive)
-			if err != nil {
-				return fmt.Errorf("error while parsing use directives in %q: %w", name, err)
-			}
-			continue
+		dep := "k6"
+		constraint := directive
+		if strings.HasPrefix(directive, "with k6/x/") {
+			directive = strings.TrimSpace(strings.TrimPrefix(directive, "with "))
+			dep, constraint, _ = strings.Cut(directive, " ")
 		}
-		directive = strings.TrimSpace(strings.TrimPrefix(directive, "with "))
-		dep, constraint, _ := strings.Cut(directive, " ")
-		err := deps.update(dep, constraint)
+		var con *semver.Constraints
+		var err error
+		if len(constraint) > 0 {
+			con, err = semver.NewConstraint(constraint)
+			if err != nil {
+				return fmt.Errorf("error while parsing use directives constraint %q for %q in %q: %w", constraint, dep, name, err)
+			}
+		}
+
+		err = deps.update(dep, con)
 		if err != nil {
 			return fmt.Errorf("error while parsing use directives in %q: %w", name, err)
 		}
@@ -298,4 +305,16 @@ func findDirectives(text []byte) []string {
 		}
 	}
 	return result
+}
+
+func parseManifest(manifestString string) (dependencies, error) {
+	if manifestString == "" {
+		return nil, nil //nolint:nilnil
+	}
+
+	manifestMap := make(map[string]string)
+	if err := json.Unmarshal([]byte(manifestString), &manifestMap); err != nil {
+		return nil, fmt.Errorf("invalid dependencies manifest %w", err)
+	}
+	return dependenciesFromMap(manifestMap)
 }

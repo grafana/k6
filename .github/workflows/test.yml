@@ -27,36 +27,19 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Run common test steps
+        uses: ./.github/actions/test-common
+        with:
+          go_version: ${{ matrix.go-version }}
+          platform: ${{ matrix.platform }}
       - name: Get the k6 version
         id: get_k6_version
         run: |
           echo "Running tests on '${GITHUB_REF}' with '$(git describe --tags --always --long --dirty)' checked out..."
-      - name: Install Go
-        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
-        with:
-          go-version: ${{ matrix.go-version }}
-          check-latest: true
-      - name: Install chromium
-        # This is only needed on arm images, chromium comes preinstalled on amd64 runner images.
-        if: contains(matrix.platform, 'arm')
-        run: |
-          sudo apt update && sudo apt install chromium-browser
-          chromium --version
       - name: Run tests
-        run: |
-          set -x
-          go version
-          export GOMAXPROCS=2
-          args=("-p" "2" "-race")
-          # Run with less concurrency on Windows/ARM to minimize flakiness.
-          if [[ "${{ matrix.platform }}" == windows* || "${{ matrix.platform }}" == *arm ]]; then
-            args[1]="1"
-            export GOMAXPROCS=1
-            if [[ "${{ matrix.platform }}" == windows* ]]; then
-              unset args[2]
-            fi
-          fi
-          go test "${args[@]}" -timeout 800s ./...
+        uses: ./.github/actions/test
+        with:
+          platform: ${{ matrix.platform }}
 
   test-tip:
     strategy:
@@ -70,41 +53,17 @@ jobs:
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
         with:
           persist-credentials: false
-      - name: Download Go tip
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release download ${{ matrix.platform }} --repo grafana/gotip --pattern 'go.zip'
-      - name: Install Go tip
-        run: |
-          unzip go.zip -d $HOME/sdk
-          echo "GOROOT=$HOME/sdk/gotip" >> "$GITHUB_ENV"
-          echo "GOPATH=$HOME/go" >> "$GITHUB_ENV"
-          echo "$HOME/go/bin" >> "$GITHUB_PATH"
-          echo "$HOME/sdk/gotip/bin" >> "$GITHUB_PATH"
-      - name: Install chromium
-        # This is only needed on arm images, chromium comes preinstalled on amd64 runner images.
-        if: contains(matrix.platform, 'arm')
-        run: |
-          sudo apt update && sudo apt install chromium-browser
-          chromium --version
+      - name: Run common test steps
+        uses: ./.github/actions/test-common
+        with:
+          go_version: "gotip"
+          platform: ${{ matrix.platform }}
       - name: Run tests
-        run: |
-          set -x
-          which go
-          go version
-          export GOMAXPROCS=2
-          args=("-p" "2" "-race")
-          # Run with less concurrency on Windows/ARM to minimize flakiness.
-          if [[ "${{ matrix.platform }}" == windows* || "${{ matrix.platform }}" == *arm ]]; then
-            args[1]="1"
-            export GOMAXPROCS=1
-            if [[ "${{ matrix.platform }}" == windows* ]]; then
-              unset args[2]
-            fi
-          fi
-          go test "${args[@]}" -timeout 800s ./...
-
+        uses: ./.github/actions/test
+        with:
+          use_gotip: "true"
+          platform: ${{ matrix.platform }}
+  
   test-latest:
     strategy:
       fail-fast: false
@@ -117,29 +76,12 @@ jobs:
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
         with:
           persist-credentials: false
-      - name: Install Go
-        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
+      - name: Run common test steps
+        uses: ./.github/actions/test-common
         with:
-          go-version: ${{ matrix.go-version }}
-          check-latest: true
-      - name: Install chromium
-        # This is only needed on arm images, chromium comes preinstalled on amd64 runner images.
-        if: contains(matrix.platform, 'arm')
-        run: |
-          sudo apt update && sudo apt install chromium-browser
-          chromium --version
+          go_version: ${{ matrix.go-version }}
+          platform: ${{ matrix.platform }}
       - name: Run tests
-        run: |
-          set -x
-          go version
-          export GOMAXPROCS=2
-          args=("-p" "2" "-race")
-          # Run with less concurrency on Windows/ARM to minimize flakiness.
-          if [[ "${{ matrix.platform }}" == windows* || "${{ matrix.platform }}" == *arm ]]; then
-            args[1]="1"
-            export GOMAXPROCS=1
-            if [[ "${{ matrix.platform }}" == windows* ]]; then
-              unset args[2]
-            fi
-          fi
-          go test "${args[@]}" -timeout 800s ./...
+        uses: ./.github/actions/test
+        with:
+          platform: ${{ matrix.platform }}
