@@ -2513,3 +2513,369 @@ func TestArchivingAnArchiveWorks(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, r3)
 }
+
+func TestUserInitCalled(t *testing.T) {
+	t.Parallel()
+
+	script := `
+		var Counter = require("k6/metrics").Counter;
+
+		exports.options = {
+			scenarios: {
+				sc1: {
+					executor: "shared-iterations",
+					vus: 2,
+					iterations: 2,
+					exec: "sc1",
+				},
+				sc2: {
+					executor: "per-vu-iterations",
+					vus: 1,
+					iterations: 5,
+					exec: "sc2",
+				},
+			},
+		};
+		var userInitCalls = new Counter("userInitCalls");
+		var iterationsCalls = new Counter("iterationsCalls");
+
+		exports.userInit = function() {
+			userInitCalls.add(1);
+		}
+
+		exports.sc1 = function(data) {
+			iterationsCalls.add(1);
+		}
+
+		exports.sc2 = function(data) {
+			iterationsCalls.add(1);
+		}
+
+	`
+
+	runner, err := getSimpleRunner(t, "/script.js", script)
+	require.NoError(t, err)
+
+	options := runner.GetOptions()
+	require.Empty(t, options.Validate())
+
+	testRunState := &lib.TestRunState{
+		TestPreInitState: runner.preInitState,
+		Options:          options,
+		Runner:           runner,
+		RunTags:          runner.preInitState.Registry.RootTagSet().WithTagsFromMap(options.RunTags),
+	}
+
+	execScheduler, err := execution.NewScheduler(testRunState, local.NewController())
+	require.NoError(t, err)
+
+	globalCtx, globalCancel := context.WithCancel(context.Background())
+	defer globalCancel()
+	runCtx, runAbort := execution.NewTestRunContext(globalCtx, testRunState.Logger)
+
+	mockOutput := mockoutput.New()
+	outputManager := output.NewManager([]output.Output{mockOutput}, testRunState.Logger, runAbort)
+	samples := make(chan metrics.SampleContainer, 1000)
+	waitForMetricsFlushed, stopOutputs, err := outputManager.Start(samples)
+	require.NoError(t, err)
+	defer stopOutputs(nil)
+
+	stopEmission, err := execScheduler.Init(runCtx, samples)
+	require.NoError(t, err)
+
+	errC := make(chan error)
+	go func() { errC <- execScheduler.Run(globalCtx, runCtx, samples) }()
+
+	select {
+	case <-time.After(20 * time.Second):
+		runAbort(fmt.Errorf("unexpected abort"))
+		t.Fatal("Test timed out")
+	case err := <-errC:
+		stopEmission()
+		close(samples)
+		require.NoError(t, err)
+		waitForMetricsFlushed()
+	}
+	var iterationsCalls, userInitCalls int
+	for _, s := range mockOutput.Samples {
+		switch s.Metric.Name {
+		case "userInitCalls":
+			userInitCalls += int(s.Value)
+		case "iterationsCalls":
+			iterationsCalls += int(s.Value)
+		}
+	}
+	require.Equal(t, 3, userInitCalls, "userInitCalls should be one per VU")
+	require.Equal(t, 7, iterationsCalls, "iterationsCalls should be sum of iterations")
+}
+
+func TestSharedArrayInUserInit(t *testing.T) {
+	t.Parallel()
+
+	script := `
+		var Counter = require("k6/metrics").Counter;
+		var SharedArray = require('k6/data').SharedArray;
+
+		exports.options = {
+			scenarios: {
+				sc1: {
+					executor: "per-vu-iterations",
+					vus: 2,
+					iterations: 5,
+				},
+			},
+		};
+		var userInitCalls = new Counter("userInitCalls");
+		var iterationsCalls = new Counter("iterationsCalls");
+		var sharedArrayFunctionCalls = new Counter("sharedArrayFunctionCalls");
+		var sharedArray;
+
+		exports.userInit = function() {
+			userInitCalls.add(1);
+			sharedArray = new SharedArray('some name', function () {
+				sharedArrayFunctionCalls.add(1);
+				return ['dummy'];
+            });
+		}
+
+		exports.default = function() {
+			iterationsCalls.add(1);
+		}
+
+
+	`
+
+	runner, err := getSimpleRunner(t, "/script.js", script)
+	require.NoError(t, err)
+
+	options := runner.GetOptions()
+	require.Empty(t, options.Validate())
+
+	testRunState := &lib.TestRunState{
+		TestPreInitState: runner.preInitState,
+		Options:          options,
+		Runner:           runner,
+		RunTags:          runner.preInitState.Registry.RootTagSet().WithTagsFromMap(options.RunTags),
+	}
+
+	execScheduler, err := execution.NewScheduler(testRunState, local.NewController())
+	require.NoError(t, err)
+
+	globalCtx, globalCancel := context.WithCancel(context.Background())
+	defer globalCancel()
+	runCtx, runAbort := execution.NewTestRunContext(globalCtx, testRunState.Logger)
+
+	mockOutput := mockoutput.New()
+	outputManager := output.NewManager([]output.Output{mockOutput}, testRunState.Logger, runAbort)
+	samples := make(chan metrics.SampleContainer, 1000)
+	waitForMetricsFlushed, stopOutputs, err := outputManager.Start(samples)
+	require.NoError(t, err)
+	defer stopOutputs(nil)
+
+	stopEmission, err := execScheduler.Init(runCtx, samples)
+	require.NoError(t, err)
+
+	errC := make(chan error)
+	go func() { errC <- execScheduler.Run(globalCtx, runCtx, samples) }()
+
+	select {
+	case <-time.After(20 * time.Second):
+		runAbort(fmt.Errorf("unexpected abort"))
+		t.Fatal("Test timed out")
+	case err := <-errC:
+		stopEmission()
+		close(samples)
+		require.NoError(t, err)
+		waitForMetricsFlushed()
+	}
+	var iterationsCalls, userInitCalls, sharedArrayFunctionCalls int
+	for _, s := range mockOutput.Samples {
+		switch s.Metric.Name {
+		case "userInitCalls":
+			userInitCalls += int(s.Value)
+		case "iterationsCalls":
+			iterationsCalls += int(s.Value)
+		case "sharedArrayFunctionCalls":
+			sharedArrayFunctionCalls += int(s.Value)
+		}
+	}
+	require.Equal(t, 2, userInitCalls, "userInitCalls should be one per VU")
+	require.Equal(t, 10, iterationsCalls, "iterationsCalls should be sum(VU*iterations) over scenarios")
+	require.Equal(t, 1, sharedArrayFunctionCalls, "sharedArrayFunctionCalls should be one per instance")
+}
+
+func TestCustomUserInit(t *testing.T) {
+	t.Parallel()
+
+	script := `
+		var Counter = require("k6/metrics").Counter;
+
+		exports.options = {
+			scenarios: {
+				sc1: {
+					executor: "per-vu-iterations",
+					vus: 2,
+					iterations: 5,
+					userInit: 'customUserInit',
+				},
+			},
+		};
+		var userInitCalls = new Counter("userInitCalls");
+		var customUserInitCalls = new Counter("customUserInitCalls");
+
+		exports.userInit = function() {
+			userInitCalls.add(1);
+		}
+		exports.customUserInit = function() {
+			customUserInitCalls.add(1);
+		}
+
+		exports.default = function() {
+		}
+
+
+	`
+
+	runner, err := getSimpleRunner(t, "/script.js", script)
+	require.NoError(t, err)
+
+	options := runner.GetOptions()
+	require.Empty(t, options.Validate())
+
+	testRunState := &lib.TestRunState{
+		TestPreInitState: runner.preInitState,
+		Options:          options,
+		Runner:           runner,
+		RunTags:          runner.preInitState.Registry.RootTagSet().WithTagsFromMap(options.RunTags),
+	}
+
+	execScheduler, err := execution.NewScheduler(testRunState, local.NewController())
+	require.NoError(t, err)
+
+	globalCtx, globalCancel := context.WithCancel(context.Background())
+	defer globalCancel()
+	runCtx, runAbort := execution.NewTestRunContext(globalCtx, testRunState.Logger)
+
+	mockOutput := mockoutput.New()
+	outputManager := output.NewManager([]output.Output{mockOutput}, testRunState.Logger, runAbort)
+	samples := make(chan metrics.SampleContainer, 1000)
+	waitForMetricsFlushed, stopOutputs, err := outputManager.Start(samples)
+	require.NoError(t, err)
+	defer stopOutputs(nil)
+
+	stopEmission, err := execScheduler.Init(runCtx, samples)
+	require.NoError(t, err)
+
+	errC := make(chan error)
+	go func() { errC <- execScheduler.Run(globalCtx, runCtx, samples) }()
+
+	select {
+	case <-time.After(20 * time.Second):
+		runAbort(fmt.Errorf("unexpected abort"))
+		t.Fatal("Test timed out")
+	case err := <-errC:
+		stopEmission()
+		close(samples)
+		require.NoError(t, err)
+		waitForMetricsFlushed()
+	}
+	var userInitCalls, customUserInitCalls int
+	for _, s := range mockOutput.Samples {
+		switch s.Metric.Name {
+		case "userInitCalls":
+			userInitCalls += int(s.Value)
+		case "customUserInitCalls":
+			customUserInitCalls += int(s.Value)
+		}
+	}
+	require.Equal(t, 2, customUserInitCalls, "customUserInitCalls should be one per VU")
+	require.Equal(t, 0, userInitCalls, "userInit() should not be called as userInit option is set to customUserInit")
+}
+
+func TestUserInitCanUseHttpInSharedArray(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+
+	script := tb.Replacer.Replace(`
+		var SharedArray = require('k6/data').SharedArray;
+		var Counter = require("k6/metrics").Counter;
+		var http = require('k6/http');
+		var sharedArray;
+		var sharedArrayFunctionCalls = new Counter("sharedArrayFunctionCalls");
+
+		exports.options = {
+			hosts: { 'httpbin.local': '127.0.0.1' },
+			scenarios: {
+				sc1: {
+					executor: "per-vu-iterations",
+					vus: 1,
+					iterations: 1,
+				},
+			},
+		};
+
+		exports.userInit = function() {
+			sharedArray = new SharedArray('some name', function () {
+				let res = http.get("HTTPBIN_URL");
+				if (res.status != 200) { throw new Error("wrong status: " + res.status) }
+				sharedArrayFunctionCalls.add(1);
+				return ["dummy"];
+			});
+		}
+
+		exports.default = function() {
+		}
+
+	`)
+
+	runner, err := getSimpleRunner(t, "/script.js", script)
+	require.NoError(t, err)
+
+	options := runner.GetOptions()
+	require.Empty(t, options.Validate())
+
+	testRunState := &lib.TestRunState{
+		TestPreInitState: runner.preInitState,
+		Options:          options,
+		Runner:           runner,
+		RunTags:          runner.preInitState.Registry.RootTagSet().WithTagsFromMap(options.RunTags),
+	}
+
+	execScheduler, err := execution.NewScheduler(testRunState, local.NewController())
+	require.NoError(t, err)
+
+	globalCtx, globalCancel := context.WithCancel(context.Background())
+	defer globalCancel()
+	runCtx, runAbort := execution.NewTestRunContext(globalCtx, testRunState.Logger)
+
+	mockOutput := mockoutput.New()
+	outputManager := output.NewManager([]output.Output{mockOutput}, testRunState.Logger, runAbort)
+	samples := make(chan metrics.SampleContainer, 1000)
+	waitForMetricsFlushed, stopOutputs, err := outputManager.Start(samples)
+	require.NoError(t, err)
+	defer stopOutputs(nil)
+
+	stopEmission, err := execScheduler.Init(runCtx, samples)
+	require.NoError(t, err)
+
+	errC := make(chan error)
+	go func() { errC <- execScheduler.Run(globalCtx, runCtx, samples) }()
+
+	select {
+	case <-time.After(20 * time.Second):
+		runAbort(fmt.Errorf("unexpected abort"))
+		t.Fatal("Test timed out")
+	case err := <-errC:
+		stopEmission()
+		close(samples)
+		require.NoError(t, err)
+		waitForMetricsFlushed()
+	}
+	var sharedArrayFunctionCalls int
+	for _, s := range mockOutput.Samples {
+		if s.Metric.Name == "sharedArrayFunctionCalls" {
+			sharedArrayFunctionCalls += int(s.Value)
+		}
+	}
+	require.Equal(t, 1, sharedArrayFunctionCalls, "sharedArrayFunctionCalls should be one per instance")
+}
