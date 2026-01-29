@@ -128,6 +128,7 @@ func TestResolveAndSetProjectID(t *testing.T) {
 			},
 			expectedError:     "",
 			expectedProjectID: 123,
+			logContains:       "No stack specified",
 		},
 		{
 			name: "logs warnings when projectID is 0 and no StackID",
@@ -136,7 +137,7 @@ func TestResolveAndSetProjectID(t *testing.T) {
 			},
 			expectedError:     "",
 			expectedProjectID: 0,
-			logContains:       "No projectID or default stack specified",
+			logContains:       "No stack specified",
 		},
 		{
 			name: "propagates error from resolveDefaultProjectID",
