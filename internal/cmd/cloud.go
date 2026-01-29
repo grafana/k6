@@ -463,9 +463,14 @@ func resolveAndSetProjectID(
 
 		cloudConfig.ProjectID = null.IntFrom(projectID)
 	}
-	if projectID == 0 && (!cloudConfig.StackID.Valid || cloudConfig.StackID.Int64 == 0) {
-		gs.Logger.Warn("No projectID or default stack specified. Falling back to the first available stack. " +
-			"Consider setting a default stack via the `k6 cloud login` command.")
+	if !cloudConfig.StackID.Valid || cloudConfig.StackID.Int64 == 0 {
+		fallBackMsg := ""
+		if !cloudConfig.ProjectID.Valid || cloudConfig.ProjectID.Int64 == 0 {
+			fallBackMsg = "Falling back to the first available stack. "
+		}
+		gs.Logger.Warn("DEPRECATED: No stack specified. " + fallBackMsg +
+			"Consider setting a default stack via the `k6 cloud login` command or the `K6_CLOUD_STACK_ID` " +
+			"environment variable as this will become mandatory in the next major release.")
 	}
 	return nil
 }

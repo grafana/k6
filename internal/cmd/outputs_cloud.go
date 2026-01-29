@@ -54,11 +54,14 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 		return errUserUnauthenticated
 	}
 
-	// Show warning early if no projectID and no default stack
-	if !conf.ProjectID.Valid && (!conf.StackID.Valid || conf.StackID.Int64 == 0) {
-		gs.Logger.Warn(
-			"No projectID or default stack specified. Using the first available stack. " +
-				"Consider setting a default stack via the `k6 cloud login` command.")
+	if !conf.StackID.Valid || conf.StackID.Int64 == 0 {
+		fallBackMsg := ""
+		if !conf.ProjectID.Valid || conf.ProjectID.Int64 == 0 {
+			fallBackMsg = "Falling back to the first available stack. "
+		}
+		gs.Logger.Warn("DEPRECATED: No stack specified. " + fallBackMsg +
+			"Consider setting a default stack via the `k6 cloud login` command or the `K6_CLOUD_STACK_ID` " +
+			"environment variable as this will become mandatory in the next major release.")
 	}
 
 	// If not, we continue with some validations and the creation of the test run.
