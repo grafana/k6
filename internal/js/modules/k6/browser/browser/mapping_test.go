@@ -335,6 +335,8 @@ type pageAPI interface { //nolint:interfacebloat
 	GetMouse() *common.Mouse
 	GetTouchscreen() *common.Touchscreen
 	Goto(url string, opts sobek.Value) (*common.Response, error)
+	GoBack(opts sobek.Value) (*common.Response, error)
+	GoForward(opts sobek.Value) (*common.Response, error)
 	Hover(selector string, opts sobek.Value) error
 	InnerHTML(selector string, opts sobek.Value) (string, error)
 	InnerText(selector string, opts sobek.Value) (string, error)
@@ -382,7 +384,7 @@ type pageAPI interface { //nolint:interfacebloat
 	WaitForSelector(selector string, opts sobek.Value) (*common.ElementHandle, error)
 	WaitForTimeout(timeout int64)
 	WaitForURL(url string, opts sobek.Value) (*sobek.Promise, error)
-	WaitForEvent(event string, opts sobek.Value) (*sobek.Promise, error)
+	WaitForEvent(event common.PageEventName, opts sobek.Value) (*sobek.Promise, error)
 	WaitForResponse(url string, opts sobek.Value) (*sobek.Promise, error)
 	WaitForRequest(url string, opts sobek.Value) (*sobek.Promise, error)
 	Workers() []*common.Worker

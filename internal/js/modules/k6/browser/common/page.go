@@ -1485,9 +1485,9 @@ func (p *Page) Reload(opts *PageReloadOptions) (_ *Response, rerr error) { //nol
 	)
 	select {
 	case <-p.ctx.Done():
-		err = p.ctx.Err()
+		err = ContextErr(p.ctx)
 	case <-timeoutCtx.Done():
-		err = wrapTimeoutError(timeoutCtx.Err())
+		err = wrapTimeoutError(ContextErr(timeoutCtx))
 	case event := <-waitForFrameNavigation:
 		var ok bool
 		if navigationEvent, ok = event.(*NavigationEvent); !ok {
@@ -1514,12 +1514,93 @@ func (p *Page) Reload(opts *PageReloadOptions) (_ *Response, rerr error) { //nol
 	select {
 	case <-waitForLifecycleEvent:
 	case <-timeoutCtx.Done():
-		return nil, wrapTimeoutError(timeoutCtx.Err())
+		return nil, wrapTimeoutError(ContextErr(timeoutCtx))
 	}
 
 	applySlowMo(p.ctx)
 
 	return resp, nil
+}
+
+// GoBackForward navigates through the browser's session history.
+// Use delta = -1 for going back and delta = +1 for going forward.
+func (p *Page) GoBackForward(delta int, opts *PageGoBackForwardOptions) (_ *Response, rerr error) {
+	direction := "back"
+	spanName := "page.goBack"
+	if delta > 0 {
+		direction = "forward"
+		spanName = "page.goForward"
+	}
+
+	p.logger.Debugf("Page:GoBackForward", "sid:%v direction:%s", p.sessionID(), direction)
+	_, span := TraceAPICall(p.ctx, p.targetID.String(), spanName)
+	defer span.End()
+	defer func() {
+		if rerr != nil {
+			rerr = spanRecordErrorf(span, "page going %s: %w", direction, rerr)
+		}
+	}()
+
+	currentIndex, entries, err := page.GetNavigationHistory().Do(cdp.WithExecutor(p.ctx, p.session))
+	if err != nil {
+		return nil, err
+	}
+
+	targetIndex := currentIndex + int64(delta)
+
+	// Check boundaries
+	if targetIndex < 0 || targetIndex >= int64(len(entries)) {
+		return nil, nil //nolint:nilnil
+	}
+
+	historyEntryID := entries[targetIndex].ID
+	targetURL := entries[targetIndex].URL
+
+	timeoutCtx, timeoutCancelFn := context.WithTimeout(p.ctx, opts.Timeout)
+	defer timeoutCancelFn()
+
+	navAction := page.NavigateToHistoryEntry(historyEntryID)
+	if err := navAction.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
+		return nil, fmt.Errorf("navigating to history entry %d: %w", historyEntryID, err)
+	}
+
+	wrapTimeoutError := func(err error) error {
+		if errors.Is(err, context.DeadlineExceeded) {
+			err = &k6ext.UserFriendlyError{
+				Err:     err,
+				Timeout: opts.Timeout,
+			}
+		}
+		p.logger.Debugf("Page:GoBackForward", "timeoutCtx done: %v", err)
+		return fmt.Errorf("navigating %s to history entry %d: %w", direction, historyEntryID, err)
+	}
+
+	// Poll for URL change, don't rely on lifecycle events since bfcache
+	// restorations don't re-fire them.
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-p.ctx.Done():
+			return nil, p.ctx.Err()
+		case <-timeoutCtx.Done():
+			return nil, wrapTimeoutError(timeoutCtx.Err())
+		case <-ticker.C:
+			mainFrame := p.frameManager.MainFrame()
+			if mainFrame == nil {
+				continue
+			}
+			currentURL := mainFrame.URL()
+			p.logger.Debugf("Page:GoBackForward", "polling: currentURL=%s targetURL=%s", currentURL, targetURL)
+
+			if currentURL == targetURL {
+				p.logger.Debugf("Page:GoBackForward", "navigation complete to %s", targetURL)
+				applySlowMo(p.ctx)
+				return nil, nil //nolint:nilnil
+			}
+		}
+	}
 }
 
 // Screenshot will instruct Chrome to save a screenshot of the current page and save it to specified file.
@@ -1820,7 +1901,7 @@ func (p *Page) waitForEvent(
 	case r := <-result:
 		return r.event, r.err
 	case <-ctx.Done():
-		return PageEvent{}, ctx.Err()
+		return PageEvent{}, ContextErr(ctx)
 	}
 }
 

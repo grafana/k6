@@ -637,6 +637,26 @@ func TestParse(t *testing.T) {
 	})
 }
 
+func TestBuildSharedArrayNameDeterministic(t *testing.T) {
+	t.Parallel()
+
+	file := fs.File{Path: "/tmp/data.csv"}
+	options := newDefaultParserOptions()
+
+	first, err := buildSharedArrayName(file, options)
+	require.NoError(t, err)
+
+	second, err := buildSharedArrayName(file, options)
+	require.NoError(t, err)
+	require.Equal(t, first, second)
+
+	options.Delimiter = ';'
+
+	third, err := buildSharedArrayName(file, options)
+	require.NoError(t, err)
+	require.NotEqual(t, first, third)
+}
+
 const initGlobals = `
 	globalThis.fs = require("k6/experimental/fs");
 	globalThis.csv = require("k6/experimental/csv");
