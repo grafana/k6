@@ -239,7 +239,9 @@ func mergeHeaderMaps(base map[string][]string, extra map[string][]string) map[st
 		}
 		key := strings.ToLower(name)
 		current := merged[key]
-		current = make([]string, 0, len(values))
+		if current == nil {
+			current = make([]string, 0, len(values))
+		}
 		for _, v := range values {
 			if !containsString(current, v) {
 				current = append(current, v)
