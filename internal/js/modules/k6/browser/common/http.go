@@ -70,16 +70,18 @@ type RequestFailure struct {
 
 // Request represents a browser HTTP request.
 type Request struct {
-	ctx           context.Context
-	frame         *Frame
-	responseMu    sync.RWMutex
-	response      *Response
-	redirectChain []*Request
-	requestID     network.RequestID
-	documentID    string
-	url           *url.URL
-	method        string
-	headers       map[string][]string
+	ctx            context.Context
+	frame          *Frame
+	responseMu     sync.RWMutex
+	response       *Response
+	redirectChain  []*Request
+	requestID      network.RequestID
+	documentID     string
+	url            *url.URL
+	method         string
+	headers        map[string][]string
+	extraHeaders   map[string][]string
+	extraHeadersMu sync.RWMutex
 	// For now we're only going to work with the 0th entry of postDataEntries.
 	// We've not been able to reproduce a situation where more than one entry
 	// occupies the slice. Once we have a better idea of when more than one
@@ -179,6 +181,88 @@ func NewRequest(ctx context.Context, logger *log.Logger, rp NewRequestParams) (*
 	return &r, nil
 }
 
+func parseExtraHeaders(headers network.Headers) map[string][]string {
+	if len(headers) == 0 {
+		return nil
+	}
+	parsed := make(map[string][]string, len(headers))
+	for name, value := range headers {
+		switch v := value.(type) {
+		case string:
+			parsed[name] = splitHeaderValues(v)
+		case []string:
+			parsed[name] = append([]string{}, v...)
+		case []any:
+			values := make([]string, 0, len(v))
+			for _, item := range v {
+				if s, ok := item.(string); ok {
+					values = append(values, s)
+				}
+			}
+			if len(values) > 0 {
+				parsed[name] = values
+			}
+		}
+	}
+	if len(parsed) == 0 {
+		return nil
+	}
+	return parsed
+}
+
+// CDP concatenates duplicate header values with newlines; split to match Playwright.
+func splitHeaderValues(value string) []string {
+	if strings.Contains(value, "\n") {
+		return strings.Split(value, "\n")
+	}
+	return []string{value}
+}
+
+func containsString(values []string, value string) bool {
+	for _, v := range values {
+		if v == value {
+			return true
+		}
+	}
+	return false
+}
+
+func mergeHeaderMaps(base map[string][]string, extra map[string][]string) map[string][]string {
+	if len(base) == 0 && len(extra) == 0 {
+		return nil
+	}
+
+	merged := make(map[string][]string)
+	add := func(name string, values []string) {
+		if len(values) == 0 {
+			return
+		}
+		key := strings.ToLower(name)
+		current := merged[key]
+		if current == nil {
+			current = make([]string, 0, len(values))
+		}
+		for _, v := range values {
+			if !containsString(current, v) {
+				current = append(current, v)
+			}
+		}
+		merged[key] = current
+	}
+	for name, values := range base {
+		add(name, values)
+	}
+	for name, values := range extra {
+		add(name, values)
+	}
+
+	if len(merged) == 0 {
+		return nil
+	}
+
+	return merged
+}
+
 // validateResourceType will validate network.ResourceType string values against our own
 // ResourceType string values.
 //   - If a new network.ResourceType is added, this will log a warn and return
@@ -231,10 +315,24 @@ func (r *Request) headersSize() int64 {
 	size += len(r.method)
 	size += len(r.url.Path)
 	size += 8 // httpVersion
-	for n, v := range r.headers {
-		size += len(n) + len(strings.Join(v, "")) + 4 // 4 = ': ' + '\r\n'
+	r.extraHeadersMu.RLock()
+	merged := mergeHeaderMaps(r.headers, r.extraHeaders)
+	for name, values := range merged {
+		for _, value := range values {
+			size += len(name) + len(value) + 4 // 4 = ': ' + '\r\n'
+		}
 	}
+	r.extraHeadersMu.RUnlock()
 	return int64(size)
+}
+
+func (r *Request) addExtraHeaders(extra map[string][]string) {
+	if len(extra) == 0 {
+		return
+	}
+	r.extraHeadersMu.Lock()
+	r.extraHeaders = mergeHeaderMaps(r.extraHeaders, extra)
+	r.extraHeadersMu.Unlock()
 }
 
 func (r *Request) setErrorText(errorText string) {
@@ -255,10 +353,12 @@ func (r *Request) setLoadedFromCache(fromMemoryCache bool) {
 
 // AllHeaders returns all the request headers.
 func (r *Request) AllHeaders() map[string]string {
-	// TODO: fix this data to include "ExtraInfo" header data
 	headers := make(map[string]string)
-	for n, v := range r.headers {
-		headers[strings.ToLower(n)] = strings.Join(v, ",")
+	r.extraHeadersMu.RLock()
+	merged := mergeHeaderMaps(r.headers, r.extraHeaders)
+	r.extraHeadersMu.RUnlock()
+	for name, values := range merged {
+		headers[strings.ToLower(name)] = strings.Join(values, "\n")
 	}
 	return headers
 }
@@ -279,7 +379,7 @@ func (r *Request) HeaderValue(name string) (string, bool) {
 func (r *Request) Headers() map[string]string {
 	headers := make(map[string]string)
 	for n, v := range r.headers {
-		headers[n] = strings.Join(v, ",")
+		headers[strings.ToLower(n)] = strings.Join(v, ",")
 	}
 	return headers
 }
@@ -287,11 +387,28 @@ func (r *Request) Headers() map[string]string {
 // HeadersArray returns the request headers as an array of objects.
 func (r *Request) HeadersArray() []HTTPHeader {
 	headers := make([]HTTPHeader, 0)
-	for n, vals := range r.headers {
-		for _, v := range vals {
-			headers = append(headers, HTTPHeader{Name: n, Value: v})
+	seen := make(map[string]map[string]bool)
+	add := func(name string, values []string) {
+		key := strings.ToLower(name)
+		if _, ok := seen[key]; !ok {
+			seen[key] = make(map[string]bool)
+		}
+		for _, v := range values {
+			if seen[key][v] {
+				continue
+			}
+			seen[key][v] = true
+			headers = append(headers, HTTPHeader{Name: name, Value: v})
 		}
 	}
+	for n, vals := range r.headers {
+		add(n, vals)
+	}
+	r.extraHeadersMu.RLock()
+	for n, vals := range r.extraHeaders {
+		add(n, vals)
+	}
+	r.extraHeadersMu.RUnlock()
 	return headers
 }
 
@@ -428,6 +545,8 @@ type Response struct {
 	bodyMu            sync.RWMutex
 	body              []byte
 	headers           map[string][]string
+	extraHeaders      map[string][]string
+	extraHeadersMu    sync.RWMutex
 	fromDiskCache     bool
 	fromServiceWorker bool
 	fromPrefetchCache bool
@@ -537,19 +656,26 @@ func (r *Response) headersSize() int64 {
 	size += 8 // httpVersion
 	size += 3 // statusCode
 	size += len(r.statusText)
-	for n, v := range r.headers {
-		size += len(n) + len(strings.Join(v, "")) + 4 // 4 = ': ' + '\r\n'
+	r.extraHeadersMu.RLock()
+	merged := mergeHeaderMaps(r.headers, r.extraHeaders)
+	for name, values := range merged {
+		for _, value := range values {
+			size += len(name) + len(value) + 4 // 4 = ': ' + '\r\n'
+		}
 	}
+	r.extraHeadersMu.RUnlock()
 	size += 2 // '\r\n'
 	return int64(size)
 }
 
 // AllHeaders returns all the response headers.
 func (r *Response) AllHeaders() map[string]string {
-	// TODO: fix this data to include "ExtraInfo" header data
 	headers := make(map[string]string)
-	for n, v := range r.headers {
-		headers[strings.ToLower(n)] = strings.Join(v, ",")
+	r.extraHeadersMu.RLock()
+	merged := mergeHeaderMaps(r.headers, r.extraHeaders)
+	r.extraHeadersMu.RUnlock()
+	for name, values := range merged {
+		headers[strings.ToLower(name)] = strings.Join(values, "\n")
 	}
 	return headers
 }
@@ -625,7 +751,7 @@ func (r *Response) FromServiceWorker() bool {
 func (r *Response) Headers() map[string]string {
 	headers := make(map[string]string)
 	for n, v := range r.headers {
-		headers[n] = strings.Join(v, ",")
+		headers[strings.ToLower(n)] = strings.Join(v, ",")
 	}
 	return headers
 }
@@ -633,12 +759,38 @@ func (r *Response) Headers() map[string]string {
 // HeadersArray returns the response headers as an array of objects.
 func (r *Response) HeadersArray() []HTTPHeader {
 	headers := make([]HTTPHeader, 0)
-	for n, vals := range r.headers {
-		for _, v := range vals {
-			headers = append(headers, HTTPHeader{Name: n, Value: v})
+	seen := make(map[string]map[string]bool)
+	add := func(name string, values []string) {
+		key := strings.ToLower(name)
+		if _, ok := seen[key]; !ok {
+			seen[key] = make(map[string]bool)
+		}
+		for _, v := range values {
+			if seen[key][v] {
+				continue
+			}
+			seen[key][v] = true
+			headers = append(headers, HTTPHeader{Name: name, Value: v})
 		}
 	}
+	for n, vals := range r.headers {
+		add(n, vals)
+	}
+	r.extraHeadersMu.RLock()
+	for n, vals := range r.extraHeaders {
+		add(n, vals)
+	}
+	r.extraHeadersMu.RUnlock()
 	return headers
+}
+
+func (r *Response) addExtraHeaders(extra map[string][]string) {
+	if len(extra) == 0 {
+		return
+	}
+	r.extraHeadersMu.Lock()
+	r.extraHeaders = mergeHeaderMaps(r.extraHeaders, extra)
+	r.extraHeadersMu.Unlock()
 }
 
 // JSON returns the response body as JSON data.
