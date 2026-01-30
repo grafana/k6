@@ -1,11 +1,16 @@
 package opentelemetry
 
 import (
+	"bytes"
 	"encoding/json"
+	"io"
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"go.k6.io/k6/internal/build"
 	"go.k6.io/k6/lib/types"
 	"gopkg.in/guregu/null.v3"
@@ -34,6 +39,37 @@ func TestConfig(t *testing.T) {
 				ExportInterval:       types.NewNullDuration(10*time.Second, false),
 				FlushInterval:        types.NewNullDuration(1*time.Second, false),
 				SingleCounterForRate: null.NewBool(true, false),
+			},
+		},
+
+		"OTLP exporter env vars overwrite defaults": {
+			env: map[string]string{
+				"OTEL_SERVICE_NAME":                     "k6-test",
+				"OTEL_EXPORTER_OTLP_PROTOCOL":           httpExporterProtocol,
+				"OTEL_METRIC_EXPORT_INTERVAL":           "1m",
+				"OTEL_EXPORTER_OTLP_HEADERS":            "k1=v1,k2=v2",
+				"OTEL_EXPORTER_OTLP_CERTIFICATE":        "fake-certificate",
+				"OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE": "fake-client-certificate",
+				"OTEL_EXPORTER_OTLP_CLIENT_KEY":         "fake-client-key",
+				"OTEL_EXPORTER_OTLP_INSECURE":           "true",
+				"OTEL_EXPORTER_OTLP_ENDPOINT":           "http://localhost:4317",
+			},
+			expectedConfig: Config{
+				ServiceName:          null.StringFrom("k6-test"),
+				ServiceVersion:       null.NewString(build.Version, false),
+				ExporterProtocol:     null.StringFrom(httpExporterProtocol),
+				HTTPExporterInsecure: null.BoolFrom(true),
+				HTTPExporterEndpoint: null.StringFrom("localhost:4317"),
+				HTTPExporterURLPath:  null.NewString("/v1/metrics", false),
+				GRPCExporterInsecure: null.NewBool(false, false),
+				GRPCExporterEndpoint: null.NewString("localhost:4317", false),
+				ExportInterval:       types.NullDurationFrom(1 * time.Minute),
+				FlushInterval:        types.NewNullDuration(1*time.Second, false),
+				SingleCounterForRate: null.NewBool(true, false),
+				Headers:              null.StringFrom("k1=v1,k2=v2"),
+				TLSCertificate:       null.StringFrom("fake-certificate"),
+				TLSClientCertificate: null.StringFrom("fake-client-certificate"),
+				TLSClientKey:         null.StringFrom("fake-client-key"),
 			},
 		},
 
@@ -95,22 +131,45 @@ func TestConfig(t *testing.T) {
 			},
 		},
 
-		"OTEL environment variables": {
+		"OTLP exporter env vars overwritten by k6 env vars": {
 			env: map[string]string{
-				"OTEL_SERVICE_NAME": "otel-service",
+				"OTEL_SERVICE_NAME":                     "k6-test",
+				"K6_OTEL_SERVICE_NAME":                  "foo",
+				"OTEL_EXPORTER_OTLP_PROTOCOL":           httpExporterProtocol,
+				"K6_OTEL_EXPORTER_PROTOCOL":             grpcExporterProtocol,
+				"OTEL_METRIC_EXPORT_INTERVAL":           "1m",
+				"K6_OTEL_EXPORT_INTERVAL":               "4ms",
+				"OTEL_EXPORTER_OTLP_HEADERS":            "k1=v1,k2=v2",
+				"K6_OTEL_HEADERS":                       "key1=value1,key2=value2",
+				"OTEL_EXPORTER_OTLP_CERTIFICATE":        "fake-certificate",
+				"K6_OTEL_TLS_CERTIFICATE":               "cert_path",
+				"OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE": "fake-client-certificate",
+				"K6_OTEL_TLS_CLIENT_CERTIFICATE":        "client_cert_path",
+				"OTEL_EXPORTER_OTLP_CLIENT_KEY":         "fake-client-key",
+				"K6_OTEL_TLS_CLIENT_KEY":                "client_key_path",
+				"OTEL_EXPORTER_OTLP_INSECURE":           "true",
+				"K6_OTEL_HTTP_EXPORTER_INSECURE":        "false",
+				"K6_OTEL_GRPC_EXPORTER_INSECURE":        "false",
+				"OTEL_EXPORTER_OTLP_ENDPOINT":           "http://localhost:4317",
+				"K6_OTEL_HTTP_EXPORTER_ENDPOINT":        "localhost:4318",
+				"K6_OTEL_GRPC_EXPORTER_ENDPOINT":        "localhost:4318",
 			},
 			expectedConfig: Config{
-				ServiceName:          null.NewString("otel-service", true),
+				ServiceName:          null.StringFrom("foo"),
 				ServiceVersion:       null.NewString(build.Version, false),
-				ExporterProtocol:     null.NewString(grpcExporterProtocol, false),
-				HTTPExporterInsecure: null.NewBool(false, false),
-				HTTPExporterEndpoint: null.NewString("localhost:4318", false),
+				ExporterProtocol:     null.StringFrom(grpcExporterProtocol),
+				HTTPExporterInsecure: null.BoolFrom(false),
+				HTTPExporterEndpoint: null.StringFrom("localhost:4318"),
 				HTTPExporterURLPath:  null.NewString("/v1/metrics", false),
-				GRPCExporterInsecure: null.NewBool(false, false),
-				GRPCExporterEndpoint: null.NewString("localhost:4317", false),
-				ExportInterval:       types.NewNullDuration(10*time.Second, false),
+				GRPCExporterInsecure: null.BoolFrom(false),
+				GRPCExporterEndpoint: null.StringFrom("localhost:4318"),
+				ExportInterval:       types.NullDurationFrom(4 * time.Millisecond),
 				FlushInterval:        types.NewNullDuration(1*time.Second, false),
 				SingleCounterForRate: null.NewBool(true, false),
+				Headers:              null.StringFrom("key1=value1,key2=value2"),
+				TLSCertificate:       null.StringFrom("cert_path"),
+				TLSClientCertificate: null.StringFrom("client_cert_path"),
+				TLSClientKey:         null.StringFrom("client_key_path"),
 			},
 		},
 
@@ -154,6 +213,52 @@ func TestConfig(t *testing.T) {
 				TLSClientKey:          null.NewString("client_key_path", true),
 				Headers:               null.NewString("key1=value1,key2=value2", true),
 				SingleCounterForRate:  null.NewBool(false, true),
+			},
+		},
+
+		"OTLP exporter env vars overwritten by JSON config": {
+			jsonRaw: json.RawMessage(
+				`{` +
+					`"serviceName":"foo",` +
+					`"exporterProtocol":"grpc",` +
+					`"exportInterval":"15ms",` +
+					`"httpExporterInsecure":false,` +
+					`"httpExporterEndpoint":"localhost:4318",` +
+					`"grpcExporterInsecure":false,` +
+					`"grpcExporterEndpoint":"localhost:4318",` +
+					`"tlsCertificate":"cert_path",` +
+					`"tlsClientCertificate":"client_cert_path",` +
+					`"tlsClientKey":"client_key_path",` +
+					`"headers":"key1=value1,key2=value2"` +
+					`}`,
+			),
+			env: map[string]string{
+				"OTEL_SERVICE_NAME":                     "k6-test",
+				"OTEL_EXPORTER_OTLP_PROTOCOL":           httpExporterProtocol,
+				"OTEL_METRIC_EXPORT_INTERVAL":           "1m",
+				"OTEL_EXPORTER_OTLP_HEADERS":            "k1=v1,k2=v2",
+				"OTEL_EXPORTER_OTLP_CERTIFICATE":        "fake-certificate",
+				"OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE": "fake-client-certificate",
+				"OTEL_EXPORTER_OTLP_CLIENT_KEY":         "fake-client-key",
+				"OTEL_EXPORTER_OTLP_INSECURE":           "true",
+				"OTEL_EXPORTER_OTLP_ENDPOINT":           "http://localhost:4317",
+			},
+			expectedConfig: Config{
+				ServiceName:          null.StringFrom("foo"),
+				ServiceVersion:       null.NewString(build.Version, false),
+				ExporterProtocol:     null.StringFrom(grpcExporterProtocol),
+				HTTPExporterInsecure: null.BoolFrom(false),
+				HTTPExporterEndpoint: null.StringFrom("localhost:4318"),
+				HTTPExporterURLPath:  null.NewString("/v1/metrics", false),
+				GRPCExporterInsecure: null.BoolFrom(false),
+				GRPCExporterEndpoint: null.StringFrom("localhost:4318"),
+				ExportInterval:       types.NullDurationFrom(15 * time.Millisecond),
+				FlushInterval:        types.NewNullDuration(1*time.Second, false),
+				SingleCounterForRate: null.NewBool(true, false),
+				Headers:              null.StringFrom("key1=value1,key2=value2"),
+				TLSCertificate:       null.StringFrom("cert_path"),
+				TLSClientCertificate: null.StringFrom("client_cert_path"),
+				TLSClientKey:         null.StringFrom("client_key_path"),
 			},
 		},
 
@@ -213,7 +318,11 @@ func TestConfig(t *testing.T) {
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			config, err := GetConsolidatedConfig(testCase.jsonRaw, testCase.env)
+
+			logger := logrus.New()
+			logger.SetOutput(io.Discard)
+
+			config, err := GetConsolidatedConfig(testCase.jsonRaw, testCase.env, logger)
 			if testCase.err != "" {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), testCase.err)
@@ -223,4 +332,58 @@ func TestConfig(t *testing.T) {
 			require.Equal(t, testCase.expectedConfig, config)
 		})
 	}
+}
+
+func TestConfig_warnIfConfigMismatch(t *testing.T) {
+	t.Parallel()
+
+	t.Run("none", func(t *testing.T) {
+		t.Parallel()
+
+		var logsBuffer bytes.Buffer
+		logger := logrus.New()
+		logger.SetOutput(&logsBuffer)
+
+		_, err := GetConsolidatedConfig(json.RawMessage(`
+{
+  "exporterProtocol": "grpc",
+  "grpcExporterInsecure":true
+}`), nil, logger)
+		require.NoError(t, err)
+
+		assert.NotContains(t, logsBuffer.String(), "Configuration mismatch detected")
+	})
+
+	t.Run("json", func(t *testing.T) {
+		t.Parallel()
+
+		var logsBuffer bytes.Buffer
+		logger := logrus.New()
+		logger.SetOutput(&logsBuffer)
+
+		_, err := GetConsolidatedConfig(json.RawMessage(`
+{
+  "exporterProtocol": "grpc",
+  "httpExporterInsecure":true
+}`), nil, logger)
+		require.NoError(t, err)
+
+		assert.Contains(t, logsBuffer.String(), "Configuration mismatch detected: the gRPC exporter type is set, but also some HTTP configuration options")
+	})
+
+	t.Run("env", func(t *testing.T) {
+		t.Parallel()
+
+		var logsBuffer bytes.Buffer
+		logger := logrus.New()
+		logger.SetOutput(&logsBuffer)
+
+		_, err := GetConsolidatedConfig(nil, map[string]string{
+			"K6_OTEL_EXPORTER_PROTOCOL":      "http/protobuf",
+			"K6_OTEL_GRPC_EXPORTER_INSECURE": "true",
+		}, logger)
+		require.NoError(t, err)
+
+		assert.Contains(t, logsBuffer.String(), "Configuration mismatch detected: the HTTP exporter type is set, but also some gRPC configuration options")
+	})
 }
