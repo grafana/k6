@@ -1,13 +1,16 @@
 package cloudapi
 
 import (
+	"archive/tar"
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"testing"
 	"time"
 
@@ -227,6 +230,138 @@ func TestCreateTestRun(t *testing.T) {
 		assert.Equal(t, 2, called)
 		assert.NotNil(t, resp)
 		assert.Nil(t, err)
+	})
+
+	t.Run("invalid project ID and stack ID should fail", func(t *testing.T) {
+		t.Parallel()
+		called := 0
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			b, err := io.ReadAll(r.Body)
+			require.NoError(t, err)
+
+			var testRun TestRun
+			require.NoError(t, json.Unmarshal(b, &testRun))
+
+			var stackID int64
+			if r.Header.Get("X-Stack-Id") != "" {
+				stackID, err = strconv.ParseInt(r.Header.Get("X-Stack-Id"), 10, 64)
+				require.NoError(t, err)
+			}
+
+			called++
+			w.WriteHeader(http.StatusForbidden)
+			errorMsg := fmt.Sprintf("Project matching ID %d not found in stack %d.", testRun.ProjectID, stackID)
+			fprint(t, w, fmt.Sprintf(`{"error": {"code": 2, "message": "Validation failed", "errors": ["%s"]}}`, errorMsg))
+		}))
+		defer server.Close()
+
+		client := NewClient(testutils.NewLogger(t), "token", server.URL, "1.0", 1*time.Second)
+		client.SetStackID(1)
+
+		resp, err := client.CreateTestRun(&TestRun{
+			Name:      "test",
+			ProjectID: 2,
+		})
+
+		assert.Equal(t, 1, called)
+		assert.Nil(t, resp)
+		assert.EqualError(t, err, "(403/E2) Validation failed\n Project matching ID 2 not found in stack 1.")
+	})
+
+	t.Run("invalid project ID and stack ID with archive should fail", func(t *testing.T) {
+		t.Parallel()
+		called := 0
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Parse the multipart form data
+			reader, err := r.MultipartReader()
+			require.NoError(t, err)
+
+			// Initialize a map to store the parsed form data
+			formData := make(map[string]string)
+
+			// Iterate through the parts
+			for {
+				part, nextErr := reader.NextPart()
+				if errors.Is(nextErr, io.EOF) {
+					break
+				}
+				require.NoError(t, nextErr)
+
+				// Read the part content
+				buf := new(bytes.Buffer)
+				_, err = io.Copy(buf, part)
+				require.NoError(t, err)
+
+				// Store the part content in the map
+				formData[part.FormName()] = buf.String()
+			}
+
+			// Extract metadata.json from the tar archive
+			archiveData := formData["file"]
+			tarReader := tar.NewReader(bytes.NewReader([]byte(archiveData)))
+
+			var metadata struct {
+				Options struct {
+					Cloud struct {
+						ProjectID int64 `json:"project_id"`
+						StackID   int64 `json:"stack_id"`
+					} `json:"cloud"`
+				} `json:"options"`
+			}
+
+			// Find and read metadata.json from the tar archive
+			for {
+				header, tarErr := tarReader.Next()
+				if errors.Is(tarErr, io.EOF) {
+					break
+				}
+				require.NoError(t, tarErr)
+
+				if header.Name == "metadata.json" {
+					metadataBytes, readErr := io.ReadAll(tarReader)
+					require.NoError(t, readErr)
+					err = json.Unmarshal(metadataBytes, &metadata)
+					require.NoError(t, err)
+					break
+				}
+			}
+
+			called++
+			w.WriteHeader(http.StatusForbidden)
+			errorMsg := fmt.Sprintf("Project matching ID %d not found in stack %d.", metadata.Options.Cloud.ProjectID, metadata.Options.Cloud.StackID)
+			fprint(t, w, fmt.Sprintf(`{"error": {"code": 2, "message": "Validation failed", "errors": ["%s"]}}`, errorMsg))
+		}))
+		defer server.Close()
+
+		client := NewClient(testutils.NewLogger(t), "token", server.URL, "1.0", 1*time.Second)
+
+		// Produce a test archive
+		fs := fsext.NewMemMapFs()
+		err := fsext.WriteFile(fs, "/path/to/a.js", []byte(`// a contents`), 0o644)
+		require.NoError(t, err)
+
+		arc := &lib.Archive{
+			Type:      "js",
+			K6Version: build.Version,
+			Options: lib.Options{
+				Cloud: json.RawMessage(`{"project_id":2,"stack_id":1}`),
+			},
+			FilenameURL: &url.URL{Scheme: "file", Path: "/path/to/a.js"},
+			Data:        []byte(`// a contents`),
+			PwdURL:      &url.URL{Scheme: "file", Path: "/path/to"},
+			Filesystems: map[string]fsext.Fs{
+				"file": fs,
+			},
+		}
+
+		resp, err := client.CreateTestRun(&TestRun{
+			Name:    "test",
+			Archive: arc,
+		})
+
+		assert.Equal(t, 1, called)
+		assert.Nil(t, resp)
+		assert.EqualError(t, err, "(403/E2) Validation failed\n Project matching ID 2 not found in stack 1.")
 	})
 }
 
