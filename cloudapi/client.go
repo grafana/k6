@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -136,6 +137,10 @@ func (c *Client) prepareHeaders(req *http.Request) {
 	}
 
 	req.Header.Set("User-Agent", "k6cloud/"+c.version)
+
+	if c.stackID != 0 {
+		req.Header.Set("X-Stack-Id", strconv.FormatInt(c.stackID, 10))
+	}
 }
 
 func (c *Client) do(req *http.Request, v interface{}, attempt int) (retry bool, err error) {
