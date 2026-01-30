@@ -1110,17 +1110,17 @@ func parseSize(rt *sobek.Runtime, opts sobek.Value) (*common.Size, error) {
 		switch k {
 		case "width":
 			switch v.ExportType().Kind() {
-			case reflect.Int64, reflect.Float64:
+			case reflect.Int64:
 				size.Width = v.ToFloat()
 			default:
-				return nil, fmt.Errorf("width must be a number, got %s", v.ExportType().Kind())
+				return nil, fmt.Errorf("width must be an integer, got %s", v.ExportType().Kind())
 			}
 		case "height":
 			switch v.ExportType().Kind() {
-			case reflect.Int64, reflect.Float64:
+			case reflect.Int64:
 				size.Height = v.ToFloat()
 			default:
-				return nil, fmt.Errorf("height must be a number, got %s", v.ExportType().Kind())
+				return nil, fmt.Errorf("height must be an integer, got %s", v.ExportType().Kind())
 			}
 		}
 	}

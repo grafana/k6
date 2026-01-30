@@ -78,9 +78,14 @@ func TestParseSize(t *testing.T) {
 			want:  &common.Size{Width: 1920, Height: 0},
 		},
 		{
-			name:  "float_values",
-			input: `({width: 1920.5, height: 1080.5})`,
-			want:  &common.Size{Width: 1920.5, Height: 1080.5},
+			name:    "invalid_width_float",
+			input:   `({width: 1920.5, height: 1080})`,
+			wantErr: "width must be an integer",
+		},
+		{
+			name:    "invalid_height_float",
+			input:   `({width: 1920, height: 1080.5})`,
+			wantErr: "height must be an integer",
 		},
 		{
 			name:  "null_width",
@@ -95,12 +100,12 @@ func TestParseSize(t *testing.T) {
 		{
 			name:    "invalid_width_string",
 			input:   `({width: "1920", height: 1080})`,
-			wantErr: "width must be a number",
+			wantErr: "width must be an integer",
 		},
 		{
 			name:    "invalid_height_string",
 			input:   `({width: 1920, height: "1080"})`,
-			wantErr: "height must be a number",
+			wantErr: "height must be an integer",
 		},
 	}
 
