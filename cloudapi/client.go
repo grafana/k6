@@ -27,6 +27,7 @@ const (
 type Client struct {
 	client  *http.Client
 	token   string
+	stackID int64
 	baseURL string
 	version string
 
@@ -48,6 +49,11 @@ func NewClient(logger logrus.FieldLogger, token, host, version string, timeout t
 		logger:        logger,
 	}
 	return c
+}
+
+// SetStackID sets the stack ID for the client.
+func (c *Client) SetStackID(stackID int64) {
+	c.stackID = stackID
 }
 
 // BaseURL returns configured host.

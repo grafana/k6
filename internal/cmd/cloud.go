@@ -171,6 +171,9 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Validating script options"))
 	client := cloudapi.NewClient(
 		logger, cloudConfig.Token.String, cloudConfig.Host.String, build.Version, cloudConfig.Timeout.TimeDuration())
+	if cloudConfig.StackID.Valid {
+		client.SetStackID(cloudConfig.StackID.Int64)
+	}
 	if err = client.ValidateOptions(arc.Options); err != nil {
 		return err
 	}
