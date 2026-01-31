@@ -59,6 +59,7 @@ func NewLocator(ctx context.Context, opts *LocatorOptions, selector string, f *F
 // BoundingBox will return the bounding box of the element.
 func (l *Locator) BoundingBox(opts *FrameBaseOptions) (*Rect, error) {
 	opts.Strict = true
+	opts.retry = true
 	return l.frame.boundingBox(l.selector, opts)
 }
 
@@ -341,6 +342,7 @@ func (l *Locator) GetAttribute(name string, opts *FrameBaseOptions) (string, boo
 	)
 
 	opts.Strict = true
+	opts.retry = true
 	s, ok, err := l.frame.getAttribute(l.selector, name, opts)
 	if err != nil {
 		return "", false, fmt.Errorf("getting attribute %q of %q: %w", name, l.selector, err)
