@@ -59,7 +59,7 @@ func NewLocator(ctx context.Context, opts *LocatorOptions, selector string, f *F
 // BoundingBox will return the bounding box of the element.
 func (l *Locator) BoundingBox(opts *FrameBaseOptions) (*Rect, error) {
 	opts.Strict = true
-	opts.retry = true
+	
 	return l.frame.boundingBox(l.selector, opts)
 }
 
@@ -342,7 +342,7 @@ func (l *Locator) GetAttribute(name string, opts *FrameBaseOptions) (string, boo
 	)
 
 	opts.Strict = true
-	opts.retry = true
+	
 	s, ok, err := l.frame.getAttribute(l.selector, name, opts)
 	if err != nil {
 		return "", false, fmt.Errorf("getting attribute %q of %q: %w", name, l.selector, err)
@@ -587,7 +587,7 @@ func (l *Locator) Hover(opts *FrameHoverOptions) error {
 	l.log.Debugf("Locator:Hover", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
 	opts.Strict = true
-	opts.retry = true
+
 	if err := l.frame.hover(l.selector, opts); err != nil {
 		return fmt.Errorf("hovering on %q: %w", l.selector, err)
 	}
@@ -602,7 +602,7 @@ func (l *Locator) Tap(opts *FrameTapOptions) error {
 	l.log.Debugf("Locator:Tap", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
 	opts.Strict = true
-	opts.retry = true
+
 	if err := l.frame.tap(l.selector, opts); err != nil {
 		return fmt.Errorf("tapping on %q: %w", l.selector, err)
 	}
