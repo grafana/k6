@@ -6,7 +6,7 @@ RUN apk --no-cache add git=~2
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -o /usr/bin/k6
 
 # Runtime stage
-FROM alpine:3.22@sha256:4b7ce07002c69e8f3d704a9c5d6fd3053be500b7f1c69fc0d80990c2ad8dd412 as release
+FROM alpine:3.22@sha256:55ae5d250caebc548793f321534bc6a8ef1d116f334f18f4ada1b2daad3251b2 as release
 
 RUN adduser -D -u 12345 -g 12345 k6
 COPY --from=builder /usr/bin/k6 /usr/bin/k6
