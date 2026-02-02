@@ -224,3 +224,80 @@ func TestConfig(t *testing.T) {
 		})
 	}
 }
+
+func TestConfigString(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		config   Config
+		expected string
+	}{
+		"default grpc": {
+			config: Config{
+				ExporterProtocol:     null.NewString(grpcExporterProtocol, false),
+				GRPCExporterEndpoint: null.NewString("localhost:4317", false),
+				GRPCExporterInsecure: null.NewBool(false, false),
+			},
+			expected: "grpc, localhost:4317",
+		},
+		"grpc with ExporterProtocol set": {
+			config: Config{
+				ExporterProtocol:     null.NewString(grpcExporterProtocol, true),
+				GRPCExporterEndpoint: null.NewString("localhost:4317", true),
+				GRPCExporterInsecure: null.NewBool(false, true),
+			},
+			expected: "grpc, localhost:4317",
+		},
+		"grpc insecure with ExporterProtocol set": {
+			config: Config{
+				ExporterProtocol:     null.NewString(grpcExporterProtocol, true),
+				GRPCExporterEndpoint: null.NewString("localhost:4317", true),
+				GRPCExporterInsecure: null.NewBool(true, true),
+			},
+			expected: "grpc (insecure), localhost:4317",
+		},
+		"http/protobuf with ExporterProtocol set": {
+			config: Config{
+				ExporterProtocol:     null.NewString(httpExporterProtocol, true),
+				HTTPExporterEndpoint: null.NewString("localhost:4318", true),
+				HTTPExporterURLPath:  null.NewString("/v1/metrics", true),
+				HTTPExporterInsecure: null.NewBool(false, true),
+			},
+			expected: "http/protobuf, https://localhost:4318/v1/metrics",
+		},
+		"http/protobuf insecure with ExporterProtocol set": {
+			config: Config{
+				ExporterProtocol:     null.NewString(httpExporterProtocol, true),
+				HTTPExporterEndpoint: null.NewString("localhost:4318", true),
+				HTTPExporterURLPath:  null.NewString("/v1/metrics", true),
+				HTTPExporterInsecure: null.NewBool(true, true),
+			},
+			expected: "http/protobuf, http://localhost:4318/v1/metrics",
+		},
+		"deprecated ExporterType http": {
+			config: Config{
+				ExporterType:         null.NewString(httpExporterType, true),
+				HTTPExporterEndpoint: null.NewString("localhost:4318", true),
+				HTTPExporterURLPath:  null.NewString("/v1/metrics", true),
+				HTTPExporterInsecure: null.NewBool(false, true),
+			},
+			expected: "http/protobuf, https://localhost:4318/v1/metrics",
+		},
+		"deprecated ExporterType grpc": {
+			config: Config{
+				ExporterType:         null.NewString(grpcExporterType, true),
+				GRPCExporterEndpoint: null.NewString("localhost:4317", true),
+				GRPCExporterInsecure: null.NewBool(false, true),
+			},
+			expected: "grpc, localhost:4317",
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			result := testCase.config.String()
+			require.Equal(t, testCase.expected, result)
+		})
+	}
+}
