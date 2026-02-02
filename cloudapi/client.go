@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -27,6 +28,7 @@ const (
 type Client struct {
 	client  *http.Client
 	token   string
+	stackID int64
 	baseURL string
 	version string
 
@@ -48,6 +50,11 @@ func NewClient(logger logrus.FieldLogger, token, host, version string, timeout t
 		logger:        logger,
 	}
 	return c
+}
+
+// SetStackID sets the stack ID for the client.
+func (c *Client) SetStackID(stackID int64) {
+	c.stackID = stackID
 }
 
 // BaseURL returns configured host.
@@ -130,6 +137,10 @@ func (c *Client) prepareHeaders(req *http.Request) {
 	}
 
 	req.Header.Set("User-Agent", "k6cloud/"+c.version)
+
+	if c.stackID != 0 {
+		req.Header.Set("X-Stack-Id", strconv.FormatInt(c.stackID, 10))
+	}
 }
 
 func (c *Client) do(req *http.Request, v interface{}, attempt int) (retry bool, err error) {
