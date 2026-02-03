@@ -214,6 +214,22 @@ func (mi *K6) Check(arg0, checks sobek.Value, extras ...sobek.Value) (bool, erro
 
 		metrics.PushIfNotDone(ctx, state.Samples, sample)
 
+		// Emit checks_total counter with status label
+		status := "fail"
+		if booleanVal {
+			status = "pass"
+		}
+		checksCountSample := metrics.Sample{
+			TimeSeries: metrics.TimeSeries{
+				Metric: state.BuiltinMetrics.ChecksTotal,
+				Tags:   tags.With("status", status),
+			},
+			Time:     t,
+			Metadata: commonTagsAndMeta.Metadata,
+			Value:    1,
+		}
+		metrics.PushIfNotDone(ctx, state.Samples, checksCountSample)
+
 		if exc != nil {
 			return false, exc
 		}

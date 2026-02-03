@@ -9,6 +9,7 @@ const (
 	DroppedIterationsName = "dropped_iterations"
 
 	ChecksName        = "checks"
+	ChecksTotalName   = "checks_total"
 	GroupDurationName = "group_duration"
 
 	HTTPReqsName              = "http_reqs"
@@ -44,6 +45,7 @@ type BuiltinMetrics struct {
 
 	// Runner-emitted.
 	Checks        *Metric
+	ChecksTotal   *Metric
 	GroupDuration *Metric
 
 	// HTTP-related.
@@ -83,6 +85,7 @@ func RegisterBuiltinMetrics(registry *Registry) *BuiltinMetrics {
 		DroppedIterations: registry.MustNewMetric(DroppedIterationsName, Counter),
 
 		Checks:        registry.MustNewMetric(ChecksName, Rate),
+		ChecksTotal:   registry.MustNewMetric(ChecksTotalName, Counter),
 		GroupDuration: registry.MustNewMetric(GroupDurationName, Trend, Time),
 
 		HTTPReqs:              registry.MustNewMetric(HTTPReqsName, Counter),
