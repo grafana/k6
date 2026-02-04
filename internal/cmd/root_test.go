@@ -26,7 +26,7 @@ func TestRootCommandHelpDisplayCommands(t *testing.T) {
 		},
 		{
 			name:               "should have cloud command",
-			wantStdoutContains: "  cloud       Run a test on the cloud",
+			wantStdoutContains: "  cloud       Run and manage Grafana Cloud tests",
 		},
 		{
 			name:               "should have completion command",
