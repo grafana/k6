@@ -65,7 +65,7 @@ func newRootCommand(gs *state.GlobalState) *rootCommand {
 	// the base command when called without any subcommands.
 	rootCmd := &cobra.Command{
 		Use:           gs.BinaryName,
-		Short:         "Grafana k6 is an easy-to-use, open source load and performance testing tool",
+		Short:         "Grafana k6 is an easy-to-use, open-source load and performance testing tool",
 		Long:          "\n" + getBanner(gs.Flags.NoColor || !gs.Stdout.IsTTY, isTrueColor(gs.Env)),
 		SilenceUsage:  true,
 		SilenceErrors: true,
