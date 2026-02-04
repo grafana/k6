@@ -124,10 +124,17 @@ Flags:
       --version   Show version information
 
 Examples:
-  {{.CommandPath}} new test.js                          Create a test
-  {{.CommandPath}} run test.js                          Run a test
-  {{.CommandPath}} cloud run test.js                    Run a test in Grafana Cloud
-  {{.CommandPath}} cloud run --local-execution test.js  Run locally, stream results to Grafana Cloud
+  # Create a test
+  $ {{.CommandPath}} new test.js
+
+  # Run a test
+  $ {{.CommandPath}} run test.js
+
+  # Run a test in Grafana Cloud
+  $ {{.CommandPath}} cloud run test.js
+
+  # Run locally, stream results to Grafana Cloud
+  $ {{.CommandPath}} cloud run --local-execution test.js
 {{if .HasAvailableSubCommands}}
 Use "{{.CommandPath}} [command] --help" for more information about a command.
 Full CLI documentation: %s{{end}}
