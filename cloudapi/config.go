@@ -18,11 +18,15 @@ const LegacyCloudConfigKey = "loadimpact"
 //nolint:lll
 type Config struct {
 	// TODO: refactor common stuff between cloud execution and output
-	Token     null.String `json:"token" envconfig:"K6_CLOUD_TOKEN"`
-	ProjectID null.Int    `json:"projectID" envconfig:"K6_CLOUD_PROJECT_ID"`
-	Name      null.String `json:"name" envconfig:"K6_CLOUD_NAME"`
+	StackID          null.Int    `json:"stackID,omitempty" envconfig:"K6_CLOUD_STACK_ID"`
+	StackURL         null.String `json:"stackURL,omitempty" envconfig:"K6_CLOUD_STACK_URL"`
+	DefaultProjectID null.Int    `json:"defaultProjectID,omitempty"`
+	Token            null.String `json:"token" envconfig:"K6_CLOUD_TOKEN"`
+	ProjectID        null.Int    `json:"projectID" envconfig:"K6_CLOUD_PROJECT_ID"`
+	Name             null.String `json:"name" envconfig:"K6_CLOUD_NAME"`
 
 	Host    null.String        `json:"host" envconfig:"K6_CLOUD_HOST"`
+	Hostv6  null.String        `json:"hostv6" envconfig:"K6_CLOUD_HOST_V6"` // For test purposes only
 	Timeout types.NullDuration `json:"timeout" envconfig:"K6_CLOUD_TIMEOUT"`
 
 	LogsTailURL    null.String `json:"-" envconfig:"K6_CLOUD_LOGS_TAIL_URL"`
@@ -71,6 +75,7 @@ func NewConfig() Config {
 	return Config{
 		APIVersion:            null.NewInt(2, false),
 		Host:                  null.NewString("https://ingest.k6.io", false),
+		Hostv6:                null.NewString("https://api.k6.io", false),
 		LogsTailURL:           null.NewString("wss://cloudlogs.k6.io/api/v1/tail", false),
 		WebAppURL:             null.NewString("https://app.k6.io", false),
 		MetricPushInterval:    types.NewNullDuration(1*time.Second, false),
@@ -101,8 +106,17 @@ func NewConfig() Config {
 
 // Apply saves config non-zero config values from the passed config in the receiver.
 //
-//nolint:cyclop
+//nolint:cyclop,gocognit
 func (c Config) Apply(cfg Config) Config {
+	if cfg.StackID.Valid {
+		c.StackID = cfg.StackID
+	}
+	if cfg.StackURL.Valid && !c.StackURL.Valid {
+		c.StackURL = cfg.StackURL
+	}
+	if cfg.DefaultProjectID.Valid {
+		c.DefaultProjectID = cfg.DefaultProjectID
+	}
 	if cfg.Token.Valid {
 		c.Token = cfg.Token
 	}
@@ -114,6 +128,9 @@ func (c Config) Apply(cfg Config) Config {
 	}
 	if cfg.Host.Valid && cfg.Host.String != "" {
 		c.Host = cfg.Host
+	}
+	if cfg.Hostv6.Valid && cfg.Hostv6.String != "" {
+		c.Hostv6 = cfg.Hostv6
 	}
 	if cfg.LogsTailURL.Valid && cfg.LogsTailURL.String != "" {
 		c.LogsTailURL = cfg.LogsTailURL
@@ -240,7 +257,9 @@ func mergeFromCloudOptionAndExternal(
 	if err := json.Unmarshal(source, &tmpConfig); err != nil {
 		return err
 	}
-	// Only take out the ProjectID, Name and Token from the options.cloud (or legacy loadimpact struct) map:
+
+	// Only merge ProjectID, Name, Token, and StackID from options.
+	// StackURL and DefaultProjectID can only be set via login.
 	if tmpConfig.ProjectID.Valid {
 		conf.ProjectID = tmpConfig.ProjectID
 	}
@@ -249,6 +268,9 @@ func mergeFromCloudOptionAndExternal(
 	}
 	if tmpConfig.Token.Valid {
 		conf.Token = tmpConfig.Token
+	}
+	if tmpConfig.StackID.Valid {
+		conf.StackID = tmpConfig.StackID
 	}
 
 	return nil

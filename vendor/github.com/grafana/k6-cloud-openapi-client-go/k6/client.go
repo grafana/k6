@@ -3,7 +3,7 @@ Grafana Cloud k6
 
 HTTP API for interacting with Grafana Cloud k6.
 
-API version: 1.7.0
+API version: 1.7.1
 Contact: info@grafana.com
 */
 
@@ -41,7 +41,7 @@ var (
 	queryDescape    = strings.NewReplacer("%5B", "[", "%5D", "]")
 )
 
-// APIClient manages communication with the Grafana Cloud k6 API v1.7.0
+// APIClient manages communication with the Grafana Cloud k6 API v1.7.1
 // In most cases there should be only one, shared, APIClient.
 type APIClient struct {
 	cfg    *Configuration
@@ -142,6 +142,10 @@ func typeCheckParameter(obj interface{}, expected string, name string) error {
 
 func parameterValueToString(obj interface{}, key string) string {
 	if reflect.TypeOf(obj).Kind() != reflect.Ptr {
+		if actualObj, ok := obj.(interface{ GetActualInstanceValue() interface{} }); ok {
+			return fmt.Sprintf("%v", actualObj.GetActualInstanceValue())
+		}
+
 		return fmt.Sprintf("%v", obj)
 	}
 	var param, ok = obj.(MappedNullable)
@@ -265,9 +269,24 @@ func (c *APIClient) callAPI(request *http.Request) (*http.Response, error) {
 		log.Printf("\n%s\n", string(dump))
 	}
 
-	resp, err := c.cfg.HTTPClient.Do(request)
-	if err != nil {
-		return resp, err
+	var resp *http.Response
+	var err error
+	for i := 0; i <= c.cfg.MaxRetries; i++ {
+		resp, err = c.cfg.HTTPClient.Do(request)
+		if shouldRetry(resp, err, i, c.cfg.MaxRetries) {
+			if c.cfg.Debug {
+				log.Printf("Request failed, retrying... %d/%d\n", i+1, c.cfg.MaxRetries)
+			}
+
+			time.Sleep(c.cfg.RetryInterval)
+			continue
+		}
+
+		if err != nil {
+			return resp, err
+		}
+
+		break
 	}
 
 	if c.cfg.Debug {
@@ -278,6 +297,23 @@ func (c *APIClient) callAPI(request *http.Request) (*http.Response, error) {
 		log.Printf("\n%s\n", string(dump))
 	}
 	return resp, err
+}
+
+func shouldRetry(resp *http.Response, err error, attempt int, maxAttempts int) bool {
+	// Checking number of retries here to avoid unnecessary sleep
+	if attempt >= maxAttempts {
+		return false
+	}
+
+	if resp == nil || err != nil {
+		return true
+	}
+
+	if resp.StatusCode >= 500 || resp.StatusCode == http.StatusTooManyRequests {
+		return true
+	}
+
+	return false
 }
 
 // Allow modification of underlying config for alternate implementations and testing

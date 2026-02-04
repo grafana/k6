@@ -342,6 +342,10 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			ml := mapLocator(vu, p.Locator(selector, parseLocatorOptions(rt, opts)))
 			return rt.ToValue(ml).ToObject(rt)
 		},
+		"frameLocator": func(selector string) *sobek.Object {
+			mfl := mapFrameLocator(vu, p.FrameLocator(selector))
+			return rt.ToValue(mfl).ToObject(rt)
+		},
 		"mainFrame": func() *sobek.Object {
 			mf := mapFrame(vu, p.MainFrame())
 			return rt.ToValue(mf).ToObject(rt)
@@ -369,6 +373,38 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}
 			return promise(vu, func() (any, error) {
 				resp, err := p.Reload(popts)
+				if err != nil {
+					return nil, err //nolint:wrapcheck
+				}
+				if resp == nil {
+					return nil, nil //nolint:nilnil
+				}
+				return mapResponse(vu, resp), nil
+			}), nil
+		},
+		"goBack": func(opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewPageGoBackForwardOptions(common.LifecycleEventLoad, p.NavigationTimeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing page go back options: %w", err)
+			}
+			return promise(vu, func() (any, error) {
+				resp, err := p.GoBackForward(-1, popts)
+				if err != nil {
+					return nil, err //nolint:wrapcheck
+				}
+				if resp == nil {
+					return nil, nil //nolint:nilnil
+				}
+				return mapResponse(vu, resp), nil
+			}), nil
+		},
+		"goForward": func(opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewPageGoBackForwardOptions(common.LifecycleEventLoad, p.NavigationTimeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing page go forward options: %w", err)
+			}
+			return promise(vu, func() (any, error) {
+				resp, err := p.GoBackForward(+1, popts)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
 				}
@@ -645,6 +681,10 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 					return mapRequestEvent(vu, pe), nil
 				case common.PageEventResponse:
 					return mapResponseEvent(vu, pe), nil
+				case common.PageEventRequestFinished:
+					return mapRequestEvent(vu, pe), nil
+				case common.PageEventRequestFailed:
+					return mapRequestEvent(vu, pe), nil
 				case common.PageEventMetric:
 					// intentionally left blank
 				}
@@ -738,10 +778,12 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageEventName, sobek.Cal
 			mapp func(vu moduleVU, event common.PageEvent) mapping
 			wait bool // Whether to wait for the handler to complete.
 		}{
-			common.PageEventConsole:  {mapp: mapConsoleMessage},
-			common.PageEventMetric:   {mapp: mapMetricEvent, wait: true},
-			common.PageEventRequest:  {mapp: mapRequestEvent},
-			common.PageEventResponse: {mapp: mapResponseEvent},
+			common.PageEventConsole:         {mapp: mapConsoleMessage},
+			common.PageEventMetric:          {mapp: mapMetricEvent, wait: true},
+			common.PageEventRequest:         {mapp: mapRequestEvent},
+			common.PageEventResponse:        {mapp: mapResponseEvent},
+			common.PageEventRequestFinished: {mapp: mapRequestEvent},
+			common.PageEventRequestFailed:   {mapp: mapRequestEvent},
 		}
 		pageEvent, ok := pageEvents[eventName]
 		if !ok {

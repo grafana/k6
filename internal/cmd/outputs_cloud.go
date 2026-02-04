@@ -32,7 +32,7 @@ const (
 // and to populate the Cloud configuration back in case the Cloud API returned some overrides,
 // as expected by the Cloud output.
 //
-//nolint:funlen
+//nolint:funlen,gocognit,cyclop
 func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error {
 	// Otherwise, we continue normally with the creation of the test run in the k6 Cloud backend services.
 	conf, warn, err := cloudapi.GetConsolidatedConfig(
@@ -52,6 +52,16 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 
 	if conf.Token.String == "" {
 		return errUserUnauthenticated
+	}
+
+	if !conf.StackID.Valid || conf.StackID.Int64 == 0 {
+		fallBackMsg := ""
+		if !conf.ProjectID.Valid || conf.ProjectID.Int64 == 0 {
+			fallBackMsg = "Falling back to the first available stack. "
+		}
+		gs.Logger.Warn("DEPRECATED: No stack specified. " + fallBackMsg +
+			"Consider setting a default stack via the `k6 cloud login` command or the `K6_CLOUD_STACK_ID` " +
+			"environment variable as this will become mandatory in the next major release.")
 	}
 
 	// If not, we continue with some validations and the creation of the test run.
@@ -121,6 +131,19 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 
 	apiClient := cloudapi.NewClient(
 		logger, conf.Token.String, conf.Host.String, build.Version, conf.Timeout.TimeDuration())
+	if conf.StackID.Valid {
+		apiClient.SetStackID(conf.StackID.Int64)
+	}
+
+	if testRun.ProjectID == 0 {
+		projectID, err := resolveDefaultProjectID(gs, &conf)
+		if err != nil {
+			return err
+		}
+		if projectID > 0 {
+			testRun.ProjectID = projectID
+		}
+	}
 
 	response, err := apiClient.CreateTestRun(testRun)
 	if err != nil {

@@ -335,6 +335,8 @@ type pageAPI interface { //nolint:interfacebloat
 	GetMouse() *common.Mouse
 	GetTouchscreen() *common.Touchscreen
 	Goto(url string, opts sobek.Value) (*common.Response, error)
+	GoBack(opts sobek.Value) (*common.Response, error)
+	GoForward(opts sobek.Value) (*common.Response, error)
 	Hover(selector string, opts sobek.Value) error
 	InnerHTML(selector string, opts sobek.Value) (string, error)
 	InnerText(selector string, opts sobek.Value) (string, error)
@@ -347,6 +349,7 @@ type pageAPI interface { //nolint:interfacebloat
 	IsHidden(selector string, opts sobek.Value) (bool, error)
 	IsVisible(selector string, opts sobek.Value) (bool, error)
 	Locator(selector string, opts sobek.Value) *common.Locator
+	FrameLocator(selector string) *common.FrameLocator
 	MainFrame() *common.Frame
 	On(event common.PageEventName, handler func(common.PageEvent) error) error
 	Opener() pageAPI
@@ -381,7 +384,7 @@ type pageAPI interface { //nolint:interfacebloat
 	WaitForSelector(selector string, opts sobek.Value) (*common.ElementHandle, error)
 	WaitForTimeout(timeout int64)
 	WaitForURL(url string, opts sobek.Value) (*sobek.Promise, error)
-	WaitForEvent(event string, opts sobek.Value) (*sobek.Promise, error)
+	WaitForEvent(event common.PageEventName, opts sobek.Value) (*sobek.Promise, error)
 	WaitForResponse(url string, opts sobek.Value) (*sobek.Promise, error)
 	WaitForRequest(url string, opts sobek.Value) (*sobek.Promise, error)
 	Workers() []*common.Worker
@@ -438,6 +441,7 @@ type frameAPI interface { //nolint:interfacebloat
 	ID() string
 	LoaderID() string
 	Locator(selector string, opts sobek.Value) *common.Locator
+	FrameLocator(selector string) *common.FrameLocator
 	Name() string
 	Query(selector string) (*common.ElementHandle, error)
 	QueryAll(selector string) ([]*common.ElementHandle, error)
@@ -512,11 +516,13 @@ type frameLocatorAPI interface {
 	GetByText(text string, opts *common.GetByBaseOptions) *common.Locator
 	GetByTitle(title string, opts *common.GetByBaseOptions) *common.Locator
 	Locator(selector string) *common.Locator
+	FrameLocator(selector string) *common.FrameLocator
 }
 
 // requestAPI is the interface of an HTTP request.
 type requestAPI interface { //nolint:interfacebloat
 	AllHeaders() map[string]string
+	Failure() *common.RequestFailure
 	Frame() *common.Frame
 	HeaderValue(string) sobek.Value
 	Headers() map[string]string
@@ -590,6 +596,7 @@ type locatorAPI interface { //nolint:interfacebloat
 	TextContent(opts sobek.Value) (string, bool, error)
 	InputValue(opts sobek.Value) (string, error)
 	Locator(selector string) *common.Locator
+	FrameLocator(selector string) *common.FrameLocator
 	Last() *common.Locator
 	Nth(nth int) *common.Locator
 	SelectOption(values sobek.Value, opts sobek.Value) ([]string, error)

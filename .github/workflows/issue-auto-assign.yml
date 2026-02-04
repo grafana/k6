@@ -21,10 +21,11 @@ jobs:
         with:
           script: |
             const assignees = ['ankur22', 'codebien', 'inancgumus', 'joanlopez', 'mstoykov', 'oleiade', 'AgnesToulet'];
+            const teamMembers = assignees.concat(['andrewslotin']);
             const assigneeCount = 1;
 
-            // Do not automatically assign users if someone was already assigned or it was opened by a maintainer
-            if (context.payload.issue.assignees.length > 0 || assignees.includes(context.actor)) {
+            // Do not automatically assign users if someone was already assigned or it was opened by a team member
+            if (context.payload.issue.assignees.length > 0 || teamMembers.includes(context.actor)) {
               return;
             }
             const crypto = require("node:crypto");

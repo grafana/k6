@@ -92,7 +92,8 @@ func (d *Data) sharedArray(call sobek.ConstructorCall) *sobek.Object {
 		common.Throw(rt, errors.New("a function is expected as the second argument of SharedArray's constructor"))
 	}
 
-	array := d.shared.get(rt, name, fn)
+	builder := func() sharedArray { return getSharedArrayFromCall(rt, fn) }
+	array := d.shared.loadOrStore(name, builder)
 	return array.wrap(rt).ToObject(rt)
 }
 
@@ -104,69 +105,84 @@ type RecordReader interface {
 	Read() (any, error)
 }
 
-// NewSharedArrayFrom creates a new shared array from the provided data.
+// NewSharedArrayFrom creates a new shared array from the provided [RecordReader].
 //
 // This function is not exposed to the JS runtime. It is used internally to instantiate
 // shared arrays without having to go through the whole JS runtime machinery, which effectively has
 // a big performance impact (e.g. when filling a shared array from a CSV file).
 //
-// This function takes an explicit runtime argument to retain control over which VU runtime it is
-// executed in. This is important because the shared array underlying implementation relies on maintaining
-// a single instance of arrays for the whole test setup and VUs.
+// The rt argument is an explicit runtime parameter to retain control over which VU runtime the
+// function is executed in. This is important because the shared array underlying implementation
+// relies on maintaining a single instance of arrays for the whole test setup and VUs.
+//
+// The name argument uniquely identifies the shared array and must not be empty.
+//
+// The r argument is a [RecordReader] from which records are read and stored in the shared array.
 func (d *Data) NewSharedArrayFrom(rt *sobek.Runtime, name string, r RecordReader) *sobek.Object {
 	if name == "" {
 		common.Throw(rt, errors.New("empty name provided to SharedArray's constructor"))
 	}
 
-	var arr []string
-	for {
-		record, err := r.Read()
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if err != nil {
-			common.Throw(rt, fmt.Errorf("failed to read record; reason: %w", err))
+	// The builder function is passed to loadOrStore, which ensures it is only
+	// executed once for a given name. This guarantees the underlying data is
+	// initialized exactly once, even if multiple VUs call this function concurrently
+	// with the same name.
+	builder := func() sharedArray {
+		var arr []string
+		for {
+			record, err := r.Read()
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			if err != nil {
+				common.Throw(rt, fmt.Errorf("failed to read record; reason: %w", err))
+			}
+
+			marshaled, err := json.Marshal(record)
+			if err != nil {
+				common.Throw(rt, fmt.Errorf("failed to marshal record; reason: %w", err))
+			}
+
+			arr = append(arr, string(marshaled))
 		}
 
-		marshaled, err := json.Marshal(record)
-		if err != nil {
-			common.Throw(rt, fmt.Errorf("failed to marshal record; reason: %w", err))
-		}
-
-		arr = append(arr, string(marshaled))
+		return sharedArray{arr: arr}
 	}
 
-	return d.shared.set(name, arr).wrap(rt).ToObject(rt)
+	array := d.shared.loadOrStore(name, builder)
+	return array.wrap(rt).ToObject(rt)
 }
 
-// set is a helper method to set a shared array in the underlying shared arrays map.
-func (s *sharedArrays) set(name string, arr []string) sharedArray {
+// loadOrStore returns the shared array associated with the given name. If no array
+// exists for that name, it invokes the builder function to create one and stores it.
+//
+// This method is thread-safe. The builder function is guaranteed to be called at most
+// once for each unique name, even if multiple goroutines call loadOrStore concurrently
+// with the same name.
+func (s *sharedArrays) loadOrStore(name string, builder func() sharedArray) sharedArray {
+	// Try read-only lookup first
+	s.mu.RLock()
+	arr, ok := s.data[name]
+	s.mu.RUnlock()
+	if ok {
+		return arr
+	}
+
+	// Not found, acquire write lock
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	array := sharedArray{arr: arr}
-	s.data[name] = array
 
-	return array
-}
-
-func (s *sharedArrays) get(rt *sobek.Runtime, name string, call sobek.Callable) sharedArray {
-	s.mu.RLock()
-	array, ok := s.data[name]
-	s.mu.RUnlock()
-	if !ok {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		array, ok = s.data[name]
-		if !ok {
-			array = getShareArrayFromCall(rt, call)
-			s.data[name] = array
-		}
+	// Double-check after acquiring write lock
+	if arr, ok = s.data[name]; ok {
+		return arr
 	}
 
-	return array
+	arr = builder()
+	s.data[name] = arr
+	return arr
 }
 
-func getShareArrayFromCall(rt *sobek.Runtime, call sobek.Callable) sharedArray {
+func getSharedArrayFromCall(rt *sobek.Runtime, call sobek.Callable) sharedArray {
 	sobekValue, err := call(sobek.Undefined())
 	if err != nil {
 		common.Throw(rt, err)

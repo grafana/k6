@@ -1,14 +1,5 @@
 package common
 
-import (
-	"context"
-
-	"github.com/grafana/sobek"
-
-	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
-	"go.k6.io/k6/js/common"
-)
-
 type MouseClickOptions struct {
 	Button     string `json:"button"`
 	ClickCount int64  `json:"clickCount"`
@@ -37,25 +28,6 @@ func NewMouseClickOptions() *MouseClickOptions {
 	}
 }
 
-// Parse parses the mouse click options.
-func (o *MouseClickOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	rt := k6ext.Runtime(ctx)
-	if !common.IsNullish(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			switch k {
-			case "button":
-				o.Button = opts.Get(k).String()
-			case "clickCount":
-				o.ClickCount = opts.Get(k).ToInteger()
-			case "delay":
-				o.Delay = opts.Get(k).ToInteger()
-			}
-		}
-	}
-	return nil
-}
-
 func (o *MouseClickOptions) ToMouseDownUpOptions() *MouseDownUpOptions {
 	o2 := NewMouseDownUpOptions()
 	o2.Button = o.Button
@@ -68,23 +40,6 @@ func NewMouseDblClickOptions() *MouseDblClickOptions {
 		Button: "left",
 		Delay:  0,
 	}
-}
-
-// Parse parses the mouse double click options.
-func (o *MouseDblClickOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	rt := k6ext.Runtime(ctx)
-	if !common.IsNullish(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			switch k {
-			case "button":
-				o.Button = opts.Get(k).String()
-			case "delay":
-				o.Delay = opts.Get(k).ToInteger()
-			}
-		}
-	}
-	return nil
 }
 
 // ToMouseClickOptions converts MouseDblClickOptions to a MouseClickOptions.
@@ -103,39 +58,8 @@ func NewMouseDownUpOptions() *MouseDownUpOptions {
 	}
 }
 
-// Parse parses the mouse down/up options.
-func (o *MouseDownUpOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	rt := k6ext.Runtime(ctx)
-	if !common.IsNullish(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			switch k {
-			case "button":
-				o.Button = opts.Get(k).String()
-			case "clickCount":
-				o.ClickCount = opts.Get(k).ToInteger()
-			}
-		}
-	}
-	return nil
-}
-
 func NewMouseMoveOptions() *MouseMoveOptions {
 	return &MouseMoveOptions{
 		Steps: 1,
 	}
-}
-
-// Parse parses the mouse move options.
-func (o *MouseMoveOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	rt := k6ext.Runtime(ctx)
-	if !common.IsNullish(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			if k == "steps" {
-				o.Steps = opts.Get(k).ToInteger()
-			}
-		}
-	}
-	return nil
 }

@@ -297,24 +297,25 @@ func (cfg Config) validateExporterProtocol() error {
 // String returns a string representation of the config
 func (cfg Config) String() string {
 	var endpoint string
-	exporter := cfg.ExporterType.String
-
-	if cfg.ExporterType.String == httpExporterType {
+	protocol := mergeExporterTypeAndProtocol(cfg)
+	switch protocol {
+	case httpExporterProtocol:
 		endpoint = "http"
 		if !cfg.HTTPExporterInsecure.Bool {
 			endpoint += "s"
 		}
-
 		endpoint += "://" + cfg.HTTPExporterEndpoint.String + cfg.HTTPExporterURLPath.String
-	} else {
+	case grpcExporterProtocol:
 		endpoint = cfg.GRPCExporterEndpoint.String
-
 		if cfg.GRPCExporterInsecure.Bool {
-			exporter += " (insecure)"
+			protocol += " (insecure)"
 		}
+	default:
+		// This should never happen after validation
+		panic("unsupported OpenTelemetry exporter protocol: " + protocol)
 	}
 
-	return fmt.Sprintf("%s, %s", exporter, endpoint)
+	return fmt.Sprintf("%s, %s", protocol, endpoint)
 }
 
 // parseJSON parses the supplied JSON into a Config.

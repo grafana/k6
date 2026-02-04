@@ -17,7 +17,7 @@ import (
 	"github.com/grafana/sobek"
 	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
 
-	"go.k6.io/k6/internal/js/modules/k6/experimental/websockets/events"
+	"go.k6.io/k6/internal/js/modules/k6/websockets/events"
 
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"

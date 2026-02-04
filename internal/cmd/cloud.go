@@ -19,6 +19,7 @@ import (
 	"go.k6.io/k6/internal/build"
 	"go.k6.io/k6/internal/ui/pb"
 	"go.k6.io/k6/lib"
+	"gopkg.in/guregu/null.v3"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -170,8 +171,17 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Validating script options"))
 	client := cloudapi.NewClient(
 		logger, cloudConfig.Token.String, cloudConfig.Host.String, build.Version, cloudConfig.Timeout.TimeDuration())
+	if cloudConfig.StackID.Valid {
+		client.SetStackID(cloudConfig.StackID.Int64)
+	}
 	if err = client.ValidateOptions(arc.Options); err != nil {
 		return err
+	}
+
+	if cloudConfig.ProjectID.Int64 == 0 {
+		if err := resolveAndSetProjectID(c.gs, &cloudConfig, tmpCloudConfig, arc); err != nil {
+			return err
+		}
 	}
 
 	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Uploading archive"))
@@ -405,6 +415,67 @@ service. Be sure to run the "k6 cloud login" command prior to authenticate with 
 	cloudCmd.Flags().AddFlagSet(c.flagSet())
 
 	return cloudCmd
+}
+
+func resolveDefaultProjectID(
+	gs *state.GlobalState,
+	cloudConfig *cloudapi.Config,
+) (int64, error) {
+	// Priority: projectID -> default stack from config
+	if cloudConfig.ProjectID.Valid && cloudConfig.ProjectID.Int64 > 0 {
+		return cloudConfig.ProjectID.Int64, nil
+	}
+	if cloudConfig.StackID.Valid && cloudConfig.StackID.Int64 != 0 {
+		if cloudConfig.DefaultProjectID.Valid && cloudConfig.DefaultProjectID.Int64 > 0 {
+			stackName := cloudConfig.StackURL.String
+			if !cloudConfig.StackURL.Valid {
+				stackName = fmt.Sprintf("stack-%d", cloudConfig.StackID.Int64)
+			}
+			gs.Logger.Warnf("No projectID specified, using default project of the %s stack\n", stackName)
+			return cloudConfig.DefaultProjectID.Int64, nil
+		}
+		return 0, fmt.Errorf(
+			"default stack configured but the default project ID is not available - " +
+				"please run `k6 cloud login` to refresh your configuration")
+	}
+
+	// Return 0 to let the backend pick the project (old behavior)
+	return 0, nil
+}
+
+func resolveAndSetProjectID(
+	gs *state.GlobalState,
+	cloudConfig *cloudapi.Config,
+	tmpCloudConfig map[string]interface{},
+	arc *lib.Archive,
+) error {
+	projectID, err := resolveDefaultProjectID(gs, cloudConfig)
+	if err != nil {
+		return err
+	}
+	if projectID > 0 {
+		tmpCloudConfig["projectID"] = projectID
+
+		b, err := json.Marshal(tmpCloudConfig)
+		if err != nil {
+			return err
+		}
+
+		arc.Options.Cloud = b
+		arc.Options.External[cloudapi.LegacyCloudConfigKey] = b
+
+		cloudConfig.ProjectID = null.IntFrom(projectID)
+	}
+	if !cloudConfig.StackID.Valid || cloudConfig.StackID.Int64 == 0 {
+		fallBackMsg := ""
+		if !cloudConfig.ProjectID.Valid || cloudConfig.ProjectID.Int64 == 0 {
+			fallBackMsg = "Falling back to the first available stack. "
+		}
+		gs.Logger.Warn("DEPRECATED: No stack specified. " + fallBackMsg +
+			"Consider setting a default stack via the `k6 cloud login` command or the `K6_CLOUD_STACK_ID` " +
+			"environment variable as this will become mandatory in the next major release.")
+	}
+	return nil
 }
 
 func exactCloudArgs() cobra.PositionalArgs {

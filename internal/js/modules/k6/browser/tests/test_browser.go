@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/grafana/sobek"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
@@ -329,6 +330,25 @@ func (b *testBrowser) GotoPage(p *common.Page, url string) {
 	require.NoError(b.t, err)
 }
 
+// GotoPageAndAssertURL navigates to a URL and asserts that the page URL matches.
+func (b *testBrowser) GotoPageAndAssertURL(p *common.Page, url string) {
+	b.t.Helper()
+
+	b.GotoPage(p, url)
+	currentURL, err := p.URL()
+	require.NoError(b.t, err)
+	require.Equal(b.t, url, currentURL)
+}
+
+// AssertURL asserts that the current page URL matches the expected URL.
+func (b *testBrowser) AssertURL(p *common.Page, expectedURL string, msgAndArgs ...any) {
+	b.t.Helper()
+
+	currentURL, err := p.URL()
+	require.NoError(b.t, err)
+	assert.Equal(b.t, expectedURL, currentURL, msgAndArgs...)
+}
+
 // NewPage is a wrapper around Browser.NewPage that fails the test if an
 // error occurs. Added this helper to avoid boilerplate code in tests.
 func (b *testBrowser) NewPage(opts *common.BrowserContextOptions) *common.Page {
@@ -391,7 +411,7 @@ func (b *testBrowser) run(ctx context.Context, fs ...func() error) error {
 			case err := <-errc:
 				return err
 			case <-ctx.Done():
-				if err := ctx.Err(); err != nil {
+				if err := common.ContextErr(ctx); err != nil {
 					return fmt.Errorf("while running %T: %w", f, err)
 				}
 			}
