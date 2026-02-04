@@ -39,6 +39,44 @@ func getDocsURL() string {
 	return "https://grafana.com/docs/k6/latest/"
 }
 
+func getRootUsageTemplate() string {
+	return fmt.Sprintf(`{{.Short}}
+
+Usage:{{if .Runnable}}
+  {{.UseLine}}{{end}}{{if .HasAvailableSubCommands}}
+  {{.CommandPath}} [command]{{end}}{{if .HasAvailableSubCommands}}
+
+Core Commands:{{range .Commands}}{{if eq .Name "new"}}
+  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{range .Commands}}{{if eq .Name "run"}}
+  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{range .Commands}}{{if eq .Name "cloud"}}
+  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}
+
+Additional Commands:{{range .Commands}}{{if and .IsAvailableCommand (ne .Name "new") (ne .Name "run") `+
+		`(ne .Name "cloud") (ne .Name "help") (ne .Name "version")}}
+  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}
+
+Flags:
+  -h, --help      Show help
+      --version   Show version information
+
+Examples:
+  # Create a test
+  $ {{.CommandPath}} new test.js
+
+  # Run a test
+  $ {{.CommandPath}} run test.js
+
+  # Run a test in Grafana Cloud
+  $ {{.CommandPath}} cloud run test.js
+
+  # Run locally, stream results to Grafana Cloud
+  $ {{.CommandPath}} cloud run --local-execution test.js
+{{if .HasAvailableSubCommands}}
+Use "{{.CommandPath}} [command] --help" for more information about a command.
+Full CLI documentation: %s{{end}}
+`, getDocsURL())
+}
+
 // ExecuteWithGlobalState runs the root command with an existing GlobalState.
 // It adds all child commands to the root command and it sets flags appropriately.
 // It is called by main.main(). It only needs to happen once to the rootCmd.
@@ -104,41 +142,7 @@ func newRootCommand(gs *state.GlobalState) *rootCommand {
 		rootCmd.AddCommand(xCmd)
 	}
 
-	rootCmd.SetUsageTemplate(fmt.Sprintf(`{{.Short}}
-
-Usage:{{if .Runnable}}
-  {{.UseLine}}{{end}}{{if .HasAvailableSubCommands}}
-  {{.CommandPath}} [command]{{end}}{{if .HasAvailableSubCommands}}
-
-Core Commands:{{range .Commands}}{{if eq .Name "new"}}
-  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{range .Commands}}{{if eq .Name "run"}}
-  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{range .Commands}}{{if eq .Name "cloud"}}
-  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}
-
-Additional Commands:{{range .Commands}}{{if and .IsAvailableCommand (ne .Name "new") (ne .Name "run") `+
-		`(ne .Name "cloud") (ne .Name "help") (ne .Name "version")}}
-  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}
-
-Flags:
-  -h, --help      Show help
-      --version   Show version information
-
-Examples:
-  # Create a test
-  $ {{.CommandPath}} new test.js
-
-  # Run a test
-  $ {{.CommandPath}} run test.js
-
-  # Run a test in Grafana Cloud
-  $ {{.CommandPath}} cloud run test.js
-
-  # Run locally, stream results to Grafana Cloud
-  $ {{.CommandPath}} cloud run --local-execution test.js
-{{if .HasAvailableSubCommands}}
-Use "{{.CommandPath}} [command] --help" for more information about a command.
-Full CLI documentation: %s{{end}}
-`, getDocsURL()))
+	rootCmd.SetUsageTemplate(getRootUsageTemplate())
 
 	c.cmd = rootCmd
 	return c
