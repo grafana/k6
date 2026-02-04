@@ -373,12 +373,27 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 		uploadOnly:    false,
 	}
 
-	cloudCmd := &cobra.Command{
-		Use:   "cloud",
-		Short: "Run and manage Grafana Cloud tests",
-		Long: `Run and manage tests in Grafana Cloud.
+	exampleText := getExampleText(gs, `
+  # [deprecated] Run a test script in Grafana Cloud
+  $ {{.}} cloud script.js
 
-Note: Running tests directly with "k6 cloud script.js" is deprecated. Use "k6 cloud run script.js" instead.`,
+  # [deprecated] Run a test archive in Grafana Cloud
+  $ {{.}} cloud archive.tar
+
+  # Authenticate with Grafana Cloud
+  $ {{.}} cloud login
+
+  # Run a test script in Grafana Cloud
+  $ {{.}} cloud run script.js
+
+  # Run a test archive in Grafana Cloud
+  $ {{.}} cloud run archive.tar`[1:])
+
+	cloudCmd := &cobra.Command{
+		Use:     "cloud",
+		Short:   "Run and manage Grafana Cloud tests",
+		Long:    "Run and manage tests in Grafana Cloud.",
+		Example: exampleText,
 		PreRunE: c.preRun,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// If no args provided, show help
@@ -418,7 +433,10 @@ Commands:{{range .Commands}}{{if (or (eq .Name "login") (eq .Name "run"))}}
 
 Flags:
   -h, --help   Show help
-
+{{if .HasExample}}
+Examples:
+{{.Example}}
+{{end}}
 Use "{{.CommandPath}} [command] --help" for more information about a command.
 `)
 
