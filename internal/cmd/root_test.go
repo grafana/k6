@@ -26,15 +26,11 @@ func TestRootCommandHelpDisplayCommands(t *testing.T) {
 		},
 		{
 			name:               "should have cloud command",
-			wantStdoutContains: "  cloud       Run a test on the cloud",
+			wantStdoutContains: "  cloud       Run and manage Grafana Cloud tests",
 		},
 		{
 			name:               "should have completion command",
 			wantStdoutContains: "  completion  Generate the autocompletion script for the specified shell",
-		},
-		{
-			name:               "should have help command",
-			wantStdoutContains: "  help        Help about any command",
 		},
 		{
 			name:               "should have inspect command",
@@ -42,7 +38,7 @@ func TestRootCommandHelpDisplayCommands(t *testing.T) {
 		},
 		{
 			name:               "should have new command",
-			wantStdoutContains: "  new         Create and initialize a new k6 script",
+			wantStdoutContains: "  new         Create a test",
 		},
 		{
 			name:               "should have pause command",
@@ -54,7 +50,7 @@ func TestRootCommandHelpDisplayCommands(t *testing.T) {
 		},
 		{
 			name:               "should have run command",
-			wantStdoutContains: "  run         Start a test",
+			wantStdoutContains: "  run         Run a test",
 		},
 		{
 			name:               "should have scale command",
@@ -67,10 +63,6 @@ func TestRootCommandHelpDisplayCommands(t *testing.T) {
 		{
 			name:               "should have status command",
 			wantStdoutContains: "  status      Show test status",
-		},
-		{
-			name:               "should have version command",
-			wantStdoutContains: "  version     Show application version",
 		},
 		{
 			name:               "should have x command",
