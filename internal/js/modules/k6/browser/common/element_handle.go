@@ -216,7 +216,7 @@ func (h *ElementHandle) click(p *Position, opts *MouseClickOptions) error {
 func (h *ElementHandle) clickablePoint() (*Position, error) {
 	r, err := h.BoundingBox()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("finding clickable point: %w", err)
 	}
 	return &Position{X: r.X + r.Width/2, Y: r.Y + r.Height/2}, nil
 }
