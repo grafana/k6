@@ -409,7 +409,7 @@ func (h *ElementHandle) offsetPosition(apiCtx context.Context, offset *Position)
 
 	box, err := h.BoundingBox()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("finding offset position: %w", err)
 	}
 
 	if box == nil || (border.Left == 0 && border.Top == 0) {
