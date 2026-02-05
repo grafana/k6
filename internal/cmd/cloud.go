@@ -86,6 +86,21 @@ func (c *cmdCloud) preRun(cmd *cobra.Command, _ []string) error {
 //
 //nolint:funlen,gocognit,cyclop
 func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
+	// If no args provided and called from main cloud command, show helpful error
+	if cmd.Name() == "cloud" && len(args) == 0 {
+		//nolint:staticcheck
+		return errors.New("the \"k6 cloud\" command expects either a subcommand such as \"run\" or \"login\", " +
+			"or a single argument consisting in a path to a script/archive, or the `-` symbol instructing " +
+			"the command to read the test content from stdin; received no arguments")
+	}
+
+	// Show deprecation warning only when running tests directly via "k6 cloud <file>"
+	// (not when using subcommands like "k6 cloud run")
+	if cmd.Name() == "cloud" && len(args) > 0 {
+		c.gs.Logger.Warn("Running tests directly with \"k6 cloud <file>\" is deprecated. " +
+			"Use \"k6 cloud run <file>\" instead. This behavior will be removed in a future release.")
+	}
+
 	test, err := loadAndConfigureLocalTest(c.gs, cmd, args, getPartialConfig)
 	if err != nil {
 		return err
@@ -395,13 +410,7 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 		Long:    "Run and manage tests in Grafana Cloud.",
 		Example: exampleText,
 		PreRunE: c.preRun,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			// If no args provided, show help
-			if len(args) == 0 {
-				return cmd.Help()
-			}
-			return c.run(cmd, args)
-		},
+		RunE:    c.run,
 	}
 
 	// Register `k6 cloud` subcommands with default usage template
