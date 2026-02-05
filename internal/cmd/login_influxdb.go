@@ -25,10 +25,6 @@ func getCmdLoginInfluxDB(gs *state.GlobalState) *cobra.Command {
 This will set the default server used when just "-o influxdb" is passed.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			if err := migrateLegacyConfigFileIfAny(gs); err != nil {
-				return err
-			}
-
 			config, err := readDiskConfig(gs)
 			if err != nil {
 				return err

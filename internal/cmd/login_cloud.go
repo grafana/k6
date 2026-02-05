@@ -42,10 +42,6 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 Please use the "k6 cloud login" command instead.
 `,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := migrateLegacyConfigFileIfAny(gs); err != nil {
-				return err
-			}
-
 			currentDiskConf, err := readDiskConfig(gs)
 			if err != nil {
 				return err
