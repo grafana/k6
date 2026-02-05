@@ -51,7 +51,8 @@ Core Commands:{{range .Commands}}{{if eq .Name "new"}}
   {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{range .Commands}}{{if eq .Name "cloud"}}
   {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}
 
-Additional Commands:{{range .Commands}}{{if and .IsAvailableCommand (ne .Name "new") (ne .Name "run") (ne .Name "cloud") (ne .Name "help")}}
+Additional Commands:{{range .Commands}}{{if and .IsAvailableCommand (ne .Name "new") (ne .Name "run") `+
+		`(ne .Name "cloud") (ne .Name "help")}}
   {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}
 
 Flags:
