@@ -1686,7 +1686,7 @@ func (h *ElementHandle) newPointerAction(
 		} else {
 			p, err = h.clickablePoint()
 			if err != nil {
-				return nil, fmt.Errorf("getting clickable point: %w", err)
+				return nil, fmt.Errorf("pointer action: %w", err)
 			}
 		}
 
