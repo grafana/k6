@@ -88,7 +88,6 @@ func (c *cmdCloud) preRun(cmd *cobra.Command, _ []string) error {
 func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	// If no args provided and called from main cloud command, show helpful error
 	if cmd.Name() == "cloud" && len(args) == 0 {
-		//nolint:staticcheck
 		return errors.New("the \"k6 cloud\" command expects either a subcommand such as \"run\" or \"login\", " +
 			"or a single argument consisting in a path to a script/archive, or the `-` symbol instructing " +
 			"the command to read the test content from stdin; received no arguments")
