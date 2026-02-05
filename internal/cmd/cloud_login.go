@@ -68,13 +68,6 @@ func getCmdCloudLogin(gs *state.GlobalState) *cobra.Command {
 //
 //nolint:funlen
 func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
-	if !checkIfMigrationCompleted(c.globalState) {
-		err := migrateLegacyConfigFileIfAny(c.globalState)
-		if err != nil {
-			return err
-		}
-	}
-
 	currentDiskConf, err := readDiskConfig(c.globalState)
 	if err != nil {
 		return err
