@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -81,6 +82,8 @@ type GlobalState struct {
 	SecretsManager *secretsource.Manager
 	Usage          *usage.Usage
 	TestStatus     *lib.TestStatus
+	// ServerListener is used mainly for testing purposes (See https://github.com/grafana/k6/issues/3846)
+	ServerListener net.Listener
 }
 
 // NewGlobalState returns a new GlobalState with the given ctx.
