@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
+	k6event "go.k6.io/k6/internal/event"
 	"go.k6.io/k6/internal/js/modules/k6/browser/browser"
 	"go.k6.io/k6/internal/js/modules/k6/browser/chromium"
 	"go.k6.io/k6/internal/js/modules/k6/browser/common"
@@ -91,6 +92,17 @@ func newTestBrowser(tb testing.TB, opts ...func(*testBrowser)) *testBrowser {
 	tbr.pid = pid
 	tbr.wsURL = b.WsURL()
 	tb.Cleanup(func() {
+		// Send Exit event to trigger browser registry cleanup.
+		// This ensures the registry's event handler goroutines are properly stopped.
+		if globalSys, ok := tbr.vu.Events().Global.(*k6event.System); ok {
+			waitDone := globalSys.Emit(&k6event.Event{
+				Type: k6event.Exit,
+				Data: nil,
+			})
+			// Wait for the event to be processed
+			_ = waitDone(context.Background())
+		}
+
 		if !tbr.skipClose {
 			b.Close()
 		}
