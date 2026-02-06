@@ -391,7 +391,7 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 
 	cloudCmd := &cobra.Command{
 		Use:   "cloud",
-		Short: "Run a test on the cloud",
+		Short: "Run and manage Grafana Cloud tests",
 		Long: `The original behavior of the "k6 cloud" command described below is deprecated.
 In future versions, the "cloud" command will only display a help text and will no longer run tests
 in Grafana Cloud k6. To continue running tests in the cloud, please transition to using the "k6 cloud run" command.

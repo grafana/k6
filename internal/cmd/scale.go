@@ -13,8 +13,9 @@ import (
 func getCmdScale(gs *state.GlobalState) *cobra.Command {
 	// scaleCmd represents the scale command
 	scaleCmd := &cobra.Command{
-		Use:   "scale",
-		Short: "Scale a running test",
+		Use:    "scale",
+		Short:  "Scale a running test",
+		Hidden: true,
 		Long: `Scale a running test.
 
   Use the global --address flag to specify the URL to the API server.`,

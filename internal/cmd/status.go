@@ -10,8 +10,9 @@ import (
 func getCmdStatus(gs *state.GlobalState) *cobra.Command {
 	// statusCmd represents the status command
 	statusCmd := &cobra.Command{
-		Use:   "status",
-		Short: "Show test status",
+		Use:    "status",
+		Short:  "Show test status",
+		Hidden: true,
 		Long: `Show test status.
 
   Use the global --address flag to specify the URL to the API server.`,
