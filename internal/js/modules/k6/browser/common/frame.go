@@ -385,7 +385,7 @@ func (f *Frame) position() (*Position, error) {
 
 	box, err := element.BoundingBox()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("finding position in frame: %w", err)
 	}
 
 	return &Position{X: box.X, Y: box.Y}, nil

@@ -216,7 +216,7 @@ func (h *ElementHandle) click(p *Position, opts *MouseClickOptions) error {
 func (h *ElementHandle) clickablePoint() (*Position, error) {
 	r, err := h.BoundingBox()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("finding clickable point: %w", err)
 	}
 	return &Position{X: r.X + r.Width/2, Y: r.Y + r.Height/2}, nil
 }
@@ -409,7 +409,7 @@ func (h *ElementHandle) offsetPosition(apiCtx context.Context, offset *Position)
 
 	box, err := h.BoundingBox()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("finding offset position: %w", err)
 	}
 
 	if box == nil || (border.Left == 0 && border.Top == 0) {
@@ -1686,7 +1686,7 @@ func (h *ElementHandle) newPointerAction(
 		} else {
 			p, err = h.clickablePoint()
 			if err != nil {
-				return nil, fmt.Errorf("getting clickable point: %w", err)
+				return nil, fmt.Errorf("pointer action: %w", err)
 			}
 		}
 
