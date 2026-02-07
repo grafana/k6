@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>RAF-Toggling Counter Button</title>
+</head>
+<body>
+  <button id="incBtn" type="button">+1</button>
+
+  <script>
+    const incBtn = document.getElementById('incBtn');
+    
+    attached = true;
+    function loop() {
+      // Flip visibility every animation frame (~60 times per second)
+      // incBtn.hidden = !incBtn.hidden;
+      if(attached) {
+        incBtn.remove();
+      } else {
+        document.body.appendChild(incBtn);
+      }
+      attached = !attached;
+      requestAnimationFrame(loop);
+    }
+
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>
