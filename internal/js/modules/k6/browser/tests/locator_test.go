@@ -1030,8 +1030,59 @@ func TestActionabilityRetry(t *testing.T) {
 
 	value := p.Locator("#value", nil)
 	text, err := value.InnerText(common.NewFrameInnerTextOptions(value.Timeout()))
+
 	require.NoError(t, err)
 	require.Equal(t, "0", text)
+}
+
+func TestNonClickRetry(t *testing.T) {
+	t.Parallel()
+
+	const detachPage = "detach_attach.html"
+	const hidePage = "hide_unhide.html"
+	cases := []struct {
+		Name      string
+		Page      string
+		Operation func(*testing.T, *common.Locator)
+	}{
+		{
+			Name: "BoundingBox_Detach",
+			Page: detachPage,
+			Operation: func(t *testing.T, lo *common.Locator) {
+				_, err := lo.BoundingBox(common.NewFrameBaseOptions(lo.Timeout()))
+
+				require.NoError(t, err)
+			},
+		},
+		{
+			Name: "BoundingBox_Hide",
+			Page: hidePage,
+			Operation: func(t *testing.T, lo *common.Locator) {
+				_, err := lo.BoundingBox(common.NewFrameBaseOptions(lo.Timeout()))
+
+				require.NoError(t, err)
+			},
+		},
+	}
+
+	for _, theCase := range cases {
+		t.Run(theCase.Name, func(t *testing.T) {
+			t.Parallel()
+
+			tb := newTestBrowser(t, withFileServer())
+			p := tb.NewPage(nil)
+			opts := &common.FrameGotoOptions{
+				Timeout: common.DefaultTimeout,
+			}
+			_, err := p.Goto(
+				tb.staticURL(theCase.Page),
+				opts,
+			)
+			require.NoError(t, err)
+
+			theCase.Operation(t, p.Locator("#incBtn", nil))
+		})
+	}
 }
 
 func TestLocatorFilter(t *testing.T) {

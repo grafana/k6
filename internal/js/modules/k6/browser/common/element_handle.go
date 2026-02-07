@@ -1611,7 +1611,7 @@ func (h *ElementHandle) newAction(
 	}
 
 	return func(apiCtx context.Context, resultCh chan any, errCh chan error) {
-		if res, err := actionFn(apiCtx); err != nil {
+		if res, err := retryNonPointerAction(apiCtx, actionFn); err != nil {
 			select {
 			case <-apiCtx.Done():
 			case errCh <- err:
@@ -1621,6 +1621,28 @@ func (h *ElementHandle) newAction(
 			case <-apiCtx.Done():
 			case resultCh <- res:
 			}
+		}
+	}
+}
+
+func retryNonPointerAction(apiCtx context.Context, fn func(apiCtx context.Context) (any, error)) (res any, err error) {
+	for {
+		res, err := fn(apiCtx)
+
+		if err == nil {
+			return res, err
+		}
+
+		if !errors.Is(err, ErrElementNotVisible) &&
+			!errors.Is(err, ErrElementNotAttachedToDOM) &&
+			!strings.Contains(err.Error(), "frame has been detached") {
+			return res, err
+		}
+
+		select {
+		case <-apiCtx.Done():
+			return nil, apiCtx.Err()
+		case <-time.After(20 * time.Millisecond):
 		}
 	}
 }
