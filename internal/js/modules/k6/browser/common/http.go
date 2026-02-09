@@ -289,12 +289,9 @@ func (r *Request) headersSize() int64 {
 }
 
 func (r *Request) addExtraHeaders(extra map[string][]string) {
-	if len(extra) == 0 {
-		return
-	}
 	r.extraHeadersMu.Lock()
+	defer r.extraHeadersMu.Unlock()
 	r.extraHeaders = extra
-	r.extraHeadersMu.Unlock()
 }
 
 func (r *Request) setErrorText(errorText string) {
@@ -746,12 +743,9 @@ func (r *Response) HeadersArray() []HTTPHeader {
 }
 
 func (r *Response) addExtraHeaders(extra map[string][]string) {
-	if len(extra) == 0 {
-		return
-	}
 	r.extraHeadersMu.Lock()
+	defer r.extraHeadersMu.Unlock()
 	r.extraHeaders = extra
-	r.extraHeadersMu.Unlock()
 }
 
 // JSON returns the response body as JSON data.
