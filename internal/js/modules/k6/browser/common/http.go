@@ -275,11 +275,18 @@ func (r *Request) setLoadedFromCache(fromMemoryCache bool) {
 
 // AllHeaders returns all the request headers.
 func (r *Request) AllHeaders() map[string]string {
-	// TODO: fix this data to include "ExtraInfo" header data
 	headers := make(map[string]string)
-	for n, v := range r.headers {
-		headers[strings.ToLower(n)] = strings.Join(v, ",")
+	r.extraHeadersMu.RLock()
+	if len(r.extraHeaders) != 0 {
+		for name, values := range r.extraHeaders {
+			headers[strings.ToLower(name)] = strings.Join(values, "\n")
+		}
+	} else {
+		for name, values := range r.headers {
+			headers[strings.ToLower(name)] = strings.Join(values, "\n")
+		}
 	}
+	r.extraHeadersMu.RUnlock()
 	return headers
 }
 
