@@ -2960,6 +2960,70 @@ func TestPageOnResponseAllHeadersExtraInfo(t *testing.T) {
 	assert.Contains(t, ev.Request.Response().AllHeaders()["set-cookie"], "test_cookie_name=test_cookie_value")
 }
 
+// TestPageOnResponseAllHeadersRedirectChain verifies that each response in a
+// redirect chain receives its own distinct extra headers from
+// responseReceivedExtraInfo, rather than merging them all together.
+func TestPageOnResponseAllHeadersRedirectChain(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withHTTPServer())
+
+	// Set up a 3-step redirect chain, each response has a distinct X-Step header.
+	tb.withHandler("/redir-start", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Step", "1")
+		http.Redirect(w, r, tb.url("/redir-mid"), http.StatusFound)
+	})
+	tb.withHandler("/redir-mid", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Step", "2")
+		http.Redirect(w, r, tb.url("/redir-end"), http.StatusFound)
+	})
+	tb.withHandler("/redir-end", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Step", "3")
+		w.Header().Set("Content-Type", "text/html")
+		_, err := fmt.Fprint(w, "<html><body>done</body></html>")
+		require.NoError(t, err)
+	})
+
+	p := tb.NewPage(nil)
+
+	opts := &common.FrameGotoOptions{
+		WaitUntil: common.LifecycleEventNetworkIdle,
+		Timeout:   common.DefaultTimeout,
+	}
+	gotoPage := func() error {
+		_, err := p.Goto(tb.url("/redir-start"), opts)
+		return err
+	}
+
+	// Wait for the final request to finish so we are guaranteed to
+	// have extra headers available on all responses in the chain.
+	var ev common.PageEvent
+	waitForRequestFinished := func() error {
+		var err error
+		ev, err = p.WaitForEvent(
+			common.PageEventRequestFinished,
+			&common.PageWaitForEventOptions{Timeout: p.Timeout()},
+			func(pe common.PageEvent) (bool, error) {
+				return strings.Contains(pe.Request.URL(), "/redir-end"), nil
+			},
+		)
+		return err
+	}
+
+	err := tb.run(tb.context(), gotoPage, waitForRequestFinished)
+	require.NoError(t, err)
+	require.NotNil(t, ev.Request)
+
+	finalResp := ev.Request.Response()
+	require.NotNil(t, finalResp)
+
+	// Verify the final (200) response has only its own X-Step header,
+	// not a merged set of values from all redirects.
+	finalHeaders := finalResp.AllHeaders()
+	assert.Equal(t, "3", finalHeaders["x-step"],
+		"final response should have x-step=3, not merged values from earlier redirects")
+}
+
 // TestPageOnRequestFinished tests that the requestfinished event fires when requests complete successfully.
 func TestPageOnRequestFinished(t *testing.T) {
 	t.Parallel()
