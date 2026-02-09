@@ -239,9 +239,21 @@ func (r *Request) headersSize() int64 {
 	size += len(r.method)
 	size += len(r.url.Path)
 	size += 8 // httpVersion
-	for n, v := range r.headers {
-		size += len(n) + len(strings.Join(v, "")) + 4 // 4 = ': ' + '\r\n'
+	r.extraHeadersMu.RLock()
+	if len(r.extraHeaders) != 0 {
+		for name, values := range r.extraHeaders {
+			for _, value := range values {
+				size += len(name) + len(value) + 4 // 4 = ': ' + '\r\n'
+			}
+		}
+	} else {
+		for name, values := range r.headers {
+			for _, value := range values {
+				size += len(name) + len(value) + 4 // 4 = ': ' + '\r\n'
+			}
+		}
 	}
+	r.extraHeadersMu.RUnlock()
 	return int64(size)
 }
 
