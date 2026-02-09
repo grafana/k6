@@ -2925,6 +2925,82 @@ func TestPageOnRequestFinished(t *testing.T) {
 	assert.True(t, foundCSS, "expected to find /style.css request in finished requests")
 }
 
+// TestPageOnRequestFinishedRedirect tests that the requestfinished event fires
+// for each request in a redirect chain, not just the final one.
+func TestPageOnRequestFinishedRedirect(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withHTTPServer())
+	tb.withHandler("/redir-a", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, tb.url("/redir-b"), http.StatusFound)
+	})
+	tb.withHandler("/redir-b", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, tb.url("/redir-final"), http.StatusFound)
+	})
+	tb.withHandler("/redir-final", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, err := fmt.Fprint(w, "<html><body>done</body></html>")
+		require.NoError(t, err)
+	})
+
+	tb.vu.ActivateVU()
+	tb.vu.StartIteration(t)
+	defer tb.vu.EndIteration(t)
+
+	gv, err := tb.vu.RunAsync(t, `
+		const context = await browser.newContext();
+		const page = await context.newPage();
+
+		const expectedCount = 3; // redir-a, redir-b, redir-final
+		var finishedRequests = [];
+		let resolveAll;
+		const allFinished = new Promise(r => { resolveAll = r; });
+
+		page.on('requestfinished', (request) => {
+			const url = request.url();
+			if (url.includes('/redir-')) {
+				finishedRequests.push({ url: url });
+				if (finishedRequests.length >= expectedCount) {
+					resolveAll();
+				}
+			}
+		});
+
+		await page.goto('%s', {waitUntil: 'networkidle'});
+		await allFinished;
+		await page.close();
+		return JSON.stringify(finishedRequests, null, 2);
+	`, tb.url("/redir-a"))
+	require.NoError(t, err)
+
+	got := k6test.ToPromise(t, gv)
+	require.Equal(t, sobek.PromiseStateFulfilled, got.State())
+
+	var finishedRequests []struct {
+		URL string `json:"url"`
+	}
+	err = json.Unmarshal([]byte(got.Result().String()), &finishedRequests)
+	require.NoError(t, err)
+
+	// Verify that requestfinished fired for the redirect requests,
+	// not just the final response.
+	var foundRedirA, foundRedirB, foundFinal bool
+	for _, req := range finishedRequests {
+		switch {
+		case strings.HasSuffix(req.URL, "/redir-a"):
+			foundRedirA = true
+		case strings.HasSuffix(req.URL, "/redir-b"):
+			foundRedirB = true
+		case strings.HasSuffix(req.URL, "/redir-final"):
+			foundFinal = true
+		}
+	}
+
+	assert.True(t, foundRedirA, "expected requestfinished to fire for /redir-a (first redirect)")
+	assert.True(t, foundRedirB, "expected requestfinished to fire for /redir-b (second redirect)")
+	assert.True(t, foundFinal, "expected requestfinished to fire for /redir-final (final response)")
+}
+
 // TestPageOnRequestFailed tests that the requestfailed event fires when requests fail.
 func TestPageOnRequestFailed(t *testing.T) {
 	t.Parallel()
