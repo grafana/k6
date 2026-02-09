@@ -218,51 +218,6 @@ func splitHeaderValues(value string) []string {
 	return []string{value}
 }
 
-func containsString(values []string, value string) bool {
-	for _, v := range values {
-		if v == value {
-			return true
-		}
-	}
-	return false
-}
-
-func mergeHeaderMaps(base map[string][]string, extra map[string][]string) map[string][]string {
-	if len(base) == 0 && len(extra) == 0 {
-		return nil
-	}
-
-	merged := make(map[string][]string)
-	add := func(name string, values []string) {
-		if len(values) == 0 {
-			return
-		}
-		key := strings.ToLower(name)
-		current := merged[key]
-		if current == nil {
-			current = make([]string, 0, len(values))
-		}
-		for _, v := range values {
-			if !containsString(current, v) {
-				current = append(current, v)
-			}
-		}
-		merged[key] = current
-	}
-	for name, values := range base {
-		add(name, values)
-	}
-	for name, values := range extra {
-		add(name, values)
-	}
-
-	if len(merged) == 0 {
-		return nil
-	}
-
-	return merged
-}
-
 // validateResourceType will validate network.ResourceType string values against our own
 // ResourceType string values.
 //   - If a new network.ResourceType is added, this will log a warn and return
@@ -316,10 +271,17 @@ func (r *Request) headersSize() int64 {
 	size += len(r.url.Path)
 	size += 8 // httpVersion
 	r.extraHeadersMu.RLock()
-	merged := mergeHeaderMaps(r.headers, r.extraHeaders)
-	for name, values := range merged {
-		for _, value := range values {
-			size += len(name) + len(value) + 4 // 4 = ': ' + '\r\n'
+	if len(r.extraHeaders) != 0 {
+		for name, values := range r.extraHeaders {
+			for _, value := range values {
+				size += len(name) + len(value) + 4 // 4 = ': ' + '\r\n'
+			}
+		}
+	} else {
+		for name, values := range r.headers {
+			for _, value := range values {
+				size += len(name) + len(value) + 4 // 4 = ': ' + '\r\n'
+			}
 		}
 	}
 	r.extraHeadersMu.RUnlock()
@@ -331,7 +293,7 @@ func (r *Request) addExtraHeaders(extra map[string][]string) {
 		return
 	}
 	r.extraHeadersMu.Lock()
-	r.extraHeaders = mergeHeaderMaps(r.extraHeaders, extra)
+	r.extraHeaders = extra
 	r.extraHeadersMu.Unlock()
 }
 
@@ -355,11 +317,16 @@ func (r *Request) setLoadedFromCache(fromMemoryCache bool) {
 func (r *Request) AllHeaders() map[string]string {
 	headers := make(map[string]string)
 	r.extraHeadersMu.RLock()
-	merged := mergeHeaderMaps(r.headers, r.extraHeaders)
-	r.extraHeadersMu.RUnlock()
-	for name, values := range merged {
-		headers[strings.ToLower(name)] = strings.Join(values, "\n")
+	if len(r.extraHeaders) != 0 {
+		for name, values := range r.extraHeaders {
+			headers[strings.ToLower(name)] = strings.Join(values, "\n")
+		}
+	} else {
+		for name, values := range r.headers {
+			headers[strings.ToLower(name)] = strings.Join(values, "\n")
+		}
 	}
+	r.extraHeadersMu.RUnlock()
 	return headers
 }
 
@@ -657,10 +624,17 @@ func (r *Response) headersSize() int64 {
 	size += 3 // statusCode
 	size += len(r.statusText)
 	r.extraHeadersMu.RLock()
-	merged := mergeHeaderMaps(r.headers, r.extraHeaders)
-	for name, values := range merged {
-		for _, value := range values {
-			size += len(name) + len(value) + 4 // 4 = ': ' + '\r\n'
+	if len(r.extraHeaders) != 0 {
+		for name, values := range r.extraHeaders {
+			for _, value := range values {
+				size += len(name) + len(value) + 4 // 4 = ': ' + '\r\n'
+			}
+		}
+	} else {
+		for name, values := range r.headers {
+			for _, value := range values {
+				size += len(name) + len(value) + 4 // 4 = ': ' + '\r\n'
+			}
 		}
 	}
 	r.extraHeadersMu.RUnlock()
@@ -672,11 +646,16 @@ func (r *Response) headersSize() int64 {
 func (r *Response) AllHeaders() map[string]string {
 	headers := make(map[string]string)
 	r.extraHeadersMu.RLock()
-	merged := mergeHeaderMaps(r.headers, r.extraHeaders)
-	r.extraHeadersMu.RUnlock()
-	for name, values := range merged {
-		headers[strings.ToLower(name)] = strings.Join(values, "\n")
+	if len(r.extraHeaders) != 0 {
+		for name, values := range r.extraHeaders {
+			headers[strings.ToLower(name)] = strings.Join(values, "\n")
+		}
+	} else {
+		for name, values := range r.headers {
+			headers[strings.ToLower(name)] = strings.Join(values, "\n")
+		}
 	}
+	r.extraHeadersMu.RUnlock()
 	return headers
 }
 
@@ -789,7 +768,7 @@ func (r *Response) addExtraHeaders(extra map[string][]string) {
 		return
 	}
 	r.extraHeadersMu.Lock()
-	r.extraHeaders = mergeHeaderMaps(r.extraHeaders, extra)
+	r.extraHeaders = extra
 	r.extraHeadersMu.Unlock()
 }
 

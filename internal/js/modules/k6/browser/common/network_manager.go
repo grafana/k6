@@ -80,9 +80,7 @@ type NetworkManager struct {
 	eventsWillBeSentMu            sync.RWMutex
 	reqIDToRequestPausedEvent     map[network.RequestID]*fetch.EventRequestPaused
 	eventsPausedMu                sync.RWMutex
-	reqIDToRequestExtraHeaders    map[network.RequestID]map[string][]string
-	reqIDToResponseExtraHeaders   map[network.RequestID]map[string][]string
-	extraHeadersMu                sync.RWMutex
+	extraInfoTracker              *extraInfoTracker
 
 	attemptedAuth map[fetch.RequestID]bool
 
@@ -126,8 +124,7 @@ func NewNetworkManager(
 		reqIDToRequest:                make(map[network.RequestID]*Request),
 		reqIDToRequestWillBeSentEvent: make(map[network.RequestID]*network.EventRequestWillBeSent),
 		reqIDToRequestPausedEvent:     make(map[network.RequestID]*fetch.EventRequestPaused),
-		reqIDToRequestExtraHeaders:    make(map[network.RequestID]map[string][]string),
-		reqIDToResponseExtraHeaders:   make(map[network.RequestID]map[string][]string),
+		extraInfoTracker:              newExtraInfoTracker(),
 		attemptedAuth:                 make(map[fetch.RequestID]bool),
 		extraHTTPHeaders:              make(map[string]string),
 		networkProfile:                NewNetworkProfile(),
@@ -338,6 +335,7 @@ func (m *NetworkManager) handleRequestRedirect(
 	req *Request, redirectResponse *network.Response, timestamp *cdp.MonotonicTime,
 ) {
 	resp := NewHTTPResponse(m.ctx, req, redirectResponse, timestamp)
+	m.extraInfoTracker.processResponse(req.requestID, resp)
 	req.responseMu.Lock()
 	req.response = resp
 	req.responseMu.Unlock()
@@ -437,6 +435,7 @@ func (m *NetworkManager) onLoadingFailed(event *network.EventLoadingFailed) {
 	req.responseEndTiming = float64(event.Timestamp.Time().Unix()-req.timestamp.Unix()) * 1000
 	m.eventInterceptor.onRequestFailed(req)
 	m.deleteRequestByID(event.RequestID)
+	m.extraInfoTracker.cleanup(event.RequestID)
 	m.frameManager.requestFailed(req, event.Canceled)
 }
 
@@ -449,6 +448,7 @@ func (m *NetworkManager) onLoadingFinished(event *network.EventLoadingFinished) 
 
 	req.responseEndTiming = float64(event.Timestamp.Time().Unix()-req.timestamp.Unix()) * 1000
 	m.deleteRequestByID(event.RequestID)
+	m.extraInfoTracker.cleanup(event.RequestID)
 	m.frameManager.requestFinished(req)
 	m.eventInterceptor.onRequestFinished(req)
 
@@ -573,9 +573,7 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent,
 		m.logger.Errorf("NetworkManager", "creating request: %s", err)
 		return
 	}
-	if extra := m.takeRequestExtraHeaders(event.RequestID); len(extra) > 0 {
-		req.addExtraHeaders(extra)
-	}
+	m.extraInfoTracker.processRequest(event.RequestID, req)
 	// Skip data and blob URLs, since they're internal to the browser.
 	if isInternalURL(req.url) {
 		m.logger.Debugf("NetworkManager", "skipping request handling of %s URL", req.url.Scheme)
@@ -620,11 +618,7 @@ func (m *NetworkManager) onRequestWillBeSentExtraInfo(event *network.EventReques
 	if len(extra) == 0 {
 		return
 	}
-	if req, ok := m.requestFromID(event.RequestID); ok {
-		req.addExtraHeaders(extra)
-		return
-	}
-	m.storeRequestExtraHeaders(event.RequestID, extra)
+	m.extraInfoTracker.requestWillBeSentExtraInfo(event.RequestID, extra)
 }
 
 // onRequestPaused can send one of these two CDP events:
@@ -786,9 +780,7 @@ func (m *NetworkManager) onResponseReceived(event *network.EventResponseReceived
 		return
 	}
 	resp := NewHTTPResponse(m.ctx, req, event.Response, event.Timestamp)
-	if extra := m.takeResponseExtraHeaders(event.RequestID); len(extra) > 0 {
-		resp.addExtraHeaders(extra)
-	}
+	m.extraInfoTracker.processResponse(event.RequestID, resp)
 	req.responseMu.Lock()
 	req.response = resp
 	req.responseMu.Unlock()
@@ -803,16 +795,7 @@ func (m *NetworkManager) onResponseReceivedExtraInfo(event *network.EventRespons
 	if len(extra) == 0 {
 		return
 	}
-	if req, ok := m.requestFromID(event.RequestID); ok {
-		req.responseMu.RLock()
-		resp := req.response
-		req.responseMu.RUnlock()
-		if resp != nil {
-			resp.addExtraHeaders(extra)
-			return
-		}
-	}
-	m.storeResponseExtraHeaders(event.RequestID, extra)
+	m.extraInfoTracker.responseReceivedExtraInfo(event.RequestID, extra)
 }
 
 func (m *NetworkManager) requestFromID(reqID network.RequestID) (*Request, bool) {
@@ -840,34 +823,6 @@ func (m *NetworkManager) pausedEventFromReqID(reqID network.RequestID) (*fetch.E
 	e, ok := m.reqIDToRequestPausedEvent[reqID]
 
 	return e, ok
-}
-
-func (m *NetworkManager) storeRequestExtraHeaders(reqID network.RequestID, headers map[string][]string) {
-	m.extraHeadersMu.Lock()
-	defer m.extraHeadersMu.Unlock()
-	m.reqIDToRequestExtraHeaders[reqID] = mergeHeaderMaps(m.reqIDToRequestExtraHeaders[reqID], headers)
-}
-
-func (m *NetworkManager) storeResponseExtraHeaders(reqID network.RequestID, headers map[string][]string) {
-	m.extraHeadersMu.Lock()
-	defer m.extraHeadersMu.Unlock()
-	m.reqIDToResponseExtraHeaders[reqID] = mergeHeaderMaps(m.reqIDToResponseExtraHeaders[reqID], headers)
-}
-
-func (m *NetworkManager) takeRequestExtraHeaders(reqID network.RequestID) map[string][]string {
-	m.extraHeadersMu.Lock()
-	defer m.extraHeadersMu.Unlock()
-	headers := m.reqIDToRequestExtraHeaders[reqID]
-	delete(m.reqIDToRequestExtraHeaders, reqID)
-	return headers
-}
-
-func (m *NetworkManager) takeResponseExtraHeaders(reqID network.RequestID) map[string][]string {
-	m.extraHeadersMu.Lock()
-	defer m.extraHeadersMu.Unlock()
-	headers := m.reqIDToResponseExtraHeaders[reqID]
-	delete(m.reqIDToResponseExtraHeaders, reqID)
-	return headers
 }
 
 func (m *NetworkManager) setRequestInterception(value bool) error {
