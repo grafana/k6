@@ -379,6 +379,26 @@ func (c *cmdCloud) flagSet() *pflag.FlagSet {
 	return flags
 }
 
+func getCloudUsageTemplate() string {
+	return `{{.Short}}
+
+Usage:{{if .Runnable}}
+  {{.UseLine}}{{end}}{{if .HasAvailableSubCommands}}
+  {{.CommandPath}} [command]{{end}}{{if .HasExample}}
+
+Examples:
+{{.Example}}{{end}}{{if .HasAvailableSubCommands}}
+
+Available Commands:{{range .Commands}}{{if .IsAvailableCommand}}
+  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}
+
+Flags:
+  -h, --help   Show help
+{{if .HasAvailableSubCommands}}
+Use "{{.CommandPath}} [command] --help" for more information about a command.{{end}}
+`
+}
+
 func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 	c := &cmdCloud{
 		gs:            gs,
@@ -444,23 +464,7 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 	cloudCmd.Flags().AddFlagSet(c.flagSet())
 
 	// Use custom template similar to root - hardcode flags to avoid showing global flags
-	cloudTemplate := `{{.Short}}
-
-Usage:{{if .Runnable}}
-  {{.UseLine}}{{end}}{{if .HasAvailableSubCommands}}
-  {{.CommandPath}} [command]{{end}}{{if .HasExample}}
-
-Examples:
-{{.Example}}{{end}}{{if .HasAvailableSubCommands}}
-
-Available Commands:{{range .Commands}}{{if .IsAvailableCommand}}
-  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}
-
-Flags:
-  -h, --help   Show help
-{{if .HasAvailableSubCommands}}
-Use "{{.CommandPath}} [command] --help" for more information about a command.{{end}}
-`
+	cloudTemplate := getCloudUsageTemplate()
 	cloudCmd.SetUsageTemplate(cloudTemplate)
 	cloudCmd.SetHelpTemplate(cloudTemplate)
 
