@@ -531,6 +531,8 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent,
 		redirectChain = make([]*Request, 0)
 	}
 
+	// TODO: Fix this by removing it, but we need a test to validate the redirect
+	// request header sizes first to validate the fix.
 	for _, r := range redirectChain {
 		m.emitRequestMetrics(r)
 	}
