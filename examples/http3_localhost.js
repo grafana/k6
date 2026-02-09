@@ -6,8 +6,8 @@ export const options = {
   insecureSkipTLSVerify: true,
   tlsAuth: [
     {
-      cert: open('/Users/valdemarpavesi/localhost.pem'),
-      key: open('/Users/valdemarpavesi/localhost-key.pem'),
+      cert: open('./localhost.pem'),
+      key: open('./localhost-key.pem'),
       domains: ['localhost'],
     },
   ],
