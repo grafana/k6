@@ -314,11 +314,17 @@ func (r *Request) Headers() map[string]string {
 // HeadersArray returns the request headers as an array of objects.
 func (r *Request) HeadersArray() []HTTPHeader {
 	headers := make([]HTTPHeader, 0)
-	for n, vals := range r.headers {
-		for _, v := range vals {
-			headers = append(headers, HTTPHeader{Name: n, Value: v})
+	r.extraHeadersMu.RLock()
+	source := r.headers
+	if len(r.extraHeaders) != 0 {
+		source = r.extraHeaders
+	}
+	for name, values := range source {
+		for _, v := range values {
+			headers = append(headers, HTTPHeader{Name: name, Value: v})
 		}
 	}
+	r.extraHeadersMu.RUnlock()
 	return headers
 }
 
