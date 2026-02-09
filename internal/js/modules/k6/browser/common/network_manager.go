@@ -1054,3 +1054,40 @@ func (m *NetworkManager) SetCacheEnabled(enabled bool) {
 		k6ext.Panicf(m.ctx, "%v", err)
 	}
 }
+
+func parseExtraHeaders(headers network.Headers) map[string][]string {
+	if len(headers) == 0 {
+		return nil
+	}
+	parsed := make(map[string][]string, len(headers))
+	for name, value := range headers {
+		switch v := value.(type) {
+		case string:
+			parsed[name] = splitHeaderValues(v)
+		case []string:
+			parsed[name] = append([]string{}, v...)
+		case []any:
+			values := make([]string, 0, len(v))
+			for _, item := range v {
+				if s, ok := item.(string); ok {
+					values = append(values, s)
+				}
+			}
+			if len(values) > 0 {
+				parsed[name] = values
+			}
+		}
+	}
+	if len(parsed) == 0 {
+		return nil
+	}
+	return parsed
+}
+
+// CDP concatenates duplicate header values with newlines; split to match Playwright.
+func splitHeaderValues(value string) []string {
+	if strings.Contains(value, "\n") {
+		return strings.Split(value, "\n")
+	}
+	return []string{value}
+}
