@@ -407,11 +407,13 @@ func (m *NetworkManager) handleEvents(in <-chan Event) bool {
 		case *network.EventRequestWillBeSent:
 			m.onRequestWillBeSent(ev)
 		case *network.EventRequestWillBeSentExtraInfo:
+			m.onRequestWillBeSentExtraInfo(ev)
 		case *network.EventRequestServedFromCache:
 			m.onRequestServedFromCache(ev)
 		case *network.EventResponseReceived:
 			m.onResponseReceived(ev)
 		case *network.EventResponseReceivedExtraInfo:
+			m.onResponseReceivedExtraInfo(ev)
 		case *fetch.EventRequestPaused:
 			m.onRequestPaused(ev)
 		case *fetch.EventAuthRequired:
@@ -603,6 +605,13 @@ func (m *NetworkManager) onRequestWillBeSent(event *network.EventRequestWillBeSe
 	}
 }
 
+func (m *NetworkManager) onRequestWillBeSentExtraInfo(event *network.EventRequestWillBeSentExtraInfo) {
+	extra := parseExtraHeaders(event.Headers)
+	if len(extra) == 0 {
+		return
+	}
+}
+
 // onRequestPaused can send one of these two CDP events:
 // - Fetch.failRequest if the URL is part of the blocked hosts or IPs
 // - Fetch.continueRequest if the request is not blocked and no route is configured
@@ -769,6 +778,13 @@ func (m *NetworkManager) onResponseReceived(event *network.EventResponseReceived
 	m.logger.Debugf("FrameManager:onResponseReceived", "rid:%s rurl:%s", event.RequestID, resp.URL())
 
 	m.eventInterceptor.onResponse(resp)
+}
+
+func (m *NetworkManager) onResponseReceivedExtraInfo(event *network.EventResponseReceivedExtraInfo) {
+	extra := parseExtraHeaders(event.Headers)
+	if len(extra) == 0 {
+		return
+	}
 }
 
 func (m *NetworkManager) requestFromID(reqID network.RequestID) (*Request, bool) {
