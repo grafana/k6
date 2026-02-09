@@ -612,6 +612,7 @@ func (m *NetworkManager) onRequestWillBeSentExtraInfo(event *network.EventReques
 	if len(extra) == 0 {
 		return
 	}
+	m.extraInfoTracker.requestWillBeSentExtraInfo(event.RequestID, extra)
 }
 
 // onRequestPaused can send one of these two CDP events:
@@ -787,6 +788,7 @@ func (m *NetworkManager) onResponseReceivedExtraInfo(event *network.EventRespons
 	if len(extra) == 0 {
 		return
 	}
+	m.extraInfoTracker.responseReceivedExtraInfo(event.RequestID, extra)
 }
 
 func (m *NetworkManager) requestFromID(reqID network.RequestID) (*Request, bool) {
