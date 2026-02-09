@@ -17,6 +17,8 @@ import (
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
 	"go.k6.io/k6/internal/js/modules/k6/browser/log"
+
+	"go.k6.io/k6/lib"
 )
 
 // maxRetry controls how many times to retry if an action fails.
@@ -2036,7 +2038,7 @@ func (f *Frame) WaitForLoadState(state string, popts *FrameWaitForLoadStateOptio
 	select {
 	case <-lifecycleEvent:
 	case <-timeoutCtx.Done():
-		return fmt.Errorf("waiting for load state %q: %w", state, ContextErr(timeoutCtx))
+		return fmt.Errorf("waiting for load state %q: %w", state, lib.ContextErr(timeoutCtx))
 	}
 
 	return nil
@@ -2124,7 +2126,7 @@ func (f *Frame) WaitForNavigation(opts *FrameWaitForNavigationOptions, rm RegExM
 			}
 		}
 	case <-timeoutCtx.Done():
-		return nil, handleTimeoutError(ContextErr(timeoutCtx))
+		return nil, handleTimeoutError(lib.ContextErr(timeoutCtx))
 	}
 
 	// A lifecycle event won't be received when navigating within the same
@@ -2134,7 +2136,7 @@ func (f *Frame) WaitForNavigation(opts *FrameWaitForNavigationOptions, rm RegExM
 		select {
 		case <-lifecycleEvtCh:
 		case <-timeoutCtx.Done():
-			return nil, handleTimeoutError(ContextErr(timeoutCtx))
+			return nil, handleTimeoutError(lib.ContextErr(timeoutCtx))
 		}
 	}
 

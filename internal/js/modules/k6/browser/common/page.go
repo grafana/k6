@@ -26,6 +26,8 @@ import (
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
 	"go.k6.io/k6/internal/js/modules/k6/browser/log"
+
+	"go.k6.io/k6/lib"
 )
 
 // BlankPage represents a blank page.
@@ -1485,9 +1487,9 @@ func (p *Page) Reload(opts *PageReloadOptions) (_ *Response, rerr error) { //nol
 	)
 	select {
 	case <-p.ctx.Done():
-		err = ContextErr(p.ctx)
+		err = lib.ContextErr(p.ctx)
 	case <-timeoutCtx.Done():
-		err = wrapTimeoutError(ContextErr(timeoutCtx))
+		err = wrapTimeoutError(lib.ContextErr(timeoutCtx))
 	case event := <-waitForFrameNavigation:
 		var ok bool
 		if navigationEvent, ok = event.(*NavigationEvent); !ok {
@@ -1514,7 +1516,7 @@ func (p *Page) Reload(opts *PageReloadOptions) (_ *Response, rerr error) { //nol
 	select {
 	case <-waitForLifecycleEvent:
 	case <-timeoutCtx.Done():
-		return nil, wrapTimeoutError(ContextErr(timeoutCtx))
+		return nil, wrapTimeoutError(lib.ContextErr(timeoutCtx))
 	}
 
 	applySlowMo(p.ctx)
@@ -1901,7 +1903,7 @@ func (p *Page) waitForEvent(
 	case r := <-result:
 		return r.event, r.err
 	case <-ctx.Done():
-		return PageEvent{}, ContextErr(ctx)
+		return PageEvent{}, lib.ContextErr(ctx)
 	}
 }
 

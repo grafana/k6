@@ -2,8 +2,6 @@ package common
 
 import (
 	"context"
-	"errors"
-	"fmt"
 )
 
 type ctxKey int
@@ -84,19 +82,4 @@ func contextWithDoneChan(ctx context.Context, done chan struct{}) context.Contex
 		}
 	}()
 	return ctx
-}
-
-// ContextErr returns ctx.Err() and, if present, appends the cancel cause.
-func ContextErr(ctx context.Context) error {
-	err := ctx.Err()
-	if err == nil {
-		return nil
-	}
-
-	cause := context.Cause(ctx)
-	if cause == nil || errors.Is(cause, err) {
-		return err
-	}
-
-	return fmt.Errorf("%w: %w", err, cause)
 }

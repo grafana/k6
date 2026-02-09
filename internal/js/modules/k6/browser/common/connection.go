@@ -19,6 +19,8 @@ import (
 	jsonv2 "github.com/go-json-experiment/json"
 	"github.com/go-json-experiment/json/jsontext"
 	"github.com/gorilla/websocket"
+
+	"go.k6.io/k6/lib"
 )
 
 const wsWriteBufferSize = 1 << 20
@@ -526,12 +528,12 @@ func (c *Connection) send(
 		c.logger.Debugf("Connection:send:<-c.done #2", "sid:%v tid:%v wsURL:%q", msg.SessionID, tid, c.wsURL)
 	case <-ctx.Done():
 		c.logger.Debugf("Connection:send:<-ctx.Done()", "sid:%v tid:%v wsURL:%q err:%v",
-			msg.SessionID, tid, c.wsURL, ContextErr(c.ctx))
-		return ContextErr(ctx)
+			msg.SessionID, tid, c.wsURL, lib.ContextErr(ctx))
+		return lib.ContextErr(ctx)
 	case <-c.ctx.Done():
 		c.logger.Debugf("Connection:send:<-c.ctx.Done()", "sid:%v tid:%v wsURL:%q err:%v",
-			msg.SessionID, tid, c.wsURL, ContextErr(c.ctx))
-		return ContextErr(c.ctx)
+			msg.SessionID, tid, c.wsURL, lib.ContextErr(c.ctx))
+		return lib.ContextErr(c.ctx)
 	}
 	return nil
 }

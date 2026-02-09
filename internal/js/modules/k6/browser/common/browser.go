@@ -17,6 +17,8 @@ import (
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
 	"go.k6.io/k6/internal/js/modules/k6/browser/log"
+
+	"go.k6.io/k6/lib"
 )
 
 const (
@@ -507,7 +509,7 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 		b.logger.Debugf("Browser:newPageInContext:<-ctx.Done", "tid:%v bctxid:%v err:%v", tid, id, ctx.Err())
 	}
 
-	if err = ContextErr(ctx); err != nil {
+	if err = lib.ContextErr(ctx); err != nil {
 		err = &k6ext.UserFriendlyError{
 			Err:     err,
 			Timeout: b.browserOpts.Timeout,
@@ -679,7 +681,7 @@ func (b *Browser) On(event string) (bool, error) {
 	case <-b.browserProc.lostConnection:
 		return true, nil
 	case <-b.vuCtx.Done():
-		return false, fmt.Errorf("browser.on promise rejected: %w", ContextErr(b.vuCtx))
+		return false, fmt.Errorf("browser.on promise rejected: %w", lib.ContextErr(b.vuCtx))
 	}
 }
 

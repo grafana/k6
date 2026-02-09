@@ -14,6 +14,8 @@ import (
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
 	k6common "go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/promises"
+
+	"go.k6.io/k6/lib"
 )
 
 func panicIfFatalError(ctx context.Context, err error) {
@@ -126,7 +128,7 @@ func queueTask[T any](
 			return result, err
 		case <-ctx.Done():
 			var zero T
-			return zero, fmt.Errorf("running on task queue: %w", common.ContextErr(ctx))
+			return zero, fmt.Errorf("running on task queue: %w", lib.ContextErr(ctx))
 		}
 	}
 }
