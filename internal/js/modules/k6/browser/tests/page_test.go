@@ -2376,9 +2376,9 @@ func TestPageOnRequest(t *testing.T) {
 			FrameURL:             "about:blank",
 			AcceptLanguageHeader: "en-US",
 			Headers: map[string]string{
-				"accept-language":           "en-US",
-				"upgrade-insecure-requests": "1",
-				"user-agent":                "some-user-agent",
+				"Accept-Language":           "en-US",
+				"Upgrade-Insecure-Requests": "1",
+				"User-Agent":                "some-user-agent",
 			},
 			HeadersArray: []map[string]string{
 				{"name": "Upgrade-Insecure-Requests", "value": "1"},
@@ -2405,9 +2405,9 @@ func TestPageOnRequest(t *testing.T) {
 			FrameURL:             tb.url("/home"),
 			AcceptLanguageHeader: "en-US",
 			Headers: map[string]string{
-				"accept-language": "en-US",
-				"referer":         tb.url("/home"),
-				"user-agent":      "some-user-agent",
+				"Accept-Language": "en-US",
+				"Referer":         tb.url("/home"),
+				"User-Agent":      "some-user-agent",
 			},
 			HeadersArray: []map[string]string{
 				{"name": "User-Agent", "value": "some-user-agent"},
@@ -2435,10 +2435,10 @@ func TestPageOnRequest(t *testing.T) {
 			FrameURL:             tb.url("/home"),
 			AcceptLanguageHeader: "en-US",
 			Headers: map[string]string{
-				"accept-language": "en-US",
-				"content-type":    "application/json",
-				"referer":         tb.url("/home"),
-				"user-agent":      "some-user-agent",
+				"Accept-Language": "en-US",
+				"Content-Type":    "application/json",
+				"Referer":         tb.url("/home"),
+				"User-Agent":      "some-user-agent",
 			},
 			HeadersArray: []map[string]string{
 				{"name": "Referer", "value": tb.url("/home")},
@@ -2466,9 +2466,9 @@ func TestPageOnRequest(t *testing.T) {
 			FrameURL:             tb.url("/home"),
 			AcceptLanguageHeader: "en-US",
 			Headers: map[string]string{
-				"accept-language": "en-US",
-				"referer":         tb.url("/home"),
-				"user-agent":      "some-user-agent",
+				"Accept-Language": "en-US",
+				"Referer":         tb.url("/home"),
+				"User-Agent":      "some-user-agent",
 			},
 			HeadersArray: []map[string]string{
 				{"name": "Accept-Language", "value": "en-US"},
@@ -2701,9 +2701,9 @@ func TestPageOnResponse(t *testing.T) {
 			AcceptLanguageHeader:  "",
 			AcceptLanguageHeaders: []string{""},
 			Headers: map[string]string{
-				"content-length": "286",
-				"content-type":   "text/html; charset=utf-8",
-				"date":           "Wed, 29 Jan 2025 09:00:00 GMT",
+				"Content-Length": "286",
+				"Content-Type":   "text/html; charset=utf-8",
+				"Date":           "Wed, 29 Jan 2025 09:00:00 GMT",
 			},
 			HeadersArray: []map[string]string{
 				{"name": "Content-Length", "value": "286"},
@@ -2732,9 +2732,9 @@ func TestPageOnResponse(t *testing.T) {
 			AcceptLanguageHeader:  "",
 			AcceptLanguageHeaders: []string{""},
 			Headers: map[string]string{
-				"content-length": "35",
-				"content-type":   "text/css",
-				"date":           "Wed, 29 Jan 2025 09:00:00 GMT",
+				"Content-Length": "35",
+				"Content-Type":   "text/css",
+				"Date":           "Wed, 29 Jan 2025 09:00:00 GMT",
 			},
 			HeadersArray: []map[string]string{
 				{"name": "Date", "value": "Wed, 29 Jan 2025 09:00:00 GMT"},
@@ -2766,12 +2766,12 @@ func TestPageOnResponse(t *testing.T) {
 			AcceptLanguageHeader:  "",
 			AcceptLanguageHeaders: []string{""},
 			Headers: map[string]string{
-				"access-control-allow-credentials": "true",
-				"access-control-allow-origin":      "*",
-				"content-length":                   "19",
-				"content-type":                     "text/plain; charset=utf-8",
-				"date":                             "Wed, 29 Jan 2025 09:00:00 GMT",
-				"x-content-type-options":           "nosniff",
+				"Access-Control-Allow-Credentials": "true",
+				"Access-Control-Allow-Origin":      "*",
+				"Content-Length":                   "19",
+				"Content-Type":                     "text/plain; charset=utf-8",
+				"Date":                             "Wed, 29 Jan 2025 09:00:00 GMT",
+				"X-Content-Type-Options":           "nosniff",
 			},
 			HeadersArray: []map[string]string{
 				{"name": "Date", "value": "Wed, 29 Jan 2025 09:00:00 GMT"},
@@ -2803,9 +2803,9 @@ func TestPageOnResponse(t *testing.T) {
 			AcceptLanguageHeader:  "",
 			AcceptLanguageHeaders: []string{""},
 			Headers: map[string]string{
-				"content-length": "28",
-				"content-type":   "application/json",
-				"date":           "Wed, 29 Jan 2025 09:00:00 GMT",
+				"Content-Length": "28",
+				"Content-Type":   "application/json",
+				"Date":           "Wed, 29 Jan 2025 09:00:00 GMT",
 			},
 			HeadersArray: []map[string]string{
 				{"name": "Date", "value": "Wed, 29 Jan 2025 09:00:00 GMT"},
