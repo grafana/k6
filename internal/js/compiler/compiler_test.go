@@ -13,8 +13,11 @@ import (
 	"go.k6.io/k6/internal/lib/testutils"
 )
 
+//nolint:tparallel
 func TestCompile(t *testing.T) {
-	t.Parallel()
+	// TODO(@joanlopez): Revisit later: it started to fail after the commit below, but hopefully will be fixed soon.
+	// https://github.com/golang/go/commit/481ab86aafe0cac177df793c9946c5ef2126137c
+	// t.Parallel()
 	t.Run("ES5", func(t *testing.T) {
 		t.Parallel()
 		c := New(testutils.NewLogger(t))
