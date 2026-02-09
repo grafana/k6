@@ -352,28 +352,19 @@ func (r *Request) Headers() map[string]string {
 }
 
 // HeadersArray returns the request headers as an array of objects.
+// If extra headers are available (from requestWillBeSentExtraInfo),
+// they are used exclusively; otherwise, the original headers are returned.
 func (r *Request) HeadersArray() []HTTPHeader {
 	headers := make([]HTTPHeader, 0)
-	seen := make(map[string]map[string]bool)
-	add := func(name string, values []string) {
-		key := strings.ToLower(name)
-		if _, ok := seen[key]; !ok {
-			seen[key] = make(map[string]bool)
-		}
+	r.extraHeadersMu.RLock()
+	source := r.headers
+	if len(r.extraHeaders) != 0 {
+		source = r.extraHeaders
+	}
+	for name, values := range source {
 		for _, v := range values {
-			if seen[key][v] {
-				continue
-			}
-			seen[key][v] = true
 			headers = append(headers, HTTPHeader{Name: name, Value: v})
 		}
-	}
-	for n, vals := range r.headers {
-		add(n, vals)
-	}
-	r.extraHeadersMu.RLock()
-	for n, vals := range r.extraHeaders {
-		add(n, vals)
 	}
 	r.extraHeadersMu.RUnlock()
 	return headers
@@ -736,28 +727,19 @@ func (r *Response) Headers() map[string]string {
 }
 
 // HeadersArray returns the response headers as an array of objects.
+// If extra headers are available (from responseReceivedExtraInfo),
+// they are used exclusively; otherwise, the original headers are returned.
 func (r *Response) HeadersArray() []HTTPHeader {
 	headers := make([]HTTPHeader, 0)
-	seen := make(map[string]map[string]bool)
-	add := func(name string, values []string) {
-		key := strings.ToLower(name)
-		if _, ok := seen[key]; !ok {
-			seen[key] = make(map[string]bool)
-		}
+	r.extraHeadersMu.RLock()
+	source := r.headers
+	if len(r.extraHeaders) != 0 {
+		source = r.extraHeaders
+	}
+	for name, values := range source {
 		for _, v := range values {
-			if seen[key][v] {
-				continue
-			}
-			seen[key][v] = true
 			headers = append(headers, HTTPHeader{Name: name, Value: v})
 		}
-	}
-	for n, vals := range r.headers {
-		add(n, vals)
-	}
-	r.extraHeadersMu.RLock()
-	for n, vals := range r.extraHeaders {
-		add(n, vals)
 	}
 	r.extraHeadersMu.RUnlock()
 	return headers
