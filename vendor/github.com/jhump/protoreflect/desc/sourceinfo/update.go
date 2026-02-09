@@ -1,10 +1,9 @@
 package sourceinfo
 
 import (
-	"fmt"
-
 	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/reflect/protoregistry"
+
+	"github.com/jhump/protoreflect/v2/sourceinfo"
 )
 
 // AddSourceInfoToFile will return a new file descriptor that is a copy
@@ -13,7 +12,7 @@ import (
 // or was not processed with the protoc-gen-gosrcinfo plugin, then fd
 // is returned as is, unchanged.
 func AddSourceInfoToFile(fd protoreflect.FileDescriptor) (protoreflect.FileDescriptor, error) {
-	return getFile(fd)
+	return sourceinfo.AddSourceInfoToFile(fd)
 }
 
 // AddSourceInfoToMessage will return a new message descriptor that is a
@@ -22,7 +21,7 @@ func AddSourceInfoToFile(fd protoreflect.FileDescriptor) (protoreflect.FileDescr
 // was not registered from generated code, or was not processed with the
 // protoc-gen-gosrcinfo plugin, then md is returned as is, unchanged.
 func AddSourceInfoToMessage(md protoreflect.MessageDescriptor) (protoreflect.MessageDescriptor, error) {
-	return updateDescriptor(md)
+	return sourceinfo.AddSourceInfoToMessage(md)
 }
 
 // AddSourceInfoToEnum will return a new enum descriptor that is a copy
@@ -31,7 +30,7 @@ func AddSourceInfoToMessage(md protoreflect.MessageDescriptor) (protoreflect.Mes
 // not registered from generated code, or was not processed with the
 // protoc-gen-gosrcinfo plugin, then ed is returned as is, unchanged.
 func AddSourceInfoToEnum(ed protoreflect.EnumDescriptor) (protoreflect.EnumDescriptor, error) {
-	return updateDescriptor(ed)
+	return sourceinfo.AddSourceInfoToEnum(ed)
 }
 
 // AddSourceInfoToService will return a new service descriptor that is
@@ -41,7 +40,7 @@ func AddSourceInfoToEnum(ed protoreflect.EnumDescriptor) (protoreflect.EnumDescr
 // with the protoc-gen-gosrcinfo plugin, then ed is returned as is,
 // unchanged.
 func AddSourceInfoToService(sd protoreflect.ServiceDescriptor) (protoreflect.ServiceDescriptor, error) {
-	return updateDescriptor(sd)
+	return sourceinfo.AddSourceInfoToService(sd)
 }
 
 // AddSourceInfoToExtensionType will return a new extension type that
@@ -51,14 +50,7 @@ func AddSourceInfoToService(sd protoreflect.ServiceDescriptor) (protoreflect.Ser
 // code, or was not processed with the protoc-gen-gosrcinfo plugin,
 // then xt is returned as is, unchanged.
 func AddSourceInfoToExtensionType(xt protoreflect.ExtensionType) (protoreflect.ExtensionType, error) {
-	if genType, err := protoregistry.GlobalTypes.FindExtensionByName(xt.TypeDescriptor().FullName()); err != nil || genType != xt {
-		return xt, nil // not from generated code
-	}
-	ext, err := updateField(xt.TypeDescriptor().Descriptor())
-	if err != nil {
-		return nil, err
-	}
-	return extensionType{ExtensionType: xt, extDesc: ext}, nil
+	return sourceinfo.AddSourceInfoToExtensionType(xt)
 }
 
 // AddSourceInfoToMessageType will return a new message type that
@@ -68,14 +60,7 @@ func AddSourceInfoToExtensionType(xt protoreflect.ExtensionType) (protoreflect.E
 // code, or was not processed with the protoc-gen-gosrcinfo plugin,
 // then mt is returned as is, unchanged.
 func AddSourceInfoToMessageType(mt protoreflect.MessageType) (protoreflect.MessageType, error) {
-	if genType, err := protoregistry.GlobalTypes.FindMessageByName(mt.Descriptor().FullName()); err != nil || genType != mt {
-		return mt, nil // not from generated code
-	}
-	msg, err := updateDescriptor(mt.Descriptor())
-	if err != nil {
-		return nil, err
-	}
-	return messageType{MessageType: mt, msgDesc: msg}, nil
+	return sourceinfo.AddSourceInfoToMessageType(mt)
 }
 
 // WrapFile is present for backwards-compatibility reasons. It calls
@@ -173,142 +158,4 @@ func WrapMessageType(mt protoreflect.MessageType) protoreflect.MessageType {
 		panic(err)
 	}
 	return result
-}
-
-type extensionType struct {
-	protoreflect.ExtensionType
-	extDesc protoreflect.ExtensionDescriptor
-}
-
-func (xt extensionType) TypeDescriptor() protoreflect.ExtensionTypeDescriptor {
-	return extensionTypeDescriptor{ExtensionDescriptor: xt.extDesc, extType: xt.ExtensionType}
-}
-
-type extensionTypeDescriptor struct {
-	protoreflect.ExtensionDescriptor
-	extType protoreflect.ExtensionType
-}
-
-func (xtd extensionTypeDescriptor) Type() protoreflect.ExtensionType {
-	return extensionType{ExtensionType: xtd.extType, extDesc: xtd.ExtensionDescriptor}
-}
-
-func (xtd extensionTypeDescriptor) Descriptor() protoreflect.ExtensionDescriptor {
-	return xtd.ExtensionDescriptor
-}
-
-type messageType struct {
-	protoreflect.MessageType
-	msgDesc protoreflect.MessageDescriptor
-}
-
-func (mt messageType) Descriptor() protoreflect.MessageDescriptor {
-	return mt.msgDesc
-}
-
-func updateField(fd protoreflect.FieldDescriptor) (protoreflect.FieldDescriptor, error) {
-	if xtd, ok := fd.(protoreflect.ExtensionTypeDescriptor); ok {
-		ext, err := updateField(xtd.Descriptor())
-		if err != nil {
-			return nil, err
-		}
-		return extensionTypeDescriptor{ExtensionDescriptor: ext, extType: xtd.Type()}, nil
-	}
-	d, err := updateDescriptor(fd)
-	if err != nil {
-		return nil, err
-	}
-	return d.(protoreflect.FieldDescriptor), nil
-}
-
-func updateDescriptor[D protoreflect.Descriptor](d D) (D, error) {
-	updatedFile, err := getFile(d.ParentFile())
-	if err != nil {
-		var zero D
-		return zero, err
-	}
-	if updatedFile == d.ParentFile() {
-		// no change
-		return d, nil
-	}
-	updated := findDescriptor(updatedFile, d)
-	result, ok := updated.(D)
-	if !ok {
-		var zero D
-		return zero, fmt.Errorf("updated result is type %T which could not be converted to %T", updated, result)
-	}
-	return result, nil
-}
-
-func findDescriptor(fd protoreflect.FileDescriptor, d protoreflect.Descriptor) protoreflect.Descriptor {
-	if d == nil {
-		return nil
-	}
-	if _, isFile := d.(protoreflect.FileDescriptor); isFile {
-		return fd
-	}
-	if d.Parent() == nil {
-		return d
-	}
-	switch d := d.(type) {
-	case protoreflect.MessageDescriptor:
-		parent := findDescriptor(fd, d.Parent()).(messageContainer)
-		return parent.Messages().Get(d.Index())
-	case protoreflect.FieldDescriptor:
-		if d.IsExtension() {
-			parent := findDescriptor(fd, d.Parent()).(extensionContainer)
-			return parent.Extensions().Get(d.Index())
-		} else {
-			parent := findDescriptor(fd, d.Parent()).(fieldContainer)
-			return parent.Fields().Get(d.Index())
-		}
-	case protoreflect.OneofDescriptor:
-		parent := findDescriptor(fd, d.Parent()).(oneofContainer)
-		return parent.Oneofs().Get(d.Index())
-	case protoreflect.EnumDescriptor:
-		parent := findDescriptor(fd, d.Parent()).(enumContainer)
-		return parent.Enums().Get(d.Index())
-	case protoreflect.EnumValueDescriptor:
-		parent := findDescriptor(fd, d.Parent()).(enumValueContainer)
-		return parent.Values().Get(d.Index())
-	case protoreflect.ServiceDescriptor:
-		parent := findDescriptor(fd, d.Parent()).(serviceContainer)
-		return parent.Services().Get(d.Index())
-	case protoreflect.MethodDescriptor:
-		parent := findDescriptor(fd, d.Parent()).(methodContainer)
-		return parent.Methods().Get(d.Index())
-	}
-	return d
-}
-
-type messageContainer interface {
-	Messages() protoreflect.MessageDescriptors
-}
-
-type extensionContainer interface {
-	Extensions() protoreflect.ExtensionDescriptors
-}
-
-type fieldContainer interface {
-	Fields() protoreflect.FieldDescriptors
-}
-
-type oneofContainer interface {
-	Oneofs() protoreflect.OneofDescriptors
-}
-
-type enumContainer interface {
-	Enums() protoreflect.EnumDescriptors
-}
-
-type enumValueContainer interface {
-	Values() protoreflect.EnumValueDescriptors
-}
-
-type serviceContainer interface {
-	Services() protoreflect.ServiceDescriptors
-}
-
-type methodContainer interface {
-	Methods() protoreflect.MethodDescriptors
 }
