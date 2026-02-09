@@ -388,20 +388,23 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 	}
 
 	exampleText := getExampleText(gs, `
-  # [deprecated] Run a test script in Grafana Cloud
-  $ {{.}} cloud script.js
-
-  # [deprecated] Run a test archive in Grafana Cloud
-  $ {{.}} cloud archive.tar
-
   # Authenticate with Grafana Cloud
   $ {{.}} cloud login
 
   # Run a test script in Grafana Cloud
   $ {{.}} cloud run script.js
 
+  # Run a test script locally and stream results to Grafana Cloud
+  $ {{.}} cloud run --local-execution script.js
+
   # Run a test archive in Grafana Cloud
-  $ {{.}} cloud run archive.tar`[1:])
+  $ {{.}} cloud run archive.tar
+  
+  # [deprecated] Run a test script in Grafana Cloud
+  $ {{.}} cloud script.js
+
+  # [deprecated] Run a test archive in Grafana Cloud
+  $ {{.}} cloud archive.tar`[1:])
 
 	cloudCmd := &cobra.Command{
 		Use:     "cloud",
@@ -409,7 +412,13 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 		Long:    "Run and manage tests in Grafana Cloud.",
 		Example: exampleText,
 		PreRunE: c.preRun,
-		RunE:    c.run,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// If no args provided, show help
+			if len(args) == 0 {
+				return cmd.Help()
+			}
+			return c.run(cmd, args)
+		},
 	}
 
 	// Register `k6 cloud` subcommands with default usage template
@@ -418,35 +427,42 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 
 	runCmd := getCmdCloudRun(c)
 	runCmd.SetUsageTemplate(defaultUsageTemplate)
+	runCmd.SetHelpTemplate((&cobra.Command{}).HelpTemplate())
 	cloudCmd.AddCommand(runCmd)
 
 	loginCmd := getCmdCloudLogin(gs)
 	loginCmd.SetUsageTemplate(defaultUsageTemplate)
+	loginCmd.SetHelpTemplate((&cobra.Command{}).HelpTemplate())
 	cloudCmd.AddCommand(loginCmd)
 
 	uploadCmd := getCmdCloudUpload(c)
 	uploadCmd.SetUsageTemplate(defaultUsageTemplate)
+	uploadCmd.SetHelpTemplate((&cobra.Command{}).HelpTemplate())
 	cloudCmd.AddCommand(uploadCmd)
 
 	cloudCmd.Flags().SortFlags = false
 	cloudCmd.Flags().AddFlagSet(c.flagSet())
 
-	cloudCmd.SetUsageTemplate(`Usage:
-  {{.CommandPath}} [command]
+	// Use custom template similar to root - hardcode flags to avoid showing global flags
+	cloudTemplate := `{{.Short}}
 
-Commands:{{range .Commands}}{{if (or (eq .Name "login") (eq .Name "run"))}}
-  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{range .Commands}}` +
-		`{{if and .IsAvailableCommand (ne .Name "login") (ne .Name "run")}}
-  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}
+Usage:{{if .Runnable}}
+  {{.UseLine}}{{end}}{{if .HasAvailableSubCommands}}
+  {{.CommandPath}} [command]{{end}}{{if .HasExample}}
+
+Examples:
+{{.Example}}{{end}}{{if .HasAvailableSubCommands}}
+
+Available Commands:{{range .Commands}}{{if .IsAvailableCommand}}
+  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}
 
 Flags:
   -h, --help   Show help
-{{if .HasExample}}
-Examples:
-{{.Example}}
-{{end}}
-Use "{{.CommandPath}} [command] --help" for more information about a command.
-`)
+{{if .HasAvailableSubCommands}}
+Use "{{.CommandPath}} [command] --help" for more information about a command.{{end}}
+`
+	cloudCmd.SetUsageTemplate(cloudTemplate)
+	cloudCmd.SetHelpTemplate(cloudTemplate)
 
 	return cloudCmd
 }
