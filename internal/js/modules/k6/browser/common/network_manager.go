@@ -406,10 +406,12 @@ func (m *NetworkManager) handleEvents(in <-chan Event) bool {
 			m.onLoadingFinished(ev)
 		case *network.EventRequestWillBeSent:
 			m.onRequestWillBeSent(ev)
+		case *network.EventRequestWillBeSentExtraInfo:
 		case *network.EventRequestServedFromCache:
 			m.onRequestServedFromCache(ev)
 		case *network.EventResponseReceived:
 			m.onResponseReceived(ev)
+		case *network.EventResponseReceivedExtraInfo:
 		case *fetch.EventRequestPaused:
 			m.onRequestPaused(ev)
 		case *fetch.EventAuthRequired:
