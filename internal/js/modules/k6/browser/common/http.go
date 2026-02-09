@@ -216,6 +216,12 @@ func validateResourceType(logger *log.Logger, t string) string {
 	return t
 }
 
+func (r *Request) addExtraHeaders(extra map[string][]string) {
+	r.extraHeadersMu.Lock()
+	defer r.extraHeadersMu.Unlock()
+	r.extraHeaders = extra
+}
+
 func (r *Request) getFrame() *Frame {
 	return r.frame
 }
@@ -492,6 +498,12 @@ func NewHTTPResponse(
 	}
 
 	return &r
+}
+
+func (r *Response) addExtraHeaders(extra map[string][]string) {
+	r.extraHeadersMu.Lock()
+	defer r.extraHeadersMu.Unlock()
+	r.extraHeaders = extra
 }
 
 func (r *Response) fetchBody() error {
