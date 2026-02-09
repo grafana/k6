@@ -348,6 +348,8 @@ func (m *NetworkManager) handleRequestRedirect(
 		delete(m.attemptedAuth, req.interceptionID);
 	*/
 
+	m.eventInterceptor.onResponse(resp)
+	m.eventInterceptor.onRequestFinished(req)
 	m.emit(cdproto.EventNetworkResponseReceived, resp)
 	m.emit(cdproto.EventNetworkLoadingFinished, req)
 }
