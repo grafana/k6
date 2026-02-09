@@ -2489,16 +2489,39 @@ func TestPageOnRequest(t *testing.T) {
 	}
 
 	// Compare each request one by one for better test failure visibility
+	// We only want to compare against the exepcted values. The actual values
+	// may contain extra headers that are not present in the expected values.
+	// Extra headers are racey and can be present or may not be present when
+	// the page.on('request') handler is called.
 	for _, req := range requests {
 		i := slices.IndexFunc(expected, func(r request) bool { return req.URL == r.URL })
 		assert.NotEqual(t, -1, i, "failed to find expected request with URL %s", req.URL)
 
-		sortByName := func(m1, m2 map[string]string) int {
-			return strings.Compare(m1["name"], m2["name"])
+		expectedHeadersArray := make(map[string]string)
+		for _, header := range expected[i].HeadersArray {
+			expectedHeadersArray[header["name"]] = header["value"]
 		}
-		slices.SortFunc(req.HeadersArray, sortByName)
-		slices.SortFunc(expected[i].HeadersArray, sortByName)
-		assert.Equal(t, expected[i], req)
+		for name, value := range expected[i].AllHeaders {
+			actualValue, ok := req.AllHeaders[name]
+			require.True(t, ok, "missing allHeaders[%s] for %s", name, req.URL)
+			require.Equal(t, value, actualValue, "allHeaders[%s] mismatch for %s", name, req.URL)
+		}
+		require.Equal(t, expected[i].FrameURL, req.FrameURL, i)
+		require.Equal(t, expected[i].AcceptLanguageHeader, req.AcceptLanguageHeader, i)
+		require.Equal(t, expected[i].Headers, req.Headers, i)
+		for _, header := range req.HeadersArray {
+			if expectedValue, ok := expectedHeadersArray[header["name"]]; ok {
+				require.Equal(t, expectedValue, header["value"], "headersArray[%s] mismatch for %s", header["name"], req.URL)
+				delete(expectedHeadersArray, header["name"])
+			}
+		}
+		require.Empty(t, expectedHeadersArray, "missing headersArray entries for %s", req.URL)
+		require.Equal(t, expected[i].IsNavigationRequest, req.IsNavigationRequest, i)
+		require.Equal(t, expected[i].Method, req.Method, i)
+		require.Equal(t, expected[i].PostData, req.PostData, i)
+		require.Equal(t, expected[i].PostDataBuffer, req.PostDataBuffer, i)
+		require.Equal(t, expected[i].ResourceType, req.ResourceType, i)
+		require.Equal(t, expected[i].URL, req.URL, i)
 	}
 }
 
@@ -2803,16 +2826,44 @@ func TestPageOnResponse(t *testing.T) {
 	}
 
 	// Compare each response one by one for better test failure visibility
+	// We only want to compare against the expected values. The actual values
+	// may contain extra headers that are not present in the expected values.
+	// Extra headers are racey and can be present or may not be present when
+	// the page.on('response') handler is called.
 	for _, resp := range responses {
 		i := slices.IndexFunc(expected, func(r response) bool { return resp.URL == r.URL })
 		assert.NotEqual(t, -1, i, "failed to find expected request with URL %s", resp.URL)
 
-		sortByName := func(m1, m2 map[string]string) int {
-			return strings.Compare(m1["name"], m2["name"])
+		expectedHeadersArray := make(map[string]string)
+		for _, header := range expected[i].HeadersArray {
+			expectedHeadersArray[header["name"]] = header["value"]
 		}
-		slices.SortFunc(resp.HeadersArray, sortByName)
-		slices.SortFunc(expected[i].HeadersArray, sortByName)
-		assert.Equal(t, expected[i], resp)
+		for name, value := range expected[i].AllHeaders {
+			actualValue, ok := resp.AllHeaders[name]
+			require.True(t, ok, "missing allHeaders[%s] for %s", name, resp.URL)
+			require.Equal(t, value, actualValue, "allHeaders[%s] mismatch for %s", name, resp.URL)
+		}
+		require.Equal(t, expected[i].Body, resp.Body, i)
+		require.Equal(t, expected[i].FrameURL, resp.FrameURL, i)
+		require.Equal(t, expected[i].AcceptLanguageHeader, resp.AcceptLanguageHeader, i)
+		require.Equal(t, expected[i].AcceptLanguageHeaders, resp.AcceptLanguageHeaders, i)
+		require.Equal(t, expected[i].Headers, resp.Headers, i)
+		for _, header := range resp.HeadersArray {
+			if expectedValue, ok := expectedHeadersArray[header["name"]]; ok {
+				require.Equal(t, expectedValue, header["value"], "headersArray[%s] mismatch for %s", header["name"], resp.URL)
+				delete(expectedHeadersArray, header["name"])
+			}
+		}
+		require.Empty(t, expectedHeadersArray, "missing headersArray entries for %s", resp.URL)
+		require.Equal(t, expected[i].JSON, resp.JSON, i)
+		require.Equal(t, expected[i].OK, resp.OK, i)
+		require.Equal(t, expected[i].RequestURL, resp.RequestURL, i)
+		require.Equal(t, expected[i].SecurityDetails, resp.SecurityDetails, i)
+		require.Equal(t, expected[i].ServerAddr, resp.ServerAddr, i)
+		require.Equal(t, expected[i].Status, resp.Status, i)
+		require.Equal(t, expected[i].StatusText, resp.StatusText, i)
+		require.Equal(t, expected[i].URL, resp.URL, i)
+		require.Equal(t, expected[i].Text, resp.Text, i)
 	}
 }
 
