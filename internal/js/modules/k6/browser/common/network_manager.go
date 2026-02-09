@@ -377,8 +377,10 @@ func (m *NetworkManager) initEvents() {
 		cdproto.EventNetworkLoadingFailed,
 		cdproto.EventNetworkLoadingFinished,
 		cdproto.EventNetworkRequestWillBeSent,
+		cdproto.EventNetworkRequestWillBeSentExtraInfo,
 		cdproto.EventNetworkRequestServedFromCache,
 		cdproto.EventNetworkResponseReceived,
+		cdproto.EventNetworkResponseReceivedExtraInfo,
 		cdproto.EventFetchRequestPaused,
 		cdproto.EventFetchAuthRequired,
 	}, chHandler)
