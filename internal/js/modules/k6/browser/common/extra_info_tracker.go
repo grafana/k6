@@ -1,8 +1,6 @@
 package common
 
 import (
-	"sync"
-
 	"github.com/chromedp/cdproto/network"
 )
 
@@ -32,8 +30,12 @@ type requestExtraInfo struct {
 // extraInfoTracker pairs requestWillBeSentExtraInfo / responseReceivedExtraInfo
 // events with their corresponding Request / Response objects using index-based
 // matching (modelled after Playwright's ResponseExtraInfoTracker).
+//
+// All methods are called from the single NetworkManager event-processing
+// goroutine (handleEvents), so no mutex is needed on the tracker itself.
+// Cross-goroutine safety for header reads (e.g. AllHeaders from the JS
+// goroutine) is handled by extraHeadersMu on each Request/Response.
 type extraInfoTracker struct {
-	mu       sync.Mutex
 	requests map[network.RequestID]*requestExtraInfo
 }
 
@@ -57,9 +59,6 @@ func (t *extraInfoTracker) getOrCreate(reqID network.RequestID) *requestExtraInf
 // requestWillBeSentExtraInfo records parsed request extra headers and
 // tries to pair them with an already-registered Request at the same index.
 func (t *extraInfoTracker) requestWillBeSentExtraInfo(reqID network.RequestID, headers map[string][]string) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
 	info := t.getOrCreate(reqID)
 	info.requestExtraHeaders = append(info.requestExtraHeaders, headers)
 	t.patchRequestHeaders(info, len(info.requestExtraHeaders)-1)
@@ -68,9 +67,6 @@ func (t *extraInfoTracker) requestWillBeSentExtraInfo(reqID network.RequestID, h
 // responseReceivedExtraInfo records parsed response extra headers and
 // tries to pair them with an already-registered Response at the same index.
 func (t *extraInfoTracker) responseReceivedExtraInfo(reqID network.RequestID, headers map[string][]string) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
 	info := t.getOrCreate(reqID)
 	info.responseExtraHeaders = append(info.responseExtraHeaders, headers)
 	t.patchResponseHeaders(info, len(info.responseExtraHeaders)-1)
@@ -79,9 +75,6 @@ func (t *extraInfoTracker) responseReceivedExtraInfo(reqID network.RequestID, he
 // processRequest registers a Request and tries to pair it with
 // already-received request extra headers at the same index.
 func (t *extraInfoTracker) processRequest(reqID network.RequestID, req *Request) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
 	info := t.getOrCreate(reqID)
 	info.requests = append(info.requests, req)
 	t.patchRequestHeaders(info, len(info.requests)-1)
@@ -90,9 +83,6 @@ func (t *extraInfoTracker) processRequest(reqID network.RequestID, req *Request)
 // processResponse registers a Response and tries to pair it with
 // already-received response extra headers at the same index.
 func (t *extraInfoTracker) processResponse(reqID network.RequestID, resp *Response) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
 	info := t.getOrCreate(reqID)
 	info.responses = append(info.responses, resp)
 	t.patchResponseHeaders(info, len(info.responses)-1)
@@ -135,7 +125,5 @@ func (t *extraInfoTracker) patchResponseHeaders(info *requestExtraInfo, index in
 // cleanup removes the tracking entry for the given requestId.
 // Should be called when loading finishes or fails.
 func (t *extraInfoTracker) cleanup(reqID network.RequestID) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
 	delete(t.requests, reqID)
 }
