@@ -335,6 +335,7 @@ func (m *NetworkManager) handleRequestRedirect(
 	req *Request, redirectResponse *network.Response, timestamp *cdp.MonotonicTime,
 ) {
 	resp := NewHTTPResponse(m.ctx, req, redirectResponse, timestamp)
+	m.extraInfoTracker.processResponse(req.requestID, resp)
 	req.responseMu.Lock()
 	req.response = resp
 	req.responseMu.Unlock()
@@ -568,6 +569,7 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent,
 		m.logger.Errorf("NetworkManager", "creating request: %s", err)
 		return
 	}
+	m.extraInfoTracker.processRequest(event.RequestID, req)
 	// Skip data and blob URLs, since they're internal to the browser.
 	if isInternalURL(req.url) {
 		m.logger.Debugf("NetworkManager", "skipping request handling of %s URL", req.url.Scheme)
