@@ -776,6 +776,7 @@ func (m *NetworkManager) onResponseReceived(event *network.EventResponseReceived
 		return
 	}
 	resp := NewHTTPResponse(m.ctx, req, event.Response, event.Timestamp)
+	m.extraInfoTracker.processResponse(event.RequestID, resp)
 	req.responseMu.Lock()
 	req.response = resp
 	req.responseMu.Unlock()
