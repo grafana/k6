@@ -382,19 +382,18 @@ func (c *cmdCloud) flagSet() *pflag.FlagSet {
 func getCloudUsageTemplate() string {
 	return `{{.Short}}
 
-Usage:{{if .Runnable}}
-  {{.UseLine}}{{end}}{{if .HasAvailableSubCommands}}
-  {{.CommandPath}} [command]{{end}}{{if .HasExample}}
-
-Examples:
-{{.Example}}{{end}}{{if .HasAvailableSubCommands}}
+Usage:{{if .HasAvailableSubCommands}}
+  {{.CommandPath}} [command]{{end}}{{if .HasAvailableSubCommands}}
 
 Available Commands:{{range .Commands}}{{if .IsAvailableCommand}}
   {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}
 
 Flags:
   -h, --help   Show help
-{{if .HasAvailableSubCommands}}
+{{if .HasExample}}
+Examples:
+{{.Example}}
+{{end}}{{if .HasAvailableSubCommands}}
 Use "{{.CommandPath}} [command] --help" for more information about a command.{{end}}
 `
 }
