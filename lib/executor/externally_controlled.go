@@ -277,7 +277,7 @@ func (mex *ExternallyControlled) UpdateConfig(ctx context.Context, newConf inter
 		return <-event.err
 	case <-ctx.Done():
 		mex.configLock.Unlock()
-		return ctx.Err()
+		return lib.ContextErr(ctx)
 	default:
 		mex.currentControlConfig = newConfigParams
 		mex.configLock.Unlock()
@@ -427,7 +427,7 @@ func (rs *externallyControlledRunState) handleConfigChange(oldCfg, newCfg Extern
 	for i := oldMaxVUs; i < newMaxVUs; i++ {
 		select { // check if the user didn't try to abort k6 while we're scaling up the VUs
 		case <-rs.ctx.Done():
-			return rs.ctx.Err()
+			return lib.ContextErr(rs.ctx)
 		default: // do nothing
 		}
 		initVU, vuInitErr := executionState.InitializeNewVU(rs.ctx, rs.executor.logger)

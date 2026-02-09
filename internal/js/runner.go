@@ -825,7 +825,7 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 func (u *ActiveVU) RunOnce() error {
 	select {
 	case <-u.RunContext.Done():
-		return u.RunContext.Err() // we are done, return
+		return lib.ContextErr(u.RunContext) // we are done, return
 	case u.busy <- struct{}{}:
 		// nothing else can run now, and the VU cannot be deactivated
 	}

@@ -1585,9 +1585,9 @@ func (p *Page) GoBackForward(delta int, opts *PageGoBackForwardOptions) (_ *Resp
 	for {
 		select {
 		case <-p.ctx.Done():
-			return nil, p.ctx.Err()
+			return nil, lib.ContextErr(p.ctx)
 		case <-timeoutCtx.Done():
-			return nil, wrapTimeoutError(timeoutCtx.Err())
+			return nil, wrapTimeoutError(lib.ContextErr(timeoutCtx))
 		case <-ticker.C:
 			mainFrame := p.frameManager.MainFrame()
 			if mainFrame == nil {

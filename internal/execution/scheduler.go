@@ -186,7 +186,7 @@ func (e *Scheduler) initVUsConcurrently(
 			case <-ctx.Done():
 				for skipVu := vuNum; skipVu < count; skipVu++ {
 					// do not even start initializing the remaining VUs
-					doneInits <- ctx.Err()
+					doneInits <- lib.ContextErr(ctx)
 				}
 				return
 			}
@@ -286,7 +286,7 @@ func (e *Scheduler) initVUsAndExecutors(ctx context.Context, samplesOut chan<- m
 				atomic.AddUint64(initializedVUs, 1)
 			}
 		case <-ctx.Done():
-			err = ctx.Err()
+			err = lib.ContextErr(ctx)
 		}
 
 		if err == nil || initErr != nil {
