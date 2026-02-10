@@ -95,15 +95,15 @@ const parseSharedArrayNamePrefix = "csv.parse."
 
 // Parse parses the provided CSV file, and returns a promise that resolves to a shared array
 // containing the parsed data.
-func (mi *ModuleInstance) Parse(file sobek.Value, options sobek.Value) *sobek.Promise {
+func (mi *ModuleInstance) Parse(file sobek.Value, options sobek.Value) (*sobek.Promise, error) {
 	rt := mi.vu.Runtime()
 
 	promise, resolve, reject := rt.NewPromise()
 	// 1. Make sure the Sobek object is a fs.File (Sobek operation)
 	var fileObj fs.File
 	if err := mi.vu.Runtime().ExportTo(file, &fileObj); err != nil {
-		reject(fmt.Errorf("first argument expected to be a fs.File instance, got %T instead", file))
-		return promise
+		err := reject(fmt.Errorf("first argument expected to be a fs.File instance, got %T instead", file))
+		return promise, err
 	}
 
 	parserOptions := newDefaultParserOptions()
@@ -111,21 +111,21 @@ func (mi *ModuleInstance) Parse(file sobek.Value, options sobek.Value) *sobek.Pr
 		var err error
 		parserOptions, err = newParserOptionsFrom(options.ToObject(rt))
 		if err != nil {
-			reject(fmt.Errorf("failed to interpret the provided Parser options; reason: %w", err))
-			return promise
+			err := reject(fmt.Errorf("failed to interpret the provided Parser options; reason: %w", err))
+			return promise, err
 		}
 	}
 
 	r, err := NewReaderFrom(fileObj.ReadSeekStater, parserOptions)
 	if err != nil {
-		reject(fmt.Errorf("failed to create a new parser; reason: %w", err))
-		return promise
+		err := reject(fmt.Errorf("failed to create a new parser; reason: %w", err))
+		return promise, err
 	}
 
 	underlyingSharedArrayName, err := buildSharedArrayName(fileObj, parserOptions)
 	if err != nil {
-		reject(fmt.Errorf("failed to derive shared array name; reason: %w", err))
-		return promise
+		err := reject(fmt.Errorf("failed to derive shared array name; reason: %w", err))
+		return promise, err
 	}
 
 	callback := mi.vu.RegisterCallback()
@@ -141,13 +141,14 @@ func (mi *ModuleInstance) Parse(file sobek.Value, options sobek.Value) *sobek.Pr
 			callback(func() error {
 				return reject(err)
 			})
+			return
 		}
 		callback(func() error {
 			return resolve(fn())
 		})
 	}()
 
-	return promise
+	return promise, nil
 }
 
 // NewParser creates a new CSV parser instance.

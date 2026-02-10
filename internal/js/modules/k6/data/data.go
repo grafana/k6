@@ -96,9 +96,9 @@ func (d *Data) sharedArray(call sobek.ConstructorCall) *sobek.Object {
 	builder := func() (sharedArray, error) { return getSharedArrayFromCall(rt, fn) }
 	array, err := d.shared.loadOrStore(name, builder)
 	if err != nil {
-
 		common.Throw(rt, err)
 	}
+
 	return array.wrap(rt).ToObject(rt)
 }
 
@@ -212,7 +212,7 @@ func getSharedArrayFromCall(rt *sobek.Runtime, call sobek.Callable) (sharedArray
 	for i := range arr {
 		val, err = stringifyFunc(sobek.Undefined(), obj.Get(strconv.Itoa(i)))
 		if err != nil {
-			return sharedArray{}, nil
+			return sharedArray{}, err
 		}
 		arr[i] = val.String()
 	}

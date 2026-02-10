@@ -23,14 +23,16 @@ func TestNewSharedArrayFromReusesExistingArrays(t *testing.T) {
 		{"a", "b"},
 	})
 
-	dataModule.NewSharedArrayFrom(runtime.VU.Runtime(), "shared", reader)
+	_, err := dataModule.NewSharedArrayFrom(runtime.VU.Runtime(), "shared", reader)
+	require.NoError(t, err)
 	require.Positive(t, reader.reads.Load())
 
 	anotherReader := newCountingRecordReader([][]string{
 		{"x", "y"},
 	})
 
-	dataModule.NewSharedArrayFrom(runtime.VU.Runtime(), "shared", anotherReader)
+	_, err = dataModule.NewSharedArrayFrom(runtime.VU.Runtime(), "shared", anotherReader)
+	require.NoError(t, err)
 	require.Zero(t, anotherReader.reads.Load())
 }
 
@@ -42,9 +44,9 @@ func TestSharedArraysLoadOrStoreBuildsOnce(t *testing.T) {
 	}
 
 	var buildsCount atomic.Int32
-	builder := func() sharedArray {
+	builder := func() (sharedArray, error) { //nolint:unparam
 		buildsCount.Add(1)
-		return sharedArray{arr: []string{"v"}}
+		return sharedArray{arr: []string{"v"}}, nil
 	}
 
 	var wg sync.WaitGroup
@@ -53,7 +55,7 @@ func TestSharedArraysLoadOrStoreBuildsOnce(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			arrays.loadOrStore("shared", builder)
+			_, _ = arrays.loadOrStore("shared", builder)
 		}()
 	}
 
@@ -103,7 +105,8 @@ func TestNewSharedArrayFromConcurrentMultiVU(t *testing.T) {
 				records: [][]string{{"a", "b"}, {"c", "d"}},
 				reads:   &totalReads,
 			}
-			dataModule.NewSharedArrayFrom(runtime.VU.Runtime(), "concurrent-test", reader)
+			_, err := dataModule.NewSharedArrayFrom(runtime.VU.Runtime(), "concurrent-test", reader)
+			require.NoError(t, err)
 		}()
 	}
 
@@ -142,9 +145,8 @@ func TestNewSharedArrayFromReaderError(t *testing.T) {
 		errAt:   1, // Error on second read
 	}
 
-	require.Panics(t, func() {
-		dataModule.NewSharedArrayFrom(runtime.VU.Runtime(), "error-test", errReader)
-	})
+	_, err := dataModule.NewSharedArrayFrom(runtime.VU.Runtime(), "error-test", errReader)
+	require.Error(t, err)
 }
 
 type errorRecordReader struct {
@@ -175,9 +177,8 @@ func TestNewSharedArrayFromMarshalError(t *testing.T) {
 	// channels cannot be marshaled to JSON
 	unmarshalableReader := &unmarshalableRecordReader{}
 
-	require.Panics(t, func() {
-		dataModule.NewSharedArrayFrom(runtime.VU.Runtime(), "marshal-error", unmarshalableReader)
-	})
+	_, err := dataModule.NewSharedArrayFrom(runtime.VU.Runtime(), "marshal-error", unmarshalableReader)
+	require.Error(t, err)
 }
 
 type unmarshalableRecordReader struct {
@@ -202,7 +203,10 @@ func TestNewSharedArrayFromEmpty(t *testing.T) {
 
 	emptyReader := newCountingRecordReader([][]string{})
 
-	result := dataModule.NewSharedArrayFrom(runtime.VU.Runtime(), "empty", emptyReader)
+	fn, err := dataModule.NewSharedArrayFrom(runtime.VU.Runtime(), "empty", emptyReader)
+	require.NoError(t, err)
+	require.NotNil(t, fn)
+	result := fn()
 	require.NotNil(t, result)
 
 	length := result.Get("length")
@@ -219,8 +223,10 @@ func TestNewSharedArrayFromDifferentNames(t *testing.T) {
 	reader1 := newCountingRecordReader([][]string{{"a"}})
 	reader2 := newCountingRecordReader([][]string{{"b"}})
 
-	dataModule.NewSharedArrayFrom(runtime.VU.Runtime(), "name1", reader1)
-	dataModule.NewSharedArrayFrom(runtime.VU.Runtime(), "name2", reader2)
+	_, err := dataModule.NewSharedArrayFrom(runtime.VU.Runtime(), "name1", reader1)
+	require.NoError(t, err)
+	_, err = dataModule.NewSharedArrayFrom(runtime.VU.Runtime(), "name2", reader2)
+	require.NoError(t, err)
 
 	// Both readers should have been consumed since names are different
 	require.Positive(t, reader1.reads.Load())
