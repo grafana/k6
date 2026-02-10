@@ -80,6 +80,7 @@ type NetworkManager struct {
 	eventsWillBeSentMu            sync.RWMutex
 	reqIDToRequestPausedEvent     map[network.RequestID]*fetch.EventRequestPaused
 	eventsPausedMu                sync.RWMutex
+	extraInfoTracker              *extraInfoTracker
 
 	attemptedAuth map[fetch.RequestID]bool
 
@@ -123,6 +124,7 @@ func NewNetworkManager(
 		reqIDToRequest:                make(map[network.RequestID]*Request),
 		reqIDToRequestWillBeSentEvent: make(map[network.RequestID]*network.EventRequestWillBeSent),
 		reqIDToRequestPausedEvent:     make(map[network.RequestID]*fetch.EventRequestPaused),
+		extraInfoTracker:              newExtraInfoTracker(),
 		attemptedAuth:                 make(map[fetch.RequestID]bool),
 		extraHTTPHeaders:              make(map[string]string),
 		networkProfile:                NewNetworkProfile(),
@@ -333,6 +335,7 @@ func (m *NetworkManager) handleRequestRedirect(
 	req *Request, redirectResponse *network.Response, timestamp *cdp.MonotonicTime,
 ) {
 	resp := NewHTTPResponse(m.ctx, req, redirectResponse, timestamp)
+	m.extraInfoTracker.processResponse(req.requestID, resp)
 	req.responseMu.Lock()
 	req.response = resp
 	req.responseMu.Unlock()
@@ -375,8 +378,10 @@ func (m *NetworkManager) initEvents() {
 		cdproto.EventNetworkLoadingFailed,
 		cdproto.EventNetworkLoadingFinished,
 		cdproto.EventNetworkRequestWillBeSent,
+		cdproto.EventNetworkRequestWillBeSentExtraInfo,
 		cdproto.EventNetworkRequestServedFromCache,
 		cdproto.EventNetworkResponseReceived,
+		cdproto.EventNetworkResponseReceivedExtraInfo,
 		cdproto.EventFetchRequestPaused,
 		cdproto.EventFetchAuthRequired,
 	}, chHandler)
@@ -404,10 +409,14 @@ func (m *NetworkManager) handleEvents(in <-chan Event) bool {
 			m.onLoadingFinished(ev)
 		case *network.EventRequestWillBeSent:
 			m.onRequestWillBeSent(ev)
+		case *network.EventRequestWillBeSentExtraInfo:
+			m.onRequestWillBeSentExtraInfo(ev)
 		case *network.EventRequestServedFromCache:
 			m.onRequestServedFromCache(ev)
 		case *network.EventResponseReceived:
 			m.onResponseReceived(ev)
+		case *network.EventResponseReceivedExtraInfo:
+			m.onResponseReceivedExtraInfo(ev)
 		case *fetch.EventRequestPaused:
 			m.onRequestPaused(ev)
 		case *fetch.EventAuthRequired:
@@ -428,6 +437,7 @@ func (m *NetworkManager) onLoadingFailed(event *network.EventLoadingFailed) {
 	req.responseEndTiming = float64(event.Timestamp.Time().Unix()-req.timestamp.Unix()) * 1000
 	m.eventInterceptor.onRequestFailed(req)
 	m.deleteRequestByID(event.RequestID)
+	m.extraInfoTracker.cleanup(event.RequestID)
 	m.frameManager.requestFailed(req, event.Canceled)
 }
 
@@ -440,6 +450,7 @@ func (m *NetworkManager) onLoadingFinished(event *network.EventLoadingFinished) 
 
 	req.responseEndTiming = float64(event.Timestamp.Time().Unix()-req.timestamp.Unix()) * 1000
 	m.deleteRequestByID(event.RequestID)
+	m.extraInfoTracker.cleanup(event.RequestID)
 	m.frameManager.requestFinished(req)
 	m.eventInterceptor.onRequestFinished(req)
 
@@ -560,6 +571,7 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent,
 		m.logger.Errorf("NetworkManager", "creating request: %s", err)
 		return
 	}
+	m.extraInfoTracker.processRequest(event.RequestID, req)
 	// Skip data and blob URLs, since they're internal to the browser.
 	if isInternalURL(req.url) {
 		m.logger.Debugf("NetworkManager", "skipping request handling of %s URL", req.url.Scheme)
@@ -597,6 +609,14 @@ func (m *NetworkManager) onRequestWillBeSent(event *network.EventRequestWillBeSe
 	} else {
 		m.onRequest(event, nil)
 	}
+}
+
+func (m *NetworkManager) onRequestWillBeSentExtraInfo(event *network.EventRequestWillBeSentExtraInfo) {
+	extra := parseExtraHeaders(event.Headers)
+	if len(extra) == 0 {
+		return
+	}
+	m.extraInfoTracker.requestWillBeSentExtraInfo(event.RequestID, extra)
 }
 
 // onRequestPaused can send one of these two CDP events:
@@ -758,6 +778,7 @@ func (m *NetworkManager) onResponseReceived(event *network.EventResponseReceived
 		return
 	}
 	resp := NewHTTPResponse(m.ctx, req, event.Response, event.Timestamp)
+	m.extraInfoTracker.processResponse(event.RequestID, resp)
 	req.responseMu.Lock()
 	req.response = resp
 	req.responseMu.Unlock()
@@ -765,6 +786,14 @@ func (m *NetworkManager) onResponseReceived(event *network.EventResponseReceived
 	m.logger.Debugf("FrameManager:onResponseReceived", "rid:%s rurl:%s", event.RequestID, resp.URL())
 
 	m.eventInterceptor.onResponse(resp)
+}
+
+func (m *NetworkManager) onResponseReceivedExtraInfo(event *network.EventResponseReceivedExtraInfo) {
+	extra := parseExtraHeaders(event.Headers)
+	if len(extra) == 0 {
+		return
+	}
+	m.extraInfoTracker.responseReceivedExtraInfo(event.RequestID, extra)
 }
 
 func (m *NetworkManager) requestFromID(reqID network.RequestID) (*Request, bool) {
@@ -1053,4 +1082,41 @@ func (m *NetworkManager) SetCacheEnabled(enabled bool) {
 	if err := m.updateProtocolCacheDisabled(); err != nil {
 		k6ext.Panicf(m.ctx, "%v", err)
 	}
+}
+
+func parseExtraHeaders(headers network.Headers) map[string][]string {
+	if len(headers) == 0 {
+		return nil
+	}
+	parsed := make(map[string][]string, len(headers))
+	for name, value := range headers {
+		switch v := value.(type) {
+		case string:
+			parsed[name] = splitHeaderValues(v)
+		case []string:
+			parsed[name] = append([]string{}, v...)
+		case []any:
+			values := make([]string, 0, len(v))
+			for _, item := range v {
+				if s, ok := item.(string); ok {
+					values = append(values, s)
+				}
+			}
+			if len(values) > 0 {
+				parsed[name] = values
+			}
+		}
+	}
+	if len(parsed) == 0 {
+		return nil
+	}
+	return parsed
+}
+
+// CDP concatenates duplicate header values with newlines; split to match Playwright.
+func splitHeaderValues(value string) []string {
+	if strings.Contains(value, "\n") {
+		return strings.Split(value, "\n")
+	}
+	return []string{value}
 }
