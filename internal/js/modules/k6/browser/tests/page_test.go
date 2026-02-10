@@ -2952,7 +2952,7 @@ func TestPageOnRequestFinishedRedirect(t *testing.T) {
 		const page = await context.newPage();
 
 		const expectedCount = 3; // redir-a, redir-b, redir-final
-		var finishedRequests = [];
+		const finishedRequests = [];
 		let resolveAll;
 		const allFinished = new Promise(r => { resolveAll = r; });
 
