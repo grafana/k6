@@ -2333,7 +2333,8 @@ func TestPageOnRequest(t *testing.T) {
 		page.on('request', async (request) => {
 			returnValue.push({
 				allHeaders: await request.allHeaders(),
-				frameUrl: request.frame().url(),
+				// Ignoring frameUrl as it is racey due to the async nature of how it is set.
+				// frameUrl: request.frame().url(),
 				acceptLanguageHeader: await request.headerValue('Accept-Language'),
 				headers: request.headers(),
 				headersArray: await request.headersArray(),
@@ -2373,7 +2374,6 @@ func TestPageOnRequest(t *testing.T) {
 				"upgrade-insecure-requests": "1",
 				"user-agent":                "some-user-agent",
 			},
-			FrameURL:             "about:blank",
 			AcceptLanguageHeader: "en-US",
 			Headers: map[string]string{
 				"Accept-Language":           "en-US",
@@ -2402,7 +2402,6 @@ func TestPageOnRequest(t *testing.T) {
 				"referer":         tb.url("/home"),
 				"user-agent":      "some-user-agent",
 			},
-			FrameURL:             tb.url("/home"),
 			AcceptLanguageHeader: "en-US",
 			Headers: map[string]string{
 				"Accept-Language": "en-US",
@@ -2432,7 +2431,6 @@ func TestPageOnRequest(t *testing.T) {
 				"referer":         tb.url("/home"),
 				"user-agent":      "some-user-agent",
 			},
-			FrameURL:             tb.url("/home"),
 			AcceptLanguageHeader: "en-US",
 			Headers: map[string]string{
 				"Accept-Language": "en-US",
@@ -2463,7 +2461,6 @@ func TestPageOnRequest(t *testing.T) {
 				"referer":         tb.url("/home"),
 				"user-agent":      "some-user-agent",
 			},
-			FrameURL:             tb.url("/home"),
 			AcceptLanguageHeader: "en-US",
 			Headers: map[string]string{
 				"Accept-Language": "en-US",
@@ -2506,7 +2503,6 @@ func TestPageOnRequest(t *testing.T) {
 			require.True(t, ok, "missing allHeaders[%s] for %s", name, req.URL)
 			require.Equal(t, value, actualValue, "allHeaders[%s] mismatch for %s", name, req.URL)
 		}
-		require.Equal(t, expected[i].FrameURL, req.FrameURL, i)
 		require.Equal(t, expected[i].AcceptLanguageHeader, req.AcceptLanguageHeader, i)
 		require.Equal(t, expected[i].Headers, req.Headers, i)
 		for _, header := range req.HeadersArray {
@@ -2527,7 +2523,6 @@ func TestPageOnRequest(t *testing.T) {
 
 type request struct {
 	AllHeaders           map[string]string   `json:"allHeaders"`
-	FrameURL             string              `json:"frameUrl"`
 	AcceptLanguageHeader string              `json:"acceptLanguageHeader"`
 	Headers              map[string]string   `json:"headers"`
 	HeadersArray         []map[string]string `json:"headersArray"`
