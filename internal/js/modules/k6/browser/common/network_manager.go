@@ -520,10 +520,6 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent,
 		redirectChain = make([]*Request, 0)
 	}
 
-	for _, r := range redirectChain {
-		m.emitRequestMetrics(r)
-	}
-
 	var frame *Frame = nil
 	var ok bool
 	if event.FrameID != "" {
