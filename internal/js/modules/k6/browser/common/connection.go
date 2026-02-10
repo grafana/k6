@@ -485,7 +485,7 @@ func (c *Connection) send(
 		_ = c.close(code)
 		return fmt.Errorf("closing communication with browser: %w", &websocket.CloseError{Code: code})
 	case <-ctx.Done():
-		c.logger.Debugf("Connection:send:<-ctx.Done", "wsURL:%q sid:%v err:%v", c.wsURL, msg.SessionID, c.ctx.Err())
+		c.logger.Debugf("Connection:send:<-ctx.Done", "wsURL:%q sid:%v err:%v", c.wsURL, msg.SessionID, lib.ContextErr(ctx))
 		return nil
 	case <-c.done:
 		c.logger.Debugf("Connection:send:<-c.done", "wsURL:%q sid:%v", c.wsURL, msg.SessionID)
@@ -565,7 +565,7 @@ func (c *Connection) sendLoop() {
 			c.logger.Debugf("Connection:sendLoop:<-c.done#2", "wsURL:%q", c.wsURL)
 			return
 		case <-c.ctx.Done():
-			c.logger.Debugf("connection:sendLoop", "returning, ctx.Err: %q", c.ctx.Err())
+			c.logger.Debugf("connection:sendLoop", "returning, ctx.Err: %q", lib.ContextErr(c.ctx))
 			return
 		}
 	}
@@ -596,14 +596,14 @@ func (c *Connection) Execute(
 		for {
 			select {
 			case <-evCancelCtx.Done():
-				c.logger.Debugf("connection:Execute:<-evCancelCtx.Done()", "wsURL:%q err:%v", c.wsURL, evCancelCtx.Err())
+				c.logger.Debugf("connection:Execute:<-evCancelCtx.Done()", "wsURL:%q err:%v", c.wsURL, lib.ContextErr(evCancelCtx))
 				return
 			case ev := <-chEvHandler:
 				msg, ok := ev.data.(*cdproto.Message)
 				if ok && msg.ID == id {
 					select {
 					case <-evCancelCtx.Done():
-						c.logger.Debugf("connection:Execute:<-evCancelCtx.Done()#2", "wsURL:%q err:%v", c.wsURL, evCancelCtx.Err())
+						c.logger.Debugf("connection:Execute:<-evCancelCtx.Done()#2", "wsURL:%q err:%v", c.wsURL, lib.ContextErr(evCancelCtx))
 					case ch <- msg:
 						// Stopping goroutine as we expect only one response with the matching message ID
 						return

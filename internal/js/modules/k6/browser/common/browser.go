@@ -412,7 +412,7 @@ func (b *Browser) isPageAttachmentErrorIgnorable(ev *target.EventAttachedToTarge
 	case <-b.vuCtx.Done():
 		b.logger.Debugf("Browser:isPageAttachmentErrorIgnorable:return:<-ctx.Done",
 			"sid:%v tid:%v pageType:%s err:%v",
-			ev.SessionID, targetPage.TargetID, targetPage.Type, b.vuCtx.Err())
+			ev.SessionID, targetPage.TargetID, targetPage.Type, lib.ContextErr(b.vuCtx))
 		return true
 	default:
 	}
@@ -506,7 +506,7 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 		page = b.pages[tid]
 		b.pagesMu.RUnlock()
 	case <-ctx.Done():
-		b.logger.Debugf("Browser:newPageInContext:<-ctx.Done", "tid:%v bctxid:%v err:%v", tid, id, ctx.Err())
+		b.logger.Debugf("Browser:newPageInContext:<-ctx.Done", "tid:%v bctxid:%v err:%v", tid, id, lib.ContextErr(ctx))
 	}
 
 	if err = lib.ContextErr(ctx); err != nil {
