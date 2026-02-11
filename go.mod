@@ -26,7 +26,7 @@ require (
 	github.com/grafana/xk6-redis v0.3.6
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
-	github.com/jhump/protoreflect v1.17.0
+	github.com/jhump/protoreflect v1.18.0
 	github.com/klauspost/compress v1.18.2
 	github.com/mailru/easyjson v0.9.0
 	github.com/mattn/go-colorable v0.1.14
@@ -67,6 +67,7 @@ require (
 )
 
 require (
+	github.com/jhump/protoreflect/v2 v2.0.0-beta.1 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	gopkg.in/validator.v2 v2.0.1 // indirect
