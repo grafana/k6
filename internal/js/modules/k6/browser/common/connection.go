@@ -603,7 +603,8 @@ func (c *Connection) Execute(
 				if ok && msg.ID == id {
 					select {
 					case <-evCancelCtx.Done():
-						c.logger.Debugf("connection:Execute:<-evCancelCtx.Done()#2", "wsURL:%q err:%v", c.wsURL, lib.ContextErr(evCancelCtx))
+						c.logger.Debugf("connection:Execute:<-evCancelCtx.Done()#2",
+							"wsURL:%q err:%v", c.wsURL, lib.ContextErr(evCancelCtx))
 					case ch <- msg:
 						// Stopping goroutine as we expect only one response with the matching message ID
 						return
