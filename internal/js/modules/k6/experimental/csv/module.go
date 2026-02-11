@@ -98,12 +98,10 @@ const parseSharedArrayNamePrefix = "csv.parse."
 func (mi *ModuleInstance) Parse(file sobek.Value, options sobek.Value) (*sobek.Promise, error) {
 	rt := mi.vu.Runtime()
 
-	promise, resolve, reject := rt.NewPromise()
 	// 1. Make sure the Sobek object is a fs.File (Sobek operation)
 	var fileObj fs.File
 	if err := mi.vu.Runtime().ExportTo(file, &fileObj); err != nil {
-		err := reject(fmt.Errorf("first argument expected to be a fs.File instance, got %T instead", file))
-		return promise, err
+		return nil, fmt.Errorf("first argument expected to be a fs.File instance, got %T instead", file)
 	}
 
 	parserOptions := newDefaultParserOptions()
@@ -111,24 +109,22 @@ func (mi *ModuleInstance) Parse(file sobek.Value, options sobek.Value) (*sobek.P
 		var err error
 		parserOptions, err = newParserOptionsFrom(options.ToObject(rt))
 		if err != nil {
-			err := reject(fmt.Errorf("failed to interpret the provided Parser options; reason: %w", err))
-			return promise, err
+			return nil, fmt.Errorf("failed to interpret the provided Parser options; reason: %w", err)
 		}
 	}
 
 	r, err := NewReaderFrom(fileObj.ReadSeekStater, parserOptions)
 	if err != nil {
-		err := reject(fmt.Errorf("failed to create a new parser; reason: %w", err))
-		return promise, err
+		return nil, fmt.Errorf("failed to create a new parser; reason: %w", err)
 	}
 
 	underlyingSharedArrayName, err := buildSharedArrayName(fileObj, parserOptions)
 	if err != nil {
-		err := reject(fmt.Errorf("failed to derive shared array name; reason: %w", err))
-		return promise, err
+		return nil, fmt.Errorf("failed to derive shared array name; reason: %w", err)
 	}
 
 	callback := mi.vu.RegisterCallback()
+	promise, resolve, reject := rt.NewPromise()
 
 	go func() {
 		// Because we rely on the data module to create the shared array, we need to
@@ -139,7 +135,7 @@ func (mi *ModuleInstance) Parse(file sobek.Value, options sobek.Value) (*sobek.P
 		fn, err := mi.dataModuleInstance.NewSharedArrayFrom(mi.vu.Runtime(), underlyingSharedArrayName, r)
 		if err != nil {
 			callback(func() error {
-				return reject(err)
+				return reject(rt.NewGoError(err))
 			})
 			return
 		}

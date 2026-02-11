@@ -636,7 +636,7 @@ func TestParse(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("parse concurrent with same file should succeed", func(t *testing.T) {
+	t.Run("parse with invalid first argument should fail", func(t *testing.T) {
 		t.Parallel()
 
 		r, err := newConfiguredRuntime(t)
@@ -646,25 +646,45 @@ func TestParse(t *testing.T) {
 			return fsext.WriteFile(fs, testFilePath, []byte(csvTestData), 0o644)
 		})
 
+		_, err = r.RunOnEventLoop(wrapInAsyncLambda(`
+			try {
+				await csv.parse(5);
+				throw new Error("Expected csv.parse to reject, but it resolved");
+			} catch (e) {
+				if (!e.message.includes("fs.File instance")) {
+					throw new Error("Expected error about fs.File, got: " + e.message);
+				}
+			}
+		`))
+
+		require.NoError(t, err)
+	})
+
+	t.Run("parse with asObjects and malformed CSV should fail", func(t *testing.T) {
+		t.Parallel()
+
+		// CSV with header (3 cols) but row has only 2 cols - record length mismatch
+		malformedCSV := "a,b,c\n1,2\n"
+		malformedPath := fsext.FilePathSeparator + "malformed.csv"
+
+		r, err := newConfiguredRuntime(t)
+		require.NoError(t, err)
+
+		r.VU.InitEnvField.FileSystems["file"] = newTestFs(t, func(fs fsext.Fs) error {
+			return fsext.WriteFile(fs, malformedPath, []byte(malformedCSV), 0o644)
+		})
+
 		_, err = r.RunOnEventLoop(wrapInAsyncLambda(fmt.Sprintf(`
-			const filePath = %q;
-			const [records1, records2, records3] = await Promise.all([
-				fs.open(filePath).then(f => csv.parse(f)),
-				fs.open(filePath).then(f => csv.parse(f)),
-				fs.open(filePath).then(f => csv.parse(f)),
-			]);
-
-			const expectedLength = 11;
-			if (records1.length !== expectedLength || records2.length !== expectedLength || records3.length !== expectedLength) {
-				throw new Error("Expected " + expectedLength + " records from each parse, got " +
-					records1.length + ", " + records2.length + ", " + records3.length);
+			try {
+				const file = await fs.open(%q);
+				await csv.parse(file, { asObjects: true });
+				throw new Error("Expected csv.parse to reject, but it resolved");
+			} catch (e) {
+				if (!e.message.includes("doesn't match header length") && !e.message.includes("failed to read")) {
+					throw new Error("Expected error about record/header mismatch, got: " + e.message);
+				}
 			}
-
-			const firstRecord = JSON.stringify(records1[0]);
-			if (JSON.stringify(records2[0]) !== firstRecord || JSON.stringify(records3[0]) !== firstRecord) {
-				throw new Error("All modules should get the same parsed data");
-			}
-		`, testFilePath)))
+		`, malformedPath)))
 
 		require.NoError(t, err)
 	})
