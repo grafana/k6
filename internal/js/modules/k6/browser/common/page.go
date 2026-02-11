@@ -26,7 +26,14 @@ import (
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
 	"go.k6.io/k6/internal/js/modules/k6/browser/log"
+
+	k6metrics "go.k6.io/k6/metrics"
 )
+
+// MetricPusher queues metric samples to be pushed on the event loop,
+// avoiding the race between metric emission from CDP event goroutines
+// and channel closure during k6 shutdown.
+type MetricPusher func(k6metrics.ConnectedSamples)
 
 // BlankPage represents a blank page.
 const BlankPage = "about:blank"
@@ -271,6 +278,12 @@ type Page struct {
 	workersMu        sync.Mutex
 	routes           []*RouteHandler
 	routesMu         sync.RWMutex
+
+	// metricPusher safely pushes metric samples on the event loop to avoid
+	// racing with channel closure during shutdown. It is set by the browser
+	// mapping layer and read by FrameSession and NetworkManager goroutines.
+	metricPusherMu sync.RWMutex
+	metricPusher   MetricPusher
 
 	logger *log.Logger
 }
@@ -2005,6 +2018,24 @@ func (p *Page) Workers() []*Worker {
 // For internal use only.
 func (p *Page) TargetID() string {
 	return p.targetID.String()
+}
+
+// SetMetricPusher sets the metric pusher for the page. The pusher queues
+// metric samples to be pushed on the event loop, avoiding the race between
+// metric emission from CDP event goroutines and channel closure during
+// shutdown. It is set from the browser mapping layer.
+func (p *Page) SetMetricPusher(mp MetricPusher) {
+	p.metricPusherMu.Lock()
+	p.metricPusher = mp
+	p.metricPusherMu.Unlock()
+}
+
+// GetMetricPusher returns the current metric pusher, or nil if not set.
+func (p *Page) GetMetricPusher() MetricPusher {
+	p.metricPusherMu.RLock()
+	mp := p.metricPusher
+	p.metricPusherMu.RUnlock()
+	return mp
 }
 
 // executionContextForID returns the page ExecutionContext for the given ID.

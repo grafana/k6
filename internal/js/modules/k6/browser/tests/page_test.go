@@ -4365,3 +4365,67 @@ func TestPageGoBackForward(t *testing.T) {
 		tb.AssertURL(p, url3, "after rapid navigation should still be on page2")
 	})
 }
+
+// TestPageGotoMetricEmissionRace verifies that metric emission from CDP event
+// goroutines doesn't race with channel closure during shutdown.
+//
+// The race condition occurs when the samples channel is closed (as it is in
+// cmd/run.go during k6 shutdown) while NetworkManager or FrameSession
+// goroutines are still calling PushIfNotDone to emit metrics. The fix queues
+// metric pushes on the event loop via the MetricPusher callback, ensuring
+// they're synchronized with the channel lifecycle.
+//
+// Run with: go test -race -count 100 -run ^TestPageGotoMetricEmissionRace$
+//
+// See: https://github.com/grafana/k6/issues/4203
+func TestPageGotoMetricEmissionRace(t *testing.T) {
+	t.Parallel()
+
+	// Use a custom samples channel so we can close it to simulate k6
+	// shutdown, which is where the race occurs (cmd/run.go does
+	// defer close(state.Samples)).
+	samples := make(chan metrics.SampleContainer, 100)
+
+	tb := newTestBrowser(t, withHTTPServer(), withSamples(samples))
+	tb.withHandler("/race-test", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = fmt.Fprintf(w, `
+		<html>
+			<head></head>
+			<body>
+				<script type="module">
+					// Generate multiple network requests to increase the chance
+					// of metric emission racing with shutdown.
+					await Promise.all([
+						fetch('/ping-race'),
+						fetch('/ping-race'),
+						fetch('/ping-race'),
+					]);
+				</script>
+			</body>
+		</html>`)
+	})
+	tb.withHandler("/ping-race", func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = fmt.Fprintf(w, `pong`)
+	})
+
+	tb.vu.ActivateVU()
+	tb.vu.StartIteration(t)
+
+	// Using RunAsync ensures the page goes through the mapping layer where
+	// SetMetricPusher is called. The test navigates to a page that generates
+	// multiple network requests and then closes the page.
+	_, err := tb.vu.RunAsync(t, `
+		const page = await browser.newPage()
+		await page.goto('%s')
+		await page.close()
+	`, tb.url("/race-test"))
+	require.NoError(t, err)
+
+	tb.vu.EndIteration(t)
+
+	// Simulate what k6's cmd/run.go does during shutdown: close the
+	// samples channel. This is the operation that races with metric
+	// emission goroutines calling PushIfNotDone. Without the fix,
+	// the race detector should flag this as a data race.
+	close(samples)
+}

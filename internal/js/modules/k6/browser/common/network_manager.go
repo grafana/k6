@@ -67,6 +67,7 @@ type NetworkManager struct {
 	vu               k6modules.VU
 	customMetrics    *k6ext.CustomMetrics
 	eventInterceptor eventInterceptor
+	page             *Page // for accessing MetricPusher
 	errorReasons     map[string]network.ErrorReason
 
 	// TODO: manage inflight requests separately (move them between the two maps
@@ -99,6 +100,7 @@ func NewNetworkManager(
 	fm *FrameManager,
 	parent *NetworkManager,
 	ei eventInterceptor,
+	page *Page,
 ) (*NetworkManager, error) {
 	vu := k6ext.GetVU(ctx)
 	state := vu.State()
@@ -120,6 +122,7 @@ func NewNetworkManager(
 		resolver:                      resolver,
 		vu:                            vu,
 		customMetrics:                 customMetrics,
+		page:                          page,
 		reqIDToRequest:                make(map[network.RequestID]*Request),
 		reqIDToRequestWillBeSentEvent: make(map[network.RequestID]*network.EventRequestWillBeSent),
 		reqIDToRequestPausedEvent:     make(map[network.RequestID]*fetch.EventRequestPaused),
@@ -206,6 +209,21 @@ func (m *NetworkManager) deleteRequestByID(reqID network.RequestID) {
 	delete(m.reqIDToRequest, reqID)
 }
 
+// pushMetric pushes metric samples via the MetricPusher if available (which
+// queues the push on the event loop), otherwise falls back to calling
+// PushIfNotDone directly. This avoids the race between metric emission from
+// CDP event goroutines and channel closure during k6 shutdown.
+func (m *NetworkManager) pushMetric(samples k6metrics.ConnectedSamples) {
+	if m.page != nil {
+		if mp := m.page.GetMetricPusher(); mp != nil {
+			mp(samples)
+			return
+		}
+	}
+	state := m.vu.State()
+	k6metrics.PushIfNotDone(m.vu.Context(), state.Samples, samples)
+}
+
 func (m *NetworkManager) emitRequestMetrics(req *Request) {
 	state := m.vu.State()
 
@@ -218,7 +236,7 @@ func (m *NetworkManager) emitRequestMetrics(req *Request) {
 	}
 	tags = tags.With("resource_type", req.ResourceType())
 
-	k6metrics.PushIfNotDone(m.vu.Context(), state.Samples, k6metrics.ConnectedSamples{
+	m.pushMetric(k6metrics.ConnectedSamples{
 		Samples: []k6metrics.Sample{
 			{
 				TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserDataSent, Tags: tags},
@@ -285,7 +303,7 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 	tags = tags.With("from_service_worker", strconv.FormatBool(fromSvcWrk))
 	tags = tags.With("resource_type", req.ResourceType())
 
-	k6metrics.PushIfNotDone(m.vu.Context(), state.Samples, k6metrics.ConnectedSamples{
+	m.pushMetric(k6metrics.ConnectedSamples{
 		Samples: []k6metrics.Sample{
 			{
 				TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserHTTPReqDuration, Tags: tags},
@@ -301,7 +319,7 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 	})
 
 	if resp != nil && resp.timing != nil {
-		k6metrics.PushIfNotDone(m.vu.Context(), state.Samples, k6metrics.ConnectedSamples{
+		m.pushMetric(k6metrics.ConnectedSamples{
 			Samples: []k6metrics.Sample{
 				{
 					TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserHTTPReqFailed, Tags: tags},

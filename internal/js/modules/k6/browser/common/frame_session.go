@@ -123,7 +123,7 @@ func NewFrameSession(
 	if fs.parent != nil {
 		parentNM = fs.parent.networkManager
 	}
-	fs.networkManager, err = NewNetworkManager(ctx, k6Metrics, s, fs.manager, parentNM, fs.manager.page)
+	fs.networkManager, err = NewNetworkManager(ctx, k6Metrics, s, fs.manager, parentNM, fs.manager.page, fs.page)
 	if err != nil {
 		l.Debugf("NewFrameSession:NewNetworkManager", "sid:%v tid:%v err:%v",
 			s.ID(), tid, err)
@@ -326,6 +326,19 @@ func (fs *FrameSession) onEventBindingCalled(event *cdpruntime.EventBindingCalle
 	}
 }
 
+// pushMetric pushes metric samples via the MetricPusher if available (which
+// queues the push on the event loop), otherwise falls back to calling
+// PushIfNotDone directly. This avoids the race between metric emission from
+// CDP event goroutines and channel closure during k6 shutdown.
+func (fs *FrameSession) pushMetric(samples k6metrics.ConnectedSamples) {
+	if mp := fs.page.GetMetricPusher(); mp != nil {
+		mp(samples)
+		return
+	}
+	state := fs.vu.State()
+	k6metrics.PushIfNotDone(fs.vu.Context(), state.Samples, samples)
+}
+
 func (fs *FrameSession) parseAndEmitWebVitalMetric(object string) error {
 	fs.logger.Debugf("FrameSession:parseAndEmitWebVitalMetric", "object:%s", object)
 
@@ -364,7 +377,7 @@ func (fs *FrameSession) parseAndEmitWebVitalMetric(object string) error {
 	tags = tags.With("rating", wv.Rating)
 
 	now := time.Now()
-	k6metrics.PushIfNotDone(fs.vu.Context(), state.Samples, k6metrics.ConnectedSamples{
+	fs.pushMetric(k6metrics.ConnectedSamples{
 		Samples: []k6metrics.Sample{
 			{
 				TimeSeries: k6metrics.TimeSeries{Metric: metric, Tags: tags},
