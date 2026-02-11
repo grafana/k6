@@ -4,7 +4,11 @@ import (
 	"testing"
 
 	"github.com/grafana/sobek"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"go.k6.io/k6/internal/js/modules/k6/browser/common"
+	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext/k6test"
 )
 
 func TestParseStringOrRegex(t *testing.T) {
@@ -45,6 +49,83 @@ func TestParseStringOrRegex(t *testing.T) {
 			t.Parallel()
 			got := parseStringOrRegex(tc.input, tc.doubleQuote)
 			require.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func TestParseSize(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		input   string
+		want    *common.Size
+		wantErr string
+	}{
+		{
+			name:  "defaults_on_null",
+			input: `null`,
+			want:  &common.Size{Width: 0, Height: 0},
+		},
+		{
+			name:  "all_options",
+			input: `({width: 1920, height: 1080})`,
+			want:  &common.Size{Width: 1920, Height: 1080},
+		},
+		{
+			name:  "partial_width_only",
+			input: `({width: 1920})`,
+			want:  &common.Size{Width: 1920, Height: 0},
+		},
+		{
+			name:  "float_width",
+			input: `({width: 1920.5, height: 1080})`,
+			want:  &common.Size{Width: 1920.5, Height: 1080},
+		},
+		{
+			name:  "float_height",
+			input: `({width: 1920, height: 1080.5})`,
+			want:  &common.Size{Width: 1920, Height: 1080.5},
+		},
+		{
+			name:  "null_width",
+			input: `({width: null, height: 1080})`,
+			want:  &common.Size{Width: 0, Height: 1080},
+		},
+		{
+			name:  "undefined_width",
+			input: `({width: undefined, height: 1080})`,
+			want:  &common.Size{Width: 0, Height: 1080},
+		},
+		{
+			name:    "invalid_width_string",
+			input:   `({width: "1920", height: 1080})`,
+			wantErr: "width must be a number",
+		},
+		{
+			name:    "invalid_height_string",
+			input:   `({width: 1920, height: "1080"})`,
+			wantErr: "height must be a number",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			vu := k6test.NewVU(t)
+			v, err := vu.Runtime().RunString(tt.input)
+			require.NoError(t, err)
+
+			opts, err := parseSize(vu.Runtime(), v)
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, opts)
 		})
 	}
 }
