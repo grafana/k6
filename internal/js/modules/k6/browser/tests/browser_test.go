@@ -329,6 +329,7 @@ func TestMultiConnectToSingleBrowser(t *testing.T) {
 
 	b1, err := tb.browserType.Connect(context.Background(), ctx, tb.wsURL)
 	require.NoError(t, err)
+	t.Cleanup(b1.Close)
 	bctx1, err := b1.NewContext(nil)
 	require.NoError(t, err)
 	p1, err := bctx1.NewPage()
@@ -336,6 +337,7 @@ func TestMultiConnectToSingleBrowser(t *testing.T) {
 
 	b2, err := tb.browserType.Connect(context.Background(), ctx, tb.wsURL)
 	require.NoError(t, err)
+	t.Cleanup(b2.Close)
 	bctx2, err := b2.NewContext(nil)
 	require.NoError(t, err)
 
