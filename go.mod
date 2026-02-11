@@ -26,8 +26,8 @@ require (
 	github.com/grafana/xk6-redis v0.3.6
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
-	github.com/jhump/protoreflect v1.17.0
-	github.com/klauspost/compress v1.18.2
+	github.com/jhump/protoreflect v1.18.0
+	github.com/klauspost/compress v1.18.4
 	github.com/mailru/easyjson v0.9.0
 	github.com/mattn/go-colorable v0.1.14
 	github.com/mattn/go-isatty v0.0.20
@@ -60,13 +60,14 @@ require (
 	golang.org/x/sync v0.19.0
 	golang.org/x/term v0.39.0
 	golang.org/x/time v0.14.0
-	google.golang.org/grpc v1.77.0
+	google.golang.org/grpc v1.78.0
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/guregu/null.v3 v3.3.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
+	github.com/jhump/protoreflect/v2 v2.0.0-beta.1 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	gopkg.in/validator.v2 v2.0.1 // indirect
@@ -105,8 +106,8 @@ require (
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	golang.org/x/sys v0.40.0 // indirect
 	golang.org/x/text v0.33.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20251022142026-3a174f9686a8 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20251022142026-3a174f9686a8 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20251029180050-ab9386a59fda // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20251029180050-ab9386a59fda // indirect
 	gopkg.in/cenkalti/backoff.v1 v1.1.0 // indirect
 )
 
