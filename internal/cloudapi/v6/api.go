@@ -94,7 +94,11 @@ func (c *Client) GetCloudTestByName(name string, projectID int64) (lt *k6cloud.L
 	return nil, fmt.Errorf("failed to retrieve existing test with name %q", name)
 }
 
-func (c *Client) CreateOrUpdateCloudTest(name string, projectID int64, arc *lib.Archive) (*k6cloud.LoadTestApiModel, error) {
+// CreateOrUpdateCloudTest creates a new cloud test or updates an existing one
+// if a test with the same name already exists.
+func (c *Client) CreateOrUpdateCloudTest(
+	name string, projectID int64, arc *lib.Archive,
+) (*k6cloud.LoadTestApiModel, error) {
 	test, err := c.CreateCloudTest(name, projectID, arc)
 	if err != nil {
 		var rErr ResponseError
