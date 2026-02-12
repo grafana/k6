@@ -95,16 +95,13 @@ const parseSharedArrayNamePrefix = "csv.parse."
 
 // Parse parses the provided CSV file, and returns a promise that resolves to a shared array
 // containing the parsed data.
-func (mi *ModuleInstance) Parse(file sobek.Value, options sobek.Value) *sobek.Promise {
-	promise, resolve, reject := promises.New(mi.vu)
-
+func (mi *ModuleInstance) Parse(file sobek.Value, options sobek.Value) (*sobek.Promise, error) {
 	rt := mi.vu.Runtime()
 
 	// 1. Make sure the Sobek object is a fs.File (Sobek operation)
 	var fileObj fs.File
 	if err := mi.vu.Runtime().ExportTo(file, &fileObj); err != nil {
-		reject(fmt.Errorf("first argument expected to be a fs.File instance, got %T instead", file))
-		return promise
+		return nil, fmt.Errorf("first argument expected to be a fs.File instance, got %T instead", file)
 	}
 
 	parserOptions := newDefaultParserOptions()
@@ -112,22 +109,22 @@ func (mi *ModuleInstance) Parse(file sobek.Value, options sobek.Value) *sobek.Pr
 		var err error
 		parserOptions, err = newParserOptionsFrom(options.ToObject(rt))
 		if err != nil {
-			reject(fmt.Errorf("failed to interpret the provided Parser options; reason: %w", err))
-			return promise
+			return nil, fmt.Errorf("failed to interpret the provided Parser options; reason: %w", err)
 		}
 	}
 
 	r, err := NewReaderFrom(fileObj.ReadSeekStater, parserOptions)
 	if err != nil {
-		reject(fmt.Errorf("failed to create a new parser; reason: %w", err))
-		return promise
+		return nil, fmt.Errorf("failed to create a new parser; reason: %w", err)
 	}
 
 	underlyingSharedArrayName, err := buildSharedArrayName(fileObj, parserOptions)
 	if err != nil {
-		reject(fmt.Errorf("failed to derive shared array name; reason: %w", err))
-		return promise
+		return nil, fmt.Errorf("failed to derive shared array name; reason: %w", err)
 	}
+
+	callback := mi.vu.RegisterCallback()
+	promise, resolve, reject := rt.NewPromise()
 
 	go func() {
 		// Because we rely on the data module to create the shared array, we need to
@@ -135,10 +132,19 @@ func (mi *ModuleInstance) Parse(file sobek.Value, options sobek.Value) *sobek.Pr
 		// it multiple times.
 		//
 		// As such we hold a single instance of it in the RootModule, and we use it to create the shared array.
-		resolve(mi.dataModuleInstance.NewSharedArrayFrom(mi.vu.Runtime(), underlyingSharedArrayName, r))
+		fn, err := mi.dataModuleInstance.NewSharedArrayFrom(mi.vu.Runtime(), underlyingSharedArrayName, r)
+		if err != nil {
+			callback(func() error {
+				return reject(rt.NewGoError(err))
+			})
+			return
+		}
+		callback(func() error {
+			return resolve(fn())
+		})
 	}()
 
-	return promise
+	return promise, nil
 }
 
 // NewParser creates a new CSV parser instance.
