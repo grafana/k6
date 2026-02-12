@@ -428,6 +428,9 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 	uploadCmd.SetUsageTemplate(defaultUsageTemplate)
 	cloudCmd.AddCommand(uploadCmd)
 
+	projectCmd := getCmdCloudProject(c)
+	cloudCmd.AddCommand(projectCmd)
+
 	cloudCmd.Flags().SortFlags = false
 	cloudCmd.Flags().AddFlagSet(c.flagSet())
 
