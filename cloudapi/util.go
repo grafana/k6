@@ -8,3 +8,12 @@ func URLForResults(refID string, config Config) string {
 
 	return config.WebAppURL.String + "/runs/" + refID
 }
+
+// URLForTest returns the cloud URL with the test details.
+func URLForTest(refID string, config Config) string {
+	if config.TestRunDetails.Valid {
+		return config.TestRunDetails.String
+	}
+
+	return config.WebAppURL.String + "/tests/" + refID
+}

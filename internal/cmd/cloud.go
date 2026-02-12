@@ -174,18 +174,25 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	client := cloudapi.NewClient(
 		logger, cloudConfig.Token.String, cloudConfig.Host.String, build.Version, cloudConfig.Timeout.TimeDuration())
 
+	shouldUseV6API := cloudConfig.StackID.Valid && cloudConfig.StackID.Int64 != 0
 	var refID string
-	// TODO: Should handle upload only with v6 API as well
+	var testURL string
 	//nolint:nestif
-	if cloudConfig.StackID.Valid && cloudConfig.StackID.Int64 != 0 && !c.uploadOnly {
+	if shouldUseV6API {
 		var stopSignalHandling func()
 		refID, stopSignalHandling, err = startCloudTestRunV6(
-			c.gs, logger, progressBar, &cloudConfig, tmpCloudConfig, name, arc, globalCancel)
+			c.gs, logger, progressBar, &cloudConfig, tmpCloudConfig, name, arc, c.uploadOnly, globalCancel)
 		if err != nil {
 			return err
 		}
 
 		defer stopSignalHandling()
+
+		if c.uploadOnly {
+			testURL = cloudapi.URLForTest(refID, cloudConfig)
+		} else {
+			testURL = cloudapi.URLForResults(refID, cloudConfig)
+		}
 	} else {
 		if cloudConfig.StackID.Valid {
 			client.SetStackID(cloudConfig.StackID.Int64)
@@ -238,13 +245,14 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 		}
 		stopSignalHandling := handleTestAbortSignals(c.gs, gracefulStop, onHardStop)
 		defer stopSignalHandling()
+
+		testURL = cloudapi.URLForResults(refID, cloudConfig)
 	}
 
 	et, err := lib.NewExecutionTuple(test.derivedConfig.ExecutionSegment, test.derivedConfig.ExecutionSegmentSequence)
 	if err != nil {
 		return err
 	}
-	testURL := cloudapi.URLForResults(refID, cloudConfig)
 	executionPlan := test.derivedConfig.Scenarios.GetFullExecutionRequirements(et)
 	printExecutionDescription(
 		c.gs, "cloud", test.sourceRootPath, testURL, test.derivedConfig, et, executionPlan, nil,
@@ -264,6 +272,26 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 		showProgress(progressCtx, c.gs, []*pb.ProgressBar{progressBar}, logger)
 		progressBarWG.Done()
 	}()
+
+	// When only uploading archive using Cloud API v6, we don't have a test run ID to track,
+	// so we skip the progress tracking and log streaming.
+	if shouldUseV6API && c.uploadOnly {
+		modifyAndPrintBar(
+			c.gs, progressBar,
+			pb.WithConstLeft("Run "), pb.WithConstProgress(1, "Uploaded"),
+		)
+
+		if !c.gs.Flags.Quiet {
+			valueColor := getColor(c.gs.Flags.NoColor || !c.gs.Stdout.IsTTY, color.FgCyan)
+			printToStdout(c.gs, fmt.Sprintf(
+				"     test status: %s\n", valueColor.Sprint("Uploaded"),
+			))
+		} else {
+			logger.WithField("run_status", "Uploaded").Debug("Test finished")
+		}
+
+		return nil
+	}
 
 	var (
 		startTime   time.Time
@@ -527,6 +555,7 @@ func startCloudTestRunV6(
 	tmpCloudConfig map[string]interface{},
 	testName string,
 	arc *lib.Archive,
+	uploadOnly bool,
 	globalCancel context.CancelFunc,
 ) (string, func(), error) {
 	client, err := v6cloudapi.NewClient(
@@ -552,7 +581,22 @@ func startCloudTestRunV6(
 
 	modifyAndPrintBar(gs, progressBar, pb.WithConstProgress(0, "Uploading archive"))
 
+	if uploadOnly {
+		loadTest, err := client.CreateOrUpdateCloudTest(testName, cloudConfig.ProjectID.Int64, arc)
+		if err != nil {
+			return "", nil, err
+		}
+
+		// Trap Interrupts, SIGINTs and SIGTERMs.
+		gracefulStop := func(_ os.Signal) {
+			globalCancel()
+		}
+		stopSignalHandling := handleTestAbortSignals(gs, gracefulStop, nil)
+		return strconv.FormatInt(int64(loadTest.Id), 10), stopSignalHandling, nil
+	}
+
 	cloudTestRun, err := client.CreateAndStartCloudTestRun(testName, cloudConfig.ProjectID.Int64, arc)
+
 	if err != nil {
 		return "", nil, err
 	}
