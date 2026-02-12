@@ -72,7 +72,6 @@ require (
 	github.com/jhump/protoreflect/v2 v2.0.0-beta.1 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
-	gopkg.in/validator.v2 v2.0.1 // indirect
 )
 
 require (
@@ -88,7 +87,7 @@ require (
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/pprof v0.0.0-20230728192033-2ba5b33183c6 // indirect
-	github.com/grafana/k6-cloud-openapi-client-go v0.0.0-20260206104121-a02255dcc950 // indirect
+	github.com/grafana/k6-cloud-openapi-client-go v0.0.0-20260206104121-a02255dcc950
 	github.com/grafana/k6build v0.5.15 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.2 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
