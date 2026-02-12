@@ -1634,7 +1634,7 @@ func retryAction(apiCtx context.Context, fn func(apiCtx context.Context) (any, e
 		res, err := fn(apiCtx)
 
 		if err == nil {
-			return res, err
+			return res, nil
 		}
 
 		if shouldRetry, err := shouldRetry(apiCtx, err); !shouldRetry {
