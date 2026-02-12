@@ -21,7 +21,7 @@ func TestRootCommand(t *testing.T) {
 		"Help flag": {"k6", "--help"},
 	}
 
-	helptxt := "Usage:\n  k6 [command]\n\nAvailable Commands"
+	helptxt := "Usage:\n  k6 [command]\n\nCore Commands"
 	for name, args := range cases {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()

@@ -635,6 +635,59 @@ func TestParse(t *testing.T) {
 		`, testFilePath)))
 		require.NoError(t, err)
 	})
+
+	t.Run("parse with invalid first argument should fail", func(t *testing.T) {
+		t.Parallel()
+
+		r, err := newConfiguredRuntime(t)
+		require.NoError(t, err)
+
+		r.VU.InitEnvField.FileSystems["file"] = newTestFs(t, func(fs fsext.Fs) error {
+			return fsext.WriteFile(fs, testFilePath, []byte(csvTestData), 0o644)
+		})
+
+		_, err = r.RunOnEventLoop(wrapInAsyncLambda(`
+			try {
+				await csv.parse(5);
+				throw new Error("Expected csv.parse to reject, but it resolved");
+			} catch (e) {
+				if (!e.message.includes("fs.File instance")) {
+					throw new Error("Expected error about fs.File, got: " + e.message);
+				}
+			}
+		`))
+
+		require.NoError(t, err)
+	})
+
+	t.Run("parse with asObjects and malformed CSV should fail", func(t *testing.T) {
+		t.Parallel()
+
+		// CSV with header (3 cols) but row has only 2 cols - record length mismatch
+		malformedCSV := "a,b,c\n1,2\n"
+		malformedPath := fsext.FilePathSeparator + "malformed.csv"
+
+		r, err := newConfiguredRuntime(t)
+		require.NoError(t, err)
+
+		r.VU.InitEnvField.FileSystems["file"] = newTestFs(t, func(fs fsext.Fs) error {
+			return fsext.WriteFile(fs, malformedPath, []byte(malformedCSV), 0o644)
+		})
+
+		_, err = r.RunOnEventLoop(wrapInAsyncLambda(fmt.Sprintf(`
+			try {
+				const file = await fs.open(%q);
+				await csv.parse(file, { asObjects: true });
+				throw new Error("Expected csv.parse to reject, but it resolved");
+			} catch (e) {
+				if (!e.message.includes("doesn't match header length") && !e.message.includes("failed to read")) {
+					throw new Error("Expected error about record/header mismatch, got: " + e.message);
+				}
+			}
+		`, malformedPath)))
+
+		require.NoError(t, err)
+	})
 }
 
 func TestBuildSharedArrayNameDeterministic(t *testing.T) {

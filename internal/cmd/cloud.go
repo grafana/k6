@@ -29,10 +29,10 @@ import (
 )
 
 // errUserUnauthenticated represents an authentication error when trying to use
-// Grafana Cloud k6 without being logged in or having a valid token.
+// Grafana Cloud without being logged in or having a valid token.
 //
 //nolint:staticcheck // the error is shown to the user so here punctuation and capital are required
-var errUserUnauthenticated = errors.New("To run tests with Grafana Cloud k6, you must first authenticate." +
+var errUserUnauthenticated = errors.New("To run tests in Grafana Cloud, you must first authenticate." +
 	" Run the `k6 cloud login` command, or check the docs" +
 	" https://grafana.com/docs/grafana-cloud/testing/k6/author-run/tokens-and-cli-authentication" +
 	" for additional authentication methods.")
@@ -88,6 +88,20 @@ func (c *cmdCloud) preRun(cmd *cobra.Command, _ []string) error {
 //
 //nolint:funlen,gocognit,cyclop
 func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
+	// If no args provided and called from main cloud command, show helpful error
+	if cmd.Name() == "cloud" && len(args) == 0 {
+		return errors.New("the \"k6 cloud\" command expects either a subcommand such as \"run\" or \"login\", " +
+			"or a single argument consisting in a path to a script/archive, or the `-` symbol instructing " +
+			"the command to read the test content from stdin; received no arguments")
+	}
+
+	// Show deprecation warning only when running tests directly via "k6 cloud <file>"
+	// (not when using subcommands like "k6 cloud run")
+	if cmd.Name() == "cloud" && len(args) > 0 {
+		c.gs.Logger.Warn("Running tests directly with \"k6 cloud <file>\" is deprecated. " +
+			"Use \"k6 cloud run <file>\" instead. This behavior will be removed in a future release.")
+	}
+
 	test, err := loadAndConfigureLocalTest(c.gs, cmd, args, getPartialConfig)
 	if err != nil {
 		return err
@@ -419,45 +433,65 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 	}
 
 	exampleText := getExampleText(gs, `
-  # [deprecated] Run a k6 script in the Grafana Cloud k6
+  # [deprecated] Run a test script in Grafana Cloud
   $ {{.}} cloud script.js
 
-  # [deprecated] Run a k6 archive in the Grafana Cloud k6
+  # [deprecated] Run a test archive in Grafana Cloud
   $ {{.}} cloud archive.tar
 
-  # Authenticate with Grafana Cloud k6
+  # Authenticate with Grafana Cloud
   $ {{.}} cloud login
 
-  # Run a k6 script in the Grafana Cloud k6
+  # Run a test script in Grafana Cloud
   $ {{.}} cloud run script.js
 
-  # Run a k6 archive in the Grafana Cloud k6
+  # Run a test archive in Grafana Cloud
   $ {{.}} cloud run archive.tar`[1:])
 
 	cloudCmd := &cobra.Command{
-		Use:   "cloud",
-		Short: "Run a test on the cloud",
-		Long: `The original behavior of the "k6 cloud" command described below is deprecated.
-In future versions, the "cloud" command will only display a help text and will no longer run tests
-in Grafana Cloud k6. To continue running tests in the cloud, please transition to using the "k6 cloud run" command.
-
-Run a test in the Grafana Cloud k6.
-
-This will archive test script(s), including all necessary resources, and execute the test in the Grafana Cloud k6
-service. Be sure to run the "k6 cloud login" command prior to authenticate with Grafana Cloud k6.`,
-		Args:    exactCloudArgs(),
+		Use:     "cloud",
+		Short:   "Run and manage Grafana Cloud tests",
+		Long:    "Run and manage tests in Grafana Cloud.",
+		Example: exampleText,
 		PreRunE: c.preRun,
 		RunE:    c.run,
-		Example: exampleText,
 	}
 
-	// Register `k6 cloud` subcommands
-	cloudCmd.AddCommand(getCmdCloudRun(c))
-	cloudCmd.AddCommand(getCmdCloudLogin(gs))
-	cloudCmd.AddCommand(getCmdCloudUpload(c))
+	// Register `k6 cloud` subcommands with default usage template
+	defaultUsageTemplate := (&cobra.Command{}).UsageTemplate()
+	defaultUsageTemplate = strings.ReplaceAll(defaultUsageTemplate, "FlagUsages", "FlagUsagesWrapped 120")
+
+	runCmd := getCmdCloudRun(c)
+	runCmd.SetUsageTemplate(defaultUsageTemplate)
+	cloudCmd.AddCommand(runCmd)
+
+	loginCmd := getCmdCloudLogin(gs)
+	loginCmd.SetUsageTemplate(defaultUsageTemplate)
+	cloudCmd.AddCommand(loginCmd)
+
+	uploadCmd := getCmdCloudUpload(c)
+	uploadCmd.SetUsageTemplate(defaultUsageTemplate)
+	cloudCmd.AddCommand(uploadCmd)
 
 	cloudCmd.Flags().SortFlags = false
 	cloudCmd.Flags().AddFlagSet(c.flagSet())
+
+	cloudCmd.SetUsageTemplate(`Usage:
+  {{.CommandPath}} [command]
+
+Commands:{{range .Commands}}{{if (or (eq .Name "login") (eq .Name "run"))}}
+  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{range .Commands}}` +
+		`{{if and .IsAvailableCommand (ne .Name "login") (ne .Name "run")}}
+  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}
+
+Flags:
+  -h, --help   Show help
+{{if .HasExample}}
+Examples:
+{{.Example}}
+{{end}}
+Use "{{.CommandPath}} [command] --help" for more information about a command.
+`)
 
 	return cloudCmd
 }
@@ -521,28 +555,6 @@ func resolveAndSetProjectID(
 			"environment variable as this will become mandatory in the next major release.")
 	}
 	return nil
-}
-
-func exactCloudArgs() cobra.PositionalArgs {
-	return func(_ *cobra.Command, args []string) error {
-		const baseErrMsg = `the "k6 cloud" command expects either a subcommand such as "run" or "login", or ` +
-			"a single argument consisting in a path to a script/archive, or the `-` symbol instructing " +
-			"the command to read the test content from stdin"
-
-		if len(args) == 0 {
-			return fmt.Errorf(baseErrMsg + "; " + "received no arguments")
-		}
-
-		hasSubcommand := args[0] == "run" || args[0] == "login"
-		if len(args) > 1 && !hasSubcommand {
-			return fmt.Errorf(
-				baseErrMsg+"; "+"received %d arguments %q, and %s is not a valid subcommand",
-				len(args), strings.Join(args, " "), args[0],
-			)
-		}
-
-		return nil
-	}
 }
 
 // startCloudTestRunV6 starts a cloud test run using the v6 API client and returns a reference ID

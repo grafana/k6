@@ -22,7 +22,7 @@ FROM release as with-browser
 USER root
 
 COPY --from=release /usr/bin/k6 /usr/bin/k6
-RUN apk --no-cache add chromium-swiftshader
+RUN apk --no-cache add chromium chromium-swiftshader
 
 USER 12345
 

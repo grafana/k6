@@ -587,7 +587,7 @@ func getCmdRun(gs *state.GlobalState) *cobra.Command {
 
 	runCmd := &cobra.Command{
 		Use:   "run",
-		Short: "Start a test",
+		Short: "Run a test",
 		Long: `Start a test. This also exposes a REST API to interact with it. Various k6 subcommands offer
 a commandline interface for interacting with it.`,
 		Example: exampleText,

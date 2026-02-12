@@ -20,6 +20,7 @@ import (
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/ext"
+	"go.k6.io/k6/internal/build"
 	"go.k6.io/k6/internal/log"
 	"go.k6.io/k6/secretsource"
 
@@ -27,6 +28,54 @@ import (
 )
 
 const waitLoggerCloseTimeout = time.Second * 5
+
+func getDocsURL() string {
+	version := build.Version
+	version = strings.TrimPrefix(version, "v")
+	parts := strings.SplitN(version, ".", 3)
+	if len(parts) >= 2 {
+		return fmt.Sprintf("https://grafana.com/docs/k6/v%s.%s.x/", parts[0], parts[1])
+	}
+	return "https://grafana.com/docs/k6/latest/"
+}
+
+func getRootUsageTemplate() string {
+	return fmt.Sprintf(`{{.Short}}
+
+Usage:{{if .Runnable}}
+  {{.UseLine}}{{end}}{{if .HasAvailableSubCommands}}
+  {{.CommandPath}} [command]{{end}}{{if .HasAvailableSubCommands}}
+
+Core Commands:{{range .Commands}}{{if eq .Name "new"}}
+  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{range .Commands}}{{if eq .Name "run"}}
+  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{range .Commands}}{{if eq .Name "cloud"}}
+  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}
+
+Additional Commands:{{range .Commands}}{{if and .IsAvailableCommand (ne .Name "new") (ne .Name "run") `+
+		`(ne .Name "cloud") (ne .Name "help")}}
+  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}
+
+Flags:
+  -h, --help      Show help
+      --version   Show version information
+
+Examples:
+  # Create a test
+  $ {{.CommandPath}} new test.js
+
+  # Run a test
+  $ {{.CommandPath}} run test.js
+
+  # Run a test in Grafana Cloud
+  $ {{.CommandPath}} cloud run test.js
+
+  # Run locally, stream results to Grafana Cloud
+  $ {{.CommandPath}} cloud run --local-execution test.js
+{{if .HasAvailableSubCommands}}
+Use "{{.CommandPath}} [command] --help" for more information about a command.
+Full CLI documentation: %s{{end}}
+`, getDocsURL())
+}
 
 // ExecuteWithGlobalState runs the root command with an existing GlobalState.
 // It adds all child commands to the root command and it sets flags appropriately.
@@ -53,10 +102,9 @@ func newRootCommand(gs *state.GlobalState) *rootCommand {
 	}
 	// the base command when called without any subcommands.
 	rootCmd := &cobra.Command{
-		Use:   gs.BinaryName,
-		Short: "a next-generation load generator",
-		Long: "\n" + getBanner(gs.Flags.NoColor || !gs.Stdout.IsTTY, isTrueColor(gs.Env)) +
-			"\n\nFull CLI documentation is available at: https://grafana.com/docs/k6/latest/using-k6/k6-options/reference/",
+		Use:               gs.BinaryName,
+		Short:             "Grafana k6 is an easy-to-use, open-source load and performance testing tool",
+		Long:              "\n" + getBanner(gs.Flags.NoColor || !gs.Stdout.IsTTY, isTrueColor(gs.Env)),
 		SilenceUsage:      true,
 		SilenceErrors:     true,
 		PersistentPreRunE: c.persistentPreRunE,
@@ -66,10 +114,6 @@ func newRootCommand(gs *state.GlobalState) *rootCommand {
 	rootCmd.SetVersionTemplate(
 		`{{with .Name}}{{printf "%s " .}}{{end}}{{printf "v%s\n" .Version}}`,
 	)
-
-	usageTemplate := rootCmd.UsageTemplate()
-	usageTemplate = strings.ReplaceAll(usageTemplate, "FlagUsages", "FlagUsagesWrapped 120")
-	rootCmd.SetUsageTemplate(usageTemplate)
 
 	rootCmd.PersistentFlags().AddFlagSet(rootCmdPersistentFlagSet(gs))
 	rootCmd.SetArgs(gs.CmdArgs[1:])
@@ -83,14 +127,22 @@ func newRootCommand(gs *state.GlobalState) *rootCommand {
 		getCmdStats, getCmdStatus, getCmdVersion,
 	}
 
+	defaultUsageTemplate := (&cobra.Command{}).UsageTemplate()
+	defaultUsageTemplate = strings.ReplaceAll(defaultUsageTemplate, "FlagUsages", "FlagUsagesWrapped 120")
+
 	for _, sc := range subCommands {
-		rootCmd.AddCommand(sc(gs))
+		cmd := sc(gs)
+		cmd.SetUsageTemplate(defaultUsageTemplate)
+		rootCmd.AddCommand(cmd)
 	}
 
 	// Add the "x" command only if there are registered subcommand extensions.
 	if xCmd := getX(gs); len(xCmd.Commands()) > 0 {
+		xCmd.SetUsageTemplate(defaultUsageTemplate)
 		rootCmd.AddCommand(xCmd)
 	}
+
+	rootCmd.SetUsageTemplate(getRootUsageTemplate())
 
 	c.cmd = rootCmd
 	return c

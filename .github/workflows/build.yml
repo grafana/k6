@@ -38,7 +38,7 @@ jobs:
       sign_windows_artifacts: ${{ steps.determine_windows_signing.outputs.sign_windows_artifacts }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -103,12 +103,12 @@ jobs:
       VERSION: ${{ needs.configure.outputs.k6_version }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 0
           persist-credentials: false
       - name: Install Go
-        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
+        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6
         with:
           go-version: ${{ needs.configure.outputs.go_version }}
           check-latest: true
@@ -169,7 +169,7 @@ jobs:
       VERSION: ${{ needs.configure.outputs.k6_version }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -201,7 +201,7 @@ jobs:
         if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') }}
         uses: grafana/shared-workflows/actions/dockerhub-login@081a366728379fd0426b9cfef190e9a21c2d5418 # dockerhub-login/v1.0.3
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         env:
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -361,7 +361,7 @@ jobs:
       VERSION: ${{ needs.configure.outputs.k6_version }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           persist-credentials: false
       - name: Install pandoc
@@ -468,7 +468,7 @@ jobs:
        contents: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           persist-credentials: false
       - name: Download binaries
@@ -485,7 +485,7 @@ jobs:
         run: cd dist && sha256sum * > "k6-${VERSION}-checksums.txt"
       - name: Anchore SBOM Action
         continue-on-error: true
-        uses: anchore/sbom-action@62ad5284b8ced813296287a0b63906cb364b73ee # v0.22.0
+        uses: anchore/sbom-action@28d71544de8eaf1b958d335707167c5f783590ad # v0.22.2
         with:
           artifact-name: k6-${{ env.VERSION }}-spdx.json
           upload-release-assets: false
@@ -551,7 +551,7 @@ jobs:
       id-token: write # Required for Vault
     steps:
       - name: Checkout code
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           persist-credentials: false
       - name: Download binaries
@@ -596,7 +596,7 @@ jobs:
           EOF
           echo "${PGP_SIGN_KEY}" > packaging/sign-key.gpg
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         env:
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
