@@ -17,11 +17,13 @@ import (
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/internal/build"
+	v6cloudapi "go.k6.io/k6/internal/cloudapi/v6"
 	"go.k6.io/k6/internal/ui/pb"
 	"go.k6.io/k6/lib"
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/fatih/color"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -171,57 +173,72 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Validating script options"))
 	client := cloudapi.NewClient(
 		logger, cloudConfig.Token.String, cloudConfig.Host.String, build.Version, cloudConfig.Timeout.TimeDuration())
-	if cloudConfig.StackID.Valid {
-		client.SetStackID(cloudConfig.StackID.Int64)
-	}
-	if err = client.ValidateOptions(arc.Options); err != nil {
-		return err
-	}
 
-	if cloudConfig.ProjectID.Int64 == 0 {
-		if err := resolveAndSetProjectID(c.gs, &cloudConfig, tmpCloudConfig, arc); err != nil {
+	var refID string
+	// TODO: Should handle upload only with v6 API as well
+	//nolint:nestif
+	if cloudConfig.StackID.Valid && cloudConfig.StackID.Int64 != 0 && !c.uploadOnly {
+		var stopSignalHandling func()
+		refID, stopSignalHandling, err = startCloudTestRunV6(
+			c.gs, logger, progressBar, &cloudConfig, tmpCloudConfig, name, arc, globalCancel)
+		if err != nil {
 			return err
 		}
-	}
 
-	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Uploading archive"))
-
-	var cloudTestRun *cloudapi.CreateTestRunResponse
-	if c.uploadOnly {
-		cloudTestRun, err = client.UploadTestOnly(name, cloudConfig.ProjectID.Int64, arc)
+		defer stopSignalHandling()
 	} else {
-		cloudTestRun, err = client.StartCloudTestRun(name, cloudConfig.ProjectID.Int64, arc)
-	}
+		if cloudConfig.StackID.Valid {
+			client.SetStackID(cloudConfig.StackID.Int64)
+		}
+		if err = client.ValidateOptions(arc.Options); err != nil {
+			return err
+		}
 
-	if err != nil {
-		return err
-	}
-
-	refID := cloudTestRun.ReferenceID
-	if cloudTestRun.ConfigOverride != nil {
-		cloudConfig = cloudConfig.Apply(*cloudTestRun.ConfigOverride)
-	}
-
-	// Trap Interrupts, SIGINTs and SIGTERMs.
-	gracefulStop := func(sig os.Signal) {
-		logger.WithField("sig", sig).Print("Stopping cloud test run in response to signal...")
-		// Do this in a separate goroutine so that if it blocks, the
-		// second signal can still abort the process execution.
-		go func() {
-			stopErr := client.StopCloudTestRun(refID)
-			if stopErr != nil {
-				logger.WithError(stopErr).Error("Stop cloud test error")
-			} else {
-				logger.Info("Successfully sent signal to stop the cloud test, now waiting for it to actually stop...")
+		if cloudConfig.ProjectID.Int64 == 0 {
+			if err := resolveAndSetProjectID(c.gs, &cloudConfig, tmpCloudConfig, arc); err != nil {
+				return err
 			}
-			globalCancel()
-		}()
+		}
+
+		modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Uploading archive"))
+
+		var cloudTestRun *cloudapi.CreateTestRunResponse
+		if c.uploadOnly {
+			cloudTestRun, err = client.UploadTestOnly(name, cloudConfig.ProjectID.Int64, arc)
+		} else {
+			cloudTestRun, err = client.StartCloudTestRun(name, cloudConfig.ProjectID.Int64, arc)
+		}
+
+		if err != nil {
+			return err
+		}
+
+		refID = cloudTestRun.ReferenceID
+		if cloudTestRun.ConfigOverride != nil {
+			cloudConfig = cloudConfig.Apply(*cloudTestRun.ConfigOverride)
+		}
+
+		// Trap Interrupts, SIGINTs and SIGTERMs.
+		gracefulStop := func(sig os.Signal) {
+			logger.WithField("sig", sig).Print("Stopping cloud test run in response to signal...")
+			// Do this in a separate goroutine so that if it blocks, the
+			// second signal can still abort the process execution.
+			go func() {
+				stopErr := client.StopCloudTestRun(refID)
+				if stopErr != nil {
+					logger.WithError(stopErr).Error("Stop cloud test error")
+				} else {
+					logger.Info("Successfully sent signal to stop the cloud test, now waiting for it to actually stop...")
+				}
+				globalCancel()
+			}()
+		}
+		onHardStop := func(sig os.Signal) {
+			logger.WithField("sig", sig).Error("Aborting k6 in response to signal, we won't wait for the test to end.")
+		}
+		stopSignalHandling := handleTestAbortSignals(c.gs, gracefulStop, onHardStop)
+		defer stopSignalHandling()
 	}
-	onHardStop := func(sig os.Signal) {
-		logger.WithField("sig", sig).Error("Aborting k6 in response to signal, we won't wait for the test to end.")
-	}
-	stopSignalHandling := handleTestAbortSignals(c.gs, gracefulStop, onHardStop)
-	defer stopSignalHandling()
 
 	et, err := lib.NewExecutionTuple(test.derivedConfig.ExecutionSegment, test.derivedConfig.ExecutionSegmentSequence)
 	if err != nil {
@@ -498,4 +515,69 @@ func exactCloudArgs() cobra.PositionalArgs {
 
 		return nil
 	}
+}
+
+// startCloudTestRunV6 starts a cloud test run using the v6 API client and returns a reference ID
+// (either of the test if uploadOnly is true or of the test run) and a function to stop signal handling.
+func startCloudTestRunV6(
+	gs *state.GlobalState,
+	logger logrus.FieldLogger,
+	progressBar *pb.ProgressBar,
+	cloudConfig *cloudapi.Config,
+	tmpCloudConfig map[string]interface{},
+	testName string,
+	arc *lib.Archive,
+	globalCancel context.CancelFunc,
+) (string, func(), error) {
+	client, err := v6cloudapi.NewClient(
+		logger, cloudConfig.Token.String, cloudConfig.Hostv6.String, build.Version, cloudConfig.Timeout.TimeDuration())
+	if err != nil {
+		return "", nil, err
+	}
+	if err := client.SetStackID(cloudConfig.StackID.Int64); err != nil {
+		return "", nil, err
+	}
+
+	cloudConfig.WebAppURL = null.StringFrom(cloudConfig.StackURL.String + "/a/k6-app")
+
+	if cloudConfig.ProjectID.Int64 == 0 {
+		if err := resolveAndSetProjectID(gs, cloudConfig, tmpCloudConfig, arc); err != nil {
+			return "", nil, err
+		}
+	}
+
+	if err = client.ValidateOptions(cloudConfig.ProjectID.Int64, arc.Options); err != nil {
+		return "", nil, err
+	}
+
+	modifyAndPrintBar(gs, progressBar, pb.WithConstProgress(0, "Uploading archive"))
+
+	cloudTestRun, err := client.CreateAndStartCloudTestRun(testName, cloudConfig.ProjectID.Int64, arc)
+	if err != nil {
+		return "", nil, err
+	}
+
+	refID := cloudTestRun.Id
+
+	// Trap Interrupts, SIGINTs and SIGTERMs.
+	gracefulStop := func(sig os.Signal) {
+		logger.WithField("sig", sig).Print("Stopping cloud test run in response to signal...")
+		// Do this in a separate goroutine so that if it blocks, the
+		// second signal can still abort the process execution.
+		go func() {
+			stopErr := client.StopCloudTestRun(int64(refID))
+			if stopErr != nil {
+				logger.WithError(stopErr).Error("Stop cloud test error")
+			} else {
+				logger.Info("Successfully sent signal to stop the cloud test, now waiting for it to actually stop...")
+			}
+			globalCancel()
+		}()
+	}
+	onHardStop := func(sig os.Signal) {
+		logger.WithField("sig", sig).Error("Aborting k6 in response to signal, we won't wait for the test to end.")
+	}
+	stopSignalHandling := handleTestAbortSignals(gs, gracefulStop, onHardStop)
+
+	return strconv.FormatInt(int64(refID), 10), stopSignalHandling, nil
 }
