@@ -608,7 +608,6 @@ func startCloudTestRunV6(
 	}
 
 	cloudTestRun, err := client.CreateAndStartCloudTestRun(testName, cloudConfig.ProjectID.Int64, arc)
-
 	if err != nil {
 		return "", nil, err
 	}
