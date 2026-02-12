@@ -1,14 +1,8 @@
 package common
 
 import (
-	"context"
 	"fmt"
 	"math"
-
-	"github.com/grafana/sobek"
-
-	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
-	"go.k6.io/k6/js/common"
 )
 
 // Position represents a position.
@@ -56,24 +50,6 @@ func (s Size) enclosingIntSize() *Size {
 		Width:  math.Floor(s.Width + 1e-3),
 		Height: math.Floor(s.Height + 1e-3),
 	}
-}
-
-// Parse size details from a given sobek viewport value.
-func (s *Size) Parse(ctx context.Context, viewport sobek.Value) error {
-	rt := k6ext.Runtime(ctx)
-	if !common.IsNullish(viewport) {
-		viewport := viewport.ToObject(rt)
-		for _, k := range viewport.Keys() {
-			switch k {
-			case "width":
-				s.Width = viewport.Get(k).ToFloat()
-			case "height":
-				s.Height = viewport.Get(k).ToFloat()
-			}
-		}
-	}
-
-	return nil
 }
 
 func (s Size) String() string {

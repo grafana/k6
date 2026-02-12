@@ -496,8 +496,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"setViewportSize": func(viewportSize sobek.Value) (*sobek.Promise, error) {
-			s := new(common.Size)
-			if err := s.Parse(vu.Context(), viewportSize); err != nil {
+			s, err := parseSize(rt, viewportSize)
+			if err != nil {
 				return nil, fmt.Errorf("parsing viewport size: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -1092,4 +1092,38 @@ func parsePageWaitForEventOptions(
 	}
 
 	return ropts, pred, nil
+}
+
+// parseSize parses the size options from a Sobek value.
+func parseSize(rt *sobek.Runtime, opts sobek.Value) (*common.Size, error) {
+	size := &common.Size{}
+	if k6common.IsNullish(opts) {
+		return size, nil
+	}
+
+	obj := opts.ToObject(rt)
+	for _, k := range obj.Keys() {
+		v := obj.Get(k)
+		if k6common.IsNullish(v) {
+			continue
+		}
+		switch k {
+		case "width":
+			switch v.ExportType().Kind() {
+			case reflect.Int64, reflect.Float64:
+				size.Width = v.ToFloat()
+			default:
+				return nil, fmt.Errorf("width must be a number, got %s", v.ExportType().Kind())
+			}
+		case "height":
+			switch v.ExportType().Kind() {
+			case reflect.Int64, reflect.Float64:
+				size.Height = v.ToFloat()
+			default:
+				return nil, fmt.Errorf("height must be a number, got %s", v.ExportType().Kind())
+			}
+		}
+	}
+
+	return size, nil
 }
