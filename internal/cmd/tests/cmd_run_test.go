@@ -1086,6 +1086,63 @@ func TestRunFromNotBaseDirectory(t *testing.T) {
 	require.Contains(t, stdout, `p = 5`)
 }
 
+func TestRunCSVParseConcurrentFromMultipleModules(t *testing.T) {
+	t.Parallel()
+
+	csvData := `col1,col2
+a,b
+c,d
+`
+	module1Script := `
+		import csv from "k6/experimental/csv";
+		import fs from "k6/experimental/fs";
+
+		const file = await fs.open("data.csv");
+		export const data = await csv.parse(file);
+	`
+	module2Script := `
+		import csv from "k6/experimental/csv";
+		import fs from "k6/experimental/fs";
+
+		const file = await fs.open("data.csv");
+		export const data = await csv.parse(file);
+	`
+	module3Script := `
+		import csv from "k6/experimental/csv";
+		import fs from "k6/experimental/fs";
+
+		const file = await fs.open("data.csv");
+		export const data = await csv.parse(file);
+	`
+	// Main: imports all 3 modules - each has await csv.parse at top level
+	mainScript := `
+		import { data as data1 } from "./modules/module1.js";
+		import { data as data2 } from "./modules/module2.js";
+		import { data as data3 } from "./modules/module3.js";
+
+		if (data1.length !== 3 || data2.length !== 3 || data3.length !== 3) {
+			throw new Error("Expected 3 records from each parse");
+		}
+
+		if (data1[0][0] !== "col1" || data2[0][0] !== "col1" || data3[0][0] !== "col1") {
+			throw new Error("Unexpected CSV data");
+		}
+		export default function() { } // just to not error out
+	`
+
+	ts := NewGlobalTestState(t)
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "data.csv"), []byte(csvData), 0o644))
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "modules/module1.js"), []byte(module1Script), 0o644))
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "modules/module2.js"), []byte(module2Script), 0o644))
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "modules/module3.js"), []byte(module3Script), 0o644))
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "main.js"), []byte(mainScript), 0o644))
+
+	ts.CmdArgs = []string{"k6", "run", "--vus", "1", "--iterations", "1", "main.js"}
+	ts.ExpectedExitCode = 0
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+}
+
 func TestRunFromSeparateDriveWindows(t *testing.T) {
 	t.Parallel()
 	if runtime.GOOS != "windows" {
