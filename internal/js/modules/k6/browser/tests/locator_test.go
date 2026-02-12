@@ -1030,7 +1030,6 @@ func TestActionabilityRetry(t *testing.T) {
 
 	value := p.Locator("#value", nil)
 	text, err := value.InnerText(common.NewFrameInnerTextOptions(value.Timeout()))
-
 	require.NoError(t, err)
 	require.Equal(t, "0", text)
 }
