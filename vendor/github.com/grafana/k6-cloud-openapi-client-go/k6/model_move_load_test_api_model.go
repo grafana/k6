@@ -12,6 +12,7 @@ Contact: info@grafana.com
 package k6
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 )
@@ -22,8 +23,7 @@ var _ MappedNullable = &MoveLoadTestApiModel{}
 // MoveLoadTestApiModel struct for MoveLoadTestApiModel
 type MoveLoadTestApiModel struct {
 	// ID of the destination project.
-	ProjectId            int32 `json:"project_id"`
-	AdditionalProperties map[string]interface{}
+	ProjectId int32 `json:"project_id"`
 }
 
 type _MoveLoadTestApiModel MoveLoadTestApiModel
@@ -81,11 +81,6 @@ func (o MoveLoadTestApiModel) MarshalJSON() ([]byte, error) {
 func (o MoveLoadTestApiModel) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	toSerialize["project_id"] = o.ProjectId
-
-	for key, value := range o.AdditionalProperties {
-		toSerialize[key] = value
-	}
-
 	return toSerialize, nil
 }
 
@@ -113,20 +108,15 @@ func (o *MoveLoadTestApiModel) UnmarshalJSON(data []byte) (err error) {
 
 	varMoveLoadTestApiModel := _MoveLoadTestApiModel{}
 
-	err = json.Unmarshal(data, &varMoveLoadTestApiModel)
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	err = decoder.Decode(&varMoveLoadTestApiModel)
 
 	if err != nil {
 		return err
 	}
 
 	*o = MoveLoadTestApiModel(varMoveLoadTestApiModel)
-
-	additionalProperties := make(map[string]interface{})
-
-	if err = json.Unmarshal(data, &additionalProperties); err == nil {
-		delete(additionalProperties, "project_id")
-		o.AdditionalProperties = additionalProperties
-	}
 
 	return err
 }

@@ -15,6 +15,13 @@ All URIs are relative to *https://api.k6.io*
 Class | Method | HTTP request | Description
 ------------ | ------------- | ------------- | -------------
 *AuthorizationAPI* | [**Auth**](docs/AuthorizationAPI.md#auth) | **Get** /cloud/v6/auth | Validate a Grafana Cloud k6 API token and access to the stack.
+*LabelsAPI* | [**LabelsCreate**](docs/LabelsAPI.md#labelscreate) | **Post** /cloud/v6/labels | Create label keys.
+*LabelsAPI* | [**LabelsDestroy**](docs/LabelsAPI.md#labelsdestroy) | **Delete** /cloud/v6/labels/{id} | Delete a label key.
+*LabelsAPI* | [**LabelsList**](docs/LabelsAPI.md#labelslist) | **Get** /cloud/v6/labels | List label keys.
+*LabelsAPI* | [**LabelsPartialUpdate**](docs/LabelsAPI.md#labelspartialupdate) | **Patch** /cloud/v6/labels/{id} | Update a label key.
+*LabelsAPI* | [**ProjectsLabelsDestroy**](docs/LabelsAPI.md#projectslabelsdestroy) | **Delete** /cloud/v6/projects/{project_id}/labels/{key} | Remove a label from project.
+*LabelsAPI* | [**ProjectsLabelsList**](docs/LabelsAPI.md#projectslabelslist) | **Get** /cloud/v6/projects/{project_id}/labels | List project labels.
+*LabelsAPI* | [**ProjectsLabelsUpdate**](docs/LabelsAPI.md#projectslabelsupdate) | **Put** /cloud/v6/projects/{project_id}/labels | Replace project labels.
 *LoadTestsAPI* | [**LoadTestsDestroy**](docs/LoadTestsAPI.md#loadtestsdestroy) | **Delete** /cloud/v6/load_tests/{id} | Delete a load test.
 *LoadTestsAPI* | [**LoadTestsList**](docs/LoadTestsAPI.md#loadtestslist) | **Get** /cloud/v6/load_tests | List all tests.
 *LoadTestsAPI* | [**LoadTestsMove**](docs/LoadTestsAPI.md#loadtestsmove) | **Put** /cloud/v6/load_tests/{id}/move | Move a test to another project.
@@ -78,6 +85,11 @@ Class | Method | HTTP request | Description
  - [ErrorDetailsApiModel](docs/ErrorDetailsApiModel.md)
  - [ErrorResponseApiModel](docs/ErrorResponseApiModel.md)
  - [Frequency](docs/Frequency.md)
+ - [LabelKeyCreateItem](docs/LabelKeyCreateItem.md)
+ - [LabelKeyCreateRequest](docs/LabelKeyCreateRequest.md)
+ - [LabelKeyListResponse](docs/LabelKeyListResponse.md)
+ - [LabelKeyPatchRequest](docs/LabelKeyPatchRequest.md)
+ - [LabelKeyResponse](docs/LabelKeyResponse.md)
  - [LoadTestApiModel](docs/LoadTestApiModel.md)
  - [LoadTestListResponse](docs/LoadTestListResponse.md)
  - [LoadZoneApiModel](docs/LoadZoneApiModel.md)
@@ -92,6 +104,12 @@ Class | Method | HTTP request | Description
  - [PatchProjectLimitsRequest](docs/PatchProjectLimitsRequest.md)
  - [PatchTestRunApiModel](docs/PatchTestRunApiModel.md)
  - [ProjectApiModel](docs/ProjectApiModel.md)
+ - [ProjectLabelItem](docs/ProjectLabelItem.md)
+ - [ProjectLabelListResponse](docs/ProjectLabelListResponse.md)
+ - [ProjectLabelPutItem](docs/ProjectLabelPutItem.md)
+ - [ProjectLabelPutRequest](docs/ProjectLabelPutRequest.md)
+ - [ProjectLabelPutResponse](docs/ProjectLabelPutResponse.md)
+ - [ProjectLabelPutResponseItem](docs/ProjectLabelPutResponseItem.md)
  - [ProjectLimitsApiModel](docs/ProjectLimitsApiModel.md)
  - [ProjectLimitsListResponse](docs/ProjectLimitsListResponse.md)
  - [ProjectListResponse](docs/ProjectListResponse.md)

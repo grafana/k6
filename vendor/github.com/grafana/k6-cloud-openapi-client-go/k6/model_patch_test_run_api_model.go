@@ -12,6 +12,7 @@ Contact: info@grafana.com
 package k6
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 )
@@ -22,8 +23,7 @@ var _ MappedNullable = &PatchTestRunApiModel{}
 // PatchTestRunApiModel struct for PatchTestRunApiModel
 type PatchTestRunApiModel struct {
 	// User-defined note for the test run.
-	Note                 string `json:"note"`
-	AdditionalProperties map[string]interface{}
+	Note string `json:"note"`
 }
 
 type _PatchTestRunApiModel PatchTestRunApiModel
@@ -81,11 +81,6 @@ func (o PatchTestRunApiModel) MarshalJSON() ([]byte, error) {
 func (o PatchTestRunApiModel) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	toSerialize["note"] = o.Note
-
-	for key, value := range o.AdditionalProperties {
-		toSerialize[key] = value
-	}
-
 	return toSerialize, nil
 }
 
@@ -113,20 +108,15 @@ func (o *PatchTestRunApiModel) UnmarshalJSON(data []byte) (err error) {
 
 	varPatchTestRunApiModel := _PatchTestRunApiModel{}
 
-	err = json.Unmarshal(data, &varPatchTestRunApiModel)
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	err = decoder.Decode(&varPatchTestRunApiModel)
 
 	if err != nil {
 		return err
 	}
 
 	*o = PatchTestRunApiModel(varPatchTestRunApiModel)
-
-	additionalProperties := make(map[string]interface{})
-
-	if err = json.Unmarshal(data, &additionalProperties); err == nil {
-		delete(additionalProperties, "note")
-		o.AdditionalProperties = additionalProperties
-	}
 
 	return err
 }

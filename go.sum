@@ -86,6 +86,8 @@ github.com/gorilla/websocket v1.5.3 h1:saDtZ6Pbx/0u+bgYQ3q96pZgCzfhKXGPqt7kZ72aN
 github.com/gorilla/websocket v1.5.3/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
 github.com/grafana/k6-cloud-openapi-client-go v0.0.0-20260106090513-285631296b5d h1:fb0Y2ejWxOv0f/VlMLyE7GErwM499C3+ct3JlYHi9IA=
 github.com/grafana/k6-cloud-openapi-client-go v0.0.0-20260106090513-285631296b5d/go.mod h1:RBPBP7qIR/K6qzQEQYESVhp/XJspiBTOyBEBCbPXrvI=
+github.com/grafana/k6-cloud-openapi-client-go v0.0.0-20260206104121-a02255dcc950 h1:blysO1wTCY1NsCVopSzH3ieGsnRgmU0kVxxwrGmeUtE=
+github.com/grafana/k6-cloud-openapi-client-go v0.0.0-20260206104121-a02255dcc950/go.mod h1:RBPBP7qIR/K6qzQEQYESVhp/XJspiBTOyBEBCbPXrvI=
 github.com/grafana/k6build v0.5.15 h1:4I5dkAWSMvXsElS1OpLbHj6ZXnebXZGnmwDXy5vcwSQ=
 github.com/grafana/k6build v0.5.15/go.mod h1:Sk7SUiCnx2AgkirG3PrCtmJKYL+a8EeRdTzFfbxP0X8=
 github.com/grafana/k6foundry v0.4.7 h1:1YXkTBwO/2dSx0pqJrraJATsFlsIX0vEpaEjV7E35w4=
