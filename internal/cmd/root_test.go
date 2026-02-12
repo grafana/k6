@@ -45,28 +45,12 @@ func TestRootCommandHelpDisplayCommands(t *testing.T) {
 			wantStdoutContains: "  new         Create and initialize a new k6 script",
 		},
 		{
-			name:               "should have pause command",
-			wantStdoutContains: "  pause       Pause a running test",
-		},
-		{
-			name:               "should have resume command",
-			wantStdoutContains: "  resume      Resume a paused test",
-		},
-		{
 			name:               "should have run command",
 			wantStdoutContains: "  run         Start a test",
 		},
 		{
-			name:               "should have scale command",
-			wantStdoutContains: "  scale       Scale a running test",
-		},
-		{
 			name:               "should have stats command",
 			wantStdoutContains: "  stats       Show test metrics",
-		},
-		{
-			name:               "should have status command",
-			wantStdoutContains: "  status      Show test status",
 		},
 		{
 			name:               "should have version command",
