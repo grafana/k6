@@ -1799,11 +1799,12 @@ func shouldRetry(apiCtx context.Context, err error) (bool, error) {
 		return false, nil
 	}
 
+	// Wait with timeout or context cancellation
 	select {
 	case <-apiCtx.Done():
 		return false, apiCtx.Err()
 	case <-time.After(20 * time.Millisecond):
-		return true, nil
+		return true, nil // Continue retrying after delay
 	}
 }
 
