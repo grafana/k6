@@ -137,8 +137,8 @@ func queueTask[T any](
 // the returned cancel function is called or when the VU's context is done.
 //
 // Do not call this function off of the event loop.
-func newTaskQueue(vu moduleVU) (*taskqueue.TaskQueue, context.Context, context.CancelFunc) {
-	ctx, cancel := context.WithCancel(vu.Context())
+func newTaskQueue(vu moduleVU) (*taskqueue.TaskQueue, context.Context, context.CancelCauseFunc) {
+	ctx, cancel := context.WithCancelCause(vu.Context())
 	tq := taskqueue.New(vu.RegisterCallback)
 	go func() {
 		<-ctx.Done()

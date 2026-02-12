@@ -34,7 +34,7 @@ type Browser struct {
 	browserCancelFn context.CancelCauseFunc
 
 	vuCtx         context.Context
-	vuCtxCancelFn context.CancelFunc
+	vuCtxCancelFn context.CancelCauseFunc
 
 	state int64
 
@@ -91,7 +91,7 @@ type browserVersion struct {
 func NewBrowser(
 	ctx context.Context,
 	vuCtx context.Context,
-	vuCtxCancelFn context.CancelFunc,
+	vuCtxCancelFn context.CancelCauseFunc,
 	browserProc *BrowserProcess,
 	browserOpts *BrowserOptions,
 	logger *log.Logger,
@@ -114,7 +114,7 @@ func NewBrowser(
 func newBrowser(
 	ctx context.Context,
 	vuCtx context.Context,
-	vuCtxCancelFn context.CancelFunc,
+	vuCtxCancelFn context.CancelCauseFunc,
 	browserProc *BrowserProcess,
 	browserOpts *BrowserOptions,
 	logger *log.Logger,
@@ -226,7 +226,7 @@ func (b *Browser) initEvents() error {
 			// whereas the initContext is controlled by the k6 event system when
 			// browser.close() is called. k6 iteration ends before the event system.
 			if b.vuCtxCancelFn != nil {
-				b.vuCtxCancelFn()
+				b.vuCtxCancelFn(nil)
 			}
 		}()
 		for {
@@ -488,7 +488,7 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 			return e.(*Page).targetID == tid //nolint:forcetypeassert
 		},
 	)
-	defer removeEventHandler()
+	defer removeEventHandler(nil)
 
 	// create a new page.
 	action := target.CreateTarget(BlankPage).WithNewWindow(true).WithBrowserContextID(id)

@@ -112,8 +112,10 @@ func newTestBrowserVU(tb testing.TB, tbr *testBrowser) (_ *k6test.VU, cancel fun
 		vu.Context(),
 		k6ext.RegisterCustomMetrics(k6metrics.NewRegistry()),
 	)
-	ctx, cancel := context.WithCancel(metricsCtx)
-	tb.Cleanup(cancel)
+	// Rename to avoid conflict with named return 'cancel'
+	ctx, cancelCtx := context.WithCancelCause(metricsCtx)
+	wrappedCancel := func() { cancelCtx(nil) }
+	tb.Cleanup(wrappedCancel)
 	vu.CtxField = ctx
 	vu.InitEnvField.LookupEnv = tbr.lookupFunc
 
@@ -123,7 +125,7 @@ func newTestBrowserVU(tb testing.TB, tbr *testBrowser) (_ *k6test.VU, cancel fun
 	// Setting the mapped browser into the vu's sobek runtime.
 	require.NoError(tb, vu.Runtime().Set("browser", jsMod.Browser))
 
-	return vu, cancel
+	return vu, wrappedCancel
 }
 
 // applyDefaultOptions applies the default options for the testBrowser.

@@ -286,7 +286,7 @@ func (mex *ExternallyControlled) UpdateConfig(ctx context.Context, newConf inter
 }
 
 // This is a helper function that is used in run for non-infinite durations.
-func (mex *ExternallyControlled) stopWhenDurationIsReached(ctx context.Context, duration time.Duration, cancel func()) {
+func (mex *ExternallyControlled) stopWhenDurationIsReached(ctx context.Context, duration time.Duration, cancel func(error)) {
 	ctxDone := ctx.Done()
 	checkInterval := time.NewTicker(100 * time.Millisecond)
 	for {
@@ -300,7 +300,7 @@ func (mex *ExternallyControlled) stopWhenDurationIsReached(ctx context.Context, 
 		case <-checkInterval.C:
 			elapsed := mex.executionState.GetCurrentTestRunDuration() - mex.config.StartTime.TimeDuration()
 			if elapsed >= duration {
-				cancel()
+				cancel(fmt.Errorf("externally controlled duration reached"))
 				return
 			}
 		}
@@ -320,7 +320,7 @@ type manualVUHandle struct {
 
 	// This is the cancel of the local context, used to kill its goroutine when
 	// we reduce the number of MaxVUs, so that the Go GC can clean up the VU.
-	cancelVU func()
+	cancelVU func(error)
 }
 
 func (rs *externallyControlledRunState) newManualVUHandle(
@@ -339,7 +339,7 @@ func (rs *externallyControlledRunState) newManualVUHandle(
 		atomic.AddInt64(rs.activeVUsCount, -1)
 		wg.Done()
 	}
-	ctx, cancel := context.WithCancel(rs.ctx)
+	ctx, cancel := context.WithCancelCause(rs.ctx)
 	return &manualVUHandle{
 		vuHandle: newStoppedVUHandle(ctx, getVU, returnVU,
 			rs.executor.nextIterationCounters,
@@ -459,7 +459,7 @@ func (rs *externallyControlledRunState) handleConfigChange(oldCfg, newCfg Extern
 
 	if oldMaxVUs > newMaxVUs {
 		for i := newMaxVUs; i < oldMaxVUs; i++ {
-			rs.vuHandles[i].cancelVU()
+			rs.vuHandles[i].cancelVU(nil)
 			if i < rs.startMaxVUs {
 				// return the initial planned VUs to the common buffer
 				executionState.ReturnVU(rs.vuHandles[i].initVU, false)
@@ -489,10 +489,10 @@ func (mex *ExternallyControlled) Run(parentCtx context.Context, _ chan<- metrics
 	close(mex.hasStarted)
 	mex.configLock.RUnlock()
 
-	ctx, cancel := context.WithCancel(parentCtx)
+	ctx, cancel := context.WithCancelCause(parentCtx)
 	waitOnProgressChannel := make(chan struct{})
 	defer func() {
-		cancel()
+		cancel(nil)
 		<-waitOnProgressChannel
 	}()
 

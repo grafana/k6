@@ -261,8 +261,8 @@ func (e *Scheduler) initVUsAndExecutors(ctx context.Context, samplesOut chan<- m
 		"executorsCount": len(e.executors),
 	}).Debugf("Start of initialization")
 
-	subctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	subctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(nil)
 
 	e.state.SetExecutionStatus(lib.ExecutionStatusInitVUs)
 	doneInits := e.initVUsConcurrently(subctx, samplesOut, vusToInitialize, runtime.GOMAXPROCS(0), logger)
@@ -297,7 +297,7 @@ func (e *Scheduler) initVUsAndExecutors(ctx context.Context, samplesOut chan<- m
 
 		logger.WithError(err).Debug("VU initialization returned with an error, aborting...")
 		initErr = err
-		cancel()
+		cancel(initErr)
 	}
 
 	if initErr != nil {
@@ -504,8 +504,8 @@ func (e *Scheduler) Run(globalCtx, runCtx context.Context, samplesOut chan<- met
 	logger.Debug("Start all executors...")
 	e.state.SetExecutionStatus(lib.ExecutionStatusRunning)
 
-	executorsRunCtx, executorsRunCancel := context.WithCancel(withExecStateCtx)
-	defer executorsRunCancel()
+	executorsRunCtx, executorsRunCancel := context.WithCancelCause(withExecStateCtx)
+	defer executorsRunCancel(nil)
 	for _, exec := range e.executors {
 		go e.runExecutor(executorsRunCtx, runResults, samplesOut, exec)
 	}
@@ -519,7 +519,7 @@ func (e *Scheduler) Run(globalCtx, runCtx context.Context, samplesOut chan<- met
 		if err != nil && firstErr == nil {
 			logger.WithError(err).Debug("Executor returned with an error, cancelling test run...")
 			firstErr = err
-			executorsRunCancel()
+			executorsRunCancel(firstErr)
 		}
 	}
 

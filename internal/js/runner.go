@@ -628,8 +628,8 @@ func (r *Runner) runPart(
 	name string,
 	arg interface{},
 ) (sobek.Value, error) {
-	ctx, cancel := context.WithCancel(parentCtx)
-	defer cancel()
+	ctx, cancel := context.WithCancelCause(parentCtx)
+	defer cancel(nil)
 
 	vu, err := r.newVU(ctx, 0, 0, out)
 	if err != nil {
@@ -858,8 +858,8 @@ func (u *ActiveVU) RunOnce() error {
 		panic(fmt.Errorf("error setting __ITER in Sobek runtime: %w", err))
 	}
 
-	ctx, cancel := context.WithCancel(u.RunContext)
-	defer cancel()
+	ctx, cancel := context.WithCancelCause(u.RunContext)
+	defer cancel(nil)
 	u.moduleVUImpl.ctx = ctx
 
 	eventIterData := event.IterData{
@@ -916,7 +916,7 @@ func (u *VU) getExported(name string) sobek.Value {
 // if isDefault is true, cancel also needs to be provided and it should cancel the provided context
 // TODO remove the need for the above through refactoring of this function and its callees
 func (u *VU) runFn(
-	ctx context.Context, isDefault bool, fn sobek.Callable, cancel func(), args ...sobek.Value,
+	ctx context.Context, isDefault bool, fn sobek.Callable, cancel func(error), args ...sobek.Value,
 ) (v sobek.Value, isFullIteration bool, t time.Duration, err error) {
 	if !u.Runner.Bundle.Options.NoCookiesReset.ValueOrZero() {
 		u.state.CookieJar, err = cookiejar.New(nil)
@@ -951,7 +951,7 @@ func (u *VU) runFn(
 	}
 
 	if cancel != nil {
-		cancel()
+		cancel(nil)
 		u.moduleVUImpl.eventLoop.WaitOnRegistered()
 	}
 	endTime := time.Now()

@@ -2,6 +2,7 @@ package executor
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"sync/atomic"
 
@@ -83,7 +84,7 @@ type vuHandle struct {
 	// stateH []int32 // helper for debugging
 
 	ctx    context.Context
-	cancel func()
+	cancel func(error)
 	logger *logrus.Entry
 }
 
@@ -93,7 +94,7 @@ func newStoppedVUHandle(
 	nextIterationCounters func() (uint64, uint64),
 	config *BaseConfig, logger *logrus.Entry,
 ) *vuHandle {
-	ctx, cancel := context.WithCancel(parentCtx)
+	ctx, cancel := context.WithCancelCause(parentCtx)
 
 	return &vuHandle{
 		mutex:                 &sync.Mutex{},
@@ -151,8 +152,8 @@ func (vh *vuHandle) gracefulStop() {
 	case toGracefulStop, toHardStop, stopped:
 		return // nothing to do
 	case starting: // we raced with the loop and apparently it won't do a single iteration
-		vh.cancel()
-		vh.ctx, vh.cancel = context.WithCancel(vh.parentCtx)
+		vh.cancel(errors.New("graceful stop"))
+		vh.ctx, vh.cancel = context.WithCancelCause(vh.parentCtx)
 		vh.changeState(stopped)
 	case running:
 		vh.changeState(toGracefulStop)
@@ -175,8 +176,8 @@ func (vh *vuHandle) hardStop() {
 		vh.changeState(toHardStop)
 	}
 	vh.logger.Debug("Hard stop")
-	vh.cancel()
-	vh.ctx, vh.cancel = context.WithCancel(vh.parentCtx)
+	vh.cancel(errors.New("hard stop"))
+	vh.ctx, vh.cancel = context.WithCancelCause(vh.parentCtx)
 	vh.canStartIter = make(chan struct{})
 }
 
@@ -196,7 +197,7 @@ func (vh *vuHandle) runLoopsIfPossible(runIter func(context.Context, lib.ActiveV
 	var (
 		executorDone = vh.parentCtx.Done()
 		ctx          context.Context
-		cancel       func()
+		cancel       func(error)
 		vu           lib.ActiveVU
 	)
 
@@ -224,8 +225,8 @@ func (vh *vuHandle) runLoopsIfPossible(runIter func(context.Context, lib.ActiveV
 			if cancel != nil {
 				// we need to cancel the context, to return the vu
 				// and because *we* did, lets reinitialize it
-				cancel()
-				vh.ctx, vh.cancel = context.WithCancel(vh.parentCtx) //nolint:fatcontext // isn't actually on the same context
+				cancel(errors.New("graceful stop"))
+				vh.ctx, vh.cancel = context.WithCancelCause(vh.parentCtx) //nolint:fatcontext // isn't actually on the same context
 			}
 			fallthrough // to set the state
 		case toHardStop:
