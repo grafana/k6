@@ -971,10 +971,9 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 	case "worker":
 		err = fs.attachWorkerToTarget(ti, session)
 	default:
-		// Just unblock (debugger continue) these targets and detach from them.
-		_ = session.ExecuteWithoutExpectationOnReply(fs.ctx, cdpruntime.CommandRunIfWaitingForDebugger, nil, nil)
-		_ = session.ExecuteWithoutExpectationOnReply(fs.ctx, target.CommandDetachFromTarget,
-			&target.DetachFromTargetParams{SessionID: session.id}, nil)
+		fs.logger.Debugf("FrameSession:onAttachedToTarget",
+			"detaching: unsupported target type %q sid:%v", ti.Type, session.ID())
+		detachSession(fs.teardownCtx, session)
 	}
 	if err == nil {
 		return
@@ -1020,6 +1019,14 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 
 // attachIFrameToTarget attaches an IFrame target to a given session.
 func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, session *Session) error {
+	// If the page is closing, don't create a new FrameSession.
+	// Unblocks the target so the browser doesn't hang.
+	if fs.page.isClosing() {
+		fs.logger.Debugf("FrameSession:attachIFrameToTarget", "detaching: page closing, skipping iframe tid=%v", ti.TargetID)
+		detachSession(fs.teardownCtx, session)
+		return nil
+	}
+
 	sid := session.ID()
 	fr, ok := fs.manager.getFrameByID(cdp.FrameID(ti.TargetID))
 	if !ok {
@@ -1052,6 +1059,12 @@ func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, session *Session) 
 	}
 
 	if err := fs.page.attachFrameSession(cdp.FrameID(ti.TargetID), nfs); err != nil {
+		if errors.Is(err, errPageClosing) {
+			fs.logger.Debugf("FrameSession:attachIFrameToTarget",
+				"detaching: attachment rejected for iframe tid=%v", ti.TargetID)
+			detachSession(fs.teardownCtx, session)
+			return nil
+		}
 		return err
 	}
 
@@ -1060,6 +1073,12 @@ func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, session *Session) 
 
 // attachWorkerToTarget attaches a Worker target to a given session.
 func (fs *FrameSession) attachWorkerToTarget(ti *target.Info, session *Session) error {
+	if fs.page.isClosing() {
+		fs.logger.Debugf("FrameSession:attachWorkerToTarget", "detaching: page closing, skipping worker tid=%v", ti.TargetID)
+		detachSession(fs.teardownCtx, session)
+		return nil
+	}
+
 	w, err := NewWorker(fs.ctx, session, ti.TargetID, ti.URL)
 	if err != nil {
 		return fmt.Errorf("attaching worker target ID %v to session ID %v: %w",
