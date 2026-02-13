@@ -49,6 +49,7 @@ structs.
 */
 type FrameSession struct {
 	ctx            context.Context
+	cancel         context.CancelCauseFunc
 	session        session
 	page           *Page
 	parent         *FrameSession
@@ -71,6 +72,7 @@ type FrameSession struct {
 	isolatedWorlds       map[string]bool
 
 	eventCh chan Event
+	wg      sync.WaitGroup
 
 	childSessions map[cdp.FrameID]*FrameSession
 	vu            k6modules.VU
@@ -97,8 +99,10 @@ func NewFrameSession(
 
 	k6Metrics := k6ext.GetCustomMetrics(ctx)
 
+	ctx, cancel := context.WithCancelCause(ctx)
 	fs := FrameSession{
-		ctx:                  ctx, // TODO: create cancelable context that can be used to cancel and close all child sessions
+		ctx:                  ctx,
+		cancel:               cancel,
 		session:              s,
 		page:                 p,
 		parent:               parent,
@@ -225,7 +229,7 @@ func (fs *FrameSession) initDomains() error {
 	return nil
 }
 
-//nolint:cyclop
+//nolint:cyclop,funlen
 func (fs *FrameSession) initEvents() {
 	fs.logger.Debugf("NewFrameSession:initEvents",
 		"sid:%v tid:%v", fs.session.ID(), fs.targetID)
@@ -238,7 +242,10 @@ func (fs *FrameSession) initEvents() {
 		fs.initRendererEvents()
 	}
 
+	fs.wg.Add(1)
 	go func() {
+		defer fs.wg.Done()
+
 		fs.logger.Debugf("NewFrameSession:initEvents:go",
 			"sid:%v tid:%v", fs.session.ID(), fs.targetID)
 		defer func() {
@@ -597,6 +604,16 @@ func (fs *FrameSession) initRendererEvents() {
 
 func (fs *FrameSession) isMainFrame() bool {
 	return fs.targetID == fs.page.targetID
+}
+
+func (fs *FrameSession) wait(ctx context.Context) error {
+	if err := waitForTimeout(ctx, func() error {
+		fs.wg.Wait()
+		return nil
+	}); err != nil {
+		return fmt.Errorf("waiting for frame session to close: %w", err)
+	}
+	return fs.networkManager.wait(ctx)
 }
 
 func (fs *FrameSession) handleFrameTree(frameTree *cdppage.FrameTree, initialFrame bool) {
@@ -1250,4 +1267,12 @@ func (fs *FrameSession) executionContextForID(
 	}
 
 	return nil, fmt.Errorf("no execution context found for id: %v", executionContextID)
+}
+
+// detachSession unblocks a target waiting for debugger and detaches from it.
+// Prevents the browser from hanging on rejected targets during close
+func detachSession(ctx context.Context, session *Session) {
+	_ = session.ExecuteWithoutExpectationOnReply(ctx, cdpruntime.CommandRunIfWaitingForDebugger, nil, nil)
+	_ = session.ExecuteWithoutExpectationOnReply(ctx, target.CommandDetachFromTarget,
+		&target.DetachFromTargetParams{SessionID: session.id}, nil)
 }
