@@ -281,6 +281,19 @@ func (rm RegExMatcher) Match(pattern, s string) (bool, error) {
 	return m(s)
 }
 
+// waitForTimeout runs fn in a goroutine and waits for it to complete.
+// If ctx is done before fn returns, it returns the context error.
+func waitForTimeout(ctx context.Context, fn func() error) error {
+	c := make(chan error, 1)
+	go func() { c <- fn() }()
+	select {
+	case err := <-c:
+		return err
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
 var sourceURLRegex = regexp.MustCompile(`(?s)[\040\t]*//[@#] sourceURL=\s*(\S*?)\s*$`)
 
 func hasSourceURL(js string) bool {

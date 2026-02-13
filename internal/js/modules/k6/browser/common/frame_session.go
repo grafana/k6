@@ -49,6 +49,8 @@ structs.
 */
 type FrameSession struct {
 	ctx            context.Context
+	cancel         context.CancelCauseFunc
+	teardownCtx    context.Context
 	session        session
 	page           *Page
 	parent         *FrameSession
@@ -71,6 +73,7 @@ type FrameSession struct {
 	isolatedWorlds       map[string]bool
 
 	eventCh chan Event
+	wg      sync.WaitGroup
 
 	childSessions map[cdp.FrameID]*FrameSession
 	vu            k6modules.VU
@@ -91,14 +94,17 @@ type FrameSession struct {
 //
 //nolint:funlen
 func NewFrameSession(
-	ctx context.Context, s session, p *Page, parent *FrameSession, tid target.ID, l *log.Logger, hasUIWindow bool,
+	ctx context.Context, teardownCtx context.Context, s session, p *Page, parent *FrameSession, tid target.ID, l *log.Logger, hasUIWindow bool,
 ) (_ *FrameSession, err error) {
 	l.Debugf("NewFrameSession", "sid:%v tid:%v", s.ID(), tid)
 
 	k6Metrics := k6ext.GetCustomMetrics(ctx)
 
+	ctx, cancel := context.WithCancelCause(ctx)
 	fs := FrameSession{
-		ctx:                  ctx, // TODO: create cancelable context that can be used to cancel and close all child sessions
+		ctx:                  ctx,
+		cancel:               cancel,
+		teardownCtx:          teardownCtx,
 		session:              s,
 		page:                 p,
 		parent:               parent,
@@ -225,7 +231,7 @@ func (fs *FrameSession) initDomains() error {
 	return nil
 }
 
-//nolint:cyclop
+//nolint:cyclop,funlen
 func (fs *FrameSession) initEvents() {
 	fs.logger.Debugf("NewFrameSession:initEvents",
 		"sid:%v tid:%v", fs.session.ID(), fs.targetID)
@@ -238,7 +244,10 @@ func (fs *FrameSession) initEvents() {
 		fs.initRendererEvents()
 	}
 
+	fs.wg.Add(1)
 	go func() {
+		defer fs.wg.Done()
+
 		fs.logger.Debugf("NewFrameSession:initEvents:go",
 			"sid:%v tid:%v", fs.session.ID(), fs.targetID)
 		defer func() {
@@ -599,6 +608,16 @@ func (fs *FrameSession) isMainFrame() bool {
 	return fs.targetID == fs.page.targetID
 }
 
+func (fs *FrameSession) wait(ctx context.Context) error {
+	if err := waitForTimeout(ctx, func() error {
+		fs.wg.Wait()
+		return nil
+	}); err != nil {
+		return fmt.Errorf("waiting for frame session to close: %w", err)
+	}
+	return fs.networkManager.wait(ctx)
+}
+
 func (fs *FrameSession) handleFrameTree(frameTree *cdppage.FrameTree, initialFrame bool) {
 	fs.logger.Debugf("FrameSession:handleFrameTree",
 		"fid:%v sid:%v tid:%v", frameTree.Frame.ID, fs.session.ID(), fs.targetID)
@@ -952,10 +971,9 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 	case "worker":
 		err = fs.attachWorkerToTarget(ti, session)
 	default:
-		// Just unblock (debugger continue) these targets and detach from them.
-		_ = session.ExecuteWithoutExpectationOnReply(fs.ctx, cdpruntime.CommandRunIfWaitingForDebugger, nil, nil)
-		_ = session.ExecuteWithoutExpectationOnReply(fs.ctx, target.CommandDetachFromTarget,
-			&target.DetachFromTargetParams{SessionID: session.id}, nil)
+		fs.logger.Debugf("FrameSession:onAttachedToTarget",
+			"detaching: unsupported target type %q sid:%v", ti.Type, session.ID())
+		detachSession(fs.teardownCtx, session)
 	}
 	if err == nil {
 		return
@@ -1001,6 +1019,14 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 
 // attachIFrameToTarget attaches an IFrame target to a given session.
 func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, session *Session) error {
+	// If the page is closing, don't create a new FrameSession.
+	// Unblocks the target so the browser doesn't hang.
+	if fs.page.isClosing() {
+		fs.logger.Debugf("FrameSession:attachIFrameToTarget", "detaching: page closing, skipping iframe tid=%v", ti.TargetID)
+		detachSession(fs.teardownCtx, session)
+		return nil
+	}
+
 	sid := session.ID()
 	fr, ok := fs.manager.getFrameByID(cdp.FrameID(ti.TargetID))
 	if !ok {
@@ -1022,6 +1048,7 @@ func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, session *Session) 
 
 	nfs, err := NewFrameSession(
 		fs.ctx,
+		fs.teardownCtx,
 		session,
 		fs.page, fs, ti.TargetID,
 		fs.logger,
@@ -1032,6 +1059,12 @@ func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, session *Session) 
 	}
 
 	if err := fs.page.attachFrameSession(cdp.FrameID(ti.TargetID), nfs); err != nil {
+		if errors.Is(err, errPageClosing) {
+			fs.logger.Debugf("FrameSession:attachIFrameToTarget",
+				"detaching: attachment rejected for iframe tid=%v", ti.TargetID)
+			detachSession(fs.teardownCtx, session)
+			return nil
+		}
 		return err
 	}
 
@@ -1040,6 +1073,12 @@ func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, session *Session) 
 
 // attachWorkerToTarget attaches a Worker target to a given session.
 func (fs *FrameSession) attachWorkerToTarget(ti *target.Info, session *Session) error {
+	if fs.page.isClosing() {
+		fs.logger.Debugf("FrameSession:attachWorkerToTarget", "detaching: page closing, skipping worker tid=%v", ti.TargetID)
+		detachSession(fs.teardownCtx, session)
+		return nil
+	}
+
 	w, err := NewWorker(fs.ctx, session, ti.TargetID, ti.URL)
 	if err != nil {
 		return fmt.Errorf("attaching worker target ID %v to session ID %v: %w",
@@ -1250,4 +1289,12 @@ func (fs *FrameSession) executionContextForID(
 	}
 
 	return nil, fmt.Errorf("no execution context found for id: %v", executionContextID)
+}
+
+// detachSession unblocks a target waiting for debugger and detaches from it.
+// Prevents the browser from hanging on rejected targets during close
+func detachSession(ctx context.Context, session *Session) {
+	_ = session.ExecuteWithoutExpectationOnReply(ctx, cdpruntime.CommandRunIfWaitingForDebugger, nil, nil)
+	_ = session.ExecuteWithoutExpectationOnReply(ctx, target.CommandDetachFromTarget,
+		&target.DetachFromTargetParams{SessionID: session.id}, nil)
 }

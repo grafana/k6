@@ -27,7 +27,7 @@ import (
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext/k6test"
-	"go.k6.io/k6/metrics"
+	k6metrics "go.k6.io/k6/metrics"
 )
 
 type emulateMediaOpts struct {
@@ -2157,7 +2157,7 @@ func TestPageOnMetric(t *testing.T) {
 
 			done := make(chan bool)
 
-			samples := make(chan metrics.SampleContainer)
+			samples := make(chan k6metrics.SampleContainer)
 			// This page will perform many pings with a changing h query parameter.
 			// This URL should be grouped according to how page.on('metric') is used.
 			tb := newTestBrowser(t, withHTTPServer(), withSamples(samples))
@@ -4356,4 +4356,97 @@ func TestPageGoBackForward(t *testing.T) {
 		}
 		tb.AssertURL(p, url3, "after rapid navigation should still be on page2")
 	})
+}
+
+// The race occurs when browser goroutines (FrameSession event loop,
+// NetworkManager fire-and-forget goroutines) call PushIfNotDone on the
+// k6 samples channel while close(samples) runs during engine shutdown.
+func TestPageCloseMetricEmissionRaceCondition(t *testing.T) {
+	t.Parallel()
+
+	samples := make(chan k6metrics.SampleContainer, 100)
+	tb := newTestBrowser(t, withHTTPServer(), withSamples(samples), withSkipClose())
+	tb.vu.StartIteration(t)
+	page := tb.NewPage(nil)
+
+	// Simulates a page that emits a web vital metric on pagehide.
+	tb.withHandler("/issue5341", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = fmt.Fprint(w, `
+			<html>
+			<head><link rel="icon" href="data:,"></head>
+			<body>
+			<script>
+			window.addEventListener('pagehide', () => {
+				window.k6browserSendWebVitalMetric(JSON.stringify({
+					id: "v1-5341",
+					name: "CLS",
+					value: 0.05,
+					rating: "good",
+					delta: 0.05,
+					numEntries: 1,
+					navigationType: "navigate",
+					url: window.location.href,
+					spanID: ""
+				}));
+			});
+			</script>
+			</body>
+			</html>`,
+		)
+	})
+
+	opts := &common.FrameGotoOptions{Timeout: common.DefaultTimeout}
+	_, err := page.Goto(tb.url("/issue5341"), opts)
+	require.NoError(t, err)
+
+	// Trigger a burst of web vital binding events to queue up many metric
+	// emission calls, increasing the likelihood of hitting the race.
+	_, err = page.Evaluate(`() => {
+		for (let i = 0; i < 50; i++) {
+			window.k6browserSendWebVitalMetric(JSON.stringify({
+				id: "v1-5341-" + i,
+				name: "CLS",
+				value: 0.01 * i,
+				rating: "good",
+				delta: 0.01,
+				numEntries: 1,
+				navigationType: "navigate",
+				url: window.location.href,
+				spanID: ""
+			}));
+		}
+	}`)
+	require.NoError(t, err)
+
+	// Dispatches a pagehide event to trigger Web Vital metric emission.
+	require.NoError(t, page.Close())
+
+	// Simulate engine shutdown.
+	close(samples)
+}
+
+// TestPageCloseIdempotent verifies that calling Page.Close() multiple times
+// does not re-execute teardown and returns the same result each time.
+func TestPageCloseIdempotent(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withHTTPServer(), withSkipClose())
+	tb.vu.StartIteration(t)
+	page := tb.NewPage(nil)
+
+	opts := &common.FrameGotoOptions{Timeout: common.DefaultTimeout}
+	_, err := page.Goto(tb.url("/get"), opts)
+	require.NoError(t, err)
+
+	// First close should succeed.
+	err1 := page.Close()
+
+	// Second and third close should return the same result without
+	// panicking or repeating teardown.
+	err2 := page.Close()
+	err3 := page.Close()
+
+	assert.Equal(t, err1, err2, "repeated Close() should return the same error")
+	assert.Equal(t, err1, err3, "repeated Close() should return the same error")
 }

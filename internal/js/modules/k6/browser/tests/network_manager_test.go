@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/common"
+	k6metrics "go.k6.io/k6/metrics"
 
 	k6lib "go.k6.io/k6/lib"
 	k6types "go.k6.io/k6/lib/types"
@@ -243,4 +244,55 @@ func TestInterceptBeforePageLoad(t *testing.T) {
 	defer cancel()
 	err = tb.run(ctx, gotoPage)
 	require.NoError(t, err)
+}
+
+// TestNetworkManagerCloseMetricEmissionRace reproduces the #4203 race condition
+// where NetworkManager's emitResponseMetrics goroutines call PushIfNotDone on the
+// k6 samples channel while close(samples) runs during engine shutdown.
+//
+// The race window: page close cancels the page context, but HTTP response metrics
+// are still being emitted by fire-and-forget goroutines in onLoadingFinished.
+// Without proper drain ordering, close(samples) can run while a send is in flight.
+func TestNetworkManagerCloseMetricEmissionRace(t *testing.T) {
+	t.Parallel()
+
+	samples := make(chan k6metrics.SampleContainer, 500)
+	tb := newTestBrowser(t, withHTTPServer(), withSamples(samples), withSkipClose())
+	tb.vu.StartIteration(t)
+	page := tb.NewPage(nil)
+
+	// Serve a page that triggers many sub-resource fetches, each of which
+	// produces an emitResponseMetrics call in the NetworkManager.
+	tb.withHandler("/foo", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = fmt.Fprint(w, `<html><head><link rel="icon" href="data:,"></head><body>loaded</body></html>`)
+	})
+	// Serve a lightweight endpoint that the page fetches many times.
+	tb.withHandler("/ping", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		_, _ = fmt.Fprint(w, "pong")
+	})
+
+	opts := &common.FrameGotoOptions{Timeout: common.DefaultTimeout}
+	_, err := page.Goto(tb.url("/foo"), opts)
+	require.NoError(t, err)
+
+	// Fire a burst of fetch requests from JS so that many HTTP-metric
+	// emission goroutines are active or queued when we close the page.
+	_, err = page.Evaluate(`() => {
+		const promises = [];
+		for (let i = 0; i < 50; i++) {
+			promises.push(fetch('/ping?i=' + i));
+		}
+		return Promise.all(promises).then(() => 'done');
+	}`)
+	require.NoError(t, err)
+
+	// Close the page. The fix ensures that Page.Close() waits for all
+	// frame session and network manager goroutines before returning.
+	require.NoError(t, page.Close())
+
+	// Simulate engine shutdown by closing the samples channel.
+	// Without the fix, a concurrent PushIfNotDone send would panic here.
+	close(samples)
 }

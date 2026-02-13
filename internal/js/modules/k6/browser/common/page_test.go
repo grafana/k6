@@ -4,9 +4,12 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"go.k6.io/k6/internal/js/modules/k6/browser/log"
 )
 
 // TestPageLocator can be removed later on when we add integration
@@ -165,4 +168,35 @@ func TestPageOn(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Len(t, p.eventHandlers[("metric")], 1)
 	})
+}
+
+// TestPageCloseRejectsLateFrameSession verifies that when a page is
+// closing, late frame-session attachment is rejected (returns
+// errPageClosing) and does not stall teardown.
+func TestPageCloseRejectsLateFrameSession(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	logger := log.NewNullLogger()
+
+	p := newClosingTestPage(ctx, logger)
+
+	// attachFrameSession must reject the late attachment immediately.
+	done := make(chan error, 1)
+	go func() {
+		done <- p.attachFrameSession("late-frame", &FrameSession{})
+	}()
+
+	select {
+	case err := <-done:
+		require.ErrorIs(t, err, errPageClosing,
+			"late frame-session attachment must be rejected with errPageClosing")
+	case <-time.After(5 * time.Second):
+		t.Fatal("attachFrameSession stalled during close-in-progress — late attachment was not rejected")
+	}
+
+	// Verify no frame session was inserted.
+	p.frameSessionsMu.RLock()
+	assert.Empty(t, p.frameSessions, "no frame session should be registered after rejection")
+	p.frameSessionsMu.RUnlock()
 }
