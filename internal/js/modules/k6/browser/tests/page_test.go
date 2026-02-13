@@ -30,12 +30,6 @@ import (
 	"go.k6.io/k6/metrics"
 )
 
-type emulateMediaOpts struct {
-	Media         string `js:"media"`
-	ColorScheme   string `js:"colorScheme"`
-	ReducedMotion string `js:"reducedMotion"`
-}
-
 type jsFrameBaseOpts struct {
 	Timeout string
 	Strict  bool
@@ -98,12 +92,11 @@ func TestPageEmulateMedia(t *testing.T) {
 	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
-	popts := common.NewPageEmulateMediaOptions(p)
-	require.NoError(t, popts.Parse(tb.context(), tb.toSobekValue(emulateMediaOpts{
+	popts := &common.PageEmulateMediaOptions{
 		Media:         "print",
 		ColorScheme:   "dark",
 		ReducedMotion: "reduce",
-	})))
+	}
 	err := p.EmulateMedia(popts)
 	require.NoError(t, err)
 

@@ -85,8 +85,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"emulateMedia": func(opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewPageEmulateMediaOptions(p)
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parsePageEmulateMediaOptions(rt, opts, common.NewPageEmulateMediaOptions(p))
+			if err != nil {
 				return nil, fmt.Errorf("parsing emulateMedia options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -1126,4 +1126,29 @@ func parseSize(rt *sobek.Runtime, opts sobek.Value) (*common.Size, error) {
 	}
 
 	return size, nil
+}
+
+// parsePageEmulateMediaOptions parses the page emulate media options from a Sobek value.
+//
+//nolint:unparam
+func parsePageEmulateMediaOptions(
+	rt *sobek.Runtime, opts sobek.Value, defaults *common.PageEmulateMediaOptions,
+) (*common.PageEmulateMediaOptions, error) {
+	if k6common.IsNullish(opts) {
+		return defaults, nil
+	}
+
+	obj := opts.ToObject(rt)
+	for _, k := range obj.Keys() {
+		switch k {
+		case "colorScheme":
+			defaults.ColorScheme = common.ColorScheme(obj.Get(k).String())
+		case "media":
+			defaults.Media = common.MediaType(obj.Get(k).String())
+		case "reducedMotion":
+			defaults.ReducedMotion = common.ReducedMotion(obj.Get(k).String())
+		}
+	}
+
+	return defaults, nil
 }
