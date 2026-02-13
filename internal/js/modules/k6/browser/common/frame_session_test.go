@@ -2,7 +2,10 @@ package common
 
 import (
 	"context"
+	"errors"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/cdp"
@@ -94,4 +97,55 @@ done:
 		"Runtime.runIfWaitingForDebugger",
 		"Target.detachFromTarget",
 	}, methods)
+}
+
+func TestFrameSessionWaitDrainsAllTrackedWorkers(t *testing.T) {
+	t.Parallel()
+
+	fsCtx, fsCancel := context.WithCancelCause(t.Context())
+	nmCtx, nmCancel := context.WithCancelCause(fsCtx)
+
+	nm := &NetworkManager{
+		ctx:    nmCtx,
+		cancel: nmCancel,
+	}
+
+	const (
+		fsWorkers = 3
+		nmWorkers = 4
+	)
+	var fsStopped atomic.Int32
+	var nmStopped atomic.Int32
+
+	fs := &FrameSession{
+		ctx:            fsCtx,
+		cancel:         fsCancel,
+		networkManager: nm,
+	}
+
+	for range fsWorkers {
+		fs.wg.Add(1)
+		go func() {
+			defer fs.wg.Done()
+			<-fs.ctx.Done()
+			fsStopped.Add(1)
+		}()
+	}
+
+	for range nmWorkers {
+		nm.wg.Add(1)
+		go func() {
+			defer nm.wg.Done()
+			<-nm.ctx.Done()
+			nmStopped.Add(1)
+		}()
+	}
+
+	ctx, closeCancel := context.WithTimeout(t.Context(), time.Second)
+	defer closeCancel()
+
+	fs.cancel(errors.New("test cancel frame session"))
+	require.NoError(t, fs.wait(ctx))
+	require.EqualValues(t, fsWorkers, fsStopped.Load(), "all frame-session workers must stop before wait returns")
+	require.EqualValues(t, nmWorkers, nmStopped.Load(), "all network-manager workers must stop before wait returns")
 }
