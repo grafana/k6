@@ -13,6 +13,7 @@ import (
 	"go.k6.io/k6/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
 	k6common "go.k6.io/k6/js/common"
+	k6metrics "go.k6.io/k6/metrics"
 )
 
 // mapPage to the JS module.
@@ -20,6 +21,24 @@ import (
 //nolint:funlen
 func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 	rt := vu.Runtime()
+
+	// Set up the metric pusher to ensure metrics are pushed on the event loop,
+	// avoiding the race between metric emission from CDP event goroutines and
+	// channel closure during k6 shutdown. See: #4203
+	if p.GetMetricPusher() == nil && vu.State() != nil {
+		tq := vu.get(vu.Context(), p.TargetID())
+		p.SetMetricPusher(func(samples k6metrics.ConnectedSamples) {
+			tq.Queue(func() error {
+				state := vu.State()
+				if state == nil {
+					return nil
+				}
+				k6metrics.PushIfNotDone(vu.Context(), state.Samples, samples)
+				return nil
+			})
+		})
+	}
+
 	maps := mapping{
 		"bringToFront": func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
