@@ -179,3 +179,41 @@ func TestFrameSessionWaitTimeoutWhenFrameSessionWorkerDoesNotDrain(t *testing.T)
 	// Keep test-local state consistent.
 	fs.wg.Done()
 }
+
+func TestFrameSessionWaitTimeoutWhenNetworkManagerWorkerDoesNotDrain(t *testing.T) {
+	t.Parallel()
+
+	fsCtx, fsCancel := context.WithCancelCause(t.Context())
+	nmCtx, nmCancel := context.WithCancelCause(fsCtx)
+
+	nm := &NetworkManager{
+		ctx:    nmCtx,
+		cancel: nmCancel,
+	}
+	fs := &FrameSession{
+		ctx:            fsCtx,
+		cancel:         fsCancel,
+		networkManager: nm,
+	}
+
+	// Frame-session worker exits on cancel.
+	fs.wg.Add(1)
+	go func() {
+		defer fs.wg.Done()
+		<-fs.ctx.Done()
+	}()
+
+	// Simulate a network-manager worker that cannot be drained.
+	nm.wg.Add(1)
+
+	ctx, closeCancel := context.WithTimeout(t.Context(), 20*time.Millisecond)
+	defer closeCancel()
+
+	fs.cancel(errors.New("test cancel frame session"))
+	err := fs.wait(ctx)
+	require.Error(t, err)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+
+	// Keep test-local state consistent.
+	nm.wg.Done()
+}
