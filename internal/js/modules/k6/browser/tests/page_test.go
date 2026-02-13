@@ -4425,3 +4425,28 @@ func TestPageCloseMetricEmissionRaceCondition(t *testing.T) {
 	// Simulate engine shutdown.
 	close(samples)
 }
+
+// TestPageCloseIdempotent verifies that calling Page.Close() multiple times
+// does not re-execute teardown and returns the same result each time.
+func TestPageCloseIdempotent(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withHTTPServer(), withSkipClose())
+	tb.vu.StartIteration(t)
+	page := tb.NewPage(nil)
+
+	opts := &common.FrameGotoOptions{Timeout: common.DefaultTimeout}
+	_, err := page.Goto(tb.url("/get"), opts)
+	require.NoError(t, err)
+
+	// First close should succeed.
+	err1 := page.Close()
+
+	// Second and third close should return the same result without
+	// panicking or repeating teardown.
+	err2 := page.Close()
+	err3 := page.Close()
+
+	assert.Equal(t, err1, err2, "repeated Close() should return the same error")
+	assert.Equal(t, err1, err3, "repeated Close() should return the same error")
+}
