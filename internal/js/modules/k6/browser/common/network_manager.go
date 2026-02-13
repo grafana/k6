@@ -58,6 +58,7 @@ type NetworkManager struct {
 	BaseEventEmitter
 
 	ctx              context.Context
+	cancel           context.CancelCauseFunc
 	logger           *log.Logger
 	session          session
 	parent           *NetworkManager
@@ -89,6 +90,8 @@ type NetworkManager struct {
 	userCacheDisabled              bool
 	userReqInterceptionEnabled     bool
 	protocolReqInterceptionEnabled bool
+
+	wg sync.WaitGroup
 }
 
 // NewNetworkManager creates a new network manager.
@@ -108,9 +111,11 @@ func NewNetworkManager(
 		return nil, fmt.Errorf("newResolver(%+v): %w", state.Options.DNS, err)
 	}
 
+	ctx, cancel := context.WithCancelCause(ctx)
 	m := NetworkManager{
 		BaseEventEmitter: NewBaseEventEmitter(ctx),
 		ctx:              ctx,
+		cancel:           cancel,
 		// TODO: Pass an internal logger instead of basing it on k6's logger?
 		// See https://go.k6.io/k6/js/modules/k6/browser/issues/54
 		logger:                        log.New(state.Logger, GetIterationID(ctx)),
@@ -379,7 +384,9 @@ func (m *NetworkManager) initEvents() {
 		cdproto.EventFetchAuthRequired,
 	}, chHandler)
 
+	m.wg.Add(1)
 	go func() {
+		defer m.wg.Done()
 		for m.handleEvents(chHandler) {
 		}
 	}()
@@ -389,9 +396,13 @@ func (m *NetworkManager) handleEvents(in <-chan Event) bool {
 	select {
 	case <-m.ctx.Done():
 		return false
+	case <-m.session.Done():
+		return false
 	case event := <-in:
 		select {
 		case <-m.ctx.Done():
+			return false
+		case <-m.session.Done():
 			return false
 		default:
 		}
@@ -463,7 +474,11 @@ func (m *NetworkManager) onLoadingFinished(event *network.EventLoadingFinished) 
 	// This happens when the main page request redirects before it finishes loading.
 	// So the new redirect request will be blocked until the main page finishes loading.
 	// The main page will wait forever since its subrequest is blocked.
-	go emitResponseMetrics()
+	m.wg.Add(1)
+	go func() {
+		defer m.wg.Done()
+		emitResponseMetrics()
+	}()
 }
 
 // requestForOnLoadingFinished returns the request for the given request ID.
@@ -1055,4 +1070,11 @@ func (m *NetworkManager) SetCacheEnabled(enabled bool) {
 	if err := m.updateProtocolCacheDisabled(); err != nil {
 		k6ext.Panicf(m.ctx, "%v", err)
 	}
+}
+
+func (m *NetworkManager) wait(ctx context.Context) error {
+	return waitForTimeout(ctx, func() error {
+		m.wg.Wait()
+		return nil
+	})
 }
