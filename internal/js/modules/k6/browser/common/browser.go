@@ -64,8 +64,15 @@ type Browser struct {
 	sessionIDtoTargetIDMu sync.RWMutex
 	sessionIDtoTargetID   map[target.SessionID]target.ID
 
-	// Used to display a warning when the browser is reclosed.
-	closed bool
+	// closing is set to true when Browser.Close() begins teardown.
+	// It is used to reject new page attachments during shutdown.
+	closing atomic.Bool
+
+	// closeOnce ensures that Browser.Close() teardown runs exactly once.
+	closeOnce sync.Once
+
+	// closed tracks whether Close() has already completed, used for re-close warnings.
+	closed atomic.Bool
 
 	// version caches the browser version information.
 	version browserVersion
@@ -319,13 +326,31 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) error {
 	}
 	p, err := NewPage(b.vuCtx, session, browserCtx, targetPage.TargetID, opener, isPage, b.logger)
 	if err != nil && b.isPageAttachmentErrorIgnorable(ev, session, err) {
+		if b.closing.Load() {
+			b.logger.Debugf("Browser:onAttachedToTarget", "detaching: page creation failed during close sid:%v", ev.SessionID)
+			detachSession(b.browserCtx, session)
+		}
 		return nil // Ignore this page.
 	}
 	if err != nil {
 		return fmt.Errorf("creating a new %s: %w", targetPage.Type, err)
 	}
 
-	b.attachNewPage(p, ev) // Register the page as an active page.
+	// This prevents a race where Close() sets closing and snapshots
+	// pages, but a new page is inserted outside that snapshot.
+	if err := b.attachNewPage(p, ev); err != nil {
+		if errors.Is(err, errBrowserClosing) {
+			b.logger.Debugf("Browser:onAttachedToTarget",
+				"detaching: rejected late page after creation sid:%v tid:%v",
+				ev.SessionID, ev.TargetInfo.TargetID)
+			if closeErr := p.Close(); closeErr != nil {
+				b.logger.Debugf("Browser:onAttachedToTarget", "closing rejected late page: %v", closeErr)
+			}
+			detachSession(b.browserCtx, session)
+			return nil
+		}
+		return fmt.Errorf("attaching new page: %w", err)
+	}
 
 	// Emit the page event only for pages, not for background pages.
 	// Background pages are created by extensions.
@@ -336,24 +361,43 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) error {
 	return nil
 }
 
-// attachNewPage registers the page as an active page and attaches the sessionID with the targetID.
-func (b *Browser) attachNewPage(p *Page, ev *target.EventAttachedToTarget) {
+// errBrowserClosing is returned when a page attachment
+// is rejected because the browser has started closing.
+var errBrowserClosing = errors.New("browser is closing")
+
+// attachNewPage checks whether the browser is closing and, if not, attaches
+// the page. Returns errBrowserClosing if the browser is shutting down.
+func (b *Browser) attachNewPage(p *Page, ev *target.EventAttachedToTarget) error {
 	targetPage := ev.TargetInfo
 
-	// Register the page as an active page.
-	b.logger.Debugf("Browser:attachNewPage:addTarget", "sid:%v tid:%v pageType:%s",
-		ev.SessionID, targetPage.TargetID, targetPage.Type)
-	b.pagesMu.Lock()
-	b.pages[targetPage.TargetID] = p
-	b.pagesMu.Unlock()
+	attachPage := func() error {
+		b.pagesMu.Lock()
+		defer b.pagesMu.Unlock()
 
-	// Attach the sessionID with the targetID so we can communicate with the
-	// page later.
-	b.logger.Debugf("Browser:attachNewPage:addSession", "sid:%v tid:%v pageType:%s",
-		ev.SessionID, targetPage.TargetID, targetPage.Type)
+		if b.closing.Load() {
+			b.logger.Debugf("Browser:attachNewPage",
+				"rejected late page before adding to pages map sid:%v tid:%v",
+				ev.SessionID, targetPage.TargetID,
+			)
+			return errBrowserClosing
+		}
+
+		b.logger.Debugf("Browser:attachNewPage:addTarget", "sid:%v tid:%v pageType:%s",
+			ev.SessionID, targetPage.TargetID, targetPage.Type)
+		b.pages[targetPage.TargetID] = p
+
+		return nil
+	}
+
+	if err := attachPage(); err != nil {
+		return err
+	}
+
 	b.sessionIDtoTargetIDMu.Lock()
 	b.sessionIDtoTargetID[ev.SessionID] = targetPage.TargetID
 	b.sessionIDtoTargetIDMu.Unlock()
+
+	return nil
 }
 
 // isAttachedPageValid returns true if the attached page is valid and should be
@@ -525,80 +569,104 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 
 // Close shuts down the browser.
 func (b *Browser) Close() {
-	// This will help with some cleanup in the connection and event loop above in
-	// initEvents().
-	defer b.browserCancelFn(errors.New("browser closed"))
+	b.closeOnce.Do(func() {
+		getPages := func() []*Page {
+			b.pagesMu.Lock()
+			defer b.pagesMu.Unlock()
 
-	if b.closed {
+			b.closing.Store(true)
+
+			pages := make([]*Page, 0, len(b.pages))
+			for _, p := range b.pages {
+				pages = append(pages, p)
+			}
+			return pages
+		}
+		pages := getPages()
+
+		// This will help with some cleanup in the connection and event loop above in
+		// initEvents().
+		defer b.browserCancelFn(errors.New("browser closed"))
+
+		defer func() {
+			if err := b.browserProc.Cleanup(); err != nil {
+				b.logger.Errorf("Browser:Close", "cleaning up the user data directory: %v", err)
+			}
+		}()
+		defer func() {
+			for _, fn := range b.runOnClose {
+				if err := fn(); err != nil {
+					b.logger.Errorf("Browser:Close", "running cleanup function: %v", err)
+				}
+			}
+		}()
+
+		// Close and drain all open pages to ensure their goroutines
+		// (frame sessions, network managers) are properly waited on
+		// before the browser process is terminated.
+		for _, p := range pages {
+			if err := p.Close(); err != nil {
+				b.logger.Debugf("Browser:Close", "closing page: %v", err)
+			}
+		}
+
+		atomic.CompareAndSwapInt64(&b.state, b.state, BrowserStateClosed)
+
+		// Signal to the connection and the process that we're gracefully closing.
+		// We ignore any IO errors reading from the WS connection, because the below
+		// CDP Browser.close command ends the connection unexpectedly, which causes
+		// `websocket.ReadMessage()` to return `close 1006 (abnormal closure):
+		// unexpected EOF`.
+		b.conn.IgnoreIOErrors()
+		b.browserProc.GracefulClose()
+
+		// If the browser is not being executed remotely, send the Browser.close CDP
+		// command, which triggers the browser process to exit.
+		if !b.browserOpts.isRemoteBrowser {
+			var closeErr *websocket.CloseError
+			// Using the internal context with a timeout of 10 seconds here since
+			// 1. vu context will very likely be closed;
+			// 2. there's a chance that the process has died but the connection still
+			//    thinks it's open.
+			toCtx, toCancelCtx := context.WithTimeout(b.browserCtx, time.Second*10)
+			defer toCancelCtx()
+
+			err := cdpbrowser.Close().Do(cdp.WithExecutor(toCtx, b.conn))
+			if err != nil && !errors.As(err, &closeErr) {
+				b.logger.Errorf("Browser:Close", "closing the browser: %v", err)
+			}
+		}
+
+		// Wait for all outstanding events (e.g. Target.detachedFromTarget) to be
+		// processed, and for the process to exit gracefully. Otherwise kill it
+		// forcefully after the timeout.
+		timeout := time.Second
+		select {
+		case <-b.browserProc.processDone:
+		case <-time.After(timeout):
+			b.logger.Debugf("Browser:Close", "killing browser process with PID %d after %s", b.browserProc.Pid(), timeout)
+			b.browserProc.Terminate()
+		}
+
+		// This is unintuitive, since the process exited, so the connection would've
+		// been closed as well. The reason we still call conn.Close() here is to
+		// close all sessions and emit the EventConnectionClose event, which will
+		// trigger the cancellation of the main browser context. We don't call it
+		// before the process is done to avoid disconnecting too early, since we
+		// expect some CDP events to arrive after Browser.close, and we can't know
+		// for sure when that has finished. This will error writing to the socket,
+		// but we ignore it.
+		b.conn.Close()
+	})
+
+	// If Close is called again after the first call has completed,
+	// log a warning but do not repeat teardown (sync.Once handles this).
+	if !b.closed.CompareAndSwap(false, true) {
 		b.logger.Warnf(
 			"Browser:Close",
 			"Please call browser.close only once, and do not use the browser after calling close.",
 		)
-		return
 	}
-	b.closed = true
-
-	defer func() {
-		if err := b.browserProc.Cleanup(); err != nil {
-			b.logger.Errorf("Browser:Close", "cleaning up the user data directory: %v", err)
-		}
-	}()
-	defer func() {
-		for _, fn := range b.runOnClose {
-			if err := fn(); err != nil {
-				b.logger.Errorf("Browser:Close", "running cleanup function: %v", err)
-			}
-		}
-	}()
-
-	b.logger.Debugf("Browser:Close", "")
-	atomic.CompareAndSwapInt64(&b.state, b.state, BrowserStateClosed)
-
-	// Signal to the connection and the process that we're gracefully closing.
-	// We ignore any IO errors reading from the WS connection, because the below
-	// CDP Browser.close command ends the connection unexpectedly, which causes
-	// `websocket.ReadMessage()` to return `close 1006 (abnormal closure):
-	// unexpected EOF`.
-	b.conn.IgnoreIOErrors()
-	b.browserProc.GracefulClose()
-
-	// If the browser is not being executed remotely, send the Browser.close CDP
-	// command, which triggers the browser process to exit.
-	if !b.browserOpts.isRemoteBrowser {
-		var closeErr *websocket.CloseError
-		// Using the internal context with a timeout of 10 seconds here since
-		// 1. vu context will very likely be closed;
-		// 2. there's a chance that the process has died but the connection still
-		//    thinks it's open.
-		toCtx, toCancelCtx := context.WithTimeout(b.browserCtx, time.Second*10)
-		defer toCancelCtx()
-
-		err := cdpbrowser.Close().Do(cdp.WithExecutor(toCtx, b.conn))
-		if err != nil && !errors.As(err, &closeErr) {
-			b.logger.Errorf("Browser:Close", "closing the browser: %v", err)
-		}
-	}
-
-	// Wait for all outstanding events (e.g. Target.detachedFromTarget) to be
-	// processed, and for the process to exit gracefully. Otherwise kill it
-	// forcefully after the timeout.
-	timeout := time.Second
-	select {
-	case <-b.browserProc.processDone:
-	case <-time.After(timeout):
-		b.logger.Debugf("Browser:Close", "killing browser process with PID %d after %s", b.browserProc.Pid(), timeout)
-		b.browserProc.Terminate()
-	}
-
-	// This is unintuitive, since the process exited, so the connection would've
-	// been closed as well. The reason we still call conn.Close() here is to
-	// close all sessions and emit the EventConnectionClose event, which will
-	// trigger the cancellation of the main browser context. We don't call it
-	// before the process is done to avoid disconnecting too early, since we
-	// expect some CDP events to arrive after Browser.close, and we can't know
-	// for sure when that has finished. This will error writing to the socket,
-	// but we ignore it.
-	b.conn.Close()
 }
 
 // CloseContext is a short-cut function to close the current browser's context.
