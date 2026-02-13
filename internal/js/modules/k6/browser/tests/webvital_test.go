@@ -30,7 +30,6 @@ func TestWebVitalMetric(t *testing.T) {
 			"browser_web_vital_ttfb": false,
 			"browser_web_vital_fcp":  false,
 			"browser_web_vital_lcp":  false,
-			"browser_web_vital_fid":  false,
 			"browser_web_vital_cls":  false,
 		}
 	)
@@ -67,7 +66,7 @@ func TestWebVitalMetric(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 
-	// A click action helps measure first input delay.
+	// A click action helps measure INP (Interaction to Next Paint).
 	// The click action also refreshes the page, which
 	// also helps the web vital library to measure CLS.
 	err = browser.run(
