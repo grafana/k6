@@ -149,3 +149,33 @@ func TestFrameSessionWaitDrainsAllTrackedWorkers(t *testing.T) {
 	require.EqualValues(t, fsWorkers, fsStopped.Load(), "all frame-session workers must stop before wait returns")
 	require.EqualValues(t, nmWorkers, nmStopped.Load(), "all network-manager workers must stop before wait returns")
 }
+
+func TestFrameSessionWaitTimeoutWhenFrameSessionWorkerDoesNotDrain(t *testing.T) {
+	t.Parallel()
+
+	fsCtx, fsCancel := context.WithCancelCause(t.Context())
+	nmCtx, nmCancel := context.WithCancelCause(fsCtx)
+
+	fs := &FrameSession{
+		ctx:    fsCtx,
+		cancel: fsCancel,
+		networkManager: &NetworkManager{
+			ctx:    nmCtx,
+			cancel: nmCancel,
+		},
+	}
+
+	// Simulate a frame-session worker that cannot be drained.
+	fs.wg.Add(1)
+
+	ctx, closeCancel := context.WithTimeout(t.Context(), 20*time.Millisecond)
+	defer closeCancel()
+
+	err := fs.wait(ctx)
+	require.Error(t, err)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	require.ErrorContains(t, err, "waiting for frame session to close")
+
+	// Keep test-local state consistent.
+	fs.wg.Done()
+}
