@@ -141,7 +141,7 @@ func (pvi PerVUIterations) Run(parentCtx context.Context, out chan<- metrics.Sam
 	waitOnProgressChannel := make(chan struct{})
 	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(parentCtx, duration, gracefulStop)
 	defer func() {
-		cancel()
+		cancel(nil)
 		<-waitOnProgressChannel
 	}()
 
@@ -233,7 +233,7 @@ func (pvi PerVUIterations) Run(parentCtx context.Context, out chan<- metrics.Sam
 	for i := int64(0); i < numVUs; i++ {
 		initializedVU, err := pvi.executionState.GetPlannedVU(pvi.logger, true)
 		if err != nil {
-			cancel()
+			cancel(nil)
 			return err
 		}
 		activeVUs.Add(1)

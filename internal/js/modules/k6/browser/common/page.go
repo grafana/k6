@@ -1450,7 +1450,7 @@ func (p *Page) Reload(opts *PageReloadOptions) (_ *Response, rerr error) { //nol
 			return true // Both successful and failed navigations are considered
 		},
 	)
-	defer cancelWaitingForFrameNavigation() // Remove event handler
+	defer cancelWaitingForFrameNavigation(nil) // Remove event handler
 
 	waitForLifecycleEvent, cancelWaitingForLifecycleEvent := createWaitForEventPredicateHandler(
 		timeoutCtx, p.frameManager.MainFrame(),
@@ -1461,7 +1461,7 @@ func (p *Page) Reload(opts *PageReloadOptions) (_ *Response, rerr error) { //nol
 			}
 			return false
 		})
-	defer cancelWaitingForLifecycleEvent()
+	defer cancelWaitingForLifecycleEvent(nil)
 
 	reloadAction := page.Reload()
 	if err := reloadAction.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {

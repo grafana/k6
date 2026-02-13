@@ -286,7 +286,9 @@ func (mex *ExternallyControlled) UpdateConfig(ctx context.Context, newConf inter
 }
 
 // This is a helper function that is used in run for non-infinite durations.
-func (mex *ExternallyControlled) stopWhenDurationIsReached(ctx context.Context, duration time.Duration, cancel func(error)) {
+func (mex *ExternallyControlled) stopWhenDurationIsReached(
+	ctx context.Context, duration time.Duration, cancel func(error),
+) {
 	ctxDone := ctx.Done()
 	checkInterval := time.NewTicker(100 * time.Millisecond)
 	for {

@@ -112,7 +112,6 @@ func newTestBrowserVU(tb testing.TB, tbr *testBrowser) (_ *k6test.VU, cancel fun
 		vu.Context(),
 		k6ext.RegisterCustomMetrics(k6metrics.NewRegistry()),
 	)
-	// Rename to avoid conflict with named return 'cancel'
 	ctx, cancelCtx := context.WithCancelCause(metricsCtx)
 	wrappedCancel := func() { cancelCtx(nil) }
 	tb.Cleanup(wrappedCancel)

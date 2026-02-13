@@ -139,17 +139,20 @@ func getIterationRunner(
 //     that will also cancel these contexts, thus the "general abort" case is
 //     handled transparently.
 func getDurationContexts(parentCtx context.Context, regularDuration, gracefulStop time.Duration) (
-	startTime time.Time, maxDurationCtx, regDurationCtx context.Context, maxDurationCancel func(),
+	startTime time.Time, maxDurationCtx, regDurationCtx context.Context, maxDurationCancel func(error),
 ) {
 	startTime = time.Now()
 	maxEndTime := startTime.Add(regularDuration + gracefulStop)
 
-	maxDurationCtx, maxDurationCancel = context.WithDeadline(parentCtx, maxEndTime)
+	// If we cancel the parent 'ctx' with an error, 'maxDurationCtx' will also be cancelled and
+	// will inherit that error cause.
+	ctx, cancel := context.WithCancelCause(parentCtx)
+	maxDurationCtx, _ = context.WithDeadline(ctx, maxEndTime) //nolint:govet // we rely on parent cancel
 	if gracefulStop == 0 {
-		return startTime, maxDurationCtx, maxDurationCtx, maxDurationCancel
+		return startTime, maxDurationCtx, maxDurationCtx, cancel
 	}
 	regDurationCtx, _ = context.WithDeadline(maxDurationCtx, startTime.Add(regularDuration)) //nolint:govet
-	return startTime, maxDurationCtx, regDurationCtx, maxDurationCancel
+	return startTime, maxDurationCtx, regDurationCtx, cancel
 }
 
 // trackProgress is a helper function that monitors certain end-events in an

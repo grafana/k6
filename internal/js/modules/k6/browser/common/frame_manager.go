@@ -653,7 +653,7 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *Frame
 			}
 			return false
 		})
-	defer navEvtCancel()
+	defer navEvtCancel(nil)
 
 	lifecycleEvtCh, lifecycleEvtCancel := createWaitForEventPredicateHandler(
 		timeoutCtx, frame, []string{EventFrameAddLifecycle},
@@ -676,7 +676,7 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *Frame
 
 			return le.Event == parsedOpts.WaitUntil
 		})
-	defer lifecycleEvtCancel()
+	defer lifecycleEvtCancel(nil)
 
 	fs, ok := frame.page.getFrameSession(cdp.FrameID(frame.ID()))
 	if !ok {

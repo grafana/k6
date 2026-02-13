@@ -130,7 +130,7 @@ func (clv ConstantVUs) Run(parentCtx context.Context, _ chan<- metrics.SampleCon
 	waitOnProgressChannel := make(chan struct{})
 	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(parentCtx, duration, gracefulStop)
 	defer func() {
-		cancel()
+		cancel(nil)
 		<-waitOnProgressChannel
 	}()
 
@@ -176,8 +176,8 @@ func (clv ConstantVUs) Run(parentCtx context.Context, _ chan<- metrics.SampleCon
 	}
 
 	handleVU := func(initVU lib.InitializedVU) {
-		ctx, cancel := context.WithCancel(maxDurationCtx)
-		defer cancel()
+		ctx, cancel := context.WithCancelCause(maxDurationCtx)
+		defer cancel(nil)
 
 		activeVU := initVU.Activate(
 			getVUActivationParams(ctx, clv.config.BaseConfig, returnVU, clv.nextIterationCounters))
@@ -195,7 +195,7 @@ func (clv ConstantVUs) Run(parentCtx context.Context, _ chan<- metrics.SampleCon
 	for i := int64(0); i < numVUs; i++ {
 		initVU, err := clv.executionState.GetPlannedVU(clv.logger, true)
 		if err != nil {
-			cancel()
+			cancel(err)
 			return err
 		}
 		activeVUs.Add(1)

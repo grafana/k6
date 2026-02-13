@@ -2029,7 +2029,7 @@ func (f *Frame) WaitForLoadState(state string, popts *FrameWaitForLoadStateOptio
 			}
 			return false
 		})
-	defer lifecycleEventCancel()
+	defer lifecycleEventCancel(nil)
 
 	if f.hasLifecycleEventFired(waitUntil) {
 		return nil
@@ -2095,8 +2095,8 @@ func (f *Frame) WaitForNavigation(opts *FrameWaitForNavigationOptions, rm RegExM
 
 	defer func() {
 		timeoutCancel()
-		navEvtCancel()
-		lifecycleEvtCancel()
+		navEvtCancel(nil)
+		lifecycleEvtCancel(nil)
 	}()
 
 	var (

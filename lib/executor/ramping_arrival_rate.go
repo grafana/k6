@@ -336,7 +336,7 @@ func (varr RampingArrivalRate) Run(parentCtx context.Context, out chan<- metrics
 		<-returnedVUs
 		// first close the vusPool so we wait for the gracefulShutdown
 		vusPool.Close()
-		cancel()
+		cancel(nil)
 		activeVUsWg.Wait()
 		<-waitOnProgressChannel
 	}()
