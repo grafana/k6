@@ -579,6 +579,7 @@ func startCloudTestRunV6(
 		return "", nil, err
 	}
 
+	// TODO: This should come from the Cloud API but meanwhile, this is a hack that should work for most of the stacks
 	cloudConfig.WebAppURL = null.StringFrom(cloudConfig.StackURL.String + "/a/k6-app")
 
 	if cloudConfig.ProjectID.Int64 == 0 {
