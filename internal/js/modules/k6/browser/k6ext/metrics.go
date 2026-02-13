@@ -5,14 +5,12 @@ import (
 )
 
 const (
-	webVitalFID  = "FID"
 	webVitalTTFB = "TTFB"
 	webVitalLCP  = "LCP"
 	webVitalCLS  = "CLS"
 	webVitalINP  = "INP"
 	webVitalFCP  = "FCP"
 
-	fidName  = "browser_web_vital_fid"
 	ttfbName = "browser_web_vital_ttfb"
 	lcpName  = "browser_web_vital_lcp"
 	clsName  = "browser_web_vital_cls"
@@ -39,7 +37,6 @@ type CustomMetrics struct {
 // VU Registry and returns our internal struct pointer.
 func RegisterCustomMetrics(registry *k6metrics.Registry) *CustomMetrics {
 	wvs := map[string]string{
-		webVitalFID:  fidName,  // first input delay
 		webVitalTTFB: ttfbName, // time to first byte
 		webVitalLCP:  lcpName,  // largest content paint
 		webVitalCLS:  clsName,  // cumulative layout shift
