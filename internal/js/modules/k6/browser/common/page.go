@@ -941,12 +941,6 @@ func (p *Page) Close() error {
 		p.logger.Warnf("Page:Close", "failed to dispatch keydown for web vitals: %v", err)
 	}
 
-	// Evaluate a no-op to synchronize: this ensures all binding
-	// calls triggered by the above events have been delivered via CDP.
-	if _, err := p.MainFrame().EvaluateWithContext(ctx, `() => {}`); err != nil {
-		p.logger.Warnf("Page:Close", "failed to sync after web vitals finalization: %v", err)
-	}
-
 	add := runtime.RemoveBinding(webVitalBinding)
 	if err := add.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
 		return spanRecordErrorf(span, "internal error while removing binding from page: %w", err)
