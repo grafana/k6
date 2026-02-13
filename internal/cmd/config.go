@@ -318,6 +318,9 @@ func applyDefault(conf Config) Config {
 	if !conf.TeardownTimeout.Valid {
 		conf.TeardownTimeout.Duration = types.Duration(60 * time.Second)
 	}
+	if !conf.HandleSummaryTimeout.Valid {
+		conf.HandleSummaryTimeout = types.NewNullDuration(120*time.Second, true)
+	}
 	return conf
 }
 
