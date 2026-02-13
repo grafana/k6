@@ -76,6 +76,7 @@ linters:
         - pattern: ^os\.(.*)$(# Using anything except Signal and SyscallError from the os package is forbidden )?
         - pattern: ^syscall\.[^A-Z_]+$(# Using anything except constants from the syscall package is forbidden )?
         - pattern: ^logrus\.Logger$
+        - pattern: ^afero\.(.*)$(# Using afero outside of the fsext package is forbidden )?
     funlen:
       lines: 80
       statements: 60
@@ -115,6 +116,10 @@ linters:
       - linters:
           - forbidigo
         text: use of `os\.(SyscallError|Signal|Interrupt)` forbidden
+      - linters:
+          - forbidigo
+        text: use of `afero\.(.*)` forbidden
+        path: lib/fsext/.*\.go
       - linters:
           - revive
         text: avoid meaningless package names
