@@ -825,4 +825,20 @@ func TestValidate(t *testing.T) {
 			})
 		}
 	})
+	t.Run("BlockedAndAllowedHostnamesMutualExclusion", func(t *testing.T) {
+		t.Parallel()
+		blocked, err := types.NewNullHostnameTrie([]string{"blocked.com"})
+		require.NoError(t, err)
+		allowed, err := types.NewNullHostnameTrie([]string{"allowed.com"})
+		require.NoError(t, err)
+
+		opts := Options{
+			BlockedHostnames: blocked,
+			AllowedHostnames: allowed,
+		}
+
+		errs := opts.Validate()
+		require.Len(t, errs, 1)
+		assert.Contains(t, errs[0].Error(), "mutually exclusive")
+	})
 }
