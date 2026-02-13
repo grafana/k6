@@ -17,6 +17,8 @@ import (
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
 	"go.k6.io/k6/internal/js/modules/k6/browser/log"
+
+	"go.k6.io/k6/lib"
 )
 
 const (
@@ -32,7 +34,7 @@ type Browser struct {
 	browserCancelFn context.CancelCauseFunc
 
 	vuCtx         context.Context
-	vuCtxCancelFn context.CancelFunc
+	vuCtxCancelFn context.CancelCauseFunc
 
 	state int64
 
@@ -89,7 +91,7 @@ type browserVersion struct {
 func NewBrowser(
 	ctx context.Context,
 	vuCtx context.Context,
-	vuCtxCancelFn context.CancelFunc,
+	vuCtxCancelFn context.CancelCauseFunc,
 	browserProc *BrowserProcess,
 	browserOpts *BrowserOptions,
 	logger *log.Logger,
@@ -112,7 +114,7 @@ func NewBrowser(
 func newBrowser(
 	ctx context.Context,
 	vuCtx context.Context,
-	vuCtxCancelFn context.CancelFunc,
+	vuCtxCancelFn context.CancelCauseFunc,
 	browserProc *BrowserProcess,
 	browserOpts *BrowserOptions,
 	logger *log.Logger,
@@ -224,7 +226,7 @@ func (b *Browser) initEvents() error {
 			// whereas the initContext is controlled by the k6 event system when
 			// browser.close() is called. k6 iteration ends before the event system.
 			if b.vuCtxCancelFn != nil {
-				b.vuCtxCancelFn()
+				b.vuCtxCancelFn(nil)
 			}
 		}()
 		for {
@@ -410,7 +412,7 @@ func (b *Browser) isPageAttachmentErrorIgnorable(ev *target.EventAttachedToTarge
 	case <-b.vuCtx.Done():
 		b.logger.Debugf("Browser:isPageAttachmentErrorIgnorable:return:<-ctx.Done",
 			"sid:%v tid:%v pageType:%s err:%v",
-			ev.SessionID, targetPage.TargetID, targetPage.Type, b.vuCtx.Err())
+			ev.SessionID, targetPage.TargetID, targetPage.Type, lib.ContextErr(b.vuCtx))
 		return true
 	default:
 	}
@@ -486,7 +488,7 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 			return e.(*Page).targetID == tid //nolint:forcetypeassert
 		},
 	)
-	defer removeEventHandler()
+	defer removeEventHandler(nil)
 
 	// create a new page.
 	action := target.CreateTarget(BlankPage).WithNewWindow(true).WithBrowserContextID(id)
@@ -504,10 +506,10 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 		page = b.pages[tid]
 		b.pagesMu.RUnlock()
 	case <-ctx.Done():
-		b.logger.Debugf("Browser:newPageInContext:<-ctx.Done", "tid:%v bctxid:%v err:%v", tid, id, ctx.Err())
+		b.logger.Debugf("Browser:newPageInContext:<-ctx.Done", "tid:%v bctxid:%v err:%v", tid, id, lib.ContextErr(ctx))
 	}
 
-	if err = ContextErr(ctx); err != nil {
+	if err = lib.ContextErr(ctx); err != nil {
 		err = &k6ext.UserFriendlyError{
 			Err:     err,
 			Timeout: b.browserOpts.Timeout,
@@ -679,7 +681,7 @@ func (b *Browser) On(event string) (bool, error) {
 	case <-b.browserProc.lostConnection:
 		return true, nil
 	case <-b.vuCtx.Done():
-		return false, fmt.Errorf("browser.on promise rejected: %w", ContextErr(b.vuCtx))
+		return false, fmt.Errorf("browser.on promise rejected: %w", lib.ContextErr(b.vuCtx))
 	}
 }
 

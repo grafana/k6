@@ -12,6 +12,8 @@ import (
 	"github.com/chromedp/cdproto/input"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/keyboardlayout"
+
+	"go.k6.io/k6/lib"
 )
 
 const (
@@ -344,7 +346,7 @@ func wait(ctx context.Context, delay int64) error {
 		if !t.Stop() {
 			<-t.C
 		}
-		return fmt.Errorf("%w", ContextErr(ctx))
+		return fmt.Errorf("%w", lib.ContextErr(ctx))
 	case <-t.C:
 	}
 

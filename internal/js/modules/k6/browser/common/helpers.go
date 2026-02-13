@@ -15,6 +15,8 @@ import (
 	"github.com/grafana/sobek"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
+
+	"go.k6.io/k6/lib"
 )
 
 func convertBaseJSHandleTypes(
@@ -109,7 +111,7 @@ func call(
 	select {
 	case <-ctx.Done():
 		err = &k6ext.UserFriendlyError{
-			Err:     ContextErr(ctx),
+			Err:     lib.ContextErr(ctx),
 			Timeout: timeout,
 		}
 	case result = <-resultCh:
@@ -125,9 +127,9 @@ func createWaitForEventHandler(
 	emitter EventEmitter, events []string,
 	predicateFn func(data any) bool,
 ) (
-	chan any, context.CancelFunc,
+	chan any, context.CancelCauseFunc,
 ) {
-	evCancelCtx, evCancelFn := context.WithCancel(ctx)
+	evCancelCtx, evCancelFn := context.WithCancelCause(ctx)
 	chEvHandler := make(chan Event)
 	ch := make(chan any)
 
@@ -157,7 +159,7 @@ func createWaitForEventHandler(
 
 					// We wait for one matching event only,
 					// then remove the event handler by cancelling context and stopping goroutine.
-					evCancelFn()
+					evCancelFn(nil)
 
 					return
 				}
@@ -176,9 +178,9 @@ func createWaitForEventPredicateHandler(
 	ctx context.Context, emitter EventEmitter, events []string,
 	predicateFn func(data any) bool,
 ) (
-	chan any, context.CancelFunc,
+	chan any, context.CancelCauseFunc,
 ) {
-	evCancelCtx, evCancelFn := context.WithCancel(ctx)
+	evCancelCtx, evCancelFn := context.WithCancelCause(ctx)
 	chEvHandler := make(chan Event)
 	ch := make(chan any)
 
@@ -193,7 +195,7 @@ func createWaitForEventPredicateHandler(
 					select {
 					case ch <- ev.data:
 						close(ch)
-						evCancelFn()
+						evCancelFn(nil)
 					case <-evCancelCtx.Done():
 					}
 					return

@@ -508,7 +508,7 @@ func (vlv *RampingVUs) Run(ctx context.Context, _ chan<- metrics.SampleContainer
 		ctx, regularDuration, maxDuration-regularDuration,
 	)
 	defer func() {
-		cancel()
+		cancel(nil)
 		<-waitOnProgressChannel
 	}()
 
@@ -595,12 +595,12 @@ func (rs *rampingVUsRunState) makeProgressFn(regular time.Duration) (progressFn 
 	}
 }
 
-func (rs *rampingVUsRunState) runLoopsIfPossible(ctx context.Context, cancel func()) {
+func (rs *rampingVUsRunState) runLoopsIfPossible(ctx context.Context, cancel func(error)) {
 	getVU := func() (lib.InitializedVU, error) {
 		pvu, err := rs.executor.executionState.GetPlannedVU(rs.executor.logger, false)
 		if err != nil {
 			rs.executor.logger.WithError(err).Error("Cannot get a VU from the buffer")
-			cancel()
+			cancel(err)
 			return pvu, err
 		}
 		rs.wg.Add(1)

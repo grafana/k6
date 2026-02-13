@@ -19,6 +19,8 @@ import (
 	jsonv2 "github.com/go-json-experiment/json"
 	"github.com/go-json-experiment/json/jsontext"
 	"github.com/gorilla/websocket"
+
+	"go.k6.io/k6/lib"
 )
 
 const wsWriteBufferSize = 1 << 20
@@ -483,7 +485,7 @@ func (c *Connection) send(
 		_ = c.close(code)
 		return fmt.Errorf("closing communication with browser: %w", &websocket.CloseError{Code: code})
 	case <-ctx.Done():
-		c.logger.Debugf("Connection:send:<-ctx.Done", "wsURL:%q sid:%v err:%v", c.wsURL, msg.SessionID, c.ctx.Err())
+		c.logger.Debugf("Connection:send:<-ctx.Done", "wsURL:%q sid:%v err:%v", c.wsURL, msg.SessionID, lib.ContextErr(ctx))
 		return nil
 	case <-c.done:
 		c.logger.Debugf("Connection:send:<-c.done", "wsURL:%q sid:%v", c.wsURL, msg.SessionID)
@@ -526,12 +528,12 @@ func (c *Connection) send(
 		c.logger.Debugf("Connection:send:<-c.done #2", "sid:%v tid:%v wsURL:%q", msg.SessionID, tid, c.wsURL)
 	case <-ctx.Done():
 		c.logger.Debugf("Connection:send:<-ctx.Done()", "sid:%v tid:%v wsURL:%q err:%v",
-			msg.SessionID, tid, c.wsURL, ContextErr(c.ctx))
-		return ContextErr(ctx)
+			msg.SessionID, tid, c.wsURL, lib.ContextErr(ctx))
+		return lib.ContextErr(ctx)
 	case <-c.ctx.Done():
 		c.logger.Debugf("Connection:send:<-c.ctx.Done()", "sid:%v tid:%v wsURL:%q err:%v",
-			msg.SessionID, tid, c.wsURL, ContextErr(c.ctx))
-		return ContextErr(c.ctx)
+			msg.SessionID, tid, c.wsURL, lib.ContextErr(c.ctx))
+		return lib.ContextErr(c.ctx)
 	}
 	return nil
 }
@@ -563,7 +565,7 @@ func (c *Connection) sendLoop() {
 			c.logger.Debugf("Connection:sendLoop:<-c.done#2", "wsURL:%q", c.wsURL)
 			return
 		case <-c.ctx.Done():
-			c.logger.Debugf("connection:sendLoop", "returning, ctx.Err: %q", c.ctx.Err())
+			c.logger.Debugf("connection:sendLoop", "returning, ctx.Err: %q", lib.ContextErr(c.ctx))
 			return
 		}
 	}
@@ -588,20 +590,21 @@ func (c *Connection) Execute(
 
 	// Setup event handler used to block for response to message being sent.
 	ch := make(chan *cdproto.Message, 1)
-	evCancelCtx, evCancelFn := context.WithCancel(ctx)
+	evCancelCtx, evCancelFn := context.WithCancelCause(ctx)
 	chEvHandler := make(chan Event)
 	go func() {
 		for {
 			select {
 			case <-evCancelCtx.Done():
-				c.logger.Debugf("connection:Execute:<-evCancelCtx.Done()", "wsURL:%q err:%v", c.wsURL, evCancelCtx.Err())
+				c.logger.Debugf("connection:Execute:<-evCancelCtx.Done()", "wsURL:%q err:%v", c.wsURL, lib.ContextErr(evCancelCtx))
 				return
 			case ev := <-chEvHandler:
 				msg, ok := ev.data.(*cdproto.Message)
 				if ok && msg.ID == id {
 					select {
 					case <-evCancelCtx.Done():
-						c.logger.Debugf("connection:Execute:<-evCancelCtx.Done()#2", "wsURL:%q err:%v", c.wsURL, evCancelCtx.Err())
+						c.logger.Debugf("connection:Execute:<-evCancelCtx.Done()#2",
+							"wsURL:%q err:%v", c.wsURL, lib.ContextErr(evCancelCtx))
 					case ch <- msg:
 						// Stopping goroutine as we expect only one response with the matching message ID
 						return
@@ -611,7 +614,7 @@ func (c *Connection) Execute(
 		}
 	}()
 	c.onAll(evCancelCtx, chEvHandler)
-	defer evCancelFn() // Remove event handler
+	defer evCancelFn(nil) // Remove event handler
 
 	// Send the message
 	var buf []byte
