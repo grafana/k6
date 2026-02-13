@@ -50,6 +50,7 @@ structs.
 type FrameSession struct {
 	ctx            context.Context
 	cancel         context.CancelCauseFunc
+	teardownCtx    context.Context
 	session        session
 	page           *Page
 	parent         *FrameSession
@@ -93,7 +94,7 @@ type FrameSession struct {
 //
 //nolint:funlen
 func NewFrameSession(
-	ctx context.Context, s session, p *Page, parent *FrameSession, tid target.ID, l *log.Logger, hasUIWindow bool,
+	ctx context.Context, teardownCtx context.Context, s session, p *Page, parent *FrameSession, tid target.ID, l *log.Logger, hasUIWindow bool,
 ) (_ *FrameSession, err error) {
 	l.Debugf("NewFrameSession", "sid:%v tid:%v", s.ID(), tid)
 
@@ -103,6 +104,7 @@ func NewFrameSession(
 	fs := FrameSession{
 		ctx:                  ctx,
 		cancel:               cancel,
+		teardownCtx:          teardownCtx,
 		session:              s,
 		page:                 p,
 		parent:               parent,
@@ -1039,6 +1041,7 @@ func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, session *Session) 
 
 	nfs, err := NewFrameSession(
 		fs.ctx,
+		fs.teardownCtx,
 		session,
 		fs.page, fs, ti.TargetID,
 		fs.logger,
