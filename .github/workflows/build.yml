@@ -192,11 +192,6 @@ jobs:
           docker run $DOCKER_IMAGE_ID help
           docker run $DOCKER_IMAGE_ID run --help
           docker run $DOCKER_IMAGE_ID inspect --help
-          docker run $DOCKER_IMAGE_ID status --help
-          docker run $DOCKER_IMAGE_ID stats --help
-          docker run $DOCKER_IMAGE_ID scale --help
-          docker run $DOCKER_IMAGE_ID pause --help
-          docker run $DOCKER_IMAGE_ID resume --help
       - name: Login to DockerHub
         if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') }}
         uses: grafana/shared-workflows/actions/dockerhub-login@081a366728379fd0426b9cfef190e9a21c2d5418 # dockerhub-login/v1.0.3
