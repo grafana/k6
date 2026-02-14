@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mattn/go-colorable"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -321,68 +322,15 @@ func (c *rootCommand) setupLoggers(stop <-chan struct{}) error {
 		c.globalState.Logger.SetLevel(logrus.DebugLevel)
 	}
 
-	var (
-		hook log.AsyncHook
-		err  error
-	)
-
-	loggerForceColors := false // disable color by default
-	switch line := c.globalState.Flags.LogOutput; {
-	case line == "stderr":
-		loggerForceColors = !c.globalState.Flags.NoColor && c.globalState.Stderr.IsTTY
-		c.globalState.Logger.SetOutput(c.globalState.Stderr)
-	case line == "stdout":
-		loggerForceColors = !c.globalState.Flags.NoColor && c.globalState.Stdout.IsTTY
-		c.globalState.Logger.SetOutput(c.globalState.Stdout)
-	case line == "none":
-		c.globalState.Logger.SetOutput(io.Discard)
-	case strings.HasPrefix(line, "loki"):
-		c.loggerIsRemote = true
-		hook, err = log.LokiFromConfigLine(c.globalState.FallbackLogger, line)
-		if err != nil {
-			return err
-		}
-		c.globalState.Flags.LogFormat = "raw"
-	case strings.HasPrefix(line, "file"):
-		hook, err = log.FileHookFromConfigLine(
-			c.globalState.FS, c.globalState.Getwd,
-			c.globalState.FallbackLogger, line,
-		)
-		if err != nil {
-			return err
-		}
-	default:
-		return fmt.Errorf("unsupported log output '%s'", line)
-	}
-
-	switch c.globalState.Flags.LogFormat {
-	case "raw":
-		c.globalState.Logger.SetFormatter(&RawFormatter{})
-		c.globalState.Logger.Debug("Logger format: RAW")
-	case "json":
-		c.globalState.Logger.SetFormatter(&logrus.JSONFormatter{})
-		c.globalState.Logger.Debug("Logger format: JSON")
-	default:
-		c.globalState.Logger.SetFormatter(&logrus.TextFormatter{
-			ForceColors: loggerForceColors, DisableColors: c.globalState.Flags.NoColor,
-		})
-		c.globalState.Logger.Debug("Logger format: TEXT")
-	}
-
-	secretsources, err := createSecretSources(c.globalState)
+	hook, isTTY, err := c.configureLogOutput()
 	if err != nil {
 		return err
 	}
-	// it is important that we add this hook first as hooks are executed in order of addition
-	// and this means no other hook will get secrets
-	var secretsHook logrus.Hook
-	c.globalState.SecretsManager, secretsHook, err = secretsource.NewManager(secretsources)
-	if err != nil {
+
+	c.configureLogFormat(isTTY)
+
+	if err := c.setupSecretsManager(); err != nil {
 		return err
-	}
-	if len(secretsources) != 0 {
-		// don't actually filter anything if there will be no secrets
-		c.globalState.Logger.AddHook(secretsHook)
 	}
 
 	cancel := func() {} // noop as default
@@ -405,6 +353,106 @@ func (c *rootCommand) setupLoggers(stop <-chan struct{}) error {
 		_ = w.Close()
 		c.loggersWg.Done()
 	}()
+	return nil
+}
+
+// configureLogOutput configures the log output destination and returns an async hook if needed
+func (c *rootCommand) configureLogOutput() (log.AsyncHook, bool, error) {
+	var (
+		hook        log.AsyncHook
+		err         error
+		loggerOut   io.Writer
+		loggerIsTTY = false
+	)
+
+	switch line := c.globalState.Flags.LogOutput; {
+	case line == "stderr":
+		loggerOut = c.globalState.Stderr
+		loggerIsTTY = c.globalState.Stderr.IsTTY
+	case line == "stdout":
+		loggerOut = c.globalState.Stdout
+		loggerIsTTY = c.globalState.Stdout.IsTTY
+	case line == "none":
+		loggerOut = io.Discard
+	case strings.HasPrefix(line, "loki"):
+		c.loggerIsRemote = true
+		hook, err = log.LokiFromConfigLine(c.globalState.FallbackLogger, line)
+		if err != nil {
+			return nil, false, err
+		}
+		c.globalState.Flags.LogFormat = "raw"
+	case strings.HasPrefix(line, "file"):
+		hook, err = log.FileHookFromConfigLine(
+			c.globalState.FS, c.globalState.Getwd,
+			c.globalState.FallbackLogger, line,
+		)
+		if err != nil {
+			return nil, false, err
+		}
+	default:
+		return nil, false, fmt.Errorf("unsupported log output '%s'", line)
+	}
+
+	// Wrap with NonColorable to strip ANSI codes if:
+	// - Non-TTY (always strip for logfmt), OR
+	// - TTY with NoColor flag (strip for k6 format)
+	if loggerOut != nil && (!loggerIsTTY || c.globalState.Flags.NoColor) {
+		loggerOut = colorable.NewNonColorable(loggerOut)
+	}
+
+	if loggerOut != nil {
+		c.globalState.Logger.SetOutput(loggerOut)
+	}
+
+	return hook, loggerIsTTY, nil
+}
+
+// configureLogFormat configures the log formatter based on the log format flag
+func (c *rootCommand) configureLogFormat(isTTY bool) {
+	switch c.globalState.Flags.LogFormat {
+	case "raw":
+		c.globalState.Logger.SetFormatter(&RawFormatter{})
+		c.globalState.Logger.Debug("Logger format: RAW")
+	case "json":
+		c.globalState.Logger.SetFormatter(&logrus.JSONFormatter{})
+		c.globalState.Logger.Debug("Logger format: JSON")
+	default:
+		// TTY-first logic: TTY gets k6 format, non-TTY gets logfmt
+		if isTTY {
+			// TTY: use k6 format (INFO[0000])
+			// NoColor handling is done in configureLogOutput via NonColorable wrapper
+			c.globalState.Logger.SetFormatter(&logrus.TextFormatter{
+				ForceColors:   true,
+				DisableColors: false,
+			})
+		} else {
+			// Non-TTY: use logfmt format (level=info)
+			c.globalState.Logger.SetFormatter(&logrus.TextFormatter{
+				ForceColors:   false,
+				DisableColors: true,
+			})
+		}
+		c.globalState.Logger.Debug("Logger format: TEXT")
+	}
+}
+
+// setupSecretsManager sets up the secrets manager and adds the secrets hook to the logger
+func (c *rootCommand) setupSecretsManager() error {
+	secretsources, err := createSecretSources(c.globalState)
+	if err != nil {
+		return err
+	}
+	// it is important that we add this hook first as hooks are executed in order of addition
+	// and this means no other hook will get secrets
+	var secretsHook logrus.Hook
+	c.globalState.SecretsManager, secretsHook, err = secretsource.NewManager(secretsources)
+	if err != nil {
+		return err
+	}
+	if len(secretsources) != 0 {
+		// don't actually filter anything if there will be no secrets
+		c.globalState.Logger.AddHook(secretsHook)
+	}
 	return nil
 }
 

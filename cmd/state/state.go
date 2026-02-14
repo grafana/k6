@@ -89,7 +89,7 @@ type GlobalState struct {
 // like os.Stdout, os.Stderr, os.Stdin, os.Getenv(), etc. should be removed and
 // the respective properties of globalState used instead.
 //
-//nolint:forbidigo
+//nolint:forbidigo,funlen
 func NewGlobalState(ctx context.Context) *GlobalState {
 	isDumbTerm := os.Getenv("TERM") == "dumb"
 	stdoutTTY := !isDumbTerm && (isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd()))
@@ -132,14 +132,31 @@ func NewGlobalState(ctx context.Context) *GlobalState {
 		logLevel = logrus.DebugLevel
 	}
 
+	// TTY-first logic: TTY gets k6 format, non-TTY gets logfmt
+	loggerOut := io.Writer(stderr)
+	formatter := &logrus.TextFormatter{}
+
+	if stderrTTY {
+		// TTY: use k6 format (INFO[0000])
+		formatter.ForceColors = true
+		formatter.DisableColors = false
+		// Wrap with NonColorable if NoColor is set (strips ANSI codes)
+		if globalFlags.NoColor {
+			loggerOut = colorable.NewNonColorable(stderr)
+		}
+	} else {
+		// Non-TTY: use logfmt format (level=info)
+		formatter.ForceColors = false
+		formatter.DisableColors = true
+		// Always wrap to strip any ANSI codes
+		loggerOut = colorable.NewNonColorable(stderr)
+	}
+
 	logger := &logrus.Logger{
-		Out: stderr,
-		Formatter: &logrus.TextFormatter{
-			ForceColors:   stderrTTY,
-			DisableColors: !stderrTTY || globalFlags.NoColor,
-		},
-		Hooks: make(logrus.LevelHooks),
-		Level: logLevel,
+		Out:       loggerOut,
+		Formatter: formatter,
+		Hooks:     make(logrus.LevelHooks),
+		Level:     logLevel,
 	}
 
 	return &GlobalState{
