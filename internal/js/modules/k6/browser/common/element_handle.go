@@ -1637,7 +1637,11 @@ func retryAction(apiCtx context.Context, fn func(apiCtx context.Context) (any, e
 			return res, nil
 		}
 
-		if shouldRetry, err := shouldRetry(apiCtx, err); !shouldRetry {
+		shouldRetry, retryErr := shouldRetry(apiCtx, err)
+		if !shouldRetry {
+			if retryErr != nil {
+				return res, retryErr
+			}
 			return res, err
 		}
 	}
@@ -1786,7 +1790,11 @@ func retryPointerAction(
 			return res, err
 		}
 
-		if shouldRetry, err := shouldRetry(apiCtx, err); !shouldRetry {
+		shouldRetry, retryErr := shouldRetry(apiCtx, err)
+		if !shouldRetry {
+			if retryErr != nil {
+				return res, retryErr
+			}
 			return res, err
 		}
 	}
