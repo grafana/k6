@@ -27,7 +27,7 @@ import (
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext/k6test"
-	"go.k6.io/k6/metrics"
+	k6metrics "go.k6.io/k6/metrics"
 )
 
 type emulateMediaOpts struct {
@@ -2157,7 +2157,7 @@ func TestPageOnMetric(t *testing.T) {
 
 			done := make(chan bool)
 
-			samples := make(chan metrics.SampleContainer)
+			samples := make(chan k6metrics.SampleContainer)
 			// This page will perform many pings with a changing h query parameter.
 			// This URL should be grouped according to how page.on('metric') is used.
 			tb := newTestBrowser(t, withHTTPServer(), withSamples(samples))
@@ -4356,4 +4356,37 @@ func TestPageGoBackForward(t *testing.T) {
 		}
 		tb.AssertURL(p, url3, "after rapid navigation should still be on page2")
 	})
+}
+
+// The race occurs when browser goroutines (FrameSession event loop,
+// NetworkManager fire-and-forget goroutines) call PushIfNotDone on the
+// k6 samples channel while close(samples) runs during engine shutdown.
+// Reproduces the issue 5341 when run with the -race flag.
+func TestPageCloseMetricEmissionRaceCondition(t *testing.T) {
+	t.Parallel()
+
+	samples := make(chan k6metrics.SampleContainer, 100)
+	tb := newTestBrowser(t, withSamples(samples), withSkipClose())
+	tb.vu.StartIteration(t)
+
+	page := tb.NewPage(nil)
+	_, err := page.Evaluate(`() => {
+		window.k6browserSendWebVitalMetric(JSON.stringify({
+			id: "v1-5341-1",
+			name: "CLS",
+			value: 0.01,
+			rating: "good",
+			delta: 0.01,
+			numEntries: 1,
+			navigationType: "navigate",
+			url: window.location.href,
+			spanID: ""
+		}));
+	}`)
+	require.NoError(t, err)
+
+	// Dispatches a pagehide event to trigger Web Vital metric emission.
+	// At the same time, simulate the engine is shutting down.
+	require.NoError(t, page.Close())
+	close(samples)
 }
