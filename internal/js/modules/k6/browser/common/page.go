@@ -753,9 +753,17 @@ func (p *Page) attachFrameSession(fid cdp.FrameID, fs *FrameSession) error {
 		return errors.New("internal error: FrameSession is nil")
 	}
 
+	// This prevents a TOCTOU race where Close() snapshots owned sessions
+	// and then a new session is inserted outside that snapshot.
 	p.frameSessionsMu.Lock()
 	defer p.frameSessionsMu.Unlock()
-	fs.page.frameSessions[fid] = fs
+
+	if p.isClosing() {
+		p.logger.Debugf("Page:attachFrameSession", "rejected fid=%v: page is closing", fid)
+		return errPageClosing
+	}
+
+	p.frameSessions[fid] = fs
 
 	return nil
 }
