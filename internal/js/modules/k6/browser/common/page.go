@@ -230,7 +230,10 @@ type Page struct {
 	Mouse       *Mouse
 	Touchscreen *Touchscreen
 
-	ctx context.Context
+	ctx       context.Context
+	cancelCtx context.CancelFunc
+
+	teardownCtx context.Context
 
 	// what it really needs is an executor with
 	// SessionID and TargetID
@@ -285,8 +288,12 @@ func NewPage(
 	bp bool,
 	logger *log.Logger,
 ) (*Page, error) {
+	pageCtx, pageCancel := context.WithCancel(ctx)
+
 	p := Page{
-		ctx:              ctx,
+		ctx:              pageCtx,
+		cancelCtx:        pageCancel,
+		teardownCtx:      bctx.browser.browserCtx,
 		session:          s,
 		browserCtx:       bctx,
 		targetID:         tid,
@@ -317,7 +324,7 @@ func NewPage(
 
 	var err error
 	p.frameManager = NewFrameManager(ctx, s, &p, p.timeoutSettings, p.logger)
-	p.mainFrameSession, err = NewFrameSession(ctx, s, &p, nil, tid, p.logger, true)
+	p.mainFrameSession, err = NewFrameSession(p.ctx, p.teardownCtx, s, &p, nil, tid, p.logger, true)
 	if err != nil {
 		p.logger.Debugf("Page:NewPage:NewFrameSession:return", "sid:%v tid:%v err:%v",
 			p.sessionID(), tid, err)
