@@ -253,6 +253,14 @@ type Page struct {
 	closedMu sync.RWMutex
 	closed   bool
 
+	// closing serializes Page.Close() so that repeated calls return the
+	// same result without repeating teardown.
+	closingOnce sync.Once
+	closeErr    error
+	// closing is closed when the page begins tearing down.  Checked by
+	// attachment paths (attachFrameSession) to reject late frame sessions.
+	closing chan struct{}
+
 	// TODO: setter change these fields (mutex?)
 	emulatedSize     *EmulatedSize
 	mediaType        MediaType
@@ -306,6 +314,7 @@ func NewPage(
 		timeoutSettings:  NewTimeoutSettings(bctx.timeoutSettings),
 		Keyboard:         NewKeyboard(ctx, s),
 		jsEnabled:        true,
+		closing:          make(chan struct{}),
 		eventCh:          make(chan Event),
 		eventHandlers:    make(map[PageEventName][]pageEventHandlerRecord),
 		frameSessions:    make(map[cdp.FrameID]*FrameSession),
@@ -733,6 +742,10 @@ func (p *Page) getOwnerFrame(apiCtx context.Context, h *ElementHandle) (cdp.Fram
 	return frameID, nil
 }
 
+// errPageClosing is returned when a frame-session attachment is rejected
+// because the page has started closing.
+var errPageClosing = errors.New("page is closing")
+
 func (p *Page) attachFrameSession(fid cdp.FrameID, fs *FrameSession) error {
 	p.logger.Debugf("Page:attachFrameSession", "sid:%v fid=%v", p.session.ID(), fid)
 
@@ -745,6 +758,20 @@ func (p *Page) attachFrameSession(fid cdp.FrameID, fs *FrameSession) error {
 	fs.page.frameSessions[fid] = fs
 
 	return nil
+}
+
+// waitForFrameSessions waits for every FrameSession's event goroutine
+// (and transitively its NetworkManager goroutines) to finish.
+func (p *Page) waitForFrameSessions() {
+	p.frameSessionsMu.RLock()
+	sessions := make([]*FrameSession, 0, len(p.frameSessions))
+	for _, fs := range p.frameSessions {
+		sessions = append(sessions, fs)
+	}
+	p.frameSessionsMu.RUnlock()
+	for _, fs := range sessions {
+		fs.wait()
+	}
 }
 
 func (p *Page) getFrameSession(frameID cdp.FrameID) (*FrameSession, bool) {
@@ -914,6 +941,16 @@ func (p *Page) Click(selector string, opts *FrameClickOptions) error {
 	p.logger.Debugf("Page:Click", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().Click(selector, opts)
+}
+
+// isClosing reports whether the page has started closing.
+func (p *Page) isClosing() bool {
+	select {
+	case <-p.closing:
+		return true
+	default:
+		return false
+	}
 }
 
 // Close closes the page.
