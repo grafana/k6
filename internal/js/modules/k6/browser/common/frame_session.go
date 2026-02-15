@@ -71,6 +71,7 @@ type FrameSession struct {
 	isolatedWorlds       map[string]bool
 
 	eventCh chan Event
+	wg      sync.WaitGroup
 
 	childSessions map[cdp.FrameID]*FrameSession
 	vu            k6modules.VU
@@ -225,7 +226,7 @@ func (fs *FrameSession) initDomains() error {
 	return nil
 }
 
-//nolint:cyclop
+//nolint:cyclop,funlen
 func (fs *FrameSession) initEvents() {
 	fs.logger.Debugf("NewFrameSession:initEvents",
 		"sid:%v tid:%v", fs.session.ID(), fs.targetID)
@@ -238,7 +239,10 @@ func (fs *FrameSession) initEvents() {
 		fs.initRendererEvents()
 	}
 
+	fs.wg.Add(1)
 	go func() {
+		defer fs.wg.Done()
+
 		fs.logger.Debugf("NewFrameSession:initEvents:go",
 			"sid:%v tid:%v", fs.session.ID(), fs.targetID)
 		defer func() {
@@ -597,6 +601,11 @@ func (fs *FrameSession) initRendererEvents() {
 
 func (fs *FrameSession) isMainFrame() bool {
 	return fs.targetID == fs.page.targetID
+}
+
+func (fs *FrameSession) wait() {
+	fs.wg.Wait()
+	fs.networkManager.wait()
 }
 
 func (fs *FrameSession) handleFrameTree(frameTree *cdppage.FrameTree, initialFrame bool) {
