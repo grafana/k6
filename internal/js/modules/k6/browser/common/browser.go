@@ -320,13 +320,39 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) error {
 	}
 	p, err := NewPage(b.vuCtx, session, browserCtx, targetPage.TargetID, opener, isPage, b.logger)
 	if err != nil && b.isPageAttachmentErrorIgnorable(ev, session, err) {
+		if b.closing.Load() {
+			b.logger.Debugf("Browser:onAttachedToTarget", "new page failed; browser is closing: sid:%v", ev.SessionID)
+			detachSession(b.browserCtx, session)
+		}
 		return nil // Ignore this page.
 	}
 	if err != nil {
 		return fmt.Errorf("creating a new %s: %w", targetPage.Type, err)
 	}
 
-	b.attachNewPage(p, ev) // Register the page as an active page.
+	// This prevents a race where Close() sets closing and snapshots
+	// pages, but a new page is inserted outside that snapshot.
+	if err := b.attachNewPage(p, ev); err != nil {
+		if !errors.Is(err, errBrowserClosing) {
+			return fmt.Errorf("attaching new page: %w", err)
+		}
+
+		b.logger.Debugf(
+			"Browser:onAttachedToTarget",
+			"rejected page attachment; browser is closing: sid:%v tid:%v",
+			ev.SessionID, ev.TargetInfo.TargetID,
+		)
+		if closeErr := p.Close(); closeErr != nil {
+			b.logger.Debugf(
+				"Browser:onAttachedToTarget",
+				"closing rejected page: %v", closeErr,
+			)
+		}
+
+		detachSession(b.browserCtx, session)
+
+		return nil
+	}
 
 	// Emit the page event only for pages, not for background pages.
 	// Background pages are created by extensions.
@@ -337,24 +363,42 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) error {
 	return nil
 }
 
-// attachNewPage registers the page as an active page and attaches the sessionID with the targetID.
-func (b *Browser) attachNewPage(p *Page, ev *target.EventAttachedToTarget) {
+// errBrowserClosing is returned when a page attachment
+// is rejected because the browser has started closing.
+var errBrowserClosing = errors.New("browser is closing")
+
+// attachNewPage checks whether the browser is closing and, if not, attaches
+// the page. Returns errBrowserClosing if the browser is shutting down.
+func (b *Browser) attachNewPage(p *Page, ev *target.EventAttachedToTarget) error {
 	targetPage := ev.TargetInfo
 
-	// Register the page as an active page.
-	b.logger.Debugf("Browser:attachNewPage:addTarget", "sid:%v tid:%v pageType:%s",
-		ev.SessionID, targetPage.TargetID, targetPage.Type)
-	b.pagesMu.Lock()
-	b.pages[targetPage.TargetID] = p
-	b.pagesMu.Unlock()
+	attachPage := func() error {
+		b.pagesMu.Lock()
+		defer b.pagesMu.Unlock()
 
-	// Attach the sessionID with the targetID so we can communicate with the
-	// page later.
-	b.logger.Debugf("Browser:attachNewPage:addSession", "sid:%v tid:%v pageType:%s",
-		ev.SessionID, targetPage.TargetID, targetPage.Type)
+		if b.closing.Load() {
+			return errBrowserClosing
+		}
+
+		b.logger.Debugf(
+			"Browser:attachNewPage:addTarget",
+			"sid:%v tid:%v pageType:%s",
+			ev.SessionID, targetPage.TargetID, targetPage.Type,
+		)
+		b.pages[targetPage.TargetID] = p
+
+		return nil
+	}
+
+	if err := attachPage(); err != nil {
+		return err
+	}
+
 	b.sessionIDtoTargetIDMu.Lock()
 	b.sessionIDtoTargetID[ev.SessionID] = targetPage.TargetID
 	b.sessionIDtoTargetIDMu.Unlock()
+
+	return nil
 }
 
 // isAttachedPageValid returns true if the attached page is valid and should be
