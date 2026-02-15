@@ -952,10 +952,9 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 	case "worker":
 		err = fs.attachWorkerToTarget(ti, session)
 	default:
-		// Just unblock (debugger continue) these targets and detach from them.
-		_ = session.ExecuteWithoutExpectationOnReply(fs.ctx, cdpruntime.CommandRunIfWaitingForDebugger, nil, nil)
-		_ = session.ExecuteWithoutExpectationOnReply(fs.ctx, target.CommandDetachFromTarget,
-			&target.DetachFromTargetParams{SessionID: session.id}, nil)
+		fs.logger.Debugf("FrameSession:onAttachedToTarget",
+			"unsupported target type %q sid:%v", ti.Type, session.ID())
+		detachSession(fs.ctx, session)
 	}
 	if err == nil {
 		return
@@ -1250,4 +1249,12 @@ func (fs *FrameSession) executionContextForID(
 	}
 
 	return nil, fmt.Errorf("no execution context found for id: %v", executionContextID)
+}
+
+// detachSession unblocks a target waiting for debugger and detaches from it.
+// Prevents the browser from hanging on rejected targets during close
+func detachSession(ctx context.Context, session *Session) {
+	_ = session.ExecuteWithoutExpectationOnReply(ctx, cdpruntime.CommandRunIfWaitingForDebugger, nil, nil)
+	_ = session.ExecuteWithoutExpectationOnReply(ctx, target.CommandDetachFromTarget,
+		&target.DetachFromTargetParams{SessionID: session.id}, nil)
 }
