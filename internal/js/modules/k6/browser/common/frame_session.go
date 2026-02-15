@@ -49,6 +49,7 @@ structs.
 */
 type FrameSession struct {
 	ctx            context.Context
+	teardownCtx    context.Context
 	session        session
 	page           *Page
 	parent         *FrameSession
@@ -92,14 +93,22 @@ type FrameSession struct {
 //
 //nolint:funlen
 func NewFrameSession(
-	ctx context.Context, s session, p *Page, parent *FrameSession, tid target.ID, l *log.Logger, hasUIWindow bool,
+	ctx context.Context,
+	teardownCtx context.Context,
+	s session,
+	p *Page,
+	parent *FrameSession,
+	tid target.ID,
+	l *log.Logger,
+	hasUIWindow bool,
 ) (_ *FrameSession, err error) {
 	l.Debugf("NewFrameSession", "sid:%v tid:%v", s.ID(), tid)
 
 	k6Metrics := k6ext.GetCustomMetrics(ctx)
 
 	fs := FrameSession{
-		ctx:                  ctx, // TODO: create cancelable context that can be used to cancel and close all child sessions
+		ctx:                  ctx,
+		teardownCtx:          teardownCtx,
 		session:              s,
 		page:                 p,
 		parent:               parent,
@@ -963,7 +972,7 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 	default:
 		fs.logger.Debugf("FrameSession:onAttachedToTarget",
 			"unsupported target type %q sid:%v", ti.Type, session.ID())
-		detachSession(fs.ctx, session)
+		detachSession(fs.teardownCtx, session)
 	}
 	if err == nil {
 		return
@@ -1030,6 +1039,7 @@ func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, session *Session) 
 
 	nfs, err := NewFrameSession(
 		fs.ctx,
+		fs.teardownCtx,
 		session,
 		fs.page, fs, ti.TargetID,
 		fs.logger,
