@@ -50,11 +50,14 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			// TODO when opts are implemented for this function, parse them here before calling promise()
 			// in a goroutine off the event loop. As that will race with anything running on the event loop.
 			return promise(vu, func() (any, error) {
-				// It's safe to close the taskqueue for this targetID (if one
-				// exists).
+				// Close the page first so its goroutines (FrameSession, NetworkManager)
+				// can finish processing events through the task queue before it's shut down.
+				err := p.Close()
+
+				// Now it's safe to close the taskqueue for this targetID.
 				vu.close(p.TargetID())
 
-				return nil, p.Close() //nolint:wrapcheck
+				return nil, err //nolint:wrapcheck
 			})
 		},
 		"content": func() *sobek.Promise {
