@@ -15,6 +15,8 @@ import (
 	"github.com/grafana/sobek"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
+	"go.k6.io/k6/internal/js/modules/k6/browser/log"
+	k6metrics "go.k6.io/k6/metrics"
 )
 
 func convertBaseJSHandleTypes(
@@ -301,4 +303,20 @@ func hasSourceURL(js string) bool {
 	}
 
 	return sourceURLRegex.MatchString(js[lastNewLineBeforeLastLineIndex:])
+}
+
+// pushIfNotDone preserves PushIfNotDone semantics and logs when
+// a metric drop is observed because the provided context is done.
+func pushIfNotDone(
+	ctx context.Context,
+	logger *log.Logger,
+	output chan<- k6metrics.SampleContainer,
+	sample k6metrics.SampleContainer,
+) {
+	if k6metrics.PushIfNotDone(ctx, output, sample) {
+		return
+	}
+	// Should no longer happen under normal circumstances,
+	// but if it does, log it for better observability.
+	logger.Warnf("pushIfNotDone", "dropping metric sample: %v", ContextErr(ctx))
 }

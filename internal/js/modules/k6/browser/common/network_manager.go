@@ -220,7 +220,7 @@ func (m *NetworkManager) emitRequestMetrics(req *Request) {
 	}
 	tags = tags.With("resource_type", req.ResourceType())
 
-	k6metrics.PushIfNotDone(m.vu.Context(), state.Samples, k6metrics.ConnectedSamples{
+	pushIfNotDone(m.vu.Context(), m.logger, state.Samples, k6metrics.ConnectedSamples{
 		Samples: []k6metrics.Sample{
 			{
 				TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserDataSent, Tags: tags},
@@ -287,7 +287,7 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 	tags = tags.With("from_service_worker", strconv.FormatBool(fromSvcWrk))
 	tags = tags.With("resource_type", req.ResourceType())
 
-	k6metrics.PushIfNotDone(m.vu.Context(), state.Samples, k6metrics.ConnectedSamples{
+	pushIfNotDone(m.vu.Context(), m.logger, state.Samples, k6metrics.ConnectedSamples{
 		Samples: []k6metrics.Sample{
 			{
 				TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserHTTPReqDuration, Tags: tags},
@@ -303,7 +303,7 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 	})
 
 	if resp != nil && resp.timing != nil {
-		k6metrics.PushIfNotDone(m.vu.Context(), state.Samples, k6metrics.ConnectedSamples{
+		pushIfNotDone(m.vu.Context(), m.logger, state.Samples, k6metrics.ConnectedSamples{
 			Samples: []k6metrics.Sample{
 				{
 					TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserHTTPReqFailed, Tags: tags},
