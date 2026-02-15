@@ -393,9 +393,13 @@ func (m *NetworkManager) handleEvents(in <-chan Event) bool {
 	select {
 	case <-m.ctx.Done():
 		return false
+	case <-m.session.Done():
+		return false
 	case event := <-in:
 		select {
 		case <-m.ctx.Done():
+			return false
+		case <-m.session.Done():
 			return false
 		default:
 		}
