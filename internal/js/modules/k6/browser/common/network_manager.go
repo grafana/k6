@@ -89,6 +89,8 @@ type NetworkManager struct {
 	userCacheDisabled              bool
 	userReqInterceptionEnabled     bool
 	protocolReqInterceptionEnabled bool
+
+	wg sync.WaitGroup
 }
 
 // NewNetworkManager creates a new network manager.
@@ -379,7 +381,9 @@ func (m *NetworkManager) initEvents() {
 		cdproto.EventFetchAuthRequired,
 	}, chHandler)
 
+	m.wg.Add(1)
 	go func() {
+		defer m.wg.Done()
 		for m.handleEvents(chHandler) {
 		}
 	}()
@@ -463,7 +467,11 @@ func (m *NetworkManager) onLoadingFinished(event *network.EventLoadingFinished) 
 	// This happens when the main page request redirects before it finishes loading.
 	// So the new redirect request will be blocked until the main page finishes loading.
 	// The main page will wait forever since its subrequest is blocked.
-	go emitResponseMetrics()
+	m.wg.Add(1)
+	go func() {
+		defer m.wg.Done()
+		emitResponseMetrics()
+	}()
 }
 
 // requestForOnLoadingFinished returns the request for the given request ID.
@@ -1055,4 +1063,8 @@ func (m *NetworkManager) SetCacheEnabled(enabled bool) {
 	if err := m.updateProtocolCacheDisabled(); err != nil {
 		k6ext.Panicf(m.ctx, "%v", err)
 	}
+}
+
+func (m *NetworkManager) wait() {
+	m.wg.Wait()
 }
