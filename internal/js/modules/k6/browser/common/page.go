@@ -961,46 +961,61 @@ func (p *Page) isClosing() bool {
 	}
 }
 
-// Close closes the page.
+// Close closes the page. It is safe to call multiple times; only the
+// first call performs the teardown and subsequent calls return the same result.
 func (p *Page) Close() error {
 	p.logger.Debugf("Page:Close", "sid:%v", p.sessionID())
-	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.close")
-	defer span.End()
 
-	// forcing the pagehide event to trigger web vitals metrics.
-	v := `() => window.dispatchEvent(new Event('pagehide'))`
-	ctx, cancel := context.WithTimeout(p.ctx, p.defaultTimeout())
-	defer cancel()
-	_, err := p.MainFrame().EvaluateWithContext(ctx, v)
-	if err != nil {
-		p.logger.Warnf("Page:Close", "failed to hide page: %v", err)
-	}
+	p.closingOnce.Do(func() {
+		_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.close")
+		defer span.End()
 
-	add := runtime.RemoveBinding(webVitalBinding)
-	if err := add.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-		return spanRecordErrorf(span, "internal error while removing binding from page: %w", err)
-	}
+		close(p.closing)
 
-	action := target.CloseTarget(p.targetID)
-	err = action.Do(cdp.WithExecutor(p.ctx, p.session))
-	if err != nil {
-		// When a close target command is sent to the browser via CDP,
-		// the browser will start to cleanup and the first thing it
-		// will do is return a target.EventDetachedFromTarget, which in
-		// our implementation will close the session connection (this
-		// does not close the CDP websocket, just removes the session
-		// so no other CDP calls can be made with the session ID).
-		// This can result in the session's context being closed while
-		// we're waiting for the response to come back from the browser
-		// for this current command (it's racey).
-		if errors.Is(err, context.Canceled) {
-			return nil
+		teardownTimeoutCtx, closeCancel := context.WithTimeout(p.teardownCtx, p.defaultTimeout())
+		defer closeCancel()
+
+		// forcing the pagehide event to trigger web vitals metrics.
+		v := `() => window.dispatchEvent(new Event('pagehide'))`
+		_, err := p.MainFrame().EvaluateWithContext(teardownTimeoutCtx, v)
+		if err != nil {
+			p.logger.Warnf("Page:Close", "failed to hide page: %v", err)
 		}
 
-		return spanRecordErrorf(span, "closing a page: %w", err)
-	}
+		var closeErrs []error
 
-	return nil
+		add := runtime.RemoveBinding(webVitalBinding)
+		if err := add.Do(cdp.WithExecutor(teardownTimeoutCtx, p.session)); err != nil {
+			// continue so that we can shutdown the page even if we fail to remove the binding.
+			closeErrs = append(closeErrs, fmt.Errorf("internal error while removing binding from page: %w", err))
+		}
+
+		err = target.CloseTarget(p.targetID).Do(cdp.WithExecutor(teardownTimeoutCtx, p.session))
+		if err != nil && !errors.Is(err, context.Canceled) {
+			// When a close target command is sent to the browser via CDP,
+			// the browser will start to cleanup and the first thing it
+			// will do is return a target.EventDetachedFromTarget, which in
+			// our implementation will close the session connection (this
+			// does not close the CDP websocket, just removes the session
+			// so no other CDP calls can be made with the session ID).
+			// This can result in the session's context being closed while
+			// we're waiting for the response to come back from the browser
+			// for this current command (it's racey).
+			closeErrs = append(closeErrs, fmt.Errorf("closing a page: %w", err))
+		}
+
+		// Start the teardown of the page's resources (FrameSessions, NetworkManagers, etc)
+		// and wait for them to finish their teardown. This allows for a graceful cleanup
+		// of resources and ensures that all events are processed before the page is closed.
+		p.cancelCtx()
+		p.waitForFrameSessions()
+
+		if len(closeErrs) > 0 {
+			p.closeErr = spanRecordError(span, errors.Join(closeErrs...))
+		}
+	})
+
+	return p.closeErr
 }
 
 // Content returns the HTML content of the page.
