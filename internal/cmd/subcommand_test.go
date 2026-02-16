@@ -93,48 +93,6 @@ func TestXCommandHelpDisplayCommands(t *testing.T) {
 	}
 }
 
-func Test_needsProvisioningSubcommand(t *testing.T) {
-	t.Parallel()
-
-	t.Run("returns false for already provisioned subcommand", func(t *testing.T) {
-		t.Parallel()
-
-		_, x := getRootWithXForTest(t)
-
-		for _, cmd := range x.Commands() {
-			needs, subcommand, err := needsProvisioningSubcommand(cmd, []string{cmd.Use})
-
-			require.NoError(t, err)
-			require.False(t, needs)
-			require.Equal(t, cmd.Use, subcommand)
-		}
-	})
-
-	t.Run("returns true for not provisioned subcommand", func(t *testing.T) {
-		t.Parallel()
-
-		_, x := getRootWithXForTest(t)
-
-		needs, subcommand, err := needsProvisioningSubcommand(x, []string{"test-cmd-n"})
-
-		require.NoError(t, err)
-		require.True(t, needs)
-		require.Equal(t, "test-cmd-n", subcommand)
-	})
-
-	t.Run("returns err when preconditions failed", func(t *testing.T) {
-		t.Parallel()
-
-		root, _ := getRootWithXForTest(t)
-
-		needs, subcommand, err := needsProvisioningSubcommand(root, []string{"test-cmd-n"})
-
-		require.Error(t, err)
-		require.False(t, needs)
-		require.Equal(t, "", subcommand)
-	})
-}
-
 func Test_dependenciesFromSubcommand(t *testing.T) {
 	t.Parallel()
 
@@ -207,23 +165,4 @@ func registerTestSubcommandExtensions(t *testing.T) {
 			}
 		})
 	})
-}
-
-func getRootWithXForTest(t *testing.T) (*cobra.Command, *cobra.Command) {
-	t.Helper()
-
-	registerTestSubcommandExtensions(t)
-
-	ts := tests.NewGlobalTestState(t)
-
-	root := &cobra.Command{Use: ts.BinaryName}
-	x := getX(ts.GlobalState)
-
-	root.AddCommand(x)
-
-	subcommands := extensionSubcommands(ts.GlobalState)
-
-	x.AddCommand(subcommands...)
-
-	return root, x
 }

@@ -1,8 +1,8 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"go.k6.io/k6/cmd/state"
@@ -21,15 +21,22 @@ import (
 // Execution Flow:
 //
 //  1. User runs: k6 x <subcommand> [args...]
-//  2. PersistentPreRunE checks if the subcommand needs provisioning by calling needsProvisioningSubcommand
-//  3. If provisioning is needed:
-//     a. dependenciesFromSubcommand constructs a dependencies object with "subcommand:<name>" format
-//     b. A binaryIsNotSatisfyingDependenciesError is returned with the dependencies
-//     c. The error is caught by handleUnsatisfiedDependencies in root.go
-//     d. A custom k6 binary with the extension is built via k6build provisioner
-//     e. The custom binary is executed with the original arguments
-//  4. If provisioning is not needed (subcommand already exists):
-//     a. The registered extension subcommand is executed normally
+//  2. Cobra attempts to match <subcommand> with registered subcommands:
+//     a. If <subcommand> is registered (exists), Cobra executes it normally
+//     b. If <subcommand> is NOT registered (missing), Cobra falls through to the "x" command's RunE
+//  3. The RunE function (catch-all handler):
+//     a. Checks if help is requested (no args, "help", or flag starting with "-")
+//     b. If help requested, displays the "x" command help showing available subcommands
+//     c. Otherwise, extracts the subcommand name from args[0]
+//     d. Calls dependenciesFromSubcommand to construct dependencies with "subcommand:<name>" format
+//     e. Returns binaryIsNotSatisfyingDependenciesError with the dependencies
+//  4. Error handling in root.go:
+//     a. handleUnsatisfiedDependencies catches the error
+//     b. Triggers k6build provisioner to build a custom binary with the extension
+//     c. Executes the custom binary with the original arguments (including --help if present)
+//
+// Note: DisableFlagParsing is enabled to pass all arguments (including --help) to the provisioned
+// binary unchanged. This ensures that "k6 x httpbin --help" will show httpbin's help after provisioning.
 //
 // The "x" command itself (without subcommand) displays help showing all available extension subcommands.
 func getX(gs *state.GlobalState) *cobra.Command {
@@ -41,21 +48,18 @@ func getX(gs *state.GlobalState) *cobra.Command {
 This command serves as a parent for subcommands registered by k6 extensions,
 allowing them to extend k6's functionality with custom commands.
 `,
-		FParseErrWhitelist: cobra.FParseErrWhitelist{
-			UnknownFlags: true,
-		},
+		// Disable flag parsing to pass all arguments unchanged to the provisioned binary.
+		// This ensures flags like --help reach the extension subcommand after provisioning.
+		DisableFlagParsing: true,
 
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			needs, subcommand, err := needsProvisioningSubcommand(cmd, args)
-			if err != nil {
-				return err
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Show help if: no args, explicit "help", or starts with a flag
+			if len(args) == 0 || args[0] == "help" || strings.HasPrefix(args[0], "-") {
+				return cmd.Help()
 			}
 
-			if !needs {
-				return nil
-			}
-
-			deps, err := dependenciesFromSubcommand(gs, subcommand)
+			// Subcommand not found - trigger provisioning
+			deps, err := dependenciesFromSubcommand(gs, args[0])
 			if err != nil {
 				return err
 			}
@@ -63,10 +67,6 @@ allowing them to extend k6's functionality with custom commands.
 			return binaryIsNotSatisfyingDependenciesError{
 				deps: deps,
 			}
-		},
-
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			return cmd.Help()
 		},
 	}
 
@@ -101,42 +101,6 @@ func getCmdForExtension(extension *ext.Extension, gs *state.GlobalState) *cobra.
 	}
 
 	return cmd
-}
-
-// needsProvisioningSubcommand checks if the given subcommand needs provisioning and
-// returns the name of the subcommand to provision if needed.
-func needsProvisioningSubcommand(cmd *cobra.Command, args []string) (bool, string, error) {
-	var (
-		xCmd   *cobra.Command
-		extCmd *cobra.Command
-	)
-
-	for c := cmd; c != nil; c = c.Parent() {
-		if c.Name() == "x" {
-			xCmd = c
-			break
-		}
-
-		extCmd = c
-	}
-
-	// should not happen, only called from 'x' command PersistentPreRunE
-	if xCmd == nil {
-		return false, "", errors.New("'x' command not found in parent chain")
-	}
-
-	if cmd == xCmd {
-		// x command itself is being run
-		if len(args) == 0 || args[0] == "help" {
-			return false, "", nil
-		}
-
-		// provision args[0] required
-		return true, args[0], nil
-	}
-
-	// nothing to do, already provisioned subcommand is being run
-	return false, extCmd.Name(), nil
 }
 
 // dependenciesFromSubcommand constructs a dependencies object for the given subcommand,
