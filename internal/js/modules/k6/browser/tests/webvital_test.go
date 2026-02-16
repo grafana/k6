@@ -1,10 +1,8 @@
 package tests
 
 import (
-	"context"
 	"runtime"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -23,7 +21,7 @@ func TestWebVitalMetric(t *testing.T) {
 		t.Skip("timeouts on windows")
 	}
 	var (
-		samples  = make(chan k6metrics.SampleContainer)
+		samples  = make(chan k6metrics.SampleContainer, 1000)
 		browser  = newTestBrowser(t, withFileServer(), withSamples(samples))
 		page     = browser.NewPage(nil)
 		expected = map[string]bool{
@@ -34,28 +32,6 @@ func TestWebVitalMetric(t *testing.T) {
 			"browser_web_vital_cls":  false,
 		}
 	)
-
-	done := make(chan struct{})
-	ctx, cancel := context.WithTimeout(browser.context(), 5*time.Second)
-	defer cancel()
-	go func() {
-		for {
-			var metric k6metrics.SampleContainer
-			select {
-			case <-done:
-				return
-			case <-ctx.Done():
-				return
-			case metric = <-samples:
-			}
-			samples := metric.GetSamples()
-			for _, s := range samples {
-				if _, ok := expected[s.Metric.Name]; ok {
-					expected[s.Metric.Name] = true
-				}
-			}
-		}
-	}()
 
 	opts := &common.FrameGotoOptions{
 		Timeout: common.DefaultTimeout,
@@ -71,7 +47,7 @@ func TestWebVitalMetric(t *testing.T) {
 	// The click action also refreshes the page, which
 	// also helps the web vital library to measure CLS.
 	err = browser.run(
-		ctx,
+		browser.context(),
 		func() error { return page.Click("#clickMe", common.NewFrameClickOptions(page.Timeout())) },
 		func() error {
 			_, err := page.WaitForNavigation(
@@ -81,9 +57,9 @@ func TestWebVitalMetric(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	// prevents `err:fetching response body: context canceled` warning.`
 	require.NoError(t, page.Close())
-	done <- struct{}{}
+	close(samples)
+	markExpectedWebVitalsFromSamples(samples, expected)
 
 	for k, v := range expected {
 		assert.True(t, v, "expected %s to have been measured and emitted", k)
@@ -96,7 +72,7 @@ func TestWebVitalMetricNoInteraction(t *testing.T) {
 		t.Skip("timeouts on windows")
 	}
 	var (
-		samples  = make(chan k6metrics.SampleContainer)
+		samples  = make(chan k6metrics.SampleContainer, 1000)
 		browser  = newTestBrowser(t, withFileServer(), withSamples(samples))
 		expected = map[string]bool{
 			"browser_web_vital_ttfb": false,
@@ -105,28 +81,6 @@ func TestWebVitalMetricNoInteraction(t *testing.T) {
 			"browser_web_vital_cls":  false,
 		}
 	)
-
-	done := make(chan struct{})
-	ctx, cancel := context.WithTimeout(browser.context(), common.DefaultTimeout)
-	defer cancel()
-	go func() {
-		for {
-			var metric k6metrics.SampleContainer
-			select {
-			case <-done:
-				return
-			case <-ctx.Done():
-				return
-			case metric = <-samples:
-			}
-			samples := metric.GetSamples()
-			for _, s := range samples {
-				if _, ok := expected[s.Metric.Name]; ok {
-					expected[s.Metric.Name] = true
-				}
-			}
-		}
-	}()
 
 	page := browser.NewPage(nil)
 	opts := &common.FrameGotoOptions{
@@ -141,14 +95,21 @@ func TestWebVitalMetricNoInteraction(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 
-	// Add a small delay to ensure all metrics are collected
-	time.Sleep(1 * time.Second)
-
-	// prevents `err:fetching response body: context canceled` warning.`
 	require.NoError(t, page.Close())
-	done <- struct{}{}
+	close(samples)
+	markExpectedWebVitalsFromSamples(samples, expected)
 
 	for k, v := range expected {
 		assert.True(t, v, "expected %s to have been measured and emitted", k)
+	}
+}
+
+func markExpectedWebVitalsFromSamples(samples <-chan k6metrics.SampleContainer, expected map[string]bool) {
+	for metric := range samples {
+		for _, s := range metric.GetSamples() {
+			if _, ok := expected[s.Metric.Name]; ok {
+				expected[s.Metric.Name] = true
+			}
+		}
 	}
 }
