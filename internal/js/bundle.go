@@ -339,7 +339,7 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*BundleInstance
 	go func() {
 		select {
 		case <-vuImpl.ctx.Done():
-			rt.Interrupt(vuImpl.ctx.Err())
+			rt.Interrupt(lib.ContextErr(vuImpl.ctx))
 		case initDone <- struct{}{}: // do nothing
 		}
 		close(initDone)

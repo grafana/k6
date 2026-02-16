@@ -12,6 +12,8 @@ import (
 
 	"github.com/chromedp/cdproto/cdp"
 	cdppage "github.com/chromedp/cdproto/page"
+
+	"go.k6.io/k6/lib"
 )
 
 // FrameManager manages all frames in a page and their life-cycles, it's a purely internal component.
@@ -651,7 +653,7 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *Frame
 			}
 			return false
 		})
-	defer navEvtCancel()
+	defer navEvtCancel(nil)
 
 	lifecycleEvtCh, lifecycleEvtCancel := createWaitForEventPredicateHandler(
 		timeoutCtx, frame, []string{EventFrameAddLifecycle},
@@ -674,7 +676,7 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *Frame
 
 			return le.Event == parsedOpts.WaitUntil
 		})
-	defer lifecycleEvtCancel()
+	defer lifecycleEvtCancel(nil)
 
 	fs, ok := frame.page.getFrameSession(cdp.FrameID(frame.ID()))
 	if !ok {
@@ -737,13 +739,13 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *Frame
 			}
 		}
 	case <-timeoutCtx.Done():
-		return nil, wrapTimeoutError(ContextErr(timeoutCtx))
+		return nil, wrapTimeoutError(lib.ContextErr(timeoutCtx))
 	}
 
 	select {
 	case <-lifecycleEvtCh:
 	case <-timeoutCtx.Done():
-		return nil, wrapTimeoutError(ContextErr(timeoutCtx))
+		return nil, wrapTimeoutError(lib.ContextErr(timeoutCtx))
 	}
 
 	return resp, nil

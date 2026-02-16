@@ -22,6 +22,8 @@ import (
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext/k6test"
 
+	"go.k6.io/k6/lib"
+
 	k6httpmultibin "go.k6.io/k6/internal/lib/testutils/httpmultibin"
 	k6metrics "go.k6.io/k6/metrics"
 )
@@ -110,8 +112,9 @@ func newTestBrowserVU(tb testing.TB, tbr *testBrowser) (_ *k6test.VU, cancel fun
 		vu.Context(),
 		k6ext.RegisterCustomMetrics(k6metrics.NewRegistry()),
 	)
-	ctx, cancel := context.WithCancel(metricsCtx)
-	tb.Cleanup(cancel)
+	ctx, cancelCtx := context.WithCancelCause(metricsCtx)
+	wrappedCancel := func() { cancelCtx(nil) }
+	tb.Cleanup(wrappedCancel)
 	vu.CtxField = ctx
 	vu.InitEnvField.LookupEnv = tbr.lookupFunc
 
@@ -121,7 +124,7 @@ func newTestBrowserVU(tb testing.TB, tbr *testBrowser) (_ *k6test.VU, cancel fun
 	// Setting the mapped browser into the vu's sobek runtime.
 	require.NoError(tb, vu.Runtime().Set("browser", jsMod.Browser))
 
-	return vu, cancel
+	return vu, wrappedCancel
 }
 
 // applyDefaultOptions applies the default options for the testBrowser.
@@ -411,7 +414,7 @@ func (b *testBrowser) run(ctx context.Context, fs ...func() error) error {
 			case err := <-errc:
 				return err
 			case <-ctx.Done():
-				if err := common.ContextErr(ctx); err != nil {
+				if err := lib.ContextErr(ctx); err != nil {
 					return fmt.Errorf("while running %T: %w", f, err)
 				}
 			}
