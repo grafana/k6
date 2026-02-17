@@ -288,9 +288,6 @@ func (h *ElementHandle) focus(apiCtx context.Context, resetSelectionIfNotFocused
 	}
 	result, err := h.evalWithScript(apiCtx, opts, fn, resetSelectionIfNotFocused)
 	if err != nil {
-		if strings.Contains(err.Error(), "element is not attached to the DOM") {
-			return ErrElementNotAttachedToDOM
-		}
 		return err
 	}
 	s, ok := result.(string)
@@ -1587,7 +1584,6 @@ func (h *ElementHandle) newAction(
 	// 2. Visible
 	// 3. Stable
 	// 4. Enabled
-
 	actionFn := func(apiCtx context.Context) (any, error) {
 		// Check if we should run actionability checks
 		if !force {
