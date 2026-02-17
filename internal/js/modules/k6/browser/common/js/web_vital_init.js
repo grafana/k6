@@ -20,7 +20,6 @@ function print(metric) {
 
 function load() {
   webVitals.onCLS(print);
-  webVitals.onFID(print);
   webVitals.onLCP(print);
 
   webVitals.onFCP(print);
