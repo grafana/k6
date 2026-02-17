@@ -9,6 +9,7 @@ import (
 	"net/http/httptrace"
 	"strconv"
 	"sync"
+	"time"
 
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/netext"
@@ -30,11 +31,13 @@ type transport struct {
 // unfinishedRequest stores the request and the raw result returned from the
 // underlying http.RoundTripper, but before its body has been read
 type unfinishedRequest struct {
-	ctx      context.Context
-	tracer   *Tracer
-	request  *http.Request
-	response *http.Response
-	err      error
+	ctx            context.Context
+	tracer         *Tracer
+	request        *http.Request
+	response       *http.Response
+	err            error
+	roundTripStart int64 // timestamp (UnixNano) before RoundTrip call
+	roundTripEnd   int64 // timestamp (UnixNano) after RoundTrip call
 }
 
 // finishedRequest is produced once the request has been finalized; it is
@@ -73,7 +76,7 @@ func newTransport(
 // Helper method to finish the tracer trail, assemble the tag values and emits
 // the metric samples for the supplied unfinished request.
 func (t *transport) measureAndEmitMetrics(unfReq *unfinishedRequest) *finishedRequest {
-	trail := unfReq.tracer.Done()
+	trail := unfReq.tracer.DoneWithFallback(unfReq.roundTripStart, unfReq.roundTripEnd)
 
 	result := &finishedRequest{
 		unfinishedRequest: unfReq,
@@ -203,7 +206,10 @@ func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	tracer := &Tracer{}
 	// nosemgrep: dynamic-httptrace-clienttrace // this is a false possitive
 	reqWithTracer := req.WithContext(httptrace.WithClientTrace(ctx, tracer.Trace()))
+
+	rtStart := time.Now().UnixNano()
 	resp, err := t.state.Transport.RoundTrip(reqWithTracer)
+	rtEnd := time.Now().UnixNano()
 
 	var netError net.Error
 	if errors.As(err, &netError) && netError.Timeout() {
@@ -216,11 +222,13 @@ func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 
 	t.saveCurrentRequest(&unfinishedRequest{
-		ctx:      ctx,
-		tracer:   tracer,
-		request:  req,
-		response: resp,
-		err:      err,
+		ctx:            ctx,
+		tracer:         tracer,
+		request:        req,
+		response:       resp,
+		err:            err,
+		roundTripStart: rtStart,
+		roundTripEnd:   rtEnd,
 	})
 
 	return resp, err

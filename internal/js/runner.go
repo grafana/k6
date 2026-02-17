@@ -17,6 +17,8 @@ import (
 	"time"
 
 	"github.com/grafana/sobek"
+	"github.com/quic-go/quic-go"
+	"github.com/quic-go/quic-go/http3"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/http2"
 	"golang.org/x/time/rate"
@@ -103,8 +105,17 @@ func NewFromBundle(piState *lib.TestPreInitState, b *Bundle) (*Runner, error) {
 	}
 
 	err := r.SetOptions(r.Bundle.Options)
+	if err != nil {
+		return r, err
+	}
 
-	return r, err
+	if r.Bundle.Options.HTTP3.Bool {
+		if reportErr := piState.Usage.Uint64("usage/http3", 1); reportErr != nil {
+			piState.Logger.WithError(reportErr).Warn("Failed to report HTTP/3 usage")
+		}
+	}
+
+	return r, nil
 }
 
 // MakeArchive creates an Archive of the runner. There should be a corresponding NewFromArchive() function
@@ -210,6 +221,21 @@ func (r *Runner) newVU(
 		_ = http2.ConfigureTransport(transport) // send over h2 protocol
 	}
 
+	var roundTripper http.RoundTripper = transport
+
+	if r.Bundle.Options.HTTP3.Bool {
+		h3Transport := &http3.Transport{
+			TLSClientConfig:    tlsConfig,
+			DisableCompression: true,
+			QUICConfig: &quic.Config{
+				MaxIdleTimeout:  30 * time.Second,
+				KeepAlivePeriod: 15 * time.Second,
+			},
+			Dial: dialer.QUICDial,
+		}
+		roundTripper = h3Transport
+	}
+
 	cookieJar, err := cookiejar.New(nil)
 	if err != nil {
 		return nil, err
@@ -221,7 +247,7 @@ func (r *Runner) newVU(
 		iteration:      int64(-1),
 		BundleInstance: *bi,
 		Runner:         r,
-		Transport:      transport,
+		Transport:      roundTripper,
 		Dialer:         dialer,
 		CookieJar:      cookieJar,
 		TLSConfig:      tlsConfig,
@@ -701,7 +727,7 @@ type VU struct {
 	BundleInstance
 
 	Runner    *Runner
-	Transport *http.Transport
+	Transport http.RoundTripper
 	Dialer    *netext.Dialer
 	CookieJar *cookiejar.Jar
 	TLSConfig *tls.Config
@@ -961,7 +987,14 @@ func (u *VU) runFn(
 	}
 
 	if u.Runner.Bundle.Options.NoVUConnectionReuse.Bool {
-		u.Transport.CloseIdleConnections()
+		type idleCloser interface{ CloseIdleConnections() }
+		if ic, ok := u.Transport.(idleCloser); ok {
+			ic.CloseIdleConnections()
+		}
+		type closer interface{ Close() error }
+		if c, ok := u.Transport.(closer); ok {
+			c.Close()
+		}
 	}
 
 	builtinMetrics := u.Runner.preInitState.BuiltinMetrics
