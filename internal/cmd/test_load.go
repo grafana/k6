@@ -296,6 +296,12 @@ func collectTestDependencies(
 		return nil, err
 	}
 
+	// Ensure k6 is always a dependency with "*" constraint by default.
+	// This can be overridden by "use k6" or "use k6 with k6/x/..." directives in the script.
+	if _, ok := deps["k6"]; !ok {
+		deps["k6"] = nil
+	}
+
 	if err := analyseUseContraints(imports, fileSystems, deps); err != nil {
 		return nil, err
 	}

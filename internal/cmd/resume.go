@@ -12,8 +12,9 @@ import (
 func getCmdResume(gs *state.GlobalState) *cobra.Command {
 	// resumeCmd represents the resume command
 	resumeCmd := &cobra.Command{
-		Use:   "resume",
-		Short: "Resume a paused test",
+		Use:    "resume",
+		Short:  "Resume a paused test",
+		Hidden: true,
 		Long: `Resume a paused test.
 
   Use the global --address flag to specify the URL to the API server.`,

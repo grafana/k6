@@ -30,6 +30,20 @@ func TestWebPlatformTestSuite(t *testing.T) {
 		// if empty, no function will be called
 		callFn string
 	}{
+		// test cases for crypto api
+		{
+			catalog: "",
+			files: []string{
+				"getRandomValues.any.js",
+			},
+		},
+		{
+			catalog: "",
+			files: []string{
+				"randomUUID.https.any.js",
+			},
+		},
+		// test cases for subtle crypto api
 		{
 			catalog: "digest",
 			files: []string{

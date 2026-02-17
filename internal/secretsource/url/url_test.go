@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
@@ -76,7 +75,7 @@ func TestInlineConfig(t *testing.T) {
 		}
 		configData, err := json.Marshal(baseConfig)
 		require.NoError(t, err)
-		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
+		err = fsext.WriteFile(fs, testConfigFile, configData, 0o600)
 		require.NoError(t, err)
 
 		// Load from file and override with inline config
@@ -233,7 +232,7 @@ func TestGetConfig(t *testing.T) {
 
 		configData, err := json.Marshal(config)
 		require.NoError(t, err)
-		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
+		err = fsext.WriteFile(fs, testConfigFile, configData, 0o600)
 		require.NoError(t, err)
 
 		result, err := getConfig("config="+testConfigFile, fs, nil)
@@ -263,7 +262,7 @@ func TestGetConfig(t *testing.T) {
 
 		configData, err := json.Marshal(config)
 		require.NoError(t, err)
-		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
+		err = fsext.WriteFile(fs, testConfigFile, configData, 0o600)
 		require.NoError(t, err)
 
 		result, err := getConfig("config="+testConfigFile, fs, nil)
@@ -285,7 +284,7 @@ func TestGetConfig(t *testing.T) {
 
 		configData, err := json.Marshal(config)
 		require.NoError(t, err)
-		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
+		err = fsext.WriteFile(fs, testConfigFile, configData, 0o600)
 		require.NoError(t, err)
 
 		_, err = getConfig("config="+testConfigFile, fs, nil)
@@ -304,7 +303,7 @@ func TestGetConfig(t *testing.T) {
 
 		configData, err := json.Marshal(config)
 		require.NoError(t, err)
-		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
+		err = fsext.WriteFile(fs, testConfigFile, configData, 0o600)
 		require.NoError(t, err)
 
 		_, err = getConfig("config="+testConfigFile, fs, nil)
@@ -329,7 +328,7 @@ func TestGetConfig(t *testing.T) {
 
 		configData, err := json.Marshal(config)
 		require.NoError(t, err)
-		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
+		err = fsext.WriteFile(fs, testConfigFile, configData, 0o600)
 		require.NoError(t, err)
 
 		_, err = getConfig("config="+testConfigFile, fs, nil)
@@ -346,7 +345,7 @@ func TestGetConfig(t *testing.T) {
 
 		configData, err := json.Marshal(config)
 		require.NoError(t, err)
-		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
+		err = fsext.WriteFile(fs, testConfigFile, configData, 0o600)
 		require.NoError(t, err)
 
 		result, err := getConfig("config="+testConfigFile, fs, nil)
@@ -364,7 +363,7 @@ func TestGetConfig(t *testing.T) {
 
 		configData, err := json.Marshal(config)
 		require.NoError(t, err)
-		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
+		err = fsext.WriteFile(fs, testConfigFile, configData, 0o600)
 		require.NoError(t, err)
 
 		result, err := getConfig("config="+testConfigFile, fs, nil)
@@ -382,7 +381,7 @@ func TestGetConfig(t *testing.T) {
 
 		configData, err := json.Marshal(config)
 		require.NoError(t, err)
-		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
+		err = fsext.WriteFile(fs, testConfigFile, configData, 0o600)
 		require.NoError(t, err)
 
 		_, err = getConfig("config="+testConfigFile, fs, nil)
@@ -905,7 +904,7 @@ func TestGetConfig_Retry(t *testing.T) {
 
 		configData, err := json.Marshal(config)
 		require.NoError(t, err)
-		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
+		err = fsext.WriteFile(fs, testConfigFile, configData, 0o600)
 		require.NoError(t, err)
 
 		result, err := getConfig("config="+testConfigFile, fs, nil)
@@ -928,7 +927,7 @@ func TestGetConfig_Retry(t *testing.T) {
 
 		configData, err := json.Marshal(config)
 		require.NoError(t, err)
-		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
+		err = fsext.WriteFile(fs, testConfigFile, configData, 0o600)
 		require.NoError(t, err)
 
 		result, err := getConfig("config="+testConfigFile, fs, nil)
@@ -949,7 +948,7 @@ func TestGetConfig_Retry(t *testing.T) {
 
 		configData, err := json.Marshal(config)
 		require.NoError(t, err)
-		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
+		err = fsext.WriteFile(fs, testConfigFile, configData, 0o600)
 		require.NoError(t, err)
 
 		_, err = getConfig("config="+testConfigFile, fs, nil)
@@ -968,7 +967,7 @@ func TestGetConfig_Retry(t *testing.T) {
 
 		configData, err := json.Marshal(config)
 		require.NoError(t, err)
-		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
+		err = fsext.WriteFile(fs, testConfigFile, configData, 0o600)
 		require.NoError(t, err)
 
 		_, err = getConfig("config="+testConfigFile, fs, nil)
@@ -987,7 +986,7 @@ func TestGetConfig_Retry(t *testing.T) {
 
 		configData, err := json.Marshal(config)
 		require.NoError(t, err)
-		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
+		err = fsext.WriteFile(fs, testConfigFile, configData, 0o600)
 		require.NoError(t, err)
 
 		result, err := getConfig("config="+testConfigFile, fs, nil)

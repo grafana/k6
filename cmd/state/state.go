@@ -115,7 +115,7 @@ func NewGlobalState(ctx context.Context) *GlobalState {
 
 	cacheDir, err := os.UserCacheDir()
 	if err != nil {
-		confDir = ".cache"
+		cacheDir = ".cache"
 	}
 
 	binary, err := os.Executable()

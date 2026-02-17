@@ -4,10 +4,7 @@ go 1.23.0
 
 toolchain go1.23.7
 
-require (
-	github.com/spf13/afero v1.1.2
-	go.k6.io/k6 v0.57.0
-)
+require go.k6.io/k6 v0.57.0
 
 require (
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
@@ -22,6 +19,7 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mstoykov/atlas v0.0.0-20220811071828-388f114305dd // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
+	github.com/spf13/afero v1.1.2 // indirect
 	go.opentelemetry.io/otel v1.31.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.29.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.29.0 // indirect
