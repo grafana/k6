@@ -102,14 +102,14 @@ func (m *FrameManager) frameAbortedNavigation(frameID cdp.FrameID, errorText, do
 		return
 	}
 
-	frame.pendingDocumentMu.Lock()
+	frame.documentMu.Lock()
 
 	if frame.pendingDocument == nil {
-		frame.pendingDocumentMu.Unlock()
+		frame.documentMu.Unlock()
 		return
 	}
 	if documentID != "" && frame.pendingDocument.documentID != documentID {
-		frame.pendingDocumentMu.Unlock()
+		frame.documentMu.Unlock()
 		return
 	}
 
@@ -125,7 +125,7 @@ func (m *FrameManager) frameAbortedNavigation(frameID cdp.FrameID, errorText, do
 	}
 	frame.pendingDocument = nil
 
-	frame.pendingDocumentMu.Unlock()
+	frame.documentMu.Unlock()
 
 	frame.emit(EventFrameNavigation, ne)
 }
@@ -298,8 +298,8 @@ func (m *FrameManager) frameNavigated(
 
 	frame.navigated(name, url, documentID)
 
-	frame.pendingDocumentMu.Lock()
-	defer frame.pendingDocumentMu.Unlock()
+	frame.documentMu.Lock()
+	defer frame.documentMu.Unlock()
 
 	var (
 		keepPending     *DocumentInfo
@@ -400,8 +400,8 @@ func (m *FrameManager) frameRequestedNavigation(frameID cdp.FrameID, url string,
 		b.AddFrameNavigation(frame)
 	}
 
-	frame.pendingDocumentMu.Lock()
-	defer frame.pendingDocumentMu.Unlock()
+	frame.documentMu.Lock()
+	defer frame.documentMu.Unlock()
 
 	if frame.pendingDocument != nil && frame.pendingDocument.documentID == documentID {
 		m.logger.Debugf("FrameManager:frameRequestedNavigation:return",
@@ -478,10 +478,10 @@ func (m *FrameManager) requestFailed(req *Request, canceled bool) {
 	}
 	frame.deleteRequest(req.getID())
 
-	frame.pendingDocumentMu.RLock()
+	frame.documentMu.RLock()
 	if frame.pendingDocument == nil || frame.pendingDocument.request != req {
 		m.logger.Debugf("FrameManager:requestFailed:return", "fmid:%d pdoc:nil", m.ID())
-		frame.pendingDocumentMu.RUnlock()
+		frame.documentMu.RUnlock()
 		return
 	}
 
@@ -491,7 +491,7 @@ func (m *FrameManager) requestFailed(req *Request, canceled bool) {
 	}
 
 	docID := frame.pendingDocument.documentID
-	frame.pendingDocumentMu.RUnlock()
+	frame.documentMu.RUnlock()
 
 	m.frameAbortedNavigation(cdp.FrameID(frame.ID()), errorText, docID)
 }
@@ -531,9 +531,9 @@ func (m *FrameManager) requestStarted(req *Request) {
 
 	frame.addRequest(req.getID())
 	if req.documentID != "" {
-		frame.pendingDocumentMu.Lock()
+		frame.documentMu.Lock()
 		frame.pendingDocument = &DocumentInfo{documentID: req.documentID, request: req}
-		frame.pendingDocumentMu.Unlock()
+		frame.documentMu.Unlock()
 	}
 
 	if !m.page.hasRoutes() {
