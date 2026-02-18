@@ -595,7 +595,7 @@ func TestFileConsole(t *testing.T) {
 							entryStr, err := entry.String()
 							require.NoError(t, err)
 
-							f, err = os.Open(logFilename) //nolint:forbidigo,gosec // fix with https://github.com/grafana/k6/issues/2565
+							f, err = os.Open(logFilename) //nolint:forbidigo // fix with https://github.com/grafana/k6/issues/2565
 							require.NoError(t, err)
 
 							fileContent, err := io.ReadAll(f)

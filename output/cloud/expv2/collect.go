@@ -134,7 +134,7 @@ func (c *collector) expiredBuckets() []timeBucket {
 
 	// Here, it avoids pre-allocation
 	// because it expects to be zero for most of the time
-	var expired []timeBucket //nolint:prealloc
+	var expired []timeBucket
 
 	// Mark as expired all aggregation buckets older than bucketCutoffID
 	for bucketID, seriesSinks := range c.timeBuckets {

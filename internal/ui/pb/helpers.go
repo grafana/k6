@@ -41,7 +41,7 @@ func GetFixedLengthFloatFormat(maxValue float64, precision uint) (formatStr stri
 	if precision > 0 {
 		resLen += precision + 1
 	}
-	return "%0" + strconv.FormatUint(uint64(resLen), 10) + "." + strconv.Itoa(int(precision)) + "f"
+	return "%0" + strconv.FormatUint(uint64(resLen), 10) + "." + strconv.Itoa(int(precision)) + "f" //nolint:gosec
 }
 
 // GetFixedLengthDuration takes a *positive* duration and its max value and
@@ -69,41 +69,41 @@ func GetFixedLengthDuration(d, maxDuration time.Duration) (result string) {
 	buf := [18]byte{'0', '0', '0', '0', '0', '0', 'd', '0', '0', 'h', '0', '0', 'm', '0', '0', '.', '0', 's'}
 
 	u := d.Round(rounding) / (rounding)
-	u, buf[16] = u/10, byte(u%10)+'0'
-	u, buf[14] = u/10, byte(u%10)+'0'
+	u, buf[16] = u/10, byte(u%10)+'0' //nolint:gosec
+	u, buf[14] = u/10, byte(u%10)+'0' //nolint:gosec
 	if maxDuration < 10*time.Second {
 		return string(buf[14:])
 	}
 
-	u, buf[13] = u/6, byte(u%6)+'0'
+	u, buf[13] = u/6, byte(u%6)+'0' //nolint:gosec
 	if maxDuration < time.Minute {
 		return string(buf[13:])
 	}
 
-	u, buf[11] = u/10, byte(u%10)+'0'
+	u, buf[11] = u/10, byte(u%10)+'0' //nolint:gosec
 	if maxDuration < 10*time.Minute {
 		return string(buf[11:])
 	}
 
-	u, buf[10] = u/6, byte(u%6)+'0'
+	u, buf[10] = u/6, byte(u%6)+'0' //nolint:gosec
 	if maxDuration < time.Hour {
 		return string(buf[10:])
 	}
 
 	u, h := u/24, u%24
-	buf[7], buf[8] = byte(h/10)+'0', byte(h%10)+'0'
+	buf[7], buf[8] = byte(h/10)+'0', byte(h%10)+'0' //nolint:gosec
 	if maxDuration < 10*time.Hour {
 		return string(buf[8:])
 	} else if maxDuration < 24*time.Hour {
 		return string(buf[7:])
 	}
 
-	u, buf[5] = u/10, byte(u%10)+'0'
+	u, buf[5] = u/10, byte(u%10)+'0' //nolint:gosec
 	remDayPowers := maxDuration / (240 * time.Hour)
 	i := 5
 	for remDayPowers > 0 {
 		i--
-		u, buf[i] = u/10, byte(u%10)+'0'
+		u, buf[i] = u/10, byte(u%10)+'0' //nolint:gosec
 		remDayPowers /= 10
 	}
 

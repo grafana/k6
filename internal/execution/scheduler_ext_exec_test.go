@@ -371,7 +371,7 @@ func TestExecutionInfoAll(t *testing.T) {
 			gracefulStop: "0s",`,
 	}
 
-	testCases := []struct{ name, script string }{}
+	testCases := make([]struct{ name, script string }, 0, len(executorConfigs))
 
 	for ename, econf := range executorConfigs {
 		testCases = append(testCases, struct{ name, script string }{

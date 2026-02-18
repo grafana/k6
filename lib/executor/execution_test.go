@@ -58,7 +58,7 @@ func TestExecutionStateVUIDs(t *testing.T) {
 			assert.EqualValues(t, expGlobal, idg)
 
 			seed := time.Now().UnixNano()
-			r := rand.New(rand.NewSource(seed)) //nolint:gosec
+			r := rand.New(rand.NewSource(seed))
 			t.Logf("Random source seeded with %d\n", seed)
 			count := 100 + r.Intn(50)
 			wg := sync.WaitGroup{}

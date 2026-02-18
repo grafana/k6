@@ -179,11 +179,11 @@ func buildCanonicalHeaders(
 	var canonicalHeaders strings.Builder
 	for _, h := range headers {
 		if h == hostHeader {
-			canonicalHeaders.WriteString(fmt.Sprintf("%s:%s\n", hostHeader, stripExcessSpaces(host)))
+			_, _ = fmt.Fprintf(&canonicalHeaders, "%s:%s\n", hostHeader, stripExcessSpaces(host)) //nolint:gosec
 			continue
 		}
 
-		canonicalHeaders.WriteString(fmt.Sprintf("%s:", h))
+		_, _ = fmt.Fprintf(&canonicalHeaders, "%s:", h)
 		values := signed[h]
 		for j, v := range values {
 			cleanedValue := strings.TrimSpace(stripExcessSpaces(v))

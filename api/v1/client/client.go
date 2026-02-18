@@ -94,7 +94,7 @@ func (c *Client) CallAPI(ctx context.Context, method string, rel *url.URL, body,
 	}
 	req = req.WithContext(ctx)
 
-	res, err := c.httpClient.Do(req)
+	res, err := c.httpClient.Do(req) //nolint:gosec
 	if err != nil {
 		return err
 	}
