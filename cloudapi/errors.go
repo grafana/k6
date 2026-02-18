@@ -46,7 +46,7 @@ func (e ResponseError) Error() string {
 
 	// `e.Details` is the old API version
 	// TODO: do not handle `details` when the old API becomes obsolete
-	var details []string //nolint:prealloc
+	var details []string
 	var detail string
 	for k, v := range e.Details {
 		detail = k + ": " + strings.Join(v, ", ")

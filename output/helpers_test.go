@@ -54,7 +54,7 @@ func TestSampleBufferConcurrently(t *testing.T) {
 	t.Parallel()
 
 	seed := time.Now().UnixNano()
-	r := rand.New(rand.NewSource(seed)) //nolint:gosec
+	r := rand.New(rand.NewSource(seed))
 	t.Logf("Random source seeded with %d\n", seed)
 
 	registry := metrics.NewRegistry()
@@ -144,7 +144,7 @@ func TestPeriodicFlusherConcurrency(t *testing.T) {
 	t.Parallel()
 
 	seed := time.Now().UnixNano()
-	r := rand.New(rand.NewSource(seed)) //nolint:gosec
+	r := rand.New(rand.NewSource(seed))
 	randStops := 10 + r.Intn(10)
 	t.Logf("Random source seeded with %d\n", seed)
 

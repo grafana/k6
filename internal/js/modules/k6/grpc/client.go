@@ -162,10 +162,9 @@ func buildTLSConfig(parentConfig *tls.Config, certificate, key []byte, caCertifi
 	// Ignoring 'TLS MinVersion is too low' because this tls.Config will inherit MinValue and MaxValue
 	// from the vu state tls.Config
 
-	//nolint:gosec
 	tlsCfg := &tls.Config{
 		CipherSuites:       parentConfig.CipherSuites,
-		InsecureSkipVerify: parentConfig.InsecureSkipVerify,
+		InsecureSkipVerify: parentConfig.InsecureSkipVerify, //nolint:gosec
 		MinVersion:         parentConfig.MinVersion,
 		MaxVersion:         parentConfig.MaxVersion,
 		Renegotiation:      parentConfig.Renegotiation,
