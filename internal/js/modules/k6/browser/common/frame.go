@@ -2132,7 +2132,7 @@ func (f *Frame) WaitForNavigation(opts *FrameWaitForNavigationOptions, rm RegExM
 	}()
 
 	var (
-		resp       *Response
+		docID      string
 		sameDocNav bool
 	)
 	select {
@@ -2149,13 +2149,8 @@ func (f *Frame) WaitForNavigation(opts *FrameWaitForNavigationOptions, rm RegExM
 				sameDocNav = true
 				break
 			}
-			// request could be nil if navigating to e.g. BlankPage.
-			req := e.newDocument.request
-			if req != nil {
-				req.responseMu.RLock()
-				resp = req.response
-				req.responseMu.RUnlock()
-			}
+
+			docID = e.newDocument.documentID
 		}
 	case <-timeoutCtx.Done():
 		return nil, handleTimeoutError(ContextErr(timeoutCtx))
@@ -2170,6 +2165,11 @@ func (f *Frame) WaitForNavigation(opts *FrameWaitForNavigationOptions, rm RegExM
 		case <-timeoutCtx.Done():
 			return nil, handleTimeoutError(ContextErr(timeoutCtx))
 		}
+	}
+
+	var resp *Response
+	if !sameDocNav {
+		resp = f.responseByDocumentID(docID)
 	}
 
 	// Since the response will be in an interface, it will never be nil,
