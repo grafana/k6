@@ -92,7 +92,7 @@ func TestRegistryAll(t *testing.T) {
 
 		names := func(m []*Metric) []string {
 			s := make([]string, len(m))
-			for i := 0; i < len(m); i++ {
+			for i := range m {
 				s[i] = m[i].Name
 			}
 			return s

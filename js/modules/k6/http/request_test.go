@@ -559,9 +559,9 @@ func TestRequest(t *testing.T) {
 			ret, err := rt.RunString(js)
 			require.NoError(t, err)
 			require.NotNil(t, ret)
-			var retobj map[string]interface{}
+			var retobj map[string]any
 			var ok bool
-			if retobj, ok = ret.Export().(map[string]interface{}); !ok {
+			if retobj, ok = ret.Export().(map[string]any); !ok {
 				require.Fail(t, "got wrong return object: %#+v", retobj)
 			}
 			require.Equal(t, int64(1020), retobj["error_code"])
@@ -1564,7 +1564,7 @@ func TestResponseTypes(t *testing.T) {
 
 	binaryLen := 300
 	binary := make([]byte, binaryLen)
-	for i := 0; i < binaryLen; i++ {
+	for i := range binaryLen {
 		binary[i] = byte(i)
 	}
 	tb.Mux.HandleFunc("/get-bin", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -2291,8 +2291,8 @@ func GenerateTLSCertificate(t *testing.T, host string, notBefore time.Time, vali
 		SignatureAlgorithm:    x509.ECDSAWithSHA256,
 	}
 
-	hosts := strings.Split(host, ",")
-	for _, h := range hosts {
+	hosts := strings.SplitSeq(host, ",")
+	for h := range hosts {
 		if ip := net.ParseIP(h); ip != nil {
 			template.IPAddresses = append(template.IPAddresses, ip)
 		} else {

@@ -56,7 +56,7 @@ func (c *Client) Request(method string, url sobek.Value, args ...sobek.Value) (*
 	return c.responseFromHTTPext(resp), nil
 }
 
-func splitRequestArgs(args []sobek.Value) (body interface{}, params sobek.Value) {
+func splitRequestArgs(args []sobek.Value) (body any, params sobek.Value) {
 	if len(args) > 0 {
 		body = args[0].Export()
 	}
@@ -141,7 +141,7 @@ func (c *Client) responseFromHTTPext(resp *httpext.Response) *Response {
 //
 //nolint:gocyclo, cyclop, funlen, gocognit
 func (c *Client) parseRequest(
-	method string, reqURL, body interface{}, params sobek.Value,
+	method string, reqURL, body any, params sobek.Value,
 ) (*httpext.ParsedHTTPRequest, error) {
 	rt := c.moduleInstance.vu.Runtime()
 	state := c.moduleInstance.vu.State()
@@ -178,16 +178,16 @@ func (c *Client) parseRequest(
 		result.ResponseType = httpext.ResponseTypeText
 	}
 
-	formatFormVal := func(v interface{}) string {
+	formatFormVal := func(v any) string {
 		// TODO: handle/warn about unsupported/nested values
 		return fmt.Sprintf("%v", v)
 	}
 
-	handleObjectBody := func(data map[string]interface{}) error {
+	handleObjectBody := func(data map[string]any) error {
 		if !requestContainsFile(data) {
 			bodyQuery := make(url.Values, len(data))
 			for k, v := range data {
-				if arr, ok := v.([]interface{}); ok {
+				if arr, ok := v.([]any); ok {
 					for _, el := range arr {
 						bodyQuery.Add(k, formatFormVal(el))
 					}
@@ -257,7 +257,7 @@ func (c *Client) parseRequest(
 		switch data := body.(type) {
 		case map[string]sobek.Value:
 			// TODO: fix forms submission and serialization in k6/html before fixing this..
-			newData := map[string]interface{}{}
+			newData := map[string]any{}
 			for k, v := range data {
 				newData[k] = v.Export()
 			}
@@ -266,7 +266,7 @@ func (c *Client) parseRequest(
 			}
 		case sobek.ArrayBuffer:
 			result.Body = bytes.NewBuffer(data.Bytes())
-		case map[string]interface{}:
+		case map[string]any:
 			if err := handleObjectBody(data); err != nil {
 				return nil, err
 			}
@@ -306,7 +306,7 @@ func (c *Client) parseRequest(
 						continue
 					}
 					switch cookieV.ExportType() {
-					case reflect.TypeOf(map[string]interface{}{}):
+					case reflect.TypeFor[map[string]any]():
 						result.Cookies[key] = &httpext.HTTPRequestCookie{Name: key, Value: "", Replace: false}
 						cookie := cookieV.ToObject(rt)
 						for _, attr := range cookie.Keys() {
@@ -403,7 +403,7 @@ func (c *Client) parseRequest(
 	return result, nil
 }
 
-func (c *Client) prepareBatchArray(requests []interface{}) (
+func (c *Client) prepareBatchArray(requests []any) (
 	[]httpext.BatchParsedHTTPRequest, []*Response, error,
 ) {
 	reqCount := len(requests)
@@ -432,7 +432,7 @@ func (c *Client) prepareBatchArray(requests []interface{}) (
 	return batchReqs, results, nil
 }
 
-func (c *Client) prepareBatchObject(requests map[string]interface{}) (
+func (c *Client) prepareBatchObject(requests map[string]any) (
 	[]httpext.BatchParsedHTTPRequest, map[string]*Response, error,
 ) {
 	reqCount := len(requests)
@@ -465,7 +465,7 @@ func (c *Client) prepareBatchObject(requests map[string]interface{}) (
 
 // Batch makes multiple simultaneous HTTP requests. The provideds reqsV should be an array of request
 // objects. Batch returns an array of responses and/or error
-func (c *Client) Batch(reqsV ...sobek.Value) (interface{}, error) {
+func (c *Client) Batch(reqsV ...sobek.Value) (any, error) {
 	state := c.moduleInstance.vu.State()
 	if state == nil {
 		return nil, ErrBatchForbiddenInInitContext
@@ -479,13 +479,13 @@ func (c *Client) Batch(reqsV ...sobek.Value) (interface{}, error) {
 	var (
 		err       error
 		batchReqs []httpext.BatchParsedHTTPRequest
-		results   interface{} // either []*Response or map[string]*Response
+		results   any // either []*Response or map[string]*Response
 	)
 
 	switch v := reqsV[0].Export().(type) {
-	case []interface{}:
+	case []any:
 		batchReqs, results, err = c.prepareBatchArray(v)
-	case map[string]interface{}:
+	case map[string]any:
 		batchReqs, results, err = c.prepareBatchObject(v)
 	default:
 		return nil, fmt.Errorf("invalid http.batch() argument type %T", v)
@@ -505,7 +505,7 @@ func (c *Client) Batch(reqsV ...sobek.Value) (interface{}, error) {
 		int(state.Options.Batch.Int64), int(state.Options.BatchPerHost.Int64),
 	)
 
-	for i := 0; i < reqCount; i++ {
+	for range reqCount {
 		if e := <-errs; e != nil && err == nil { // Save only the first error
 			err = e
 		}
@@ -518,17 +518,17 @@ func (c *Client) Batch(reqsV ...sobek.Value) (interface{}, error) {
 	return results, err
 }
 
-func (c *Client) parseBatchRequest(key interface{}, val interface{}) (*httpext.ParsedHTTPRequest, error) {
+func (c *Client) parseBatchRequest(key any, val any) (*httpext.ParsedHTTPRequest, error) {
 	var (
 		method       = http.MethodGet
 		ok           bool
-		body, reqURL interface{}
+		body, reqURL any
 		params       sobek.Value
 		rt           = c.moduleInstance.vu.Runtime()
 	)
 
 	switch data := val.(type) {
-	case []interface{}:
+	case []any:
 		// Handling of ["GET", "http://example.com/"]
 		dataLen := len(data)
 		if dataLen < 2 {
@@ -546,7 +546,7 @@ func (c *Client) parseBatchRequest(key interface{}, val interface{}) (*httpext.P
 			params = rt.ToValue(data[3])
 		}
 
-	case map[string]interface{}:
+	case map[string]any:
 		// Handling of {method: "GET", url: "https://test.k6.io"}
 		if _, ok := data["url"]; !ok {
 			return nil, fmt.Errorf("batch request %v doesn't have a url key", key)
@@ -575,7 +575,7 @@ func (c *Client) parseBatchRequest(key interface{}, val interface{}) (*httpext.P
 	return c.parseRequest(method, reqURL, body, params)
 }
 
-func requestContainsFile(data map[string]interface{}) bool {
+func requestContainsFile(data map[string]any) bool {
 	for _, v := range data {
 		if _, ok := v.(*FileData); ok {
 			return true

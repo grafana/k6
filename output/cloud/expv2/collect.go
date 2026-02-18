@@ -93,7 +93,7 @@ func (c *collector) CollectSamples(containers []metrics.SampleContainer) {
 	for _, sampleContainer := range containers {
 		samples := sampleContainer.GetSamples()
 
-		for i := 0; i < len(samples); i++ {
+		for i := range samples {
 			c.collectSample(samples[i])
 		}
 	}

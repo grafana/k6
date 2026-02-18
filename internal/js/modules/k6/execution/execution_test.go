@@ -100,7 +100,7 @@ func TestVUTagMetadatasSetSuccessAcceptedTypes(t *testing.T) {
 	// bool and numbers are implicitly converted into string
 
 	tests := map[string]struct {
-		v   interface{}
+		v   any
 		exp string
 	}{
 		"string": {v: `"tag1"`, exp: "tag1"},

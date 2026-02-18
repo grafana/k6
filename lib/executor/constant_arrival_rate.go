@@ -304,7 +304,7 @@ func (car ConstantArrivalRate) Run(parentCtx context.Context, out chan<- metrics
 	}()
 
 	// Get the pre-allocated VUs in the local buffer
-	for i := int64(0); i < preAllocatedVUs; i++ {
+	for range preAllocatedVUs {
 		initVU, err := car.executionState.GetPlannedVU(car.logger, false)
 		if err != nil {
 			return err

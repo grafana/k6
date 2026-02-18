@@ -2,7 +2,6 @@ package v1
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -142,8 +141,7 @@ func TestSetupData(t *testing.T) {
 			metricsEngine, err := engine.NewMetricsEngine(testState.Registry, testState.Logger)
 			require.NoError(t, err)
 
-			globalCtx, globalCancel := context.WithCancel(context.Background())
-			defer globalCancel()
+			globalCtx := t.Context()
 			runCtx, runAbort := execution.NewTestRunContext(globalCtx, testState.Logger)
 			defer runAbort(fmt.Errorf("unexpected abort"))
 

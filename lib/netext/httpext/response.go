@@ -61,7 +61,7 @@ type Response struct {
 	Proto          string                   `json:"proto"`
 	Headers        map[string]string        `json:"headers"`
 	Cookies        map[string][]*HTTPCookie `json:"cookies"`
-	Body           interface{}              `json:"body"`
+	Body           any                      `json:"body"`
 	Timings        ResponseTimings          `json:"timings"`
 	TLSVersion     string                   `json:"tls_version"`
 	TLSCipherSuite string                   `json:"tls_cipher_suite"`

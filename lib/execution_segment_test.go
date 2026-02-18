@@ -433,12 +433,12 @@ func generateRandomSequence(t testing.TB, n, m int64, r *rand.Rand) ExecutionSeg
 	ess := ExecutionSegmentSequence(make([]*ExecutionSegment, n))
 	numerators := make([]int64, n)
 	var denominator int64
-	for i := int64(0); i < n; i++ {
+	for i := range n {
 		numerators[i] = 1 + r.Int63n(m)
 		denominator += numerators[i]
 	}
 	from := big.NewRat(0, 1)
-	for i := int64(0); i < n; i++ {
+	for i := range n {
 		to := new(big.Rat).Add(big.NewRat(numerators[i], denominator), from)
 		ess[i], err = NewExecutionSegment(from, to)
 		require.NoError(t, err)
@@ -456,7 +456,7 @@ func TestExecutionSegmentScaleConsistency(t *testing.T) {
 	r := getTestRand(t)
 
 	const numTests = 10
-	for i := 0; i < numTests; i++ {
+	for range numTests {
 		scale := r.Int31n(99) + 2
 		seq := generateRandomSequence(t, r.Int63n(9)+2, 100, r)
 
@@ -478,7 +478,7 @@ func TestExecutionTupleScaleConsistency(t *testing.T) {
 
 	r := getTestRand(t)
 	const numTests = 10
-	for i := 0; i < numTests; i++ {
+	for range numTests {
 		scale := r.Int31n(99) + 2
 		seq := generateRandomSequence(t, r.Int63n(9)+2, 200, r)
 
@@ -520,7 +520,7 @@ func TestExecutionSegmentScaleNoWobble(t *testing.T) {
 
 	// Random segments
 	const numTests = 10
-	for i := 0; i < numTests; i++ {
+	for range numTests {
 		seq := generateRandomSequence(t, r.Int63n(9)+2, 100, r)
 
 		es := seq[r.Intn(len(seq))]
@@ -641,7 +641,7 @@ func BenchmarkGetStripedOffsetsEven(b *testing.B) {
 		ess := ExecutionSegmentSequence(make([]*ExecutionSegment, n))
 		numerators := make([]int64, n)
 		var denominator int64
-		for i := int64(0); i < n; i++ {
+		for i := range n {
 			numerators[i] = 1 // nice and simple :)
 			denominator += numerators[i]
 		}

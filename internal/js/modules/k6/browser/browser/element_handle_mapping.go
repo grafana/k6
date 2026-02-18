@@ -3,6 +3,7 @@ package browser
 import (
 	"errors"
 	"fmt"
+	maps0 "maps"
 
 	"github.com/grafana/sobek"
 
@@ -334,9 +335,7 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 	}
 
 	jsHandleMap := mapJSHandle(vu, eh)
-	for k, v := range jsHandleMap {
-		maps[k] = v
-	}
+	maps0.Copy(maps, jsHandleMap)
 
 	return maps
 }

@@ -482,8 +482,8 @@ func (ce *astInspectState) defaultHandler(node ast.Node) nodeHandlerFunc {
 func (ce *astInspectState) elementTagNameHandler(node ast.Node) nodeHandlerFunc {
 	switch x := node.(type) {
 	case *ast.Ident:
-		if strings.HasSuffix(x.Name, "TagName") {
-			ce.elemName = strings.TrimSuffix(x.Name, "TagName")
+		if before, ok := strings.CutSuffix(x.Name, "TagName"); ok {
+			ce.elemName = before
 			ce.elemInfos[ce.elemName] = &elemInfo{"", ""}
 		}
 

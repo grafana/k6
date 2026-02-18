@@ -66,7 +66,7 @@ func (c *Client) BaseURL() string {
 //
 // This is the same as http.NewRequest, except that data if not nil
 // will be serialized in json format.
-func (c *Client) NewRequest(method, url string, data interface{}) (*http.Request, error) {
+func (c *Client) NewRequest(method, url string, data any) (*http.Request, error) {
 	var buf io.Reader
 
 	if data != nil {
@@ -87,7 +87,7 @@ func (c *Client) NewRequest(method, url string, data interface{}) (*http.Request
 }
 
 // Do is simpler to http.Do but also unmarshals the response in the provided v
-func (c *Client) Do(req *http.Request, v interface{}) error {
+func (c *Client) Do(req *http.Request, v any) error {
 	if req.Body != nil && req.GetBody == nil {
 		originalBody, err := io.ReadAll(req.Body)
 		if err != nil {
@@ -143,7 +143,7 @@ func (c *Client) prepareHeaders(req *http.Request) {
 	}
 }
 
-func (c *Client) do(req *http.Request, v interface{}, attempt int) (retry bool, err error) {
+func (c *Client) do(req *http.Request, v any, attempt int) (retry bool, err error) {
 	resp, err := c.client.Do(req) //nolint:gosec
 
 	defer func() {

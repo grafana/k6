@@ -51,7 +51,7 @@ func TestSharedArraysLoadOrStoreBuildsOnce(t *testing.T) {
 
 	var wg sync.WaitGroup
 	const goroutines = 10
-	for i := 0; i < goroutines; i++ {
+	for range goroutines {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -93,7 +93,7 @@ func TestNewSharedArrayFromConcurrentMultiVU(t *testing.T) {
 	var wg sync.WaitGroup
 	const vus = 10
 
-	for i := 0; i < vus; i++ {
+	for range vus {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()

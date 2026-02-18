@@ -147,8 +147,7 @@ func TestSchedulerRunNonDefault(t *testing.T) {
 			execScheduler, err := execution.NewScheduler(testRunState, local.NewController())
 			require.NoError(t, err)
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			done := make(chan struct{})
 			samples := make(chan metrics.SampleContainer)
@@ -263,8 +262,7 @@ func TestSchedulerRunEnv(t *testing.T) {
 			execScheduler, err := execution.NewScheduler(testRunState, local.NewController())
 			require.NoError(t, err)
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			done := make(chan struct{})
 			samples := make(chan metrics.SampleContainer)
@@ -984,8 +982,7 @@ func TestSchedulerEndIterations(t *testing.T) {
 		Options: options,
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	testRunState := getTestRunState(t, getTestPreInitState(t), runner.GetOptions(), runner)
 	execScheduler, err := execution.NewScheduler(testRunState, local.NewController())
@@ -1004,7 +1001,7 @@ func TestSchedulerEndIterations(t *testing.T) {
 	assert.Equal(t, uint64(0), execScheduler.GetState().GetPartialIterationCount())
 	assert.Equal(t, int64(100), i)
 	require.Equal(t, 100, len(samples)) // TODO: change to 200 https://github.com/k6io/k6/issues/1250
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		mySample, ok := <-samples
 		require.True(t, ok)
 		assert.Equal(t, metrics.Sample{TimeSeries: ts, Value: 1.0}, mySample)
@@ -1206,8 +1203,7 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 	execScheduler, err := execution.NewScheduler(testRunState, local.NewController())
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	done := make(chan struct{})
 	samples := make(chan metrics.SampleContainer)

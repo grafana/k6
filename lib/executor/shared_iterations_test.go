@@ -3,7 +3,7 @@ package executor
 import (
 	"context"
 	"fmt"
-	"sort"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -73,7 +73,7 @@ func TestSharedIterationsRunVariableVU(t *testing.T) {
 	require.NoError(t, test.executor.Run(test.ctx, nil))
 
 	var totalIters uint64
-	result.Range(func(_, value interface{}) bool {
+	result.Range(func(_, value any) bool {
 		totalIters += value.(uint64)
 		return true
 	})
@@ -148,7 +148,7 @@ func TestSharedIterationsGlobalIters(t *testing.T) {
 
 			engineOut := make(chan metrics.SampleContainer, 100)
 			require.NoError(t, test.executor.Run(test.ctx, engineOut))
-			sort.Slice(gotIters, func(i, j int) bool { return gotIters[i] < gotIters[j] })
+			slices.Sort(gotIters)
 			assert.Equal(t, tc.expIters, gotIters)
 		})
 	}

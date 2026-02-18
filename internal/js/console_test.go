@@ -1,7 +1,6 @@
 package js
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -46,7 +45,7 @@ func TestConsoleContext(t *testing.T) {
 	require.Equal(t, "b", entry.Message)
 }
 
-func getSimpleRunner(tb testing.TB, filename, data string, opts ...interface{}) (*Runner, error) {
+func getSimpleRunner(tb testing.TB, filename, data string, opts ...any) (*Runner, error) {
 	var (
 		rtOpts      = lib.RuntimeOptions{CompatibilityMode: null.NewString("base", true)}
 		logger      = testutils.NewLogger(tb)
@@ -90,7 +89,7 @@ func getSimpleRunner(tb testing.TB, filename, data string, opts ...interface{}) 
 	)
 }
 
-func getSimpleArchiveRunner(tb testing.TB, arc *lib.Archive, opts ...interface{}) (*Runner, error) {
+func getSimpleArchiveRunner(tb testing.TB, arc *lib.Archive, opts ...any) (*Runner, error) {
 	var (
 		rtOpts      = lib.RuntimeOptions{CompatibilityMode: null.NewString("base", true)}
 		logger      = testutils.NewLogger(tb)
@@ -171,7 +170,7 @@ func TestConsoleLogObjectsWithGoTypes(t *testing.T) {
 
 	tests := []struct {
 		name string
-		in   interface{}
+		in   any
 		exp  string
 	}{
 		{
@@ -190,7 +189,7 @@ func TestConsoleLogObjectsWithGoTypes(t *testing.T) {
 		},
 		{
 			name: "Map",
-			in: map[string]interface{}{
+			in: map[string]any{
 				"text": "test3",
 			},
 			exp: `{ text: "test3" }`,
@@ -356,8 +355,7 @@ func TestConsoleLog(t *testing.T) {
 				`exports.default = function() { console.log(%s); }`, tt.in))
 			require.NoError(t, err)
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			samples := make(chan metrics.SampleContainer, 100)
 			initVU, err := r.newVU(ctx, 1, 1, samples)
 			require.NoError(t, err)
@@ -464,8 +462,7 @@ func TestConsoleLevels(t *testing.T) {
 					))
 					require.NoError(t, err)
 
-					ctx, cancel := context.WithCancel(context.Background())
-					defer cancel()
+					ctx := t.Context()
 
 					samples := make(chan metrics.SampleContainer, 100)
 					initVU, err := r.newVU(ctx, 1, 1, samples)
@@ -554,8 +551,7 @@ func TestFileConsole(t *testing.T) {
 							})
 							require.NoError(t, err)
 
-							ctx, cancel := context.WithCancel(context.Background())
-							defer cancel()
+							ctx := t.Context()
 
 							samples := make(chan metrics.SampleContainer, 100)
 							initVU, err := r.newVU(ctx, 1, 1, samples)

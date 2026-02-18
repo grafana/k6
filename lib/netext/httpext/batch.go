@@ -27,10 +27,7 @@ func MakeBatchRequests(
 	requests []BatchParsedHTTPRequest,
 	reqCount, globalLimit, perHostLimit int,
 ) <-chan error {
-	workers := globalLimit
-	if reqCount < workers {
-		workers = reqCount
-	}
+	workers := min(reqCount, globalLimit)
 	result := make(chan error, reqCount)
 	perHostLimiter := lib.NewMultiSlotLimiter(perHostLimit)
 
@@ -48,7 +45,7 @@ func MakeBatchRequests(
 	}
 
 	counter, i32reqCount := int32(-1), int32(reqCount) //nolint:gosec
-	for i := 0; i < workers; i++ {
+	for range workers {
 		go func() {
 			for {
 				reqNum := atomic.AddInt32(&counter, 1)

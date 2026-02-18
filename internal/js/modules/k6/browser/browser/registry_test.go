@@ -22,10 +22,10 @@ func TestPidRegistry(t *testing.T) {
 	p := &pidRegistry{}
 
 	var wg sync.WaitGroup
-	expected := []int{}
 	iteration := 100
+	expected := make([]int, 0, iteration)
 	wg.Add(iteration)
-	for i := 0; i < iteration; i++ {
+	for i := range iteration {
 		go func(i int) {
 			p.registerPid(i)
 			wg.Done()

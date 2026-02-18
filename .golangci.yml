@@ -39,6 +39,7 @@ linters:
     - lll
     - makezero
     - misspell
+    - modernize
     - nakedret
     - nestif
     - nilerr

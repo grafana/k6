@@ -68,7 +68,7 @@ func TestSampleBufferConcurrently(t *testing.T) {
 
 	wg := make(chan struct{})
 	fillBuffer := func() {
-		for i := 0; i < sampleCount; i++ {
+		for i := range sampleCount {
 			buffer.AddMetricSamples([]metrics.SampleContainer{metrics.Sample{
 				TimeSeries: metrics.TimeSeries{
 					Metric: metric,
@@ -81,7 +81,7 @@ func TestSampleBufferConcurrently(t *testing.T) {
 		}
 		wg <- struct{}{}
 	}
-	for i := 0; i < producersCount; i++ {
+	for range producersCount {
 		go fillBuffer()
 	}
 
@@ -166,7 +166,7 @@ func TestPeriodicFlusherConcurrency(t *testing.T) {
 
 	stopWG := &sync.WaitGroup{}
 	stopWG.Add(randStops)
-	for i := 0; i < randStops; i++ {
+	for range randStops {
 		go func() {
 			f.Stop()
 			stopWG.Done()

@@ -128,7 +128,7 @@ func (aka AESKeyAlgorithm) alg() string {
 }
 
 // exportAESKey exports an AES key to its raw representation.
-func exportAESKey(key *CryptoKey, format KeyFormat) (interface{}, error) {
+func exportAESKey(key *CryptoKey, format KeyFormat) (any, error) {
 	if !key.Extractable {
 		return nil, NewError(InvalidAccessError, "the key is not extractable")
 	}

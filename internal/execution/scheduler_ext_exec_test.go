@@ -286,7 +286,7 @@ func TestSharedIterationsStable(t *testing.T) {
 	go func() { errCh <- execScheduler.Run(ctx, ctx, samples) }()
 
 	expIters := [50]int64{}
-	for i := 0; i < 50; i++ {
+	for i := range 50 {
 		expIters[i] = int64(i)
 	}
 	gotLocalIters, gotGlobalIters := []int64{}, []int64{}
