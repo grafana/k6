@@ -141,10 +141,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"frames": func() *sobek.Object {
-			var (
-				mfrs []mapping
-				frs  = p.Frames()
-			)
+			frs := p.Frames()
+			mfrs := make([]mapping, 0, len(frs))
 			for _, fr := range frs {
 				mfrs = append(mfrs, mapFrame(vu, fr))
 			}
@@ -723,8 +721,9 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"workers": func() *sobek.Object {
-			var mws []mapping
-			for _, w := range p.Workers() {
+			workers := p.Workers()
+			mws := make([]mapping, 0, len(workers))
+			for _, w := range workers {
 				mw := mapWorker(vu, w)
 				mws = append(mws, mw)
 			}

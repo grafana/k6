@@ -268,7 +268,7 @@ func TestCancelledRequest(t *testing.T) {
 		ctx, cancel := context.WithCancel(httptrace.WithClientTrace(req.Context(), tracer.Trace()))
 		req = req.WithContext(ctx)
 		go func() {
-			time.Sleep(time.Duration(rand.Int31n(50)) * time.Millisecond) //nolint:gosec
+			time.Sleep(time.Duration(rand.Int31n(50)) * time.Millisecond)
 			cancel()
 		}()
 

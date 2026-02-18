@@ -179,7 +179,7 @@ func (us *urlSecrets) Get(key string) (string, error) {
 			req.Header.Set(k, v)
 		}
 
-		response, err := us.httpClient.Do(req)
+		response, err := us.httpClient.Do(req) //nolint:gosec
 		if err != nil {
 			// Network errors are retryable
 			return fmt.Errorf("failed to get secret: %w", err), true

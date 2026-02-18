@@ -860,7 +860,7 @@ func getTestServerWithCertificate(t *testing.T, certPem, key []byte) *httptest.S
 	certpool.AddCert(certificate)
 	client := &http.Client{Transport: &http.Transport{}}
 	client.Transport = &http.Transport{
-		TLSClientConfig: &tls.Config{ //nolint:gosec
+		TLSClientConfig: &tls.Config{
 			RootCAs: certpool,
 		},
 		ForceAttemptHTTP2: s.EnableHTTP2,
@@ -1628,13 +1628,13 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 		"WithoutDomains":   {true, false, true, ""},
 	}
 
-	listener, err := tls.Listen("tcp", "127.0.0.1:0", &tls.Config{ //nolint:gosec
+	listener, err := tls.Listen("tcp", "127.0.0.1:0", &tls.Config{
 		Certificates: []tls.Certificate{serverCert},
 		ClientAuth:   tls.RequireAndVerifyClientCert,
 		ClientCAs:    clientCAPool,
 	})
 	require.NoError(t, err)
-	srv := &http.Server{ //nolint:gosec
+	srv := &http.Server{
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			_, _ = fmt.Fprintf(w, "ok")
 		}),
@@ -2041,7 +2041,7 @@ func TestSystemTags(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			vu, err := r.NewVU(ctx, uint64(num), 0, samples) //nolint:gosec
+			vu, err := r.NewVU(ctx, uint64(num), 0, samples)
 			require.NoError(t, err)
 			activeVU := vu.Activate(&lib.VUActivationParams{
 				RunContext: ctx,

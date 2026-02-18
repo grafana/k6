@@ -233,7 +233,7 @@ func TestSchedulerRunEnv(t *testing.T) {
 			gracefulStop: "0.5s",`,
 	}
 
-	testCases := []struct{ name, script string }{}
+	testCases := make([]struct{ name, script string }, 0, 2*len(executorConfigs))
 
 	// Generate tests using global env and with env override
 	for ename, econf := range executorConfigs {
@@ -451,7 +451,7 @@ func TestSchedulerRunCustomTags(t *testing.T) {
 			gracefulStop: "0.5s",`,
 	}
 
-	testCases := []struct{ name, script string }{}
+	testCases := make([]struct{ name, script string }, 0, len(executorConfigs))
 
 	// Generate tests using custom tags
 	for ename, econf := range executorConfigs {
@@ -1222,10 +1222,10 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 		assert.NoError(t, execScheduler.Run(ctx, ctx, samples))
 	}()
 
-	expectIn := func(from, to time.Duration, expected metrics.SampleContainer) {
+	expectIn := func(fromMs, toMs int64, expected metrics.SampleContainer) {
 		start := time.Now()
-		from *= time.Millisecond
-		to *= time.Millisecond
+		from := time.Duration(fromMs) * time.Millisecond
+		to := time.Duration(toMs) * time.Millisecond
 		for {
 			select {
 			case sampleContainer := <-samples:
@@ -1288,7 +1288,8 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 		}
 	}
 	getNetworkSamples := func(group string, addExpTags ...string) metrics.SampleContainer {
-		expTags := []string{"group", group}
+		expTags := make([]string, 0, 2+len(addExpTags))
+		expTags = append(expTags, "group", group)
 		expTags = append(expTags, addExpTags...)
 		dialer := netext.NewDialer(
 			net.Dialer{},
@@ -1300,7 +1301,8 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 	}
 
 	getIterationsSamples := func(group string, addExpTags ...string) metrics.SampleContainer {
-		expTags := []string{"group", group}
+		expTags := make([]string, 0, 2+len(addExpTags))
+		expTags = append(expTags, "group", group)
 		expTags = append(expTags, addExpTags...)
 		ctm := metrics.TagsAndMeta{Tags: getTags(piState.Registry, expTags...)}
 		startTime := time.Now()

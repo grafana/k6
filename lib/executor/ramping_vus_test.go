@@ -1167,7 +1167,7 @@ func TestSumRandomSegmentSequenceMatchesNoSegment(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			seed := time.Now().UnixNano()
-			r := rand.New(rand.NewSource(seed)) //nolint:gosec
+			r := rand.New(rand.NewSource(seed))
 			t.Logf("Random source seeded with %d\n", seed)
 			c := getTestConfig(r, name)
 			ranSeqLen := 2 + r.Int63n(segmentSeqMaxLen-1)

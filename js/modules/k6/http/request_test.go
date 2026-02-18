@@ -2362,7 +2362,7 @@ func GetTestServerWithCertificate(t *testing.T, certPem, key []byte, suitesIDs .
 	certpool.AddCert(certificate)
 	client := &http.Client{Transport: &http.Transport{}}
 	client.Transport = &http.Transport{
-		TLSClientConfig: &tls.Config{ //nolint:gosec
+		TLSClientConfig: &tls.Config{
 			RootCAs:      certpool,
 			MinVersion:   tls.VersionTLS10,
 			MaxVersion:   tls.VersionTLS12, // this so that the ciphersuite work

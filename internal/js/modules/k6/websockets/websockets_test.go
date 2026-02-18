@@ -120,7 +120,7 @@ func (r *callRecorder) Recorded() []string {
 	r.Lock()
 	defer r.Unlock()
 
-	result := []string{}
+	result := make([]string, 0, len(r.calls))
 	result = append(result, r.calls...)
 
 	return result

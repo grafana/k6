@@ -144,7 +144,7 @@ func (c *Client) prepareHeaders(req *http.Request) {
 }
 
 func (c *Client) do(req *http.Request, v interface{}, attempt int) (retry bool, err error) {
-	resp, err := c.client.Do(req)
+	resp, err := c.client.Do(req) //nolint:gosec
 
 	defer func() {
 		if resp != nil {

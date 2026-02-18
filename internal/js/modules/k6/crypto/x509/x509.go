@@ -243,7 +243,8 @@ func makeRdn(name pkix.AttributeTypeAndValue) RDN {
 }
 
 func altNames(parsed *x509.Certificate) []string {
-	var names []string
+	capacity := len(parsed.DNSNames) + len(parsed.EmailAddresses) + len(parsed.IPAddresses) + len(parsed.URIs)
+	names := make([]string, 0, capacity)
 	names = append(names, parsed.DNSNames...)
 	names = append(names, parsed.EmailAddresses...)
 	names = append(names, ipAddresses(parsed)...)

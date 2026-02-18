@@ -421,7 +421,7 @@ func TestExecutionSegmentStringSequences(t *testing.T) {
 func getTestRand(t testing.TB) *rand.Rand {
 	t.Helper()
 	seed := time.Now().UnixNano()
-	r := rand.New(rand.NewSource(seed)) //nolint:gosec
+	r := rand.New(rand.NewSource(seed))
 	t.Logf("Random source seeded with %d\n", seed)
 	return r
 }
@@ -618,7 +618,7 @@ func TestSequenceLCD(t *testing.T) {
 func BenchmarkGetStripedOffsets(b *testing.B) {
 	lengths := [...]int64{10, 100}
 	const seed = 777
-	r := rand.New(rand.NewSource(seed)) //nolint:gosec
+	r := rand.New(rand.NewSource(seed))
 
 	for _, length := range lengths {
 		b.Run(fmt.Sprintf("length%d,seed%d", length, seed), func(b *testing.B) {

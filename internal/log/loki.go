@@ -347,7 +347,7 @@ func (h *lokiHook) push(b bytes.Buffer) error {
 		req.Header.Add(header[0], header[1])
 	}
 
-	res, err := h.client.Do(req)
+	res, err := h.client.Do(req) //nolint:gosec
 
 	if res != nil {
 		if res.StatusCode >= 400 {

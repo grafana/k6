@@ -311,7 +311,7 @@ func (m *tc39Meta) hasFlag(flag string) bool {
 }
 
 func parseTC39File(name string) (*tc39Meta, string, error) {
-	f, err := os.Open(name) //nolint:gosec
+	f, err := os.Open(name)
 	if err != nil {
 		return nil, "", err
 	}
@@ -612,7 +612,7 @@ func (ctx *tc39TestCtx) compile(base, name string) (*sobek.Program, error) {
 	prg := ctx.prgCache[name]
 	if prg == nil {
 		fname := path.Join(base, name)
-		f, err := os.Open(fname) //nolint:gosec
+		f, err := os.Open(fname)
 		if err != nil {
 			return nil, err
 		}

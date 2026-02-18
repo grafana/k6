@@ -95,7 +95,8 @@ func (g *Group) SetToOneReferenceID(name, id string) error {
 // FlattenGroup flattens a group and all its subgroups
 // into a slice of groups
 func FlattenGroup(g *Group) []*Group {
-	groups := []*Group{g}
+	groups := make([]*Group, 0, 1+len(g.Groups))
+	groups = append(groups, g)
 	for _, gp := range g.Groups {
 		groups = append(groups, FlattenGroup(gp)...)
 	}

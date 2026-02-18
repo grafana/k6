@@ -344,7 +344,7 @@ func TestOutputSetTrendStatsResolver(t *testing.T) {
 
 		assert.Len(t, o.trendStatsResolver, len(tt.expResolverKeys))
 		assert.ElementsMatch(t, tt.expResolverKeys, func() []string {
-			var keys []string
+			keys := make([]string, 0, len(o.trendStatsResolver))
 			for statKey := range o.trendStatsResolver {
 				keys = append(keys, statKey)
 			}
