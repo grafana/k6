@@ -27,6 +27,10 @@ type DocumentInfo struct {
 	request    *Request
 }
 
+func (d *DocumentInfo) is(id string) bool {
+	return d != nil && d.documentID == id
+}
+
 // DOMElementState represents a DOM element state.
 type DOMElementState int
 

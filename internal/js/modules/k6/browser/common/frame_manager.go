@@ -309,7 +309,7 @@ func (m *FrameManager) frameNavigated(
 		if pendingDocument.documentID == "" {
 			pendingDocument.documentID = documentID
 		}
-		if pendingDocument.documentID == documentID {
+		if pendingDocument.is(documentID) {
 			// Committing a pending document.
 			frame.currentDocument = pendingDocument
 		} else {
@@ -403,7 +403,7 @@ func (m *FrameManager) frameRequestedNavigation(frameID cdp.FrameID, url string,
 	frame.documentMu.Lock()
 	defer frame.documentMu.Unlock()
 
-	if frame.pendingDocument != nil && frame.pendingDocument.documentID == documentID {
+	if frame.pendingDocument.is(documentID) {
 		m.logger.Debugf("FrameManager:frameRequestedNavigation:return",
 			"fmid:%d fid:%v furl:%s url:%s docid:%s pdocid:%s pdoc:dontSet",
 			m.ID(), frameID, frame.URL(), url, documentID,
