@@ -335,6 +335,18 @@ func (f *Frame) requestByDocumentID(id string) *Request {
 	return nil
 }
 
+func (f *Frame) responseByDocumentID(id string) *Response {
+	request := f.requestByDocumentID(id)
+	if request == nil {
+		return nil
+	}
+
+	request.responseMu.RLock()
+	defer request.responseMu.RUnlock()
+
+	return request.response
+}
+
 func (f *Frame) navigated(name string, url string, loaderID string) {
 	f.log.Debugf("Frame:navigated", "fid:%s furl:%q lid:%s name:%q url:%q", f.ID(), f.URL(), loaderID, name, url)
 

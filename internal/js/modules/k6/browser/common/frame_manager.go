@@ -720,10 +720,7 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *Frame
 		return err // TODO maybe wrap this as well?
 	}
 
-	var (
-		request *Request
-		resp    *Response
-	)
+	var resp *Response
 	select {
 	case evt := <-navEvtCh:
 		if e, ok := evt.(*NavigationEvent); ok {
@@ -732,12 +729,7 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *Frame
 			}
 
 			if e.newDocument != nil {
-				request = frame.requestByDocumentID(e.newDocument.documentID)
-			}
-			if request != nil {
-				request.responseMu.RLock()
-				resp = request.response
-				request.responseMu.RUnlock()
+				resp = frame.responseByDocumentID(e.newDocument.documentID)
 			}
 		}
 	case <-timeoutCtx.Done():
