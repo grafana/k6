@@ -10,7 +10,7 @@ import (
 func buildAwsNoEscape() [256]bool {
 	var noEscape [256]bool
 
-	for i := 0; i < len(noEscape); i++ {
+	for i := range len(noEscape) {
 		// AWS expects every character except these to be escaped
 		noEscape[i] = (i >= 'A' && i <= 'Z') ||
 			(i >= 'a' && i <= 'z') ||

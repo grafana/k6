@@ -60,7 +60,7 @@ func WithLogger(logger *logrus.Entry) Option {
 
 // CallAPI executes the desired REST API request.
 // it's expected that the body and out are the structs that follows the JSON:API
-func (c *Client) CallAPI(ctx context.Context, method string, rel *url.URL, body, out interface{}) (err error) {
+func (c *Client) CallAPI(ctx context.Context, method string, rel *url.URL, body, out any) (err error) {
 	if c.logger != nil {
 		c.logger.Debugf("[REST API] Making a %s request to '%s'", method, rel.String())
 		defer func() {

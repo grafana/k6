@@ -194,9 +194,9 @@ func TestAsyncRequestErrors(t *testing.T) {
 			_, err := ts.runtime.RunOnEventLoop(wrapInAsyncLambda(js))
 			require.NoError(t, err)
 			ret := rt.GlobalObject().Get("ret")
-			var retobj map[string]interface{}
+			var retobj map[string]any
 			var ok bool
-			if retobj, ok = ret.Export().(map[string]interface{}); !ok {
+			if retobj, ok = ret.Export().(map[string]any); !ok {
 				require.Fail(t, "got wrong return object: %#+v", retobj)
 			}
 			require.Equal(t, int64(1020), retobj["error_code"])

@@ -13,7 +13,7 @@ func TestNewSink(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		sink interface{}
+		sink any
 		mt   MetricType
 	}{
 		{mt: Counter, sink: &CounterSink{}},

@@ -10,7 +10,7 @@ import (
 
 // StrictJSONUnmarshal decodes a JSON in a strict manner, emitting an error if there
 // are unknown fields or unexpected data
-func StrictJSONUnmarshal(data []byte, v interface{}) error {
+func StrictJSONUnmarshal(data []byte, v any) error {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.DisallowUnknownFields()
 	dec.UseNumber()

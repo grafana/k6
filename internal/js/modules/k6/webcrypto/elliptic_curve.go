@@ -413,7 +413,7 @@ func pickEllipticCurve(k string) (elliptic.Curve, error) {
 	}
 }
 
-func exportECKey(ck *CryptoKey, format KeyFormat) (interface{}, error) {
+func exportECKey(ck *CryptoKey, format KeyFormat) (any, error) {
 	if ck.handle == nil {
 		return nil, NewError(OperationError, "key data is not accessible")
 	}

@@ -45,8 +45,8 @@ type InvokeRequest struct {
 
 // InvokeResponse represents a gRPC response.
 type InvokeResponse struct {
-	Message  interface{}
-	Error    interface{}
+	Message  any
+	Error    any
 	Headers  map[string][]string
 	Trailers map[string][]string
 	Status   codes.Code
@@ -85,11 +85,10 @@ func DefaultOptions(getState func() *lib.State) []grpc.DialOption {
 		return getState().Dialer.DialContext(ctx, "tcp", addr)
 	}
 
-	//nolint:staticcheck // see https://github.com/grafana/k6/issues/3699
 	return []grpc.DialOption{
-		grpc.WithBlock(),
-		grpc.FailOnNonTempDialError(true),
-		grpc.WithReturnConnectionError(),
+		grpc.WithBlock(),                  //nolint:staticcheck
+		grpc.FailOnNonTempDialError(true), //nolint:staticcheck
+		grpc.WithReturnConnectionError(),  //nolint:staticcheck
 		grpc.WithStatsHandler(statsHandler{getState: getState}),
 		grpc.WithContextDialer(dialer),
 	}
@@ -97,8 +96,7 @@ func DefaultOptions(getState func() *lib.State) []grpc.DialOption {
 
 // Dial establish a gRPC connection.
 func Dial(ctx context.Context, addr string, types *protoregistry.Types, options ...grpc.DialOption) (*Conn, error) {
-	//nolint:staticcheck // see https://github.com/grafana/k6/issues/3699
-	conn, err := grpc.DialContext(ctx, addr, options...)
+	conn, err := grpc.DialContext(ctx, addr, options...) //nolint:staticcheck
 	if err != nil {
 		return nil, err
 	}
@@ -190,7 +188,7 @@ func (c *Conn) Invoke(
 		// JSON.Stringify() shows the object to be correctly present.
 
 		raw, _ := marshaler.Marshal(sterr.Proto())
-		errMsg := make(map[string]interface{})
+		errMsg := make(map[string]any)
 		_ = json.Unmarshal(raw, &errMsg)
 		response.Error = errMsg
 	}
@@ -348,7 +346,7 @@ func formatMetadata(md metadata.MD) string {
 	return sb.String()
 }
 
-func formatPayload(payload interface{}) string {
+func formatPayload(payload any) string {
 	msg, ok := payload.(proto.Message)
 	if !ok {
 		// check to see if we are dealing with a APIv1 message

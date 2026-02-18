@@ -53,7 +53,7 @@ func (*RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 // Exports returns the exports of the k6 module.
 func (mi *K6) Exports() modules.Exports {
 	return modules.Exports{
-		Named: map[string]interface{}{
+		Named: map[string]any{
 			"check":      mi.Check,
 			"fail":       mi.Fail,
 			"group":      mi.Group,
