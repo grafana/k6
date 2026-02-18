@@ -27,6 +27,10 @@ type DocumentInfo struct {
 	request    *Request
 }
 
+func (d *DocumentInfo) is(id string) bool {
+	return d != nil && d.documentID == id
+}
+
 // DOMElementState represents a DOM element state.
 type DOMElementState int
 
@@ -110,9 +114,9 @@ type Frame struct {
 	inflightRequestsMu sync.RWMutex
 	inflightRequests   map[network.RequestID]bool
 
-	currentDocument   *DocumentInfo
-	pendingDocumentMu sync.RWMutex
-	pendingDocument   *DocumentInfo
+	currentDocument *DocumentInfo
+	pendingDocument *DocumentInfo
+	documentMu      sync.RWMutex
 
 	log *log.Logger
 }
@@ -311,6 +315,36 @@ func (f *Frame) hasLifecycleEventFired(event LifecycleEvent) bool {
 	defer f.lifecycleEventsMu.RUnlock()
 
 	return f.lifecycleEvents[event]
+}
+
+func (f *Frame) requestByDocumentID(id string) *Request {
+	if id == "" {
+		return nil
+	}
+
+	f.documentMu.RLock()
+	defer f.documentMu.RUnlock()
+
+	if f.pendingDocument.is(id) {
+		return f.pendingDocument.request
+	}
+	if f.currentDocument.is(id) {
+		return f.currentDocument.request
+	}
+
+	return nil
+}
+
+func (f *Frame) responseByDocumentID(id string) *Response {
+	request := f.requestByDocumentID(id)
+	if request == nil {
+		return nil
+	}
+
+	request.responseMu.RLock()
+	defer request.responseMu.RUnlock()
+
+	return request.response
 }
 
 func (f *Frame) navigated(name string, url string, loaderID string) {
@@ -2098,7 +2132,7 @@ func (f *Frame) WaitForNavigation(opts *FrameWaitForNavigationOptions, rm RegExM
 	}()
 
 	var (
-		resp       *Response
+		docID      string
 		sameDocNav bool
 	)
 	select {
@@ -2115,13 +2149,8 @@ func (f *Frame) WaitForNavigation(opts *FrameWaitForNavigationOptions, rm RegExM
 				sameDocNav = true
 				break
 			}
-			// request could be nil if navigating to e.g. BlankPage.
-			req := e.newDocument.request
-			if req != nil {
-				req.responseMu.RLock()
-				resp = req.response
-				req.responseMu.RUnlock()
-			}
+
+			docID = e.newDocument.documentID
 		}
 	case <-timeoutCtx.Done():
 		return nil, handleTimeoutError(ContextErr(timeoutCtx))
@@ -2136,6 +2165,11 @@ func (f *Frame) WaitForNavigation(opts *FrameWaitForNavigationOptions, rm RegExM
 		case <-timeoutCtx.Done():
 			return nil, handleTimeoutError(ContextErr(timeoutCtx))
 		}
+	}
+
+	var resp *Response
+	if !sameDocNav {
+		resp = f.responseByDocumentID(docID)
 	}
 
 	// Since the response will be in an interface, it will never be nil,

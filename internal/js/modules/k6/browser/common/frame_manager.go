@@ -102,14 +102,14 @@ func (m *FrameManager) frameAbortedNavigation(frameID cdp.FrameID, errorText, do
 		return
 	}
 
-	frame.pendingDocumentMu.Lock()
+	frame.documentMu.Lock()
 
 	if frame.pendingDocument == nil {
-		frame.pendingDocumentMu.Unlock()
+		frame.documentMu.Unlock()
 		return
 	}
 	if documentID != "" && frame.pendingDocument.documentID != documentID {
-		frame.pendingDocumentMu.Unlock()
+		frame.documentMu.Unlock()
 		return
 	}
 
@@ -125,7 +125,7 @@ func (m *FrameManager) frameAbortedNavigation(frameID cdp.FrameID, errorText, do
 	}
 	frame.pendingDocument = nil
 
-	frame.pendingDocumentMu.Unlock()
+	frame.documentMu.Unlock()
 
 	frame.emit(EventFrameNavigation, ne)
 }
@@ -298,8 +298,8 @@ func (m *FrameManager) frameNavigated(
 
 	frame.navigated(name, url, documentID)
 
-	frame.pendingDocumentMu.Lock()
-	defer frame.pendingDocumentMu.Unlock()
+	frame.documentMu.Lock()
+	defer frame.documentMu.Unlock()
 
 	var (
 		keepPending     *DocumentInfo
@@ -309,7 +309,7 @@ func (m *FrameManager) frameNavigated(
 		if pendingDocument.documentID == "" {
 			pendingDocument.documentID = documentID
 		}
-		if pendingDocument.documentID == documentID {
+		if pendingDocument.is(documentID) {
 			// Committing a pending document.
 			frame.currentDocument = pendingDocument
 		} else {
@@ -400,10 +400,10 @@ func (m *FrameManager) frameRequestedNavigation(frameID cdp.FrameID, url string,
 		b.AddFrameNavigation(frame)
 	}
 
-	frame.pendingDocumentMu.Lock()
-	defer frame.pendingDocumentMu.Unlock()
+	frame.documentMu.Lock()
+	defer frame.documentMu.Unlock()
 
-	if frame.pendingDocument != nil && frame.pendingDocument.documentID == documentID {
+	if frame.pendingDocument.is(documentID) {
 		m.logger.Debugf("FrameManager:frameRequestedNavigation:return",
 			"fmid:%d fid:%v furl:%s url:%s docid:%s pdocid:%s pdoc:dontSet",
 			m.ID(), frameID, frame.URL(), url, documentID,
@@ -478,10 +478,10 @@ func (m *FrameManager) requestFailed(req *Request, canceled bool) {
 	}
 	frame.deleteRequest(req.getID())
 
-	frame.pendingDocumentMu.RLock()
+	frame.documentMu.RLock()
 	if frame.pendingDocument == nil || frame.pendingDocument.request != req {
 		m.logger.Debugf("FrameManager:requestFailed:return", "fmid:%d pdoc:nil", m.ID())
-		frame.pendingDocumentMu.RUnlock()
+		frame.documentMu.RUnlock()
 		return
 	}
 
@@ -491,7 +491,7 @@ func (m *FrameManager) requestFailed(req *Request, canceled bool) {
 	}
 
 	docID := frame.pendingDocument.documentID
-	frame.pendingDocumentMu.RUnlock()
+	frame.documentMu.RUnlock()
 
 	m.frameAbortedNavigation(cdp.FrameID(frame.ID()), errorText, docID)
 }
@@ -531,9 +531,19 @@ func (m *FrameManager) requestStarted(req *Request) {
 
 	frame.addRequest(req.getID())
 	if req.documentID != "" {
-		frame.pendingDocumentMu.Lock()
-		frame.pendingDocument = &DocumentInfo{documentID: req.documentID, request: req}
-		frame.pendingDocumentMu.Unlock()
+		frame.documentMu.Lock()
+		switch {
+		case frame.currentDocument.is(req.documentID):
+			frame.currentDocument.request = req
+			if frame.pendingDocument.is(req.documentID) {
+				frame.pendingDocument = nil
+			}
+		case frame.pendingDocument.is(req.documentID):
+			frame.pendingDocument.request = req
+		default:
+			frame.pendingDocument = &DocumentInfo{documentID: req.documentID, request: req}
+		}
+		frame.documentMu.Unlock()
 	}
 
 	if !m.page.hasRoutes() {
@@ -720,7 +730,7 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *Frame
 		return err // TODO maybe wrap this as well?
 	}
 
-	var resp *Response
+	var docID string
 	select {
 	case evt := <-navEvtCh:
 		if e, ok := evt.(*NavigationEvent); ok {
@@ -728,12 +738,8 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *Frame
 				return nil, e.err
 			}
 
-			req := e.newDocument.request
-			// Request could be nil in case of navigation to e.g. BlankPage.
-			if req != nil {
-				req.responseMu.RLock()
-				resp = req.response
-				req.responseMu.RUnlock()
+			if e.newDocument != nil {
+				docID = e.newDocument.documentID
 			}
 		}
 	case <-timeoutCtx.Done():
@@ -746,7 +752,7 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *Frame
 		return nil, wrapTimeoutError(ContextErr(timeoutCtx))
 	}
 
-	return resp, nil
+	return frame.responseByDocumentID(docID), nil
 }
 
 // Page returns the page that this frame manager belongs to.
