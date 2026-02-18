@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"io"
 	stdlog "log"
+	"os"
 	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/grafana/sobek"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -164,9 +166,25 @@ func (c *rootCommand) execute() {
 	c.globalState.Ctx = ctx
 
 	exitCode := -1
+	f, err := os.CreateTemp(".", "sobek.profile")
+	defer f.Close()
+	if err != nil {
+		fmt.Println(err)
+		panic(err)
+	}
+	err = sobek.StartProfile(f)
+	if err != nil {
+		fmt.Println(err)
+		panic(err)
+	}
 	defer func() {
 		cancel()
+		sobek.StopProfile()
+		time.Sleep(time.Second * 5)
+		fmt.Println("here")
 		c.stopLoggers()
+		fmt.Println(f.Close())
+
 		c.globalState.OSExit(exitCode)
 	}()
 
@@ -181,7 +199,7 @@ func (c *rootCommand) execute() {
 		}
 	}()
 
-	err := c.cmd.Execute()
+	err = c.cmd.Execute()
 	if err == nil {
 		exitCode = 0
 		return
