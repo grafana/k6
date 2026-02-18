@@ -26,7 +26,9 @@ type ValidateOptionsRequest struct {
 	// k6 script options object to validate.
 	Options Options `json:"options"`
 	// Version of k6 and extensions to validate, as a map of dependency name to dependency version constraint.
-	K6Dependencies       map[string]string `json:"k6_dependencies,omitempty"`
+	K6Dependencies map[string]string `json:"k6_dependencies,omitempty"`
+	// Whether the test is being executed locally.
+	IsLocalExecution     *bool `json:"is_local_execution,omitempty"`
 	AdditionalProperties map[string]interface{}
 }
 
@@ -39,6 +41,8 @@ type _ValidateOptionsRequest ValidateOptionsRequest
 func NewValidateOptionsRequest(options Options) *ValidateOptionsRequest {
 	this := ValidateOptionsRequest{}
 	this.Options = options
+	var isLocalExecution bool = false
+	this.IsLocalExecution = &isLocalExecution
 	return &this
 }
 
@@ -47,6 +51,8 @@ func NewValidateOptionsRequest(options Options) *ValidateOptionsRequest {
 // but it doesn't guarantee that properties required by API are set
 func NewValidateOptionsRequestWithDefaults() *ValidateOptionsRequest {
 	this := ValidateOptionsRequest{}
+	var isLocalExecution bool = false
+	this.IsLocalExecution = &isLocalExecution
 	return &this
 }
 
@@ -149,6 +155,38 @@ func (o *ValidateOptionsRequest) SetK6Dependencies(v map[string]string) {
 	o.K6Dependencies = v
 }
 
+// GetIsLocalExecution returns the IsLocalExecution field value if set, zero value otherwise.
+func (o *ValidateOptionsRequest) GetIsLocalExecution() bool {
+	if o == nil || IsNil(o.IsLocalExecution) {
+		var ret bool
+		return ret
+	}
+	return *o.IsLocalExecution
+}
+
+// GetIsLocalExecutionOk returns a tuple with the IsLocalExecution field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ValidateOptionsRequest) GetIsLocalExecutionOk() (*bool, bool) {
+	if o == nil || IsNil(o.IsLocalExecution) {
+		return nil, false
+	}
+	return o.IsLocalExecution, true
+}
+
+// HasIsLocalExecution returns a boolean if a field has been set.
+func (o *ValidateOptionsRequest) HasIsLocalExecution() bool {
+	if o != nil && !IsNil(o.IsLocalExecution) {
+		return true
+	}
+
+	return false
+}
+
+// SetIsLocalExecution gets a reference to the given bool and assigns it to the IsLocalExecution field.
+func (o *ValidateOptionsRequest) SetIsLocalExecution(v bool) {
+	o.IsLocalExecution = &v
+}
+
 func (o ValidateOptionsRequest) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -165,6 +203,9 @@ func (o ValidateOptionsRequest) ToMap() (map[string]interface{}, error) {
 	toSerialize["options"] = o.Options
 	if !IsNil(o.K6Dependencies) {
 		toSerialize["k6_dependencies"] = o.K6Dependencies
+	}
+	if !IsNil(o.IsLocalExecution) {
+		toSerialize["is_local_execution"] = o.IsLocalExecution
 	}
 
 	for key, value := range o.AdditionalProperties {
@@ -212,6 +253,7 @@ func (o *ValidateOptionsRequest) UnmarshalJSON(data []byte) (err error) {
 		delete(additionalProperties, "project_id")
 		delete(additionalProperties, "options")
 		delete(additionalProperties, "k6_dependencies")
+		delete(additionalProperties, "is_local_execution")
 		o.AdditionalProperties = additionalProperties
 	}
 

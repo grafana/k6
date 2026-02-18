@@ -30,6 +30,7 @@ type ApiLoadTestsTestRunsRetrieveRequest struct {
 	xStackId      *int32
 	id            int32
 	count         *bool
+	orderby       *string
 	skip          *int32
 	top           *int32
 	createdAfter  *time.Time
@@ -45,6 +46,12 @@ func (r *ApiLoadTestsTestRunsRetrieveRequest) XStackId(xStackId int32) *ApiLoadT
 // Include collection length in the response object as &#x60;@count&#x60;.
 func (r *ApiLoadTestsTestRunsRetrieveRequest) Count(count bool) *ApiLoadTestsTestRunsRetrieveRequest {
 	r.count = &count
+	return r
+}
+
+// Comma-separated list of fields to use when ordering the results. Available fields: - created  The default ascending order can be reversed by appending the &#x60;desc&#x60; specifier.
+func (r *ApiLoadTestsTestRunsRetrieveRequest) Orderby(orderby string) *ApiLoadTestsTestRunsRetrieveRequest {
+	r.orderby = &orderby
 	return r
 }
 
@@ -121,6 +128,9 @@ func (a *TestRunsAPIService) LoadTestsTestRunsRetrieveExecute(r *ApiLoadTestsTes
 
 	if r.count != nil {
 		parameterAddToHeaderOrQuery(localVarQueryParams, "$count", r.count, "form", "")
+	}
+	if r.orderby != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "$orderby", r.orderby, "form", "")
 	}
 	if r.skip != nil {
 		parameterAddToHeaderOrQuery(localVarQueryParams, "$skip", r.skip, "form", "")

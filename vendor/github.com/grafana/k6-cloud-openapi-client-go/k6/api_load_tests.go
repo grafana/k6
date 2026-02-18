@@ -1244,15 +1244,22 @@ func (a *LoadTestsAPIService) LoadTestsScriptUpdateExecute(r *ApiLoadTestsScript
 }
 
 type ApiLoadTestsStartRequest struct {
-	ctx        context.Context
-	ApiService *LoadTestsAPIService
-	xStackId   *int32
-	id         int32
+	ctx              context.Context
+	ApiService       *LoadTestsAPIService
+	xStackId         *int32
+	id               int32
+	k6IdempotencyKey *string
 }
 
 // Numeric ID of the Grafana stack representing the request scope. - If the API is called with a *Personal API token*, the user must be a member of the specified stack. - If the API is called with a *Grafana Stack API token*, the value must be the ID of the corresponding stack.
 func (r *ApiLoadTestsStartRequest) XStackId(xStackId int32) *ApiLoadTestsStartRequest {
 	r.xStackId = &xStackId
+	return r
+}
+
+// Idempotency key to prevent duplicate test starts when retrying requests. The key is valid for 10 minutes.
+func (r *ApiLoadTestsStartRequest) K6IdempotencyKey(k6IdempotencyKey string) *ApiLoadTestsStartRequest {
+	r.k6IdempotencyKey = &k6IdempotencyKey
 	return r
 }
 
@@ -1321,6 +1328,9 @@ func (a *LoadTestsAPIService) LoadTestsStartExecute(r *ApiLoadTestsStartRequest)
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}
 	parameterAddToHeaderOrQuery(localVarHeaderParams, "X-Stack-Id", r.xStackId, "simple", "")
+	if r.k6IdempotencyKey != nil {
+		parameterAddToHeaderOrQuery(localVarHeaderParams, "K6-Idempotency-Key", r.k6IdempotencyKey, "simple", "")
+	}
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -1643,6 +1653,7 @@ type ApiProjectsLoadTestsRetrieveRequest struct {
 	orderby    *string
 	skip       *int32
 	top        *int32
+	name       *string
 }
 
 // Numeric ID of the Grafana stack representing the request scope. - If the API is called with a *Personal API token*, the user must be a member of the specified stack. - If the API is called with a *Grafana Stack API token*, the value must be the ID of the corresponding stack.
@@ -1672,6 +1683,12 @@ func (r *ApiProjectsLoadTestsRetrieveRequest) Skip(skip int32) *ApiProjectsLoadT
 // Number of results to return per page.
 func (r *ApiProjectsLoadTestsRetrieveRequest) Top(top int32) *ApiProjectsLoadTestsRetrieveRequest {
 	r.top = &top
+	return r
+}
+
+// Filter results by load test name (exact match).
+func (r *ApiProjectsLoadTestsRetrieveRequest) Name(name string) *ApiProjectsLoadTestsRetrieveRequest {
+	r.name = &name
 	return r
 }
 
@@ -1736,6 +1753,9 @@ func (a *LoadTestsAPIService) ProjectsLoadTestsRetrieveExecute(r *ApiProjectsLoa
 	} else {
 		var defaultValue int32 = 1000
 		r.top = &defaultValue
+	}
+	if r.name != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "name", r.name, "form", "")
 	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}

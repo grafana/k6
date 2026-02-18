@@ -23,11 +23,8 @@ type PatchLoadTestApiModel struct {
 	// Unique name of the test within the project.
 	Name *string `json:"name,omitempty"`
 	// ID of a baseline test run used for results comparison.
-	BaselineTestRunId    NullableInt32 `json:"baseline_test_run_id,omitempty"`
-	AdditionalProperties map[string]interface{}
+	BaselineTestRunId NullableInt32 `json:"baseline_test_run_id,omitempty"`
 }
-
-type _PatchLoadTestApiModel PatchLoadTestApiModel
 
 // NewPatchLoadTestApiModel instantiates a new PatchLoadTestApiModel object
 // This constructor will assign default values to properties that have it defined,
@@ -137,34 +134,7 @@ func (o PatchLoadTestApiModel) ToMap() (map[string]interface{}, error) {
 	if o.BaselineTestRunId.IsSet() {
 		toSerialize["baseline_test_run_id"] = o.BaselineTestRunId.Get()
 	}
-
-	for key, value := range o.AdditionalProperties {
-		toSerialize[key] = value
-	}
-
 	return toSerialize, nil
-}
-
-func (o *PatchLoadTestApiModel) UnmarshalJSON(data []byte) (err error) {
-	varPatchLoadTestApiModel := _PatchLoadTestApiModel{}
-
-	err = json.Unmarshal(data, &varPatchLoadTestApiModel)
-
-	if err != nil {
-		return err
-	}
-
-	*o = PatchLoadTestApiModel(varPatchLoadTestApiModel)
-
-	additionalProperties := make(map[string]interface{})
-
-	if err = json.Unmarshal(data, &additionalProperties); err == nil {
-		delete(additionalProperties, "name")
-		delete(additionalProperties, "baseline_test_run_id")
-		o.AdditionalProperties = additionalProperties
-	}
-
-	return err
 }
 
 type NullablePatchLoadTestApiModel struct {

@@ -27,11 +27,8 @@ type PatchProjectLimitsRequest struct {
 	// Max number of concurrent browser virtual users (VUs) used in one test.
 	VuBrowserMaxPerTest NullableInt32 `json:"vu_browser_max_per_test,omitempty"`
 	// Max duration of a test in seconds.
-	DurationMaxPerTest   NullableInt32 `json:"duration_max_per_test,omitempty"`
-	AdditionalProperties map[string]interface{}
+	DurationMaxPerTest NullableInt32 `json:"duration_max_per_test,omitempty"`
 }
-
-type _PatchProjectLimitsRequest PatchProjectLimitsRequest
 
 // NewPatchProjectLimitsRequest instantiates a new PatchProjectLimitsRequest object
 // This constructor will assign default values to properties that have it defined,
@@ -244,36 +241,7 @@ func (o PatchProjectLimitsRequest) ToMap() (map[string]interface{}, error) {
 	if o.DurationMaxPerTest.IsSet() {
 		toSerialize["duration_max_per_test"] = o.DurationMaxPerTest.Get()
 	}
-
-	for key, value := range o.AdditionalProperties {
-		toSerialize[key] = value
-	}
-
 	return toSerialize, nil
-}
-
-func (o *PatchProjectLimitsRequest) UnmarshalJSON(data []byte) (err error) {
-	varPatchProjectLimitsRequest := _PatchProjectLimitsRequest{}
-
-	err = json.Unmarshal(data, &varPatchProjectLimitsRequest)
-
-	if err != nil {
-		return err
-	}
-
-	*o = PatchProjectLimitsRequest(varPatchProjectLimitsRequest)
-
-	additionalProperties := make(map[string]interface{})
-
-	if err = json.Unmarshal(data, &additionalProperties); err == nil {
-		delete(additionalProperties, "vuh_max_per_month")
-		delete(additionalProperties, "vu_max_per_test")
-		delete(additionalProperties, "vu_browser_max_per_test")
-		delete(additionalProperties, "duration_max_per_test")
-		o.AdditionalProperties = additionalProperties
-	}
-
-	return err
 }
 
 type NullablePatchProjectLimitsRequest struct {

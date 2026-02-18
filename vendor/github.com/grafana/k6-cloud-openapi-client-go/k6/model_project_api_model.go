@@ -33,7 +33,9 @@ type ProjectApiModel struct {
 	// The date when the project was created.
 	Created time.Time `json:"created"`
 	// The date when the project was last updated.
-	Updated              time.Time `json:"updated"`
+	Updated time.Time `json:"updated"`
+	// Project labels.
+	Labels               map[string]string `json:"labels,omitempty"`
 	AdditionalProperties map[string]interface{}
 }
 
@@ -208,6 +210,38 @@ func (o *ProjectApiModel) SetUpdated(v time.Time) {
 	o.Updated = v
 }
 
+// GetLabels returns the Labels field value if set, zero value otherwise.
+func (o *ProjectApiModel) GetLabels() map[string]string {
+	if o == nil || IsNil(o.Labels) {
+		var ret map[string]string
+		return ret
+	}
+	return o.Labels
+}
+
+// GetLabelsOk returns a tuple with the Labels field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ProjectApiModel) GetLabelsOk() (map[string]string, bool) {
+	if o == nil || IsNil(o.Labels) {
+		return map[string]string{}, false
+	}
+	return o.Labels, true
+}
+
+// HasLabels returns a boolean if a field has been set.
+func (o *ProjectApiModel) HasLabels() bool {
+	if o != nil && !IsNil(o.Labels) {
+		return true
+	}
+
+	return false
+}
+
+// SetLabels gets a reference to the given map[string]string and assigns it to the Labels field.
+func (o *ProjectApiModel) SetLabels(v map[string]string) {
+	o.Labels = v
+}
+
 func (o ProjectApiModel) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -224,6 +258,9 @@ func (o ProjectApiModel) ToMap() (map[string]interface{}, error) {
 	toSerialize["grafana_folder_uid"] = o.GrafanaFolderUid.Get()
 	toSerialize["created"] = o.Created
 	toSerialize["updated"] = o.Updated
+	if !IsNil(o.Labels) {
+		toSerialize["labels"] = o.Labels
+	}
 
 	for key, value := range o.AdditionalProperties {
 		toSerialize[key] = value
@@ -278,6 +315,7 @@ func (o *ProjectApiModel) UnmarshalJSON(data []byte) (err error) {
 		delete(additionalProperties, "grafana_folder_uid")
 		delete(additionalProperties, "created")
 		delete(additionalProperties, "updated")
+		delete(additionalProperties, "labels")
 		o.AdditionalProperties = additionalProperties
 	}
 
