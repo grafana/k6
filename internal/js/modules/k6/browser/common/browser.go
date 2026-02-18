@@ -61,6 +61,9 @@ type Browser struct {
 	pagesMu sync.RWMutex
 	pages   map[target.ID]*Page
 
+	workersMu sync.RWMutex
+	workers   map[target.ID]*Worker
+
 	sessionIDtoTargetIDMu sync.RWMutex
 	sessionIDtoTargetID   map[target.SessionID]target.ID
 
@@ -133,6 +136,7 @@ func newBrowser(
 		browserProc:         browserProc,
 		browserOpts:         browserOpts,
 		pages:               make(map[target.ID]*Page),
+		workers:             make(map[target.ID]*Worker),
 		sessionIDtoTargetID: make(map[target.SessionID]target.ID),
 		logger:              logger,
 	}
@@ -290,9 +294,13 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) error {
 		ev.SessionID, ev.TargetInfo.TargetID, ev.TargetInfo.BrowserContextID)
 
 	var (
-		targetPage = ev.TargetInfo
-		browserCtx = b.getDefaultBrowserContextOrMatchedID(targetPage.BrowserContextID)
+		targetInfo = ev.TargetInfo
+		browserCtx = b.getDefaultBrowserContextOrMatchedID(targetInfo.BrowserContextID)
 	)
+
+	if targetInfo.Type == "shared_worker" {
+		return b.onAttachedToSharedWorkerTarget(ev)
+	}
 
 	if !b.isAttachedPageValid(ev, browserCtx) {
 		return nil // Ignore this page.
@@ -301,28 +309,28 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) error {
 	if session == nil {
 		b.logger.Debugf("Browser:onAttachedToTarget",
 			"session closed before attachToTarget is handled. sid:%v tid:%v",
-			ev.SessionID, targetPage.TargetID)
+			ev.SessionID, targetInfo.TargetID)
 		return nil // ignore
 	}
 
 	var (
-		isPage = targetPage.Type == "page"
+		isPage = targetInfo.Type == "page"
 		opener *Page
 	)
 	// Opener is nil for the initial page.
 	if isPage {
 		b.pagesMu.RLock()
-		if t, ok := b.pages[targetPage.OpenerID]; ok {
+		if t, ok := b.pages[targetInfo.OpenerID]; ok {
 			opener = t
 		}
 		b.pagesMu.RUnlock()
 	}
-	p, err := NewPage(b.vuCtx, session, browserCtx, targetPage.TargetID, opener, isPage, b.logger)
+	p, err := NewPage(b.vuCtx, session, browserCtx, targetInfo.TargetID, opener, isPage, b.logger)
 	if err != nil && b.isPageAttachmentErrorIgnorable(ev, session, err) {
 		return nil // Ignore this page.
 	}
 	if err != nil {
-		return fmt.Errorf("creating a new %s: %w", targetPage.Type, err)
+		return fmt.Errorf("creating a new %s: %w", targetInfo.Type, err)
 	}
 
 	b.attachNewPage(p, ev) // Register the page as an active page.
@@ -332,6 +340,38 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) error {
 	if isPage {
 		browserCtx.emit(EventBrowserContextPage, p)
 	}
+
+	return nil
+}
+
+// onAttachedToSharedWorkerTarget handles worker attachment at Browser level.
+func (b *Browser) onAttachedToSharedWorkerTarget(ev *target.EventAttachedToTarget) error {
+	b.logger.Debugf("Browser:onAttachedToSharedWorkerTarget", "sid:%v tid:%v type:%q url:%q",
+		ev.SessionID, ev.TargetInfo.TargetID, ev.TargetInfo.Type, ev.TargetInfo.URL)
+
+	session := b.conn.getSession(ev.SessionID)
+	if session == nil {
+		b.logger.Debugf("Browser:onAttachedToSharedWorkerTarget:getSession",
+			"session closed before worker attachment. sid:%v tid:%v",
+			ev.SessionID, ev.TargetInfo.TargetID)
+		return nil
+	}
+
+	w, err := NewWorker(b.browserCtx, session, ev.TargetInfo.TargetID, ev.TargetInfo.URL)
+	if err != nil {
+		b.logger.Debugf("Browser:onAttachedToSharedWorkerTarget:NewWorker",
+			"failed to create worker sid:%v tid:%v type:%q err:%v",
+			ev.SessionID, ev.TargetInfo.TargetID, ev.TargetInfo.Type, err)
+		return nil
+	}
+
+	b.workersMu.Lock()
+	b.workers[ev.TargetInfo.TargetID] = w
+	b.workersMu.Unlock()
+
+	b.logger.Debugf("Browser:onAttachedToSharedWorkerTarget:success",
+		"stored %s sid:%v url:%q",
+		ev.TargetInfo.Type, ev.SessionID, w.URL())
 
 	return nil
 }
@@ -434,19 +474,26 @@ func (b *Browser) isPageAttachmentErrorIgnorable(ev *target.EventAttachedToTarge
 }
 
 // onDetachedFromTarget event can be issued multiple times per target if multiple
-// sessions have been attached to it. So we'll remove the page only once.
+// sessions have been attached to it. So we'll remove the page/worker only once.
 func (b *Browser) onDetachedFromTarget(ev *target.EventDetachedFromTarget) {
 	b.sessionIDtoTargetIDMu.RLock()
 	targetID, ok := b.sessionIDtoTargetID[ev.SessionID]
+	b.sessionIDtoTargetIDMu.RUnlock()
 
 	b.logger.Debugf("Browser:onDetachedFromTarget", "sid:%v tid:%v", ev.SessionID, targetID)
 	defer b.logger.Debugf("Browser:onDetachedFromTarget:return", "sid:%v tid:%v", ev.SessionID, targetID)
 
-	b.sessionIDtoTargetIDMu.RUnlock()
 	if !ok {
 		// We don't track targets of type "browser", "other" and "devtools",
 		// so ignore if we don't recognize target.
 		return
+	}
+
+	b.workersMu.Lock()
+	defer b.workersMu.Unlock()
+	if _, ok := b.workers[targetID]; ok {
+		b.logger.Debugf("Browser:onDetachedFromTarget:deleteWorker", "sid:%v tid:%v", ev.SessionID, targetID)
+		delete(b.workers, targetID)
 	}
 
 	b.pagesMu.Lock()
