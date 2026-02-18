@@ -114,7 +114,7 @@ func TestOutput(t *testing.T) {
 		rw.WriteHeader(http.StatusNoContent)
 	}, func(_ testing.TB, c *Output) {
 		samples := make(metrics.Samples, 10)
-		for i := 0; i < len(samples); i++ {
+		for i := range samples {
 			samples[i] = metrics.Sample{
 				TimeSeries: metrics.TimeSeries{
 					Metric: metric,
@@ -152,7 +152,7 @@ func TestOutputFlushMetricsConcurrency(t *testing.T) {
 	}))
 	defer func() {
 		// unlock the server
-		for i := 0; i < 4; i++ {
+		for range 4 {
 			<-block
 		}
 		close(block)
@@ -169,7 +169,7 @@ func TestOutputFlushMetricsConcurrency(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		select {
 		case o.semaphoreCh <- struct{}{}:
 			<-o.semaphoreCh
@@ -208,7 +208,7 @@ func TestExtractTagsToValues(t *testing.T) {
 		"floatField":   "3.14",
 		"intField":     "12345",
 	}
-	values := o.extractTagsToValues(tags, map[string]interface{}{})
+	values := o.extractTagsToValues(tags, map[string]any{})
 
 	require.Equal(t, "string", values["stringField"])
 	require.Equal(t, "string2", values["stringField2"])

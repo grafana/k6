@@ -124,7 +124,7 @@ func TestInvoke(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, codes.OK, res.Status)
-	assert.Equal(t, map[string]interface{}{"reply": "text reply"}, res.Message)
+	assert.Equal(t, map[string]any{"reply": "text reply"}, res.Message)
 	assert.Empty(t, res.Error)
 }
 
@@ -189,7 +189,7 @@ func TestInvokeReturnError(t *testing.T) {
 
 	assert.Equal(t, codes.Unknown, res.Status)
 	assert.NotEmpty(t, res.Error)
-	assert.Equal(t, map[string]interface{}{"reply": ""}, res.Message)
+	assert.Equal(t, map[string]any{"reply": ""}, res.Message)
 }
 
 func TestConnInvokeInvalid(t *testing.T) {
@@ -313,7 +313,7 @@ message Empty {
 // invokemock is a mock for the grpc connection supporting only unary requests.
 type invokemock func(in, out *dynamicpb.Message, opts ...grpc.CallOption) error
 
-func (im invokemock) Invoke(_ context.Context, _ string, payload interface{}, reply interface{}, opts ...grpc.CallOption) error {
+func (im invokemock) Invoke(_ context.Context, _ string, payload any, reply any, opts ...grpc.CallOption) error {
 	in, ok := payload.(*dynamicpb.Message)
 	if !ok {
 		return fmt.Errorf("unexpected type for payload")

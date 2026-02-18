@@ -575,7 +575,7 @@ func TestOptionsEnv(t *testing.T) {
 		return p
 	}
 
-	testdata := map[struct{ Name, Key string }]map[string]interface{}{
+	testdata := map[struct{ Name, Key string }]map[string]any{
 		{"Paused", "K6_PAUSED"}: {
 			"":      null.Bool{},
 			"true":  null.BoolFrom(true),

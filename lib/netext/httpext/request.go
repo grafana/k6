@@ -186,7 +186,7 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 
 	if state.Options.HTTPDebug.String != "" {
 		// Combine tags with common log fields
-		combinedLogFields := map[string]interface{}{"source": "http-debug", "vu": state.VUID, "iter": state.Iteration}
+		combinedLogFields := map[string]any{"source": "http-debug", "vu": state.VUID, "iter": state.Iteration}
 		for k, v := range preq.TagsAndMeta.Metadata {
 			if _, present := combinedLogFields[k]; !present {
 				combinedLogFields[k] = v

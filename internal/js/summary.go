@@ -35,18 +35,18 @@ var summaryWrapperLambdaCode string
 // in code), as that's one of the characteristics of JS objects while it doesn't apply to Go maps (not preserved).
 // TODO: Map "checks" into a JS object to get rid of "OrderedChecks" and remove that logic from summary.js.
 // TODO: Explore if it's possible to apply the same idea with Thresholds, in order to preserve order from code.
-func summarizeReportToObject(rt *sobek.Runtime, s *summary.Summary) (map[string]interface{}, error) {
+func summarizeReportToObject(rt *sobek.Runtime, s *summary.Summary) (map[string]any, error) {
 	// We use a JS object to preserve insertion order of groups, so we don't need to pass
 	// an extra array with the order of groups, but just an object.
 	var mapGroups func(groups map[string]summary.Group, sorted []string) (*sobek.Object, error)
 
-	mapGroup := func(g summary.Group) (map[string]interface{}, error) {
+	mapGroup := func(g summary.Group) (map[string]any, error) {
 		gGroupsObj, err := mapGroups(g.Groups, g.GroupsOrder)
 		if err != nil {
 			return nil, err
 		}
 
-		groupObj := make(map[string]interface{})
+		groupObj := make(map[string]any)
 		groupObj["checks"] = g.Checks
 		groupObj["metrics"] = g.Metrics
 		groupObj["groups"] = gGroupsObj
@@ -127,16 +127,16 @@ func metricValueGetter(summaryTrendStats []string) func(metrics.Sink, time.Durat
 
 // summarizeMetricsToObject transforms the summary objects in a way that's
 // suitable to pass to the JS runtime or export to JSON.
-func summarizeMetricsToObject(data *lib.LegacySummary, options lib.Options, setupData []byte) map[string]interface{} {
-	m := make(map[string]interface{})
+func summarizeMetricsToObject(data *lib.LegacySummary, options lib.Options, setupData []byte) map[string]any {
+	m := make(map[string]any)
 	m["root_group"] = exportGroup(data.RootGroup)
-	m["options"] = map[string]interface{}{
+	m["options"] = map[string]any{
 		// TODO: improve when we can easily export all option values, including defaults?
 		"summaryTrendStats": options.SummaryTrendStats,
 		"summaryTimeUnit":   options.SummaryTimeUnit.String,
 		"noColor":           data.NoColor, // TODO: move to the (runtime) options
 	}
-	m["state"] = map[string]interface{}{
+	m["state"] = map[string]any{
 		"isStdOutTTY":       data.UIState.IsStdOutTTY,
 		"isStdErrTTY":       data.UIState.IsStdErrTTY,
 		"testRunDurationMs": float64(data.TestRunDuration) / float64(time.Millisecond),
@@ -144,18 +144,18 @@ func summarizeMetricsToObject(data *lib.LegacySummary, options lib.Options, setu
 
 	getMetricValues := metricValueGetter(options.SummaryTrendStats)
 
-	metricsData := make(map[string]interface{})
+	metricsData := make(map[string]any)
 	for name, m := range data.Metrics {
-		metricData := map[string]interface{}{
+		metricData := map[string]any{
 			"type":     m.Type.String(),
 			"contains": m.Contains.String(),
 			"values":   getMetricValues(m.Sink, data.TestRunDuration),
 		}
 
 		if len(m.Thresholds.Thresholds) > 0 {
-			thresholds := make(map[string]interface{})
+			thresholds := make(map[string]any)
 			for _, threshold := range m.Thresholds.Thresholds {
-				thresholds[threshold.Source] = map[string]interface{}{
+				thresholds[threshold.Source] = map[string]any{
 					"ok": !threshold.LastFailed,
 				}
 			}
@@ -165,7 +165,7 @@ func summarizeMetricsToObject(data *lib.LegacySummary, options lib.Options, setu
 	}
 	m["metrics"] = metricsData
 
-	var setupDataI interface{}
+	var setupDataI any
 	if setupData != nil {
 		if err := json.Unmarshal(setupData, &setupDataI); err != nil {
 			// TODO: log the error
@@ -180,15 +180,15 @@ func summarizeMetricsToObject(data *lib.LegacySummary, options lib.Options, setu
 	return m
 }
 
-func exportGroup(group *lib.Group) map[string]interface{} {
-	subGroups := make([]map[string]interface{}, len(group.OrderedGroups))
+func exportGroup(group *lib.Group) map[string]any {
+	subGroups := make([]map[string]any, len(group.OrderedGroups))
 	for i, subGroup := range group.OrderedGroups {
 		subGroups[i] = exportGroup(subGroup)
 	}
 
-	checks := make([]map[string]interface{}, len(group.OrderedChecks))
+	checks := make([]map[string]any, len(group.OrderedChecks))
 	for i, check := range group.OrderedChecks {
-		checks[i] = map[string]interface{}{
+		checks[i] = map[string]any{
 			"name":   check.Name,
 			"path":   check.Path,
 			"id":     check.ID,
@@ -197,7 +197,7 @@ func exportGroup(group *lib.Group) map[string]interface{} {
 		}
 	}
 
-	return map[string]interface{}{
+	return map[string]any{
 		"name":   group.Name,
 		"path":   group.Path,
 		"id":     group.ID,
@@ -211,7 +211,7 @@ func getSummaryResult(rawResult sobek.Value) (map[string]io.Reader, error) {
 		return nil, nil //nolint:nilnil // this is actually valid result in this case
 	}
 
-	rawResultMap, ok := rawResult.Export().(map[string]interface{})
+	rawResultMap, ok := rawResult.Export().(map[string]any)
 	if !ok {
 		return nil, fmt.Errorf("handleSummary() should return a map with string keys")
 	}

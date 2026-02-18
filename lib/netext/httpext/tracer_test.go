@@ -282,7 +282,7 @@ func TestCancelledRequest(t *testing.T) {
 	// This Run will not return until the parallel subtests complete.
 	t.Run("group", func(t *testing.T) {
 		t.Parallel()
-		for i := 0; i < 200; i++ {
+		for i := range 200 {
 			t.Run(fmt.Sprintf("TestCancelledRequest_%d", i),
 				func(t *testing.T) {
 					t.Parallel()

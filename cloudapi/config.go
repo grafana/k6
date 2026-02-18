@@ -6,8 +6,9 @@ import (
 	"time"
 
 	"github.com/mstoykov/envconfig"
-	"go.k6.io/k6/lib/types"
 	"gopkg.in/guregu/null.v3"
+
+	"go.k6.io/k6/lib/types"
 )
 
 // LegacyCloudConfigKey is the key used in the JSON config for the cloud output.
@@ -18,9 +19,9 @@ const LegacyCloudConfigKey = "loadimpact"
 //nolint:lll
 type Config struct {
 	// TODO: refactor common stuff between cloud execution and output
-	StackID          null.Int    `json:"stackID,omitempty" envconfig:"K6_CLOUD_STACK_ID"`
-	StackURL         null.String `json:"stackURL,omitempty" envconfig:"K6_CLOUD_STACK_URL"`
-	DefaultProjectID null.Int    `json:"defaultProjectID,omitempty"`
+	StackID          null.Int    `json:"stackID" envconfig:"K6_CLOUD_STACK_ID"`
+	StackURL         null.String `json:"stackURL" envconfig:"K6_CLOUD_STACK_URL"`
+	DefaultProjectID null.Int    `json:"defaultProjectID"`
 	Token            null.String `json:"token" envconfig:"K6_CLOUD_TOKEN"`
 	ProjectID        null.Int    `json:"projectID" envconfig:"K6_CLOUD_PROJECT_ID"`
 	Name             null.String `json:"name" envconfig:"K6_CLOUD_NAME"`
@@ -284,12 +285,12 @@ func mergeFromCloudOptionAndExternal(
 // order for this to happen, we shouldn't actually marshal cloud.Config on top of it, because
 // it will be missing some fields that aren't actually mentioned in the struct.
 // So in order for use to copy the fields that we need for k6 cloud's api we unmarshal in
-// map[string]interface{} and copy what we need if it isn't set already
+// map[string]any and copy what we need if it isn't set already
 func GetTemporaryCloudConfig(
 	cloudConfig json.RawMessage,
 	external map[string]json.RawMessage,
-) (map[string]interface{}, error) {
-	tmpCloudConfig := make(map[string]interface{}, 3)
+) (map[string]any, error) {
+	tmpCloudConfig := make(map[string]any, 3)
 
 	source := pickSource(cloudConfig, external)
 	if source == nil {

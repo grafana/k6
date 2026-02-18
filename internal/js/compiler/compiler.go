@@ -215,7 +215,7 @@ func (ps *parsingState) updateInlineSourceMap(code string, index int) (string, e
 // required file in a function to support/emulate commonjs
 func (ps *parsingState) increaseMappingsByOne(sourceMap []byte) ([]byte, error) {
 	var err error
-	m := make(map[string]interface{})
+	m := make(map[string]any)
 	if err = json.Unmarshal(sourceMap, &m); err != nil {
 		return nil, err
 	}

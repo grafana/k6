@@ -58,7 +58,7 @@ func (f *metricsFlusher) flush() error {
 	}()
 
 	msb := newMetricSetBuilder(f.testRunID, f.aggregationPeriodInSeconds)
-	for i := 0; i < len(buckets); i++ {
+	for i := range buckets {
 		for timeSeries, sink := range buckets[i].Sinks {
 			msb.addTimeSeries(buckets[i].Time, timeSeries, sink)
 			if len(msb.seriesIndex) < f.maxSeriesInBatch {
@@ -106,7 +106,7 @@ func (f *metricsFlusher) flushBatches(batches []*pbcloud.MetricSet) error {
 	}
 
 outer:
-	for i := 0; i < len(batches); i++ {
+	for i := range batches {
 		select {
 		case err := <-errs:
 			workers--

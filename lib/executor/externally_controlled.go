@@ -245,7 +245,7 @@ func (mex *ExternallyControlled) SetPaused(paused bool) error {
 // possible to update the configuration even when k6 is paused, either in the
 // beginning (i.e. when running k6 with --paused) or in the middle of the script
 // execution.
-func (mex *ExternallyControlled) UpdateConfig(ctx context.Context, newConf interface{}) error {
+func (mex *ExternallyControlled) UpdateConfig(ctx context.Context, newConf any) error {
 	newConfigParams, ok := newConf.(ExternallyControlledConfigParams)
 	if !ok {
 		return errors.New("invalid config type")
@@ -575,14 +575,14 @@ func (mex *ExternallyControlled) Run(parentCtx context.Context, _ chan<- metrics
 			}
 			activeVUs := currentControlConfig.VUs.Int64
 			if pauseEvent.isPaused {
-				for i := int64(0); i < activeVUs; i++ {
+				for i := range activeVUs {
 					runState.vuHandles[i].gracefulStop()
 				}
-				for i := int64(0); i < activeVUs; i++ {
+				for i := range activeVUs {
 					runState.vuHandles[i].wg.Wait()
 				}
 			} else {
-				for i := int64(0); i < activeVUs; i++ {
+				for i := range activeVUs {
 					if err := runState.vuHandles[i].start(); err != nil {
 						// TODO again ... just log it?
 						pauseEvent.err <- err

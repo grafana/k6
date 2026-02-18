@@ -9,12 +9,12 @@ import (
 // NullSetupData is wrapper around null to satisfy jsonapi
 type NullSetupData struct {
 	SetupData
-	Data interface{} `json:"data,omitempty" yaml:"data"`
+	Data any `json:"data,omitempty" yaml:"data"`
 }
 
 // SetupData is just a simple wrapper to satisfy jsonapi
 type SetupData struct {
-	Data interface{} `json:"data" yaml:"data"`
+	Data any `json:"data" yaml:"data"`
 }
 
 func handleSetupDataOutput(rw http.ResponseWriter, setupData json.RawMessage) {
@@ -48,7 +48,7 @@ func handleSetSetupData(cs *ControlSurface, rw http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	var data interface{}
+	var data any
 	if len(body) > 0 {
 		if err := json.Unmarshal(body, &data); err != nil {
 			apiError(rw, "Error parsing request body", err.Error(), http.StatusBadRequest)

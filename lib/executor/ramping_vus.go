@@ -369,10 +369,7 @@ func (vlvc RampingVUsConfig) reserveVUsForGracefulRampDowns(
 		skippedToNewRawStep := false
 		timeOffsetWithTimeout := rawStep.TimeOffset + gracefulRampDownPeriod
 
-		advStepStart := rawStepNum + 1
-		if lastDownwardSlopeStepNum > advStepStart {
-			advStepStart = lastDownwardSlopeStepNum
-		}
+		advStepStart := max(lastDownwardSlopeStepNum, rawStepNum+1)
 
 		wasRampingDown := true
 		for advStepNum := advStepStart; advStepNum < rawStepsLen; advStepNum++ {
@@ -731,7 +728,7 @@ func validateTargetShifts(startVUs int64, stages []Stage) []error {
 			"the startVUs exceed max limit of %d", maxConcurrentVUs))
 	}
 
-	for i := 0; i < len(stages); i++ {
+	for i := range stages {
 		if stages[i].Target.Int64 > int64(maxConcurrentVUs) {
 			errors = append(errors, fmt.Errorf(
 				"target for stage %d exceeds max limit of %d", i+1, maxConcurrentVUs))
