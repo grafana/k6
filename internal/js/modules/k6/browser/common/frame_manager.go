@@ -720,7 +720,10 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *Frame
 		return err // TODO maybe wrap this as well?
 	}
 
-	var resp *Response
+	var (
+		request *Request
+		resp    *Response
+	)
 	select {
 	case evt := <-navEvtCh:
 		if e, ok := evt.(*NavigationEvent); ok {
@@ -728,12 +731,13 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *Frame
 				return nil, e.err
 			}
 
-			req := e.newDocument.request
-			// Request could be nil in case of navigation to e.g. BlankPage.
-			if req != nil {
-				req.responseMu.RLock()
-				resp = req.response
-				req.responseMu.RUnlock()
+			if e.newDocument != nil {
+				request = frame.requestByDocumentID(e.newDocument.documentID)
+			}
+			if request != nil {
+				request.responseMu.RLock()
+				resp = request.response
+				request.responseMu.RUnlock()
 			}
 		}
 	case <-timeoutCtx.Done():

@@ -317,6 +317,24 @@ func (f *Frame) hasLifecycleEventFired(event LifecycleEvent) bool {
 	return f.lifecycleEvents[event]
 }
 
+func (f *Frame) requestByDocumentID(id string) *Request {
+	if id == "" {
+		return nil
+	}
+
+	f.documentMu.RLock()
+	defer f.documentMu.RUnlock()
+
+	if f.pendingDocument.is(id) {
+		return f.pendingDocument.request
+	}
+	if f.currentDocument.is(id) {
+		return f.currentDocument.request
+	}
+
+	return nil
+}
+
 func (f *Frame) navigated(name string, url string, loaderID string) {
 	f.log.Debugf("Frame:navigated", "fid:%s furl:%q lid:%s name:%q url:%q", f.ID(), f.URL(), loaderID, name, url)
 
