@@ -720,7 +720,7 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *Frame
 		return err // TODO maybe wrap this as well?
 	}
 
-	var resp *Response
+	var docID string
 	select {
 	case evt := <-navEvtCh:
 		if e, ok := evt.(*NavigationEvent); ok {
@@ -729,7 +729,7 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *Frame
 			}
 
 			if e.newDocument != nil {
-				resp = frame.responseByDocumentID(e.newDocument.documentID)
+				docID = e.newDocument.documentID
 			}
 		}
 	case <-timeoutCtx.Done():
@@ -742,7 +742,7 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *Frame
 		return nil, wrapTimeoutError(ContextErr(timeoutCtx))
 	}
 
-	return resp, nil
+	return frame.responseByDocumentID(docID), nil
 }
 
 // Page returns the page that this frame manager belongs to.
