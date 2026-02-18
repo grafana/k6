@@ -532,7 +532,17 @@ func (m *FrameManager) requestStarted(req *Request) {
 	frame.addRequest(req.getID())
 	if req.documentID != "" {
 		frame.documentMu.Lock()
-		frame.pendingDocument = &DocumentInfo{documentID: req.documentID, request: req}
+		switch {
+		case frame.currentDocument.is(req.documentID):
+			frame.currentDocument.request = req
+			if frame.pendingDocument.is(req.documentID) {
+				frame.pendingDocument = nil
+			}
+		case frame.pendingDocument.is(req.documentID):
+			frame.pendingDocument.request = req
+		default:
+			frame.pendingDocument = &DocumentInfo{documentID: req.documentID, request: req}
+		}
 		frame.documentMu.Unlock()
 	}
 
