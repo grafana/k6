@@ -19,16 +19,15 @@ const (
 	iframeID         = "frameB"
 )
 
+// Keep this matrix-style browser test sequential. In low-parallel environments
+// (for example GOMAXPROCS=1 on ARM CI), nested t.Parallel() can lead to
+// unstable timeouts while launching many browser instances.
 func TestGetByRoleSuccess(t *testing.T) {
-	t.Parallel()
-
 	// This test all the implicit roles that are valid for the role-based
 	// selector engine that is in the injected_script.js file. Implicit roles
 	// are roles that are not explicitly defined in the HTML, but are
 	// implied by the context of the element.
 	t.Run("implicit", func(t *testing.T) {
-		t.Parallel()
-
 		tests := []struct {
 			name         string
 			role         string
@@ -435,8 +434,6 @@ func TestGetByRoleSuccess(t *testing.T) {
 		}
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
-
 				tb := newTestBrowser(t, withFileServer())
 				staticURL := tb.staticURL("get_by_role_implicit.html")
 				tb.withIFrameURL(staticURL, iframeID)
@@ -475,8 +472,6 @@ func TestGetByRoleSuccess(t *testing.T) {
 	// are roles that are explicitly defined in the HTML using the correct
 	// role attribute.
 	t.Run("explicit", func(t *testing.T) {
-		t.Parallel()
-
 		tests := []struct {
 			role         string
 			expected     int
@@ -567,8 +562,6 @@ func TestGetByRoleSuccess(t *testing.T) {
 		}
 		for _, tt := range tests {
 			t.Run(tt.role, func(t *testing.T) {
-				t.Parallel()
-
 				tb := newTestBrowser(t, withFileServer())
 				staticURL := tb.staticURL("get_by_role_explicit.html")
 				tb.withIFrameURL(staticURL, iframeID)
@@ -604,8 +597,6 @@ func TestGetByRoleSuccess(t *testing.T) {
 		// We test the 'document' role independently, because the expectations
 		// for each getByRole implementation (page, frame, locator) are different:
 		t.Run("document", func(t *testing.T) {
-			t.Parallel()
-
 			tb := newTestBrowser(t, withFileServer())
 			staticURL := tb.staticURL("get_by_role_explicit.html")
 			tb.withIFrameURL(staticURL, iframeID)
@@ -643,8 +634,6 @@ func TestGetByRoleSuccess(t *testing.T) {
 	// aria attributes vs the text value of an element) that can be used in
 	// the DOM with the same role.
 	t.Run("edge_cases", func(t *testing.T) {
-		t.Parallel()
-
 		tests := []struct {
 			name         string
 			role         string
@@ -769,8 +758,6 @@ func TestGetByRoleSuccess(t *testing.T) {
 		}
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
-
 				tb := newTestBrowser(t, withFileServer())
 				staticURL := tb.staticURL("get_by_role_edge_cases.html")
 				tb.withIFrameURL(staticURL, iframeID)
