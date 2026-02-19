@@ -89,6 +89,8 @@ type NetworkManager struct {
 	userCacheDisabled              bool
 	userReqInterceptionEnabled     bool
 	protocolReqInterceptionEnabled bool
+
+	wg sync.WaitGroup
 }
 
 // NewNetworkManager creates a new network manager.
@@ -218,7 +220,7 @@ func (m *NetworkManager) emitRequestMetrics(req *Request) {
 	}
 	tags = tags.With("resource_type", req.ResourceType())
 
-	k6metrics.PushIfNotDone(m.vu.Context(), state.Samples, k6metrics.ConnectedSamples{
+	pushIfNotDone(m.vu.Context(), m.logger, state.Samples, k6metrics.ConnectedSamples{
 		Samples: []k6metrics.Sample{
 			{
 				TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserDataSent, Tags: tags},
@@ -285,7 +287,7 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 	tags = tags.With("from_service_worker", strconv.FormatBool(fromSvcWrk))
 	tags = tags.With("resource_type", req.ResourceType())
 
-	k6metrics.PushIfNotDone(m.vu.Context(), state.Samples, k6metrics.ConnectedSamples{
+	pushIfNotDone(m.vu.Context(), m.logger, state.Samples, k6metrics.ConnectedSamples{
 		Samples: []k6metrics.Sample{
 			{
 				TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserHTTPReqDuration, Tags: tags},
@@ -301,7 +303,7 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 	})
 
 	if resp != nil && resp.timing != nil {
-		k6metrics.PushIfNotDone(m.vu.Context(), state.Samples, k6metrics.ConnectedSamples{
+		pushIfNotDone(m.vu.Context(), m.logger, state.Samples, k6metrics.ConnectedSamples{
 			Samples: []k6metrics.Sample{
 				{
 					TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserHTTPReqFailed, Tags: tags},
@@ -379,7 +381,9 @@ func (m *NetworkManager) initEvents() {
 		cdproto.EventFetchAuthRequired,
 	}, chHandler)
 
+	m.wg.Add(1)
 	go func() {
+		defer m.wg.Done()
 		for m.handleEvents(chHandler) {
 		}
 	}()
@@ -389,9 +393,13 @@ func (m *NetworkManager) handleEvents(in <-chan Event) bool {
 	select {
 	case <-m.ctx.Done():
 		return false
+	case <-m.session.Done():
+		return false
 	case event := <-in:
 		select {
 		case <-m.ctx.Done():
+			return false
+		case <-m.session.Done():
 			return false
 		default:
 		}
@@ -463,7 +471,11 @@ func (m *NetworkManager) onLoadingFinished(event *network.EventLoadingFinished) 
 	// This happens when the main page request redirects before it finishes loading.
 	// So the new redirect request will be blocked until the main page finishes loading.
 	// The main page will wait forever since its subrequest is blocked.
-	go emitResponseMetrics()
+	m.wg.Add(1)
+	go func() {
+		defer m.wg.Done()
+		emitResponseMetrics()
+	}()
 }
 
 // requestForOnLoadingFinished returns the request for the given request ID.
@@ -1055,4 +1067,8 @@ func (m *NetworkManager) SetCacheEnabled(enabled bool) {
 	if err := m.updateProtocolCacheDisabled(); err != nil {
 		k6ext.Panicf(m.ctx, "%v", err)
 	}
+}
+
+func (m *NetworkManager) wait() {
+	m.wg.Wait()
 }
