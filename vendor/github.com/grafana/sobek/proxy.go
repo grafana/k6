@@ -351,7 +351,7 @@ func (p *proxyObject) preventExtensions(throw bool) bool {
 			p.val.runtime.typeErrorResult(throw, "'preventExtensions' on proxy: trap returned falsish")
 			return false
 		}
-		if te := target.self.isExtensible(); booleanTrapResult && te {
+		if target.self.isExtensible() {
 			panic(p.val.runtime.NewTypeError("'preventExtensions' on proxy: trap returned truish but the proxy target is extensible"))
 		}
 	}
@@ -791,7 +791,7 @@ func (p *proxyObject) proxyOwnKeys() ([]Value, bool) {
 	if v, ok := p.checkHandler().ownKeys(target); ok {
 		keys := p.val.runtime.toObject(v)
 		var keyList []Value
-		keySet := make(map[Value]struct{})
+		var keySet propNameSet
 		l := toLength(keys.self.getStr("length", nil))
 		for k := int64(0); k < l; k++ {
 			item := keys.self.getIdx(valueInt(k), nil)
@@ -800,16 +800,16 @@ func (p *proxyObject) proxyOwnKeys() ([]Value, bool) {
 					panic(p.val.runtime.NewTypeError("%s is not a valid property name", item.String()))
 				}
 			}
-			if _, exists := keySet[item]; exists {
+			if keySet.has(item) {
 				panic(p.val.runtime.NewTypeError("'ownKeys' on proxy: trap returned duplicate entries"))
 			}
 			keyList = append(keyList, item)
-			keySet[item] = struct{}{}
+			keySet.add(item)
 		}
 		ext := target.self.isExtensible()
 		for item, next := target.self.iterateKeys()(); next != nil; item, next = next() {
-			if _, exists := keySet[item.name]; exists {
-				delete(keySet, item.name)
+			if keySet.has(item.name) {
+				keySet.delete(item.name)
 			} else {
 				if !ext {
 					panic(p.val.runtime.NewTypeError("'ownKeys' on proxy: trap result did not include '%s'", item.name.String()))
@@ -825,7 +825,7 @@ func (p *proxyObject) proxyOwnKeys() ([]Value, bool) {
 				}
 			}
 		}
-		if !ext && len(keyList) > 0 && len(keySet) > 0 {
+		if !ext && len(keyList) > 0 && keySet.size() > 0 {
 			panic(p.val.runtime.NewTypeError("'ownKeys' on proxy: trap returned extra keys but proxy target is non-extensible"))
 		}
 

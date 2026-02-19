@@ -144,10 +144,6 @@ func (b *unicodeStringBuilder) Grow(n int) {
 		copy(buf, b.buf)
 		b.buf = buf
 	}
-}
-
-func (b *unicodeStringBuilder) ensureStarted(initialSize int) {
-	b.Grow(initialSize)
 	if len(b.buf) == 0 {
 		b.buf = append(b.buf, unistring.BOM)
 	}
@@ -181,7 +177,7 @@ func (b *unicodeStringBuilder) String() String {
 }
 
 func (b *unicodeStringBuilder) WriteRune(r rune) {
-	b.ensureStarted(2)
+	b.Grow(2)
 	b.writeRuneFast(r)
 }
 
@@ -306,7 +302,7 @@ func (b *StringBuilder) switchToUnicode(extraLen int) {
 		if newCap < c {
 			newCap = c
 		}
-		b.unicodeBuilder.ensureStarted(newCap)
+		b.unicodeBuilder.Grow(newCap)
 		b.unicodeBuilder.writeASCIIString(b.asciiBuilder.String())
 		b.asciiBuilder.Reset()
 	}
