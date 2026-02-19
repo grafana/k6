@@ -106,13 +106,14 @@ func getCmdForExtension(extension *ext.Extension, gs *state.GlobalState) *cobra.
 // dependenciesFromSubcommand constructs a dependencies object for the given subcommand,
 // potentially using the manifest file specified in the global state.
 //
+// Without a manifest, it returns a dependencies object with a single entry for the subcommand
+// with nil version (indicating any version is acceptable).
+//
 // Dependency name is in the format "subcommand:<subcommand name>" to distinguish from
 // other types of dependencies. The builder service can use this information to determine
 // which subcommand is being run and provision the appropriate binary.
 func dependenciesFromSubcommand(gs *state.GlobalState, subcommand string) (dependencies, error) {
 	deps := dependencies{
-		// Any version of the subcommand is fine,
-		// the error is used as a signal for provisioning, not for unsatisfied dependencies.
 		"subcommand:" + subcommand: nil,
 	}
 
