@@ -55,6 +55,8 @@ type testBrowser struct {
 	lookupFunc env.LookupFunc
 	// samples is set by the withSamples option.
 	samples chan k6metrics.SampleContainer
+	// withoutSampleDrain is set by the withSamples option.
+	withoutSampleDrain bool
 	// skipClose is set by the withSkipClose option.
 	skipClose bool
 }
@@ -105,7 +107,11 @@ func newTestBrowser(tb testing.TB, opts ...func(*testBrowser)) *testBrowser {
 func newTestBrowserVU(tb testing.TB, tbr *testBrowser) (_ *k6test.VU, cancel func()) {
 	tb.Helper()
 
-	vu := k6test.NewVU(tb, k6test.WithSamples(tbr.samples))
+	vuOpts := []any{k6test.WithSamples(tbr.samples)}
+	if tbr.withoutSampleDrain {
+		vuOpts = append(vuOpts, k6test.WithoutSampleDrain())
+	}
+	vu := k6test.NewVU(tb, vuOpts...)
 	metricsCtx := k6ext.WithCustomMetrics(
 		vu.Context(),
 		k6ext.RegisterCustomMetrics(k6metrics.NewRegistry()),
@@ -289,7 +295,10 @@ func withLogCache() func(*testBrowser) {
 // withSamples is used to indicate we want to use a bidirectional channel
 // so that the test can read the metrics being emitted to the channel.
 func withSamples(sc chan k6metrics.SampleContainer) func(*testBrowser) {
-	return func(tb *testBrowser) { tb.samples = sc }
+	return func(tb *testBrowser) {
+		tb.samples = sc
+		tb.withoutSampleDrain = true
+	}
 }
 
 // withSkipClose skips calling Browser.Close() in t.Cleanup().

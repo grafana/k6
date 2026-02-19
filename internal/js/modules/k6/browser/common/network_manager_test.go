@@ -287,7 +287,7 @@ func TestNetworkManagerEmitRequestResponseMetricsTimingSkew(t *testing.T) {
 			k6m := k6ext.RegisterCustomMetrics(registry)
 
 			var (
-				vu = k6test.NewVU(t)
+				vu = k6test.NewVU(t, k6test.WithoutSampleDrain())
 				nm = &NetworkManager{ctx: vu.Context(), vu: vu, customMetrics: k6m, eventInterceptor: &EventInterceptorMock{}}
 			)
 			vu.ActivateVU()

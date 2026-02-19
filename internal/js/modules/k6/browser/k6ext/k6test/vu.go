@@ -174,27 +174,65 @@ func ToPromise(tb testing.TB, gv sobek.Value) *sobek.Promise {
 // so that the test can read the metrics being emitted to the channel.
 type WithSamples chan k6metrics.SampleContainer
 
+type withoutSampleDrainOpt struct{}
+
+// WithoutSampleDrain disables the default background samples drainer.
+// Use this when tests need to inspect metrics via AssertSamples.
+func WithoutSampleDrain() any {
+	return withoutSampleDrainOpt{}
+}
+
 // WithTracerProvider allows to set the VU TracerProvider.
 type WithTracerProvider lib.TracerProvider
+
+func registerExitEventCleanup(tb testing.TB, globalEvents *event.System) {
+	tb.Cleanup(func() {
+		waitDone := globalEvents.Emit(&event.Event{
+			Type: event.Exit,
+		})
+		_ = waitDone(context.Background())
+	})
+}
+
+func startSamplesDrain(tb testing.TB, samples chan k6metrics.SampleContainer) {
+	ctx, cancel := context.WithCancel(context.Background())
+	tb.Cleanup(cancel)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case _, ok := <-samples:
+				if !ok {
+					return
+				}
+			}
+		}
+	}()
+}
 
 // NewVU returns a mock k6 VU.
 //
 // opts can be one of the following:
 //   - WithSamples: a bidirectional channel that will be used to emit metrics.
+//   - WithoutSampleDrain: disables the default samples drainer.
 //   - env.LookupFunc: a lookup function that will be used to lookup environment variables.
 //   - WithTracerProvider: a TracerProvider that will be set as the VU TracerProvider.
 func NewVU(tb testing.TB, opts ...any) *VU {
 	tb.Helper()
 
 	var (
-		samples                           = make(chan k6metrics.SampleContainer, 1000)
-		lookupFunc                        = env.EmptyLookup
-		tracerProvider lib.TracerProvider = k6trace.NewNoopTracerProvider()
+		samples            = make(chan k6metrics.SampleContainer, 1000)
+		lookupFunc         = env.EmptyLookup
+		withoutSampleDrain bool
+		tracerProvider     lib.TracerProvider = k6trace.NewNoopTracerProvider()
 	)
 	for _, opt := range opts {
 		switch opt := opt.(type) {
 		case WithSamples:
 			samples = opt
+		case withoutSampleDrainOpt:
+			withoutSampleDrain = true
 		case env.LookupFunc:
 			lookupFunc = opt
 		case WithTracerProvider:
@@ -215,12 +253,12 @@ func NewVU(tb testing.TB, opts ...any) *VU {
 	// (handleIterEvents and handleExitEvent) are properly terminated.
 	// Without this, those goroutines block on channel receives forever,
 	// leaking across tests and eventually causing the test suite to hang.
-	tb.Cleanup(func() {
-		waitDone := globalEvents.Emit(&event.Event{
-			Type: event.Exit,
-		})
-		_ = waitDone(context.Background())
-	})
+	registerExitEventCleanup(tb, globalEvents)
+	// By default, drain metrics in the background to avoid tests blocking on a
+	// full samples buffer. Tests that need to assert metrics can opt out.
+	if !withoutSampleDrain {
+		startSamplesDrain(tb, samples)
+	}
 
 	state := &lib.State{
 		Options: lib.Options{
