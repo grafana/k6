@@ -35,5 +35,20 @@ runs:
       if: ${{contains(inputs.platform, 'arm') }}
       shell: bash
       run: |
-        sudo apt update && sudo apt install chromium-browser
-        chromium --version || true
+        set -euo pipefail
+
+        if command -v chromium >/dev/null 2>&1; then
+          chromium --version || true
+          exit 0
+        fi
+
+        # Installing Chromium via snap avoids failing apt updates when runner images include
+        # third-party apt repos that may be temporarily unavailable.
+        if command -v snap >/dev/null 2>&1; then
+          sudo snap install chromium || sudo snap refresh chromium
+        else
+          sudo apt-get update
+          sudo apt-get install -y chromium-browser
+        fi
+
+        chromium --version
