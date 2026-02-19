@@ -381,7 +381,7 @@ func (r *Runtime) stringproto_localeCompare(call FunctionCall) Value {
 func (r *Runtime) stringproto_match(call FunctionCall) Value {
 	r.checkObjectCoercible(call.This)
 	regexp := call.Argument(0)
-	if regexp != _undefined && regexp != _null {
+	if _, ok := regexp.(*Object); ok {
 		if matcher := toMethod(r.getV(regexp, SymMatch)); matcher != nil {
 			return matcher(FunctionCall{
 				This:      regexp,
@@ -412,14 +412,12 @@ func (r *Runtime) stringproto_match(call FunctionCall) Value {
 func (r *Runtime) stringproto_matchAll(call FunctionCall) Value {
 	r.checkObjectCoercible(call.This)
 	regexp := call.Argument(0)
-	if regexp != _undefined && regexp != _null {
+	if o, ok := regexp.(*Object); ok {
 		if isRegexp(regexp) {
-			if o, ok := regexp.(*Object); ok {
-				flags := nilSafe(o.self.getStr("flags", nil))
-				r.checkObjectCoercible(flags)
-				if !strings.Contains(flags.toString().String(), "g") {
-					panic(r.NewTypeError("RegExp doesn't have global flag set"))
-				}
+			flags := nilSafe(o.self.getStr("flags", nil))
+			r.checkObjectCoercible(flags)
+			if !strings.Contains(flags.toString().String(), "g") {
+				panic(r.NewTypeError("RegExp doesn't have global flag set"))
 			}
 		}
 		if matcher := toMethod(r.getV(regexp, SymMatchAll)); matcher != nil {
@@ -524,7 +522,7 @@ func (r *Runtime) _stringPad(call FunctionCall, start bool) Value {
 		return asciiString(sb.String())
 	}
 	var sb unicodeStringBuilder
-	sb.ensureStarted(toIntStrict(maxLength))
+	sb.Grow(toIntStrict(maxLength))
 	if !start {
 		sb.writeString(s)
 	}
@@ -664,7 +662,7 @@ func (r *Runtime) stringproto_replace(call FunctionCall) Value {
 	r.checkObjectCoercible(call.This)
 	searchValue := call.Argument(0)
 	replaceValue := call.Argument(1)
-	if searchValue != _undefined && searchValue != _null {
+	if _, ok := searchValue.(*Object); ok {
 		if replacer := toMethod(r.getV(searchValue, SymReplace)); replacer != nil {
 			return replacer(FunctionCall{
 				This:      searchValue,
@@ -689,14 +687,12 @@ func (r *Runtime) stringproto_replaceAll(call FunctionCall) Value {
 	r.checkObjectCoercible(call.This)
 	searchValue := call.Argument(0)
 	replaceValue := call.Argument(1)
-	if searchValue != _undefined && searchValue != _null {
+	if o, ok := searchValue.(*Object); ok {
 		if isRegexp(searchValue) {
-			if o, ok := searchValue.(*Object); ok {
-				flags := nilSafe(o.self.getStr("flags", nil))
-				r.checkObjectCoercible(flags)
-				if !strings.Contains(flags.toString().String(), "g") {
-					panic(r.NewTypeError("String.prototype.replaceAll called with a non-global RegExp argument"))
-				}
+			flags := nilSafe(o.self.getStr("flags", nil))
+			r.checkObjectCoercible(flags)
+			if !strings.Contains(flags.toString().String(), "g") {
+				panic(r.NewTypeError("String.prototype.replaceAll called with a non-global RegExp argument"))
 			}
 		}
 		if replacer := toMethod(r.getV(searchValue, SymReplace)); replacer != nil {
@@ -726,7 +722,7 @@ func (r *Runtime) stringproto_replaceAll(call FunctionCall) Value {
 func (r *Runtime) stringproto_search(call FunctionCall) Value {
 	r.checkObjectCoercible(call.This)
 	regexp := call.Argument(0)
-	if regexp != _undefined && regexp != _null {
+	if _, ok := regexp.(*Object); ok {
 		if searcher := toMethod(r.getV(regexp, SymSearch)); searcher != nil {
 			return searcher(FunctionCall{
 				This:      regexp,
@@ -799,7 +795,7 @@ func (r *Runtime) stringproto_split(call FunctionCall) Value {
 	r.checkObjectCoercible(call.This)
 	separatorValue := call.Argument(0)
 	limitValue := call.Argument(1)
-	if separatorValue != _undefined && separatorValue != _null {
+	if _, ok := separatorValue.(*Object); ok {
 		if splitter := toMethod(r.getV(separatorValue, SymSplit)); splitter != nil {
 			return splitter(FunctionCall{
 				This:      separatorValue,

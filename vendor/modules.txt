@@ -190,7 +190,7 @@ github.com/grafana/k6build/pkg/client
 # github.com/grafana/k6provider v0.2.0
 ## explicit; go 1.24.0
 github.com/grafana/k6provider
-# github.com/grafana/sobek v0.0.0-20260121195222-d8d9202018c5
+# github.com/grafana/sobek v0.0.0-20260219184149-bdae4a158e94
 ## explicit; go 1.20
 github.com/grafana/sobek
 github.com/grafana/sobek/ast

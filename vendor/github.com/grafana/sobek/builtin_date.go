@@ -684,24 +684,24 @@ func _dateSetMilliseconds(year, mon, day, hours, min, sec int64, t time.Time, ca
 func (r *Runtime) dateproto_setMilliseconds(call FunctionCall) Value {
 	obj := r.toObject(call.This)
 	if d, ok := obj.self.(*dateObject); ok {
+		tv := d.msec
 		n := call.Argument(0).ToNumber()
+		if tv == timeUnset {
+			return _NaN
+		}
 		if IsNaN(n) {
 			d.unset()
 			return _NaN
 		}
 		msec := n.ToInteger()
-		sec := d.msec / 1e3
+		sec := tv / 1e3
 		var ok bool
 		sec, msec, ok = _norm(sec, msec, 1e3)
 		if !ok {
 			d.unset()
 			return _NaN
 		}
-		if d.isSet() {
-			return d.setTimeMs(sec*1e3 + msec)
-		} else {
-			return _NaN
-		}
+		return d.setTimeMs(sec*1e3 + msec)
 	}
 	panic(r.NewTypeError("Method Date.prototype.setMilliseconds is called on incompatible receiver"))
 }
@@ -709,24 +709,24 @@ func (r *Runtime) dateproto_setMilliseconds(call FunctionCall) Value {
 func (r *Runtime) dateproto_setUTCMilliseconds(call FunctionCall) Value {
 	obj := r.toObject(call.This)
 	if d, ok := obj.self.(*dateObject); ok {
+		tv := d.msec
 		n := call.Argument(0).ToNumber()
+		if tv == timeUnset {
+			return _NaN
+		}
 		if IsNaN(n) {
 			d.unset()
 			return _NaN
 		}
 		msec := n.ToInteger()
-		sec := d.msec / 1e3
+		sec := tv / 1e3
 		var ok bool
 		sec, msec, ok = _norm(sec, msec, 1e3)
 		if !ok {
 			d.unset()
 			return _NaN
 		}
-		if d.isSet() {
-			return d.setTimeMs(sec*1e3 + msec)
-		} else {
-			return _NaN
-		}
+		return d.setTimeMs(sec*1e3 + msec)
 	}
 	panic(r.NewTypeError("Method Date.prototype.setUTCMilliseconds is called on incompatible receiver"))
 }
@@ -734,16 +734,16 @@ func (r *Runtime) dateproto_setUTCMilliseconds(call FunctionCall) Value {
 func (r *Runtime) dateproto_setSeconds(call FunctionCall) Value {
 	obj := r.toObject(call.This)
 	if d, ok := obj.self.(*dateObject); ok {
+		tv := d.msec
 		t, ok := _dateSetFullYear(d.time(), call, -5, false)
 		if !ok {
 			d.unset()
 			return _NaN
 		}
-		if d.isSet() {
-			return d.setTimeMs(timeToMsec(t))
-		} else {
+		if tv == timeUnset {
 			return _NaN
 		}
+		return d.setTimeMs(timeToMsec(t))
 	}
 	panic(r.NewTypeError("Method Date.prototype.setSeconds is called on incompatible receiver"))
 }
@@ -751,16 +751,16 @@ func (r *Runtime) dateproto_setSeconds(call FunctionCall) Value {
 func (r *Runtime) dateproto_setUTCSeconds(call FunctionCall) Value {
 	obj := r.toObject(call.This)
 	if d, ok := obj.self.(*dateObject); ok {
+		tv := d.msec
 		t, ok := _dateSetFullYear(d.timeUTC(), call, -5, true)
 		if !ok {
 			d.unset()
 			return _NaN
 		}
-		if d.isSet() {
-			return d.setTimeMs(timeToMsec(t))
-		} else {
+		if tv == timeUnset {
 			return _NaN
 		}
+		return d.setTimeMs(timeToMsec(t))
 	}
 	panic(r.NewTypeError("Method Date.prototype.setUTCSeconds is called on incompatible receiver"))
 }
@@ -768,16 +768,16 @@ func (r *Runtime) dateproto_setUTCSeconds(call FunctionCall) Value {
 func (r *Runtime) dateproto_setMinutes(call FunctionCall) Value {
 	obj := r.toObject(call.This)
 	if d, ok := obj.self.(*dateObject); ok {
+		tv := d.msec
 		t, ok := _dateSetFullYear(d.time(), call, -4, false)
 		if !ok {
 			d.unset()
 			return _NaN
 		}
-		if d.isSet() {
-			return d.setTimeMs(timeToMsec(t))
-		} else {
+		if tv == timeUnset {
 			return _NaN
 		}
+		return d.setTimeMs(timeToMsec(t))
 	}
 	panic(r.NewTypeError("Method Date.prototype.setMinutes is called on incompatible receiver"))
 }
@@ -785,16 +785,16 @@ func (r *Runtime) dateproto_setMinutes(call FunctionCall) Value {
 func (r *Runtime) dateproto_setUTCMinutes(call FunctionCall) Value {
 	obj := r.toObject(call.This)
 	if d, ok := obj.self.(*dateObject); ok {
+		tv := d.msec
 		t, ok := _dateSetFullYear(d.timeUTC(), call, -4, true)
 		if !ok {
 			d.unset()
 			return _NaN
 		}
-		if d.isSet() {
-			return d.setTimeMs(timeToMsec(t))
-		} else {
+		if tv == timeUnset {
 			return _NaN
 		}
+		return d.setTimeMs(timeToMsec(t))
 	}
 	panic(r.NewTypeError("Method Date.prototype.setUTCMinutes is called on incompatible receiver"))
 }
@@ -802,16 +802,16 @@ func (r *Runtime) dateproto_setUTCMinutes(call FunctionCall) Value {
 func (r *Runtime) dateproto_setHours(call FunctionCall) Value {
 	obj := r.toObject(call.This)
 	if d, ok := obj.self.(*dateObject); ok {
+		tv := d.msec
 		t, ok := _dateSetFullYear(d.time(), call, -3, false)
 		if !ok {
 			d.unset()
 			return _NaN
 		}
-		if d.isSet() {
-			return d.setTimeMs(timeToMsec(t))
-		} else {
+		if tv == timeUnset {
 			return _NaN
 		}
+		return d.setTimeMs(timeToMsec(t))
 	}
 	panic(r.NewTypeError("Method Date.prototype.setHours is called on incompatible receiver"))
 }
@@ -819,16 +819,16 @@ func (r *Runtime) dateproto_setHours(call FunctionCall) Value {
 func (r *Runtime) dateproto_setUTCHours(call FunctionCall) Value {
 	obj := r.toObject(call.This)
 	if d, ok := obj.self.(*dateObject); ok {
+		tv := d.msec
 		t, ok := _dateSetFullYear(d.timeUTC(), call, -3, true)
 		if !ok {
 			d.unset()
 			return _NaN
 		}
-		if d.isSet() {
-			return d.setTimeMs(timeToMsec(t))
-		} else {
+		if tv == timeUnset {
 			return _NaN
 		}
+		return d.setTimeMs(timeToMsec(t))
 	}
 	panic(r.NewTypeError("Method Date.prototype.setUTCHours is called on incompatible receiver"))
 }
@@ -836,16 +836,16 @@ func (r *Runtime) dateproto_setUTCHours(call FunctionCall) Value {
 func (r *Runtime) dateproto_setDate(call FunctionCall) Value {
 	obj := r.toObject(call.This)
 	if d, ok := obj.self.(*dateObject); ok {
+		tv := d.msec
 		t, ok := _dateSetFullYear(d.time(), limitCallArgs(call, 1), -2, false)
 		if !ok {
 			d.unset()
 			return _NaN
 		}
-		if d.isSet() {
-			return d.setTimeMs(timeToMsec(t))
-		} else {
+		if tv == timeUnset {
 			return _NaN
 		}
+		return d.setTimeMs(timeToMsec(t))
 	}
 	panic(r.NewTypeError("Method Date.prototype.setDate is called on incompatible receiver"))
 }
@@ -853,16 +853,16 @@ func (r *Runtime) dateproto_setDate(call FunctionCall) Value {
 func (r *Runtime) dateproto_setUTCDate(call FunctionCall) Value {
 	obj := r.toObject(call.This)
 	if d, ok := obj.self.(*dateObject); ok {
+		tv := d.msec
 		t, ok := _dateSetFullYear(d.timeUTC(), limitCallArgs(call, 1), -2, true)
 		if !ok {
 			d.unset()
 			return _NaN
 		}
-		if d.isSet() {
-			return d.setTimeMs(timeToMsec(t))
-		} else {
+		if tv == timeUnset {
 			return _NaN
 		}
+		return d.setTimeMs(timeToMsec(t))
 	}
 	panic(r.NewTypeError("Method Date.prototype.setUTCDate is called on incompatible receiver"))
 }
@@ -870,16 +870,16 @@ func (r *Runtime) dateproto_setUTCDate(call FunctionCall) Value {
 func (r *Runtime) dateproto_setMonth(call FunctionCall) Value {
 	obj := r.toObject(call.This)
 	if d, ok := obj.self.(*dateObject); ok {
+		tv := d.msec
 		t, ok := _dateSetFullYear(d.time(), limitCallArgs(call, 2), -1, false)
 		if !ok {
 			d.unset()
 			return _NaN
 		}
-		if d.isSet() {
-			return d.setTimeMs(timeToMsec(t))
-		} else {
+		if tv == timeUnset {
 			return _NaN
 		}
+		return d.setTimeMs(timeToMsec(t))
 	}
 	panic(r.NewTypeError("Method Date.prototype.setMonth is called on incompatible receiver"))
 }
@@ -887,16 +887,16 @@ func (r *Runtime) dateproto_setMonth(call FunctionCall) Value {
 func (r *Runtime) dateproto_setUTCMonth(call FunctionCall) Value {
 	obj := r.toObject(call.This)
 	if d, ok := obj.self.(*dateObject); ok {
+		tv := d.msec
 		t, ok := _dateSetFullYear(d.timeUTC(), limitCallArgs(call, 2), -1, true)
 		if !ok {
 			d.unset()
 			return _NaN
 		}
-		if d.isSet() {
-			return d.setTimeMs(timeToMsec(t))
-		} else {
+		if tv == timeUnset {
 			return _NaN
 		}
+		return d.setTimeMs(timeToMsec(t))
 	}
 	panic(r.NewTypeError("Method Date.prototype.setUTCMonth is called on incompatible receiver"))
 }

@@ -1,14 +1,15 @@
 package sobek
 
 import (
-	"github.com/grafana/sobek/unistring"
 	"reflect"
+
+	"github.com/grafana/sobek/unistring"
 )
 
 type destructKeyedSource struct {
 	r        *Runtime
 	wrapped  Value
-	usedKeys map[Value]struct{}
+	usedKeys propNameSet
 }
 
 func newDestructKeyedSource(r *Runtime, wrapped Value) *destructKeyedSource {
@@ -30,10 +31,7 @@ func (d *destructKeyedSource) w() objectImpl {
 }
 
 func (d *destructKeyedSource) recordKey(key Value) {
-	if d.usedKeys == nil {
-		d.usedKeys = make(map[Value]struct{})
-	}
-	d.usedKeys[key] = struct{}{}
+	d.usedKeys.add(key)
 }
 
 func (d *destructKeyedSource) sortLen() int {
@@ -202,7 +200,7 @@ func (i *destructKeyedSourceIter) next() (propIterItem, iterNextFunc) {
 			return item, nil
 		}
 		i.wrapped = next
-		if _, exists := i.d.usedKeys[item.name]; !exists {
+		if !i.d.usedKeys.has(item.name) {
 			return item, i.next
 		}
 	}
@@ -268,7 +266,7 @@ func (d *destructKeyedSource) stringKeys(all bool, accum []Value) []Value {
 func (d *destructKeyedSource) filterUsedKeys(keys []Value) []Value {
 	k := 0
 	for i, key := range keys {
-		if _, exists := d.usedKeys[key]; exists {
+		if d.usedKeys.has(key) {
 			continue
 		}
 		if k != i {
