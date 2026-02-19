@@ -432,17 +432,17 @@ func TestGetByRoleSuccess(t *testing.T) {
 			// 	expected: 1, expectedText: "",
 			// },
 		}
+		tb := newTestBrowser(t, withFileServer())
+		staticURL := tb.staticURL("get_by_role_implicit.html")
+		tb.withIFrameURL(staticURL, iframeID)
+		p := tb.NewPage(nil)
+
+		getByRoleImplementations := getByImplementationsOf[interface {
+			GetByRole(role string, opts *common.GetByRoleOptions) *common.Locator
+		}](p)
+
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				tb := newTestBrowser(t, withFileServer())
-				staticURL := tb.staticURL("get_by_role_implicit.html")
-				tb.withIFrameURL(staticURL, iframeID)
-				p := tb.NewPage(nil)
-
-				getByRoleImplementations := getByImplementationsOf[interface {
-					GetByRole(role string, opts *common.GetByRoleOptions) *common.Locator
-				}](p)
-
 				for implName, impl := range getByRoleImplementations {
 					t.Run(implName, func(t *testing.T) { //nolint:paralleltest
 						if implName == frameLocatorImpl {
@@ -560,17 +560,17 @@ func TestGetByRoleSuccess(t *testing.T) {
 			{role: "treegrid", expected: 1, expectedText: "Tree Grid"},
 			{role: "treeitem", expected: 1, expectedText: "Tree Item"},
 		}
+		tb := newTestBrowser(t, withFileServer())
+		staticURL := tb.staticURL("get_by_role_explicit.html")
+		tb.withIFrameURL(staticURL, iframeID)
+		p := tb.NewPage(nil)
+
+		getByRoleImplementations := getByImplementationsOf[interface {
+			GetByRole(role string, opts *common.GetByRoleOptions) *common.Locator
+		}](p)
+
 		for _, tt := range tests {
 			t.Run(tt.role, func(t *testing.T) {
-				tb := newTestBrowser(t, withFileServer())
-				staticURL := tb.staticURL("get_by_role_explicit.html")
-				tb.withIFrameURL(staticURL, iframeID)
-				p := tb.NewPage(nil)
-
-				getByRoleImplementations := getByImplementationsOf[interface {
-					GetByRole(role string, opts *common.GetByRoleOptions) *common.Locator
-				}](p)
-
 				for implName, impl := range getByRoleImplementations {
 					t.Run(implName, func(t *testing.T) { //nolint:paralleltest
 						if implName == frameLocatorImpl {
@@ -597,15 +597,6 @@ func TestGetByRoleSuccess(t *testing.T) {
 		// We test the 'document' role independently, because the expectations
 		// for each getByRole implementation (page, frame, locator) are different:
 		t.Run("document", func(t *testing.T) {
-			tb := newTestBrowser(t, withFileServer())
-			staticURL := tb.staticURL("get_by_role_explicit.html")
-			tb.withIFrameURL(staticURL, iframeID)
-			p := tb.NewPage(nil)
-
-			getByRoleImplementations := getByImplementationsOf[interface {
-				GetByRole(role string, opts *common.GetByRoleOptions) *common.Locator
-			}](p)
-
 			expectedByImplementation := map[string]int{
 				pageImpl:         2,
 				frameImpl:        2,
@@ -756,17 +747,17 @@ func TestGetByRoleSuccess(t *testing.T) {
 				expected: 1, expectedText: "Combo Options Button",
 			},
 		}
+		tb := newTestBrowser(t, withFileServer())
+		staticURL := tb.staticURL("get_by_role_edge_cases.html")
+		tb.withIFrameURL(staticURL, iframeID)
+		p := tb.NewPage(nil)
+
+		getByRoleImplementations := getByImplementationsOf[interface {
+			GetByRole(role string, opts *common.GetByRoleOptions) *common.Locator
+		}](p)
+
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				tb := newTestBrowser(t, withFileServer())
-				staticURL := tb.staticURL("get_by_role_edge_cases.html")
-				tb.withIFrameURL(staticURL, iframeID)
-				p := tb.NewPage(nil)
-
-				getByRoleImplementations := getByImplementationsOf[interface {
-					GetByRole(role string, opts *common.GetByRoleOptions) *common.Locator
-				}](p)
-
 				for implName, impl := range getByRoleImplementations {
 					t.Run(implName, func(t *testing.T) { //nolint:paralleltest
 						if implName == frameLocatorImpl {
