@@ -1,7 +1,7 @@
 package expv2
 
 import (
-	"sort"
+	"slices"
 
 	"go.k6.io/k6/internal/ds/histogram"
 	"go.k6.io/k6/internal/output/cloud/expv2/pbcloud"
@@ -22,9 +22,7 @@ func histogramAsProto(h *histogram.Hdr, time int64) *pbcloud.TrendHdrValue {
 		for index := range h.Buckets {
 			indexes = append(indexes, index)
 		}
-		sort.Slice(indexes, func(i, j int) bool {
-			return indexes[i] < indexes[j]
-		})
+		slices.Sort(indexes)
 
 		// init the counters
 		counters = make([]uint32, 1, len(h.Buckets))

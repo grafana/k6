@@ -2,6 +2,7 @@ package webcrypto
 
 import (
 	"errors"
+	"slices"
 	"strings"
 
 	"github.com/grafana/sobek"
@@ -109,7 +110,7 @@ var _ CryptoKeyGenerationResult = &CryptoKey{}
 
 // ContainsUsage returns true if the key contains the specified usage.
 func (ck *CryptoKey) ContainsUsage(usage CryptoKeyUsage) bool {
-	return contains(ck.Usages, usage)
+	return slices.Contains(ck.Usages, usage)
 }
 
 // CryptoKeyType represents the type of a key.
@@ -304,22 +305,12 @@ func UsageIntersection(a, b []CryptoKeyUsage) []CryptoKeyUsage {
 	for _, usage := range a {
 		// Note that the intersection algorithm is case-sensitive.
 		// It is also expected to return the occurrence in the a slice "as-is".
-		if contains(b, usage) && !contains(intersection, usage) {
+		if slices.Contains(b, usage) && !slices.Contains(intersection, usage) {
 			intersection = append(intersection, usage)
 		}
 	}
 
 	return intersection
-}
-
-func contains[T comparable](container []T, element T) bool {
-	for _, e := range container {
-		if e == element {
-			return true
-		}
-	}
-
-	return false
 }
 
 // KeyFormat represents the format of a CryptoKey.

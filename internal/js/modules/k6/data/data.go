@@ -61,7 +61,7 @@ func (rm *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 // Exports returns the exports of the data module.
 func (d *Data) Exports() modules.Exports {
 	return modules.Exports{
-		Named: map[string]interface{}{
+		Named: map[string]any{
 			"SharedArray": d.sharedArray,
 		},
 	}

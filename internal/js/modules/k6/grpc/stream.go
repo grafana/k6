@@ -146,7 +146,7 @@ func (s *stream) loop() {
 	}
 }
 
-func (s *stream) queueMessage(msg interface{}) {
+func (s *stream) queueMessage(msg any) {
 	now := time.Now()
 	metrics.PushIfNotDone(s.vu.Context(), s.vu.State().Samples, metrics.Sample{
 		TimeSeries: metrics.TimeSeries{
@@ -414,7 +414,7 @@ type grpcError struct {
 	// Code is a gRPC error code.
 	Code codes.Code `json:"code"`
 	// Details is a list details attached to the error.
-	Details []interface{} `json:"details"`
+	Details []any `json:"details"`
 	// Message is the original error message.
 	Message string `json:"message"`
 }

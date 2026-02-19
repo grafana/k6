@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"maps"
 	"sort"
 	"strings"
 
@@ -224,9 +225,7 @@ func (tm TagsAndMeta) Clone() TagsAndMeta {
 		return res
 	}
 	res.Metadata = make(map[string]string, len(tm.Metadata))
-	for k, v := range tm.Metadata {
-		res.Metadata[k] = v
-	}
+	maps.Copy(res.Metadata, tm.Metadata)
 	return res
 }
 

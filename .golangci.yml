@@ -1,4 +1,4 @@
-# v2.5.0
+# v2.10.1
 # Please don't remove the first line. It uses in CI to determine the golangci version
 version: "2"
 linters:
@@ -39,6 +39,7 @@ linters:
     - lll
     - makezero
     - misspell
+    - modernize
     - nakedret
     - nestif
     - nilerr
@@ -96,6 +97,7 @@ linters:
           - funlen
           - gocognit
           - lll
+          - gosec
         path: _(test|gen)\.go
       - linters:
           - contextcheck
@@ -123,6 +125,9 @@ linters:
       - linters:
           - revive
         text: avoid meaningless package names
+      - linters:
+          - revive
+        text: avoid package names that conflict with Go standard library
     paths:
       - third_party$
       - builtin$

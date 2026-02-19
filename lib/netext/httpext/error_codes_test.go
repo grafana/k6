@@ -276,7 +276,7 @@ func TestDefaultTLSError(t *testing.T) {
 		Timeout: time.Second * 3,
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true, //nolint:gosec
+				InsecureSkipVerify: true,
 			},
 		},
 	}

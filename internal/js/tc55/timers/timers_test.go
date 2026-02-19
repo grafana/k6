@@ -82,7 +82,7 @@ func TestSetTimeoutOrder(t *testing.T) {
 	var log []string
 	require.NoError(t, rt.Set("print", func(s string) { log = append(log, s) }))
 
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		_, err := runtime.RunOnEventLoop(`
 			setTimeout((_) => print("one"), 1);
 			setTimeout((_) => print("two"), 1);
@@ -107,7 +107,7 @@ func TestSetIntervalOrder(t *testing.T) {
 	var log []string
 	require.NoError(t, rt.Set("print", func(s string) { log = append(log, s) }))
 
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		_, err := runtime.RunOnEventLoop(`
 			var one = setInterval((_) => print("one"), 1);
 			var two = setInterval((_) => print("two"), 1);

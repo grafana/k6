@@ -1092,12 +1092,12 @@ func generateRandomSequence(t testing.TB, n, m int64, r *rand.Rand) lib.Executio
 	ess := lib.ExecutionSegmentSequence(make([]*lib.ExecutionSegment, n))
 	numerators := make([]int64, n)
 	var denominator int64
-	for i := int64(0); i < n; i++ {
+	for i := range n {
 		numerators[i] = 1 + r.Int63n(m)
 		denominator += numerators[i]
 	}
 	from := big.NewRat(0, 1)
-	for i := int64(0); i < n; i++ {
+	for i := range n {
 		to := new(big.Rat).Add(big.NewRat(numerators[i], denominator), from)
 		ess[i], err = lib.NewExecutionSegment(from, to)
 		require.NoError(t, err)
@@ -1122,7 +1122,7 @@ func TestSumRandomSegmentSequenceMatchesNoSegment(t *testing.T) {
 	getTestConfig := func(r *rand.Rand, name string) RampingVUsConfig {
 		stagesCount := 1 + r.Int31n(maxStages)
 		stages := make([]Stage, stagesCount)
-		for s := int32(0); s < stagesCount; s++ {
+		for s := range stagesCount {
 			dur := (minStageDuration + time.Duration(r.Int63n(int64(maxStageDuration-minStageDuration)))).Round(time.Second)
 			stages[s] = Stage{Duration: types.NullDurationFrom(dur), Target: null.IntFrom(r.Int63n(maxVUs))}
 		}
@@ -1162,12 +1162,12 @@ func TestSumRandomSegmentSequenceMatchesNoSegment(t *testing.T) {
 		}
 	}
 
-	for i := 0; i < numTests; i++ {
+	for i := range numTests {
 		name := fmt.Sprintf("random%02d", i)
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			seed := time.Now().UnixNano()
-			r := rand.New(rand.NewSource(seed)) //nolint:gosec
+			r := rand.New(rand.NewSource(seed))
 			t.Logf("Random source seeded with %d\n", seed)
 			c := getTestConfig(r, name)
 			ranSeqLen := 2 + r.Int63n(segmentSeqMaxLen-1)

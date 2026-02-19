@@ -26,7 +26,7 @@ func (r *WebSocketsAPI) blob(call sobek.ConstructorCall) *sobek.Object {
 	rt := r.vu.Runtime()
 
 	b := &blob{data: new(bytes.Buffer)}
-	var blobParts []interface{}
+	var blobParts []any
 	if len(call.Arguments) > 0 {
 		if err := rt.ExportTo(call.Arguments[0], &blobParts); err != nil {
 			common.Throw(rt, fmt.Errorf("failed to process [blobParts]: %w", err))
@@ -102,7 +102,7 @@ func (r *WebSocketsAPI) blob(call sobek.ConstructorCall) *sobek.Object {
 	return obj
 }
 
-func (r *WebSocketsAPI) fillData(b *blob, blobParts []interface{}, call sobek.ConstructorCall) {
+func (r *WebSocketsAPI) fillData(b *blob, blobParts []any, call sobek.ConstructorCall) {
 	rt := r.vu.Runtime()
 
 	if len(blobParts) > 0 {
@@ -119,7 +119,7 @@ func (r *WebSocketsAPI) fillData(b *blob, blobParts []interface{}, call sobek.Co
 				_, err = b.data.Write(v.Bytes())
 			case string:
 				_, err = b.data.WriteString(v)
-			case map[string]interface{}:
+			case map[string]any:
 				obj := call.Arguments[0].ToObject(rt).Get(strconv.FormatInt(int64(n), 10)).ToObject(rt)
 				switch {
 				case isDataView(obj, rt):
@@ -164,7 +164,7 @@ func (r *WebSocketsAPI) slice(call sobek.FunctionCall, b *blob, rt *sobek.Runtim
 	opts := rt.NewObject()
 	must(rt, opts.Set("type", ct))
 
-	sliced, err := rt.New(r.blobConstructor, rt.ToValue([]interface{}{b.data.Bytes()[from:to]}), opts)
+	sliced, err := rt.New(r.blobConstructor, rt.ToValue([]any{b.data.Bytes()[from:to]}), opts)
 	must(rt, err)
 
 	return sliced

@@ -67,7 +67,7 @@ func assertTimeSeriesEqual(t *testing.T, expected []*prompb.TimeSeries, actual [
 	t.Helper()
 	require.Len(t, actual, len(expected))
 
-	for i := 0; i < len(expected); i++ {
+	for i := range expected {
 		assert.Equal(t, expected[i], actual[i])
 	}
 }

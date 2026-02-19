@@ -735,11 +735,11 @@ func (b *Browser) UserAgent() string {
 // Version returns the controlled browser's version.
 func (b *Browser) Version() string {
 	product := b.version.product
-	i := strings.Index(product, "/")
-	if i == -1 {
+	_, after, ok := strings.Cut(product, "/")
+	if !ok {
 		return product
 	}
-	return product[i+1:]
+	return after
 }
 
 // fetchVersion returns the browser version information.

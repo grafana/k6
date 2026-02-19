@@ -120,7 +120,7 @@ func readResponseBody(
 	respType ResponseType,
 	resp *http.Response,
 	respErr error,
-) (interface{}, error) {
+) (any, error) {
 	if resp == nil || respErr != nil {
 		return nil, respErr
 	}
@@ -173,7 +173,7 @@ func readResponseBody(
 		respErr = wrapDecompressionError(err)
 	}
 
-	var result interface{}
+	var result any
 	// Binary or string
 	switch respType {
 	case ResponseTypeText:

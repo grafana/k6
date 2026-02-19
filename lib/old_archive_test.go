@@ -197,7 +197,7 @@ func TestDerivedExecutionDiscarding(t *testing.T) {
 	var emptyConfigMap ScenarioConfigs
 	tests := []struct {
 		metadata     string
-		expScenarios interface{}
+		expScenarios any
 		expError     string
 	}{
 		// Tests to make sure that "execution" in the options, the old name for

@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"gopkg.in/guregu/null.v3"
+
 	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/errext"
@@ -19,7 +21,6 @@ import (
 	"go.k6.io/k6/internal/build"
 	"go.k6.io/k6/internal/ui/pb"
 	"go.k6.io/k6/lib"
-	"gopkg.in/guregu/null.v3"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -480,7 +481,7 @@ func resolveDefaultProjectID(
 func resolveAndSetProjectID(
 	gs *state.GlobalState,
 	cloudConfig *cloudapi.Config,
-	tmpCloudConfig map[string]interface{},
+	tmpCloudConfig map[string]any,
 	arc *lib.Archive,
 ) error {
 	projectID, err := resolveDefaultProjectID(gs, cloudConfig)

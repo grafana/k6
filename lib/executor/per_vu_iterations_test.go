@@ -43,7 +43,7 @@ func TestPerVUIterationsRun(t *testing.T) {
 	require.NoError(t, test.executor.Run(test.ctx, engineOut))
 
 	var totalIters uint64
-	result.Range(func(_, value interface{}) bool {
+	result.Range(func(_, value any) bool {
 		vuIters := value.(uint64)
 		assert.Equal(t, uint64(100), vuIters)
 		totalIters += vuIters
@@ -80,7 +80,7 @@ func TestPerVUIterationsRunVariableVU(t *testing.T) {
 	assert.True(t, ok)
 
 	var totalIters uint64
-	result.Range(func(key, value interface{}) bool {
+	result.Range(func(key, value any) bool {
 		vuIters := value.(uint64)
 		if key != slowVUID {
 			assert.Equal(t, uint64(100), vuIters)

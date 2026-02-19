@@ -115,8 +115,7 @@ func TestMakeRequestError(t *testing.T) {
 			w.WriteHeader(http.StatusSwitchingProtocols)
 		}))
 		defer srv.Close()
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 		logger := logrus.New()
 		logger.Level = logrus.DebugLevel
 		state := &lib.State{
@@ -188,8 +187,7 @@ func TestResponseStatus(t *testing.T) {
 					TagsAndMeta:  state.Tags.GetCurrentValues(),
 				}
 
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
+				ctx := t.Context()
 				res, err := MakeRequest(ctx, state, preq)
 				require.NoError(t, err)
 				assert.Equal(t, tc.statusCodeExpected, res.Status)
@@ -240,8 +238,7 @@ func TestMakeRequestTimeoutInTheMiddle(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 	}))
 	defer srv.Close()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	samples := make(chan metrics.SampleContainer, 10)
 	logger := logrus.New()
 	logger.Level = logrus.DebugLevel
@@ -383,8 +380,7 @@ func TestMakeRequestDialTimeout(t *testing.T) {
 	defer func() {
 		require.NoError(t, ln.Close())
 	}()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	samples := make(chan metrics.SampleContainer, 10)
 	logger := logrus.New()
 	logger.Level = logrus.DebugLevel
@@ -443,8 +439,7 @@ func TestMakeRequestTimeoutInTheBegining(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 	}))
 	defer srv.Close()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	samples := make(chan metrics.SampleContainer, 10)
 	logger := logrus.New()
 	logger.Level = logrus.DebugLevel
@@ -494,8 +489,7 @@ func TestMakeRequestTimeoutInTheBegining(t *testing.T) {
 
 func TestMakeRequestFailedHostInitializesHeadersAndCookies(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	samples := make(chan metrics.SampleContainer, 10)
 	logger := logrus.New()
 	logger.Level = logrus.DebugLevel
@@ -545,8 +539,7 @@ func TestMakeRequestRPSLimit(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	samples := make(chan metrics.SampleContainer, 10)
 	go func() {

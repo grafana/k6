@@ -155,8 +155,10 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	backgroundProcesses.Add(1)
 	go func() {
 		defer backgroundProcesses.Done()
-		pbs := []*pb.ProgressBar{initBar}
-		for _, s := range execScheduler.GetExecutors() {
+		executors := execScheduler.GetExecutors()
+		pbs := make([]*pb.ProgressBar, 0, 1+len(executors))
+		pbs = append(pbs, initBar)
+		for _, s := range executors {
 			pbs = append(pbs, s.GetProgress())
 		}
 		showProgress(progressCtx, c.gs, pbs, logger)

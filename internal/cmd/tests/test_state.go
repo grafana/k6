@@ -126,7 +126,7 @@ func NewGlobalTestState(tb testing.TB) *GlobalTestState {
 var portRangeStart uint64 = 6565 //nolint:gochecknoglobals
 
 func getFreeBindAddr(tb testing.TB) string {
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		port := atomic.AddUint64(&portRangeStart, 1)
 		addr := net.JoinHostPort("localhost", strconv.FormatUint(port, 10))
 

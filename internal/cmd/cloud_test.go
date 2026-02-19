@@ -156,7 +156,7 @@ func TestResolveAndSetProjectID(t *testing.T) {
 			t.Parallel()
 			ts := tests.NewGlobalTestState(t)
 
-			tmpCloudConfig := map[string]interface{}{}
+			tmpCloudConfig := map[string]any{}
 			arc := &lib.Archive{
 				Options: lib.Options{
 					External: make(map[string]json.RawMessage),
@@ -177,12 +177,12 @@ func TestResolveAndSetProjectID(t *testing.T) {
 				assert.Equal(t, tc.expectedProjectID, tc.cloudConfig.ProjectID.Int64)
 
 				// Verify arc.Options.Cloud contains the projectID
-				var cloudData map[string]interface{}
+				var cloudData map[string]any
 				require.NoError(t, json.Unmarshal(arc.Options.Cloud, &cloudData))
 				assert.Equal(t, float64(tc.expectedProjectID), cloudData["projectID"])
 
 				// Verify arc.Options.External contains the projectID
-				var externalData map[string]interface{}
+				var externalData map[string]any
 				require.NoError(t, json.Unmarshal(arc.Options.External[cloudapi.LegacyCloudConfigKey], &externalData))
 				assert.Equal(t, float64(tc.expectedProjectID), externalData["projectID"])
 			}

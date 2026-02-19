@@ -96,7 +96,7 @@ func TestTmpDirCleanup(t *testing.T) {
 	// actually complete the removal of the directory. It's a race condition.
 	// To try to mitigate the issue, we're adding a retry which waits half a
 	// second if the dir still exits.
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		matches, err = filepath.Glob(filepath.Join(tmpDirPath, storage.K6BrowserDataDirPattern))
 		assert.NoError(t, err)
 		if len(matches) == 0 {

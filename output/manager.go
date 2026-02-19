@@ -103,7 +103,7 @@ func (om *Manager) startOutputs() error {
 
 func (om *Manager) stopOutputs(testErr error, upToID int) {
 	om.logger.Debugf("Stopping %d outputs...", upToID)
-	for i := 0; i < upToID; i++ {
+	for i := range upToID {
 		out := om.outputs[i]
 		var err error
 		if sout, ok := out.(WithStopWithTestError); ok {

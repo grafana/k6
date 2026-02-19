@@ -33,7 +33,7 @@ import (
 // Credentials holds HTTP authentication credentials.
 type Credentials struct {
 	Username string `js:"username"`
-	Password string `js:"password"`
+	Password string `js:"password"` //nolint:gosec
 }
 
 // IsEmpty returns true if the credentials are empty.

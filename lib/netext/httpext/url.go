@@ -54,7 +54,7 @@ func (u URL) GetURL() *url.URL {
 }
 
 // ToURL tries to convert anything passed to it to a k6 URL struct
-func ToURL(u interface{}) (URL, error) {
+func ToURL(u any) (URL, error) {
 	switch tu := u.(type) {
 	case URL:
 		// Handling of http.url`http://example.com/{$id}`

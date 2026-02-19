@@ -13,7 +13,7 @@ func TestHTTPFile(t *testing.T) {
 	input := "hello"
 
 	testCases := []struct {
-		input    func(rt *sobek.Runtime) interface{}
+		input    func(rt *sobek.Runtime) any
 		args     []string
 		expected *FileData
 		expErr   string
@@ -22,24 +22,24 @@ func TestHTTPFile(t *testing.T) {
 		// as File() calls time.Now(), so we'd need some time freezing/mocking
 		// or refactoring, or to exclude the field from the assertion.
 		{
-			func(*sobek.Runtime) interface{} { return input },
+			func(*sobek.Runtime) any { return input },
 			[]string{"test.bin"},
 			&FileData{Data: input, Filename: "test.bin", ContentType: "application/octet-stream"},
 			"",
 		},
 		{
-			func(*sobek.Runtime) interface{} { return input },
+			func(*sobek.Runtime) any { return input },
 			[]string{"test.txt", "text/plain"},
 			&FileData{Data: input, Filename: "test.txt", ContentType: "text/plain"},
 			"",
 		},
 		{
-			func(rt *sobek.Runtime) interface{} { return rt.NewArrayBuffer([]byte(input)) },
+			func(rt *sobek.Runtime) any { return rt.NewArrayBuffer([]byte(input)) },
 			[]string{"test-ab.bin"},
 			&FileData{Data: input, Filename: "test-ab.bin", ContentType: "application/octet-stream"},
 			"",
 		},
-		{func(*sobek.Runtime) interface{} { return struct{}{} }, []string{}, &FileData{}, "GoError: invalid type struct {}, expected string or ArrayBuffer"},
+		{func(*sobek.Runtime) any { return struct{}{} }, []string{}, &FileData{}, "GoError: invalid type struct {}, expected string or ArrayBuffer"},
 	}
 
 	for i, tc := range testCases {
