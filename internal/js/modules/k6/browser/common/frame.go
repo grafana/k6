@@ -243,16 +243,16 @@ func (f *Frame) defaultTimeout() time.Duration {
 	return f.manager.timeoutSettings.timeout()
 }
 
-func (f *Frame) document() (*ElementHandle, error) {
+func (f *Frame) document(ctx context.Context) (*ElementHandle, error) {
 	f.log.Debugf("Frame:document", "fid:%s furl:%q", f.ID(), f.URL())
 
 	if cdh, ok := f.cachedDocumentHandle(); ok {
 		return cdh, nil
 	}
 
-	f.waitForExecutionContext(mainWorld)
+	f.waitForExecution(ctx, mainWorld)
 
-	dh, err := f.newDocumentHandle()
+	dh, err := f.newDocumentHandle(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting new document handle: %w", err)
 	}
@@ -275,9 +275,9 @@ func (f *Frame) cachedDocumentHandle() (*ElementHandle, bool) {
 	return f.documentHandle, f.documentHandle != nil
 }
 
-func (f *Frame) newDocumentHandle() (*ElementHandle, error) {
+func (f *Frame) newDocumentHandle(ctx context.Context) (*ElementHandle, error) {
 	result, err := f.evaluate(
-		f.ctx,
+		ctx,
 		mainWorld,
 		evalOptions{
 			forceCallable: false,
@@ -430,7 +430,7 @@ func (f *Frame) setContext(world executionWorld, execCtx frameExecutionContext) 
 	// since the ids do not match.
 	//
 	// If we didn't overwrite the first execCtx with the new one, then
-	// waitForExecutionContext could end up waiting indefinitely since all
+	// waitForExecution could end up waiting indefinitely since all
 	// execCtx were destroyed.
 	if f.executionContexts[world] != nil {
 		f.log.Debugf("Frame:setContext", "fid:%s furl:%q ectxid:%d world:%s, overriding existing world",
@@ -452,8 +452,8 @@ func (f *Frame) setID(id cdp.FrameID) {
 	f.id = id
 }
 
-func (f *Frame) waitForExecutionContext(world executionWorld) {
-	f.log.Debugf("Frame:waitForExecutionContext", "fid:%s furl:%q world:%s",
+func (f *Frame) waitForExecution(ctx context.Context, world executionWorld) {
+	f.log.Debugf("Frame:waitForExecution", "fid:%s furl:%q world:%s",
 		f.ID(), f.URL(), world)
 
 	t := time.NewTicker(50 * time.Millisecond)
@@ -464,6 +464,8 @@ func (f *Frame) waitForExecutionContext(world executionWorld) {
 			if f.hasContext(world) {
 				return
 			}
+		case <-ctx.Done():
+			return
 		case <-f.ctx.Done():
 			return
 		}
@@ -471,10 +473,10 @@ func (f *Frame) waitForExecutionContext(world executionWorld) {
 }
 
 func (f *Frame) waitForSelectorRetry(
-	selector string, opts *FrameWaitForSelectorOptions, retry int,
+	ctx context.Context, selector string, opts *FrameWaitForSelectorOptions, retry int,
 ) (h *ElementHandle, err error) {
 	for ; retry >= 0; retry-- {
-		if h, err = f.waitForSelector(selector, opts); err == nil {
+		if h, err = f.waitForSelector(ctx, selector, opts); err == nil {
 			return h, nil
 		}
 	}
@@ -482,16 +484,16 @@ func (f *Frame) waitForSelectorRetry(
 	return nil, err
 }
 
-// waitForSelector will wait for the given selector to reach a defined state in
-// opts.
-//
-// It will auto retry on certain errors until the retryCount is below 0. The
-// retry workaround is needed since the underlying DOM can change when the
-// wait action is performed during a navigation.
-func (f *Frame) waitForSelector(selector string, opts *FrameWaitForSelectorOptions) (*ElementHandle, error) {
+// waitForSelector will wait for the given selector to reach a defined state
+// in opts. It will auto retry on certain errors until the retryCount is
+// below 0. The retry workaround is needed since the underlying DOM can chang
+// when the wait action is performed during a navigation.
+func (f *Frame) waitForSelector(
+	ctx context.Context, selector string, opts *FrameWaitForSelectorOptions,
+) (*ElementHandle, error) {
 	f.log.Debugf("Frame:waitForSelector", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	handle, err := f.waitFor(selector, opts, 20)
+	handle, err := f.waitFor(ctx, selector, opts, 20)
 	if err != nil {
 		return nil, err
 	}
@@ -533,6 +535,24 @@ func (f *Frame) waitForSelector(selector string, opts *FrameWaitForSelectorOptio
 }
 
 func (f *Frame) waitFor(
+	ctx context.Context,
+	selector string, opts *FrameWaitForSelectorOptions, retryCount int,
+) (_ *ElementHandle, rerr error) {
+	if opts == nil {
+		opts = NewFrameWaitForSelectorOptions(f.defaultTimeout())
+	}
+
+	if opts.Timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, opts.Timeout)
+		defer cancel()
+	}
+
+	return f.waitForRetry(ctx, selector, opts, retryCount)
+}
+
+func (f *Frame) waitForRetry(
+	ctx context.Context,
 	selector string, opts *FrameWaitForSelectorOptions, retryCount int,
 ) (_ *ElementHandle, rerr error) {
 	f.log.Debugf("Frame:waitFor", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
@@ -542,27 +562,27 @@ func (f *Frame) waitFor(
 		return nil, errors.New("waitFor retry threshold reached")
 	}
 
-	document, err := f.document()
+	document, err := f.document(ctx)
 	if err != nil {
 		if strings.Contains(err.Error(), "Cannot find context with specified id") {
-			return f.waitFor(selector, opts, retryCount)
+			return f.waitForRetry(ctx, selector, opts, retryCount)
 		}
 		return nil, err
 	}
 
-	handle, err := document.waitForSelector(f.ctx, selector, opts)
+	handle, err := document.waitForSelector(ctx, selector, opts)
 	if err != nil {
 		if strings.Contains(err.Error(), "Inspected target navigated or closed") {
-			return f.waitFor(selector, opts, retryCount)
+			return f.waitForRetry(ctx, selector, opts, retryCount)
 		}
 		if strings.Contains(err.Error(), "Cannot find context with specified id") {
-			return f.waitFor(selector, opts, retryCount)
+			return f.waitForRetry(ctx, selector, opts, retryCount)
 		}
 		if strings.Contains(err.Error(), "Execution context was destroyed") {
-			return f.waitFor(selector, opts, retryCount)
+			return f.waitForRetry(ctx, selector, opts, retryCount)
 		}
 		if strings.Contains(err.Error(), "visible") {
-			return f.waitFor(selector, opts, retryCount)
+			return f.waitForRetry(ctx, selector, opts, retryCount)
 		}
 	}
 
@@ -628,15 +648,18 @@ func (f *Frame) click(selector string, opts *FrameClickOptions) error {
 	return nil
 }
 
-func (f *Frame) count(selector string) (int, error) {
+func (f *Frame) count(ctx context.Context, selector string) (int, error) {
 	f.log.Debugf("Frame:count", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	document, err := f.document()
+	ctx, cancel := context.WithTimeout(ctx, f.defaultTimeout())
+	defer cancel()
+
+	document, err := f.document(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("getting document: %w", err)
 	}
 
-	c, err := document.count(f.ctx, selector)
+	c, err := document.count(ctx, selector)
 	if err != nil {
 		return 0, fmt.Errorf("counting elements: %w", err)
 	}
@@ -857,7 +880,7 @@ func (f *Frame) dispatchEvent(selector, typ string, eventInit any, opts *FrameDi
 func (f *Frame) EvaluateWithContext(ctx context.Context, pageFunc string, args ...any) (any, error) {
 	f.log.Debugf("Frame:EvaluateWithContext", "fid:%s furl:%q", f.ID(), f.URL())
 
-	f.waitForExecutionContext(mainWorld)
+	f.waitForExecution(f.ctx, mainWorld)
 
 	opts := evalOptions{
 		forceCallable: true,
@@ -913,7 +936,7 @@ func (f *Frame) EvaluateHandle(pageFunc string, args ...any) (handle JSHandleAPI
 		return ec.EvalHandle(f.ctx, pageFunc, args...) //nolint:wrapcheck
 	}
 
-	f.waitForExecutionContext(mainWorld)
+	f.waitForExecution(f.ctx, mainWorld)
 	handle, err := evalHandle()
 	if err != nil {
 		return nil, fmt.Errorf("evaluating handle for frame: %w", err)
@@ -1536,7 +1559,7 @@ func (f *Frame) isHidden(selector string, opts *FrameIsHiddenOptions) (bool, err
 		}
 		return v, err
 	}
-	v, err := f.runActionOnSelector(f.ctx, selector, opts.Strict, isHidden, func() bool { return true })
+	v, err := f.runActionOnSelector(selector, opts.Strict, isHidden, func() bool { return true })
 	if err != nil {
 		return false, fmt.Errorf("checking is %q hidden: %w", selector, err)
 	}
@@ -1565,7 +1588,7 @@ func (f *Frame) isVisible(selector string, opts *FrameIsVisibleOptions) (bool, e
 		}
 		return v, err
 	}
-	v, err := f.runActionOnSelector(f.ctx, selector, opts.Strict, isVisible, func() bool { return false })
+	v, err := f.runActionOnSelector(selector, opts.Strict, isVisible, func() bool { return false })
 	if err != nil {
 		return false, fmt.Errorf("checking is %q visible: %w", selector, err)
 	}
@@ -1616,18 +1639,22 @@ func (f *Frame) Name() string {
 func (f *Frame) Query(selector string, strict bool) (*ElementHandle, error) {
 	f.log.Debugf("Frame:Query", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	document, err := f.document()
+	return f.query(f.ctx, selector, strict)
+}
+
+func (f *Frame) query(ctx context.Context, selector string, strict bool) (*ElementHandle, error) {
+	document, err := f.document(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting document: %w", err)
 	}
-	return document.Query(selector, strict)
+	return document.query(ctx, selector, strict)
 }
 
 // QueryAll runs a selector query against the document tree, returning all matching elements.
 func (f *Frame) QueryAll(selector string) ([]*ElementHandle, error) {
 	f.log.Debugf("Frame:QueryAll", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	document, err := f.document()
+	document, err := f.document(f.ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting document: %w", err)
 	}
@@ -1741,7 +1768,7 @@ func (f *Frame) SetContent(html string, _ *FrameSetContentOptions) error {
 		document.close();
 	}`
 
-	f.waitForExecutionContext(utilityWorld)
+	f.waitForExecution(f.ctx, utilityWorld)
 
 	eopts := evalOptions{
 		forceCallable: true,
@@ -1953,7 +1980,7 @@ func (f *Frame) waitForFunction(
 		"fid:%s furl:%q world:%s poll:%s timeout:%s",
 		f.ID(), f.URL(), world, polling, timeout)
 
-	f.waitForExecutionContext(world)
+	f.waitForExecution(f.ctx, world)
 
 	f.executionContextMu.RLock()
 	defer f.executionContextMu.RUnlock()
@@ -2168,7 +2195,7 @@ func (f *Frame) handleWaitForNavigationTimeoutErrorFn(opts *FrameWaitForNavigati
 
 // WaitForSelector waits for the given selector to match the waiting criteria.
 func (f *Frame) WaitForSelector(selector string, popts *FrameWaitForSelectorOptions) (*ElementHandle, error) {
-	handle, err := f.waitForSelectorRetry(selector, popts, maxRetry)
+	handle, err := f.waitForSelectorRetry(f.ctx, selector, popts, maxRetry)
 	if err != nil {
 		return nil, fmt.Errorf("waiting for selector %q: %w", selector, err)
 	}
@@ -2257,7 +2284,7 @@ func (f *Frame) evaluateWithSelector(selector string, pageFunc string, args ...a
 	f.log.Debugf("Frame:evaluateWithSelector", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	evaluate := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
-		return handle.Evaluate(pageFunc, args...)
+		return handle.execCtx.Eval(apiCtx, pageFunc, append([]any{handle}, args...)...)
 	}
 
 	act := f.newAction(
@@ -2274,7 +2301,7 @@ func (f *Frame) evaluateHandleWithSelector(selector string, pageFunc string, arg
 	f.log.Debugf("Frame:evaluateHandleWithSelector", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	evaluateHandle := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
-		return handle.EvaluateHandle(pageFunc, args...)
+		return handle.execCtx.EvalHandle(apiCtx, pageFunc, append([]any{handle}, args...)...)
 	}
 
 	act := f.newAction(
@@ -2329,9 +2356,12 @@ type frameExecutionContext interface {
 }
 
 func (f *Frame) runActionOnSelector(
-	ctx context.Context, selector string, strict bool, fn elementHandleActionFunc, nullResponder func() bool,
+	selector string, strict bool, fn elementHandleActionFunc, nullResponder func() bool,
 ) (bool, error) {
-	handle, err := f.Query(selector, strict)
+	ctx, cancel := context.WithTimeout(f.ctx, f.defaultTimeout())
+	defer cancel()
+
+	handle, err := f.query(ctx, selector, strict)
 	if err != nil {
 		return false, fmt.Errorf("query: %w", err)
 	}
@@ -2366,7 +2396,7 @@ func (f *Frame) newAction(
 		waitOpts := NewFrameWaitForSelectorOptions(f.defaultTimeout())
 		waitOpts.State = state
 		waitOpts.Strict = strict
-		handle, err := f.waitForSelector(selector, waitOpts)
+		handle, err := f.waitForSelector(apiCtx, selector, waitOpts)
 		if err != nil {
 			select {
 			case <-apiCtx.Done():
@@ -2399,7 +2429,7 @@ func (f *Frame) newPointerAction(
 		waitOpts := NewFrameWaitForSelectorOptions(f.defaultTimeout())
 		waitOpts.State = state
 		waitOpts.Strict = strict
-		handle, err := f.waitForSelector(selector, waitOpts)
+		handle, err := f.waitForSelector(apiCtx, selector, waitOpts)
 		if err != nil {
 			select {
 			case <-apiCtx.Done():

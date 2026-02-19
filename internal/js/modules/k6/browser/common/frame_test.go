@@ -44,7 +44,7 @@ func TestFrameNilDocument(t *testing.T) {
 	}
 
 	require.NotPanics(t, func() {
-		_, err := frame.document()
+		_, err := frame.document(frame.ctx)
 		require.Error(t, err)
 	})
 
@@ -55,7 +55,7 @@ func TestFrameNilDocument(t *testing.T) {
 	) (res any, err error) {
 		return want, nil
 	}
-	got, err := frame.document()
+	got, err := frame.document(frame.ctx)
 	require.NoError(t, err)
 	require.Equal(t, want, got)
 

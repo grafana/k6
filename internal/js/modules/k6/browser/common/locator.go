@@ -127,7 +127,7 @@ func (l *Locator) ContentFrame() *FrameLocator {
 // strict to true, allowing it to return the total number of elements matching
 // the selector.
 func (l *Locator) Count() (int, error) {
-	return l.frame.count(l.selector)
+	return l.frame.count(l.frame.ctx, l.selector)
 }
 
 // Dblclick double clicks on an element using locator's selector with strict mode on.
@@ -633,7 +633,7 @@ func (l *Locator) WaitFor(opts *FrameWaitForSelectorOptions) error {
 	l.log.Debugf("Locator:WaitFor", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
 	opts.Strict = true
-	_, err := l.frame.waitFor(l.selector, opts, 20)
+	_, err := l.frame.waitFor(l.frame.ctx, l.selector, opts, 20)
 	if err != nil {
 		return fmt.Errorf("waiting for %q: %w", l.selector, err)
 	}
