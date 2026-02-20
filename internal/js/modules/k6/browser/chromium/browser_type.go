@@ -206,7 +206,14 @@ func (b *BrowserType) launch(
 		return nil, 0, fmt.Errorf("finding browser executable: %w", err)
 	}
 
-	browserProc, err := b.allocate(ctx, path, flags, dataDir, logger)
+	allocCtx := ctx
+	if opts.Timeout > 0 {
+		var cancel context.CancelFunc
+		allocCtx, cancel = context.WithTimeout(ctx, opts.Timeout)
+		defer cancel()
+	}
+
+	browserProc, err := b.allocate(allocCtx, path, flags, dataDir, logger)
 	if browserProc == nil {
 		return nil, 0, fmt.Errorf("launching browser: %w", err)
 	}
