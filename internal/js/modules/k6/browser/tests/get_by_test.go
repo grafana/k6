@@ -4,6 +4,8 @@
 package tests
 
 import (
+	"context"
+	"net/http"
 	"testing"
 
 	"github.com/grafana/sobek"
@@ -904,6 +906,7 @@ func TestGetByAltTextSuccess(t *testing.T) {
 			1,
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -1477,6 +1480,358 @@ func TestGetByNullHandling(t *testing.T) {
 		await %s.getByText().click();
 	`, getByImpl)
 		require.ErrorContains(t, err, "missing required argument 'text'")
+	}
+}
+
+// Reproduces issue 5681 and similar GetBy* issues where the timeout is not respected.
+func TestGetByRoleRespectTimeoutWhenRendererBlocked(t *testing.T) {
+	t.Parallel()
+
+	blockRendererWithSyncXHR := func(t *testing.T, tb *testBrowser, p *common.Page, path string) {
+		t.Helper()
+
+		block := make(chan struct{})
+		unblock := make(chan struct{})
+		tb.withHandler(path, func(w http.ResponseWriter, r *http.Request) {
+			close(block)
+			<-unblock
+			_, _ = w.Write([]byte("ok"))
+		})
+
+		errs := make(chan error, 1)
+		go func() {
+			_, err := p.Evaluate(`(path) => {
+			const xhr = new XMLHttpRequest();
+			xhr.open('GET', path, false);
+			xhr.send();
+			return xhr.responseText;
+		}`, path)
+			errs <- err
+		}()
+		t.Cleanup(func() {
+			close(unblock)
+			<-errs
+		})
+		<-block
+	}
+
+	buttonOpts := &common.GetByRoleOptions{Name: toPtr(`'Click'`)}
+	textboxOpts := &common.GetByRoleOptions{Name: toPtr(`'Text type'`)}
+	comboboxOpts := &common.GetByRoleOptions{Name: toPtr(`'select'`)}
+
+	implNames := []string{pageImpl, frameImpl, locatorImpl, frameLocatorImpl}
+
+	tests := []struct {
+		name     string
+		role     string
+		roleOpts *common.GetByRoleOptions
+		action   func(l *common.Locator) error
+	}{
+		{
+			name:     "all",
+			role:     "button",
+			roleOpts: buttonOpts,
+			action: func(l *common.Locator) error {
+				_, err := l.All()
+				return err
+			},
+		},
+		{
+			name:     "bounding-box",
+			role:     "button",
+			roleOpts: buttonOpts,
+			action: func(l *common.Locator) error {
+				_, err := l.BoundingBox(common.NewFrameBaseOptions(l.Timeout()))
+				return err
+			},
+		},
+		{
+			name:     "clear",
+			role:     "textbox",
+			roleOpts: textboxOpts,
+			action: func(l *common.Locator) error {
+				return l.Clear(common.NewFrameFillOptions(l.Timeout()))
+			},
+		},
+		{
+			name:     "click",
+			role:     "button",
+			roleOpts: buttonOpts,
+			action: func(l *common.Locator) error {
+				return l.Click(common.NewFrameClickOptions(l.Timeout()))
+			},
+		},
+		{
+			name:     "count",
+			role:     "button",
+			roleOpts: buttonOpts,
+			action: func(l *common.Locator) error {
+				_, err := l.Count()
+				return err
+			},
+		},
+		{
+			name:     "dblclick",
+			role:     "button",
+			roleOpts: buttonOpts,
+			action: func(l *common.Locator) error {
+				return l.Dblclick(common.NewFrameDblClickOptions(l.Timeout()))
+			},
+		},
+		{
+			name:     "evaluate",
+			role:     "button",
+			roleOpts: buttonOpts,
+			action: func(l *common.Locator) error {
+				_, err := l.Evaluate(`(node) => node.textContent`)
+				return err
+			},
+		},
+		{
+			name:     "evaluate-handle",
+			role:     "button",
+			roleOpts: buttonOpts,
+			action: func(l *common.Locator) error {
+				_, err := l.EvaluateHandle(`(node) => node`)
+				return err
+			},
+		},
+		{
+			name:     "set-checked",
+			role:     "checkbox",
+			roleOpts: nil,
+			action: func(l *common.Locator) error {
+				return l.SetChecked(true, common.NewFrameCheckOptions(l.Timeout()))
+			},
+		},
+		{
+			name:     "check",
+			role:     "checkbox",
+			roleOpts: nil,
+			action: func(l *common.Locator) error {
+				return l.Check(common.NewFrameCheckOptions(l.Timeout()))
+			},
+		},
+		{
+			name:     "uncheck",
+			role:     "checkbox",
+			roleOpts: nil,
+			action: func(l *common.Locator) error {
+				return l.Uncheck(common.NewFrameUncheckOptions(l.Timeout()))
+			},
+		},
+		{
+			name:     "is-checked",
+			role:     "checkbox",
+			roleOpts: nil,
+			action: func(l *common.Locator) error {
+				_, err := l.IsChecked(common.NewFrameIsCheckedOptions(l.Timeout()))
+				return err
+			},
+		},
+		{
+			name:     "is-editable",
+			role:     "textbox",
+			roleOpts: textboxOpts,
+			action: func(l *common.Locator) error {
+				_, err := l.IsEditable(common.NewFrameIsEditableOptions(l.Timeout()))
+				return err
+			},
+		},
+		{
+			name:     "is-enabled",
+			role:     "button",
+			roleOpts: buttonOpts,
+			action: func(l *common.Locator) error {
+				_, err := l.IsEnabled(common.NewFrameIsEnabledOptions(l.Timeout()))
+				return err
+			},
+		},
+		{
+			name:     "is-disabled",
+			role:     "button",
+			roleOpts: buttonOpts,
+			action: func(l *common.Locator) error {
+				_, err := l.IsDisabled(common.NewFrameIsDisabledOptions(l.Timeout()))
+				return err
+			},
+		},
+		{
+			name:     "is-visible",
+			role:     "button",
+			roleOpts: buttonOpts,
+			action: func(l *common.Locator) error {
+				_, err := l.IsVisible()
+				return err
+			},
+		},
+		{
+			name:     "is-hidden",
+			role:     "button",
+			roleOpts: buttonOpts,
+			action: func(l *common.Locator) error {
+				_, err := l.IsHidden()
+				return err
+			},
+		},
+		{
+			name:     "fill",
+			role:     "textbox",
+			roleOpts: textboxOpts,
+			action: func(l *common.Locator) error {
+				return l.Fill("new value", common.NewFrameFillOptions(l.Timeout()))
+			},
+		},
+		{
+			name:     "focus",
+			role:     "button",
+			roleOpts: buttonOpts,
+			action: func(l *common.Locator) error {
+				return l.Focus(common.NewFrameBaseOptions(l.Timeout()))
+			},
+		},
+		{
+			name:     "get-attribute",
+			role:     "button",
+			roleOpts: buttonOpts,
+			action: func(l *common.Locator) error {
+				_, _, err := l.GetAttribute("id", common.NewFrameBaseOptions(l.Timeout()))
+				return err
+			},
+		},
+		{
+			name:     "inner-html",
+			role:     "button",
+			roleOpts: buttonOpts,
+			action: func(l *common.Locator) error {
+				_, err := l.InnerHTML(common.NewFrameInnerHTMLOptions(l.Timeout()))
+				return err
+			},
+		},
+		{
+			name:     "inner-text",
+			role:     "button",
+			roleOpts: buttonOpts,
+			action: func(l *common.Locator) error {
+				_, err := l.InnerText(common.NewFrameInnerTextOptions(l.Timeout()))
+				return err
+			},
+		},
+		{
+			name:     "text-content",
+			role:     "button",
+			roleOpts: buttonOpts,
+			action: func(l *common.Locator) error {
+				_, _, err := l.TextContent(common.NewFrameTextContentOptions(l.Timeout()))
+				return err
+			},
+		},
+		{
+			name:     "input-value",
+			role:     "textbox",
+			roleOpts: textboxOpts,
+			action: func(l *common.Locator) error {
+				_, err := l.InputValue(common.NewFrameInputValueOptions(l.Timeout()))
+				return err
+			},
+		},
+		{
+			name:     "select-option",
+			role:     "combobox",
+			roleOpts: comboboxOpts,
+			action: func(l *common.Locator) error {
+				_, err := l.SelectOption([]any{"A"}, common.NewFrameSelectOptionOptions(l.Timeout()))
+				return err
+			},
+		},
+		{
+			name:     "press",
+			role:     "textbox",
+			roleOpts: textboxOpts,
+			action: func(l *common.Locator) error {
+				return l.Press("A", common.NewFramePressOptions(l.Timeout()))
+			},
+		},
+		{
+			name:     "press-sequentially",
+			role:     "textbox",
+			roleOpts: textboxOpts,
+			action: func(l *common.Locator) error {
+				return l.PressSequentially("abc", common.NewFrameTypeOptions(l.Timeout()))
+			},
+		},
+		{
+			name:     "type",
+			role:     "textbox",
+			roleOpts: textboxOpts,
+			action: func(l *common.Locator) error {
+				return l.Type("abc", common.NewFrameTypeOptions(l.Timeout()))
+			},
+		},
+		{
+			name:     "hover",
+			role:     "button",
+			roleOpts: buttonOpts,
+			action: func(l *common.Locator) error {
+				return l.Hover(common.NewFrameHoverOptions(l.Timeout()))
+			},
+		},
+		{
+			name:     "tap",
+			role:     "button",
+			roleOpts: buttonOpts,
+			action: func(l *common.Locator) error {
+				return l.Tap(common.NewFrameTapOptions(l.Timeout()))
+			},
+		},
+		{
+			name:     "dispatch-event",
+			role:     "button",
+			roleOpts: buttonOpts,
+			action: func(l *common.Locator) error {
+				return l.DispatchEvent("click", nil, common.NewFrameDispatchEventOptions(l.Timeout()))
+			},
+		},
+		{
+			name:     "wait-for",
+			role:     "button",
+			roleOpts: buttonOpts,
+			action: func(l *common.Locator) error {
+				return l.WaitFor(common.NewFrameWaitForSelectorOptions(l.Timeout()))
+			},
+		},
+	}
+
+	for _, implName := range implNames {
+		t.Run(implName, func(t *testing.T) {
+			t.Parallel()
+
+			tb := newTestBrowser(t, withFileServer())
+			staticURL := tb.staticURL("get_by_role_implicit.html")
+			tb.withIFrameURL(staticURL, iframeID)
+
+			p := tb.NewPage(nil)
+			p.SetDefaultTimeout(25)
+			if implName == frameLocatorImpl {
+				tb.GotoPage(p, tb.url("/iframe"))
+			} else {
+				tb.GotoPage(p, staticURL)
+			}
+
+			getByRoleImplementations := getByImplementationsOf[interface {
+				GetByRole(role string, opts *common.GetByRoleOptions) *common.Locator
+			}](p)
+			impl := getByRoleImplementations[implName]
+
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
+					blockRendererWithSyncXHR(t, tb, p, "/block-"+implName+"-"+tt.name)
+
+					err := tt.action(impl.GetByRole(tt.role, tt.roleOpts))
+					require.ErrorIs(t, err, context.DeadlineExceeded)
+				})
+			}
+		})
 	}
 }
 

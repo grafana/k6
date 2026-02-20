@@ -144,7 +144,7 @@ func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, point Position)
 		forceCallable: true,
 		returnByValue: true,
 	}
-	result, err := h.evalWithScript(h.ctx, opts, fn, point)
+	result, err := h.evalWithScript(apiCtx, opts, fn, point)
 	if err != nil {
 		return false, err
 	}
@@ -181,7 +181,7 @@ func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, point Position)
 	return true, nil
 }
 
-func (h *ElementHandle) checkElementState(_ context.Context, state string) (*bool, error) {
+func (h *ElementHandle) checkElementState(apiCtx context.Context, state string) (*bool, error) {
 	fn := `
 		(node, injected, state) => {
 			return injected.checkElementState(node, state);
@@ -191,7 +191,7 @@ func (h *ElementHandle) checkElementState(_ context.Context, state string) (*boo
 		forceCallable: true,
 		returnByValue: true,
 	}
-	result, err := h.evalWithScript(h.ctx, opts, fn, state)
+	result, err := h.evalWithScript(apiCtx, opts, fn, state)
 	if err != nil {
 		return nil, err
 	}
@@ -230,7 +230,7 @@ func (h *ElementHandle) DefaultTimeout() time.Duration {
 	return h.frame.manager.timeoutSettings.timeout()
 }
 
-func (h *ElementHandle) dispatchEvent(_ context.Context, typ string, eventInit any) (any, error) {
+func (h *ElementHandle) dispatchEvent(apiCtx context.Context, typ string, eventInit any) (any, error) {
 	fn := `
 		(node, injected, type, eventInit) => {
 			injected.dispatchEvent(node, type, eventInit);
@@ -240,12 +240,12 @@ func (h *ElementHandle) dispatchEvent(_ context.Context, typ string, eventInit a
 		forceCallable: true,
 		returnByValue: true,
 	}
-	_, err := h.evalWithScript(h.ctx, opts, fn, typ, eventInit)
+	_, err := h.evalWithScript(apiCtx, opts, fn, typ, eventInit)
 
 	return nil, err
 }
 
-func (h *ElementHandle) fill(_ context.Context, value string) error {
+func (h *ElementHandle) fill(apiCtx context.Context, value string) error {
 	fn := `
 		(node, injected, value) => {
 			return injected.fill(node, value);
@@ -255,7 +255,7 @@ func (h *ElementHandle) fill(_ context.Context, value string) error {
 		forceCallable: true,
 		returnByValue: true,
 	}
-	result, err := h.evalWithScript(h.ctx, opts, fn, value)
+	result, err := h.evalWithScript(apiCtx, opts, fn, value)
 	if err != nil {
 		return err
 	}
@@ -599,7 +599,7 @@ func (h *ElementHandle) waitForElementState(
 // step outside of the browser (chromium). It returns the frame that it has stepped
 // into and the selector to use within that frame.
 func (h *ElementHandle) stepIntoFrame(
-	apiCtx context.Context, parsedSelector *Selector, frameNavIndex int, opts *FrameWaitForSelectorOptions,
+	ctx context.Context, parsedSelector *Selector, frameNavIndex int, opts *FrameWaitForSelectorOptions,
 ) (*Frame, string, error) {
 	// Split selector at frame navigation boundary
 	beforeFrame, afterFrame := h.splitSelectorAtFrame(parsedSelector, frameNavIndex)
@@ -607,7 +607,7 @@ func (h *ElementHandle) stepIntoFrame(
 	// Find the iframe element using the "before frame" selector
 	iframeSelector := h.reconstructSelector(beforeFrame)
 
-	iframeHandle, err := h.waitForSelector(apiCtx, iframeSelector, opts)
+	iframeHandle, err := h.waitForSelector(ctx, iframeSelector, opts)
 	if err != nil {
 		return nil, "", fmt.Errorf("finding iframe with selector %q: %w", iframeSelector, err)
 	}
@@ -618,7 +618,7 @@ func (h *ElementHandle) stepIntoFrame(
 		return nil, "", ErrElementNotVisible
 	}
 
-	frame, err := iframeHandle.ContentFrame()
+	frame, err := iframeHandle.contentFrame(ctx)
 	if err != nil {
 		return nil, "", fmt.Errorf("getting iframe frame: %w", err)
 	}
@@ -630,7 +630,7 @@ func (h *ElementHandle) stepIntoFrame(
 }
 
 func (h *ElementHandle) waitForSelector(
-	apiCtx context.Context, selector string, opts *FrameWaitForSelectorOptions,
+	ctx context.Context, selector string, opts *FrameWaitForSelectorOptions,
 ) (*ElementHandle, error) {
 	parsedSelector, err := NewSelector(selector)
 	if err != nil {
@@ -648,12 +648,12 @@ func (h *ElementHandle) waitForSelector(
 			Strict:  true,
 		}
 
-		frame, afterFrameSelector, err := h.stepIntoFrame(apiCtx, parsedSelector, frameNavIndex, opts)
+		frame, afterFrameSelector, err := h.stepIntoFrame(ctx, parsedSelector, frameNavIndex, opts)
 		if err != nil {
 			return nil, err
 		}
 
-		return frame.waitForSelector(afterFrameSelector, opts)
+		return frame.waitForSelector(ctx, afterFrameSelector, opts)
 	}
 
 	// No frame navigation - proceed with normal waitForSelector logic
@@ -667,7 +667,7 @@ func (h *ElementHandle) waitForSelector(
 		returnByValue: false,
 	}
 	result, err := h.evalWithScript(
-		apiCtx,
+		ctx,
 		eopts, fn, parsedSelector,
 		opts.Strict, opts.State.String(), opts.Timeout.Milliseconds(),
 	)
@@ -684,7 +684,7 @@ func (h *ElementHandle) waitForSelector(
 	}
 }
 
-func (h *ElementHandle) count(apiCtx context.Context, selector string) (int, error) {
+func (h *ElementHandle) count(ctx context.Context, selector string) (int, error) {
 	parsedSelector, err := NewSelector(selector)
 	if err != nil {
 		return 0, err
@@ -701,12 +701,12 @@ func (h *ElementHandle) count(apiCtx context.Context, selector string) (int, err
 			Strict:  true,
 		}
 
-		frame, afterFrameSelector, err := h.stepIntoFrame(apiCtx, parsedSelector, frameNavIndex, opts)
+		frame, afterFrameSelector, err := h.stepIntoFrame(ctx, parsedSelector, frameNavIndex, opts)
 		if err != nil {
 			return 0, err
 		}
 
-		return frame.count(afterFrameSelector)
+		return frame.count(ctx, afterFrameSelector)
 	}
 
 	// No frame navigation - proceed with normal count logic
@@ -720,7 +720,7 @@ func (h *ElementHandle) count(apiCtx context.Context, selector string) (int, err
 		returnByValue: true,
 	}
 	result, err := h.evalWithScript(
-		apiCtx,
+		ctx,
 		eopts, fn, parsedSelector,
 	)
 	if err != nil {
@@ -819,12 +819,16 @@ func (h *ElementHandle) Click(opts *ElementHandleClickOptions) error {
 
 // ContentFrame returns the frame that contains this element.
 func (h *ElementHandle) ContentFrame() (*Frame, error) {
+	return h.contentFrame(h.ctx)
+}
+
+func (h *ElementHandle) contentFrame(ctx context.Context) (*Frame, error) {
 	var (
 		node *cdp.Node
 		err  error
 	)
 	action := dom.DescribeNode().WithObjectID(h.remoteObject.ObjectID)
-	if node, err = action.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
+	if node, err = action.Do(cdp.WithExecutor(ctx, h.session)); err != nil {
 		return nil, fmt.Errorf("getting remote node %q: %w", h.remoteObject.ObjectID, err)
 	}
 	if node == nil || node.FrameID == "" {
@@ -1156,6 +1160,12 @@ func (h *ElementHandle) Press(key string, opts *ElementHandlePressOptions) error
 // Query runs "element.querySelector" within the page. If no element matches the selector,
 // the return value resolves to "null".
 func (h *ElementHandle) Query(selector string, strict bool) (_ *ElementHandle, rerr error) {
+	return h.query(h.ctx, selector, strict)
+}
+
+func (h *ElementHandle) query(
+	ctx context.Context, selector string, strict bool,
+) (_ *ElementHandle, rerr error) {
 	parsedSelector, err := NewSelector(selector)
 	if err != nil {
 		return nil, fmt.Errorf("parsing selector %q: %w", selector, err)
@@ -1172,12 +1182,12 @@ func (h *ElementHandle) Query(selector string, strict bool) (_ *ElementHandle, r
 			Strict:  true,
 		}
 
-		frame, afterFrameSelector, err := h.stepIntoFrame(h.ctx, parsedSelector, frameNavIndex, opts)
+		frame, afterFrameSelector, err := h.stepIntoFrame(ctx, parsedSelector, frameNavIndex, opts)
 		if err != nil {
 			return nil, err
 		}
 
-		return frame.Query(afterFrameSelector, strict)
+		return frame.query(ctx, afterFrameSelector, strict)
 	}
 
 	// No frame navigation - proceed with normal Query logic
@@ -1190,7 +1200,7 @@ func (h *ElementHandle) Query(selector string, strict bool) (_ *ElementHandle, r
 		forceCallable: true,
 		returnByValue: false,
 	}
-	result, err := h.evalWithScript(h.ctx, opts, querySelector, parsedSelector, strict)
+	result, err := h.evalWithScript(ctx, opts, querySelector, parsedSelector, strict)
 	if err != nil {
 		return nil, fmt.Errorf("querying selector %q: %w", selector, err)
 	}
@@ -1560,7 +1570,7 @@ func (h *ElementHandle) evalWithScript(
 	ctx context.Context,
 	opts evalOptions, js string, args ...any,
 ) (any, error) {
-	script, err := h.execCtx.getInjectedScript(h.ctx)
+	script, err := h.execCtx.getInjectedScript(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting injected script: %w", err)
 	}

@@ -723,7 +723,7 @@ func (p *Page) getOwnerFrame(apiCtx context.Context, h *ElementHandle) (cdp.Fram
 	// Instead here we use the element's session to retrieve the description of
 	// itself, which works even when we're handling elements that are not in
 	// an iframe.
-	node, err := action.Do(cdp.WithExecutor(p.ctx, h.session))
+	node, err := action.Do(cdp.WithExecutor(apiCtx, h.session))
 	if err != nil {
 		p.logger.Debugf("Page:getOwnerFrame:DescribeNode:return", "sid:%v err:%v", p.sessionID(), err)
 		return "", nil

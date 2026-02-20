@@ -206,7 +206,7 @@ func (b *BrowserType) launch(
 		return nil, 0, fmt.Errorf("finding browser executable: %w", err)
 	}
 
-	browserProc, err := b.allocate(ctx, path, flags, dataDir, logger)
+	browserProc, err := b.allocate(ctx, opts.Timeout, path, flags, dataDir, logger)
 	if browserProc == nil {
 		return nil, 0, fmt.Errorf("launching browser: %w", err)
 	}
@@ -240,11 +240,18 @@ func (b *BrowserType) Name() string {
 // allocate starts a new Chromium browser process and returns it.
 func (b *BrowserType) allocate(
 	ctx context.Context,
+	timeout time.Duration,
 	path string,
 	flags map[string]any, dataDir *storage.Dir,
 	logger *log.Logger,
 ) (_ *common.BrowserProcess, rerr error) {
 	bProcCtx, bProcCtxCancel := context.WithCancelCause(ctx)
+	parseCtx := bProcCtx
+	if timeout > 0 {
+		var parseCtxCancel context.CancelFunc
+		parseCtx, parseCtxCancel = context.WithTimeout(bProcCtx, timeout)
+		defer parseCtxCancel()
+	}
 	defer func() {
 		if rerr != nil {
 			bProcCtxCancel(errors.New("local browser process init failed"))
@@ -256,7 +263,9 @@ func (b *BrowserType) allocate(
 		return nil, err
 	}
 
-	return common.NewLocalBrowserProcess(bProcCtx, path, args, dataDir, bProcCtxCancel, logger) //nolint: wrapcheck
+	return common.NewLocalBrowserProcess(
+		bProcCtx, parseCtx, path, args, dataDir, bProcCtxCancel, logger,
+	) //nolint: wrapcheck
 }
 
 var (
