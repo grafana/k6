@@ -144,7 +144,7 @@ func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, point Position)
 		forceCallable: true,
 		returnByValue: true,
 	}
-	result, err := h.evalWithScript(h.ctx, opts, fn, point)
+	result, err := h.evalWithScript(apiCtx, opts, fn, point)
 	if err != nil {
 		return false, err
 	}
@@ -181,7 +181,7 @@ func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, point Position)
 	return true, nil
 }
 
-func (h *ElementHandle) checkElementState(_ context.Context, state string) (*bool, error) {
+func (h *ElementHandle) checkElementState(apiCtx context.Context, state string) (*bool, error) {
 	fn := `
 		(node, injected, state) => {
 			return injected.checkElementState(node, state);
@@ -191,7 +191,7 @@ func (h *ElementHandle) checkElementState(_ context.Context, state string) (*boo
 		forceCallable: true,
 		returnByValue: true,
 	}
-	result, err := h.evalWithScript(h.ctx, opts, fn, state)
+	result, err := h.evalWithScript(apiCtx, opts, fn, state)
 	if err != nil {
 		return nil, err
 	}
@@ -230,7 +230,7 @@ func (h *ElementHandle) DefaultTimeout() time.Duration {
 	return h.frame.manager.timeoutSettings.timeout()
 }
 
-func (h *ElementHandle) dispatchEvent(_ context.Context, typ string, eventInit any) (any, error) {
+func (h *ElementHandle) dispatchEvent(apiCtx context.Context, typ string, eventInit any) (any, error) {
 	fn := `
 		(node, injected, type, eventInit) => {
 			injected.dispatchEvent(node, type, eventInit);
@@ -240,12 +240,12 @@ func (h *ElementHandle) dispatchEvent(_ context.Context, typ string, eventInit a
 		forceCallable: true,
 		returnByValue: true,
 	}
-	_, err := h.evalWithScript(h.ctx, opts, fn, typ, eventInit)
+	_, err := h.evalWithScript(apiCtx, opts, fn, typ, eventInit)
 
 	return nil, err
 }
 
-func (h *ElementHandle) fill(_ context.Context, value string) error {
+func (h *ElementHandle) fill(apiCtx context.Context, value string) error {
 	fn := `
 		(node, injected, value) => {
 			return injected.fill(node, value);
@@ -255,7 +255,7 @@ func (h *ElementHandle) fill(_ context.Context, value string) error {
 		forceCallable: true,
 		returnByValue: true,
 	}
-	result, err := h.evalWithScript(h.ctx, opts, fn, value)
+	result, err := h.evalWithScript(apiCtx, opts, fn, value)
 	if err != nil {
 		return err
 	}

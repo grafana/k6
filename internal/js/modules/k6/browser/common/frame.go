@@ -892,7 +892,7 @@ func (f *Frame) dispatchEvent(selector, typ string, eventInit any, opts *FrameDi
 func (f *Frame) EvaluateWithContext(ctx context.Context, pageFunc string, args ...any) (any, error) {
 	f.log.Debugf("Frame:EvaluateWithContext", "fid:%s furl:%q", f.ID(), f.URL())
 
-	f.waitForExecution(f.ctx, mainWorld)
+	f.waitForExecution(ctx, mainWorld)
 
 	opts := evalOptions{
 		forceCallable: true,
@@ -1992,7 +1992,7 @@ func (f *Frame) waitForFunction(
 		"fid:%s furl:%q world:%s poll:%s timeout:%s",
 		f.ID(), f.URL(), world, polling, timeout)
 
-	f.waitForExecution(f.ctx, world)
+	f.waitForExecution(apiCtx, world)
 
 	f.executionContextMu.RLock()
 	defer f.executionContextMu.RUnlock()
