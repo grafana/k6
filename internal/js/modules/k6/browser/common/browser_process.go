@@ -36,6 +36,7 @@ type BrowserProcess struct {
 // returns a new BrowserProcess instance to interact with it.
 func NewLocalBrowserProcess(
 	ctx context.Context,
+	parseCtx context.Context,
 	path string,
 	args []string,
 	dataDir *storage.Dir,
@@ -47,7 +48,7 @@ func NewLocalBrowserProcess(
 		return nil, err
 	}
 
-	wsURL, err := parseDevToolsURL(ctx, cmd)
+	wsURL, err := parseDevToolsURL(parseCtx, cmd)
 	if err != nil {
 		return nil, err
 	}
