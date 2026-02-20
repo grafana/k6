@@ -263,7 +263,9 @@ func (b *BrowserType) allocate(
 		return nil, err
 	}
 
-	return common.NewLocalBrowserProcess(bProcCtx, parseCtx, path, args, dataDir, bProcCtxCancel, logger) //nolint: wrapcheck
+	return common.NewLocalBrowserProcess(
+		bProcCtx, parseCtx, path, args, dataDir, bProcCtxCancel, logger,
+	) //nolint: wrapcheck
 }
 
 var (
