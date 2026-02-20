@@ -82,6 +82,12 @@ type UserFriendlyError struct {
 	Timeout time.Duration // prints "timed out after Ns" error
 }
 
+// NewUserFriendlyError returns a new UserFriendlyError with the given error and timeout.
+// The timeout is optional and is only used to provide more context in case of a timeout.
+func NewUserFriendlyError(err error, t time.Duration) *UserFriendlyError {
+	return &UserFriendlyError{Err: err, Timeout: t}
+}
+
 func (e *UserFriendlyError) Unwrap() error { return e.Err }
 
 func (e *UserFriendlyError) Error() string {

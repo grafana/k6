@@ -101,6 +101,12 @@ func call(
 		resultCh = make(chan any)
 		errCh    = make(chan error)
 	)
+	defer func() {
+		if err != nil {
+			err = k6ext.NewUserFriendlyError(err, timeout)
+		}
+	}()
+
 	if timeout > 0 {
 		ctx, cancelFn = context.WithTimeout(ctx, timeout)
 		defer cancelFn()
@@ -110,10 +116,7 @@ func call(
 
 	select {
 	case <-ctx.Done():
-		err = &k6ext.UserFriendlyError{
-			Err:     ContextErr(ctx),
-			Timeout: timeout,
-		}
+		err = k6ext.NewUserFriendlyError(ContextErr(ctx), timeout)
 	case result = <-resultCh:
 	case err = <-errCh:
 	}

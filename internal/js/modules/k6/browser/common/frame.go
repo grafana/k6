@@ -541,6 +541,11 @@ func (f *Frame) waitFor(
 	if opts == nil {
 		opts = NewFrameWaitForSelectorOptions(f.defaultTimeout())
 	}
+	defer func() {
+		if rerr != nil {
+			rerr = k6ext.NewUserFriendlyError(rerr, opts.Timeout)
+		}
+	}()
 
 	if opts.Timeout > 0 {
 		var cancel context.CancelFunc
@@ -648,10 +653,17 @@ func (f *Frame) click(selector string, opts *FrameClickOptions) error {
 	return nil
 }
 
-func (f *Frame) count(ctx context.Context, selector string) (int, error) {
+func (f *Frame) count(ctx context.Context, selector string) (count int, rerr error) {
 	f.log.Debugf("Frame:count", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	ctx, cancel := context.WithTimeout(ctx, f.defaultTimeout())
+	timeout := f.defaultTimeout()
+	defer func() {
+		if rerr != nil {
+			rerr = k6ext.NewUserFriendlyError(rerr, timeout)
+		}
+	}()
+
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	document, err := f.document(ctx)
@@ -659,12 +671,12 @@ func (f *Frame) count(ctx context.Context, selector string) (int, error) {
 		return 0, fmt.Errorf("getting document: %w", err)
 	}
 
-	c, err := document.count(ctx, selector)
+	count, err = document.count(ctx, selector)
 	if err != nil {
 		return 0, fmt.Errorf("counting elements: %w", err)
 	}
 
-	return c, nil
+	return count, nil
 }
 
 // Check clicks the first element found that matches selector.
@@ -2030,9 +2042,14 @@ func (f *Frame) waitForFunction(
 
 // WaitForLoadState waits for the given load state to be reached.
 // This will unblock if that lifecycle event has already been received.
-func (f *Frame) WaitForLoadState(state string, popts *FrameWaitForLoadStateOptions) error {
+func (f *Frame) WaitForLoadState(state string, popts *FrameWaitForLoadStateOptions) (rerr error) {
 	f.log.Debugf("Frame:WaitForLoadState", "fid:%s furl:%q state:%s", f.ID(), f.URL(), state)
 	defer f.log.Debugf("Frame:WaitForLoadState:return", "fid:%s furl:%q state:%s", f.ID(), f.URL(), state)
+	defer func() {
+		if rerr != nil {
+			rerr = k6ext.NewUserFriendlyError(rerr, popts.Timeout)
+		}
+	}()
 
 	timeoutCtx, timeoutCancel := context.WithTimeout(f.ctx, popts.Timeout)
 	defer timeoutCancel()
@@ -2073,11 +2090,16 @@ func (f *Frame) WaitForLoadState(state string, popts *FrameWaitForLoadStateOptio
 // RegExMatcher should be non-nil to be able to test against a URL pattern in the options.
 //
 //nolint:funlen
-func (f *Frame) WaitForNavigation(opts *FrameWaitForNavigationOptions, rm RegExMatcher) (*Response, error) {
+func (f *Frame) WaitForNavigation(opts *FrameWaitForNavigationOptions, rm RegExMatcher) (_ *Response, rerr error) {
 	f.log.Debugf("Frame:WaitForNavigation",
 		"fid:%s furl:%s url:%s", f.ID(), f.URL(), opts.URL)
 	defer f.log.Debugf("Frame:WaitForNavigation:return",
 		"fid:%s furl:%s", f.ID(), f.URL())
+	defer func() {
+		if rerr != nil {
+			rerr = k6ext.NewUserFriendlyError(rerr, opts.Timeout)
+		}
+	}()
 
 	timeoutCtx, timeoutCancel := context.WithTimeout(f.ctx, opts.Timeout)
 
@@ -2116,8 +2138,6 @@ func (f *Frame) WaitForNavigation(opts *FrameWaitForNavigationOptions, rm RegExM
 			return false
 		})
 
-	handleTimeoutError := f.handleWaitForNavigationTimeoutErrorFn(opts)
-
 	defer func() {
 		timeoutCancel()
 		navEvtCancel()
@@ -2151,7 +2171,10 @@ func (f *Frame) WaitForNavigation(opts *FrameWaitForNavigationOptions, rm RegExM
 			}
 		}
 	case <-timeoutCtx.Done():
-		return nil, handleTimeoutError(ContextErr(timeoutCtx))
+		if opts.URL != "" {
+			return nil, fmt.Errorf("waiting for navigation to URL matching %q: %w", opts.URL, ContextErr(timeoutCtx))
+		}
+		return nil, fmt.Errorf("waiting for navigation: %w", ContextErr(timeoutCtx))
 	}
 
 	// A lifecycle event won't be received when navigating within the same
@@ -2161,7 +2184,10 @@ func (f *Frame) WaitForNavigation(opts *FrameWaitForNavigationOptions, rm RegExM
 		select {
 		case <-lifecycleEvtCh:
 		case <-timeoutCtx.Done():
-			return nil, handleTimeoutError(ContextErr(timeoutCtx))
+			if opts.URL != "" {
+				return nil, fmt.Errorf("waiting for navigation to URL matching %q: %w", opts.URL, ContextErr(timeoutCtx))
+			}
+			return nil, fmt.Errorf("waiting for navigation: %w", ContextErr(timeoutCtx))
 		}
 	}
 
@@ -2172,25 +2198,6 @@ func (f *Frame) WaitForNavigation(opts *FrameWaitForNavigationOptions, rm RegExM
 	}
 
 	return resp, nil
-}
-
-func (f *Frame) handleWaitForNavigationTimeoutErrorFn(opts *FrameWaitForNavigationOptions) func(err error) error {
-	return func(err error) error {
-		f.log.Debugf("Frame:WaitForNavigation",
-			"fid:%v furl:%s timeoutCtx done: %v", f.ID(), f.URL(), err)
-		if err != nil {
-			e := &k6ext.UserFriendlyError{
-				Err:     err,
-				Timeout: opts.Timeout,
-			}
-			if opts.URL != "" {
-				return fmt.Errorf("waiting for navigation to URL matching %q: %w", opts.URL, e)
-			}
-			return fmt.Errorf("waiting for navigation: %w", e)
-		}
-
-		return nil
-	}
 }
 
 // WaitForSelector waits for the given selector to match the waiting criteria.
@@ -2357,8 +2364,15 @@ type frameExecutionContext interface {
 
 func (f *Frame) runActionOnSelector(
 	selector string, strict bool, fn elementHandleActionFunc, nullResponder func() bool,
-) (bool, error) {
-	ctx, cancel := context.WithTimeout(f.ctx, f.defaultTimeout())
+) (_ bool, rerr error) {
+	timeout := f.defaultTimeout()
+	defer func() {
+		if rerr != nil {
+			rerr = k6ext.NewUserFriendlyError(rerr, timeout)
+		}
+	}()
+
+	ctx, cancel := context.WithTimeout(f.ctx, timeout)
 	defer cancel()
 
 	handle, err := f.query(ctx, selector, strict)
