@@ -2401,3 +2401,84 @@ func TestGzipped204Response(t *testing.T) {
 			`))
 	assert.NoError(t, err)
 }
+
+func TestExtraArgsWarning(t *testing.T) {
+	t.Parallel()
+	ts := newTestCase(t)
+	tb := ts.tb
+	rt := ts.runtime.VU.Runtime()
+
+	sr := tb.Replacer.Replace
+
+	t.Run("http.get", func(t *testing.T) {
+		t.Run("no warning with 0 args", func(t *testing.T) {
+			ts.hook.Drain() // clear previous log entries
+			_, err := rt.RunString(sr(`http.get("HTTPBIN_URL/get");`))
+			require.NoError(t, err)
+			entries := testutils.FilterEntries(ts.hook.Drain(), logrus.WarnLevel, "http.get only accepts")
+			assert.Empty(t, entries)
+		})
+
+		t.Run("no warning with 1 arg", func(t *testing.T) {
+			ts.hook.Drain()
+			_, err := rt.RunString(sr(`http.get("HTTPBIN_URL/get", null);`))
+			require.NoError(t, err)
+			entries := testutils.FilterEntries(ts.hook.Drain(), logrus.WarnLevel, "http.get only accepts")
+			assert.Empty(t, entries)
+		})
+
+		t.Run("warning with 2 args", func(t *testing.T) {
+			ts.hook.Drain()
+			_, err := rt.RunString(sr(`http.get("HTTPBIN_URL/get", null, null);`))
+			require.NoError(t, err)
+			entries := testutils.FilterEntries(ts.hook.Drain(), logrus.WarnLevel, "http.get only accepts")
+			require.Len(t, entries, 1)
+			assert.Contains(t, entries[0].Message, "1 extra argument(s) will be ignored")
+		})
+
+		t.Run("warning with 3 args", func(t *testing.T) {
+			ts.hook.Drain()
+			_, err := rt.RunString(sr(`http.get("HTTPBIN_URL/get", null, null, null);`))
+			require.NoError(t, err)
+			entries := testutils.FilterEntries(ts.hook.Drain(), logrus.WarnLevel, "http.get only accepts")
+			require.Len(t, entries, 1)
+			assert.Contains(t, entries[0].Message, "2 extra argument(s) will be ignored")
+		})
+	})
+
+	t.Run("http.head", func(t *testing.T) {
+		t.Run("no warning with 0 args", func(t *testing.T) {
+			ts.hook.Drain()
+			_, err := rt.RunString(sr(`http.head("HTTPBIN_URL/get");`))
+			require.NoError(t, err)
+			entries := testutils.FilterEntries(ts.hook.Drain(), logrus.WarnLevel, "http.head only accepts")
+			assert.Empty(t, entries)
+		})
+
+		t.Run("no warning with 1 arg", func(t *testing.T) {
+			ts.hook.Drain()
+			_, err := rt.RunString(sr(`http.head("HTTPBIN_URL/get", null);`))
+			require.NoError(t, err)
+			entries := testutils.FilterEntries(ts.hook.Drain(), logrus.WarnLevel, "http.head only accepts")
+			assert.Empty(t, entries)
+		})
+
+		t.Run("warning with 2 args", func(t *testing.T) {
+			ts.hook.Drain()
+			_, err := rt.RunString(sr(`http.head("HTTPBIN_URL/get", null, null);`))
+			require.NoError(t, err)
+			entries := testutils.FilterEntries(ts.hook.Drain(), logrus.WarnLevel, "http.head only accepts")
+			require.Len(t, entries, 1)
+			assert.Contains(t, entries[0].Message, "1 extra argument(s) will be ignored")
+		})
+
+		t.Run("warning with 3 args", func(t *testing.T) {
+			ts.hook.Drain()
+			_, err := rt.RunString(sr(`http.head("HTTPBIN_URL/get", null, null, null);`))
+			require.NoError(t, err)
+			entries := testutils.FilterEntries(ts.hook.Drain(), logrus.WarnLevel, "http.head only accepts")
+			require.Len(t, entries, 1)
+			assert.Contains(t, entries[0].Message, "2 extra argument(s) will be ignored")
+		})
+	})
+}
