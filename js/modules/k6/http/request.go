@@ -407,9 +407,10 @@ func (c *Client) prepareBatchArray(requests []interface{}) (
 	[]httpext.BatchParsedHTTPRequest, []*Response, error,
 ) {
 	reqCount := len(requests)
-	batchReqs := make([]httpext.BatchParsedHTTPRequest, reqCount)
+	batchReqs := make([]httpext.BatchParsedHTTPRequest, 0, reqCount)
 	results := make([]*Response, reqCount)
 
+	var firstErr error // remember earliest preparation error so Batch() can throw/log consistently
 	for i, req := range requests {
 		resp := httpext.NewResponse()
 		parsedReq, err := c.parseBatchRequest(i, req)
@@ -419,27 +420,30 @@ func (c *Client) prepareBatchArray(requests []interface{}) (
 			if errors.As(err, &k6e) {
 				resp.ErrorCode = int(k6e.Code)
 			}
+			if firstErr == nil {
+				firstErr = err
+			}
 			results[i] = c.responseFromHTTPext(resp)
-			return batchReqs, results, err
+			continue
 		}
-		batchReqs[i] = httpext.BatchParsedHTTPRequest{
+		batchReqs = append(batchReqs, httpext.BatchParsedHTTPRequest{
 			ParsedHTTPRequest: parsedReq,
 			Response:          resp,
-		}
+		})
 		results[i] = c.responseFromHTTPext(resp)
 	}
 
-	return batchReqs, results, nil
+	return batchReqs, results, firstErr
 }
 
 func (c *Client) prepareBatchObject(requests map[string]interface{}) (
 	[]httpext.BatchParsedHTTPRequest, map[string]*Response, error,
 ) {
 	reqCount := len(requests)
-	batchReqs := make([]httpext.BatchParsedHTTPRequest, reqCount)
+	batchReqs := make([]httpext.BatchParsedHTTPRequest, 0, reqCount)
 	results := make(map[string]*Response, reqCount)
 
-	i := 0
+	var firstErr error // remember earliest preparation error so Batch() can throw/log consistently
 	for key, req := range requests {
 		resp := httpext.NewResponse()
 		parsedReq, err := c.parseBatchRequest(key, req)
@@ -449,18 +453,20 @@ func (c *Client) prepareBatchObject(requests map[string]interface{}) (
 			if errors.As(err, &k6e) {
 				resp.ErrorCode = int(k6e.Code)
 			}
+			if firstErr == nil {
+				firstErr = err
+			}
 			results[key] = c.responseFromHTTPext(resp)
-			return batchReqs, results, err
+			continue
 		}
-		batchReqs[i] = httpext.BatchParsedHTTPRequest{
+		batchReqs = append(batchReqs, httpext.BatchParsedHTTPRequest{
 			ParsedHTTPRequest: parsedReq,
 			Response:          resp,
-		}
+		})
 		results[key] = c.responseFromHTTPext(resp)
-		i++
 	}
 
-	return batchReqs, results, nil
+	return batchReqs, results, firstErr
 }
 
 // Batch makes multiple simultaneous HTTP requests. The provideds reqsV should be an array of request
@@ -477,6 +483,7 @@ func (c *Client) Batch(reqsV ...sobek.Value) (interface{}, error) {
 		return nil, fmt.Errorf("http.batch() accepts only an array or an object of requests")
 	}
 	var (
+		parseErr  error
 		err       error
 		batchReqs []httpext.BatchParsedHTTPRequest
 		results   interface{} // either []*Response or map[string]*Response
@@ -484,37 +491,39 @@ func (c *Client) Batch(reqsV ...sobek.Value) (interface{}, error) {
 
 	switch v := reqsV[0].Export().(type) {
 	case []interface{}:
-		batchReqs, results, err = c.prepareBatchArray(v)
+		batchReqs, results, parseErr = c.prepareBatchArray(v)
 	case map[string]interface{}:
-		batchReqs, results, err = c.prepareBatchObject(v)
+		batchReqs, results, parseErr = c.prepareBatchObject(v)
 	default:
 		return nil, fmt.Errorf("invalid http.batch() argument type %T", v)
 	}
 
-	if err != nil {
-		if state.Options.Throw.Bool {
-			return nil, err
-		}
-		state.Logger.WithField("error", err).Warn("A batch request failed")
-		return results, nil
-	}
-
 	reqCount := len(batchReqs)
-	errs := httpext.MakeBatchRequests(
-		c.moduleInstance.vu.Context(), state, batchReqs, reqCount,
-		int(state.Options.Batch.Int64), int(state.Options.BatchPerHost.Int64),
-	)
+	if reqCount > 0 {
+		errs := httpext.MakeBatchRequests(
+			c.moduleInstance.vu.Context(), state, batchReqs, reqCount,
+			int(state.Options.Batch.Int64), int(state.Options.BatchPerHost.Int64),
+		)
 
-	for i := 0; i < reqCount; i++ {
-		if e := <-errs; e != nil && err == nil { // Save only the first error
-			err = e
+		for i := 0; i < reqCount; i++ {
+			if e := <-errs; e != nil && err == nil { // Save only the first error
+				err = e
+			}
+		}
+		for _, req := range batchReqs {
+			if req.Response != nil {
+				c.processResponse(req.Response, req.ResponseType)
+			}
 		}
 	}
-	for _, req := range batchReqs {
-		if req.Response != nil {
-			c.processResponse(req.Response, req.ResponseType)
+
+	if parseErr != nil {
+		if state.Options.Throw.Bool {
+			return nil, parseErr
 		}
+		state.Logger.WithField("error", parseErr).Warn("A batch request failed")
 	}
+
 	return results, err
 }
 

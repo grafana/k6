@@ -116,16 +116,20 @@ func TestBatchErrorNoPanic(t *testing.T) {
 	t.Parallel()
 	testCases := []struct{ name, code string }{
 		{
-			name: "array", code: `[
-						["GET", "https:// invalidurl.com"],
-						["GET", "https://somevalidurl.com"],
-					]`,
+			name: "array", code: `
+						[
+							["GET", "https:// invalidurl.com"],
+							["GET", "HTTPBIN_URL/"],
+						]
+					`,
 		},
 		{
-			name: "object", code: `[
-						{method: "GET", url: "https:// invalidurl.com"},
-						{method: "GET", url: "https://somevalidurl.com"},
-					]`,
+			name: "object", code: `
+						[
+							{method: "GET", url: "https:// invalidurl.com"},
+							{method: "GET", url: "HTTPBIN_URL/"},
+						]
+					`,
 		},
 	}
 
@@ -135,20 +139,23 @@ func TestBatchErrorNoPanic(t *testing.T) {
 			ts := newTestCase(t)
 			state := ts.runtime.VU.State()
 			rt := ts.runtime.VU.Runtime()
+			tb := ts.tb
+			sr := tb.Replacer.Replace
 			oldThrow := state.Options.Throw.Bool
 			state.Options.Throw.Bool = false
 			defer func() { state.Options.Throw.Bool = oldThrow }()
 
-			ret, err := rt.RunString(fmt.Sprintf(`
+			ret, err := rt.RunString(sr(fmt.Sprintf(`
 						(function(){
 							var r = http.batch(%s);
 							if (r.length !== 2) throw new Error('unexpected responses length: '+r.length);
-							if (r[1] !== null) throw new Error('expected response at index 1 to be null');
+							if (r[1] === null) throw new Error('expected response at index 1 to be non-null');
+							if (r[1].status !== 200) throw new Error('expected successful response, got '+r[1].status);
 							r[0].html();
 							r[0].json();
 	            		    return r[0].error_code; // not reached because of json()
 						})()
-					`, tc.code))
+					`, tc.code)))
 			require.Error(t, err)
 			assert.Nil(t, ret)
 			assert.Contains(t, err.Error(), "unexpected end of JSON input")
