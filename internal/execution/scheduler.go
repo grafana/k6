@@ -504,8 +504,8 @@ func (e *Scheduler) Run(globalCtx, runCtx context.Context, samplesOut chan<- met
 	logger.Debug("Start all executors...")
 	e.state.SetExecutionStatus(lib.ExecutionStatusRunning)
 
-	executorsRunCtx, executorsRunCancel := context.WithCancelCause(withExecStateCtx)
-	defer executorsRunCancel(nil)
+	executorsRunCtx, executorsRunCancel := context.WithCancel(withExecStateCtx)
+	defer executorsRunCancel()
 	for _, exec := range e.executors {
 		go e.runExecutor(executorsRunCtx, runResults, samplesOut, exec)
 	}
@@ -519,7 +519,7 @@ func (e *Scheduler) Run(globalCtx, runCtx context.Context, samplesOut chan<- met
 		if err != nil && firstErr == nil {
 			logger.WithError(err).Debug("Executor returned with an error, cancelling test run...")
 			firstErr = err
-			executorsRunCancel(firstErr)
+			executorsRunCancel()
 		}
 	}
 

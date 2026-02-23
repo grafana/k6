@@ -17,8 +17,6 @@ import (
 	"go.k6.io/k6/internal/js/modules/k6/browser/common/js"
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6error"
 	"go.k6.io/k6/internal/js/modules/k6/browser/log"
-
-	"go.k6.io/k6/lib"
 )
 
 // waitForEventType represents the event types that can be used when working
@@ -379,7 +377,7 @@ func (b *BrowserContext) waitForEvent(
 
 	select {
 	case <-b.ctx.Done():
-		return nil, lib.ContextErr(b.ctx) //nolint:wrapcheck
+		return nil, ContextErr(b.ctx) //nolint:wrapcheck
 	case <-time.After(timeout):
 		b.logger.Debugf("BrowserContext:WaitForEvent:timeout", "bctxid:%v event:%q", b.id, event)
 		return nil, fmt.Errorf("waitForEvent timed out after %v", timeout)

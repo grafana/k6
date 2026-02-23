@@ -643,7 +643,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			tq, ctx, stop := newTaskQueue(vu)
 
 			return promise(vu, func() (result any, reason error) {
-				defer stop(nil)
+				defer stop()
 				return p.WaitForResponse(val, popts, newRegExMatcher(ctx, vu, tq))
 			}), nil
 		},
@@ -664,7 +664,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			tq, ctx, stop := newTaskQueue(vu)
 
 			return promise(vu, func() (result any, reason error) {
-				defer stop(nil)
+				defer stop()
 				return p.WaitForRequest(val, popts, newRegExMatcher(ctx, vu, tq))
 			}), nil
 		},
@@ -977,7 +977,7 @@ func mapWaitForURL(vu moduleVU, target interface {
 	tq, ctx, stop := newTaskQueue(vu)
 
 	return promise(vu, func() (result any, reason error) {
-		defer stop(nil)
+		defer stop()
 		return nil, target.WaitForURL(purl, popts, newRegExMatcher(ctx, vu, tq))
 	}), nil
 }
@@ -998,7 +998,7 @@ func mapWaitForNavigation(vu moduleVU, target interface {
 			return nil, func() {}
 		}
 		tq, ctx, stop := newTaskQueue(vu)
-		return newRegExMatcher(ctx, vu, tq), func() { stop(nil) }
+		return newRegExMatcher(ctx, vu, tq), func() { stop() }
 	}()
 
 	return promise(vu, func() (any, error) {

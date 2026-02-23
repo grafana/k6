@@ -19,7 +19,7 @@ func TestNewBrowserContext(t *testing.T) {
 	t.Run("add_web_vital_js_scripts_to_context", func(t *testing.T) {
 		t.Parallel()
 
-		ctx, cancel := context.WithCancelCause(context.Background())
+		ctx, cancel := context.WithCancel(context.Background())
 		logger := log.NewNullLogger()
 		b := newBrowser(context.Background(), ctx, cancel, nil, NewLocalBrowserOptions(), logger)
 

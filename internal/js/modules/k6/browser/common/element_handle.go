@@ -18,8 +18,6 @@ import (
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/common/js"
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
-
-	"go.k6.io/k6/lib"
 )
 
 // Common error types for element visibility.
@@ -1779,7 +1777,7 @@ func retryPointerAction(
 		// Wait with timeout or context cancellation
 		select {
 		case <-apiCtx.Done():
-			return nil, lib.ContextErr(apiCtx)
+			return nil, ContextErr(apiCtx)
 		case <-time.After(20 * time.Millisecond):
 			// Continue retrying after delay
 		}

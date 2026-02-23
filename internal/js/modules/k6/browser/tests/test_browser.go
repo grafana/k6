@@ -22,8 +22,6 @@ import (
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext/k6test"
 
-	"go.k6.io/k6/lib"
-
 	k6httpmultibin "go.k6.io/k6/internal/lib/testutils/httpmultibin"
 	k6metrics "go.k6.io/k6/metrics"
 )
@@ -414,7 +412,7 @@ func (b *testBrowser) run(ctx context.Context, fs ...func() error) error {
 			case err := <-errc:
 				return err
 			case <-ctx.Done():
-				if err := lib.ContextErr(ctx); err != nil {
+				if err := common.ContextErr(ctx); err != nil {
 					return fmt.Errorf("while running %T: %w", f, err)
 				}
 			}

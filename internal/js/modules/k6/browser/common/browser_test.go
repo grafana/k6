@@ -30,7 +30,7 @@ func TestBrowserNewPageInContext(t *testing.T) {
 	}
 
 	newTestCase := func(id cdp.BrowserContextID) *testCase {
-		ctx, cancel := context.WithCancelCause(context.Background())
+		ctx, cancel := context.WithCancel(context.Background())
 		b := newBrowser(context.Background(), ctx, cancel, nil, NewLocalBrowserOptions(), log.NewNullLogger())
 
 		// set a new browser context in the browser with `id`, so that newPageInContext can find it.

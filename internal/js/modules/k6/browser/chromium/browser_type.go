@@ -131,7 +131,7 @@ func (b *BrowserType) connect(
 
 	// If this context is cancelled we'll initiate an extension wide
 	// cancellation and shutdown.
-	browserCtx, browserCtxCancel := context.WithCancelCause(vuCtx)
+	browserCtx, browserCtxCancel := context.WithCancel(vuCtx)
 	b.Ctx = browserCtx
 	browser, err := common.NewBrowser(
 		ctx, browserCtx, browserCtxCancel, browserProc, opts, logger,
@@ -213,7 +213,7 @@ func (b *BrowserType) launch(
 
 	// If this context is cancelled we'll initiate an extension wide
 	// cancellation and shutdown.
-	browserCtx, browserCtxCancel := context.WithCancelCause(vuCtx)
+	browserCtx, browserCtxCancel := context.WithCancel(vuCtx)
 	b.Ctx = browserCtx
 	browser, err := common.NewBrowser(ctx, browserCtx, browserCtxCancel,
 		browserProc, opts, logger)

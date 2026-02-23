@@ -13,8 +13,6 @@ import (
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/log"
 	"go.k6.io/k6/internal/js/modules/k6/browser/storage"
-
-	"go.k6.io/k6/lib"
 )
 
 type BrowserProcess struct {
@@ -182,7 +180,7 @@ func execute(
 		return command{}, fmt.Errorf("%w", err)
 	}
 	if ctx.Err() != nil {
-		return command{}, lib.ContextErr(ctx)
+		return command{}, ContextErr(ctx)
 	}
 
 	done := make(chan struct{})
@@ -222,7 +220,7 @@ func parseDevToolsURL(ctx context.Context, cmd command) (_ string, err error) {
 		case <-done:
 			err = parser.err()
 		case <-ctx.Done():
-			err = lib.ContextErr(ctx)
+			err = ContextErr(ctx)
 		case <-cmd.done:
 			err = errors.New("browser process ended unexpectedly")
 		}

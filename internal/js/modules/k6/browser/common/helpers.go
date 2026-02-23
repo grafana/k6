@@ -15,8 +15,6 @@ import (
 	"github.com/grafana/sobek"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
-
-	"go.k6.io/k6/lib"
 )
 
 func convertBaseJSHandleTypes(
@@ -111,7 +109,7 @@ func call(
 	select {
 	case <-ctx.Done():
 		err = &k6ext.UserFriendlyError{
-			Err:     lib.ContextErr(ctx),
+			Err:     ContextErr(ctx),
 			Timeout: timeout,
 		}
 	case result = <-resultCh:
