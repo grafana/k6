@@ -58,6 +58,10 @@ allowing them to extend k6's functionality with custom commands.
 				return cmd.Help()
 			}
 
+			if !gs.Flags.AutoExtensionResolution {
+				return cobra.NoArgs(cmd, args)
+			}
+
 			// Subcommand not found - trigger provisioning
 			deps, err := dependenciesFromSubcommand(gs, args[0])
 			if err != nil {
