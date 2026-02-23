@@ -364,8 +364,8 @@ func (b *BrowserContext) waitForEvent(
 		return nil, fmt.Errorf("incorrect event %q, %q is the only event supported", event, waitForEventTypePage)
 	}
 
-	evCancelCtx, evCancelFn := context.WithCancelCause(b.ctx)
-	defer evCancelFn(nil) // This will remove the event handler once we return from here.
+	evCancelCtx, evCancelFn := context.WithCancel(b.ctx)
+	defer evCancelFn() // This will remove the event handler once we return from here.
 
 	chEvHandler := make(chan Event)
 	ch := make(chan any)

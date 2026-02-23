@@ -588,7 +588,7 @@ func (c *Connection) Execute(
 
 	// Setup event handler used to block for response to message being sent.
 	ch := make(chan *cdproto.Message, 1)
-	evCancelCtx, evCancelFn := context.WithCancelCause(ctx)
+	evCancelCtx, evCancelFn := context.WithCancel(ctx)
 	chEvHandler := make(chan Event)
 	go func() {
 		for {
@@ -612,7 +612,7 @@ func (c *Connection) Execute(
 		}
 	}()
 	c.onAll(evCancelCtx, chEvHandler)
-	defer evCancelFn(nil) // Remove event handler
+	defer evCancelFn() // Remove event handler
 
 	// Send the message
 	var buf []byte

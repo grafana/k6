@@ -28,7 +28,7 @@ func (b *Barrier) AddFrameNavigation(frame *Frame) {
 		return true
 	})
 	go func() {
-		defer evCancelFn(nil) // Remove event handler
+		defer evCancelFn() // Remove event handler
 		atomic.AddInt64(&b.count, 1)
 		select {
 		case <-frame.ctx.Done():

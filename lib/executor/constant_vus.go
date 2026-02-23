@@ -176,8 +176,8 @@ func (clv ConstantVUs) Run(parentCtx context.Context, _ chan<- metrics.SampleCon
 	}
 
 	handleVU := func(initVU lib.InitializedVU) {
-		ctx, cancel := context.WithCancelCause(maxDurationCtx)
-		defer cancel(nil)
+		ctx, cancel := context.WithCancel(maxDurationCtx)
+		defer cancel()
 
 		activeVU := initVU.Activate(
 			getVUActivationParams(ctx, clv.config.BaseConfig, returnVU, clv.nextIterationCounters))

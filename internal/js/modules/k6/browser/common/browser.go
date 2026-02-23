@@ -486,7 +486,7 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 			return e.(*Page).targetID == tid //nolint:forcetypeassert
 		},
 	)
-	defer removeEventHandler(nil)
+	defer removeEventHandler()
 
 	// create a new page.
 	action := target.CreateTarget(BlankPage).WithNewWindow(true).WithBrowserContextID(id)
