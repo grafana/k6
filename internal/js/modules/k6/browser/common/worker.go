@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/log"
@@ -44,9 +45,13 @@ func (w *Worker) initEvents() error {
 			return fmt.Errorf("protocol error while initializing worker %T: %w", action, err)
 		}
 	}
-	_ = w.session.ExecuteWithoutExpectationOnReply(
-		w.ctx, runtime.CommandRunIfWaitingForDebugger, nil, nil,
-	)
+	go func() {
+		ctx, cancel := context.WithTimeout(w.ctx, time.Second)
+		defer cancel()
+		_ = w.session.ExecuteWithoutExpectationOnReply(
+			ctx, runtime.CommandRunIfWaitingForDebugger, nil, nil,
+		)
+	}()
 	return nil
 }
 
