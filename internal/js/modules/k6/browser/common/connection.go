@@ -291,8 +291,11 @@ func (c *Connection) handleIOError(err error) {
 
 	// Report an unexpected closure
 	c.logger.Errorf("cdp", "communicating with browser: %v", err)
-	// Never block publishing to errorCh: in unexpected-close paths there might
-	// be no active request reading from the channel.
+	// Never block publishing to errorCh:
+	// When closing unexpectedly, there might be no active request
+	// reading from the channel, so we need to make sure the error
+	// is published even if the channel is not being listened to.
+	// This avoids: 1) losing the error and 2) deadlocks.
 	select {
 	case c.errorCh <- err:
 	case <-c.done:
@@ -491,10 +494,10 @@ func (c *Connection) send(
 		return fmt.Errorf("closing communication with browser: %w", &websocket.CloseError{Code: code})
 	case <-ctx.Done():
 		c.logger.Debugf("Connection:send:<-ctx.Done", "wsURL:%q sid:%v err:%v", c.wsURL, msg.SessionID, c.ctx.Err())
-		return nil
+		return ContextErr(ctx)
 	case <-c.done:
 		c.logger.Debugf("Connection:send:<-c.done", "wsURL:%q sid:%v", c.wsURL, msg.SessionID)
-		return nil
+		return ContextErr(c.ctx)
 	}
 
 	// Block waiting for response.
@@ -531,6 +534,7 @@ func (c *Connection) send(
 		return &websocket.CloseError{Code: code}
 	case <-c.done:
 		c.logger.Debugf("Connection:send:<-c.done #2", "sid:%v tid:%v wsURL:%q", msg.SessionID, tid, c.wsURL)
+		return ContextErr(c.ctx)
 	case <-ctx.Done():
 		c.logger.Debugf("Connection:send:<-ctx.Done()", "sid:%v tid:%v wsURL:%q err:%v",
 			msg.SessionID, tid, c.wsURL, ContextErr(c.ctx))
