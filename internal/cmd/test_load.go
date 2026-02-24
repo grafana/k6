@@ -499,7 +499,18 @@ func (lt *loadedTest) consolidateDeriveAndValidateConfig(
 		}
 	}
 
-	derivedConfig, err := deriveAndValidateConfig(consolidatedConfig, lt.initRunner.IsExecutable, gs.Logger)
+	// Get imported modules to check for browser import
+	var importedModules []string
+	if lt.moduleResolver != nil {
+		importedModules = lt.moduleResolver.Imported()
+	}
+
+	derivedConfig, err := deriveAndValidateConfig(
+		consolidatedConfig,
+		lt.initRunner.IsExecutable,
+		importedModules,
+		gs.Logger,
+	)
 	if err != nil {
 		return nil, err
 	}
