@@ -544,7 +544,6 @@ func (c *Connection) send(
 			msg.SessionID, tid, c.wsURL, ContextErr(c.ctx))
 		return ContextErr(c.ctx)
 	}
-	return nil
 }
 
 func (c *Connection) sendLoop() {
