@@ -474,10 +474,13 @@ func (c *Connection) stopWaitingForDebugger(sid target.SessionID) {
 		SessionID: sid,
 		Method:    cdproto.MethodType(cdpruntime.CommandRunIfWaitingForDebugger),
 	}
-	err := c.send(c.ctx, msg, nil, nil)
-	if err != nil {
-		c.logger.Errorf("Connection:stopWaitingForDebugger", "sid:%v wsURL:%q, err:%v", sid, c.wsURL, err)
-	}
+	go func() {
+		ctx, cancel := context.WithTimeout(c.ctx, time.Second)
+		defer cancel()
+		if err := c.send(ctx, msg, nil, nil); err != nil {
+			c.logger.Debugf("Connection:stopWaitingForDebugger", "sid:%v wsURL:%q, err:%v", sid, c.wsURL, err)
+		}
+	}()
 }
 
 func (c *Connection) send(
