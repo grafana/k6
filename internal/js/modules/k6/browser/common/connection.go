@@ -171,16 +171,18 @@ func NewConnection(
 	}
 
 	c := Connection{
-		BaseEventEmitter:         NewBaseEventEmitter(ctx),
-		ctx:                      ctx,
-		cancelCtx:                cancelCtx,
-		wsURL:                    wsURL,
-		logger:                   logger,
-		conn:                     conn,
-		sendCh:                   make(chan *cdproto.Message, 32), // Avoid blocking in Execute
-		recvCh:                   make(chan *cdproto.Message),
-		closeCh:                  make(chan int),
-		errorCh:                  make(chan error),
+		BaseEventEmitter: NewBaseEventEmitter(ctx),
+		ctx:              ctx,
+		cancelCtx:        cancelCtx,
+		wsURL:            wsURL,
+		logger:           logger,
+		conn:             conn,
+		sendCh:           make(chan *cdproto.Message, 32), // Avoid blocking in Execute
+		recvCh:           make(chan *cdproto.Message),
+		closeCh:          make(chan int),
+		// Keep one slot so unexpected IO errors can be published even if no
+		// request is currently waiting on the channel.
+		errorCh:                  make(chan error, 1),
 		done:                     make(chan struct{}),
 		closing:                  make(chan struct{}),
 		msgIDGen:                 &msgID{},
@@ -289,11 +291,15 @@ func (c *Connection) handleIOError(err error) {
 
 	// Report an unexpected closure
 	c.logger.Errorf("cdp", "communicating with browser: %v", err)
+	// Never block publishing to errorCh: in unexpected-close paths there might
+	// be no active request reading from the channel.
 	select {
 	case c.errorCh <- err:
 	case <-c.done:
 		return
+	default:
 	}
+
 	var (
 		cerr *websocket.CloseError
 		code = websocket.CloseGoingAway
@@ -301,6 +307,7 @@ func (c *Connection) handleIOError(err error) {
 	if errors.As(err, &cerr) {
 		code = cerr.Code
 	}
+
 	select {
 	case c.closeCh <- code:
 		c.logger.Debugf("cdp", "ending browser communication with code %d", code)
