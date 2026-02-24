@@ -125,8 +125,10 @@ func NewFrameSession(
 		hasUIWindow:          hasUIWindow,
 	}
 
-	if err := cdpruntime.RunIfWaitingForDebugger().Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
-		return nil, fmt.Errorf("run if waiting for debugger to attach: %w", err)
+	if err := fs.session.ExecuteWithoutExpectationOnReply(
+		fs.ctx, cdpruntime.CommandRunIfWaitingForDebugger, nil, nil,
+	); err != nil {
+		l.Debugf("NewFrameSession:RunIfWaitingForDebugger", "sid:%v tid:%v err:%v", s.ID(), tid, err)
 	}
 
 	var parentNM *NetworkManager

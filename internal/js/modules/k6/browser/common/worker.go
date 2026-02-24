@@ -38,13 +38,15 @@ func (w *Worker) initEvents() error {
 	actions := []Action{
 		log.Enable(),
 		network.Enable(),
-		runtime.RunIfWaitingForDebugger(),
 	}
 	for _, action := range actions {
 		if err := action.Do(cdp.WithExecutor(w.ctx, w.session)); err != nil {
 			return fmt.Errorf("protocol error while initializing worker %T: %w", action, err)
 		}
 	}
+	_ = w.session.ExecuteWithoutExpectationOnReply(
+		w.ctx, runtime.CommandRunIfWaitingForDebugger, nil, nil,
+	)
 	return nil
 }
 
