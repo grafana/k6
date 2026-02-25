@@ -244,15 +244,19 @@ func (f *Frame) defaultTimeout() time.Duration {
 }
 
 func (f *Frame) document() (*ElementHandle, error) {
+	return f.documentWithContext(f.ctx)
+}
+
+func (f *Frame) documentWithContext(apiCtx context.Context) (*ElementHandle, error) {
 	f.log.Debugf("Frame:document", "fid:%s furl:%q", f.ID(), f.URL())
 
 	if cdh, ok := f.cachedDocumentHandle(); ok {
 		return cdh, nil
 	}
 
-	f.waitForExecutionContext(mainWorld)
+	f.waitForExecutionContextWithContext(apiCtx, mainWorld)
 
-	dh, err := f.newDocumentHandle()
+	dh, err := f.newDocumentHandle(apiCtx)
 	if err != nil {
 		return nil, fmt.Errorf("getting new document handle: %w", err)
 	}
@@ -275,9 +279,9 @@ func (f *Frame) cachedDocumentHandle() (*ElementHandle, bool) {
 	return f.documentHandle, f.documentHandle != nil
 }
 
-func (f *Frame) newDocumentHandle() (*ElementHandle, error) {
+func (f *Frame) newDocumentHandle(apiCtx context.Context) (*ElementHandle, error) {
 	result, err := f.evaluate(
-		f.ctx,
+		apiCtx,
 		mainWorld,
 		evalOptions{
 			forceCallable: false,
@@ -453,6 +457,10 @@ func (f *Frame) setID(id cdp.FrameID) {
 }
 
 func (f *Frame) waitForExecutionContext(world executionWorld) {
+	f.waitForExecutionContextWithContext(f.ctx, world)
+}
+
+func (f *Frame) waitForExecutionContextWithContext(apiCtx context.Context, world executionWorld) {
 	f.log.Debugf("Frame:waitForExecutionContext", "fid:%s furl:%q world:%s",
 		f.ID(), f.URL(), world)
 
@@ -469,6 +477,8 @@ func (f *Frame) waitForExecutionContext(world executionWorld) {
 			if f.hasContext(world) {
 				return
 			}
+		case <-apiCtx.Done():
+			return
 		case <-f.ctx.Done():
 			return
 		case <-sessionDone:
@@ -640,12 +650,15 @@ func (f *Frame) click(selector string, opts *FrameClickOptions) error {
 func (f *Frame) count(selector string) (int, error) {
 	f.log.Debugf("Frame:count", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	document, err := f.document()
+	countCtx, cancel := context.WithTimeout(f.ctx, f.defaultTimeout())
+	defer cancel()
+
+	document, err := f.documentWithContext(countCtx)
 	if err != nil {
 		return 0, fmt.Errorf("getting document: %w", err)
 	}
 
-	c, err := document.count(f.ctx, selector)
+	c, err := document.count(countCtx, selector)
 	if err != nil {
 		return 0, fmt.Errorf("counting elements: %w", err)
 	}

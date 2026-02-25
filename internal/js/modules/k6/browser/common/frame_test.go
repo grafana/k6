@@ -89,6 +89,29 @@ func TestFrameWaitForExecutionContextReturnsWhenSessionCloses(t *testing.T) {
 	}
 }
 
+func TestFrameWaitForExecutionContextReturnsWhenCallContextCloses(t *testing.T) {
+	t.Parallel()
+
+	l := log.NewNullLogger()
+	fm := NewFrameManager(context.Background(), nil, nil, NewTimeoutSettings(nil), l)
+	frame := NewFrame(context.Background(), fm, nil, cdp.FrameID("42"), l)
+
+	callCtx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	waitDone := make(chan struct{})
+	go func() {
+		frame.waitForExecutionContextWithContext(callCtx, mainWorld)
+		close(waitDone)
+	}()
+
+	select {
+	case <-waitDone:
+	case <-time.After(time.Second):
+		require.FailNow(t, "waitForExecutionContextWithContext should return when call context closes")
+	}
+}
+
 // See: Issue #177 for details.
 func TestFrameManagerFrameAbortedNavigationShouldEmitANonNilPendingDocument(t *testing.T) {
 	t.Parallel()
