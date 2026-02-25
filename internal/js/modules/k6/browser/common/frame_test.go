@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/chromedp/cdproto/target"
+
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext/k6test"
 	"go.k6.io/k6/internal/js/modules/k6/browser/log"
 
@@ -64,6 +66,29 @@ func TestFrameNilDocument(t *testing.T) {
 	require.Equal(t, want, got)
 }
 
+func TestFrameWaitForExecutionContextReturnsWhenSessionCloses(t *testing.T) {
+	t.Parallel()
+
+	l := log.NewNullLogger()
+	s := &sessionDoneTestStub{done: make(chan struct{})}
+	fm := NewFrameManager(context.Background(), s, nil, NewTimeoutSettings(nil), l)
+	frame := NewFrame(context.Background(), fm, nil, cdp.FrameID("42"), l)
+
+	waitDone := make(chan struct{})
+	go func() {
+		frame.waitForExecutionContext(mainWorld)
+		close(waitDone)
+	}()
+
+	close(s.done)
+
+	select {
+	case <-waitDone:
+	case <-time.After(time.Second):
+		require.FailNow(t, "waitForExecutionContext should return when session closes")
+	}
+}
+
 // See: Issue #177 for details.
 func TestFrameManagerFrameAbortedNavigationShouldEmitANonNilPendingDocument(t *testing.T) {
 	t.Parallel()
@@ -103,6 +128,36 @@ type executionContextTestStub struct {
 	evalFn func(
 		apiCtx context.Context, opts evalOptions, js string, args ...any,
 	) (res any, err error)
+}
+
+type sessionDoneTestStub struct {
+	done chan struct{}
+}
+
+func (s *sessionDoneTestStub) Execute(context.Context, string, any, any) error {
+	return nil
+}
+
+func (s *sessionDoneTestStub) emit(string, any) {}
+
+func (s *sessionDoneTestStub) on(context.Context, []string, chan Event) {}
+
+func (s *sessionDoneTestStub) onAll(context.Context, chan Event) {}
+
+func (s *sessionDoneTestStub) ExecuteWithoutExpectationOnReply(context.Context, string, any, any) error {
+	return nil
+}
+
+func (s *sessionDoneTestStub) ID() target.SessionID {
+	return target.SessionID("session")
+}
+
+func (s *sessionDoneTestStub) TargetID() target.ID {
+	return target.ID("target")
+}
+
+func (s *sessionDoneTestStub) Done() <-chan struct{} {
+	return s.done
 }
 
 func (e *executionContextTestStub) eval( // this needs to be a pointer as otherwise it will copy the mutex inside of it

@@ -456,6 +456,11 @@ func (f *Frame) waitForExecutionContext(world executionWorld) {
 	f.log.Debugf("Frame:waitForExecutionContext", "fid:%s furl:%q world:%s",
 		f.ID(), f.URL(), world)
 
+	var sessionDone <-chan struct{}
+	if f.manager != nil && f.manager.session != nil {
+		sessionDone = f.manager.session.Done()
+	}
+
 	t := time.NewTicker(50 * time.Millisecond)
 	defer t.Stop()
 	for {
@@ -465,6 +470,10 @@ func (f *Frame) waitForExecutionContext(world executionWorld) {
 				return
 			}
 		case <-f.ctx.Done():
+			return
+		case <-sessionDone:
+			f.log.Debugf("Frame:waitForExecutionContext", "fid:%s furl:%q world:%s session closed",
+				f.ID(), f.URL(), world)
 			return
 		}
 	}
