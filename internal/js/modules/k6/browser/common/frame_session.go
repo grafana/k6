@@ -125,15 +125,13 @@ func NewFrameSession(
 		hasUIWindow:          hasUIWindow,
 	}
 
-	go func() {
-		ctx, cancel := context.WithTimeout(fs.ctx, time.Second)
-		defer cancel()
-		if err := fs.session.ExecuteWithoutExpectationOnReply(
-			ctx, cdpruntime.CommandRunIfWaitingForDebugger, nil, nil,
-		); err != nil {
-			l.Debugf("NewFrameSession:RunIfWaitingForDebugger", "sid:%v tid:%v err:%v", s.ID(), tid, err)
-		}
-	}()
+	runCtx, cancelRun := context.WithTimeout(fs.ctx, time.Second)
+	defer cancelRun()
+	if err := fs.session.ExecuteWithoutExpectationOnReply(
+		runCtx, cdpruntime.CommandRunIfWaitingForDebugger, nil, nil,
+	); err != nil {
+		l.Debugf("NewFrameSession:RunIfWaitingForDebugger", "sid:%v tid:%v err:%v", s.ID(), tid, err)
+	}
 
 	var parentNM *NetworkManager
 	if fs.parent != nil {
@@ -1301,12 +1299,10 @@ func (fs *FrameSession) executionContextForID(
 // detachSession unblocks a target waiting for debugger and detaches from it.
 // Prevents the browser from hanging on rejected targets during close
 func detachSession(ctx context.Context, session *Session) {
-	go func() {
-		c, cancel := context.WithTimeout(ctx, 2*time.Second)
-		defer cancel()
+	c, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
 
-		_ = session.ExecuteWithoutExpectationOnReply(c, cdpruntime.CommandRunIfWaitingForDebugger, nil, nil)
-		_ = session.ExecuteWithoutExpectationOnReply(c, target.CommandDetachFromTarget,
-			&target.DetachFromTargetParams{SessionID: session.id}, nil)
-	}()
+	_ = session.ExecuteWithoutExpectationOnReply(c, cdpruntime.CommandRunIfWaitingForDebugger, nil, nil)
+	_ = session.ExecuteWithoutExpectationOnReply(c, target.CommandDetachFromTarget,
+		&target.DetachFromTargetParams{SessionID: session.id}, nil)
 }

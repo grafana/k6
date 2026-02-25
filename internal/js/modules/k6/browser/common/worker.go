@@ -45,13 +45,11 @@ func (w *Worker) initEvents() error {
 			return fmt.Errorf("protocol error while initializing worker %T: %w", action, err)
 		}
 	}
-	go func() {
-		ctx, cancel := context.WithTimeout(w.ctx, time.Second)
-		defer cancel()
-		_ = w.session.ExecuteWithoutExpectationOnReply(
-			ctx, runtime.CommandRunIfWaitingForDebugger, nil, nil,
-		)
-	}()
+	ctx, cancel := context.WithTimeout(w.ctx, time.Second)
+	defer cancel()
+	_ = w.session.ExecuteWithoutExpectationOnReply(
+		ctx, runtime.CommandRunIfWaitingForDebugger, nil, nil,
+	)
 	return nil
 }
 
