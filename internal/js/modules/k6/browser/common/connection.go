@@ -498,7 +498,7 @@ func (c *Connection) send(
 		return ContextErr(ctx)
 	case <-c.done:
 		c.logger.Debugf("Connection:send:<-c.done", "wsURL:%q sid:%v", c.wsURL, msg.SessionID)
-		return ContextErr(c.ctx)
+		return connectionDoneErr(c.ctx)
 	}
 
 	// Block waiting for response.
@@ -535,7 +535,7 @@ func (c *Connection) send(
 		return &websocket.CloseError{Code: code}
 	case <-c.done:
 		c.logger.Debugf("Connection:send:<-c.done #2", "sid:%v tid:%v wsURL:%q", msg.SessionID, tid, c.wsURL)
-		return ContextErr(c.ctx)
+		return connectionDoneErr(c.ctx)
 	case <-ctx.Done():
 		c.logger.Debugf("Connection:send:<-ctx.Done()", "sid:%v tid:%v wsURL:%q err:%v",
 			msg.SessionID, tid, c.wsURL, ContextErr(c.ctx))
@@ -545,6 +545,13 @@ func (c *Connection) send(
 			msg.SessionID, tid, c.wsURL, ContextErr(c.ctx))
 		return ContextErr(c.ctx)
 	}
+}
+
+func connectionDoneErr(ctx context.Context) error {
+	if err := ContextErr(ctx); err != nil {
+		return err
+	}
+	return ErrChannelClosed
 }
 
 func (c *Connection) sendLoop() {

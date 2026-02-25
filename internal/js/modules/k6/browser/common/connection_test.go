@@ -236,3 +236,25 @@ func TestConnectionAbnormalClosurePendingCloses(t *testing.T) {
 		t.Fatalf("connection did not close with pending request")
 	}
 }
+
+func TestConnectionSendDoneReturnsError(t *testing.T) {
+	t.Parallel()
+
+	conn := &Connection{
+		ctx:     context.Background(),
+		logger:  log.NewNullLogger(),
+		sendCh:  make(chan *cdproto.Message),
+		closeCh: make(chan int),
+		errorCh: make(chan error, 1),
+		done:    make(chan struct{}),
+	}
+	close(conn.done)
+
+	err := conn.send(
+		context.Background(),
+		&cdproto.Message{ID: 1},
+		make(chan *cdproto.Message),
+		nil,
+	)
+	require.Error(t, err)
+}
