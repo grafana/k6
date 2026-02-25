@@ -46,6 +46,10 @@ const (
 	ResourceTypeUnknown            string = "Unknown"
 )
 
+// Bound response body fetch attempts so a stalled CDP call does not block
+// event processing indefinitely under degraded browser conditions.
+const responseBodyFetchTimeout = 2 * time.Second
+
 // HTTPHeader is a single HTTP header.
 type HTTPHeader struct {
 	Name  string `json:"name"`
@@ -509,7 +513,15 @@ func (r *Response) fetchBody() error {
 	var err error
 	maxRetries := 5
 	for i := 0; i <= maxRetries; i++ {
-		body, err = action.Do(cdp.WithExecutor(r.ctx, r.request.frame.manager.session))
+		reqCtx := r.ctx
+		cancel := func() {}
+		// Keep explicit caller deadlines intact, but cap otherwise-unbounded
+		// background fetches (e.g. metrics emission).
+		if _, hasDeadline := reqCtx.Deadline(); !hasDeadline {
+			reqCtx, cancel = context.WithTimeout(reqCtx, responseBodyFetchTimeout)
+		}
+		body, err = action.Do(cdp.WithExecutor(reqCtx, r.request.frame.manager.session))
+		cancel()
 		if err == nil {
 			break
 		}

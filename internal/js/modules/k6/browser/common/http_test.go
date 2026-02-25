@@ -1,12 +1,14 @@
 package common
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/network"
+	"github.com/chromedp/cdproto/target"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -127,6 +129,36 @@ func TestResponse(t *testing.T) {
 	})
 }
 
+func TestResponseFetchBodyTimesOutWhenCDPDoesNotReply(t *testing.T) {
+	t.Parallel()
+
+	vu := k6test.NewVU(t)
+	vu.ActivateVU()
+
+	logger := log.NewNullLogger()
+	session := &blockingSessionStub{done: make(chan struct{})}
+	frameManager := NewFrameManager(vu.Context(), session, nil, NewTimeoutSettings(nil), logger)
+	frame := NewFrame(vu.Context(), frameManager, nil, cdp.FrameID("f1"), logger)
+
+	req := &Request{
+		frame:     frame,
+		requestID: network.RequestID("req-1"),
+	}
+	ts := cdp.MonotonicTime(time.Now())
+	resp := NewHTTPResponse(vu.Context(), req, &network.Response{
+		URL:     "https://test/post",
+		Headers: network.Headers{},
+	}, &ts)
+
+	start := time.Now()
+	err := resp.fetchBody()
+	elapsed := time.Since(start)
+
+	require.Error(t, err)
+	require.ErrorContains(t, err, "fetching response body")
+	require.Less(t, elapsed, responseBodyFetchTimeout+time.Second)
+}
+
 func TestValidateResourceType(t *testing.T) {
 	t.Parallel()
 
@@ -165,4 +197,35 @@ func TestValidateResourceType(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+type blockingSessionStub struct {
+	done chan struct{}
+}
+
+func (s *blockingSessionStub) Execute(ctx context.Context, _ string, _, _ any) error {
+	<-ctx.Done()
+	return ctx.Err()
+}
+
+func (s *blockingSessionStub) emit(string, any) {}
+
+func (s *blockingSessionStub) on(context.Context, []string, chan Event) {}
+
+func (s *blockingSessionStub) onAll(context.Context, chan Event) {}
+
+func (s *blockingSessionStub) ExecuteWithoutExpectationOnReply(context.Context, string, any, any) error {
+	return nil
+}
+
+func (s *blockingSessionStub) ID() target.SessionID {
+	return target.SessionID("sid")
+}
+
+func (s *blockingSessionStub) TargetID() target.ID {
+	return target.ID("tid")
+}
+
+func (s *blockingSessionStub) Done() <-chan struct{} {
+	return s.done
 }
