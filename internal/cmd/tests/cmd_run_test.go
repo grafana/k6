@@ -2579,6 +2579,98 @@ func TestSetupTimeout(t *testing.T) {
 	assert.Contains(t, stderr, "setup() execution timed out after 1 seconds")
 }
 
+func TestHandleSummaryTimeout(t *testing.T) {
+	t.Parallel()
+	ts := NewGlobalTestState(t)
+	ts.ExpectedExitCode = int(exitcodes.HandleSummaryTimeout)
+	ts.CmdArgs = []string{"k6", "run", "-"}
+	ts.Stdin = bytes.NewBufferString(`
+		import { sleep } from 'k6';
+
+		export const options = {
+			handleSummaryTimeout: '1s',
+		};
+
+		export function handleSummary(data) {
+			sleep(100000);
+		}
+
+		export default function() {}
+	`)
+
+	start := time.Now()
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+	elapsed := time.Since(start)
+	assert.Greater(t, elapsed, 1*time.Second, "expected more time to have passed because of handleSummaryTimeout")
+	assert.Less(
+		t, elapsed, 5*time.Second,
+		"expected less time to have passed because of handleSummaryTimeout",
+	)
+
+	stderr := ts.Stderr.String()
+	t.Log(stderr)
+	assert.Contains(t, stderr, "handleSummary() execution timed out after 1 seconds")
+}
+
+func TestHandleSummaryTimeoutWithCliFlag(t *testing.T) {
+	t.Parallel()
+	ts := NewGlobalTestState(t)
+	ts.ExpectedExitCode = int(exitcodes.HandleSummaryTimeout)
+	ts.CmdArgs = []string{"k6", "run", "--summary-timeout", "1s", "-"}
+	ts.Stdin = bytes.NewBufferString(`
+		import { sleep } from 'k6';
+
+		export function handleSummary(data) {
+			sleep(100000);
+		}
+
+		export default function() {}
+	`)
+
+	start := time.Now()
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+	elapsed := time.Since(start)
+	assert.Greater(t, elapsed, 1*time.Second, "expected more time to have passed because of handleSummaryTimeout")
+	assert.Less(
+		t, elapsed, 5*time.Second,
+		"expected less time to have passed because of handleSummaryTimeout",
+	)
+
+	stderr := ts.Stderr.String()
+	t.Log(stderr)
+	assert.Contains(t, stderr, "handleSummary() execution timed out after 1 seconds")
+}
+
+func TestHandleSummaryTimeoutWithEnvVar(t *testing.T) {
+	t.Parallel()
+	ts := NewGlobalTestState(t)
+	ts.ExpectedExitCode = int(exitcodes.HandleSummaryTimeout)
+	ts.CmdArgs = []string{"k6", "run", "-"}
+	ts.Env["K6_HANDLE_SUMMARY_TIMEOUT"] = "1s"
+	ts.Stdin = bytes.NewBufferString(`
+		import { sleep } from 'k6';
+
+		export function handleSummary(data) {
+			sleep(100000);
+		}
+
+		export default function() {}
+	`)
+
+	start := time.Now()
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+	elapsed := time.Since(start)
+	assert.Greater(t, elapsed, 1*time.Second, "expected more time to have passed because of handleSummaryTimeout")
+	assert.Less(
+		t, elapsed, 5*time.Second,
+		"expected less time to have passed because of handleSummaryTimeout",
+	)
+
+	stderr := ts.Stderr.String()
+	t.Log(stderr)
+	assert.Contains(t, stderr, "handleSummary() execution timed out after 1 seconds")
+}
+
 func TestTypeScriptSupport(t *testing.T) {
 	t.Parallel()
 	depScript := `

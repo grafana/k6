@@ -418,6 +418,9 @@ func (o Options) Apply(opts Options) Options {
 	if opts.TeardownTimeout.Valid {
 		o.TeardownTimeout = opts.TeardownTimeout
 	}
+	if opts.HandleSummaryTimeout.Valid {
+		o.HandleSummaryTimeout = opts.HandleSummaryTimeout
+	}
 	if opts.RPS.Valid {
 		o.RPS = opts.RPS
 	}
