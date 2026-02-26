@@ -44,7 +44,7 @@ func TestConstantVUsRun(t *testing.T) {
 	require.NoError(t, test.executor.Run(test.ctx, nil))
 
 	var totalIters uint64
-	result.Range(func(_, value interface{}) bool {
+	result.Range(func(_, value any) bool {
 		vuIters := value.(uint64)
 		assert.Equal(t, uint64(5), vuIters)
 		totalIters += vuIters

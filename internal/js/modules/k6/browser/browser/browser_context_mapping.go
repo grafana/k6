@@ -34,9 +34,9 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 
 				source := ""
 				switch script.ExportType() {
-				case reflect.TypeOf(string("")):
+				case reflect.TypeFor[string]():
 					source = script.String()
-				case reflect.TypeOf(sobek.Object{}):
+				case reflect.TypeFor[sobek.Object]():
 					opts := script.ToObject(rt)
 					for _, k := range opts.Keys() {
 						if k == "content" {

@@ -44,7 +44,7 @@ type secretResponse struct {
 
 func main() {
 	// Mock secret store
-	mockSecrets := map[string]string{
+	mockSecrets := map[string]string{ //nolint:gosec
 		"api-key":        "super-secret-api-key-12345",
 		"database-pass":  "db-password-xyz789",
 		"jwt-secret":     "jwt-signing-key-abc123",
@@ -105,11 +105,11 @@ func main() {
 func createSecretHandler(mockSecrets map[string]string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Log incoming request
-		log.Printf("%s %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
+		log.Printf("%s %s from %s", r.Method, r.URL.Path, r.RemoteAddr) //nolint:gosec
 
 		// Check HTTP method
 		if r.Method != http.MethodGet {
-			log.Printf("  ❌ Invalid method: %s", r.Method)
+			log.Printf("  ❌ Invalid method: %s", r.Method) //nolint:gosec
 			http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
 			return
 		}
@@ -126,7 +126,7 @@ func createSecretHandler(mockSecrets map[string]string) http.HandlerFunc {
 
 		// Validate Bearer token
 		if authHeader != expectedToken {
-			log.Printf("  ❌ Invalid token: %s", authHeader)
+			log.Printf("  ❌ Invalid token: %s", authHeader) //nolint:gosec
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnauthorized)
 			_, _ = fmt.Fprint(w, `{"error":"invalid authorization token"}`)
@@ -151,10 +151,10 @@ func createSecretHandler(mockSecrets map[string]string) http.HandlerFunc {
 		// Look up secret
 		secretValue, exists := mockSecrets[secretKey]
 		if !exists {
-			log.Printf("  ❌ Secret not found: %s", secretKey)
+			log.Printf("  ❌ Secret not found: %s", secretKey) //nolint:gosec
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusNotFound)
-			_, _ = fmt.Fprintf(w, `{"error":"secret %q not found"}`, secretKey)
+			_, _ = fmt.Fprintf(w, `{"error":"secret %q not found"}`, secretKey) //nolint:gosec
 			return
 		}
 
@@ -172,7 +172,7 @@ func createSecretHandler(mockSecrets map[string]string) http.HandlerFunc {
 			return
 		}
 
-		log.Printf("  ✅ Returned secret: %s (length: %d)", secretKey, len(secretValue))
+		log.Printf("  ✅ Returned secret: %s (length: %d)", secretKey, len(secretValue)) //nolint:gosec
 	}
 }
 

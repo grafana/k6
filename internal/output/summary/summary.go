@@ -103,12 +103,12 @@ func (o *Output) flushSample(sample metrics.Sample) {
 		if normalizedGroupName == consts.SetupFn || normalizedGroupName == consts.TeardownFn {
 			return // Essentially skip samples tagged with group: setup/teardown.
 		}
-		groupNames := strings.Split(normalizedGroupName, lib.GroupSeparator)
+		groupNames := strings.SplitSeq(normalizedGroupName, lib.GroupSeparator)
 
 		// We traverse over all the groups to create a nested structure,
 		// but we only add the sample to the group the sample belongs to,
 		// cause by definition every group is independent.
-		for _, groupName := range groupNames {
+		for groupName := range groupNames {
 			groupData.groupDataFor(groupName)
 			groupData = groupData.groupsData[groupName]
 		}

@@ -1,9 +1,9 @@
 package outputtest
 
 import (
+	"io"
 	"strconv"
 
-	"github.com/spf13/afero"
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
 )
@@ -18,7 +18,7 @@ func init() {
 type Output struct {
 	params     output.Params
 	calcResult float64
-	outputFile afero.File
+	outputFile io.WriteCloser
 }
 
 // Description returns a human-readable description of the output.

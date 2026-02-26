@@ -132,7 +132,7 @@ type PausableExecutor interface {
 // configuration can be modified in the middle of the test execution. Currently,
 // only the manual execution executor implements it.
 type LiveUpdatableExecutor interface {
-	UpdateConfig(ctx context.Context, newConfig interface{}) error
+	UpdateConfig(ctx context.Context, newConfig any) error
 }
 
 // ExecutorConfigConstructor is a simple function that returns a concrete

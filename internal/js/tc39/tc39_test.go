@@ -15,6 +15,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -302,16 +303,11 @@ type tc39Meta struct {
 }
 
 func (m *tc39Meta) hasFlag(flag string) bool {
-	for _, f := range m.Flags {
-		if f == flag {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(m.Flags, flag)
 }
 
 func parseTC39File(name string) (*tc39Meta, string, error) {
-	f, err := os.Open(name) //nolint:gosec
+	f, err := os.Open(name)
 	if err != nil {
 		return nil, "", err
 	}
@@ -382,7 +378,7 @@ func (ctx *tc39TestCtx) runTC39Test(t testing.TB, name, src string, meta *tc39Me
 	if skipList[name] {
 		t.Skip("Excluded")
 	}
-	failf := func(str string, args ...interface{}) {
+	failf := func(str string, args ...any) {
 		str = fmt.Sprintf(str, args...)
 		ctx.fail(t, name, strict, str)
 	}
@@ -498,7 +494,7 @@ func (ctx *tc39TestCtx) runTC39Test(t testing.TB, name, src string, meta *tc39Me
 	}
 }
 
-func getErrType(name string, err error, failf func(str string, args ...interface{})) string {
+func getErrType(name string, err error, failf func(str string, args ...any)) string {
 	switch err := err.(type) { //nolint:errorlint
 	case *sobek.Exception:
 		if o, ok := err.Value().(*sobek.Object); ok {
@@ -612,7 +608,7 @@ func (ctx *tc39TestCtx) compile(base, name string) (*sobek.Program, error) {
 	prg := ctx.prgCache[name]
 	if prg == nil {
 		fname := path.Join(base, name)
-		f, err := os.Open(fname) //nolint:gosec
+		f, err := os.Open(fname)
 		if err != nil {
 			return nil, err
 		}

@@ -28,7 +28,7 @@ const isWindows = runtime.GOOS == "windows"
 // codeBlock represents an execution of a k6 script.
 type codeBlock struct {
 	code       string
-	val        interface{}
+	val        any
 	err        string
 	windowsErr string
 	asserts    func(*testing.T, *httpmultibin.HTTPMultiBin, chan metrics.SampleContainer, error)
@@ -68,7 +68,7 @@ func (r *callRecorder) Recorded() []string {
 	r.Lock()
 	defer r.Unlock()
 
-	result := []string{}
+	result := make([]string, 0, len(r.calls))
 	result = append(result, r.calls...)
 
 	return result

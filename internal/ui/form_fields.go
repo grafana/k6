@@ -107,7 +107,7 @@ func (f PasswordField) GetContents(r io.Reader) (string, error) {
 	if !ok {
 		return "", errors.New("cannot read password from the supplied terminal")
 	}
-	password, err := term.ReadPassword(int(stdin.Fd()))
+	password, err := term.ReadPassword(int(stdin.Fd())) //nolint:gosec
 	if err != nil {
 		// Possibly running on Cygwin/mintty which doesn't emulate
 		// pseudo terminals properly, so fallback to plain text input.

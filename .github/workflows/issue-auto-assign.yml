@@ -20,7 +20,7 @@ jobs:
       - uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
           script: |
-            const assignees = ['ankur22', 'codebien', 'inancgumus', 'joanlopez', 'mstoykov', 'oleiade', 'AgnesToulet'];
+            const assignees = ['ankur22', 'codebien', 'inancgumus', 'joanlopez', 'mstoykov', 'oleiade', 'szkiba'];
             const teamMembers = assignees.concat(['andrewslotin']);
             const assigneeCount = 1;
 

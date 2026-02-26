@@ -93,6 +93,48 @@ func TestXCommandHelpDisplayCommands(t *testing.T) {
 	}
 }
 
+func Test_dependenciesFromSubcommand(t *testing.T) {
+	t.Parallel()
+
+	t.Run("without manifest", func(t *testing.T) {
+		t.Parallel()
+
+		ts := tests.NewGlobalTestState(t)
+		deps, err := dependenciesFromSubcommand(ts.GlobalState, "test-cmd")
+
+		require.NoError(t, err)
+		require.Contains(t, deps, "subcommand:test-cmd")
+		require.Nil(t, deps["subcommand:test-cmd"])
+	})
+
+	t.Run("with manifest", func(t *testing.T) {
+		t.Parallel()
+
+		ts := tests.NewGlobalTestState(t)
+
+		ts.Flags.DependenciesManifest = `{"subcommand:test-cmd": "1.2.3"}`
+
+		deps, err := dependenciesFromSubcommand(ts.GlobalState, "test-cmd")
+
+		require.NoError(t, err)
+		require.Contains(t, deps, "subcommand:test-cmd")
+		require.Equal(t, "1.2.3", deps["subcommand:test-cmd"].String())
+	})
+
+	t.Run("with malformed manifest", func(t *testing.T) {
+		t.Parallel()
+
+		ts := tests.NewGlobalTestState(t)
+
+		ts.Flags.DependenciesManifest = `{subcommand:test-cmd": "1.2.3"}`
+
+		deps, err := dependenciesFromSubcommand(ts.GlobalState, "test-cmd")
+
+		require.Error(t, err)
+		require.Nil(t, deps)
+	})
+}
+
 var registerTestSubcommandExtensionsOnce sync.Once //nolint:gochecknoglobals
 
 func registerTestSubcommandExtensions(t *testing.T) {

@@ -17,9 +17,11 @@ import (
 
 const (
 	// grpcExporterType GRPC exporter type
+	//
 	// Deprecated: use grpcExporterProtocol
 	grpcExporterType = "grpc"
 	// httpExporterType HTTP exporter type
+	//
 	// Deprecated: use httpExporterProtocol
 	httpExporterType = "http"
 
@@ -43,6 +45,7 @@ type Config struct {
 	FlushInterval types.NullDuration `json:"flushInterval" envconfig:"K6_OTEL_FLUSH_INTERVAL"`
 
 	// ExporterType sets the type of OpenTelemetry Exporter to use
+	//
 	// Deprecated: use ExporterProtocol
 	ExporterType null.String `json:"exporterType" envconfig:"K6_OTEL_EXPORTER_TYPE"`
 	// ExporterProtocol sets the protocol of OpenTelemetry Exporter to use

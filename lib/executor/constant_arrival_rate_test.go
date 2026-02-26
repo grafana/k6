@@ -214,7 +214,7 @@ func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
 				// check that we got around the amount of VU iterations as we would expect
 				var currentCount int64
 
-				for i := 0; i < seconds; i++ {
+				for i := range seconds {
 					time.Sleep(time.Second)
 					currentCount = atomic.LoadInt64(&count)
 					assert.InDelta(t, int64(i+1)*rateScaled, currentCount, 3)

@@ -97,7 +97,7 @@ func TestEventSystem(t *testing.T) {
 			data++
 		}
 
-		for i := 0; i < 2; i++ {
+		for range 2 {
 			select {
 			case result := <-resultCh:
 				require.NoError(t, result.err)
@@ -145,7 +145,7 @@ func TestEventSystem(t *testing.T) {
 			wg      sync.WaitGroup
 			numSubs = 100
 		)
-		for i := 0; i < numSubs; i++ {
+		for range numSubs {
 			sid, evtCh := es.Subscribe(Exit)
 			wg.Add(1)
 			go func() {
@@ -185,7 +185,7 @@ func TestEventSystem(t *testing.T) {
 			wg      sync.WaitGroup
 			numSubs = 100
 		)
-		for i := 0; i < numSubs; i++ {
+		for range numSubs {
 			sid, evtCh := es.Subscribe(Exit)
 			wg.Add(1)
 			go func() {
@@ -248,7 +248,7 @@ func TestEventSystem(t *testing.T) {
 			numSubs = 5
 			subs    = make([]uint64, numSubs)
 		)
-		for i := 0; i < numSubs; i++ {
+		for i := range numSubs {
 			sid, _ := es.Subscribe(Init)
 			subs[i] = sid
 		}

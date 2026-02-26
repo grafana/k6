@@ -39,7 +39,7 @@ func TestFormat(t *testing.T) {
 		err := errext.WithHint(errors.New("error with hint"), "hint message")
 		errorText, fields := errext.Format(err)
 		assert.Equal(t, "error with hint", errorText)
-		assert.Equal(t, map[string]interface{}{"hint": "hint message"}, fields)
+		assert.Equal(t, map[string]any{"hint": "hint message"}, fields)
 	})
 
 	t.Run("ExceptionWithHint", func(t *testing.T) {
@@ -47,7 +47,7 @@ func TestFormat(t *testing.T) {
 		err := fakeExceptionError{error: errext.WithHint(errors.New("error with hint"), "hint message"), stack: "stack trace"}
 		errorText, fields := errext.Format(err)
 		assert.Equal(t, "stack trace", errorText)
-		assert.Equal(t, map[string]interface{}{"hint": "hint message"}, fields)
+		assert.Equal(t, map[string]any{"hint": "hint message"}, fields)
 	})
 }
 
