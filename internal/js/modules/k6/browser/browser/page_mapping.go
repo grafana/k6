@@ -998,7 +998,7 @@ func mapWaitForNavigation(vu moduleVU, target interface {
 			return nil, func() {}
 		}
 		tq, ctx, stop := newTaskQueue(vu)
-		return newRegExMatcher(ctx, vu, tq), func() { stop() }
+		return newRegExMatcher(ctx, vu, tq), stop
 	}()
 
 	return promise(vu, func() (any, error) {

@@ -173,7 +173,7 @@ func (si SharedIterations) Run(parentCtx context.Context, out chan<- metrics.Sam
 	waitOnProgressChannel := make(chan struct{})
 	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(parentCtx, duration, gracefulStop)
 	defer func() {
-		cancel(nil)
+		cancel()
 		<-waitOnProgressChannel
 	}()
 
@@ -264,7 +264,7 @@ func (si SharedIterations) Run(parentCtx context.Context, out chan<- metrics.Sam
 	for range numVUs {
 		initVU, err := si.executionState.GetPlannedVU(si.logger, true)
 		if err != nil {
-			cancel(err)
+			cancel()
 			return err
 		}
 		activeVUs.Add(1)

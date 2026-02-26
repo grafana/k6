@@ -214,7 +214,7 @@ func (car ConstantArrivalRate) Run(parentCtx context.Context, out chan<- metrics
 	waitOnProgressChannel := make(chan struct{})
 	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(parentCtx, duration, gracefulStop)
 	defer func() {
-		cancel(nil)
+		cancel()
 		<-waitOnProgressChannel
 	}()
 
@@ -225,7 +225,7 @@ func (car ConstantArrivalRate) Run(parentCtx context.Context, out chan<- metrics
 		<-returnedVUs
 		// first close the vusPool so we wait for the gracefulShutdown
 		vusPool.Close()
-		cancel(nil)
+		cancel()
 		activeVUsWg.Wait()
 	}()
 	activeVUsCount := uint64(0)
