@@ -50,7 +50,7 @@ jobs:
         if: contains(matrix.platform, 'arm')
         run: |
           sudo apt update && sudo apt install chromium-browser
-          chromium --version
+          chromiums --version
       - name: Build k6
         run: |
           which go
