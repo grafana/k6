@@ -2,9 +2,9 @@ package executor
 
 import (
 	"context"
-	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -28,78 +28,79 @@ func getTestExternallyControlledConfig() ExternallyControlledConfig {
 func TestExternallyControlledRun(t *testing.T) {
 	t.Parallel()
 
-	doneIters := new(uint64)
-	runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
-		time.Sleep(200 * time.Millisecond)
-		atomic.AddUint64(doneIters, 1)
-		return nil
-	})
+	synctest.Test(t, func(t *testing.T) {
+		doneIters := new(uint64)
+		runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
+			time.Sleep(200 * time.Millisecond)
+			atomic.AddUint64(doneIters, 1)
+			return nil
+		})
 
-	test := setupExecutorTest(t, "", "", lib.Options{}, runner, getTestExternallyControlledConfig())
-	defer test.cancel()
+		test := setupExecutorTest(t, "", "", lib.Options{}, runner, getTestExternallyControlledConfig())
+		defer test.cancel()
 
-	var (
-		wg     sync.WaitGroup
-		errCh  = make(chan error, 1)
-		doneCh = make(chan struct{})
-	)
-	wg.Go(func() {
-		test.state.MarkStarted()
-		errCh <- test.executor.Run(test.ctx, nil)
-		test.state.MarkEnded()
-		close(doneCh)
-	})
+		var (
+			errCh  = make(chan error, 1)
+			doneCh = make(chan struct{})
+		)
+		go func() {
+			test.state.MarkStarted()
+			errCh <- test.executor.Run(test.ctx, nil)
+			test.state.MarkEnded()
+			close(doneCh)
+		}()
 
-	updateConfig := func(vus, maxVUs int64, errMsg string) {
-		newConfig := ExternallyControlledConfigParams{
-			VUs:      null.IntFrom(vus),
-			MaxVUs:   null.IntFrom(maxVUs),
-			Duration: types.NullDurationFrom(2 * time.Second),
-		}
-		err := test.executor.(*ExternallyControlled).UpdateConfig(test.ctx, newConfig)
-		if errMsg != "" {
-			assert.EqualError(t, err, errMsg)
-		} else {
-			assert.NoError(t, err)
-		}
-	}
-
-	var resultVUCount [][]int64
-	snapshot := func() {
-		resultVUCount = append(resultVUCount,
-			[]int64{test.state.GetCurrentlyActiveVUsCount(), test.state.GetInitializedVUsCount()})
-	}
-
-	wg.Go(func() {
-		snapshotTicker := time.NewTicker(500 * time.Millisecond)
-		ticks := 0
-		for {
-			select {
-			case <-snapshotTicker.C:
-				snapshot()
-				switch ticks {
-				case 0, 2:
-					updateConfig(4, 10, "")
-				case 1:
-					updateConfig(8, 20, "")
-				case 3:
-					updateConfig(15, 10,
-						"invalid configuration supplied: the number of active VUs (15)"+
-							" must be less than or equal to the number of maxVUs (10)")
-					updateConfig(-1, 10,
-						"invalid configuration supplied: the number of VUs can't be negative")
-				}
-				ticks++
-			case <-doneCh:
-				snapshotTicker.Stop()
-				snapshot()
-				return
+		updateConfig := func(vus, maxVUs int64, errMsg string) {
+			newConfig := ExternallyControlledConfigParams{
+				VUs:      null.IntFrom(vus),
+				MaxVUs:   null.IntFrom(maxVUs),
+				Duration: types.NullDurationFrom(2 * time.Second),
+			}
+			err := test.executor.(*ExternallyControlled).UpdateConfig(test.ctx, newConfig)
+			if errMsg != "" {
+				assert.EqualError(t, err, errMsg)
+			} else {
+				assert.NoError(t, err)
 			}
 		}
-	})
 
-	wg.Wait()
-	require.NoError(t, <-errCh)
-	assert.InDelta(t, 48, atomic.LoadUint64(doneIters), 2)
-	assert.Equal(t, [][]int64{{2, 10}, {4, 10}, {8, 20}, {4, 10}, {0, 10}}, resultVUCount)
+		var resultVUCount [][]int64
+		snapshot := func() {
+			resultVUCount = append(resultVUCount,
+				[]int64{test.state.GetCurrentlyActiveVUsCount(), test.state.GetInitializedVUsCount()})
+		}
+
+		go func() {
+			snapshotTicker := time.NewTicker(500 * time.Millisecond)
+			ticks := 0
+			for {
+				select {
+				case <-snapshotTicker.C:
+					snapshot()
+					switch ticks {
+					case 0, 2:
+						updateConfig(4, 10, "")
+					case 1:
+						updateConfig(8, 20, "")
+					case 3:
+						updateConfig(15, 10,
+							"invalid configuration supplied: the number of active VUs (15)"+
+								" must be less than or equal to the number of maxVUs (10)")
+						updateConfig(-1, 10,
+							"invalid configuration supplied: the number of VUs can't be negative")
+					}
+					ticks++
+				case <-doneCh:
+					snapshotTicker.Stop()
+					snapshot()
+					return
+				}
+			}
+		}()
+
+		require.NoError(t, <-errCh)
+		synctest.Wait()
+		assert.InDelta(t, 48, atomic.LoadUint64(doneIters), 2)
+		assert.Equal(t, [][]int64{{2, 10}, {4, 10}, {8, 20}, {4, 10}, {0, 10}}, resultVUCount)
+	})
 }

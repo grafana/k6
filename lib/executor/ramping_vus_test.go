@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -90,211 +91,219 @@ func TestRampingVUsConfigValidation(t *testing.T) {
 func TestRampingVUsRun(t *testing.T) {
 	t.Parallel()
 
-	config := RampingVUsConfig{
-		BaseConfig:       BaseConfig{GracefulStop: types.NullDurationFrom(0)},
-		GracefulRampDown: types.NullDurationFrom(0),
-		StartVUs:         null.IntFrom(5),
-		Stages: []Stage{
-			{
-				Duration: types.NullDurationFrom(1 * time.Second),
-				Target:   null.IntFrom(5),
+	synctest.Test(t, func(t *testing.T) {
+		config := RampingVUsConfig{
+			BaseConfig:       BaseConfig{GracefulStop: types.NullDurationFrom(0)},
+			GracefulRampDown: types.NullDurationFrom(0),
+			StartVUs:         null.IntFrom(5),
+			Stages: []Stage{
+				{
+					Duration: types.NullDurationFrom(1 * time.Second),
+					Target:   null.IntFrom(5),
+				},
+				{
+					Duration: types.NullDurationFrom(0),
+					Target:   null.IntFrom(3),
+				},
+				{
+					Duration: types.NullDurationFrom(1 * time.Second),
+					Target:   null.IntFrom(3),
+				},
 			},
-			{
-				Duration: types.NullDurationFrom(0),
-				Target:   null.IntFrom(3),
-			},
-			{
-				Duration: types.NullDurationFrom(1 * time.Second),
-				Target:   null.IntFrom(3),
-			},
-		},
-	}
+		}
 
-	var iterCount int64
+		var iterCount int64
 
-	runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
-		// Sleeping for a weird duration somewhat offset from the
-		// executor ticks to hopefully keep race conditions out of
-		// our control from failing the test.
-		time.Sleep(300 * time.Millisecond)
-		atomic.AddInt64(&iterCount, 1)
-		return nil
+		runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
+			// Sleeping for a weird duration somewhat offset from the
+			// executor ticks to hopefully keep race conditions out of
+			// our control from failing the test.
+			time.Sleep(300 * time.Millisecond)
+			atomic.AddInt64(&iterCount, 1)
+			return nil
+		})
+
+		test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
+		defer test.cancel()
+
+		sampleTimes := []time.Duration{
+			500 * time.Millisecond,
+			1000 * time.Millisecond,
+			900 * time.Millisecond,
+		}
+
+		errCh := make(chan error)
+		go func() { errCh <- test.executor.Run(test.ctx, nil) }()
+
+		result := make([]int64, len(sampleTimes))
+		for i, d := range sampleTimes {
+			time.Sleep(d)
+			result[i] = test.state.GetCurrentlyActiveVUsCount()
+		}
+
+		require.NoError(t, <-errCh)
+
+		assert.Equal(t, []int64{5, 3, 0}, result)
+		assert.Equal(t, int64(29), atomic.LoadInt64(&iterCount))
 	})
-
-	test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
-	defer test.cancel()
-
-	sampleTimes := []time.Duration{
-		500 * time.Millisecond,
-		1000 * time.Millisecond,
-		900 * time.Millisecond,
-	}
-
-	errCh := make(chan error)
-	go func() { errCh <- test.executor.Run(test.ctx, nil) }()
-
-	result := make([]int64, len(sampleTimes))
-	for i, d := range sampleTimes {
-		time.Sleep(d)
-		result[i] = test.state.GetCurrentlyActiveVUsCount()
-	}
-
-	require.NoError(t, <-errCh)
-
-	assert.Equal(t, []int64{5, 3, 0}, result)
-	assert.Equal(t, int64(29), atomic.LoadInt64(&iterCount))
 }
 
 func TestRampingVUsGracefulStopWaits(t *testing.T) {
 	t.Parallel()
 
-	config := RampingVUsConfig{
-		BaseConfig: BaseConfig{GracefulStop: types.NullDurationFrom(time.Second)},
-		StartVUs:   null.IntFrom(1),
-		Stages: []Stage{
-			{
-				Duration: types.NullDurationFrom(1 * time.Second),
-				Target:   null.IntFrom(1),
+	synctest.Test(t, func(t *testing.T) {
+		config := RampingVUsConfig{
+			BaseConfig: BaseConfig{GracefulStop: types.NullDurationFrom(time.Second)},
+			StartVUs:   null.IntFrom(1),
+			Stages: []Stage{
+				{
+					Duration: types.NullDurationFrom(1 * time.Second),
+					Target:   null.IntFrom(1),
+				},
 			},
-		},
-	}
-
-	var (
-		started = make(chan struct{}) // the iteration started
-		stopped = make(chan struct{}) // the iteration stopped
-		stop    = make(chan struct{}) // the itearation should stop
-	)
-
-	runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
-		close(started)
-		defer close(stopped)
-		select {
-		case <-ctx.Done():
-			t.Fatal("The iterations should've ended before the context")
-		case <-stop:
 		}
-		return nil
+
+		var (
+			started = make(chan struct{}) // the iteration started
+			stopped = make(chan struct{}) // the iteration stopped
+			stop    = make(chan struct{}) // the itearation should stop
+		)
+
+		runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
+			close(started)
+			defer close(stopped)
+			select {
+			case <-ctx.Done():
+				t.Fatal("The iterations should've ended before the context")
+			case <-stop:
+			}
+			return nil
+		})
+
+		test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
+		defer test.cancel()
+
+		errCh := make(chan error)
+		go func() { errCh <- test.executor.Run(test.ctx, nil) }()
+
+		<-started
+		// 500 milliseconds more then the duration and 500 less then the gracefulStop
+		time.Sleep(time.Millisecond * 1500)
+		close(stop)
+		<-stopped
+
+		require.NoError(t, <-errCh)
 	})
-
-	test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
-	defer test.cancel()
-
-	errCh := make(chan error)
-	go func() { errCh <- test.executor.Run(test.ctx, nil) }()
-
-	<-started
-	// 500 milliseconds more then the duration and 500 less then the gracefulStop
-	time.Sleep(time.Millisecond * 1500)
-	close(stop)
-	<-stopped
-
-	require.NoError(t, <-errCh)
 }
 
 func TestRampingVUsGracefulStopStops(t *testing.T) {
 	t.Parallel()
 
-	config := RampingVUsConfig{
-		BaseConfig: BaseConfig{GracefulStop: types.NullDurationFrom(time.Second)},
-		StartVUs:   null.IntFrom(1),
-		Stages: []Stage{
-			{
-				Duration: types.NullDurationFrom(1 * time.Second),
-				Target:   null.IntFrom(1),
+	synctest.Test(t, func(t *testing.T) {
+		config := RampingVUsConfig{
+			BaseConfig: BaseConfig{GracefulStop: types.NullDurationFrom(time.Second)},
+			StartVUs:   null.IntFrom(1),
+			Stages: []Stage{
+				{
+					Duration: types.NullDurationFrom(1 * time.Second),
+					Target:   null.IntFrom(1),
+				},
 			},
-		},
-	}
-
-	var (
-		started = make(chan struct{}) // the iteration started
-		stopped = make(chan struct{}) // the iteration stopped
-		stop    = make(chan struct{}) // the itearation should stop
-	)
-
-	runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
-		close(started)
-		defer close(stopped)
-		select {
-		case <-ctx.Done():
-		case <-stop:
-			t.Fatal("The iterations shouldn't have ended before the context")
 		}
-		return nil
+
+		var (
+			started = make(chan struct{}) // the iteration started
+			stopped = make(chan struct{}) // the iteration stopped
+			stop    = make(chan struct{}) // the itearation should stop
+		)
+
+		runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
+			close(started)
+			defer close(stopped)
+			select {
+			case <-ctx.Done():
+			case <-stop:
+				t.Fatal("The iterations shouldn't have ended before the context")
+			}
+			return nil
+		})
+
+		test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
+		defer test.cancel()
+
+		errCh := make(chan error)
+		go func() { errCh <- test.executor.Run(test.ctx, nil) }()
+
+		<-started
+		// 500 milliseconds more then the gracefulStop + duration
+		time.Sleep(time.Millisecond * 2500)
+		close(stop)
+		<-stopped
+
+		require.NoError(t, <-errCh)
 	})
-
-	test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
-	defer test.cancel()
-
-	errCh := make(chan error)
-	go func() { errCh <- test.executor.Run(test.ctx, nil) }()
-
-	<-started
-	// 500 milliseconds more then the gracefulStop + duration
-	time.Sleep(time.Millisecond * 2500)
-	close(stop)
-	<-stopped
-
-	require.NoError(t, <-errCh)
 }
 
 func TestRampingVUsGracefulRampDown(t *testing.T) {
 	t.Parallel()
 
-	config := RampingVUsConfig{
-		BaseConfig:       BaseConfig{GracefulStop: types.NullDurationFrom(5 * time.Second)},
-		StartVUs:         null.IntFrom(2),
-		GracefulRampDown: types.NullDurationFrom(5 * time.Second),
-		Stages: []Stage{
-			{
-				Duration: types.NullDurationFrom(1 * time.Second),
-				Target:   null.IntFrom(2),
+	synctest.Test(t, func(t *testing.T) {
+		config := RampingVUsConfig{
+			BaseConfig:       BaseConfig{GracefulStop: types.NullDurationFrom(5 * time.Second)},
+			StartVUs:         null.IntFrom(2),
+			GracefulRampDown: types.NullDurationFrom(5 * time.Second),
+			Stages: []Stage{
+				{
+					Duration: types.NullDurationFrom(1 * time.Second),
+					Target:   null.IntFrom(2),
+				},
+				{
+					Duration: types.NullDurationFrom(1 * time.Second),
+					Target:   null.IntFrom(0),
+				},
 			},
-			{
-				Duration: types.NullDurationFrom(1 * time.Second),
-				Target:   null.IntFrom(0),
-			},
-		},
-	}
-
-	var (
-		started = make(chan struct{}) // the iteration started
-		stopped = make(chan struct{}) // the iteration stopped
-		stop    = make(chan struct{}) // the itearation should stop
-	)
-
-	runner := simpleRunner(func(ctx context.Context, state *lib.State) error {
-		if state.VUID == 1 { // the first VU will wait here to do stuff
-			close(started)
-			defer close(stopped)
-			select {
-			case <-ctx.Done():
-				t.Fatal("The iterations can't have ended before the context")
-			case <-stop:
-			}
-		} else { // all other (1) VUs will just sleep long enough
-			time.Sleep(2500 * time.Millisecond)
 		}
-		return nil
+
+		var (
+			started = make(chan struct{}) // the iteration started
+			stopped = make(chan struct{}) // the iteration stopped
+			stop    = make(chan struct{}) // the itearation should stop
+		)
+
+		runner := simpleRunner(func(ctx context.Context, state *lib.State) error {
+			if state.VUID == 1 { // the first VU will wait here to do stuff
+				close(started)
+				defer close(stopped)
+				select {
+				case <-ctx.Done():
+					t.Fatal("The iterations can't have ended before the context")
+				case <-stop:
+				}
+			} else { // all other (1) VUs will just sleep long enough
+				time.Sleep(2500 * time.Millisecond)
+			}
+			return nil
+		})
+
+		test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
+		defer test.cancel()
+
+		errCh := make(chan error)
+		go func() { errCh <- test.executor.Run(test.ctx, nil) }()
+
+		<-started
+		// 500 milliseconds more then the gracefulRampDown + duration
+		time.Sleep(2500 * time.Millisecond)
+		close(stop)
+		<-stopped
+
+		select {
+		case err := <-errCh:
+			require.NoError(t, err)
+		case <-time.After(time.Second): // way too much time
+			t.Fatal("Execution should've ended already")
+		}
 	})
-
-	test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
-	defer test.cancel()
-
-	errCh := make(chan error)
-	go func() { errCh <- test.executor.Run(test.ctx, nil) }()
-
-	<-started
-	// 500 milliseconds more then the gracefulRampDown + duration
-	time.Sleep(2500 * time.Millisecond)
-	close(stop)
-	<-stopped
-
-	select {
-	case err := <-errCh:
-		require.NoError(t, err)
-	case <-time.After(time.Second): // way too much time
-		t.Fatal("Execution should've ended already")
-	}
 }
 
 // This test aims to check whether the ramping VU executor interrupts
@@ -311,64 +320,66 @@ func TestRampingVUsGracefulRampDown(t *testing.T) {
 func TestRampingVUsHandleRemainingVUs(t *testing.T) {
 	t.Parallel()
 
-	const (
-		maxVus                   = 2
-		vuSleepDuration          = 65 * time.Millisecond // Each VU will sleep 65ms
-		wantVuFinished    uint32 = 1                     // one VU should finish an iteration
-		wantVuInterrupted uint32 = 1                     // one VU should be interrupted
-	)
+	synctest.Test(t, func(t *testing.T) {
+		const (
+			maxVus                   = 2
+			vuSleepDuration          = 65 * time.Millisecond // Each VU will sleep 65ms
+			wantVuFinished    uint32 = 1                     // one VU should finish an iteration
+			wantVuInterrupted uint32 = 1                     // one VU should be interrupted
+		)
 
-	cfg := RampingVUsConfig{
-		BaseConfig: BaseConfig{
-			// Extend the total test duration 50ms more
-			//
-			// test duration = sum(stages) + GracefulStop
-			//
-			// This could have been 30ms but increased it to 50ms
-			// to prevent the test to become flaky.
-			GracefulStop: types.NullDurationFrom(50 * time.Millisecond),
-		},
-		// Wait 30ms more for already started iterations
-		// (Happens in the 2nd stage below: Graceful rampdown period)
-		GracefulRampDown: types.NullDurationFrom(30 * time.Millisecond),
-		// Total test duration is 50ms (excluding the GracefulRampdown period)
-		Stages: []Stage{
-			// Activate 2 VUs in 10ms
-			{
-				Duration: types.NullDurationFrom(10 * time.Millisecond),
-				Target:   null.IntFrom(int64(maxVus)),
+		cfg := RampingVUsConfig{
+			BaseConfig: BaseConfig{
+				// Extend the total test duration 50ms more
+				//
+				// test duration = sum(stages) + GracefulStop
+				//
+				// This could have been 30ms but increased it to 50ms
+				// to prevent the test to become flaky.
+				GracefulStop: types.NullDurationFrom(50 * time.Millisecond),
 			},
-			// Rampdown to 0 VUs in 40ms
-			{
-				Duration: types.NullDurationFrom(40 * time.Millisecond),
-				Target:   null.IntFrom(int64(0)),
+			// Wait 30ms more for already started iterations
+			// (Happens in the 2nd stage below: Graceful rampdown period)
+			GracefulRampDown: types.NullDurationFrom(30 * time.Millisecond),
+			// Total test duration is 50ms (excluding the GracefulRampdown period)
+			Stages: []Stage{
+				// Activate 2 VUs in 10ms
+				{
+					Duration: types.NullDurationFrom(10 * time.Millisecond),
+					Target:   null.IntFrom(int64(maxVus)),
+				},
+				// Rampdown to 0 VUs in 40ms
+				{
+					Duration: types.NullDurationFrom(40 * time.Millisecond),
+					Target:   null.IntFrom(int64(0)),
+				},
 			},
-		},
-	}
-
-	var (
-		gotVuInterrupted uint32
-		gotVuFinished    uint32
-	)
-	runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
-		select {
-		case <-time.After(vuSleepDuration):
-			atomic.AddUint32(&gotVuFinished, 1)
-		case <-ctx.Done():
-			atomic.AddUint32(&gotVuInterrupted, 1)
 		}
-		return nil
+
+		var (
+			gotVuInterrupted uint32
+			gotVuFinished    uint32
+		)
+		runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
+			select {
+			case <-time.After(vuSleepDuration):
+				atomic.AddUint32(&gotVuFinished, 1)
+			case <-ctx.Done():
+				atomic.AddUint32(&gotVuInterrupted, 1)
+			}
+			return nil
+		})
+
+		test := setupExecutorTest(t, "", "", lib.Options{}, runner, cfg)
+		defer test.cancel()
+
+		// run the executor: this should finish in ~70ms
+		// sum(stages) + GracefulRampDown
+		require.NoError(t, test.executor.Run(test.ctx, nil))
+
+		assert.Equal(t, wantVuInterrupted, atomic.LoadUint32(&gotVuInterrupted))
+		assert.Equal(t, wantVuFinished, atomic.LoadUint32(&gotVuFinished))
 	})
-
-	test := setupExecutorTest(t, "", "", lib.Options{}, runner, cfg)
-	defer test.cancel()
-
-	// run the executor: this should finish in ~70ms
-	// sum(stages) + GracefulRampDown
-	require.NoError(t, test.executor.Run(test.ctx, nil))
-
-	assert.Equal(t, wantVuInterrupted, atomic.LoadUint32(&gotVuInterrupted))
-	assert.Equal(t, wantVuFinished, atomic.LoadUint32(&gotVuFinished))
 }
 
 // Ensure there's no wobble of VUs during graceful ramp-down, without segments.
@@ -376,67 +387,69 @@ func TestRampingVUsHandleRemainingVUs(t *testing.T) {
 func TestRampingVUsRampDownNoWobble(t *testing.T) {
 	t.Parallel()
 
-	config := RampingVUsConfig{
-		BaseConfig:       BaseConfig{GracefulStop: types.NullDurationFrom(0)},
-		GracefulRampDown: types.NullDurationFrom(1 * time.Second),
-		StartVUs:         null.IntFrom(0),
-		Stages: []Stage{
-			{
-				Duration: types.NullDurationFrom(3 * time.Second),
-				Target:   null.IntFrom(10),
+	synctest.Test(t, func(t *testing.T) {
+		config := RampingVUsConfig{
+			BaseConfig:       BaseConfig{GracefulStop: types.NullDurationFrom(0)},
+			GracefulRampDown: types.NullDurationFrom(1 * time.Second),
+			StartVUs:         null.IntFrom(0),
+			Stages: []Stage{
+				{
+					Duration: types.NullDurationFrom(3 * time.Second),
+					Target:   null.IntFrom(10),
+				},
+				{
+					Duration: types.NullDurationFrom(2 * time.Second),
+					Target:   null.IntFrom(0),
+				},
 			},
-			{
-				Duration: types.NullDurationFrom(2 * time.Second),
-				Target:   null.IntFrom(0),
-			},
-		},
-	}
-
-	runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
-		time.Sleep(500 * time.Millisecond)
-		return nil
-	})
-
-	test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
-	defer test.cancel()
-
-	sampleTimes := []time.Duration{
-		100 * time.Millisecond,
-		3000 * time.Millisecond,
-	}
-	const rampDownSampleTime = 50 * time.Millisecond
-	rampDownSamples := int((config.Stages[len(config.Stages)-1].Duration.TimeDuration() + config.GracefulRampDown.TimeDuration()) / rampDownSampleTime)
-
-	errCh := make(chan error)
-	go func() { errCh <- test.executor.Run(test.ctx, nil) }()
-
-	result := make([]int64, len(sampleTimes)+rampDownSamples)
-	for i, d := range sampleTimes {
-		time.Sleep(d)
-		result[i] = test.state.GetCurrentlyActiveVUsCount()
-	}
-
-	// Sample ramp-down at a higher rate
-	for i := len(sampleTimes); i < rampDownSamples; i++ {
-		time.Sleep(rampDownSampleTime)
-		result[i] = test.state.GetCurrentlyActiveVUsCount()
-	}
-
-	require.NoError(t, <-errCh)
-
-	// Some baseline checks
-	assert.Equal(t, int64(0), result[0])
-	assert.Equal(t, int64(10), result[1])
-	assert.Equal(t, int64(0), result[len(result)-1])
-
-	vuChanges := []int64{result[2]}
-	// Check ramp-down consistency
-	for i := 3; i < len(result[2:]); i++ {
-		if result[i] != result[i-1] {
-			vuChanges = append(vuChanges, result[i])
 		}
-	}
-	assert.Equal(t, []int64{10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0}, vuChanges)
+
+		runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
+			time.Sleep(500 * time.Millisecond)
+			return nil
+		})
+
+		test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
+		defer test.cancel()
+
+		sampleTimes := []time.Duration{
+			100 * time.Millisecond,
+			3000 * time.Millisecond,
+		}
+		const rampDownSampleTime = 50 * time.Millisecond
+		rampDownSamples := int((config.Stages[len(config.Stages)-1].Duration.TimeDuration() + config.GracefulRampDown.TimeDuration()) / rampDownSampleTime)
+
+		errCh := make(chan error)
+		go func() { errCh <- test.executor.Run(test.ctx, nil) }()
+
+		result := make([]int64, len(sampleTimes)+rampDownSamples)
+		for i, d := range sampleTimes {
+			time.Sleep(d)
+			result[i] = test.state.GetCurrentlyActiveVUsCount()
+		}
+
+		// Sample ramp-down at a higher rate
+		for i := len(sampleTimes); i < rampDownSamples; i++ {
+			time.Sleep(rampDownSampleTime)
+			result[i] = test.state.GetCurrentlyActiveVUsCount()
+		}
+
+		require.NoError(t, <-errCh)
+
+		// Some baseline checks
+		assert.Equal(t, int64(0), result[0])
+		assert.Equal(t, int64(10), result[1])
+		assert.Equal(t, int64(0), result[len(result)-1])
+
+		vuChanges := []int64{result[2]}
+		// Check ramp-down consistency
+		for i := 3; i < len(result[2:]); i++ {
+			if result[i] != result[i-1] {
+				vuChanges = append(vuChanges, result[i])
+			}
+		}
+		assert.Equal(t, []int64{10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0}, vuChanges)
+	})
 }
 
 func TestRampingVUsConfigExecutionPlanExample(t *testing.T) {

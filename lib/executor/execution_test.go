@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
-	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -61,111 +61,117 @@ func TestExecutionStateVUIDs(t *testing.T) {
 			r := rand.New(rand.NewSource(seed))
 			t.Logf("Random source seeded with %d\n", seed)
 			count := 100 + r.Intn(50)
-			wg := sync.WaitGroup{}
-			wg.Add(count)
-			for range count {
-				go func() {
-					es.GetUniqueVUIdentifiers()
-					wg.Done()
-				}()
-			}
-			wg.Wait()
-			idl, idg = es.GetUniqueVUIdentifiers()
-			assert.EqualValues(t, 4+count, idl)
-			assert.EqualValues(t, (3+count)*int(offsets[0])+int(start+1), idg)
+
+			synctest.Test(t, func(t *testing.T) {
+				for range count {
+					go func() {
+						es.GetUniqueVUIdentifiers()
+					}()
+				}
+				synctest.Wait()
+				idl, idg = es.GetUniqueVUIdentifiers()
+				assert.EqualValues(t, 4+count, idl)
+				assert.EqualValues(t, (3+count)*int(offsets[0])+int(start+1), idg)
+			})
 		})
 	}
 }
 
 func TestExecutionStateGettingVUsWhenNonAreAvailable(t *testing.T) {
 	t.Parallel()
-	et, err := lib.NewExecutionTuple(nil, nil)
-	require.NoError(t, err)
-	es := lib.NewExecutionState(nil, et, 0, 0)
-	logHook := testutils.NewLogHook(logrus.WarnLevel)
-	testLog := logrus.New()
-	testLog.AddHook(logHook)
-	testLog.SetOutput(io.Discard)
-	vu, err := es.GetPlannedVU(logrus.NewEntry(testLog), true)
-	require.Nil(t, vu)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "could not get a VU from the buffer in")
-	entries := logHook.Drain()
-	require.Equal(t, lib.MaxRetriesGetPlannedVU, len(entries))
-	for _, entry := range entries {
-		require.Contains(t, entry.Message, "Could not get a VU from the buffer for ")
-	}
+
+	synctest.Test(t, func(t *testing.T) {
+		et, err := lib.NewExecutionTuple(nil, nil)
+		require.NoError(t, err)
+		es := lib.NewExecutionState(nil, et, 0, 0)
+		logHook := testutils.NewLogHook(logrus.WarnLevel)
+		testLog := logrus.New()
+		testLog.AddHook(logHook)
+		testLog.SetOutput(io.Discard)
+		vu, err := es.GetPlannedVU(logrus.NewEntry(testLog), true)
+		require.Nil(t, vu)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "could not get a VU from the buffer in")
+		entries := logHook.Drain()
+		require.Equal(t, lib.MaxRetriesGetPlannedVU, len(entries))
+		for _, entry := range entries {
+			require.Contains(t, entry.Message, "Could not get a VU from the buffer for ")
+		}
+	})
 }
 
 func TestExecutionStateGettingVUs(t *testing.T) {
 	t.Parallel()
-	logHook := testutils.NewLogHook(logrus.WarnLevel, logrus.DebugLevel)
-	testLog := logrus.New()
-	testLog.AddHook(logHook)
-	testLog.SetOutput(io.Discard)
-	logEntry := logrus.NewEntry(testLog)
 
-	et, err := lib.NewExecutionTuple(nil, nil)
-	require.NoError(t, err)
-	es := lib.NewExecutionState(nil, et, 10, 20)
-	es.SetInitVUFunc(func(_ context.Context, _ *logrus.Entry) (lib.InitializedVU, error) {
-		return &minirunner.VU{}, nil
-	})
+	synctest.Test(t, func(t *testing.T) {
+		logHook := testutils.NewLogHook(logrus.WarnLevel, logrus.DebugLevel)
+		testLog := logrus.New()
+		testLog.AddHook(logHook)
+		testLog.SetOutput(io.Discard)
+		logEntry := logrus.NewEntry(testLog)
 
-	var vu lib.InitializedVU
-	for i := range 10 {
-		require.EqualValues(t, i, es.GetInitializedVUsCount())
-		vu, err = es.InitializeNewVU(context.Background(), logEntry)
+		et, err := lib.NewExecutionTuple(nil, nil)
 		require.NoError(t, err)
-		require.EqualValues(t, i+1, es.GetInitializedVUsCount())
-		es.ReturnVU(vu, false)
-		require.EqualValues(t, 0, es.GetCurrentlyActiveVUsCount())
-		require.EqualValues(t, i+1, es.GetInitializedVUsCount())
-	}
+		es := lib.NewExecutionState(nil, et, 10, 20)
+		es.SetInitVUFunc(func(_ context.Context, _ *logrus.Entry) (lib.InitializedVU, error) {
+			return &minirunner.VU{}, nil
+		})
 
-	// Test getting initialized VUs is okay :)
-	for i := range 10 {
-		require.EqualValues(t, i, es.GetCurrentlyActiveVUsCount())
+		var vu lib.InitializedVU
+		for i := range 10 {
+			require.EqualValues(t, i, es.GetInitializedVUsCount())
+			vu, err = es.InitializeNewVU(context.Background(), logEntry)
+			require.NoError(t, err)
+			require.EqualValues(t, i+1, es.GetInitializedVUsCount())
+			es.ReturnVU(vu, false)
+			require.EqualValues(t, 0, es.GetCurrentlyActiveVUsCount())
+			require.EqualValues(t, i+1, es.GetInitializedVUsCount())
+		}
+
+		// Test getting initialized VUs is okay :)
+		for i := range 10 {
+			require.EqualValues(t, i, es.GetCurrentlyActiveVUsCount())
+			vu, err = es.GetPlannedVU(logEntry, true)
+			require.NoError(t, err)
+			require.Empty(t, logHook.Drain())
+			require.NotNil(t, vu)
+			require.EqualValues(t, i+1, es.GetCurrentlyActiveVUsCount())
+			require.EqualValues(t, 10, es.GetInitializedVUsCount())
+		}
+
+		// Check that getting 1 more planned VU will error out
 		vu, err = es.GetPlannedVU(logEntry, true)
-		require.NoError(t, err)
-		require.Empty(t, logHook.Drain())
-		require.NotNil(t, vu)
-		require.EqualValues(t, i+1, es.GetCurrentlyActiveVUsCount())
-		require.EqualValues(t, 10, es.GetInitializedVUsCount())
-	}
+		require.Nil(t, vu)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "could not get a VU from the buffer in")
+		entries := logHook.Drain()
+		require.Equal(t, lib.MaxRetriesGetPlannedVU, len(entries))
+		for _, entry := range entries {
+			require.Contains(t, entry.Message, "Could not get a VU from the buffer for ")
+		}
 
-	// Check that getting 1 more planned VU will error out
-	vu, err = es.GetPlannedVU(logEntry, true)
-	require.Nil(t, vu)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "could not get a VU from the buffer in")
-	entries := logHook.Drain()
-	require.Equal(t, lib.MaxRetriesGetPlannedVU, len(entries))
-	for _, entry := range entries {
-		require.Contains(t, entry.Message, "Could not get a VU from the buffer for ")
-	}
+		// Test getting uninitialized vus will work
+		for i := range 10 {
+			require.EqualValues(t, 10+i, es.GetInitializedVUsCount())
+			vu, err = es.GetUnplannedVU(context.Background(), logEntry)
+			require.NoError(t, err)
+			require.Empty(t, logHook.Drain())
+			require.NotNil(t, vu)
+			require.EqualValues(t, 10+i+1, es.GetInitializedVUsCount())
+			require.EqualValues(t, 10, es.GetCurrentlyActiveVUsCount())
+		}
 
-	// Test getting uninitialized vus will work
-	for i := range 10 {
-		require.EqualValues(t, 10+i, es.GetInitializedVUsCount())
+		// Check that getting 1 more unplanned VU will error out
 		vu, err = es.GetUnplannedVU(context.Background(), logEntry)
-		require.NoError(t, err)
-		require.Empty(t, logHook.Drain())
-		require.NotNil(t, vu)
-		require.EqualValues(t, 10+i+1, es.GetInitializedVUsCount())
-		require.EqualValues(t, 10, es.GetCurrentlyActiveVUsCount())
-	}
-
-	// Check that getting 1 more unplanned VU will error out
-	vu, err = es.GetUnplannedVU(context.Background(), logEntry)
-	require.Nil(t, vu)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "could not get a VU from the buffer in")
-	entries = logHook.Drain()
-	require.Equal(t, lib.MaxRetriesGetPlannedVU, len(entries))
-	for _, entry := range entries {
-		require.Contains(t, entry.Message, "Could not get a VU from the buffer for ")
-	}
+		require.Nil(t, vu)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "could not get a VU from the buffer in")
+		entries = logHook.Drain()
+		require.Equal(t, lib.MaxRetriesGetPlannedVU, len(entries))
+		for _, entry := range entries {
+			require.Contains(t, entry.Message, "Could not get a VU from the buffer for ")
+		}
+	})
 }
 
 func TestMarkStartedPanicsOnSecondRun(t *testing.T) {

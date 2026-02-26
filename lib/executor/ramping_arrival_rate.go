@@ -231,7 +231,7 @@ func (varr *RampingArrivalRate) Init(_ context.Context) error {
 // The specific implementation here can only go forward and does incorporate
 // the striping algorithm from the lib.ExecutionTuple for additional speed up but this could
 // possibly be refactored if need for this arises.
-func (varc RampingArrivalRateConfig) cal(et *lib.ExecutionTuple, ch chan<- time.Duration) {
+func (varc RampingArrivalRateConfig) cal(ctx context.Context, et *lib.ExecutionTuple, ch chan<- time.Duration) {
 	start, offsets, _ := et.GetStripedOffsets()
 	li := -1
 	// TODO: move this to a utility function, or directly what GetStripedOffsets uses once we see everywhere we will use it
@@ -246,7 +246,8 @@ func (varc RampingArrivalRateConfig) cal(et *lib.ExecutionTuple, ch chan<- time.
 		doneSoFar, endCount, to, dur float64
 		from                         = float64(varc.StartRate.ValueOrZero()) / timeUnit
 		// start .. starts at 0 but the algorithm works with area so we need to start from 1 not 0
-		i = float64(start + 1)
+		i    = float64(start + 1)
+		done = ctx.Done()
 	)
 
 	for _, stage := range varc.Stages {
@@ -259,12 +260,20 @@ func (varc RampingArrivalRateConfig) cal(et *lib.ExecutionTuple, ch chan<- time.
 				// somewhere where it is less in the middle of the equation
 				x := (from*dur - noNegativeSqrt(dur*(from*from*dur+2*(i-doneSoFar)*(to-from)))) / (from - to)
 
-				ch <- time.Duration(x) + stageStart
+				select {
+				case <-done:
+					return
+				case ch <- time.Duration(x) + stageStart:
+				}
 			}
 		} else {
 			endCount += dur * to
 			for ; i <= endCount; i += float64(next()) {
-				ch <- time.Duration((i-doneSoFar)/to) + stageStart
+				select {
+				case <-done:
+					return
+				case ch <- time.Duration((i-doneSoFar)/to) + stageStart:
+				}
 			}
 		}
 		doneSoFar = endCount
@@ -442,7 +451,7 @@ func (varr RampingArrivalRate) Run(parentCtx context.Context, out chan<- metrics
 	var prevTime time.Duration
 	shownWarning := false
 	metricTags := varr.getMetricTags(nil)
-	go varr.config.cal(varr.et, ch)
+	go varr.config.cal(maxDurationCtx, varr.et, ch)
 	for nextTime := range ch {
 		select {
 		case <-regDurationDone:
