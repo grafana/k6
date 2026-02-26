@@ -1,7 +1,7 @@
 # JSON Serialization (v2)
 
 [![GoDev](https://img.shields.io/static/v1?label=godev&message=reference&color=00add8)](https://pkg.go.dev/github.com/go-json-experiment/json)
-[![Build Status](https://github.com/go-json-experiment/json/actions/workflows/test.yml/badge.svg?branch=master)](https://github.com/go-json-experiment/json/actions)
+[![Build Status](https://github.com/go-json-experiment/json/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/go-json-experiment/json/actions)
 
 This module hosts an experimental implementation of v2 `encoding/json`.
 The API is unstable and breaking changes will regularly be made.
@@ -12,7 +12,29 @@ with the string "WARNING: " near the top of the commit message.
 It is your responsibility to inspect the list of commit changes
 when upgrading the module. Not all breaking changes will lead to build failures.
 
-A [Discussion about including this package in Go as `encoding/json/v2`](https://github.com/golang/go/discussions/63397) has been started on the Go Github project on 2023-10-05. Please provide your feedback there.
+## Current status
+
+A [proposal to include this module in Go as `encoding/json/v2` and `encoding/json/jsontext`](https://github.com/golang/go/issues/71497)
+has been started on the Go Github project on 2025-01-30. Please provide your feedback there.
+At present, this module is available within the Go standard library as a Go experiment.
+See ["A new experimental Go API for JSON"](https://go.dev/blog/jsonv2-exp) for more details.
+
+On 2025-11-20, a `json/v2` working group was established by the Go project
+consisting of @aclements, @neild, @prattmic, @ChrisHines, and @dsnet
+to review outstanding issues in preparing for formal adoption into the standard library.
+The working group meets weekly and notes are recorded on [issue #76406](https://github.com/golang/go/issues/76406).
+
+See [the project dashboard](https://github.com/orgs/golang/projects/50/views/1)
+to get a sense of what issues remain for the meeting group to resolve.
+The "Under review" and "Needs review" categories need to be emptied
+before `json/v2` can be released.
+
+This repository will continue to import and mirror the upstream Go project
+for the foreseeable future. Consequently, code changes should be made at
+the upstream [Go project](https://go.googlesource.com/go/) instead of here.
+Building this module with the `goexperiment.jsonv2` tag will cause the
+module to use the `encoding/json/v2` package under-the-hood,
+otherwise this will provide a different implementation of `json/v2`.
 
 ## Goals and objectives
 
@@ -55,27 +77,6 @@ behavioral changes in v2 relative to v1 need to be exposed as options.
 * **Avoid unsafe:** Standard library packages generally avoid the use of
 package `unsafe` even if it could provide a performance boost.
 We aim to preserve this property.
-
-## Expectations
-
-While this module aims to possibly be the v2 implementation of `encoding/json`,
-there is no guarantee that this outcome will occur. As with any major change
-to the Go standard library, this will eventually go through the
-[Go proposal process](https://github.com/golang/proposal#readme).
-At the present moment, this is still in the design and experimentation phase
-and is not ready for a formal proposal.
-
-There are several possible outcomes from this experiment:
-1. We determine that a v2 `encoding/json` would not provide sufficient benefit
-over the existing v1 `encoding/json` package. Thus, we abandon this effort.
-2. We propose a v2 `encoding/json` design, but it is rejected in favor of some
-other design that is considered superior.
-3. We propose a v2 `encoding/json` design, but rather than adding an entirely
-new v2 `encoding/json` package, we decide to merge its functionality into
-the existing v1 `encoding/json` package.
-4. We propose a v2 `encoding/json` design and it is accepted, resulting in
-its addition to the standard library.
-5. Some other unforeseen outcome (among the infinite number of possibilities).
 
 ## Development
 
@@ -159,7 +160,7 @@ This table shows an overview of the changes:
 | When unmarshaling, **an error does not occur** if the input JSON value contains objects with duplicate names. | When unmarshaling, **an error does occur** if the input JSON value contains objects with duplicate names. | [DuplicateNames](/v1/diff_test.go#:~:text=TestDuplicateNames) |
 | Unmarshaling a JSON null into a non-empty Go value **inconsistently clears the value or does nothing**. | Unmarshaling a JSON null into a non-empty Go value **always clears the value**. | [MergeNull](/v1/diff_test.go#:~:text=TestMergeNull) |
 | Unmarshaling a JSON value into a non-empty Go value **follows inconsistent and bizarre behavior**. | Unmarshaling a JSON value into a non-empty Go value **always merges if the input is an object, and otherwise replaces**.  | [MergeComposite](/v1/diff_test.go#:~:text=TestMergeComposite) |
-| A `time.Duration` is represented as a **JSON number containing the decimal number of nanoseconds**. | A `time.Duration` is represented as a **JSON string containing the formatted duration (e.g., "1h2m3.456s")**. | [TimeDurations](/v1/diff_test.go#:~:text=TestTimeDurations) |
+| A `time.Duration` is represented as a **JSON number containing the decimal number of nanoseconds**. | A `time.Duration` has no default representation in v2 (see [#71631](https://golang.org/issue/71631)) and results in an error. | |
 | A Go struct with only unexported fields **can be serialized**. | A Go struct with only unexported fields **cannot be serialized**. | [EmptyStructs](/v1/diff_test.go#:~:text=TestEmptyStructs) |
 
 See [diff_test.go](/v1/diff_test.go) for details about every change.
