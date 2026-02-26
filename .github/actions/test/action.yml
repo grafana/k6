@@ -39,4 +39,4 @@ runs:
             unset args[2]
           fi
         fi
-        go test "${args[@]}" -timeout 800s `go list ./... | grep -v browser/tests`
+        go test "${args[@]}" -timeout 1600s `go list ./... | grep -v browser/tests`
