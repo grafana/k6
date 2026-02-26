@@ -273,6 +273,9 @@ type Options struct {
 	// Should all HTTP requests and responses be logged (excluding body)?
 	HTTPDebug null.String `json:"httpDebug" envconfig:"K6_HTTP_DEBUG"`
 
+	// Enable HTTP/3 (QUIC) for HTTP requests
+	HTTP3 null.Bool `json:"http3" envconfig:"K6_HTTP3"`
+
 	// Accept invalid or untrusted TLS certificates.
 	InsecureSkipTLSVerify null.Bool `json:"insecureSkipTLSVerify" envconfig:"K6_INSECURE_SKIP_TLS_VERIFY"`
 
@@ -434,6 +437,9 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.HTTPDebug.Valid {
 		o.HTTPDebug = opts.HTTPDebug
+	}
+	if opts.HTTP3.Valid {
+		o.HTTP3 = opts.HTTP3
 	}
 	if opts.InsecureSkipTLSVerify.Valid {
 		o.InsecureSkipTLSVerify = opts.InsecureSkipTLSVerify

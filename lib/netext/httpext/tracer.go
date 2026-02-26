@@ -311,6 +311,31 @@ func (t *Tracer) GotFirstResponseByte() {
 	atomic.CompareAndSwapInt64(&t.gotFirstResponseByte, 0, now())
 }
 
+// DoneWithFallback calculates all metrics. If the httptrace hooks fired
+// (e.g. for HTTP/1.1 and HTTP/2), it delegates to Done(). For transports
+// where httptrace is not supported (e.g. HTTP/3 / QUIC), it uses the
+// provided roundTrip start/end timestamps to produce approximate timings.
+func (t *Tracer) DoneWithFallback(rtStart, rtEnd int64) *Trail {
+	if atomic.LoadInt64(&t.gotConn) != 0 {
+		return t.Done()
+	}
+
+	done := time.Now()
+	trail := Trail{
+		ConnReused:     t.connReused,
+		ConnRemoteAddr: t.connRemoteAddr,
+		EndTime:        done,
+	}
+
+	if rtEnd > rtStart {
+		trail.Waiting = time.Duration(rtEnd - rtStart)
+	}
+	trail.Receiving = done.Sub(time.Unix(0, rtEnd))
+	trail.Duration = trail.Waiting + trail.Receiving
+
+	return &trail
+}
+
 // Done calculates all metrics and should be called when the request is finished.
 func (t *Tracer) Done() *Trail {
 	done := time.Now()

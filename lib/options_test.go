@@ -556,6 +556,12 @@ func TestOptions(t *testing.T) {
 		assert.True(t, opts.DiscardResponseBodies.Valid)
 		assert.True(t, opts.DiscardResponseBodies.Bool)
 	})
+	t.Run("HTTP3", func(t *testing.T) {
+		t.Parallel()
+		opts := Options{}.Apply(Options{HTTP3: null.BoolFrom(true)})
+		assert.True(t, opts.HTTP3.Valid)
+		assert.True(t, opts.HTTP3.Bool)
+	})
 	t.Run("ClientIPRanges", func(t *testing.T) {
 		t.Parallel()
 		clientIPRanges := types.NullIPPool{}
@@ -655,6 +661,11 @@ func TestOptionsEnv(t *testing.T) {
 			"false": null.BoolFrom(false),
 		},
 		{"NoCookiesReset", "K6_NO_COOKIES_RESET"}: {
+			"":      null.Bool{},
+			"true":  null.BoolFrom(true),
+			"false": null.BoolFrom(false),
+		},
+		{"HTTP3", "K6_HTTP3"}: {
 			"":      null.Bool{},
 			"true":  null.BoolFrom(true),
 			"false": null.BoolFrom(false),
