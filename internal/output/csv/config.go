@@ -68,8 +68,8 @@ func ParseArg(arg string) (Config, error) {
 		return c, nil
 	}
 
-	pairs := strings.Split(arg, ",")
-	for _, pair := range pairs {
+	pairs := strings.SplitSeq(arg, ",")
+	for pair := range pairs {
 		k, v, _ := strings.Cut(pair, "=")
 		if v == "" {
 			return c, fmt.Errorf("couldn't parse %q as argument for csv output", arg)

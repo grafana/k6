@@ -155,8 +155,10 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	backgroundProcesses.Add(1)
 	go func() {
 		defer backgroundProcesses.Done()
-		pbs := []*pb.ProgressBar{initBar}
-		for _, s := range execScheduler.GetExecutors() {
+		executors := execScheduler.GetExecutors()
+		pbs := make([]*pb.ProgressBar, 0, 1+len(executors))
+		pbs = append(pbs, initBar)
+		for _, s := range executors {
 			pbs = append(pbs, s.GetProgress())
 		}
 		showProgress(progressCtx, c.gs, pbs, logger)
@@ -582,8 +584,8 @@ func getCmdRun(gs *state.GlobalState) *cobra.Command {
   # Ramp VUs from 0 to 100 over 10s, stay there for 60s, then 10s down to 0.
   {{.}} run -u 0 -s 10s:100 -s 60s:100 -s 10s:0
 
-  # Send metrics to an influxdb server
-  {{.}} run -o influxdb=http://1.2.3.4:8086/k6`[1:])
+  # Send metrics to a remote storage using the OpenTelemetry output.
+  {{.}} run -o opentelemetry`[1:])
 
 	runCmd := &cobra.Command{
 		Use:   "run",

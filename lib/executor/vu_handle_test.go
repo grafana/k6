@@ -71,7 +71,7 @@ func TestVUHandleRace(t *testing.T) {
 	wg.Add(3)
 	go func() {
 		defer wg.Done()
-		for i := 0; i < 10000; i++ {
+		for range 10000 {
 			err := vuHandle.start()
 			require.NoError(t, err)
 		}
@@ -79,7 +79,7 @@ func TestVUHandleRace(t *testing.T) {
 
 	go func() {
 		defer wg.Done()
-		for i := 0; i < 1000; i++ {
+		for range 1000 {
 			vuHandle.gracefulStop()
 			time.Sleep(1 * time.Nanosecond)
 		}
@@ -87,7 +87,7 @@ func TestVUHandleRace(t *testing.T) {
 
 	go func() {
 		defer wg.Done()
-		for i := 0; i < 100; i++ {
+		for range 100 {
 			vuHandle.hardStop()
 			time.Sleep(10 * time.Nanosecond)
 		}
@@ -159,7 +159,7 @@ func TestVUHandleStartStopRace(t *testing.T) {
 
 	vuHandle := newStoppedVUHandle(ctx, getVU, returnVU, mockNextIterations, &BaseConfig{}, logEntry)
 	go vuHandle.runLoopsIfPossible(runIter)
-	for i := 0; i < testIterations; i++ {
+	for range testIterations {
 		err := vuHandle.start()
 		vuHandle.gracefulStop()
 		require.NoError(t, err)

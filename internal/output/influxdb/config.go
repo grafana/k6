@@ -18,19 +18,19 @@ import (
 type Config struct {
 	// Connection.
 	Addr             null.String        `json:"addr" envconfig:"K6_INFLUXDB_ADDR"`
-	Proxy            null.String        `json:"proxy,omitempty" envconfig:"K6_INFLUXDB_PROXY"`
-	Username         null.String        `json:"username,omitempty" envconfig:"K6_INFLUXDB_USERNAME"`
-	Password         null.String        `json:"password,omitempty" envconfig:"K6_INFLUXDB_PASSWORD"`
-	Insecure         null.Bool          `json:"insecure,omitempty" envconfig:"K6_INFLUXDB_INSECURE"`
-	PayloadSize      null.Int           `json:"payloadSize,omitempty" envconfig:"K6_INFLUXDB_PAYLOAD_SIZE"`
-	PushInterval     types.NullDuration `json:"pushInterval,omitempty" envconfig:"K6_INFLUXDB_PUSH_INTERVAL"`
-	ConcurrentWrites null.Int           `json:"concurrentWrites,omitempty" envconfig:"K6_INFLUXDB_CONCURRENT_WRITES"`
+	Proxy            null.String        `json:"proxy" envconfig:"K6_INFLUXDB_PROXY"`
+	Username         null.String        `json:"username" envconfig:"K6_INFLUXDB_USERNAME"`
+	Password         null.String        `json:"password" envconfig:"K6_INFLUXDB_PASSWORD"`
+	Insecure         null.Bool          `json:"insecure" envconfig:"K6_INFLUXDB_INSECURE"`
+	PayloadSize      null.Int           `json:"payloadSize" envconfig:"K6_INFLUXDB_PAYLOAD_SIZE"`
+	PushInterval     types.NullDuration `json:"pushInterval" envconfig:"K6_INFLUXDB_PUSH_INTERVAL"`
+	ConcurrentWrites null.Int           `json:"concurrentWrites" envconfig:"K6_INFLUXDB_CONCURRENT_WRITES"`
 
 	// Samples.
 	DB           null.String `json:"db" envconfig:"K6_INFLUXDB_DB"`
-	Precision    null.String `json:"precision,omitempty" envconfig:"K6_INFLUXDB_PRECISION"`
-	Retention    null.String `json:"retention,omitempty" envconfig:"K6_INFLUXDB_RETENTION"`
-	Consistency  null.String `json:"consistency,omitempty" envconfig:"K6_INFLUXDB_CONSISTENCY"`
+	Precision    null.String `json:"precision" envconfig:"K6_INFLUXDB_PRECISION"`
+	Retention    null.String `json:"retention" envconfig:"K6_INFLUXDB_RETENTION"`
+	Consistency  null.String `json:"consistency" envconfig:"K6_INFLUXDB_CONSISTENCY"`
 	TagsAsFields []string    `json:"tagsAsFields,omitempty" envconfig:"K6_INFLUXDB_TAGS_AS_FIELDS"`
 }
 

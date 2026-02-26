@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"go.k6.io/k6/metrics"
 )
 
@@ -28,8 +29,7 @@ func TestVUStateTagsSafeConcurrent(t *testing.T) {
 	wg := &sync.WaitGroup{}
 	wg.Add(2)
 	defer wg.Wait()
-
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	stateTags := NewVUStateTags(metrics.NewRegistry().RootTagSet())

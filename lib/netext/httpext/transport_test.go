@@ -1,7 +1,6 @@
 package httpext
 
 import (
-	"context"
 	"net/http"
 	"net/url"
 	"testing"
@@ -12,8 +11,7 @@ import (
 )
 
 func BenchmarkMeasureAndEmitMetrics(b *testing.B) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := b.Context()
 	samples := make(chan metrics.SampleContainer, 10)
 	defer close(samples)
 	go func() { // discard all metrics

@@ -26,10 +26,8 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			}), nil
 		},
 		"childFrames": func() []mapping {
-			var (
-				mcfs []mapping
-				cfs  = f.ChildFrames()
-			)
+			cfs := f.ChildFrames()
+			mcfs := make([]mapping, 0, len(cfs))
 			for _, fr := range cfs {
 				mcfs = append(mcfs, mapFrame(vu, fr))
 			}

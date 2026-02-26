@@ -2,6 +2,7 @@ package ext
 
 import (
 	"fmt"
+	"maps"
 	"reflect"
 	"runtime"
 	"runtime/debug"
@@ -48,7 +49,7 @@ func (e ExtensionType) String() string {
 type Extension struct {
 	Name, Path, Version string
 	Type                ExtensionType
-	Module              interface{}
+	Module              any
 }
 
 func (e Extension) String() string {
@@ -58,7 +59,7 @@ func (e Extension) String() string {
 // Register a new extension with the given name and type. This function will
 // panic if an unsupported extension type is provided, or if an extension of the
 // same type and name is already registered.
-func Register(name string, typ ExtensionType, mod interface{}) {
+func Register(name string, typ ExtensionType, mod any) {
 	mx.Lock()
 	defer mx.Unlock()
 
@@ -94,9 +95,7 @@ func Get(typ ExtensionType) map[string]*Extension {
 
 	result := make(map[string]*Extension, len(exts))
 
-	for name, ext := range exts {
-		result[name] = ext
-	}
+	maps.Copy(result, exts)
 
 	return result
 }
@@ -131,7 +130,7 @@ func GetAll() []*Extension {
 
 // extractModuleInfo attempts to return the package path and version of the Go
 // module that created the given value.
-func extractModuleInfo(mod interface{}) (path, version string) {
+func extractModuleInfo(mod any) (path, version string) {
 	t := reflect.TypeOf(mod)
 
 	switch t.Kind() {

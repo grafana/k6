@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net"
 	"net/http"
 	"net/http/cookiejar"
@@ -302,7 +303,7 @@ func (r *Runner) Setup(ctx context.Context, out chan<- metrics.SampleContainer) 
 	if err != nil {
 		return fmt.Errorf("error marshaling setup() data to JSON: %w", err)
 	}
-	var tmp interface{}
+	var tmp any
 	return json.Unmarshal(r.setupData, &tmp)
 }
 
@@ -329,7 +330,7 @@ func (r *Runner) Teardown(ctx context.Context, out chan<- metrics.SampleContaine
 	teardownCtx, teardownCancel := context.WithTimeout(ctx, r.getTimeoutFor(consts.TeardownFn))
 	defer teardownCancel()
 
-	var data interface{}
+	var data any
 	if r.setupData != nil {
 		if err := json.Unmarshal(r.setupData, &data); err != nil {
 			return fmt.Errorf("error unmarshaling setup data for teardown() from JSON: %w", err)
@@ -496,7 +497,7 @@ func prepareHandleWrapperArgs(
 	noColor, enableColors, newMachineReadableSummary bool,
 	callbackResult, handleSummaryData, summaryData sobek.Value,
 ) []sobek.Value {
-	options := map[string]interface{}{
+	options := map[string]any{
 		// TODO: improve when we can easily export all option values, including defaults?
 		"summaryTrendStats":         vu.Runner.Bundle.Options.SummaryTrendStats,
 		"summaryTimeUnit":           vu.Runner.Bundle.Options.SummaryTimeUnit.String,
@@ -626,7 +627,7 @@ func (r *Runner) runPart(
 	parentCtx context.Context,
 	out chan<- metrics.SampleContainer,
 	name string,
-	arg interface{},
+	arg any,
 ) (sobek.Value, error) {
 	ctx, cancel := context.WithCancel(parentCtx)
 	defer cancel()
@@ -665,7 +666,7 @@ func (r *Runner) runPart(
 }
 
 //nolint:gochecknoglobals
-var sobekPromiseType = reflect.TypeOf((*sobek.Promise)(nil))
+var sobekPromiseType = reflect.TypeFor[*sobek.Promise]()
 
 // unPromisify gets the result of v if it is a promise, otherwise returns v
 func unPromisify(v sobek.Value) sobek.Value {
@@ -756,12 +757,8 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 
 	// Override the preset global env with any custom env vars
 	env := make(map[string]string, len(u.env)+len(params.Env))
-	for key, value := range u.env {
-		env[key] = value
-	}
-	for key, value := range params.Env {
-		env[key] = value
-	}
+	maps.Copy(env, u.env)
+	maps.Copy(env, params.Env)
 	//nolint:errcheck,gosec // see https://github.com/grafana/k6/issues/1722#issuecomment-1761173634
 	u.Runtime.Set("__ENV", env)
 
@@ -840,7 +837,7 @@ func (u *ActiveVU) RunOnce() error {
 	// still don't use too much CPU in the middle test
 	if u.setupData == nil {
 		if u.Runner.setupData != nil {
-			var data interface{}
+			var data any
 			if err := json.Unmarshal(u.Runner.setupData, &data); err != nil {
 				return fmt.Errorf("error unmarshaling setup data for the iteration from JSON: %w", err)
 			}

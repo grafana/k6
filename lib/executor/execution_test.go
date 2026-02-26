@@ -58,12 +58,12 @@ func TestExecutionStateVUIDs(t *testing.T) {
 			assert.EqualValues(t, expGlobal, idg)
 
 			seed := time.Now().UnixNano()
-			r := rand.New(rand.NewSource(seed)) //nolint:gosec
+			r := rand.New(rand.NewSource(seed))
 			t.Logf("Random source seeded with %d\n", seed)
 			count := 100 + r.Intn(50)
 			wg := sync.WaitGroup{}
 			wg.Add(count)
-			for i := 0; i < count; i++ {
+			for range count {
 				go func() {
 					es.GetUniqueVUIdentifiers()
 					wg.Done()
@@ -113,7 +113,7 @@ func TestExecutionStateGettingVUs(t *testing.T) {
 	})
 
 	var vu lib.InitializedVU
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		require.EqualValues(t, i, es.GetInitializedVUsCount())
 		vu, err = es.InitializeNewVU(context.Background(), logEntry)
 		require.NoError(t, err)
@@ -124,7 +124,7 @@ func TestExecutionStateGettingVUs(t *testing.T) {
 	}
 
 	// Test getting initialized VUs is okay :)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		require.EqualValues(t, i, es.GetCurrentlyActiveVUsCount())
 		vu, err = es.GetPlannedVU(logEntry, true)
 		require.NoError(t, err)
@@ -146,7 +146,7 @@ func TestExecutionStateGettingVUs(t *testing.T) {
 	}
 
 	// Test getting uninitialized vus will work
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		require.EqualValues(t, 10+i, es.GetInitializedVUsCount())
 		vu, err = es.GetUnplannedVU(context.Background(), logEntry)
 		require.NoError(t, err)

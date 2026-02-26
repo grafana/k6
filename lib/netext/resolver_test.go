@@ -84,8 +84,9 @@ func TestResolver(t *testing.T) {
 				}
 
 				if tc.sel == types.DNSroundRobin {
-					ips := []net.IP{ip}
-					for i := 0; i < 3; i++ {
+					ips := make([]net.IP, 1, 4)
+					ips[0] = ip
+					for range 3 {
 						ip, err = r.LookupIP(host)
 						require.NoError(t, err)
 						ips = append(ips, ip)

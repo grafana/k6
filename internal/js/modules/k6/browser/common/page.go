@@ -230,7 +230,10 @@ type Page struct {
 	Mouse       *Mouse
 	Touchscreen *Touchscreen
 
-	ctx context.Context
+	ctx       context.Context
+	cancelCtx context.CancelFunc
+
+	teardownCtx context.Context
 
 	// what it really needs is an executor with
 	// SessionID and TargetID
@@ -249,6 +252,14 @@ type Page struct {
 	// - FrameSession.initEvents.onFrameDetached->FrameManager.frameDetached.removeFramesRecursively->Page.IsClosed
 	closedMu sync.RWMutex
 	closed   bool
+
+	// closing serializes Page.Close() so that repeated calls return the
+	// same result without repeating teardown.
+	closingOnce sync.Once
+	closeErr    error
+	// closing is closed when the page begins tearing down.  Checked by
+	// attachment paths (attachFrameSession) to reject late frame sessions.
+	closing chan struct{}
 
 	// TODO: setter change these fields (mutex?)
 	emulatedSize     *EmulatedSize
@@ -285,8 +296,12 @@ func NewPage(
 	bp bool,
 	logger *log.Logger,
 ) (*Page, error) {
+	pageCtx, pageCancel := context.WithCancel(ctx)
+
 	p := Page{
-		ctx:              ctx,
+		ctx:              pageCtx,
+		cancelCtx:        pageCancel,
+		teardownCtx:      bctx.browser.browserCtx,
 		session:          s,
 		browserCtx:       bctx,
 		targetID:         tid,
@@ -299,6 +314,7 @@ func NewPage(
 		timeoutSettings:  NewTimeoutSettings(bctx.timeoutSettings),
 		Keyboard:         NewKeyboard(ctx, s),
 		jsEnabled:        true,
+		closing:          make(chan struct{}),
 		eventCh:          make(chan Event),
 		eventHandlers:    make(map[PageEventName][]pageEventHandlerRecord),
 		frameSessions:    make(map[cdp.FrameID]*FrameSession),
@@ -317,7 +333,7 @@ func NewPage(
 
 	var err error
 	p.frameManager = NewFrameManager(ctx, s, &p, p.timeoutSettings, p.logger)
-	p.mainFrameSession, err = NewFrameSession(ctx, s, &p, nil, tid, p.logger, true)
+	p.mainFrameSession, err = NewFrameSession(p.ctx, p.teardownCtx, s, &p, nil, tid, p.logger, true)
 	if err != nil {
 		p.logger.Debugf("Page:NewPage:NewFrameSession:return", "sid:%v tid:%v err:%v",
 			p.sessionID(), tid, err)
@@ -726,6 +742,10 @@ func (p *Page) getOwnerFrame(apiCtx context.Context, h *ElementHandle) (cdp.Fram
 	return frameID, nil
 }
 
+// errPageClosing is returned when a frame-session attachment is rejected
+// because the page has started closing.
+var errPageClosing = errors.New("page is closing")
+
 func (p *Page) attachFrameSession(fid cdp.FrameID, fs *FrameSession) error {
 	p.logger.Debugf("Page:attachFrameSession", "sid:%v fid=%v", p.session.ID(), fid)
 
@@ -733,11 +753,33 @@ func (p *Page) attachFrameSession(fid cdp.FrameID, fs *FrameSession) error {
 		return errors.New("internal error: FrameSession is nil")
 	}
 
+	// This prevents a TOCTOU race where Close() snapshots owned sessions
+	// and then a new session is inserted outside that snapshot.
 	p.frameSessionsMu.Lock()
 	defer p.frameSessionsMu.Unlock()
-	fs.page.frameSessions[fid] = fs
+
+	if p.isClosing() {
+		p.logger.Debugf("Page:attachFrameSession", "rejected fid=%v: page is closing", fid)
+		return errPageClosing
+	}
+
+	p.frameSessions[fid] = fs
 
 	return nil
+}
+
+// waitForFrameSessions waits for every FrameSession's event goroutine
+// (and transitively its NetworkManager goroutines) to finish.
+func (p *Page) waitForFrameSessions() {
+	p.frameSessionsMu.RLock()
+	sessions := make([]*FrameSession, 0, len(p.frameSessions))
+	for _, fs := range p.frameSessions {
+		sessions = append(sessions, fs)
+	}
+	p.frameSessionsMu.RUnlock()
+	for _, fs := range sessions {
+		fs.wait()
+	}
 }
 
 func (p *Page) getFrameSession(frameID cdp.FrameID) (*FrameSession, bool) {
@@ -909,46 +951,71 @@ func (p *Page) Click(selector string, opts *FrameClickOptions) error {
 	return p.MainFrame().Click(selector, opts)
 }
 
-// Close closes the page.
+// isClosing reports whether the page has started closing.
+func (p *Page) isClosing() bool {
+	select {
+	case <-p.closing:
+		return true
+	default:
+		return false
+	}
+}
+
+// Close closes the page. It is safe to call multiple times; only the
+// first call performs the teardown and subsequent calls return the same result.
 func (p *Page) Close() error {
 	p.logger.Debugf("Page:Close", "sid:%v", p.sessionID())
-	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.close")
-	defer span.End()
 
-	// forcing the pagehide event to trigger web vitals metrics.
-	v := `() => window.dispatchEvent(new Event('pagehide'))`
-	ctx, cancel := context.WithTimeout(p.ctx, p.defaultTimeout())
-	defer cancel()
-	_, err := p.MainFrame().EvaluateWithContext(ctx, v)
-	if err != nil {
-		p.logger.Warnf("Page:Close", "failed to hide page: %v", err)
-	}
+	p.closingOnce.Do(func() {
+		_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.close")
+		defer span.End()
 
-	add := runtime.RemoveBinding(webVitalBinding)
-	if err := add.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-		return spanRecordErrorf(span, "internal error while removing binding from page: %w", err)
-	}
+		close(p.closing)
 
-	action := target.CloseTarget(p.targetID)
-	err = action.Do(cdp.WithExecutor(p.ctx, p.session))
-	if err != nil {
-		// When a close target command is sent to the browser via CDP,
-		// the browser will start to cleanup and the first thing it
-		// will do is return a target.EventDetachedFromTarget, which in
-		// our implementation will close the session connection (this
-		// does not close the CDP websocket, just removes the session
-		// so no other CDP calls can be made with the session ID).
-		// This can result in the session's context being closed while
-		// we're waiting for the response to come back from the browser
-		// for this current command (it's racey).
-		if errors.Is(err, context.Canceled) {
-			return nil
+		teardownTimeoutCtx, closeCancel := context.WithTimeout(p.teardownCtx, p.defaultTimeout())
+		defer closeCancel()
+
+		// forcing the pagehide event to trigger web vitals metrics.
+		v := `() => window.dispatchEvent(new Event('pagehide'))`
+		_, err := p.MainFrame().EvaluateWithContext(teardownTimeoutCtx, v)
+		if err != nil {
+			p.logger.Warnf("Page:Close", "failed to hide page: %v", err)
 		}
 
-		return spanRecordErrorf(span, "closing a page: %w", err)
-	}
+		var closeErrs []error
 
-	return nil
+		add := runtime.RemoveBinding(webVitalBinding)
+		if err := add.Do(cdp.WithExecutor(teardownTimeoutCtx, p.session)); err != nil {
+			// continue so that we can shutdown the page even if we fail to remove the binding.
+			closeErrs = append(closeErrs, fmt.Errorf("internal error while removing binding from page: %w", err))
+		}
+
+		err = target.CloseTarget(p.targetID).Do(cdp.WithExecutor(teardownTimeoutCtx, p.session))
+		if err != nil && !errors.Is(err, context.Canceled) {
+			// When a close target command is sent to the browser via CDP,
+			// the browser will start to cleanup and the first thing it
+			// will do is return a target.EventDetachedFromTarget, which in
+			// our implementation will close the session connection (this
+			// does not close the CDP websocket, just removes the session
+			// so no other CDP calls can be made with the session ID).
+			// This can result in the session's context being closed while
+			// we're waiting for the response to come back from the browser
+			// for this current command (it's racey).
+			closeErrs = append(closeErrs, fmt.Errorf("closing a page: %w", err))
+		}
+
+		// Start the teardown of the page's resources (FrameSessions, NetworkManagers, etc)
+		// and wait for them to finish their teardown. This allows for a graceful cleanup
+		// of resources and ensures that all events are processed before the page is closed.
+		p.cancelCtx()
+		p.waitForFrameSessions()
+
+		if len(closeErrs) > 0 {
+			p.closeErr = spanRecordError(span, errors.Join(closeErrs...))
+		}
+	})
+
+	return p.closeErr
 }
 
 // Content returns the HTML content of the page.

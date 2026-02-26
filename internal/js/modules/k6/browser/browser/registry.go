@@ -499,7 +499,7 @@ func parseTracesMetadata(envLookup env.LookupFunc) (map[string]string, error) {
 		return m, nil
 	}
 
-	for _, elem := range strings.Split(v, ",") {
+	for elem := range strings.SplitSeq(v, ",") {
 		kv := strings.Split(elem, "=")
 		if len(kv) != 2 {
 			return nil, fmt.Errorf("%q is not a valid key=value metadata", elem)

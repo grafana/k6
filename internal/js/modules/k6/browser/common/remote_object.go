@@ -239,8 +239,8 @@ func parseConsoleRemoteObjectValue(
 	case runtime.TypeFunction:
 		return "function()", nil
 	case runtime.TypeString:
-		if strings.HasPrefix(val, `"`) {
-			val = strings.TrimPrefix(val, `"`)
+		if after, ok := strings.CutPrefix(val, `"`); ok {
+			val = after
 			val = strings.TrimSuffix(val, `"`)
 		}
 	case runtime.TypeObject:

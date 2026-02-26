@@ -105,7 +105,7 @@ func (tc *thresholdConfig) UnmarshalJSON(data []byte) error {
 }
 
 func (tc thresholdConfig) MarshalJSON() ([]byte, error) {
-	var data interface{} = tc.Threshold
+	var data any = tc.Threshold
 	if tc.AbortOnFail {
 		data = rawThresholdConfig(tc)
 	}
@@ -311,7 +311,7 @@ func (ts Thresholds) MarshalJSON() ([]byte, error) {
 
 // MarshalJSONWithoutHTMLEscape marshals t to JSON without escaping characters
 // for safe use in HTML.
-func MarshalJSONWithoutHTMLEscape(t interface{}) ([]byte, error) {
+func MarshalJSONWithoutHTMLEscape(t any) ([]byte, error) {
 	buffer := &bytes.Buffer{}
 	encoder := json.NewEncoder(buffer)
 	encoder.SetEscapeHTML(false)

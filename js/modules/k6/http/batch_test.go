@@ -92,9 +92,9 @@ func TestBatchError(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				require.NotNil(t, ret)
-				var retobj map[string]interface{}
+				var retobj map[string]any
 				var ok bool
-				if retobj, ok = ret.Export().(map[string]interface{}); !ok {
+				if retobj, ok = ret.Export().(map[string]any); !ok {
 					require.Fail(t, "got wrong return object: %#+v", retobj)
 				}
 				require.Equal(t, int64(1020), retobj["error_code"])

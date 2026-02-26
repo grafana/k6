@@ -109,7 +109,7 @@ func (l *Locator) All() ([]*Locator, error) {
 	}
 
 	locators := make([]*Locator, count)
-	for i := 0; i < count; i++ {
+	for i := range count {
 		locators[i] = l.Nth(i)
 	}
 

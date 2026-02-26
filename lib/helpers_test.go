@@ -18,8 +18,8 @@ func TestStrictJSONUnmarshal(t *testing.T) {
 	testCases := []struct {
 		data           string
 		expectedError  bool
-		destination    interface{}
-		expectedResult interface{}
+		destination    any
+		expectedResult any
 	}{
 		{``, true, &someElement{}, nil},
 		{`123`, true, &someElement{}, nil},

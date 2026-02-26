@@ -124,7 +124,7 @@ func newRootCommand(gs *state.GlobalState) *rootCommand {
 	subCommands := []func(*state.GlobalState) *cobra.Command{
 		getCmdArchive, getCmdCloud, getCmdNewScript, getCmdInspect, getCmdDeps,
 		getCmdLogin, getCmdPause, getCmdResume, getCmdScale, getCmdRun,
-		getCmdStats, getCmdStatus, getCmdVersion,
+		getCmdStats, getCmdStatus, getCmdVersion, getX,
 	}
 
 	defaultUsageTemplate := (&cobra.Command{}).UsageTemplate()
@@ -134,12 +134,6 @@ func newRootCommand(gs *state.GlobalState) *rootCommand {
 		cmd := sc(gs)
 		cmd.SetUsageTemplate(defaultUsageTemplate)
 		rootCmd.AddCommand(cmd)
-	}
-
-	// Add the "x" command only if there are registered subcommand extensions.
-	if xCmd := getX(gs); len(xCmd.Commands()) > 0 {
-		xCmd.SetUsageTemplate(defaultUsageTemplate)
-		rootCmd.AddCommand(xCmd)
 	}
 
 	rootCmd.SetUsageTemplate(getRootUsageTemplate())
