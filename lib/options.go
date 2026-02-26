@@ -249,10 +249,11 @@ type Options struct {
 	ExecutionSegmentSequence *ExecutionSegmentSequence `json:"executionSegmentSequence" ignored:"true"`
 
 	// Timeouts for the setup() and teardown() functions
-	NoSetup         null.Bool          `json:"noSetup" envconfig:"K6_NO_SETUP"`
-	SetupTimeout    types.NullDuration `json:"setupTimeout" envconfig:"K6_SETUP_TIMEOUT"`
-	NoTeardown      null.Bool          `json:"noTeardown" envconfig:"K6_NO_TEARDOWN"`
-	TeardownTimeout types.NullDuration `json:"teardownTimeout" envconfig:"K6_TEARDOWN_TIMEOUT"`
+	NoSetup              null.Bool          `json:"noSetup" envconfig:"K6_NO_SETUP"`
+	SetupTimeout         types.NullDuration `json:"setupTimeout" envconfig:"K6_SETUP_TIMEOUT"`
+	NoTeardown           null.Bool          `json:"noTeardown" envconfig:"K6_NO_TEARDOWN"`
+	TeardownTimeout      types.NullDuration `json:"teardownTimeout" envconfig:"K6_TEARDOWN_TIMEOUT"`
+	HandleSummaryTimeout types.NullDuration `json:"handleSummaryTimeout" envconfig:"K6_HANDLE_SUMMARY_TIMEOUT"`
 
 	// Limit HTTP requests per second.
 	RPS null.Int `json:"rps" envconfig:"K6_RPS"`
@@ -416,6 +417,9 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.TeardownTimeout.Valid {
 		o.TeardownTimeout = opts.TeardownTimeout
+	}
+	if opts.HandleSummaryTimeout.Valid {
+		o.HandleSummaryTimeout = opts.HandleSummaryTimeout
 	}
 	if opts.RPS.Valid {
 		o.RPS = opts.RPS

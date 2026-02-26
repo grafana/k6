@@ -54,4 +54,7 @@ const (
 
 	// MarkedAsFailed indicates that the test was marked as failed.
 	MarkedAsFailed ExitCode = 110
+
+	// HandleSummaryTimeout indicates that the handleSummary() function timed out.
+	HandleSummaryTimeout ExitCode = 111
 )
