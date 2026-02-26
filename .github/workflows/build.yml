@@ -294,7 +294,7 @@ jobs:
           if-no-files-found: error
 
       - name: Get secrets for Azure Trusted Signing
-        uses: grafana/shared-workflows/actions/get-vault-secrets@a37de51f3d713a30a9e4b21bcdfbd38170020593 # get-vault-secrets/v1.3.0
+        uses: grafana/shared-workflows/actions/get-vault-secrets@f1614b210386ac420af6807a997ac7f6d96e477a # get-vault-secrets/v1.3.1
         id: get-signing-secrets
         if: needs.configure.outputs.sign_windows_artifacts == 'true'
         with:
@@ -428,7 +428,7 @@ jobs:
           path: packaging
 
       - name: Get secrets for Azure Trusted Signing
-        uses: grafana/shared-workflows/actions/get-vault-secrets@a37de51f3d713a30a9e4b21bcdfbd38170020593 # get-vault-secrets/v1.3.0
+        uses: grafana/shared-workflows/actions/get-vault-secrets@f1614b210386ac420af6807a997ac7f6d96e477a # get-vault-secrets/v1.3.1
         id: get-signing-secrets
         if: needs.configure.outputs.sign_windows_artifacts == 'true'
         with:
@@ -518,7 +518,7 @@ jobs:
         Add-AppxPackage $appxBundleFile
 
     - name: Get WinGet token
-      uses: grafana/shared-workflows/actions/get-vault-secrets@a37de51f3d713a30a9e4b21bcdfbd38170020593 # get-vault-secrets/v1.3.0
+      uses: grafana/shared-workflows/actions/get-vault-secrets@f1614b210386ac420af6807a997ac7f6d96e477a # get-vault-secrets/v1.3.1
       id: get-token
       with:
         export_env: false
@@ -570,7 +570,7 @@ jobs:
           mv "dist/k6-$VERSION-windows-amd64.msi" "dist/k6-$VERSION-amd64.msi"
           mv "dist/k6-$VERSION-linux-amd64.rpm" "dist/k6-$VERSION-amd64.rpm"
           mv "dist/k6-$VERSION-linux-amd64.deb" "dist/k6-$VERSION-amd64.deb"
-      - uses: grafana/shared-workflows/actions/get-vault-secrets@a37de51f3d713a30a9e4b21bcdfbd38170020593 # get-vault-secrets/v1.3.0
+      - uses: grafana/shared-workflows/actions/get-vault-secrets@f1614b210386ac420af6807a997ac7f6d96e477a # get-vault-secrets/v1.3.1
         with:
           repo_secrets: |
             IAM_ROLE_ARN=deploy:packager-iam-role
