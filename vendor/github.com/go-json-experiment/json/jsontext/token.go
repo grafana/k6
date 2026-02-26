@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build !goexperiment.jsonv2 || !go1.25
+
 package jsontext
 
 import (
@@ -31,8 +33,8 @@ var errInvalidToken = errors.New("invalid jsontext.Token")
 //   - a JSON literal (i.e., null, true, or false)
 //   - a JSON string (e.g., "hello, world!")
 //   - a JSON number (e.g., 123.456)
-//   - a start or end delimiter for a JSON object (i.e., { or } )
-//   - a start or end delimiter for a JSON array (i.e., [ or ] )
+//   - a begin or end delimiter for a JSON object (i.e., { or } )
+//   - a begin or end delimiter for a JSON array (i.e., [ or ] )
 //
 // A Token cannot represent entire array or object values, while a [Value] can.
 // There is no Token to represent commas and colons since
@@ -94,10 +96,10 @@ var (
 	False Token = rawToken("false")
 	True  Token = rawToken("true")
 
-	ObjectStart Token = rawToken("{")
-	ObjectEnd   Token = rawToken("}")
-	ArrayStart  Token = rawToken("[")
-	ArrayEnd    Token = rawToken("]")
+	BeginObject Token = rawToken("{")
+	EndObject   Token = rawToken("}")
+	BeginArray  Token = rawToken("[")
+	EndArray    Token = rawToken("]")
 
 	zeroString Token = rawToken(`""`)
 	zeroNumber Token = rawToken(`0`)
@@ -176,14 +178,14 @@ func (t Token) Clone() Token {
 				return False
 			case True.raw:
 				return True
-			case ObjectStart.raw:
-				return ObjectStart
-			case ObjectEnd.raw:
-				return ObjectEnd
-			case ArrayStart.raw:
-				return ArrayStart
-			case ArrayEnd.raw:
-				return ArrayEnd
+			case BeginObject.raw:
+				return BeginObject
+			case EndObject.raw:
+				return EndObject
+			case BeginArray.raw:
+				return BeginArray
+			case EndArray.raw:
+				return EndArray
 			}
 		}
 
@@ -470,29 +472,33 @@ func (t Token) Kind() Kind {
 	}
 }
 
+// A Kind represents the kind of a JSON token.
+//
 // Kind represents each possible JSON token kind with a single byte,
 // which is conveniently the first byte of that kind's grammar
-// with the restriction that numbers always be represented with '0':
-//
-//   - 'n': null
-//   - 'f': false
-//   - 't': true
-//   - '"': string
-//   - '0': number
-//   - '{': object start
-//   - '}': object end
-//   - '[': array start
-//   - ']': array end
-//
-// An invalid kind is usually represented using 0,
-// but may be non-zero due to invalid JSON data.
+// with the restriction that numbers always be represented with '0'.
 type Kind byte
+
+const (
+	KindInvalid     Kind = 0   // invalid kind
+	KindNull        Kind = 'n' // null
+	KindFalse       Kind = 'f' // false
+	KindTrue        Kind = 't' // true
+	KindString      Kind = '"' // string
+	KindNumber      Kind = '0' // number
+	KindBeginObject Kind = '{' // begin object
+	KindEndObject   Kind = '}' // end object
+	KindBeginArray  Kind = '[' // begin array
+	KindEndArray    Kind = ']' // end array
+)
 
 const invalidKind Kind = 0
 
 // String prints the kind in a humanly readable fashion.
 func (k Kind) String() string {
 	switch k {
+	case 0:
+		return "invalid"
 	case 'n':
 		return "null"
 	case 'f':
@@ -516,10 +522,31 @@ func (k Kind) String() string {
 	}
 }
 
-// normalize coalesces all possible starting characters of a number as just '0'.
+var normKind = [256]Kind{
+	'n': 'n',
+	'f': 'f',
+	't': 't',
+	'"': '"',
+	'{': '{',
+	'}': '}',
+	'[': '[',
+	']': ']',
+	'-': '0',
+	'0': '0',
+	'1': '0',
+	'2': '0',
+	'3': '0',
+	'4': '0',
+	'5': '0',
+	'6': '0',
+	'7': '0',
+	'8': '0',
+	'9': '0',
+}
+
+// normalize coalesces all possible starting characters of a number as just '0',
+// and converts all invalid kinds to 0.
 func (k Kind) normalize() Kind {
-	if k == '-' || ('0' <= k && k <= '9') {
-		return '0'
-	}
-	return k
+	// A lookup table keeps the inlining cost as low as possible.
+	return normKind[k]
 }

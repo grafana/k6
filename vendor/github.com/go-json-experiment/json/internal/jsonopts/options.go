@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build !goexperiment.jsonv2 || !go1.25
+
 package jsonopts
 
 import (
@@ -46,35 +48,24 @@ type ArshalValues struct {
 // DefaultOptionsV2 is the set of all options that define default v2 behavior.
 var DefaultOptionsV2 = Struct{
 	Flags: jsonflags.Flags{
-		Presence: uint64(jsonflags.AllFlags & ^jsonflags.WhitespaceFlags),
-		Values:   uint64(0),
+		Presence: uint64(jsonflags.DefaultV1Flags),
+		Values:   uint64(0), // all flags in DefaultV1Flags are false
 	},
 }
 
 // DefaultOptionsV1 is the set of all options that define default v1 behavior.
 var DefaultOptionsV1 = Struct{
 	Flags: jsonflags.Flags{
-		Presence: uint64(jsonflags.AllFlags & ^jsonflags.WhitespaceFlags),
-		Values:   uint64(jsonflags.DefaultV1Flags),
+		Presence: uint64(jsonflags.DefaultV1Flags),
+		Values:   uint64(jsonflags.DefaultV1Flags), // all flags in DefaultV1Flags are true
 	},
-}
-
-// CopyCoderOptions copies coder-specific options from src to dst.
-// This is used by json.MarshalEncode and json.UnmarshalDecode since those
-// functions ignore any coder-specific options and uses the options from the
-// Encoder or Decoder that is passed in.
-func (dst *Struct) CopyCoderOptions(src *Struct) {
-	srcFlags := src.Flags
-	srcFlags.Clear(^jsonflags.AllCoderFlags)
-	dst.Flags.Join(srcFlags)
-	dst.CoderValues = src.CoderValues
 }
 
 func (*Struct) JSONOptions(internal.NotForPublicUse) {}
 
 // GetUnknownOption is injected by the "json" package to handle Options
 // declared in that package so that "jsonopts" can handle them.
-var GetUnknownOption = func(*Struct, Options) (any, bool) { panic("unknown option") }
+var GetUnknownOption = func(Struct, Options) (any, bool) { panic("unknown option") }
 
 func GetOption[T any](opts Options, setter func(T) Options) (T, bool) {
 	// Collapse the options to *Struct to simplify lookup.
@@ -113,62 +104,85 @@ func GetOption[T any](opts Options, setter func(T) Options) (T, bool) {
 		}
 		return any(structOpts.DepthLimit).(T), true
 	default:
-		v, ok := GetUnknownOption(structOpts, opt)
+		v, ok := GetUnknownOption(*structOpts, opt)
 		return v.(T), ok
 	}
 }
 
 // JoinUnknownOption is injected by the "json" package to handle Options
 // declared in that package so that "jsonopts" can handle them.
-var JoinUnknownOption = func(*Struct, Options) { panic("unknown option") }
+var JoinUnknownOption = func(Struct, Options) Struct { panic("unknown option") }
 
 func (dst *Struct) Join(srcs ...Options) {
+	dst.join(false, srcs...)
+}
+
+func (dst *Struct) JoinWithoutCoderOptions(srcs ...Options) {
+	dst.join(true, srcs...)
+}
+
+func (dst *Struct) join(excludeCoderOptions bool, srcs ...Options) {
 	for _, src := range srcs {
 		switch src := src.(type) {
 		case nil:
 			continue
 		case jsonflags.Bools:
+			if excludeCoderOptions {
+				src &= ^jsonflags.AllCoderFlags
+			}
 			dst.Flags.Set(src)
 		case Indent:
+			if excludeCoderOptions {
+				continue
+			}
 			dst.Flags.Set(jsonflags.Multiline | jsonflags.Indent | 1)
 			dst.Indent = string(src)
 		case IndentPrefix:
+			if excludeCoderOptions {
+				continue
+			}
 			dst.Flags.Set(jsonflags.Multiline | jsonflags.IndentPrefix | 1)
 			dst.IndentPrefix = string(src)
 		case ByteLimit:
+			if excludeCoderOptions {
+				continue
+			}
 			dst.Flags.Set(jsonflags.ByteLimit | 1)
 			dst.ByteLimit = int64(src)
 		case DepthLimit:
+			if excludeCoderOptions {
+				continue
+			}
 			dst.Flags.Set(jsonflags.DepthLimit | 1)
 			dst.DepthLimit = int(src)
 		case *Struct:
-			dst.Flags.Join(src.Flags)
-			if src.Flags.Has(jsonflags.NonBooleanFlags) {
-				if src.Flags.Has(jsonflags.Indent) {
+			srcFlags := src.Flags // shallow copy the flags
+			if excludeCoderOptions {
+				srcFlags.Clear(jsonflags.AllCoderFlags)
+			}
+			dst.Flags.Join(srcFlags)
+			if srcFlags.Has(jsonflags.NonBooleanFlags) {
+				if srcFlags.Has(jsonflags.Indent) {
 					dst.Indent = src.Indent
 				}
-				if src.Flags.Has(jsonflags.IndentPrefix) {
+				if srcFlags.Has(jsonflags.IndentPrefix) {
 					dst.IndentPrefix = src.IndentPrefix
 				}
-				if src.Flags.Has(jsonflags.ByteLimit) {
+				if srcFlags.Has(jsonflags.ByteLimit) {
 					dst.ByteLimit = src.ByteLimit
 				}
-				if src.Flags.Has(jsonflags.DepthLimit) {
+				if srcFlags.Has(jsonflags.DepthLimit) {
 					dst.DepthLimit = src.DepthLimit
 				}
-				if src.Flags.Has(jsonflags.Marshalers) {
+				if srcFlags.Has(jsonflags.Marshalers) {
 					dst.Marshalers = src.Marshalers
 				}
-				if src.Flags.Has(jsonflags.Unmarshalers) {
+				if srcFlags.Has(jsonflags.Unmarshalers) {
 					dst.Unmarshalers = src.Unmarshalers
 				}
 			}
-			if src.Format != "" {
-				dst.Format = src.Format
-				dst.FormatDepth = src.FormatDepth
-			}
 		default:
-			JoinUnknownOption(dst, src)
+			*dst = JoinUnknownOption(*dst, src)
 		}
 	}
 }

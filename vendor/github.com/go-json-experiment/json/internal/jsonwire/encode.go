@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build !goexperiment.jsonv2 || !go1.25
+
 package jsonwire
 
 import (
@@ -90,11 +92,7 @@ func AppendQuote[Bytes ~[]byte | ~string](dst []byte, src Bytes, flags *jsonflag
 			case isInvalidUTF8(r, rn):
 				hasInvalidUTF8 = true
 				dst = append(dst, src[i:n-rn]...)
-				if flags.Get(jsonflags.EscapeInvalidUTF8) {
-					dst = append(dst, `\ufffd`...)
-				} else {
-					dst = append(dst, "\ufffd"...)
-				}
+				dst = append(dst, "\ufffd"...)
 				i = n
 			case (r == '\u2028' || r == '\u2029') && flags.Get(jsonflags.EscapeForJS):
 				dst = append(dst, src[i:n-rn]...)

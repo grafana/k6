@@ -1,8 +1,6 @@
 module go.k6.io/k6
 
-go 1.24.0
-
-toolchain go1.24.13
+go 1.26
 
 require (
 	buf.build/gen/go/prometheus/prometheus/protocolbuffers/go v1.36.11-20251118093737-4105057cc7d4.1
@@ -15,7 +13,7 @@ require (
 	github.com/chromedp/cdproto v0.0.0-20250803210736-d308e07a266d
 	github.com/evanw/esbuild v0.27.2
 	github.com/fatih/color v1.18.0
-	github.com/go-json-experiment/json v0.0.0-20250211171154-1ae217ad3535
+	github.com/go-json-experiment/json v0.0.0-20260214004413-d219187c3433
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible
 	github.com/golang/protobuf v1.5.4
 	github.com/google/uuid v1.6.0

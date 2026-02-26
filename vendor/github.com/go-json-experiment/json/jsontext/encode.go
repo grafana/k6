@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build !goexperiment.jsonv2 || !go1.25
+
 package jsontext
 
 import (
@@ -25,19 +27,19 @@ import (
 //
 // can be composed with the following calls (ignoring errors for brevity):
 //
-//	e.WriteToken(ObjectStart)        // {
+//	e.WriteToken(BeginObject)        // {
 //	e.WriteToken(String("name"))     // "name"
 //	e.WriteToken(String("value"))    // "value"
 //	e.WriteValue(Value(`"array"`))   // "array"
-//	e.WriteToken(ArrayStart)         // [
+//	e.WriteToken(BeginArray)         // [
 //	e.WriteToken(Null)               // null
 //	e.WriteToken(False)              // false
 //	e.WriteValue(Value("true"))      // true
 //	e.WriteToken(Float(3.14159))     // 3.14159
-//	e.WriteToken(ArrayEnd)           // ]
+//	e.WriteToken(EndArray)           // ]
 //	e.WriteValue(Value(`"object"`))  // "object"
 //	e.WriteValue(Value(`{"k":"v"}`)) // {"k":"v"}
-//	e.WriteToken(ObjectEnd)          // }
+//	e.WriteToken(EndObject)          // }
 //
 // The above is one of many possible sequence of calls and
 // may not represent the most sensible method to call for any given token/value.
@@ -72,8 +74,8 @@ type encodeBuffer struct {
 
 	// maxValue is the approximate maximum Value size passed to WriteValue.
 	maxValue int
-	// unusedCache is the buffer returned by the UnusedBuffer method.
-	unusedCache []byte
+	// availBuffer is the buffer returned by the AvailableBuffer method.
+	availBuffer []byte // always has zero length
 	// bufStats is statistics about buffer utilization.
 	// It is only used with pooled encoders in pools.go.
 	bufStats bufferStatistics
@@ -105,17 +107,23 @@ func (e *Encoder) Reset(w io.Writer, opts ...Options) {
 	case e.s.Flags.Get(jsonflags.WithinArshalCall):
 		panic("jsontext: cannot reset Encoder passed to json.MarshalerTo")
 	}
-	e.s.reset(nil, w, opts...)
+	// Reuse the buffer if it does not alias a previous [bytes.Buffer].
+	b := e.s.Buf[:0]
+	if _, ok := e.s.wr.(*bytes.Buffer); ok {
+		b = nil
+	}
+	e.s.reset(b, w, opts...)
 }
 
 func (e *encoderState) reset(b []byte, w io.Writer, opts ...Options) {
 	e.state.reset()
-	e.encodeBuffer = encodeBuffer{Buf: b, wr: w, bufStats: e.bufStats}
+	e.encodeBuffer = encodeBuffer{Buf: b, wr: w, availBuffer: e.availBuffer, bufStats: e.bufStats}
 	if bb, ok := w.(*bytes.Buffer); ok && bb != nil {
-		e.Buf = bb.Bytes()[bb.Len():] // alias the unused buffer of bb
+		e.Buf = bb.AvailableBuffer() // alias the unused buffer of bb
 	}
-	e.Struct = jsonopts.Struct{}
-	e.Struct.Join(opts...)
+	opts2 := jsonopts.Struct{} // avoid mutating e.Struct in case it is part of opts
+	opts2.Join(opts...)
+	e.Struct = opts2
 	if e.Flags.Get(jsonflags.Multiline) {
 		if !e.Flags.Has(jsonflags.SpaceAfterColon) {
 			e.Flags.Set(jsonflags.SpaceAfterColon | 1)
@@ -128,6 +136,18 @@ func (e *encoderState) reset(b []byte, w io.Writer, opts ...Options) {
 			e.Indent = "\t"
 		}
 	}
+}
+
+// Options returns the options used to construct the decoder and
+// may additionally contain semantic options passed to a
+// [encoding/json/v2.MarshalEncode] call.
+//
+// If operating within
+// a [encoding/json/v2.MarshalerTo.MarshalJSONTo] method call or
+// a [encoding/json/v2.MarshalToFunc] function call,
+// then the returned options are only valid within the call.
+func (e *Encoder) Options() Options {
+	return &e.s.Struct
 }
 
 // NeedFlush determines whether to flush at this point.
@@ -218,7 +238,7 @@ func (e *encodeBuffer) unflushedBuffer() []byte  { return e.Buf }
 func (e *encoderState) avoidFlush() bool {
 	switch {
 	case e.Tokens.Last.Length() == 0:
-		// Never flush after ObjectStart or ArrayStart since we don't know yet
+		// Never flush after BeginObject or BeginArray since we don't know yet
 		// if the object or array will end up being empty.
 		return true
 	case e.Tokens.Last.needObjectValue():
@@ -450,9 +470,9 @@ func (e *encoderState) AppendRaw(k Kind, safeASCII bool, appendFn func([]byte) (
 		isVerbatim := safeASCII || !jsonwire.NeedEscape(b[pos+len(`"`):len(b)-len(`"`)])
 		if !isVerbatim {
 			var err error
-			b2 := append(e.unusedCache, b[pos+len(`"`):len(b)-len(`"`)]...)
+			b2 := append(e.availBuffer, b[pos+len(`"`):len(b)-len(`"`)]...)
 			b, err = jsonwire.AppendQuote(b[:pos], string(b2), &e.Flags)
-			e.unusedCache = b2[:0]
+			e.availBuffer = b2[:0]
 			if err != nil {
 				return wrapSyntacticError(e, err, pos, +1)
 			}
@@ -698,7 +718,7 @@ func (e *encoderState) reformatValue(dst []byte, src Value, depth int) ([]byte, 
 // appends it to the end of src, reformatting whitespace and strings as needed.
 // It returns the extended dst buffer and the number of consumed input bytes.
 func (e *encoderState) reformatObject(dst []byte, src Value, depth int) ([]byte, int, error) {
-	// Append object start.
+	// Append object begin.
 	if len(src) == 0 || src[0] != '{' {
 		panic("BUG: reformatObject must be called with a buffer that starts with '{'")
 	} else if depth == maxNestingDepth+1 {
@@ -809,7 +829,7 @@ func (e *encoderState) reformatObject(dst []byte, src Value, depth int) ([]byte,
 // appends it to the end of dst, reformatting whitespace and strings as needed.
 // It returns the extended dst buffer and the number of consumed input bytes.
 func (e *encoderState) reformatArray(dst []byte, src Value, depth int) ([]byte, int, error) {
-	// Append array start.
+	// Append array begin.
 	if len(src) == 0 || src[0] != '[' {
 		panic("BUG: reformatArray must be called with a buffer that starts with '['")
 	} else if depth == maxNestingDepth+1 {
@@ -885,20 +905,20 @@ func (e *Encoder) OutputOffset() int64 {
 	return e.s.previousOffsetEnd()
 }
 
-// UnusedBuffer returns a zero-length buffer with a possible non-zero capacity.
+// AvailableBuffer returns a zero-length buffer with a possible non-zero capacity.
 // This buffer is intended to be used to populate a [Value]
 // being passed to an immediately succeeding [Encoder.WriteValue] call.
 //
 // Example usage:
 //
-//	b := d.UnusedBuffer()
+//	b := d.AvailableBuffer()
 //	b = append(b, '"')
 //	b = appendString(b, v) // append the string formatting of v
 //	b = append(b, '"')
 //	... := d.WriteValue(b)
 //
 // It is the user's responsibility to ensure that the value is valid JSON.
-func (e *Encoder) UnusedBuffer() []byte {
+func (e *Encoder) AvailableBuffer() []byte {
 	// NOTE: We don't return e.buf[len(e.buf):cap(e.buf)] since WriteValue would
 	// need to take special care to avoid mangling the data while reformatting.
 	// WriteValue can't easily identify whether the input Value aliases e.buf
@@ -906,16 +926,16 @@ func (e *Encoder) UnusedBuffer() []byte {
 	// Should this ever alias e.buf, we need to consider how it operates with
 	// the specialized performance optimization for bytes.Buffer.
 	n := 1 << bits.Len(uint(e.s.maxValue|63)) // fast approximation for max length
-	if cap(e.s.unusedCache) < n {
-		e.s.unusedCache = make([]byte, 0, n)
+	if cap(e.s.availBuffer) < n {
+		e.s.availBuffer = make([]byte, 0, n)
 	}
-	return e.s.unusedCache
+	return e.s.availBuffer
 }
 
 // StackDepth returns the depth of the state machine for written JSON data.
 // Each level on the stack represents a nested JSON object or array.
-// It is incremented whenever an [ObjectStart] or [ArrayStart] token is encountered
-// and decremented whenever an [ObjectEnd] or [ArrayEnd] token is encountered.
+// It is incremented whenever an [BeginObject] or [BeginArray] token is encountered
+// and decremented whenever an [EndObject] or [EndArray] token is encountered.
 // The depth is zero-indexed, where zero represents the top-level JSON value.
 func (e *Encoder) StackDepth() int {
 	// NOTE: Keep in sync with Decoder.StackDepth.
@@ -926,9 +946,9 @@ func (e *Encoder) StackDepth() int {
 // It must be a number between 0 and [Encoder.StackDepth], inclusive.
 // For each level, it reports the kind:
 //
-//   - 0 for a level of zero,
-//   - '{' for a level representing a JSON object, and
-//   - '[' for a level representing a JSON array.
+//   - [KindInvalid] for a level of zero,
+//   - [KindBeginObject] for a level representing a JSON object, and
+//   - [KindBeginArray] for a level representing a JSON array.
 //
 // It also reports the length of that JSON object or array.
 // Each name and value in a JSON object is counted separately,
