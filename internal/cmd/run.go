@@ -584,8 +584,8 @@ func getCmdRun(gs *state.GlobalState) *cobra.Command {
   # Ramp VUs from 0 to 100 over 10s, stay there for 60s, then 10s down to 0.
   {{.}} run -u 0 -s 10s:100 -s 60s:100 -s 10s:0
 
-  # Send metrics to an influxdb server
-  {{.}} run -o influxdb=http://1.2.3.4:8086/k6`[1:])
+  # Send metrics to a remote storage using the OpenTelemetry output.
+  {{.}} run -o opentelemetry`[1:])
 
 	runCmd := &cobra.Command{
 		Use:   "run",
