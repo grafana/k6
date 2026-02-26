@@ -295,6 +295,9 @@ type Options struct {
 	// Block hostname patterns that tests may not contact.
 	BlockedHostnames types.NullHostnameTrie `json:"blockHostnames" envconfig:"K6_BLOCK_HOSTNAMES"`
 
+	// Allow hostname patterns that tests may contact. When set, only these patterns are allowed.
+	AllowedHostnames types.NullHostnameTrie `json:"allowHostnames" envconfig:"K6_ALLOW_HOSTNAMES"`
+
 	// Hosts overrides dns entries for given hosts
 	Hosts types.NullHosts `json:"hosts" envconfig:"K6_HOSTS"`
 
@@ -534,6 +537,12 @@ func (o Options) Validate() []error {
 		}
 	}
 	validationErrors = append(validationErrors, o.Scenarios.Validate()...)
+
+	// Validate mutual exclusion of BlockedHostnames and AllowedHostnames
+	if o.BlockedHostnames.Valid && o.AllowedHostnames.Valid {
+		validationErrors = append(validationErrors,
+			errors.New("blockedHostnames and allowHostnames options are mutually exclusive"))
+	}
 
 	// Duration
 	if o.SetupTimeout.Valid && o.SetupTimeout.Duration <= 0 {

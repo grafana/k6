@@ -109,6 +109,49 @@ func TestDialerAddrBlockHostnamesStar(t *testing.T) {
 	}
 }
 
+func TestDialerAddrAllowHostnames(t *testing.T) {
+	t.Parallel()
+	dialer := NewDialer(net.Dialer{}, newResolver())
+	hosts, err := types.NewHosts(map[string]types.Host{
+		"allowed.com":       {IP: net.ParseIP("1.2.3.4")},
+		"example.com":       {IP: net.ParseIP("5.6.7.8")},
+		"test.wildcard.com": {IP: net.ParseIP("9.10.11.12")},
+	})
+	require.NoError(t, err)
+	dialer.Hosts = hosts
+
+	allowed, err := types.NewHostnameTrie([]string{"allowed.com", "*.wildcard.com"})
+	require.NoError(t, err)
+	dialer.AllowedHostnames = allowed
+
+	testCases := []struct {
+		address, expAddress, expErr string
+	}{
+		// Allowed hostnames
+		{"allowed.com:80", "1.2.3.4:80", ""},
+		{"test.wildcard.com:443", "9.10.11.12:443", ""},
+		// Not allowed hostnames
+		{"example.com:80", "", "hostname (example.com) is not in the allowed hostnames list"},
+		{"notallowed.com:80", "", "hostname (notallowed.com) is not in the allowed hostnames list"},
+		// IPs should bypass the allowlist
+		{"1.2.3.4:80", "1.2.3.4:80", ""},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.address, func(t *testing.T) {
+			t.Parallel()
+			addr, err := dialer.getDialAddr(tc.address)
+
+			if tc.expErr != "" {
+				require.EqualError(t, err, tc.expErr)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tc.expAddress, addr.String())
+			}
+		})
+	}
+}
+
 // Benchmarks /etc/hosts like hostname mapping
 func BenchmarkDialerHosts(b *testing.B) {
 	hosts, err := types.NewHosts(map[string]types.Host{
