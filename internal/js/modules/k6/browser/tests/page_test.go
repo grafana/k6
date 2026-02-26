@@ -1665,7 +1665,7 @@ func performPingTest(t *testing.T, tb *testBrowser, page *common.Page, iteration
 	t.Helper()
 
 	var ms int64
-	for i := 0; i < iterations; i++ {
+	for range iterations {
 		start := time.Now()
 
 		opts := &common.FrameGotoOptions{
@@ -4504,7 +4504,7 @@ func TestPageGoBackForward(t *testing.T) {
 		require.NoError(t, err)
 		tb.AssertURL(p, url3, "second goForward should land on page2")
 
-		for i := 0; i < 3; i++ {
+		for range 3 {
 			_, err = p.GoBackForward(-1, opts)
 			require.NoError(t, err)
 			_, err = p.GoBackForward(+1, opts)

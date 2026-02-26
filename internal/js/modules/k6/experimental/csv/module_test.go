@@ -718,7 +718,7 @@ const initGlobals = `
 func newConfiguredRuntime(t testing.TB) (*modulestest.Runtime, error) {
 	runtime := modulestest.NewRuntime(t)
 
-	modules := map[string]interface{}{
+	modules := map[string]any{
 		"k6/experimental/fs":  fs.New(),
 		"k6/experimental/csv": New(),
 	}

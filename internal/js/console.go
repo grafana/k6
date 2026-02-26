@@ -9,6 +9,7 @@ import (
 
 	"github.com/grafana/sobek"
 	"github.com/sirupsen/logrus"
+
 	"go.k6.io/k6/js/common"
 )
 
@@ -40,7 +41,7 @@ func newFileConsole(filepath string, formatter logrus.Formatter, level logrus.Le
 
 func (c console) log(level logrus.Level, args ...sobek.Value) {
 	var strs strings.Builder
-	for i := 0; i < len(args); i++ {
+	for i := range args {
 		if i > 0 {
 			strs.WriteString(" ")
 		}
@@ -48,7 +49,7 @@ func (c console) log(level logrus.Level, args ...sobek.Value) {
 	}
 	msg := strs.String()
 
-	switch level { //nolint:exhaustive
+	switch level {
 	case logrus.DebugLevel:
 		c.logger.Debug(msg)
 	case logrus.InfoLevel:
@@ -57,6 +58,8 @@ func (c console) log(level logrus.Level, args ...sobek.Value) {
 		c.logger.Warn(msg)
 	case logrus.ErrorLevel:
 		c.logger.Error(msg)
+	default:
+		panic("unsupported log level: " + level.String())
 	}
 }
 
@@ -88,7 +91,7 @@ const (
 // errorType is used to check if a [sobek.Value] implements the [error] interface.
 //
 //nolint:gochecknoglobals
-var errorType = reflect.TypeOf((*error)(nil)).Elem()
+var errorType = reflect.TypeFor[error]()
 
 func (c console) valueString(v sobek.Value) string {
 	if _, isFunction := sobek.AssertFunction(v); isFunction {
@@ -168,7 +171,7 @@ func (c console) traverseValue(sb *strings.Builder, v sobek.Value, seen map[*sob
 			return
 		}
 		sb.WriteString("[ ")
-		for i := int64(0); i < length; i++ {
+		for i := range length {
 			if i > 0 {
 				sb.WriteString(", ")
 			}
@@ -289,7 +292,7 @@ func formatBinaryData(sb *strings.Builder, obj *sobek.Object) {
 		}
 
 		sb.WriteString(" [ ")
-		for i := int64(0); i < length; i++ {
+		for i := range length {
 			if i > 0 {
 				sb.WriteString(", ")
 			}

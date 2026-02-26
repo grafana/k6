@@ -12,8 +12,8 @@ import (
 )
 
 func attrToProperty(s string) string {
-	if idx := strings.Index(s, "-"); idx != -1 {
-		return s[0:idx] + snaker.SnakeToCamel(strings.ReplaceAll(s[idx+1:], "-", "_"))
+	if before, after, ok := strings.Cut(s, "-"); ok {
+		return before + snaker.SnakeToCamel(strings.ReplaceAll(after, "-", "_"))
 	}
 	return s
 }
@@ -84,13 +84,13 @@ func toNumeric(val string) (float64, bool) {
 	return 0, false
 }
 
-func convertDataAttrVal(val string) interface{} {
+func convertDataAttrVal(val string) any {
 	if len(val) == 0 {
 		return sobek.Undefined()
 	}
 
 	if val[0] == '{' || val[0] == '[' {
-		var subdata interface{}
+		var subdata any
 
 		err := json.Unmarshal([]byte(val), &subdata)
 		if err == nil {

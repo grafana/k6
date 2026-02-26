@@ -140,9 +140,9 @@ func (i *SystemTagSet) UnmarshalJSON(data []byte) error {
 
 // UnmarshalText converts the tag list to SystemTagSet.
 func (i *SystemTagSet) UnmarshalText(data []byte) error {
-	list := bytes.Split(data, []byte(","))
+	list := bytes.SplitSeq(data, []byte(","))
 
-	for _, key := range list {
+	for key := range list {
 		key := strings.TrimSpace(string(key))
 		if key == "" {
 			continue

@@ -360,8 +360,7 @@ func TestRequestWithBinaryFile(t *testing.T) {
 		Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	bi.moduleVUImpl.ctx = ctx
 
 	v, err := bi.getCallableExport(consts.DefaultFn)(sobek.Undefined())
@@ -502,8 +501,7 @@ func TestRequestWithMultipleBinaryFiles(t *testing.T) {
 		Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	bi.moduleVUImpl.ctx = ctx
 
 	v, err := bi.getCallableExport(consts.DefaultFn)(sobek.Undefined())

@@ -50,7 +50,7 @@ func getTestPreInitState(tb testing.TB, logger logrus.FieldLogger, rtOpts *lib.R
 	}
 }
 
-func getSimpleBundle(tb testing.TB, filename, data string, opts ...interface{}) (*Bundle, error) {
+func getSimpleBundle(tb testing.TB, filename, data string, opts ...any) (*Bundle, error) {
 	tb.Helper()
 	fs := fsext.NewMemMapFs()
 	var rtOpts *lib.RuntimeOptions
@@ -84,7 +84,7 @@ func getSimpleBundle(tb testing.TB, filename, data string, opts ...interface{}) 
 	)
 }
 
-func getSimpleBundleFromArchive(tb testing.TB, arc *lib.Archive, opts ...interface{}) (*Bundle, error) {
+func getSimpleBundleFromArchive(tb testing.TB, arc *lib.Archive, opts ...any) (*Bundle, error) {
 	tb.Helper()
 	var rtOpts *lib.RuntimeOptions
 	var logger logrus.FieldLogger
@@ -105,7 +105,7 @@ func getSimpleBundleFromArchive(tb testing.TB, arc *lib.Archive, opts ...interfa
 	return NewBundleFromArchive(preInitState, arc, moduleResolver)
 }
 
-func getSimpleBundleStdin(tb testing.TB, pwd *url.URL, data string, opts ...interface{}) (*Bundle, error) {
+func getSimpleBundleStdin(tb testing.TB, pwd *url.URL, data string, opts ...any) (*Bundle, error) {
 	tb.Helper()
 	fs := fsext.NewMemMapFs()
 	var rtOpts *lib.RuntimeOptions
@@ -926,10 +926,10 @@ func TestBundleNotSharable(t *testing.T) {
 	for name, b := range bundles {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			for i := uint64(0); i < vus; i++ {
+			for i := range vus {
 				bi, err := b.Instantiate(context.Background(), i)
 				require.NoError(t, err)
-				for j := uint64(0); j < iters; j++ {
+				for j := range iters {
 					require.NoError(t, bi.Runtime.Set("__ITER", j))
 					_, err := bi.getCallableExport(consts.DefaultFn)(sobek.Undefined())
 					require.NoError(t, err)

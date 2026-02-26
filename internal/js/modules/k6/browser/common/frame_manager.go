@@ -580,7 +580,7 @@ func (m *FrameManager) requestStarted(req *Request) {
 func (m *FrameManager) Frames() []*Frame {
 	m.framesMu.RLock()
 	defer m.framesMu.RUnlock()
-	frames := make([]*Frame, 0)
+	frames := make([]*Frame, 0, len(m.frames))
 	for _, frame := range m.frames {
 		frames = append(frames, frame)
 	}

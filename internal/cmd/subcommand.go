@@ -81,9 +81,10 @@ allowing them to extend k6's functionality with custom commands.
 
 // extensionSubcommands retrieves all subcommands provided by extensions.
 func extensionSubcommands(gs *state.GlobalState) []*cobra.Command {
-	commands := make([]*cobra.Command, 0)
+	extensions := ext.Get(ext.SubcommandExtension)
+	commands := make([]*cobra.Command, 0, len(extensions))
 
-	for _, extension := range ext.Get(ext.SubcommandExtension) {
+	for _, extension := range extensions {
 		commands = append(commands, getCmdForExtension(extension, gs))
 	}
 

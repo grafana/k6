@@ -144,10 +144,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"frames": func() *sobek.Object {
-			var (
-				mfrs []mapping
-				frs  = p.Frames()
-			)
+			frs := p.Frames()
+			mfrs := make([]mapping, 0, len(frs))
 			for _, fr := range frs {
 				mfrs = append(mfrs, mapFrame(vu, fr))
 			}
@@ -637,7 +635,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 
 			var val string
 			switch url.ExportType() {
-			case reflect.TypeOf(string("")):
+			case reflect.TypeFor[string]():
 				val = "'" + url.String() + "'" // Strings require quotes
 			default: // JS Regex, CSS, numbers or booleans
 				val = url.String() // No quotes
@@ -658,7 +656,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 
 			var val string
 			switch url.ExportType() {
-			case reflect.TypeOf(string("")):
+			case reflect.TypeFor[string]():
 				val = "'" + url.String() + "'" // Strings require quotes
 			default: // JS Regex, CSS, numbers or booleans
 				val = url.String() // No quotes
@@ -726,8 +724,9 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"workers": func() *sobek.Object {
-			var mws []mapping
-			for _, w := range p.Workers() {
+			workers := p.Workers()
+			mws := make([]mapping, 0, len(workers))
+			for _, w := range workers {
 				mw := mapWorker(vu, w)
 				mws = append(mws, mw)
 			}
@@ -843,17 +842,15 @@ func parseWaitForFunctionArgs(
 // so that it is easier to copy over updates/fixes from Playwright when we need
 // to.
 func parseStringOrRegex(v sobek.Value, doubleQuote bool) string {
-	const stringType = string("")
-
 	var a string
 	switch v.ExportType() {
-	case reflect.TypeOf(stringType): // text values require quotes
+	case reflect.TypeFor[string](): // text values require quotes
 		if doubleQuote {
 			a = `"` + strings.ReplaceAll(v.String(), `"`, `\"`) + `"`
 		} else {
 			a = `'` + strings.ReplaceAll(v.String(), `'`, `\'`) + `'`
 		}
-	case reflect.TypeOf(map[string]interface{}(nil)): // JS RegExp
+	case reflect.TypeFor[map[string]any](): // JS RegExp
 		a = v.String() // No quotes
 	default: // CSS, numbers or booleans
 		a = v.String() // No quotes

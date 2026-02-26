@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 )
 
@@ -25,12 +26,7 @@ type ResponseError struct {
 }
 
 func contains(s []string, e string) bool {
-	for _, a := range s {
-		if a == e {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(s, e)
 }
 
 func (e ResponseError) Error() string {
@@ -46,7 +42,7 @@ func (e ResponseError) Error() string {
 
 	// `e.Details` is the old API version
 	// TODO: do not handle `details` when the old API becomes obsolete
-	var details []string //nolint:prealloc
+	var details []string
 	var detail string
 	for k, v := range e.Details {
 		detail = k + ": " + strings.Join(v, ", ")

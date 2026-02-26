@@ -306,7 +306,7 @@ func TestKeyboardPress(t *testing.T) {
 		require.NoError(t, kb.Press("ArrowLeft", common.KeyboardOptions{}))
 		// Should hold the key until Up() is called.
 		require.NoError(t, kb.Down("Shift"))
-		for i := 0; i < len(" World"); i++ {
+		for range len(" World") {
 			require.NoError(t, kb.Press("ArrowLeft", common.KeyboardOptions{}))
 		}
 		// Should release the key but the selection should remain active.

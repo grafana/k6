@@ -925,7 +925,7 @@ func (sc *SubtleCrypto) ExportKey( //nolint:funlen // we have a lot of error han
 
 	var (
 		ck          *CryptoKey
-		keyExporter func(*CryptoKey, KeyFormat) (interface{}, error)
+		keyExporter func(*CryptoKey, KeyFormat) (any, error)
 	)
 
 	err := func() error {

@@ -38,7 +38,7 @@ func (*RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 // Exports returns the exports of the encoding module.
 func (e *Encoding) Exports() modules.Exports {
 	return modules.Exports{
-		Named: map[string]interface{}{
+		Named: map[string]any{
 			"b64encode": e.b64Encode,
 			"b64decode": e.b64Decode,
 		},
@@ -47,7 +47,7 @@ func (e *Encoding) Exports() modules.Exports {
 
 // b64encode returns the base64 encoding of input as a string.
 // The data type of input can be a string, []byte or ArrayBuffer.
-func (e *Encoding) b64Encode(input interface{}, encoding string) string {
+func (e *Encoding) b64Encode(input any, encoding string) string {
 	data, err := common.ToBytes(input)
 	if err != nil {
 		common.Throw(e.vu.Runtime(), err)
@@ -69,7 +69,7 @@ func (e *Encoding) b64Encode(input interface{}, encoding string) string {
 // b64decode returns the decoded data of the base64 encoded input string using
 // the given encoding. If format is "s" it returns the data as a string,
 // otherwise as an ArrayBuffer.
-func (e *Encoding) b64Decode(input, encoding, format string) interface{} {
+func (e *Encoding) b64Decode(input, encoding, format string) any {
 	var (
 		output []byte
 		err    error
@@ -92,7 +92,7 @@ func (e *Encoding) b64Decode(input, encoding, format string) interface{} {
 		common.Throw(e.vu.Runtime(), err)
 	}
 
-	var out interface{}
+	var out any
 	if format == "s" {
 		out = string(output)
 	} else {
