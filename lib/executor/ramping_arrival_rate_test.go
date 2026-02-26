@@ -78,9 +78,7 @@ func TestRampingArrivalRateRunCorrectRate(t *testing.T) {
 	defer test.cancel()
 
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		// check that we got around the amount of VU iterations as we would expect
 		var currentCount int64
 
@@ -95,7 +93,7 @@ func TestRampingArrivalRateRunCorrectRate(t *testing.T) {
 		time.Sleep(time.Second)
 		currentCount = atomic.SwapInt64(&count, 0)
 		assert.InDelta(t, 50, currentCount, 3)
-	}()
+	})
 	engineOut := make(chan metrics.SampleContainer, 1000)
 	require.NoError(t, test.executor.Run(test.ctx, engineOut))
 	wg.Wait()

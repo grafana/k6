@@ -856,9 +856,7 @@ func asyncWaitForStdoutAndRun(
 	t *testing.T, ts *GlobalTestState, attempts int, interval time.Duration, expText string, callback func(),
 ) {
 	wg := &sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		reachedCondition := false
 		for i := range attempts {
 			ts.OutMutex.Lock()
@@ -887,7 +885,7 @@ func asyncWaitForStdoutAndRun(
 			t, "expected output not found", "did not find the text '%s' in the process stdout after %d attempts (%s)",
 			expText, attempts, time.Duration(attempts)*interval,
 		)
-	}()
+	})
 
 	t.Cleanup(wg.Wait) // ensure the test waits for the goroutine to finish
 }

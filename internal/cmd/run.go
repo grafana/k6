@@ -152,9 +152,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	defer progressCancel()
 
 	initBar := execScheduler.GetInitProgressBar()
-	backgroundProcesses.Add(1)
-	go func() {
-		defer backgroundProcesses.Done()
+	backgroundProcesses.Go(func() {
 		executors := execScheduler.GetExecutors()
 		pbs := make([]*pb.ProgressBar, 0, 1+len(executors))
 		pbs = append(pbs, initBar)
@@ -162,7 +160,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 			pbs = append(pbs, s.GetProgress())
 		}
 		showProgress(progressCtx, c.gs, pbs, logger)
-	}()
+	})
 
 	// Create all outputs.
 	executionPlan := execScheduler.GetExecutionPlan()
@@ -478,9 +476,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	// Init has passed successfully, so unless disabled, make sure we send a
 	// usage report after the context is done.
 	if !conf.NoUsageReport.Bool {
-		backgroundProcesses.Add(1)
-		go func() {
-			defer backgroundProcesses.Done()
+		backgroundProcesses.Go(func() {
 			reportCtx, reportCancel := context.WithTimeout(globalCtx, 3*time.Second)
 			defer reportCancel()
 			logger.Debug("Sending usage report...")
@@ -490,7 +486,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 			} else {
 				logger.Debug("Usage report sent successfully")
 			}
-		}()
+		})
 	}
 
 	// Check what the execScheduler.Run() error is.
