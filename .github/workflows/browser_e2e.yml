@@ -51,6 +51,7 @@ jobs:
         run: |
           sudo apt update && sudo apt install chromium-browser
           chromium --version
+          exit 1
       - name: Build k6
         run: |
           which go
