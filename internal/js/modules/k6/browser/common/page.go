@@ -1650,9 +1650,9 @@ func (p *Page) GoBackForward(delta int, opts *PageGoBackForwardOptions) (_ *Resp
 	for {
 		select {
 		case <-p.ctx.Done():
-			return nil, p.ctx.Err()
+			return nil, ContextErr(p.ctx)
 		case <-timeoutCtx.Done():
-			return nil, wrapTimeoutError(timeoutCtx.Err())
+			return nil, wrapTimeoutError(ContextErr(timeoutCtx))
 		case <-ticker.C:
 			mainFrame := p.frameManager.MainFrame()
 			if mainFrame == nil {
