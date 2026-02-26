@@ -85,7 +85,7 @@ func (c *Crypto) GetRandomValues(typedArray sobek.Value) sobek.Value {
 		common.Throw(c.vu.Runtime(), err)
 	}
 
-	for i := int64(0); i < objLength; i++ {
+	for i := range objLength {
 		err := obj.Set(strconv.FormatInt(i, 10), randomValues[i])
 		if err != nil {
 			common.Throw(c.vu.Runtime(), err)

@@ -176,7 +176,7 @@ func generateRSAKeyPair(
 	return privateKey, privateKey.Public(), nil
 }
 
-func exportRSAKey(ck *CryptoKey, format KeyFormat) (interface{}, error) {
+func exportRSAKey(ck *CryptoKey, format KeyFormat) (any, error) {
 	if ck.handle == nil {
 		return nil, NewError(OperationError, "key data is not accessible")
 	}

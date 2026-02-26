@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
@@ -76,7 +75,7 @@ func TestInlineConfig(t *testing.T) {
 		}
 		configData, err := json.Marshal(baseConfig)
 		require.NoError(t, err)
-		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
+		err = fsext.WriteFile(fs, testConfigFile, configData, 0o600)
 		require.NoError(t, err)
 
 		// Load from file and override with inline config
@@ -233,7 +232,7 @@ func TestGetConfig(t *testing.T) {
 
 		configData, err := json.Marshal(config)
 		require.NoError(t, err)
-		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
+		err = fsext.WriteFile(fs, testConfigFile, configData, 0o600)
 		require.NoError(t, err)
 
 		result, err := getConfig("config="+testConfigFile, fs, nil)
@@ -263,7 +262,7 @@ func TestGetConfig(t *testing.T) {
 
 		configData, err := json.Marshal(config)
 		require.NoError(t, err)
-		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
+		err = fsext.WriteFile(fs, testConfigFile, configData, 0o600)
 		require.NoError(t, err)
 
 		result, err := getConfig("config="+testConfigFile, fs, nil)
@@ -285,7 +284,7 @@ func TestGetConfig(t *testing.T) {
 
 		configData, err := json.Marshal(config)
 		require.NoError(t, err)
-		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
+		err = fsext.WriteFile(fs, testConfigFile, configData, 0o600)
 		require.NoError(t, err)
 
 		_, err = getConfig("config="+testConfigFile, fs, nil)
@@ -304,7 +303,7 @@ func TestGetConfig(t *testing.T) {
 
 		configData, err := json.Marshal(config)
 		require.NoError(t, err)
-		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
+		err = fsext.WriteFile(fs, testConfigFile, configData, 0o600)
 		require.NoError(t, err)
 
 		_, err = getConfig("config="+testConfigFile, fs, nil)
@@ -329,7 +328,7 @@ func TestGetConfig(t *testing.T) {
 
 		configData, err := json.Marshal(config)
 		require.NoError(t, err)
-		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
+		err = fsext.WriteFile(fs, testConfigFile, configData, 0o600)
 		require.NoError(t, err)
 
 		_, err = getConfig("config="+testConfigFile, fs, nil)
@@ -346,7 +345,7 @@ func TestGetConfig(t *testing.T) {
 
 		configData, err := json.Marshal(config)
 		require.NoError(t, err)
-		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
+		err = fsext.WriteFile(fs, testConfigFile, configData, 0o600)
 		require.NoError(t, err)
 
 		result, err := getConfig("config="+testConfigFile, fs, nil)
@@ -364,7 +363,7 @@ func TestGetConfig(t *testing.T) {
 
 		configData, err := json.Marshal(config)
 		require.NoError(t, err)
-		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
+		err = fsext.WriteFile(fs, testConfigFile, configData, 0o600)
 		require.NoError(t, err)
 
 		result, err := getConfig("config="+testConfigFile, fs, nil)
@@ -382,7 +381,7 @@ func TestGetConfig(t *testing.T) {
 
 		configData, err := json.Marshal(config)
 		require.NoError(t, err)
-		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
+		err = fsext.WriteFile(fs, testConfigFile, configData, 0o600)
 		require.NoError(t, err)
 
 		_, err = getConfig("config="+testConfigFile, fs, nil)
@@ -905,7 +904,7 @@ func TestGetConfig_Retry(t *testing.T) {
 
 		configData, err := json.Marshal(config)
 		require.NoError(t, err)
-		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
+		err = fsext.WriteFile(fs, testConfigFile, configData, 0o600)
 		require.NoError(t, err)
 
 		result, err := getConfig("config="+testConfigFile, fs, nil)
@@ -928,7 +927,7 @@ func TestGetConfig_Retry(t *testing.T) {
 
 		configData, err := json.Marshal(config)
 		require.NoError(t, err)
-		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
+		err = fsext.WriteFile(fs, testConfigFile, configData, 0o600)
 		require.NoError(t, err)
 
 		result, err := getConfig("config="+testConfigFile, fs, nil)
@@ -949,7 +948,7 @@ func TestGetConfig_Retry(t *testing.T) {
 
 		configData, err := json.Marshal(config)
 		require.NoError(t, err)
-		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
+		err = fsext.WriteFile(fs, testConfigFile, configData, 0o600)
 		require.NoError(t, err)
 
 		_, err = getConfig("config="+testConfigFile, fs, nil)
@@ -968,7 +967,7 @@ func TestGetConfig_Retry(t *testing.T) {
 
 		configData, err := json.Marshal(config)
 		require.NoError(t, err)
-		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
+		err = fsext.WriteFile(fs, testConfigFile, configData, 0o600)
 		require.NoError(t, err)
 
 		_, err = getConfig("config="+testConfigFile, fs, nil)
@@ -987,7 +986,7 @@ func TestGetConfig_Retry(t *testing.T) {
 
 		configData, err := json.Marshal(config)
 		require.NoError(t, err)
-		err = afero.WriteFile(fs, testConfigFile, configData, 0o600)
+		err = fsext.WriteFile(fs, testConfigFile, configData, 0o600)
 		require.NoError(t, err)
 
 		result, err := getConfig("config="+testConfigFile, fs, nil)
@@ -1026,7 +1025,7 @@ func TestURLSecrets_JSONResponseIntegration(t *testing.T) {
 			assert.Equal(t, expectedPath, req.URL.Path)
 
 			// Return a structured JSON response with metadata and the secret value
-			response := map[string]interface{}{
+			response := map[string]any{
 				"uuid":        "550e8400-e29b-41d4-a716-446655440000",
 				"name":        "my-secret",
 				"description": "A test secret",
@@ -1103,7 +1102,7 @@ func TestURLSecrets_JSONResponseIntegration(t *testing.T) {
 				return
 			}
 
-			response := map[string]interface{}{
+			response := map[string]any{
 				"name":      secretID,
 				"plaintext": plaintext,
 			}
@@ -1198,7 +1197,7 @@ func TestURLSecrets_JSONResponseIntegration(t *testing.T) {
 			assert.True(t, strings.HasPrefix(req.URL.Path, "/secrets/"))
 			assert.True(t, strings.HasSuffix(req.URL.Path, "/decrypt"))
 
-			response := map[string]interface{}{
+			response := map[string]any{
 				"plaintext": "secret-from-api",
 			}
 
@@ -1238,7 +1237,7 @@ func TestNewLimiter(t *testing.T) {
 
 	// Test that limiter allows burst
 	ctx := context.Background()
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		err := limiter.Wait(ctx)
 		assert.NoError(t, err)
 	}

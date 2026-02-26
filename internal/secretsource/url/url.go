@@ -180,7 +180,7 @@ func (us *urlSecrets) Get(key string) (string, error) {
 			req.Header.Set(k, v)
 		}
 
-		response, err := us.httpClient.Do(req)
+		response, err := us.httpClient.Do(req) //nolint:gosec
 		if err != nil {
 			// Network errors are retryable
 			return fmt.Errorf("failed to get secret: %w", err), true
@@ -274,7 +274,7 @@ func retry(
 	r := rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec
 
 	var lastErr error
-	for i := 0; i < attempts; i++ {
+	for i := range attempts {
 		if i > 0 {
 			// Calculate exponential backoff: base^attempt + jitter
 			wait := time.Duration(math.Pow(baseBackoff.Seconds(), float64(i))) * time.Second
@@ -325,8 +325,8 @@ func parseInlineConfig(configArg string, fs fsext.Fs) (extConfig, error) {
 	var inlineCfg extConfig
 
 	// Split by comma to parse key=value pairs
-	parts := strings.Split(configArg, ",")
-	for _, part := range parts {
+	parts := strings.SplitSeq(configArg, ",")
+	for part := range parts {
 		key, value, ok := strings.Cut(part, "=")
 		if !ok {
 			return extConfig{}, fmt.Errorf("invalid config format %q, expected key=value", part)
@@ -480,8 +480,8 @@ func parseEnvConfig(env map[string]string) (extConfig, error) {
 	// Read headers - iterate through all environment variables
 	// Headers are prefixed with K6_SECRET_SOURCE_URL_HEADER_
 	for key, value := range env {
-		if strings.HasPrefix(key, "K6_SECRET_SOURCE_URL_HEADER_") {
-			headerName := strings.TrimPrefix(key, "K6_SECRET_SOURCE_URL_HEADER_")
+		if after, ok := strings.CutPrefix(key, "K6_SECRET_SOURCE_URL_HEADER_"); ok {
+			headerName := after
 			if cfg.Headers == nil {
 				cfg.Headers = make(map[string]string)
 			}

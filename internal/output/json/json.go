@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"maps"
 	"strings"
 	"time"
 
@@ -116,9 +117,7 @@ func (o *Output) SetThresholds(thresholds map[string]metrics.Thresholds) {
 		return
 	}
 	o.thresholds = make(map[string]metrics.Thresholds, len(thresholds))
-	for name, t := range thresholds {
-		o.thresholds[name] = t
-	}
+	maps.Copy(o.thresholds, thresholds)
 }
 
 func (o *Output) flushMetrics() {

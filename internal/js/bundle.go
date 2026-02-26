@@ -176,9 +176,7 @@ func (b *Bundle) makeArchive() *lib.Archive {
 		Goos:              runtime.GOOS,
 	}
 	// Copy env so changes in the archive are not reflected in the source Bundle
-	for k, v := range b.preInitState.RuntimeOptions.Env {
-		arc.Env[k] = v
-	}
+	maps.Copy(arc.Env, b.preInitState.RuntimeOptions.Env)
 
 	return arc
 }
@@ -290,7 +288,7 @@ func (bi *BundleInstance) manipulateOptions(options lib.Options) error {
 
 	jsOptionsObj = jsOptions.ToObject(bi.Runtime)
 	var instErr error
-	options.ForEachSpecified("json", func(key string, val interface{}) {
+	options.ForEachSpecified("json", func(key string, val any) {
 		if err := jsOptionsObj.Set(key, val); err != nil {
 			instErr = err
 		}
@@ -409,9 +407,7 @@ func (b *Bundle) setupJSRuntime(rt *sobek.Runtime, vuID uint64, logger logrus.Fi
 	rt.SetRandSource(common.NewRandSource())
 
 	env := make(map[string]string, len(b.preInitState.RuntimeOptions.Env))
-	for key, value := range b.preInitState.RuntimeOptions.Env {
-		env[key] = value
-	}
+	maps.Copy(env, b.preInitState.RuntimeOptions.Env)
 	err := rt.Set("__ENV", env)
 	if err != nil {
 		return err
@@ -458,7 +454,7 @@ func (r *requireImpl) require(specifier string) (*sobek.Object, error) {
 }
 
 func (b *Bundle) setInitGlobals(rt *sobek.Runtime, vu *moduleVUImpl, modSys *modules.ModuleSystem) {
-	mustSet := func(k string, v interface{}) {
+	mustSet := func(k string, v any) {
 		if err := rt.Set(k, v); err != nil {
 			panic(fmt.Errorf("failed to set '%s' global object: %w", k, err))
 		}

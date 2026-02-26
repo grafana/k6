@@ -691,7 +691,7 @@ const initGlobals = `
 func newConfiguredRuntime(t testing.TB) (*modulestest.Runtime, error) {
 	runtime := modulestest.NewRuntime(t)
 
-	err := runtime.SetupModuleSystem(map[string]interface{}{"k6/experimental/fs": New()}, nil, compiler.New(runtime.VU.InitEnv().Logger))
+	err := runtime.SetupModuleSystem(map[string]any{"k6/experimental/fs": New()}, nil, compiler.New(runtime.VU.InitEnv().Logger))
 	if err != nil {
 		return nil, err
 	}

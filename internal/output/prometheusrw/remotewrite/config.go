@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"strings"
 	"time"
@@ -218,9 +219,7 @@ func (conf Config) Apply(applied Config) Config {
 	}
 
 	if len(applied.Headers) > 0 {
-		for k, v := range applied.Headers {
-			conf.Headers[k] = v
-		}
+		maps.Copy(conf.Headers, applied.Headers)
 	}
 
 	if len(applied.TrendStats) > 0 {
@@ -279,8 +278,8 @@ func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, _
 func envMap(env map[string]string, prefix string) map[string]string {
 	result := make(map[string]string)
 	for ek, ev := range env {
-		if strings.HasPrefix(ek, prefix) {
-			k := strings.TrimPrefix(ek, prefix)
+		if after, ok := strings.CutPrefix(ek, prefix); ok {
+			k := after
 			result[k] = ev
 		}
 	}
@@ -303,12 +302,10 @@ func parseEnvs(env map[string]string) (Config, error) {
 	// We don't rely on `envconfig` for headers, as we do use our own logic/syntax with
 	// dynamically-defined header-associated environment variables.
 	envHeaders := envMap(env, "K6_PROMETHEUS_RW_HEADERS_")
-	for k, v := range envHeaders {
-		c.Headers[k] = v
-	}
+	maps.Copy(c.Headers, envHeaders)
 
 	if headers, headersDefined := env["K6_PROMETHEUS_RW_HTTP_HEADERS"]; headersDefined {
-		for _, kvPair := range strings.Split(headers, ",") {
+		for kvPair := range strings.SplitSeq(headers, ",") {
 			header := strings.Split(kvPair, ":")
 			if len(header) != 2 {
 				return c, fmt.Errorf("the provided header (%s) does not respect the expected format <header key>:<value>", kvPair)
@@ -330,9 +327,9 @@ func parseJSON(data json.RawMessage) (Config, error) {
 // parseArg parses the supplied string of arguments into a Config.
 func parseArg(text string) (Config, error) {
 	var c Config
-	opts := strings.Split(text, ",")
+	opts := strings.SplitSeq(text, ",")
 
-	for _, opt := range opts {
+	for opt := range opts {
 		r := strings.SplitN(opt, "=", 2)
 		if len(r) != 2 {
 			return c, fmt.Errorf("couldn't parse argument %q as option", opt)

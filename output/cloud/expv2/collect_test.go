@@ -39,7 +39,7 @@ func TestCollectorCollectSample(t *testing.T) {
 			return time.Unix(31, 0)
 		},
 	}
-	for i := 0; i < len(samples); i++ {
+	for i := range samples {
 		sample := metrics.Sample{
 			TimeSeries: metrics.TimeSeries{
 				Metric: m1,
@@ -77,7 +77,7 @@ func TestCollectorCollectSampleAggregateNumbers(t *testing.T) {
 		Tags:   tags,
 	}
 
-	for i := 0; i < len(samples); i++ {
+	for i := range samples {
 		sample := metrics.Sample{
 			TimeSeries: ts,
 			Value:      3.5,

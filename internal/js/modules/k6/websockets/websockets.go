@@ -51,7 +51,7 @@ func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 func (r *WebSocketsAPI) Exports() modules.Exports {
 	r.blobConstructor = r.vu.Runtime().ToValue(r.blob)
 	return modules.Exports{
-		Named: map[string]interface{}{
+		Named: map[string]any{
 			"WebSocket": r.websocket,
 			"Blob":      r.blobConstructor,
 		},
@@ -456,7 +456,7 @@ func (w *webSocket) queueMessage(msg *message) {
 			switch w.binaryType {
 			case blobBinaryType:
 				var err error
-				data, err = rt.New(w.blobConstructor, rt.ToValue([]interface{}{msg.data}))
+				data, err = rt.New(w.blobConstructor, rt.ToValue([]any{msg.data}))
 				if err != nil {
 					return fmt.Errorf("failed to create Blob: %w", err)
 				}
@@ -617,7 +617,7 @@ func (w *webSocket) send(msg sobek.Value) {
 		w.sendArrayBuffer(*o)
 	case sobek.ArrayBuffer:
 		w.sendArrayBuffer(o)
-	case map[string]interface{}:
+	case map[string]any:
 		rt := w.vu.Runtime()
 		obj := msg.ToObject(rt)
 		if !isBlob(obj, w.blobConstructor) {
@@ -826,7 +826,7 @@ func (w *webSocket) newEvent(eventType string, t time.Time, funcOptions ...func(
 	must(rt, o.DefineAccessorProperty("type", rt.ToValue(func() string {
 		return eventType
 	}), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
-	must(rt, o.DefineAccessorProperty("target", rt.ToValue(func() interface{} {
+	must(rt, o.DefineAccessorProperty("target", rt.ToValue(func() any {
 		return w.obj
 	}), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
 	// skip srcElement

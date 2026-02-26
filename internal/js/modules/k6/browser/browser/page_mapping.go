@@ -50,11 +50,14 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			// TODO when opts are implemented for this function, parse them here before calling promise()
 			// in a goroutine off the event loop. As that will race with anything running on the event loop.
 			return promise(vu, func() (any, error) {
-				// It's safe to close the taskqueue for this targetID (if one
-				// exists).
+				// Close the page first so its goroutines (FrameSession, NetworkManager)
+				// can finish processing events through the task queue before it's shut down.
+				err := p.Close()
+
+				// Now it's safe to close the taskqueue for this targetID.
 				vu.close(p.TargetID())
 
-				return nil, p.Close() //nolint:wrapcheck
+				return nil, err //nolint:wrapcheck
 			})
 		},
 		"content": func() *sobek.Promise {
@@ -141,10 +144,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"frames": func() *sobek.Object {
-			var (
-				mfrs []mapping
-				frs  = p.Frames()
-			)
+			frs := p.Frames()
+			mfrs := make([]mapping, 0, len(frs))
 			for _, fr := range frs {
 				mfrs = append(mfrs, mapFrame(vu, fr))
 			}
@@ -496,8 +497,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"setViewportSize": func(viewportSize sobek.Value) (*sobek.Promise, error) {
-			s := new(common.Size)
-			if err := s.Parse(vu.Context(), viewportSize); err != nil {
+			s, err := parseSize(rt, viewportSize)
+			if err != nil {
 				return nil, fmt.Errorf("parsing viewport size: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -634,7 +635,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 
 			var val string
 			switch url.ExportType() {
-			case reflect.TypeOf(string("")):
+			case reflect.TypeFor[string]():
 				val = "'" + url.String() + "'" // Strings require quotes
 			default: // JS Regex, CSS, numbers or booleans
 				val = url.String() // No quotes
@@ -655,7 +656,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 
 			var val string
 			switch url.ExportType() {
-			case reflect.TypeOf(string("")):
+			case reflect.TypeFor[string]():
 				val = "'" + url.String() + "'" // Strings require quotes
 			default: // JS Regex, CSS, numbers or booleans
 				val = url.String() // No quotes
@@ -723,8 +724,9 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"workers": func() *sobek.Object {
-			var mws []mapping
-			for _, w := range p.Workers() {
+			workers := p.Workers()
+			mws := make([]mapping, 0, len(workers))
+			for _, w := range workers {
 				mw := mapWorker(vu, w)
 				mws = append(mws, mw)
 			}
@@ -840,17 +842,15 @@ func parseWaitForFunctionArgs(
 // so that it is easier to copy over updates/fixes from Playwright when we need
 // to.
 func parseStringOrRegex(v sobek.Value, doubleQuote bool) string {
-	const stringType = string("")
-
 	var a string
 	switch v.ExportType() {
-	case reflect.TypeOf(stringType): // text values require quotes
+	case reflect.TypeFor[string](): // text values require quotes
 		if doubleQuote {
 			a = `"` + strings.ReplaceAll(v.String(), `"`, `\"`) + `"`
 		} else {
 			a = `'` + strings.ReplaceAll(v.String(), `'`, `\'`) + `'`
 		}
-	case reflect.TypeOf(map[string]interface{}(nil)): // JS RegExp
+	case reflect.TypeFor[map[string]any](): // JS RegExp
 		a = v.String() // No quotes
 	default: // CSS, numbers or booleans
 		a = v.String() // No quotes
@@ -1092,4 +1092,38 @@ func parsePageWaitForEventOptions(
 	}
 
 	return ropts, pred, nil
+}
+
+// parseSize parses the size options from a Sobek value.
+func parseSize(rt *sobek.Runtime, opts sobek.Value) (*common.Size, error) {
+	size := &common.Size{}
+	if k6common.IsNullish(opts) {
+		return size, nil
+	}
+
+	obj := opts.ToObject(rt)
+	for _, k := range obj.Keys() {
+		v := obj.Get(k)
+		if k6common.IsNullish(v) {
+			continue
+		}
+		switch k {
+		case "width":
+			switch v.ExportType().Kind() {
+			case reflect.Int64, reflect.Float64:
+				size.Width = v.ToFloat()
+			default:
+				return nil, fmt.Errorf("width must be a number, got %s", v.ExportType().Kind())
+			}
+		case "height":
+			switch v.ExportType().Kind() {
+			case reflect.Int64, reflect.Float64:
+				size.Height = v.ToFloat()
+			default:
+				return nil, fmt.Errorf("height must be a number, got %s", v.ExportType().Kind())
+			}
+		}
+	}
+
+	return size, nil
 }

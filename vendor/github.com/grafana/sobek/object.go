@@ -1816,3 +1816,43 @@ func (i *privateId) String() string {
 func (i *privateId) string() unistring.String {
 	return privateIdString(i.name)
 }
+
+type propNameSet struct {
+	stringProps map[unistring.String]struct{}
+	symbolProps map[*Symbol]struct{}
+}
+
+func (s *propNameSet) add(prop Value) {
+	if sym, ok := prop.(*Symbol); ok {
+		if s.symbolProps == nil {
+			s.symbolProps = make(map[*Symbol]struct{})
+		}
+		s.symbolProps[sym] = struct{}{}
+	} else {
+		if s.stringProps == nil {
+			s.stringProps = make(map[unistring.String]struct{})
+		}
+		s.stringProps[prop.string()] = struct{}{}
+	}
+}
+
+func (s *propNameSet) has(prop Value) bool {
+	if sym, ok := prop.(*Symbol); ok {
+		_, exists := s.symbolProps[sym]
+		return exists
+	}
+	_, exists := s.stringProps[prop.string()]
+	return exists
+}
+
+func (s *propNameSet) delete(prop Value) {
+	if sym, ok := prop.(*Symbol); ok {
+		delete(s.symbolProps, sym)
+	} else {
+		delete(s.stringProps, prop.string())
+	}
+}
+
+func (s *propNameSet) size() int {
+	return len(s.stringProps) + len(s.symbolProps)
+}

@@ -366,19 +366,19 @@ func TestMetricsAndThresholds(t *testing.T) {
 
 	assert.Equal(t, strings.Join(expLogLines, "\n")+"\n", ts.Stderr.String())
 
-	var summary map[string]interface{}
+	var summary map[string]any
 	require.NoError(t, json.Unmarshal(ts.Stdout.Bytes(), &summary))
 
-	metrics, ok := summary["metrics"].(map[string]interface{})
+	metrics, ok := summary["metrics"].(map[string]any)
 	require.True(t, ok)
 
-	teardownCounter, ok := metrics["teardown_counter"].(map[string]interface{})
+	teardownCounter, ok := metrics["teardown_counter"].(map[string]any)
 	require.True(t, ok)
 
-	teardownThresholds, ok := teardownCounter["thresholds"].(map[string]interface{})
+	teardownThresholds, ok := teardownCounter["thresholds"].(map[string]any)
 	require.True(t, ok)
 
-	expected := map[string]interface{}{"count == 1": map[string]interface{}{"ok": true}}
+	expected := map[string]any{"count == 1": map[string]any{"ok": true}}
 	require.Equal(t, expected, teardownThresholds)
 }
 
@@ -860,7 +860,7 @@ func asyncWaitForStdoutAndRun(
 	go func() {
 		defer wg.Done()
 		reachedCondition := false
-		for i := 0; i < attempts; i++ {
+		for i := range attempts {
 			ts.OutMutex.Lock()
 			stdOut := ts.Stdout.String()
 			ts.OutMutex.Unlock()
@@ -895,13 +895,7 @@ func asyncWaitForStdoutAndRun(
 func injectMockSignalNotifier(ts *GlobalTestState) (sendSignal chan os.Signal) {
 	sendSignal = make(chan os.Signal)
 	ts.SignalNotify = func(c chan<- os.Signal, signals ...os.Signal) {
-		isAbortNotify := false
-		for _, s := range signals {
-			if s == os.Interrupt {
-				isAbortNotify = true
-				break
-			}
-		}
+		isAbortNotify := slices.Contains(signals, os.Interrupt)
 		if !isAbortNotify {
 			return
 		}
@@ -1084,6 +1078,63 @@ func TestRunFromNotBaseDirectory(t *testing.T) {
 	stdout := ts.Stdout.String()
 	t.Log(stdout)
 	require.Contains(t, stdout, `p = 5`)
+}
+
+func TestRunCSVParseConcurrentFromMultipleModules(t *testing.T) {
+	t.Parallel()
+
+	csvData := `col1,col2
+a,b
+c,d
+`
+	module1Script := `
+		import csv from "k6/experimental/csv";
+		import fs from "k6/experimental/fs";
+
+		const file = await fs.open("data.csv");
+		export const data = await csv.parse(file);
+	`
+	module2Script := `
+		import csv from "k6/experimental/csv";
+		import fs from "k6/experimental/fs";
+
+		const file = await fs.open("data.csv");
+		export const data = await csv.parse(file);
+	`
+	module3Script := `
+		import csv from "k6/experimental/csv";
+		import fs from "k6/experimental/fs";
+
+		const file = await fs.open("data.csv");
+		export const data = await csv.parse(file);
+	`
+	// Main: imports all 3 modules - each has await csv.parse at top level
+	mainScript := `
+		import { data as data1 } from "./modules/module1.js";
+		import { data as data2 } from "./modules/module2.js";
+		import { data as data3 } from "./modules/module3.js";
+
+		if (data1.length !== 3 || data2.length !== 3 || data3.length !== 3) {
+			throw new Error("Expected 3 records from each parse");
+		}
+
+		if (data1[0][0] !== "col1" || data2[0][0] !== "col1" || data3[0][0] !== "col1") {
+			throw new Error("Unexpected CSV data");
+		}
+		export default function() { } // just to not error out
+	`
+
+	ts := NewGlobalTestState(t)
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "data.csv"), []byte(csvData), 0o644))
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "modules/module1.js"), []byte(module1Script), 0o644))
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "modules/module2.js"), []byte(module2Script), 0o644))
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "modules/module3.js"), []byte(module3Script), 0o644))
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "main.js"), []byte(mainScript), 0o644))
+
+	ts.CmdArgs = []string{"k6", "run", "--vus", "1", "--iterations", "1", "main.js"}
+	ts.ExpectedExitCode = 0
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 }
 
 func TestRunFromSeparateDriveWindows(t *testing.T) {
@@ -1544,8 +1595,8 @@ func getSampleValues(t *testing.T, jsonOutput []byte, metric string, tags map[st
 	jsonLines := bytes.Split(jsonOutput, []byte("\n"))
 	result := []float64{}
 
-	tagsMatch := func(rawTags interface{}) bool {
-		sampleTags, ok := rawTags.(map[string]interface{})
+	tagsMatch := func(rawTags any) bool {
+		sampleTags, ok := rawTags.(map[string]any)
 		require.True(t, ok)
 		for k, v := range tags {
 			rv, sok := sampleTags[k]
@@ -1565,7 +1616,7 @@ func getSampleValues(t *testing.T, jsonOutput []byte, metric string, tags map[st
 		if len(jsonLine) == 0 {
 			continue
 		}
-		var line map[string]interface{}
+		var line map[string]any
 		require.NoError(t, json.Unmarshal(jsonLine, &line))
 		sampleType, ok := line["type"].(string)
 		require.True(t, ok)
@@ -1577,7 +1628,7 @@ func getSampleValues(t *testing.T, jsonOutput []byte, metric string, tags map[st
 		if sampleMetric != metric {
 			continue
 		}
-		sampleData, ok := line["data"].(map[string]interface{})
+		sampleData, ok := line["data"].(map[string]any)
 		require.True(t, ok)
 
 		if !tagsMatch(sampleData["tags"]) {
@@ -2180,7 +2231,7 @@ func TestEventSystemOK(t *testing.T) {
 	modules.Register(moduleName, mod)
 
 	ts.CmdArgs = []string{"k6", "--quiet", "run", "-"}
-	ts.Stdin = bytes.NewBuffer([]byte(fmt.Sprintf(`
+	ts.Stdin = bytes.NewBuffer(fmt.Appendf(nil, `
 		import events from '%s';
 		import { sleep } from 'k6';
 
@@ -2190,7 +2241,7 @@ func TestEventSystemOK(t *testing.T) {
 		}
 
 		export default function () { sleep(1); }
-	`, moduleName)))
+	`, moduleName))
 
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
@@ -2307,7 +2358,7 @@ func TestEventSystemError(t *testing.T) {
 
 			ts.CmdArgs = []string{"k6", "--quiet", "run", "-"}
 			ts.ExpectedExitCode = int(tc.expExitCode)
-			ts.Stdin = bytes.NewBuffer([]byte(fmt.Sprintf("import events from '%s';\n%s", moduleName, tc.script)))
+			ts.Stdin = bytes.NewBuffer(fmt.Appendf(nil, "import events from '%s';\n%s", moduleName, tc.script))
 
 			cmd.ExecuteWithGlobalState(ts.GlobalState)
 
@@ -2363,7 +2414,7 @@ func BenchmarkRunEvents(b *testing.B) {
 		modules.Register(moduleName, mod)
 
 		ts.CmdArgs = []string{"k6", "--quiet", "run", "-"}
-		ts.Stdin = bytes.NewBuffer([]byte(fmt.Sprintf(`
+		ts.Stdin = bytes.NewBuffer(fmt.Appendf(nil, `
 		import events from '%s';
 		export let options = {
 			vus: 10,
@@ -2371,7 +2422,7 @@ func BenchmarkRunEvents(b *testing.B) {
 		}
 
 		export default function () {}
-		`, moduleName)))
+		`, moduleName))
 		ts.ExpectedExitCode = 0
 
 		b.StartTimer()
@@ -2675,13 +2726,13 @@ func TestSummaryExport(t *testing.T) {
 		rawSummaryExport, err := fsext.ReadFile(fs, "results.json")
 		require.NoError(t, err)
 
-		var summaryExport map[string]interface{}
+		var summaryExport map[string]any
 		require.NoError(t, json.Unmarshal(rawSummaryExport, &summaryExport))
 
-		assert.Equal(t, map[string]interface{}{
-			"groups": map[string]interface{}{},
-			"checks": map[string]interface{}{
-				"TRUE is TRUE": map[string]interface{}{
+		assert.Equal(t, map[string]any{
+			"groups": map[string]any{},
+			"checks": map[string]any{
+				"TRUE is TRUE": map[string]any{
 					"fails":  float64(0),
 					"id":     "1bed1cc5e442054df516f1ca1076ac6a",
 					"name":   "TRUE is TRUE",
@@ -2694,12 +2745,12 @@ func TestSummaryExport(t *testing.T) {
 			"id":   "d41d8cd98f00b204e9800998ecf8427e",
 		}, summaryExport["root_group"])
 
-		metrics := summaryExport["metrics"].(map[string]interface{})
+		metrics := summaryExport["metrics"].(map[string]any)
 
-		assert.Equal(t, 1.0, metrics["custom_iterations"].(map[string]interface{})["count"])
-		assert.Equal(t, 1.0, metrics["iterations"].(map[string]interface{})["count"])
+		assert.Equal(t, 1.0, metrics["custom_iterations"].(map[string]any)["count"])
+		assert.Equal(t, 1.0, metrics["iterations"].(map[string]any)["count"])
 
-		checks := metrics["checks"].(map[string]interface{})
+		checks := metrics["checks"].(map[string]any)
 		assert.Equal(t, 1.0, checks["passes"])
 		assert.Equal(t, 0.0, checks["fails"])
 		assert.Equal(t, 1.0, checks["value"])
@@ -2811,13 +2862,13 @@ func TestHandleSummary(t *testing.T) {
 			rawSummaryExport, err := fsext.ReadFile(ts.FS, "summary.json")
 			require.NoError(t, err)
 
-			var summaryExport map[string]interface{}
+			var summaryExport map[string]any
 			require.NoError(t, json.Unmarshal(rawSummaryExport, &summaryExport))
 
-			assert.Equal(t, map[string]interface{}{
-				"groups": []interface{}{},
-				"checks": []interface{}{
-					map[string]interface{}{
+			assert.Equal(t, map[string]any{
+				"groups": []any{},
+				"checks": []any{
+					map[string]any{
 						"fails":  float64(0),
 						"id":     "1bed1cc5e442054df516f1ca1076ac6a",
 						"name":   "TRUE is TRUE",
@@ -2830,16 +2881,16 @@ func TestHandleSummary(t *testing.T) {
 				"id":   "d41d8cd98f00b204e9800998ecf8427e",
 			}, summaryExport["root_group"])
 
-			metrics := summaryExport["metrics"].(map[string]interface{})
+			metrics := summaryExport["metrics"].(map[string]any)
 
 			assert.Equal(t, 1.0,
-				metrics["custom_iterations"].(map[string]interface{})["values"].(map[string]interface{})["count"],
+				metrics["custom_iterations"].(map[string]any)["values"].(map[string]any)["count"],
 			)
 			assert.Equal(t, 1.0,
-				metrics["iterations"].(map[string]interface{})["values"].(map[string]interface{})["count"],
+				metrics["iterations"].(map[string]any)["values"].(map[string]any)["count"],
 			)
 
-			checks := metrics["checks"].(map[string]interface{})["values"].(map[string]interface{})
+			checks := metrics["checks"].(map[string]any)["values"].(map[string]any)
 			assert.Equal(t, 1.0, checks["rate"])
 			assert.Equal(t, 1.0, checks["passes"])
 			assert.Equal(t, 0.0, checks["fails"])

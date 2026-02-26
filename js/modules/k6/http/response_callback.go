@@ -3,6 +3,7 @@ package http
 import (
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/grafana/sobek"
 	"go.k6.io/k6/js/common"
@@ -22,10 +23,8 @@ type expectedStatuses struct {
 }
 
 func (e expectedStatuses) match(status int) bool {
-	for _, v := range e.exact {
-		if v == status {
-			return true
-		}
+	if slices.Contains(e.exact, status) {
+		return true
 	}
 
 	for _, v := range e.minmax {

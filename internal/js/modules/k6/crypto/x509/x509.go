@@ -2,7 +2,7 @@
 package x509
 
 import (
-	"crypto/dsa" //nolint:staticcheck // DSA is weak, but we need it for compatibility
+	"crypto/dsa" //nolint:staticcheck
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"crypto/sha1" // #nosec G505
@@ -47,7 +47,7 @@ func (*RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 // Exports returns the exports of the execution module.
 func (mi *X509) Exports() modules.Exports {
 	return modules.Exports{
-		Named: map[string]interface{}{
+		Named: map[string]any{
 			"parse":       mi.parse,
 			"getAltNames": mi.altNames,
 			"getIssuer":   mi.issuer,
@@ -100,7 +100,7 @@ type Issuer struct {
 // PublicKey is used for decryption and signature verification
 type PublicKey struct {
 	Algorithm string
-	Key       interface{}
+	Key       any
 }
 
 // parse produces an entire X.509 certificate
@@ -197,7 +197,7 @@ func makeIssuer(issuer pkix.Name) Issuer {
 	}
 }
 
-func makePublicKey(parsed interface{}) (PublicKey, error) {
+func makePublicKey(parsed any) (PublicKey, error) {
 	var algorithm string
 	switch parsed.(type) {
 	case *dsa.PublicKey:
@@ -243,7 +243,8 @@ func makeRdn(name pkix.AttributeTypeAndValue) RDN {
 }
 
 func altNames(parsed *x509.Certificate) []string {
-	var names []string
+	capacity := len(parsed.DNSNames) + len(parsed.EmailAddresses) + len(parsed.IPAddresses) + len(parsed.URIs)
+	names := make([]string, 0, capacity)
 	names = append(names, parsed.DNSNames...)
 	names = append(names, parsed.EmailAddresses...)
 	names = append(names, ipAddresses(parsed)...)

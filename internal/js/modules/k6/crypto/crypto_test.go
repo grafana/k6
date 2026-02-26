@@ -497,7 +497,7 @@ func TestHexEncode(t *testing.T) {
 		t.Parallel()
 		rt := sobek.New()
 		input := []byte{104, 101, 108, 108, 111}
-		testCases := []interface{}{
+		testCases := []any{
 			input, string(input), rt.NewArrayBuffer(input),
 		}
 

@@ -10,10 +10,8 @@ func mapConsoleMessage(vu moduleVU, event common.PageEvent) mapping {
 
 	return mapping{
 		"args": func() []mapping {
-			var (
-				margs []mapping
-				args  = cm.Args
-			)
+			args := cm.Args
+			margs := make([]mapping, 0, len(args))
 			for _, arg := range args {
 				a := mapJSHandle(vu, arg)
 				margs = append(margs, a)

@@ -23,7 +23,7 @@ func (b byteLength) asBitLength() bitLength {
 }
 
 // ToBytes tries to return a byte slice from compatible types.
-func ToBytes(data interface{}) ([]byte, error) {
+func ToBytes(data any) ([]byte, error) {
 	switch dt := data.(type) {
 	case []byte:
 		return dt, nil

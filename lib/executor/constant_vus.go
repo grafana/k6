@@ -192,7 +192,7 @@ func (clv ConstantVUs) Run(parentCtx context.Context, _ chan<- metrics.SampleCon
 		}
 	}
 
-	for i := int64(0); i < numVUs; i++ {
+	for range numVUs {
 		initVU, err := clv.executionState.GetPlannedVU(clv.logger, true)
 		if err != nil {
 			cancel(err)

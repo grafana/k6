@@ -210,7 +210,7 @@ func (pvi PerVUIterations) Run(parentCtx context.Context, out chan<- metrics.Sam
 			getVUActivationParams(ctx, pvi.config.BaseConfig, returnVU,
 				pvi.nextIterationCounters))
 
-		for i := int64(0); i < iterations; i++ {
+		for i := range iterations {
 			select {
 			case <-regDurationDone:
 				metrics.PushIfNotDone(parentCtx, out, metrics.Sample{
@@ -230,7 +230,7 @@ func (pvi PerVUIterations) Run(parentCtx context.Context, out chan<- metrics.Sam
 		}
 	}
 
-	for i := int64(0); i < numVUs; i++ {
+	for range numVUs {
 		initializedVU, err := pvi.executionState.GetPlannedVU(pvi.logger, true)
 		if err != nil {
 			cancel(nil)

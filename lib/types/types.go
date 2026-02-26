@@ -160,7 +160,7 @@ func (d NullDuration) TimeDuration() time.Duration {
 	return time.Duration(d.Duration)
 }
 
-func getInt64(v interface{}) (int64, error) {
+func getInt64(v any) (int64, error) {
 	switch n := v.(type) {
 	case int:
 		return int64(n), nil
@@ -194,7 +194,7 @@ func getInt64(v interface{}) (int64, error) {
 // types to time.Duration.
 //
 // TODO: move to a separate package and check for integer overflows?
-func GetDurationValue(v interface{}) (time.Duration, error) {
+func GetDurationValue(v any) (time.Duration, error) {
 	switch d := v.(type) {
 	case time.Duration:
 		return d, nil

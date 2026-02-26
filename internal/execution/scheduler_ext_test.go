@@ -147,8 +147,7 @@ func TestSchedulerRunNonDefault(t *testing.T) {
 			execScheduler, err := execution.NewScheduler(testRunState, local.NewController())
 			require.NoError(t, err)
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			done := make(chan struct{})
 			samples := make(chan metrics.SampleContainer)
@@ -233,7 +232,7 @@ func TestSchedulerRunEnv(t *testing.T) {
 			gracefulStop: "0.5s",`,
 	}
 
-	testCases := []struct{ name, script string }{}
+	testCases := make([]struct{ name, script string }, 0, 2*len(executorConfigs))
 
 	// Generate tests using global env and with env override
 	for ename, econf := range executorConfigs {
@@ -263,8 +262,7 @@ func TestSchedulerRunEnv(t *testing.T) {
 			execScheduler, err := execution.NewScheduler(testRunState, local.NewController())
 			require.NoError(t, err)
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			done := make(chan struct{})
 			samples := make(chan metrics.SampleContainer)
@@ -451,7 +449,7 @@ func TestSchedulerRunCustomTags(t *testing.T) {
 			gracefulStop: "0.5s",`,
 	}
 
-	testCases := []struct{ name, script string }{}
+	testCases := make([]struct{ name, script string }, 0, len(executorConfigs))
 
 	// Generate tests using custom tags
 	for ename, econf := range executorConfigs {
@@ -984,8 +982,7 @@ func TestSchedulerEndIterations(t *testing.T) {
 		Options: options,
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	testRunState := getTestRunState(t, getTestPreInitState(t), runner.GetOptions(), runner)
 	execScheduler, err := execution.NewScheduler(testRunState, local.NewController())
@@ -1004,7 +1001,7 @@ func TestSchedulerEndIterations(t *testing.T) {
 	assert.Equal(t, uint64(0), execScheduler.GetState().GetPartialIterationCount())
 	assert.Equal(t, int64(100), i)
 	require.Equal(t, 100, len(samples)) // TODO: change to 200 https://github.com/k6io/k6/issues/1250
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		mySample, ok := <-samples
 		require.True(t, ok)
 		assert.Equal(t, metrics.Sample{TimeSeries: ts, Value: 1.0}, mySample)
@@ -1206,8 +1203,7 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 	execScheduler, err := execution.NewScheduler(testRunState, local.NewController())
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	done := make(chan struct{})
 	samples := make(chan metrics.SampleContainer)
@@ -1222,10 +1218,10 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 		assert.NoError(t, execScheduler.Run(ctx, ctx, samples))
 	}()
 
-	expectIn := func(from, to time.Duration, expected metrics.SampleContainer) {
+	expectIn := func(fromMs, toMs int64, expected metrics.SampleContainer) {
 		start := time.Now()
-		from *= time.Millisecond
-		to *= time.Millisecond
+		from := time.Duration(fromMs) * time.Millisecond
+		to := time.Duration(toMs) * time.Millisecond
 		for {
 			select {
 			case sampleContainer := <-samples:
@@ -1288,7 +1284,8 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 		}
 	}
 	getNetworkSamples := func(group string, addExpTags ...string) metrics.SampleContainer {
-		expTags := []string{"group", group}
+		expTags := make([]string, 0, 2+len(addExpTags))
+		expTags = append(expTags, "group", group)
 		expTags = append(expTags, addExpTags...)
 		dialer := netext.NewDialer(
 			net.Dialer{},
@@ -1300,7 +1297,8 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 	}
 
 	getIterationsSamples := func(group string, addExpTags ...string) metrics.SampleContainer {
-		expTags := []string{"group", group}
+		expTags := make([]string, 0, 2+len(addExpTags))
+		expTags = append(expTags, "group", group)
 		expTags = append(expTags, addExpTags...)
 		ctm := metrics.TagsAndMeta{Tags: getTags(piState.Registry, expTags...)}
 		startTime := time.Now()

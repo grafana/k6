@@ -12,9 +12,9 @@ import (
 
 // MakeClient returns a new InfluxDB client based on the given Config.
 func MakeClient(conf Config) (client.Client, error) {
-	if strings.HasPrefix(conf.Addr.String, "udp://") {
+	if after, ok := strings.CutPrefix(conf.Addr.String, "udp://"); ok {
 		return client.NewUDPClient(client.UDPConfig{
-			Addr:        strings.TrimPrefix(conf.Addr.String, "udp://"),
+			Addr:        after,
 			PayloadSize: int(conf.PayloadSize.Int64),
 		})
 	}

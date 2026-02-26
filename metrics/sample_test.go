@@ -102,7 +102,7 @@ func TestGetResolversForTrendColumnsCalculation(t *testing.T) {
 func createTestTrendSink(count int) *TrendSink {
 	sink := NewTrendSink()
 
-	for i := 0; i < count; i++ {
+	for i := range count {
 		sink.Add(Sample{Value: float64(i)})
 	}
 

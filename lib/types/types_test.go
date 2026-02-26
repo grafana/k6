@@ -187,7 +187,7 @@ func TestNullDurationFrom(t *testing.T) {
 func TestGetDurationValue(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
-		val      interface{}
+		val      any
 		expError bool
 		exp      time.Duration
 	}{

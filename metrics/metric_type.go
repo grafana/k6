@@ -1,6 +1,9 @@
 package metrics
 
-import "errors"
+import (
+	"errors"
+	"slices"
+)
 
 // A MetricType specifies the type of a metric.
 type MetricType int
@@ -112,11 +115,5 @@ func (t MetricType) supportedAggregationMethods() []string {
 // supportsAggregationMethod returns whether the MetricType supports a
 // given threshold aggregation method or not.
 func (t MetricType) supportsAggregationMethod(aggregationMethod string) bool {
-	for _, m := range t.supportedAggregationMethods() {
-		if aggregationMethod == m {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(t.supportedAggregationMethods(), aggregationMethod)
 }

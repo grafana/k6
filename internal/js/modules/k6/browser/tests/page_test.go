@@ -27,7 +27,7 @@ import (
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext/k6test"
-	"go.k6.io/k6/metrics"
+	k6metrics "go.k6.io/k6/metrics"
 )
 
 type emulateMediaOpts struct {
@@ -672,15 +672,7 @@ func TestPageScreenshotFullpage(t *testing.T) {
 	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
-	viewportSize := tb.toSobekValue(struct {
-		Width  float64 `js:"width"`
-		Height float64 `js:"height"`
-	}{
-		Width: 1280, Height: 800,
-	})
-	s := new(common.Size)
-	require.NoError(t, s.Parse(tb.context(), viewportSize))
-
+	s := &common.Size{Width: 1280, Height: 800}
 	err := p.SetViewportSize(s)
 	require.NoError(t, err)
 
@@ -1673,7 +1665,7 @@ func performPingTest(t *testing.T, tb *testBrowser, page *common.Page, iteration
 	t.Helper()
 
 	var ms int64
-	for i := 0; i < iterations; i++ {
+	for range iterations {
 		start := time.Now()
 
 		opts := &common.FrameGotoOptions{
@@ -2165,7 +2157,7 @@ func TestPageOnMetric(t *testing.T) {
 
 			done := make(chan bool)
 
-			samples := make(chan metrics.SampleContainer)
+			samples := make(chan k6metrics.SampleContainer)
 			// This page will perform many pings with a changing h query parameter.
 			// This URL should be grouped according to how page.on('metric') is used.
 			tb := newTestBrowser(t, withHTTPServer(), withSamples(samples))
@@ -2923,6 +2915,162 @@ func TestPageOnRequestFinished(t *testing.T) {
 	assert.True(t, foundHome, "expected to find /home request in finished requests")
 	assert.True(t, foundAPI, "expected to find /api request in finished requests")
 	assert.True(t, foundCSS, "expected to find /style.css request in finished requests")
+}
+
+// TestPageOnRequestFinishedRedirect tests that the requestfinished event fires
+// for each request in a redirect chain, not just the final one.
+func TestPageOnRequestFinishedRedirect(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withHTTPServer())
+	tb.withHandler("/redir-a", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, tb.url("/redir-b"), http.StatusFound)
+	})
+	tb.withHandler("/redir-b", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, tb.url("/redir-final"), http.StatusFound)
+	})
+	tb.withHandler("/redir-final", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, err := fmt.Fprint(w, "<html><body>done</body></html>")
+		require.NoError(t, err)
+	})
+
+	tb.vu.ActivateVU()
+	tb.vu.StartIteration(t)
+	defer tb.vu.EndIteration(t)
+
+	gv, err := tb.vu.RunAsync(t, `
+		const context = await browser.newContext();
+		const page = await context.newPage();
+
+		const expectedCount = 3; // redir-a, redir-b, redir-final
+		const finishedRequests = [];
+		let resolveAll;
+		const allFinished = new Promise(r => { resolveAll = r; });
+
+		page.on('requestfinished', (request) => {
+			const url = request.url();
+			if (url.includes('/redir-')) {
+				finishedRequests.push({ url: url });
+				if (finishedRequests.length >= expectedCount) {
+					resolveAll();
+				}
+			}
+		});
+
+		await page.goto('%s', {waitUntil: 'networkidle'});
+		await allFinished;
+		await page.close();
+		return JSON.stringify(finishedRequests, null, 2);
+	`, tb.url("/redir-a"))
+	require.NoError(t, err)
+
+	got := k6test.ToPromise(t, gv)
+	require.Equal(t, sobek.PromiseStateFulfilled, got.State())
+
+	var finishedRequests []struct {
+		URL string `json:"url"`
+	}
+	err = json.Unmarshal([]byte(got.Result().String()), &finishedRequests)
+	require.NoError(t, err)
+
+	// Verify that requestfinished fired for the redirect requests,
+	// not just the final response.
+	var foundRedirA, foundRedirB, foundFinal bool
+	for _, req := range finishedRequests {
+		switch {
+		case strings.HasSuffix(req.URL, "/redir-a"):
+			foundRedirA = true
+		case strings.HasSuffix(req.URL, "/redir-b"):
+			foundRedirB = true
+		case strings.HasSuffix(req.URL, "/redir-final"):
+			foundFinal = true
+		}
+	}
+
+	assert.True(t, foundRedirA, "expected requestfinished to fire for /redir-a (first redirect)")
+	assert.True(t, foundRedirB, "expected requestfinished to fire for /redir-b (second redirect)")
+	assert.True(t, foundFinal, "expected requestfinished to fire for /redir-final (final response)")
+}
+
+// TestPageOnResponseRedirect tests that the response event fires
+// for each response in a redirect chain, not just the final one.
+func TestPageOnResponseRedirect(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withHTTPServer())
+	tb.withHandler("/redir-a", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, tb.url("/redir-b"), http.StatusFound)
+	})
+	tb.withHandler("/redir-b", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, tb.url("/redir-final"), http.StatusFound)
+	})
+	tb.withHandler("/redir-final", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, err := fmt.Fprint(w, "<html><body>done</body></html>")
+		require.NoError(t, err)
+	})
+
+	tb.vu.ActivateVU()
+	tb.vu.StartIteration(t)
+	defer tb.vu.EndIteration(t)
+
+	gv, err := tb.vu.RunAsync(t, `
+		const context = await browser.newContext();
+		const page = await context.newPage();
+
+		const expectedCount = 3; // redir-a, redir-b, redir-final
+		const responses = [];
+		let resolveAll;
+		const allReceived = new Promise(r => { resolveAll = r; });
+
+		page.on('response', (response) => {
+			const url = response.url();
+			if (url.includes('/redir-')) {
+				responses.push({ url: url, status: response.status() });
+				if (responses.length >= expectedCount) {
+					resolveAll();
+				}
+			}
+		});
+
+		await page.goto('%s', {waitUntil: 'networkidle'});
+		await allReceived;
+		await page.close();
+		return JSON.stringify(responses, null, 2);
+	`, tb.url("/redir-a"))
+	require.NoError(t, err)
+
+	got := k6test.ToPromise(t, gv)
+	require.Equal(t, sobek.PromiseStateFulfilled, got.State())
+
+	var responses []struct {
+		URL    string `json:"url"`
+		Status int    `json:"status"`
+	}
+	err = json.Unmarshal([]byte(got.Result().String()), &responses)
+	require.NoError(t, err)
+
+	// Verify that response event fired for each redirect response,
+	// not just the final one.
+	var foundRedirA, foundRedirB, foundFinal bool
+	for _, resp := range responses {
+		switch {
+		case strings.HasSuffix(resp.URL, "/redir-a"):
+			foundRedirA = true
+			assert.Equal(t, http.StatusFound, resp.Status, "/redir-a should be a 302")
+		case strings.HasSuffix(resp.URL, "/redir-b"):
+			foundRedirB = true
+			assert.Equal(t, http.StatusFound, resp.Status, "/redir-b should be a 302")
+		case strings.HasSuffix(resp.URL, "/redir-final"):
+			foundFinal = true
+			assert.Equal(t, http.StatusOK, resp.Status, "/redir-final should be a 200")
+		}
+	}
+
+	assert.True(t, foundRedirA, "expected response event to fire for /redir-a (first redirect)")
+	assert.True(t, foundRedirB, "expected response event to fire for /redir-b (second redirect)")
+	assert.True(t, foundFinal, "expected response event to fire for /redir-final (final response)")
 }
 
 // TestPageOnRequestFailed tests that the requestfailed event fires when requests fail.
@@ -4356,7 +4504,7 @@ func TestPageGoBackForward(t *testing.T) {
 		require.NoError(t, err)
 		tb.AssertURL(p, url3, "second goForward should land on page2")
 
-		for i := 0; i < 3; i++ {
+		for range 3 {
 			_, err = p.GoBackForward(-1, opts)
 			require.NoError(t, err)
 			_, err = p.GoBackForward(+1, opts)
@@ -4364,4 +4512,37 @@ func TestPageGoBackForward(t *testing.T) {
 		}
 		tb.AssertURL(p, url3, "after rapid navigation should still be on page2")
 	})
+}
+
+// The race occurs when browser goroutines (FrameSession event loop,
+// NetworkManager fire-and-forget goroutines) call PushIfNotDone on the
+// k6 samples channel while close(samples) runs during engine shutdown.
+// Reproduces the issue 5341 when run with the -race flag.
+func TestPageCloseMetricEmissionRaceCondition(t *testing.T) {
+	t.Parallel()
+
+	samples := make(chan k6metrics.SampleContainer, 100)
+	tb := newTestBrowser(t, withSamples(samples), withSkipClose())
+	tb.vu.StartIteration(t)
+
+	page := tb.NewPage(nil)
+	_, err := page.Evaluate(`() => {
+		window.k6browserSendWebVitalMetric(JSON.stringify({
+			id: "v1-5341-1",
+			name: "CLS",
+			value: 0.01,
+			rating: "good",
+			delta: 0.01,
+			numEntries: 1,
+			navigationType: "navigate",
+			url: window.location.href,
+			spanID: ""
+		}));
+	}`)
+	require.NoError(t, err)
+
+	// Dispatches a pagehide event to trigger Web Vital metric emission.
+	// At the same time, simulate the engine is shutting down.
+	require.NoError(t, page.Close())
+	close(samples)
 }

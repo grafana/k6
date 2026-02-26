@@ -24,7 +24,7 @@ type (
 	// ModuleInstance represents an instance of the GRPC module for every VU.
 	ModuleInstance struct {
 		vu      modules.VU
-		exports map[string]interface{}
+		exports map[string]any
 		metrics *instanceMetrics
 	}
 )
@@ -49,7 +49,7 @@ func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 
 	mi := &ModuleInstance{
 		vu:      vu,
-		exports: make(map[string]interface{}),
+		exports: make(map[string]any),
 		metrics: metrics,
 	}
 

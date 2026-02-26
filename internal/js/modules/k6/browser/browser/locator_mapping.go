@@ -36,7 +36,13 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 				return nil, fmt.Errorf("parsing locator bounding box options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
-				return lo.BoundingBox(popts) //nolint:wrapcheck
+				box, err := lo.BoundingBox(popts)
+				// We want to avoid errors when an element is not visible and instead
+				// opt to return a nil rectangle -- this matches Playwright's behaviour.
+				if errors.Is(err, common.ErrElementNotVisible) {
+					return nil, nil
+				}
+				return box, err
 			}), nil
 		},
 		"clear": func(opts sobek.Value) (*sobek.Promise, error) {

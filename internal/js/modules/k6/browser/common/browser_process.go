@@ -158,7 +158,7 @@ func execute(
 	ctx context.Context, path string, args []string,
 	dataDir *storage.Dir, logger *log.Logger,
 ) (command, error) {
-	cmd := exec.CommandContext(ctx, path, args...)
+	cmd := exec.CommandContext(ctx, path, args...) //nolint:gosec
 	killAfterParent(cmd)
 
 	stdout, err := cmd.StdoutPipe()

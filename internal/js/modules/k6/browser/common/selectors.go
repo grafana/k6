@@ -83,13 +83,13 @@ func (s *Selector) parse() error {
 			return nil, false
 		}
 
-		eqIndex := strings.Index(part, "=")
+		before, after, ok := strings.Cut(part, "=")
 		var name, body string
 
 		switch {
-		case eqIndex != -1 && reQueryEngine.MatchString(strings.TrimSpace(part[:eqIndex])):
-			name = strings.TrimSpace(part[:eqIndex])
-			body = part[eqIndex+1:]
+		case ok && reQueryEngine.MatchString(strings.TrimSpace(before)):
+			name = strings.TrimSpace(before)
+			body = after
 		case len(part) > 1 && part[0] == '"' && part[len(part)-1] == '"':
 			name = "text"
 			body = part

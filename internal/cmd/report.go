@@ -47,7 +47,7 @@ func reportUsage(ctx context.Context, execScheduler *execution.Scheduler, test *
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	res, err := http.DefaultClient.Do(req)
+	res, err := http.DefaultClient.Do(req) //nolint:gosec
 	if err == nil {
 		_ = res.Body.Close()
 	}
