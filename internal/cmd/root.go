@@ -392,22 +392,18 @@ func (c *rootCommand) setupLoggers(stop <-chan struct{}) error {
 	// Check for details https://github.com/grafana/k6/issues/711#issue-341414887
 	w := c.globalState.Logger.Writer()
 	stdlog.SetOutput(w)
-	c.loggersWg.Add(1)
-	go func() {
+	c.loggersWg.Go(func() {
 		<-stop
 		cancel()
 		_ = w.Close()
-		c.loggersWg.Done()
-	}()
+	})
 	return nil
 }
 
 func (c *rootCommand) setLoggerHook(ctx context.Context, h log.AsyncHook) {
-	c.loggersWg.Add(1)
-	go func() {
+	c.loggersWg.Go(func() {
 		h.Listen(ctx)
-		c.loggersWg.Done()
-	}()
+	})
 	c.globalState.Logger.AddHook(h)
 	c.globalState.Logger.SetOutput(io.Discard) // don't output to anywhere else
 }
