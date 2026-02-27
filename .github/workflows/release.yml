@@ -1,0 +1,110 @@
+name: Release
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (must be v1.{minor}.{patch}, e.g., v1.5.0)"
+        required: true
+        type: string
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  MAJOR_VERSION: "1"
+
+jobs:
+  validate-input:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.validate-match.outputs.version }}
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: master
+          persist-credentials: false
+
+      - name: Validate version format
+        id: validate-format
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          MAJOR_VERSION: ${{ env.MAJOR_VERSION }}
+        run: |
+          if [[ ! "$INPUT_VERSION" =~ ^v${MAJOR_VERSION}\.[0-9]+\.[0-9]+$ ]]; then
+            echo "❌ Error: Version must be in format v${MAJOR_VERSION}.{minor}.{patch} (e.g., v${MAJOR_VERSION}.5.0)"
+            echo "   Got: $INPUT_VERSION"
+            exit 1
+          fi
+          echo "Input version format is valid: $INPUT_VERSION"
+
+          # Patch releases are not yet supported
+          #
+          # Extract patch version (e.g., v1.5.3 -> 3)
+          PATCH_VERSION=$(echo "$INPUT_VERSION" | sed -n 's/^v[0-9]\+\.[0-9]\+\.\([0-9]\+\)$/\1/p')
+
+          if [[ "$PATCH_VERSION" != "0" ]]; then
+            echo "❌ Error: Currently patch releases are not supported"
+            echo "   Got: $INPUT_VERSION (patch version: $PATCH_VERSION)"
+            echo "   Expected format: v{major}.{minor}.0"
+            exit 1
+          echo "Patch version validation passed: patch is 0"
+
+      - name: Extract version from version.go
+        id: get_version
+        run: |
+          VERSION=$(grep -oP 'const Version = "\K[^"]+' internal/build/version.go)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Found version in version.go: $VERSION"
+
+      - name: Validate input version matches version.go
+        id: validate-match
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          FILE_VERSION: ${{ steps.get_version.outputs.version }}
+        run: |
+          if [[ "$INPUT_VERSION" != "v$FILE_VERSION" ]]; then
+            echo "❌ Error: Input version does not match version in internal/build/version.go"
+            echo "   Expected: v$FILE_VERSION"
+            echo "   Got: $INPUT_VERSION"
+            exit 1
+          fi
+
+          echo "version=$INPUT_VERSION" >> $GITHUB_OUTPUT
+
+  create-release:
+    runs-on: ubuntu-latest
+    needs: validate-input
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: master
+          persist-credentials: false
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Create release branch and tag
+        env:
+          VERSION: ${{ needs.validate-input.outputs.version }}
+        run: |
+          # Extract branch name (e.g., v1.5.0 -> v1.5.x)
+          BRANCH_NAME="$(echo "$VERSION" | sed 's/\.0$/\.x/')"
+
+          echo "Creating release branch: $BRANCH_NAME"
+          git checkout -b "$BRANCH_NAME"
+          git push origin "$BRANCH_NAME"
+
+          echo "Creating and pushing tag: $VERSION"
+          git tag "$VERSION" -m "$VERSION"
+          git push origin "$VERSION"
