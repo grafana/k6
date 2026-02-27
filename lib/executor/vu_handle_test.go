@@ -5,6 +5,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -225,118 +226,124 @@ func TestVUHandleSimple(t *testing.T) {
 
 	t.Run("start before gracefulStop finishes", func(t *testing.T) {
 		t.Parallel()
-		logHook := testutils.NewLogHook(logrus.DebugLevel)
-		testLog := logrus.New()
-		testLog.AddHook(logHook)
-		testLog.SetOutput(testutils.NewTestOutput(t))
-		// testLog.Level = logrus.DebugLevel
-		logEntry := logrus.NewEntry(testLog)
-		test := &handleVUTest{runner: &minirunner.MiniRunner{}}
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		synctest.Test(t, func(t *testing.T) {
+			logHook := testutils.NewLogHook(logrus.DebugLevel)
+			testLog := logrus.New()
+			testLog.AddHook(logHook)
+			testLog.SetOutput(testutils.NewTestOutput(t))
+			// testLog.Level = logrus.DebugLevel
+			logEntry := logrus.NewEntry(testLog)
+			test := &handleVUTest{runner: &minirunner.MiniRunner{}}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
-		vuHandle := newStoppedVUHandle(ctx, test.getVU, test.returnVU, mockNextIterations, &BaseConfig{}, logEntry)
-		var wg sync.WaitGroup
-		wg.Go(func() {
-			vuHandle.runLoopsIfPossible(test.runIter)
+			vuHandle := newStoppedVUHandle(ctx, test.getVU, test.returnVU, mockNextIterations, &BaseConfig{}, logEntry)
+			var wg sync.WaitGroup
+			wg.Go(func() {
+				vuHandle.runLoopsIfPossible(test.runIter)
+			})
+			err := vuHandle.start()
+			require.NoError(t, err)
+			time.Sleep(time.Millisecond * 50)
+			vuHandle.gracefulStop()
+			// time.Sleep(time.Millisecond * 5) // No sleep as we want to always not return the VU
+			err = vuHandle.start()
+			require.NoError(t, err)
+			time.Sleep(time.Millisecond * 1500)
+			assert.EqualValues(t, 1, atomic.LoadUint32(&test.getVUCount))
+			assert.EqualValues(t, 0, atomic.LoadUint32(&test.returnVUCount))
+			assert.EqualValues(t, 0, atomic.LoadInt64(&test.interruptedIter))
+			assert.EqualValues(t, 1, atomic.LoadInt64(&test.fullIterations))
+			cancel()
+			wg.Wait()
+			time.Sleep(time.Millisecond * 5)
+			assert.EqualValues(t, 1, atomic.LoadUint32(&test.getVUCount))
+			assert.EqualValues(t, 1, atomic.LoadUint32(&test.returnVUCount))
+			assert.EqualValues(t, 1, atomic.LoadInt64(&test.interruptedIter))
+			assert.EqualValues(t, 1, atomic.LoadInt64(&test.fullIterations))
 		})
-		err := vuHandle.start()
-		require.NoError(t, err)
-		time.Sleep(time.Millisecond * 50)
-		vuHandle.gracefulStop()
-		// time.Sleep(time.Millisecond * 5) // No sleep as we want to always not return the VU
-		err = vuHandle.start()
-		require.NoError(t, err)
-		time.Sleep(time.Millisecond * 1500)
-		assert.EqualValues(t, 1, atomic.LoadUint32(&test.getVUCount))
-		assert.EqualValues(t, 0, atomic.LoadUint32(&test.returnVUCount))
-		assert.EqualValues(t, 0, atomic.LoadInt64(&test.interruptedIter))
-		assert.EqualValues(t, 1, atomic.LoadInt64(&test.fullIterations))
-		cancel()
-		wg.Wait()
-		time.Sleep(time.Millisecond * 5)
-		assert.EqualValues(t, 1, atomic.LoadUint32(&test.getVUCount))
-		assert.EqualValues(t, 1, atomic.LoadUint32(&test.returnVUCount))
-		assert.EqualValues(t, 1, atomic.LoadInt64(&test.interruptedIter))
-		assert.EqualValues(t, 1, atomic.LoadInt64(&test.fullIterations))
 	})
 
 	t.Run("start after gracefulStop finishes", func(t *testing.T) {
 		t.Parallel()
-		logHook := testutils.NewLogHook(logrus.DebugLevel)
-		testLog := logrus.New()
-		testLog.AddHook(logHook)
-		testLog.SetOutput(testutils.NewTestOutput(t))
-		// testLog.Level = logrus.DebugLevel
-		logEntry := logrus.NewEntry(testLog)
-		test := &handleVUTest{runner: &minirunner.MiniRunner{}}
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		synctest.Test(t, func(t *testing.T) {
+			logHook := testutils.NewLogHook(logrus.DebugLevel)
+			testLog := logrus.New()
+			testLog.AddHook(logHook)
+			testLog.SetOutput(testutils.NewTestOutput(t))
+			// testLog.Level = logrus.DebugLevel
+			logEntry := logrus.NewEntry(testLog)
+			test := &handleVUTest{runner: &minirunner.MiniRunner{}}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
-		vuHandle := newStoppedVUHandle(ctx, test.getVU, test.returnVU, mockNextIterations, &BaseConfig{}, logEntry)
-		var wg sync.WaitGroup
-		wg.Go(func() {
-			vuHandle.runLoopsIfPossible(test.runIter)
+			vuHandle := newStoppedVUHandle(ctx, test.getVU, test.returnVU, mockNextIterations, &BaseConfig{}, logEntry)
+			var wg sync.WaitGroup
+			wg.Go(func() {
+				vuHandle.runLoopsIfPossible(test.runIter)
+			})
+			err := vuHandle.start()
+			require.NoError(t, err)
+			time.Sleep(time.Millisecond * 50)
+			vuHandle.gracefulStop()
+			time.Sleep(time.Millisecond * 1500)
+			assert.EqualValues(t, 1, atomic.LoadUint32(&test.getVUCount))
+			assert.EqualValues(t, 1, atomic.LoadUint32(&test.returnVUCount))
+			assert.EqualValues(t, 0, atomic.LoadInt64(&test.interruptedIter))
+			assert.EqualValues(t, 1, atomic.LoadInt64(&test.fullIterations))
+			err = vuHandle.start()
+			require.NoError(t, err)
+			time.Sleep(time.Millisecond * 1500)
+			cancel()
+			wg.Wait()
+
+			time.Sleep(time.Millisecond * 50)
+			assert.EqualValues(t, 2, atomic.LoadUint32(&test.getVUCount))
+			assert.EqualValues(t, 2, atomic.LoadUint32(&test.returnVUCount))
+			assert.EqualValues(t, 1, atomic.LoadInt64(&test.interruptedIter))
+			assert.EqualValues(t, 2, atomic.LoadInt64(&test.fullIterations))
 		})
-		err := vuHandle.start()
-		require.NoError(t, err)
-		time.Sleep(time.Millisecond * 50)
-		vuHandle.gracefulStop()
-		time.Sleep(time.Millisecond * 1500)
-		assert.EqualValues(t, 1, atomic.LoadUint32(&test.getVUCount))
-		assert.EqualValues(t, 1, atomic.LoadUint32(&test.returnVUCount))
-		assert.EqualValues(t, 0, atomic.LoadInt64(&test.interruptedIter))
-		assert.EqualValues(t, 1, atomic.LoadInt64(&test.fullIterations))
-		err = vuHandle.start()
-		require.NoError(t, err)
-		time.Sleep(time.Millisecond * 1500)
-		cancel()
-		wg.Wait()
-
-		time.Sleep(time.Millisecond * 50)
-		assert.EqualValues(t, 2, atomic.LoadUint32(&test.getVUCount))
-		assert.EqualValues(t, 2, atomic.LoadUint32(&test.returnVUCount))
-		assert.EqualValues(t, 1, atomic.LoadInt64(&test.interruptedIter))
-		assert.EqualValues(t, 2, atomic.LoadInt64(&test.fullIterations))
 	})
 
 	t.Run("start after hardStop", func(t *testing.T) {
 		t.Parallel()
-		logHook := testutils.NewLogHook(logrus.DebugLevel)
-		testLog := logrus.New()
-		testLog.AddHook(logHook)
-		testLog.SetOutput(testutils.NewTestOutput(t))
-		// testLog.Level = logrus.DebugLevel
-		logEntry := logrus.NewEntry(testLog)
-		test := &handleVUTest{runner: &minirunner.MiniRunner{}}
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		synctest.Test(t, func(t *testing.T) {
+			logHook := testutils.NewLogHook(logrus.DebugLevel)
+			testLog := logrus.New()
+			testLog.AddHook(logHook)
+			testLog.SetOutput(testutils.NewTestOutput(t))
+			// testLog.Level = logrus.DebugLevel
+			logEntry := logrus.NewEntry(testLog)
+			test := &handleVUTest{runner: &minirunner.MiniRunner{}}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
-		vuHandle := newStoppedVUHandle(ctx, test.getVU, test.returnVU, mockNextIterations, &BaseConfig{}, logEntry)
-		var wg sync.WaitGroup
-		wg.Go(func() {
-			vuHandle.runLoopsIfPossible(test.runIter)
+			vuHandle := newStoppedVUHandle(ctx, test.getVU, test.returnVU, mockNextIterations, &BaseConfig{}, logEntry)
+			var wg sync.WaitGroup
+			wg.Go(func() {
+				vuHandle.runLoopsIfPossible(test.runIter)
+			})
+			err := vuHandle.start()
+			require.NoError(t, err)
+			time.Sleep(time.Millisecond * 5)
+			vuHandle.hardStop()
+			time.Sleep(time.Millisecond * 15)
+			assert.EqualValues(t, 1, atomic.LoadUint32(&test.getVUCount))
+			assert.EqualValues(t, 1, atomic.LoadUint32(&test.returnVUCount))
+			assert.EqualValues(t, 1, atomic.LoadInt64(&test.interruptedIter))
+			assert.EqualValues(t, 0, atomic.LoadInt64(&test.fullIterations))
+			err = vuHandle.start()
+			require.NoError(t, err)
+			time.Sleep(time.Millisecond * 1500)
+			cancel()
+			wg.Wait()
+
+			time.Sleep(time.Millisecond * 5)
+			assert.EqualValues(t, 2, atomic.LoadUint32(&test.getVUCount))
+			assert.EqualValues(t, 2, atomic.LoadUint32(&test.returnVUCount))
+			assert.EqualValues(t, 2, atomic.LoadInt64(&test.interruptedIter))
+			assert.EqualValues(t, 1, atomic.LoadInt64(&test.fullIterations))
 		})
-		err := vuHandle.start()
-		require.NoError(t, err)
-		time.Sleep(time.Millisecond * 5)
-		vuHandle.hardStop()
-		time.Sleep(time.Millisecond * 15)
-		assert.EqualValues(t, 1, atomic.LoadUint32(&test.getVUCount))
-		assert.EqualValues(t, 1, atomic.LoadUint32(&test.returnVUCount))
-		assert.EqualValues(t, 1, atomic.LoadInt64(&test.interruptedIter))
-		assert.EqualValues(t, 0, atomic.LoadInt64(&test.fullIterations))
-		err = vuHandle.start()
-		require.NoError(t, err)
-		time.Sleep(time.Millisecond * 1500)
-		cancel()
-		wg.Wait()
-
-		time.Sleep(time.Millisecond * 5)
-		assert.EqualValues(t, 2, atomic.LoadUint32(&test.getVUCount))
-		assert.EqualValues(t, 2, atomic.LoadUint32(&test.returnVUCount))
-		assert.EqualValues(t, 2, atomic.LoadInt64(&test.interruptedIter))
-		assert.EqualValues(t, 1, atomic.LoadInt64(&test.fullIterations))
 	})
 }
 
