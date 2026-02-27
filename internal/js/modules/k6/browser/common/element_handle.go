@@ -1611,7 +1611,7 @@ func (h *ElementHandle) newAction(
 	}
 
 	return func(apiCtx context.Context, resultCh chan any, errCh chan error) {
-		if res, err := actionFn(apiCtx); err != nil {
+		if res, err := retryAction(apiCtx, actionFn); err != nil {
 			select {
 			case <-apiCtx.Done():
 			case errCh <- err:
@@ -1621,6 +1621,24 @@ func (h *ElementHandle) newAction(
 			case <-apiCtx.Done():
 			case resultCh <- res:
 			}
+		}
+	}
+}
+
+func retryAction(apiCtx context.Context, fn func(apiCtx context.Context) (any, error)) (res any, err error) {
+	for {
+		res, err := fn(apiCtx)
+
+		if err == nil {
+			return res, nil
+		}
+
+		shouldRetry, retryErr := shouldRetry(apiCtx, err)
+		if !shouldRetry {
+			if retryErr != nil {
+				return res, retryErr
+			}
+			return res, err
 		}
 	}
 }
@@ -1768,19 +1786,29 @@ func retryPointerAction(
 			return res, err
 		}
 
-		if !errors.Is(err, ErrElementNotVisible) &&
-			!errors.Is(err, ErrElementNotAttachedToDOM) &&
-			!strings.Contains(err.Error(), "frame has been detached") {
+		shouldRetry, retryErr := shouldRetry(apiCtx, err)
+		if !shouldRetry {
+			if retryErr != nil {
+				return res, retryErr
+			}
 			return res, err
 		}
+	}
+}
 
-		// Wait with timeout or context cancellation
-		select {
-		case <-apiCtx.Done():
-			return nil, ContextErr(apiCtx)
-		case <-time.After(20 * time.Millisecond):
-			// Continue retrying after delay
-		}
+func shouldRetry(apiCtx context.Context, err error) (bool, error) {
+	if !errors.Is(err, ErrElementNotVisible) &&
+		!errors.Is(err, ErrElementNotAttachedToDOM) &&
+		!strings.Contains(err.Error(), "frame has been detached") {
+		return false, nil
+	}
+
+	// Wait with timeout or context cancellation
+	select {
+	case <-apiCtx.Done():
+		return false, apiCtx.Err()
+	case <-time.After(20 * time.Millisecond):
+		return true, nil // Continue retrying after delay
 	}
 }
 
