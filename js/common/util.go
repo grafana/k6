@@ -3,17 +3,36 @@ package common
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 
 	"github.com/grafana/sobek"
 )
 
+// JSException represents a Go error that knows how to materialize itself as a JS value.
+// Implementors can expose rich JavaScript Error objects (with proper prototypes) so
+// they can participate in instanceof checks and other JS semantics.
+type JSException interface {
+	error
+	JSValue(rt *sobek.Runtime) sobek.Value
+}
+
 // Throw a JS error; avoids re-wrapping GoErrors.
 func Throw(rt *sobek.Runtime, err error) {
+	if err == nil {
+		return
+	}
+
 	if e, ok := err.(*sobek.Exception); ok { //nolint:errorlint // we don't really want to unwrap here
 		panic(e)
 	}
+
+	var jsErr JSException
+	if errors.As(err, &jsErr) {
+		panic(jsErr.JSValue(rt))
+	}
+
 	panic(rt.NewGoError(err)) // this catches the stack unlike rt.ToValue
 }
 
