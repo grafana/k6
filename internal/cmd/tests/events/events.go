@@ -78,9 +78,7 @@ func (rm *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 		// goroutines would exit normally once rm.exit is closed.
 		sid, evtCh := vu.Events().Local.Subscribe(rm.vuEvents...)
 		logger := vu.InitEnv().Logger
-		rm.WG.Add(1)
-		go func() {
-			defer rm.WG.Done()
+		rm.WG.Go(func() {
 			for {
 				select {
 				case evt, ok := <-evtCh:
@@ -94,7 +92,7 @@ func (rm *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 					return
 				}
 			}
-		}()
+		})
 	}
 
 	return &Events{}

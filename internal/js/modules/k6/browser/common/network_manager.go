@@ -383,12 +383,10 @@ func (m *NetworkManager) initEvents() {
 		cdproto.EventFetchAuthRequired,
 	}, chHandler)
 
-	m.wg.Add(1)
-	go func() {
-		defer m.wg.Done()
+	m.wg.Go(func() {
 		for m.handleEvents(chHandler) {
 		}
-	}()
+	})
 }
 
 func (m *NetworkManager) handleEvents(in <-chan Event) bool {
@@ -473,11 +471,9 @@ func (m *NetworkManager) onLoadingFinished(event *network.EventLoadingFinished) 
 	// This happens when the main page request redirects before it finishes loading.
 	// So the new redirect request will be blocked until the main page finishes loading.
 	// The main page will wait forever since its subrequest is blocked.
-	m.wg.Add(1)
-	go func() {
-		defer m.wg.Done()
+	m.wg.Go(func() {
 		emitResponseMetrics()
-	}()
+	})
 }
 
 // requestForOnLoadingFinished returns the request for the given request ID.

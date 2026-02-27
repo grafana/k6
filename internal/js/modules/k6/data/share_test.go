@@ -230,12 +230,10 @@ func TestSharedArrayRaceInInitialization(t *testing.T) {
 		}
 		var wg sync.WaitGroup
 		for _, rt := range runtimes {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				_, err := rt.RunString(`var array = new data.SharedArray("shared", function() {return [1,2,3,4,5,6,7,8,9, 10]});`)
 				require.NoError(t, err)
-			}()
+			})
 		}
 		ch := make(chan struct{})
 		go func() {

@@ -237,11 +237,9 @@ func TestVUHandleSimple(t *testing.T) {
 
 		vuHandle := newStoppedVUHandle(ctx, test.getVU, test.returnVU, mockNextIterations, &BaseConfig{}, logEntry)
 		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			vuHandle.runLoopsIfPossible(test.runIter)
-		}()
+		})
 		err := vuHandle.start()
 		require.NoError(t, err)
 		time.Sleep(time.Millisecond * 50)
@@ -277,11 +275,9 @@ func TestVUHandleSimple(t *testing.T) {
 
 		vuHandle := newStoppedVUHandle(ctx, test.getVU, test.returnVU, mockNextIterations, &BaseConfig{}, logEntry)
 		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			vuHandle.runLoopsIfPossible(test.runIter)
-		}()
+		})
 		err := vuHandle.start()
 		require.NoError(t, err)
 		time.Sleep(time.Millisecond * 50)
@@ -318,11 +314,9 @@ func TestVUHandleSimple(t *testing.T) {
 
 		vuHandle := newStoppedVUHandle(ctx, test.getVU, test.returnVU, mockNextIterations, &BaseConfig{}, logEntry)
 		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			vuHandle.runLoopsIfPossible(test.runIter)
-		}()
+		})
 		err := vuHandle.start()
 		require.NoError(t, err)
 		time.Sleep(time.Millisecond * 5)
@@ -397,11 +391,9 @@ func BenchmarkVUHandleIterations(b *testing.B) {
 
 	vuHandle := newStoppedVUHandle(ctx, getVU, returnVU, mockNextIterations, &BaseConfig{}, logEntry)
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		vuHandle.runLoopsIfPossible(runIter)
-	}()
+	})
 	start := time.Now()
 	b.ResetTimer()
 	err := vuHandle.start()

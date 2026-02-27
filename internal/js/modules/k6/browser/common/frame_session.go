@@ -235,7 +235,7 @@ func (fs *FrameSession) initDomains() error {
 	return nil
 }
 
-//nolint:cyclop,funlen
+//nolint:cyclop
 func (fs *FrameSession) initEvents() {
 	fs.logger.Debugf("NewFrameSession:initEvents",
 		"sid:%v tid:%v", fs.session.ID(), fs.targetID)
@@ -248,10 +248,7 @@ func (fs *FrameSession) initEvents() {
 		fs.initRendererEvents()
 	}
 
-	fs.wg.Add(1)
-	go func() {
-		defer fs.wg.Done()
-
+	fs.wg.Go(func() {
 		fs.logger.Debugf("NewFrameSession:initEvents:go",
 			"sid:%v tid:%v", fs.session.ID(), fs.targetID)
 		defer func() {
@@ -325,7 +322,7 @@ func (fs *FrameSession) initEvents() {
 				}
 			}
 		}
-	}()
+	})
 }
 
 func (fs *FrameSession) onEventBindingCalled(event *cdpruntime.EventBindingCalled) {
