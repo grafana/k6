@@ -554,6 +554,7 @@ func (fs *FrameSession) initOptions() error {
 
 	var reqIntercept bool
 	if state.Options.BlockedHostnames.Trie != nil ||
+		state.Options.AllowedHostnames.Trie != nil ||
 		len(state.Options.BlacklistIPs) > 0 {
 		reqIntercept = true
 	}
