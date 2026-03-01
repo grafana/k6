@@ -239,7 +239,7 @@ func getFlags(defaultFlags GlobalFlags, env map[string]string, args []string) Gl
 			result.AutoExtensionResolution = vb
 		}
 	}
-	if v, ok := env["K6_AUTO_EXTENSION_RESOLUTION"]; ok {
+	if v, ok := env[AutoExtensionResolution]; ok {
 		vb, err := strconv.ParseBool(v)
 		if err == nil {
 			result.AutoExtensionResolution = vb
@@ -254,7 +254,7 @@ func getFlags(defaultFlags GlobalFlags, env map[string]string, args []string) Gl
 			result.EnableCommunityExtensions = vb
 		}
 	}
-	if val, ok := env["K6_DEPENDENCIES_MANIFEST"]; ok {
+	if val, ok := env[DependenciesManifest]; ok {
 		result.DependenciesManifest = val
 	}
 
