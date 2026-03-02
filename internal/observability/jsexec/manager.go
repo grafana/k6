@@ -3,13 +3,12 @@ package jsexec
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"runtime/pprof"
-	"sort"
-	"strconv"
+	rtrace "runtime/trace"
 	"sync"
 	"time"
 
@@ -100,25 +99,6 @@ type Manager struct {
 	selectedRT   *sobek.Runtime
 	mu           sync.Mutex
 	stopOnce     sync.Once
-
-	traceMu     sync.Mutex
-	traceEvents []jsTraceEvent
-}
-
-type jsTraceEvent struct {
-	Name string            `json:"name"`
-	Cat  string            `json:"cat"`
-	Ph   string            `json:"ph"`
-	Ts   int64             `json:"ts"`
-	Dur  int64             `json:"dur"`
-	Pid  int               `json:"pid"`
-	Tid  int               `json:"tid"`
-	Args map[string]string `json:"args,omitempty"`
-}
-
-type jsTraceFile struct {
-	TraceEvents     []jsTraceEvent `json:"traceEvents"`
-	DisplayTimeUnit string         `json:"displayTimeUnit"`
 }
 
 // NewManager builds a capture manager from config.
@@ -168,6 +148,12 @@ func (m *Manager) Start() error {
 			return err
 		}
 		m.traceFile = f
+		w := io.MultiWriter(f, &m.traceBuf)
+		if err := rtrace.Start(w); err != nil {
+			_ = f.Close()
+			m.traceFile = nil
+			return fmt.Errorf("start runtime trace: %w", err)
+		}
 		m.traceEnabled = true
 	}
 	return nil
@@ -181,7 +167,7 @@ func (m *Manager) Stop() {
 			m.cpuStarted = false
 		}
 		if m.traceEnabled {
-			m.flushTrace()
+			rtrace.Stop()
 			m.traceEnabled = false
 		}
 		if m.cpuFile != nil {
@@ -210,37 +196,6 @@ func (m *Manager) Stop() {
 			})
 		}
 	})
-}
-
-func (m *Manager) flushTrace() {
-	events := m.snapshotTraceEvents()
-	if len(events) == 0 {
-		return
-	}
-
-	payload := jsTraceFile{
-		TraceEvents:     events,
-		DisplayTimeUnit: "ms",
-	}
-	data, err := json.Marshal(payload)
-	if err != nil {
-		return
-	}
-	if m.traceFile != nil {
-		_, _ = m.traceFile.Write(data)
-	}
-	m.traceBuf.Write(data)
-}
-
-func (m *Manager) snapshotTraceEvents() []jsTraceEvent {
-	m.traceMu.Lock()
-	defer m.traceMu.Unlock()
-	if len(m.traceEvents) == 0 {
-		return nil
-	}
-	out := append([]jsTraceEvent(nil), m.traceEvents...)
-	sort.Slice(out, func(i, j int) bool { return out[i].Ts < out[j].Ts })
-	return out
 }
 
 func (m *Manager) maybeStartRuntimeProfile(rt *sobek.Runtime) {
@@ -280,52 +235,11 @@ func DoWithLabels(ctx context.Context, labels map[string]string, fn func(context
 
 // WithRegion executes fn within a runtime/trace region.
 func WithRegion(ctx context.Context, region string, fn func()) {
-	active.mu.RLock()
-	m := active.m
-	active.mu.RUnlock()
-	if m == nil || !m.traceEnabled || region == "" {
+	if region == "" {
 		fn()
 		return
 	}
-	start := time.Now().UTC()
-	fn()
-	m.recordRegion(ctx, region, start, time.Now().UTC())
-}
-
-func (m *Manager) recordRegion(ctx context.Context, region string, start, end time.Time) {
-	if !m.traceEnabled || end.Before(start) {
-		return
-	}
-
-	args := map[string]string{}
-	tid := 1
-	pprof.ForLabels(ctx, func(key, value string) bool {
-		if key == "" || value == "" {
-			return true
-		}
-		args[key] = value
-		if key == "js.vu" {
-			if parsed, err := strconv.Atoi(value); err == nil {
-				tid = parsed
-			}
-		}
-		return true
-	})
-
-	event := jsTraceEvent{
-		Name: region,
-		Cat:  "js",
-		Ph:   "X",
-		Ts:   start.UnixMicro(),
-		Dur:  end.Sub(start).Microseconds(),
-		Pid:  1,
-		Tid:  tid,
-		Args: args,
-	}
-
-	m.traceMu.Lock()
-	m.traceEvents = append(m.traceEvents, event)
-	m.traceMu.Unlock()
+	rtrace.WithRegion(ctx, region, fn)
 }
 
 var active = struct {
