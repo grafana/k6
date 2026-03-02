@@ -48,6 +48,10 @@ extended: base + sets "global" as alias for "globalThis"
 		"which is used for summary exports and as handleSummary() argument")
 	flags.String("traces-output", "none",
 		"set the output for k6 traces, possible values are none,otel[=host:port]")
+	flags.Bool("js-profiling-enabled", false, "enable JS execution observability captures (experimental)")
+	flags.String("js-cpu-profile-output", "", "write JS-attributed CPU profile to file path")
+	flags.String("js-runtime-trace-output", "", "write JS-attributed runtime trace to file path")
+	flags.String("js-profile-id", "", "set a custom profile correlation id")
 	return flags
 }
 
@@ -90,6 +94,10 @@ func runtimeOptionsFromFlags(flags *pflag.FlagSet) lib.RuntimeOptions {
 		SummaryExport:             getNullString(flags, "summary-export"),
 		NewMachineReadableSummary: getNullBool(flags, "new-machine-readable-summary"),
 		TracesOutput:              getNullString(flags, "traces-output"),
+		JSProfilingEnabled:        getNullBool(flags, "js-profiling-enabled"),
+		JSCPUProfileOutput:        getNullString(flags, "js-cpu-profile-output"),
+		JSRuntimeTraceOutput:      getNullString(flags, "js-runtime-trace-output"),
+		JSProfileID:               getNullString(flags, "js-profile-id"),
 		Env:                       make(map[string]string),
 	}
 	return opts
@@ -149,6 +157,18 @@ func populateRuntimeOptionsFromEnv(opts lib.RuntimeOptions, environment map[stri
 
 	if envVar, ok := environment["K6_TRACES_OUTPUT"]; !opts.TracesOutput.Valid && ok {
 		opts.TracesOutput = null.StringFrom(envVar)
+	}
+	if err := saveBoolFromEnv(environment, "K6_JS_PROFILING_ENABLED", &opts.JSProfilingEnabled); err != nil {
+		return opts, err
+	}
+	if envVar, ok := environment["K6_JS_CPU_PROFILE_OUTPUT"]; !opts.JSCPUProfileOutput.Valid && ok {
+		opts.JSCPUProfileOutput = null.StringFrom(envVar)
+	}
+	if envVar, ok := environment["K6_JS_RUNTIME_TRACE_OUTPUT"]; !opts.JSRuntimeTraceOutput.Valid && ok {
+		opts.JSRuntimeTraceOutput = null.StringFrom(envVar)
+	}
+	if envVar, ok := environment["K6_JS_PROFILE_ID"]; !opts.JSProfileID.Valid && ok {
+		opts.JSProfileID = null.StringFrom(envVar)
 	}
 
 	// If enabled, gather the actual system environment variables

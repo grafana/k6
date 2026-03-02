@@ -10,12 +10,13 @@ import (
 )
 
 const (
-	metadataTraceIDKey = "trace_id"
-	scenarioTag        = "scenario"
-	groupTag           = "group"
-	nameTag            = "name"
-	methodTag          = "method"
-	statusTag          = "status"
+	metadataTraceIDKey   = "trace_id"
+	metadataJSTraceIDKey = "js_trace_id"
+	scenarioTag          = "scenario"
+	groupTag             = "group"
+	nameTag              = "name"
+	methodTag            = "method"
+	statusTag            = "status"
 )
 
 // RequestMetadatasCollector is an interface for collecting request metadatas
@@ -59,6 +60,9 @@ func (c *Collector) CollectRequestMetadatas(sampleContainers []metrics.SampleCon
 		}
 
 		traceID, found := trail.Metadata[metadataTraceIDKey]
+		if !found {
+			traceID, found = trail.Metadata[metadataJSTraceIDKey]
+		}
 		if !found {
 			continue
 		}

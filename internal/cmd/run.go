@@ -27,6 +27,7 @@ import (
 	"go.k6.io/k6/internal/lib/summary"
 	"go.k6.io/k6/internal/lib/trace"
 	"go.k6.io/k6/internal/metrics/engine"
+	"go.k6.io/k6/internal/observability/jsexec"
 	"go.k6.io/k6/internal/output/cloud"
 	summaryoutput "go.k6.io/k6/internal/output/summary"
 	"go.k6.io/k6/internal/ui/pb"
@@ -103,6 +104,24 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		c.gs.Events.UnsubscribeAll()
 	}()
 
+	runtimeOpts, err := getRuntimeOptions(cmd.Flags(), c.gs.Env)
+	if err != nil {
+		return err
+	}
+	jsObsManager := jsexec.NewManager(jsexec.ConfigFromRuntimeOptions(runtimeOpts))
+	if err = jsObsManager.Start(); err != nil {
+		return err
+	}
+	jsexec.Activate(jsObsManager)
+	defer jsexec.Deactivate(jsObsManager)
+	defer jsObsManager.Stop()
+	// Flush profiles/traces as soon as test execution context ends, even if
+	// command teardown continues (e.g. linger or extended cleanup paths).
+	go func() {
+		<-runCtx.Done()
+		jsObsManager.Stop()
+	}()
+
 	test, controller, err := c.loadConfiguredTest(cmd, args)
 	if err != nil {
 		return err
@@ -119,6 +138,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	if err = c.setupTracerProvider(globalCtx, test); err != nil {
 		return err
 	}
+
 	waitTracesFlushed := func() {
 		ctx, cancel := context.WithTimeout(globalCtx, waitForTracerProviderStopTimeout)
 		defer cancel()

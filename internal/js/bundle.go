@@ -25,6 +25,7 @@ import (
 	"go.k6.io/k6/internal/js/tc55/timers"
 	"go.k6.io/k6/internal/lib/consts"
 	"go.k6.io/k6/internal/loader"
+	"go.k6.io/k6/internal/observability/jsexec"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/lib"
@@ -307,6 +308,7 @@ func newCompiler(preInitState *lib.TestPreInitState, filesystems map[string]fsex
 
 func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*BundleInstance, error) {
 	rt := vuImpl.runtime
+	jsexec.MaybeStartRuntimeProfile(rt)
 	err := b.setupJSRuntime(rt, vuID, b.preInitState.Logger)
 	if err != nil {
 		return nil, err
@@ -351,7 +353,14 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*BundleInstance
 	var result *modules.RunSourceDataResult
 	callback := func() error { // this exists so that Sobek catches uncatchable panics such as Interrupt
 		var err error
-		result, err = modSys.RunSourceData(b.sourceData)
+		jsexec.DoWithLabels(vuImpl.ctx, map[string]string{
+			"js.phase": "bundle.instantiate",
+			"js.vu":    fmt.Sprintf("%d", vuID),
+		}, func(ctx context.Context) {
+			jsexec.WithRegion(ctx, "k6.js.bundle.instantiate", func() {
+				result, err = modSys.RunSourceData(b.sourceData)
+			})
+		})
 		return err
 	}
 

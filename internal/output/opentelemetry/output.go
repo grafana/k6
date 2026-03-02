@@ -155,7 +155,7 @@ func (o *Output) dispatch(entry metrics.Sample) error {
 	ctx := context.Background()
 	name := normalizeMetricName(o.config, entry.Metric.Name)
 
-	attributeSet := newAttributeSet(entry.Tags)
+	attributeSet := newAttributeSet(entry.Tags, entry.Metadata)
 	attributeSetOpt := otelMetric.WithAttributeSet(attributeSet)
 
 	unit := normalizeUnit(entry.Metric.Contains)

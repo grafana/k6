@@ -46,6 +46,12 @@ type RuntimeOptions struct {
 	KeyWriter     null.String `json:"-"`
 	TracesOutput  null.String `json:"tracesOutput"`
 
+	// JS observability controls.
+	JSProfilingEnabled   null.Bool   `json:"jsProfilingEnabled"`
+	JSCPUProfileOutput   null.String `json:"jsCpuProfileOutput"`
+	JSRuntimeTraceOutput null.String `json:"jsRuntimeTraceOutput"`
+	JSProfileID          null.String `json:"jsProfileId"`
+
 	// Until v2
 	NewMachineReadableSummary null.Bool `json:"newMachineReadableSummary"`
 }

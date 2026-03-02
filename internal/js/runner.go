@@ -29,6 +29,7 @@ import (
 	"go.k6.io/k6/internal/lib/consts"
 	"go.k6.io/k6/internal/lib/summary"
 	"go.k6.io/k6/internal/loader"
+	"go.k6.io/k6/internal/observability/jsexec"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/lib"
@@ -935,8 +936,17 @@ func (u *VU) runFn(
 	if u.moduleVUImpl.eventLoop == nil {
 		u.moduleVUImpl.eventLoop = eventloop.New(u.moduleVUImpl)
 	}
+	jsexec.MaybeStartRuntimeProfile(u.Runtime)
+	jsLabels := map[string]string{
+		"js.phase": "iteration",
+		"js.vu":    strconv.FormatUint(u.ID, 10),
+	}
 	err = u.moduleVUImpl.eventLoop.Start(func() (err error) {
-		v, err = fn(sobek.Undefined(), args...) // Actually run the JS script
+		jsexec.DoWithLabels(ctx, jsLabels, func(ctx context.Context) {
+			jsexec.WithRegion(ctx, "k6.js.runFn", func() {
+				v, err = fn(sobek.Undefined(), args...) // Actually run the JS script
+			})
+		})
 		return err
 	})
 

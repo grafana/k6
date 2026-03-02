@@ -16,6 +16,7 @@ import (
 	v1 "go.k6.io/k6/api/v1"
 	"go.k6.io/k6/internal/execution"
 	"go.k6.io/k6/internal/metrics/engine"
+	"go.k6.io/k6/internal/observability/jsexec"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/metrics"
 )
@@ -44,8 +45,25 @@ func injectProfilerHandler(mux *http.ServeMux, profilingEnabled bool) {
 	}
 
 	mux.Handle("/debug/pprof/", handler)
+	mux.Handle("/debug/pprof/js-cpu", jsArtifactHandler("js-cpu", "application/octet-stream"))
+	mux.Handle("/debug/pprof/js-trace", jsArtifactHandler("js-trace", "application/octet-stream"))
 	mux.Handle("/debug/vars/", expvar.Handler())
 	mux.Handle("/metrics", promhttp.Handler())
+}
+
+func jsArtifactHandler(name, ctype string) http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		artifact, ok := jsexec.LatestArtifact(name)
+		if !ok {
+			rw.WriteHeader(http.StatusNotFound)
+			_, _ = rw.Write([]byte("no artifact captured yet"))
+			return
+		}
+		rw.Header().Set("Content-Type", ctype)
+		rw.Header().Set("X-K6-JS-Profile-ID", artifact.ProfileID)
+		rw.Header().Set("X-K6-JS-Artifact-Created-At", artifact.CreatedAt.Format(time.RFC3339Nano))
+		_, _ = rw.Write(artifact.Data)
+	})
 }
 
 // GetServer returns a http.Server instance that can serve k6's REST API.

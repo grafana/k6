@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"slices"
@@ -13,6 +14,7 @@ import (
 
 	"go.k6.io/k6/internal/js/compiler"
 	"go.k6.io/k6/internal/loader"
+	"go.k6.io/k6/internal/observability/jsexec"
 	"go.k6.io/k6/internal/usage"
 )
 
@@ -265,7 +267,15 @@ func NewModuleSystem(resolver *ModuleResolver, vu VU) *ModuleSystem {
 func (ms *ModuleSystem) RunSourceData(source *loader.SourceData) (*RunSourceDataResult, error) {
 	specifier := source.URL.String()
 	pwd := source.URL.JoinPath("../")
-	err := ms.resolver.LoadMainModule(pwd, specifier, source.Data)
+	err := error(nil)
+	jsexec.DoWithLabels(context.Background(), map[string]string{
+		"js.phase":     "module.load",
+		"js.specifier": specifier,
+	}, func(ctx context.Context) {
+		jsexec.WithRegion(ctx, "k6.js.module.load", func() {
+			err = ms.resolver.LoadMainModule(pwd, specifier, source.Data)
+		})
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -282,7 +292,15 @@ func (ms *ModuleSystem) RunSourceData(source *loader.SourceData) (*RunSourceData
 	}
 
 	rt := ms.vu.Runtime()
-	promise := rt.CyclicModuleRecordEvaluate(ci, ms.resolver.sobekModuleResolver)
+	var promise *sobek.Promise
+	jsexec.DoWithLabels(context.Background(), map[string]string{
+		"js.phase":     "module.evaluate",
+		"js.specifier": specifier,
+	}, func(ctx context.Context) {
+		jsexec.WithRegion(ctx, "k6.js.module.evaluate", func() {
+			promise = rt.CyclicModuleRecordEvaluate(ci, ms.resolver.sobekModuleResolver)
+		})
+	})
 
 	promisesThenIgnore(rt, promise)
 
