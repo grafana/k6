@@ -1,13 +1,11 @@
 package jsexec
 
 import (
-	"bytes"
 	"context"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/google/pprof/profile"
 	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
@@ -64,16 +62,6 @@ s;
 	require.True(t, ok)
 	require.Equal(t, "p1", cpu.ProfileID)
 	require.NotEmpty(t, cpu.Data)
-	parsed, err := profile.Parse(bytes.NewReader(cpu.Data))
-	require.NoError(t, err)
-	sampleTypes := make(map[string]struct{}, len(parsed.SampleType))
-	for _, st := range parsed.SampleType {
-		sampleTypes[st.Type] = struct{}{}
-	}
-	_, hasAllocObjects := sampleTypes["alloc_objects"]
-	_, hasAllocSpace := sampleTypes["alloc_space"]
-	require.True(t, hasAllocObjects)
-	require.True(t, hasAllocSpace)
 
 	trace, ok := LatestArtifact("js-trace")
 	require.True(t, ok)

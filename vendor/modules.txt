@@ -23,9 +23,6 @@ github.com/andybalholm/brotli/matchfinder
 # github.com/andybalholm/cascadia v1.3.3
 ## explicit; go 1.16
 github.com/andybalholm/cascadia
-# github.com/aymanbagabas/go-osc52/v2 v2.0.1
-## explicit; go 1.16
-github.com/aymanbagabas/go-osc52/v2
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11
 github.com/beorn7/perks/quantile
@@ -50,25 +47,6 @@ github.com/cenkalti/backoff/v5
 # github.com/cespare/xxhash/v2 v2.3.0
 ## explicit; go 1.11
 github.com/cespare/xxhash/v2
-# github.com/charmbracelet/bubbletea v1.3.10
-## explicit; go 1.24.0
-github.com/charmbracelet/bubbletea
-# github.com/charmbracelet/colorprofile v0.2.3-0.20250311203215-f60798e515dc
-## explicit; go 1.18
-github.com/charmbracelet/colorprofile
-# github.com/charmbracelet/lipgloss v1.1.0
-## explicit; go 1.18
-github.com/charmbracelet/lipgloss
-# github.com/charmbracelet/x/ansi v0.10.1
-## explicit; go 1.23.0
-github.com/charmbracelet/x/ansi
-github.com/charmbracelet/x/ansi/parser
-# github.com/charmbracelet/x/cellbuf v0.0.13-0.20250311204145-2c3ea96c31dd
-## explicit; go 1.18
-github.com/charmbracelet/x/cellbuf
-# github.com/charmbracelet/x/term v0.2.1
-## explicit; go 1.18
-github.com/charmbracelet/x/term
 # github.com/chromedp/cdproto v0.0.0-20250803210736-d308e07a266d
 ## explicit; go 1.23
 github.com/chromedp/cdproto
@@ -137,9 +115,6 @@ github.com/dgryski/go-rendezvous
 ## explicit; go 1.13
 github.com/dlclark/regexp2
 github.com/dlclark/regexp2/syntax
-# github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f
-## explicit; go 1.16
-github.com/erikgeiser/coninput
 # github.com/evanw/esbuild v0.27.2
 ## explicit; go 1.13
 github.com/evanw/esbuild/internal/api_helpers
@@ -282,9 +257,6 @@ github.com/klauspost/compress/s2
 github.com/klauspost/compress/snappy
 github.com/klauspost/compress/zstd
 github.com/klauspost/compress/zstd/internal/xxhash
-# github.com/lucasb-eyer/go-colorful v1.2.0
-## explicit; go 1.12
-github.com/lucasb-eyer/go-colorful
 # github.com/mailru/easyjson v0.9.0
 ## explicit; go 1.20
 github.com/mailru/easyjson
@@ -297,12 +269,6 @@ github.com/mattn/go-colorable
 # github.com/mattn/go-isatty v0.0.20
 ## explicit; go 1.15
 github.com/mattn/go-isatty
-# github.com/mattn/go-localereader v0.0.1
-## explicit
-github.com/mattn/go-localereader
-# github.com/mattn/go-runewidth v0.0.16
-## explicit; go 1.9
-github.com/mattn/go-runewidth
 # github.com/mccutchen/go-httpbin/v2 v2.20.0
 ## explicit; go 1.22.0
 github.com/mccutchen/go-httpbin/v2/httpbin
@@ -317,16 +283,6 @@ github.com/mstoykov/envconfig
 # github.com/mstoykov/k6-taskqueue-lib v0.1.3
 ## explicit; go 1.21
 github.com/mstoykov/k6-taskqueue-lib/taskqueue
-# github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6
-## explicit; go 1.17
-github.com/muesli/ansi
-github.com/muesli/ansi/compressor
-# github.com/muesli/cancelreader v0.2.2
-## explicit; go 1.17
-github.com/muesli/cancelreader
-# github.com/muesli/termenv v0.16.0
-## explicit; go 1.17
-github.com/muesli/termenv
 # github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 ## explicit
 github.com/munnerz/goautoneg
@@ -380,9 +336,6 @@ github.com/redis/go-redis/v9/internal/rand
 github.com/redis/go-redis/v9/internal/util
 github.com/redis/go-redis/v9/maintnotifications
 github.com/redis/go-redis/v9/push
-# github.com/rivo/uniseg v0.4.7
-## explicit; go 1.18
-github.com/rivo/uniseg
 # github.com/serenize/snaker v0.0.0-20201027110005-a7ad2135616e
 ## explicit
 github.com/serenize/snaker
@@ -414,9 +367,6 @@ github.com/tidwall/match
 # github.com/tidwall/pretty v1.2.1
 ## explicit; go 1.16
 github.com/tidwall/pretty
-# github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e
-## explicit; go 1.19
-github.com/xo/terminfo
 # go.opentelemetry.io/auto/sdk v1.2.1
 ## explicit; go 1.24.0
 go.opentelemetry.io/auto/sdk

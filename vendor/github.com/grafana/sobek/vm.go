@@ -1,13 +1,10 @@
 package sobek
 
 import (
-	stdctx "context"
 	"fmt"
 	"math"
 	"math/big"
 	"reflect"
-	"runtime"
-	"runtime/pprof"
 	"strconv"
 	"strings"
 	"sync"
@@ -628,7 +625,7 @@ func (vm *vm) run() {
 	interrupted := false
 	for {
 		if count == 0 {
-			if atomic.LoadInt32(&vm.r.profiler.enabled) == 1 && !vm.runWithProfiler() {
+			if atomic.LoadInt32(&globalProfiler.enabled) == 1 && !vm.runWithProfiler() {
 				return
 			}
 			count = 100
@@ -659,7 +656,7 @@ func (vm *vm) run() {
 func (vm *vm) runWithProfiler() bool {
 	pt := vm.profTracker
 	if pt == nil {
-		pt = vm.r.profiler.p.registerVm()
+		pt = globalProfiler.p.registerVm()
 		vm.profTracker = pt
 		defer func() {
 			atomic.StoreInt32(&vm.profTracker.finished, 1)
@@ -682,19 +679,9 @@ func (vm *vm) runWithProfiler() bool {
 		}
 		if req == profReqDoSample {
 			pt.stop = time.Now()
-			runtime.ReadMemStats(&pt.allocStop)
 
 			pt.numFrames = len(vm.r.CaptureCallStack(len(pt.frames), pt.frames[:0]))
 			pt.frames[0].pc = pc
-			if pt.numFrames > 0 {
-				stack := stackLabel(pt.frames[:pt.numFrames], 2048)
-				top := stackLabel(pt.frames[:1], 512)
-				lbl := pprof.WithLabels(stdctx.Background(), pprof.Labels(
-					"js_stack", stack,
-					"js_top_frame", top,
-				))
-				pprof.SetGoroutineLabels(lbl)
-			}
 			atomic.StoreInt32(&pt.req, profReqSampleReady)
 		}
 	}

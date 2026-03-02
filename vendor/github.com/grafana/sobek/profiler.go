@@ -3,9 +3,7 @@ package sobek
 import (
 	"errors"
 	"io"
-	"runtime"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -23,24 +21,20 @@ const (
 	profReqStop
 )
 
-type runtimeProfiler struct {
+type _globalProfiler struct {
 	p profiler
 	w io.Writer
 
 	enabled int32
 }
 
-// Compatibility shim for code paths still referencing the old global profiler.
-// New code should use Runtime.StartProfile/StopProfile.
-var globalProfiler runtimeProfiler
+var globalProfiler _globalProfiler
 
 type profTracker struct {
 	req, finished int32
 	start, stop   time.Time
 	numFrames     int
 	frames        [profMaxStackDepth]StackFrame
-	allocStart    runtime.MemStats
-	allocStop     runtime.MemStats
 }
 
 type profiler struct {
@@ -65,30 +59,6 @@ type profSampleNode struct {
 type profBuffer struct {
 	funcs map[*Program]*profFunc
 	root  profSampleNode
-}
-
-func stackLabel(frames []StackFrame, maxLen int) string {
-	if len(frames) == 0 {
-		return ""
-	}
-	var b strings.Builder
-	for i, frame := range frames {
-		pos := frame.Position()
-		if i > 0 {
-			b.WriteString(";")
-		}
-		b.WriteString(frame.FuncName())
-		b.WriteString("@")
-		b.WriteString(frame.SrcName())
-		b.WriteString(":")
-		b.WriteString(strconv.Itoa(pos.Line))
-		b.WriteString(":")
-		b.WriteString(strconv.Itoa(pos.Column))
-		if maxLen > 0 && b.Len() >= maxLen {
-			return b.String()[:maxLen]
-		}
-	}
-	return b.String()
 }
 
 func (pb *profBuffer) addSample(pt *profTracker) {
@@ -134,27 +104,14 @@ func (pb *profBuffer) addSample(pt *profTracker) {
 		for n1 := n; n1.loc != nil; n1 = n1.parent {
 			locs = append(locs, n1.loc)
 		}
-		jsStack := stackLabel(sampleFrames, 2048)
-		labels := make(map[string][]string, 2)
-		labels["js_top_frame"] = []string{stackLabel(sampleFrames[:1], 512)}
-		if jsStack != "" {
-			labels["js_stack"] = []string{jsStack}
-		}
 		smpl = &profile.Sample{
 			Location: locs,
-			Value:    make([]int64, 4),
-			Label:    labels,
+			Value:    make([]int64, 2),
 		}
 		n.sample = smpl
 	}
 	smpl.Value[0]++
 	smpl.Value[1] += int64(pt.stop.Sub(pt.start))
-	if pt.allocStop.Mallocs >= pt.allocStart.Mallocs {
-		smpl.Value[2] += int64(pt.allocStop.Mallocs - pt.allocStart.Mallocs)
-	}
-	if pt.allocStop.TotalAlloc >= pt.allocStart.TotalAlloc {
-		smpl.Value[3] += int64(pt.allocStop.TotalAlloc - pt.allocStart.TotalAlloc)
-	}
 }
 
 func (pb *profBuffer) profile() *profile.Profile {
@@ -162,8 +119,6 @@ func (pb *profBuffer) profile() *profile.Profile {
 	pr.SampleType = []*profile.ValueType{
 		{Type: "samples", Unit: "count"},
 		{Type: "cpu", Unit: "nanoseconds"},
-		{Type: "alloc_objects", Unit: "count"},
-		{Type: "alloc_space", Unit: "bytes"},
 	}
 	pr.PeriodType = pr.SampleType[1]
 	pr.Period = int64(profInterval)
@@ -186,8 +141,7 @@ func (pb *profBuffer) profile() *profile.Profile {
 		if prg.funcName != "" {
 			funcName = prg.funcName.String()
 		} else {
-			// Use file name for top-level module scope instead of a generic anonymous label.
-			funcName = fileName
+			funcName = "<anonymous>"
 		}
 		// Make sure the function name is unique, otherwise the graph display merges them into one node, even
 		// if they are in different mappings.
@@ -256,7 +210,6 @@ func (p *profiler) run() {
 				if req != profReqDoSample {
 					// signal the VM to take a sample
 					tracker.start = ts
-					runtime.ReadMemStats(&tracker.allocStart)
 					atomic.StoreInt32(&tracker.req, profReqDoSample)
 					break
 				}
@@ -278,11 +231,6 @@ func (p *profiler) registerVm() *profTracker {
 	pt := new(profTracker)
 	p.mu.Lock()
 	if p.buf != nil {
-		// Request an immediate first sample so short-lived runs (e.g. --paused then stop)
-		// still capture at least one execution sample without waiting for the ticker.
-		pt.start = time.Now()
-		runtime.ReadMemStats(&pt.allocStart)
-		atomic.StoreInt32(&pt.req, profReqDoSample)
 		p.trackers = append(p.trackers, pt)
 		if !p.running {
 			go p.run()
@@ -362,37 +310,41 @@ func (p *profiler) stop() *profile.Profile {
 }
 
 /*
-StartProfile enables execution-time profiling for this Runtime only.
+StartProfile enables execution time profiling for all Runtimes within the current process.
 This works similar to pprof.StartCPUProfile and produces the same format which can be consumed by `go tool pprof`.
 There are, however, a few notable differences. Firstly, it's not a CPU profile, rather "execution time" profile.
 It measures the time the VM spends executing an instruction. If this instruction happens to be a call to a
 blocking Go function, the waiting time will be measured. Secondly, the 'cpu' sample isn't simply `count*period`,
-it's the time interval between when sampling was requested and when the instruction has finished. If the VM is still
+it's the time interval between when sampling was requested and when the instruction has finished. If a VM is still
 executing the same instruction when the time comes for the next sample, the sampling is skipped (i.e. `count` doesn't
 grow).
 
+If there are multiple functions with the same name, their names get a '.N' suffix, where N is a unique number,
+because otherwise the graph view merges them together (even if they are in different mappings). This includes
+"<anonymous>" functions.
+
 The sampling period is set to 10ms.
 
-It returns an error if profiling is already active on this Runtime.
+It returns an error if profiling is already active.
 */
-func (r *Runtime) StartProfile(w io.Writer) error {
-	err := r.profiler.p.start()
+func StartProfile(w io.Writer) error {
+	err := globalProfiler.p.start()
 	if err != nil {
 		return err
 	}
-	r.profiler.w = w
-	atomic.StoreInt32(&r.profiler.enabled, 1)
+	globalProfiler.w = w
+	atomic.StoreInt32(&globalProfiler.enabled, 1)
 	return nil
 }
 
 /*
-StopProfile stops the current profile initiated by StartProfile on this Runtime, if any.
+StopProfile stops the current profile initiated by StartProfile, if any.
 */
-func (r *Runtime) StopProfile() {
-	atomic.StoreInt32(&r.profiler.enabled, 0)
-	pr := r.profiler.p.stop()
+func StopProfile() {
+	atomic.StoreInt32(&globalProfiler.enabled, 0)
+	pr := globalProfiler.p.stop()
 	if pr != nil {
-		_ = pr.Write(r.profiler.w)
+		_ = pr.Write(globalProfiler.w)
 	}
-	r.profiler.w = nil
+	globalProfiler.w = nil
 }
