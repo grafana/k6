@@ -48,6 +48,7 @@ type RuntimeOptions struct {
 
 	// JS observability controls.
 	JSProfilingEnabled   null.Bool   `json:"jsProfilingEnabled"`
+	JSProfilingScope     null.String `json:"jsProfilingScope"`
 	JSCPUProfileOutput   null.String `json:"jsCpuProfileOutput"`
 	JSRuntimeTraceOutput null.String `json:"jsRuntimeTraceOutput"`
 	JSProfileID          null.String `json:"jsProfileId"`

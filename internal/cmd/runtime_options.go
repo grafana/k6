@@ -49,6 +49,7 @@ extended: base + sets "global" as alias for "globalThis"
 	flags.String("traces-output", "none",
 		"set the output for k6 traces, possible values are none,otel[=host:port]")
 	flags.Bool("js-profiling-enabled", false, "enable JS execution observability captures (experimental)")
+	flags.String("js-profiling-scope", "", "set JS profiling scope: init|vu|combined (default: combined)")
 	flags.String("js-cpu-profile-output", "", "write JS-attributed CPU profile to file path")
 	flags.String("js-runtime-trace-output", "", "write JS-attributed runtime trace to file path")
 	flags.String("js-profile-id", "", "set a custom profile correlation id")
@@ -95,6 +96,7 @@ func runtimeOptionsFromFlags(flags *pflag.FlagSet) lib.RuntimeOptions {
 		NewMachineReadableSummary: getNullBool(flags, "new-machine-readable-summary"),
 		TracesOutput:              getNullString(flags, "traces-output"),
 		JSProfilingEnabled:        getNullBool(flags, "js-profiling-enabled"),
+		JSProfilingScope:          getNullString(flags, "js-profiling-scope"),
 		JSCPUProfileOutput:        getNullString(flags, "js-cpu-profile-output"),
 		JSRuntimeTraceOutput:      getNullString(flags, "js-runtime-trace-output"),
 		JSProfileID:               getNullString(flags, "js-profile-id"),
@@ -160,6 +162,9 @@ func populateRuntimeOptionsFromEnv(opts lib.RuntimeOptions, environment map[stri
 	}
 	if err := saveBoolFromEnv(environment, "K6_JS_PROFILING_ENABLED", &opts.JSProfilingEnabled); err != nil {
 		return opts, err
+	}
+	if envVar, ok := environment["K6_JS_PROFILING_SCOPE"]; !opts.JSProfilingScope.Valid && ok {
+		opts.JSProfilingScope = null.StringFrom(envVar)
 	}
 	if envVar, ok := environment["K6_JS_CPU_PROFILE_OUTPUT"]; !opts.JSCPUProfileOutput.Valid && ok {
 		opts.JSCPUProfileOutput = null.StringFrom(envVar)

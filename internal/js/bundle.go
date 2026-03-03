@@ -124,7 +124,7 @@ func newBundle(
 		},
 	}
 	vuImpl.eventLoop = eventloop.New(vuImpl)
-	bi, err := bundle.instantiate(vuImpl, 0, false)
+	bi, err := bundle.instantiate(vuImpl, 0, true)
 	if err != nil {
 		return nil, err
 	}
@@ -267,7 +267,7 @@ func (b *Bundle) Instantiate(ctx context.Context, vuID uint64) (*BundleInstance,
 		},
 	}
 	vuImpl.eventLoop = eventloop.New(vuImpl)
-	bi, err := b.instantiate(vuImpl, vuID, true)
+	bi, err := b.instantiate(vuImpl, vuID, false)
 	if err != nil {
 		return nil, err
 	}
@@ -309,7 +309,7 @@ func newCompiler(preInitState *lib.TestPreInitState, filesystems map[string]fsex
 func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64, allowProfiling bool) (*BundleInstance, error) {
 	rt := vuImpl.runtime
 	if allowProfiling {
-		jsexec.MaybeStartRuntimeProfile(rt)
+		jsexec.MaybeStartRuntimeProfile(rt, jsexec.ScopeInit)
 	}
 	err := b.setupJSRuntime(rt, vuID, b.preInitState.Logger)
 	if err != nil {
@@ -357,11 +357,13 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64, allowProfiling b
 		var err error
 		jsexec.DoWithLabels(vuImpl.ctx, map[string]string{
 			"js.phase": "bundle.instantiate",
+			"js.scope": "init",
 			"js.vu":    fmt.Sprintf("%d", vuID),
 		}, func(ctx context.Context) {
 			if jsexec.Enabled() {
 				jsexec.UpdateRuntimeAsyncLabels(rt, map[string]string{
 					"js.phase": "bundle.instantiate",
+					"js.scope": "init",
 					"js.vu":    fmt.Sprintf("%d", vuID),
 				})
 			}
@@ -437,6 +439,7 @@ func (b *Bundle) setupJSRuntime(rt *sobek.Runtime, vuID uint64, logger logrus.Fi
 		traceID, profileID := jsexec.CorrelationIDs()
 		baseLabels := map[string]string{
 			"js.phase": "bundle.instantiate",
+			"js.scope": "init",
 			"js.vu":    fmt.Sprintf("%d", vuID),
 		}
 		if traceID != "" {

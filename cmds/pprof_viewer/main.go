@@ -31,14 +31,15 @@ type fileStats struct {
 type lineStats map[int]fileStats
 
 type appState struct {
-	prof       *profile.Profile
-	sampleIdx  map[string]int
-	files      map[string]string
-	mainFile   string
-	perFile    map[string]fileStats
-	perLine    map[string]lineStats
-	sortMetric string
-	color      bool
+	prof        *profile.Profile
+	sampleIdx   map[string]int
+	files       map[string]string
+	mainFile    string
+	perFile     map[string]fileStats
+	perLine     map[string]lineStats
+	sortMetric  string
+	color       bool
+	scopeTotals map[string]fileStats
 }
 
 func normalizeProfilePath(raw string) string {
@@ -222,6 +223,19 @@ func aggregate(p *profile.Profile) (map[string]fileStats, map[string]lineStats) 
 		ls[line] = v
 	}
 	return perFile, perLine
+}
+
+func sumStats(perFile map[string]fileStats) fileStats {
+	var out fileStats
+	for _, v := range perFile {
+		out.Samples += v.Samples
+		out.CPUNanos += v.CPUNanos
+		out.AllocObjects += v.AllocObjects
+		out.AllocSpace += v.AllocSpace
+		out.AsyncWaitNS += v.AsyncWaitNS
+		out.AsyncRunNS += v.AsyncRunNS
+	}
+	return out
 }
 
 func fmtBytes(n int64) string {
@@ -493,6 +507,17 @@ func (m viewerModel) View() string {
 		focus,
 		selectedInfo,
 	)
+	if len(m.st.scopeTotals) > 0 {
+		initS := m.st.scopeTotals["init"]
+		vuS := m.st.scopeTotals["vu"]
+		combinedS := m.st.scopeTotals["combined"]
+		header = header + fmt.Sprintf(
+			" | scope cpu(init/vu/combined)=%s/%s/%s",
+			fmtDurationNS(initS.CPUNanos),
+			fmtDurationNS(vuS.CPUNanos),
+			fmtDurationNS(combinedS.CPUNanos),
+		)
+	}
 
 	left := m.renderLeft(leftW, bodyH)
 	right := m.renderRight(rightW, bodyH)
@@ -641,52 +666,114 @@ func ansiStrip(s string) string {
 
 func usage() {
 	fmt.Println("pprof_viewer -pprof <profile.pprof> -archive <archive.tar>")
+	fmt.Println("or: pprof_viewer -pprof-init <init.pprof> -pprof-vu <vu.pprof> -archive <archive.tar>")
 }
 
 func main() {
 	var (
-		pprofPath   string
-		archivePath string
-		sortMetric  string
-		noColor     bool
+		pprofPath         string
+		pprofInitPath     string
+		pprofVUPath       string
+		pprofCombinedPath string
+		archivePath       string
+		sortMetric        string
+		noColor           bool
 	)
 	flag.StringVar(&pprofPath, "pprof", "", "path to pprof profile")
+	flag.StringVar(&pprofInitPath, "pprof-init", "", "path to init scope pprof profile")
+	flag.StringVar(&pprofVUPath, "pprof-vu", "", "path to vu scope pprof profile")
+	flag.StringVar(&pprofCombinedPath, "pprof-combined", "", "path to combined scope pprof profile")
 	flag.StringVar(&archivePath, "archive", "", "path to k6 archive.tar")
 	flag.StringVar(&sortMetric, "sort", "alloc_space", "initial sort metric: cpu|alloc_space|alloc_objects")
 	flag.BoolVar(&noColor, "no-color", false, "disable ANSI colors")
 	flag.Parse()
 
-	if pprofPath == "" || archivePath == "" {
+	if archivePath == "" {
 		usage()
 		os.Exit(2)
 	}
-
-	pf, err := os.Open(pprofPath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "open profile: %v\n", err)
-		os.Exit(1)
+	scopeProfiles := make(map[string]*profile.Profile)
+	openProfile := func(p string) (*profile.Profile, error) {
+		f, err := os.Open(p)
+		if err != nil {
+			return nil, err
+		}
+		defer f.Close()
+		return profile.Parse(f)
 	}
-	defer pf.Close()
-	prof, err := profile.Parse(pf)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "parse profile: %v\n", err)
-		os.Exit(1)
+	if pprofPath != "" {
+		p, err := openProfile(pprofPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "parse profile: %v\n", err)
+			os.Exit(1)
+		}
+		scopeProfiles["combined"] = p
+	}
+	if pprofInitPath != "" {
+		p, err := openProfile(pprofInitPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "parse init profile: %v\n", err)
+			os.Exit(1)
+		}
+		scopeProfiles["init"] = p
+	}
+	if pprofVUPath != "" {
+		p, err := openProfile(pprofVUPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "parse vu profile: %v\n", err)
+			os.Exit(1)
+		}
+		scopeProfiles["vu"] = p
+	}
+	if pprofCombinedPath != "" {
+		p, err := openProfile(pprofCombinedPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "parse combined profile: %v\n", err)
+			os.Exit(1)
+		}
+		scopeProfiles["combined"] = p
+	}
+	if len(scopeProfiles) == 0 {
+		usage()
+		os.Exit(2)
+	}
+	if scopeProfiles["combined"] == nil {
+		var toMerge []*profile.Profile
+		if p := scopeProfiles["init"]; p != nil {
+			toMerge = append(toMerge, p)
+		}
+		if p := scopeProfiles["vu"]; p != nil {
+			toMerge = append(toMerge, p)
+		}
+		merged, err := profile.Merge(toMerge)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "merge profile scopes: %v\n", err)
+			os.Exit(1)
+		}
+		scopeProfiles["combined"] = merged
 	}
 	files, mainFile, err := parseArchive(archivePath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "parse archive: %v\n", err)
 		os.Exit(1)
 	}
+	prof := scopeProfiles["combined"]
 	perFile, perLine := aggregate(prof)
+	scopeTotals := map[string]fileStats{}
+	for scope, p := range scopeProfiles {
+		pf, _ := aggregate(p)
+		scopeTotals[scope] = sumStats(pf)
+	}
 	st := &appState{
-		prof:       prof,
-		sampleIdx:  sampleTypeIndex(prof),
-		files:      files,
-		mainFile:   mainFile,
-		perFile:    perFile,
-		perLine:    perLine,
-		sortMetric: sortMetric,
-		color:      supportsColor() && !noColor,
+		prof:        prof,
+		sampleIdx:   sampleTypeIndex(prof),
+		files:       files,
+		mainFile:    mainFile,
+		perFile:     perFile,
+		perLine:     perLine,
+		sortMetric:  sortMetric,
+		color:       supportsColor() && !noColor,
+		scopeTotals: scopeTotals,
 	}
 	m := newViewerModel(*st)
 	p := tea.NewProgram(m, tea.WithAltScreen())

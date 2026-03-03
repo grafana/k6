@@ -936,13 +936,14 @@ func (u *VU) runFn(
 	if u.moduleVUImpl.eventLoop == nil {
 		u.moduleVUImpl.eventLoop = eventloop.New(u.moduleVUImpl)
 	}
-	jsexec.MaybeStartRuntimeProfile(u.Runtime)
+	jsexec.MaybeStartRuntimeProfile(u.Runtime, jsexec.ScopeVU)
 	if phase == "" {
 		phase = "iteration"
 	}
 	traceID, profileID := jsexec.CorrelationIDs()
 	jsLabels := map[string]string{
 		"js.phase": phase,
+		"js.scope": "vu",
 		"js.vu":    strconv.FormatUint(u.ID, 10),
 	}
 	if traceID != "" {

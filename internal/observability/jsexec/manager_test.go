@@ -25,6 +25,7 @@ func TestConfigFromRuntimeOptions(t *testing.T) {
 
 	cfg := ConfigFromRuntimeOptions(opts)
 	require.True(t, cfg.Enabled)
+	require.Equal(t, ScopeCombined, cfg.Scope)
 	require.Equal(t, "cpu.pprof", cfg.CPUProfilePath)
 	require.Equal(t, "run.trace", cfg.RuntimeTracePath)
 	require.Equal(t, "test-profile", cfg.ProfileID)
@@ -42,7 +43,7 @@ func TestManagerStartStopStoresArtifacts(t *testing.T) {
 	Activate(m)
 	defer Deactivate(m)
 	rt := sobek.New()
-	m.maybeStartRuntimeProfile(rt)
+	m.maybeStartRuntimeProfile(rt, ScopeVU)
 	var err error
 	DoWithLabels(context.Background(), map[string]string{
 		"js.phase": "test",
@@ -88,7 +89,7 @@ func TestManagerCapturesAsyncAllocationAndWaitLabels(t *testing.T) {
 		"js.phase": "test.async",
 		"js.vu":    "1",
 	})
-	m.maybeStartRuntimeProfile(rt)
+	m.maybeStartRuntimeProfile(rt, ScopeVU)
 
 	_, err := rt.RunString(`
 async function allocateAsync() {
@@ -129,4 +130,39 @@ allocateAsync();
 	require.True(t, ok)
 	require.NotEmpty(t, trace.Data)
 	require.Contains(t, string(trace.Data), "sobek.async.promise_reaction")
+}
+
+func TestManagerScopesInitVUCombined(t *testing.T) {
+	dir := t.TempDir()
+	m := NewManager(Config{
+		Enabled:          true,
+		Scope:            ScopeCombined,
+		CPUProfilePath:   filepath.Join(dir, "cpu.pprof"),
+		RuntimeTracePath: filepath.Join(dir, "run.trace"),
+		ProfileID:        "p-scope",
+	})
+	require.NoError(t, m.Start())
+	rtInit := sobek.New()
+	rtVU := sobek.New()
+	m.maybeStartRuntimeProfile(rtInit, ScopeInit)
+	m.maybeStartRuntimeProfile(rtVU, ScopeVU)
+	_, err := rtInit.RunString(`let a=0; for (let i=0;i<50000;i++) { a += i; } a;`)
+	require.NoError(t, err)
+	_, err = rtVU.RunString(`let b=0; for (let i=0;i<50000;i++) { b += i*2; } b;`)
+	require.NoError(t, err)
+	time.Sleep(25 * time.Millisecond)
+	m.Stop()
+
+	initCPU, ok := LatestArtifact("js-cpu-init")
+	require.True(t, ok)
+	require.NotEmpty(t, initCPU.Data)
+	vuCPU, ok := LatestArtifact("js-cpu-vu")
+	require.True(t, ok)
+	require.NotEmpty(t, vuCPU.Data)
+	combinedCPU, ok := LatestArtifact("js-cpu-combined")
+	require.True(t, ok)
+	require.NotEmpty(t, combinedCPU.Data)
+	defaultCPU, ok := LatestArtifact("js-cpu")
+	require.True(t, ok)
+	require.NotEmpty(t, defaultCPU.Data)
 }

@@ -52,8 +52,19 @@ func injectProfilerHandler(mux *http.ServeMux, profilingEnabled bool) {
 }
 
 func jsArtifactHandler(name, ctype string) http.Handler {
-	return http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
-		artifact, ok := jsexec.LatestArtifact(name)
+	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		artifactName := name
+		if name == "js-cpu" {
+			switch r.URL.Query().Get("scope") {
+			case "init":
+				artifactName = "js-cpu-init"
+			case "vu":
+				artifactName = "js-cpu-vu"
+			case "combined":
+				artifactName = "js-cpu-combined"
+			}
+		}
+		artifact, ok := jsexec.LatestArtifact(artifactName)
 		if !ok {
 			rw.WriteHeader(http.StatusNotFound)
 			_, _ = rw.Write([]byte("no artifact captured yet"))
