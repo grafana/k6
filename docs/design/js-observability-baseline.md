@@ -5,7 +5,7 @@ in JS-attributed profiling and runtime trace capture.
 
 ## Script
 
-- `scripts/observability/js_observability_baseline.js`
+- `examples/observability/js_observability_baseline.js`
 
 The script intentionally has:
 
@@ -19,7 +19,7 @@ The script intentionally has:
 ### Baseline (no JS observability)
 
 ```bash
-k6 run scripts/observability/js_observability_baseline.js
+k6 run examples/observability/js_observability_baseline.js
 ```
 
 ### With JS observability
@@ -29,7 +29,7 @@ k6 run \
   --js-profiling-enabled \
   --js-cpu-profile-output=baseline-js.pprof \
   --js-runtime-trace-output=baseline-js.trace \
-  scripts/observability/js_observability_baseline.js
+  examples/observability/js_observability_baseline.js
 ```
 
 ## Validation Artifacts
