@@ -252,6 +252,9 @@ func (r *Runtime) newPromiseReactionJob(reaction *promiseReaction, argument Valu
 			runNS := r.now().Sub(runStart).Nanoseconds()
 			rtrace.Log(ctx, "js.async.run_ns", strconv.FormatInt(runNS, 10))
 			rtrace.Log(ctx, "js.async.wait_ns", strconv.FormatInt(waitNS, 10))
+			// Promise reaction handlers are often short-lived; force a profiling sample so
+			// their allocation deltas don't get missed between periodic ticks.
+			r.vm.requestProfilerSample()
 			if ex != nil {
 				handlerResult = ex.val
 			}

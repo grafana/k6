@@ -697,6 +697,7 @@ func (ar *asyncRunner) onFulfilled(call FunctionCall) Value {
 	arg := call.Argument(0)
 	res, resType, ex := ar.gen.next(arg)
 	ar.step(res, resType == resultNormal, ex)
+	ar.gen.vm.requestProfilerSample()
 	return _undefined
 }
 
@@ -711,6 +712,7 @@ func (ar *asyncRunner) onRejected(call FunctionCall) Value {
 	reason := call.Argument(0)
 	res, resType, ex := ar.gen.nextThrow(reason)
 	ar.step(res, resType == resultNormal, ex)
+	ar.gen.vm.requestProfilerSample()
 	return _undefined
 }
 

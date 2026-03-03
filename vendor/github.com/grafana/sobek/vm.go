@@ -710,6 +710,17 @@ func (vm *vm) runWithProfiler() bool {
 	return false
 }
 
+func (vm *vm) requestProfilerSample() {
+	pt := vm.profTracker
+	if pt == nil {
+		return
+	}
+
+	if atomic.CompareAndSwapInt32(&pt.req, profReqNone, profReqDoSample) {
+		pt.start = time.Now()
+	}
+}
+
 func (vm *vm) Interrupt(v interface{}) {
 	vm.interruptLock.Lock()
 	vm.interruptVal = v
