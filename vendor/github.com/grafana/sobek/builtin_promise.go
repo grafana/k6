@@ -3,6 +3,7 @@ package sobek
 import (
 	stdctx "context"
 	"reflect"
+	"runtime"
 	"runtime/pprof"
 	rtrace "runtime/trace"
 	"strconv"
@@ -44,14 +45,16 @@ type promiseCapability struct {
 }
 
 type promiseReaction struct {
-	capability  *promiseCapability
-	typ         promiseReactionType
-	handler     *jobCallback
-	asyncRunner *asyncRunner
-	asyncCtx    interface{}
-	asyncOpID   uint64
-	parentOpID  uint64
-	enqueuedAt  time.Time
+	capability         *promiseCapability
+	typ                promiseReactionType
+	handler            *jobCallback
+	asyncRunner        *asyncRunner
+	asyncCtx           interface{}
+	asyncOpID          uint64
+	parentOpID         uint64
+	enqueuedAt         time.Time
+	enqueuedMallocs    uint64
+	enqueuedTotalAlloc uint64
 }
 
 var typePromise = reflect.TypeOf((*Promise)(nil))
@@ -165,12 +168,18 @@ func (p *Promise) addReactions(fulfillReaction *promiseReaction, rejectReaction 
 		parentOpID = 1
 	}
 	queuedAt := r.now()
+	var ms runtime.MemStats
+	runtime.ReadMemStats(&ms)
 	fulfillReaction.parentOpID = parentOpID
 	fulfillReaction.asyncOpID = r.nextAsyncOpID()
 	fulfillReaction.enqueuedAt = queuedAt
+	fulfillReaction.enqueuedMallocs = ms.Mallocs
+	fulfillReaction.enqueuedTotalAlloc = ms.TotalAlloc
 	rejectReaction.parentOpID = parentOpID
 	rejectReaction.asyncOpID = r.nextAsyncOpID()
 	rejectReaction.enqueuedAt = queuedAt
+	rejectReaction.enqueuedMallocs = ms.Mallocs
+	rejectReaction.enqueuedTotalAlloc = ms.TotalAlloc
 	if tracker := r.asyncContextTracker; tracker != nil {
 		ctx := tracker.Grab()
 		fulfillReaction.asyncCtx = ctx
@@ -221,8 +230,21 @@ func (r *Runtime) newPromiseReactionJob(reaction *promiseReaction, argument Valu
 		var handlerResult Value
 		fulfill := false
 		waitNS := int64(0)
+		waitAllocObjects := int64(0)
+		waitAllocSpace := int64(0)
 		if !reaction.enqueuedAt.IsZero() {
 			waitNS = r.now().Sub(reaction.enqueuedAt).Nanoseconds()
+		}
+		if reaction.enqueuedTotalAlloc > 0 || reaction.enqueuedMallocs > 0 {
+			var stopMS runtime.MemStats
+			runtime.ReadMemStats(&stopMS)
+			if stopMS.Mallocs >= reaction.enqueuedMallocs {
+				waitAllocObjects = int64(stopMS.Mallocs - reaction.enqueuedMallocs)
+			}
+			if stopMS.TotalAlloc >= reaction.enqueuedTotalAlloc {
+				waitAllocSpace = int64(stopMS.TotalAlloc - reaction.enqueuedTotalAlloc)
+			}
+			r.addPendingAsyncAllocs(waitAllocObjects, waitAllocSpace)
 		}
 		if reaction.handler == nil {
 			handlerResult = argument

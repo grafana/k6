@@ -13,6 +13,7 @@ import (
 	"reflect"
 	"runtime"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/text/collate"
@@ -208,11 +209,13 @@ type Runtime struct {
 
 	jobQueue []func()
 
-	promiseRejectionTracker PromiseRejectionTracker
-	asyncContextTracker     AsyncContextTracker
-	asyncOpSeq              uint64
-	currentAsyncOpID        uint64
-	profiler                runtimeProfiler
+	promiseRejectionTracker  PromiseRejectionTracker
+	asyncContextTracker      AsyncContextTracker
+	asyncOpSeq               uint64
+	currentAsyncOpID         uint64
+	pendingAsyncAllocObjects int64
+	pendingAsyncAllocSpace   int64
+	profiler                 runtimeProfiler
 
 	// Stack for tracking objects currently being converted to string
 	// to detect and handle circular references
@@ -223,6 +226,21 @@ type StackFrame struct {
 	prg      *Program
 	funcName unistring.String
 	pc       int
+}
+
+func (r *Runtime) addPendingAsyncAllocs(objs, space int64) {
+	if objs > 0 {
+		atomic.AddInt64(&r.pendingAsyncAllocObjects, objs)
+	}
+	if space > 0 {
+		atomic.AddInt64(&r.pendingAsyncAllocSpace, space)
+	}
+}
+
+func (r *Runtime) takePendingAsyncAllocs() (objs, space int64) {
+	objs = atomic.SwapInt64(&r.pendingAsyncAllocObjects, 0)
+	space = atomic.SwapInt64(&r.pendingAsyncAllocSpace, 0)
+	return objs, space
 }
 
 func (f *StackFrame) SrcName() string {

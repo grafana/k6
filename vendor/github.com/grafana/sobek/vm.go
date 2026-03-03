@@ -691,6 +691,13 @@ func (vm *vm) runWithProfiler() bool {
 			if pt.allocStop.TotalAlloc >= pt.allocStart.TotalAlloc {
 				pt.allocSpace = int64(pt.allocStop.TotalAlloc - pt.allocStart.TotalAlloc)
 			}
+			extraAllocObjects, extraAllocSpace := vm.r.takePendingAsyncAllocs()
+			if extraAllocObjects > 0 {
+				pt.allocObjects += extraAllocObjects
+			}
+			if extraAllocSpace > 0 {
+				pt.allocSpace += extraAllocSpace
+			}
 
 			pt.numFrames = len(vm.r.CaptureCallStack(len(pt.frames), pt.frames[:0]))
 			pt.frames[0].pc = pc

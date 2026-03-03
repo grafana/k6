@@ -86,9 +86,6 @@ func TestJSProfilingBrowserScreenshotAllocSpaceOver1MB(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping browser alloc profiling test in short mode")
 	}
-	if os.Getenv("K6_RUN_BROWSER_ALLOC_TEST") != "1" {
-		t.Skip("set K6_RUN_BROWSER_ALLOC_TEST=1 to run browser alloc profiling test")
-	}
 
 	const minScreenshotBytes = 1_000_000
 	const minAllocSpaceBytes = 1_000_000
