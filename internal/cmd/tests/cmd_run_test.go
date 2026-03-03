@@ -88,15 +88,17 @@ func TestJSProfilingBrowserScreenshotAllocSpaceOver1MB(t *testing.T) {
 	}
 
 	const minScreenshotBytes = 1_000_000
-	const minAllocSpaceBytes = 1_000_000
+	const minScreenshotAllocSpaceBytes = 1_000_000
 
 	script := `
 import { browser } from "k6/browser";
+import { sleep } from "k6";
 
 export const options = {
   scenarios: {
-    ui: {
+    screenshot: {
       executor: "shared-iterations",
+      exec: "screenshotScenario",
       vus: 1,
       iterations: 1,
       options: {
@@ -105,10 +107,16 @@ export const options = {
         },
       },
     },
+    small: {
+      executor: "shared-iterations",
+      exec: "smallAllocScenario",
+      vus: 1,
+      iterations: 1,
+    },
   },
 };
 
-export default async function () {
+export async function screenshotScenario() {
   const context = await browser.newContext();
   const page = await context.newPage();
 
@@ -124,6 +132,16 @@ export default async function () {
     await page.close();
     await context.close();
   }
+}
+
+export function smallAllocScenario() {
+  let s = "x".repeat(1024);
+  while (s.length < 20000) {
+    const left = 20000 - s.length;
+    s += "x".repeat(Math.min(1024, left));
+  }
+  sleep(1);
+  return s.length;
 }
 `
 
@@ -171,18 +189,53 @@ export default async function () {
 	require.NotEqual(t, -1, allocSpaceIdx, "alloc_space sample type missing")
 
 	var totalAllocSpace int64
+	var screenshotAllocSpace int64
+	var smallAllocSpace int64
 	for _, s := range pr.Sample {
-		if allocSpaceIdx < len(s.Value) {
-			totalAllocSpace += s.Value[allocSpaceIdx]
+		if allocSpaceIdx >= len(s.Value) {
+			continue
+		}
+		alloc := s.Value[allocSpaceIdx]
+		totalAllocSpace += alloc
+
+		hasScreenshot := false
+		hasSmall := false
+		for _, loc := range s.Location {
+			for _, line := range loc.Line {
+				if line.Function == nil {
+					continue
+				}
+				name := line.Function.Name
+				if strings.HasPrefix(name, "screenshotScenario") {
+					hasScreenshot = true
+				}
+				if strings.HasPrefix(name, "smallAllocScenario") {
+					hasSmall = true
+				}
+			}
+		}
+		if hasScreenshot {
+			screenshotAllocSpace += alloc
+		}
+		if hasSmall {
+			smallAllocSpace += alloc
 		}
 	}
 
 	require.GreaterOrEqual(
 		t,
-		totalAllocSpace,
-		int64(minAllocSpaceBytes),
+		screenshotAllocSpace,
+		int64(minScreenshotAllocSpaceBytes),
 		"expected alloc_space >= 1MB for full-page grafana.com screenshot",
 	)
+	require.Greater(t, smallAllocSpace, int64(0), "small alloc scenario should have some attributed allocs")
+	require.Greater(
+		t,
+		screenshotAllocSpace,
+		smallAllocSpace*3,
+		"browser screenshot alloc should dominate small alloc scenario",
+	)
+	require.Greater(t, totalAllocSpace, int64(0))
 }
 
 func TestBinaryNameStdout(t *testing.T) {
