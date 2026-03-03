@@ -1,5 +1,5 @@
 #!/bin/sh -e
-sha=cb4a6c8074671c00df8cbc17a620c0f9462b312a # this is just the commit it was last tested with
+sha=3af36bec45bd4f72d4b57366653578e1e4dafef7 # this is just the commit it was last tested with
 mkdir -p ./TestTC39/test262
 cd ./TestTC39/test262
 git init
