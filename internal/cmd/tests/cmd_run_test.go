@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/pprof/profile"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -77,6 +78,114 @@ func TestSimpleTestStdin(t *testing.T) {
 	assert.Contains(t, stdout, "1 complete and 0 interrupted iterations")
 	assert.Empty(t, ts.Stderr.Bytes())
 	assert.Empty(t, ts.LoggerHook.Drain())
+}
+
+func TestJSProfilingBrowserScreenshotAllocSpaceOver1MB(t *testing.T) {
+	t.Parallel()
+
+	if testing.Short() {
+		t.Skip("skipping browser alloc profiling test in short mode")
+	}
+	if os.Getenv("K6_RUN_BROWSER_ALLOC_TEST") != "1" {
+		t.Skip("set K6_RUN_BROWSER_ALLOC_TEST=1 to run browser alloc profiling test")
+	}
+
+	const minScreenshotBytes = 1_000_000
+	const minAllocSpaceBytes = 1_000_000
+
+	script := `
+import { browser } from "k6/browser";
+
+export const options = {
+  scenarios: {
+    ui: {
+      executor: "shared-iterations",
+      vus: 1,
+      iterations: 1,
+      options: {
+        browser: {
+          type: "chromium",
+        },
+      },
+    },
+  },
+};
+
+export default async function () {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+
+  try {
+    await page.goto("https://grafana.com/", { waitUntil: "networkidle" });
+    const buf = await page.screenshot({ fullPage: true, type: "png" });
+    const size = buf.byteLength;
+    console.log("screenshot-bytes=" + size);
+    if (size < ` + fmt.Sprintf("%d", minScreenshotBytes) + `) {
+      throw new Error("expected screenshot size >= ` + fmt.Sprintf("%d", minScreenshotBytes) + ` bytes, got " + size);
+    }
+  } finally {
+    await page.close();
+    await context.close();
+  }
+}
+`
+
+	ts := NewGlobalTestState(t)
+	ts.Cwd = t.TempDir()
+	ts.FS = fsext.NewOsFs()
+	ts.Getwd = func() (string, error) { return ts.Cwd, nil }
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test.js"), []byte(script), 0o644))
+
+	cpuProfilePath := filepath.Join(ts.Cwd, "browser_alloc.pprof")
+	ts.CmdArgs = []string{
+		"k6", "run",
+		"--js-profiling-enabled",
+		"--js-profiling-scope=vu",
+		"--js-cpu-profile-output", cpuProfilePath,
+		"test.js",
+	}
+	ts.Env["K6_BROWSER_ENABLED"] = "true"
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	exists, err := fsext.Exists(ts.FS, cpuProfilePath)
+	require.NoError(t, err)
+	if !exists {
+		t.Skipf(
+			"js cpu profile not created; stdout=%q stderr=%q",
+			ts.Stdout.String(),
+			ts.Stderr.String(),
+		)
+	}
+
+	rawProfile, err := fsext.ReadFile(ts.FS, cpuProfilePath)
+	require.NoError(t, err)
+	require.NotEmpty(t, rawProfile)
+
+	pr, err := profile.Parse(bytes.NewReader(rawProfile))
+	require.NoError(t, err)
+
+	allocSpaceIdx := -1
+	for i, st := range pr.SampleType {
+		if st.Type == "alloc_space" {
+			allocSpaceIdx = i
+			break
+		}
+	}
+	require.NotEqual(t, -1, allocSpaceIdx, "alloc_space sample type missing")
+
+	var totalAllocSpace int64
+	for _, s := range pr.Sample {
+		if allocSpaceIdx < len(s.Value) {
+			totalAllocSpace += s.Value[allocSpaceIdx]
+		}
+	}
+
+	require.GreaterOrEqual(
+		t,
+		totalAllocSpace,
+		int64(minAllocSpaceBytes),
+		"expected alloc_space >= 1MB for full-page grafana.com screenshot",
+	)
 }
 
 func TestBinaryNameStdout(t *testing.T) {
