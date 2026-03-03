@@ -12,6 +12,7 @@ import (
 	"go.k6.io/k6/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6error"
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
+	"go.k6.io/k6/internal/observability/asyncattr"
 	k6common "go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/promises"
 )
@@ -90,8 +91,12 @@ func newRegExMatcher(ctx context.Context, vu moduleVU, tq *taskqueue.TaskQueue) 
 //   - Otherwise, rejects the promise with the error fn returns.
 func promise(vu moduleVU, fn func() (result any, reason error)) *sobek.Promise {
 	p, resolve, reject := promises.New(vu)
+	rt := vu.Runtime()
+	baseCtx := vu.Context()
 	go func() {
-		v, err := fn()
+		v, err := asyncattr.RunHostOp(baseCtx, rt, "browser", "promise", func(_ context.Context) (any, error) {
+			return fn()
+		})
 		if err != nil {
 			reject(err)
 			return

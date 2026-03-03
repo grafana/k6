@@ -237,6 +237,12 @@ func (r *Runtime) addPendingAsyncAllocs(objs, space int64) {
 	}
 }
 
+// AddPendingAsyncAllocs queues allocation deltas to be attributed to the next
+// sampled JS frame in this runtime.
+func (r *Runtime) AddPendingAsyncAllocs(objs, space int64) {
+	r.addPendingAsyncAllocs(objs, space)
+}
+
 func (r *Runtime) takePendingAsyncAllocs() (objs, space int64) {
 	objs = atomic.SwapInt64(&r.pendingAsyncAllocObjects, 0)
 	space = atomic.SwapInt64(&r.pendingAsyncAllocSpace, 0)
