@@ -124,7 +124,7 @@ func newBundle(
 		},
 	}
 	vuImpl.eventLoop = eventloop.New(vuImpl)
-	bi, err := bundle.instantiate(vuImpl, 0)
+	bi, err := bundle.instantiate(vuImpl, 0, false)
 	if err != nil {
 		return nil, err
 	}
@@ -267,7 +267,7 @@ func (b *Bundle) Instantiate(ctx context.Context, vuID uint64) (*BundleInstance,
 		},
 	}
 	vuImpl.eventLoop = eventloop.New(vuImpl)
-	bi, err := b.instantiate(vuImpl, vuID)
+	bi, err := b.instantiate(vuImpl, vuID, true)
 	if err != nil {
 		return nil, err
 	}
@@ -306,9 +306,11 @@ func newCompiler(preInitState *lib.TestPreInitState, filesystems map[string]fsex
 	return c
 }
 
-func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*BundleInstance, error) {
+func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64, allowProfiling bool) (*BundleInstance, error) {
 	rt := vuImpl.runtime
-	jsexec.MaybeStartRuntimeProfile(rt)
+	if allowProfiling {
+		jsexec.MaybeStartRuntimeProfile(rt)
+	}
 	err := b.setupJSRuntime(rt, vuID, b.preInitState.Logger)
 	if err != nil {
 		return nil, err
