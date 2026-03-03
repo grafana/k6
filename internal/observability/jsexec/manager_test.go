@@ -115,16 +115,34 @@ allocateAsync();
 
 	hasAllocObjects := false
 	hasAllocSpace := false
-	for _, st := range pr.SampleType {
+	allocObjectsIdx := -1
+	allocSpaceIdx := -1
+	for i, st := range pr.SampleType {
 		if st.Type == "alloc_objects" {
 			hasAllocObjects = true
+			allocObjectsIdx = i
 		}
 		if st.Type == "alloc_space" {
 			hasAllocSpace = true
+			allocSpaceIdx = i
 		}
 	}
 	require.True(t, hasAllocObjects, "alloc_objects sample type missing")
 	require.True(t, hasAllocSpace, "alloc_space sample type missing")
+	require.NotEqual(t, -1, allocObjectsIdx)
+	require.NotEqual(t, -1, allocSpaceIdx)
+
+	var totalAllocObjects, totalAllocSpace int64
+	for _, s := range pr.Sample {
+		if allocObjectsIdx < len(s.Value) {
+			totalAllocObjects += s.Value[allocObjectsIdx]
+		}
+		if allocSpaceIdx < len(s.Value) {
+			totalAllocSpace += s.Value[allocSpaceIdx]
+		}
+	}
+	require.Greater(t, totalAllocObjects, int64(0), "expected attributed alloc_objects to be > 0")
+	require.Greater(t, totalAllocSpace, int64(0), "expected attributed alloc_space to be > 0")
 
 	trace, ok := LatestArtifact("js-trace")
 	require.True(t, ok)

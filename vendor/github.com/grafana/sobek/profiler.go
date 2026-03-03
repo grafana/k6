@@ -35,6 +35,8 @@ type profTracker struct {
 	req, finished         int32
 	start, stop           time.Time
 	allocStart, allocStop runtime.MemStats
+	allocObjects          int64
+	allocSpace            int64
 	numFrames             int
 	frames                [profMaxStackDepth]StackFrame
 }
@@ -114,10 +116,8 @@ func (pb *profBuffer) addSample(pt *profTracker) {
 	}
 	smpl.Value[0]++
 	smpl.Value[1] += int64(pt.stop.Sub(pt.start))
-	if pt.allocStop.TotalAlloc >= pt.allocStart.TotalAlloc {
-		smpl.Value[2] += int64(pt.allocStop.Mallocs - pt.allocStart.Mallocs)
-		smpl.Value[3] += int64(pt.allocStop.TotalAlloc - pt.allocStart.TotalAlloc)
-	}
+	smpl.Value[2] += pt.allocObjects
+	smpl.Value[3] += pt.allocSpace
 }
 
 func (pb *profBuffer) profile() *profile.Profile {
@@ -218,7 +218,6 @@ func (p *profiler) run() {
 				if req != profReqDoSample {
 					// signal the VM to take a sample
 					tracker.start = ts
-					runtime.ReadMemStats(&tracker.allocStart)
 					atomic.StoreInt32(&tracker.req, profReqDoSample)
 					break
 				}

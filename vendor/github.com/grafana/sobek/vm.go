@@ -683,6 +683,14 @@ func (vm *vm) runWithProfiler() bool {
 		if req == profReqDoSample {
 			pt.stop = time.Now()
 			runtime.ReadMemStats(&pt.allocStop)
+			pt.allocObjects = 0
+			pt.allocSpace = 0
+			if pt.allocStop.Mallocs >= pt.allocStart.Mallocs {
+				pt.allocObjects = int64(pt.allocStop.Mallocs - pt.allocStart.Mallocs)
+			}
+			if pt.allocStop.TotalAlloc >= pt.allocStart.TotalAlloc {
+				pt.allocSpace = int64(pt.allocStop.TotalAlloc - pt.allocStart.TotalAlloc)
+			}
 
 			pt.numFrames = len(vm.r.CaptureCallStack(len(pt.frames), pt.frames[:0]))
 			pt.frames[0].pc = pc
@@ -692,6 +700,9 @@ func (vm *vm) runWithProfiler() bool {
 					"js_top_frame", jsFrames[0].SrcName()+":"+strconv.Itoa(jsFrames[0].Position().Line),
 				)))
 			}
+			// Keep allocation accounting continuous across samples instead of per-request windows.
+			// This improves attribution for allocations that happen between sample ticks.
+			pt.allocStart = pt.allocStop
 			atomic.StoreInt32(&pt.req, profReqSampleReady)
 		}
 	}
