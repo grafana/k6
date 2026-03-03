@@ -247,16 +247,19 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 				}
 				if hsErr != nil {
 					logger.WithError(hsErr).Error("failed to handle the end-of-test summary")
+					if err == nil {
+						err = hsErr
+					}
 				}
 			}()
 		default:
 			// Instantiates the summary output
-			summaryOutput, err := summaryoutput.New(output.Params{
+			summaryOutput, soErr := summaryoutput.New(output.Params{
 				RuntimeOptions: testRunState.RuntimeOptions,
 				Logger:         c.gs.Logger,
 			})
-			if err != nil {
-				logger.WithError(err).Error("failed to initialize the end-of-test summary output")
+			if soErr != nil {
+				logger.WithError(soErr).Error("failed to initialize the end-of-test summary output")
 			}
 			outputs = append(outputs, summaryOutput)
 
@@ -283,6 +286,9 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 				}
 				if hsErr != nil {
 					logger.WithError(hsErr).Error("failed to handle the end-of-test summary")
+					if err == nil {
+						err = hsErr
+					}
 				}
 			}()
 		}
