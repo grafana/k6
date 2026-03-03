@@ -1,7 +1,12 @@
 package sobek
 
 import (
+	stdctx "context"
 	"reflect"
+	"runtime/pprof"
+	rtrace "runtime/trace"
+	"strconv"
+	"time"
 
 	"github.com/grafana/sobek/unistring"
 )
@@ -44,6 +49,9 @@ type promiseReaction struct {
 	handler     *jobCallback
 	asyncRunner *asyncRunner
 	asyncCtx    interface{}
+	asyncOpID   uint64
+	parentOpID  uint64
+	enqueuedAt  time.Time
 }
 
 var typePromise = reflect.TypeOf((*Promise)(nil))
@@ -152,6 +160,17 @@ func (p *Promise) export(*objectExportCtx) interface{} {
 
 func (p *Promise) addReactions(fulfillReaction *promiseReaction, rejectReaction *promiseReaction) {
 	r := p.val.runtime
+	parentOpID := r.currentAsyncOpID
+	if parentOpID == 0 {
+		parentOpID = 1
+	}
+	queuedAt := r.now()
+	fulfillReaction.parentOpID = parentOpID
+	fulfillReaction.asyncOpID = r.nextAsyncOpID()
+	fulfillReaction.enqueuedAt = queuedAt
+	rejectReaction.parentOpID = parentOpID
+	rejectReaction.asyncOpID = r.nextAsyncOpID()
+	rejectReaction.enqueuedAt = queuedAt
 	if tracker := r.asyncContextTracker; tracker != nil {
 		ctx := tracker.Grab()
 		fulfillReaction.asyncCtx = ctx
@@ -201,25 +220,45 @@ func (r *Runtime) newPromiseReactionJob(reaction *promiseReaction, argument Valu
 	return func() {
 		var handlerResult Value
 		fulfill := false
+		waitNS := int64(0)
+		if !reaction.enqueuedAt.IsZero() {
+			waitNS = r.now().Sub(reaction.enqueuedAt).Nanoseconds()
+		}
 		if reaction.handler == nil {
 			handlerResult = argument
 			if reaction.typ == promiseReactionFulfill {
 				fulfill = true
 			}
 		} else {
+			prevOpID := r.currentAsyncOpID
+			r.currentAsyncOpID = reaction.asyncOpID
 			if tracker := r.asyncContextTracker; tracker != nil {
 				tracker.Resumed(reaction.asyncCtx)
 			}
+			ctx := pprof.WithLabels(stdctx.Background(), pprof.Labels(
+				"js.async.op_id", strconv.FormatUint(reaction.asyncOpID, 10),
+				"js.async.parent_op_id", strconv.FormatUint(reaction.parentOpID, 10),
+				"js.async.wait_ns", strconv.FormatInt(waitNS, 10),
+				"js.async.run_ns", "0",
+			))
+			pprof.SetGoroutineLabels(ctx)
+			runStart := r.now()
 			ex := r.vm.try(func() {
-				handlerResult = r.callJobCallback(reaction.handler, _undefined, argument)
-				fulfill = true
+				rtrace.WithRegion(ctx, "sobek.async.promise_reaction", func() {
+					handlerResult = r.callJobCallback(reaction.handler, _undefined, argument)
+					fulfill = true
+				})
 			})
+			runNS := r.now().Sub(runStart).Nanoseconds()
+			rtrace.Log(ctx, "js.async.run_ns", strconv.FormatInt(runNS, 10))
+			rtrace.Log(ctx, "js.async.wait_ns", strconv.FormatInt(waitNS, 10))
 			if ex != nil {
 				handlerResult = ex.val
 			}
 			if tracker := r.asyncContextTracker; tracker != nil {
 				tracker.Exited()
 			}
+			r.currentAsyncOpID = prevOpID
 		}
 		if reaction.capability != nil {
 			if fulfill {
@@ -648,4 +687,9 @@ func (r *Runtime) SetPromiseRejectionTracker(tracker PromiseRejectionTracker) {
 // This method (as Runtime in general) is not goroutine-safe.
 func (r *Runtime) SetAsyncContextTracker(tracker AsyncContextTracker) {
 	r.asyncContextTracker = tracker
+}
+
+func (r *Runtime) nextAsyncOpID() uint64 {
+	r.asyncOpSeq++
+	return r.asyncOpSeq
 }

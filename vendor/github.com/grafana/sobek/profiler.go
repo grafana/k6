@@ -1,8 +1,11 @@
 package sobek
 
 import (
+	stdctx "context"
 	"errors"
 	"io"
+	"runtime"
+	"runtime/pprof"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -21,20 +24,19 @@ const (
 	profReqStop
 )
 
-type _globalProfiler struct {
+type runtimeProfiler struct {
 	p profiler
 	w io.Writer
 
 	enabled int32
 }
 
-var globalProfiler _globalProfiler
-
 type profTracker struct {
-	req, finished int32
-	start, stop   time.Time
-	numFrames     int
-	frames        [profMaxStackDepth]StackFrame
+	req, finished         int32
+	start, stop           time.Time
+	allocStart, allocStop runtime.MemStats
+	numFrames             int
+	frames                [profMaxStackDepth]StackFrame
 }
 
 type profiler struct {
@@ -106,12 +108,16 @@ func (pb *profBuffer) addSample(pt *profTracker) {
 		}
 		smpl = &profile.Sample{
 			Location: locs,
-			Value:    make([]int64, 2),
+			Value:    make([]int64, 4),
 		}
 		n.sample = smpl
 	}
 	smpl.Value[0]++
 	smpl.Value[1] += int64(pt.stop.Sub(pt.start))
+	if pt.allocStop.TotalAlloc >= pt.allocStart.TotalAlloc {
+		smpl.Value[2] += int64(pt.allocStop.Mallocs - pt.allocStart.Mallocs)
+		smpl.Value[3] += int64(pt.allocStop.TotalAlloc - pt.allocStart.TotalAlloc)
+	}
 }
 
 func (pb *profBuffer) profile() *profile.Profile {
@@ -119,6 +125,8 @@ func (pb *profBuffer) profile() *profile.Profile {
 	pr.SampleType = []*profile.ValueType{
 		{Type: "samples", Unit: "count"},
 		{Type: "cpu", Unit: "nanoseconds"},
+		{Type: "alloc_objects", Unit: "count"},
+		{Type: "alloc_space", Unit: "bytes"},
 	}
 	pr.PeriodType = pr.SampleType[1]
 	pr.Period = int64(profInterval)
@@ -141,7 +149,7 @@ func (pb *profBuffer) profile() *profile.Profile {
 		if prg.funcName != "" {
 			funcName = prg.funcName.String()
 		} else {
-			funcName = "<anonymous>"
+			funcName = fileName
 		}
 		// Make sure the function name is unique, otherwise the graph display merges them into one node, even
 		// if they are in different mappings.
@@ -210,6 +218,7 @@ func (p *profiler) run() {
 				if req != profReqDoSample {
 					// signal the VM to take a sample
 					tracker.start = ts
+					runtime.ReadMemStats(&tracker.allocStart)
 					atomic.StoreInt32(&tracker.req, profReqDoSample)
 					break
 				}
@@ -232,6 +241,9 @@ func (p *profiler) registerVm() *profTracker {
 	p.mu.Lock()
 	if p.buf != nil {
 		p.trackers = append(p.trackers, pt)
+		pt.start = time.Now()
+		runtime.ReadMemStats(&pt.allocStart)
+		atomic.StoreInt32(&pt.req, profReqDoSample)
 		if !p.running {
 			go p.run()
 			p.running = true
@@ -327,24 +339,25 @@ The sampling period is set to 10ms.
 
 It returns an error if profiling is already active.
 */
-func StartProfile(w io.Writer) error {
-	err := globalProfiler.p.start()
+func (r *Runtime) StartProfile(w io.Writer) error {
+	err := r.profiler.p.start()
 	if err != nil {
 		return err
 	}
-	globalProfiler.w = w
-	atomic.StoreInt32(&globalProfiler.enabled, 1)
+	r.profiler.w = w
+	atomic.StoreInt32(&r.profiler.enabled, 1)
+	pprof.SetGoroutineLabels(stdctx.Background())
 	return nil
 }
 
 /*
 StopProfile stops the current profile initiated by StartProfile, if any.
 */
-func StopProfile() {
-	atomic.StoreInt32(&globalProfiler.enabled, 0)
-	pr := globalProfiler.p.stop()
+func (r *Runtime) StopProfile() {
+	atomic.StoreInt32(&r.profiler.enabled, 0)
+	pr := r.profiler.p.stop()
 	if pr != nil {
-		_ = pr.Write(globalProfiler.w)
+		_ = pr.Write(r.profiler.w)
 	}
-	globalProfiler.w = nil
+	r.profiler.w = nil
 }

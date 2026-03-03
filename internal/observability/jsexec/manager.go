@@ -242,6 +242,17 @@ func WithRegion(ctx context.Context, region string, fn func()) {
 	rtrace.WithRegion(ctx, region, fn)
 }
 
+// WithTask runs fn under a runtime/trace task root for hierarchy.
+func WithTask(ctx context.Context, taskName string, fn func(context.Context)) {
+	if taskName == "" {
+		fn(ctx)
+		return
+	}
+	taskCtx, task := rtrace.NewTask(ctx, taskName)
+	defer task.End()
+	fn(taskCtx)
+}
+
 var active = struct {
 	mu sync.RWMutex
 	m  *Manager
@@ -272,4 +283,24 @@ func MaybeStartRuntimeProfile(rt *sobek.Runtime) {
 		return
 	}
 	m.maybeStartRuntimeProfile(rt)
+}
+
+// CorrelationIDs returns currently active observability IDs.
+func CorrelationIDs() (traceID, profileID string) {
+	active.mu.RLock()
+	m := active.m
+	active.mu.RUnlock()
+	if m == nil {
+		return "", ""
+	}
+	id := m.ProfileID()
+	return id, id
+}
+
+// Enabled reports whether JS observability manager is active and enabled.
+func Enabled() bool {
+	active.mu.RLock()
+	m := active.m
+	active.mu.RUnlock()
+	return m != nil && m.cfg.Enabled
 }

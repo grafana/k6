@@ -210,6 +210,9 @@ type Runtime struct {
 
 	promiseRejectionTracker PromiseRejectionTracker
 	asyncContextTracker     AsyncContextTracker
+	asyncOpSeq              uint64
+	currentAsyncOpID        uint64
+	profiler                runtimeProfiler
 
 	// Stack for tracking objects currently being converted to string
 	// to detect and handle circular references

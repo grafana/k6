@@ -683,12 +683,16 @@ type asyncRunner struct {
 	promiseCap *promiseCapability
 	f          *Object
 	vmCall     func(*vm, int)
+	asyncOpID  uint64
 }
 
 func (ar *asyncRunner) onFulfilled(call FunctionCall) Value {
+	prevOpID := ar.f.runtime.currentAsyncOpID
+	ar.f.runtime.currentAsyncOpID = ar.asyncOpID
 	ar.gen.vm.curAsyncRunner = ar
 	defer func() {
 		ar.gen.vm.curAsyncRunner = nil
+		ar.f.runtime.currentAsyncOpID = prevOpID
 	}()
 	arg := call.Argument(0)
 	res, resType, ex := ar.gen.next(arg)
@@ -697,9 +701,12 @@ func (ar *asyncRunner) onFulfilled(call FunctionCall) Value {
 }
 
 func (ar *asyncRunner) onRejected(call FunctionCall) Value {
+	prevOpID := ar.f.runtime.currentAsyncOpID
+	ar.f.runtime.currentAsyncOpID = ar.asyncOpID
 	ar.gen.vm.curAsyncRunner = ar
 	defer func() {
 		ar.gen.vm.curAsyncRunner = nil
+		ar.f.runtime.currentAsyncOpID = prevOpID
 	}()
 	reason := call.Argument(0)
 	res, resType, ex := ar.gen.nextThrow(reason)
@@ -733,6 +740,7 @@ func (ar *asyncRunner) step(res Value, done bool, ex *Exception) {
 
 func (ar *asyncRunner) start(nArgs int) {
 	r := ar.f.runtime
+	ar.asyncOpID = r.nextAsyncOpID()
 	ar.gen.vm = r.vm
 	ar.promiseCap = r.newPromiseCapability(r.getPromise())
 	sp := r.vm.sp

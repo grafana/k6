@@ -1,11 +1,13 @@
 package jsexec
 
 import (
+	"bytes"
 	"context"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/google/pprof/profile"
 	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
@@ -67,4 +69,64 @@ s;
 	require.True(t, ok)
 	require.Equal(t, "p1", trace.ProfileID)
 	require.NotEmpty(t, trace.Data)
+}
+
+func TestManagerCapturesAsyncAllocationAndWaitLabels(t *testing.T) {
+	dir := t.TempDir()
+	m := NewManager(Config{
+		Enabled:          true,
+		CPUProfilePath:   filepath.Join(dir, "cpu_async.pprof"),
+		RuntimeTracePath: filepath.Join(dir, "run_async.trace"),
+		ProfileID:        "p-async",
+	})
+	require.NoError(t, m.Start())
+	Activate(m)
+	defer Deactivate(m)
+
+	rt := sobek.New()
+	InstallRuntimeAsyncContextTracker(rt, map[string]string{
+		"js.phase": "test.async",
+		"js.vu":    "1",
+	})
+	m.maybeStartRuntimeProfile(rt)
+
+	_, err := rt.RunString(`
+async function allocateAsync() {
+  let out = [];
+  for (let i = 0; i < 200; i++) {
+    await Promise.resolve(i);
+    out.push({ i, payload: "v-" + i, nested: { k: i % 3 } });
+  }
+  return out.length;
+}
+allocateAsync();
+`)
+	require.NoError(t, err)
+	time.Sleep(30 * time.Millisecond)
+	m.Stop()
+
+	cpu, ok := LatestArtifact("js-cpu")
+	require.True(t, ok)
+	require.NotEmpty(t, cpu.Data)
+
+	pr, err := profile.Parse(bytes.NewReader(cpu.Data))
+	require.NoError(t, err)
+
+	hasAllocObjects := false
+	hasAllocSpace := false
+	for _, st := range pr.SampleType {
+		if st.Type == "alloc_objects" {
+			hasAllocObjects = true
+		}
+		if st.Type == "alloc_space" {
+			hasAllocSpace = true
+		}
+	}
+	require.True(t, hasAllocObjects, "alloc_objects sample type missing")
+	require.True(t, hasAllocSpace, "alloc_space sample type missing")
+
+	trace, ok := LatestArtifact("js-trace")
+	require.True(t, ok)
+	require.NotEmpty(t, trace.Data)
+	require.Contains(t, string(trace.Data), "sobek.async.promise_reaction")
 }

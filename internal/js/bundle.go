@@ -357,6 +357,12 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*BundleInstance
 			"js.phase": "bundle.instantiate",
 			"js.vu":    fmt.Sprintf("%d", vuID),
 		}, func(ctx context.Context) {
+			if jsexec.Enabled() {
+				jsexec.UpdateRuntimeAsyncLabels(rt, map[string]string{
+					"js.phase": "bundle.instantiate",
+					"js.vu":    fmt.Sprintf("%d", vuID),
+				})
+			}
 			jsexec.WithRegion(ctx, "k6.js.bundle.instantiate", func() {
 				result, err = modSys.RunSourceData(b.sourceData)
 			})
@@ -424,6 +430,20 @@ func (b *Bundle) setupJSRuntime(rt *sobek.Runtime, vuID uint64, logger logrus.Fi
 	err = rt.Set("__VU", vuID)
 	if err != nil {
 		return err
+	}
+	if jsexec.Enabled() {
+		traceID, profileID := jsexec.CorrelationIDs()
+		baseLabels := map[string]string{
+			"js.phase": "bundle.instantiate",
+			"js.vu":    fmt.Sprintf("%d", vuID),
+		}
+		if traceID != "" {
+			baseLabels[jsexec.MetadataTraceIDKey] = traceID
+		}
+		if profileID != "" {
+			baseLabels[jsexec.MetadataProfileIDKey] = profileID
+		}
+		jsexec.InstallRuntimeAsyncContextTracker(rt, baseLabels)
 	}
 	err = rt.Set("console", newConsole(logger))
 	if err != nil {

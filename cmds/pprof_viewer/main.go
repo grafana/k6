@@ -24,6 +24,8 @@ type fileStats struct {
 	CPUNanos     int64
 	AllocObjects int64
 	AllocSpace   int64
+	AsyncWaitNS  int64
+	AsyncRunNS   int64
 }
 
 type lineStats map[int]fileStats
@@ -161,6 +163,21 @@ func sampleValue(sample *profile.Sample, idx int) int64 {
 	return sample.Value[idx]
 }
 
+func sampleLabelInt(sample *profile.Sample, key string) int64 {
+	if sample == nil || sample.Label == nil {
+		return 0
+	}
+	vals := sample.Label[key]
+	if len(vals) == 0 {
+		return 0
+	}
+	v, err := strconv.ParseInt(vals[0], 10, 64)
+	if err != nil {
+		return 0
+	}
+	return v
+}
+
 func aggregate(p *profile.Profile) (map[string]fileStats, map[string]lineStats) {
 	idx := sampleTypeIndex(p)
 	perFile := make(map[string]fileStats)
@@ -186,6 +203,8 @@ func aggregate(p *profile.Profile) (map[string]fileStats, map[string]lineStats) 
 		fs.CPUNanos += sampleValue(s, idx["cpu"])
 		fs.AllocObjects += sampleValue(s, idx["alloc_objects"])
 		fs.AllocSpace += sampleValue(s, idx["alloc_space"])
+		fs.AsyncWaitNS += sampleLabelInt(s, "js.async.wait_ns")
+		fs.AsyncRunNS += sampleLabelInt(s, "js.async.run_ns")
 		perFile[file] = fs
 
 		ls := perLine[file]
@@ -198,6 +217,8 @@ func aggregate(p *profile.Profile) (map[string]fileStats, map[string]lineStats) 
 		v.CPUNanos += sampleValue(s, idx["cpu"])
 		v.AllocObjects += sampleValue(s, idx["alloc_objects"])
 		v.AllocSpace += sampleValue(s, idx["alloc_space"])
+		v.AsyncWaitNS += sampleLabelInt(s, "js.async.wait_ns")
+		v.AsyncRunNS += sampleLabelInt(s, "js.async.run_ns")
 		ls[line] = v
 	}
 	return perFile, perLine
@@ -457,10 +478,12 @@ func (m viewerModel) View() string {
 		sf := m.fileOrder[m.selected]
 		sv := m.st.perFile[sf]
 		selectedInfo = fmt.Sprintf(
-			"selected: cpu=%s mem=%s obj=%s smp=%d",
+			"selected: cpu=%s mem=%s obj=%s wait=%s run=%s smp=%d",
 			fmtDurationNS(sv.CPUNanos),
 			fmtBytes(sv.AllocSpace),
 			strconv.FormatInt(sv.AllocObjects, 10),
+			fmtDurationNS(sv.AsyncWaitNS),
+			fmtDurationNS(sv.AsyncRunNS),
 			sv.Samples,
 		)
 	}
@@ -502,7 +525,7 @@ func (m viewerModel) renderLeft(width, height int) string {
 		title = "> Files"
 	}
 	b.WriteString(title + "\n")
-	b.WriteString(fmt.Sprintf("%-4s %-10s %-10s %-10s %-8s %s\n", "#", "cpu", "mem", "objs", "smp", "file"))
+	b.WriteString(fmt.Sprintf("%-4s %-9s %-9s %-9s %-9s %-9s %-7s %s\n", "#", "cpu", "mem", "objs", "wait", "run", "smp", "file"))
 	start := 0
 	if m.selected >= height-2 {
 		start = m.selected - (height - 3)
@@ -519,16 +542,20 @@ func (m viewerModel) renderLeft(width, height int) string {
 		if idx == m.selected {
 			prefix = ">"
 		}
-		cpuText := fmt.Sprintf("%-10s", fmtDurationNS(v.CPUNanos))
-		memText := fmt.Sprintf("%-10s", fmtBytes(v.AllocSpace))
-		objText := fmt.Sprintf("%-10d", v.AllocObjects)
-		smpText := fmt.Sprintf("%-8d", v.Samples)
+		cpuText := fmt.Sprintf("%-9s", fmtDurationNS(v.CPUNanos))
+		memText := fmt.Sprintf("%-9s", fmtBytes(v.AllocSpace))
+		objText := fmt.Sprintf("%-9d", v.AllocObjects)
+		waitText := fmt.Sprintf("%-9s", fmtDurationNS(v.AsyncWaitNS))
+		runText := fmt.Sprintf("%-9s", fmtDurationNS(v.AsyncRunNS))
+		smpText := fmt.Sprintf("%-7d", v.Samples)
 		line := fmt.Sprintf(
-			"%s%-3d %s %s %s %s %s",
+			"%s%-3d %s %s %s %s %s %s %s",
 			prefix, idx+1,
 			colorCPU(m.st.color, v.CPUNanos, cpuText),
 			colorMem(m.st.color, v.AllocSpace, memText),
 			colorObj(m.st.color, v.AllocObjects, objText),
+			waitText,
+			runText,
 			smpText,
 			f,
 		)
@@ -569,9 +596,11 @@ func (m viewerModel) renderRight(width, height int) string {
 		cpuText := colorCPU(m.st.color, stat.CPUNanos, fmt.Sprintf("%8s", fmtDurationNS(stat.CPUNanos)))
 		memText := colorMem(m.st.color, stat.AllocSpace, fmt.Sprintf("%8s", fmtBytes(stat.AllocSpace)))
 		objText := colorObj(m.st.color, stat.AllocObjects, fmt.Sprintf("%6d", stat.AllocObjects))
+		waitText := fmt.Sprintf("%8s", fmtDurationNS(stat.AsyncWaitNS))
+		runText := fmt.Sprintf("%8s", fmtDurationNS(stat.AsyncRunNS))
 		rendered := fmt.Sprintf(
-			"%s %4d | %s %s %s | %s",
-			marker, lineNo, cpuText, memText, objText, highlightLineJS(line, m.st.color),
+			"%s %4d | %s %s %s %s %s | %s",
+			marker, lineNo, cpuText, memText, objText, waitText, runText, highlightLineJS(line, m.st.color),
 		)
 		b.WriteString(truncate(rendered, width) + "\n")
 	}

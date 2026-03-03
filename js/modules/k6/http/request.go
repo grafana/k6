@@ -15,6 +15,7 @@ import (
 	"github.com/grafana/sobek"
 	"gopkg.in/guregu/null.v3"
 
+	"go.k6.io/k6/internal/observability/jsexec"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib/netext/httpext"
 	"go.k6.io/k6/lib/types"
@@ -170,6 +171,13 @@ func (c *Client) parseRequest(
 		Cookies:          make(map[string]*httpext.HTTPRequestCookie),
 		ResponseCallback: c.responseCallback,
 		TagsAndMeta:      c.moduleInstance.vu.State().Tags.GetCurrentValues(),
+	}
+	traceID, profileID := jsexec.CorrelationIDs()
+	if traceID != "" {
+		result.TagsAndMeta.SetMetadata(jsexec.MetadataTraceIDKey, traceID)
+	}
+	if profileID != "" {
+		result.TagsAndMeta.SetMetadata(jsexec.MetadataProfileIDKey, profileID)
 	}
 
 	if state.Options.DiscardResponseBodies.Bool {

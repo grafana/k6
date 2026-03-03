@@ -410,7 +410,7 @@ func (r *Runner) HandleSummary(
 	wrapperArgs := prepareHandleWrapperArgs(
 		vu, noColor, enableColors, newMachineReadableSummary, callbackResult, handleSummaryData, summaryData,
 	)
-	rawResult, _, _, err := vu.runFn(summaryCtx, false, handleSummaryWrapper, nil, wrapperArgs...)
+	rawResult, _, _, err := vu.runFn(summaryCtx, false, "handleSummary", handleSummaryWrapper, nil, wrapperArgs...)
 
 	if deadlineError := r.checkDeadline(summaryCtx, consts.HandleSummaryFn, rawResult, err); deadlineError != nil {
 		return nil, deadlineError
@@ -482,7 +482,7 @@ func runUserProvidedHandleSummaryCallback(
 		return nil, fmt.Errorf("exported identifier %s must be a function", consts.HandleSummaryFn)
 	}
 
-	callbackResult, _, _, err := vu.runFn(summaryCtx, false, handleSummaryFn, nil, handleSummaryData)
+	callbackResult, _, _, err := vu.runFn(summaryCtx, false, "handleSummary", handleSummaryFn, nil, handleSummaryData)
 	if err != nil {
 		errText, fields := errext.Format(err)
 		vu.Runner.preInitState.Logger.WithFields(fields).Error(errText)
@@ -657,7 +657,7 @@ func (r *Runner) runPart(
 			tagsAndMeta.SetSystemTagOrMeta(metrics.TagGroup, groupPath)
 		})
 	}
-	v, _, _, err := vu.runFn(ctx, false, fn, nil, vu.Runtime.ToValue(arg))
+	v, _, _, err := vu.runFn(ctx, false, name, fn, nil, vu.Runtime.ToValue(arg))
 
 	if deadlineError := r.checkDeadline(ctx, name, v, err); deadlineError != nil {
 		return nil, deadlineError
@@ -869,7 +869,7 @@ func (u *ActiveVU) RunOnce() error {
 	u.emitAndWaitEvent(&event.Event{Type: event.IterStart, Data: eventIterData})
 
 	// Call the exported function.
-	_, isFullIteration, totalTime, err := u.runFn(ctx, true, fn, cancel, u.setupData)
+	_, isFullIteration, totalTime, err := u.runFn(ctx, true, "iteration", fn, cancel, u.setupData)
 	if err != nil {
 		var x *sobek.InterruptedError
 		if errors.As(err, &x) {
@@ -914,7 +914,7 @@ func (u *VU) getExported(name string) sobek.Value {
 // if isDefault is true, cancel also needs to be provided and it should cancel the provided context
 // TODO remove the need for the above through refactoring of this function and its callees
 func (u *VU) runFn(
-	ctx context.Context, isDefault bool, fn sobek.Callable, cancel func(), args ...sobek.Value,
+	ctx context.Context, isDefault bool, phase string, fn sobek.Callable, cancel func(), args ...sobek.Value,
 ) (v sobek.Value, isFullIteration bool, t time.Duration, err error) {
 	if !u.Runner.Bundle.Options.NoCookiesReset.ValueOrZero() {
 		u.state.CookieJar, err = cookiejar.New(nil)
@@ -937,14 +937,27 @@ func (u *VU) runFn(
 		u.moduleVUImpl.eventLoop = eventloop.New(u.moduleVUImpl)
 	}
 	jsexec.MaybeStartRuntimeProfile(u.Runtime)
+	if phase == "" {
+		phase = "iteration"
+	}
+	traceID, profileID := jsexec.CorrelationIDs()
 	jsLabels := map[string]string{
-		"js.phase": "iteration",
+		"js.phase": phase,
 		"js.vu":    strconv.FormatUint(u.ID, 10),
 	}
+	if traceID != "" {
+		jsLabels[jsexec.MetadataTraceIDKey] = traceID
+	}
+	if profileID != "" {
+		jsLabels[jsexec.MetadataProfileIDKey] = profileID
+	}
+	jsexec.UpdateRuntimeAsyncLabels(u.Runtime, jsLabels)
 	err = u.moduleVUImpl.eventLoop.Start(func() (err error) {
-		jsexec.DoWithLabels(ctx, jsLabels, func(ctx context.Context) {
-			jsexec.WithRegion(ctx, "k6.js.runFn", func() {
-				v, err = fn(sobek.Undefined(), args...) // Actually run the JS script
+		jsexec.WithTask(ctx, "k6.js."+phase, func(taskCtx context.Context) {
+			jsexec.DoWithLabels(taskCtx, jsLabels, func(runCtx context.Context) {
+				jsexec.WithRegion(runCtx, "k6.js.runFn."+phase, func() {
+					v, err = fn(sobek.Undefined(), args...) // Actually run the JS script
+				})
 			})
 		})
 		return err
