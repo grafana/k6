@@ -43,14 +43,12 @@ func TestExternallyControlledRun(t *testing.T) {
 		errCh  = make(chan error, 1)
 		doneCh = make(chan struct{})
 	)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		test.state.MarkStarted()
 		errCh <- test.executor.Run(test.ctx, nil)
 		test.state.MarkEnded()
 		close(doneCh)
-	}()
+	})
 
 	updateConfig := func(vus, maxVUs int64, errMsg string) {
 		newConfig := ExternallyControlledConfigParams{
@@ -72,9 +70,7 @@ func TestExternallyControlledRun(t *testing.T) {
 			[]int64{test.state.GetCurrentlyActiveVUsCount(), test.state.GetInitializedVUsCount()})
 	}
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		snapshotTicker := time.NewTicker(500 * time.Millisecond)
 		ticks := 0
 		for {
@@ -100,7 +96,7 @@ func TestExternallyControlledRun(t *testing.T) {
 				return
 			}
 		}
-	}()
+	})
 
 	wg.Wait()
 	require.NoError(t, <-errCh)

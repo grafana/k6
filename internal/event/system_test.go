@@ -147,12 +147,10 @@ func TestEventSystem(t *testing.T) {
 		)
 		for range numSubs {
 			sid, evtCh := es.Subscribe(Exit)
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				_, err := processEvents(ctx, es, sid, evtCh)
 				require.NoError(t, err)
-			}()
+			})
 		}
 
 		var done uint32
@@ -187,12 +185,10 @@ func TestEventSystem(t *testing.T) {
 		)
 		for range numSubs {
 			sid, evtCh := es.Subscribe(Exit)
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				_, err := processEvents(ctx, es, sid, evtCh)
 				require.NoError(t, err)
-			}()
+			})
 		}
 
 		var done uint32
@@ -218,12 +214,10 @@ func TestEventSystem(t *testing.T) {
 
 		sid, evtCh := es.Subscribe(Exit)
 		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			_, err := processEvents(ctx, es, sid, evtCh)
 			assert.NoError(t, err)
-		}()
+		})
 
 		wait := es.Emit(&Event{Type: Exit, Done: func() {
 			time.Sleep(200 * time.Millisecond)
