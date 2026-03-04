@@ -2,6 +2,7 @@ package cloudapi
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -22,7 +23,7 @@ const (
 type Client struct {
 	apiClient *k6cloud.APIClient
 	token     string
-	stackID   int64
+	stackID   int32
 	baseURL   string
 
 	logger logrus.FieldLogger
@@ -62,8 +63,13 @@ func NewClient(logger logrus.FieldLogger, token, host, version string, timeout t
 }
 
 // SetStackID sets the stack ID for the client.
-func (c *Client) SetStackID(stackID int64) {
-	c.stackID = stackID
+func (c *Client) SetStackID(stackID int64) error {
+	stackID32, err := toInt32(stackID)
+	if err != nil {
+		return fmt.Errorf("invalid stack ID: %w", err)
+	}
+	c.stackID = stackID32
+	return nil
 }
 
 // BaseURL returns configured host.
@@ -74,7 +80,14 @@ func (c *Client) BaseURL() string {
 // CheckResponse checks the parsed response.
 // It returns nil if the code is in the successful range,
 // otherwise it tries to parse the body and return a parsed error.
-func CheckResponse(r *http.Response) error {
+func CheckResponse(r *http.Response, err error) error {
+	if err != nil {
+		var cloudErr *k6cloud.GenericOpenAPIError
+		if !errors.As(err, &cloudErr) {
+			return err
+		}
+	}
+
 	if r == nil {
 		return errUnknown
 	}
@@ -105,4 +118,24 @@ func CheckResponse(r *http.Response) error {
 	}
 	payload.Response = r
 	return payload
+}
+
+// closeResponse is a helper that ensures the response body is properly closed.
+// It should be called with defer immediately after receiving a response.
+func closeResponse(r *http.Response, errPtr *error) {
+	if r == nil {
+		return
+	}
+	_, _ = io.Copy(io.Discard, r.Body)
+	if cerr := r.Body.Close(); cerr != nil && *errPtr == nil {
+		*errPtr = cerr
+	}
+}
+
+// toInt32 safely converts an int64 to int32, returning an error if overflow would occur.
+func toInt32(val int64) (int32, error) {
+	if val < -2147483648 || val > 2147483647 {
+		return 0, fmt.Errorf("value %d overflows int32", val)
+	}
+	return int32(val), nil
 }
