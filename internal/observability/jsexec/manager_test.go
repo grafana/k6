@@ -16,6 +16,8 @@ import (
 )
 
 func TestConfigFromRuntimeOptions(t *testing.T) {
+	t.Parallel()
+
 	opts := lib.RuntimeOptions{
 		JSProfilingEnabled:          null.BoolFrom(true),
 		JSCPUProfileOutput:          null.StringFrom("cpu.pprof"),
@@ -36,6 +38,8 @@ func TestConfigFromRuntimeOptions(t *testing.T) {
 }
 
 func TestHumanizeBytes(t *testing.T) {
+	t.Parallel()
+
 	require.Equal(t, "0B", humanizeBytes(0))
 	require.Equal(t, "999B", humanizeBytes(999))
 	require.Equal(t, "1.0KB", humanizeBytes(1000))
@@ -44,6 +48,7 @@ func TestHumanizeBytes(t *testing.T) {
 	require.Equal(t, "2.3GB", humanizeBytes(2300*1000*1000))
 }
 
+//nolint:paralleltest // CPU/memory attribution uses shared process-level signals and cannot be isolated per parallel test.
 func TestManagerStartStopStoresArtifacts(t *testing.T) {
 	dir := t.TempDir()
 	m := NewManager(Config{
@@ -85,6 +90,7 @@ s;
 	require.NotEmpty(t, trace.Data)
 }
 
+//nolint:paralleltest // CPU/memory attribution uses shared process-level signals and cannot be isolated per parallel test.
 func TestManagerCapturesAsyncAllocationAndWaitLabels(t *testing.T) {
 	dir := t.TempDir()
 	m := NewManager(Config{
@@ -163,6 +169,7 @@ allocateAsync();
 	require.Contains(t, string(trace.Data), "sobek.async.promise_reaction")
 }
 
+//nolint:paralleltest // CPU/memory attribution uses shared process-level signals and cannot be isolated per parallel test.
 func TestManagerScopesInitVUCombined(t *testing.T) {
 	dir := t.TempDir()
 	m := NewManager(Config{
@@ -173,6 +180,8 @@ func TestManagerScopesInitVUCombined(t *testing.T) {
 		ProfileID:        "p-scope",
 	})
 	require.NoError(t, m.Start())
+	Activate(m)
+	defer Deactivate(m)
 	rtInit := sobek.New()
 	rtVU := sobek.New()
 	m.maybeStartRuntimeProfile(rtInit, ScopeInit)

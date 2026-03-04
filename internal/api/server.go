@@ -3,6 +3,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"expvar"
@@ -97,9 +98,14 @@ func listJSArtifactsAvailability() map[string]bool {
 }
 
 func writeJSON(rw http.ResponseWriter, status int, v any) {
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(v); err != nil {
+		http.Error(rw, "failed to serialize response", http.StatusInternalServerError)
+		return
+	}
 	rw.Header().Set("Content-Type", "application/json")
 	rw.WriteHeader(status)
-	_ = json.NewEncoder(rw).Encode(v)
+	_, _ = rw.Write(buf.Bytes())
 }
 
 func injectProfilerHandler(mux *http.ServeMux, profilingEnabled bool) {

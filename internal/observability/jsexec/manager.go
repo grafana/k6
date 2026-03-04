@@ -5,24 +5,26 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"runtime/pprof"
 	rtrace "runtime/trace"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/google/pprof/profile"
 	"github.com/grafana/sobek"
 
 	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/fsext"
 )
 
 const (
-	// Metadata keys that can be propagated to outputs for correlation.
-	MetadataTraceIDKey   = "js_trace_id"
+	// MetadataTraceIDKey is the output metadata key for JS trace correlation.
+	MetadataTraceIDKey = "js_trace_id"
+	// MetadataProfileIDKey is the output metadata key for JS profile correlation.
 	MetadataProfileIDKey = "js_profile_id"
 )
 
@@ -39,11 +41,15 @@ type Config struct {
 	Logf                      func(format string, args ...any)
 }
 
+// ProfileScope controls where JS profiling is captured.
 type ProfileScope string
 
 const (
-	ScopeInit     ProfileScope = "init"
-	ScopeVU       ProfileScope = "vu"
+	// ScopeInit captures only init-context runtime execution.
+	ScopeInit ProfileScope = "init"
+	// ScopeVU captures only VU runtime execution.
+	ScopeVU ProfileScope = "vu"
+	// ScopeCombined captures both init and VU runtime execution.
 	ScopeCombined ProfileScope = "combined"
 )
 
@@ -110,27 +116,6 @@ type Artifact struct {
 	Data      []byte
 }
 
-var artifactStore = struct {
-	mu   sync.RWMutex
-	data map[string]Artifact
-}{
-	data: make(map[string]Artifact),
-}
-
-// LatestArtifact returns the latest stored artifact by name.
-func LatestArtifact(name string) (Artifact, bool) {
-	artifactStore.mu.RLock()
-	defer artifactStore.mu.RUnlock()
-	v, ok := artifactStore.data[name]
-	return v, ok
-}
-
-func putArtifact(a Artifact) {
-	artifactStore.mu.Lock()
-	artifactStore.data[a.Name] = a
-	artifactStore.mu.Unlock()
-}
-
 // Manager controls JS observability captures for a test run.
 type Manager struct {
 	cfg Config
@@ -138,9 +123,16 @@ type Manager struct {
 	traceBuf bytes.Buffer
 
 	cpuOutputPath string
-	traceFile     *os.File
+	traceFile     io.WriteCloser
+	fs            fsext.Fs
 	cpuMu         sync.Mutex
 	captures      map[*sobek.Runtime]*runtimeCapture
+
+	artifactMu sync.RWMutex
+	artifacts  map[string]Artifact
+
+	asyncTrackersMu sync.RWMutex
+	asyncTrackers   map[*sobek.Runtime]*sobekAsyncContextTracker
 
 	cpuEnabled   bool
 	traceEnabled bool
@@ -150,6 +142,7 @@ type Manager struct {
 	stopOnce     sync.Once
 }
 
+// FirstRunnerMemMilestone represents one recorded first-runner memory threshold.
 type FirstRunnerMemMilestone struct {
 	ThresholdBytes uint64 `json:"threshold_bytes"`
 	HeapAllocBytes uint64 `json:"heap_alloc_bytes"`
@@ -158,12 +151,14 @@ type FirstRunnerMemMilestone struct {
 	TopAllocSpace  int64  `json:"top_alloc_space_bytes,omitempty"`
 }
 
+// FirstRunnerMemTopLine represents one top JS line by attributed alloc_space.
 type FirstRunnerMemTopLine struct {
 	File       string `json:"file"`
 	Line       int    `json:"line"`
 	AllocSpace int64  `json:"alloc_space_bytes"`
 }
 
+// FirstRunnerMemReport is a structured view of first-runner memory sampling.
 type FirstRunnerMemReport struct {
 	Enabled     bool                      `json:"enabled"`
 	MaxBytes    int64                     `json:"max_bytes"`
@@ -185,7 +180,12 @@ func NewManager(cfg Config) *Manager {
 	if cfg.FirstRunnerMemStepPercent <= 0 {
 		cfg.FirstRunnerMemStepPercent = 5
 	}
-	return &Manager{cfg: cfg}
+	return &Manager{
+		cfg:           cfg,
+		fs:            fsext.NewOsFs(),
+		artifacts:     make(map[string]Artifact),
+		asyncTrackers: make(map[*sobek.Runtime]*sobekAsyncContextTracker),
+	}
 }
 
 func parseSizeWithSuffix(v string) (int64, error) {
@@ -224,12 +224,12 @@ func parseSizeWithSuffix(v string) (int64, error) {
 	return base * mult, nil
 }
 
-func ensureParentDir(path string) error {
+func ensureParentDir(fs fsext.Fs, path string) error {
 	parent := filepath.Dir(path)
 	if parent == "." || parent == "" {
 		return nil
 	}
-	return os.MkdirAll(parent, 0o755)
+	return fs.MkdirAll(parent, 0o750)
 }
 
 // Start activates enabled captures.
@@ -245,7 +245,8 @@ func (m *Manager) Start() error {
 		tracePath = "k6-js-exec.trace"
 	}
 	if cpuPath != "" {
-		if err := ensureParentDir(cpuPath); err != nil {
+		cpuPath = normalizeOutputPath(cpuPath)
+		if err := ensureParentDir(m.fs, cpuPath); err != nil {
 			return err
 		}
 		m.cpuOutputPath = cpuPath
@@ -253,10 +254,11 @@ func (m *Manager) Start() error {
 		m.cpuEnabled = true
 	}
 	if tracePath != "" {
-		if err := ensureParentDir(tracePath); err != nil {
+		tracePath = normalizeOutputPath(tracePath)
+		if err := ensureParentDir(m.fs, tracePath); err != nil {
 			return err
 		}
-		f, err := os.Create(tracePath)
+		f, err := m.fs.OpenFile(tracePath, syscall.O_WRONLY|syscall.O_CREAT|syscall.O_TRUNC, 0o600)
 		if err != nil {
 			return err
 		}
@@ -296,7 +298,7 @@ func (m *Manager) Stop() {
 		now := time.Now().UTC()
 		scopeData := m.buildScopedCPUArtifacts(captures)
 		if data := scopeData[ScopeInit]; len(data) > 0 {
-			putArtifact(Artifact{
+			m.putArtifact(Artifact{
 				Name:      "js-cpu-init",
 				ProfileID: m.cfg.ProfileID,
 				CreatedAt: now,
@@ -304,7 +306,7 @@ func (m *Manager) Stop() {
 			})
 		}
 		if data := scopeData[ScopeVU]; len(data) > 0 {
-			putArtifact(Artifact{
+			m.putArtifact(Artifact{
 				Name:      "js-cpu-vu",
 				ProfileID: m.cfg.ProfileID,
 				CreatedAt: now,
@@ -312,7 +314,7 @@ func (m *Manager) Stop() {
 			})
 		}
 		if data := scopeData[ScopeCombined]; len(data) > 0 {
-			putArtifact(Artifact{
+			m.putArtifact(Artifact{
 				Name:      "js-cpu-combined",
 				ProfileID: m.cfg.ProfileID,
 				CreatedAt: now,
@@ -320,7 +322,7 @@ func (m *Manager) Stop() {
 			})
 		}
 		if data := scopeData[m.cfg.Scope]; len(data) > 0 {
-			putArtifact(Artifact{
+			m.putArtifact(Artifact{
 				Name:      "js-cpu",
 				ProfileID: m.cfg.ProfileID,
 				CreatedAt: now,
@@ -329,7 +331,7 @@ func (m *Manager) Stop() {
 		}
 		m.writeCPUArtifacts(scopeData)
 		if m.traceBuf.Len() > 0 {
-			putArtifact(Artifact{
+			m.putArtifact(Artifact{
 				Name:      "js-trace",
 				ProfileID: m.cfg.ProfileID,
 				CreatedAt: now,
@@ -338,6 +340,10 @@ func (m *Manager) Stop() {
 		}
 		m.reportFirstRunnerMemSampling()
 	})
+}
+
+func normalizeOutputPath(path string) string {
+	return filepath.Clean(strings.TrimSpace(path))
 }
 
 func (m *Manager) maybeStartRuntimeProfile(rt *sobek.Runtime, scope ProfileScope) {
@@ -373,6 +379,7 @@ func (m *Manager) isEnabled() bool {
 	return m.cfg.Enabled
 }
 
+// SetEnabled toggles runtime JS profiling behavior for this manager.
 func (m *Manager) SetEnabled(enabled bool) {
 	m.mu.Lock()
 	old := m.cfg.Enabled
@@ -403,6 +410,7 @@ func (m *Manager) SetEnabled(enabled bool) {
 	m.firstSampler = nil
 }
 
+// FirstRunnerMemReport returns first-runner memory milestone and top-line data.
 func (m *Manager) FirstRunnerMemReport() FirstRunnerMemReport {
 	out := FirstRunnerMemReport{
 		MaxBytes:    m.cfg.FirstRunnerMemMaxBytes,
@@ -414,20 +422,10 @@ func (m *Manager) FirstRunnerMemReport() FirstRunnerMemReport {
 	}
 
 	for _, ms := range m.firstSampler.snapshotMilestones() {
-		out.Milestones = append(out.Milestones, FirstRunnerMemMilestone{
-			ThresholdBytes: ms.ThresholdBytes,
-			HeapAllocBytes: ms.HeapAllocBytes,
-			TopFile:        ms.TopFile,
-			TopLine:        ms.TopLine,
-			TopAllocSpace:  ms.TopAllocSpace,
-		})
+		out.Milestones = append(out.Milestones, FirstRunnerMemMilestone(ms))
 	}
 	for _, st := range m.firstSampler.topN(5) {
-		out.TopLines = append(out.TopLines, FirstRunnerMemTopLine{
-			File:       st.File,
-			Line:       st.Line,
-			AllocSpace: st.AllocSpace,
-		})
+		out.TopLines = append(out.TopLines, FirstRunnerMemTopLine(st))
 	}
 	return out
 }
@@ -457,7 +455,7 @@ func (m *Manager) reportFirstRunnerMemSampling() {
 			humanizeBytes(mark.HeapAllocBytes),
 			mark.TopFile,
 			mark.TopLine,
-			humanizeBytes(uint64(mark.TopAllocSpace)),
+			humanizeBytesFromInt64(mark.TopAllocSpace),
 		)
 	}
 
@@ -468,9 +466,16 @@ func (m *Manager) reportFirstRunnerMemSampling() {
 			i+1,
 			st.File,
 			st.Line,
-			humanizeBytes(uint64(st.AllocSpace)),
+			humanizeBytesFromInt64(st.AllocSpace),
 		)
 	}
+}
+
+func humanizeBytesFromInt64(v int64) string {
+	if v <= 0 {
+		return "0B"
+	}
+	return humanizeBytes(uint64(v))
 }
 
 func humanizeBytes(v uint64) string {
@@ -558,17 +563,30 @@ func (m *Manager) writeCPUArtifacts(scopeData map[ProfileScope][]byte) {
 	}
 	// Default output path corresponds to configured scope.
 	if data := scopeData[m.cfg.Scope]; len(data) > 0 {
-		_ = os.WriteFile(m.cpuOutputPath, data, 0o644)
+		_ = fsext.WriteFile(m.fs, m.cpuOutputPath, data, 0o600)
 	}
 	// In combined mode, also emit per-scope side files.
 	if m.cfg.Scope == ScopeCombined {
 		if data := scopeData[ScopeInit]; len(data) > 0 {
-			_ = os.WriteFile(scopePath(m.cpuOutputPath, ScopeInit), data, 0o644)
+			_ = fsext.WriteFile(m.fs, scopePath(m.cpuOutputPath, ScopeInit), data, 0o600)
 		}
 		if data := scopeData[ScopeVU]; len(data) > 0 {
-			_ = os.WriteFile(scopePath(m.cpuOutputPath, ScopeVU), data, 0o644)
+			_ = fsext.WriteFile(m.fs, scopePath(m.cpuOutputPath, ScopeVU), data, 0o600)
 		}
 	}
+}
+
+func (m *Manager) putArtifact(a Artifact) {
+	m.artifactMu.Lock()
+	m.artifacts[a.Name] = a
+	m.artifactMu.Unlock()
+}
+
+func (m *Manager) latestArtifact(name string) (Artifact, bool) {
+	m.artifactMu.RLock()
+	defer m.artifactMu.RUnlock()
+	v, ok := m.artifacts[name]
+	return v, ok
 }
 
 // ProfileID returns correlation id for current run.
@@ -613,6 +631,7 @@ func WithTask(ctx context.Context, taskName string, fn func(context.Context)) {
 	fn(taskCtx)
 }
 
+//nolint:gochecknoglobals // Runtime hook sites need shared access to the currently active manager.
 var active = struct {
 	mu sync.RWMutex
 	m  *Manager
@@ -636,9 +655,7 @@ func Deactivate(m *Manager) {
 
 // MaybeStartRuntimeProfile lazily starts runtime-local sobek profiling for a scope.
 func MaybeStartRuntimeProfile(rt *sobek.Runtime, scope ProfileScope) {
-	active.mu.RLock()
-	m := active.m
-	active.mu.RUnlock()
+	m := activeManager()
 	if m == nil {
 		return
 	}
@@ -647,9 +664,7 @@ func MaybeStartRuntimeProfile(rt *sobek.Runtime, scope ProfileScope) {
 
 // CorrelationIDs returns currently active observability IDs.
 func CorrelationIDs() (traceID, profileID string) {
-	active.mu.RLock()
-	m := active.m
-	active.mu.RUnlock()
+	m := activeManager()
 	if m == nil {
 		return "", ""
 	}
@@ -659,17 +674,13 @@ func CorrelationIDs() (traceID, profileID string) {
 
 // Enabled reports whether JS observability manager is active and enabled.
 func Enabled() bool {
-	active.mu.RLock()
-	m := active.m
-	active.mu.RUnlock()
+	m := activeManager()
 	return m != nil && m.isEnabled()
 }
 
 // SetProfilingEnabled toggles JS profiling at runtime.
 func SetProfilingEnabled(enabled bool) bool {
-	active.mu.RLock()
-	m := active.m
-	active.mu.RUnlock()
+	m := activeManager()
 	if m == nil {
 		return false
 	}
@@ -679,11 +690,25 @@ func SetProfilingEnabled(enabled bool) bool {
 
 // FirstRunnerMemoryReport returns structured first-runner memory diagnostics.
 func FirstRunnerMemoryReport() FirstRunnerMemReport {
-	active.mu.RLock()
-	m := active.m
-	active.mu.RUnlock()
+	m := activeManager()
 	if m == nil {
 		return FirstRunnerMemReport{}
 	}
 	return m.FirstRunnerMemReport()
+}
+
+// LatestArtifact returns the latest stored artifact by name.
+func LatestArtifact(name string) (Artifact, bool) {
+	m := activeManager()
+	if m == nil {
+		return Artifact{}, false
+	}
+	return m.latestArtifact(name)
+}
+
+func activeManager() *Manager {
+	active.mu.RLock()
+	m := active.m
+	active.mu.RUnlock()
+	return m
 }
