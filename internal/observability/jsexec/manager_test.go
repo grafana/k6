@@ -35,6 +35,15 @@ func TestConfigFromRuntimeOptions(t *testing.T) {
 	require.EqualValues(t, 5, cfg.FirstRunnerMemStepPercent)
 }
 
+func TestHumanizeBytes(t *testing.T) {
+	require.Equal(t, "0B", humanizeBytes(0))
+	require.Equal(t, "999B", humanizeBytes(999))
+	require.Equal(t, "1.0KB", humanizeBytes(1000))
+	require.Equal(t, "1.5KB", humanizeBytes(1500))
+	require.Equal(t, "1.0MB", humanizeBytes(1000*1000))
+	require.Equal(t, "2.3GB", humanizeBytes(2300*1000*1000))
+}
+
 func TestManagerStartStopStoresArtifacts(t *testing.T) {
 	dir := t.TempDir()
 	m := NewManager(Config{

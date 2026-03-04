@@ -358,32 +358,57 @@ func (m *Manager) reportFirstRunnerMemSampling() {
 	for _, mark := range ms {
 		if mark.TopFile == "" {
 			logf(
-				"js first-runner mem milestone: threshold=%d heap=%d no-js-line-yet",
-				mark.ThresholdBytes,
-				mark.HeapAllocBytes,
+				"js first-runner mem milestone: threshold=%s heap=%s no-js-line-yet",
+				humanizeBytes(mark.ThresholdBytes),
+				humanizeBytes(mark.HeapAllocBytes),
 			)
 			continue
 		}
 		logf(
-			"js first-runner mem milestone: threshold=%d heap=%d top=%s:%d alloc_space=%d",
-			mark.ThresholdBytes,
-			mark.HeapAllocBytes,
+			"js first-runner mem milestone: threshold=%s heap=%s top=%s:%d alloc_space=%s",
+			humanizeBytes(mark.ThresholdBytes),
+			humanizeBytes(mark.HeapAllocBytes),
 			mark.TopFile,
 			mark.TopLine,
-			mark.TopAllocSpace,
+			humanizeBytes(uint64(mark.TopAllocSpace)),
 		)
 	}
 
 	top := m.firstSampler.topN(5)
 	for i, st := range top {
 		logf(
-			"js first-runner top alloc #%d: %s:%d alloc_space=%d",
+			"js first-runner top alloc #%d: %s:%d alloc_space=%s",
 			i+1,
 			st.File,
 			st.Line,
-			st.AllocSpace,
+			humanizeBytes(uint64(st.AllocSpace)),
 		)
 	}
+}
+
+func humanizeBytes(v uint64) string {
+	const unit = 1000
+	if v < unit {
+		return fmt.Sprintf("%dB", v)
+	}
+	type suffixDef struct {
+		suffix string
+		pow    uint64
+	}
+	suffixes := []suffixDef{
+		{suffix: "TB", pow: unit * unit * unit * unit},
+		{suffix: "GB", pow: unit * unit * unit},
+		{suffix: "MB", pow: unit * unit},
+		{suffix: "KB", pow: unit},
+	}
+	for _, s := range suffixes {
+		if v >= s.pow {
+			whole := v / s.pow
+			frac := (v % s.pow) * 10 / s.pow
+			return fmt.Sprintf("%d.%d%s", whole, frac, s.suffix)
+		}
+	}
+	return fmt.Sprintf("%dB", v)
 }
 
 func mergeProfiles(src []*profile.Profile) []byte {
