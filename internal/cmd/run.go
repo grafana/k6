@@ -108,7 +108,9 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	if err != nil {
 		return err
 	}
-	jsObsManager := jsexec.NewManager(jsexec.ConfigFromRuntimeOptions(runtimeOpts))
+	jsObsCfg := jsexec.ConfigFromRuntimeOptions(runtimeOpts)
+	jsObsCfg.Logf = logger.Infof
+	jsObsManager := jsexec.NewManager(jsObsCfg)
 	if err = jsObsManager.Start(); err != nil {
 		return err
 	}

@@ -28,7 +28,16 @@ type runtimeProfiler struct {
 	p profiler
 	w io.Writer
 
-	enabled int32
+	enabled  int32
+	observer func(ProfileSample)
+}
+
+type ProfileSample struct {
+	Time         time.Time
+	HeapAlloc    uint64
+	AllocObjects int64
+	AllocSpace   int64
+	TopFrame     StackFrame
 }
 
 type profTracker struct {
@@ -359,4 +368,10 @@ func (r *Runtime) StopProfile() {
 		_ = pr.Write(r.profiler.w)
 	}
 	r.profiler.w = nil
+}
+
+// SetProfileSampleObserver installs an optional callback invoked on each runtime sample.
+// Passing nil disables callbacks.
+func (r *Runtime) SetProfileSampleObserver(fn func(ProfileSample)) {
+	r.profiler.observer = fn
 }

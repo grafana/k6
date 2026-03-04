@@ -53,6 +53,8 @@ extended: base + sets "global" as alias for "globalThis"
 	flags.String("js-cpu-profile-output", "", "write JS-attributed CPU profile to file path")
 	flags.String("js-runtime-trace-output", "", "write JS-attributed runtime trace to file path")
 	flags.String("js-profile-id", "", "set a custom profile correlation id")
+	flags.Int64("js-first-runner-mem-max-bytes", 0, "track first-runner JS memory milestones against max bytes (0 disables)")
+	flags.Int64("js-first-runner-mem-step-percent", 5, "first-runner memory milestone step percentage of max bytes")
 	return flags
 }
 
@@ -100,7 +102,12 @@ func runtimeOptionsFromFlags(flags *pflag.FlagSet) lib.RuntimeOptions {
 		JSCPUProfileOutput:        getNullString(flags, "js-cpu-profile-output"),
 		JSRuntimeTraceOutput:      getNullString(flags, "js-runtime-trace-output"),
 		JSProfileID:               getNullString(flags, "js-profile-id"),
-		Env:                       make(map[string]string),
+		JSFirstRunnerMemMaxBytes:  getNullInt64(flags, "js-first-runner-mem-max-bytes"),
+		JSFirstRunnerMemStepPercent: getNullInt64(
+			flags,
+			"js-first-runner-mem-step-percent",
+		),
+		Env: make(map[string]string),
 	}
 	return opts
 }
@@ -174,6 +181,20 @@ func populateRuntimeOptionsFromEnv(opts lib.RuntimeOptions, environment map[stri
 	}
 	if envVar, ok := environment["K6_JS_PROFILE_ID"]; !opts.JSProfileID.Valid && ok {
 		opts.JSProfileID = null.StringFrom(envVar)
+	}
+	if envVar, ok := environment["K6_JS_FIRST_RUNNER_MEM_MAX_BYTES"]; !opts.JSFirstRunnerMemMaxBytes.Valid && ok {
+		v, err := strconv.ParseInt(envVar, 10, 64)
+		if err != nil {
+			return opts, fmt.Errorf("env var 'K6_JS_FIRST_RUNNER_MEM_MAX_BYTES' is not a valid integer value: %w", err)
+		}
+		opts.JSFirstRunnerMemMaxBytes = null.IntFrom(v)
+	}
+	if envVar, ok := environment["K6_JS_FIRST_RUNNER_MEM_STEP_PERCENT"]; !opts.JSFirstRunnerMemStepPercent.Valid && ok {
+		v, err := strconv.ParseInt(envVar, 10, 64)
+		if err != nil {
+			return opts, fmt.Errorf("env var 'K6_JS_FIRST_RUNNER_MEM_STEP_PERCENT' is not a valid integer value: %w", err)
+		}
+		opts.JSFirstRunnerMemStepPercent = null.IntFrom(v)
 	}
 
 	// If enabled, gather the actual system environment variables

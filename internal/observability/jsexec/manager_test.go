@@ -17,10 +17,12 @@ import (
 
 func TestConfigFromRuntimeOptions(t *testing.T) {
 	opts := lib.RuntimeOptions{
-		JSProfilingEnabled:   null.BoolFrom(true),
-		JSCPUProfileOutput:   null.StringFrom("cpu.pprof"),
-		JSRuntimeTraceOutput: null.StringFrom("run.trace"),
-		JSProfileID:          null.StringFrom("test-profile"),
+		JSProfilingEnabled:          null.BoolFrom(true),
+		JSCPUProfileOutput:          null.StringFrom("cpu.pprof"),
+		JSRuntimeTraceOutput:        null.StringFrom("run.trace"),
+		JSProfileID:                 null.StringFrom("test-profile"),
+		JSFirstRunnerMemMaxBytes:    null.IntFrom(1024),
+		JSFirstRunnerMemStepPercent: null.IntFrom(5),
 	}
 
 	cfg := ConfigFromRuntimeOptions(opts)
@@ -29,6 +31,8 @@ func TestConfigFromRuntimeOptions(t *testing.T) {
 	require.Equal(t, "cpu.pprof", cfg.CPUProfilePath)
 	require.Equal(t, "run.trace", cfg.RuntimeTracePath)
 	require.Equal(t, "test-profile", cfg.ProfileID)
+	require.EqualValues(t, 1024, cfg.FirstRunnerMemMaxBytes)
+	require.EqualValues(t, 5, cfg.FirstRunnerMemStepPercent)
 }
 
 func TestManagerStartStopStoresArtifacts(t *testing.T) {

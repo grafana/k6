@@ -52,6 +52,9 @@ type RuntimeOptions struct {
 	JSCPUProfileOutput   null.String `json:"jsCpuProfileOutput"`
 	JSRuntimeTraceOutput null.String `json:"jsRuntimeTraceOutput"`
 	JSProfileID          null.String `json:"jsProfileId"`
+	// JS first-runner memory stepping controls.
+	JSFirstRunnerMemMaxBytes    null.Int `json:"jsFirstRunnerMemMaxBytes"`
+	JSFirstRunnerMemStepPercent null.Int `json:"jsFirstRunnerMemStepPercent"`
 
 	// Until v2
 	NewMachineReadableSummary null.Bool `json:"newMachineReadableSummary"`

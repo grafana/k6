@@ -27,12 +27,15 @@ const (
 
 // Config defines JS observability capture settings.
 type Config struct {
-	Enabled            bool
-	Scope              ProfileScope
-	CPUProfilePath     string
-	RuntimeTracePath   string
-	ProfileID          string
-	MaxJSStackLabelLen int
+	Enabled                   bool
+	Scope                     ProfileScope
+	CPUProfilePath            string
+	RuntimeTracePath          string
+	ProfileID                 string
+	MaxJSStackLabelLen        int
+	FirstRunnerMemMaxBytes    int64
+	FirstRunnerMemStepPercent int64
+	Logf                      func(format string, args ...any)
 }
 
 type ProfileScope string
@@ -84,6 +87,12 @@ func ConfigFromRuntimeOptions(opts lib.RuntimeOptions) Config {
 	if opts.JSProfileID.Valid {
 		cfg.ProfileID = opts.JSProfileID.String
 	}
+	if opts.JSFirstRunnerMemMaxBytes.Valid {
+		cfg.FirstRunnerMemMaxBytes = opts.JSFirstRunnerMemMaxBytes.Int64
+	}
+	if opts.JSFirstRunnerMemStepPercent.Valid {
+		cfg.FirstRunnerMemStepPercent = opts.JSFirstRunnerMemStepPercent.Int64
+	}
 	if cfg.ProfileID == "" {
 		cfg.ProfileID = time.Now().UTC().Format("20060102T150405.000000000")
 	}
@@ -132,6 +141,8 @@ type Manager struct {
 
 	cpuEnabled   bool
 	traceEnabled bool
+	firstSampler *firstRunnerMemSampler
+	firstRT      *sobek.Runtime
 	mu           sync.Mutex
 	stopOnce     sync.Once
 }
@@ -145,6 +156,9 @@ type runtimeCapture struct {
 func NewManager(cfg Config) *Manager {
 	if cfg.Scope == "" {
 		cfg.Scope = ScopeCombined
+	}
+	if cfg.FirstRunnerMemStepPercent <= 0 {
+		cfg.FirstRunnerMemStepPercent = 5
 	}
 	return &Manager{cfg: cfg}
 }
@@ -206,6 +220,9 @@ func (m *Manager) Stop() {
 		m.cpuMu.Unlock()
 		for rt := range captures {
 			rt.StopProfile()
+			if rt == m.firstRT {
+				rt.SetProfileSampleObserver(nil)
+			}
 		}
 		if m.traceEnabled {
 			rtrace.Stop()
@@ -258,6 +275,7 @@ func (m *Manager) Stop() {
 				Data:      append([]byte(nil), m.traceBuf.Bytes()...),
 			})
 		}
+		m.reportFirstRunnerMemSampling()
 	})
 }
 
@@ -270,11 +288,63 @@ func (m *Manager) maybeStartRuntimeProfile(rt *sobek.Runtime, scope ProfileScope
 	if _, ok := m.captures[rt]; ok {
 		return
 	}
+	if m.cfg.FirstRunnerMemMaxBytes > 0 && m.firstRT == nil {
+		sampler := newFirstRunnerMemSampler(uint64(m.cfg.FirstRunnerMemMaxBytes), m.cfg.FirstRunnerMemStepPercent)
+		rt.SetProfileSampleObserver(sampler.observe)
+		m.firstSampler = sampler
+		m.firstRT = rt
+	}
 	capture := &runtimeCapture{scope: scope}
 	if err := rt.StartProfile(&capture.buf); err != nil {
+		if rt == m.firstRT {
+			rt.SetProfileSampleObserver(nil)
+			m.firstRT = nil
+			m.firstSampler = nil
+		}
 		return
 	}
 	m.captures[rt] = capture
+}
+
+func (m *Manager) reportFirstRunnerMemSampling() {
+	if m.firstSampler == nil {
+		return
+	}
+	logf := m.cfg.Logf
+	if logf == nil {
+		return
+	}
+
+	ms := m.firstSampler.snapshotMilestones()
+	for _, mark := range ms {
+		if mark.TopFile == "" {
+			logf(
+				"js first-runner mem milestone: threshold=%d heap=%d no-js-line-yet",
+				mark.ThresholdBytes,
+				mark.HeapAllocBytes,
+			)
+			continue
+		}
+		logf(
+			"js first-runner mem milestone: threshold=%d heap=%d top=%s:%d alloc_space=%d",
+			mark.ThresholdBytes,
+			mark.HeapAllocBytes,
+			mark.TopFile,
+			mark.TopLine,
+			mark.TopAllocSpace,
+		)
+	}
+
+	top := m.firstSampler.topN(5)
+	for i, st := range top {
+		logf(
+			"js first-runner top alloc #%d: %s:%d alloc_space=%d",
+			i+1,
+			st.File,
+			st.Line,
+			st.AllocSpace,
+		)
+	}
 }
 
 func mergeProfiles(src []*profile.Profile) []byte {

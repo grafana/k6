@@ -707,6 +707,18 @@ func (vm *vm) runWithProfiler() bool {
 					"js_top_frame", jsFrames[0].SrcName()+":"+strconv.Itoa(jsFrames[0].Position().Line),
 				)))
 			}
+			if cb := vm.r.profiler.observer; cb != nil {
+				s := ProfileSample{
+					Time:         pt.stop,
+					HeapAlloc:    pt.allocStop.Alloc,
+					AllocObjects: pt.allocObjects,
+					AllocSpace:   pt.allocSpace,
+				}
+				if len(jsFrames) > 0 {
+					s.TopFrame = jsFrames[0]
+				}
+				cb(s)
+			}
 			// Keep allocation accounting continuous across samples instead of per-request windows.
 			// This improves attribution for allocations that happen between sample ticks.
 			pt.allocStart = pt.allocStop
