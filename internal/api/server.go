@@ -4,6 +4,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"expvar"
 	"fmt"
 	"net/http"
@@ -26,10 +27,79 @@ func newHandler(cs *v1.ControlSurface, profilingEnabled bool) http.Handler {
 	mux.Handle("/v1/", v1.NewHandler(cs))
 	mux.Handle("/ping", handlePing(cs.RunState.Logger))
 	mux.Handle("/", handlePing(cs.RunState.Logger))
+	mux.Handle("/v1/js-observability", jsObservabilityStateHandler())
+	mux.Handle("/v1/js-observability/profiling", jsObservabilityProfilingHandler())
+	mux.Handle("/v1/js-observability/profiling/enable", jsObservabilityToggleHandler(true))
+	mux.Handle("/v1/js-observability/profiling/disable", jsObservabilityToggleHandler(false))
 
 	injectProfilerHandler(mux, profilingEnabled)
 
 	return mux
+}
+
+func jsObservabilityStateHandler() http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(rw, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		resp := map[string]any{
+			"profiling_enabled":   jsexec.Enabled(),
+			"first_runner_memory": jsexec.FirstRunnerMemoryReport(),
+			"artifacts_available": listJSArtifactsAvailability(),
+		}
+		writeJSON(rw, http.StatusOK, resp)
+	})
+}
+
+func jsObservabilityProfilingHandler() http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(rw, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		writeJSON(rw, http.StatusOK, map[string]any{
+			"profiling_enabled": jsexec.Enabled(),
+		})
+	})
+}
+
+func jsObservabilityToggleHandler(enabled bool) http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(rw, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if !jsexec.SetProfilingEnabled(enabled) {
+			http.Error(rw, "js observability manager not active", http.StatusServiceUnavailable)
+			return
+		}
+		writeJSON(rw, http.StatusOK, map[string]any{
+			"profiling_enabled": enabled,
+		})
+	})
+}
+
+func listJSArtifactsAvailability() map[string]bool {
+	names := []string{
+		"js-cpu",
+		"js-cpu-init",
+		"js-cpu-vu",
+		"js-cpu-combined",
+		"js-trace",
+	}
+	out := make(map[string]bool, len(names))
+	for _, name := range names {
+		_, ok := jsexec.LatestArtifact(name)
+		out[name] = ok
+	}
+	return out
+}
+
+func writeJSON(rw http.ResponseWriter, status int, v any) {
+	rw.Header().Set("Content-Type", "application/json")
+	rw.WriteHeader(status)
+	_ = json.NewEncoder(rw).Encode(v)
 }
 
 func injectProfilerHandler(mux *http.ServeMux, profilingEnabled bool) {

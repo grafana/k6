@@ -150,6 +150,28 @@ type Manager struct {
 	stopOnce     sync.Once
 }
 
+type FirstRunnerMemMilestone struct {
+	ThresholdBytes uint64 `json:"threshold_bytes"`
+	HeapAllocBytes uint64 `json:"heap_alloc_bytes"`
+	TopFile        string `json:"top_file,omitempty"`
+	TopLine        int    `json:"top_line,omitempty"`
+	TopAllocSpace  int64  `json:"top_alloc_space_bytes,omitempty"`
+}
+
+type FirstRunnerMemTopLine struct {
+	File       string `json:"file"`
+	Line       int    `json:"line"`
+	AllocSpace int64  `json:"alloc_space_bytes"`
+}
+
+type FirstRunnerMemReport struct {
+	Enabled     bool                      `json:"enabled"`
+	MaxBytes    int64                     `json:"max_bytes"`
+	StepPercent int64                     `json:"step_percent"`
+	Milestones  []FirstRunnerMemMilestone `json:"milestones"`
+	TopLines    []FirstRunnerMemTopLine   `json:"top_lines"`
+}
+
 type runtimeCapture struct {
 	scope ProfileScope
 	buf   bytes.Buffer
@@ -319,7 +341,7 @@ func (m *Manager) Stop() {
 }
 
 func (m *Manager) maybeStartRuntimeProfile(rt *sobek.Runtime, scope ProfileScope) {
-	if !m.cpuEnabled || rt == nil || !m.cfg.Scope.captures(scope) {
+	if !m.isEnabled() || !m.cpuEnabled || rt == nil || !m.cfg.Scope.captures(scope) {
 		return
 	}
 	m.cpuMu.Lock()
@@ -343,6 +365,71 @@ func (m *Manager) maybeStartRuntimeProfile(rt *sobek.Runtime, scope ProfileScope
 		return
 	}
 	m.captures[rt] = capture
+}
+
+func (m *Manager) isEnabled() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.cfg.Enabled
+}
+
+func (m *Manager) SetEnabled(enabled bool) {
+	m.mu.Lock()
+	old := m.cfg.Enabled
+	m.cfg.Enabled = enabled
+	m.mu.Unlock()
+	if old == enabled {
+		return
+	}
+
+	m.cpuMu.Lock()
+	defer m.cpuMu.Unlock()
+	if enabled {
+		if m.captures == nil {
+			m.captures = make(map[*sobek.Runtime]*runtimeCapture)
+		}
+		if !m.cpuEnabled {
+			m.cpuEnabled = true
+		}
+		return
+	}
+
+	for rt := range m.captures {
+		rt.StopProfile()
+		rt.SetProfileSampleObserver(nil)
+	}
+	m.captures = make(map[*sobek.Runtime]*runtimeCapture)
+	m.firstRT = nil
+	m.firstSampler = nil
+}
+
+func (m *Manager) FirstRunnerMemReport() FirstRunnerMemReport {
+	out := FirstRunnerMemReport{
+		MaxBytes:    m.cfg.FirstRunnerMemMaxBytes,
+		StepPercent: m.cfg.FirstRunnerMemStepPercent,
+	}
+	out.Enabled = m.isEnabled()
+	if m.firstSampler == nil {
+		return out
+	}
+
+	for _, ms := range m.firstSampler.snapshotMilestones() {
+		out.Milestones = append(out.Milestones, FirstRunnerMemMilestone{
+			ThresholdBytes: ms.ThresholdBytes,
+			HeapAllocBytes: ms.HeapAllocBytes,
+			TopFile:        ms.TopFile,
+			TopLine:        ms.TopLine,
+			TopAllocSpace:  ms.TopAllocSpace,
+		})
+	}
+	for _, st := range m.firstSampler.topN(5) {
+		out.TopLines = append(out.TopLines, FirstRunnerMemTopLine{
+			File:       st.File,
+			Line:       st.Line,
+			AllocSpace: st.AllocSpace,
+		})
+	}
+	return out
 }
 
 func (m *Manager) reportFirstRunnerMemSampling() {
@@ -575,5 +662,28 @@ func Enabled() bool {
 	active.mu.RLock()
 	m := active.m
 	active.mu.RUnlock()
-	return m != nil && m.cfg.Enabled
+	return m != nil && m.isEnabled()
+}
+
+// SetProfilingEnabled toggles JS profiling at runtime.
+func SetProfilingEnabled(enabled bool) bool {
+	active.mu.RLock()
+	m := active.m
+	active.mu.RUnlock()
+	if m == nil {
+		return false
+	}
+	m.SetEnabled(enabled)
+	return true
+}
+
+// FirstRunnerMemoryReport returns structured first-runner memory diagnostics.
+func FirstRunnerMemoryReport() FirstRunnerMemReport {
+	active.mu.RLock()
+	m := active.m
+	active.mu.RUnlock()
+	if m == nil {
+		return FirstRunnerMemReport{}
+	}
+	return m.FirstRunnerMemReport()
 }
