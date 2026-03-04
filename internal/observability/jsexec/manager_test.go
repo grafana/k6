@@ -21,7 +21,7 @@ func TestConfigFromRuntimeOptions(t *testing.T) {
 		JSCPUProfileOutput:          null.StringFrom("cpu.pprof"),
 		JSRuntimeTraceOutput:        null.StringFrom("run.trace"),
 		JSProfileID:                 null.StringFrom("test-profile"),
-		JSFirstRunnerMemMaxBytes:    null.IntFrom(1024),
+		JSFirstRunnerMemMaxBytes:    null.StringFrom("1kb"),
 		JSFirstRunnerMemStepPercent: null.IntFrom(5),
 	}
 
@@ -31,7 +31,7 @@ func TestConfigFromRuntimeOptions(t *testing.T) {
 	require.Equal(t, "cpu.pprof", cfg.CPUProfilePath)
 	require.Equal(t, "run.trace", cfg.RuntimeTracePath)
 	require.Equal(t, "test-profile", cfg.ProfileID)
-	require.EqualValues(t, 1024, cfg.FirstRunnerMemMaxBytes)
+	require.EqualValues(t, 1000, cfg.FirstRunnerMemMaxBytes)
 	require.EqualValues(t, 5, cfg.FirstRunnerMemStepPercent)
 }
 

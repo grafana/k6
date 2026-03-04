@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime/pprof"
 	rtrace "runtime/trace"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -88,7 +89,9 @@ func ConfigFromRuntimeOptions(opts lib.RuntimeOptions) Config {
 		cfg.ProfileID = opts.JSProfileID.String
 	}
 	if opts.JSFirstRunnerMemMaxBytes.Valid {
-		cfg.FirstRunnerMemMaxBytes = opts.JSFirstRunnerMemMaxBytes.Int64
+		if v, err := parseSizeWithSuffix(opts.JSFirstRunnerMemMaxBytes.String); err == nil {
+			cfg.FirstRunnerMemMaxBytes = v
+		}
 	}
 	if opts.JSFirstRunnerMemStepPercent.Valid {
 		cfg.FirstRunnerMemStepPercent = opts.JSFirstRunnerMemStepPercent.Int64
@@ -161,6 +164,42 @@ func NewManager(cfg Config) *Manager {
 		cfg.FirstRunnerMemStepPercent = 5
 	}
 	return &Manager{cfg: cfg}
+}
+
+func parseSizeWithSuffix(v string) (int64, error) {
+	var mult int64 = 1
+	s := strings.TrimSpace(strings.ToLower(v))
+	switch {
+	case strings.HasSuffix(s, "tib"):
+		mult, s = 1<<40, strings.TrimSpace(strings.TrimSuffix(s, "tib"))
+	case strings.HasSuffix(s, "gib"):
+		mult, s = 1<<30, strings.TrimSpace(strings.TrimSuffix(s, "gib"))
+	case strings.HasSuffix(s, "mib"):
+		mult, s = 1<<20, strings.TrimSpace(strings.TrimSuffix(s, "mib"))
+	case strings.HasSuffix(s, "kib"):
+		mult, s = 1<<10, strings.TrimSpace(strings.TrimSuffix(s, "kib"))
+	case strings.HasSuffix(s, "tb"):
+		mult, s = 1000*1000*1000*1000, strings.TrimSpace(strings.TrimSuffix(s, "tb"))
+	case strings.HasSuffix(s, "gb"):
+		mult, s = 1000*1000*1000, strings.TrimSpace(strings.TrimSuffix(s, "gb"))
+	case strings.HasSuffix(s, "mb"):
+		mult, s = 1000*1000, strings.TrimSpace(strings.TrimSuffix(s, "mb"))
+	case strings.HasSuffix(s, "kb"):
+		mult, s = 1000, strings.TrimSpace(strings.TrimSuffix(s, "kb"))
+	case strings.HasSuffix(s, "b"):
+		mult, s = 1, strings.TrimSpace(strings.TrimSuffix(s, "b"))
+	}
+	if s == "" {
+		return 0, fmt.Errorf("empty size")
+	}
+	base, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+	if base < 0 {
+		return 0, fmt.Errorf("value must be >= 0")
+	}
+	return base * mult, nil
 }
 
 func ensureParentDir(path string) error {

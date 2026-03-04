@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/spf13/pflag"
 	"gopkg.in/guregu/null.v3"
@@ -53,7 +54,7 @@ extended: base + sets "global" as alias for "globalThis"
 	flags.String("js-cpu-profile-output", "", "write JS-attributed CPU profile to file path")
 	flags.String("js-runtime-trace-output", "", "write JS-attributed runtime trace to file path")
 	flags.String("js-profile-id", "", "set a custom profile correlation id")
-	flags.Int64("js-first-runner-mem-max-bytes", 0, "track first-runner JS memory milestones against max bytes (0 disables)")
+	flags.String("js-first-runner-mem-max-bytes", "", "track first-runner JS memory milestones against max bytes (supports suffixes like kb, mb, gb)")
 	flags.Int64("js-first-runner-mem-step-percent", 5, "first-runner memory milestone step percentage of max bytes")
 	return flags
 }
@@ -82,6 +83,11 @@ func getRuntimeOptions(
 		}
 		opts.Env[k] = v
 	}
+	if opts.JSFirstRunnerMemMaxBytes.Valid {
+		if _, err = parseByteSize(opts.JSFirstRunnerMemMaxBytes.String); err != nil {
+			return opts, fmt.Errorf("invalid js-first-runner-mem-max-bytes value: %w", err)
+		}
+	}
 
 	return opts, nil
 }
@@ -102,7 +108,7 @@ func runtimeOptionsFromFlags(flags *pflag.FlagSet) lib.RuntimeOptions {
 		JSCPUProfileOutput:        getNullString(flags, "js-cpu-profile-output"),
 		JSRuntimeTraceOutput:      getNullString(flags, "js-runtime-trace-output"),
 		JSProfileID:               getNullString(flags, "js-profile-id"),
-		JSFirstRunnerMemMaxBytes:  getNullInt64(flags, "js-first-runner-mem-max-bytes"),
+		JSFirstRunnerMemMaxBytes:  getNullString(flags, "js-first-runner-mem-max-bytes"),
 		JSFirstRunnerMemStepPercent: getNullInt64(
 			flags,
 			"js-first-runner-mem-step-percent",
@@ -183,11 +189,7 @@ func populateRuntimeOptionsFromEnv(opts lib.RuntimeOptions, environment map[stri
 		opts.JSProfileID = null.StringFrom(envVar)
 	}
 	if envVar, ok := environment["K6_JS_FIRST_RUNNER_MEM_MAX_BYTES"]; !opts.JSFirstRunnerMemMaxBytes.Valid && ok {
-		v, err := strconv.ParseInt(envVar, 10, 64)
-		if err != nil {
-			return opts, fmt.Errorf("env var 'K6_JS_FIRST_RUNNER_MEM_MAX_BYTES' is not a valid integer value: %w", err)
-		}
-		opts.JSFirstRunnerMemMaxBytes = null.IntFrom(v)
+		opts.JSFirstRunnerMemMaxBytes = null.StringFrom(envVar)
 	}
 	if envVar, ok := environment["K6_JS_FIRST_RUNNER_MEM_STEP_PERCENT"]; !opts.JSFirstRunnerMemStepPercent.Valid && ok {
 		v, err := strconv.ParseInt(envVar, 10, 64)
@@ -203,6 +205,54 @@ func populateRuntimeOptionsFromEnv(opts lib.RuntimeOptions, environment map[stri
 	}
 
 	return opts, nil
+}
+
+func parseByteSize(v string) (int64, error) {
+	s := strings.TrimSpace(strings.ToLower(v))
+	if s == "" {
+		return 0, fmt.Errorf("empty value")
+	}
+
+	type unitDef struct {
+		suffix string
+		mult   int64
+	}
+	units := []unitDef{
+		{suffix: "tib", mult: 1 << 40},
+		{suffix: "gib", mult: 1 << 30},
+		{suffix: "mib", mult: 1 << 20},
+		{suffix: "kib", mult: 1 << 10},
+		{suffix: "tb", mult: 1000 * 1000 * 1000 * 1000},
+		{suffix: "gb", mult: 1000 * 1000 * 1000},
+		{suffix: "mb", mult: 1000 * 1000},
+		{suffix: "kb", mult: 1000},
+		{suffix: "b", mult: 1},
+	}
+	for _, u := range units {
+		if strings.HasSuffix(s, u.suffix) {
+			n := strings.TrimSpace(strings.TrimSuffix(s, u.suffix))
+			if n == "" {
+				return 0, fmt.Errorf("missing number in %q", v)
+			}
+			base, err := strconv.ParseInt(n, 10, 64)
+			if err != nil {
+				return 0, fmt.Errorf("invalid number in %q: %w", v, err)
+			}
+			if base < 0 {
+				return 0, fmt.Errorf("value must be >= 0")
+			}
+			return base * u.mult, nil
+		}
+	}
+
+	base, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("unsupported size format %q", v)
+	}
+	if base < 0 {
+		return 0, fmt.Errorf("value must be >= 0")
+	}
+	return base, nil
 }
 
 func saveBoolFromEnv(env map[string]string, varName string, placeholder *null.Bool) error {
