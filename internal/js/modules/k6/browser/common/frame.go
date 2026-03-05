@@ -571,7 +571,7 @@ func (f *Frame) waitFor(
 
 func (f *Frame) boundingBox(selector string, opts *FrameBaseOptions) (*Rect, error) {
 	getBoundingBox := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
-		return handle.boundingBox()
+		return handle.BoundingBox()
 	}
 	act := f.newAction(
 		selector, DOMElementStateAttached, opts.Strict, getBoundingBox, []string{}, false, true, opts.Timeout,
