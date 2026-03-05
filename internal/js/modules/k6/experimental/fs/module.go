@@ -63,6 +63,7 @@ func (mi *ModuleInstance) Exports() modules.Exports {
 				"Current": SeekModeCurrent,
 				"End":     SeekModeEnd,
 			},
+			"FSError": common.ExportNamedError(fsErrorConstructorName)(mi.vu.Runtime()),
 		},
 	}
 }
@@ -222,25 +223,25 @@ func (f *File) Stat() *sobek.Promise {
 //
 // It is possible for a read to successfully return with 0 bytes.
 // This does not indicate EOF.
-func (f *File) Read(into sobek.Value) (*sobek.Promise, error) {
-	promise, resolve, reject := f.vu.Runtime().NewPromise()
+func (f *File) Read(into sobek.Value) *sobek.Promise {
+	promise, resolve, reject := promises.New(f.vu)
 
 	if common.IsNullish(into) {
-		err := reject(newFsError(TypeError, "read() failed; reason: into argument cannot be null or undefined"))
-		return promise, err
+		reject(newFsError(TypeError, "read() failed; reason: into argument cannot be null or undefined"))
+		return promise
 	}
 
 	intoObj := into.ToObject(f.vu.Runtime())
 	if !isUint8Array(f.vu.Runtime(), intoObj) {
-		err := reject(newFsError(TypeError, "read() failed; reason: into argument must be a Uint8Array"))
-		return promise, err
+		reject(newFsError(TypeError, "read() failed; reason: into argument must be a Uint8Array"))
+		return promise
 	}
 
 	// Obtain the underlying ArrayBuffer from the Uint8Array
 	ab, ok := intoObj.Get("buffer").Export().(sobek.ArrayBuffer)
 	if !ok {
-		err := reject(newFsError(TypeError, "read() failed; reason: into argument must be a Uint8Array"))
-		return promise, err
+		reject(newFsError(TypeError, "read() failed; reason: into argument must be a Uint8Array"))
+		return promise
 	}
 
 	// To avoid concurrency linked to modifying the runtime's `into` buffer from multiple
@@ -261,7 +262,8 @@ func (f *File) Read(into sobek.Value) (*sobek.Promise, error) {
 			// Read was successful, resolve early with the number of
 			// bytes read.
 			if readErr == nil {
-				return resolve(n)
+				resolve(n)
+				return nil
 			}
 
 			// If the read operation failed, we need to check if it was an io.EOF error
@@ -273,17 +275,20 @@ func (f *File) Read(into sobek.Value) (*sobek.Promise, error) {
 			var fsErr *fsError
 			isFSErr := errors.As(readErr, &fsErr)
 			if !isFSErr {
-				return reject(readErr)
+				reject(readErr)
+				return nil
 			}
 
 			if fsErr.kind == EOFError && n == 0 {
-				return resolve(sobek.Null())
+				resolve(sobek.Null())
+				return nil
 			}
-			return resolve(n)
+			resolve(n)
+			return nil
 		})
 	}()
 
-	return promise, nil
+	return promise
 }
 
 // Seek seeks to the given `offset` in the file, under the given `whence` mode.
@@ -291,19 +296,19 @@ func (f *File) Read(into sobek.Value) (*sobek.Promise, error) {
 // The returned promise resolves to the new `offset` (position) within the file, which
 // is expressed in bytes from the selected start, current, or end position depending
 // the provided `whence`.
-func (f *File) Seek(offset sobek.Value, whence sobek.Value) (*sobek.Promise, error) {
-	promise, resolve, reject := f.vu.Runtime().NewPromise()
+func (f *File) Seek(offset sobek.Value, whence sobek.Value) *sobek.Promise {
+	promise, resolve, reject := promises.New(f.vu)
 
 	intOffset, err := exportInt(offset)
 	if err != nil {
-		err := reject(newFsError(TypeError, "seek() failed; reason: the offset argument "+err.Error()))
-		return promise, err
+		reject(newFsError(TypeError, "seek() failed; reason: the offset argument "+err.Error()))
+		return promise
 	}
 
 	intWhence, err := exportInt(whence)
 	if err != nil {
-		err := reject(newFsError(TypeError, "seek() failed; reason: the whence argument "+err.Error()))
-		return promise, err
+		reject(newFsError(TypeError, "seek() failed; reason: the whence argument "+err.Error()))
+		return promise
 	}
 
 	seekMode := SeekMode(intWhence)
@@ -311,8 +316,8 @@ func (f *File) Seek(offset sobek.Value, whence sobek.Value) (*sobek.Promise, err
 	case SeekModeStart, SeekModeCurrent, SeekModeEnd:
 		// Valid modes, do nothing.
 	default:
-		err := reject(newFsError(TypeError, "seek() failed; reason: the whence argument must be a SeekMode"))
-		return promise, err
+		reject(newFsError(TypeError, "seek() failed; reason: the whence argument must be a SeekMode"))
+		return promise
 	}
 
 	callback := f.vu.RegisterCallback()
@@ -320,14 +325,16 @@ func (f *File) Seek(offset sobek.Value, whence sobek.Value) (*sobek.Promise, err
 		newOffset, err := f.ReadSeekStater.Seek(intOffset, seekMode)
 		callback(func() error {
 			if err != nil {
-				return reject(err)
+				reject(err)
+				return nil
 			}
 
-			return resolve(newOffset)
+			resolve(newOffset)
+			return nil
 		})
 	}()
 
-	return promise, nil
+	return promise
 }
 
 func isUint8Array(rt *sobek.Runtime, o *sobek.Object) bool {
