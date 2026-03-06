@@ -187,11 +187,12 @@ func (o *ElementHandleBasePointerOptions) Parse(ctx context.Context, opts sobek.
 			switch k {
 			case "position":
 				var p map[string]float64
-				o.Position = &Position{}
-				if rt.ExportTo(opts.Get(k), &p) != nil {
-					o.Position.X = p["x"]
-					o.Position.Y = p["y"]
+				if err := rt.ExportTo(opts.Get(k), &p); err != nil {
+					return err
 				}
+				o.Position = &Position{}
+				o.Position.X = p["x"]
+				o.Position.Y = p["y"]
 			case "trial":
 				o.Trial = opts.Get(k).ToBoolean()
 			}
