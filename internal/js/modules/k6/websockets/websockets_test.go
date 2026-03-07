@@ -437,13 +437,16 @@ func TestBinaryType_ArrayBuffer_issue_5226(t *testing.T) {
 		ws.binaryType = "arraybuffer"
 		ws.addEventListener("open", () => {
 			const sent = new Uint8Array(1024)
-			ws.send(sent.subarray(0, 1))
+			ws.send(sent.subarray(0, 10))
+			if (ws.bufferedAmount != 10) {
+				throw "Expected 10 bufferedAmount got "+ ws.bufferedAmount
+			}
 			ws.onmessage = (e) => {
 				if (!(e.data instanceof ArrayBuffer)) {
 					throw new Error("Wrong event.data type; expected: ArrayBuffer, got: "+ typeof e.data);
 				}
 
-				if (e.data.byteLength != 1) {
+				if (e.data.byteLength != 10) {
 					throw new Error("The data received isn't equal to the data sent "  + e.data.byteLength);
 				}
 
