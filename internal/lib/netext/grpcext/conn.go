@@ -16,6 +16,7 @@ import (
 	"go.k6.io/k6/metrics"
 
 	protov1 "github.com/golang/protobuf/proto" //nolint:staticcheck,nolintlint // this is the old v1 version
+	spb "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
@@ -178,19 +179,7 @@ func (c *Conn) Invoke(
 	marshaler := protojson.MarshalOptions{EmitUnpopulated: true, Resolver: c.types}
 
 	if err != nil {
-		sterr := status.Convert(err)
-		response.Status = sterr.Code()
-
-		// (rogchap) when you access a JSON property in Sobek, you are actually accessing the underling
-		// Go type (struct, map, slice etc); because these are dynamic messages the Unmarshaled JSON does
-		// not map back to a "real" field or value (as a normal Go type would). If we don't marshal and then
-		// unmarshal back to a map, you will get "undefined" when accessing JSON properties, even when
-		// JSON.Stringify() shows the object to be correctly present.
-
-		raw, _ := marshaler.Marshal(sterr.Proto())
-		errMsg := make(map[string]any)
-		_ = json.Unmarshal(raw, &errMsg)
-		response.Error = errMsg
+		response.Status, response.Error = convertInvokeError(err, trailer)
 	}
 
 	if resp != nil && !req.DiscardResponseMessage {
@@ -202,6 +191,49 @@ func (c *Conn) Invoke(
 		response.Message = msg
 	}
 	return &response, nil
+}
+
+// convertInvokeError converts a gRPC invocation error into a status code and
+// a JSON-serializable error map. It reads the grpc-status-details-bin trailer
+// to populate rich error details when present and the status code matches.
+func convertInvokeError(err error, trailer metadata.MD) (codes.Code, map[string]any) {
+	sterr := status.Convert(err)
+
+	// grpc-status-details-bin carries a google.rpc.Status protobuf with rich error details.
+	// Only use it when the status code matches to avoid inconsistent state.
+	if detailsBin := trailer.Get("grpc-status-details-bin"); len(detailsBin) > 0 {
+		statusProto := &spb.Status{}
+		if unmarshalErr := proto.Unmarshal([]byte(detailsBin[0]), statusProto); unmarshalErr == nil {
+			if statusProto.Code == int32(sterr.Code()) { //nolint:gosec // gRPC codes are 0-16, always within int32 range
+				sterr = status.FromProto(statusProto)
+			}
+		}
+	}
+
+	// (rogchap) when you access a JSON property in Sobek, you are actually accessing the underling
+	// Go type (struct, map, slice etc); because these are dynamic messages the Unmarshaled JSON does
+	// not map back to a "real" field or value (as a normal Go type would). If we don't marshal and then
+	// unmarshal back to a map, you will get "undefined" when accessing JSON properties, even when
+	// JSON.Stringify() shows the object to be correctly present.
+
+	// c.types only contains user-defined protobuf types, so we use nil here to fall back to the
+	// global registry for standard Google types (e.g. google.protobuf.Any, google.rpc.ErrorInfo).
+	errorMarshaler := protojson.MarshalOptions{EmitUnpopulated: true, Resolver: nil}
+	raw, err := errorMarshaler.Marshal(sterr.Proto())
+	if err != nil {
+		return sterr.Code(), map[string]any{
+			"code":    int32(sterr.Code()), //nolint:gosec // gRPC codes are 0-16, always within int32 range
+			"message": sterr.Message(),
+		}
+	}
+	errMsg := make(map[string]any)
+	if err = json.Unmarshal(raw, &errMsg); err != nil {
+		return sterr.Code(), map[string]any{
+			"code":    int32(sterr.Code()), //nolint:gosec // gRPC codes are 0-16, always within int32 range
+			"message": sterr.Message(),
+		}
+	}
+	return sterr.Code(), errMsg
 }
 
 // NewStream creates a new gRPC stream.
