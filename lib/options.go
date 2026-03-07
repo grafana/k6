@@ -7,6 +7,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"maps"
 	"net"
 	"reflect"
 	"slices"
@@ -490,7 +491,15 @@ func (o Options) Apply(opts Options) Options {
 		o.SystemTags = opts.SystemTags
 	}
 	if len(opts.RunTags) > 0 {
-		o.RunTags = opts.RunTags
+		// Tags are merged across config layers rather than replaced wholesale,
+		// so that each layer can contribute its own keys. When the same key
+		// appears in multiple layers the higher-priority layer wins, consistent
+		// with the order of precedence documented at:
+		// https://grafana.com/docs/k6/latest/using-k6/k6-options/how-to/#order-of-precedence
+		merged := make(map[string]string, len(o.RunTags)+len(opts.RunTags))
+		maps.Copy(merged, o.RunTags)
+		maps.Copy(merged, opts.RunTags)
+		o.RunTags = merged
 	}
 	if opts.MetricSamplesBufferSize.Valid {
 		o.MetricSamplesBufferSize = opts.MetricSamplesBufferSize
