@@ -3,9 +3,9 @@ description: "Pre-test steps: Go install and optional Chromium install"
 
 inputs:
   go_version:
-    description: "Go version (eg 1.25.x) or gotip."
+    description: "Go version (eg 1.26.x) or gotip."
     required: false
-    default: "1.25.x"
+    default: "1.26.x"
   platform:
     description: "matrix.platform value (used for windows/arm detection)."
     required: true
