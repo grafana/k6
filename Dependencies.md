@@ -26,7 +26,7 @@ The latter also serves as a time to open/close issues that are related to the up
 
 ## Go versions
 
-We aim to support building of the k6 binary with the two latest versions of golang as long as the latest version has at least `.1` path release. The support [policy](https://go.dev/doc/devel/release#policy) of the Go team details that they support the two latest versions.
+We aim to support building of the k6 binary with the two latest versions of Go as long as the latest version has at least `.1` path release. The support [policy](https://go.dev/doc/devel/release#policy) of the Go team details that they support the two latest versions.
 
 E.g.
 
