@@ -7,7 +7,9 @@ on:
   pull_request:
       paths:
           - 'js/**'
+          - 'internal/js/**'
           - 'vendor/github.com/grafana/sobek/**'
+          - 'vendor/github.com/evanw/esbuild**'
 
 defaults:
   run:
