@@ -3,7 +3,28 @@ local M = {}
 M.ns = vim.api.nvim_create_namespace("k6_profile_overlay")
 M.state = {
   by_file = {},
+  totals = {
+    cpu_ns = 0,
+    alloc_space = 0,
+    alloc_objects = 0,
+  },
 }
+
+local function setup_highlights()
+  local ok = pcall(vim.api.nvim_set_hl, 0, "K6ProfileStatus", {
+    fg = "#00d7ff",
+    bold = true,
+  })
+  if not ok then
+    return
+  end
+  pcall(vim.api.nvim_set_hl, 0, "K6ProfileMetric", {
+    fg = "#ffd75f",
+    bold = true,
+  })
+end
+
+setup_highlights()
 
 local function debug_enabled()
   if vim.g.k6_profile_debug == nil then
@@ -43,6 +64,13 @@ local function hr_bytes(v)
     return string.format("%.2fKB", v / 1024)
   end
   return tostring(v) .. "B"
+end
+
+local function pct(part, total)
+  if not part or not total or total <= 0 then
+    return "0.00%"
+  end
+  return string.format("%.2f%%", (part * 100.0) / total)
 end
 
 local function repo_root()
@@ -144,10 +172,15 @@ function M.apply(bufnr)
     for _ in pairs(stats) do
       count = count + 1
     end
-    status_text = string.format("k6 profile overlay: ON (%d profiled lines)", count)
+    status_text = string.format(
+      "k6 profile overlay: ON (%d profiled lines, total CPU=%s, total MEM=%s)",
+      count,
+      hr_duration_ns(M.state.totals.cpu_ns or 0),
+      hr_bytes(M.state.totals.alloc_space or 0)
+    )
   end
   vim.api.nvim_buf_set_extmark(bufnr, M.ns, 0, 0, {
-    virt_text = { { status_text, "DiagnosticInfo" } },
+    virt_text = { { status_text, "K6ProfileStatus" } },
     virt_text_pos = "eol",
   })
 
@@ -159,13 +192,16 @@ function M.apply(bufnr)
     local row = tonumber(lnum) - 1
     if row and row >= 0 then
       local vt = string.format(
-        " CPU %s | MEM %s | OBJ %d",
+        " CPU %s (%s) | MEM %s (%s) | OBJ %d (%s)",
         hr_duration_ns(v.cpu_ns or 0),
+        pct(v.cpu_ns or 0, M.state.totals.cpu_ns),
         hr_bytes(v.alloc_space or 0),
-        v.alloc_objects or 0
+        pct(v.alloc_space or 0, M.state.totals.alloc_space),
+        v.alloc_objects or 0,
+        pct(v.alloc_objects or 0, M.state.totals.alloc_objects)
       )
       vim.api.nvim_buf_set_extmark(bufnr, M.ns, row, 0, {
-        virt_text = { { vt, "Comment" } },
+        virt_text = { { vt, "K6ProfileMetric" } },
         virt_text_pos = "eol",
       })
     end
@@ -204,6 +240,29 @@ function M.load(pprof_path)
   end
 
   M.state.by_file = decoded.files
+  local totals = {
+    cpu_ns = 0,
+    alloc_space = 0,
+    alloc_objects = 0,
+  }
+  for _, file_stats in pairs(M.state.by_file) do
+    if type(file_stats) == "table" then
+      for _, line_stats in pairs(file_stats) do
+        if type(line_stats) == "table" then
+          totals.cpu_ns = totals.cpu_ns + (line_stats.cpu_ns or 0)
+          totals.alloc_space = totals.alloc_space + (line_stats.alloc_space or 0)
+          totals.alloc_objects = totals.alloc_objects + (line_stats.alloc_objects or 0)
+        end
+      end
+    end
+  end
+  M.state.totals = totals
+  debug_log(string.format(
+    "load: totals cpu=%d mem=%d obj=%d",
+    totals.cpu_ns,
+    totals.alloc_space,
+    totals.alloc_objects
+  ))
   M.apply(0)
   vim.notify("k6 profile loaded", vim.log.levels.INFO)
 end
