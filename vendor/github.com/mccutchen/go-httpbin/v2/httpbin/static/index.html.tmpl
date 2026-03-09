@@ -116,6 +116,7 @@
 <li><a href="{{.Prefix}}/stream/20"><code>{{.Prefix}}/stream/:n</code></a> Streams <em>min(n, 100)</em> lines.</li>
 <li><a href="{{.Prefix}}/trailers?trailer1=value1&amp;trailer2=value2"><code>{{.Prefix}}/trailers?key=val</code></a> Returns JSON response with query params added as HTTP Trailers.</li>
 <li><a href="{{.Prefix}}/unstable"><code>{{.Prefix}}/unstable</code></a> Fails half the time, accepts optional <em>failure_rate</em> float and <em>seed</em> integer parameters.</li>
+<li><code>{{.Prefix}}/upload</code> Discards the body of <code>POST</code>/<code>PUT</code>/<code>PATCH</code> requests, for testing upload performance.</li>
 <li><a href="{{.Prefix}}/user-agent"><code>{{.Prefix}}/user-agent</code></a> Returns user-agent.</li>
 <li><a href="{{.Prefix}}/uuid"><code>{{.Prefix}}/uuid</code></a> Generates a <a href="https://en.wikipedia.org/wiki/Universally_unique_identifier">UUIDv4</a> value.</li>
 <li><a href="{{.Prefix}}/websocket/echo?max_fragment_size=2048&amp;max_message_size=10240"><code>{{.Prefix}}/websocket/echo?max_fragment_size=2048&amp;max_message_size=10240</code></a> A WebSocket echo service.</li>
