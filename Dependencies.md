@@ -31,7 +31,7 @@ We aim to support building of the k6 binary with the two latest versions of Go a
 E.g.
 
 1. If the latest Go version is 1.26, the Go team will support 1.25 and 1.26, dropping support for 1.24.
-2. We will support Go versions 1.24, 1.25 and 1.26 until 1.26.1 is released.
+2. We will support Go versions 1.24 and 1.25 until 1.26.1 is released.
 3. When the Go team release version 1.26.1, they will still only support 1.25 and 1.26.
 4. We will support Go versions 1.25 and 1.26, dropping support of 1.24.
 
