@@ -559,7 +559,7 @@ func (h *ElementHandle) waitAndScrollIntoViewIfNeeded(
 
 		return h.eval(apiCtx, opts, fn)
 	}
-	actFn := h.newAction([]string{"visible", "stable"}, fn, force, noWaitAfter, timeout)
+	actFn := h.newAction([]string{"visible", "stable"}, fn, force, true, noWaitAfter, timeout)
 	_, err := call(h.ctx, actFn, timeout)
 
 	return err
@@ -861,7 +861,7 @@ func (h *ElementHandle) DispatchEvent(typ string, eventInit any) error {
 	}
 	opts := NewElementHandleBaseOptions(h.DefaultTimeout())
 	dispatchEventAction := h.newAction(
-		[]string{}, dispatchEvent, opts.Force, opts.NoWaitAfter, opts.Timeout,
+		[]string{}, dispatchEvent, opts.Force, true, opts.NoWaitAfter, opts.Timeout,
 	)
 	if _, err := call(h.ctx, dispatchEventAction, opts.Timeout); err != nil {
 		return fmt.Errorf("dispatching element event %q: %w", typ, err)
@@ -879,7 +879,7 @@ func (h *ElementHandle) Fill(value string, opts *ElementHandleBaseOptions) error
 	}
 	fillAction := h.newAction(
 		[]string{"visible", "enabled", "editable"},
-		fill, opts.Force, opts.NoWaitAfter, opts.Timeout,
+		fill, opts.Force, true, opts.NoWaitAfter, opts.Timeout,
 	)
 	if _, err := call(h.ctx, fillAction, opts.Timeout); err != nil {
 		return fmt.Errorf("filling element: %w", err)
@@ -897,7 +897,7 @@ func (h *ElementHandle) Focus() error {
 	}
 	opts := NewElementHandleBaseOptions(h.DefaultTimeout())
 	focusAction := h.newAction(
-		[]string{}, focus, opts.Force, opts.NoWaitAfter, opts.Timeout,
+		[]string{}, focus, opts.Force, true, opts.NoWaitAfter, opts.Timeout,
 	)
 	if _, err := call(h.ctx, focusAction, opts.Timeout); err != nil {
 		return fmt.Errorf("focusing on element: %w", err)
@@ -916,7 +916,7 @@ func (h *ElementHandle) GetAttribute(name string) (string, bool, error) {
 	}
 	opts := NewElementHandleBaseOptions(h.DefaultTimeout())
 	getAttributeAction := h.newAction(
-		[]string{}, getAttribute, opts.Force, opts.NoWaitAfter, opts.Timeout,
+		[]string{}, getAttribute, opts.Force, true, opts.NoWaitAfter, opts.Timeout,
 	)
 
 	v, err := call(h.ctx, getAttributeAction, opts.Timeout)
@@ -959,7 +959,7 @@ func (h *ElementHandle) InnerHTML() (string, error) {
 	}
 	opts := NewElementHandleBaseOptions(h.DefaultTimeout())
 	innerHTMLAction := h.newAction(
-		[]string{}, innerHTML, opts.Force, opts.NoWaitAfter, opts.Timeout,
+		[]string{}, innerHTML, opts.Force, true, opts.NoWaitAfter, opts.Timeout,
 	)
 	v, err := call(h.ctx, innerHTMLAction, opts.Timeout)
 	if err != nil {
@@ -983,7 +983,7 @@ func (h *ElementHandle) InnerText() (string, error) {
 	}
 	opts := NewElementHandleBaseOptions(h.DefaultTimeout())
 	innerTextAction := h.newAction(
-		[]string{}, innerText, opts.Force, opts.NoWaitAfter, opts.Timeout.Abs(),
+		[]string{}, innerText, opts.Force, true, opts.NoWaitAfter, opts.Timeout.Abs(),
 	)
 	v, err := call(h.ctx, innerTextAction, opts.Timeout)
 	if err != nil {
@@ -1005,7 +1005,7 @@ func (h *ElementHandle) InputValue(opts *ElementHandleBaseOptions) (string, erro
 	inputValue := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return handle.inputValue(apiCtx)
 	}
-	inputValueAction := h.newAction([]string{}, inputValue, opts.Force, opts.NoWaitAfter, opts.Timeout)
+	inputValueAction := h.newAction([]string{}, inputValue, opts.Force, true, opts.NoWaitAfter, opts.Timeout)
 	v, err := call(h.ctx, inputValueAction, opts.Timeout)
 	if err != nil {
 		return "", fmt.Errorf("getting element's input value: %w", err)
@@ -1142,7 +1142,7 @@ func (h *ElementHandle) Press(key string, opts *ElementHandlePressOptions) error
 		return nil, handle.press(apiCtx, key, KeyboardOptions{})
 	}
 	pressAction := h.newAction(
-		[]string{}, press, false, opts.NoWaitAfter, opts.Timeout,
+		[]string{}, press, false, true, opts.NoWaitAfter, opts.Timeout,
 	)
 	if _, err := call(h.ctx, pressAction, opts.Timeout); err != nil {
 		return fmt.Errorf("pressing %q on element: %w", key, err)
@@ -1387,7 +1387,7 @@ func (h *ElementHandle) SelectOption(values []any, opts *ElementHandleBaseOption
 		return handle.selectOption(apiCtx, values)
 	}
 	selectOptionAction := h.newAction(
-		[]string{}, selectOption, opts.Force, opts.NoWaitAfter, opts.Timeout,
+		[]string{}, selectOption, opts.Force, true, opts.NoWaitAfter, opts.Timeout,
 	)
 	selectedOptions, err := call(h.ctx, selectOptionAction, opts.Timeout)
 	if err != nil {
@@ -1409,7 +1409,7 @@ func (h *ElementHandle) SelectText(opts *ElementHandleBaseOptions) error {
 		return nil, handle.selectText(apiCtx)
 	}
 	selectTextAction := h.newAction(
-		[]string{}, selectText, opts.Force, opts.NoWaitAfter, opts.Timeout,
+		[]string{}, selectText, opts.Force, true, opts.NoWaitAfter, opts.Timeout,
 	)
 	if _, err := call(h.ctx, selectTextAction, opts.Timeout); err != nil {
 		return fmt.Errorf("selecting text: %w", err)
@@ -1425,7 +1425,7 @@ func (h *ElementHandle) SetInputFiles(files *Files, opts *ElementHandleSetInputF
 	setInputFiles := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return nil, handle.setInputFiles(apiCtx, files)
 	}
-	setInputFilesAction := h.newAction([]string{}, setInputFiles, opts.Force, opts.NoWaitAfter, opts.Timeout)
+	setInputFilesAction := h.newAction([]string{}, setInputFiles, opts.Force, true, opts.NoWaitAfter, opts.Timeout)
 	if _, err := call(h.ctx, setInputFilesAction, opts.Timeout); err != nil {
 		return fmt.Errorf("setting input files: %w", err)
 	}
@@ -1491,7 +1491,7 @@ func (h *ElementHandle) TextContent() (string, bool, error) {
 	}
 	opts := NewElementHandleBaseOptions(h.DefaultTimeout())
 	textContentAction := h.newAction(
-		[]string{}, textContent, opts.Force, opts.NoWaitAfter, opts.Timeout,
+		[]string{}, textContent, opts.Force, true, opts.NoWaitAfter, opts.Timeout,
 	)
 	v, err := call(h.ctx, textContentAction, opts.Timeout)
 	if err != nil {
@@ -1523,7 +1523,7 @@ func (h *ElementHandle) Type(text string, opts *ElementHandleTypeOptions) error 
 		return nil, handle.typ(apiCtx, text, KeyboardOptions{})
 	}
 	typeAction := h.newAction(
-		[]string{}, typ, false, opts.NoWaitAfter, opts.Timeout,
+		[]string{}, typ, false, true, opts.NoWaitAfter, opts.Timeout,
 	)
 	if _, err := call(h.ctx, typeAction, opts.Timeout); err != nil {
 		return fmt.Errorf("typing text %q: %w", text, err)
@@ -1577,7 +1577,7 @@ func (h *ElementHandle) eval(
 }
 
 func (h *ElementHandle) newAction(
-	states []string, fn elementHandleActionFunc, force, noWaitAfter bool, timeout time.Duration,
+	states []string, fn elementHandleActionFunc, force bool, retry bool, noWaitAfter bool, timeout time.Duration,
 ) func(apiCtx context.Context, resultCh chan any, errCh chan error) {
 	// All or a subset of the following actionability checks are made before performing the actual action:
 	// 1. Attached to DOM
@@ -1611,7 +1611,16 @@ func (h *ElementHandle) newAction(
 	}
 
 	return func(apiCtx context.Context, resultCh chan any, errCh chan error) {
-		if res, err := retryAction(apiCtx, actionFn); err != nil {
+		var res any
+		var err error
+
+		if retry && !force {
+			res, err = retryAction(apiCtx, actionFn)
+		} else {
+			res, err = actionFn(apiCtx)
+		}
+
+		if err != nil {
 			select {
 			case <-apiCtx.Done():
 			case errCh <- err:

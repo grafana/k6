@@ -574,7 +574,7 @@ func (f *Frame) boundingBox(selector string, opts *FrameBaseOptions) (*Rect, err
 		return handle.BoundingBox()
 	}
 	act := f.newAction(
-		selector, DOMElementStateAttached, opts.Strict, getBoundingBox, []string{}, false, true, opts.Timeout,
+		selector, DOMElementStateAttached, opts.Strict, getBoundingBox, []string{}, false, false, true, opts.Timeout,
 	)
 	v, err := call(f.ctx, act, opts.Timeout)
 	if err != nil {
@@ -747,7 +747,7 @@ func (f *Frame) isChecked(selector string, opts *FrameIsCheckedOptions) (bool, e
 		return v, err
 	}
 	act := f.newAction(
-		selector, DOMElementStateAttached, opts.Strict, isChecked, []string{}, false, true, opts.Timeout,
+		selector, DOMElementStateAttached, opts.Strict, isChecked, []string{}, false, true, true, opts.Timeout,
 	)
 	v, err := call(f.ctx, act, opts.Timeout)
 	if err != nil {
@@ -842,7 +842,7 @@ func (f *Frame) dispatchEvent(selector, typ string, eventInit any, opts *FrameDi
 	)
 	act := f.newAction(
 		selector, DOMElementStateAttached, opts.Strict, dispatchEvent, []string{},
-		force, noWaitAfter, opts.Timeout,
+		force, true, noWaitAfter, opts.Timeout,
 	)
 	if _, err := call(f.ctx, act, opts.Timeout); err != nil {
 		return errorFromDOMError(err)
@@ -944,7 +944,7 @@ func (f *Frame) fill(selector, value string, opts *FrameFillOptions) error {
 	act := f.newAction(
 		selector, DOMElementStateAttached, opts.Strict,
 		fill, []string{"visible", "enabled", "editable"},
-		opts.Force, opts.NoWaitAfter, opts.Timeout,
+		opts.Force, true, opts.NoWaitAfter, opts.Timeout,
 	)
 	if _, err := call(f.ctx, act, opts.Timeout); err != nil {
 		return errorFromDOMError(err)
@@ -972,7 +972,7 @@ func (f *Frame) focus(selector string, opts *FrameBaseOptions) error {
 	}
 	act := f.newAction(
 		selector, DOMElementStateAttached, opts.Strict, focus,
-		[]string{}, false, true, opts.Timeout,
+		[]string{}, false, true, true, opts.Timeout,
 	)
 	if _, err := call(f.ctx, act, opts.Timeout); err != nil {
 		return errorFromDOMError(err)
@@ -1011,7 +1011,7 @@ func (f *Frame) getAttribute(selector, name string, opts *FrameBaseOptions) (str
 	}
 	act := f.newAction(
 		selector, DOMElementStateAttached, opts.Strict, getAttribute,
-		[]string{}, false, true, opts.Timeout,
+		[]string{}, false, true, true, opts.Timeout,
 	)
 	v, err := call(f.ctx, act, opts.Timeout)
 	if err != nil {
@@ -1303,7 +1303,7 @@ func (f *Frame) innerHTML(selector string, opts *FrameInnerHTMLOptions) (string,
 	}
 	act := f.newAction(
 		selector, DOMElementStateAttached, opts.Strict, innerHTML,
-		[]string{}, false, true, opts.Timeout,
+		[]string{}, false, true, true, opts.Timeout,
 	)
 	v, err := call(f.ctx, act, opts.Timeout)
 	if err != nil {
@@ -1339,7 +1339,7 @@ func (f *Frame) innerText(selector string, opts *FrameInnerTextOptions) (string,
 	}
 	act := f.newAction(
 		selector, DOMElementStateAttached, opts.Strict, innerText,
-		[]string{}, false, true, opts.Timeout,
+		[]string{}, false, true, true, opts.Timeout,
 	)
 	v, err := call(f.ctx, act, opts.Timeout)
 	if err != nil {
@@ -1374,7 +1374,7 @@ func (f *Frame) inputValue(selector string, opts *FrameInputValueOptions) (strin
 	}
 	act := f.newAction(
 		selector, DOMElementStateAttached, opts.Strict, inputValue,
-		[]string{}, false, true, opts.Timeout,
+		[]string{}, false, true, true, opts.Timeout,
 	)
 	v, err := call(f.ctx, act, opts.Timeout)
 	if err != nil {
@@ -1426,7 +1426,7 @@ func (f *Frame) isEditable(selector string, opts *FrameIsEditableOptions) (bool,
 		return v, err
 	}
 	act := f.newAction(
-		selector, DOMElementStateAttached, opts.Strict, isEditable, []string{}, false, true, opts.Timeout,
+		selector, DOMElementStateAttached, opts.Strict, isEditable, []string{}, false, true, true, opts.Timeout,
 	)
 	v, err := call(f.ctx, act, opts.Timeout)
 	if err != nil {
@@ -1463,7 +1463,7 @@ func (f *Frame) isEnabled(selector string, opts *FrameIsEnabledOptions) (bool, e
 		return v, err
 	}
 	act := f.newAction(
-		selector, DOMElementStateAttached, opts.Strict, isEnabled, []string{}, false, true, opts.Timeout,
+		selector, DOMElementStateAttached, opts.Strict, isEnabled, []string{}, false, true, true, opts.Timeout,
 	)
 	v, err := call(f.ctx, act, opts.Timeout)
 	if err != nil {
@@ -1500,7 +1500,7 @@ func (f *Frame) isDisabled(selector string, opts *FrameIsDisabledOptions) (bool,
 		return v, err
 	}
 	act := f.newAction(
-		selector, DOMElementStateAttached, opts.Strict, isDisabled, []string{}, false, true, opts.Timeout,
+		selector, DOMElementStateAttached, opts.Strict, isDisabled, []string{}, false, true, true, opts.Timeout,
 	)
 	v, err := call(f.ctx, act, opts.Timeout)
 	if err != nil {
@@ -1663,7 +1663,7 @@ func (f *Frame) press(selector, key string, opts *FramePressOptions) error {
 	}
 	act := f.newAction(
 		selector, DOMElementStateAttached, opts.Strict, press,
-		[]string{}, false, opts.NoWaitAfter, opts.Timeout,
+		[]string{}, false, true, opts.NoWaitAfter, opts.Timeout,
 	)
 	if _, err := call(f.ctx, act, opts.Timeout); err != nil {
 		return errorFromDOMError(err)
@@ -1693,7 +1693,7 @@ func (f *Frame) selectOption(selector string, values []any, opts *FrameSelectOpt
 	}
 	act := f.newAction(
 		selector, DOMElementStateAttached, opts.Strict, selectOption,
-		[]string{}, opts.Force, opts.NoWaitAfter, opts.Timeout,
+		[]string{}, opts.Force, true, opts.NoWaitAfter, opts.Timeout,
 	)
 	v, err := call(f.ctx, act, opts.Timeout)
 	if err != nil {
@@ -1803,7 +1803,7 @@ func (f *Frame) setInputFiles(selector string, files *Files, opts *FrameSetInput
 	act := f.newAction(
 		selector, DOMElementStateAttached, opts.Strict,
 		setInputFiles, []string{},
-		opts.Force, opts.NoWaitAfter, opts.Timeout,
+		opts.Force, true, opts.NoWaitAfter, opts.Timeout,
 	)
 
 	if _, err := call(f.ctx, act, opts.Timeout); err != nil {
@@ -1833,7 +1833,7 @@ func (f *Frame) textContent(selector string, opts *FrameTextContentOptions) (str
 	}
 	act := f.newAction(
 		selector, DOMElementStateAttached, opts.Strict, TextContent,
-		[]string{}, false, true, opts.Timeout,
+		[]string{}, true, false, true, opts.Timeout,
 	)
 	v, err := call(f.ctx, act, opts.Timeout)
 	if err != nil {
@@ -1892,7 +1892,7 @@ func (f *Frame) typ(selector, text string, opts *FrameTypeOptions) error {
 	}
 	act := f.newAction(
 		selector, DOMElementStateAttached, opts.Strict, typeText,
-		[]string{}, false, opts.NoWaitAfter, opts.Timeout,
+		[]string{}, true, false, opts.NoWaitAfter, opts.Timeout,
 	)
 	if _, err := call(f.ctx, act, opts.Timeout); err != nil {
 		return errorFromDOMError(err)
@@ -2261,7 +2261,7 @@ func (f *Frame) evaluateWithSelector(selector string, pageFunc string, args ...a
 	}
 
 	act := f.newAction(
-		selector, DOMElementStateAttached, true, evaluate, []string{}, false, true, f.defaultTimeout(),
+		selector, DOMElementStateAttached, true, evaluate, []string{}, false, true, true, f.defaultTimeout(),
 	)
 	v, err := call(f.ctx, act, f.defaultTimeout())
 	if err != nil {
@@ -2278,7 +2278,7 @@ func (f *Frame) evaluateHandleWithSelector(selector string, pageFunc string, arg
 	}
 
 	act := f.newAction(
-		selector, DOMElementStateAttached, true, evaluateHandle, []string{}, false, true, f.defaultTimeout(),
+		selector, DOMElementStateAttached, true, evaluateHandle, []string{}, false, true, true, f.defaultTimeout(),
 	)
 	v, err := call(f.ctx, act, f.defaultTimeout())
 	if err != nil {
@@ -2356,7 +2356,7 @@ func (f *Frame) runActionOnSelector(
 //nolint:unparam
 func (f *Frame) newAction(
 	selector string, state DOMElementState, strict bool, fn elementHandleActionFunc, states []string,
-	force, noWaitAfter bool, timeout time.Duration,
+	force bool, retry bool, noWaitAfter bool, timeout time.Duration,
 ) func(apiCtx context.Context, resultCh chan any, errCh chan error) {
 	// We execute a frame action in the following steps:
 	// 1. Find element matching specified selector
@@ -2381,7 +2381,7 @@ func (f *Frame) newAction(
 			}
 			return
 		}
-		f := handle.newAction(states, fn, force, noWaitAfter, timeout)
+		f := handle.newAction(states, fn, force, retry, noWaitAfter, timeout)
 		f(apiCtx, resultCh, errCh)
 	}
 }
