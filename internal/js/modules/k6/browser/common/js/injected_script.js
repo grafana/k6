@@ -1767,12 +1767,39 @@ class InjectedScript {
     };
   }
 
-  _querySelectorRecursively(roots, selector, index, queryCache) {
+  _querySelectorRecursively(roots, selector, index, queryCache, originalRoot) {
     if (index === selector.parts.length) {
       return roots;
     }
 
     const part = selector.parts[index];
+    if (part.name === "internal:or") {
+      const innerSelector = JSON.parse(part.body);
+      const orRoots = this._querySelectorRecursively(
+        [{ element: originalRoot, capture: undefined }],
+        innerSelector,
+        0,
+        new k6BrowserNative.Map(),
+        originalRoot
+      );
+      const merged = [...roots, ...orRoots];
+      const seen = new k6BrowserNative.Set();
+      const unique = [];
+      for (const item of merged) {
+        if (!seen.has(item.element)) {
+          seen.add(item.element);
+          unique.push(item);
+        }
+      }
+      unique.sort((a, b) => {
+        const pos = a.element.compareDocumentPosition(b.element);
+        if (pos & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
+        if (pos & Node.DOCUMENT_POSITION_PRECEDING) return 1;
+        return 0;
+      });
+      return this._querySelectorRecursively(unique, selector, index + 1, queryCache, originalRoot);
+    }
+
     if (part.name === "nth") {
       let filtered = [];
       if (part.body === "0") {
@@ -1798,7 +1825,8 @@ class InjectedScript {
         filtered,
         selector,
         index + 1,
-        queryCache
+        queryCache,
+        originalRoot
       );
     }
 
@@ -1834,7 +1862,7 @@ class InjectedScript {
       }
 
       // Explore the Shadow DOM recursively.
-      const shadowResults = this._exploreShadowDOM(root.element, selector, index, queryCache, capture);
+      const shadowResults = this._exploreShadowDOM(root.element, selector, index, queryCache, capture, originalRoot);
       result.push(...shadowResults);
     }
 
@@ -1842,18 +1870,20 @@ class InjectedScript {
       result,
       selector,
       index + 1,
-      queryCache
+      queryCache,
+      originalRoot
     );
   }
 
-  _exploreShadowDOM(root, selector, index, queryCache, capture) {
+  _exploreShadowDOM(root, selector, index, queryCache, capture, originalRoot) {
     let result = [];
     if (root.shadowRoot) {
       const shadowRootResults = this._querySelectorRecursively(
         [{ element: root.shadowRoot, capture }],
         selector,
         index,
-        queryCache
+        queryCache,
+        originalRoot
       );
       result = result.concat(shadowRootResults);
     }
@@ -1862,7 +1892,7 @@ class InjectedScript {
     
     for (let i = 0; i < root.children.length; i++) {
       const childElement = root.children[i];
-      result = result.concat(this._exploreShadowDOM(childElement, selector, index, queryCache, capture));
+      result = result.concat(this._exploreShadowDOM(childElement, selector, index, queryCache, capture, originalRoot));
     }
     
     return result;
@@ -2244,7 +2274,8 @@ class InjectedScript {
       [{ element: root, capture: undefined }],
       selector,
       0,
-      new k6BrowserNative.Map()
+      new k6BrowserNative.Map(),
+      root
     );
     if (strict && result.length > 1) {
       throw "error:strictmodeviolation";
@@ -2263,7 +2294,8 @@ class InjectedScript {
       [{ element: root, capture: undefined }],
       selector,
       0,
-      new k6BrowserNative.Map()
+      new k6BrowserNative.Map(),
+      root
     );
     const set = new k6BrowserNative.Set();
     for (const r of result) {
