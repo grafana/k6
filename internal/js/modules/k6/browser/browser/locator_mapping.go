@@ -16,6 +16,7 @@ import (
 func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 	rt := vu.Runtime()
 	return mapping{
+		"__locator": lo,
 		"all": func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				all, err := lo.All()
@@ -317,6 +318,19 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 		"nth": func(nth int) *sobek.Object {
 			ml := mapLocator(vu, lo.Nth(nth))
 			return rt.ToValue(ml).ToObject(rt)
+		},
+		"or": func(locatorObj sobek.Value) (*sobek.Object, error) {
+			obj := locatorObj.ToObject(rt)
+			innerLocVal := obj.Get("__locator")
+			if k6common.IsNullish(innerLocVal) {
+				return nil, errors.New("internal locator is missing")
+			}
+			innerLoc, ok := innerLocVal.Export().(*common.Locator)
+			if !ok {
+				return nil, errors.New("internal locator has invalid type")
+			}
+			ml := mapLocator(vu, lo.Or(innerLoc))
+			return rt.ToValue(ml).ToObject(rt), nil
 		},
 		"textContent": func(opts sobek.Value) (*sobek.Promise, error) {
 			copts := common.NewFrameTextContentOptions(lo.Timeout())
