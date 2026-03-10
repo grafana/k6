@@ -1049,7 +1049,7 @@ func TestBoundingBoxOnInvisibleElement(t *testing.T) {
 
 	rect, err := loc.BoundingBox(&common.FrameBaseOptions{Strict: true, Timeout: time.Second})
 
-	require.ErrorContains(t, err, common.ErrElementNotVisible.Error())
+	require.ErrorIs(t, err, common.ErrElementNotVisible)
 	require.Nil(t, rect)
 }
 

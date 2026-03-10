@@ -1854,6 +1854,14 @@ func errorFromDOMError(v any) error {
 		return ErrElementNotAttachedToDOM
 	}
 
+	if errors.Is(err, ErrElementNotVisible) {
+		return ErrElementNotVisible
+	}
+
+	if errors.Is(err, ErrElementNotAttachedToDOM) {
+		return ErrElementNotVisible
+	}
+
 	errs := map[string]string{
 		"error:notelement":             "node is not an element",
 		"error:nothtmlelement":         "not an HTMLElement",
