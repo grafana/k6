@@ -267,7 +267,7 @@ func (b *Bundle) Instantiate(ctx context.Context, vuID uint64) (*BundleInstance,
 		},
 	}
 	vuImpl.eventLoop = eventloop.New(vuImpl)
-	bi, err := b.instantiate(vuImpl, vuID, false)
+	bi, err := b.instantiate(vuImpl, vuID, true)
 	if err != nil {
 		return nil, err
 	}

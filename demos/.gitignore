@@ -1,0 +1,5 @@
+*/out/
+05-csv-papaparse/data.csv
+06-csv-experimental-csv/data.csv
+07-json-sharedarray/data.json
+08-json-no-sharedarray/data.json

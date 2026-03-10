@@ -12,6 +12,11 @@ vim.api.nvim_create_user_command("K6ProfileClear", function()
   k6p.clear(0)
 end, {})
 
+
+vim.api.nvim_create_user_command("K6ProfileRunCurrent", function()
+  k6p.run_current_file()
+end, {})
+
 vim.api.nvim_create_autocmd({ "BufEnter", "BufWinEnter" }, {
   callback = function(args)
     if next(k6p.state.by_file) ~= nil then
