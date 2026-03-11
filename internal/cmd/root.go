@@ -7,6 +7,7 @@ import (
 	"io"
 	stdlog "log"
 	"runtime/debug"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -416,8 +417,20 @@ func createSecretSources(gs *state.GlobalState) (map[string]secretsource.Source,
 		Usage:       gs.Usage,
 	}
 
+	// K6_SECRET_SOURCE is equivalent to a single extra --secret-source flag.
+	// It is treated as one complete source spec (e.g. "file=path.secret" or
+	// "mock=name=mysource,key=value") so commas inside the spec are handled
+	// correctly by extractNameAndDefault and the source's own config parser.
+	// Exact duplicates of an already-present flag value are skipped silently.
+	secretSourceArgs := gs.Flags.SecretSource
+	if envSrc := strings.TrimSpace(gs.Env["K6_SECRET_SOURCE"]); envSrc != "" {
+		if !slices.Contains(secretSourceArgs, envSrc) {
+			secretSourceArgs = append(secretSourceArgs, envSrc)
+		}
+	}
+
 	result := make(map[string]secretsource.Source)
-	for _, line := range gs.Flags.SecretSource {
+	for _, line := range secretSourceArgs {
 		t, config, ok := strings.Cut(line, "=")
 		if !ok {
 			// Special case: allow --secret-source=url without explicit config
