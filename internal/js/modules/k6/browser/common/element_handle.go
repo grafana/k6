@@ -1859,7 +1859,7 @@ func errorFromDOMError(v any) error {
 	}
 
 	if errors.Is(err, ErrElementNotAttachedToDOM) {
-		return ErrElementNotVisible
+		return ErrElementNotAttachedToDOM
 	}
 
 	errs := map[string]string{
