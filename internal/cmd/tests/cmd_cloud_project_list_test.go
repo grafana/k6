@@ -31,7 +31,7 @@ func TestCloudProjectList(t *testing.T) {
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 		stdout := ts.Stdout.String()
-		assert.Contains(t, stdout, fmt.Sprintf("Projects for stack %d:", validStackID))
+		assert.Contains(t, stdout, fmt.Sprintf("Projects for stack-%d:", validStackID))
 		assert.Contains(t, stdout, "ID   NAME              DEFAULT")
 		assert.Contains(t, stdout, "1    Default project   yes")
 		assert.Contains(t, stdout, "2    My project        no")
@@ -84,7 +84,7 @@ func TestCloudProjectList(t *testing.T) {
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 		stdout := ts.Stdout.String()
-		assert.Contains(t, stdout, fmt.Sprintf("Projects for stack %d:", validStackID))
+		assert.Contains(t, stdout, fmt.Sprintf("Projects for stack-%d:", validStackID))
 		assert.Contains(t, stdout, "No projects found.")
 		assert.Contains(t, stdout, "https://grafana.com/docs/grafana-cloud/testing/k6/projects/")
 	})
