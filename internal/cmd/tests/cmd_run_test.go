@@ -2733,6 +2733,8 @@ func TestK6SecretSourceEnvVar(t *testing.T) {
 		t.Log(stderr)
 		assert.NotContains(t, stderr, "level=error")
 		assert.Contains(t, stderr, `level=info msg="***SECRET_REDACTED***" source=console`)
+		assert.NotContains(t, stderr, "something")
+		assert.NotContains(t, stderr, "other")
 	})
 
 	t.Run("file source via env var", func(t *testing.T) {
@@ -2751,6 +2753,8 @@ func TestK6SecretSourceEnvVar(t *testing.T) {
 		t.Log(stderr)
 		assert.NotContains(t, stderr, "level=error")
 		assert.Contains(t, stderr, `level=info msg="***SECRET_REDACTED***" source=console`)
+		assert.NotContains(t, stderr, "val1")
+		assert.NotContains(t, stderr, "val2")
 	})
 
 	t.Run("commas inside spec are not treated as source separators", func(t *testing.T) {
