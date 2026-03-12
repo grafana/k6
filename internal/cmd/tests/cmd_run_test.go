@@ -2900,6 +2900,26 @@ func TestK6SecretSourceEnvVar(t *testing.T) {
 		assert.NotContains(t, stderr, "level=error")
 		assert.Contains(t, stderr, `level=info msg="***SECRET_REDACTED***" source=console`)
 	})
+
+	t.Run("conflicting source name via env var and flag gives clear error", func(t *testing.T) {
+		// --secret-source is registered first; K6_SECRET_SOURCE is appended after.
+		// When both resolve to the same source name (but different configs), the
+		// second registration fails with a clear "already registered" error.
+		// This also documents precedence: the flag spec wins, env var loses.
+		t.Parallel()
+		ts := NewGlobalTestState(t)
+		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(script), 0o644))
+
+		ts.ExpectedExitCode = -1
+		ts.Env["K6_SECRET_SOURCE"] = "mock=name=src,cool=fromenv"
+		ts.CmdArgs = []string{"k6", "run", "--secret-source=mock=name=src,cool=fromflag", "script.js"}
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stderr := ts.Stderr.String()
+		t.Log(stderr)
+		assert.Contains(t, stderr, "already registered")
+	})
 }
 
 func TestSummaryExport(t *testing.T) {
