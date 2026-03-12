@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math"
 	"strings"
@@ -69,9 +68,7 @@ func (c *cmdCloudProjectList) run(_ *cobra.Command, _ []string) error {
 	}
 
 	if !cloudConfig.StackID.Valid || cloudConfig.StackID.Int64 == 0 {
-		return errors.New(
-			"no stack configured. Please run `k6 cloud login --stack <your-stack>` to set a default stack",
-		)
+		return errNoStackConfigured
 	}
 
 	client, err := v6cloudapi.NewClient(
