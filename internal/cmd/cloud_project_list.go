@@ -96,7 +96,11 @@ func (c *cmdCloudProjectList) run(_ *cobra.Command, _ []string) error {
 		return c.outputJSON(resp.Value)
 	}
 
-	stackHeader := fmt.Sprintf("Projects for stack %d:\n\n", cloudConfig.StackID.Int64)
+	stackName := cloudConfig.StackURL.String
+	if !cloudConfig.StackURL.Valid {
+		stackName = fmt.Sprintf("stack-%d", cloudConfig.StackID.Int64)
+	}
+	stackHeader := fmt.Sprintf("Projects for %s:\n\n", stackName)
 
 	if len(resp.Value) == 0 {
 		printToStdout(c.globalState, stackHeader+
