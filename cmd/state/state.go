@@ -207,6 +207,8 @@ func GetDefaultFlags(homeDir string, cacheDir string) GlobalFlags {
 	}
 }
 
+// GetFlags builds GlobalFlags by applying environment variables and CLI args on
+// top of the provided defaults.
 func GetFlags(defaultFlags GlobalFlags, env map[string]string, args []string) GlobalFlags {
 	result := defaultFlags
 
