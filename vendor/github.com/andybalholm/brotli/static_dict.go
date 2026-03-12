@@ -14,10 +14,11 @@ const maxStaticDictionaryMatchLen = 37
 
 const kInvalidMatch uint32 = 0xFFFFFFF
 
-/* Copyright 2013 Google Inc. All Rights Reserved.
+/*
+Copyright 2013 Google Inc. All Rights Reserved.
 
-   Distributed under MIT license.
-   See file LICENSE for detail or copy at https://opensource.org/licenses/MIT
+	Distributed under MIT license.
+	See file LICENSE for detail or copy at https://opensource.org/licenses/MIT
 */
 func hash(data []byte) uint32 {
 	var h uint32 = binary.LittleEndian.Uint32(data) * kDictHashMul32

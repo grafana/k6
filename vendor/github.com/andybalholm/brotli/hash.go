@@ -42,12 +42,14 @@ type hasherSearchResult struct {
 	len_code_delta int
 }
 
-/* kHashMul32 multiplier has these properties:
-   * The multiplier must be odd. Otherwise we may lose the highest bit.
-   * No long streaks of ones or zeros.
-   * There is no effort to ensure that it is a prime, the oddity is enough
-     for this use.
-   * The number has been tuned heuristically against compression benchmarks. */
+/*
+kHashMul32 multiplier has these properties:
+  - The multiplier must be odd. Otherwise we may lose the highest bit.
+  - No long streaks of ones or zeros.
+  - There is no effort to ensure that it is a prime, the oddity is enough
+    for this use.
+  - The number has been tuned heuristically against compression benchmarks.
+*/
 const kHashMul32 uint32 = 0x1E35A7BD
 
 const kHashMul64 uint64 = 0x1E35A7BD1E35A7BD
@@ -90,22 +92,25 @@ const distanceBitPenalty = 30
 /* Score must be positive after applying maximal penalty. */
 const scoreBase = (distanceBitPenalty * 8 * 8)
 
-/* Usually, we always choose the longest backward reference. This function
-   allows for the exception of that rule.
+/*
+Usually, we always choose the longest backward reference. This function
 
-   If we choose a backward reference that is further away, it will
-   usually be coded with more bits. We approximate this by assuming
-   log2(distance). If the distance can be expressed in terms of the
-   last four distances, we use some heuristic constants to estimate
-   the bits cost. For the first up to four literals we use the bit
-   cost of the literals from the literal cost model, after that we
-   use the average bit cost of the cost model.
+	allows for the exception of that rule.
 
-   This function is used to sometimes discard a longer backward reference
-   when it is not much longer and the bit cost for encoding it is more
-   than the saved literals.
+	If we choose a backward reference that is further away, it will
+	usually be coded with more bits. We approximate this by assuming
+	log2(distance). If the distance can be expressed in terms of the
+	last four distances, we use some heuristic constants to estimate
+	the bits cost. For the first up to four literals we use the bit
+	cost of the literals from the literal cost model, after that we
+	use the average bit cost of the cost model.
 
-   backward_reference_offset MUST be positive. */
+	This function is used to sometimes discard a longer backward reference
+	when it is not much longer and the bit cost for encoding it is more
+	than the saved literals.
+
+	backward_reference_offset MUST be positive.
+*/
 func backwardReferenceScore(copy_length uint, backward_reference_offset uint) uint {
 	return scoreBase + literalByteScore*uint(copy_length) - distanceBitPenalty*uint(log2FloorNonZero(backward_reference_offset))
 }

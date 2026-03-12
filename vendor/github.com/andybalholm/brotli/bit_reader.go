@@ -70,11 +70,14 @@ type bitReaderState struct {
 
 /* Initializes the BrotliBitReader fields. */
 
-/* Ensures that accumulator is not empty.
-   May consume up to sizeof(brotli_reg_t) - 1 bytes of input.
-   Returns false if data is required but there is no input available.
-   For BROTLI_ALIGNED_READ this function also prepares bit reader for aligned
-   reading. */
+/*
+Ensures that accumulator is not empty.
+
+	May consume up to sizeof(brotli_reg_t) - 1 bytes of input.
+	Returns false if data is required but there is no input available.
+	For BROTLI_ALIGNED_READ this function also prepares bit reader for aligned
+	reading.
+*/
 func bitReaderSaveState(from *bitReader, to *bitReaderState) {
 	to.val_ = from.val_
 	to.bit_pos_ = from.bit_pos_
@@ -95,22 +98,31 @@ func getAvailableBits(br *bitReader) uint32 {
 	return 64 - br.bit_pos_
 }
 
-/* Returns amount of unread bytes the bit reader still has buffered from the
-   BrotliInput, including whole bytes in br->val_. */
+/*
+Returns amount of unread bytes the bit reader still has buffered from the
+
+	BrotliInput, including whole bytes in br->val_.
+*/
 func getRemainingBytes(br *bitReader) uint {
 	return uint(uint32(br.input_len-br.byte_pos) + (getAvailableBits(br) >> 3))
 }
 
-/* Checks if there is at least |num| bytes left in the input ring-buffer
-   (excluding the bits remaining in br->val_). */
+/*
+Checks if there is at least |num| bytes left in the input ring-buffer
+
+	(excluding the bits remaining in br->val_).
+*/
 func checkInputAmount(br *bitReader, num uint) bool {
 	return br.input_len-br.byte_pos >= num
 }
 
-/* Guarantees that there are at least |n_bits| + 1 bits in accumulator.
-   Precondition: accumulator contains at least 1 bit.
-   |n_bits| should be in the range [1..24] for regular build. For portable
-   non-64-bit little-endian build only 16 bits are safe to request. */
+/*
+Guarantees that there are at least |n_bits| + 1 bits in accumulator.
+
+	Precondition: accumulator contains at least 1 bit.
+	|n_bits| should be in the range [1..24] for regular build. For portable
+	non-64-bit little-endian build only 16 bits are safe to request.
+*/
 func fillBitWindow(br *bitReader, n_bits uint32) {
 	if br.bit_pos_ >= 32 {
 		br.val_ >>= 32
@@ -120,14 +132,20 @@ func fillBitWindow(br *bitReader, n_bits uint32) {
 	}
 }
 
-/* Mostly like BrotliFillBitWindow, but guarantees only 16 bits and reads no
-   more than BROTLI_SHORT_FILL_BIT_WINDOW_READ bytes of input. */
+/*
+Mostly like BrotliFillBitWindow, but guarantees only 16 bits and reads no
+
+	more than BROTLI_SHORT_FILL_BIT_WINDOW_READ bytes of input.
+*/
 func fillBitWindow16(br *bitReader) {
 	fillBitWindow(br, 17)
 }
 
-/* Tries to pull one byte of input to accumulator.
-   Returns false if there is no input available. */
+/*
+Tries to pull one byte of input to accumulator.
+
+	Returns false if there is no input available.
+*/
 func pullByte(br *bitReader) bool {
 	if br.byte_pos == br.input_len {
 		return false
@@ -140,28 +158,40 @@ func pullByte(br *bitReader) bool {
 	return true
 }
 
-/* Returns currently available bits.
-   The number of valid bits could be calculated by BrotliGetAvailableBits. */
+/*
+Returns currently available bits.
+
+	The number of valid bits could be calculated by BrotliGetAvailableBits.
+*/
 func getBitsUnmasked(br *bitReader) uint64 {
 	return br.val_ >> br.bit_pos_
 }
 
-/* Like BrotliGetBits, but does not mask the result.
-   The result contains at least 16 valid bits. */
+/*
+Like BrotliGetBits, but does not mask the result.
+
+	The result contains at least 16 valid bits.
+*/
 func get16BitsUnmasked(br *bitReader) uint32 {
 	fillBitWindow(br, 16)
 	return uint32(getBitsUnmasked(br))
 }
 
-/* Returns the specified number of bits from |br| without advancing bit
-   position. */
+/*
+Returns the specified number of bits from |br| without advancing bit
+
+	position.
+*/
 func getBits(br *bitReader, n_bits uint32) uint32 {
 	fillBitWindow(br, n_bits)
 	return uint32(getBitsUnmasked(br)) & bitMask(n_bits)
 }
 
-/* Tries to peek the specified amount of bits. Returns false, if there
-   is not enough input. */
+/*
+Tries to peek the specified amount of bits. Returns false, if there
+
+	is not enough input.
+*/
 func safeGetBits(br *bitReader, n_bits uint32, val *uint32) bool {
 	for getAvailableBits(br) < n_bits {
 		if !pullByte(br) {
@@ -191,15 +221,21 @@ func bitReaderUnload(br *bitReader) {
 	br.bit_pos_ += unused_bits
 }
 
-/* Reads the specified number of bits from |br| and advances the bit pos.
-   Precondition: accumulator MUST contain at least |n_bits|. */
+/*
+Reads the specified number of bits from |br| and advances the bit pos.
+
+	Precondition: accumulator MUST contain at least |n_bits|.
+*/
 func takeBits(br *bitReader, n_bits uint32, val *uint32) {
 	*val = uint32(getBitsUnmasked(br)) & bitMask(n_bits)
 	dropBits(br, n_bits)
 }
 
-/* Reads the specified number of bits from |br| and advances the bit pos.
-   Assumes that there is enough input to perform BrotliFillBitWindow. */
+/*
+Reads the specified number of bits from |br| and advances the bit pos.
+
+	Assumes that there is enough input to perform BrotliFillBitWindow.
+*/
 func readBits(br *bitReader, n_bits uint32) uint32 {
 	var val uint32
 	fillBitWindow(br, n_bits)
@@ -207,8 +243,11 @@ func readBits(br *bitReader, n_bits uint32) uint32 {
 	return val
 }
 
-/* Tries to read the specified amount of bits. Returns false, if there
-   is not enough input. |n_bits| MUST be positive. */
+/*
+Tries to read the specified amount of bits. Returns false, if there
+
+	is not enough input. |n_bits| MUST be positive.
+*/
 func safeReadBits(br *bitReader, n_bits uint32, val *uint32) bool {
 	for getAvailableBits(br) < n_bits {
 		if !pullByte(br) {
@@ -220,8 +259,11 @@ func safeReadBits(br *bitReader, n_bits uint32, val *uint32) bool {
 	return true
 }
 
-/* Advances the bit reader position to the next byte boundary and verifies
-   that any skipped bits are set to zero. */
+/*
+Advances the bit reader position to the next byte boundary and verifies
+
+	that any skipped bits are set to zero.
+*/
 func bitReaderJumpToByteBoundary(br *bitReader) bool {
 	var pad_bits_count uint32 = getAvailableBits(br) & 0x7
 	var pad_bits uint32 = 0
@@ -232,9 +274,12 @@ func bitReaderJumpToByteBoundary(br *bitReader) bool {
 	return pad_bits == 0
 }
 
-/* Copies remaining input bytes stored in the bit reader to the output. Value
-   |num| may not be larger than BrotliGetRemainingBytes. The bit reader must be
-   warmed up again after this. */
+/*
+Copies remaining input bytes stored in the bit reader to the output. Value
+
+	|num| may not be larger than BrotliGetRemainingBytes. The bit reader must be
+	warmed up again after this.
+*/
 func copyBytes(dest []byte, br *bitReader, num uint) {
 	for getAvailableBits(br) >= 8 && num > 0 {
 		dest[0] = byte(getBitsUnmasked(br))

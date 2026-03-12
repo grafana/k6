@@ -49,7 +49,7 @@ Then validating a variable of type NewUserRequest becomes trivial.
 		// do something
 	}
 
-Builtin validator functions
+# Builtin validator functions
 
 Here is the list of validator functions builtin in the package.
 
@@ -93,7 +93,7 @@ instance, these fields will never be valid.
 	B string  `validate:"len=10,regexp=^$"
 	...
 
-Custom validation functions
+# Custom validation functions
 
 It is possible to define custom validation functions by using SetValidationFunc.
 First, one needs to create a validation function.
@@ -165,16 +165,16 @@ false and with error validate.ErrUnknownTag.
 Finally, package validator also provides a helper function that can be used
 to validate simple variables/values.
 
-    	// errs: nil
-	errs = validator.Valid(42, "min=10, max=50")
+	    	// errs: nil
+		errs = validator.Valid(42, "min=10, max=50")
 
-	// errs: [validate.ErrZeroValue]
-	errs = validator.Valid(nil, "nonzero")
+		// errs: [validate.ErrZeroValue]
+		errs = validator.Valid(nil, "nonzero")
 
-	// errs: [validate.ErrMin,validate.ErrMax]
-	errs = validator.Valid("hi", "nonzero,min=3,max=2")
+		// errs: [validate.ErrMin,validate.ErrMax]
+		errs = validator.Valid("hi", "nonzero,min=3,max=2")
 
-Custom tag name
+# Custom tag name
 
 In case there is a reason why one would not wish to use tag 'validate' (maybe due to
 a conflict with a different package), it is possible to tell the package to use
@@ -197,7 +197,7 @@ with a new call to SetTag. A way to temporarily use a different tag exists.
 	// But this will go back to using 'validate'
 	validator.Validate(t)
 
-Multiple validators
+# Multiple validators
 
 You may often need to have a different set of validation
 rules for different situations. In all the examples above,
@@ -264,6 +264,5 @@ You might use two different validators.
 It is also possible to do all of that using only the default validator as long
 as SetTag is always called before calling validator.Validate() or you chain the
 with WithTag().
-
 */
 package validator

@@ -1314,15 +1314,18 @@ func TestAbortedByScriptAbortInVUCode(t *testing.T) {
 		export function handleSummary() { return {stdout: '\n\n\nbogus summary\n\n\n'};}
 	`
 
-	t.Run("noLinger", func(t *testing.T) {
-		t.Parallel()
-		testAbortedByScriptTestAbort(t, script, runTestWithNoLinger)
-	})
-
-	t.Run("withLinger", func(t *testing.T) {
-		t.Parallel()
-		testAbortedByScriptTestAbort(t, script, runTestWithLinger)
-	})
+	for _, tc := range []struct {
+		name    string
+		runTest func(*testing.T, *GlobalTestState)
+	}{
+		{"noLinger", runTestWithNoLinger},
+		{"withLinger", runTestWithLinger},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			testAbortedByScriptTestAbort(t, script, tc.runTest)
+		})
+	}
 }
 
 func TestAbortedByScriptAbortInVUCodeInGroup(t *testing.T) {
@@ -1338,15 +1341,18 @@ func TestAbortedByScriptAbortInVUCodeInGroup(t *testing.T) {
 		export function handleSummary() { return {stdout: '\n\n\nbogus summary\n\n\n'};}
 	`
 
-	t.Run("noLinger", func(t *testing.T) {
-		t.Parallel()
-		testAbortedByScriptTestAbort(t, script, runTestWithNoLinger)
-	})
-
-	t.Run("withLinger", func(t *testing.T) {
-		t.Parallel()
-		testAbortedByScriptTestAbort(t, script, runTestWithLinger)
-	})
+	for _, tc := range []struct {
+		name    string
+		runTest func(*testing.T, *GlobalTestState)
+	}{
+		{"noLinger", runTestWithNoLinger},
+		{"withLinger", runTestWithLinger},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			testAbortedByScriptTestAbort(t, script, tc.runTest)
+		})
+	}
 }
 
 func TestAbortedByScriptAbortInSetup(t *testing.T) {
@@ -1360,14 +1366,18 @@ func TestAbortedByScriptAbortInSetup(t *testing.T) {
 		export function handleSummary() { return {stdout: '\n\n\nbogus summary\n\n\n'};}
 	`
 
-	t.Run("noLinger", func(t *testing.T) {
-		t.Parallel()
-		testAbortedByScriptTestAbort(t, script, runTestWithNoLinger)
-	})
-	t.Run("withLinger", func(t *testing.T) {
-		t.Parallel()
-		testAbortedByScriptTestAbort(t, script, runTestWithLinger)
-	})
+	for _, tc := range []struct {
+		name    string
+		runTest func(*testing.T, *GlobalTestState)
+	}{
+		{"noLinger", runTestWithNoLinger},
+		{"withLinger", runTestWithLinger},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			testAbortedByScriptTestAbort(t, script, tc.runTest)
+		})
+	}
 }
 
 func TestAbortedByScriptAbortInTeardown(t *testing.T) {
@@ -1381,15 +1391,18 @@ func TestAbortedByScriptAbortInTeardown(t *testing.T) {
 		export function handleSummary() { return {stdout: '\n\n\nbogus summary\n\n\n'};}
 	`
 
-	t.Run("noLinger", func(t *testing.T) {
-		t.Parallel()
-		testAbortedByScriptTestAbort(t, script, runTestWithNoLinger)
-	})
-
-	t.Run("withLinger", func(t *testing.T) {
-		t.Parallel()
-		testAbortedByScriptTestAbort(t, script, runTestWithLinger)
-	})
+	for _, tc := range []struct {
+		name    string
+		runTest func(*testing.T, *GlobalTestState)
+	}{
+		{"noLinger", runTestWithNoLinger},
+		{"withLinger", runTestWithLinger},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			testAbortedByScriptTestAbort(t, script, tc.runTest)
+		})
+	}
 }
 
 func testAbortedByScriptTestAbort(t *testing.T, script string, runTest func(*testing.T, *GlobalTestState)) {
@@ -2719,23 +2732,59 @@ func TestK6SecretSourceEnvVar(t *testing.T) {
 		}
 	`
 
-	t.Run("basic mock source via env var", func(t *testing.T) {
-		t.Parallel()
-		ts := NewGlobalTestState(t)
-		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(script), 0o644))
+	tests := []struct {
+		name             string
+		envVar           string
+		expectedExitCode int
+		contains         []string
+		notContains      []string
+	}{
+		{
+			name:        "basic mock source via env var",
+			envVar:      "mock=cool=something,else=other",
+			contains:    []string{`level=info msg="***SECRET_REDACTED***" source=console`},
+			notContains: []string{"level=error", "something", "other"},
+		},
+		{
+			name:     "empty env var is ignored, no source configured error",
+			envVar:   "",
+			contains: []string{"no secret sources are configured"},
+		},
+		{
+			name:     "whitespace-only env var is ignored",
+			envVar:   "   ",
+			contains: []string{"no secret sources are configured"},
+		},
+		{
+			name:             "invalid source type gives clear error",
+			envVar:           "nonexistent=config",
+			expectedExitCode: -1,
+			contains:         []string{"no secret source for type", "nonexistent"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			ts := NewGlobalTestState(t)
+			require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(script), 0o644))
+			if tc.expectedExitCode != 0 {
+				ts.ExpectedExitCode = tc.expectedExitCode
+			}
+			ts.Env["K6_SECRET_SOURCE"] = tc.envVar
+			ts.CmdArgs = []string{"k6", "run", "script.js"}
 
-		ts.Env["K6_SECRET_SOURCE"] = "mock=cool=something,else=other"
-		ts.CmdArgs = []string{"k6", "run", "script.js"}
+			cmd.ExecuteWithGlobalState(ts.GlobalState)
 
-		cmd.ExecuteWithGlobalState(ts.GlobalState)
-
-		stderr := ts.Stderr.String()
-		t.Log(stderr)
-		assert.NotContains(t, stderr, "level=error")
-		assert.Contains(t, stderr, `level=info msg="***SECRET_REDACTED***" source=console`)
-		assert.NotContains(t, stderr, "something")
-		assert.NotContains(t, stderr, "other")
-	})
+			stderr := ts.Stderr.String()
+			t.Log(stderr)
+			for _, s := range tc.contains {
+				assert.Contains(t, stderr, s)
+			}
+			for _, s := range tc.notContains {
+				assert.NotContains(t, stderr, s)
+			}
+		})
+	}
 
 	t.Run("file source via env var", func(t *testing.T) {
 		t.Parallel()
@@ -2865,52 +2914,6 @@ func TestK6SecretSourceEnvVar(t *testing.T) {
 		assert.Contains(t, stderr, `level=info msg="***SECRET_REDACTED***" source=console`)
 	})
 
-	t.Run("empty env var is ignored, no source configured error", func(t *testing.T) {
-		t.Parallel()
-		ts := NewGlobalTestState(t)
-		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(script), 0o644))
-
-		ts.Env["K6_SECRET_SOURCE"] = ""
-		ts.CmdArgs = []string{"k6", "run", "script.js"}
-
-		cmd.ExecuteWithGlobalState(ts.GlobalState)
-
-		stderr := ts.Stderr.String()
-		t.Log(stderr)
-		assert.Contains(t, stderr, "no secret sources are configured")
-	})
-
-	t.Run("whitespace-only env var is ignored", func(t *testing.T) {
-		t.Parallel()
-		ts := NewGlobalTestState(t)
-		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(script), 0o644))
-
-		ts.Env["K6_SECRET_SOURCE"] = "   "
-		ts.CmdArgs = []string{"k6", "run", "script.js"}
-
-		cmd.ExecuteWithGlobalState(ts.GlobalState)
-
-		stderr := ts.Stderr.String()
-		t.Log(stderr)
-		assert.Contains(t, stderr, "no secret sources are configured")
-	})
-
-	t.Run("invalid source type gives clear error", func(t *testing.T) {
-		t.Parallel()
-		ts := NewGlobalTestState(t)
-		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(script), 0o644))
-
-		ts.ExpectedExitCode = -1
-		ts.Env["K6_SECRET_SOURCE"] = "nonexistent=config"
-		ts.CmdArgs = []string{"k6", "run", "script.js"}
-
-		cmd.ExecuteWithGlobalState(ts.GlobalState)
-
-		stderr := ts.Stderr.String()
-		t.Log(stderr)
-		assert.Contains(t, stderr, "no secret source for type")
-		assert.Contains(t, stderr, "nonexistent")
-	})
 }
 
 func TestSummaryExport(t *testing.T) {

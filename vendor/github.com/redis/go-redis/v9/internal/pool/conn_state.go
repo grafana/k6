@@ -13,11 +13,12 @@ import (
 // States are designed to be lightweight and fast to check.
 //
 // State Transitions:
-//   CREATED → INITIALIZING → IDLE ⇄ IN_USE
-//                              ↓
-//                          UNUSABLE (handoff/reauth)
-//                              ↓
-//                           IDLE/CLOSED
+//
+//	CREATED → INITIALIZING → IDLE ⇄ IN_USE
+//	                           ↓
+//	                       UNUSABLE (handoff/reauth)
+//	                           ↓
+//	                        IDLE/CLOSED
 type ConnState uint32
 
 const (
@@ -120,7 +121,7 @@ type ConnStateMachine struct {
 
 	// FIFO queue for waiters - only locked during waiter add/remove/notify
 	mu          sync.Mutex
-	waiters     *list.List // List of *waiter
+	waiters     *list.List   // List of *waiter
 	waiterCount atomic.Int32 // Fast lock-free check for waiters (avoids mutex in hot path)
 }
 
@@ -340,4 +341,3 @@ func (sm *ConnStateMachine) notifyWaiters() {
 		}
 	}
 }
-

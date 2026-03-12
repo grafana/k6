@@ -54,9 +54,11 @@ const huffmanTableBits = 8
 
 const huffmanTableMask = 0xFF
 
-/* We need the slack region for the following reasons:
-   - doing up to two 16-byte copies for fast backward copying
-   - inserting transformed dictionary word (5 prefix + 24 base + 8 suffix) */
+/*
+We need the slack region for the following reasons:
+  - doing up to two 16-byte copies for fast backward copying
+  - inserting transformed dictionary word (5 prefix + 24 base + 8 suffix)
+*/
 const kRingBufferWriteAheadSlack uint32 = 42
 
 var kCodeLengthCodeOrder = [codeLengthCodes]byte{1, 2, 3, 4, 0, 5, 17, 6, 16, 7, 8, 9, 10, 11, 12, 13, 14, 15}
@@ -84,8 +86,11 @@ func saveErrorCode(s *Reader, e int) int {
 	}
 }
 
-/* Decodes WBITS by reading 1 - 7 bits, or 0x11 for "Large Window Brotli".
-   Precondition: bit-reader accumulator has at least 8 bits. */
+/*
+Decodes WBITS by reading 1 - 7 bits, or 0x11 for "Large Window Brotli".
+
+	Precondition: bit-reader accumulator has at least 8 bits.
+*/
 func decodeWindowBits(s *Reader, br *bitReader) int {
 	var n uint32
 	var large_window bool = s.large_window
@@ -324,10 +329,13 @@ func decodeMetaBlockLength(s *Reader, br *bitReader) int {
 	}
 }
 
-/* Decodes the Huffman code.
-   This method doesn't read data from the bit reader, BUT drops the amount of
-   bits that correspond to the decoded symbol.
-   bits MUST contain at least 15 (BROTLI_HUFFMAN_MAX_CODE_LENGTH) valid bits. */
+/*
+Decodes the Huffman code.
+
+	This method doesn't read data from the bit reader, BUT drops the amount of
+	bits that correspond to the decoded symbol.
+	bits MUST contain at least 15 (BROTLI_HUFFMAN_MAX_CODE_LENGTH) valid bits.
+*/
 func decodeSymbol(bits uint32, table []huffmanCode, br *bitReader) uint32 {
 	table = table[bits&huffmanTableMask:]
 	if table[0].bits > huffmanTableBits {
@@ -340,14 +348,20 @@ func decodeSymbol(bits uint32, table []huffmanCode, br *bitReader) uint32 {
 	return uint32(table[0].value)
 }
 
-/* Reads and decodes the next Huffman code from bit-stream.
-   This method peeks 16 bits of input and drops 0 - 15 of them. */
+/*
+Reads and decodes the next Huffman code from bit-stream.
+
+	This method peeks 16 bits of input and drops 0 - 15 of them.
+*/
 func readSymbol(table []huffmanCode, br *bitReader) uint32 {
 	return decodeSymbol(get16BitsUnmasked(br), table, br)
 }
 
-/* Same as DecodeSymbol, but it is known that there is less than 15 bits of
-   input are currently available. */
+/*
+Same as DecodeSymbol, but it is known that there is less than 15 bits of
+
+	input are currently available.
+*/
 func safeDecodeSymbol(table []huffmanCode, br *bitReader, result *uint32) bool {
 	var val uint32
 	var available_bits uint32 = getAvailableBits(br)
@@ -411,8 +425,11 @@ func preloadSymbol(safe int, table []huffmanCode, br *bitReader, bits *uint32, v
 	*value = uint32(table[0].value)
 }
 
-/* Decodes the next Huffman code using data prepared by PreloadSymbol.
-   Reads 0 - 15 bits. Also peeks 8 following bits. */
+/*
+Decodes the next Huffman code using data prepared by PreloadSymbol.
+
+	Reads 0 - 15 bits. Also peeks 8 following bits.
+*/
 func readPreloadedSymbol(table []huffmanCode, br *bitReader, bits *uint32, value *uint32) uint32 {
 	var result uint32 = *value
 	var ext []huffmanCode
@@ -442,9 +459,12 @@ func log2Floor(x uint32) uint32 {
 	return result
 }
 
-/* Reads (s->symbol + 1) symbols.
-   Totally 1..4 symbols are read, 1..11 bits each.
-   The list of symbols MUST NOT contain duplicates. */
+/*
+Reads (s->symbol + 1) symbols.
+
+	Totally 1..4 symbols are read, 1..11 bits each.
+	The list of symbols MUST NOT contain duplicates.
+*/
 func readSimpleHuffmanSymbols(alphabet_size uint32, max_symbol uint32, s *Reader) int {
 	var br *bitReader = &s.br
 	var max_bits uint32 = log2Floor(alphabet_size - 1)
@@ -480,12 +500,15 @@ func readSimpleHuffmanSymbols(alphabet_size uint32, max_symbol uint32, s *Reader
 	return decoderSuccess
 }
 
-/* Process single decoded symbol code length:
-   A) reset the repeat variable
-   B) remember code length (if it is not 0)
-   C) extend corresponding index-chain
-   D) reduce the Huffman space
-   E) update the histogram */
+/*
+Process single decoded symbol code length:
+
+	A) reset the repeat variable
+	B) remember code length (if it is not 0)
+	C) extend corresponding index-chain
+	D) reduce the Huffman space
+	E) update the histogram
+*/
 func processSingleCodeLength(code_len uint32, symbol *uint32, repeat *uint32, space *uint32, prev_code_len *uint32, symbol_lists symbolList, code_length_histo []uint16, next_symbol []int) {
 	*repeat = 0
 	if code_len != 0 { /* code_len == 1..15 */
@@ -499,16 +522,19 @@ func processSingleCodeLength(code_len uint32, symbol *uint32, repeat *uint32, sp
 	(*symbol)++
 }
 
-/* Process repeated symbol code length.
-    A) Check if it is the extension of previous repeat sequence; if the decoded
-       value is not BROTLI_REPEAT_PREVIOUS_CODE_LENGTH, then it is a new
-       symbol-skip
-    B) Update repeat variable
-    C) Check if operation is feasible (fits alphabet)
-    D) For each symbol do the same operations as in ProcessSingleCodeLength
+/*
+Process repeated symbol code length.
 
-   PRECONDITION: code_len == BROTLI_REPEAT_PREVIOUS_CODE_LENGTH or
-                 code_len == BROTLI_REPEAT_ZERO_CODE_LENGTH */
+	 A) Check if it is the extension of previous repeat sequence; if the decoded
+	    value is not BROTLI_REPEAT_PREVIOUS_CODE_LENGTH, then it is a new
+	    symbol-skip
+	 B) Update repeat variable
+	 C) Check if operation is feasible (fits alphabet)
+	 D) For each symbol do the same operations as in ProcessSingleCodeLength
+
+	PRECONDITION: code_len == BROTLI_REPEAT_PREVIOUS_CODE_LENGTH or
+	              code_len == BROTLI_REPEAT_ZERO_CODE_LENGTH
+*/
 func processRepeatedCodeLength(code_len uint32, repeat_delta uint32, alphabet_size uint32, symbol *uint32, repeat *uint32, space *uint32, prev_code_len *uint32, repeat_code_len *uint32, symbol_lists symbolList, code_length_histo []uint16, next_symbol []int) {
 	var old_repeat uint32 /* for BROTLI_REPEAT_ZERO_CODE_LENGTH */ /* for BROTLI_REPEAT_ZERO_CODE_LENGTH */
 	var extra_bits uint32 = 3
@@ -651,8 +677,11 @@ func safeReadSymbolCodeLengths(alphabet_size uint32, s *Reader) int {
 	return decoderSuccess
 }
 
-/* Reads and decodes 15..18 codes using static prefix code.
-   Each code is 2..4 bits long. In total 30..72 bits are used. */
+/*
+Reads and decodes 15..18 codes using static prefix code.
+
+	Each code is 2..4 bits long. In total 30..72 bits are used.
+*/
 func readCodeLengthCodeLengths(s *Reader) int {
 	var br *bitReader = &s.br
 	var num_codes uint32 = s.repeat
@@ -700,17 +729,20 @@ func readCodeLengthCodeLengths(s *Reader) int {
 	return decoderSuccess
 }
 
-/* Decodes the Huffman tables.
-   There are 2 scenarios:
-    A) Huffman code contains only few symbols (1..4). Those symbols are read
-       directly; their code lengths are defined by the number of symbols.
-       For this scenario 4 - 49 bits will be read.
+/*
+Decodes the Huffman tables.
 
-    B) 2-phase decoding:
-    B.1) Small Huffman table is decoded; it is specified with code lengths
-         encoded with predefined entropy code. 32 - 74 bits are used.
-    B.2) Decoded table is used to decode code lengths of symbols in resulting
-         Huffman table. In worst case 3520 bits are read. */
+	There are 2 scenarios:
+	 A) Huffman code contains only few symbols (1..4). Those symbols are read
+	    directly; their code lengths are defined by the number of symbols.
+	    For this scenario 4 - 49 bits will be read.
+
+	 B) 2-phase decoding:
+	 B.1) Small Huffman table is decoded; it is specified with code lengths
+	      encoded with predefined entropy code. 32 - 74 bits are used.
+	 B.2) Decoded table is used to decode code lengths of symbols in resulting
+	      Huffman table. In worst case 3520 bits are read.
+*/
 func readHuffmanCode(alphabet_size uint32, max_symbol uint32, table []huffmanCode, opt_table_size *uint32, s *Reader) int {
 	var br *bitReader = &s.br
 
@@ -850,8 +882,11 @@ func readBlockLength(table []huffmanCode, br *bitReader) uint32 {
 	return kBlockLengthPrefixCode[code].offset + readBits(br, nbits)
 }
 
-/* WARNING: if state is not BROTLI_STATE_READ_BLOCK_LENGTH_NONE, then
-   reading can't be continued with ReadBlockLength. */
+/*
+WARNING: if state is not BROTLI_STATE_READ_BLOCK_LENGTH_NONE, then
+
+	reading can't be continued with ReadBlockLength.
+*/
 func safeReadBlockLength(s *Reader, result *uint32, table []huffmanCode, br *bitReader) bool {
 	var index uint32
 	if s.substate_read_block_length == stateReadBlockLengthNone {
@@ -876,20 +911,24 @@ func safeReadBlockLength(s *Reader, result *uint32, table []huffmanCode, br *bit
 	}
 }
 
-/* Transform:
-    1) initialize list L with values 0, 1,... 255
-    2) For each input element X:
+/*
+Transform:
+
+ 1. initialize list L with values 0, 1,... 255
+
+ 2. For each input element X:
     2.1) let Y = L[X]
     2.2) remove X-th element from L
     2.3) prepend Y to L
     2.4) append Y to output
 
-   In most cases max(Y) <= 7, so most of L remains intact.
-   To reduce the cost of initialization, we reuse L, remember the upper bound
-   of Y values, and reinitialize only first elements in L.
+    In most cases max(Y) <= 7, so most of L remains intact.
+    To reduce the cost of initialization, we reuse L, remember the upper bound
+    of Y values, and reinitialize only first elements in L.
 
-   Most of input values are 0 and 1. To reduce number of branches, we replace
-   inner for loop with do-while. */
+    Most of input values are 0 and 1. To reduce number of branches, we replace
+    inner for loop with do-while.
+*/
 func inverseMoveToFrontTransform(v []byte, v_len uint32, state *Reader) {
 	var mtf [256]byte
 	var i int
@@ -936,14 +975,17 @@ func huffmanTreeGroupDecode(group *huffmanTreeGroup, s *Reader) int {
 	return decoderSuccess
 }
 
-/* Decodes a context map.
-   Decoding is done in 4 phases:
-    1) Read auxiliary information (6..16 bits) and allocate memory.
-       In case of trivial context map, decoding is finished at this phase.
-    2) Decode Huffman table using ReadHuffmanCode function.
-       This table will be used for reading context map items.
-    3) Read context map items; "0" values could be run-length encoded.
-    4) Optionally, apply InverseMoveToFront transform to the resulting map. */
+/*
+Decodes a context map.
+
+	Decoding is done in 4 phases:
+	 1) Read auxiliary information (6..16 bits) and allocate memory.
+	    In case of trivial context map, decoding is finished at this phase.
+	 2) Decode Huffman table using ReadHuffmanCode function.
+	    This table will be used for reading context map items.
+	 3) Read context map items; "0" values could be run-length encoded.
+	 4) Optionally, apply InverseMoveToFront transform to the resulting map.
+*/
 func decodeContextMap(context_map_size uint32, num_htrees *uint32, context_map_arg *[]byte, s *Reader) int {
 	var br *bitReader = &s.br
 	var result int = decoderSuccess
@@ -1084,8 +1126,11 @@ func decodeContextMap(context_map_size uint32, num_htrees *uint32, context_map_a
 	}
 }
 
-/* Decodes a command or literal and updates block type ring-buffer.
-   Reads 3..54 bits. */
+/*
+Decodes a command or literal and updates block type ring-buffer.
+
+	Reads 3..54 bits.
+*/
 func decodeBlockTypeAndLength(safe int, s *Reader, tree_type int) bool {
 	var max_block_type uint32 = s.num_block_types[tree_type]
 	type_tree := s.block_type_trees[tree_type*huffmanMaxSize258:]
@@ -1168,8 +1213,11 @@ func prepareLiteralDecoding(s *Reader) {
 	s.context_lookup = getContextLUT(int(context_mode))
 }
 
-/* Decodes the block type and updates the state for literal context.
-   Reads 3..54 bits. */
+/*
+Decodes the block type and updates the state for literal context.
+
+	Reads 3..54 bits.
+*/
 func decodeLiteralBlockSwitchInternal(safe int, s *Reader) bool {
 	if !decodeBlockTypeAndLength(safe, s, 0) {
 		return false
@@ -1187,8 +1235,11 @@ func safeDecodeLiteralBlockSwitch(s *Reader) bool {
 	return decodeLiteralBlockSwitchInternal(1, s)
 }
 
-/* Block switch for insert/copy length.
-   Reads 3..54 bits. */
+/*
+Block switch for insert/copy length.
+
+	Reads 3..54 bits.
+*/
 func decodeCommandBlockSwitchInternal(safe int, s *Reader) bool {
 	if !decodeBlockTypeAndLength(safe, s, 1) {
 		return false
@@ -1206,8 +1257,11 @@ func safeDecodeCommandBlockSwitch(s *Reader) bool {
 	return decodeCommandBlockSwitchInternal(1, s)
 }
 
-/* Block switch for distance codes.
-   Reads 3..54 bits. */
+/*
+Block switch for distance codes.
+
+	Reads 3..54 bits.
+*/
 func decodeDistanceBlockSwitchInternal(safe int, s *Reader) bool {
 	if !decodeBlockTypeAndLength(safe, s, 2) {
 		return false
@@ -1237,9 +1291,12 @@ func unwrittenBytes(s *Reader, wrap bool) uint {
 	return partial_pos_rb - s.partial_pos_out
 }
 
-/* Dumps output.
-   Returns BROTLI_DECODER_NEEDS_MORE_OUTPUT only if there is more output to push
-   and either ring-buffer is as big as window size, or |force| is true. */
+/*
+Dumps output.
+
+	Returns BROTLI_DECODER_NEEDS_MORE_OUTPUT only if there is more output to push
+	and either ring-buffer is as big as window size, or |force| is true.
+*/
 func writeRingBuffer(s *Reader, available_out *uint, next_out *[]byte, total_out *uint, force bool) int {
 	start := s.ringbuffer[s.partial_pos_out&uint(s.ringbuffer_mask):]
 	var to_write uint = unwrittenBytes(s, true)
@@ -1296,13 +1353,15 @@ func wrapRingBuffer(s *Reader) {
 	}
 }
 
-/* Allocates ring-buffer.
+/*
+Allocates ring-buffer.
 
-   s->ringbuffer_size MUST be updated by BrotliCalculateRingBufferSize before
-   this function is called.
+	s->ringbuffer_size MUST be updated by BrotliCalculateRingBufferSize before
+	this function is called.
 
-   Last two bytes of ring-buffer are initialized to 0, so context calculation
-   could be done uniformly for the first two and all other positions. */
+	Last two bytes of ring-buffer are initialized to 0, so context calculation
+	could be done uniformly for the first two and all other positions.
+*/
 func ensureRingBuffer(s *Reader) bool {
 	var old_ringbuffer []byte
 	if s.ringbuffer_size == s.new_ringbuffer_size {
@@ -1383,12 +1442,14 @@ func copyUncompressedBlockToOutput(available_out *uint, next_out *[]byte, total_
 	}
 }
 
-/* Calculates the smallest feasible ring buffer.
+/*
+Calculates the smallest feasible ring buffer.
 
-   If we know the data size is small, do not allocate more ring buffer
-   size than needed to reduce memory usage.
+	If we know the data size is small, do not allocate more ring buffer
+	size than needed to reduce memory usage.
 
-   When this method is called, metablock size and flags MUST be decoded. */
+	When this method is called, metablock size and flags MUST be decoded.
+*/
 func calculateRingBufferSize(s *Reader) {
 	var window_size int = 1 << s.window_bits
 	var new_ringbuffer_size int = window_size
@@ -2011,17 +2072,19 @@ func maxDistanceSymbol(ndirect uint32, npostfix uint32) uint32 {
 	}
 }
 
-/* Invariant: input stream is never overconsumed:
-   - invalid input implies that the whole stream is invalid -> any amount of
-     input could be read and discarded
-   - when result is "needs more input", then at least one more byte is REQUIRED
-     to complete decoding; all input data MUST be consumed by decoder, so
-     client could swap the input buffer
-   - when result is "needs more output" decoder MUST ensure that it doesn't
-     hold more than 7 bits in bit reader; this saves client from swapping input
-     buffer ahead of time
-   - when result is "success" decoder MUST return all unused data back to input
-     buffer; this is possible because the invariant is held on enter */
+/*
+Invariant: input stream is never overconsumed:
+  - invalid input implies that the whole stream is invalid -> any amount of
+    input could be read and discarded
+  - when result is "needs more input", then at least one more byte is REQUIRED
+    to complete decoding; all input data MUST be consumed by decoder, so
+    client could swap the input buffer
+  - when result is "needs more output" decoder MUST ensure that it doesn't
+    hold more than 7 bits in bit reader; this saves client from swapping input
+    buffer ahead of time
+  - when result is "success" decoder MUST return all unused data back to input
+    buffer; this is possible because the invariant is held on enter
+*/
 func decoderDecompressStream(s *Reader, available_in *uint, next_in *[]byte, available_out *uint, next_out *[]byte) int {
 	var result int = decoderSuccess
 	var br *bitReader = &s.br

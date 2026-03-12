@@ -6,8 +6,11 @@ package brotli
    See file LICENSE for detail or copy at https://opensource.org/licenses/MIT
 */
 
-/* Computes the bit cost reduction by combining out[idx1] and out[idx2] and if
-   it is below a threshold, stores the pair (idx1, idx2) in the *pairs queue. */
+/*
+Computes the bit cost reduction by combining out[idx1] and out[idx2] and if
+
+	it is below a threshold, stores the pair (idx1, idx2) in the *pairs queue.
+*/
 func compareAndPushToQueueCommand(out []histogramCommand, cluster_size []uint32, idx1 uint32, idx2 uint32, max_num_pairs uint, pairs []histogramPair, num_pairs *uint) {
 	var is_good_pair bool = false
 	var p histogramPair

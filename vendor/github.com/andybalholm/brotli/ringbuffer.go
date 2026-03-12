@@ -6,15 +6,18 @@ package brotli
    See file LICENSE for detail or copy at https://opensource.org/licenses/MIT
 */
 
-/* A ringBuffer(window_bits, tail_bits) contains `1 << window_bits' bytes of
-   data in a circular manner: writing a byte writes it to:
-     `position() % (1 << window_bits)'.
-   For convenience, the ringBuffer array contains another copy of the
-   first `1 << tail_bits' bytes:
-     buffer_[i] == buffer_[i + (1 << window_bits)], if i < (1 << tail_bits),
-   and another copy of the last two bytes:
-     buffer_[-1] == buffer_[(1 << window_bits) - 1] and
-     buffer_[-2] == buffer_[(1 << window_bits) - 2]. */
+/*
+A ringBuffer(window_bits, tail_bits) contains `1 << window_bits' bytes of
+
+	data in a circular manner: writing a byte writes it to:
+	  `position() % (1 << window_bits)'.
+	For convenience, the ringBuffer array contains another copy of the
+	first `1 << tail_bits' bytes:
+	  buffer_[i] == buffer_[i + (1 << window_bits)], if i < (1 << tail_bits),
+	and another copy of the last two bytes:
+	  buffer_[-1] == buffer_[(1 << window_bits) - 1] and
+	  buffer_[-2] == buffer_[(1 << window_bits) - 2].
+*/
 type ringBuffer struct {
 	size_       uint32
 	mask_       uint32
@@ -41,8 +44,11 @@ func ringBufferSetup(params *encoderParams, rb *ringBuffer) {
 
 const kSlackForEightByteHashingEverywhere uint = 7
 
-/* Allocates or re-allocates data_ to the given length + plus some slack
-   region before and after. Fills the slack regions with zeros. */
+/*
+Allocates or re-allocates data_ to the given length + plus some slack
+
+	region before and after. Fills the slack regions with zeros.
+*/
 func ringBufferInitBuffer(buflen uint32, rb *ringBuffer) {
 	var new_data []byte
 	var i uint

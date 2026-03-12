@@ -268,8 +268,11 @@ func buildMetaBlock(ringbuffer []byte, pos uint, mask uint, params *encoderParam
 
 const maxStaticContexts = 13
 
-/* Greedy block splitter for one block category (literal, command or distance).
-   Gathers histograms for all context buckets. */
+/*
+Greedy block splitter for one block category (literal, command or distance).
+
+	Gathers histograms for all context buckets.
+*/
 type contextBlockSplitter struct {
 	alphabet_size_     uint
 	num_contexts_      uint
@@ -328,10 +331,13 @@ func initContextBlockSplitter(self *contextBlockSplitter, alphabet_size uint, nu
 	self.last_histogram_ix_[0] = self.last_histogram_ix_[1]
 }
 
-/* Does either of three things:
-   (1) emits the current block with a new block type;
-   (2) emits the current block with the type of the second last block;
-   (3) merges the current block with the last block. */
+/*
+Does either of three things:
+
+	(1) emits the current block with a new block type;
+	(2) emits the current block with the type of the second last block;
+	(3) merges the current block with the last block.
+*/
 func contextBlockSplitterFinishBlock(self *contextBlockSplitter, is_final bool) {
 	var split *blockSplit = self.split_
 	var num_contexts uint = self.num_contexts_
@@ -459,8 +465,11 @@ func contextBlockSplitterFinishBlock(self *contextBlockSplitter, is_final bool) 
 	}
 }
 
-/* Adds the next symbol to the current block type and context. When the
-   current block reaches the target size, decides on merging the block. */
+/*
+Adds the next symbol to the current block type and context. When the
+
+	current block reaches the target size, decides on merging the block.
+*/
 func contextBlockSplitterAddSymbol(self *contextBlockSplitter, symbol uint, context uint) {
 	histogramAddLiteral(&self.histograms_[self.curr_histogram_ix_+context], symbol)
 	self.block_size_++
