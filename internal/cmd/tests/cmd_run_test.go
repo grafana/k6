@@ -2733,14 +2733,16 @@ func TestK6SecretSourceEnvVar(t *testing.T) {
 			notContains: []string{"level=error", "something", "other"},
 		},
 		{
-			name:     "empty env var is ignored, no source configured error",
-			envVar:   "",
-			contains: []string{"no secret sources are configured"},
+			name:             "empty env var is error",
+			envVar:           "",
+			expectedExitCode: -1,
+			contains:         []string{"couldn't parse secret source configuration \\\"\\\""},
 		},
 		{
-			name:     "whitespace-only env var is ignored",
-			envVar:   "   ",
-			contains: []string{"no secret sources are configured"},
+			name:             "whitespace-only env var is error",
+			envVar:           "   ",
+			expectedExitCode: -1,
+			contains:         []string{"couldn't parse secret source configuration \\\"   \\\""},
 		},
 		{
 			name:             "invalid source type gives clear error",
@@ -2760,6 +2762,7 @@ func TestK6SecretSourceEnvVar(t *testing.T) {
 			ts.Env["K6_SECRET_SOURCE"] = tc.envVar
 			ts.CmdArgs = []string{"k6", "run", "script.js"}
 
+			ts.ReparseFlags()
 			cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 			stderr := ts.Stderr.String()
@@ -2783,6 +2786,7 @@ func TestK6SecretSourceEnvVar(t *testing.T) {
 		ts.Env["K6_SECRET_SOURCE"] = "file=" + secretFile
 		ts.CmdArgs = []string{"k6", "run", "script.js"}
 
+		ts.ReparseFlags()
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 		stderr := ts.Stderr.String()
@@ -2808,6 +2812,7 @@ func TestK6SecretSourceEnvVar(t *testing.T) {
 
 		ts.Env["K6_SECRET_SOURCE"] = fmt.Sprintf("url=urlTemplate=%s/secrets/{key},maxRetries=0", srv.URL)
 		ts.CmdArgs = []string{"k6", "run", "script.js"}
+		ts.ReparseFlags()
 
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
@@ -2837,6 +2842,7 @@ func TestK6SecretSourceEnvVar(t *testing.T) {
 		ts.Env["K6_SECRET_SOURCE"] = "mock=name=mysource,cool=secretval"
 		ts.CmdArgs = []string{"k6", "run", "script.js"}
 
+		ts.ReparseFlags()
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 		stderr := ts.Stderr.String()
@@ -2864,6 +2870,7 @@ func TestK6SecretSourceEnvVar(t *testing.T) {
 		ts.Env["K6_SECRET_SOURCE"] = "mock=name=named,cool=secretval,default"
 		ts.CmdArgs = []string{"k6", "run", "script.js"}
 
+		ts.ReparseFlags()
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 		stderr := ts.Stderr.String()
@@ -2872,16 +2879,20 @@ func TestK6SecretSourceEnvVar(t *testing.T) {
 		assert.Contains(t, stderr, `level=info msg="***SECRET_REDACTED***" source=console`)
 	})
 
-	t.Run("env var merged with flag provides two separate sources", func(t *testing.T) {
+	t.Run("cli flags overrides env variable", func(t *testing.T) {
 		t.Parallel()
 		multiScript := `
 			import secrets from "k6/secrets";
 			export default async () => {
-				const a = await secrets.source("first").get("cool");
-				const b = await secrets.source("second").get("cool");
-				console.log(a);
+				let secondMissing = false;
+				try {
+					const a = await secrets.source("second").get("cool");
+				} catch (e) {
+					secondMissing = true
+				}
+				const b = await secrets.source("first").get("cool");
 				console.log(b);
-				console.log(a === b);
+				console.log(secondMissing);
 			}
 		`
 		ts := NewGlobalTestState(t)
@@ -2890,6 +2901,7 @@ func TestK6SecretSourceEnvVar(t *testing.T) {
 		ts.Env["K6_SECRET_SOURCE"] = "mock=name=second,cool=second-secret"
 		ts.CmdArgs = []string{"k6", "run", "--secret-source=mock=name=first,cool=first-secret", "script.js"}
 
+		ts.ReparseFlags()
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 		stderr := ts.Stderr.String()
@@ -2898,52 +2910,7 @@ func TestK6SecretSourceEnvVar(t *testing.T) {
 		// Both secrets are redacted in the output.
 		assert.Contains(t, stderr, `level=info msg="***SECRET_REDACTED***" source=console`)
 		// The boolean false is not a secret — it is logged as-is.
-		assert.Contains(t, stderr, `level=info msg=false source=console`)
-	})
-
-	t.Run("exact duplicate of flag value is silently deduplicated", func(t *testing.T) {
-		// When K6_SECRET_SOURCE equals a --secret-source value exactly, only one
-		// source is registered (no "already registered" error).
-		t.Parallel()
-		singleScript := `
-			import secrets from "k6/secrets";
-			export default async () => {
-				const v = await secrets.get("cool");
-				console.log(v);
-			}
-		`
-		ts := NewGlobalTestState(t)
-		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(singleScript), 0o644))
-
-		ts.Env["K6_SECRET_SOURCE"] = "mock=cool=secretval"
-		ts.CmdArgs = []string{"k6", "run", "--secret-source=mock=cool=secretval", "script.js"}
-
-		cmd.ExecuteWithGlobalState(ts.GlobalState)
-
-		stderr := ts.Stderr.String()
-		t.Log(stderr)
-		assert.NotContains(t, stderr, "level=error")
-		assert.Contains(t, stderr, `level=info msg="***SECRET_REDACTED***" source=console`)
-	})
-
-	t.Run("conflicting source name via env var and flag gives clear error", func(t *testing.T) {
-		// --secret-source is registered first; K6_SECRET_SOURCE is appended after.
-		// When both resolve to the same source name (but different configs), the
-		// second registration fails with a clear "already registered" error.
-		// This also documents precedence: the flag spec wins, env var loses.
-		t.Parallel()
-		ts := NewGlobalTestState(t)
-		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(script), 0o644))
-
-		ts.ExpectedExitCode = -1
-		ts.Env["K6_SECRET_SOURCE"] = "mock=name=src,cool=fromenv"
-		ts.CmdArgs = []string{"k6", "run", "--secret-source=mock=name=src,cool=fromflag", "script.js"}
-
-		cmd.ExecuteWithGlobalState(ts.GlobalState)
-
-		stderr := ts.Stderr.String()
-		t.Log(stderr)
-		assert.Contains(t, stderr, "already registered")
+		assert.Contains(t, stderr, `level=info msg=true source=console`)
 	})
 }
 

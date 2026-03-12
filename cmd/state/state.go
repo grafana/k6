@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
-	"strings"
 	"sync"
 
 	"go.k6.io/k6/lib"
@@ -126,7 +125,7 @@ func NewGlobalState(ctx context.Context) *GlobalState {
 
 	env := BuildEnvMap(os.Environ())
 	defaultFlags := GetDefaultFlags(confDir, cacheDir)
-	globalFlags := GetFlags(defaultFlags, env, os.Args)
+	globalFlags := getFlags(defaultFlags, env, os.Args)
 
 	logLevel := logrus.InfoLevel
 	if globalFlags.Verbose {
@@ -182,7 +181,6 @@ type GlobalFlags struct {
 	ProfilingEnabled bool
 	LogOutput        string
 	SecretSource     []string
-	SecretSourceEnv  string
 	LogFormat        string
 	Verbose          bool
 
@@ -207,9 +205,7 @@ func GetDefaultFlags(homeDir string, cacheDir string) GlobalFlags {
 	}
 }
 
-// GetFlags builds GlobalFlags by applying environment variables and CLI args on
-// top of the provided defaults.
-func GetFlags(defaultFlags GlobalFlags, env map[string]string, args []string) GlobalFlags {
+func getFlags(defaultFlags GlobalFlags, env map[string]string, args []string) GlobalFlags {
 	result := defaultFlags
 
 	// TODO: add env vars for the rest of the values (after adjusting
@@ -269,10 +265,9 @@ func GetFlags(defaultFlags GlobalFlags, env map[string]string, args []string) Gl
 		result.BuildServiceURL = fmt.Sprintf("%s/%s", defaultBuildServiceURL, communityExtensionsCatalog)
 	}
 
-	// K6_SECRET_SOURCE is equivalent to a single extra --secret-source flag value.
-	// Stored separately so that merging with cobra-parsed SecretSource can happen
-	// after cobra parses flags (cobra replaces StringArrayVar defaults on any explicit flag).
-	result.SecretSourceEnv = strings.TrimSpace(env["K6_SECRET_SOURCE"])
+	if val, ok := env["K6_SECRET_SOURCE"]; ok {
+		result.SecretSource = []string{val}
+	}
 
 	// check if verbose flag is set
 	if slices.Contains(args, "-v") || slices.Contains(args, "--verbose") {
