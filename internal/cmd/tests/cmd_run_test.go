@@ -2757,9 +2757,11 @@ func TestK6SecretSourceEnvVar(t *testing.T) {
 		assert.NotContains(t, stderr, "val2")
 	})
 
-	t.Run("commas inside spec are not treated as source separators", func(t *testing.T) {
-		// mock=name=mysource,cool=val has a comma, but it belongs to the source
-		// spec (name= suffix + key=val), not a second source definition.
+	t.Run("entire env var value is one spec, commas within it are source arguments not separators", func(t *testing.T) {
+		// K6_SECRET_SOURCE is equivalent to a single --secret-source flag value —
+		// the whole string is one spec. Commas within it belong to the source's
+		// own argument syntax (e.g. mock=name=mysource,cool=val uses commas to
+		// separate name= and key=val arguments), not source-to-source separators.
 		t.Parallel()
 		namedScript := `
 			import secrets from "k6/secrets";
