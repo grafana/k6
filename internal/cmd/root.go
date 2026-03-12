@@ -116,6 +116,11 @@ func newRootCommand(gs *state.GlobalState) *rootCommand {
 		`{{with .Name}}{{printf "%s " .}}{{end}}{{printf "v%s\n" .Version}}`,
 	)
 
+	// Refresh SecretSourceEnv from the current env map so that env vars set after
+	// GlobalState construction (e.g. in tests) are picked up before cobra registers
+	// flag defaults. Other flags are left unchanged to preserve any modifications
+	// made directly to gs.Flags (e.g. in tests).
+	gs.Flags.SecretSourceEnv = strings.TrimSpace(gs.Env["K6_SECRET_SOURCE"])
 	rootCmd.PersistentFlags().AddFlagSet(rootCmdPersistentFlagSet(gs))
 	rootCmd.SetArgs(gs.CmdArgs[1:])
 	rootCmd.SetOut(gs.Stdout)
@@ -417,20 +422,15 @@ func createSecretSources(gs *state.GlobalState) (map[string]secretsource.Source,
 		Usage:       gs.Usage,
 	}
 
-	// K6_SECRET_SOURCE is equivalent to a single extra --secret-source flag.
-	// It is treated as one complete source spec (e.g. "file=path.secret" or
-	// "mock=name=mysource,key=value") so commas inside the spec are handled
-	// correctly by extractNameAndDefault and the source's own config parser.
-	// Exact duplicates of an already-present flag value are skipped silently.
-	secretSourceArgs := gs.Flags.SecretSource
-	if envSrc := strings.TrimSpace(gs.Env["K6_SECRET_SOURCE"]); envSrc != "" {
-		if !slices.Contains(secretSourceArgs, envSrc) {
-			secretSourceArgs = append(secretSourceArgs, envSrc)
-		}
+	// Merge --secret-source flags with K6_SECRET_SOURCE env var (parsed by GetFlags).
+	// K6_SECRET_SOURCE is treated as one complete spec; exact duplicates are skipped.
+	secretSources := gs.Flags.SecretSource
+	if envSrc := gs.Flags.SecretSourceEnv; envSrc != "" && !slices.Contains(secretSources, envSrc) {
+		secretSources = append(secretSources, envSrc)
 	}
 
 	result := make(map[string]secretsource.Source)
-	for _, line := range secretSourceArgs {
+	for _, line := range secretSources {
 		t, config, ok := strings.Cut(line, "=")
 		if !ok {
 			// Special case: allow --secret-source=url without explicit config

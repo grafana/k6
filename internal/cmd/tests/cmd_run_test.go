@@ -2900,7 +2900,6 @@ func TestK6SecretSourceEnvVar(t *testing.T) {
 		assert.NotContains(t, stderr, "level=error")
 		assert.Contains(t, stderr, `level=info msg="***SECRET_REDACTED***" source=console`)
 	})
-
 }
 
 func TestSummaryExport(t *testing.T) {
