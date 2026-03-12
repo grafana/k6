@@ -2797,7 +2797,7 @@ func TestK6SecretSourceEnvVar(t *testing.T) {
 		t.Parallel()
 
 		// Spin up a local HTTP server that returns a plain-text secret.
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			// The key is the last path segment: /secrets/{key}
 			_, _ = w.Write([]byte("url-secret-value"))
 		}))
