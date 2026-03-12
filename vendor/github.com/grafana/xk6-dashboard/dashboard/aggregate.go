@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/afero"
 	"github.com/tidwall/gjson"
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
@@ -60,8 +59,9 @@ func aggregate(input, output string, opts *options, proc *process) error {
 	agg.seenMetrics = make([]string, 0)
 
 	var (
-		inputFile, outputFile afero.File
-		err                   error
+		inputFile  io.ReadCloser
+		outputFile io.WriteCloser
+		err        error
 	)
 
 	if inputFile, err = proc.fs.Open(input); err != nil {
