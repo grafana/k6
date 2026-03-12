@@ -265,6 +265,10 @@ func getFlags(defaultFlags GlobalFlags, env map[string]string, args []string) Gl
 		result.BuildServiceURL = fmt.Sprintf("%s/%s", defaultBuildServiceURL, communityExtensionsCatalog)
 	}
 
+	if val, ok := env["K6_SECRET_SOURCE"]; ok {
+		result.SecretSource = []string{val}
+	}
+
 	// check if verbose flag is set
 	if slices.Contains(args, "-v") || slices.Contains(args, "--verbose") {
 		result.Verbose = true
