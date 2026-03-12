@@ -2793,6 +2793,31 @@ func TestK6SecretSourceEnvVar(t *testing.T) {
 		assert.NotContains(t, stderr, "val2")
 	})
 
+	t.Run("url source via env var", func(t *testing.T) {
+		t.Parallel()
+
+		// Spin up a local HTTP server that returns a plain-text secret.
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// The key is the last path segment: /secrets/{key}
+			_, _ = w.Write([]byte("url-secret-value"))
+		}))
+		t.Cleanup(srv.Close)
+
+		ts := NewGlobalTestState(t)
+		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(script), 0o644))
+
+		ts.Env["K6_SECRET_SOURCE"] = fmt.Sprintf("url=urlTemplate=%s/secrets/{key},maxRetries=0", srv.URL)
+		ts.CmdArgs = []string{"k6", "run", "script.js"}
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stderr := ts.Stderr.String()
+		t.Log(stderr)
+		assert.NotContains(t, stderr, "level=error")
+		assert.Contains(t, stderr, `level=info msg="***SECRET_REDACTED***" source=console`)
+		assert.NotContains(t, stderr, "url-secret-value")
+	})
+
 	t.Run("entire env var value is one spec, commas within it are source arguments not separators", func(t *testing.T) {
 		// K6_SECRET_SOURCE is equivalent to a single --secret-source flag value —
 		// the whole string is one spec. Commas within it belong to the source's
