@@ -155,15 +155,9 @@ func (rep *reporter) exportBase64(out io.Writer) error {
 }
 
 func (rep *reporter) exportHTML(out io.Writer) error {
-	file, err := rep.assets.report.Open("index.html")
-	if err != nil {
-		return err
-	}
+	html := rep.assets.report
 
-	html, err := io.ReadAll(file)
-	if err != nil {
-		return err
-	}
+	var err error
 
 	html, err = rep.inject(out, html, []byte(dataTag), rep.exportBase64)
 	if err != nil {
