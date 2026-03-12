@@ -5,13 +5,13 @@ package colorable
 
 import (
 	"bytes"
-	syscall "golang.org/x/sys/windows"
 	"io"
 	"math"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
+	syscall "golang.org/x/sys/windows"
 	"unsafe"
 
 	"github.com/mattn/go-isatty"

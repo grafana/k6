@@ -1314,18 +1314,15 @@ func TestAbortedByScriptAbortInVUCode(t *testing.T) {
 		export function handleSummary() { return {stdout: '\n\n\nbogus summary\n\n\n'};}
 	`
 
-	for _, tc := range []struct {
-		name    string
-		runTest func(*testing.T, *GlobalTestState)
-	}{
-		{"noLinger", runTestWithNoLinger},
-		{"withLinger", runTestWithLinger},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			testAbortedByScriptTestAbort(t, script, tc.runTest)
-		})
-	}
+	t.Run("noLinger", func(t *testing.T) {
+		t.Parallel()
+		testAbortedByScriptTestAbort(t, script, runTestWithNoLinger)
+	})
+
+	t.Run("withLinger", func(t *testing.T) {
+		t.Parallel()
+		testAbortedByScriptTestAbort(t, script, runTestWithLinger)
+	})
 }
 
 func TestAbortedByScriptAbortInVUCodeInGroup(t *testing.T) {
@@ -1341,18 +1338,15 @@ func TestAbortedByScriptAbortInVUCodeInGroup(t *testing.T) {
 		export function handleSummary() { return {stdout: '\n\n\nbogus summary\n\n\n'};}
 	`
 
-	for _, tc := range []struct {
-		name    string
-		runTest func(*testing.T, *GlobalTestState)
-	}{
-		{"noLinger", runTestWithNoLinger},
-		{"withLinger", runTestWithLinger},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			testAbortedByScriptTestAbort(t, script, tc.runTest)
-		})
-	}
+	t.Run("noLinger", func(t *testing.T) {
+		t.Parallel()
+		testAbortedByScriptTestAbort(t, script, runTestWithNoLinger)
+	})
+
+	t.Run("withLinger", func(t *testing.T) {
+		t.Parallel()
+		testAbortedByScriptTestAbort(t, script, runTestWithLinger)
+	})
 }
 
 func TestAbortedByScriptAbortInSetup(t *testing.T) {
@@ -1391,18 +1385,15 @@ func TestAbortedByScriptAbortInTeardown(t *testing.T) {
 		export function handleSummary() { return {stdout: '\n\n\nbogus summary\n\n\n'};}
 	`
 
-	for _, tc := range []struct {
-		name    string
-		runTest func(*testing.T, *GlobalTestState)
-	}{
-		{"noLinger", runTestWithNoLinger},
-		{"withLinger", runTestWithLinger},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			testAbortedByScriptTestAbort(t, script, tc.runTest)
-		})
-	}
+	t.Run("noLinger", func(t *testing.T) {
+		t.Parallel()
+		testAbortedByScriptTestAbort(t, script, runTestWithNoLinger)
+	})
+
+	t.Run("withLinger", func(t *testing.T) {
+		t.Parallel()
+		testAbortedByScriptTestAbort(t, script, runTestWithLinger)
+	})
 }
 
 func testAbortedByScriptTestAbort(t *testing.T, script string, runTest func(*testing.T, *GlobalTestState)) {
