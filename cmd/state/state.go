@@ -231,14 +231,6 @@ func getFlags(defaultFlags GlobalFlags, env map[string]string, args []string) Gl
 	if _, ok := env["K6_PROFILING_ENABLED"]; ok {
 		result.ProfilingEnabled = true
 	}
-	//  old name for the K6_AUTO_EXTENSION_RESOLUTION feature flag
-	//  maintained for backward compatibility to be removed in a future release
-	if v, ok := env["K6_BINARY_PROVISIONING"]; ok {
-		vb, err := strconv.ParseBool(v)
-		if err == nil {
-			result.AutoExtensionResolution = vb
-		}
-	}
 	if v, ok := env["K6_AUTO_EXTENSION_RESOLUTION"]; ok {
 		vb, err := strconv.ParseBool(v)
 		if err == nil {
