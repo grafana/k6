@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build !goexperiment.jsonv2 || !go1.25
+
 package jsontext
 
 import (
@@ -234,7 +236,7 @@ func (v *Value) UnmarshalJSON(b []byte) error {
 }
 
 // Kind returns the starting token kind.
-// For a valid value, this will never include '}' or ']'.
+// For a valid value, this will never include [KindEndObject] or [KindEndArray].
 func (v Value) Kind() Kind {
 	if v := v[jsonwire.ConsumeWhitespace(v):]; len(v) > 0 {
 		return Kind(v[0]).normalize()
