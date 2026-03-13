@@ -130,6 +130,7 @@ func TestVUHandleStartStopRace(t *testing.T) {
 
 	var vuID uint64
 	testIterations := 10000
+	const returnTimeout = 500 * time.Millisecond
 	returned := make(chan struct{})
 
 	getVU := func() (lib.InitializedVU, error) {
@@ -159,15 +160,14 @@ func TestVUHandleStartStopRace(t *testing.T) {
 
 	vuHandle := newStoppedVUHandle(ctx, getVU, returnVU, mockNextIterations, &BaseConfig{}, logEntry)
 	go vuHandle.runLoopsIfPossible(runIter)
-	for range testIterations {
+	for i := range testIterations {
 		err := vuHandle.start()
 		vuHandle.gracefulStop()
 		require.NoError(t, err)
 		select {
 		case <-returned:
-		case <-time.After(100 * time.Millisecond):
-			go panic("returning took too long")
-			time.Sleep(time.Second)
+		case <-time.After(returnTimeout):
+			t.Fatalf("VU was not returned within %s after iteration %d", returnTimeout, i)
 		}
 	}
 

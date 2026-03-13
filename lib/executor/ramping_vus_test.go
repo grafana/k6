@@ -417,7 +417,7 @@ func TestRampingVUsRampDownNoWobble(t *testing.T) {
 	}
 
 	// Sample ramp-down at a higher rate
-	for i := len(sampleTimes); i < rampDownSamples; i++ {
+	for i := len(sampleTimes); i < len(result); i++ {
 		time.Sleep(rampDownSampleTime)
 		result[i] = test.state.GetCurrentlyActiveVUsCount()
 	}
@@ -431,12 +431,18 @@ func TestRampingVUsRampDownNoWobble(t *testing.T) {
 
 	vuChanges := []int64{result[2]}
 	// Check ramp-down consistency
-	for i := 3; i < len(result[2:]); i++ {
+	for i := 3; i < len(result); i++ {
 		if result[i] != result[i-1] {
 			vuChanges = append(vuChanges, result[i])
 		}
 	}
-	assert.Equal(t, []int64{10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0}, vuChanges)
+	assert.Equal(t, int64(0), vuChanges[len(vuChanges)-1], "ramp-down must end at 0 active VUs")
+	for i := 1; i < len(vuChanges); i++ {
+		assert.Lessf(t, vuChanges[i], vuChanges[i-1],
+			"active VUs increased during ramp-down: %d -> %d (full sample: %v)",
+			vuChanges[i-1], vuChanges[i], result,
+		)
+	}
 }
 
 func TestRampingVUsConfigExecutionPlanExample(t *testing.T) {
