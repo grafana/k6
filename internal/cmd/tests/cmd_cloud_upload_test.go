@@ -139,7 +139,8 @@ func TestK6CloudUpload(t *testing.T) {
 		ts.CmdArgs = []string{"k6", "cloud", "upload", "archive.tar"}
 		ts.Env["K6_SHOW_CLOUD_LOGS"] = "false" // no mock for the logs yet
 		ts.Env["K6_CLOUD_HOST"] = srv.URL
-		ts.Env["K6_CLOUD_TOKEN"] = "foo" // doesn't matter, we mock the cloud
+		ts.Env["K6_CLOUD_TOKEN"] = "foo"    // doesn't matter, we mock the cloud
+		ts.Env["K6_CLOUD_STACK_ID"] = "123" // satisfy mandatory stack check (archive already has projectID: 124)
 
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
@@ -149,6 +150,37 @@ func TestK6CloudUpload(t *testing.T) {
 		assert.Contains(t, stdout, `execution: cloud`)
 		assert.Contains(t, stdout, `output: https://app.k6.io/runs/123`)
 		assert.Contains(t, stdout, `test status: Archived`)
+	})
+
+	t.Run("TestCloudUploadNoStackConfigured", func(t *testing.T) {
+		t.Parallel()
+
+		validateOptionsCalled := false
+		unexpectedCall := func(route string) http.HandlerFunc {
+			return func(w http.ResponseWriter, _ *http.Request) {
+				t.Errorf("unexpected call to %s: fail-fast stack check must have prevented this", route)
+				http.Error(w, "unexpected call", http.StatusServiceUnavailable)
+			}
+		}
+		srv := getTestServer(t, map[string]http.Handler{
+			"POST ^/v1/validate-options$":    http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { validateOptionsCalled = true; w.WriteHeader(http.StatusOK) }),
+			"POST ^/v1/archive-upload$":      unexpectedCall("/v1/archive-upload"),
+			"GET ^/v1/test-progress/[0-9]+$": unexpectedCall("/v1/test-progress"),
+		})
+		t.Cleanup(srv.Close)
+
+		ts := NewGlobalTestState(t)
+		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test.js"), []byte(`export default function() {}`), 0o644))
+		ts.CmdArgs = []string{"k6", "cloud", "upload", "--log-output=stdout", "test.js"}
+		ts.Env["K6_SHOW_CLOUD_LOGS"] = "false"
+		ts.Env["K6_CLOUD_HOST"] = srv.URL
+		ts.Env["K6_CLOUD_TOKEN"] = "foo"
+		// K6_CLOUD_STACK_ID intentionally absent
+		ts.ExpectedExitCode = -1
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		assert.Contains(t, ts.Stdout.String(), "No Grafana Cloud Stack configured")
+		assert.False(t, validateOptionsCalled, "/validate-options must not be called when stack is not configured")
 	})
 }
 

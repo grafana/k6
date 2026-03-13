@@ -197,6 +197,34 @@ export default function() {
 		assert.Contains(t, stdout, "output: cloud (https://app.k6.io/runs/1337)")
 		assert.Contains(t, stdout, "The test run id is "+strconv.Itoa(testRunID))
 	})
+
+	t.Run("TestCloudRunLocalExecutionNoStackConfigured", func(t *testing.T) {
+		t.Parallel()
+
+		unexpectedCall := func(route string) http.HandlerFunc {
+			return func(w http.ResponseWriter, _ *http.Request) {
+				t.Errorf("unexpected call to %s: fail-fast stack check must have prevented this", route)
+				http.Error(w, "unexpected call", http.StatusServiceUnavailable)
+			}
+		}
+		srv := getTestServer(t, map[string]http.Handler{
+			"POST ^/v1/tests$":               unexpectedCall("/v1/tests"),
+			"POST ^/v1/archive-upload$":      unexpectedCall("/v1/archive-upload"),
+			"GET ^/v1/test-progress/[0-9]+$": unexpectedCall("/v1/test-progress"),
+		})
+		t.Cleanup(srv.Close)
+
+		ts := NewGlobalTestState(t)
+		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test.js"), []byte(`export default function() {}`), 0o644))
+		ts.CmdArgs = []string{"k6", "cloud", "run", "--local-execution", "--log-output=stdout", "test.js"}
+		ts.ExpectedExitCode = -1
+		ts.Env["K6_CLOUD_TOKEN"] = "foo"
+		ts.Env["K6_CLOUD_HOST"] = srv.URL
+		// K6_CLOUD_STACK_ID intentionally absent
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		assert.Contains(t, ts.Stdout.String(), "No Grafana Cloud Stack configured")
+	})
 }
 
 func makeTestState(tb testing.TB, script string, cliFlags []string, expExitCode exitcodes.ExitCode) *GlobalTestState {
@@ -208,7 +236,8 @@ func makeTestState(tb testing.TB, script string, cliFlags []string, expExitCode 
 	require.NoError(tb, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test.js"), []byte(script), 0o644))
 	ts.CmdArgs = append(append([]string{"k6", "cloud", "run"}, cliFlags...), "test.js")
 	ts.ExpectedExitCode = int(expExitCode)
-	ts.Env["K6_CLOUD_TOKEN"] = "foo" // doesn't matter, we mock the cloud
+	ts.Env["K6_CLOUD_TOKEN"] = "foo"    // doesn't matter, we mock the cloud
+	ts.Env["K6_CLOUD_STACK_ID"] = "123" // satisfy mandatory stack check
 
 	return ts
 }
