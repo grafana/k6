@@ -48,6 +48,25 @@ type CreateTestRunResponse struct {
 	ReferenceID    string     `json:"reference_id"`
 	ConfigOverride *Config    `json:"config"`
 	Logs           []LogEntry `json:"logs"`
+
+	// TestRunToken is an ephemeral token for authenticating secrets requests for this run.
+	// It has limited scope (read-only secrets for this project) and expires after the test
+	// duration plus a grace period.
+	TestRunToken string `json:"test_run_token,omitempty"`
+
+	// SecretsConfig contains the endpoint and response format for fetching secrets.
+	SecretsConfig *SecretsConfig `json:"secrets_config,omitempty"`
+}
+
+// SecretsConfig holds the endpoint configuration needed to access secrets from the cloud.
+type SecretsConfig struct {
+	// Endpoint is the URL template for fetching secrets.
+	// It should contain {key} placeholder, e.g., "https://api.k6.io/v1/secrets/12345/{key}"
+	Endpoint string `json:"endpoint,omitempty"`
+
+	// ResponsePath is the JSON path to extract the secret value from the response.
+	// Default is "plaintext" for cloud secrets.
+	ResponsePath string `json:"response_path,omitempty"`
 }
 
 // TestProgressResponse represents the progress of a cloud test.
