@@ -22,6 +22,11 @@ func TestThrow(t *testing.T) {
 	require.True(t, ok, "fn2 is invalid")
 	_, err = fn2(sobek.Undefined())
 	assert.EqualError(t, err, "GoError: aaaa")
+
+	fn3, ok := sobek.AssertFunction(rt.ToValue(func() { Throw(rt, testJSExceptionError{message: "failed"}) }))
+	require.True(t, ok, "fn3 is invalid")
+	_, err = fn3(sobek.Undefined())
+	assert.EqualError(t, err, "TypeError: failed")
 }
 
 func TestToBytes(t *testing.T) {
@@ -77,4 +82,16 @@ func TestToString(t *testing.T) {
 			assert.Equal(t, tc.expOut, out)
 		})
 	}
+}
+
+type testJSExceptionError struct {
+	message string
+}
+
+func (t testJSExceptionError) Error() string {
+	return t.message
+}
+
+func (t testJSExceptionError) JSValue(rt *sobek.Runtime) sobek.Value {
+	return rt.NewTypeError(t.message)
 }
