@@ -1,0 +1,23 @@
+<!doctype html>
+<html>
+<body>
+  <input id="elem"></input>
+
+  <script>
+    var attached = true;
+    const elem = document.getElementById('elem');
+
+    function loop() {
+      if (attached) {
+        elem.remove();
+      } else {
+        document.body.appendChild(elem);
+      }
+      attached = !attached;
+      setTimeout(loop, 0);
+    }
+
+    setTimeout(loop, 0);
+  </script>
+</body>
+</html>
