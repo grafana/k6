@@ -41,6 +41,8 @@ func (t timeoutError) Hint() string {
 		hint = "You can increase the time limit via the setupTimeout option"
 	case consts.TeardownFn:
 		hint = "You can increase the time limit via the teardownTimeout option"
+	case consts.HandleSummaryFn:
+		hint = "You can increase the time limit via the handleSummaryTimeout option or the --summary-timeout CLI flag"
 	}
 	return hint
 }
@@ -51,12 +53,13 @@ func (t timeoutError) AbortReason() errext.AbortReason {
 
 // ExitCode returns the corresponding exit code value to the place.
 func (t timeoutError) ExitCode() exitcodes.ExitCode {
-	// TODO: add handleSummary()
 	switch t.place {
 	case consts.SetupFn:
 		return exitcodes.SetupTimeout
 	case consts.TeardownFn:
 		return exitcodes.TeardownTimeout
+	case consts.HandleSummaryFn:
+		return exitcodes.HandleSummaryTimeout
 	default:
 		return exitcodes.GenericTimeout
 	}
