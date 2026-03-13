@@ -315,6 +315,20 @@ func parseSeed(rawSeed string) (*rand.Rand, error) {
 	return rng, nil
 }
 
+func computePausePerWrite(duration time.Duration, count int64) time.Duration {
+	pause := duration
+	if count > 1 {
+		// compensate for lack of pause after final write (i.e. if we're
+		// doing 10 writes we will only pause 9 times).
+		//
+		// note: use ceiling division to ensure pause*count >= duration when
+		// count does not divided evenly.
+		n := time.Duration(count - 1)
+		pause = (duration + n - 1) / n
+	}
+	return pause
+}
+
 // syntheticByteStream implements the ReadSeeker interface to allow reading
 // arbitrary subsets of bytes up to a maximum size given a function for
 // generating the byte at a given offset.
@@ -561,13 +575,13 @@ func parseWeightedChoices[T any](rawChoices string, parser func(string) (T, erro
 // weightedRandomChoice returns a randomly chosen element from the weighted
 // choices, given as a slice of "choice:weight" strings where weight is a
 // floating point number. Weights do not need to sum to 1.
-func weightedRandomChoice[T any](choices []weightedChoice[T]) T {
+func weightedRandomChoice[T any](choices []weightedChoice[T], randomFloat64 func() float64) T {
 	// Calculate total weight
 	var totalWeight float64
 	for _, wc := range choices {
 		totalWeight += wc.Weight
 	}
-	randomNumber := rand.Float64() * totalWeight
+	randomNumber := randomFloat64() * totalWeight
 	currentWeight := 0.0
 	for _, wc := range choices {
 		currentWeight += wc.Weight
