@@ -163,7 +163,10 @@ func TestK6CloudUpload(t *testing.T) {
 			}
 		}
 		srv := getTestServer(t, map[string]http.Handler{
-			"POST ^/v1/validate-options$":    http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { validateOptionsCalled = true; w.WriteHeader(http.StatusOK) }),
+			"POST ^/v1/validate-options$": http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				validateOptionsCalled = true
+				w.WriteHeader(http.StatusOK)
+			}),
 			"POST ^/v1/archive-upload$":      unexpectedCall("/v1/archive-upload"),
 			"GET ^/v1/test-progress/[0-9]+$": unexpectedCall("/v1/test-progress"),
 		})

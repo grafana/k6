@@ -291,7 +291,10 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 			}
 		}
 		srv := getTestServer(t, map[string]http.Handler{
-			"POST ^/v1/validate-options$":    http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { validateOptionsCalled = true; w.WriteHeader(http.StatusOK) }),
+			"POST ^/v1/validate-options$": http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				validateOptionsCalled = true
+				w.WriteHeader(http.StatusOK)
+			}),
 			"POST ^/v1/archive-upload$":      unexpectedCall("/v1/archive-upload"),
 			"GET ^/v1/test-progress/[0-9]+$": unexpectedCall("/v1/test-progress"),
 		})
@@ -370,8 +373,8 @@ func getSimpleCloudTestState(t *testing.T, script []byte, setupCmd setupCommandF
 	ts.CmdArgs = setupCmd(cliFlags)
 	ts.Env["K6_SHOW_CLOUD_LOGS"] = "false" // no mock for the logs yet
 	ts.Env["K6_CLOUD_HOST"] = srv.URL
-	ts.Env["K6_CLOUD_TOKEN"] = "foo"     // doesn't matter, we mock the cloud
-	ts.Env["K6_CLOUD_STACK_ID"] = "123"  // satisfy mandatory stack check
+	ts.Env["K6_CLOUD_TOKEN"] = "foo"      // doesn't matter, we mock the cloud
+	ts.Env["K6_CLOUD_STACK_ID"] = "123"   // satisfy mandatory stack check
 	ts.Env["K6_CLOUD_PROJECT_ID"] = "456" // avoid "default project ID not available" error
 
 	return ts
