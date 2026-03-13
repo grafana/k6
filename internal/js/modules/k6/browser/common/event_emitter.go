@@ -73,7 +73,7 @@ type BaseEventEmitter struct {
 
 	queues map[chan Event]*queue
 
-	syncCh chan syncFunc
+	syncCh chan chan struct{}
 	ctx    context.Context
 }
 
@@ -81,7 +81,7 @@ type BaseEventEmitter struct {
 func NewBaseEventEmitter(ctx context.Context) BaseEventEmitter {
 	bem := BaseEventEmitter{
 		handlers: make(map[string][]*eventHandler),
-		syncCh:   make(chan syncFunc),
+		syncCh:   make(chan chan struct{}),
 		ctx:      ctx,
 		queues:   make(map[chan Event]*queue),
 	}
@@ -94,31 +94,26 @@ func NewBaseEventEmitter(ctx context.Context) BaseEventEmitter {
 //
 // It returns when the BaseEventEmitter context is done.
 func (e *BaseEventEmitter) syncAll(ctx context.Context) {
+	ch := make(chan struct{})
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case fn := <-e.syncCh:
-			// run the function and signal when it's done
-			done := fn()
-			done <- struct{}{}
+		case e.syncCh <- ch:
+			<-ch
 		}
 	}
 }
 
 // sync is a helper for sychronized access to the BaseEventEmitter.
 func (e *BaseEventEmitter) sync(fn func()) {
-	done := make(chan struct{})
 	select {
 	case <-e.ctx.Done():
 		return
-	case e.syncCh <- func() chan struct{} {
+	case ch := <-e.syncCh:
 		fn()
-		return done
-	}:
+		ch <- struct{}{}
 	}
-	// wait for the function to return
-	<-done
 }
 
 func (e *BaseEventEmitter) emit(event string, data any) {
