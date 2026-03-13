@@ -35,6 +35,11 @@
 !/vendor/modules.txt
 /vendor/**/*.y*ml
 /vendor/**/.*.y*ml
+/vendor/**/CODEOWNERS
+/vendor/**/CONTRIBUTING.md
+/vendor/**/CODE_OF_CONDUCT.md
+/vendor/**/README.md
+/vendor/**/.gitignore
 /vendor/github.com/dlclark/regexp2/testoutput1
 
 /packaging/.env
