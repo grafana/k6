@@ -32,6 +32,7 @@ import (
 	"go.k6.io/k6/internal/event"
 	"go.k6.io/k6/internal/lib/testutils"
 	"go.k6.io/k6/internal/lib/testutils/httpmultibin"
+	cloudsecrets "go.k6.io/k6/internal/secretsource/cloud"
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/lib/fsext"
 )
@@ -3458,4 +3459,118 @@ func TestSpaceInPath(t *testing.T) {
 	stderr := ts.Stderr.String()
 	t.Log(stderr)
 	assert.Contains(t, stderr, `something 42`)
+}
+
+// TestBareSecretSourceFlag verifies that --secret-source=<type> (no =config suffix) is accepted
+// for any registered source type — not just "url". The fix generalized the old url-only special
+// case so that e.g. --secret-source=cloud works when the source is configured via env vars.
+//
+//nolint:paralleltest // modifies package-level cloud global state
+func TestBareSecretSourceFlag(t *testing.T) {
+	// Spin up a mock server that returns a JSON response with a "plaintext" field.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"plaintext":"bare-type-secret"}`))
+	}))
+	t.Cleanup(srv.Close)
+	t.Cleanup(func() { cloudsecrets.SetConfig(nil) })
+
+	script := `
+		import secrets from "k6/secrets";
+		export default async () => {
+			const v = await secrets.source("cloud").get("mykey");
+			console.log(v);
+		}
+	`
+	ts := NewGlobalTestState(t)
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(script), 0o644))
+
+	ts.Env["K6_CLOUD_SECRETS_TOKEN"] = "test-token"
+	ts.Env["K6_CLOUD_SECRETS_ENDPOINT"] = srv.URL + "/secrets/{key}"
+	// --secret-source=cloud with no =config suffix: previously returned "couldn't parse" error.
+	ts.CmdArgs = []string{"k6", "run", "--secret-source=cloud", "script.js"}
+	ts.ReparseFlags()
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stderr := ts.Stderr.String()
+	t.Log(stderr)
+	assert.NotContains(t, stderr, "couldn't parse secret source configuration")
+	assert.NotContains(t, stderr, "level=error")
+	assert.Contains(t, stderr, `level=info msg="***SECRET_REDACTED***" source=console`)
+	assert.NotContains(t, stderr, "bare-type-secret")
+}
+
+// TestCloudSourceAlwaysAvailable verifies that the "cloud" secret source is always registered
+// even when the user does not pass --secret-source=cloud. Scripts can reference it by name and
+// get a clear "not configured" error rather than "no source named cloud".
+//
+//nolint:paralleltest // depends on globalConfig being nil; must not overlap with other cloud tests that call SetConfig
+func TestCloudSourceAlwaysAvailable(t *testing.T) {
+	// Ensure globalConfig is nil so the cloud source reports "not configured" rather than
+	// accidentally succeeding with credentials left over from a previous test.
+	cloudsecrets.SetConfig(nil)
+	t.Cleanup(func() { cloudsecrets.SetConfig(nil) })
+
+	script := `
+		import secrets from "k6/secrets";
+		export default async () => {
+			try {
+				await secrets.source("cloud").get("key");
+			} catch (e) {
+				console.log("cloud error: " + e.message);
+			}
+		}
+	`
+	ts := NewGlobalTestState(t)
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(script), 0o644))
+	ts.CmdArgs = []string{"k6", "run", "script.js"}
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stderr := ts.Stderr.String()
+	t.Log(stderr)
+	// Should fail with "not configured", not with "no source" — proving cloud is registered.
+	assert.Contains(t, stderr, "cloud error:")
+	assert.NotContains(t, stderr, "no source")
+}
+
+// TestPLZCloudSecretsEnvVars verifies that setting K6_CLOUD_SECRETS_TOKEN and
+// K6_CLOUD_SECRETS_ENDPOINT configures the cloud secret source without requiring
+// --secret-source=cloud or a /v1/tests API round-trip (the PLZ operator path).
+//
+//nolint:paralleltest // modifies package-level cloud global state
+func TestPLZCloudSecretsEnvVars(t *testing.T) {
+	// Spin up a mock server that returns the secret as a JSON {"plaintext": "..."} response.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		// Verify the Authorization header carries the token.
+		assert.Equal(t, "Bearer plz-token", r.Header.Get("Authorization"))
+		_, _ = w.Write([]byte(`{"plaintext":"plz-secret-value"}`))
+	}))
+	t.Cleanup(srv.Close)
+	t.Cleanup(func() { cloudsecrets.SetConfig(nil) })
+
+	script := `
+		import secrets from "k6/secrets";
+		export default async () => {
+			const v = await secrets.source("cloud").get("mykey");
+			console.log(v);
+		}
+	`
+	ts := NewGlobalTestState(t)
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(script), 0o644))
+
+	ts.Env["K6_CLOUD_SECRETS_TOKEN"] = "plz-token"
+	ts.Env["K6_CLOUD_SECRETS_ENDPOINT"] = srv.URL + "/secrets/{key}"
+	// No --secret-source flag: cloud source is auto-registered and PLZ env vars configure it.
+	ts.CmdArgs = []string{"k6", "run", "script.js"}
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stderr := ts.Stderr.String()
+	t.Log(stderr)
+	assert.NotContains(t, stderr, "level=error")
+	assert.Contains(t, stderr, `level=info msg="***SECRET_REDACTED***" source=console`)
+	assert.NotContains(t, stderr, "plz-secret-value")
 }

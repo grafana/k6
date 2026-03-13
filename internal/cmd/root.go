@@ -25,6 +25,7 @@ import (
 	"go.k6.io/k6/secretsource"
 
 	_ "go.k6.io/k6/internal/secretsource" // import it to register internal secret sources
+	cloudsecrets "go.k6.io/k6/internal/secretsource/cloud"
 )
 
 const waitLoggerCloseTimeout = time.Second * 5
@@ -420,14 +421,13 @@ func createSecretSources(gs *state.GlobalState) (map[string]secretsource.Source,
 	for _, line := range gs.Flags.SecretSource {
 		t, config, ok := strings.Cut(line, "=")
 		if !ok {
-			// Special case: allow --secret-source=url without explicit config
-			// (it will use environment variables + defaults)
-			if line == "url" {
-				t = line
-				config = ""
-			} else {
+			if strings.TrimSpace(line) == "" {
 				return nil, fmt.Errorf("couldn't parse secret source configuration %q", line)
 			}
+			// Allow any non-empty source type without explicit config — it will use
+			// environment variables and built-in defaults.
+			t = line
+			config = ""
 		}
 		secretSources := ext.Get(ext.SecretSourceExtension)
 		found, ok := secretSources[t]
@@ -437,6 +437,9 @@ func createSecretSources(gs *state.GlobalState) (map[string]secretsource.Source,
 		c := found.Module.(secretsource.Constructor) //nolint:forcetypeassert
 		params := baseParams
 		name, isDefault, config := extractNameAndDefault(config)
+		if name == "" {
+			name = t
+		}
 		params.ConfigArgument = config
 
 		secretSource, err := c(params)
@@ -460,6 +463,31 @@ func createSecretSources(gs *state.GlobalState) (map[string]secretsource.Source,
 		for _, l := range result {
 			result["default"] = l
 		}
+	}
+
+	// Always register the cloud source so that SetConfig (called from createCloudTest on API
+	// response) is sufficient to enable secrets — no dynamic AddSource needed at runtime.
+	// For non-cloud runs the source is registered but never configured, so Get() returns a
+	// clear "not configured" error if a script calls secrets.get().
+	if _, ok := result["cloud"]; !ok {
+		cloudSource, err := cloudsecrets.New(baseParams)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize cloud secret source: %w", err)
+		}
+		result["cloud"] = cloudSource
+		if _, ok := result["default"]; !ok {
+			result["default"] = cloudSource
+		}
+	}
+
+	// PLZ path: the k6-operator injects K6_CLOUD_SECRETS_TOKEN + K6_CLOUD_SECRETS_ENDPOINT
+	// via environment variables because it never calls createCloudTest (no /v1/tests round-trip).
+	if token := gs.Env["K6_CLOUD_SECRETS_TOKEN"]; token != "" {
+		cloudsecrets.SetConfig(&cloudsecrets.Config{
+			Token:        token,
+			Endpoint:     gs.Env["K6_CLOUD_SECRETS_ENDPOINT"],
+			ResponsePath: gs.Env["K6_CLOUD_SECRETS_RESPONSE_PATH"],
+		})
 	}
 
 	return result, nil
