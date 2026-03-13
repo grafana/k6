@@ -36,6 +36,13 @@ var errUserUnauthenticated = errors.New("To run tests in Grafana Cloud, you must
 	" https://grafana.com/docs/grafana-cloud/testing/k6/author-run/tokens-and-cli-authentication" +
 	" for additional authentication methods.")
 
+// errNoStackConfigured is returned when a k6 cloud command is run without a Grafana Cloud Stack configured.
+//
+//nolint:staticcheck // the error is shown to the user so here punctuation and capital are required
+var errNoStackConfigured = errors.New("No Grafana Cloud Stack configured." +
+	" Set a default stack by running `k6 cloud login --stack <stack-url>`" +
+	" or via the K6_CLOUD_STACK_ID environment variable.")
+
 // cmdCloud handles the `k6 cloud` sub-command
 type cmdCloud struct {
 	gs *state.GlobalState
@@ -143,6 +150,9 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	}
 	if !cloudConfig.Token.Valid {
 		return errUserUnauthenticated
+	}
+	if !cloudConfig.StackID.Valid || cloudConfig.StackID.Int64 == 0 {
+		return errNoStackConfigured
 	}
 
 	// Display config warning if needed
@@ -500,15 +510,6 @@ func resolveAndSetProjectID(
 		arc.Options.External[cloudapi.LegacyCloudConfigKey] = b
 
 		cloudConfig.ProjectID = null.IntFrom(projectID)
-	}
-	if !cloudConfig.StackID.Valid || cloudConfig.StackID.Int64 == 0 {
-		fallBackMsg := ""
-		if !cloudConfig.ProjectID.Valid || cloudConfig.ProjectID.Int64 == 0 {
-			fallBackMsg = "Falling back to the first available stack. "
-		}
-		gs.Logger.Warn("DEPRECATED: No stack specified. " + fallBackMsg +
-			"Consider setting a default stack via the `k6 cloud login` command or the `K6_CLOUD_STACK_ID` " +
-			"environment variable as this will become mandatory in the next major release.")
 	}
 	return nil
 }
