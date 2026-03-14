@@ -565,7 +565,19 @@ func getCmdRun(gs *state.GlobalState) *cobra.Command {
 a commandline interface for interacting with it.`,
 		Example: exampleText,
 		Args:    exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
-		RunE:    c.run,
+		PreRunE: func(_ *cobra.Command, _ []string) error {
+			for _, s := range gs.Flags.SecretSource {
+				t, _, _ := strings.Cut(s, "=")
+				if strings.TrimSpace(t) == "cloud" {
+					return errext.WithExitCodeIfNone(
+						fmt.Errorf("the 'cloud' secret source can only be used with 'k6 cloud run --local-execution'"),
+						exitcodes.InvalidConfig,
+					)
+				}
+			}
+			return nil
+		},
+		RunE: c.run,
 	}
 
 	runCmd.Flags().SortFlags = false

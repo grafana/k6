@@ -3417,6 +3417,17 @@ func TestCloudSourceAlwaysAvailable(t *testing.T) {
 	assert.NotContains(t, stderr, "no source")
 }
 
+// TestCloudSecretSourceRejectedByK6Run verifies that --secret-source=cloud is rejected
+// by 'k6 run' since the cloud source is only valid with 'k6 cloud run --local-execution'.
+func TestCloudSecretSourceRejectedByK6Run(t *testing.T) {
+	t.Parallel()
+
+	ts := getSingleFileTestState(t, `export default function() {}`, []string{"--secret-source=cloud"}, exitcodes.InvalidConfig)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	assert.Contains(t, ts.Stderr.String(), "the 'cloud' secret source can only be used with 'k6 cloud run --local-execution'")
+}
+
 // TestPLZCloudSecretsEnvVars verifies that setting K6_CLOUD_SECRETS_TOKEN and
 // K6_CLOUD_SECRETS_ENDPOINT configures the cloud secret source without requiring
 // --secret-source=cloud or a /v1/tests API round-trip (the PLZ operator path).
