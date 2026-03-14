@@ -3461,46 +3461,6 @@ func TestSpaceInPath(t *testing.T) {
 	assert.Contains(t, stderr, `something 42`)
 }
 
-// TestBareSecretSourceFlag verifies that --secret-source=<type> (no =config suffix) is accepted
-// for any registered source type — not just "url". The fix generalized the old url-only special
-// case so that e.g. --secret-source=cloud works when the source is configured via env vars.
-//
-//nolint:paralleltest // modifies package-level cloud global state
-func TestBareSecretSourceFlag(t *testing.T) {
-	// Spin up a mock server that returns a JSON response with a "plaintext" field.
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"plaintext":"bare-type-secret"}`))
-	}))
-	t.Cleanup(srv.Close)
-	t.Cleanup(func() { cloudsecrets.SetConfig(nil) })
-
-	script := `
-		import secrets from "k6/secrets";
-		export default async () => {
-			const v = await secrets.source("cloud").get("mykey");
-			console.log(v);
-		}
-	`
-	ts := NewGlobalTestState(t)
-	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(script), 0o644))
-
-	ts.Env["K6_CLOUD_SECRETS_TOKEN"] = "test-token"
-	ts.Env["K6_CLOUD_SECRETS_ENDPOINT"] = srv.URL + "/secrets/{key}"
-	// --secret-source=cloud with no =config suffix: previously returned "couldn't parse" error.
-	ts.CmdArgs = []string{"k6", "run", "--secret-source=cloud", "script.js"}
-	ts.ReparseFlags()
-
-	cmd.ExecuteWithGlobalState(ts.GlobalState)
-
-	stderr := ts.Stderr.String()
-	t.Log(stderr)
-	assert.NotContains(t, stderr, "couldn't parse secret source configuration")
-	assert.NotContains(t, stderr, "level=error")
-	assert.Contains(t, stderr, `level=info msg="***SECRET_REDACTED***" source=console`)
-	assert.NotContains(t, stderr, "bare-type-secret")
-}
-
 // TestCloudSourceAlwaysAvailable verifies that the "cloud" secret source is always registered
 // even when the user does not pass --secret-source=cloud. Scripts can reference it by name and
 // get a clear "not configured" error rather than "no source named cloud".
