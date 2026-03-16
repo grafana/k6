@@ -69,14 +69,36 @@ func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 	// wrappers (facades) that convert the old k6 idiosyncratic APIs to the new
 	// proper Client ones that accept Request objects and don't suck
 	mustExport("get", func(url sobek.Value, args ...sobek.Value) (*Response, error) {
-		// http.get(url, params) doesn't have a body argument, so we add undefined
-		// as the third argument to http.request(method, url, body, params)
+		// http.get(url, params) only accepts a URL and an optional params argument.
+		// It does not accept a body argument like http.post or http.put.
+		// Warn the user if they pass more arguments than expected, as they likely
+		// intended to pass a body (e.g. http.get(url, body, params)), which is
+		// not supported by HTTP GET.
+		if len(args) > 1 {
+			state := mi.vu.State()
+			if state != nil {
+				state.Logger.Warnf(
+					"http.get only accepts a url and an optional params argument. %.0f extra argument(s) will be ignored.",
+					float64(len(args)-1),
+				)
+			}
+		}
 		args = append([]sobek.Value{sobek.Undefined()}, args...)
 		return mi.defaultClient.Request(http.MethodGet, url, args...)
 	})
 	mustExport("head", func(url sobek.Value, args ...sobek.Value) (*Response, error) {
-		// http.head(url, params) doesn't have a body argument, so we add undefined
-		// as the third argument to http.request(method, url, body, params)
+		// http.head(url, params) only accepts a URL and an optional params argument.
+		// It does not accept a body argument like http.post or http.put.
+		// Warn the user if they pass more arguments than expected.
+		if len(args) > 1 {
+			state := mi.vu.State()
+			if state != nil {
+				state.Logger.Warnf(
+					"http.head only accepts a url and an optional params argument. %.0f extra argument(s) will be ignored.",
+					float64(len(args)-1),
+				)
+			}
+		}
 		args = append([]sobek.Value{sobek.Undefined()}, args...)
 		return mi.defaultClient.Request(http.MethodHead, url, args...)
 	})
