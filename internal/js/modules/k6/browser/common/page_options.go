@@ -47,25 +47,6 @@ func NewPageEmulateMediaOptions(from *Page) *PageEmulateMediaOptions {
 	}
 }
 
-// Parse parses the page emulate media options.
-func (o *PageEmulateMediaOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	rt := k6ext.Runtime(ctx)
-	if !common.IsNullish(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			switch k {
-			case "colorScheme":
-				o.ColorScheme = ColorScheme(opts.Get(k).String())
-			case "media":
-				o.Media = MediaType(opts.Get(k).String())
-			case "reducedMotion":
-				o.ReducedMotion = ReducedMotion(opts.Get(k).String())
-			}
-		}
-	}
-	return nil
-}
-
 func NewPageReloadOptions(defaultWaitUntil LifecycleEvent, defaultTimeout time.Duration) *PageReloadOptions {
 	return &PageReloadOptions{
 		WaitUntil: defaultWaitUntil,

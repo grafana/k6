@@ -82,9 +82,7 @@ func TestConstantArrivalRateRunCorrectRate(t *testing.T) {
 	defer test.cancel()
 
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		// check that we got around the amount of VU iterations as we would expect
 		var totalCount int64
 
@@ -105,7 +103,7 @@ func TestConstantArrivalRateRunCorrectRate(t *testing.T) {
 		time.Sleep(200 * time.Millisecond) // just in case
 
 		assert.InDelta(t, 250, totalCount+atomic.LoadInt64(&count), 2)
-	}()
+	})
 	engineOut := make(chan metrics.SampleContainer, 1000)
 	require.NoError(t, test.executor.Run(test.ctx, engineOut))
 	wg.Wait()
@@ -208,9 +206,7 @@ func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
 			rateScaled := newET.ScaleInt64(config.Rate.Int64)
 
 			var wg sync.WaitGroup
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				// check that we got around the amount of VU iterations as we would expect
 				var currentCount int64
 
@@ -219,7 +215,7 @@ func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
 					currentCount = atomic.LoadInt64(&count)
 					assert.InDelta(t, int64(i+1)*rateScaled, currentCount, 3)
 				}
-			}()
+			})
 			startTime = time.Now()
 			engineOut := make(chan metrics.SampleContainer, 1000)
 			err = execTest.executor.Run(execTest.ctx, engineOut)
@@ -256,14 +252,11 @@ func TestArrivalRateCancel(t *testing.T) {
 			defer test.cancel()
 
 			var wg sync.WaitGroup
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-
+			wg.Go(func() {
 				engineOut := make(chan metrics.SampleContainer, 1000)
 				errCh <- test.executor.Run(test.ctx, engineOut)
 				close(weAreDoneCh)
-			}()
+			})
 
 			time.Sleep(time.Second)
 			ch <- struct{}{}
