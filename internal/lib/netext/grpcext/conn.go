@@ -39,6 +39,7 @@ type InvokeRequest struct {
 	Timeout                time.Duration
 	TagsAndMeta            *metrics.TagsAndMeta
 	DiscardResponseMessage bool
+	DiscardUnknownFields   bool
 	Message                []byte
 	Metadata               metadata.MD
 }
@@ -58,6 +59,7 @@ type StreamRequest struct {
 	MethodDescriptor       protoreflect.MethodDescriptor
 	Timeout                time.Duration
 	DiscardResponseMessage bool
+	DiscardUnknownFields   bool
 	TagsAndMeta            *metrics.TagsAndMeta
 	Metadata               metadata.MD
 }
@@ -149,7 +151,11 @@ func (c *Conn) Invoke(
 	ctx = metadata.NewOutgoingContext(ctx, req.Metadata)
 
 	reqdm := dynamicpb.NewMessage(req.MethodDescriptor.Input())
-	if err := (protojson.UnmarshalOptions{Resolver: c.types}).Unmarshal(req.Message, reqdm); err != nil {
+	unmarshalOpts := protojson.UnmarshalOptions{
+		Resolver:       c.types,
+		DiscardUnknown: req.DiscardUnknownFields,
+	}
+	if err := unmarshalOpts.Unmarshal(req.Message, reqdm); err != nil {
 		return nil, fmt.Errorf("unable to serialise request object to protocol buffer: %w", err)
 	}
 
@@ -229,7 +235,7 @@ func (c *Conn) NewStream(
 		methodDescriptor:       req.MethodDescriptor,
 		discardResponseMessage: req.DiscardResponseMessage,
 		marshaler:              protojson.MarshalOptions{Resolver: c.types, EmitUnpopulated: true},
-		unmarshaler:            protojson.UnmarshalOptions{Resolver: c.types},
+		unmarshaler:            protojson.UnmarshalOptions{Resolver: c.types, DiscardUnknown: req.DiscardUnknownFields},
 	}, nil
 }
 
