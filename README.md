@@ -17,7 +17,7 @@
 <p align="center">Modern load testing for developers and testers in the DevOps era.</p>
 
 <p align="center">
-  <a href="https://github.com/grafana/k6/releases"><img src="https://img.shields.io/github/release/grafana/k6.svg" alt="Github release"></a>
+  <a href="https://github.com/grafana/k6/releases"><img src="https://img.shields.io/github/release/grafana/k6.svg" alt="GitHub release"></a>
   <a href="https://github.com/grafana/k6/actions/workflows/all.yml"><img src="https://github.com/grafana/k6/actions/workflows/build.yml/badge.svg" alt="Build status"></a>
   <a href="https://goreportcard.com/report/github.com/grafana/k6"><img src="https://goreportcard.com/badge/github.com/grafana/k6" alt="Go Report Card"></a>
  <a href="https://codecov.io/gh/grafana/k6"><img src="https://img.shields.io/codecov/c/github/grafana/k6/master.svg" alt="Codecov branch"></a>
@@ -47,7 +47,7 @@ Its core features are:
 - **Multiple Protocol support**. HTTP, WebSockets, gRPC, Browser, and more.
 - **Large extension ecosystem.** You can extend k6 to support your needs. And many people have already shared their extensions with the community! [Explore](https://grafana.com/docs/k6/latest/extensions/explore) the available extensions.
 - **Flexible metrics storage and visualization**. Summary statistics or granular metrics, exported to the service of your choice.
-- **Native integration with Grafana cloud**. [SaaS solution](https://grafana.com/products/cloud/k6/) for test execution, metrics correlation, data analysis, and more.
+- **Native integration with Grafana Cloud**. [SaaS solution](https://grafana.com/products/cloud/k6/) for test execution, metrics correlation, data analysis, and more.
 
 This is what load testing looks like in the 21st century.
 
@@ -84,7 +84,7 @@ export default function () {
 You can run scripts like this on the CLI, or in your CI, or across a Kubernetes cluster.
 
 > [!NOTE]
-> Don't want to write code ?
+> Don't want to write code?
 > 
 > We got you! Meet [k6 Studio](https://github.com/grafana/k6-studio), a desktop application made to help you generate k6 scripts without having to touch code!
 
