@@ -688,6 +688,230 @@ func TestParseOnceFlag(t *testing.T) {
 	})
 }
 
+func TestOnceEachMode(t *testing.T) {
+	t.Parallel()
+
+	alwaysExec := func(_ string) bool { return true }
+
+	t.Run("MultiScenario", func(t *testing.T) {
+		t.Parallel()
+		conf := Config{
+			OnceEach: null.BoolFrom(true),
+			Options: lib.Options{Scenarios: lib.ScenarioConfigs{
+				"api": executor.ConstantVUsConfig{
+					BaseConfig: executor.BaseConfig{
+						Name: "api", Type: "constant-vus",
+						Exec: null.StringFrom("apiTest"),
+						Tags: map[string]string{"test_type": "api"},
+					},
+					VUs:      null.IntFrom(10),
+					Duration: types.NullDurationFrom(30 * time.Second),
+				},
+				"write": executor.SharedIterationsConfig{
+					BaseConfig: executor.BaseConfig{
+						Name: "write", Type: "shared-iterations",
+						Exec: null.StringFrom("writeTest"),
+						Tags: map[string]string{"test_type": "write"},
+					},
+					VUs:         null.IntFrom(5),
+					Iterations:  null.IntFrom(100),
+					MaxDuration: types.NullDurationFrom(10 * time.Minute),
+				},
+			}},
+		}
+		result, err := deriveAndValidateConfig(conf, alwaysExec, nil)
+		require.NoError(t, err)
+		require.Len(t, result.Scenarios, 2)
+
+		apiSc := result.Scenarios["api"]
+		assert.Equal(t, "shared-iterations", apiSc.GetType())
+		assert.Equal(t, "apiTest", apiSc.GetExec())
+		assert.Equal(t, map[string]string{"test_type": "api"}, apiSc.GetTags())
+
+		writeSc := result.Scenarios["write"]
+		assert.Equal(t, "shared-iterations", writeSc.GetType())
+		assert.Equal(t, "writeTest", writeSc.GetExec())
+		assert.Equal(t, map[string]string{"test_type": "write"}, writeSc.GetTags())
+	})
+
+	t.Run("SingleScenario", func(t *testing.T) {
+		t.Parallel()
+		conf := Config{
+			OnceEach: null.BoolFrom(true),
+			Options: lib.Options{Scenarios: lib.ScenarioConfigs{
+				"api": executor.ConstantVUsConfig{
+					BaseConfig: executor.BaseConfig{
+						Name: "api", Type: "constant-vus",
+						Exec: null.StringFrom("apiTest"),
+						Env:  map[string]string{"BASE_URL": "http://example.com"},
+					},
+					VUs:      null.IntFrom(10),
+					Duration: types.NullDurationFrom(30 * time.Second),
+				},
+			}},
+		}
+		result, err := deriveAndValidateConfig(conf, alwaysExec, nil)
+		require.NoError(t, err)
+		require.Len(t, result.Scenarios, 1)
+		sc := result.Scenarios["api"]
+		assert.Equal(t, "shared-iterations", sc.GetType())
+		assert.Equal(t, "apiTest", sc.GetExec())
+		assert.Equal(t, map[string]string{"BASE_URL": "http://example.com"}, sc.GetEnv())
+	})
+
+	t.Run("BareDefault", func(t *testing.T) {
+		t.Parallel()
+		// No scenarios defined - DeriveScenariosFromShortcuts creates a default one.
+		conf := Config{
+			OnceEach: null.BoolFrom(true),
+		}
+		result, err := deriveAndValidateConfig(conf, alwaysExec, nil)
+		require.NoError(t, err)
+		require.Len(t, result.Scenarios, 1)
+		sc := result.Scenarios["default"]
+		assert.Equal(t, "shared-iterations", sc.GetType())
+		assert.Equal(t, "default", sc.GetExec())
+	})
+
+	t.Run("BrowserOptionsPreserved", func(t *testing.T) {
+		t.Parallel()
+		conf := Config{
+			OnceEach: null.BoolFrom(true),
+			Options: lib.Options{Scenarios: lib.ScenarioConfigs{
+				"ui": executor.ConstantVUsConfig{
+					BaseConfig: executor.BaseConfig{
+						Name: "ui", Type: "constant-vus",
+						Exec: null.StringFrom("uiTest"),
+						Options: &lib.ScenarioOptions{
+							Browser: map[string]any{"type": "chromium"},
+						},
+					},
+					VUs:      null.IntFrom(1),
+					Duration: types.NullDurationFrom(10 * time.Second),
+				},
+			}},
+		}
+		result, err := deriveAndValidateConfig(conf, alwaysExec, nil)
+		require.NoError(t, err)
+		sc := result.Scenarios["ui"]
+		assert.Equal(t, "shared-iterations", sc.GetType())
+		opts := sc.GetScenarioOptions()
+		require.NotNil(t, opts)
+		assert.Equal(t, "chromium", opts.Browser["type"])
+	})
+
+	t.Run("ConflictWithOnce", func(t *testing.T) {
+		t.Parallel()
+		conf := Config{
+			OnceEach: null.BoolFrom(true),
+			Once:     null.StringFrom(""),
+		}
+		_, err := deriveAndValidateConfig(conf, alwaysExec, nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "--once-each cannot be combined with --once")
+	})
+
+	t.Run("NotSet", func(t *testing.T) {
+		t.Parallel()
+		conf := Config{}
+		result, err := deriveAndValidateConfig(conf, alwaysExec, nil)
+		require.NoError(t, err)
+		// Normal behavior - default per-vu-iterations scenario
+		assert.Equal(t, "per-vu-iterations", result.Scenarios["default"].GetType())
+	})
+
+	t.Run("MixedExecAndDefault", func(t *testing.T) {
+		t.Parallel()
+		conf := Config{
+			OnceEach: null.BoolFrom(true),
+			Options: lib.Options{Scenarios: lib.ScenarioConfigs{
+				"api": executor.ConstantVUsConfig{
+					BaseConfig: executor.BaseConfig{
+						Name: "api", Type: "constant-vus",
+						Exec: null.StringFrom("apiTest"),
+					},
+					VUs:      null.IntFrom(10),
+					Duration: types.NullDurationFrom(30 * time.Second),
+				},
+				"smoke": executor.PerVUIterationsConfig{
+					BaseConfig: executor.BaseConfig{
+						Name: "smoke", Type: "per-vu-iterations",
+					},
+					VUs:         null.IntFrom(1),
+					Iterations:  null.IntFrom(1),
+					MaxDuration: types.NullDurationFrom(10 * time.Minute),
+				},
+			}},
+		}
+		result, err := deriveAndValidateConfig(conf, alwaysExec, nil)
+		require.NoError(t, err)
+		require.Len(t, result.Scenarios, 2)
+
+		apiSc := result.Scenarios["api"]
+		assert.Equal(t, "shared-iterations", apiSc.GetType())
+		assert.Equal(t, "apiTest", apiSc.GetExec())
+
+		smokeSc := result.Scenarios["smoke"]
+		assert.Equal(t, "shared-iterations", smokeSc.GetType())
+		assert.Equal(t, "default", smokeSc.GetExec())
+	})
+}
+
+func TestParseOnceEachFlag(t *testing.T) {
+	t.Parallel()
+
+	t.Run("NotSet", func(t *testing.T) {
+		t.Parallel()
+		flags := configFlagSet()
+		flags.AddFlagSet(optionFlagSet())
+		require.NoError(t, flags.Parse([]string{}))
+		conf, err := getConfig(flags)
+		require.NoError(t, err)
+		assert.False(t, conf.OnceEach.Valid)
+	})
+
+	t.Run("Set", func(t *testing.T) {
+		t.Parallel()
+		flags := configFlagSet()
+		flags.AddFlagSet(optionFlagSet())
+		require.NoError(t, flags.Parse([]string{"--once-each"}))
+		conf, err := getConfig(flags)
+		require.NoError(t, err)
+		assert.True(t, conf.OnceEach.Valid)
+		assert.True(t, conf.OnceEach.Bool)
+	})
+
+	t.Run("ConflictVUs", func(t *testing.T) {
+		t.Parallel()
+		flags := configFlagSet()
+		flags.AddFlagSet(optionFlagSet())
+		require.NoError(t, flags.Parse([]string{"--once-each", "--vus", "5"}))
+		_, err := getConfig(flags)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "--once-each cannot be combined with --vus")
+	})
+
+	t.Run("ConflictIterations", func(t *testing.T) {
+		t.Parallel()
+		flags := configFlagSet()
+		flags.AddFlagSet(optionFlagSet())
+		require.NoError(t, flags.Parse([]string{"--once-each", "--iterations", "10"}))
+		_, err := getConfig(flags)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "--iterations")
+	})
+
+	t.Run("ConflictOnce", func(t *testing.T) {
+		t.Parallel()
+		flags := configFlagSet()
+		flags.AddFlagSet(optionFlagSet())
+		require.NoError(t, flags.Parse([]string{"--once-each", "--once"}))
+		_, err := getConfig(flags)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "--once-each cannot be combined with --once")
+	})
+}
+
 func TestReadDiskConfigWithDefaultFlags(t *testing.T) {
 	t.Parallel()
 	memfs := fsext.NewMemMapFs()

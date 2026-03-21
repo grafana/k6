@@ -40,6 +40,8 @@ func configFlagSet() *pflag.FlagSet {
 	flags.String("once", "", "run a single scenario with 1 VU and 1 iteration; "+
 		"use --once or --once=`scenario` to select a specific scenario")
 	flags.Lookup("once").NoOptDefVal = " "
+	flags.Bool("once-each", false,
+		"run every scenario with 1 VU and 1 iteration, preserving exec/env/tags/options")
 	return flags
 }
 
@@ -63,6 +65,10 @@ type Config struct {
 	// When Valid, the flag was passed. The String value is the optional scenario name
 	// (empty = no scenario name given).
 	Once null.String `json:"-" envconfig:"-"`
+
+	// OnceEach is a CLI-only flag that converts ALL scenarios to shared-iterations
+	// with 1 VU and 1 iteration each, preserving exec, env, tags, and options.
+	OnceEach null.Bool `json:"-" envconfig:"-"`
 
 	// TODO: deprecate
 	Collectors map[string]json.RawMessage `json:"collectors"`
@@ -98,6 +104,9 @@ func (c Config) Apply(cfg Config) Config {
 	if cfg.Once.Valid {
 		c.Once = cfg.Once
 	}
+	if cfg.OnceEach.Valid {
+		c.OnceEach = cfg.OnceEach
+	}
 	if len(cfg.Collectors) > 0 {
 		c.Collectors = cfg.Collectors
 	}
@@ -116,7 +125,12 @@ func getPartialConfig(flags *pflag.FlagSet) (Config, error) {
 		return Config{}, err
 	}
 
-	return Config{Options: opts, Once: once}, nil
+	onceEach, err := parseOnceEachFlag(flags)
+	if err != nil {
+		return Config{}, err
+	}
+
+	return Config{Options: opts, Once: once, OnceEach: onceEach}, nil
 }
 
 // parseOnceFlag reads the --once flag and checks for conflicting shortcut flags.
@@ -154,6 +168,30 @@ func parseOnceFlag(flags *pflag.FlagSet) (null.String, error) {
 	return null.NewString(once, true), nil
 }
 
+func parseOnceEachFlag(flags *pflag.FlagSet) (null.Bool, error) {
+	if !flags.Changed("once-each") {
+		return null.Bool{}, nil
+	}
+
+	var conflicting []string
+	for _, f := range []string{"vus", "iterations", "duration", "stage"} {
+		if flags.Changed(f) {
+			conflicting = append(conflicting, "--"+f)
+		}
+	}
+	if flags.Changed("once") {
+		conflicting = append(conflicting, "--once")
+	}
+
+	if len(conflicting) > 0 {
+		return null.Bool{}, fmt.Errorf(
+			"--once-each cannot be combined with %s", strings.Join(conflicting, ", "),
+		)
+	}
+
+	return null.BoolFrom(true), nil
+}
+
 // Gets configuration from CLI flags.
 func getConfig(flags *pflag.FlagSet) (Config, error) {
 	opts, err := getOptions(flags)
@@ -168,6 +206,10 @@ func getConfig(flags *pflag.FlagSet) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	onceEach, err := parseOnceEachFlag(flags)
+	if err != nil {
+		return Config{}, err
+	}
 
 	return Config{
 		Options:       opts,
@@ -175,6 +217,7 @@ func getConfig(flags *pflag.FlagSet) (Config, error) {
 		Linger:        getNullBool(flags, "linger"),
 		NoUsageReport: getNullBool(flags, "no-usage-report"),
 		Once:          once,
+		OnceEach:      onceEach,
 
 		// As the "run" and the "cloud run" commands share the same implementation
 		// we enforce the run command to ignore the no-archive-upload flag, and always
@@ -389,11 +432,22 @@ func deriveAndValidateConfig(
 		return result, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
 	}
 
+	if conf.Once.Valid && conf.OnceEach.Valid {
+		return result, errext.WithExitCodeIfNone(
+			fmt.Errorf("--once-each cannot be combined with --once"),
+			exitcodes.InvalidConfig,
+		)
+	}
+
 	if conf.Once.Valid {
 		result.Options, err = applyOnceMode(conf.Once.String, result.Options, isExecutable)
 		if err != nil {
 			return result, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
 		}
+	}
+
+	if conf.OnceEach.Valid {
+		result.Options = applyOnceEachMode(result.Options)
 	}
 
 	err = validateConfig(result, isExecutable)
@@ -453,6 +507,23 @@ func applyOnceMode(scenarioName string, opts lib.Options, isExecutable func(stri
 	opts.Stages = nil
 
 	return opts, nil
+}
+
+// applyOnceEachMode converts every scenario to shared-iterations with 1 VU
+// and 1 iteration, preserving exec, env, tags, and options from each original.
+func applyOnceEachMode(opts lib.Options) lib.Options {
+	converted := make(lib.ScenarioConfigs, len(opts.Scenarios))
+	for name, sc := range opts.Scenarios {
+		converted[name] = makeOnceScenario(name, sc)
+	}
+	opts.Scenarios = converted
+
+	opts.VUs = null.Int{}
+	opts.Duration = types.NullDuration{}
+	opts.Iterations = null.Int{}
+	opts.Stages = nil
+
+	return opts
 }
 
 func makeOnceScenario(name string, original lib.ExecutorConfig) executor.SharedIterationsConfig {

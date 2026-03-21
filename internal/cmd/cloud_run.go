@@ -180,6 +180,8 @@ func (c *cmdCloudRun) flagSet() *pflag.FlagSet {
 	flags.String("once", "", "run a single scenario with 1 VU and 1 iteration; "+
 		"use --once or --once=`scenario` to select a specific scenario")
 	flags.Lookup("once").NoOptDefVal = " "
+	flags.Bool("once-each", false,
+		"run every scenario with 1 VU and 1 iteration, preserving exec/env/tags/options")
 
 	return flags
 }
@@ -194,6 +196,10 @@ func getCloudRunLocalExecutionConfig(flags *pflag.FlagSet) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	onceEach, err := parseOnceEachFlag(flags)
+	if err != nil {
+		return Config{}, err
+	}
 
 	// When running locally, we force the output to be cloud.
 	out := []string{"cloud"}
@@ -205,5 +211,6 @@ func getCloudRunLocalExecutionConfig(flags *pflag.FlagSet) (Config, error) {
 		NoUsageReport:   getNullBool(flags, "no-usage-report"),
 		NoArchiveUpload: getNullBool(flags, "no-archive-upload"),
 		Once:            once,
+		OnceEach:        onceEach,
 	}, nil
 }
