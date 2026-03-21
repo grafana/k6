@@ -74,7 +74,6 @@ func optionFlagSet() *pflag.FlagSet {
 		"Milliseconds are assumed if no unit is provided. "+
 		"Possible select values to return a single IP are: 'first', 'random' or 'roundRobin'. "+
 		"Possible policy values are: 'preferIPv4', 'preferIPv6', 'onlyIPv4', 'onlyIPv6' or 'any'.")
-	flags.Bool("once", false, "run default() with 1 VU and 1 iteration, ignoring all other scenarios")
 	return flags
 }
 

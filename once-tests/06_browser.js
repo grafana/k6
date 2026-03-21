@@ -6,19 +6,12 @@ export const options = {
       vus: 1,
       duration: '10s',
       exec: 'uiTest',
-      options: {
-        browser: { type: 'chromium' },
-      },
+      options: { browser: { type: 'chromium' } },
     },
   },
 };
 export async function uiTest() {
-  const page = await browser.newPage();
-  await page.goto('https://test.k6.io/');
-  await page.close();
-}
-export default async function () {
-  console.log('RUNNING DEFAULT');
+  console.log('RUNNING UI_TEST');
   const page = await browser.newPage();
   await page.goto('https://test.k6.io/');
   await page.close();

@@ -177,12 +177,20 @@ func (c *cmdCloudRun) flagSet() *pflag.FlagSet {
 		c.noArchiveUpload,
 		"only when using the local-execution mode, don't upload the test archive to the cloud service",
 	)
+	flags.String("once", "", "run a single scenario with 1 VU and 1 iteration; "+
+		"use --once or --once=`scenario` to select a specific scenario")
+	flags.Lookup("once").NoOptDefVal = " "
 
 	return flags
 }
 
 func getCloudRunLocalExecutionConfig(flags *pflag.FlagSet) (Config, error) {
 	opts, err := getOptions(flags)
+	if err != nil {
+		return Config{}, err
+	}
+
+	once, err := parseOnceFlag(flags)
 	if err != nil {
 		return Config{}, err
 	}
@@ -196,6 +204,6 @@ func getCloudRunLocalExecutionConfig(flags *pflag.FlagSet) (Config, error) {
 		Linger:          getNullBool(flags, "linger"),
 		NoUsageReport:   getNullBool(flags, "no-usage-report"),
 		NoArchiveUpload: getNullBool(flags, "no-archive-upload"),
-		Once:            getNullBool(flags, "once"),
+		Once:            once,
 	}, nil
 }

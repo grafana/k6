@@ -475,12 +475,6 @@ func (lt *loadedTest) consolidateDeriveAndValidateConfig(
 		}
 	}
 
-	if cliConfig.Once.Valid && cliConfig.Once.Bool {
-		if err := checkOnceCLIConflicts(cliConfig); err != nil {
-			return nil, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
-		}
-	}
-
 	gs.Logger.Debug("Consolidating config layers...")
 	consolidatedConfig, err := getConsolidatedConfig(gs, cliConfig, lt.initRunner.GetOptions())
 	if err != nil {

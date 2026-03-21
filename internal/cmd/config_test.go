@@ -210,32 +210,30 @@ func TestApplyOnceMode(t *testing.T) {
 
 	t.Run("single scenario preserves exec env tags and browser", func(t *testing.T) {
 		t.Parallel()
-		conf := Config{
-			Once: null.BoolFrom(true),
-			Options: lib.Options{
-				Scenarios: lib.ScenarioConfigs{
-					"api": executor.ConstantVUsConfig{
-						BaseConfig: executor.BaseConfig{
-							Name: "api",
-							Type: "constant-vus",
-							Exec: null.StringFrom("apiTest"),
-							Env:  map[string]string{"BASE_URL": "https://test.k6.io"},
-							Tags: map[string]string{"test_type": "api"},
-							Options: &lib.ScenarioOptions{
-								Browser: map[string]any{"type": "chromium"},
-							},
+		opts := lib.Options{
+			Scenarios: lib.ScenarioConfigs{
+				"api": executor.ConstantVUsConfig{
+					BaseConfig: executor.BaseConfig{
+						Name: "api",
+						Type: "constant-vus",
+						Exec: null.StringFrom("apiTest"),
+						Env:  map[string]string{"BASE_URL": "https://test.k6.io"},
+						Tags: map[string]string{"test_type": "api"},
+						Options: &lib.ScenarioOptions{
+							Browser: map[string]any{"type": "chromium"},
 						},
-						VUs:      null.IntFrom(10),
-						Duration: types.NullDurationFrom(30 * time.Second),
 					},
+					VUs:      null.IntFrom(10),
+					Duration: types.NullDurationFrom(30 * time.Second),
 				},
 			},
 		}
 
-		applyOnceMode(&conf, func(fn string) bool { return fn != "default" })
+		result, err := applyOnceMode("", opts, func(fn string) bool { return fn != "default" })
+		require.NoError(t, err)
 
-		require.Len(t, conf.Scenarios, 1)
-		sc := conf.Scenarios["api"]
+		require.Len(t, result.Scenarios, 1)
+		sc := result.Scenarios["api"]
 		assert.Equal(t, "apiTest", sc.GetExec())
 		assert.Equal(t, map[string]string{"BASE_URL": "https://test.k6.io"}, sc.GetEnv())
 		assert.Equal(t, map[string]string{"test_type": "api"}, sc.GetTags())
@@ -249,27 +247,25 @@ func TestApplyOnceMode(t *testing.T) {
 
 	t.Run("single scenario with default prefers default", func(t *testing.T) {
 		t.Parallel()
-		conf := Config{
-			Once: null.BoolFrom(true),
-			Options: lib.Options{
-				Scenarios: lib.ScenarioConfigs{
-					"api": executor.ConstantVUsConfig{
-						BaseConfig: executor.BaseConfig{
-							Name: "api",
-							Type: "constant-vus",
-							Exec: null.StringFrom("apiTest"),
-						},
-						VUs:      null.IntFrom(10),
-						Duration: types.NullDurationFrom(30 * time.Second),
+		opts := lib.Options{
+			Scenarios: lib.ScenarioConfigs{
+				"api": executor.ConstantVUsConfig{
+					BaseConfig: executor.BaseConfig{
+						Name: "api",
+						Type: "constant-vus",
+						Exec: null.StringFrom("apiTest"),
 					},
+					VUs:      null.IntFrom(10),
+					Duration: types.NullDurationFrom(30 * time.Second),
 				},
 			},
 		}
 
-		applyOnceMode(&conf, func(_ string) bool { return true })
+		result, err := applyOnceMode("", opts, func(_ string) bool { return true })
+		require.NoError(t, err)
 
-		require.Len(t, conf.Scenarios, 1)
-		sc := conf.Scenarios[lib.DefaultScenarioName]
+		require.Len(t, result.Scenarios, 1)
+		sc := result.Scenarios[lib.DefaultScenarioName]
 		assert.Equal(t, "default", sc.GetExec())
 
 		siCfg, ok := sc.(executor.SharedIterationsConfig)
@@ -280,151 +276,415 @@ func TestApplyOnceMode(t *testing.T) {
 
 	t.Run("single scenario without default uses scenario exec", func(t *testing.T) {
 		t.Parallel()
-		conf := Config{
-			Once: null.BoolFrom(true),
-			Options: lib.Options{
-				Scenarios: lib.ScenarioConfigs{
-					"api": executor.ConstantVUsConfig{
-						BaseConfig: executor.BaseConfig{
-							Name: "api",
-							Type: "constant-vus",
-							Exec: null.StringFrom("apiTest"),
-						},
-						VUs:      null.IntFrom(10),
-						Duration: types.NullDurationFrom(30 * time.Second),
+		opts := lib.Options{
+			Scenarios: lib.ScenarioConfigs{
+				"api": executor.ConstantVUsConfig{
+					BaseConfig: executor.BaseConfig{
+						Name: "api",
+						Type: "constant-vus",
+						Exec: null.StringFrom("apiTest"),
 					},
+					VUs:      null.IntFrom(10),
+					Duration: types.NullDurationFrom(30 * time.Second),
 				},
 			},
 		}
 
-		applyOnceMode(&conf, func(fn string) bool { return fn != "default" })
+		result, err := applyOnceMode("", opts, func(fn string) bool { return fn != "default" })
+		require.NoError(t, err)
 
-		require.Len(t, conf.Scenarios, 1)
-		sc := conf.Scenarios["api"]
+		require.Len(t, result.Scenarios, 1)
+		sc := result.Scenarios["api"]
 		assert.Equal(t, "apiTest", sc.GetExec())
-	})
-
-	t.Run("multi scenario falls back to default", func(t *testing.T) {
-		t.Parallel()
-		conf := Config{
-			Once: null.BoolFrom(true),
-			Options: lib.Options{
-				Scenarios: lib.ScenarioConfigs{
-					"api": executor.ConstantVUsConfig{
-						BaseConfig: executor.BaseConfig{
-							Name: "api",
-							Type: "constant-vus",
-							Exec: null.StringFrom("apiTest"),
-						},
-						VUs:      null.IntFrom(10),
-						Duration: types.NullDurationFrom(30 * time.Second),
-					},
-					"ui": executor.ConstantVUsConfig{
-						BaseConfig: executor.BaseConfig{
-							Name: "ui",
-							Type: "constant-vus",
-							Exec: null.StringFrom("uiTest"),
-						},
-						VUs:      null.IntFrom(1),
-						Duration: types.NullDurationFrom(10 * time.Second),
-					},
-				},
-			},
-		}
-
-		applyOnceMode(&conf, func(_ string) bool { return true })
-
-		require.Len(t, conf.Scenarios, 1)
-		sc := conf.Scenarios[lib.DefaultScenarioName]
-		assert.Equal(t, "default", sc.GetExec())
 	})
 
 	t.Run("multi scenario only carries browser from default-targeting scenarios", func(t *testing.T) {
 		t.Parallel()
-		conf := Config{
-			Once: null.BoolFrom(true),
-			Options: lib.Options{
-				Scenarios: lib.ScenarioConfigs{
-					"api": executor.ConstantVUsConfig{
-						BaseConfig: executor.BaseConfig{
-							Name: "api",
-							Type: "constant-vus",
-							Exec: null.StringFrom("apiTest"),
-						},
-						VUs:      null.IntFrom(10),
-						Duration: types.NullDurationFrom(30 * time.Second),
+		opts := lib.Options{
+			Scenarios: lib.ScenarioConfigs{
+				"api": executor.ConstantVUsConfig{
+					BaseConfig: executor.BaseConfig{
+						Name: "api",
+						Type: "constant-vus",
+						Exec: null.StringFrom("apiTest"),
 					},
-					"ui": executor.ConstantVUsConfig{
-						BaseConfig: executor.BaseConfig{
-							Name: "ui",
-							Type: "constant-vus",
-							Exec: null.StringFrom("uiTest"),
-							Options: &lib.ScenarioOptions{
-								Browser: map[string]any{"type": "chromium"},
-							},
+					VUs:      null.IntFrom(10),
+					Duration: types.NullDurationFrom(30 * time.Second),
+				},
+				"ui": executor.ConstantVUsConfig{
+					BaseConfig: executor.BaseConfig{
+						Name: "ui",
+						Type: "constant-vus",
+						Exec: null.StringFrom("uiTest"),
+						Options: &lib.ScenarioOptions{
+							Browser: map[string]any{"type": "chromium"},
 						},
-						VUs:      null.IntFrom(1),
-						Duration: types.NullDurationFrom(10 * time.Second),
 					},
+					VUs:      null.IntFrom(1),
+					Duration: types.NullDurationFrom(10 * time.Second),
 				},
 			},
 		}
 
-		applyOnceMode(&conf, func(_ string) bool { return true })
-
-		sc := conf.Scenarios[lib.DefaultScenarioName]
-		// uiTest's browser should NOT be carried to default
-		assert.Nil(t, sc.GetScenarioOptions())
+		// Multi-scenario without name now errors in P2
+		_, err := applyOnceMode("", opts, func(_ string) bool { return true })
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "--once requires a scenario name")
 	})
 
 	t.Run("multi scenario carries browser from no-exec scenario", func(t *testing.T) {
 		t.Parallel()
-		conf := Config{
-			Once: null.BoolFrom(true),
-			Options: lib.Options{
-				Scenarios: lib.ScenarioConfigs{
-					"api": executor.ConstantVUsConfig{
-						BaseConfig: executor.BaseConfig{
-							Name: "api",
-							Type: "constant-vus",
-							Exec: null.StringFrom("apiTest"),
-						},
-						VUs:      null.IntFrom(10),
-						Duration: types.NullDurationFrom(30 * time.Second),
+		opts := lib.Options{
+			Scenarios: lib.ScenarioConfigs{
+				"api": executor.ConstantVUsConfig{
+					BaseConfig: executor.BaseConfig{
+						Name: "api",
+						Type: "constant-vus",
+						Exec: null.StringFrom("apiTest"),
 					},
-					"visual": executor.ConstantVUsConfig{
-						BaseConfig: executor.BaseConfig{
-							Name: "visual",
-							Type: "constant-vus",
-							Options: &lib.ScenarioOptions{
-								Browser: map[string]any{"type": "chromium"},
-							},
+					VUs:      null.IntFrom(10),
+					Duration: types.NullDurationFrom(30 * time.Second),
+				},
+				"visual": executor.ConstantVUsConfig{
+					BaseConfig: executor.BaseConfig{
+						Name: "visual",
+						Type: "constant-vus",
+						Options: &lib.ScenarioOptions{
+							Browser: map[string]any{"type": "chromium"},
 						},
-						VUs:      null.IntFrom(1),
-						Duration: types.NullDurationFrom(10 * time.Second),
 					},
+					VUs:      null.IntFrom(1),
+					Duration: types.NullDurationFrom(10 * time.Second),
 				},
 			},
 		}
 
-		applyOnceMode(&conf, func(_ string) bool { return true })
-
-		sc := conf.Scenarios[lib.DefaultScenarioName]
-		require.NotNil(t, sc.GetScenarioOptions())
-		assert.Equal(t, map[string]any{"type": "chromium"}, sc.GetScenarioOptions().Browser)
+		// Multi-scenario without name now errors in P2
+		_, err := applyOnceMode("", opts, func(_ string) bool { return true })
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "--once requires a scenario name")
 	})
 
 	t.Run("zero scenarios creates default", func(t *testing.T) {
 		t.Parallel()
-		conf := Config{
-			Once: null.BoolFrom(true),
-		}
+		opts := lib.Options{}
 
-		applyOnceMode(&conf, func(_ string) bool { return true })
+		result, err := applyOnceMode("", opts, func(_ string) bool { return true })
+		require.NoError(t, err)
 
-		require.Len(t, conf.Scenarios, 1)
-		sc := conf.Scenarios[lib.DefaultScenarioName]
+		require.Len(t, result.Scenarios, 1)
+		sc := result.Scenarios[lib.DefaultScenarioName]
 		assert.Equal(t, "default", sc.GetExec())
+	})
+}
+
+func TestOnceMode(t *testing.T) {
+	t.Parallel()
+
+	alwaysExec := func(_ string) bool { return true }
+
+	t.Run("SingleScenarioNoArg", func(t *testing.T) {
+		t.Parallel()
+		conf := Config{
+			Once: null.StringFrom(""),
+			Options: lib.Options{Scenarios: lib.ScenarioConfigs{
+				"api": executor.ConstantVUsConfig{
+					BaseConfig: executor.BaseConfig{
+						Name: "api", Type: "constant-vus",
+						Exec: null.StringFrom("apiTest"),
+						Env:  map[string]string{"BASE_URL": "http://example.com"},
+						Tags: map[string]string{"test_type": "api"},
+					},
+					VUs:      null.IntFrom(10),
+					Duration: types.NullDurationFrom(30 * time.Second),
+				},
+			}},
+		}
+		result, err := deriveAndValidateConfig(conf, alwaysExec, nil)
+		require.NoError(t, err)
+		require.Len(t, result.Scenarios, 1)
+		sc := result.Scenarios["default"]
+		assert.Equal(t, "shared-iterations", sc.GetType())
+		assert.Equal(t, "default", sc.GetExec())
+	})
+
+	t.Run("SingleScenarioNoArgWithoutDefault", func(t *testing.T) {
+		t.Parallel()
+		conf := Config{
+			Once: null.StringFrom(""),
+			Options: lib.Options{Scenarios: lib.ScenarioConfigs{
+				"api": executor.ConstantVUsConfig{
+					BaseConfig: executor.BaseConfig{
+						Name: "api", Type: "constant-vus",
+						Exec: null.StringFrom("apiTest"),
+						Env:  map[string]string{"BASE_URL": "http://example.com"},
+						Tags: map[string]string{"test_type": "api"},
+					},
+					VUs:      null.IntFrom(10),
+					Duration: types.NullDurationFrom(30 * time.Second),
+				},
+			}},
+		}
+		noDefault := func(fn string) bool { return fn != "default" }
+		result, err := deriveAndValidateConfig(conf, noDefault, nil)
+		require.NoError(t, err)
+		require.Len(t, result.Scenarios, 1)
+		sc := result.Scenarios["api"]
+		assert.Equal(t, "shared-iterations", sc.GetType())
+		assert.Equal(t, "apiTest", sc.GetExec())
+		assert.Equal(t, map[string]string{"BASE_URL": "http://example.com"}, sc.GetEnv())
+		assert.Equal(t, map[string]string{"test_type": "api"}, sc.GetTags())
+	})
+
+	t.Run("SingleScenarioWithArg", func(t *testing.T) {
+		t.Parallel()
+		conf := Config{
+			Once: null.StringFrom("api"),
+			Options: lib.Options{Scenarios: lib.ScenarioConfigs{
+				"api": executor.ConstantVUsConfig{
+					BaseConfig: executor.BaseConfig{
+						Name: "api", Type: "constant-vus",
+						Exec: null.StringFrom("apiTest"),
+					},
+					VUs:      null.IntFrom(10),
+					Duration: types.NullDurationFrom(30 * time.Second),
+				},
+			}},
+		}
+		result, err := deriveAndValidateConfig(conf, alwaysExec, nil)
+		require.NoError(t, err)
+		require.Len(t, result.Scenarios, 1)
+		assert.Equal(t, "shared-iterations", result.Scenarios["api"].GetType())
+	})
+
+	t.Run("MultiScenarioNoArg", func(t *testing.T) {
+		t.Parallel()
+		conf := Config{
+			Once: null.StringFrom(""),
+			Options: lib.Options{Scenarios: lib.ScenarioConfigs{
+				"api": executor.ConstantVUsConfig{
+					BaseConfig: executor.BaseConfig{Name: "api", Type: "constant-vus"},
+					VUs:        null.IntFrom(10),
+					Duration:   types.NullDurationFrom(30 * time.Second),
+				},
+				"write": executor.SharedIterationsConfig{
+					BaseConfig:  executor.BaseConfig{Name: "write", Type: "shared-iterations"},
+					VUs:         null.IntFrom(5),
+					Iterations:  null.IntFrom(100),
+					MaxDuration: types.NullDurationFrom(10 * time.Minute),
+				},
+			}},
+		}
+		_, err := deriveAndValidateConfig(conf, alwaysExec, nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "--once requires a scenario name")
+		assert.Contains(t, err.Error(), "api")
+		assert.Contains(t, err.Error(), "write")
+	})
+
+	t.Run("MultiScenarioNamed", func(t *testing.T) {
+		t.Parallel()
+		conf := Config{
+			Once: null.StringFrom("write"),
+			Options: lib.Options{Scenarios: lib.ScenarioConfigs{
+				"api": executor.ConstantVUsConfig{
+					BaseConfig: executor.BaseConfig{Name: "api", Type: "constant-vus"},
+					VUs:        null.IntFrom(10),
+					Duration:   types.NullDurationFrom(30 * time.Second),
+				},
+				"write": executor.SharedIterationsConfig{
+					BaseConfig: executor.BaseConfig{
+						Name: "write", Type: "shared-iterations",
+						Exec: null.StringFrom("writeTest"),
+						Tags: map[string]string{"team": "backend"},
+					},
+					VUs:         null.IntFrom(5),
+					Iterations:  null.IntFrom(100),
+					MaxDuration: types.NullDurationFrom(10 * time.Minute),
+				},
+			}},
+		}
+		result, err := deriveAndValidateConfig(conf, alwaysExec, nil)
+		require.NoError(t, err)
+		require.Len(t, result.Scenarios, 1)
+		sc := result.Scenarios["write"]
+		assert.Equal(t, "shared-iterations", sc.GetType())
+		assert.Equal(t, "writeTest", sc.GetExec())
+		assert.Equal(t, map[string]string{"team": "backend"}, sc.GetTags())
+	})
+
+	t.Run("ScenarioNotFound", func(t *testing.T) {
+		t.Parallel()
+		conf := Config{
+			Once: null.StringFrom("xxx"),
+			Options: lib.Options{Scenarios: lib.ScenarioConfigs{
+				"api": executor.ConstantVUsConfig{
+					BaseConfig: executor.BaseConfig{Name: "api", Type: "constant-vus"},
+					VUs:        null.IntFrom(10),
+					Duration:   types.NullDurationFrom(30 * time.Second),
+				},
+			}},
+		}
+		_, err := deriveAndValidateConfig(conf, alwaysExec, nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), `scenario "xxx" not found`)
+		assert.Contains(t, err.Error(), "api")
+	})
+
+	t.Run("DefaultFunctionNoScenarios", func(t *testing.T) {
+		t.Parallel()
+		// When no scenarios defined in script, DeriveScenariosFromShortcuts creates a default one.
+		// So --once with no arg and no explicit scenarios should work (single default scenario).
+		conf := Config{
+			Once: null.StringFrom(""),
+		}
+		result, err := deriveAndValidateConfig(conf, alwaysExec, nil)
+		require.NoError(t, err)
+		require.Len(t, result.Scenarios, 1)
+		sc := result.Scenarios["default"]
+		assert.Equal(t, "shared-iterations", sc.GetType())
+		assert.Equal(t, "default", sc.GetExec())
+	})
+
+	t.Run("OnceFlagNotSet", func(t *testing.T) {
+		t.Parallel()
+		// Once not set -> normal behavior
+		conf := Config{}
+		result, err := deriveAndValidateConfig(conf, alwaysExec, nil)
+		require.NoError(t, err)
+		require.Len(t, result.Scenarios, 1)
+		assert.Equal(t, "per-vu-iterations", result.Scenarios["default"].GetType())
+	})
+
+	t.Run("BrowserOptionsPreservedByName", func(t *testing.T) {
+		t.Parallel()
+		conf := Config{
+			Once: null.StringFrom("ui"),
+			Options: lib.Options{Scenarios: lib.ScenarioConfigs{
+				"ui": executor.ConstantVUsConfig{
+					BaseConfig: executor.BaseConfig{
+						Name: "ui", Type: "constant-vus",
+						Exec: null.StringFrom("uiTest"),
+						Options: &lib.ScenarioOptions{
+							Browser: map[string]any{"type": "chromium"},
+						},
+					},
+					VUs:      null.IntFrom(1),
+					Duration: types.NullDurationFrom(10 * time.Second),
+				},
+			}},
+		}
+		result, err := deriveAndValidateConfig(conf, alwaysExec, nil)
+		require.NoError(t, err)
+		sc := result.Scenarios["ui"]
+		assert.Equal(t, "shared-iterations", sc.GetType())
+		opts := sc.GetScenarioOptions()
+		require.NotNil(t, opts)
+		assert.Equal(t, "chromium", opts.Browser["type"])
+	})
+
+	t.Run("BrowserOptionsPreservedWithoutDefault", func(t *testing.T) {
+		t.Parallel()
+		conf := Config{
+			Once: null.StringFrom(""),
+			Options: lib.Options{Scenarios: lib.ScenarioConfigs{
+				"ui": executor.ConstantVUsConfig{
+					BaseConfig: executor.BaseConfig{
+						Name: "ui", Type: "constant-vus",
+						Exec: null.StringFrom("uiTest"),
+						Options: &lib.ScenarioOptions{
+							Browser: map[string]any{"type": "chromium"},
+						},
+					},
+					VUs:      null.IntFrom(1),
+					Duration: types.NullDurationFrom(10 * time.Second),
+				},
+			}},
+		}
+		noDefault := func(fn string) bool { return fn != "default" }
+		result, err := deriveAndValidateConfig(conf, noDefault, nil)
+		require.NoError(t, err)
+		sc := result.Scenarios["ui"]
+		assert.Equal(t, "shared-iterations", sc.GetType())
+		opts := sc.GetScenarioOptions()
+		require.NotNil(t, opts)
+		assert.Equal(t, "chromium", opts.Browser["type"])
+	})
+}
+
+func TestParseOnceFlag(t *testing.T) {
+	t.Parallel()
+
+	t.Run("NotSet", func(t *testing.T) {
+		t.Parallel()
+		flags := configFlagSet()
+		flags.AddFlagSet(optionFlagSet())
+		require.NoError(t, flags.Parse([]string{}))
+		once, err := parseOnceFlag(flags)
+		require.NoError(t, err)
+		assert.False(t, once.Valid)
+	})
+
+	t.Run("NoValue", func(t *testing.T) {
+		t.Parallel()
+		flags := configFlagSet()
+		flags.AddFlagSet(optionFlagSet())
+		require.NoError(t, flags.Parse([]string{"--once"}))
+		once, err := parseOnceFlag(flags)
+		require.NoError(t, err)
+		assert.True(t, once.Valid)
+		assert.Equal(t, "", once.String)
+	})
+
+	t.Run("WithValue", func(t *testing.T) {
+		t.Parallel()
+		flags := configFlagSet()
+		flags.AddFlagSet(optionFlagSet())
+		require.NoError(t, flags.Parse([]string{"--once=api"}))
+		once, err := parseOnceFlag(flags)
+		require.NoError(t, err)
+		assert.True(t, once.Valid)
+		assert.Equal(t, "api", once.String)
+	})
+
+	t.Run("ConflictVUs", func(t *testing.T) {
+		t.Parallel()
+		flags := configFlagSet()
+		flags.AddFlagSet(optionFlagSet())
+		require.NoError(t, flags.Parse([]string{"--once", "--vus", "5"}))
+		_, err := parseOnceFlag(flags)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "--once cannot be combined with --vus")
+	})
+
+	t.Run("ConflictIterations", func(t *testing.T) {
+		t.Parallel()
+		flags := configFlagSet()
+		flags.AddFlagSet(optionFlagSet())
+		require.NoError(t, flags.Parse([]string{"--once", "--iterations", "10"}))
+		_, err := parseOnceFlag(flags)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "--iterations")
+	})
+
+	t.Run("ConflictDuration", func(t *testing.T) {
+		t.Parallel()
+		flags := configFlagSet()
+		flags.AddFlagSet(optionFlagSet())
+		require.NoError(t, flags.Parse([]string{"--once", "--duration", "30s"}))
+		_, err := parseOnceFlag(flags)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "--duration")
+	})
+
+	t.Run("ConflictStage", func(t *testing.T) {
+		t.Parallel()
+		flags := configFlagSet()
+		flags.AddFlagSet(optionFlagSet())
+		require.NoError(t, flags.Parse([]string{"--once", "-s", "30s:10"}))
+		_, err := parseOnceFlag(flags)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "--stage")
 	})
 }
 

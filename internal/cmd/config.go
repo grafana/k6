@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
+	"go.k6.io/k6/internal/lib/consts"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/executor"
 	"go.k6.io/k6/lib/fsext"
@@ -35,6 +37,9 @@ func configFlagSet() *pflag.FlagSet {
 		false,
 		"don't send anonymous usage"+"stats (https://grafana.com/docs/k6/latest/set-up/usage-collection/)",
 	)
+	flags.String("once", "", "run a single scenario with 1 VU and 1 iteration; "+
+		"use --once or --once=`scenario` to select a specific scenario")
+	flags.Lookup("once").NoOptDefVal = " "
 	return flags
 }
 
@@ -54,10 +59,10 @@ type Config struct {
 	// need to be able to pass down a configuration option that is only relevant to the cloud run command.
 	NoArchiveUpload null.Bool `json:"noArchiveUpload" envconfig:"K6_NO_ARCHIVE_UPLOAD"`
 
-	// Once runs the default function with 1 VU and 1 iteration using
-	// shared-iterations executor, replacing any configured scenarios.
-	// CLI-only flag, not persisted to config files or environment variables.
-	Once null.Bool `json:"-" envconfig:"-"`
+	// Once is a CLI-only flag that runs a single scenario with 1 VU and 1 iteration.
+	// When Valid, the flag was passed. The String value is the optional scenario name
+	// (empty = no scenario name given).
+	Once null.String `json:"-" envconfig:"-"`
 
 	// TODO: deprecate
 	Collectors map[string]json.RawMessage `json:"collectors"`
@@ -106,7 +111,47 @@ func getPartialConfig(flags *pflag.FlagSet) (Config, error) {
 		return Config{}, err
 	}
 
-	return Config{Options: opts, Once: getNullBool(flags, "once")}, nil
+	once, err := parseOnceFlag(flags)
+	if err != nil {
+		return Config{}, err
+	}
+
+	return Config{Options: opts, Once: once}, nil
+}
+
+// parseOnceFlag reads the --once flag and checks for conflicting shortcut flags.
+// The flag uses NoOptDefVal=" " so that --once (no value) is distinguishable from
+// the flag not being passed at all. A space value means "no scenario name."
+func parseOnceFlag(flags *pflag.FlagSet) (null.String, error) {
+	if !flags.Changed("once") {
+		return null.String{}, nil
+	}
+
+	once, err := flags.GetString("once")
+	if err != nil {
+		return null.String{}, err
+	}
+
+	// NoOptDefVal is " " (space), which means the flag was passed without a value.
+	// Normalize to empty string for the scenario name.
+	if once == " " {
+		once = ""
+	}
+
+	var conflicting []string
+	for _, f := range []string{"vus", "iterations", "duration", "stage"} {
+		if flags.Changed(f) {
+			conflicting = append(conflicting, "--"+f)
+		}
+	}
+
+	if len(conflicting) > 0 {
+		return null.String{}, fmt.Errorf(
+			"--once cannot be combined with %s", strings.Join(conflicting, ", "),
+		)
+	}
+
+	return null.NewString(once, true), nil
 }
 
 // Gets configuration from CLI flags.
@@ -119,12 +164,17 @@ func getConfig(flags *pflag.FlagSet) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	once, err := parseOnceFlag(flags)
+	if err != nil {
+		return Config{}, err
+	}
+
 	return Config{
 		Options:       opts,
 		Out:           out,
 		Linger:        getNullBool(flags, "linger"),
 		NoUsageReport: getNullBool(flags, "no-usage-report"),
-		Once:          getNullBool(flags, "once"),
+		Once:          once,
 
 		// As the "run" and the "cloud run" commands share the same implementation
 		// we enforce the run command to ignore the no-archive-upload flag, and always
@@ -339,89 +389,122 @@ func deriveAndValidateConfig(
 		return result, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
 	}
 
-	if result.Once.Valid && result.Once.Bool {
-		applyOnceMode(&result, isExecutable)
+	if conf.Once.Valid {
+		result.Options, err = applyOnceMode(conf.Once.String, result.Options, isExecutable)
+		if err != nil {
+			return result, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
+		}
 	}
 
 	err = validateConfig(result, isExecutable)
 	return result, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
 }
 
-func checkOnceCLIConflicts(cliConf Config) error {
-	if cliConf.Duration.Valid {
-		return fmt.Errorf("--once cannot be combined with --duration")
-	}
-	if cliConf.Iterations.Valid {
-		return fmt.Errorf("--once cannot be combined with --iterations")
-	}
-	if len(cliConf.Stages) > 0 {
-		return fmt.Errorf("--once cannot be combined with --stage")
-	}
-	if cliConf.VUs.Valid && cliConf.VUs.Int64 != 1 {
-		return fmt.Errorf("--once cannot be combined with --vus")
-	}
-	return nil
-}
+// applyOnceMode replaces the scenario configuration to run a single scenario
+// with 1 VU and 1 iteration using the shared-iterations executor.
+//
+// Behavior:
+//   - Named scenario (--once=name): select that scenario by name
+//   - Single scenario with default() available: prefer default scenario
+//   - Single scenario without default(): use the scenario's exec
+//   - Multiple scenarios without name: error listing available scenarios
+//   - No scenarios: create a default scenario
+func applyOnceMode(scenarioName string, opts lib.Options, isExecutable func(string) bool) (lib.Options, error) {
+	scenarios := opts.Scenarios
 
-func applyOnceMode(conf *Config, isExecutable func(string) bool) {
-	switch len(conf.Scenarios) {
-	case 1:
-		if isExecutable(lib.DefaultScenarioName) {
-			applyOnceDefaultScenario(conf)
-		} else {
-			applyOnceSingleScenario(conf)
+	switch {
+	case scenarioName != "":
+		sc, ok := scenarios[scenarioName]
+		if !ok {
+			return opts, fmt.Errorf(
+				"scenario %q not found; available scenarios: %s",
+				scenarioName, sortedScenarioNames(scenarios),
+			)
 		}
+		opts.Scenarios = lib.ScenarioConfigs{
+			scenarioName: makeOnceScenario(scenarioName, sc),
+		}
+
+	case len(scenarios) == 1:
+		if isExecutable(lib.DefaultScenarioName) {
+			applyOnceDefaultScenario(&opts)
+		} else {
+			for name, sc := range scenarios {
+				opts.Scenarios = lib.ScenarioConfigs{
+					name: makeOnceScenario(name, sc),
+				}
+			}
+		}
+
+	case len(scenarios) > 1:
+		return opts, fmt.Errorf(
+			"--once requires a scenario name when multiple scenarios are defined; "+
+				"available scenarios: %s", sortedScenarioNames(scenarios),
+		)
+
 	default:
-		applyOnceDefaultScenario(conf)
+		applyOnceDefaultScenario(&opts)
 	}
 
-	// Clear shortcut fields so they don't conflict.
-	conf.Duration = types.NullDuration{}
-	conf.Iterations = null.Int{}
-	conf.Stages = nil
-	conf.VUs = null.Int{}
+	// Clear shortcut fields so they don't conflict with the generated scenario.
+	opts.VUs = null.Int{}
+	opts.Duration = types.NullDuration{}
+	opts.Iterations = null.Int{}
+	opts.Stages = nil
+
+	return opts, nil
 }
 
-// applyOnceSingleScenario replaces the single scenario's executor with
-// shared-iterations 1/1 while preserving exec, env, tags, and options.
-func applyOnceSingleScenario(conf *Config) {
-	for name, sc := range conf.Scenarios {
-		ds := executor.NewSharedIterationsConfig(name)
-		ds.VUs = null.NewInt(1, true)
-		ds.Iterations = null.NewInt(1, true)
-		ds.Exec = null.NewString(sc.GetExec(), true)
-		ds.Env = sc.GetEnv()
-		ds.Tags = sc.GetTags()
-		ds.Options = sc.GetScenarioOptions()
-		conf.Scenarios = lib.ScenarioConfigs{name: ds}
-		return
+func makeOnceScenario(name string, original lib.ExecutorConfig) executor.SharedIterationsConfig {
+	cfg := executor.NewSharedIterationsConfig(name)
+	cfg.VUs = null.IntFrom(1)
+	cfg.Iterations = null.IntFrom(1)
+
+	// Preserve exec from original (only set if non-default).
+	if execFn := original.GetExec(); execFn != consts.DefaultFn {
+		cfg.Exec = null.StringFrom(execFn)
 	}
+
+	cfg.Env = original.GetEnv()
+	cfg.Tags = original.GetTags()
+	cfg.Options = original.GetScenarioOptions()
+
+	return cfg
 }
 
 // applyOnceDefaultScenario creates a default scenario with 1 VU / 1 iteration.
 // Browser options are only carried from scenarios targeting default().
-func applyOnceDefaultScenario(conf *Config) {
+func applyOnceDefaultScenario(opts *lib.Options) {
 	var browserOpts map[string]any
-	for _, sc := range conf.Scenarios {
+	for _, sc := range opts.Scenarios {
 		if sc.GetExec() != lib.DefaultScenarioName {
 			continue
 		}
-		opts := sc.GetScenarioOptions()
-		if opts != nil && len(opts.Browser) > 0 {
-			browserOpts = opts.Browser
+		sopts := sc.GetScenarioOptions()
+		if sopts != nil && len(sopts.Browser) > 0 {
+			browserOpts = sopts.Browser
 			break
 		}
 	}
 
 	ds := executor.NewSharedIterationsConfig(lib.DefaultScenarioName)
-	ds.VUs = null.NewInt(1, true)
-	ds.Iterations = null.NewInt(1, true)
+	ds.VUs = null.IntFrom(1)
+	ds.Iterations = null.IntFrom(1)
 
 	if browserOpts != nil {
 		ds.Options = &lib.ScenarioOptions{Browser: browserOpts}
 	}
 
-	conf.Scenarios = lib.ScenarioConfigs{lib.DefaultScenarioName: ds}
+	opts.Scenarios = lib.ScenarioConfigs{lib.DefaultScenarioName: ds}
+}
+
+func sortedScenarioNames(scenarios lib.ScenarioConfigs) string {
+	names := make([]string, 0, len(scenarios))
+	for name := range scenarios {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return strings.Join(names, ", ")
 }
 
 func validateConfig(conf Config, isExecutable func(string) bool) error {

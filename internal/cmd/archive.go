@@ -30,7 +30,7 @@ func (c *cmdArchive) run(cmd *cobra.Command, args []string) error {
 	// When --once is active, we use the derived options because
 	// applyOnceMode already cleared the shortcut fields.
 	configForRunner := test.consolidatedConfig.Options
-	if test.derivedConfig.Once.Valid && test.derivedConfig.Once.Bool {
+	if test.derivedConfig.Once.Valid {
 		configForRunner = test.derivedConfig.Options
 	}
 	testRunState, err := test.buildTestRunState(configForRunner)

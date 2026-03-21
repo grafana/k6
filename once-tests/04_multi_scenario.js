@@ -6,12 +6,15 @@ export const options = {
       vus: 10,
       duration: '30s',
       exec: 'apiTest',
+      env: { BASE_URL: 'https://test.k6.io' },
+      tags: { test_type: 'api' },
     },
     write: {
       executor: 'shared-iterations',
       vus: 5,
       iterations: 100,
       exec: 'writeTest',
+      tags: { test_type: 'write' },
     },
   },
 };
@@ -21,9 +24,5 @@ export function apiTest() {
 }
 export function writeTest() {
   console.log('RUNNING WRITE_TEST');
-  http.get('https://test.k6.io/');
-}
-export default function () {
-  console.log('RUNNING DEFAULT');
   http.get('https://test.k6.io/');
 }
