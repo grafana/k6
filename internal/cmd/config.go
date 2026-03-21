@@ -54,6 +54,11 @@ type Config struct {
 	// need to be able to pass down a configuration option that is only relevant to the cloud run command.
 	NoArchiveUpload null.Bool `json:"noArchiveUpload" envconfig:"K6_NO_ARCHIVE_UPLOAD"`
 
+	// Once runs the default function with 1 VU and 1 iteration using
+	// shared-iterations executor, replacing any configured scenarios.
+	// CLI-only flag, not persisted to config files or environment variables.
+	Once null.Bool `json:"-" envconfig:"-"`
+
 	// TODO: deprecate
 	Collectors map[string]json.RawMessage `json:"collectors"`
 }
@@ -85,6 +90,9 @@ func (c Config) Apply(cfg Config) Config {
 	if cfg.NoArchiveUpload.Valid {
 		c.NoArchiveUpload = cfg.NoArchiveUpload
 	}
+	if cfg.Once.Valid {
+		c.Once = cfg.Once
+	}
 	if len(cfg.Collectors) > 0 {
 		c.Collectors = cfg.Collectors
 	}
@@ -98,7 +106,7 @@ func getPartialConfig(flags *pflag.FlagSet) (Config, error) {
 		return Config{}, err
 	}
 
-	return Config{Options: opts}, nil
+	return Config{Options: opts, Once: getNullBool(flags, "once")}, nil
 }
 
 // Gets configuration from CLI flags.
@@ -116,6 +124,7 @@ func getConfig(flags *pflag.FlagSet) (Config, error) {
 		Out:           out,
 		Linger:        getNullBool(flags, "linger"),
 		NoUsageReport: getNullBool(flags, "no-usage-report"),
+		Once:          getNullBool(flags, "once"),
 
 		// As the "run" and the "cloud run" commands share the same implementation
 		// we enforce the run command to ignore the no-archive-upload flag, and always
@@ -326,10 +335,93 @@ func deriveAndValidateConfig(
 ) (result Config, err error) {
 	result = conf
 	result.Options, err = executor.DeriveScenariosFromShortcuts(conf.Options, logger)
-	if err == nil {
-		err = validateConfig(result, isExecutable)
+	if err != nil {
+		return result, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
 	}
+
+	if result.Once.Valid && result.Once.Bool {
+		applyOnceMode(&result, isExecutable)
+	}
+
+	err = validateConfig(result, isExecutable)
 	return result, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
+}
+
+func checkOnceCLIConflicts(cliConf Config) error {
+	if cliConf.Duration.Valid {
+		return fmt.Errorf("--once cannot be combined with --duration")
+	}
+	if cliConf.Iterations.Valid {
+		return fmt.Errorf("--once cannot be combined with --iterations")
+	}
+	if len(cliConf.Stages) > 0 {
+		return fmt.Errorf("--once cannot be combined with --stage")
+	}
+	if cliConf.VUs.Valid && cliConf.VUs.Int64 != 1 {
+		return fmt.Errorf("--once cannot be combined with --vus")
+	}
+	return nil
+}
+
+func applyOnceMode(conf *Config, isExecutable func(string) bool) {
+	switch len(conf.Scenarios) {
+	case 1:
+		if isExecutable(lib.DefaultScenarioName) {
+			applyOnceDefaultScenario(conf)
+		} else {
+			applyOnceSingleScenario(conf)
+		}
+	default:
+		applyOnceDefaultScenario(conf)
+	}
+
+	// Clear shortcut fields so they don't conflict.
+	conf.Duration = types.NullDuration{}
+	conf.Iterations = null.Int{}
+	conf.Stages = nil
+	conf.VUs = null.Int{}
+}
+
+// applyOnceSingleScenario replaces the single scenario's executor with
+// shared-iterations 1/1 while preserving exec, env, tags, and options.
+func applyOnceSingleScenario(conf *Config) {
+	for name, sc := range conf.Scenarios {
+		ds := executor.NewSharedIterationsConfig(name)
+		ds.VUs = null.NewInt(1, true)
+		ds.Iterations = null.NewInt(1, true)
+		ds.Exec = null.NewString(sc.GetExec(), true)
+		ds.Env = sc.GetEnv()
+		ds.Tags = sc.GetTags()
+		ds.Options = sc.GetScenarioOptions()
+		conf.Scenarios = lib.ScenarioConfigs{name: ds}
+		return
+	}
+}
+
+// applyOnceDefaultScenario creates a default scenario with 1 VU / 1 iteration.
+// Browser options are only carried from scenarios targeting default().
+func applyOnceDefaultScenario(conf *Config) {
+	var browserOpts map[string]any
+	for _, sc := range conf.Scenarios {
+		if sc.GetExec() != lib.DefaultScenarioName {
+			continue
+		}
+		opts := sc.GetScenarioOptions()
+		if opts != nil && len(opts.Browser) > 0 {
+			browserOpts = opts.Browser
+			break
+		}
+	}
+
+	ds := executor.NewSharedIterationsConfig(lib.DefaultScenarioName)
+	ds.VUs = null.NewInt(1, true)
+	ds.Iterations = null.NewInt(1, true)
+
+	if browserOpts != nil {
+		ds.Options = &lib.ScenarioOptions{Browser: browserOpts}
+	}
+
+	conf.Scenarios = lib.ScenarioConfigs{lib.DefaultScenarioName: ds}
 }
 
 func validateConfig(conf Config, isExecutable func(string) bool) error {

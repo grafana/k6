@@ -196,5 +196,6 @@ func getCloudRunLocalExecutionConfig(flags *pflag.FlagSet) (Config, error) {
 		Linger:          getNullBool(flags, "linger"),
 		NoUsageReport:   getNullBool(flags, "no-usage-report"),
 		NoArchiveUpload: getNullBool(flags, "no-archive-upload"),
+		Once:            getNullBool(flags, "once"),
 	}, nil
 }

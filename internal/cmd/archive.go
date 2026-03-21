@@ -26,7 +26,14 @@ func (c *cmdArchive) run(cmd *cobra.Command, args []string) error {
 	// an execution shortcut option (e.g. `iterations` or `duration`),
 	// we will have multiple conflicting execution options since the
 	// derivation will set `scenarios` as well.
-	testRunState, err := test.buildTestRunState(test.consolidatedConfig.Options)
+	//
+	// When --once is active, we use the derived options because
+	// applyOnceMode already cleared the shortcut fields.
+	configForRunner := test.consolidatedConfig.Options
+	if test.derivedConfig.Once.Valid && test.derivedConfig.Once.Bool {
+		configForRunner = test.derivedConfig.Options
+	}
+	testRunState, err := test.buildTestRunState(configForRunner)
 	if err != nil {
 		return err
 	}
