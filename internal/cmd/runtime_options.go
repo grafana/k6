@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strconv"
 
+	"github.com/joho/godotenv"
 	"github.com/spf13/pflag"
 	"gopkg.in/guregu/null.v3"
 
@@ -48,6 +49,7 @@ extended: base + sets "global" as alias for "globalThis"
 		"which is used for summary exports and as handleSummary() argument")
 	flags.String("traces-output", "none",
 		"set the output for k6 traces, possible values are none,otel[=host:port]")
+	flags.String("env-file", "", "pass file with the environment variable as --env-file=.env")
 	return flags
 }
 
@@ -91,6 +93,7 @@ func runtimeOptionsFromFlags(flags *pflag.FlagSet) lib.RuntimeOptions {
 		NewMachineReadableSummary: getNullBool(flags, "new-machine-readable-summary"),
 		TracesOutput:              getNullString(flags, "traces-output"),
 		Env:                       make(map[string]string),
+		EnvFile:                   getNullString(flags, "env-file"),
 	}
 	return opts
 }
@@ -154,6 +157,15 @@ func populateRuntimeOptionsFromEnv(opts lib.RuntimeOptions, environment map[stri
 	// If enabled, gather the actual system environment variables
 	if opts.IncludeSystemEnvVars.Bool {
 		opts.Env = environment
+	}
+
+	if opts.EnvFile.Valid {
+		envs, err := godotenv.Read(opts.EnvFile.String)
+		if err != nil {
+			return opts, fmt.Errorf("error loading env-file %s: %w", opts.EnvFile.String, err)
+		}
+		// TODO: It is overwriting all the envs, check existing ones (?)
+		opts.Env = envs
 	}
 
 	return opts, nil

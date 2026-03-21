@@ -485,6 +485,20 @@ func TestRuntimeOptions(t *testing.T) {
 				NewMachineReadableSummary: defaultNewMachineReadableSummary,
 			},
 		},
+		"load envs from the flag --env-file": {
+			useSysEnv: false,
+			systemEnv: map[string]string{"K6_SUMMARY_MODE": "full"},
+			cliFlags:  []string{"--env-file", "testdata/.env"},
+			expRTOpts: lib.RuntimeOptions{
+				IncludeSystemEnvVars:      null.NewBool(false, false),
+				CompatibilityMode:         defaultCompatMode,
+				Env:                       map[string]string{"TEST": "HELLO"},
+				TracesOutput:              defaultTracesOutput,
+				SummaryMode:               null.NewString("full", true),
+				EnvFile:                   null.NewString("testdata/.env", true),
+				NewMachineReadableSummary: defaultNewMachineReadableSummary,
+			},
+		},
 	}
 	for name, tc := range runtimeOptionsTestCases {
 		t.Run(fmt.Sprintf("RuntimeOptions test '%s'", name), func(t *testing.T) {
