@@ -48,6 +48,9 @@ type RuntimeOptions struct {
 
 	// Until v2
 	NewMachineReadableSummary null.Bool `json:"newMachineReadableSummary"`
+
+	// File with the environment variables
+	EnvFile null.String `json:"env-file"`
 }
 
 // ValidateCompatibilityMode checks if the provided val is a valid compatibility mode
