@@ -518,3 +518,129 @@ func TestLoadConfig(t *testing.T) {
 		})
 	}
 }
+
+func TestApplyOnceMode(t *testing.T) {
+	t.Parallel()
+
+	alwaysExec := func(_ string) bool { return true }
+	neverExec := func(_ string) bool { return false }
+	onlyDefault := func(name string) bool { return name == lib.DefaultScenarioName }
+
+	t.Run("NoScenarios_DefaultExists", func(t *testing.T) {
+		t.Parallel()
+		conf := Config{}
+		err := applyOnceMode(&conf, alwaysExec)
+		require.NoError(t, err)
+		require.Len(t, conf.Scenarios, 1)
+		sc, ok := conf.Scenarios[lib.DefaultScenarioName]
+		require.True(t, ok)
+		sic, ok := sc.(executor.SharedIterationsConfig)
+		require.True(t, ok)
+		assert.Equal(t, null.NewInt(1, true), sic.VUs)
+		assert.Equal(t, null.NewInt(1, true), sic.Iterations)
+	})
+
+	t.Run("SingleScenario_WithExec", func(t *testing.T) {
+		t.Parallel()
+		conf := Config{Options: lib.Options{Scenarios: lib.ScenarioConfigs{
+			"my_scenario": executor.PerVUIterationsConfig{
+				BaseConfig: executor.BaseConfig{
+					Name: "my_scenario",
+					Type: "per-vu-iterations",
+					Exec: null.StringFrom("myFunc"),
+					Env:  map[string]string{"FOO": "bar"},
+					Tags: map[string]string{"tag1": "val1"},
+					Options: &lib.ScenarioOptions{
+						Browser: map[string]any{"headless": true},
+					},
+				},
+				VUs:         null.IntFrom(10),
+				Iterations:  null.IntFrom(100),
+				MaxDuration: types.NullDurationFrom(time.Minute),
+			},
+		}}}
+		err := applyOnceMode(&conf, alwaysExec)
+		require.NoError(t, err)
+		require.Len(t, conf.Scenarios, 1)
+		sc, ok := conf.Scenarios["my_scenario"]
+		require.True(t, ok)
+		sic, ok := sc.(executor.SharedIterationsConfig)
+		require.True(t, ok)
+		assert.Equal(t, null.NewInt(1, true), sic.VUs)
+		assert.Equal(t, null.NewInt(1, true), sic.Iterations)
+		assert.Equal(t, null.NewString("myFunc", true), sic.Exec)
+		assert.Equal(t, map[string]string{"FOO": "bar"}, sic.Env)
+		assert.Equal(t, map[string]string{"tag1": "val1"}, sic.Tags)
+		require.NotNil(t, sic.Options)
+		assert.Equal(t, map[string]any{"headless": true}, sic.Options.Browser)
+	})
+
+	t.Run("SingleScenario_WithExec_DefaultExists", func(t *testing.T) {
+		t.Parallel()
+		conf := Config{Options: lib.Options{Scenarios: lib.ScenarioConfigs{
+			"custom": executor.ConstantVUsConfig{
+				BaseConfig: executor.BaseConfig{
+					Name: "custom",
+					Type: "constant-vus",
+					Exec: null.StringFrom("customFunc"),
+				},
+			},
+		}}}
+		err := applyOnceMode(&conf, alwaysExec)
+		require.NoError(t, err)
+		require.Len(t, conf.Scenarios, 1)
+		sc, ok := conf.Scenarios["custom"]
+		require.True(t, ok)
+		sic, ok := sc.(executor.SharedIterationsConfig)
+		require.True(t, ok)
+		assert.Equal(t, null.NewString("customFunc", true), sic.Exec)
+	})
+
+	t.Run("SingleScenario_WithoutExec", func(t *testing.T) {
+		t.Parallel()
+		conf := Config{Options: lib.Options{Scenarios: lib.ScenarioConfigs{
+			"browser_test": executor.ConstantVUsConfig{
+				BaseConfig: executor.BaseConfig{
+					Name: "browser_test",
+					Type: "constant-vus",
+					Options: &lib.ScenarioOptions{
+						Browser: map[string]any{"headless": false},
+					},
+				},
+			},
+		}}}
+		err := applyOnceMode(&conf, onlyDefault)
+		require.NoError(t, err)
+		require.Len(t, conf.Scenarios, 1)
+		sc := conf.Scenarios["browser_test"]
+		sic := sc.(executor.SharedIterationsConfig)
+		assert.False(t, sic.Exec.Valid) // exec is "default" (implicit), stays unset
+		require.NotNil(t, sic.Options)
+		assert.Equal(t, map[string]any{"headless": false}, sic.Options.Browser)
+	})
+
+	t.Run("MultipleScenarios_Error", func(t *testing.T) {
+		t.Parallel()
+		conf := Config{Options: lib.Options{Scenarios: lib.ScenarioConfigs{
+			"sc1": executor.PerVUIterationsConfig{
+				BaseConfig: executor.BaseConfig{Name: "sc1", Type: "per-vu-iterations"},
+			},
+			"sc2": executor.PerVUIterationsConfig{
+				BaseConfig: executor.BaseConfig{Name: "sc2", Type: "per-vu-iterations"},
+			},
+		}}}
+		err := applyOnceMode(&conf, alwaysExec)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "--once cannot determine which scenario to run")
+		assert.Contains(t, err.Error(), "sc1")
+		assert.Contains(t, err.Error(), "sc2")
+	})
+
+	t.Run("NoScenarios_NoDefault_Error", func(t *testing.T) {
+		t.Parallel()
+		conf := Config{}
+		err := applyOnceMode(&conf, neverExec)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "no default export found")
+	})
+}

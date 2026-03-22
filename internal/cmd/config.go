@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
+	"go.k6.io/k6/internal/lib/consts"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/executor"
 	"go.k6.io/k6/lib/fsext"
@@ -35,6 +37,7 @@ func configFlagSet() *pflag.FlagSet {
 		false,
 		"don't send anonymous usage"+"stats (https://grafana.com/docs/k6/latest/set-up/usage-collection/)",
 	)
+	flags.Bool("once", false, "run a single VU, single iteration (respects scenario exec/env/tags/options)")
 	return flags
 }
 
@@ -53,6 +56,11 @@ type Config struct {
 	// Because the implementation of k6 cloud run calls the same code as the k6 run command under the hood, we
 	// need to be able to pass down a configuration option that is only relevant to the cloud run command.
 	NoArchiveUpload null.Bool `json:"noArchiveUpload" envconfig:"K6_NO_ARCHIVE_UPLOAD"`
+
+	// Once is a CLI-only flag that forces a single VU / single iteration run.
+	// It preserves existing scenario config (exec, env, tags, options) but
+	// replaces the executor with shared-iterations 1/1.
+	Once null.Bool `json:"-" envconfig:"-"`
 
 	// TODO: deprecate
 	Collectors map[string]json.RawMessage `json:"collectors"`
@@ -85,6 +93,9 @@ func (c Config) Apply(cfg Config) Config {
 	if cfg.NoArchiveUpload.Valid {
 		c.NoArchiveUpload = cfg.NoArchiveUpload
 	}
+	if cfg.Once.Valid {
+		c.Once = cfg.Once
+	}
 	if len(cfg.Collectors) > 0 {
 		c.Collectors = cfg.Collectors
 	}
@@ -116,6 +127,7 @@ func getConfig(flags *pflag.FlagSet) (Config, error) {
 		Out:           out,
 		Linger:        getNullBool(flags, "linger"),
 		NoUsageReport: getNullBool(flags, "no-usage-report"),
+		Once:          getNullBool(flags, "once"),
 
 		// As the "run" and the "cloud run" commands share the same implementation
 		// we enforce the run command to ignore the no-archive-upload flag, and always
@@ -423,4 +435,72 @@ func checkIfMigrationCompleted(gs *state.GlobalState) bool {
 	}
 
 	return true
+}
+
+// checkOnceCLIConflicts returns an error if --once is combined with shortcut flags
+// that would conflict with its 1 VU / 1 iteration semantics.
+func checkOnceCLIConflicts(flags *pflag.FlagSet) error {
+	conflicts := []string{"vus", "iterations", "duration", "stage"}
+	var found []string
+	for _, name := range conflicts {
+		if flags.Changed(name) {
+			found = append(found, "--"+name)
+		}
+	}
+	if len(found) > 0 {
+		return fmt.Errorf("--once cannot be combined with %s", strings.Join(found, ", "))
+	}
+	return nil
+}
+
+// applyOnceMode rewrites the scenario configuration to run a single VU with a
+// single iteration, preserving exec/env/tags/options from the original scenario.
+func applyOnceMode(conf *Config, isExecutable func(string) bool) error {
+	scenarios := conf.Scenarios
+
+	switch {
+	case len(scenarios) == 1:
+		for name, sc := range scenarios {
+			ds := executor.NewSharedIterationsConfig(name)
+			ds.VUs = null.NewInt(1, true)
+			ds.Iterations = null.NewInt(1, true)
+			if execFn := sc.GetExec(); execFn != consts.DefaultFn {
+				ds.Exec = null.StringFrom(execFn)
+			}
+			ds.Env = sc.GetEnv()
+			ds.Tags = sc.GetTags()
+			ds.Options = sc.GetScenarioOptions()
+			conf.Scenarios = lib.ScenarioConfigs{name: ds}
+		}
+	case len(scenarios) > 1:
+		return fmt.Errorf(
+			"--once cannot determine which scenario to run; available scenarios: %s",
+			sortedScenarioNames(scenarios),
+		)
+	default:
+		if !isExecutable(lib.DefaultScenarioName) {
+			return fmt.Errorf("no default export found")
+		}
+		ds := executor.NewSharedIterationsConfig(lib.DefaultScenarioName)
+		ds.VUs = null.NewInt(1, true)
+		ds.Iterations = null.NewInt(1, true)
+		conf.Scenarios = lib.ScenarioConfigs{lib.DefaultScenarioName: ds}
+	}
+
+	// Clear shortcuts so DeriveScenariosFromShortcuts won't conflict.
+	conf.Duration = types.NullDuration{}
+	conf.Iterations = null.Int{}
+	conf.Stages = nil
+	conf.VUs = null.Int{}
+
+	return nil
+}
+
+func sortedScenarioNames(scenarios lib.ScenarioConfigs) string {
+	names := make([]string, 0, len(scenarios))
+	for name := range scenarios {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return strings.Join(names, ", ")
 }

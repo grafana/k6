@@ -111,7 +111,14 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	// an execution shortcut option (e.g. `iterations` or `duration`),
 	// we will have multiple conflicting execution options since the
 	// derivation will set `scenarios` as well.
-	testRunState, err := test.buildTestRunState(test.consolidatedConfig.Options)
+	//
+	// When --once is active the consolidated config already has the
+	// rewritten scenarios, so it is safe to feed back directly.
+	configToReinject := test.consolidatedConfig.Options
+	if test.consolidatedConfig.Once.Valid && test.consolidatedConfig.Once.Bool {
+		configToReinject = test.derivedConfig.Options
+	}
+	testRunState, err := test.buildTestRunState(configToReinject)
 	if err != nil {
 		return err
 	}
@@ -129,6 +136,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 
 	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Building the archive..."))
 	arc := testRunState.Runner.MakeArchive()
+	_, _ = fmt.Fprintf(c.gs.Stderr, "DEBUG cloud.run archive scenarios: %v\n", arc.Options.Scenarios)
 
 	tmpCloudConfig, err := cloudapi.GetTemporaryCloudConfig(arc.Options.Cloud, arc.Options.External)
 	if err != nil {

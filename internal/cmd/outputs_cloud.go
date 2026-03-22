@@ -115,7 +115,17 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 
 	var testArchive *lib.Archive
 	if !test.derivedConfig.NoArchiveUpload.Bool {
+		// When --once is active, the runner still has the original script
+		// options because SetOptions hasn't been called yet (that happens
+		// later in buildTestRunState). Inject derived options so the
+		// uploaded archive reflects the 1 VU / 1 iteration configuration.
+		if test.consolidatedConfig.Once.Valid && test.consolidatedConfig.Once.Bool {
+			if err := test.initRunner.SetOptions(test.derivedConfig.Options); err != nil {
+				return fmt.Errorf("setting once-mode options for archive: %w", err)
+			}
+		}
 		testArchive = test.initRunner.MakeArchive()
+		_, _ = fmt.Fprintf(gs.Stderr, "DEBUG createCloudTest archive scenarios: %v\n", testArchive.Options.Scenarios)
 	}
 
 	testRun := &cloudapi.TestRun{
