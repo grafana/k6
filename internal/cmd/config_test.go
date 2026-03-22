@@ -524,15 +524,14 @@ func TestApplyOnceMode(t *testing.T) {
 
 	alwaysExec := func(_ string) bool { return true }
 	neverExec := func(_ string) bool { return false }
-	onlyDefault := func(name string) bool { return name == lib.DefaultScenarioName }
 
 	t.Run("NoScenarios_DefaultExists", func(t *testing.T) {
 		t.Parallel()
-		conf := Config{}
-		err := applyOnceMode(&conf, alwaysExec)
+		opts := lib.Options{}
+		result, err := applyOnceMode("", opts, alwaysExec)
 		require.NoError(t, err)
-		require.Len(t, conf.Scenarios, 1)
-		sc, ok := conf.Scenarios[lib.DefaultScenarioName]
+		require.Len(t, result.Scenarios, 1)
+		sc, ok := result.Scenarios[lib.DefaultScenarioName]
 		require.True(t, ok)
 		sic, ok := sc.(executor.SharedIterationsConfig)
 		require.True(t, ok)
@@ -542,7 +541,7 @@ func TestApplyOnceMode(t *testing.T) {
 
 	t.Run("SingleScenario_WithExec", func(t *testing.T) {
 		t.Parallel()
-		conf := Config{Options: lib.Options{Scenarios: lib.ScenarioConfigs{
+		opts := lib.Options{Scenarios: lib.ScenarioConfigs{
 			"my_scenario": executor.PerVUIterationsConfig{
 				BaseConfig: executor.BaseConfig{
 					Name: "my_scenario",
@@ -558,17 +557,17 @@ func TestApplyOnceMode(t *testing.T) {
 				Iterations:  null.IntFrom(100),
 				MaxDuration: types.NullDurationFrom(time.Minute),
 			},
-		}}}
-		err := applyOnceMode(&conf, alwaysExec)
+		}}
+		result, err := applyOnceMode("", opts, alwaysExec)
 		require.NoError(t, err)
-		require.Len(t, conf.Scenarios, 1)
-		sc, ok := conf.Scenarios["my_scenario"]
+		require.Len(t, result.Scenarios, 1)
+		sc, ok := result.Scenarios["my_scenario"]
 		require.True(t, ok)
 		sic, ok := sc.(executor.SharedIterationsConfig)
 		require.True(t, ok)
 		assert.Equal(t, null.NewInt(1, true), sic.VUs)
 		assert.Equal(t, null.NewInt(1, true), sic.Iterations)
-		assert.Equal(t, null.NewString("myFunc", true), sic.Exec)
+		assert.Equal(t, null.StringFrom("myFunc"), sic.Exec)
 		assert.Equal(t, map[string]string{"FOO": "bar"}, sic.Env)
 		assert.Equal(t, map[string]string{"tag1": "val1"}, sic.Tags)
 		require.NotNil(t, sic.Options)
@@ -577,7 +576,7 @@ func TestApplyOnceMode(t *testing.T) {
 
 	t.Run("SingleScenario_WithExec_DefaultExists", func(t *testing.T) {
 		t.Parallel()
-		conf := Config{Options: lib.Options{Scenarios: lib.ScenarioConfigs{
+		opts := lib.Options{Scenarios: lib.ScenarioConfigs{
 			"custom": executor.ConstantVUsConfig{
 				BaseConfig: executor.BaseConfig{
 					Name: "custom",
@@ -585,20 +584,20 @@ func TestApplyOnceMode(t *testing.T) {
 					Exec: null.StringFrom("customFunc"),
 				},
 			},
-		}}}
-		err := applyOnceMode(&conf, alwaysExec)
+		}}
+		result, err := applyOnceMode("", opts, alwaysExec)
 		require.NoError(t, err)
-		require.Len(t, conf.Scenarios, 1)
-		sc, ok := conf.Scenarios["custom"]
+		require.Len(t, result.Scenarios, 1)
+		sc, ok := result.Scenarios["custom"]
 		require.True(t, ok)
 		sic, ok := sc.(executor.SharedIterationsConfig)
 		require.True(t, ok)
-		assert.Equal(t, null.NewString("customFunc", true), sic.Exec)
+		assert.Equal(t, null.StringFrom("customFunc"), sic.Exec)
 	})
 
-	t.Run("SingleScenario_WithoutExec", func(t *testing.T) {
+	t.Run("SingleScenario_WithoutExec_PreservesDefault", func(t *testing.T) {
 		t.Parallel()
-		conf := Config{Options: lib.Options{Scenarios: lib.ScenarioConfigs{
+		opts := lib.Options{Scenarios: lib.ScenarioConfigs{
 			"browser_test": executor.ConstantVUsConfig{
 				BaseConfig: executor.BaseConfig{
 					Name: "browser_test",
@@ -608,39 +607,165 @@ func TestApplyOnceMode(t *testing.T) {
 					},
 				},
 			},
-		}}}
-		err := applyOnceMode(&conf, onlyDefault)
+		}}
+		result, err := applyOnceMode("", opts, alwaysExec)
 		require.NoError(t, err)
-		require.Len(t, conf.Scenarios, 1)
-		sc := conf.Scenarios["browser_test"]
+		require.Len(t, result.Scenarios, 1)
+		sc := result.Scenarios["browser_test"]
 		sic := sc.(executor.SharedIterationsConfig)
-		assert.False(t, sic.Exec.Valid) // exec is "default" (implicit), stays unset
+		// exec is "default" which is omitted by makeOnceScenario
+		assert.False(t, sic.Exec.Valid)
 		require.NotNil(t, sic.Options)
 		assert.Equal(t, map[string]any{"headless": false}, sic.Options.Browser)
 	})
 
-	t.Run("MultipleScenarios_Error", func(t *testing.T) {
+	t.Run("MultipleScenarios_BareOnce_Error", func(t *testing.T) {
 		t.Parallel()
-		conf := Config{Options: lib.Options{Scenarios: lib.ScenarioConfigs{
+		opts := lib.Options{Scenarios: lib.ScenarioConfigs{
 			"sc1": executor.PerVUIterationsConfig{
 				BaseConfig: executor.BaseConfig{Name: "sc1", Type: "per-vu-iterations"},
 			},
 			"sc2": executor.PerVUIterationsConfig{
 				BaseConfig: executor.BaseConfig{Name: "sc2", Type: "per-vu-iterations"},
 			},
-		}}}
-		err := applyOnceMode(&conf, alwaysExec)
+		}}
+		_, err := applyOnceMode("", opts, alwaysExec)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "--once cannot determine which scenario to run")
+		assert.Contains(t, err.Error(), "--once requires a scenario")
 		assert.Contains(t, err.Error(), "sc1")
 		assert.Contains(t, err.Error(), "sc2")
 	})
 
+	t.Run("NamedScenario_Found", func(t *testing.T) {
+		t.Parallel()
+		opts := lib.Options{Scenarios: lib.ScenarioConfigs{
+			"api": executor.ConstantVUsConfig{
+				BaseConfig: executor.BaseConfig{
+					Name: "api",
+					Type: "constant-vus",
+					Exec: null.StringFrom("apiTest"),
+					Env:  map[string]string{"BASE_URL": "http://localhost"},
+					Tags: map[string]string{"type": "api"},
+				},
+			},
+			"ui": executor.ConstantVUsConfig{
+				BaseConfig: executor.BaseConfig{
+					Name: "ui",
+					Type: "constant-vus",
+					Exec: null.StringFrom("uiTest"),
+					Options: &lib.ScenarioOptions{
+						Browser: map[string]any{"headless": true},
+					},
+				},
+			},
+		}}
+		result, err := applyOnceMode("api", opts, alwaysExec)
+		require.NoError(t, err)
+		require.Len(t, result.Scenarios, 1)
+		sc, ok := result.Scenarios["api"]
+		require.True(t, ok)
+		sic := sc.(executor.SharedIterationsConfig)
+		assert.Equal(t, null.NewInt(1, true), sic.VUs)
+		assert.Equal(t, null.NewInt(1, true), sic.Iterations)
+		assert.Equal(t, null.StringFrom("apiTest"), sic.Exec)
+		assert.Equal(t, map[string]string{"BASE_URL": "http://localhost"}, sic.Env)
+		assert.Equal(t, map[string]string{"type": "api"}, sic.Tags)
+	})
+
+	t.Run("NamedScenario_NotFound", func(t *testing.T) {
+		t.Parallel()
+		opts := lib.Options{Scenarios: lib.ScenarioConfigs{
+			"api": executor.ConstantVUsConfig{
+				BaseConfig: executor.BaseConfig{Name: "api", Type: "constant-vus"},
+			},
+			"ui": executor.ConstantVUsConfig{
+				BaseConfig: executor.BaseConfig{Name: "ui", Type: "constant-vus"},
+			},
+		}}
+		_, err := applyOnceMode("xxx", opts, alwaysExec)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), `scenario "xxx" not found`)
+		assert.Contains(t, err.Error(), "api")
+		assert.Contains(t, err.Error(), "ui")
+	})
+
 	t.Run("NoScenarios_NoDefault_Error", func(t *testing.T) {
 		t.Parallel()
-		conf := Config{}
-		err := applyOnceMode(&conf, neverExec)
+		opts := lib.Options{}
+		_, err := applyOnceMode("", opts, neverExec)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no default export found")
+	})
+
+	t.Run("ClearsShortcuts", func(t *testing.T) {
+		t.Parallel()
+		opts := lib.Options{
+			VUs:        null.IntFrom(5),
+			Iterations: null.IntFrom(10),
+			Duration:   types.NullDurationFrom(30 * time.Second),
+			Stages:     []lib.Stage{{Duration: types.NullDurationFrom(time.Minute)}},
+		}
+		result, err := applyOnceMode("", opts, alwaysExec)
+		require.NoError(t, err)
+		assert.False(t, result.VUs.Valid)
+		assert.False(t, result.Iterations.Valid)
+		assert.False(t, result.Duration.Valid)
+		assert.Nil(t, result.Stages)
+	})
+}
+
+func TestParseOnceFlag(t *testing.T) {
+	t.Parallel()
+
+	t.Run("NotSet", func(t *testing.T) {
+		t.Parallel()
+		flags := configFlagSet()
+		flags.AddFlagSet(optionFlagSet())
+		require.NoError(t, flags.Parse([]string{}))
+		once, err := parseOnceFlag(flags)
+		require.NoError(t, err)
+		assert.False(t, once.Valid)
+	})
+
+	t.Run("BareOnce", func(t *testing.T) {
+		t.Parallel()
+		flags := configFlagSet()
+		flags.AddFlagSet(optionFlagSet())
+		require.NoError(t, flags.Parse([]string{"--once"}))
+		once, err := parseOnceFlag(flags)
+		require.NoError(t, err)
+		assert.True(t, once.Valid)
+		assert.Equal(t, "", once.String)
+	})
+
+	t.Run("NamedOnce", func(t *testing.T) {
+		t.Parallel()
+		flags := configFlagSet()
+		flags.AddFlagSet(optionFlagSet())
+		require.NoError(t, flags.Parse([]string{"--once=api"}))
+		once, err := parseOnceFlag(flags)
+		require.NoError(t, err)
+		assert.True(t, once.Valid)
+		assert.Equal(t, "api", once.String)
+	})
+
+	t.Run("ConflictsWithVUs", func(t *testing.T) {
+		t.Parallel()
+		flags := configFlagSet()
+		flags.AddFlagSet(optionFlagSet())
+		require.NoError(t, flags.Parse([]string{"--once", "--vus", "5"}))
+		_, err := parseOnceFlag(flags)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "--vus")
+	})
+
+	t.Run("ConflictsWithDuration", func(t *testing.T) {
+		t.Parallel()
+		flags := configFlagSet()
+		flags.AddFlagSet(optionFlagSet())
+		require.NoError(t, flags.Parse([]string{"--once", "--duration", "10s"}))
+		_, err := parseOnceFlag(flags)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "--duration")
 	})
 }

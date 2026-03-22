@@ -115,7 +115,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	// When --once is active the consolidated config already has the
 	// rewritten scenarios, so it is safe to feed back directly.
 	configToReinject := test.consolidatedConfig.Options
-	if test.consolidatedConfig.Once.Valid && test.consolidatedConfig.Once.Bool {
+	if test.consolidatedConfig.Once.Valid {
 		configToReinject = test.derivedConfig.Options
 	}
 	testRunState, err := test.buildTestRunState(configToReinject)

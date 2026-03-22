@@ -119,7 +119,7 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 		// options because SetOptions hasn't been called yet (that happens
 		// later in buildTestRunState). Inject derived options so the
 		// uploaded archive reflects the 1 VU / 1 iteration configuration.
-		if test.consolidatedConfig.Once.Valid && test.consolidatedConfig.Once.Bool {
+		if test.consolidatedConfig.Once.Valid {
 			if err := test.initRunner.SetOptions(test.derivedConfig.Options); err != nil {
 				return fmt.Errorf("setting once-mode options for archive: %w", err)
 			}

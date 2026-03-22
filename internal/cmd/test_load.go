@@ -19,7 +19,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/errext"
@@ -476,14 +475,6 @@ func (lt *loadedTest) consolidateDeriveAndValidateConfig(
 		}
 	}
 
-	// Reject shortcut flags when --once is set before consolidation touches them.
-	if cmd.Flags().Changed("once") {
-		cliConfig.Once = null.BoolFrom(true)
-		if err := checkOnceCLIConflicts(cmd.Flags()); err != nil {
-			return nil, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
-		}
-	}
-
 	gs.Logger.Debug("Consolidating config layers...")
 	consolidatedConfig, err := getConsolidatedConfig(gs, cliConfig, lt.initRunner.GetOptions())
 	if err != nil {
@@ -491,8 +482,11 @@ func (lt *loadedTest) consolidateDeriveAndValidateConfig(
 	}
 
 	// Apply --once after consolidation so we see the final scenario set.
-	if consolidatedConfig.Once.Valid && consolidatedConfig.Once.Bool {
-		if err := applyOnceMode(&consolidatedConfig, lt.initRunner.IsExecutable); err != nil {
+	if consolidatedConfig.Once.Valid {
+		consolidatedConfig.Options, err = applyOnceMode(
+			consolidatedConfig.Once.String, consolidatedConfig.Options, lt.initRunner.IsExecutable,
+		)
+		if err != nil {
 			return nil, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
 		}
 	}
