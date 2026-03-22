@@ -619,21 +619,39 @@ func TestApplyOnceMode(t *testing.T) {
 		assert.Equal(t, map[string]any{"headless": false}, sic.Options.Browser)
 	})
 
-	t.Run("MultipleScenarios_BareOnce_Error", func(t *testing.T) {
+	t.Run("MultipleScenarios_BareOnce_RunsAll", func(t *testing.T) {
 		t.Parallel()
 		opts := lib.Options{Scenarios: lib.ScenarioConfigs{
 			"sc1": executor.PerVUIterationsConfig{
-				BaseConfig: executor.BaseConfig{Name: "sc1", Type: "per-vu-iterations"},
+				BaseConfig: executor.BaseConfig{
+					Name: "sc1", Type: "per-vu-iterations",
+					Exec: null.StringFrom("sc1Fn"),
+					Env:  map[string]string{"K": "1"},
+					Tags: map[string]string{"s": "1"},
+				},
 			},
 			"sc2": executor.PerVUIterationsConfig{
-				BaseConfig: executor.BaseConfig{Name: "sc2", Type: "per-vu-iterations"},
+				BaseConfig: executor.BaseConfig{
+					Name: "sc2", Type: "per-vu-iterations",
+					Exec: null.StringFrom("sc2Fn"),
+					Env:  map[string]string{"K": "2"},
+					Tags: map[string]string{"s": "2"},
+				},
 			},
 		}}
-		_, err := applyOnceMode("", opts, alwaysExec)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "--once requires a scenario")
-		assert.Contains(t, err.Error(), "sc1")
-		assert.Contains(t, err.Error(), "sc2")
+		result, err := applyOnceMode("", opts, alwaysExec)
+		require.NoError(t, err)
+		require.Len(t, result.Scenarios, 2)
+		for _, name := range []string{"sc1", "sc2"} {
+			sc := result.Scenarios[name]
+			assert.Equal(t, "shared-iterations", sc.GetType())
+			assert.Equal(t, int64(1), sc.(executor.SharedIterationsConfig).VUs.Int64)
+			assert.Equal(t, int64(1), sc.(executor.SharedIterationsConfig).Iterations.Int64)
+		}
+		assert.Equal(t, map[string]string{"K": "1"}, result.Scenarios["sc1"].GetEnv())
+		assert.Equal(t, map[string]string{"K": "2"}, result.Scenarios["sc2"].GetEnv())
+		assert.Equal(t, map[string]string{"s": "1"}, result.Scenarios["sc1"].GetTags())
+		assert.Equal(t, map[string]string{"s": "2"}, result.Scenarios["sc2"].GetTags())
 	})
 
 	t.Run("NamedScenario_Found", func(t *testing.T) {

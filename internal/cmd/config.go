@@ -497,10 +497,11 @@ func applyOnceMode(scenarioName string, opts lib.Options, isExecutable func(stri
 			opts.Scenarios = lib.ScenarioConfigs{name: makeOnceScenario(name, sc)}
 		}
 	case len(scenarios) > 1:
-		return opts, fmt.Errorf(
-			"--once requires a scenario when multiple scenarios are defined; available scenarios: %s",
-			sortedScenarioNames(scenarios),
-		)
+		converted := make(lib.ScenarioConfigs, len(scenarios))
+		for name, sc := range scenarios {
+			converted[name] = makeOnceScenario(name, sc)
+		}
+		opts.Scenarios = converted
 	default:
 		if !isExecutable(lib.DefaultScenarioName) {
 			return opts, fmt.Errorf("no default export found")
