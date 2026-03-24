@@ -146,5 +146,3 @@ func (d *Download) finish(errMsg string) {
 		close(d.finished)
 	}
 }
-
-

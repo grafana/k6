@@ -103,11 +103,11 @@ func TestDownload(t *testing.T) {
 
 		dir := t.TempDir()
 		srcDir := filepath.Join(dir, "src")
-		require.NoError(t, os.MkdirAll(srcDir, 0o750))
+		require.NoError(t, os.MkdirAll(srcDir, 0o750)) //nolint:forbidigo
 
 		// Create a fake downloaded file.
 		content := []byte("file content")
-		require.NoError(t, os.WriteFile(filepath.Join(srcDir, "guid-123"), content, 0o600))
+		require.NoError(t, os.WriteFile(filepath.Join(srcDir, "guid-123"), content, 0o600)) //nolint:forbidigo
 
 		dl := newDownload(nil, "guid-123", "https://example.com/file.zip", "file.zip", srcDir)
 		dl.finish("")
@@ -115,7 +115,7 @@ func TestDownload(t *testing.T) {
 		dst := filepath.Join(dir, "dst", "saved.zip")
 		require.NoError(t, dl.SaveAs(dst))
 
-		got, err := os.ReadFile(dst)
+		got, err := os.ReadFile(dst) //nolint:forbidigo
 		require.NoError(t, err)
 		assert.Equal(t, content, got)
 	})

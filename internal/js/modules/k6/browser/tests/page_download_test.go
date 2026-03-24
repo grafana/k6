@@ -150,7 +150,7 @@ func TestPageOnDownloadCancel(t *testing.T) {
 		if !ok {
 			return
 		}
-		for i := 0; i < 100; i++ {
+		for range 100 {
 			_, _ = w.Write(make([]byte, 1024))
 			flusher.Flush()
 			time.Sleep(50 * time.Millisecond)

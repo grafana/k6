@@ -256,6 +256,8 @@ func (b *Browser) onDownloadProgress(ev *cdpbrowser.EventDownloadProgress) {
 		dl.finish("")
 	case cdpbrowser.DownloadProgressStateCanceled:
 		dl.finish("canceled")
+	case cdpbrowser.DownloadProgressStateInProgress:
+		// nothing to do, download is still in progress
 	}
 }
 
