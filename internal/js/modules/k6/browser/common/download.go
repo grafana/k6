@@ -1,14 +1,16 @@
 package common
 
 import (
+	"context"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"sync"
 
 	cdpbrowser "github.com/chromedp/cdproto/browser"
 	"github.com/chromedp/cdproto/cdp"
+
+	"go.k6.io/k6/internal/js/modules/k6/browser/storage"
 )
 
 // Download represents a file download initiated by a browser page.
@@ -90,7 +92,18 @@ func (d *Download) SaveAs(path string) error {
 
 	src := filepath.Join(d.downloadsPath, d.guid)
 
-	return copyFile(src, path)
+	in, err := os.Open(src) //nolint:forbidigo,gosec
+	if err != nil {
+		return fmt.Errorf("opening source: %w", err)
+	}
+	defer in.Close() //nolint:errcheck
+
+	persister := &storage.LocalFilePersister{}
+	if err := persister.Persist(context.Background(), path, in); err != nil {
+		return fmt.Errorf("saving download: %w", err)
+	}
+
+	return nil
 }
 
 // Cancel cancels the download by sending a Browser.cancelDownload CDP command.
@@ -134,26 +147,4 @@ func (d *Download) finish(errMsg string) {
 	}
 }
 
-func copyFile(src, dst string) error {
-	in, err := os.Open(src) //nolint:gosec
-	if err != nil {
-		return fmt.Errorf("opening source: %w", err)
-	}
-	defer in.Close() //nolint:errcheck
 
-	if err := os.MkdirAll(filepath.Dir(dst), 0o750); err != nil {
-		return fmt.Errorf("creating destination directory: %w", err)
-	}
-
-	out, err := os.Create(dst) //nolint:gosec
-	if err != nil {
-		return fmt.Errorf("creating destination: %w", err)
-	}
-	defer out.Close() //nolint:errcheck
-
-	if _, err := io.Copy(out, in); err != nil {
-		return fmt.Errorf("copying file: %w", err)
-	}
-
-	return out.Close()
-}
