@@ -124,6 +124,7 @@ func (b *BrowserContext) setDownloadBehavior(acceptDownloads bool) error {
 	action := cdpbrowser.
 		SetDownloadBehavior(behavior).
 		WithDownloadPath(b.DownloadsPath).
+		WithEventsEnabled(true).
 		WithBrowserContextID(b.id)
 	if err := action.Do(cdp.WithExecutor(b.ctx, b.browser.conn)); err != nil {
 		return fmt.Errorf("set download behavior: %w", err)

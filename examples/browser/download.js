@@ -24,8 +24,28 @@ export default async function() {
   const page = await context.newPage();
 
   try {
-    // Navigate to a page and interact with download links.
-    await page.goto('https://quickpizza.grafana.com/test.k6.io/');
+    await page.goto('https://example.com/download-page');
+
+    // Start waiting for the download before clicking.
+    const downloadPromise = page.waitForEvent('download');
+    await page.click('#download-link');
+    const download = await downloadPromise;
+
+    console.log(`Download started: ${download.url()}`);
+    console.log(`Suggested filename: ${download.suggestedFilename()}`);
+
+    // Wait for the download to complete and get the path.
+    const path = await download.path();
+    console.log(`Downloaded to: ${path}`);
+
+    // Alternatively, save the file to a specific location.
+    await download.saveAs('/tmp/my-file.txt');
+
+    // Check if the download failed.
+    const failure = await download.failure();
+    if (failure) {
+      console.log(`Download failed: ${failure}`);
+    }
   } finally {
     await page.close();
   }

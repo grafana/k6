@@ -54,6 +54,9 @@ const (
 
 	// PageEventRequestFailed represents the page requestfailed event.
 	PageEventRequestFailed PageEventName = "requestfailed"
+
+	// PageEventDownload represents the page download event.
+	PageEventDownload PageEventName = "download"
 )
 
 // PageEventHandler is a function type that handles a page on event.
@@ -545,6 +548,16 @@ func (p *Page) onRequestFailed(request *Request) {
 	for handle := range p.eventHandlersByName(PageEventRequestFailed) {
 		if err := handle(PageEvent{Request: request}); err != nil {
 			p.logger.Warnf("onRequestFailed", "handler returned an error: %v", err)
+		}
+	}
+}
+
+// onDownload calls handlers for the page.on('download') event.
+func (p *Page) onDownload(dl *Download) {
+	for handle := range p.eventHandlersByName(PageEventDownload) {
+		if err := handle(PageEvent{Download: dl}); err != nil {
+			p.logger.Warnf("onDownload", "handler returned an error: %v", err)
+			return
 		}
 	}
 }
@@ -1415,6 +1428,9 @@ type PageEvent struct {
 
 	// Response is the read only response that was received from the WuT.
 	Response *Response
+
+	// Download is the download event data.
+	Download *Download
 }
 
 // On subscribes to a page event for which the given handler will be executed
