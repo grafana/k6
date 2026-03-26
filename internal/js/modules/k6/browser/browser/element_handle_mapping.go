@@ -17,9 +17,9 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 		"boundingBox": func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				box, err := eh.BoundingBox()
-				// We want to avoid errors when an element is not visible and instead
+				// We want to avoid errors when an element is not visible or detached and instead
 				// opt to return a nil rectangle -- this matches Playwright's behaviour.
-				if errors.Is(err, common.ErrElementNotVisible) {
+				if errors.Is(err, common.ErrElementNotVisible) || errors.Is(err, common.ErrElementNotAttachedToDOM) {
 					return nil, nil
 				}
 				return box, err
