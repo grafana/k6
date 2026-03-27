@@ -291,28 +291,43 @@ func resolveModulesDependencies(
 	}
 }
 
+// collectTestDependencies builds the complete set of build dependencies for a
+// script in three ordered steps, then snapshots them before applying any
+// external manifest override.
+//
+// Step 1 — failed imports (extractUnknownModules): modules that the resolver
+// could not find are the primary signal that an extension is needed.
+//
+// Step 2 — k6/x/ import scan: ModuleResolver.Imported() contains every k6/x/
+// specifier the resolver touched, including ones that loaded successfully
+// because they are already built into the binary. Step 1 misses those.
+// This matters for auto-extension-resolution: on the re-execution with the
+// provisioned binary the extension is registered, so step 1 never fires for
+// it. Step 2 must run before step 3 so that a "use k6 with k6/x/foo >= 1.0"
+// directive found in step 3 can override the nil constraint added here.
+//
+// Step 3 — "use k6" directives (analyseUseContraints): explicit version
+// constraints declared inside script files. These take precedence over the
+// unconstrained entries added by steps 1 and 2 because deps.update only
+// overwrites nil/"*" constraints.
+//
+// After the three steps the map is cloned to preserve the pre-manifest state,
+// then the external manifest is applied.
 func collectTestDependencies(
 	originalError error, imports []string, fileSystems map[string]fsext.Fs, manifest string,
 ) (dependencies, dependencies, error) {
+	// Step 1: modules that failed to load.
 	deps, err := extractUnknownModules(originalError)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// Ensure k6 is always a dependency with "*" constraint by default.
-	// This can be overridden by "use k6" or "use k6 with k6/x/..." directives in the script.
+	// k6 itself is always a dependency; directives in the script can tighten this.
 	if _, ok := deps["k6"]; !ok {
 		deps["k6"] = nil
 	}
 
-	// Add every k6/x/ import as a dep regardless of whether it is registered in the
-	// current binary. ModuleResolver.Imported() returns all k6/x/ specifiers that were
-	// encountered during loading — both unknown ones (already caught by extractUnknownModules
-	// above) and ones that loaded successfully because they are built into the binary.
-	// The latter case matters for auto-extension-resolution: the first run detects an
-	// unknown k6/x/foo, provisions a custom binary, and re-executes. On the second run
-	// k6/x/foo is registered so extractUnknownModules never fires, but we still need it
-	// in the archive's dependency metadata so downstream consumers know to provision it.
+	// Step 2: all k6/x/ imports, registered or not.
 	for _, imported := range imports {
 		if strings.HasPrefix(imported, "k6/x/") {
 			if _, ok := deps[imported]; !ok {
@@ -321,20 +336,20 @@ func collectTestDependencies(
 		}
 	}
 
+	// Step 3: explicit version constraints from "use k6" directives in script files.
 	if err := analyseUseContraints(imports, fileSystems, deps); err != nil {
 		return nil, nil, err
 	}
 
-	// Snapshot deps before the manifest is applied so callers can record
-	// the script's own declared constraints independently of any external policy.
+	// Snapshot before the manifest so callers can distinguish what the script
+	// declared from what an external policy required.
 	preDeps := maps.Clone(deps)
 
 	m, err := parseManifest(manifest)
 	if err != nil {
 		return nil, nil, err
 	}
-	err = deps.applyManifest(m)
-	if err != nil {
+	if err = deps.applyManifest(m); err != nil {
 		return nil, nil, err
 	}
 
