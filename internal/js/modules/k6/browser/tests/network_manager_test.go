@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/common"
+	k6metrics "go.k6.io/k6/metrics"
 
 	k6lib "go.k6.io/k6/lib"
 	k6types "go.k6.io/k6/lib/types"
@@ -243,4 +244,57 @@ func TestInterceptBeforePageLoad(t *testing.T) {
 	defer cancel()
 	err = tb.run(ctx, gotoPage)
 	require.NoError(t, err)
+}
+
+// TestNetworkManagerCloseMetricEmissionRace reproduces the race
+// condition where NetworkManager emits metrics during the engine
+// shutdown. Reproduces the issue 4203 when run with the -race flag.
+func TestNetworkManagerCloseMetricEmissionRace(t *testing.T) {
+	t.Parallel()
+
+	samples := make(chan k6metrics.SampleContainer, 5)
+	tb := newTestBrowser(t, withHTTPServer(), withSamples(samples), withSkipClose())
+	tb.vu.StartIteration(t)
+	page := tb.NewPage(nil)
+
+	tb.withHandler("/foo", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = fmt.Fprint(w, `<html><head></head><body>loaded</body></html>`)
+	})
+	tb.withHandler("/ping", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = fmt.Fprint(w, "pong")
+	})
+
+	opts := &common.FrameGotoOptions{Timeout: common.DefaultTimeout}
+	_, err := page.Goto(tb.url("/foo"), opts)
+	require.NoError(t, err)
+
+	// Fire a burst of fetch requests from JS so that many HTTP-metric
+	// emission goroutines are active or queued when we close the page.
+	_, err = page.Evaluate(`() => {
+		const promises = [];
+		for (let i = 0; i < 5; i++) {
+			promises.push(fetch('/ping?i=' + i));
+		}
+		return Promise.all(promises).then(() => 'done');
+	}`)
+	require.NoError(t, err)
+
+	// Close the page in a goroutine. On a correct implementation,
+	// Close blocks until all metric-emitting goroutines finish.
+	closeDone := make(chan error, 1)
+	go func() { closeDone <- page.Close() }()
+
+	defer close(samples)
+	go func() {
+		for range samples {
+		}
+	}()
+
+	// Wait for Close to return.
+	select {
+	case err := <-closeDone:
+		require.NoError(t, err)
+	case <-time.After(30 * time.Second):
+		t.Fatal("page.Close() did not return after draining samples")
+	}
 }

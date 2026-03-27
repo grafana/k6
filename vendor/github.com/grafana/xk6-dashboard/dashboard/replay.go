@@ -13,7 +13,6 @@ import (
 	"strings"
 
 	"github.com/pkg/browser"
-	"github.com/spf13/afero"
 )
 
 type replayer struct {
@@ -36,7 +35,7 @@ func replay(input string, opts *options, assets *assets, proc *process) error {
 	}
 
 	var (
-		inputFile afero.File
+		inputFile io.ReadCloser
 		err       error
 	)
 

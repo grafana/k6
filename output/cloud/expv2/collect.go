@@ -93,7 +93,7 @@ func (c *collector) CollectSamples(containers []metrics.SampleContainer) {
 	for _, sampleContainer := range containers {
 		samples := sampleContainer.GetSamples()
 
-		for i := 0; i < len(samples); i++ {
+		for i := range samples {
 			c.collectSample(samples[i])
 		}
 	}
@@ -134,7 +134,7 @@ func (c *collector) expiredBuckets() []timeBucket {
 
 	// Here, it avoids pre-allocation
 	// because it expects to be zero for most of the time
-	var expired []timeBucket //nolint:prealloc
+	var expired []timeBucket
 
 	// Mark as expired all aggregation buckets older than bucketCutoffID
 	for bucketID, seriesSinks := range c.timeBuckets {

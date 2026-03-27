@@ -96,13 +96,13 @@ func NewGlobalState(ctx context.Context) *GlobalState {
 	stderrTTY := !isDumbTerm && (isatty.IsTerminal(os.Stderr.Fd()) || isatty.IsCygwinTerminal(os.Stderr.Fd()))
 	outMutex := &sync.Mutex{}
 	stdout := &console.Writer{
-		RawOutFd: int(os.Stdout.Fd()),
+		RawOutFd: int(os.Stdout.Fd()), //nolint:gosec
 		Mutex:    outMutex,
 		Writer:   colorable.NewColorable(os.Stdout),
 		IsTTY:    stdoutTTY,
 	}
 	stderr := &console.Writer{
-		RawOutFd: int(os.Stderr.Fd()),
+		RawOutFd: int(os.Stderr.Fd()), //nolint:gosec
 		Mutex:    outMutex,
 		Writer:   colorable.NewColorable(os.Stderr),
 		IsTTY:    stderrTTY,
@@ -239,7 +239,7 @@ func getFlags(defaultFlags GlobalFlags, env map[string]string, args []string) Gl
 			result.AutoExtensionResolution = vb
 		}
 	}
-	if v, ok := env["K6_AUTO_EXTENSION_RESOLUTION"]; ok {
+	if v, ok := env[AutoExtensionResolution]; ok {
 		vb, err := strconv.ParseBool(v)
 		if err == nil {
 			result.AutoExtensionResolution = vb
@@ -254,7 +254,7 @@ func getFlags(defaultFlags GlobalFlags, env map[string]string, args []string) Gl
 			result.EnableCommunityExtensions = vb
 		}
 	}
-	if val, ok := env["K6_DEPENDENCIES_MANIFEST"]; ok {
+	if val, ok := env[DependenciesManifest]; ok {
 		result.DependenciesManifest = val
 	}
 
@@ -263,6 +263,10 @@ func getFlags(defaultFlags GlobalFlags, env map[string]string, args []string) Gl
 	// for custom build service URLs it has no effect (because the /oss path may not be implemented)
 	if result.EnableCommunityExtensions && result.BuildServiceURL == defaultBuildServiceURL {
 		result.BuildServiceURL = fmt.Sprintf("%s/%s", defaultBuildServiceURL, communityExtensionsCatalog)
+	}
+
+	if val, ok := env["K6_SECRET_SOURCE"]; ok {
+		result.SecretSource = []string{val}
 	}
 
 	// check if verbose flag is set

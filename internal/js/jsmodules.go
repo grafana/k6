@@ -29,8 +29,8 @@ import (
 	"github.com/grafana/xk6-redis/redis"
 )
 
-func getInternalJSModules() map[string]interface{} {
-	return map[string]interface{}{
+func getInternalJSModules() map[string]any {
+	return map[string]any{
 		// Stable modules
 		"k6":             k6.New(),
 		"k6/browser":     browser.New(),
@@ -85,7 +85,7 @@ func getInternalJSModules() map[string]interface{} {
 	}
 }
 
-func getJSModules() map[string]interface{} {
+func getJSModules() map[string]any {
 	result := getInternalJSModules()
 	external := ext.Get(ext.JSExtension)
 

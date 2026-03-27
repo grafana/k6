@@ -1,7 +1,6 @@
 package js
 
 import (
-	"context"
 	"io"
 	"testing"
 
@@ -73,8 +72,7 @@ exports.default = function() {
 	for name, r := range testdata {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			samples := make(chan metrics.SampleContainer, 100)
 			initVU, err := r.NewVU(ctx, 1, 1, samples)

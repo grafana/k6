@@ -367,7 +367,7 @@ func TestMetricsFlusherErrorCase(t *testing.T) {
 	series := 7
 
 	bq.buckets = make([]timeBucket, 0, series)
-	for i := 0; i < series; i++ {
+	for i := range series {
 		ts := metrics.TimeSeries{
 			Metric: m1,
 			Tags:   r.RootTagSet().With("key1", "val"+strconv.Itoa(i)),

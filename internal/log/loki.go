@@ -122,13 +122,13 @@ func (h *lokiHook) parseArgs(line string) error {
 		case "allowedLabels":
 			h.allowedLabels = strings.Split(value, ",")
 		default:
-			if strings.HasPrefix(key, "label.") {
-				labelKey := strings.TrimPrefix(key, "label.")
+			if after, ok := strings.CutPrefix(key, "label."); ok {
+				labelKey := after
 				h.labels = append(h.labels, [2]string{labelKey, value})
 
 				continue
-			} else if strings.HasPrefix(key, "header.") {
-				headerKey := strings.TrimPrefix(key, "header.")
+			} else if after, ok := strings.CutPrefix(key, "header."); ok {
+				headerKey := after
 				h.headers = append(h.headers, [2]string{headerKey, value})
 
 				continue
@@ -347,7 +347,7 @@ func (h *lokiHook) push(b bytes.Buffer) error {
 		req.Header.Add(header[0], header[1])
 	}
 
-	res, err := h.client.Do(req)
+	res, err := h.client.Do(req) //nolint:gosec
 
 	if res != nil {
 		if res.StatusCode >= 400 {

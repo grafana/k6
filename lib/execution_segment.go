@@ -71,8 +71,8 @@ func newExecutionSegment(from, to *big.Rat) *ExecutionSegment {
 // stringToRat is a helper function that tries to convert a string to a rational
 // number while allowing percentage, decimal, and fraction values.
 func stringToRat(s string) (*big.Rat, error) {
-	if strings.HasSuffix(s, "%") {
-		num, ok := new(big.Int).SetString(strings.TrimSuffix(s, "%"), 10)
+	if before, ok := strings.CutSuffix(s, "%"); ok {
+		num, ok := new(big.Int).SetString(before, 10)
 		if !ok {
 			return nil, fmt.Errorf("'%s' is not a valid percentage", s)
 		}
@@ -177,7 +177,7 @@ func (es *ExecutionSegment) Split(numParts int64) ([]*ExecutionSegment, error) {
 	increment.Denom().Mul(increment.Denom(), big.NewInt(numParts))
 
 	results := make([]*ExecutionSegment, numParts)
-	for i := int64(0); i < numParts; i++ {
+	for i := range numParts {
 		segmentTo := new(big.Rat).Add(from, increment)
 		segment, err := NewExecutionSegment(from, segmentTo)
 		if err != nil {
@@ -555,7 +555,7 @@ func NewExecutionSegmentSequenceWrapper(ess ExecutionSegmentSequence) *Execution
 			offsets[index] = append(offsets[index], offsets[index][0]+lcd-iteration)
 		}
 	}
-	for i := int64(0); i < lcd; i++ {
+	for i := range lcd {
 		for sortedIndex, chosenCount := range chosenCounts {
 			num := chosenCount * lcd
 			denom := sortedNormalizedIndexes[sortedIndex].normNumerator

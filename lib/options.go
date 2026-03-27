@@ -9,10 +9,12 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"slices"
+
+	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/metrics"
-	"gopkg.in/guregu/null.v3"
 )
 
 // DefaultScenarioName is used as the default key/ID of the scenario config entries
@@ -522,11 +524,8 @@ func (o Options) Validate() []error {
 	var validationErrors []error
 	if o.ExecutionSegmentSequence != nil {
 		var segmentFound bool
-		for _, segment := range *o.ExecutionSegmentSequence {
-			if o.ExecutionSegment.Equal(segment) {
-				segmentFound = true
-				break
-			}
+		if slices.ContainsFunc(*o.ExecutionSegmentSequence, o.ExecutionSegment.Equal) {
+			segmentFound = true
 		}
 		if !segmentFound {
 			validationErrors = append(validationErrors,
@@ -546,8 +545,8 @@ func (o Options) Validate() []error {
 // ForEachSpecified enumerates all struct fields and calls the supplied function with each
 // element that is valid. It panics for any unfamiliar or unexpected fields, so make sure
 // new fields in Options are accounted for.
-func (o Options) ForEachSpecified(structTag string, callback func(key string, value interface{})) {
-	structType := reflect.TypeOf(o)
+func (o Options) ForEachSpecified(structTag string, callback func(key string, value any)) {
+	structType := reflect.TypeFor[Options]()
 	structVal := reflect.ValueOf(o)
 	for i := 0; i < structType.NumField(); i++ {
 		fieldType := structType.Field(i)

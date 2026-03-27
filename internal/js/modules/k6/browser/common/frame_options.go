@@ -685,7 +685,7 @@ func (o *FrameWaitForNavigationOptions) Parse(ctx context.Context, opts sobek.Va
 			case "url":
 				var val string
 				switch opts.Get(k).ExportType() {
-				case reflect.TypeOf(string("")):
+				case reflect.TypeFor[string]():
 					val = fmt.Sprintf("'%s'", opts.Get(k).String()) // Strings require quotes
 				default: // JS Regex, CSS, numbers or booleans
 					val = opts.Get(k).String() // No quotes

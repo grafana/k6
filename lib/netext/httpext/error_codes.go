@@ -119,7 +119,7 @@ func errorCodeForNetOpError(err *net.OpError) (errCode, string) {
 		case syscall.Errno:
 			return netUnknownErrnoErrorCode,
 				fmt.Sprintf(netUnknownErrnoErrorCodeMsg,
-					err.Op, (int)(inErr), runtime.GOOS, inErr.Error())
+					err.Op, (int)(inErr), runtime.GOOS, inErr.Error()) //nolint:gosec
 		default:
 			return defaultTCPErrorCode, err.Error()
 		}

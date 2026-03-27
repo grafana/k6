@@ -124,7 +124,7 @@ func newRootCommand(gs *state.GlobalState) *rootCommand {
 	subCommands := []func(*state.GlobalState) *cobra.Command{
 		getCmdArchive, getCmdCloud, getCmdNewScript, getCmdInspect, getCmdDeps,
 		getCmdLogin, getCmdPause, getCmdResume, getCmdScale, getCmdRun,
-		getCmdStats, getCmdStatus, getCmdVersion,
+		getCmdStats, getCmdStatus, getCmdVersion, getX,
 	}
 
 	defaultUsageTemplate := (&cobra.Command{}).UsageTemplate()
@@ -134,12 +134,6 @@ func newRootCommand(gs *state.GlobalState) *rootCommand {
 		cmd := sc(gs)
 		cmd.SetUsageTemplate(defaultUsageTemplate)
 		rootCmd.AddCommand(cmd)
-	}
-
-	// Add the "x" command only if there are registered subcommand extensions.
-	if xCmd := getX(gs); len(xCmd.Commands()) > 0 {
-		xCmd.SetUsageTemplate(defaultUsageTemplate)
-		rootCmd.AddCommand(xCmd)
 	}
 
 	rootCmd.SetUsageTemplate(getRootUsageTemplate())
@@ -398,22 +392,18 @@ func (c *rootCommand) setupLoggers(stop <-chan struct{}) error {
 	// Check for details https://github.com/grafana/k6/issues/711#issue-341414887
 	w := c.globalState.Logger.Writer()
 	stdlog.SetOutput(w)
-	c.loggersWg.Add(1)
-	go func() {
+	c.loggersWg.Go(func() {
 		<-stop
 		cancel()
 		_ = w.Close()
-		c.loggersWg.Done()
-	}()
+	})
 	return nil
 }
 
 func (c *rootCommand) setLoggerHook(ctx context.Context, h log.AsyncHook) {
-	c.loggersWg.Add(1)
-	go func() {
+	c.loggersWg.Go(func() {
 		h.Listen(ctx)
-		c.loggersWg.Done()
-	}()
+	})
 	c.globalState.Logger.AddHook(h)
 	c.globalState.Logger.SetOutput(io.Discard) // don't output to anywhere else
 }

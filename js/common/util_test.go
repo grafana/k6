@@ -29,7 +29,7 @@ func TestToBytes(t *testing.T) {
 	rt := sobek.New()
 	b := []byte("hello")
 	testCases := []struct {
-		in     interface{}
+		in     any
 		expOut []byte
 		expErr string
 	}{
@@ -57,7 +57,7 @@ func TestToString(t *testing.T) {
 	rt := sobek.New()
 	s := "hello"
 	testCases := []struct {
-		in             interface{}
+		in             any
 		expOut, expErr string
 	}{
 		{s, s, ""},

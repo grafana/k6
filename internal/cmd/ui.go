@@ -137,8 +137,8 @@ func printExecutionDescription(
 			case engine.IngesterDescription, lib.GroupSummaryDescription, summary.OutputName:
 				continue
 			}
-			if strings.HasPrefix(desc, dashboard.OutputName) {
-				fmt.Fprintf(buf, " web dashboard:%s\n", valueColor.Sprint(strings.TrimPrefix(desc, dashboard.OutputName)))
+			if after, ok := strings.CutPrefix(desc, dashboard.OutputName); ok {
+				fmt.Fprintf(buf, " web dashboard:%s\n", valueColor.Sprint(after))
 
 				continue
 			}
@@ -394,7 +394,7 @@ func showProgress(ctx context.Context, gs *state.GlobalState, pbs []*pb.Progress
 	}
 }
 
-func yamlPrint(w io.Writer, v interface{}) error {
+func yamlPrint(w io.Writer, v any) error {
 	data, err := yaml.Marshal(v)
 	if err != nil {
 		return fmt.Errorf("could not marshal YAML: %w", err)

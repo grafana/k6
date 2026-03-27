@@ -199,7 +199,7 @@ func (mr *ModuleResolver) sobekModuleResolver(
 	return mr.resolve(mr.reversePath(referencingScriptOrModule), specifier)
 }
 
-func (mr *ModuleResolver) reversePath(referencingScriptOrModule interface{}) *url.URL {
+func (mr *ModuleResolver) reversePath(referencingScriptOrModule any) *url.URL {
 	p, ok := mr.reverse[referencingScriptOrModule]
 	if !ok {
 		if referencingScriptOrModule != nil {

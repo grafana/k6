@@ -1,6 +1,6 @@
 #!/bin/sh -e
 # this is just the commit it was last tested with
-sha=cb4a6c8074671c00df8cbc17a620c0f9462b312a
+sha=3af36bec45bd4f72d4b57366653578e1e4dafef7
 
 mkdir -p testdata/test262
 cd testdata/test262

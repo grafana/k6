@@ -9,8 +9,9 @@ import (
 	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/metrics"
 	"google.golang.org/protobuf/encoding/protojson"
+
+	"go.k6.io/k6/metrics"
 )
 
 func TestExtendedTrendSinkMapPrompb(t *testing.T) {
@@ -169,7 +170,7 @@ func BenchmarkK6TrendSinkAdd(b *testing.B) {
 		TimeSeries: metrics.TimeSeries{
 			Metric: m,
 		},
-		Value: rand.Float64(), //nolint:gosec
+		Value: rand.Float64(),
 		Time:  time.Now(),
 	}
 	b.ResetTimer()
@@ -229,7 +230,7 @@ func BenchmarkHistogramSinkAdd(b *testing.B) {
 		TimeSeries: metrics.TimeSeries{
 			Metric: m,
 		},
-		Value: rand.Float64(), //nolint:gosec
+		Value: rand.Float64(),
 		Time:  time.Now(),
 	}
 	b.ResetTimer()
