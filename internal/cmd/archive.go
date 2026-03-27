@@ -33,6 +33,7 @@ func (c *cmdArchive) run(cmd *cobra.Command, args []string) error {
 
 	// Archive.
 	arc := testRunState.Runner.MakeArchive()
+	arc.Dependencies = test.preManifestDependencies.toStringMap()
 
 	if c.excludeEnvVars {
 		c.gs.Logger.Debug("environment variables will be excluded from the archive")

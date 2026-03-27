@@ -50,10 +50,11 @@ type loadedTest struct {
 	initRunner     lib.Runner // TODO: rename to something more appropriate
 	keyLogger      io.Closer
 
-	dependencies       dependencies
-	imports            []string
-	runnerContinuation func() (lib.Runner, error)
-	dependencyErr      error
+	dependencies            dependencies
+	preManifestDependencies dependencies
+	imports                 []string
+	runnerContinuation      func() (lib.Runner, error)
+	dependencyErr           error
 }
 
 func loadLocalTestWithoutRunner(gs *state.GlobalState, cmd *cobra.Command, args []string) (*loadedTest, error) {
@@ -172,8 +173,9 @@ func (lt *loadedTest) prepareFirstRunner(gs *state.GlobalState) error {
 			moduleResolver.LoadMainModule(pwd, specifier, lt.source.Data),
 			exitcodes.ScriptException)
 		lt.imports = moduleResolver.Imported()
-		deps, depErr := resolveModulesDependencies(err, lt.imports, logger, lt.fileSystems, lt.source, gs)
+		deps, preDeps, depErr := resolveModulesDependencies(err, lt.imports, logger, lt.fileSystems, lt.source, gs)
 		lt.dependencies = deps
+		lt.preManifestDependencies = preDeps
 		if depErr != nil {
 			return fmt.Errorf("could not load JS test '%s': %w", testPath, depErr)
 		}
@@ -205,8 +207,9 @@ func (lt *loadedTest) prepareFirstRunner(gs *state.GlobalState) error {
 				moduleResolver.LoadMainModule(pwd, specifier, arc.Data),
 				exitcodes.ScriptException)
 			lt.imports = moduleResolver.Imported()
-			deps, depErr := resolveModulesDependencies(loadErr, lt.imports, logger, arc.Filesystems, lt.source, gs)
+			deps, preDeps, depErr := resolveModulesDependencies(loadErr, lt.imports, logger, arc.Filesystems, lt.source, gs)
 			lt.dependencies = deps
+			lt.preManifestDependencies = preDeps
 			if depErr != nil {
 				return fmt.Errorf("could not load JS test '%s': %w", testPath, depErr)
 			}
@@ -258,42 +261,42 @@ func (lt *loadedTest) Imports() []string {
 func resolveModulesDependencies(
 	originalError error, imports []string, logger logrus.FieldLogger,
 	fileSystems map[string]fsext.Fs, source *loader.SourceData, gs *state.GlobalState,
-) (dependencies, error) {
-	deps, err := collectTestDependencies(originalError, imports, fileSystems, gs.Flags.DependenciesManifest)
+) (dependencies, dependencies, error) {
+	deps, preDeps, err := collectTestDependencies(originalError, imports, fileSystems, gs.Flags.DependenciesManifest)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if !gs.Flags.AutoExtensionResolution {
-		return deps, originalError
+		return deps, preDeps, originalError
 	}
 
 	if len(deps) == 0 {
-		return deps, nil
+		return deps, preDeps, nil
 	}
 
 	if !isCustomBuildRequired(deps, build.Version, ext.GetAll()) {
 		logger.
 			Debug("The current k6 binary already satisfies all the required dependencies," +
 				" it isn't required to provision a new binary.")
-		return deps, nil
+		return deps, preDeps, nil
 	}
 
 	if source.URL.Path == "/-" {
 		gs.Stdin = bytes.NewBuffer(source.Data)
 	}
 
-	return deps, binaryIsNotSatisfyingDependenciesError{
+	return deps, preDeps, binaryIsNotSatisfyingDependenciesError{
 		deps: deps,
 	}
 }
 
 func collectTestDependencies(
 	originalError error, imports []string, fileSystems map[string]fsext.Fs, manifest string,
-) (dependencies, error) {
+) (dependencies, dependencies, error) {
 	deps, err := extractUnknownModules(originalError)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Ensure k6 is always a dependency with "*" constraint by default.
@@ -302,20 +305,40 @@ func collectTestDependencies(
 		deps["k6"] = nil
 	}
 
-	if err := analyseUseContraints(imports, fileSystems, deps); err != nil {
-		return nil, err
+	// Add every k6/x/ import as a dep regardless of whether it is registered in the
+	// current binary. ModuleResolver.Imported() returns all k6/x/ specifiers that were
+	// encountered during loading — both unknown ones (already caught by extractUnknownModules
+	// above) and ones that loaded successfully because they are built into the binary.
+	// The latter case matters for auto-extension-resolution: the first run detects an
+	// unknown k6/x/foo, provisions a custom binary, and re-executes. On the second run
+	// k6/x/foo is registered so extractUnknownModules never fires, but we still need it
+	// in the archive's dependency metadata so downstream consumers know to provision it.
+	for _, imported := range imports {
+		if strings.HasPrefix(imported, "k6/x/") {
+			if _, ok := deps[imported]; !ok {
+				deps[imported] = nil
+			}
+		}
 	}
+
+	if err := analyseUseContraints(imports, fileSystems, deps); err != nil {
+		return nil, nil, err
+	}
+
+	// Snapshot deps before the manifest is applied so callers can record
+	// the script's own declared constraints independently of any external policy.
+	preDeps := maps.Clone(deps)
 
 	m, err := parseManifest(manifest)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	err = deps.applyManifest(m)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return deps, nil
+	return deps, preDeps, nil
 }
 
 func analyseUseContraints(imports []string, fileSystems map[string]fsext.Fs, deps dependencies) error {
@@ -396,6 +419,18 @@ func (d dependencies) String() string {
 		}
 	}
 	return buf.String()
+}
+
+func (d dependencies) toStringMap() map[string]string {
+	m := make(map[string]string, len(d))
+	for k, v := range d {
+		if v == nil {
+			m[k] = "*"
+		} else {
+			m[k] = v.String()
+		}
+	}
+	return m
 }
 
 func dependenciesFromMap(input map[string]string) (dependencies, error) {

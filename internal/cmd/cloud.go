@@ -129,6 +129,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 
 	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Building the archive..."))
 	arc := testRunState.Runner.MakeArchive()
+	arc.Dependencies = test.preManifestDependencies.toStringMap()
 
 	tmpCloudConfig, err := cloudapi.GetTemporaryCloudConfig(arc.Options.Cloud)
 	if err != nil {
