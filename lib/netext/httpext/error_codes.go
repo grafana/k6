@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"syscall"
 
+	"github.com/quic-go/quic-go"
 	"golang.org/x/net/http2"
 
 	"go.k6.io/k6/lib/netext"
@@ -65,6 +66,13 @@ const (
 	// Custom k6 content errors, i.e. when the magic fails
 	// defaultContentError errCode = 1700 // reserved for future use
 	responseDecompressionErrorCode errCode = 1701
+
+	// QUIC errors
+	defaultQUICErrorCode   errCode = 1800
+	quicHandshakeErrorCode errCode = 1810 //nolint:unused
+	quicStreamErrorCode    errCode = 1820
+	quicConnectionErrorCode errCode = 1830
+	quicTimeoutErrorCode   errCode = 1840 //nolint:unused
 )
 
 const (
@@ -190,6 +198,10 @@ func errorCodeForError(err error) (errCode, string) {
 		return x509HostnameErrorCode, x509HostnameErrorCodeMsg
 	case tls.RecordHeaderError:
 		return tlsHeaderErrorCode, err.Error()
+	case *quic.TransportError:
+		return quicConnectionErrorCode, fmt.Sprintf("quic: transport error: %s", e.Error())
+	case *quic.ApplicationError:
+		return quicStreamErrorCode, fmt.Sprintf("quic: application error: %s", e.Error())
 	case *url.Error:
 		return errorCodeForError(e.Err)
 	default:
