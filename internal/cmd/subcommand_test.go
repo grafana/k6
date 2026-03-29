@@ -136,6 +136,50 @@ func Test_dependenciesFromSubcommand(t *testing.T) {
 	})
 }
 
+func TestXCompletion(t *testing.T) {
+	t.Parallel()
+
+	registerTestSubcommandExtensions(t)
+
+	tt := []struct {
+		name    string
+		args    []string
+		want    []string
+		notWant []string
+	}{
+		{
+			name:    "committed extension name completes its args",
+			args:    []string{"k6", "__complete", "x", "test-cmd-1", ""},
+			want:    []string{"alpha", "bravo", "charlie"},
+			notWant: []string{"test-cmd-1"},
+		},
+		{
+			name:    "deeper args complete within extension",
+			args:    []string{"k6", "__complete", "x", "test-cmd-1", "alpha", ""},
+			want:    []string{"deep-one", "deep-two"},
+			notWant: []string{"alpha"},
+		},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			ts := tests.NewGlobalTestState(t)
+			ts.CmdArgs = tc.args
+			newRootCommand(ts.GlobalState).execute()
+
+			out := ts.Stdout.String()
+			for _, w := range tc.want {
+				require.Contains(t, out, w)
+			}
+			for _, nw := range tc.notWant {
+				require.NotContains(t, out, nw)
+			}
+		})
+	}
+}
+
 func Test_detectExtensionCompletion(t *testing.T) {
 	t.Parallel()
 
