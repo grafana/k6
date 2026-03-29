@@ -114,6 +114,27 @@ func getCmdForExtension(extension *ext.Extension, gs *state.GlobalState) *cobra.
 	return cmd
 }
 
+// detectExtensionCompletion checks whether CmdArgs represent a completion
+// request for an unregistered extension subcommand (e.g. k6 __complete x docs "").
+// Returns true and the extension name when provisioning is needed.
+func detectExtensionCompletion(root *cobra.Command, gs *state.GlobalState) (string, bool) {
+	if !gs.Flags.AutoExtensionResolution {
+		return "", false
+	}
+
+	args := gs.CmdArgs[1:]
+	if len(args) == 0 || (args[0] != cobra.ShellCompRequestCmd && args[0] != cobra.ShellCompNoDescRequestCmd) {
+		return "", false
+	}
+
+	cmd, remaining, err := root.Find(args[1:])
+	if err != nil || cmd.Name() != "x" || len(remaining) < 2 {
+		return "", false
+	}
+
+	return remaining[0], true
+}
+
 // dependenciesFromSubcommand constructs a dependencies object for the given subcommand,
 // potentially using the manifest file specified in the global state.
 //
