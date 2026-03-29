@@ -63,20 +63,26 @@ allowing them to extend k6's functionality with custom commands.
 			}
 
 			// Subcommand not found - trigger provisioning
-			deps, err := dependenciesFromSubcommand(gs, args[0])
-			if err != nil {
-				return err
-			}
-
-			return binaryIsNotSatisfyingDependenciesError{
-				deps: deps,
-			}
+			return buildExtensionDeps(gs, args[0])
 		},
 	}
 
 	cmd.AddCommand(extensionSubcommands(gs)...)
 
 	return cmd
+}
+
+// buildExtensionDeps returns a [binaryIsNotSatisfyingDependenciesError] for
+// the given extension name if the required dependencies are not satisfied.
+// It's used by both [getX] and extension completions check in root.go to
+// trigger provisioning via [handleUnsatisfiedDependencies].
+func buildExtensionDeps(gs *state.GlobalState, extName string) error {
+	deps, err := dependenciesFromSubcommand(gs, extName)
+	if err != nil {
+		return err
+	}
+	// Will kickoff the provisioning flow in [handleUnsatisfiedDependencies].
+	return binaryIsNotSatisfyingDependenciesError{deps: deps}
 }
 
 // extensionSubcommands retrieves all subcommands provided by extensions.
