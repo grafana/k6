@@ -135,6 +135,17 @@ func Test_dependenciesFromSubcommand(t *testing.T) {
 	})
 }
 
+func Test_buildExtensionDeps(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+	err := buildExtensionDeps(ts.GlobalState, "docs")
+
+	var derr binaryIsNotSatisfyingDependenciesError
+	require.ErrorAs(t, err, &derr)
+	require.Contains(t, derr.deps, "subcommand:docs")
+}
+
 var registerTestSubcommandExtensionsOnce sync.Once //nolint:gochecknoglobals
 
 func registerTestSubcommandExtensions(t *testing.T) {
