@@ -19,7 +19,7 @@ var (
 	_ easyjson.Marshaler
 )
 
-func easyjson42239ddeDecodeGoK6IoK6InternalOutputJson(in *jlexer.Lexer, out *sampleEnvelope) {
+func easyjson42239ddeDecodeGoK6IoK6V2InternalOutputJson(in *jlexer.Lexer, out *sampleEnvelope) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -57,7 +57,7 @@ func easyjson42239ddeDecodeGoK6IoK6InternalOutputJson(in *jlexer.Lexer, out *sam
 		in.Consumed()
 	}
 }
-func easyjson42239ddeEncodeGoK6IoK6InternalOutputJson(out *jwriter.Writer, in sampleEnvelope) {
+func easyjson42239ddeEncodeGoK6IoK6V2InternalOutputJson(out *jwriter.Writer, in sampleEnvelope) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -81,12 +81,12 @@ func easyjson42239ddeEncodeGoK6IoK6InternalOutputJson(out *jwriter.Writer, in sa
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v sampleEnvelope) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjson42239ddeEncodeGoK6IoK6InternalOutputJson(w, v)
+	easyjson42239ddeEncodeGoK6IoK6V2InternalOutputJson(w, v)
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *sampleEnvelope) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjson42239ddeDecodeGoK6IoK6InternalOutputJson(l, v)
+	easyjson42239ddeDecodeGoK6IoK6V2InternalOutputJson(l, v)
 }
 func easyjson42239ddeDecode(in *jlexer.Lexer, out *struct {
 	Time     time.Time         `json:"time"`
@@ -218,7 +218,7 @@ func easyjson42239ddeEncode(out *jwriter.Writer, in struct {
 	}
 	out.RawByte('}')
 }
-func easyjson42239ddeDecodeGoK6IoK6InternalOutputJson1(in *jlexer.Lexer, out *metricEnvelope) {
+func easyjson42239ddeDecodeGoK6IoK6V2InternalOutputJson1(in *jlexer.Lexer, out *metricEnvelope) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -256,7 +256,7 @@ func easyjson42239ddeDecodeGoK6IoK6InternalOutputJson1(in *jlexer.Lexer, out *me
 		in.Consumed()
 	}
 }
-func easyjson42239ddeEncodeGoK6IoK6InternalOutputJson1(out *jwriter.Writer, in metricEnvelope) {
+func easyjson42239ddeEncodeGoK6IoK6V2InternalOutputJson1(out *jwriter.Writer, in metricEnvelope) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -280,12 +280,12 @@ func easyjson42239ddeEncodeGoK6IoK6InternalOutputJson1(out *jwriter.Writer, in m
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v metricEnvelope) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjson42239ddeEncodeGoK6IoK6InternalOutputJson1(w, v)
+	easyjson42239ddeEncodeGoK6IoK6V2InternalOutputJson1(w, v)
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *metricEnvelope) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjson42239ddeDecodeGoK6IoK6InternalOutputJson1(l, v)
+	easyjson42239ddeDecodeGoK6IoK6V2InternalOutputJson1(l, v)
 }
 func easyjson42239ddeDecode1(in *jlexer.Lexer, out *struct {
 	Name       string               `json:"name"`
@@ -361,7 +361,7 @@ func easyjson42239ddeDecode1(in *jlexer.Lexer, out *struct {
 						if v3 == nil {
 							v3 = new(metrics.Submetric)
 						}
-						easyjson42239ddeDecodeGoK6IoK6Metrics(in, v3)
+						easyjson42239ddeDecodeGoK6IoK6V2Metrics(in, v3)
 					}
 					out.Submetrics = append(out.Submetrics, v3)
 					in.WantComma()
@@ -422,7 +422,7 @@ func easyjson42239ddeEncode1(out *jwriter.Writer, in struct {
 				if v5 == nil {
 					out.RawString("null")
 				} else {
-					easyjson42239ddeEncodeGoK6IoK6Metrics(out, *v5)
+					easyjson42239ddeEncodeGoK6IoK6V2Metrics(out, *v5)
 				}
 			}
 			out.RawByte(']')
@@ -430,7 +430,7 @@ func easyjson42239ddeEncode1(out *jwriter.Writer, in struct {
 	}
 	out.RawByte('}')
 }
-func easyjson42239ddeDecodeGoK6IoK6Metrics(in *jlexer.Lexer, out *metrics.Submetric) {
+func easyjson42239ddeDecodeGoK6IoK6V2Metrics(in *jlexer.Lexer, out *metrics.Submetric) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -480,7 +480,7 @@ func easyjson42239ddeDecodeGoK6IoK6Metrics(in *jlexer.Lexer, out *metrics.Submet
 		in.Consumed()
 	}
 }
-func easyjson42239ddeEncodeGoK6IoK6Metrics(out *jwriter.Writer, in metrics.Submetric) {
+func easyjson42239ddeEncodeGoK6IoK6V2Metrics(out *jwriter.Writer, in metrics.Submetric) {
 	out.RawByte('{')
 	first := true
 	_ = first
