@@ -59,7 +59,7 @@ Please use the "k6 cloud login" command instead.
 			// We want to use this fully consolidated config for things like
 			// host addresses, so users can overwrite them with env vars.
 			consolidatedCurrentConfig, warn, err := cloudapi.GetConsolidatedConfig(
-				currentJSONConfigRaw, gs.Env, "", nil, nil)
+				currentJSONConfigRaw, gs.Env, "", nil)
 			if err != nil {
 				return err
 			}

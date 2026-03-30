@@ -224,7 +224,7 @@ func extractToken(gs *state.GlobalState) (string, error) {
 		return "", err
 	}
 
-	config, _, err := cloudapi.GetConsolidatedConfig(diskConfig.Collectors["cloud"], gs.Env, "", nil, nil)
+	config, _, err := cloudapi.GetConsolidatedConfig(diskConfig.Collectors["cloud"], gs.Env, "", nil)
 	if err != nil {
 		return "", err
 	}
