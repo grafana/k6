@@ -330,7 +330,7 @@ func TestTagSetIterate(t *testing.T) {
 
 	// Iterating an empty TagSet should not call fn at all
 	called := false
-	root.Iterate(func(key, value string) {
+	root.Iterate(func(_, _ string) {
 		called = true
 	})
 	assert.False(t, called)
