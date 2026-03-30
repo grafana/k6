@@ -1082,7 +1082,7 @@ func TestVUIntegrationHosts(t *testing.T) {
 					var fail = k6.fail;
 					var http = require("k6/http");;
 					exports.default = function() {
-						var res = http.get("http://test.loadimpact.com:HTTPBIN_PORT/");
+						var res = http.get("http://test.grafana.com:HTTPBIN_PORT/");
 						check(res, {
 							"is correct IP": function(r) { return r.remote_ip === "127.0.0.1" }
 						}) || fail("failed to override dns");
@@ -1094,7 +1094,7 @@ func TestVUIntegrationHosts(t *testing.T) {
 		Throw: null.BoolFrom(true),
 		Hosts: func() types.NullHosts {
 			hosts, er := types.NewNullHosts(map[string]types.Host{
-				"test.loadimpact.com": {IP: net.ParseIP("127.0.0.1")},
+				"test.grafana.com": {IP: net.ParseIP("127.0.0.1")},
 			})
 			require.NoError(t, er)
 
