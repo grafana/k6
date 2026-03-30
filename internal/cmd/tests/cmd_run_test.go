@@ -253,7 +253,7 @@ func TestWrongCliFlagIterations(t *testing.T) {
 	ts := NewGlobalTestState(t)
 	ts.CmdArgs = []string{"k6", "run", "--iterations", "foo", "-"}
 	ts.Stdin = bytes.NewBufferString(`export default function() {};`)
-	// TODO: check for exitcodes.InvalidConfig after https://github.com/loadimpact/k6/issues/883 is done...
+	// TODO: check for exitcodes.InvalidConfig after https://github.com/grafana/k6/issues/883 is done...
 	ts.ExpectedExitCode = -1
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 	assert.True(t, testutils.LogContains(ts.LoggerHook.Drain(), logrus.ErrorLevel, `invalid argument "foo"`))

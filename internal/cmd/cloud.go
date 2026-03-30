@@ -46,7 +46,7 @@ type cmdCloud struct {
 }
 
 func (c *cmdCloud) preRun(cmd *cobra.Command, _ []string) error {
-	// TODO: refactor (https://github.com/loadimpact/k6/issues/883)
+	// TODO: refactor (https://github.com/grafana/k6/issues/883)
 	//
 	// We deliberately parse the env variables, to validate for wrong
 	// values, even if we don't subsequently use them (if the respective
