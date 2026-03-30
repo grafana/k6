@@ -13,10 +13,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"go.k6.io/k6/cloudapi"
-	"go.k6.io/k6/errext/exitcodes"
-	"go.k6.io/k6/internal/cmd"
-	"go.k6.io/k6/lib/fsext"
+	"go.k6.io/k6/v2/cloudapi"
+	"go.k6.io/k6/v2/errext/exitcodes"
+	"go.k6.io/k6/v2/internal/cmd"
+	"go.k6.io/k6/v2/lib/fsext"
 )
 
 func TestK6CloudRun(t *testing.T) {

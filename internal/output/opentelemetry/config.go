@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/mstoykov/envconfig"
-	"go.k6.io/k6/errext"
-	"go.k6.io/k6/errext/exitcodes"
-	"go.k6.io/k6/internal/build"
-	"go.k6.io/k6/lib/types"
+	"go.k6.io/k6/v2/errext"
+	"go.k6.io/k6/v2/errext/exitcodes"
+	"go.k6.io/k6/v2/internal/build"
+	"go.k6.io/k6/v2/lib/types"
 	"gopkg.in/guregu/null.v3"
 )
 

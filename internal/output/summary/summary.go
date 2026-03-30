@@ -5,11 +5,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"go.k6.io/k6/internal/lib/consts"
-	"go.k6.io/k6/internal/lib/summary"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/output"
+	"go.k6.io/k6/v2/internal/lib/consts"
+	"go.k6.io/k6/v2/internal/lib/summary"
+	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/metrics"
+	"go.k6.io/k6/v2/output"
 
 	"github.com/sirupsen/logrus"
 )

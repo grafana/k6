@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	k6netext "go.k6.io/k6/lib/netext"
-	k6types "go.k6.io/k6/lib/types"
+	k6netext "go.k6.io/k6/v2/lib/netext"
+	k6types "go.k6.io/k6/v2/lib/types"
 
 	"github.com/chromedp/cdproto"
 	jsonv2 "github.com/go-json-experiment/json"

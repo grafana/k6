@@ -3,7 +3,7 @@ package httpext
 import (
 	"crypto/tls"
 
-	"go.k6.io/k6/lib/netext"
+	"go.k6.io/k6/v2/lib/netext"
 )
 
 // ResponseType is used in the request to specify how the response body should be treated

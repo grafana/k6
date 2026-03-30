@@ -7,8 +7,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/cloudapi"
-	"go.k6.io/k6/internal/cmd/tests"
+	"go.k6.io/k6/v2/cloudapi"
+	"go.k6.io/k6/v2/internal/cmd/tests"
 )
 
 func TestMaskToken(t *testing.T) {
