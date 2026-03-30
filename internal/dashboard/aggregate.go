@@ -187,7 +187,7 @@ func (agg *aggregator) updateAndSend(
 	agg.fireEvent(event, data)
 }
 
-func (agg *aggregator) fireEvent(event string, data interface{}) {
+func (agg *aggregator) fireEvent(event string, data any) {
 	if err := agg.encoder.Encode(recorderEnvelope{Name: event, Data: data}); err != nil {
 		agg.logger.Warn(err)
 	}

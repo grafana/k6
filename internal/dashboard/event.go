@@ -7,7 +7,7 @@
 package dashboard
 
 type eventListener interface {
-	onEvent(event string, data interface{})
+	onEvent(event string, data any)
 	onStart() error
 	onStop(reason error) error
 }
@@ -20,7 +20,7 @@ func (src *eventSource) addEventListener(listener eventListener) {
 	src.listeners = append(src.listeners, listener)
 }
 
-func (src *eventSource) fireEvent(event string, data interface{}) {
+func (src *eventSource) fireEvent(event string, data any) {
 	for _, e := range src.listeners {
 		e.onEvent(event, data)
 	}

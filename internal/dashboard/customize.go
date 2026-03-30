@@ -44,7 +44,7 @@ func loadConfigJSON(filename string, proc *process) (json.RawMessage, error) {
 		return nil, err
 	}
 
-	conf := map[string]interface{}{}
+	conf := map[string]any{}
 
 	if err := json.Unmarshal(bin, &conf); err != nil {
 		return nil, err

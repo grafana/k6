@@ -52,7 +52,7 @@ func (rec *recorder) onStop(_ error) error {
 	return rec.writer.Close()
 }
 
-func (rec *recorder) onEvent(name string, data interface{}) {
+func (rec *recorder) onEvent(name string, data any) {
 	rec.mu.Lock()
 	defer rec.mu.Unlock()
 
@@ -68,6 +68,6 @@ func (rec *recorder) onEvent(name string, data interface{}) {
 }
 
 type recorderEnvelope struct {
-	Name string      `json:"event"`
-	Data interface{} `json:"data"`
+	Name string `json:"event"`
+	Data any    `json:"data"`
 }
