@@ -7,6 +7,7 @@
 package dashboard
 
 import (
+	"context"
 	"errors"
 	"io/fs"
 	"net"
@@ -64,7 +65,7 @@ func newWebServer(
 }
 
 func (srv *webServer) listenAndServe(addr string) (*net.TCPAddr, error) {
-	listener, err := net.Listen("tcp", addr)
+	listener, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", addr)
 	if err != nil {
 		return nil, err
 	}
