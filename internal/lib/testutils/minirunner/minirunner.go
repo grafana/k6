@@ -6,9 +6,9 @@ import (
 	"context"
 	"io"
 
-	"go.k6.io/k6/internal/lib/summary"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/v2/internal/lib/summary"
+	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/metrics"
 )
 
 // Ensure mock implementations conform to the interfaces.

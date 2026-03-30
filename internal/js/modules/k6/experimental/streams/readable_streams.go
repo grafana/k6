@@ -5,8 +5,8 @@ import (
 
 	"github.com/grafana/sobek"
 
-	"go.k6.io/k6/js/common"
-	"go.k6.io/k6/js/modules"
+	"go.k6.io/k6/v2/js/common"
+	"go.k6.io/k6/v2/js/modules"
 )
 
 // ReadableStream is a concrete instance of the general [readable stream] concept.

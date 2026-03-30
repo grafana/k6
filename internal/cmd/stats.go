@@ -3,8 +3,8 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 
-	"go.k6.io/k6/api/v1/client"
-	"go.k6.io/k6/cmd/state"
+	"go.k6.io/k6/v2/api/v1/client"
+	"go.k6.io/k6/v2/cmd/state"
 )
 
 func getCmdStats(gs *state.GlobalState) *cobra.Command {

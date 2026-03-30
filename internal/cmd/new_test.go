@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/internal/cmd/tests"
-	"go.k6.io/k6/lib/fsext"
+	"go.k6.io/k6/v2/internal/cmd/tests"
+	"go.k6.io/k6/v2/lib/fsext"
 )
 
 func TestNewScriptCmd(t *testing.T) {
