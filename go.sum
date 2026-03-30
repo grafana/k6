@@ -94,8 +94,6 @@ github.com/grafana/k6provider v0.2.0 h1:Zu8FBnk6cJyTTkpCA+y+Ravc2YFeAQjsIfPpcbZt
 github.com/grafana/k6provider v0.2.0/go.mod h1:TJ6vzPm4yDQ2ji/Fet0dFOpdjktrKZp4hsnLZhRoZVA=
 github.com/grafana/sobek v0.0.0-20260219184149-bdae4a158e94 h1:yB8ad5rnZcJ6Aun/tobcYMMLtb3+tZp46M5Cs5v4j9w=
 github.com/grafana/sobek v0.0.0-20260219184149-bdae4a158e94/go.mod h1:YtuqiJX1W3XvRSilL/kUZzduJG3phPJWyzM9DiIEfBo=
-github.com/grafana/xk6-dashboard v0.8.1 h1:QTEXPhkSYxiSN1lnl/cIlrnA97dUvOW+0yxQQCa9AAU=
-github.com/grafana/xk6-dashboard v0.8.1/go.mod h1:H1d7bUniuCFWWACgBdJBvpM5dC9vXehycQyMKzCC8CE=
 github.com/grafana/xk6-dashboard-assets v0.1.2 h1:n2wqytPICn2ZYsKa9HE6GlvFXk+WjByMfT4eM+ms3gE=
 github.com/grafana/xk6-dashboard-assets v0.1.2/go.mod h1:SeoRjvmFF8UhLIFDfvjqqwBtE8MtaIPYIDWqVJZEHDo=
 github.com/grafana/xk6-redis v0.3.6 h1:RS7AZwiHqIxU2gb4PxkZnqspI75xffRSKKldc6znjIg=

@@ -274,12 +274,6 @@ func newParamData(params *output.Params) *paramData {
 	return param
 }
 
-func (param *paramData) withTags(tags []string) *paramData {
-	param.Tags = tags
-
-	return param
-}
-
 func (param *paramData) withThresholds(thresholds map[string]metrics.Thresholds) *paramData {
 	if len(thresholds) == 0 {
 		return param

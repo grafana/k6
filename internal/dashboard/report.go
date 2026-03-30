@@ -95,7 +95,7 @@ func (rep *reporter) onStop(_ error) error {
 	return file.Close()
 }
 
-func (rep *reporter) onEvent(name string, data interface{}) {
+func (rep *reporter) onEvent(name string, data any) {
 	rep.mu.Lock()
 	defer rep.mu.Unlock()
 

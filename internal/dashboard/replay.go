@@ -108,6 +108,6 @@ func (rep *replayer) run() error {
 }
 
 type replayerEnvelope struct {
-	Name string      `json:"event"`
-	Data interface{} `json:"data"`
+	Name string `json:"event"`
+	Data any    `json:"data"`
 }
