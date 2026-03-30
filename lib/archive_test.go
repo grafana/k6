@@ -129,8 +129,8 @@ func TestArchiveReadWrite(t *testing.T) {
 					"/path/to/file2.txt": []byte(`bye!`),
 				}),
 				"https": testutils.MakeMemMapFs(t, map[string][]byte{
-					"/cdnjs.com/libraries/Faker":          []byte(`// faker contents`),
-					"/github.com/loadimpact/k6/README.md": []byte(`README`),
+					"/cdnjs.com/libraries/Faker":       []byte(`// faker contents`),
+					"/github.com/grafana/k6/README.md": []byte(`README`),
 				}),
 			},
 		}
