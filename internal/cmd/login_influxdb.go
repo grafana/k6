@@ -9,9 +9,9 @@ import (
 	"golang.org/x/term"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/cmd/state"
-	"go.k6.io/k6/internal/output/influxdb"
-	"go.k6.io/k6/internal/ui"
+	"go.k6.io/k6/v2/cmd/state"
+	"go.k6.io/k6/v2/internal/output/influxdb"
+	"go.k6.io/k6/v2/internal/ui"
 )
 
 //nolint:funlen

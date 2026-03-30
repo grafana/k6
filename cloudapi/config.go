@@ -8,7 +8,7 @@ import (
 	"github.com/mstoykov/envconfig"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/lib/types"
+	"go.k6.io/k6/v2/lib/types"
 )
 
 // LegacyCloudConfigKey is the key used in the JSON config for the cloud output.

@@ -7,11 +7,11 @@ import (
 	"sort"
 	"testing"
 
-	"go.k6.io/k6/internal/js/modules/k6/browser/common"
-	"go.k6.io/k6/internal/js/modules/k6/browser/env"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/env"
 
-	k6lib "go.k6.io/k6/lib"
-	k6types "go.k6.io/k6/lib/types"
+	k6lib "go.k6.io/k6/v2/lib"
+	k6types "go.k6.io/k6/v2/lib/types"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

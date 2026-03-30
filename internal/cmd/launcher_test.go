@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"go.k6.io/k6/ext"
+	"go.k6.io/k6/v2/ext"
 
-	"go.k6.io/k6/internal/cmd/tests"
+	"go.k6.io/k6/v2/internal/cmd/tests"
 )
 
 func TestIsCustomBuildRequired(t *testing.T) {

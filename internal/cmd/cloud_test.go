@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"testing"
 
-	"go.k6.io/k6/cloudapi"
-	"go.k6.io/k6/internal/cmd/tests"
-	"go.k6.io/k6/internal/lib/testutils"
-	"go.k6.io/k6/lib"
+	"go.k6.io/k6/v2/cloudapi"
+	"go.k6.io/k6/v2/internal/cmd/tests"
+	"go.k6.io/k6/v2/internal/lib/testutils"
+	"go.k6.io/k6/v2/lib"
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/sirupsen/logrus"

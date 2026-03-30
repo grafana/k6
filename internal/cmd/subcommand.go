@@ -5,9 +5,9 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"go.k6.io/k6/cmd/state"
-	"go.k6.io/k6/ext"
-	"go.k6.io/k6/subcommand"
+	"go.k6.io/k6/v2/cmd/state"
+	"go.k6.io/k6/v2/ext"
+	"go.k6.io/k6/v2/subcommand"
 )
 
 // getX creates the "x" command that serves as a namespace for extension-provided subcommands.
