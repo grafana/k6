@@ -17,11 +17,11 @@ import (
 	"time"
 )
 
-// checks if the TestRunApiModel type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &TestRunApiModel{}
+// checks if the StartLoadTestResponse type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &StartLoadTestResponse{}
 
-// TestRunApiModel The API model for a test run.
-type TestRunApiModel struct {
+// StartLoadTestResponse struct for StartLoadTestResponse
+type StartLoadTestResponse struct {
 	// ID of the test run.
 	Id int32 `json:"id"`
 	// ID of the parent test.
@@ -37,8 +37,8 @@ type TestRunApiModel struct {
 	// User-defined note for the test run.
 	Note string `json:"note"`
 	// Timestamp after which the test run results are deleted or null if the test run is saved.
-	RetentionExpiry NullableTime                `json:"retention_expiry"`
-	Cost            NullableTestRunApiModelCost `json:"cost"`
+	RetentionExpiry NullableTime             `json:"retention_expiry"`
+	Cost            NullableTestCostApiModel `json:"cost"`
 	// Current test run status.
 	Status string `json:"status"`
 	// Details of the current test run status.
@@ -64,18 +64,20 @@ type TestRunApiModel struct {
 	// The estimated duration of the test run in seconds.
 	EstimatedDuration NullableInt32 `json:"estimated_duration"`
 	// The real billable duration of the test run in seconds.
-	ExecutionDuration    int32 `json:"execution_duration"`
-	AdditionalProperties map[string]interface{}
+	ExecutionDuration int32 `json:"execution_duration"`
+	// URL to the Grafana web app test run page.
+	TestRunDetailsPageUrl string `json:"test_run_details_page_url"`
+	AdditionalProperties  map[string]interface{}
 }
 
-type _TestRunApiModel TestRunApiModel
+type _StartLoadTestResponse StartLoadTestResponse
 
-// NewTestRunApiModel instantiates a new TestRunApiModel object
+// NewStartLoadTestResponse instantiates a new StartLoadTestResponse object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewTestRunApiModel(id int32, testId int32, projectId int32, startedBy NullableString, created time.Time, ended NullableTime, note string, retentionExpiry NullableTime, cost NullableTestRunApiModelCost, status string, statusDetails StatusApiModel, statusHistory []StatusApiModel, distribution []DistributionZoneApiModel, result NullableString, resultDetails map[string]interface{}, options map[string]interface{}, k6Dependencies map[string]string, k6Versions map[string]string, maxVus NullableInt32, maxBrowserVus NullableInt32, estimatedDuration NullableInt32, executionDuration int32) *TestRunApiModel {
-	this := TestRunApiModel{}
+func NewStartLoadTestResponse(id int32, testId int32, projectId int32, startedBy NullableString, created time.Time, ended NullableTime, note string, retentionExpiry NullableTime, cost NullableTestCostApiModel, status string, statusDetails StatusApiModel, statusHistory []StatusApiModel, distribution []DistributionZoneApiModel, result NullableString, resultDetails map[string]interface{}, options map[string]interface{}, k6Dependencies map[string]string, k6Versions map[string]string, maxVus NullableInt32, maxBrowserVus NullableInt32, estimatedDuration NullableInt32, executionDuration int32, testRunDetailsPageUrl string) *StartLoadTestResponse {
+	this := StartLoadTestResponse{}
 	this.Id = id
 	this.TestId = testId
 	this.ProjectId = projectId
@@ -98,19 +100,20 @@ func NewTestRunApiModel(id int32, testId int32, projectId int32, startedBy Nulla
 	this.MaxBrowserVus = maxBrowserVus
 	this.EstimatedDuration = estimatedDuration
 	this.ExecutionDuration = executionDuration
+	this.TestRunDetailsPageUrl = testRunDetailsPageUrl
 	return &this
 }
 
-// NewTestRunApiModelWithDefaults instantiates a new TestRunApiModel object
+// NewStartLoadTestResponseWithDefaults instantiates a new StartLoadTestResponse object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewTestRunApiModelWithDefaults() *TestRunApiModel {
-	this := TestRunApiModel{}
+func NewStartLoadTestResponseWithDefaults() *StartLoadTestResponse {
+	this := StartLoadTestResponse{}
 	return &this
 }
 
 // GetId returns the Id field value
-func (o *TestRunApiModel) GetId() int32 {
+func (o *StartLoadTestResponse) GetId() int32 {
 	if o == nil {
 		var ret int32
 		return ret
@@ -121,7 +124,7 @@ func (o *TestRunApiModel) GetId() int32 {
 
 // GetIdOk returns a tuple with the Id field value
 // and a boolean to check if the value has been set.
-func (o *TestRunApiModel) GetIdOk() (*int32, bool) {
+func (o *StartLoadTestResponse) GetIdOk() (*int32, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -129,12 +132,12 @@ func (o *TestRunApiModel) GetIdOk() (*int32, bool) {
 }
 
 // SetId sets field value
-func (o *TestRunApiModel) SetId(v int32) {
+func (o *StartLoadTestResponse) SetId(v int32) {
 	o.Id = v
 }
 
 // GetTestId returns the TestId field value
-func (o *TestRunApiModel) GetTestId() int32 {
+func (o *StartLoadTestResponse) GetTestId() int32 {
 	if o == nil {
 		var ret int32
 		return ret
@@ -145,7 +148,7 @@ func (o *TestRunApiModel) GetTestId() int32 {
 
 // GetTestIdOk returns a tuple with the TestId field value
 // and a boolean to check if the value has been set.
-func (o *TestRunApiModel) GetTestIdOk() (*int32, bool) {
+func (o *StartLoadTestResponse) GetTestIdOk() (*int32, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -153,12 +156,12 @@ func (o *TestRunApiModel) GetTestIdOk() (*int32, bool) {
 }
 
 // SetTestId sets field value
-func (o *TestRunApiModel) SetTestId(v int32) {
+func (o *StartLoadTestResponse) SetTestId(v int32) {
 	o.TestId = v
 }
 
 // GetProjectId returns the ProjectId field value
-func (o *TestRunApiModel) GetProjectId() int32 {
+func (o *StartLoadTestResponse) GetProjectId() int32 {
 	if o == nil {
 		var ret int32
 		return ret
@@ -169,7 +172,7 @@ func (o *TestRunApiModel) GetProjectId() int32 {
 
 // GetProjectIdOk returns a tuple with the ProjectId field value
 // and a boolean to check if the value has been set.
-func (o *TestRunApiModel) GetProjectIdOk() (*int32, bool) {
+func (o *StartLoadTestResponse) GetProjectIdOk() (*int32, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -177,13 +180,13 @@ func (o *TestRunApiModel) GetProjectIdOk() (*int32, bool) {
 }
 
 // SetProjectId sets field value
-func (o *TestRunApiModel) SetProjectId(v int32) {
+func (o *StartLoadTestResponse) SetProjectId(v int32) {
 	o.ProjectId = v
 }
 
 // GetStartedBy returns the StartedBy field value
 // If the value is explicit nil, the zero value for string will be returned
-func (o *TestRunApiModel) GetStartedBy() string {
+func (o *StartLoadTestResponse) GetStartedBy() string {
 	if o == nil || o.StartedBy.Get() == nil {
 		var ret string
 		return ret
@@ -195,7 +198,7 @@ func (o *TestRunApiModel) GetStartedBy() string {
 // GetStartedByOk returns a tuple with the StartedBy field value
 // and a boolean to check if the value has been set.
 // NOTE: If the value is an explicit nil, `nil, true` will be returned
-func (o *TestRunApiModel) GetStartedByOk() (*string, bool) {
+func (o *StartLoadTestResponse) GetStartedByOk() (*string, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -203,12 +206,12 @@ func (o *TestRunApiModel) GetStartedByOk() (*string, bool) {
 }
 
 // SetStartedBy sets field value
-func (o *TestRunApiModel) SetStartedBy(v string) {
+func (o *StartLoadTestResponse) SetStartedBy(v string) {
 	o.StartedBy.Set(&v)
 }
 
 // GetCreated returns the Created field value
-func (o *TestRunApiModel) GetCreated() time.Time {
+func (o *StartLoadTestResponse) GetCreated() time.Time {
 	if o == nil {
 		var ret time.Time
 		return ret
@@ -219,7 +222,7 @@ func (o *TestRunApiModel) GetCreated() time.Time {
 
 // GetCreatedOk returns a tuple with the Created field value
 // and a boolean to check if the value has been set.
-func (o *TestRunApiModel) GetCreatedOk() (*time.Time, bool) {
+func (o *StartLoadTestResponse) GetCreatedOk() (*time.Time, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -227,13 +230,13 @@ func (o *TestRunApiModel) GetCreatedOk() (*time.Time, bool) {
 }
 
 // SetCreated sets field value
-func (o *TestRunApiModel) SetCreated(v time.Time) {
+func (o *StartLoadTestResponse) SetCreated(v time.Time) {
 	o.Created = v
 }
 
 // GetEnded returns the Ended field value
 // If the value is explicit nil, the zero value for time.Time will be returned
-func (o *TestRunApiModel) GetEnded() time.Time {
+func (o *StartLoadTestResponse) GetEnded() time.Time {
 	if o == nil || o.Ended.Get() == nil {
 		var ret time.Time
 		return ret
@@ -245,7 +248,7 @@ func (o *TestRunApiModel) GetEnded() time.Time {
 // GetEndedOk returns a tuple with the Ended field value
 // and a boolean to check if the value has been set.
 // NOTE: If the value is an explicit nil, `nil, true` will be returned
-func (o *TestRunApiModel) GetEndedOk() (*time.Time, bool) {
+func (o *StartLoadTestResponse) GetEndedOk() (*time.Time, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -253,12 +256,12 @@ func (o *TestRunApiModel) GetEndedOk() (*time.Time, bool) {
 }
 
 // SetEnded sets field value
-func (o *TestRunApiModel) SetEnded(v time.Time) {
+func (o *StartLoadTestResponse) SetEnded(v time.Time) {
 	o.Ended.Set(&v)
 }
 
 // GetNote returns the Note field value
-func (o *TestRunApiModel) GetNote() string {
+func (o *StartLoadTestResponse) GetNote() string {
 	if o == nil {
 		var ret string
 		return ret
@@ -269,7 +272,7 @@ func (o *TestRunApiModel) GetNote() string {
 
 // GetNoteOk returns a tuple with the Note field value
 // and a boolean to check if the value has been set.
-func (o *TestRunApiModel) GetNoteOk() (*string, bool) {
+func (o *StartLoadTestResponse) GetNoteOk() (*string, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -277,13 +280,13 @@ func (o *TestRunApiModel) GetNoteOk() (*string, bool) {
 }
 
 // SetNote sets field value
-func (o *TestRunApiModel) SetNote(v string) {
+func (o *StartLoadTestResponse) SetNote(v string) {
 	o.Note = v
 }
 
 // GetRetentionExpiry returns the RetentionExpiry field value
 // If the value is explicit nil, the zero value for time.Time will be returned
-func (o *TestRunApiModel) GetRetentionExpiry() time.Time {
+func (o *StartLoadTestResponse) GetRetentionExpiry() time.Time {
 	if o == nil || o.RetentionExpiry.Get() == nil {
 		var ret time.Time
 		return ret
@@ -295,7 +298,7 @@ func (o *TestRunApiModel) GetRetentionExpiry() time.Time {
 // GetRetentionExpiryOk returns a tuple with the RetentionExpiry field value
 // and a boolean to check if the value has been set.
 // NOTE: If the value is an explicit nil, `nil, true` will be returned
-func (o *TestRunApiModel) GetRetentionExpiryOk() (*time.Time, bool) {
+func (o *StartLoadTestResponse) GetRetentionExpiryOk() (*time.Time, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -303,15 +306,15 @@ func (o *TestRunApiModel) GetRetentionExpiryOk() (*time.Time, bool) {
 }
 
 // SetRetentionExpiry sets field value
-func (o *TestRunApiModel) SetRetentionExpiry(v time.Time) {
+func (o *StartLoadTestResponse) SetRetentionExpiry(v time.Time) {
 	o.RetentionExpiry.Set(&v)
 }
 
 // GetCost returns the Cost field value
-// If the value is explicit nil, the zero value for TestRunApiModelCost will be returned
-func (o *TestRunApiModel) GetCost() TestRunApiModelCost {
+// If the value is explicit nil, the zero value for TestCostApiModel will be returned
+func (o *StartLoadTestResponse) GetCost() TestCostApiModel {
 	if o == nil || o.Cost.Get() == nil {
-		var ret TestRunApiModelCost
+		var ret TestCostApiModel
 		return ret
 	}
 
@@ -321,7 +324,7 @@ func (o *TestRunApiModel) GetCost() TestRunApiModelCost {
 // GetCostOk returns a tuple with the Cost field value
 // and a boolean to check if the value has been set.
 // NOTE: If the value is an explicit nil, `nil, true` will be returned
-func (o *TestRunApiModel) GetCostOk() (*TestRunApiModelCost, bool) {
+func (o *StartLoadTestResponse) GetCostOk() (*TestCostApiModel, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -329,12 +332,12 @@ func (o *TestRunApiModel) GetCostOk() (*TestRunApiModelCost, bool) {
 }
 
 // SetCost sets field value
-func (o *TestRunApiModel) SetCost(v TestRunApiModelCost) {
+func (o *StartLoadTestResponse) SetCost(v TestCostApiModel) {
 	o.Cost.Set(&v)
 }
 
 // GetStatus returns the Status field value
-func (o *TestRunApiModel) GetStatus() string {
+func (o *StartLoadTestResponse) GetStatus() string {
 	if o == nil {
 		var ret string
 		return ret
@@ -345,7 +348,7 @@ func (o *TestRunApiModel) GetStatus() string {
 
 // GetStatusOk returns a tuple with the Status field value
 // and a boolean to check if the value has been set.
-func (o *TestRunApiModel) GetStatusOk() (*string, bool) {
+func (o *StartLoadTestResponse) GetStatusOk() (*string, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -353,12 +356,12 @@ func (o *TestRunApiModel) GetStatusOk() (*string, bool) {
 }
 
 // SetStatus sets field value
-func (o *TestRunApiModel) SetStatus(v string) {
+func (o *StartLoadTestResponse) SetStatus(v string) {
 	o.Status = v
 }
 
 // GetStatusDetails returns the StatusDetails field value
-func (o *TestRunApiModel) GetStatusDetails() StatusApiModel {
+func (o *StartLoadTestResponse) GetStatusDetails() StatusApiModel {
 	if o == nil {
 		var ret StatusApiModel
 		return ret
@@ -369,7 +372,7 @@ func (o *TestRunApiModel) GetStatusDetails() StatusApiModel {
 
 // GetStatusDetailsOk returns a tuple with the StatusDetails field value
 // and a boolean to check if the value has been set.
-func (o *TestRunApiModel) GetStatusDetailsOk() (*StatusApiModel, bool) {
+func (o *StartLoadTestResponse) GetStatusDetailsOk() (*StatusApiModel, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -377,12 +380,12 @@ func (o *TestRunApiModel) GetStatusDetailsOk() (*StatusApiModel, bool) {
 }
 
 // SetStatusDetails sets field value
-func (o *TestRunApiModel) SetStatusDetails(v StatusApiModel) {
+func (o *StartLoadTestResponse) SetStatusDetails(v StatusApiModel) {
 	o.StatusDetails = v
 }
 
 // GetStatusHistory returns the StatusHistory field value
-func (o *TestRunApiModel) GetStatusHistory() []StatusApiModel {
+func (o *StartLoadTestResponse) GetStatusHistory() []StatusApiModel {
 	if o == nil {
 		var ret []StatusApiModel
 		return ret
@@ -393,7 +396,7 @@ func (o *TestRunApiModel) GetStatusHistory() []StatusApiModel {
 
 // GetStatusHistoryOk returns a tuple with the StatusHistory field value
 // and a boolean to check if the value has been set.
-func (o *TestRunApiModel) GetStatusHistoryOk() ([]StatusApiModel, bool) {
+func (o *StartLoadTestResponse) GetStatusHistoryOk() ([]StatusApiModel, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -401,13 +404,13 @@ func (o *TestRunApiModel) GetStatusHistoryOk() ([]StatusApiModel, bool) {
 }
 
 // SetStatusHistory sets field value
-func (o *TestRunApiModel) SetStatusHistory(v []StatusApiModel) {
+func (o *StartLoadTestResponse) SetStatusHistory(v []StatusApiModel) {
 	o.StatusHistory = v
 }
 
 // GetDistribution returns the Distribution field value
 // If the value is explicit nil, the zero value for []DistributionZoneApiModel will be returned
-func (o *TestRunApiModel) GetDistribution() []DistributionZoneApiModel {
+func (o *StartLoadTestResponse) GetDistribution() []DistributionZoneApiModel {
 	if o == nil {
 		var ret []DistributionZoneApiModel
 		return ret
@@ -419,7 +422,7 @@ func (o *TestRunApiModel) GetDistribution() []DistributionZoneApiModel {
 // GetDistributionOk returns a tuple with the Distribution field value
 // and a boolean to check if the value has been set.
 // NOTE: If the value is an explicit nil, `nil, true` will be returned
-func (o *TestRunApiModel) GetDistributionOk() ([]DistributionZoneApiModel, bool) {
+func (o *StartLoadTestResponse) GetDistributionOk() ([]DistributionZoneApiModel, bool) {
 	if o == nil || IsNil(o.Distribution) {
 		return nil, false
 	}
@@ -427,13 +430,13 @@ func (o *TestRunApiModel) GetDistributionOk() ([]DistributionZoneApiModel, bool)
 }
 
 // SetDistribution sets field value
-func (o *TestRunApiModel) SetDistribution(v []DistributionZoneApiModel) {
+func (o *StartLoadTestResponse) SetDistribution(v []DistributionZoneApiModel) {
 	o.Distribution = v
 }
 
 // GetResult returns the Result field value
 // If the value is explicit nil, the zero value for string will be returned
-func (o *TestRunApiModel) GetResult() string {
+func (o *StartLoadTestResponse) GetResult() string {
 	if o == nil || o.Result.Get() == nil {
 		var ret string
 		return ret
@@ -445,7 +448,7 @@ func (o *TestRunApiModel) GetResult() string {
 // GetResultOk returns a tuple with the Result field value
 // and a boolean to check if the value has been set.
 // NOTE: If the value is an explicit nil, `nil, true` will be returned
-func (o *TestRunApiModel) GetResultOk() (*string, bool) {
+func (o *StartLoadTestResponse) GetResultOk() (*string, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -453,13 +456,13 @@ func (o *TestRunApiModel) GetResultOk() (*string, bool) {
 }
 
 // SetResult sets field value
-func (o *TestRunApiModel) SetResult(v string) {
+func (o *StartLoadTestResponse) SetResult(v string) {
 	o.Result.Set(&v)
 }
 
 // GetResultDetails returns the ResultDetails field value
 // If the value is explicit nil, the zero value for map[string]interface{} will be returned
-func (o *TestRunApiModel) GetResultDetails() map[string]interface{} {
+func (o *StartLoadTestResponse) GetResultDetails() map[string]interface{} {
 	if o == nil {
 		var ret map[string]interface{}
 		return ret
@@ -471,7 +474,7 @@ func (o *TestRunApiModel) GetResultDetails() map[string]interface{} {
 // GetResultDetailsOk returns a tuple with the ResultDetails field value
 // and a boolean to check if the value has been set.
 // NOTE: If the value is an explicit nil, `nil, true` will be returned
-func (o *TestRunApiModel) GetResultDetailsOk() (map[string]interface{}, bool) {
+func (o *StartLoadTestResponse) GetResultDetailsOk() (map[string]interface{}, bool) {
 	if o == nil || IsNil(o.ResultDetails) {
 		return map[string]interface{}{}, false
 	}
@@ -479,13 +482,13 @@ func (o *TestRunApiModel) GetResultDetailsOk() (map[string]interface{}, bool) {
 }
 
 // SetResultDetails sets field value
-func (o *TestRunApiModel) SetResultDetails(v map[string]interface{}) {
+func (o *StartLoadTestResponse) SetResultDetails(v map[string]interface{}) {
 	o.ResultDetails = v
 }
 
 // GetOptions returns the Options field value
 // If the value is explicit nil, the zero value for map[string]interface{} will be returned
-func (o *TestRunApiModel) GetOptions() map[string]interface{} {
+func (o *StartLoadTestResponse) GetOptions() map[string]interface{} {
 	if o == nil {
 		var ret map[string]interface{}
 		return ret
@@ -497,7 +500,7 @@ func (o *TestRunApiModel) GetOptions() map[string]interface{} {
 // GetOptionsOk returns a tuple with the Options field value
 // and a boolean to check if the value has been set.
 // NOTE: If the value is an explicit nil, `nil, true` will be returned
-func (o *TestRunApiModel) GetOptionsOk() (map[string]interface{}, bool) {
+func (o *StartLoadTestResponse) GetOptionsOk() (map[string]interface{}, bool) {
 	if o == nil || IsNil(o.Options) {
 		return map[string]interface{}{}, false
 	}
@@ -505,12 +508,12 @@ func (o *TestRunApiModel) GetOptionsOk() (map[string]interface{}, bool) {
 }
 
 // SetOptions sets field value
-func (o *TestRunApiModel) SetOptions(v map[string]interface{}) {
+func (o *StartLoadTestResponse) SetOptions(v map[string]interface{}) {
 	o.Options = v
 }
 
 // GetK6Dependencies returns the K6Dependencies field value
-func (o *TestRunApiModel) GetK6Dependencies() map[string]string {
+func (o *StartLoadTestResponse) GetK6Dependencies() map[string]string {
 	if o == nil {
 		var ret map[string]string
 		return ret
@@ -521,7 +524,7 @@ func (o *TestRunApiModel) GetK6Dependencies() map[string]string {
 
 // GetK6DependenciesOk returns a tuple with the K6Dependencies field value
 // and a boolean to check if the value has been set.
-func (o *TestRunApiModel) GetK6DependenciesOk() (map[string]string, bool) {
+func (o *StartLoadTestResponse) GetK6DependenciesOk() (map[string]string, bool) {
 	if o == nil {
 		return map[string]string{}, false
 	}
@@ -529,12 +532,12 @@ func (o *TestRunApiModel) GetK6DependenciesOk() (map[string]string, bool) {
 }
 
 // SetK6Dependencies sets field value
-func (o *TestRunApiModel) SetK6Dependencies(v map[string]string) {
+func (o *StartLoadTestResponse) SetK6Dependencies(v map[string]string) {
 	o.K6Dependencies = v
 }
 
 // GetK6Versions returns the K6Versions field value
-func (o *TestRunApiModel) GetK6Versions() map[string]string {
+func (o *StartLoadTestResponse) GetK6Versions() map[string]string {
 	if o == nil {
 		var ret map[string]string
 		return ret
@@ -545,7 +548,7 @@ func (o *TestRunApiModel) GetK6Versions() map[string]string {
 
 // GetK6VersionsOk returns a tuple with the K6Versions field value
 // and a boolean to check if the value has been set.
-func (o *TestRunApiModel) GetK6VersionsOk() (map[string]string, bool) {
+func (o *StartLoadTestResponse) GetK6VersionsOk() (map[string]string, bool) {
 	if o == nil {
 		return map[string]string{}, false
 	}
@@ -553,13 +556,13 @@ func (o *TestRunApiModel) GetK6VersionsOk() (map[string]string, bool) {
 }
 
 // SetK6Versions sets field value
-func (o *TestRunApiModel) SetK6Versions(v map[string]string) {
+func (o *StartLoadTestResponse) SetK6Versions(v map[string]string) {
 	o.K6Versions = v
 }
 
 // GetMaxVus returns the MaxVus field value
 // If the value is explicit nil, the zero value for int32 will be returned
-func (o *TestRunApiModel) GetMaxVus() int32 {
+func (o *StartLoadTestResponse) GetMaxVus() int32 {
 	if o == nil || o.MaxVus.Get() == nil {
 		var ret int32
 		return ret
@@ -571,7 +574,7 @@ func (o *TestRunApiModel) GetMaxVus() int32 {
 // GetMaxVusOk returns a tuple with the MaxVus field value
 // and a boolean to check if the value has been set.
 // NOTE: If the value is an explicit nil, `nil, true` will be returned
-func (o *TestRunApiModel) GetMaxVusOk() (*int32, bool) {
+func (o *StartLoadTestResponse) GetMaxVusOk() (*int32, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -579,13 +582,13 @@ func (o *TestRunApiModel) GetMaxVusOk() (*int32, bool) {
 }
 
 // SetMaxVus sets field value
-func (o *TestRunApiModel) SetMaxVus(v int32) {
+func (o *StartLoadTestResponse) SetMaxVus(v int32) {
 	o.MaxVus.Set(&v)
 }
 
 // GetMaxBrowserVus returns the MaxBrowserVus field value
 // If the value is explicit nil, the zero value for int32 will be returned
-func (o *TestRunApiModel) GetMaxBrowserVus() int32 {
+func (o *StartLoadTestResponse) GetMaxBrowserVus() int32 {
 	if o == nil || o.MaxBrowserVus.Get() == nil {
 		var ret int32
 		return ret
@@ -597,7 +600,7 @@ func (o *TestRunApiModel) GetMaxBrowserVus() int32 {
 // GetMaxBrowserVusOk returns a tuple with the MaxBrowserVus field value
 // and a boolean to check if the value has been set.
 // NOTE: If the value is an explicit nil, `nil, true` will be returned
-func (o *TestRunApiModel) GetMaxBrowserVusOk() (*int32, bool) {
+func (o *StartLoadTestResponse) GetMaxBrowserVusOk() (*int32, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -605,13 +608,13 @@ func (o *TestRunApiModel) GetMaxBrowserVusOk() (*int32, bool) {
 }
 
 // SetMaxBrowserVus sets field value
-func (o *TestRunApiModel) SetMaxBrowserVus(v int32) {
+func (o *StartLoadTestResponse) SetMaxBrowserVus(v int32) {
 	o.MaxBrowserVus.Set(&v)
 }
 
 // GetEstimatedDuration returns the EstimatedDuration field value
 // If the value is explicit nil, the zero value for int32 will be returned
-func (o *TestRunApiModel) GetEstimatedDuration() int32 {
+func (o *StartLoadTestResponse) GetEstimatedDuration() int32 {
 	if o == nil || o.EstimatedDuration.Get() == nil {
 		var ret int32
 		return ret
@@ -623,7 +626,7 @@ func (o *TestRunApiModel) GetEstimatedDuration() int32 {
 // GetEstimatedDurationOk returns a tuple with the EstimatedDuration field value
 // and a boolean to check if the value has been set.
 // NOTE: If the value is an explicit nil, `nil, true` will be returned
-func (o *TestRunApiModel) GetEstimatedDurationOk() (*int32, bool) {
+func (o *StartLoadTestResponse) GetEstimatedDurationOk() (*int32, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -631,12 +634,12 @@ func (o *TestRunApiModel) GetEstimatedDurationOk() (*int32, bool) {
 }
 
 // SetEstimatedDuration sets field value
-func (o *TestRunApiModel) SetEstimatedDuration(v int32) {
+func (o *StartLoadTestResponse) SetEstimatedDuration(v int32) {
 	o.EstimatedDuration.Set(&v)
 }
 
 // GetExecutionDuration returns the ExecutionDuration field value
-func (o *TestRunApiModel) GetExecutionDuration() int32 {
+func (o *StartLoadTestResponse) GetExecutionDuration() int32 {
 	if o == nil {
 		var ret int32
 		return ret
@@ -647,7 +650,7 @@ func (o *TestRunApiModel) GetExecutionDuration() int32 {
 
 // GetExecutionDurationOk returns a tuple with the ExecutionDuration field value
 // and a boolean to check if the value has been set.
-func (o *TestRunApiModel) GetExecutionDurationOk() (*int32, bool) {
+func (o *StartLoadTestResponse) GetExecutionDurationOk() (*int32, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -655,11 +658,35 @@ func (o *TestRunApiModel) GetExecutionDurationOk() (*int32, bool) {
 }
 
 // SetExecutionDuration sets field value
-func (o *TestRunApiModel) SetExecutionDuration(v int32) {
+func (o *StartLoadTestResponse) SetExecutionDuration(v int32) {
 	o.ExecutionDuration = v
 }
 
-func (o TestRunApiModel) MarshalJSON() ([]byte, error) {
+// GetTestRunDetailsPageUrl returns the TestRunDetailsPageUrl field value
+func (o *StartLoadTestResponse) GetTestRunDetailsPageUrl() string {
+	if o == nil {
+		var ret string
+		return ret
+	}
+
+	return o.TestRunDetailsPageUrl
+}
+
+// GetTestRunDetailsPageUrlOk returns a tuple with the TestRunDetailsPageUrl field value
+// and a boolean to check if the value has been set.
+func (o *StartLoadTestResponse) GetTestRunDetailsPageUrlOk() (*string, bool) {
+	if o == nil {
+		return nil, false
+	}
+	return &o.TestRunDetailsPageUrl, true
+}
+
+// SetTestRunDetailsPageUrl sets field value
+func (o *StartLoadTestResponse) SetTestRunDetailsPageUrl(v string) {
+	o.TestRunDetailsPageUrl = v
+}
+
+func (o StartLoadTestResponse) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -667,7 +694,7 @@ func (o TestRunApiModel) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o TestRunApiModel) ToMap() (map[string]interface{}, error) {
+func (o StartLoadTestResponse) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	toSerialize["id"] = o.Id
 	toSerialize["test_id"] = o.TestId
@@ -697,6 +724,7 @@ func (o TestRunApiModel) ToMap() (map[string]interface{}, error) {
 	toSerialize["max_browser_vus"] = o.MaxBrowserVus.Get()
 	toSerialize["estimated_duration"] = o.EstimatedDuration.Get()
 	toSerialize["execution_duration"] = o.ExecutionDuration
+	toSerialize["test_run_details_page_url"] = o.TestRunDetailsPageUrl
 
 	for key, value := range o.AdditionalProperties {
 		toSerialize[key] = value
@@ -705,7 +733,7 @@ func (o TestRunApiModel) ToMap() (map[string]interface{}, error) {
 	return toSerialize, nil
 }
 
-func (o *TestRunApiModel) UnmarshalJSON(data []byte) (err error) {
+func (o *StartLoadTestResponse) UnmarshalJSON(data []byte) (err error) {
 	// This validates that all required properties are included in the JSON object
 	// by unmarshalling the object into a generic map with string keys and checking
 	// that every required field exists as a key in the generic map.
@@ -732,6 +760,7 @@ func (o *TestRunApiModel) UnmarshalJSON(data []byte) (err error) {
 		"max_browser_vus",
 		"estimated_duration",
 		"execution_duration",
+		"test_run_details_page_url",
 	}
 
 	allProperties := make(map[string]interface{})
@@ -748,15 +777,15 @@ func (o *TestRunApiModel) UnmarshalJSON(data []byte) (err error) {
 		}
 	}
 
-	varTestRunApiModel := _TestRunApiModel{}
+	varStartLoadTestResponse := _StartLoadTestResponse{}
 
-	err = json.Unmarshal(data, &varTestRunApiModel)
+	err = json.Unmarshal(data, &varStartLoadTestResponse)
 
 	if err != nil {
 		return err
 	}
 
-	*o = TestRunApiModel(varTestRunApiModel)
+	*o = StartLoadTestResponse(varStartLoadTestResponse)
 
 	additionalProperties := make(map[string]interface{})
 
@@ -783,44 +812,45 @@ func (o *TestRunApiModel) UnmarshalJSON(data []byte) (err error) {
 		delete(additionalProperties, "max_browser_vus")
 		delete(additionalProperties, "estimated_duration")
 		delete(additionalProperties, "execution_duration")
+		delete(additionalProperties, "test_run_details_page_url")
 		o.AdditionalProperties = additionalProperties
 	}
 
 	return err
 }
 
-type NullableTestRunApiModel struct {
-	value *TestRunApiModel
+type NullableStartLoadTestResponse struct {
+	value *StartLoadTestResponse
 	isSet bool
 }
 
-func (v NullableTestRunApiModel) Get() *TestRunApiModel {
+func (v NullableStartLoadTestResponse) Get() *StartLoadTestResponse {
 	return v.value
 }
 
-func (v *NullableTestRunApiModel) Set(val *TestRunApiModel) {
+func (v *NullableStartLoadTestResponse) Set(val *StartLoadTestResponse) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableTestRunApiModel) IsSet() bool {
+func (v NullableStartLoadTestResponse) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableTestRunApiModel) Unset() {
+func (v *NullableStartLoadTestResponse) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableTestRunApiModel(val *TestRunApiModel) *NullableTestRunApiModel {
-	return &NullableTestRunApiModel{value: val, isSet: true}
+func NewNullableStartLoadTestResponse(val *StartLoadTestResponse) *NullableStartLoadTestResponse {
+	return &NullableStartLoadTestResponse{value: val, isSet: true}
 }
 
-func (v NullableTestRunApiModel) MarshalJSON() ([]byte, error) {
+func (v NullableStartLoadTestResponse) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableTestRunApiModel) UnmarshalJSON(src []byte) error {
+func (v *NullableStartLoadTestResponse) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }

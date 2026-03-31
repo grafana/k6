@@ -16,40 +16,40 @@ import (
 	"fmt"
 )
 
-// checks if the AllowedLoadZonesListApiModel type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &AllowedLoadZonesListApiModel{}
+// checks if the LabelKeyListResponse type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &LabelKeyListResponse{}
 
-// AllowedLoadZonesListApiModel struct for AllowedLoadZonesListApiModel
-type AllowedLoadZonesListApiModel struct {
+// LabelKeyListResponse Response for listing label keys
+type LabelKeyListResponse struct {
 	// List of the resulting values.
-	Value                []AllowedLoadZoneApiModel `json:"value"`
+	Value                []LabelKeyResponse `json:"value"`
 	AdditionalProperties map[string]interface{}
 }
 
-type _AllowedLoadZonesListApiModel AllowedLoadZonesListApiModel
+type _LabelKeyListResponse LabelKeyListResponse
 
-// NewAllowedLoadZonesListApiModel instantiates a new AllowedLoadZonesListApiModel object
+// NewLabelKeyListResponse instantiates a new LabelKeyListResponse object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewAllowedLoadZonesListApiModel(value []AllowedLoadZoneApiModel) *AllowedLoadZonesListApiModel {
-	this := AllowedLoadZonesListApiModel{}
+func NewLabelKeyListResponse(value []LabelKeyResponse) *LabelKeyListResponse {
+	this := LabelKeyListResponse{}
 	this.Value = value
 	return &this
 }
 
-// NewAllowedLoadZonesListApiModelWithDefaults instantiates a new AllowedLoadZonesListApiModel object
+// NewLabelKeyListResponseWithDefaults instantiates a new LabelKeyListResponse object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewAllowedLoadZonesListApiModelWithDefaults() *AllowedLoadZonesListApiModel {
-	this := AllowedLoadZonesListApiModel{}
+func NewLabelKeyListResponseWithDefaults() *LabelKeyListResponse {
+	this := LabelKeyListResponse{}
 	return &this
 }
 
 // GetValue returns the Value field value
-func (o *AllowedLoadZonesListApiModel) GetValue() []AllowedLoadZoneApiModel {
+func (o *LabelKeyListResponse) GetValue() []LabelKeyResponse {
 	if o == nil {
-		var ret []AllowedLoadZoneApiModel
+		var ret []LabelKeyResponse
 		return ret
 	}
 
@@ -58,7 +58,7 @@ func (o *AllowedLoadZonesListApiModel) GetValue() []AllowedLoadZoneApiModel {
 
 // GetValueOk returns a tuple with the Value field value
 // and a boolean to check if the value has been set.
-func (o *AllowedLoadZonesListApiModel) GetValueOk() ([]AllowedLoadZoneApiModel, bool) {
+func (o *LabelKeyListResponse) GetValueOk() ([]LabelKeyResponse, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -66,11 +66,11 @@ func (o *AllowedLoadZonesListApiModel) GetValueOk() ([]AllowedLoadZoneApiModel, 
 }
 
 // SetValue sets field value
-func (o *AllowedLoadZonesListApiModel) SetValue(v []AllowedLoadZoneApiModel) {
+func (o *LabelKeyListResponse) SetValue(v []LabelKeyResponse) {
 	o.Value = v
 }
 
-func (o AllowedLoadZonesListApiModel) MarshalJSON() ([]byte, error) {
+func (o LabelKeyListResponse) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -78,7 +78,7 @@ func (o AllowedLoadZonesListApiModel) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o AllowedLoadZonesListApiModel) ToMap() (map[string]interface{}, error) {
+func (o LabelKeyListResponse) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	toSerialize["value"] = o.Value
 
@@ -89,7 +89,7 @@ func (o AllowedLoadZonesListApiModel) ToMap() (map[string]interface{}, error) {
 	return toSerialize, nil
 }
 
-func (o *AllowedLoadZonesListApiModel) UnmarshalJSON(data []byte) (err error) {
+func (o *LabelKeyListResponse) UnmarshalJSON(data []byte) (err error) {
 	// This validates that all required properties are included in the JSON object
 	// by unmarshalling the object into a generic map with string keys and checking
 	// that every required field exists as a key in the generic map.
@@ -111,15 +111,15 @@ func (o *AllowedLoadZonesListApiModel) UnmarshalJSON(data []byte) (err error) {
 		}
 	}
 
-	varAllowedLoadZonesListApiModel := _AllowedLoadZonesListApiModel{}
+	varLabelKeyListResponse := _LabelKeyListResponse{}
 
-	err = json.Unmarshal(data, &varAllowedLoadZonesListApiModel)
+	err = json.Unmarshal(data, &varLabelKeyListResponse)
 
 	if err != nil {
 		return err
 	}
 
-	*o = AllowedLoadZonesListApiModel(varAllowedLoadZonesListApiModel)
+	*o = LabelKeyListResponse(varLabelKeyListResponse)
 
 	additionalProperties := make(map[string]interface{})
 
@@ -131,38 +131,38 @@ func (o *AllowedLoadZonesListApiModel) UnmarshalJSON(data []byte) (err error) {
 	return err
 }
 
-type NullableAllowedLoadZonesListApiModel struct {
-	value *AllowedLoadZonesListApiModel
+type NullableLabelKeyListResponse struct {
+	value *LabelKeyListResponse
 	isSet bool
 }
 
-func (v NullableAllowedLoadZonesListApiModel) Get() *AllowedLoadZonesListApiModel {
+func (v NullableLabelKeyListResponse) Get() *LabelKeyListResponse {
 	return v.value
 }
 
-func (v *NullableAllowedLoadZonesListApiModel) Set(val *AllowedLoadZonesListApiModel) {
+func (v *NullableLabelKeyListResponse) Set(val *LabelKeyListResponse) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableAllowedLoadZonesListApiModel) IsSet() bool {
+func (v NullableLabelKeyListResponse) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableAllowedLoadZonesListApiModel) Unset() {
+func (v *NullableLabelKeyListResponse) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableAllowedLoadZonesListApiModel(val *AllowedLoadZonesListApiModel) *NullableAllowedLoadZonesListApiModel {
-	return &NullableAllowedLoadZonesListApiModel{value: val, isSet: true}
+func NewNullableLabelKeyListResponse(val *LabelKeyListResponse) *NullableLabelKeyListResponse {
+	return &NullableLabelKeyListResponse{value: val, isSet: true}
 }
 
-func (v NullableAllowedLoadZonesListApiModel) MarshalJSON() ([]byte, error) {
+func (v NullableLabelKeyListResponse) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableAllowedLoadZonesListApiModel) UnmarshalJSON(src []byte) error {
+func (v *NullableLabelKeyListResponse) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
