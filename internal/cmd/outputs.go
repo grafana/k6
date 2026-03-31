@@ -17,7 +17,7 @@ import (
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/output"
 
-	"github.com/grafana/xk6-dashboard/dashboard"
+	"go.k6.io/k6/internal/dashboard"
 )
 
 // builtinOutput marks the available builtin outputs.

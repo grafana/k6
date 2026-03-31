@@ -69,7 +69,7 @@ func (emitter *eventEmitter) onStop(reason error) error {
 	return nil
 }
 
-func (emitter *eventEmitter) onEvent(name string, data interface{}) {
+func (emitter *eventEmitter) onEvent(name string, data any) {
 	buff, err := json.Marshal(data)
 	if err != nil {
 		emitter.logger.Error(err)

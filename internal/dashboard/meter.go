@@ -262,12 +262,12 @@ func (m *meter) newbies(seen []string) (map[string]metricData, []string) {
 }
 
 func (m *meter) get(name string) *metrics.Metric {
-	openingPos := strings.IndexByte(name, '{')
-	if openingPos == -1 {
+	base, _, hasTag := strings.Cut(name, "{")
+	if !hasTag {
 		return m.registry.Get(name)
 	}
 
-	metric := m.registry.Get(name[:openingPos])
+	metric := m.registry.Get(base)
 
 	for _, sub := range metric.Submetrics {
 		if sub.Name == name {
@@ -288,9 +288,8 @@ type metricData struct {
 func newMetricData(origin *metrics.Metric) *metricData {
 	name := origin.Name
 
-	openingPos := strings.IndexByte(name, '{')
-	if openingPos != -1 {
-		name = name[:openingPos]
+	if base, _, hasTag := strings.Cut(name, "{"); hasTag {
+		name = base
 	}
 
 	return &metricData{
