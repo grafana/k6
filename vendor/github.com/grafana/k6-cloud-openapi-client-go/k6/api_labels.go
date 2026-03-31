@@ -20,72 +20,66 @@ import (
 	"strings"
 )
 
-// SchedulesAPIService SchedulesAPI service
-type SchedulesAPIService service
+// LabelsAPIService LabelsAPI service
+type LabelsAPIService service
 
-type ApiLoadTestsScheduleCreateRequest struct {
+type ApiLabelsCreateRequest struct {
 	ctx                   context.Context
-	ApiService            *SchedulesAPIService
+	ApiService            *LabelsAPIService
 	xStackId              *int32
-	id                    int32
-	createScheduleRequest *CreateScheduleRequest
+	labelKeyCreateRequest *LabelKeyCreateRequest
 }
 
 // Numeric ID of the Grafana stack representing the request scope. - If the API is called with a *Personal API token*, the user must be a member of the specified stack. - If the API is called with a *Grafana Stack API token*, the value must be the ID of the corresponding stack.
-func (r *ApiLoadTestsScheduleCreateRequest) XStackId(xStackId int32) *ApiLoadTestsScheduleCreateRequest {
+func (r *ApiLabelsCreateRequest) XStackId(xStackId int32) *ApiLabelsCreateRequest {
 	r.xStackId = &xStackId
 	return r
 }
 
-func (r *ApiLoadTestsScheduleCreateRequest) CreateScheduleRequest(createScheduleRequest *CreateScheduleRequest) *ApiLoadTestsScheduleCreateRequest {
-	r.createScheduleRequest = createScheduleRequest
+func (r *ApiLabelsCreateRequest) LabelKeyCreateRequest(labelKeyCreateRequest *LabelKeyCreateRequest) *ApiLabelsCreateRequest {
+	r.labelKeyCreateRequest = labelKeyCreateRequest
 	return r
 }
 
-func (r *ApiLoadTestsScheduleCreateRequest) Execute() (*ScheduleApiModel, *http.Response, error) {
-	return r.ApiService.LoadTestsScheduleCreateExecute(r)
+func (r *ApiLabelsCreateRequest) Execute() (*LabelKeyListResponse, *http.Response, error) {
+	return r.ApiService.LabelsCreateExecute(r)
 }
 
 /*
-LoadTestsScheduleCreate Set a schedule for the load test.
+LabelsCreate Create label keys.
 
-Set a schedule for the load test.
+Creates one or more label keys for the organization.
 
-This operation overwrites any existing test schedule.
-
-Monthly schedules running on days 29-31 are adjusted to run on the last day of the month
-if the target day doesn't exist in a given month (for example, March 31 -> April 30).
+This operation is additive: it adds the new labels to the existing ones
+without replacing them.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id ID of the load test.
-	@return *ApiLoadTestsScheduleCreateRequest
+	@return *ApiLabelsCreateRequest
 */
-func (a *SchedulesAPIService) LoadTestsScheduleCreate(ctx context.Context, id int32) *ApiLoadTestsScheduleCreateRequest {
-	return &ApiLoadTestsScheduleCreateRequest{
+func (a *LabelsAPIService) LabelsCreate(ctx context.Context) *ApiLabelsCreateRequest {
+	return &ApiLabelsCreateRequest{
 		ApiService: a,
 		ctx:        ctx,
-		id:         id,
 	}
 }
 
 // Execute executes the request
 //
-//	@return ScheduleApiModel
-func (a *SchedulesAPIService) LoadTestsScheduleCreateExecute(r *ApiLoadTestsScheduleCreateRequest) (*ScheduleApiModel, *http.Response, error) {
+//	@return LabelKeyListResponse
+func (a *LabelsAPIService) LabelsCreateExecute(r *ApiLabelsCreateRequest) (*LabelKeyListResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod  = http.MethodPost
 		localVarPostBody    interface{}
 		formFiles           []formFile
-		localVarReturnValue *ScheduleApiModel
+		localVarReturnValue *LabelKeyListResponse
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "SchedulesAPIService.LoadTestsScheduleCreate")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "LabelsAPIService.LabelsCreate")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/cloud/v6/load_tests/{id}/schedule"
-	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
+	localVarPath := localBasePath + "/cloud/v6/labels"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -93,8 +87,8 @@ func (a *SchedulesAPIService) LoadTestsScheduleCreateExecute(r *ApiLoadTestsSche
 	if r.xStackId == nil {
 		return localVarReturnValue, nil, reportError("xStackId is required and must be specified")
 	}
-	if r.createScheduleRequest == nil {
-		return localVarReturnValue, nil, reportError("createScheduleRequest is required and must be specified")
+	if r.labelKeyCreateRequest == nil {
+		return localVarReturnValue, nil, reportError("labelKeyCreateRequest is required and must be specified")
 	}
 
 	// to determine the Content-Type header
@@ -116,7 +110,7 @@ func (a *SchedulesAPIService) LoadTestsScheduleCreateExecute(r *ApiLoadTestsSche
 	}
 	parameterAddToHeaderOrQuery(localVarHeaderParams, "X-Stack-Id", r.xStackId, "simple", "")
 	// body params
-	localVarPostBody = r.createScheduleRequest
+	localVarPostBody = r.labelKeyCreateRequest
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -171,540 +165,74 @@ func (a *SchedulesAPIService) LoadTestsScheduleCreateExecute(r *ApiLoadTestsSche
 			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
 			newErr.model = v
 			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		if localVarHTTPResponse.StatusCode == 404 {
-			var v ErrorResponseApiModel
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		if localVarHTTPResponse.StatusCode == 500 {
-			var v ErrorResponseApiModel
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-		}
-		return localVarReturnValue, localVarHTTPResponse, newErr
-	}
-
-	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-	if err != nil {
-		newErr := &GenericOpenAPIError{
-			body:  localVarBody,
-			error: err.Error(),
-		}
-		return localVarReturnValue, localVarHTTPResponse, newErr
-	}
-
-	return localVarReturnValue, localVarHTTPResponse, nil
-}
-
-type ApiLoadTestsScheduleRetrieveRequest struct {
-	ctx        context.Context
-	ApiService *SchedulesAPIService
-	xStackId   *int32
-	id         int32
-}
-
-// Numeric ID of the Grafana stack representing the request scope. - If the API is called with a *Personal API token*, the user must be a member of the specified stack. - If the API is called with a *Grafana Stack API token*, the value must be the ID of the corresponding stack.
-func (r *ApiLoadTestsScheduleRetrieveRequest) XStackId(xStackId int32) *ApiLoadTestsScheduleRetrieveRequest {
-	r.xStackId = &xStackId
-	return r
-}
-
-func (r *ApiLoadTestsScheduleRetrieveRequest) Execute() (*ScheduleApiModel, *http.Response, error) {
-	return r.ApiService.LoadTestsScheduleRetrieveExecute(r)
-}
-
-/*
-LoadTestsScheduleRetrieve Get the load test schedule.
-
-Get the load test schedule.
-
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id ID of the load test.
-	@return *ApiLoadTestsScheduleRetrieveRequest
-*/
-func (a *SchedulesAPIService) LoadTestsScheduleRetrieve(ctx context.Context, id int32) *ApiLoadTestsScheduleRetrieveRequest {
-	return &ApiLoadTestsScheduleRetrieveRequest{
-		ApiService: a,
-		ctx:        ctx,
-		id:         id,
-	}
-}
-
-// Execute executes the request
-//
-//	@return ScheduleApiModel
-func (a *SchedulesAPIService) LoadTestsScheduleRetrieveExecute(r *ApiLoadTestsScheduleRetrieveRequest) (*ScheduleApiModel, *http.Response, error) {
-	var (
-		localVarHTTPMethod  = http.MethodGet
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue *ScheduleApiModel
-	)
-
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "SchedulesAPIService.LoadTestsScheduleRetrieve")
-	if err != nil {
-		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
-	}
-
-	localVarPath := localBasePath + "/cloud/v6/load_tests/{id}/schedule"
-	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
-
-	localVarHeaderParams := make(map[string]string)
-	localVarQueryParams := url.Values{}
-	localVarFormParams := url.Values{}
-	if r.xStackId == nil {
-		return localVarReturnValue, nil, reportError("xStackId is required and must be specified")
-	}
-
-	// to determine the Content-Type header
-	localVarHTTPContentTypes := []string{}
-
-	// set Content-Type header
-	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
-	if localVarHTTPContentType != "" {
-		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
-	}
-
-	// to determine the Accept header
-	localVarHTTPHeaderAccepts := []string{"application/json"}
-
-	// set Accept header
-	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
-	if localVarHTTPHeaderAccept != "" {
-		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
-	}
-	parameterAddToHeaderOrQuery(localVarHeaderParams, "X-Stack-Id", r.xStackId, "simple", "")
-	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
-	if err != nil {
-		return localVarReturnValue, nil, err
-	}
-
-	localVarHTTPResponse, err := a.client.callAPI(req)
-	if err != nil || localVarHTTPResponse == nil {
-		return localVarReturnValue, localVarHTTPResponse, err
-	}
-
-	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
-	localVarHTTPResponse.Body.Close()
-	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
-	if err != nil {
-		return localVarReturnValue, localVarHTTPResponse, err
-	}
-
-	if localVarHTTPResponse.StatusCode >= 300 {
-		newErr := &GenericOpenAPIError{
-			body:  localVarBody,
-			error: localVarHTTPResponse.Status,
-		}
-		if localVarHTTPResponse.StatusCode == 401 {
-			var v ErrorResponseApiModel
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		if localVarHTTPResponse.StatusCode == 403 {
-			var v ErrorResponseApiModel
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		if localVarHTTPResponse.StatusCode == 404 {
-			var v ErrorResponseApiModel
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		if localVarHTTPResponse.StatusCode == 500 {
-			var v ErrorResponseApiModel
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-		}
-		return localVarReturnValue, localVarHTTPResponse, newErr
-	}
-
-	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-	if err != nil {
-		newErr := &GenericOpenAPIError{
-			body:  localVarBody,
-			error: err.Error(),
-		}
-		return localVarReturnValue, localVarHTTPResponse, newErr
-	}
-
-	return localVarReturnValue, localVarHTTPResponse, nil
-}
-
-type ApiScheduleActivateRequest struct {
-	ctx        context.Context
-	ApiService *SchedulesAPIService
-	xStackId   *int32
-	id         int32
-}
-
-// Numeric ID of the Grafana stack representing the request scope. - If the API is called with a *Personal API token*, the user must be a member of the specified stack. - If the API is called with a *Grafana Stack API token*, the value must be the ID of the corresponding stack.
-func (r *ApiScheduleActivateRequest) XStackId(xStackId int32) *ApiScheduleActivateRequest {
-	r.xStackId = &xStackId
-	return r
-}
-
-func (r *ApiScheduleActivateRequest) Execute() (*http.Response, error) {
-	return r.ApiService.ScheduleActivateExecute(r)
-}
-
-/*
-ScheduleActivate Re-activate deactivated schedule.
-
-Re-activate a deactivated schedule.
-
-A deactivated schedule can be re-activated only if it still has at least one future
-recurrence.
-
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id ID of the schedule.
-	@return *ApiScheduleActivateRequest
-*/
-func (a *SchedulesAPIService) ScheduleActivate(ctx context.Context, id int32) *ApiScheduleActivateRequest {
-	return &ApiScheduleActivateRequest{
-		ApiService: a,
-		ctx:        ctx,
-		id:         id,
-	}
-}
-
-// Execute executes the request
-func (a *SchedulesAPIService) ScheduleActivateExecute(r *ApiScheduleActivateRequest) (*http.Response, error) {
-	var (
-		localVarHTTPMethod = http.MethodPost
-		localVarPostBody   interface{}
-		formFiles          []formFile
-	)
-
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "SchedulesAPIService.ScheduleActivate")
-	if err != nil {
-		return nil, &GenericOpenAPIError{error: err.Error()}
-	}
-
-	localVarPath := localBasePath + "/cloud/v6/schedules/{id}/activate"
-	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
-
-	localVarHeaderParams := make(map[string]string)
-	localVarQueryParams := url.Values{}
-	localVarFormParams := url.Values{}
-	if r.xStackId == nil {
-		return nil, reportError("xStackId is required and must be specified")
-	}
-
-	// to determine the Content-Type header
-	localVarHTTPContentTypes := []string{}
-
-	// set Content-Type header
-	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
-	if localVarHTTPContentType != "" {
-		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
-	}
-
-	// to determine the Accept header
-	localVarHTTPHeaderAccepts := []string{"application/json"}
-
-	// set Accept header
-	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
-	if localVarHTTPHeaderAccept != "" {
-		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
-	}
-	parameterAddToHeaderOrQuery(localVarHeaderParams, "X-Stack-Id", r.xStackId, "simple", "")
-	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
-	if err != nil {
-		return nil, err
-	}
-
-	localVarHTTPResponse, err := a.client.callAPI(req)
-	if err != nil || localVarHTTPResponse == nil {
-		return localVarHTTPResponse, err
-	}
-
-	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
-	localVarHTTPResponse.Body.Close()
-	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
-	if err != nil {
-		return localVarHTTPResponse, err
-	}
-
-	if localVarHTTPResponse.StatusCode >= 300 {
-		newErr := &GenericOpenAPIError{
-			body:  localVarBody,
-			error: localVarHTTPResponse.Status,
-		}
-		if localVarHTTPResponse.StatusCode == 401 {
-			var v ErrorResponseApiModel
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarHTTPResponse, newErr
-		}
-		if localVarHTTPResponse.StatusCode == 403 {
-			var v ErrorResponseApiModel
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarHTTPResponse, newErr
-		}
-		if localVarHTTPResponse.StatusCode == 404 {
-			var v ErrorResponseApiModel
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 409 {
 			var v ErrorResponseApiModel
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
-				return localVarHTTPResponse, newErr
+				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
 			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
 			newErr.model = v
-			return localVarHTTPResponse, newErr
+			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 500 {
 			var v ErrorResponseApiModel
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
-				return localVarHTTPResponse, newErr
+				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
 			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
 			newErr.model = v
 		}
-		return localVarHTTPResponse, newErr
+		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
-	return localVarHTTPResponse, nil
-}
-
-type ApiScheduleDeactivateRequest struct {
-	ctx        context.Context
-	ApiService *SchedulesAPIService
-	xStackId   *int32
-	id         int32
-}
-
-// Numeric ID of the Grafana stack representing the request scope. - If the API is called with a *Personal API token*, the user must be a member of the specified stack. - If the API is called with a *Grafana Stack API token*, the value must be the ID of the corresponding stack.
-func (r *ApiScheduleDeactivateRequest) XStackId(xStackId int32) *ApiScheduleDeactivateRequest {
-	r.xStackId = &xStackId
-	return r
-}
-
-func (r *ApiScheduleDeactivateRequest) Execute() (*http.Response, error) {
-	return r.ApiService.ScheduleDeactivateExecute(r)
-}
-
-/*
-ScheduleDeactivate Deactivate a schedule.
-
-Deactivate a schedule.
-
-A deactivated schedule will not trigger new test runs. Disabling a schedule does not affect
-the schedule recurrence rule and does not delay its expiration.
-
-The operation has no effect if the schedule is expired.
-
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id ID of the schedule.
-	@return *ApiScheduleDeactivateRequest
-*/
-func (a *SchedulesAPIService) ScheduleDeactivate(ctx context.Context, id int32) *ApiScheduleDeactivateRequest {
-	return &ApiScheduleDeactivateRequest{
-		ApiService: a,
-		ctx:        ctx,
-		id:         id,
-	}
-}
-
-// Execute executes the request
-func (a *SchedulesAPIService) ScheduleDeactivateExecute(r *ApiScheduleDeactivateRequest) (*http.Response, error) {
-	var (
-		localVarHTTPMethod = http.MethodPost
-		localVarPostBody   interface{}
-		formFiles          []formFile
-	)
-
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "SchedulesAPIService.ScheduleDeactivate")
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 	if err != nil {
-		return nil, &GenericOpenAPIError{error: err.Error()}
-	}
-
-	localVarPath := localBasePath + "/cloud/v6/schedules/{id}/deactivate"
-	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
-
-	localVarHeaderParams := make(map[string]string)
-	localVarQueryParams := url.Values{}
-	localVarFormParams := url.Values{}
-	if r.xStackId == nil {
-		return nil, reportError("xStackId is required and must be specified")
-	}
-
-	// to determine the Content-Type header
-	localVarHTTPContentTypes := []string{}
-
-	// set Content-Type header
-	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
-	if localVarHTTPContentType != "" {
-		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
-	}
-
-	// to determine the Accept header
-	localVarHTTPHeaderAccepts := []string{"application/json"}
-
-	// set Accept header
-	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
-	if localVarHTTPHeaderAccept != "" {
-		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
-	}
-	parameterAddToHeaderOrQuery(localVarHeaderParams, "X-Stack-Id", r.xStackId, "simple", "")
-	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
-	if err != nil {
-		return nil, err
-	}
-
-	localVarHTTPResponse, err := a.client.callAPI(req)
-	if err != nil || localVarHTTPResponse == nil {
-		return localVarHTTPResponse, err
-	}
-
-	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
-	localVarHTTPResponse.Body.Close()
-	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
-	if err != nil {
-		return localVarHTTPResponse, err
-	}
-
-	if localVarHTTPResponse.StatusCode >= 300 {
 		newErr := &GenericOpenAPIError{
 			body:  localVarBody,
-			error: localVarHTTPResponse.Status,
+			error: err.Error(),
 		}
-		if localVarHTTPResponse.StatusCode == 401 {
-			var v ErrorResponseApiModel
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarHTTPResponse, newErr
-		}
-		if localVarHTTPResponse.StatusCode == 403 {
-			var v ErrorResponseApiModel
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarHTTPResponse, newErr
-		}
-		if localVarHTTPResponse.StatusCode == 404 {
-			var v ErrorResponseApiModel
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarHTTPResponse, newErr
-		}
-		if localVarHTTPResponse.StatusCode == 500 {
-			var v ErrorResponseApiModel
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-		}
-		return localVarHTTPResponse, newErr
+		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
-	return localVarHTTPResponse, nil
+	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
-type ApiSchedulesDestroyRequest struct {
+type ApiLabelsDestroyRequest struct {
 	ctx        context.Context
-	ApiService *SchedulesAPIService
+	ApiService *LabelsAPIService
 	xStackId   *int32
 	id         int32
 }
 
 // Numeric ID of the Grafana stack representing the request scope. - If the API is called with a *Personal API token*, the user must be a member of the specified stack. - If the API is called with a *Grafana Stack API token*, the value must be the ID of the corresponding stack.
-func (r *ApiSchedulesDestroyRequest) XStackId(xStackId int32) *ApiSchedulesDestroyRequest {
+func (r *ApiLabelsDestroyRequest) XStackId(xStackId int32) *ApiLabelsDestroyRequest {
 	r.xStackId = &xStackId
 	return r
 }
 
-func (r *ApiSchedulesDestroyRequest) Execute() (*http.Response, error) {
-	return r.ApiService.SchedulesDestroyExecute(r)
+func (r *ApiLabelsDestroyRequest) Execute() (*http.Response, error) {
+	return r.ApiService.LabelsDestroyExecute(r)
 }
 
 /*
-SchedulesDestroy Delete a schedule.
+LabelsDestroy Delete a label key.
 
-Delete a schedule.
+Delete a label key (Admin only).
+
+When a label key is deleted, all project labels using this key
+are cascade deleted.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id ID of the schedule.
-	@return *ApiSchedulesDestroyRequest
+	@param id ID of the label key.
+	@return *ApiLabelsDestroyRequest
 */
-func (a *SchedulesAPIService) SchedulesDestroy(ctx context.Context, id int32) *ApiSchedulesDestroyRequest {
-	return &ApiSchedulesDestroyRequest{
+func (a *LabelsAPIService) LabelsDestroy(ctx context.Context, id int32) *ApiLabelsDestroyRequest {
+	return &ApiLabelsDestroyRequest{
 		ApiService: a,
 		ctx:        ctx,
 		id:         id,
@@ -712,19 +240,19 @@ func (a *SchedulesAPIService) SchedulesDestroy(ctx context.Context, id int32) *A
 }
 
 // Execute executes the request
-func (a *SchedulesAPIService) SchedulesDestroyExecute(r *ApiSchedulesDestroyRequest) (*http.Response, error) {
+func (a *LabelsAPIService) LabelsDestroyExecute(r *ApiLabelsDestroyRequest) (*http.Response, error) {
 	var (
 		localVarHTTPMethod = http.MethodDelete
 		localVarPostBody   interface{}
 		formFiles          []formFile
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "SchedulesAPIService.SchedulesDestroy")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "LabelsAPIService.LabelsDestroy")
 	if err != nil {
 		return nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/cloud/v6/schedules/{id}"
+	localVarPath := localBasePath + "/cloud/v6/labels/{id}"
 	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -823,53 +351,32 @@ func (a *SchedulesAPIService) SchedulesDestroyExecute(r *ApiSchedulesDestroyRequ
 	return localVarHTTPResponse, nil
 }
 
-type ApiSchedulesListRequest struct {
+type ApiLabelsListRequest struct {
 	ctx        context.Context
-	ApiService *SchedulesAPIService
+	ApiService *LabelsAPIService
 	xStackId   *int32
-	count      *bool
-	skip       *int32
-	top        *int32
 }
 
 // Numeric ID of the Grafana stack representing the request scope. - If the API is called with a *Personal API token*, the user must be a member of the specified stack. - If the API is called with a *Grafana Stack API token*, the value must be the ID of the corresponding stack.
-func (r *ApiSchedulesListRequest) XStackId(xStackId int32) *ApiSchedulesListRequest {
+func (r *ApiLabelsListRequest) XStackId(xStackId int32) *ApiLabelsListRequest {
 	r.xStackId = &xStackId
 	return r
 }
 
-// Include collection length in the response object as &#x60;@count&#x60;.
-func (r *ApiSchedulesListRequest) Count(count bool) *ApiSchedulesListRequest {
-	r.count = &count
-	return r
-}
-
-// The initial index from which to return the results.
-func (r *ApiSchedulesListRequest) Skip(skip int32) *ApiSchedulesListRequest {
-	r.skip = &skip
-	return r
-}
-
-// Number of results to return per page.
-func (r *ApiSchedulesListRequest) Top(top int32) *ApiSchedulesListRequest {
-	r.top = &top
-	return r
-}
-
-func (r *ApiSchedulesListRequest) Execute() (*ScheduleListResponse, *http.Response, error) {
-	return r.ApiService.SchedulesListExecute(r)
+func (r *ApiLabelsListRequest) Execute() (*LabelKeyListResponse, *http.Response, error) {
+	return r.ApiService.LabelsListExecute(r)
 }
 
 /*
-SchedulesList List all schedules.
+LabelsList List label keys.
 
-List all schedules.
+List all label keys (accessible by all authenticated users).
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@return *ApiSchedulesListRequest
+	@return *ApiLabelsListRequest
 */
-func (a *SchedulesAPIService) SchedulesList(ctx context.Context) *ApiSchedulesListRequest {
-	return &ApiSchedulesListRequest{
+func (a *LabelsAPIService) LabelsList(ctx context.Context) *ApiLabelsListRequest {
+	return &ApiLabelsListRequest{
 		ApiService: a,
 		ctx:        ctx,
 	}
@@ -877,21 +384,21 @@ func (a *SchedulesAPIService) SchedulesList(ctx context.Context) *ApiSchedulesLi
 
 // Execute executes the request
 //
-//	@return ScheduleListResponse
-func (a *SchedulesAPIService) SchedulesListExecute(r *ApiSchedulesListRequest) (*ScheduleListResponse, *http.Response, error) {
+//	@return LabelKeyListResponse
+func (a *LabelsAPIService) LabelsListExecute(r *ApiLabelsListRequest) (*LabelKeyListResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod  = http.MethodGet
 		localVarPostBody    interface{}
 		formFiles           []formFile
-		localVarReturnValue *ScheduleListResponse
+		localVarReturnValue *LabelKeyListResponse
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "SchedulesAPIService.SchedulesList")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "LabelsAPIService.LabelsList")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/cloud/v6/schedules"
+	localVarPath := localBasePath + "/cloud/v6/labels"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -900,18 +407,6 @@ func (a *SchedulesAPIService) SchedulesListExecute(r *ApiSchedulesListRequest) (
 		return localVarReturnValue, nil, reportError("xStackId is required and must be specified")
 	}
 
-	if r.count != nil {
-		parameterAddToHeaderOrQuery(localVarQueryParams, "$count", r.count, "form", "")
-	}
-	if r.skip != nil {
-		parameterAddToHeaderOrQuery(localVarQueryParams, "$skip", r.skip, "form", "")
-	}
-	if r.top != nil {
-		parameterAddToHeaderOrQuery(localVarQueryParams, "$top", r.top, "form", "")
-	} else {
-		var defaultValue int32 = 1000
-		r.top = &defaultValue
-	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
 
@@ -930,6 +425,161 @@ func (a *SchedulesAPIService) SchedulesListExecute(r *ApiSchedulesListRequest) (
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}
 	parameterAddToHeaderOrQuery(localVarHeaderParams, "X-Stack-Id", r.xStackId, "simple", "")
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 401 {
+			var v ErrorResponseApiModel
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 403 {
+			var v ErrorResponseApiModel
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v ErrorResponseApiModel
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiLabelsPartialUpdateRequest struct {
+	ctx                  context.Context
+	ApiService           *LabelsAPIService
+	xStackId             *int32
+	id                   int32
+	labelKeyPatchRequest *LabelKeyPatchRequest
+}
+
+// Numeric ID of the Grafana stack representing the request scope. - If the API is called with a *Personal API token*, the user must be a member of the specified stack. - If the API is called with a *Grafana Stack API token*, the value must be the ID of the corresponding stack.
+func (r *ApiLabelsPartialUpdateRequest) XStackId(xStackId int32) *ApiLabelsPartialUpdateRequest {
+	r.xStackId = &xStackId
+	return r
+}
+
+func (r *ApiLabelsPartialUpdateRequest) LabelKeyPatchRequest(labelKeyPatchRequest *LabelKeyPatchRequest) *ApiLabelsPartialUpdateRequest {
+	r.labelKeyPatchRequest = labelKeyPatchRequest
+	return r
+}
+
+func (r *ApiLabelsPartialUpdateRequest) Execute() (*LabelKeyResponse, *http.Response, error) {
+	return r.ApiService.LabelsPartialUpdateExecute(r)
+}
+
+/*
+LabelsPartialUpdate Update a label key.
+
+Update a label key (rename or update description) (Admin only).
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param id ID of the label key.
+	@return *ApiLabelsPartialUpdateRequest
+*/
+func (a *LabelsAPIService) LabelsPartialUpdate(ctx context.Context, id int32) *ApiLabelsPartialUpdateRequest {
+	return &ApiLabelsPartialUpdateRequest{
+		ApiService: a,
+		ctx:        ctx,
+		id:         id,
+	}
+}
+
+// Execute executes the request
+//
+//	@return LabelKeyResponse
+func (a *LabelsAPIService) LabelsPartialUpdateExecute(r *ApiLabelsPartialUpdateRequest) (*LabelKeyResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodPatch
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *LabelKeyResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "LabelsAPIService.LabelsPartialUpdate")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/cloud/v6/labels/{id}"
+	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.xStackId == nil {
+		return localVarReturnValue, nil, reportError("xStackId is required and must be specified")
+	}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{"application/json"}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	parameterAddToHeaderOrQuery(localVarHeaderParams, "X-Stack-Id", r.xStackId, "simple", "")
+	// body params
+	localVarPostBody = r.labelKeyPatchRequest
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -985,6 +635,28 @@ func (a *SchedulesAPIService) SchedulesListExecute(r *ApiSchedulesListRequest) (
 			newErr.model = v
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
+		if localVarHTTPResponse.StatusCode == 404 {
+			var v ErrorResponseApiModel
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 409 {
+			var v ErrorResponseApiModel
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
 		if localVarHTTPResponse.StatusCode == 500 {
 			var v ErrorResponseApiModel
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
@@ -1010,58 +682,208 @@ func (a *SchedulesAPIService) SchedulesListExecute(r *ApiSchedulesListRequest) (
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
-type ApiSchedulesRetrieveRequest struct {
+type ApiProjectsLabelsDestroyRequest struct {
 	ctx        context.Context
-	ApiService *SchedulesAPIService
+	ApiService *LabelsAPIService
 	xStackId   *int32
-	id         int32
+	key        string
+	projectId  int32
 }
 
 // Numeric ID of the Grafana stack representing the request scope. - If the API is called with a *Personal API token*, the user must be a member of the specified stack. - If the API is called with a *Grafana Stack API token*, the value must be the ID of the corresponding stack.
-func (r *ApiSchedulesRetrieveRequest) XStackId(xStackId int32) *ApiSchedulesRetrieveRequest {
+func (r *ApiProjectsLabelsDestroyRequest) XStackId(xStackId int32) *ApiProjectsLabelsDestroyRequest {
 	r.xStackId = &xStackId
 	return r
 }
 
-func (r *ApiSchedulesRetrieveRequest) Execute() (*ScheduleApiModel, *http.Response, error) {
-	return r.ApiService.SchedulesRetrieveExecute(r)
+func (r *ApiProjectsLabelsDestroyRequest) Execute() (*http.Response, error) {
+	return r.ApiService.ProjectsLabelsDestroyExecute(r)
 }
 
 /*
-SchedulesRetrieve Get a schedule by ID.
+ProjectsLabelsDestroy Remove a label from project.
 
-Get a schedule by ID.
+Remove a label from a project (Admin or Editor).
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id ID of the schedule.
-	@return *ApiSchedulesRetrieveRequest
+	@param key Label key name.
+	@param projectId ID of the project.
+	@return *ApiProjectsLabelsDestroyRequest
 */
-func (a *SchedulesAPIService) SchedulesRetrieve(ctx context.Context, id int32) *ApiSchedulesRetrieveRequest {
-	return &ApiSchedulesRetrieveRequest{
+func (a *LabelsAPIService) ProjectsLabelsDestroy(ctx context.Context, key string, projectId int32) *ApiProjectsLabelsDestroyRequest {
+	return &ApiProjectsLabelsDestroyRequest{
 		ApiService: a,
 		ctx:        ctx,
-		id:         id,
+		key:        key,
+		projectId:  projectId,
+	}
+}
+
+// Execute executes the request
+func (a *LabelsAPIService) ProjectsLabelsDestroyExecute(r *ApiProjectsLabelsDestroyRequest) (*http.Response, error) {
+	var (
+		localVarHTTPMethod = http.MethodDelete
+		localVarPostBody   interface{}
+		formFiles          []formFile
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "LabelsAPIService.ProjectsLabelsDestroy")
+	if err != nil {
+		return nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/cloud/v6/projects/{project_id}/labels/{key}"
+	localVarPath = strings.Replace(localVarPath, "{"+"key"+"}", url.PathEscape(parameterValueToString(r.key, "key")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"project_id"+"}", url.PathEscape(parameterValueToString(r.projectId, "projectId")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.xStackId == nil {
+		return nil, reportError("xStackId is required and must be specified")
+	}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	parameterAddToHeaderOrQuery(localVarHeaderParams, "X-Stack-Id", r.xStackId, "simple", "")
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 401 {
+			var v ErrorResponseApiModel
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 403 {
+			var v ErrorResponseApiModel
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 404 {
+			var v ErrorResponseApiModel
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v ErrorResponseApiModel
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+		}
+		return localVarHTTPResponse, newErr
+	}
+
+	return localVarHTTPResponse, nil
+}
+
+type ApiProjectsLabelsListRequest struct {
+	ctx        context.Context
+	ApiService *LabelsAPIService
+	xStackId   *int32
+	projectId  int32
+}
+
+// Numeric ID of the Grafana stack representing the request scope. - If the API is called with a *Personal API token*, the user must be a member of the specified stack. - If the API is called with a *Grafana Stack API token*, the value must be the ID of the corresponding stack.
+func (r *ApiProjectsLabelsListRequest) XStackId(xStackId int32) *ApiProjectsLabelsListRequest {
+	r.xStackId = &xStackId
+	return r
+}
+
+func (r *ApiProjectsLabelsListRequest) Execute() (*ProjectLabelListResponse, *http.Response, error) {
+	return r.ApiService.ProjectsLabelsListExecute(r)
+}
+
+/*
+ProjectsLabelsList List project labels.
+
+List all labels on a project.
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param projectId ID of the project.
+	@return *ApiProjectsLabelsListRequest
+*/
+func (a *LabelsAPIService) ProjectsLabelsList(ctx context.Context, projectId int32) *ApiProjectsLabelsListRequest {
+	return &ApiProjectsLabelsListRequest{
+		ApiService: a,
+		ctx:        ctx,
+		projectId:  projectId,
 	}
 }
 
 // Execute executes the request
 //
-//	@return ScheduleApiModel
-func (a *SchedulesAPIService) SchedulesRetrieveExecute(r *ApiSchedulesRetrieveRequest) (*ScheduleApiModel, *http.Response, error) {
+//	@return ProjectLabelListResponse
+func (a *LabelsAPIService) ProjectsLabelsListExecute(r *ApiProjectsLabelsListRequest) (*ProjectLabelListResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod  = http.MethodGet
 		localVarPostBody    interface{}
 		formFiles           []formFile
-		localVarReturnValue *ScheduleApiModel
+		localVarReturnValue *ProjectLabelListResponse
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "SchedulesAPIService.SchedulesRetrieve")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "LabelsAPIService.ProjectsLabelsList")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/cloud/v6/schedules/{id}"
-	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
+	localVarPath := localBasePath + "/cloud/v6/projects/{project_id}/labels"
+	localVarPath = strings.Replace(localVarPath, "{"+"project_id"+"}", url.PathEscape(parameterValueToString(r.projectId, "projectId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -1133,6 +955,199 @@ func (a *SchedulesAPIService) SchedulesRetrieveExecute(r *ApiSchedulesRetrieveRe
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 404 {
+			var v ErrorResponseApiModel
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v ErrorResponseApiModel
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiProjectsLabelsUpdateRequest struct {
+	ctx                    context.Context
+	ApiService             *LabelsAPIService
+	xStackId               *int32
+	projectId              int32
+	projectLabelPutRequest *ProjectLabelPutRequest
+}
+
+// Numeric ID of the Grafana stack representing the request scope. - If the API is called with a *Personal API token*, the user must be a member of the specified stack. - If the API is called with a *Grafana Stack API token*, the value must be the ID of the corresponding stack.
+func (r *ApiProjectsLabelsUpdateRequest) XStackId(xStackId int32) *ApiProjectsLabelsUpdateRequest {
+	r.xStackId = &xStackId
+	return r
+}
+
+func (r *ApiProjectsLabelsUpdateRequest) ProjectLabelPutRequest(projectLabelPutRequest *ProjectLabelPutRequest) *ApiProjectsLabelsUpdateRequest {
+	r.projectLabelPutRequest = projectLabelPutRequest
+	return r
+}
+
+func (r *ApiProjectsLabelsUpdateRequest) Execute() (*ProjectLabelPutResponse, *http.Response, error) {
+	return r.ApiService.ProjectsLabelsUpdateExecute(r)
+}
+
+/*
+ProjectsLabelsUpdate Replace project labels.
+
+Replace labels on a project (Admin or Editor).
+
+This is a full replacement operation.
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param projectId ID of the project.
+	@return *ApiProjectsLabelsUpdateRequest
+*/
+func (a *LabelsAPIService) ProjectsLabelsUpdate(ctx context.Context, projectId int32) *ApiProjectsLabelsUpdateRequest {
+	return &ApiProjectsLabelsUpdateRequest{
+		ApiService: a,
+		ctx:        ctx,
+		projectId:  projectId,
+	}
+}
+
+// Execute executes the request
+//
+//	@return ProjectLabelPutResponse
+func (a *LabelsAPIService) ProjectsLabelsUpdateExecute(r *ApiProjectsLabelsUpdateRequest) (*ProjectLabelPutResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodPut
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *ProjectLabelPutResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "LabelsAPIService.ProjectsLabelsUpdate")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/cloud/v6/projects/{project_id}/labels"
+	localVarPath = strings.Replace(localVarPath, "{"+"project_id"+"}", url.PathEscape(parameterValueToString(r.projectId, "projectId")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.xStackId == nil {
+		return localVarReturnValue, nil, reportError("xStackId is required and must be specified")
+	}
+	if r.projectLabelPutRequest == nil {
+		return localVarReturnValue, nil, reportError("projectLabelPutRequest is required and must be specified")
+	}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{"application/json"}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	parameterAddToHeaderOrQuery(localVarHeaderParams, "X-Stack-Id", r.xStackId, "simple", "")
+	// body params
+	localVarPostBody = r.projectLabelPutRequest
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 400 {
+			var v ErrorResponseApiModel
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 401 {
+			var v ErrorResponseApiModel
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 403 {
+			var v ErrorResponseApiModel
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 404 {
+			var v ErrorResponseApiModel
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 409 {
 			var v ErrorResponseApiModel
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
