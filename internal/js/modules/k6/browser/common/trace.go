@@ -7,7 +7,7 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 
-	browsertrace "go.k6.io/k6/internal/js/modules/k6/browser/trace"
+	browsertrace "go.k6.io/k6/v2/internal/js/modules/k6/browser/trace"
 )
 
 // Tracer defines the interface with the tracing methods used in the common package.

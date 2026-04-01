@@ -2,9 +2,9 @@ package secretsource
 
 import (
 	"github.com/sirupsen/logrus"
-	"go.k6.io/k6/ext"
-	"go.k6.io/k6/internal/usage"
-	"go.k6.io/k6/lib/fsext"
+	"go.k6.io/k6/v2/ext"
+	"go.k6.io/k6/v2/internal/usage"
+	"go.k6.io/k6/v2/lib/fsext"
 )
 
 // Constructor returns an instance of a secret source extension module.

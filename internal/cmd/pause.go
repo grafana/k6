@@ -4,9 +4,9 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/guregu/null.v3"
 
-	v1 "go.k6.io/k6/api/v1"
-	"go.k6.io/k6/api/v1/client"
-	"go.k6.io/k6/cmd/state"
+	v1 "go.k6.io/k6/v2/api/v1"
+	"go.k6.io/k6/v2/api/v1/client"
+	"go.k6.io/k6/v2/cmd/state"
 )
 
 func getCmdPause(gs *state.GlobalState) *cobra.Command {

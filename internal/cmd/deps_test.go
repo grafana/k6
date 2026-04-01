@@ -10,8 +10,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"go.k6.io/k6/internal/cmd/tests"
-	"go.k6.io/k6/internal/lib/testutils"
+	"go.k6.io/k6/v2/internal/cmd/tests"
+	"go.k6.io/k6/v2/internal/lib/testutils"
 )
 
 func TestGetCmdDeps(t *testing.T) {
@@ -117,9 +117,9 @@ export default function () {
 }
 `),
 			},
-			manifest:          `{"k6": ">=1.6.0"}`,
-			expectedDeps:      map[string]string{"k6": ">=1.6.0"},
-			expectCustomBuild: false, // current k6 version satisfies >=1.6.0
+			manifest:          `{"k6": ">=2.0.0-0"}`, // using -0 to match prereleases
+			expectedDeps:      map[string]string{"k6": ">=2.0.0-0"},
+			expectCustomBuild: false, // current k6 version satisfies >=2.0.0-0
 			expectedImports:   []string{"/main.js", "k6/http"},
 		},
 	}
