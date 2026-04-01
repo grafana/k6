@@ -14,7 +14,7 @@ import (
 // padding.
 func createTestProgressBars(num, padding, colIdx int) []*pb.ProgressBar {
 	pbs := make([]*pb.ProgressBar, num)
-	for i := 0; i < num; i++ {
+	for i := range num {
 		left := fmt.Sprintf("left %d", i)
 		rightCol1 := fmt.Sprintf("right %d", i)
 		progress := 0.0

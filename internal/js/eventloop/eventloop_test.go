@@ -91,7 +91,7 @@ func TestEventLoopAllCallbacksGetCalled(t *testing.T) {
 	loop := eventloop.New(&modulestest.VU{RuntimeField: sobek.New()})
 	var called int64
 	f := func() error {
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			bad := i == 99
 			r := loop.RegisterCallback()
 
@@ -110,7 +110,7 @@ func TestEventLoopAllCallbacksGetCalled(t *testing.T) {
 		}
 		return fmt.Errorf("expected")
 	}
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		called = 0
 		start := time.Now()
 		require.Error(t, loop.Start(f))

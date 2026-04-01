@@ -137,7 +137,7 @@ export default function() {};`
 			body, err := io.ReadAll(req.Body)
 			require.NoError(t, err)
 
-			var payload map[string]interface{}
+			var payload map[string]any
 			err = json.Unmarshal(body, &payload)
 			require.NoError(t, err)
 

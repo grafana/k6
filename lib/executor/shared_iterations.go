@@ -261,7 +261,7 @@ func (si SharedIterations) Run(parentCtx context.Context, out chan<- metrics.Sam
 		}
 	}
 
-	for i := int64(0); i < numVUs; i++ {
+	for range numVUs {
 		initVU, err := si.executionState.GetPlannedVU(si.logger, true)
 		if err != nil {
 			cancel()

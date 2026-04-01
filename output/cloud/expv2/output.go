@@ -228,10 +228,7 @@ func (o *Output) AddMetricSamples(s []metrics.SampleContainer) {
 }
 
 func (o *Output) periodicInvoke(d time.Duration, callback func()) {
-	o.wg.Add(1)
-	go func() {
-		defer o.wg.Done()
-
+	o.wg.Go(func() {
 		t := time.NewTicker(d)
 		defer t.Stop()
 		for {
@@ -244,7 +241,7 @@ func (o *Output) periodicInvoke(d time.Duration, callback func()) {
 				return
 			}
 		}
-	}()
+	})
 }
 
 func (o *Output) collectSamples() {
@@ -273,9 +270,7 @@ func (o *Output) runFlushRequestMetadatas() {
 	t := time.NewTicker(o.config.TracesPushInterval.TimeDuration())
 
 	for i := int64(0); i < o.config.TracesPushConcurrency.Int64; i++ {
-		o.wg.Add(1)
-		go func() {
-			defer o.wg.Done()
+		o.wg.Go(func() {
 			defer t.Stop()
 
 			for {
@@ -288,7 +283,7 @@ func (o *Output) runFlushRequestMetadatas() {
 					return
 				}
 			}
-		}()
+		})
 	}
 }
 

@@ -192,10 +192,11 @@ func getCmdVersion(gs *state.GlobalState) *cobra.Command {
 	versionCmd := &versionCmd{gs: gs}
 
 	cmd := &cobra.Command{
-		Use:   "version",
-		Short: "Show application version",
-		Long:  `Show the application version and exit.`,
-		RunE:  versionCmd.run,
+		Use:    "version",
+		Short:  "Show application version",
+		Long:   `Show the application version and exit.`,
+		Hidden: true,
+		RunE:   versionCmd.run,
 	}
 
 	cmd.Flags().BoolVar(&versionCmd.isJSON, "json", false, "if set, output version information will be in JSON format")

@@ -74,7 +74,7 @@ func TestConfigRemoteConfig(t *testing.T) {
 	exprcc := &remote.HTTPConfig{
 		Timeout: 5 * time.Second,
 		TLSConfig: &tls.Config{
-			InsecureSkipVerify: true, //nolint:gosec
+			InsecureSkipVerify: true,
 			MinVersion:         tls.VersionTLS13,
 		},
 		BasicAuth: &remote.BasicAuth{
@@ -429,7 +429,7 @@ func TestTLSMinVersion(t *testing.T) {
 
 			exprcc := &remote.HTTPConfig{
 				Timeout: 5 * time.Second,
-				TLSConfig: &tls.Config{ //nolint:gosec
+				TLSConfig: &tls.Config{
 					InsecureSkipVerify: false,
 					MinVersion:         tc.wantRccTLS,
 				},

@@ -20,10 +20,10 @@ const (
 )
 
 // JsonWebKey represents a JSON Web Key (JsonWebKey) key.
-type JsonWebKey map[string]interface{} //nolint:revive // we name this type JsonWebKey to match the spec
+type JsonWebKey map[string]any //nolint:revive // we name this type JsonWebKey to match the spec
 
 // Set sets a key-value pair in the JWK.
-func (jwk *JsonWebKey) Set(key string, value interface{}) {
+func (jwk *JsonWebKey) Set(key string, value any) {
 	(*jwk)[key] = value
 }
 
@@ -165,7 +165,7 @@ func padLeft(bytes []byte, size int) []byte {
 	return append(padding, bytes...) //nolint:makezero // we need to pad with zeros
 }
 
-func exportECJWK(key *CryptoKey) (interface{}, error) {
+func exportECJWK(key *CryptoKey) (any, error) {
 	exported := &JsonWebKey{}
 	exported.Set("kty", JWKECKeyType)
 
@@ -400,7 +400,7 @@ func importRSAJWK(jsonKeyData []byte) (any, CryptoKeyType, int, error) {
 	return privKey, PrivateCryptoKeyType, pubKey.N.BitLen(), nil
 }
 
-func exportRSAJWK(key *CryptoKey) (interface{}, error) {
+func exportRSAJWK(key *CryptoKey) (any, error) {
 	exported := &JsonWebKey{}
 	exported.Set("kty", "RSA")
 

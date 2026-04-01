@@ -162,7 +162,7 @@ func echoHandler(t testing.TB, closePrematurely bool) http.Handler {
 	})
 }
 
-func writeJSON(w io.Writer, v interface{}) error {
+func writeJSON(w io.Writer, v any) error {
 	e := json.NewEncoder(w)
 	e.SetIndent("", "  ")
 	if err := e.Encode(v); err != nil {

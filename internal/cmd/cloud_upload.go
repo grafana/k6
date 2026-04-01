@@ -26,18 +26,13 @@ func getCmdCloudUpload(cloudCmd *cmdCloud) *cobra.Command {
 
 	// uploadCloudCommand represents the 'cloud upload' command
 	exampleText := getExampleText(cloudCmd.gs, `
-  # Upload the test script and its resources to the Grafana Cloud k6 without actually starting a test run
+  # Upload a test to Grafana Cloud without running it
   $ {{.}} cloud upload script.js`[1:])
 
 	uploadCloudCommand := &cobra.Command{
-		Use:   cloudUploadCommandName,
-		Short: "Upload the test script to the Grafana Cloud k6",
-		Long: `Upload the test script and its resources to the Grafana Cloud k6.
-
-This will upload the test script and its resources to the Grafana Cloud k6 service. 
-Using this command requires to be authenticated against the Grafana Cloud k6. 
-Use the "k6 cloud login" command to authenticate.
-`,
+		Use:     cloudUploadCommandName,
+		Short:   "Upload a test to Grafana Cloud",
+		Long:    "Upload a test to Grafana Cloud without running it. Requires authentication via \"k6 cloud login\".",
 		Example: exampleText,
 		Args:    exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
 		PreRunE: c.preRun,

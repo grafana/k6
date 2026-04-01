@@ -32,7 +32,7 @@ func getCmdCloudLogin(gs *state.GlobalState) *cobra.Command {
 
 	// loginCloudCommand represents the 'cloud login' command
 	exampleText := getExampleText(gs, `
-  # Authenticate interactively with Grafana Cloud k6
+  # Authenticate interactively with Grafana Cloud
   $ {{.}} cloud login
 
   # Store a token in k6's persistent configuration
@@ -48,15 +48,9 @@ func getCmdCloudLogin(gs *state.GlobalState) *cobra.Command {
   $ {{.}} cloud login -r`[1:])
 
 	loginCloudCommand := &cobra.Command{
-		Use:   cloudLoginCommandName,
-		Short: "Authenticate with Grafana Cloud k6",
-		Long: `Authenticate with Grafana Cloud k6.
-
-This command will authenticate you with Grafana Cloud k6.
-Once authenticated you can start running tests in the cloud by using the "k6 cloud run"
-command, or by executing a test locally and outputting samples to the cloud using
-the "k6 run -o cloud" command.
-`,
+		Use:     cloudLoginCommandName,
+		Short:   "Authenticate with Grafana Cloud",
+		Long:    "Authenticate with Grafana Cloud. Required before running cloud tests.",
 		Example: exampleText,
 		Args:    cobra.NoArgs,
 		RunE:    c.run,
@@ -74,13 +68,6 @@ the "k6 run -o cloud" command.
 //
 //nolint:funlen
 func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
-	if !checkIfMigrationCompleted(c.globalState) {
-		err := migrateLegacyConfigFileIfAny(c.globalState)
-		if err != nil {
-			return err
-		}
-	}
-
 	currentDiskConf, err := readDiskConfig(c.globalState)
 	if err != nil {
 		return err
@@ -124,8 +111,8 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 
 		/* Token form */
 		tokenForm := ui.Form{
-			Banner: "Enter your token to authenticate with Grafana Cloud k6.\n" +
-				"Please, consult the Grafana Cloud k6 documentation for instructions on how to generate one:\n" +
+			Banner: "Enter your token to authenticate with Grafana Cloud.\n" +
+				"Please, consult the documentation for instructions on how to generate one:\n" +
 				"https://grafana.com/docs/grafana-cloud/testing/k6/author-run/tokens-and-cli-authentication",
 			Fields: []ui.Field{
 				ui.PasswordField{
@@ -229,7 +216,7 @@ func validateInputs(
 ) error {
 	config.Token = token
 	consolidatedCurrentConfig, warn, err := cloudapi.GetConsolidatedConfig(
-		rawConfig, gs.Env, "", nil, nil)
+		rawConfig, gs.Env, "", nil)
 	if err != nil {
 		return err
 	}
@@ -243,7 +230,7 @@ func validateInputs(
 			gs, consolidatedCurrentConfig, token.String, stackValue)
 		if err != nil {
 			return fmt.Errorf(
-				"your stack is invalid - please, consult the Grafana Cloud k6 documentation "+
+				"your stack is invalid - please, consult the documentation "+
 					"for instructions on how to get yours: "+
 					"https://grafana.com/docs/grafana-cloud/testing/k6/author-run/configure-stack. "+
 					"Error details: %w",
@@ -263,6 +250,7 @@ func validateInputs(
 }
 
 // validateTokenV1 validates a token using v1 cloud API.
+//
 // Deprecated: use validateTokenV6 instead if a stack name is provided.
 func validateTokenV1(gs *state.GlobalState, config cloudapi.Config, token string) error {
 	client := cloudapi.NewClient(
@@ -280,7 +268,7 @@ func validateTokenV1(gs *state.GlobalState, config cloudapi.Config, token string
 
 	if !res.IsValid {
 		return errors.New("your API token is invalid - " +
-			"please, consult the Grafana Cloud k6 documentation for instructions on how to generate a new one:\n" +
+			"please, consult the documentation for instructions on how to generate a new one:\n" +
 			"https://grafana.com/docs/grafana-cloud/testing/k6/author-run/tokens-and-cli-authentication")
 	}
 

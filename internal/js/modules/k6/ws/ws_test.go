@@ -776,7 +776,7 @@ func TestTLSConfig(t *testing.T) {
 
 		test := newTestState(t)
 		test.VU.StateField.TLSConfig = &tls.Config{
-			InsecureSkipVerify: true, //nolint:gosec
+			InsecureSkipVerify: true,
 		}
 
 		_, err := test.VU.Runtime().RunString(sr(`

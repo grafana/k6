@@ -15,6 +15,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -32,7 +33,6 @@ import (
 	"go.k6.io/k6/internal/usage"
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/js/modulestest"
-	"go.k6.io/k6/lib"
 )
 
 const (
@@ -284,7 +284,7 @@ type tc39TestCtx struct {
 	errorsLock sync.Mutex
 	errors     map[string]string
 
-	compatibilityMode lib.CompatibilityMode
+	stripTypes bool
 }
 
 type TC39MetaNegative struct {
@@ -302,16 +302,11 @@ type tc39Meta struct {
 }
 
 func (m *tc39Meta) hasFlag(flag string) bool {
-	for _, f := range m.Flags {
-		if f == flag {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(m.Flags, flag)
 }
 
 func parseTC39File(name string) (*tc39Meta, string, error) {
-	f, err := os.Open(name) //nolint:gosec
+	f, err := os.Open(name)
 	if err != nil {
 		return nil, "", err
 	}
@@ -382,7 +377,7 @@ func (ctx *tc39TestCtx) runTC39Test(t testing.TB, name, src string, meta *tc39Me
 	if skipList[name] {
 		t.Skip("Excluded")
 	}
-	failf := func(str string, args ...interface{}) {
+	failf := func(str string, args ...any) {
 		str = fmt.Sprintf(str, args...)
 		ctx.fail(t, name, strict, str)
 	}
@@ -498,7 +493,7 @@ func (ctx *tc39TestCtx) runTC39Test(t testing.TB, name, src string, meta *tc39Me
 	}
 }
 
-func getErrType(name string, err error, failf func(str string, args ...interface{})) string {
+func getErrType(name string, err error, failf func(str string, args ...any)) string {
 	switch err := err.(type) { //nolint:errorlint
 	case *sobek.Exception:
 		if o, ok := err.Value().(*sobek.Object); ok {
@@ -581,8 +576,8 @@ func (ctx *tc39TestCtx) runTC39File(name string, t testing.TB) {
 	}
 }
 
-func breakingTestErrorsFilename(compatibilityMode lib.CompatibilityMode) string {
-	return fmt.Sprintf("./breaking_test_errors-%s.json", compatibilityMode)
+func breakingTestErrorsFilename(stripTypes bool) string {
+	return fmt.Sprintf("./breaking_test_errors-stripTypes=%t.json", stripTypes)
 }
 
 func (ctx *tc39TestCtx) init() {
@@ -590,7 +585,7 @@ func (ctx *tc39TestCtx) init() {
 	ctx.errors = make(map[string]string)
 
 	if !*update {
-		b, err := os.ReadFile(breakingTestErrorsFilename(ctx.compatibilityMode))
+		b, err := os.ReadFile(breakingTestErrorsFilename(ctx.stripTypes))
 		if err != nil {
 			panic(err)
 		}
@@ -612,7 +607,7 @@ func (ctx *tc39TestCtx) compile(base, name string) (*sobek.Program, error) {
 	prg := ctx.prgCache[name]
 	if prg == nil {
 		fname := path.Join(base, name)
-		f, err := os.Open(fname) //nolint:gosec
+		f, err := os.Open(fname)
 		if err != nil {
 			return nil, err
 		}
@@ -623,7 +618,7 @@ func (ctx *tc39TestCtx) compile(base, name string) (*sobek.Program, error) {
 			return nil, err
 		}
 
-		prg, err = ctx.compileOnly(string(b), name, ctx.compatibilityMode)
+		prg, err = ctx.compileOnly(string(b), name, ctx.stripTypes)
 		if err != nil {
 			return nil, err
 		}
@@ -642,9 +637,9 @@ func (ctx *tc39TestCtx) runFile(base, name string, vm *sobek.Runtime) error {
 	return err
 }
 
-func (ctx *tc39TestCtx) compileOnly(src, name string, compatibilityMode lib.CompatibilityMode) (*sobek.Program, error) {
+func (ctx *tc39TestCtx) compileOnly(src, name string, stripTypes bool) (*sobek.Program, error) {
 	comp := ctx.compiler()
-	if compatibilityMode == lib.CompatibilityModeExperimentalEnhanced {
+	if stripTypes {
 		code, _, err := compiler.StripTypes(src, name)
 		if err != nil {
 			return nil, err
@@ -681,9 +676,9 @@ func (ctx *tc39TestCtx) runTC39Script(name, src string, includes []string, vm *s
 		}
 	}
 
-	p, err := ctx.compileOnly(src, name, lib.CompatibilityModeBase)
+	p, err := ctx.compileOnly(src, name, false)
 	if err != nil && !expectsError {
-		p, err = ctx.compileOnly(src, name, lib.CompatibilityModeExtended)
+		p, err = ctx.compileOnly(src, name, false)
 	}
 	if err != nil {
 		return early, err
@@ -722,7 +717,7 @@ func (ctx *tc39TestCtx) runTC39Module(name, src string, includes []string, vm *s
 		func(specifier *url.URL, _ string) ([]byte, error) {
 			b, err := fs.ReadFile(os.DirFS("."), specifier.Path[1:])
 
-			if ctx.compatibilityMode == lib.CompatibilityModeExperimentalEnhanced {
+			if ctx.stripTypes {
 				code, _, err := compiler.StripTypes(string(b), name)
 				if err != nil {
 					return nil, err
@@ -796,11 +791,11 @@ func TestTC39(t *testing.T) {
 		t.Skip()
 	}
 
-	runTestTC39(t, lib.CompatibilityModeExtended)
-	runTestTC39(t, lib.CompatibilityModeExperimentalEnhanced)
+	runTestTC39(t, false)
+	runTestTC39(t, true)
 }
 
-func runTestTC39(t *testing.T, compatibilityMode lib.CompatibilityMode) {
+func runTestTC39(t *testing.T, stripTypes bool) {
 	t.Helper()
 
 	if _, err := os.Stat(tc39BASE); err != nil {
@@ -808,8 +803,8 @@ func runTestTC39(t *testing.T, compatibilityMode lib.CompatibilityMode) {
 	}
 
 	ctx := &tc39TestCtx{
-		base:              tc39BASE,
-		compatibilityMode: compatibilityMode,
+		base:       tc39BASE,
+		stripTypes: stripTypes,
 	}
 	ctx.init()
 	// ctx.enableBench = true
@@ -837,7 +832,7 @@ func runTestTC39(t *testing.T, compatibilityMode lib.CompatibilityMode) {
 		}
 	}
 	if len(ctx.errors) > 0 && *update {
-		filename := breakingTestErrorsFilename(ctx.compatibilityMode)
+		filename := breakingTestErrorsFilename(ctx.stripTypes)
 		file, err := os.Create(filepath.Clean(filename))
 		if err != nil {
 			t.Logf("Error while creating %s: %s", filename, err)

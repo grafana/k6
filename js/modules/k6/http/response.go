@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/url"
 	"strings"
@@ -21,7 +22,7 @@ type Response struct {
 	*httpext.Response `js:"-"`
 	client            *Client
 
-	cachedJSON    interface{}
+	cachedJSON    any
 	validatedJSON bool
 }
 
@@ -73,7 +74,7 @@ func (res *Response) JSON(selector ...string) sobek.Value {
 
 	hasSelector := len(selector) > 0
 	if res.cachedJSON == nil || hasSelector { //nolint:nestif
-		var v interface{}
+		var v any
 
 		body, err := common.ToBytes(res.Body)
 		if err != nil {
@@ -213,9 +214,7 @@ func (res *Response) SubmitForm(args ...sobek.Value) (*Response, error) {
 	}
 
 	// Set the values supplied in the arguments, overriding automatically set values
-	for k, v := range fields {
-		values[k] = v
-	}
+	maps.Copy(values, fields)
 
 	if requestMethod == http.MethodGet {
 		q := url.Values{}

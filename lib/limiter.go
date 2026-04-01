@@ -14,7 +14,7 @@ func NewSlotLimiter(slots int) SlotLimiter {
 	}
 
 	ch := make(chan struct{}, slots)
-	for i := 0; i < slots; i++ {
+	for range slots {
 		ch <- struct{}{}
 	}
 	return ch

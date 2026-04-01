@@ -296,6 +296,12 @@ func collectTestDependencies(
 		return nil, err
 	}
 
+	// Ensure k6 is always a dependency with "*" constraint by default.
+	// This can be overridden by "use k6" or "use k6 with k6/x/..." directives in the script.
+	if _, ok := deps["k6"]; !ok {
+		deps["k6"] = nil
+	}
+
 	if err := analyseUseContraints(imports, fileSystems, deps); err != nil {
 		return nil, err
 	}
@@ -538,14 +544,6 @@ func (lct *loadedAndConfiguredTest) buildTestRunState(
 	// This might be the full derived or just the consolidated options
 	if err := lct.initRunner.SetOptions(configToReinject); err != nil {
 		return nil, err
-	}
-
-	// Here, where we get the consolidated options, is where we check if any
-	// of the deprecated options is being used, and we report it.
-	if _, isPresent := configToReinject.External["loadimpact"]; isPresent {
-		if err := lct.preInitState.Usage.Uint64("deprecations/options.ext.loadimpact", 1); err != nil {
-			return nil, err
-		}
 	}
 
 	// it pre-loads system certificates to avoid doing it on the first TLS request.

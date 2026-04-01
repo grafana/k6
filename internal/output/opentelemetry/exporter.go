@@ -122,7 +122,7 @@ func buildGRPCExporter(
 
 func parseHeaders(raw string) (map[string]string, error) {
 	headers := make(map[string]string)
-	for _, header := range strings.Split(raw, ",") {
+	for header := range strings.SplitSeq(raw, ",") {
 		rawKey, rawValue, ok := strings.Cut(header, "=")
 		if !ok {
 			return nil, fmt.Errorf("invalid header %q, expected format key=value", header)

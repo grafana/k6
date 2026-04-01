@@ -25,12 +25,10 @@ import (
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/js/modules/k6/html"
 	"go.k6.io/k6/js/modules/k6/http"
-
-	"github.com/grafana/xk6-redis/redis"
 )
 
-func getInternalJSModules() map[string]interface{} {
-	return map[string]interface{}{
+func getInternalJSModules() map[string]any {
+	return map[string]any{
 		// Stable modules
 		"k6":             k6.New(),
 		"k6/browser":     browser.New(),
@@ -57,9 +55,9 @@ func getInternalJSModules() map[string]interface{} {
 		"k6/experimental/websockets": newWarnExperimentalModule(websockets.New(),
 			"k6/experimental/websockets is deprecated and will be removed in a future release."+
 				" Please use k6/websockets instead."),
-		"k6/experimental/redis": newWarnExperimentalModule(redis.New(),
-			"k6/experimental/redis has been deprecated and will be removed in future versions."+
-				" Please migrate to the new version by changing your import to 'k6/x/redis'."+
+		"k6/experimental/redis": newRemovedModule(
+			"k6/experimental/redis has been removed." +
+				" Please migrate to the new version by changing your import to 'k6/x/redis'." +
 				" Read more here: https://grafana.com/docs/k6/latest/javascript-api/k6-x-redis"),
 
 		// Removed modules
@@ -85,7 +83,7 @@ func getInternalJSModules() map[string]interface{} {
 	}
 }
 
-func getJSModules() map[string]interface{} {
+func getJSModules() map[string]any {
 	result := getInternalJSModules()
 	external := ext.Get(ext.JSExtension)
 

@@ -1,7 +1,6 @@
 package k6_test
 
 import (
-	"context"
 	"net/url"
 	"testing"
 	"time"
@@ -119,8 +118,7 @@ func TestSetupDataMarshalling(t *testing.T) {
 
 	samples := make(chan<- metrics.SampleContainer, 100)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	require.NoError(t, runner.Setup(ctx, samples))
 	initVU, err := runner.NewVU(ctx, 1, 1, samples)
 	require.NoError(t, err)

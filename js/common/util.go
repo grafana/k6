@@ -18,7 +18,7 @@ func Throw(rt *sobek.Runtime, err error) {
 }
 
 // GetReader tries to return an io.Reader value from an exported Sobek value.
-func GetReader(data interface{}) (io.Reader, error) {
+func GetReader(data any) (io.Reader, error) {
 	switch r := data.(type) {
 	case string:
 		return bytes.NewBufferString(r), nil
@@ -34,7 +34,7 @@ func GetReader(data interface{}) (io.Reader, error) {
 }
 
 // ToBytes tries to return a byte slice from compatible types.
-func ToBytes(data interface{}) ([]byte, error) {
+func ToBytes(data any) ([]byte, error) {
 	switch dt := data.(type) {
 	case []byte:
 		return dt, nil
@@ -48,7 +48,7 @@ func ToBytes(data interface{}) ([]byte, error) {
 }
 
 // ToString tries to return a string from compatible types.
-func ToString(data interface{}) (string, error) {
+func ToString(data any) (string, error) {
 	switch dt := data.(type) {
 	case []byte:
 		return string(dt), nil

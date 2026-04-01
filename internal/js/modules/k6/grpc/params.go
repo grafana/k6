@@ -79,7 +79,7 @@ func newMetadata(input sobek.Value) (metadata.MD, error) {
 
 	v := input.Export()
 
-	rawHeaders, ok := v.(map[string]interface{})
+	rawHeaders, ok := v.(map[string]any)
 	if !ok {
 		return md, errors.New("must be an object with key-value pairs")
 	}
@@ -130,7 +130,7 @@ type connectParams struct {
 	Timeout               time.Duration
 	MaxReceiveSize        int64
 	MaxSendSize           int64
-	TLS                   map[string]interface{}
+	TLS                   map[string]any
 	Authority             string
 }
 
@@ -217,9 +217,9 @@ func newConnectParams(vu modules.VU, input sobek.Value) (*connectParams, error) 
 	return result, nil
 }
 
-func parseConnectTLSParam(params *connectParams, v interface{}) error {
+func parseConnectTLSParam(params *connectParams, v any) error {
 	var ok bool
-	params.TLS, ok = v.(map[string]interface{})
+	params.TLS, ok = v.(map[string]any)
 
 	if !ok {
 		return fmt.Errorf("invalid tls value: '%#v', expected (optional) keys: cert, key, password, and cacerts", v)
@@ -241,8 +241,8 @@ func parseConnectTLSParam(params *connectParams, v interface{}) error {
 		}
 	}
 	if cacerts, cacertsok := params.TLS["cacerts"]; cacertsok {
-		var cacertsArray []interface{}
-		if cacertsArray, ok = cacerts.([]interface{}); ok {
+		var cacertsArray []any
+		if cacertsArray, ok = cacerts.([]any); ok {
 			for _, cacertsArrayEntry := range cacertsArray {
 				if _, ok = cacertsArrayEntry.(string); !ok {
 					return fmt.Errorf("invalid tls cacerts value: '%#v',"+

@@ -69,7 +69,7 @@ func TestVersionJSONSubCommand(t *testing.T) {
 	assert.NotEmpty(t, stdout)
 
 	// try to unmarshal the JSON output
-	var details map[string]interface{}
+	var details map[string]any
 	err := json.Unmarshal([]byte(stdout), &details)
 	assert.NoError(t, err)
 

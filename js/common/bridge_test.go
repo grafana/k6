@@ -48,22 +48,22 @@ func TestFieldNameMapper(t *testing.T) {
 		Fields  map[string]string
 		Methods map[string]string
 	}{
-		{reflect.TypeOf(bridgeTestFieldsType{}), map[string]string{
+		{reflect.TypeFor[bridgeTestFieldsType](), map[string]string{
 			"Exported":       "exported",
 			"ExportedTag":    "renamed",
 			"ExportedHidden": "",
 			"unexported":     "",
 			"unexportedTag":  "",
 		}, nil},
-		{reflect.TypeOf(bridgeTestMethodsType{}), nil, map[string]string{
+		{reflect.TypeFor[bridgeTestMethodsType](), nil, map[string]string{
 			"ExportedFn":   "exportedFn",
 			"unexportedFn": "",
 		}},
-		{reflect.TypeOf(bridgeTestOddFieldsType{}), map[string]string{
+		{reflect.TypeFor[bridgeTestOddFieldsType](), map[string]string{
 			"TwoWords": "two_words",
 			"URL":      "url",
 		}, nil},
-		{reflect.TypeOf(bridgeTestConstructorType{}), nil, map[string]string{
+		{reflect.TypeFor[bridgeTestConstructorType](), nil, map[string]string{
 			"XConstructor": "Constructor",
 		}},
 	}
