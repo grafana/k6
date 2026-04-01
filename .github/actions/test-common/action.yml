@@ -34,8 +34,6 @@ runs:
         unzip go.zip -d $HOME/sdk
 
     - name: Install chromium
-      # This is only needed on arm images, chromium comes preinstalled on amd64 runner images.
-      if: ${{contains(inputs.platform, 'arm') }}
       shell: bash
       run: |
         sudo apt update && sudo apt install chromium-browser
