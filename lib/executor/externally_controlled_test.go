@@ -30,8 +30,11 @@ func TestExternallyControlledRun(t *testing.T) {
 
 	synctest.Test(t, func(t *testing.T) {
 		doneIters := new(uint64)
-		runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
-			time.Sleep(200 * time.Millisecond)
+		runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
+			select {
+			case <-ctx.Done():
+			case <-time.After(200 * time.Millisecond):
+			}
 			atomic.AddUint64(doneIters, 1)
 			return nil
 		})
