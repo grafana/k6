@@ -223,9 +223,7 @@ func (s *stream) writeData(wg *sync.WaitGroup) {
 
 	writeChannel := make(chan message)
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		for {
 			select {
 			case msg, ok := <-writeChannel:
@@ -265,7 +263,7 @@ func (s *stream) writeData(wg *sync.WaitGroup) {
 				return
 			}
 		}
-	}()
+	})
 
 	{
 		defer close(writeChannel)

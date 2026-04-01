@@ -11,8 +11,8 @@ import (
 	"unicode/utf8"
 
 	"github.com/fatih/color"
-	"github.com/grafana/xk6-dashboard/dashboard"
 	"github.com/sirupsen/logrus"
+	"go.k6.io/k6/internal/dashboard"
 	"golang.org/x/term"
 
 	"gopkg.in/yaml.v3"
