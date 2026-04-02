@@ -64,6 +64,9 @@ Examples:
 Documentation:
   # Look up the JavaScript API, examples, and best practices
   $ {{.CommandPath}} x docs
+
+  # Discover available k6 extensions
+  $ {{.CommandPath}} x explore
 {{if .HasAvailableSubCommands}}
 Use "{{.CommandPath}} [command] --help" for more information about a command.{{end}}
 `
