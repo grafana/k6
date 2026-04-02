@@ -108,9 +108,6 @@ github.com/chromedp/sysutil
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
 github.com/davecgh/go-spew/spew
-# github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f
-## explicit
-github.com/dgryski/go-rendezvous
 # github.com/dlclark/regexp2 v1.11.5
 ## explicit; go 1.13
 github.com/dlclark/regexp2
@@ -200,12 +197,9 @@ github.com/grafana/sobek/ftoa/internal/fast
 github.com/grafana/sobek/parser
 github.com/grafana/sobek/token
 github.com/grafana/sobek/unistring
-# github.com/grafana/xk6-dashboard v0.7.13
-## explicit; go 1.23.0
-github.com/grafana/xk6-dashboard/dashboard
-# github.com/grafana/xk6-redis v0.3.6
-## explicit; go 1.24.0
-github.com/grafana/xk6-redis/redis
+# github.com/grafana/xk6-dashboard-assets v0.1.2
+## explicit; go 1.24
+github.com/grafana/xk6-dashboard-assets
 # github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 ## explicit; go 1.14
 github.com/grpc-ecosystem/go-grpc-middleware/retry
@@ -257,7 +251,7 @@ github.com/klauspost/compress/s2
 github.com/klauspost/compress/snappy
 github.com/klauspost/compress/zstd
 github.com/klauspost/compress/zstd/internal/xxhash
-# github.com/mailru/easyjson v0.9.0
+# github.com/mailru/easyjson v0.9.1
 ## explicit; go 1.20
 github.com/mailru/easyjson
 github.com/mailru/easyjson/buffer
@@ -320,22 +314,6 @@ github.com/prometheus/procfs/internal/util
 # github.com/r3labs/sse/v2 v2.10.0
 ## explicit; go 1.13
 github.com/r3labs/sse/v2
-# github.com/redis/go-redis/v9 v9.17.2
-## explicit; go 1.18
-github.com/redis/go-redis/v9
-github.com/redis/go-redis/v9/auth
-github.com/redis/go-redis/v9/internal
-github.com/redis/go-redis/v9/internal/auth/streaming
-github.com/redis/go-redis/v9/internal/hashtag
-github.com/redis/go-redis/v9/internal/hscan
-github.com/redis/go-redis/v9/internal/interfaces
-github.com/redis/go-redis/v9/internal/maintnotifications/logs
-github.com/redis/go-redis/v9/internal/pool
-github.com/redis/go-redis/v9/internal/proto
-github.com/redis/go-redis/v9/internal/rand
-github.com/redis/go-redis/v9/internal/util
-github.com/redis/go-redis/v9/maintnotifications
-github.com/redis/go-redis/v9/push
 # github.com/serenize/snaker v0.0.0-20201027110005-a7ad2135616e
 ## explicit
 github.com/serenize/snaker
@@ -517,14 +495,14 @@ golang.org/x/text/unicode/rangetable
 # golang.org/x/time v0.14.0
 ## explicit; go 1.24.0
 golang.org/x/time/rate
-# google.golang.org/genproto/googleapis/api v0.0.0-20251029180050-ab9386a59fda
+# google.golang.org/genproto/googleapis/api v0.0.0-20251202230838-ff82c1b0f217
 ## explicit; go 1.24.0
 google.golang.org/genproto/googleapis/api/httpbody
-# google.golang.org/genproto/googleapis/rpc v0.0.0-20251029180050-ab9386a59fda
+# google.golang.org/genproto/googleapis/rpc v0.0.0-20251202230838-ff82c1b0f217
 ## explicit; go 1.24.0
 google.golang.org/genproto/googleapis/rpc/errdetails
 google.golang.org/genproto/googleapis/rpc/status
-# google.golang.org/grpc v1.78.0
+# google.golang.org/grpc v1.79.3
 ## explicit; go 1.24.0
 google.golang.org/grpc
 google.golang.org/grpc/attributes
@@ -554,6 +532,7 @@ google.golang.org/grpc/health/grpc_health_v1
 google.golang.org/grpc/internal
 google.golang.org/grpc/internal/backoff
 google.golang.org/grpc/internal/balancer/gracefulswitch
+google.golang.org/grpc/internal/balancer/weight
 google.golang.org/grpc/internal/balancerload
 google.golang.org/grpc/internal/binarylog
 google.golang.org/grpc/internal/buffer
