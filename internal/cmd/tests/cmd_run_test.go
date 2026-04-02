@@ -218,7 +218,7 @@ func TestWrongCliFlagIterations(t *testing.T) {
 	ts := NewGlobalTestState(t)
 	ts.CmdArgs = []string{"k6", "run", "--iterations", "foo", "-"}
 	ts.Stdin = bytes.NewBufferString(`export default function() {};`)
-	// TODO: check for exitcodes.InvalidConfig after https://github.com/loadimpact/k6/issues/883 is done...
+	// TODO: check for exitcodes.InvalidConfig after https://github.com/grafana/k6/issues/883 is done...
 	ts.ExpectedExitCode = -1
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 	assert.True(t, testutils.LogContains(ts.LoggerHook.Drain(), logrus.ErrorLevel, `invalid argument "foo"`))
@@ -821,9 +821,7 @@ func asyncWaitForStdoutAndRun(
 	t *testing.T, ts *GlobalTestState, attempts int, interval time.Duration, expText string, callback func(),
 ) {
 	wg := &sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		reachedCondition := false
 		for i := range attempts {
 			ts.OutMutex.Lock()
@@ -852,7 +850,7 @@ func asyncWaitForStdoutAndRun(
 			t, "expected output not found", "did not find the text '%s' in the process stdout after %d attempts (%s)",
 			expText, attempts, time.Duration(attempts)*interval,
 		)
-	}()
+	})
 
 	t.Cleanup(wg.Wait) // ensure the test waits for the goroutine to finish
 }
@@ -1891,58 +1889,6 @@ func TestRunWithCloudOutputOverrides(t *testing.T) {
 	assert.Contains(t, stdout, "iterations...........: 1")
 }
 
-func TestRunWithCloudOutputCustomConfigAndOverridesLegacyCloudOption(t *testing.T) {
-	t.Parallel()
-
-	script := `
-export const options = {
-  ext: {
-    loadimpact: {
-      name: 'Hello k6 Cloud!',
-      projectID: 123456,
-    },
-  },
-};
-
-export default function() {};`
-
-	ts := getSingleFileTestState(t, script, []string{"-v", "--log-output=stdout", "--out=cloud"}, 0)
-
-	configOverride := http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
-		b, err := io.ReadAll(req.Body)
-		require.NoError(t, err)
-
-		bjs := string(b)
-		assert.Contains(t, bjs, `"name":"Hello k6 Cloud!"`)
-		assert.Contains(t, bjs, `"project_id":123456`)
-
-		resp.WriteHeader(http.StatusOK)
-		_, err = fmt.Fprint(resp, `{
-			"reference_id": "1337",
-			"config": {
-				"webAppURL": "https://bogus.url",
-				"testRunDetails": "https://some.other.url/foo/tests/org/1337?bar=baz"
-			},
-			"logs": [
-				{"level": "debug", "message": "test debug message"},
-				{"level": "info", "message": "test message"}
-			]
-		}`)
-		assert.NoError(t, err)
-	})
-	srv := getCloudTestEndChecker(t, 1337, configOverride, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed)
-	ts.Env["K6_CLOUD_HOST"] = srv.URL
-
-	cmd.ExecuteWithGlobalState(ts.GlobalState)
-
-	stdout := ts.Stdout.String()
-	t.Log(stdout)
-	assert.Contains(t, stdout, "execution: local")
-	assert.Contains(t, stdout, "output: cloud (https://some.other.url/foo/tests/org/1337?bar=baz)")
-	assert.Contains(t, stdout, `level=debug msg="test debug message" output=cloud source=grafana-k6-cloud`)
-	assert.Contains(t, stdout, `level=info msg="test message" output=cloud source=grafana-k6-cloud`)
-}
-
 func TestRunWithCloudOutputCustomConfigAndOverrides(t *testing.T) {
 	t.Parallel()
 
@@ -2668,6 +2614,217 @@ func TestMultipleSecretSources(t *testing.T) {
 	assert.Contains(t, stderr, `level=info msg="***SECRET_REDACTED***" source=console`)
 	assert.Contains(t, stderr, `level=info msg="***SECRET_REDACTED***" ***SECRET_REDACTED***=console`)
 	assert.Contains(t, stderr, `level=info msg="trigger exception on wrong key" ***SECRET_REDACTED***=console`)
+}
+
+// TestK6SecretSourceEnvVar covers the K6_SECRET_SOURCE environment variable, which is
+// treated as a single complete source spec equivalent to one --secret-source flag value.
+func TestK6SecretSourceEnvVar(t *testing.T) {
+	t.Parallel()
+
+	// Script that reads two keys from the default secret source.
+	script := `
+		import secrets from "k6/secrets";
+		export default async () => {
+			const a = await secrets.get("cool");
+			const b = await secrets.get("else");
+			console.log(a);
+			console.log(b);
+		}
+	`
+
+	tests := []struct {
+		name             string
+		envVar           string
+		expectedExitCode int
+		contains         []string
+		notContains      []string
+	}{
+		{
+			name:        "basic mock source via env var",
+			envVar:      "mock=cool=something,else=other",
+			contains:    []string{`level=info msg="***SECRET_REDACTED***" source=console`},
+			notContains: []string{"level=error", "something", "other"},
+		},
+		{
+			name:             "empty env var is error",
+			envVar:           "",
+			expectedExitCode: -1,
+			contains:         []string{"couldn't parse secret source configuration \\\"\\\""},
+		},
+		{
+			name:             "whitespace-only env var is error",
+			envVar:           "   ",
+			expectedExitCode: -1,
+			contains:         []string{"couldn't parse secret source configuration \\\"   \\\""},
+		},
+		{
+			name:             "invalid source type gives clear error",
+			envVar:           "nonexistent=config",
+			expectedExitCode: -1,
+			contains:         []string{"no secret source for type", "nonexistent"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			ts := NewGlobalTestState(t)
+			require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(script), 0o644))
+			if tc.expectedExitCode != 0 {
+				ts.ExpectedExitCode = tc.expectedExitCode
+			}
+			ts.Env["K6_SECRET_SOURCE"] = tc.envVar
+			ts.CmdArgs = []string{"k6", "run", "script.js"}
+
+			ts.ReparseFlags()
+			cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+			stderr := ts.Stderr.String()
+			t.Log(stderr)
+			for _, s := range tc.contains {
+				assert.Contains(t, stderr, s)
+			}
+			for _, s := range tc.notContains {
+				assert.NotContains(t, stderr, s)
+			}
+		})
+	}
+
+	t.Run("file source via env var", func(t *testing.T) {
+		t.Parallel()
+		ts := NewGlobalTestState(t)
+		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(script), 0o644))
+		secretFile := filepath.Join(ts.Cwd, "secrets.env")
+		require.NoError(t, fsext.WriteFile(ts.FS, secretFile, []byte("cool=val1\nelse=val2\n"), 0o644))
+
+		ts.Env["K6_SECRET_SOURCE"] = "file=" + secretFile
+		ts.CmdArgs = []string{"k6", "run", "script.js"}
+
+		ts.ReparseFlags()
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stderr := ts.Stderr.String()
+		t.Log(stderr)
+		assert.NotContains(t, stderr, "level=error")
+		assert.Contains(t, stderr, `level=info msg="***SECRET_REDACTED***" source=console`)
+		assert.NotContains(t, stderr, "val1")
+		assert.NotContains(t, stderr, "val2")
+	})
+
+	t.Run("url source via env var", func(t *testing.T) {
+		t.Parallel()
+
+		// Spin up a local HTTP server that returns a plain-text secret.
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			// The key is the last path segment: /secrets/{key}
+			_, _ = w.Write([]byte("url-secret-value"))
+		}))
+		t.Cleanup(srv.Close)
+
+		ts := NewGlobalTestState(t)
+		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(script), 0o644))
+
+		ts.Env["K6_SECRET_SOURCE"] = fmt.Sprintf("url=urlTemplate=%s/secrets/{key},maxRetries=0", srv.URL)
+		ts.CmdArgs = []string{"k6", "run", "script.js"}
+		ts.ReparseFlags()
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stderr := ts.Stderr.String()
+		t.Log(stderr)
+		assert.NotContains(t, stderr, "level=error")
+		assert.Contains(t, stderr, `level=info msg="***SECRET_REDACTED***" source=console`)
+		assert.NotContains(t, stderr, "url-secret-value")
+	})
+
+	t.Run("entire env var value is one spec, commas within it are source arguments not separators", func(t *testing.T) {
+		// K6_SECRET_SOURCE is equivalent to a single --secret-source flag value —
+		// the whole string is one spec. Commas within it belong to the source's
+		// own argument syntax (e.g. mock=name=mysource,cool=val uses commas to
+		// separate name= and key=val arguments), not source-to-source separators.
+		t.Parallel()
+		namedScript := `
+			import secrets from "k6/secrets";
+			export default async () => {
+				const v = await secrets.source("mysource").get("cool");
+				console.log(v);
+			}
+		`
+		ts := NewGlobalTestState(t)
+		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(namedScript), 0o644))
+
+		ts.Env["K6_SECRET_SOURCE"] = "mock=name=mysource,cool=secretval"
+		ts.CmdArgs = []string{"k6", "run", "script.js"}
+
+		ts.ReparseFlags()
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stderr := ts.Stderr.String()
+		t.Log(stderr)
+		assert.NotContains(t, stderr, "level=error")
+		assert.Contains(t, stderr, `level=info msg="***SECRET_REDACTED***" source=console`)
+	})
+
+	t.Run("name= and default suffixes work via env var", func(t *testing.T) {
+		t.Parallel()
+		namedScript := `
+			import secrets from "k6/secrets";
+			export default async () => {
+				// access by explicit name
+				const a = await secrets.source("named").get("cool");
+				// access via default
+				const b = await secrets.get("cool");
+				console.log(a);
+				console.log(b);
+			}
+		`
+		ts := NewGlobalTestState(t)
+		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(namedScript), 0o644))
+
+		ts.Env["K6_SECRET_SOURCE"] = "mock=name=named,cool=secretval,default"
+		ts.CmdArgs = []string{"k6", "run", "script.js"}
+
+		ts.ReparseFlags()
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stderr := ts.Stderr.String()
+		t.Log(stderr)
+		assert.NotContains(t, stderr, "level=error")
+		assert.Contains(t, stderr, `level=info msg="***SECRET_REDACTED***" source=console`)
+	})
+
+	t.Run("cli flags overrides env variable", func(t *testing.T) {
+		t.Parallel()
+		multiScript := `
+			import secrets from "k6/secrets";
+			export default async () => {
+				let secondMissing = false;
+				try {
+					const a = await secrets.source("second").get("cool");
+				} catch (e) {
+					secondMissing = true
+				}
+				const b = await secrets.source("first").get("cool");
+				console.log(b);
+				console.log(secondMissing);
+			}
+		`
+		ts := NewGlobalTestState(t)
+		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(multiScript), 0o644))
+
+		ts.Env["K6_SECRET_SOURCE"] = "mock=name=second,cool=second-secret"
+		ts.CmdArgs = []string{"k6", "run", "--secret-source=mock=name=first,cool=first-secret", "script.js"}
+
+		ts.ReparseFlags()
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stderr := ts.Stderr.String()
+		t.Log(stderr)
+		assert.NotContains(t, stderr, "level=error")
+		// Both secrets are redacted in the output.
+		assert.Contains(t, stderr, `level=info msg="***SECRET_REDACTED***" source=console`)
+		// The boolean false is not a secret — it is logged as-is.
+		assert.Contains(t, stderr, `level=info msg=true source=console`)
+	})
 }
 
 func TestSummaryExport(t *testing.T) {

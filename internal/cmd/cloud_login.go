@@ -216,7 +216,7 @@ func validateInputs(
 ) error {
 	config.Token = token
 	consolidatedCurrentConfig, warn, err := cloudapi.GetConsolidatedConfig(
-		rawConfig, gs.Env, "", nil, nil)
+		rawConfig, gs.Env, "", nil)
 	if err != nil {
 		return err
 	}
