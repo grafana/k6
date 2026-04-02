@@ -7,6 +7,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -47,69 +48,75 @@ func TestSharedIterationsRun(t *testing.T) {
 // This is the reverse behavior of the PerVUIterations executor.
 func TestSharedIterationsRunVariableVU(t *testing.T) {
 	t.Parallel()
-	var (
-		result   sync.Map
-		slowVUID uint64
-	)
 
-	runner := simpleRunner(func(_ context.Context, state *lib.State) error {
-		time.Sleep(10 * time.Millisecond) // small wait to stabilize the test
-		// Pick one VU randomly and always slow it down.
-		sid := atomic.LoadUint64(&slowVUID)
-		if sid == uint64(0) {
-			atomic.StoreUint64(&slowVUID, state.VUID)
-		}
-		if sid == state.VUID {
-			time.Sleep(200 * time.Millisecond)
-		}
-		currIter, _ := result.LoadOrStore(state.VUID, uint64(0))
-		result.Store(state.VUID, currIter.(uint64)+1)
-		return nil
+	synctest.Test(t, func(t *testing.T) {
+		var (
+			result   sync.Map
+			slowVUID uint64
+		)
+
+		runner := simpleRunner(func(_ context.Context, state *lib.State) error {
+			time.Sleep(10 * time.Millisecond) // small wait to stabilize the test
+			// Pick one VU randomly and always slow it down.
+			sid := atomic.LoadUint64(&slowVUID)
+			if sid == uint64(0) {
+				atomic.StoreUint64(&slowVUID, state.VUID)
+			}
+			if sid == state.VUID {
+				time.Sleep(200 * time.Millisecond)
+			}
+			currIter, _ := result.LoadOrStore(state.VUID, uint64(0))
+			result.Store(state.VUID, currIter.(uint64)+1)
+			return nil
+		})
+
+		test := setupExecutorTest(t, "", "", lib.Options{}, runner, getTestSharedIterationsConfig())
+		defer test.cancel()
+
+		require.NoError(t, test.executor.Run(test.ctx, nil))
+
+		var totalIters uint64
+		result.Range(func(_, value any) bool {
+			totalIters += value.(uint64)
+			return true
+		})
+
+		// The slow VU should complete 2 iterations given these timings,
+		// while the rest should randomly complete the other 98 iterations.
+		val, ok := result.Load(slowVUID)
+		assert.True(t, ok)
+		assert.Equal(t, uint64(2), val)
+		assert.Equal(t, uint64(100), totalIters)
 	})
-
-	test := setupExecutorTest(t, "", "", lib.Options{}, runner, getTestSharedIterationsConfig())
-	defer test.cancel()
-
-	require.NoError(t, test.executor.Run(test.ctx, nil))
-
-	var totalIters uint64
-	result.Range(func(_, value any) bool {
-		totalIters += value.(uint64)
-		return true
-	})
-
-	// The slow VU should complete 2 iterations given these timings,
-	// while the rest should randomly complete the other 98 iterations.
-	val, ok := result.Load(slowVUID)
-	assert.True(t, ok)
-	assert.Equal(t, uint64(2), val)
-	assert.Equal(t, uint64(100), totalIters)
 }
 
 func TestSharedIterationsEmitDroppedIterations(t *testing.T) {
 	t.Parallel()
-	var count int64
 
-	runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
-		atomic.AddInt64(&count, 1)
-		<-ctx.Done()
-		return nil
+	synctest.Test(t, func(t *testing.T) {
+		var count int64
+
+		runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
+			atomic.AddInt64(&count, 1)
+			<-ctx.Done()
+			return nil
+		})
+
+		config := &SharedIterationsConfig{
+			VUs:         null.IntFrom(5),
+			Iterations:  null.IntFrom(100),
+			MaxDuration: types.NullDurationFrom(1 * time.Second),
+		}
+
+		test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
+		defer test.cancel()
+
+		engineOut := make(chan metrics.SampleContainer, 1000)
+		require.NoError(t, test.executor.Run(test.ctx, engineOut))
+		assert.Empty(t, test.logHook.Drain())
+		assert.Equal(t, int64(5), count)
+		assert.Equal(t, float64(95), sumMetricValues(engineOut, metrics.DroppedIterationsName))
 	})
-
-	config := &SharedIterationsConfig{
-		VUs:         null.IntFrom(5),
-		Iterations:  null.IntFrom(100),
-		MaxDuration: types.NullDurationFrom(1 * time.Second),
-	}
-
-	test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
-	defer test.cancel()
-
-	engineOut := make(chan metrics.SampleContainer, 1000)
-	require.NoError(t, test.executor.Run(test.ctx, engineOut))
-	assert.Empty(t, test.logHook.Drain())
-	assert.Equal(t, int64(5), count)
-	assert.Equal(t, float64(95), sumMetricValues(engineOut, metrics.DroppedIterationsName))
 }
 
 func TestSharedIterationsGlobalIters(t *testing.T) {
