@@ -170,13 +170,11 @@ func TestLokiFlushingOnStop(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	wg := new(sync.WaitGroup)
 	now := time.Now()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		err = h.Fire(&logrus.Entry{Time: now, Level: logrus.InfoLevel, Message: "test message"})
 		time.Sleep(time.Millisecond * 10)
 		cancel()
-	}()
+	})
 	h.Listen(ctx)
 	wg.Wait()
 	select {
@@ -206,13 +204,11 @@ func TestLokiHeaders(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	wg := new(sync.WaitGroup)
 	now := time.Now()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		err = h.Fire(&logrus.Entry{Time: now, Level: logrus.InfoLevel, Message: "test message"})
 		time.Sleep(time.Millisecond * 10)
 		cancel()
-	}()
+	})
 	h.Listen(ctx)
 	wg.Wait()
 
