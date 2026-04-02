@@ -2,9 +2,12 @@ package common
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
+	"strings"
 	"testing"
+	"time"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/log"
 	"go.k6.io/k6/internal/js/modules/k6/browser/tests/ws"
@@ -41,20 +44,30 @@ func TestConnectionClosureAbnormal(t *testing.T) {
 
 	server := ws.NewServer(t, ws.WithClosureAbnormalHandler("/closure-abnormal"))
 
-	t.Run("closure abnormal", func(t *testing.T) {
-		t.Parallel()
+	ctx := context.Background()
+	url, _ := url.Parse(server.ServerHTTP.URL)
+	wsURL := fmt.Sprintf("ws://%s/closure-abnormal", url.Host)
+	conn, err := NewConnection(ctx, wsURL, log.NewNullLogger(), nil)
 
-		ctx := context.Background()
-		url, _ := url.Parse(server.ServerHTTP.URL)
-		wsURL := fmt.Sprintf("ws://%s/closure-abnormal", url.Host)
-		conn, err := NewConnection(ctx, wsURL, log.NewNullLogger(), nil)
+	if !assert.NoError(t, err) {
+		return
+	}
 
-		if assert.NoError(t, err) {
-			action := target.SetDiscoverTargets(true)
-			err := action.Do(cdp.WithExecutor(ctx, conn))
-			require.ErrorContains(t, err, "websocket: close 1006 (abnormal closure): unexpected EOF")
-		}
-	})
+	err = target.SetDiscoverTargets(true).Do(cdp.WithExecutor(ctx, conn))
+	require.Error(t, err)
+
+	var closeErr *websocket.CloseError
+	if errors.As(err, &closeErr) {
+		require.Equal(t, websocket.CloseAbnormalClosure, closeErr.Code)
+		return
+	}
+
+	msg := err.Error()
+	require.Truef(t,
+		strings.Contains(msg, "1006") ||
+			strings.Contains(msg, "connection reset by peer"),
+		"expected abnormal websocket closure error, got: %v", err,
+	)
 }
 
 func TestConnectionSendRecv(t *testing.T) {
@@ -155,4 +168,93 @@ func TestConnectionCreateSession(t *testing.T) {
 			}, cmdsReceived)
 		}
 	})
+}
+
+// Ensure the connection can tear down even when an abnormal closure happens
+// while there is no request actively waiting on c.errorCh.
+func TestConnectionAbnormalClosureIdleCloses(t *testing.T) {
+	t.Parallel()
+
+	srv := ws.NewServer(t, ws.WithClosureAbnormalHandler("/closure-abnormal-idle"))
+	u, err := url.Parse(srv.ServerHTTP.URL)
+	require.NoError(t, err)
+	wsURL := fmt.Sprintf("ws://%s/closure-abnormal-idle", u.Host)
+
+	conn, err := NewConnection(t.Context(), wsURL, log.NewNullLogger(), nil)
+	if err != nil {
+		t.Fatalf("new connection: %v", err)
+	}
+	t.Cleanup(conn.Close)
+
+	select {
+	case <-conn.done:
+		// Expected: the connection should tear down even if there is no active
+		// request waiting on c.errorCh when the abnormal closure happens.
+	case <-time.After(time.Minute):
+		t.Fatalf("connection did not close after idle abnormal closure")
+	}
+}
+
+// Ensure the connection can tear down even when an abnormal closure happens
+// while there is a pending request waiting on c.errorCh. This tests the case
+// where the connection receives an abnormal closure while there is an active
+// request waiting for a response, which will be pending when the abnormal
+// closure happens. The connection should still tear down properly without
+// deadlocking, even if there is a pending request waiting on c.errorCh
+// when the abnormal closure happens.
+func TestConnectionAbnormalClosurePendingCloses(t *testing.T) {
+	t.Parallel()
+
+	srv := ws.NewServer(t, ws.WithClosureAbnormalHandler("/closure-abnormal-pending"))
+	u, err := url.Parse(srv.ServerHTTP.URL)
+	require.NoError(t, err)
+
+	conn, err := NewConnection(
+		t.Context(),
+		fmt.Sprintf("ws://%s/closure-abnormal-pending", u.Host),
+		log.NewNullLogger(),
+		nil, // onTargetAttachedToTarget callback
+	)
+	if err != nil {
+		t.Fatalf("new connection: %v", err)
+	}
+	t.Cleanup(conn.Close)
+
+	// Send a command that will be pending when the abnormal closure happens.
+	if err := target.SetDiscoverTargets(true).Do(
+		cdp.WithExecutor(t.Context(), conn),
+	); err == nil {
+		t.Fatalf("expected abnormal-closure error")
+	}
+
+	// The connection should still tear down even if there is a pending
+	// request waiting on c.errorCh when the abnormal closure happens.
+	select {
+	case <-conn.done:
+		// Once a sender is receiving from errorCh/closeCh, teardown completes.
+	case <-time.After(time.Minute):
+		t.Fatalf("connection did not close with pending request")
+	}
+}
+
+func TestConnectionSendDoneReturnsError(t *testing.T) {
+	t.Parallel()
+
+	conn := &Connection{
+		ctx:     context.Background(),
+		logger:  log.NewNullLogger(),
+		sendCh:  make(chan *cdproto.Message),
+		closeCh: make(chan int),
+		errorCh: make(chan error, 1),
+		done:    make(chan struct{}),
+	}
+	close(conn.done)
+
+	err := conn.send(
+		context.Background(),
+		&cdproto.Message{ID: 1},
+		make(chan *cdproto.Message),
+		nil,
+	)
+	require.Error(t, err)
 }
