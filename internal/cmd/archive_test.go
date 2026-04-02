@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/internal/cmd/tests"
 	"go.k6.io/k6/internal/lib/testutils"
@@ -121,60 +122,6 @@ func TestArchiveContainsEnv(t *testing.T) {
 
 	require.Equal(t, "lorem", metadata.Env["ENV1"])
 	require.Equal(t, "ipsum", metadata.Env["ENV2"])
-}
-
-func TestArchiveContainsLegacyCloudSettings(t *testing.T) {
-	t.Parallel()
-
-	// given a script with the cloud options
-	fileName := "script.js"
-	testScript := []byte(`
-		export let options = {
-			ext: {
-				loadimpact: {
-					distribution: {
-						one: { loadZone: 'amazon:us:ashburn', percent: 30 },
-						two: { loadZone: 'amazon:ie:dublin', percent: 70 },
-					},
-				},
-			},
-		};
-		export default function () {}
-	`)
-	ts := tests.NewGlobalTestState(t)
-	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, fileName), testScript, 0o644))
-
-	// when we do archiving
-	ts.CmdArgs = []string{"k6", "archive", fileName}
-
-	newRootCommand(ts.GlobalState).execute()
-	require.NoError(t, testutils.Untar(t, ts.FS, "archive.tar", "tmp/"))
-
-	data, err := fsext.ReadFile(ts.FS, "tmp/metadata.json")
-	require.NoError(t, err)
-
-	// we just need some basic struct
-	metadata := struct {
-		Options struct {
-			Ext struct {
-				LoadImpact struct {
-					Distribution map[string]struct {
-						LoadZone string  `json:"loadZone"`
-						Percent  float64 `json:"percent"`
-					} `json:"distribution"`
-				} `json:"loadimpact"`
-			} `json:"ext"`
-		} `json:"options"`
-	}{}
-
-	// then unpacked metadata should contain a ext.loadimpact struct the proper values
-	require.NoError(t, json.Unmarshal(data, &metadata))
-	require.Len(t, metadata.Options.Ext.LoadImpact.Distribution, 2)
-
-	require.Equal(t, "amazon:us:ashburn", metadata.Options.Ext.LoadImpact.Distribution["one"].LoadZone)
-	require.Equal(t, 30., metadata.Options.Ext.LoadImpact.Distribution["one"].Percent)
-	require.Equal(t, "amazon:ie:dublin", metadata.Options.Ext.LoadImpact.Distribution["two"].LoadZone)
-	require.Equal(t, 70., metadata.Options.Ext.LoadImpact.Distribution["two"].Percent)
 }
 
 func TestArchiveContainsCloudSettings(t *testing.T) {

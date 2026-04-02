@@ -55,11 +55,7 @@ func TestBrowserOptionsSlowMo(t *testing.T) {
 			tb := newTestBrowser(t, withFileServer())
 			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p *common.Page) {
 				popts := common.NewPageEmulateMediaOptions(p)
-				require.NoError(t, popts.Parse(tb.context(), tb.toSobekValue(struct {
-					Media string `js:"media"`
-				}{
-					Media: "print",
-				})))
+				popts.Media = "print"
 				err := p.EmulateMedia(popts)
 				require.NoError(t, err)
 			})
