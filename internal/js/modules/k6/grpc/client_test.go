@@ -1613,7 +1613,7 @@ func TestAnyWithNotCommonTypes(t *testing.T) {
 	t.Parallel()
 	randseed := time.Now().Unix()
 	t.Log("Random seed is", randseed)
-	r := rand.New(rand.NewSource(randseed)) //nolint:gosec
+	r := rand.New(rand.NewSource(randseed))
 	words := []string{"sum", "square", "circle", "testing", "some"}
 	// This tests specifically with types that aren't available to the server and are not part of anything precompiled
 	randWord := func() string {

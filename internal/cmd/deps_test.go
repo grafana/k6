@@ -19,6 +19,7 @@ func TestGetCmdDeps(t *testing.T) {
 	testCases := []struct {
 		name              string
 		files             map[string][]byte
+		manifest          string
 		expectedDeps      map[string]string
 		expectCustomBuild bool
 		expectedImports   []string
@@ -35,7 +36,7 @@ export default function () {
 }
 `),
 			},
-			expectedDeps:      map[string]string{"k6/x/foo": "*"},
+			expectedDeps:      map[string]string{"k6": "*", "k6/x/foo": "*"},
 			expectCustomBuild: true,
 			expectedImports:   []string{"/main.js", "k6/http", "k6/x/foo"},
 		},
@@ -49,7 +50,7 @@ export default function () {
 }
 `),
 			},
-			expectedDeps:      map[string]string{},
+			expectedDeps:      map[string]string{"k6": "*"},
 			expectCustomBuild: false,
 			expectedImports:   []string{"/main.js", "k6/http"},
 		},
@@ -75,7 +76,7 @@ export default function () {
 }
 `),
 			},
-			expectedDeps:      map[string]string{"k6/x/bar": "*"},
+			expectedDeps:      map[string]string{"k6": "*", "k6/x/bar": "*"},
 			expectCustomBuild: true,
 			expectedImports:   []string{"/lib/helper.js", "/main.js", "/shared/nested.js", "k6/x/bar"},
 		},
@@ -102,9 +103,24 @@ export default function () {
 }
 `),
 			},
-			expectedDeps:      map[string]string{"k6/x/alpha": ">=1.2.3", "k6/x/beta": "*"},
+			expectedDeps:      map[string]string{"k6": "*", "k6/x/alpha": ">=1.2.3", "k6/x/beta": "*"},
 			expectCustomBuild: true,
 			expectedImports:   []string{"/main.js", "/modules/util.js", "/modules/with-directive.js", "k6/x/beta"},
+		},
+		{
+			name: "manifest overrides default k6 constraint without use directive",
+			files: map[string][]byte{
+				"/main.js": []byte(`import http from "k6/http";
+
+export default function () {
+  http.get("https://example.com");
+}
+`),
+			},
+			manifest:          `{"k6": ">=1.6.0"}`,
+			expectedDeps:      map[string]string{"k6": ">=1.6.0"},
+			expectCustomBuild: false, // current k6 version satisfies >=1.6.0
+			expectedImports:   []string{"/main.js", "k6/http"},
 		},
 	}
 
@@ -113,6 +129,7 @@ export default function () {
 			t.Parallel()
 			ts := tests.NewGlobalTestState(t)
 			ts.FS = testutils.MakeMemMapFs(t, prependCWDToFileMap(ts.Cwd, tc.files))
+			ts.Flags.DependenciesManifest = tc.manifest
 
 			cmd := getCmdDeps(ts.GlobalState)
 			cmd.SetArgs([]string{"--json", "main.js"})
@@ -160,6 +177,7 @@ export default function () {
 	output := ts.Stdout.String()
 	// Verify human-readable format
 	require.Contains(t, output, "Build Dependencies:")
+	require.Contains(t, output, "k6: *")
 	require.Contains(t, output, "k6/x/foo: *")
 	require.Contains(t, output, "Imports:")
 	require.Contains(t, output, "Custom Build Required:")

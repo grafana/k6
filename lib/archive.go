@@ -60,7 +60,7 @@ type Archive struct {
 	Data        []byte   `json:"-"`
 
 	// Working directory for resolving relative paths.
-	Pwd    string   `json:"pwd"` // only for json
+	Pwd    string   `json:"pwd"` //nolint:gosec // only for json
 	PwdURL *url.URL `json:"-"`
 
 	Filesystems map[string]fsext.Fs `json:"-"`

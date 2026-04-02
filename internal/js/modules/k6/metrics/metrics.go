@@ -155,7 +155,7 @@ func New() *RootModule {
 // Exports returns the exports of the metrics module
 func (mi *ModuleInstance) Exports() modules.Exports {
 	return modules.Exports{
-		Named: map[string]interface{}{
+		Named: map[string]any{
 			"Counter": mi.XCounter,
 			"Gauge":   mi.XGauge,
 			"Trend":   mi.XTrend,

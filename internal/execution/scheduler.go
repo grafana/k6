@@ -166,7 +166,7 @@ func (e *Scheduler) initVUsConcurrently(
 	doneInits := make(chan error, count) // poor man's waitgroup with results
 	limiter := make(chan struct{})
 
-	for i := 0; i < concurrency; i++ {
+	for range concurrency {
 		go func() {
 			for range limiter {
 				newVU, err := e.initVU(ctx, samplesOut, logger)
@@ -180,7 +180,7 @@ func (e *Scheduler) initVUsConcurrently(
 
 	go func() {
 		defer close(limiter)
-		for vuNum := uint64(0); vuNum < count; vuNum++ {
+		for vuNum := range count {
 			select {
 			case limiter <- struct{}{}:
 			case <-ctx.Done():
@@ -278,7 +278,7 @@ func (e *Scheduler) initVUsAndExecutors(ctx context.Context, samplesOut chan<- m
 	)
 
 	var initErr error
-	for vuNum := uint64(0); vuNum < vusToInitialize; vuNum++ {
+	for range vusToInitialize {
 		var err error
 		select {
 		case err = <-doneInits:

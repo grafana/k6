@@ -178,7 +178,7 @@ func (hka HMACKeyAlgorithm) hash() string {
 	return hka.Hash.Name
 }
 
-func exportHMACKey(ck *CryptoKey, format KeyFormat) (interface{}, error) {
+func exportHMACKey(ck *CryptoKey, format KeyFormat) (any, error) {
 	// 1.
 	if ck.handle == nil {
 		return nil, NewError(OperationError, "key data is not accessible")

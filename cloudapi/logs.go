@@ -228,7 +228,7 @@ func retry(s sleeper, attempts int, interval, maxDuration time.Duration, do func
 	baseInterval := math.Abs(interval.Truncate(time.Second).Seconds())
 	r := rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec
 
-	for i := 0; i < attempts; i++ {
+	for i := range attempts {
 		if i > 0 {
 			// wait = (interval ^ i) + random milliseconds
 			wait := time.Duration(math.Pow(baseInterval, float64(i))) * time.Second

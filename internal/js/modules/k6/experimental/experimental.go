@@ -37,7 +37,7 @@ func New() *RootModule {
 // Exports returns the exports of the experimental module
 func (mi *ModuleInstance) Exports() modules.Exports {
 	return modules.Exports{
-		Named: map[string]interface{}{
+		Named: map[string]any{
 			"setTimeout": mi.setTimeout,
 		},
 	}

@@ -162,10 +162,9 @@ func buildTLSConfig(parentConfig *tls.Config, certificate, key []byte, caCertifi
 	// Ignoring 'TLS MinVersion is too low' because this tls.Config will inherit MinValue and MaxValue
 	// from the vu state tls.Config
 
-	//nolint:gosec
 	tlsCfg := &tls.Config{
 		CipherSuites:       parentConfig.CipherSuites,
-		InsecureSkipVerify: parentConfig.InsecureSkipVerify,
+		InsecureSkipVerify: parentConfig.InsecureSkipVerify, //nolint:gosec
 		MinVersion:         parentConfig.MinVersion,
 		MaxVersion:         parentConfig.MaxVersion,
 		Renegotiation:      parentConfig.Renegotiation,
@@ -181,7 +180,7 @@ func buildTLSConfig(parentConfig *tls.Config, certificate, key []byte, caCertifi
 	return tlsCfg, nil
 }
 
-func buildTLSConfigFromMap(parentConfig *tls.Config, tlsConfigMap map[string]interface{}) (*tls.Config, error) {
+func buildTLSConfigFromMap(parentConfig *tls.Config, tlsConfigMap map[string]any) (*tls.Config, error) {
 	var cert, key, pass []byte
 	var ca [][]byte
 	var err error
@@ -200,8 +199,8 @@ func buildTLSConfigFromMap(parentConfig *tls.Config, tlsConfigMap map[string]int
 		}
 	}
 	if cas, ok := tlsConfigMap["cacerts"]; ok {
-		var caCertsArray []interface{}
-		if caCertsArray, ok = cas.([]interface{}); ok {
+		var caCertsArray []any
+		if caCertsArray, ok = cas.([]any); ok {
 			ca = make([][]byte, len(caCertsArray))
 			for i, entry := range caCertsArray {
 				var entryStr string

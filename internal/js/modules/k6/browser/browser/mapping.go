@@ -58,7 +58,7 @@ func ConvertSelectOptionValues(rt *sobek.Runtime, values sobek.Value) ([]any, er
 	)
 	switch values.ExportType().Kind() {
 	case reflect.Slice:
-		var sl []interface{}
+		var sl []any
 		if err := rt.ExportTo(values, &sl); err != nil {
 			return nil, fmt.Errorf("options: expected array, got %T", values)
 		}
@@ -72,7 +72,7 @@ func ConvertSelectOptionValues(rt *sobek.Runtime, values sobek.Value) ([]any, er
 				labelOpt := common.SelectOption{Label: new(string)}
 				*labelOpt.Label = item
 				opts = append(opts, &valOpt, &labelOpt)
-			case map[string]interface{}:
+			case map[string]any:
 				opt, err := extractSelectOptionFromMap(item)
 				if err != nil {
 					return nil, err
@@ -84,7 +84,7 @@ func ConvertSelectOptionValues(rt *sobek.Runtime, values sobek.Value) ([]any, er
 			}
 		}
 	case reflect.Map:
-		var raw map[string]interface{}
+		var raw map[string]any
 		if err := rt.ExportTo(values, &raw); err != nil {
 			return nil, fmt.Errorf("options: expected object, got %T", values)
 		}
@@ -95,9 +95,9 @@ func ConvertSelectOptionValues(rt *sobek.Runtime, values sobek.Value) ([]any, er
 		}
 
 		opts = append(opts, opt)
-	case reflect.TypeOf(&common.ElementHandle{}).Kind():
+	case reflect.TypeFor[*common.ElementHandle]().Kind():
 		opts = append(opts, t.(*common.ElementHandle)) //nolint:forcetypeassert
-	case reflect.TypeOf(sobek.Object{}).Kind():
+	case reflect.TypeFor[sobek.Object]().Kind():
 		obj := values.ToObject(rt)
 		opt := common.SelectOption{}
 		for _, k := range obj.Keys() {
@@ -128,7 +128,7 @@ func ConvertSelectOptionValues(rt *sobek.Runtime, values sobek.Value) ([]any, er
 	return opts, nil
 }
 
-func extractSelectOptionFromMap(v map[string]interface{}) (*common.SelectOption, error) {
+func extractSelectOptionFromMap(v map[string]any) (*common.SelectOption, error) {
 	opt := &common.SelectOption{}
 	for k, raw := range v {
 		switch k {

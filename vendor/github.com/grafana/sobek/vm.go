@@ -5438,7 +5438,7 @@ func (n concatStrings) exec(vm *vm) {
 		vm.stack[vm.sp-1] = asciiString(buf.String())
 	} else {
 		var buf unicodeStringBuilder
-		buf.ensureStarted(length)
+		buf.Grow(length)
 		for _, s := range strs {
 			buf.writeString(s.(String))
 		}

@@ -186,7 +186,7 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 
 	if state.Options.HTTPDebug.String != "" {
 		// Combine tags with common log fields
-		combinedLogFields := map[string]interface{}{"source": "http-debug", "vu": state.VUID, "iter": state.Iteration}
+		combinedLogFields := map[string]any{"source": "http-debug", "vu": state.VUID, "iter": state.Iteration}
 		for k, v := range preq.TagsAndMeta.Metadata {
 			if _, present := combinedLogFields[k]; !present {
 				combinedLogFields[k] = v
@@ -268,7 +268,7 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 	reqCtx, cancelFunc := context.WithTimeout(ctx, preq.Timeout)
 	defer cancelFunc()
 	mreq := preq.Req.WithContext(reqCtx)
-	res, resErr := client.Do(mreq)
+	res, resErr := client.Do(mreq) //nolint:gosec
 
 	// TODO(imiric): It would be safer to check for a writeable
 	// response body here instead of status code, but those are

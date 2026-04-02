@@ -18,13 +18,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go-version: [1.24.x]
+        go-version: [1.25.x]
         platform:
-          [ubuntu-22.04, ubuntu-arm64-large, github-hosted-windows-x64-large]
+          [ubuntu-24.04, ubuntu-arm64-large, github-hosted-windows-x64-large]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -33,6 +33,7 @@ jobs:
         with:
           go_version: ${{ matrix.go-version }}
           platform: ${{ matrix.platform }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Get the k6 version
         id: get_k6_version
         run: |
@@ -45,8 +46,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: ubuntu-22.04
-            gotip_platform: ubuntu-22.04
+          - platform: ubuntu-24.04
+            gotip_platform: ubuntu-24.04
           - platform: ubuntu-arm64-large
             gotip_platform: ubuntu-24.04-arm
           - platform: github-hosted-windows-x64-large
@@ -55,7 +56,7 @@ jobs:
     continue-on-error: true
     steps:
       - name: Checkout code
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           persist-credentials: false
       - name: Run common test steps
@@ -63,6 +64,7 @@ jobs:
         with:
           go_version: "gotip"
           platform: ${{ matrix.gotip_platform }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Run tests
         uses: ./.github/actions/test-browser
         with:
@@ -72,13 +74,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go-version: [1.25.x]
+        go-version: [1.26.x]
         platform:
-          [ubuntu-22.04, ubuntu-arm64-large, github-hosted-windows-x64-large]
+          [ubuntu-24.04, ubuntu-arm64-large, github-hosted-windows-x64-large]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           persist-credentials: false
       - name: Run common test steps
@@ -86,5 +88,6 @@ jobs:
         with:
           go_version: ${{ matrix.go-version }}
           platform: ${{ matrix.platform }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Run tests
         uses: ./.github/actions/test-browser

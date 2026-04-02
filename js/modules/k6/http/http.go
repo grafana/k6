@@ -54,7 +54,7 @@ func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 		responseCallback: defaultExpectedStatuses.match,
 	}
 
-	mustExport := func(name string, value interface{}) {
+	mustExport := func(name string, value any) {
 		if err := mi.exports.Set(name, value); err != nil {
 			common.Throw(rt, err)
 		}

@@ -34,7 +34,7 @@ const initGlobals = `
 func newConfiguredRuntime(t testing.TB) (*modulestest.Runtime, error) {
 	runtime := modulestest.NewRuntime(t)
 
-	err := runtime.SetupModuleSystem(map[string]interface{}{"k6/data": New()}, nil, compiler.New(runtime.VU.InitEnv().Logger))
+	err := runtime.SetupModuleSystem(map[string]any{"k6/data": New()}, nil, compiler.New(runtime.VU.InitEnv().Logger))
 	if err != nil {
 		return nil, err
 	}
@@ -221,21 +221,19 @@ func TestSharedArrayRaceInInitialization(t *testing.T) {
 
 	const instances = 10
 	const repeats = 100
-	for i := 0; i < repeats; i++ {
+	for range repeats {
 		runtimes := make([]*sobek.Runtime, instances)
-		for j := 0; j < instances; j++ {
+		for j := range instances {
 			runtime, err := newConfiguredRuntime(t)
 			require.NoError(t, err)
 			runtimes[j] = runtime.VU.Runtime()
 		}
 		var wg sync.WaitGroup
 		for _, rt := range runtimes {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				_, err := rt.RunString(`var array = new data.SharedArray("shared", function() {return [1,2,3,4,5,6,7,8,9, 10]});`)
 				require.NoError(t, err)
-			}()
+			})
 		}
 		ch := make(chan struct{})
 		go func() {

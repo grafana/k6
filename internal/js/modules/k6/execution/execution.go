@@ -89,14 +89,14 @@ func (mi *ModuleInstance) newScenarioInfo() (*sobek.Object, error) {
 		return ss
 	}
 
-	si := map[string]func() interface{}{
-		"name": func() interface{} {
+	si := map[string]func() any{
+		"name": func() any {
 			return getScenarioState().Name
 		},
-		"executor": func() interface{} {
+		"executor": func() any {
 			return getScenarioState().Executor
 		},
-		"startTime": func() interface{} {
+		"startTime": func() any {
 			//nolint:lll
 			// Return the timestamp in milliseconds, since that's how JS
 			// timestamps usually are:
@@ -104,18 +104,18 @@ func (mi *ModuleInstance) newScenarioInfo() (*sobek.Object, error) {
 			// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date/now#return_value
 			return getScenarioState().StartTime.UnixNano() / int64(time.Millisecond)
 		},
-		"progress": func() interface{} {
+		"progress": func() any {
 			p, _ := getScenarioState().ProgressFn()
 			return p
 		},
-		"iterationInInstance": func() interface{} {
+		"iterationInInstance": func() any {
 			if vuState.GetScenarioLocalVUIter == nil {
 				common.Throw(rt, errRunInInitContext)
 			}
 
 			return vuState.GetScenarioLocalVUIter()
 		},
-		"iterationInTest": func() interface{} {
+		"iterationInTest": func() any {
 			if vuState.GetScenarioGlobalVUIter == nil {
 				common.Throw(rt, errRunInInitContext)
 			}
@@ -139,20 +139,20 @@ func (mi *ModuleInstance) newInstanceInfo() (*sobek.Object, error) {
 	}
 	rt := mi.vu.Runtime()
 
-	ti := map[string]func() interface{}{
-		"currentTestRunDuration": func() interface{} {
+	ti := map[string]func() any{
+		"currentTestRunDuration": func() any {
 			return float64(es.GetCurrentTestRunDuration()) / float64(time.Millisecond)
 		},
-		"iterationsCompleted": func() interface{} {
+		"iterationsCompleted": func() any {
 			return es.GetFullIterationCount()
 		},
-		"iterationsInterrupted": func() interface{} {
+		"iterationsInterrupted": func() any {
 			return es.GetPartialIterationCount()
 		},
-		"vusActive": func() interface{} {
+		"vusActive": func() any {
 			return es.GetCurrentlyActiveVUsCount()
 		},
-		"vusInitialized": func() interface{} {
+		"vusInitialized": func() any {
 			return es.GetInitializedVUsCount()
 		},
 	}
@@ -169,9 +169,9 @@ func (mi *ModuleInstance) newTestInfo() (*sobek.Object, error) {
 	// for the consolidated and derived lib.Options
 	var optionsObject *sobek.Object
 	rt := mi.vu.Runtime()
-	ti := map[string]func() interface{}{
+	ti := map[string]func() any{
 		// stop the test run
-		"abort": func() interface{} {
+		"abort": func() any {
 			return func(msg sobek.Value) {
 				reason := errext.AbortTest
 				if !common.IsNullish(msg) {
@@ -180,7 +180,7 @@ func (mi *ModuleInstance) newTestInfo() (*sobek.Object, error) {
 				rt.Interrupt(&errext.InterruptError{Reason: reason})
 			}
 		},
-		"fail": func() interface{} {
+		"fail": func() any {
 			return func(msg sobek.Value) {
 				reason := errext.MarkedAsFailedTest
 				if !common.IsNullish(msg) {
@@ -195,7 +195,7 @@ func (mi *ModuleInstance) newTestInfo() (*sobek.Object, error) {
 				mi.vu.State().TestStatus.MarkFailed()
 			}
 		},
-		"options": func() interface{} {
+		"options": func() any {
 			vuState := mi.vu.State()
 			if vuState == nil {
 				common.Throw(rt, errTestInfoInitContext)
@@ -225,11 +225,11 @@ func (mi *ModuleInstance) newVUInfo() (*sobek.Object, error) {
 	}
 	rt := mi.vu.Runtime()
 
-	vi := map[string]func() interface{}{
-		"idInInstance":        func() interface{} { return vuState.VUID },
-		"idInTest":            func() interface{} { return vuState.VUIDGlobal },
-		"iterationInInstance": func() interface{} { return vuState.Iteration },
-		"iterationInScenario": func() interface{} {
+	vi := map[string]func() any{
+		"idInInstance":        func() any { return vuState.VUID },
+		"idInTest":            func() any { return vuState.VUIDGlobal },
+		"iterationInInstance": func() any { return vuState.Iteration },
+		"iterationInScenario": func() any {
 			if vuState.GetScenarioVUIter == nil {
 				// hasn't been set yet, no iteration stats available
 				return 0
@@ -254,9 +254,9 @@ func (mi *ModuleInstance) newVUInfo() (*sobek.Object, error) {
 	if err != nil {
 		return o, err
 	}
-	metrics, err := newInfoObj(rt, map[string]func() interface{}{
-		"tags": func() interface{} { return tagsDynamicObject },
-		"metadata": func() interface{} {
+	metrics, err := newInfoObj(rt, map[string]func() any{
+		"tags": func() any { return tagsDynamicObject },
+		"metadata": func() any {
 			return rt.NewDynamicObject(&metadataDynamicObject{
 				runtime: rt,
 				state:   vuState,
@@ -275,7 +275,7 @@ func (mi *ModuleInstance) newVUInfo() (*sobek.Object, error) {
 	return o, err
 }
 
-func newInfoObj(rt *sobek.Runtime, props map[string]func() interface{}) (*sobek.Object, error) {
+func newInfoObj(rt *sobek.Runtime, props map[string]func() any) (*sobek.Object, error) {
 	o := rt.NewObject()
 
 	for p, get := range props {
@@ -315,7 +315,7 @@ func optionsAsObject(rt *sobek.Runtime, options lib.Options) (*sobek.Object, err
 			common.Throw(rt, delErr)
 		}
 	}
-	mustSetReadOnlyProperty := func(k string, v interface{}) {
+	mustSetReadOnlyProperty := func(k string, v any) {
 		defErr := obj.DefineDataProperty(k, rt.ToValue(v), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 		if err != nil {
 			common.Throw(rt, defErr)

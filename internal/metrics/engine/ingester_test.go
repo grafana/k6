@@ -116,7 +116,7 @@ func TestOutputFlushMetricsTimeSeriesWarning(t *testing.T) {
 	ingester.cardinality.timeSeriesLimit = 2 // mock the limit
 
 	require.NoError(t, ingester.Start())
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		ingester.AddMetricSamples([]metrics.SampleContainer{metrics.Sample{
 			TimeSeries: metrics.TimeSeries{
 				Metric: testMetric,
@@ -151,7 +151,7 @@ func TestCardinalityControlAdd(t *testing.T) {
 	// the first iteration adds two new time series
 	// the second does not change the count
 	// because the time series have been already seen before
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		cc.Add(metrics.TimeSeries{
 			Metric: m1,
 			Tags:   tags,

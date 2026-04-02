@@ -18,12 +18,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go-version: [1.24.x]
-        platform: [ubuntu-22.04, ubuntu-24.04-arm, windows-latest]
+        go-version: [1.25.x]
+        platform: [ubuntu-24.04, ubuntu-24.04-arm, windows-latest]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -32,6 +32,7 @@ jobs:
         with:
           go_version: ${{ matrix.go-version }}
           platform: ${{ matrix.platform }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Get the k6 version
         id: get_k6_version
         run: |
@@ -45,12 +46,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [ubuntu-22.04, ubuntu-24.04-arm, windows-latest]
+        platform: [ubuntu-24.04, ubuntu-24.04-arm, windows-latest]
     runs-on: ${{ matrix.platform }}
     continue-on-error: true
     steps:
       - name: Checkout code
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           persist-credentials: false
       - name: Run common test steps
@@ -58,22 +59,23 @@ jobs:
         with:
           go_version: "gotip"
           platform: ${{ matrix.platform }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Run tests
         uses: ./.github/actions/test
         with:
           use_gotip: "true"
           platform: ${{ matrix.platform }}
-  
+
   test-latest:
     strategy:
       fail-fast: false
       matrix:
-        go-version: [1.25.x]
-        platform: [ubuntu-22.04, ubuntu-24.04-arm, windows-latest]
+        go-version: [1.26.x]
+        platform: [ubuntu-24.04, ubuntu-24.04-arm, windows-latest]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           persist-credentials: false
       - name: Run common test steps
@@ -81,6 +83,7 @@ jobs:
         with:
           go_version: ${{ matrix.go-version }}
           platform: ${{ matrix.platform }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Run tests
         uses: ./.github/actions/test
         with:

@@ -912,7 +912,7 @@ func TestParseHTML(t *testing.T) {
 		t.Run("dataset", func(t *testing.T) {
 			v, err := rt.RunString(`doc.find("h1").data()`)
 			if assert.NoError(t, err) {
-				data, ok := v.Export().(map[string]interface{})
+				data, ok := v.Export().(map[string]any)
 
 				assert.True(t, ok)
 				assert.Equal(t, "dataval", data["test"])

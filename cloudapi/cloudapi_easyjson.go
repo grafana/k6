@@ -30,11 +30,6 @@ func easyjsonC9ac27e5DecodeGoK6IoK6Cloudapi(in *jlexer.Lexer, out *msgStreams) {
 	for !in.IsDelim('}') {
 		key := in.UnsafeFieldName(false)
 		in.WantColon()
-		if in.IsNull() {
-			in.Skip()
-			in.WantComma()
-			continue
-		}
 		switch key {
 		case "stream":
 			if in.IsNull() {
@@ -46,7 +41,11 @@ func easyjsonC9ac27e5DecodeGoK6IoK6Cloudapi(in *jlexer.Lexer, out *msgStreams) {
 					key := string(in.String())
 					in.WantColon()
 					var v1 string
-					v1 = string(in.String())
+					if in.IsNull() {
+						in.Skip()
+					} else {
+						v1 = string(in.String())
+					}
 					(out.Stream)[key] = v1
 					in.WantComma()
 				}
@@ -76,7 +75,11 @@ func easyjsonC9ac27e5DecodeGoK6IoK6Cloudapi(in *jlexer.Lexer, out *msgStreams) {
 						v3 := 0
 						for !in.IsDelim(']') {
 							if v3 < 2 {
-								(v2)[v3] = string(in.String())
+								if in.IsNull() {
+									in.Skip()
+								} else {
+									(v2)[v3] = string(in.String())
+								}
 								v3++
 							} else {
 								in.SkipRecursive()
@@ -173,11 +176,6 @@ func easyjsonC9ac27e5DecodeGoK6IoK6Cloudapi1(in *jlexer.Lexer, out *msgDroppedEn
 	for !in.IsDelim('}') {
 		key := in.UnsafeFieldName(false)
 		in.WantColon()
-		if in.IsNull() {
-			in.Skip()
-			in.WantComma()
-			continue
-		}
 		switch key {
 		case "labels":
 			if in.IsNull() {
@@ -189,14 +187,22 @@ func easyjsonC9ac27e5DecodeGoK6IoK6Cloudapi1(in *jlexer.Lexer, out *msgDroppedEn
 					key := string(in.String())
 					in.WantColon()
 					var v8 string
-					v8 = string(in.String())
+					if in.IsNull() {
+						in.Skip()
+					} else {
+						v8 = string(in.String())
+					}
 					(out.Labels)[key] = v8
 					in.WantComma()
 				}
 				in.Delim('}')
 			}
 		case "timestamp":
-			out.Timestamp = string(in.String())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Timestamp = string(in.String())
+			}
 		default:
 			in.SkipRecursive()
 		}
@@ -262,11 +268,6 @@ func easyjsonC9ac27e5DecodeGoK6IoK6Cloudapi2(in *jlexer.Lexer, out *msg) {
 	for !in.IsDelim('}') {
 		key := in.UnsafeFieldName(false)
 		in.WantColon()
-		if in.IsNull() {
-			in.Skip()
-			in.WantComma()
-			continue
-		}
 		switch key {
 		case "streams":
 			if in.IsNull() {
@@ -285,7 +286,11 @@ func easyjsonC9ac27e5DecodeGoK6IoK6Cloudapi2(in *jlexer.Lexer, out *msg) {
 				}
 				for !in.IsDelim(']') {
 					var v10 msgStreams
-					(v10).UnmarshalEasyJSON(in)
+					if in.IsNull() {
+						in.Skip()
+					} else {
+						(v10).UnmarshalEasyJSON(in)
+					}
 					out.Streams = append(out.Streams, v10)
 					in.WantComma()
 				}
@@ -308,7 +313,11 @@ func easyjsonC9ac27e5DecodeGoK6IoK6Cloudapi2(in *jlexer.Lexer, out *msg) {
 				}
 				for !in.IsDelim(']') {
 					var v11 msgDroppedEntries
-					(v11).UnmarshalEasyJSON(in)
+					if in.IsNull() {
+						in.Skip()
+					} else {
+						(v11).UnmarshalEasyJSON(in)
+					}
 					out.DroppedEntries = append(out.DroppedEntries, v11)
 					in.WantComma()
 				}

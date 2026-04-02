@@ -206,10 +206,21 @@ func NewVU(tb testing.TB, opts ...any) *VU {
 
 	testRT := k6modulestest.NewRuntime(tb)
 	testRT.VU.InitEnvField.LookupEnv = lookupFunc
+	globalEvents := event.NewEventSystem(100, logger)
 	testRT.VU.EventsField = k6common.Events{
-		Global: event.NewEventSystem(100, logger),
+		Global: globalEvents,
 		Local:  event.NewEventSystem(100, logger),
 	}
+	// Emit an Exit event on cleanup to ensure browser registry goroutines
+	// (handleIterEvents and handleExitEvent) are properly terminated.
+	// Without this, those goroutines block on channel receives forever,
+	// leaking across tests and eventually causing the test suite to hang.
+	tb.Cleanup(func() {
+		waitDone := globalEvents.Emit(&event.Event{
+			Type: event.Exit,
+		})
+		_ = waitDone(context.Background())
+	})
 
 	state := &lib.State{
 		Options: lib.Options{

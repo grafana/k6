@@ -38,7 +38,7 @@ func TestGoroutineLeakOnRepeatedClicks(t *testing.T) {
 	t.Logf("Baseline goroutines: %d", baselineGoroutines)
 
 	const clickCount = 20
-	for i := 0; i < clickCount; i++ {
+	for i := range clickCount {
 		button, err := p.Query("#test-button")
 		require.NoError(t, err)
 

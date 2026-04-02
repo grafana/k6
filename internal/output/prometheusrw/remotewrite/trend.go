@@ -218,7 +218,7 @@ func histogramToHistogramProto(timestamp int64, h prometheus.Histogram) *prompb.
 
 func toBucketSpanProto(s []*dto.BucketSpan) []*prompb.BucketSpan {
 	spans := make([]*prompb.BucketSpan, len(s))
-	for i := 0; i < len(s); i++ {
+	for i := range s {
 		spans[i] = &prompb.BucketSpan{Offset: *s[i].Offset, Length: *s[i].Length}
 	}
 	return spans
