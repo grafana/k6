@@ -53,7 +53,7 @@ type cmdCloud struct {
 }
 
 func (c *cmdCloud) preRun(cmd *cobra.Command, _ []string) error {
-	// TODO: refactor (https://github.com/loadimpact/k6/issues/883)
+	// TODO: refactor (https://github.com/grafana/k6/issues/883)
 	//
 	// We deliberately parse the env variables, to validate for wrong
 	// values, even if we don't subsequently use them (if the respective
@@ -137,14 +137,14 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Building the archive..."))
 	arc := testRunState.Runner.MakeArchive()
 
-	tmpCloudConfig, err := cloudapi.GetTemporaryCloudConfig(arc.Options.Cloud, arc.Options.External)
+	tmpCloudConfig, err := cloudapi.GetTemporaryCloudConfig(arc.Options.Cloud)
 	if err != nil {
 		return err
 	}
 
 	// Cloud config
 	cloudConfig, warn, err := cloudapi.GetConsolidatedConfig(
-		test.derivedConfig.Collectors["cloud"], c.gs.Env, "", arc.Options.Cloud, arc.Options.External)
+		test.derivedConfig.Collectors["cloud"], c.gs.Env, "", arc.Options.Cloud)
 	if err != nil {
 		return err
 	}
@@ -180,7 +180,6 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	}
 
 	arc.Options.Cloud = b
-	arc.Options.External[cloudapi.LegacyCloudConfigKey] = b
 
 	name := cloudConfig.Name.String
 	if !cloudConfig.Name.Valid || cloudConfig.Name.String == "" {
@@ -507,7 +506,6 @@ func resolveAndSetProjectID(
 		}
 
 		arc.Options.Cloud = b
-		arc.Options.External[cloudapi.LegacyCloudConfigKey] = b
 
 		cloudConfig.ProjectID = null.IntFrom(projectID)
 	}

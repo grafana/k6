@@ -4,11 +4,12 @@ import (
 	"encoding/json"
 	"testing"
 
+	"gopkg.in/guregu/null.v3"
+
 	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/internal/cmd/tests"
 	"go.k6.io/k6/internal/lib/testutils"
 	"go.k6.io/k6/lib"
-	"gopkg.in/guregu/null.v3"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -178,11 +179,6 @@ func TestResolveAndSetProjectID(t *testing.T) {
 				var cloudData map[string]any
 				require.NoError(t, json.Unmarshal(arc.Options.Cloud, &cloudData))
 				assert.Equal(t, float64(tc.expectedProjectID), cloudData["projectID"])
-
-				// Verify arc.Options.External contains the projectID
-				var externalData map[string]any
-				require.NoError(t, json.Unmarshal(arc.Options.External[cloudapi.LegacyCloudConfigKey], &externalData))
-				assert.Equal(t, float64(tc.expectedProjectID), externalData["projectID"])
 			}
 
 			logs := ts.LoggerHook.Drain()

@@ -40,7 +40,6 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 		gs.Env,
 		"", // Historically used for -o cloud=..., no longer used (deprecated).
 		test.derivedConfig.Cloud,
-		test.derivedConfig.External,
 	)
 	if err != nil {
 		return err

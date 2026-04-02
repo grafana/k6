@@ -24,12 +24,11 @@ require (
 	github.com/grafana/k6provider v0.2.0
 	github.com/grafana/sobek v0.0.0-20260219184149-bdae4a158e94
 	github.com/grafana/xk6-dashboard-assets v0.1.2
-	github.com/grafana/xk6-redis v0.3.6
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
 	github.com/jhump/protoreflect v1.18.0
 	github.com/klauspost/compress v1.18.4
-	github.com/mailru/easyjson v0.9.0
+	github.com/mailru/easyjson v0.9.1
 	github.com/mattn/go-colorable v0.1.14
 	github.com/mattn/go-isatty v0.0.20
 	github.com/mccutchen/go-httpbin/v2 v2.20.0
@@ -79,7 +78,6 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/chromedp/sysutil v1.1.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
@@ -95,7 +93,6 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/common v0.66.1 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect
-	github.com/redis/go-redis/v9 v9.17.2 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
