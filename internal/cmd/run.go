@@ -518,10 +518,6 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 }
 
 func getSummaryMode(runtimeOptions lib.RuntimeOptions) (summary.Mode, bool, error) {
-	if runtimeOptions.NoSummary.Bool {
-		return summary.ModeDisabled, false, nil
-	}
-
 	sm, err := summary.ValidateMode(runtimeOptions.SummaryMode.String)
 	if err != nil {
 		return summary.ModeDisabled, false, err

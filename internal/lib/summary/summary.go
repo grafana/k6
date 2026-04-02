@@ -17,7 +17,7 @@ const (
 	ModeCompact  = Mode(iota) // Compact mode that only displays the total results.
 	ModeFull                  // Extended mode that displays total and partial results.
 	ModeLegacy                // Deprecated. Legacy mode, used for backwards compatibility.
-	ModeDisabled              // Disabled, formerly known as --no-summary.
+	ModeDisabled              // Disabled. Can be used with --summary-mode=disabled.
 )
 
 // ErrInvalidSummaryMode indicates the serialized summary mode is invalid.
