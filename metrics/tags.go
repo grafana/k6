@@ -65,12 +65,37 @@ func (ts *TagSet) Contains(other *TagSet) bool {
 	return ((*atlas.Node)(ts)).Contains((*atlas.Node)(other))
 }
 
+// Len returns the number of key=value tag pairs in the set.
+func (ts *TagSet) Len() int {
+	return ((*atlas.Node)(ts)).Len()
+}
+
 // IsEmpty checks if the tag set is empty, i.e. if it's the root atlas node.
 func (ts *TagSet) IsEmpty() bool {
 	return ((*atlas.Node)(ts)).IsRoot()
 }
 
+// ForEach iterates over all key=value tag pairs in the set, calling fn for
+// each one. This is more memory-efficient than Map(), which allocates a new
+// map[string]string on every call. Prefer ForEach when you need to process
+// each tag pair without retaining the full map.
+//
+// The iteration order follows the underlying atlas node chain and is not
+// guaranteed to be sorted by key.
+func (ts *TagSet) ForEach(fn func(key, value string)) {
+	n := (*atlas.Node)(ts)
+	for !n.IsRoot() {
+		prev, key, value := n.Data()
+		fn(key, value)
+		n = prev
+	}
+}
+
 // Map returns a {key: value} string map with all of the tags in the set.
+//
+// Note: this method allocates a new map on every call. When you only need to
+// iterate over the tags (e.g. to convert them to another format), prefer
+// ForEach for better memory efficiency.
 func (ts *TagSet) Map() map[string]string {
 	return ((*atlas.Node)(ts)).Path()
 }
