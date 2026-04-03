@@ -93,6 +93,15 @@ func TestSelectorParse(t *testing.T) {
 			},
 			expectedCap: nil,
 		},
+		{
+			name:  "Internal or with nested selector",
+			input: `button >> internal:or="a"`,
+			expectedParts: []*SelectorPart{
+				{Name: "css", Body: "button"},
+				{Name: "internal:or", Body: `{"selector":"a","parts":[{"name":"css","body":"a"}],"capture":null}`},
+			},
+			expectedCap: nil,
+		},
 	}
 
 	for _, tc := range testCases {

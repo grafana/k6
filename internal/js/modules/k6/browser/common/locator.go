@@ -425,6 +425,15 @@ func (l *Locator) Locator(selector string, opts *LocatorOptions) *Locator {
 	return NewLocator(l.ctx, opts, l.selector+" >> "+selector, l.frame, l.log)
 }
 
+// Or returns a new locator that matches elements from either the current
+// locator or the given locator. The resulting locator resolves to all elements
+// that match either selector, merged and sorted in DOM order.
+func (l *Locator) Or(locator *Locator) *Locator {
+	return NewLocator(l.ctx, nil,
+		l.selector+" >> internal:or="+strconv.Quote(locator.selector),
+		l.frame, l.log)
+}
+
 // FrameLocator creates a frame locator for an iframe matching the given selector
 // within the current locator's scope.
 func (l *Locator) FrameLocator(selector string) *FrameLocator {
