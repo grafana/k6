@@ -359,7 +359,7 @@ func TestMachineReadable_IncludesP99(t *testing.T) {
 		Values: map[string]float64{
 			"avg":   50,
 			"p(95)": 95,
-			"p(99)": 99, // 👈 critical for test
+			"p(99)": 99, 
 		},
 	}
 
