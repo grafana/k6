@@ -9,6 +9,8 @@ import (
 	k6cloud "github.com/grafana/k6-cloud-openapi-client-go/k6"
 )
 
+// Mirrors unexported sentinels in cloudapi/ — duplicated because they
+// can't be imported.
 var (
 	errNotAuthorized    = errors.New("not allowed to upload result to k6 Cloud")
 	errNotAuthenticated = errors.New("failed to authenticate with k6 Cloud")

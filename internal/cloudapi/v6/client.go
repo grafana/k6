@@ -1,28 +1,29 @@
 package cloudapi
 
 import (
+	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"time"
 
 	k6cloud "github.com/grafana/k6-cloud-openapi-client-go/k6"
 	"github.com/sirupsen/logrus"
+
+	"go.k6.io/k6/cloudapi"
 )
 
-const (
-	// RetryInterval is the default cloud request retry interval
-	RetryInterval = 500 * time.Millisecond
-	// MaxRetries specifies max retry attempts
-	MaxRetries = 3
-)
-
-// Client handles communication with the k6 Cloud API.
+// Client handles communication with the k6 Cloud API v6.
 type Client struct {
 	apiClient *k6cloud.APIClient
 	token     string
-	stackID   int64
+	stackID   int32
+	projectID int32
 	baseURL   string
 
 	logger logrus.FieldLogger
@@ -31,7 +32,7 @@ type Client struct {
 	retryInterval time.Duration
 }
 
-// NewClient return a new client for the cloud API
+// NewClient return a new client for the cloud API.
 func NewClient(logger logrus.FieldLogger, token, host, version string, timeout time.Duration) (*Client, error) {
 	if token == "" {
 		return nil, fmt.Errorf("token is required to create cloud API client")
@@ -48,22 +49,45 @@ func NewClient(logger logrus.FieldLogger, token, host, version string, timeout t
 		},
 		OperationServers: map[string]k6cloud.ServerConfigurations{},
 		HTTPClient:       &http.Client{Timeout: timeout},
+		// Retries are handled by retryDo, not by the generated client.
+		// Explicit zero prevents silent double-retry if the generated
+		// client ever changes its default.
+		MaxRetries: 0,
 	}
 
-	c := &Client{
+	return &Client{
 		apiClient:     k6cloud.NewAPIClient(cfg),
 		token:         token,
 		baseURL:       fmt.Sprintf("%s/cloud/v6", host),
-		retries:       MaxRetries,
-		retryInterval: RetryInterval,
+		retries:       cloudapi.MaxRetries,
+		retryInterval: cloudapi.RetryInterval,
 		logger:        logger,
-	}
-	return c, nil
+	}, nil
 }
 
 // SetStackID sets the stack ID for the client.
-func (c *Client) SetStackID(stackID int64) {
-	c.stackID = stackID
+// Mandatory stack/project enforcement is handled by the separate
+// PR #5737 (k6#5651), not by this migration. Zero is allowed here
+// so existing flows that rely on server-side defaults continue to work.
+func (c *Client) SetStackID(stackID int64) error {
+	id, err := toInt32(stackID)
+	if err != nil {
+		return fmt.Errorf("invalid stack ID: %w", err)
+	}
+	c.stackID = id
+	return nil
+}
+
+// SetProjectID sets the project ID for the client.
+// Zero means "let the backend pick" — see k6-cloud#4281 which defines
+// project resolution as: explicit > stack default > 0.
+func (c *Client) SetProjectID(projectID int64) error {
+	id, err := toInt32(projectID)
+	if err != nil {
+		return fmt.Errorf("invalid project ID: %w", err)
+	}
+	c.projectID = id
+	return nil
 }
 
 // BaseURL returns configured host.
@@ -71,10 +95,33 @@ func (c *Client) BaseURL() string {
 	return c.baseURL
 }
 
+// authCtx returns a context enriched with the client's access token.
+func (c *Client) authCtx(ctx context.Context) context.Context {
+	return context.WithValue(ctx, k6cloud.ContextAccessToken, c.token)
+}
+
+// closeResponse ensures the response body is drained and closed.
+func closeResponse(r *http.Response, errPtr *error) {
+	if r == nil {
+		return
+	}
+	_, _ = io.Copy(io.Discard, r.Body)
+	if cerr := r.Body.Close(); cerr != nil && *errPtr == nil {
+		*errPtr = cerr
+	}
+}
+
 // CheckResponse checks the parsed response.
 // It returns nil if the code is in the successful range,
 // otherwise it tries to parse the body and return a parsed error.
-func CheckResponse(r *http.Response) error {
+func CheckResponse(r *http.Response, err error) error {
+	if err != nil {
+		var cloudErr *k6cloud.GenericOpenAPIError
+		if !errors.As(err, &cloudErr) {
+			return err
+		}
+	}
+
 	if r == nil {
 		return errUnknown
 	}
@@ -105,4 +152,62 @@ func CheckResponse(r *http.Response) error {
 	}
 	payload.Response = r
 	return payload
+}
+
+// shouldRetry decides whether the failed request should be retried.
+// Retries on: nil response (transport error), 5xx, and 429.
+func shouldRetry(r *http.Response, err error) bool {
+	if r == nil {
+		return err != nil
+	}
+	return r.StatusCode >= 500 || r.StatusCode == http.StatusTooManyRequests
+}
+
+// retryDo executes fn up to c.retries+1 times, retrying on transient errors.
+// fn returns whether the request is retryable and any error.
+//
+// The generated OpenAPI client has its own retry loop (callAPI), but it uses
+// time.Sleep which blocks through context cancellation. retryDo uses
+// select on ctx.Done() so a cancelled context (e.g. SIGINT) immediately
+// stops the retry wait instead of sleeping through it.
+func (c *Client) retryDo(ctx context.Context, fn func() (retryable bool, err error)) error {
+	var lastErr error
+	for attempt := range c.retries + 1 {
+		retry, err := fn()
+		if err == nil {
+			return nil
+		}
+		if !retry {
+			return err
+		}
+		lastErr = err
+		if attempt < c.retries {
+			c.logger.WithField("attempt", attempt+1).
+				Warn("Transient error, retrying...")
+			retryTimer := time.NewTimer(c.retryInterval)
+			select {
+			case <-ctx.Done():
+				retryTimer.Stop()
+				return ctx.Err()
+			case <-retryTimer.C:
+			}
+		}
+	}
+	return lastErr
+}
+
+// randomStrHex returns a hex string for use as an idempotency key.
+// Mirrors cloudapi.randomStrHex — unexported there, so duplicated.
+func randomStrHex() string {
+	b := make([]byte, 8)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)
+}
+
+// toInt32 safely converts an int64 to int32, returning an error if overflow would occur.
+func toInt32(val int64) (int32, error) {
+	if val < math.MinInt32 || val > math.MaxInt32 {
+		return 0, fmt.Errorf("value %d overflows int32", val)
+	}
+	return int32(val), nil
 }
