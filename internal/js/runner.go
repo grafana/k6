@@ -164,6 +164,7 @@ func (r *Runner) newVU(
 		Resolver:         r.Resolver,
 		Blacklist:        r.Bundle.Options.BlacklistIPs,
 		BlockedHostnames: r.Bundle.Options.BlockedHostnames.Trie,
+		AllowedHostnames: r.Bundle.Options.AllowedHostnames.Trie,
 		Hosts:            r.Bundle.Options.Hosts.Trie,
 	}
 	if r.Bundle.Options.LocalIPs.Valid {
