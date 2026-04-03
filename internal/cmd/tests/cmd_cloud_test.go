@@ -8,16 +8,20 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sync/atomic"
+	"syscall"
 	"testing"
+	"time"
 
-	"go.k6.io/k6/cloudapi"
+	k6cloud "github.com/grafana/k6-cloud-openapi-client-go/k6"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"go.k6.io/k6/errext/exitcodes"
+	v6cloudapi "go.k6.io/k6/internal/cloudapi/v6"
 	"go.k6.io/k6/internal/cmd"
 	"go.k6.io/k6/internal/lib/testutils"
 	"go.k6.io/k6/lib/fsext"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestK6Cloud(t *testing.T) {
@@ -30,6 +34,8 @@ func setupK6CloudCmd(cliFlags []string) []string {
 }
 
 type setupCommandFunc func(cliFlags []string) []string
+
+const testStackURL = "https://app.k6.io"
 
 func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 	t.Run("TestCloudUserNotAuthenticated", func(t *testing.T) {
@@ -68,17 +74,18 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 		t.Log(stdout)
 		assert.NotContains(t, stdout, `not logged in`)
 		assert.Contains(t, stdout, `execution: cloud`)
-		assert.Contains(t, stdout, `output: https://app.k6.io/runs/123`)
-		assert.Contains(t, stdout, `test status: Finished`)
+		assert.Contains(t, stdout, "output: "+testStackURL+"/a/k6-app/runs/123")
+		assert.Contains(t, stdout, `test status: Completed`)
 	})
 
 	t.Run("TestCloudExitOnRunning", func(t *testing.T) {
 		t.Parallel()
 
-		cs := func() cloudapi.TestProgressResponse {
-			return cloudapi.TestProgressResponse{
-				RunStatusText: "Running",
-				RunStatus:     cloudapi.RunStatusRunning,
+		cs := func() v6cloudapi.TestRunProgress {
+			return v6cloudapi.TestRunProgress{
+				Status:            v6cloudapi.StatusRunning,
+				EstimatedDuration: 10,
+				ExecutionDuration: 1,
 			}
 		}
 
@@ -88,79 +95,64 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 		stdout := ts.Stdout.String()
 		t.Log(stdout)
 		assert.Contains(t, stdout, `execution: cloud`)
-		assert.Contains(t, stdout, `output: https://app.k6.io/runs/123`)
+		assert.Contains(t, stdout, "output: "+testStackURL+"/a/k6-app/runs/123")
 		assert.Contains(t, stdout, `test status: Running`)
 	})
 
 	t.Run("TestCloudUploadOnly", func(t *testing.T) {
 		t.Parallel()
 
-		cs := func() cloudapi.TestProgressResponse {
-			return cloudapi.TestProgressResponse{
-				RunStatusText: "Archived",
-				RunStatus:     cloudapi.RunStatusArchived,
-			}
-		}
-
-		ts := getSimpleCloudTestState(t, nil, setupCmd, []string{"--upload-only", "--log-output=stdout"}, nil, cs)
+		ts := getSimpleCloudTestState(t, nil, setupCmd, []string{"--upload-only", "--log-output=stdout"}, nil, nil)
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 		stdout := ts.Stdout.String()
 		t.Log(stdout)
 		assert.Contains(t, stdout, `execution: cloud`)
-		assert.Contains(t, stdout, `output: https://app.k6.io/runs/123`)
-		assert.Contains(t, stdout, `test status: Archived`)
+		assert.Contains(t, stdout, "output: "+testStackURL+"/a/k6-app/tests/456")
+		assert.Contains(t, stdout, `test status: Uploaded`)
 	})
 
-	t.Run("TestCloudWithConfigOverride", func(t *testing.T) {
+	t.Run("TestCloudUploadOnlyNoStackURL", func(t *testing.T) {
 		t.Parallel()
 
-		configOverride := http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
-			resp.WriteHeader(http.StatusOK)
-			_, err := fmt.Fprint(resp, `{
-			"reference_id": "123",
-			"config": {
-				"webAppURL": "https://bogus.url",
-				"testRunDetails": "something from the cloud"
-			},
-			"logs": [
-				{"level": "invalid", "message": "test debug message"},
-				{"level": "warning", "message": "test warning"},
-				{"level": "error", "message": "test error"}
-			]
-		}`)
-			assert.NoError(t, err)
+		ts := getSimpleCloudTestState(t, nil, setupCmd, []string{"--upload-only", "--log-output=stdout"}, nil, nil)
+		delete(ts.Env, "K6_CLOUD_STACK_URL")
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stdout := ts.Stdout.String()
+		t.Log(stdout)
+		assert.Contains(t, stdout, `test status: Uploaded`)
+		assert.Contains(t, stdout, "output: -")
+		// Without StackURL, no URL should be shown — neither a broken
+		// relative path nor a run URL (upload-only has no test run).
+		assert.NotContains(t, stdout, `output: /a/k6-app/tests/`)
+		assert.NotContains(t, stdout, `/runs/`)
+	})
+
+	t.Run("TestCloudStartResponseURL", func(t *testing.T) {
+		t.Parallel()
+
+		// v6 start response includes test_run_details_page_url which the
+		// CLI uses directly as the output URL (no ConfigOverride like v1).
+		testRunURL := "https://custom.cloud.url/runs/123"
+
+		startHandler := http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
+			writeJSON(resp, http.StatusOK,
+				newTestRunJSON(123, v6cloudapi.StatusRunning, nil, testRunURL))
 		})
-		ts := getSimpleCloudTestState(t, nil, setupCmd, nil, configOverride, nil)
+
+		ts := getSimpleCloudTestState(t, nil, setupCmd, nil, startHandler, nil)
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 		stdout := ts.Stdout.String()
 		t.Log(stdout)
 		assert.Contains(t, stdout, "execution: cloud")
-		assert.Contains(t, stdout, "output: something from the cloud")
-		assert.Contains(t, stdout, `level=debug msg="invalid message level 'invalid' for message 'test debug message'`)
-		assert.Contains(t, stdout, `level=error msg="test debug message" source=grafana-k6-cloud`)
-		assert.Contains(t, stdout, `level=warning msg="test warning" source=grafana-k6-cloud`)
-		assert.Contains(t, stdout, `level=error msg="test error" source=grafana-k6-cloud`)
+		assert.Contains(t, stdout, "output: "+testRunURL)
 	})
 
-	// TestCloudWithArchive tests that if k6 uses a static archive with the script inside that has cloud options like:
-	//
-	//	export let options = {
-	//		cloud: {
-	//			name: "my load test",
-	//			projectID: 124,
-	//			note: "lorem ipsum",
-	//		}
-	//	};
-	//
-	// actually sends to the cloud the archive with the correct metadata (metadata.json), like:
-	//
-	//	"clouad": {
-	//	    "name": "my load test",
-	//	    "note": "lorem ipsum",
-	//	    "projectID": 124
-	//	}
+	// TestCloudWithArchive verifies that when running from a pre-built
+	// archive, the uploaded archive metadata reflects the K6_CLOUD_PROJECT_ID
+	// env var (456) rather than the script-embedded projectID (124).
 	t.Run("TestCloudWithArchive", func(t *testing.T) {
 		t.Parallel()
 
@@ -169,7 +161,7 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 
 		archiveUpload := http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
 			// check the archive
-			file, _, err := req.FormFile("file")
+			file, _, err := req.FormFile("script")
 			assert.NoError(t, err)
 			assert.NotNil(t, file)
 
@@ -200,15 +192,14 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 			require.NoError(t, json.Unmarshal(metadataRaw, &metadata))
 			require.Equal(t, "my load test", metadata.Options.Cloud.Name)
 			require.Equal(t, "lorem ipsum", metadata.Options.Cloud.Note)
-			require.Equal(t, 124, metadata.Options.Cloud.ProjectID)
+			// projectID is overridden by K6_CLOUD_PROJECT_ID env var (456)
+			require.Equal(t, 456, metadata.Options.Cloud.ProjectID)
 
-			// respond with the test run ID
-			resp.WriteHeader(http.StatusOK)
-			_, err = fmt.Fprintf(resp, `{"reference_id": "%d"}`, testRunID)
-			assert.NoError(t, err)
+			// respond with the load test
+			writeJSON(resp, http.StatusCreated, newLoadTestJSON())
 		})
 
-		srv := getMockCloud(t, testRunID, archiveUpload, nil)
+		srv := getMockCloud(t, mockCloudOpts{testRunID: testRunID, createHandler: archiveUpload})
 
 		data, err := os.ReadFile(filepath.Join("testdata/archives", "archive_v1.0.0_with_cloud_option.tar")) //nolint:forbidigo // it's a test
 		require.NoError(t, err)
@@ -218,7 +209,11 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 		ts.CmdArgs = []string{"k6", "cloud", "--verbose", "--log-output=stdout", "archive.tar"}
 		ts.Env["K6_SHOW_CLOUD_LOGS"] = "false" // no mock for the logs yet
 		ts.Env["K6_CLOUD_HOST"] = srv.URL
+		ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
 		ts.Env["K6_CLOUD_TOKEN"] = "foo" // doesn't matter, we mock the cloud
+		ts.Env["K6_CLOUD_STACK_ID"] = "123"
+		ts.Env["K6_CLOUD_PROJECT_ID"] = "456"
+		ts.Env["K6_CLOUD_STACK_URL"] = testStackURL
 
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
@@ -227,19 +222,80 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 		assert.NotContains(t, stdout, `not logged in`)
 		assert.Contains(t, stdout, `execution: cloud`)
 		assert.Contains(t, stdout, `hello world from archive`)
-		assert.Contains(t, stdout, `output: https://app.k6.io/runs/123`)
-		assert.Contains(t, stdout, `test status: Finished`)
+		assert.Contains(t, stdout, "output: "+testStackURL+"/a/k6-app/runs/123")
+		assert.Contains(t, stdout, `test status: Completed`)
+	})
+
+	// TestCloudWithArchiveScriptProjectID verifies that when no
+	// K6_CLOUD_PROJECT_ID env var is set, the script-embedded projectID
+	// (124) is preserved in the uploaded archive metadata.
+	t.Run("TestCloudWithArchiveScriptProjectID", func(t *testing.T) {
+		t.Parallel()
+
+		testRunID := 123
+		ts := NewGlobalTestState(t)
+
+		archiveUpload := http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+			file, _, err := req.FormFile("script")
+			assert.NoError(t, err)
+			assert.NotNil(t, file)
+
+			data, err := io.ReadAll(file)
+			assert.NoError(t, err)
+
+			tmpPath := filepath.Join(ts.Cwd, "archive_to_cloud.tar")
+			require.NoError(t, fsext.WriteFile(ts.FS, tmpPath, data, 0o644))
+			require.NoError(t, testutils.Untar(t, ts.FS, tmpPath, "tmp/"))
+
+			metadataRaw, err := fsext.ReadFile(ts.FS, "tmp/metadata.json")
+			require.NoError(t, err)
+
+			metadata := struct {
+				Options struct {
+					Cloud struct {
+						ProjectID int `json:"projectID"`
+					} `json:"cloud"`
+				} `json:"options"`
+			}{}
+
+			require.NoError(t, json.Unmarshal(metadataRaw, &metadata))
+			// No K6_CLOUD_PROJECT_ID set, so the script-embedded value (124) survives.
+			require.Equal(t, 124, metadata.Options.Cloud.ProjectID)
+
+			writeJSON(resp, http.StatusCreated, newLoadTestJSON())
+		})
+
+		srv := getMockCloud(t, mockCloudOpts{testRunID: testRunID, createHandler: archiveUpload})
+
+		data, err := os.ReadFile(filepath.Join("testdata/archives", "archive_v1.0.0_with_cloud_option.tar")) //nolint:forbidigo // it's a test
+		require.NoError(t, err)
+		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "archive.tar"), data, 0o644))
+
+		ts.CmdArgs = []string{"k6", "cloud", "--verbose", "--log-output=stdout", "archive.tar"}
+		ts.Env["K6_SHOW_CLOUD_LOGS"] = "false"
+		ts.Env["K6_CLOUD_HOST"] = srv.URL
+		ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
+		ts.Env["K6_CLOUD_TOKEN"] = "foo"
+		ts.Env["K6_CLOUD_STACK_ID"] = "123"
+		// K6_CLOUD_PROJECT_ID intentionally NOT set
+		ts.Env["K6_CLOUD_STACK_URL"] = testStackURL
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stdout := ts.Stdout.String()
+		t.Log(stdout)
+		assert.Contains(t, stdout, `test status: Completed`)
 	})
 
 	t.Run("TestCloudThresholdsHaveFailed", func(t *testing.T) {
 		t.Parallel()
 
-		progressCallback := func() cloudapi.TestProgressResponse {
-			return cloudapi.TestProgressResponse{
-				RunStatusText: "Finished",
-				RunStatus:     cloudapi.RunStatusFinished,
-				ResultStatus:  cloudapi.ResultStatusFailed,
-				Progress:      1.0,
+		progressCallback := func() v6cloudapi.TestRunProgress {
+			return v6cloudapi.TestRunProgress{
+				Status:            v6cloudapi.StatusCompleted,
+				Result:            v6cloudapi.ResultFailed,
+				EstimatedDuration: 10,
+				ExecutionDuration: 10,
 			}
 		}
 		ts := getSimpleCloudTestState(t, nil, setupCmd, nil, nil, progressCallback)
@@ -252,15 +308,17 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 		assert.Contains(t, stdout, `Thresholds have been crossed`)
 	})
 
-	t.Run("TestCloudAbortedThreshold", func(t *testing.T) {
+	t.Run("TestCloudAbortedFailed", func(t *testing.T) {
 		t.Parallel()
 
-		progressCallback := func() cloudapi.TestProgressResponse {
-			return cloudapi.TestProgressResponse{
-				RunStatusText: "Finished",
-				RunStatus:     cloudapi.RunStatusAbortedThreshold,
-				ResultStatus:  cloudapi.ResultStatusFailed,
-				Progress:      1.0,
+		// Per the v6 spec, result "failed" always means thresholds breached,
+		// even when the test was aborted (e.g. aborted due to threshold).
+		progressCallback := func() v6cloudapi.TestRunProgress {
+			return v6cloudapi.TestRunProgress{
+				Status:            v6cloudapi.StatusAborted,
+				Result:            v6cloudapi.ResultFailed,
+				EstimatedDuration: 10,
+				ExecutionDuration: 10,
 			}
 		}
 		ts := getSimpleCloudTestState(t, nil, setupCmd, nil, nil, progressCallback)
@@ -271,10 +329,152 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 		stdout := ts.Stdout.String()
 		t.Log(stdout)
 		assert.Contains(t, stdout, `Thresholds have been crossed`)
+		assert.Contains(t, stdout, `test status: Aborted`)
+	})
+
+	t.Run("TestCloudResultError", func(t *testing.T) {
+		t.Parallel()
+
+		progressCallback := func() v6cloudapi.TestRunProgress {
+			return v6cloudapi.TestRunProgress{
+				Status:            v6cloudapi.StatusCompleted,
+				Result:            v6cloudapi.ResultError,
+				EstimatedDuration: 10,
+				ExecutionDuration: 10,
+			}
+		}
+		ts := getSimpleCloudTestState(t, nil, setupCmd, nil, nil, progressCallback)
+		ts.ExpectedExitCode = int(exitcodes.CloudTestRunFailed)
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stdout := ts.Stdout.String()
+		t.Log(stdout)
+		assert.Contains(t, stdout, `The test has failed`)
+	})
+
+	t.Run("TestCloudGracefulStopWaitsForTerminal", func(t *testing.T) {
+		t.Parallel()
+
+		var aborted atomic.Bool
+		progressCallback := func() v6cloudapi.TestRunProgress {
+			if aborted.Load() {
+				return v6cloudapi.TestRunProgress{
+					Status:            v6cloudapi.StatusAborted,
+					EstimatedDuration: 60,
+					ExecutionDuration: 30,
+				}
+			}
+			return v6cloudapi.TestRunProgress{
+				Status:            v6cloudapi.StatusRunning,
+				EstimatedDuration: 60,
+				ExecutionDuration: 5,
+			}
+		}
+
+		testRunID := 123
+		defaultWebAppURL := fmt.Sprintf("%s/a/k6-app/runs/%d", testStackURL, testRunID)
+		defaultProgress := v6cloudapi.TestRunProgress{
+			Status:            v6cloudapi.StatusRunning,
+			EstimatedDuration: 60,
+			ExecutionDuration: 5,
+		}
+
+		abortHandler := http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
+			aborted.Store(true)
+			resp.WriteHeader(http.StatusNoContent)
+		})
+
+		srv := getTestServer(t, map[string]http.Handler{
+			"POST ^/cloud/v6/validate_options$":                           http.HandlerFunc(v6ValidateOptionsHandler),
+			`POST ^/cloud/v6/projects/\d+/load_tests$`:                    cloudTestCreateSimple(t),
+			`PUT ^/cloud/v6/load_tests/\d+/script$`:                       http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) { resp.WriteHeader(http.StatusNoContent) }),
+			`POST ^/cloud/v6/load_tests/\d+/start$`:                       cloudTestStartSimple(t, testRunID, defaultWebAppURL),
+			fmt.Sprintf("GET ^/cloud/v6/test_runs/%d$", testRunID):        v6ProgressHandler(testRunID, defaultWebAppURL, defaultProgress, progressCallback),
+			fmt.Sprintf("POST ^/cloud/v6/test_runs/%d/abort$", testRunID): abortHandler,
+			`GET ^/cloud/v6/projects/\d+/load_tests`: http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
+				writeJSON(resp, http.StatusOK, fmt.Sprintf(`{"value": [%s]}`, newLoadTestJSON()))
+			}),
+		})
+		t.Cleanup(srv.Close)
+
+		ts := NewGlobalTestState(t)
+		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test.js"), []byte(`export default function() {}`), 0o644))
+		ts.CmdArgs = setupCmd([]string{"--verbose", "--log-output=stdout"})
+		ts.Env["K6_SHOW_CLOUD_LOGS"] = "false"
+		ts.Env["K6_CLOUD_HOST"] = srv.URL
+		ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
+		ts.Env["K6_CLOUD_TOKEN"] = "foo"
+		ts.Env["K6_CLOUD_STACK_ID"] = "123"
+		ts.Env["K6_CLOUD_PROJECT_ID"] = "456"
+		ts.Env["K6_CLOUD_STACK_URL"] = testStackURL
+
+		sendSignal := injectMockSignalNotifier(ts)
+		asyncWaitForStdoutAndRun(t, ts, 20, 500*time.Millisecond, "Trapping interrupt signals", func() {
+			t.Log("signal trap is set, sending SIGINT...")
+			sendSignal <- syscall.SIGINT
+			<-sendSignal
+		})
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stdout := ts.Stdout.String()
+		t.Log(stdout)
+		assert.Contains(t, stdout, `test status: Aborted`)
+		assert.True(t, aborted.Load(), "abort endpoint should have been called")
 	})
 }
 
-func cloudTestStartSimple(tb testing.TB, testRunID int) http.Handler {
+var testEpoch = time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC) //nolint:gochecknoglobals
+
+// marshalJSON marshals v to JSON; panics on error (test helper).
+func marshalJSON(v any) string {
+	b, err := json.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
+	return string(b)
+}
+
+// newLoadTestJSON builds a LoadTestApiModel JSON response string.
+// Using the generated model ensures fixtures break at compile time
+// if the spec adds or renames required fields.
+func newLoadTestJSON() string {
+	return marshalJSON(k6cloud.NewLoadTestApiModel(
+		456, 789, "test", *k6cloud.NewNullableInt32(nil),
+		testEpoch, testEpoch,
+	))
+}
+
+// newTestRunJSON builds a StartLoadTestResponse JSON string for mocks.
+func newTestRunJSON(id int32, status string, result *string, webAppURL string) string {
+	m := k6cloud.NewStartLoadTestResponse(
+		id, 456, 789,
+		*k6cloud.NewNullableString(nil), // started_by
+		testEpoch,                       // created
+		*k6cloud.NewNullableTime(nil),   // ended
+		"",                              // note
+		*k6cloud.NewNullableTime(nil),   // retention_expiry
+		*k6cloud.NewNullableTestCostApiModel(nil), // cost
+		status,
+		*k6cloud.NewStatusApiModel("created", testEpoch), // status_details
+		[]k6cloud.StatusApiModel{},                       // status_history
+		[]k6cloud.DistributionZoneApiModel{},             // distribution
+		*k6cloud.NewNullableString(result),               // result
+		map[string]any{},                                 // result_details
+		map[string]any{},                                 // options
+		map[string]string{},                              // k6_dependencies
+		map[string]string{},                              // k6_versions
+		*k6cloud.NewNullableInt32(nil),                   // max_vus
+		*k6cloud.NewNullableInt32(nil),                   // max_browser_vus
+		*k6cloud.NewNullableInt32(nil),                   // estimated_duration
+		0,                                                // execution_duration
+		webAppURL,                                        // test_run_details_page_url
+	)
+	return marshalJSON(m)
+}
+
+func cloudTestStartSimpleV1(tb testing.TB, testRunID int) http.Handler {
 	return http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
 		resp.WriteHeader(http.StatusOK)
 		_, err := fmt.Fprintf(resp, `{"reference_id": "%d"}`, testRunID)
@@ -282,57 +482,122 @@ func cloudTestStartSimple(tb testing.TB, testRunID int) http.Handler {
 	})
 }
 
-func getMockCloud(
-	t *testing.T, testRunID int,
-	archiveUpload http.Handler, progressCallback func() cloudapi.TestProgressResponse,
-) *httptest.Server {
-	if archiveUpload == nil {
-		archiveUpload = cloudTestStartSimple(t, testRunID)
+func cloudTestCreateSimple(_ testing.TB) http.Handler {
+	return http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
+		writeJSON(resp, http.StatusCreated, newLoadTestJSON())
+	})
+}
+
+func cloudTestStartSimple(_ testing.TB, testRunID int, webAppURL string) http.Handler {
+	return http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
+		writeJSON(resp, http.StatusOK,
+			newTestRunJSON(int32(testRunID), "running", nil, webAppURL))
+	})
+}
+
+// writeJSON sets Content-Type and writes a JSON body to the response.
+func writeJSON(resp http.ResponseWriter, status int, body string) {
+	resp.Header().Set("Content-Type", "application/json")
+	resp.WriteHeader(status)
+	_, _ = fmt.Fprint(resp, body)
+}
+
+func v6ValidateOptionsHandler(resp http.ResponseWriter, _ *http.Request) {
+	writeJSON(resp, http.StatusOK, `{}`)
+}
+
+func v6ProgressHandler(
+	testRunID int, webAppURL string, defaultProgress v6cloudapi.TestRunProgress,
+	progressCallback func() v6cloudapi.TestRunProgress,
+) http.Handler {
+	return http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
+		tp := defaultProgress
+		if progressCallback != nil {
+			tp = progressCallback()
+		}
+		var result *string
+		if tp.Result != "" {
+			result = &tp.Result
+		}
+		writeJSON(resp, http.StatusOK,
+			newTestRunJSON(int32(testRunID), tp.Status, result, webAppURL))
+	})
+}
+
+// mockCloudOpts configures getMockCloud.
+type mockCloudOpts struct {
+	testRunID        int
+	createHandler    http.Handler
+	startHandler     http.Handler
+	progressCallback func() v6cloudapi.TestRunProgress
+}
+
+func getMockCloud(t *testing.T, opts mockCloudOpts) *httptest.Server {
+	if opts.testRunID == 0 {
+		opts.testRunID = 123
 	}
-	testProgressURL := fmt.Sprintf("GET ^/v1/test-progress/%d$", testRunID)
-	defaultProgress := cloudapi.TestProgressResponse{
-		RunStatusText: "Finished",
-		RunStatus:     cloudapi.RunStatusFinished,
-		ResultStatus:  cloudapi.ResultStatusPassed,
-		Progress:      1,
+	if opts.createHandler == nil {
+		opts.createHandler = cloudTestCreateSimple(t)
+	}
+
+	webAppURL := fmt.Sprintf("%s/a/k6-app/runs/%d", testStackURL, opts.testRunID)
+
+	if opts.startHandler == nil {
+		opts.startHandler = cloudTestStartSimple(t, opts.testRunID, webAppURL)
+	}
+
+	defaultProgress := v6cloudapi.TestRunProgress{
+		Status:            v6cloudapi.StatusCompleted,
+		EstimatedDuration: 10,
+		ExecutionDuration: 10,
 	}
 
 	srv := getTestServer(t, map[string]http.Handler{
-		"POST ^/v1/archive-upload$": archiveUpload,
-		testProgressURL: http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
-			testProgress := defaultProgress
-			if progressCallback != nil {
-				testProgress = progressCallback()
-			}
-			respBody, err := json.Marshal(testProgress)
-			assert.NoError(t, err)
-			_, err = fmt.Fprint(resp, string(respBody))
-			assert.NoError(t, err)
+		"POST ^/cloud/v6/validate_options$":                                http.HandlerFunc(v6ValidateOptionsHandler),
+		`POST ^/cloud/v6/projects/\d+/load_tests$`:                         opts.createHandler,
+		`PUT ^/cloud/v6/load_tests/\d+/script$`:                            http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) { resp.WriteHeader(http.StatusNoContent) }),
+		`POST ^/cloud/v6/load_tests/\d+/start$`:                            opts.startHandler,
+		fmt.Sprintf("GET ^/cloud/v6/test_runs/%d$", opts.testRunID):        v6ProgressHandler(opts.testRunID, webAppURL, defaultProgress, opts.progressCallback),
+		fmt.Sprintf("POST ^/cloud/v6/test_runs/%d/abort$", opts.testRunID): http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) { resp.WriteHeader(http.StatusNoContent) }),
+		`GET ^/cloud/v6/projects/\d+/load_tests`: http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
+			writeJSON(resp, http.StatusOK, fmt.Sprintf(`{"value": [%s]}`, newLoadTestJSON()))
 		}),
 	})
 
 	t.Cleanup(srv.Close)
-
 	return srv
 }
 
-func getSimpleCloudTestState(t *testing.T, script []byte, setupCmd setupCommandFunc, cliFlags []string, archiveUpload http.Handler, progressCallback func() cloudapi.TestProgressResponse) *GlobalTestState {
+func getSimpleCloudTestState(
+	t *testing.T,
+	script []byte,
+	setupCmd setupCommandFunc,
+	cliFlags []string,
+	startHandler http.Handler,
+	progressCallback func() v6cloudapi.TestRunProgress,
+) *GlobalTestState {
 	if script == nil {
 		script = []byte(`export default function() {}`)
 	}
-
 	if cliFlags == nil {
 		cliFlags = []string{"--verbose", "--log-output=stdout"}
 	}
 
-	srv := getMockCloud(t, 123, archiveUpload, progressCallback)
+	srv := getMockCloud(t, mockCloudOpts{
+		startHandler:     startHandler,
+		progressCallback: progressCallback,
+	})
 
 	ts := NewGlobalTestState(t)
 	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test.js"), script, 0o644))
 	ts.CmdArgs = setupCmd(cliFlags)
-	ts.Env["K6_SHOW_CLOUD_LOGS"] = "false" // no mock for the logs yet
+	ts.Env["K6_SHOW_CLOUD_LOGS"] = "false"
 	ts.Env["K6_CLOUD_HOST"] = srv.URL
-	ts.Env["K6_CLOUD_TOKEN"] = "foo" // doesn't matter, we mock the cloud
+	ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
+	ts.Env["K6_CLOUD_TOKEN"] = "foo"
+	ts.Env["K6_CLOUD_STACK_ID"] = "123"
+	ts.Env["K6_CLOUD_PROJECT_ID"] = "456"
+	ts.Env["K6_CLOUD_STACK_URL"] = testStackURL
 
 	return ts
 }

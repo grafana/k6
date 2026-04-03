@@ -2,20 +2,18 @@ package tests
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
 
-	"go.k6.io/k6/cloudapi"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"go.k6.io/k6/internal/cmd"
 	"go.k6.io/k6/internal/lib/testutils"
 	"go.k6.io/k6/lib/fsext"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestK6CloudUpload(t *testing.T) {
@@ -37,40 +35,19 @@ func TestK6CloudUpload(t *testing.T) {
 	t.Run("TestCloudUploadWithScript", func(t *testing.T) {
 		t.Parallel()
 
-		cs := func() cloudapi.TestProgressResponse {
-			return cloudapi.TestProgressResponse{
-				RunStatusText: "Archived",
-				RunStatus:     cloudapi.RunStatusArchived,
-			}
-		}
-
-		ts := getSimpleCloudTestState(t, nil, setupK6CloudUploadCmd, nil, nil, cs)
+		ts := getSimpleCloudTestState(t, nil, setupK6CloudUploadCmd, nil, nil, nil)
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 		stdout := ts.Stdout.String()
 		t.Log(stdout)
 		assert.Contains(t, stdout, `execution: cloud`)
-		assert.Contains(t, stdout, `output: https://app.k6.io/runs/123`)
-		assert.Contains(t, stdout, `test status: Archived`)
+		assert.Contains(t, stdout, "output: "+testStackURL+"/a/k6-app/tests/456")
+		assert.Contains(t, stdout, `test status: Uploaded`)
 	})
 
-	// TestCloudUploadWithArchive tests that if k6 uses a static archive with the script inside that has cloud options like:
-	//
-	//	export let options = {
-	//		cloud: {
-	//			name: "my load test",
-	//			projectID: 124,
-	//			note: "lorem ipsum",
-	//		},
-	//	};
-	//
-	// actually sends to the cloud the archive with the correct metadata (metadata.json), like:
-	//
-	//	"cloud": {
-	//	    "name": "my load test",
-	//	    "note": "lorem ipsum",
-	//	    "projectID": 124
-	//	}
+	// TestCloudUploadWithArchive verifies that when uploading from a
+	// pre-built archive, the K6_CLOUD_PROJECT_ID env var (456) overrides
+	// the script-embedded projectID (124) in the uploaded metadata.
 	t.Run("TestCloudUploadWithArchive", func(t *testing.T) {
 		t.Parallel()
 
@@ -79,7 +56,7 @@ func TestK6CloudUpload(t *testing.T) {
 
 		archiveUpload := http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
 			// check the archive
-			file, _, err := req.FormFile("file")
+			file, _, err := req.FormFile("script")
 			assert.NoError(t, err)
 			assert.NotNil(t, file)
 
@@ -110,22 +87,14 @@ func TestK6CloudUpload(t *testing.T) {
 			require.NoError(t, json.Unmarshal(metadataRaw, &metadata))
 			require.Equal(t, "my load test", metadata.Options.Cloud.Name)
 			require.Equal(t, "lorem ipsum", metadata.Options.Cloud.Note)
-			require.Equal(t, 124, metadata.Options.Cloud.ProjectID)
+			// projectID is overridden by K6_CLOUD_PROJECT_ID env var (456)
+			require.Equal(t, 456, metadata.Options.Cloud.ProjectID)
 
-			// respond with the test run ID
-			resp.WriteHeader(http.StatusOK)
-			_, err = fmt.Fprintf(resp, `{"reference_id": "%d"}`, testRunID)
-			assert.NoError(t, err)
+			// respond with the load test
+			writeJSON(resp, http.StatusCreated, newLoadTestJSON())
 		})
 
-		cs := func() cloudapi.TestProgressResponse {
-			return cloudapi.TestProgressResponse{
-				RunStatusText: "Archived",
-				RunStatus:     cloudapi.RunStatusArchived,
-			}
-		}
-
-		srv := getMockCloud(t, testRunID, archiveUpload, cs)
+		srv := getMockCloud(t, mockCloudOpts{testRunID: testRunID, createHandler: archiveUpload})
 
 		data, err := os.ReadFile(filepath.Join("testdata/archives", "archive_v1.0.0_with_cloud_option.tar")) //nolint:forbidigo // it's a test
 		require.NoError(t, err)
@@ -135,7 +104,11 @@ func TestK6CloudUpload(t *testing.T) {
 		ts.CmdArgs = []string{"k6", "cloud", "upload", "archive.tar"}
 		ts.Env["K6_SHOW_CLOUD_LOGS"] = "false" // no mock for the logs yet
 		ts.Env["K6_CLOUD_HOST"] = srv.URL
+		ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
 		ts.Env["K6_CLOUD_TOKEN"] = "foo" // doesn't matter, we mock the cloud
+		ts.Env["K6_CLOUD_STACK_ID"] = "123"
+		ts.Env["K6_CLOUD_PROJECT_ID"] = "456"
+		ts.Env["K6_CLOUD_STACK_URL"] = testStackURL
 
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
@@ -143,8 +116,8 @@ func TestK6CloudUpload(t *testing.T) {
 		t.Log(stdout)
 		assert.NotContains(t, stdout, `not logged in`)
 		assert.Contains(t, stdout, `execution: cloud`)
-		assert.Contains(t, stdout, `output: https://app.k6.io/runs/123`)
-		assert.Contains(t, stdout, `test status: Archived`)
+		assert.Contains(t, stdout, "output: "+testStackURL+"/a/k6-app/tests/456")
+		assert.Contains(t, stdout, `test status: Uploaded`)
 	})
 }
 
