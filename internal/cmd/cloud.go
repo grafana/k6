@@ -86,7 +86,7 @@ func (c *cmdCloud) preRun(cmd *cobra.Command, _ []string) error {
 
 // TODO: split apart some more
 //
-//nolint:funlen,gocognit,cyclop
+//nolint:funlen,gocognit,cyclop,nestif
 func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	// If no args provided and called from main cloud command, show helpful error
 	if cmd.Name() == "cloud" && len(args) == 0 {
