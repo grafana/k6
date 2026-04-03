@@ -113,14 +113,12 @@ func (c *Client) ValidateOptions(ctx context.Context, options lib.Options) error
 	if err != nil {
 		return fmt.Errorf("marshaling options: %w", err)
 	}
-	var generic map[string]any
-	if err := json.Unmarshal(raw, &generic); err != nil {
+	var opts k6cloud.Options
+	if err := json.Unmarshal(raw, &opts); err != nil {
 		return fmt.Errorf("unmarshaling options: %w", err)
 	}
 
-	validateOptions := k6cloud.NewValidateOptionsRequest(k6cloud.Options{
-		AdditionalProperties: generic,
-	})
+	validateOptions := k6cloud.NewValidateOptionsRequest(opts)
 	validateOptions.ProjectId = *k6cloud.NewNullableInt32(&c.projectID)
 
 	return c.retryDo(ctx, func() (bool, error) {
