@@ -298,3 +298,82 @@ func TestEnabledTagsTextUnmarshal(t *testing.T) {
 		require.Equal(t, expected, *set)
 	}
 }
+
+func TestTagSetLen(t *testing.T) {
+	t.Parallel()
+
+	r := NewRegistry()
+	root := r.RootTagSet()
+
+	assert.Equal(t, 0, root.Len())
+
+	one := root.With("k1", "v1")
+	assert.Equal(t, 1, one.Len())
+
+	two := one.With("k2", "v2")
+	assert.Equal(t, 2, two.Len())
+
+	// Overwriting a key should not increase the count
+	overwrite := one.With("k1", "v2")
+	assert.Equal(t, 1, overwrite.Len())
+
+	// Removing a key should decrease the count
+	back := two.Without("k2")
+	assert.Equal(t, 1, back.Len())
+}
+
+func TestTagSetIterate(t *testing.T) {
+	t.Parallel()
+
+	r := NewRegistry()
+	root := r.RootTagSet()
+
+	// Iterating an empty TagSet should not call fn at all
+	called := false
+	root.Iterate(func(_, _ string) {
+		called = true
+	})
+	assert.False(t, called)
+
+	// Iterating a non-empty TagSet should yield all key-value pairs
+	tags := root.With("a", "1").With("b", "2").With("c", "3")
+	got := make(map[string]string)
+	tags.Iterate(func(key, value string) {
+		got[key] = value
+	})
+	assert.Equal(t, map[string]string{"a": "1", "b": "2", "c": "3"}, got)
+
+	// Iterate and Map should produce the same key-value pairs
+	assert.Equal(t, tags.Map(), got)
+}
+
+func BenchmarkTagSetMap(b *testing.B) {
+	r := NewRegistry()
+	tags := r.RootTagSet()
+	for i := range 8 {
+		tags = tags.With(fmt.Sprintf("key%d", i), fmt.Sprintf("val%d", i))
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for range b.N {
+		m := tags.Map()
+		_ = m
+	}
+}
+
+func BenchmarkTagSetIterate(b *testing.B) {
+	r := NewRegistry()
+	tags := r.RootTagSet()
+	for i := range 8 {
+		tags = tags.With(fmt.Sprintf("key%d", i), fmt.Sprintf("val%d", i))
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for range b.N {
+		tags.Iterate(func(key, value string) {
+			_, _ = key, value
+		})
+	}
+}

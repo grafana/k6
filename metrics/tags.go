@@ -75,6 +75,27 @@ func (ts *TagSet) Map() map[string]string {
 	return ((*atlas.Node)(ts)).Path()
 }
 
+// Len returns the number of key-value tag pairs in the set.
+func (ts *TagSet) Len() int {
+	return (*atlas.Node)(ts).Len()
+}
+
+// Iterate calls the provided function for each key-value tag pair in the set.
+// Unlike Map(), it does not allocate an intermediate map, making it more
+// memory-efficient when only iteration is needed (e.g. when building a list
+// of labels in an extension).
+//
+// The iteration order is deterministic but reflects the internal atlas.Node
+// traversal order, which may differ from insertion order.
+func (ts *TagSet) Iterate(fn func(key, value string)) {
+	n := (*atlas.Node)(ts)
+	for !n.IsRoot() {
+		prev, key, value := n.Data()
+		fn(key, value)
+		n = prev
+	}
+}
+
 // WithTagsFromMap sorts the given tags by their keys and adds them to the
 // current tag set one by one, without branching out. This is generally
 // discouraged and sequential usage of the TagSet.With() method should be
