@@ -64,6 +64,10 @@ type Browser struct {
 	sessionIDtoTargetIDMu sync.RWMutex
 	sessionIDtoTargetID   map[target.SessionID]target.ID
 
+	// downloads tracks in-progress downloads by GUID.
+	downloadsMu sync.Mutex
+	downloads   map[string]*Download
+
 	// closing guards against new pages being attached while we're closing
 	// the browser. It also protects against multiple calls to Close().
 	closing atomic.Bool
@@ -135,6 +139,7 @@ func newBrowser(
 		browserOpts:         browserOpts,
 		pages:               make(map[target.ID]*Page),
 		sessionIDtoTargetID: make(map[target.SessionID]target.ID),
+		downloads:           make(map[string]*Download),
 		logger:              logger,
 	}
 }
@@ -205,6 +210,57 @@ func (b *Browser) getPages() []*Page {
 	return pages
 }
 
+// pageForFrame finds the Page that owns the given frame ID.
+func (b *Browser) pageForFrame(fid cdp.FrameID) *Page {
+	for _, p := range b.getPages() {
+		if _, ok := p.frameManager.getFrameByID(fid); ok {
+			return p
+		}
+	}
+	return nil
+}
+
+// onDownloadWillBegin routes a CDP download event to the page that initiated it.
+func (b *Browser) onDownloadWillBegin(ev *cdpbrowser.EventDownloadWillBegin) {
+	p := b.pageForFrame(ev.FrameID)
+	if p == nil {
+		b.logger.Warnf("Browser:onDownloadWillBegin", "no page found for frame %s", ev.FrameID)
+		return
+	}
+
+	dl := newDownload(p, ev.GUID, ev.URL, ev.SuggestedFilename, p.browserCtx.DownloadsPath)
+
+	b.downloadsMu.Lock()
+	b.downloads[ev.GUID] = dl
+	b.downloadsMu.Unlock()
+
+	p.onDownload(dl)
+}
+
+// onDownloadProgress updates the download state when it completes or is canceled.
+func (b *Browser) onDownloadProgress(ev *cdpbrowser.EventDownloadProgress) {
+	b.downloadsMu.Lock()
+	dl, ok := b.downloads[ev.GUID]
+	if ok && (ev.State == cdpbrowser.DownloadProgressStateCompleted || ev.State == cdpbrowser.DownloadProgressStateCanceled) {
+		delete(b.downloads, ev.GUID)
+	}
+	b.downloadsMu.Unlock()
+
+	if !ok {
+		b.logger.Warnf("Browser:onDownloadProgress", "no download found for GUID %s", ev.GUID)
+		return
+	}
+
+	switch ev.State {
+	case cdpbrowser.DownloadProgressStateCompleted:
+		dl.finish("")
+	case cdpbrowser.DownloadProgressStateCanceled:
+		dl.finish("canceled")
+	case cdpbrowser.DownloadProgressStateInProgress:
+		// nothing to do, download is still in progress
+	}
+}
+
 func (b *Browser) initEvents() error {
 	chHandler := make(chan Event)
 
@@ -214,6 +270,8 @@ func (b *Browser) initEvents() error {
 	b.conn.on(b.browserCtx, []string{
 		cdproto.EventTargetAttachedToTarget,
 		cdproto.EventTargetDetachedFromTarget,
+		cdproto.EventBrowserDownloadWillBegin,
+		cdproto.EventBrowserDownloadProgress,
 		EventConnectionClose,
 	}, chHandler)
 
@@ -241,6 +299,10 @@ func (b *Browser) initEvents() error {
 				} else if ev, ok := event.data.(*target.EventDetachedFromTarget); ok {
 					b.logger.Debugf("Browser:initEvents:onDetachedFromTarget", "sid:%v", ev.SessionID)
 					b.onDetachedFromTarget(ev)
+				} else if ev, ok := event.data.(*cdpbrowser.EventDownloadWillBegin); ok {
+					b.onDownloadWillBegin(ev)
+				} else if ev, ok := event.data.(*cdpbrowser.EventDownloadProgress); ok {
+					b.onDownloadProgress(ev)
 				} else if event.typ == EventConnectionClose {
 					b.logger.Debugf("Browser:initEvents:EventConnectionClose", "")
 					return

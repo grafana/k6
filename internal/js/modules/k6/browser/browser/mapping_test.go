@@ -227,6 +227,12 @@ func TestMappings(t *testing.T) {
 				return mapMouse(moduleVU{VU: vu}, &common.Mouse{})
 			},
 		},
+		"mapDownload": {
+			apiInterface: (*downloadAPI)(nil),
+			mapp: func() mapping {
+				return mapDownload(moduleVU{VU: vu}, &common.Download{})
+			},
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -630,6 +636,17 @@ type mouseAPI interface {
 	Down(opts sobek.Value) error
 	Up(opts sobek.Value) error
 	Move(x float64, y float64, opts sobek.Value) error
+}
+
+// downloadAPI is the interface of a file download.
+type downloadAPI interface {
+	URL() string
+	SuggestedFilename() string
+	Path() (string, error)
+	Failure() string
+	SaveAs(path string) error
+	Cancel() error
+	Page() *common.Page
 }
 
 // workerAPI is the interface of a web worker.
