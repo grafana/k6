@@ -14,6 +14,7 @@ import (
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
+	"encoding/json"
 )
 
 func TestOutput_Summary(t *testing.T) {
@@ -342,4 +343,60 @@ func TestOutput_AddMetricSamples(t *testing.T) {
 
 		assert.Equal(t, []string{"something", "auth"}, o.dataModel.groupsOrder)
 	})
+}
+
+func TestMachineReadable_IncludesP99(t *testing.T) {
+	t.Parallel()
+
+	s := summary.New()
+
+	m := summary.Metric{
+		MetricInfo: summary.MetricInfo{
+			Name:     "request_duration",
+			Type:     "trend",
+			Contains: "default",
+		},
+		Values: map[string]float64{
+			"avg":   50,
+			"p(95)": 95,
+			"p(99)": 99, // 👈 critical for test
+		},
+	}
+
+	s.Group.Metrics.Custom = map[string]summary.Metric{
+		"request_duration": m,
+	}
+
+	meta := summary.Meta{}
+
+	mr, err := summary.ToMachineReadable(s, meta)
+	require.NoError(t, err)
+
+	b, err := json.Marshal(mr)
+	require.NoError(t, err)
+
+	var result map[string]interface{}
+	err = json.Unmarshal(b, &result)
+	require.NoError(t, err)
+
+	// Navigate safely
+	results, ok := result["results"].(map[string]interface{})
+	require.True(t, ok)
+
+	metrics, ok := results["metrics"].([]interface{})
+	require.True(t, ok)
+	require.NotEmpty(t, metrics)
+
+	metric, ok := metrics[0].(map[string]interface{})
+	require.True(t, ok)
+
+	values, ok := metric["values"].(map[string]interface{})
+	require.True(t, ok)
+
+	// ❌ This should FAIL before fix
+	assert.Contains(t, values, "p(99)")
+
+	// sanity checks
+	assert.Contains(t, values, "avg")
+	assert.Contains(t, values, "p(95)")
 }
