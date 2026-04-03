@@ -204,9 +204,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	executionState := execScheduler.GetState()
 	if summaryEnabled { //nolint:nestif
 		// Despite having the revamped [summary.Summary], we still keep the use of the
-		// [lib.LegacySummary] for multiple backwards compatibility options,
-		// to be deprecated by v1.0 and likely removed or replaced by v2.0:
-		// - the `legacy` summary mode (which keeps the old summary format/display).
+		// [lib.LegacySummary] for backwards compatibility:
 		// - the data structure for custom `handleSummary()` implementations.
 		// - the data structure for the JSON (--summary-export) output.
 		legacySummary := func() *lib.LegacySummary {
@@ -231,22 +229,6 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		}
 
 		switch summaryMode {
-		// TODO(@joanlopez): remove by k6 v2.0, once we completely drop the support for --summary-mode=legacy.
-		case summary.ModeLegacy:
-			logger.Warn(`The "legacy" summary mode has been deprecated, and will be removed by k6 v2.0. ` +
-				`Please, migrate to either "compact" or "full" as soon as possible.`)
-			// At the end of the test run
-			defer func() {
-				logger.Debug("Generating the end-of-test summary...")
-
-				summaryResult, hsErr := test.initRunner.HandleSummary(globalCtx, legacySummary(), nil, summaryMeta)
-				if hsErr == nil {
-					hsErr = handleSummaryResult(c.gs.FS, c.gs.Stdout, c.gs.Stderr, summaryResult)
-				}
-				if hsErr != nil {
-					logger.WithError(hsErr).Error("failed to handle the end-of-test summary")
-				}
-			}()
 		default:
 			// Instantiates the summary output
 			summaryOutput, err := summaryoutput.New(output.Params{

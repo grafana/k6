@@ -2950,35 +2950,6 @@ func TestSummaryExport(t *testing.T) {
 		})
 	}
 
-	// TODO(@joanlopez): remove by k6 v2.0, once we completely drop the support for --summary-mode=legacy.
-	t.Run("legacy", func(t *testing.T) {
-		t.Parallel()
-
-		ts := NewGlobalTestState(t)
-		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(mainScript), 0o644))
-
-		ts.CmdArgs = []string{
-			"k6", "run",
-			"--summary-export=results.json",
-			"--summary-mode=legacy",
-			"script.js",
-		}
-
-		cmd.ExecuteWithGlobalState(ts.GlobalState)
-
-		stdout := ts.Stdout.String()
-		t.Log(stdout)
-
-		assert.Contains(t, stdout, "✓ TRUE is TRUE")
-		assert.Contains(t, stdout, "checks...............: 100.00% 1 out of 1")
-		assert.Contains(t, stdout, "custom_iterations....: 1")
-		assert.Contains(t, stdout, "iterations...........: 1")
-
-		// As of now, "legacy" has been deprecated.
-		assert.Contains(t, ts.Stderr.String(), `The \"legacy\" summary mode has been deprecated, and will be removed by k6 v2.0.`)
-
-		assertSummaryExport(t, ts.FS)
-	})
 }
 
 func TestHandleSummary(t *testing.T) {
@@ -3001,8 +2972,7 @@ func TestHandleSummary(t *testing.T) {
 	}
 	`
 
-	// TODO(@joanlopez): remove "summary" by k6 v2.0, once we completely drop the support for --summary-mode=legacy.
-	for _, summaryMode := range []string{"compact", "full", "legacy"} {
+	for _, summaryMode := range []string{"compact", "full"} {
 		t.Run(summaryMode, func(t *testing.T) {
 			t.Parallel()
 
