@@ -3,6 +3,8 @@ package cloudapi
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -154,22 +156,6 @@ func (c *Client) CreateCloudTest(
 	return result, err
 }
 
-// updateCloudTest updates an existing cloud test with the provided script archive.
-func (c *Client) updateCloudTest(ctx context.Context, testID int32, arcData []byte) error {
-	return c.retryDo(ctx, func() (bool, error) {
-		res, rerr := c.apiClient.LoadTestsAPI.
-			LoadTestsScriptUpdate(c.authCtx(ctx), testID).
-			Body(io.NopCloser(bytes.NewReader(arcData))).
-			XStackId(c.stackID).
-			Execute()
-		defer closeResponse(res, &rerr)
-		if err := CheckResponse(res, rerr); err != nil {
-			return shouldRetry(res, rerr), fmt.Errorf("updating cloud test script: %w", err)
-		}
-		return false, nil
-	})
-}
-
 // FetchCloudTestByName retrieves a cloud test by its name within the specified project.
 // The API's name parameter is an exact-match filter.
 func (c *Client) FetchCloudTestByName(
@@ -218,8 +204,20 @@ func (c *Client) CreateOrUpdateCloudTest(
 			return nil, err
 		}
 
-		if err := c.updateCloudTest(ctx, test.Id, arcData); err != nil {
-			return nil, err
+		updateErr := c.retryDo(ctx, func() (bool, error) {
+			res, rerr := c.apiClient.LoadTestsAPI.
+				LoadTestsScriptUpdate(c.authCtx(ctx), test.Id).
+				Body(io.NopCloser(bytes.NewReader(arcData))).
+				XStackId(c.stackID).
+				Execute()
+			defer closeResponse(res, &rerr)
+			if err := CheckResponse(res, rerr); err != nil {
+				return shouldRetry(res, rerr), fmt.Errorf("updating cloud test script: %w", err)
+			}
+			return false, nil
+		})
+		if updateErr != nil {
+			return nil, updateErr
 		}
 	}
 
@@ -232,7 +230,9 @@ func (c *Client) StartCloudTestRun(
 ) (*k6cloud.StartLoadTestResponse, error) {
 	// Generate the key once so retries reuse it — the backend deduplicates
 	// by this key, so a fresh key per attempt would defeat idempotency.
-	idempotencyKey := randomStrHex()
+	b := make([]byte, 8)
+	_, _ = rand.Read(b)
+	idempotencyKey := hex.EncodeToString(b)
 
 	var result *k6cloud.StartLoadTestResponse
 	err := c.retryDo(ctx, func() (bool, error) {
@@ -249,17 +249,6 @@ func (c *Client) StartCloudTestRun(
 		return false, nil
 	})
 	return result, err
-}
-
-// CreateAndStartCloudTestRun creates or updates a cloud test and starts a run.
-func (c *Client) CreateAndStartCloudTestRun(
-	ctx context.Context, name string, arc *lib.Archive,
-) (*k6cloud.StartLoadTestResponse, error) {
-	loadTest, err := c.CreateOrUpdateCloudTest(ctx, name, arc)
-	if err != nil {
-		return nil, err
-	}
-	return c.StartCloudTestRun(ctx, loadTest.Id)
 }
 
 // StopCloudTestRun tells the cloud to abort the test run.

@@ -249,7 +249,12 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	cloudTestRun, err := client.CreateAndStartCloudTestRun(globalCtx, name, arc)
+	loadTest, err := client.CreateOrUpdateCloudTest(globalCtx, name, arc)
+	if err != nil {
+		return fmt.Errorf("uploading cloud test: %w", err)
+	}
+
+	cloudTestRun, err := client.StartCloudTestRun(globalCtx, loadTest.Id)
 	if err != nil {
 		return fmt.Errorf("starting cloud test run: %w", err)
 	}

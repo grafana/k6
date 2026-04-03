@@ -2,8 +2,6 @@ package cloudapi
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -194,14 +192,6 @@ func (c *Client) retryDo(ctx context.Context, fn func() (retryable bool, err err
 		}
 	}
 	return lastErr
-}
-
-// randomStrHex returns a hex string for use as an idempotency key.
-// Mirrors cloudapi.randomStrHex — unexported there, so duplicated.
-func randomStrHex() string {
-	b := make([]byte, 8)
-	_, _ = rand.Read(b)
-	return hex.EncodeToString(b)
 }
 
 // toInt32 safely converts an int64 to int32, returning an error if overflow would occur.
