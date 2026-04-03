@@ -4,7 +4,7 @@ Thank you for your interest in contributing to k6!
 
 (ﾉ◕ヮ◕)ﾉ*:・ﾟ✧
 
-Before you begin, make sure to familiarize yourself with the [Code of Conduct](CODE_OF_CONDUCT.md). If you've previously contributed to other open source project, you may recognize it as the classic [Contributor Covenant](https://contributor-covenant.org/).
+Before you begin, make sure to familiarize yourself with the [Code of Conduct](CODE_OF_CONDUCT.md). If you've previously contributed to other open source projects, you may recognize it as the classic [Contributor Covenant](https://contributor-covenant.org/).
 
 If you want to chat with the team or the community, you can [join our community forums](https://community.k6.io/).
 
