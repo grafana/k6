@@ -74,6 +74,7 @@ func optionFlagSet() *pflag.FlagSet {
 		"Milliseconds are assumed if no unit is provided. "+
 		"Possible select values to return a single IP are: 'first', 'random' or 'roundRobin'. "+
 		"Possible policy values are: 'preferIPv4', 'preferIPv6', 'onlyIPv4', 'onlyIPv6' or 'any'.")
+	flags.Duration("summary-timeout", 0, "maximum amount of time k6 will take executing handleSummary()")
 	return flags
 }
 
@@ -96,6 +97,7 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		NoConnectionReuse:       getNullBool(flags, "no-connection-reuse"),
 		NoVUConnectionReuse:     getNullBool(flags, "no-vu-connection-reuse"),
 		MinIterationDuration:    getNullDuration(flags, "min-iteration-duration"),
+		HandleSummaryTimeout:    getNullDuration(flags, "summary-timeout"),
 		Throw:                   getNullBool(flags, "throw"),
 		DiscardResponseBodies:   getNullBool(flags, "discard-response-bodies"),
 		MetricSamplesBufferSize: null.NewInt(1000, false),
