@@ -127,6 +127,28 @@ func TestValidateOptions(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("retries on 502", func(t *testing.T) {
+		t.Parallel()
+		attempts := 0
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			attempts++
+			if attempts < 3 {
+				w.WriteHeader(http.StatusBadGateway)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			fprint(t, w, `{}`)
+		}))
+		defer srv.Close()
+
+		client := newTestClient(t, srv)
+		client.retryInterval = time.Millisecond
+
+		err := client.ValidateOptions(t.Context(), lib.Options{})
+		require.NoError(t, err)
+		assert.Equal(t, 3, attempts)
+	})
+
 	t.Run("validation error", func(t *testing.T) {
 		t.Parallel()
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -177,6 +199,37 @@ func TestCreateCloudTest(t *testing.T) {
 	})
 }
 
+func TestCreateCloudTestRetry(t *testing.T) {
+	t.Parallel()
+
+	t.Run("retries on 502", func(t *testing.T) {
+		t.Parallel()
+		attempts := 0
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			attempts++
+			if attempts < 3 {
+				w.WriteHeader(http.StatusBadGateway)
+				return
+			}
+			w.Header().Add("Content-Type", "application/json")
+			fprint(t, w, `{
+				"id": 789, "name": "test-name", "project_id": 456,
+				"baseline_test_run_id": null,
+				"created": "2024-01-01T00:00:00Z", "updated": "2024-01-01T00:00:00Z"
+			}`)
+		}))
+		defer srv.Close()
+
+		client := newTestClient(t, srv)
+		client.retryInterval = time.Millisecond
+
+		result, err := client.CreateCloudTest(t.Context(), "test-name", createTestArchiveBytes(t))
+		require.NoError(t, err)
+		assert.Equal(t, int32(789), result.Id)
+		assert.Equal(t, 3, attempts)
+	})
+}
+
 func TestFetchCloudTestByName(t *testing.T) {
 	t.Parallel()
 
@@ -214,6 +267,35 @@ func TestFetchCloudTestByName(t *testing.T) {
 		_, err := client.FetchCloudTestByName(t.Context(), "my-test")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), `"my-test" not found in project`)
+	})
+
+	t.Run("retries on 502", func(t *testing.T) {
+		t.Parallel()
+		attempts := 0
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			attempts++
+			if attempts < 3 {
+				w.WriteHeader(http.StatusBadGateway)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			fprint(t, w, `{
+				"value": [{
+					"id": 789, "name": "test-name", "project_id": 456,
+					"baseline_test_run_id": null,
+					"created": "2024-01-01T00:00:00Z", "updated": "2024-01-01T00:00:00Z"
+				}]
+			}`)
+		}))
+		defer srv.Close()
+
+		client := newTestClient(t, srv)
+		client.retryInterval = time.Millisecond
+
+		result, err := client.FetchCloudTestByName(t.Context(), "test-name")
+		require.NoError(t, err)
+		assert.Equal(t, int32(789), result.Id)
+		assert.Equal(t, 3, attempts)
 	})
 }
 
@@ -347,6 +429,27 @@ func TestStopCloudTestRun(t *testing.T) {
 		client := newTestClient(t, srv)
 		err := client.StopCloudTestRun(t.Context(), 999)
 		require.NoError(t, err)
+	})
+
+	t.Run("retries on 502", func(t *testing.T) {
+		t.Parallel()
+		attempts := 0
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			attempts++
+			if attempts < 3 {
+				w.WriteHeader(http.StatusBadGateway)
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
+		}))
+		defer srv.Close()
+
+		client := newTestClient(t, srv)
+		client.retryInterval = time.Millisecond
+
+		err := client.StopCloudTestRun(t.Context(), 999)
+		require.NoError(t, err)
+		assert.Equal(t, 3, attempts)
 	})
 }
 

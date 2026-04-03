@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gorilla/websocket"
 	k6cloud "github.com/grafana/k6-cloud-openapi-client-go/k6"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -148,6 +149,52 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 		t.Log(stdout)
 		assert.Contains(t, stdout, "execution: cloud")
 		assert.Contains(t, stdout, "output: "+testRunURL)
+	})
+
+	// TestCloudLogStreaming proves that the v6 numeric run ID works as
+	// refID for the log streaming WebSocket endpoint. The test enables
+	// --show-logs and provides a WebSocket mock that sends one log entry,
+	// then verifies the message appears in stdout.
+	t.Run("TestCloudLogStreaming", func(t *testing.T) {
+		t.Parallel()
+
+		upgrader := websocket.Upgrader{CheckOrigin: func(*http.Request) bool { return true }}
+		logSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Verify the refID is the v6 numeric test run ID
+			assert.Contains(t, r.URL.RawQuery, `test_run_id="123"`)
+
+			conn, err := upgrader.Upgrade(w, r, nil)
+			if err != nil {
+				t.Logf("websocket upgrade error: %v", err)
+				return
+			}
+			defer func() { _ = conn.Close() }()
+
+			msg := `{"streams":[{"stream":{"level":"info"},"values":[["1704067200000000000","log entry from cloud"]]}]}`
+			_ = conn.WriteMessage(websocket.TextMessage, []byte(msg))
+
+			// Keep the connection open until the client disconnects.
+			for {
+				if _, _, rerr := conn.ReadMessage(); rerr != nil {
+					break
+				}
+			}
+		}))
+		defer logSrv.Close()
+
+		// Replace https:// with ws:// for the WebSocket URL
+		wsURL := "ws" + logSrv.URL[len("http"):]
+
+		ts := getSimpleCloudTestState(t, nil, setupCmd, []string{"--show-logs", "--verbose", "--log-output=stdout"}, nil, nil)
+		ts.Env["K6_CLOUD_LOGS_TAIL_URL"] = wsURL + "/api/v1/tail"
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stdout := ts.Stdout.String()
+		t.Log(stdout)
+		assert.Contains(t, stdout, `execution: cloud`)
+		assert.Contains(t, stdout, `test status: Completed`)
+		assert.Contains(t, stdout, `log entry from cloud`)
 	})
 
 	// TestCloudWithArchive verifies that when running from a pre-built
@@ -351,6 +398,50 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 		stdout := ts.Stdout.String()
 		t.Log(stdout)
 		assert.Contains(t, stdout, `The test has failed`)
+	})
+
+	// TestCloudUploadOnlyNeverAborts proves that upload-only never calls
+	// the test run abort endpoint. An earlier version shared testRunID and
+	// signal handling across both paths, so SIGINT during upload-only could
+	// send a load test ID to POST /test_runs/{id}/abort.
+	t.Run("TestCloudUploadOnlyNeverAborts", func(t *testing.T) {
+		t.Parallel()
+
+		var aborted atomic.Bool
+		abortHandler := http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
+			aborted.Store(true)
+			resp.WriteHeader(http.StatusNoContent)
+		})
+
+		srv := getTestServer(t, map[string]http.Handler{
+			"POST ^/cloud/v6/validate_options$":        http.HandlerFunc(v6ValidateOptionsHandler),
+			`POST ^/cloud/v6/projects/\d+/load_tests$`: cloudTestCreateSimple(t),
+			`PUT ^/cloud/v6/load_tests/\d+/script$`:    http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) { resp.WriteHeader(http.StatusNoContent) }),
+			`POST ^/cloud/v6/load_tests/\d+/start$`:    http.HandlerFunc(func(http.ResponseWriter, *http.Request) { t.Error("start should not be called in upload-only") }),
+			`POST ^/cloud/v6/test_runs/\d+/abort$`:     abortHandler,
+			`GET ^/cloud/v6/projects/\d+/load_tests`: http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
+				writeJSON(resp, http.StatusOK, fmt.Sprintf(`{"value": [%s]}`, newLoadTestJSON()))
+			}),
+		})
+		t.Cleanup(srv.Close)
+
+		ts := NewGlobalTestState(t)
+		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test.js"), []byte(`export default function() {}`), 0o644))
+		ts.CmdArgs = setupCmd([]string{"--upload-only", "--verbose", "--log-output=stdout"})
+		ts.Env["K6_SHOW_CLOUD_LOGS"] = "false"
+		ts.Env["K6_CLOUD_HOST"] = srv.URL
+		ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
+		ts.Env["K6_CLOUD_TOKEN"] = "foo"
+		ts.Env["K6_CLOUD_STACK_ID"] = "123"
+		ts.Env["K6_CLOUD_PROJECT_ID"] = "456"
+		ts.Env["K6_CLOUD_STACK_URL"] = testStackURL
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stdout := ts.Stdout.String()
+		t.Log(stdout)
+		assert.Contains(t, stdout, `test status: Uploaded`)
+		assert.False(t, aborted.Load(), "abort endpoint must not be called during upload-only")
 	})
 
 	t.Run("TestCloudGracefulStopWaitsForTerminal", func(t *testing.T) {
