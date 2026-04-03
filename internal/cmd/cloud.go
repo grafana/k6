@@ -210,8 +210,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 
 	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Uploading archive"))
 
-	// Upload-only creates or updates the test without starting a run.
-	// Return before installing signal handling — there is no test run to abort.
+	// Return before signal handling — upload-only has no test run to abort.
 	if c.uploadOnly {
 		loadTest, createErr := client.CreateOrUpdateCloudTest(globalCtx, name, arc)
 		if createErr != nil {
