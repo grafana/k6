@@ -20,6 +20,7 @@ import (
 
 	"go.k6.io/k6/errext/exitcodes"
 	v6cloudapi "go.k6.io/k6/internal/cloudapi/v6"
+	"go.k6.io/k6/internal/cloudapi/v6/v6testing"
 	"go.k6.io/k6/internal/cmd"
 	"go.k6.io/k6/internal/lib/testutils"
 	"go.k6.io/k6/lib/fsext"
@@ -113,6 +114,19 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 		assert.Contains(t, stdout, `test status: Uploaded`)
 	})
 
+	t.Run("TestCloudUploadOnlyTrailingSlash", func(t *testing.T) {
+		t.Parallel()
+
+		ts := getSimpleCloudTestState(t, nil, setupCmd, []string{"--upload-only", "--log-output=stdout"}, nil, nil)
+		ts.Env["K6_CLOUD_STACK_URL"] = testStackURL + "/"
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stdout := ts.Stdout.String()
+		t.Log(stdout)
+		assert.Contains(t, stdout, "output: "+testStackURL+"/a/k6-app/tests/456")
+		assert.NotContains(t, stdout, "//a/k6-app")
+	})
+
 	t.Run("TestCloudUploadOnlyNoStackURL", func(t *testing.T) {
 		t.Parallel()
 
@@ -139,7 +153,7 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 
 		startHandler := http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
 			writeJSON(resp, http.StatusOK,
-				newTestRunJSON(123, v6cloudapi.StatusRunning, nil, testRunURL))
+				v6testing.TestRunJSON(t, 123, v6cloudapi.StatusRunning, nil, testRunURL))
 		})
 
 		ts := getSimpleCloudTestState(t, nil, setupCmd, nil, startHandler, nil)
@@ -481,7 +495,7 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 			`POST ^/cloud/v6/projects/\d+/load_tests$`:                    cloudTestCreateSimple(t),
 			`PUT ^/cloud/v6/load_tests/\d+/script$`:                       http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) { resp.WriteHeader(http.StatusNoContent) }),
 			`POST ^/cloud/v6/load_tests/\d+/start$`:                       cloudTestStartSimple(t, testRunID, defaultWebAppURL),
-			fmt.Sprintf("GET ^/cloud/v6/test_runs/%d$", testRunID):        v6ProgressHandler(testRunID, defaultWebAppURL, defaultProgress, progressCallback),
+			fmt.Sprintf("GET ^/cloud/v6/test_runs/%d$", testRunID):        v6ProgressHandler(t, testRunID, defaultWebAppURL, defaultProgress, progressCallback),
 			fmt.Sprintf("POST ^/cloud/v6/test_runs/%d/abort$", testRunID): abortHandler,
 			`GET ^/cloud/v6/projects/\d+/load_tests`: http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
 				writeJSON(resp, http.StatusOK, fmt.Sprintf(`{"value": [%s]}`, newLoadTestJSON()))
@@ -537,34 +551,6 @@ func newLoadTestJSON() string {
 	))
 }
 
-// newTestRunJSON builds a StartLoadTestResponse JSON string for mocks.
-func newTestRunJSON(id int32, status string, result *string, webAppURL string) string {
-	m := k6cloud.NewStartLoadTestResponse(
-		id, 456, 789,
-		*k6cloud.NewNullableString(nil), // started_by
-		testEpoch,                       // created
-		*k6cloud.NewNullableTime(nil),   // ended
-		"",                              // note
-		*k6cloud.NewNullableTime(nil),   // retention_expiry
-		*k6cloud.NewNullableTestCostApiModel(nil), // cost
-		status,
-		*k6cloud.NewStatusApiModel("created", testEpoch), // status_details
-		[]k6cloud.StatusApiModel{},                       // status_history
-		[]k6cloud.DistributionZoneApiModel{},             // distribution
-		*k6cloud.NewNullableString(result),               // result
-		map[string]any{},                                 // result_details
-		map[string]any{},                                 // options
-		map[string]string{},                              // k6_dependencies
-		map[string]string{},                              // k6_versions
-		*k6cloud.NewNullableInt32(nil),                   // max_vus
-		*k6cloud.NewNullableInt32(nil),                   // max_browser_vus
-		*k6cloud.NewNullableInt32(nil),                   // estimated_duration
-		0,                                                // execution_duration
-		webAppURL,                                        // test_run_details_page_url
-	)
-	return marshalJSON(m)
-}
-
 func cloudTestStartSimpleV1(tb testing.TB, testRunID int) http.Handler {
 	return http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
 		resp.WriteHeader(http.StatusOK)
@@ -579,10 +565,10 @@ func cloudTestCreateSimple(_ testing.TB) http.Handler {
 	})
 }
 
-func cloudTestStartSimple(_ testing.TB, testRunID int, webAppURL string) http.Handler {
+func cloudTestStartSimple(t testing.TB, testRunID int, webAppURL string) http.Handler {
 	return http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
 		writeJSON(resp, http.StatusOK,
-			newTestRunJSON(int32(testRunID), "running", nil, webAppURL))
+			v6testing.TestRunJSON(t, int32(testRunID), "running", nil, webAppURL))
 	})
 }
 
@@ -594,11 +580,20 @@ func writeJSON(resp http.ResponseWriter, status int, body string) {
 }
 
 func v6ValidateOptionsHandler(resp http.ResponseWriter, _ *http.Request) {
-	writeJSON(resp, http.StatusOK, `{}`)
+	writeJSON(resp, http.StatusOK, `{
+		"vuh_usage": 0,
+		"breakdown": {
+			"protocol_vuh": 0,
+			"browser_vuh": 0,
+			"base_total_vuh": 0,
+			"reduction_rate": 0,
+			"reduction_rate_breakdown": null
+		}
+	}`)
 }
 
 func v6ProgressHandler(
-	testRunID int, webAppURL string, defaultProgress v6cloudapi.TestRunProgress,
+	t testing.TB, testRunID int, webAppURL string, defaultProgress v6cloudapi.TestRunProgress,
 	progressCallback func() v6cloudapi.TestRunProgress,
 ) http.Handler {
 	return http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
@@ -611,7 +606,7 @@ func v6ProgressHandler(
 			result = &tp.Result
 		}
 		writeJSON(resp, http.StatusOK,
-			newTestRunJSON(int32(testRunID), tp.Status, result, webAppURL))
+			v6testing.TestRunJSON(t, int32(testRunID), tp.Status, result, webAppURL))
 	})
 }
 
@@ -648,7 +643,7 @@ func getMockCloud(t *testing.T, opts mockCloudOpts) *httptest.Server {
 		`POST ^/cloud/v6/projects/\d+/load_tests$`:                         opts.createHandler,
 		`PUT ^/cloud/v6/load_tests/\d+/script$`:                            http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) { resp.WriteHeader(http.StatusNoContent) }),
 		`POST ^/cloud/v6/load_tests/\d+/start$`:                            opts.startHandler,
-		fmt.Sprintf("GET ^/cloud/v6/test_runs/%d$", opts.testRunID):        v6ProgressHandler(opts.testRunID, webAppURL, defaultProgress, opts.progressCallback),
+		fmt.Sprintf("GET ^/cloud/v6/test_runs/%d$", opts.testRunID):        v6ProgressHandler(t, opts.testRunID, webAppURL, defaultProgress, opts.progressCallback),
 		fmt.Sprintf("POST ^/cloud/v6/test_runs/%d/abort$", opts.testRunID): http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) { resp.WriteHeader(http.StatusNoContent) }),
 		`GET ^/cloud/v6/projects/\d+/load_tests`: http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
 			writeJSON(resp, http.StatusOK, fmt.Sprintf(`{"value": [%s]}`, newLoadTestJSON()))

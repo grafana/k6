@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/internal/build"
+	"go.k6.io/k6/internal/cloudapi/v6/v6testing"
 	"go.k6.io/k6/internal/lib/testutils"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/fsext"
@@ -372,7 +373,7 @@ func TestStartCloudTestRun(t *testing.T) {
 			assert.NotEmpty(t, r.Header.Get("K6-Idempotency-Key"))
 
 			w.Header().Set("Content-Type", "application/json")
-			fprint(t, w, testRunJSON(t, 999, "created", nil, "https://app.grafana.com/runs/999"))
+			fprint(t, w, v6testing.TestRunJSON(t, 999, "created", nil, "https://app.grafana.com/runs/999"))
 		}))
 		defer srv.Close()
 
@@ -396,7 +397,7 @@ func TestStartCloudTestRun(t *testing.T) {
 				return
 			}
 			w.Header().Set("Content-Type", "application/json")
-			fprint(t, w, testRunJSON(t, 999, "created", nil, "https://app.grafana.com/runs/999"))
+			fprint(t, w, v6testing.TestRunJSON(t, 999, "created", nil, "https://app.grafana.com/runs/999"))
 		}))
 		defer srv.Close()
 
@@ -681,40 +682,6 @@ func createTestArchiveBytes(t *testing.T) []byte {
 	var buf bytes.Buffer
 	require.NoError(t, createTestArchive(t).Write(&buf))
 	return buf.Bytes()
-}
-
-var testEpoch = time.Date(2024, 6, 1, 19, 0, 0, 0, time.UTC) //nolint:gochecknoglobals
-
-// testRunJSON builds a StartLoadTestResponse JSON string using the generated
-// model constructor so fixtures break at compile time if the spec changes.
-func testRunJSON(t *testing.T, id int32, status string, result *string, webAppURL string) string {
-	t.Helper()
-	m := k6cloud.NewStartLoadTestResponse(
-		id, 789, 456,
-		*k6cloud.NewNullableString(nil), // started_by
-		testEpoch,                       // created
-		*k6cloud.NewNullableTime(nil),   // ended
-		"",                              // note
-		*k6cloud.NewNullableTime(nil),   // retention_expiry
-		*k6cloud.NewNullableTestCostApiModel(nil), // cost
-		status, // status
-		*k6cloud.NewStatusApiModel("created", testEpoch), // status_details
-		[]k6cloud.StatusApiModel{},                       // status_history
-		[]k6cloud.DistributionZoneApiModel{},             // distribution
-		*k6cloud.NewNullableString(result),               // result
-		map[string]any{},                                 // result_details
-		map[string]any{},                                 // options
-		map[string]string{},                              // k6_dependencies
-		map[string]string{},                              // k6_versions
-		*k6cloud.NewNullableInt32(nil),                   // max_vus
-		*k6cloud.NewNullableInt32(nil),                   // max_browser_vus
-		*k6cloud.NewNullableInt32(nil),                   // estimated_duration
-		0,                                                // execution_duration
-		webAppURL,                                        // test_run_details_page_url
-	)
-	b, err := json.Marshal(m)
-	require.NoError(t, err)
-	return string(b)
 }
 
 func parseFormData(t *testing.T, r *http.Request) map[string]string {

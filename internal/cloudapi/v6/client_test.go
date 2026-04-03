@@ -170,7 +170,7 @@ func TestRetryDo(t *testing.T) {
 			return true, errors.New("service unavailable")
 		})
 		require.Error(t, err)
-		assert.Equal(t, 4, calls) // 1 initial + 3 retries
+		assert.Equal(t, 3, calls) // matches master's retry budget
 	})
 }
 

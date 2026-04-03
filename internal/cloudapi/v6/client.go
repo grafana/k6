@@ -163,7 +163,7 @@ func shouldRetry(r *http.Response, err error) bool {
 	return r.StatusCode >= 500 || r.StatusCode == http.StatusTooManyRequests
 }
 
-// retryDo executes fn up to c.retries+1 times, retrying on transient errors.
+// retryDo executes fn up to c.retries times, matching master's retry budget.
 // fn returns whether the request is retryable and any error.
 //
 // The generated OpenAPI client has its own retry loop (callAPI), but it uses
@@ -172,7 +172,7 @@ func shouldRetry(r *http.Response, err error) bool {
 // stops the retry wait instead of sleeping through it.
 func (c *Client) retryDo(ctx context.Context, fn func() (retryable bool, err error)) error {
 	var lastErr error
-	for attempt := range c.retries + 1 {
+	for attempt := range c.retries {
 		retry, err := fn()
 		if err == nil {
 			return nil
@@ -181,7 +181,7 @@ func (c *Client) retryDo(ctx context.Context, fn func() (retryable bool, err err
 			return err
 		}
 		lastErr = err
-		if attempt < c.retries {
+		if attempt < c.retries-1 {
 			c.logger.WithField("attempt", attempt+1).
 				Warn("Transient error, retrying...")
 			retryTimer := time.NewTimer(c.retryInterval)

@@ -222,7 +222,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 
 		var testURL string
 		if cloudConfig.StackURL.Valid && cloudConfig.StackURL.String != "" {
-			testURL = cloudConfig.StackURL.String + "/a/k6-app/tests/" + refID
+			testURL = strings.TrimRight(cloudConfig.StackURL.String, "/") + "/a/k6-app/tests/" + refID
 		}
 
 		et, err := lib.NewExecutionTuple(test.derivedConfig.ExecutionSegment, test.derivedConfig.ExecutionSegmentSequence)
