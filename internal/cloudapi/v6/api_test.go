@@ -298,6 +298,30 @@ func TestFetchCloudTestByName(t *testing.T) {
 		assert.Equal(t, int32(789), result.Id)
 		assert.Equal(t, 3, attempts)
 	})
+
+	t.Run("multiple results picks exact name", func(t *testing.T) {
+		t.Parallel()
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			fprint(t, w, `{
+				"value": [
+					{"id": 111, "name": "my-test-old", "project_id": 456,
+					 "baseline_test_run_id": null,
+					 "created": "2024-01-01T00:00:00Z", "updated": "2024-01-01T00:00:00Z"},
+					{"id": 222, "name": "my-test", "project_id": 456,
+					 "baseline_test_run_id": null,
+					 "created": "2024-01-01T00:00:00Z", "updated": "2024-01-01T00:00:00Z"}
+				]
+			}`)
+		}))
+		defer srv.Close()
+
+		client := newTestClient(t, srv)
+		result, err := client.FetchCloudTestByName(t.Context(), "my-test")
+		require.NoError(t, err)
+		assert.Equal(t, int32(222), result.Id)
+		assert.Equal(t, "my-test", result.Name)
+	})
 }
 
 func TestCreateOrUpdateCloudTest(t *testing.T) {

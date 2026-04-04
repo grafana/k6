@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 
 	k6cloud "github.com/grafana/k6-cloud-openapi-client-go/k6"
 	"go.k6.io/k6/lib"
@@ -160,10 +161,13 @@ func (c *Client) FetchCloudTestByName(
 		if err := CheckResponse(res, rerr); err != nil {
 			return shouldRetry(res, rerr), fmt.Errorf("fetching cloud test by name: %w", err)
 		}
-		if len(loadTests.Value) == 0 {
+		idx := slices.IndexFunc(loadTests.Value, func(t k6cloud.LoadTestApiModel) bool {
+			return t.Name == name
+		})
+		if idx < 0 {
 			return false, fmt.Errorf("load test %q not found in project", name)
 		}
-		result = &loadTests.Value[0]
+		result = &loadTests.Value[idx]
 		return false, nil
 	})
 	return result, err
