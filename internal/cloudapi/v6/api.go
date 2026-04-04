@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	"net/http"
 	"net/url"
 
@@ -71,15 +70,6 @@ func (p TestRunProgress) IsTerminal() bool {
 	default:
 		return false
 	}
-}
-
-// Progress computes execution_duration / estimated_duration,
-// clamped to [0, 1]. Returns 0 if estimated_duration is zero or negative.
-func (p TestRunProgress) Progress() float64 {
-	if p.EstimatedDuration <= 0 || p.ExecutionDuration < 0 {
-		return 0
-	}
-	return math.Min(float64(p.ExecutionDuration)/float64(p.EstimatedDuration), 1.0)
 }
 
 // ValidateToken calls the endpoint to validate the Client's token and returns the result.

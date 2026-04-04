@@ -14,7 +14,10 @@ var testEpoch = time.Date(2024, 6, 1, 19, 0, 0, 0, time.UTC) //nolint:gochecknog
 
 // TestRunJSON builds a StartLoadTestResponse JSON string using the generated
 // model constructor so fixtures break at compile time if the spec changes.
-func TestRunJSON(t testing.TB, id int32, status string, result *string, webAppURL string) string {
+func TestRunJSON(
+	t testing.TB, id int32, status string, result *string, webAppURL string,
+	estimatedDuration *int32, executionDuration int32,
+) string {
 	t.Helper()
 	m := k6cloud.NewStartLoadTestResponse(
 		id, 789, 456,
@@ -35,8 +38,8 @@ func TestRunJSON(t testing.TB, id int32, status string, result *string, webAppUR
 		map[string]string{},                              // k6_versions
 		*k6cloud.NewNullableInt32(nil),                   // max_vus
 		*k6cloud.NewNullableInt32(nil),                   // max_browser_vus
-		*k6cloud.NewNullableInt32(nil),                   // estimated_duration
-		0,                                                // execution_duration
+		*k6cloud.NewNullableInt32(estimatedDuration),     // estimated_duration
+		executionDuration,                                // execution_duration
 		webAppURL,                                        // test_run_details_page_url
 	)
 	b, err := json.Marshal(m)

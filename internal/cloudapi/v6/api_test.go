@@ -373,7 +373,7 @@ func TestStartCloudTestRun(t *testing.T) {
 			assert.NotEmpty(t, r.Header.Get("K6-Idempotency-Key"))
 
 			w.Header().Set("Content-Type", "application/json")
-			fprint(t, w, v6testing.TestRunJSON(t, 999, "created", nil, "https://app.grafana.com/runs/999"))
+			fprint(t, w, v6testing.TestRunJSON(t, 999, "created", nil, "https://app.grafana.com/runs/999", nil, 0))
 		}))
 		defer srv.Close()
 
@@ -397,7 +397,7 @@ func TestStartCloudTestRun(t *testing.T) {
 				return
 			}
 			w.Header().Set("Content-Type", "application/json")
-			fprint(t, w, v6testing.TestRunJSON(t, 999, "created", nil, "https://app.grafana.com/runs/999"))
+			fprint(t, w, v6testing.TestRunJSON(t, 999, "created", nil, "https://app.grafana.com/runs/999", nil, 0))
 		}))
 		defer srv.Close()
 
@@ -488,7 +488,6 @@ func TestFetchTestRun(t *testing.T) {
 		assert.Equal(t, "passed", progress.Result)
 		assert.Equal(t, int32(60), progress.EstimatedDuration)
 		assert.Equal(t, int32(30), progress.ExecutionDuration)
-		assert.InDelta(t, 0.5, progress.Progress(), 0.01)
 	})
 
 	t.Run("retries on 502", func(t *testing.T) {
@@ -585,27 +584,6 @@ func TestFetchTestRun(t *testing.T) {
 
 func TestTestRunProgress(t *testing.T) {
 	t.Parallel()
-
-	t.Run("Progress", func(t *testing.T) {
-		t.Parallel()
-		tests := []struct {
-			name      string
-			est, exec int32
-			expected  float64
-		}{
-			{"half done", 60, 30, 0.5},
-			{"exceeds estimate", 60, 70, 1.0},
-			{"zero estimated", 0, 30, 0.0},
-			{"negative execution", 60, -1, 0.0},
-		}
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
-				p := TestRunProgress{EstimatedDuration: tt.est, ExecutionDuration: tt.exec}
-				assert.InDelta(t, tt.expected, p.Progress(), 0.01)
-			})
-		}
-	})
 
 	t.Run("IsTerminal", func(t *testing.T) {
 		t.Parallel()

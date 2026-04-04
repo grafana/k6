@@ -101,6 +101,42 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 		assert.Contains(t, stdout, `test status: Running`)
 	})
 
+	// TestCloudProgressUsesLocalTime verifies that the progress bar uses
+	// local elapsed time during running, not execution_duration/estimated_duration.
+	// The server sets execution_duration to the configured max duration
+	// (not real-time elapsed), so using it would jump the bar to ~95% immediately.
+	t.Run("TestCloudProgressUsesLocalTime", func(t *testing.T) {
+		t.Parallel()
+
+		var calls atomic.Int32
+		cs := func() v6cloudapi.TestRunProgress {
+			if calls.Add(1) >= 3 {
+				return v6cloudapi.TestRunProgress{
+					Status:            v6cloudapi.StatusCompleted,
+					EstimatedDuration: 630,
+					ExecutionDuration: 600,
+				}
+			}
+			// Server returns configured max duration (600s), not elapsed time.
+			return v6cloudapi.TestRunProgress{
+				Status:            v6cloudapi.StatusRunning,
+				EstimatedDuration: 630,
+				ExecutionDuration: 600,
+			}
+		}
+
+		ts := getSimpleCloudTestState(t, nil, setupCmd, []string{"--verbose", "--log-output=stdout"}, nil, cs)
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stdout := ts.Stdout.String()
+		t.Log(stdout)
+		// With local time, progress during "running" should be near 0% (test runs for ~4s
+		// vs 10m30s max), not ~95% (which execution_duration/estimated_duration would give).
+		assert.NotContains(t, stdout, `[  95% ]`)
+		assert.Contains(t, stdout, `[   0% ]`)
+		assert.Contains(t, stdout, `test status: Completed`)
+	})
+
 	t.Run("TestCloudUploadOnly", func(t *testing.T) {
 		t.Parallel()
 
@@ -153,7 +189,7 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 
 		startHandler := http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
 			writeJSON(resp, http.StatusOK,
-				v6testing.TestRunJSON(t, 123, v6cloudapi.StatusRunning, nil, testRunURL))
+				v6testing.TestRunJSON(t, 123, v6cloudapi.StatusRunning, nil, testRunURL, nil, 0))
 		})
 
 		ts := getSimpleCloudTestState(t, nil, setupCmd, nil, startHandler, nil)
@@ -568,7 +604,7 @@ func cloudTestCreateSimple(_ testing.TB) http.Handler {
 func cloudTestStartSimple(t testing.TB, testRunID int, webAppURL string) http.Handler {
 	return http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
 		writeJSON(resp, http.StatusOK,
-			v6testing.TestRunJSON(t, int32(testRunID), "running", nil, webAppURL))
+			v6testing.TestRunJSON(t, int32(testRunID), "running", nil, webAppURL, nil, 0))
 	})
 }
 
@@ -605,8 +641,12 @@ func v6ProgressHandler(
 		if tp.Result != "" {
 			result = &tp.Result
 		}
+		var estDur *int32
+		if tp.EstimatedDuration > 0 {
+			estDur = &tp.EstimatedDuration
+		}
 		writeJSON(resp, http.StatusOK,
-			v6testing.TestRunJSON(t, int32(testRunID), tp.Status, result, webAppURL))
+			v6testing.TestRunJSON(t, int32(testRunID), tp.Status, result, webAppURL, estDur, tp.ExecutionDuration))
 	})
 }
 

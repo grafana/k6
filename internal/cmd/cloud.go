@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -328,15 +329,19 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 			}
 
 			statusText := v6cloudapi.FormatStatus(testProgress.Status)
+			progress := 0.0
 
 			switch testProgress.Status {
-			case v6cloudapi.StatusCompleted:
-				return 1, []string{statusText}
+			case v6cloudapi.StatusCompleted, v6cloudapi.StatusAborted, v6cloudapi.StatusProcessingMetrics:
+				progress = 1
 			case v6cloudapi.StatusRunning:
 				if startTime.IsZero() {
 					startTime = time.Now()
 				}
 				spent := time.Since(startTime)
+				if maxDuration > 0 {
+					progress = math.Min(float64(spent)/float64(maxDuration), 1.0)
+				}
 				if spent > maxDuration {
 					statusText = maxDuration.String()
 				} else {
@@ -344,7 +349,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 				}
 			}
 
-			return testProgress.Progress(), []string{statusText}
+			return progress, []string{statusText}
 		}),
 	)
 
