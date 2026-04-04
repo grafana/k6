@@ -129,6 +129,11 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 
 	// Write the full consolidated *and derived* options back to the Runner.
 	conf := test.derivedConfig
+
+	if cmd.Flags().Changed("vus") && len(conf.Options.Scenarios) > 0 {
+        return fmt.Errorf("invalid configuration: --vus cannot be used when scenarios are defined")
+    }
+	
 	testRunState, err := test.buildTestRunState(conf.Options)
 	if err != nil {
 		return err
