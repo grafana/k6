@@ -571,7 +571,7 @@ func getCloudTestEndChecker(
 	testFinished := false
 
 	if testStart == nil {
-		testStart = cloudTestStartSimple(tb, testRunID)
+		testStart = cloudTestStartSimpleV1(tb, testRunID)
 	}
 
 	srv := getTestServer(tb, map[string]http.Handler{

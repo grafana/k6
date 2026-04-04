@@ -24,7 +24,7 @@ type Config struct {
 	Name             null.String `json:"name" envconfig:"K6_CLOUD_NAME"`
 
 	Host    null.String        `json:"host" envconfig:"K6_CLOUD_HOST"`
-	Hostv6  null.String        `json:"hostv6" envconfig:"K6_CLOUD_HOST_V6"` // For test purposes only
+	Hostv6  null.String        `json:"hostv6" envconfig:"K6_CLOUD_HOST_V6"` // v6 API base URL used by cloud run/upload
 	Timeout types.NullDuration `json:"timeout" envconfig:"K6_CLOUD_TIMEOUT"`
 
 	LogsTailURL    null.String `json:"-" envconfig:"K6_CLOUD_LOGS_TAIL_URL"`
