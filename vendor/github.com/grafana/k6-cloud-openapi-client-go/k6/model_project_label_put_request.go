@@ -16,40 +16,40 @@ import (
 	"fmt"
 )
 
-// checks if the AllowedLoadZonesListApiModel type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &AllowedLoadZonesListApiModel{}
+// checks if the ProjectLabelPutRequest type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &ProjectLabelPutRequest{}
 
-// AllowedLoadZonesListApiModel struct for AllowedLoadZonesListApiModel
-type AllowedLoadZonesListApiModel struct {
-	// List of the resulting values.
-	Value                []AllowedLoadZoneApiModel `json:"value"`
+// ProjectLabelPutRequest Request to replace project labels.  This is a full replacement of all labels on the project.
+type ProjectLabelPutRequest struct {
+	// Array of labels to assign (0-30).
+	Value                []ProjectLabelPutItem `json:"value"`
 	AdditionalProperties map[string]interface{}
 }
 
-type _AllowedLoadZonesListApiModel AllowedLoadZonesListApiModel
+type _ProjectLabelPutRequest ProjectLabelPutRequest
 
-// NewAllowedLoadZonesListApiModel instantiates a new AllowedLoadZonesListApiModel object
+// NewProjectLabelPutRequest instantiates a new ProjectLabelPutRequest object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewAllowedLoadZonesListApiModel(value []AllowedLoadZoneApiModel) *AllowedLoadZonesListApiModel {
-	this := AllowedLoadZonesListApiModel{}
+func NewProjectLabelPutRequest(value []ProjectLabelPutItem) *ProjectLabelPutRequest {
+	this := ProjectLabelPutRequest{}
 	this.Value = value
 	return &this
 }
 
-// NewAllowedLoadZonesListApiModelWithDefaults instantiates a new AllowedLoadZonesListApiModel object
+// NewProjectLabelPutRequestWithDefaults instantiates a new ProjectLabelPutRequest object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewAllowedLoadZonesListApiModelWithDefaults() *AllowedLoadZonesListApiModel {
-	this := AllowedLoadZonesListApiModel{}
+func NewProjectLabelPutRequestWithDefaults() *ProjectLabelPutRequest {
+	this := ProjectLabelPutRequest{}
 	return &this
 }
 
 // GetValue returns the Value field value
-func (o *AllowedLoadZonesListApiModel) GetValue() []AllowedLoadZoneApiModel {
+func (o *ProjectLabelPutRequest) GetValue() []ProjectLabelPutItem {
 	if o == nil {
-		var ret []AllowedLoadZoneApiModel
+		var ret []ProjectLabelPutItem
 		return ret
 	}
 
@@ -58,7 +58,7 @@ func (o *AllowedLoadZonesListApiModel) GetValue() []AllowedLoadZoneApiModel {
 
 // GetValueOk returns a tuple with the Value field value
 // and a boolean to check if the value has been set.
-func (o *AllowedLoadZonesListApiModel) GetValueOk() ([]AllowedLoadZoneApiModel, bool) {
+func (o *ProjectLabelPutRequest) GetValueOk() ([]ProjectLabelPutItem, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -66,11 +66,11 @@ func (o *AllowedLoadZonesListApiModel) GetValueOk() ([]AllowedLoadZoneApiModel, 
 }
 
 // SetValue sets field value
-func (o *AllowedLoadZonesListApiModel) SetValue(v []AllowedLoadZoneApiModel) {
+func (o *ProjectLabelPutRequest) SetValue(v []ProjectLabelPutItem) {
 	o.Value = v
 }
 
-func (o AllowedLoadZonesListApiModel) MarshalJSON() ([]byte, error) {
+func (o ProjectLabelPutRequest) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -78,7 +78,7 @@ func (o AllowedLoadZonesListApiModel) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o AllowedLoadZonesListApiModel) ToMap() (map[string]interface{}, error) {
+func (o ProjectLabelPutRequest) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	toSerialize["value"] = o.Value
 
@@ -89,7 +89,7 @@ func (o AllowedLoadZonesListApiModel) ToMap() (map[string]interface{}, error) {
 	return toSerialize, nil
 }
 
-func (o *AllowedLoadZonesListApiModel) UnmarshalJSON(data []byte) (err error) {
+func (o *ProjectLabelPutRequest) UnmarshalJSON(data []byte) (err error) {
 	// This validates that all required properties are included in the JSON object
 	// by unmarshalling the object into a generic map with string keys and checking
 	// that every required field exists as a key in the generic map.
@@ -111,15 +111,15 @@ func (o *AllowedLoadZonesListApiModel) UnmarshalJSON(data []byte) (err error) {
 		}
 	}
 
-	varAllowedLoadZonesListApiModel := _AllowedLoadZonesListApiModel{}
+	varProjectLabelPutRequest := _ProjectLabelPutRequest{}
 
-	err = json.Unmarshal(data, &varAllowedLoadZonesListApiModel)
+	err = json.Unmarshal(data, &varProjectLabelPutRequest)
 
 	if err != nil {
 		return err
 	}
 
-	*o = AllowedLoadZonesListApiModel(varAllowedLoadZonesListApiModel)
+	*o = ProjectLabelPutRequest(varProjectLabelPutRequest)
 
 	additionalProperties := make(map[string]interface{})
 
@@ -131,38 +131,38 @@ func (o *AllowedLoadZonesListApiModel) UnmarshalJSON(data []byte) (err error) {
 	return err
 }
 
-type NullableAllowedLoadZonesListApiModel struct {
-	value *AllowedLoadZonesListApiModel
+type NullableProjectLabelPutRequest struct {
+	value *ProjectLabelPutRequest
 	isSet bool
 }
 
-func (v NullableAllowedLoadZonesListApiModel) Get() *AllowedLoadZonesListApiModel {
+func (v NullableProjectLabelPutRequest) Get() *ProjectLabelPutRequest {
 	return v.value
 }
 
-func (v *NullableAllowedLoadZonesListApiModel) Set(val *AllowedLoadZonesListApiModel) {
+func (v *NullableProjectLabelPutRequest) Set(val *ProjectLabelPutRequest) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableAllowedLoadZonesListApiModel) IsSet() bool {
+func (v NullableProjectLabelPutRequest) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableAllowedLoadZonesListApiModel) Unset() {
+func (v *NullableProjectLabelPutRequest) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableAllowedLoadZonesListApiModel(val *AllowedLoadZonesListApiModel) *NullableAllowedLoadZonesListApiModel {
-	return &NullableAllowedLoadZonesListApiModel{value: val, isSet: true}
+func NewNullableProjectLabelPutRequest(val *ProjectLabelPutRequest) *NullableProjectLabelPutRequest {
+	return &NullableProjectLabelPutRequest{value: val, isSet: true}
 }
 
-func (v NullableAllowedLoadZonesListApiModel) MarshalJSON() ([]byte, error) {
+func (v NullableProjectLabelPutRequest) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableAllowedLoadZonesListApiModel) UnmarshalJSON(src []byte) error {
+func (v *NullableProjectLabelPutRequest) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
