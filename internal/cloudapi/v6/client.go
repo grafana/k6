@@ -12,8 +12,6 @@ import (
 
 	k6cloud "github.com/grafana/k6-cloud-openapi-client-go/k6"
 	"github.com/sirupsen/logrus"
-
-	"go.k6.io/k6/cloudapi"
 )
 
 // Client handles communication with the k6 Cloud API v6.
@@ -25,9 +23,6 @@ type Client struct {
 	baseURL   string
 
 	logger logrus.FieldLogger
-
-	retries       int
-	retryInterval time.Duration
 }
 
 // NewClient return a new client for the cloud API.
@@ -47,19 +42,13 @@ func NewClient(logger logrus.FieldLogger, token, host, version string, timeout t
 		},
 		OperationServers: map[string]k6cloud.ServerConfigurations{},
 		HTTPClient:       &http.Client{Timeout: timeout},
-		// Retries are handled by retryDo, not by the generated client.
-		// Explicit zero prevents silent double-retry if the generated
-		// client ever changes its default.
-		MaxRetries: 0,
 	}
 
 	return &Client{
-		apiClient:     k6cloud.NewAPIClient(cfg),
-		token:         token,
-		baseURL:       fmt.Sprintf("%s/cloud/v6", host),
-		retries:       cloudapi.MaxRetries,
-		retryInterval: cloudapi.RetryInterval,
-		logger:        logger,
+		apiClient: k6cloud.NewAPIClient(cfg),
+		token:     token,
+		baseURL:   fmt.Sprintf("%s/cloud/v6", host),
+		logger:    logger,
 	}, nil
 }
 
@@ -150,48 +139,6 @@ func CheckResponse(r *http.Response, err error) error {
 	}
 	payload.Response = r
 	return payload
-}
-
-// shouldRetry decides whether the failed request should be retried.
-// Retries on: nil response (transport error), 5xx, and 429.
-func shouldRetry(r *http.Response, err error) bool {
-	if r == nil {
-		return err != nil
-	}
-	return r.StatusCode >= 500 || r.StatusCode == http.StatusTooManyRequests
-}
-
-// retryDo executes fn up to c.retries times, matching master's retry budget.
-// fn returns whether the request is retryable and any error.
-//
-// The generated OpenAPI client has its own retry loop (callAPI), but it uses
-// time.Sleep which blocks through context cancellation. retryDo uses
-// select on ctx.Done() so a cancelled context (e.g. SIGINT) immediately
-// stops the retry wait instead of sleeping through it.
-func (c *Client) retryDo(ctx context.Context, fn func() (retryable bool, err error)) error {
-	var lastErr error
-	for attempt := range c.retries {
-		retry, err := fn()
-		if err == nil {
-			return nil
-		}
-		if !retry {
-			return err
-		}
-		lastErr = err
-		if attempt < c.retries-1 {
-			c.logger.WithField("attempt", attempt+1).
-				Warn("Transient error, retrying...")
-			retryTimer := time.NewTimer(c.retryInterval)
-			select {
-			case <-ctx.Done():
-				retryTimer.Stop()
-				return ctx.Err()
-			case <-retryTimer.C:
-			}
-		}
-	}
-	return lastErr
 }
 
 // toInt32 safely converts an int64 to int32, returning an error if overflow would occur.

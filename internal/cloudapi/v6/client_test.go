@@ -1,7 +1,6 @@
 package cloudapi
 
 import (
-	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -60,117 +59,6 @@ func TestSetProjectID(t *testing.T) {
 		c, err := NewClient(testutils.NewLogger(t), "token", "http://example.com", "1.0", time.Second)
 		require.NoError(t, err)
 		require.NoError(t, c.SetProjectID(456))
-	})
-}
-
-func TestShouldRetry(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name   string
-		resp   *http.Response
-		err    error
-		expect bool
-	}{
-		{"nil response nil error", nil, nil, false},
-		{"nil response with error", nil, errors.New("dial tcp: connection refused"), true},
-		{"transport error", nil, errors.New("connection refused"), true},
-		{"500", &http.Response{StatusCode: http.StatusInternalServerError}, errors.New("err"), true},
-		{"502", &http.Response{StatusCode: http.StatusBadGateway}, errors.New("err"), true},
-		{"503", &http.Response{StatusCode: http.StatusServiceUnavailable}, errors.New("err"), true},
-		{"429", &http.Response{StatusCode: http.StatusTooManyRequests}, errors.New("err"), true},
-		{"400 not retryable", &http.Response{StatusCode: http.StatusBadRequest}, errors.New("err"), false},
-		{"404 not retryable", &http.Response{StatusCode: http.StatusNotFound}, errors.New("err"), false},
-		{"409 not retryable", &http.Response{StatusCode: http.StatusConflict}, errors.New("err"), false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			assert.Equal(t, tt.expect, shouldRetry(tt.resp, tt.err))
-		})
-	}
-}
-
-func TestRetryDo(t *testing.T) {
-	t.Parallel()
-
-	t.Run("succeeds on first try", func(t *testing.T) {
-		t.Parallel()
-		client, err := NewClient(testutils.NewLogger(t), "token", "http://example.com", "1.0", time.Second)
-		require.NoError(t, err)
-
-		calls := 0
-		err = client.retryDo(t.Context(), func() (bool, error) {
-			calls++
-			return false, nil
-		})
-		require.NoError(t, err)
-		assert.Equal(t, 1, calls)
-	})
-
-	t.Run("retries transient then succeeds", func(t *testing.T) {
-		t.Parallel()
-		client, err := NewClient(testutils.NewLogger(t), "token", "http://example.com", "1.0", time.Second)
-		require.NoError(t, err)
-		client.retryInterval = time.Millisecond
-
-		calls := 0
-		err = client.retryDo(t.Context(), func() (bool, error) {
-			calls++
-			if calls < 3 {
-				return true, errors.New("bad gateway")
-			}
-			return false, nil
-		})
-		require.NoError(t, err)
-		assert.Equal(t, 3, calls)
-	})
-
-	t.Run("does not retry client errors", func(t *testing.T) {
-		t.Parallel()
-		client, err := NewClient(testutils.NewLogger(t), "token", "http://example.com", "1.0", time.Second)
-		require.NoError(t, err)
-
-		calls := 0
-		err = client.retryDo(t.Context(), func() (bool, error) {
-			calls++
-			return false, errors.New("bad request")
-		})
-		require.Error(t, err)
-		assert.Equal(t, 1, calls)
-	})
-
-	t.Run("respects context cancellation", func(t *testing.T) {
-		t.Parallel()
-		client, err := NewClient(testutils.NewLogger(t), "token", "http://example.com", "1.0", time.Second)
-		require.NoError(t, err)
-		client.retryInterval = time.Hour
-
-		ctx, cancel := context.WithCancel(t.Context())
-		calls := 0
-		err = client.retryDo(ctx, func() (bool, error) {
-			calls++
-			cancel()
-			return true, errors.New("transport error")
-		})
-		require.Error(t, err)
-		assert.ErrorIs(t, err, context.Canceled)
-	})
-
-	t.Run("exhausts retries", func(t *testing.T) {
-		t.Parallel()
-		client, err := NewClient(testutils.NewLogger(t), "token", "http://example.com", "1.0", time.Second)
-		require.NoError(t, err)
-		client.retryInterval = time.Millisecond
-
-		calls := 0
-		err = client.retryDo(t.Context(), func() (bool, error) {
-			calls++
-			return true, errors.New("service unavailable")
-		})
-		require.Error(t, err)
-		assert.Equal(t, 3, calls) // matches master's retry budget
 	})
 }
 

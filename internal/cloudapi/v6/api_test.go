@@ -2,7 +2,6 @@ package cloudapi
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -66,7 +65,6 @@ func TestValidateToken(t *testing.T) {
 		t.Parallel()
 		client, err := NewClient(testutils.NewLogger(t), "test-token", "http://invalid-url-that-does-not-exist", "1.0", 1*time.Second)
 		require.NoError(t, err)
-		client.retryInterval = time.Millisecond
 
 		resp, err := client.ValidateToken(t.Context(), "https://stack.grafana.net")
 		assert.Error(t, err)
@@ -128,28 +126,6 @@ func TestValidateOptions(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("retries on 502", func(t *testing.T) {
-		t.Parallel()
-		attempts := 0
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			attempts++
-			if attempts < 3 {
-				w.WriteHeader(http.StatusBadGateway)
-				return
-			}
-			w.Header().Set("Content-Type", "application/json")
-			fprint(t, w, `{}`)
-		}))
-		defer srv.Close()
-
-		client := newTestClient(t, srv)
-		client.retryInterval = time.Millisecond
-
-		err := client.ValidateOptions(t.Context(), lib.Options{})
-		require.NoError(t, err)
-		assert.Equal(t, 3, attempts)
-	})
-
 	t.Run("validation error", func(t *testing.T) {
 		t.Parallel()
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -200,37 +176,6 @@ func TestCreateCloudTest(t *testing.T) {
 	})
 }
 
-func TestCreateCloudTestRetry(t *testing.T) {
-	t.Parallel()
-
-	t.Run("retries on 502", func(t *testing.T) {
-		t.Parallel()
-		attempts := 0
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			attempts++
-			if attempts < 3 {
-				w.WriteHeader(http.StatusBadGateway)
-				return
-			}
-			w.Header().Add("Content-Type", "application/json")
-			fprint(t, w, `{
-				"id": 789, "name": "test-name", "project_id": 456,
-				"baseline_test_run_id": null,
-				"created": "2024-01-01T00:00:00Z", "updated": "2024-01-01T00:00:00Z"
-			}`)
-		}))
-		defer srv.Close()
-
-		client := newTestClient(t, srv)
-		client.retryInterval = time.Millisecond
-
-		result, err := client.CreateCloudTest(t.Context(), "test-name", createTestArchiveBytes(t))
-		require.NoError(t, err)
-		assert.Equal(t, int32(789), result.Id)
-		assert.Equal(t, 3, attempts)
-	})
-}
-
 func TestFetchCloudTestByName(t *testing.T) {
 	t.Parallel()
 
@@ -268,35 +213,6 @@ func TestFetchCloudTestByName(t *testing.T) {
 		_, err := client.FetchCloudTestByName(t.Context(), "my-test")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), `"my-test" not found in project`)
-	})
-
-	t.Run("retries on 502", func(t *testing.T) {
-		t.Parallel()
-		attempts := 0
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			attempts++
-			if attempts < 3 {
-				w.WriteHeader(http.StatusBadGateway)
-				return
-			}
-			w.Header().Set("Content-Type", "application/json")
-			fprint(t, w, `{
-				"value": [{
-					"id": 789, "name": "test-name", "project_id": 456,
-					"baseline_test_run_id": null,
-					"created": "2024-01-01T00:00:00Z", "updated": "2024-01-01T00:00:00Z"
-				}]
-			}`)
-		}))
-		defer srv.Close()
-
-		client := newTestClient(t, srv)
-		client.retryInterval = time.Millisecond
-
-		result, err := client.FetchCloudTestByName(t.Context(), "test-name")
-		require.NoError(t, err)
-		assert.Equal(t, int32(789), result.Id)
-		assert.Equal(t, 3, attempts)
 	})
 
 	t.Run("multiple results picks exact name", func(t *testing.T) {
@@ -409,33 +325,6 @@ func TestStartCloudTestRun(t *testing.T) {
 		assert.Equal(t, "https://app.grafana.com/runs/999", result.TestRunDetailsPageUrl)
 	})
 
-	t.Run("idempotency key stable across retries", func(t *testing.T) {
-		t.Parallel()
-		var keys []string
-		attempts := 0
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			keys = append(keys, r.Header.Get("K6-Idempotency-Key"))
-			attempts++
-			if attempts < 3 {
-				w.WriteHeader(http.StatusBadGateway)
-				return
-			}
-			w.Header().Set("Content-Type", "application/json")
-			fprint(t, w, v6testing.TestRunJSON(t, 999, "created", nil, "https://app.grafana.com/runs/999", nil, 0))
-		}))
-		defer srv.Close()
-
-		client := newTestClient(t, srv)
-		client.retryInterval = time.Millisecond
-
-		_, err := client.StartCloudTestRun(t.Context(), 789)
-		require.NoError(t, err)
-		require.Equal(t, 3, attempts)
-		require.Len(t, keys, 3)
-		assert.Equal(t, keys[0], keys[1], "key must be the same across retries")
-		assert.Equal(t, keys[0], keys[2], "key must be the same across retries")
-		assert.NotEmpty(t, keys[0])
-	})
 }
 
 func TestStopCloudTestRun(t *testing.T) {
@@ -454,27 +343,6 @@ func TestStopCloudTestRun(t *testing.T) {
 		client := newTestClient(t, srv)
 		err := client.StopCloudTestRun(t.Context(), 999)
 		require.NoError(t, err)
-	})
-
-	t.Run("retries on 502", func(t *testing.T) {
-		t.Parallel()
-		attempts := 0
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			attempts++
-			if attempts < 3 {
-				w.WriteHeader(http.StatusBadGateway)
-				return
-			}
-			w.WriteHeader(http.StatusNoContent)
-		}))
-		defer srv.Close()
-
-		client := newTestClient(t, srv)
-		client.retryInterval = time.Millisecond
-
-		err := client.StopCloudTestRun(t.Context(), 999)
-		require.NoError(t, err)
-		assert.Equal(t, 3, attempts)
 	})
 }
 
@@ -512,56 +380,6 @@ func TestFetchTestRun(t *testing.T) {
 		assert.Equal(t, "passed", progress.Result)
 		assert.Equal(t, int32(60), progress.EstimatedDuration)
 		assert.Equal(t, int32(30), progress.ExecutionDuration)
-	})
-
-	t.Run("retries on 502", func(t *testing.T) {
-		t.Parallel()
-		attempts := 0
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			attempts++
-			if attempts < 3 {
-				w.WriteHeader(http.StatusBadGateway)
-				return
-			}
-			w.Header().Set("Content-Type", "application/json")
-			fprint(t, w, `{
-				"id": 999, "test_id": 789, "project_id": 456,
-				"started_by": null, "created": "2024-06-01T19:00:00Z",
-				"ended": null, "cost": null, "note": "", "retention_expiry": null,
-				"distribution": null, "options": null, "result": null,
-				"result_details": null, "status": "running",
-				"status_details": {"type": "running", "entered": "2024-06-01T19:00:00Z"},
-				"status_history": [], "k6_dependencies": {}, "k6_versions": {},
-				"max_vus": null, "max_browser_vus": null,
-				"estimated_duration": null, "execution_duration": 0
-			}`)
-		}))
-		defer srv.Close()
-
-		client := newTestClient(t, srv)
-		client.retryInterval = time.Millisecond
-
-		progress, err := client.FetchTestRun(t.Context(), 999)
-		require.NoError(t, err)
-		assert.Equal(t, StatusRunning, progress.Status)
-		assert.Equal(t, 3, attempts)
-	})
-
-	t.Run("context cancelled during retry", func(t *testing.T) {
-		t.Parallel()
-		ctx, cancel := context.WithCancel(t.Context())
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			cancel()
-			w.WriteHeader(http.StatusBadGateway)
-		}))
-		defer srv.Close()
-
-		client := newTestClient(t, srv)
-		client.retryInterval = time.Hour
-
-		_, err := client.FetchTestRun(ctx, 999)
-		require.Error(t, err)
-		assert.ErrorIs(t, err, context.Canceled)
 	})
 
 	t.Run("non-retryable error", func(t *testing.T) {
