@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"html"
 	"io"
+	"math/rand"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -96,6 +97,28 @@ func (h *HTTPBin) RequestWithBody(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	writeJSON(http.StatusOK, w, resp)
+}
+
+// RequestWithBodyDiscard handles POST, PUT, and PATCH requests by responding with a
+// JSON representation of the incoming request without body data
+func (h *HTTPBin) RequestWithBodyDiscard(w http.ResponseWriter, r *http.Request) {
+	resp := &discardedBodyResponse{
+		noBodyResponse: noBodyResponse{
+			Args:    r.URL.Query(),
+			Headers: getRequestHeaders(r, h.excludeHeadersProcessor),
+			Method:  r.Method,
+			Origin:  getClientIP(r),
+			URL:     getURL(r).String(),
+		},
+	}
+
+	n, err := io.Copy(io.Discard, r.Body)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	resp.BytesReceived = n
 	writeJSON(http.StatusOK, w, resp)
 }
 
@@ -279,7 +302,7 @@ func (h *HTTPBin) Status(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	choice := weightedRandomChoice(choices)
+	choice := weightedRandomChoice(choices, rand.Float64)
 	h.doStatus(w, choice)
 }
 
@@ -476,9 +499,9 @@ func (h *HTTPBin) RedirectTo(w http.ResponseWriter, r *http.Request) {
 
 // Cookies responds with the cookies in the incoming request
 func (h *HTTPBin) Cookies(w http.ResponseWriter, r *http.Request) {
-	resp := cookiesResponse{}
+	resp := cookiesResponse{Cookies: make(map[string]string)}
 	for _, c := range r.Cookies() {
-		resp[c.Name] = c.Value
+		resp.Cookies[c.Name] = c.Value
 	}
 	writeJSON(http.StatusOK, w, resp)
 }
@@ -528,8 +551,9 @@ func (h *HTTPBin) BasicAuth(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(status, w, authResponse{
-		Authorized: authorized,
-		User:       givenUser,
+		Authenticated: authorized,
+		Authorized:    authorized,
+		User:          givenUser,
 	})
 }
 
@@ -548,8 +572,9 @@ func (h *HTTPBin) HiddenBasicAuth(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(http.StatusOK, w, authResponse{
-		Authorized: authorized,
-		User:       givenUser,
+		Authenticated: authorized,
+		Authorized:    authorized,
+		User:          givenUser,
 	})
 }
 
@@ -709,12 +734,7 @@ func (h *HTTPBin) Drip(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pause := duration
-	if numBytes > 1 {
-		// compensate for lack of pause after final write (i.e. if we're
-		// writing 10 bytes, we will only pause 9 times)
-		pause = duration / time.Duration(numBytes-1)
-	}
+	pause := computePausePerWrite(duration, numBytes)
 
 	// Initial delay before we send any response data
 	if delay > 0 {
@@ -804,6 +824,7 @@ func (h *HTTPBin) Range(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Add("ETag", fmt.Sprintf("range%d", numBytes))
 	w.Header().Add("Accept-Ranges", "bytes")
+	w.Header().Set("Content-Type", textContentType)
 
 	if numBytes <= 0 || numBytes > h.MaxBodySize {
 		writeError(w, http.StatusBadRequest, fmt.Errorf("invalid count: %d not in range [1, %d]", numBytes, h.MaxBodySize))
@@ -960,7 +981,7 @@ func (h *HTTPBin) handleBytes(w http.ResponseWriter, r *http.Request, streaming 
 	w.WriteHeader(http.StatusOK)
 
 	var chunk []byte
-	for i := 0; i < numBytes; i++ {
+	for range numBytes {
 		chunk = append(chunk, byte(rng.Intn(256)))
 		if len(chunk) == chunkSize {
 			write(chunk)
@@ -1109,8 +1130,9 @@ func (h *HTTPBin) DigestAuth(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(http.StatusOK, w, authResponse{
-		Authorized: true,
-		User:       user,
+		Authenticated: true,
+		Authorized:    true,
+		User:          user,
 	})
 }
 
@@ -1227,12 +1249,7 @@ func (h *HTTPBin) SSE(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pause := duration
-	if count > 1 {
-		// compensate for lack of pause after final write (i.e. if we're
-		// writing 10 events, we will only pause 9 times)
-		pause = duration / time.Duration(count-1)
-	}
+	pause := computePausePerWrite(duration, int64(count))
 
 	// Initial delay before we send any response data
 	if delay > 0 {
