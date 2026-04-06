@@ -5,7 +5,7 @@ go 1.25.0
 toolchain go1.25.8
 
 require (
-	buf.build/gen/go/prometheus/prometheus/protocolbuffers/go v1.36.11-20251118093737-4105057cc7d4.1
+	buf.build/gen/go/prometheus/prometheus/protocolbuffers/go v1.36.11-20260331160422-eae785f0a21d.1
 	github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/PuerkitoBio/goquery v1.11.0
