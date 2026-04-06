@@ -305,7 +305,7 @@ jobs:
             tenant-id=azure-trusted-signing:tenant-id
 
       - name: Sign Windows binary
-        uses: grafana/shared-workflows/actions/azure-trusted-signing@e86cdb1c0a8cf5df57d3078f285261f7c9577174 # azure-trusted-signing/v1.0.0
+        uses: grafana/shared-workflows/actions/azure-trusted-signing@d3e134ded5c97bd60d74ec8878eb3d0eb2d66fad # azure-trusted-signing/v1.0.1
         id: sign-artifacts
         if: needs.configure.outputs.sign_windows_artifacts == 'true'
         with:
@@ -439,7 +439,7 @@ jobs:
             tenant-id=azure-trusted-signing:tenant-id
 
       - name: Sign Windows installer
-        uses: grafana/shared-workflows/actions/azure-trusted-signing@e86cdb1c0a8cf5df57d3078f285261f7c9577174 # azure-trusted-signing/v1.0.0
+        uses: grafana/shared-workflows/actions/azure-trusted-signing@d3e134ded5c97bd60d74ec8878eb3d0eb2d66fad # azure-trusted-signing/v1.0.1
         id: sign-artifacts
         if: needs.configure.outputs.sign_windows_artifacts == 'true'
         with:
