@@ -33,6 +33,12 @@ type PageScreenshotOptions struct {
 	Quality        int64          `json:"quality"`
 }
 
+// PageGoBackForwardOptions are options for Page.GoBack and Page.GoForward.
+type PageGoBackForwardOptions struct {
+	WaitUntil LifecycleEvent `json:"waitUntil"`
+	Timeout   time.Duration  `json:"timeout"`
+}
+
 func NewPageEmulateMediaOptions(from *Page) *PageEmulateMediaOptions {
 	return &PageEmulateMediaOptions{
 		ColorScheme:   from.colorScheme,
@@ -41,30 +47,46 @@ func NewPageEmulateMediaOptions(from *Page) *PageEmulateMediaOptions {
 	}
 }
 
-// Parse parses the page emulate media options.
-func (o *PageEmulateMediaOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	rt := k6ext.Runtime(ctx)
-	if !common.IsNullish(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			switch k {
-			case "colorScheme":
-				o.ColorScheme = ColorScheme(opts.Get(k).String())
-			case "media":
-				o.Media = MediaType(opts.Get(k).String())
-			case "reducedMotion":
-				o.ReducedMotion = ReducedMotion(opts.Get(k).String())
-			}
-		}
-	}
-	return nil
-}
-
 func NewPageReloadOptions(defaultWaitUntil LifecycleEvent, defaultTimeout time.Duration) *PageReloadOptions {
 	return &PageReloadOptions{
 		WaitUntil: defaultWaitUntil,
 		Timeout:   defaultTimeout,
 	}
+}
+
+// NewPageGoBackForwardOptions returns a new PageGoBackForwardOptions.
+func NewPageGoBackForwardOptions(
+	defaultWaitUntil LifecycleEvent,
+	defaultTimeout time.Duration,
+) *PageGoBackForwardOptions {
+	return &PageGoBackForwardOptions{
+		WaitUntil: defaultWaitUntil,
+		Timeout:   defaultTimeout,
+	}
+}
+
+// Parse parses the page go back/forward options.
+func (o *PageGoBackForwardOptions) Parse(ctx context.Context, opts sobek.Value) error {
+	if common.IsNullish(opts) {
+		return nil
+	}
+
+	obj := opts.ToObject(k6ext.Runtime(ctx))
+	for _, k := range obj.Keys() {
+		switch k {
+		case "waitUntil":
+			lifeCycle := obj.Get(k).String()
+			if l, ok := lifecycleEventToID[lifeCycle]; ok {
+				o.WaitUntil = l
+			} else {
+				return fmt.Errorf("%q is not a valid lifecycle", lifeCycle)
+			}
+		case "timeout":
+			o.Timeout = time.Duration(obj.Get(k).ToInteger()) * time.Millisecond
+		}
+	}
+
+	return nil
 }
 
 // Parse parses the page reload options.

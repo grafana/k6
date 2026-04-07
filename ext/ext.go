@@ -2,6 +2,7 @@ package ext
 
 import (
 	"fmt"
+	"maps"
 	"reflect"
 	"runtime"
 	"runtime/debug"
@@ -26,6 +27,7 @@ const (
 	JSExtension ExtensionType = iota + 1
 	OutputExtension
 	SecretSourceExtension
+	SubcommandExtension
 )
 
 func (e ExtensionType) String() string {
@@ -37,6 +39,8 @@ func (e ExtensionType) String() string {
 		s = "output"
 	case SecretSourceExtension:
 		s = "secret-source"
+	case SubcommandExtension:
+		s = "subcommand"
 	}
 	return s
 }
@@ -45,7 +49,7 @@ func (e ExtensionType) String() string {
 type Extension struct {
 	Name, Path, Version string
 	Type                ExtensionType
-	Module              interface{}
+	Module              any
 }
 
 func (e Extension) String() string {
@@ -55,7 +59,7 @@ func (e Extension) String() string {
 // Register a new extension with the given name and type. This function will
 // panic if an unsupported extension type is provided, or if an extension of the
 // same type and name is already registered.
-func Register(name string, typ ExtensionType, mod interface{}) {
+func Register(name string, typ ExtensionType, mod any) {
 	mx.Lock()
 	defer mx.Unlock()
 
@@ -91,9 +95,7 @@ func Get(typ ExtensionType) map[string]*Extension {
 
 	result := make(map[string]*Extension, len(exts))
 
-	for name, ext := range exts {
-		result[name] = ext
-	}
+	maps.Copy(result, exts)
 
 	return result
 }
@@ -103,13 +105,16 @@ func GetAll() []*Extension {
 	mx.RLock()
 	defer mx.RUnlock()
 
-	js, out := extensions[JSExtension], extensions[OutputExtension]
-	result := make([]*Extension, 0, len(js)+len(out))
+	js, out, subcommand := extensions[JSExtension], extensions[OutputExtension], extensions[SubcommandExtension]
+	result := make([]*Extension, 0, len(js)+len(out)+len(subcommand))
 
 	for _, e := range js {
 		result = append(result, e)
 	}
 	for _, e := range out {
+		result = append(result, e)
+	}
+	for _, e := range subcommand {
 		result = append(result, e)
 	}
 
@@ -125,7 +130,7 @@ func GetAll() []*Extension {
 
 // extractModuleInfo attempts to return the package path and version of the Go
 // module that created the given value.
-func extractModuleInfo(mod interface{}) (path, version string) {
+func extractModuleInfo(mod any) (path, version string) {
 	t := reflect.TypeOf(mod)
 
 	switch t.Kind() {
@@ -136,12 +141,12 @@ func extractModuleInfo(mod interface{}) (path, version string) {
 	case reflect.Func:
 		path = runtime.FuncForPC(reflect.ValueOf(mod).Pointer()).Name()
 	default:
-		return
+		return path, version
 	}
 
 	buildInfo, ok := debug.ReadBuildInfo()
 	if !ok {
-		return
+		return path, version
 	}
 
 	for _, dep := range buildInfo.Deps {
@@ -154,11 +159,12 @@ func extractModuleInfo(mod interface{}) (path, version string) {
 		}
 	}
 
-	return
+	return path, version
 }
 
 func init() {
 	extensions[JSExtension] = make(map[string]*Extension)
 	extensions[OutputExtension] = make(map[string]*Extension)
 	extensions[SecretSourceExtension] = make(map[string]*Extension)
+	extensions[SubcommandExtension] = make(map[string]*Extension)
 }

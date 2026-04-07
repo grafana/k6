@@ -2,6 +2,7 @@
 /k6.exe
 /dist
 /pkg-build
+/internal/lib/summary/machinereadable/k6-summary
 /internal/js/tc39/TestTC39
 /internal/js/modules/k6/experimental/streams/tests/wpt
 /internal/js/modules/k6/webcrypto/tests/wpt/
@@ -23,6 +24,8 @@
 /vendor/**/*.json
 # Excluding as it is required (embedded) configuration file for web-dashboard
 !/vendor/github.com/grafana/xk6-dashboard/dashboard/assets/packages/config/dist/config.json
+!/vendor/github.com/grafana/xk6-dashboard-assets/packages/config/dist/config.json
+/vendor/github.com/grafana/xk6-dashboard-assets/yarn.lock
 /vendor/**/.*.json
 /vendor/**/Makefile
 /vendor/**/*.png
@@ -32,6 +35,11 @@
 !/vendor/modules.txt
 /vendor/**/*.y*ml
 /vendor/**/.*.y*ml
+/vendor/**/CODEOWNERS
+/vendor/**/CONTRIBUTING.md
+/vendor/**/CODE_OF_CONDUCT.md
+/vendor/**/README.md
+/vendor/**/.gitignore
 /vendor/github.com/dlclark/regexp2/testoutput1
 
 /packaging/.env

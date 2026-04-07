@@ -17,7 +17,7 @@ type MemoryDumpConfig struct{}
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Tracing#type-TraceConfig
 type TraceConfig struct {
-	RecordMode           RecordMode        `json:"recordMode,omitempty,omitzero"`          // Controls how the trace buffer stores data.
+	RecordMode           RecordMode        `json:"recordMode,omitempty,omitzero"`          // Controls how the trace buffer stores data. The default is recordUntilFull.
 	TraceBufferSizeInKb  float64           `json:"traceBufferSizeInKb,omitempty,omitzero"` // Size of the trace buffer in kilobytes. If not specified or zero is passed, a default value of 200 MB would be used.
 	EnableSampling       bool              `json:"enableSampling"`                         // Turns on JavaScript stack sampling.
 	EnableSystrace       bool              `json:"enableSystrace"`                         // Turns on system tracing.
@@ -170,7 +170,8 @@ func (t *Backend) UnmarshalJSON(buf []byte) error {
 	return nil
 }
 
-// RecordMode controls how the trace buffer stores data.
+// RecordMode controls how the trace buffer stores data. The default is
+// recordUntilFull.
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Tracing#type-TraceConfig
 type RecordMode string

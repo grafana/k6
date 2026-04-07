@@ -51,6 +51,7 @@ type Options struct {
 	AddSourceMappings   bool
 	LegalComments       config.LegalComments
 	NeedsMetafile       bool
+	MetafileFormat      config.MetafileFormat
 }
 
 type PrintResult struct {
@@ -93,9 +94,10 @@ func (p *printer) recordImportPathForMetafile(importRecordIndex uint32) {
 		record := p.importRecords[importRecordIndex]
 		external := ""
 		if (record.Flags & ast.ShouldNotBeExternalInMetafile) == 0 {
-			external = ",\n          \"external\": true"
+			external = p.options.MetafileFormat.MaybeRemoveWhitespace(",\n          \"external\": true")
 		}
-		p.jsonMetadataImports = append(p.jsonMetadataImports, fmt.Sprintf("\n        {\n          \"path\": %s,\n          \"kind\": %s%s\n        }",
+		p.jsonMetadataImports = append(p.jsonMetadataImports, fmt.Sprintf(
+			p.options.MetafileFormat.MaybeRemoveWhitespace("\n        {\n          \"path\": %s,\n          \"kind\": %s%s\n        }"),
 			helpers.QuoteForJSON(record.Path.Text, p.options.ASCIIOnly),
 			helpers.QuoteForJSON(record.Kind.StringForMetafile(), p.options.ASCIIOnly),
 			external))
@@ -186,11 +188,20 @@ func (p *printer) printRule(rule css_ast.Rule, indent int32, omitTrailingSemicol
 				p.printTokens(conditions.Supports, printTokensOpts{})
 				space = true
 			}
-			if len(conditions.Media) > 0 {
+			if len(conditions.Queries) > 0 {
 				if space {
 					p.print(" ")
 				}
-				p.printTokens(conditions.Media, printTokensOpts{})
+				for i, query := range conditions.Queries {
+					if i > 0 {
+						if p.options.MinifyWhitespace {
+							p.print(",")
+						} else {
+							p.print(", ")
+						}
+					}
+					p.printMediaQuery(query, 0)
+				}
 			}
 		}
 		p.print(";")
@@ -344,12 +355,183 @@ func (p *printer) printRule(rule css_ast.Rule, indent int32, omitTrailingSemicol
 			p.printRuleBlock(r.Rules, indent, r.CloseBraceLoc)
 		}
 
+	case *css_ast.RAtMedia:
+		p.print("@media")
+		var flags mqFlags
+		if p.options.MinifyWhitespace {
+			flags = mqAfterIdentifier
+		} else {
+			p.print(" ")
+		}
+		for i, query := range r.Queries {
+			if i > 0 {
+				if p.options.MinifyWhitespace {
+					p.print(",")
+				} else {
+					p.print(", ")
+				}
+			}
+			p.printMediaQuery(query, flags)
+			flags = 0
+		}
+		if !p.options.MinifyWhitespace && len(r.Queries) > 0 {
+			p.print(" ")
+		}
+		p.printRuleBlock(r.Rules, indent, r.CloseBraceLoc)
+
+	case *css_ast.RAtScope:
+		p.print("@scope")
+		if len(r.Start) > 0 {
+			if p.options.MinifyWhitespace {
+				p.print("(")
+			} else {
+				p.print(" (")
+			}
+			p.printComplexSelectors(r.Start, indent, layoutSingleLine)
+			p.print(")")
+		}
+		if len(r.End) > 0 {
+			if p.options.MinifyWhitespace {
+				p.print("to (")
+			} else {
+				p.print(" to (")
+			}
+			p.printComplexSelectors(r.End, indent, layoutSingleLine)
+			p.print(")")
+		}
+		if !p.options.MinifyWhitespace {
+			p.print(" ")
+		}
+		p.printRuleBlock(r.Rules, indent, r.CloseBraceLoc)
+
 	default:
 		panic("Internal error")
 	}
 
 	if !p.options.MinifyWhitespace {
 		p.print("\n")
+	}
+}
+
+type mqFlags uint8
+
+const (
+	mqNeedsParens mqFlags = 1 << iota
+	mqAfterIdentifier
+)
+
+func (p *printer) printMediaQuery(query css_ast.MediaQuery, flags mqFlags) {
+	if q, ok := query.Data.(*css_ast.MQArbitraryTokens); ok {
+		if (flags & mqAfterIdentifier) != 0 {
+			p.print(" ")
+		}
+		p.printTokens(q.Tokens, printTokensOpts{})
+		return
+	}
+
+	switch q := query.Data.(type) {
+	case *css_ast.MQType:
+		if (flags & mqAfterIdentifier) != 0 {
+			p.print(" ")
+		}
+		if p.options.AddSourceMappings {
+			p.builder.AddSourceMapping(query.Loc, "", p.css)
+		}
+		switch q.Op {
+		case css_ast.MQTypeOpNot:
+			p.print("not ")
+		case css_ast.MQTypeOpOnly:
+			p.print("only ")
+		}
+		p.printIdent(q.Type, identNormal, 0)
+		if q.AndOrNull.Data != nil {
+			p.print(" and ")
+			var flags mqFlags
+			if binary, ok := q.AndOrNull.Data.(*css_ast.MQBinary); ok && binary.Op == css_ast.MQBinaryOpOr {
+				flags = mqNeedsParens
+			}
+			p.printMediaQuery(q.AndOrNull, flags)
+		}
+
+	case *css_ast.MQNot:
+		if (flags & mqNeedsParens) != 0 {
+			p.print("(")
+		} else if (flags & mqAfterIdentifier) != 0 {
+			p.print(" ")
+		}
+		if p.options.AddSourceMappings {
+			p.builder.AddSourceMapping(query.Loc, "", p.css)
+		}
+		p.print("not ")
+		p.printMediaQuery(q.Inner, mqNeedsParens)
+		if (flags & mqNeedsParens) != 0 {
+			p.print(")")
+		}
+
+	case *css_ast.MQBinary:
+		if (flags & mqNeedsParens) != 0 {
+			p.print("(")
+		}
+		for i, inner := range q.Terms {
+			if i > 0 {
+				if !p.options.MinifyWhitespace {
+					p.print(" ")
+				}
+				switch q.Op {
+				case css_ast.MQBinaryOpAnd:
+					p.print("and ")
+				case css_ast.MQBinaryOpOr:
+					p.print("or ")
+				}
+			}
+			p.printMediaQuery(inner, mqNeedsParens)
+		}
+		if (flags & mqNeedsParens) != 0 {
+			p.print(")")
+		}
+
+	case *css_ast.MQPlainOrBoolean:
+		p.print("(")
+		if p.options.AddSourceMappings {
+			p.builder.AddSourceMapping(query.Loc, "", p.css)
+		}
+		p.printIdent(q.Name, identNormal, 0)
+		if q.ValueOrNil != nil {
+			if p.options.MinifyWhitespace {
+				p.print(":")
+			} else {
+				p.print(": ")
+			}
+			p.printTokens(q.ValueOrNil, printTokensOpts{})
+		}
+		p.print(")")
+
+	case *css_ast.MQRange:
+		space := " "
+		if p.options.MinifyWhitespace {
+			space = ""
+		}
+		p.print("(")
+		if q.BeforeCmp != css_ast.MQCmpNone {
+			p.printTokens(q.Before, printTokensOpts{})
+			p.print(space)
+			p.print(q.BeforeCmp.String())
+			p.print(space)
+		}
+		if p.options.AddSourceMappings {
+			p.builder.AddSourceMapping(q.NameLoc, "", p.css)
+		}
+		p.printIdent(q.Name, identNormal, 0)
+		if q.AfterCmp != css_ast.MQCmpNone {
+			p.print(space)
+			p.print(q.AfterCmp.String())
+			p.print(space)
+			p.printTokens(q.After, printTokensOpts{})
+		}
+		p.print(")")
+
+	default:
+		panic("Internal error")
 	}
 }
 

@@ -5,13 +5,9 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
-	"regexp"
 	"sync"
 
-	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
 	"go.k6.io/k6/internal/js/modules/k6/browser/log"
-
-	k6modules "go.k6.io/k6/js/modules"
 
 	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/cdp"
@@ -24,8 +20,6 @@ const evaluationScriptURL = "__xk6_browser_evaluation_script__"
 
 // This error code originates from chromium.
 const devToolsServerErrorCode = -32000
-
-var sourceURLRegex = regexp.MustCompile(`^(?s)[\040\t]*//[@#] sourceURL=\s*(\S*?)\s*$`)
 
 type executionWorld string
 
@@ -55,7 +49,6 @@ type ExecutionContext struct {
 	id             runtime.ExecutionContextID
 	isMutex        sync.RWMutex
 	injectedScript JSHandleAPI
-	vu             k6modules.VU
 
 	// Used for logging
 	sid  target.SessionID // Session ID
@@ -74,7 +67,6 @@ func NewExecutionContext(
 		frame:          f,
 		id:             id,
 		injectedScript: nil,
-		vu:             k6ext.GetVU(ctx),
 		logger:         l,
 	}
 	if s != nil {
@@ -182,7 +174,7 @@ func (e *ExecutionContext) eval(
 	}
 
 	if !opts.forceCallable {
-		if !sourceURLRegex.Match([]byte(js)) {
+		if !hasSourceURL(js) {
 			js += "\n" + suffix
 		}
 
@@ -225,7 +217,7 @@ func (e *ExecutionContext) eval(
 			return nil, errors.New(cdpe.Message)
 		}
 
-		e.logger.Warnf("ExecutionContext:eval", "Unexpected DevTools server error: %v", err)
+		e.logger.Debugf("ExecutionContext:eval", "Unexpected DevTools server error: %v", err)
 		return nil, err
 	}
 	if exceptionDetails != nil {
@@ -260,6 +252,10 @@ func (e *ExecutionContext) eval(
 //go:embed js/injected_script.js
 var injectedScriptSource string
 
+//nolint:gochecknoglobals
+var injectedScriptSourceWithSourceURL = `(() => {` + injectedScriptSource + `; return new InjectedScript();})()` +
+	"\n//# sourceURL=" + evaluationScriptURL
+
 // getInjectedScript returns a JS handle to the injected script of helper functions.
 func (e *ExecutionContext) getInjectedScript(apiCtx context.Context) (JSHandleAPI, error) {
 	e.logger.Debugf(
@@ -275,19 +271,10 @@ func (e *ExecutionContext) getInjectedScript(apiCtx context.Context) (JSHandleAP
 	}
 	e.isMutex.RUnlock()
 
-	var (
-		suffix                  = `//# sourceURL=` + evaluationScriptURL
-		source                  = `(() => {` + injectedScriptSource + `; return new InjectedScript();})()`
-		expression              = source
-		expressionWithSourceURL = expression
-	)
-	if !sourceURLRegex.Match([]byte(expression)) {
-		expressionWithSourceURL = expression + "\n" + suffix
-	}
 	handle, err := e.eval(
 		apiCtx,
 		evalOptions{forceCallable: false, returnByValue: false},
-		expressionWithSourceURL,
+		injectedScriptSourceWithSourceURL,
 	)
 	if err != nil {
 		return nil, err

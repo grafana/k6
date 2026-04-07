@@ -23,6 +23,9 @@ func (s *secretsHook) Levels() []logrus.Level { return logrus.AllLevels }
 // Adding the same secret multiple times will not error, but is not recommended.
 // It is users job to not keep adding the same secret over time but only once.
 func (s *secretsHook) add(secret string) {
+	if strings.TrimSpace(secret) == "" {
+		return
+	}
 	s.mx.Lock()
 	defer s.mx.Unlock()
 	s.secrets = append(s.secrets, secret, "***SECRET_REDACTED***")

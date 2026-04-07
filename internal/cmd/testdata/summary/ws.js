@@ -2,7 +2,7 @@ import {
 	randomString,
 	randomIntBetween,
 } from "https://jslib.k6.io/k6-utils/1.1.0/index.js";
-import {WebSocket} from "k6/experimental/websockets";
+import {WebSocket} from "k6/websockets";
 import {
 	setTimeout,
 	clearTimeout,

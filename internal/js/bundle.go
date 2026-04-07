@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/url"
 	"path/filepath"
 	"runtime"
@@ -13,7 +14,6 @@ import (
 
 	"github.com/grafana/sobek"
 	"github.com/sirupsen/logrus"
-	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
@@ -80,14 +80,15 @@ func (bi *BundleInstance) getExported(name string) sobek.Value {
 
 // NewBundle creates a new bundle from a source file and a filesystem.
 func NewBundle(
-	piState *lib.TestPreInitState, src *loader.SourceData, filesystems map[string]fsext.Fs,
+	piState *lib.TestPreInitState, src *loader.SourceData, filesystems map[string]fsext.Fs, mr *modules.ModuleResolver,
 ) (*Bundle, error) {
-	return newBundle(piState, src, filesystems, lib.Options{}, true)
+	return newBundle(piState, src, filesystems, lib.Options{}, true, mr)
 }
 
 func newBundle(
 	piState *lib.TestPreInitState, src *loader.SourceData, filesystems map[string]fsext.Fs,
 	options lib.Options, updateOptions bool, // TODO: try to figure out a way to not need both
+	moduleResolver *modules.ModuleResolver,
 ) (*Bundle, error) {
 	compatMode, err := lib.ValidateCompatibilityMode(piState.RuntimeOptions.CompatibilityMode.String)
 	if err != nil {
@@ -103,15 +104,12 @@ func newBundle(
 		filesystems:       filesystems,
 		pwd:               src.PWD,
 		preInitState:      piState,
+		ModuleResolver:    moduleResolver,
 	}
 
 	if bundle.pwd == nil {
 		bundle.pwd = loader.Dir(src.URL)
 	}
-
-	c := bundle.newCompiler(piState.Logger)
-	bundle.ModuleResolver = modules.NewModuleResolver(
-		getJSModules(), generateFileLoad(bundle), c, bundle.pwd, piState.Usage, piState.Logger)
 
 	// Instantiate the bundle into a new VM using a bound init context. This uses a context with a
 	// runtime, but no state, to allow module-provided types to function within the init context.
@@ -140,30 +138,25 @@ func newBundle(
 }
 
 // NewBundleFromArchive creates a new bundle from an lib.Archive.
-func NewBundleFromArchive(piState *lib.TestPreInitState, arc *lib.Archive) (*Bundle, error) {
+func NewBundleFromArchive(
+	piState *lib.TestPreInitState, arc *lib.Archive, mr *modules.ModuleResolver,
+) (*Bundle, error) {
 	if arc.Type != "js" {
 		return nil, fmt.Errorf("expected bundle type 'js', got '%s'", arc.Type)
 	}
 
-	if !piState.RuntimeOptions.CompatibilityMode.Valid {
-		// `k6 run --compatibility-mode=whatever archive.tar` should override
-		// whatever value is in the archive
-		piState.RuntimeOptions.CompatibilityMode = null.StringFrom(arc.CompatibilityMode)
-	}
 	env := arc.Env
 	if env == nil {
 		// Older archives (<=0.20.0) don't have an "env" property
 		env = make(map[string]string)
 	}
-	for k, v := range piState.RuntimeOptions.Env {
-		env[k] = v
-	}
+	maps.Copy(env, piState.RuntimeOptions.Env)
 	piState.RuntimeOptions.Env = env
 
 	return newBundle(piState, &loader.SourceData{
 		Data: arc.Data,
 		URL:  arc.FilenameURL,
-	}, arc.Filesystems, arc.Options, false)
+	}, arc.Filesystems, arc.Options, false, mr)
 }
 
 func (b *Bundle) makeArchive() *lib.Archive {
@@ -183,9 +176,7 @@ func (b *Bundle) makeArchive() *lib.Archive {
 		Goos:              runtime.GOOS,
 	}
 	// Copy env so changes in the archive are not reflected in the source Bundle
-	for k, v := range b.preInitState.RuntimeOptions.Env {
-		arc.Env[k] = v
-	}
+	maps.Copy(arc.Env, b.preInitState.RuntimeOptions.Env)
 
 	return arc
 }
@@ -297,7 +288,7 @@ func (bi *BundleInstance) manipulateOptions(options lib.Options) error {
 
 	jsOptionsObj = jsOptions.ToObject(bi.Runtime)
 	var instErr error
-	options.ForEachSpecified("json", func(key string, val interface{}) {
+	options.ForEachSpecified("json", func(key string, val any) {
 		if err := jsOptionsObj.Set(key, val); err != nil {
 			instErr = err
 		}
@@ -305,12 +296,11 @@ func (bi *BundleInstance) manipulateOptions(options lib.Options) error {
 	return instErr
 }
 
-func (b *Bundle) newCompiler(logger logrus.FieldLogger) *compiler.Compiler {
-	c := compiler.New(logger)
-	c.WithUsage(b.preInitState.Usage)
+func newCompiler(preInitState *lib.TestPreInitState, filesystems map[string]fsext.Fs) *compiler.Compiler {
+	c := compiler.New(preInitState.Logger)
+	c.WithUsage(preInitState.Usage)
 	c.Options = compiler.Options{
-		CompatibilityMode: b.CompatibilityMode,
-		SourceMapLoader:   generateSourceMapLoader(logger, b.filesystems),
+		SourceMapLoader: generateSourceMapLoader(preInitState.Logger, filesystems),
 	}
 	return c
 }
@@ -417,9 +407,7 @@ func (b *Bundle) setupJSRuntime(rt *sobek.Runtime, vuID uint64, logger logrus.Fi
 	rt.SetRandSource(common.NewRandSource())
 
 	env := make(map[string]string, len(b.preInitState.RuntimeOptions.Env))
-	for key, value := range b.preInitState.RuntimeOptions.Env {
-		env[key] = value
-	}
+	maps.Copy(env, b.preInitState.RuntimeOptions.Env)
 	err := rt.Set("__ENV", env)
 	if err != nil {
 		return err
@@ -466,7 +454,7 @@ func (r *requireImpl) require(specifier string) (*sobek.Object, error) {
 }
 
 func (b *Bundle) setInitGlobals(rt *sobek.Runtime, vu *moduleVUImpl, modSys *modules.ModuleSystem) {
-	mustSet := func(k string, v interface{}) {
+	mustSet := func(k string, v any) {
 		if err := rt.Set(k, v); err != nil {
 			panic(fmt.Errorf("failed to set '%s' global object: %w", k, err))
 		}
@@ -541,18 +529,26 @@ func (b *Bundle) setInitGlobals(rt *sobek.Runtime, vu *moduleVUImpl, modSys *mod
 	})
 }
 
-func generateFileLoad(b *Bundle) modules.FileLoader {
+func generateFileLoad(logger logrus.FieldLogger, filesystems map[string]fsext.Fs) modules.FileLoader {
 	return func(specifier *url.URL, name string) ([]byte, error) {
 		if filepath.IsAbs(name) && runtime.GOOS == "windows" {
-			b.preInitState.Logger.Warnf("'%s' was imported with an absolute path - this won't be cross-platform and "+
+			logger.Warnf("'%s' was imported with an absolute path - this won't be cross-platform and "+
 				"won't work if you move the script between machines or run it with `k6 cloud`; if absolute paths are "+
 				"required, import them with the `file://` schema for slightly better compatibility",
 				name)
 		}
-		d, err := loader.Load(b.preInitState.Logger, b.filesystems, specifier, name)
+		d, err := loader.Load(logger, filesystems, specifier, name)
 		if err != nil {
 			return nil, err
 		}
 		return d.Data, nil
 	}
+}
+
+// NewModuleResolver is used to create a Runner appropriate module resolver
+func NewModuleResolver(pwd *url.URL, preInitState *lib.TestPreInitState, filesystems map[string]fsext.Fs,
+) *modules.ModuleResolver {
+	c := newCompiler(preInitState, filesystems)
+	return modules.NewModuleResolver(
+		getJSModules(), generateFileLoad(preInitState.Logger, filesystems), c, pwd, preInitState.Usage, preInitState.Logger)
 }

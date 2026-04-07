@@ -12,8 +12,9 @@ import (
 func getCmdPause(gs *state.GlobalState) *cobra.Command {
 	// pauseCmd represents the pause command
 	pauseCmd := &cobra.Command{
-		Use:   "pause",
-		Short: "Pause a running test",
+		Use:    "pause",
+		Short:  "Pause a running test",
+		Hidden: true,
 		Long: `Pause a running test.
 
   Use the global --address flag to specify the URL to the API server.`,

@@ -10,8 +10,6 @@ import (
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
 	"go.k6.io/k6/internal/js/modules/k6/browser/log"
 
-	k6modules "go.k6.io/k6/js/modules"
-
 	"github.com/chromedp/cdproto/cdp"
 	cdppage "github.com/chromedp/cdproto/page"
 )
@@ -37,8 +35,6 @@ type FrameManager struct {
 	barriersMu sync.RWMutex
 	barriers   []*Barrier
 
-	vu k6modules.VU
-
 	logger *log.Logger
 	id     int64
 }
@@ -61,7 +57,6 @@ func NewFrameManager(
 		timeoutSettings: ts,
 		frames:          make(map[cdp.FrameID]*Frame),
 		barriers:        make([]*Barrier, 0),
-		vu:              k6ext.GetVU(ctx),
 		logger:          l,
 		id:              atomic.AddInt64(&frameManagerID, 1),
 	}
@@ -585,7 +580,7 @@ func (m *FrameManager) requestStarted(req *Request) {
 func (m *FrameManager) Frames() []*Frame {
 	m.framesMu.RLock()
 	defer m.framesMu.RUnlock()
-	frames := make([]*Frame, 0)
+	frames := make([]*Frame, 0, len(m.frames))
 	for _, frame := range m.frames {
 		frames = append(frames, frame)
 	}
@@ -742,13 +737,13 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *Frame
 			}
 		}
 	case <-timeoutCtx.Done():
-		return nil, wrapTimeoutError(timeoutCtx.Err())
+		return nil, wrapTimeoutError(ContextErr(timeoutCtx))
 	}
 
 	select {
 	case <-lifecycleEvtCh:
 	case <-timeoutCtx.Done():
-		return nil, wrapTimeoutError(timeoutCtx.Err())
+		return nil, wrapTimeoutError(ContextErr(timeoutCtx))
 	}
 
 	return resp, nil

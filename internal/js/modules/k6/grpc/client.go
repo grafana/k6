@@ -18,9 +18,8 @@ import (
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 
+	"github.com/bufbuild/protocompile"
 	"github.com/grafana/sobek"
-	"github.com/jhump/protoreflect/desc"            //nolint:staticcheck // FIXME: #4035
-	"github.com/jhump/protoreflect/desc/protoparse" //nolint:staticcheck // FIXME: #4035
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
@@ -65,22 +64,24 @@ func (c *Client) Load(importPaths []string, filenames ...string) ([]MethodInfo, 
 		importPaths[i] = strings.TrimPrefix(s, "file://")
 	}
 
-	parser := protoparse.Parser{
-		ImportPaths:      importPaths,
-		InferImportPaths: false,
-		Accessor: protoparse.FileAccessor(func(filename string) (io.ReadCloser, error) {
+	resolver := protocompile.WithStandardImports(&protocompile.SourceResolver{
+		ImportPaths: importPaths,
+		Accessor: func(filename string) (io.ReadCloser, error) {
 			absFilePath := initEnv.GetAbsFilePath(filename)
 			return initEnv.FileSystems["file"].Open(absFilePath)
-		}),
+		},
+	})
+
+	compiler := protocompile.Compiler{
+		Resolver: resolver,
 	}
 
-	fds, err := parser.ParseFiles(filenames...)
+	fds, err := compiler.Compile(c.vu.Context(), filenames...)
 	if err != nil {
 		return nil, err
 	}
 
 	fdset := &descriptorpb.FileDescriptorSet{}
-
 	seen := make(map[string]struct{})
 	for _, fd := range fds {
 		fdset.File = append(fdset.File, walkFileDescriptors(seen, fd)...)
@@ -161,10 +162,9 @@ func buildTLSConfig(parentConfig *tls.Config, certificate, key []byte, caCertifi
 	// Ignoring 'TLS MinVersion is too low' because this tls.Config will inherit MinValue and MaxValue
 	// from the vu state tls.Config
 
-	//nolint:gosec
 	tlsCfg := &tls.Config{
 		CipherSuites:       parentConfig.CipherSuites,
-		InsecureSkipVerify: parentConfig.InsecureSkipVerify,
+		InsecureSkipVerify: parentConfig.InsecureSkipVerify, //nolint:gosec
 		MinVersion:         parentConfig.MinVersion,
 		MaxVersion:         parentConfig.MaxVersion,
 		Renegotiation:      parentConfig.Renegotiation,
@@ -180,7 +180,7 @@ func buildTLSConfig(parentConfig *tls.Config, certificate, key []byte, caCertifi
 	return tlsCfg, nil
 }
 
-func buildTLSConfigFromMap(parentConfig *tls.Config, tlsConfigMap map[string]interface{}) (*tls.Config, error) {
+func buildTLSConfigFromMap(parentConfig *tls.Config, tlsConfigMap map[string]any) (*tls.Config, error) {
 	var cert, key, pass []byte
 	var ca [][]byte
 	var err error
@@ -199,8 +199,8 @@ func buildTLSConfigFromMap(parentConfig *tls.Config, tlsConfigMap map[string]int
 		}
 	}
 	if cas, ok := tlsConfigMap["cacerts"]; ok {
-		var caCertsArray []interface{}
-		if caCertsArray, ok = cas.([]interface{}); ok {
+		var caCertsArray []any
+		if caCertsArray, ok = cas.([]any); ok {
 			ca = make([][]byte, len(caCertsArray))
 			for i, entry := range caCertsArray {
 				var entryStr string
@@ -571,20 +571,24 @@ func (c *Client) convertToMethodInfo(fdset *descriptorpb.FileDescriptorSet) ([]M
 	return rtn, nil
 }
 
-func walkFileDescriptors(seen map[string]struct{}, fd *desc.FileDescriptor) []*descriptorpb.FileDescriptorProto {
+// walkFileDescriptors recursively walks through a file descriptor and its dependencies,
+// converting them to FileDescriptorProto.
+// This ensures that all dependencies are included in the FileDescriptorSet.
+func walkFileDescriptors(seen map[string]struct{}, fd protoreflect.FileDescriptor) []*descriptorpb.FileDescriptorProto {
 	fds := []*descriptorpb.FileDescriptorProto{}
 
-	if _, ok := seen[fd.GetName()]; ok {
+	if _, ok := seen[fd.Path()]; ok {
 		return fds
 	}
-	seen[fd.GetName()] = struct{}{}
-	fds = append(fds, fd.AsFileDescriptorProto())
+	seen[fd.Path()] = struct{}{}
+	fds = append(fds, protodesc.ToFileDescriptorProto(fd))
 
-	for _, dep := range fd.GetDependencies() {
+	imports := fd.Imports()
+	for i := 0; i < imports.Len(); i++ {
+		dep := imports.Get(i).FileDescriptor
 		deps := walkFileDescriptors(seen, dep)
 		fds = append(fds, deps...)
 	}
-
 	return fds
 }
 

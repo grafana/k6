@@ -25,9 +25,11 @@ func TestConfigApply(t *testing.T) {
 
 	full := Config{
 		Token:                 null.NewString("Token", true),
+		StackID:               null.NewInt(1, true),
 		ProjectID:             null.NewInt(1, true),
 		Name:                  null.NewString("Name", true),
 		Host:                  null.NewString("Host", true),
+		Hostv6:                null.NewString("Hostv6", true),
 		Timeout:               types.NewNullDuration(5*time.Second, true),
 		LogsTailURL:           null.NewString("LogsTailURL", true),
 		PushRefID:             null.NewString("PushRefID", true),
@@ -55,9 +57,9 @@ func TestConfigApply(t *testing.T) {
 
 func TestGetConsolidatedConfig(t *testing.T) {
 	t.Parallel()
-	config, warn, err := GetConsolidatedConfig(json.RawMessage(`{"token":"jsonraw"}`), nil, "", nil, nil)
+	config, warn, err := GetConsolidatedConfig(json.RawMessage(`{"token":"jsonraw"}`), nil, "", nil)
 	require.NoError(t, err)
-	require.Equal(t, config.Token.String, "jsonraw")
+	require.Equal(t, "jsonraw", config.Token.String)
 	require.Empty(t, warn)
 
 	config, warn, err = GetConsolidatedConfig(
@@ -65,10 +67,9 @@ func TestGetConsolidatedConfig(t *testing.T) {
 		nil,
 		"",
 		json.RawMessage(`{"token":"ext"}`),
-		nil,
 	)
 	require.NoError(t, err)
-	require.Equal(t, config.Token.String, "ext")
+	require.Equal(t, "ext", config.Token.String)
 	require.Empty(t, warn)
 
 	config, warn, err = GetConsolidatedConfig(
@@ -76,57 +77,8 @@ func TestGetConsolidatedConfig(t *testing.T) {
 		map[string]string{"K6_CLOUD_TOKEN": "envvalue"},
 		"",
 		json.RawMessage(`{"token":"ext"}`),
-		nil,
 	)
 	require.NoError(t, err)
-	require.Equal(t, config.Token.String, "envvalue")
-	require.Empty(t, warn)
-}
-
-func TestGetConsolidatedConfig_WithLegacyOnly(t *testing.T) {
-	t.Parallel()
-
-	config, warn, err := GetConsolidatedConfig(json.RawMessage(`{"token":"jsonraw"}`), nil, "", nil,
-		map[string]json.RawMessage{"loadimpact": json.RawMessage(`{"token":"ext"}`)})
-	require.NoError(t, err)
-	require.Equal(t, config.Token.String, "ext")
-	require.NotEmpty(t, warn)
-
-	config, warn, err = GetConsolidatedConfig(json.RawMessage(`{"token":"jsonraw"}`), map[string]string{"K6_CLOUD_TOKEN": "envvalue"}, "", nil,
-		map[string]json.RawMessage{"loadimpact": json.RawMessage(`{"token":"ext"}`)})
-	require.NoError(t, err)
-	require.Equal(t, config.Token.String, "envvalue")
-	require.NotEmpty(t, warn)
-}
-
-func TestGetConsolidatedConfig_LegacyHasLowerPriority(t *testing.T) {
-	t.Parallel()
-
-	config, warn, err := GetConsolidatedConfig(
-		json.RawMessage(`{"token":"jsonraw"}`),
-		nil,
-		"",
-		json.RawMessage(`{"token":"cloud"}`),
-		map[string]json.RawMessage{"loadimpact": json.RawMessage(`{"token":"ext"}`)},
-	)
-
-	require.NoError(t, err)
-	require.Equal(t, config.Token.String, "cloud")
-	require.Empty(t, warn)
-}
-
-func TestGetConsolidatedConfig_EnvHasHigherPriority(t *testing.T) {
-	t.Parallel()
-
-	config, warn, err := GetConsolidatedConfig(
-		json.RawMessage(`{"token":"jsonraw"}`),
-		map[string]string{"K6_CLOUD_TOKEN": "envvalue"},
-		"",
-		json.RawMessage(`{"token":"cloud"}`),
-		map[string]json.RawMessage{"loadimpact": json.RawMessage(`{"token":"ext"}`)},
-	)
-	require.NoError(t, err)
-
-	require.Equal(t, config.Token.String, "envvalue")
+	require.Equal(t, "envvalue", config.Token.String)
 	require.Empty(t, warn)
 }

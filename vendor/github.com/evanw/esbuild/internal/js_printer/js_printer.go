@@ -2333,6 +2333,9 @@ func (p *printer) printExpr(expr js_ast.Expr, level js_ast.L, flags printExprFla
 				if _, ok := arg.Data.(*js_ast.ESpread); !ok {
 					if (flags & exprResultIsUnused) != 0 {
 						arg = p.astHelpers.SimplifyUnusedExpr(arg, p.options.UnsupportedFeatures)
+						if arg.Data == nil {
+							arg.Data = js_ast.EUndefinedShared
+						}
 					}
 					p.printExpr(p.guardAgainstBehaviorChangeDueToSubstitution(arg, flags), level, flags)
 					break
@@ -3933,9 +3936,10 @@ func (p *printer) printPath(importRecordIndex uint32, importKind ast.ImportKind)
 	if p.options.NeedsMetafile {
 		external := ""
 		if (record.Flags & ast.ShouldNotBeExternalInMetafile) == 0 {
-			external = ",\n          \"external\": true"
+			external = p.options.MetafileFormat.MaybeRemoveWhitespace(",\n          \"external\": true")
 		}
-		p.jsonMetadataImports = append(p.jsonMetadataImports, fmt.Sprintf("\n        {\n          \"path\": %s,\n          \"kind\": %s%s\n        }",
+		p.jsonMetadataImports = append(p.jsonMetadataImports, fmt.Sprintf(
+			p.options.MetafileFormat.MaybeRemoveWhitespace("\n        {\n          \"path\": %s,\n          \"kind\": %s%s\n        }"),
 			helpers.QuoteForJSON(record.Path.Text, p.options.ASCIIOnly),
 			helpers.QuoteForJSON(importKind.StringForMetafile(), p.options.ASCIIOnly),
 			external))
@@ -4939,6 +4943,7 @@ type Options struct {
 	SourceMap           config.SourceMap
 	AddSourceMappings   bool
 	NeedsMetafile       bool
+	MetafileFormat      config.MetafileFormat
 }
 
 type RequireOrImportMeta struct {

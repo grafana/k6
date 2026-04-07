@@ -74,7 +74,7 @@ func initializeVUs(
 	ctx context.Context, t testing.TB, logEntry *logrus.Entry, es *lib.ExecutionState, number uint64, initVU lib.InitVUFunc,
 ) {
 	// This is not how the local ExecutionScheduler initializes VUs, but should do the same job
-	for i := uint64(0); i < number; i++ {
+	for range number {
 		// Not calling es.InitializeNewVU() here to avoid a double increment of initializedVUs,
 		// which is done in es.AddInitializedVU().
 		vu, err := initVU(ctx, logEntry)

@@ -281,7 +281,7 @@ func (r *browserRegistry) handleIterEvents(
 
 		if data, ok = e.Data.(k6event.IterData); !ok {
 			e.Done()
-			k6ext.Abort(vuCtx, "unexpected iteration event data format: %v", e.Data)
+			k6ext.Abortf(vuCtx, "unexpected iteration event data format: %v", e.Data)
 			// Continue so we don't block the k6 event system producer.
 			// Test will be aborted by k6, which will previously send the
 			// 'Exit' event so browser resources cleanup can be guaranteed.
@@ -306,7 +306,7 @@ func (r *browserRegistry) handleIterEvents(
 			b, err := r.buildFn(ctx, tracedCtx)
 			if err != nil {
 				e.Done()
-				k6ext.Abort(vuCtx, "error building browser on IterStart: %v", err)
+				k6ext.Abortf(vuCtx, "error building browser on IterStart: %v", err)
 				// Continue so we don't block the k6 event system producer.
 				// Test will be aborted by k6, which will previously send the
 				// 'Exit' event so browser resources cleanup can be guaranteed.
@@ -325,13 +325,25 @@ func (r *browserRegistry) handleIterEvents(
 }
 
 func (r *browserRegistry) handleExitEvent(exitCh <-chan *k6event.Event, unsubscribeFn func()) {
+	var e *k6event.Event
+	// Defers run LIFO: unsubscribeFn (registered second) runs before e.Done
+	// (registered first). unsubscribeFn must complete before Done is signalled
+	// so that by the time the caller's waitDone returns, the subscription is
+	// already removed. Otherwise a concurrent Exit emission (e.g. from
+	// t.Cleanup in tests) can be delivered to a closed goroutine, causing
+	// e.Done to never be called and waitDone to block forever.
+	defer func() {
+		if e != nil {
+			e.Done()
+		}
+	}()
 	defer unsubscribeFn()
 
-	e, ok := <-exitCh
+	var ok bool
+	e, ok = <-exitCh
 	if !ok {
 		return
 	}
-	defer e.Done()
 	r.clear()
 
 	// Stop traces registry before calling e.Done()
@@ -499,7 +511,7 @@ func parseTracesMetadata(envLookup env.LookupFunc) (map[string]string, error) {
 		return m, nil
 	}
 
-	for _, elem := range strings.Split(v, ",") {
+	for elem := range strings.SplitSeq(v, ",") {
 		kv := strings.Split(elem, "=")
 		if len(kv) != 2 {
 			return nil, fmt.Errorf("%q is not a valid key=value metadata", elem)

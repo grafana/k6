@@ -45,8 +45,9 @@ func (t RuleSetErrorType) String() string {
 
 // RuleSetErrorType values.
 const (
-	RuleSetErrorTypeSourceIsNotJSONObject RuleSetErrorType = "SourceIsNotJsonObject"
-	RuleSetErrorTypeInvalidRulesSkipped   RuleSetErrorType = "InvalidRulesSkipped"
+	RuleSetErrorTypeSourceIsNotJSONObject  RuleSetErrorType = "SourceIsNotJsonObject"
+	RuleSetErrorTypeInvalidRulesSkipped    RuleSetErrorType = "InvalidRulesSkipped"
+	RuleSetErrorTypeInvalidRulesetLevelTag RuleSetErrorType = "InvalidRulesetLevelTag"
 )
 
 // UnmarshalJSON satisfies [json.Unmarshaler].
@@ -59,6 +60,8 @@ func (t *RuleSetErrorType) UnmarshalJSON(buf []byte) error {
 		*t = RuleSetErrorTypeSourceIsNotJSONObject
 	case RuleSetErrorTypeInvalidRulesSkipped:
 		*t = RuleSetErrorTypeInvalidRulesSkipped
+	case RuleSetErrorTypeInvalidRulesetLevelTag:
+		*t = RuleSetErrorTypeInvalidRulesetLevelTag
 	default:
 		return fmt.Errorf("unknown RuleSetErrorType value: %v", s)
 	}
@@ -191,7 +194,6 @@ const (
 	PrerenderFinalStatusInvalidSchemeRedirect                                      PrerenderFinalStatus = "InvalidSchemeRedirect"
 	PrerenderFinalStatusInvalidSchemeNavigation                                    PrerenderFinalStatus = "InvalidSchemeNavigation"
 	PrerenderFinalStatusNavigationRequestBlockedByCsp                              PrerenderFinalStatus = "NavigationRequestBlockedByCsp"
-	PrerenderFinalStatusMainFrameNavigation                                        PrerenderFinalStatus = "MainFrameNavigation"
 	PrerenderFinalStatusMojoBinderPolicy                                           PrerenderFinalStatus = "MojoBinderPolicy"
 	PrerenderFinalStatusRendererProcessCrashed                                     PrerenderFinalStatus = "RendererProcessCrashed"
 	PrerenderFinalStatusRendererProcessKilled                                      PrerenderFinalStatus = "RendererProcessKilled"
@@ -259,6 +261,7 @@ const (
 	PrerenderFinalStatusV8optimizerDisabled                                        PrerenderFinalStatus = "V8OptimizerDisabled"
 	PrerenderFinalStatusPrerenderFailedDuringPrefetch                              PrerenderFinalStatus = "PrerenderFailedDuringPrefetch"
 	PrerenderFinalStatusBrowsingDataRemoved                                        PrerenderFinalStatus = "BrowsingDataRemoved"
+	PrerenderFinalStatusPrerenderHostReused                                        PrerenderFinalStatus = "PrerenderHostReused"
 )
 
 // UnmarshalJSON satisfies [json.Unmarshaler].
@@ -279,8 +282,6 @@ func (t *PrerenderFinalStatus) UnmarshalJSON(buf []byte) error {
 		*t = PrerenderFinalStatusInvalidSchemeNavigation
 	case PrerenderFinalStatusNavigationRequestBlockedByCsp:
 		*t = PrerenderFinalStatusNavigationRequestBlockedByCsp
-	case PrerenderFinalStatusMainFrameNavigation:
-		*t = PrerenderFinalStatusMainFrameNavigation
 	case PrerenderFinalStatusMojoBinderPolicy:
 		*t = PrerenderFinalStatusMojoBinderPolicy
 	case PrerenderFinalStatusRendererProcessCrashed:
@@ -415,6 +416,8 @@ func (t *PrerenderFinalStatus) UnmarshalJSON(buf []byte) error {
 		*t = PrerenderFinalStatusPrerenderFailedDuringPrefetch
 	case PrerenderFinalStatusBrowsingDataRemoved:
 		*t = PrerenderFinalStatusBrowsingDataRemoved
+	case PrerenderFinalStatusPrerenderHostReused:
+		*t = PrerenderFinalStatusPrerenderHostReused
 	default:
 		return fmt.Errorf("unknown PrerenderFinalStatus value: %v", s)
 	}

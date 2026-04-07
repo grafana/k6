@@ -30,6 +30,20 @@ func TestWebPlatformTestSuite(t *testing.T) {
 		// if empty, no function will be called
 		callFn string
 	}{
+		// test cases for crypto api
+		{
+			catalog: "",
+			files: []string{
+				"getRandomValues.any.js",
+			},
+		},
+		{
+			catalog: "",
+			files: []string{
+				"randomUUID.https.any.js",
+			},
+		},
+		// test cases for subtle crypto api
 		{
 			catalog: "digest",
 			files: []string{
@@ -140,6 +154,15 @@ func TestWebPlatformTestSuite(t *testing.T) {
 			catalog: "derive_bits_keys",
 			files: []string{
 				"ecdh_bits.js",
+			},
+			callFn: "define_tests",
+		},
+		{
+			catalog: "derive_bits_keys",
+			files: []string{
+				"pbkdf2.js",
+				"pbkdf2_vectors.js",
+				"pbkdf2.https.any.js",
 			},
 			callFn: "define_tests",
 		},

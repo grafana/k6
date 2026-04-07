@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net"
 	"net/http"
 	"net/http/cookiejar"
@@ -29,6 +30,7 @@ import (
 	"go.k6.io/k6/internal/lib/summary"
 	"go.k6.io/k6/internal/loader"
 	"go.k6.io/k6/js/common"
+	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/lib/netext"
@@ -63,8 +65,10 @@ type Runner struct {
 }
 
 // New returns a new Runner for the provided source
-func New(piState *lib.TestPreInitState, src *loader.SourceData, filesystems map[string]fsext.Fs) (*Runner, error) {
-	bundle, err := NewBundle(piState, src, filesystems)
+func New(
+	piState *lib.TestPreInitState, src *loader.SourceData, filesystems map[string]fsext.Fs, mr *modules.ModuleResolver,
+) (*Runner, error) {
+	bundle, err := NewBundle(piState, src, filesystems, mr)
 	if err != nil {
 		return nil, err
 	}
@@ -73,8 +77,8 @@ func New(piState *lib.TestPreInitState, src *loader.SourceData, filesystems map[
 }
 
 // NewFromArchive returns a new Runner from the source in the provided archive
-func NewFromArchive(piState *lib.TestPreInitState, arc *lib.Archive) (*Runner, error) {
-	bundle, err := NewBundleFromArchive(piState, arc)
+func NewFromArchive(piState *lib.TestPreInitState, arc *lib.Archive, mr *modules.ModuleResolver) (*Runner, error) {
+	bundle, err := NewBundleFromArchive(piState, arc, mr)
 	if err != nil {
 		return nil, err
 	}
@@ -299,7 +303,7 @@ func (r *Runner) Setup(ctx context.Context, out chan<- metrics.SampleContainer) 
 	if err != nil {
 		return fmt.Errorf("error marshaling setup() data to JSON: %w", err)
 	}
-	var tmp interface{}
+	var tmp any
 	return json.Unmarshal(r.setupData, &tmp)
 }
 
@@ -326,7 +330,7 @@ func (r *Runner) Teardown(ctx context.Context, out chan<- metrics.SampleContaine
 	teardownCtx, teardownCancel := context.WithTimeout(ctx, r.getTimeoutFor(consts.TeardownFn))
 	defer teardownCancel()
 
-	var data interface{}
+	var data any
 	if r.setupData != nil {
 		if err := json.Unmarshal(r.setupData, &data); err != nil {
 			return fmt.Errorf("error unmarshaling setup data for teardown() from JSON: %w", err)
@@ -354,7 +358,8 @@ func (r *Runner) IsExecutable(name string) bool {
 func (r *Runner) HandleSummary(
 	ctx context.Context,
 	legacy *lib.LegacySummary,
-	summary *summary.Summary,
+	s *summary.Summary,
+	meta summary.Meta,
 ) (map[string]io.Reader, error) {
 	out := make(chan metrics.SampleContainer, 100)
 	defer close(out)
@@ -377,15 +382,16 @@ func (r *Runner) HandleSummary(
 	})
 	vu.moduleVUImpl.ctx = summaryCtx
 
-	noColor, enableColors, legacyData, summaryData, summaryCode, err := prepareHandleSummaryCall(
-		r, vu.Runtime, legacy, summary,
+	noColor, enableColors, newMachineReadableSummary,
+		summaryCode, summaryData, handleSummaryData,
+		err := prepareHandleSummaryCall(
+		r, vu.Runtime, legacy, s, meta,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	handleSummaryDataAsValue := vu.Runtime.ToValue(legacyData)
-	callbackResult, err := runUserProvidedHandleSummaryCallback(summaryCtx, vu, handleSummaryDataAsValue)
+	callbackResult, err := runUserProvidedHandleSummaryCallback(summaryCtx, vu, handleSummaryData)
 	if err != nil {
 		return nil, err
 	}
@@ -401,7 +407,8 @@ func (r *Runner) HandleSummary(
 	}
 
 	wrapperArgs := prepareHandleWrapperArgs(
-		vu, noColor, enableColors, callbackResult, handleSummaryDataAsValue, vu.Runtime.ToValue(summaryData))
+		vu, noColor, enableColors, newMachineReadableSummary, callbackResult, handleSummaryData, summaryData,
+	)
 	rawResult, _, _, err := vu.runFn(summaryCtx, false, handleSummaryWrapper, nil, wrapperArgs...)
 
 	if deadlineError := r.checkDeadline(summaryCtx, consts.HandleSummaryFn, rawResult, err); deadlineError != nil {
@@ -419,37 +426,50 @@ func prepareHandleSummaryCall(
 	r *Runner,
 	rt *sobek.Runtime,
 	legacy *lib.LegacySummary,
-	summary *summary.Summary,
-) (bool, bool, interface{}, interface{}, string, error) {
+	s *summary.Summary,
+	meta summary.Meta,
+) (bool, bool, bool, string, sobek.Value, sobek.Value, error) {
 	var (
-		noColor          bool
-		enableColors     bool
-		legacyDataForJS  interface{}
-		summaryDataForJS interface{}
-		summaryCode      string
-		err              error
+		noColor                   bool
+		enableColors              bool
+		newMachineReadableSummary bool
+		summaryCode               string
+		summaryData               sobek.Value
+		handleSummaryData         sobek.Value
+		err                       error
 	)
-	if summary != nil {
-		noColor = summary.NoColor
-		enableColors = summary.EnableColors
-		legacyDataForJS = summarizeMetricsToObject(legacy, r.Bundle.Options, r.setupData)
-		summaryDataForJS, err = summarizeReportToObject(rt, summary)
+	// TODO(@joanlopez): Drop this if-else once we stop supporting the legacy summary. Summary wouldn't be nil by then.
+	if s != nil {
+		noColor = s.NoColor
+		enableColors = s.EnableColors
+		newMachineReadableSummary = s.NewMachineReadableSummary
 		summaryCode = jslibSummaryCode
-	} else { // TODO: Remove this code block once we stop supporting the legacy summary.
+
+		summaryReport, srErr := summarizeReportToObject(rt, s)
+		summaryData = rt.ToValue(summaryReport)
+
+		if s.NewMachineReadableSummary {
+			mrSummary, mrsErr := summary.ToMachineReadable(s, meta)
+			handleSummaryData = rt.ToValue(mrSummary)
+			err = errors.Join(srErr, mrsErr)
+		} else {
+			handleSummaryData = rt.ToValue(summarizeMetricsToObject(legacy, r.Bundle.Options, r.setupData))
+		}
+	} else {
 		noColor = legacy.NoColor
 		enableColors = !legacy.NoColor && legacy.UIState.IsStdOutTTY
-		legacyDataForJS = summarizeMetricsToObject(legacy, r.Bundle.Options, r.setupData)
-		summaryDataForJS = legacyDataForJS
 		summaryCode = jslibSummaryLegacyCode
+		summaryData = rt.ToValue(summarizeMetricsToObject(legacy, r.Bundle.Options, r.setupData))
+		handleSummaryData = summaryData
 	}
 
-	return noColor, enableColors, legacyDataForJS, summaryDataForJS, summaryCode, err
+	return noColor, enableColors, newMachineReadableSummary, summaryCode, summaryData, handleSummaryData, err
 }
 
 func runUserProvidedHandleSummaryCallback(
 	summaryCtx context.Context,
 	vu *VU,
-	summaryData sobek.Value,
+	handleSummaryData sobek.Value,
 ) (sobek.Value, error) {
 	fn := vu.getExported(consts.HandleSummaryFn)
 	if fn == nil {
@@ -461,35 +481,36 @@ func runUserProvidedHandleSummaryCallback(
 		return nil, fmt.Errorf("exported identifier %s must be a function", consts.HandleSummaryFn)
 	}
 
-	callbackResult, _, _, err := vu.runFn(summaryCtx, false, handleSummaryFn, nil, summaryData)
+	callbackResult, _, _, err := vu.runFn(summaryCtx, false, handleSummaryFn, nil, handleSummaryData)
 	if err != nil {
 		errText, fields := errext.Format(err)
 		vu.Runner.preInitState.Logger.WithFields(fields).Error(errText)
 	}
 
-	// In case of err, we only want to log it,
+	// In case of error, we only want to log it
 	// but still proceed with the built-in summary handler, so we return nil.
 	return callbackResult, nil
 }
 
 func prepareHandleWrapperArgs(
 	vu *VU,
-	noColor bool, enableColors bool,
-	callbackResult, handleSummaryDataAsValue, summaryDataAsValue sobek.Value,
+	noColor, enableColors, newMachineReadableSummary bool,
+	callbackResult, handleSummaryData, summaryData sobek.Value,
 ) []sobek.Value {
-	options := map[string]interface{}{
+	options := map[string]any{
 		// TODO: improve when we can easily export all option values, including defaults?
-		"summaryTrendStats": vu.Runner.Bundle.Options.SummaryTrendStats,
-		"summaryTimeUnit":   vu.Runner.Bundle.Options.SummaryTimeUnit.String,
-		"noColor":           noColor, // TODO: move to the (runtime) options
-		"enableColors":      enableColors,
+		"summaryTrendStats":         vu.Runner.Bundle.Options.SummaryTrendStats,
+		"summaryTimeUnit":           vu.Runner.Bundle.Options.SummaryTimeUnit.String,
+		"noColor":                   noColor, // TODO: move to the (runtime) options
+		"enableColors":              enableColors,
+		"newMachineReadableSummary": newMachineReadableSummary,
 	}
 
 	wrapperArgs := []sobek.Value{
 		callbackResult,
 		vu.Runtime.ToValue(vu.Runner.Bundle.preInitState.RuntimeOptions.SummaryExport.String),
-		handleSummaryDataAsValue,
-		summaryDataAsValue,
+		handleSummaryData,
+		summaryData,
 		vu.Runtime.ToValue(options),
 	}
 
@@ -606,7 +627,7 @@ func (r *Runner) runPart(
 	parentCtx context.Context,
 	out chan<- metrics.SampleContainer,
 	name string,
-	arg interface{},
+	arg any,
 ) (sobek.Value, error) {
 	ctx, cancel := context.WithCancel(parentCtx)
 	defer cancel()
@@ -645,7 +666,7 @@ func (r *Runner) runPart(
 }
 
 //nolint:gochecknoglobals
-var sobekPromiseType = reflect.TypeOf((*sobek.Promise)(nil))
+var sobekPromiseType = reflect.TypeFor[*sobek.Promise]()
 
 // unPromisify gets the result of v if it is a promise, otherwise returns v
 func unPromisify(v sobek.Value) sobek.Value {
@@ -733,12 +754,8 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 
 	// Override the preset global env with any custom env vars
 	env := make(map[string]string, len(u.env)+len(params.Env))
-	for key, value := range u.env {
-		env[key] = value
-	}
-	for key, value := range params.Env {
-		env[key] = value
-	}
+	maps.Copy(env, u.env)
+	maps.Copy(env, params.Env)
 	//nolint:errcheck,gosec // see https://github.com/grafana/k6/issues/1722#issuecomment-1761173634
 	u.Runtime.Set("__ENV", env)
 
@@ -817,7 +834,7 @@ func (u *ActiveVU) RunOnce() error {
 	// still don't use too much CPU in the middle test
 	if u.setupData == nil {
 		if u.Runner.setupData != nil {
-			var data interface{}
+			var data any
 			if err := json.Unmarshal(u.Runner.setupData, &data); err != nil {
 				return fmt.Errorf("error unmarshaling setup data for the iteration from JSON: %w", err)
 			}

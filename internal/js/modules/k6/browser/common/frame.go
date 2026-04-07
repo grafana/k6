@@ -17,8 +17,6 @@ import (
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
 	"go.k6.io/k6/internal/js/modules/k6/browser/log"
-
-	k6modules "go.k6.io/k6/js/modules"
 )
 
 // maxRetry controls how many times to retry if an action fails.
@@ -78,34 +76,6 @@ func (s *DOMElementState) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// URLMatcher is a function that matches a URL against a pattern.
-// It relies on JavaScript's regex engine for regex matching.
-type URLMatcher func(string) (bool, error)
-
-// urlMatcher matches URLs based on pattern type. It can match on exact and regex
-// patterns. If the pattern is empty or a single quote, it matches any URL.
-func urlMatcher(pattern string, jsRegexChecker JSRegexChecker) (URLMatcher, error) {
-	if pattern == "" || pattern == "''" {
-		return func(url string) (bool, error) { return true, nil }, nil
-	}
-
-	if isQuotedText(pattern) {
-		return func(url string) (bool, error) { return "'"+url+"'" == pattern, nil }, nil
-	}
-
-	if jsRegexChecker == nil {
-		return nil, fmt.Errorf("JavaScript pattern matcher is required for URL matching")
-	}
-
-	return func(url string) (bool, error) {
-		matched, err := jsRegexChecker(pattern, url)
-		if err != nil {
-			return false, fmt.Errorf("URL pattern matching error for pattern %q and URL %q: %w", pattern, url, err)
-		}
-		return matched, nil
-	}, nil
-}
-
 // Frame represents a frame in an HTML document.
 type Frame struct {
 	BaseEventEmitter
@@ -124,7 +94,6 @@ type Frame struct {
 	name         string
 	url          string
 	detached     bool
-	vu           k6modules.VU
 
 	// A life cycle event is only considered triggered for a frame if the entire
 	// frame subtree has also had the life cycle event triggered.
@@ -183,7 +152,6 @@ func NewFrame(
 		parentFrame:       parentFrame,
 		childFrames:       make(map[*Frame]bool),
 		id:                frameID,
-		vu:                k6ext.GetVU(ctx),
 		lifecycleEvents:   make(map[LifecycleEvent]bool),
 		inflightRequests:  make(map[network.RequestID]bool),
 		executionContexts: make(map[executionWorld]frameExecutionContext),
@@ -417,7 +385,7 @@ func (f *Frame) position() (*Position, error) {
 
 	box, err := element.BoundingBox()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("finding position in frame: %w", err)
 	}
 
 	return &Position{X: box.X, Y: box.Y}, nil
@@ -603,10 +571,10 @@ func (f *Frame) waitFor(
 
 func (f *Frame) boundingBox(selector string, opts *FrameBaseOptions) (*Rect, error) {
 	getBoundingBox := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
-		return handle.boundingBox()
+		return handle.BoundingBox()
 	}
 	act := f.newAction(
-		selector, DOMElementStateAttached, opts.Strict, getBoundingBox, []string{}, false, true, opts.Timeout,
+		selector, DOMElementStateAttached, opts.Strict, getBoundingBox, []string{}, false, noRetry, true, opts.Timeout,
 	)
 	v, err := call(f.ctx, act, opts.Timeout)
 	if err != nil {
@@ -779,7 +747,7 @@ func (f *Frame) isChecked(selector string, opts *FrameIsCheckedOptions) (bool, e
 		return v, err
 	}
 	act := f.newAction(
-		selector, DOMElementStateAttached, opts.Strict, isChecked, []string{}, false, true, opts.Timeout,
+		selector, DOMElementStateAttached, opts.Strict, isChecked, []string{}, false, withRetry, true, opts.Timeout,
 	)
 	v, err := call(f.ctx, act, opts.Timeout)
 	if err != nil {
@@ -874,7 +842,7 @@ func (f *Frame) dispatchEvent(selector, typ string, eventInit any, opts *FrameDi
 	)
 	act := f.newAction(
 		selector, DOMElementStateAttached, opts.Strict, dispatchEvent, []string{},
-		force, noWaitAfter, opts.Timeout,
+		force, withRetry, noWaitAfter, opts.Timeout,
 	)
 	if _, err := call(f.ctx, act, opts.Timeout); err != nil {
 		return errorFromDOMError(err)
@@ -976,7 +944,7 @@ func (f *Frame) fill(selector, value string, opts *FrameFillOptions) error {
 	act := f.newAction(
 		selector, DOMElementStateAttached, opts.Strict,
 		fill, []string{"visible", "enabled", "editable"},
-		opts.Force, opts.NoWaitAfter, opts.Timeout,
+		opts.Force, withRetry, opts.NoWaitAfter, opts.Timeout,
 	)
 	if _, err := call(f.ctx, act, opts.Timeout); err != nil {
 		return errorFromDOMError(err)
@@ -1004,7 +972,7 @@ func (f *Frame) focus(selector string, opts *FrameBaseOptions) error {
 	}
 	act := f.newAction(
 		selector, DOMElementStateAttached, opts.Strict, focus,
-		[]string{}, false, true, opts.Timeout,
+		[]string{}, false, withRetry, true, opts.Timeout,
 	)
 	if _, err := call(f.ctx, act, opts.Timeout); err != nil {
 		return errorFromDOMError(err)
@@ -1043,7 +1011,7 @@ func (f *Frame) getAttribute(selector, name string, opts *FrameBaseOptions) (str
 	}
 	act := f.newAction(
 		selector, DOMElementStateAttached, opts.Strict, getAttribute,
-		[]string{}, false, true, opts.Timeout,
+		[]string{}, false, withRetry, true, opts.Timeout,
 	)
 	v, err := call(f.ctx, act, opts.Timeout)
 	if err != nil {
@@ -1335,7 +1303,7 @@ func (f *Frame) innerHTML(selector string, opts *FrameInnerHTMLOptions) (string,
 	}
 	act := f.newAction(
 		selector, DOMElementStateAttached, opts.Strict, innerHTML,
-		[]string{}, false, true, opts.Timeout,
+		[]string{}, false, withRetry, true, opts.Timeout,
 	)
 	v, err := call(f.ctx, act, opts.Timeout)
 	if err != nil {
@@ -1371,7 +1339,7 @@ func (f *Frame) innerText(selector string, opts *FrameInnerTextOptions) (string,
 	}
 	act := f.newAction(
 		selector, DOMElementStateAttached, opts.Strict, innerText,
-		[]string{}, false, true, opts.Timeout,
+		[]string{}, false, withRetry, true, opts.Timeout,
 	)
 	v, err := call(f.ctx, act, opts.Timeout)
 	if err != nil {
@@ -1406,7 +1374,7 @@ func (f *Frame) inputValue(selector string, opts *FrameInputValueOptions) (strin
 	}
 	act := f.newAction(
 		selector, DOMElementStateAttached, opts.Strict, inputValue,
-		[]string{}, false, true, opts.Timeout,
+		[]string{}, false, withRetry, true, opts.Timeout,
 	)
 	v, err := call(f.ctx, act, opts.Timeout)
 	if err != nil {
@@ -1458,7 +1426,7 @@ func (f *Frame) isEditable(selector string, opts *FrameIsEditableOptions) (bool,
 		return v, err
 	}
 	act := f.newAction(
-		selector, DOMElementStateAttached, opts.Strict, isEditable, []string{}, false, true, opts.Timeout,
+		selector, DOMElementStateAttached, opts.Strict, isEditable, []string{}, false, withRetry, true, opts.Timeout,
 	)
 	v, err := call(f.ctx, act, opts.Timeout)
 	if err != nil {
@@ -1495,7 +1463,7 @@ func (f *Frame) isEnabled(selector string, opts *FrameIsEnabledOptions) (bool, e
 		return v, err
 	}
 	act := f.newAction(
-		selector, DOMElementStateAttached, opts.Strict, isEnabled, []string{}, false, true, opts.Timeout,
+		selector, DOMElementStateAttached, opts.Strict, isEnabled, []string{}, false, withRetry, true, opts.Timeout,
 	)
 	v, err := call(f.ctx, act, opts.Timeout)
 	if err != nil {
@@ -1532,7 +1500,7 @@ func (f *Frame) isDisabled(selector string, opts *FrameIsDisabledOptions) (bool,
 		return v, err
 	}
 	act := f.newAction(
-		selector, DOMElementStateAttached, opts.Strict, isDisabled, []string{}, false, true, opts.Timeout,
+		selector, DOMElementStateAttached, opts.Strict, isDisabled, []string{}, false, withRetry, true, opts.Timeout,
 	)
 	v, err := call(f.ctx, act, opts.Timeout)
 	if err != nil {
@@ -1620,6 +1588,13 @@ func (f *Frame) Locator(selector string, opts *LocatorOptions) *Locator {
 	return NewLocator(f.ctx, opts, selector, f, f.log)
 }
 
+// FrameLocator is a convenience method equivalent to frame.locator(selector).contentFrame().
+func (f *Frame) FrameLocator(selector string) *FrameLocator {
+	f.log.Debugf("Frame:FrameLocator", "fid:%s furl:%q selector:%q", f.ID(), f.URL(), selector)
+
+	return f.Locator(selector, nil).ContentFrame()
+}
+
 // LoaderID returns the ID of the frame that loaded this frame.
 func (f *Frame) LoaderID() string {
 	f.propertiesMu.RLock()
@@ -1688,7 +1663,7 @@ func (f *Frame) press(selector, key string, opts *FramePressOptions) error {
 	}
 	act := f.newAction(
 		selector, DOMElementStateAttached, opts.Strict, press,
-		[]string{}, false, opts.NoWaitAfter, opts.Timeout,
+		[]string{}, false, withRetry, opts.NoWaitAfter, opts.Timeout,
 	)
 	if _, err := call(f.ctx, act, opts.Timeout); err != nil {
 		return errorFromDOMError(err)
@@ -1718,7 +1693,7 @@ func (f *Frame) selectOption(selector string, values []any, opts *FrameSelectOpt
 	}
 	act := f.newAction(
 		selector, DOMElementStateAttached, opts.Strict, selectOption,
-		[]string{}, opts.Force, opts.NoWaitAfter, opts.Timeout,
+		[]string{}, opts.Force, withRetry, opts.NoWaitAfter, opts.Timeout,
 	)
 	v, err := call(f.ctx, act, opts.Timeout)
 	if err != nil {
@@ -1828,7 +1803,7 @@ func (f *Frame) setInputFiles(selector string, files *Files, opts *FrameSetInput
 	act := f.newAction(
 		selector, DOMElementStateAttached, opts.Strict,
 		setInputFiles, []string{},
-		opts.Force, opts.NoWaitAfter, opts.Timeout,
+		opts.Force, withRetry, opts.NoWaitAfter, opts.Timeout,
 	)
 
 	if _, err := call(f.ctx, act, opts.Timeout); err != nil {
@@ -1858,7 +1833,7 @@ func (f *Frame) textContent(selector string, opts *FrameTextContentOptions) (str
 	}
 	act := f.newAction(
 		selector, DOMElementStateAttached, opts.Strict, TextContent,
-		[]string{}, false, true, opts.Timeout,
+		[]string{}, false, withRetry, true, opts.Timeout,
 	)
 	v, err := call(f.ctx, act, opts.Timeout)
 	if err != nil {
@@ -1917,7 +1892,7 @@ func (f *Frame) typ(selector, text string, opts *FrameTypeOptions) error {
 	}
 	act := f.newAction(
 		selector, DOMElementStateAttached, opts.Strict, typeText,
-		[]string{}, false, opts.NoWaitAfter, opts.Timeout,
+		[]string{}, false, withRetry, opts.NoWaitAfter, opts.Timeout,
 	)
 	if _, err := call(f.ctx, act, opts.Timeout); err != nil {
 		return errorFromDOMError(err)
@@ -2061,20 +2036,17 @@ func (f *Frame) WaitForLoadState(state string, popts *FrameWaitForLoadStateOptio
 	select {
 	case <-lifecycleEvent:
 	case <-timeoutCtx.Done():
-		return fmt.Errorf("waiting for load state %q: %w", state, timeoutCtx.Err())
+		return fmt.Errorf("waiting for load state %q: %w", state, ContextErr(timeoutCtx))
 	}
 
 	return nil
 }
 
 // WaitForNavigation waits for the given navigation lifecycle event to happen.
-// jsRegexChecker should be non-nil to be able to test against a URL pattern in the options.
+// RegExMatcher should be non-nil to be able to test against a URL pattern in the options.
 //
 //nolint:funlen
-func (f *Frame) WaitForNavigation(
-	opts *FrameWaitForNavigationOptions,
-	jsRegexChecker JSRegexChecker,
-) (*Response, error) {
+func (f *Frame) WaitForNavigation(opts *FrameWaitForNavigationOptions, rm RegExMatcher) (*Response, error) {
 	f.log.Debugf("Frame:WaitForNavigation",
 		"fid:%s furl:%s url:%s", f.ID(), f.URL(), opts.URL)
 	defer f.log.Debugf("Frame:WaitForNavigation:return",
@@ -2083,7 +2055,7 @@ func (f *Frame) WaitForNavigation(
 	timeoutCtx, timeoutCancel := context.WithTimeout(f.ctx, opts.Timeout)
 
 	// Create URL matcher based on the pattern
-	matcher, err := urlMatcher(opts.URL, jsRegexChecker)
+	matcher, err := newPatternMatcher(opts.URL, rm)
 	if err != nil {
 		timeoutCancel()
 		return nil, fmt.Errorf("parsing URL pattern: %w", err)
@@ -2152,7 +2124,7 @@ func (f *Frame) WaitForNavigation(
 			}
 		}
 	case <-timeoutCtx.Done():
-		return nil, handleTimeoutError(timeoutCtx.Err())
+		return nil, handleTimeoutError(ContextErr(timeoutCtx))
 	}
 
 	// A lifecycle event won't be received when navigating within the same
@@ -2162,7 +2134,7 @@ func (f *Frame) WaitForNavigation(
 		select {
 		case <-lifecycleEvtCh:
 		case <-timeoutCtx.Done():
-			return nil, handleTimeoutError(timeoutCtx.Err())
+			return nil, handleTimeoutError(ContextErr(timeoutCtx))
 		}
 	}
 
@@ -2218,19 +2190,14 @@ func (f *Frame) WaitForTimeout(timeout int64) {
 }
 
 // WaitForURL waits for the frame to navigate to a URL matching the given pattern.
-// jsRegexChecker should be non-nil to be able to test against a URL pattern.
-func (f *Frame) WaitForURL(urlPattern string, opts *FrameWaitForURLOptions, jsRegexChecker JSRegexChecker) error {
+// RegExMatcher should be non-nil to be able to test against a URL pattern.
+func (f *Frame) WaitForURL(urlPattern string, opts *FrameWaitForURLOptions, rm RegExMatcher) error {
 	f.log.Debugf("Frame:WaitForURL", "fid:%s furl:%q pattern:%s", f.ID(), f.URL(), urlPattern)
 	defer f.log.Debugf("Frame:WaitForURL:return", "fid:%s furl:%q pattern:%s", f.ID(), f.URL(), urlPattern)
 
-	matcher, err := urlMatcher(urlPattern, jsRegexChecker)
+	matched, err := rm.Match(urlPattern, f.URL())
 	if err != nil {
-		return fmt.Errorf("parsing URL pattern: %w", err)
-	}
-
-	matched, err := matcher(f.URL())
-	if err != nil {
-		return fmt.Errorf("checking current URL: %w", err)
+		return fmt.Errorf("waiting for URL %q: %w", urlPattern, err)
 	}
 	if matched {
 		// Already at target URL, just wait for load state
@@ -2245,7 +2212,8 @@ func (f *Frame) WaitForURL(urlPattern string, opts *FrameWaitForURLOptions, jsRe
 		Timeout:   opts.Timeout,
 		WaitUntil: opts.WaitUntil,
 	}
-	_, err = f.WaitForNavigation(navOpts, jsRegexChecker)
+	_, err = f.WaitForNavigation(navOpts, rm)
+
 	return err
 }
 
@@ -2283,6 +2251,46 @@ func (f *Frame) evaluate(
 	}
 
 	return eh, nil
+}
+
+func (f *Frame) evaluateWithSelector(selector string, pageFunc string, args ...any) (any, error) {
+	f.log.Debugf("Frame:evaluateWithSelector", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
+
+	evaluate := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+		return handle.Evaluate(pageFunc, args...)
+	}
+
+	act := f.newAction(
+		selector, DOMElementStateAttached, true, evaluate, []string{}, false, withRetry, true, f.defaultTimeout(),
+	)
+	v, err := call(f.ctx, act, f.defaultTimeout())
+	if err != nil {
+		return nil, errorFromDOMError(err)
+	}
+	return v, nil
+}
+
+func (f *Frame) evaluateHandleWithSelector(selector string, pageFunc string, args ...any) (JSHandleAPI, error) {
+	f.log.Debugf("Frame:evaluateHandleWithSelector", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
+
+	evaluateHandle := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+		return handle.EvaluateHandle(pageFunc, args...)
+	}
+
+	act := f.newAction(
+		selector, DOMElementStateAttached, true, evaluateHandle, []string{}, false, withRetry, true, f.defaultTimeout(),
+	)
+	v, err := call(f.ctx, act, f.defaultTimeout())
+	if err != nil {
+		return nil, errorFromDOMError(err)
+	}
+
+	handle, ok := v.(JSHandleAPI)
+	if !ok {
+		return nil, fmt.Errorf("evaluating handle of %q: unexpected type %T", selector, v)
+	}
+
+	return handle, nil
 }
 
 // frameExecutionContext represents a JS execution context that belongs to Frame.
@@ -2348,7 +2356,7 @@ func (f *Frame) runActionOnSelector(
 //nolint:unparam
 func (f *Frame) newAction(
 	selector string, state DOMElementState, strict bool, fn elementHandleActionFunc, states []string,
-	force, noWaitAfter bool, timeout time.Duration,
+	force bool, retry bool, noWaitAfter bool, timeout time.Duration,
 ) func(apiCtx context.Context, resultCh chan any, errCh chan error) {
 	// We execute a frame action in the following steps:
 	// 1. Find element matching specified selector
@@ -2373,7 +2381,7 @@ func (f *Frame) newAction(
 			}
 			return
 		}
-		f := handle.newAction(states, fn, force, noWaitAfter, timeout)
+		f := handle.newAction(states, fn, force, retry, noWaitAfter, timeout)
 		f(apiCtx, resultCh, errCh)
 	}
 }

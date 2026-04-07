@@ -16,10 +16,7 @@ import (
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/common/js"
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6error"
-	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
 	"go.k6.io/k6/internal/js/modules/k6/browser/log"
-
-	k6modules "go.k6.io/k6/js/modules"
 )
 
 // waitForEventType represents the event types that can be used when working
@@ -81,7 +78,6 @@ type BrowserContext struct {
 	opts            *BrowserContextOptions
 	timeoutSettings *TimeoutSettings
 	logger          *log.Logger
-	vu              k6modules.VU
 
 	evaluateOnNewDocumentSources []string
 
@@ -141,7 +137,6 @@ func NewBrowserContext(
 		id:               id,
 		opts:             opts,
 		logger:           logger,
-		vu:               k6ext.GetVU(ctx),
 		timeoutSettings:  NewTimeoutSettings(nil),
 	}
 
@@ -266,9 +261,7 @@ func (b *BrowserContext) NewPage() (*Page, error) {
 
 	p, err := b.browser.newPageInContext(b.id)
 	if err != nil {
-		err := fmt.Errorf("creating new page in browser context: %w", err)
-		spanRecordError(span, err)
-		return nil, err
+		return nil, spanRecordErrorf(span, "creating new page in browser context: %w", err)
 	}
 
 	b.logger.Debugf("BrowserContext:NewPage:return", "bctxid:%v ptid:%s", b.id, p.targetID)
@@ -384,7 +377,7 @@ func (b *BrowserContext) waitForEvent(
 
 	select {
 	case <-b.ctx.Done():
-		return nil, b.ctx.Err() //nolint:wrapcheck
+		return nil, ContextErr(b.ctx) //nolint:wrapcheck
 	case <-time.After(timeout):
 		b.logger.Debugf("BrowserContext:WaitForEvent:timeout", "bctxid:%v event:%q", b.id, event)
 		return nil, fmt.Errorf("waitForEvent timed out after %v", timeout)

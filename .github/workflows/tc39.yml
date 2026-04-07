@@ -7,7 +7,9 @@ on:
   pull_request:
       paths:
           - 'js/**'
+          - 'internal/js/**'
           - 'vendor/github.com/grafana/sobek/**'
+          - 'vendor/github.com/evanw/esbuild**'
 
 defaults:
   run:
@@ -22,13 +24,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           persist-credentials: false
       - name: Install Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
-          go-version: 1.24.x
+          go-version: 1.26.x
           check-latest: true
       - name: Run tests
         run: |

@@ -74,7 +74,7 @@ func TestConfigRemoteConfig(t *testing.T) {
 	exprcc := &remote.HTTPConfig{
 		Timeout: 5 * time.Second,
 		TLSConfig: &tls.Config{
-			InsecureSkipVerify: true, //nolint:gosec
+			InsecureSkipVerify: true,
 			MinVersion:         tls.VersionTLS13,
 		},
 		BasicAuth: &remote.BasicAuth{
@@ -318,15 +318,15 @@ func TestOptionInsecureSkipTLSVerify(t *testing.T) {
 		env     map[string]string
 		jsonRaw json.RawMessage
 	}{
-		"JSON": {jsonRaw: json.RawMessage(`{"insecureSkipTLSVerify":false}`)},
-		"Env":  {env: map[string]string{"K6_PROMETHEUS_RW_INSECURE_SKIP_TLS_VERIFY": "false"}},
+		"JSON": {jsonRaw: json.RawMessage(`{"insecureSkipTLSVerify":true}`)},
+		"Env":  {env: map[string]string{"K6_PROMETHEUS_RW_INSECURE_SKIP_TLS_VERIFY": "true"}},
 		//nolint:gocritic
 		//"Arg":  {arg: "insecureSkipTLSVerify=false"},
 	}
 
 	expconfig := Config{
 		ServerURL:             null.StringFrom(defaultServerURL),
-		InsecureSkipTLSVerify: null.BoolFrom(false),
+		InsecureSkipTLSVerify: null.BoolFrom(true),
 		PushInterval:          types.NullDurationFrom(defaultPushInterval),
 		Headers:               make(map[string]string),
 		TrendStats:            []string{"p(99)"},
@@ -339,6 +339,104 @@ func TestOptionInsecureSkipTLSVerify(t *testing.T) {
 				tc.jsonRaw, tc.env, tc.arg)
 			require.NoError(t, err)
 			assert.Equal(t, expconfig, c)
+		})
+	}
+}
+
+func TestTLSMinVersion(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		arg        string
+		env        map[string]string
+		jsonRaw    json.RawMessage
+		wantRccTLS uint16
+		expconfig  Config
+	}{
+		"JSON": {
+			jsonRaw:    json.RawMessage(`{"tlsMinVersion":"1.2"}`),
+			wantRccTLS: tls.VersionTLS12,
+			expconfig: Config{
+				ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
+				InsecureSkipTLSVerify: null.BoolFrom(false),
+				TLSMinVersion:         null.NewString("1.2", true), // depends on test case
+				PushInterval:          types.NullDurationFrom(5 * time.Second),
+				Headers:               make(map[string]string),
+				TrendStats:            []string{"p(99)"},
+				StaleMarkers:          null.BoolFrom(false),
+			},
+		},
+		"JSON incorrect": {
+			jsonRaw:    json.RawMessage(`{"tlsMinVersion":""}`),
+			wantRccTLS: tls.VersionTLS13,
+			expconfig: Config{
+				ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
+				InsecureSkipTLSVerify: null.BoolFrom(false),
+				TLSMinVersion:         null.NewString("", true), // depends on test case
+				PushInterval:          types.NullDurationFrom(5 * time.Second),
+				Headers:               make(map[string]string),
+				TrendStats:            []string{"p(99)"},
+				StaleMarkers:          null.BoolFrom(false),
+			},
+		},
+		"Env": {
+			env:        map[string]string{"K6_PROMETHEUS_RW_TLS_MINIMUM_VERSION": "1.2"},
+			wantRccTLS: tls.VersionTLS12,
+			expconfig: Config{
+				ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
+				InsecureSkipTLSVerify: null.BoolFrom(false),
+				TLSMinVersion:         null.NewString("1.2", true), // depends on test case
+				PushInterval:          types.NullDurationFrom(5 * time.Second),
+				Headers:               make(map[string]string),
+				TrendStats:            []string{"p(99)"},
+				StaleMarkers:          null.BoolFrom(false),
+			},
+		},
+		"Env incorrect": {
+			env:        map[string]string{"K6_PROMETHEUS_RW_TLS_MINIMUM_VERSION": "0.0"},
+			wantRccTLS: tls.VersionTLS13,
+			expconfig: Config{
+				ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
+				InsecureSkipTLSVerify: null.BoolFrom(false),
+				TLSMinVersion:         null.NewString("0.0", true), // depends on test case
+				PushInterval:          types.NullDurationFrom(5 * time.Second),
+				Headers:               make(map[string]string),
+				TrendStats:            []string{"p(99)"},
+				StaleMarkers:          null.BoolFrom(false),
+			},
+		},
+		"version not set": {
+			wantRccTLS: tls.VersionTLS13,
+			expconfig: Config{
+				ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
+				InsecureSkipTLSVerify: null.BoolFrom(false),
+				TLSMinVersion:         null.NewString("", false), // depends on test case
+				PushInterval:          types.NullDurationFrom(5 * time.Second),
+				Headers:               make(map[string]string),
+				TrendStats:            []string{"p(99)"},
+				StaleMarkers:          null.BoolFrom(false),
+			},
+		},
+		// should `ParseArgs` function (for CLI flags) be implemented, add "Arg" test case(-s)
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			c, err := GetConsolidatedConfig(tc.jsonRaw, tc.env, tc.arg)
+			require.NoError(t, err)
+			assert.Equal(t, tc.expconfig, c)
+
+			exprcc := &remote.HTTPConfig{
+				Timeout: 5 * time.Second,
+				TLSConfig: &tls.Config{
+					InsecureSkipVerify: false,
+					MinVersion:         tc.wantRccTLS,
+				},
+			}
+			rcc, err := c.RemoteConfig()
+			require.NoError(t, err)
+			assert.Equal(t, exprcc, rcc)
 		})
 	}
 }
@@ -571,6 +669,51 @@ func TestOptionStaleMarker(t *testing.T) {
 		Headers:               make(map[string]string),
 		TrendStats:            []string{"p(99)"},
 		StaleMarkers:          null.BoolFrom(true),
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			c, err := GetConsolidatedConfig(
+				tc.jsonRaw, tc.env, tc.arg)
+			require.NoError(t, err)
+			assert.Equal(t, expconfig, c)
+		})
+	}
+}
+
+func TestOptionSigV4(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		arg     string
+		env     map[string]string
+		jsonRaw json.RawMessage
+	}{
+		"JSON": {jsonRaw: json.RawMessage(`
+{
+  "sigV4Region":"us-east-2",
+  "sigV4AccessKey":"ASIAUZABC123456",
+  "sigV4SecretKey":"5wfFi0FEaaaaacccc1111111111111"
+}
+`)},
+		"Env": {env: map[string]string{
+			"K6_PROMETHEUS_RW_SIGV4_REGION":     "us-east-2",
+			"K6_PROMETHEUS_RW_SIGV4_ACCESS_KEY": "ASIAUZABC123456",
+			"K6_PROMETHEUS_RW_SIGV4_SECRET_KEY": "5wfFi0FEaaaaacccc1111111111111",
+		}},
+	}
+
+	expconfig := Config{
+		ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
+		InsecureSkipTLSVerify: null.BoolFrom(false),
+		PushInterval:          types.NullDurationFrom(5 * time.Second),
+		Headers:               make(map[string]string),
+		TrendStats:            []string{"p(99)"},
+		StaleMarkers:          null.BoolFrom(false),
+		SigV4Region:           null.StringFrom("us-east-2"),
+		SigV4AccessKey:        null.StringFrom("ASIAUZABC123456"),
+		SigV4SecretKey:        null.StringFrom("5wfFi0FEaaaaacccc1111111111111"),
 	}
 
 	for name, tc := range cases {

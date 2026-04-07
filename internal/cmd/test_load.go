@@ -4,18 +4,27 @@ import (
 	"archive/tar"
 	"bytes"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"io"
+	"maps"
+	"net/url"
 	"path/filepath"
+	"slices"
+	"strings"
 	"sync"
 	"syscall"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
+	"go.k6.io/k6/ext"
+	"go.k6.io/k6/internal/build"
 	"go.k6.io/k6/internal/js"
 	"go.k6.io/k6/internal/loader"
 	"go.k6.io/k6/js/modules"
@@ -40,10 +49,14 @@ type loadedTest struct {
 	preInitState   *lib.TestPreInitState
 	initRunner     lib.Runner // TODO: rename to something more appropriate
 	keyLogger      io.Closer
-	moduleResolver *modules.ModuleResolver
+
+	dependencies       dependencies
+	imports            []string
+	runnerContinuation func() (lib.Runner, error)
+	dependencyErr      error
 }
 
-func loadLocalTest(gs *state.GlobalState, cmd *cobra.Command, args []string) (*loadedTest, error) {
+func loadLocalTestWithoutRunner(gs *state.GlobalState, cmd *cobra.Command, args []string) (*loadedTest, error) {
 	if len(args) < 1 {
 		return nil, fmt.Errorf("k6 needs at least one argument to load the test")
 	}
@@ -67,7 +80,7 @@ func loadLocalTest(gs *state.GlobalState, cmd *cobra.Command, args []string) (*l
 	}
 
 	if runtimeOptions.CompatibilityMode.String == lib.CompatibilityModeExperimentalEnhanced.String() {
-		gs.Logger.Warnf("ComaptibilityMode %[1]q is deprecated. Types are stripped by default for `.ts` files. "+
+		gs.Logger.Warnf("CompatibilityMode %[1]q is deprecated. Types are stripped by default for `.ts` files. "+
 			"Please move to using %[2]q instead as %[1]q will be removed in the future",
 			lib.CompatibilityModeExperimentalEnhanced.String(), lib.CompatibilityModeBase.String())
 	}
@@ -97,15 +110,32 @@ func loadLocalTest(gs *state.GlobalState, cmd *cobra.Command, args []string) (*l
 		preInitState:   state,
 	}
 
-	gs.Logger.Debugf("Initializing k6 runner for '%s' (%s)...", sourceRootPath, resolvedPath)
-	if err := test.initializeFirstRunner(gs); err != nil {
-		return nil, fmt.Errorf("could not initialize '%s': %w", sourceRootPath, err)
+	if err := test.prepareFirstRunner(gs); err != nil {
+		return test, fmt.Errorf("could not initialize '%s': %w", sourceRootPath, err)
 	}
-	gs.Logger.Debug("Runner successfully initialized!")
+
 	return test, nil
 }
 
-func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
+func loadLocalTest(gs *state.GlobalState, cmd *cobra.Command, args []string) (*loadedTest, error) {
+	test, err := loadLocalTestWithoutRunner(gs, cmd, args)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := test.continueInitialization(gs); err != nil {
+		return nil, fmt.Errorf("could not initialize '%s': %w", test.sourceRootPath, err)
+	}
+
+	return test, nil
+}
+
+//nolint:funlen
+func (lt *loadedTest) prepareFirstRunner(gs *state.GlobalState) error {
+	if lt.initRunner != nil || lt.runnerContinuation != nil {
+		return nil
+	}
+
 	testPath := lt.source.URL.String()
 	logger := gs.Logger.WithField("test_path", testPath)
 
@@ -134,20 +164,31 @@ func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
 	}
 	switch testType {
 	case testTypeJS:
+		specifier := lt.source.URL.String()
+		pwd := lt.source.URL.JoinPath("../")
 		logger.Debug("Trying to load as a JS test...")
-		runner, err := js.New(lt.preInitState, lt.source, lt.fileSystems)
-		// TODO: should we use common.UnwrapGojaInterruptedError() here?
-		if err != nil {
-			return fmt.Errorf("could not load JS test '%s': %w", testPath, err)
+		moduleResolver := js.NewModuleResolver(pwd, lt.preInitState, lt.fileSystems)
+		err := errext.WithExitCodeIfNone(
+			moduleResolver.LoadMainModule(pwd, specifier, lt.source.Data),
+			exitcodes.ScriptException)
+		lt.imports = moduleResolver.Imported()
+		deps, depErr := resolveModulesDependencies(err, lt.imports, logger, lt.fileSystems, lt.source, gs)
+		lt.dependencies = deps
+		if depErr != nil {
+			return fmt.Errorf("could not load JS test '%s': %w", testPath, depErr)
 		}
-		lt.initRunner = runner
-		lt.moduleResolver = runner.Bundle.ModuleResolver
+		lt.runnerContinuation = func() (lib.Runner, error) {
+			runner, err := js.New(lt.preInitState, lt.source, lt.fileSystems, moduleResolver)
+			if err != nil {
+				return nil, fmt.Errorf("could not load JS test '%s': %w", testPath, err)
+			}
+			return runner, nil
+		}
 		return nil
 
 	case testTypeArchive:
 		logger.Debug("Trying to load test as an archive bundle...")
 
-		var arc *lib.Archive
 		arc, err := lib.ReadArchive(bytes.NewReader(lt.source.Data))
 		if err != nil {
 			return fmt.Errorf("could not load test archive bundle '%s': %w", testPath, err)
@@ -157,12 +198,25 @@ func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
 		switch arc.Type {
 		case testTypeJS:
 			logger.Debug("Evaluating JS from archive bundle...")
-			runner, err := js.NewFromArchive(lt.preInitState, arc)
-			if err != nil {
-				return fmt.Errorf("could not load JS from test archive bundle '%s': %w", testPath, err)
+			specifier := arc.Filename
+			pwd := arc.PwdURL
+			moduleResolver := js.NewModuleResolver(pwd, lt.preInitState, arc.Filesystems)
+			loadErr := errext.WithExitCodeIfNone(
+				moduleResolver.LoadMainModule(pwd, specifier, arc.Data),
+				exitcodes.ScriptException)
+			lt.imports = moduleResolver.Imported()
+			deps, depErr := resolveModulesDependencies(loadErr, lt.imports, logger, arc.Filesystems, lt.source, gs)
+			lt.dependencies = deps
+			if depErr != nil {
+				return fmt.Errorf("could not load JS test '%s': %w", testPath, depErr)
 			}
-			lt.initRunner = runner
-			lt.moduleResolver = runner.Bundle.ModuleResolver
+			lt.runnerContinuation = func() (lib.Runner, error) {
+				runner, err := js.NewFromArchive(lt.preInitState, arc, moduleResolver)
+				if err != nil {
+					return nil, fmt.Errorf("could not load JS from test archive bundle '%s': %w", testPath, err)
+				}
+				return runner, nil
+			}
 			return nil
 		default:
 			return fmt.Errorf("archive '%s' has an unsupported test type '%s'", testPath, arc.Type)
@@ -170,6 +224,221 @@ func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
 	default:
 		return fmt.Errorf("unknown or unspecified test type '%s' for '%s'", testType, testPath)
 	}
+}
+
+func (lt *loadedTest) continueInitialization(gs *state.GlobalState) error {
+	if lt.dependencyErr != nil {
+		return lt.dependencyErr
+	}
+	if lt.runnerContinuation == nil {
+		return fmt.Errorf("runner initialization was not prepared")
+	}
+
+	resolvedPath := lt.source.URL.String()
+	gs.Logger.Debugf("Initializing k6 runner for '%s' (%s)...", lt.sourceRootPath, resolvedPath)
+	runner, err := lt.runnerContinuation()
+	if err != nil {
+		return err
+	}
+
+	lt.initRunner = runner
+	lt.runnerContinuation = nil
+	gs.Logger.Debug("Runner successfully initialized!")
+	return nil
+}
+
+func (lt *loadedTest) Dependencies() dependencies {
+	return lt.dependencies
+}
+
+func (lt *loadedTest) Imports() []string {
+	return append([]string(nil), lt.imports...)
+}
+
+func resolveModulesDependencies(
+	originalError error, imports []string, logger logrus.FieldLogger,
+	fileSystems map[string]fsext.Fs, source *loader.SourceData, gs *state.GlobalState,
+) (dependencies, error) {
+	deps, err := collectTestDependencies(originalError, imports, fileSystems, gs.Flags.DependenciesManifest)
+	if err != nil {
+		return nil, err
+	}
+
+	if !gs.Flags.AutoExtensionResolution {
+		return deps, originalError
+	}
+
+	if len(deps) == 0 {
+		return deps, nil
+	}
+
+	if !isCustomBuildRequired(deps, build.Version, ext.GetAll()) {
+		logger.
+			Debug("The current k6 binary already satisfies all the required dependencies," +
+				" it isn't required to provision a new binary.")
+		return deps, nil
+	}
+
+	if source.URL.Path == "/-" {
+		gs.Stdin = bytes.NewBuffer(source.Data)
+	}
+
+	return deps, binaryIsNotSatisfyingDependenciesError{
+		deps: deps,
+	}
+}
+
+func collectTestDependencies(
+	originalError error, imports []string, fileSystems map[string]fsext.Fs, manifest string,
+) (dependencies, error) {
+	deps, err := extractUnknownModules(originalError)
+	if err != nil {
+		return nil, err
+	}
+
+	// Ensure k6 is always a dependency with "*" constraint by default.
+	// This can be overridden by "use k6" or "use k6 with k6/x/..." directives in the script.
+	if _, ok := deps["k6"]; !ok {
+		deps["k6"] = nil
+	}
+
+	if err := analyseUseContraints(imports, fileSystems, deps); err != nil {
+		return nil, err
+	}
+
+	m, err := parseManifest(manifest)
+	if err != nil {
+		return nil, err
+	}
+	err = deps.applyManifest(m)
+	if err != nil {
+		return nil, err
+	}
+
+	return deps, nil
+}
+
+func analyseUseContraints(imports []string, fileSystems map[string]fsext.Fs, deps dependencies) error {
+	for _, imported := range imports {
+		if strings.HasPrefix(imported, "k6") {
+			continue
+		}
+		u, err := url.Parse(imported)
+		if err != nil {
+			return err
+		}
+		// We always have URLs here with scheme and everything
+		_, path, _ := strings.Cut(imported, "://")
+		if u.Scheme == "https" {
+			path = "/" + path
+		}
+		path, err = url.PathUnescape(filepath.FromSlash(path))
+		if err != nil {
+			return err
+		}
+
+		data, err := fsext.ReadFile(fileSystems[u.Scheme], path)
+		if err != nil {
+			return err
+		}
+		err = processUseDirectives(imported, data, deps)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+type dependencies map[string]*semver.Constraints
+
+func (d dependencies) update(dep string, constraint *semver.Constraints) error {
+	// TODO: We could actually do constraint comparison here and get the more specific one
+	oldConstraint, ok := d[dep]
+	if !ok || oldConstraint == nil || oldConstraint.String() == "*" { // either nothing or it didn't have constraint
+		d[dep] = constraint
+		return nil
+	}
+	if constraint == oldConstraint || constraint == nil {
+		return nil
+	}
+	return fmt.Errorf("already have constraint for %q, when parsing %q", dep, constraint)
+}
+
+func (d dependencies) applyManifest(manifest dependencies) error {
+	for m, k := range d {
+		if k != nil && k.String() != "*" { // if there is constraint skip it
+			continue
+		}
+		c, ok := manifest[m]
+		if !ok { // skip anything not in the manifest
+			continue
+		}
+		err := d.update(m, c)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (d dependencies) String() string {
+	var buf bytes.Buffer
+
+	for idx, depName := range slices.Sorted(maps.Keys(d)) {
+		if idx > 0 {
+			_ = buf.WriteByte(';')
+		}
+
+		buf.WriteString(depName)
+		constraint := d[depName]
+		if constraint != nil {
+			buf.WriteString(constraint.String())
+		}
+	}
+	return buf.String()
+}
+
+func dependenciesFromMap(input map[string]string) (dependencies, error) {
+	result := make(dependencies)
+	for k, v := range input {
+		if len(v) == 0 {
+			result[k] = nil
+			continue
+		}
+		con, err := semver.NewConstraint(v)
+		if err != nil {
+			return nil, err
+		}
+		result[k] = con
+	}
+	return result, nil
+}
+
+func extractUnknownModules(err error) (dependencies, error) {
+	deps := make(dependencies)
+	if err == nil {
+		return deps, nil
+	}
+
+	var u modules.UnknownModulesError
+
+	if errors.As(err, &u) {
+		for _, name := range u.List() {
+			deps[name] = nil
+		}
+		return deps, nil
+	}
+
+	return nil, err
+}
+
+// TODO(@mstoykov) potentially figure out some less "exceptionl workflow" solution
+type binaryIsNotSatisfyingDependenciesError struct {
+	deps dependencies
+}
+
+func (r binaryIsNotSatisfyingDependenciesError) Error() string {
+	return fmt.Sprintf("binary does not satisfy dependencies %q", r.deps)
 }
 
 // readSource is a small wrapper around loader.ReadSource returning
@@ -275,14 +544,6 @@ func (lct *loadedAndConfiguredTest) buildTestRunState(
 	// This might be the full derived or just the consolidated options
 	if err := lct.initRunner.SetOptions(configToReinject); err != nil {
 		return nil, err
-	}
-
-	// Here, where we get the consolidated options, is where we check if any
-	// of the deprecated options is being used, and we report it.
-	if _, isPresent := configToReinject.External["loadimpact"]; isPresent {
-		if err := lct.preInitState.Usage.Uint64("deprecations/options.ext.loadimpact", 1); err != nil {
-			return nil, err
-		}
 	}
 
 	// it pre-loads system certificates to avoid doing it on the first TLS request.

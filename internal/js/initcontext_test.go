@@ -30,8 +30,7 @@ func TestRequire(t *testing.T) {
 		t.Run("Nonexistent", func(t *testing.T) {
 			t.Parallel()
 			_, err := getSimpleBundle(t, "/script.js", `import "k6/NONEXISTENT";`)
-			require.Error(t, err)
-			require.Contains(t, err.Error(), "unknown module: k6/NONEXISTENT")
+			require.ErrorContains(t, err, "GoError: unknown modules [\"k6/NONEXISTENT\"]")
 		})
 
 		t.Run("k6", func(t *testing.T) {
@@ -361,8 +360,7 @@ func TestRequestWithBinaryFile(t *testing.T) {
 		Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	bi.moduleVUImpl.ctx = ctx
 
 	v, err := bi.getCallableExport(consts.DefaultFn)(sobek.Undefined())
@@ -503,8 +501,7 @@ func TestRequestWithMultipleBinaryFiles(t *testing.T) {
 		Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	bi.moduleVUImpl.ctx = ctx
 
 	v, err := bi.getCallableExport(consts.DefaultFn)(sobek.Undefined())
@@ -560,7 +557,7 @@ export default function(){
 	require.Error(t, err)
 	exception := new(sobek.Exception)
 	require.ErrorAs(t, err, &exception)
-	require.Equal(t, exception.String(), "exception in line 2\n\tat f2 (file:///module1.js:2:5(2))\n\tat default (file:///script.js:5:15(3))\n")
+	require.Equal(t, "exception in line 2\n\tat f2 (file:///module1.js:2:5(2))\n\tat default (file:///script.js:5:15(3))\n", exception.String())
 }
 
 func TestSourceMapsCJS(t *testing.T) {
@@ -594,7 +591,7 @@ export default function(){
 	require.Error(t, err)
 	exception := new(sobek.Exception)
 	require.ErrorAs(t, err, &exception)
-	require.Equal(t, exception.String(), "exception in line 2\n\tat file:///module1.js:2:5(2)\n\tat default (file:///script.js:5:15(3))\n")
+	require.Equal(t, "exception in line 2\n\tat file:///module1.js:2:5(2)\n\tat default (file:///script.js:5:15(3))\n", exception.String())
 }
 
 func TestSourceMapsExternal(t *testing.T) {

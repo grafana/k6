@@ -32,10 +32,9 @@ type expoHistogramDataPoint[N int64 | float64] struct {
 	attrs attribute.Set
 	res   FilteredExemplarReservoir[N]
 
-	count uint64
-	min   N
-	max   N
-	sum   N
+	min N
+	max N
+	sum N
 
 	maxSize  int
 	noMinMax bool
@@ -74,8 +73,6 @@ func newExpoHistogramDataPoint[N int64 | float64](
 
 // record adds a new measurement to the histogram. It will rescale the buckets if needed.
 func (p *expoHistogramDataPoint[N]) record(v N) {
-	p.count++
-
 	if !p.noMinMax {
 		if v < p.min {
 			p.min = v
@@ -183,14 +180,18 @@ func (p *expoHistogramDataPoint[N]) scaleChange(bin, startBin int32, length int)
 
 	var count int32
 	for high-low >= p.maxSize {
-		low = low >> 1
-		high = high >> 1
+		low >>= 1
+		high >>= 1
 		count++
 		if count > expoMaxScale-expoMinScale {
 			return count
 		}
 	}
 	return count
+}
+
+func (p *expoHistogramDataPoint[N]) count() uint64 {
+	return p.posBuckets.count() + p.negBuckets.count() + p.zeroCount
 }
 
 // expoBuckets is a set of buckets in an exponential histogram.
@@ -225,7 +226,7 @@ func (b *expoBuckets) record(bin int32) {
 			b.counts = append(b.counts, make([]uint64, newLength-len(b.counts))...)
 		}
 
-		copy(b.counts[shift:origLen+int(shift)], b.counts[:])
+		copy(b.counts[shift:origLen+int(shift)], b.counts)
 		b.counts = b.counts[:newLength]
 		for i := 1; i < int(shift); i++ {
 			b.counts[i] = 0
@@ -264,7 +265,7 @@ func (b *expoBuckets) downscale(delta int32) {
 	// new Counts: [4, 14, 30, 10]
 
 	if len(b.counts) <= 1 || delta < 1 {
-		b.startBin = b.startBin >> delta
+		b.startBin >>= delta
 		return
 	}
 
@@ -282,7 +283,15 @@ func (b *expoBuckets) downscale(delta int32) {
 
 	lastIdx := (len(b.counts) - 1 + int(offset)) / int(steps)
 	b.counts = b.counts[:lastIdx+1]
-	b.startBin = b.startBin >> delta
+	b.startBin >>= delta
+}
+
+func (b *expoBuckets) count() uint64 {
+	var total uint64
+	for _, count := range b.counts {
+		total += count
+	}
+	return total
 }
 
 // newExponentialHistogram returns an Aggregator that summarizes a set of
@@ -301,7 +310,7 @@ func newExponentialHistogram[N int64 | float64](
 		maxScale: maxScale,
 
 		newRes: r,
-		limit:  newLimiter[*expoHistogramDataPoint[N]](limit),
+		limit:  newLimiter[expoHistogramDataPoint[N]](limit),
 		values: make(map[attribute.Distinct]*expoHistogramDataPoint[N]),
 
 		start: now(),
@@ -317,7 +326,7 @@ type expoHistogram[N int64 | float64] struct {
 	maxScale int32
 
 	newRes   func(attribute.Set) FilteredExemplarReservoir[N]
-	limit    limiter[*expoHistogramDataPoint[N]]
+	limit    limiter[expoHistogramDataPoint[N]]
 	values   map[attribute.Distinct]*expoHistogramDataPoint[N]
 	valuesMu sync.Mutex
 
@@ -338,19 +347,26 @@ func (e *expoHistogram[N]) measure(
 	e.valuesMu.Lock()
 	defer e.valuesMu.Unlock()
 
-	attr := e.limit.Attributes(fltrAttr, e.values)
-	v, ok := e.values[attr.Equivalent()]
+	v, ok := e.values[fltrAttr.Equivalent()]
 	if !ok {
-		v = newExpoHistogramDataPoint[N](attr, e.maxSize, e.maxScale, e.noMinMax, e.noSum)
-		v.res = e.newRes(attr)
+		fltrAttr = e.limit.Attributes(fltrAttr, e.values)
+		// If we overflowed, make sure we add to the existing overflow series
+		// if it already exists.
+		v, ok = e.values[fltrAttr.Equivalent()]
+		if !ok {
+			v = newExpoHistogramDataPoint[N](fltrAttr, e.maxSize, e.maxScale, e.noMinMax, e.noSum)
+			v.res = e.newRes(fltrAttr)
 
-		e.values[attr.Equivalent()] = v
+			e.values[fltrAttr.Equivalent()] = v
+		}
 	}
 	v.record(value)
 	v.res.Offer(ctx, value, droppedAttr)
 }
 
-func (e *expoHistogram[N]) delta(dest *metricdata.Aggregation) int {
+func (e *expoHistogram[N]) delta(
+	dest *metricdata.Aggregation, //nolint:gocritic // The pointer is needed for the ComputeAggregation interface
+) int {
 	t := now()
 
 	// If *dest is not a metricdata.ExponentialHistogram, memory reuse is missed.
@@ -369,7 +385,7 @@ func (e *expoHistogram[N]) delta(dest *metricdata.Aggregation) int {
 		hDPts[i].Attributes = val.attrs
 		hDPts[i].StartTime = e.start
 		hDPts[i].Time = t
-		hDPts[i].Count = val.count
+		hDPts[i].Count = val.count()
 		hDPts[i].Scale = val.scale
 		hDPts[i].ZeroCount = val.zeroCount
 		hDPts[i].ZeroThreshold = 0.0
@@ -411,7 +427,9 @@ func (e *expoHistogram[N]) delta(dest *metricdata.Aggregation) int {
 	return n
 }
 
-func (e *expoHistogram[N]) cumulative(dest *metricdata.Aggregation) int {
+func (e *expoHistogram[N]) cumulative(
+	dest *metricdata.Aggregation, //nolint:gocritic // The pointer is needed for the ComputeAggregation interface
+) int {
 	t := now()
 
 	// If *dest is not a metricdata.ExponentialHistogram, memory reuse is missed.
@@ -430,7 +448,7 @@ func (e *expoHistogram[N]) cumulative(dest *metricdata.Aggregation) int {
 		hDPts[i].Attributes = val.attrs
 		hDPts[i].StartTime = e.start
 		hDPts[i].Time = t
-		hDPts[i].Count = val.count
+		hDPts[i].Count = val.count()
 		hDPts[i].Scale = val.scale
 		hDPts[i].ZeroCount = val.zeroCount
 		hDPts[i].ZeroThreshold = 0.0

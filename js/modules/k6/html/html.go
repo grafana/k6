@@ -90,7 +90,7 @@ func (s Selection) buildMatcher(v sobek.Value, sobekFn sobek.Callable) func(int,
 	}
 }
 
-func (s Selection) varargFnCall(arg interface{},
+func (s Selection) varargFnCall(arg any,
 	strFilter func(string) *goquery.Selection,
 	selFilter func(*goquery.Selection) *goquery.Selection,
 	nodeFilter func(...*gohtml.Node) *goquery.Selection,
@@ -164,19 +164,19 @@ func (s Selection) adjacentUntil(until func(string) *goquery.Selection,
 	panic(s.rt.NewGoError(err))
 }
 
-func (s Selection) Add(arg interface{}) Selection {
+func (s Selection) Add(arg any) Selection {
 	return s.varargFnCall(arg, s.sel.Add, s.sel.AddSelection, s.sel.AddNodes)
 }
 
-func (s Selection) Find(arg interface{}) Selection {
+func (s Selection) Find(arg any) Selection {
 	return s.varargFnCall(arg, s.sel.Find, s.sel.FindSelection, s.sel.FindNodes)
 }
 
-func (s Selection) Closest(arg interface{}) Selection {
+func (s Selection) Closest(arg any) Selection {
 	return s.varargFnCall(arg, s.sel.Closest, s.sel.ClosestSelection, s.sel.ClosestNodes)
 }
 
-func (s Selection) Has(arg interface{}) Selection {
+func (s Selection) Has(arg any) Selection {
 	return s.varargFnCall(arg, s.sel.Has, s.sel.HasSelection, s.sel.HasNodes)
 }
 
@@ -498,7 +498,7 @@ func (s Selection) Data(def ...string) sobek.Value {
 		}
 		return sobek.Undefined()
 	}
-	data := make(map[string]interface{})
+	data := make(map[string]any)
 	for _, attr := range s.sel.Nodes[0].Attr {
 		if strings.HasPrefix(attr.Key, "data-") && len(attr.Key) > 5 {
 			data[attrToProperty(attr.Key[5:])] = convertDataAttrVal(attr.Val)

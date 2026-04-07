@@ -24,7 +24,7 @@ export default async function() {
   try {
     await page.goto('https://quickpizza.grafana.com/test.k6.io/', { waitUntil: 'networkidle' });
 
-    const contacts = page.locator('a[href="/contacts.php"]');
+    const contacts = page.getByRole('link', { name: '/contacts.php' });
     await contacts.dispatchEvent("click");
 
     await check(page.locator('h3'), {

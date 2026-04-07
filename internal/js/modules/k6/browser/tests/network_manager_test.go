@@ -11,11 +11,15 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/common"
+	k6metrics "go.k6.io/k6/metrics"
 
 	k6lib "go.k6.io/k6/lib"
 	k6types "go.k6.io/k6/lib/types"
 )
 
+// TestURLSkipRequest checks that, since https://github.com/grafana/k6/commit/f29064ef, k6 doesn't
+// handle navigation requests for local urls, like: blob:... or data:..., and so it doesn't emit errors
+// neither (e.g. in case of a non-existing blob), in contraposition to what Playwright does.
 func TestURLSkipRequest(t *testing.T) {
 	t.Parallel()
 
@@ -29,25 +33,25 @@ func TestURLSkipRequest(t *testing.T) {
 	require.NoError(t, err)
 	tb.logCache.assertContains(t, "skipping request handling of data URL")
 
-	// In this test, we're checking that the network manager is skipping request handling
-	// of certain URLs, but Browser navigation still happens.
+	// In this test, we're checking that the network manager is skipping request handling of certain URLs,
+	// but Browser navigation still happens.
 	//
-	// Under that assumption, it's important to notice that the Blob URL that we use
-	// for this test case isn't valid, and we cannot use a valid one because we lack
-	// general support for Blob and URL WebAPIs.
+	// However, until Chrome 139.x, there was a subtle bug causing no valid NavigationEvent to be emitted.
+	// An event being considered valid by having a document id that matches the document id of the frame
+	// that navigated to that url. So, until that, we expected the following [p.Goto] call to timeout.
 	//
-	// So, here the Browser tries to navigate to a non-existing Blob URL, which
-	// doesn't produce any valid NavigationEvent, causing the method to timeout.
+	// Since Chrome 140.x, this bug has been fixed, and now the navigation to a non-existing blob behaves
+	// similarly to what happens in the lines above, no timing out but succeeding with normality.
 	//
-	// Ideally, we could capture NavigationEvents that navigate to chrome-error://.
-	// However, as that isn't supported yet, and it's not trivial, we just make
-	// the timeout to finish quickly, for the sake of the test.
+	// Note that, in spite of non-existing blob (we cannot define a valid one because k6 lacks general support
+	// for Blob and URL WebAPIs), this doesn't return any error because as stated in the TestURLSkipRequest docs,
+	// k6 intentionally skips that request handling, thus not throwing the net::ERR_FILE_NOT_FOUND that Chrome
+	// throws in such case, as Playwright does.
 	_, err = p.Goto(
 		"blob:something",
-		&common.FrameGotoOptions{Timeout: 200 * time.Millisecond},
+		&common.FrameGotoOptions{Timeout: common.DefaultTimeout},
 	)
-	require.Error(t, err)
-	require.ErrorContains(t, err, `navigating frame to "blob:something": navigating to "blob:something": timed out after 200ms`)
+	require.NoError(t, err)
 	tb.logCache.assertContains(t, "skipping request handling of blob URL")
 }
 
@@ -240,4 +244,57 @@ func TestInterceptBeforePageLoad(t *testing.T) {
 	defer cancel()
 	err = tb.run(ctx, gotoPage)
 	require.NoError(t, err)
+}
+
+// TestNetworkManagerCloseMetricEmissionRace reproduces the race
+// condition where NetworkManager emits metrics during the engine
+// shutdown. Reproduces the issue 4203 when run with the -race flag.
+func TestNetworkManagerCloseMetricEmissionRace(t *testing.T) {
+	t.Parallel()
+
+	samples := make(chan k6metrics.SampleContainer, 5)
+	tb := newTestBrowser(t, withHTTPServer(), withSamples(samples), withSkipClose())
+	tb.vu.StartIteration(t)
+	page := tb.NewPage(nil)
+
+	tb.withHandler("/foo", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = fmt.Fprint(w, `<html><head></head><body>loaded</body></html>`)
+	})
+	tb.withHandler("/ping", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = fmt.Fprint(w, "pong")
+	})
+
+	opts := &common.FrameGotoOptions{Timeout: common.DefaultTimeout}
+	_, err := page.Goto(tb.url("/foo"), opts)
+	require.NoError(t, err)
+
+	// Fire a burst of fetch requests from JS so that many HTTP-metric
+	// emission goroutines are active or queued when we close the page.
+	_, err = page.Evaluate(`() => {
+		const promises = [];
+		for (let i = 0; i < 5; i++) {
+			promises.push(fetch('/ping?i=' + i));
+		}
+		return Promise.all(promises).then(() => 'done');
+	}`)
+	require.NoError(t, err)
+
+	// Close the page in a goroutine. On a correct implementation,
+	// Close blocks until all metric-emitting goroutines finish.
+	closeDone := make(chan error, 1)
+	go func() { closeDone <- page.Close() }()
+
+	defer close(samples)
+	go func() {
+		for range samples {
+		}
+	}()
+
+	// Wait for Close to return.
+	select {
+	case err := <-closeDone:
+		require.NoError(t, err)
+	case <-time.After(30 * time.Second):
+		t.Fatal("page.Close() did not return after draining samples")
+	}
 }

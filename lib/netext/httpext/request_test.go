@@ -14,14 +14,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mccutchen/go-httpbin/httpbin"
+	"github.com/mccutchen/go-httpbin/v2/httpbin"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/metrics"
 	"golang.org/x/time/rate"
 	"gopkg.in/guregu/null.v3"
+
+	"go.k6.io/k6/lib"
+	"go.k6.io/k6/metrics"
 )
 
 type reader func([]byte) (int, error)
@@ -68,14 +69,14 @@ func TestCompressionBodyError(t *testing.T) {
 		t.Parallel()
 		_, _, err := compressBody(algos, io.NopCloser(badReadBody()))
 		require.Error(t, err)
-		require.Equal(t, err.Error(), badReadMsg)
+		require.EqualError(t, err, badReadMsg)
 	})
 
 	t.Run("bad close body", func(t *testing.T) {
 		t.Parallel()
 		_, _, err := compressBody(algos, badCloseBody())
 		require.Error(t, err)
-		require.Equal(t, err.Error(), badCloseMsg)
+		require.EqualError(t, err, badCloseMsg)
 	})
 }
 
@@ -86,7 +87,7 @@ func TestMakeRequestError(t *testing.T) {
 
 	t.Run("bad compression algorithm body", func(t *testing.T) {
 		t.Parallel()
-		req, err := http.NewRequest(http.MethodGet, "https://wont.be.used", nil)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://wont.be.used", nil)
 
 		require.NoError(t, err)
 		badCompressionType := CompressionType(13)
@@ -103,7 +104,7 @@ func TestMakeRequestError(t *testing.T) {
 		}
 		_, err = MakeRequest(ctx, state, preq)
 		require.Error(t, err)
-		require.Equal(t, err.Error(), "unknown compressionType CompressionType(13)")
+		require.EqualError(t, err, "unknown compressionType CompressionType(13)")
 	})
 
 	t.Run("invalid upgrade response", func(t *testing.T) {
@@ -114,8 +115,7 @@ func TestMakeRequestError(t *testing.T) {
 			w.WriteHeader(http.StatusSwitchingProtocols)
 		}))
 		defer srv.Close()
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 		logger := logrus.New()
 		logger.Level = logrus.DebugLevel
 		state := &lib.State{
@@ -123,7 +123,7 @@ func TestMakeRequestError(t *testing.T) {
 			Logger:    logger,
 			Tags:      lib.NewVUStateTags(metrics.NewRegistry().RootTagSet()),
 		}
-		req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
+		req, _ := http.NewRequestWithContext(ctx, http.MethodGet, srv.URL, nil)
 		preq := &ParsedHTTPRequest{
 			Req:         req,
 			URL:         &URL{u: req.URL},
@@ -175,7 +175,7 @@ func TestResponseStatus(t *testing.T) {
 					BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 					Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 				}
-				req, err := http.NewRequest(http.MethodGet, server.URL, nil)
+				req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, server.URL, nil)
 				require.NoError(t, err)
 
 				preq := &ParsedHTTPRequest{
@@ -187,8 +187,7 @@ func TestResponseStatus(t *testing.T) {
 					TagsAndMeta:  state.Tags.GetCurrentValues(),
 				}
 
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
+				ctx := t.Context()
 				res, err := MakeRequest(ctx, state, preq)
 				require.NoError(t, err)
 				assert.Equal(t, tc.statusCodeExpected, res.Status)
@@ -239,8 +238,7 @@ func TestMakeRequestTimeoutInTheMiddle(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 	}))
 	defer srv.Close()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	samples := make(chan metrics.SampleContainer, 10)
 	logger := logrus.New()
 	logger.Level = logrus.DebugLevel
@@ -256,7 +254,7 @@ func TestMakeRequestTimeoutInTheMiddle(t *testing.T) {
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 		Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 	}
-	req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
+	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, srv.URL, nil)
 	preq := &ParsedHTTPRequest{
 		Req:              req,
 		URL:              &URL{u: req.URL, URL: srv.URL},
@@ -334,7 +332,7 @@ func TestTrailFailed(t *testing.T) {
 				BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 				Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 			}
-			req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
+			req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, srv.URL, nil)
 			preq := &ParsedHTTPRequest{
 				Req:              req,
 				URL:              &URL{u: req.URL, URL: srv.URL},
@@ -374,7 +372,7 @@ func TestMakeRequestDialTimeout(t *testing.T) {
 		t.Skipf("dial timeout doesn't get returned on windows") // or we don't match it correctly
 	}
 	t.Parallel()
-	ln, err := net.Listen("tcp", "localhost:0")
+	ln, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "localhost:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -382,8 +380,7 @@ func TestMakeRequestDialTimeout(t *testing.T) {
 	defer func() {
 		require.NoError(t, ln.Close())
 	}()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	samples := make(chan metrics.SampleContainer, 10)
 	logger := logrus.New()
 	logger.Level = logrus.DebugLevel
@@ -404,7 +401,7 @@ func TestMakeRequestDialTimeout(t *testing.T) {
 		Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 	}
 
-	req, _ := http.NewRequest(http.MethodGet, "http://"+addr.String(), nil)
+	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://"+addr.String(), nil)
 	preq := &ParsedHTTPRequest{
 		Req:              req,
 		URL:              &URL{u: req.URL, URL: req.URL.String()},
@@ -442,8 +439,7 @@ func TestMakeRequestTimeoutInTheBegining(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 	}))
 	defer srv.Close()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	samples := make(chan metrics.SampleContainer, 10)
 	logger := logrus.New()
 	logger.Level = logrus.DebugLevel
@@ -459,7 +455,7 @@ func TestMakeRequestTimeoutInTheBegining(t *testing.T) {
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 		Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 	}
-	req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
+	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, srv.URL, nil)
 	preq := &ParsedHTTPRequest{
 		Req:              req,
 		URL:              &URL{u: req.URL, URL: srv.URL},
@@ -491,6 +487,50 @@ func TestMakeRequestTimeoutInTheBegining(t *testing.T) {
 	}
 }
 
+func TestMakeRequestFailedHostInitializesHeadersAndCookies(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	samples := make(chan metrics.SampleContainer, 10)
+	logger := logrus.New()
+	logger.Level = logrus.DebugLevel
+	registry := metrics.NewRegistry()
+	state := &lib.State{
+		Options: lib.Options{
+			SystemTags: &metrics.DefaultSystemTagSet,
+		},
+		Transport:      http.DefaultTransport,
+		Samples:        samples,
+		Logger:         logger,
+		BufferPool:     lib.NewBufferPool(),
+		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
+		Tags:           lib.NewVUStateTags(registry.RootTagSet()),
+	}
+
+	invalidURL := "https://test.k6.i"
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, invalidURL, nil)
+	require.NoError(t, err)
+
+	preq := &ParsedHTTPRequest{
+		Req:         req,
+		URL:         &URL{u: req.URL, URL: invalidURL},
+		Body:        new(bytes.Buffer),
+		Timeout:     10 * time.Second,
+		TagsAndMeta: state.Tags.GetCurrentValues(),
+	}
+
+	res, err := MakeRequest(ctx, state, preq)
+	require.NoError(t, err)
+	require.NotNil(t, res)
+
+	assert.NotNil(t, res.Headers, "Headers map should be initialized even for failed requests")
+	assert.NotNil(t, res.Cookies, "Cookies map should be initialized even for failed requests")
+
+	res.Headers["test-key"] = "test-value"
+	res.Cookies["test-cookie"] = []*HTTPCookie{{Name: "test", Value: "value"}}
+	assert.Equal(t, "test-value", res.Headers["test-key"])
+	assert.Equal(t, "test", res.Cookies["test-cookie"][0].Name)
+}
+
 func TestMakeRequestRPSLimit(t *testing.T) {
 	t.Parallel()
 	var requests int64
@@ -499,8 +539,7 @@ func TestMakeRequestRPSLimit(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	samples := make(chan metrics.SampleContainer, 10)
 	go func() {
@@ -540,7 +579,7 @@ func TestMakeRequestRPSLimit(t *testing.T) {
 			assert.InDelta(t, val, 3, 3)
 			return
 		default:
-			req, _ := http.NewRequest(http.MethodGet, ts.URL, nil)
+			req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, ts.URL, nil)
 			preq := &ParsedHTTPRequest{
 				Req:         req,
 				URL:         &URL{u: req.URL, URL: ts.URL, Name: ts.URL},

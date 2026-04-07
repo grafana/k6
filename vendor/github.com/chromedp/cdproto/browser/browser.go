@@ -527,6 +527,47 @@ func (p *SetWindowBoundsParams) Do(ctx context.Context) (err error) {
 	return cdp.Execute(ctx, CommandSetWindowBounds, p, nil)
 }
 
+// SetContentsSizeParams set size of the browser contents resizing browser
+// window as necessary.
+type SetContentsSizeParams struct {
+	WindowID WindowID `json:"windowId"`                  // Browser window id.
+	Width    int64    `json:"width,omitempty,omitzero"`  // The window contents width in DIP. Assumes current width if omitted. Must be specified if 'height' is omitted.
+	Height   int64    `json:"height,omitempty,omitzero"` // The window contents height in DIP. Assumes current height if omitted. Must be specified if 'width' is omitted.
+}
+
+// SetContentsSize set size of the browser contents resizing browser window
+// as necessary.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Browser#method-setContentsSize
+//
+// parameters:
+//
+//	windowID - Browser window id.
+func SetContentsSize(windowID WindowID) *SetContentsSizeParams {
+	return &SetContentsSizeParams{
+		WindowID: windowID,
+	}
+}
+
+// WithWidth the window contents width in DIP. Assumes current width if
+// omitted. Must be specified if 'height' is omitted.
+func (p SetContentsSizeParams) WithWidth(width int64) *SetContentsSizeParams {
+	p.Width = width
+	return &p
+}
+
+// WithHeight the window contents height in DIP. Assumes current height if
+// omitted. Must be specified if 'width' is omitted.
+func (p SetContentsSizeParams) WithHeight(height int64) *SetContentsSizeParams {
+	p.Height = height
+	return &p
+}
+
+// Do executes Browser.setContentsSize against the provided context.
+func (p *SetContentsSizeParams) Do(ctx context.Context) (err error) {
+	return cdp.Execute(ctx, CommandSetContentsSize, p, nil)
+}
+
 // SetDockTileParams set dock tile details, platform-specific.
 type SetDockTileParams struct {
 	BadgeLabel string `json:"badgeLabel,omitempty,omitzero"`
@@ -670,6 +711,7 @@ const (
 	CommandGetWindowBounds                       = "Browser.getWindowBounds"
 	CommandGetWindowForTarget                    = "Browser.getWindowForTarget"
 	CommandSetWindowBounds                       = "Browser.setWindowBounds"
+	CommandSetContentsSize                       = "Browser.setContentsSize"
 	CommandSetDockTile                           = "Browser.setDockTile"
 	CommandExecuteBrowserCommand                 = "Browser.executeBrowserCommand"
 	CommandAddPrivacySandboxEnrollmentOverride   = "Browser.addPrivacySandboxEnrollmentOverride"

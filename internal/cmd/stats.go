@@ -10,8 +10,9 @@ import (
 func getCmdStats(gs *state.GlobalState) *cobra.Command {
 	// statsCmd represents the stats command
 	statsCmd := &cobra.Command{
-		Use:   "stats",
-		Short: "Show test metrics",
+		Use:    "stats",
+		Short:  "Show test metrics",
+		Hidden: true,
 		Long: `Show test metrics.
 
   Use the global --address flag to specify the URL to the API server.`,

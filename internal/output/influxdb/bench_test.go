@@ -34,7 +34,7 @@ func benchmarkInfluxdb(b *testing.B, t time.Duration) {
 		b.ResetTimer()
 
 		samples := make(metrics.Samples, 10)
-		for i := 0; i < len(samples); i++ {
+		for i := range samples {
 			samples[i] = metrics.Sample{
 				TimeSeries: metrics.TimeSeries{
 					Metric: metric,

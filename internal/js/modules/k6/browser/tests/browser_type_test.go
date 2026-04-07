@@ -24,6 +24,7 @@ func TestBrowserTypeConnect(t *testing.T) {
 
 	b, err := bt.Connect(context.Background(), context.Background(), tb.wsURL)
 	require.NoError(t, err)
+	t.Cleanup(b.Close)
 	_, err = b.NewPage(nil)
 	require.NoError(t, err)
 }

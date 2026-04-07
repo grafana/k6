@@ -163,8 +163,8 @@ func TestOptions(t *testing.T) {
 		opts := Options{}.Apply(Options{TLSVersion: &versions})
 
 		assert.NotNil(t, opts.TLSVersion)
-		assert.Equal(t, opts.TLSVersion.Min, TLSVersion(tls.VersionSSL30)) //nolint:staticcheck
-		assert.Equal(t, opts.TLSVersion.Max, TLSVersion(tls.VersionTLS12))
+		assert.Equal(t, TLSVersion(tls.VersionSSL30), opts.TLSVersion.Min) //nolint:staticcheck
+		assert.Equal(t, TLSVersion(tls.VersionTLS12), opts.TLSVersion.Max)
 
 		t.Run("JSON", func(t *testing.T) {
 			t.Parallel()
@@ -461,14 +461,14 @@ func TestOptions(t *testing.T) {
 		assert.NoError(t, err)
 
 		hosts, err := types.NewNullHosts(map[string]types.Host{
-			"test.loadimpact.com": *host,
+			"test.k6.com": *host,
 		})
 		assert.NoError(t, err)
 		opts := Options{}.Apply(Options{Hosts: hosts})
 		assert.NotNil(t, opts.Hosts)
 		assert.NotEmpty(t, opts.Hosts)
 
-		assert.Equal(t, "192.0.2.1:80", opts.Hosts.Trie.Match("test.loadimpact.com").String())
+		assert.Equal(t, "192.0.2.1:80", opts.Hosts.Trie.Match("test.k6.com").String())
 	})
 
 	t.Run("Throws", func(t *testing.T) {
@@ -575,7 +575,7 @@ func TestOptionsEnv(t *testing.T) {
 		return p
 	}
 
-	testdata := map[struct{ Name, Key string }]map[string]interface{}{
+	testdata := map[struct{ Name, Key string }]map[string]any{
 		{"Paused", "K6_PAUSED"}: {
 			"":      null.Bool{},
 			"true":  null.BoolFrom(true),

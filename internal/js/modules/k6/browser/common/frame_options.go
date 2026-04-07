@@ -187,9 +187,6 @@ type FrameWaitForLoadStateOptions struct {
 	Timeout time.Duration `json:"timeout"`
 }
 
-// JSRegexChecker is a function that performs regex matching using JavaScript's regex engine
-type JSRegexChecker func(pattern, url string) (bool, error)
-
 type FrameWaitForNavigationOptions struct {
 	URL       string         `json:"url"`
 	WaitUntil LifecycleEvent `json:"waitUntil" js:"waitUntil"`
@@ -688,7 +685,7 @@ func (o *FrameWaitForNavigationOptions) Parse(ctx context.Context, opts sobek.Va
 			case "url":
 				var val string
 				switch opts.Get(k).ExportType() {
-				case reflect.TypeOf(string("")):
+				case reflect.TypeFor[string]():
 					val = fmt.Sprintf("'%s'", opts.Get(k).String()) // Strings require quotes
 				default: // JS Regex, CSS, numbers or booleans
 					val = opts.Get(k).String() // No quotes

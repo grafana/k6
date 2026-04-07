@@ -63,6 +63,11 @@ func (s HTTPMessageSize) Total() int64 {
 	return s.Headers + s.Body
 }
 
+// RequestFailure contains information about a failed request.
+type RequestFailure struct {
+	ErrorText string `js:"errorText"`
+}
+
 // Request represents a browser HTTP request.
 type Request struct {
 	ctx           context.Context
@@ -101,7 +106,6 @@ type Request struct {
 	timestamp         time.Time
 	wallTime          time.Time
 	responseEndTiming float64
-	vu                k6modules.VU
 }
 
 // NewRequestParams are input parameters for NewRequest.
@@ -165,7 +169,6 @@ func NewRequest(ctx context.Context, logger *log.Logger, rp NewRequestParams) (*
 		documentID:          documentID.String(),
 		headers:             make(map[string][]string, len(ev.Request.Headers)),
 		ctx:                 ctx,
-		vu:                  k6ext.GetVU(ctx),
 	}
 	for n, v := range ev.Request.Headers {
 		if s, ok := v.(string); ok {
@@ -236,6 +239,14 @@ func (r *Request) headersSize() int64 {
 
 func (r *Request) setErrorText(errorText string) {
 	r.errorText = errorText
+}
+
+// Failure returns the error text if the request failed, otherwise nil.
+func (r *Request) Failure() *RequestFailure {
+	if r.errorText == "" {
+		return nil
+	}
+	return &RequestFailure{ErrorText: r.errorText}
 }
 
 func (r *Request) setLoadedFromCache(fromMemoryCache bool) {

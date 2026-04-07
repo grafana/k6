@@ -11,8 +11,8 @@ import (
 	"unicode/utf8"
 
 	"github.com/fatih/color"
-	"github.com/grafana/xk6-dashboard/dashboard"
 	"github.com/sirupsen/logrus"
+	"go.k6.io/k6/internal/dashboard"
 	"golang.org/x/term"
 
 	"gopkg.in/yaml.v3"
@@ -122,6 +122,7 @@ func printExecutionDescription(
 	valueColor := getColor(noColor, color.FgCyan)
 
 	buf := &strings.Builder{}
+	fmt.Fprintln(buf)
 	fmt.Fprintf(buf, "     execution: %s\n", valueColor.Sprint(execution))
 	fmt.Fprintf(buf, "        script: %s\n", valueColor.Sprint(filename))
 
@@ -136,8 +137,8 @@ func printExecutionDescription(
 			case engine.IngesterDescription, lib.GroupSummaryDescription, summary.OutputName:
 				continue
 			}
-			if strings.HasPrefix(desc, dashboard.OutputName) {
-				fmt.Fprintf(buf, " web dashboard:%s\n", valueColor.Sprint(strings.TrimPrefix(desc, dashboard.OutputName)))
+			if after, ok := strings.CutPrefix(desc, dashboard.OutputName); ok {
+				fmt.Fprintf(buf, " web dashboard:%s\n", valueColor.Sprint(after))
 
 				continue
 			}
@@ -393,7 +394,7 @@ func showProgress(ctx context.Context, gs *state.GlobalState, pbs []*pb.Progress
 	}
 }
 
-func yamlPrint(w io.Writer, v interface{}) error {
+func yamlPrint(w io.Writer, v any) error {
 	data, err := yaml.Marshal(v)
 	if err != nil {
 		return fmt.Errorf("could not marshal YAML: %w", err)

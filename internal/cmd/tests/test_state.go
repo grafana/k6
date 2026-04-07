@@ -10,12 +10,14 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	_ "unsafe" //nolint:revive,nolintlint // needed for the go:linkname and nolintlint is buggy
 
 	"go.k6.io/k6/lib"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/internal/event"
 	"go.k6.io/k6/internal/lib/testutils"
@@ -40,6 +42,7 @@ type GlobalTestState struct {
 // NewGlobalTestState returns an initialized GlobalTestState, mocking all
 // GlobalState fields for use in tests.
 func NewGlobalTestState(tb testing.TB) *GlobalTestState {
+	tb.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	tb.Cleanup(cancel)
 
@@ -121,14 +124,27 @@ func NewGlobalTestState(tb testing.TB) *GlobalTestState {
 	return ts
 }
 
+// ReparseFlags reparses flags so it can take into account changes to env variables and arguments
+func (ts *GlobalTestState) ReparseFlags() {
+	defaultFlags := getFlags(ts.DefaultFlags, ts.Env, ts.CmdArgs)
+	ts.DefaultFlags = defaultFlags
+	ts.Flags = defaultFlags
+}
+
+// TODO(@mstoykov): Figure out how to not do it this way and not have more public APIs
+// Also use this for testing more of the GlobalState.Flags
+//
+//go:linkname getFlags go.k6.io/k6/cmd/state.getFlags
+func getFlags(defaultFlags state.GlobalFlags, env map[string]string, args []string) state.GlobalFlags
+
 var portRangeStart uint64 = 6565 //nolint:gochecknoglobals
 
 func getFreeBindAddr(tb testing.TB) string {
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		port := atomic.AddUint64(&portRangeStart, 1)
 		addr := net.JoinHostPort("localhost", strconv.FormatUint(port, 10))
 
-		listener, err := net.Listen("tcp", addr)
+		listener, err := (&net.ListenConfig{}).Listen(tb.Context(), "tcp", addr)
 		if err != nil {
 			continue // port was busy for some reason
 		}

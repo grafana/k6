@@ -17,7 +17,7 @@ import (
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/output"
 
-	"github.com/grafana/xk6-dashboard/dashboard"
+	"go.k6.io/k6/internal/dashboard"
 )
 
 // builtinOutput marks the available builtin outputs.
@@ -37,6 +37,7 @@ const (
 	builtinOutputKafka
 	builtinOutputStatsd
 	builtinOutputExperimentalOpentelemetry
+	builtinOutputOpentelemetry
 	builtinOutputSummary
 )
 
@@ -69,6 +70,13 @@ func getAllOutputConstructors() (map[string]output.Constructor, error) {
 		},
 		"web-dashboard": dashboard.New,
 		builtinOutputExperimentalOpentelemetry.String(): func(params output.Params) (output.Output, error) {
+			params.Logger.Warnf("OpenTelemetry output has been graduated as a stable output."+
+				"You can now use just %q instead of %q. The experimental version will be removed in future versions.",
+
+				"opentelemetry", "experimental-opentelemetry")
+			return opentelemetry.New(params)
+		},
+		builtinOutputOpentelemetry.String(): func(params output.Params) (output.Output, error) {
 			return opentelemetry.New(params)
 		},
 	}

@@ -1,7 +1,6 @@
 package js
 
 import (
-	"context"
 	"testing"
 
 	"go.k6.io/k6/lib/types"
@@ -41,8 +40,7 @@ func BenchmarkHTTPRequests(b *testing.B) {
 
 	ch := newDevNullSampleChannel()
 	defer close(ch)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := b.Context()
 	initVU, err := r.NewVU(ctx, 1, 1, ch)
 	require.NoError(b, err)
 	vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
@@ -75,8 +73,7 @@ func BenchmarkHTTPRequestsBase(b *testing.B) {
 
 	ch := newDevNullSampleChannel()
 	defer close(ch)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := b.Context()
 	initVU, err := r.NewVU(ctx, 1, 1, ch)
 	require.NoError(b, err)
 	vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})

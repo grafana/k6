@@ -116,7 +116,7 @@ func getCmdNewScript(gs *state.GlobalState) *cobra.Command {
 
 	initCmd := &cobra.Command{
 		Use:   "new [file]",
-		Short: "Create and initialize a new k6 script",
+		Short: "Create a test",
 		Long: `Create and initialize a new k6 script using one of the predefined templates.
 
 By default, the script will be named script.js unless a different name is specified.`,

@@ -6,23 +6,25 @@ import (
 	"time"
 
 	"github.com/mstoykov/envconfig"
-	"go.k6.io/k6/lib/types"
 	"gopkg.in/guregu/null.v3"
-)
 
-// LegacyCloudConfigKey is the key used in the JSON config for the cloud output.
-const LegacyCloudConfigKey = "loadimpact"
+	"go.k6.io/k6/lib/types"
+)
 
 // Config holds all the necessary data and options for sending metrics to the k6 Cloud.
 //
 //nolint:lll
 type Config struct {
 	// TODO: refactor common stuff between cloud execution and output
-	Token     null.String `json:"token" envconfig:"K6_CLOUD_TOKEN"`
-	ProjectID null.Int    `json:"projectID" envconfig:"K6_CLOUD_PROJECT_ID"`
-	Name      null.String `json:"name" envconfig:"K6_CLOUD_NAME"`
+	StackID          null.Int    `json:"stackID" envconfig:"K6_CLOUD_STACK_ID"`
+	StackURL         null.String `json:"stackURL" envconfig:"K6_CLOUD_STACK_URL"`
+	DefaultProjectID null.Int    `json:"defaultProjectID"`
+	Token            null.String `json:"token" envconfig:"K6_CLOUD_TOKEN"`
+	ProjectID        null.Int    `json:"projectID" envconfig:"K6_CLOUD_PROJECT_ID"`
+	Name             null.String `json:"name" envconfig:"K6_CLOUD_NAME"`
 
 	Host    null.String        `json:"host" envconfig:"K6_CLOUD_HOST"`
+	Hostv6  null.String        `json:"hostv6" envconfig:"K6_CLOUD_HOST_V6"` // For test purposes only
 	Timeout types.NullDuration `json:"timeout" envconfig:"K6_CLOUD_TIMEOUT"`
 
 	LogsTailURL    null.String `json:"-" envconfig:"K6_CLOUD_LOGS_TAIL_URL"`
@@ -71,6 +73,7 @@ func NewConfig() Config {
 	return Config{
 		APIVersion:            null.NewInt(2, false),
 		Host:                  null.NewString("https://ingest.k6.io", false),
+		Hostv6:                null.NewString("https://api.k6.io", false),
 		LogsTailURL:           null.NewString("wss://cloudlogs.k6.io/api/v1/tail", false),
 		WebAppURL:             null.NewString("https://app.k6.io", false),
 		MetricPushInterval:    types.NewNullDuration(1*time.Second, false),
@@ -101,8 +104,17 @@ func NewConfig() Config {
 
 // Apply saves config non-zero config values from the passed config in the receiver.
 //
-//nolint:cyclop
+//nolint:cyclop,gocognit
 func (c Config) Apply(cfg Config) Config {
+	if cfg.StackID.Valid {
+		c.StackID = cfg.StackID
+	}
+	if cfg.StackURL.Valid && !c.StackURL.Valid {
+		c.StackURL = cfg.StackURL
+	}
+	if cfg.DefaultProjectID.Valid {
+		c.DefaultProjectID = cfg.DefaultProjectID
+	}
 	if cfg.Token.Valid {
 		c.Token = cfg.Token
 	}
@@ -114,6 +126,9 @@ func (c Config) Apply(cfg Config) Config {
 	}
 	if cfg.Host.Valid && cfg.Host.String != "" {
 		c.Host = cfg.Host
+	}
+	if cfg.Hostv6.Valid && cfg.Hostv6.String != "" {
+		c.Hostv6 = cfg.Hostv6
 	}
 	if cfg.LogsTailURL.Valid && cfg.LogsTailURL.String != "" {
 		c.LogsTailURL = cfg.LogsTailURL
@@ -178,7 +193,6 @@ func GetConsolidatedConfig(
 	env map[string]string,
 	configArg string,
 	cloudConfig json.RawMessage,
-	external map[string]json.RawMessage,
 ) (Config, string, error) {
 	warn := ""
 
@@ -191,18 +205,8 @@ func GetConsolidatedConfig(
 		result = result.Apply(jsonConf)
 	}
 
-	if err := mergeFromCloudOptionAndExternal(cloudConfig, external, &result); err != nil {
+	if err := extractFromCloudOption(cloudConfig, &result); err != nil {
 		return result, warn, err
-	}
-
-	// We want to show a warning if the user is using the only old way of defining the config.
-	// Note: Since the migration to the options.cloud is a long process, this warning is planned
-	// to be emitted for a long time (1-2 years), after some point, and depending on the state
-	// of migration we could re-evaluate this warning.
-	if cloudConfig == nil && external != nil {
-		if _, ok := external[LegacyCloudConfigKey]; ok {
-			warn = "The options.ext.loadimpact option is deprecated, please use options.cloud instead"
-		}
 	}
 
 	envConfig := Config{}
@@ -222,25 +226,22 @@ func GetConsolidatedConfig(
 	return result, warn, nil
 }
 
-// mergeFromCloudOptionAndExternal merges three fields from the JSON in a cloud key of
+// extractFromCloudOption merges fields from the JSON in a cloud key of
 // the provided external map. Used for options.cloud settings.
-func mergeFromCloudOptionAndExternal(
+func extractFromCloudOption(
 	cloudConfig json.RawMessage,
-	external map[string]json.RawMessage,
 	conf *Config,
 ) error {
-	source := pickSource(cloudConfig, external)
-	if source == nil {
+	tmpConfig := Config{}
+	if cloudConfig == nil {
 		return nil
 	}
-
-	// Original comment
-	// TODO: Important! Separate configs and fix the whole 2 configs mess!
-	tmpConfig := Config{}
-	if err := json.Unmarshal(source, &tmpConfig); err != nil {
+	if err := json.Unmarshal(cloudConfig, &tmpConfig); err != nil {
 		return err
 	}
-	// Only take out the ProjectID, Name and Token from the options.cloud (or legacy loadimpact struct) map:
+
+	// Only merge ProjectID, Name, Token, and StackID from options.
+	// StackURL and DefaultProjectID can only be set via login.
 	if tmpConfig.ProjectID.Valid {
 		conf.ProjectID = tmpConfig.ProjectID
 	}
@@ -250,6 +251,9 @@ func mergeFromCloudOptionAndExternal(
 	if tmpConfig.Token.Valid {
 		conf.Token = tmpConfig.Token
 	}
+	if tmpConfig.StackID.Valid {
+		conf.StackID = tmpConfig.StackID
+	}
 
 	return nil
 }
@@ -257,47 +261,23 @@ func mergeFromCloudOptionAndExternal(
 // GetTemporaryCloudConfig returns a temporary cloud config.
 // Original comment
 // TODO: Fix this
-// We reuse cloud.Config for parsing options.cloud (or legacy loadimpact struct), but this probably shouldn't be
-// done, as the idea of options.ext is that they are extensible without touching k6. But in
+// We reuse cloud.Config for parsing options.cloud, but this probably shouldn't be
+// done, as the idea of options.cloud is that they are extensible without touching k6. But in
 // order for this to happen, we shouldn't actually marshal cloud.Config on top of it, because
 // it will be missing some fields that aren't actually mentioned in the struct.
 // So in order for use to copy the fields that we need for k6 cloud's api we unmarshal in
-// map[string]interface{} and copy what we need if it isn't set already
-func GetTemporaryCloudConfig(
-	cloudConfig json.RawMessage,
-	external map[string]json.RawMessage,
-) (map[string]interface{}, error) {
-	tmpCloudConfig := make(map[string]interface{}, 3)
+// map[string]any and copy what we need if it isn't set already
+func GetTemporaryCloudConfig(cloudConfig json.RawMessage) (map[string]any, error) {
+	tmpCloudConfig := make(map[string]any, 3)
 
-	source := pickSource(cloudConfig, external)
-	if source == nil {
+	if cloudConfig == nil {
 		return tmpCloudConfig, nil
 	}
-
-	dec := json.NewDecoder(bytes.NewReader(source))
+	dec := json.NewDecoder(bytes.NewReader(cloudConfig))
 	dec.UseNumber() // otherwise float64 are used
 	if err := dec.Decode(&tmpCloudConfig); err != nil {
 		return nil, err
 	}
 
 	return tmpCloudConfig, nil
-}
-
-// pickSource returns the config source to use.
-func pickSource(
-	cloudConfig json.RawMessage,
-	external map[string]json.RawMessage,
-) json.RawMessage {
-	// priority is the new way of defining the config
-	// via options.cloud
-	if cloudConfig != nil {
-		return cloudConfig
-	}
-
-	// fallback to the old way of defining the config
-	if val, ok := external[LegacyCloudConfigKey]; ok {
-		return val
-	}
-
-	return nil
 }

@@ -10,7 +10,8 @@ func TestBuiltinOutputString(t *testing.T) {
 	t.Parallel()
 	exp := []string{
 		"cloud", "csv", "datadog", "experimental-prometheus-rw",
-		"influxdb", "json", "kafka", "statsd", "experimental-opentelemetry",
+		"influxdb", "json", "kafka", "statsd",
+		"experimental-opentelemetry", "opentelemetry",
 		"summary",
 	}
 	assert.Equal(t, exp, builtinOutputStrings())

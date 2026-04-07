@@ -5,15 +5,13 @@ import (
 )
 
 // mapConsoleMessage to the JS module.
-func mapConsoleMessage(vu moduleVU, event common.PageOnEvent) mapping {
+func mapConsoleMessage(vu moduleVU, event common.PageEvent) mapping {
 	cm := event.ConsoleMessage
 
 	return mapping{
 		"args": func() []mapping {
-			var (
-				margs []mapping
-				args  = cm.Args
-			)
+			args := cm.Args
+			margs := make([]mapping, 0, len(args))
 			for _, arg := range args {
 				a := mapJSHandle(vu, arg)
 				margs = append(margs, a)

@@ -706,7 +706,8 @@ func (c *linkerContext) generateChunksInParallel(additionalFiles []graph.OutputF
 					AbsPath:  c.fs.Join(c.options.AbsOutputDir, finalRelPathForLegalComments),
 					Contents: chunk.externalLegalComments,
 					JSONMetadataChunk: fmt.Sprintf(
-						"{\n      \"imports\": [],\n      \"exports\": [],\n      \"inputs\": {},\n      \"bytes\": %d\n    }", len(chunk.externalLegalComments)),
+						c.options.MetafileFormat.MaybeRemoveWhitespace("{\n      \"imports\": [],\n      \"exports\": [],\n      \"inputs\": {},\n      \"bytes\": %d\n    }"),
+						len(chunk.externalLegalComments)),
 				})
 			}
 
@@ -744,7 +745,8 @@ func (c *linkerContext) generateChunksInParallel(additionalFiles []graph.OutputF
 						AbsPath:  c.fs.Join(c.options.AbsOutputDir, finalRelPathForSourceMap),
 						Contents: outputSourceMap,
 						JSONMetadataChunk: fmt.Sprintf(
-							"{\n      \"imports\": [],\n      \"exports\": [],\n      \"inputs\": {},\n      \"bytes\": %d\n    }", len(outputSourceMap)),
+							c.options.MetafileFormat.MaybeRemoveWhitespace("{\n      \"imports\": [],\n      \"exports\": [],\n      \"inputs\": {},\n      \"bytes\": %d\n    }"),
+							len(outputSourceMap)),
 					})
 				}
 			}
@@ -3773,7 +3775,7 @@ func importConditionsAreEqual(a []css_ast.ImportConditions, b []css_ast.ImportCo
 		bi := b[i]
 		if !css_ast.TokensEqualIgnoringWhitespace(ai.Layers, bi.Layers) ||
 			!css_ast.TokensEqualIgnoringWhitespace(ai.Supports, bi.Supports) ||
-			!css_ast.TokensEqualIgnoringWhitespace(ai.Media, bi.Media) {
+			!css_ast.MediaQueriesEqualIgnoringWhitespace(ai.Queries, bi.Queries) {
 			return false
 		}
 	}
@@ -3821,7 +3823,7 @@ func isConditionalImportRedundant(earlier []css_ast.ImportConditions, later []cs
 		// Only compare "@supports" and "@media" if "@layers" is equal
 		if css_ast.TokensEqualIgnoringWhitespace(a.Layers, b.Layers) {
 			sameSupports := css_ast.TokensEqualIgnoringWhitespace(a.Supports, b.Supports)
-			sameMedia := css_ast.TokensEqualIgnoringWhitespace(a.Media, b.Media)
+			sameMedia := css_ast.MediaQueriesEqualIgnoringWhitespace(a.Queries, b.Queries)
 
 			// If the import conditions are exactly equal, then only keep
 			// the later one. The earlier one is redundant. Example:
@@ -3854,7 +3856,7 @@ func isConditionalImportRedundant(earlier []css_ast.ImportConditions, later []cs
 			//   @import "foo.css" layer(abc) supports(display: flex);
 			//
 			// The later one makes the earlier one redundant.
-			if sameSupports && len(b.Media) == 0 {
+			if sameSupports && len(b.Queries) == 0 {
 				continue
 			}
 		}
@@ -4467,10 +4469,7 @@ func (c *linkerContext) convertStmtsForChunk(sourceIndex uint32, stmtList *stmtL
 
 			if c.options.UnsupportedJSFeatures.Has(compat.ArbitraryModuleNamespaceNames) {
 				for _, item := range s.Items {
-					c.maybeForbidArbitraryModuleNamespaceIdentifier("export", sourceIndex, item.AliasLoc, item.Alias)
-					if item.AliasLoc != item.Name.Loc {
-						c.maybeForbidArbitraryModuleNamespaceIdentifier("import", sourceIndex, item.Name.Loc, item.OriginalName)
-					}
+					c.maybeForbidArbitraryModuleNamespaceIdentifier("import", sourceIndex, item.Name.Loc, item.OriginalName)
 				}
 			}
 
@@ -4484,6 +4483,12 @@ func (c *linkerContext) convertStmtsForChunk(sourceIndex uint32, stmtList *stmtL
 					Items:             &s.Items,
 					ImportRecordIndex: s.ImportRecordIndex,
 					IsSingleLine:      s.IsSingleLine,
+				}
+			} else if c.options.UnsupportedJSFeatures.Has(compat.ArbitraryModuleNamespaceNames) {
+				for _, item := range s.Items {
+					if item.AliasLoc != item.Name.Loc {
+						c.maybeForbidArbitraryModuleNamespaceIdentifier("export", sourceIndex, item.AliasLoc, item.Alias)
+					}
 				}
 			}
 
@@ -4965,6 +4970,7 @@ func (c *linkerContext) generateCodeForFileInChunkJS(
 		RequireOrImportMetaForSource: c.requireOrImportMetaForSource,
 		MangledProps:                 c.mangledProps,
 		NeedsMetafile:                c.options.NeedsMetafile,
+		MetafileFormat:               c.options.MetafileFormat,
 	}
 	tree := repr.AST
 	tree.Directives = nil // This is handled elsewhere
@@ -4975,7 +4981,8 @@ func (c *linkerContext) generateCodeForFileInChunkJS(
 	}
 
 	if file.InputFile.Loader == config.LoaderFile {
-		result.JSONMetadataImports = append(result.JSONMetadataImports, fmt.Sprintf("\n        {\n          \"path\": %s,\n          \"kind\": \"file-loader\"\n        }",
+		result.JSONMetadataImports = append(result.JSONMetadataImports, fmt.Sprintf(
+			c.options.MetafileFormat.MaybeRemoveWhitespace("\n        {\n          \"path\": %s,\n          \"kind\": \"file-loader\"\n        }"),
 			helpers.QuoteForJSON(file.InputFile.UniqueKeyForAdditionalFile, c.options.ASCIIOnly)))
 	}
 
@@ -5627,6 +5634,7 @@ func (c *linkerContext) generateChunkJS(chunkIndex int, chunkWaitGroup *sync.Wai
 			MinifySyntax:      c.options.MinifySyntax,
 			LineLimit:         c.options.LineLimit,
 			NeedsMetafile:     c.options.NeedsMetafile,
+			MetafileFormat:    c.options.MetafileFormat,
 		}
 		crossChunkImportRecords := make([]ast.ImportRecord, len(chunk.crossChunkImports))
 		for i, chunkImport := range chunk.crossChunkImports {
@@ -5742,7 +5750,7 @@ func (c *linkerContext) generateChunkJS(chunkIndex int, chunkWaitGroup *sync.Wai
 	if c.options.NeedsMetafile {
 		// Print imports
 		isFirstMeta := true
-		jMeta.AddString("{\n      \"imports\": [")
+		jMeta.AddString(c.options.MetafileFormat.MaybeRemoveWhitespace("{\n      \"imports\": ["))
 		for _, json := range jsonMetadataImports {
 			if isFirstMeta {
 				isFirstMeta = false
@@ -5762,11 +5770,11 @@ func (c *linkerContext) generateChunkJS(chunkIndex int, chunkWaitGroup *sync.Wai
 			}
 		}
 		if !isFirstMeta {
-			jMeta.AddString("\n      ")
+			jMeta.AddString(c.options.MetafileFormat.MaybeRemoveWhitespace("\n      "))
 		}
 
 		// Print exports
-		jMeta.AddString("],\n      \"exports\": [")
+		jMeta.AddString(c.options.MetafileFormat.MaybeRemoveWhitespace("],\n      \"exports\": ["))
 		var aliases []string
 		if c.options.OutputFormat.KeepESMImportExportSyntax() {
 			if chunk.isEntryPoint {
@@ -5794,21 +5802,22 @@ func (c *linkerContext) generateChunkJS(chunkIndex int, chunkWaitGroup *sync.Wai
 			} else {
 				jMeta.AddString(",")
 			}
-			jMeta.AddString(fmt.Sprintf("\n        %s",
+			jMeta.AddString(fmt.Sprintf(
+				c.options.MetafileFormat.MaybeRemoveWhitespace("\n        %s"),
 				helpers.QuoteForJSON(alias, c.options.ASCIIOnly)))
 		}
 		if !isFirstMeta {
-			jMeta.AddString("\n      ")
+			jMeta.AddString(c.options.MetafileFormat.MaybeRemoveWhitespace("\n      "))
 		}
-		jMeta.AddString("],\n")
+		jMeta.AddString(c.options.MetafileFormat.MaybeRemoveWhitespace("],\n"))
 		if chunk.isEntryPoint {
 			entryPoint := c.graph.Files[chunk.sourceIndex].InputFile.Source.PrettyPaths.Select(c.options.MetafilePathStyle)
-			jMeta.AddString(fmt.Sprintf("      \"entryPoint\": %s,\n", helpers.QuoteForJSON(entryPoint, c.options.ASCIIOnly)))
+			jMeta.AddString(fmt.Sprintf(c.options.MetafileFormat.MaybeRemoveWhitespace("      \"entryPoint\": %s,\n"), helpers.QuoteForJSON(entryPoint, c.options.ASCIIOnly)))
 		}
 		if chunkRepr.hasCSSChunk {
-			jMeta.AddString(fmt.Sprintf("      \"cssBundle\": %s,\n", helpers.QuoteForJSON(c.chunks[chunkRepr.cssChunkIndex].uniqueKey, c.options.ASCIIOnly)))
+			jMeta.AddString(fmt.Sprintf(c.options.MetafileFormat.MaybeRemoveWhitespace("      \"cssBundle\": %s,\n"), helpers.QuoteForJSON(c.chunks[chunkRepr.cssChunkIndex].uniqueKey, c.options.ASCIIOnly)))
 		}
-		jMeta.AddString("      \"inputs\": {")
+		jMeta.AddString(c.options.MetafileFormat.MaybeRemoveWhitespace("      \"inputs\": {"))
 	}
 
 	// Concatenate the generated JavaScript chunks together
@@ -5969,14 +5978,15 @@ func (c *linkerContext) generateChunkJS(chunkIndex int, chunkWaitGroup *sync.Wai
 				for _, output := range pieces[i] {
 					count += c.accurateFinalByteCount(output, finalRelDir)
 				}
-				jMeta.AddString(fmt.Sprintf("\n        %s: {\n          \"bytesInOutput\": %d\n        %s}",
+				jMeta.AddString(fmt.Sprintf(
+					c.options.MetafileFormat.MaybeRemoveWhitespace("\n        %s: {\n          \"bytesInOutput\": %d\n        %s}"),
 					helpers.QuoteForJSON(c.graph.Files[sourceIndex].InputFile.Source.PrettyPaths.Select(c.options.MetafilePathStyle), c.options.ASCIIOnly),
 					count, c.generateExtraDataForFileJS(sourceIndex)))
 			}
 			if len(metaOrder) > 0 {
-				jMeta.AddString("\n      ")
+				jMeta.AddString(c.options.MetafileFormat.MaybeRemoveWhitespace("\n      "))
 			}
-			jMeta.AddString(fmt.Sprintf("},\n      \"bytes\": %d\n    }", finalOutputSize))
+			jMeta.AddString(fmt.Sprintf(c.options.MetafileFormat.MaybeRemoveWhitespace("},\n      \"bytes\": %d\n    }"), finalOutputSize))
 			return jMeta
 		}
 	}
@@ -6110,9 +6120,9 @@ func (c *linkerContext) generateChunkCSS(chunkIndex int, chunkWaitGroup *sync.Wa
 	// in parallel, and must be done from the last rule to the first rule.
 	timer.Begin("Prepare CSS ASTs")
 	asts := make([]css_ast.AST, len(chunkRepr.importsInChunkInOrder))
-	var remover css_parser.DuplicateRuleRemover
+	var remover css_parser.DeadRuleRemover
 	if c.options.MinifySyntax {
-		remover = css_parser.MakeDuplicateRuleMangler(c.graph.Symbols)
+		remover = css_parser.MakeDeadRuleMangler(c.graph.Symbols)
 	}
 	for i := len(chunkRepr.importsInChunkInOrder) - 1; i >= 0; i-- {
 		entry := chunkRepr.importsInChunkInOrder[i]
@@ -6208,7 +6218,7 @@ func (c *linkerContext) generateChunkCSS(chunkIndex int, chunkWaitGroup *sync.Wa
 
 			// Remove top-level duplicate rules across files
 			if c.options.MinifySyntax {
-				rules = remover.RemoveDuplicateRulesInPlace(entry.sourceIndex, rules, ast.ImportRecords)
+				rules = remover.RemoveDeadRulesInPlace(entry.sourceIndex, rules, ast.ImportRecords)
 			}
 
 			ast.Rules = rules
@@ -6232,6 +6242,7 @@ func (c *linkerContext) generateChunkCSS(chunkIndex int, chunkWaitGroup *sync.Wa
 				SourceMap:           c.options.SourceMap,
 				UnsupportedFeatures: c.options.UnsupportedCSSFeatures,
 				NeedsMetafile:       c.options.NeedsMetafile,
+				MetafileFormat:      c.options.MetafileFormat,
 				LocalNames:          c.mangledProps,
 			}
 
@@ -6288,6 +6299,7 @@ func (c *linkerContext) generateChunkCSS(chunkIndex int, chunkWaitGroup *sync.Wa
 				LineLimit:        c.options.LineLimit,
 				ASCIIOnly:        c.options.ASCIIOnly,
 				NeedsMetafile:    c.options.NeedsMetafile,
+				MetafileFormat:   c.options.MetafileFormat,
 			})
 			jsonMetadataImports = result.JSONMetadataImports
 			if len(result.CSS) > 0 {
@@ -6302,7 +6314,7 @@ func (c *linkerContext) generateChunkCSS(chunkIndex int, chunkWaitGroup *sync.Wa
 	jMeta := helpers.Joiner{}
 	if c.options.NeedsMetafile {
 		isFirstMeta := true
-		jMeta.AddString("{\n      \"imports\": [")
+		jMeta.AddString(c.options.MetafileFormat.MaybeRemoveWhitespace("{\n      \"imports\": ["))
 		for _, json := range jsonMetadataImports {
 			if isFirstMeta {
 				isFirstMeta = false
@@ -6322,7 +6334,7 @@ func (c *linkerContext) generateChunkCSS(chunkIndex int, chunkWaitGroup *sync.Wa
 			}
 		}
 		if !isFirstMeta {
-			jMeta.AddString("\n      ")
+			jMeta.AddString(c.options.MetafileFormat.MaybeRemoveWhitespace("\n      "))
 		}
 		if chunk.isEntryPoint {
 			file := &c.graph.Files[chunk.sourceIndex]
@@ -6331,13 +6343,14 @@ func (c *linkerContext) generateChunkCSS(chunkIndex int, chunkWaitGroup *sync.Wa
 			// importing CSS into JavaScript. We want this to be a 1:1 relationship
 			// and there is already an output file for the JavaScript entry point.
 			if _, ok := file.InputFile.Repr.(*graph.CSSRepr); ok {
-				jMeta.AddString(fmt.Sprintf("],\n      \"entryPoint\": %s,\n      \"inputs\": {",
+				jMeta.AddString(fmt.Sprintf(
+					c.options.MetafileFormat.MaybeRemoveWhitespace("],\n      \"entryPoint\": %s,\n      \"inputs\": {"),
 					helpers.QuoteForJSON(file.InputFile.Source.PrettyPaths.Select(c.options.MetafilePathStyle), c.options.ASCIIOnly)))
 			} else {
-				jMeta.AddString("],\n      \"inputs\": {")
+				jMeta.AddString(c.options.MetafileFormat.MaybeRemoveWhitespace("],\n      \"inputs\": {"))
 			}
 		} else {
-			jMeta.AddString("],\n      \"inputs\": {")
+			jMeta.AddString(c.options.MetafileFormat.MaybeRemoveWhitespace("],\n      \"inputs\": {"))
 		}
 	}
 
@@ -6440,14 +6453,15 @@ func (c *linkerContext) generateChunkCSS(chunkIndex int, chunkWaitGroup *sync.Wa
 				} else {
 					jMeta.AddString(",")
 				}
-				jMeta.AddString(fmt.Sprintf("\n        %s: {\n          \"bytesInOutput\": %d\n        }",
+				jMeta.AddString(fmt.Sprintf(
+					c.options.MetafileFormat.MaybeRemoveWhitespace("\n        %s: {\n          \"bytesInOutput\": %d\n        }"),
 					helpers.QuoteForJSON(c.graph.Files[compileResult.sourceIndex.GetIndex()].InputFile.Source.PrettyPaths.Select(c.options.MetafilePathStyle), c.options.ASCIIOnly),
 					c.accurateFinalByteCount(pieces[i], finalRelDir)))
 			}
 			if len(compileResults) > 0 {
-				jMeta.AddString("\n      ")
+				jMeta.AddString(c.options.MetafileFormat.MaybeRemoveWhitespace("\n      "))
 			}
-			jMeta.AddString(fmt.Sprintf("},\n      \"bytes\": %d\n    }", finalOutputSize))
+			jMeta.AddString(fmt.Sprintf(c.options.MetafileFormat.MaybeRemoveWhitespace("},\n      \"bytes\": %d\n    }"), finalOutputSize))
 			return jMeta
 		}
 	}
@@ -6505,12 +6519,11 @@ func wrapRulesWithConditions(
 
 		// Generate "@media" wrappers. This is not done if the rule block is
 		// empty because empty "@media" rules have no effect.
-		if len(rules) > 0 && len(item.Media) > 0 {
-			var prelude []css_ast.Token
-			prelude, importRecords = css_ast.CloneTokensWithImportRecords(item.Media, conditionImportRecords, nil, importRecords)
-			rules = []css_ast.Rule{{Data: &css_ast.RKnownAt{
-				AtToken: "media",
-				Prelude: prelude,
+		if len(rules) > 0 && len(item.Queries) > 0 {
+			var queries []css_ast.MediaQuery
+			queries, importRecords = css_ast.CloneMediaQueriesWithImportRecords(item.Queries, conditionImportRecords, nil, importRecords)
+			rules = []css_ast.Rule{{Data: &css_ast.RAtMedia{
+				Queries: queries,
 				Rules:   rules,
 			}}}
 		}

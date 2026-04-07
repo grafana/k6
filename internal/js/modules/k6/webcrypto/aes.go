@@ -128,7 +128,7 @@ func (aka AESKeyAlgorithm) alg() string {
 }
 
 // exportAESKey exports an AES key to its raw representation.
-func exportAESKey(key *CryptoKey, format KeyFormat) (interface{}, error) {
+func exportAESKey(key *CryptoKey, format KeyFormat) (any, error) {
 	if !key.Extractable {
 		return nil, NewError(InvalidAccessError, "the key is not extractable")
 	}
@@ -159,6 +159,29 @@ func exportAESKey(key *CryptoKey, format KeyFormat) (interface{}, error) {
 	}
 }
 
+// AESGetLengthParams is the parameters required for algorithms to run the GetLength Operation
+type AESGetLengthParams struct {
+	Algorithm
+	Length int
+}
+
+func newAESGetLengthParams(rt *sobek.Runtime, normalized Algorithm, params sobek.Value) (*AESGetLengthParams, error) {
+	length, err := traverseObject(rt, params, "length")
+	if err != nil {
+		return nil, NewError(OperationError, "aes length parameter not specified")
+	}
+
+	return &AESGetLengthParams{
+		Algorithm: normalized,
+		Length:    int(length.ToInteger()),
+	}, nil
+}
+
+// GetKeyLength represents the AES function that get the key length from the AES params
+func (kgl AESGetLengthParams) GetKeyLength() int {
+	return kgl.Length
+}
+
 // AESImportParams is an internal placeholder struct for AES import parameters.
 // Although not described by the specification, we define it to be able to implement
 // our internal KeyImporter interface.
@@ -177,6 +200,7 @@ func newAESImportParams(normalized Algorithm) *AESImportParams {
 func (aip *AESImportParams) ImportKey(
 	format KeyFormat,
 	keyData []byte,
+	_ bool,
 	keyUsages []CryptoKeyUsage,
 ) (*CryptoKey, error) {
 	for _, usage := range keyUsages {
@@ -652,7 +676,7 @@ func pKCS7Pad(plaintext []byte, blockSize int) ([]byte, error) {
 
 	l := len(plaintext)
 	padding := blockSize - (l % blockSize)
-	paddingText := bytes.Repeat([]byte{byte(padding)}, padding)
+	paddingText := bytes.Repeat([]byte{byte(padding)}, padding) //nolint:gosec
 	return append(plaintext, paddingText...), nil
 }
 

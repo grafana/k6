@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/ext"
 	"go.k6.io/k6/internal/build"
@@ -16,6 +17,7 @@ import (
 const (
 	commitKey      = "commit"
 	commitDirtyKey = "commit_dirty"
+	mainK6Path     = "go.k6.io/k6"
 )
 
 // fullVersion returns the maximally full version and build information for
@@ -44,13 +46,13 @@ func fullVersion() string {
 }
 
 // versionDetails returns the structured details about version
-func versionDetails() map[string]interface{} {
+func versionDetails() map[string]any {
 	v := build.Version
 	if !strings.HasPrefix(v, "v") {
 		v = "v" + v
 	}
 
-	details := map[string]interface{}{
+	details := map[string]any{
 		"version":    v,
 		"go_version": runtime.Version(),
 		"go_os":      runtime.GOOS,
@@ -62,33 +64,31 @@ func versionDetails() map[string]interface{} {
 		return details
 	}
 
-	var (
-		commit string
-		dirty  bool
-	)
-	for _, s := range buildInfo.Settings {
-		switch s.Key {
-		case "vcs.revision":
-			commitLen := 10
-			if len(s.Value) < commitLen {
-				commitLen = len(s.Value)
-			}
-			commit = s.Value[:commitLen]
-		case "vcs.modified":
-			if s.Value == "true" {
-				dirty = true
-			}
-		default:
+	if buildInfo.Main.Path == mainK6Path {
+		details["version"] = buildInfo.Main.Version
+		if buildInfo.Main.Version == "(devel)" {
+			details["version"] = v
+			details[commitKey] = "devel"
 		}
-	}
-
-	if commit == "" {
-		return details
-	}
-
-	details[commitKey] = commit
-	if dirty {
-		details[commitDirtyKey] = true
+		for _, s := range buildInfo.Settings {
+			switch s.Key {
+			case "vcs.revision":
+				commitLen := min(len(s.Value), 10)
+				details[commitKey] = s.Value[:commitLen]
+			case "vcs.modified":
+				if s.Value == "true" {
+					details[commitDirtyKey] = true
+				}
+			default:
+			}
+		}
+	} else {
+		for _, dep := range buildInfo.Deps {
+			if dep.Path == mainK6Path {
+				details["version"] = dep.Version
+				break
+			}
+		}
 	}
 
 	return details
@@ -108,6 +108,61 @@ func versionString() string {
 	return v
 }
 
+// versionDetailsWithExtensions returns the structured details about version including extensions
+// returns error if there are unhandled extension types
+func versionDetailsWithExtensions(exts []*ext.Extension) (map[string]any, error) {
+	details := versionDetails()
+
+	if len(exts) == 0 {
+		return details, nil
+	}
+
+	// extInfo represents the JSON structure for an extension in the version details
+	// modeled after k6 extension registry structure
+	type extInfo struct {
+		Module  string   `json:"module"`
+		Version string   `json:"version"`
+		Imports []string `json:"imports,omitempty"`
+		Outputs []string `json:"outputs,omitempty"`
+	}
+
+	infoList := make([]*extInfo, 0, len(exts))
+	infoMap := make(map[string]*extInfo)
+
+	for _, e := range exts {
+		key := e.Path + "@" + e.Version
+
+		info, found := infoMap[key]
+		if !found {
+			info = &extInfo{
+				Module:  e.Path,
+				Version: e.Version,
+			}
+
+			infoMap[key] = info
+			infoList = append(infoList, info)
+		}
+
+		switch e.Type {
+		case ext.OutputExtension:
+			info.Outputs = append(info.Outputs, e.Name)
+		case ext.JSExtension:
+			info.Imports = append(info.Imports, e.Name)
+		case ext.SecretSourceExtension:
+			// currently, no special handling is needed for secret source extensions
+		case ext.SubcommandExtension:
+			// currently, no special handling is needed for subcommand extensions
+		default:
+			// report unhandled extension type for future proofing
+			return details, fmt.Errorf("unhandled extension type: %s", e.Type)
+		}
+	}
+
+	details["extensions"] = infoList
+
+	return details, nil
+}
+
 type versionCmd struct {
 	gs     *state.GlobalState
 	isJSON bool
@@ -121,37 +176,9 @@ func (c *versionCmd) run(cmd *cobra.Command, _ []string) error {
 		return nil
 	}
 
-	details := versionDetails()
-	if exts := ext.GetAll(); len(exts) > 0 {
-		type extInfo struct {
-			Module  string   `json:"module"`
-			Version string   `json:"version"`
-			Imports []string `json:"imports"`
-		}
-
-		ext := make(map[string]extInfo)
-		for _, e := range exts {
-			key := e.Path + "@" + e.Version
-
-			if v, ok := ext[key]; ok {
-				v.Imports = append(v.Imports, e.Name)
-				ext[key] = v
-				continue
-			}
-
-			ext[key] = extInfo{
-				Module:  e.Path,
-				Version: e.Version,
-				Imports: []string{e.Name},
-			}
-		}
-
-		list := make([]extInfo, 0, len(ext))
-		for _, v := range ext {
-			list = append(list, v)
-		}
-
-		details["extensions"] = list
+	details, err := versionDetailsWithExtensions(ext.GetAll())
+	if err != nil {
+		return fmt.Errorf("failed to get version details with extensions: %w", err)
 	}
 
 	if err := json.NewEncoder(c.gs.Stdout).Encode(details); err != nil {
@@ -165,10 +192,11 @@ func getCmdVersion(gs *state.GlobalState) *cobra.Command {
 	versionCmd := &versionCmd{gs: gs}
 
 	cmd := &cobra.Command{
-		Use:   "version",
-		Short: "Show application version",
-		Long:  `Show the application version and exit.`,
-		RunE:  versionCmd.run,
+		Use:    "version",
+		Short:  "Show application version",
+		Long:   `Show the application version and exit.`,
+		Hidden: true,
+		RunE:   versionCmd.run,
 	}
 
 	cmd.Flags().BoolVar(&versionCmd.isJSON, "json", false, "if set, output version information will be in JSON format")

@@ -58,17 +58,16 @@ type Output struct {
 
 // New creates a new cloud output.
 func New(logger logrus.FieldLogger, conf cloudapi.Config, _ *cloudapi.Client) (*Output, error) {
+	// TODO: move this creation operation to the centralized output. Reducing the probability to
+	// break the logic for the config overwriting.
+	//
+	// It creates a new client because in the case the backend has overwritten
+	// the config we need to use the new set.
 	return &Output{
 		config: conf,
 		logger: logger.WithField("output", "cloudv2"),
 		abort:  make(chan struct{}),
 		stop:   make(chan struct{}),
-
-		// TODO: move this creation operation to the centralized output. Reducing the probability to
-		// break the logic for the config overwriting.
-		//
-		// It creates a new client because in the case the backend has overwritten
-		// the config we need to use the new set.
 		cloudClient: cloudapi.NewClient(
 			logger, conf.Token.String, conf.Host.String, build.Version, conf.Timeout.TimeDuration()),
 	}, nil
@@ -229,10 +228,7 @@ func (o *Output) AddMetricSamples(s []metrics.SampleContainer) {
 }
 
 func (o *Output) periodicInvoke(d time.Duration, callback func()) {
-	o.wg.Add(1)
-	go func() {
-		defer o.wg.Done()
-
+	o.wg.Go(func() {
 		t := time.NewTicker(d)
 		defer t.Stop()
 		for {
@@ -245,7 +241,7 @@ func (o *Output) periodicInvoke(d time.Duration, callback func()) {
 				return
 			}
 		}
-	}()
+	})
 }
 
 func (o *Output) collectSamples() {
@@ -274,9 +270,7 @@ func (o *Output) runFlushRequestMetadatas() {
 	t := time.NewTicker(o.config.TracesPushInterval.TimeDuration())
 
 	for i := int64(0); i < o.config.TracesPushConcurrency.Int64; i++ {
-		o.wg.Add(1)
-		go func() {
-			defer o.wg.Done()
+		o.wg.Go(func() {
 			defer t.Stop()
 
 			for {
@@ -289,7 +283,7 @@ func (o *Output) runFlushRequestMetadatas() {
 					return
 				}
 			}
-		}()
+		})
 	}
 }
 

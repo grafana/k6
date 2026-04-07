@@ -47,7 +47,7 @@ func WithNotify(n Notify) RetryOption {
 	}
 }
 
-// WithMaxTries limits the number of retry attempts.
+// WithMaxTries limits the number of all attempts.
 func WithMaxTries(n uint) RetryOption {
 	return func(args *retryOptions) {
 		args.MaxTries = n
@@ -97,7 +97,7 @@ func Retry[T any](ctx context.Context, operation Operation[T], opts ...RetryOpti
 		// Handle permanent errors without retrying.
 		var permanent *PermanentError
 		if errors.As(err, &permanent) {
-			return res, err
+			return res, permanent.Unwrap()
 		}
 
 		// Stop retrying if context is cancelled.

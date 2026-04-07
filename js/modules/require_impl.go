@@ -3,6 +3,7 @@ package modules
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"net/url"
 	"strings"
 
@@ -13,8 +14,10 @@ import (
 
 // Require is the actual call that implements require
 func (ms *ModuleSystem) Require(specifier string) (*sobek.Object, error) {
-	if err := ms.resolver.usage.Uint64("usage/require", 1); err != nil {
-		ms.resolver.logger.WithError(err).Warn("couldn't report usage")
+	if !ms.resolver.locked {
+		if err := ms.resolver.usage.Uint64("usage/require", 1); err != nil {
+			ms.resolver.logger.WithError(err).Warn("couldn't report usage")
+		}
 	}
 
 	if specifier == "" {
@@ -162,7 +165,7 @@ func (ms *ModuleSystem) ShouldWarnOnParentDirNotMatchingCurrentModuleParentDir(v
 	return "", false
 }
 
-func toESModuleExports(exp Exports) interface{} {
+func toESModuleExports(exp Exports) any {
 	if exp.Named == nil {
 		return exp.Default
 	}
@@ -170,11 +173,9 @@ func toESModuleExports(exp Exports) interface{} {
 		return exp.Named
 	}
 
-	result := make(map[string]interface{}, len(exp.Named)+2)
+	result := make(map[string]any, len(exp.Named)+2)
 
-	for k, v := range exp.Named {
-		result[k] = v
-	}
+	maps.Copy(result, exp.Named)
 	result[jsDefaultExportIdentifier] = exp.Default
 	// This is to interop with any code that is transpiled by Babel or any similar tool.
 	result["__esModule"] = true

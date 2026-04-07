@@ -1,27 +1,14 @@
 package browser
 
 import (
-	"context"
 	"errors"
 	"fmt"
 
 	"github.com/grafana/sobek"
-	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/common"
-	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
 	k6common "go.k6.io/k6/js/common"
 )
-
-func cancelableTaskQueue(ctx context.Context, registerCallback func() func(func() error)) *taskqueue.TaskQueue {
-	tq := taskqueue.New(registerCallback)
-
-	go func() {
-		<-ctx.Done()
-		tq.Close()
-	}()
-	return tq
-}
 
 // mapFrame to the JS module.
 //
@@ -34,15 +21,13 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing new frame check options: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, f.Check(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
 		"childFrames": func() []mapping {
-			var (
-				mcfs []mapping
-				cfs  = f.ChildFrames()
-			)
+			cfs := f.ChildFrames()
+			mcfs := make([]mapping, 0, len(cfs))
 			for _, fr := range cfs {
 				mcfs = append(mcfs, mapFrame(vu, fr))
 			}
@@ -54,13 +39,13 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				return nil, err
 			}
 
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				err := f.Click(selector, popts)
 				return nil, err //nolint:wrapcheck
 			}), nil
 		},
 		"content": func() *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return f.Content() //nolint:wrapcheck
 			})
 		},
@@ -69,7 +54,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing double click options: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, f.Dblclick(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -79,7 +64,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				return nil, fmt.Errorf("parsing frame dispatch event options: %w", err)
 			}
 			earg := exportArg(eventInit)
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, f.DispatchEvent(selector, typ, earg, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -87,16 +72,20 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			if sobekEmptyString(pageFunc) {
 				return nil, fmt.Errorf("evaluate requires a page function")
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return f.Evaluate(pageFunc.String(), exportArgs(gargs)...)
+			funcString := pageFunc.String()
+			gopts := exportArgs(gargs)
+			return promise(vu, func() (any, error) {
+				return f.Evaluate(funcString, gopts...)
 			}), nil
 		},
 		"evaluateHandle": func(pageFunc sobek.Value, gargs ...sobek.Value) (*sobek.Promise, error) {
 			if sobekEmptyString(pageFunc) {
 				return nil, fmt.Errorf("evaluateHandle requires a page function")
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
-				jsh, err := f.EvaluateHandle(pageFunc.String(), exportArgs(gargs)...)
+			funcString := pageFunc.String()
+			gopts := exportArgs(gargs)
+			return promise(vu, func() (any, error) {
+				jsh, err := f.EvaluateHandle(funcString, gopts...)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
 				}
@@ -108,7 +97,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing fill options: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, f.Fill(selector, value, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -117,12 +106,12 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing focus options: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, f.Focus(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
 		"frameElement": func() *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				fe, err := f.FrameElement()
 				if err != nil {
 					return nil, err //nolint:wrapcheck
@@ -135,7 +124,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing getAttribute options: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				s, ok, err := f.GetAttribute(selector, name, popts)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
@@ -217,7 +206,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			if err := gopts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing frame navigation options to %q: %w", url, err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				resp, err := f.Goto(url, gopts)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
@@ -231,7 +220,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing hover options: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, f.Hover(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -240,7 +229,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing inner HTML options: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return f.InnerHTML(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -249,7 +238,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing inner text options: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return f.InnerText(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -258,7 +247,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing input value options: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return f.InputValue(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -267,7 +256,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing isChecked options of selector %q: %w", selector, err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return f.IsChecked(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -277,7 +266,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing isDisabled options of selector %q: %w", selector, err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return f.IsDisabled(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -286,7 +275,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parse isEditable options of selector %q: %w", selector, err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return f.IsEditable(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -295,7 +284,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parse isEnabled options of selector %q: %w", selector, err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return f.IsEnabled(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -304,7 +293,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parse isHidden options of selector %q: %w", selector, err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return f.IsHidden(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -313,12 +302,16 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parse isVisible options of selector %q: %w", selector, err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return f.IsVisible(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
 		"locator": func(selector string, opts sobek.Value) mapping {
 			return mapLocator(vu, f.Locator(selector, parseLocatorOptions(rt, opts)))
+		},
+		"frameLocator": func(selector string) *sobek.Object {
+			mfl := mapFrameLocator(vu, f.FrameLocator(selector))
+			return rt.ToValue(mfl).ToObject(rt)
 		},
 		"name": f.Name,
 		"page": func() mapping {
@@ -332,7 +325,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parse press options of selector %q on key %q: %w", selector, key, err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, f.Press(selector, key, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -342,12 +335,12 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				return nil, fmt.Errorf("parsing select option options: %w", err)
 			}
 
-			convValues, err := common.ConvertSelectOptionValues(rt, values)
+			convValues, err := ConvertSelectOptionValues(rt, values)
 			if err != nil {
 				return nil, fmt.Errorf("parsing select options values: %w", err)
 			}
 
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return f.SelectOption(selector, convValues, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -357,7 +350,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				return nil, fmt.Errorf("parsing frame set check options: %w", err)
 			}
 
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, f.SetChecked(selector, checked, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -366,7 +359,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing setContent options: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, f.SetContent(html, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -381,7 +374,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				return nil, fmt.Errorf("parsing setInputFiles parameter: %w", err)
 			}
 
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, f.SetInputFiles(selector, pfiles, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -390,7 +383,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing frame tap options: %w", err)
 			}
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, f.Tap(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -400,7 +393,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				return nil, fmt.Errorf("parsing text content options: %w", err)
 			}
 
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				s, ok, err := f.TextContent(selector, popts)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
@@ -412,7 +405,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			}), nil
 		},
 		"title": func() *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return f.Title()
 			})
 		},
@@ -422,7 +415,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				return nil, fmt.Errorf("parsing type options: %w", err)
 			}
 
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, f.Type(selector, text, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -432,7 +425,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				return nil, fmt.Errorf("parsing frame uncheck options %q: %w", selector, err)
 			}
 
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, f.Uncheck(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -445,7 +438,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				return nil, fmt.Errorf("frame waitForFunction: %w", err)
 			}
 
-			return k6ext.Promise(vu.Context(), func() (result any, reason error) {
+			return promise(vu, func() (result any, reason error) {
 				return f.WaitForFunction(js, popts, pargs...) //nolint:wrapcheck
 			}), nil
 		},
@@ -455,12 +448,12 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				return nil, fmt.Errorf("parsing waitForLoadState %q options: %w", state, err)
 			}
 
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				return nil, f.WaitForLoadState(state, popts) //nolint:wrapcheck
 			}), nil
 		},
 		"waitForNavigation": func(opts sobek.Value) (*sobek.Promise, error) {
-			return waitForNavigationBodyImpl(vu, f, opts)
+			return mapWaitForNavigation(vu, f, opts)
 		},
 		"waitForSelector": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
 			popts := common.NewFrameWaitForSelectorOptions(f.Timeout())
@@ -468,7 +461,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				return nil, fmt.Errorf("parsing wait for selector %q options: %w", selector, err)
 			}
 
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				eh, err := f.WaitForSelector(selector, popts)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
@@ -477,17 +470,17 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			}), nil
 		},
 		"waitForTimeout": func(timeout int64) *sobek.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
+			return promise(vu, func() (any, error) {
 				f.WaitForTimeout(timeout)
 				return nil, nil
 			})
 		},
 		"waitForURL": func(url sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
-			return waitForURLBodyImpl(vu, f, url, opts)
+			return mapWaitForURL(vu, f, url, opts)
 		},
 	}
 	maps["$"] = func(selector string) *sobek.Promise {
-		return k6ext.Promise(vu.Context(), func() (any, error) {
+		return promise(vu, func() (any, error) {
 			eh, err := f.Query(selector, common.StrictModeOff)
 			if err != nil {
 				return nil, err //nolint:wrapcheck
@@ -504,7 +497,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 		})
 	}
 	maps["$$"] = func(selector string) *sobek.Promise {
-		return k6ext.Promise(vu.Context(), func() (any, error) {
+		return promise(vu, func() (any, error) {
 			ehs, err := f.QueryAll(selector)
 			if err != nil {
 				return nil, err //nolint:wrapcheck

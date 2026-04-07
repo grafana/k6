@@ -154,32 +154,71 @@ func TestStdoutAndStderrAreEmptyWithQuietAndHandleSummary(t *testing.T) {
 func TestStdoutAndStderrAreEmptyWithQuietAndLogsForwarded(t *testing.T) {
 	t.Parallel()
 
-	ts := NewGlobalTestState(t)
+	// TODO(@joanlopez): remove by k6 v2.0, once we completely drop the support of the deprecated --no-summary flag.
+	t.Run("--no-summary", func(t *testing.T) {
+		t.Parallel()
 
-	// TODO: add a test with relative path
-	logFilePath := filepath.Join(ts.Cwd, "test.log")
+		ts := NewGlobalTestState(t)
 
-	ts.CmdArgs = []string{
-		"k6", "--quiet", "--log-output", "file=" + logFilePath,
-		"--log-format", "raw", "run", "--no-summary", "-",
-	}
-	ts.Stdin = bytes.NewBufferString(`
+		// TODO: add a test with relative path
+		logFilePath := filepath.Join(ts.Cwd, "test.log")
+
+		ts.CmdArgs = []string{
+			"k6", "--quiet", "--log-output", "file=" + logFilePath,
+			"--log-format", "raw", "run", "--no-summary", "-",
+		}
+		ts.Stdin = bytes.NewBufferString(`
 		console.log('init');
 		export default function() { console.log('foo'); };
 	`)
-	cmd.ExecuteWithGlobalState(ts.GlobalState)
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
-	// The test state hook still catches this message
-	assert.True(t, testutils.LogContains(ts.LoggerHook.Drain(), logrus.InfoLevel, `foo`))
+		// The test state hook still catches this message
+		assert.True(t, testutils.LogContains(ts.LoggerHook.Drain(), logrus.InfoLevel, `foo`))
 
-	// But it's not shown on stderr or stdout
-	assert.Empty(t, ts.Stderr.Bytes())
-	assert.Empty(t, ts.Stdout.Bytes())
+		// But it's not shown on stderr or stdout
+		assert.Empty(t, ts.Stderr.Bytes())
+		assert.Equal(t,
+			"Flag --no-summary has been deprecated, use --summary-mode=disabled instead\n",
+			ts.Stdout.String(),
+		) // We don't expect it to be completely empty, but to contain the deprecation message for --no-summary.
 
-	// Instead it should be in the log file
-	logContents, err := fsext.ReadFile(ts.FS, logFilePath)
-	require.NoError(t, err)
-	assert.Equal(t, "init\ninit\nfoo\n", string(logContents)) //nolint:dupword
+		// Instead, it should be in the log file
+		logContents, err := fsext.ReadFile(ts.FS, logFilePath)
+		require.NoError(t, err)
+		assert.Equal(t, "init\ninit\nfoo\n", string(logContents)) //nolint:dupword
+	})
+
+	t.Run("--summary-mode=disabled", func(t *testing.T) {
+		t.Parallel()
+
+		ts := NewGlobalTestState(t)
+
+		// TODO: add a test with relative path
+		logFilePath := filepath.Join(ts.Cwd, "test.log")
+
+		ts.CmdArgs = []string{
+			"k6", "--quiet", "--log-output", "file=" + logFilePath,
+			"--log-format", "raw", "run", "--summary-mode=disabled", "-",
+		}
+		ts.Stdin = bytes.NewBufferString(`
+		console.log('init');
+		export default function() { console.log('foo'); };
+	`)
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		// The test state hook still catches this message
+		assert.True(t, testutils.LogContains(ts.LoggerHook.Drain(), logrus.InfoLevel, `foo`))
+
+		// But it's not shown on stderr or stdout
+		assert.Empty(t, ts.Stderr.Bytes())
+		assert.Empty(t, ts.Stdout.Bytes())
+
+		// Instead, it should be in the log file
+		logContents, err := fsext.ReadFile(ts.FS, logFilePath)
+		require.NoError(t, err)
+		assert.Equal(t, "init\ninit\nfoo\n", string(logContents)) //nolint:dupword
+	})
 }
 
 func TestRelativeLogPathWithSetupAndTeardown(t *testing.T) {
@@ -214,7 +253,7 @@ func TestWrongCliFlagIterations(t *testing.T) {
 	ts := NewGlobalTestState(t)
 	ts.CmdArgs = []string{"k6", "run", "--iterations", "foo", "-"}
 	ts.Stdin = bytes.NewBufferString(`export default function() {};`)
-	// TODO: check for exitcodes.InvalidConfig after https://github.com/loadimpact/k6/issues/883 is done...
+	// TODO: check for exitcodes.InvalidConfig after https://github.com/grafana/k6/issues/883 is done...
 	ts.ExpectedExitCode = -1
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 	assert.True(t, testutils.LogContains(ts.LoggerHook.Drain(), logrus.ErrorLevel, `invalid argument "foo"`))
@@ -327,19 +366,19 @@ func TestMetricsAndThresholds(t *testing.T) {
 
 	assert.Equal(t, strings.Join(expLogLines, "\n")+"\n", ts.Stderr.String())
 
-	var summary map[string]interface{}
+	var summary map[string]any
 	require.NoError(t, json.Unmarshal(ts.Stdout.Bytes(), &summary))
 
-	metrics, ok := summary["metrics"].(map[string]interface{})
+	metrics, ok := summary["metrics"].(map[string]any)
 	require.True(t, ok)
 
-	teardownCounter, ok := metrics["teardown_counter"].(map[string]interface{})
+	teardownCounter, ok := metrics["teardown_counter"].(map[string]any)
 	require.True(t, ok)
 
-	teardownThresholds, ok := teardownCounter["thresholds"].(map[string]interface{})
+	teardownThresholds, ok := teardownCounter["thresholds"].(map[string]any)
 	require.True(t, ok)
 
-	expected := map[string]interface{}{"count == 1": map[string]interface{}{"ok": true}}
+	expected := map[string]any{"count == 1": map[string]any{"ok": true}}
 	require.Equal(t, expected, teardownThresholds)
 }
 
@@ -464,7 +503,7 @@ func TestExecutionTestOptionsDefaultValues(t *testing.T) {
 		import exec from 'k6/execution';
 
 		export default function () {
-			console.log(exec.test.options)
+			console.log(JSON.stringify(exec.test.options))
 		}
 	`
 
@@ -817,11 +856,9 @@ func asyncWaitForStdoutAndRun(
 	t *testing.T, ts *GlobalTestState, attempts int, interval time.Duration, expText string, callback func(),
 ) {
 	wg := &sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		reachedCondition := false
-		for i := 0; i < attempts; i++ {
+		for i := range attempts {
 			ts.OutMutex.Lock()
 			stdOut := ts.Stdout.String()
 			ts.OutMutex.Unlock()
@@ -848,7 +885,7 @@ func asyncWaitForStdoutAndRun(
 			t, "expected output not found", "did not find the text '%s' in the process stdout after %d attempts (%s)",
 			expText, attempts, time.Duration(attempts)*interval,
 		)
-	}()
+	})
 
 	t.Cleanup(wg.Wait) // ensure the test waits for the goroutine to finish
 }
@@ -856,13 +893,7 @@ func asyncWaitForStdoutAndRun(
 func injectMockSignalNotifier(ts *GlobalTestState) (sendSignal chan os.Signal) {
 	sendSignal = make(chan os.Signal)
 	ts.SignalNotify = func(c chan<- os.Signal, signals ...os.Signal) {
-		isAbortNotify := false
-		for _, s := range signals {
-			if s == os.Interrupt {
-				isAbortNotify = true
-				break
-			}
-		}
+		isAbortNotify := slices.Contains(signals, os.Interrupt)
 		if !isAbortNotify {
 			return
 		}
@@ -991,6 +1022,146 @@ func TestAbortedByScriptSetupErrorWithDependency(t *testing.T) {
 		rootPath+`test/bar.js:3:7(3))\n\tat setup (`+rootPath+`test/test.js:5:7(8))\n" hint="script exception"`)
 	assert.Contains(t, stdout, `level=debug msg="Sending test finished" output=cloud ref=123 run_status=7 tainted=false`)
 	assert.Contains(t, stdout, "bogus summary")
+}
+
+func TestAbortedByUnknownModules(t *testing.T) {
+	t.Parallel()
+	depScript := `
+		import { something } from "k6/x/somethinghere"
+		import { another } from "k6/x/anotherone"
+	`
+	mainScript := `
+		import { something } from "k6/x/somethinghere"
+		import "./a.js"
+		export default function () { }
+	`
+
+	ts := NewGlobalTestState(t)
+	ts.Flags.AutoExtensionResolution = false
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test.js"), []byte(mainScript), 0o644))
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "a.js"), []byte(depScript), 0o644))
+
+	ts.CmdArgs = []string{"k6", "run", "-v", "--log-output=stdout", "test.js"}
+	ts.ExpectedExitCode = int(exitcodes.ScriptException)
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stdout := ts.Stdout.String()
+	t.Log(stdout)
+
+	assert.Contains(t, stdout, `unknown modules [\"k6/x/anotherone\", \"k6/x/somethinghere\"] were tried to be loaded,`)
+}
+
+func TestRunFromNotBaseDirectory(t *testing.T) {
+	t.Parallel()
+	depScript := `
+		export const p = 5;
+	`
+	mainScript := `
+		import { p } from "../../../b/dep.js";
+		export default function() {
+			console.log("p = " + p);
+		};
+	`
+
+	ts := NewGlobalTestState(t)
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "a/b/c/test.js"), []byte(mainScript), 0o644))
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "b/dep.js"), []byte(depScript), 0o644))
+
+	ts.Cwd = filepath.Join(ts.Cwd, "./a/")
+	ts.CmdArgs = []string{"k6", "run", "-v", "--log-output=stdout", "b/c/test.js"}
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stdout := ts.Stdout.String()
+	t.Log(stdout)
+	require.Contains(t, stdout, `p = 5`)
+}
+
+func TestRunCSVParseConcurrentFromMultipleModules(t *testing.T) {
+	t.Parallel()
+
+	csvData := `col1,col2
+a,b
+c,d
+`
+	module1Script := `
+		import csv from "k6/experimental/csv";
+		import fs from "k6/experimental/fs";
+
+		const file = await fs.open("data.csv");
+		export const data = await csv.parse(file);
+	`
+	module2Script := `
+		import csv from "k6/experimental/csv";
+		import fs from "k6/experimental/fs";
+
+		const file = await fs.open("data.csv");
+		export const data = await csv.parse(file);
+	`
+	module3Script := `
+		import csv from "k6/experimental/csv";
+		import fs from "k6/experimental/fs";
+
+		const file = await fs.open("data.csv");
+		export const data = await csv.parse(file);
+	`
+	// Main: imports all 3 modules - each has await csv.parse at top level
+	mainScript := `
+		import { data as data1 } from "./modules/module1.js";
+		import { data as data2 } from "./modules/module2.js";
+		import { data as data3 } from "./modules/module3.js";
+
+		if (data1.length !== 3 || data2.length !== 3 || data3.length !== 3) {
+			throw new Error("Expected 3 records from each parse");
+		}
+
+		if (data1[0][0] !== "col1" || data2[0][0] !== "col1" || data3[0][0] !== "col1") {
+			throw new Error("Unexpected CSV data");
+		}
+		export default function() { } // just to not error out
+	`
+
+	ts := NewGlobalTestState(t)
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "data.csv"), []byte(csvData), 0o644))
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "modules/module1.js"), []byte(module1Script), 0o644))
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "modules/module2.js"), []byte(module2Script), 0o644))
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "modules/module3.js"), []byte(module3Script), 0o644))
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "main.js"), []byte(mainScript), 0o644))
+
+	ts.CmdArgs = []string{"k6", "run", "--vus", "1", "--iterations", "1", "main.js"}
+	ts.ExpectedExitCode = 0
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+}
+
+func TestRunFromSeparateDriveWindows(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS != "windows" {
+		t.Skip("test only for windows")
+	}
+	depScript := `
+		export const p = 5;
+	`
+	mainScript := `
+		import { p } from "../../../b/dep.js";
+		export default function() {
+			console.log("p = " + p);
+		};
+	`
+
+	ts := NewGlobalTestState(t)
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "a/b/c/test.js"), []byte(mainScript), 0o644))
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "b/dep.js"), []byte(depScript), 0o644))
+
+	ts.Cwd = "f:\\something somewhere\\and another\\"
+	ts.CmdArgs = []string{"k6", "run", "-v", "--log-output=stdout", "c:\\test\\a\\b\\c\\test.js"}
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stdout := ts.Stdout.String()
+	t.Log(stdout)
+	require.Contains(t, stdout, `p = 5`)
 }
 
 func runTestWithNoLinger(_ *testing.T, ts *GlobalTestState) {
@@ -1422,8 +1593,8 @@ func getSampleValues(t *testing.T, jsonOutput []byte, metric string, tags map[st
 	jsonLines := bytes.Split(jsonOutput, []byte("\n"))
 	result := []float64{}
 
-	tagsMatch := func(rawTags interface{}) bool {
-		sampleTags, ok := rawTags.(map[string]interface{})
+	tagsMatch := func(rawTags any) bool {
+		sampleTags, ok := rawTags.(map[string]any)
 		require.True(t, ok)
 		for k, v := range tags {
 			rv, sok := sampleTags[k]
@@ -1443,7 +1614,7 @@ func getSampleValues(t *testing.T, jsonOutput []byte, metric string, tags map[st
 		if len(jsonLine) == 0 {
 			continue
 		}
-		var line map[string]interface{}
+		var line map[string]any
 		require.NoError(t, json.Unmarshal(jsonLine, &line))
 		sampleType, ok := line["type"].(string)
 		require.True(t, ok)
@@ -1455,7 +1626,7 @@ func getSampleValues(t *testing.T, jsonOutput []byte, metric string, tags map[st
 		if sampleMetric != metric {
 			continue
 		}
-		sampleData, ok := line["data"].(map[string]interface{})
+		sampleData, ok := line["data"].(map[string]any)
 		require.True(t, ok)
 
 		if !tagsMatch(sampleData["tags"]) {
@@ -1753,58 +1924,6 @@ func TestRunWithCloudOutputOverrides(t *testing.T) {
 	assert.Contains(t, stdout, "iterations...........: 1")
 }
 
-func TestRunWithCloudOutputCustomConfigAndOverridesLegacyCloudOption(t *testing.T) {
-	t.Parallel()
-
-	script := `
-export const options = {
-  ext: {
-    loadimpact: {
-      name: 'Hello k6 Cloud!',
-      projectID: 123456,
-    },
-  },
-};
-
-export default function() {};`
-
-	ts := getSingleFileTestState(t, script, []string{"-v", "--log-output=stdout", "--out=cloud"}, 0)
-
-	configOverride := http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
-		b, err := io.ReadAll(req.Body)
-		require.NoError(t, err)
-
-		bjs := string(b)
-		assert.Contains(t, bjs, `"name":"Hello k6 Cloud!"`)
-		assert.Contains(t, bjs, `"project_id":123456`)
-
-		resp.WriteHeader(http.StatusOK)
-		_, err = fmt.Fprint(resp, `{
-			"reference_id": "1337",
-			"config": {
-				"webAppURL": "https://bogus.url",
-				"testRunDetails": "https://some.other.url/foo/tests/org/1337?bar=baz"
-			},
-			"logs": [
-				{"level": "debug", "message": "test debug message"},
-				{"level": "info", "message": "test message"}
-			]
-		}`)
-		assert.NoError(t, err)
-	})
-	srv := getCloudTestEndChecker(t, 1337, configOverride, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed)
-	ts.Env["K6_CLOUD_HOST"] = srv.URL
-
-	cmd.ExecuteWithGlobalState(ts.GlobalState)
-
-	stdout := ts.Stdout.String()
-	t.Log(stdout)
-	assert.Contains(t, stdout, "execution: local")
-	assert.Contains(t, stdout, "output: cloud (https://some.other.url/foo/tests/org/1337?bar=baz)")
-	assert.Contains(t, stdout, `level=debug msg="test debug message" output=cloud source=grafana-k6-cloud`)
-	assert.Contains(t, stdout, `level=info msg="test message" output=cloud source=grafana-k6-cloud`)
-}
-
 func TestRunWithCloudOutputCustomConfigAndOverrides(t *testing.T) {
 	t.Parallel()
 
@@ -2058,7 +2177,7 @@ func TestEventSystemOK(t *testing.T) {
 	modules.Register(moduleName, mod)
 
 	ts.CmdArgs = []string{"k6", "--quiet", "run", "-"}
-	ts.Stdin = bytes.NewBuffer([]byte(fmt.Sprintf(`
+	ts.Stdin = bytes.NewBuffer(fmt.Appendf(nil, `
 		import events from '%s';
 		import { sleep } from 'k6';
 
@@ -2068,7 +2187,7 @@ func TestEventSystemOK(t *testing.T) {
 		}
 
 		export default function () { sleep(1); }
-	`, moduleName)))
+	`, moduleName))
 
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
@@ -2185,7 +2304,7 @@ func TestEventSystemError(t *testing.T) {
 
 			ts.CmdArgs = []string{"k6", "--quiet", "run", "-"}
 			ts.ExpectedExitCode = int(tc.expExitCode)
-			ts.Stdin = bytes.NewBuffer([]byte(fmt.Sprintf("import events from '%s';\n%s", moduleName, tc.script)))
+			ts.Stdin = bytes.NewBuffer(fmt.Appendf(nil, "import events from '%s';\n%s", moduleName, tc.script))
 
 			cmd.ExecuteWithGlobalState(ts.GlobalState)
 
@@ -2241,7 +2360,7 @@ func BenchmarkRunEvents(b *testing.B) {
 		modules.Register(moduleName, mod)
 
 		ts.CmdArgs = []string{"k6", "--quiet", "run", "-"}
-		ts.Stdin = bytes.NewBuffer([]byte(fmt.Sprintf(`
+		ts.Stdin = bytes.NewBuffer(fmt.Appendf(nil, `
 		import events from '%s';
 		export let options = {
 			vus: 10,
@@ -2249,7 +2368,7 @@ func BenchmarkRunEvents(b *testing.B) {
 		}
 
 		export default function () {}
-		`, moduleName)))
+		`, moduleName))
 		ts.ExpectedExitCode = 0
 
 		b.StartTimer()
@@ -2532,6 +2651,217 @@ func TestMultipleSecretSources(t *testing.T) {
 	assert.Contains(t, stderr, `level=info msg="trigger exception on wrong key" ***SECRET_REDACTED***=console`)
 }
 
+// TestK6SecretSourceEnvVar covers the K6_SECRET_SOURCE environment variable, which is
+// treated as a single complete source spec equivalent to one --secret-source flag value.
+func TestK6SecretSourceEnvVar(t *testing.T) {
+	t.Parallel()
+
+	// Script that reads two keys from the default secret source.
+	script := `
+		import secrets from "k6/secrets";
+		export default async () => {
+			const a = await secrets.get("cool");
+			const b = await secrets.get("else");
+			console.log(a);
+			console.log(b);
+		}
+	`
+
+	tests := []struct {
+		name             string
+		envVar           string
+		expectedExitCode int
+		contains         []string
+		notContains      []string
+	}{
+		{
+			name:        "basic mock source via env var",
+			envVar:      "mock=cool=something,else=other",
+			contains:    []string{`level=info msg="***SECRET_REDACTED***" source=console`},
+			notContains: []string{"level=error", "something", "other"},
+		},
+		{
+			name:             "empty env var is error",
+			envVar:           "",
+			expectedExitCode: -1,
+			contains:         []string{"couldn't parse secret source configuration \\\"\\\""},
+		},
+		{
+			name:             "whitespace-only env var is error",
+			envVar:           "   ",
+			expectedExitCode: -1,
+			contains:         []string{"couldn't parse secret source configuration \\\"   \\\""},
+		},
+		{
+			name:             "invalid source type gives clear error",
+			envVar:           "nonexistent=config",
+			expectedExitCode: -1,
+			contains:         []string{"no secret source for type", "nonexistent"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			ts := NewGlobalTestState(t)
+			require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(script), 0o644))
+			if tc.expectedExitCode != 0 {
+				ts.ExpectedExitCode = tc.expectedExitCode
+			}
+			ts.Env["K6_SECRET_SOURCE"] = tc.envVar
+			ts.CmdArgs = []string{"k6", "run", "script.js"}
+
+			ts.ReparseFlags()
+			cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+			stderr := ts.Stderr.String()
+			t.Log(stderr)
+			for _, s := range tc.contains {
+				assert.Contains(t, stderr, s)
+			}
+			for _, s := range tc.notContains {
+				assert.NotContains(t, stderr, s)
+			}
+		})
+	}
+
+	t.Run("file source via env var", func(t *testing.T) {
+		t.Parallel()
+		ts := NewGlobalTestState(t)
+		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(script), 0o644))
+		secretFile := filepath.Join(ts.Cwd, "secrets.env")
+		require.NoError(t, fsext.WriteFile(ts.FS, secretFile, []byte("cool=val1\nelse=val2\n"), 0o644))
+
+		ts.Env["K6_SECRET_SOURCE"] = "file=" + secretFile
+		ts.CmdArgs = []string{"k6", "run", "script.js"}
+
+		ts.ReparseFlags()
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stderr := ts.Stderr.String()
+		t.Log(stderr)
+		assert.NotContains(t, stderr, "level=error")
+		assert.Contains(t, stderr, `level=info msg="***SECRET_REDACTED***" source=console`)
+		assert.NotContains(t, stderr, "val1")
+		assert.NotContains(t, stderr, "val2")
+	})
+
+	t.Run("url source via env var", func(t *testing.T) {
+		t.Parallel()
+
+		// Spin up a local HTTP server that returns a plain-text secret.
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			// The key is the last path segment: /secrets/{key}
+			_, _ = w.Write([]byte("url-secret-value"))
+		}))
+		t.Cleanup(srv.Close)
+
+		ts := NewGlobalTestState(t)
+		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(script), 0o644))
+
+		ts.Env["K6_SECRET_SOURCE"] = fmt.Sprintf("url=urlTemplate=%s/secrets/{key},maxRetries=0", srv.URL)
+		ts.CmdArgs = []string{"k6", "run", "script.js"}
+		ts.ReparseFlags()
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stderr := ts.Stderr.String()
+		t.Log(stderr)
+		assert.NotContains(t, stderr, "level=error")
+		assert.Contains(t, stderr, `level=info msg="***SECRET_REDACTED***" source=console`)
+		assert.NotContains(t, stderr, "url-secret-value")
+	})
+
+	t.Run("entire env var value is one spec, commas within it are source arguments not separators", func(t *testing.T) {
+		// K6_SECRET_SOURCE is equivalent to a single --secret-source flag value —
+		// the whole string is one spec. Commas within it belong to the source's
+		// own argument syntax (e.g. mock=name=mysource,cool=val uses commas to
+		// separate name= and key=val arguments), not source-to-source separators.
+		t.Parallel()
+		namedScript := `
+			import secrets from "k6/secrets";
+			export default async () => {
+				const v = await secrets.source("mysource").get("cool");
+				console.log(v);
+			}
+		`
+		ts := NewGlobalTestState(t)
+		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(namedScript), 0o644))
+
+		ts.Env["K6_SECRET_SOURCE"] = "mock=name=mysource,cool=secretval"
+		ts.CmdArgs = []string{"k6", "run", "script.js"}
+
+		ts.ReparseFlags()
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stderr := ts.Stderr.String()
+		t.Log(stderr)
+		assert.NotContains(t, stderr, "level=error")
+		assert.Contains(t, stderr, `level=info msg="***SECRET_REDACTED***" source=console`)
+	})
+
+	t.Run("name= and default suffixes work via env var", func(t *testing.T) {
+		t.Parallel()
+		namedScript := `
+			import secrets from "k6/secrets";
+			export default async () => {
+				// access by explicit name
+				const a = await secrets.source("named").get("cool");
+				// access via default
+				const b = await secrets.get("cool");
+				console.log(a);
+				console.log(b);
+			}
+		`
+		ts := NewGlobalTestState(t)
+		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(namedScript), 0o644))
+
+		ts.Env["K6_SECRET_SOURCE"] = "mock=name=named,cool=secretval,default"
+		ts.CmdArgs = []string{"k6", "run", "script.js"}
+
+		ts.ReparseFlags()
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stderr := ts.Stderr.String()
+		t.Log(stderr)
+		assert.NotContains(t, stderr, "level=error")
+		assert.Contains(t, stderr, `level=info msg="***SECRET_REDACTED***" source=console`)
+	})
+
+	t.Run("cli flags overrides env variable", func(t *testing.T) {
+		t.Parallel()
+		multiScript := `
+			import secrets from "k6/secrets";
+			export default async () => {
+				let secondMissing = false;
+				try {
+					const a = await secrets.source("second").get("cool");
+				} catch (e) {
+					secondMissing = true
+				}
+				const b = await secrets.source("first").get("cool");
+				console.log(b);
+				console.log(secondMissing);
+			}
+		`
+		ts := NewGlobalTestState(t)
+		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(multiScript), 0o644))
+
+		ts.Env["K6_SECRET_SOURCE"] = "mock=name=second,cool=second-secret"
+		ts.CmdArgs = []string{"k6", "run", "--secret-source=mock=name=first,cool=first-secret", "script.js"}
+
+		ts.ReparseFlags()
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stderr := ts.Stderr.String()
+		t.Log(stderr)
+		assert.NotContains(t, stderr, "level=error")
+		// Both secrets are redacted in the output.
+		assert.Contains(t, stderr, `level=info msg="***SECRET_REDACTED***" source=console`)
+		// The boolean false is not a secret — it is logged as-is.
+		assert.Contains(t, stderr, `level=info msg=true source=console`)
+	})
+}
+
 func TestSummaryExport(t *testing.T) {
 	t.Parallel()
 
@@ -2553,13 +2883,13 @@ func TestSummaryExport(t *testing.T) {
 		rawSummaryExport, err := fsext.ReadFile(fs, "results.json")
 		require.NoError(t, err)
 
-		var summaryExport map[string]interface{}
+		var summaryExport map[string]any
 		require.NoError(t, json.Unmarshal(rawSummaryExport, &summaryExport))
 
-		assert.Equal(t, map[string]interface{}{
-			"groups": map[string]interface{}{},
-			"checks": map[string]interface{}{
-				"TRUE is TRUE": map[string]interface{}{
+		assert.Equal(t, map[string]any{
+			"groups": map[string]any{},
+			"checks": map[string]any{
+				"TRUE is TRUE": map[string]any{
 					"fails":  float64(0),
 					"id":     "1bed1cc5e442054df516f1ca1076ac6a",
 					"name":   "TRUE is TRUE",
@@ -2572,12 +2902,12 @@ func TestSummaryExport(t *testing.T) {
 			"id":   "d41d8cd98f00b204e9800998ecf8427e",
 		}, summaryExport["root_group"])
 
-		metrics := summaryExport["metrics"].(map[string]interface{})
+		metrics := summaryExport["metrics"].(map[string]any)
 
-		assert.Equal(t, 1.0, metrics["custom_iterations"].(map[string]interface{})["count"])
-		assert.Equal(t, 1.0, metrics["iterations"].(map[string]interface{})["count"])
+		assert.Equal(t, 1.0, metrics["custom_iterations"].(map[string]any)["count"])
+		assert.Equal(t, 1.0, metrics["iterations"].(map[string]any)["count"])
 
-		checks := metrics["checks"].(map[string]interface{})
+		checks := metrics["checks"].(map[string]any)
 		assert.Equal(t, 1.0, checks["passes"])
 		assert.Equal(t, 0.0, checks["fails"])
 		assert.Equal(t, 1.0, checks["value"])
@@ -2620,6 +2950,7 @@ func TestSummaryExport(t *testing.T) {
 		})
 	}
 
+	// TODO(@joanlopez): remove by k6 v2.0, once we completely drop the support for --summary-mode=legacy.
 	t.Run("legacy", func(t *testing.T) {
 		t.Parallel()
 
@@ -2642,6 +2973,9 @@ func TestSummaryExport(t *testing.T) {
 		assert.Contains(t, stdout, "checks...............: 100.00% 1 out of 1")
 		assert.Contains(t, stdout, "custom_iterations....: 1")
 		assert.Contains(t, stdout, "iterations...........: 1")
+
+		// As of now, "legacy" has been deprecated.
+		assert.Contains(t, ts.Stderr.String(), `The \"legacy\" summary mode has been deprecated, and will be removed by k6 v2.0.`)
 
 		assertSummaryExport(t, ts.FS)
 	})
@@ -2667,6 +3001,7 @@ func TestHandleSummary(t *testing.T) {
 	}
 	`
 
+	// TODO(@joanlopez): remove "summary" by k6 v2.0, once we completely drop the support for --summary-mode=legacy.
 	for _, summaryMode := range []string{"compact", "full", "legacy"} {
 		t.Run(summaryMode, func(t *testing.T) {
 			t.Parallel()
@@ -2684,13 +3019,13 @@ func TestHandleSummary(t *testing.T) {
 			rawSummaryExport, err := fsext.ReadFile(ts.FS, "summary.json")
 			require.NoError(t, err)
 
-			var summaryExport map[string]interface{}
+			var summaryExport map[string]any
 			require.NoError(t, json.Unmarshal(rawSummaryExport, &summaryExport))
 
-			assert.Equal(t, map[string]interface{}{
-				"groups": []interface{}{},
-				"checks": []interface{}{
-					map[string]interface{}{
+			assert.Equal(t, map[string]any{
+				"groups": []any{},
+				"checks": []any{
+					map[string]any{
 						"fails":  float64(0),
 						"id":     "1bed1cc5e442054df516f1ca1076ac6a",
 						"name":   "TRUE is TRUE",
@@ -2703,16 +3038,16 @@ func TestHandleSummary(t *testing.T) {
 				"id":   "d41d8cd98f00b204e9800998ecf8427e",
 			}, summaryExport["root_group"])
 
-			metrics := summaryExport["metrics"].(map[string]interface{})
+			metrics := summaryExport["metrics"].(map[string]any)
 
 			assert.Equal(t, 1.0,
-				metrics["custom_iterations"].(map[string]interface{})["values"].(map[string]interface{})["count"],
+				metrics["custom_iterations"].(map[string]any)["values"].(map[string]any)["count"],
 			)
 			assert.Equal(t, 1.0,
-				metrics["iterations"].(map[string]interface{})["values"].(map[string]interface{})["count"],
+				metrics["iterations"].(map[string]any)["values"].(map[string]any)["count"],
 			)
 
-			checks := metrics["checks"].(map[string]interface{})["values"].(map[string]interface{})
+			checks := metrics["checks"].(map[string]any)["values"].(map[string]any)
 			assert.Equal(t, 1.0, checks["rate"])
 			assert.Equal(t, 1.0, checks["passes"])
 			assert.Equal(t, 0.0, checks["fails"])
@@ -2820,4 +3155,255 @@ func TestGroupsOrderInFullSummaryWithScenario(t *testing.T) {
           ↳ GROUP: too much nesting\s*`
 
 	assert.Regexp(t, regexp.MustCompile(expectedGroupsRegex), stdout)
+}
+
+func TestInvalidSummaryModeAbortsTheExecution(t *testing.T) {
+	t.Parallel()
+
+	ts := NewGlobalTestState(t)
+	ts.CmdArgs = []string{
+		"k6", "run", "--summary-mode=unknown", "-",
+	}
+	ts.Stdin = bytes.NewBufferString(`export default function() {};`)
+
+	// We expect the execution to be aborted by the invalid summary
+	// mode and the exit code to be non-zero.
+	ts.ExpectedExitCode = -1
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	// And the error to be shown on stderr.
+	assert.Contains(t,
+		ts.Stderr.String(),
+		`level=error msg="invalid summary mode"`,
+	)
+}
+
+func TestMachineReadableSummary(t *testing.T) {
+	t.Parallel()
+
+	mainScript := `
+		import { check } from "k6";
+		import { Counter } from 'k6/metrics';
+
+		const customIter = new Counter("custom_iterations");
+
+		export default function () {
+			customIter.add(1);
+			check(true, { "TRUE is TRUE": (r) => r });
+		};
+	`
+
+	assertSummaryExport := func(t *testing.T, out string) {
+		t.Helper()
+
+		// Configuration block: duration is dynamic.
+		configPattern := `"config": \{
+        "duration": [\d.]+,
+        "execution": "local",
+        "script": "(?:[^"\\]|\\.)*"
+    \}`
+		assert.Regexp(t, regexp.MustCompile(configPattern), out)
+
+		// Metadata block: generated_at is dynamic.
+		metadataPattern := `"metadata": \{
+        "generated_at": "\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+(Z|[+-]\d{2}:\d{2})",
+        "k6_version": "` + regexp.QuoteMeta(build.Version) + `"
+    \}`
+		assert.Regexp(t, regexp.MustCompile(metadataPattern), out)
+
+		// Checks block: checks.metrics preserve the order.
+		checksPattern := `"checks": \{
+            "metrics": \[
+                \{
+                    "contains": "default",
+                    "name": "checks_total",
+                    "type": "counter",
+                    "values": \{
+                        "count": 1
+                    \}
+                \},
+                \{
+                    "contains": "default",
+                    "name": "checks_failed",
+                    "type": "rate",
+                    "values": \{
+                        "matches": 0,
+                        "rate": 0,
+                        "total": 1
+                    \}
+                \},
+                \{
+                    "contains": "default",
+                    "name": "checks_succeeded",
+                    "type": "rate",
+                    "values": \{
+                        "matches": 1,
+                        "rate": 1,
+                        "total": 1
+                    \}
+                \}
+            \],
+            "results": \[
+                \{
+                    "fails": 0,
+                    "name": "TRUE is TRUE",
+                    "passes": 1
+                \}
+            \]
+        \}`
+		assert.Regexp(t, regexp.MustCompile(checksPattern), out)
+
+		// Metrics block: asserted individual because order may vary between executions.
+		iterationDurationPattern := `\{
+                "contains": "time",
+                "name": "iteration_duration",
+                "type": "trend",
+                "values": \{
+                    "avg": [\d.]+,
+                    "max": [\d.]+,
+                    "med": [\d.]+,
+                    "min": [\d.]+,
+                    "p90": [\d.]+,
+                    "p95": [\d.]+
+                \}
+            \}`
+		assert.Regexp(t, regexp.MustCompile(iterationDurationPattern), out)
+
+		iterationsPattern := `\{
+                "contains": "default",
+                "name": "iterations",
+                "type": "counter",
+                "values": \{
+                    "count": 1
+                \}
+            \}`
+		assert.Regexp(t, regexp.MustCompile(iterationsPattern), out)
+
+		dataSentPattern := `\{
+                "contains": "data",
+                "name": "data_sent",
+                "type": "counter",
+                "values": \{
+                    "count": 0
+                \}
+            \}`
+		assert.Regexp(t, regexp.MustCompile(dataSentPattern), out)
+
+		dataReceivedPattern := `\{
+                "contains": "data",
+                "name": "data_received",
+                "type": "counter",
+                "values": \{
+                    "count": 0
+                \}
+            \}`
+		assert.Regexp(t, regexp.MustCompile(dataReceivedPattern), out)
+
+		customIterationsPattern := `\{
+                "contains": "default",
+                "name": "custom_iterations",
+                "type": "counter",
+                "values": \{
+                    "count": 1
+                \}
+            \}`
+		assert.Regexp(t, regexp.MustCompile(customIterationsPattern), out)
+
+		// Schema version: statically defined, as changes in the schema will likely require changes in code.
+		versionPattern := `"version": "1\.0\.0"`
+		assert.Regexp(t, regexp.MustCompile(versionPattern), out)
+	}
+
+	t.Run("--summary-export", func(t *testing.T) {
+		t.Parallel()
+
+		ts := NewGlobalTestState(t)
+		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(mainScript), 0o644))
+
+		ts.CmdArgs = []string{
+			"k6", "run",
+			"--summary-export=summary.json",
+			"--new-machine-readable-summary=true",
+			"script.js",
+		}
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stdout := ts.Stdout.String()
+		t.Log(stdout)
+
+		assert.Contains(t, stdout, "checks_total.......: 1")
+		assert.Contains(t, stdout, "checks_succeeded...: 100.00% 1 out of 1")
+		assert.Contains(t, stdout, "checks_failed......: 0.00%   0 out of 1")
+
+		assert.Contains(t, stdout, `CUSTOM
+    custom_iterations....: 1`)
+		assert.Contains(t, stdout, "iterations...........: 1")
+
+		summaryExport, err := fsext.ReadFile(ts.FS, "summary.json")
+		require.NoError(t, err)
+
+		assertSummaryExport(t, string(summaryExport))
+	})
+
+	t.Run("handleSummary()", func(t *testing.T) {
+		t.Parallel()
+
+		mainScript := mainScript + `
+
+		export function handleSummary(data) {
+			return {
+			  'summary.json': JSON.stringify(data, null, 4),
+			};
+		}
+`
+
+		ts := NewGlobalTestState(t)
+		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(mainScript), 0o644))
+
+		ts.CmdArgs = []string{
+			"k6", "run",
+			"--new-machine-readable-summary=true",
+			"script.js",
+		}
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stdout := ts.Stdout.String()
+		t.Log(stdout)
+
+		summaryExport, err := fsext.ReadFile(ts.FS, "summary.json")
+		require.NoError(t, err)
+
+		assertSummaryExport(t, string(summaryExport))
+	})
+}
+
+func TestSpaceInPath(t *testing.T) {
+	t.Parallel()
+	depScript := `
+		export default function() {
+			let p = 42;
+			return p;
+		}
+	`
+	mainScript := `
+		import bar from "./foo bar.js";
+		let s = "something";
+		export default function() {
+			console.log(s, bar());
+		};
+	`
+
+	ts := NewGlobalTestState(t)
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test me.js"), []byte(mainScript), 0o644))
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "foo bar.js"), []byte(depScript), 0o644))
+
+	ts.CmdArgs = []string{"k6", "run", "--quiet", "test me.js"}
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stderr := ts.Stderr.String()
+	t.Log(stderr)
+	assert.Contains(t, stderr, `something 42`)
 }

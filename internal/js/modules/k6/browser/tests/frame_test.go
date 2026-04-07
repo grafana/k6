@@ -5,7 +5,6 @@ package tests
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -312,7 +311,6 @@ func TestFrameWaitForURLSuccess(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Setup
 			tb := newTestBrowser(t, withFileServer())
 			tb.vu.ActivateVU()
 			tb.vu.StartIteration(t)
@@ -321,24 +319,20 @@ func TestFrameWaitForURLSuccess(t *testing.T) {
 			tb.vu.SetVar(t, "testURL", tb.staticURL("waitfornavigation_test.html"))
 			tb.vu.SetVar(t, "page1URL", tb.staticURL("page1.html"))
 			_, err := tb.vu.RunAsync(t, `
-					const page = await browser.newPage();
-		
-					await page.setContent('<iframe></iframe>');
-		
-					const iframeElement = await page.$('iframe');
-					frame = await iframeElement.contentFrame();
-				`)
+				const page = await browser.newPage();
+	
+				await page.setContent('<iframe></iframe>');
+	
+				const iframeElement = await page.$('iframe');
+				frame = await iframeElement.contentFrame();
+			`)
 			require.NoError(t, err)
 
-			// Test logic
-			code := fmt.Sprintf(`
-			await frame.goto(testURL);
-
-			%s
-			
-			return frame.url();`, tt.code)
-
-			result := tb.vu.RunPromise(t, code)
+			result := tb.vu.RunPromise(t, `
+				await frame.goto(testURL);
+				%s
+				return frame.url();
+			`, tt.code)
 			got := strings.ReplaceAll(result.Result().String(), tb.staticURL(""), "")
 			assert.Contains(t, tt.expected, got)
 		})
@@ -376,7 +370,6 @@ func TestFrameWaitForURLFailure(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Setup
 			tb := newTestBrowser(t, withFileServer())
 			tb.vu.ActivateVU()
 			tb.vu.StartIteration(t)
@@ -384,22 +377,19 @@ func TestFrameWaitForURLFailure(t *testing.T) {
 			tb.vu.SetVar(t, "frame", &sobek.Object{})
 			tb.vu.SetVar(t, "testURL", tb.staticURL("waitfornavigation_test.html"))
 			_, err := tb.vu.RunAsync(t, `
-					const page = await browser.newPage();
-		
-					await page.setContent('<iframe></iframe>');
-		
-					const iframeElement = await page.$('iframe');
-					frame = await iframeElement.contentFrame();
-				`)
+				const page = await browser.newPage();
+	
+				await page.setContent('<iframe></iframe>');
+	
+				const iframeElement = await page.$('iframe');
+				frame = await iframeElement.contentFrame();
+			`)
 			require.NoError(t, err)
 
-			// Test logic
-			code := fmt.Sprintf(`
-			await frame.goto(testURL);
-
-			%s`, tt.code)
-
-			_, err = tb.vu.RunAsync(t, code)
+			_, err = tb.vu.RunAsync(t, `
+				await frame.goto(testURL);
+				%s
+			`, tt.code)
 			assert.ErrorContains(t, err, tt.expected)
 		})
 	}

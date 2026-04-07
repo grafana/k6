@@ -6,13 +6,17 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"regexp"
 	"slices"
+	"strings"
 	"time"
 
 	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/grafana/sobek"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
+	"go.k6.io/k6/internal/js/modules/k6/browser/log"
+	k6metrics "go.k6.io/k6/metrics"
 )
 
 func convertBaseJSHandleTypes(
@@ -107,7 +111,7 @@ func call(
 	select {
 	case <-ctx.Done():
 		err = &k6ext.UserFriendlyError{
-			Err:     ctx.Err(),
+			Err:     ContextErr(ctx),
 			Timeout: timeout,
 		}
 	case result = <-resultCh:
@@ -205,16 +209,6 @@ func createWaitForEventPredicateHandler(
 	return ch, evCancelFn
 }
 
-// panicOrSlowMo panics if err is not nil, otherwise applies slow motion.
-//
-//nolint:unused
-func panicOrSlowMo(ctx context.Context, err error) {
-	if err != nil {
-		k6ext.Panic(ctx, "%w", err)
-	}
-	applySlowMo(ctx)
-}
-
 // TrimQuotes removes surrounding single or double quotes from s.
 // We're not using strings.Trim() to avoid trimming unbalanced values,
 // e.g. `"'arg` shouldn't change.
@@ -248,4 +242,81 @@ func escapesSobekValues(args ...any) bool {
 		}
 	}
 	return false
+}
+
+// patternMatcherFunc is a function that matches a string against a pattern.
+type patternMatcherFunc func(string) (bool, error)
+
+// RegExMatcher is a function that matches a pattern against
+// a string and returns true if they match, false otherwise.
+type RegExMatcher func(pattern, str string) (bool, error)
+
+// newPatternMatcher returns a [patternMatcherFunc] that uses string matching for
+// quoted strings, and ECMAScript (Sobek) regex matching for others. If the pattern
+// is empty or a single quote, it matches any string.
+func newPatternMatcher(pattern string, rm RegExMatcher) (patternMatcherFunc, error) {
+	if pattern == "" || pattern == "''" {
+		return func(s string) (bool, error) { return true, nil }, nil
+	}
+	if isQuotedText(pattern) {
+		return func(s string) (bool, error) { return "'"+s+"'" == pattern, nil }, nil
+	}
+	if rm == nil {
+		return nil, fmt.Errorf("regex matcher must be provided")
+	}
+	return func(s string) (bool, error) {
+		ok, err := rm(pattern, s)
+		if err != nil {
+			return false, fmt.Errorf("matching %q against pattern %q: %w", s, pattern, err)
+		}
+		return ok, nil
+	}, nil
+}
+
+// Match evaluates the supplied string against the given pattern using the provided
+// [RegExMatcher] for regex patterns. The matcher behavior is determined by [newPatternMatcher].
+func (rm RegExMatcher) Match(pattern, s string) (bool, error) {
+	m, err := newPatternMatcher(pattern, rm)
+	if err != nil {
+		return false, fmt.Errorf("matching %q against pattern %q: %w", s, pattern, err)
+	}
+	return m(s)
+}
+
+var sourceURLRegex = regexp.MustCompile(`(?s)[\040\t]*//[@#] sourceURL=\s*(\S*?)\s*$`)
+
+func hasSourceURL(js string) bool {
+	lastNotEmptyIndex := strings.LastIndexFunc(js, func(r rune) bool {
+		switch r {
+		case '\n', '\r', ' ', '\t':
+			return false
+		default:
+			return true
+		}
+	})
+	lastNewLineBeforeLastLineIndex := 0 // default to going through the whole string
+	if lastNotEmptyIndex != -1 {        // if there are no new lines - go through the whole string
+		lastNewLineBeforeLastLineIndex = strings.LastIndex(js[:lastNotEmptyIndex], "\n")
+		if lastNewLineBeforeLastLineIndex == -1 { // reset to zero again
+			lastNewLineBeforeLastLineIndex = 0
+		}
+	}
+
+	return sourceURLRegex.MatchString(js[lastNewLineBeforeLastLineIndex:])
+}
+
+// pushIfNotDone preserves PushIfNotDone semantics and logs when
+// a metric drop is observed because the provided context is done.
+func pushIfNotDone(
+	ctx context.Context,
+	logger *log.Logger,
+	output chan<- k6metrics.SampleContainer,
+	sample k6metrics.SampleContainer,
+) {
+	if k6metrics.PushIfNotDone(ctx, output, sample) {
+		return
+	}
+	// Should no longer happen under normal circumstances,
+	// but if it does, log it for better observability.
+	logger.Warnf("pushIfNotDone", "dropping metric sample: %v", ContextErr(ctx))
 }

@@ -49,6 +49,7 @@ structs.
 */
 type FrameSession struct {
 	ctx            context.Context
+	teardownCtx    context.Context
 	session        session
 	page           *Page
 	parent         *FrameSession
@@ -71,6 +72,7 @@ type FrameSession struct {
 	isolatedWorlds       map[string]bool
 
 	eventCh chan Event
+	wg      sync.WaitGroup
 
 	childSessions map[cdp.FrameID]*FrameSession
 	vu            k6modules.VU
@@ -91,14 +93,22 @@ type FrameSession struct {
 //
 //nolint:funlen
 func NewFrameSession(
-	ctx context.Context, s session, p *Page, parent *FrameSession, tid target.ID, l *log.Logger, hasUIWindow bool,
+	ctx context.Context,
+	teardownCtx context.Context,
+	s session,
+	p *Page,
+	parent *FrameSession,
+	tid target.ID,
+	l *log.Logger,
+	hasUIWindow bool,
 ) (_ *FrameSession, err error) {
 	l.Debugf("NewFrameSession", "sid:%v tid:%v", s.ID(), tid)
 
 	k6Metrics := k6ext.GetCustomMetrics(ctx)
 
 	fs := FrameSession{
-		ctx:                  ctx, // TODO: create cancelable context that can be used to cancel and close all child sessions
+		ctx:                  ctx,
+		teardownCtx:          teardownCtx,
 		session:              s,
 		page:                 p,
 		parent:               parent,
@@ -238,7 +248,7 @@ func (fs *FrameSession) initEvents() {
 		fs.initRendererEvents()
 	}
 
-	go func() {
+	fs.wg.Go(func() {
 		fs.logger.Debugf("NewFrameSession:initEvents:go",
 			"sid:%v tid:%v", fs.session.ID(), fs.targetID)
 		defer func() {
@@ -312,7 +322,7 @@ func (fs *FrameSession) initEvents() {
 				}
 			}
 		}
-	}()
+	})
 }
 
 func (fs *FrameSession) onEventBindingCalled(event *cdpruntime.EventBindingCalled) {
@@ -364,7 +374,7 @@ func (fs *FrameSession) parseAndEmitWebVitalMetric(object string) error {
 	tags = tags.With("rating", wv.Rating)
 
 	now := time.Now()
-	k6metrics.PushIfNotDone(fs.vu.Context(), state.Samples, k6metrics.ConnectedSamples{
+	pushIfNotDone(fs.vu.Context(), fs.logger, state.Samples, k6metrics.ConnectedSamples{
 		Samples: []k6metrics.Sample{
 			{
 				TimeSeries: k6metrics.TimeSeries{Metric: metric, Tags: tags},
@@ -599,6 +609,11 @@ func (fs *FrameSession) isMainFrame() bool {
 	return fs.targetID == fs.page.targetID
 }
 
+func (fs *FrameSession) wait() {
+	fs.wg.Wait()
+	fs.networkManager.wait()
+}
+
 func (fs *FrameSession) handleFrameTree(frameTree *cdppage.FrameTree, initialFrame bool) {
 	fs.logger.Debugf("FrameSession:handleFrameTree",
 		"fid:%v sid:%v tid:%v", frameTree.Frame.ID, fs.session.ID(), fs.targetID)
@@ -621,7 +636,7 @@ func (fs *FrameSession) navigateFrame(frame *Frame, url, referrer string) (strin
 		fs.session.ID(), frame.ID(), fs.targetID, url, referrer)
 
 	action := cdppage.Navigate(url).WithReferrer(referrer).WithFrameID(cdp.FrameID(frame.ID()))
-	_, documentID, errorText, err := action.Do(cdp.WithExecutor(fs.ctx, fs.session))
+	_, documentID, errorText, _, err := action.Do(cdp.WithExecutor(fs.ctx, fs.session))
 	if err != nil {
 		if errorText == "" {
 			err = fmt.Errorf("%w", err)
@@ -682,7 +697,7 @@ func (fs *FrameSession) onExecutionContextCreated(event *cdpruntime.EventExecuti
 		Type      string      `json:"type"`
 	}
 	if err := json.Unmarshal(auxData, &i); err != nil {
-		k6ext.Panic(fs.ctx, "unmarshaling executionContextCreated event JSON: %w", err)
+		k6ext.Panicf(fs.ctx, "unmarshaling executionContextCreated event JSON: %w", err)
 	}
 
 	frame, ok := fs.manager.getFrameByID(i.FrameID)
@@ -767,7 +782,7 @@ func (fs *FrameSession) onFrameDetached(frameID cdp.FrameID, reason cdppage.Fram
 		fs.session.ID(), fs.targetID, frameID, reason)
 
 	if err := fs.manager.frameDetached(frameID, reason); err != nil {
-		k6ext.Panic(fs.ctx, "handling frameDetached event: %w", err)
+		k6ext.Panicf(fs.ctx, "handling frameDetached event: %w", err)
 	}
 }
 
@@ -780,7 +795,7 @@ func (fs *FrameSession) onFrameNavigated(frame *cdp.Frame, initial bool) {
 		frame.ID, frame.ParentID, frame.LoaderID.String(),
 		frame.Name, frame.URL+frame.URLFragment, initial)
 	if err != nil {
-		k6ext.Panic(fs.ctx, "handling frameNavigated event to %q: %w",
+		k6ext.Panicf(fs.ctx, "handling frameNavigated event to %q: %w",
 			frame.URL+frame.URLFragment, err)
 	}
 
@@ -830,7 +845,7 @@ func (fs *FrameSession) processNavigationSpan(id cdp.FrameID) {
 		js := fmt.Sprintf("window.k6SpanId = '%s';", spanID)
 		err := newFrame.EvaluateGlobal(fs.ctx, js)
 		if err != nil {
-			fs.logger.Errorf(
+			fs.logger.Debugf(
 				"FrameSession:onFrameNavigated", "error on evaluating window.k6SpanId: %v", err,
 			)
 		}
@@ -855,7 +870,7 @@ func (fs *FrameSession) onFrameRequestedNavigation(event *cdppage.EventFrameRequ
 	if event.Disposition == "currentTab" {
 		err := fs.manager.frameRequestedNavigation(event.FrameID, event.URL, "")
 		if err != nil {
-			k6ext.Panic(fs.ctx, "handling frameRequestedNavigation event to %q: %w", event.URL, err)
+			k6ext.Panicf(fs.ctx, "handling frameRequestedNavigation event to %q: %w", event.URL, err)
 		}
 	}
 }
@@ -952,10 +967,9 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 	case "worker":
 		err = fs.attachWorkerToTarget(ti, session)
 	default:
-		// Just unblock (debugger continue) these targets and detach from them.
-		_ = session.ExecuteWithoutExpectationOnReply(fs.ctx, cdpruntime.CommandRunIfWaitingForDebugger, nil, nil)
-		_ = session.ExecuteWithoutExpectationOnReply(fs.ctx, target.CommandDetachFromTarget,
-			&target.DetachFromTargetParams{SessionID: session.id}, nil)
+		fs.logger.Debugf("FrameSession:onAttachedToTarget",
+			"unsupported target type %q sid:%v", ti.Type, session.ID())
+		detachSession(fs.teardownCtx, session)
 	}
 	if err == nil {
 		return
@@ -995,12 +1009,21 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 			return // ignore
 		}
 		reason = "fatal"
-		k6ext.Panic(fs.ctx, "attaching %v: %w", ti.Type, err)
+		k6ext.Panicf(fs.ctx, "attaching %v: %w", ti.Type, err)
 	}
 }
 
 // attachIFrameToTarget attaches an IFrame target to a given session.
 func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, session *Session) error {
+	// If the page is closing, don't create a new FrameSession.
+	// Unblocks the target so the browser doesn't hang.
+	if fs.page.isClosing() {
+		fs.logger.Debugf("FrameSession:attachIFrameToTarget",
+			"rejected frame; page is closing: tid=%v", ti.TargetID)
+		detachSession(fs.teardownCtx, session)
+		return nil
+	}
+
 	sid := session.ID()
 	fr, ok := fs.manager.getFrameByID(cdp.FrameID(ti.TargetID))
 	if !ok {
@@ -1022,6 +1045,7 @@ func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, session *Session) 
 
 	nfs, err := NewFrameSession(
 		fs.ctx,
+		fs.teardownCtx,
 		session,
 		fs.page, fs, ti.TargetID,
 		fs.logger,
@@ -1032,6 +1056,12 @@ func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, session *Session) 
 	}
 
 	if err := fs.page.attachFrameSession(cdp.FrameID(ti.TargetID), nfs); err != nil {
+		if errors.Is(err, errPageClosing) {
+			fs.logger.Debugf("FrameSession:attachIFrameToTarget",
+				"rejected frame; page is closing: tid=%v", ti.TargetID)
+			detachSession(fs.teardownCtx, session)
+			return nil
+		}
 		return err
 	}
 
@@ -1040,6 +1070,13 @@ func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, session *Session) 
 
 // attachWorkerToTarget attaches a Worker target to a given session.
 func (fs *FrameSession) attachWorkerToTarget(ti *target.Info, session *Session) error {
+	if fs.page.isClosing() {
+		fs.logger.Debugf("FrameSession:attachWorkerToTarget",
+			"rejected worker; page is closing: tid=%v", ti.TargetID)
+		detachSession(fs.teardownCtx, session)
+		return nil
+	}
+
 	w, err := NewWorker(fs.ctx, session, ti.TargetID, ti.URL)
 	if err != nil {
 		return fmt.Errorf("attaching worker target ID %v to session ID %v: %w",
@@ -1064,7 +1101,7 @@ func (fs *FrameSession) onTargetCrashed() {
 	// TODO:?
 	s, ok := fs.session.(*Session)
 	if !ok {
-		k6ext.Panic(fs.ctx, "unexpected type %T", fs.session)
+		k6ext.Panicf(fs.ctx, "unexpected type %T", fs.session)
 	}
 	s.markAsCrashed()
 }
@@ -1250,4 +1287,12 @@ func (fs *FrameSession) executionContextForID(
 	}
 
 	return nil, fmt.Errorf("no execution context found for id: %v", executionContextID)
+}
+
+// detachSession unblocks a target waiting for debugger and detaches from it.
+// Prevents the browser from hanging on rejected targets during close
+func detachSession(ctx context.Context, session *Session) {
+	_ = session.ExecuteWithoutExpectationOnReply(ctx, cdpruntime.CommandRunIfWaitingForDebugger, nil, nil)
+	_ = session.ExecuteWithoutExpectationOnReply(ctx, target.CommandDetachFromTarget,
+		&target.DetachFromTargetParams{SessionID: session.id}, nil)
 }

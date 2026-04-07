@@ -2,14 +2,17 @@ package tests
 
 import (
 	"bytes"
+	"context"
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"image/png"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"runtime"
 	"slices"
 	"strconv"
@@ -24,14 +27,8 @@ import (
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext/k6test"
-	"go.k6.io/k6/metrics"
+	k6metrics "go.k6.io/k6/metrics"
 )
-
-type emulateMediaOpts struct {
-	Media         string `js:"media"`
-	ColorScheme   string `js:"colorScheme"`
-	ReducedMotion string `js:"reducedMotion"`
-}
 
 type jsFrameBaseOpts struct {
 	Timeout string
@@ -95,12 +92,11 @@ func TestPageEmulateMedia(t *testing.T) {
 	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
-	popts := common.NewPageEmulateMediaOptions(p)
-	require.NoError(t, popts.Parse(tb.context(), tb.toSobekValue(emulateMediaOpts{
+	popts := &common.PageEmulateMediaOptions{
 		Media:         "print",
 		ColorScheme:   "dark",
 		ReducedMotion: "reduce",
-	})))
+	}
 	err := p.EmulateMedia(popts)
 	require.NoError(t, err)
 
@@ -414,7 +410,7 @@ func TestPageInnerHTML(t *testing.T) {
 		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
 		_, err := p.InnerHTML("", common.NewFrameInnerHTMLOptions(p.Context().Timeout()))
-		require.ErrorContains(t, err, "The provided selector is empty")
+		require.ErrorContains(t, err, "provided selector is empty")
 	})
 
 	t.Run("err_wrong_selector", func(t *testing.T) {
@@ -451,7 +447,7 @@ func TestPageInnerText(t *testing.T) {
 		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
 		_, err := p.InnerText("", common.NewFrameInnerTextOptions(p.MainFrame().Timeout()))
-		require.ErrorContains(t, err, "The provided selector is empty")
+		require.ErrorContains(t, err, "provided selector is empty")
 	})
 
 	t.Run("err_wrong_selector", func(t *testing.T) {
@@ -490,7 +486,7 @@ func TestPageTextContent(t *testing.T) {
 		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
 		_, _, err := p.TextContent("", common.NewFrameTextContentOptions(p.MainFrame().Timeout()))
-		require.ErrorContains(t, err, "The provided selector is empty")
+		require.ErrorContains(t, err, "provided selector is empty")
 	})
 
 	t.Run("err_wrong_selector", func(t *testing.T) {
@@ -531,17 +527,17 @@ func TestPageInputValue(t *testing.T) {
 	inputValue, err := p.InputValue("input", common.NewFrameInputValueOptions(p.MainFrame().Timeout()))
 	require.NoError(t, err)
 	got, want := inputValue, "hello1"
-	assert.Equal(t, got, want)
+	assert.Equal(t, want, got)
 
 	inputValue, err = p.InputValue("select", common.NewFrameInputValueOptions(p.MainFrame().Timeout()))
 	require.NoError(t, err)
 	got, want = inputValue, "hello2"
-	assert.Equal(t, got, want)
+	assert.Equal(t, want, got)
 
 	inputValue, err = p.InputValue("textarea", common.NewFrameInputValueOptions(p.MainFrame().Timeout()))
 	require.NoError(t, err)
 	got, want = inputValue, "hello3"
-	assert.Equal(t, got, want)
+	assert.Equal(t, want, got)
 }
 
 // test for: https://go.k6.io/k6/js/modules/k6/browser/issues/132
@@ -669,15 +665,7 @@ func TestPageScreenshotFullpage(t *testing.T) {
 	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
-	viewportSize := tb.toSobekValue(struct {
-		Width  float64 `js:"width"`
-		Height float64 `js:"height"`
-	}{
-		Width: 1280, Height: 800,
-	})
-	s := new(common.Size)
-	require.NoError(t, s.Parse(tb.context(), viewportSize))
-
+	s := &common.Size{Width: 1280, Height: 800}
 	err := p.SetViewportSize(s)
 	require.NoError(t, err)
 
@@ -819,7 +807,7 @@ func TestPageWaitForFunction(t *testing.T) {
 		tb.logCache.contains("ok: null")
 
 		p := tb.vu.RunPromise(t, `return await page.evaluate(() => window._arg);`)
-		require.Equal(t, p.State(), sobek.PromiseStateFulfilled)
+		require.Equal(t, sobek.PromiseStateFulfilled, p.State())
 		assert.Equal(t, "raf_arg", p.Result().String())
 	})
 
@@ -843,7 +831,7 @@ func TestPageWaitForFunction(t *testing.T) {
 		tb.logCache.contains("ok: null")
 
 		p := tb.vu.RunPromise(t, `return await page.evaluate(() => window._args);`)
-		require.Equal(t, p.State(), sobek.PromiseStateFulfilled)
+		require.Equal(t, sobek.PromiseStateFulfilled, p.State())
 		var gotArgs []int
 		_ = tb.vu.Runtime().ExportTo(p.Result(), &gotArgs)
 		assert.Equal(t, args, gotArgs)
@@ -1031,6 +1019,81 @@ func TestPageClose(t *testing.T) {
 }
 
 func TestPageOn(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		fun     string
+		wantErr string
+	}{
+		"nil on('console') handler": {
+			fun:     `page.on('console')`,
+			wantErr: `TypeError: The "listener" argument must be a function`,
+		},
+		"valid on('console') handler": {
+			fun: `page.on('console', () => {})`,
+		},
+		"nil on('metric') handler": {
+			fun:     `page.on('metric')`,
+			wantErr: `TypeError: The "listener" argument must be a function`,
+		},
+		"valid on('metric') handler": {
+			fun: `page.on('metric', () => {})`,
+		},
+		"nil on('request') handler": {
+			fun:     `page.on('request')`,
+			wantErr: `TypeError: The "listener" argument must be a function`,
+		},
+		"valid on('request') handler": {
+			fun: `page.on('request', () => {})`,
+		},
+		"nil on('response') handler": {
+			fun:     `page.on('response')`,
+			wantErr: `TypeError: The "listener" argument must be a function`,
+		},
+		"valid on('response') handler": {
+			fun: `page.on('response', () => {})`,
+		},
+		"nil on('requestfailed') handler": {
+			fun:     `page.on('requestfailed')`,
+			wantErr: `TypeError: The "listener" argument must be a function`,
+		},
+		"valid on('requestfailed') handler": {
+			fun: `page.on('requestfailed', () => {})`,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
+
+			tb.vu.ActivateVU()
+			tb.vu.StartIteration(t)
+			defer tb.vu.EndIteration(t)
+
+			gv, err := tb.vu.RunAsync(t, `
+				const page = await browser.newPage();
+				try {
+					%s        // e.g. page.on('console', handler);
+				} finally {
+					await page.close();
+				}
+ 			`, tt.fun)
+
+			got := k6test.ToPromise(t, gv)
+
+			if tt.wantErr != "" {
+				assert.ErrorContains(t, err, tt.wantErr)
+				assert.Equal(t, sobek.PromiseStateRejected, got.State())
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, sobek.PromiseStateFulfilled, got.State())
+			}
+		})
+	}
+}
+
+func TestPageOnConsole(t *testing.T) {
 	t.Parallel()
 
 	const blankPage = "about:blank"
@@ -1283,13 +1346,13 @@ func TestPageOn(t *testing.T) {
 			)
 
 			// Console Messages should be multiplexed for every registered handler
-			eventHandlerOne := func(event common.PageOnEvent) error {
+			eventHandlerOne := func(event common.PageEvent) error {
 				defer close(done1)
 				tc.assertFn(t, event.ConsoleMessage)
 				return nil
 			}
 
-			eventHandlerTwo := func(event common.PageOnEvent) error {
+			eventHandlerTwo := func(event common.PageEvent) error {
 				defer close(done2)
 				tc.assertFn(t, event.ConsoleMessage)
 				return nil
@@ -1595,7 +1658,7 @@ func performPingTest(t *testing.T, tb *testBrowser, page *common.Page, iteration
 	t.Helper()
 
 	var ms int64
-	for i := 0; i < iterations; i++ {
+	for range iterations {
 		start := time.Now()
 
 		opts := &common.FrameGotoOptions{
@@ -2087,7 +2150,7 @@ func TestPageOnMetric(t *testing.T) {
 
 			done := make(chan bool)
 
-			samples := make(chan metrics.SampleContainer)
+			samples := make(chan k6metrics.SampleContainer)
 			// This page will perform many pings with a changing h query parameter.
 			// This URL should be grouped according to how page.on('metric') is used.
 			tb := newTestBrowser(t, withHTTPServer(), withSamples(samples))
@@ -2553,7 +2616,7 @@ func TestPageOnResponse(t *testing.T) {
 
 		return JSON.stringify(returnValue, null, 2);
 	`, tb.url("/home"))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	got := k6test.ToPromise(t, gv)
 
@@ -2655,19 +2718,19 @@ func TestPageOnResponse(t *testing.T) {
 			AllHeaders: map[string]string{
 				"access-control-allow-credentials": "true",
 				"access-control-allow-origin":      "*",
-				"content-length":                   "10",
+				"content-length":                   "19",
 				"content-type":                     "text/plain; charset=utf-8",
 				"date":                             "Wed, 29 Jan 2025 09:00:00 GMT",
 				"x-content-type-options":           "nosniff",
 			},
-			Body:                  "Not Found\n",
+			Body:                  "404 page not found\n",
 			FrameURL:              tb.url("/home"),
 			AcceptLanguageHeader:  "",
 			AcceptLanguageHeaders: []string{""},
 			Headers: map[string]string{
 				"Access-Control-Allow-Credentials": "true",
 				"Access-Control-Allow-Origin":      "*",
-				"Content-Length":                   "10",
+				"Content-Length":                   "19",
 				"Content-Type":                     "text/plain; charset=utf-8",
 				"Date":                             "Wed, 29 Jan 2025 09:00:00 GMT",
 				"X-Content-Type-Options":           "nosniff",
@@ -2678,18 +2741,18 @@ func TestPageOnResponse(t *testing.T) {
 				{"name": "Access-Control-Allow-Credentials", "value": "true"},
 				{"name": "X-Content-Type-Options", "value": "nosniff"},
 				{"name": "Access-Control-Allow-Origin", "value": "*"},
-				{"name": "Content-Length", "value": "10"},
+				{"name": "Content-Length", "value": "19"},
 			},
 			JSON:            "null",
 			OK:              false,
 			RequestURL:      tb.url("/favicon.ico"),
 			SecurityDetails: common.SecurityDetails{},
 			ServerAddr:      common.RemoteAddress{IPAddress: host, Port: port},
-			Size:            map[string]int{"body": 10, "headers": 229},
+			Size:            map[string]int{"body": 19, "headers": 229},
 			Status:          404,
 			StatusText:      "Not Found",
 			URL:             tb.url("/favicon.ico"),
-			Text:            "Not Found\n",
+			Text:            "404 page not found\n",
 		},
 		{
 			AllHeaders: map[string]string{
@@ -2736,6 +2799,396 @@ func TestPageOnResponse(t *testing.T) {
 		slices.SortFunc(expected[i].HeadersArray, sortByName)
 		assert.Equal(t, expected[i], resp)
 	}
+}
+
+// TestPageOnRequestFinished tests that the requestfinished event fires when requests complete successfully.
+func TestPageOnRequestFinished(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withHTTPServer())
+	tb.withHandler("/home", func(w http.ResponseWriter, _ *http.Request) {
+		_, err := fmt.Fprintf(w, `<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <script>fetch('/api', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({name: 'tester'})
+    })</script>
+</body>
+</html>`)
+		require.NoError(t, err)
+	})
+	tb.withHandler("/api", func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		defer require.NoError(t, r.Body.Close())
+
+		var data struct {
+			Name string `json:"name"`
+		}
+		err = json.Unmarshal(body, &data)
+		require.NoError(t, err)
+
+		w.Header().Set("Content-Type", "application/json")
+		_, err = fmt.Fprintf(w, `{"message": "Hello %s!"}`, data.Name)
+		require.NoError(t, err)
+	})
+	tb.withHandler("/style.css", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/css")
+		_, err := fmt.Fprintf(w, `body { background-color: #f0f0f0; }`)
+		require.NoError(t, err)
+	})
+
+	tb.vu.ActivateVU()
+	tb.vu.StartIteration(t)
+	defer tb.vu.EndIteration(t)
+
+	gv, err := tb.vu.RunAsync(t, `
+		const context = await browser.newContext();
+		const page = await context.newPage();
+
+		var finishedRequests = [];
+		page.on('requestfinished', (request) => {
+			finishedRequests.push({
+				url: request.url(),
+				method: request.method(),
+				resourceType: request.resourceType(),
+				isNavigationRequest: request.isNavigationRequest(),
+			});
+		});
+
+		await page.goto('%s', {waitUntil: 'networkidle'});
+		await page.close();
+		return JSON.stringify(finishedRequests, null, 2);
+	`, tb.url("/home"))
+	require.NoError(t, err)
+
+	got := k6test.ToPromise(t, gv)
+	require.Equal(t, sobek.PromiseStateFulfilled, got.State())
+
+	var finishedRequests []struct {
+		URL                 string `json:"url"`
+		Method              string `json:"method"`
+		ResourceType        string `json:"resourceType"`
+		IsNavigationRequest bool   `json:"isNavigationRequest"`
+	}
+	err = json.Unmarshal([]byte(got.Result().String()), &finishedRequests)
+	require.NoError(t, err)
+
+	// Verify we captured some finished requests
+	require.NotEmpty(t, finishedRequests, "expected to capture at least one finished request")
+
+	var foundHome, foundAPI, foundCSS bool
+	for _, req := range finishedRequests {
+		switch {
+		case strings.HasSuffix(req.URL, "/home"):
+			foundHome = true
+			assert.Equal(t, "GET", req.Method)
+			assert.Equal(t, "Document", req.ResourceType)
+			assert.True(t, req.IsNavigationRequest)
+		case strings.HasSuffix(req.URL, "/api"):
+			foundAPI = true
+			assert.Equal(t, "POST", req.Method)
+			assert.Equal(t, "Fetch", req.ResourceType)
+			assert.False(t, req.IsNavigationRequest)
+		case strings.HasSuffix(req.URL, "/style.css"):
+			foundCSS = true
+			assert.Equal(t, "GET", req.Method)
+			assert.Equal(t, "Stylesheet", req.ResourceType)
+			assert.False(t, req.IsNavigationRequest)
+		}
+	}
+
+	assert.True(t, foundHome, "expected to find /home request in finished requests")
+	assert.True(t, foundAPI, "expected to find /api request in finished requests")
+	assert.True(t, foundCSS, "expected to find /style.css request in finished requests")
+}
+
+// TestPageOnRequestFinishedRedirect tests that the requestfinished event fires
+// for each request in a redirect chain, not just the final one.
+func TestPageOnRequestFinishedRedirect(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withHTTPServer())
+	tb.withHandler("/redir-a", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, tb.url("/redir-b"), http.StatusFound)
+	})
+	tb.withHandler("/redir-b", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, tb.url("/redir-final"), http.StatusFound)
+	})
+	tb.withHandler("/redir-final", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, err := fmt.Fprint(w, "<html><body>done</body></html>")
+		require.NoError(t, err)
+	})
+
+	tb.vu.ActivateVU()
+	tb.vu.StartIteration(t)
+	defer tb.vu.EndIteration(t)
+
+	gv, err := tb.vu.RunAsync(t, `
+		const context = await browser.newContext();
+		const page = await context.newPage();
+
+		const expectedCount = 3; // redir-a, redir-b, redir-final
+		const finishedRequests = [];
+		let resolveAll;
+		const allFinished = new Promise(r => { resolveAll = r; });
+
+		page.on('requestfinished', (request) => {
+			const url = request.url();
+			if (url.includes('/redir-')) {
+				finishedRequests.push({ url: url });
+				if (finishedRequests.length >= expectedCount) {
+					resolveAll();
+				}
+			}
+		});
+
+		await page.goto('%s', {waitUntil: 'networkidle'});
+		await allFinished;
+		await page.close();
+		return JSON.stringify(finishedRequests, null, 2);
+	`, tb.url("/redir-a"))
+	require.NoError(t, err)
+
+	got := k6test.ToPromise(t, gv)
+	require.Equal(t, sobek.PromiseStateFulfilled, got.State())
+
+	var finishedRequests []struct {
+		URL string `json:"url"`
+	}
+	err = json.Unmarshal([]byte(got.Result().String()), &finishedRequests)
+	require.NoError(t, err)
+
+	// Verify that requestfinished fired for the redirect requests,
+	// not just the final response.
+	var foundRedirA, foundRedirB, foundFinal bool
+	for _, req := range finishedRequests {
+		switch {
+		case strings.HasSuffix(req.URL, "/redir-a"):
+			foundRedirA = true
+		case strings.HasSuffix(req.URL, "/redir-b"):
+			foundRedirB = true
+		case strings.HasSuffix(req.URL, "/redir-final"):
+			foundFinal = true
+		}
+	}
+
+	assert.True(t, foundRedirA, "expected requestfinished to fire for /redir-a (first redirect)")
+	assert.True(t, foundRedirB, "expected requestfinished to fire for /redir-b (second redirect)")
+	assert.True(t, foundFinal, "expected requestfinished to fire for /redir-final (final response)")
+}
+
+// TestPageOnResponseRedirect tests that the response event fires
+// for each response in a redirect chain, not just the final one.
+func TestPageOnResponseRedirect(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withHTTPServer())
+	tb.withHandler("/redir-a", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, tb.url("/redir-b"), http.StatusFound)
+	})
+	tb.withHandler("/redir-b", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, tb.url("/redir-final"), http.StatusFound)
+	})
+	tb.withHandler("/redir-final", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, err := fmt.Fprint(w, "<html><body>done</body></html>")
+		require.NoError(t, err)
+	})
+
+	tb.vu.ActivateVU()
+	tb.vu.StartIteration(t)
+	defer tb.vu.EndIteration(t)
+
+	gv, err := tb.vu.RunAsync(t, `
+		const context = await browser.newContext();
+		const page = await context.newPage();
+
+		const expectedCount = 3; // redir-a, redir-b, redir-final
+		const responses = [];
+		let resolveAll;
+		const allReceived = new Promise(r => { resolveAll = r; });
+
+		page.on('response', (response) => {
+			const url = response.url();
+			if (url.includes('/redir-')) {
+				responses.push({ url: url, status: response.status() });
+				if (responses.length >= expectedCount) {
+					resolveAll();
+				}
+			}
+		});
+
+		await page.goto('%s', {waitUntil: 'networkidle'});
+		await allReceived;
+		await page.close();
+		return JSON.stringify(responses, null, 2);
+	`, tb.url("/redir-a"))
+	require.NoError(t, err)
+
+	got := k6test.ToPromise(t, gv)
+	require.Equal(t, sobek.PromiseStateFulfilled, got.State())
+
+	var responses []struct {
+		URL    string `json:"url"`
+		Status int    `json:"status"`
+	}
+	err = json.Unmarshal([]byte(got.Result().String()), &responses)
+	require.NoError(t, err)
+
+	// Verify that response event fired for each redirect response,
+	// not just the final one.
+	var foundRedirA, foundRedirB, foundFinal bool
+	for _, resp := range responses {
+		switch {
+		case strings.HasSuffix(resp.URL, "/redir-a"):
+			foundRedirA = true
+			assert.Equal(t, http.StatusFound, resp.Status, "/redir-a should be a 302")
+		case strings.HasSuffix(resp.URL, "/redir-b"):
+			foundRedirB = true
+			assert.Equal(t, http.StatusFound, resp.Status, "/redir-b should be a 302")
+		case strings.HasSuffix(resp.URL, "/redir-final"):
+			foundFinal = true
+			assert.Equal(t, http.StatusOK, resp.Status, "/redir-final should be a 200")
+		}
+	}
+
+	assert.True(t, foundRedirA, "expected response event to fire for /redir-a (first redirect)")
+	assert.True(t, foundRedirB, "expected response event to fire for /redir-b (second redirect)")
+	assert.True(t, foundFinal, "expected response event to fire for /redir-final (final response)")
+}
+
+// TestPageOnRequestFailed tests that the requestfailed event fires when requests fail.
+func TestPageOnRequestFailed(t *testing.T) {
+	t.Parallel()
+
+	t.Run("server_aborted_request", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withHTTPServer())
+
+		tb.withHandler("/home", func(w http.ResponseWriter, _ *http.Request) {
+			_, err := fmt.Fprintf(w, `<!DOCTYPE html>
+<html>
+<body>
+    <h1>Test Page</h1>
+    <script>
+        fetch('/api/data')
+            .then(() => { window.fetchResult = 'success'; })
+            .catch(() => { window.fetchResult = 'failed'; });
+    </script>
+</body>
+</html>`)
+			require.NoError(t, err)
+		})
+
+		tb.withHandler("/api/data", func(w http.ResponseWriter, _ *http.Request) {
+			panic(http.ErrAbortHandler)
+		})
+
+		p := tb.NewPage(nil)
+
+		var failedRequests []map[string]string
+		err := p.On(common.PageEventRequestFailed, func(ev common.PageEvent) error {
+			req := ev.Request
+			failure := req.Failure()
+			errorText := ""
+			if failure != nil {
+				errorText = failure.ErrorText
+			}
+			failedRequests = append(failedRequests, map[string]string{
+				"url":          req.URL(),
+				"method":       req.Method(),
+				"resourceType": req.ResourceType(),
+				"errorText":    errorText,
+			})
+			return nil
+		})
+		require.NoError(t, err)
+
+		opts := &common.FrameGotoOptions{
+			WaitUntil: common.LifecycleEventNetworkIdle,
+			Timeout:   common.DefaultTimeout,
+		}
+		_, err = p.Goto(tb.url("/home"), opts)
+		require.NoError(t, err)
+
+		require.Len(t, failedRequests, 1, "expected exactly one failed request")
+
+		failedReq := failedRequests[0]
+		assert.Contains(t, failedReq["url"], "/api/data", "failed request URL should contain /api/data")
+		assert.Equal(t, "GET", failedReq["method"], "failed request method should be GET")
+		assert.Equal(t, "Fetch", failedReq["resourceType"], "failed request resourceType should be Fetch")
+		assert.NotEmpty(t, failedReq["errorText"], "failed request should have error text")
+	})
+
+	t.Run("server_aborted_multiple_requests", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withHTTPServer())
+
+		tb.withHandler("/home", func(w http.ResponseWriter, _ *http.Request) {
+			_, err := fmt.Fprintf(w, `<!DOCTYPE html>
+<html>
+<body>
+    <script>
+        Promise.allSettled([
+            fetch('/api/first'),
+            fetch('/api/second')
+        ]).then(() => { window.allDone = true; });
+    </script>
+</body>
+</html>`)
+			require.NoError(t, err)
+		})
+
+		tb.withHandler("/api/first", func(w http.ResponseWriter, _ *http.Request) {
+			panic(http.ErrAbortHandler)
+		})
+
+		tb.withHandler("/api/second", func(w http.ResponseWriter, _ *http.Request) {
+			panic(http.ErrAbortHandler)
+		})
+
+		p := tb.NewPage(nil)
+
+		var failedRequests []string
+		err := p.On(common.PageEventRequestFailed, func(ev common.PageEvent) error {
+			failedRequests = append(failedRequests, ev.Request.URL())
+			return nil
+		})
+		require.NoError(t, err)
+
+		opts := &common.FrameGotoOptions{
+			WaitUntil: common.LifecycleEventNetworkIdle,
+			Timeout:   common.DefaultTimeout,
+		}
+		_, err = p.Goto(tb.url("/home"), opts)
+		require.NoError(t, err)
+
+		// Verify that both requests failed
+		require.Len(t, failedRequests, 2, "expected two failed requests")
+
+		var hasFirst, hasSecond bool
+		for _, url := range failedRequests {
+			if strings.Contains(url, "/api/first") {
+				hasFirst = true
+			}
+			if strings.Contains(url, "/api/second") {
+				hasSecond = true
+			}
+		}
+		assert.True(t, hasFirst, "expected /api/first to be in failed requests")
+		assert.True(t, hasSecond, "expected /api/second to be in failed requests")
+	})
 }
 
 func TestPageMustUseNativeJavaScriptObjects(t *testing.T) {
@@ -2944,7 +3397,6 @@ func TestPageWaitForURLSuccess(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Setup
 			tb := newTestBrowser(t, withFileServer())
 			tb.vu.ActivateVU()
 			tb.vu.StartIteration(t)
@@ -2953,19 +3405,15 @@ func TestPageWaitForURLSuccess(t *testing.T) {
 			tb.vu.SetVar(t, "testURL", tb.staticURL("waitfornavigation_test.html"))
 			tb.vu.SetVar(t, "page1URL", tb.staticURL("page1.html"))
 			_, err := tb.vu.RunAsync(t, `
-					page = await browser.newPage();
-				`)
+				page = await browser.newPage();
+			`)
 			require.NoError(t, err)
 
-			// test logic
-			code := fmt.Sprintf(`
-			await page.goto(testURL);
-
-			%s
-			
-			return page.url();`, tt.code)
-
-			result := tb.vu.RunPromise(t, code)
+			result := tb.vu.RunPromise(t, `
+				await page.goto(testURL);
+				%s
+				return page.url();
+			`, tt.code)
 			got := strings.ReplaceAll(result.Result().String(), tb.staticURL(""), "")
 			assert.Contains(t, tt.expected, got)
 		})
@@ -3010,20 +3458,17 @@ func TestPageWaitForURLFailure(t *testing.T) {
 			tb.vu.ActivateVU()
 			tb.vu.StartIteration(t)
 
-			// Setup
 			tb.vu.SetVar(t, "page", &sobek.Object{})
 			tb.vu.SetVar(t, "testURL", tb.staticURL("waitfornavigation_test.html"))
 			_, err := tb.vu.RunAsync(t, `
-					page = await browser.newPage();
-				`)
+				page = await browser.newPage();
+			`)
 			require.NoError(t, err)
 
-			code := fmt.Sprintf(`
-			await page.goto(testURL);
-
-			%s`, tt.code)
-
-			_, err = tb.vu.RunAsync(t, code)
+			_, err = tb.vu.RunAsync(t, `
+				await page.goto(testURL);
+				%s
+			`, tt.code)
 			assert.ErrorContains(t, err, tt.expected)
 		})
 	}
@@ -3095,7 +3540,7 @@ func TestPageWaitForResponse(t *testing.T) {
 		}
 
 		_, err := p.WaitForResponse("/page", opts, mockRegexChecker)
-		require.ErrorContains(t, err, "canceled")
+		require.ErrorIs(t, err, context.Canceled)
 	})
 
 	t.Run("err/timeout", func(t *testing.T) {
@@ -3121,7 +3566,116 @@ func TestPageWaitForResponse(t *testing.T) {
 		}
 
 		err := tb.run(tb.context(), waitForApi)
-		require.ErrorContains(t, err, "waiting for response")
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+	})
+}
+
+func TestPageWaitForRequest(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ok/waits_for_request", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withFileServer())
+		p := tb.GotoNewPage(tb.staticURL("/usual.html"))
+
+		var req *common.Request
+		err := tb.run(tb.context(),
+			// We make three requests for detecting edge cases,
+			// such as if WaitForRequest stops at the first match,
+			// or misses requests made in quick succession.
+			func() error {
+				_, err := p.Evaluate(`() => {
+					fetch('fetch-request-1');
+					fetch('fetch-request-2');
+					fetch('fetch-request-3');
+				}`, nil)
+				return err
+			},
+			// Waits until the request we're looking for is made.
+			func() error {
+				var werr error
+				req, werr = p.WaitForRequest(
+					"fetch-request-2",
+					&common.PageWaitForRequestOptions{
+						Timeout: p.Timeout(),
+					},
+					func(pattern, url string) (bool, error) {
+						return strings.Contains(url, pattern), nil
+					},
+				)
+				return werr
+			},
+		)
+		require.NoError(t, err)
+		require.NotNilf(t, req, "must have returned the request")
+		require.Contains(t, req.URL(), "fetch-request-2", "must return the correct request")
+	})
+
+	t.Run("err/pattern-func-error", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withFileServer(), withLogCache())
+		p := tb.GotoNewPage(tb.staticURL("/usual.html"))
+
+		patternFuncError := errors.New("pattern func error")
+		err := tb.run(tb.context(), func() error {
+			_, werr := p.WaitForRequest(
+				"usual.html",
+				&common.PageWaitForRequestOptions{
+					Timeout: p.Timeout(),
+				},
+				func(pattern, url string) (bool, error) {
+					return false, patternFuncError
+				},
+			)
+			return werr
+		})
+		require.ErrorIs(t, err, patternFuncError)
+		tb.logCache.assertContains(t, patternFuncError.Error())
+	})
+
+	t.Run("err/canceled", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t)
+		p := tb.NewPage(nil)
+
+		go tb.cancelContext()
+		<-tb.context().Done()
+
+		req, err := p.WaitForRequest(
+			"/does-not-matter",
+			&common.PageWaitForRequestOptions{Timeout: p.Timeout()},
+			func(pattern, url string) (bool, error) {
+				return true, nil
+			},
+		)
+		require.ErrorIs(t, err, context.Canceled)
+		require.Nil(t, req)
+	})
+
+	t.Run("err/timeout", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t)
+
+		var req *common.Request
+		err := tb.run(tb.context(), func() error {
+			var werr error
+			req, werr = tb.NewPage(nil).WaitForRequest(
+				"/does-not-exist",
+				&common.PageWaitForRequestOptions{
+					Timeout: 500 * time.Millisecond,
+				},
+				func(pattern, url string) (bool, error) {
+					return true, nil
+				},
+			)
+			return werr
+		})
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+		require.Nil(t, req)
 	})
 }
 
@@ -3288,7 +3842,8 @@ func TestClickInNestedFramesCORS(t *testing.T) {
 		err = page.Locator("#incrementA", nil).Click(clickOpts)
 		require.NoError(t, err)
 
-		countA, ok, err := page.Locator("#countA", nil).TextContent(nil)
+		la := page.Locator("#countA", nil)
+		countA, ok, err := la.TextContent(common.NewFrameTextContentOptions(la.Timeout()))
 		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, expectedCount, countA)
@@ -3304,7 +3859,8 @@ func TestClickInNestedFramesCORS(t *testing.T) {
 		err = frameAContent.Locator("#incrementA2", nil).Click(clickOpts)
 		require.NoError(t, err)
 
-		countA2, ok, err := frameAContent.Locator("#countA2", nil).TextContent(nil)
+		la2 := frameAContent.Locator("#countA2", nil)
+		countA2, ok, err := la2.TextContent(common.NewFrameTextContentOptions(la2.Timeout()))
 		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, expectedCount, countA2)
@@ -3320,7 +3876,8 @@ func TestClickInNestedFramesCORS(t *testing.T) {
 		err = frameBContent.Locator("#incrementB", nil).Click(clickOpts)
 		require.NoError(t, err)
 
-		countB, ok, err := frameBContent.Locator("#countB", nil).TextContent(nil)
+		lb := frameBContent.Locator("#countB", nil)
+		countB, ok, err := lb.TextContent(common.NewFrameTextContentOptions(lb.Timeout()))
 		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, expectedCount, countB)
@@ -3336,7 +3893,8 @@ func TestClickInNestedFramesCORS(t *testing.T) {
 		err = frameCContent.Locator("#increment", nil).Click(clickOpts)
 		require.NoError(t, err)
 
-		count, ok, err := frameCContent.Locator("#count", nil).TextContent(nil)
+		lc := frameCContent.Locator("#count", nil)
+		count, ok, err := lc.TextContent(common.NewFrameTextContentOptions(lc.Timeout()))
 		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, expectedCount, count)
@@ -3352,7 +3910,8 @@ func TestClickInNestedFramesCORS(t *testing.T) {
 		err = frameDContent.Locator("#incrementD", nil).Click(clickOpts)
 		require.NoError(t, err)
 
-		countD, ok, err := frameDContent.Locator("#countD", nil).TextContent(nil)
+		ld := frameDContent.Locator("#countD", nil)
+		countD, ok, err := ld.TextContent(common.NewFrameTextContentOptions(ld.Timeout()))
 		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, expectedCount, countD)
@@ -3382,7 +3941,8 @@ func TestClickInNestedFramesCORS(t *testing.T) {
 		err = page.Locator("#incrementA", nil).Click(clickOpts)
 		require.NoError(t, err)
 
-		countA, ok, err := page.Locator("#countA", nil).TextContent(nil)
+		la := page.Locator("#countA", nil)
+		countA, ok, err := la.TextContent(common.NewFrameTextContentOptions(la.Timeout()))
 		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, expectedCount, countA)
@@ -3391,10 +3951,11 @@ func TestClickInNestedFramesCORS(t *testing.T) {
 		frameAContent := page.Locator("#frameA", nil).ContentFrame()
 
 		// Click on the second nested frame.
-		err = frameAContent.Locator("#incrementA2").Click(clickOpts)
+		err = frameAContent.Locator("#incrementA2", nil).Click(clickOpts)
 		require.NoError(t, err)
 
-		countA2, ok, err := frameAContent.Locator("#countA2").TextContent(nil)
+		la2 := frameAContent.Locator("#countA2", nil)
+		countA2, ok, err := la2.TextContent(common.NewFrameTextContentOptions(la2.Timeout()))
 		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, expectedCount, countA2)
@@ -3403,36 +3964,578 @@ func TestClickInNestedFramesCORS(t *testing.T) {
 		frameBContent := page.Locator("#frameB", nil).ContentFrame()
 
 		// Click on the third nested frame.
-		err = frameBContent.Locator("#incrementB").Click(clickOpts)
+		err = frameBContent.Locator("#incrementB", nil).Click(clickOpts)
 		require.NoError(t, err)
 
-		countB, ok, err := frameBContent.Locator("#countB").TextContent(nil)
+		lb := frameBContent.Locator("#countB", nil)
+		countB, ok, err := lb.TextContent(common.NewFrameTextContentOptions(lb.Timeout()))
 		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, expectedCount, countB)
 
 		// Now get the third nested frame.
-		frameCContent := frameBContent.Locator("#frameC").ContentFrame()
+		frameCContent := frameBContent.Locator("#frameC", nil).ContentFrame()
 
 		// Click on the fourth nested frame.
-		err = frameCContent.Locator("#increment").Click(clickOpts)
+		err = frameCContent.Locator("#increment", nil).Click(clickOpts)
 		require.NoError(t, err)
 
-		count, ok, err := frameCContent.Locator("#count").TextContent(nil)
+		lc := frameCContent.Locator("#count", nil)
+		count, ok, err := lc.TextContent(common.NewFrameTextContentOptions(lc.Timeout()))
 		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, expectedCount, count)
 
 		// Now get the fourth nested frame.
-		frameDContent := frameCContent.Locator("#frameD").ContentFrame()
+		frameDContent := frameCContent.Locator("#frameD", nil).ContentFrame()
 
 		// Click on the fifth nested frame.
-		err = frameDContent.Locator("#incrementD").Click(clickOpts)
+		err = frameDContent.Locator("#incrementD", nil).Click(clickOpts)
 		require.NoError(t, err)
 
-		countD, ok, err := frameDContent.Locator("#countD").TextContent(nil)
+		ld := frameDContent.Locator("#countD", nil)
+		countD, ok, err := ld.TextContent(common.NewFrameTextContentOptions(ld.Timeout()))
 		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, expectedCount, countD)
 	})
+}
+
+func TestPageUnroute(t *testing.T) {
+	t.Parallel()
+
+	jsRegexCheckerMock := func(pattern, url string) (bool, error) {
+		matched, err := regexp.MatchString(fmt.Sprintf("http://[^/]*%s", pattern), url)
+		if err != nil {
+			return false, fmt.Errorf("error matching regex: %w", err)
+		}
+		return matched, nil
+	}
+
+	t.Run("unroute_single_route", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withHTTPServer())
+		p := tb.NewPage(nil)
+
+		routeHandlerCalls := 0
+		routeHandler := func(route *common.Route) error {
+			routeHandlerCalls++
+			return route.Continue(common.ContinueOptions{})
+		}
+
+		tb.withHandler("/test", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "text/html")
+			_, err := fmt.Fprintf(w, `
+			<html>
+				<body>
+					<script>
+						fetch('/api/data');
+					</script>
+				</body>
+			</html>
+			`)
+			require.NoError(t, err)
+		})
+
+		tb.withHandler("/api/data", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, err := fmt.Fprint(w, `{"data": "test"}`)
+			require.NoError(t, err)
+		})
+
+		// Add route
+		err := p.Route("/api/data", routeHandler, jsRegexCheckerMock)
+		require.NoError(t, err)
+
+		opts := &common.FrameGotoOptions{
+			WaitUntil: common.LifecycleEventNetworkIdle,
+			Timeout:   common.DefaultTimeout,
+		}
+		_, err = p.Goto(tb.url("/test"), opts)
+		require.NoError(t, err)
+
+		assert.Equal(t, 1, routeHandlerCalls)
+
+		// Remove the route
+		routeHandlerCalls = 0
+		err = p.Unroute("/api/data")
+		require.NoError(t, err)
+
+		_, err = p.Goto(tb.url("/test"), opts)
+		require.NoError(t, err)
+
+		assert.Equal(t, 0, routeHandlerCalls, "Route handler should not be called after unroute")
+	})
+
+	t.Run("unroute_multiple_matching_routes", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withHTTPServer())
+		p := tb.NewPage(nil)
+
+		handler1Calls := 0
+		handler2Calls := 0
+
+		routeHandler1 := func(route *common.Route) error {
+			handler1Calls++
+			return route.Continue(common.ContinueOptions{})
+		}
+
+		routeHandler2 := func(route *common.Route) error {
+			handler2Calls++
+			return route.Continue(common.ContinueOptions{})
+		}
+
+		tb.withHandler("/test", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "text/html")
+			_, err := fmt.Fprintf(w, `
+			<html>
+				<body>
+					<script>
+						fetch('/api/data');
+					</script>
+				</body>
+			</html>
+			`)
+			require.NoError(t, err)
+		})
+
+		tb.withHandler("/api/data", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, err := fmt.Fprint(w, `{"data": "test"}`)
+			require.NoError(t, err)
+		})
+
+		// Add multiple routes for the same path
+		err := p.Route("/api/data", routeHandler1, jsRegexCheckerMock)
+		require.NoError(t, err)
+		err = p.Route("/api/data", routeHandler2, jsRegexCheckerMock)
+		require.NoError(t, err)
+
+		opts := &common.FrameGotoOptions{
+			WaitUntil: common.LifecycleEventNetworkIdle,
+			Timeout:   common.DefaultTimeout,
+		}
+		_, err = p.Goto(tb.url("/test"), opts)
+		require.NoError(t, err)
+
+		// Only the most recently added handler should be called
+		assert.Equal(t, 0, handler1Calls, "First handler should not be called when second handler is present")
+		assert.Equal(t, 1, handler2Calls, "Second handler should be called")
+
+		// Remove all routes for this path
+		handler1Calls = 0
+		handler2Calls = 0
+
+		err = p.Unroute("/api/data")
+		require.NoError(t, err)
+
+		// Second navigation should not trigger any route handlers
+		_, err = p.Goto(tb.url("/test"), opts)
+		require.NoError(t, err)
+
+		assert.Equal(t, 0, handler1Calls, "First handler should not be called after unroute")
+		assert.Equal(t, 0, handler2Calls, "Second handler should not be called after unroute")
+	})
+
+	t.Run("unroute_nonexistent_route", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withHTTPServer())
+		p := tb.NewPage(nil)
+
+		routeHandlerCalls := 0
+		routeHandler := func(route *common.Route) error {
+			routeHandlerCalls++
+			return route.Continue(common.ContinueOptions{})
+		}
+
+		tb.withHandler("/test", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "text/html")
+			_, err := fmt.Fprintf(w, `
+			<html>
+				<body>
+					<script>
+						fetch('/api/data');
+					</script>
+				</body>
+			</html>
+			`)
+			require.NoError(t, err)
+		})
+
+		tb.withHandler("/api/data", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, err := fmt.Fprint(w, `{"data": "data"}`)
+			require.NoError(t, err)
+		})
+
+		err := p.Route("/api/data", routeHandler, jsRegexCheckerMock)
+		require.NoError(t, err)
+
+		opts := &common.FrameGotoOptions{
+			WaitUntil: common.LifecycleEventNetworkIdle,
+			Timeout:   common.DefaultTimeout,
+		}
+		_, err = p.Goto(tb.url("/test"), opts)
+		require.NoError(t, err)
+
+		assert.Equal(t, 1, routeHandlerCalls)
+
+		// Remove a non-existent route - this should be a no-op and not affect existing route
+		routeHandlerCalls = 0
+		err = p.Unroute("/unknown")
+		require.NoError(t, err)
+
+		_, err = p.Goto(tb.url("/test"), opts)
+		require.NoError(t, err)
+
+		assert.Equal(t, 1, routeHandlerCalls, "Route handler should still be active")
+	})
+}
+
+func TestPageUnrouteAll(t *testing.T) {
+	t.Parallel()
+
+	jsRegexCheckerMock := func(pattern, url string) (bool, error) {
+		matched, err := regexp.MatchString(fmt.Sprintf("http://[^/]*%s", pattern), url)
+		if err != nil {
+			return false, fmt.Errorf("error matching regex: %w", err)
+		}
+		return matched, nil
+	}
+
+	tb := newTestBrowser(t, withHTTPServer())
+	p := tb.NewPage(nil)
+
+	route1Calls := 0
+	route2Calls := 0
+
+	routeHandler1 := func(route *common.Route) error {
+		route1Calls++
+		return route.Continue(common.ContinueOptions{})
+	}
+
+	routeHandler2 := func(route *common.Route) error {
+		route2Calls++
+		return route.Continue(common.ContinueOptions{})
+	}
+
+	tb.withHandler("/test", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, err := fmt.Fprintf(w, `
+			<html>
+				<body>
+					<script>
+						fetch('/api/first');
+						fetch('/api/second');
+					</script>
+				</body>
+			</html>
+			`)
+		require.NoError(t, err)
+	})
+
+	tb.withHandler("/api/first", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, err := fmt.Fprint(w, `{"data": "first"}`)
+		require.NoError(t, err)
+	})
+
+	tb.withHandler("/api/second", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, err := fmt.Fprint(w, `{"data": "second"}`)
+		require.NoError(t, err)
+	})
+
+	// Add multiple routes
+	err := p.Route("/api/first", routeHandler1, jsRegexCheckerMock)
+	require.NoError(t, err)
+	err = p.Route("/api/second", routeHandler2, jsRegexCheckerMock)
+	require.NoError(t, err)
+
+	opts := &common.FrameGotoOptions{
+		WaitUntil: common.LifecycleEventNetworkIdle,
+		Timeout:   common.DefaultTimeout,
+	}
+	_, err = p.Goto(tb.url("/test"), opts)
+	require.NoError(t, err)
+
+	assert.Equal(t, 1, route1Calls)
+	assert.Equal(t, 1, route2Calls)
+
+	// Remove all routes - no route handler should be triggered
+	route1Calls = 0
+	route2Calls = 0
+	err = p.UnrouteAll()
+	require.NoError(t, err)
+
+	_, err = p.Goto(tb.url("/test"), opts)
+	require.NoError(t, err)
+
+	assert.Equal(t, 0, route1Calls, "First route should be removed")
+	assert.Equal(t, 0, route2Calls, "Second route should be removed")
+}
+
+func TestPageWaitForEvent(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ok/waits_for_console_event", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withHTTPServer())
+		tb.withHandler("/page", func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = fmt.Fprintf(w, `
+				<!doctype html>
+				<html><body><script>
+					setTimeout(() => console.log("hello world"), 50);
+				</script></body></html>
+			`)
+		})
+
+		p := tb.NewPage(nil)
+
+		gotoPage := func() error {
+			_, err := p.Goto(tb.url("/page"), &common.FrameGotoOptions{
+				WaitUntil: common.LifecycleEventDOMContentLoad,
+				Timeout:   common.DefaultTimeout,
+			})
+			return err
+		}
+
+		var ev common.PageEvent
+		waitForConsole := func() error {
+			var err error
+			ev, err = p.WaitForEvent(
+				common.PageEventConsole,
+				&common.PageWaitForEventOptions{Timeout: p.Timeout()},
+				nil,
+			)
+			return err
+		}
+
+		err := tb.run(tb.context(), gotoPage, waitForConsole)
+		require.NoError(t, err)
+		require.NotNil(t, ev.ConsoleMessage)
+		require.Equal(t, "hello world", ev.ConsoleMessage.Text)
+	})
+
+	t.Run("ok/waits_for_response_event", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withHTTPServer())
+		tb.withHandler("/api/data", func(w http.ResponseWriter, r *http.Request) {
+			_, _ = fmt.Fprintf(w, `{"data": "test"}`)
+		})
+		tb.withHandler("/page", func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = fmt.Fprintf(w, `
+				<!doctype html>
+				<html><body><script>
+					setTimeout(() => fetch('/api/data'), 50);
+				</script></body></html>
+			`)
+		})
+
+		p := tb.NewPage(nil)
+
+		gotoPage := func() error {
+			_, err := p.Goto(tb.url("/page"), &common.FrameGotoOptions{
+				WaitUntil: common.LifecycleEventDOMContentLoad,
+				Timeout:   common.DefaultTimeout,
+			})
+			return err
+		}
+
+		var ev common.PageEvent
+		waitForResponse := func() error {
+			var err error
+			ev, err = p.WaitForEvent(
+				common.PageEventResponse,
+				&common.PageWaitForEventOptions{Timeout: p.Timeout()},
+				func(pe common.PageEvent) (bool, error) {
+					return strings.Contains(pe.Response.URL(), "/api/data"), nil
+				},
+			)
+			return err
+		}
+
+		err := tb.run(tb.context(), gotoPage, waitForResponse)
+		require.NoError(t, err)
+		require.NotNil(t, ev.Response)
+		require.Contains(t, ev.Response.URL(), "/api/data")
+	})
+
+	t.Run("err/canceled", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t)
+		p := tb.NewPage(nil)
+
+		go tb.cancelContext()
+		<-tb.context().Done()
+
+		_, err := p.WaitForEvent(
+			common.PageEventConsole,
+			&common.PageWaitForEventOptions{Timeout: p.Timeout()},
+			nil,
+		)
+		require.ErrorIs(t, err, context.Canceled)
+	})
+
+	t.Run("err/timeout", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t)
+		p := tb.NewPage(nil)
+
+		err := tb.run(tb.context(), func() error {
+			_, werr := p.WaitForEvent(
+				common.PageEventConsole,
+				&common.PageWaitForEventOptions{Timeout: 500 * time.Millisecond},
+				nil,
+			)
+			return werr
+		})
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+	})
+}
+
+func TestPageGoBackForward(t *testing.T) {
+	t.Parallel()
+
+	t.Run("go_back_and_forward", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withFileServer())
+		p := tb.NewPage(nil)
+
+		url1 := tb.staticURL("page1.html")
+		tb.GotoPageAndAssertURL(p, url1)
+
+		url2 := tb.staticURL("page2.html")
+		tb.GotoPageAndAssertURL(p, url2)
+
+		opts := common.NewPageGoBackForwardOptions(common.LifecycleEventLoad, common.DefaultTimeout)
+		_, err := p.GoBackForward(-1, opts)
+		require.NoError(t, err)
+		tb.AssertURL(p, url1, "expected to be back on first page")
+
+		_, err = p.GoBackForward(+1, opts)
+		require.NoError(t, err)
+		tb.AssertURL(p, url2, "expected to be forward on second page")
+	})
+
+	t.Run("go_back_to_about_blank", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withFileServer())
+		p := tb.NewPage(nil)
+
+		url1 := tb.staticURL("page1.html")
+		tb.GotoPage(p, url1)
+
+		opts := common.NewPageGoBackForwardOptions(common.LifecycleEventLoad, common.DefaultTimeout)
+		_, err := p.GoBackForward(-1, opts)
+		require.NoError(t, err)
+		tb.AssertURL(p, common.BlankPage, "expected to be back on about:blank")
+
+		resp, err := p.GoBackForward(-1, opts)
+		require.NoError(t, err)
+		assert.Nil(t, resp, "expected nil response when can't go back")
+	})
+
+	t.Run("go_forward_returns_nil_at_boundary", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withFileServer())
+		p := tb.NewPage(nil)
+
+		url1 := tb.staticURL("page1.html")
+		tb.GotoPage(p, url1)
+
+		opts := common.NewPageGoBackForwardOptions(common.LifecycleEventLoad, common.DefaultTimeout)
+		resp, err := p.GoBackForward(+1, opts)
+		require.NoError(t, err)
+		assert.Nil(t, resp, "expected nil response when can't go forward")
+		tb.AssertURL(p, url1, "URL should not change when can't go forward")
+	})
+
+	t.Run("go_back_and_forward_with_iframe_page", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withFileServer())
+		p := tb.NewPage(nil)
+		opts := common.NewPageGoBackForwardOptions(common.LifecycleEventLoad, common.DefaultTimeout)
+
+		url1 := tb.staticURL("page1.html")
+		url2 := tb.staticURL("page_with_iframe.html")
+		url3 := tb.staticURL("page2.html")
+
+		tb.GotoPage(p, url1)
+		tb.GotoPage(p, url2)
+		tb.GotoPage(p, url3)
+		tb.GotoPageAndAssertURL(p, url1)
+
+		_, err := p.GoBackForward(-1, opts)
+		require.NoError(t, err)
+		tb.AssertURL(p, url3, "first goBack should land on page2")
+
+		_, err = p.GoBackForward(-1, opts)
+		require.NoError(t, err)
+		tb.AssertURL(p, url2, "second goBack should land on iframe page")
+
+		_, err = p.GoBackForward(-1, opts)
+		require.NoError(t, err)
+		tb.AssertURL(p, url1, "third goBack should land on page1")
+
+		_, err = p.GoBackForward(+1, opts)
+		require.NoError(t, err)
+		tb.AssertURL(p, url2, "first goForward should land on iframe page")
+
+		_, err = p.GoBackForward(+1, opts)
+		require.NoError(t, err)
+		tb.AssertURL(p, url3, "second goForward should land on page2")
+
+		for range 3 {
+			_, err = p.GoBackForward(-1, opts)
+			require.NoError(t, err)
+			_, err = p.GoBackForward(+1, opts)
+			require.NoError(t, err)
+		}
+		tb.AssertURL(p, url3, "after rapid navigation should still be on page2")
+	})
+}
+
+// The race occurs when browser goroutines (FrameSession event loop,
+// NetworkManager fire-and-forget goroutines) call PushIfNotDone on the
+// k6 samples channel while close(samples) runs during engine shutdown.
+// Reproduces the issue 5341 when run with the -race flag.
+func TestPageCloseMetricEmissionRaceCondition(t *testing.T) {
+	t.Parallel()
+
+	samples := make(chan k6metrics.SampleContainer, 100)
+	tb := newTestBrowser(t, withSamples(samples), withSkipClose())
+	tb.vu.StartIteration(t)
+
+	page := tb.NewPage(nil)
+	_, err := page.Evaluate(`() => {
+		window.k6browserSendWebVitalMetric(JSON.stringify({
+			id: "v1-5341-1",
+			name: "CLS",
+			value: 0.01,
+			rating: "good",
+			delta: 0.01,
+			numEntries: 1,
+			navigationType: "navigate",
+			url: window.location.href,
+			spanID: ""
+		}));
+	}`)
+	require.NoError(t, err)
+
+	// Dispatches a pagehide event to trigger Web Vital metric emission.
+	// At the same time, simulate the engine is shutting down.
+	require.NoError(t, page.Close())
+	close(samples)
 }

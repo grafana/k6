@@ -37,16 +37,16 @@ func TestSampleBufferBasics(t *testing.T) {
 	assert.Empty(t, buffer.GetBufferedSamples())
 
 	// Verify some internals
-	assert.Equal(t, cap(buffer.buffer), 5)
+	assert.Equal(t, 5, cap(buffer.buffer))
 	buffer.AddMetricSamples([]metrics.SampleContainer{single, connected})
 	buffer.AddMetricSamples(nil)
 	buffer.AddMetricSamples([]metrics.SampleContainer{})
 	buffer.AddMetricSamples([]metrics.SampleContainer{single})
 	assert.Equal(t, []metrics.SampleContainer{single, connected, single}, buffer.GetBufferedSamples())
-	assert.Equal(t, cap(buffer.buffer), 4)
+	assert.Equal(t, 4, cap(buffer.buffer))
 	buffer.AddMetricSamples([]metrics.SampleContainer{single})
 	assert.Equal(t, []metrics.SampleContainer{single}, buffer.GetBufferedSamples())
-	assert.Equal(t, cap(buffer.buffer), 3)
+	assert.Equal(t, 3, cap(buffer.buffer))
 	assert.Empty(t, buffer.GetBufferedSamples())
 }
 
@@ -54,7 +54,7 @@ func TestSampleBufferConcurrently(t *testing.T) {
 	t.Parallel()
 
 	seed := time.Now().UnixNano()
-	r := rand.New(rand.NewSource(seed)) //nolint:gosec
+	r := rand.New(rand.NewSource(seed))
 	t.Logf("Random source seeded with %d\n", seed)
 
 	registry := metrics.NewRegistry()
@@ -68,7 +68,7 @@ func TestSampleBufferConcurrently(t *testing.T) {
 
 	wg := make(chan struct{})
 	fillBuffer := func() {
-		for i := 0; i < sampleCount; i++ {
+		for i := range sampleCount {
 			buffer.AddMetricSamples([]metrics.SampleContainer{metrics.Sample{
 				TimeSeries: metrics.TimeSeries{
 					Metric: metric,
@@ -81,7 +81,7 @@ func TestSampleBufferConcurrently(t *testing.T) {
 		}
 		wg <- struct{}{}
 	}
-	for i := 0; i < producersCount; i++ {
+	for range producersCount {
 		go fillBuffer()
 	}
 
@@ -144,7 +144,7 @@ func TestPeriodicFlusherConcurrency(t *testing.T) {
 	t.Parallel()
 
 	seed := time.Now().UnixNano()
-	r := rand.New(rand.NewSource(seed)) //nolint:gosec
+	r := rand.New(rand.NewSource(seed))
 	randStops := 10 + r.Intn(10)
 	t.Logf("Random source seeded with %d\n", seed)
 
@@ -166,7 +166,7 @@ func TestPeriodicFlusherConcurrency(t *testing.T) {
 
 	stopWG := &sync.WaitGroup{}
 	stopWG.Add(randStops)
-	for i := 0; i < randStops; i++ {
+	for range randStops {
 		go func() {
 			f.Stop()
 			stopWG.Done()

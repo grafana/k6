@@ -736,8 +736,8 @@ func TestThresholdsRun(t *testing.T) {
 			require.NoError(t, gotParseErr)
 
 			gotOk, gotErr := thresholds.Run(testCase.args.sink, testCase.args.duration)
-			assert.Equal(t, gotErr != nil, testCase.wantErr, "Thresholds.Run() error = %v, wantErr %v", gotErr, testCase.wantErr)
-			assert.Equal(t, gotOk, testCase.want, "Thresholds.Run() = %v, want %v", gotOk, testCase.want)
+			assert.Equal(t, testCase.wantErr, gotErr != nil, "Thresholds.Run() error = %v, wantErr %v", gotErr, testCase.wantErr)
+			assert.Equal(t, testCase.want, gotOk, "Thresholds.Run() = %v, want %v", gotOk, testCase.want)
 		})
 	}
 }

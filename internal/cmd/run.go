@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -26,6 +27,7 @@ import (
 	"go.k6.io/k6/internal/lib/summary"
 	"go.k6.io/k6/internal/lib/trace"
 	"go.k6.io/k6/internal/metrics/engine"
+	"go.k6.io/k6/internal/output/cloud"
 	summaryoutput "go.k6.io/k6/internal/output/summary"
 	"go.k6.io/k6/internal/ui/pb"
 	"go.k6.io/k6/js/common"
@@ -67,7 +69,6 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 			logger.WithError(err).Debug("Everything has finished, exiting k6 with an error!")
 		}
 	}()
-	printBanner(c.gs)
 
 	globalCtx, globalCancel := context.WithCancel(c.gs.Ctx)
 	defer globalCancel()
@@ -106,6 +107,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	if err != nil {
 		return err
 	}
+	printBanner(c.gs)
 	if test.keyLogger != nil {
 		defer func() {
 			if klErr := test.keyLogger.Close(); klErr != nil {
@@ -150,15 +152,15 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	defer progressCancel()
 
 	initBar := execScheduler.GetInitProgressBar()
-	backgroundProcesses.Add(1)
-	go func() {
-		defer backgroundProcesses.Done()
-		pbs := []*pb.ProgressBar{initBar}
-		for _, s := range execScheduler.GetExecutors() {
+	backgroundProcesses.Go(func() {
+		executors := execScheduler.GetExecutors()
+		pbs := make([]*pb.ProgressBar, 0, 1+len(executors))
+		pbs = append(pbs, initBar)
+		for _, s := range executors {
 			pbs = append(pbs, s.GetProgress())
 		}
 		showProgress(progressCtx, c.gs, pbs, logger)
-	}()
+	})
 
 	// Create all outputs.
 	executionPlan := execScheduler.GetExecutionPlan()
@@ -174,13 +176,22 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		return err
 	}
 
+	summaryMode, summaryEnabled, err := getSummaryMode(testRunState.RuntimeOptions)
+	if err != nil {
+		// Theoretically, this should never happen, as we already verify whether the summary
+		// mode is valid while parsing the runtime options, but just in case it happens, we
+		// want to abort the execution anyway.
+		return err
+	}
+
+	thresholdsEnabled := !testRunState.RuntimeOptions.NoThresholds.Bool
+
 	// We'll need to pipe metrics to the MetricsEngine and process them if any
 	// of these are enabled: thresholds, end-of-test summary
-	shouldProcessMetrics := !testRunState.RuntimeOptions.NoSummary.Bool ||
-		!testRunState.RuntimeOptions.NoThresholds.Bool
+	shouldProcessMetrics := summaryEnabled || thresholdsEnabled
 	var metricsIngester *engine.OutputIngester
 	if shouldProcessMetrics {
-		err = metricsEngine.InitSubMetricsAndThresholds(conf.Options, testRunState.RuntimeOptions.NoThresholds.Bool)
+		err = metricsEngine.InitSubMetricsAndThresholds(conf.Options, !thresholdsEnabled)
 		if err != nil {
 			return err
 		}
@@ -191,7 +202,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	executionState := execScheduler.GetState()
-	if !testRunState.RuntimeOptions.NoSummary.Bool { //nolint:nestif
+	if summaryEnabled { //nolint:nestif
 		// Despite having the revamped [summary.Summary], we still keep the use of the
 		// [lib.LegacySummary] for multiple backwards compatibility options,
 		// to be deprecated by v1.0 and likely removed or replaced by v2.0:
@@ -211,22 +222,24 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 			}
 		}
 
-		sm, err := summary.ValidateMode(testRunState.RuntimeOptions.SummaryMode.String)
-		if err != nil {
-			logger.WithError(err).Warnf(
-				"invalid summary mode %q, falling back to \"compact\" (default)",
-				testRunState.RuntimeOptions.SummaryMode.String,
-			)
+		summaryMeta := summary.Meta{
+			Script: string(test.source.Data),
+			IsCloud: slices.ContainsFunc(outputs, func(o output.Output) bool {
+				_, isCloud := o.(*cloud.Output)
+				return isCloud
+			}),
 		}
 
-		switch sm {
-		// TODO: Remove this code block once we stop supporting the legacy summary, and just leave the default.
+		switch summaryMode {
+		// TODO(@joanlopez): remove by k6 v2.0, once we completely drop the support for --summary-mode=legacy.
 		case summary.ModeLegacy:
+			logger.Warn(`The "legacy" summary mode has been deprecated, and will be removed by k6 v2.0. ` +
+				`Please, migrate to either "compact" or "full" as soon as possible.`)
 			// At the end of the test run
 			defer func() {
 				logger.Debug("Generating the end-of-test summary...")
 
-				summaryResult, hsErr := test.initRunner.HandleSummary(globalCtx, legacySummary(), nil)
+				summaryResult, hsErr := test.initRunner.HandleSummary(globalCtx, legacySummary(), nil, summaryMeta)
 				if hsErr == nil {
 					hsErr = handleSummaryResult(c.gs.FS, c.gs.Stdout, c.gs.Stderr, summaryResult)
 				}
@@ -259,8 +272,10 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 				// likely as an additional argument like options.
 				summary.NoColor = c.gs.Flags.NoColor
 				summary.EnableColors = !summary.NoColor && c.gs.Stdout.IsTTY
+				summary.NewMachineReadableSummary = testRunState.RuntimeOptions.NewMachineReadableSummary.Valid &&
+					testRunState.RuntimeOptions.NewMachineReadableSummary.Bool
 
-				summaryResult, hsErr := test.initRunner.HandleSummary(globalCtx, legacySummary(), summary)
+				summaryResult, hsErr := test.initRunner.HandleSummary(globalCtx, legacySummary(), summary, summaryMeta)
 				if hsErr == nil {
 					hsErr = handleSummaryResult(c.gs.FS, c.gs.Stdout, c.gs.Stderr, summaryResult)
 				}
@@ -347,7 +362,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		stopOutputs(err)
 	}()
 
-	if !testRunState.RuntimeOptions.NoThresholds.Bool {
+	if thresholdsEnabled {
 		finalizeThresholds := metricsEngine.StartThresholdCalculations(
 			metricsIngester, runAbort, executionState.GetCurrentTestRunDuration,
 		)
@@ -461,9 +476,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	// Init has passed successfully, so unless disabled, make sure we send a
 	// usage report after the context is done.
 	if !conf.NoUsageReport.Bool {
-		backgroundProcesses.Add(1)
-		go func() {
-			defer backgroundProcesses.Done()
+		backgroundProcesses.Go(func() {
 			reportCtx, reportCancel := context.WithTimeout(globalCtx, 3*time.Second)
 			defer reportCancel()
 			logger.Debug("Sending usage report...")
@@ -473,7 +486,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 			} else {
 				logger.Debug("Usage report sent successfully")
 			}
-		}()
+		})
 	}
 
 	// Check what the execScheduler.Run() error is.
@@ -502,6 +515,19 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	logger.Debug("Test finished cleanly")
 
 	return nil
+}
+
+func getSummaryMode(runtimeOptions lib.RuntimeOptions) (summary.Mode, bool, error) {
+	if runtimeOptions.NoSummary.Bool {
+		return summary.ModeDisabled, false, nil
+	}
+
+	sm, err := summary.ValidateMode(runtimeOptions.SummaryMode.String)
+	if err != nil {
+		return summary.ModeDisabled, false, err
+	}
+
+	return sm, sm != summary.ModeDisabled, nil
 }
 
 func (c *cmdRun) flagSet() *pflag.FlagSet {
@@ -554,12 +580,12 @@ func getCmdRun(gs *state.GlobalState) *cobra.Command {
   # Ramp VUs from 0 to 100 over 10s, stay there for 60s, then 10s down to 0.
   {{.}} run -u 0 -s 10s:100 -s 60s:100 -s 10s:0
 
-  # Send metrics to an influxdb server
-  {{.}} run -o influxdb=http://1.2.3.4:8086/k6`[1:])
+  # Send metrics to a remote storage using the OpenTelemetry output.
+  {{.}} run -o opentelemetry`[1:])
 
 	runCmd := &cobra.Command{
 		Use:   "run",
-		Short: "Start a test",
+		Short: "Run a test",
 		Long: `Start a test. This also exposes a REST API to interact with it. Various k6 subcommands offer
 a commandline interface for interacting with it.`,
 		Example: exampleText,

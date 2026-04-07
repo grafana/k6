@@ -14,13 +14,14 @@ import (
 	"net/url"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/andybalholm/brotli"
 	"github.com/gorilla/websocket"
 	"github.com/klauspost/compress/zstd"
-	"github.com/mccutchen/go-httpbin/httpbin"
+	"github.com/mccutchen/go-httpbin/v2/httpbin"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/http2"
 	"google.golang.org/grpc"
@@ -140,18 +141,19 @@ func echoHandler(t testing.TB, closePrematurely bool) http.Handler {
 		// closePrematurely=true mimics an invalid WS server that doesn't
 		// send a close control frame before closing the connection.
 		if !closePrematurely {
+			var once sync.Once
 			// Closing is delegated to the client,
 			// it waits the control message for closing.
 			closeReceived := make(chan struct{})
 			defaultCloseHandler := conn.CloseHandler()
 			conn.SetCloseHandler(func(code int, text string) error {
-				close(closeReceived)
+				once.Do(func() { close(closeReceived) })
 				return defaultCloseHandler(code, text)
 			})
 
 			for {
-				_, _, e := conn.ReadMessage()
-				if e != nil {
+				if _, _, err := conn.ReadMessage(); err != nil {
+					once.Do(func() { close(closeReceived) })
 					break
 				}
 			}
@@ -160,7 +162,7 @@ func echoHandler(t testing.TB, closePrematurely bool) http.Handler {
 	})
 }
 
-func writeJSON(w io.Writer, v interface{}) error {
+func writeJSON(w io.Writer, v any) error {
 	e := json.NewEncoder(w)
 	e.SetIndent("", "  ")
 	if err := e.Encode(v); err != nil {

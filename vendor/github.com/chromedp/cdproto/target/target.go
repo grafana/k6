@@ -721,6 +721,45 @@ func (p *SetRemoteLocationsParams) Do(ctx context.Context) (err error) {
 	return cdp.Execute(ctx, CommandSetRemoteLocations, p, nil)
 }
 
+// OpenDevToolsParams opens a DevTools window for the target.
+type OpenDevToolsParams struct {
+	TargetID ID `json:"targetId"` // This can be the page or tab target ID.
+}
+
+// OpenDevTools opens a DevTools window for the target.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Target#method-openDevTools
+//
+// parameters:
+//
+//	targetID - This can be the page or tab target ID.
+func OpenDevTools(targetID ID) *OpenDevToolsParams {
+	return &OpenDevToolsParams{
+		TargetID: targetID,
+	}
+}
+
+// OpenDevToolsReturns return values.
+type OpenDevToolsReturns struct {
+	TargetID ID `json:"targetId,omitempty,omitzero"` // The targetId of DevTools page target.
+}
+
+// Do executes Target.openDevTools against the provided context.
+//
+// returns:
+//
+//	targetID - The targetId of DevTools page target.
+func (p *OpenDevToolsParams) Do(ctx context.Context) (targetID ID, err error) {
+	// execute
+	var res OpenDevToolsReturns
+	err = cdp.Execute(ctx, CommandOpenDevTools, p, &res)
+	if err != nil {
+		return "", err
+	}
+
+	return res.TargetID, nil
+}
+
 // Command names.
 const (
 	CommandActivateTarget         = "Target.activateTarget"
@@ -739,4 +778,5 @@ const (
 	CommandAutoAttachRelated      = "Target.autoAttachRelated"
 	CommandSetDiscoverTargets     = "Target.setDiscoverTargets"
 	CommandSetRemoteLocations     = "Target.setRemoteLocations"
+	CommandOpenDevTools           = "Target.openDevTools"
 )

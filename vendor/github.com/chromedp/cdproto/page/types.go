@@ -11,13 +11,23 @@ import (
 	"github.com/chromedp/cdproto/runtime"
 )
 
-// AdScriptID identifies the bottom-most script which caused the frame to be
+// AdScriptID identifies the script which caused a script or frame to be
 // labelled as an ad.
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Page#type-AdScriptId
 type AdScriptID struct {
-	ScriptID   runtime.ScriptID         `json:"scriptId"`   // Script Id of the bottom-most script which caused the frame to be labelled as an ad.
-	DebuggerID runtime.UniqueDebuggerID `json:"debuggerId"` // Id of adScriptId's debugger.
+	ScriptID   runtime.ScriptID         `json:"scriptId"`   // Script Id of the script which caused a script or frame to be labelled as an ad.
+	DebuggerID runtime.UniqueDebuggerID `json:"debuggerId"` // Id of scriptId's debugger.
+}
+
+// AdScriptAncestry encapsulates the script ancestry and the root script
+// filterlist rule that caused the frame to be labelled as an ad. Only created
+// when ancestryChain is not empty.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Page#type-AdScriptAncestry
+type AdScriptAncestry struct {
+	AncestryChain            []*AdScriptID `json:"ancestryChain"`                               // A chain of AdScriptIds representing the ancestry of an ad script that led to the creation of a frame. The chain is ordered from the script itself (lower level) up to its root ancestor that was flagged by filterlist.
+	RootScriptFilterlistRule string        `json:"rootScriptFilterlistRule,omitempty,omitzero"` // The filterlist rule that caused the root (last) script in ancestryChain to be ad-tagged. Only populated if the rule is available.
 }
 
 // PermissionsPolicyFeature all Permissions Policy features. This enum should
@@ -38,6 +48,7 @@ const (
 	PermissionsPolicyFeatureAccelerometer                  PermissionsPolicyFeature = "accelerometer"
 	PermissionsPolicyFeatureAllScreensCapture              PermissionsPolicyFeature = "all-screens-capture"
 	PermissionsPolicyFeatureAmbientLightSensor             PermissionsPolicyFeature = "ambient-light-sensor"
+	PermissionsPolicyFeatureAriaNotify                     PermissionsPolicyFeature = "aria-notify"
 	PermissionsPolicyFeatureAttributionReporting           PermissionsPolicyFeature = "attribution-reporting"
 	PermissionsPolicyFeatureAutoplay                       PermissionsPolicyFeature = "autoplay"
 	PermissionsPolicyFeatureBluetooth                      PermissionsPolicyFeature = "bluetooth"
@@ -98,12 +109,14 @@ const (
 	PermissionsPolicyFeatureJoinAdInterestGroup            PermissionsPolicyFeature = "join-ad-interest-group"
 	PermissionsPolicyFeatureKeyboardMap                    PermissionsPolicyFeature = "keyboard-map"
 	PermissionsPolicyFeatureLanguageDetector               PermissionsPolicyFeature = "language-detector"
+	PermissionsPolicyFeatureLanguageModel                  PermissionsPolicyFeature = "language-model"
 	PermissionsPolicyFeatureLocalFonts                     PermissionsPolicyFeature = "local-fonts"
 	PermissionsPolicyFeatureLocalNetworkAccess             PermissionsPolicyFeature = "local-network-access"
 	PermissionsPolicyFeatureMagnetometer                   PermissionsPolicyFeature = "magnetometer"
 	PermissionsPolicyFeatureMediaPlaybackWhileNotVisible   PermissionsPolicyFeature = "media-playback-while-not-visible"
 	PermissionsPolicyFeatureMicrophone                     PermissionsPolicyFeature = "microphone"
 	PermissionsPolicyFeatureMidi                           PermissionsPolicyFeature = "midi"
+	PermissionsPolicyFeatureOnDeviceSpeechRecognition      PermissionsPolicyFeature = "on-device-speech-recognition"
 	PermissionsPolicyFeatureOtpCredentials                 PermissionsPolicyFeature = "otp-credentials"
 	PermissionsPolicyFeaturePayment                        PermissionsPolicyFeature = "payment"
 	PermissionsPolicyFeaturePictureInPicture               PermissionsPolicyFeature = "picture-in-picture"
@@ -152,6 +165,8 @@ func (t *PermissionsPolicyFeature) UnmarshalJSON(buf []byte) error {
 		*t = PermissionsPolicyFeatureAllScreensCapture
 	case PermissionsPolicyFeatureAmbientLightSensor:
 		*t = PermissionsPolicyFeatureAmbientLightSensor
+	case PermissionsPolicyFeatureAriaNotify:
+		*t = PermissionsPolicyFeatureAriaNotify
 	case PermissionsPolicyFeatureAttributionReporting:
 		*t = PermissionsPolicyFeatureAttributionReporting
 	case PermissionsPolicyFeatureAutoplay:
@@ -272,6 +287,8 @@ func (t *PermissionsPolicyFeature) UnmarshalJSON(buf []byte) error {
 		*t = PermissionsPolicyFeatureKeyboardMap
 	case PermissionsPolicyFeatureLanguageDetector:
 		*t = PermissionsPolicyFeatureLanguageDetector
+	case PermissionsPolicyFeatureLanguageModel:
+		*t = PermissionsPolicyFeatureLanguageModel
 	case PermissionsPolicyFeatureLocalFonts:
 		*t = PermissionsPolicyFeatureLocalFonts
 	case PermissionsPolicyFeatureLocalNetworkAccess:
@@ -284,6 +301,8 @@ func (t *PermissionsPolicyFeature) UnmarshalJSON(buf []byte) error {
 		*t = PermissionsPolicyFeatureMicrophone
 	case PermissionsPolicyFeatureMidi:
 		*t = PermissionsPolicyFeatureMidi
+	case PermissionsPolicyFeatureOnDeviceSpeechRecognition:
+		*t = PermissionsPolicyFeatureOnDeviceSpeechRecognition
 	case PermissionsPolicyFeatureOtpCredentials:
 		*t = PermissionsPolicyFeatureOtpCredentials
 	case PermissionsPolicyFeaturePayment:
@@ -950,45 +969,6 @@ type WebAppManifest struct {
 	ThemeColor                string                `json:"themeColor,omitempty,omitzero"`
 }
 
-// AutoResponseMode enum of possible auto-response for permission / prompt
-// dialogs.
-//
-// See: https://chromedevtools.github.io/devtools-protocol/tot/Page#type-AutoResponseMode
-type AutoResponseMode string
-
-// String returns the AutoResponseMode as string value.
-func (t AutoResponseMode) String() string {
-	return string(t)
-}
-
-// AutoResponseMode values.
-const (
-	AutoResponseModeNone       AutoResponseMode = "none"
-	AutoResponseModeAutoAccept AutoResponseMode = "autoAccept"
-	AutoResponseModeAutoReject AutoResponseMode = "autoReject"
-	AutoResponseModeAutoOptOut AutoResponseMode = "autoOptOut"
-)
-
-// UnmarshalJSON satisfies [json.Unmarshaler].
-func (t *AutoResponseMode) UnmarshalJSON(buf []byte) error {
-	s := string(buf)
-	s = strings.TrimSuffix(strings.TrimPrefix(s, `"`), `"`)
-
-	switch AutoResponseMode(s) {
-	case AutoResponseModeNone:
-		*t = AutoResponseModeNone
-	case AutoResponseModeAutoAccept:
-		*t = AutoResponseModeAutoAccept
-	case AutoResponseModeAutoReject:
-		*t = AutoResponseModeAutoReject
-	case AutoResponseModeAutoOptOut:
-		*t = AutoResponseModeAutoOptOut
-	default:
-		return fmt.Errorf("unknown AutoResponseMode value: %v", s)
-	}
-	return nil
-}
-
 // NavigationType the type of a frameNavigated event.
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Page#type-NavigationType
@@ -1114,6 +1094,7 @@ const (
 	BackForwardCacheNotRestoredReasonBroadcastChannel                                         BackForwardCacheNotRestoredReason = "BroadcastChannel"
 	BackForwardCacheNotRestoredReasonWebXR                                                    BackForwardCacheNotRestoredReason = "WebXR"
 	BackForwardCacheNotRestoredReasonSharedWorker                                             BackForwardCacheNotRestoredReason = "SharedWorker"
+	BackForwardCacheNotRestoredReasonSharedWorkerMessage                                      BackForwardCacheNotRestoredReason = "SharedWorkerMessage"
 	BackForwardCacheNotRestoredReasonWebLocks                                                 BackForwardCacheNotRestoredReason = "WebLocks"
 	BackForwardCacheNotRestoredReasonWebHID                                                   BackForwardCacheNotRestoredReason = "WebHID"
 	BackForwardCacheNotRestoredReasonWebShare                                                 BackForwardCacheNotRestoredReason = "WebShare"
@@ -1344,6 +1325,8 @@ func (t *BackForwardCacheNotRestoredReason) UnmarshalJSON(buf []byte) error {
 		*t = BackForwardCacheNotRestoredReasonWebXR
 	case BackForwardCacheNotRestoredReasonSharedWorker:
 		*t = BackForwardCacheNotRestoredReasonSharedWorker
+	case BackForwardCacheNotRestoredReasonSharedWorkerMessage:
+		*t = BackForwardCacheNotRestoredReasonSharedWorkerMessage
 	case BackForwardCacheNotRestoredReasonWebLocks:
 		*t = BackForwardCacheNotRestoredReasonWebLocks
 	case BackForwardCacheNotRestoredReasonWebHID:
@@ -1844,6 +1827,82 @@ func (t *SetWebLifecycleStateState) UnmarshalJSON(buf []byte) error {
 		*t = SetWebLifecycleStateStateActive
 	default:
 		return fmt.Errorf("unknown SetWebLifecycleStateState value: %v", s)
+	}
+	return nil
+}
+
+// SetSPCTransactionModeMode [no description].
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Page#method-setSPCTransactionMode
+type SetSPCTransactionModeMode string
+
+// String returns the SetSPCTransactionModeMode as string value.
+func (t SetSPCTransactionModeMode) String() string {
+	return string(t)
+}
+
+// SetSPCTransactionModeMode values.
+const (
+	SetSPCTransactionModeModeNone                       SetSPCTransactionModeMode = "none"
+	SetSPCTransactionModeModeAutoAccept                 SetSPCTransactionModeMode = "autoAccept"
+	SetSPCTransactionModeModeAutoChooseToAuthAnotherWay SetSPCTransactionModeMode = "autoChooseToAuthAnotherWay"
+	SetSPCTransactionModeModeAutoReject                 SetSPCTransactionModeMode = "autoReject"
+	SetSPCTransactionModeModeAutoOptOut                 SetSPCTransactionModeMode = "autoOptOut"
+)
+
+// UnmarshalJSON satisfies [json.Unmarshaler].
+func (t *SetSPCTransactionModeMode) UnmarshalJSON(buf []byte) error {
+	s := string(buf)
+	s = strings.TrimSuffix(strings.TrimPrefix(s, `"`), `"`)
+
+	switch SetSPCTransactionModeMode(s) {
+	case SetSPCTransactionModeModeNone:
+		*t = SetSPCTransactionModeModeNone
+	case SetSPCTransactionModeModeAutoAccept:
+		*t = SetSPCTransactionModeModeAutoAccept
+	case SetSPCTransactionModeModeAutoChooseToAuthAnotherWay:
+		*t = SetSPCTransactionModeModeAutoChooseToAuthAnotherWay
+	case SetSPCTransactionModeModeAutoReject:
+		*t = SetSPCTransactionModeModeAutoReject
+	case SetSPCTransactionModeModeAutoOptOut:
+		*t = SetSPCTransactionModeModeAutoOptOut
+	default:
+		return fmt.Errorf("unknown SetSPCTransactionModeMode value: %v", s)
+	}
+	return nil
+}
+
+// SetRPHRegistrationModeMode [no description].
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Page#method-setRPHRegistrationMode
+type SetRPHRegistrationModeMode string
+
+// String returns the SetRPHRegistrationModeMode as string value.
+func (t SetRPHRegistrationModeMode) String() string {
+	return string(t)
+}
+
+// SetRPHRegistrationModeMode values.
+const (
+	SetRPHRegistrationModeModeNone       SetRPHRegistrationModeMode = "none"
+	SetRPHRegistrationModeModeAutoAccept SetRPHRegistrationModeMode = "autoAccept"
+	SetRPHRegistrationModeModeAutoReject SetRPHRegistrationModeMode = "autoReject"
+)
+
+// UnmarshalJSON satisfies [json.Unmarshaler].
+func (t *SetRPHRegistrationModeMode) UnmarshalJSON(buf []byte) error {
+	s := string(buf)
+	s = strings.TrimSuffix(strings.TrimPrefix(s, `"`), `"`)
+
+	switch SetRPHRegistrationModeMode(s) {
+	case SetRPHRegistrationModeModeNone:
+		*t = SetRPHRegistrationModeModeNone
+	case SetRPHRegistrationModeModeAutoAccept:
+		*t = SetRPHRegistrationModeModeAutoAccept
+	case SetRPHRegistrationModeModeAutoReject:
+		*t = SetRPHRegistrationModeModeAutoReject
+	default:
+		return fmt.Errorf("unknown SetRPHRegistrationModeMode value: %v", s)
 	}
 	return nil
 }

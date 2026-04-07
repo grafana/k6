@@ -68,23 +68,19 @@ func getCmdCloudRun(cloudCmd *cmdCloud) *cobra.Command {
 	}
 
 	exampleText := getExampleText(cloudCmd.gs, `
-  # Run a test script in Grafana Cloud k6
+  # Run a test script in Grafana Cloud
   $ {{.}} cloud run script.js
 
-  # Run a test archive in Grafana Cloud k6
+  # Run a test archive in Grafana Cloud
   $ {{.}} cloud run archive.tar
 
-  # Read a test script or archive from stdin and run it in Grafana Cloud k6
+  # Read a test script or archive from stdin
   $ {{.}} cloud run - < script.js`[1:])
 
 	thisCmd := &cobra.Command{
-		Use:   cloudRunCommandName,
-		Short: "Run a test in Grafana Cloud k6",
-		Long: `Run a test in Grafana Cloud k6.
-
-This will archive test script(s), including all necessary resources, and execute the test in the Grafana Cloud k6
-service. Using this command requires to be authenticated against Grafana Cloud k6.
-Use the "k6 cloud login" command to authenticate.`,
+		Use:     cloudRunCommandName,
+		Short:   "Run a test in Grafana Cloud",
+		Long:    "Run a test in Grafana Cloud. Requires authentication via \"k6 cloud login\".",
 		Example: exampleText,
 		Args: exactArgsWithMsg(1,
 			"the k6 cloud run command expects a single argument consisting in either a path to a script or "+

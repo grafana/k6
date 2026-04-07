@@ -1,0 +1,40 @@
+name: "Test common"
+description: "Pre-test steps: Go install and optional Chromium install"
+
+inputs:
+  go_version:
+    description: "Go version (eg 1.26.x) or gotip."
+    required: false
+    default: "1.26.x"
+  platform:
+    description: "matrix.platform value (used for windows/arm detection)."
+    required: true
+  github_token:
+    description: "GitHub token, required when go_version is gotip."
+    required: false
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install Go
+      if: ${{ inputs.go_version != 'gotip' }}
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+      with:
+        go-version: ${{ inputs.go_version }}
+        check-latest: true
+
+    - name: Download and install Go tip
+      if: ${{ inputs.go_version == 'gotip' }}
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+        PLATFORM: ${{ inputs.platform }}
+      run: |
+        gh release download ${PLATFORM} --repo grafana/gotip --pattern 'go.zip'
+        unzip go.zip -d $HOME/sdk
+
+    - name: Install chromium
+      shell: bash
+      run: |
+        sudo apt update && sudo apt install chromium-browser
+        chromium --version || true

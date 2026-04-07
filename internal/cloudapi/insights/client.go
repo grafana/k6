@@ -147,8 +147,8 @@ func (c *Client) Dial(ctx context.Context) error {
 
 	ctx, cancel := context.WithTimeout(ctx, c.cfg.ConnectConfig.Timeout)
 	defer cancel()
-	//nolint:staticcheck // see https://github.com/grafana/k6/issues/3699
-	conn, err := grpc.DialContext(ctx, c.cfg.IngesterHost, opts...)
+
+	conn, err := grpc.DialContext(ctx, c.cfg.IngesterHost, opts...) //nolint:staticcheck
 	if err != nil {
 		return fmt.Errorf("failed to dial: %w", err)
 	}
@@ -208,13 +208,11 @@ func dialOptionsFromClientConfig(cfg ClientConfig) ([]grpc.DialOption, error) {
 	var opts []grpc.DialOption
 
 	if cfg.ConnectConfig.Block {
-		//nolint:staticcheck // see https://github.com/grafana/k6/issues/3699
-		opts = append(opts, grpc.WithBlock())
+		opts = append(opts, grpc.WithBlock()) //nolint:staticcheck
 	}
 
 	if cfg.ConnectConfig.FailOnNonTempDialError {
-		//nolint:staticcheck // see https://github.com/grafana/k6/issues/3699
-		opts = append(opts, grpc.FailOnNonTempDialError(true))
+		opts = append(opts, grpc.FailOnNonTempDialError(true)) //nolint:staticcheck
 	}
 
 	if cfg.ConnectConfig.Dialer != nil {

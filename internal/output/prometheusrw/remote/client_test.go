@@ -25,7 +25,7 @@ func TestNewWriteClient(t *testing.T) {
 		wc, err := NewWriteClient("http://example.com/api/v1/write", nil)
 		require.NoError(t, err)
 		require.NotNil(t, wc)
-		assert.Equal(t, wc.cfg, &HTTPConfig{})
+		assert.Equal(t, &HTTPConfig{}, wc.cfg)
 	})
 
 	t.Run("CustomConfig", func(t *testing.T) {
@@ -34,7 +34,7 @@ func TestNewWriteClient(t *testing.T) {
 		wc, err := NewWriteClient("http://example.com/api/v1/write", hc)
 		require.NoError(t, err)
 		require.NotNil(t, wc)
-		assert.Equal(t, wc.cfg, hc)
+		assert.Equal(t, hc, wc.cfg)
 	})
 
 	t.Run("InvalidURL", func(t *testing.T) {
@@ -48,10 +48,10 @@ func TestNewWriteClient(t *testing.T) {
 func TestClientStore(t *testing.T) {
 	t.Parallel()
 	h := func(rw http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, r.Header.Get("Content-Encoding"), "snappy")
-		assert.Equal(t, r.Header.Get("Content-Type"), "application/x-protobuf")
-		assert.Equal(t, r.Header.Get("User-Agent"), "k6-prometheus-rw-output")
-		assert.Equal(t, r.Header.Get("X-Prometheus-Remote-Write-Version"), "0.1.0")
+		assert.Equal(t, "snappy", r.Header.Get("Content-Encoding"))
+		assert.Equal(t, "application/x-protobuf", r.Header.Get("Content-Type"))
+		assert.Equal(t, "k6-prometheus-rw-output", r.Header.Get("User-Agent"))
+		assert.Equal(t, "0.1.0", r.Header.Get("X-Prometheus-Remote-Write-Version"))
 		assert.NotEmpty(t, r.Header.Get("Content-Length"))
 
 		b, err := io.ReadAll(r.Body)
@@ -138,8 +138,8 @@ func TestClientStoreHTTPBasic(t *testing.T) {
 func TestClientStoreHeaders(t *testing.T) {
 	t.Parallel()
 	h := func(_ http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, r.Header.Get("X-Prometheus-Remote-Write-Version"), "0.1.0")
-		assert.Equal(t, r.Header.Get("X-MY-CUSTOM-HEADER"), "fake")
+		assert.Equal(t, "0.1.0", r.Header.Get("X-Prometheus-Remote-Write-Version"))
+		assert.Equal(t, "fake", r.Header.Get("X-MY-CUSTOM-HEADER"))
 	}
 	ts := httptest.NewServer(http.HandlerFunc(h))
 	defer ts.Close()

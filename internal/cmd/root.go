@@ -28,6 +28,47 @@ import (
 
 const waitLoggerCloseTimeout = time.Second * 5
 
+func getRootUsageTemplate() string {
+	return `{{.Short}}
+
+Usage:{{if .Runnable}}
+  {{.UseLine}}{{end}}{{if .HasAvailableSubCommands}}
+  {{.CommandPath}} [command]{{end}}{{if .HasAvailableSubCommands}}
+
+Core Commands:{{range .Commands}}{{if eq .Name "new"}}
+  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{range .Commands}}{{if eq .Name "run"}}
+  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{range .Commands}}{{if eq .Name "cloud"}}
+  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}
+
+Additional Commands:{{range .Commands}}{{if and .IsAvailableCommand (ne .Name "new") (ne .Name "run") ` +
+		`(ne .Name "cloud") (ne .Name "help")}}
+  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}
+
+Flags:
+  -h, --help      Show help
+      --version   Show version information
+
+Examples:
+  # Create a test
+  $ {{.CommandPath}} new test.js
+
+  # Run a test
+  $ {{.CommandPath}} run test.js
+
+  # Run a test in Grafana Cloud
+  $ {{.CommandPath}} cloud run test.js
+
+  # Run locally, stream results to Grafana Cloud
+  $ {{.CommandPath}} cloud run --local-execution test.js
+
+Documentation:
+  # Look up the JavaScript API, examples, and best practices
+  $ {{.CommandPath}} x docs
+{{if .HasAvailableSubCommands}}
+Use "{{.CommandPath}} [command] --help" for more information about a command.{{end}}
+`
+}
+
 // ExecuteWithGlobalState runs the root command with an existing GlobalState.
 // It adds all child commands to the root command and it sets flags appropriately.
 // It is called by main.main(). It only needs to happen once to the rootCmd.
@@ -43,28 +84,19 @@ type rootCommand struct {
 	stopLoggersCh  chan struct{}
 	loggersWg      sync.WaitGroup
 	loggerIsRemote bool
-	launcher       *launcher
 }
 
 // newRootCommand creates a root command with a default launcher
 func newRootCommand(gs *state.GlobalState) *rootCommand {
-	return newRootWithLauncher(gs, newLauncher(gs))
-}
-
-// newRootWithLauncher creates a root command with a launcher.
-// It facilitates unit testing scenarios.
-func newRootWithLauncher(gs *state.GlobalState, l *launcher) *rootCommand {
 	c := &rootCommand{
 		globalState:   gs,
 		stopLoggersCh: make(chan struct{}),
-		launcher:      l,
 	}
 	// the base command when called without any subcommands.
 	rootCmd := &cobra.Command{
-		Use:   gs.BinaryName,
-		Short: "a next-generation load generator",
-		Long: "\n" + getBanner(gs.Flags.NoColor || !gs.Stdout.IsTTY, isTrueColor(gs.Env)) +
-			"\n\nFull CLI documentation is available at: https://grafana.com/docs/k6/latest/using-k6/k6-options/reference/",
+		Use:               gs.BinaryName,
+		Short:             "Grafana k6 is an easy-to-use, open-source load and performance testing tool",
+		Long:              "\n" + getBanner(gs.Flags.NoColor || !gs.Stdout.IsTTY, isTrueColor(gs.Env)),
 		SilenceUsage:      true,
 		SilenceErrors:     true,
 		PersistentPreRunE: c.persistentPreRunE,
@@ -75,10 +107,6 @@ func newRootWithLauncher(gs *state.GlobalState, l *launcher) *rootCommand {
 		`{{with .Name}}{{printf "%s " .}}{{end}}{{printf "v%s\n" .Version}}`,
 	)
 
-	usageTemplate := rootCmd.UsageTemplate()
-	usageTemplate = strings.ReplaceAll(usageTemplate, "FlagUsages", "FlagUsagesWrapped 120")
-	rootCmd.SetUsageTemplate(usageTemplate)
-
 	rootCmd.PersistentFlags().AddFlagSet(rootCmdPersistentFlagSet(gs))
 	rootCmd.SetArgs(gs.CmdArgs[1:])
 	rootCmd.SetOut(gs.Stdout)
@@ -86,20 +114,27 @@ func newRootWithLauncher(gs *state.GlobalState, l *launcher) *rootCommand {
 	rootCmd.SetIn(gs.Stdin)
 
 	subCommands := []func(*state.GlobalState) *cobra.Command{
-		getCmdArchive, getCmdCloud, getCmdNewScript, getCmdInspect,
-		getCmdPause, getCmdResume, getCmdScale, getCmdRun, getCmdStats,
-		getCmdStatus, getCmdVersion,
+		getCmdArchive, getCmdCloud, getCmdNewScript, getCmdInspect, getCmdDeps,
+		getCmdPause, getCmdResume, getCmdScale, getCmdRun,
+		getCmdStats, getCmdStatus, getCmdVersion, getX,
 	}
 
+	defaultUsageTemplate := (&cobra.Command{}).UsageTemplate()
+	defaultUsageTemplate = strings.ReplaceAll(defaultUsageTemplate, "FlagUsages", "FlagUsagesWrapped 120")
+
 	for _, sc := range subCommands {
-		rootCmd.AddCommand(sc(gs))
+		cmd := sc(gs)
+		cmd.SetUsageTemplate(defaultUsageTemplate)
+		rootCmd.AddCommand(cmd)
 	}
+
+	rootCmd.SetUsageTemplate(getRootUsageTemplate())
 
 	c.cmd = rootCmd
 	return c
 }
 
-func (c *rootCommand) persistentPreRunE(cmd *cobra.Command, args []string) error {
+func (c *rootCommand) persistentPreRunE(_ *cobra.Command, _ []string) error {
 	err := c.setupLoggers(c.stopLoggersCh)
 	if err != nil {
 		return err
@@ -107,16 +142,7 @@ func (c *rootCommand) persistentPreRunE(cmd *cobra.Command, args []string) error
 
 	c.globalState.Logger.Debugf("k6 version: v%s", fullVersion())
 
-	// If automatic extension resolution is not enabled, continue with the regular k6 execution path
-	if !c.globalState.Flags.AutoExtensionResolution {
-		c.globalState.Logger.Debug("Automatic extension resolution is disabled.")
-		return nil
-	}
-
-	c.globalState.Logger.
-		Debug("Automatic extension resolution is enabled.")
-
-	return c.launcher.launch(cmd, args)
+	return nil
 }
 
 func (c *rootCommand) execute() {
@@ -147,9 +173,20 @@ func (c *rootCommand) execute() {
 		return
 	}
 
+	newExitCode, err := handleUnsatisfiedDependencies(err, c)
+
+	if err == nil {
+		exitCode = int(newExitCode)
+		return
+	}
+
 	var ecerr errext.HasExitCode
 	if errors.As(err, &ecerr) {
 		exitCode = int(ecerr.ExitCode())
+	}
+
+	if errors.Is(err, errAlreadyReported) {
+		return
 	}
 
 	errText, fields := errext.Format(err)
@@ -157,6 +194,39 @@ func (c *rootCommand) execute() {
 	if c.loggerIsRemote {
 		c.globalState.FallbackLogger.WithFields(fields).Error(errText)
 	}
+}
+
+func handleUnsatisfiedDependencies(err error, c *rootCommand) (exitcodes.ExitCode, error) {
+	var unsatisfiedDependenciesErr binaryIsNotSatisfyingDependenciesError
+
+	if !errors.As(err, &unsatisfiedDependenciesErr) {
+		return 0, err
+	}
+	deps := unsatisfiedDependenciesErr.deps
+	c.globalState.Logger.
+		WithField("deps", deps).
+		Info("Automatic extension resolution is enabled. The current k6 binary doesn't satisfy all dependencies," +
+			" it's required to provision a custom binary.")
+	provisioner := newK6BuildProvisioner(c.globalState)
+	var customBinary commandExecutor
+	customBinary, err = provisioner.provision(constraintsMapToProvisionDependency(deps))
+	if err != nil {
+		err = errext.WithExitCodeIfNone(err, exitcodes.ScriptException)
+		c.globalState.Logger.
+			WithError(err).
+			Error("Failed to provision a k6 binary with required dependencies." +
+				" Please, make sure to report this issue by opening a bug report.")
+		return 0, err
+	}
+
+	err = customBinary.run(c.globalState)
+	// this only happens if we actually ran the binary and it exited afterwads, in which case we propagate the exit code
+	var ecerr errext.HasExitCode
+	if errors.As(err, &ecerr) {
+		return ecerr.ExitCode(), err
+	}
+
+	return 0, err
 }
 
 func (c *rootCommand) stopLoggers() {
@@ -314,22 +384,18 @@ func (c *rootCommand) setupLoggers(stop <-chan struct{}) error {
 	// Check for details https://github.com/grafana/k6/issues/711#issue-341414887
 	w := c.globalState.Logger.Writer()
 	stdlog.SetOutput(w)
-	c.loggersWg.Add(1)
-	go func() {
+	c.loggersWg.Go(func() {
 		<-stop
 		cancel()
 		_ = w.Close()
-		c.loggersWg.Done()
-	}()
+	})
 	return nil
 }
 
 func (c *rootCommand) setLoggerHook(ctx context.Context, h log.AsyncHook) {
-	c.loggersWg.Add(1)
-	go func() {
+	c.loggersWg.Go(func() {
 		h.Listen(ctx)
-		c.loggersWg.Done()
-	}()
+	})
 	c.globalState.Logger.AddHook(h)
 	c.globalState.Logger.SetOutput(io.Discard) // don't output to anywhere else
 }
@@ -346,7 +412,14 @@ func createSecretSources(gs *state.GlobalState) (map[string]secretsource.Source,
 	for _, line := range gs.Flags.SecretSource {
 		t, config, ok := strings.Cut(line, "=")
 		if !ok {
-			return nil, fmt.Errorf("couldn't parse secret source configuration %q", line)
+			// Special case: allow --secret-source=url without explicit config
+			// (it will use environment variables + defaults)
+			if line == "url" {
+				t = line
+				config = ""
+			} else {
+				return nil, fmt.Errorf("couldn't parse secret source configuration %q", line)
+			}
 		}
 		secretSources := ext.Get(ext.SecretSourceExtension)
 		found, ok := secretSources[t]

@@ -196,7 +196,7 @@ func TestMappings(t *testing.T) {
 		"mapConsoleMessage": {
 			apiInterface: (*consoleMessageAPI)(nil),
 			mapp: func() mapping {
-				return mapConsoleMessage(moduleVU{VU: vu}, common.PageOnEvent{
+				return mapConsoleMessage(moduleVU{VU: vu}, common.PageEvent{
 					ConsoleMessage: &common.ConsoleMessage{},
 				})
 			},
@@ -204,7 +204,7 @@ func TestMappings(t *testing.T) {
 		"mapMetricEvent": {
 			apiInterface: (*metricEventAPI)(nil),
 			mapp: func() mapping {
-				return mapMetricEvent(moduleVU{VU: vu}, common.PageOnEvent{
+				return mapMetricEvent(moduleVU{VU: vu}, common.PageEvent{
 					Metric: &common.MetricEvent{},
 				})
 			},
@@ -303,7 +303,7 @@ type browserContextAPI interface { //nolint:interfacebloat
 	SetGeolocation(geolocation *common.Geolocation) error
 	SetHTTPCredentials(httpCredentials common.Credentials) error
 	SetOffline(offline bool) error
-	WaitForEvent(event string, optsOrPredicate sobek.Value) (any, error)
+	WaitForEvent(event common.PageEventName, optsOrPredicate sobek.Value) (any, error)
 }
 
 // pageAPI is the interface of a single browser tab.
@@ -335,6 +335,8 @@ type pageAPI interface { //nolint:interfacebloat
 	GetMouse() *common.Mouse
 	GetTouchscreen() *common.Touchscreen
 	Goto(url string, opts sobek.Value) (*common.Response, error)
+	GoBack(opts sobek.Value) (*common.Response, error)
+	GoForward(opts sobek.Value) (*common.Response, error)
 	Hover(selector string, opts sobek.Value) error
 	InnerHTML(selector string, opts sobek.Value) (string, error)
 	InnerText(selector string, opts sobek.Value) (string, error)
@@ -347,8 +349,9 @@ type pageAPI interface { //nolint:interfacebloat
 	IsHidden(selector string, opts sobek.Value) (bool, error)
 	IsVisible(selector string, opts sobek.Value) (bool, error)
 	Locator(selector string, opts sobek.Value) *common.Locator
+	FrameLocator(selector string) *common.FrameLocator
 	MainFrame() *common.Frame
-	On(event common.PageOnEventName, handler func(common.PageOnEvent) error) error
+	On(event common.PageEventName, handler func(common.PageEvent) error) error
 	Opener() pageAPI
 	Press(selector string, key string, opts sobek.Value) error
 	Query(selector string) (*common.ElementHandle, error)
@@ -371,6 +374,8 @@ type pageAPI interface { //nolint:interfacebloat
 	Title() (string, error)
 	Type(selector string, text string, opts sobek.Value) error
 	Uncheck(selector string, opts sobek.Value) error
+	Unroute(url string) error
+	UnrouteAll() error
 	URL() (string, error)
 	ViewportSize() map[string]float64
 	WaitForFunction(fn, opts sobek.Value, args ...sobek.Value) (any, error)
@@ -379,7 +384,9 @@ type pageAPI interface { //nolint:interfacebloat
 	WaitForSelector(selector string, opts sobek.Value) (*common.ElementHandle, error)
 	WaitForTimeout(timeout int64)
 	WaitForURL(url string, opts sobek.Value) (*sobek.Promise, error)
+	WaitForEvent(event common.PageEventName, opts sobek.Value) (*sobek.Promise, error)
 	WaitForResponse(url string, opts sobek.Value) (*sobek.Promise, error)
+	WaitForRequest(url string, opts sobek.Value) (*sobek.Promise, error)
 	Workers() []*common.Worker
 }
 
@@ -393,7 +400,7 @@ type consoleMessageAPI interface {
 
 // metricEventAPI is the interface of a metric event.
 type metricEventAPI interface {
-	Tag(matchesRegex common.K6BrowserCheckRegEx, patterns common.TagMatches) error
+	Tag(rm common.RegExMatcher, patterns common.TagMatches) error
 }
 
 // frameAPI is the interface of a CDP target frame.
@@ -434,6 +441,7 @@ type frameAPI interface { //nolint:interfacebloat
 	ID() string
 	LoaderID() string
 	Locator(selector string, opts sobek.Value) *common.Locator
+	FrameLocator(selector string) *common.FrameLocator
 	Name() string
 	Query(selector string) (*common.ElementHandle, error)
 	QueryAll(selector string) ([]*common.ElementHandle, error)
@@ -500,12 +508,21 @@ type elementHandleAPI interface { //nolint:interfacebloat
 }
 
 type frameLocatorAPI interface {
+	GetByAltText(alt string, opts *common.GetByBaseOptions) *common.Locator
+	GetByLabel(label string, opts *common.GetByBaseOptions) *common.Locator
+	GetByPlaceholder(placeholder string, opts *common.GetByBaseOptions) *common.Locator
+	GetByRole(role string, opts *common.GetByRoleOptions) *common.Locator
+	GetByTestId(testID string) *common.Locator
+	GetByText(text string, opts *common.GetByBaseOptions) *common.Locator
+	GetByTitle(title string, opts *common.GetByBaseOptions) *common.Locator
 	Locator(selector string) *common.Locator
+	FrameLocator(selector string) *common.FrameLocator
 }
 
 // requestAPI is the interface of an HTTP request.
 type requestAPI interface { //nolint:interfacebloat
 	AllHeaders() map[string]string
+	Failure() *common.RequestFailure
 	Frame() *common.Frame
 	HeaderValue(string) sobek.Value
 	Headers() map[string]string
@@ -551,6 +568,8 @@ type locatorAPI interface { //nolint:interfacebloat
 	ContentFrame() *common.FrameLocator
 	Count() (int, error)
 	Dblclick(opts sobek.Value) error
+	Evaluate(pageFunc sobek.Value, arg ...sobek.Value) (any, error)
+	EvaluateHandle(pageFunc sobek.Value, arg ...sobek.Value) (common.JSHandleAPI, error)
 	SetChecked(checked bool, opts sobek.Value) error
 	Check(opts sobek.Value) error
 	Uncheck(opts sobek.Value) error
@@ -577,10 +596,12 @@ type locatorAPI interface { //nolint:interfacebloat
 	TextContent(opts sobek.Value) (string, bool, error)
 	InputValue(opts sobek.Value) (string, error)
 	Locator(selector string) *common.Locator
+	FrameLocator(selector string) *common.FrameLocator
 	Last() *common.Locator
 	Nth(nth int) *common.Locator
 	SelectOption(values sobek.Value, opts sobek.Value) ([]string, error)
 	Press(key string, opts sobek.Value) error
+	PressSequentially(text string, opts sobek.Value) error
 	Type(text string, opts sobek.Value) error
 	Hover(opts sobek.Value) error
 	Tap(opts sobek.Value) error

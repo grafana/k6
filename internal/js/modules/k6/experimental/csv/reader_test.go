@@ -81,7 +81,7 @@ func TestNewReaderFrom(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, r.columnNames)
 		assert.Equal(t, []string{"lastname", "firstname", "composer", "born", "died", "dates"}, r.columnNames)
-		assert.Equal(t, r.currentLine.Load(), int64(1))
+		assert.Equal(t, int64(1), r.currentLine.Load())
 	})
 
 	t.Run("skipFirstLine option skips first line and succeeds", func(t *testing.T) {

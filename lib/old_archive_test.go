@@ -119,7 +119,7 @@ func TestUnknownPrefix(t *testing.T) {
 
 	_, err = ReadArchive(buf)
 	require.Error(t, err)
-	require.Equal(t, err.Error(),
+	require.EqualError(t, err,
 		"unknown file prefix `strange` for file `strange/something`")
 }
 
@@ -197,7 +197,7 @@ func TestDerivedExecutionDiscarding(t *testing.T) {
 	var emptyConfigMap ScenarioConfigs
 	tests := []struct {
 		metadata     string
-		expScenarios interface{}
+		expScenarios any
 		expError     string
 	}{
 		// Tests to make sure that "execution" in the options, the old name for

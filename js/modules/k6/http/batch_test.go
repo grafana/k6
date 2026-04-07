@@ -7,6 +7,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"go.k6.io/k6/metrics"
 )
 
@@ -91,9 +92,9 @@ func TestBatchError(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				require.NotNil(t, ret)
-				var retobj map[string]interface{}
+				var retobj map[string]any
 				var ok bool
-				if retobj, ok = ret.Export().(map[string]interface{}); !ok {
+				if retobj, ok = ret.Export().(map[string]any); !ok {
 					require.Fail(t, "got wrong return object: %#+v", retobj)
 				}
 				require.Equal(t, int64(1020), retobj["error_code"])
@@ -360,7 +361,7 @@ func TestBatchGet(t *testing.T) {
 					var res = http.batch(reqs);
 					for (var key in res) {
 						if (res[key].status != 200) { throw new Error("wrong status: " + key + ": " + res[key].status); }
-						if (res[key].json().data != "testbody" && res[key].json().form.hello != "world!") { throw new Error("wrong response for " + key + ": " + res[key].body); }
+						if (res[key].json().data != "data:application/octet-stream;base64,dGVzdGJvZHk=" && res[key].json().form.hello != "world!") { throw new Error("wrong response for " + key + ": " + res[key].body); }
 					}`))
 		assert.NoError(t, err)
 		bufSamples := metrics.GetBufferedSamples(samples)
