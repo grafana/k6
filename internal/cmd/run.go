@@ -16,6 +16,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/errext"
@@ -32,6 +33,7 @@ import (
 	"go.k6.io/k6/internal/ui/pb"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/executor"
 	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
@@ -56,6 +58,15 @@ const (
 	// provides a safeguard to not block indefinitely.
 	waitForTracerProviderStopTimeout = 3 * time.Minute
 )
+
+func getExecFn(scs lib.ScenarioConfigs) string {
+	for _, sc := range scs {
+		if e := sc.GetExec(); e != "" {
+			return e
+		}
+	}
+	return "default"
+}
 
 // TODO: split apart some more
 //
@@ -107,6 +118,38 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	if err != nil {
 		return err
 	}
+
+	if cmd.Flags().Changed("vus") {
+		logger.Warnf("--vus overrides scenarios configuration")
+
+		vus, vusErr := cmd.Flags().GetInt64("vus")
+		if vusErr != nil {
+			return vusErr
+		}
+
+		execFn := getExecFn(test.derivedConfig.Scenarios)
+
+		cfg := executor.NewSharedIterationsConfig(lib.DefaultScenarioName)
+		cfg.VUs = null.NewInt(vus, true)
+		cfg.Iterations = null.NewInt(vus, true)
+		cfg.Exec = null.StringFrom(execFn)
+
+		scs := lib.ScenarioConfigs{
+			lib.DefaultScenarioName: cfg,
+		}
+
+		opts := test.initRunner.GetOptions()
+		opts.Scenarios = scs
+		opts.VUs = null.NewInt(vus, true)
+
+		if err := test.initRunner.SetOptions(opts); err != nil {
+			return err
+		}
+
+		test.derivedConfig.Scenarios = scs
+		test.derivedConfig.VUs = null.NewInt(vus, true)
+	}
+
 	printBanner(c.gs)
 	if test.keyLogger != nil {
 		defer func() {
