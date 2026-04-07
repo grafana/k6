@@ -1,7 +1,7 @@
 # buf.build/gen/go/gogo/protobuf/protocolbuffers/go v1.36.11-20240617172848-e1dbca2775a7.1
 ## explicit; go 1.23
 buf.build/gen/go/gogo/protobuf/protocolbuffers/go/gogoproto
-# buf.build/gen/go/prometheus/prometheus/protocolbuffers/go v1.36.11-20251118093737-4105057cc7d4.1
+# buf.build/gen/go/prometheus/prometheus/protocolbuffers/go v1.36.11-20260331160422-eae785f0a21d.1
 ## explicit; go 1.23
 buf.build/gen/go/prometheus/prometheus/protocolbuffers/go
 # github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358
@@ -139,8 +139,8 @@ github.com/evanw/esbuild/internal/runtime
 github.com/evanw/esbuild/internal/sourcemap
 github.com/evanw/esbuild/internal/xxhash
 github.com/evanw/esbuild/pkg/api
-# github.com/fatih/color v1.18.0
-## explicit; go 1.17
+# github.com/fatih/color v1.19.0
+## explicit; go 1.25.0
 github.com/fatih/color
 # github.com/go-json-experiment/json v0.0.0-20250211171154-1ae217ad3535
 ## explicit; go 1.23
@@ -251,7 +251,7 @@ github.com/klauspost/compress/s2
 github.com/klauspost/compress/snappy
 github.com/klauspost/compress/zstd
 github.com/klauspost/compress/zstd/internal/xxhash
-# github.com/mailru/easyjson v0.9.1
+# github.com/mailru/easyjson v0.9.2
 ## explicit; go 1.20
 github.com/mailru/easyjson
 github.com/mailru/easyjson/buffer
@@ -476,8 +476,8 @@ golang.org/x/net/trace
 ## explicit; go 1.24.0
 golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore
-# golang.org/x/sys v0.41.0
-## explicit; go 1.24.0
+# golang.org/x/sys v0.42.0
+## explicit; go 1.25.0
 golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
