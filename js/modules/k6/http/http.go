@@ -71,12 +71,22 @@ func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 	mustExport("get", func(url sobek.Value, args ...sobek.Value) (*Response, error) {
 		// http.get(url, params) doesn't have a body argument, so we add undefined
 		// as the third argument to http.request(method, url, body, params)
+		if len(args) > 1 {
+			if state := mi.vu.State(); state != nil {
+				state.Logger.Warnf("http.get only accepts a url and an optional params argument, but %d extra argument(s) were provided and will be ignored; if you want to send a request body, use http.post or http.request", len(args)-1)
+			}
+		}
 		args = append([]sobek.Value{sobek.Undefined()}, args...)
 		return mi.defaultClient.Request(http.MethodGet, url, args...)
 	})
 	mustExport("head", func(url sobek.Value, args ...sobek.Value) (*Response, error) {
 		// http.head(url, params) doesn't have a body argument, so we add undefined
 		// as the third argument to http.request(method, url, body, params)
+		if len(args) > 1 {
+			if state := mi.vu.State(); state != nil {
+				state.Logger.Warnf("http.head only accepts a url and an optional params argument, but %d extra argument(s) were provided and will be ignored; if you want to send a request body, use http.post or http.request", len(args)-1)
+			}
+		}
 		args = append([]sobek.Value{sobek.Undefined()}, args...)
 		return mi.defaultClient.Request(http.MethodHead, url, args...)
 	})
