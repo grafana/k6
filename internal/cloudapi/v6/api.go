@@ -276,3 +276,23 @@ func (c *Client) FetchTest(ctx context.Context, testRunID int64) (_ *TestRunProg
 		EstimatedDuration: resp.GetEstimatedDuration(),
 	}, nil
 }
+
+// StopTest aborts a remote run.
+func (c *Client) StopTest(ctx context.Context, testRunID int64) (err error) {
+	trid, err := checkInt32("test run ID", testRunID)
+	if err != nil {
+		return fmt.Errorf("checking test run ID: %w", err)
+	}
+	stackID, err := checkInt32("stack ID", c.stackID)
+	if err != nil {
+		return fmt.Errorf("checking stack ID: %w", err)
+	}
+
+	res, rerr := c.apiClient.TestRunsAPI.
+		TestRunsAbort(c.authCtx(ctx), trid).
+		XStackId(stackID).
+		Execute()
+	defer closeResponse(res, &err)
+
+	return checkRequest(res, rerr, "aborting cloud test run")
+}
