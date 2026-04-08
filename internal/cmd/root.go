@@ -137,7 +137,14 @@ func newRootCommand(gs *state.GlobalState) *rootCommand {
 	return c
 }
 
-func (c *rootCommand) persistentPreRunE(_ *cobra.Command, _ []string) error {
+func (c *rootCommand) persistentPreRunE(cmd *cobra.Command, _ []string) error {
+	// For 'k6 cloud run --local-execution', automatically register the cloud secret source
+	// so scripts can call secrets.get() without requiring an explicit --secret-source=cloud flag.
+	// This must happen before setupLoggers, which calls createSecretSources internally.
+	if isCloudRunWithLocalExecution(cmd) && !hasCloudSecretSource(c.globalState.Flags.SecretSource) {
+		c.globalState.Flags.SecretSource = append(c.globalState.Flags.SecretSource, "cloud")
+	}
+
 	err := c.setupLoggers(c.stopLoggersCh)
 	if err != nil {
 		return err
@@ -409,6 +416,7 @@ func (c *rootCommand) setLoggerHook(ctx context.Context, h log.AsyncHook) {
 	c.globalState.Logger.SetOutput(io.Discard) // don't output to anywhere else
 }
 
+//nolint:gocognit
 func createSecretSources(gs *state.GlobalState) (map[string]secretsource.Source, error) {
 	baseParams := secretsource.Params{
 		Logger:      gs.Logger,
@@ -438,6 +446,7 @@ func createSecretSources(gs *state.GlobalState) (map[string]secretsource.Source,
 		params := baseParams
 		name, isDefault, config := extractNameAndDefault(config)
 		if name == "" {
+			// Default the name to the source type to avoid an empty-string key.
 			name = t
 		}
 		params.ConfigArgument = config
@@ -465,36 +474,72 @@ func createSecretSources(gs *state.GlobalState) (map[string]secretsource.Source,
 		}
 	}
 
-	// Always register the cloud source so that SetConfig (called from createCloudTest on API
-	// response) is sufficient to enable secrets — no dynamic AddSource needed at runtime.
-	// For non-cloud runs the source is registered but never configured, so Get() returns a
-	// clear "not configured" error if a script calls secrets.get().
-	if _, ok := result["cloud"]; !ok {
-		cloudSource, err := cloudsecrets.New(baseParams)
-		if err != nil {
-			return nil, fmt.Errorf("failed to initialize cloud secret source: %w", err)
-		}
-		result["cloud"] = cloudSource
-		if _, ok := result["default"]; !ok {
-			result["default"] = cloudSource
-		}
-		gs.CloudSecretSource = cloudSource
-	} else if cs, ok := result["cloud"].(*cloudsecrets.SecretSource); ok {
-		// User explicitly passed --secret-source=cloud; capture the instance for SetConfig.
+	// Capture the cloud source instance if it was registered (via --secret-source=cloud or
+	// the local-execution injection above), so createCloudTest can call SetConfig on it later.
+	if cs, ok := result["cloud"].(*cloudsecrets.SecretSource); ok {
 		gs.CloudSecretSource = cs
 	}
 
 	// PLZ path: the k6-operator injects K6_CLOUD_SECRETS_TOKEN + K6_CLOUD_SECRETS_ENDPOINT
 	// via environment variables because it never calls createCloudTest (no /v1/tests round-trip).
-	if token := gs.Env["K6_CLOUD_SECRETS_TOKEN"]; token != "" && gs.CloudSecretSource != nil {
+	// Create and configure the cloud source here; set it as the default if none was chosen.
+	if token := gs.Env["K6_CLOUD_SECRETS_TOKEN"]; token != "" {
+		if gs.CloudSecretSource == nil {
+			cloudSource, err := cloudsecrets.New(baseParams)
+			if err != nil {
+				return nil, fmt.Errorf("failed to initialize cloud secret source: %w", err)
+			}
+			result["cloud"] = cloudSource
+			gs.CloudSecretSource = cloudSource
+		}
 		gs.CloudSecretSource.SetConfig(&cloudsecrets.Config{
 			Token:        token,
 			Endpoint:     gs.Env["K6_CLOUD_SECRETS_ENDPOINT"],
 			ResponsePath: gs.Env["K6_CLOUD_SECRETS_RESPONSE_PATH"],
 		})
+		if _, ok := result["default"]; !ok {
+			result["default"] = gs.CloudSecretSource
+		}
 	}
 
 	return result, nil
+}
+
+// isCloudRunWithLocalExecution returns true when the command being executed is
+// 'k6 cloud run' with the --local-execution flag set.
+func isCloudRunWithLocalExecution(cmd *cobra.Command) bool {
+	if cmd == nil || cmd.Name() != cloudRunCommandName {
+		return false
+	}
+	parent := cmd.Parent()
+	if parent == nil || parent.Name() != "cloud" {
+		return false
+	}
+	f := cmd.Flag("local-execution")
+	return f != nil && f.Changed
+}
+
+// hasCloudSecretSource returns true if the 'cloud' secret source type appears in sources.
+func hasCloudSecretSource(sources []string) bool {
+	for _, s := range sources {
+		t, _, _ := strings.Cut(s, "=")
+		if strings.TrimSpace(t) == "cloud" {
+			return true
+		}
+	}
+	return false
+}
+
+// validateNoCloudSecretSource returns an error if any source in sources is of type 'cloud'.
+// The cloud secret source is only valid for 'k6 cloud run --local-execution'.
+func validateNoCloudSecretSource(sources []string) error {
+	if hasCloudSecretSource(sources) {
+		return errext.WithExitCodeIfNone(
+			fmt.Errorf("the 'cloud' secret source can only be used with 'k6 cloud run --local-execution'"),
+			exitcodes.InvalidConfig,
+		)
+	}
+	return nil
 }
 
 func extractNameAndDefault(config string) (name string, isDefault bool, remaining string) {

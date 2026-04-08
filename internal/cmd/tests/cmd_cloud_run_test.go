@@ -54,7 +54,7 @@ func TestCloudRunCommandIncompatibleFlags(t *testing.T) {
 		{
 			name:               "using --secret-source=cloud without --local-execution should fail",
 			cliArgs:            []string{"--secret-source=cloud"},
-			wantStderrContains: "the 'cloud' secret source can only be used with the --local-execution flag",
+			wantStderrContains: "the 'cloud' secret source can only be used with 'k6 cloud run --local-execution'",
 		},
 	}
 
