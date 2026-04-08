@@ -26,14 +26,12 @@ func (c *cmdArchive) run(cmd *cobra.Command, args []string) error {
 	// an execution shortcut option (e.g. `iterations` or `duration`),
 	// we will have multiple conflicting execution options since the
 	// derivation will set `scenarios` as well.
-	testRunState, err := test.buildTestRunState(test.consolidatedConfig.Options)
-	if err != nil {
+	if err := test.initRunner.SetOptions(test.consolidatedConfig.Options); err != nil {
 		return err
 	}
 
 	// Archive.
-	arc := testRunState.Runner.MakeArchive()
-	arc.Dependencies = test.preManifestDependencies.toStringMap()
+	arc := test.makeArchive()
 
 	if c.excludeEnvVars {
 		c.gs.Logger.Debug("environment variables will be excluded from the archive")

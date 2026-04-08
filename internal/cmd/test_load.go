@@ -258,21 +258,23 @@ func (lt *loadedTest) Imports() []string {
 	return append([]string(nil), lt.imports...)
 }
 
+func (lt *loadedTest) makeArchive() *lib.Archive {
+	arc := lt.initRunner.MakeArchive()
+	arc.Dependencies = lt.preManifestDependencies.toStringMap()
+	return arc
+}
+
 func resolveModulesDependencies(
 	originalError error, imports []string, logger logrus.FieldLogger,
 	fileSystems map[string]fsext.Fs, source *loader.SourceData, gs *state.GlobalState,
-) (dependencies, dependencies, error) {
-	deps, preDeps, err := collectTestDependencies(originalError, imports, fileSystems, gs.Flags.DependenciesManifest)
+) (deps, preDeps dependencies, err error) {
+	deps, preDeps, err = collectTestDependencies(originalError, imports, fileSystems, gs.Flags.DependenciesManifest)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	if !gs.Flags.AutoExtensionResolution {
 		return deps, preDeps, originalError
-	}
-
-	if len(deps) == 0 {
-		return deps, preDeps, nil
 	}
 
 	if !isCustomBuildRequired(deps, build.Version, ext.GetAll()) {
@@ -315,9 +317,9 @@ func resolveModulesDependencies(
 // then the external manifest is applied.
 func collectTestDependencies(
 	originalError error, imports []string, fileSystems map[string]fsext.Fs, manifest string,
-) (dependencies, dependencies, error) {
+) (deps, preDeps dependencies, err error) {
 	// Step 1: modules that failed to load.
-	deps, err := extractUnknownModules(originalError)
+	deps, err = extractUnknownModules(originalError)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -337,13 +339,13 @@ func collectTestDependencies(
 	}
 
 	// Step 3: explicit version constraints from "use k6" directives in script files.
-	if err := analyseUseContraints(imports, fileSystems, deps); err != nil {
+	if err = analyseUseContraints(imports, fileSystems, deps); err != nil {
 		return nil, nil, err
 	}
 
 	// Snapshot before the manifest so callers can distinguish what the script
 	// declared from what an external policy required.
-	preDeps := maps.Clone(deps)
+	preDeps = maps.Clone(deps)
 
 	m, err := parseManifest(manifest)
 	if err != nil {

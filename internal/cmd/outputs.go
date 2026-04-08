@@ -173,9 +173,7 @@ func createOutputs(
 		// with building an archive and setting it on the output instance.
 		if !test.derivedConfig.NoArchiveUpload.Bool {
 			if archiveOut, ok := out.(output.WithArchive); ok {
-				arc := test.initRunner.MakeArchive()
-				arc.Dependencies = test.preManifestDependencies.toStringMap()
-				archiveOut.SetArchive(arc)
+				archiveOut.SetArchive(test.makeArchive())
 			}
 		}
 

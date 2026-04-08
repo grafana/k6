@@ -111,8 +111,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	// an execution shortcut option (e.g. `iterations` or `duration`),
 	// we will have multiple conflicting execution options since the
 	// derivation will set `scenarios` as well.
-	testRunState, err := test.buildTestRunState(test.consolidatedConfig.Options)
-	if err != nil {
+	if err := test.initRunner.SetOptions(test.consolidatedConfig.Options); err != nil {
 		return err
 	}
 
@@ -128,8 +127,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	printBar(c.gs, progressBar)
 
 	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Building the archive..."))
-	arc := testRunState.Runner.MakeArchive()
-	arc.Dependencies = test.preManifestDependencies.toStringMap()
+	arc := test.makeArchive()
 
 	tmpCloudConfig, err := cloudapi.GetTemporaryCloudConfig(arc.Options.Cloud)
 	if err != nil {
