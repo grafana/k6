@@ -12,7 +12,7 @@ import (
 	"golang.org/x/term"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/cloudapi"
+	v1api "go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/internal/build"
 	v6cloudapi "go.k6.io/k6/internal/cloudapi/v6"
@@ -73,7 +73,7 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	currentJSONConfig := cloudapi.Config{}
+	currentJSONConfig := v1api.Config{}
 	currentJSONConfigRaw := currentDiskConf.Collectors["cloud"]
 	if currentJSONConfigRaw != nil {
 		// We only want to modify this config, see comment below
@@ -182,7 +182,7 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 	return nil
 }
 
-func printConfig(gs *state.GlobalState, cloudConf cloudapi.Config) {
+func printConfig(gs *state.GlobalState, cloudConf v1api.Config) {
 	valueColor := getColor(gs.Flags.NoColor || !gs.Stdout.IsTTY, color.FgCyan)
 	printToStdout(gs, fmt.Sprintf("  token: %s\n", valueColor.Sprint(cloudConf.Token.String)))
 
@@ -210,12 +210,12 @@ func printConfig(gs *state.GlobalState, cloudConf cloudapi.Config) {
 // and update the config with the given inputs
 func validateInputs(
 	gs *state.GlobalState,
-	config *cloudapi.Config,
+	cfg *v1api.Config,
 	rawConfig json.RawMessage,
 	token, stackInput null.String,
 ) error {
-	config.Token = token
-	consolidatedCurrentConfig, warn, err := cloudapi.GetConsolidatedConfig(
+	cfg.Token = token
+	consolidatedCurrentConfig, warn, err := v1api.GetConsolidatedConfig(
 		rawConfig, gs.Env, "", nil)
 	if err != nil {
 		return err
@@ -236,11 +236,11 @@ func validateInputs(
 					"Error details: %w",
 				err)
 		}
-		config.StackURL = null.StringFrom(stackURL)
-		config.StackID = null.IntFrom(stackID)
-		config.DefaultProjectID = null.IntFrom(defaultProjectID)
+		cfg.StackURL = null.StringFrom(stackURL)
+		cfg.StackID = null.IntFrom(stackID)
+		cfg.DefaultProjectID = null.IntFrom(defaultProjectID)
 	} else {
-		err = validateTokenV1(gs, consolidatedCurrentConfig, config.Token.String)
+		err = validateTokenV1(gs, consolidatedCurrentConfig, cfg.Token.String)
 		if err != nil {
 			return err
 		}
@@ -252,13 +252,13 @@ func validateInputs(
 // validateTokenV1 validates a token using v1 cloud API.
 //
 // Deprecated: use validateTokenV6 instead if a stack name is provided.
-func validateTokenV1(gs *state.GlobalState, config cloudapi.Config, token string) error {
-	client := cloudapi.NewClient(
+func validateTokenV1(gs *state.GlobalState, cfg v1api.Config, token string) error {
+	client := v1api.NewClient(
 		gs.Logger,
 		token,
-		config.Host.String,
+		cfg.Host.String,
 		build.Version,
-		config.Timeout.TimeDuration(),
+		cfg.Timeout.TimeDuration(),
 	)
 
 	res, err := client.ValidateToken()
@@ -280,7 +280,7 @@ func validateTokenV1(gs *state.GlobalState, config cloudapi.Config, token string
 // The stackInput can be either a full URL (e.g., https://my-team.grafana.net) or just a slug (e.g., my-team).
 func validateTokenV6(
 	gs *state.GlobalState,
-	config cloudapi.Config,
+	cfg v1api.Config,
 	token, stackInput string,
 ) (stackURL string, stackID int64, defaultProjectID int64, err error) {
 	normalizedURL := normalizeStackURL(stackInput)
@@ -288,17 +288,17 @@ func validateTokenV6(
 	client, err := v6cloudapi.NewClient(
 		gs.Logger,
 		token,
-		config.Hostv6.String,
+		cfg.Hostv6.String,
 		build.Version,
-		config.Timeout.TimeDuration(),
+		cfg.Timeout.TimeDuration(),
 	)
 	if err != nil {
-		return "", 0, 0, err
+		return "", 0, 0, fmt.Errorf("creating client: %w", err)
 	}
 
-	authResp, err := client.ValidateToken(normalizedURL)
+	authResp, err := client.ValidateToken(gs.Ctx, normalizedURL)
 	if err != nil {
-		return "", 0, 0, err
+		return "", 0, 0, fmt.Errorf("validating token: %w", err)
 	}
 
 	return normalizedURL, int64(authResp.StackId), int64(authResp.DefaultProjectId), nil

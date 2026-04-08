@@ -1,7 +1,9 @@
 package cloudapi
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -26,9 +28,6 @@ type Client struct {
 	baseURL   string
 
 	logger logrus.FieldLogger
-
-	retries       int
-	retryInterval time.Duration
 }
 
 // NewClient return a new client for the cloud API
@@ -48,15 +47,15 @@ func NewClient(logger logrus.FieldLogger, token, host, version string, timeout t
 		},
 		OperationServers: map[string]k6cloud.ServerConfigurations{},
 		HTTPClient:       &http.Client{Timeout: timeout},
+		MaxRetries:       MaxRetries,
+		RetryInterval:    RetryInterval,
 	}
 
 	c := &Client{
-		apiClient:     k6cloud.NewAPIClient(cfg),
-		token:         token,
-		baseURL:       fmt.Sprintf("%s/cloud/v6", host),
-		retries:       MaxRetries,
-		retryInterval: RetryInterval,
-		logger:        logger,
+		apiClient: k6cloud.NewAPIClient(cfg),
+		token:     token,
+		baseURL:   fmt.Sprintf("%s/cloud/v6", host),
+		logger:    logger,
 	}
 	return c, nil
 }
@@ -69,6 +68,36 @@ func (c *Client) SetStackID(stackID int64) {
 // BaseURL returns configured host.
 func (c *Client) BaseURL() string {
 	return c.baseURL
+}
+
+func (c *Client) authCtx(ctx context.Context) context.Context {
+	return context.WithValue(ctx, k6cloud.ContextAccessToken, c.token)
+}
+
+func closeResponse(res *http.Response, err *error) {
+	if res == nil {
+		return
+	}
+
+	_, _ = io.Copy(io.Discard, res.Body)
+	if cerr := res.Body.Close(); cerr != nil && err != nil && *err == nil {
+		*err = cerr
+	}
+}
+
+func checkRequest(res *http.Response, rerr error, action string) error {
+	if rerr != nil {
+		var gerr *k6cloud.GenericOpenAPIError
+		if !errors.As(rerr, &gerr) {
+			return fmt.Errorf("%s: %w", action, rerr)
+		}
+	}
+
+	if err := CheckResponse(res); err != nil {
+		return fmt.Errorf("%s: %w", action, err)
+	}
+
+	return nil
 }
 
 // CheckResponse checks the parsed response.
@@ -89,20 +118,22 @@ func CheckResponse(r *http.Response) error {
 	}
 
 	var payload ResponseError
-	if err := json.Unmarshal(data, &payload); err != nil {
-		if r.StatusCode == http.StatusUnauthorized {
-			return errNotAuthenticated
-		}
-		if r.StatusCode == http.StatusForbidden {
-			return errNotAuthorized
-		}
-		return fmt.Errorf(
-			"unexpected HTTP error from %s: %d %s",
-			r.Request.URL,
-			r.StatusCode,
-			http.StatusText(r.StatusCode),
-		)
+	err = json.Unmarshal(data, &payload)
+	if err == nil {
+		payload.Response = r
+		return payload
 	}
-	payload.Response = r
-	return payload
+	if r.StatusCode == http.StatusUnauthorized {
+		return errNotAuthenticated
+	}
+	if r.StatusCode == http.StatusForbidden {
+		return errNotAuthorized
+	}
+
+	return fmt.Errorf(
+		"unexpected HTTP error from %s: %d %s",
+		r.Request.URL,
+		r.StatusCode,
+		http.StatusText(r.StatusCode),
+	)
 }

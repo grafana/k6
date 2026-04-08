@@ -1,6 +1,7 @@
 package cloudapi
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -38,7 +39,7 @@ func TestValidateToken(t *testing.T) {
 		client, err := NewClient(testutils.NewLogger(t), "test-token", server.URL, "1.0", 1*time.Second)
 		require.NoError(t, err)
 
-		resp, err := client.ValidateToken("https://stack.grafana.net")
+		resp, err := client.ValidateToken(t.Context(), "https://stack.grafana.net")
 		require.NoError(t, err)
 		require.NotNil(t, resp)
 		assert.Equal(t, int32(123), resp.StackId)
@@ -62,7 +63,7 @@ func TestValidateToken(t *testing.T) {
 		client, err := NewClient(testutils.NewLogger(t), "invalid-token", server.URL, "1.0", 1*time.Second)
 		require.NoError(t, err)
 
-		resp, err := client.ValidateToken("https://stack.grafana.net")
+		resp, err := client.ValidateToken(t.Context(), "https://stack.grafana.net")
 		assert.Error(t, err)
 		assert.Nil(t, resp)
 		assert.Contains(t, err.Error(), "(401/error) Invalid token")
@@ -70,11 +71,12 @@ func TestValidateToken(t *testing.T) {
 
 	t.Run("network error should fail", func(t *testing.T) {
 		t.Parallel()
-		// Use an invalid URL to simulate network error
-		client, err := NewClient(testutils.NewLogger(t), "test-token", "http://invalid-url-that-does-not-exist", "1.0", 1*time.Second)
+		client, err := NewClient(
+			testutils.NewLogger(t), "test-token", "http://invalid-url-that-does-not-exist", "1.0", 1*time.Second,
+		)
 		require.NoError(t, err)
 
-		resp, err := client.ValidateToken("https://stack.grafana.net")
+		resp, err := client.ValidateToken(t.Context(), "https://stack.grafana.net")
 		assert.Error(t, err)
 		assert.Nil(t, resp)
 	})
@@ -84,7 +86,7 @@ func TestValidateToken(t *testing.T) {
 		client, err := NewClient(testutils.NewLogger(t), "test-token", "http://example.com", "1.0", 1*time.Second)
 		require.NoError(t, err)
 
-		resp, err := client.ValidateToken("")
+		resp, err := client.ValidateToken(t.Context(), "")
 		assert.Error(t, err)
 		assert.Nil(t, resp)
 		assert.Equal(t, "stack URL is required to validate token", err.Error())
@@ -95,14 +97,30 @@ func TestValidateToken(t *testing.T) {
 		client, err := NewClient(testutils.NewLogger(t), "test-token", "http://example.com", "1.0", 1*time.Second)
 		require.NoError(t, err)
 
-		resp, err := client.ValidateToken("://invalid-url")
+		resp, err := client.ValidateToken(t.Context(), "://invalid-url")
 		assert.Error(t, err)
 		assert.Nil(t, resp)
 		assert.Contains(t, err.Error(), "invalid stack URL")
 	})
+
+	t.Run("canceled context should fail", func(t *testing.T) {
+		t.Parallel()
+
+		client, err := NewClient(testutils.NewLogger(t), "test-token", "http://example.com", "1.0", 1*time.Second)
+		require.NoError(t, err)
+
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+
+		resp, err := client.ValidateToken(ctx, "https://stack.grafana.net")
+		assert.ErrorIs(t, err, context.Canceled)
+		assert.Nil(t, resp)
+	})
 }
 
-func fprint(t *testing.T, w io.Writer, format string) int {
+func fprint(t testing.TB, w io.Writer, format string) int {
+	t.Helper()
+
 	n, err := fmt.Fprint(w, format)
 	require.NoError(t, err)
 	return n
