@@ -557,13 +557,24 @@ func (c *cmdCloud) reportCloudTestResult(testProgress *v1api.TestProgressRespons
 	// when thresholds have been crossed (failed). So, we report this situation as such.
 	if testProgress.RunStatus == v1api.RunStatusFinished ||
 		testProgress.RunStatus == v1api.RunStatusAbortedThreshold {
-		//nolint:staticcheck
-		return errext.WithExitCodeIfNone(errors.New("Thresholds have been crossed"), exitcodes.ThresholdsHaveFailed)
+		return errext.WithExitCodeIfNone(errThresholdsCrossed, exitcodes.ThresholdsHaveFailed)
 	}
 
 	// TODO: use different exit codes for failed thresholds vs failed test (e.g. aborted by system/limit)
-	return errext.WithExitCodeIfNone(errors.New("The test has failed"), exitcodes.CloudTestRunFailed) //nolint:staticcheck
+	return errext.WithExitCodeIfNone(errTestFailed, exitcodes.CloudTestRunFailed)
 }
+
+type cloudRunError string
+
+func (e cloudRunError) Error() string {
+	s := string(e)
+	return strings.ToUpper(s[:1]) + s[1:]
+}
+
+const (
+	errThresholdsCrossed cloudRunError = "thresholds have been crossed"
+	errTestFailed        cloudRunError = "the test has failed"
+)
 
 func (c *cmdCloud) flagSet() *pflag.FlagSet {
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
