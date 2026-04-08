@@ -8,11 +8,13 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	k6cloud "github.com/grafana/k6-cloud-openapi-client-go/k6"
 	"go.k6.io/k6/cloudapi"
+	"go.k6.io/k6/errext/exitcodes"
 	v6cloudapi "go.k6.io/k6/internal/cloudapi/v6"
 	"go.k6.io/k6/internal/cmd"
 	"go.k6.io/k6/internal/lib/testutils"
@@ -114,6 +116,45 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 		assert.Contains(t, stdout, `output: https://app.k6.io/runs/123`)
 		assert.Contains(t, stdout, `test status: Archived`)
 	})
+
+	t.Run("TestCloudRemoteValidateUsesV6Endpoint", func(t *testing.T) {
+		t.Parallel()
+
+		var validated atomic.Bool
+		routes := newRemoteCloudRoutes(t, nil)
+		routes["POST ^/cloud/v6/validate_options$"] = http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+			validated.Store(true)
+			assert.Equal(t, "123", req.Header.Get("X-Stack-Id"))
+
+			var body struct {
+				Options map[string]any `json:"options"`
+			}
+			require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
+			assert.EqualValues(t, 10, body.Options["vus"])
+			assert.Equal(t, "10s", body.Options["duration"])
+
+			resp.Header().Set("Content-Type", "application/json")
+			_, err := fmt.Fprint(resp, `{}`)
+			assert.NoError(t, err)
+		})
+		srv := getTestServer(t, routes)
+		t.Cleanup(srv.Close)
+
+		ts := NewGlobalTestState(t)
+		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test.js"), []byte(`
+			export const options = { vus: 10, duration: "10s" };
+			export default function() {}
+		`), 0o644))
+		ts.CmdArgs = setupCmd([]string{"--verbose", "--log-output=stdout"})
+		ts.Env["K6_SHOW_CLOUD_LOGS"] = "false"
+		ts.Env["K6_CLOUD_HOST"] = srv.URL
+		ts.Env["K6_CLOUD_STACK_ID"] = "123"
+		ts.Env["K6_CLOUD_PROJECT_ID"] = "124"
+		ts.Env["K6_CLOUD_TOKEN"] = "foo"
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+		assert.True(t, validated.Load())
+	})
 	// TestCloudWithArchive tests that if k6 uses a static archive with the script inside that has cloud options like:
 	//
 	//	export let options = {
@@ -198,6 +239,89 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 		assert.Contains(t, stdout, `hello world from archive`)
 		assert.Contains(t, stdout, `output: https://app.k6.io/runs/123`)
 		assert.Contains(t, stdout, `test status: Completed`)
+	})
+
+	t.Run("TestCloudAbortUsesV6Endpoint", func(t *testing.T) {
+		t.Parallel()
+
+		var aborted atomic.Bool
+		routes := newRemoteCloudRoutes(t, func() v6cloudapi.TestRunProgress {
+			if aborted.Load() {
+				return v6cloudapi.TestRunProgress{
+					Status:            v6cloudapi.StatusCompleted,
+					EstimatedDuration: 10,
+					ExecutionDuration: 10,
+				}
+			}
+
+			return v6cloudapi.TestRunProgress{
+				Status:            v6cloudapi.StatusRunning,
+				EstimatedDuration: 10,
+				ExecutionDuration: 1,
+			}
+		})
+		routes[`POST ^/cloud/v6/test_runs/\d+/abort$`] = http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
+			aborted.Store(true)
+			resp.WriteHeader(http.StatusNoContent)
+		})
+		srv := getTestServer(t, routes)
+		t.Cleanup(srv.Close)
+
+		ts := NewGlobalTestState(t)
+		require.NoError(t, fsext.WriteFile(
+			ts.FS, filepath.Join(ts.Cwd, "test.js"), []byte(`export default function() {}`), 0o644,
+		))
+		ts.CmdArgs = setupCmd([]string{"--verbose", "--log-output=stdout"})
+		ts.Env["K6_SHOW_CLOUD_LOGS"] = "false"
+		ts.Env["K6_CLOUD_HOST"] = srv.URL
+		ts.Env["K6_CLOUD_STACK_ID"] = "123"
+		ts.Env["K6_CLOUD_PROJECT_ID"] = "124"
+		ts.Env["K6_CLOUD_TOKEN"] = "foo"
+
+		asyncWaitForStdoutAndStopTestWithInterruptSignal(t, ts, 20, 200*time.Millisecond, "execution: cloud")
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stdout := ts.Stdout.String()
+		t.Log(stdout)
+		assert.True(t, aborted.Load(), "remote abort must use the v6 endpoint")
+	})
+
+	t.Run("TestCloudThresholdsHaveFailed", func(t *testing.T) {
+		t.Parallel()
+
+		progressCallback := func() v6cloudapi.TestRunProgress {
+			return v6cloudapi.TestRunProgress{
+				Status: v6cloudapi.StatusCompleted,
+				Result: v6cloudapi.ResultFailed,
+			}
+		}
+		ts := getSimpleRemoteCloudTestState(t, nil, setupCmd, nil, progressCallback)
+		ts.ExpectedExitCode = int(exitcodes.ThresholdsHaveFailed)
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stdout := ts.Stdout.String()
+		t.Log(stdout)
+		assert.Contains(t, stdout, `Thresholds have been crossed`)
+	})
+
+	t.Run("TestCloudAbortedThreshold", func(t *testing.T) {
+		t.Parallel()
+
+		progressCallback := func() v6cloudapi.TestRunProgress {
+			return v6cloudapi.TestRunProgress{
+				Status: v6cloudapi.StatusAbortedThreshold,
+				Result: v6cloudapi.ResultFailed,
+			}
+		}
+		ts := getSimpleRemoteCloudTestState(t, nil, setupCmd, nil, progressCallback)
+		ts.ExpectedExitCode = int(exitcodes.ThresholdsHaveFailed)
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stdout := ts.Stdout.String()
+		t.Log(stdout)
+		assert.Contains(t, stdout, `Thresholds have been crossed`)
 	})
 }
 
