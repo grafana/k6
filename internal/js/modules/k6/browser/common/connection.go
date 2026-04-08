@@ -171,16 +171,18 @@ func NewConnection(
 	}
 
 	c := Connection{
-		BaseEventEmitter:         NewBaseEventEmitter(ctx),
-		ctx:                      ctx,
-		cancelCtx:                cancelCtx,
-		wsURL:                    wsURL,
-		logger:                   logger,
-		conn:                     conn,
-		sendCh:                   make(chan *cdproto.Message, 32), // Avoid blocking in Execute
-		recvCh:                   make(chan *cdproto.Message),
-		closeCh:                  make(chan int),
-		errorCh:                  make(chan error),
+		BaseEventEmitter: NewBaseEventEmitter(ctx),
+		ctx:              ctx,
+		cancelCtx:        cancelCtx,
+		wsURL:            wsURL,
+		logger:           logger,
+		conn:             conn,
+		sendCh:           make(chan *cdproto.Message, 32), // Avoid blocking in Execute
+		recvCh:           make(chan *cdproto.Message),
+		closeCh:          make(chan int),
+		// Keep one slot so unexpected IO errors can be published even if no
+		// request is currently waiting on the channel.
+		errorCh:                  make(chan error, 1),
 		done:                     make(chan struct{}),
 		closing:                  make(chan struct{}),
 		msgIDGen:                 &msgID{},
@@ -289,11 +291,18 @@ func (c *Connection) handleIOError(err error) {
 
 	// Report an unexpected closure
 	c.logger.Errorf("cdp", "communicating with browser: %v", err)
+	// Never block publishing to errorCh:
+	// When closing unexpectedly, there might be no active request
+	// reading from the channel, so we need to make sure the error
+	// is published even if the channel is not being listened to.
+	// This avoids: 1) losing the error and 2) deadlocks.
 	select {
 	case c.errorCh <- err:
 	case <-c.done:
 		return
+	default:
 	}
+
 	var (
 		cerr *websocket.CloseError
 		code = websocket.CloseGoingAway
@@ -301,6 +310,7 @@ func (c *Connection) handleIOError(err error) {
 	if errors.As(err, &cerr) {
 		code = cerr.Code
 	}
+
 	select {
 	case c.closeCh <- code:
 		c.logger.Debugf("cdp", "ending browser communication with code %d", code)
@@ -464,9 +474,10 @@ func (c *Connection) stopWaitingForDebugger(sid target.SessionID) {
 		SessionID: sid,
 		Method:    cdproto.MethodType(cdpruntime.CommandRunIfWaitingForDebugger),
 	}
-	err := c.send(c.ctx, msg, nil, nil)
-	if err != nil {
-		c.logger.Errorf("Connection:stopWaitingForDebugger", "sid:%v wsURL:%q, err:%v", sid, c.wsURL, err)
+	ctx, cancel := context.WithTimeout(c.ctx, time.Second)
+	defer cancel()
+	if err := c.send(ctx, msg, nil, nil); err != nil {
+		c.logger.Debugf("Connection:stopWaitingForDebugger", "sid:%v wsURL:%q, err:%v", sid, c.wsURL, err)
 	}
 }
 
@@ -484,10 +495,10 @@ func (c *Connection) send(
 		return fmt.Errorf("closing communication with browser: %w", &websocket.CloseError{Code: code})
 	case <-ctx.Done():
 		c.logger.Debugf("Connection:send:<-ctx.Done", "wsURL:%q sid:%v err:%v", c.wsURL, msg.SessionID, c.ctx.Err())
-		return nil
+		return ContextErr(ctx)
 	case <-c.done:
 		c.logger.Debugf("Connection:send:<-c.done", "wsURL:%q sid:%v", c.wsURL, msg.SessionID)
-		return nil
+		return connectionDoneErr(c.ctx)
 	}
 
 	// Block waiting for response.
@@ -524,6 +535,7 @@ func (c *Connection) send(
 		return &websocket.CloseError{Code: code}
 	case <-c.done:
 		c.logger.Debugf("Connection:send:<-c.done #2", "sid:%v tid:%v wsURL:%q", msg.SessionID, tid, c.wsURL)
+		return connectionDoneErr(c.ctx)
 	case <-ctx.Done():
 		c.logger.Debugf("Connection:send:<-ctx.Done()", "sid:%v tid:%v wsURL:%q err:%v",
 			msg.SessionID, tid, c.wsURL, ContextErr(c.ctx))
@@ -533,7 +545,13 @@ func (c *Connection) send(
 			msg.SessionID, tid, c.wsURL, ContextErr(c.ctx))
 		return ContextErr(c.ctx)
 	}
-	return nil
+}
+
+func connectionDoneErr(ctx context.Context) error {
+	if err := ContextErr(ctx); err != nil {
+		return err
+	}
+	return ErrChannelClosed
 }
 
 func (c *Connection) sendLoop() {
