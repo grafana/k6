@@ -262,21 +262,21 @@ func TestBucketQPopAll(t *testing.T) {
 
 func TestBucketQPushPopConcurrency(t *testing.T) {
 	t.Parallel()
+	const iterations = 1000
 	var (
-		count = 0
-		bq    = bucketQ{}
-		sink  = &counter{}
+		bq   = bucketQ{}
+		sink = &counter{}
 
-		stop = time.After(100 * time.Millisecond)
-		pop  = make(chan struct{}, 10)
-		done = make(chan struct{})
+		pop           = make(chan struct{}, 10)
+		done          = make(chan struct{})
+		goroutineDone = make(chan struct{})
 	)
 
 	go func() {
+		defer close(goroutineDone)
 		for {
 			select {
 			case <-done:
-				close(pop)
 				return
 			case <-pop:
 				b := bq.PopAll()
@@ -286,25 +286,20 @@ func TestBucketQPushPopConcurrency(t *testing.T) {
 	}()
 
 	now := time.Now().Truncate(time.Second).UnixNano()
-	for {
-		select {
-		case <-stop:
-			close(done)
-			return
-		default:
-			count++
-			bq.Push([]timeBucket{
-				{
-					Time: now,
-					Sinks: map[metrics.TimeSeries]metricValue{
-						{}: sink,
-					},
+	for count := range iterations {
+		bq.Push([]timeBucket{
+			{
+				Time: now,
+				Sinks: map[metrics.TimeSeries]metricValue{
+					{}: sink,
 				},
-			})
+			},
+		})
 
-			if count%5 == 0 { // a fixed-arbitrary flush rate
-				pop <- struct{}{}
-			}
+		if count%5 == 0 { // a fixed-arbitrary flush rate
+			pop <- struct{}{}
 		}
 	}
+	close(done)
+	<-goroutineDone
 }
