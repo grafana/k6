@@ -190,6 +190,25 @@ func (c *Client) StartTest(ctx context.Context, name string, projectID int64,
 	return c.startCloudTestRun(ctx, stackID, loadTest.Id)
 }
 
+// UploadTest creates a new cloud test or updates the existing one on name conflict.
+func (c *Client) UploadTest(ctx context.Context, name string, projectID int64, arc *lib.Archive) (int64, error) {
+	pid, err := checkInt32("project ID", projectID)
+	if err != nil {
+		return 0, fmt.Errorf("checking project ID: %w", err)
+	}
+	stackID, err := checkInt32("stack ID", c.stackID)
+	if err != nil {
+		return 0, fmt.Errorf("checking stack ID: %w", err)
+	}
+
+	loadTest, err := c.createOrUpdateCloudTest(ctx, pid, stackID, name, arc)
+	if err != nil {
+		return 0, fmt.Errorf("uploading cloud test: %w", err)
+	}
+
+	return int64(loadTest.Id), nil
+}
+
 func (c *Client) createOrUpdateCloudTest(ctx context.Context, projectID int32, stackID int32, name string,
 	arc *lib.Archive,
 ) (_ *k6cloud.LoadTestApiModel, err error) {
