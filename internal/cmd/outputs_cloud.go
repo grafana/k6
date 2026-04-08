@@ -153,11 +153,13 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 	// We store the test run id in the environment, so it can be used later.
 	test.preInitState.RuntimeOptions.Env[testRunIDKey] = response.ReferenceID
 
-	cloudsecrets.SetConfig(&cloudsecrets.Config{
-		Token:        response.TestRunToken,
-		Endpoint:     response.SecretsConfig.Endpoint,
-		ResponsePath: response.SecretsConfig.ResponsePath,
-	})
+	if response.SecretsConfig != nil {
+		cloudsecrets.SetConfig(&cloudsecrets.Config{
+			Token:        response.TestRunToken,
+			Endpoint:     response.SecretsConfig.Endpoint,
+			ResponsePath: response.SecretsConfig.ResponsePath,
+		})
+	}
 
 	// If the Cloud API returned configuration overrides, we apply them to the current configuration.
 	// Then, we serialize the overridden configuration back, so it can be used by the Cloud output.
