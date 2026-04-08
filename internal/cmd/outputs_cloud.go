@@ -153,8 +153,8 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 	// We store the test run id in the environment, so it can be used later.
 	test.preInitState.RuntimeOptions.Env[testRunIDKey] = response.ReferenceID
 
-	if response.SecretsConfig != nil {
-		cloudsecrets.SetConfig(&cloudsecrets.Config{
+	if response.SecretsConfig != nil && gs.CloudSecretSource != nil {
+		gs.CloudSecretSource.SetConfig(&cloudsecrets.Config{
 			Token:        response.TestRunToken,
 			Endpoint:     response.SecretsConfig.Endpoint,
 			ResponsePath: response.SecretsConfig.ResponsePath,

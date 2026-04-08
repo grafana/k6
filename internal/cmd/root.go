@@ -478,12 +478,16 @@ func createSecretSources(gs *state.GlobalState) (map[string]secretsource.Source,
 		if _, ok := result["default"]; !ok {
 			result["default"] = cloudSource
 		}
+		gs.CloudSecretSource = cloudSource
+	} else if cs, ok := result["cloud"].(*cloudsecrets.SecretSource); ok {
+		// User explicitly passed --secret-source=cloud; capture the instance for SetConfig.
+		gs.CloudSecretSource = cs
 	}
 
 	// PLZ path: the k6-operator injects K6_CLOUD_SECRETS_TOKEN + K6_CLOUD_SECRETS_ENDPOINT
 	// via environment variables because it never calls createCloudTest (no /v1/tests round-trip).
-	if token := gs.Env["K6_CLOUD_SECRETS_TOKEN"]; token != "" {
-		cloudsecrets.SetConfig(&cloudsecrets.Config{
+	if token := gs.Env["K6_CLOUD_SECRETS_TOKEN"]; token != "" && gs.CloudSecretSource != nil {
+		gs.CloudSecretSource.SetConfig(&cloudsecrets.Config{
 			Token:        token,
 			Endpoint:     gs.Env["K6_CLOUD_SECRETS_ENDPOINT"],
 			ResponsePath: gs.Env["K6_CLOUD_SECRETS_RESPONSE_PATH"],

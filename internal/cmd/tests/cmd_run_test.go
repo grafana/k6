@@ -32,7 +32,6 @@ import (
 	"go.k6.io/k6/internal/event"
 	"go.k6.io/k6/internal/lib/testutils"
 	"go.k6.io/k6/internal/lib/testutils/httpmultibin"
-	cloudsecrets "go.k6.io/k6/internal/secretsource/cloud"
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/lib/fsext"
 )
@@ -3346,13 +3345,8 @@ func TestSpaceInPath(t *testing.T) {
 // TestCloudSourceAlwaysAvailable verifies that the "cloud" secret source is always registered
 // even when the user does not pass --secret-source=cloud. Scripts can reference it by name and
 // get a clear "not configured" error rather than "no source named cloud".
-//
-//nolint:paralleltest // depends on globalConfig being nil; must not overlap with other cloud tests that call SetConfig
 func TestCloudSourceAlwaysAvailable(t *testing.T) {
-	// Ensure globalConfig is nil so the cloud source reports "not configured" rather than
-	// accidentally succeeding with credentials left over from a previous test.
-	cloudsecrets.SetConfig(nil)
-	t.Cleanup(func() { cloudsecrets.SetConfig(nil) })
+	t.Parallel()
 
 	script := `
 		import secrets from "k6/secrets";
@@ -3391,9 +3385,9 @@ func TestCloudSecretSourceRejectedByK6Run(t *testing.T) {
 // TestPLZCloudSecretsEnvVars verifies that setting K6_CLOUD_SECRETS_TOKEN and
 // K6_CLOUD_SECRETS_ENDPOINT configures the cloud secret source without requiring
 // --secret-source=cloud or a /v1/tests API round-trip (the PLZ operator path).
-//
-//nolint:paralleltest // modifies package-level cloud global state
 func TestPLZCloudSecretsEnvVars(t *testing.T) {
+	t.Parallel()
+
 	// Spin up a mock server that returns the secret as a JSON {"plaintext": "..."} response.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -3402,7 +3396,6 @@ func TestPLZCloudSecretsEnvVars(t *testing.T) {
 		_, _ = w.Write([]byte(`{"plaintext":"plz-secret-value"}`))
 	}))
 	t.Cleanup(srv.Close)
-	t.Cleanup(func() { cloudsecrets.SetConfig(nil) })
 
 	script := `
 		import secrets from "k6/secrets";
