@@ -1,6 +1,7 @@
 package expv2
 
 import (
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"go.k6.io/k6/v2/cloudapi"
 	"go.k6.io/k6/v2/internal/output/cloud/expv2/pbcloud"
 )
@@ -48,16 +50,27 @@ func TestMetricsClientPush(t *testing.T) {
 func TestMetricsClientPushUnexpectedStatus(t *testing.T) {
 	t.Parallel()
 
-	h := func(rw http.ResponseWriter, _ *http.Request) {
-		rw.WriteHeader(http.StatusInternalServerError)
+	// Use a mock that returns immediately without HTTP - no server, no retries.
+	mock := &mockMetricsHTTPClient{
+		doErr: errors.New("500 Internal Server Error"),
 	}
-	ts := httptest.NewServer(http.HandlerFunc(h))
-	defer ts.Close()
-
-	c := cloudapi.NewClient(nil, "fake-token", ts.URL, "k6cloud/v0.4", 1*time.Second)
-	mc, err := newMetricsClient(c, "test-ref-id")
+	mc, err := newMetricsClient(mock, "test-ref-id")
 	require.NoError(t, err)
 
 	err = mc.push(nil)
 	assert.ErrorContains(t, err, "500 Internal Server Error")
+}
+
+// mockMetricsHTTPClient implements metricsHTTPClient for tests.
+// It returns immediately without making HTTP requests.
+type mockMetricsHTTPClient struct {
+	doErr error
+}
+
+func (m *mockMetricsHTTPClient) Do(_ *http.Request, _ any) error {
+	return m.doErr
+}
+
+func (m *mockMetricsHTTPClient) BaseURL() string {
+	return "http://test/v1"
 }
