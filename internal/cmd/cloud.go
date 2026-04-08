@@ -254,30 +254,43 @@ func (c *cmdCloud) runV1CloudTest(
 func (c *cmdCloud) prepareV1CloudClient(cfg v1api.Config, tmpCloudConfig map[string]any, arc *lib.Archive,
 	progressBar *pb.ProgressBar,
 ) (*v1api.Client, v1api.Config, error) {
-	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Validating script options"))
-	client := v1api.NewClient(
-		c.gs.Logger,
-		cfg.Token.String,
-		cfg.Host.String,
-		build.Version,
-		cfg.Timeout.TimeDuration(),
-	)
-	if cfg.StackID.Valid {
-		client.SetStackID(cfg.StackID.Int64)
-	}
-	if err := client.ValidateOptions(arc.Options); err != nil {
-		return nil, cfg, fmt.Errorf("validating options: %w", err)
-	}
-	if cfg.ProjectID.Int64 != 0 {
-		return client, cfg, nil
-	}
-
-	err := resolveAndSetProjectID(c.gs, &cfg, tmpCloudConfig, arc)
+	client := c.newV1CloudClient(cfg)
+	err := c.validateCloudOptions(&cfg, tmpCloudConfig, arc, progressBar, func(v1api.Config) error {
+		return client.ValidateOptions(arc.Options)
+	})
 	if err != nil {
 		return nil, cfg, err
 	}
 
 	return client, cfg, nil
+}
+
+func (c *cmdCloud) newV1CloudClient(cfg v1api.Config) *v1api.Client {
+	client := v1api.NewClient(c.gs.Logger, cfg.Token.String, cfg.Host.String, build.Version, cfg.Timeout.TimeDuration())
+	if cfg.StackID.Valid {
+		client.SetStackID(cfg.StackID.Int64)
+	}
+
+	return client
+}
+
+func (c *cmdCloud) validateCloudOptions(cfg *v1api.Config, tmpCloudConfig map[string]any,
+	arc *lib.Archive, progressBar *pb.ProgressBar, validate func(v1api.Config) error,
+) error {
+	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Validating script options"))
+
+	if cfg.ProjectID.Int64 == 0 {
+		err := resolveAndSetProjectID(c.gs, cfg, tmpCloudConfig, arc)
+		if err != nil {
+			return fmt.Errorf("resolving project ID: %w", err)
+		}
+	}
+
+	if err := validate(*cfg); err != nil {
+		return fmt.Errorf("validating options: %w", err)
+	}
+
+	return nil
 }
 
 func (c *cmdCloud) waitV1CloudTest(globalCtx context.Context, globalCancel context.CancelFunc,
