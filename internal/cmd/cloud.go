@@ -252,71 +252,38 @@ func (c *cmdCloud) runRemote(test *loadedAndConfiguredTest, cfg v1api.Config, tm
 func (c *cmdCloud) runUploadOnly(test *loadedAndConfiguredTest, cfg v1api.Config,
 	tmpCloudConfig map[string]any, arc *lib.Archive, name string, progressBar *pb.ProgressBar,
 ) error {
-	return c.runV1CloudTest(test, cfg, tmpCloudConfig, arc, progressBar,
-		func(client *v1api.Client, cfg v1api.Config) (*v1api.CreateTestRunResponse, error) {
-			cloudTestRun, err := client.UploadTestOnly(name, cfg.ProjectID.Int64, arc)
-			if err != nil {
-				return nil, fmt.Errorf("uploading cloud test: %w", err)
-			}
-
-			return cloudTestRun, nil
-		},
-	)
-}
-
-func (c *cmdCloud) runV1CloudTest(
-	test *loadedAndConfiguredTest,
-	cfg v1api.Config,
-	tmpCloudConfig map[string]any,
-	arc *lib.Archive,
-	progressBar *pb.ProgressBar,
-	start func(*v1api.Client, v1api.Config) (*v1api.CreateTestRunResponse, error),
-) error {
-	client, cfg, err := c.prepareV1CloudClient(cfg, tmpCloudConfig, arc, progressBar)
+	client, err := c.newRemoteClient(test, cfg, arc)
 	if err != nil {
-		return err
+		return fmt.Errorf("creating remote client: %w", err)
 	}
-
-	globalCtx, globalCancel := context.WithCancel(c.gs.Ctx)
-	defer globalCancel()
+	err = c.validateCloudOptions(&cfg, tmpCloudConfig, arc, progressBar, func(cfg v1api.Config) error {
+		return client.ValidateOptions(c.gs.Ctx, cfg.ProjectID.Int64, arc.Options)
+	})
+	if err != nil {
+		return fmt.Errorf("validating remote options: %w", err)
+	}
 
 	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Uploading archive"))
 
-	cloudTestRun, err := start(client, cfg)
+	testID, err := client.UploadTest(c.gs.Ctx, name, cfg.ProjectID.Int64, arc)
 	if err != nil {
-		return err
+		return fmt.Errorf("uploading cloud test: %w", err)
 	}
 
-	refID := cloudTestRun.ReferenceID
-	if cloudTestRun.ConfigOverride != nil {
-		cfg = cfg.Apply(*cloudTestRun.ConfigOverride)
-	}
-
-	testURL := v1api.URLForResults(refID, cfg)
-	return c.waitV1CloudTest(globalCtx, globalCancel, progressBar, client, cfg, refID, test, testURL)
-}
-
-func (c *cmdCloud) prepareV1CloudClient(cfg v1api.Config, tmpCloudConfig map[string]any, arc *lib.Archive,
-	progressBar *pb.ProgressBar,
-) (*v1api.Client, v1api.Config, error) {
-	client := c.newV1CloudClient(cfg)
-	err := c.validateCloudOptions(&cfg, tmpCloudConfig, arc, progressBar, func(v1api.Config) error {
-		return client.ValidateOptions(arc.Options)
-	})
+	testURL, err := v1api.URLForTest(testID, cfg)
 	if err != nil {
-		return nil, cfg, err
+		c.gs.Logger.WithError(err).Warn("Could not build test page URL")
 	}
 
-	return client, cfg, nil
-}
-
-func (c *cmdCloud) newV1CloudClient(cfg v1api.Config) *v1api.Client {
-	client := v1api.NewClient(c.gs.Logger, cfg.Token.String, cfg.Host.String, build.Version, cfg.Timeout.TimeDuration())
-	if cfg.StackID.Valid {
-		client.SetStackID(cfg.StackID.Int64)
+	et, err := lib.NewExecutionTuple(test.derivedConfig.ExecutionSegment, test.derivedConfig.ExecutionSegmentSequence)
+	if err != nil {
+		return fmt.Errorf("building execution tuple: %w", err)
 	}
+	executionPlan := test.derivedConfig.Scenarios.GetFullExecutionRequirements(et)
+	printExecutionDescription(c.gs, "cloud", test.sourceRootPath, testURL, test.derivedConfig, et, executionPlan, nil)
 
-	return client
+	c.reportCloudTestStatus("Uploaded")
+	return nil
 }
 
 func (c *cmdCloud) newRemoteClient(test *loadedAndConfiguredTest, cfg v1api.Config,
@@ -363,47 +330,6 @@ func (c *cmdCloud) validateCloudOptions(cfg *v1api.Config, tmpCloudConfig map[st
 	}
 
 	return nil
-}
-
-func (c *cmdCloud) waitV1CloudTest(globalCtx context.Context, globalCancel context.CancelFunc,
-	progressBar *pb.ProgressBar, client *v1api.Client, cfg v1api.Config, refID string,
-	test *loadedAndConfiguredTest, testURL string,
-) error {
-	logger := c.gs.Logger
-
-	gracefulStop := func(sig os.Signal) {
-		logger.WithField("sig", sig).Print("Stopping cloud test run in response to signal...")
-		go func() {
-			err := client.StopCloudTestRun(refID)
-			if err == nil {
-				logger.Info("Successfully sent signal to stop the cloud test, now waiting for it to actually stop...")
-				globalCancel()
-				return
-			}
-
-			logger.WithError(err).Error("stopping cloud test run")
-			globalCancel()
-		}()
-	}
-	onHardStop := func(sig os.Signal) {
-		logger.WithField("sig", sig).Error("Aborting k6 in response to signal, we won't wait for the test to end.")
-	}
-	stopSignalHandling := handleTestAbortSignals(c.gs, gracefulStop, onHardStop)
-	defer stopSignalHandling()
-
-	maxDuration, err := c.printCloudExecution(test, progressBar, testURL)
-	if err != nil {
-		return err
-	}
-
-	testProgress, err := c.pollCloudTestProgress(
-		globalCtx, globalCancel, progressBar, client, cfg, refID, maxDuration,
-	)
-	if err != nil {
-		return err
-	}
-
-	return c.reportCloudTestResult(testProgress)
 }
 
 func (c *cmdCloud) pollCloudProgress(globalCtx context.Context, globalCancel context.CancelFunc,
@@ -468,65 +394,6 @@ func (c *cmdCloud) printCloudExecution(test *loadedAndConfiguredTest, progressBa
 	return maxDuration, nil
 }
 
-func (c *cmdCloud) pollCloudTestProgress(globalCtx context.Context, globalCancel context.CancelFunc,
-	progressBar *pb.ProgressBar, client *v1api.Client, cfg v1api.Config, refID string,
-	maxDuration time.Duration,
-) (*v1api.TestProgressResponse, error) {
-	var startTime time.Time
-	var mu sync.Mutex
-	var progress *v1api.TestProgressResponse
-
-	if err := c.pollCloudProgress(
-		globalCtx,
-		globalCancel,
-		progressBar,
-		func() (float64, string) {
-			mu.Lock()
-			defer mu.Unlock()
-
-			if progress == nil {
-				return 0, "Waiting..."
-			}
-
-			return v1CloudTestProgress(progress, &startTime, maxDuration)
-		},
-		func(context.Context) (bool, error) {
-			next, err := client.GetTestProgress(refID)
-			if err != nil {
-				c.gs.Logger.WithError(err).Error("Test progress error")
-				return false, nil
-			}
-
-			mu.Lock()
-			defer mu.Unlock()
-			progress = next
-
-			return next.RunStatus > v1api.RunStatusRunning ||
-				(c.exitOnRunning && next.RunStatus == v1api.RunStatusRunning), nil
-		},
-		func(ctx context.Context) {
-			if !c.showCloudLogs {
-				return
-			}
-
-			c.gs.Logger.Debug("Connecting to cloud logs server...")
-			if err := cfg.StreamLogsToLogger(ctx, c.gs.Logger, refID, 0); err != nil {
-				c.gs.Logger.WithError(err).Error("error while tailing cloud logs")
-			}
-		},
-	); err != nil {
-		return nil, err
-	}
-
-	mu.Lock()
-	defer mu.Unlock()
-	if progress == nil {
-		return nil, errext.WithExitCodeIfNone(errors.New("test progress error"), exitcodes.CloudFailedToGetProgress)
-	}
-
-	return progress, nil
-}
-
 func (c *cmdCloud) pollRemoteCloudTestProgress(globalCtx context.Context, globalCancel context.CancelFunc,
 	progressBar *pb.ProgressBar, client *v6cloudapi.Client, testRunID int64,
 ) (*v6cloudapi.TestRunProgress, error) {
@@ -581,38 +448,6 @@ func (c *cmdCloud) pollRemoteCloudTestProgress(globalCtx context.Context, global
 	return progress, nil
 }
 
-func runningCloudProgress(startTime *time.Time) time.Duration {
-	if startTime.IsZero() {
-		*startTime = time.Now()
-	}
-
-	return time.Since(*startTime)
-}
-
-func runningCloudStatus(spent, maxDuration time.Duration) string {
-	if spent > maxDuration {
-		return maxDuration.String()
-	}
-
-	return fmt.Sprintf("%s/%s", pb.GetFixedLengthDuration(spent, maxDuration), maxDuration)
-}
-
-func v1CloudTestProgress(testProgress *v1api.TestProgressResponse, startTime *time.Time,
-	maxDuration time.Duration,
-) (float64, string) {
-	statusText := testProgress.RunStatusText
-
-	switch testProgress.RunStatus { //nolint:exhaustive
-	case v1api.RunStatusFinished:
-		testProgress.Progress = 1
-	case v1api.RunStatusRunning:
-		spent := runningCloudProgress(startTime)
-		statusText = runningCloudStatus(spent, maxDuration)
-	}
-
-	return testProgress.Progress, statusText
-}
-
 func cloudTestProgress(maxProgress float64, testProgress *v6cloudapi.TestRunProgress) (float64, string) {
 	progress := max(maxProgress, testProgress.Progress())
 	if testProgress.IsFinished() {
@@ -639,25 +474,6 @@ func (c *cmdCloud) reportCloudTestStatus(statusText string) {
 	} else {
 		c.gs.Logger.WithField("run_status", statusText).Debug("Test finished")
 	}
-}
-
-func (c *cmdCloud) reportCloudTestResult(testProgress *v1api.TestProgressResponse) error {
-	c.reportCloudTestStatus(testProgress.RunStatusText)
-
-	if testProgress.ResultStatus != v1api.ResultStatusFailed {
-		return nil
-	}
-
-	// Although by looking at [ResultStatus] and [RunStatus] isn't self-explanatory,
-	// the scenario when the test run has finished, but it failed is an exceptional case for those situations
-	// when thresholds have been crossed (failed). So, we report this situation as such.
-	if testProgress.RunStatus == v1api.RunStatusFinished ||
-		testProgress.RunStatus == v1api.RunStatusAbortedThreshold {
-		return errext.WithExitCodeIfNone(errThresholdsCrossed, exitcodes.ThresholdsHaveFailed)
-	}
-
-	// TODO: use different exit codes for failed thresholds vs failed test (e.g. aborted by system/limit)
-	return errext.WithExitCodeIfNone(errTestFailed, exitcodes.CloudTestRunFailed)
 }
 
 func mapRemoteCloudTestResult(testProgress *v6cloudapi.TestRunProgress) error {

@@ -100,21 +100,14 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 	t.Run("TestCloudUploadOnly", func(t *testing.T) {
 		t.Parallel()
 
-		cs := func() cloudapi.TestProgressResponse {
-			return cloudapi.TestProgressResponse{
-				RunStatusText: "Archived",
-				RunStatus:     cloudapi.RunStatusArchived,
-			}
-		}
-
-		ts := getSimpleCloudTestState(t, setupCmd, []string{"--upload-only", "--log-output=stdout"}, cs)
+		ts := getSimpleUploadOnlyCloudTestState(t, setupCmd, []string{"--upload-only", "--log-output=stdout"})
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 		stdout := ts.Stdout.String()
 		t.Log(stdout)
 		assert.Contains(t, stdout, `execution: cloud`)
-		assert.Contains(t, stdout, `output: https://app.k6.io/runs/123`)
-		assert.Contains(t, stdout, `test status: Archived`)
+		assert.Contains(t, stdout, `output: https://app.k6.io/a/k6-app/tests/456`)
+		assert.Contains(t, stdout, `test status: Uploaded`)
 	})
 
 	t.Run("TestCloudRemoteValidateUsesV6Endpoint", func(t *testing.T) {
@@ -534,6 +527,54 @@ func newRemoteCloudRoutes(t testing.TB, progressCallback func() v6cloudapi.TestR
 			assert.NoError(t, err)
 		}),
 	}
+}
+
+func newUploadOnlyCloudRoutes(t testing.TB) map[string]http.Handler {
+	t.Helper()
+
+	return map[string]http.Handler{
+		"POST ^/cloud/v6/validate_options$": http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+			assert.Equal(t, "123", req.Header.Get("X-Stack-Id"))
+			resp.Header().Set("Content-Type", "application/json")
+			_, err := fmt.Fprint(resp, `{}`)
+			assert.NoError(t, err)
+		}),
+		`POST ^/cloud/v6/projects/\d+/load_tests$`: http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
+			resp.Header().Set("Content-Type", "application/json")
+			resp.WriteHeader(http.StatusCreated)
+			_, err := fmt.Fprint(resp, newLoadTestJSON(t, "test-name"))
+			assert.NoError(t, err)
+		}),
+	}
+}
+
+func getMockUploadOnlyCloud(t *testing.T) *httptest.Server {
+	srv := getTestServer(t, newUploadOnlyCloudRoutes(t))
+	t.Cleanup(srv.Close)
+
+	return srv
+}
+
+func getSimpleUploadOnlyCloudTestState(t *testing.T, setupCmd setupCommandFunc, cliFlags []string) *GlobalTestState {
+	if cliFlags == nil {
+		cliFlags = []string{"--verbose", "--log-output=stdout"}
+	}
+
+	srv := getMockUploadOnlyCloud(t)
+
+	ts := NewGlobalTestState(t)
+	require.NoError(t, fsext.WriteFile(
+		ts.FS, filepath.Join(ts.Cwd, "test.js"), []byte(`export default function() {}`), 0o644,
+	))
+	ts.CmdArgs = setupCmd(cliFlags)
+	ts.Env["K6_SHOW_CLOUD_LOGS"] = "false"
+	ts.Env["K6_CLOUD_HOST"] = srv.URL
+	ts.Env["K6_CLOUD_STACK_ID"] = "123"
+	ts.Env["K6_CLOUD_STACK_URL"] = "https://app.k6.io"
+	ts.Env["K6_CLOUD_PROJECT_ID"] = "124"
+	ts.Env["K6_CLOUD_TOKEN"] = "foo"
+
+	return ts
 }
 
 func newStartLoadTestResponseJSON(tb testing.TB, testRunID int) string {
