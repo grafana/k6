@@ -7,6 +7,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/cloudapi"
+	v6cloudapi "go.k6.io/k6/internal/cloudapi/v6"
 	"go.k6.io/k6/internal/cmd/tests"
 	"go.k6.io/k6/internal/lib/testutils"
 	"go.k6.io/k6/lib"
@@ -189,6 +190,63 @@ func TestResolveAndSetProjectID(t *testing.T) {
 			} else {
 				assert.Len(t, logs, 0)
 			}
+		})
+	}
+}
+
+func TestCloudTestProgress(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name        string
+		maxProgress float64
+		progress    *v6cloudapi.TestRunProgress
+		wantValue   float64
+		wantStatus  string
+	}{
+		{
+			name:        "uses execution duration while running",
+			maxProgress: 0,
+			progress: &v6cloudapi.TestRunProgress{
+				Status:            v6cloudapi.StatusRunning,
+				ExecutionDuration: 12,
+				EstimatedDuration: 90,
+			},
+			wantValue:  12.0 / 90.0,
+			wantStatus: "0m12.0s/1m30s",
+		},
+		{
+			name:        "keeps the max seen progress",
+			maxProgress: 0.8,
+			progress: &v6cloudapi.TestRunProgress{
+				Status:            v6cloudapi.StatusRunning,
+				ExecutionDuration: 12,
+				EstimatedDuration: 90,
+			},
+			wantValue:  0.8,
+			wantStatus: "0m12.0s/1m30s",
+		},
+		{
+			name:        "forces full progress when finished",
+			maxProgress: 0.8,
+			progress: &v6cloudapi.TestRunProgress{
+				Status:            v6cloudapi.StatusCompleted,
+				ExecutionDuration: 12,
+				EstimatedDuration: 90,
+			},
+			wantValue:  1,
+			wantStatus: "Completed",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			value, status := cloudTestProgress(tc.maxProgress, tc.progress)
+
+			assert.Equal(t, tc.wantValue, value)
+			assert.Equal(t, tc.wantStatus, status)
 		})
 	}
 }

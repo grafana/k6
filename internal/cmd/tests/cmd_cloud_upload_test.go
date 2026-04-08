@@ -24,7 +24,7 @@ func TestK6CloudUpload(t *testing.T) {
 	t.Run("TestCloudUploadUserNotAuthenticated", func(t *testing.T) {
 		t.Parallel()
 
-		ts := getSimpleCloudTestState(t, nil, setupK6CloudUploadCmd, nil, nil, nil)
+		ts := getSimpleCloudTestState(t, setupK6CloudUploadCmd, nil, nil)
 		delete(ts.Env, "K6_CLOUD_TOKEN")
 		ts.ExpectedExitCode = -1
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
@@ -44,7 +44,7 @@ func TestK6CloudUpload(t *testing.T) {
 			}
 		}
 
-		ts := getSimpleCloudTestState(t, nil, setupK6CloudUploadCmd, nil, nil, cs)
+		ts := getSimpleCloudTestState(t, setupK6CloudUploadCmd, nil, cs)
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 		stdout := ts.Stdout.String()
