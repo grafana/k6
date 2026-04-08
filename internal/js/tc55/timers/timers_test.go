@@ -3,6 +3,7 @@ package timers_test
 import (
 	"context"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/require"
@@ -47,97 +48,103 @@ func TestSetUndefinedFunction(t *testing.T) {
 
 func TestSetInterval(t *testing.T) {
 	t.Parallel()
-	runtime := newRuntime(t)
+	synctest.Test(t, func(t *testing.T) {
+		runtime := newRuntime(t)
 
-	rt := runtime.VU.Runtime()
-	var log []string
-	require.NoError(t, rt.Set("print", func(s string) { log = append(log, s) }))
-	require.NoError(t, rt.Set("sleep10", func() { time.Sleep(10 * time.Millisecond) }))
+		rt := runtime.VU.Runtime()
+		var log []string
+		require.NoError(t, rt.Set("print", func(s string) { log = append(log, s) }))
+		require.NoError(t, rt.Set("sleep10", func() { time.Sleep(10 * time.Millisecond) }))
 
-	_, err := runtime.RunOnEventLoop(`
-		var i = 0;
-		let s = setInterval(()=> {
-			sleep10();
-			if (i>1) {
-			  print("in setInterval");
-			  clearInterval(s);
-			}
-			i++;
-		}, 1);
-		print("outside setInterval")
-	`)
-	require.NoError(t, err)
-	require.Len(t, log, 2)
-	require.Equal(t, "outside setInterval", log[0])
-	for i, l := range log[1:] {
-		require.Equal(t, "in setInterval", l, i)
-	}
+		_, err := runtime.RunOnEventLoop(`
+			var i = 0;
+			let s = setInterval(()=> {
+				sleep10();
+				if (i>1) {
+				  print("in setInterval");
+				  clearInterval(s);
+				}
+				i++;
+			}, 1);
+			print("outside setInterval")
+		`)
+		require.NoError(t, err)
+		require.Len(t, log, 2)
+		require.Equal(t, "outside setInterval", log[0])
+		for i, l := range log[1:] {
+			require.Equal(t, "in setInterval", l, i)
+		}
+	})
 }
 
 func TestSetTimeoutOrder(t *testing.T) {
 	t.Parallel()
-	runtime := newRuntime(t)
+	synctest.Test(t, func(t *testing.T) {
+		runtime := newRuntime(t)
 
-	rt := runtime.VU.Runtime()
-	var log []string
-	require.NoError(t, rt.Set("print", func(s string) { log = append(log, s) }))
+		rt := runtime.VU.Runtime()
+		var log []string
+		require.NoError(t, rt.Set("print", func(s string) { log = append(log, s) }))
 
-	for i := range 100 {
-		_, err := runtime.RunOnEventLoop(`
-			setTimeout((_) => print("one"), 1);
-			setTimeout((_) => print("two"), 1);
-			setTimeout((_) => print("three"), 1);
-			setTimeout((_) => print("last"), 20);
-			setTimeout((_) => print("four"), 1);
-			setTimeout((_) => print("five"), 1);
-			setTimeout((_) => print("six"), 1);
-			print("outside setTimeout");
-		`)
-		require.NoError(t, err)
-		require.Equal(t, []string{"outside setTimeout", "one", "two", "three", "four", "five", "six", "last"}, log, i)
-		log = log[:0]
-	}
+		for i := range 100 {
+			_, err := runtime.RunOnEventLoop(`
+				setTimeout((_) => print("one"), 1);
+				setTimeout((_) => print("two"), 1);
+				setTimeout((_) => print("three"), 1);
+				setTimeout((_) => print("last"), 20);
+				setTimeout((_) => print("four"), 1);
+				setTimeout((_) => print("five"), 1);
+				setTimeout((_) => print("six"), 1);
+				print("outside setTimeout");
+			`)
+			require.NoError(t, err)
+			require.Equal(t, []string{"outside setTimeout", "one", "two", "three", "four", "five", "six", "last"}, log, i)
+			log = log[:0]
+		}
+	})
 }
 
 func TestSetIntervalOrder(t *testing.T) {
 	t.Parallel()
-	runtime := newRuntime(t)
+	synctest.Test(t, func(t *testing.T) {
+		runtime := newRuntime(t)
 
-	rt := runtime.VU.Runtime()
-	var log []string
-	require.NoError(t, rt.Set("print", func(s string) { log = append(log, s) }))
+		rt := runtime.VU.Runtime()
+		var log []string
+		require.NoError(t, rt.Set("print", func(s string) { log = append(log, s) }))
 
-	for range 100 {
-		_, err := runtime.RunOnEventLoop(`
-			var one = setInterval((_) => print("one"), 1);
-			var two = setInterval((_) => print("two"), 1);
-			var last = setInterval((_) => {
-				print("last")
-				clearInterval(one);
-				clearInterval(two);
-				clearInterval(three);
-				clearInterval(last);
-			}, 10);
-			var three = setInterval((_) => print("three"), 1);
-			print("outside");
-		`)
-		require.NoError(t, err)
-		runtime.EventLoop.WaitOnRegistered()
-		require.GreaterOrEqual(t, len(log), 5)
-		require.Equal(t, "outside", log[0])
-		for i := 1; i < len(log)-1; i += 3 {
-			switch len(log) - i {
-			case 2:
-				require.Equal(t, []string{"one"}, log[i:i+1])
-			case 3:
-				require.Equal(t, []string{"one", "two"}, log[i:i+2])
-			default:
-				require.Equal(t, []string{"one", "two", "three"}, log[i:i+3])
+		for range 100 {
+			_, err := runtime.RunOnEventLoop(`
+				var one = setInterval((_) => print("one"), 1);
+				var two = setInterval((_) => print("two"), 1);
+				var last = setInterval((_) => {
+					print("last")
+					clearInterval(one);
+					clearInterval(two);
+					clearInterval(three);
+					clearInterval(last);
+				}, 10);
+				var three = setInterval((_) => print("three"), 1);
+				print("outside");
+			`)
+			require.NoError(t, err)
+			runtime.EventLoop.WaitOnRegistered()
+			require.GreaterOrEqual(t, len(log), 5)
+			require.Equal(t, "outside", log[0])
+			for i := 1; i < len(log)-1; i += 3 {
+				switch len(log) - i {
+				case 2:
+					require.Equal(t, []string{"one"}, log[i:i+1])
+				case 3:
+					require.Equal(t, []string{"one", "two"}, log[i:i+2])
+				default:
+					require.Equal(t, []string{"one", "two", "three"}, log[i:i+3])
+				}
 			}
+			require.Equal(t, "last", log[len(log)-1])
+			log = log[:0]
 		}
-		require.Equal(t, "last", log[len(log)-1])
-		log = log[:0]
-	}
+	})
 }
 
 func TestSetTimeoutContextCancel(t *testing.T) {
@@ -199,21 +206,22 @@ func TestSetTimeoutContextCancel(t *testing.T) {
 
 func TestClearFirstTimeoutWhenMultiple(t *testing.T) {
 	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		runtime := newRuntime(t)
+		rt := runtime.VU.Runtime()
+		var log []time.Time
 
-	runtime := newRuntime(t)
-	rt := runtime.VU.Runtime()
-	var log []time.Time
-
-	start := time.Now()
-	require.NoError(t, rt.Set("time", func() { log = append(log, time.Now()) }))
-	_, err := runtime.RunOnEventLoop(`
-		setTimeout(() => {
-		   time();
-		}, 1000);
-		const cancelTimeout = setTimeout(() => {}, 200);
-		clearTimeout(cancelTimeout);
-	`)
-	require.NoError(t, err)
-	require.Len(t, log, 1)
-	require.Greater(t, log[0].Sub(start), time.Second)
+		start := time.Now()
+		require.NoError(t, rt.Set("time", func() { log = append(log, time.Now()) }))
+		_, err := runtime.RunOnEventLoop(`
+			setTimeout(() => {
+			   time();
+			}, 1000);
+			const cancelTimeout = setTimeout(() => {}, 200);
+			clearTimeout(cancelTimeout);
+		`)
+		require.NoError(t, err)
+		require.Len(t, log, 1)
+		require.GreaterOrEqual(t, log[0].Sub(start), time.Second)
+	})
 }
