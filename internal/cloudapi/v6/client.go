@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"time"
 
@@ -98,6 +99,17 @@ func checkRequest(res *http.Response, rerr error, action string) error {
 	}
 
 	return nil
+}
+
+func checkInt32(name string, value int64) (int32, error) {
+	if value < math.MinInt32 || value > math.MaxInt32 {
+		return 0, fmt.Errorf(
+			"invalid %s: cannot be less than %d or greater than %d",
+			name, math.MinInt32, math.MaxInt32,
+		)
+	}
+
+	return int32(value), nil
 }
 
 // CheckResponse checks the parsed response.
