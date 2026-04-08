@@ -64,6 +64,9 @@ Examples:
 Documentation:
   # Look up the JavaScript API, examples, and best practices
   $ {{.CommandPath}} x docs
+
+  # Discover available k6 extensions
+  $ {{.CommandPath}} x explore
 {{if .HasAvailableSubCommands}}
 Use "{{.CommandPath}} [command] --help" for more information about a command.{{end}}
 `
@@ -115,8 +118,7 @@ func newRootCommand(gs *state.GlobalState) *rootCommand {
 
 	subCommands := []func(*state.GlobalState) *cobra.Command{
 		getCmdArchive, getCmdCloud, getCmdNewScript, getCmdInspect, getCmdDeps,
-		getCmdLogin, getCmdPause, getCmdResume, getCmdScale, getCmdRun,
-		getCmdStats, getCmdStatus, getCmdVersion, getX,
+		getCmdRun, getCmdStats, getCmdVersion, getX,
 	}
 
 	defaultUsageTemplate := (&cobra.Command{}).UsageTemplate()
@@ -167,14 +169,20 @@ func (c *rootCommand) execute() {
 		}
 	}()
 
-	err := c.cmd.Execute()
+	// Completion requests for unregistered extensions must bypass Execute:
+	// cobra's __complete writes to stdout as a side-effect, and the
+	// provisioned binary's output would append to it, producing double output.
+	var err error
+	if ext, ok := detectExtensionCompletion(c.cmd, c.globalState); ok {
+		err = buildExtensionDeps(c.globalState, ext)
+	} else {
+		err = c.cmd.Execute()
+	}
 	if err == nil {
 		exitCode = 0
 		return
 	}
-
 	newExitCode, err := handleUnsatisfiedDependencies(err, c)
-
 	if err == nil {
 		exitCode = int(newExitCode)
 		return
