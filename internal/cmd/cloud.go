@@ -19,6 +19,7 @@ import (
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/internal/build"
+	v6cloudapi "go.k6.io/k6/internal/cloudapi/v6"
 	"go.k6.io/k6/internal/ui/pb"
 	"go.k6.io/k6/lib"
 
@@ -189,19 +190,38 @@ func (c *cmdCloud) validateCloudRunArgs(cmd *cobra.Command, args []string) error
 	return nil
 }
 
-func (c *cmdCloud) runRemote(test *loadedAndConfiguredTest, cfg v1api.Config,
-	tmpCloudConfig map[string]any, arc *lib.Archive, name string, progressBar *pb.ProgressBar,
+func (c *cmdCloud) runRemote(test *loadedAndConfiguredTest, cfg v1api.Config, tmpCloudConfig map[string]any,
+	arc *lib.Archive, name string, progressBar *pb.ProgressBar,
 ) error {
-	return c.runV1CloudTest(test, cfg, tmpCloudConfig, arc, progressBar,
-		func(client *v1api.Client, cfg v1api.Config) (*v1api.CreateTestRunResponse, error) {
-			cloudTestRun, err := client.StartCloudTestRun(name, cfg.ProjectID.Int64, arc)
-			if err != nil {
-				return nil, fmt.Errorf("starting cloud test run: %w", err)
-			}
+	client, err := c.newRemoteClient(test, cfg, arc)
+	if err != nil {
+		return fmt.Errorf("creating remote client: %w", err)
+	}
+	err = c.validateCloudOptions(&cfg, tmpCloudConfig, arc, progressBar, func(cfg v1api.Config) error {
+		return client.ValidateOptions(c.gs.Ctx, cfg.ProjectID.Int64, arc.Options)
+	})
+	if err != nil {
+		return fmt.Errorf("validating remote options: %w", err)
+	}
 
-			return cloudTestRun, nil
-		},
-	)
+	v1Client := c.newV1CloudClient(cfg)
+	globalCtx, globalCancel := context.WithCancel(c.gs.Ctx)
+	defer globalCancel()
+
+	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Uploading archive"))
+
+	cloudTestRun, err := v1Client.StartCloudTestRun(name, cfg.ProjectID.Int64, arc)
+	if err != nil {
+		return fmt.Errorf("starting cloud test run: %w", err)
+	}
+
+	refID := cloudTestRun.ReferenceID
+	if cloudTestRun.ConfigOverride != nil {
+		cfg = cfg.Apply(*cloudTestRun.ConfigOverride)
+	}
+
+	testURL := v1api.URLForResults(refID, cfg)
+	return c.waitV1CloudTest(globalCtx, globalCancel, progressBar, v1Client, cfg, refID, test, testURL)
 }
 
 func (c *cmdCloud) runUploadOnly(test *loadedAndConfiguredTest, cfg v1api.Config,
@@ -272,6 +292,33 @@ func (c *cmdCloud) newV1CloudClient(cfg v1api.Config) *v1api.Client {
 	}
 
 	return client
+}
+
+func (c *cmdCloud) newRemoteClient(test *loadedAndConfiguredTest, cfg v1api.Config,
+	arc *lib.Archive,
+) (*v6cloudapi.Client, error) {
+	remoteCfg, err := v6cloudapi.GetConsolidatedConfig(
+		test.derivedConfig.Collectors["cloud"], c.gs.Env, "", arc.Options.Cloud,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("building cloud config: %w", err)
+	}
+
+	client, err := v6cloudapi.NewClient(
+		c.gs.Logger,
+		cfg.Token.String,
+		remoteCfg.Host.String,
+		build.Version,
+		cfg.Timeout.TimeDuration(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("creating client: %w", err)
+	}
+	if cfg.StackID.Valid {
+		client.SetStackID(cfg.StackID.Int64)
+	}
+
+	return client, nil
 }
 
 func (c *cmdCloud) validateCloudOptions(cfg *v1api.Config, tmpCloudConfig map[string]any,

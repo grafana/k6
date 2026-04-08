@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 
 	"go.k6.io/k6/cloudapi"
@@ -110,6 +111,58 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 		assert.Contains(t, stdout, `execution: cloud`)
 		assert.Contains(t, stdout, `output: https://app.k6.io/runs/123`)
 		assert.Contains(t, stdout, `test status: Archived`)
+	})
+
+	t.Run("TestCloudRemoteValidateUsesV6Endpoint", func(t *testing.T) {
+		t.Parallel()
+
+		var validated atomic.Bool
+		srv := getTestServer(t, map[string]http.Handler{
+			"POST ^/cloud/v6/validate_options$": http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+				validated.Store(true)
+				assert.Equal(t, "123", req.Header.Get("X-Stack-Id"))
+
+				var body struct {
+					Options map[string]any `json:"options"`
+				}
+				require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
+				assert.EqualValues(t, 10, body.Options["vus"])
+				assert.Equal(t, "10s", body.Options["duration"])
+
+				resp.Header().Set("Content-Type", "application/json")
+				_, err := fmt.Fprint(resp, `{}`)
+				assert.NoError(t, err)
+			}),
+			"POST ^/v1/archive-upload$": cloudTestStartSimple(t, 123),
+			"GET ^/v1/test-progress/123$": http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
+				respBody, err := json.Marshal(cloudapi.TestProgressResponse{
+					RunStatusText: "Finished",
+					RunStatus:     cloudapi.RunStatusFinished,
+					ResultStatus:  cloudapi.ResultStatusPassed,
+					Progress:      1,
+				})
+				assert.NoError(t, err)
+				_, err = fmt.Fprint(resp, string(respBody))
+				assert.NoError(t, err)
+			}),
+		})
+		t.Cleanup(srv.Close)
+
+		ts := NewGlobalTestState(t)
+		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test.js"), []byte(`
+			export const options = { vus: 10, duration: "10s" };
+			export default function() {}
+		`), 0o644))
+		ts.CmdArgs = setupCmd([]string{"--verbose", "--log-output=stdout"})
+		ts.Env["K6_SHOW_CLOUD_LOGS"] = "false"
+		ts.Env["K6_CLOUD_HOST"] = srv.URL
+		ts.Env["K6_CLOUD_STACK_ID"] = "123"
+		ts.Env["K6_CLOUD_PROJECT_ID"] = "124"
+		ts.Env["K6_CLOUD_TOKEN"] = "foo"
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		assert.True(t, validated.Load())
 	})
 
 	t.Run("TestCloudWithConfigOverride", func(t *testing.T) {
