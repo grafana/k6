@@ -26,50 +26,56 @@ type Config struct {
 	ResponsePath string
 }
 
-//nolint:gochecknoglobals // package-level config is the intended design for this secret source
-var globalConfig atomic.Pointer[Config]
-
-// SetConfig stores the cloud secrets configuration. Called from createCloudTest once the
-// CreateTestRun API response is available, before any VU goroutine can call Get().
-// Kept exported for tests.
-func SetConfig(c *Config) { globalConfig.Store(c) }
-
-// New creates a cloud secret source. Exported so createSecretSources can pre-register it.
-func New(params secretsource.Params) (secretsource.Source, error) {
-	return &cloudSecrets{params: params}, nil
+// New creates a SecretSource with its own per-instance config pointer.
+// Exported so createSecretSources can pre-register it and later call SetConfig
+// once the cloud API response is available (before any VU goroutine calls Get).
+func New(params secretsource.Params) (*SecretSource, error) {
+	return &SecretSource{
+		params:    params,
+		configPtr: &atomic.Pointer[Config]{},
+	}, nil
 }
 
 //nolint:gochecknoinits // This is how k6 secret source registration works.
 func init() {
 	secretsource.RegisterExtension("cloud", func(params secretsource.Params) (secretsource.Source, error) {
-		return &cloudSecrets{params: params}, nil
+		return New(params)
 	})
 }
 
-// cloudSecrets wraps the URL secret source for cloud-based secrets.
+// SecretSource wraps the URL secret source for cloud-based secrets.
 // It is pre-registered as the default secret source for all cloud runs (see createSecretSources
 // in root.go). Configuration arrives later via SetConfig, before the first Get() call.
 //
-// The URL source is rebuilt whenever globalConfig changes (i.e. a new test run starts with
+// The URL source is rebuilt whenever configPtr changes (i.e. a new test run starts with
 // different credentials). This supports sequential test runs in the same process — each run
 // calls SetConfig with its own token/endpoint, and the URL source is re-initialized.
 // A mutex serialises concurrent Get() calls during initialisation.
-type cloudSecrets struct {
+type SecretSource struct {
 	params    secretsource.Params
+	configPtr *atomic.Pointer[Config]
 	mu        sync.Mutex
 	activeCfg *Config // the Config pointer that urlSource was built from
 	urlSource secretsource.Source
 	initErr   error
 }
 
+// SetConfig stores the cloud secrets configuration. Called from createCloudTest once the
+// CreateTestRun API response is available, before any VU goroutine can call Get().
+func (cs *SecretSource) SetConfig(c *Config) {
+	cs.configPtr.Store(c)
+}
+
 // Description returns a description of this secret source.
-func (cs *cloudSecrets) Description() string {
+func (cs *SecretSource) Description() string {
 	return "Grafana Cloud k6 secret source"
 }
 
-// ensureInitialized builds (or rebuilds) the URL source from globalConfig.
-func (cs *cloudSecrets) ensureInitialized() (secretsource.Source, error) {
-	current := globalConfig.Load()
+// ensureInitialized builds (or rebuilds) the URL source from configPtr.
+func (cs *SecretSource) ensureInitialized() (secretsource.Source, error) {
+	// Load outside the lock as a fast-path check: if the pointer hasn't changed
+	// since we last initialized, we can avoid acquiring the lock at all.
+	current := cs.configPtr.Load()
 
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
@@ -120,7 +126,7 @@ func (cs *cloudSecrets) ensureInitialized() (secretsource.Source, error) {
 }
 
 // Get retrieves a secret from the cloud by delegating to the URL secret source.
-func (cs *cloudSecrets) Get(key string) (string, error) {
+func (cs *SecretSource) Get(key string) (string, error) {
 	src, err := cs.ensureInitialized()
 	if err != nil {
 		return "", err

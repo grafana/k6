@@ -37,14 +37,10 @@ func makeParams() secretsource.Params {
 }
 
 // TestCloudSecretsRequiresConfig verifies construction succeeds but Get fails with no config.
-//
-//nolint:paralleltest // modifies package-level globalConfig; cannot run concurrently with other config tests
 func TestCloudSecretsRequiresConfig(t *testing.T) {
-	t.Cleanup(func() { SetConfig(nil) })
-	SetConfig(nil)
+	t.Parallel()
 
-	constructor := getCloudConstructor(t)
-	source, err := constructor(makeParams())
+	source, err := New(makeParams())
 	require.NoError(t, err, "construction should succeed")
 
 	// Error should occur on Get() when no config is set
@@ -53,7 +49,7 @@ func TestCloudSecretsRequiresConfig(t *testing.T) {
 	require.Contains(t, err.Error(), "cloud secrets not configured")
 }
 
-// TestCloudSecretsDescription is safe to run in parallel — does not modify globalConfig.
+// TestCloudSecretsDescription verifies the extension is registered with the expected description.
 func TestCloudSecretsDescription(t *testing.T) {
 	t.Parallel()
 
@@ -66,10 +62,8 @@ func TestCloudSecretsDescription(t *testing.T) {
 }
 
 // TestCloudSecretsGet verifies a successful secret fetch via an httptest server.
-//
-//nolint:paralleltest // modifies package-level globalConfig; cannot run concurrently with other config tests
 func TestCloudSecretsGet(t *testing.T) {
-	t.Cleanup(func() { SetConfig(nil) })
+	t.Parallel()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -77,15 +71,13 @@ func TestCloudSecretsGet(t *testing.T) {
 	}))
 	defer server.Close()
 
-	SetConfig(&Config{
+	source, err := New(makeParams())
+	require.NoError(t, err)
+	source.SetConfig(&Config{
 		Token:        "test-token-123",
 		Endpoint:     server.URL + "/{key}",
 		ResponsePath: "plaintext",
 	})
-
-	constructor := getCloudConstructor(t)
-	source, err := constructor(makeParams())
-	require.NoError(t, err)
 
 	value, err := source.Get("MY_KEY")
 	require.NoError(t, err)
@@ -93,10 +85,8 @@ func TestCloudSecretsGet(t *testing.T) {
 }
 
 // TestCloudSecretsGetAuthHeader verifies that the Authorization header is set correctly.
-//
-//nolint:paralleltest // modifies package-level globalConfig; cannot run concurrently with other config tests
 func TestCloudSecretsGetAuthHeader(t *testing.T) {
-	t.Cleanup(func() { SetConfig(nil) })
+	t.Parallel()
 
 	var gotAuth string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -106,15 +96,13 @@ func TestCloudSecretsGetAuthHeader(t *testing.T) {
 	}))
 	defer server.Close()
 
-	SetConfig(&Config{
+	source, err := New(makeParams())
+	require.NoError(t, err)
+	source.SetConfig(&Config{
 		Token:        "test-token-123",
 		Endpoint:     server.URL + "/{key}",
 		ResponsePath: "plaintext",
 	})
-
-	constructor := getCloudConstructor(t)
-	source, err := constructor(makeParams())
-	require.NoError(t, err)
 
 	_, err = source.Get("MY_KEY")
 	require.NoError(t, err)
@@ -122,10 +110,8 @@ func TestCloudSecretsGetAuthHeader(t *testing.T) {
 }
 
 // TestCloudSecretsGetConcurrent verifies that 50 goroutines calling Get() concurrently is safe.
-//
-//nolint:paralleltest // modifies package-level globalConfig; cannot run concurrently with other config tests
 func TestCloudSecretsGetConcurrent(t *testing.T) {
-	t.Cleanup(func() { SetConfig(nil) })
+	t.Parallel()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -133,15 +119,13 @@ func TestCloudSecretsGetConcurrent(t *testing.T) {
 	}))
 	defer server.Close()
 
-	SetConfig(&Config{
+	source, err := New(makeParams())
+	require.NoError(t, err)
+	source.SetConfig(&Config{
 		Token:        "concurrent-token",
 		Endpoint:     server.URL + "/{key}",
 		ResponsePath: "plaintext",
 	})
-
-	constructor := getCloudConstructor(t)
-	source, err := constructor(makeParams())
-	require.NoError(t, err)
 
 	const goroutines = 50
 	var wg sync.WaitGroup
@@ -158,10 +142,8 @@ func TestCloudSecretsGetConcurrent(t *testing.T) {
 }
 
 // TestCloudSecretsGetResponsePath verifies nested JSON path extraction.
-//
-//nolint:paralleltest // modifies package-level globalConfig; cannot run concurrently with other config tests
 func TestCloudSecretsGetResponsePath(t *testing.T) {
-	t.Cleanup(func() { SetConfig(nil) })
+	t.Parallel()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -171,15 +153,13 @@ func TestCloudSecretsGetResponsePath(t *testing.T) {
 	}))
 	defer server.Close()
 
-	SetConfig(&Config{
+	source, err := New(makeParams())
+	require.NoError(t, err)
+	source.SetConfig(&Config{
 		Token:        "path-token",
 		Endpoint:     server.URL + "/{key}",
 		ResponsePath: "data.value",
 	})
-
-	constructor := getCloudConstructor(t)
-	source, err := constructor(makeParams())
-	require.NoError(t, err)
 
 	value, err := source.Get("nested-key")
 	require.NoError(t, err)
@@ -187,19 +167,12 @@ func TestCloudSecretsGetResponsePath(t *testing.T) {
 }
 
 // TestCloudSecretsGetMissingToken verifies that an empty token produces a clear error.
-//
-//nolint:paralleltest // modifies package-level globalConfig; cannot run concurrently with other config tests
 func TestCloudSecretsGetMissingToken(t *testing.T) {
-	t.Cleanup(func() { SetConfig(nil) })
+	t.Parallel()
 
-	SetConfig(&Config{
-		Token:    "",
-		Endpoint: "https://example.com/{key}",
-	})
-
-	constructor := getCloudConstructor(t)
-	source, err := constructor(makeParams())
+	source, err := New(makeParams())
 	require.NoError(t, err)
+	source.SetConfig(&Config{Token: "", Endpoint: "https://example.com/{key}"})
 
 	_, err = source.Get("key")
 	require.Error(t, err)
@@ -207,19 +180,12 @@ func TestCloudSecretsGetMissingToken(t *testing.T) {
 }
 
 // TestCloudSecretsGetMissingEndpoint verifies that an empty endpoint produces a clear error.
-//
-//nolint:paralleltest // modifies package-level globalConfig; cannot run concurrently with other config tests
 func TestCloudSecretsGetMissingEndpoint(t *testing.T) {
-	t.Cleanup(func() { SetConfig(nil) })
+	t.Parallel()
 
-	SetConfig(&Config{
-		Token:    "some-token",
-		Endpoint: "",
-	})
-
-	constructor := getCloudConstructor(t)
-	source, err := constructor(makeParams())
+	source, err := New(makeParams())
 	require.NoError(t, err)
+	source.SetConfig(&Config{Token: "some-token", Endpoint: ""})
 
 	_, err = source.Get("key")
 	require.Error(t, err)
@@ -229,10 +195,8 @@ func TestCloudSecretsGetMissingEndpoint(t *testing.T) {
 // TestCloudSecretsMultipleRuns verifies that a single pre-registered source correctly
 // re-initializes when SetConfig is called for a second sequential test run.
 // With sync.Once this would silently use the first run's credentials forever.
-//
-//nolint:paralleltest // modifies package-level globalConfig; cannot run concurrently with other config tests
 func TestCloudSecretsMultipleRuns(t *testing.T) {
-	t.Cleanup(func() { SetConfig(nil) })
+	t.Parallel()
 
 	makeServer := func(secret string) *httptest.Server {
 		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -251,13 +215,13 @@ func TestCloudSecretsMultipleRuns(t *testing.T) {
 	require.NoError(t, err)
 
 	// First test run
-	SetConfig(&Config{Token: "token-run-1", Endpoint: server1.URL + "/{key}", ResponsePath: "plaintext"})
+	source.SetConfig(&Config{Token: "token-run-1", Endpoint: server1.URL + "/{key}", ResponsePath: "plaintext"})
 	val, err := source.Get("mykey")
 	require.NoError(t, err)
 	require.Equal(t, "secret-run-1", val)
 
 	// Second test run — SetConfig with different credentials
-	SetConfig(&Config{Token: "token-run-2", Endpoint: server2.URL + "/{key}", ResponsePath: "plaintext"})
+	source.SetConfig(&Config{Token: "token-run-2", Endpoint: server2.URL + "/{key}", ResponsePath: "plaintext"})
 	val, err = source.Get("mykey")
 	require.NoError(t, err)
 	require.Equal(t, "secret-run-2", val, "second run must use new credentials, not cached ones from first run")
@@ -266,10 +230,8 @@ func TestCloudSecretsMultipleRuns(t *testing.T) {
 // TestSetConfigAndGet verifies the normal flow: SetConfig then Get via a pre-registered source.
 // This mirrors how createSecretSources (root.go) pre-registers the source and createCloudTest
 // (outputs_cloud.go) calls SetConfig before VUs start.
-//
-//nolint:paralleltest // modifies package-level globalConfig; cannot run concurrently with other config tests
 func TestSetConfigAndGet(t *testing.T) {
-	t.Cleanup(func() { SetConfig(nil) })
+	t.Parallel()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -287,7 +249,7 @@ func TestSetConfigAndGet(t *testing.T) {
 	require.NoError(t, err)
 
 	// Simulate createCloudTest: SetConfig called after manager creation, before VUs start
-	SetConfig(&Config{
+	cloudSource.SetConfig(&Config{
 		Token:        "pre-config-token",
 		Endpoint:     server.URL + "/{key}",
 		ResponsePath: "plaintext",
