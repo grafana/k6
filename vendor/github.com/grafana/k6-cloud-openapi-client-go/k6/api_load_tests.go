@@ -3,7 +3,7 @@ Grafana Cloud k6
 
 HTTP API for interacting with Grafana Cloud k6.
 
-API version: 1.7.1
+API version: 1.9.1
 Contact: info@grafana.com
 */
 
@@ -121,17 +121,6 @@ func (a *LoadTestsAPIService) LoadTestsDestroyExecute(r *ApiLoadTestsDestroyRequ
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		if localVarHTTPResponse.StatusCode == 409 {
-			var v ErrorResponseApiModel
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarHTTPResponse, newErr
-		}
 		if localVarHTTPResponse.StatusCode == 401 {
 			var v ErrorResponseApiModel
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
@@ -155,6 +144,17 @@ func (a *LoadTestsAPIService) LoadTestsDestroyExecute(r *ApiLoadTestsDestroyRequ
 			return localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 404 {
+			var v ErrorResponseApiModel
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 409 {
 			var v ErrorResponseApiModel
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
@@ -497,17 +497,6 @@ func (a *LoadTestsAPIService) LoadTestsMoveExecute(r *ApiLoadTestsMoveRequest) (
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		if localVarHTTPResponse.StatusCode == 409 {
-			var v ErrorResponseApiModel
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarHTTPResponse, newErr
-		}
 		if localVarHTTPResponse.StatusCode == 400 {
 			var v ErrorResponseApiModel
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
@@ -542,6 +531,17 @@ func (a *LoadTestsAPIService) LoadTestsMoveExecute(r *ApiLoadTestsMoveRequest) (
 			return localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 404 {
+			var v ErrorResponseApiModel
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 409 {
 			var v ErrorResponseApiModel
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
@@ -673,17 +673,6 @@ func (a *LoadTestsAPIService) LoadTestsPartialUpdateExecute(r *ApiLoadTestsParti
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		if localVarHTTPResponse.StatusCode == 409 {
-			var v ErrorResponseApiModel
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarHTTPResponse, newErr
-		}
 		if localVarHTTPResponse.StatusCode == 400 {
 			var v ErrorResponseApiModel
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
@@ -718,6 +707,17 @@ func (a *LoadTestsAPIService) LoadTestsPartialUpdateExecute(r *ApiLoadTestsParti
 			return localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 404 {
+			var v ErrorResponseApiModel
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 409 {
 			var v ErrorResponseApiModel
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
@@ -1005,17 +1005,6 @@ func (a *LoadTestsAPIService) LoadTestsScriptRetrieveExecute(r *ApiLoadTestsScri
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		if localVarHTTPResponse.StatusCode == 406 {
-			var v ErrorResponseApiModel
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
 		if localVarHTTPResponse.StatusCode == 401 {
 			var v ErrorResponseApiModel
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
@@ -1039,6 +1028,17 @@ func (a *LoadTestsAPIService) LoadTestsScriptRetrieveExecute(r *ApiLoadTestsScri
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 404 {
+			var v ErrorResponseApiModel
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 406 {
 			var v ErrorResponseApiModel
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
@@ -1244,10 +1244,11 @@ func (a *LoadTestsAPIService) LoadTestsScriptUpdateExecute(r *ApiLoadTestsScript
 }
 
 type ApiLoadTestsStartRequest struct {
-	ctx        context.Context
-	ApiService *LoadTestsAPIService
-	xStackId   *int32
-	id         int32
+	ctx              context.Context
+	ApiService       *LoadTestsAPIService
+	xStackId         *int32
+	id               int32
+	k6IdempotencyKey *string
 }
 
 // Numeric ID of the Grafana stack representing the request scope. - If the API is called with a *Personal API token*, the user must be a member of the specified stack. - If the API is called with a *Grafana Stack API token*, the value must be the ID of the corresponding stack.
@@ -1256,7 +1257,13 @@ func (r *ApiLoadTestsStartRequest) XStackId(xStackId int32) *ApiLoadTestsStartRe
 	return r
 }
 
-func (r *ApiLoadTestsStartRequest) Execute() (*TestRunApiModel, *http.Response, error) {
+// Idempotency key to prevent duplicate test starts when retrying requests. The key is valid for 10 minutes.
+func (r *ApiLoadTestsStartRequest) K6IdempotencyKey(k6IdempotencyKey string) *ApiLoadTestsStartRequest {
+	r.k6IdempotencyKey = &k6IdempotencyKey
+	return r
+}
+
+func (r *ApiLoadTestsStartRequest) Execute() (*StartLoadTestResponse, *http.Response, error) {
 	return r.ApiService.LoadTestsStartExecute(r)
 }
 
@@ -1279,13 +1286,13 @@ func (a *LoadTestsAPIService) LoadTestsStart(ctx context.Context, id int32) *Api
 
 // Execute executes the request
 //
-//	@return TestRunApiModel
-func (a *LoadTestsAPIService) LoadTestsStartExecute(r *ApiLoadTestsStartRequest) (*TestRunApiModel, *http.Response, error) {
+//	@return StartLoadTestResponse
+func (a *LoadTestsAPIService) LoadTestsStartExecute(r *ApiLoadTestsStartRequest) (*StartLoadTestResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod  = http.MethodPost
 		localVarPostBody    interface{}
 		formFiles           []formFile
-		localVarReturnValue *TestRunApiModel
+		localVarReturnValue *StartLoadTestResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "LoadTestsAPIService.LoadTestsStart")
@@ -1321,6 +1328,9 @@ func (a *LoadTestsAPIService) LoadTestsStartExecute(r *ApiLoadTestsStartRequest)
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}
 	parameterAddToHeaderOrQuery(localVarHeaderParams, "X-Stack-Id", r.xStackId, "simple", "")
+	if r.k6IdempotencyKey != nil {
+		parameterAddToHeaderOrQuery(localVarHeaderParams, "K6-Idempotency-Key", r.k6IdempotencyKey, "simple", "")
+	}
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -1487,9 +1497,6 @@ func (a *LoadTestsAPIService) ProjectsLoadTestsCreateExecute(r *ApiProjectsLoadT
 	if strlen(*r.name) > 300 {
 		return localVarReturnValue, nil, reportError("name must have less than 300 elements")
 	}
-	if r.script == nil {
-		return localVarReturnValue, nil, reportError("script is required and must be specified")
-	}
 
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{"multipart/form-data"}
@@ -1554,17 +1561,6 @@ func (a *LoadTestsAPIService) ProjectsLoadTestsCreateExecute(r *ApiProjectsLoadT
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		if localVarHTTPResponse.StatusCode == 409 {
-			var v ErrorResponseApiModel
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
 		if localVarHTTPResponse.StatusCode == 400 {
 			var v ErrorResponseApiModel
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
@@ -1609,6 +1605,17 @@ func (a *LoadTestsAPIService) ProjectsLoadTestsCreateExecute(r *ApiProjectsLoadT
 			newErr.model = v
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
+		if localVarHTTPResponse.StatusCode == 409 {
+			var v ErrorResponseApiModel
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
 		if localVarHTTPResponse.StatusCode == 500 {
 			var v ErrorResponseApiModel
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
@@ -1643,6 +1650,7 @@ type ApiProjectsLoadTestsRetrieveRequest struct {
 	orderby    *string
 	skip       *int32
 	top        *int32
+	name       *string
 }
 
 // Numeric ID of the Grafana stack representing the request scope. - If the API is called with a *Personal API token*, the user must be a member of the specified stack. - If the API is called with a *Grafana Stack API token*, the value must be the ID of the corresponding stack.
@@ -1672,6 +1680,12 @@ func (r *ApiProjectsLoadTestsRetrieveRequest) Skip(skip int32) *ApiProjectsLoadT
 // Number of results to return per page.
 func (r *ApiProjectsLoadTestsRetrieveRequest) Top(top int32) *ApiProjectsLoadTestsRetrieveRequest {
 	r.top = &top
+	return r
+}
+
+// Filter results by load test name (exact match).
+func (r *ApiProjectsLoadTestsRetrieveRequest) Name(name string) *ApiProjectsLoadTestsRetrieveRequest {
+	r.name = &name
 	return r
 }
 
@@ -1736,6 +1750,9 @@ func (a *LoadTestsAPIService) ProjectsLoadTestsRetrieveExecute(r *ApiProjectsLoa
 	} else {
 		var defaultValue int32 = 1000
 		r.top = &defaultValue
+	}
+	if r.name != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "name", r.name, "form", "")
 	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}

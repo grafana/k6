@@ -3,7 +3,7 @@ Grafana Cloud k6
 
 HTTP API for interacting with Grafana Cloud k6.
 
-API version: 1.7.1
+API version: 1.9.1
 Contact: info@grafana.com
 */
 
@@ -37,8 +37,8 @@ type TestRunApiModel struct {
 	// User-defined note for the test run.
 	Note string `json:"note"`
 	// Timestamp after which the test run results are deleted or null if the test run is saved.
-	RetentionExpiry NullableTime             `json:"retention_expiry"`
-	Cost            NullableTestCostApiModel `json:"cost"`
+	RetentionExpiry NullableTime                `json:"retention_expiry"`
+	Cost            NullableTestRunApiModelCost `json:"cost"`
 	// Current test run status.
 	Status string `json:"status"`
 	// Details of the current test run status.
@@ -56,7 +56,15 @@ type TestRunApiModel struct {
 	// The requested version of k6 and extensions that was part of the script/archive.
 	K6Dependencies map[string]string `json:"k6_dependencies"`
 	// The computed version for k6 and extensions used to run the test.
-	K6Versions           map[string]string `json:"k6_versions"`
+	K6Versions map[string]string `json:"k6_versions"`
+	// The maximum number of total VUs (browser and protocol) at any stage of the execution plan.
+	MaxVus NullableInt32 `json:"max_vus"`
+	// The maximum number of browser VUs at any stage of the execution plan.
+	MaxBrowserVus NullableInt32 `json:"max_browser_vus"`
+	// The estimated duration of the test run in seconds.
+	EstimatedDuration NullableInt32 `json:"estimated_duration"`
+	// The real billable duration of the test run in seconds.
+	ExecutionDuration    int32 `json:"execution_duration"`
 	AdditionalProperties map[string]interface{}
 }
 
@@ -66,7 +74,7 @@ type _TestRunApiModel TestRunApiModel
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewTestRunApiModel(id int32, testId int32, projectId int32, startedBy NullableString, created time.Time, ended NullableTime, note string, retentionExpiry NullableTime, cost NullableTestCostApiModel, status string, statusDetails StatusApiModel, statusHistory []StatusApiModel, distribution []DistributionZoneApiModel, result NullableString, resultDetails map[string]interface{}, options map[string]interface{}, k6Dependencies map[string]string, k6Versions map[string]string) *TestRunApiModel {
+func NewTestRunApiModel(id int32, testId int32, projectId int32, startedBy NullableString, created time.Time, ended NullableTime, note string, retentionExpiry NullableTime, cost NullableTestRunApiModelCost, status string, statusDetails StatusApiModel, statusHistory []StatusApiModel, distribution []DistributionZoneApiModel, result NullableString, resultDetails map[string]interface{}, options map[string]interface{}, k6Dependencies map[string]string, k6Versions map[string]string, maxVus NullableInt32, maxBrowserVus NullableInt32, estimatedDuration NullableInt32, executionDuration int32) *TestRunApiModel {
 	this := TestRunApiModel{}
 	this.Id = id
 	this.TestId = testId
@@ -86,6 +94,10 @@ func NewTestRunApiModel(id int32, testId int32, projectId int32, startedBy Nulla
 	this.Options = options
 	this.K6Dependencies = k6Dependencies
 	this.K6Versions = k6Versions
+	this.MaxVus = maxVus
+	this.MaxBrowserVus = maxBrowserVus
+	this.EstimatedDuration = estimatedDuration
+	this.ExecutionDuration = executionDuration
 	return &this
 }
 
@@ -296,10 +308,10 @@ func (o *TestRunApiModel) SetRetentionExpiry(v time.Time) {
 }
 
 // GetCost returns the Cost field value
-// If the value is explicit nil, the zero value for TestCostApiModel will be returned
-func (o *TestRunApiModel) GetCost() TestCostApiModel {
+// If the value is explicit nil, the zero value for TestRunApiModelCost will be returned
+func (o *TestRunApiModel) GetCost() TestRunApiModelCost {
 	if o == nil || o.Cost.Get() == nil {
-		var ret TestCostApiModel
+		var ret TestRunApiModelCost
 		return ret
 	}
 
@@ -309,7 +321,7 @@ func (o *TestRunApiModel) GetCost() TestCostApiModel {
 // GetCostOk returns a tuple with the Cost field value
 // and a boolean to check if the value has been set.
 // NOTE: If the value is an explicit nil, `nil, true` will be returned
-func (o *TestRunApiModel) GetCostOk() (*TestCostApiModel, bool) {
+func (o *TestRunApiModel) GetCostOk() (*TestRunApiModelCost, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -317,7 +329,7 @@ func (o *TestRunApiModel) GetCostOk() (*TestCostApiModel, bool) {
 }
 
 // SetCost sets field value
-func (o *TestRunApiModel) SetCost(v TestCostApiModel) {
+func (o *TestRunApiModel) SetCost(v TestRunApiModelCost) {
 	o.Cost.Set(&v)
 }
 
@@ -545,6 +557,108 @@ func (o *TestRunApiModel) SetK6Versions(v map[string]string) {
 	o.K6Versions = v
 }
 
+// GetMaxVus returns the MaxVus field value
+// If the value is explicit nil, the zero value for int32 will be returned
+func (o *TestRunApiModel) GetMaxVus() int32 {
+	if o == nil || o.MaxVus.Get() == nil {
+		var ret int32
+		return ret
+	}
+
+	return *o.MaxVus.Get()
+}
+
+// GetMaxVusOk returns a tuple with the MaxVus field value
+// and a boolean to check if the value has been set.
+// NOTE: If the value is an explicit nil, `nil, true` will be returned
+func (o *TestRunApiModel) GetMaxVusOk() (*int32, bool) {
+	if o == nil {
+		return nil, false
+	}
+	return o.MaxVus.Get(), o.MaxVus.IsSet()
+}
+
+// SetMaxVus sets field value
+func (o *TestRunApiModel) SetMaxVus(v int32) {
+	o.MaxVus.Set(&v)
+}
+
+// GetMaxBrowserVus returns the MaxBrowserVus field value
+// If the value is explicit nil, the zero value for int32 will be returned
+func (o *TestRunApiModel) GetMaxBrowserVus() int32 {
+	if o == nil || o.MaxBrowserVus.Get() == nil {
+		var ret int32
+		return ret
+	}
+
+	return *o.MaxBrowserVus.Get()
+}
+
+// GetMaxBrowserVusOk returns a tuple with the MaxBrowserVus field value
+// and a boolean to check if the value has been set.
+// NOTE: If the value is an explicit nil, `nil, true` will be returned
+func (o *TestRunApiModel) GetMaxBrowserVusOk() (*int32, bool) {
+	if o == nil {
+		return nil, false
+	}
+	return o.MaxBrowserVus.Get(), o.MaxBrowserVus.IsSet()
+}
+
+// SetMaxBrowserVus sets field value
+func (o *TestRunApiModel) SetMaxBrowserVus(v int32) {
+	o.MaxBrowserVus.Set(&v)
+}
+
+// GetEstimatedDuration returns the EstimatedDuration field value
+// If the value is explicit nil, the zero value for int32 will be returned
+func (o *TestRunApiModel) GetEstimatedDuration() int32 {
+	if o == nil || o.EstimatedDuration.Get() == nil {
+		var ret int32
+		return ret
+	}
+
+	return *o.EstimatedDuration.Get()
+}
+
+// GetEstimatedDurationOk returns a tuple with the EstimatedDuration field value
+// and a boolean to check if the value has been set.
+// NOTE: If the value is an explicit nil, `nil, true` will be returned
+func (o *TestRunApiModel) GetEstimatedDurationOk() (*int32, bool) {
+	if o == nil {
+		return nil, false
+	}
+	return o.EstimatedDuration.Get(), o.EstimatedDuration.IsSet()
+}
+
+// SetEstimatedDuration sets field value
+func (o *TestRunApiModel) SetEstimatedDuration(v int32) {
+	o.EstimatedDuration.Set(&v)
+}
+
+// GetExecutionDuration returns the ExecutionDuration field value
+func (o *TestRunApiModel) GetExecutionDuration() int32 {
+	if o == nil {
+		var ret int32
+		return ret
+	}
+
+	return o.ExecutionDuration
+}
+
+// GetExecutionDurationOk returns a tuple with the ExecutionDuration field value
+// and a boolean to check if the value has been set.
+func (o *TestRunApiModel) GetExecutionDurationOk() (*int32, bool) {
+	if o == nil {
+		return nil, false
+	}
+	return &o.ExecutionDuration, true
+}
+
+// SetExecutionDuration sets field value
+func (o *TestRunApiModel) SetExecutionDuration(v int32) {
+	o.ExecutionDuration = v
+}
+
 func (o TestRunApiModel) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -579,6 +693,10 @@ func (o TestRunApiModel) ToMap() (map[string]interface{}, error) {
 	}
 	toSerialize["k6_dependencies"] = o.K6Dependencies
 	toSerialize["k6_versions"] = o.K6Versions
+	toSerialize["max_vus"] = o.MaxVus.Get()
+	toSerialize["max_browser_vus"] = o.MaxBrowserVus.Get()
+	toSerialize["estimated_duration"] = o.EstimatedDuration.Get()
+	toSerialize["execution_duration"] = o.ExecutionDuration
 
 	for key, value := range o.AdditionalProperties {
 		toSerialize[key] = value
@@ -610,6 +728,10 @@ func (o *TestRunApiModel) UnmarshalJSON(data []byte) (err error) {
 		"options",
 		"k6_dependencies",
 		"k6_versions",
+		"max_vus",
+		"max_browser_vus",
+		"estimated_duration",
+		"execution_duration",
 	}
 
 	allProperties := make(map[string]interface{})
@@ -657,6 +779,10 @@ func (o *TestRunApiModel) UnmarshalJSON(data []byte) (err error) {
 		delete(additionalProperties, "options")
 		delete(additionalProperties, "k6_dependencies")
 		delete(additionalProperties, "k6_versions")
+		delete(additionalProperties, "max_vus")
+		delete(additionalProperties, "max_browser_vus")
+		delete(additionalProperties, "estimated_duration")
+		delete(additionalProperties, "execution_duration")
 		o.AdditionalProperties = additionalProperties
 	}
 
