@@ -1568,7 +1568,6 @@ func testArrayBufferViewBufferedAmount(t *testing.T, viewName string) {
 				throw new Error("Expected " + sent.byteLength + " bufferedAmount got " + ws.bufferedAmount);
 			}
 			ws.onmessage = async (e) => {
-				const received = new %[1]s(await e.data.arrayBuffer());
 				if (ws.bufferedAmount != 0) {
 					throw new Error("Expected 0 bufferedAmount got " + ws.bufferedAmount);
 				}
