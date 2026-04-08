@@ -7,7 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
+	"slices"
 
 	k6cloud "github.com/grafana/k6-cloud-openapi-client-go/k6"
 	"go.k6.io/k6/lib"
@@ -180,12 +182,36 @@ func (c *Client) StartTest(ctx context.Context, name string, projectID int64,
 		return nil, fmt.Errorf("checking stack ID: %w", err)
 	}
 
-	loadTest, err := c.createCloudTest(ctx, pid, stackID, name, arc)
+	loadTest, err := c.createOrUpdateCloudTest(ctx, pid, stackID, name, arc)
 	if err != nil {
 		return nil, fmt.Errorf("creating cloud test: %w", err)
 	}
 
 	return c.startCloudTestRun(ctx, stackID, loadTest.Id)
+}
+
+func (c *Client) createOrUpdateCloudTest(ctx context.Context, projectID int32, stackID int32, name string,
+	arc *lib.Archive,
+) (_ *k6cloud.LoadTestApiModel, err error) {
+	loadTest, err := c.createCloudTest(ctx, projectID, stackID, name, arc)
+	if err == nil {
+		return loadTest, nil
+	}
+
+	var rerr ResponseError
+	if !errors.As(err, &rerr) || rerr.Response.StatusCode != http.StatusConflict {
+		return nil, fmt.Errorf("creating cloud test: %w", err)
+	}
+
+	loadTest, err = c.fetchCloudTestByName(ctx, projectID, stackID, name)
+	if err != nil {
+		return nil, fmt.Errorf("fetching cloud test: %w", err)
+	}
+	if err = c.updateCloudTest(ctx, stackID, loadTest.Id, arc); err != nil {
+		return nil, fmt.Errorf("updating cloud test: %w", err)
+	}
+
+	return loadTest, nil
 }
 
 func (c *Client) createCloudTest(ctx context.Context, projectID int32, stackID int32, name string,
@@ -233,6 +259,47 @@ func (c *Client) startCloudTestRun(ctx context.Context, stackID int32, loadTestI
 		ID:        int64(loadTestRun.Id),
 		WebAppURL: loadTestRun.TestRunDetailsPageUrl,
 	}, nil
+}
+
+func (c *Client) fetchCloudTestByName(
+	ctx context.Context,
+	projectID int32,
+	stackID int32,
+	name string,
+) (_ *k6cloud.LoadTestApiModel, err error) {
+	resp, res, rerr := c.apiClient.LoadTestsAPI.
+		LoadTestsList(c.authCtx(ctx)).
+		XStackId(stackID).
+		Name(name).
+		Execute()
+	defer closeResponse(res, &err)
+
+	if err = checkRequest(res, rerr, "fetching cloud test"); err != nil {
+		return nil, err
+	}
+	if resp == nil {
+		return nil, errors.New("empty load test list response")
+	}
+
+	idx := slices.IndexFunc(resp.Value, func(loadTest k6cloud.LoadTestApiModel) bool {
+		return loadTest.ProjectId == projectID && loadTest.Name == name
+	})
+	if idx < 0 {
+		return nil, fmt.Errorf("cloud test %q not found", name)
+	}
+
+	return &resp.Value[idx], nil
+}
+
+func (c *Client) updateCloudTest(ctx context.Context, stackID int32, loadTestID int32, arc *lib.Archive) (err error) {
+	res, rerr := c.apiClient.LoadTestsAPI.
+		LoadTestsScriptUpdate(c.authCtx(ctx), loadTestID).
+		XStackId(stackID).
+		Body(archiveReader(arc)).
+		Execute()
+	defer closeResponse(res, &err)
+
+	return checkRequest(res, rerr, "updating cloud test")
 }
 
 func archiveReader(arc *lib.Archive) io.ReadCloser {

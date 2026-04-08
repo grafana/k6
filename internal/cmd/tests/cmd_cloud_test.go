@@ -286,6 +286,93 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 		assert.True(t, aborted.Load(), "remote abort must use the v6 endpoint")
 	})
 
+	t.Run("TestCloudUpdatesExistingRemoteTest", func(t *testing.T) {
+		t.Parallel()
+
+		var updateCalls atomic.Int32
+
+		routes := map[string]http.Handler{
+			"POST ^/cloud/v6/validate_options$": http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
+				resp.Header().Set("Content-Type", "application/json")
+				_, err := fmt.Fprint(resp, `{}`)
+				assert.NoError(t, err)
+			}),
+			`POST ^/cloud/v6/projects/\d+/load_tests$`: http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
+				resp.Header().Set("Content-Type", "application/json")
+				resp.WriteHeader(http.StatusConflict)
+				_, err := fmt.Fprint(resp, `{"error":{"code":"conflict","message":"load test already exists","details":[]}}`)
+				assert.NoError(t, err)
+			}),
+			`GET ^/cloud/v6/load_tests.*$`: http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+				assert.Equal(t, "test.js", req.URL.Query().Get("name"))
+
+				list := k6cloud.NewLoadTestListResponse([]k6cloud.LoadTestApiModel{
+					*k6cloud.NewLoadTestApiModel(
+						455,
+						124,
+						"test.js-copy",
+						*k6cloud.NewNullableInt32(nil),
+						time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+						time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+					),
+					*k6cloud.NewLoadTestApiModel(
+						456,
+						124,
+						"test.js",
+						*k6cloud.NewNullableInt32(nil),
+						time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+						time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+					),
+				})
+
+				resp.Header().Set("Content-Type", "application/json")
+				_, err := fmt.Fprint(resp, mustJSON(t, list))
+				assert.NoError(t, err)
+			}),
+			`PUT ^/cloud/v6/load_tests/456/script$`: http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+				updateCalls.Add(1)
+
+				data, err := io.ReadAll(req.Body)
+				assert.NoError(t, err)
+				assert.NotEmpty(t, data)
+
+				resp.WriteHeader(http.StatusNoContent)
+			}),
+			`POST ^/cloud/v6/load_tests/456/start$`: http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
+				resp.Header().Set("Content-Type", "application/json")
+				_, err := fmt.Fprint(resp, newStartLoadTestResponseJSON(t, 123))
+				assert.NoError(t, err)
+			}),
+			`GET ^/cloud/v6/test_runs/\d+$`: http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
+				resp.Header().Set("Content-Type", "application/json")
+				_, err := fmt.Fprint(resp, newTestRunJSON(t, 123, v6cloudapi.TestRunProgress{
+					Status: v6cloudapi.StatusCompleted,
+					Result: v6cloudapi.ResultPassed,
+				}))
+				assert.NoError(t, err)
+			}),
+		}
+		srv := getTestServer(t, routes)
+		t.Cleanup(srv.Close)
+
+		ts := NewGlobalTestState(t)
+		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test.js"), []byte(`export default function() {}`), 0o644))
+		ts.CmdArgs = setupCmd([]string{"--verbose", "--log-output=stdout"})
+		ts.Env["K6_SHOW_CLOUD_LOGS"] = "false"
+		ts.Env["K6_CLOUD_HOST"] = srv.URL
+		ts.Env["K6_CLOUD_STACK_ID"] = "123"
+		ts.Env["K6_CLOUD_PROJECT_ID"] = "124"
+		ts.Env["K6_CLOUD_TOKEN"] = "foo"
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stdout := ts.Stdout.String()
+		t.Log(stdout)
+		assert.EqualValues(t, 1, updateCalls.Load())
+		assert.Contains(t, stdout, `output: https://app.k6.io/runs/123`)
+		assert.Contains(t, stdout, `test status: Completed`)
+	})
+
 	t.Run("TestCloudThresholdsHaveFailed", func(t *testing.T) {
 		t.Parallel()
 
