@@ -3,11 +3,9 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"strings"
-
-	"go.k6.io/k6/errext/exitcodes"
 
 	"go.k6.io/k6/errext"
+	"go.k6.io/k6/errext/exitcodes"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -99,13 +97,9 @@ func getCmdCloudRun(cloudCmd *cmdCloud) *cobra.Command {
 }
 
 func (c *cmdCloudRun) preRun(cmd *cobra.Command, args []string) error {
-	for _, s := range c.runCmd.gs.Flags.SecretSource {
-		t, _, _ := strings.Cut(s, "=")
-		if strings.TrimSpace(t) == "cloud" && !c.localExecution {
-			return errext.WithExitCodeIfNone(
-				fmt.Errorf("the 'cloud' secret source can only be used with the --local-execution flag"),
-				exitcodes.InvalidConfig,
-			)
+	if !c.localExecution {
+		if err := validateNoCloudSecretSource(c.runCmd.gs.Flags.SecretSource); err != nil {
+			return err
 		}
 	}
 

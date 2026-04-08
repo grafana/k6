@@ -3408,10 +3408,10 @@ func TestSpaceInPath(t *testing.T) {
 	assert.Contains(t, stderr, `something 42`)
 }
 
-// TestCloudSourceAlwaysAvailable verifies that the "cloud" secret source is always registered
-// even when the user does not pass --secret-source=cloud. Scripts can reference it by name and
-// get a clear "not configured" error rather than "no source named cloud".
-func TestCloudSourceAlwaysAvailable(t *testing.T) {
+// TestCloudSourceNotRegisteredForPlainRun verifies that the "cloud" secret source is NOT
+// registered for plain 'k6 run'. Scripts referencing it should get "no such source", not
+// a silent "not configured" that implies cloud was attempted.
+func TestCloudSourceNotRegisteredForPlainRun(t *testing.T) {
 	t.Parallel()
 
 	script := `
@@ -3420,7 +3420,7 @@ func TestCloudSourceAlwaysAvailable(t *testing.T) {
 			try {
 				await secrets.source("cloud").get("key");
 			} catch (e) {
-				console.log("cloud error: " + e.message);
+				console.log("cloud error: " + e.toString());
 			}
 		}
 	`
@@ -3432,9 +3432,10 @@ func TestCloudSourceAlwaysAvailable(t *testing.T) {
 
 	stderr := ts.Stderr.String()
 	t.Log(stderr)
-	// Should fail with "not configured", not with "no source" — proving cloud is registered.
-	assert.Contains(t, stderr, "cloud error:")
-	assert.NotContains(t, stderr, "no source")
+	// Cloud source is not registered for plain k6 run — script should get a "no sources" error,
+	// not a "not configured" error that implies cloud was silently attempted.
+	assert.Contains(t, stderr, "no secret sources are configured")
+	assert.NotContains(t, stderr, "cloud secrets not configured")
 }
 
 // TestCloudSecretSourceRejectedByK6Run verifies that --secret-source=cloud is rejected
