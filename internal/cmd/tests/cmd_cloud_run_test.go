@@ -213,32 +213,46 @@ export default function() {
 		assert.Contains(t, stdout, "The test run id is "+strconv.Itoa(testRunID))
 	})
 
-	t.Run("should error when no stack is configured", func(t *testing.T) {
+	t.Run("reuses existing test run when K6_CLOUD_PUSH_REF_ID is set", func(t *testing.T) {
 		t.Parallel()
 
 		script := `
 export const options = {
   cloud: {
-      name: 'Hello k6 Cloud!',
-      projectID: 123456,
+	  name: 'Hello k6 Cloud!',
+	  projectID: 123456,
   },
 };
 
-export default function() {};`
+export default function() {
+    ` + "console.log(`The test run id is ${__ENV.K6_CLOUDRUN_TEST_RUN_ID}`);" + `
+};`
 
-		ts := makeTestState(t, script, []string{"--local-execution", "--log-output=stdout"})
-		ts.ExpectedExitCode = -1
-		delete(ts.Env, "K6_CLOUD_STACK_ID")
+		ts := makeTestState(t, script, []string{"--local-execution", "--log-output=stdout"}, 0)
+
+		const pushRefID = "99999"
+		ts.Env["K6_CLOUD_PUSH_REF_ID"] = pushRefID
+
+		srv := getTestServer(t, map[string]http.Handler{
+			"POST ^/v1/tests$": http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+				require.Fail(t, "CreateTestRun must not be called when K6_CLOUD_PUSH_REF_ID is set")
+			}),
+		})
+		t.Cleanup(srv.Close)
+		ts.Env["K6_CLOUD_HOST"] = srv.URL
 
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 		stdout := ts.Stdout.String()
 		t.Log(stdout)
-		assert.Contains(t, stdout, "must first authenticate")
+
+		assert.Contains(t, stdout, "execution: local")
+		assert.Contains(t, stdout, "output: cloud (https://app.k6.io/runs/"+pushRefID+")")
+		assert.Contains(t, stdout, "The test run id is "+pushRefID)
 	})
 }
 
-func makeTestState(tb testing.TB, script string, cliFlags []string) *GlobalTestState {
+func makeTestState(tb testing.TB, script string, cliFlags []string, expExitCode exitcodes.ExitCode) *GlobalTestState {
 	if cliFlags == nil {
 		cliFlags = []string{"-v", "--log-output=stdout"}
 	}
