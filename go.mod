@@ -22,7 +22,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/grafana/k6-cloud-openapi-client-go v0.0.0-20260331193133-94d5832119b8
 	github.com/grafana/k6provider v0.2.0
-	github.com/grafana/sobek v0.0.0-20260331145705-2272ac4993ef
+	github.com/grafana/sobek v0.0.0-20260406180825-6d789dcdd177
 	github.com/grafana/xk6-dashboard-assets v0.1.2
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
