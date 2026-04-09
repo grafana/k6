@@ -359,7 +359,7 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 			},
 		},
 
-		// Test-wide Tags
+		// Test-wide Tags: CLI and file tags are merged; CLI wins on key collision
 		{
 			opts{
 				fs:  defaultConfig(`{"tags": { "codeTagKey": "codeTagValue"}}`),
@@ -367,7 +367,10 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 			},
 			exp{},
 			func(t *testing.T, c Config) {
-				exp := map[string]string{"clitagkey": "clitagvalue"}
+				exp := map[string]string{
+					"codeTagKey": "codeTagValue",
+					"clitagkey":  "clitagvalue",
+				}
 				assert.Equal(t, exp, c.RunTags)
 			},
 		},
