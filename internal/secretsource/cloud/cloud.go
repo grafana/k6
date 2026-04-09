@@ -44,8 +44,10 @@ func init() {
 }
 
 // SecretSource wraps the URL secret source for cloud-based secrets.
-// It is pre-registered as the default secret source for all cloud runs (see createSecretSources
-// in root.go). Configuration arrives later via SetConfig, before the first Get() call.
+// It is registered automatically for 'k6 cloud run --local-execution' and for the PLZ
+// operator path (K6_CLOUD_SECRETS_TOKEN env var). Configuration arrives via SetConfig —
+// either from the CreateTestRun API response (createCloudTest) or directly from env vars —
+// before the first Get() call.
 //
 // The URL source is rebuilt whenever configPtr changes (i.e. a new test run starts with
 // different credentials). This supports sequential test runs in the same process — each run
@@ -73,8 +75,9 @@ func (cs *SecretSource) Description() string {
 
 // ensureInitialized builds (or rebuilds) the URL source from configPtr.
 func (cs *SecretSource) ensureInitialized() (secretsource.Source, error) {
-	// Load outside the lock as a fast-path check: if the pointer hasn't changed
-	// since we last initialized, we can avoid acquiring the lock at all.
+	// Load the config pointer before acquiring the lock to get a stable snapshot
+	// for the pointer-equality comparison inside the lock (cs.activeCfg == current).
+	// We always acquire the lock; this is not a lock-free fast path.
 	current := cs.configPtr.Load()
 
 	cs.mu.Lock()
