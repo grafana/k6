@@ -75,19 +75,6 @@ func (sm *Manager) Get(sourceName, key string) (string, error) {
 	return value, err
 }
 
-// SetDefaultSource makes the named source the default, so that calls to Get("default", key)
-// resolve to it. Safe to call after NewManager, before any VU goroutines start.
-func (sm *Manager) SetDefaultSource(name string) error {
-	source, ok := sm.sources[name]
-	if !ok {
-		return fmt.Errorf("no secret source with name %q", name)
-	}
-	sm.sources[DefaultSourceName] = source
-	// Share the same cache entry so secrets fetched by name and by "default" are deduplicated.
-	sm.cache[DefaultSourceName] = sm.cache[name]
-	return nil
-}
-
 // UnknownSourceError is returned when a unknown source is requested
 type UnknownSourceError string
 
