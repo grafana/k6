@@ -400,6 +400,7 @@ func (c *Client) buildInvokeRequest(
 		MethodDescriptor:       methodDesc,
 		Timeout:                p.Timeout,
 		DiscardResponseMessage: p.DiscardResponseMessage,
+		DiscardUnknownFields:   p.DiscardUnknownFields,
 		Message:                b,
 		TagsAndMeta:            &p.TagsAndMeta,
 		Metadata:               p.Metadata,

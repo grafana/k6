@@ -83,6 +83,7 @@ func (s *stream) beginStream(p *callParams) error {
 		Method:                 s.method,
 		MethodDescriptor:       s.methodDescriptor,
 		DiscardResponseMessage: p.DiscardResponseMessage,
+		DiscardUnknownFields:   p.DiscardUnknownFields,
 		TagsAndMeta:            &p.TagsAndMeta,
 		Metadata:               p.Metadata,
 	}

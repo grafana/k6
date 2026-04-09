@@ -172,6 +172,45 @@ func TestCallParamsDiscardResponseMessageParse(t *testing.T) {
 	}
 }
 
+func TestCallParamsDiscardUnknownFieldsParse(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		Name                 string
+		JSON                 string
+		DiscardUnknownFields bool
+	}{
+		{
+			Name:                 "Empty",
+			JSON:                 `{}`,
+			DiscardUnknownFields: false,
+		},
+		{
+			Name:                 "DiscardUnknownFieldsFalse",
+			JSON:                 `{ discardUnknownFields: false }`,
+			DiscardUnknownFields: false,
+		},
+		{
+			Name:                 "DiscardUnknownFieldsTrue",
+			JSON:                 `{ discardUnknownFields: true }`,
+			DiscardUnknownFields: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			t.Parallel()
+
+			testRuntime, params := newParamsTestRuntime(t, tc.JSON)
+
+			p, err := newCallParams(testRuntime.VU, params)
+			require.NoError(t, err)
+
+			assert.Equal(t, tc.DiscardUnknownFields, p.DiscardUnknownFields)
+		})
+	}
+}
+
 func TestConnectParamsAuthority(t *testing.T) {
 	t.Parallel()
 
