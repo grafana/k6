@@ -13,9 +13,6 @@ defaults:
   run:
     shell: bash
 
-permissions:
-  contents: read
-
 jobs:
   install-linux-deb:
     strategy:
