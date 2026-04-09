@@ -107,7 +107,11 @@ func (cs *SecretSource) ensureInitialized() (secretsource.Source, error) {
 		return nil, cs.initErr
 	}
 
-	envCopy := make(map[string]string, len(cs.params.Environment)+3)
+	extra := 2 // always: URL template + Authorization header
+	if current.ResponsePath != "" {
+		extra = 3
+	}
+	envCopy := make(map[string]string, len(cs.params.Environment)+extra)
 	maps.Copy(envCopy, cs.params.Environment)
 	envCopy["K6_SECRET_SOURCE_URL_URL_TEMPLATE"] = current.Endpoint
 	envCopy["K6_SECRET_SOURCE_URL_HEADER_AUTHORIZATION"] = "Bearer " + current.Token
