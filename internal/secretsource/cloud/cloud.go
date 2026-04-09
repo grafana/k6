@@ -75,13 +75,10 @@ func (cs *SecretSource) Description() string {
 
 // ensureInitialized builds (or rebuilds) the URL source from configPtr.
 func (cs *SecretSource) ensureInitialized() (secretsource.Source, error) {
-	// Load the config pointer before acquiring the lock to get a stable snapshot
-	// for the pointer-equality comparison inside the lock (cs.activeCfg == current).
-	// We always acquire the lock; this is not a lock-free fast path.
-	current := cs.configPtr.Load()
-
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
+
+	current := cs.configPtr.Load()
 
 	// Re-use the cached source if the config pointer is unchanged.
 	if cs.activeCfg == current && (cs.urlSource != nil || cs.initErr != nil) {
