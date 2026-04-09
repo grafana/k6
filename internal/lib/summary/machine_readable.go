@@ -168,6 +168,18 @@ func machineReadableMetricValues(m Metric) (any, error) {
 			Rate:    m.Values["rate"],
 		}, nil
 	case string(machinereadable.MetricTypeTrend):
+		known := map[string]bool{"avg": true, "min": true, "max": true, "med": true, "p(90)": true, "p(95)": true}
+		for k := range m.Values {
+			if !known[k] {
+				// return a map with all present values so dynamic percentiles are preserved
+				vals := make(map[string]float64, len(m.Values))
+				for kk, vv := range m.Values {
+					vals[kk] = vv
+				}
+				return vals, nil
+			}
+		}
+
 		var values machinereadable.TrendValues
 		if avgVal, ok := m.Values["avg"]; ok {
 			values.Avg = &avgVal
