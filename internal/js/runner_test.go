@@ -2054,7 +2054,7 @@ func runMultiFileTestCase(t *testing.T, tc multiFileTestCase, tb *httpmultibin.H
 	options := runner.GetOptions()
 	require.Empty(t, options.Validate())
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	vu, err := runner.NewVU(ctx, 1, 1, tc.samples)
