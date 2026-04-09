@@ -506,7 +506,7 @@ func createSecretSources(gs *state.GlobalState) (map[string]secretsource.Source,
 }
 
 // isCloudRunWithLocalExecution returns true when the command being executed is
-// 'k6 cloud run' with the --local-execution flag set.
+// 'k6 cloud run' with the --local-execution flag explicitly set to true.
 func isCloudRunWithLocalExecution(cmd *cobra.Command) bool {
 	if cmd == nil || cmd.Name() != cloudRunCommandName {
 		return false
@@ -515,8 +515,8 @@ func isCloudRunWithLocalExecution(cmd *cobra.Command) bool {
 	if parent == nil || parent.Name() != "cloud" {
 		return false
 	}
-	f := cmd.Flag("local-execution")
-	return f != nil && f.Changed
+	v, err := cmd.Flags().GetBool("local-execution")
+	return err == nil && v
 }
 
 // hasCloudSecretSource returns true if the 'cloud' secret source type appears in sources.
