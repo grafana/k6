@@ -3432,9 +3432,10 @@ func TestCloudSourceNotRegisteredForPlainRun(t *testing.T) {
 
 	stderr := ts.Stderr.String()
 	t.Log(stderr)
-	// Cloud source is not registered for plain k6 run — script should get a "no sources" error,
-	// not a "not configured" error that implies cloud was silently attempted.
-	assert.Contains(t, stderr, "no secret sources are configured")
+	// Cloud source is not registered for plain k6 run — the catch block must report the
+	// "no sources configured" error, not a "cloud secrets not configured" error that would
+	// imply cloud was silently registered and attempted.
+	assert.Contains(t, stderr, "cloud error: no secret sources are configured")
 	assert.NotContains(t, stderr, "cloud secrets not configured")
 }
 
