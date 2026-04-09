@@ -42,7 +42,8 @@ func (t timeoutError) Hint() string {
 	case consts.TeardownFn:
 		hint = "You can increase the time limit via the teardownTimeout option"
 	case consts.HandleSummaryFn:
-		hint = "You can increase the time limit via the handleSummaryTimeout option or the K6_HANDLE_SUMMARY_TIMEOUT environment variable"
+		hint = "You can increase the time limit via the handleSummaryTimeout option" +
+			" or the K6_HANDLE_SUMMARY_TIMEOUT environment variable"
 	}
 	return hint
 }
