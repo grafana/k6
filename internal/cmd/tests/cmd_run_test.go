@@ -2949,7 +2949,6 @@ func TestSummaryExport(t *testing.T) {
 			assertSummaryExport(t, ts.FS)
 		})
 	}
-
 }
 
 func TestHandleSummary(t *testing.T) {
