@@ -137,14 +137,7 @@ func newRootCommand(gs *state.GlobalState) *rootCommand {
 	return c
 }
 
-func (c *rootCommand) persistentPreRunE(cmd *cobra.Command, _ []string) error {
-	// For 'k6 cloud run --local-execution', automatically register the cloud secret source
-	// so scripts can call secrets.get() without requiring an explicit --secret-source=cloud flag.
-	// This must happen before setupLoggers, which calls createSecretSources internally.
-	if isCloudRunWithLocalExecution(cmd) && !hasCloudSecretSource(c.globalState.Flags.SecretSource) {
-		c.globalState.Flags.SecretSource = append(c.globalState.Flags.SecretSource, "cloud")
-	}
-
+func (c *rootCommand) persistentPreRunE(_ *cobra.Command, _ []string) error {
 	err := c.setupLoggers(c.stopLoggersCh)
 	if err != nil {
 		return err
@@ -503,20 +496,6 @@ func createSecretSources(gs *state.GlobalState) (map[string]secretsource.Source,
 	}
 
 	return result, nil
-}
-
-// isCloudRunWithLocalExecution returns true when the command being executed is
-// 'k6 cloud run' with the --local-execution flag explicitly set to true.
-func isCloudRunWithLocalExecution(cmd *cobra.Command) bool {
-	if cmd == nil || cmd.Name() != cloudRunCommandName {
-		return false
-	}
-	parent := cmd.Parent()
-	if parent == nil || parent.Name() != "cloud" {
-		return false
-	}
-	v, err := cmd.Flags().GetBool("local-execution")
-	return err == nil && v
 }
 
 // hasCloudSecretSource returns true if the 'cloud' secret source type appears in sources.
