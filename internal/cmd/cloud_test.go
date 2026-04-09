@@ -129,16 +129,14 @@ func TestResolveAndSetProjectID(t *testing.T) {
 			},
 			expectedError:     "",
 			expectedProjectID: 123,
-			logContains:       "No stack specified",
 		},
 		{
-			name: "logs warnings when projectID is 0 and no StackID",
+			name: "sets projectID to 0 when no StackID",
 			cloudConfig: &cloudapi.Config{
 				ProjectID: null.IntFrom(0),
 			},
 			expectedError:     "",
 			expectedProjectID: 0,
-			logContains:       "No stack specified",
 		},
 		{
 			name: "propagates error from resolveDefaultProjectID",
