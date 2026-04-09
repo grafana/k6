@@ -5,10 +5,46 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/url"
 
 	k6cloud "github.com/grafana/k6-cloud-openapi-client-go/k6"
 )
+
+// ListProjects retrieves the list of projects for the configured stack.
+func (c *Client) ListProjects() (*k6cloud.ProjectListResponse, error) {
+	// Bound checking stackID (int64) to support using it as an int32 in calls
+	// to the API.
+	if c.stackID < math.MinInt32 || c.stackID > math.MaxInt32 {
+		return nil, fmt.Errorf("stack ID %d overflows int32", c.stackID)
+	}
+
+	ctx := context.WithValue(context.Background(), k6cloud.ContextAccessToken, c.token)
+	req := c.apiClient.ProjectsAPI.
+		ProjectsList(ctx).
+		XStackId(int32(c.stackID))
+
+	resp, httpRes, rerr := req.Execute()
+	defer func() {
+		if httpRes != nil {
+			_, _ = io.Copy(io.Discard, httpRes.Body)
+			_ = httpRes.Body.Close()
+		}
+	}()
+
+	if rerr != nil {
+		var apiErr *k6cloud.GenericOpenAPIError
+		if !errors.As(rerr, &apiErr) {
+			return nil, fmt.Errorf("failed to list projects: %w", rerr)
+		}
+	}
+
+	if err := CheckResponse(httpRes); err != nil {
+		return nil, fmt.Errorf("failed to list projects: %w", err)
+	}
+
+	return resp, nil
+}
 
 // ValidateToken calls the endpoint to validate the Client's token and returns the result.
 func (c *Client) ValidateToken(stackURL string) (_ *k6cloud.AuthenticationResponse, err error) {
