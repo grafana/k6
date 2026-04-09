@@ -7,9 +7,23 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.k6.io/k6/internal/lib/testutils"
 )
+
+func TestNewClientConfiguresRetries(t *testing.T) {
+	t.Parallel()
+
+	client, err := NewClient(testutils.NewLogger(t), "test-token", "https://api.k6.io", "1.0", time.Second)
+	require.NoError(t, err)
+
+	cfg := client.apiClient.GetConfig()
+	assert.Equal(t, MaxRetries, cfg.MaxRetries)
+	assert.Equal(t, RetryInterval, cfg.RetryInterval)
+}
 
 func TestCheckResponse(t *testing.T) {
 	t.Parallel()
@@ -85,9 +99,9 @@ func TestCheckResponse(t *testing.T) {
 			assert.Error(t, err)
 
 			if tt.expectResponseError {
-				var respErr ResponseError
-				assert.True(t, errors.As(err, &respErr))
-				assert.Equal(t, tt.response, respErr.Response)
+				var rerr ResponseError
+				assert.True(t, errors.As(err, &rerr))
+				assert.Equal(t, tt.response, rerr.Response)
 			} else {
 				assert.Equal(t, tt.expectedError, err.Error())
 			}

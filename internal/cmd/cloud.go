@@ -14,11 +14,12 @@ import (
 
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/cloudapi"
+	v1api "go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/internal/build"
+	v6cloudapi "go.k6.io/k6/internal/cloudapi/v6"
 	"go.k6.io/k6/internal/ui/pb"
 	"go.k6.io/k6/lib"
 
@@ -84,26 +85,14 @@ func (c *cmdCloud) preRun(cmd *cobra.Command, _ []string) error {
 }
 
 // TODO: split apart some more
-//
-//nolint:funlen,gocognit,cyclop
 func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
-	// If no args provided and called from main cloud command, show helpful error
-	if cmd.Name() == "cloud" && len(args) == 0 {
-		return errors.New("the \"k6 cloud\" command expects either a subcommand such as \"run\" or \"login\", " +
-			"or a single argument consisting in a path to a script/archive, or the `-` symbol instructing " +
-			"the command to read the test content from stdin; received no arguments")
-	}
-
-	// Show deprecation warning only when running tests directly via "k6 cloud <file>"
-	// (not when using subcommands like "k6 cloud run")
-	if cmd.Name() == "cloud" && len(args) > 0 {
-		c.gs.Logger.Warn("Running tests directly with \"k6 cloud <file>\" is deprecated. " +
-			"Use \"k6 cloud run <file>\" instead. This behavior will be removed in a future release.")
+	if err := c.validateCloudRunArgs(cmd, args); err != nil {
+		return err
 	}
 
 	test, err := loadAndConfigureLocalTest(c.gs, cmd, args, getPartialConfig)
 	if err != nil {
-		return err
+		return fmt.Errorf("loading local test: %w", err)
 	}
 
 	// It's important to NOT set the derived options back to the runner
@@ -113,7 +102,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	// derivation will set `scenarios` as well.
 	testRunState, err := test.buildTestRunState(test.consolidatedConfig.Options)
 	if err != nil {
-		return err
+		return fmt.Errorf("building test run state: %w", err)
 	}
 
 	// TODO: validate for usage of execution segment
@@ -130,18 +119,18 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Building the archive..."))
 	arc := testRunState.Runner.MakeArchive()
 
-	tmpCloudConfig, err := cloudapi.GetTemporaryCloudConfig(arc.Options.Cloud)
+	tmpCloudConfig, err := v1api.GetTemporaryCloudConfig(arc.Options.Cloud)
 	if err != nil {
-		return err
+		return fmt.Errorf("reading temporary cloud config: %w", err)
 	}
 
 	// Cloud config
-	cloudConfig, warn, err := cloudapi.GetConsolidatedConfig(
+	cfg, warn, err := v1api.GetConsolidatedConfig(
 		test.derivedConfig.Collectors["cloud"], c.gs.Env, "", arc.Options.Cloud)
 	if err != nil {
-		return err
+		return fmt.Errorf("building cloud config: %w", err)
 	}
-	if !cloudConfig.Token.Valid {
+	if !cfg.Token.Valid {
 		return errUserUnauthenticated
 	}
 
@@ -150,14 +139,14 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 		modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Warning: "+warn))
 	}
 
-	if cloudConfig.Token.Valid {
-		tmpCloudConfig["token"] = cloudConfig.Token
+	if cfg.Token.Valid {
+		tmpCloudConfig["token"] = cfg.Token
 	}
-	if cloudConfig.Name.Valid {
-		tmpCloudConfig["name"] = cloudConfig.Name
+	if cfg.Name.Valid {
+		tmpCloudConfig["name"] = cfg.Name
 	}
-	if cloudConfig.ProjectID.Valid {
-		tmpCloudConfig["projectID"] = cloudConfig.ProjectID
+	if cfg.ProjectID.Valid {
+		tmpCloudConfig["projectID"] = cfg.ProjectID
 	}
 
 	if arc.Options.External == nil {
@@ -166,68 +155,78 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 
 	b, err := json.Marshal(tmpCloudConfig)
 	if err != nil {
-		return err
+		return fmt.Errorf("marshaling cloud config: %w", err)
 	}
 
 	arc.Options.Cloud = b
 
-	name := cloudConfig.Name.String
-	if !cloudConfig.Name.Valid || cloudConfig.Name.String == "" {
+	name := cfg.Name.String
+	if !cfg.Name.Valid || cfg.Name.String == "" {
 		name = filepath.Base(test.sourceRootPath)
+	}
+
+	if c.uploadOnly {
+		return c.runUploadOnly(test, cfg, tmpCloudConfig, arc, name, progressBar)
+	}
+
+	return c.runRemote(test, cfg, tmpCloudConfig, arc, name, progressBar)
+}
+
+func (c *cmdCloud) validateCloudRunArgs(cmd *cobra.Command, args []string) error {
+	// If no args provided and called from main cloud command, show helpful error
+	if cmd.Name() == "cloud" && len(args) == 0 {
+		return errors.New("the \"k6 cloud\" command expects either a subcommand such as \"run\" or \"login\", " +
+			"or a single argument consisting in a path to a script/archive, or the `-` symbol instructing " +
+			"the command to read the test content from stdin; received no arguments")
+	}
+
+	// Show deprecation warning only when running tests directly via "k6 cloud <file>"
+	// (not when using subcommands like "k6 cloud run")
+	if cmd.Name() == "cloud" && len(args) > 0 {
+		c.gs.Logger.Warn("Running tests directly with \"k6 cloud <file>\" is deprecated. " +
+			"Use \"k6 cloud run <file>\" instead. This behavior will be removed in a future release.")
+	}
+
+	return nil
+}
+
+func (c *cmdCloud) runRemote(test *loadedAndConfiguredTest, cfg v1api.Config, tmpCloudConfig map[string]any,
+	arc *lib.Archive, name string, progressBar *pb.ProgressBar,
+) error {
+	client, err := c.newRemoteClient(test, cfg, arc)
+	if err != nil {
+		return fmt.Errorf("creating remote client: %w", err)
+	}
+	err = c.validateCloudOptions(&cfg, tmpCloudConfig, arc, progressBar, func(cfg v1api.Config) error {
+		return client.ValidateOptions(c.gs.Ctx, cfg.ProjectID.Int64, arc.Options)
+	})
+	if err != nil {
+		return fmt.Errorf("validating remote options: %w", err)
 	}
 
 	globalCtx, globalCancel := context.WithCancel(c.gs.Ctx)
 	defer globalCancel()
 
-	logger := c.gs.Logger
-
-	// Start cloud test run
-	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Validating script options"))
-	client := cloudapi.NewClient(
-		logger, cloudConfig.Token.String, cloudConfig.Host.String, build.Version, cloudConfig.Timeout.TimeDuration())
-	if cloudConfig.StackID.Valid {
-		client.SetStackID(cloudConfig.StackID.Int64)
-	}
-	if err = client.ValidateOptions(arc.Options); err != nil {
-		return err
-	}
-
-	if cloudConfig.ProjectID.Int64 == 0 {
-		if err := resolveAndSetProjectID(c.gs, &cloudConfig, tmpCloudConfig, arc); err != nil {
-			return err
-		}
-	}
-
 	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Uploading archive"))
 
-	var cloudTestRun *cloudapi.CreateTestRunResponse
-	if c.uploadOnly {
-		cloudTestRun, err = client.UploadTestOnly(name, cloudConfig.ProjectID.Int64, arc)
-	} else {
-		cloudTestRun, err = client.StartCloudTestRun(name, cloudConfig.ProjectID.Int64, arc)
-	}
-
+	testRun, err := client.StartTest(globalCtx, name, cfg.ProjectID.Int64, arc)
 	if err != nil {
-		return err
+		return fmt.Errorf("starting cloud test run: %w", err)
 	}
 
-	refID := cloudTestRun.ReferenceID
-	if cloudTestRun.ConfigOverride != nil {
-		cloudConfig = cloudConfig.Apply(*cloudTestRun.ConfigOverride)
-	}
+	logger := c.gs.Logger
 
-	// Trap Interrupts, SIGINTs and SIGTERMs.
 	gracefulStop := func(sig os.Signal) {
 		logger.WithField("sig", sig).Print("Stopping cloud test run in response to signal...")
-		// Do this in a separate goroutine so that if it blocks, the
-		// second signal can still abort the process execution.
 		go func() {
-			stopErr := client.StopCloudTestRun(refID)
-			if stopErr != nil {
-				logger.WithError(stopErr).Error("Stop cloud test error")
-			} else {
-				logger.Info("Successfully sent signal to stop the cloud test, now waiting for it to actually stop...")
+			err := client.StopTest(context.WithoutCancel(globalCtx), testRun.ID)
+			if err != nil {
+				logger.WithError(err).Error("stopping cloud test run")
+				globalCancel()
+				return
 			}
+
+			logger.Info("Successfully sent signal to stop the cloud test, now waiting for it to actually stop...")
 			globalCancel()
 		}()
 	}
@@ -237,19 +236,111 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	stopSignalHandling := handleTestAbortSignals(c.gs, gracefulStop, onHardStop)
 	defer stopSignalHandling()
 
+	if _, err = c.printCloudExecution(test, progressBar, testRun.WebAppURL); err != nil {
+		return fmt.Errorf("printing cloud execution: %w", err)
+	}
+
+	testProgress, err := c.pollRemoteCloudTestProgress(globalCtx, globalCancel, progressBar, client, testRun.ID)
+	if err != nil {
+		return fmt.Errorf("polling remote test progress: %w", err)
+	}
+
+	c.reportCloudTestStatus(v6cloudapi.FormatStatus(testProgress.Status))
+	return mapRemoteCloudTestResult(testProgress)
+}
+
+func (c *cmdCloud) runUploadOnly(test *loadedAndConfiguredTest, cfg v1api.Config,
+	tmpCloudConfig map[string]any, arc *lib.Archive, name string, progressBar *pb.ProgressBar,
+) error {
+	client, err := c.newRemoteClient(test, cfg, arc)
+	if err != nil {
+		return fmt.Errorf("creating remote client: %w", err)
+	}
+	err = c.validateCloudOptions(&cfg, tmpCloudConfig, arc, progressBar, func(cfg v1api.Config) error {
+		return client.ValidateOptions(c.gs.Ctx, cfg.ProjectID.Int64, arc.Options)
+	})
+	if err != nil {
+		return fmt.Errorf("validating remote options: %w", err)
+	}
+
+	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Uploading archive"))
+
+	testID, err := client.UploadTest(c.gs.Ctx, name, cfg.ProjectID.Int64, arc)
+	if err != nil {
+		return fmt.Errorf("uploading cloud test: %w", err)
+	}
+
+	testURL, err := v1api.URLForTest(testID, cfg)
+	if err != nil {
+		c.gs.Logger.WithError(err).Warn("Could not build test page URL")
+	}
+
 	et, err := lib.NewExecutionTuple(test.derivedConfig.ExecutionSegment, test.derivedConfig.ExecutionSegmentSequence)
 	if err != nil {
-		return err
+		return fmt.Errorf("building execution tuple: %w", err)
 	}
-	testURL := cloudapi.URLForResults(refID, cloudConfig)
 	executionPlan := test.derivedConfig.Scenarios.GetFullExecutionRequirements(et)
-	printExecutionDescription(
-		c.gs, "cloud", test.sourceRootPath, testURL, test.derivedConfig, et, executionPlan, nil,
-	)
+	printExecutionDescription(c.gs, "cloud", test.sourceRootPath, testURL, test.derivedConfig, et, executionPlan, nil)
 
-	modifyAndPrintBar(
-		c.gs, progressBar,
-		pb.WithConstLeft("Run "), pb.WithConstProgress(0, "Initializing the cloud test"),
+	c.reportCloudTestStatus("Uploaded")
+	return nil
+}
+
+func (c *cmdCloud) newRemoteClient(test *loadedAndConfiguredTest, cfg v1api.Config,
+	arc *lib.Archive,
+) (*v6cloudapi.Client, error) {
+	remoteCfg, err := v6cloudapi.GetConsolidatedConfig(
+		test.derivedConfig.Collectors["cloud"], c.gs.Env, "", arc.Options.Cloud,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("building cloud config: %w", err)
+	}
+
+	client, err := v6cloudapi.NewClient(
+		c.gs.Logger,
+		cfg.Token.String,
+		remoteCfg.Host.String,
+		build.Version,
+		cfg.Timeout.TimeDuration(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("creating client: %w", err)
+	}
+	if cfg.StackID.Valid {
+		client.SetStackID(cfg.StackID.Int64)
+	}
+
+	return client, nil
+}
+
+func (c *cmdCloud) validateCloudOptions(cfg *v1api.Config, tmpCloudConfig map[string]any,
+	arc *lib.Archive, progressBar *pb.ProgressBar, validate func(v1api.Config) error,
+) error {
+	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Validating script options"))
+
+	if cfg.ProjectID.Int64 == 0 {
+		err := resolveAndSetProjectID(c.gs, cfg, tmpCloudConfig, arc)
+		if err != nil {
+			return fmt.Errorf("resolving project ID: %w", err)
+		}
+	}
+
+	if err := validate(*cfg); err != nil {
+		return fmt.Errorf("validating options: %w", err)
+	}
+
+	return nil
+}
+
+func (c *cmdCloud) pollCloudProgress(globalCtx context.Context, globalCancel context.CancelFunc,
+	progressBar *pb.ProgressBar, progress func() (float64, string),
+	fetch func(context.Context) (bool, error), streamLogs func(context.Context),
+) error {
+	progressBar.Modify(
+		pb.WithProgress(func() (float64, []string) {
+			value, status := progress()
+			return value, []string{status}
+		}),
 	)
 
 	progressCtx, progressCancel := context.WithCancel(globalCtx)
@@ -258,106 +349,156 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	defer progressBarWG.Wait()
 	defer progressCancel()
 	go func() {
-		showProgress(progressCtx, c.gs, []*pb.ProgressBar{progressBar}, logger)
+		showProgress(progressCtx, c.gs, []*pb.ProgressBar{progressBar}, c.gs.Logger)
 		progressBarWG.Done()
 	}()
 
-	var (
-		startTime   time.Time
-		maxDuration time.Duration
-	)
-	maxDuration, _ = lib.GetEndOffset(executionPlan)
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
 
-	testProgressLock := &sync.Mutex{}
-	var testProgress *cloudapi.TestProgressResponse
-	progressBar.Modify(
-		pb.WithProgress(func() (float64, []string) {
-			testProgressLock.Lock()
-			defer testProgressLock.Unlock()
-
-			if testProgress == nil {
-				return 0, []string{"Waiting..."}
-			}
-
-			statusText := testProgress.RunStatusText
-
-			switch testProgress.RunStatus { //nolint:exhaustive
-			case cloudapi.RunStatusFinished:
-				testProgress.Progress = 1
-			case cloudapi.RunStatusRunning:
-				if startTime.IsZero() {
-					startTime = time.Now()
-				}
-				spent := time.Since(startTime)
-				if spent > maxDuration {
-					statusText = maxDuration.String()
-				} else {
-					statusText = fmt.Sprintf("%s/%s", pb.GetFixedLengthDuration(spent, maxDuration), maxDuration)
-				}
-			}
-
-			return testProgress.Progress, []string{statusText}
-		}),
-	)
-
-	ticker := time.NewTicker(time.Millisecond * 2000)
-	if c.showCloudLogs {
-		go func() {
-			logger.Debug("Connecting to cloud logs server...")
-			if err := cloudConfig.StreamLogsToLogger(globalCtx, logger, refID, 0); err != nil {
-				logger.WithError(err).Error("error while tailing cloud logs")
-			}
-		}()
+	if streamLogs != nil {
+		go streamLogs(progressCtx)
 	}
 
 	for range ticker.C {
-		newTestProgress, progressErr := client.GetTestProgress(refID)
-		if progressErr != nil {
-			logger.WithError(progressErr).Error("Test progress error")
-			continue
+		done, err := fetch(context.WithoutCancel(progressCtx))
+		if err != nil {
+			return err
 		}
 
-		testProgressLock.Lock()
-		testProgress = newTestProgress
-		testProgressLock.Unlock()
-
-		if (newTestProgress.RunStatus > cloudapi.RunStatusRunning) ||
-			(c.exitOnRunning && newTestProgress.RunStatus == cloudapi.RunStatusRunning) {
+		if done {
 			globalCancel()
 			break
 		}
 	}
 
-	if testProgress == nil {
-		//nolint:staticcheck
-		return errext.WithExitCodeIfNone(errors.New("Test progress error"), exitcodes.CloudFailedToGetProgress)
+	return nil
+}
+
+func (c *cmdCloud) printCloudExecution(test *loadedAndConfiguredTest, progressBar *pb.ProgressBar,
+	testURL string,
+) (time.Duration, error) {
+	et, err := lib.NewExecutionTuple(test.derivedConfig.ExecutionSegment, test.derivedConfig.ExecutionSegmentSequence)
+	if err != nil {
+		return 0, fmt.Errorf("building execution tuple: %w", err)
+	}
+	executionPlan := test.derivedConfig.Scenarios.GetFullExecutionRequirements(et)
+	printExecutionDescription(c.gs, "cloud", test.sourceRootPath, testURL, test.derivedConfig, et, executionPlan, nil)
+
+	modifyAndPrintBar(
+		c.gs, progressBar,
+		pb.WithConstLeft("Run "), pb.WithConstProgress(0, "Initializing the cloud test"),
+	)
+
+	maxDuration, _ := lib.GetEndOffset(executionPlan)
+	return maxDuration, nil
+}
+
+func (c *cmdCloud) pollRemoteCloudTestProgress(globalCtx context.Context, globalCancel context.CancelFunc,
+	progressBar *pb.ProgressBar, client *v6cloudapi.Client, testRunID int64,
+) (*v6cloudapi.TestRunProgress, error) {
+	var maxProgress float64
+	var mu sync.Mutex
+	var progress *v6cloudapi.TestRunProgress
+
+	if err := c.pollCloudProgress(
+		globalCtx,
+		globalCancel,
+		progressBar,
+		func() (float64, string) {
+			mu.Lock()
+			defer mu.Unlock()
+
+			if progress == nil {
+				return 0, "Waiting..."
+			}
+
+			value, status := cloudTestProgress(maxProgress, progress)
+			maxProgress = value
+
+			return value, status
+		},
+		func(ctx context.Context) (bool, error) {
+			next, err := client.FetchTest(ctx, testRunID)
+			if err != nil {
+				return false, fmt.Errorf("fetching test run: %w", err)
+			}
+
+			mu.Lock()
+			defer mu.Unlock()
+			progress = next
+			if next.IsFinished() {
+				maxProgress = 1
+			}
+
+			return next.IsFinished() || c.exitOnRunning && next.IsRunning(), nil
+		},
+		nil,
+	); err != nil {
+		return nil, fmt.Errorf("polling test progress: %w", err)
 	}
 
+	mu.Lock()
+	defer mu.Unlock()
+	if progress == nil {
+		err := errors.New("test progress error")
+		return nil, errext.WithExitCodeIfNone(err, exitcodes.CloudFailedToGetProgress)
+	}
+
+	return progress, nil
+}
+
+func cloudTestProgress(maxProgress float64, testProgress *v6cloudapi.TestRunProgress) (float64, string) {
+	progress := max(maxProgress, testProgress.Progress())
+	if testProgress.IsFinished() {
+		progress = 1
+	}
+
+	if !testProgress.IsRunning() || testProgress.EstimatedDuration <= 0 {
+		return progress, v6cloudapi.FormatStatus(testProgress.Status)
+	}
+
+	spent := time.Duration(testProgress.ExecutionDuration) * time.Second
+	maxDuration := time.Duration(testProgress.EstimatedDuration) * time.Second
+	status := fmt.Sprintf("%s/%s", pb.GetFixedLengthDuration(spent, maxDuration), maxDuration)
+
+	return progress, status
+}
+
+func (c *cmdCloud) reportCloudTestStatus(statusText string) {
 	if !c.gs.Flags.Quiet {
 		valueColor := getColor(c.gs.Flags.NoColor || !c.gs.Stdout.IsTTY, color.FgCyan)
 		printToStdout(c.gs, fmt.Sprintf(
-			"     test status: %s\n", valueColor.Sprint(testProgress.RunStatusText),
+			"     test status: %s\n", valueColor.Sprint(statusText),
 		))
 	} else {
-		logger.WithField("run_status", testProgress.RunStatusText).Debug("Test finished")
+		c.gs.Logger.WithField("run_status", statusText).Debug("Test finished")
 	}
+}
 
-	if testProgress.ResultStatus == cloudapi.ResultStatusFailed {
-		// Although by looking at [ResultStatus] and [RunStatus] isn't self-explanatory,
-		// the scenario when the test run has finished, but it failed is an exceptional case for those situations
-		// when thresholds have been crossed (failed). So, we report this situation as such.
-		if testProgress.RunStatus == cloudapi.RunStatusFinished ||
-			testProgress.RunStatus == cloudapi.RunStatusAbortedThreshold {
-			//nolint:staticcheck
-			return errext.WithExitCodeIfNone(errors.New("Thresholds have been crossed"), exitcodes.ThresholdsHaveFailed)
-		}
-
-		// TODO: use different exit codes for failed thresholds vs failed test (e.g. aborted by system/limit)
-		return errext.WithExitCodeIfNone(errors.New("The test has failed"), exitcodes.CloudTestRunFailed) //nolint:staticcheck
+func mapRemoteCloudTestResult(testProgress *v6cloudapi.TestRunProgress) error {
+	if testProgress.Result == v6cloudapi.ResultFailed &&
+		(testProgress.IsFinished() || testProgress.Status == v6cloudapi.StatusAbortedThreshold) {
+		return errext.WithExitCodeIfNone(errThresholdsCrossed, exitcodes.ThresholdsHaveFailed)
+	}
+	if testProgress.Result == v6cloudapi.ResultFailed || testProgress.Result == v6cloudapi.ResultError {
+		return errext.WithExitCodeIfNone(errTestFailed, exitcodes.CloudTestRunFailed)
 	}
 
 	return nil
 }
+
+type cloudRunError string
+
+func (e cloudRunError) Error() string {
+	s := string(e)
+	return strings.ToUpper(s[:1]) + s[1:]
+}
+
+const (
+	errThresholdsCrossed cloudRunError = "thresholds have been crossed"
+	errTestFailed        cloudRunError = "the test has failed"
+)
 
 func (c *cmdCloud) flagSet() *pflag.FlagSet {
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
@@ -451,36 +592,29 @@ Use "{{.CommandPath}} [command] --help" for more information about a command.
 	return cloudCmd
 }
 
-func resolveDefaultProjectID(
-	gs *state.GlobalState,
-	cloudConfig *cloudapi.Config,
-) (int64, error) {
+func resolveDefaultProjectID(gs *state.GlobalState, cloudConfig *v1api.Config) (int64, error) {
 	// Priority: projectID -> default stack from config
 	if cloudConfig.ProjectID.Valid && cloudConfig.ProjectID.Int64 > 0 {
 		return cloudConfig.ProjectID.Int64, nil
 	}
-	if cloudConfig.StackID.Valid && cloudConfig.StackID.Int64 != 0 {
-		if cloudConfig.DefaultProjectID.Valid && cloudConfig.DefaultProjectID.Int64 > 0 {
-			stackName := cloudConfig.StackURL.String
-			if !cloudConfig.StackURL.Valid {
-				stackName = fmt.Sprintf("stack-%d", cloudConfig.StackID.Int64)
-			}
-			gs.Logger.Warnf("No projectID specified, using default project of the %s stack\n", stackName)
-			return cloudConfig.DefaultProjectID.Int64, nil
+	if !cloudConfig.StackID.Valid || cloudConfig.StackID.Int64 == 0 {
+		return 0, nil
+	}
+	if cloudConfig.DefaultProjectID.Valid && cloudConfig.DefaultProjectID.Int64 > 0 {
+		stackName := cloudConfig.StackURL.String
+		if !cloudConfig.StackURL.Valid {
+			stackName = fmt.Sprintf("stack-%d", cloudConfig.StackID.Int64)
 		}
-		return 0, fmt.Errorf(
-			"default stack configured but the default project ID is not available - " +
-				"please run `k6 cloud login` to refresh your configuration")
+		gs.Logger.Warnf("No projectID specified, using default project of the %s stack\n", stackName)
+		return cloudConfig.DefaultProjectID.Int64, nil
 	}
 
-	// Return 0 to let the backend pick the project (old behavior)
-	return 0, nil
+	return 0, fmt.Errorf(
+		"default stack configured but the default project ID is not available - " +
+			"please run `k6 cloud login` to refresh your configuration")
 }
 
-func resolveAndSetProjectID(
-	gs *state.GlobalState,
-	cloudConfig *cloudapi.Config,
-	tmpCloudConfig map[string]any,
+func resolveAndSetProjectID(gs *state.GlobalState, cloudConfig *v1api.Config, tmpCloudConfig map[string]any,
 	arc *lib.Archive,
 ) error {
 	projectID, err := resolveDefaultProjectID(gs, cloudConfig)

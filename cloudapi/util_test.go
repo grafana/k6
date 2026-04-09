@@ -24,3 +24,16 @@ func TestURLForResults(t *testing.T) {
 	conf.TestRunDetails = null.NewString(testRunDetails, true)
 	require.Equal(t, testRunDetails, URLForResults(refID, conf))
 }
+
+func TestURLForTest(t *testing.T) {
+	t.Parallel()
+
+	cfg := Config{}
+	_, err := URLForTest(1234, cfg)
+	require.EqualError(t, err, "cannot build test page URL: stack URL is not configured")
+
+	cfg.StackURL = null.NewString("https://app.k6.io/", true)
+	url, err := URLForTest(1234, cfg)
+	require.NoError(t, err)
+	require.Equal(t, "https://app.k6.io/a/k6-app/tests/1234", url)
+}

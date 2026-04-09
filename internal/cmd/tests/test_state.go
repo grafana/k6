@@ -43,7 +43,7 @@ type GlobalTestState struct {
 // GlobalState fields for use in tests.
 func NewGlobalTestState(tb testing.TB) *GlobalTestState {
 	tb.Helper()
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(tb.Context())
 	tb.Cleanup(cancel)
 
 	fs := fsext.NewMemMapFs()
