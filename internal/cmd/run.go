@@ -176,7 +176,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		return err
 	}
 
-	summaryMode, summaryEnabled, err := getSummaryMode(testRunState.RuntimeOptions)
+	_, summaryEnabled, err := getSummaryMode(testRunState.RuntimeOptions)
 	if err != nil {
 		// Theoretically, this should never happen, as we already verify whether the summary
 		// mode is valid while parsing the runtime options, but just in case it happens, we
@@ -202,11 +202,9 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	executionState := execScheduler.GetState()
-	if summaryEnabled { //nolint:nestif
+	if summaryEnabled {
 		// Despite having the revamped [summary.Summary], we still keep the use of the
-		// [lib.LegacySummary] for multiple backwards compatibility options,
-		// to be deprecated by v1.0 and likely removed or replaced by v2.0:
-		// - the `legacy` summary mode (which keeps the old summary format/display).
+		// [lib.LegacySummary] for backwards compatibility:
 		// - the data structure for custom `handleSummary()` implementations.
 		// - the data structure for the JSON (--summary-export) output.
 		legacySummary := func() *lib.LegacySummary {
@@ -230,60 +228,41 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 			}),
 		}
 
-		switch summaryMode {
-		// TODO(@joanlopez): remove by k6 v2.0, once we completely drop the support for --summary-mode=legacy.
-		case summary.ModeLegacy:
-			logger.Warn(`The "legacy" summary mode has been deprecated, and will be removed by k6 v2.0. ` +
-				`Please, migrate to either "compact" or "full" as soon as possible.`)
-			// At the end of the test run
-			defer func() {
-				logger.Debug("Generating the end-of-test summary...")
-
-				summaryResult, hsErr := test.initRunner.HandleSummary(globalCtx, legacySummary(), nil, summaryMeta)
-				if hsErr == nil {
-					hsErr = handleSummaryResult(c.gs.FS, c.gs.Stdout, c.gs.Stderr, summaryResult)
-				}
-				if hsErr != nil {
-					logger.WithError(hsErr).Error("failed to handle the end-of-test summary")
-				}
-			}()
-		default:
-			// Instantiates the summary output
-			summaryOutput, err := summaryoutput.New(output.Params{
-				RuntimeOptions: testRunState.RuntimeOptions,
-				Logger:         c.gs.Logger,
-			})
-			if err != nil {
-				logger.WithError(err).Error("failed to initialize the end-of-test summary output")
-			}
-			outputs = append(outputs, summaryOutput)
-
-			// At the end of the test run
-			defer func() {
-				logger.Debug("Generating the end-of-test summary...")
-
-				summary := summaryOutput.Summary(
-					executionState.GetCurrentTestRunDuration(),
-					metricsEngine.ObservedMetrics,
-					test.initRunner.GetOptions(),
-				)
-
-				// TODO: We should probably try to move these out of the summary,
-				// likely as an additional argument like options.
-				summary.NoColor = c.gs.Flags.NoColor
-				summary.EnableColors = !summary.NoColor && c.gs.Stdout.IsTTY
-				summary.NewMachineReadableSummary = testRunState.RuntimeOptions.NewMachineReadableSummary.Valid &&
-					testRunState.RuntimeOptions.NewMachineReadableSummary.Bool
-
-				summaryResult, hsErr := test.initRunner.HandleSummary(globalCtx, legacySummary(), summary, summaryMeta)
-				if hsErr == nil {
-					hsErr = handleSummaryResult(c.gs.FS, c.gs.Stdout, c.gs.Stderr, summaryResult)
-				}
-				if hsErr != nil {
-					logger.WithError(hsErr).Error("failed to handle the end-of-test summary")
-				}
-			}()
+		// Instantiates the summary output
+		summaryOutput, err := summaryoutput.New(output.Params{
+			RuntimeOptions: testRunState.RuntimeOptions,
+			Logger:         c.gs.Logger,
+		})
+		if err != nil {
+			logger.WithError(err).Error("failed to initialize the end-of-test summary output")
 		}
+		outputs = append(outputs, summaryOutput)
+
+		// At the end of the test run
+		defer func() {
+			logger.Debug("Generating the end-of-test summary...")
+
+			summary := summaryOutput.Summary(
+				executionState.GetCurrentTestRunDuration(),
+				metricsEngine.ObservedMetrics,
+				test.initRunner.GetOptions(),
+			)
+
+			// TODO: We should probably try to move these out of the summary,
+			// likely as an additional argument like options.
+			summary.NoColor = c.gs.Flags.NoColor
+			summary.EnableColors = !summary.NoColor && c.gs.Stdout.IsTTY
+			summary.NewMachineReadableSummary = testRunState.RuntimeOptions.NewMachineReadableSummary.Valid &&
+				testRunState.RuntimeOptions.NewMachineReadableSummary.Bool
+
+			summaryResult, hsErr := test.initRunner.HandleSummary(globalCtx, legacySummary(), summary, summaryMeta)
+			if hsErr == nil {
+				hsErr = handleSummaryResult(c.gs.FS, c.gs.Stdout, c.gs.Stderr, summaryResult)
+			}
+			if hsErr != nil {
+				logger.WithError(hsErr).Error("failed to handle the end-of-test summary")
+			}
+		}()
 	}
 
 	waitInitDone := emitEvent(&event.Event{Type: event.Init})

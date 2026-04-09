@@ -475,13 +475,13 @@ func TestRuntimeOptions(t *testing.T) {
 		"summary mode from env overwritten by CLI": {
 			useSysEnv: false,
 			systemEnv: map[string]string{"K6_SUMMARY_MODE": "full"},
-			cliFlags:  []string{"--summary-mode", "legacy"},
+			cliFlags:  []string{"--summary-mode", "compact"},
 			expRTOpts: lib.RuntimeOptions{
 				IncludeSystemEnvVars:      null.NewBool(false, false),
 				CompatibilityMode:         defaultCompatMode,
 				Env:                       map[string]string{},
 				TracesOutput:              defaultTracesOutput,
-				SummaryMode:               null.NewString("legacy", true),
+				SummaryMode:               null.NewString("compact", true),
 				NewMachineReadableSummary: defaultNewMachineReadableSummary,
 			},
 		},
