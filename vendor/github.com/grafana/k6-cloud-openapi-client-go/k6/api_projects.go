@@ -3,7 +3,7 @@ Grafana Cloud k6
 
 HTTP API for interacting with Grafana Cloud k6.
 
-API version: 1.7.1
+API version: 1.9.1
 Contact: info@grafana.com
 */
 
@@ -17,6 +17,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"reflect"
 	"strings"
 )
 
@@ -24,12 +25,13 @@ import (
 type ProjectsAPIService service
 
 type ApiProjectLimitsRetrieveRequest struct {
-	ctx        context.Context
-	ApiService *ProjectsAPIService
-	xStackId   *int32
-	count      *bool
-	skip       *int32
-	top        *int32
+	ctx         context.Context
+	ApiService  *ProjectsAPIService
+	xStackId    *int32
+	count       *bool
+	skip        *int32
+	top         *int32
+	projectIdIn *[]int32
 }
 
 // Numeric ID of the Grafana stack representing the request scope. - If the API is called with a *Personal API token*, the user must be a member of the specified stack. - If the API is called with a *Grafana Stack API token*, the value must be the ID of the corresponding stack.
@@ -53,6 +55,12 @@ func (r *ApiProjectLimitsRetrieveRequest) Skip(skip int32) *ApiProjectLimitsRetr
 // Number of results to return per page.
 func (r *ApiProjectLimitsRetrieveRequest) Top(top int32) *ApiProjectLimitsRetrieveRequest {
 	r.top = &top
+	return r
+}
+
+// Filter results by project ID (comma-separated list of IDs).
+func (r *ApiProjectLimitsRetrieveRequest) ProjectIdIn(projectIdIn []int32) *ApiProjectLimitsRetrieveRequest {
+	r.projectIdIn = &projectIdIn
 	return r
 }
 
@@ -111,6 +119,17 @@ func (a *ProjectsAPIService) ProjectLimitsRetrieveExecute(r *ApiProjectLimitsRet
 	} else {
 		var defaultValue int32 = 1000
 		r.top = &defaultValue
+	}
+	if r.projectIdIn != nil {
+		t := *r.projectIdIn
+		if reflect.TypeOf(t).Kind() == reflect.Slice {
+			s := reflect.ValueOf(t)
+			for i := 0; i < s.Len(); i++ {
+				parameterAddToHeaderOrQuery(localVarQueryParams, "project_id_in", s.Index(i).Interface(), "form", "multi")
+			}
+		} else {
+			parameterAddToHeaderOrQuery(localVarQueryParams, "project_id_in", t, "form", "multi")
+		}
 	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
@@ -317,17 +336,6 @@ func (a *ProjectsAPIService) ProjectsCreateExecute(r *ApiProjectsCreateRequest) 
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		if localVarHTTPResponse.StatusCode == 409 {
-			var v ErrorResponseApiModel
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
 		if localVarHTTPResponse.StatusCode == 400 {
 			var v ErrorResponseApiModel
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
@@ -351,6 +359,17 @@ func (a *ProjectsAPIService) ProjectsCreateExecute(r *ApiProjectsCreateRequest) 
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 403 {
+			var v ErrorResponseApiModel
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 409 {
 			var v ErrorResponseApiModel
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
@@ -483,17 +502,6 @@ func (a *ProjectsAPIService) ProjectsDestroyExecute(r *ApiProjectsDestroyRequest
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		if localVarHTTPResponse.StatusCode == 409 {
-			var v ErrorResponseApiModel
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarHTTPResponse, newErr
-		}
 		if localVarHTTPResponse.StatusCode == 401 {
 			var v ErrorResponseApiModel
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
@@ -517,6 +525,17 @@ func (a *ProjectsAPIService) ProjectsDestroyExecute(r *ApiProjectsDestroyRequest
 			return localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 404 {
+			var v ErrorResponseApiModel
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 409 {
 			var v ErrorResponseApiModel
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
@@ -877,6 +896,7 @@ type ApiProjectsListRequest struct {
 	skip       *int32
 	top        *int32
 	name       *string
+	nameSearch *string
 }
 
 // Numeric ID of the Grafana stack representing the request scope. - If the API is called with a *Personal API token*, the user must be a member of the specified stack. - If the API is called with a *Grafana Stack API token*, the value must be the ID of the corresponding stack.
@@ -891,7 +911,7 @@ func (r *ApiProjectsListRequest) Count(count bool) *ApiProjectsListRequest {
 	return r
 }
 
-// Comma-separated list of fields to use when ordering the results. Available fields: - created  The default ascending order can be reversed by appending the &#x60;desc&#x60; specifier.
+// Comma-separated list of fields to use when ordering the results. Available fields: - created - name  The default ascending order can be reversed by appending the &#x60;desc&#x60; specifier.
 func (r *ApiProjectsListRequest) Orderby(orderby string) *ApiProjectsListRequest {
 	r.orderby = &orderby
 	return r
@@ -912,6 +932,12 @@ func (r *ApiProjectsListRequest) Top(top int32) *ApiProjectsListRequest {
 // Filter results by project name (exact match).
 func (r *ApiProjectsListRequest) Name(name string) *ApiProjectsListRequest {
 	r.name = &name
+	return r
+}
+
+// Search projects by name.
+func (r *ApiProjectsListRequest) NameSearch(nameSearch string) *ApiProjectsListRequest {
+	r.nameSearch = &nameSearch
 	return r
 }
 
@@ -976,6 +1002,9 @@ func (a *ProjectsAPIService) ProjectsListExecute(r *ApiProjectsListRequest) (*Pr
 	}
 	if r.name != nil {
 		parameterAddToHeaderOrQuery(localVarQueryParams, "name", r.name, "form", "")
+	}
+	if r.nameSearch != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "name_search", r.nameSearch, "form", "")
 	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
@@ -1183,17 +1212,6 @@ func (a *ProjectsAPIService) ProjectsPartialUpdateExecute(r *ApiProjectsPartialU
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		if localVarHTTPResponse.StatusCode == 409 {
-			var v ErrorResponseApiModel
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarHTTPResponse, newErr
-		}
 		if localVarHTTPResponse.StatusCode == 400 {
 			var v ErrorResponseApiModel
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
@@ -1228,6 +1246,17 @@ func (a *ProjectsAPIService) ProjectsPartialUpdateExecute(r *ApiProjectsPartialU
 			return localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 404 {
+			var v ErrorResponseApiModel
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 409 {
 			var v ErrorResponseApiModel
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
