@@ -4,11 +4,11 @@ import (
 	"errors"
 	"fmt"
 
-	"go.k6.io/k6/errext"
-	"go.k6.io/k6/errext/exitcodes"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
+	"go.k6.io/k6/errext"
+	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/internal/execution"
 	"go.k6.io/k6/internal/execution/local"
 )
