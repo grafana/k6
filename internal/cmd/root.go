@@ -20,7 +20,6 @@ import (
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/ext"
-	"go.k6.io/k6/internal/build"
 	"go.k6.io/k6/internal/log"
 	"go.k6.io/k6/secretsource"
 
@@ -29,18 +28,8 @@ import (
 
 const waitLoggerCloseTimeout = time.Second * 5
 
-func getDocsURL() string {
-	version := build.Version
-	version = strings.TrimPrefix(version, "v")
-	parts := strings.SplitN(version, ".", 3)
-	if len(parts) >= 2 {
-		return fmt.Sprintf("https://grafana.com/docs/k6/v%s.%s.x/", parts[0], parts[1])
-	}
-	return "https://grafana.com/docs/k6/latest/"
-}
-
 func getRootUsageTemplate() string {
-	return fmt.Sprintf(`{{.Short}}
+	return `{{.Short}}
 
 Usage:{{if .Runnable}}
   {{.UseLine}}{{end}}{{if .HasAvailableSubCommands}}
@@ -51,7 +40,7 @@ Core Commands:{{range .Commands}}{{if eq .Name "new"}}
   {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{range .Commands}}{{if eq .Name "cloud"}}
   {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}
 
-Additional Commands:{{range .Commands}}{{if and .IsAvailableCommand (ne .Name "new") (ne .Name "run") `+
+Additional Commands:{{range .Commands}}{{if and .IsAvailableCommand (ne .Name "new") (ne .Name "run") ` +
 		`(ne .Name "cloud") (ne .Name "help")}}
   {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}
 
@@ -71,10 +60,16 @@ Examples:
 
   # Run locally, stream results to Grafana Cloud
   $ {{.CommandPath}} cloud run --local-execution test.js
+
+Documentation:
+  # Look up the JavaScript API, examples, and best practices
+  $ {{.CommandPath}} x docs
+
+  # Discover available k6 extensions
+  $ {{.CommandPath}} x explore
 {{if .HasAvailableSubCommands}}
-Use "{{.CommandPath}} [command] --help" for more information about a command.
-Full CLI documentation: %s{{end}}
-`, getDocsURL())
+Use "{{.CommandPath}} [command] --help" for more information about a command.{{end}}
+`
 }
 
 // ExecuteWithGlobalState runs the root command with an existing GlobalState.
@@ -123,8 +118,7 @@ func newRootCommand(gs *state.GlobalState) *rootCommand {
 
 	subCommands := []func(*state.GlobalState) *cobra.Command{
 		getCmdArchive, getCmdCloud, getCmdNewScript, getCmdInspect, getCmdDeps,
-		getCmdLogin, getCmdPause, getCmdResume, getCmdScale, getCmdRun,
-		getCmdStats, getCmdStatus, getCmdVersion, getX,
+		getCmdRun, getCmdStats, getCmdVersion, getX,
 	}
 
 	defaultUsageTemplate := (&cobra.Command{}).UsageTemplate()
@@ -175,14 +169,20 @@ func (c *rootCommand) execute() {
 		}
 	}()
 
-	err := c.cmd.Execute()
+	// Completion requests for unregistered extensions must bypass Execute:
+	// cobra's __complete writes to stdout as a side-effect, and the
+	// provisioned binary's output would append to it, producing double output.
+	var err error
+	if ext, ok := detectExtensionCompletion(c.cmd, c.globalState); ok {
+		err = buildExtensionDeps(c.globalState, ext)
+	} else {
+		err = c.cmd.Execute()
+	}
 	if err == nil {
 		exitCode = 0
 		return
 	}
-
 	newExitCode, err := handleUnsatisfiedDependencies(err, c)
-
 	if err == nil {
 		exitCode = int(newExitCode)
 		return
@@ -392,22 +392,18 @@ func (c *rootCommand) setupLoggers(stop <-chan struct{}) error {
 	// Check for details https://github.com/grafana/k6/issues/711#issue-341414887
 	w := c.globalState.Logger.Writer()
 	stdlog.SetOutput(w)
-	c.loggersWg.Add(1)
-	go func() {
+	c.loggersWg.Go(func() {
 		<-stop
 		cancel()
 		_ = w.Close()
-		c.loggersWg.Done()
-	}()
+	})
 	return nil
 }
 
 func (c *rootCommand) setLoggerHook(ctx context.Context, h log.AsyncHook) {
-	c.loggersWg.Add(1)
-	go func() {
+	c.loggersWg.Go(func() {
 		h.Listen(ctx)
-		c.loggersWg.Done()
-	}()
+	})
 	c.globalState.Logger.AddHook(h)
 	c.globalState.Logger.SetOutput(io.Discard) // don't output to anywhere else
 }

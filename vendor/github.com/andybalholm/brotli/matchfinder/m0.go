@@ -22,7 +22,7 @@ func (M0) Reset() {}
 const (
 	m0HashLen = 5
 
-	m0TableBits = 14
+	m0TableBits = 16
 	m0TableSize = 1 << m0TableBits
 	m0Shift     = 32 - m0TableBits
 	// m0TableMask is redundant, but helps the compiler eliminate bounds
@@ -145,18 +145,24 @@ func (m M0) FindMatches(dst []Match, src []byte) []Match {
 		if m.Lazy {
 			// If lazy matching is enabled, we update the hash table for
 			// every byte in the match.
-			for i := origBase + 2; i < s-1; i++ {
+			for i := origBase + 2; i < s-3; i++ {
 				x := binary.LittleEndian.Uint64(src[i:])
 				table[m.hash(x)&m0TableMask] = uint16(i)
 			}
+		} else {
+			// We update the hash table only at base+1
+			x := binary.LittleEndian.Uint64(src[base+1:])
+			table[m.hash(x)&m0TableMask] = uint16(base + 1)
 		}
 
 		// We could immediately start working at s now, but to improve
-		// compression we first update the hash table at s-1 and at s.
-		x := binary.LittleEndian.Uint64(src[s-1:])
-		prevHash := m.hash(x >> 0)
+		// compression we first update the hash table.
+		x := binary.LittleEndian.Uint64(src[s-3:])
+		table[m.hash(x)&m0TableMask] = uint16(s - 3)
+		table[m.hash(x>>8)&m0TableMask] = uint16(s - 2)
+		prevHash := m.hash(x >> 16)
 		table[prevHash&m0TableMask] = uint16(s - 1)
-		nextHash = m.hash(x >> 8)
+		nextHash = m.hash(x >> 24)
 	}
 
 emitRemainder:

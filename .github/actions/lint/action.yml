@@ -5,9 +5,9 @@ runs:
   using: composite
   steps:
     - name: Install Go
-      uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
       with:
-        go-version: 1.25.x
+        go-version: 1.26.x
         check-latest: true
     - name: Get golangci-lint version and download rules
       shell: bash
