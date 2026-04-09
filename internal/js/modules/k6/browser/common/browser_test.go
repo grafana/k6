@@ -6,8 +6,10 @@ import (
 	"testing"
 	"time"
 
+	cdpbrowser "github.com/chromedp/cdproto/browser"
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/target"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
@@ -32,6 +34,7 @@ func TestBrowserNewPageInContext(t *testing.T) {
 	newTestCase := func(id cdp.BrowserContextID) *testCase {
 		ctx, cancel := context.WithCancel(context.Background())
 		b := newBrowser(context.Background(), ctx, cancel, nil, NewLocalBrowserOptions(), log.NewNullLogger())
+		b.conn = &recordingConn{}
 
 		// set a new browser context in the browser with `id`, so that newPageInContext can find it.
 		var err error
@@ -186,6 +189,202 @@ func TestBrowserNewPageInContext(t *testing.T) {
 		require.Error(t, err)
 		require.ErrorIs(t, err, context.Canceled)
 		require.Nil(t, page)
+	})
+}
+
+func TestBrowserPageForFrame(t *testing.T) {
+	t.Parallel()
+
+	newBrowserWithPage := func(t *testing.T, frameID cdp.FrameID) (*Browser, *Page) {
+		t.Helper()
+
+		ctx := context.Background()
+		b := newBrowser(ctx, ctx, nil, nil, NewLocalBrowserOptions(), log.NewNullLogger())
+
+		p := &Page{
+			targetID:     "page-1",
+			frameManager: NewFrameManager(ctx, nil, nil, &TimeoutSettings{}, log.NewNullLogger()),
+		}
+		p.frameManager.frames[frameID] = &Frame{}
+
+		b.pages["page-1"] = p
+		return b, p
+	}
+
+	t.Run("returns_page_for_known_frame", func(t *testing.T) {
+		t.Parallel()
+
+		b, want := newBrowserWithPage(t, "frame-1")
+		got := b.pageForFrame("frame-1")
+		require.Equal(t, want, got)
+	})
+
+	t.Run("returns_nil_for_unknown_frame", func(t *testing.T) {
+		t.Parallel()
+
+		b, _ := newBrowserWithPage(t, "frame-1")
+		got := b.pageForFrame("unknown-frame")
+		require.Nil(t, got)
+	})
+}
+
+func TestBrowserOnDownloadWillBegin(t *testing.T) {
+	t.Parallel()
+
+	t.Run("creates_download_and_stores_in_map", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := context.Background()
+		b := newBrowser(ctx, ctx, nil, nil, NewLocalBrowserOptions(), log.NewNullLogger())
+
+		// Create a page with a frame so pageForFrame can find it.
+		p := &Page{
+			targetID:      "page-1",
+			frameManager:  NewFrameManager(ctx, nil, nil, &TimeoutSettings{}, log.NewNullLogger()),
+			browserCtx:    &BrowserContext{DownloadsPath: "/tmp/dl"},
+			eventHandlers: make(map[PageEventName][]pageEventHandlerRecord),
+		}
+		const frameID cdp.FrameID = "frame-1"
+		p.frameManager.frames[frameID] = &Frame{}
+		b.pages["page-1"] = p
+
+		// Use the same pattern as the E2E tests to capture the download event.
+		done := make(chan struct{})
+		var gotDownload *Download
+
+		err := p.On(PageEventDownload, func(ev PageEvent) error {
+			gotDownload = ev.Download
+			close(done)
+			return nil
+		})
+		require.NoError(t, err)
+
+		ev := &cdpbrowser.EventDownloadWillBegin{
+			FrameID:           frameID,
+			GUID:              "dl-guid-1",
+			URL:               "https://example.com/file.zip",
+			SuggestedFilename: "file.zip",
+		}
+		b.onDownloadWillBegin(ev)
+
+		<-done
+
+		// Verify download was stored in the browser's map.
+		b.downloadsMu.Lock()
+		dl, ok := b.downloads["dl-guid-1"]
+		b.downloadsMu.Unlock()
+
+		require.True(t, ok)
+		require.NotNil(t, dl)
+		assert.Equal(t, "https://example.com/file.zip", dl.URL())
+		assert.Equal(t, "file.zip", dl.SuggestedFilename())
+
+		// Verify the page handler received the download.
+		require.NotNil(t, gotDownload)
+		assert.Equal(t, dl, gotDownload)
+		assert.Equal(t, p, gotDownload.Page())
+	})
+
+	t.Run("no_page_for_frame_logs_warning", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := context.Background()
+		b := newBrowser(ctx, ctx, nil, nil, NewLocalBrowserOptions(), log.NewNullLogger())
+
+		ev := &cdpbrowser.EventDownloadWillBegin{
+			FrameID:           "unknown-frame",
+			GUID:              "dl-guid-2",
+			URL:               "https://example.com/file.zip",
+			SuggestedFilename: "file.zip",
+		}
+		// Should not panic even with no matching page.
+		require.NotPanics(t, func() {
+			b.onDownloadWillBegin(ev)
+		})
+
+		// Download should not be stored.
+		b.downloadsMu.Lock()
+		_, ok := b.downloads["dl-guid-2"]
+		b.downloadsMu.Unlock()
+		assert.False(t, ok)
+	})
+}
+
+func TestBrowserOnDownloadProgress(t *testing.T) {
+	t.Parallel()
+
+	newBrowserWithDownload := func(guid string) (*Browser, *Download) {
+		ctx := context.Background()
+		b := newBrowser(ctx, ctx, nil, nil, NewLocalBrowserOptions(), log.NewNullLogger())
+		dl := newDownload(nil, guid, "https://example.com/file.zip", "file.zip", "/tmp/dl")
+		b.downloads[guid] = dl
+		return b, dl
+	}
+
+	t.Run("completed_finishes_download", func(t *testing.T) {
+		t.Parallel()
+
+		b, dl := newBrowserWithDownload("dl-1")
+		b.onDownloadProgress(&cdpbrowser.EventDownloadProgress{
+			GUID:  "dl-1",
+			State: cdpbrowser.DownloadProgressStateCompleted,
+		})
+
+		// Download should be finished with no error.
+		assert.Empty(t, dl.Failure())
+
+		// Should be removed from the map.
+		b.downloadsMu.Lock()
+		_, ok := b.downloads["dl-1"]
+		b.downloadsMu.Unlock()
+		assert.False(t, ok)
+	})
+
+	t.Run("canceled_finishes_download_with_error", func(t *testing.T) {
+		t.Parallel()
+
+		b, dl := newBrowserWithDownload("dl-2")
+		b.onDownloadProgress(&cdpbrowser.EventDownloadProgress{
+			GUID:  "dl-2",
+			State: cdpbrowser.DownloadProgressStateCanceled,
+		})
+
+		assert.Equal(t, "canceled", dl.Failure())
+
+		b.downloadsMu.Lock()
+		_, ok := b.downloads["dl-2"]
+		b.downloadsMu.Unlock()
+		assert.False(t, ok)
+	})
+
+	t.Run("unknown_guid_does_not_panic", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := context.Background()
+		b := newBrowser(ctx, ctx, nil, nil, NewLocalBrowserOptions(), log.NewNullLogger())
+
+		require.NotPanics(t, func() {
+			b.onDownloadProgress(&cdpbrowser.EventDownloadProgress{
+				GUID:  "nonexistent",
+				State: cdpbrowser.DownloadProgressStateCompleted,
+			})
+		})
+	})
+
+	t.Run("in_progress_state_does_not_finish", func(t *testing.T) {
+		t.Parallel()
+
+		b, _ := newBrowserWithDownload("dl-3")
+		b.onDownloadProgress(&cdpbrowser.EventDownloadProgress{
+			GUID:  "dl-3",
+			State: cdpbrowser.DownloadProgressStateInProgress,
+		})
+
+		// Download should still be in the map.
+		b.downloadsMu.Lock()
+		_, ok := b.downloads["dl-3"]
+		b.downloadsMu.Unlock()
+		assert.True(t, ok)
 	})
 }
 
