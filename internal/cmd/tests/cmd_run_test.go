@@ -100,7 +100,7 @@ func TestBinaryNameHelpStdout(t *testing.T) {
 
 	tests := []struct {
 		cmdName        string
-		extraCmd       string // For the `login cloud` cmd
+		extraCmd       string // For the `cloud login` cmd
 		containsOutput string
 	}{
 		{
@@ -112,9 +112,9 @@ func TestBinaryNameHelpStdout(t *testing.T) {
 			containsOutput: fmt.Sprintf("%s cloud script.js", ts.BinaryName),
 		},
 		{
-			cmdName:        "login",
-			extraCmd:       "cloud",
-			containsOutput: fmt.Sprintf("%s login cloud -t YOUR_TOKEN", ts.BinaryName),
+			cmdName:        "cloud",
+			extraCmd:       "login",
+			containsOutput: fmt.Sprintf("%s cloud login -t <YOUR_TOKEN>", ts.BinaryName),
 		},
 		{
 			cmdName:        "run",
