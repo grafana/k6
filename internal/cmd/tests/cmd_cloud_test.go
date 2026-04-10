@@ -45,6 +45,19 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 		assert.Contains(t, stdout, `must first authenticate`)
 	})
 
+	t.Run("TestCloudStackNotConfigured", func(t *testing.T) {
+		t.Parallel()
+
+		ts := getSimpleCloudTestState(t, nil, setupCmd, nil, nil, nil)
+		delete(ts.Env, "K6_CLOUD_STACK_ID")
+		ts.ExpectedExitCode = -1
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stdout := ts.Stdout.String()
+		t.Log(stdout)
+		assert.Contains(t, stdout, `stack must be configured`)
+	})
+
 	t.Run("TestCloudLoggedInWithScriptToken", func(t *testing.T) {
 		t.Parallel()
 
@@ -196,9 +209,10 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "archive.tar"), data, 0o644))
 
 		ts.CmdArgs = []string{"k6", "cloud", "--verbose", "--log-output=stdout", "archive.tar"}
-		ts.Env["K6_SHOW_CLOUD_LOGS"] = "false" // no mock for the logs yet
+		ts.Env["K6_SHOW_CLOUD_LOGS"] = "false"  // no mock for the logs yet
 		ts.Env["K6_CLOUD_HOST"] = srv.URL
-		ts.Env["K6_CLOUD_TOKEN"] = "foo" // doesn't matter, we mock the cloud
+		ts.Env["K6_CLOUD_TOKEN"] = "foo"        // doesn't matter, we mock the cloud
+		ts.Env["K6_CLOUD_STACK_ID"] = "1234"    // doesn't matter, we mock the cloud
 
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
@@ -317,9 +331,11 @@ func getSimpleCloudTestState(t *testing.T, script []byte, setupCmd setupCommandF
 	ts := NewGlobalTestState(t)
 	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test.js"), script, 0o644))
 	ts.CmdArgs = setupCmd(cliFlags)
-	ts.Env["K6_SHOW_CLOUD_LOGS"] = "false" // no mock for the logs yet
+	ts.Env["K6_SHOW_CLOUD_LOGS"] = "false"  // no mock for the logs yet
 	ts.Env["K6_CLOUD_HOST"] = srv.URL
-	ts.Env["K6_CLOUD_TOKEN"] = "foo" // doesn't matter, we mock the cloud
+	ts.Env["K6_CLOUD_TOKEN"] = "foo"        // doesn't matter, we mock the cloud
+	ts.Env["K6_CLOUD_STACK_ID"] = "1234"    // doesn't matter, we mock the cloud
+	ts.Env["K6_CLOUD_PROJECT_ID"] = "1234"  // doesn't matter, we mock the cloud
 
 	return ts
 }
