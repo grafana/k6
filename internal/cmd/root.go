@@ -20,7 +20,6 @@ import (
 	"go.k6.io/k6/v2/errext"
 	"go.k6.io/k6/v2/errext/exitcodes"
 	"go.k6.io/k6/v2/ext"
-	"go.k6.io/k6/v2/internal/build"
 	"go.k6.io/k6/v2/internal/log"
 	"go.k6.io/k6/v2/secretsource"
 
