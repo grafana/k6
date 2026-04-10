@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"sync"
 
-	"go.k6.io/k6/internal/js/modules/k6/browser/log"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/log"
 
 	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/cdp"
