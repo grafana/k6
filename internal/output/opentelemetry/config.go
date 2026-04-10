@@ -68,11 +68,6 @@ type Config struct {
 	// GRPCExporterInsecure disables client transport security for the Exporter's gRPC
 	// connection.
 	GRPCExporterInsecure null.Bool `json:"grpcExporterInsecure" envconfig:"K6_OTEL_GRPC_EXPORTER_INSECURE"`
-
-	// SingleCounterForRate sets the feature flag defining how to export metrics defined as Rate type.
-	// When it is set to true, metrics are exported as a single counter, using an attribute as discriminator.
-	// When the opposite, the old method is used generating two different counters.
-	SingleCounterForRate null.Bool `json:"singleCounterForRate" envconfig:"K6_OTEL_SINGLE_COUNTER_FOR_RATE"`
 }
 
 // GetConsolidatedConfig combines the options' values from the different sources
@@ -123,8 +118,6 @@ func newDefaultConfig() Config {
 
 		ExportInterval: types.NewNullDuration(10*time.Second, false),
 		FlushInterval:  types.NewNullDuration(1*time.Second, false),
-
-		SingleCounterForRate: null.NewBool(true, false),
 	}
 }
 
@@ -192,10 +185,6 @@ func (cfg Config) Apply(v Config) Config {
 
 	if v.Headers.Valid {
 		cfg.Headers = v.Headers
-	}
-
-	if v.SingleCounterForRate.Valid {
-		cfg.SingleCounterForRate = v.SingleCounterForRate
 	}
 
 	return cfg
