@@ -211,15 +211,15 @@ export const options = {
 
 export default function() {};`
 
-		ts := makeTestState(t, script, []string{"--local-execution"}, 0)
+		ts := makeTestState(t, script, []string{"--local-execution", "--log-output=stdout"}, 0)
 		ts.ExpectedExitCode = -1
 		delete(ts.Env, "K6_CLOUD_STACK_ID")
 
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
-		stderr := ts.Stderr.String()
-		t.Log(stderr)
-		assert.Contains(t, stderr, "stack must be configured")
+		stdout := ts.Stdout.String()
+		t.Log(stdout)
+		assert.Contains(t, stdout, "stack must be configured")
 	})
 }
 
