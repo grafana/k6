@@ -1,9 +1,7 @@
 package tests
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -125,24 +123,6 @@ func mockValidateTokenServer(t *testing.T) *httptest.Server {
 
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		switch req.URL.Path {
-		// v1 path to validate token only
-		case "/v1/validate-token":
-			body, err := io.ReadAll(req.Body)
-			require.NoError(t, err)
-
-			var payload map[string]any
-			err = json.Unmarshal(body, &payload)
-			require.NoError(t, err)
-
-			assert.Contains(t, payload, "token")
-			if payload["token"] == validToken {
-				_, err = fmt.Fprintf(w, `{"is_valid": true, "message": "Token is valid"}`)
-				require.NoError(t, err)
-				return
-			}
-			_, err = fmt.Fprintf(w, `{"is_valid": false, "message": "Token is invalid"}`)
-			require.NoError(t, err)
-
 		// v6 path to validate token and stack
 		case "/cloud/v6/auth":
 			authHeader := req.Header.Get("Authorization")
