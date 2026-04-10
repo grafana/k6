@@ -1,4 +1,4 @@
-FROM debian:bullseye-20250811@sha256:8ec25a9073e8cc89a184a6256e219828196d75203375a8ad4f0977f3011f2115
+FROM debian:bullseye-20260406@sha256:bf53effcacca31b60ce97dabc67578f37e43075d716dc90804d3da3a80d2996c
 
 LABEL maintainer="k6 Developers <developers@k6.io>"
 
