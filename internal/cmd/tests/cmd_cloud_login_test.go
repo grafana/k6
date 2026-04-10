@@ -33,12 +33,11 @@ func TestCloudLoginWithArgs(t *testing.T) {
 		wantStdoutContains []string
 	}{
 		{
-			name:    "valid token",
+			name:    "valid token without stack fails",
 			token:   validToken,
-			wantErr: false,
+			wantErr: true,
 			wantStdoutContains: []string{
-				"Logged in successfully",
-				fmt.Sprintf("token: %s", validToken),
+				"stack must be configured",
 			},
 		},
 		{
@@ -55,20 +54,20 @@ func TestCloudLoginWithArgs(t *testing.T) {
 			},
 		},
 		{
-			name:    "valid token and 'None' stack",
+			name:    "valid token and 'None' stack fails",
 			token:   validToken,
 			stack:   "None",
-			wantErr: false,
+			wantErr: true,
 			wantStdoutContains: []string{
-				"Logged in successfully",
-				fmt.Sprintf("token: %s", validToken),
+				"stack must be configured",
 			},
 		},
 		{
-			name:               "invalid token",
+			name:               "invalid token and valid stack",
 			token:              "invalid-token",
+			stack:              validStack,
 			wantErr:            true,
-			wantStdoutContains: []string{"your API token is invalid"},
+			wantStdoutContains: []string{"your stack is invalid"},
 		},
 		{
 			name:               "valid token and invalid stack",

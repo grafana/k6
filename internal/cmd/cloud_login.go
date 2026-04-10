@@ -224,53 +224,23 @@ func validateInputs(
 		gs.Logger.Warn(warn)
 	}
 
-	stackValue := stackInput.String
-	if stackInput.Valid && stackValue != "" && stackValue != "None" {
-		stackURL, stackID, defaultProjectID, err := validateTokenV6(
-			gs, consolidatedCurrentConfig, token.String, stackValue)
-		if err != nil {
-			return fmt.Errorf(
-				"your stack is invalid - please, consult the documentation "+
-					"for instructions on how to get yours: "+
-					"https://grafana.com/docs/grafana-cloud/testing/k6/author-run/configure-stack. "+
-					"Error details: %w",
-				err)
-		}
-		config.StackURL = null.StringFrom(stackURL)
-		config.StackID = null.IntFrom(stackID)
-		config.DefaultProjectID = null.IntFrom(defaultProjectID)
-	} else {
-		err = validateTokenV1(gs, consolidatedCurrentConfig, config.Token.String)
-		if err != nil {
-			return err
-		}
+	stackValue := strings.TrimSpace(stackInput.String)
+	if !stackInput.Valid || stackValue == "" || stackValue == "None" {
+		return errStackNotConfigured
 	}
-
-	return nil
-}
-
-// validateTokenV1 validates a token using v1 cloud API.
-//
-// Deprecated: use validateTokenV6 instead if a stack name is provided.
-func validateTokenV1(gs *state.GlobalState, config cloudapi.Config, token string) error {
-	client := cloudapi.NewClient(
-		gs.Logger,
-		token,
-		config.Host.String,
-		build.Version,
-		config.Timeout.TimeDuration(),
-	)
-
-	res, err := client.ValidateToken()
+	stackURL, stackID, defaultProjectID, err := validateTokenV6(
+		gs, consolidatedCurrentConfig, token.String, stackValue)
 	if err != nil {
-		return fmt.Errorf("can't validate the API token: %s", err.Error())
+		return fmt.Errorf(
+			"your stack is invalid - please, consult the documentation "+
+				"for instructions on how to get yours: "+
+				"https://grafana.com/docs/grafana-cloud/testing/k6/author-run/configure-stack. "+
+				"Error details: %w",
+			err)
 	}
-
-	if !res.IsValid {
-		return errors.New("your API token is invalid - " +
-			"please, consult the documentation for instructions on how to generate a new one:\n" +
-			"https://grafana.com/docs/grafana-cloud/testing/k6/author-run/tokens-and-cli-authentication")
-	}
+	config.StackURL = null.StringFrom(stackURL)
+	config.StackID = null.IntFrom(stackID)
+	config.DefaultProjectID = null.IntFrom(defaultProjectID)
 
 	return nil
 }
