@@ -197,6 +197,30 @@ export default function() {
 		assert.Contains(t, stdout, "output: cloud (https://app.k6.io/runs/1337)")
 		assert.Contains(t, stdout, "The test run id is "+strconv.Itoa(testRunID))
 	})
+
+	t.Run("should error when no stack is configured", func(t *testing.T) {
+		t.Parallel()
+
+		script := `
+export const options = {
+  cloud: {
+      name: 'Hello k6 Cloud!',
+      projectID: 123456,
+  },
+};
+
+export default function() {};`
+
+		ts := makeTestState(t, script, []string{"--local-execution", "--log-output=stdout"}, 0)
+		ts.ExpectedExitCode = -1
+		delete(ts.Env, "K6_CLOUD_STACK_ID")
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stdout := ts.Stdout.String()
+		t.Log(stdout)
+		assert.Contains(t, stdout, "stack must be configured")
+	})
 }
 
 func makeTestState(tb testing.TB, script string, cliFlags []string, expExitCode exitcodes.ExitCode) *GlobalTestState {
@@ -208,7 +232,8 @@ func makeTestState(tb testing.TB, script string, cliFlags []string, expExitCode 
 	require.NoError(tb, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test.js"), []byte(script), 0o644))
 	ts.CmdArgs = append(append([]string{"k6", "cloud", "run"}, cliFlags...), "test.js")
 	ts.ExpectedExitCode = int(expExitCode)
-	ts.Env["K6_CLOUD_TOKEN"] = "foo" // doesn't matter, we mock the cloud
+	ts.Env["K6_CLOUD_TOKEN"] = "foo"      // doesn't matter, we mock the cloud
+	ts.Env["K6_CLOUD_STACK_ID"] = "1234"  // doesn't matter, we mock the cloud
 
 	return ts
 }

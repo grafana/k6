@@ -1,9 +1,7 @@
 package tests
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -33,12 +31,11 @@ func TestCloudLoginWithArgs(t *testing.T) {
 		wantStdoutContains []string
 	}{
 		{
-			name:    "valid token",
+			name:    "valid token without stack fails",
 			token:   validToken,
-			wantErr: false,
+			wantErr: true,
 			wantStdoutContains: []string{
-				"Logged in successfully",
-				fmt.Sprintf("token: %s", validToken),
+				"stack must be configured",
 			},
 		},
 		{
@@ -55,20 +52,20 @@ func TestCloudLoginWithArgs(t *testing.T) {
 			},
 		},
 		{
-			name:    "valid token and 'None' stack",
+			name:    "valid token and 'None' stack fails",
 			token:   validToken,
 			stack:   "None",
-			wantErr: false,
+			wantErr: true,
 			wantStdoutContains: []string{
-				"Logged in successfully",
-				fmt.Sprintf("token: %s", validToken),
+				"stack must be configured",
 			},
 		},
 		{
-			name:               "invalid token",
+			name:               "invalid token and valid stack",
 			token:              "invalid-token",
+			stack:              validStack,
 			wantErr:            true,
-			wantStdoutContains: []string{"your API token is invalid"},
+			wantStdoutContains: []string{"your stack is invalid"},
 		},
 		{
 			name:               "valid token and invalid stack",
@@ -126,24 +123,6 @@ func mockValidateTokenServer(t *testing.T) *httptest.Server {
 
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		switch req.URL.Path {
-		// v1 path to validate token only
-		case "/v1/validate-token":
-			body, err := io.ReadAll(req.Body)
-			require.NoError(t, err)
-
-			var payload map[string]any
-			err = json.Unmarshal(body, &payload)
-			require.NoError(t, err)
-
-			assert.Contains(t, payload, "token")
-			if payload["token"] == validToken {
-				_, err = fmt.Fprintf(w, `{"is_valid": true, "message": "Token is valid"}`)
-				require.NoError(t, err)
-				return
-			}
-			_, err = fmt.Fprintf(w, `{"is_valid": false, "message": "Token is invalid"}`)
-			require.NoError(t, err)
-
 		// v6 path to validate token and stack
 		case "/cloud/v6/auth":
 			authHeader := req.Header.Get("Authorization")
