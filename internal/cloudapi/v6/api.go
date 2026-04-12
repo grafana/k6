@@ -73,6 +73,91 @@ func (c *Client) ValidateOptions(ctx context.Context, projectID int32, opts lib.
 	return nil
 }
 
+// UploadTest creates or updates a cloud load test's script.
+func (c *Client) UploadTest(
+	ctx context.Context, name string, projectID int32, arc *lib.Archive,
+) (*k6cloud.LoadTestApiModel, error) {
+	lt, err := c.createTest(ctx, name, projectID, arc)
+	if err == nil {
+		return lt, nil
+	}
+	var rerr ResponseError
+	if !errors.As(err, &rerr) || rerr.Response == nil || rerr.Response.StatusCode != http.StatusConflict {
+		return nil, err
+	}
+
+	// 409: a test with this name already exists in this project. Look it
+	// up by exact-match filter and update its script.
+	lt, err = c.findTestByName(ctx, projectID, name)
+	if err != nil {
+		return nil, err
+	}
+	if err := c.updateScript(ctx, lt.GetId(), arc); err != nil {
+		return nil, err
+	}
+
+	return lt, nil
+}
+
+// createTest creates a new cloud load test in the given project.
+func (c *Client) createTest(
+	ctx context.Context, name string, projectID int32, arc *lib.Archive,
+) (_ *k6cloud.LoadTestApiModel, err error) {
+	res, hr, err := c.apiClient.LoadTestsAPI.
+		ProjectsLoadTestsCreate(c.authCtx(ctx), projectID).
+		XStackId(c.stackID).
+		Name(name).
+		Script(archiveReader(arc)).
+		Execute()
+	defer closeResponse(hr, &err)
+
+	if err := CheckResponse(hr, err); err != nil {
+		return nil, err
+	}
+	if res == nil {
+		return nil, errUnknown
+	}
+
+	return res, nil
+}
+
+func (c *Client) findTestByName(
+	ctx context.Context, projectID int32, name string,
+) (_ *k6cloud.LoadTestApiModel, err error) {
+	res, hr, err := c.apiClient.LoadTestsAPI.
+		ProjectsLoadTestsRetrieve(c.authCtx(ctx), projectID).
+		XStackId(c.stackID).
+		Name(name).
+		Top(1).
+		Execute()
+	defer closeResponse(hr, &err)
+
+	if err := CheckResponse(hr, err); err != nil {
+		return nil, err
+	}
+	if res == nil {
+		return nil, errUnknown
+	}
+
+	tests := res.GetValue()
+	if len(tests) == 0 {
+		return nil, errUnknown
+	}
+
+	return &tests[0], nil
+}
+
+func (c *Client) updateScript(ctx context.Context, testID int32, arc *lib.Archive) (err error) {
+	res, err := c.apiClient.LoadTestsAPI.
+		LoadTestsScriptUpdate(c.authCtx(ctx), testID).
+		XStackId(c.stackID).
+		Body(archiveReader(arc)).
+		Execute()
+	defer closeResponse(res, &err)
+
+	return CheckResponse(res, err)
+}
+
 func (c *Client) authCtx(ctx context.Context) context.Context {
 	return context.WithValue(ctx, k6cloud.ContextAccessToken, c.token)
 }

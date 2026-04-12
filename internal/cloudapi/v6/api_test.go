@@ -1,18 +1,23 @@
 package cloudapi
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 
+	k6cloud "github.com/grafana/k6-cloud-openapi-client-go/k6"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.k6.io/k6/v2/internal/build"
 	"go.k6.io/k6/v2/internal/lib/testutils"
 	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/lib/fsext"
 	"go.k6.io/k6/v2/lib/types"
 	"gopkg.in/guregu/null.v3"
 )
@@ -135,6 +140,98 @@ func TestValidateOptions(t *testing.T) {
 	assert.Equal(t, int32(42), body.ProjectID)
 }
 
+func TestUploadTest(t *testing.T) {
+	t.Parallel()
+
+	newTestArchive := func(t *testing.T) *lib.Archive {
+		t.Helper()
+
+		fs := fsext.NewMemMapFs()
+		require.NoError(t, fsext.WriteFile(fs, "/a.js", []byte(`// c`), 0o644))
+		return &lib.Archive{
+			Type:        "js",
+			K6Version:   build.Version,
+			FilenameURL: &url.URL{Scheme: "file", Path: "/a.js"},
+			PwdURL:      &url.URL{Scheme: "file", Path: "/"},
+			Data:        []byte(`// c`),
+			Filesystems: map[string]fsext.Fs{"file": fs},
+		}
+	}
+
+	loadTest := k6cloud.NewLoadTestApiModelWithDefaults()
+	loadTest.SetId(42)
+
+	t.Run("creates new on success", func(t *testing.T) {
+		t.Parallel()
+
+		var script []byte
+		client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if !assert.NoError(t, r.ParseMultipartForm(1<<20)) {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			f, _, err := r.FormFile("script")
+			if !assert.NoError(t, err) {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			script, err = io.ReadAll(f)
+			if !assert.NoError(t, err) {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			writeJSON(t, w, http.StatusCreated, loadTest)
+		}))
+		arc := newTestArchive(t)
+		got, err := client.UploadTest(t.Context(), "test", 1, arc)
+		require.NoError(t, err)
+		assertJSONEqual(t, loadTest, got)
+		assertArchiveEqual(t, arc, script)
+	})
+
+	t.Run("updates existing on 409", func(t *testing.T) {
+		t.Parallel()
+
+		var script []byte
+		client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.Method {
+			case http.MethodPost:
+				writeError(t, w, http.StatusConflict, "conflict", "already exists")
+			case http.MethodGet:
+				writeJSON(t, w, http.StatusOK, map[string]any{"value": []any{loadTest}})
+			case http.MethodPut:
+				var err error
+				script, err = io.ReadAll(r.Body)
+				if !assert.NoError(t, err) {
+					w.WriteHeader(http.StatusBadRequest)
+					return
+				}
+				w.WriteHeader(http.StatusNoContent)
+			}
+		}))
+		arc := newTestArchive(t)
+		got, err := client.UploadTest(t.Context(), "test", 1, arc)
+		require.NoError(t, err)
+		assertJSONEqual(t, loadTest, got)
+		assertArchiveEqual(t, arc, script)
+	})
+
+	t.Run("fails when not found", func(t *testing.T) {
+		t.Parallel()
+
+		client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.Method {
+			case http.MethodPost:
+				writeError(t, w, http.StatusConflict, "conflict", "already exists")
+			case http.MethodGet:
+				writeJSON(t, w, http.StatusOK, map[string]any{"value": []any{}})
+			}
+		}))
+		_, err := client.UploadTest(t.Context(), "test", 1, newTestArchive(t))
+		assert.ErrorIs(t, err, errUnknown)
+	})
+}
+
 func newTestClient(t *testing.T, handler http.Handler) *Client {
 	t.Helper()
 
@@ -168,4 +265,20 @@ func fprint(t *testing.T, w io.Writer, format string) int {
 	n, err := fmt.Fprint(w, format)
 	assert.NoError(t, err)
 	return n
+}
+
+func assertJSONEqual(t *testing.T, want, got any) {
+	t.Helper()
+	w, err := json.Marshal(want)
+	require.NoError(t, err)
+	g, err := json.Marshal(got)
+	require.NoError(t, err)
+	assert.JSONEq(t, string(w), string(g))
+}
+
+func assertArchiveEqual(t *testing.T, want *lib.Archive, got []byte) {
+	t.Helper()
+	var b bytes.Buffer
+	require.NoError(t, want.Write(&b))
+	assert.Equal(t, b.Bytes(), got)
 }
