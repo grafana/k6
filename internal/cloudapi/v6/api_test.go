@@ -232,6 +232,48 @@ func TestUploadTest(t *testing.T) {
 	})
 }
 
+func TestStartTest(t *testing.T) {
+	t.Parallel()
+
+	res := k6cloud.NewStartLoadTestResponseWithDefaults()
+	res.SetId(7)
+	res.SetDistribution([]k6cloud.DistributionZoneApiModel{})
+	res.SetResultDetails(map[string]any{})
+	res.SetOptions(map[string]any{})
+
+	client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Contains(t, r.URL.Path, "/42/start")
+		assert.Regexpf(t, `^[0-9a-f]{16}$`, r.Header.Get("K6-Idempotency-Key"),
+			"missing or invalid K6-Idempotency-Key header")
+		writeJSON(t, w, http.StatusOK, res)
+	}))
+
+	got, err := client.StartTest(t.Context(), 42)
+	require.NoError(t, err)
+	assertJSONEqual(t, res, got)
+}
+
+func TestStopTest(t *testing.T) {
+	t.Parallel()
+
+	t.Run("no content succeeds", func(t *testing.T) {
+		t.Parallel()
+		client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Contains(t, r.URL.Path, "/42/abort")
+			w.WriteHeader(http.StatusNoContent)
+		}))
+		require.NoError(t, client.StopTest(t.Context(), 42))
+	})
+	t.Run("already stopped is swallowed", func(t *testing.T) {
+		t.Parallel()
+		client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Contains(t, r.URL.Path, "/42/abort")
+			writeError(t, w, http.StatusConflict, "conflict", "already stopped")
+		}))
+		require.NoError(t, client.StopTest(t.Context(), 42))
+	})
+}
+
 func newTestClient(t *testing.T, handler http.Handler) *Client {
 	t.Helper()
 
