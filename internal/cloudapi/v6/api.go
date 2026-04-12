@@ -2,6 +2,8 @@ package cloudapi
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -156,6 +158,47 @@ func (c *Client) updateScript(ctx context.Context, testID int32, arc *lib.Archiv
 	defer closeResponse(res, &err)
 
 	return CheckResponse(res, err)
+}
+
+// StartTest starts a cloud load test run.
+func (c *Client) StartTest(ctx context.Context, loadTestID int32) (_ *k6cloud.StartLoadTestResponse, err error) {
+	var key [8]byte
+	if _, err := rand.Read(key[:]); err != nil {
+		return nil, err
+	}
+
+	res, hr, err := c.apiClient.LoadTestsAPI.
+		LoadTestsStart(c.authCtx(ctx), loadTestID).
+		XStackId(c.stackID).
+		K6IdempotencyKey(hex.EncodeToString(key[:])).
+		Execute()
+	defer closeResponse(hr, &err)
+
+	if err := CheckResponse(hr, err); err != nil {
+		return nil, err
+	}
+	if res == nil {
+		return nil, errUnknown
+	}
+
+	return res, nil
+}
+
+// StopTest aborts a running cloud test run.
+func (c *Client) StopTest(ctx context.Context, testRunID int32) (err error) {
+	hr, err := c.apiClient.TestRunsAPI.
+		TestRunsAbort(c.authCtx(ctx), testRunID).
+		XStackId(c.stackID).
+		Execute()
+	defer closeResponse(hr, &err)
+
+	err = CheckResponse(hr, err)
+	var rerr ResponseError
+	if errors.As(err, &rerr) && rerr.Response != nil && rerr.Response.StatusCode == http.StatusConflict {
+		return nil // Already stopped: swallow the error to keep the caller/TUI clean.
+	}
+
+	return err
 }
 
 func (c *Client) authCtx(ctx context.Context) context.Context {
