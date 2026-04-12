@@ -201,6 +201,30 @@ func (c *Client) StopTest(ctx context.Context, testRunID int32) (err error) {
 	return err
 }
 
+// FetchTest fetches the current progress of a cloud test run.
+func (c *Client) FetchTest(ctx context.Context, testRunID int32) (_ *TestProgress, err error) {
+	res, hr, err := c.apiClient.TestRunsAPI.
+		TestRunsRetrieve(c.authCtx(ctx), testRunID).
+		XStackId(c.stackID).
+		Execute()
+	defer closeResponse(hr, &err)
+
+	if err := CheckResponse(hr, err); err != nil {
+		return nil, err
+	}
+	if res == nil {
+		return nil, errUnknown
+	}
+
+	return &TestProgress{
+		Status:            Status(res.GetStatus()),
+		Result:            Result(res.GetResult()),
+		EstimatedDuration: res.GetEstimatedDuration(),
+		ExecutionDuration: res.GetExecutionDuration(),
+		StatusHistory:     FromStatusModel(res.GetStatusHistory()),
+	}, nil
+}
+
 func (c *Client) authCtx(ctx context.Context) context.Context {
 	return context.WithValue(ctx, k6cloud.ContextAccessToken, c.token)
 }

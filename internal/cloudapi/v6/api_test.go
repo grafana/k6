@@ -274,6 +274,43 @@ func TestStopTest(t *testing.T) {
 	})
 }
 
+func TestFetchTest(t *testing.T) {
+	t.Parallel()
+
+	want := &TestProgress{
+		Status:            StatusRunning,
+		Result:            ResultFailed,
+		EstimatedDuration: 120,
+		ExecutionDuration: 60,
+		StatusHistory: []StatusEvent{{
+			Status:  StatusCreated,
+			Entered: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+			ByUser:  "u@e.com",
+			Code:    3,
+			Message: "boom",
+		}},
+	}
+
+	res := k6cloud.NewTestRunApiModelWithDefaults()
+	res.SetStatus(want.Status.String())
+	res.SetResult(want.Result.String())
+	res.SetEstimatedDuration(want.EstimatedDuration)
+	res.SetExecutionDuration(want.ExecutionDuration)
+	res.SetStatusHistory(ToStatusModel(want.StatusHistory))
+	res.SetDistribution([]k6cloud.DistributionZoneApiModel{*k6cloud.NewDistributionZoneApiModelWithDefaults()})
+	res.SetResultDetails(map[string]any{"foo": "bar"})
+	res.SetOptions(map[string]any{"vus": 10})
+
+	client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Contains(t, r.URL.Path, "/test_runs/42")
+		writeJSON(t, w, http.StatusOK, res)
+	}))
+
+	got, err := client.FetchTest(t.Context(), 42)
+	require.NoError(t, err)
+	assert.Equal(t, want, got)
+}
+
 func newTestClient(t *testing.T, handler http.Handler) *Client {
 	t.Helper()
 
