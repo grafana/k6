@@ -20,6 +20,9 @@ const (
 	grpcExporterProtocol = "grpc"
 	// httpExporterProtocol HTTP exporter protocol
 	httpExporterProtocol = "http/protobuf"
+
+	deprecatedExporterTypeEnvVar  = "K6_OTEL_EXPORTER_TYPE"
+	deprecatedExporterTypeJSONKey = "exporterType"
 )
 
 // Config represents the configuration for the OpenTelemetry output
@@ -274,6 +277,14 @@ func (cfg Config) String() string {
 // parseJSON parses the supplied JSON into a Config.
 func parseJSON(data json.RawMessage) (Config, error) {
 	var c Config
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return c, err
+	}
+	if _, ok := raw[deprecatedExporterTypeJSONKey]; ok {
+		return c, fmt.Errorf("%q is no longer supported, use %q instead",
+			deprecatedExporterTypeJSONKey, "exporterProtocol")
+	}
 	err := json.Unmarshal(data, &c)
 	return c, err
 }
@@ -281,6 +292,11 @@ func parseJSON(data json.RawMessage) (Config, error) {
 // parseEnvs parses the supplied environment variables into a Config.
 func parseEnvs(env map[string]string) (Config, error) {
 	cfg := Config{}
+
+	if _, ok := env[deprecatedExporterTypeEnvVar]; ok {
+		return cfg, fmt.Errorf("%s is no longer supported, use K6_OTEL_EXPORTER_PROTOCOL instead",
+			deprecatedExporterTypeEnvVar)
+	}
 
 	if serviceName, ok := env["OTEL_SERVICE_NAME"]; ok {
 		cfg.ServiceName = null.StringFrom(serviceName)

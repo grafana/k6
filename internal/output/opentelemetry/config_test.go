@@ -188,6 +188,17 @@ func TestConfig(t *testing.T) {
 			env: map[string]string{"K6_OTEL_GRPC_EXPORTER_ENDPOINT": "else", "K6_OTEL_EXPORT_INTERVAL": "4m", "K6_OTEL_EXPORTER_PROTOCOL": "socket"},
 			err: `error validating OpenTelemetry output config: unsupported exporter protocol "socket", only "grpc" and "http/protobuf" are supported`,
 		},
+		"deprecated exporter type env var": {
+			env: map[string]string{
+				"K6_OTEL_EXPORTER_TYPE":          "http",
+				"K6_OTEL_HTTP_EXPORTER_ENDPOINT": "collector:4318",
+			},
+			err: `K6_OTEL_EXPORTER_TYPE is no longer supported, use K6_OTEL_EXPORTER_PROTOCOL instead`,
+		},
+		"deprecated exporter type JSON field": {
+			jsonRaw: json.RawMessage(`{"exporterType":"http","httpExporterEndpoint":"collector:4318","httpExporterURLPath":"/v1/metrics"}`),
+			err:     `"exporterType" is no longer supported, use "exporterProtocol" instead`,
+		},
 
 		"missing required": {
 			jsonRaw: json.RawMessage(`{"exporterProtocol":"http/protobuf","httpExporterEndpoint":"","httpExporterURLPath":"/lorem/ipsum"}`),
