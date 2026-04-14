@@ -102,6 +102,16 @@ func TestValidateToken(t *testing.T) {
 	})
 }
 
+func TestClientRetry(t *testing.T) {
+	t.Parallel()
+
+	client, err := NewClient(testutils.NewLogger(t), "test-token", "http://example.com", "1.0", 1*time.Second)
+	require.NoError(t, err)
+	// the client already tests retries. we just verify we set it up correctly.
+	assert.Equal(t, MaxRetries, client.apiClient.GetConfig().MaxRetries)
+	assert.Equal(t, RetryInterval, client.apiClient.GetConfig().RetryInterval)
+}
+
 func fprint(t *testing.T, w io.Writer, format string) int {
 	n, err := fmt.Fprint(w, format)
 	require.NoError(t, err)

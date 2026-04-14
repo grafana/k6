@@ -26,9 +26,6 @@ type Client struct {
 	baseURL   string
 
 	logger logrus.FieldLogger
-
-	retries       int
-	retryInterval time.Duration
 }
 
 // NewClient return a new client for the cloud API
@@ -48,15 +45,15 @@ func NewClient(logger logrus.FieldLogger, token, host, version string, timeout t
 		},
 		OperationServers: map[string]k6cloud.ServerConfigurations{},
 		HTTPClient:       &http.Client{Timeout: timeout},
+		MaxRetries:       MaxRetries,
+		RetryInterval:    RetryInterval,
 	}
 
 	c := &Client{
-		apiClient:     k6cloud.NewAPIClient(cfg),
-		token:         token,
-		baseURL:       fmt.Sprintf("%s/cloud/v6", host),
-		retries:       MaxRetries,
-		retryInterval: RetryInterval,
-		logger:        logger,
+		apiClient: k6cloud.NewAPIClient(cfg),
+		token:     token,
+		baseURL:   fmt.Sprintf("%s/cloud/v6", host),
+		logger:    logger,
 	}
 	return c, nil
 }
