@@ -1,7 +1,6 @@
 package opentelemetry
 
 import (
-	"github.com/mstoykov/atlas"
 	"go.k6.io/k6/metrics"
 	"go.opentelemetry.io/otel/attribute"
 )
@@ -9,19 +8,16 @@ import (
 // newAttributeSet converts a k6 tag set into
 // the equivalent set of opentelemetry attributes
 func newAttributeSet(t *metrics.TagSet) attribute.Set {
-	n := (*atlas.Node)(t)
-	if n.Len() < 1 {
+	if t.Len() < 1 {
 		return *attribute.EmptySet()
 	}
-	labels := make([]attribute.KeyValue, 0, n.Len())
-	for !n.IsRoot() {
-		prev, key, value := n.Data()
-		n = prev
+	labels := make([]attribute.KeyValue, 0, t.Len())
+	t.ForEach(func(key, value string) {
 		if key == "" || value == "" {
-			continue
+			return
 		}
 		labels = append(labels, attribute.String(key, value))
-	}
+	})
 
 	return attribute.NewSet(labels...)
 }

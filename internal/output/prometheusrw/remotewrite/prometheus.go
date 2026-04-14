@@ -5,7 +5,6 @@ import (
 	"slices"
 
 	prompb "buf.build/gen/go/prometheus/prometheus/protocolbuffers/go"
-	"github.com/mstoykov/atlas"
 	"go.k6.io/k6/metrics"
 )
 
@@ -15,19 +14,16 @@ const namelbl = "__name__"
 // the equivalent set of Labels as expected from the
 // Prometheus' data model.
 func MapTagSet(t *metrics.TagSet) []*prompb.Label {
-	n := (*atlas.Node)(t)
-	if n.Len() < 1 {
+	if t.Len() < 1 {
 		return nil
 	}
-	labels := make([]*prompb.Label, 0, n.Len())
-	for !n.IsRoot() {
-		prev, key, value := n.Data()
-		n = prev
+	labels := make([]*prompb.Label, 0, t.Len())
+	t.ForEach(func(key, value string) {
 		if key == "" || value == "" {
-			continue
+			return
 		}
 		labels = append(labels, &prompb.Label{Name: key, Value: value})
-	}
+	})
 	return labels
 }
 

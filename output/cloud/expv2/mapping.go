@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mstoykov/atlas"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"go.k6.io/k6/internal/ds/histogram"
@@ -14,22 +13,18 @@ import (
 
 // TODO: unit test
 func mapTimeSeriesLabelsProto(tags *metrics.TagSet) ([]*pbcloud.Label, []string) {
-	labels := make([]*pbcloud.Label, 0, ((*atlas.Node)(tags)).Len())
+	labels := make([]*pbcloud.Label, 0, tags.Len())
 	var discardedLabels []string
 
 	// TODO: move this as a shared func
 	// https://github.com/grafana/k6/issues/2764
-	n := (*atlas.Node)(tags)
-	if n.Len() < 1 {
+	if tags.Len() < 1 {
 		return labels, discardedLabels
 	}
-	for !n.IsRoot() {
-		prev, key, value := n.Data()
-
-		n = prev
+	tags.ForEach(func(key, value string) {
 		if !isReservedLabelName(key) {
 			labels = append(labels, &pbcloud.Label{Name: key, Value: value})
-			continue
+			return
 		}
 
 		if discardedLabels == nil {
@@ -37,7 +32,7 @@ func mapTimeSeriesLabelsProto(tags *metrics.TagSet) ([]*pbcloud.Label, []string)
 		}
 
 		discardedLabels = append(discardedLabels, key)
-	}
+	})
 	return labels, discardedLabels
 }
 
