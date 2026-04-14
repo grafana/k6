@@ -35,9 +35,6 @@ func getCmdCloudLogin(gs *state.GlobalState) *cobra.Command {
   # Authenticate interactively with Grafana Cloud
   $ {{.}} cloud login
 
-  # Store a token in k6's persistent configuration
-  $ {{.}} cloud login -t <YOUR_TOKEN>
-
   # Store a token in k6's persistent configuration and set the stack
   $ {{.}} cloud login -t <YOUR_TOKEN> --stack <YOUR_STACK_URL_OR_SLUG>
 
@@ -139,9 +136,8 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 				"You can enter a full URL (e.g. https://my-team.grafana.net) or just the slug (e.g. my-team):",
 			Fields: []ui.Field{
 				ui.StringField{
-					Key:     "Stack",
-					Label:   "Stack",
-					Default: "None",
+					Key:   "Stack",
+					Label: "Stack",
 				},
 			},
 		}
@@ -150,6 +146,9 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 			return err
 		}
 		stackInput := null.StringFrom(strings.TrimSpace(stackVals["Stack"]))
+		if !stackInput.Valid {
+			return errors.New("stack cannot be empty")
+		}
 
 		err = validateInputs(gs, &newCloudConf, currentJSONConfigRaw, tokenInput, stackInput)
 		if err != nil {
