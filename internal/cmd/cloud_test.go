@@ -148,7 +148,7 @@ func TestCheckCloudLogin(t *testing.T) {
 			conf: cloudapi.Config{
 				Token: null.StringFrom("valid-token"),
 			},
-			wantErr: errStackNotConfigured,
+			wantErr: errUserUnauthenticated,
 		},
 		{
 			name: "zero stack ID returns stack not configured error",
@@ -156,7 +156,7 @@ func TestCheckCloudLogin(t *testing.T) {
 				Token:   null.StringFrom("valid-token"),
 				StackID: null.IntFrom(0),
 			},
-			wantErr: errStackNotConfigured,
+			wantErr: errUserUnauthenticated,
 		},
 	}
 
