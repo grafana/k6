@@ -233,12 +233,6 @@ func SampleToRow(sample *metrics.Sample, resTags []string, ignoredTags []string,
 	}
 
 	row[2] = fmt.Sprintf("%f", sample.Value)
-	// TODO: optimize all of this - do not use tags.Map(), flip resTags, fix the
-	// for loops, get rid of IsStringInSlice(), etc.
-	sampleTags := sample.Tags.Map()
-	for ind, tag := range resTags {
-		row[ind+3] = sampleTags[tag]
-	}
 
 	extraTags := bytes.Buffer{}
 	prev := false
@@ -267,11 +261,18 @@ func SampleToRow(sample *metrics.Sample, resTags []string, ignoredTags []string,
 		return true
 	}
 
-	for tag, val := range sampleTags {
-		if !writeTag(tag, val) {
-			break
+	// Single ForEach pass replaces Map() allocation + separate lookup/iteration loops.
+	// For each tag: fill the corresponding row column if it's a resTag, otherwise
+	// delegate to writeTag which filters ignoredTags and collects extras.
+	sample.Tags.ForEach(func(tag, val string) {
+		for ind, resTag := range resTags {
+			if tag == resTag {
+				row[ind+3] = val
+				return
+			}
 		}
-	}
+		writeTag(tag, val)
+	})
 	row[len(row)-2] = extraTags.String()
 	extraTags.Reset()
 	prev = false

@@ -192,11 +192,11 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 				combinedLogFields[k] = v
 			}
 		}
-		for k, v := range preq.TagsAndMeta.Tags.Map() {
+		preq.TagsAndMeta.Tags.ForEach(func(k, v string) {
 			if _, present := combinedLogFields[k]; !present {
 				combinedLogFields[k] = v
 			}
-		}
+		})
 		transport = httpDebugTransport{
 			originalTransport: transport,
 			httpDebugOption:   state.Options.HTTPDebug.String,
