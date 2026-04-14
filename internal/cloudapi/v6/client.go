@@ -22,7 +22,7 @@ const (
 type Client struct {
 	apiClient *k6cloud.APIClient
 	token     string
-	stackID   int64
+	stackID   int32
 	baseURL   string
 
 	logger logrus.FieldLogger
@@ -62,7 +62,7 @@ func NewClient(logger logrus.FieldLogger, token, host, version string, timeout t
 }
 
 // SetStackID sets the stack ID for the client.
-func (c *Client) SetStackID(stackID int64) {
+func (c *Client) SetStackID(stackID int32) {
 	c.stackID = stackID
 }
 
