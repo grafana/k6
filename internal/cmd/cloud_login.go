@@ -88,7 +88,7 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 
 	show := getNullBool(cmd.Flags(), "show")
 	reset := getNullBool(cmd.Flags(), "reset")
-	token := getNullString(cmd.Flags(), "token")
+	tokenInput := getNullString(cmd.Flags(), "token")
 	stackInput := getNullString(cmd.Flags(), "stack")
 
 	switch {
@@ -97,12 +97,18 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 		newCloudConf.StackID = null.IntFromPtr(nil)
 		newCloudConf.StackURL = null.StringFromPtr(nil)
 		newCloudConf.DefaultProjectID = null.IntFromPtr(nil)
-		printToStdout(c.globalState, "  token and stack info reset\n")
+		printToStdout(c.globalState, "\nToken and stack info have been reset.\n")
 	case show.Bool:
 		printConfig(c.globalState, newCloudConf)
 		return nil
-	case token.Valid:
-		err := validateInputs(c.globalState, &newCloudConf, currentJSONConfigRaw, token, stackInput)
+	case tokenInput.Valid || stackInput.Valid:
+		if !stackInput.Valid || stackInput.String == "" {
+			return errors.New("Stack value is required but it was not passed or is empty")
+		}
+		if !tokenInput.Valid || tokenInput.String == "" {
+			return errors.New("Token value is required but it was not passed or is empty")
+		}
+		err := validateInputs(c.globalState, &newCloudConf, currentJSONConfigRaw, tokenInput, stackInput)
 		if err != nil {
 			return err
 		}
@@ -129,8 +135,8 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 			return err
 		}
 		tokenInput := null.StringFrom(tokenVals["Token"])
-		if !tokenInput.Valid {
-			return errors.New("token cannot be empty")
+		if tokenInput.String == "" {
+			return errors.New("Token cannot be empty")
 		}
 
 		/* Stack form */
@@ -149,8 +155,8 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 			return err
 		}
 		stackInput := null.StringFrom(strings.TrimSpace(stackVals["Stack"]))
-		if !stackInput.Valid {
-			return errors.New("stack cannot be empty")
+		if stackInput.String == "" {
+			return errors.New("Stack cannot be empty")
 		}
 
 		err = validateInputs(gs, &newCloudConf, currentJSONConfigRaw, tokenInput, stackInput)
@@ -218,7 +224,7 @@ func validateInputs(
 	gs *state.GlobalState,
 	config *cloudapi.Config,
 	rawConfig json.RawMessage,
-	token, stackInput null.String,
+	token, stack null.String,
 ) error {
 	config.Token = token
 	consolidatedCurrentConfig, warn, err := cloudapi.GetConsolidatedConfig(
@@ -230,18 +236,14 @@ func validateInputs(
 		gs.Logger.Warn(warn)
 	}
 
-	stackValue := strings.TrimSpace(stackInput.String)
-	if !stackInput.Valid || stackValue == "" || stackValue == "None" {
-		return errStackNotConfigured
-	}
 	stackURL, stackID, defaultProjectID, err := validateTokenV6(
-		gs, consolidatedCurrentConfig, token.String, stackValue)
+		gs, consolidatedCurrentConfig, token.String, stack.String)
 	if err != nil {
 		return fmt.Errorf(
-			"your stack is invalid - please, consult the documentation "+
-				"for instructions on how to get yours: "+
-				"https://grafana.com/docs/grafana-cloud/testing/k6/author-run/configure-stack. "+
-				"Error details: %w",
+			"Authentication failed as provided token or stack might not be valid."+
+				" Learn more: https://grafana.com/docs/grafana-cloud/testing/k6/author-run/tokens-and-cli-authentication."+
+				" Server error for details: %w",
+
 			err)
 	}
 	config.StackURL = null.StringFrom(stackURL)
