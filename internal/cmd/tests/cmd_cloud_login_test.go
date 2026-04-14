@@ -31,33 +31,32 @@ func TestCloudLoginWithArgs(t *testing.T) {
 		wantStdoutContains []string
 	}{
 		{
-			name:    "valid token without stack fails",
-			token:   validToken,
-			wantErr: true,
-			wantStdoutContains: []string{
-				"stack must be configured",
-			},
-		},
-		{
 			name:    "valid token and valid stack",
 			token:   validToken,
 			stack:   validStack,
 			wantErr: false,
 			wantStdoutContains: []string{
 				"Logged in successfully",
-				fmt.Sprintf("token: %s", validToken),
+				fmt.Sprintf("token: %s", "vali***oken"),
 				fmt.Sprintf("stack-id: %d", validStackID),
 				fmt.Sprintf("stack-url: %s", validStackURL),
 				fmt.Sprintf("default-project-id: %d", defaultProjectID),
 			},
 		},
 		{
-			name:    "valid token and 'None' stack fails",
+			name:    "valid token without stack fails",
 			token:   validToken,
-			stack:   "None",
 			wantErr: true,
 			wantStdoutContains: []string{
-				"stack must be configured",
+				"Stack value is required",
+			},
+		},
+		{
+			name:    "valid stack without token fails",
+			stack:   validStack,
+			wantErr: true,
+			wantStdoutContains: []string{
+				"Token value is required",
 			},
 		},
 		{
@@ -65,14 +64,14 @@ func TestCloudLoginWithArgs(t *testing.T) {
 			token:              "invalid-token",
 			stack:              validStack,
 			wantErr:            true,
-			wantStdoutContains: []string{"your stack is invalid"},
+			wantStdoutContains: []string{"Authentication failed"},
 		},
 		{
 			name:               "valid token and invalid stack",
 			token:              validToken,
 			stack:              "invalid-stack",
 			wantErr:            true,
-			wantStdoutContains: []string{"your stack is invalid"},
+			wantStdoutContains: []string{"Authentication failed"},
 		},
 	}
 
