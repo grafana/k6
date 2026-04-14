@@ -103,10 +103,10 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 		return nil
 	case tokenInput.Valid || stackInput.Valid:
 		if !stackInput.Valid || stackInput.String == "" {
-			return errors.New("Stack value is required but it was not passed or is empty")
+			return errors.New("stack value is required but it was not passed or is empty")
 		}
 		if !tokenInput.Valid || tokenInput.String == "" {
-			return errors.New("Token value is required but it was not passed or is empty")
+			return errors.New("token value is required but it was not passed or is empty")
 		}
 		err := authenticateUserToken(c.globalState, &newCloudConf, currentJSONConfigRaw, tokenInput.String, stackInput.String)
 		if err != nil {
@@ -179,7 +179,7 @@ func promptUserAuthForm(gs *state.GlobalState) (userAuthForm, error) {
 	}
 	token := strings.TrimSpace(tokenVals["Token"])
 	if token == "" {
-		return userAuthForm{}, errors.New("Token cannot be empty")
+		return userAuthForm{}, errors.New("token cannot be empty")
 	}
 
 	/* Stack form */
@@ -199,7 +199,7 @@ func promptUserAuthForm(gs *state.GlobalState) (userAuthForm, error) {
 	}
 	stack := strings.TrimSpace(stackVals["Stack"])
 	if stack == "" {
-		return userAuthForm{}, errors.New("Stack cannot be empty")
+		return userAuthForm{}, errors.New("stack cannot be empty")
 	}
 
 	return userAuthForm{token: token, stack: stack}, nil
@@ -254,7 +254,7 @@ func authenticateUserToken(
 	stackURL, stackID, defaultProjectID, err := validateTokenV6(
 		gs, consolidatedCurrentConfig, token, stack)
 	if err != nil {
-		return fmt.Errorf(
+		return fmt.Errorf( //nolint:staticcheck // ST1005: this is a user-facing error
 			"Authentication failed as provided token or stack might not be valid."+
 				" Learn more: https://grafana.com/docs/grafana-cloud/testing/k6/author-run/tokens-and-cli-authentication."+
 				" Server error for details: %w",

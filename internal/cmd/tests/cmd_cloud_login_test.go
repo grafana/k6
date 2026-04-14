@@ -48,7 +48,7 @@ func TestCloudLoginWithArgs(t *testing.T) {
 			token:   validToken,
 			wantErr: true,
 			wantStdoutContains: []string{
-				"Stack value is required",
+				"stack value is required",
 			},
 		},
 		{
@@ -56,7 +56,7 @@ func TestCloudLoginWithArgs(t *testing.T) {
 			stack:   validStack,
 			wantErr: true,
 			wantStdoutContains: []string{
-				"Token value is required",
+				"token value is required",
 			},
 		},
 		{
