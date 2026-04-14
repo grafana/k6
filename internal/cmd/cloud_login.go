@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -65,6 +66,8 @@ func getCmdCloudLogin(gs *state.GlobalState) *cobra.Command {
 //
 //nolint:funlen
 func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
+	printBanner(c.globalState)
+
 	currentDiskConf, err := readDiskConfig(c.globalState)
 	if err != nil {
 		return err
@@ -182,30 +185,31 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 }
 
 func printConfig(gs *state.GlobalState, cloudConf cloudapi.Config) {
-	token := cloudConf.Token.String
-	asterisks := strings.Repeat("*", len(token)-8)
-	maskedToken := token[:4] + asterisks + token[len(token)-4:]
-	valueColor := getColor(gs.Flags.NoColor || !gs.Stdout.IsTTY, color.FgCyan)
-	printToStdout(gs, fmt.Sprintf("  token: %s\n", valueColor.Sprint(maskedToken)))
+	const notSet = "<not set>"
+	token, stackID, stackURL, defProj := notSet, notSet, notSet, notSet
 
-	if !cloudConf.StackID.Valid && !cloudConf.StackURL.Valid {
-		printToStdout(gs, "  stack-id: <not set>\n")
-		printToStdout(gs, "  stack-url: <not set>\n")
-		printToStdout(gs, "  default-project-id: <not set>\n")
-
-		return
+	if cloudConf.Token.String != "" {
+		// If a token is set then we assume we have a valid token longer than 8 chars
+		// print the token with all the chars masked, except the first and the last four
+		unmasked := cloudConf.Token.String
+		asterisks := strings.Repeat("*", len(unmasked)-8)
+		token = unmasked[:4] + asterisks + unmasked[len(unmasked)-4:]
 	}
-
 	if cloudConf.StackID.Valid {
-		printToStdout(gs, fmt.Sprintf("  stack-id: %s\n", valueColor.Sprint(cloudConf.StackID.Int64)))
+		stackID = strconv.FormatInt(cloudConf.StackID.Int64, 10)
 	}
 	if cloudConf.StackURL.Valid {
-		printToStdout(gs, fmt.Sprintf("  stack-url: %s\n", valueColor.Sprint(cloudConf.StackURL.String)))
+		stackURL = cloudConf.StackURL.String
 	}
 	if cloudConf.DefaultProjectID.Valid {
-		printToStdout(gs, fmt.Sprintf("  default-project-id: %s\n",
-			valueColor.Sprint(cloudConf.DefaultProjectID.Int64)))
+		defProj = strconv.FormatInt(cloudConf.DefaultProjectID.Int64, 10)
 	}
+
+	valueColor := getColor(gs.Flags.NoColor || !gs.Stdout.IsTTY, color.FgCyan)
+	printToStdout(gs, fmt.Sprintf("  token: %s\n", valueColor.Sprint(token)))
+	printToStdout(gs, fmt.Sprintf("  stack-id: %s\n", valueColor.Sprint(stackID)))
+	printToStdout(gs, fmt.Sprintf("  stack-url: %s\n", valueColor.Sprint(stackURL)))
+	printToStdout(gs, fmt.Sprintf("  default-project-id: %s\n", valueColor.Sprint(defProj)))
 }
 
 // validateInputs validates a token and a stack if provided
