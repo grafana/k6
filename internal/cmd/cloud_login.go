@@ -182,8 +182,11 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 }
 
 func printConfig(gs *state.GlobalState, cloudConf cloudapi.Config) {
+	token := cloudConf.Token.String
+	asterisks := strings.Repeat("*", len(token)-8)
+	maskedToken := token[:4] + asterisks + token[len(token)-4:]
 	valueColor := getColor(gs.Flags.NoColor || !gs.Stdout.IsTTY, color.FgCyan)
-	printToStdout(gs, fmt.Sprintf("  token: %s\n", valueColor.Sprint(cloudConf.Token.String)))
+	printToStdout(gs, fmt.Sprintf("  token: %s\n", valueColor.Sprint(maskedToken)))
 
 	if !cloudConf.StackID.Valid && !cloudConf.StackURL.Valid {
 		printToStdout(gs, "  stack-id: <not set>\n")
