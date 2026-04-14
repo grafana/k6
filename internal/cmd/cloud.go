@@ -70,16 +70,6 @@ func (c *cmdCloud) preRun(cmd *cobra.Command, _ []string) error {
 			c.exitOnRunning = exitOnRunningValue
 		}
 	}
-	if uploadOnlyEnv, ok := c.gs.Env["K6_CLOUD_UPLOAD_ONLY"]; ok {
-		uploadOnlyValue, err := strconv.ParseBool(uploadOnlyEnv)
-		if err != nil {
-			return fmt.Errorf("parsing K6_CLOUD_UPLOAD_ONLY returned an error: %w", err)
-		}
-		if !cmd.Flags().Changed("upload-only") {
-			c.uploadOnly = uploadOnlyValue
-		}
-	}
-
 	return nil
 }
 
@@ -369,12 +359,6 @@ func (c *cmdCloud) flagSet() *pflag.FlagSet {
 		"exits when test reaches the running status")
 	flags.BoolVar(&c.showCloudLogs, "show-logs", c.showCloudLogs,
 		"enable showing of logs when a test is executed in the cloud")
-	flags.BoolVar(&c.uploadOnly, "upload-only", c.uploadOnly,
-		"only upload the test to the cloud without actually starting a test run")
-	if err := flags.MarkDeprecated("upload-only", "use \"k6 cloud upload\" instead"); err != nil {
-		panic(err) // Should never happen
-	}
-
 	return flags
 }
 
@@ -383,7 +367,6 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 		gs:            gs,
 		showCloudLogs: true,
 		exitOnRunning: false,
-		uploadOnly:    false,
 	}
 
 	exampleText := getExampleText(gs, `
