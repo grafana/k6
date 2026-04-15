@@ -213,9 +213,6 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	}
 
 	refID := cloudTestRun.ReferenceID
-	if cloudTestRun.ConfigOverride != nil {
-		cloudConfig = cloudConfig.Apply(*cloudTestRun.ConfigOverride)
-	}
 
 	// Trap Interrupts, SIGINTs and SIGTERMs.
 	gracefulStop := func(sig os.Signal) {

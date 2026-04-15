@@ -62,7 +62,7 @@ func TestCloudRunCommandIncompatibleFlags(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			ts := getSimpleCloudTestState(t, nil, setupK6CloudRunCmd, tc.cliArgs, nil, nil)
+			ts := getSimpleCloudTestState(t, nil, setupK6CloudRunCmd, tc.cliArgs, nil)
 			ts.ExpectedExitCode = int(exitcodes.InvalidConfig)
 			cmd.ExecuteWithGlobalState(ts.GlobalState)
 
