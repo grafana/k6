@@ -210,11 +210,7 @@ func printConfig(gs *state.GlobalState, cloudConf cloudapi.Config) {
 	token, stackID, stackURL, defProj := notSet, notSet, notSet, notSet
 
 	if cloudConf.Token.String != "" {
-		// If a token is set then we assume we have a valid token longer than 8 chars
-		// print the token with all the chars masked, except the first and the last four
-		unmasked := cloudConf.Token.String
-		asterisks := strings.Repeat("*", len(unmasked)-8)
-		token = unmasked[:4] + asterisks + unmasked[len(unmasked)-4:]
+		token = maskToken(cloudConf.Token.String)
 	}
 	if cloudConf.StackID.Valid {
 		stackID = strconv.FormatInt(cloudConf.StackID.Int64, 10)
@@ -231,6 +227,22 @@ func printConfig(gs *state.GlobalState, cloudConf cloudapi.Config) {
 	printToStdout(gs, fmt.Sprintf("  stack-id: %s\n", valueColor.Sprint(stackID)))
 	printToStdout(gs, fmt.Sprintf("  stack-url: %s\n", valueColor.Sprint(stackURL)))
 	printToStdout(gs, fmt.Sprintf("  default-project-id: %s\n", valueColor.Sprint(defProj)))
+}
+
+func maskToken(unmasked string) string {
+	if len(unmasked) < 1 {
+		return ""
+	}
+	// Require at least 4 asterisks in the middle to give a meaningful visual hint.
+	// Any token shorter than 12 chars would produce fewer, so mask it entirely.
+	if len(unmasked) < 12 {
+		return strings.Repeat("*", len(unmasked))
+	}
+	// We try to have a good DX here.
+	// A valid Cloud token should be 12+ chars, so it prints the token with all
+	// the chars masked, except the first and the last four.
+	asterisks := strings.Repeat("*", len(unmasked)-8)
+	return unmasked[:4] + asterisks + unmasked[len(unmasked)-4:]
 }
 
 // tokenAuthentication validates a token and a stack

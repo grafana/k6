@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -37,7 +38,7 @@ func TestCloudLoginWithArgs(t *testing.T) {
 			wantErr: false,
 			wantStdoutContains: []string{
 				"Logged in successfully",
-				fmt.Sprintf("token: %s", "vali***oken"),
+				fmt.Sprintf("token: %s", strings.Repeat("*", 11)),
 				fmt.Sprintf("stack-id: %d", validStackID),
 				fmt.Sprintf("stack-url: %s", validStackURL),
 				fmt.Sprintf("default-project-id: %d", defaultProjectID),
