@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/mailru/easyjson"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -67,7 +66,7 @@ func TestMsgParsing(t *testing.T) {
 		},
 	}
 	var message msg
-	require.NoError(t, easyjson.Unmarshal([]byte(m), &message))
+	require.NoError(t, json.Unmarshal([]byte(m), &message))
 	require.Equal(t, expectMsg, message)
 }
 

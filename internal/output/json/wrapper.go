@@ -6,9 +6,6 @@ import (
 	"go.k6.io/k6/metrics"
 )
 
-//go:generate easyjson -pkg -no_std_marshalers -gen_build_flags -mod=mod .
-
-//easyjson:json
 type sampleEnvelope struct {
 	Metric string `json:"metric"`
 	Type   string `json:"type"`
@@ -34,7 +31,6 @@ func wrapSample(sample metrics.Sample) sampleEnvelope {
 	return s
 }
 
-//easyjson:json
 type metricEnvelope struct {
 	Type string `json:"type"`
 	Data struct {

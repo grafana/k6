@@ -4,6 +4,7 @@ package json
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"io"
 	"maps"
@@ -11,7 +12,6 @@ import (
 	"time"
 
 	"github.com/klauspost/compress/gzip"
-	"github.com/mailru/easyjson/jwriter"
 	"github.com/sirupsen/logrus"
 
 	"go.k6.io/k6/metrics"
@@ -124,27 +124,23 @@ func (o *Output) flushMetrics() {
 	samples := o.GetBufferedSamples()
 	start := time.Now()
 	var count int
-	jw := new(jwriter.Writer)
+	enc := json.NewEncoder(o.out)
 	for _, sc := range samples {
 		samples := sc.GetSamples()
 		count += len(samples)
 		for _, sample := range samples {
-			o.handleMetric(sample.Metric, jw)
-			wrapSample(sample).MarshalEasyJSON(jw)
-			jw.RawByte('\n')
+			o.handleMetric(sample.Metric, enc)
+			if err := enc.Encode(wrapSample(sample)); err != nil {
+				o.logger.WithError(err).Error("Sample couldn't be marshalled to JSON")
+			}
 		}
-	}
-
-	if _, err := jw.DumpTo(o.out); err != nil {
-		// Skip metric if it can't be made into JSON or envelope is null.
-		o.logger.WithError(err).Error("Sample couldn't be marshalled to JSON")
 	}
 	if count > 0 {
 		o.logger.WithField("t", time.Since(start)).WithField("count", count).Debug("Wrote metrics to JSON")
 	}
 }
 
-func (o *Output) handleMetric(m *metrics.Metric, jw *jwriter.Writer) {
+func (o *Output) handleMetric(m *metrics.Metric, enc *json.Encoder) {
 	if _, ok := o.seenMetrics[m.Name]; ok {
 		return
 	}
@@ -163,6 +159,7 @@ func (o *Output) handleMetric(m *metrics.Metric, jw *jwriter.Writer) {
 		wrapped.Data.Thresholds = ts
 	}
 
-	wrapped.MarshalEasyJSON(jw)
-	jw.RawByte('\n')
+	if err := enc.Encode(wrapped); err != nil {
+		o.logger.WithError(err).Error("Metric couldn't be marshalled to JSON")
+	}
 }
