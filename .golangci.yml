@@ -1,4 +1,4 @@
-# v2.10.1
+# v2.11.4
 # Please don't remove the first line. It uses in CI to determine the golangci version
 version: "2"
 linters:
