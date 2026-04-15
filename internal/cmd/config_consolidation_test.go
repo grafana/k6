@@ -57,19 +57,6 @@ func verifyConstLoopingVUs(vus null.Int, duration time.Duration) func(t *testing
 	}
 }
 
-func verifyExternallyExecuted(scenarioName string, vus null.Int, duration time.Duration) func(t *testing.T, c Config) {
-	return func(t *testing.T, c Config) {
-		exec := c.Scenarios[scenarioName]
-		require.NotEmpty(t, exec)
-		require.IsType(t, executor.ExternallyControlledConfig{}, exec)
-		ecc, ok := exec.(executor.ExternallyControlledConfig)
-		require.True(t, ok)
-		assert.Equal(t, vus, ecc.VUs)
-		assert.Equal(t, types.NullDurationFrom(duration), ecc.Duration)
-		assert.Equal(t, vus, ecc.MaxVUs) // MaxVUs defaults to VUs unless specified
-	}
-}
-
 func verifyRampingVUs(startVus null.Int, stages []executor.Stage) func(t *testing.T, c Config) {
 	return func(t *testing.T, c Config) {
 		exec := c.Scenarios[lib.DefaultScenarioName]
@@ -315,15 +302,6 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 				assert.Equal(t, types.NullDurationFrom(time.Second+500*time.Microsecond), clvc.StartTime)
 				assert.Equal(t, types.NullDurationFrom(10*time.Second), clvc.GracefulStop)
 			},
-		},
-		{
-			opts{
-				fs: defaultConfig(`{"scenarios": { "def": {
-					"executor": "externally-controlled", "vus": 15, "duration": "2h"
-				}}}`),
-			},
-			exp{},
-			verifyExternallyExecuted("def", I(15), 2*time.Hour),
 		},
 		// TODO: test execution-segment
 

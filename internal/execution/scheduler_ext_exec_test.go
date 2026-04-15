@@ -347,9 +347,6 @@ func TestExecutionInfoAll(t *testing.T) {
 			vus: 1,
 			duration: "1s",
 			gracefulStop: "0s",`,
-		"externally-controlled": `
-			vus: 1,
-			duration: "1s",`,
 		"per-vu-iterations": `
 			vus: 1,
 			iterations: 1,
