@@ -10,22 +10,16 @@ import (
 const cloudUploadCommandName = "upload"
 
 type cmdCloudUpload struct {
-	globalState *state.GlobalState
-
-	// cloudCmd holds an instance of the k6 cloud command that we store
-	// in order to be able to call its run method to support the cloud upload
-	// feature
-	cloudCmd *cmdCloud
+	gs *state.GlobalState
 }
 
-func getCmdCloudUpload(cloudCmd *cmdCloud) *cobra.Command {
+func getCmdCloudUpload(gs *state.GlobalState) *cobra.Command {
 	c := &cmdCloudUpload{
-		globalState: cloudCmd.gs,
-		cloudCmd:    cloudCmd,
+		gs: gs,
 	}
 
 	// uploadCloudCommand represents the 'cloud upload' command
-	exampleText := getExampleText(cloudCmd.gs, `
+	exampleText := getExampleText(gs, `
   # Upload a test to Grafana Cloud without running it
   $ {{.}} cloud upload script.js`[1:])
 
@@ -35,7 +29,6 @@ func getCmdCloudUpload(cloudCmd *cmdCloud) *cobra.Command {
 		Long:    "Upload a test to Grafana Cloud without running it. Requires authentication via \"k6 cloud login\".",
 		Example: exampleText,
 		Args:    exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
-		PreRunE: c.preRun,
 		RunE:    c.run,
 	}
 
@@ -44,14 +37,25 @@ func getCmdCloudUpload(cloudCmd *cmdCloud) *cobra.Command {
 	return uploadCloudCommand
 }
 
-func (c *cmdCloudUpload) preRun(cmd *cobra.Command, args []string) error {
-	return c.cloudCmd.preRun(cmd, args)
-}
-
 // run is the code that runs when the user executes `k6 cloud upload`
 func (c *cmdCloudUpload) run(cmd *cobra.Command, args []string) error {
-	c.cloudCmd.uploadOnly = true
-	return c.cloudCmd.run(cmd, args)
+	setup, err := prepareCloudTest(c.gs, cmd, args)
+	if err != nil {
+		return err
+	}
+
+	cloudTestRun, err := setup.client.UploadTestOnly(setup.name, setup.cloudConfig.ProjectID.Int64, setup.arc)
+	if err != nil {
+		return err
+	}
+
+	refID := cloudTestRun.ReferenceID
+	cloudConfig := setup.cloudConfig
+	if cloudTestRun.ConfigOverride != nil {
+		cloudConfig = cloudConfig.Apply(*cloudTestRun.ConfigOverride)
+	}
+
+	return trackCloudTestProgress(c.gs, setup, refID, cloudConfig, false, false)
 }
 
 func (c *cmdCloudUpload) flagSet() *pflag.FlagSet {

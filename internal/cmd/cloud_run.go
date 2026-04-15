@@ -3,10 +3,11 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"strconv"
 
-	"go.k6.io/k6/errext/exitcodes"
-
+	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/errext"
+	"go.k6.io/k6/errext/exitcodes"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -17,6 +18,8 @@ import (
 const cloudRunCommandName string = "run"
 
 type cmdCloudRun struct {
+	gs *state.GlobalState
+
 	// localExecution stores the state of the --local-execution flag.
 	localExecution bool
 
@@ -32,22 +35,23 @@ type cmdCloudRun struct {
 	// archive to the cloud service.
 	noArchiveUpload bool
 
+	// showCloudLogs stores the state of the --show-logs flag.
+	showCloudLogs bool
+
+	// exitOnRunning stores the state of the --exit-on-running flag.
+	exitOnRunning bool
+
 	// runCmd holds an instance of the k6 run command that we store
 	// in order to be able to call its run method to support
 	// the --local-execution flag mode.
 	runCmd *cmdRun
-
-	// parentCloudCmd holds an instance of the k6 cloud command that we store
-	// in order to be able to call its run method to support the cloud execution
-	// feature, and to have access to its flagSet if necessary.
-	parentCloudCmd *cmdCloud
 }
 
-func getCmdCloudRun(cloudCmd *cmdCloud) *cobra.Command {
+func getCmdCloudRun(gs *state.GlobalState) *cobra.Command {
 	// We instantiate the run command here to be able to call its run method
 	// when the --local-execution flag is set.
 	runCmd := &cmdRun{
-		gs: cloudCmd.gs,
+		gs: gs,
 
 		// We override the loadConfiguredTest func to use the local execution
 		// configuration which enforces the use of the cloud output among other
@@ -57,17 +61,18 @@ func getCmdCloudRun(cloudCmd *cmdCloud) *cobra.Command {
 			execution.Controller,
 			error,
 		) {
-			test, err := loadAndConfigureLocalTest(cloudCmd.gs, cmd, args, getCloudRunLocalExecutionConfig)
+			test, err := loadAndConfigureLocalTest(gs, cmd, args, getCloudRunLocalExecutionConfig)
 			return test, local.NewController(), err
 		},
 	}
 
 	cloudRunCmd := &cmdCloudRun{
-		parentCloudCmd: cloudCmd,
-		runCmd:         runCmd,
+		gs:            gs,
+		showCloudLogs: true,
+		runCmd:        runCmd,
 	}
 
-	exampleText := getExampleText(cloudCmd.gs, `
+	exampleText := getExampleText(gs, `
   # Run a test script in Grafana Cloud
   $ {{.}} cloud run script.js
 
@@ -92,12 +97,36 @@ func getCmdCloudRun(cloudCmd *cmdCloud) *cobra.Command {
 
 	thisCmd.Flags().SortFlags = false
 	thisCmd.Flags().AddFlagSet(cloudRunCmd.flagSet())
-	thisCmd.Flags().AddFlagSet(cloudCmd.flagSet())
 
 	return thisCmd
 }
 
-func (c *cmdCloudRun) preRun(cmd *cobra.Command, args []string) error {
+func (c *cmdCloudRun) preRun(cmd *cobra.Command, _ []string) error {
+	// TODO: refactor (https://github.com/grafana/k6/issues/883)
+	//
+	// We deliberately parse the env variables, to validate for wrong
+	// values, even if we don't subsequently use them (if the respective
+	// CLI flag was specified, since it has a higher priority).
+	if showCloudLogsEnv, ok := c.gs.Env["K6_SHOW_CLOUD_LOGS"]; ok {
+		showCloudLogsValue, err := strconv.ParseBool(showCloudLogsEnv)
+		if err != nil {
+			return fmt.Errorf("parsing K6_SHOW_CLOUD_LOGS returned an error: %w", err)
+		}
+		if !cmd.Flags().Changed("show-logs") {
+			c.showCloudLogs = showCloudLogsValue
+		}
+	}
+
+	if exitOnRunningEnv, ok := c.gs.Env["K6_EXIT_ON_RUNNING"]; ok {
+		exitOnRunningValue, err := strconv.ParseBool(exitOnRunningEnv)
+		if err != nil {
+			return fmt.Errorf("parsing K6_EXIT_ON_RUNNING returned an error: %w", err)
+		}
+		if !cmd.Flags().Changed("exit-on-running") {
+			c.exitOnRunning = exitOnRunningValue
+		}
+	}
+
 	if c.localExecution {
 		if cmd.Flags().Changed("exit-on-running") {
 			return errext.WithExitCodeIfNone(
@@ -123,7 +152,7 @@ func (c *cmdCloudRun) preRun(cmd *cobra.Command, args []string) error {
 		)
 	}
 
-	return c.parentCloudCmd.preRun(cmd, args)
+	return nil
 }
 
 func (c *cmdCloudRun) run(cmd *cobra.Command, args []string) error {
@@ -149,12 +178,36 @@ func (c *cmdCloudRun) run(cmd *cobra.Command, args []string) error {
 	// When running the `k6 cloud run` command explicitly disable the usage report.
 	c.noUsageReport = true
 
-	return c.parentCloudCmd.run(cmd, args)
+	setup, err := prepareCloudTest(c.gs, cmd, args)
+	if err != nil {
+		return err
+	}
+
+	cloudTestRun, err := setup.client.StartCloudTestRun(setup.name, setup.cloudConfig.ProjectID.Int64, setup.arc)
+	if err != nil {
+		return err
+	}
+
+	refID := cloudTestRun.ReferenceID
+	cloudConfig := setup.cloudConfig
+	if cloudTestRun.ConfigOverride != nil {
+		cloudConfig = cloudConfig.Apply(*cloudTestRun.ConfigOverride)
+	}
+
+	return trackCloudTestProgress(c.gs, setup, refID, cloudConfig, c.showCloudLogs, c.exitOnRunning)
 }
 
 func (c *cmdCloudRun) flagSet() *pflag.FlagSet {
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
 	flags.SortFlags = false
+
+	flags.AddFlagSet(optionFlagSet())
+	flags.AddFlagSet(runtimeOptionFlagSet(false))
+
+	flags.BoolVar(&c.exitOnRunning, "exit-on-running", c.exitOnRunning,
+		"exits when test reaches the running status")
+	flags.BoolVar(&c.showCloudLogs, "show-logs", c.showCloudLogs,
+		"enable showing of logs when a test is executed in the cloud")
 
 	flags.BoolVar(&c.localExecution, "local-execution", c.localExecution,
 		"executes the test locally instead of in the cloud")

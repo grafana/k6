@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -506,7 +507,11 @@ func runTestCase(t *testing.T, testCase configConsolidationTestCase, subCmd stri
 	t.Logf("Test for `k6 %s` with opts=%#v and exp=%#v\n", subCmd, testCase.options, testCase.expected)
 
 	ts := tests.NewGlobalTestState(t)
-	ts.CmdArgs = append([]string{"k6", subCmd}, testCase.options.cli...)
+	subCmdParts := strings.Fields(subCmd)
+	ts.CmdArgs = make([]string, 0, 1+len(subCmdParts)+len(testCase.options.cli))
+	ts.CmdArgs = append(ts.CmdArgs, "k6")
+	ts.CmdArgs = append(ts.CmdArgs, subCmdParts...)
+	ts.CmdArgs = append(ts.CmdArgs, testCase.options.cli...)
 	ts.Env = state.BuildEnvMap(testCase.options.env)
 	if testCase.options.fs != nil {
 		ts.FS = testCase.options.fs
@@ -582,7 +587,7 @@ func TestConfigConsolidation(t *testing.T) {
 	for tcNum, testCase := range getConfigConsolidationTestCases() {
 		subCommands := testCase.options.cmds
 		if subCommands == nil { // handle the most common case
-			subCommands = []string{"run", "archive", "cloud"}
+			subCommands = []string{"run", "archive", "cloud run"}
 		}
 		for fsNum, subCmd := range subCommands {
 			t.Run(
