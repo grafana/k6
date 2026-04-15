@@ -115,7 +115,7 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 
 	var testArchive *lib.Archive
 	if !test.derivedConfig.NoArchiveUpload.Bool {
-		testArchive = test.initRunner.MakeArchive()
+		testArchive = test.makeArchive()
 	}
 
 	testRun := &cloudapi.TestRun{
