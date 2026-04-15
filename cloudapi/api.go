@@ -296,7 +296,7 @@ func (c *Client) ValidateOptions(options lib.Options) error {
 
 type loginRequest struct {
 	Email    string `json:"email"`
-	Password string `json:"password"` //nolint:gosec
+	Password string `json:"password"`
 }
 
 // Login the user with the specified email and password.

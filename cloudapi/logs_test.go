@@ -279,11 +279,11 @@ func TestStreamLogsToLogger(t *testing.T) {
 			return start, err
 		}
 
-		var requestsCount uint64
+		var requestsCount atomic.Uint64
 
 		tb := httpmultibin.NewHTTPMultiBin(t)
 		logtailHandleFunc(tb, func(conn *websocket.Conn, req *http.Request) {
-			requests := atomic.AddUint64(&requestsCount, 1)
+			requests := requestsCount.Add(1)
 
 			start, err := startFilter(*req.URL)
 			require.NoError(t, err)
@@ -358,12 +358,12 @@ func TestStreamLogsToLogger(t *testing.T) {
 			return start, err
 		}
 
-		var requestsCount uint64
+		var requestsCount atomic.Uint64
 		t0 := time.Now()
 
 		tb := httpmultibin.NewHTTPMultiBin(t)
 		logtailHandleFunc(tb, func(conn *websocket.Conn, req *http.Request) {
-			requests := atomic.AddUint64(&requestsCount, 1)
+			requests := requestsCount.Add(1)
 
 			start, err := startFilter(*req.URL)
 			require.NoError(t, err)

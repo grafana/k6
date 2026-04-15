@@ -508,7 +508,7 @@ func (varr RampingArrivalRate) Run(parentCtx context.Context, out chan<- metrics
 // executing the received requests for iterations.
 type activeVUPool struct {
 	iterations chan struct{}
-	running    uint64
+	running    atomic.Uint64
 	execState  *lib.ExecutionState
 	wg         sync.WaitGroup
 }
@@ -535,7 +535,7 @@ func (p *activeVUPool) TryRunIteration() bool {
 
 // Running returns the number of the currently running VUs.
 func (p *activeVUPool) Running() uint64 {
-	return atomic.LoadUint64(&p.running)
+	return p.running.Load()
 }
 
 // AddVU adds the active VU to the pool of VUs for handling the incoming
@@ -550,11 +550,11 @@ func (p *activeVUPool) AddVU(ctx context.Context, avu lib.ActiveVU, runfn func(c
 
 		close(ch)
 		for range p.iterations {
-			atomic.AddUint64(&p.running, uint64(1))
+			p.running.Add(uint64(1))
 			p.execState.ModCurrentlyActiveVUsCount(+1)
 			runfn(ctx, avu)
 			p.execState.ModCurrentlyActiveVUsCount(-1)
-			atomic.AddUint64(&p.running, ^uint64(0))
+			p.running.Add(^uint64(0))
 		}
 	}()
 	<-ch

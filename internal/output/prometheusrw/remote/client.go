@@ -30,7 +30,7 @@ type HTTPConfig struct {
 
 // BasicAuth holds the config for basic authentication.
 type BasicAuth struct {
-	Username, Password string //nolint:gosec
+	Username, Password string
 }
 
 // WriteClient is a client implementation of the Prometheus remote write protocol.
@@ -100,7 +100,7 @@ func (c *WriteClient) Store(ctx context.Context, series []*prompb.TimeSeries) er
 	req.Header.Set("Content-Type", "application/x-protobuf")
 	req.Header.Set("X-Prometheus-Remote-Write-Version", "0.1.0")
 
-	resp, err := c.hc.Do(req) //nolint:gosec
+	resp, err := c.hc.Do(req)
 	if err != nil {
 		return fmt.Errorf("HTTP POST request failed: %w", err)
 	}

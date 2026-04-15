@@ -112,14 +112,14 @@ func TestRampingVUsRun(t *testing.T) {
 			},
 		}
 
-		var iterCount int64
+		var iterCount atomic.Int64
 
 		runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
 			// Sleeping for a weird duration somewhat offset from the
 			// executor ticks to hopefully keep race conditions out of
 			// our control from failing the test.
 			time.Sleep(300 * time.Millisecond)
-			atomic.AddInt64(&iterCount, 1)
+			iterCount.Add(1)
 			return nil
 		})
 
@@ -144,7 +144,7 @@ func TestRampingVUsRun(t *testing.T) {
 		require.NoError(t, <-errCh)
 
 		assert.Equal(t, []int64{5, 3, 0}, result)
-		assert.Equal(t, int64(29), atomic.LoadInt64(&iterCount))
+		assert.Equal(t, int64(29), iterCount.Load())
 	})
 }
 
@@ -357,15 +357,15 @@ func TestRampingVUsHandleRemainingVUs(t *testing.T) {
 		}
 
 		var (
-			gotVuInterrupted uint32
-			gotVuFinished    uint32
+			gotVuInterrupted atomic.Uint32
+			gotVuFinished    atomic.Uint32
 		)
 		runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
 			select {
 			case <-time.After(vuSleepDuration):
-				atomic.AddUint32(&gotVuFinished, 1)
+				gotVuFinished.Add(1)
 			case <-ctx.Done():
-				atomic.AddUint32(&gotVuInterrupted, 1)
+				gotVuInterrupted.Add(1)
 			}
 			return nil
 		})
@@ -377,8 +377,8 @@ func TestRampingVUsHandleRemainingVUs(t *testing.T) {
 		// sum(stages) + GracefulRampDown
 		require.NoError(t, test.executor.Run(test.ctx, nil))
 
-		assert.Equal(t, wantVuInterrupted, atomic.LoadUint32(&gotVuInterrupted))
-		assert.Equal(t, wantVuFinished, atomic.LoadUint32(&gotVuFinished))
+		assert.Equal(t, wantVuInterrupted, gotVuInterrupted.Load())
+		assert.Equal(t, wantVuFinished, gotVuFinished.Load())
 	})
 }
 

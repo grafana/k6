@@ -2129,7 +2129,7 @@ func TestBadLogOutput(t *testing.T) {
 }
 
 // HACK: We need this so multiple tests can register differently named modules.
-var uniqueModuleNumber uint64 //nolint:gochecknoglobals
+var uniqueModuleNumber atomic.Uint64 //nolint:gochecknoglobals
 
 // Tests that the appropriate events are emitted in the correct order.
 func TestEventSystemOK(t *testing.T) {
@@ -2137,7 +2137,7 @@ func TestEventSystemOK(t *testing.T) {
 
 	ts := NewGlobalTestState(t)
 
-	moduleName := fmt.Sprintf("k6/x/testevents-%d", atomic.AddUint64(&uniqueModuleNumber, 1))
+	moduleName := fmt.Sprintf("k6/x/testevents-%d", uniqueModuleNumber.Add(1))
 	mod := events.New(event.GlobalEvents, event.VUEvents)
 	modules.Register(moduleName, mod)
 
@@ -2263,7 +2263,7 @@ func TestEventSystemError(t *testing.T) {
 			t.Parallel()
 			ts := NewGlobalTestState(t)
 
-			moduleName := fmt.Sprintf("k6/x/testevents-%d", atomic.AddUint64(&uniqueModuleNumber, 1))
+			moduleName := fmt.Sprintf("k6/x/testevents-%d", uniqueModuleNumber.Add(1))
 			mod := events.New(event.GlobalEvents, event.VUEvents)
 			modules.Register(moduleName, mod)
 
@@ -2320,7 +2320,7 @@ func BenchmarkRunEvents(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		ts := NewGlobalTestState(b)
 
-		moduleName := fmt.Sprintf("k6/x/testevents-%d", atomic.AddUint64(&uniqueModuleNumber, 1))
+		moduleName := fmt.Sprintf("k6/x/testevents-%d", uniqueModuleNumber.Add(1))
 		mod := events.New(event.GlobalEvents, event.VUEvents)
 		modules.Register(moduleName, mod)
 
