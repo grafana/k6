@@ -3,8 +3,6 @@ package k6provider
 import (
 	"errors"
 	"fmt"
-	"io"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -12,7 +10,7 @@ import (
 	"time"
 )
 
-// Pruner prunes binaries using a LRU policy to enforce a limit
+// Pruner prunes binaries suing a LRU policy to enforce a limit
 // defined in a high-water-mark.
 type Pruner struct {
 	pruneLock     sync.Mutex
@@ -21,7 +19,6 @@ type Pruner struct {
 	hwm           int64
 	pruneInterval time.Duration
 	lastPrune     time.Time
-	logger        *slog.Logger
 }
 
 type pruneTarget struct {
@@ -33,21 +30,11 @@ type pruneTarget struct {
 // NewPruner creates a [Pruner] given its high-water-mark limit, and the
 // prune interval
 func NewPruner(dir string, hwm int64, pruneInterval time.Duration) *Pruner {
-	return NewPrunerWithLogger(dir, hwm, pruneInterval, nil)
-}
-
-// NewPrunerWithLogger creates a [Pruner] with the given logger.
-// If logger is nil, a discard logger is used.
-func NewPrunerWithLogger(dir string, hwm int64, pruneInterval time.Duration, logger *slog.Logger) *Pruner {
-	if logger == nil {
-		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
-	}
 	return &Pruner{
 		dirLock:       newDirLock(dir),
 		dir:           dir,
 		hwm:           hwm,
 		pruneInterval: pruneInterval,
-		logger:        logger,
 	}
 }
 
@@ -56,40 +43,8 @@ func (p *Pruner) Touch(binPath string) {
 	if p.hwm > 0 {
 		p.pruneLock.Lock()
 		defer p.pruneLock.Unlock()
-		_ = os.Chtimes(binPath, time.Now(), time.Now()) //nolint:forbidigo
+		_ = os.Chtimes(binPath, time.Now(), time.Now())
 	}
-}
-
-// scanTargets reads the cache directory and returns the list of binaries
-// eligible for pruning together with the total cache size.
-func (p *Pruner) scanTargets() ([]pruneTarget, int64, error) {
-	binaries, err := os.ReadDir(p.dir) //nolint:forbidigo
-	if err != nil {
-		return nil, 0, fmt.Errorf("%w: %w", ErrPruningCache, err)
-	}
-
-	var (
-		cacheSize    int64
-		pruneTargets []pruneTarget
-	)
-	for _, binDir := range binaries {
-		// skip any spurious file, each binary is in a directory
-		if !binDir.IsDir() {
-			continue
-		}
-		binPath := filepath.Join(p.dir, binDir.Name(), k6Binary)
-		binInfo, err := os.Stat(binPath) //nolint:forbidigo
-		if err != nil {
-			continue
-		}
-		cacheSize += binInfo.Size()
-		pruneTargets = append(pruneTargets, pruneTarget{
-			path:      filepath.Dir(binPath), // we are going to prune the directory
-			size:      binInfo.Size(),
-			timestamp: binInfo.ModTime(),
-		})
-	}
-	return pruneTargets, cacheSize, nil
 }
 
 // Prune the cache of least recently used files
@@ -122,37 +77,50 @@ func (p *Pruner) Prune() error {
 		_ = p.dirLock.unlock()
 	}()
 
-	pruneTargets, cacheSize, err := p.scanTargets()
+	binaries, err := os.ReadDir(p.dir)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: %w", ErrPruningCache, err)
+	}
+
+	errs := []error{ErrPruningCache}
+	cacheSize := int64(0)
+	pruneTargets := []pruneTarget{}
+	for _, binDir := range binaries {
+		// skip any spurious file, each binary is in a directory
+		if !binDir.IsDir() {
+			continue
+		}
+
+		binPath := filepath.Join(p.dir, binDir.Name(), k6Binary)
+		binInfo, err := os.Stat(binPath)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		cacheSize += binInfo.Size()
+		pruneTargets = append(
+			pruneTargets,
+			pruneTarget{
+				path:      filepath.Dir(binPath), // we are going to prune the directory
+				size:      binInfo.Size(),
+				timestamp: binInfo.ModTime(),
+			})
 	}
 
 	if cacheSize <= p.hwm {
 		return nil
 	}
 
-	p.logger.Info("Pruning binary cache",
-		"dir", p.dir,
-		"cache_size", cacheSize,
-		"limit", p.hwm,
-		"entries", len(pruneTargets),
-	)
-
 	sort.Slice(pruneTargets, func(i, j int) bool {
 		return pruneTargets[i].timestamp.Before(pruneTargets[j].timestamp)
 	})
 
-	errs := []error{ErrPruningCache}
 	for _, target := range pruneTargets {
-		if err := os.RemoveAll(target.path); err != nil { //nolint:forbidigo
+		if err := os.RemoveAll(target.path); err != nil {
 			errs = append(errs, err)
 			continue
 		}
 
-		p.logger.Debug("Pruned cached binary",
-			"path", target.path,
-			"size", target.size,
-		)
 		cacheSize -= target.size
 		if cacheSize <= p.hwm {
 			return nil
