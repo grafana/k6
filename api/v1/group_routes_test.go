@@ -102,7 +102,7 @@ func TestGetGroups(t *testing.T) {
 		t.Parallel()
 
 		rw := httptest.NewRecorder()
-		NewHandler(cs).ServeHTTP(rw, httptest.NewRequest(http.MethodGet, "/v1/groups", nil))
+		NewHandler(cs).ServeHTTP(rw, httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/v1/groups", nil))
 		res := rw.Result()
 		t.Cleanup(func() {
 			assert.NoError(t, res.Body.Close())
@@ -158,7 +158,7 @@ func TestGetGroups(t *testing.T) {
 		t.Run(gp.Name, func(t *testing.T) {
 			t.Parallel()
 			rw := httptest.NewRecorder()
-			NewHandler(cs).ServeHTTP(rw, httptest.NewRequest(http.MethodGet, "/v1/groups/"+gp.ID, nil))
+			NewHandler(cs).ServeHTTP(rw, httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/v1/groups/"+gp.ID, nil))
 			res := rw.Result()
 			t.Cleanup(func() {
 				assert.NoError(t, res.Body.Close())

@@ -469,28 +469,29 @@ func TestRampingVUsConfigExecutionPlanExample(t *testing.T) {
 		{Target: null.IntFrom(1), Duration: types.NullDurationFrom(3 * time.Second)},
 	}
 
-	expRawStepsNoZeroEnd := []lib.ExecutionStep{
-		{TimeOffset: 0 * time.Second, PlannedVUs: 4},
-		{TimeOffset: 1 * time.Second, PlannedVUs: 5},
-		{TimeOffset: 2 * time.Second, PlannedVUs: 6},
-		{TimeOffset: 3 * time.Second, PlannedVUs: 5},
-		{TimeOffset: 4 * time.Second, PlannedVUs: 4},
-		{TimeOffset: 5 * time.Second, PlannedVUs: 3},
-		{TimeOffset: 6 * time.Second, PlannedVUs: 2},
-		{TimeOffset: 7 * time.Second, PlannedVUs: 1},
-		{TimeOffset: 8 * time.Second, PlannedVUs: 2},
-		{TimeOffset: 9 * time.Second, PlannedVUs: 3},
-		{TimeOffset: 10 * time.Second, PlannedVUs: 4},
-		{TimeOffset: 11 * time.Second, PlannedVUs: 5},
-		{TimeOffset: 12 * time.Second, PlannedVUs: 4},
-		{TimeOffset: 13 * time.Second, PlannedVUs: 3},
-		{TimeOffset: 14 * time.Second, PlannedVUs: 2},
-		{TimeOffset: 15 * time.Second, PlannedVUs: 1},
-		{TimeOffset: 16 * time.Second, PlannedVUs: 2},
-		{TimeOffset: 17 * time.Second, PlannedVUs: 3},
-		{TimeOffset: 18 * time.Second, PlannedVUs: 4},
-		{TimeOffset: 20 * time.Second, PlannedVUs: 1},
-	}
+	expRawStepsNoZeroEnd := make([]lib.ExecutionStep, 0, 21)
+	expRawStepsNoZeroEnd = append(expRawStepsNoZeroEnd,
+		lib.ExecutionStep{TimeOffset: 0 * time.Second, PlannedVUs: 4},
+		lib.ExecutionStep{TimeOffset: 1 * time.Second, PlannedVUs: 5},
+		lib.ExecutionStep{TimeOffset: 2 * time.Second, PlannedVUs: 6},
+		lib.ExecutionStep{TimeOffset: 3 * time.Second, PlannedVUs: 5},
+		lib.ExecutionStep{TimeOffset: 4 * time.Second, PlannedVUs: 4},
+		lib.ExecutionStep{TimeOffset: 5 * time.Second, PlannedVUs: 3},
+		lib.ExecutionStep{TimeOffset: 6 * time.Second, PlannedVUs: 2},
+		lib.ExecutionStep{TimeOffset: 7 * time.Second, PlannedVUs: 1},
+		lib.ExecutionStep{TimeOffset: 8 * time.Second, PlannedVUs: 2},
+		lib.ExecutionStep{TimeOffset: 9 * time.Second, PlannedVUs: 3},
+		lib.ExecutionStep{TimeOffset: 10 * time.Second, PlannedVUs: 4},
+		lib.ExecutionStep{TimeOffset: 11 * time.Second, PlannedVUs: 5},
+		lib.ExecutionStep{TimeOffset: 12 * time.Second, PlannedVUs: 4},
+		lib.ExecutionStep{TimeOffset: 13 * time.Second, PlannedVUs: 3},
+		lib.ExecutionStep{TimeOffset: 14 * time.Second, PlannedVUs: 2},
+		lib.ExecutionStep{TimeOffset: 15 * time.Second, PlannedVUs: 1},
+		lib.ExecutionStep{TimeOffset: 16 * time.Second, PlannedVUs: 2},
+		lib.ExecutionStep{TimeOffset: 17 * time.Second, PlannedVUs: 3},
+		lib.ExecutionStep{TimeOffset: 18 * time.Second, PlannedVUs: 4},
+		lib.ExecutionStep{TimeOffset: 20 * time.Second, PlannedVUs: 1},
+	)
 	rawStepsNoZeroEnd := conf.getRawExecutionSteps(et, false)
 	assert.Equal(t, expRawStepsNoZeroEnd, rawStepsNoZeroEnd)
 	endOffset, isFinal := lib.GetEndOffset(rawStepsNoZeroEnd)

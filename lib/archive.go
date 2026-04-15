@@ -373,7 +373,7 @@ func (arc *Archive) json() ([]byte, error) {
 	// this prevents <, >, and & from being escaped in JSON strings
 	encoder.SetEscapeHTML(false)
 	encoder.SetIndent("", "  ")
-	if err := encoder.Encode(arc); err != nil {
+	if err := encoder.Encode(arc); err != nil { //nolint:gosec // pwd is a working directory path, not a secret
 		return nil, err
 	}
 

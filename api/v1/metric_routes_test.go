@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -29,7 +30,7 @@ func TestGetMetrics(t *testing.T) {
 	cs.MetricsEngine.ObservedMetrics["my_metric"].Tainted = null.BoolFrom(true)
 
 	rw := httptest.NewRecorder()
-	NewHandler(cs).ServeHTTP(rw, httptest.NewRequest(http.MethodGet, "/v1/metrics", nil))
+	NewHandler(cs).ServeHTTP(rw, httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/v1/metrics", nil))
 	res := rw.Result()
 	t.Cleanup(func() {
 		assert.NoError(t, res.Body.Close())
@@ -91,7 +92,7 @@ func TestGetMetric(t *testing.T) {
 		t.Parallel()
 
 		rw := httptest.NewRecorder()
-		NewHandler(cs).ServeHTTP(rw, httptest.NewRequest(http.MethodGet, "/v1/metrics/notreal", nil))
+		NewHandler(cs).ServeHTTP(rw, httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/v1/metrics/notreal", nil))
 		res := rw.Result()
 		t.Cleanup(func() {
 			assert.NoError(t, res.Body.Close())
@@ -103,7 +104,7 @@ func TestGetMetric(t *testing.T) {
 		t.Parallel()
 
 		rw := httptest.NewRecorder()
-		NewHandler(cs).ServeHTTP(rw, httptest.NewRequest(http.MethodGet, "/v1/metrics/my_metric", nil))
+		NewHandler(cs).ServeHTTP(rw, httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/v1/metrics/my_metric", nil))
 		res := rw.Result()
 		t.Cleanup(func() {
 			assert.NoError(t, res.Body.Close())

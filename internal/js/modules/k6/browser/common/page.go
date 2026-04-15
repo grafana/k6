@@ -297,7 +297,7 @@ func NewPage(
 	bp bool,
 	logger *log.Logger,
 ) (*Page, error) {
-	pageCtx, pageCancel := context.WithCancel(ctx)
+	pageCtx, pageCancel := context.WithCancel(ctx) //nolint:gosec
 
 	p := Page{
 		ctx:              pageCtx,
