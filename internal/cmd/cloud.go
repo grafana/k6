@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -19,6 +20,7 @@ import (
 	"go.k6.io/k6/v2/errext"
 	"go.k6.io/k6/v2/errext/exitcodes"
 	"go.k6.io/k6/v2/internal/build"
+	cloudapiv6 "go.k6.io/k6/v2/internal/cloudapi/v6"
 	"go.k6.io/k6/v2/internal/ui/pb"
 	"go.k6.io/k6/v2/lib"
 
@@ -357,6 +359,17 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+func (c *cmdCloud) printTestStatus(status string) {
+	if !c.gs.Flags.Quiet {
+		valueColor := getColor(c.gs.Flags.NoColor || !c.gs.Stdout.IsTTY, color.FgCyan)
+		printToStdout(c.gs, fmt.Sprintf(
+			"     test status: %s\n", valueColor.Sprint(status),
+		))
+	} else {
+		c.gs.Logger.WithField("run_status", status).Debug("Test finished")
+	}
+}
+
 func (c *cmdCloud) flagSet() *pflag.FlagSet {
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
 	flags.SortFlags = false
@@ -459,6 +472,49 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 	cloudCmd.SetHelpTemplate(cloudTemplate)
 
 	return cloudCmd
+}
+
+// prepCloudTestRun wires stack and project IDs into the client, validates
+// script options, and resolves a default project when none was specified.
+// Returns the project ID as used by subsequent v6 calls.
+func prepCloudTestRun(
+	ctx context.Context, gs *state.GlobalState,
+	client *cloudapiv6.Client,
+	cloudConfig *cloudapi.Config, tmpCloudConfig map[string]any, arc *lib.Archive,
+) (int32, error) {
+	toInt32 := func(v int64) (int32, error) {
+		if v < math.MinInt32 || v > math.MaxInt32 {
+			return 0, fmt.Errorf("value %d overflows int32", v)
+		}
+		return int32(v), nil
+	}
+
+	stackID, err := toInt32(cloudConfig.StackID.Int64)
+	if err != nil {
+		return 0, err
+	}
+	client.SetStackID(stackID)
+
+	projectID, err := toInt32(cloudConfig.ProjectID.Int64)
+	if err != nil {
+		return 0, err
+	}
+
+	if projectID == 0 {
+		if err := resolveAndSetProjectID(gs, cloudConfig, tmpCloudConfig, arc); err != nil {
+			return 0, err
+		}
+		projectID, err = toInt32(cloudConfig.ProjectID.Int64)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	if err := client.ValidateOptions(ctx, projectID, arc.Options); err != nil {
+		return 0, err
+	}
+
+	return projectID, nil
 }
 
 func resolveDefaultProjectID(
