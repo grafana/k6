@@ -59,17 +59,8 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 		return err
 	}
 
-	if !conf.Name.Valid || conf.Name.String == "" {
-		scriptPath := test.source.URL.String()
-		if scriptPath == "" {
-			// Script from stdin without a name, likely from stdin
-			return errors.New("script name not set, please specify K6_CLOUD_NAME or options.cloud.name")
-		}
-
-		conf.Name = null.StringFrom(filepath.Base(scriptPath))
-	}
-	if conf.Name.String == "-" {
-		conf.Name = null.StringFrom(defaultTestName)
+	if conf.Name, err = resolveCloudTestName(conf.Name, test.source.URL.String()); err != nil {
+		return err
 	}
 
 	thresholds := make(map[string][]string)
@@ -200,4 +191,20 @@ func cloudConfToRawMessage(conf cloudapi.Config) (json.RawMessage, error) {
 		return nil, err
 	}
 	return buff.Bytes(), nil
+}
+
+// resolveCloudTestName returns the test name from the config, or derives it from
+// the script path when the config name is unset. A name of "-" is replaced
+// with the default test name.
+func resolveCloudTestName(name null.String, scriptPath string) (null.String, error) {
+	if !name.Valid || name.String == "" {
+		if scriptPath == "" {
+			return name, errors.New("script name not set, please specify K6_CLOUD_NAME or options.cloud.name")
+		}
+		name = null.StringFrom(filepath.Base(scriptPath))
+	}
+	if name.String == "-" {
+		name = null.StringFrom(defaultTestName)
+	}
+	return name, nil
 }
