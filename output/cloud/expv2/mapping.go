@@ -16,8 +16,6 @@ func mapTimeSeriesLabelsProto(tags *metrics.TagSet) ([]*pbcloud.Label, []string)
 	labels := make([]*pbcloud.Label, 0, tags.Len())
 	var discardedLabels []string
 
-	// TODO: move this as a shared func
-	// https://github.com/grafana/k6/issues/2764
 	if tags.Len() < 1 {
 		return labels, discardedLabels
 	}
