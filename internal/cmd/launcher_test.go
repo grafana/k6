@@ -250,7 +250,7 @@ func TestProcessUseDirectives(t *testing.T) {
 			t.Parallel()
 			deps, err := dependenciesFromMap(test.expectedOutput)
 			require.NoError(t, err)
-			expected := constraintsMapToProvisionDependency(deps)
+			expected := constraintsMapToProvisionDependency(deps, "")
 			if len(test.expectedError) > 0 {
 				expected = nil
 			}
@@ -260,7 +260,7 @@ func TestProcessUseDirectives(t *testing.T) {
 			if len(test.expectedError) > 0 {
 				require.ErrorContains(t, err, test.expectedError)
 			} else {
-				require.EqualValues(t, expected, constraintsMapToProvisionDependency(m))
+				require.EqualValues(t, expected, constraintsMapToProvisionDependency(m, ""))
 			}
 		})
 	}
@@ -398,7 +398,82 @@ func TestDependenciesApplyManifest(t *testing.T) {
 			if len(test.expectedError) > 0 {
 				require.ErrorContains(t, err, test.expectedError)
 			} else {
-				require.EqualValues(t, test.expected, (map[string]string)(constraintsMapToProvisionDependency(deps)))
+				require.EqualValues(t, test.expected, (map[string]string)(constraintsMapToProvisionDependency(deps, "")))
+			}
+		})
+	}
+}
+
+func TestK6MajorConstraint(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		version  string
+		expected string
+	}{
+		{version: "2.0.0-rc1", expected: ">= 2.0.0-0"},
+		{version: "0.57.0", expected: ">= 0.0.0-0"},
+		{version: "invalid", expected: "*"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.version, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tc.expected, k6MajorConstraint(tc.version))
+		})
+	}
+}
+
+func TestConstraintsMapToProvisionDependencyK6Version(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		title      string
+		deps       map[string]string
+		k6Version  string
+		expectedK6 string
+	}{
+		{
+			title:      "nil k6 constraint uses major floor",
+			deps:       map[string]string{"k6": ""},
+			k6Version:  "2.0.0-rc1",
+			expectedK6: ">= 2.0.0-0",
+		},
+		{
+			title:      "explicit k6 constraint combined with major floor",
+			deps:       map[string]string{"k6": ">= 2.1.0"},
+			k6Version:  "2.0.0-rc1",
+			expectedK6: ">=2.1.0, >= 2.0.0-0",
+		},
+		{
+			title:      "non-k6 dep with nil constraint gets wildcard",
+			deps:       map[string]string{"k6/x/faker": ""},
+			k6Version:  "2.0.0-rc1",
+			expectedK6: "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.title, func(t *testing.T) {
+			t.Parallel()
+
+			deps := make(map[string]*semver.Constraints)
+			for name, constraintStr := range tc.deps {
+				if constraintStr == "" {
+					deps[name] = nil
+				} else {
+					constraint, err := semver.NewConstraint(constraintStr)
+					require.NoError(t, err)
+					deps[name] = constraint
+				}
+			}
+
+			result := constraintsMapToProvisionDependency(deps, tc.k6Version)
+
+			if tc.expectedK6 != "" {
+				assert.Equal(t, tc.expectedK6, result["k6"])
+			} else {
+				assert.Equal(t, "*", result["k6/x/faker"])
 			}
 		})
 	}

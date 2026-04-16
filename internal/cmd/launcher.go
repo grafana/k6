@@ -33,9 +33,32 @@ type provisioner interface {
 	provision(map[string]string) (commandExecutor, error)
 }
 
-func constraintsMapToProvisionDependency(deps map[string]*semver.Constraints) k6provider.Dependencies {
+// k6MajorConstraint returns a semver constraint string pinning to the major version
+// of the running k6 binary. For example, "2.0.0-rc1" → ">= 2.0.0-0".
+// This tells the build service which k6 module path to use (go.k6.io/k6 vs go.k6.io/k6/v2).
+// Returns "*" if the version cannot be parsed.
+func k6MajorConstraint(version string) string {
+	v, err := semver.NewVersion(version)
+	if err != nil {
+		return "*"
+	}
+	return fmt.Sprintf(">= %d.0.0-0", v.Major())
+}
+
+func constraintsMapToProvisionDependency(
+	deps map[string]*semver.Constraints, k6Version string,
+) k6provider.Dependencies {
 	result := make(k6provider.Dependencies)
 	for name, constraint := range deps {
+		if name == "k6" {
+			majorFloor := k6MajorConstraint(k6Version)
+			if constraint == nil || constraint.String() == "*" {
+				result[name] = majorFloor
+			} else {
+				result[name] = constraint.String() + ", " + majorFloor
+			}
+			continue
+		}
 		if constraint == nil {
 			// If dependency's constraint is nil, assume it is "*" and consider it satisfied.
 			// See https://github.com/grafana/k6deps/issues/91
