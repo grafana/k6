@@ -55,9 +55,10 @@ const (
 type Output struct {
 	versionedOutput
 
-	logger    logrus.FieldLogger
-	config    cloudapi.Config
-	testRunID string
+	logger             logrus.FieldLogger
+	config             cloudapi.Config
+	testRunID          string
+	onCloudTestCreated func(*cloudapi.CreateTestRunResponse)
 
 	executionPlan []lib.ExecutionStep
 	duration      int64 // in seconds
@@ -143,13 +144,14 @@ func newOutput(params output.Params) (*Output, error) {
 		logger, conf.Token.String, conf.Host.String, build.Version, conf.Timeout.TimeDuration())
 
 	return &Output{
-		config:        conf,
-		client:        apiClient,
-		executionPlan: params.ExecutionPlan,
-		duration:      int64(duration / time.Second),
-		logger:        logger,
-		usage:         params.Usage,
-		testRunID:     params.RuntimeOptions.Env[testRunIDKey],
+		config:             conf,
+		client:             apiClient,
+		executionPlan:      params.ExecutionPlan,
+		duration:           int64(duration / time.Second),
+		logger:             logger,
+		usage:              params.Usage,
+		testRunID:          params.RuntimeOptions.Env[testRunIDKey],
+		onCloudTestCreated: params.OnCloudTestCreated,
 	}, nil
 }
 
@@ -209,6 +211,9 @@ func (out *Output) Start() error {
 		return err
 	}
 	out.testRunID = response.ReferenceID
+	if out.onCloudTestCreated != nil {
+		out.onCloudTestCreated(response)
+	}
 
 	if response.ConfigOverride != nil {
 		out.logger.WithFields(logrus.Fields{
