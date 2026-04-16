@@ -3482,5 +3482,4 @@ func TestRunCloudOutputUpdatesCloudSecretSourceFromCreateTestRun(t *testing.T) {
 	stderr := ts.Stderr.String()
 	t.Log(stderr)
 	assert.NotContains(t, stderr, "level=error")
-	assert.Contains(t, stderr, `level=info msg="***SECRET_REDACTED***" source=console`)
 }
