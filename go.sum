@@ -86,6 +86,8 @@ github.com/grafana/k6foundry v0.4.7 h1:1YXkTBwO/2dSx0pqJrraJATsFlsIX0vEpaEjV7E35
 github.com/grafana/k6foundry v0.4.7/go.mod h1:eLsr0whhH+5Y1y7YpDxJi3Jv5wHMuf+80vdRyMH10pg=
 github.com/grafana/k6provider v0.2.0 h1:Zu8FBnk6cJyTTkpCA+y+Ravc2YFeAQjsIfPpcbZtfB0=
 github.com/grafana/k6provider v0.2.0/go.mod h1:TJ6vzPm4yDQ2ji/Fet0dFOpdjktrKZp4hsnLZhRoZVA=
+github.com/grafana/k6provider v0.3.0 h1:Sw3CX4RaCmsW8fc3frDv+Mj4IcrIz7NfMMf9FJEYtrM=
+github.com/grafana/k6provider v0.3.0/go.mod h1:R9WKthnwk96E47m6w/mnC13hhBYTn5iMdP5caFt/t5k=
 github.com/grafana/sobek v0.0.0-20260406180825-6d789dcdd177 h1:0OMR7GLMuIoXDyXWKD4+ySHckqjgIpo0ZJ3iMA4Em4c=
 github.com/grafana/sobek v0.0.0-20260406180825-6d789dcdd177/go.mod h1:YtuqiJX1W3XvRSilL/kUZzduJG3phPJWyzM9DiIEfBo=
 github.com/grafana/xk6-dashboard-assets v0.1.2 h1:n2wqytPICn2ZYsKa9HE6GlvFXk+WjByMfT4eM+ms3gE=

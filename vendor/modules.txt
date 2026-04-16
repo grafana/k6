@@ -182,10 +182,7 @@ github.com/gorilla/websocket
 github.com/grafana/k6-cloud-openapi-client-go/k6
 # github.com/grafana/k6build v0.5.15
 ## explicit; go 1.24.0
-github.com/grafana/k6build
-github.com/grafana/k6build/pkg/api
-github.com/grafana/k6build/pkg/client
-# github.com/grafana/k6provider v0.2.0
+# github.com/grafana/k6provider v0.3.0
 ## explicit; go 1.24.0
 github.com/grafana/k6provider
 # github.com/grafana/sobek v0.0.0-20260406180825-6d789dcdd177
