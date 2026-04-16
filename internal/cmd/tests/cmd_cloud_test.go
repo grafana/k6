@@ -92,26 +92,6 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 		assert.Contains(t, stdout, `test status: Running`)
 	})
 
-	t.Run("TestCloudUploadOnly", func(t *testing.T) {
-		t.Parallel()
-
-		cs := func() cloudapi.TestProgressResponse {
-			return cloudapi.TestProgressResponse{
-				RunStatusText: "Archived",
-				RunStatus:     cloudapi.RunStatusArchived,
-			}
-		}
-
-		ts := getSimpleCloudTestState(t, nil, setupCmd, []string{"--upload-only", "--log-output=stdout"}, nil, cs)
-		cmd.ExecuteWithGlobalState(ts.GlobalState)
-
-		stdout := ts.Stdout.String()
-		t.Log(stdout)
-		assert.Contains(t, stdout, `execution: cloud`)
-		assert.Contains(t, stdout, `output: https://app.k6.io/runs/123`)
-		assert.Contains(t, stdout, `test status: Archived`)
-	})
-
 	t.Run("TestCloudWithConfigOverride", func(t *testing.T) {
 		t.Parallel()
 
@@ -277,7 +257,14 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 func cloudTestStartSimple(tb testing.TB, testRunID int) http.Handler {
 	return http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
 		resp.WriteHeader(http.StatusOK)
-		_, err := fmt.Fprintf(resp, `{"reference_id": "%d"}`, testRunID)
+		_, err := fmt.Fprintf(resp, `{
+			"reference_id": "%d",
+			"test_run_token": "mock-test-run-token",
+			"secrets_config": {
+				"endpoint": "https://mock-secrets.example.com/{key}",
+				"response_path": "plaintext"
+			}
+		}`, testRunID)
 		assert.NoError(tb, err)
 	})
 }

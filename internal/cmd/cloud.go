@@ -70,16 +70,6 @@ func (c *cmdCloud) preRun(cmd *cobra.Command, _ []string) error {
 			c.exitOnRunning = exitOnRunningValue
 		}
 	}
-	if uploadOnlyEnv, ok := c.gs.Env["K6_CLOUD_UPLOAD_ONLY"]; ok {
-		uploadOnlyValue, err := strconv.ParseBool(uploadOnlyEnv)
-		if err != nil {
-			return fmt.Errorf("parsing K6_CLOUD_UPLOAD_ONLY returned an error: %w", err)
-		}
-		if !cmd.Flags().Changed("upload-only") {
-			c.uploadOnly = uploadOnlyValue
-		}
-	}
-
 	return nil
 }
 
@@ -111,8 +101,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	// an execution shortcut option (e.g. `iterations` or `duration`),
 	// we will have multiple conflicting execution options since the
 	// derivation will set `scenarios` as well.
-	testRunState, err := test.buildTestRunState(test.consolidatedConfig.Options)
-	if err != nil {
+	if err := test.initRunner.SetOptions(test.consolidatedConfig.Options); err != nil {
 		return err
 	}
 
@@ -128,7 +117,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	printBar(c.gs, progressBar)
 
 	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Building the archive..."))
-	arc := testRunState.Runner.MakeArchive()
+	arc := test.makeArchive()
 
 	tmpCloudConfig, err := cloudapi.GetTemporaryCloudConfig(arc.Options.Cloud)
 	if err != nil {
@@ -370,13 +359,26 @@ func (c *cmdCloud) flagSet() *pflag.FlagSet {
 		"exits when test reaches the running status")
 	flags.BoolVar(&c.showCloudLogs, "show-logs", c.showCloudLogs,
 		"enable showing of logs when a test is executed in the cloud")
-	flags.BoolVar(&c.uploadOnly, "upload-only", c.uploadOnly,
-		"only upload the test to the cloud without actually starting a test run")
-	if err := flags.MarkDeprecated("upload-only", "use \"k6 cloud upload\" instead"); err != nil {
-		panic(err) // Should never happen
-	}
-
 	return flags
+}
+
+func getCloudUsageTemplate() string {
+	return `{{.Short}}
+
+Usage:{{if .HasAvailableSubCommands}}
+  {{.CommandPath}} [command]{{end}}{{if .HasAvailableSubCommands}}
+
+Available Commands:{{range .Commands}}{{if .IsAvailableCommand}}
+  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}
+
+Flags:
+  -h, --help   Show help
+{{if .HasExample}}
+Examples:
+{{.Example}}
+{{end}}{{if .HasAvailableSubCommands}}
+Use "{{.CommandPath}} [command] --help" for more information about a command.{{end}}
+`
 }
 
 func getCmdCloud(gs *state.GlobalState) *cobra.Command {
@@ -384,24 +386,26 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 		gs:            gs,
 		showCloudLogs: true,
 		exitOnRunning: false,
-		uploadOnly:    false,
 	}
 
 	exampleText := getExampleText(gs, `
-  # [deprecated] Run a test script in Grafana Cloud
-  $ {{.}} cloud script.js
-
-  # [deprecated] Run a test archive in Grafana Cloud
-  $ {{.}} cloud archive.tar
-
   # Authenticate with Grafana Cloud
   $ {{.}} cloud login
 
   # Run a test script in Grafana Cloud
   $ {{.}} cloud run script.js
 
+  # Run a test script locally and stream results to Grafana Cloud
+  $ {{.}} cloud run --local-execution script.js
+
   # Run a test archive in Grafana Cloud
-  $ {{.}} cloud run archive.tar`[1:])
+  $ {{.}} cloud run archive.tar
+  
+  # [deprecated] Run a test script in Grafana Cloud
+  $ {{.}} cloud script.js
+
+  # [deprecated] Run a test archive in Grafana Cloud
+  $ {{.}} cloud archive.tar`[1:])
 
 	cloudCmd := &cobra.Command{
 		Use:     "cloud",
@@ -409,7 +413,13 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 		Long:    "Run and manage tests in Grafana Cloud.",
 		Example: exampleText,
 		PreRunE: c.preRun,
-		RunE:    c.run,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// If no args provided, show help
+			if len(args) == 0 {
+				return cmd.Help()
+			}
+			return c.run(cmd, args)
+		},
 	}
 
 	// Register `k6 cloud` subcommands with default usage template
@@ -418,35 +428,26 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 
 	runCmd := getCmdCloudRun(c)
 	runCmd.SetUsageTemplate(defaultUsageTemplate)
+	runCmd.SetHelpTemplate((&cobra.Command{}).HelpTemplate())
 	cloudCmd.AddCommand(runCmd)
 
 	loginCmd := getCmdCloudLogin(gs)
 	loginCmd.SetUsageTemplate(defaultUsageTemplate)
+	loginCmd.SetHelpTemplate((&cobra.Command{}).HelpTemplate())
 	cloudCmd.AddCommand(loginCmd)
 
 	uploadCmd := getCmdCloudUpload(c)
 	uploadCmd.SetUsageTemplate(defaultUsageTemplate)
+	uploadCmd.SetHelpTemplate((&cobra.Command{}).HelpTemplate())
 	cloudCmd.AddCommand(uploadCmd)
 
 	cloudCmd.Flags().SortFlags = false
 	cloudCmd.Flags().AddFlagSet(c.flagSet())
 
-	cloudCmd.SetUsageTemplate(`Usage:
-  {{.CommandPath}} [command]
-
-Commands:{{range .Commands}}{{if (or (eq .Name "login") (eq .Name "run"))}}
-  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{range .Commands}}` +
-		`{{if and .IsAvailableCommand (ne .Name "login") (ne .Name "run")}}
-  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}
-
-Flags:
-  -h, --help   Show help
-{{if .HasExample}}
-Examples:
-{{.Example}}
-{{end}}
-Use "{{.CommandPath}} [command] --help" for more information about a command.
-`)
+	// Use custom template similar to root - hardcode flags to avoid showing global flags
+	cloudTemplate := getCloudUsageTemplate()
+	cloudCmd.SetUsageTemplate(cloudTemplate)
+	cloudCmd.SetHelpTemplate(cloudTemplate)
 
 	return cloudCmd
 }
