@@ -388,15 +388,7 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 	cloudCmd := &cobra.Command{
 		Use:   "cloud",
 		Short: "Run a test on the cloud",
-		Long: `Manage Grafana Cloud k6 tests.
-
-This command provides subcommands for interacting with Grafana Cloud k6:
-- "run": Run a test in Grafana Cloud k6
-- "login": Authenticate with Grafana Cloud k6
-- "upload": Upload a test script to Grafana Cloud k6 without running it
-
-The direct usage of "k6 cloud script.js" has been removed in v2.0.0.
-Please use "k6 cloud run script.js" instead.`,
+		Long:  `Manage Grafana Cloud k6 tests.`,
 		Args:    exactCloudArgs(),
 		Example: exampleText,
 	}
