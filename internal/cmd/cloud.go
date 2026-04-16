@@ -77,20 +77,6 @@ func (c *cmdCloud) preRun(cmd *cobra.Command, _ []string) error {
 //
 //nolint:funlen,gocognit,cyclop
 func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
-	// If no args provided and called from main cloud command, show helpful error
-	if cmd.Name() == "cloud" && len(args) == 0 {
-		return errors.New("the \"k6 cloud\" command expects either a subcommand such as \"run\" or \"login\", " +
-			"or a single argument consisting in a path to a script/archive, or the `-` symbol instructing " +
-			"the command to read the test content from stdin; received no arguments")
-	}
-
-	// Show deprecation warning only when running tests directly via "k6 cloud <file>"
-	// (not when using subcommands like "k6 cloud run")
-	if cmd.Name() == "cloud" && len(args) > 0 {
-		c.gs.Logger.Warn("Running tests directly with \"k6 cloud <file>\" is deprecated. " +
-			"Use \"k6 cloud run <file>\" instead. This behavior will be removed in a future release.")
-	}
-
 	test, err := loadAndConfigureLocalTest(c.gs, cmd, args, getPartialConfig)
 	if err != nil {
 		return err
@@ -370,28 +356,24 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 	}
 
 	exampleText := getExampleText(gs, `
-  # [deprecated] Run a test script in Grafana Cloud
-  $ {{.}} cloud script.js
-
-  # [deprecated] Run a test archive in Grafana Cloud
-  $ {{.}} cloud archive.tar
-
-  # Authenticate with Grafana Cloud
+  # Authenticate with Grafana Cloud k6
   $ {{.}} cloud login
 
-  # Run a test script in Grafana Cloud
+  # Run a test script in Grafana Cloud k6
   $ {{.}} cloud run script.js
 
-  # Run a test archive in Grafana Cloud
-  $ {{.}} cloud run archive.tar`[1:])
+  # Run a k6 archive in Grafana Cloud k6
+  $ {{.}} cloud run archive.tar
+
+  # Upload a test script to Grafana Cloud k6
+  $ {{.}} cloud upload script.js`[1:])
 
 	cloudCmd := &cobra.Command{
-		Use:     "cloud",
-		Short:   "Run and manage Grafana Cloud tests",
-		Long:    "Run and manage tests in Grafana Cloud.",
+		Use:   "cloud",
+		Short: "Run a test on the cloud",
+		Long:  `Manage Grafana Cloud k6 tests.`,
+		Args:    exactCloudArgs(),
 		Example: exampleText,
-		PreRunE: c.preRun,
-		RunE:    c.run,
 	}
 
 	// Register `k6 cloud` subcommands with default usage template
@@ -431,6 +413,28 @@ Use "{{.CommandPath}} [command] --help" for more information about a command.
 `)
 
 	return cloudCmd
+}
+
+func exactCloudArgs() cobra.PositionalArgs {
+	return func(_ *cobra.Command, args []string) error {
+		const baseErrMsg = `the "k6 cloud" command requires a subcommand such as "run", "login", or "upload"`
+
+		if len(args) == 0 {
+			return fmt.Errorf(baseErrMsg + "; " + "received no arguments")
+		}
+
+		hasSubcommand := args[0] == "run" || args[0] == "login" || args[0] == "upload"
+		if !hasSubcommand {
+			return fmt.Errorf(
+				baseErrMsg+"; "+
+					`direct script execution has been removed in v2.0.0. `+
+					`To run "%s", use: k6 cloud run %s`,
+				args[0], args[0],
+			)
+		}
+
+		return nil
+	}
 }
 
 func resolveDefaultProjectID(

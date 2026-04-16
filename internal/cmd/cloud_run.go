@@ -36,10 +36,10 @@ type cmdCloudRun struct {
 	// the --local-execution flag mode.
 	runCmd *cmdRun
 
-	// deprecatedCloudCmd holds an instance of the k6 cloud command that we store
+	// parentCloudCmd holds an instance of the k6 cloud command that we store
 	// in order to be able to call its run method to support the cloud execution
 	// feature, and to have access to its flagSet if necessary.
-	deprecatedCloudCmd *cmdCloud
+	parentCloudCmd *cmdCloud
 }
 
 func getCmdCloudRun(cloudCmd *cmdCloud) *cobra.Command {
@@ -62,8 +62,8 @@ func getCmdCloudRun(cloudCmd *cmdCloud) *cobra.Command {
 	}
 
 	cloudRunCmd := &cmdCloudRun{
-		deprecatedCloudCmd: cloudCmd,
-		runCmd:             runCmd,
+		parentCloudCmd: cloudCmd,
+		runCmd:         runCmd,
 	}
 
 	exampleText := getExampleText(cloudCmd.gs, `
@@ -128,7 +128,7 @@ func (c *cmdCloudRun) preRun(cmd *cobra.Command, args []string) error {
 		)
 	}
 
-	return c.deprecatedCloudCmd.preRun(cmd, args)
+	return c.parentCloudCmd.preRun(cmd, args)
 }
 
 func (c *cmdCloudRun) run(cmd *cobra.Command, args []string) error {
@@ -154,7 +154,7 @@ func (c *cmdCloudRun) run(cmd *cobra.Command, args []string) error {
 	// When running the `k6 cloud run` command explicitly disable the usage report.
 	c.noUsageReport = true
 
-	return c.deprecatedCloudCmd.run(cmd, args)
+	return c.parentCloudCmd.run(cmd, args)
 }
 
 func (c *cmdCloudRun) flagSet() *pflag.FlagSet {
