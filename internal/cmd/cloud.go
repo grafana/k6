@@ -186,35 +186,43 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 
 	// Start cloud test run
 	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Validating script options"))
-	client := cloudapi.NewClient(
-		logger, cloudConfig.Token.String, cloudConfig.Host.String, build.Version, cloudConfig.Timeout.TimeDuration())
-	if cloudConfig.StackID.Valid {
-		client.SetStackID(cloudConfig.StackID.Int64)
-	}
-	if err = client.ValidateOptions(arc.Options); err != nil {
+	client, err := cloudapiv6.NewClient(
+		logger, cloudConfig.Token.String, cloudConfig.Hostv6.String, build.Version, cloudConfig.Timeout.TimeDuration())
+	if err != nil {
 		return err
 	}
-
-	if cloudConfig.ProjectID.Int64 == 0 {
-		if err := resolveAndSetProjectID(c.gs, &cloudConfig, tmpCloudConfig, arc); err != nil {
-			return err
-		}
-	}
-
-	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Uploading archive"))
-
-	var cloudTestRun *cloudapi.CreateTestRunResponse
-	if c.uploadOnly {
-		cloudTestRun, err = client.UploadTestOnly(name, cloudConfig.ProjectID.Int64, arc)
-	} else {
-		cloudTestRun, err = client.StartCloudTestRun(name, cloudConfig.ProjectID.Int64, arc)
-	}
-
+	projectID, err := prepCloudTestRun(globalCtx, c.gs, client, &cloudConfig, tmpCloudConfig, arc)
 	if err != nil {
 		return err
 	}
 
-	refID := cloudTestRun.ReferenceID
+	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Uploading archive"))
+
+	loadTest, err := client.UploadTest(globalCtx, name, projectID, arc)
+	if err != nil {
+		return fmt.Errorf("uploading test: %w", err)
+	}
+
+	if c.uploadOnly {
+		et, err := lib.NewExecutionTuple(test.derivedConfig.ExecutionSegment, test.derivedConfig.ExecutionSegmentSequence)
+		if err != nil {
+			return err
+		}
+		executionPlan := test.derivedConfig.Scenarios.GetFullExecutionRequirements(et)
+		testURL := fmt.Sprintf("%s/a/k6-app/tests/%d", strings.TrimSuffix(cloudConfig.StackURL.String, "/"), loadTest.GetId())
+		printExecutionDescription(
+			c.gs, "cloud", test.sourceRootPath, testURL, test.derivedConfig, et, executionPlan, nil,
+		)
+		modifyAndPrintBar(c.gs, progressBar, pb.WithConstLeft("Run "), pb.WithConstProgress(1.0, "Archived"))
+		c.printTestStatus("Archived")
+		return nil
+	}
+
+	run, err := client.StartTest(globalCtx, loadTest.GetId())
+	if err != nil {
+		return fmt.Errorf("starting test: %w", err)
+	}
+	testRunID := run.GetId()
 
 	// Trap Interrupts, SIGINTs and SIGTERMs.
 	gracefulStop := func(sig os.Signal) {
@@ -222,7 +230,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 		// Do this in a separate goroutine so that if it blocks, the
 		// second signal can still abort the process execution.
 		go func() {
-			stopErr := client.StopCloudTestRun(refID)
+			stopErr := client.StopTest(context.WithoutCancel(globalCtx), testRunID)
 			if stopErr != nil {
 				logger.WithError(stopErr).Error("Stop cloud test error")
 			} else {
@@ -241,7 +249,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	testURL := cloudapi.URLForResults(refID, cloudConfig)
+	testURL := run.GetTestRunDetailsPageUrl()
 	executionPlan := test.derivedConfig.Scenarios.GetFullExecutionRequirements(et)
 	printExecutionDescription(
 		c.gs, "cloud", test.sourceRootPath, testURL, test.derivedConfig, et, executionPlan, nil,
@@ -262,14 +270,8 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 		progressBarWG.Done()
 	}()
 
-	var (
-		startTime   time.Time
-		maxDuration time.Duration
-	)
-	maxDuration, _ = lib.GetEndOffset(executionPlan)
-
 	testProgressLock := &sync.Mutex{}
-	var testProgress *cloudapi.TestProgressResponse
+	var testProgress *cloudapiv6.TestProgress
 	progressBar.Modify(
 		pb.WithProgress(func() (float64, []string) {
 			testProgressLock.Lock()
@@ -278,30 +280,19 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 			if testProgress == nil {
 				return 0, []string{"Waiting..."}
 			}
-
-			statusText := testProgress.RunStatusText
-
-			switch testProgress.RunStatus { //nolint:exhaustive
-			case cloudapi.RunStatusFinished:
-				testProgress.Progress = 1
-			case cloudapi.RunStatusRunning:
-				if startTime.IsZero() {
-					startTime = time.Now()
-				}
-				spent := time.Since(startTime)
-				if spent > maxDuration {
-					statusText = maxDuration.String()
-				} else {
-					statusText = fmt.Sprintf("%s/%s", pb.GetFixedLengthDuration(spent, maxDuration), maxDuration)
+			if testProgress.IsRunning() {
+				est := testProgress.Estimated()
+				return testProgress.Progress(), []string{
+					fmt.Sprintf("%s/%s", pb.GetFixedLengthDuration(testProgress.Elapsed(), est), est),
 				}
 			}
-
-			return testProgress.Progress, []string{statusText}
+			return testProgress.Progress(), []string{testProgress.FormatStatus()}
 		}),
 	)
 
 	ticker := time.NewTicker(time.Millisecond * 2000)
 	if c.showCloudLogs {
+		refID := strconv.FormatInt(int64(testRunID), 10)
 		go func() {
 			logger.Debug("Connecting to cloud logs server...")
 			if err := cloudConfig.StreamLogsToLogger(globalCtx, logger, refID, 0); err != nil {
@@ -311,7 +302,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	}
 
 	for range ticker.C {
-		newTestProgress, progressErr := client.GetTestProgress(refID)
+		newTestProgress, progressErr := client.FetchTest(context.WithoutCancel(globalCtx), testRunID)
 		if progressErr != nil {
 			logger.WithError(progressErr).Error("Test progress error")
 			continue
@@ -321,39 +312,31 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 		testProgress = newTestProgress
 		testProgressLock.Unlock()
 
-		if (newTestProgress.RunStatus > cloudapi.RunStatusRunning) ||
-			(c.exitOnRunning && newTestProgress.RunStatus == cloudapi.RunStatusRunning) {
+		if newTestProgress.IsFinished() ||
+			(c.exitOnRunning && newTestProgress.IsRunning()) {
 			globalCancel()
 			break
 		}
 	}
+
+	// Stop progress rendering before printing final status to avoid ghost bars.
+	progressCancel()
+	progressBarWG.Wait()
 
 	if testProgress == nil {
 		//nolint:staticcheck
 		return errext.WithExitCodeIfNone(errors.New("Test progress error"), exitcodes.CloudFailedToGetProgress)
 	}
 
-	if !c.gs.Flags.Quiet {
-		valueColor := getColor(c.gs.Flags.NoColor || !c.gs.Stdout.IsTTY, color.FgCyan)
-		printToStdout(c.gs, fmt.Sprintf(
-			"     test status: %s\n", valueColor.Sprint(testProgress.RunStatusText),
-		))
-	} else {
-		logger.WithField("run_status", testProgress.RunStatusText).Debug("Test finished")
+	c.printTestStatus(testProgress.FormatStatus())
+
+	if testProgress.ThresholdsFailed() {
+		//nolint:staticcheck
+		return errext.WithExitCodeIfNone(errors.New("Thresholds have been crossed"), exitcodes.ThresholdsHaveFailed)
 	}
-
-	if testProgress.ResultStatus == cloudapi.ResultStatusFailed {
-		// Although by looking at [ResultStatus] and [RunStatus] isn't self-explanatory,
-		// the scenario when the test run has finished, but it failed is an exceptional case for those situations
-		// when thresholds have been crossed (failed). So, we report this situation as such.
-		if testProgress.RunStatus == cloudapi.RunStatusFinished ||
-			testProgress.RunStatus == cloudapi.RunStatusAbortedThreshold {
-			//nolint:staticcheck
-			return errext.WithExitCodeIfNone(errors.New("Thresholds have been crossed"), exitcodes.ThresholdsHaveFailed)
-		}
-
-		// TODO: use different exit codes for failed thresholds vs failed test (e.g. aborted by system/limit)
-		return errext.WithExitCodeIfNone(errors.New("The test has failed"), exitcodes.CloudTestRunFailed) //nolint:staticcheck
+	if testProgress.TestFailed() {
+		//nolint:staticcheck
+		return errext.WithExitCodeIfNone(errors.New("The test has failed"), exitcodes.CloudTestRunFailed)
 	}
 
 	return nil
