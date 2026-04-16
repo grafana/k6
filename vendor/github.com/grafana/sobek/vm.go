@@ -4522,6 +4522,55 @@ func (j joptc) exec(vm *vm) {
 	}
 }
 
+type joptdel int32
+
+func (j joptdel) exec(vm *vm) {
+	switch vm.stack[vm.sp-1].(type) {
+	case valueNull, valueUndefined:
+		vm.stack[vm.sp-1] = valueTrue
+		vm.pc += int(j)
+	default:
+		vm.pc++
+	}
+}
+
+type joptdelc int32
+
+func (j joptdelc) exec(vm *vm) {
+	switch vm.stack[vm.sp-1].(type) {
+	case valueNull, valueUndefined, memberUnresolved:
+		vm.sp--
+		vm.stack[vm.sp-1] = valueTrue
+		vm.pc += int(j)
+	default:
+		vm.pc++
+	}
+}
+
+type joptdelP int32
+
+func (j joptdelP) exec(vm *vm) {
+	switch vm.stack[vm.sp-1].(type) {
+	case valueNull, valueUndefined:
+		vm.sp--
+		vm.pc += int(j)
+	default:
+		vm.pc++
+	}
+}
+
+type joptdelcP int32
+
+func (j joptdelcP) exec(vm *vm) {
+	switch vm.stack[vm.sp-1].(type) {
+	case valueNull, valueUndefined, memberUnresolved:
+		vm.sp -= 2
+		vm.pc += int(j)
+	default:
+		vm.pc++
+	}
+}
+
 type jcoalesc int32
 
 func (j jcoalesc) exec(vm *vm) {
@@ -4866,6 +4915,7 @@ func (leaveTry) exec(vm *vm) {
 		vm.pc = int(tf.finallyPos)
 		tf.finallyPos = -1
 		tf.catchPos = -1
+		vm.sp, vm.stash = int(tf.sp), tf.stash
 	} else {
 		vm.popTryFrame()
 		vm.pc++

@@ -18,7 +18,7 @@ runs:
   steps:
     - name: Install Go
       if: ${{ inputs.go_version != 'gotip' }}
-      uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
       with:
         go-version: ${{ inputs.go_version }}
         check-latest: true
@@ -34,8 +34,6 @@ runs:
         unzip go.zip -d $HOME/sdk
 
     - name: Install chromium
-      # This is only needed on arm images, chromium comes preinstalled on amd64 runner images.
-      if: ${{contains(inputs.platform, 'arm') }}
       shell: bash
       run: |
         sudo apt update && sudo apt install chromium-browser

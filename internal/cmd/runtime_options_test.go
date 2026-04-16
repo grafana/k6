@@ -383,13 +383,12 @@ func TestRuntimeOptions(t *testing.T) {
 		},
 		"summary and thresholds from env": {
 			useSysEnv: false,
-			systemEnv: map[string]string{"K6_NO_THRESHOLDS": "false", "K6_NO_SUMMARY": "0", "K6_SUMMARY_EXPORT": "foo"},
+			systemEnv: map[string]string{"K6_NO_THRESHOLDS": "false", "K6_SUMMARY_EXPORT": "foo"},
 			expRTOpts: lib.RuntimeOptions{
 				IncludeSystemEnvVars:      null.NewBool(false, false),
 				CompatibilityMode:         defaultCompatMode,
 				Env:                       map[string]string{},
 				NoThresholds:              null.NewBool(false, true),
-				NoSummary:                 null.NewBool(false, true),
 				SummaryExport:             null.NewString("foo", true),
 				TracesOutput:              defaultTracesOutput,
 				SummaryMode:               defaultSummaryMode,
@@ -398,14 +397,13 @@ func TestRuntimeOptions(t *testing.T) {
 		},
 		"summary and thresholds from env overwritten by CLI": {
 			useSysEnv: false,
-			systemEnv: map[string]string{"K6_NO_THRESHOLDS": "FALSE", "K6_NO_SUMMARY": "0", "K6_SUMMARY_EXPORT": "foo"},
-			cliFlags:  []string{"--no-thresholds", "true", "--no-summary", "true", "--summary-export", "bar"},
+			systemEnv: map[string]string{"K6_NO_THRESHOLDS": "FALSE", "K6_SUMMARY_EXPORT": "foo"},
+			cliFlags:  []string{"--no-thresholds", "true", "--summary-export", "bar"},
 			expRTOpts: lib.RuntimeOptions{
 				IncludeSystemEnvVars:      null.NewBool(false, false),
 				CompatibilityMode:         defaultCompatMode,
 				Env:                       map[string]string{},
 				NoThresholds:              null.NewBool(true, true),
-				NoSummary:                 null.NewBool(true, true),
 				SummaryExport:             null.NewString("bar", true),
 				TracesOutput:              defaultTracesOutput,
 				SummaryMode:               defaultSummaryMode,
@@ -416,12 +414,6 @@ func TestRuntimeOptions(t *testing.T) {
 			useSysEnv: false,
 			systemEnv: map[string]string{"K6_NO_THRESHOLDS": "boo"},
 			cliFlags:  []string{"--no-thresholds", "true"},
-			expErr:    true,
-		},
-		"env var error detected even when CLI flags overwrite 2": {
-			useSysEnv: false,
-			systemEnv: map[string]string{"K6_NO_SUMMARY": "hoo"},
-			cliFlags:  []string{"--no-summary", "true"},
 			expErr:    true,
 		},
 		"traces output default": {
@@ -475,13 +467,13 @@ func TestRuntimeOptions(t *testing.T) {
 		"summary mode from env overwritten by CLI": {
 			useSysEnv: false,
 			systemEnv: map[string]string{"K6_SUMMARY_MODE": "full"},
-			cliFlags:  []string{"--summary-mode", "legacy"},
+			cliFlags:  []string{"--summary-mode", "compact"},
 			expRTOpts: lib.RuntimeOptions{
 				IncludeSystemEnvVars:      null.NewBool(false, false),
 				CompatibilityMode:         defaultCompatMode,
 				Env:                       map[string]string{},
 				TracesOutput:              defaultTracesOutput,
-				SummaryMode:               null.NewString("legacy", true),
+				SummaryMode:               null.NewString("compact", true),
 				NewMachineReadableSummary: defaultNewMachineReadableSummary,
 			},
 		},

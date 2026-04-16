@@ -46,7 +46,7 @@ type cmdCloud struct {
 }
 
 func (c *cmdCloud) preRun(cmd *cobra.Command, _ []string) error {
-	// TODO: refactor (https://github.com/loadimpact/k6/issues/883)
+	// TODO: refactor (https://github.com/grafana/k6/issues/883)
 	//
 	// We deliberately parse the env variables, to validate for wrong
 	// values, even if we don't subsequently use them (if the respective
@@ -70,16 +70,6 @@ func (c *cmdCloud) preRun(cmd *cobra.Command, _ []string) error {
 			c.exitOnRunning = exitOnRunningValue
 		}
 	}
-	if uploadOnlyEnv, ok := c.gs.Env["K6_CLOUD_UPLOAD_ONLY"]; ok {
-		uploadOnlyValue, err := strconv.ParseBool(uploadOnlyEnv)
-		if err != nil {
-			return fmt.Errorf("parsing K6_CLOUD_UPLOAD_ONLY returned an error: %w", err)
-		}
-		if !cmd.Flags().Changed("upload-only") {
-			c.uploadOnly = uploadOnlyValue
-		}
-	}
-
 	return nil
 }
 
@@ -111,8 +101,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	// an execution shortcut option (e.g. `iterations` or `duration`),
 	// we will have multiple conflicting execution options since the
 	// derivation will set `scenarios` as well.
-	testRunState, err := test.buildTestRunState(test.consolidatedConfig.Options)
-	if err != nil {
+	if err := test.initRunner.SetOptions(test.consolidatedConfig.Options); err != nil {
 		return err
 	}
 
@@ -128,16 +117,16 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	printBar(c.gs, progressBar)
 
 	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Building the archive..."))
-	arc := testRunState.Runner.MakeArchive()
+	arc := test.makeArchive()
 
-	tmpCloudConfig, err := cloudapi.GetTemporaryCloudConfig(arc.Options.Cloud, arc.Options.External)
+	tmpCloudConfig, err := cloudapi.GetTemporaryCloudConfig(arc.Options.Cloud)
 	if err != nil {
 		return err
 	}
 
 	// Cloud config
 	cloudConfig, warn, err := cloudapi.GetConsolidatedConfig(
-		test.derivedConfig.Collectors["cloud"], c.gs.Env, "", arc.Options.Cloud, arc.Options.External)
+		test.derivedConfig.Collectors["cloud"], c.gs.Env, "", arc.Options.Cloud)
 	if err != nil {
 		return err
 	}
@@ -170,7 +159,6 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	}
 
 	arc.Options.Cloud = b
-	arc.Options.External[cloudapi.LegacyCloudConfigKey] = b
 
 	name := cloudConfig.Name.String
 	if !cloudConfig.Name.Valid || cloudConfig.Name.String == "" {
@@ -371,12 +359,6 @@ func (c *cmdCloud) flagSet() *pflag.FlagSet {
 		"exits when test reaches the running status")
 	flags.BoolVar(&c.showCloudLogs, "show-logs", c.showCloudLogs,
 		"enable showing of logs when a test is executed in the cloud")
-	flags.BoolVar(&c.uploadOnly, "upload-only", c.uploadOnly,
-		"only upload the test to the cloud without actually starting a test run")
-	if err := flags.MarkDeprecated("upload-only", "use \"k6 cloud upload\" instead"); err != nil {
-		panic(err) // Should never happen
-	}
-
 	return flags
 }
 
@@ -404,7 +386,6 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 		gs:            gs,
 		showCloudLogs: true,
 		exitOnRunning: false,
-		uploadOnly:    false,
 	}
 
 	exampleText := getExampleText(gs, `
@@ -516,7 +497,6 @@ func resolveAndSetProjectID(
 		}
 
 		arc.Options.Cloud = b
-		arc.Options.External[cloudapi.LegacyCloudConfigKey] = b
 
 		cloudConfig.ProjectID = null.IntFrom(projectID)
 	}
