@@ -25,58 +25,66 @@ func TestCheckBuiltinDependencies(t *testing.T) {
 		wantErr   bool
 	}{
 		{
-			name:    "k6 satisfied",
-			deps:    map[string]string{"k6": "=v1.0.0"},
-			exts:    []*ext.Extension{},
+			name:      "k6 satisfied",
+			k6Version: "v1.0.0",
+			deps:      map[string]string{"k6": "=v1.0.0"},
+
 			wantErr: false,
 		},
 		{
-			name:    "k6 not satisfied",
-			deps:    map[string]string{"k6": ">v1.0.0"},
-			exts:    []*ext.Extension{},
+			name:      "k6 not satisfied",
+			k6Version: "v1.0.0",
+			deps:      map[string]string{"k6": ">v1.0.0"},
+
 			wantErr: true,
 		},
 		{
-			name:    "extension not present",
-			deps:    map[string]string{"k6": "*", "k6/x/faker": "*"},
-			exts:    []*ext.Extension{},
+			name:      "extension not present",
+			k6Version: "v1.0.0",
+			deps:      map[string]string{"k6": "*", "k6/x/faker": "*"},
+
 			wantErr: true,
 		},
 		{
-			name: "extension satisfied",
-			deps: map[string]string{"k6/x/faker": "=v0.4.0"},
-			exts: []*ext.Extension{
-				{Name: "k6/x/faker", Module: "github.com/grafana/xk6-faker", Version: "v0.4.0"},
-			},
-			wantErr: false,
-		},
-		{
-			name: "extension not satisfied",
-			deps: map[string]string{"k6/x/faker": ">v0.4.0"},
-			exts: []*ext.Extension{
-				{Name: "k6/x/faker", Module: "github.com/grafana/xk6-faker", Version: "v0.4.0"},
-			},
-			wantErr: true,
-		},
-		{
-			name: "k6 and extension satisfied",
-			deps: map[string]string{"k6": "=v1.0.0", "k6/x/faker": "=v0.4.0"},
+			name:      "extension satisfied",
+			k6Version: "v1.0.0",
+			deps:      map[string]string{"k6/x/faker": "=v0.4.0"},
 			exts: []*ext.Extension{
 				{Name: "k6/x/faker", Module: "github.com/grafana/xk6-faker", Version: "v0.4.0"},
 			},
 			wantErr: false,
 		},
 		{
-			name: "k6 satisfied, extension not satisfied",
-			deps: map[string]string{"k6": "=v1.0.0", "k6/x/faker": ">v0.4.0"},
+			name:      "extension not satisfied",
+			k6Version: "v1.0.0",
+			deps:      map[string]string{"k6/x/faker": ">v0.4.0"},
 			exts: []*ext.Extension{
 				{Name: "k6/x/faker", Module: "github.com/grafana/xk6-faker", Version: "v0.4.0"},
 			},
 			wantErr: true,
 		},
 		{
-			name: "k6 not satisfied, extension satisfied",
-			deps: map[string]string{"k6": ">v1.0.0", "k6/x/faker": "=v0.4.0"},
+			name:      "k6 and extension satisfied",
+			k6Version: "v1.0.0",
+			deps:      map[string]string{"k6": "=v1.0.0", "k6/x/faker": "=v0.4.0"},
+			exts: []*ext.Extension{
+				{Name: "k6/x/faker", Module: "github.com/grafana/xk6-faker", Version: "v0.4.0"},
+			},
+			wantErr: false,
+		},
+		{
+			name:      "k6 satisfied, extension not satisfied",
+			k6Version: "v1.0.0",
+			deps:      map[string]string{"k6": "=v1.0.0", "k6/x/faker": ">v0.4.0"},
+			exts: []*ext.Extension{
+				{Name: "k6/x/faker", Module: "github.com/grafana/xk6-faker", Version: "v0.4.0"},
+			},
+			wantErr: true,
+		},
+		{
+			name:      "k6 not satisfied, extension satisfied",
+			k6Version: "v1.0.0",
+			deps:      map[string]string{"k6": ">v1.0.0", "k6/x/faker": "=v0.4.0"},
 			exts: []*ext.Extension{
 				{Name: "k6/x/faker", Module: "github.com/grafana/xk6-faker", Version: "v0.4.0"},
 			},
@@ -87,43 +95,57 @@ func TestCheckBuiltinDependencies(t *testing.T) {
 			name:      "k6 build-metadata pseudo-version matches exact constraint",
 			k6Version: "v0.0.0+abc123456789",
 			deps:      map[string]string{"k6": "=v0.0.0+abc123456789"},
-			exts:      []*ext.Extension{},
-			wantErr:   false,
+
+			wantErr: false,
 		},
 		{
 			name:      "k6 go pseudo-version matches exact constraint",
 			k6Version: "v0.0.0-20241015123456-abc123456789",
 			deps:      map[string]string{"k6": "=v0.0.0-20241015123456-abc123456789"},
-			exts:      []*ext.Extension{},
-			wantErr:   false,
+
+			wantErr: false,
 		},
 		{
 			name:      "k6 build-metadata pseudo-version matches constraint with same SHA",
 			k6Version: "v0.0.0+abc123456789",
 			deps:      map[string]string{"k6": "=v0.0.0-20241015123456-abc123456789"},
-			exts:      []*ext.Extension{},
-			wantErr:   false,
+
+			wantErr: false,
 		},
 		{
 			name:      "k6 go pseudo-version matches constraint with build-metadata SHA",
 			k6Version: "v0.0.0-20241015123456-abc123456789",
 			deps:      map[string]string{"k6": "=v0.0.0+abc123456789"},
-			exts:      []*ext.Extension{},
-			wantErr:   false,
+
+			wantErr: false,
 		},
 		{
 			name:      "k6 pseudo-version does not match different SHA",
 			k6Version: "v0.0.0+abc123456789",
 			deps:      map[string]string{"k6": "=v0.0.0+def456789012"},
-			exts:      []*ext.Extension{},
-			wantErr:   true,
+
+			wantErr: true,
+		},
+		{
+			name:      "k6 pseudo-version does not satisfy strict greater-than constraint with same SHA",
+			k6Version: "v0.0.0+abc123456789",
+			deps:      map[string]string{"k6": ">v0.0.0+abc123456789"},
+
+			wantErr: true,
+		},
+		{
+			name:      "k6 pseudo-version does not satisfy not-equal constraint with same SHA",
+			k6Version: "v0.0.0+abc123456789",
+			deps:      map[string]string{"k6": "!=v0.0.0+abc123456789"},
+
+			wantErr: true,
 		},
 		{
 			name:      "k6 pseudo-version does not satisfy range constraint",
 			k6Version: "v0.0.0+abc123456789",
 			deps:      map[string]string{"k6": ">=v1.0.0"},
-			exts:      []*ext.Extension{},
-			wantErr:   true,
+
+			wantErr: true,
 		},
 		{
 			name:      "extension build-metadata pseudo-version matches exact constraint",
@@ -143,6 +165,155 @@ func TestCheckBuiltinDependencies(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		// Pseudo-versions with non-zero base version against a plain semver range.
+		// go pseudo-versions (pre-release form) do not satisfy non-pre-release constraints
+		// per Masterminds semver semantics, regardless of whether the base version is higher.
+		// build-metadata pseudo-versions (+sha) behave like normal releases because metadata
+		// is stripped before comparison.
+		// Using >=vX.Y.Z-0 as the constraint lower bound opts pre-release versions back in.
+		{
+			name:      "k6 go pseudo-version with lower base version does not satisfy range constraint",
+			k6Version: "v1.4.0-20241015123456-abc123456789",
+			deps:      map[string]string{"k6": ">=v1.5.0"},
+
+			wantErr: true,
+		},
+		{
+			name:      "k6 go pseudo-version with higher base version does not satisfy non-pre-release range constraint",
+			k6Version: "v1.6.0-20241015123456-abc123456789",
+			deps:      map[string]string{"k6": ">=v1.5.0"},
+
+			wantErr: true,
+		},
+		{
+			name:      "k6 go pseudo-version with higher base version satisfies pre-release range constraint",
+			k6Version: "v1.6.0-20241015123456-abc123456789",
+			deps:      map[string]string{"k6": ">=v1.5.0-0"},
+
+			wantErr: false,
+		},
+		{
+			name:      "k6 go pseudo-version with lower base version does not satisfy pre-release range constraint",
+			k6Version: "v1.4.0-20241015123456-abc123456789",
+			deps:      map[string]string{"k6": ">=v1.5.0-0"},
+
+			wantErr: true,
+		},
+		{
+			name:      "k6 build-metadata pseudo-version with lower base version does not satisfy range constraint",
+			k6Version: "v1.4.0+abc123456789",
+			deps:      map[string]string{"k6": ">=v1.5.0"},
+
+			wantErr: true,
+		},
+		{
+			name:      "k6 build-metadata pseudo-version with higher base version satisfies range constraint",
+			k6Version: "v1.6.0+abc123456789",
+			deps:      map[string]string{"k6": ">=v1.5.0"},
+
+			wantErr: false,
+		},
+		// Pseudo-version constraints (the constraint itself is a pseudo-version)
+		{
+			name:      "normal k6 version does not match pseudo-version exact constraint",
+			k6Version: "v1.0.0",
+			deps:      map[string]string{"k6": "=v0.0.0+abc123456789"},
+			wantErr:   true,
+		},
+		{
+			name:      "normal k6 version satisfies pseudo-version lower-bound range",
+			k6Version: "v1.0.0",
+			deps:      map[string]string{"k6": ">=v0.0.0-20241015123456-abc123456789"},
+			wantErr:   false,
+		},
+		{
+			name:      "k6 pseudo-version satisfies matching pseudo-version lower-bound range",
+			k6Version: "v0.0.0+abc123456789",
+			deps:      map[string]string{"k6": ">=v0.0.0-20241015123456-abc123456789"},
+			wantErr:   false,
+		},
+		{
+			name:      "extension go pseudo-version matches build-metadata pseudo-version exact constraint",
+			k6Version: "v1.0.0",
+			deps:      map[string]string{"k6/x/sql": "=v0.0.0+abc123456789"},
+			exts: []*ext.Extension{
+				{Name: "k6/x/sql", Module: "github.com/grafana/xk6-sql", Version: "v0.0.0-20241015123456-abc123456789"},
+			},
+			wantErr: false,
+		},
+		// Multiple constraints (compound range)
+		{
+			name:      "k6 satisfies compound range constraint",
+			k6Version: "v1.0.0",
+			deps:      map[string]string{"k6": ">=v0.9.0 <v2.0.0"},
+			wantErr:   false,
+		},
+		{
+			name:      "k6 below compound range constraint",
+			k6Version: "v1.0.0",
+			deps:      map[string]string{"k6": ">=v1.1.0 <v2.0.0"},
+			wantErr:   true,
+		},
+		{
+			name:      "k6 above compound range constraint",
+			k6Version: "v1.0.0",
+			deps:      map[string]string{"k6": ">=v0.9.0 <v1.0.0"},
+			wantErr:   true,
+		},
+		{
+			name:      "k6 build-metadata pseudo-version does not satisfy compound range constraint",
+			k6Version: "v0.0.0+abc123456789",
+			deps:      map[string]string{"k6": ">=v0.9.0 <v2.0.0"},
+			wantErr:   true,
+		},
+		{
+			name:      "k6 go pseudo-version does not satisfy compound range constraint",
+			k6Version: "v0.0.0-20241015123456-abc123456789",
+			deps:      map[string]string{"k6": ">=v0.9.0 <v2.0.0"},
+			wantErr:   true,
+		},
+		// Compound constraint: exact pseudo-version SHA plus an upper limit.
+		// Note: compound constraints (containing spaces) bypass SHA comparison and
+		// rely entirely on semver, so cross-format SHA matching does not apply.
+		{
+			name:      "k6 go pseudo-version does not satisfy exact-sha-plus-upper-limit compound constraint",
+			k6Version: "v1.6.0-20241015123456-abc123456789",
+			deps:      map[string]string{"k6": "=v1.6.0-20241015123456-abc123456789 <v2.0.0"},
+
+			wantErr: true,
+		},
+		{
+			name:      "k6 go pseudo-version with different SHA does not satisfy exact-sha-plus-upper-limit compound constraint",
+			k6Version: "v1.7.0-20241015123456-def456789012",
+			deps:      map[string]string{"k6": "=v1.6.0-20241015123456-abc123456789 <v2.0.0"},
+
+			wantErr: true,
+		},
+		{
+			name:      "k6 build-metadata pseudo-version does not match go pseudo-version in compound constraint",
+			k6Version: "v1.6.0+abc123456789",
+			deps:      map[string]string{"k6": "=v1.6.0-20241015123456-abc123456789 <v2.0.0"},
+
+			wantErr: true,
+		},
+		{
+			name:      "extension satisfies compound range constraint",
+			k6Version: "v1.0.0",
+			deps:      map[string]string{"k6/x/faker": ">=v0.3.0 <v1.0.0"},
+			exts: []*ext.Extension{
+				{Name: "k6/x/faker", Module: "github.com/grafana/xk6-faker", Version: "v0.4.0"},
+			},
+			wantErr: false,
+		},
+		{
+			name:      "extension does not satisfy compound range constraint",
+			k6Version: "v1.0.0",
+			deps:      map[string]string{"k6/x/faker": ">=v0.5.0 <v1.0.0"},
+			exts: []*ext.Extension{
+				{Name: "k6/x/faker", Module: "github.com/grafana/xk6-faker", Version: "v0.4.0"},
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -158,11 +329,7 @@ func TestCheckBuiltinDependencies(t *testing.T) {
 				deps[name] = constraint
 			}
 
-			k6Version := tc.k6Version
-			if k6Version == "" {
-				k6Version = "v1.0.0"
-			}
-			err := checkBuiltinDependencies(deps, k6Version, tc.exts)
+			err := checkBuiltinDependencies(deps, tc.k6Version, tc.exts)
 			assert.Equal(t, tc.wantErr, err != nil)
 		})
 	}
@@ -212,6 +379,9 @@ func TestPseudoVersionSatisfies(t *testing.T) {
 		{"v0.0.0+abc123456789", "=v0.0.0+abc123", true},
 		// different SHA
 		{"v0.0.0+abc123456789", "=v0.0.0+def456789012", false},
+		// non-exact operators with matching SHA — SHA comparison should not apply
+		{"v0.0.0+abc123456789", ">v0.0.0+abc123456789", false},
+		{"v0.0.0+abc123456789", "!=v0.0.0+abc123456789", false},
 		// range constraint — no SHA comparison
 		{"v0.0.0+abc123456789", ">=v1.0.0", false},
 		// compound constraint — no SHA comparison
