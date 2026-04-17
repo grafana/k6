@@ -20,3 +20,9 @@ type EventTargetCrashed struct{}
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Inspector#event-targetReloadedAfterCrash
 type EventTargetReloadedAfterCrash struct{}
+
+// EventWorkerScriptLoaded fired on worker targets when main worker script
+// and any imported scripts have been evaluated.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Inspector#event-workerScriptLoaded
+type EventWorkerScriptLoaded struct{}

@@ -476,7 +476,7 @@ func GetAdScriptAncestry(frameID cdp.FrameID) *GetAdScriptAncestryParams {
 
 // GetAdScriptAncestryReturns return values.
 type GetAdScriptAncestryReturns struct {
-	AdScriptAncestry *AdScriptAncestry `json:"adScriptAncestry,omitempty,omitzero"` // The ancestry chain of ad script identifiers leading to this frame's creation, along with the root script's filterlist rule. The ancestry chain is ordered from the most immediate script (in the frame creation stack) to more distant ancestors (that created the immediately preceding script). Only sent if frame is labelled as an ad and ids are available.
+	AdScriptAncestry *cdp.AdAncestry `json:"adScriptAncestry,omitempty,omitzero"` // The ancestry chain of ad script identifiers leading to this frame's creation, along with the root script's filterlist rule. The ancestry chain is ordered from the most immediate script (in the frame creation stack) to more distant ancestors (that created the immediately preceding script). Only sent if frame is labelled as an ad and ids are available.
 }
 
 // Do executes Page.getAdScriptAncestry against the provided context.
@@ -484,7 +484,7 @@ type GetAdScriptAncestryReturns struct {
 // returns:
 //
 //	adScriptAncestry - The ancestry chain of ad script identifiers leading to this frame's creation, along with the root script's filterlist rule. The ancestry chain is ordered from the most immediate script (in the frame creation stack) to more distant ancestors (that created the immediately preceding script). Only sent if frame is labelled as an ad and ids are available.
-func (p *GetAdScriptAncestryParams) Do(ctx context.Context) (adScriptAncestry *AdScriptAncestry, err error) {
+func (p *GetAdScriptAncestryParams) Do(ctx context.Context) (adScriptAncestry *cdp.AdAncestry, err error) {
 	// execute
 	var res GetAdScriptAncestryReturns
 	err = cdp.Execute(ctx, CommandGetAdScriptAncestry, p, &res)
@@ -1792,6 +1792,58 @@ func (p *SetPrerenderingAllowedParams) Do(ctx context.Context) (err error) {
 	return cdp.Execute(ctx, CommandSetPrerenderingAllowed, p, nil)
 }
 
+// GetAnnotatedPageContentParams get the annotated page content for the main
+// frame. This is an experimental command that is subject to change.
+type GetAnnotatedPageContentParams struct {
+	IncludeActionableInformation bool `json:"includeActionableInformation"` // Whether to include actionable information. Defaults to true.
+}
+
+// GetAnnotatedPageContent get the annotated page content for the main frame.
+// This is an experimental command that is subject to change.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Page#method-getAnnotatedPageContent
+//
+// parameters:
+func GetAnnotatedPageContent() *GetAnnotatedPageContentParams {
+	return &GetAnnotatedPageContentParams{
+		IncludeActionableInformation: true,
+	}
+}
+
+// WithIncludeActionableInformation whether to include actionable
+// information. Defaults to true.
+func (p GetAnnotatedPageContentParams) WithIncludeActionableInformation(includeActionableInformation bool) *GetAnnotatedPageContentParams {
+	p.IncludeActionableInformation = includeActionableInformation
+	return &p
+}
+
+// GetAnnotatedPageContentReturns return values.
+type GetAnnotatedPageContentReturns struct {
+	Content string `json:"content,omitempty,omitzero"` // The annotated page content as a base64 encoded protobuf. The format is defined by the AnnotatedPageContent message in components/optimization_guide/proto/features/common_quality_data.proto
+}
+
+// Do executes Page.getAnnotatedPageContent against the provided context.
+//
+// returns:
+//
+//	content - The annotated page content as a base64 encoded protobuf. The format is defined by the AnnotatedPageContent message in components/optimization_guide/proto/features/common_quality_data.proto
+func (p *GetAnnotatedPageContentParams) Do(ctx context.Context) (content []byte, err error) {
+	// execute
+	var res GetAnnotatedPageContentReturns
+	err = cdp.Execute(ctx, CommandGetAnnotatedPageContent, p, &res)
+	if err != nil {
+		return nil, err
+	}
+
+	// decode
+	var dec []byte
+	dec, err = base64.StdEncoding.DecodeString(res.Content)
+	if err != nil {
+		return nil, err
+	}
+	return dec, nil
+}
+
 // Command names.
 const (
 	CommandAddScriptToEvaluateOnNewDocument    = "Page.addScriptToEvaluateOnNewDocument"
@@ -1842,4 +1894,5 @@ const (
 	CommandWaitForDebugger                     = "Page.waitForDebugger"
 	CommandSetInterceptFileChooserDialog       = "Page.setInterceptFileChooserDialog"
 	CommandSetPrerenderingAllowed              = "Page.setPrerenderingAllowed"
+	CommandGetAnnotatedPageContent             = "Page.getAnnotatedPageContent"
 )
