@@ -275,12 +275,21 @@ func checkVersionConstraint(name, version string, constraint *semver.Constraints
 // checkConstraintBySHA checks if vSHA matches the SHA embedded in constraint.
 // Returns (satisfied, definitive): definitive=false means the constraint has no
 // embedded SHA and normal semver comparison should be used instead.
+// SHA matching is only applied to exact-version constraints (operator "=" or no
+// operator); all other operators fall back to normal semver comparison.
 func checkConstraintBySHA(vSHA string, constraint *semver.Constraints) (bool, bool) {
 	cs := constraint.String()
+	// Compound constraints cannot be matched by SHA alone; refuse definitively
+	// so the caller does not fall back to semver, which mishandles pseudo-versions.
 	if strings.ContainsAny(cs, " ,") {
+		return false, true
+	}
+	versionStr := constraintVersionStr(cs)
+	operator := cs[:len(cs)-len(versionStr)]
+	if operator != "" && operator != "=" {
 		return false, false
 	}
-	cv, err := semver.NewVersion(constraintVersionStr(cs))
+	cv, err := semver.NewVersion(versionStr)
 	if err != nil {
 		return false, false
 	}
