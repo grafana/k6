@@ -24,7 +24,6 @@ import (
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/ext"
-	"go.k6.io/k6/internal/build"
 	"go.k6.io/k6/internal/js"
 	"go.k6.io/k6/internal/loader"
 	"go.k6.io/k6/js/modules"
@@ -272,7 +271,9 @@ func resolveModulesDependencies(
 		return deps, nil
 	}
 
-	if !isCustomBuildRequired(deps, build.Version, ext.GetAll()) {
+	if err := checkBuiltinDependencies(deps, runtimeK6Version(), ext.GetAll()); err != nil {
+		logger.WithError(err).Debug("Current binary does not satisfy all dependencies, custom build required")
+	} else {
 		logger.
 			Debug("The current k6 binary already satisfies all the required dependencies," +
 				" it isn't required to provision a new binary.")

@@ -14,77 +14,139 @@ import (
 	"go.k6.io/k6/internal/cmd/tests"
 )
 
-func TestIsCustomBuildRequired(t *testing.T) {
+func TestCheckBuiltinDependencies(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
-		title  string
-		deps   map[string]string
-		exts   []*ext.Extension
-		expect bool
+		name      string
+		k6Version string
+		deps      map[string]string
+		exts      []*ext.Extension
+		wantErr   bool
 	}{
 		{
-			title:  "k6 satisfied",
-			deps:   map[string]string{"k6": "=v1.0.0"},
-			exts:   []*ext.Extension{},
-			expect: false,
+			name:    "k6 satisfied",
+			deps:    map[string]string{"k6": "=v1.0.0"},
+			exts:    []*ext.Extension{},
+			wantErr: false,
 		},
 		{
-			title:  "k6 not satisfied",
-			deps:   map[string]string{"k6": ">v1.0.0"},
-			exts:   []*ext.Extension{},
-			expect: true,
+			name:    "k6 not satisfied",
+			deps:    map[string]string{"k6": ">v1.0.0"},
+			exts:    []*ext.Extension{},
+			wantErr: true,
 		},
 		{
-			title:  "extension not present",
-			deps:   map[string]string{"k6": "*", "k6/x/faker": "*"},
-			exts:   []*ext.Extension{},
-			expect: true,
+			name:    "extension not present",
+			deps:    map[string]string{"k6": "*", "k6/x/faker": "*"},
+			exts:    []*ext.Extension{},
+			wantErr: true,
 		},
 		{
-			title: "extension satisfied",
-			deps:  map[string]string{"k6/x/faker": "=v0.4.0"},
+			name: "extension satisfied",
+			deps: map[string]string{"k6/x/faker": "=v0.4.0"},
 			exts: []*ext.Extension{
 				{Name: "k6/x/faker", Module: "github.com/grafana/xk6-faker", Version: "v0.4.0"},
 			},
-			expect: false,
+			wantErr: false,
 		},
 		{
-			title: "extension not satisfied",
-			deps:  map[string]string{"k6/x/faker": ">v0.4.0"},
+			name: "extension not satisfied",
+			deps: map[string]string{"k6/x/faker": ">v0.4.0"},
 			exts: []*ext.Extension{
 				{Name: "k6/x/faker", Module: "github.com/grafana/xk6-faker", Version: "v0.4.0"},
 			},
-			expect: true,
+			wantErr: true,
 		},
 		{
-			title: "k6 and extension satisfied",
-			deps:  map[string]string{"k6": "=v1.0.0", "k6/x/faker": "=v0.4.0"},
+			name: "k6 and extension satisfied",
+			deps: map[string]string{"k6": "=v1.0.0", "k6/x/faker": "=v0.4.0"},
 			exts: []*ext.Extension{
 				{Name: "k6/x/faker", Module: "github.com/grafana/xk6-faker", Version: "v0.4.0"},
 			},
-			expect: false,
+			wantErr: false,
 		},
 		{
-			title: "k6 satisfied, extension not satisfied",
-			deps:  map[string]string{"k6": "=v1.0.0", "k6/x/faker": ">v0.4.0"},
+			name: "k6 satisfied, extension not satisfied",
+			deps: map[string]string{"k6": "=v1.0.0", "k6/x/faker": ">v0.4.0"},
 			exts: []*ext.Extension{
 				{Name: "k6/x/faker", Module: "github.com/grafana/xk6-faker", Version: "v0.4.0"},
 			},
-			expect: true,
+			wantErr: true,
 		},
 		{
-			title: "k6 not satisfied, extension satisfied",
-			deps:  map[string]string{"k6": ">v1.0.0", "k6/x/faker": "=v0.4.0"},
+			name: "k6 not satisfied, extension satisfied",
+			deps: map[string]string{"k6": ">v1.0.0", "k6/x/faker": "=v0.4.0"},
 			exts: []*ext.Extension{
 				{Name: "k6/x/faker", Module: "github.com/grafana/xk6-faker", Version: "v0.4.0"},
 			},
-			expect: true,
+			wantErr: true,
+		},
+		// Pseudo-version cases
+		{
+			name:      "k6 build-metadata pseudo-version matches exact constraint",
+			k6Version: "v0.0.0+abc123456789",
+			deps:      map[string]string{"k6": "=v0.0.0+abc123456789"},
+			exts:      []*ext.Extension{},
+			wantErr:   false,
+		},
+		{
+			name:      "k6 go pseudo-version matches exact constraint",
+			k6Version: "v0.0.0-20241015123456-abc123456789",
+			deps:      map[string]string{"k6": "=v0.0.0-20241015123456-abc123456789"},
+			exts:      []*ext.Extension{},
+			wantErr:   false,
+		},
+		{
+			name:      "k6 build-metadata pseudo-version matches constraint with same SHA",
+			k6Version: "v0.0.0+abc123456789",
+			deps:      map[string]string{"k6": "=v0.0.0-20241015123456-abc123456789"},
+			exts:      []*ext.Extension{},
+			wantErr:   false,
+		},
+		{
+			name:      "k6 go pseudo-version matches constraint with build-metadata SHA",
+			k6Version: "v0.0.0-20241015123456-abc123456789",
+			deps:      map[string]string{"k6": "=v0.0.0+abc123456789"},
+			exts:      []*ext.Extension{},
+			wantErr:   false,
+		},
+		{
+			name:      "k6 pseudo-version does not match different SHA",
+			k6Version: "v0.0.0+abc123456789",
+			deps:      map[string]string{"k6": "=v0.0.0+def456789012"},
+			exts:      []*ext.Extension{},
+			wantErr:   true,
+		},
+		{
+			name:      "k6 pseudo-version does not satisfy range constraint",
+			k6Version: "v0.0.0+abc123456789",
+			deps:      map[string]string{"k6": ">=v1.0.0"},
+			exts:      []*ext.Extension{},
+			wantErr:   true,
+		},
+		{
+			name:      "extension build-metadata pseudo-version matches exact constraint",
+			k6Version: "v1.0.0",
+			deps:      map[string]string{"k6/x/sql": "=v0.0.0+abc123456789"},
+			exts: []*ext.Extension{
+				{Name: "k6/x/sql", Module: "github.com/grafana/xk6-sql", Version: "v0.0.0+abc123456789"},
+			},
+			wantErr: false,
+		},
+		{
+			name:      "extension go pseudo-version matches exact constraint",
+			k6Version: "v1.0.0",
+			deps:      map[string]string{"k6/x/sql": "=v0.0.0-20241015123456-abc123456789"},
+			exts: []*ext.Extension{
+				{Name: "k6/x/sql", Module: "github.com/grafana/xk6-sql", Version: "v0.0.0-20241015123456-abc123456789"},
+			},
+			wantErr: false,
 		},
 	}
 
 	for _, tc := range testCases {
-		t.Run(tc.title, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
 			deps := make(map[string]*semver.Constraints)
@@ -96,9 +158,74 @@ func TestIsCustomBuildRequired(t *testing.T) {
 				deps[name] = constraint
 			}
 
-			k6Version := "v1.0.0"
-			required := isCustomBuildRequired(deps, k6Version, tc.exts)
-			assert.Equal(t, tc.expect, required)
+			k6Version := tc.k6Version
+			if k6Version == "" {
+				k6Version = "v1.0.0"
+			}
+			err := checkBuiltinDependencies(deps, k6Version, tc.exts)
+			assert.Equal(t, tc.wantErr, err != nil)
+		})
+	}
+}
+
+func TestExtractVersionSHA(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		version string
+		sha     string
+		ok      bool
+	}{
+		{"v0.0.0-20241015123456-abc123456789", "abc123456789", true},
+		{"v1.2.3-0.20241015123456-abc123456789", "abc123456789", true},
+		{"v0.0.0+abc123456789", "abc123456789", true},
+		{"v0.0.0+abc123", "abc123", true},
+		{"v1.0.0", "", false},
+		{"v0.0.0-alpha", "", false},
+		{"1.0.0", "", false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.version, func(t *testing.T) {
+			t.Parallel()
+			sha, ok := extractVersionSHA(tc.version)
+			assert.Equal(t, tc.ok, ok)
+			assert.Equal(t, tc.sha, sha)
+		})
+	}
+}
+
+func TestPseudoVersionSatisfies(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		version    string
+		constraint string
+		satisfies  bool
+	}{
+		{"v0.0.0+abc123456789", "=v0.0.0+abc123456789", true},
+		{"v0.0.0-20241015123456-abc123456789", "=v0.0.0-20241015123456-abc123456789", true},
+		// cross-format: same SHA, different pseudo-version style
+		{"v0.0.0+abc123456789", "=v0.0.0-20241015123456-abc123456789", true},
+		{"v0.0.0-20241015123456-abc123456789", "=v0.0.0+abc123456789", true},
+		// short SHA prefix match
+		{"v0.0.0+abc123456789", "=v0.0.0+abc123", true},
+		// different SHA
+		{"v0.0.0+abc123456789", "=v0.0.0+def456789012", false},
+		// range constraint — no SHA comparison
+		{"v0.0.0+abc123456789", ">=v1.0.0", false},
+		// compound constraint — no SHA comparison
+		{"v0.0.0+abc123456789", ">=v0.0.0 <v1.0.0", false},
+		// version has no SHA
+		{"v1.0.0", "=v0.0.0+abc123456789", false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.version+"/"+tc.constraint, func(t *testing.T) {
+			t.Parallel()
+			c, err := semver.NewConstraint(tc.constraint)
+			require.NoError(t, err)
+			assert.Equal(t, tc.satisfies, pseudoVersionSatisfies(tc.version, c))
 		})
 	}
 }
