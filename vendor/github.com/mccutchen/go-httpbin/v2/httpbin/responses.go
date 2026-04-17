@@ -42,6 +42,13 @@ type noBodyResponse struct {
 	Gzipped  bool `json:"gzipped,omitempty"`
 }
 
+// A response for incoming request where body data is discarded, like `/upload`
+// (POST, PUT, PATCH).
+type discardedBodyResponse struct {
+	noBodyResponse
+	BytesReceived int64 `json:"bytes_received"`
+}
+
 // A generic response for any incoming request that might contain a body (POST,
 // PUT, PATCH, etc).
 type bodyResponse struct {
@@ -57,11 +64,16 @@ type bodyResponse struct {
 	JSON  any        `json:"json"`
 }
 
-type cookiesResponse map[string]string
+type cookiesResponse struct {
+	Cookies map[string]string `json:"cookies"`
+}
 
 type authResponse struct {
-	Authorized bool   `json:"authorized"`
-	User       string `json:"user"`
+	Authenticated bool   `json:"authenticated"`
+	User          string `json:"user"`
+
+	// kept for backwards-compatibility with go-httpbin versions <= 2.20
+	Authorized bool `json:"authorized"`
 }
 
 // An actual stream response body will be made up of one or more of these
