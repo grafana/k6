@@ -2,6 +2,7 @@ package cloudapi
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -36,6 +37,40 @@ func (c *Client) ValidateToken(ctx context.Context, stackURL string) (_ *k6cloud
 	}
 
 	return res, nil
+}
+
+// ValidateOptions validates cloud test options.
+func (c *Client) ValidateOptions(ctx context.Context, projectID int32, opts lib.Options) (err error) {
+	// Round-trip [lib.Options] through JSON so every script option
+	// reaches the backend via [k6cloud.Options.AdditionalProperties].
+	buf, err := json.Marshal(opts)
+	if err != nil {
+		return err
+	}
+	copts := *k6cloud.NewOptions()
+	if err := json.Unmarshal(buf, &copts.AdditionalProperties); err != nil {
+		return err
+	}
+
+	req := k6cloud.NewValidateOptionsRequest(copts)
+	if projectID > 0 {
+		req.SetProjectId(projectID)
+	}
+	res, hr, err := c.apiClient.LoadTestsAPI.
+		ValidateOptions(c.authCtx(ctx)).
+		XStackId(c.stackID).
+		ValidateOptionsRequest(req).
+		Execute()
+	defer closeResponse(hr, &err)
+
+	if err := CheckResponse(hr, err); err != nil {
+		return err
+	}
+	if res == nil {
+		return errUnknown
+	}
+
+	return nil
 }
 
 func (c *Client) authCtx(ctx context.Context) context.Context {
