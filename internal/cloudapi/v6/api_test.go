@@ -12,6 +12,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/v2/internal/lib/testutils"
+	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/lib/types"
+	"gopkg.in/guregu/null.v3"
 )
 
 func TestValidateToken(t *testing.T) {
@@ -104,6 +107,32 @@ func TestClientRetry(t *testing.T) {
 	// the client already tests retries. we just verify we set it up correctly.
 	assert.Equal(t, MaxRetries, client.apiClient.GetConfig().MaxRetries)
 	assert.Equal(t, RetryInterval, client.apiClient.GetConfig().RetryInterval)
+}
+
+func TestValidateOptions(t *testing.T) {
+	t.Parallel()
+
+	var body struct {
+		Options   json.RawMessage `json:"options"`
+		ProjectID int32           `json:"project_id"`
+	}
+	client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		writeJSON(t, w, http.StatusOK, map[string]any{}) // the actual response body is not relevant
+	}))
+
+	opts := lib.Options{
+		VUs:      null.IntFrom(5),
+		Duration: types.NullDurationFrom(10 * time.Second),
+		Stages:   []lib.Stage{{Duration: types.NullDurationFrom(30 * time.Second), Target: null.IntFrom(20)}},
+		RunTags:  map[string]string{"env": "staging"},
+	}
+	require.NoError(t, client.ValidateOptions(t.Context(), 42, opts))
+
+	want, err := json.Marshal(opts)
+	require.NoError(t, err)
+	assert.JSONEq(t, string(want), string(body.Options))
+	assert.Equal(t, int32(42), body.ProjectID)
 }
 
 func newTestClient(t *testing.T, handler http.Handler) *Client {
