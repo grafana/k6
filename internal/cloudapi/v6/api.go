@@ -5,46 +5,57 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 
 	k6cloud "github.com/grafana/k6-cloud-openapi-client-go/k6"
+
+	"go.k6.io/k6/v2/lib"
 )
 
-// ValidateToken calls the endpoint to validate the Client's token and returns the result.
-func (c *Client) ValidateToken(stackURL string) (_ *k6cloud.AuthenticationResponse, err error) {
+// ValidateToken validates the cloud authentication token.
+func (c *Client) ValidateToken(ctx context.Context, stackURL string) (_ *k6cloud.AuthenticationResponse, err error) {
 	if stackURL == "" {
 		return nil, errors.New("stack URL is required to validate token")
 	}
-
 	if _, err := url.Parse(stackURL); err != nil {
 		return nil, fmt.Errorf("invalid stack URL: %w", err)
 	}
 
-	ctx := context.WithValue(context.Background(), k6cloud.ContextAccessToken, c.token)
-	req := c.apiClient.AuthorizationAPI.
-		Auth(ctx).
-		XStackUrl(stackURL)
+	res, hr, err := c.apiClient.AuthorizationAPI.
+		Auth(c.authCtx(ctx)).
+		XStackUrl(stackURL).
+		Execute()
+	defer closeResponse(hr, &err)
 
-	resp, httpRes, rerr := req.Execute()
-	defer func() {
-		if httpRes != nil {
-			_, _ = io.Copy(io.Discard, httpRes.Body)
-			if cerr := httpRes.Body.Close(); cerr != nil && err == nil {
-				err = cerr
-			}
-		}
+	if err := CheckResponse(hr, err); err != nil {
+		return nil, err
+	}
+	if res == nil {
+		return nil, errUnknown
+	}
+
+	return res, nil
+}
+
+func (c *Client) authCtx(ctx context.Context) context.Context {
+	return context.WithValue(ctx, k6cloud.ContextAccessToken, c.token)
+}
+
+func closeResponse(res *http.Response, rerr *error) {
+	if res == nil {
+		return
+	}
+	_, _ = io.Copy(io.Discard, res.Body)
+	if err := res.Body.Close(); err != nil && *rerr == nil {
+		*rerr = err
+	}
+}
+
+func archiveReader(arc *lib.Archive) io.ReadCloser {
+	pr, pw := io.Pipe()
+	go func() {
+		pw.CloseWithError(arc.Write(pw))
 	}()
-
-	if rerr != nil {
-		var apiErr *k6cloud.GenericOpenAPIError
-		if !errors.As(rerr, &apiErr) {
-			return nil, fmt.Errorf("failed to validate token: %w", rerr)
-		}
-	}
-
-	if err := CheckResponse(httpRes); err != nil {
-		return nil, fmt.Errorf("failed to validate token: %w", err)
-	}
-
-	return resp, err
+	return pr
 }
