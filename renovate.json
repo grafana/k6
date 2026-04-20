@@ -8,6 +8,7 @@
     "**/vendor/**",
     ".github/workflows/xk6-tests/**"
   ],
+  "baseBranches": ["master", "v1"],
   "prConcurrentLimit": 50,
   "packageRules": [
     {
@@ -97,6 +98,19 @@
       "extends": [
         "schedule:quarterly"
       ]
+    },
+	{
+      "matchBaseBranches": ["v1"],
+      "matchUpdateTypes": ["major", "minor", "patch", "pin", "digest"],
+      "enabled": false,
+      "description": "Disable all standard updates for v1"
+    },
+    {
+      "matchBaseBranches": ["v1"],
+      "matchUpdateTypes": ["security"],
+      "enabled": true,
+      "dependencyDashboardApproval": false,
+      "description": "Override and enable only security updates for v1"
     }
   ]
 }
