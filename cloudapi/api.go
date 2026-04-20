@@ -69,19 +69,6 @@ type SecretsConfig struct {
 	ResponsePath string `json:"response_path,omitempty"`
 }
 
-// TestProgressResponse represents the progress of a cloud test.
-type TestProgressResponse struct {
-	RunStatusText string       `json:"run_status_text"`
-	RunStatus     RunStatus    `json:"run_status"`
-	ResultStatus  ResultStatus `json:"result_status"`
-	Progress      float64      `json:"progress"`
-}
-
-// LoginResponse includes the token after a successful login.
-type LoginResponse struct {
-	Token string `json:"token"`
-}
-
 // ValidateTokenResponse is the response of a token validation.
 type ValidateTokenResponse struct {
 	IsValid bool   `json:"is_valid"`
@@ -182,68 +169,6 @@ func (c *Client) makeCreateTestRunRequest(url string, testRun *TestRun) (*http.R
 	return req, nil
 }
 
-// StartCloudTestRun starts a cloud test run, i.e. `k6 cloud script.js`.
-func (c *Client) StartCloudTestRun(name string, projectID int64, arc *lib.Archive) (*CreateTestRunResponse, error) {
-	fields := [][2]string{{"name", name}}
-
-	if projectID != 0 {
-		fields = append(fields, [2]string{"project_id", strconv.FormatInt(projectID, 10)})
-	}
-
-	return c.uploadArchive(fields, arc)
-}
-
-// UploadTestOnly uploads a test run to the cloud without actually starting it.
-func (c *Client) UploadTestOnly(name string, projectID int64, arc *lib.Archive) (*CreateTestRunResponse, error) {
-	fields := [][2]string{{"name", name}, {"upload_only", "true"}}
-
-	if projectID != 0 {
-		fields = append(fields, [2]string{"project_id", strconv.FormatInt(projectID, 10)})
-	}
-
-	return c.uploadArchive(fields, arc)
-}
-
-func (c *Client) uploadArchive(fields [][2]string, arc *lib.Archive) (*CreateTestRunResponse, error) {
-	requestURL := fmt.Sprintf("%s/archive-upload", c.baseURL)
-
-	var buf bytes.Buffer
-	mp := multipart.NewWriter(&buf)
-
-	for _, field := range fields {
-		if err := mp.WriteField(field[0], field[1]); err != nil {
-			return nil, err
-		}
-	}
-
-	fw, err := mp.CreateFormFile("file", "archive.tar")
-	if err != nil {
-		return nil, err
-	}
-
-	if err = arc.Write(fw); err != nil {
-		return nil, err
-	}
-
-	if err = mp.Close(); err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, requestURL, &buf) //nolint:noctx
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Content-Type", mp.FormDataContentType())
-
-	ctrr := CreateTestRunResponse{}
-	if err := c.Do(req, &ctrr); err != nil {
-		return nil, err
-	}
-	c.handleLogEntriesFromCloud(ctrr)
-	return &ctrr, nil
-}
-
 // TestFinished sends the result and run status values to the cloud, along with
 // information for the test thresholds, and marks the test run as finished.
 func (c *Client) TestFinished(referenceID string, thresholds ThresholdResult, tained bool, runStatus RunStatus) error {
@@ -270,69 +195,6 @@ func (c *Client) TestFinished(referenceID string, thresholds ThresholdResult, ta
 	}
 
 	return c.Do(req, nil)
-}
-
-// GetTestProgress for the provided referenceID.
-func (c *Client) GetTestProgress(referenceID string) (*TestProgressResponse, error) {
-	req, err := c.NewRequest(http.MethodGet, c.baseURL+"/test-progress/"+referenceID, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	ctrr := TestProgressResponse{}
-	err = c.Do(req, &ctrr)
-	if err != nil {
-		return nil, err
-	}
-
-	return &ctrr, nil
-}
-
-// StopCloudTestRun tells the cloud to stop the test with the provided referenceID.
-func (c *Client) StopCloudTestRun(referenceID string) error {
-	req, err := c.NewRequest("POST", c.baseURL+"/tests/"+referenceID+"/stop", nil)
-	if err != nil {
-		return err
-	}
-
-	return c.Do(req, nil)
-}
-
-type validateOptionsRequest struct {
-	Options lib.Options `json:"options"`
-}
-
-// ValidateOptions sends the provided options to the cloud for validation.
-func (c *Client) ValidateOptions(options lib.Options) error {
-	data := validateOptionsRequest{Options: options}
-	req, err := c.NewRequest("POST", c.baseURL+"/validate-options", data)
-	if err != nil {
-		return err
-	}
-
-	return c.Do(req, nil)
-}
-
-type loginRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"` //nolint:gosec
-}
-
-// Login the user with the specified email and password.
-func (c *Client) Login(email string, password string) (*LoginResponse, error) {
-	data := loginRequest{Email: email, Password: password}
-	req, err := c.NewRequest("POST", c.baseURL+"/login", data)
-	if err != nil {
-		return nil, err
-	}
-
-	lr := LoginResponse{}
-	err = c.Do(req, &lr)
-	if err != nil {
-		return nil, err
-	}
-
-	return &lr, nil
 }
 
 type validateTokenRequest struct {
