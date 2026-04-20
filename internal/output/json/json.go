@@ -124,25 +124,40 @@ func (o *Output) flushMetrics() {
 	samples := o.GetBufferedSamples()
 	start := time.Now()
 	var count int
+	var firstErr error
+	var errCount int
 	enc := json.NewEncoder(o.out)
+	enc.SetEscapeHTML(false)
 	for _, sc := range samples {
 		samples := sc.GetSamples()
 		count += len(samples)
 		for _, sample := range samples {
-			o.handleMetric(sample.Metric, enc)
+			if err := o.handleMetric(sample.Metric, enc); err != nil {
+				errCount++
+				if firstErr == nil {
+					firstErr = err
+				}
+			}
 			if err := enc.Encode(wrapSample(sample)); err != nil {
-				o.logger.WithError(err).Error("Sample couldn't be marshalled to JSON")
+				errCount++
+				if firstErr == nil {
+					firstErr = err
+				}
 			}
 		}
+	}
+	if firstErr != nil {
+		// Skip metric if it can't be made into JSON or envelope is null.
+		o.logger.WithError(firstErr).WithField("failed", errCount).Error("Sample(s) couldn't be marshalled to JSON")
 	}
 	if count > 0 {
 		o.logger.WithField("t", time.Since(start)).WithField("count", count).Debug("Wrote metrics to JSON")
 	}
 }
 
-func (o *Output) handleMetric(m *metrics.Metric, enc *json.Encoder) {
+func (o *Output) handleMetric(m *metrics.Metric, enc *json.Encoder) error {
 	if _, ok := o.seenMetrics[m.Name]; ok {
-		return
+		return nil
 	}
 	o.seenMetrics[m.Name] = struct{}{}
 
@@ -159,7 +174,5 @@ func (o *Output) handleMetric(m *metrics.Metric, enc *json.Encoder) {
 		wrapped.Data.Thresholds = ts
 	}
 
-	if err := enc.Encode(wrapped); err != nil {
-		o.logger.WithError(err).Error("Metric couldn't be marshalled to JSON")
-	}
+	return enc.Encode(wrapped)
 }
