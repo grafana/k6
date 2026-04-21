@@ -33,6 +33,11 @@ type Optional interface {
 	IsDefined() bool
 }
 
+// IsZero defines a zero-test method for a type to integrate with 'omitzero' logic.
+type IsZero interface {
+	IsZero() bool
+}
+
 // UnknownsUnmarshaler provides a method to unmarshal unknown struct fileds and save them as you want
 type UnknownsUnmarshaler interface {
 	UnmarshalUnknown(in *jlexer.Lexer, key string)

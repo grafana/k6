@@ -50,13 +50,11 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 
 		script := `
 		export let options = {
-			ext: {
-				loadimpact: {
-					token: "asdf",
-					name: "my load test",
-					projectID: 124,
-					note: 124,
-				},
+			cloud: {
+				token: "asdf",
+				name: "my load test",
+				projectID: 124,
+				note: 124,
 			}
 		};
 		export default function() {};
@@ -94,26 +92,6 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 		assert.Contains(t, stdout, `test status: Running`)
 	})
 
-	t.Run("TestCloudUploadOnly", func(t *testing.T) {
-		t.Parallel()
-
-		cs := func() cloudapi.TestProgressResponse {
-			return cloudapi.TestProgressResponse{
-				RunStatusText: "Archived",
-				RunStatus:     cloudapi.RunStatusArchived,
-			}
-		}
-
-		ts := getSimpleCloudTestState(t, nil, setupCmd, []string{"--upload-only", "--log-output=stdout"}, nil, cs)
-		cmd.ExecuteWithGlobalState(ts.GlobalState)
-
-		stdout := ts.Stdout.String()
-		t.Log(stdout)
-		assert.Contains(t, stdout, `execution: cloud`)
-		assert.Contains(t, stdout, `output: https://app.k6.io/runs/123`)
-		assert.Contains(t, stdout, `test status: Archived`)
-	})
-
 	t.Run("TestCloudWithConfigOverride", func(t *testing.T) {
 		t.Parallel()
 
@@ -149,23 +127,19 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 	// TestCloudWithArchive tests that if k6 uses a static archive with the script inside that has cloud options like:
 	//
 	//	export let options = {
-	//		ext: {
-	//			loadimpact: {
-	//				name: "my load test",
-	//				projectID: 124,
-	//				note: "lorem ipsum",
-	//			},
+	//		cloud: {
+	//			name: "my load test",
+	//			projectID: 124,
+	//			note: "lorem ipsum",
 	//		}
 	//	};
 	//
 	// actually sends to the cloud the archive with the correct metadata (metadata.json), like:
 	//
-	//	"ext": {
-	//		"loadimpact": {
-	//	        "name": "my load test",
-	//	        "note": "lorem ipsum",
-	//	        "projectID": 124
-	//	      }
+	//	"clouad": {
+	//	    "name": "my load test",
+	//	    "note": "lorem ipsum",
+	//	    "projectID": 124
 	//	}
 	t.Run("TestCloudWithArchive", func(t *testing.T) {
 		t.Parallel()
@@ -216,7 +190,7 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 
 		srv := getMockCloud(t, testRunID, archiveUpload, nil)
 
-		data, err := os.ReadFile(filepath.Join("testdata/archives", "archive_v0.46.0_with_loadimpact_option.tar")) //nolint:forbidigo // it's a test
+		data, err := os.ReadFile(filepath.Join("testdata/archives", "archive_v1.0.0_with_cloud_option.tar")) //nolint:forbidigo // it's a test
 		require.NoError(t, err)
 
 		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "archive.tar"), data, 0o644))
@@ -283,7 +257,14 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 func cloudTestStartSimple(tb testing.TB, testRunID int) http.Handler {
 	return http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
 		resp.WriteHeader(http.StatusOK)
-		_, err := fmt.Fprintf(resp, `{"reference_id": "%d"}`, testRunID)
+		_, err := fmt.Fprintf(resp, `{
+			"reference_id": "%d",
+			"test_run_token": "mock-test-run-token",
+			"secrets_config": {
+				"endpoint": "https://mock-secrets.example.com/{key}",
+				"response_path": "plaintext"
+			}
+		}`, testRunID)
 		assert.NoError(tb, err)
 	})
 }

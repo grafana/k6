@@ -9,15 +9,13 @@ import (
 
 // A Mode specifies the mode of the Summary,
 // which defines how the end-of-test summary will be rendered.
-// TODO(@joanlopez): remove ModeLegacy by k6 v2.0, once we completely drop the support for --summary-mode=legacy.
 type Mode int
 
 // Possible values for SummaryMode.
 const (
 	ModeCompact  = Mode(iota) // Compact mode that only displays the total results.
 	ModeFull                  // Extended mode that displays total and partial results.
-	ModeLegacy                // Deprecated. Legacy mode, used for backwards compatibility.
-	ModeDisabled              // Disabled, formerly known as --no-summary.
+	ModeDisabled              // Disabled. Can be used with --summary-mode=disabled.
 )
 
 // ErrInvalidSummaryMode indicates the serialized summary mode is invalid.
@@ -26,7 +24,6 @@ var ErrInvalidSummaryMode = errors.New("invalid summary mode")
 const (
 	compactString  = "compact"
 	fullString     = "full"
-	legacyString   = "legacy"
 	disabledString = "disabled"
 )
 
@@ -46,8 +43,6 @@ func (m Mode) MarshalText() ([]byte, error) {
 		return []byte(compactString), nil
 	case ModeFull:
 		return []byte(fullString), nil
-	case ModeLegacy:
-		return []byte(legacyString), nil
 	case ModeDisabled:
 		return []byte(disabledString), nil
 	default:
@@ -62,8 +57,6 @@ func (m *Mode) UnmarshalText(data []byte) error {
 		*m = ModeCompact
 	case fullString:
 		*m = ModeFull
-	case legacyString:
-		*m = ModeLegacy
 	case disabledString:
 		*m = ModeDisabled
 	default:
@@ -80,8 +73,6 @@ func (m Mode) String() string {
 		return compactString
 	case ModeFull:
 		return fullString
-	case ModeLegacy:
-		return legacyString
 	case ModeDisabled:
 		return disabledString
 	default:

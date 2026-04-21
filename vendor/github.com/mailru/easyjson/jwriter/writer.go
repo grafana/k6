@@ -2,7 +2,9 @@
 package jwriter
 
 import (
+	"fmt"
 	"io"
+	"math"
 	"strconv"
 	"unicode/utf8"
 
@@ -67,18 +69,6 @@ func (w *Writer) RawString(s string) {
 	w.Buffer.AppendString(s)
 }
 
-// RawBytesString appends string from bytes to the buffer.
-func (w *Writer) RawBytesString(data []byte, err error) {
-	switch {
-	case w.Error != nil:
-		return
-	case err != nil:
-		w.Error = err
-	default:
-		w.String(string(data))
-	}
-}
-
 // Raw appends raw binary data to the buffer or sets the error if it is given. Useful for
 // calling with results of MarshalJSON-like functions.
 func (w *Writer) Raw(data []byte, err error) {
@@ -102,10 +92,8 @@ func (w *Writer) RawText(data []byte, err error) {
 		return
 	case err != nil:
 		w.Error = err
-	case len(data) > 0:
-		w.String(string(data))
 	default:
-		w.RawString("null")
+		w.String(string(data))
 	}
 }
 
@@ -248,11 +236,19 @@ func (w *Writer) Int64Str(n int64) {
 }
 
 func (w *Writer) Float32(n float32) {
+	if w.checkIsUnsupportedFloat(float64(n)) {
+		return
+	}
+
 	w.Buffer.EnsureSpace(20)
 	w.Buffer.Buf = strconv.AppendFloat(w.Buffer.Buf, float64(n), 'g', -1, 32)
 }
 
 func (w *Writer) Float32Str(n float32) {
+	if w.checkIsUnsupportedFloat(float64(n)) {
+		return
+	}
+
 	w.Buffer.EnsureSpace(20)
 	w.Buffer.Buf = append(w.Buffer.Buf, '"')
 	w.Buffer.Buf = strconv.AppendFloat(w.Buffer.Buf, float64(n), 'g', -1, 32)
@@ -260,11 +256,19 @@ func (w *Writer) Float32Str(n float32) {
 }
 
 func (w *Writer) Float64(n float64) {
+	if w.checkIsUnsupportedFloat(n) {
+		return
+	}
+
 	w.Buffer.EnsureSpace(20)
 	w.Buffer.Buf = strconv.AppendFloat(w.Buffer.Buf, n, 'g', -1, 64)
 }
 
 func (w *Writer) Float64Str(n float64) {
+	if w.checkIsUnsupportedFloat(n) {
+		return
+	}
+
 	w.Buffer.EnsureSpace(20)
 	w.Buffer.Buf = append(w.Buffer.Buf, '"')
 	w.Buffer.Buf = strconv.AppendFloat(w.Buffer.Buf, float64(n), 'g', -1, 64)
@@ -414,4 +418,13 @@ func (w *Writer) base64(in []byte) {
 	case 1:
 		w.Buffer.Buf = append(w.Buffer.Buf, byte(padChar), byte(padChar))
 	}
+}
+
+func (w *Writer) checkIsUnsupportedFloat(val float64) bool {
+	isUnsupported := math.IsNaN(val) || math.IsInf(val, 0)
+	if isUnsupported && w.Error == nil {
+		w.Error = fmt.Errorf("json: unsupported value: %v", val)
+	}
+
+	return isUnsupported
 }
