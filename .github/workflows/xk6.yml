@@ -63,7 +63,7 @@ jobs:
           fi
           echo "COMMIT_ID=$COMMIT_ID"
           cd .github/workflows/xk6-tests
-          go install go.k6.io/xk6/cmd/xk6@master
+          go install go.k6.io/xk6/cmd/xk6@v2Support
           if [ "${{ github.event_name }}" == "pull_request" -a \
                "${PR_REPO}" != "${{ github.repository }}" ]; then
             export XK6_K6_REPO="github.com/${PR_REPO}"
