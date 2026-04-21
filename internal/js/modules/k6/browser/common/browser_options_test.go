@@ -155,6 +155,17 @@ func TestBrowserOptionsParse(t *testing.T) {
 				assert.False(t, lo.Headless)
 			},
 		},
+		"headless_new": {
+			opts: map[string]any{
+				"type": "chromium",
+			},
+			envLookupper: env.ConstLookup(env.BrowserHeadless, "new"),
+			assert: func(tb testing.TB, lo *BrowserOptions) {
+				tb.Helper()
+				assert.True(tb, lo.Headless)
+				assert.True(tb, lo.HeadlessNew)
+			},
+		},
 		"headless_err": {
 			opts: map[string]any{
 				"type": "chromium",

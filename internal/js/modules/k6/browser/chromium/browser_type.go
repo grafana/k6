@@ -392,6 +392,10 @@ func prepareFlags(lopts *common.BrowserOptions, k6opts *k6lib.Options) (map[stri
 		f["mute-audio"] = true
 		f["blink-settings"] = "primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4"
 	}
+	if lopts.HeadlessNew {
+		f["headless"] = "new"
+	}
+
 	ignoreDefaultArgsFlags(f, lopts.IgnoreDefaultArgs)
 
 	setFlagsFromArgs(f, lopts.Args)

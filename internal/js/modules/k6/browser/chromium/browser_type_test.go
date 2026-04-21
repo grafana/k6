@@ -153,6 +153,25 @@ func TestBrowserTypePrepareFlags(t *testing.T) {
 	}
 }
 
+func TestBrowserTypePrepareHeadlessNewMode(t *testing.T) {
+	t.Parallel()
+
+	t.Run("headless_new_sets_headless_new_flag", func(t *testing.T) {
+		t.Parallel()
+
+		opts := &common.BrowserOptions{
+			Headless:    true,
+			HeadlessNew: true,
+		}
+		flags, err := prepareFlags(opts, nil)
+		require.NoError(t, err)
+		assert.Equal(t, "new", flags["headless"])
+		// headless-only flags should still be set
+		assert.Contains(t, flags, "hide-scrollbars")
+		assert.Contains(t, flags, "mute-audio")
+	})
+}
+
 func TestExecutablePath(t *testing.T) {
 	t.Parallel()
 

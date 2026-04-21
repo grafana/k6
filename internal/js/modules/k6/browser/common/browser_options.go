@@ -23,6 +23,7 @@ type BrowserOptions struct {
 	Debug             bool
 	ExecutablePath    string
 	Headless          bool
+	HeadlessNew       bool // use --headless=new (Chrome 112+) instead of --headless
 	IgnoreDefaultArgs []string
 	LogCategoryFilter string
 	// TODO: Do not expose slowMo option by now.
@@ -99,7 +100,12 @@ func (bo *BrowserOptions) Parse(
 		case env.BrowserExecutablePath:
 			bo.ExecutablePath = ev
 		case env.BrowserHeadless:
-			bo.Headless, err = parseBoolOpt(e, ev)
+			if ev == "new" {
+				bo.Headless = true
+				bo.HeadlessNew = true
+			} else {
+				bo.Headless, err = parseBoolOpt(e, ev)
+			}
 		case env.BrowserIgnoreDefaultArgs:
 			bo.IgnoreDefaultArgs = parseListOpt(ev)
 		case env.LogCategoryFilter:
