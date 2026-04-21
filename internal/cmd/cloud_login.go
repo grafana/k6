@@ -245,7 +245,7 @@ func maskToken(unmasked string) string {
 	return unmasked[:4] + asterisks + unmasked[len(unmasked)-4:]
 }
 
-// tokenAuthentication validates a token and a stack
+// authenticateUserToken validates a token and a stack
 // and update the config with the given inputs
 func authenticateUserToken(
 	gs *state.GlobalState,
