@@ -14,6 +14,13 @@ import (
 	"go.k6.io/k6/internal/lib/testutils"
 )
 
+// TestGetCmdDeps exercises k6 deps against the standard (non-custom) binary, so
+// every k6/x/ import is unregistered and surfaces via extractUnknownModules.
+// The additional path — where a k6/x/ extension is already registered in the
+// binary and is therefore only captured by the k6/x/ import loop in
+// collectTestDependencies — cannot be exercised end-to-end without a custom
+// binary. That path is covered at unit level by
+// TestCollectTestDependenciesRegisteredExtensions.
 func TestGetCmdDeps(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
@@ -106,6 +113,22 @@ export default function () {
 			expectedDeps:      map[string]string{"k6": "*", "k6/x/alpha": ">=1.2.3", "k6/x/beta": "*"},
 			expectCustomBuild: true,
 			expectedImports:   []string{"/main.js", "/modules/util.js", "/modules/with-directive.js", "k6/x/beta"},
+		},
+		{
+			// k6/x/foo is both directly imported (captured via the k6/x/ import loop,
+			// or via extractUnknownModules on the standard binary) and constrained by
+			// a use directive. The use directive constraint must win over the bare "*".
+			name: "use directive constraint wins over bare import of same extension",
+			files: map[string][]byte{
+				"/main.js": []byte(`"use k6 with k6/x/foo >= 1.2.3";
+import foo from "k6/x/foo";
+
+export default function () { foo(); }
+`),
+			},
+			expectedDeps:      map[string]string{"k6": "*", "k6/x/foo": ">=1.2.3"},
+			expectCustomBuild: true,
+			expectedImports:   []string{"/main.js", "k6/x/foo"},
 		},
 		{
 			name: "manifest overrides default k6 constraint without use directive",

@@ -2,7 +2,6 @@ package state
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"os"
 	"os/signal"
@@ -18,6 +17,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"go.k6.io/k6/internal/event"
+	cloudsecrets "go.k6.io/k6/internal/secretsource/cloud"
 	"go.k6.io/k6/internal/ui/console"
 	"go.k6.io/k6/internal/usage"
 	"go.k6.io/k6/lib/fsext"
@@ -30,9 +30,6 @@ const (
 
 	// DependenciesManifest defines the default values for dependency resolution
 	DependenciesManifest = "K6_DEPENDENCIES_MANIFEST"
-
-	// communityExtensionsCatalog defines the catalog for community extensions
-	communityExtensionsCatalog = "oss"
 
 	// defaultBuildServiceURL defines the URL to the default (grafana hosted) build service
 	defaultBuildServiceURL = "https://ingest.k6.io/builder/api/v1"
@@ -78,9 +75,10 @@ type GlobalState struct {
 	Logger         *logrus.Logger //nolint:forbidigo //TODO:change to FieldLogger
 	FallbackLogger logrus.FieldLogger
 
-	SecretsManager *secretsource.Manager
-	Usage          *usage.Usage
-	TestStatus     *lib.TestStatus
+	SecretsManager    *secretsource.Manager
+	CloudSecretSource *cloudsecrets.SecretSource
+	Usage             *usage.Usage
+	TestStatus        *lib.TestStatus
 }
 
 // NewGlobalState returns a new GlobalState with the given ctx.
@@ -184,24 +182,22 @@ type GlobalFlags struct {
 	LogFormat        string
 	Verbose          bool
 
-	AutoExtensionResolution   bool
-	BuildServiceURL           string
-	BinaryCache               string
-	EnableCommunityExtensions bool
-	DependenciesManifest      string
+	AutoExtensionResolution bool
+	BuildServiceURL         string
+	BinaryCache             string
+	DependenciesManifest    string
 }
 
 // GetDefaultFlags returns the default global flags.
 func GetDefaultFlags(homeDir string, cacheDir string) GlobalFlags {
 	return GlobalFlags{
-		Address:                   "localhost:6565",
-		ProfilingEnabled:          false,
-		ConfigFilePath:            filepath.Join(homeDir, "k6", defaultConfigFileName),
-		LogOutput:                 "stderr",
-		AutoExtensionResolution:   true,
-		BuildServiceURL:           defaultBuildServiceURL,
-		EnableCommunityExtensions: false,
-		BinaryCache:               filepath.Join(cacheDir, "k6", defaultBinaryCacheDir),
+		Address:                 "localhost:6565",
+		ProfilingEnabled:        false,
+		ConfigFilePath:          filepath.Join(homeDir, "k6", defaultConfigFileName),
+		LogOutput:               "stderr",
+		AutoExtensionResolution: true,
+		BuildServiceURL:         defaultBuildServiceURL,
+		BinaryCache:             filepath.Join(cacheDir, "k6", defaultBinaryCacheDir),
 	}
 }
 
@@ -240,21 +236,8 @@ func getFlags(defaultFlags GlobalFlags, env map[string]string, args []string) Gl
 	if val, ok := env["K6_BUILD_SERVICE_URL"]; ok {
 		result.BuildServiceURL = val
 	}
-	if v, ok := env["K6_ENABLE_COMMUNITY_EXTENSIONS"]; ok {
-		vb, err := strconv.ParseBool(v)
-		if err == nil {
-			result.EnableCommunityExtensions = vb
-		}
-	}
 	if val, ok := env[DependenciesManifest]; ok {
 		result.DependenciesManifest = val
-	}
-
-	// adjust BuildServiceURL if community extensions are enable
-	// community extensions flag only takes effect if the default build service is used
-	// for custom build service URLs it has no effect (because the /oss path may not be implemented)
-	if result.EnableCommunityExtensions && result.BuildServiceURL == defaultBuildServiceURL {
-		result.BuildServiceURL = fmt.Sprintf("%s/%s", defaultBuildServiceURL, communityExtensionsCatalog)
 	}
 
 	if val, ok := env["K6_SECRET_SOURCE"]; ok {

@@ -26,7 +26,41 @@ The latter also serves as a time to open/close issues that are related to the up
 
 ## Go versions
 
-We aim to support a building of the k6 binary with the two latest versions of golang, which reflects the support [policy](https://go.dev/doc/devel/release#policy) of the Go team.
+We aim to support building of the k6 binary with the two latest versions of Go as long as the latest version has at least `.1` patch release. The support [policy](https://go.dev/doc/devel/release#policy) of the Go team details that they support the two latest versions.
+
+E.g.
+
+1. If the latest Go version is 1.26, the Go team will support 1.25 and 1.26, dropping support for 1.24.
+2. We will support Go versions 1.24 and 1.25 until 1.26.1 is released.
+3. When the Go team release version 1.26.1, they will still only support 1.25 and 1.26.
+4. We will support Go versions 1.25 and 1.26, dropping support of 1.24.
+
+### Why we wait for the `.1` patch release
+
+We deliberately do not rush to adopt a new major Go release (e.g. 1.26.0) the day it
+comes out. There are several reasons for this:
+
+1. **No immediate feature need** -- we rarely depend on brand-new Go APIs. Features from
+   the previous release are typically sufficient, so there is no urgency.
+2. **Early releases carry bugs** -- the `.0` release of a new Go version frequently
+   ships with regressions that are hard to catch, especially on non-x86 platforms
+   (ARM, Windows). We prefer not to debug those ourselves.
+3. **Toolchain lag** -- golangci-lint and other CI tooling need their own updates for
+   each major Go release. Even when maintainers ship same-day support, our full CI
+   pipeline (linters, Docker images, GitHub Actions caches) may not be ready yet.
+4. **Cache and infrastructure propagation** -- CI runners, Docker base images, and
+   various caches do not all pick up a new Go version simultaneously. Updating too
+   early leads to flaky or broken CI across different runners.
+5. **Release-cycle alignment** -- Go version bumps in production (e.g. Grafana Cloud k6)
+   need to land at the right point in our own release cycle, which adds a scheduling
+   constraint.
+6. **Reduces zero-day risk** -- the `.1` patch typically fixes CVEs that were introduced
+   in the `.0` release itself, so waiting a few weeks costs us nothing and lowers
+   security risk.
+
+In practice, the `.1` patch lands only a few weeks after the major release, so the
+delay is minimal while the risk reduction is significant.
+
 
 ## Exceptions
 
