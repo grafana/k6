@@ -96,7 +96,6 @@ func newOutput(params output.Params) (*Output, error) {
 		params.Environment,
 		params.ConfigArgument,
 		params.ScriptOptions.Cloud,
-		params.ScriptOptions.External,
 	)
 	if err != nil {
 		return nil, err

@@ -85,6 +85,7 @@ func (q *M4) FindMatches(dst []Match, src []byte) []Match {
 		copy(q.history, q.history[delta:])
 		q.history = q.history[:q.MaxDistance]
 		if q.ChainLength > 0 {
+			copy(q.chain, q.chain[delta:])
 			q.chain = q.chain[:q.MaxDistance]
 		}
 

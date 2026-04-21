@@ -3,10 +3,10 @@ package executor
 import (
 	"context"
 	"fmt"
-	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -49,72 +49,70 @@ func getTestConstantArrivalRateConfig() *ConstantArrivalRateConfig {
 func TestConstantArrivalRateRunNotEnoughAllocatedVUsWarn(t *testing.T) {
 	t.Parallel()
 
-	runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
-		time.Sleep(time.Second)
-		return nil
+	synctest.Test(t, func(t *testing.T) {
+		runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
+			time.Sleep(time.Second)
+			return nil
+		})
+
+		test := setupExecutorTest(t, "", "", lib.Options{}, runner, getTestConstantArrivalRateConfig())
+		defer test.cancel()
+
+		engineOut := make(chan metrics.SampleContainer, 1000)
+		require.NoError(t, test.executor.Run(test.ctx, engineOut))
+		entries := test.logHook.Drain()
+		require.NotEmpty(t, entries)
+		for _, entry := range entries {
+			require.Equal(t,
+				"Insufficient VUs, reached 20 active VUs and cannot initialize more",
+				entry.Message)
+			require.Equal(t, logrus.WarnLevel, entry.Level)
+		}
 	})
-
-	test := setupExecutorTest(t, "", "", lib.Options{}, runner, getTestConstantArrivalRateConfig())
-	defer test.cancel()
-
-	engineOut := make(chan metrics.SampleContainer, 1000)
-	require.NoError(t, test.executor.Run(test.ctx, engineOut))
-	entries := test.logHook.Drain()
-	require.NotEmpty(t, entries)
-	for _, entry := range entries {
-		require.Equal(t,
-			"Insufficient VUs, reached 20 active VUs and cannot initialize more",
-			entry.Message)
-		require.Equal(t, logrus.WarnLevel, entry.Level)
-	}
 }
 
 func TestConstantArrivalRateRunCorrectRate(t *testing.T) {
 	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		var count int64
+		runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
+			atomic.AddInt64(&count, 1)
+			return nil
+		})
 
-	var count int64
-	runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
-		atomic.AddInt64(&count, 1)
-		return nil
-	})
+		test := setupExecutorTest(t, "", "", lib.Options{}, runner, getTestConstantArrivalRateConfig())
+		defer test.cancel()
 
-	test := setupExecutorTest(t, "", "", lib.Options{}, runner, getTestConstantArrivalRateConfig())
-	defer test.cancel()
+		go func() {
+			// check that we got around the amount of VU iterations as we would expect
+			var totalCount int64
 
-	var wg sync.WaitGroup
-	wg.Go(func() {
-		// check that we got around the amount of VU iterations as we would expect
-		var totalCount int64
-
-		i := 5
-		ticker := time.NewTicker(time.Second)
-		for range ticker.C {
-			i--
-			if i == 0 {
-				break
+			i := 5
+			ticker := time.NewTicker(time.Second)
+			for range ticker.C {
+				i--
+				if i == 0 {
+					break
+				}
+				currentCount := atomic.SwapInt64(&count, 0)
+				totalCount += currentCount
+				// We have a relatively relaxed constraint here, but we also check
+				// the final iteration count exactly below:
+				assert.InDelta(t, 50, currentCount, 5)
 			}
-			currentCount := atomic.SwapInt64(&count, 0)
-			totalCount += currentCount
-			// We have a relatively relaxed constraint here, but we also check
-			// the final iteration count exactly below:
-			assert.InDelta(t, 50, currentCount, 5)
-		}
-
-		time.Sleep(200 * time.Millisecond) // just in case
-
-		assert.InDelta(t, 250, totalCount+atomic.LoadInt64(&count), 2)
+			assert.InDelta(t, 250, totalCount+atomic.LoadInt64(&count), 2)
+		}()
+		synctest.Wait()
+		engineOut := make(chan metrics.SampleContainer, 1000)
+		require.NoError(t, test.executor.Run(test.ctx, engineOut))
+		synctest.Wait()
+		require.Empty(t, test.logHook.Drain())
 	})
-	engineOut := make(chan metrics.SampleContainer, 1000)
-	require.NoError(t, test.executor.Run(test.ctx, engineOut))
-	wg.Wait()
-	require.Empty(t, test.logHook.Drain())
 }
 
-//nolint:paralleltest // this is flaky if ran with other tests
 func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skipf("this test is very flaky on the Windows GitHub Action runners...")
-	}
+	t.Parallel()
+
 	tests := []struct {
 		segment  string
 		sequence string
@@ -169,59 +167,61 @@ func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(fmt.Sprintf("segment %s sequence %s", test.segment, test.sequence), func(t *testing.T) {
-			var count int64
-			startTime := time.Now()
-			expectedTimeInt64 := int64(test.start)
-			runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
-				current := atomic.AddInt64(&count, 1)
+			t.Parallel()
+			synctest.Test(t, func(t *testing.T) {
+				var count int64
+				startTime := time.Now()
+				expectedTimeInt64 := int64(test.start)
+				runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
+					current := atomic.AddInt64(&count, 1)
 
-				expectedTime := test.start
-				if current != 1 {
-					expectedTime = time.Duration(atomic.AddInt64(&expectedTimeInt64,
-						int64(time.Millisecond)*test.steps[(current-2)%int64(len(test.steps))]))
-				}
+					expectedTime := test.start
+					if current != 1 {
+						expectedTime = time.Duration(atomic.AddInt64(&expectedTimeInt64,
+							int64(time.Millisecond)*test.steps[(current-2)%int64(len(test.steps))]))
+					}
 
-				// FIXME: replace this check with a unit test asserting that the scheduling is correct,
-				// without depending on the execution time itself
-				assert.WithinDuration(t,
-					startTime.Add(expectedTime),
-					time.Now(),
-					time.Millisecond*24,
-					"%d expectedTime %s", current, expectedTime,
+					// Under synctest, time is virtualized so scheduling assertions are deterministic
+					assert.WithinDuration(t,
+						startTime.Add(expectedTime),
+						time.Now(),
+						time.Millisecond*24,
+						"%d expectedTime %s", current, expectedTime,
+					)
+
+					return nil
+				})
+
+				config := getTestConstantArrivalRateConfig()
+				seconds := 2
+				config.Duration.Duration = types.Duration(time.Second * time.Duration(seconds))
+				execTest := setupExecutorTest(
+					t, test.segment, test.sequence, lib.Options{}, runner, config,
 				)
+				defer execTest.cancel()
 
-				return nil
+				newET, err := execTest.state.ExecutionTuple.GetNewExecutionTupleFromValue(config.MaxVUs.Int64)
+				require.NoError(t, err)
+				rateScaled := newET.ScaleInt64(config.Rate.Int64)
+
+				go func() {
+					// check that we got around the amount of VU iterations as we would expect
+					var currentCount int64
+
+					for i := range seconds {
+						time.Sleep(time.Second)
+						currentCount = atomic.LoadInt64(&count)
+						assert.InDelta(t, int64(i+1)*rateScaled, currentCount, 3)
+					}
+				}()
+
+				startTime = time.Now()
+				engineOut := make(chan metrics.SampleContainer, 1000)
+				err = execTest.executor.Run(execTest.ctx, engineOut)
+				synctest.Wait()
+				require.NoError(t, err)
+				require.Empty(t, execTest.logHook.Drain())
 			})
-
-			config := getTestConstantArrivalRateConfig()
-			seconds := 2
-			config.Duration.Duration = types.Duration(time.Second * time.Duration(seconds))
-			execTest := setupExecutorTest(
-				t, test.segment, test.sequence, lib.Options{}, runner, config,
-			)
-			defer execTest.cancel()
-
-			newET, err := execTest.state.ExecutionTuple.GetNewExecutionTupleFromValue(config.MaxVUs.Int64)
-			require.NoError(t, err)
-			rateScaled := newET.ScaleInt64(config.Rate.Int64)
-
-			var wg sync.WaitGroup
-			wg.Go(func() {
-				// check that we got around the amount of VU iterations as we would expect
-				var currentCount int64
-
-				for i := range seconds {
-					time.Sleep(time.Second)
-					currentCount = atomic.LoadInt64(&count)
-					assert.InDelta(t, int64(i+1)*rateScaled, currentCount, 3)
-				}
-			})
-			startTime = time.Now()
-			engineOut := make(chan metrics.SampleContainer, 1000)
-			err = execTest.executor.Run(execTest.ctx, engineOut)
-			wg.Wait()
-			require.NoError(t, err)
-			require.Empty(t, execTest.logHook.Drain())
 		})
 	}
 }
@@ -236,74 +236,78 @@ func TestArrivalRateCancel(t *testing.T) {
 	for name, config := range testCases {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			ch := make(chan struct{})
-			errCh := make(chan error, 1)
-			weAreDoneCh := make(chan struct{})
+			synctest.Test(t, func(t *testing.T) {
+				ch := make(chan struct{})
+				errCh := make(chan error, 1)
+				weAreDoneCh := make(chan struct{})
 
-			runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
+				runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
+					select {
+					case <-ch:
+						<-ch
+					default:
+					}
+					return nil
+				})
+				test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
+				defer test.cancel()
+
+				go func() {
+					engineOut := make(chan metrics.SampleContainer, 1000)
+					errCh <- test.executor.Run(test.ctx, engineOut)
+					close(weAreDoneCh)
+				}()
+
+				time.Sleep(time.Second)
+				ch <- struct{}{}
+				test.cancel()
+				time.Sleep(time.Second)
 				select {
-				case <-ch:
-					<-ch
+				case <-weAreDoneCh:
+					t.Fatal("Run returned before all VU iterations were finished")
 				default:
 				}
-				return nil
+				close(ch)
+				<-weAreDoneCh
+				synctest.Wait()
+				require.NoError(t, <-errCh)
+				require.Empty(t, test.logHook.Drain())
 			})
-			test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
-			defer test.cancel()
-
-			var wg sync.WaitGroup
-			wg.Go(func() {
-				engineOut := make(chan metrics.SampleContainer, 1000)
-				errCh <- test.executor.Run(test.ctx, engineOut)
-				close(weAreDoneCh)
-			})
-
-			time.Sleep(time.Second)
-			ch <- struct{}{}
-			test.cancel()
-			time.Sleep(time.Second)
-			select {
-			case <-weAreDoneCh:
-				t.Fatal("Run returned before all VU iterations were finished")
-			default:
-			}
-			close(ch)
-			<-weAreDoneCh
-			wg.Wait()
-			require.NoError(t, <-errCh)
-			require.Empty(t, test.logHook.Drain())
 		})
 	}
 }
 
 func TestConstantArrivalRateDroppedIterations(t *testing.T) {
 	t.Parallel()
-	var count int64
 
-	config := &ConstantArrivalRateConfig{
-		BaseConfig:      BaseConfig{GracefulStop: types.NullDurationFrom(0 * time.Second)},
-		TimeUnit:        types.NullDurationFrom(time.Second),
-		Rate:            null.IntFrom(10),
-		Duration:        types.NullDurationFrom(950 * time.Millisecond),
-		PreAllocatedVUs: null.IntFrom(5),
-		MaxVUs:          null.IntFrom(5),
-	}
+	synctest.Test(t, func(t *testing.T) {
+		var count int64
 
-	runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
-		atomic.AddInt64(&count, 1)
-		<-ctx.Done()
-		return nil
+		config := &ConstantArrivalRateConfig{
+			BaseConfig:      BaseConfig{GracefulStop: types.NullDurationFrom(0 * time.Second)},
+			TimeUnit:        types.NullDurationFrom(time.Second),
+			Rate:            null.IntFrom(10),
+			Duration:        types.NullDurationFrom(950 * time.Millisecond),
+			PreAllocatedVUs: null.IntFrom(5),
+			MaxVUs:          null.IntFrom(5),
+		}
+
+		runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
+			atomic.AddInt64(&count, 1)
+			<-ctx.Done()
+			return nil
+		})
+		test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
+		defer test.cancel()
+
+		engineOut := make(chan metrics.SampleContainer, 1000)
+		require.NoError(t, test.executor.Run(test.ctx, engineOut))
+		logs := test.logHook.Drain()
+		require.Len(t, logs, 1)
+		assert.Contains(t, logs[0].Message, "cannot initialize more")
+		assert.Equal(t, int64(5), count)
+		assert.Equal(t, float64(5), sumMetricValues(engineOut, metrics.DroppedIterationsName))
 	})
-	test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
-	defer test.cancel()
-
-	engineOut := make(chan metrics.SampleContainer, 1000)
-	require.NoError(t, test.executor.Run(test.ctx, engineOut))
-	logs := test.logHook.Drain()
-	require.Len(t, logs, 1)
-	assert.Contains(t, logs[0].Message, "cannot initialize more")
-	assert.Equal(t, int64(5), count)
-	assert.Equal(t, float64(5), sumMetricValues(engineOut, metrics.DroppedIterationsName))
 }
 
 func TestConstantArrivalRateGlobalIters(t *testing.T) {
@@ -330,21 +334,22 @@ func TestConstantArrivalRateGlobalIters(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(fmt.Sprintf("%s_%s", tc.seq, tc.seg), func(t *testing.T) {
 			t.Parallel()
+			synctest.Test(t, func(t *testing.T) {
+				gotIters := []uint64{}
+				var mx sync.Mutex
+				runner := simpleRunner(func(_ context.Context, state *lib.State) error {
+					mx.Lock()
+					gotIters = append(gotIters, state.GetScenarioGlobalVUIter())
+					mx.Unlock()
+					return nil
+				})
+				test := setupExecutorTest(t, tc.seg, tc.seq, lib.Options{}, runner, config)
+				defer test.cancel()
 
-			gotIters := []uint64{}
-			var mx sync.Mutex
-			runner := simpleRunner(func(_ context.Context, state *lib.State) error {
-				mx.Lock()
-				gotIters = append(gotIters, state.GetScenarioGlobalVUIter())
-				mx.Unlock()
-				return nil
+				engineOut := make(chan metrics.SampleContainer, 100)
+				require.NoError(t, test.executor.Run(test.ctx, engineOut))
+				assert.Equal(t, tc.expIters, gotIters)
 			})
-			test := setupExecutorTest(t, tc.seg, tc.seq, lib.Options{}, runner, config)
-			defer test.cancel()
-
-			engineOut := make(chan metrics.SampleContainer, 100)
-			require.NoError(t, test.executor.Run(test.ctx, engineOut))
-			assert.Equal(t, tc.expIters, gotIters)
 		})
 	}
 }
@@ -352,38 +357,40 @@ func TestConstantArrivalRateGlobalIters(t *testing.T) {
 func TestConstantArrivalRateActiveVUs(t *testing.T) {
 	t.Parallel()
 
-	config := &ConstantArrivalRateConfig{
-		BaseConfig:      BaseConfig{GracefulStop: types.NullDurationFrom(0 * time.Second)},
-		TimeUnit:        types.NullDurationFrom(time.Second),
-		Rate:            null.IntFrom(10),
-		Duration:        types.NullDurationFrom(950 * time.Millisecond),
-		PreAllocatedVUs: null.IntFrom(5),
-		MaxVUs:          null.IntFrom(10),
-	}
+	synctest.Test(t, func(t *testing.T) {
+		config := &ConstantArrivalRateConfig{
+			BaseConfig:      BaseConfig{GracefulStop: types.NullDurationFrom(0 * time.Second)},
+			TimeUnit:        types.NullDurationFrom(time.Second),
+			Rate:            null.IntFrom(10),
+			Duration:        types.NullDurationFrom(950 * time.Millisecond),
+			PreAllocatedVUs: null.IntFrom(5),
+			MaxVUs:          null.IntFrom(10),
+		}
 
-	var (
-		running          int64
-		getCurrActiveVUs func() int64
-		runMx            sync.Mutex
-	)
+		var (
+			running          int64
+			getCurrActiveVUs func() int64
+			runMx            sync.Mutex
+		)
 
-	runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
-		runMx.Lock()
-		running++
-		assert.Equal(t, running, getCurrActiveVUs())
-		runMx.Unlock()
-		// Block the VU to cause the executor to schedule more
-		<-ctx.Done()
-		return nil
+		runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
+			runMx.Lock()
+			running++
+			assert.Equal(t, running, getCurrActiveVUs())
+			runMx.Unlock()
+			// Block the VU to cause the executor to schedule more
+			<-ctx.Done()
+			return nil
+		})
+		test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
+		defer test.cancel()
+
+		getCurrActiveVUs = test.state.GetCurrentlyActiveVUsCount
+
+		engineOut := make(chan metrics.SampleContainer, 1000)
+		require.NoError(t, test.executor.Run(test.ctx, engineOut))
+
+		assert.GreaterOrEqual(t, running, int64(5))
+		assert.LessOrEqual(t, running, int64(10))
 	})
-	test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
-	defer test.cancel()
-
-	getCurrActiveVUs = test.state.GetCurrentlyActiveVUsCount
-
-	engineOut := make(chan metrics.SampleContainer, 1000)
-	require.NoError(t, test.executor.Run(test.ctx, engineOut))
-
-	assert.GreaterOrEqual(t, running, int64(5))
-	assert.LessOrEqual(t, running, int64(10))
 }

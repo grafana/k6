@@ -1,0 +1,13 @@
+# Build output
+dist
+**/dist
+
+# Dependencies
+node_modules
+**/node_modules
+
+# Misc
+coverage
+*.log
+bundle-stats.html
+*.md

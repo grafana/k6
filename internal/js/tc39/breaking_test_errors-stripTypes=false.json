@@ -36,7 +36,6 @@
   "test/built-ins/Error/isError/prop-desc.js-strict:true": "test/built-ins/Error/isError/prop-desc.js: Test262Error: obj should have an own property isError <at omitted>",
   "test/built-ins/Error/isError/symbols.js-strict:true": "test/built-ins/Error/isError/symbols.js: TypeError: Object has no member 'isError' <at omitted>",
   "test/built-ins/Function/internals/Construct/base-ctor-revoked-proxy.js-strict:true": "test/built-ins/Function/internals/Construct/base-ctor-revoked-proxy.js: Test262Error: Expected a TypeError to be thrown but no exception was thrown at all <at omitted>",
-  "test/built-ins/GeneratorPrototype/return/try-finally-set-property-within-try.js-strict:true": "panic while running test/built-ins/GeneratorPrototype/return/try-finally-set-property-within-try.js: runtime error: slice bounds out of range [:-1]",
   "test/built-ins/Iterator/concat/arguments-checked-in-order.js-strict:true": "test/built-ins/Iterator/concat/arguments-checked-in-order.js: Test262Error: Expected a TypeError but got a ReferenceError <at omitted>",
   "test/built-ins/Iterator/concat/fresh-iterator-result.js-strict:true": "test/built-ins/Iterator/concat/fresh-iterator-result.js: ReferenceError: Iterator is not defined <at omitted>",
   "test/built-ins/Iterator/concat/get-iterator-method-only-once.js-strict:true": "test/built-ins/Iterator/concat/get-iterator-method-only-once.js: ReferenceError: Iterator is not defined <at omitted>",

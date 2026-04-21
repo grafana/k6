@@ -32,16 +32,19 @@ func easyjson42239ddeDecodeGoK6IoK6InternalOutputJson(in *jlexer.Lexer, out *sam
 	for !in.IsDelim('}') {
 		key := in.UnsafeFieldName(false)
 		in.WantColon()
-		if in.IsNull() {
-			in.Skip()
-			in.WantComma()
-			continue
-		}
 		switch key {
 		case "metric":
-			out.Metric = string(in.String())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Metric = string(in.String())
+			}
 		case "type":
-			out.Type = string(in.String())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Type = string(in.String())
+			}
 		case "data":
 			easyjson42239ddeDecode(in, &out.Data)
 		default:
@@ -103,18 +106,21 @@ func easyjson42239ddeDecode(in *jlexer.Lexer, out *struct {
 	for !in.IsDelim('}') {
 		key := in.UnsafeFieldName(false)
 		in.WantColon()
-		if in.IsNull() {
-			in.Skip()
-			in.WantComma()
-			continue
-		}
 		switch key {
 		case "time":
-			if data := in.Raw(); in.Ok() {
-				in.AddError((out.Time).UnmarshalJSON(data))
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				if data := in.Raw(); in.Ok() {
+					in.AddError((out.Time).UnmarshalJSON(data))
+				}
 			}
 		case "value":
-			out.Value = float64(in.Float64())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Value = float64(in.Float64())
+			}
 		case "tags":
 			if in.IsNull() {
 				in.Skip()
@@ -123,7 +129,11 @@ func easyjson42239ddeDecode(in *jlexer.Lexer, out *struct {
 				if out.Tags == nil {
 					out.Tags = new(metrics.TagSet)
 				}
-				(*out.Tags).UnmarshalEasyJSON(in)
+				if in.IsNull() {
+					in.Skip()
+				} else {
+					(*out.Tags).UnmarshalEasyJSON(in)
+				}
 			}
 		case "metadata":
 			if in.IsNull() {
@@ -139,7 +149,11 @@ func easyjson42239ddeDecode(in *jlexer.Lexer, out *struct {
 					key := string(in.String())
 					in.WantColon()
 					var v1 string
-					v1 = string(in.String())
+					if in.IsNull() {
+						in.Skip()
+					} else {
+						v1 = string(in.String())
+					}
 					(out.Metadata)[key] = v1
 					in.WantComma()
 				}
@@ -217,18 +231,21 @@ func easyjson42239ddeDecodeGoK6IoK6InternalOutputJson1(in *jlexer.Lexer, out *me
 	for !in.IsDelim('}') {
 		key := in.UnsafeFieldName(false)
 		in.WantColon()
-		if in.IsNull() {
-			in.Skip()
-			in.WantComma()
-			continue
-		}
 		switch key {
 		case "type":
-			out.Type = string(in.String())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Type = string(in.String())
+			}
 		case "data":
 			easyjson42239ddeDecode1(in, &out.Data)
 		case "metric":
-			out.Metric = string(in.String())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Metric = string(in.String())
+			}
 		default:
 			in.SkipRecursive()
 		}
@@ -289,25 +306,36 @@ func easyjson42239ddeDecode1(in *jlexer.Lexer, out *struct {
 	for !in.IsDelim('}') {
 		key := in.UnsafeFieldName(false)
 		in.WantColon()
-		if in.IsNull() {
-			in.Skip()
-			in.WantComma()
-			continue
-		}
 		switch key {
 		case "name":
-			out.Name = string(in.String())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Name = string(in.String())
+			}
 		case "type":
-			if data := in.UnsafeBytes(); in.Ok() {
-				in.AddError((out.Type).UnmarshalText(data))
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				if data := in.UnsafeBytes(); in.Ok() {
+					in.AddError((out.Type).UnmarshalText(data))
+				}
 			}
 		case "contains":
-			if data := in.UnsafeBytes(); in.Ok() {
-				in.AddError((out.Contains).UnmarshalText(data))
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				if data := in.UnsafeBytes(); in.Ok() {
+					in.AddError((out.Contains).UnmarshalText(data))
+				}
 			}
 		case "thresholds":
-			if data := in.Raw(); in.Ok() {
-				in.AddError((out.Thresholds).UnmarshalJSON(data))
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				if data := in.Raw(); in.Ok() {
+					in.AddError((out.Thresholds).UnmarshalJSON(data))
+				}
 			}
 		case "submetrics":
 			if in.IsNull() {
@@ -415,16 +443,19 @@ func easyjson42239ddeDecodeGoK6IoK6Metrics(in *jlexer.Lexer, out *metrics.Submet
 	for !in.IsDelim('}') {
 		key := in.UnsafeFieldName(false)
 		in.WantColon()
-		if in.IsNull() {
-			in.Skip()
-			in.WantComma()
-			continue
-		}
 		switch key {
 		case "name":
-			out.Name = string(in.String())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Name = string(in.String())
+			}
 		case "suffix":
-			out.Suffix = string(in.String())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Suffix = string(in.String())
+			}
 		case "tags":
 			if in.IsNull() {
 				in.Skip()
@@ -433,7 +464,11 @@ func easyjson42239ddeDecodeGoK6IoK6Metrics(in *jlexer.Lexer, out *metrics.Submet
 				if out.Tags == nil {
 					out.Tags = new(metrics.TagSet)
 				}
-				(*out.Tags).UnmarshalEasyJSON(in)
+				if in.IsNull() {
+					in.Skip()
+				} else {
+					(*out.Tags).UnmarshalEasyJSON(in)
+				}
 			}
 		default:
 			in.SkipRecursive()

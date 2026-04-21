@@ -18,6 +18,7 @@ import (
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/cdproto/emulation"
+	"github.com/chromedp/cdproto/input"
 	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/target"
@@ -975,11 +976,27 @@ func (p *Page) Close() error {
 		teardownTimeoutCtx, closeCancel := context.WithTimeout(p.teardownCtx, p.defaultTimeout())
 		defer closeCancel()
 
-		// forcing the pagehide event to trigger web vitals metrics.
-		v := `() => window.dispatchEvent(new Event('pagehide'))`
-		_, err := p.MainFrame().EvaluateWithContext(teardownTimeoutCtx, v)
-		if err != nil {
-			p.logger.Warnf("Page:Close", "failed to hide page: %v", err)
+		// Trigger web-vitals finalization before closing. The web-vitals v5
+		// library finalizes CLS on visibilitychange (when document.visibilityState
+		// is "hidden") and finalizes LCP only on trusted keydown/click/visibilitychange
+		// events. Since headless Chrome does not support Page.setWebLifecycleState
+		// for changing visibility, we:
+		//  1. Override document.visibilityState and dispatch visibilitychange
+		//     to finalize CLS (no isTrusted check required).
+		//  2. Send a trusted keydown via CDP Input.dispatchKeyEvent to finalize
+		//     LCP (the library checks isTrusted and then sees the hidden state).
+		v := `() => {
+			Object.defineProperty(document, 'visibilityState', {value: 'hidden', configurable: true});
+			Object.defineProperty(document, 'hidden', {value: true, configurable: true});
+			document.dispatchEvent(new Event('visibilitychange'));
+		}`
+		if _, err := p.MainFrame().EvaluateWithContext(teardownTimeoutCtx, v); err != nil {
+			p.logger.Warnf("Page:Close", "failed to trigger visibilitychange for web vitals: %v", err)
+		}
+
+		keyDown := input.DispatchKeyEvent(input.KeyDown).WithKey("Escape")
+		if err := keyDown.Do(cdp.WithExecutor(teardownTimeoutCtx, p.session)); err != nil {
+			p.logger.Warnf("Page:Close", "failed to dispatch keydown for web vitals: %v", err)
 		}
 
 		var closeErrs []error
@@ -990,7 +1007,7 @@ func (p *Page) Close() error {
 			closeErrs = append(closeErrs, fmt.Errorf("internal error while removing binding from page: %w", err))
 		}
 
-		err = target.CloseTarget(p.targetID).Do(cdp.WithExecutor(teardownTimeoutCtx, p.session))
+		err := target.CloseTarget(p.targetID).Do(cdp.WithExecutor(teardownTimeoutCtx, p.session))
 		if err != nil && !errors.Is(err, context.Canceled) {
 			// When a close target command is sent to the browser via CDP,
 			// the browser will start to cleanup and the first thing it

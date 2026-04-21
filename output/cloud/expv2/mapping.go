@@ -89,8 +89,8 @@ func addBucketToTimeSeriesProto(
 		samples.Values = append(samples.Values, &pbcloud.GaugeValue{
 			Time:  timestampAsProto(time),
 			Last:  typedMetricValue.Last,
-			Min:   typedMetricValue.Max,
-			Max:   typedMetricValue.Min,
+			Min:   typedMetricValue.Min,
+			Max:   typedMetricValue.Max,
 			Avg:   typedMetricValue.Avg,
 			Count: typedMetricValue.Count,
 		})

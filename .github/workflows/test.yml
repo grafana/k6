@@ -19,7 +19,7 @@ jobs:
       fail-fast: false
       matrix:
         go-version: [1.25.x]
-        platform: [ubuntu-22.04, ubuntu-24.04-arm, windows-latest]
+        platform: [ubuntu-24.04, ubuntu-24.04-arm, windows-latest]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout code
@@ -32,6 +32,7 @@ jobs:
         with:
           go_version: ${{ matrix.go-version }}
           platform: ${{ matrix.platform }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Get the k6 version
         id: get_k6_version
         run: |
@@ -45,7 +46,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [ubuntu-22.04, ubuntu-24.04-arm, windows-latest]
+        platform: [ubuntu-24.04, ubuntu-24.04-arm, windows-latest]
     runs-on: ${{ matrix.platform }}
     continue-on-error: true
     steps:
@@ -58,18 +59,19 @@ jobs:
         with:
           go_version: "gotip"
           platform: ${{ matrix.platform }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Run tests
         uses: ./.github/actions/test
         with:
           use_gotip: "true"
           platform: ${{ matrix.platform }}
-  
+
   test-latest:
     strategy:
       fail-fast: false
       matrix:
         go-version: [1.26.x]
-        platform: [ubuntu-22.04, ubuntu-24.04-arm, windows-latest]
+        platform: [ubuntu-24.04, ubuntu-24.04-arm, windows-latest]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout code
@@ -81,6 +83,7 @@ jobs:
         with:
           go_version: ${{ matrix.go-version }}
           platform: ${{ matrix.platform }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Run tests
         uses: ./.github/actions/test
         with:

@@ -51,6 +51,11 @@ func TestCloudRunCommandIncompatibleFlags(t *testing.T) {
 			cliArgs:            []string{"--local-execution", "--show-logs"},
 			wantStderrContains: "the --local-execution flag is not compatible with the --show-logs flag",
 		},
+		{
+			name:               "using --secret-source=cloud without --local-execution should fail",
+			cliArgs:            []string{"--secret-source=cloud"},
+			wantStderrContains: "the 'cloud' secret source can only be used with 'k6 cloud run --local-execution'",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -100,6 +105,11 @@ export default function() {};`
 			resp.WriteHeader(http.StatusOK)
 			_, err = fmt.Fprint(resp, `{
 			"reference_id": "1337",
+			"test_run_token": "mock-test-run-token",
+			"secrets_config": {
+				"endpoint": "https://mock-secrets.example.com/{key}",
+				"response_path": "plaintext"
+			},
 			"config": {
 				"testRunDetails": "https://some.other.url/foo/tests/org/1337?bar=baz"
 			}
@@ -150,6 +160,11 @@ export default function() {};`
 			resp.WriteHeader(http.StatusOK)
 			_, err = fmt.Fprint(resp, `{
 			"reference_id": "1337",
+			"test_run_token": "mock-test-run-token",
+			"secrets_config": {
+				"endpoint": "https://mock-secrets.example.com/{key}",
+				"response_path": "plaintext"
+			},
 			"config": {
 				"testRunDetails": "https://some.other.url/foo/tests/org/1337?bar=baz"
 			}

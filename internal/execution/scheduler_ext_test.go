@@ -1388,7 +1388,7 @@ func TestNewSchedulerHasWork(t *testing.T) {
 		};
 
 		export default function() {
-			const response = http.get("http://test.loadimpact.com");
+			const response = http.get("http://test.grafana.com");
 		};
 `)
 

@@ -7,6 +7,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -46,210 +47,233 @@ func getTestRampingArrivalRateConfig() *RampingArrivalRateConfig {
 func TestRampingArrivalRateRunNotEnoughAllocatedVUsWarn(t *testing.T) {
 	t.Parallel()
 
-	runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
-		time.Sleep(time.Second)
-		return nil
+	synctest.Test(t, func(t *testing.T) {
+		runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
+			time.Sleep(time.Second)
+			return nil
+		})
+
+		test := setupExecutorTest(t, "", "", lib.Options{}, runner, getTestRampingArrivalRateConfig())
+		defer test.cancel()
+
+		engineOut := make(chan metrics.SampleContainer, 1000)
+		require.NoError(t, test.executor.Run(test.ctx, engineOut))
+		entries := test.logHook.Drain()
+		require.NotEmpty(t, entries)
+		for _, entry := range entries {
+			require.Equal(t,
+				"Insufficient VUs, reached 20 active VUs and cannot initialize more",
+				entry.Message)
+			require.Equal(t, logrus.WarnLevel, entry.Level)
+		}
 	})
-
-	test := setupExecutorTest(t, "", "", lib.Options{}, runner, getTestRampingArrivalRateConfig())
-	defer test.cancel()
-
-	engineOut := make(chan metrics.SampleContainer, 1000)
-	require.NoError(t, test.executor.Run(test.ctx, engineOut))
-	entries := test.logHook.Drain()
-	require.NotEmpty(t, entries)
-	for _, entry := range entries {
-		require.Equal(t,
-			"Insufficient VUs, reached 20 active VUs and cannot initialize more",
-			entry.Message)
-		require.Equal(t, logrus.WarnLevel, entry.Level)
-	}
 }
 
 func TestRampingArrivalRateRunCorrectRate(t *testing.T) {
 	t.Parallel()
-	var count int64
-	runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
-		atomic.AddInt64(&count, 1)
-		return nil
+
+	synctest.Test(t, func(t *testing.T) {
+		var count int64
+		runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
+			atomic.AddInt64(&count, 1)
+			return nil
+		})
+
+		test := setupExecutorTest(t, "", "", lib.Options{}, runner, getTestRampingArrivalRateConfig())
+		defer test.cancel()
+
+		go func(ctx context.Context) {
+			// Under synctest, time is virtualized so sampling is deterministic
+			var currentCount int64
+
+			select {
+			case <-time.After(time.Second):
+			case <-ctx.Done():
+				return
+			}
+			currentCount = atomic.SwapInt64(&count, 0)
+			assert.InDelta(t, 10, currentCount, 1)
+
+			select {
+			case <-time.After(time.Second):
+			case <-ctx.Done():
+				return
+			}
+			currentCount = atomic.SwapInt64(&count, 0)
+			assert.InDelta(t, 30, currentCount, 2)
+
+			select {
+			case <-time.After(time.Second):
+			case <-ctx.Done():
+				return
+			}
+			currentCount = atomic.SwapInt64(&count, 0)
+			assert.InDelta(t, 50, currentCount, 3)
+		}(test.ctx)
+
+		engineOut := make(chan metrics.SampleContainer, 1000)
+		require.NoError(t, test.executor.Run(test.ctx, engineOut))
+		synctest.Wait()
+		require.Empty(t, test.logHook.Drain())
 	})
-
-	test := setupExecutorTest(t, "", "", lib.Options{}, runner, getTestRampingArrivalRateConfig())
-	defer test.cancel()
-
-	var wg sync.WaitGroup
-	wg.Go(func() {
-		// check that we got around the amount of VU iterations as we would expect
-		var currentCount int64
-
-		time.Sleep(time.Second)
-		currentCount = atomic.SwapInt64(&count, 0)
-		assert.InDelta(t, 10, currentCount, 1)
-
-		time.Sleep(time.Second)
-		currentCount = atomic.SwapInt64(&count, 0)
-		assert.InDelta(t, 30, currentCount, 2)
-
-		time.Sleep(time.Second)
-		currentCount = atomic.SwapInt64(&count, 0)
-		assert.InDelta(t, 50, currentCount, 3)
-	})
-	engineOut := make(chan metrics.SampleContainer, 1000)
-	require.NoError(t, test.executor.Run(test.ctx, engineOut))
-	wg.Wait()
-	require.Empty(t, test.logHook.Drain())
 }
 
 func TestRampingArrivalRateRunUnplannedVUs(t *testing.T) {
 	t.Parallel()
 
-	config := &RampingArrivalRateConfig{
-		TimeUnit: types.NullDurationFrom(time.Second),
-		Stages: []Stage{
-			{
-				// the minus one makes it so only 9 iterations will be started instead of 10
-				// as the 10th happens to be just at the end and sometimes doesn't get executed :(
-				Duration: types.NullDurationFrom(time.Second*2 - 1),
-				Target:   null.IntFrom(10),
+	synctest.Test(t, func(t *testing.T) {
+		config := &RampingArrivalRateConfig{
+			TimeUnit: types.NullDurationFrom(time.Second),
+			Stages: []Stage{
+				{
+					// the minus one makes it so only 9 iterations will be started instead of 10
+					// as the 10th happens to be just at the end and sometimes doesn't get executed :(
+					Duration: types.NullDurationFrom(time.Second*2 - 1),
+					Target:   null.IntFrom(10),
+				},
 			},
-		},
-		PreAllocatedVUs: null.IntFrom(1),
-		MaxVUs:          null.IntFrom(3),
-	}
-
-	var count int64
-	ch := make(chan struct{})  // closed when new unplannedVU is started and signal to get to next iterations
-	ch2 := make(chan struct{}) // closed when a second iteration was started on an old VU in order to test it won't start a second unplanned VU in parallel or at all
-	runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
-		cur := atomic.AddInt64(&count, 1)
-		switch cur {
-		case 1:
-			<-ch // wait to start again
-		case 2:
-			<-ch2 // wait to start again
+			PreAllocatedVUs: null.IntFrom(1),
+			MaxVUs:          null.IntFrom(3),
 		}
 
-		return nil
+		var count int64
+		ch := make(chan struct{})  // closed when new unplannedVU is started and signal to get to next iterations
+		ch2 := make(chan struct{}) // closed when a second iteration was started on an old VU in order to test it won't start a second unplanned VU in parallel or at all
+		runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
+			cur := atomic.AddInt64(&count, 1)
+			switch cur {
+			case 1:
+				<-ch // wait to start again
+			case 2:
+				<-ch2 // wait to start again
+			}
+
+			return nil
+		})
+
+		test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
+		defer test.cancel()
+
+		engineOut := make(chan metrics.SampleContainer, 1000)
+		test.state.SetInitVUFunc(func(ctx context.Context, _ *logrus.Entry) (lib.InitializedVU, error) {
+			cur := atomic.LoadInt64(&count)
+			require.Equal(t, int64(1), cur)
+			time.Sleep(time.Second / 2)
+
+			close(ch)
+			time.Sleep(time.Millisecond * 150)
+
+			cur = atomic.LoadInt64(&count)
+			require.Equal(t, int64(2), cur)
+
+			time.Sleep(time.Millisecond * 150)
+			cur = atomic.LoadInt64(&count)
+			require.Equal(t, int64(2), cur)
+
+			close(ch2)
+			time.Sleep(time.Millisecond * 200)
+			cur = atomic.LoadInt64(&count)
+			require.NotEqual(t, int64(2), cur)
+			idl, idg := test.state.GetUniqueVUIdentifiers()
+			return runner.NewVU(ctx, idl, idg, engineOut)
+		})
+
+		assert.NoError(t, test.executor.Run(test.ctx, engineOut))
+		assert.Empty(t, test.logHook.Drain())
+
+		droppedIters := sumMetricValues(engineOut, metrics.DroppedIterationsName)
+		assert.Equal(t, count+int64(droppedIters), int64(9))
 	})
-
-	test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
-	defer test.cancel()
-
-	engineOut := make(chan metrics.SampleContainer, 1000)
-	test.state.SetInitVUFunc(func(ctx context.Context, _ *logrus.Entry) (lib.InitializedVU, error) {
-		cur := atomic.LoadInt64(&count)
-		require.Equal(t, int64(1), cur)
-		time.Sleep(time.Second / 2)
-
-		close(ch)
-		time.Sleep(time.Millisecond * 150)
-
-		cur = atomic.LoadInt64(&count)
-		require.Equal(t, int64(2), cur)
-
-		time.Sleep(time.Millisecond * 150)
-		cur = atomic.LoadInt64(&count)
-		require.Equal(t, int64(2), cur)
-
-		close(ch2)
-		time.Sleep(time.Millisecond * 200)
-		cur = atomic.LoadInt64(&count)
-		require.NotEqual(t, int64(2), cur)
-		idl, idg := test.state.GetUniqueVUIdentifiers()
-		return runner.NewVU(ctx, idl, idg, engineOut)
-	})
-
-	assert.NoError(t, test.executor.Run(test.ctx, engineOut))
-	assert.Empty(t, test.logHook.Drain())
-
-	droppedIters := sumMetricValues(engineOut, metrics.DroppedIterationsName)
-	assert.Equal(t, count+int64(droppedIters), int64(9))
 }
 
 func TestRampingArrivalRateRunCorrectRateWithSlowRate(t *testing.T) {
 	t.Parallel()
 
-	config := &RampingArrivalRateConfig{
-		TimeUnit: types.NullDurationFrom(time.Second),
-		Stages: []Stage{
-			{
-				Duration: types.NullDurationFrom(time.Second * 2),
-				Target:   null.IntFrom(10),
+	synctest.Test(t, func(t *testing.T) {
+		config := &RampingArrivalRateConfig{
+			TimeUnit: types.NullDurationFrom(time.Second),
+			Stages: []Stage{
+				{
+					Duration: types.NullDurationFrom(time.Second * 2),
+					Target:   null.IntFrom(10),
+				},
 			},
-		},
-		PreAllocatedVUs: null.IntFrom(1),
-		MaxVUs:          null.IntFrom(3),
-	}
-
-	var count int64
-	ch := make(chan struct{}) // closed when new unplannedVU is started and signal to get to next iterations
-	runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
-		cur := atomic.AddInt64(&count, 1)
-		if cur == 1 {
-			<-ch // wait to start again
+			PreAllocatedVUs: null.IntFrom(1),
+			MaxVUs:          null.IntFrom(3),
 		}
 
-		return nil
+		var count int64
+		ch := make(chan struct{}) // closed when new unplannedVU is started and signal to get to next iterations
+		runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
+			cur := atomic.AddInt64(&count, 1)
+			if cur == 1 {
+				<-ch // wait to start again
+			}
+
+			return nil
+		})
+
+		test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
+		defer test.cancel()
+
+		engineOut := make(chan metrics.SampleContainer, 1000)
+		test.state.SetInitVUFunc(func(ctx context.Context, _ *logrus.Entry) (lib.InitializedVU, error) {
+			t.Log("init")
+			cur := atomic.LoadInt64(&count)
+			require.Equal(t, int64(1), cur)
+			time.Sleep(time.Millisecond * 200)
+			close(ch)
+			time.Sleep(time.Millisecond * 200)
+			cur = atomic.LoadInt64(&count)
+			require.NotEqual(t, int64(1), cur)
+
+			idl, idg := test.state.GetUniqueVUIdentifiers()
+			return runner.NewVU(ctx, idl, idg, engineOut)
+		})
+
+		assert.NoError(t, test.executor.Run(test.ctx, engineOut))
+		assert.Empty(t, test.logHook.Drain())
+		assert.Equal(t, int64(0), test.state.GetCurrentlyActiveVUsCount())
+		assert.Equal(t, int64(2), test.state.GetInitializedVUsCount())
 	})
-
-	test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
-	defer test.cancel()
-
-	engineOut := make(chan metrics.SampleContainer, 1000)
-	test.state.SetInitVUFunc(func(ctx context.Context, _ *logrus.Entry) (lib.InitializedVU, error) {
-		t.Log("init")
-		cur := atomic.LoadInt64(&count)
-		require.Equal(t, int64(1), cur)
-		time.Sleep(time.Millisecond * 200)
-		close(ch)
-		time.Sleep(time.Millisecond * 200)
-		cur = atomic.LoadInt64(&count)
-		require.NotEqual(t, int64(1), cur)
-
-		idl, idg := test.state.GetUniqueVUIdentifiers()
-		return runner.NewVU(ctx, idl, idg, engineOut)
-	})
-
-	assert.NoError(t, test.executor.Run(test.ctx, engineOut))
-	assert.Empty(t, test.logHook.Drain())
-	assert.Equal(t, int64(0), test.state.GetCurrentlyActiveVUsCount())
-	assert.Equal(t, int64(2), test.state.GetInitializedVUsCount())
 }
 
 func TestRampingArrivalRateRunGracefulStop(t *testing.T) {
 	t.Parallel()
 
-	config := &RampingArrivalRateConfig{
-		TimeUnit: types.NullDurationFrom(1 * time.Second),
-		Stages: []Stage{
-			{
-				Duration: types.NullDurationFrom(2 * time.Second),
-				Target:   null.IntFrom(10),
+	synctest.Test(t, func(t *testing.T) {
+		config := &RampingArrivalRateConfig{
+			TimeUnit: types.NullDurationFrom(1 * time.Second),
+			Stages: []Stage{
+				{
+					Duration: types.NullDurationFrom(2 * time.Second),
+					Target:   null.IntFrom(10),
+				},
 			},
-		},
-		StartRate:       null.IntFrom(10),
-		PreAllocatedVUs: null.IntFrom(10),
-		MaxVUs:          null.IntFrom(10),
-		BaseConfig: BaseConfig{
-			GracefulStop: types.NullDurationFrom(5 * time.Second),
-		},
-	}
+			StartRate:       null.IntFrom(10),
+			PreAllocatedVUs: null.IntFrom(10),
+			MaxVUs:          null.IntFrom(10),
+			BaseConfig: BaseConfig{
+				GracefulStop: types.NullDurationFrom(5 * time.Second),
+			},
+		}
 
-	runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
-		time.Sleep(5 * time.Second)
-		return nil
+		runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
+			time.Sleep(5 * time.Second)
+			return nil
+		})
+
+		test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
+		defer test.cancel()
+
+		engineOut := make(chan metrics.SampleContainer, 1000)
+		defer close(engineOut)
+
+		assert.NoError(t, test.executor.Run(test.ctx, engineOut))
+		assert.Equal(t, int64(0), test.state.GetCurrentlyActiveVUsCount())
+		assert.Equal(t, int64(10), test.state.GetInitializedVUsCount())
+		assert.Equal(t, uint64(10), test.state.GetFullIterationCount())
 	})
-
-	test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
-	defer test.cancel()
-
-	engineOut := make(chan metrics.SampleContainer, 1000)
-	defer close(engineOut)
-
-	assert.NoError(t, test.executor.Run(test.ctx, engineOut))
-	assert.Equal(t, int64(0), test.state.GetCurrentlyActiveVUsCount())
-	assert.Equal(t, int64(10), test.state.GetInitializedVUsCount())
-	assert.Equal(t, uint64(10), test.state.GetFullIterationCount())
 }
 
 func BenchmarkRampingArrivalRateRun(b *testing.B) {
@@ -413,7 +437,7 @@ func TestRampingArrivalRateCal(t *testing.T) {
 		t.Run(fmt.Sprintf("testNum %d - %s timeunit %s", testNum, et, config.TimeUnit), func(t *testing.T) {
 			t.Parallel()
 			ch := make(chan time.Duration)
-			go config.cal(et, ch)
+			go config.cal(t.Context(), et, ch)
 			changes := make([]time.Duration, 0, len(expectedTimes))
 			for c := range ch {
 				changes = append(changes, c)
@@ -453,7 +477,7 @@ func BenchmarkCal(b *testing.B) {
 			b.RunParallel(func(pb *testing.PB) {
 				for pb.Next() {
 					ch := make(chan time.Duration, 20)
-					go config.cal(et, ch)
+					go config.cal(b.Context(), et, ch)
 					for c := range ch {
 						_ = c
 					}
@@ -551,7 +575,7 @@ func TestCompareCalImplementation(t *testing.T) {
 	chRat := make(chan time.Duration, 20)
 	ch := make(chan time.Duration, 20)
 	go config.calRat(et, chRat)
-	go config.cal(et, ch)
+	go config.cal(t.Context(), et, ch)
 	count := 0
 	var diff int
 	for c := range ch {
@@ -691,21 +715,23 @@ func TestRampingArrivalRateGlobalIters(t *testing.T) {
 		t.Run(fmt.Sprintf("%s_%s", tc.seq, tc.seg), func(t *testing.T) {
 			t.Parallel()
 
-			gotIters := []uint64{}
-			var mx sync.Mutex
-			runner := simpleRunner(func(_ context.Context, state *lib.State) error {
-				mx.Lock()
-				gotIters = append(gotIters, state.GetScenarioGlobalVUIter())
-				mx.Unlock()
-				return nil
+			synctest.Test(t, func(t *testing.T) {
+				gotIters := []uint64{}
+				var mx sync.Mutex
+				runner := simpleRunner(func(_ context.Context, state *lib.State) error {
+					mx.Lock()
+					gotIters = append(gotIters, state.GetScenarioGlobalVUIter())
+					mx.Unlock()
+					return nil
+				})
+
+				test := setupExecutorTest(t, tc.seg, tc.seq, lib.Options{}, runner, config)
+				defer test.cancel()
+
+				engineOut := make(chan metrics.SampleContainer, 100)
+				require.NoError(t, test.executor.Run(test.ctx, engineOut))
+				assert.Equal(t, tc.expIters, gotIters)
 			})
-
-			test := setupExecutorTest(t, tc.seg, tc.seq, lib.Options{}, runner, config)
-			defer test.cancel()
-
-			engineOut := make(chan metrics.SampleContainer, 100)
-			require.NoError(t, test.executor.Run(test.ctx, engineOut))
-			assert.Equal(t, tc.expIters, gotIters)
 		})
 	}
 }
@@ -733,45 +759,47 @@ func TestRampingArrivalRateCornerCase(t *testing.T) {
 func TestRampingArrivalRateActiveVUs(t *testing.T) {
 	t.Parallel()
 
-	config := &RampingArrivalRateConfig{
-		BaseConfig: BaseConfig{GracefulStop: types.NullDurationFrom(0 * time.Second)},
-		TimeUnit:   types.NullDurationFrom(time.Second),
-		StartRate:  null.IntFrom(10),
-		Stages: []Stage{
-			{
-				Duration: types.NullDurationFrom(950 * time.Millisecond),
-				Target:   null.IntFrom(20),
+	synctest.Test(t, func(t *testing.T) {
+		config := &RampingArrivalRateConfig{
+			BaseConfig: BaseConfig{GracefulStop: types.NullDurationFrom(0 * time.Second)},
+			TimeUnit:   types.NullDurationFrom(time.Second),
+			StartRate:  null.IntFrom(10),
+			Stages: []Stage{
+				{
+					Duration: types.NullDurationFrom(950 * time.Millisecond),
+					Target:   null.IntFrom(20),
+				},
 			},
-		},
-		PreAllocatedVUs: null.IntFrom(5),
-		MaxVUs:          null.IntFrom(10),
-	}
+			PreAllocatedVUs: null.IntFrom(5),
+			MaxVUs:          null.IntFrom(10),
+		}
 
-	var (
-		running          int64
-		getCurrActiveVUs func() int64
-		runMx            sync.Mutex
-	)
+		var (
+			running          int64
+			getCurrActiveVUs func() int64
+			runMx            sync.Mutex
+		)
 
-	runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
-		runMx.Lock()
-		running++
-		assert.Equal(t, running, getCurrActiveVUs())
-		runMx.Unlock()
-		// Block the VU to cause the executor to schedule more
-		<-ctx.Done()
-		return nil
+		runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
+			runMx.Lock()
+			running++
+			assert.Equal(t, running, getCurrActiveVUs())
+			runMx.Unlock()
+			// Block the VU to cause the executor to schedule more
+			<-ctx.Done()
+			return nil
+		})
+		test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
+		defer test.cancel()
+
+		getCurrActiveVUs = test.state.GetCurrentlyActiveVUsCount
+
+		engineOut := make(chan metrics.SampleContainer, 1000)
+		require.NoError(t, test.executor.Run(test.ctx, engineOut))
+
+		assert.GreaterOrEqual(t, running, int64(5))
+		assert.LessOrEqual(t, running, int64(10))
 	})
-	test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
-	defer test.cancel()
-
-	getCurrActiveVUs = test.state.GetCurrentlyActiveVUsCount
-
-	engineOut := make(chan metrics.SampleContainer, 1000)
-	require.NoError(t, test.executor.Run(test.ctx, engineOut))
-
-	assert.GreaterOrEqual(t, running, int64(5))
-	assert.LessOrEqual(t, running, int64(10))
 }
 
 func TestRampingArrivalRateActiveVUs_GetExecutionRequirements(t *testing.T) {

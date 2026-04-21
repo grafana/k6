@@ -34,11 +34,11 @@ func TestRootCommand(t *testing.T) {
 	}
 }
 
-func TestLoginCloudNotPanicking(t *testing.T) {
+func TestCloudLoginNotPanicking(t *testing.T) {
 	t.Parallel()
 
 	ts := NewGlobalTestState(t)
-	ts.CmdArgs = []string{"k6", "login", "cloud"}
+	ts.CmdArgs = []string{"k6", "cloud", "login"}
 	ts.ExpectedExitCode = -1
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 	assert.Contains(t, ts.Stderr.String(), "Stdin is not a terminal, falling back to plain text input")

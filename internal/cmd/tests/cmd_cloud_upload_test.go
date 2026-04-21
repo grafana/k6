@@ -57,23 +57,19 @@ func TestK6CloudUpload(t *testing.T) {
 	// TestCloudUploadWithArchive tests that if k6 uses a static archive with the script inside that has cloud options like:
 	//
 	//	export let options = {
-	//		ext: {
-	//			loadimpact: {
-	//				name: "my load test",
-	//				projectID: 124,
-	//				note: "lorem ipsum",
-	//			},
-	//		}
+	//		cloud: {
+	//			name: "my load test",
+	//			projectID: 124,
+	//			note: "lorem ipsum",
+	//		},
 	//	};
 	//
 	// actually sends to the cloud the archive with the correct metadata (metadata.json), like:
 	//
-	//	"ext": {
-	//		"loadimpact": {
-	//	        "name": "my load test",
-	//	        "note": "lorem ipsum",
-	//	        "projectID": 124
-	//	      }
+	//	"cloud": {
+	//	    "name": "my load test",
+	//	    "note": "lorem ipsum",
+	//	    "projectID": 124
 	//	}
 	t.Run("TestCloudUploadWithArchive", func(t *testing.T) {
 		t.Parallel()
@@ -131,7 +127,7 @@ func TestK6CloudUpload(t *testing.T) {
 
 		srv := getMockCloud(t, testRunID, archiveUpload, cs)
 
-		data, err := os.ReadFile(filepath.Join("testdata/archives", "archive_v0.46.0_with_loadimpact_option.tar")) //nolint:forbidigo // it's a test
+		data, err := os.ReadFile(filepath.Join("testdata/archives", "archive_v1.0.0_with_cloud_option.tar")) //nolint:forbidigo // it's a test
 		require.NoError(t, err)
 
 		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "archive.tar"), data, 0o644))

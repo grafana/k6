@@ -129,3 +129,59 @@ func TestParseSize(t *testing.T) {
 		})
 	}
 }
+
+func TestParsePageEmulateMediaOptions(t *testing.T) {
+	t.Parallel()
+
+	newDefaults := func() *common.PageEmulateMediaOptions {
+		return &common.PageEmulateMediaOptions{
+			ColorScheme:   common.ColorSchemeLight,
+			Media:         common.MediaTypeScreen,
+			ReducedMotion: common.ReducedMotionNoPreference,
+		}
+	}
+
+	tests := []struct {
+		name  string
+		input string
+		want  *common.PageEmulateMediaOptions
+	}{
+		{
+			name:  "defaults_on_null",
+			input: `null`,
+			want:  newDefaults(),
+		},
+		{
+			name:  "all_options",
+			input: `({colorScheme: "dark", media: "print", reducedMotion: "reduce"})`,
+			want: &common.PageEmulateMediaOptions{
+				ColorScheme:   "dark",
+				Media:         "print",
+				ReducedMotion: "reduce",
+			},
+		},
+		{
+			name:  "partial_option",
+			input: `({media: "print"})`,
+			want: &common.PageEmulateMediaOptions{
+				ColorScheme:   common.ColorSchemeLight,
+				Media:         "print",
+				ReducedMotion: common.ReducedMotionNoPreference,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			vu := k6test.NewVU(t)
+			v, err := vu.Runtime().RunString(tt.input)
+			require.NoError(t, err)
+
+			opts, err := parsePageEmulateMediaOptions(vu.Runtime(), v, newDefaults())
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, opts)
+		})
+	}
+}

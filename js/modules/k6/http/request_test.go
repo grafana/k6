@@ -1175,6 +1175,38 @@ func TestRequest(t *testing.T) {
 		assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "HEAD", sr("HTTPBIN_URL/get?a=1&b=2"), 200, "")
 	})
 
+	t.Run("GETExtraArgs", func(t *testing.T) {
+		ts := newTestCase(t)
+		rt := ts.runtime.VU.Runtime()
+
+		ts.hook.Reset()
+		_, err := rt.RunString(ts.tb.Replacer.Replace(`
+		var res = http.get("HTTPBIN_URL/get", null, {headers: {"X-We-Want-This": "value"}});
+		`))
+		require.NoError(t, err)
+
+		logEntry := ts.hook.LastEntry()
+		require.NotNil(t, logEntry)
+		assert.Equal(t, logrus.WarnLevel, logEntry.Level)
+		assert.Contains(t, logEntry.Message, "http.get only accepts a url and a params argument")
+	})
+
+	t.Run("HEADExtraArgs", func(t *testing.T) {
+		ts := newTestCase(t)
+		rt := ts.runtime.VU.Runtime()
+
+		ts.hook.Reset()
+		_, err := rt.RunString(ts.tb.Replacer.Replace(`
+		var res = http.head("HTTPBIN_URL/get", null, {headers: {"X-We-Want-This": "value"}});
+		`))
+		require.NoError(t, err)
+
+		logEntry := ts.hook.LastEntry()
+		require.NotNil(t, logEntry)
+		assert.Equal(t, logrus.WarnLevel, logEntry.Level)
+		assert.Contains(t, logEntry.Message, "http.head only accepts a url and a params argument")
+	})
+
 	t.Run("OPTIONS", func(t *testing.T) {
 		_, err := rt.RunString(sr(`
 		var res = http.options("HTTPBIN_URL/?a=1&b=2", null, {headers: {"X-We-Want-This": "value"}});

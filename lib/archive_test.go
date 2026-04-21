@@ -129,8 +129,8 @@ func TestArchiveReadWrite(t *testing.T) {
 					"/path/to/file2.txt": []byte(`bye!`),
 				}),
 				"https": testutils.MakeMemMapFs(t, map[string][]byte{
-					"/cdnjs.com/libraries/Faker":          []byte(`// faker contents`),
-					"/github.com/loadimpact/k6/README.md": []byte(`README`),
+					"/cdnjs.com/libraries/Faker":       []byte(`// faker contents`),
+					"/github.com/grafana/k6/README.md": []byte(`README`),
 				}),
 			},
 		}
@@ -152,6 +152,69 @@ func TestArchiveReadWrite(t *testing.T) {
 		assert.Equal(t, arc1, arc2)
 
 		diffMapFilesystems(t, arc1Filesystems, arc2Filesystems)
+	})
+
+	t.Run("RoundtripWithDependencies", func(t *testing.T) {
+		t.Parallel()
+		arc1 := &Archive{
+			Type:      "js",
+			K6Version: build.Version,
+			Options: Options{
+				VUs:        null.IntFrom(1),
+				SystemTags: &metrics.DefaultSystemTagSet,
+			},
+			FilenameURL: &url.URL{Scheme: "file", Path: "/path/to/a.js"},
+			Data:        []byte(`// a contents`),
+			PwdURL:      &url.URL{Scheme: "file", Path: "/path/to"},
+			Filesystems: map[string]fsext.Fs{
+				"file": testutils.MakeMemMapFs(t, map[string][]byte{
+					"/path/to/a.js": []byte(`// a contents`),
+				}),
+				"https": testutils.MakeMemMapFs(t, map[string][]byte{}),
+			},
+			Dependencies: map[string]string{
+				"k6":       "*",
+				"k6/x/sql": ">=0.4.0",
+			},
+		}
+
+		buf := bytes.NewBuffer(nil)
+		require.NoError(t, arc1.Write(buf))
+
+		arc2, err := ReadArchive(buf)
+		require.NoError(t, err)
+
+		assert.Equal(t, arc1.Dependencies, arc2.Dependencies)
+	})
+
+	t.Run("RoundtripNilDependencies", func(t *testing.T) {
+		t.Parallel()
+		arc1 := &Archive{
+			Type:      "js",
+			K6Version: build.Version,
+			Options: Options{
+				VUs:        null.IntFrom(1),
+				SystemTags: &metrics.DefaultSystemTagSet,
+			},
+			FilenameURL: &url.URL{Scheme: "file", Path: "/path/to/a.js"},
+			Data:        []byte(`// a contents`),
+			PwdURL:      &url.URL{Scheme: "file", Path: "/path/to"},
+			Filesystems: map[string]fsext.Fs{
+				"file": testutils.MakeMemMapFs(t, map[string][]byte{
+					"/path/to/a.js": []byte(`// a contents`),
+				}),
+				"https": testutils.MakeMemMapFs(t, map[string][]byte{}),
+			},
+			Dependencies: nil,
+		}
+
+		buf := bytes.NewBuffer(nil)
+		require.NoError(t, arc1.Write(buf))
+
+		arc2, err := ReadArchive(buf)
+		require.NoError(t, err)
+
+		assert.Nil(t, arc2.Dependencies)
 	})
 
 	t.Run("Anonymized", func(t *testing.T) {
@@ -181,8 +244,8 @@ func TestArchiveReadWrite(t *testing.T) {
 						fmt.Sprintf("%s/file2.txt", entry.Pwd): []byte(`bye!`),
 					}),
 					"https": testutils.MakeMemMapFs(t, map[string][]byte{
-						"/cdnjs.com/libraries/Faker":          []byte(`// faker contents`),
-						"/github.com/loadimpact/k6/README.md": []byte(`README`),
+						"/cdnjs.com/libraries/Faker":       []byte(`// faker contents`),
+						"/github.com/grafana/k6/README.md": []byte(`README`),
 					}),
 				},
 			}
@@ -205,8 +268,8 @@ func TestArchiveReadWrite(t *testing.T) {
 						fmt.Sprintf("%s/file2.txt", entry.PwdNormAnon): []byte(`bye!`),
 					}),
 					"https": testutils.MakeMemMapFs(t, map[string][]byte{
-						"/cdnjs.com/libraries/Faker":          []byte(`// faker contents`),
-						"/github.com/loadimpact/k6/README.md": []byte(`README`),
+						"/cdnjs.com/libraries/Faker":       []byte(`// faker contents`),
+						"/github.com/grafana/k6/README.md": []byte(`README`),
 					}),
 				},
 			}

@@ -85,7 +85,7 @@ func (o *Output) flushSample(sample metrics.Sample) {
 	// First, the sample data is stored into the metrics stored at the k6 metrics registry level.
 	o.storeSample(sample)
 
-	skipGroupSamples := o.summaryMode == summary.ModeCompact || o.summaryMode == summary.ModeLegacy
+	skipGroupSamples := o.summaryMode == summary.ModeCompact
 	if skipGroupSamples {
 		return
 	}

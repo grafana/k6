@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/internal/cmd/tests"
 	"go.k6.io/k6/internal/lib/testutils"
@@ -90,6 +91,74 @@ func TestArchiveThresholds(t *testing.T) {
 	}
 }
 
+func TestArchiveContainsDependencies(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name         string
+		script       []byte
+		manifest     string
+		expectedDeps map[string]string
+	}{
+		{
+			name: "no external deps, only k6",
+			script: []byte(`import http from "k6/http";
+export default function () { http.get("https://example.com"); }
+`),
+			expectedDeps: map[string]string{"k6": "*"},
+		},
+		{
+			name: "use directive sets k6 constraint",
+			script: []byte(`"use k6 >= 0.50.0";
+import http from "k6/http";
+export default function () {}
+`),
+			expectedDeps: map[string]string{"k6": ">=0.50.0"},
+		},
+		{
+			name: "manifest overrides star constraint but pre-manifest deps are stored",
+			script: []byte(`import http from "k6/http";
+export default function () {}
+`),
+			manifest:     `{"k6": ">=1.0.0"}`,
+			expectedDeps: map[string]string{"k6": "*"}, // pre-manifest: still "*"
+		},
+		{
+			name: "manifest does not override explicit use directive constraint",
+			script: []byte(`"use k6 >= 0.9.0";
+import http from "k6/http";
+export default function () {}
+`),
+			manifest:     `{"k6": ">=1.0.0"}`,
+			expectedDeps: map[string]string{"k6": ">=0.9.0"}, // pre-manifest: explicit constraint preserved
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			fileName := "script.js"
+			ts := tests.NewGlobalTestState(t)
+			require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, fileName), tc.script, 0o644))
+			ts.Flags.DependenciesManifest = tc.manifest
+			ts.CmdArgs = []string{"k6", "archive", fileName}
+
+			newRootCommand(ts.GlobalState).execute()
+			require.NoError(t, testutils.Untar(t, ts.FS, "archive.tar", "tmp/"))
+
+			data, err := fsext.ReadFile(ts.FS, "tmp/metadata.json")
+			require.NoError(t, err)
+
+			metadata := struct {
+				Dependencies map[string]string `json:"dependencies"`
+			}{}
+			require.NoError(t, json.Unmarshal(data, &metadata))
+			require.Equal(t, tc.expectedDeps, metadata.Dependencies)
+		})
+	}
+}
+
 func TestArchiveContainsEnv(t *testing.T) {
 	t.Parallel()
 
@@ -121,60 +190,6 @@ func TestArchiveContainsEnv(t *testing.T) {
 
 	require.Equal(t, "lorem", metadata.Env["ENV1"])
 	require.Equal(t, "ipsum", metadata.Env["ENV2"])
-}
-
-func TestArchiveContainsLegacyCloudSettings(t *testing.T) {
-	t.Parallel()
-
-	// given a script with the cloud options
-	fileName := "script.js"
-	testScript := []byte(`
-		export let options = {
-			ext: {
-				loadimpact: {
-					distribution: {
-						one: { loadZone: 'amazon:us:ashburn', percent: 30 },
-						two: { loadZone: 'amazon:ie:dublin', percent: 70 },
-					},
-				},
-			},
-		};
-		export default function () {}
-	`)
-	ts := tests.NewGlobalTestState(t)
-	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, fileName), testScript, 0o644))
-
-	// when we do archiving
-	ts.CmdArgs = []string{"k6", "archive", fileName}
-
-	newRootCommand(ts.GlobalState).execute()
-	require.NoError(t, testutils.Untar(t, ts.FS, "archive.tar", "tmp/"))
-
-	data, err := fsext.ReadFile(ts.FS, "tmp/metadata.json")
-	require.NoError(t, err)
-
-	// we just need some basic struct
-	metadata := struct {
-		Options struct {
-			Ext struct {
-				LoadImpact struct {
-					Distribution map[string]struct {
-						LoadZone string  `json:"loadZone"`
-						Percent  float64 `json:"percent"`
-					} `json:"distribution"`
-				} `json:"loadimpact"`
-			} `json:"ext"`
-		} `json:"options"`
-	}{}
-
-	// then unpacked metadata should contain a ext.loadimpact struct the proper values
-	require.NoError(t, json.Unmarshal(data, &metadata))
-	require.Len(t, metadata.Options.Ext.LoadImpact.Distribution, 2)
-
-	require.Equal(t, "amazon:us:ashburn", metadata.Options.Ext.LoadImpact.Distribution["one"].LoadZone)
-	require.Equal(t, 30., metadata.Options.Ext.LoadImpact.Distribution["one"].Percent)
-	require.Equal(t, "amazon:ie:dublin", metadata.Options.Ext.LoadImpact.Distribution["two"].LoadZone)
-	require.Equal(t, 70., metadata.Options.Ext.LoadImpact.Distribution["two"].Percent)
 }
 
 func TestArchiveContainsCloudSettings(t *testing.T) {

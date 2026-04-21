@@ -17,4 +17,7 @@ const (
 	// API default consts.
 
 	StrictModeOff = false
+
+	withRetry = true
+	noRetry   = false
 )

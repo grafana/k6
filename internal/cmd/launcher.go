@@ -80,8 +80,6 @@ func (b *customBinary) run(gs *state.GlobalState) error {
 	// If auto extension resolution is enabled then
 	// this avoids unnecessary re-processing of dependencies in the sub-process.
 	env = append(env, state.AutoExtensionResolution+"=false")
-	// legacy envvar used in versions v1.0.x and v1.1.x
-	env = append(env, "K6_BINARY_PROVISIONING=false")
 	cmd.Env = env
 
 	// handle signals
@@ -226,7 +224,7 @@ func extractToken(gs *state.GlobalState) (string, error) {
 		return "", err
 	}
 
-	config, _, err := cloudapi.GetConsolidatedConfig(diskConfig.Collectors["cloud"], gs.Env, "", nil, nil)
+	config, _, err := cloudapi.GetConsolidatedConfig(diskConfig.Collectors["cloud"], gs.Env, "", nil)
 	if err != nil {
 		return "", err
 	}

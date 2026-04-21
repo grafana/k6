@@ -15,6 +15,7 @@ import (
 	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/internal/build"
+	cloudsecrets "go.k6.io/k6/internal/secretsource/cloud"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/metrics"
 )
@@ -40,7 +41,6 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 		gs.Env,
 		"", // Historically used for -o cloud=..., no longer used (deprecated).
 		test.derivedConfig.Cloud,
-		test.derivedConfig.External,
 	)
 	if err != nil {
 		return err
@@ -115,7 +115,7 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 
 	var testArchive *lib.Archive
 	if !test.derivedConfig.NoArchiveUpload.Bool {
-		testArchive = test.initRunner.MakeArchive()
+		testArchive = test.makeArchive()
 	}
 
 	testRun := &cloudapi.TestRun{
@@ -152,6 +152,14 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 
 	// We store the test run id in the environment, so it can be used later.
 	test.preInitState.RuntimeOptions.Env[testRunIDKey] = response.ReferenceID
+
+	if response.SecretsConfig != nil && gs.CloudSecretSource != nil {
+		gs.CloudSecretSource.SetConfig(&cloudsecrets.Config{
+			Token:        response.TestRunToken,
+			Endpoint:     response.SecretsConfig.Endpoint,
+			ResponsePath: response.SecretsConfig.ResponsePath,
+		})
+	}
 
 	// If the Cloud API returned configuration overrides, we apply them to the current configuration.
 	// Then, we serialize the overridden configuration back, so it can be used by the Cloud output.

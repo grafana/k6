@@ -38,10 +38,6 @@ func New(p output.Params) (*Output, error) {
 		return nil, err
 	}
 
-	if conf.ExporterType.Valid {
-		p.Logger.Warn("Exporter type is deprecated, please migrate to exporter protocol")
-	}
-
 	return &Output{
 		config: conf,
 		logger: p.Logger,

@@ -14,7 +14,7 @@ type compiledExpr interface {
 	emitSetter(valueExpr compiledExpr, putOnStack bool)
 	emitRef()
 	emitUnary(prepare, body func(), postfix, putOnStack bool)
-	deleteExpr() compiledExpr
+	emitDelete(putOnStack bool)
 	constant() bool
 	addSrcMap()
 }
@@ -77,32 +77,6 @@ type compiledObjectAssignmentPattern struct {
 type compiledArrayAssignmentPattern struct {
 	baseCompiledExpr
 	expr *ast.ArrayPattern
-}
-
-type deleteGlobalExpr struct {
-	baseCompiledExpr
-	name unistring.String
-}
-
-type deleteVarExpr struct {
-	baseCompiledExpr
-	name unistring.String
-}
-
-type deletePropExpr struct {
-	baseCompiledExpr
-	left compiledExpr
-	name unistring.String
-}
-
-type deleteElemExpr struct {
-	baseCompiledExpr
-	left, member compiledExpr
-}
-
-type constantExpr struct {
-	baseCompiledExpr
-	val Value
 }
 
 type baseCompiledExpr struct {
@@ -217,11 +191,6 @@ type compiledEnumGetExpr struct {
 	baseCompiledExpr
 }
 
-type defaultDeleteExpr struct {
-	baseCompiledExpr
-	expr compiledExpr
-}
-
 type compiledSpreadCallArgument struct {
 	baseCompiledExpr
 	expr compiledExpr
@@ -238,13 +207,6 @@ type compiledOptional struct {
 }
 type compiledDynamicImport struct {
 	baseCompiledExpr
-}
-
-func (e *defaultDeleteExpr) emitGetter(putOnStack bool) {
-	e.expr.emitGetter(false)
-	if putOnStack {
-		e.c.emitLiteralValue(valueTrue)
-	}
 }
 
 func (c *compiler) compileExpression(v ast.Expression) compiledExpr {
@@ -361,12 +323,11 @@ func (e *baseCompiledExpr) emitRef() {
 	e.c.assert(false, e.offset, "Cannot emit reference for this type of expression")
 }
 
-func (e *baseCompiledExpr) deleteExpr() compiledExpr {
-	r := &constantExpr{
-		val: valueTrue,
+func (e *baseCompiledExpr) emitDelete(putOnStack bool) {
+	if putOnStack {
+		e.addSrcMap()
+		e.c.emitLiteralValue(valueTrue)
 	}
-	r.init(e.c, file.Idx(e.offset+1))
-	return r
 }
 
 func (e *baseCompiledExpr) emitUnary(func(), func(), bool, bool) {
@@ -376,13 +337,6 @@ func (e *baseCompiledExpr) emitUnary(func(), func(), bool, bool) {
 func (e *baseCompiledExpr) addSrcMap() {
 	if e.offset >= 0 {
 		e.c.p.addSrcMap(e.offset)
-	}
-}
-
-func (e *constantExpr) emitGetter(putOnStack bool) {
-	if putOnStack {
-		e.addSrcMap()
-		e.c.emitLiteralValue(e.val)
 	}
 }
 
@@ -536,33 +490,34 @@ func (e *compiledIdentifierExpr) emitUnary(prepare, body func(), postfix, putOnS
 	}
 }
 
-func (e *compiledIdentifierExpr) deleteExpr() compiledExpr {
+func (e *compiledIdentifierExpr) emitDelete(putOnStack bool) {
 	if e.c.scope.strict {
 		e.c.throwSyntaxError(e.offset, "Delete of an unqualified identifier in strict mode")
 		panic("Unreachable")
 	}
 	if b, noDynamics := e.c.scope.lookupName(e.name); noDynamics {
 		if b == nil {
-			r := &deleteGlobalExpr{
-				name: e.name,
+			e.addSrcMap()
+			e.c.emit(deleteGlobal(e.name))
+			if !putOnStack {
+				e.c.emit(pop)
 			}
-			r.init(e.c, file.Idx(0))
-			return r
+			return
 		}
 	} else {
 		if b == nil {
-			r := &deleteVarExpr{
-				name: e.name,
+			e.addSrcMap()
+			e.c.emit(deleteVar(e.name))
+			if !putOnStack {
+				e.c.emit(pop)
 			}
-			r.init(e.c, file.Idx(e.offset+1))
-			return r
+			return
 		}
 	}
-	r := &compiledLiteral{
-		val: valueFalse,
+	if putOnStack {
+		e.addSrcMap()
+		e.c.emitLiteralValue(valueFalse)
 	}
-	r.init(e.c, file.Idx(e.offset+1))
-	return r
 }
 
 type compiledSuperDotExpr struct {
@@ -654,8 +609,13 @@ func (e *compiledSuperDotExpr) emitRef() {
 	}
 }
 
-func (e *compiledSuperDotExpr) deleteExpr() compiledExpr {
-	return e.c.superDeleteError(e.offset)
+func (c *compiler) emitSuperReferenceError() {
+	c.emit(throwConst{referenceError("Unsupported reference to 'super'")})
+}
+
+func (e *compiledSuperDotExpr) emitDelete(_ bool) {
+	e.addSrcMap()
+	e.c.emitSuperReferenceError()
 }
 
 type compiledDotExpr struct {
@@ -790,9 +750,8 @@ func (e *compiledPrivateDotExpr) emitUnary(prepare, body func(), postfix, putOnS
 	}
 }
 
-func (e *compiledPrivateDotExpr) deleteExpr() compiledExpr {
+func (e *compiledPrivateDotExpr) emitDelete(_ bool) {
 	e.c.throwSyntaxError(e.offset, "Private fields can not be deleted")
-	panic("unreachable")
 }
 
 func (e *compiledPrivateDotExpr) emitRef() {
@@ -900,14 +859,9 @@ func (e *compiledSuperBracketExpr) emitRef() {
 	}
 }
 
-func (c *compiler) superDeleteError(offset int) compiledExpr {
-	return c.compileEmitterExpr(func() {
-		c.emit(throwConst{referenceError("Unsupported reference to 'super'")})
-	}, file.Idx(offset+1))
-}
-
-func (e *compiledSuperBracketExpr) deleteExpr() compiledExpr {
-	return e.c.superDeleteError(e.offset)
+func (e *compiledSuperBracketExpr) emitDelete(_ bool) {
+	e.addSrcMap()
+	e.c.emitSuperReferenceError()
 }
 
 func (c *compiler) checkConstantString(expr compiledExpr) (unistring.String, bool) {
@@ -1043,13 +997,17 @@ func (e *compiledDotExpr) emitUnary(prepare, body func(), postfix, putOnStack bo
 	}
 }
 
-func (e *compiledDotExpr) deleteExpr() compiledExpr {
-	r := &deletePropExpr{
-		left: e.left,
-		name: e.name,
+func (e *compiledDotExpr) emitDelete(putOnStack bool) {
+	e.left.emitGetter(true)
+	e.addSrcMap()
+	if e.c.scope.strict {
+		e.c.emit(deletePropStrict(e.name))
+	} else {
+		e.c.emit(deleteProp(e.name))
 	}
-	r.init(e.c, file.Idx(e.offset)+1)
-	return r
+	if !putOnStack {
+		e.c.emit(pop)
+	}
 }
 
 func (e *compiledBracketExpr) emitGetter(putOnStack bool) {
@@ -1139,16 +1097,7 @@ func (e *compiledBracketExpr) emitUnary(prepare, body func(), postfix, putOnStac
 	}
 }
 
-func (e *compiledBracketExpr) deleteExpr() compiledExpr {
-	r := &deleteElemExpr{
-		left:   e.left,
-		member: e.member,
-	}
-	r.init(e.c, file.Idx(e.offset)+1)
-	return r
-}
-
-func (e *deleteElemExpr) emitGetter(putOnStack bool) {
+func (e *compiledBracketExpr) emitDelete(putOnStack bool) {
 	e.left.emitGetter(true)
 	e.member.emitGetter(true)
 	e.addSrcMap()
@@ -1157,42 +1106,6 @@ func (e *deleteElemExpr) emitGetter(putOnStack bool) {
 	} else {
 		e.c.emit(deleteElem)
 	}
-	if !putOnStack {
-		e.c.emit(pop)
-	}
-}
-
-func (e *deletePropExpr) emitGetter(putOnStack bool) {
-	e.left.emitGetter(true)
-	e.addSrcMap()
-	if e.c.scope.strict {
-		e.c.emit(deletePropStrict(e.name))
-	} else {
-		e.c.emit(deleteProp(e.name))
-	}
-	if !putOnStack {
-		e.c.emit(pop)
-	}
-}
-
-func (e *deleteVarExpr) emitGetter(putOnStack bool) {
-	/*if e.c.scope.strict {
-		e.c.throwSyntaxError(e.offset, "Delete of an unqualified identifier in strict mode")
-		return
-	}*/
-	e.c.emit(deleteVar(e.name))
-	if !putOnStack {
-		e.c.emit(pop)
-	}
-}
-
-func (e *deleteGlobalExpr) emitGetter(putOnStack bool) {
-	/*if e.c.scope.strict {
-		e.c.throwSyntaxError(e.offset, "Delete of an unqualified identifier in strict mode")
-		return
-	}*/
-
-	e.c.emit(deleteGlobal(e.name))
 	if !putOnStack {
 		e.c.emit(pop)
 	}
@@ -2608,7 +2521,7 @@ func (e *compiledUnaryExpr) emitGetter(putOnStack bool) {
 		e.c.emit(typeof)
 		goto end
 	case token.DELETE:
-		e.operand.deleteExpr().emitGetter(putOnStack)
+		e.operand.emitDelete(putOnStack)
 		return
 	case token.MINUS:
 		e.c.emitExpr(e.operand, true)
@@ -3221,12 +3134,12 @@ func (e *compiledCallExpr) emitGetter(putOnStack bool) {
 	}
 }
 
-func (e *compiledCallExpr) deleteExpr() compiledExpr {
-	r := &defaultDeleteExpr{
-		expr: e,
+func (e *compiledCallExpr) emitDelete(putOnStack bool) {
+	e.emitGetter(false)
+	if putOnStack {
+		e.addSrcMap()
+		e.c.emitLiteralValue(valueTrue)
 	}
-	r.init(e.c, file.Idx(e.offset+1))
-	return r
 }
 
 func (c *compiler) compileSpreadCallArgument(spread *ast.SpreadElement) compiledExpr {
@@ -3634,12 +3547,44 @@ func (c *compiler) endOptChain() {
 	c.block = c.block.outer
 }
 
+func (c *compiler) endOptChainDelete() {
+	lbl := len(c.p.code)
+	for _, item := range c.block.breaks {
+		c.p.code[item] = joptdel(lbl - item)
+	}
+	for _, item := range c.block.conts {
+		c.p.code[item] = joptdelc(lbl - item)
+	}
+	c.block = c.block.outer
+}
+
+func (c *compiler) endOptChainDeleteP() {
+	lbl := len(c.p.code)
+	for _, item := range c.block.breaks {
+		c.p.code[item] = joptdelP(lbl - item)
+	}
+	for _, item := range c.block.conts {
+		c.p.code[item] = joptdelcP(lbl - item)
+	}
+	c.block = c.block.outer
+}
+
 func (e *compiledOptionalChain) emitGetter(putOnStack bool) {
 	e.c.startOptChain()
 	e.expr.emitGetter(true)
 	e.c.endOptChain()
 	if !putOnStack {
 		e.c.emit(pop)
+	}
+}
+
+func (e *compiledOptionalChain) emitDelete(putOnStack bool) {
+	e.c.startOptChain()
+	e.expr.emitDelete(putOnStack)
+	if putOnStack {
+		e.c.endOptChainDelete()
+	} else {
+		e.c.endOptChainDeleteP()
 	}
 }
 
