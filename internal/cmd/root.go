@@ -435,7 +435,6 @@ func createSecretSources(gs *state.GlobalState) (map[string]secretsource.Source,
 		if !ok {
 			return nil, fmt.Errorf("no secret source for type %q for configuration %q", t, line)
 		}
-		c := found.Module.(secretsource.Constructor) //nolint:forcetypeassert
 		params := baseParams
 		name, isDefault, config := extractNameAndDefault(config)
 		if name == "" {
@@ -444,9 +443,25 @@ func createSecretSources(gs *state.GlobalState) (map[string]secretsource.Source,
 		}
 		params.ConfigArgument = config
 
-		secretSource, err := c(params)
-		if err != nil {
-			return nil, err
+		var secretSource secretsource.Source
+		if t == "cloud" {
+			// Keep all named cloud sources pointing to the same instance so
+			// SetConfig() from createCloudTest configures every alias.
+			if gs.CloudSecretSource == nil {
+				cloudSource, newErr := cloudsecrets.New(baseParams)
+				if newErr != nil {
+					return nil, fmt.Errorf("failed to initialize cloud secret source: %w", newErr)
+				}
+				gs.CloudSecretSource = cloudSource
+			}
+			secretSource = gs.CloudSecretSource
+		} else {
+			c := found.Module.(secretsource.Constructor) //nolint:forcetypeassert
+			var newErr error
+			secretSource, newErr = c(params)
+			if newErr != nil {
+				return nil, newErr
+			}
 		}
 		_, alreadRegistered := result[name]
 		if alreadRegistered {

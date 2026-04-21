@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"strconv"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -212,6 +213,54 @@ export default function() {
 		assert.Contains(t, stdout, "output: cloud (https://app.k6.io/runs/1337)")
 		assert.Contains(t, stdout, "The test run id is "+strconv.Itoa(testRunID))
 	})
+}
+
+func TestCloudRunLocalExecutionNamedCloudSecretSource(t *testing.T) {
+	t.Parallel()
+
+	var secretFetches atomic.Int32
+	secretsSrv := getTestServer(t, map[string]http.Handler{
+		"GET ^/secrets/.+$": http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			secretFetches.Add(1)
+			assert.Equal(t, "Bearer mock-test-run-token", r.Header.Get("Authorization"))
+			w.Header().Set("Content-Type", "application/json")
+			_, err := fmt.Fprint(w, `{"plaintext":"named-secret"}`)
+			assert.NoError(t, err)
+		}),
+	})
+	t.Cleanup(secretsSrv.Close)
+
+	testStart := http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
+		resp.WriteHeader(http.StatusOK)
+		_, err := fmt.Fprintf(resp, `{
+			"reference_id": "1337",
+			"test_run_token": "mock-test-run-token",
+			"secrets_config": {
+				"endpoint": %q,
+				"response_path": "plaintext"
+			}
+		}`, secretsSrv.URL+"/secrets/{key}")
+		assert.NoError(t, err)
+	})
+
+	srv := getCloudTestEndChecker(t, 1337, testStart, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed)
+
+	script := `
+import secrets from "k6/secrets";
+export default async function() {
+	const value = await secrets.source("namedcloud").get("mykey");
+	console.log(value);
+}`
+	ts := makeTestState(t, script, []string{"--local-execution", "--secret-source=cloud=name=namedcloud", "--log-output=stdout"}, 0)
+	ts.Env["K6_CLOUD_HOST"] = srv.URL
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stderr := ts.Stderr.String()
+	t.Log(stderr)
+	assert.NotContains(t, stderr, "cloud secrets not configured")
+	assert.NotContains(t, stderr, "level=error")
+	assert.EqualValues(t, 1, secretFetches.Load(), "expected one cloud secret fetch")
 }
 
 func makeTestState(tb testing.TB, script string, cliFlags []string, expExitCode exitcodes.ExitCode) *GlobalTestState {
