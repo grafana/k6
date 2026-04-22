@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"go.k6.io/k6/internal/js/modules/k6/browser/common"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
 )
 
 func TestConsoleLogParse(t *testing.T) {
@@ -163,7 +163,7 @@ func TestEvalRemoteObjectParse(t *testing.T) {
 		},
 		// TODO:
 		// {
-		// 	// This test is ignored until https://go.k6.io/k6/js/modules/k6/browser/issues/1132
+		// 	// This test is ignored until https://go.k6.io/k6/v2/js/modules/k6/browser/issues/1132
 		// 	// has been resolved.
 		// 	name: "partially_parsed",
 		// 	eval:  "window",

@@ -24,16 +24,16 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
 
-	"go.k6.io/k6/cloudapi"
-	"go.k6.io/k6/errext/exitcodes"
-	"go.k6.io/k6/internal/build"
-	"go.k6.io/k6/internal/cmd"
-	"go.k6.io/k6/internal/cmd/tests/events"
-	"go.k6.io/k6/internal/event"
-	"go.k6.io/k6/internal/lib/testutils"
-	"go.k6.io/k6/internal/lib/testutils/httpmultibin"
-	"go.k6.io/k6/js/modules"
-	"go.k6.io/k6/lib/fsext"
+	"go.k6.io/k6/v2/cloudapi"
+	"go.k6.io/k6/v2/errext/exitcodes"
+	"go.k6.io/k6/v2/internal/build"
+	"go.k6.io/k6/v2/internal/cmd"
+	"go.k6.io/k6/v2/internal/cmd/tests/events"
+	"go.k6.io/k6/v2/internal/event"
+	"go.k6.io/k6/v2/internal/lib/testutils"
+	"go.k6.io/k6/v2/internal/lib/testutils/httpmultibin"
+	"go.k6.io/k6/v2/js/modules"
+	"go.k6.io/k6/v2/lib/fsext"
 )
 
 func TestVersion(t *testing.T) {

@@ -10,8 +10,8 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"go.k6.io/k6/internal/secretsource/url"
-	"go.k6.io/k6/secretsource"
+	"go.k6.io/k6/v2/internal/secretsource/url"
+	"go.k6.io/k6/v2/secretsource"
 )
 
 // Config holds the configuration for accessing cloud secrets.

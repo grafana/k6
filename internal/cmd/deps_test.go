@@ -10,8 +10,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"go.k6.io/k6/internal/cmd/tests"
-	"go.k6.io/k6/internal/lib/testutils"
+	"go.k6.io/k6/v2/internal/cmd/tests"
+	"go.k6.io/k6/v2/internal/lib/testutils"
 )
 
 // TestGetCmdDeps exercises k6 deps against the standard (non-custom) binary, so

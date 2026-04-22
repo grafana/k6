@@ -12,12 +12,12 @@ import (
 	"github.com/sirupsen/logrus"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/cloudapi"
-	"go.k6.io/k6/cmd/state"
-	"go.k6.io/k6/internal/build"
-	cloudsecrets "go.k6.io/k6/internal/secretsource/cloud"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/v2/cloudapi"
+	"go.k6.io/k6/v2/cmd/state"
+	"go.k6.io/k6/v2/internal/build"
+	cloudsecrets "go.k6.io/k6/v2/internal/secretsource/cloud"
+	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/metrics"
 )
 
 const (

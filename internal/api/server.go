@@ -13,11 +13,11 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 
-	v1 "go.k6.io/k6/api/v1"
-	"go.k6.io/k6/internal/execution"
-	"go.k6.io/k6/internal/metrics/engine"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/metrics"
+	v1 "go.k6.io/k6/v2/api/v1"
+	"go.k6.io/k6/v2/internal/execution"
+	"go.k6.io/k6/v2/internal/metrics/engine"
+	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/metrics"
 )
 
 func newHandler(cs *v1.ControlSurface, profilingEnabled bool) http.Handler {

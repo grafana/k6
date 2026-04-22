@@ -1,4 +1,4 @@
-module go.k6.io/k6
+module go.k6.io/k6/v2
 
 go 1.25.0
 
@@ -105,5 +105,3 @@ require (
 	gopkg.in/cenkalti/backoff.v1 v1.1.0 // indirect
 	gopkg.in/validator.v2 v2.0.1 // indirect
 )
-
-retract v1.2.0 // mistakenly pushed old tag from the old xk6-browser repo before it was merged in k6

@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"go.k6.io/k6/internal/cmd"
+	"go.k6.io/k6/v2/internal/cmd"
 )
 
 func TestMain(m *testing.M) {
