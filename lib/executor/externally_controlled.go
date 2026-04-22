@@ -339,7 +339,7 @@ func (rs *externallyControlledRunState) newManualVUHandle(
 		atomic.AddInt64(rs.activeVUsCount, -1)
 		wg.Done()
 	}
-	ctx, cancel := context.WithCancel(rs.ctx)
+	ctx, cancel := context.WithCancel(rs.ctx) //nolint:gosec
 	return &manualVUHandle{
 		vuHandle: newStoppedVUHandle(ctx, getVU, returnVU,
 			rs.executor.nextIterationCounters,

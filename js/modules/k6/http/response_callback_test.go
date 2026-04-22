@@ -90,7 +90,8 @@ func TestResponseCallbackInAction(t *testing.T) {
 
 	sr := tb.Replacer.Replace
 
-	HTTPMetricsWithoutFailed := []string{
+	HTTPMetricsWithoutFailed := make([]string, 0, 9)
+	HTTPMetricsWithoutFailed = append(HTTPMetricsWithoutFailed,
 		metrics.HTTPReqsName,
 		metrics.HTTPReqBlockedName,
 		metrics.HTTPReqConnectingName,
@@ -99,7 +100,7 @@ func TestResponseCallbackInAction(t *testing.T) {
 		metrics.HTTPReqWaitingName,
 		metrics.HTTPReqSendingName,
 		metrics.HTTPReqTLSHandshakingName,
-	}
+	)
 
 	allHTTPMetrics := append(HTTPMetricsWithoutFailed, metrics.HTTPReqFailedName) //nolint: gocritic
 
@@ -298,7 +299,8 @@ func TestResponseCallbackBatch(t *testing.T) {
 
 	sr := tb.Replacer.Replace
 
-	HTTPMetricsWithoutFailed := []string{
+	HTTPMetricsWithoutFailed := make([]string, 0, 9)
+	HTTPMetricsWithoutFailed = append(HTTPMetricsWithoutFailed,
 		metrics.HTTPReqsName,
 		metrics.HTTPReqBlockedName,
 		metrics.HTTPReqConnectingName,
@@ -307,7 +309,7 @@ func TestResponseCallbackBatch(t *testing.T) {
 		metrics.HTTPReqWaitingName,
 		metrics.HTTPReqSendingName,
 		metrics.HTTPReqTLSHandshakingName,
-	}
+	)
 
 	allHTTPMetrics := append(HTTPMetricsWithoutFailed, metrics.HTTPReqFailedName) //nolint:gocritic
 	// IMPORTANT: the tests here depend on the fact that the url they hit can be ordered in the same

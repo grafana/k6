@@ -533,9 +533,9 @@ func TestMakeRequestFailedHostInitializesHeadersAndCookies(t *testing.T) {
 
 func TestMakeRequestRPSLimit(t *testing.T) {
 	t.Parallel()
-	var requests int64
+	var requests atomic.Int64
 	ts := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
-		atomic.AddInt64(&requests, 1)
+		requests.Add(1)
 	}))
 	defer ts.Close()
 
@@ -574,7 +574,7 @@ func TestMakeRequestRPSLimit(t *testing.T) {
 		select {
 		case <-timer.C:
 			timer.Stop()
-			val := atomic.LoadInt64(&requests)
+			val := requests.Load()
 			assert.NotEmpty(t, val)
 			assert.InDelta(t, val, 3, 3)
 			return

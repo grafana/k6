@@ -210,7 +210,7 @@ func fetch(logger logrus.FieldLogger, u string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	res, err := http.DefaultClient.Do(req) //nolint:gosec
+	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
 	}

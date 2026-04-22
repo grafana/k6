@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -29,7 +30,7 @@ func TestLogger(t *testing.T) {
 				t.Run("path="+path, func(t *testing.T) {
 					t.Parallel()
 					rw := httptest.NewRecorder()
-					r := httptest.NewRequest(method, "http://example.com"+path, nil)
+					r := httptest.NewRequestWithContext(context.Background(), method, "http://example.com"+path, nil)
 
 					l, hook := logtest.NewNullLogger()
 					l.Level = logrus.DebugLevel
@@ -61,7 +62,7 @@ func TestPing(t *testing.T) {
 	mux := handlePing(logger)
 
 	rw := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodGet, "/ping", nil)
+	r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/ping", nil)
 	mux.ServeHTTP(rw, r)
 
 	res := rw.Result()

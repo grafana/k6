@@ -179,7 +179,7 @@ func buildCanonicalHeaders(
 	var canonicalHeaders strings.Builder
 	for _, h := range headers {
 		if h == hostHeader {
-			_, _ = fmt.Fprintf(&canonicalHeaders, "%s:%s\n", hostHeader, stripExcessSpaces(host)) //nolint:gosec
+			_, _ = fmt.Fprintf(&canonicalHeaders, "%s:%s\n", hostHeader, stripExcessSpaces(host))
 			continue
 		}
 

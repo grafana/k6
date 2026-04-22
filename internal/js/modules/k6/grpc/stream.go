@@ -91,7 +91,7 @@ func (s *stream) beginStream(p *callParams) error {
 	var cancel context.CancelFunc
 
 	if p.Timeout != time.Duration(0) {
-		ctx, cancel = context.WithTimeout(ctx, p.Timeout)
+		ctx, cancel = context.WithTimeout(ctx, p.Timeout) //nolint:gosec
 	}
 
 	s.timeoutCancel = cancel
