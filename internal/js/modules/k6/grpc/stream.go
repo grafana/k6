@@ -9,14 +9,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/grafana/sobek"
+	"github.com/sirupsen/logrus"
+
+	"go.k6.io/k6/internal/js/taskqueue"
 	"go.k6.io/k6/internal/lib/netext/grpcext"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/metrics"
-
-	"github.com/grafana/sobek"
-	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
-	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/reflect/protoreflect"

@@ -11,7 +11,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
 	"go.opentelemetry.io/otel/attribute"
 	oteltrace "go.opentelemetry.io/otel/trace"
 
@@ -20,6 +19,7 @@ import (
 	"go.k6.io/k6/internal/js/modules/k6/browser/env"
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
 	browsertrace "go.k6.io/k6/internal/js/modules/k6/browser/trace"
+	"go.k6.io/k6/internal/js/taskqueue"
 
 	k6event "go.k6.io/k6/internal/event"
 	k6modules "go.k6.io/k6/js/modules"
