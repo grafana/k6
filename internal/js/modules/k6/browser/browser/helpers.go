@@ -7,11 +7,11 @@ import (
 	"strings"
 
 	"github.com/grafana/sobek"
-	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
 
 	"go.k6.io/k6/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6error"
 	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
+	"go.k6.io/k6/internal/js/taskqueue"
 	k6common "go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/promises"
 )

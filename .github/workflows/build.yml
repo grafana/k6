@@ -152,7 +152,7 @@ jobs:
           go version
           ./build-release.sh "dist" "${VERSION}"
       - name: Upload artifacts
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: binaries
           path: dist/
@@ -281,7 +281,7 @@ jobs:
           Expand-Archive -Path ".\dist\k6-${env:VERSION}-windows-amd64.zip" -DestinationPath .\packaging\
 
       - name: Upload artifact for Windows installer build
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: windows-binary
           path: 'packaging/k6-${{ env.VERSION }}-windows-amd64/k6.exe'
@@ -325,7 +325,7 @@ jobs:
           Compress-Archive -Path ".\packaging\*" -DestinationPath ".\dist\k6-${env:VERSION}-windows-amd64.zip" -Force
 
       - name: Upload signed artifacts
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: needs.configure.outputs.sign_windows_artifacts == 'true'
         with:
           name: binaries-signed
@@ -387,7 +387,7 @@ jobs:
         run: move "packaging\k6.msi" "packaging\k6-${env:VERSION}-windows-amd64.msi"
 
       - name: Upload Windows installer
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: binaries-windows
           path: |
@@ -480,7 +480,7 @@ jobs:
         run: cd dist && sha256sum * > "k6-${VERSION}-checksums.txt"
       - name: Anchore SBOM Action
         continue-on-error: true
-        uses: anchore/sbom-action@28d71544de8eaf1b958d335707167c5f783590ad # v0.22.2
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
         with:
           artifact-name: k6-${{ env.VERSION }}-spdx.json
           upload-release-assets: false

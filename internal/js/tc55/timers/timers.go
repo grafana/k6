@@ -6,11 +6,11 @@ import (
 	"slices"
 	"time"
 
-	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
 	"github.com/sirupsen/logrus"
 
 	"github.com/grafana/sobek"
 
+	"go.k6.io/k6/internal/js/taskqueue"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 )

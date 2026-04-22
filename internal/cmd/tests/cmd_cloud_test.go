@@ -45,6 +45,19 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 		assert.Contains(t, stdout, `must first authenticate`)
 	})
 
+	t.Run("TestCloudStackNotConfigured", func(t *testing.T) {
+		t.Parallel()
+
+		ts := getSimpleCloudTestState(t, nil, setupCmd, nil, nil, nil)
+		delete(ts.Env, "K6_CLOUD_STACK_ID")
+		ts.ExpectedExitCode = -1
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stdout := ts.Stdout.String()
+		t.Log(stdout)
+		assert.Contains(t, stdout, `must first authenticate`)
+	})
+
 	t.Run("TestCloudLoggedInWithScriptToken", func(t *testing.T) {
 		t.Parallel()
 
@@ -90,26 +103,6 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 		assert.Contains(t, stdout, `execution: cloud`)
 		assert.Contains(t, stdout, `output: https://app.k6.io/runs/123`)
 		assert.Contains(t, stdout, `test status: Running`)
-	})
-
-	t.Run("TestCloudUploadOnly", func(t *testing.T) {
-		t.Parallel()
-
-		cs := func() cloudapi.TestProgressResponse {
-			return cloudapi.TestProgressResponse{
-				RunStatusText: "Archived",
-				RunStatus:     cloudapi.RunStatusArchived,
-			}
-		}
-
-		ts := getSimpleCloudTestState(t, nil, setupCmd, []string{"--upload-only", "--log-output=stdout"}, nil, cs)
-		cmd.ExecuteWithGlobalState(ts.GlobalState)
-
-		stdout := ts.Stdout.String()
-		t.Log(stdout)
-		assert.Contains(t, stdout, `execution: cloud`)
-		assert.Contains(t, stdout, `output: https://app.k6.io/runs/123`)
-		assert.Contains(t, stdout, `test status: Archived`)
 	})
 
 	t.Run("TestCloudWithConfigOverride", func(t *testing.T) {
@@ -218,7 +211,8 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 		ts.CmdArgs = []string{"k6", "cloud", "--verbose", "--log-output=stdout", "archive.tar"}
 		ts.Env["K6_SHOW_CLOUD_LOGS"] = "false" // no mock for the logs yet
 		ts.Env["K6_CLOUD_HOST"] = srv.URL
-		ts.Env["K6_CLOUD_TOKEN"] = "foo" // doesn't matter, we mock the cloud
+		ts.Env["K6_CLOUD_TOKEN"] = "foo"     // doesn't matter, we mock the cloud
+		ts.Env["K6_CLOUD_STACK_ID"] = "1234" // doesn't matter, we mock the cloud
 
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
@@ -277,7 +271,14 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 func cloudTestStartSimple(tb testing.TB, testRunID int) http.Handler {
 	return http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
 		resp.WriteHeader(http.StatusOK)
-		_, err := fmt.Fprintf(resp, `{"reference_id": "%d"}`, testRunID)
+		_, err := fmt.Fprintf(resp, `{
+			"reference_id": "%d",
+			"test_run_token": "mock-test-run-token",
+			"secrets_config": {
+				"endpoint": "https://mock-secrets.example.com/{key}",
+				"response_path": "plaintext"
+			}
+		}`, testRunID)
 		assert.NoError(tb, err)
 	})
 }
@@ -332,7 +333,9 @@ func getSimpleCloudTestState(t *testing.T, script []byte, setupCmd setupCommandF
 	ts.CmdArgs = setupCmd(cliFlags)
 	ts.Env["K6_SHOW_CLOUD_LOGS"] = "false" // no mock for the logs yet
 	ts.Env["K6_CLOUD_HOST"] = srv.URL
-	ts.Env["K6_CLOUD_TOKEN"] = "foo" // doesn't matter, we mock the cloud
+	ts.Env["K6_CLOUD_TOKEN"] = "foo"       // doesn't matter, we mock the cloud
+	ts.Env["K6_CLOUD_STACK_ID"] = "1234"   // doesn't matter, we mock the cloud
+	ts.Env["K6_CLOUD_PROJECT_ID"] = "1234" // doesn't matter, we mock the cloud
 
 	return ts
 }

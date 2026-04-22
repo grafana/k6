@@ -1,11 +1,10 @@
 package tests
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -33,49 +32,47 @@ func TestCloudLoginWithArgs(t *testing.T) {
 		wantStdoutContains []string
 	}{
 		{
-			name:    "valid token",
-			token:   validToken,
-			wantErr: false,
-			wantStdoutContains: []string{
-				"Logged in successfully",
-				fmt.Sprintf("token: %s", validToken),
-			},
-		},
-		{
 			name:    "valid token and valid stack",
 			token:   validToken,
 			stack:   validStack,
 			wantErr: false,
 			wantStdoutContains: []string{
 				"Logged in successfully",
-				fmt.Sprintf("token: %s", validToken),
+				fmt.Sprintf("token: %s", strings.Repeat("*", 11)),
 				fmt.Sprintf("stack-id: %d", validStackID),
 				fmt.Sprintf("stack-url: %s", validStackURL),
 				fmt.Sprintf("default-project-id: %d", defaultProjectID),
 			},
 		},
 		{
-			name:    "valid token and 'None' stack",
+			name:    "valid token without stack fails",
 			token:   validToken,
-			stack:   "None",
-			wantErr: false,
+			wantErr: true,
 			wantStdoutContains: []string{
-				"Logged in successfully",
-				fmt.Sprintf("token: %s", validToken),
+				"stack value is required",
 			},
 		},
 		{
-			name:               "invalid token",
+			name:    "valid stack without token fails",
+			stack:   validStack,
+			wantErr: true,
+			wantStdoutContains: []string{
+				"token value is required",
+			},
+		},
+		{
+			name:               "invalid token and valid stack",
 			token:              "invalid-token",
+			stack:              validStack,
 			wantErr:            true,
-			wantStdoutContains: []string{"your API token is invalid"},
+			wantStdoutContains: []string{"Authentication failed"},
 		},
 		{
 			name:               "valid token and invalid stack",
 			token:              validToken,
 			stack:              "invalid-stack",
 			wantErr:            true,
-			wantStdoutContains: []string{"your stack is invalid"},
+			wantStdoutContains: []string{"Authentication failed"},
 		},
 	}
 
@@ -126,24 +123,6 @@ func mockValidateTokenServer(t *testing.T) *httptest.Server {
 
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		switch req.URL.Path {
-		// v1 path to validate token only
-		case "/v1/validate-token":
-			body, err := io.ReadAll(req.Body)
-			require.NoError(t, err)
-
-			var payload map[string]any
-			err = json.Unmarshal(body, &payload)
-			require.NoError(t, err)
-
-			assert.Contains(t, payload, "token")
-			if payload["token"] == validToken {
-				_, err = fmt.Fprintf(w, `{"is_valid": true, "message": "Token is valid"}`)
-				require.NoError(t, err)
-				return
-			}
-			_, err = fmt.Fprintf(w, `{"is_valid": false, "message": "Token is invalid"}`)
-			require.NoError(t, err)
-
 		// v6 path to validate token and stack
 		case "/cloud/v6/auth":
 			authHeader := req.Header.Get("Authorization")
