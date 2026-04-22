@@ -395,6 +395,10 @@ func (r *Runner) HandleSummary(
 		return nil, err
 	}
 
+	if deadlineError := r.checkDeadline(summaryCtx, consts.HandleSummaryFn, nil, nil); deadlineError != nil {
+		return nil, deadlineError
+	}
+
 	wrapper := strings.Replace(summaryWrapperLambdaCode, "/*JSLIB_SUMMARY_CODE*/", summaryCode, 1)
 	handleSummaryWrapperRaw, err := vu.Runtime.RunString(wrapper)
 	if err != nil {
