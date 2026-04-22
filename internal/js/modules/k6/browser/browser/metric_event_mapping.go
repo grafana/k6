@@ -3,7 +3,7 @@ package browser
 import (
 	"fmt"
 
-	"go.k6.io/k6/internal/js/modules/k6/browser/common"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
 )
 
 // mapMetricEvent to the JS module.

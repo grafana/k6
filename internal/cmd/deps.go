@@ -10,9 +10,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"go.k6.io/k6/cmd/state"
-	"go.k6.io/k6/ext"
-	"go.k6.io/k6/internal/build"
+	"go.k6.io/k6/v2/cmd/state"
+	"go.k6.io/k6/v2/ext"
+	"go.k6.io/k6/v2/internal/build"
 )
 
 type depsCmd struct {

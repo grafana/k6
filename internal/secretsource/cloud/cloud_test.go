@@ -11,11 +11,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"go.k6.io/k6/ext"
-	"go.k6.io/k6/lib/fsext"
-	"go.k6.io/k6/secretsource"
+	"go.k6.io/k6/v2/ext"
+	"go.k6.io/k6/v2/lib/fsext"
+	"go.k6.io/k6/v2/secretsource"
 
-	_ "go.k6.io/k6/internal/secretsource/url"
+	_ "go.k6.io/k6/v2/internal/secretsource/url"
 )
 
 func getCloudConstructor(t *testing.T) secretsource.Constructor {

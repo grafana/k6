@@ -4,7 +4,7 @@ package promises
 import (
 	"github.com/grafana/sobek"
 
-	"go.k6.io/k6/js/modules"
+	"go.k6.io/k6/v2/js/modules"
 )
 
 // New can be used to create promises that will be dispatched to k6's event loop.
