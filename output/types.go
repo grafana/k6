@@ -10,6 +10,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/internal/usage"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/fsext"
@@ -32,6 +33,11 @@ type Params struct {
 	RuntimeOptions lib.RuntimeOptions
 	ExecutionPlan  []lib.ExecutionStep
 	Usage          *usage.Usage
+
+	// OnCloudTestCreated is called by the cloud output after CreateTestRun succeeds.
+	// It allows command-layer code to consume response fields that are needed outside
+	// of the output package, such as cloud secret source runtime credentials.
+	OnCloudTestCreated func(*cloudapi.CreateTestRunResponse)
 }
 
 // TODO: make v2 with buffered channels?

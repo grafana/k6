@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/ext"
 	"go.k6.io/k6/internal/output/cloud"
@@ -14,6 +15,7 @@ import (
 	"go.k6.io/k6/internal/output/json"
 	"go.k6.io/k6/internal/output/opentelemetry"
 	"go.k6.io/k6/internal/output/prometheusrw/remotewrite"
+	cloudsecrets "go.k6.io/k6/internal/secretsource/cloud"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/output"
 
@@ -126,6 +128,16 @@ func createOutputs(
 		RuntimeOptions: test.preInitState.RuntimeOptions,
 		ExecutionPlan:  executionPlan,
 		Usage:          test.preInitState.Usage,
+		OnCloudTestCreated: func(response *cloudapi.CreateTestRunResponse) {
+			if response.SecretsConfig == nil || gs.CloudSecretSource == nil {
+				return
+			}
+			gs.CloudSecretSource.SetConfig(&cloudsecrets.Config{
+				Token:        response.TestRunToken,
+				Endpoint:     response.SecretsConfig.Endpoint,
+				ResponsePath: response.SecretsConfig.ResponsePath,
+			})
+		},
 	}
 
 	outputs := test.derivedConfig.Out

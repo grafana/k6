@@ -135,6 +135,63 @@ func TestOutputCreateTestWithConfigOverwrite(t *testing.T) {
 	require.NoError(t, out.StopWithTestError(nil))
 }
 
+func TestOutputStartCallsOnCloudTestCreated(t *testing.T) {
+	t.Parallel()
+
+	var (
+		callbackCalled bool
+		gotResponse    cloudapi.CreateTestRunResponse
+	)
+
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/tests":
+			_, err := fmt.Fprintf(w, `{
+"reference_id": "12345",
+"test_run_token": "run-token",
+"secrets_config": {
+	"endpoint": "https://secrets.example.test/{key}",
+	"response_path": "plaintext"
+}
+}`)
+			require.NoError(t, err)
+		case "/v1/tests/12345":
+			w.WriteHeader(http.StatusOK)
+		default:
+			http.Error(w, "not expected path", http.StatusInternalServerError)
+		}
+	}
+	ts := httptest.NewServer(http.HandlerFunc(handler))
+	defer ts.Close()
+
+	out, err := newOutput(output.Params{
+		Logger: testutils.NewLogger(t),
+		Environment: map[string]string{
+			"K6_CLOUD_HOST": ts.URL,
+		},
+		ScriptOptions: lib.Options{
+			SystemTags: &metrics.DefaultSystemTagSet,
+		},
+		ScriptPath: &url.URL{Path: "/script.js"},
+		Usage:      usage.New(),
+		OnCloudTestCreated: func(response *cloudapi.CreateTestRunResponse) {
+			callbackCalled = true
+			gotResponse = *response
+		},
+	})
+	require.NoError(t, err)
+
+	require.NoError(t, out.Start())
+	require.NoError(t, out.StopWithTestError(nil))
+
+	require.True(t, callbackCalled)
+	assert.Equal(t, "run-token", gotResponse.TestRunToken)
+	if assert.NotNil(t, gotResponse.SecretsConfig) {
+		assert.Equal(t, "https://secrets.example.test/{key}", gotResponse.SecretsConfig.Endpoint)
+		assert.Equal(t, "plaintext", gotResponse.SecretsConfig.ResponsePath)
+	}
+}
+
 func TestOutputStartVersionError(t *testing.T) {
 	t.Parallel()
 	o, err := newOutput(output.Params{

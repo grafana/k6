@@ -3422,3 +3422,64 @@ func TestPLZCloudSecretsEnvVars(t *testing.T) {
 	assert.Contains(t, stderr, `level=info msg="***SECRET_REDACTED***" source=console`)
 	assert.NotContains(t, stderr, "plz-secret-value")
 }
+
+func TestRunCloudOutputUpdatesCloudSecretSourceFromCreateTestRun(t *testing.T) {
+	t.Parallel()
+
+	var (
+		bootstrapEndpointCalls int
+		runEndpointCalls       int
+		serverURL              string
+	)
+
+	srv := getTestServer(t, map[string]http.Handler{
+		"POST ^/v1/tests$": http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_, err := fmt.Fprintf(w, `{
+				"reference_id": "111",
+				"test_run_token": "run-token",
+				"secrets_config": {
+					"endpoint": "%s/v1/run-secrets/{key}",
+					"response_path": "plaintext"
+				}
+			}`, serverURL)
+			assert.NoError(t, err)
+		}),
+		"GET ^/v1/bootstrap-secrets/mykey$": http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			bootstrapEndpointCalls++
+			_, err := fmt.Fprint(w, `{"plaintext":"bootstrap-secret"}`)
+			assert.NoError(t, err)
+		}),
+		"GET ^/v1/run-secrets/mykey$": http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			runEndpointCalls++
+			assert.Equal(t, "Bearer run-token", r.Header.Get("Authorization"))
+			_, err := fmt.Fprint(w, `{"plaintext":"run-secret"}`)
+			assert.NoError(t, err)
+		}),
+		"POST ^/v1/tests/111$": http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}),
+	})
+	serverURL = srv.URL
+	t.Cleanup(srv.Close)
+
+	script := `
+		import secrets from "k6/secrets";
+		export default async () => {
+			const v = await secrets.source("cloud").get("mykey");
+			console.log(v);
+		}
+	`
+	ts := getSingleFileTestState(t, script, []string{"-v", "--log-output=stdout", "--out=cloud"}, 0)
+	ts.Env["K6_CLOUD_HOST"] = srv.URL
+	ts.Env["K6_CLOUD_TOKEN"] = "cloud-api-token"
+	ts.Env["K6_CLOUD_SECRETS_TOKEN"] = "bootstrap-token"
+	ts.Env["K6_CLOUD_SECRETS_ENDPOINT"] = srv.URL + "/v1/bootstrap-secrets/{key}"
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	require.Equal(t, 0, bootstrapEndpointCalls, "bootstrap endpoint should be replaced by CreateTestRun config")
+	require.Equal(t, 1, runEndpointCalls, "secrets should be fetched from CreateTestRun endpoint")
+	stderr := ts.Stderr.String()
+	t.Log(stderr)
+	assert.NotContains(t, stderr, "level=error")
+}
