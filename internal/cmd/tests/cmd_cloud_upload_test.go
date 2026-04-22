@@ -135,7 +135,8 @@ func TestK6CloudUpload(t *testing.T) {
 		ts.CmdArgs = []string{"k6", "cloud", "upload", "archive.tar"}
 		ts.Env["K6_SHOW_CLOUD_LOGS"] = "false" // no mock for the logs yet
 		ts.Env["K6_CLOUD_HOST"] = srv.URL
-		ts.Env["K6_CLOUD_TOKEN"] = "foo" // doesn't matter, we mock the cloud
+		ts.Env["K6_CLOUD_TOKEN"] = "foo"
+		ts.Env["K6_CLOUD_STACK_ID"] = "1234"
 
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 

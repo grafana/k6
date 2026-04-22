@@ -88,7 +88,7 @@ export const options = {
 
 export default function() {};`
 
-		ts := makeTestState(t, script, []string{"--local-execution"}, 0)
+		ts := makeTestState(t, script, []string{"--local-execution"})
 
 		testServerHandlerFunc := http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
 			// When using the local execution mode, the test archive should be uploaded to the cloud
@@ -141,7 +141,7 @@ export const options = {
 
 export default function() {};`
 
-		ts := makeTestState(t, script, []string{"--local-execution", "--no-archive-upload"}, 0)
+		ts := makeTestState(t, script, []string{"--local-execution", "--no-archive-upload"})
 
 		testServerHandlerFunc := http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
 			body, err := io.ReadAll(req.Body)
@@ -198,7 +198,7 @@ export default function() {
 	` + "console.log(`The test run id is ${__ENV.K6_CLOUDRUN_TEST_RUN_ID}`);" + `
 };`
 
-		ts := makeTestState(t, script, []string{"--local-execution", "--log-output=stdout"}, 0)
+		ts := makeTestState(t, script, []string{"--local-execution", "--log-output=stdout"})
 
 		const testRunID = 1337
 		srv := getCloudTestEndChecker(t, testRunID, nil, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed)
@@ -212,9 +212,33 @@ export default function() {
 		assert.Contains(t, stdout, "output: cloud (https://app.k6.io/runs/1337)")
 		assert.Contains(t, stdout, "The test run id is "+strconv.Itoa(testRunID))
 	})
+
+	t.Run("should error when no stack is configured", func(t *testing.T) {
+		t.Parallel()
+
+		script := `
+export const options = {
+  cloud: {
+      name: 'Hello k6 Cloud!',
+      projectID: 123456,
+  },
+};
+
+export default function() {};`
+
+		ts := makeTestState(t, script, []string{"--local-execution", "--log-output=stdout"})
+		ts.ExpectedExitCode = -1
+		delete(ts.Env, "K6_CLOUD_STACK_ID")
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stdout := ts.Stdout.String()
+		t.Log(stdout)
+		assert.Contains(t, stdout, "must first authenticate")
+	})
 }
 
-func makeTestState(tb testing.TB, script string, cliFlags []string, expExitCode exitcodes.ExitCode) *GlobalTestState {
+func makeTestState(tb testing.TB, script string, cliFlags []string) *GlobalTestState {
 	if cliFlags == nil {
 		cliFlags = []string{"-v", "--log-output=stdout"}
 	}
@@ -222,8 +246,8 @@ func makeTestState(tb testing.TB, script string, cliFlags []string, expExitCode 
 	ts := NewGlobalTestState(tb)
 	require.NoError(tb, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test.js"), []byte(script), 0o644))
 	ts.CmdArgs = append(append([]string{"k6", "cloud", "run"}, cliFlags...), "test.js")
-	ts.ExpectedExitCode = int(expExitCode)
-	ts.Env["K6_CLOUD_TOKEN"] = "foo" // doesn't matter, we mock the cloud
+	ts.Env["K6_CLOUD_TOKEN"] = "foo"     // doesn't matter, we mock the cloud
+	ts.Env["K6_CLOUD_STACK_ID"] = "1234" // doesn't matter, we mock the cloud
 
 	return ts
 }

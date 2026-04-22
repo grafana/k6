@@ -31,10 +31,22 @@ import (
 // Grafana Cloud without being logged in or having a valid token.
 //
 //nolint:staticcheck // the error is shown to the user so here punctuation and capital are required
-var errUserUnauthenticated = errors.New("To run tests in Grafana Cloud, you must first authenticate." +
-	" Run the `k6 cloud login` command, or check the docs" +
+var errUserUnauthenticated = errors.New("You must first authenticate to run tests in Grafana Cloud." +
+	" Run the `k6 cloud login` command providing the stack and token, or check the docs" +
 	" https://grafana.com/docs/grafana-cloud/testing/k6/author-run/tokens-and-cli-authentication" +
-	" for additional authentication methods.")
+	" for additional methods.")
+
+// checkCloudLogin verifies that both a token and a stack are configured.
+// Together they represent a complete Grafana Cloud login.
+func checkCloudLogin(conf cloudapi.Config) error {
+	if !conf.Token.Valid || conf.Token.String == "" {
+		return errUserUnauthenticated
+	}
+	if !conf.StackID.Valid || conf.StackID.Int64 == 0 {
+		return errUserUnauthenticated
+	}
+	return nil
+}
 
 // cmdCloud handles the `k6 cloud` sub-command
 type cmdCloud struct {
@@ -130,8 +142,8 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	if !cloudConfig.Token.Valid {
-		return errUserUnauthenticated
+	if err := checkCloudLogin(cloudConfig); err != nil {
+		return err
 	}
 
 	// Display config warning if needed
@@ -499,15 +511,6 @@ func resolveAndSetProjectID(
 		arc.Options.Cloud = b
 
 		cloudConfig.ProjectID = null.IntFrom(projectID)
-	}
-	if !cloudConfig.StackID.Valid || cloudConfig.StackID.Int64 == 0 {
-		fallBackMsg := ""
-		if !cloudConfig.ProjectID.Valid || cloudConfig.ProjectID.Int64 == 0 {
-			fallBackMsg = "Falling back to the first available stack. "
-		}
-		gs.Logger.Warn("DEPRECATED: No stack specified. " + fallBackMsg +
-			"Consider setting a default stack via the `k6 cloud login` command or the `K6_CLOUD_STACK_ID` " +
-			"environment variable as this will become mandatory in the next major release.")
 	}
 	return nil
 }
