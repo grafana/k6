@@ -301,7 +301,7 @@ func validateTokenV6(
 		return "", 0, 0, err
 	}
 
-	authResp, err := client.ValidateToken(normalizedURL)
+	authResp, err := client.ValidateToken(gs.Ctx, normalizedURL)
 	if err != nil {
 		return "", 0, 0, err
 	}
