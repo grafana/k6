@@ -126,6 +126,114 @@ func TestTagSetContains(t *testing.T) {
 	assert.False(t, st.Contains(outer))
 }
 
+func TestTagSetLen(t *testing.T) {
+	t.Parallel()
+
+	r := NewRegistry()
+	root := r.RootTagSet()
+
+	assert.Equal(t, 0, root.Len())
+	assert.Equal(t, 1, root.With("a", "1").Len())
+	assert.Equal(t, 2, root.With("a", "1").With("b", "2").Len())
+
+	// Overwriting a key should not increase the count.
+	assert.Equal(t, 1, root.With("a", "1").With("a", "2").Len())
+}
+
+func TestTagSetForEach(t *testing.T) {
+	t.Parallel()
+
+	r := NewRegistry()
+	root := r.RootTagSet()
+
+	t.Run("empty", func(t *testing.T) {
+		t.Parallel()
+		var count int
+		root.ForEach(func(_, _ string) { count++ })
+		assert.Equal(t, 0, count)
+	})
+
+	t.Run("collects all pairs", func(t *testing.T) {
+		t.Parallel()
+		tags := root.With("url", "https://test.k6.io").
+			With("method", "GET").
+			With("status", "200")
+
+		got := make(map[string]string, tags.Len())
+		tags.ForEach(func(key, value string) {
+			got[key] = value
+		})
+		assert.Equal(t, tags.Map(), got)
+	})
+
+	t.Run("matches Map output", func(t *testing.T) {
+		t.Parallel()
+		tags := root.With("tag1", "value1").
+			With("tag2", "value2").
+			WithTagsFromMap(map[string]string{"tag1": "overwritten", "tag3": "value3"}).
+			Without("tag3")
+
+		got := make(map[string]string, tags.Len())
+		tags.ForEach(func(key, value string) {
+			got[key] = value
+		})
+		assert.Equal(t, tags.Map(), got)
+	})
+}
+
+func BenchmarkTagSetIteration(b *testing.B) {
+	r := NewRegistry()
+	tags := r.RootTagSet()
+	for i := range 10 {
+		tags = tags.With(fmt.Sprintf("tag%d", i), fmt.Sprintf("value%d", i))
+	}
+
+	b.Run("Map", func(b *testing.B) {
+		b.ReportAllocs()
+		for range b.N {
+			m := tags.Map()
+			_ = m
+		}
+	})
+
+	b.Run("ForEach", func(b *testing.B) {
+		b.ReportAllocs()
+		for range b.N {
+			tags.ForEach(func(key, value string) {
+				_ = key
+				_ = value
+			})
+		}
+	})
+
+	// Simulates a realistic extension use case: converting tags to a slice of
+	// structs, similar to how prometheus labels are built.
+	type label struct{ Name, Value string }
+
+	b.Run("Map_to_labels", func(b *testing.B) {
+		b.ReportAllocs()
+		for range b.N {
+			m := tags.Map()
+			labels := make([]label, 0, len(m))
+			for k, v := range m {
+				labels = append(labels, label{k, v})
+			}
+			_ = labels
+		}
+	})
+
+	b.Run("ForEach_to_labels", func(b *testing.B) {
+		b.ReportAllocs()
+		for range b.N {
+			labels := make([]label, 0, tags.Len())
+			tags.ForEach(func(key, value string) {
+				labels = append(labels, label{key, value})
+			})
+			_ = labels
+		}
+	})
+}
+
 func TestTagsAndMetaSetTag(t *testing.T) {
 	t.Parallel()
 

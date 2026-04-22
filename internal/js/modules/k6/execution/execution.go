@@ -400,11 +400,10 @@ func (o *tagsDynamicObject) Delete(key string) bool {
 func (o *tagsDynamicObject) Keys() []string {
 	ctv := o.state.Tags.GetCurrentValues()
 
-	tagsMap := ctv.Tags.Map()
-	keys := make([]string, 0, len(tagsMap)+len(ctv.Metadata))
-	for k := range tagsMap {
+	keys := make([]string, 0, ctv.Tags.Len()+len(ctv.Metadata))
+	ctv.Tags.ForEach(func(k, _ string) {
 		keys = append(keys, k)
-	}
+	})
 	return keys
 }
 
