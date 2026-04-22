@@ -43,6 +43,13 @@ type versionedOutput interface {
 	AddMetricSamples(samples []metrics.SampleContainer)
 }
 
+// cloudClient is the interface used to manage test runs in the Cloud service.
+// It allows tests to inject a mock without starting a real HTTP server.
+type cloudClient interface {
+	CreateTestRun(testRun *cloudapi.TestRun) (*cloudapi.CreateTestRunResponse, error)
+	TestFinished(referenceID string, thresholds cloudapi.ThresholdResult, tainted bool, runStatus cloudapi.RunStatus) error
+}
+
 type apiVersion int64
 
 const (
@@ -71,7 +78,7 @@ type Output struct {
 	// uses the --no-archive-upload flag.
 	testArchive *lib.Archive
 
-	client       *cloudapi.Client
+	client       cloudClient
 	testStopFunc func(error)
 
 	usage *usage.Usage
@@ -384,7 +391,7 @@ func (out *Output) startVersionedOutput() error {
 	case int64(apiVersion1):
 		err = errors.New("v1 is not supported anymore")
 	case int64(apiVersion2):
-		out.versionedOutput, err = cloudv2.New(out.logger, out.config, out.client)
+		out.versionedOutput, err = cloudv2.New(out.logger, out.config, nil)
 	default:
 		err = fmt.Errorf("v%d is an unexpected version", out.config.APIVersion.Int64)
 	}
