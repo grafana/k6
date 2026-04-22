@@ -116,9 +116,11 @@ func TestCheckCloudLogin(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
-		name    string
-		conf    cloudapi.Config
-		wantErr error
+		name                string
+		conf                cloudapi.Config
+		expectedAuthError   bool
+		expectedTokenReason bool
+		expectedStackReason bool
 	}{
 		{
 			name: "valid token and stack passes",
@@ -126,29 +128,31 @@ func TestCheckCloudLogin(t *testing.T) {
 				Token:   null.StringFrom("valid-token"),
 				StackID: null.IntFrom(1234),
 			},
-			wantErr: nil,
 		},
 		{
-			name: "missing token returns unauthenticated error",
+			name: "missing token returns token not configured error",
 			conf: cloudapi.Config{
 				StackID: null.IntFrom(1234),
 			},
-			wantErr: errUserUnauthenticated,
+			expectedAuthError:   true,
+			expectedTokenReason: true,
 		},
 		{
-			name: "empty token string returns unauthenticated error",
+			name: "empty token string returns token not configured error",
 			conf: cloudapi.Config{
 				Token:   null.StringFrom(""),
 				StackID: null.IntFrom(1234),
 			},
-			wantErr: errUserUnauthenticated,
+			expectedAuthError:   true,
+			expectedTokenReason: true,
 		},
 		{
 			name: "missing stack returns stack not configured error",
 			conf: cloudapi.Config{
 				Token: null.StringFrom("valid-token"),
 			},
-			wantErr: errUserUnauthenticated,
+			expectedAuthError:   true,
+			expectedStackReason: true,
 		},
 		{
 			name: "zero stack ID returns stack not configured error",
@@ -156,7 +160,8 @@ func TestCheckCloudLogin(t *testing.T) {
 				Token:   null.StringFrom("valid-token"),
 				StackID: null.IntFrom(0),
 			},
-			wantErr: errUserUnauthenticated,
+			expectedAuthError:   true,
+			expectedStackReason: true,
 		},
 	}
 
@@ -164,11 +169,22 @@ func TestCheckCloudLogin(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			err := checkCloudLogin(tc.conf)
-			if tc.wantErr == nil {
-				require.NoError(t, err)
-			} else {
-				require.ErrorIs(t, err, tc.wantErr)
+
+			if tc.expectedAuthError {
+				var authErr *cloudAuthError
+				require.ErrorAs(t, err, &authErr)
+				switch {
+				case tc.expectedTokenReason:
+					require.ErrorContains(t, err, "an access token")
+				case tc.expectedStackReason:
+					require.ErrorContains(t, err, "a stack ID")
+				default:
+					t.Fatal("if an auth error is expected then an expected reason must be defined")
+				}
+				return
 			}
+
+			require.NoError(t, err)
 		})
 	}
 }

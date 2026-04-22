@@ -27,23 +27,30 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// errUserUnauthenticated represents an authentication error when trying to use
-// Grafana Cloud without being logged in or having a valid token.
-//
-//nolint:staticcheck // the error is shown to the user so here punctuation and capital are required
-var errUserUnauthenticated = errors.New("You must first authenticate to run tests in Grafana Cloud." +
-	" Run the `k6 cloud login` command providing the stack and token, or check the docs" +
-	" https://grafana.com/docs/grafana-cloud/testing/k6/author-run/tokens-and-cli-authentication" +
-	" for additional methods.")
+// cloudAuthError is an authentication error whose describes the cause. Typically used
+// for user-facing error messages. Callers can use errors.As to detect any Grafana Cloud authentication
+// failure regardless of the specific cause.
+type cloudAuthError struct{ reason string }
+
+func (e *cloudAuthError) Error() string { return e.reason }
 
 // checkCloudLogin verifies that both a token and a stack are configured.
 // Together they represent a complete Grafana Cloud login.
 func checkCloudLogin(conf cloudapi.Config) error {
+	const requiredErrFormat = "To run tests in Grafana Cloud, you must first authenticate" +
+		" setting %s. Run `k6 cloud login` providing the stack and token," +
+		" or check the docs for other options:" +
+		" https://grafana.com/docs/grafana-cloud/testing/k6/author-run/tokens-and-cli-authentication"
+
 	if !conf.Token.Valid || conf.Token.String == "" {
-		return errUserUnauthenticated
+		return &cloudAuthError{
+			reason: fmt.Sprintf(requiredErrFormat, "an access token"),
+		}
 	}
 	if !conf.StackID.Valid || conf.StackID.Int64 == 0 {
-		return errUserUnauthenticated
+		return &cloudAuthError{
+			reason: fmt.Sprintf(requiredErrFormat, "a stack ID"),
+		}
 	}
 	return nil
 }
