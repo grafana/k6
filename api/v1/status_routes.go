@@ -2,7 +2,6 @@ package v1
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,7 +9,6 @@ import (
 	"go.k6.io/k6/v2/errext"
 	"go.k6.io/k6/v2/errext/exitcodes"
 	"go.k6.io/k6/v2/internal/execution"
-	"go.k6.io/k6/v2/lib/executor"
 )
 
 func handleGetStatus(cs *ControlSurface, rw http.ResponseWriter, _ *http.Request) {
@@ -22,16 +20,6 @@ func handleGetStatus(cs *ControlSurface, rw http.ResponseWriter, _ *http.Request
 	}
 	rw.Header().Set("Content-Type", "application/json; charset=utf-8")
 	_, _ = rw.Write(data)
-}
-
-func getFirstExternallyControlledExecutor(execScheduler *execution.Scheduler) (*executor.ExternallyControlled, error) {
-	executors := execScheduler.GetExecutors()
-	for _, s := range executors {
-		if mex, ok := s.(*executor.ExternallyControlled); ok {
-			return mex, nil
-		}
-	}
-	return nil, errors.New("an externally-controlled executor needs to be configured for live configuration updates")
 }
 
 func handlePatchStatus(cs *ControlSurface, rw http.ResponseWriter, r *http.Request) {
@@ -52,7 +40,7 @@ func handlePatchStatus(cs *ControlSurface, rw http.ResponseWriter, r *http.Reque
 	status := statusEnvelop.Status()
 
 	if status.Stopped { //nolint:nestif
-		execution.AbortTestRun( //nolint:contextcheck // false-positive cs.RunCtx a right way of passing context there
+		execution.AbortTestRun(
 			cs.RunCtx,
 			errext.WithAbortReasonIfNone(
 				errext.WithExitCodeIfNone(fmt.Errorf("test run stopped from REST API"), exitcodes.ScriptStoppedFromRESTAPI),
@@ -68,25 +56,9 @@ func handlePatchStatus(cs *ControlSurface, rw http.ResponseWriter, r *http.Reque
 		}
 
 		if status.VUsMax.Valid || status.VUs.Valid {
-			// TODO: add ability to specify the actual executor id? Though this should
-			// likely be in the v2 REST API, where we could implement it in a way that
-			// may allow us to eventually support other executor types.
-			executor, updateErr := getFirstExternallyControlledExecutor(cs.Scheduler)
-			if updateErr != nil {
-				apiError(rw, "Execution config error", updateErr.Error(), http.StatusInternalServerError)
-				return
-			}
-			newConfig := executor.GetCurrentConfig().ExternallyControlledConfigParams
-			if status.VUsMax.Valid {
-				newConfig.MaxVUs = status.VUsMax
-			}
-			if status.VUs.Valid {
-				newConfig.VUs = status.VUs
-			}
-			if updateErr := executor.UpdateConfig(r.Context(), newConfig); updateErr != nil {
-				apiError(rw, "Config update error", updateErr.Error(), http.StatusBadRequest)
-				return
-			}
+			apiError(rw, "Execution config error",
+				"live VU configuration updates are not supported", http.StatusInternalServerError)
+			return
 		}
 	}
 

@@ -208,9 +208,6 @@ func TestSchedulerRunEnv(t *testing.T) {
 			vus: 1,
 			duration: "1s",
 			gracefulStop: "0.5s",`,
-		"externally-controlled": `
-			vus: 1,
-			duration: "1s",`,
 		"per-vu-iterations": `
 			vus: 1,
 			iterations: 1,
@@ -425,9 +422,6 @@ func TestSchedulerRunCustomTags(t *testing.T) {
 			vus: 1,
 			duration: "1s",
 			gracefulStop: "0.5s",`,
-		"externally-controlled": `
-			vus: 1,
-			duration: "1s",`,
 		"per-vu-iterations": `
 			vus: 1,
 			iterations: 1,
