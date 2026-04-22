@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"strconv"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -212,6 +214,67 @@ export default function() {
 		assert.Contains(t, stdout, "output: cloud (https://app.k6.io/runs/1337)")
 		assert.Contains(t, stdout, "The test run id is "+strconv.Itoa(testRunID))
 	})
+}
+
+func TestCloudRunLocalExecutionNamedCloudSecretSource(t *testing.T) {
+	t.Parallel()
+
+	var secretFetched atomic.Bool
+	secretServer := httptest.NewServer(http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+		secretFetched.Store(true)
+		assert.Equal(t, "Bearer mock-test-run-token", req.Header.Get("Authorization"))
+		resp.Header().Set("Content-Type", "application/json")
+		_, err := fmt.Fprint(resp, `{"plaintext":"cloud-secret-value"}`)
+		require.NoError(t, err)
+	}))
+	t.Cleanup(secretServer.Close)
+
+	script := `
+import secrets from "k6/secrets";
+
+export const options = {
+  vus: 1,
+  iterations: 1,
+};
+
+export default async function () {
+  const s = await secrets.source("cloud-alias").get("mykey");
+  console.log(s);
+}`
+
+	ts := makeTestState(
+		t,
+		script,
+		[]string{"--local-execution", "--secret-source=cloud=name=cloud-alias", "--log-output=stdout", "-v"},
+		0,
+	)
+
+	testServerHandlerFunc := http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
+		resp.WriteHeader(http.StatusOK)
+		_, err := fmt.Fprintf(resp, `{
+			"reference_id": "1337",
+			"test_run_token": "mock-test-run-token",
+			"secrets_config": {
+				"endpoint": %q,
+				"response_path": "plaintext"
+			}
+		}`, secretServer.URL+"/secrets/{key}")
+		require.NoError(t, err)
+	})
+
+	srv := getCloudTestEndChecker(t, 1337, testServerHandlerFunc, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed)
+	ts.Env["K6_CLOUD_HOST"] = srv.URL
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	assert.True(t, secretFetched.Load(), "expected cloud secret endpoint to be called")
+
+	stdout := ts.Stdout.String()
+	stderr := ts.Stderr.String()
+	combinedLogs := stdout + "\n" + stderr
+	assert.NotContains(t, combinedLogs, "cloud secrets not configured")
+	assert.NotContains(t, combinedLogs, "level=error")
+	assert.NotContains(t, combinedLogs, "cloud-secret-value")
 }
 
 func makeTestState(tb testing.TB, script string, cliFlags []string, expExitCode exitcodes.ExitCode) *GlobalTestState {

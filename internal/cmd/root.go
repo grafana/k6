@@ -453,6 +453,15 @@ func createSecretSources(gs *state.GlobalState) (map[string]secretsource.Source,
 			return nil, fmt.Errorf("secret source for name %q already registered before configuration %q", t, line)
 		}
 		result[name] = secretSource
+		if t == "cloud" {
+			// Capture the first cloud source instance regardless of its configured name.
+			// This allows createCloudTest to configure it later via SetConfig().
+			if gs.CloudSecretSource == nil {
+				if cs, ok := secretSource.(*cloudsecrets.SecretSource); ok {
+					gs.CloudSecretSource = cs
+				}
+			}
+		}
 		if isDefault {
 			if _, ok := result["default"]; ok {
 				return nil, fmt.Errorf("can't have two secret sources that are default ones, second one was %q", config)
@@ -465,12 +474,6 @@ func createSecretSources(gs *state.GlobalState) (map[string]secretsource.Source,
 		for _, l := range result {
 			result["default"] = l
 		}
-	}
-
-	// Capture the cloud source instance if it was registered (via --secret-source=cloud or
-	// the local-execution injection above), so createCloudTest can call SetConfig on it later.
-	if cs, ok := result["cloud"].(*cloudsecrets.SecretSource); ok {
-		gs.CloudSecretSource = cs
 	}
 
 	// PLZ path: the k6-operator injects K6_CLOUD_SECRETS_TOKEN + K6_CLOUD_SECRETS_ENDPOINT
