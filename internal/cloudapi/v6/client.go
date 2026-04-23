@@ -45,9 +45,12 @@ func NewClient(logger logrus.FieldLogger, token, host, version string, timeout t
 			},
 		},
 		OperationServers: map[string]k6cloud.ServerConfigurations{},
-		HTTPClient:       &http.Client{Timeout: timeout},
-		MaxRetries:       MaxRetries,
-		RetryInterval:    RetryInterval,
+		HTTPClient: &http.Client{
+			Timeout:   timeout,
+			Transport: &bodyResetTransport{base: http.DefaultTransport},
+		},
+		MaxRetries:    MaxRetries,
+		RetryInterval: RetryInterval,
 	}
 
 	c := &Client{
@@ -67,6 +70,24 @@ func (c *Client) SetStackID(stackID int32) {
 // BaseURL returns configured host.
 func (c *Client) BaseURL() string {
 	return c.baseURL
+}
+
+// bodyResetTransport resets req.Body from GetBody before each round trip.
+// The vendored SDK retries 5xx/429 by re-calling Do on the same request
+// without resetting its Body. After Connection: close the drained body
+// causes "ContentLength=N with Body length 0".
+type bodyResetTransport struct{ base http.RoundTripper }
+
+func (rt *bodyResetTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req.GetBody == nil {
+		return rt.base.RoundTrip(req)
+	}
+	body, err := req.GetBody()
+	if err != nil {
+		return nil, err
+	}
+	req.Body = body
+	return rt.base.RoundTrip(req)
 }
 
 // CheckResponse checks the parsed response.
