@@ -20,7 +20,6 @@ import (
 	"go.k6.io/k6/v2/errext"
 	"go.k6.io/k6/v2/errext/exitcodes"
 	"go.k6.io/k6/v2/ext"
-	"go.k6.io/k6/v2/internal/build"
 	"go.k6.io/k6/v2/internal/log"
 	"go.k6.io/k6/v2/secretsource"
 
@@ -218,7 +217,7 @@ func handleUnsatisfiedDependencies(err error, c *rootCommand) (exitcodes.ExitCod
 			" it's required to provision a custom binary.")
 	provisioner := newK6BuildProvisioner(c.globalState)
 	var customBinary commandExecutor
-	customBinary, err = provisioner.provision(constraintsMapToProvisionDependency(deps, build.Version))
+	customBinary, err = provisioner.provision(constraintsMapToProvisionDependency(deps))
 	if err != nil {
 		err = errext.WithExitCodeIfNone(err, exitcodes.ScriptException)
 		c.globalState.Logger.
