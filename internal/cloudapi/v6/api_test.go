@@ -228,7 +228,7 @@ func TestUploadTest(t *testing.T) {
 			}
 		}))
 		_, err := client.UploadTest(t.Context(), "test", 1, newTestArchive(t))
-		assert.ErrorIs(t, err, errUnknown)
+		assert.ErrorIs(t, err, errTestNotExists)
 	})
 }
 
