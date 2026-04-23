@@ -143,7 +143,7 @@ func (c *Client) findTestByName(
 
 	tests := res.GetValue()
 	if len(tests) == 0 {
-		return nil, errUnknown
+		return nil, errTestNotExists
 	}
 
 	return &tests[0], nil
