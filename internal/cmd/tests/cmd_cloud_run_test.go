@@ -228,13 +228,13 @@ export default function() {
     ` + "console.log(`The test run id is ${__ENV.K6_CLOUDRUN_TEST_RUN_ID}`);" + `
 };`
 
-		ts := makeTestState(t, script, []string{"--local-execution", "--log-output=stdout"}, 0)
+		ts := makeTestState(t, script, []string{"--local-execution", "--log-output=stdout"})
 
 		const pushRefID = "99999"
 		ts.Env["K6_CLOUD_PUSH_REF_ID"] = pushRefID
 
 		srv := getTestServer(t, map[string]http.Handler{
-			"POST ^/v1/tests$": http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+			"POST ^/v1/tests$": http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 				require.Fail(t, "CreateTestRun must not be called when K6_CLOUD_PUSH_REF_ID is set")
 			}),
 		})
@@ -252,7 +252,7 @@ export default function() {
 	})
 }
 
-func makeTestState(tb testing.TB, script string, cliFlags []string, expExitCode exitcodes.ExitCode) *GlobalTestState {
+func makeTestState(tb testing.TB, script string, cliFlags []string) *GlobalTestState {
 	if cliFlags == nil {
 		cliFlags = []string{"-v", "--log-output=stdout"}
 	}
