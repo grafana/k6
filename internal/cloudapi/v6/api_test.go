@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -102,6 +103,43 @@ func TestValidateToken(t *testing.T) {
 		assert.Nil(t, resp)
 		assert.Contains(t, err.Error(), "invalid stack URL")
 	})
+}
+
+func TestRetryWithConnectionClose(t *testing.T) {
+	t.Parallel()
+
+	var attempts atomic.Int32
+	var body []byte
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if attempts.Add(1) == 1 {
+			w.Header().Set("Connection", "close")
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		var err error
+		body, err = io.ReadAll(r.Body)
+		assert.NoError(t, err)
+		writeJSON(t, w, http.StatusOK, map[string]any{})
+	}))
+	defer srv.Close()
+
+	client, err := NewClient(testutils.NewLogger(t), "test-token", srv.URL, "1.0", 5*time.Second)
+	require.NoError(t, err)
+	client.SetStackID(1)
+
+	opts := lib.Options{VUs: null.IntFrom(10)}
+	require.NoError(t, client.ValidateOptions(t.Context(), 1, opts))
+
+	assert.Equal(t, int32(2), attempts.Load(), "expected exactly 2 attempts")
+
+	var got struct {
+		Options json.RawMessage `json:"options"`
+	}
+	require.NoError(t, json.Unmarshal(body, &got))
+	want, err := json.Marshal(opts)
+	require.NoError(t, err)
+	assert.JSONEq(t, string(want), string(got.Options))
 }
 
 func TestValidateOptions(t *testing.T) {
