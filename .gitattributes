@@ -1,0 +1,71 @@
+# Auto-detect text files and normalize line endings
+* text=auto
+
+# Source code
+*.py text diff=python
+*.ts text diff=typescript
+*.tsx text diff=typescript
+*.js text diff=javascript
+*.jsx text diff=javascript
+*.go text diff=go
+*.rs text diff=rust
+*.rb text diff=ruby
+*.sh text eol=lf diff=bash
+*.bash text eol=lf diff=bash
+*.zsh text eol=lf diff=bash
+*.lua text
+
+# Configuration
+*.json text
+*.yaml text
+*.yml text
+*.toml text
+*.cfg text
+*.ini text
+*.conf text
+*.env text
+
+# Templates
+*.tmpl text
+*.j2 text
+
+# Documentation
+*.md text diff=markdown
+*.txt text
+*.rst text
+
+# Web
+*.html text diff=html
+*.css text diff=css
+*.scss text diff=css
+*.astro text
+*.svg text
+
+# Build / lock files
+package-lock.json text -diff
+yarn.lock text -diff
+Cargo.lock text -diff
+poetry.lock text -diff
+
+# Binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.pdf binary
+*.zip binary
+*.gz binary
+*.tar binary
+*.db binary
+*.sqlite binary
+
+# Force LF for scripts
+Makefile text eol=lf
+Dockerfile text eol=lf
+justfile text eol=lf
