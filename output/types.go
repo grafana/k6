@@ -4,6 +4,7 @@
 package output
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/url"
@@ -18,6 +19,11 @@ import (
 
 // Params contains all possible constructor parameters an output may need.
 type Params struct {
+	// Ctx is the run context. Outputs that make long-running network calls
+	// (e.g. the cloud output's provisioning and notification calls) should
+	// use this context so that Ctrl+C cancels those calls promptly.
+	Ctx context.Context
+
 	OutputType     string // --out $OutputType=$ConfigArgument, K6_OUT="$OutputType=$ConfigArgument"
 	ConfigArgument string
 	JSONConfig     json.RawMessage

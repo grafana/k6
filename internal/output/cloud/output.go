@@ -2,9 +2,11 @@
 package cloud
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,6 +16,7 @@ import (
 	"go.k6.io/k6/v2/cloudapi"
 	"go.k6.io/k6/v2/errext"
 	"go.k6.io/k6/v2/internal/build"
+	v6cloudapi "go.k6.io/k6/v2/internal/cloudapi/v6"
 	"go.k6.io/k6/v2/internal/usage"
 	"go.k6.io/k6/v2/lib"
 	"go.k6.io/k6/v2/metrics"
@@ -55,6 +58,7 @@ const (
 type Output struct {
 	versionedOutput
 
+	ctx       context.Context
 	logger    logrus.FieldLogger
 	config    cloudapi.Config
 	testRunID string
@@ -72,6 +76,7 @@ type Output struct {
 	testArchive *lib.Archive
 
 	client       *cloudapi.Client
+	v6Client     *v6cloudapi.Client // non-nil only on the provisioning path
 	testStopFunc func(error)
 
 	usage *usage.Usage
@@ -142,7 +147,13 @@ func newOutput(params output.Params) (*Output, error) {
 	apiClient := cloudapi.NewClient(
 		logger, conf.Token.String, conf.Host.String, build.Version, conf.Timeout.TimeDuration())
 
+	ctx := params.Ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	return &Output{
+		ctx:           ctx,
 		config:        conf,
 		client:        apiClient,
 		executionPlan: params.ExecutionPlan,
@@ -179,43 +190,80 @@ func validateRequiredSystemTags(scriptTags *metrics.SystemTagSet) error {
 // Start calls the k6 Cloud API to initialize the test run, and then starts the
 // goroutine that would listen for metric samples and send them to the cloud.
 func (out *Output) Start() error {
+	// TODO(PRD D-14): PushRefID is set by k6-operator when it passes a pre-existing
+	// test_run_id. This branch preserves legacy v1 behaviour until k6-operator is updated
+	// to supply the new runtime_config fields. Tracked in grafana/k6-cloud#4283.
 	if out.config.PushRefID.Valid {
 		out.testRunID = out.config.PushRefID.String
 	}
 
 	if out.testRunID != "" {
 		out.logger.WithField("testRunId", out.testRunID).Debug("Directly pushing metrics without init")
+		// Derive MetricsPushURL for the legacy direct-push paths (PushRefID / k6-operator,
+		// or K6_CLOUDRUN_TEST_RUN_ID set externally without provisioning). The provisioning
+		// path always sets MetricsPushURL before reaching this branch.
+		if !out.config.MetricsPushURL.Valid || out.config.MetricsPushURL.String == "" {
+			host := strings.TrimSuffix(out.config.Host.String, "/")
+			out.config.MetricsPushURL = null.StringFrom(host + "/v2/metrics/" + out.testRunID)
+		}
+		// When the test run ID was provided externally by the provisioning path
+		// (K6_CLOUDRUN_TEST_RUN_ID, set by createCloudTest / k6 cloud run --local-execution),
+		// create a v6 client so that testFinished() uses NotifyTestRunCompleted instead of
+		// the legacy POST /v1/tests/{id}. We detect the provisioning path by the presence
+		// of a valid stack ID — the PLZ/PushRefID legacy paths do not set it.
+		if !out.config.PushRefID.Valid && out.config.StackID.Valid && out.config.StackID.Int64 != 0 {
+			v6c, err := v6cloudapi.NewClient(
+				out.logger, out.config.Token.String, out.config.Hostv6.String,
+				build.Version, out.config.Timeout.TimeDuration())
+			if err != nil {
+				out.logger.WithError(err).Warn("Could not create v6 client; falling back to legacy testFinished")
+			} else {
+				v6c.SetStackID(int32(out.config.StackID.Int64)) //nolint:gosec
+				out.v6Client = v6c
+			}
+		}
 		return out.startVersionedOutput()
 	}
 
-	thresholds := make(map[string][]string)
-	for name, t := range out.thresholds {
-		for _, threshold := range t {
-			thresholds[name] = append(thresholds[name], threshold.Source)
-		}
+	// Provisioning path: requires stack ID
+	if !out.config.StackID.Valid || out.config.StackID.Int64 == 0 {
+		return fmt.Errorf("K6_CLOUD_STACK_ID is required for k6 run --out cloud")
 	}
 
-	testRun := &cloudapi.TestRun{
-		Name:       out.config.Name.String,
-		ProjectID:  out.config.ProjectID.Int64,
-		VUsMax:     int64(lib.GetMaxPossibleVUs(out.executionPlan)), //nolint:gosec
-		Thresholds: thresholds,
-		Duration:   out.duration,
-		Archive:    out.testArchive,
-	}
-
-	response, err := out.client.CreateTestRun(testRun)
+	v6c, err := v6cloudapi.NewClient(
+		out.logger, out.config.Token.String, out.config.Hostv6.String,
+		build.Version, out.config.Timeout.TimeDuration())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create v6 cloud client: %w", err)
 	}
-	out.testRunID = response.ReferenceID
+	v6c.SetStackID(int32(out.config.StackID.Int64)) //nolint:gosec
 
-	if response.ConfigOverride != nil {
-		out.logger.WithFields(logrus.Fields{
-			"override": response.ConfigOverride,
-		}).Debug("overriding config options")
-		out.config = out.config.Apply(*response.ConfigOverride)
+	params := v6cloudapi.ProvisionParams{
+		Name:          out.config.Name.String,
+		ProjectID:     int32(out.config.ProjectID.Int64), //nolint:gosec
+		MaxVUs:        int64(lib.GetMaxPossibleVUs(out.executionPlan)), //nolint:gosec
+		TotalDuration: out.duration,
+		Options:       map[string]any{},
+		Archive:       out.testArchive, // nil if --no-archive-upload (hardcoded nil on this path)
 	}
+
+	result, err := v6c.ProvisionLocalExecution(out.ctx, params)
+	if err != nil {
+		return fmt.Errorf("provisioning local execution failed: %w", err)
+	}
+
+	if result.RuntimeConfig.Metrics.PushURL == "" {
+		return fmt.Errorf("provisioning response missing metrics push URL")
+	}
+	if result.RuntimeConfig.TestRunToken == "" {
+		return fmt.Errorf("provisioning response missing test run token")
+	}
+
+	out.testRunID = strconv.FormatInt(int64(result.TestRunID), 10)
+	out.config.MetricsPushURL = null.StringFrom(result.RuntimeConfig.Metrics.PushURL)
+	out.config.TestRunToken = null.StringFrom(result.RuntimeConfig.TestRunToken)
+	v6c.SetTestRunToken(result.RuntimeConfig.TestRunToken)
+	out.v6Client = v6c
 
 	err = out.startVersionedOutput()
 	if err != nil {
@@ -291,6 +339,16 @@ func (out *Output) testFinished(testErr error) error {
 		return nil
 	}
 
+	if out.v6Client != nil {
+		// Provisioning path: notify via v6 API
+		testRunID64, err := strconv.ParseInt(out.testRunID, 10, 64)
+		if err != nil {
+			return fmt.Errorf("invalid test run ID %q: %w", out.testRunID, err)
+		}
+		return out.v6Client.NotifyTestRunCompleted(out.ctx, int32(testRunID64), testErr) //nolint:gosec
+	}
+
+	// Legacy v1 path (testRunID set externally, no provisioning client)
 	testTainted := false
 	thresholdResults := make(cloudapi.ThresholdResult)
 	for name, thresholds := range out.thresholds {

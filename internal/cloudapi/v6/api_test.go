@@ -966,10 +966,12 @@ func TestNotifyTestRunCompleted_ErrorMapping(t *testing.T) {
 			var captured notifyBody
 			var capturedPath string
 			var capturedAuth string
+			var capturedStackID string
 
 			client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				capturedPath = r.URL.Path
 				capturedAuth = r.Header.Get("Authorization")
+				capturedStackID = r.Header.Get("X-Stack-Id")
 				require.NoError(t, json.NewDecoder(r.Body).Decode(&captured))
 				w.WriteHeader(http.StatusNoContent)
 			}))
@@ -979,6 +981,7 @@ func TestNotifyTestRunCompleted_ErrorMapping(t *testing.T) {
 
 			assert.Equal(t, fmt.Sprintf("/provisioning/v1/test_runs/%d/notify", tt.testRunID), capturedPath)
 			assert.Equal(t, "Bearer test-token", capturedAuth)
+			assert.Equal(t, "1", capturedStackID, "X-Stack-Id header must be set to the configured stack ID")
 			assert.Equal(t, "script_execution_completed", captured.EventType)
 
 			if tt.wantErrorField == nil {

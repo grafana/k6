@@ -21,11 +21,12 @@ const (
 
 // Client handles communication with the k6 Cloud API.
 type Client struct {
-	apiClient *k6cloud.APIClient
-	token     string
-	stackID   int32
-	baseURL   string
-	host      string
+	apiClient    *k6cloud.APIClient
+	token        string
+	testRunToken string // scoped token returned by start_local_execution
+	stackID      int32
+	baseURL      string
+	host         string
 
 	logger logrus.FieldLogger
 }
@@ -67,6 +68,13 @@ func NewClient(logger logrus.FieldLogger, token, host, version string, timeout t
 // SetStackID sets the stack ID for the client.
 func (c *Client) SetStackID(stackID int32) {
 	c.stackID = stackID
+}
+
+// SetTestRunToken stores the scoped token returned by start_local_execution.
+// Once set it is used in place of the main bearer token for test-run-scoped
+// operations (e.g. NotifyTestRunCompleted).
+func (c *Client) SetTestRunToken(token string) {
+	c.testRunToken = token
 }
 
 // BaseURL returns configured host.

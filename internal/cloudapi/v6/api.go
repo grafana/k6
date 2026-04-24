@@ -404,8 +404,13 @@ func (c *Client) NotifyTestRunCompleted(ctx context.Context, testRunID int32, te
 	if err != nil {
 		return err
 	}
+	authToken := c.testRunToken
+	if authToken == "" {
+		authToken = c.token
+	}
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", "Bearer "+c.token)
+	httpReq.Header.Set("Authorization", "Bearer "+authToken)
+	httpReq.Header.Set("X-Stack-Id", fmt.Sprintf("%d", c.stackID))
 
 	lastResp, lastErr := c.doWithRetry(httpReq)
 	if lastErr != nil {
