@@ -216,6 +216,9 @@ func getFlags(defaultFlags GlobalFlags, env map[string]string, args []string) Gl
 	if val, ok := env["K6_LOG_FORMAT"]; ok {
 		result.LogFormat = val
 	}
+	if val, ok := env["K6_ADDRESS"]; ok {
+		result.Address = val
+	}
 	if env["K6_NO_COLOR"] != "" {
 		result.NoColor = true
 	}
