@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -52,15 +53,16 @@ type downloader struct {
 	headers  map[string]string
 	retries  int
 	backoff  time.Duration
+	logger   *slog.Logger
 }
 
 // newDownloader returns a new Downloader
-func newDownloader(config DownloadConfig) (*downloader, error) {
+func newDownloader(config DownloadConfig, logger *slog.Logger) (*downloader, error) {
 	httpClient := http.DefaultClient
 
 	proxyURL := config.ProxyURL
 	if proxyURL == "" {
-		proxyURL = os.Getenv("K6_DOWNLOAD_PROXY")
+		proxyURL = os.Getenv("K6_DOWNLOAD_PROXY") //nolint:forbidigo
 	}
 	if proxyURL != "" {
 		parsed, err := url.Parse(proxyURL)
@@ -74,14 +76,13 @@ func newDownloader(config DownloadConfig) (*downloader, error) {
 
 	downloadAuth := config.Authorization
 	if downloadAuth == "" {
-		downloadAuth = os.Getenv("K6_DOWNLOAD_AUTH")
+		downloadAuth = os.Getenv("K6_DOWNLOAD_AUTH") //nolint:forbidigo
 	}
 
 	downloadAuthType := config.AuthType
 	if downloadAuthType == "" {
 		downloadAuthType = "Bearer"
 	}
-
 	return &downloader{
 		client:   httpClient,
 		auth:     downloadAuth,
@@ -89,14 +90,15 @@ func newDownloader(config DownloadConfig) (*downloader, error) {
 		headers:  config.Headers,
 		retries:  config.Retries,
 		backoff:  config.Backoff,
+		logger:   logger,
 	}, nil
 }
 
 func (d *downloader) download(ctx context.Context, from string, path string, checksum string) error {
 	downloadBin := path + ".download"
-	dest, err := os.OpenFile( //nolint:gosec
+	dest, err := os.OpenFile( //nolint:gosec,forbidigo
 		downloadBin,
-		os.O_TRUNC|os.O_WRONLY|os.O_CREATE,
+		os.O_TRUNC|os.O_WRONLY|os.O_CREATE, //nolint:forbidigo
 		syscall.S_IRUSR|syscall.S_IXUSR|syscall.S_IWUSR,
 	)
 	if err != nil {
@@ -138,12 +140,17 @@ func (d *downloader) download(ctx context.Context, from string, path string, che
 	// try at least once
 	for {
 		// it is safe to reuse the request as it doesn't have a body
-		resp, err = d.client.Do(req)
+		resp, err = d.client.Do(req) //nolint:gosec // G704: URL is from artifact, not user input
 
 		if retries == 0 || !shouldRetry(err, resp) {
 			break
 		}
 
+		d.logger.Debug("Download retry",
+			"retries_left", retries,
+			"backoff", backoff,
+			"error", err,
+		)
 		time.Sleep(backoff)
 
 		// increase backoff exponentially for next retry
@@ -180,7 +187,7 @@ func (d *downloader) download(ctx context.Context, from string, path string, che
 		return fmt.Errorf("downloaded content checksum mismatch")
 	}
 
-	err = os.Rename(downloadBin, path)
+	err = os.Rename(downloadBin, path) //nolint:forbidigo
 
 	return err
 }
