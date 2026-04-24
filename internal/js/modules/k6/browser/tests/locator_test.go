@@ -406,6 +406,61 @@ func TestLocator(t *testing.T) {
 				require.NoError(t, lo.WaitFor(opts))
 			},
 		},
+		{
+			"Or count", func(_ *testBrowser, p *common.Page) {
+				// 3 <a> elements + 1 <textarea> = 4 total
+				lo := p.Locator("a", nil).Or(p.Locator("textarea", nil))
+				n, err := lo.Count()
+				require.NoError(t, err)
+				assert.Equal(t, 4, n)
+			},
+		},
+		{
+			"Or isVisible", func(_ *testBrowser, p *common.Page) {
+				// #link exists, #nonExistent does not -- or yields exactly 1
+				lo := p.Locator("#nonExistent", nil).Or(p.Locator("#link", nil))
+				visible, err := lo.IsVisible()
+				require.NoError(t, err)
+				assert.True(t, visible)
+			},
+		},
+		{
+			"Or first element text", func(_ *testBrowser, p *common.Page) {
+				// The first <a> ("Click") comes before <textarea> in DOM order
+				lo := p.Locator("textarea", nil).Or(p.Locator("#link", nil))
+				text, err := lo.First().InnerText(common.NewFrameInnerTextOptions(lo.Timeout()))
+				require.NoError(t, err)
+				assert.Equal(t, "Click", text)
+			},
+		},
+		{
+			"Or no match on one side", func(_ *testBrowser, p *common.Page) {
+				// One locator matches nothing, the other matches 1 element
+				lo := p.Locator("#nonExistent", nil).Or(p.Locator("#link", nil))
+				n, err := lo.Count()
+				require.NoError(t, err)
+				assert.Equal(t, 1, n)
+			},
+		},
+		{
+			"Or chained three selectors", func(_ *testBrowser, p *common.Page) {
+				lo := p.Locator("#linkdbl", nil).
+					Or(p.Locator("#missing", nil)).
+					Or(p.Locator("#secondParagraph", nil))
+
+				locators, err := lo.All()
+				require.NoError(t, err)
+				require.Len(t, locators, 2)
+
+				text0, err := locators[0].InnerText(common.NewFrameInnerTextOptions(locators[0].Timeout()))
+				require.NoError(t, err)
+				assert.Equal(t, "Dblclick", text0)
+
+				text1, err := locators[1].InnerText(common.NewFrameInnerTextOptions(locators[1].Timeout()))
+				require.NoError(t, err)
+				assert.Equal(t, "original text", text1)
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
