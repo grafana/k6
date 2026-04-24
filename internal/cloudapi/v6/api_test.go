@@ -994,7 +994,7 @@ func TestNotifyTestRunCompleted_ErrorMapping(t *testing.T) {
 }
 
 // TestNotifyTestRunCompleted_5xxRetriesViaDo verifies that the notify call retries on 5xx
-// responses: server returns 503 twice then 204 on the third attempt. (WI-6 TDD cycle #7)
+// responses: server returns 503 twice then 204 on the third attempt.
 func TestNotifyTestRunCompleted_5xxRetriesViaDo(t *testing.T) {
 	t.Parallel()
 
@@ -1031,7 +1031,7 @@ func TestNotifyTestRunCompleted_5xxRetriesViaDo(t *testing.T) {
 }
 
 // TestNotifyTestRunCompleted_ContextCancelledMidRetry verifies that a context cancellation
-// mid-request propagates back as context.Canceled. (WI-6 TDD cycle #8)
+// mid-request propagates back as context.Canceled.
 func TestNotifyTestRunCompleted_ContextCancelledMidRetry(t *testing.T) {
 	t.Parallel()
 

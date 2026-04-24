@@ -190,15 +190,31 @@ func validateRequiredSystemTags(scriptTags *metrics.SystemTagSet) error {
 // Start calls the k6 Cloud API to initialize the test run, and then starts the
 // goroutine that would listen for metric samples and send them to the cloud.
 func (out *Output) Start() error {
-	// TODO(PRD D-14): PushRefID is set by k6-operator when it passes a pre-existing
-	// test_run_id. This branch preserves legacy v1 behaviour until k6-operator is updated
-	// to supply the new runtime_config fields. Tracked in grafana/k6-cloud#4283.
+	// TODO: PushRefID is set by k6-operator when it passes a pre-existing
+	// test_run_id. This branch preserves legacy v1 behaviour until k6-operator
+	// is updated to supply runtime_config fields (grafana/k6-cloud#4283).
 	if out.config.PushRefID.Valid {
 		out.testRunID = out.config.PushRefID.String
 	}
 
 	if out.testRunID != "" {
 		out.logger.WithField("testRunId", out.testRunID).Debug("Directly pushing metrics without init")
+		// When the test run ID was provided externally by the provisioning path
+		// (K6_CLOUDRUN_TEST_RUN_ID, set by createCloudTest / k6 cloud run --local-execution),
+		// create a v6 client so that testFinished() uses NotifyTestRunCompleted instead of
+		// the legacy POST /v1/tests/{id}. We detect the provisioning path by the presence
+		// of a valid stack ID — the PLZ/PushRefID legacy paths do not set it.
+		if !out.config.PushRefID.Valid && out.config.StackID.Valid && out.config.StackID.Int64 != 0 {
+			v6c, err := v6cloudapi.NewClient(
+				out.logger, out.config.Token.String, out.config.Hostv6.String,
+				build.Version, out.config.Timeout.TimeDuration())
+			if err != nil {
+				out.logger.WithError(err).Warn("Could not create v6 client; falling back to legacy testFinished")
+			} else {
+				v6c.SetStackID(int32(out.config.StackID.Int64)) //nolint:gosec
+				out.v6Client = v6c
+			}
+		}
 		return out.startVersionedOutput()
 	}
 
@@ -217,7 +233,7 @@ func (out *Output) Start() error {
 
 	params := v6cloudapi.ProvisionParams{
 		Name:          out.config.Name.String,
-		ProjectID:     int32(out.config.ProjectID.Int64), //nolint:gosec
+		ProjectID:     int32(out.config.ProjectID.Int64),               //nolint:gosec
 		MaxVUs:        int64(lib.GetMaxPossibleVUs(out.executionPlan)), //nolint:gosec
 		TotalDuration: out.duration,
 		Options:       map[string]any{},

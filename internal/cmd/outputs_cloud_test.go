@@ -25,6 +25,8 @@ import (
 	"go.k6.io/k6/v2/secretsource"
 )
 
+const testCloudToken = "test-token"
+
 // minimalLoadedAndConfiguredTest builds a loadedAndConfiguredTest with enough
 // structure for createCloudTest to reach its early validation checks, without
 // requiring a full script load or runner initialisation.
@@ -89,7 +91,7 @@ func minimalLoadedAndConfiguredTestWithScenarios(t *testing.T) *loadedAndConfigu
 }
 
 // TestCreateCloudTest_StackIDValidation verifies that createCloudTest returns a
-// hard error (AC-X03) when no stack ID is present in the configuration — no
+// hard error when no stack ID is present in the configuration — no
 // network call should be made.
 func TestCreateCloudTest_StackIDValidation(t *testing.T) {
 	t.Parallel()
@@ -98,7 +100,7 @@ func TestCreateCloudTest_StackIDValidation(t *testing.T) {
 		t.Parallel()
 
 		ts := tests.NewGlobalTestState(t)
-		ts.Env["K6_CLOUD_TOKEN"] = "test-token"
+		ts.Env["K6_CLOUD_TOKEN"] = testCloudToken
 		// K6_CLOUD_STACK_ID is intentionally absent
 
 		test := minimalLoadedAndConfiguredTest(t)
@@ -126,14 +128,14 @@ func TestCreateCloudTest_StackIDValidation(t *testing.T) {
 
 // TestCreateCloudTest_SetsTestRunIDEnvVar verifies that after a successful
 // provisioning call, the test run ID is stored as a decimal integer string in
-// the K6_CLOUDRUN_TEST_RUN_ID env var (AC-108).
+// the K6_CLOUDRUN_TEST_RUN_ID env var.
 func TestCreateCloudTest_SetsTestRunIDEnvVar(t *testing.T) {
 	t.Parallel()
 
 	srv := v6test.NewServer(t, v6test.Config{})
 
 	ts := tests.NewGlobalTestState(t)
-	ts.Env["K6_CLOUD_TOKEN"] = "test-token"
+	ts.Env["K6_CLOUD_TOKEN"] = testCloudToken
 	ts.Env["K6_CLOUD_STACK_ID"] = "1"
 	ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
 
@@ -149,9 +151,8 @@ func TestCreateCloudTest_SetsTestRunIDEnvVar(t *testing.T) {
 
 // TestCreateCloudTest_CloudSecretSourceConfigured verifies that when
 // CloudSecretSource is set (--secret-source=cloud), createCloudTest calls the
-// v1 /v1/tests endpoint to fetch SecretsConfig and wires it into the source
-// (MUST-FIX 1 option 2 — PRD Out-of-Scope #3). The v6 provisioning path
-// remains the primary path; the v1 call is a temporary bridge.
+// v1 /v1/tests endpoint to fetch SecretsConfig and wires it into the source.
+// The v6 provisioning path remains the primary path; the v1 call is a temporary bridge.
 func TestCreateCloudTest_CloudSecretSourceConfigured(t *testing.T) {
 	t.Parallel()
 
@@ -181,7 +182,7 @@ func TestCreateCloudTest_CloudSecretSourceConfigured(t *testing.T) {
 	v6Srv := v6test.NewServer(t, v6test.Config{})
 
 	ts := tests.NewGlobalTestState(t)
-	ts.Env["K6_CLOUD_TOKEN"] = "test-token"
+	ts.Env["K6_CLOUD_TOKEN"] = testCloudToken
 	ts.Env["K6_CLOUD_STACK_ID"] = "1"
 	ts.Env["K6_CLOUD_HOST_V6"] = v6Srv.URL
 	ts.Env["K6_CLOUD_HOST"] = v1Srv.URL
@@ -192,7 +193,7 @@ func TestCreateCloudTest_CloudSecretSourceConfigured(t *testing.T) {
 		Environment: map[string]string{},
 	})
 	require.NoError(t, err)
-	ts.GlobalState.CloudSecretSource = cs
+	ts.CloudSecretSource = cs
 
 	test := minimalLoadedAndConfiguredTestWithScenarios(t)
 	err = createCloudTest(ts.GlobalState, test)
@@ -221,7 +222,7 @@ func TestCreateCloudTest_CloudSecretSourceNotCalledWhenNil(t *testing.T) {
 	v6Srv := v6test.NewServer(t, v6test.Config{})
 
 	ts := tests.NewGlobalTestState(t)
-	ts.Env["K6_CLOUD_TOKEN"] = "test-token"
+	ts.Env["K6_CLOUD_TOKEN"] = testCloudToken
 	ts.Env["K6_CLOUD_STACK_ID"] = "1"
 	ts.Env["K6_CLOUD_HOST_V6"] = v6Srv.URL
 	ts.Env["K6_CLOUD_HOST"] = v1Srv.URL
@@ -243,7 +244,7 @@ func TestCreateCloudTest_PropagatesMetricsConfig(t *testing.T) {
 	srv := v6test.NewServer(t, v6test.Config{})
 
 	ts := tests.NewGlobalTestState(t)
-	ts.Env["K6_CLOUD_TOKEN"] = "test-token"
+	ts.Env["K6_CLOUD_TOKEN"] = testCloudToken
 	ts.Env["K6_CLOUD_STACK_ID"] = "1"
 	ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
 

@@ -27,6 +27,7 @@ import (
 	"go.k6.io/k6/v2/cloudapi"
 	"go.k6.io/k6/v2/errext/exitcodes"
 	"go.k6.io/k6/v2/internal/build"
+	"go.k6.io/k6/v2/internal/cloudapi/v6/v6test"
 	"go.k6.io/k6/v2/internal/cmd"
 	"go.k6.io/k6/v2/internal/cmd/tests/events"
 	"go.k6.io/k6/v2/internal/event"
@@ -531,13 +532,11 @@ func getTestServer(tb testing.TB, routes map[string]http.Handler) *httptest.Serv
 
 func getCloudTestEndChecker(
 	tb testing.TB, testRunID int,
-	testStart http.Handler, expRunStatus cloudapi.RunStatus, expResultStatus cloudapi.ResultStatus,
+	expRunStatus cloudapi.RunStatus, expResultStatus cloudapi.ResultStatus,
 ) *httptest.Server {
 	testFinished := false
 
-	if testStart == nil {
-		testStart = cloudTestStartSimple(tb, testRunID)
-	}
+	testStart := cloudTestStartSimple(tb, testRunID)
 
 	srv := getTestServer(tb, map[string]http.Handler{
 		"POST ^/v1/tests$": testStart,
@@ -585,9 +584,12 @@ func getSimpleCloudOutputTestState(
 	}
 	cliFlags = append(cliFlags, "--out", "cloud")
 
-	srv := getCloudTestEndChecker(tb, 111, nil, expRunStatus, expResultStatus)
+	srv := getCloudTestEndChecker(tb, 111, expRunStatus, expResultStatus)
 	ts := getSingleFileTestState(tb, script, cliFlags, expExitCode)
 	ts.Env["K6_CLOUD_HOST"] = srv.URL
+	// Pre-set the test run ID to bypass the provisioning path (WI-7c): the v1
+	// legacy path is still exercised for testFinished via client.TestFinished.
+	ts.Env["K6_CLOUDRUN_TEST_RUN_ID"] = "111"
 	return ts
 }
 
@@ -963,13 +965,14 @@ func TestAbortedByScriptSetupErrorWithDependency(t *testing.T) {
 		export { handleSummary } from "./bar.js";
 	`
 
-	srv := getCloudTestEndChecker(t, 123, nil, cloudapi.RunStatusAbortedScriptError, cloudapi.ResultStatusPassed)
+	srv := getCloudTestEndChecker(t, 123, cloudapi.RunStatusAbortedScriptError, cloudapi.ResultStatusPassed)
 
 	ts := NewGlobalTestState(t)
 	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test.js"), []byte(mainScript), 0o644))
 	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "bar.js"), []byte(depScript), 0o644))
 
 	ts.Env["K6_CLOUD_HOST"] = srv.URL
+	ts.Env["K6_CLOUDRUN_TEST_RUN_ID"] = "123"
 	ts.CmdArgs = []string{"k6", "run", "-v", "--out", "cloud", "--log-output=stdout", "test.js"}
 	ts.ExpectedExitCode = int(exitcodes.ScriptException)
 
@@ -1872,20 +1875,17 @@ func TestRunWithCloudOutputOverrides(t *testing.T) {
 		[]string{"-v", "--log-output=stdout", "--out=cloud", "--out", "json=results.json"}, 0,
 	)
 
-	configOverride := http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
-		resp.WriteHeader(http.StatusOK)
-		_, err := fmt.Fprint(resp, `{"reference_id": "132", "config": {"webAppURL": "https://bogus.url"}}`)
-		assert.NoError(t, err)
-	})
-	srv := getCloudTestEndChecker(t, 132, configOverride, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed)
+	// v1 config overrides are no longer applied (WI-7c: provisioning path used instead).
+	// Use a pre-set test run ID to exercise the legacy testFinished path.
+	srv := getCloudTestEndChecker(t, 132, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed)
 	ts.Env["K6_CLOUD_HOST"] = srv.URL
+	ts.Env["K6_CLOUDRUN_TEST_RUN_ID"] = "132"
 
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	stdout := ts.Stdout.String()
 	t.Log(stdout)
 	assert.Contains(t, stdout, "execution: local")
-	assert.Contains(t, stdout, "output: cloud (https://bogus.url/runs/132), json (results.json)")
 	assert.Contains(t, stdout, "iterations...........: 1")
 }
 
@@ -1904,39 +1904,17 @@ export default function() {};`
 
 	ts := getSingleFileTestState(t, script, []string{"-v", "--log-output=stdout", "--out=cloud"}, 0)
 
-	configOverride := http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
-		b, err := io.ReadAll(req.Body)
-		require.NoError(t, err)
-
-		bjs := string(b)
-		assert.Contains(t, bjs, `"name":"Hello k6 Cloud!"`)
-		assert.Contains(t, bjs, `"project_id":123456`)
-
-		resp.WriteHeader(http.StatusOK)
-		_, err = fmt.Fprint(resp, `{
-			"reference_id": "1337",
-			"config": {
-				"webAppURL": "https://bogus.url",
-				"testRunDetails": "https://some.other.url/foo/tests/org/1337?bar=baz"
-			},
-			"logs": [
-				{"level": "debug", "message": "test debug message"},
-				{"level": "info", "message": "test message"}
-			]
-		}`)
-		assert.NoError(t, err)
-	})
-	srv := getCloudTestEndChecker(t, 1337, configOverride, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed)
+	// v1 config overrides are no longer applied (WI-7c: provisioning path used instead).
+	// Use a pre-set test run ID to exercise the legacy testFinished path.
+	srv := getCloudTestEndChecker(t, 1337, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed)
 	ts.Env["K6_CLOUD_HOST"] = srv.URL
+	ts.Env["K6_CLOUDRUN_TEST_RUN_ID"] = "1337"
 
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	stdout := ts.Stdout.String()
 	t.Log(stdout)
 	assert.Contains(t, stdout, "execution: local")
-	assert.Contains(t, stdout, "output: cloud (https://some.other.url/foo/tests/org/1337?bar=baz)")
-	assert.Contains(t, stdout, `level=debug msg="test debug message" output=cloud source=grafana-k6-cloud`)
-	assert.Contains(t, stdout, `level=info msg="test message" output=cloud source=grafana-k6-cloud`)
 }
 
 func TestPrometheusRemoteWriteOutput(t *testing.T) {
@@ -3421,4 +3399,75 @@ func TestPLZCloudSecretsEnvVars(t *testing.T) {
 	assert.NotContains(t, stderr, "level=error")
 	assert.Contains(t, stderr, `level=info msg="***SECRET_REDACTED***" source=console`)
 	assert.NotContains(t, stderr, "plz-secret-value")
+}
+
+// TestRunOutCloudProvisioning verifies Path B (k6 run --out cloud) goes through the
+// provisioning flow: start_local_execution called, no archive upload (nil archive),
+// no polling, test run ID appears in output, no /v1/tests calls.
+func TestRunOutCloudProvisioning(t *testing.T) {
+	t.Parallel()
+
+	script := `
+export const options = {
+  cloud: {
+      name: 'Hello k6 Cloud Path B!',
+      projectID: 123456,
+  },
+};
+
+export default function() {};`
+
+	var (
+		mu              sync.Mutex
+		endpointsCalled []string
+	)
+
+	srv := v6test.NewServer(t, v6test.Config{
+		InspectRequest: func(r *http.Request) {
+			mu.Lock()
+			endpointsCalled = append(endpointsCalled, r.Method+" "+r.URL.Path)
+			mu.Unlock()
+		},
+	})
+
+	ts := getSingleFileTestState(t, script, []string{"-v", "--log-output=stdout", "--out", "cloud"}, 0)
+	ts.Env["K6_CLOUD_TOKEN"] = "test-tok"
+	ts.Env["K6_CLOUD_HOST"] = srv.URL
+	ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
+	ts.Env["K6_CLOUD_STACK_ID"] = "1"
+	ts.Env["K6_CLOUD_API_VERSION"] = "2"
+	// Do NOT set K6_CLOUDRUN_TEST_RUN_ID — we want the provisioning path
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stdout := ts.Stdout.String()
+	t.Log(stdout)
+	t.Log("Endpoints called:", endpointsCalled)
+
+	// Test completed successfully with the expected test run ID
+	assert.Contains(t, stdout, fmt.Sprintf("%d", v6test.DefaultTestRunID))
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	// start_local_execution must have been called
+	foundStartLocalExec := false
+	for _, path := range endpointsCalled {
+		if strings.Contains(path, "start_local_execution") {
+			foundStartLocalExec = true
+		}
+	}
+	assert.True(t, foundStartLocalExec, "expected start_local_execution endpoint to be called, got: %v", endpointsCalled)
+
+	// No archive upload (archive_upload_url is nil on this path)
+	for _, path := range endpointsCalled {
+		assert.NotEqual(t, "PUT /upload", path,
+			"expected no S3 archive upload on Path B, but got PUT /upload in %v", endpointsCalled)
+	}
+
+	// No /v1/tests calls
+	for _, path := range endpointsCalled {
+		assert.NotContains(t, path, "/v1/tests",
+			"expected no /v1/tests call on Path B, got %q in %v", path, endpointsCalled)
+	}
 }

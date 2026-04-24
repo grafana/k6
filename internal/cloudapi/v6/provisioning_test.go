@@ -35,7 +35,7 @@ func newProvisionTestServer(t *testing.T, handlers map[string]http.HandlerFunc) 
 }
 
 // makeLoadTestResponse builds a minimal LoadTestApiModel JSON-serialisable value.
-func makeLoadTestResponse(id int32, projectID int32, name string) map[string]any {
+func makeLoadTestResponse(id int32, projectID int32, name string) map[string]any { //nolint:unparam
 	now := time.Now().UTC().Format(time.RFC3339)
 	return map[string]any{
 		"id":                   id,
@@ -48,7 +48,7 @@ func makeLoadTestResponse(id int32, projectID int32, name string) map[string]any
 }
 
 // makeSLEResponse builds the start_local_execution response body.
-func makeSLEResponse(testRunID int64, archiveUploadURL *string, detailsURL string) map[string]any {
+func makeSLEResponse(testRunID int64, archiveUploadURL *string, detailsURL string) map[string]any { //nolint:unparam
 	return map[string]any{
 		"test_run_id":               testRunID,
 		"archive_upload_url":        archiveUploadURL,
@@ -209,7 +209,7 @@ func TestProvisionLocalExecution_PollAbortedNoNotify(t *testing.T) {
 		// This handler must NOT be called by ProvisionLocalExecution.
 		"/provisioning/v1/test_runs/42/notify": func(w http.ResponseWriter, _ *http.Request) {
 			notifyCalled.Add(1)
-			t.Errorf("notify endpoint must NOT be called by ProvisionLocalExecution (PRD D-25)")
+			t.Errorf("notify endpoint must NOT be called by ProvisionLocalExecution")
 			w.WriteHeader(http.StatusNoContent)
 		},
 	}
@@ -236,7 +236,7 @@ func TestProvisionLocalExecution_PollAbortedNoNotify(t *testing.T) {
 
 // TestProvisionLocalExecution_ArchiveSerialisedOnce verifies that ProvisionLocalExecution
 // serialises the archive only once and passes the resulting bytes directly to the S3
-// upload, rather than re-serialising for the upload (PRD D-24).
+// upload, rather than re-serialising for the upload.
 func TestProvisionLocalExecution_ArchiveSerialisedOnce(t *testing.T) {
 	t.Parallel()
 
@@ -288,7 +288,7 @@ func TestProvisionLocalExecution_ArchiveSerialisedOnce(t *testing.T) {
 
 // TestProvisionLocalExecution_NoNotifyBeforeTestRunID verifies that when the context is cancelled
 // during CreateOrFindLoadTest (before a test_run_id is obtained), no notify call is attempted
-// and the returned error wraps context.Canceled. (WI-6 TDD cycle #6, AC-502)
+// and the returned error wraps context.Canceled.
 func TestProvisionLocalExecution_NoNotifyBeforeTestRunID(t *testing.T) {
 	t.Parallel()
 

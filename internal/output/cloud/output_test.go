@@ -546,12 +546,12 @@ func (o versionedOutputMock) AddMetricSamples(_ []metrics.SampleContainer) {
 
 // TestOutputStart_ContextCancelPropagates verifies that cancelling the context
 // passed via output.Params.Ctx causes Start() to return rather than block
-// forever when the provisioning server is slow (AC-501, AC-502).
+// forever when the provisioning server is slow.
 func TestOutputStart_ContextCancelPropagates(t *testing.T) {
 	t.Parallel()
 
 	blocked := make(chan struct{})
-	handler := func(w http.ResponseWriter, r *http.Request) {
+	handler := func(w http.ResponseWriter, _ *http.Request) {
 		<-blocked
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}
@@ -597,12 +597,12 @@ func TestOutputStart_ContextCancelPropagates(t *testing.T) {
 
 // TestOutputStopWithTestError_ContextCancelPropagates verifies that when the
 // context from output.Params is already cancelled, StopWithTestError returns an
-// error from NotifyTestRunCompleted instead of blocking forever (AC-504).
+// error from NotifyTestRunCompleted instead of blocking forever.
 func TestOutputStopWithTestError_ContextCancelPropagates(t *testing.T) {
 	t.Parallel()
 
 	blocked := make(chan struct{})
-	handler := func(w http.ResponseWriter, r *http.Request) {
+	handler := func(w http.ResponseWriter, _ *http.Request) {
 		<-blocked
 		w.WriteHeader(http.StatusNoContent)
 	}

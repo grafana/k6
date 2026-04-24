@@ -463,7 +463,7 @@ func (c *Client) doWithRetry(req *http.Request) (*http.Response, error) {
 }
 
 // mapTestErrorToNotification maps a test-run error to the notify body's error field.
-// nil → no error; everything else maps to an error code per PRD D-11.
+// nil → no error; non-nil maps to a numeric error code sent to the notify endpoint.
 func mapTestErrorToNotification(testErr error) *notifyError {
 	if testErr == nil {
 		return nil
