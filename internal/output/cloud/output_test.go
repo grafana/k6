@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	k6cloud "github.com/grafana/k6-cloud-openapi-client-go/k6"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/v2/cloudapi"
@@ -144,6 +145,16 @@ func TestOutputStart_UsesProvisioningFlow(t *testing.T) {
 			require.NoError(t, json.NewEncoder(w).Encode(sleResp()))
 		case r.Method == http.MethodPost && path == fmt.Sprintf("/provisioning/v1/test_runs/%d/notify", testRunID):
 			w.WriteHeader(http.StatusNoContent)
+		case r.Method == http.MethodGet && path == fmt.Sprintf("/cloud/v6/test_runs/%d", testRunID):
+			// Polling: return initializing so WaitForTestRunReady resolves immediately.
+			m := k6cloud.NewTestRunApiModelWithDefaults()
+			m.SetStatus("initializing")
+			m.SetDistribution([]k6cloud.DistributionZoneApiModel{})
+			m.SetResultDetails(map[string]any{})
+			m.SetOptions(map[string]any{})
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			require.NoError(t, json.NewEncoder(w).Encode(m))
 		case r.Method == http.MethodPost && path == "/v1/tests":
 			t.Error("Output.Start must NOT call v1 /v1/tests")
 			http.Error(w, "v1 tests forbidden", http.StatusInternalServerError)
@@ -202,7 +213,8 @@ func TestOutputStart_PushRefIDSkipsProvisioning(t *testing.T) {
 	t.Cleanup(ts.Close)
 
 	out, err := newOutput(output.Params{
-		Logger: testutils.NewLogger(t),
+		Logger:     testutils.NewLogger(t),
+		JSONConfig: json.RawMessage(`{"metricsPushURL": "http://mock-push-url/v2/metrics/12345"}`),
 		Environment: map[string]string{
 			"K6_CLOUD_HOST":        ts.URL,
 			"K6_CLOUD_HOST_V6":     ts.URL,
@@ -276,6 +288,16 @@ func TestOutputStart_NoV1TestsCall(t *testing.T) {
 			require.NoError(t, json.NewEncoder(w).Encode(sleResp))
 		case r.Method == http.MethodPost && path == fmt.Sprintf("/provisioning/v1/test_runs/%d/notify", testRunID):
 			w.WriteHeader(http.StatusNoContent)
+		case r.Method == http.MethodGet && path == fmt.Sprintf("/cloud/v6/test_runs/%d", testRunID):
+			// Polling: return initializing so WaitForTestRunReady resolves immediately.
+			m := k6cloud.NewTestRunApiModelWithDefaults()
+			m.SetStatus("initializing")
+			m.SetDistribution([]k6cloud.DistributionZoneApiModel{})
+			m.SetResultDetails(map[string]any{})
+			m.SetOptions(map[string]any{})
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			require.NoError(t, json.NewEncoder(w).Encode(m))
 		default:
 			w.WriteHeader(http.StatusOK)
 		}
@@ -339,8 +361,7 @@ func TestOutputStartVersionedOutputV2(t *testing.T) {
 		testRunID: "123",
 		config: cloudapi.Config{
 			APIVersion:            null.IntFrom(2),
-			Host:                  null.StringFrom("fake-cloud-url"),
-			Token:                 null.StringFrom("fake-token"),
+			MetricsPushURL:        null.StringFrom("http://mock-push-url/v2/metrics/123"),
 			AggregationWaitPeriod: types.NullDurationFrom(1 * time.Second),
 			// Here, we are enabling it but silencing the related async ops
 			AggregationPeriod:  types.NullDurationFrom(1 * time.Hour),
@@ -348,9 +369,6 @@ func TestOutputStartVersionedOutputV2(t *testing.T) {
 		},
 		usage: usage.New(),
 	}
-
-	o.client = cloudapi.NewClient(
-		nil, o.config.Token.String, o.config.Host.String, "v/tests", o.config.Timeout.TimeDuration())
 
 	err := o.startVersionedOutput()
 	require.NoError(t, err)
@@ -386,7 +404,8 @@ func TestOutputStartWithTestRunID(t *testing.T) {
 	defer ts.Close()
 
 	out, err := newOutput(output.Params{
-		Logger: testutils.NewLogger(t),
+		Logger:     testutils.NewLogger(t),
+		JSONConfig: json.RawMessage(`{"metricsPushURL": "http://mock-push-url/v2/metrics/12345"}`),
 		Environment: map[string]string{
 			"K6_CLOUD_HOST":        ts.URL,
 			"K6_CLOUD_PUSH_REF_ID": "12345",
@@ -546,12 +565,12 @@ func (o versionedOutputMock) AddMetricSamples(_ []metrics.SampleContainer) {
 
 // TestOutputStart_ContextCancelPropagates verifies that cancelling the context
 // passed via output.Params.Ctx causes Start() to return rather than block
-// forever when the provisioning server is slow (AC-501, AC-502).
+// forever when the provisioning server is slow.
 func TestOutputStart_ContextCancelPropagates(t *testing.T) {
 	t.Parallel()
 
 	blocked := make(chan struct{})
-	handler := func(w http.ResponseWriter, r *http.Request) {
+	handler := func(w http.ResponseWriter, _ *http.Request) {
 		<-blocked
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}
@@ -597,12 +616,12 @@ func TestOutputStart_ContextCancelPropagates(t *testing.T) {
 
 // TestOutputStopWithTestError_ContextCancelPropagates verifies that when the
 // context from output.Params is already cancelled, StopWithTestError returns an
-// error from NotifyTestRunCompleted instead of blocking forever (AC-504).
+// error from NotifyTestRunCompleted instead of blocking forever.
 func TestOutputStopWithTestError_ContextCancelPropagates(t *testing.T) {
 	t.Parallel()
 
 	blocked := make(chan struct{})
-	handler := func(w http.ResponseWriter, r *http.Request) {
+	handler := func(w http.ResponseWriter, _ *http.Request) {
 		<-blocked
 		w.WriteHeader(http.StatusNoContent)
 	}

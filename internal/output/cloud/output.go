@@ -190,37 +190,18 @@ func validateRequiredSystemTags(scriptTags *metrics.SystemTagSet) error {
 // Start calls the k6 Cloud API to initialize the test run, and then starts the
 // goroutine that would listen for metric samples and send them to the cloud.
 func (out *Output) Start() error {
-	// TODO(PRD D-14): PushRefID is set by k6-operator when it passes a pre-existing
-	// test_run_id. This branch preserves legacy v1 behaviour until k6-operator is updated
-	// to supply the new runtime_config fields. Tracked in grafana/k6-cloud#4283.
+	// TODO: PushRefID is set by k6-operator when it passes a pre-existing
+	// test_run_id. This branch preserves legacy v1 behaviour until k6-operator
+	// is updated to supply runtime_config fields (grafana/k6-cloud#4283).
 	if out.config.PushRefID.Valid {
 		out.testRunID = out.config.PushRefID.String
 	}
 
 	if out.testRunID != "" {
 		out.logger.WithField("testRunId", out.testRunID).Debug("Directly pushing metrics without init")
-		// Derive MetricsPushURL for the legacy direct-push paths (PushRefID / k6-operator,
-		// or K6_CLOUDRUN_TEST_RUN_ID set externally without provisioning). The provisioning
-		// path always sets MetricsPushURL before reaching this branch.
-		if !out.config.MetricsPushURL.Valid || out.config.MetricsPushURL.String == "" {
-			host := strings.TrimSuffix(out.config.Host.String, "/")
-			out.config.MetricsPushURL = null.StringFrom(host + "/v2/metrics/" + out.testRunID)
-		}
-		// When the test run ID was provided externally by the provisioning path
-		// (K6_CLOUDRUN_TEST_RUN_ID, set by createCloudTest / k6 cloud run --local-execution),
-		// create a v6 client so that testFinished() uses NotifyTestRunCompleted instead of
-		// the legacy POST /v1/tests/{id}. We detect the provisioning path by the presence
-		// of a valid stack ID — the PLZ/PushRefID legacy paths do not set it.
-		if !out.config.PushRefID.Valid && out.config.StackID.Valid && out.config.StackID.Int64 != 0 {
-			v6c, err := v6cloudapi.NewClient(
-				out.logger, out.config.Token.String, out.config.Hostv6.String,
-				build.Version, out.config.Timeout.TimeDuration())
-			if err != nil {
-				out.logger.WithError(err).Warn("Could not create v6 client; falling back to legacy testFinished")
-			} else {
-				v6c.SetStackID(int32(out.config.StackID.Int64)) //nolint:gosec
-				out.v6Client = v6c
-			}
+		out.ensureMetricsPushURL()
+		if err := out.initV6ClientForDirectPush(); err != nil {
+			return err
 		}
 		return out.startVersionedOutput()
 	}
@@ -240,7 +221,7 @@ func (out *Output) Start() error {
 
 	params := v6cloudapi.ProvisionParams{
 		Name:          out.config.Name.String,
-		ProjectID:     int32(out.config.ProjectID.Int64), //nolint:gosec
+		ProjectID:     int32(out.config.ProjectID.Int64),               //nolint:gosec
 		MaxVUs:        int64(lib.GetMaxPossibleVUs(out.executionPlan)), //nolint:gosec
 		TotalDuration: out.duration,
 		Options:       map[string]any{},
@@ -345,6 +326,7 @@ func (out *Output) testFinished(testErr error) error {
 		if err != nil {
 			return fmt.Errorf("invalid test run ID %q: %w", out.testRunID, err)
 		}
+		out.logger.WithField("ref", out.testRunID).Debug("Sending test finished notification")
 		return out.v6Client.NotifyTestRunCompleted(out.ctx, int32(testRunID64), testErr) //nolint:gosec
 	}
 
@@ -418,6 +400,47 @@ func (out *Output) getRunStatus(testErr error) cloudapi.RunStatus {
 	// By default, the catch-all error is "aborted by system", but let's log that
 	out.logger.WithError(testErr).Debug("unknown test error classified as 'aborted by system'")
 	return cloudapi.RunStatusAbortedSystem
+}
+
+// ensureMetricsPushURL derives MetricsPushURL from the host when the legacy
+// direct-push paths (PushRefID / k6-operator, or K6_CLOUDRUN_TEST_RUN_ID set
+// externally) leave it unset. The provisioning path always sets it explicitly.
+func (out *Output) ensureMetricsPushURL() {
+	if out.config.MetricsPushURL.Valid && out.config.MetricsPushURL.String != "" {
+		return
+	}
+	host := strings.TrimSuffix(out.config.Host.String, "/")
+	out.config.MetricsPushURL = null.StringFrom(host + "/v2/metrics/" + out.testRunID)
+}
+
+// initV6ClientForDirectPush creates and wires a v6 client using credentials
+// already present in the config. This is the path where provisioning happened
+// before Output.Start() (e.g. k6 cloud run --local-execution sets testRunID,
+// MetricsPushURL, and TestRunToken in the config before Start is called).
+//
+// PushRefID paths are excluded: k6-operator manages the lifecycle externally
+// and testFinished returns nil early for those.
+func (out *Output) initV6ClientForDirectPush() error {
+	if out.config.PushRefID.Valid {
+		return nil
+	}
+	if !out.config.StackID.Valid || out.config.StackID.Int64 == 0 {
+		return fmt.Errorf("K6_CLOUD_STACK_ID is required on the provisioning path")
+	}
+	if !out.config.TestRunToken.Valid || out.config.TestRunToken.String == "" {
+		return fmt.Errorf("test run token is required on the provisioning path but was not provided")
+	}
+
+	v6c, err := v6cloudapi.NewClient(
+		out.logger, out.config.Token.String, out.config.Hostv6.String,
+		build.Version, out.config.Timeout.TimeDuration())
+	if err != nil {
+		return fmt.Errorf("failed to create v6 cloud client: %w", err)
+	}
+	v6c.SetStackID(int32(out.config.StackID.Int64)) //nolint:gosec
+	v6c.SetTestRunToken(out.config.TestRunToken.String)
+	out.v6Client = v6c
+	return nil
 }
 
 func (out *Output) startVersionedOutput() error {

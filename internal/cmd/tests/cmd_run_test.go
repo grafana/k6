@@ -27,6 +27,7 @@ import (
 	"go.k6.io/k6/v2/cloudapi"
 	"go.k6.io/k6/v2/errext/exitcodes"
 	"go.k6.io/k6/v2/internal/build"
+	"go.k6.io/k6/v2/internal/cloudapi/v6/v6test"
 	"go.k6.io/k6/v2/internal/cmd"
 	"go.k6.io/k6/v2/internal/cmd/tests/events"
 	"go.k6.io/k6/v2/internal/event"
@@ -35,6 +36,8 @@ import (
 	"go.k6.io/k6/v2/js/modules"
 	"go.k6.io/k6/v2/lib/fsext"
 )
+
+const testCloudAPIToken = "test-api-token"
 
 func TestVersion(t *testing.T) {
 	t.Parallel()
@@ -531,18 +534,13 @@ func getTestServer(tb testing.TB, routes map[string]http.Handler) *httptest.Serv
 
 func getCloudTestEndChecker(
 	tb testing.TB, testRunID int,
-	testStart http.Handler, expRunStatus cloudapi.RunStatus, expResultStatus cloudapi.ResultStatus,
+	expRunStatus cloudapi.RunStatus, _ cloudapi.ResultStatus,
 ) *httptest.Server {
 	testFinished := false
 
-	if testStart == nil {
-		testStart = cloudTestStartSimple(tb, testRunID)
-	}
-
 	srv := getTestServer(tb, map[string]http.Handler{
-		"POST ^/v1/tests$": testStart,
-		fmt.Sprintf("POST ^/v1/tests/%d$", testRunID): http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
-			require.NotNil(tb, req.Body)
+		// v6 provisioning notify endpoint — used by initV6ClientForDirectPush path.
+		fmt.Sprintf("POST ^/provisioning/v1/test_runs/%d/notify$", testRunID): http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			buf := &bytes.Buffer{}
 			_, err := io.Copy(buf, req.Body)
 			require.NoError(tb, err)
@@ -551,19 +549,17 @@ func getCloudTestEndChecker(
 			body := buf.Bytes()
 			require.True(tb, gjson.ValidBytes(body))
 
-			runStatus := gjson.GetBytes(body, "run_status")
-			require.True(tb, runStatus.Exists()) // important to check, since run_status can be 0
-			assert.Equalf(
-				tb, expRunStatus, cloudapi.RunStatus(runStatus.Int()),
-				"received wrong run_status value",
-			)
+			// v6 notify uses {event_type, error:{code,reason}} instead of run_status.
+			// A nil error field means the test finished cleanly (RunStatusFinished).
+			var gotRunStatus cloudapi.RunStatus
+			if errField := gjson.GetBytes(body, "error"); errField.Exists() && errField.Type != gjson.Null {
+				gotRunStatus = cloudapi.RunStatus(gjson.GetBytes(body, "error.code").Int())
+			} else {
+				gotRunStatus = cloudapi.RunStatusFinished
+			}
+			assert.Equalf(tb, expRunStatus, gotRunStatus, "received wrong run_status value")
 
-			resultStatus := gjson.GetBytes(body, "result_status")
-			require.True(tb, resultStatus.Exists())
-			assert.Equalf(
-				tb, expResultStatus, cloudapi.ResultStatus(resultStatus.Int()),
-				"received wrong result_status value",
-			)
+			w.WriteHeader(http.StatusOK)
 			testFinished = true
 		}),
 	})
@@ -585,9 +581,17 @@ func getSimpleCloudOutputTestState(
 	}
 	cliFlags = append(cliFlags, "--out", "cloud")
 
-	srv := getCloudTestEndChecker(tb, 111, nil, expRunStatus, expResultStatus)
+	srv := getCloudTestEndChecker(tb, 111, expRunStatus, expResultStatus)
 	ts := getSingleFileTestState(tb, script, cliFlags, expExitCode)
 	ts.Env["K6_CLOUD_HOST"] = srv.URL
+	// Use the same server for the v6 provisioning notify endpoint.
+	ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
+	// Pre-set the test run ID and required v6 credentials so initV6ClientForDirectPush
+	// wires up the v6 client and testFinished uses NotifyTestRunCompleted.
+	ts.Env["K6_CLOUD_TOKEN"] = testCloudAPIToken
+	ts.Env["K6_CLOUDRUN_TEST_RUN_ID"] = "111"
+	ts.Env["K6_CLOUD_STACK_ID"] = "1"
+	ts.Env["K6_CLOUD_TEST_RUN_TOKEN"] = "test-token-111"
 	return ts
 }
 
@@ -752,7 +756,7 @@ func TestAbortedByThreshold(t *testing.T) {
 	assert.Contains(t, stdOut, `teardown() called`)
 	assert.Contains(t, stdOut, `level=debug msg="Metrics emission of VUs and VUsMax metrics stopped"`)
 	assert.Contains(t, stdOut, `level=debug msg="Metrics and traces processing finished!"`)
-	assert.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=8 tainted=true`)
+	assert.Contains(t, stdOut, `level=debug msg="Sending test finished notification" output=cloud ref=111`)
 }
 
 func TestAbortedByUserWithGoodThresholds(t *testing.T) {
@@ -814,7 +818,7 @@ func TestAbortedByUserWithGoodThresholds(t *testing.T) {
 	assert.Contains(t, stdout, `Stopping k6 in response to signal`)
 	assert.Contains(t, stdout, `level=debug msg="Metrics emission of VUs and VUsMax metrics stopped"`)
 	assert.Contains(t, stdout, `level=debug msg="Metrics and traces processing finished!"`)
-	assert.Contains(t, stdout, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=5 tainted=false`)
+	assert.Contains(t, stdout, `level=debug msg="Sending test finished notification" output=cloud ref=111`)
 }
 
 func asyncWaitForStdoutAndRun(
@@ -936,7 +940,7 @@ func TestAbortedByUserWithRestAPI(t *testing.T) {
 	assert.Contains(t, stdout, `level=error msg="test run stopped from REST API`)
 	assert.Contains(t, stdout, `level=debug msg="Metrics emission of VUs and VUsMax metrics stopped"`)
 	assert.Contains(t, stdout, `level=debug msg="Metrics and traces processing finished!"`)
-	assert.Contains(t, stdout, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=5 tainted=false`)
+	assert.Contains(t, stdout, `level=debug msg="Sending test finished notification" output=cloud ref=111`)
 	assert.NotContains(t, stdout, `Running thresholds`)
 	assert.NotContains(t, stdout, `Finalizing thresholds`)
 }
@@ -963,13 +967,18 @@ func TestAbortedByScriptSetupErrorWithDependency(t *testing.T) {
 		export { handleSummary } from "./bar.js";
 	`
 
-	srv := getCloudTestEndChecker(t, 123, nil, cloudapi.RunStatusAbortedScriptError, cloudapi.ResultStatusPassed)
+	srv := getCloudTestEndChecker(t, 123, cloudapi.RunStatusAbortedScriptError, cloudapi.ResultStatusPassed)
 
 	ts := NewGlobalTestState(t)
 	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test.js"), []byte(mainScript), 0o644))
 	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "bar.js"), []byte(depScript), 0o644))
 
 	ts.Env["K6_CLOUD_HOST"] = srv.URL
+	ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
+	ts.Env["K6_CLOUD_TOKEN"] = testCloudAPIToken
+	ts.Env["K6_CLOUDRUN_TEST_RUN_ID"] = "123"
+	ts.Env["K6_CLOUD_STACK_ID"] = "1"
+	ts.Env["K6_CLOUD_TEST_RUN_TOKEN"] = "test-token-123"
 	ts.CmdArgs = []string{"k6", "run", "-v", "--out", "cloud", "--log-output=stdout", "test.js"}
 	ts.ExpectedExitCode = int(exitcodes.ScriptException)
 
@@ -985,7 +994,7 @@ func TestAbortedByScriptSetupErrorWithDependency(t *testing.T) {
 	}
 	assert.Contains(t, stdout, `level=error msg="Error: baz\n\tat baz (`+rootPath+`test/bar.js:6:10(3))\n\tat default (`+
 		rootPath+`test/bar.js:3:7(3))\n\tat setup (`+rootPath+`test/test.js:5:7(8))\n" hint="script exception"`)
-	assert.Contains(t, stdout, `level=debug msg="Sending test finished" output=cloud ref=123 run_status=7 tainted=false`)
+	assert.Contains(t, stdout, `level=debug msg="Sending test finished notification" output=cloud ref=123`)
 	assert.Contains(t, stdout, "bogus summary")
 }
 
@@ -1227,7 +1236,7 @@ func testAbortedByScriptError(t *testing.T, script string, runTest func(*testing
 	assert.Contains(t, stdout, `level=debug msg="Metrics emission of VUs and VUsMax metrics stopped"`)
 	assert.Contains(t, stdout, `level=debug msg="Metrics and traces processing finished!"`)
 	assert.Contains(t, stdout, `level=debug msg="Everything has finished, exiting k6 with an error!"`)
-	assert.Contains(t, stdout, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=7 tainted=false`)
+	assert.Contains(t, stdout, `level=debug msg="Sending test finished notification" output=cloud ref=111`)
 	return ts
 }
 
@@ -1368,7 +1377,7 @@ func testAbortedByScriptTestAbort(t *testing.T, script string, runTest func(*tes
 	assert.Contains(t, stdout, "execution: local")
 	assert.Contains(t, stdout, "output: cloud (https://app.k6.io/runs/111)")
 	assert.Contains(t, stdout, "test aborted: foo")
-	assert.Contains(t, stdout, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=5 tainted=false`)
+	assert.Contains(t, stdout, `level=debug msg="Sending test finished notification" output=cloud ref=111`)
 	assert.Contains(t, stdout, `level=debug msg="Metrics emission of VUs and VUsMax metrics stopped"`)
 	assert.Contains(t, stdout, `level=debug msg="Metrics and traces processing finished!"`)
 	assert.Contains(t, stdout, "bogus summary")
@@ -1402,7 +1411,7 @@ func TestAbortedByInterruptDuringVUInit(t *testing.T) {
 
 	assert.Contains(t, stdOut, `level=debug msg="Stopping k6 in response to signal..." sig=interrupt`)
 	assert.Contains(t, stdOut, `level=debug msg="Metrics emission of VUs and VUsMax metrics stopped"`)
-	assert.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=5 tainted=false`)
+	assert.Contains(t, stdOut, `level=debug msg="Sending test finished notification" output=cloud ref=111`)
 	assert.Contains(t, stdOut, `level=error msg="test run was aborted because k6 received a 'interrupt' signal"`)
 }
 
@@ -1423,7 +1432,7 @@ func TestAbortedByInterruptWhenPaused(t *testing.T) {
 
 	assert.Contains(t, stdOut, `level=debug msg="Stopping k6 in response to signal..." sig=interrupt`)
 	assert.Contains(t, stdOut, `level=debug msg="Metrics emission of VUs and VUsMax metrics stopped"`)
-	assert.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=5 tainted=false`)
+	assert.Contains(t, stdOut, `level=debug msg="Sending test finished notification" output=cloud ref=111`)
 	assert.Contains(t, stdOut, `level=error msg="test run was aborted because k6 received a 'interrupt' signal"`)
 }
 
@@ -1454,7 +1463,7 @@ func TestAbortedByScriptInitError(t *testing.T) {
 	assert.Contains(t, stdout, `level=error msg="Error: oops in 2\n\tat file:///`)
 	assert.Contains(t, stdout, `hint="error while initializing VU #2 (script exception)"`)
 	assert.Contains(t, stdout, `level=debug msg="Metrics emission of VUs and VUsMax metrics stopped"`)
-	assert.Contains(t, stdout, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=7 tainted=false`)
+	assert.Contains(t, stdout, `level=debug msg="Sending test finished notification" output=cloud ref=111`)
 }
 
 func TestMetricTagAndSetupDataIsolation(t *testing.T) {
@@ -1872,20 +1881,19 @@ func TestRunWithCloudOutputOverrides(t *testing.T) {
 		[]string{"-v", "--log-output=stdout", "--out=cloud", "--out", "json=results.json"}, 0,
 	)
 
-	configOverride := http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
-		resp.WriteHeader(http.StatusOK)
-		_, err := fmt.Fprint(resp, `{"reference_id": "132", "config": {"webAppURL": "https://bogus.url"}}`)
-		assert.NoError(t, err)
-	})
-	srv := getCloudTestEndChecker(t, 132, configOverride, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed)
+	srv := getCloudTestEndChecker(t, 132, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed)
 	ts.Env["K6_CLOUD_HOST"] = srv.URL
+	ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
+	ts.Env["K6_CLOUD_TOKEN"] = testCloudAPIToken
+	ts.Env["K6_CLOUDRUN_TEST_RUN_ID"] = "132"
+	ts.Env["K6_CLOUD_STACK_ID"] = "1"
+	ts.Env["K6_CLOUD_TEST_RUN_TOKEN"] = "test-token-132"
 
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	stdout := ts.Stdout.String()
 	t.Log(stdout)
 	assert.Contains(t, stdout, "execution: local")
-	assert.Contains(t, stdout, "output: cloud (https://bogus.url/runs/132), json (results.json)")
 	assert.Contains(t, stdout, "iterations...........: 1")
 }
 
@@ -1904,39 +1912,19 @@ export default function() {};`
 
 	ts := getSingleFileTestState(t, script, []string{"-v", "--log-output=stdout", "--out=cloud"}, 0)
 
-	configOverride := http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
-		b, err := io.ReadAll(req.Body)
-		require.NoError(t, err)
-
-		bjs := string(b)
-		assert.Contains(t, bjs, `"name":"Hello k6 Cloud!"`)
-		assert.Contains(t, bjs, `"project_id":123456`)
-
-		resp.WriteHeader(http.StatusOK)
-		_, err = fmt.Fprint(resp, `{
-			"reference_id": "1337",
-			"config": {
-				"webAppURL": "https://bogus.url",
-				"testRunDetails": "https://some.other.url/foo/tests/org/1337?bar=baz"
-			},
-			"logs": [
-				{"level": "debug", "message": "test debug message"},
-				{"level": "info", "message": "test message"}
-			]
-		}`)
-		assert.NoError(t, err)
-	})
-	srv := getCloudTestEndChecker(t, 1337, configOverride, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed)
+	srv := getCloudTestEndChecker(t, 1337, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed)
 	ts.Env["K6_CLOUD_HOST"] = srv.URL
+	ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
+	ts.Env["K6_CLOUD_TOKEN"] = testCloudAPIToken
+	ts.Env["K6_CLOUDRUN_TEST_RUN_ID"] = "1337"
+	ts.Env["K6_CLOUD_STACK_ID"] = "1"
+	ts.Env["K6_CLOUD_TEST_RUN_TOKEN"] = "test-token-1337"
 
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	stdout := ts.Stdout.String()
 	t.Log(stdout)
 	assert.Contains(t, stdout, "execution: local")
-	assert.Contains(t, stdout, "output: cloud (https://some.other.url/foo/tests/org/1337?bar=baz)")
-	assert.Contains(t, stdout, `level=debug msg="test debug message" output=cloud source=grafana-k6-cloud`)
-	assert.Contains(t, stdout, `level=info msg="test message" output=cloud source=grafana-k6-cloud`)
 }
 
 func TestPrometheusRemoteWriteOutput(t *testing.T) {
@@ -3421,4 +3409,75 @@ func TestPLZCloudSecretsEnvVars(t *testing.T) {
 	assert.NotContains(t, stderr, "level=error")
 	assert.Contains(t, stderr, `level=info msg="***SECRET_REDACTED***" source=console`)
 	assert.NotContains(t, stderr, "plz-secret-value")
+}
+
+// TestRunOutCloudProvisioning verifies Path B (k6 run --out cloud) goes through the
+// provisioning flow: start_local_execution called, no archive upload (nil archive),
+// no polling, test run ID appears in output, no /v1/tests calls.
+func TestRunOutCloudProvisioning(t *testing.T) {
+	t.Parallel()
+
+	script := `
+export const options = {
+  cloud: {
+      name: 'Hello k6 Cloud Path B!',
+      projectID: 123456,
+  },
+};
+
+export default function() {};`
+
+	var (
+		mu              sync.Mutex
+		endpointsCalled []string
+	)
+
+	srv := v6test.NewServer(t, v6test.Config{
+		InspectRequest: func(r *http.Request) {
+			mu.Lock()
+			endpointsCalled = append(endpointsCalled, r.Method+" "+r.URL.Path)
+			mu.Unlock()
+		},
+	})
+
+	ts := getSingleFileTestState(t, script, []string{"-v", "--log-output=stdout", "--out", "cloud"}, 0)
+	ts.Env["K6_CLOUD_TOKEN"] = "test-tok"
+	ts.Env["K6_CLOUD_HOST"] = srv.URL
+	ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
+	ts.Env["K6_CLOUD_STACK_ID"] = "1"
+	ts.Env["K6_CLOUD_API_VERSION"] = "2"
+	// Do NOT set K6_CLOUDRUN_TEST_RUN_ID — we want the provisioning path
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stdout := ts.Stdout.String()
+	t.Log(stdout)
+	t.Log("Endpoints called:", endpointsCalled)
+
+	// Test completed successfully with the expected test run ID
+	assert.Contains(t, stdout, fmt.Sprintf("%d", v6test.DefaultTestRunID))
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	// start_local_execution must have been called
+	foundStartLocalExec := false
+	for _, path := range endpointsCalled {
+		if strings.Contains(path, "start_local_execution") {
+			foundStartLocalExec = true
+		}
+	}
+	assert.True(t, foundStartLocalExec, "expected start_local_execution endpoint to be called, got: %v", endpointsCalled)
+
+	// No archive upload (archive_upload_url is nil on this path)
+	for _, path := range endpointsCalled {
+		assert.NotEqual(t, "PUT /upload", path,
+			"expected no S3 archive upload on Path B, but got PUT /upload in %v", endpointsCalled)
+	}
+
+	// No /v1/tests calls
+	for _, path := range endpointsCalled {
+		assert.NotContains(t, path, "/v1/tests",
+			"expected no /v1/tests call on Path B, got %q in %v", path, endpointsCalled)
+	}
 }

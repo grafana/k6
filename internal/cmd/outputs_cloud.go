@@ -128,9 +128,8 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 		return err
 	}
 
-	// Restore CloudSecretSource wiring (option 2 — PRD Out-of-Scope #3).
-	// The provisioning API does not yet return SecretsConfig, so we make a
-	// separate call to POST /v1/tests to obtain one. The v1 test run created
+	// The provisioning API does not yet return SecretsConfig, so make a
+	// separate POST /v1/tests call to obtain one. The v1 test run created
 	// by this call is intentionally discarded; only SecretsConfig is used.
 	// This bridge remains until the provisioning API exposes secrets config.
 	if gs.CloudSecretSource != nil {
