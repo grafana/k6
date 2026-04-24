@@ -528,8 +528,11 @@ func isCloudRunWithLocalExecution(cmd *cobra.Command) bool {
 	if parent == nil || parent.Name() != "cloud" {
 		return false
 	}
-	f := cmd.Flag("local-execution")
-	return f != nil && f.Changed
+	localExecution, err := cmd.Flags().GetBool("local-execution")
+	if err != nil {
+		return false
+	}
+	return localExecution
 }
 
 // hasCloudSecretSource returns true if the 'cloud' secret source type appears in sources.
