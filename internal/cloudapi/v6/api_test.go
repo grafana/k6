@@ -368,6 +368,7 @@ func writeError(t *testing.T, w http.ResponseWriter, status int, code, msg strin
 	})
 }
 
+
 func fprint(t *testing.T, w io.Writer, format string) int {
 	n, err := fmt.Fprint(w, format)
 	assert.NoError(t, err)
@@ -559,6 +560,94 @@ func TestStartLocalExecution(t *testing.T) {
 			require.NotNil(t, resp)
 
 			tt.assert(t, captured, resp)
+		})
+	}
+}
+
+func TestUploadArchive(t *testing.T) {
+	t.Parallel()
+
+	arc := newTestArchive(t)
+	var arcBuf bytes.Buffer
+	require.NoError(t, arc.Write(&arcBuf))
+	expectedBody := arcBuf.Bytes()
+
+	type capturedUpload struct {
+		method      string
+		contentType string
+		auth        string
+		body        []byte
+	}
+
+	tests := []struct {
+		name            string
+		serverStatus    int
+		wantErr         bool
+		wantErrContains string
+		checkReq        func(t *testing.T, req capturedUpload)
+	}{
+		{
+			name:         "PUT with correct content-type and body",
+			serverStatus: http.StatusOK,
+			checkReq: func(t *testing.T, req capturedUpload) {
+				t.Helper()
+				assert.Equal(t, http.MethodPut, req.method)
+				assert.Equal(t, "application/octet-stream", req.contentType)
+				assertArchiveEqual(t, arc, req.body)
+			},
+		},
+		{
+			name:         "no authorization header on S3 presigned PUT",
+			serverStatus: http.StatusOK,
+			checkReq: func(t *testing.T, req capturedUpload) {
+				t.Helper()
+				assert.Empty(t, req.auth, "Authorization header must NOT be set on S3 presigned PUT")
+			},
+		},
+		{
+			name:            "error propagation on non-2xx",
+			serverStatus:    http.StatusForbidden,
+			wantErr:         true,
+			wantErrContains: "403",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var captured capturedUpload
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				captured.method = r.Method
+				captured.contentType = r.Header.Get("Content-Type")
+				captured.auth = r.Header.Get("Authorization")
+				var err error
+				captured.body, err = io.ReadAll(r.Body)
+				require.NoError(t, err)
+				w.WriteHeader(tt.serverStatus)
+			}))
+			defer server.Close()
+
+			client, err := NewClient(testutils.NewLogger(t), "test-token", server.URL, "1.0", 5*time.Second)
+			require.NoError(t, err)
+
+			bodyBytes := make([]byte, len(expectedBody))
+			copy(bodyBytes, expectedBody)
+
+			err = client.UploadArchive(t.Context(), server.URL, bodyBytes)
+
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.wantErrContains != "" {
+					assert.Contains(t, err.Error(), tt.wantErrContains)
+				}
+			} else {
+				require.NoError(t, err)
+			}
+
+			if tt.checkReq != nil {
+				tt.checkReq(t, captured)
+			}
 		})
 	}
 }

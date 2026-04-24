@@ -331,6 +331,38 @@ func archiveReader(arc *lib.Archive) io.ReadCloser {
 	return pr
 }
 
+// UploadArchive uploads the serialized archive to the given presigned S3 URL.
+// The URL is a presigned PUT URL — no Authorization header is set.
+// Returns the serialized archive size in bytes (useful for start_local_execution).
+func (c *Client) UploadArchive(ctx context.Context, uploadURL string, arc *lib.Archive) (int64, error) {
+	var buf bytes.Buffer
+	if err := arc.Write(&buf); err != nil {
+		return 0, err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, uploadURL, bytes.NewReader(buf.Bytes()))
+	if err != nil {
+		return 0, err
+	}
+	req.Header.Set("Content-Type", "application/octet-stream")
+	req.ContentLength = int64(buf.Len())
+
+	resp, err := c.apiClient.GetConfig().HTTPClient.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return 0, fmt.Errorf("archive upload failed: %d %s", resp.StatusCode, http.StatusText(resp.StatusCode))
+	}
+
+	return int64(buf.Len()), nil
+}
+
 // StartLocalExecution calls POST /provisioning/v1/load_tests/{id}/start_local_execution.
 // It uses Bearer auth (not Token scheme) and includes a K6-Idempotency-Key header.
 func (c *Client) StartLocalExecution(
