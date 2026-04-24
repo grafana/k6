@@ -15,6 +15,7 @@ import (
 
 	k6cloud "github.com/grafana/k6-cloud-openapi-client-go/k6"
 
+	"go.k6.io/k6/v2/errext"
 	"go.k6.io/k6/v2/lib"
 )
 
@@ -370,6 +371,126 @@ func (c *Client) WaitForTestRunReady(ctx context.Context, testRunID int32, pollI
 	}
 }
 
+// notifyRequest is the body for POST /provisioning/v1/test_runs/{id}/notify.
+type notifyRequest struct {
+	EventType string       `json:"event_type"`
+	Error     *notifyError `json:"error"`
+}
+
+// notifyError carries a machine-readable error code + human reason.
+type notifyError struct {
+	Code   int    `json:"code"`
+	Reason string `json:"reason"`
+}
+
+// NotifyTestRunCompleted reports the test outcome to the provisioning API.
+// It always attempts the call; on 5xx it retries up to MaxRetries times.
+// It should not be called when testRunID == 0 (test never started).
+func (c *Client) NotifyTestRunCompleted(ctx context.Context, testRunID int32, testErr error) error {
+	rawURL := fmt.Sprintf("%s/provisioning/v1/test_runs/%d/notify", c.host, testRunID)
+
+	body := notifyRequest{
+		EventType: "script_execution_completed",
+		Error:     mapTestErrorToNotification(testErr),
+	}
+	bodyBytes, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, rawURL, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+c.token)
+
+	lastResp, lastErr := c.doWithRetry(httpReq)
+	if lastErr != nil {
+		return lastErr
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, lastResp.Body)
+		_ = lastResp.Body.Close()
+	}()
+
+	if lastResp.StatusCode < 200 || lastResp.StatusCode > 299 {
+		return fmt.Errorf(
+			"unexpected HTTP error from %s: %d %s",
+			rawURL,
+			lastResp.StatusCode,
+			http.StatusText(lastResp.StatusCode),
+		)
+	}
+
+	return nil
+}
+
+// doWithRetry executes req against the configured HTTP client and retries on
+// transport errors and 5xx responses up to MaxRetries times, sleeping
+// RetryInterval between attempts. The request body is reset via GetBody on
+// each retry (bodyResetTransport handles this transparently).
+func (c *Client) doWithRetry(req *http.Request) (*http.Response, error) {
+	httpClient := c.apiClient.GetConfig().HTTPClient
+
+	var (
+		lastErr  error
+		lastResp *http.Response
+	)
+
+	for attempt := 1; attempt <= MaxRetries; attempt++ {
+		lastResp, lastErr = httpClient.Do(req) //nolint:gosec
+		if lastErr != nil {
+			if attempt < MaxRetries {
+				time.Sleep(RetryInterval)
+				continue
+			}
+			break
+		}
+
+		if lastResp.StatusCode >= 500 && attempt < MaxRetries {
+			_, _ = io.Copy(io.Discard, lastResp.Body)
+			_ = lastResp.Body.Close()
+			time.Sleep(RetryInterval)
+			continue
+		}
+
+		break
+	}
+
+	return lastResp, lastErr
+}
+
+// mapTestErrorToNotification maps a test-run error to the notify body's error field.
+// nil → no error; everything else maps to an error code per PRD D-11.
+func mapTestErrorToNotification(testErr error) *notifyError {
+	if testErr == nil {
+		return nil
+	}
+
+	var hasAbortReason errext.HasAbortReason
+	if errors.As(testErr, &hasAbortReason) {
+		switch hasAbortReason.AbortReason() {
+		case errext.AbortedByUser, errext.AbortedByScriptAbort:
+			return &notifyError{Code: 5, Reason: testErr.Error()}
+		case errext.AbortedByThreshold:
+			return &notifyError{Code: 8, Reason: testErr.Error()}
+		case errext.AbortedByThresholdsAfterTestEnd:
+			// Test finished normally; threshold status tracked separately.
+			return nil
+		case errext.AbortedByScriptError:
+			return &notifyError{Code: 7, Reason: testErr.Error()}
+		case errext.AbortedByTimeout:
+			return &notifyError{Code: 4, Reason: testErr.Error()}
+		case errext.AbortedByOutput:
+			return &notifyError{Code: 6, Reason: testErr.Error()}
+		}
+	}
+
+	// Catch-all: system error.
+	return &notifyError{Code: 6, Reason: testErr.Error()}
+}
 
 func (c *Client) authCtx(ctx context.Context) context.Context {
 	return context.WithValue(ctx, k6cloud.ContextAccessToken, c.token)
@@ -409,7 +530,7 @@ func (c *Client) UploadArchive(ctx context.Context, uploadURL string, arc *lib.A
 	req.Header.Set("Content-Type", "application/octet-stream")
 	req.ContentLength = int64(buf.Len())
 
-	resp, err := c.apiClient.GetConfig().HTTPClient.Do(req)
+	resp, err := c.apiClient.GetConfig().HTTPClient.Do(req) //nolint:gosec
 	if err != nil {
 		return 0, err
 	}
@@ -445,41 +566,15 @@ func (c *Client) StartLocalExecution(
 	}
 	idempotencyKey := hex.EncodeToString(key[:])
 
-	httpClient := c.apiClient.GetConfig().HTTPClient
-
-	var (
-		lastErr  error
-		lastResp *http.Response
-	)
-
-	for attempt := 1; attempt <= MaxRetries; attempt++ {
-		httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, rawURL, bytes.NewReader(bodyBytes))
-		if err != nil {
-			return nil, err
-		}
-		httpReq.Header.Set("Content-Type", "application/json")
-		httpReq.Header.Set("Authorization", "Bearer "+c.token)
-		httpReq.Header.Set("K6-Idempotency-Key", idempotencyKey)
-
-		lastResp, lastErr = httpClient.Do(httpReq)
-		if lastErr != nil {
-			if attempt < MaxRetries {
-				time.Sleep(RetryInterval)
-				continue
-			}
-			break
-		}
-
-		if lastResp.StatusCode >= 500 && attempt < MaxRetries {
-			_, _ = io.Copy(io.Discard, lastResp.Body)
-			_ = lastResp.Body.Close()
-			time.Sleep(RetryInterval)
-			continue
-		}
-
-		break
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, rawURL, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return nil, err
 	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+c.token)
+	httpReq.Header.Set("K6-Idempotency-Key", idempotencyKey)
 
+	lastResp, lastErr := c.doWithRetry(httpReq)
 	if lastErr != nil {
 		return nil, lastErr
 	}
