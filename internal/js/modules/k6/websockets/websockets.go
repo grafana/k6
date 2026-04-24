@@ -665,6 +665,7 @@ func (w *webSocket) send(msg sobek.Value) {
 			common.Throw(rt,
 				fmt.Errorf("got error while trying to export ArrayBufferView to bytes: %w", err))
 		}
+		w.bufferedAmount += len(b)
 		w.writeQueueCh <- message{
 			mtype: websocket.BinaryMessage,
 			data:  b,
