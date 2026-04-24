@@ -1,6 +1,9 @@
 package cmd
 
 import (
+	"context"
+	"errors"
+	"io/fs"
 	"path/filepath"
 	"testing"
 
@@ -9,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"go.k6.io/k6/v2/cmd/state"
 	"go.k6.io/k6/v2/ext"
 
 	"go.k6.io/k6/v2/internal/cmd/tests"
@@ -696,6 +700,85 @@ func TestDependenciesApplyManifest(t *testing.T) {
 				require.ErrorContains(t, err, test.expectedError)
 			} else {
 				require.EqualValues(t, test.expected, (map[string]string)(constraintsMapToProvisionDependency(deps)))
+			}
+		})
+	}
+}
+
+type fakeCommandExecutor struct {
+	runCalled bool
+	runErr    error
+}
+
+func (f *fakeCommandExecutor) run(_ context.Context, _ *state.GlobalState) error {
+	f.runCalled = true
+	return f.runErr
+}
+
+type fakeProvisioner struct {
+	gotDeps map[string]string
+	bin     commandExecutor
+	err     error
+}
+
+func (f *fakeProvisioner) provision(_ context.Context, deps map[string]string) (commandExecutor, error) {
+	f.gotDeps = deps
+	return f.bin, f.err
+}
+
+func Test_completeExtension(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name          string
+		manifest      string
+		provisionErr  error
+		runErr        error
+		wantRunCalled bool
+		wantDepsKey   string
+	}{
+		{
+			name:          "cache hit runs the binary",
+			wantRunCalled: true,
+			wantDepsKey:   "subcommand:docs",
+		},
+		{
+			name:         "cache miss returns nil without running",
+			provisionErr: fs.ErrNotExist,
+		},
+		{
+			name:         "provisioner error is swallowed",
+			provisionErr: errors.New("provider boom"),
+		},
+		{
+			name:     "deps build error is swallowed",
+			manifest: `{not valid json`,
+		},
+		{
+			name:          "binary run error propagates",
+			runErr:        errors.New("subprocess failed"),
+			wantRunCalled: true,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ts := tests.NewGlobalTestState(t)
+			if tt.manifest != "" {
+				ts.Flags.DependenciesManifest = tt.manifest
+			}
+			exec := &fakeCommandExecutor{runErr: tt.runErr}
+			prov := &fakeProvisioner{bin: exec, err: tt.provisionErr}
+
+			err := completeExtension(ts.GlobalState, "docs", prov)
+			if tt.runErr != nil {
+				require.ErrorIs(t, err, tt.runErr)
+			} else {
+				require.NoError(t, err)
+			}
+			require.Equal(t, tt.wantRunCalled, exec.runCalled)
+			if tt.wantDepsKey != "" {
+				require.Contains(t, prov.gotDeps, tt.wantDepsKey)
 			}
 		})
 	}
