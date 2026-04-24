@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -25,12 +26,12 @@ import (
 // commandExecutor executes the requested k6 command line command.
 // It abstract the execution path from the concrete binary.
 type commandExecutor interface {
-	run(*state.GlobalState) error
+	run(ctx context.Context, gs *state.GlobalState) error
 }
 
 // provisioner defines the interface for provisioning a commandExecutor for a set of dependencies
 type provisioner interface {
-	provision(map[string]string) (commandExecutor, error)
+	provision(ctx context.Context, deps map[string]string) (commandExecutor, error)
 }
 
 func constraintsMapToProvisionDependency(deps map[string]*semver.Constraints) k6provider.Dependencies {
@@ -57,8 +58,8 @@ type customBinary struct {
 }
 
 //nolint:forbidigo
-func (b *customBinary) run(gs *state.GlobalState) error {
-	cmd := exec.CommandContext(gs.Ctx, b.path, gs.CmdArgs[1:]...) //nolint:gosec
+func (b *customBinary) run(ctx context.Context, gs *state.GlobalState) error {
+	cmd := exec.CommandContext(ctx, b.path, gs.CmdArgs[1:]...) //nolint:gosec
 
 	// we pass os stdout, err, in because passing them from GlobalState changes how
 	// the subprocess detects the type of terminal
@@ -300,16 +301,16 @@ func checkConstraintBySHA(vSHA string, constraint *semver.Constraints) (bool, bo
 	return strings.HasPrefix(vSHA, cSHA) || strings.HasPrefix(cSHA, vSHA), true
 }
 
-// k6buildProvisioner provisions a k6 binary that satisfies the dependencies using the k6build service
-type k6buildProvisioner struct {
+// buildProvisioner provisions a k6 binary that satisfies the dependencies using the k6build service.
+type buildProvisioner struct {
 	gs *state.GlobalState
 }
 
-func newK6BuildProvisioner(gs *state.GlobalState) provisioner {
-	return &k6buildProvisioner{gs: gs}
+func newBuildProvisioner(gs *state.GlobalState) provisioner {
+	return &buildProvisioner{gs: gs}
 }
 
-func (p *k6buildProvisioner) provision(deps map[string]string) (commandExecutor, error) {
+func (p *buildProvisioner) provision(ctx context.Context, deps map[string]string) (commandExecutor, error) {
 	config := getProviderConfig(p.gs)
 
 	provider, err := k6provider.NewProvider(config)
@@ -317,7 +318,7 @@ func (p *k6buildProvisioner) provision(deps map[string]string) (commandExecutor,
 		return nil, err
 	}
 
-	binary, err := provider.GetBinary(p.gs.Ctx, deps)
+	binary, err := provider.GetBinary(ctx, deps)
 	if err != nil {
 		return nil, err
 	}
