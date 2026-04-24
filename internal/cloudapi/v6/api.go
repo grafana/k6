@@ -14,6 +14,7 @@ import (
 	"time"
 
 	k6cloud "github.com/grafana/k6-cloud-openapi-client-go/k6"
+	"github.com/sirupsen/logrus"
 
 	"go.k6.io/k6/v2/lib"
 )
@@ -329,6 +330,49 @@ func archiveReader(arc *lib.Archive) io.ReadCloser {
 		pw.CloseWithError(arc.Write(pw))
 	}()
 	return pr
+}
+
+// UploadArchive uploads the serialized archive to the given presigned S3 URL.
+// The URL is a presigned PUT URL — no Authorization header is set.
+// Returns the serialized archive size in bytes (useful for start_local_execution).
+func (c *Client) UploadArchive(ctx context.Context, uploadURL string, arc *lib.Archive) (int64, error) {
+	var buf bytes.Buffer
+	if err := arc.Write(&buf); err != nil {
+		return 0, err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, uploadURL, bytes.NewReader(buf.Bytes()))
+	if err != nil {
+		return 0, err
+	}
+	req.Header.Set("Content-Type", "application/x-tar")
+	req.ContentLength = int64(buf.Len())
+
+	if parsed, parseErr := url.Parse(uploadURL); parseErr == nil {
+		c.logger.WithFields(logrus.Fields{
+			"host":           parsed.Host,
+			"content_length": req.ContentLength,
+			"content_type":   req.Header.Get("Content-Type"),
+		}).Debug("uploading archive to S3")
+	}
+
+	resp, err := c.apiClient.GetConfig().HTTPClient.Do(req) //nolint:gosec
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		respBody, readErr := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		if readErr != nil || len(respBody) == 0 {
+			return 0, fmt.Errorf("archive upload failed: %d %s", resp.StatusCode, http.StatusText(resp.StatusCode))
+		}
+		return 0, fmt.Errorf("archive upload failed: %d %s: %s",
+			resp.StatusCode, http.StatusText(resp.StatusCode), respBody)
+	}
+
+	_, _ = io.Copy(io.Discard, resp.Body)
+	return int64(buf.Len()), nil
 }
 
 // StartLocalExecution calls POST /provisioning/v1/load_tests/{id}/start_local_execution.
