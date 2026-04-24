@@ -303,11 +303,18 @@ func checkConstraintBySHA(vSHA string, constraint *semver.Constraints) (bool, bo
 
 // buildProvisioner provisions a k6 binary that satisfies the dependencies using the k6build service.
 type buildProvisioner struct {
-	gs *state.GlobalState
+	gs         *state.GlobalState
+	cachedOnly bool // if true, only looks up already-cached binaries
 }
 
 func newBuildProvisioner(gs *state.GlobalState) provisioner {
 	return &buildProvisioner{gs: gs}
+}
+
+// newCacheProvisioner returns a provisioner that only looks up already-cached binaries.
+// A cache miss surfaces as [fs.ErrNotExist]; the build service is never asked to build.
+func newCacheProvisioner(gs *state.GlobalState) provisioner {
+	return &buildProvisioner{gs: gs, cachedOnly: true}
 }
 
 func (p *buildProvisioner) provision(ctx context.Context, deps map[string]string) (commandExecutor, error) {
@@ -318,13 +325,19 @@ func (p *buildProvisioner) provision(ctx context.Context, deps map[string]string
 		return nil, err
 	}
 
-	binary, err := provider.GetBinary(ctx, deps)
+	getBinary := provider.GetBinary
+	if p.cachedOnly {
+		getBinary = provider.GetCachedBinary
+	}
+
+	binary, err := getBinary(ctx, deps)
 	if err != nil {
 		return nil, err
 	}
-
-	p.gs.Logger.
-		Info("A new k6 binary has been provisioned with version(s): ", formatDependencies(binary.Dependencies))
+	if !p.cachedOnly {
+		p.gs.Logger.Info("A new k6 binary has been provisioned with version(s): ",
+			formatDependencies(binary.Dependencies))
+	}
 
 	return &customBinary{binary.Path}, nil
 }
