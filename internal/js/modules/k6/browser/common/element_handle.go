@@ -16,8 +16,8 @@ import (
 	"github.com/chromedp/cdproto/dom"
 	"go.opentelemetry.io/otel/attribute"
 
-	"go.k6.io/k6/internal/js/modules/k6/browser/common/js"
-	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common/js"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
 )
 
 // Common error types for element visibility.

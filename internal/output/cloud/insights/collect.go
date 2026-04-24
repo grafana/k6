@@ -4,9 +4,9 @@ import (
 	"strconv"
 	"sync"
 
-	"go.k6.io/k6/internal/cloudapi/insights"
-	"go.k6.io/k6/lib/netext/httpext"
-	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/v2/internal/cloudapi/insights"
+	"go.k6.io/k6/v2/lib/netext/httpext"
+	"go.k6.io/k6/v2/metrics"
 )
 
 const (

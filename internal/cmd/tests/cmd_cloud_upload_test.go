@@ -2,17 +2,16 @@ package tests
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
 
-	"go.k6.io/k6/cloudapi"
-	"go.k6.io/k6/internal/cmd"
-	"go.k6.io/k6/internal/lib/testutils"
-	"go.k6.io/k6/lib/fsext"
+	"go.k6.io/k6/v2/internal/cloudapi/v6/v6test"
+	"go.k6.io/k6/v2/internal/cmd"
+	"go.k6.io/k6/v2/internal/lib/testutils"
+	"go.k6.io/k6/v2/lib/fsext"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,7 +23,7 @@ func TestK6CloudUpload(t *testing.T) {
 	t.Run("TestCloudUploadUserNotAuthenticated", func(t *testing.T) {
 		t.Parallel()
 
-		ts := getSimpleCloudTestState(t, nil, setupK6CloudUploadCmd, nil, nil, nil)
+		ts := getSimpleCloudTestState(t, nil, setupK6CloudUploadCmd, nil, nil)
 		delete(ts.Env, "K6_CLOUD_TOKEN")
 		ts.ExpectedExitCode = -1
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
@@ -37,20 +36,14 @@ func TestK6CloudUpload(t *testing.T) {
 	t.Run("TestCloudUploadWithScript", func(t *testing.T) {
 		t.Parallel()
 
-		cs := func() cloudapi.TestProgressResponse {
-			return cloudapi.TestProgressResponse{
-				RunStatusText: "Archived",
-				RunStatus:     cloudapi.RunStatusArchived,
-			}
-		}
-
-		ts := getSimpleCloudTestState(t, nil, setupK6CloudUploadCmd, nil, nil, cs)
+		ts := getSimpleCloudTestState(t, nil, setupK6CloudUploadCmd, nil, nil)
+		ts.Env["K6_CLOUD_STACK_URL"] = "https://stack.grafana.com/"
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 		stdout := ts.Stdout.String()
 		t.Log(stdout)
 		assert.Contains(t, stdout, `execution: cloud`)
-		assert.Contains(t, stdout, `output: https://app.k6.io/runs/123`)
+		assert.Contains(t, stdout, `output: https://stack.grafana.com/a/k6-app/tests/456`)
 		assert.Contains(t, stdout, `test status: Archived`)
 	})
 
@@ -74,12 +67,11 @@ func TestK6CloudUpload(t *testing.T) {
 	t.Run("TestCloudUploadWithArchive", func(t *testing.T) {
 		t.Parallel()
 
-		testRunID := 123
 		ts := NewGlobalTestState(t)
 
-		archiveUpload := http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+		inspectArchive := func(req *http.Request) {
 			// check the archive
-			file, _, err := req.FormFile("file")
+			file, _, err := req.FormFile("script")
 			assert.NoError(t, err)
 			assert.NotNil(t, file)
 
@@ -111,21 +103,11 @@ func TestK6CloudUpload(t *testing.T) {
 			require.Equal(t, "my load test", metadata.Options.Cloud.Name)
 			require.Equal(t, "lorem ipsum", metadata.Options.Cloud.Note)
 			require.Equal(t, 124, metadata.Options.Cloud.ProjectID)
-
-			// respond with the test run ID
-			resp.WriteHeader(http.StatusOK)
-			_, err = fmt.Fprintf(resp, `{"reference_id": "%d"}`, testRunID)
-			assert.NoError(t, err)
-		})
-
-		cs := func() cloudapi.TestProgressResponse {
-			return cloudapi.TestProgressResponse{
-				RunStatusText: "Archived",
-				RunStatus:     cloudapi.RunStatusArchived,
-			}
 		}
 
-		srv := getMockCloud(t, testRunID, archiveUpload, cs)
+		srv := v6test.NewServer(t, v6test.Config{
+			InspectArchive: inspectArchive,
+		})
 
 		data, err := os.ReadFile(filepath.Join("testdata/archives", "archive_v1.0.0_with_cloud_option.tar")) //nolint:forbidigo // it's a test
 		require.NoError(t, err)
@@ -134,8 +116,10 @@ func TestK6CloudUpload(t *testing.T) {
 
 		ts.CmdArgs = []string{"k6", "cloud", "upload", "archive.tar"}
 		ts.Env["K6_SHOW_CLOUD_LOGS"] = "false" // no mock for the logs yet
-		ts.Env["K6_CLOUD_HOST"] = srv.URL
+		ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
 		ts.Env["K6_CLOUD_TOKEN"] = "foo" // doesn't matter, we mock the cloud
+		ts.Env["K6_CLOUD_STACK_ID"] = "1"
+		ts.Env["K6_CLOUD_STACK_URL"] = "https://stack.grafana.com/"
 
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
@@ -143,7 +127,7 @@ func TestK6CloudUpload(t *testing.T) {
 		t.Log(stdout)
 		assert.NotContains(t, stdout, `not logged in`)
 		assert.Contains(t, stdout, `execution: cloud`)
-		assert.Contains(t, stdout, `output: https://app.k6.io/runs/123`)
+		assert.Contains(t, stdout, `output: https://stack.grafana.com/a/k6-app/tests/456`)
 		assert.Contains(t, stdout, `test status: Archived`)
 	})
 }

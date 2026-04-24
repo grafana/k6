@@ -8,9 +8,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"go.k6.io/k6/ext"
-	"go.k6.io/k6/internal/build"
-	"go.k6.io/k6/internal/cmd/tests"
+	"go.k6.io/k6/v2/ext"
+	"go.k6.io/k6/v2/internal/build"
+	"go.k6.io/k6/v2/internal/cmd/tests"
 )
 
 func TestVersionFlag(t *testing.T) {

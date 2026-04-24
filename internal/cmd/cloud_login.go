@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -12,11 +13,11 @@ import (
 	"golang.org/x/term"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/cloudapi"
-	"go.k6.io/k6/cmd/state"
-	"go.k6.io/k6/internal/build"
-	v6cloudapi "go.k6.io/k6/internal/cloudapi/v6"
-	"go.k6.io/k6/internal/ui"
+	"go.k6.io/k6/v2/cloudapi"
+	"go.k6.io/k6/v2/cmd/state"
+	"go.k6.io/k6/v2/internal/build"
+	v6cloudapi "go.k6.io/k6/v2/internal/cloudapi/v6"
+	"go.k6.io/k6/v2/internal/ui"
 )
 
 const cloudLoginCommandName = "login"
@@ -34,9 +35,6 @@ func getCmdCloudLogin(gs *state.GlobalState) *cobra.Command {
 	exampleText := getExampleText(gs, `
   # Authenticate interactively with Grafana Cloud
   $ {{.}} cloud login
-
-  # Store a token in k6's persistent configuration
-  $ {{.}} cloud login -t <YOUR_TOKEN>
 
   # Store a token in k6's persistent configuration and set the stack
   $ {{.}} cloud login -t <YOUR_TOKEN> --stack <YOUR_STACK_URL_OR_SLUG>
@@ -68,6 +66,8 @@ func getCmdCloudLogin(gs *state.GlobalState) *cobra.Command {
 //
 //nolint:funlen
 func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
+	printBanner(c.globalState)
+
 	currentDiskConf, err := readDiskConfig(c.globalState)
 	if err != nil {
 		return err
@@ -88,7 +88,7 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 
 	show := getNullBool(cmd.Flags(), "show")
 	reset := getNullBool(cmd.Flags(), "reset")
-	token := getNullString(cmd.Flags(), "token")
+	tokenInput := getNullString(cmd.Flags(), "token")
 	stackInput := getNullString(cmd.Flags(), "stack")
 
 	switch {
@@ -97,61 +97,31 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 		newCloudConf.StackID = null.IntFromPtr(nil)
 		newCloudConf.StackURL = null.StringFromPtr(nil)
 		newCloudConf.DefaultProjectID = null.IntFromPtr(nil)
-		printToStdout(c.globalState, "  token and stack info reset\n")
+		printToStdout(c.globalState, "\nToken and stack info have been reset.\n")
 	case show.Bool:
 		printConfig(c.globalState, newCloudConf)
 		return nil
-	case token.Valid:
-		err := validateInputs(c.globalState, &newCloudConf, currentJSONConfigRaw, token, stackInput)
+	case tokenInput.Valid || stackInput.Valid:
+		if !stackInput.Valid || stackInput.String == "" {
+			return errors.New("stack value is required but it was not passed or is empty")
+		}
+		if !tokenInput.Valid || tokenInput.String == "" {
+			return errors.New("token value is required but it was not passed or is empty")
+		}
+		err := authenticateUserToken(c.globalState, &newCloudConf, currentJSONConfigRaw, tokenInput.String, stackInput.String)
 		if err != nil {
 			return err
 		}
 	default:
 		gs := c.globalState
 
-		/* Token form */
-		tokenForm := ui.Form{
-			Banner: "Enter your token to authenticate with Grafana Cloud.\n" +
-				"Please, consult the documentation for instructions on how to generate one:\n" +
-				"https://grafana.com/docs/grafana-cloud/testing/k6/author-run/tokens-and-cli-authentication",
-			Fields: []ui.Field{
-				ui.PasswordField{
-					Key:   "Token",
-					Label: "Token",
-				},
-			},
-		}
-		if !term.IsTerminal(int(syscall.Stdin)) { //nolint:unconvert
-			gs.Logger.Warn("Stdin is not a terminal, falling back to plain text input")
-		}
-		tokenVals, err := tokenForm.Run(gs.Stdin, gs.Stdout)
+		userinfo, err := promptUserAuthForm(gs)
 		if err != nil {
 			return err
 		}
-		tokenInput := null.StringFrom(tokenVals["Token"])
-		if !tokenInput.Valid {
-			return errors.New("token cannot be empty")
-		}
 
-		/* Stack form */
-		stackForm := ui.Form{
-			Banner: "\nEnter the stack where you want to run k6's commands by default.\n" +
-				"You can enter a full URL (e.g. https://my-team.grafana.net) or just the slug (e.g. my-team):",
-			Fields: []ui.Field{
-				ui.StringField{
-					Key:     "Stack",
-					Label:   "Stack",
-					Default: "None",
-				},
-			},
-		}
-		stackVals, err := stackForm.Run(gs.Stdin, gs.Stdout)
-		if err != nil {
-			return err
-		}
-		stackInput := null.StringFrom(strings.TrimSpace(stackVals["Stack"]))
-
-		err = validateInputs(gs, &newCloudConf, currentJSONConfigRaw, tokenInput, stackInput)
+		err = authenticateUserToken(gs, &newCloudConf, currentJSONConfigRaw,
+			userinfo.token, userinfo.stack)
 		if err != nil {
 			return err
 		}
@@ -182,39 +152,108 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 	return nil
 }
 
-func printConfig(gs *state.GlobalState, cloudConf cloudapi.Config) {
-	valueColor := getColor(gs.Flags.NoColor || !gs.Stdout.IsTTY, color.FgCyan)
-	printToStdout(gs, fmt.Sprintf("  token: %s\n", valueColor.Sprint(cloudConf.Token.String)))
-
-	if !cloudConf.StackID.Valid && !cloudConf.StackURL.Valid {
-		printToStdout(gs, "  stack-id: <not set>\n")
-		printToStdout(gs, "  stack-url: <not set>\n")
-		printToStdout(gs, "  default-project-id: <not set>\n")
-
-		return
-	}
-
-	if cloudConf.StackID.Valid {
-		printToStdout(gs, fmt.Sprintf("  stack-id: %s\n", valueColor.Sprint(cloudConf.StackID.Int64)))
-	}
-	if cloudConf.StackURL.Valid {
-		printToStdout(gs, fmt.Sprintf("  stack-url: %s\n", valueColor.Sprint(cloudConf.StackURL.String)))
-	}
-	if cloudConf.DefaultProjectID.Valid {
-		printToStdout(gs, fmt.Sprintf("  default-project-id: %s\n",
-			valueColor.Sprint(cloudConf.DefaultProjectID.Int64)))
-	}
+type userAuthForm struct {
+	stack string
+	token string
 }
 
-// validateInputs validates a token and a stack if provided
+func promptUserAuthForm(gs *state.GlobalState) (userAuthForm, error) {
+	/* Token form */
+	tokenForm := ui.Form{
+		Banner: "Enter your token to authenticate with Grafana Cloud.\n" +
+			"Please, consult the documentation for instructions on how to generate one:\n" +
+			"https://grafana.com/docs/grafana-cloud/testing/k6/author-run/tokens-and-cli-authentication",
+		Fields: []ui.Field{
+			ui.PasswordField{
+				Key:   "Token",
+				Label: "Token",
+			},
+		},
+	}
+	if !term.IsTerminal(int(syscall.Stdin)) { //nolint:unconvert
+		gs.Logger.Warn("Stdin is not a terminal, falling back to plain text input")
+	}
+	tokenVals, err := tokenForm.Run(gs.Stdin, gs.Stdout)
+	if err != nil {
+		return userAuthForm{}, err
+	}
+	token := strings.TrimSpace(tokenVals["Token"])
+	if token == "" {
+		return userAuthForm{}, errors.New("token cannot be empty")
+	}
+
+	/* Stack form */
+	stackForm := ui.Form{
+		Banner: "\nEnter the stack where you want to run k6's commands by default.\n" +
+			"You can enter a full URL (e.g. https://my-team.grafana.net) or just the slug (e.g. my-team):",
+		Fields: []ui.Field{
+			ui.StringField{
+				Key:   "Stack",
+				Label: "Stack",
+			},
+		},
+	}
+	stackVals, err := stackForm.Run(gs.Stdin, gs.Stdout)
+	if err != nil {
+		return userAuthForm{}, err
+	}
+	stack := strings.TrimSpace(stackVals["Stack"])
+	if stack == "" {
+		return userAuthForm{}, errors.New("stack cannot be empty")
+	}
+
+	return userAuthForm{token: token, stack: stack}, nil
+}
+
+func printConfig(gs *state.GlobalState, cloudConf cloudapi.Config) {
+	const notSet = "<not set>"
+	token, stackID, stackURL, defProj := notSet, notSet, notSet, notSet
+
+	if cloudConf.Token.String != "" {
+		token = maskToken(cloudConf.Token.String)
+	}
+	if cloudConf.StackID.Valid {
+		stackID = strconv.FormatInt(cloudConf.StackID.Int64, 10)
+	}
+	if cloudConf.StackURL.Valid {
+		stackURL = cloudConf.StackURL.String
+	}
+	if cloudConf.DefaultProjectID.Valid {
+		defProj = strconv.FormatInt(cloudConf.DefaultProjectID.Int64, 10)
+	}
+
+	valueColor := getColor(gs.Flags.NoColor || !gs.Stdout.IsTTY, color.FgCyan)
+	printToStdout(gs, fmt.Sprintf("  token: %s\n", valueColor.Sprint(token)))
+	printToStdout(gs, fmt.Sprintf("  stack-id: %s\n", valueColor.Sprint(stackID)))
+	printToStdout(gs, fmt.Sprintf("  stack-url: %s\n", valueColor.Sprint(stackURL)))
+	printToStdout(gs, fmt.Sprintf("  default-project-id: %s\n", valueColor.Sprint(defProj)))
+}
+
+func maskToken(unmasked string) string {
+	if len(unmasked) < 1 {
+		return ""
+	}
+	// Require at least 4 asterisks in the middle to give a meaningful visual hint.
+	// Any token shorter than 12 chars would produce fewer, so mask it entirely.
+	if len(unmasked) < 12 {
+		return strings.Repeat("*", len(unmasked))
+	}
+	// We try to have a good DX here.
+	// A valid Cloud token should be 12+ chars, so it prints the token with all
+	// the chars masked, except the first and the last four.
+	asterisks := strings.Repeat("*", len(unmasked)-8)
+	return unmasked[:4] + asterisks + unmasked[len(unmasked)-4:]
+}
+
+// authenticateUserToken validates a token and a stack
 // and update the config with the given inputs
-func validateInputs(
+func authenticateUserToken(
 	gs *state.GlobalState,
 	config *cloudapi.Config,
 	rawConfig json.RawMessage,
-	token, stackInput null.String,
+	token, stack string,
 ) error {
-	config.Token = token
+	config.Token = null.StringFrom(token)
 	consolidatedCurrentConfig, warn, err := cloudapi.GetConsolidatedConfig(
 		rawConfig, gs.Env, "", nil)
 	if err != nil {
@@ -224,53 +263,19 @@ func validateInputs(
 		gs.Logger.Warn(warn)
 	}
 
-	stackValue := stackInput.String
-	if stackInput.Valid && stackValue != "" && stackValue != "None" {
-		stackURL, stackID, defaultProjectID, err := validateTokenV6(
-			gs, consolidatedCurrentConfig, token.String, stackValue)
-		if err != nil {
-			return fmt.Errorf(
-				"your stack is invalid - please, consult the documentation "+
-					"for instructions on how to get yours: "+
-					"https://grafana.com/docs/grafana-cloud/testing/k6/author-run/configure-stack. "+
-					"Error details: %w",
-				err)
-		}
-		config.StackURL = null.StringFrom(stackURL)
-		config.StackID = null.IntFrom(stackID)
-		config.DefaultProjectID = null.IntFrom(defaultProjectID)
-	} else {
-		err = validateTokenV1(gs, consolidatedCurrentConfig, config.Token.String)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// validateTokenV1 validates a token using v1 cloud API.
-//
-// Deprecated: use validateTokenV6 instead if a stack name is provided.
-func validateTokenV1(gs *state.GlobalState, config cloudapi.Config, token string) error {
-	client := cloudapi.NewClient(
-		gs.Logger,
-		token,
-		config.Host.String,
-		build.Version,
-		config.Timeout.TimeDuration(),
-	)
-
-	res, err := client.ValidateToken()
+	stackURL, stackID, defaultProjectID, err := validateTokenV6(
+		gs, consolidatedCurrentConfig, token, stack)
 	if err != nil {
-		return fmt.Errorf("can't validate the API token: %s", err.Error())
-	}
+		return fmt.Errorf( //nolint:staticcheck // ST1005: this is a user-facing error
+			"Authentication failed as provided token or stack might not be valid."+
+				" Learn more: https://grafana.com/docs/grafana-cloud/testing/k6/author-run/tokens-and-cli-authentication."+
+				" Server error for details: %w",
 
-	if !res.IsValid {
-		return errors.New("your API token is invalid - " +
-			"please, consult the documentation for instructions on how to generate a new one:\n" +
-			"https://grafana.com/docs/grafana-cloud/testing/k6/author-run/tokens-and-cli-authentication")
+			err)
 	}
+	config.StackURL = null.StringFrom(stackURL)
+	config.StackID = null.IntFrom(stackID)
+	config.DefaultProjectID = null.IntFrom(defaultProjectID)
 
 	return nil
 }
@@ -296,7 +301,7 @@ func validateTokenV6(
 		return "", 0, 0, err
 	}
 
-	authResp, err := client.ValidateToken(normalizedURL)
+	authResp, err := client.ValidateToken(gs.Ctx, normalizedURL)
 	if err != nil {
 		return "", 0, 0, err
 	}

@@ -12,11 +12,12 @@ import (
 	"github.com/sirupsen/logrus"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/cloudapi"
-	"go.k6.io/k6/cmd/state"
-	"go.k6.io/k6/internal/build"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/v2/cloudapi"
+	"go.k6.io/k6/v2/cmd/state"
+	"go.k6.io/k6/v2/internal/build"
+	cloudsecrets "go.k6.io/k6/v2/internal/secretsource/cloud"
+	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/metrics"
 )
 
 const (
@@ -32,7 +33,7 @@ const (
 // and to populate the Cloud configuration back in case the Cloud API returned some overrides,
 // as expected by the Cloud output.
 //
-//nolint:funlen,gocognit,cyclop
+//nolint:funlen
 func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error {
 	// Otherwise, we continue normally with the creation of the test run in the k6 Cloud backend services.
 	conf, warn, err := cloudapi.GetConsolidatedConfig(
@@ -49,18 +50,8 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 		gs.Logger.Warn(warn)
 	}
 
-	if conf.Token.String == "" {
-		return errUserUnauthenticated
-	}
-
-	if !conf.StackID.Valid || conf.StackID.Int64 == 0 {
-		fallBackMsg := ""
-		if !conf.ProjectID.Valid || conf.ProjectID.Int64 == 0 {
-			fallBackMsg = "Falling back to the first available stack. "
-		}
-		gs.Logger.Warn("DEPRECATED: No stack specified. " + fallBackMsg +
-			"Consider setting a default stack via the `k6 cloud login` command or the `K6_CLOUD_STACK_ID` " +
-			"environment variable as this will become mandatory in the next major release.")
+	if err := checkCloudLogin(conf); err != nil {
+		return err
 	}
 
 	// If not, we continue with some validations and the creation of the test run.
@@ -68,17 +59,8 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 		return err
 	}
 
-	if !conf.Name.Valid || conf.Name.String == "" {
-		scriptPath := test.source.URL.String()
-		if scriptPath == "" {
-			// Script from stdin without a name, likely from stdin
-			return errors.New("script name not set, please specify K6_CLOUD_NAME or options.cloud.name")
-		}
-
-		conf.Name = null.StringFrom(filepath.Base(scriptPath))
-	}
-	if conf.Name.String == "-" {
-		conf.Name = null.StringFrom(defaultTestName)
+	if conf.Name, err = resolveCloudTestName(conf.Name, test.source.URL.String()); err != nil {
+		return err
 	}
 
 	thresholds := make(map[string][]string)
@@ -114,7 +96,7 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 
 	var testArchive *lib.Archive
 	if !test.derivedConfig.NoArchiveUpload.Bool {
-		testArchive = test.initRunner.MakeArchive()
+		testArchive = test.makeArchive()
 	}
 
 	testRun := &cloudapi.TestRun{
@@ -151,6 +133,14 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 
 	// We store the test run id in the environment, so it can be used later.
 	test.preInitState.RuntimeOptions.Env[testRunIDKey] = response.ReferenceID
+
+	if response.SecretsConfig != nil && gs.CloudSecretSource != nil {
+		gs.CloudSecretSource.SetConfig(&cloudsecrets.Config{
+			Token:        response.TestRunToken,
+			Endpoint:     response.SecretsConfig.Endpoint,
+			ResponsePath: response.SecretsConfig.ResponsePath,
+		})
+	}
 
 	// If the Cloud API returned configuration overrides, we apply them to the current configuration.
 	// Then, we serialize the overridden configuration back, so it can be used by the Cloud output.
@@ -201,4 +191,20 @@ func cloudConfToRawMessage(conf cloudapi.Config) (json.RawMessage, error) {
 		return nil, err
 	}
 	return buff.Bytes(), nil
+}
+
+// resolveCloudTestName returns the test name from the config, or derives it from
+// the script path when the config name is unset. A name of "-" is replaced
+// with the default test name.
+func resolveCloudTestName(name null.String, scriptPath string) (null.String, error) {
+	if !name.Valid || name.String == "" {
+		if scriptPath == "" {
+			return name, errors.New("script name not set, please specify K6_CLOUD_NAME or options.cloud.name")
+		}
+		name = null.StringFrom(filepath.Base(scriptPath))
+	}
+	if name.String == "-" {
+		name = null.StringFrom(defaultTestName)
+	}
+	return name, nil
 }

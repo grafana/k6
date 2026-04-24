@@ -13,8 +13,8 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
 
-	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/output"
+	"go.k6.io/k6/v2/metrics"
+	"go.k6.io/k6/v2/output"
 )
 
 // Output implements the lib.Output interface
@@ -71,11 +71,6 @@ func (o *Output) Stop() error {
 // Start performs initialization tasks prior to Engine using the output
 func (o *Output) Start() error {
 	o.logger.Debug("Starting output...")
-
-	if !o.config.SingleCounterForRate.Bool {
-		o.logger.Warn("Exporting rate metrics as a pair of counters is deprecated" +
-			" and will be removed in future releases. Please migrate to the new format.")
-	}
 
 	exp, err := getExporter(o.config)
 	if err != nil {
@@ -179,36 +174,12 @@ func (o *Output) dispatch(entry metrics.Sample) error {
 
 		trend.Record(ctx, entry.Value, attributeSetOpt)
 	case metrics.Rate:
-		var err error
-		if o.config.SingleCounterForRate.Bool {
-			err = o.singleCounterForRate(ctx, name, attributeSetOpt, entry)
-		} else {
-			// Deprecated path, remove with https://github.com/grafana/k6/issues/5185
-			err = o.pairOfCountersForRate(ctx, name, attributeSetOpt, entry)
-		}
-		if err != nil {
+		if err := o.singleCounterForRate(ctx, name, attributeSetOpt, entry); err != nil {
 			return err
 		}
 	default:
 		return fmt.Errorf("metric %q has unsupported metric type", entry.Metric.Name)
 	}
-	return nil
-}
-
-func (o *Output) pairOfCountersForRate(
-	ctx context.Context,
-	metricName string,
-	attributeSetOpt otelMetric.MeasurementOption,
-	entry metrics.Sample,
-) error {
-	nonZero, total, err := o.metricsRegistry.getOrCreateCountersForRate(metricName)
-	if err != nil {
-		return fmt.Errorf("get or create counter for Rate metric %q: %w", metricName, err)
-	}
-	if entry.Value != 0 {
-		nonZero.Add(ctx, 1, attributeSetOpt)
-	}
-	total.Add(ctx, 1, attributeSetOpt)
 	return nil
 }
 

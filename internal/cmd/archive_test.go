@@ -9,10 +9,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"go.k6.io/k6/errext/exitcodes"
-	"go.k6.io/k6/internal/cmd/tests"
-	"go.k6.io/k6/internal/lib/testutils"
-	"go.k6.io/k6/lib/fsext"
+	"go.k6.io/k6/v2/errext/exitcodes"
+	"go.k6.io/k6/v2/internal/cmd/tests"
+	"go.k6.io/k6/v2/internal/lib/testutils"
+	"go.k6.io/k6/v2/lib/fsext"
 )
 
 func TestArchiveThresholds(t *testing.T) {
@@ -87,6 +87,74 @@ func TestArchiveThresholds(t *testing.T) {
 				ts.ExpectedExitCode = int(exitcodes.InvalidConfig)
 			}
 			newRootCommand(ts.GlobalState).execute()
+		})
+	}
+}
+
+func TestArchiveContainsDependencies(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name         string
+		script       []byte
+		manifest     string
+		expectedDeps map[string]string
+	}{
+		{
+			name: "no external deps, only k6",
+			script: []byte(`import http from "k6/http";
+export default function () { http.get("https://example.com"); }
+`),
+			expectedDeps: map[string]string{"k6": "*"},
+		},
+		{
+			name: "use directive sets k6 constraint",
+			script: []byte(`"use k6 >= 0.50.0";
+import http from "k6/http";
+export default function () {}
+`),
+			expectedDeps: map[string]string{"k6": ">=0.50.0"},
+		},
+		{
+			name: "manifest overrides star constraint but pre-manifest deps are stored",
+			script: []byte(`import http from "k6/http";
+export default function () {}
+`),
+			manifest:     `{"k6": ">=1.0.0"}`,
+			expectedDeps: map[string]string{"k6": "*"}, // pre-manifest: still "*"
+		},
+		{
+			name: "manifest does not override explicit use directive constraint",
+			script: []byte(`"use k6 >= 0.9.0";
+import http from "k6/http";
+export default function () {}
+`),
+			manifest:     `{"k6": ">=1.0.0"}`,
+			expectedDeps: map[string]string{"k6": ">=0.9.0"}, // pre-manifest: explicit constraint preserved
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			fileName := "script.js"
+			ts := tests.NewGlobalTestState(t)
+			require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, fileName), tc.script, 0o644))
+			ts.Flags.DependenciesManifest = tc.manifest
+			ts.CmdArgs = []string{"k6", "archive", fileName}
+
+			newRootCommand(ts.GlobalState).execute()
+			require.NoError(t, testutils.Untar(t, ts.FS, "archive.tar", "tmp/"))
+
+			data, err := fsext.ReadFile(ts.FS, "tmp/metadata.json")
+			require.NoError(t, err)
+
+			metadata := struct {
+				Dependencies map[string]string `json:"dependencies"`
+			}{}
+			require.NoError(t, json.Unmarshal(data, &metadata))
+			require.Equal(t, tc.expectedDeps, metadata.Dependencies)
 		})
 	}
 }
