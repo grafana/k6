@@ -289,8 +289,8 @@ func rootCmdPersistentFlagSet(gs *state.GlobalState) *pflag.FlagSet {
 	// either with croconf or through the hack above...
 	flags.BoolVarP(&gs.Flags.Verbose, "verbose", "v", gs.DefaultFlags.Verbose, "enable verbose logging")
 	flags.BoolVarP(&gs.Flags.Quiet, "quiet", "q", gs.DefaultFlags.Quiet, "disable progress updates")
-	flags.StringVarP(&gs.Flags.Address, "address", "a", gs.Flags.Address, "address for the HTTP API server address")
-	flags.Lookup("address").DefValue = gs.DefaultFlags.Address
+	flags.StringVarP(&gs.Flags.HTTPAPIAddr, "http-api-addr", "a", gs.Flags.HTTPAPIAddr, "address for the HTTP API server")
+	flags.Lookup("http-api-addr").DefValue = gs.DefaultFlags.HTTPAPIAddr
 	flags.BoolVar(
 		&gs.Flags.ProfilingEnabled,
 		"profiling-enabled",
