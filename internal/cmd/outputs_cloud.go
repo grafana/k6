@@ -24,13 +24,12 @@ const (
 	testRunIDKey    = "K6_CLOUDRUN_TEST_RUN_ID"
 )
 
-// createCloudTest performs some test and Cloud configuration validations and if everything
-// looks good, then it creates a test run in the k6 Cloud, using the Cloud API, meant to be used
-// for streaming test results.
+// createCloudTest performs test and Cloud configuration validations and prepares the test run.
+// It creates a new test run in the k6 Cloud backend unless a PushRefID is provided,
+// in which case it reuses an existing test run.
 //
-// This method is also responsible for filling the test run id on the test environment, so it can be used later,
-// and to populate the Cloud configuration back in case the Cloud API returned some overrides,
-// as expected by the Cloud output.
+// This method also sets the test run ID in the environment so it can be used later,
+// and applies any Cloud configuration overrides returned by the API.
 //
 //nolint:funlen,gocognit,cyclop
 func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error {
@@ -111,6 +110,12 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 	if conf.MaxTimeSeriesInBatch.Int64 < 1 {
 		return fmt.Errorf("max allowed number of time series in a single batch must be a positive number but is %d",
 			conf.MaxTimeSeriesInBatch.Int64)
+	}
+
+	if conf.PushRefID.Valid && conf.PushRefID.String != "" {
+		test.preInitState.RuntimeOptions.Env[testRunIDKey] = conf.PushRefID.String
+		gs.Logger.Debug("using PushRefID, skipping CreateTestRun")
+		return nil
 	}
 
 	var testArchive *lib.Archive
