@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"go.k6.io/k6/v2/cloudapi"
 	"go.k6.io/k6/v2/cmd/state"
 	"go.k6.io/k6/v2/internal/build"
+	cloudapiv6 "go.k6.io/k6/v2/internal/cloudapi/v6"
 	cloudsecrets "go.k6.io/k6/v2/internal/secretsource/cloud"
 	"go.k6.io/k6/v2/lib"
 	"go.k6.io/k6/v2/metrics"
@@ -25,16 +27,16 @@ const (
 	testRunIDKey    = "K6_CLOUDRUN_TEST_RUN_ID"
 )
 
-// createCloudTest performs test and Cloud configuration validations and prepares the test run.
-// It creates a new test run in the k6 Cloud backend unless a PushRefID is provided,
-// in which case it reuses an existing test run.
+// createCloudTest performs some test and Cloud configuration validations and if everything
+// looks good, then it provisions a test run in the k6 Cloud using the provisioning API,
+// meant to be used for streaming test results.
 //
-// This method also sets the test run ID in the environment so it can be used later,
-// and applies any Cloud configuration overrides returned by the API.
+// This method is also responsible for filling the test run id on the test environment, so it can be used later,
+// and to populate the Cloud configuration back with the values returned by the provisioning API,
+// as expected by the Cloud output.
 //
 //nolint:funlen
 func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error {
-	// Otherwise, we continue normally with the creation of the test run in the k6 Cloud backend services.
 	conf, warn, err := cloudapi.GetConsolidatedConfig(
 		test.derivedConfig.Collectors[builtinOutputCloud.String()],
 		gs.Env,
@@ -49,6 +51,12 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 		gs.Logger.Warn(warn)
 	}
 
+	// When a token is present but stack ID is absent, give a specific error so
+	// the user knows exactly which variable to set, rather than the generic auth error.
+	if conf.Token.Valid && conf.Token.String != "" && (!conf.StackID.Valid || conf.StackID.Int64 == 0) {
+		return fmt.Errorf("K6_CLOUD_STACK_ID is required for --local-execution")
+	}
+
 	if err := checkCloudLogin(conf); err != nil {
 		return err
 	}
@@ -60,13 +68,6 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 
 	if conf.Name, err = resolveCloudTestName(conf.Name, test.source.URL.String()); err != nil {
 		return err
-	}
-
-	thresholds := make(map[string][]string)
-	for name, t := range test.derivedConfig.Thresholds {
-		for _, threshold := range t.Thresholds {
-			thresholds[name] = append(thresholds[name], threshold.Source)
-		}
 	}
 
 	et, err := lib.NewExecutionTuple(
@@ -99,69 +100,77 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 		return nil
 	}
 
-	var testArchive *lib.Archive
-	if !test.derivedConfig.NoArchiveUpload.Bool {
-		testArchive = test.makeArchive()
-	}
-
-	testRun := &cloudapi.TestRun{
-		Name:       conf.Name.String,
-		ProjectID:  conf.ProjectID.Int64,
-		VUsMax:     int64(lib.GetMaxPossibleVUs(executionPlan)), //nolint:gosec
-		Thresholds: thresholds,
-		Duration:   int64(duration / time.Second),
-		Archive:    testArchive,
-	}
-
 	logger := gs.Logger.WithFields(logrus.Fields{"output": builtinOutputCloud.String()})
 
-	apiClient := cloudapi.NewClient(
-		logger, conf.Token.String, conf.Host.String, build.Version, conf.Timeout.TimeDuration())
-	if conf.StackID.Valid {
-		apiClient.SetStackID(conf.StackID.Int64)
+	v6Client, err := cloudapiv6.NewClient(
+		logger, conf.Token.String, conf.Hostv6.String, build.Version, conf.Timeout.TimeDuration())
+	if err != nil {
+		return err
+	}
+	v6Client.SetStackID(int32(conf.StackID.Int64)) //nolint:gosec
+
+	var archive *lib.Archive
+	if !test.derivedConfig.NoArchiveUpload.Bool {
+		archive = test.makeArchive()
 	}
 
-	if testRun.ProjectID == 0 {
-		projectID, err := resolveDefaultProjectID(gs, &conf)
-		if err != nil {
-			return err
-		}
-		if projectID > 0 {
-			testRun.ProjectID = projectID
-		}
+	params := cloudapiv6.ProvisionParams{
+		Name:          conf.Name.String,
+		ProjectID:     int32(conf.ProjectID.Int64),                 //nolint:gosec
+		MaxVUs:        int64(lib.GetMaxPossibleVUs(executionPlan)), //nolint:gosec
+		TotalDuration: int64(duration / time.Second),
+		Options:       map[string]any{},
+		Archive:       archive,
 	}
 
-	response, err := apiClient.CreateTestRun(testRun)
+	result, err := v6Client.ProvisionLocalExecution(gs.Ctx, params)
 	if err != nil {
 		return err
 	}
 
-	// We store the test run id in the environment, so it can be used later.
-	test.preInitState.RuntimeOptions.Env[testRunIDKey] = response.ReferenceID
-
-	if response.SecretsConfig != nil && gs.CloudSecretSource != nil {
-		gs.CloudSecretSource.SetConfig(&cloudsecrets.Config{
-			Token:        response.TestRunToken,
-			Endpoint:     response.SecretsConfig.Endpoint,
-			ResponsePath: response.SecretsConfig.ResponsePath,
-		})
+	// The provisioning API does not yet return SecretsConfig, so make a
+	// separate POST /v1/tests call to obtain one. The v1 test run created
+	// by this call is intentionally discarded; only SecretsConfig is used.
+	// This bridge remains until the provisioning API exposes secrets config.
+	if gs.CloudSecretSource != nil {
+		v1Client := cloudapi.NewClient(
+			logger, conf.Token.String, conf.Host.String, build.Version, conf.Timeout.TimeDuration())
+		v1TestRun := &cloudapi.TestRun{
+			Name:      conf.Name.String,
+			ProjectID: conf.ProjectID.Int64,
+			VUsMax:    params.MaxVUs,
+			Duration:  params.TotalDuration,
+		}
+		if v1Resp, v1Err := v1Client.CreateTestRun(v1TestRun); v1Err != nil {
+			logger.WithError(v1Err).Warn("cloud secret source: could not fetch SecretsConfig from v1 endpoint")
+		} else if v1Resp.SecretsConfig != nil {
+			gs.CloudSecretSource.SetConfig(&cloudsecrets.Config{
+				Token:        result.RuntimeConfig.TestRunToken,
+				Endpoint:     v1Resp.SecretsConfig.Endpoint,
+				ResponsePath: v1Resp.SecretsConfig.ResponsePath,
+			})
+		}
 	}
 
-	// If the Cloud API returned configuration overrides, we apply them to the current configuration.
-	// Then, we serialize the overridden configuration back, so it can be used by the Cloud output.
-	if response.ConfigOverride != nil {
-		logger.WithFields(logrus.Fields{"override": response.ConfigOverride}).Debug("overriding config options")
+	// Store the test run id in the environment, so it can be used later.
+	test.preInitState.RuntimeOptions.Env[testRunIDKey] = strconv.FormatInt(int64(result.TestRunID), 10)
 
-		raw, err := cloudConfToRawMessage(conf.Apply(*response.ConfigOverride))
-		if err != nil {
-			return fmt.Errorf("could not serialize overridden cloud configuration: %w", err)
-		}
-
-		if test.derivedConfig.Collectors == nil {
-			test.derivedConfig.Collectors = make(map[string]json.RawMessage)
-		}
-		test.derivedConfig.Collectors[builtinOutputCloud.String()] = raw
+	// Apply runtime config returned by the provisioning API.
+	conf.MetricsPushURL = null.StringFrom(result.RuntimeConfig.Metrics.PushURL)
+	conf.TestRunToken = null.StringFrom(result.RuntimeConfig.TestRunToken)
+	if result.TestRunDetailsPageURL != "" {
+		conf.TestRunDetails = null.StringFrom(result.TestRunDetailsPageURL)
 	}
+
+	raw, err := cloudConfToRawMessage(conf)
+	if err != nil {
+		return fmt.Errorf("could not serialize cloud configuration: %w", err)
+	}
+
+	if test.derivedConfig.Collectors == nil {
+		test.derivedConfig.Collectors = make(map[string]json.RawMessage)
+	}
+	test.derivedConfig.Collectors[builtinOutputCloud.String()] = raw
 
 	return nil
 }

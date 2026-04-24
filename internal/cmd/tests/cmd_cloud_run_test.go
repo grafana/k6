@@ -1,23 +1,32 @@
 package tests
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"path/filepath"
-	"strconv"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"go.k6.io/k6/v2/cloudapi"
 	"go.k6.io/k6/v2/errext/exitcodes"
+	"go.k6.io/k6/v2/internal/cloudapi/v6/v6test"
 	"go.k6.io/k6/v2/internal/cmd"
 	"go.k6.io/k6/v2/lib/fsext"
 )
+
+// cloudLocalExecScript is a minimal JS script with cloud options used
+// across multiple local-execution tests.
+const cloudLocalExecScript = `
+export const options = {
+  cloud: {
+      name: 'Hello k6 Cloud!',
+      projectID: 123456,
+  },
+};
+
+export default function() {};`
 
 func TestK6CloudRun(t *testing.T) {
 	t.Parallel()
@@ -75,112 +84,38 @@ func TestCloudRunCommandIncompatibleFlags(t *testing.T) {
 func TestCloudRunLocalExecution(t *testing.T) {
 	t.Parallel()
 
-	t.Run("should upload the test archive with a multipart request as a default", func(t *testing.T) {
+	t.Run("should upload the test archive as a default", func(t *testing.T) {
 		t.Parallel()
 
-		script := `
-export const options = {
-  cloud: {
-      name: 'Hello k6 Cloud!',
-      projectID: 123456,
-  },
-};
-
-export default function() {};`
-
-		ts := makeTestState(t, script, []string{"--local-execution"})
-
-		testServerHandlerFunc := http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
-			// When using the local execution mode, the test archive should be uploaded to the cloud
-			// as a multipart request.
-			formData, err := parseMultipartRequest(req)
-			require.NoError(t, err, "expected a correctly formed multipart request")
-			assert.Contains(t, formData, "name")
-			assert.Equal(t, "Hello k6 Cloud!", formData["name"])
-			assert.Contains(t, formData, "project_id")
-			assert.Equal(t, "123456", formData["project_id"])
-			assert.Contains(t, formData, "file")
-			assert.NotEmpty(t, formData["file"])
-
-			resp.WriteHeader(http.StatusOK)
-			_, err = fmt.Fprint(resp, `{
-			"reference_id": "1337",
-			"test_run_token": "mock-test-run-token",
-			"secrets_config": {
-				"endpoint": "https://mock-secrets.example.com/{key}",
-				"response_path": "plaintext"
-			},
-			"config": {
-				"testRunDetails": "https://some.other.url/foo/tests/org/1337?bar=baz"
-			}
-		}`)
-			assert.NoError(t, err)
-		})
-
-		srv := getCloudTestEndChecker(t, 1337, testServerHandlerFunc, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed)
+		ts := makeTestState(t, cloudLocalExecScript, []string{"--local-execution"})
+		srv := v6test.NewServer(t, v6test.Config{})
 		ts.Env["K6_CLOUD_HOST"] = srv.URL
+		ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
+		ts.Env["K6_CLOUD_STACK_ID"] = "1"
 
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 		stdout := ts.Stdout.String()
 		t.Log(stdout)
 		assert.Contains(t, stdout, "execution: local")
-		assert.Contains(t, stdout, "output: cloud (https://some.other.url/foo/tests/org/1337?bar=baz)")
+		assert.Contains(t, stdout, fmt.Sprintf("%d", v6test.DefaultTestRunID))
 	})
 
 	t.Run("does not upload the archive when --no-archive-upload is provided", func(t *testing.T) {
 		t.Parallel()
 
-		script := `
-export const options = {
-  cloud: {
-      name: 'Hello k6 Cloud!',
-      projectID: 123456,
-  },
-};
-
-export default function() {};`
-
-		ts := makeTestState(t, script, []string{"--local-execution", "--no-archive-upload"})
-
-		testServerHandlerFunc := http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
-			body, err := io.ReadAll(req.Body)
-			require.NoError(t, err)
-
-			var payload map[string]any
-			err = json.Unmarshal(body, &payload)
-			require.NoError(t, err)
-
-			assert.Contains(t, payload, "name")
-			assert.Equal(t, "Hello k6 Cloud!", payload["name"])
-			assert.Contains(t, payload, "project_id")
-			assert.Equal(t, float64(123456), payload["project_id"])
-			assert.NotContains(t, payload, "file")
-
-			resp.WriteHeader(http.StatusOK)
-			_, err = fmt.Fprint(resp, `{
-			"reference_id": "1337",
-			"test_run_token": "mock-test-run-token",
-			"secrets_config": {
-				"endpoint": "https://mock-secrets.example.com/{key}",
-				"response_path": "plaintext"
-			},
-			"config": {
-				"testRunDetails": "https://some.other.url/foo/tests/org/1337?bar=baz"
-			}
-		}`)
-			assert.NoError(t, err)
-		})
-
-		srv := getCloudTestEndChecker(t, 1337, testServerHandlerFunc, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed)
+		ts := makeTestState(t, cloudLocalExecScript, []string{"--local-execution", "--no-archive-upload"})
+		srv := v6test.NewServer(t, v6test.Config{})
 		ts.Env["K6_CLOUD_HOST"] = srv.URL
+		ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
+		ts.Env["K6_CLOUD_STACK_ID"] = "1"
 
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 		stdout := ts.Stdout.String()
 		t.Log(stdout)
 		assert.Contains(t, stdout, "execution: local")
-		assert.Contains(t, stdout, "output: cloud (https://some.other.url/foo/tests/org/1337?bar=baz)")
+		assert.Contains(t, stdout, fmt.Sprintf("%d", v6test.DefaultTestRunID))
 	})
 
 	t.Run("the script can read the test run id to the environment", func(t *testing.T) {
@@ -199,18 +134,17 @@ export default function() {
 };`
 
 		ts := makeTestState(t, script, []string{"--local-execution", "--log-output=stdout"})
-
-		const testRunID = 1337
-		srv := getCloudTestEndChecker(t, testRunID, nil, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed)
+		srv := v6test.NewServer(t, v6test.Config{})
 		ts.Env["K6_CLOUD_HOST"] = srv.URL
+		ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
+		ts.Env["K6_CLOUD_STACK_ID"] = "1"
 
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 		stdout := ts.Stdout.String()
 		t.Log(stdout)
 		assert.Contains(t, stdout, "execution: local")
-		assert.Contains(t, stdout, "output: cloud (https://app.k6.io/runs/1337)")
-		assert.Contains(t, stdout, "The test run id is "+strconv.Itoa(testRunID))
+		assert.Contains(t, stdout, fmt.Sprintf("The test run id is %d", v6test.DefaultTestRunID))
 	})
 
 	t.Run("reuses existing test run when K6_CLOUD_PUSH_REF_ID is set", func(t *testing.T) {
@@ -266,36 +200,117 @@ func makeTestState(tb testing.TB, script string, cliFlags []string) *GlobalTestS
 	return ts
 }
 
-func parseMultipartRequest(r *http.Request) (map[string]string, error) {
-	// Parse the multipart form data
-	reader, err := r.MultipartReader()
-	if err != nil {
-		return nil, err
+// TestCloudRunLocalExecutionProvisioning_DefaultArchiveUpload verifies the full
+// provisioning flow for Path A (k6 cloud run --local-execution) with archive upload:
+//   - All provisioning endpoints are called
+//   - Bearer auth on all provisioning/v6 calls
+//   - X-Stack-Id header on v6 calls
+//   - No Authorization header on S3 PUT
+//   - Scoped test_run_token on metrics push
+//   - No call to POST /v1/tests
+func TestCloudRunLocalExecutionProvisioning_DefaultArchiveUpload(t *testing.T) {
+	t.Parallel()
+
+	var (
+		mu              sync.Mutex
+		capturedHeaders []http.Header
+		endpointsCalled []string
+	)
+
+	srv := v6test.NewServer(t, v6test.Config{
+		ArchiveUploadEnabled: true,
+		InspectRequest: func(r *http.Request) {
+			mu.Lock()
+			capturedHeaders = append(capturedHeaders, r.Header.Clone())
+			endpointsCalled = append(endpointsCalled, r.Method+" "+r.URL.Path)
+			mu.Unlock()
+		},
+	})
+
+	ts := makeTestState(t, cloudLocalExecScript, []string{"--local-execution"})
+	ts.Env["K6_CLOUD_HOST"] = srv.URL
+	ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
+	ts.Env["K6_CLOUD_STACK_ID"] = "1"
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stdout := ts.Stdout.String()
+	t.Log(stdout)
+	t.Log("Endpoints called:", endpointsCalled)
+
+	// Test completed successfully with the expected test run ID
+	assert.Contains(t, stdout, "execution: local")
+	assert.Contains(t, stdout, fmt.Sprintf("%d", v6test.DefaultTestRunID))
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	// At least the provisioning endpoints were called
+	require.NotEmpty(t, endpointsCalled, "expected provisioning endpoints to be called")
+
+	// Verify Bearer auth on every provisioning/v6 call
+	for i, path := range endpointsCalled {
+		h := capturedHeaders[i]
+		// S3 PUT should NOT have Authorization header
+		if path == "PUT /upload" {
+			assert.Empty(t, h.Get("Authorization"),
+				"S3 PUT at index %d should not have Authorization header, path=%s", i, path)
+			continue
+		}
+		// Metrics push should use Bearer with scoped token
+		if path == "POST /mock/metrics" {
+			authHdr := h.Get("Authorization")
+			assert.Equal(t, "Bearer mock-test-run-token", authHdr,
+				"metrics push should use scoped test_run_token, path=%s", path)
+			continue
+		}
+		// All other provisioning/v6 calls must use Bearer
+		authHdr := h.Get("Authorization")
+		assert.True(t, len(authHdr) > 0 && authHdr != "Token foo",
+			"expected Bearer auth on path=%s, got %q", path, authHdr)
+		assert.Contains(t, authHdr, "Bearer ",
+			"expected Bearer auth scheme on path=%s, got %q", path, authHdr)
 	}
 
-	// Initialize a map to store the parsed form data
-	formData := make(map[string]string)
-
-	// Iterate through the parts
-	for {
-		part, nextErr := reader.NextPart()
-		if nextErr == io.EOF {
-			break
+	// Verify X-Stack-Id on v6 cloud API calls (only /cloud/v6/* endpoints use the SDK
+	// which adds the X-Stack-Id header; the /provisioning/v1/* endpoints use a direct
+	// HTTP request and do NOT include X-Stack-Id).
+	for i, path := range endpointsCalled {
+		if path == "POST /cloud/v6/projects/123456/load_tests" {
+			h := capturedHeaders[i]
+			assert.Equal(t, "1", h.Get("X-Stack-Id"),
+				"expected X-Stack-Id: 1 on path=%s", path)
 		}
-		if nextErr != nil {
-			return nil, err
-		}
-
-		// Read the part content
-		buf := new(bytes.Buffer)
-		_, err = io.Copy(buf, part)
-		if err != nil {
-			return nil, err
-		}
-
-		// Store the part content in the map
-		formData[part.FormName()] = buf.String()
 	}
 
-	return formData, nil
+	// Verify no call to POST /v1/tests
+	for _, path := range endpointsCalled {
+		assert.NotContains(t, path, "/v1/tests",
+			"expected no call to /v1/tests, but got %q", path)
+	}
+}
+
+// TestCloudRunLocalExecutionProvisioning_NameConflict409 verifies that when the
+// initial POST load_tests returns 409, the client falls back to GET and continues.
+func TestCloudRunLocalExecutionProvisioning_NameConflict409(t *testing.T) {
+	t.Parallel()
+
+	ts := makeTestState(t, cloudLocalExecScript, []string{"--local-execution", "--no-archive-upload"})
+	srv := v6test.NewServer(t, v6test.Config{
+		ConflictOnCreateLoadTest: true,
+	})
+	ts.Env["K6_CLOUD_HOST"] = srv.URL
+	ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
+	ts.Env["K6_CLOUD_STACK_ID"] = "1"
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stdout := ts.Stdout.String()
+	stderr := ts.Stderr.String()
+	t.Log("stdout:", stdout)
+	t.Log("stderr:", stderr)
+
+	// Test should complete successfully despite the initial 409
+	assert.Contains(t, stdout, "execution: local")
+	assert.Contains(t, stdout, fmt.Sprintf("%d", v6test.DefaultTestRunID))
 }

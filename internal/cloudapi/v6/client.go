@@ -25,6 +25,7 @@ type Client struct {
 	token     string
 	stackID   int32
 	baseURL   string
+	host      string
 
 	logger logrus.FieldLogger
 }
@@ -57,6 +58,7 @@ func NewClient(logger logrus.FieldLogger, token, host, version string, timeout t
 		apiClient: k6cloud.NewAPIClient(cfg),
 		token:     token,
 		baseURL:   fmt.Sprintf("%s/cloud/v6", host),
+		host:      host,
 		logger:    logger,
 	}
 	return c, nil

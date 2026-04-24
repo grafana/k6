@@ -99,7 +99,7 @@ func (o *Output) Start() error {
 		return fmt.Errorf("failed to initialize the samples collector: %w", err)
 	}
 
-	mc, err := newMetricsClient(o.cloudClient, o.testRunID)
+	mc, err := newMetricsClient(o.cloudClient, o.config.MetricsPushURL.String, o.testRunID, o.config.TestRunToken.String)
 	if err != nil {
 		return fmt.Errorf("failed to initialize the http metrics flush client: %w", err)
 	}

@@ -1,6 +1,8 @@
 package cloud
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -14,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/v2/cloudapi"
 	"go.k6.io/k6/v2/errext"
+	v6cloudapi "go.k6.io/k6/v2/internal/cloudapi/v6"
 	"go.k6.io/k6/v2/internal/lib/testutils"
 	"go.k6.io/k6/v2/internal/usage"
 	"go.k6.io/k6/v2/lib"
@@ -87,36 +90,86 @@ func TestCloudOutputRequireScriptName(t *testing.T) {
 	assert.Contains(t, err.Error(), "script name not set")
 }
 
-func TestOutputCreateTestWithConfigOverwrite(t *testing.T) {
+// TestOutputStart_UsesProvisioningFlow verifies that Output.Start() calls the v6
+// provisioning API (CreateOrFindLoadTest + StartLocalExecution) instead of the old
+// v1 CreateTestRun endpoint, and that the returned testRunID / MetricsPushURL /
+// TestRunToken are wired correctly.
+func TestOutputStart_UsesProvisioningFlow(t *testing.T) {
 	t.Parallel()
 
-	handler := func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/v1/tests":
-			_, err := fmt.Fprintf(w, `{
-"reference_id": "12345",
-"config": {
-	"metricPushInterval": "10ms",
-	"aggregationPeriod": "40s"
-}
-}`)
-			require.NoError(t, err)
-		case "/v1/tests/12345":
-			w.WriteHeader(http.StatusOK)
-		default:
-			http.Error(w, "not expected path", http.StatusInternalServerError)
+	const (
+		projectID int64 = 7
+		testRunID int64 = 55
+	)
+	pushURL := "" // filled in after server start
+
+	// We need the server URL first to build pushURL, so build a two-phase setup.
+	var ts *httptest.Server
+
+	sleResp := func() map[string]any {
+		return map[string]any{
+			"test_run_id":               testRunID,
+			"archive_upload_url":        nil,
+			"test_run_details_page_url": fmt.Sprintf("%s/runs/%d", ts.URL, testRunID),
+			"runtime_config": map[string]any{
+				"test_run_token": "scoped-tok",
+				"metrics": map[string]any{
+					"push_url": pushURL,
+				},
+				"traces": map[string]any{"push_url": ""},
+				"files":  map[string]any{"push_url": ""},
+				"logs":   map[string]any{"push_url": "", "tail_url": ""},
+			},
 		}
 	}
-	ts := httptest.NewServer(http.HandlerFunc(handler))
-	defer ts.Close()
+
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		switch {
+		case r.Method == http.MethodPost && path == fmt.Sprintf("/cloud/v6/projects/%d/load_tests", projectID):
+			ltResp := map[string]any{
+				"id":                   int32(7),
+				"project_id":           projectID,
+				"name":                 "test",
+				"baseline_test_run_id": nil,
+				"created":              "2024-01-01T00:00:00Z",
+				"updated":              "2024-01-01T00:00:00Z",
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusCreated)
+			require.NoError(t, json.NewEncoder(w).Encode(ltResp))
+		case r.Method == http.MethodPost && path == "/provisioning/v1/load_tests/7/start_local_execution":
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			require.NoError(t, json.NewEncoder(w).Encode(sleResp()))
+		case r.Method == http.MethodPost && path == fmt.Sprintf("/provisioning/v1/test_runs/%d/notify", testRunID):
+			w.WriteHeader(http.StatusNoContent)
+		case r.Method == http.MethodPost && path == "/v1/tests":
+			t.Error("Output.Start must NOT call v1 /v1/tests")
+			http.Error(w, "v1 tests forbidden", http.StatusInternalServerError)
+		default:
+			// Accept metrics push and other optional endpoints silently.
+			w.WriteHeader(http.StatusOK)
+		}
+	}
+
+	ts = httptest.NewServer(http.HandlerFunc(handler))
+	t.Cleanup(ts.Close)
+
+	pushURL = ts.URL + "/v2/metrics/55"
 
 	out, err := newOutput(output.Params{
 		Logger: testutils.NewLogger(t),
 		Environment: map[string]string{
-			"K6_CLOUD_HOST":               ts.URL,
-			"K6_CLOUD_AGGREGATION_PERIOD": "30s",
+			"K6_CLOUD_HOST":       ts.URL,
+			"K6_CLOUD_HOST_V6":    ts.URL,
+			"K6_CLOUD_STACK_ID":   "1",
+			"K6_CLOUD_TOKEN":      "test-token",
+			"K6_CLOUD_PROJECT_ID": fmt.Sprintf("%d", projectID),
+			"K6_CLOUD_NAME":       "test",
 		},
 		ScriptOptions: lib.Options{
+			Duration:   types.NullDurationFrom(1 * time.Second),
 			SystemTags: &metrics.DefaultSystemTagSet,
 		},
 		ScriptPath: &url.URL{Path: "/script.js"},
@@ -125,12 +178,134 @@ func TestOutputCreateTestWithConfigOverwrite(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, out.Start())
 
-	assert.Equal(t, types.NullDurationFrom(10*time.Millisecond), out.config.MetricPushInterval)
-	assert.Equal(t, types.NullDurationFrom(40*time.Second), out.config.AggregationPeriod)
+	assert.Equal(t, fmt.Sprintf("%d", testRunID), out.testRunID)
+	assert.Equal(t, pushURL, out.config.MetricsPushURL.String)
+	assert.Equal(t, "scoped-tok", out.config.TestRunToken.String)
+	assert.NotNil(t, out.v6Client)
 
-	// Assert that it overwrites only the provided values
-	expTimeout := types.NewNullDuration(60*time.Second, false)
-	assert.Equal(t, expTimeout, out.config.Timeout)
+	require.NoError(t, out.StopWithTestError(nil))
+}
+
+// TestOutputStart_PushRefIDSkipsProvisioning verifies that when K6_CLOUD_PUSH_REF_ID is
+// set, Start() takes the early-return path and does NOT call any provisioning endpoints.
+func TestOutputStart_PushRefIDSkipsProvisioning(t *testing.T) {
+	t.Parallel()
+
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		// Any call to provisioning endpoints is a test failure.
+		if r.URL.Path != "/v1/tests/12345" {
+			t.Errorf("unexpected request to provisioning endpoint: %s %s", r.Method, r.URL.Path)
+		}
+		w.WriteHeader(http.StatusOK)
+	}
+	ts := httptest.NewServer(http.HandlerFunc(handler))
+	t.Cleanup(ts.Close)
+
+	out, err := newOutput(output.Params{
+		Logger: testutils.NewLogger(t),
+		Environment: map[string]string{
+			"K6_CLOUD_HOST":        ts.URL,
+			"K6_CLOUD_HOST_V6":     ts.URL,
+			"K6_CLOUD_TOKEN":       "test-token",
+			"K6_CLOUD_PUSH_REF_ID": "12345",
+		},
+		ScriptOptions: lib.Options{
+			Duration:   types.NullDurationFrom(1 * time.Second),
+			SystemTags: &metrics.DefaultSystemTagSet,
+		},
+		ScriptPath: &url.URL{Path: "/script.js"},
+		Usage:      usage.New(),
+	})
+	require.NoError(t, err)
+	require.NoError(t, out.Start())
+
+	assert.Equal(t, "12345", out.testRunID)
+	assert.Nil(t, out.v6Client)
+
+	// StopWithTestError should not call TestFinished because PushRefID is set.
+	require.NoError(t, out.StopWithTestError(nil))
+}
+
+// TestOutputStart_NoV1TestsCall verifies that Output.Start() never calls the v1
+// /v1/tests endpoint during normal provisioning flow.
+func TestOutputStart_NoV1TestsCall(t *testing.T) {
+	t.Parallel()
+
+	const (
+		projectID int64 = 7
+		testRunID int64 = 55
+	)
+
+	var ts *httptest.Server
+
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		switch {
+		case r.Method == http.MethodPost && path == "/v1/tests":
+			t.Error("Output.Start MUST NOT call /v1/tests — provisioning path must use v6 API")
+			http.Error(w, "v1 forbidden", http.StatusInternalServerError)
+		case r.Method == http.MethodPost && path == fmt.Sprintf("/cloud/v6/projects/%d/load_tests", projectID):
+			ltResp := map[string]any{
+				"id":                   int32(7),
+				"project_id":           projectID,
+				"name":                 "test",
+				"baseline_test_run_id": nil,
+				"created":              "2024-01-01T00:00:00Z",
+				"updated":              "2024-01-01T00:00:00Z",
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusCreated)
+			require.NoError(t, json.NewEncoder(w).Encode(ltResp))
+		case r.Method == http.MethodPost && path == "/provisioning/v1/load_tests/7/start_local_execution":
+			sleResp := map[string]any{
+				"test_run_id":               testRunID,
+				"archive_upload_url":        nil,
+				"test_run_details_page_url": fmt.Sprintf("%s/runs/%d", ts.URL, testRunID),
+				"runtime_config": map[string]any{
+					"test_run_token": "scoped-tok",
+					"metrics": map[string]any{
+						"push_url": ts.URL + fmt.Sprintf("/v2/metrics/%d", testRunID),
+					},
+					"traces": map[string]any{"push_url": ""},
+					"files":  map[string]any{"push_url": ""},
+					"logs":   map[string]any{"push_url": "", "tail_url": ""},
+				},
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			require.NoError(t, json.NewEncoder(w).Encode(sleResp))
+		case r.Method == http.MethodPost && path == fmt.Sprintf("/provisioning/v1/test_runs/%d/notify", testRunID):
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			w.WriteHeader(http.StatusOK)
+		}
+	}
+
+	ts = httptest.NewServer(http.HandlerFunc(handler))
+	t.Cleanup(ts.Close)
+
+	out, err := newOutput(output.Params{
+		Logger: testutils.NewLogger(t),
+		Environment: map[string]string{
+			"K6_CLOUD_HOST":       ts.URL,
+			"K6_CLOUD_HOST_V6":    ts.URL,
+			"K6_CLOUD_STACK_ID":   "1",
+			"K6_CLOUD_TOKEN":      "test-token",
+			"K6_CLOUD_PROJECT_ID": fmt.Sprintf("%d", projectID),
+			"K6_CLOUD_NAME":       "test",
+		},
+		ScriptOptions: lib.Options{
+			Duration:   types.NullDurationFrom(1 * time.Second),
+			SystemTags: &metrics.DefaultSystemTagSet,
+		},
+		ScriptPath: &url.URL{Path: "/script.js"},
+		Usage:      usage.New(),
+	})
+	require.NoError(t, err)
+	require.NoError(t, out.Start())
+
+	assert.Equal(t, fmt.Sprintf("%d", testRunID), out.testRunID)
+	assert.NotNil(t, out.v6Client)
 
 	require.NoError(t, out.StopWithTestError(nil))
 }
@@ -367,4 +542,100 @@ func (o versionedOutputMock) SetTestRunID(_ string) {
 
 func (o versionedOutputMock) AddMetricSamples(_ []metrics.SampleContainer) {
 	o.callback("AddMetricSamples")
+}
+
+// TestOutputStart_ContextCancelPropagates verifies that cancelling the context
+// passed via output.Params.Ctx causes Start() to return rather than block
+// forever when the provisioning server is slow.
+func TestOutputStart_ContextCancelPropagates(t *testing.T) {
+	t.Parallel()
+
+	blocked := make(chan struct{})
+	handler := func(w http.ResponseWriter, _ *http.Request) {
+		<-blocked
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}
+	ts := httptest.NewServer(http.HandlerFunc(handler))
+	t.Cleanup(func() { close(blocked); ts.Close() })
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	out, err := newOutput(output.Params{
+		Ctx:    ctx,
+		Logger: testutils.NewLogger(t),
+		Environment: map[string]string{
+			"K6_CLOUD_HOST":       ts.URL,
+			"K6_CLOUD_HOST_V6":    ts.URL,
+			"K6_CLOUD_STACK_ID":   "1",
+			"K6_CLOUD_TOKEN":      "test-token",
+			"K6_CLOUD_PROJECT_ID": "7",
+			"K6_CLOUD_NAME":       "test",
+		},
+		ScriptOptions: lib.Options{
+			Duration:   types.NullDurationFrom(1 * time.Second),
+			SystemTags: &metrics.DefaultSystemTagSet,
+		},
+		ScriptPath: &url.URL{Path: "/script.js"},
+		Usage:      usage.New(),
+	})
+	require.NoError(t, err)
+
+	errCh := make(chan error, 1)
+	go func() { errCh <- out.Start() }()
+
+	time.Sleep(50 * time.Millisecond)
+	cancel()
+
+	select {
+	case err := <-errCh:
+		require.Error(t, err)
+	case <-time.After(3 * time.Second):
+		t.Fatal("Start() did not return after context cancellation")
+	}
+}
+
+// TestOutputStopWithTestError_ContextCancelPropagates verifies that when the
+// context from output.Params is already cancelled, StopWithTestError returns an
+// error from NotifyTestRunCompleted instead of blocking forever.
+func TestOutputStopWithTestError_ContextCancelPropagates(t *testing.T) {
+	t.Parallel()
+
+	blocked := make(chan struct{})
+	handler := func(w http.ResponseWriter, _ *http.Request) {
+		<-blocked
+		w.WriteHeader(http.StatusNoContent)
+	}
+	ts := httptest.NewServer(http.HandlerFunc(handler))
+	t.Cleanup(func() { close(blocked); ts.Close() })
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // pre-cancel so any request made with this context fails immediately
+
+	v6c, err := v6cloudapi.NewClient(
+		testutils.NewLogger(t), "test-token", ts.URL, "test", 10*time.Second)
+	require.NoError(t, err)
+	v6c.SetStackID(1)
+
+	out := &Output{
+		logger:    testutils.NewLogger(t),
+		testRunID: "55",
+		ctx:       ctx,
+		v6Client:  v6c,
+		config: cloudapi.Config{
+			Host:  null.StringFrom(ts.URL),
+			Token: null.StringFrom("test-token"),
+		},
+		versionedOutput: versionedOutputMock{callback: func(string) {}},
+	}
+
+	errCh := make(chan error, 1)
+	go func() { errCh <- out.StopWithTestError(nil) }()
+
+	select {
+	case err := <-errCh:
+		require.Error(t, err)
+	case <-time.After(3 * time.Second):
+		t.Fatal("StopWithTestError did not return after context cancellation")
+	}
 }
