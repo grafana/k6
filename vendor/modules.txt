@@ -180,12 +180,7 @@ github.com/gorilla/websocket
 # github.com/grafana/k6-cloud-openapi-client-go v0.0.0-20260331193133-94d5832119b8
 ## explicit; go 1.23.4
 github.com/grafana/k6-cloud-openapi-client-go/k6
-# github.com/grafana/k6build v0.5.15
-## explicit; go 1.24.0
-github.com/grafana/k6build
-github.com/grafana/k6build/pkg/api
-github.com/grafana/k6build/pkg/client
-# github.com/grafana/k6provider v0.2.0
+# github.com/grafana/k6provider v0.2.0 => /var/home/mstoykov/work/grafana/k6provider
 ## explicit; go 1.24.0
 github.com/grafana/k6provider
 # github.com/grafana/sobek v0.0.0-20260331145705-2272ac4993ef
@@ -644,3 +639,4 @@ gopkg.in/validator.v2
 # gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3
+# github.com/grafana/k6provider => /var/home/mstoykov/work/grafana/k6provider

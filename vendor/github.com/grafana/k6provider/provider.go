@@ -8,19 +8,23 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
 	"time"
-
-	"github.com/grafana/k6build"
-	"github.com/grafana/k6build/pkg/client"
 )
 
 const (
 	k6Module             = "k6"
 	defaultPruneInterval = time.Hour
+
+	// K6ModPath is the Go module path for k6 v1
+	K6ModPath = "go.k6.io/k6"
+	// K6ModPathV2 is the Go module path for k6 v2
+	K6ModPathV2 = "go.k6.io/k6/v2"
 )
 
 var (
@@ -37,52 +41,6 @@ var (
 	// ErrPruningCache indicates an error pruning the binary cache
 	ErrPruningCache = errors.New("pruning cache")
 )
-
-// WrappedError defines a custom error type that allows creating an error
-// specifying its cause.
-//
-// This type is compatible with the error interface.
-//
-// Contrary to the error wrapping mechanism provided by the standard library
-// the cause can be extracted using the unwrap() method.
-//
-// WrappedError also implements the Is method to that it can compare to an error
-// based on the result of the Error() method, overcoming a limitation of the error
-// implemented in the stdlib.
-//
-//	Example:
-//	var (
-//	    err    = errors.New("error")
-//	    root   = errors.New("root cause")
-//	    cause  = NewWrappedError(cause, root)
-//	    ferr   = fmt.Errorf("%w %w", err, cause)
-//	    werr   = NewWrappedError(err,)
-//	    target = errors.New("error")
-//	)
-//
-//	errors.Is(werr, err)    // returns true
-//	errors.Is(werr, cause)  // returns true
-//	errors.Is(werr, root)   // return true
-//	errors.Is(err, target)  // returns false (err != target)
-//	errors.Is(werr, target) // returns true  (err.Error() == target.Error())
-//	ferr.Unwrap()           // return nil
-//	werr.Unwrap()           // return cause
-//	werr.Unwrap().Unwrap()  // return root
-type WrappedError = *k6build.WrappedError
-
-// NewWrappedError return a new [WrappedError] from an error and its reason
-func NewWrappedError(err error, reason error) WrappedError {
-	return k6build.NewWrappedError(err, reason)
-}
-
-// AsWrappedError returns and error as a [WrapperError] and a boolean indicating if it was possible
-func AsWrappedError(err error) (WrappedError, bool) {
-	buildErr := &k6build.WrappedError{}
-	if !errors.As(err, &buildErr) {
-		return nil, false
-	}
-	return buildErr, true
-}
 
 // K6Binary defines the attributes of a k6 binary
 type K6Binary struct {
@@ -103,7 +61,7 @@ type K6Binary struct {
 func (b K6Binary) UnmarshalDeps() string {
 	buffer := &bytes.Buffer{}
 	for dep, version := range b.Dependencies {
-		buffer.WriteString(fmt.Sprintf("%s:%q;", dep, version))
+		fmt.Fprintf(buffer, "%s:%q;", dep, version)
 	}
 	return buffer.String()
 }
@@ -142,10 +100,13 @@ type Config struct {
 	PruneInterval time.Duration
 	// Download configuration
 	DownloadConfig DownloadConfig
+	// K6ModPath is the Go module path for k6. Defaults to K6ModPath (go.k6.io/k6).
+	// Set to K6ModPathV2 (go.k6.io/k6/v2) for k6 v2 builds.
+	K6ModPath string
 }
 
 // Dependencies defines a group of dependencies with their version constrains
-// For example, {"k6": "*", "k6/x/sql", ">v0.4.0"}
+// For example, {"k6": "*", "k6/x/sql": ">v0.4.0"}
 type Dependencies map[string]string
 
 // Provider implements an interface for providing custom k6 binaries
@@ -156,9 +117,11 @@ type Provider struct {
 	client     *http.Client
 	downloader *downloader
 	binDir     string
-	buildSrv   k6build.BuildService
+	buildSrv   *buildClient
 	platform   string
+	k6ModPath  string
 	pruner     *Pruner
+	logger     *slog.Logger
 }
 
 // NewDefaultProvider returns a Provider with default settings
@@ -171,6 +134,16 @@ func NewDefaultProvider() (*Provider, error) {
 
 // NewProvider returns a [Provider] with the given Config
 func NewProvider(config Config) (*Provider, error) {
+	return NewProviderWithLogger(config, nil)
+}
+
+// NewProviderWithLogger returns a [Provider] with the given Config and logger.
+// If logger is nil, a discard logger is used.
+func NewProviderWithLogger(config Config, logger *slog.Logger) (*Provider, error) {
+	if logger == nil {
+		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+	}
+
 	var err error
 
 	// try first deprecated BinDir
@@ -179,12 +152,12 @@ func NewProvider(config Config) (*Provider, error) {
 		binDir = config.BinaryCacheDir
 	}
 	if binDir == "" {
-		binDir = os.Getenv("K6_BINARY_CACHE")
+		binDir = os.Getenv("K6_BINARY_CACHE") //nolint:forbidigo
 	}
 	if binDir == "" {
-		cacheDir, err := os.UserCacheDir()
+		cacheDir, err := os.UserCacheDir() //nolint:forbidigo
 		if err != nil {
-			cacheDir = os.TempDir()
+			cacheDir = os.TempDir() //nolint:forbidigo
 		}
 		binDir = filepath.Join(cacheDir, "k6provider")
 	}
@@ -195,7 +168,7 @@ func NewProvider(config Config) (*Provider, error) {
 		cacheSize = config.BinaryCacheSize
 	}
 	if cacheSize == 0 {
-		cacheSize, err = parseSize(os.Getenv("K6_BINARY_CACHE_SIZE"))
+		cacheSize, err = parseSize(os.Getenv("K6_BINARY_CACHE_SIZE")) //nolint:forbidigo
 		if err != nil {
 			return nil, NewWrappedError(ErrConfig, err)
 		}
@@ -205,7 +178,7 @@ func NewProvider(config Config) (*Provider, error) {
 
 	buildSrvURL := config.BuildServiceURL
 	if buildSrvURL == "" {
-		buildSrvURL = os.Getenv("K6_BUILD_SERVICE_URL")
+		buildSrvURL = os.Getenv("K6_BUILD_SERVICE_URL") //nolint:forbidigo
 	}
 	if buildSrvURL == "" {
 		return nil, NewWrappedError(ErrConfig, fmt.Errorf("build service URL is required"))
@@ -213,17 +186,11 @@ func NewProvider(config Config) (*Provider, error) {
 
 	buildSrvAuth := config.BuildServiceAuth
 	if buildSrvAuth == "" {
-		buildSrvAuth = os.Getenv("K6_BUILD_SERVICE_AUTH")
+		buildSrvAuth = os.Getenv("K6_BUILD_SERVICE_AUTH") //nolint:forbidigo
 	}
 
-	buildSrv, err := client.NewBuildServiceClient(
-		client.BuildServiceClientConfig{
-			URL:               buildSrvURL,
-			Authorization:     buildSrvAuth,
-			AuthorizationType: config.BuildServiceAuthType,
-			Headers:           config.BuildServiceHeaders,
-		},
-	)
+	buildSrv, err := newBuildServiceClient(
+		buildSrvURL, buildSrvAuth, config.BuildServiceAuthType, config.BuildServiceHeaders)
 	if err != nil {
 		return nil, NewWrappedError(ErrConfig, err)
 	}
@@ -238,9 +205,16 @@ func NewProvider(config Config) (*Provider, error) {
 		pruneInterval = defaultPruneInterval
 	}
 
-	downloader, err := newDownloader(config.DownloadConfig)
+	downloader, err := newDownloader(config.DownloadConfig, logger)
 	if err != nil {
 		return nil, NewWrappedError(ErrConfig, err)
+	}
+
+	pruner := NewPrunerWithLogger(binDir, cacheSize, pruneInterval, logger)
+
+	k6ModPath := config.K6ModPath
+	if k6ModPath == "" {
+		k6ModPath = K6ModPath
 	}
 
 	return &Provider{
@@ -249,7 +223,9 @@ func NewProvider(config Config) (*Provider, error) {
 		binDir:     binDir,
 		buildSrv:   buildSrv,
 		platform:   platform,
-		pruner:     NewPruner(binDir, cacheSize, pruneInterval),
+		k6ModPath:  k6ModPath,
+		pruner:     pruner,
+		logger:     logger,
 	}, nil
 }
 
@@ -276,7 +252,11 @@ func (p *Provider) GetArtifact(
 ) (Artifact, error) {
 	k6Constrains, buildDeps := buildDeps(deps)
 
-	artifact, err := p.buildSrv.Build(ctx, p.platform, k6Constrains, buildDeps)
+	p.logger.Debug("Resolving k6 artifact",
+		"deps", deps,
+		"platform", p.platform,
+	)
+	artifact, err := p.buildSrv.Build(ctx, p.platform, p.k6ModPath, k6Constrains, buildDeps)
 	if err != nil {
 		if !errors.Is(err, ErrInvalidParameters) {
 			return Artifact{}, NewWrappedError(ErrBuild, err)
@@ -303,13 +283,20 @@ func (p *Provider) GetArtifact(
 		}
 		checksum = fmt.Sprintf("%x", decoded)
 	}
-	return Artifact{
+
+	resolved := Artifact{
 		ID:           artifact.ID,
 		URL:          artifact.URL,
 		Dependencies: artifact.Dependencies,
 		Platform:     artifact.Platform,
 		Checksum:     checksum,
-	}, nil
+	}
+	p.logger.Debug("Artifact resolved",
+		"artifact_id", resolved.ID,
+		"deps", resolved.Dependencies,
+		"url", resolved.URL,
+	)
+	return resolved, nil
 }
 
 // GetBinary returns a custom k6 binary that satisfies the given a set of dependencies.
@@ -327,10 +314,7 @@ func (p *Provider) GetArtifact(
 // If any error occurs while building, downloading or checking the binary,
 // an [WrappedError] will be returned. This error will be one of the errors
 // defined in the k6provider packaged. Using errors.Unwrap will return its cause.
-func (p *Provider) GetBinary(
-	ctx context.Context,
-	constrains Dependencies,
-) (K6Binary, error) {
+func (p *Provider) GetBinary(ctx context.Context, constrains Dependencies) (K6Binary, error) {
 	artifact, err := p.GetArtifact(ctx, constrains)
 	if err != nil {
 		return K6Binary{}, err
@@ -339,7 +323,7 @@ func (p *Provider) GetBinary(
 	// ensure the binary's directory always exists
 	// this is slightly inefficient but simplifies logic
 	artifactDir := filepath.Join(p.binDir, artifact.ID)
-	err = os.MkdirAll(artifactDir, 0o700)
+	err = os.MkdirAll(artifactDir, 0o700) //nolint:forbidigo
 	if err != nil {
 		return K6Binary{}, NewWrappedError(ErrBinary, err)
 	}
@@ -353,10 +337,15 @@ func (p *Provider) GetBinary(
 	defer lock.unlock() //nolint:errcheck
 
 	binPath := filepath.Join(artifactDir, k6Binary)
-	_, err = os.Stat(binPath)
+	_, err = os.Stat(binPath) //nolint:forbidigo
 
 	// binary already exists and is valid
 	if err == nil {
+		p.logger.Info("Using cached k6 binary",
+			"path", binPath,
+			"artifact_id", artifact.ID,
+			"deps", artifact.Dependencies,
+		)
 		go p.pruner.Touch(binPath)
 
 		return K6Binary{
@@ -368,15 +357,28 @@ func (p *Provider) GetBinary(
 	}
 
 	// if there's other error)
-	if !os.IsNotExist(err) {
+	if !os.IsNotExist(err) { //nolint:forbidigo
 		return K6Binary{}, NewWrappedError(ErrBinary, err)
 	}
 
+	p.logger.Info("Downloading custom k6 binary",
+		"artifact_id", artifact.ID,
+		"deps", artifact.Dependencies,
+	)
+	p.logger.Debug("Downloading custom k6 binary",
+		"url", artifact.URL,
+	)
 	err = p.downloader.download(ctx, artifact.URL, binPath, artifact.Checksum)
 	if err != nil {
-		_ = os.RemoveAll(artifactDir)
+		_ = os.RemoveAll(artifactDir) //nolint:forbidigo
 		return K6Binary{}, NewWrappedError(ErrDownload, err)
 	}
+
+	p.logger.Info("Custom k6 binary ready",
+		"path", binPath,
+		"artifact_id", artifact.ID,
+		"deps", artifact.Dependencies,
+	)
 
 	// start pruning in background
 	// TODO: handle case the calling process is cancelled
@@ -391,26 +393,20 @@ func (p *Provider) GetBinary(
 	}, nil
 }
 
-// buildDeps takes a set of k6 dependencies and returns a string representing
-// the version constraints for the k6 and a slice of k6build.Dependencies
-// representing the extension dependencies. The default k6 constrain is "*".
-func buildDeps(deps Dependencies) (string, []k6build.Dependency) {
-	bdeps := make([]k6build.Dependency, 0, len(deps))
+func buildDeps(deps Dependencies) (string, []dependency) {
+	bdeps := make([]dependency, 0, len(deps))
 	k6constraint := "*"
 
-	for dep, constrains := range deps {
+	for dep, constraints := range deps {
 		if dep == k6Module {
-			k6constraint = constrains
+			k6constraint = constraints
 			continue
 		}
 
-		bdeps = append(
-			bdeps,
-			k6build.Dependency{
-				Name:        dep,
-				Constraints: constrains,
-			},
-		)
+		bdeps = append(bdeps, dependency{
+			Name:        dep,
+			Constraints: constraints,
+		})
 	}
 
 	return k6constraint, bdeps

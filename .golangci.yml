@@ -81,6 +81,10 @@ linters:
     funlen:
       lines: 80
       statements: 60
+    gomoddirectives:
+      replace-allow-list:
+        - github.com/grafana/k6provider
+      replace-local: true
     goconst:
       min-len: 10
       min-occurrences: 4
