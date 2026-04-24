@@ -15,7 +15,7 @@ func getCmdStats(gs *state.GlobalState) *cobra.Command {
 		Hidden: true,
 		Long: `Show test metrics.
 
-  Use the global --address flag to specify the URL to the API server.`,
+  Use the global --address flag or the K6_ADDRESS environment variable to specify the URL to the API server.`,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			c, err := client.New(gs.Flags.Address)
 			if err != nil {
