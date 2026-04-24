@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -19,6 +20,7 @@ import (
 	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.k6.io/k6/v2/errext"
 	"go.k6.io/k6/v2/internal/build"
 	"go.k6.io/k6/v2/internal/lib/testutils"
 	"go.k6.io/k6/v2/lib"
@@ -26,6 +28,17 @@ import (
 	"go.k6.io/k6/v2/lib/types"
 	"gopkg.in/guregu/null.v3"
 )
+
+// testAbortError is a test helper implementing errext.HasAbortReason.
+type testAbortError struct {
+	reason errext.AbortReason
+	msg    string
+}
+
+func (e testAbortError) Error() string                   { return e.msg }
+func (e testAbortError) AbortReason() errext.AbortReason { return e.reason }
+
+var _ errext.HasAbortReason = testAbortError{}
 
 func TestValidateToken(t *testing.T) {
 	t.Parallel()
@@ -372,6 +385,20 @@ func writeError(t *testing.T, w http.ResponseWriter, status int, code, msg strin
 	})
 }
 
+func newTestArchive(t *testing.T) *lib.Archive {
+	t.Helper()
+
+	fs := fsext.NewMemMapFs()
+	require.NoError(t, fsext.WriteFile(fs, "/a.js", []byte(`// c`), 0o644))
+	return &lib.Archive{
+		Type:        "js",
+		K6Version:   build.Version,
+		FilenameURL: &url.URL{Scheme: "file", Path: "/a.js"},
+		PwdURL:      &url.URL{Scheme: "file", Path: "/"},
+		Data:        []byte(`// c`),
+		Filesystems: map[string]fsext.Fs{"file": fs},
+	}
+}
 
 func fprint(t *testing.T, w io.Writer, format string) int {
 	n, err := fmt.Fprint(w, format)
@@ -859,7 +886,7 @@ func TestWaitForTestRunReady_LongQueueWait(t *testing.T) {
 	t.Parallel()
 
 	responses := make([]*k6cloud.TestRunApiModel, 0, 37)
-	for i := 0; i < 35; i++ {
+	for range 35 {
 		responses = append(responses, makeTestRunResponse(StatusQueued, nil))
 	}
 	responses = append(responses, makeTestRunResponse(StatusInitializing, nil))
@@ -883,4 +910,166 @@ func TestWaitForTestRunReady_LongQueueWait(t *testing.T) {
 		}
 	}
 	assert.Equal(t, 1, queuedEntries, "queued status must be logged exactly once")
+}
+
+// notifyBody is the decoded notify request body for test assertions.
+type notifyBody struct {
+	EventType string       `json:"event_type"`
+	Error     *notifyError `json:"error"`
+}
+
+func TestNotifyTestRunCompleted_ErrorMapping(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		testRunID      int32
+		testErr        error
+		wantErrorField *notifyError // nil ⇒ expect JSON null
+	}{
+		{
+			name:           "nil error sends null",
+			testRunID:      42,
+			testErr:        nil,
+			wantErrorField: nil,
+		},
+		{
+			name:           "AbortedByUser maps to code 5",
+			testRunID:      42,
+			testErr:        testAbortError{reason: errext.AbortedByUser, msg: "aborted by user"},
+			wantErrorField: &notifyError{Code: 5, Reason: "aborted by user"},
+		},
+		{
+			name:           "AbortedByThreshold maps to code 8",
+			testRunID:      42,
+			testErr:        testAbortError{reason: errext.AbortedByThreshold, msg: "threshold reached"},
+			wantErrorField: &notifyError{Code: 8},
+		},
+		{
+			name:           "AbortedByScriptError maps to code 7",
+			testRunID:      42,
+			testErr:        testAbortError{reason: errext.AbortedByScriptError, msg: "script error"},
+			wantErrorField: &notifyError{Code: 7},
+		},
+		{
+			name:           "ctrl+c during queue-wait still maps to code 5",
+			testRunID:      99,
+			testErr:        testAbortError{reason: errext.AbortedByUser, msg: "aborted by user"},
+			wantErrorField: &notifyError{Code: 5},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var captured notifyBody
+			var capturedPath string
+			var capturedAuth string
+
+			client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				capturedPath = r.URL.Path
+				capturedAuth = r.Header.Get("Authorization")
+				require.NoError(t, json.NewDecoder(r.Body).Decode(&captured))
+				w.WriteHeader(http.StatusNoContent)
+			}))
+
+			err := client.NotifyTestRunCompleted(t.Context(), tt.testRunID, tt.testErr)
+			require.NoError(t, err)
+
+			assert.Equal(t, fmt.Sprintf("/provisioning/v1/test_runs/%d/notify", tt.testRunID), capturedPath)
+			assert.Equal(t, "Bearer test-token", capturedAuth)
+			assert.Equal(t, "script_execution_completed", captured.EventType)
+
+			if tt.wantErrorField == nil {
+				assert.Nil(t, captured.Error, "error field must be JSON null when testErr is nil")
+			} else {
+				require.NotNil(t, captured.Error)
+				assert.Equal(t, tt.wantErrorField.Code, captured.Error.Code)
+				if tt.wantErrorField.Reason != "" {
+					assert.Equal(t, tt.wantErrorField.Reason, captured.Error.Reason)
+				}
+			}
+		})
+	}
+}
+
+// TestNotifyTestRunCompleted_5xxRetriesViaDo verifies that the notify call retries on 5xx
+// responses: server returns 503 twice then 204 on the third attempt. (WI-6 TDD cycle #7)
+func TestNotifyTestRunCompleted_5xxRetriesViaDo(t *testing.T) {
+	t.Parallel()
+
+	var mu sync.Mutex
+	callCount := 0
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Drain the body so the client can proceed.
+		_, _ = io.Copy(io.Discard, r.Body)
+
+		mu.Lock()
+		callCount++
+		n := callCount
+		mu.Unlock()
+
+		if n < MaxRetries {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	client, err := NewClient(testutils.NewLogger(t), "test-token", server.URL, "1.0", 5*time.Second)
+	require.NoError(t, err)
+
+	err = client.NotifyTestRunCompleted(t.Context(), 42, nil)
+	require.NoError(t, err)
+
+	mu.Lock()
+	got := callCount
+	mu.Unlock()
+	assert.Equal(t, MaxRetries, got, "server must receive exactly MaxRetries calls")
+}
+
+// TestNotifyTestRunCompleted_ContextCancelledMidRetry verifies that a context cancellation
+// mid-request propagates back as context.Canceled. (WI-6 TDD cycle #8)
+func TestNotifyTestRunCompleted_ContextCancelledMidRetry(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	// unblockServer is closed by the test after it cancels the client context,
+	// allowing the handler goroutine to return and the httptest.Server to close.
+	started := make(chan struct{})
+	unblockServer := make(chan struct{})
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		select {
+		case started <- struct{}{}:
+		default:
+		}
+		<-unblockServer
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer func() {
+		close(unblockServer)
+		server.Close()
+	}()
+
+	client, err := NewClient(testutils.NewLogger(t), "test-token", server.URL, "1.0", 5*time.Second)
+	require.NoError(t, err)
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- client.NotifyTestRunCompleted(ctx, 42, nil)
+	}()
+
+	// Wait for the server to receive the request, then cancel the client context.
+	<-started
+	cancel()
+
+	err = <-errCh
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, context.Canceled), "expected context.Canceled, got: %v", err)
 }
