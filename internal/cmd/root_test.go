@@ -72,7 +72,7 @@ func TestAddressGlobalOption(t *testing.T) {
 
 	t.Run("default value", func(t *testing.T) {
 		t.Parallel()
-		assert.Equal(t, "localhost:6565", state.GetDefaultFlags(".config", ".cache").HTTPAPIAddr)
+		assert.Equal(t, "", state.GetDefaultFlags(".config", ".cache").HTTPAPIAddr)
 	})
 
 	t.Run("set via --address flag", func(t *testing.T) {
