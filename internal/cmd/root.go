@@ -488,14 +488,13 @@ func createSecretSources(gs *state.GlobalState) (map[string]secretsource.Source,
 	}
 
 	// Capture the cloud source instance if it was registered (via local-execution auto-injection
-	// or the PLZ env-var path below), so createCloudTest can call SetConfig on it later.
+	// or the env-var path below), so createCloudTest can call SetConfig on it later.
 	if cs, ok := result["cloud"].(*cloudsecrets.SecretSource); ok {
 		gs.CloudSecretSource = cs
 	}
 
-	// PLZ path: the k6-operator injects K6_CLOUD_SECRETS_TOKEN + K6_CLOUD_SECRETS_ENDPOINT
-	// via environment variables because it never calls createCloudTest (no /v1/tests round-trip).
-	// Create and configure the cloud source here; set it as the default if none was chosen.
+	// When  K6_CLOUD_SECRETS_TOKEN + K6_CLOUD_SECRETS_ENDPOINT are injected, create and configure the cloud source
+	// directly from env vars without a /v1/tests round-trip. Set it as the default source if none was chosen.
 	if token := gs.Env["K6_CLOUD_SECRETS_TOKEN"]; token != "" {
 		if gs.CloudSecretSource == nil {
 			cloudSource, err := cloudsecrets.New(baseParams)
