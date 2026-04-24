@@ -516,21 +516,15 @@ func archiveReader(arc *lib.Archive) io.ReadCloser {
 	return pr
 }
 
-// UploadArchive uploads the serialized archive to the given presigned S3 URL.
+// UploadArchive uploads pre-serialised archive bytes to the given presigned S3 URL.
 // The URL is a presigned PUT URL — no Authorization header is set.
-// Returns the serialized archive size in bytes (useful for start_local_execution).
-func (c *Client) UploadArchive(ctx context.Context, uploadURL string, arc *lib.Archive) (int64, error) {
-	var buf bytes.Buffer
-	if err := arc.Write(&buf); err != nil {
-		return 0, err
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, uploadURL, bytes.NewReader(buf.Bytes()))
+func (c *Client) UploadArchive(ctx context.Context, uploadURL string, body []byte) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, uploadURL, bytes.NewReader(body))
 	if err != nil {
-		return 0, err
+		return err
 	}
 	req.Header.Set("Content-Type", "application/x-tar")
-	req.ContentLength = int64(buf.Len())
+	req.ContentLength = int64(len(body))
 
 	if parsed, parseErr := url.Parse(uploadURL); parseErr == nil {
 		c.logger.WithFields(logrus.Fields{
@@ -542,21 +536,21 @@ func (c *Client) UploadArchive(ctx context.Context, uploadURL string, arc *lib.A
 
 	resp, err := c.apiClient.GetConfig().HTTPClient.Do(req) //nolint:gosec
 	if err != nil {
-		return 0, err
+		return err
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		respBody, readErr := io.ReadAll(io.LimitReader(resp.Body, 4096))
 		if readErr != nil || len(respBody) == 0 {
-			return 0, fmt.Errorf("archive upload failed: %d %s", resp.StatusCode, http.StatusText(resp.StatusCode))
+			return fmt.Errorf("archive upload failed: %d %s", resp.StatusCode, http.StatusText(resp.StatusCode))
 		}
-		return 0, fmt.Errorf("archive upload failed: %d %s: %s",
+		return fmt.Errorf("archive upload failed: %d %s: %s",
 			resp.StatusCode, http.StatusText(resp.StatusCode), respBody)
 	}
 
 	_, _ = io.Copy(io.Discard, resp.Body)
-	return int64(buf.Len()), nil
+	return nil
 }
 
 // StartLocalExecution calls POST /provisioning/v1/load_tests/{id}/start_local_execution.
