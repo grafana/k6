@@ -104,4 +104,4 @@ require (
 	gopkg.in/validator.v2 v2.0.1 // indirect
 )
 
-replace github.com/grafana/k6provider => /var/home/mstoykov/work/grafana/k6provider
+replace github.com/grafana/k6provider => /var/home/mstoykov/.agent-deck/multi-repo-worktrees/v2support-a460d039/k6provider
