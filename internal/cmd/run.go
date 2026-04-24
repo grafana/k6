@@ -279,7 +279,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		runAbort(err)
 	})
 	samples := make(chan metrics.SampleContainer, test.derivedConfig.MetricSamplesBufferSize.Int64)
-	// Spin up the REST API server, if not disabled.
+	// Spin up the REST API server, if enabled.
 	if c.gs.Flags.HTTPAPIAddr != "" { //nolint:nestif
 		initBar.Modify(pb.WithConstProgress(0, "Init API server"))
 

@@ -175,7 +175,7 @@ type GlobalFlags struct {
 	ConfigFilePath   string
 	Quiet            bool
 	NoColor          bool
-	HTTPAPIAddr   string
+	HTTPAPIAddr      string
 	ProfilingEnabled bool
 	LogOutput        string
 	SecretSource     []string
@@ -191,7 +191,7 @@ type GlobalFlags struct {
 // GetDefaultFlags returns the default global flags.
 func GetDefaultFlags(homeDir string, cacheDir string) GlobalFlags {
 	return GlobalFlags{
-		HTTPAPIAddr:          "localhost:6565",
+		HTTPAPIAddr:             "",
 		ProfilingEnabled:        false,
 		ConfigFilePath:          filepath.Join(homeDir, "k6", defaultConfigFileName),
 		LogOutput:               "stderr",
