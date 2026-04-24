@@ -216,9 +216,9 @@ func handleUnsatisfiedDependencies(err error, c *rootCommand) (exitcodes.ExitCod
 		WithField("deps", deps).
 		Info("Automatic extension resolution is enabled. The current k6 binary doesn't satisfy all dependencies," +
 			" it's required to provision a custom binary.")
-	provisioner := newK6BuildProvisioner(c.globalState)
+	provisioner := newBuildProvisioner(c.globalState)
 	var customBinary commandExecutor
-	customBinary, err = provisioner.provision(constraintsMapToProvisionDependency(deps))
+	customBinary, err = provisioner.provision(c.globalState.Ctx, constraintsMapToProvisionDependency(deps))
 	if err != nil {
 		err = errext.WithExitCodeIfNone(err, exitcodes.ScriptException)
 		c.globalState.Logger.
@@ -228,7 +228,7 @@ func handleUnsatisfiedDependencies(err error, c *rootCommand) (exitcodes.ExitCod
 		return 0, err
 	}
 
-	err = customBinary.run(c.globalState)
+	err = customBinary.run(c.globalState.Ctx, c.globalState)
 	// this only happens if we actually ran the binary and it exited afterwads, in which case we propagate the exit code
 	var ecerr errext.HasExitCode
 	if errors.As(err, &ecerr) {
