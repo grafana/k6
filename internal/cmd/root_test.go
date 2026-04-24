@@ -72,15 +72,15 @@ func TestAddressGlobalOption(t *testing.T) {
 
 	t.Run("default value", func(t *testing.T) {
 		t.Parallel()
-		assert.Equal(t, "localhost:6565", state.GetDefaultFlags(".config", ".cache").Address)
+		assert.Equal(t, "localhost:6565", state.GetDefaultFlags(".config", ".cache").HTTPAPIAddr)
 	})
 
 	t.Run("set via --address flag", func(t *testing.T) {
 		t.Parallel()
 		ts := tests.NewGlobalTestState(t)
 		flagSet := rootCmdPersistentFlagSet(ts.GlobalState)
-		require.NoError(t, flagSet.Parse([]string{"--address", "localhost:9090"}))
-		assert.Equal(t, "localhost:9090", ts.GlobalState.Flags.Address)
+		require.NoError(t, flagSet.Parse([]string{"--http-api-addr", "localhost:9090"}))
+		assert.Equal(t, "localhost:9090", ts.Flags.HTTPAPIAddr)
 	})
 
 	t.Run("set via -a shorthand flag", func(t *testing.T) {
@@ -88,29 +88,29 @@ func TestAddressGlobalOption(t *testing.T) {
 		ts := tests.NewGlobalTestState(t)
 		flagSet := rootCmdPersistentFlagSet(ts.GlobalState)
 		require.NoError(t, flagSet.Parse([]string{"-a", "localhost:9090"}))
-		assert.Equal(t, "localhost:9090", ts.GlobalState.Flags.Address)
+		assert.Equal(t, "localhost:9090", ts.Flags.HTTPAPIAddr)
 	})
 
-	t.Run("set via K6_ADDRESS env var", func(t *testing.T) {
+	t.Run("set via K6_HTTP_API_ADDR env var", func(t *testing.T) {
 		t.Parallel()
 		ts := tests.NewGlobalTestState(t)
-		ts.Env["K6_ADDRESS"] = "localhost:9090"
+		ts.Env["K6_HTTP_API_ADDR"] = "localhost:9090"
 		ts.ReparseFlags()
-		assert.Equal(t, "localhost:9090", ts.GlobalState.Flags.Address)
+		assert.Equal(t, "localhost:9090", ts.Flags.HTTPAPIAddr)
 	})
 }
 
-// TestAddressOptionPrecedence verifies that the CLI flag takes precedence over the K6_ADDRESS
+// TestAddressOptionPrecedence verifies that the CLI flag takes precedence over the K6_HTTP_API_ADDR
 // env var by going through the real cobra command path, reflecting the actual implementation.
 func TestAddressGlobalOptionPrecedence(t *testing.T) {
 	t.Parallel()
 
 	ts := tests.NewGlobalTestState(t)
-	ts.Env["K6_ADDRESS"] = "localhost:9090"
-	ts.CmdArgs = []string{"k6", "run", "--address", "localhost:9091", "script.js"}
+	ts.Env["K6_HTTP_API_ADDR"] = "localhost:9090"
+	ts.CmdArgs = []string{"k6", "run", "--http-api-addr", "localhost:9091", "script.js"}
 
 	rootCmd := newRootCommand(ts.GlobalState)
 	require.NoError(t, rootCmd.cmd.ParseFlags(ts.CmdArgs[1:]))
 
-	assert.Equal(t, "localhost:9091", ts.GlobalState.Flags.Address)
+	assert.Equal(t, "localhost:9091", ts.Flags.HTTPAPIAddr)
 }
