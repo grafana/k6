@@ -6,10 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"strings"
 	"syscall"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
@@ -467,4 +469,35 @@ func parseManifest(manifestString string) (dependencies, error) {
 		return nil, fmt.Errorf("invalid dependencies manifest %w", err)
 	}
 	return dependenciesFromMap(manifestMap)
+}
+
+// completionTimeout bounds the cache lookup for shell completion requests.
+// The build service is reachable but not guaranteed responsive; without a
+// deadline a stall would hang the shell on every TAB.
+const completionTimeout = 3 * time.Second
+
+// completeExtension handles a shell completion request for an unregistered
+// extension subcommand. If the matching provisioned binary is already cached
+// locally, it delegates the completion request to that binary. Otherwise it
+// returns nil (no completions) so the shell does not hang waiting on a build.
+func completeExtension(gs *state.GlobalState, extName string, prov provisioner) error {
+	deps, err := dependenciesFromSubcommand(gs, extName)
+	if err != nil {
+		gs.Logger.WithError(err).Debug("Failed to build completion deps")
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(gs.Ctx, completionTimeout)
+	defer cancel()
+
+	bin, err := prov.provision(ctx, constraintsMapToProvisionDependency(deps))
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		gs.Logger.WithError(err).Debug("Failed to check provisioner cache for completion request")
+		return nil
+	}
+
+	return bin.run(ctx, gs)
 }
