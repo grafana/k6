@@ -175,7 +175,7 @@ func (c *rootCommand) execute() {
 	// provisioned binary's output would append to it, producing double output.
 	var err error
 	if ext, ok := detectExtensionCompletion(c.cmd, c.globalState); ok {
-		err = buildExtensionDeps(c.globalState, ext)
+		err = completeExtension(c.globalState, ext, newCacheProvisioner(c.globalState))
 	} else {
 		err = c.cmd.Execute()
 	}
