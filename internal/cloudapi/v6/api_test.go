@@ -436,3 +436,129 @@ func TestCreateOrFindLoadTest_Conflict409FallbackFound(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, int32(99), id)
 }
+
+// capturedRequest holds the HTTP request fields captured by a mock handler.
+type capturedRequest struct {
+	method  string
+	path    string
+	headers http.Header
+	body    []byte
+}
+
+func TestStartLocalExecution(t *testing.T) {
+	t.Parallel()
+
+	// Shared happy-path mock response, covering all fields asserted by any row.
+	archiveUploadURL := "https://storage.example.com/upload/abc123"
+	fullResponse := map[string]any{
+		"test_run_id":               int64(999),
+		"archive_upload_url":        archiveUploadURL,
+		"test_run_details_page_url": "https://app.grafana.com/test-runs/999",
+		"runtime_config": map[string]any{
+			"test_run_token": "tok-abc",
+			"metrics": map[string]any{
+				"push_url":                "https://metrics.example.com/push",
+				"push_interval":           "5s",
+				"push_concurrency":        int64(2),
+				"aggregation_period":      "30s",
+				"aggregation_wait_period": "5s",
+				"aggregation_min_samples": int64(100),
+				"max_samples_per_package": int64(1000),
+			},
+			"traces": map[string]any{"push_url": "https://traces.example.com/push"},
+			"files":  map[string]any{"push_url": "https://files.example.com/push"},
+			"logs":   map[string]any{"push_url": "https://logs.example.com/push", "tail_url": "https://logs.example.com/tail"},
+		},
+	}
+
+	tests := []struct {
+		name   string
+		assert func(t *testing.T, req capturedRequest, resp *StartLocalExecutionResponse)
+	}{
+		{
+			name: "response struct fields",
+			assert: func(t *testing.T, _ capturedRequest, resp *StartLocalExecutionResponse) {
+				t.Helper()
+				assert.Equal(t, int64(999), resp.TestRunID)
+				require.NotNil(t, resp.ArchiveUploadURL)
+				assert.Equal(t, archiveUploadURL, *resp.ArchiveUploadURL)
+				assert.Equal(t, "https://app.grafana.com/test-runs/999", resp.TestRunDetailsPageURL)
+				assert.Equal(t, "tok-abc", resp.RuntimeConfig.TestRunToken)
+				assert.Equal(t, "https://metrics.example.com/push", resp.RuntimeConfig.Metrics.PushURL)
+				require.NotNil(t, resp.RuntimeConfig.Metrics.PushInterval)
+				assert.Equal(t, "5s", *resp.RuntimeConfig.Metrics.PushInterval)
+				require.NotNil(t, resp.RuntimeConfig.Metrics.PushConcurrency)
+				assert.Equal(t, int64(2), *resp.RuntimeConfig.Metrics.PushConcurrency)
+				assert.Equal(t, "https://traces.example.com/push", resp.RuntimeConfig.Traces.PushURL)
+				assert.Equal(t, "https://files.example.com/push", resp.RuntimeConfig.Files.PushURL)
+				assert.Equal(t, "https://logs.example.com/push", resp.RuntimeConfig.Logs.PushURL)
+				assert.Equal(t, "https://logs.example.com/tail", resp.RuntimeConfig.Logs.TailURL)
+			},
+		},
+		{
+			name: "request body fields",
+			assert: func(t *testing.T, req capturedRequest, _ *StartLocalExecutionResponse) {
+				t.Helper()
+				var body map[string]any
+				require.NoError(t, json.Unmarshal(req.body, &body))
+				opts, ok := body["options"].(map[string]any)
+				require.True(t, ok, "options should be a map")
+				assert.Equal(t, float64(5), opts["vus"])
+				assert.Equal(t, "30s", opts["duration"])
+				assert.Equal(t, float64(5), body["max_vus"])
+				assert.Equal(t, float64(30000), body["total_duration"])
+				assert.Equal(t, float64(4096), body["archive_size"], "archive_size should be present and non-null")
+			},
+		},
+		{
+			name: "idempotency key header",
+			assert: func(t *testing.T, req capturedRequest, _ *StartLocalExecutionResponse) {
+				t.Helper()
+				key := req.headers.Get("K6-Idempotency-Key")
+				assert.NotEmpty(t, key, "K6-Idempotency-Key header must be present")
+				assert.GreaterOrEqual(t, len(key), 1)
+				assert.LessOrEqual(t, len(key), 36)
+				assert.Regexp(t, `^[0-9a-f]+$`, key, "K6-Idempotency-Key must be hex")
+			},
+		},
+		{
+			name: "bearer auth",
+			assert: func(t *testing.T, req capturedRequest, _ *StartLocalExecutionResponse) {
+				t.Helper()
+				assert.Equal(t, "Bearer test-token", req.headers.Get("Authorization"),
+					"Authorization header must use Bearer scheme, not Token scheme")
+			},
+		},
+	}
+
+	archiveSize := int64(4096)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var captured capturedRequest
+			client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				captured.method = r.Method
+				captured.path = r.URL.Path
+				captured.headers = r.Header.Clone()
+				var err error
+				captured.body, err = io.ReadAll(r.Body)
+				require.NoError(t, err)
+				writeJSON(t, w, http.StatusOK, fullResponse)
+			}))
+
+			req := StartLocalExecutionRequest{
+				Options:       map[string]any{"vus": 5, "duration": "30s"},
+				MaxVUs:        5,
+				TotalDuration: 30000,
+				ArchiveSize:   &archiveSize,
+			}
+
+			resp, err := client.StartLocalExecution(t.Context(), 42, req)
+			require.NoError(t, err)
+			require.NotNil(t, resp)
+
+			tt.assert(t, captured, resp)
+		})
+	}
+}

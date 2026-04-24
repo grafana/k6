@@ -1,6 +1,7 @@
 package cloudapi
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -10,11 +11,65 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"time"
 
 	k6cloud "github.com/grafana/k6-cloud-openapi-client-go/k6"
 
 	"go.k6.io/k6/v2/lib"
 )
+
+// StartLocalExecutionRequest is the request body for start_local_execution.
+type StartLocalExecutionRequest struct {
+	Options       map[string]any `json:"options"`
+	MaxVUs        int64          `json:"max_vus"`
+	TotalDuration int64          `json:"total_duration"`
+	Instances     *int64         `json:"instances,omitempty"`
+	ArchiveSize   *int64         `json:"archive_size,omitempty"`
+}
+
+// StartLocalExecutionResponse is the response from start_local_execution.
+type StartLocalExecutionResponse struct {
+	TestRunID             int64         `json:"test_run_id"`
+	ArchiveUploadURL      *string       `json:"archive_upload_url"`
+	RuntimeConfig         RuntimeConfig `json:"runtime_config"`
+	TestRunDetailsPageURL string        `json:"test_run_details_page_url"`
+}
+
+// RuntimeConfig holds runtime configuration returned by the provisioning API.
+type RuntimeConfig struct {
+	Metrics      MetricsRuntimeConfig `json:"metrics"`
+	Traces       TracesRuntimeConfig  `json:"traces"`
+	Files        FilesRuntimeConfig   `json:"files"`
+	Logs         LogsRuntimeConfig    `json:"logs"`
+	TestRunToken string               `json:"test_run_token"`
+}
+
+// MetricsRuntimeConfig holds metrics runtime configuration.
+type MetricsRuntimeConfig struct {
+	PushURL               string  `json:"push_url"`
+	PushInterval          *string `json:"push_interval"`
+	PushConcurrency       *int64  `json:"push_concurrency"`
+	AggregationPeriod     *string `json:"aggregation_period"`
+	AggregationWaitPeriod *string `json:"aggregation_wait_period"`
+	AggregationMinSamples *int64  `json:"aggregation_min_samples"`
+	MaxSamplesPerPackage  *int64  `json:"max_samples_per_package"`
+}
+
+// TracesRuntimeConfig holds traces runtime configuration.
+type TracesRuntimeConfig struct {
+	PushURL string `json:"push_url"`
+}
+
+// FilesRuntimeConfig holds files runtime configuration.
+type FilesRuntimeConfig struct {
+	PushURL string `json:"push_url"`
+}
+
+// LogsRuntimeConfig holds logs runtime configuration.
+type LogsRuntimeConfig struct {
+	PushURL string `json:"push_url"`
+	TailURL string `json:"tail_url"`
+}
 
 // ValidateToken validates the cloud authentication token.
 func (c *Client) ValidateToken(ctx context.Context, stackURL string) (_ *k6cloud.AuthenticationResponse, err error) {
@@ -274,4 +329,85 @@ func archiveReader(arc *lib.Archive) io.ReadCloser {
 		pw.CloseWithError(arc.Write(pw))
 	}()
 	return pr
+}
+
+// StartLocalExecution calls POST /provisioning/v1/load_tests/{id}/start_local_execution.
+// It uses Bearer auth (not Token scheme) and includes a K6-Idempotency-Key header.
+func (c *Client) StartLocalExecution(
+	ctx context.Context,
+	loadTestID int32,
+	req StartLocalExecutionRequest,
+) (*StartLocalExecutionResponse, error) {
+	rawURL := fmt.Sprintf("%s/provisioning/v1/load_tests/%d/start_local_execution", c.host, loadTestID)
+
+	bodyBytes, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var key [8]byte
+	if _, err := rand.Read(key[:]); err != nil {
+		return nil, err
+	}
+	idempotencyKey := hex.EncodeToString(key[:])
+
+	httpClient := c.apiClient.GetConfig().HTTPClient
+
+	var (
+		lastErr  error
+		lastResp *http.Response
+	)
+
+	for attempt := 1; attempt <= MaxRetries; attempt++ {
+		httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, rawURL, bytes.NewReader(bodyBytes))
+		if err != nil {
+			return nil, err
+		}
+		httpReq.Header.Set("Content-Type", "application/json")
+		httpReq.Header.Set("Authorization", "Bearer "+c.token)
+		httpReq.Header.Set("K6-Idempotency-Key", idempotencyKey)
+
+		lastResp, lastErr = httpClient.Do(httpReq)
+		if lastErr != nil {
+			if attempt < MaxRetries {
+				time.Sleep(RetryInterval)
+				continue
+			}
+			break
+		}
+
+		if lastResp.StatusCode >= 500 && attempt < MaxRetries {
+			_, _ = io.Copy(io.Discard, lastResp.Body)
+			_ = lastResp.Body.Close()
+			time.Sleep(RetryInterval)
+			continue
+		}
+
+		break
+	}
+
+	if lastErr != nil {
+		return nil, lastErr
+	}
+
+	defer func() {
+		_, _ = io.Copy(io.Discard, lastResp.Body)
+		_ = lastResp.Body.Close()
+	}()
+
+	if lastResp.StatusCode < 200 || lastResp.StatusCode > 299 {
+		return nil, fmt.Errorf(
+			"unexpected HTTP error from %s: %d %s",
+			rawURL,
+			lastResp.StatusCode,
+			http.StatusText(lastResp.StatusCode),
+		)
+	}
+
+	var resp StartLocalExecutionResponse
+	if err := json.NewDecoder(lastResp.Body).Decode(&resp); err != nil {
+		return nil, err
+	}
+
+	return &resp, nil
 }
