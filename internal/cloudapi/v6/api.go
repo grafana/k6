@@ -101,6 +101,35 @@ func (c *Client) UploadTest(
 	return lt, nil
 }
 
+// CreateOrFindLoadTest creates a new load test in the project (name only, no script)
+// or, on 409 conflict, finds and returns the existing test with the same name.
+// Returns the load test ID.
+func (c *Client) CreateOrFindLoadTest(ctx context.Context, projectID int32, name string) (int32, error) {
+	res, hr, err := c.apiClient.LoadTestsAPI.
+		ProjectsLoadTestsCreate(c.authCtx(ctx), projectID).
+		XStackId(c.stackID).
+		Name(name).
+		Execute()
+	defer closeResponse(hr, &err)
+
+	if err := CheckResponse(hr, err); err != nil {
+		var rerr ResponseError
+		if !errors.As(err, &rerr) || rerr.Response == nil || rerr.Response.StatusCode != http.StatusConflict {
+			return 0, err
+		}
+		lt, ferr := c.findTestByName(ctx, projectID, name)
+		if ferr != nil {
+			return 0, ferr
+		}
+		return lt.GetId(), nil
+	}
+	if res == nil {
+		return 0, errUnknown
+	}
+
+	return res.GetId(), nil
+}
+
 // createTest creates a new cloud load test in the given project.
 func (c *Client) createTest(
 	ctx context.Context, name string, projectID int32, arc *lib.Archive,

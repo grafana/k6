@@ -389,3 +389,50 @@ func assertArchiveEqual(t *testing.T, want *lib.Archive, got []byte) {
 	require.NoError(t, want.Write(&b))
 	assert.Equal(t, b.Bytes(), got)
 }
+
+func TestCreateOrFindLoadTest_CreateSuccess(t *testing.T) {
+	t.Parallel()
+
+	lt := k6cloud.NewLoadTestApiModelWithDefaults()
+	lt.SetId(42)
+	lt.SetProjectId(1)
+	lt.SetName("my-test")
+
+	client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "Bearer test-token", r.Header.Get("Authorization"))
+		assert.Equal(t, "1", r.Header.Get("X-Stack-Id"))
+
+		require.NoError(t, r.ParseMultipartForm(1<<20))
+		assert.Equal(t, "my-test", r.FormValue("name"))
+		assert.Empty(t, r.MultipartForm.File["script"], "script field must not be present")
+
+		writeJSON(t, w, http.StatusCreated, lt)
+	}))
+
+	id, err := client.CreateOrFindLoadTest(t.Context(), 1, "my-test")
+	require.NoError(t, err)
+	assert.Equal(t, int32(42), id)
+}
+
+func TestCreateOrFindLoadTest_Conflict409FallbackFound(t *testing.T) {
+	t.Parallel()
+
+	lt := k6cloud.NewLoadTestApiModelWithDefaults()
+	lt.SetId(99)
+	lt.SetProjectId(1)
+	lt.SetName("my-test")
+
+	client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			writeError(t, w, http.StatusConflict, "conflict", "already exists")
+		case http.MethodGet:
+			writeJSON(t, w, http.StatusOK, map[string]any{"value": []any{lt}})
+		}
+	}))
+
+	id, err := client.CreateOrFindLoadTest(t.Context(), 1, "my-test")
+	require.NoError(t, err)
+	assert.Equal(t, int32(99), id)
+}
