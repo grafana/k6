@@ -23,8 +23,7 @@ func TestNew(t *testing.T) {
 	t.Parallel()
 
 	logger, hook := testutils.NewLoggerWithHook(t)
-	c := cloudapi.NewClient(logger, "my-token", "the-host", "v/foo", 1*time.Second)
-	o, err := New(logger, cloudapi.Config{APIVersion: null.IntFrom(99)}, c)
+	o, err := New(logger, cloudapi.Config{APIVersion: null.IntFrom(99)}, nil)
 	require.NoError(t, err)
 	require.NotNil(t, o)
 
@@ -36,18 +35,6 @@ func TestNew(t *testing.T) {
 
 	// assert the config set
 	assert.Equal(t, int64(99), o.config.APIVersion.Int64)
-}
-
-func TestNewWithConfigOverwritten(t *testing.T) {
-	t.Parallel()
-
-	logger := testutils.NewLogger(t)
-	c := cloudapi.NewClient(logger, "my-token", "the-host", "v/foo", 1*time.Second)
-	conf := cloudapi.Config{Host: null.StringFrom("the-new-host")}
-	o, err := New(logger, conf, c)
-	require.NoError(t, err)
-	require.NotNil(t, o)
-	assert.Equal(t, "the-new-host/v1", o.cloudClient.BaseURL())
 }
 
 func TestOutputSetTestRunID(t *testing.T) {
@@ -73,8 +60,7 @@ func TestOutputCollectSamples(t *testing.T) {
 	t.Parallel()
 
 	conf := cloudapi.Config{
-		Host:                  null.StringFrom("flush-is-disabled"),
-		Token:                 null.StringFrom("a-fake-token"),
+		MetricsPushURL:        null.StringFrom("http://mock-push-url"),
 		AggregationWaitPeriod: types.NewNullDuration(5*time.Second, true),
 		// Manually control and trigger the various steps
 		// instead to be time dependent
@@ -82,9 +68,7 @@ func TestOutputCollectSamples(t *testing.T) {
 		MetricPushInterval: types.NewNullDuration(1*time.Hour, true),
 	}
 	logger := testutils.NewLogger(t)
-	cc := cloudapi.NewClient(
-		logger, conf.Token.String, conf.Host.String, "v/test", conf.Timeout.TimeDuration())
-	o, err := New(logger, conf, cc)
+	o, err := New(logger, conf, nil)
 	require.NoError(t, err)
 
 	o.SetTestRunID("ref-id-123")
@@ -289,14 +273,11 @@ func TestOutputStopWithTestError(t *testing.T) {
 	t.Parallel()
 
 	config := cloudapi.NewConfig()
-	config.Host = null.StringFrom("host-is-required-but-flush-isnot-expected")
-	config.Token = null.StringFrom("token-is-required")
+	config.MetricsPushURL = null.StringFrom("http://mock-push-url")
 	config.AggregationPeriod = types.NullDurationFrom(1 * time.Hour)
 
 	logger := testutils.NewLogger(t)
-	cc := cloudapi.NewClient(
-		logger, config.Token.String, config.Host.String, "v/test", config.Timeout.TimeDuration())
-	o, err := New(logger, config, cc)
+	o, err := New(logger, config, nil)
 	require.NoError(t, err)
 
 	o.SetTestRunID("1234")

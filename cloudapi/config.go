@@ -40,6 +40,12 @@ type Config struct {
 	// no test run id, and we may still need an identifier to correlate all the things.
 	PushRefID null.String `json:"pushRefID" envconfig:"K6_CLOUD_PUSH_REF_ID"`
 
+	// MetricsPushURL is the URL to push metrics to; set from the provisioning API response.
+	MetricsPushURL null.String `json:"metricsPushURL"`
+	// TestRunToken is the scoped token for metrics push; set from the provisioning API response.
+	// Can also be injected via K6_CLOUD_TEST_RUN_TOKEN for the direct-push path.
+	TestRunToken null.String `json:"testRunToken" envconfig:"K6_CLOUD_TEST_RUN_TOKEN"`
+
 	// Defines the max allowed number of time series in a single batch.
 	MaxTimeSeriesInBatch null.Int `json:"maxTimeSeriesInBatch" envconfig:"K6_CLOUD_MAX_TIME_SERIES_IN_BATCH"`
 
@@ -104,7 +110,7 @@ func NewConfig() Config {
 
 // Apply saves config non-zero config values from the passed config in the receiver.
 //
-//nolint:cyclop,gocognit
+//nolint:cyclop,gocognit,funlen
 func (c Config) Apply(cfg Config) Config {
 	if cfg.StackID.Valid {
 		c.StackID = cfg.StackID
@@ -135,6 +141,12 @@ func (c Config) Apply(cfg Config) Config {
 	}
 	if cfg.PushRefID.Valid {
 		c.PushRefID = cfg.PushRefID
+	}
+	if cfg.MetricsPushURL.Valid {
+		c.MetricsPushURL = cfg.MetricsPushURL
+	}
+	if cfg.TestRunToken.Valid {
+		c.TestRunToken = cfg.TestRunToken
 	}
 	if cfg.WebAppURL.Valid {
 		c.WebAppURL = cfg.WebAppURL

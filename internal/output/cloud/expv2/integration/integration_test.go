@@ -42,17 +42,15 @@ func TestOutputFlush(t *testing.T) {
 
 	// init conifg
 	conf := cloudapi.NewConfig()
-	conf.Host = null.StringFrom(ts.URL)
-	conf.Token = null.StringFrom("my-secret-token")
+	conf.MetricsPushURL = null.StringFrom(ts.URL + "/v2/metrics/123")
+	conf.TestRunToken = null.StringFrom("my-scoped-token")
 	conf.AggregationPeriod = types.NullDurationFrom(3 * time.Second)
 	conf.AggregationWaitPeriod = types.NullDurationFrom(1 * time.Second)
 
 	logger := testutils.NewLogger(t)
-	cc := cloudapi.NewClient(logger, conf.Token.String, conf.Host.String,
-		"expv2/integration", conf.Timeout.TimeDuration())
 
 	// init and start the output
-	o, err := expv2.New(logger, conf, cc)
+	o, err := expv2.New(logger, conf, nil)
 	require.NoError(t, err)
 	o.SetTestRunID("123")
 	require.NoError(t, o.Start())
@@ -89,7 +87,7 @@ func TestOutputFlush(t *testing.T) {
 func metricsHandler(results chan<- *pbcloud.MetricSet) http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		token := r.Header.Get("Authorization")
-		if token != "Token my-secret-token" {
+		if token != "Bearer my-scoped-token" {
 			http.Error(rw, fmt.Sprintf("token is required; got %q", token), http.StatusUnauthorized)
 			return
 		}
