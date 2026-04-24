@@ -3373,20 +3373,20 @@ func TestCloudSourceNotRegisteredForPlainRun(t *testing.T) {
 	assert.NotContains(t, stderr, "cloud secrets not configured")
 }
 
-// TestCloudSecretSourceRejectedByK6Run verifies that --secret-source=cloud is rejected
-// by 'k6 run' since the cloud source is only valid with 'k6 cloud run --local-execution'.
-func TestCloudSecretSourceRejectedByK6Run(t *testing.T) {
+// TestCloudSecretSourceInvalidForK6Run verifies that 'cloud' is not a valid value for
+// --secret-source; cloud secrets are automatic and not user-configurable via that flag.
+func TestCloudSecretSourceInvalidForK6Run(t *testing.T) {
 	t.Parallel()
 
 	ts := getSingleFileTestState(t, `export default function() {}`, []string{"--secret-source=cloud"}, exitcodes.InvalidConfig)
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
-	assert.Contains(t, ts.Stderr.String(), "the 'cloud' secret source can only be used with 'k6 cloud run --local-execution'")
+	assert.Contains(t, ts.Stderr.String(), "'cloud' is not a valid value for --secret-source")
 }
 
 // TestPLZCloudSecretsEnvVars verifies that setting K6_CLOUD_SECRETS_TOKEN and
-// K6_CLOUD_SECRETS_ENDPOINT configures the cloud secret source without requiring
-// --secret-source=cloud or a /v1/tests API round-trip (the PLZ operator path).
+// K6_CLOUD_SECRETS_ENDPOINT configures the cloud secret source without a /v1/tests
+// API round-trip (the PLZ operator path).
 func TestPLZCloudSecretsEnvVars(t *testing.T) {
 	t.Parallel()
 
@@ -3411,7 +3411,7 @@ func TestPLZCloudSecretsEnvVars(t *testing.T) {
 
 	ts.Env["K6_CLOUD_SECRETS_TOKEN"] = "plz-token"
 	ts.Env["K6_CLOUD_SECRETS_ENDPOINT"] = srv.URL + "/secrets/{key}"
-	// No --secret-source flag: cloud source is auto-registered and PLZ env vars configure it.
+	// Cloud source is auto-registered when PLZ env vars are set; no extra flags needed.
 	ts.CmdArgs = []string{"k6", "run", "script.js"}
 
 	cmd.ExecuteWithGlobalState(ts.GlobalState)

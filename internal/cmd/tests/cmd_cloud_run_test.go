@@ -52,9 +52,19 @@ func TestCloudRunCommandIncompatibleFlags(t *testing.T) {
 			wantStderrContains: "the --local-execution flag is not compatible with the --show-logs flag",
 		},
 		{
-			name:               "using --secret-source=cloud without --local-execution should fail",
+			name:               "--secret-source=cloud is not a valid value",
 			cliArgs:            []string{"--secret-source=cloud"},
-			wantStderrContains: "the 'cloud' secret source can only be used with 'k6 cloud run --local-execution'",
+			wantStderrContains: "'cloud' is not a valid value for --secret-source",
+		},
+		{
+			name:               "--secret-source=cloud is not a valid value even with --local-execution",
+			cliArgs:            []string{"--local-execution", "--secret-source=cloud"},
+			wantStderrContains: "'cloud' is not a valid value for --secret-source",
+		},
+		{
+			name:               "using --no-cloud-secrets without --local-execution should fail",
+			cliArgs:            []string{"--no-cloud-secrets"},
+			wantStderrContains: "the --no-cloud-secrets flag can only be used in conjunction with the --local-execution flag",
 		},
 	}
 
@@ -250,6 +260,45 @@ export default function() {
 		assert.Contains(t, stdout, "output: cloud (https://app.k6.io/runs/"+pushRefID+")")
 		assert.Contains(t, stdout, "The test run id is "+pushRefID)
 	})
+}
+
+func TestCloudRunLocalExecutionNoCloudSecrets(t *testing.T) {
+	t.Parallel()
+
+	script := `
+export const options = {
+  cloud: {
+      name: 'Test no-cloud-secrets',
+      projectID: 123456,
+  },
+};
+export default function() {};`
+
+	ts := makeTestState(t, script, []string{"--local-execution", "--no-cloud-secrets"})
+
+	testServerHandlerFunc := http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
+		resp.WriteHeader(http.StatusOK)
+		_, err := fmt.Fprint(resp, `{
+			"reference_id": "1337",
+			"test_run_token": "mock-test-run-token",
+			"secrets_config": {
+				"endpoint": "https://mock-secrets.example.com/{key}",
+				"response_path": "plaintext"
+			},
+			"config": {
+				"testRunDetails": "https://some.other.url/foo/tests/org/1337?bar=baz"
+			}
+		}`)
+		assert.NoError(t, err)
+	})
+
+	srv := getCloudTestEndChecker(t, 1337, testServerHandlerFunc, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed)
+	ts.Env["K6_CLOUD_HOST"] = srv.URL
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	// --no-cloud-secrets must prevent the cloud source from being registered.
+	assert.Nil(t, ts.CloudSecretSource, "cloud secret source should not be registered when --no-cloud-secrets is set")
 }
 
 func makeTestState(tb testing.TB, script string, cliFlags []string) *GlobalTestState {
