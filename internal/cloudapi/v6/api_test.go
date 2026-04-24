@@ -2,17 +2,21 @@ package cloudapi
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	k6cloud "github.com/grafana/k6-cloud-openapi-client-go/k6"
+	"github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/v2/internal/build"
@@ -650,4 +654,232 @@ func TestUploadArchive(t *testing.T) {
 			}
 		})
 	}
+}
+
+// newTestClientWithLogger creates a test client using the provided logger (for log capture).
+func newTestClientWithLogger(t *testing.T, logger logrus.FieldLogger, handler http.Handler) *Client {
+	t.Helper()
+
+	srv := httptest.NewServer(handler)
+	t.Cleanup(srv.Close)
+
+	client, err := NewClient(logger, "test-token", srv.URL, "1.0", 5*time.Second)
+	require.NoError(t, err)
+	client.SetStackID(1)
+
+	return client
+}
+
+// makeTestRunResponse builds a minimal k6cloud.TestRunApiModel JSON-encodable value
+// for the given status.
+func makeTestRunResponse(status Status, statusHistory []StatusEvent) *k6cloud.TestRunApiModel {
+	res := k6cloud.NewTestRunApiModelWithDefaults()
+	res.SetStatus(status.String())
+	res.SetResult(ResultPassed.String())
+	res.SetDistribution([]k6cloud.DistributionZoneApiModel{})
+	res.SetResultDetails(map[string]any{})
+	res.SetOptions(map[string]any{})
+	res.SetStatusHistory(ToStatusModel(statusHistory))
+	return res
+}
+
+// sequentialHandler builds an httptest handler that returns responses[i] for the i-th call.
+// After the last response is exhausted it repeats the last one.
+func sequentialHandler(t *testing.T, responses []*k6cloud.TestRunApiModel) http.Handler {
+	t.Helper()
+	var mu sync.Mutex
+	i := 0
+	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		mu.Lock()
+		res := responses[i]
+		if i < len(responses)-1 {
+			i++
+		}
+		mu.Unlock()
+		writeJSON(t, w, http.StatusOK, res)
+	})
+}
+
+func TestWaitForTestRunReady(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name            string
+		responses       []*k6cloud.TestRunApiModel
+		wantErrContains string // "" ⇒ expect nil error
+		wantInfoLogs    int    // -1 = don't check; ≥0 = assert exact count of Info entries with "status" field
+		wantWarnLogs    int    // -1 = don't check; ≥0 = assert exact count of Warn entries
+	}{
+		{
+			name: "initializing then running",
+			responses: []*k6cloud.TestRunApiModel{
+				makeTestRunResponse(StatusInitializing, nil),
+				makeTestRunResponse(StatusInitializing, nil),
+				makeTestRunResponse(StatusInitializing, nil),
+				makeTestRunResponse(StatusRunning, nil),
+			},
+			wantInfoLogs: -1,
+			wantWarnLogs: -1,
+		},
+		{
+			name: "all three pre-run states",
+			responses: []*k6cloud.TestRunApiModel{
+				makeTestRunResponse(StatusCreated, nil),
+				makeTestRunResponse(StatusCreated, nil),
+				makeTestRunResponse(StatusQueued, nil),
+				makeTestRunResponse(StatusQueued, nil),
+				makeTestRunResponse(StatusInitializing, nil),
+				makeTestRunResponse(StatusInitializing, nil),
+				makeTestRunResponse(StatusRunning, nil),
+			},
+			wantInfoLogs: -1,
+			wantWarnLogs: -1,
+		},
+		{
+			name: "aborted fails with message",
+			responses: []*k6cloud.TestRunApiModel{
+				makeTestRunResponse(StatusAborted, []StatusEvent{
+					{Status: StatusAborted, Message: "backend rejected archive"},
+				}),
+			},
+			wantErrContains: "backend rejected archive",
+			wantInfoLogs:    -1,
+			wantWarnLogs:    -1,
+		},
+		{
+			name: "status change display logs two info entries",
+			responses: func() []*k6cloud.TestRunApiModel {
+				r := make([]*k6cloud.TestRunApiModel, 0, 9)
+				for range 5 {
+					r = append(r, makeTestRunResponse(StatusQueued, nil))
+				}
+				for range 3 {
+					r = append(r, makeTestRunResponse(StatusInitializing, nil))
+				}
+				r = append(r, makeTestRunResponse(StatusRunning, nil))
+				return r
+			}(),
+			wantInfoLogs: 2,
+			wantWarnLogs: -1,
+		},
+		{
+			name: "processing_metrics warns and proceeds",
+			responses: []*k6cloud.TestRunApiModel{
+				makeTestRunResponse(StatusProcessingMetrics, nil),
+			},
+			wantInfoLogs: -1,
+			wantWarnLogs: 1,
+		},
+		{
+			name: "completed warns and proceeds",
+			responses: []*k6cloud.TestRunApiModel{
+				makeTestRunResponse(StatusCompleted, nil),
+			},
+			wantInfoLogs: -1,
+			wantWarnLogs: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			logger, hook := logrustest.NewNullLogger()
+			logger.SetLevel(logrus.InfoLevel)
+			client := newTestClientWithLogger(t, logger, sequentialHandler(t, tt.responses))
+
+			err := client.WaitForTestRunReady(t.Context(), 42, 1*time.Millisecond)
+
+			if tt.wantErrContains != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErrContains)
+			} else {
+				require.NoError(t, err)
+			}
+
+			if tt.wantInfoLogs >= 0 {
+				var infoStatusEntries []*logrus.Entry
+				for _, e := range hook.AllEntries() {
+					if e.Level == logrus.InfoLevel {
+						if _, ok := e.Data["status"]; ok {
+							infoStatusEntries = append(infoStatusEntries, e)
+						}
+					}
+				}
+				assert.Len(t, infoStatusEntries, tt.wantInfoLogs,
+					"expected exactly %d status-change log lines at Info", tt.wantInfoLogs)
+			}
+
+			if tt.wantWarnLogs >= 0 {
+				var warnEntries []*logrus.Entry
+				for _, e := range hook.AllEntries() {
+					if e.Level == logrus.WarnLevel {
+						warnEntries = append(warnEntries, e)
+					}
+				}
+				require.Len(t, warnEntries, tt.wantWarnLogs)
+				if tt.wantWarnLogs > 0 {
+					assert.Contains(t, warnEntries[0].Message, "unexpected pre-run test run status")
+				}
+			}
+		})
+	}
+}
+
+// TestWaitForTestRunReady_ContextCancelMidPoll: context is cancelled after first FetchTest call.
+// Verifies the function returns context.Canceled or context.DeadlineExceeded.
+func TestWaitForTestRunReady_ContextCancelMidPoll(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(t.Context())
+
+	callCount := 0
+	var mu sync.Mutex
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		mu.Lock()
+		callCount++
+		mu.Unlock()
+		// Cancel after first call returns
+		cancel()
+		writeJSON(t, w, http.StatusOK, makeTestRunResponse(StatusInitializing, nil))
+	})
+
+	client := newTestClient(t, handler)
+	err := client.WaitForTestRunReady(ctx, 42, 1*time.Millisecond)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, context.Canceled)
+}
+
+// TestWaitForTestRunReady_LongQueueWait: mock returns queued×35, initializing×1, running×1.
+// Verifies no timeout, no spurious error, and queued is logged exactly once.
+func TestWaitForTestRunReady_LongQueueWait(t *testing.T) {
+	t.Parallel()
+
+	responses := make([]*k6cloud.TestRunApiModel, 0, 37)
+	for i := 0; i < 35; i++ {
+		responses = append(responses, makeTestRunResponse(StatusQueued, nil))
+	}
+	responses = append(responses, makeTestRunResponse(StatusInitializing, nil))
+	responses = append(responses, makeTestRunResponse(StatusRunning, nil))
+
+	logger, hook := logrustest.NewNullLogger()
+	logger.SetLevel(logrus.InfoLevel)
+	client := newTestClientWithLogger(t, logger, sequentialHandler(t, responses))
+
+	err := client.WaitForTestRunReady(t.Context(), 42, 1*time.Millisecond)
+	require.NoError(t, err)
+
+	// Count Info-level entries with "status" field — queued should appear exactly once.
+	var queuedEntries int
+	for _, e := range hook.AllEntries() {
+		if e.Level == logrus.InfoLevel {
+			if statusVal, ok := e.Data["status"]; ok {
+				if fmt.Sprintf("%v", statusVal) == "Queued" {
+					queuedEntries++
+				}
+			}
+		}
+	}
+	assert.Equal(t, 1, queuedEntries, "queued status must be logged exactly once")
 }

@@ -18,6 +18,8 @@ import (
 	"go.k6.io/k6/v2/lib"
 )
 
+const defaultWaitPollInterval = 2 * time.Second
+
 // StartLocalExecutionRequest is the request body for start_local_execution.
 type StartLocalExecutionRequest struct {
 	Options       map[string]any `json:"options"`
@@ -308,6 +310,66 @@ func (c *Client) FetchTest(ctx context.Context, testRunID int32) (_ *TestProgres
 		StatusHistory:     FromStatusModel(res.GetStatusHistory()),
 	}, nil
 }
+
+// WaitForTestRunReady polls the test run status until it leaves the pre-run states.
+// It keeps polling while status is one of {created, queued, initializing}.
+// It fails (returns error) if status becomes "aborted".
+// It warns and proceeds on unexpected terminal states (processing_metrics, completed).
+// It logs a status line (Info level) whenever the status changes, but only for wait states.
+// If pollInterval <= 0, it defaults to 2 seconds.
+func (c *Client) WaitForTestRunReady(ctx context.Context, testRunID int32, pollInterval time.Duration) error {
+	if pollInterval <= 0 {
+		pollInterval = defaultWaitPollInterval
+	}
+
+	lastStatus := ""
+
+	for {
+		progress, err := c.FetchTest(ctx, testRunID)
+		if err != nil {
+			return err
+		}
+
+		status := progress.Status.String()
+
+		switch Status(status) {
+		case StatusAborted:
+			var abortMsg string
+			for _, e := range progress.StatusHistory {
+				if e.Status == StatusAborted && e.Message != "" {
+					abortMsg = e.Message
+					break
+				}
+			}
+			if abortMsg != "" {
+				return fmt.Errorf("test run aborted before starting: %s", abortMsg)
+			}
+			return fmt.Errorf("test run aborted before starting")
+
+		case StatusCreated, StatusQueued, StatusInitializing:
+			if status != lastStatus {
+				c.logger.WithField("status", progress.FormatStatus()).Info("test status")
+				lastStatus = status
+			}
+
+		case StatusProcessingMetrics, StatusCompleted:
+			c.logger.WithField("status", status).Warn("unexpected pre-run test run status — proceeding")
+			return nil
+
+		default:
+			// Any other status (e.g. "running") means the run is underway — proceed.
+			return nil
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(pollInterval):
+			// continue polling
+		}
+	}
+}
+
 
 func (c *Client) authCtx(ctx context.Context) context.Context {
 	return context.WithValue(ctx, k6cloud.ContextAccessToken, c.token)
