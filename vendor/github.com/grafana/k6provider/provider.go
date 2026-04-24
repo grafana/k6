@@ -252,6 +252,13 @@ func (p *Provider) GetArtifact(
 ) (Artifact, error) {
 	k6Constrains, buildDeps := buildDeps(deps)
 
+	// When using k6 v2 and no explicit k6 version constraint was given, restrict to
+	// v2 pre-releases and above. Masterminds semver's "*" excludes pre-releases, which
+	// would prevent matching v2.0.0-rc1 and similar early releases.
+	if k6Constrains == "*" && p.k6ModPath == K6ModPathV2 {
+		k6Constrains = ">=v2.0.0-0"
+	}
+
 	p.logger.Debug("Resolving k6 artifact",
 		"deps", deps,
 		"platform", p.platform,
