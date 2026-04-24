@@ -20,29 +20,41 @@ import (
 // the collected metrics from the Cloud output
 // to the remote service.
 type metricsClient struct {
-	httpClient *cloudapi.Client
-	url        string
+	httpClient   *cloudapi.Client
+	url          string
+	testRunToken string
 }
 
 // newMetricsClient creates and initializes a new MetricsClient.
-func newMetricsClient(c *cloudapi.Client, testRunID string) (*metricsClient, error) {
-	// The cloudapi.Client works across different versions of the API, the test
-	// lifecycle management is under /v1 instead the metrics ingestion is /v2.
-	// Unfortunately, the current client has v1 hard-coded so we need to trim the wrong path
-	// to be able to replace it with the correct one.
-	// A versioned client would be better but it would require a breaking change
-	// and considering that other services (e.g. k6-operator) depend on it,
-	// we want to stabilize the API before.
-	u := c.BaseURL()
-	if !strings.HasSuffix(u, "/v1") {
-		return nil, errors.New("a /v1 suffix is expected in the Cloud service's BaseURL path")
-	}
+func newMetricsClient(
+	c *cloudapi.Client, pushURL string, testRunID string, testRunToken string,
+) (*metricsClient, error) {
 	if testRunID == "" {
 		return nil, errors.New("TestRunID of the test is required")
 	}
+
+	var url string
+	if pushURL != "" {
+		url = pushURL
+	} else {
+		// The cloudapi.Client works across different versions of the API, the test
+		// lifecycle management is under /v1 instead the metrics ingestion is /v2.
+		// Unfortunately, the current client has v1 hard-coded so we need to trim the wrong path
+		// to be able to replace it with the correct one.
+		// A versioned client would be better but it would require a breaking change
+		// and considering that other services (e.g. k6-operator) depend on it,
+		// we want to stabilize the API before.
+		u := c.BaseURL()
+		if !strings.HasSuffix(u, "/v1") {
+			return nil, errors.New("a /v1 suffix is expected in the Cloud service's BaseURL path")
+		}
+		url = strings.TrimSuffix(u, "/v1") + "/v2/metrics/" + testRunID
+	}
+
 	return &metricsClient{
-		httpClient: c,
-		url:        strings.TrimSuffix(u, "/v1") + "/v2/metrics/" + testRunID,
+		httpClient:   c,
+		url:          url,
+		testRunToken: testRunToken,
 	}, nil
 }
 
@@ -66,6 +78,10 @@ func (mc *metricsClient) push(samples *pbcloud.MetricSet) error {
 	req.Header.Set("Content-Type", "application/x-protobuf")
 	req.Header.Set("Content-Encoding", "snappy")
 	req.Header.Set("K6-Metrics-Protocol-Version", "2.0")
+
+	if mc.testRunToken != "" {
+		req.Header.Set("Authorization", "Bearer "+mc.testRunToken)
+	}
 
 	err = mc.httpClient.Do(req, nil)
 	if err != nil {
