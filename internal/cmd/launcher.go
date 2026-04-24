@@ -351,6 +351,7 @@ func getProviderConfig(gs *state.GlobalState) k6provider.Config {
 	config := k6provider.Config{
 		BuildServiceURL: gs.Flags.BuildServiceURL,
 		BinaryCacheDir:  gs.Flags.BinaryCache,
+		K6ModPath:       "go.k6.io/k6/v2",
 	}
 
 	token, err := extractToken(gs)
