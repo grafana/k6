@@ -20,17 +20,16 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"go.k6.io/k6/cmd/state"
-	"go.k6.io/k6/errext"
-	"go.k6.io/k6/errext/exitcodes"
-	"go.k6.io/k6/ext"
-	"go.k6.io/k6/internal/build"
-	"go.k6.io/k6/internal/js"
-	"go.k6.io/k6/internal/loader"
-	"go.k6.io/k6/js/modules"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/fsext"
-	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/v2/cmd/state"
+	"go.k6.io/k6/v2/errext"
+	"go.k6.io/k6/v2/errext/exitcodes"
+	"go.k6.io/k6/v2/ext"
+	"go.k6.io/k6/v2/internal/js"
+	"go.k6.io/k6/v2/internal/loader"
+	"go.k6.io/k6/v2/js/modules"
+	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/lib/fsext"
+	"go.k6.io/k6/v2/metrics"
 )
 
 const (
@@ -50,10 +49,11 @@ type loadedTest struct {
 	initRunner     lib.Runner // TODO: rename to something more appropriate
 	keyLogger      io.Closer
 
-	dependencies       dependencies
-	imports            []string
-	runnerContinuation func() (lib.Runner, error)
-	dependencyErr      error
+	dependencies            dependencies
+	preManifestDependencies dependencies
+	imports                 []string
+	runnerContinuation      func() (lib.Runner, error)
+	dependencyErr           error
 }
 
 func loadLocalTestWithoutRunner(gs *state.GlobalState, cmd *cobra.Command, args []string) (*loadedTest, error) {
@@ -172,8 +172,9 @@ func (lt *loadedTest) prepareFirstRunner(gs *state.GlobalState) error {
 			moduleResolver.LoadMainModule(pwd, specifier, lt.source.Data),
 			exitcodes.ScriptException)
 		lt.imports = moduleResolver.Imported()
-		deps, depErr := resolveModulesDependencies(err, lt.imports, logger, lt.fileSystems, lt.source, gs)
+		deps, preDeps, depErr := resolveModulesDependencies(err, lt.imports, logger, lt.fileSystems, lt.source, gs)
 		lt.dependencies = deps
+		lt.preManifestDependencies = preDeps
 		if depErr != nil {
 			return fmt.Errorf("could not load JS test '%s': %w", testPath, depErr)
 		}
@@ -205,8 +206,9 @@ func (lt *loadedTest) prepareFirstRunner(gs *state.GlobalState) error {
 				moduleResolver.LoadMainModule(pwd, specifier, arc.Data),
 				exitcodes.ScriptException)
 			lt.imports = moduleResolver.Imported()
-			deps, depErr := resolveModulesDependencies(loadErr, lt.imports, logger, arc.Filesystems, lt.source, gs)
+			deps, preDeps, depErr := resolveModulesDependencies(loadErr, lt.imports, logger, arc.Filesystems, lt.source, gs)
 			lt.dependencies = deps
+			lt.preManifestDependencies = preDeps
 			if depErr != nil {
 				return fmt.Errorf("could not load JS test '%s': %w", testPath, depErr)
 			}
@@ -255,67 +257,106 @@ func (lt *loadedTest) Imports() []string {
 	return append([]string(nil), lt.imports...)
 }
 
+func (lt *loadedTest) makeArchive() *lib.Archive {
+	arc := lt.initRunner.MakeArchive()
+	arc.Dependencies = lt.preManifestDependencies.toStringMap()
+	return arc
+}
+
 func resolveModulesDependencies(
 	originalError error, imports []string, logger logrus.FieldLogger,
 	fileSystems map[string]fsext.Fs, source *loader.SourceData, gs *state.GlobalState,
-) (dependencies, error) {
-	deps, err := collectTestDependencies(originalError, imports, fileSystems, gs.Flags.DependenciesManifest)
+) (deps, preDeps dependencies, err error) {
+	deps, preDeps, err = collectTestDependencies(originalError, imports, fileSystems, gs.Flags.DependenciesManifest)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if !gs.Flags.AutoExtensionResolution {
-		return deps, originalError
+		return deps, preDeps, originalError
 	}
 
-	if len(deps) == 0 {
-		return deps, nil
-	}
-
-	if !isCustomBuildRequired(deps, build.Version, ext.GetAll()) {
+	if err := checkBuiltinDependencies(deps, runtimeK6Version(), ext.GetAll()); err != nil {
+		logger.WithError(err).Debug("Current binary does not satisfy all dependencies, custom build required")
+	} else {
 		logger.
 			Debug("The current k6 binary already satisfies all the required dependencies," +
 				" it isn't required to provision a new binary.")
-		return deps, nil
+		return deps, preDeps, nil
 	}
 
 	if source.URL.Path == "/-" {
 		gs.Stdin = bytes.NewBuffer(source.Data)
 	}
 
-	return deps, binaryIsNotSatisfyingDependenciesError{
+	return deps, preDeps, binaryIsNotSatisfyingDependenciesError{
 		deps: deps,
 	}
 }
 
+// collectTestDependencies builds the complete set of build dependencies for a
+// script in three ordered steps, then snapshots them before applying any
+// external manifest override.
+//
+// Step 1 — failed imports (extractUnknownModules): modules that the resolver
+// could not find are the primary signal that an extension is needed.
+//
+// Step 2 — k6/x/ import scan: ModuleResolver.Imported() contains every k6/x/
+// specifier the resolver touched, including ones that loaded successfully
+// because they are already built into the binary. Step 1 misses those.
+// This matters for auto-extension-resolution: on the re-execution with the
+// provisioned binary the extension is registered, so step 1 never fires for
+// it. Step 2 must run before step 3 so that a "use k6 with k6/x/foo >= 1.0"
+// directive found in step 3 can override the nil constraint added here.
+//
+// Step 3 — "use k6" directives (analyseUseContraints): explicit version
+// constraints declared inside script files. These take precedence over the
+// unconstrained entries added by steps 1 and 2 because deps.update only
+// overwrites nil/"*" constraints.
+//
+// After the three steps the map is cloned to preserve the pre-manifest state,
+// then the external manifest is applied.
 func collectTestDependencies(
 	originalError error, imports []string, fileSystems map[string]fsext.Fs, manifest string,
-) (dependencies, error) {
-	deps, err := extractUnknownModules(originalError)
+) (deps, preDeps dependencies, err error) {
+	// Step 1: modules that failed to load.
+	deps, err = extractUnknownModules(originalError)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	// Ensure k6 is always a dependency with "*" constraint by default.
-	// This can be overridden by "use k6" or "use k6 with k6/x/..." directives in the script.
+	// k6 itself is always a dependency; directives in the script can tighten this.
 	if _, ok := deps["k6"]; !ok {
 		deps["k6"] = nil
 	}
 
-	if err := analyseUseContraints(imports, fileSystems, deps); err != nil {
-		return nil, err
+	// Step 2: all k6/x/ imports, registered or not.
+	for _, imported := range imports {
+		if strings.HasPrefix(imported, "k6/x/") {
+			if _, ok := deps[imported]; !ok {
+				deps[imported] = nil
+			}
+		}
 	}
+
+	// Step 3: explicit version constraints from "use k6" directives in script files.
+	if err = analyseUseContraints(imports, fileSystems, deps); err != nil {
+		return nil, nil, err
+	}
+
+	// Snapshot before the manifest so callers can distinguish what the script
+	// declared from what an external policy required.
+	preDeps = maps.Clone(deps)
 
 	m, err := parseManifest(manifest)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	err = deps.applyManifest(m)
-	if err != nil {
-		return nil, err
+	if err = deps.applyManifest(m); err != nil {
+		return nil, nil, err
 	}
 
-	return deps, nil
+	return deps, preDeps, nil
 }
 
 func analyseUseContraints(imports []string, fileSystems map[string]fsext.Fs, deps dependencies) error {
@@ -396,6 +437,18 @@ func (d dependencies) String() string {
 		}
 	}
 	return buf.String()
+}
+
+func (d dependencies) toStringMap() map[string]string {
+	m := make(map[string]string, len(d))
+	for k, v := range d {
+		if v == nil {
+			m[k] = "*"
+		} else {
+			m[k] = v.String()
+		}
+	}
+	return m
 }
 
 func dependenciesFromMap(input map[string]string) (dependencies, error) {
@@ -544,14 +597,6 @@ func (lct *loadedAndConfiguredTest) buildTestRunState(
 	// This might be the full derived or just the consolidated options
 	if err := lct.initRunner.SetOptions(configToReinject); err != nil {
 		return nil, err
-	}
-
-	// Here, where we get the consolidated options, is where we check if any
-	// of the deprecated options is being used, and we report it.
-	if _, isPresent := configToReinject.External["loadimpact"]; isPresent {
-		if err := lct.preInitState.Usage.Uint64("deprecations/options.ext.loadimpact", 1); err != nil {
-			return nil, err
-		}
 	}
 
 	// it pre-loads system certificates to avoid doing it on the first TLS request.

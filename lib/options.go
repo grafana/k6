@@ -13,8 +13,8 @@ import (
 
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/lib/types"
-	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/v2/lib/types"
+	"go.k6.io/k6/v2/metrics"
 )
 
 // DefaultScenarioName is used as the default key/ID of the scenario config entries
@@ -310,7 +310,7 @@ type Options struct {
 	// iteration is shorter than the specified value.
 	MinIterationDuration types.NullDuration `json:"minIterationDuration" envconfig:"K6_MIN_ITERATION_DURATION"`
 
-	// Cloud is the configuration for the k6 Cloud, formerly known as ext.loadimpact.
+	// Cloud is the configuration for the k6 Cloud.
 	Cloud json.RawMessage `json:"cloud,omitempty"`
 
 	// These values are for third party collectors' benefit.

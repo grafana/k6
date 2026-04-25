@@ -4,29 +4,27 @@ import (
 	"errors"
 	"sync"
 
-	"go.k6.io/k6/ext"
-	"go.k6.io/k6/internal/js/modules/k6"
-	"go.k6.io/k6/internal/js/modules/k6/browser/browser"
-	"go.k6.io/k6/internal/js/modules/k6/crypto"
-	"go.k6.io/k6/internal/js/modules/k6/crypto/x509"
-	"go.k6.io/k6/internal/js/modules/k6/data"
-	"go.k6.io/k6/internal/js/modules/k6/encoding"
-	"go.k6.io/k6/internal/js/modules/k6/execution"
-	"go.k6.io/k6/internal/js/modules/k6/experimental/csv"
-	"go.k6.io/k6/internal/js/modules/k6/experimental/fs"
-	"go.k6.io/k6/internal/js/modules/k6/experimental/streams"
-	"go.k6.io/k6/internal/js/modules/k6/grpc"
-	"go.k6.io/k6/internal/js/modules/k6/metrics"
-	"go.k6.io/k6/internal/js/modules/k6/secrets"
-	"go.k6.io/k6/internal/js/modules/k6/timers"
-	"go.k6.io/k6/internal/js/modules/k6/websockets"
-	"go.k6.io/k6/internal/js/modules/k6/ws"
-	"go.k6.io/k6/js/common"
-	"go.k6.io/k6/js/modules"
-	"go.k6.io/k6/js/modules/k6/html"
-	"go.k6.io/k6/js/modules/k6/http"
-
-	"github.com/grafana/xk6-redis/redis"
+	"go.k6.io/k6/v2/ext"
+	"go.k6.io/k6/v2/internal/js/modules/k6"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/browser"
+	"go.k6.io/k6/v2/internal/js/modules/k6/crypto"
+	"go.k6.io/k6/v2/internal/js/modules/k6/crypto/x509"
+	"go.k6.io/k6/v2/internal/js/modules/k6/data"
+	"go.k6.io/k6/v2/internal/js/modules/k6/encoding"
+	"go.k6.io/k6/v2/internal/js/modules/k6/execution"
+	"go.k6.io/k6/v2/internal/js/modules/k6/experimental/csv"
+	"go.k6.io/k6/v2/internal/js/modules/k6/experimental/fs"
+	"go.k6.io/k6/v2/internal/js/modules/k6/experimental/streams"
+	"go.k6.io/k6/v2/internal/js/modules/k6/grpc"
+	"go.k6.io/k6/v2/internal/js/modules/k6/metrics"
+	"go.k6.io/k6/v2/internal/js/modules/k6/secrets"
+	"go.k6.io/k6/v2/internal/js/modules/k6/timers"
+	"go.k6.io/k6/v2/internal/js/modules/k6/websockets"
+	"go.k6.io/k6/v2/internal/js/modules/k6/ws"
+	"go.k6.io/k6/v2/js/common"
+	"go.k6.io/k6/v2/js/modules"
+	"go.k6.io/k6/v2/js/modules/k6/html"
+	"go.k6.io/k6/v2/js/modules/k6/http"
 )
 
 func getInternalJSModules() map[string]any {
@@ -57,9 +55,9 @@ func getInternalJSModules() map[string]any {
 		"k6/experimental/websockets": newWarnExperimentalModule(websockets.New(),
 			"k6/experimental/websockets is deprecated and will be removed in a future release."+
 				" Please use k6/websockets instead."),
-		"k6/experimental/redis": newWarnExperimentalModule(redis.New(),
-			"k6/experimental/redis has been deprecated and will be removed in future versions."+
-				" Please migrate to the new version by changing your import to 'k6/x/redis'."+
+		"k6/experimental/redis": newRemovedModule(
+			"k6/experimental/redis has been removed." +
+				" Please migrate to the new version by changing your import to 'k6/x/redis'." +
 				" Read more here: https://grafana.com/docs/k6/latest/javascript-api/k6-x-redis"),
 
 		// Removed modules

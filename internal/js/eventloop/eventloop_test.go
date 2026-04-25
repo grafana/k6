@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/internal/js/eventloop"
-	"go.k6.io/k6/js/common"
-	"go.k6.io/k6/js/modulestest"
+	"go.k6.io/k6/v2/internal/js/eventloop"
+	"go.k6.io/k6/v2/js/common"
+	"go.k6.io/k6/v2/js/modulestest"
 )
 
 func TestBasicEventLoop(t *testing.T) {
@@ -36,118 +37,130 @@ func TestBasicEventLoop(t *testing.T) {
 
 func TestEventLoopRegistered(t *testing.T) {
 	t.Parallel()
-	loop := eventloop.New(&modulestest.VU{RuntimeField: sobek.New()})
-	var ran int
-	f := func() error {
-		ran++
-		r := loop.RegisterCallback()
-		go func() {
-			time.Sleep(time.Second)
-			r(func() error {
-				ran++
-				return nil
-			})
-		}()
-		return nil
-	}
-	start := time.Now()
-	require.NoError(t, loop.Start(f))
-	took := time.Since(start)
-	require.Equal(t, 2, ran)
-	require.Less(t, time.Second, took)
-	require.Greater(t, time.Second+time.Millisecond*100, took)
+	synctest.Test(t, func(t *testing.T) {
+		loop := eventloop.New(&modulestest.VU{RuntimeField: sobek.New()})
+		var ran int
+		f := func() error {
+			ran++
+			r := loop.RegisterCallback()
+			go func() {
+				time.Sleep(time.Second)
+				r(func() error {
+					ran++
+					return nil
+				})
+			}()
+			return nil
+		}
+		start := time.Now()
+		require.NoError(t, loop.Start(f))
+		synctest.Wait()
+		took := time.Since(start)
+		require.Equal(t, 2, ran)
+		require.GreaterOrEqual(t, took, time.Second, "should have waited for goroutine sleep")
+		require.LessOrEqual(t, took, time.Second+time.Millisecond*100)
+	})
 }
 
 func TestEventLoopWaitOnRegistered(t *testing.T) {
 	t.Parallel()
-	var ran int
-	loop := eventloop.New(&modulestest.VU{RuntimeField: sobek.New()})
-	f := func() error {
-		ran++
-		r := loop.RegisterCallback()
-		go func() {
-			time.Sleep(time.Second)
-			r(func() error {
-				ran++
-				return nil
-			})
-		}()
-		return fmt.Errorf("expected")
-	}
-	start := time.Now()
-	require.Error(t, loop.Start(f))
-	took := time.Since(start)
-	loop.WaitOnRegistered()
-	took2 := time.Since(start)
-	require.Equal(t, 2, ran)
-	require.Greater(t, time.Millisecond*50, took)
-	require.Less(t, time.Second, took2)
-	require.Greater(t, time.Second+time.Millisecond*100, took2)
-}
-
-func TestEventLoopAllCallbacksGetCalled(t *testing.T) {
-	t.Parallel()
-	sleepTime := time.Millisecond * 500
-	loop := eventloop.New(&modulestest.VU{RuntimeField: sobek.New()})
-	var called int64
-	f := func() error {
-		for i := range 100 {
-			bad := i == 99
+	synctest.Test(t, func(t *testing.T) {
+		var ran int
+		loop := eventloop.New(&modulestest.VU{RuntimeField: sobek.New()})
+		f := func() error {
+			ran++
 			r := loop.RegisterCallback()
-
 			go func() {
-				if !bad {
-					time.Sleep(sleepTime)
-				}
+				time.Sleep(time.Second)
 				r(func() error {
-					if bad {
-						return errors.New("something")
-					}
-					atomic.AddInt64(&called, 1)
+					ran++
 					return nil
 				})
 			}()
+			return fmt.Errorf("expected")
 		}
-		return fmt.Errorf("expected")
-	}
-	for range 3 {
-		called = 0
 		start := time.Now()
 		require.Error(t, loop.Start(f))
 		took := time.Since(start)
 		loop.WaitOnRegistered()
+		synctest.Wait()
 		took2 := time.Since(start)
+		require.Equal(t, 2, ran)
 		require.Greater(t, time.Millisecond*50, took)
-		require.Less(t, sleepTime, took2)
-		require.Greater(t, sleepTime+time.Millisecond*100, took2)
-		require.EqualValues(t, 99, called)
-	}
+		require.GreaterOrEqual(t, took2, time.Second, "WaitOnRegistered should have waited for goroutine")
+		require.LessOrEqual(t, took2, time.Second+time.Millisecond*100)
+	})
+}
+
+func TestEventLoopAllCallbacksGetCalled(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		sleepTime := time.Millisecond * 500
+		loop := eventloop.New(&modulestest.VU{RuntimeField: sobek.New()})
+		var called int64
+		f := func() error {
+			for i := range 100 {
+				bad := i == 99
+				r := loop.RegisterCallback()
+
+				go func() {
+					if !bad {
+						time.Sleep(sleepTime)
+					}
+					r(func() error {
+						if bad {
+							return errors.New("something")
+						}
+						atomic.AddInt64(&called, 1)
+						return nil
+					})
+				}()
+			}
+			return fmt.Errorf("expected")
+		}
+		for range 3 {
+			called = 0
+			start := time.Now()
+			require.Error(t, loop.Start(f))
+			took := time.Since(start)
+			loop.WaitOnRegistered()
+			synctest.Wait()
+			took2 := time.Since(start)
+			require.Greater(t, time.Millisecond*50, took)
+			require.GreaterOrEqual(t, took2, sleepTime, "WaitOnRegistered should have waited for goroutines")
+			require.LessOrEqual(t, took2, sleepTime+time.Millisecond*100)
+			require.EqualValues(t, 99, called)
+		}
+	})
 }
 
 func TestEventLoopPanicOnDoubleCallback(t *testing.T) {
 	t.Parallel()
-	loop := eventloop.New(&modulestest.VU{RuntimeField: sobek.New()})
-	var ran int
-	f := func() error {
-		ran++
-		r := loop.RegisterCallback()
-		go func() {
-			time.Sleep(time.Second)
-			r(func() error {
-				ran++
-				return nil
-			})
+	synctest.Test(t, func(t *testing.T) {
+		loop := eventloop.New(&modulestest.VU{RuntimeField: sobek.New()})
+		var ran int
+		f := func() error {
+			ran++
+			r := loop.RegisterCallback()
+			go func() {
+				time.Sleep(time.Second)
+				r(func() error {
+					ran++
+					return nil
+				})
 
-			require.Panics(t, func() { r(func() error { return nil }) })
-		}()
-		return nil
-	}
-	start := time.Now()
-	require.NoError(t, loop.Start(f))
-	took := time.Since(start)
-	require.Equal(t, 2, ran)
-	require.Less(t, time.Second, took)
-	require.Greater(t, time.Second+time.Millisecond*100, took)
+				require.Panics(t, func() { r(func() error { return nil }) })
+			}()
+			return nil
+		}
+		start := time.Now()
+		require.NoError(t, loop.Start(f))
+		synctest.Wait()
+		took := time.Since(start)
+		require.Equal(t, 2, ran)
+		require.GreaterOrEqual(t, took, time.Second, "should have waited for goroutine sleep")
+		require.LessOrEqual(t, took, time.Second+time.Millisecond*100)
+	})
 }
 
 func TestEventLoopRejectUndefined(t *testing.T) {
@@ -199,7 +212,7 @@ func TestEventLoopRejectGoError(t *testing.T) {
 		return err
 	})
 	loop.WaitOnRegistered()
-	require.EqualError(t, err, "Uncaught (in promise) GoError: some error\n\tat go.k6.io/k6/internal/js/eventloop_test.TestEventLoopRejectGoError.func1 (native)\n\tat <eval>:1:31(2)\n")
+	require.EqualError(t, err, "Uncaught (in promise) GoError: some error\n\tat go.k6.io/k6/v2/internal/js/eventloop_test.TestEventLoopRejectGoError.func1 (native)\n\tat <eval>:1:31(2)\n")
 }
 
 func TestEventLoopRejectThrow(t *testing.T) {
@@ -216,7 +229,7 @@ func TestEventLoopRejectThrow(t *testing.T) {
 		return err
 	})
 	loop.WaitOnRegistered()
-	require.EqualError(t, err, "Uncaught (in promise) GoError: throw error\n\tat go.k6.io/k6/internal/js/eventloop_test.TestEventLoopRejectThrow.func1 (native)\n\tat <eval>:1:31(2)\n")
+	require.EqualError(t, err, "Uncaught (in promise) GoError: throw error\n\tat go.k6.io/k6/v2/internal/js/eventloop_test.TestEventLoopRejectThrow.func1 (native)\n\tat <eval>:1:31(2)\n")
 }
 
 func TestEventLoopAsyncAwait(t *testing.T) {

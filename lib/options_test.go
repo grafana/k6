@@ -13,8 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/lib/types"
-	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/v2/lib/types"
+	"go.k6.io/k6/v2/metrics"
 )
 
 func TestOptions(t *testing.T) {
@@ -461,14 +461,14 @@ func TestOptions(t *testing.T) {
 		assert.NoError(t, err)
 
 		hosts, err := types.NewNullHosts(map[string]types.Host{
-			"test.loadimpact.com": *host,
+			"test.k6.com": *host,
 		})
 		assert.NoError(t, err)
 		opts := Options{}.Apply(Options{Hosts: hosts})
 		assert.NotNil(t, opts.Hosts)
 		assert.NotEmpty(t, opts.Hosts)
 
-		assert.Equal(t, "192.0.2.1:80", opts.Hosts.Trie.Match("test.loadimpact.com").String())
+		assert.Equal(t, "192.0.2.1:80", opts.Hosts.Trie.Match("test.k6.com").String())
 	})
 
 	t.Run("Throws", func(t *testing.T) {

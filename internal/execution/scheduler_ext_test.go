@@ -18,21 +18,21 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/internal/execution"
-	"go.k6.io/k6/internal/execution/local"
-	"go.k6.io/k6/internal/js"
-	"go.k6.io/k6/internal/lib/testutils"
-	"go.k6.io/k6/internal/lib/testutils/httpmultibin"
-	"go.k6.io/k6/internal/lib/testutils/minirunner"
-	"go.k6.io/k6/internal/lib/testutils/mockresolver"
-	"go.k6.io/k6/internal/loader"
-	"go.k6.io/k6/internal/usage"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/executor"
-	"go.k6.io/k6/lib/netext"
-	"go.k6.io/k6/lib/netext/httpext"
-	"go.k6.io/k6/lib/types"
-	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/v2/internal/execution"
+	"go.k6.io/k6/v2/internal/execution/local"
+	"go.k6.io/k6/v2/internal/js"
+	"go.k6.io/k6/v2/internal/lib/testutils"
+	"go.k6.io/k6/v2/internal/lib/testutils/httpmultibin"
+	"go.k6.io/k6/v2/internal/lib/testutils/minirunner"
+	"go.k6.io/k6/v2/internal/lib/testutils/mockresolver"
+	"go.k6.io/k6/v2/internal/loader"
+	"go.k6.io/k6/v2/internal/usage"
+	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/lib/executor"
+	"go.k6.io/k6/v2/lib/netext"
+	"go.k6.io/k6/v2/lib/netext/httpext"
+	"go.k6.io/k6/v2/lib/types"
+	"go.k6.io/k6/v2/metrics"
 )
 
 func getTestPreInitState(tb testing.TB) *lib.TestPreInitState {
@@ -208,9 +208,6 @@ func TestSchedulerRunEnv(t *testing.T) {
 			vus: 1,
 			duration: "1s",
 			gracefulStop: "0.5s",`,
-		"externally-controlled": `
-			vus: 1,
-			duration: "1s",`,
 		"per-vu-iterations": `
 			vus: 1,
 			iterations: 1,
@@ -425,9 +422,6 @@ func TestSchedulerRunCustomTags(t *testing.T) {
 			vus: 1,
 			duration: "1s",
 			gracefulStop: "0.5s",`,
-		"externally-controlled": `
-			vus: 1,
-			duration: "1s",`,
 		"per-vu-iterations": `
 			vus: 1,
 			iterations: 1,
@@ -1388,7 +1382,7 @@ func TestNewSchedulerHasWork(t *testing.T) {
 		};
 
 		export default function() {
-			const response = http.get("http://test.loadimpact.com");
+			const response = http.get("http://test.grafana.com");
 		};
 `)
 

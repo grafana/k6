@@ -11,18 +11,18 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
 	"go.opentelemetry.io/otel/attribute"
 	oteltrace "go.opentelemetry.io/otel/trace"
 
-	"go.k6.io/k6/internal/js/modules/k6/browser/chromium"
-	"go.k6.io/k6/internal/js/modules/k6/browser/common"
-	"go.k6.io/k6/internal/js/modules/k6/browser/env"
-	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
-	browsertrace "go.k6.io/k6/internal/js/modules/k6/browser/trace"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/chromium"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/env"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
+	browsertrace "go.k6.io/k6/v2/internal/js/modules/k6/browser/trace"
+	"go.k6.io/k6/v2/internal/js/taskqueue"
 
-	k6event "go.k6.io/k6/internal/event"
-	k6modules "go.k6.io/k6/js/modules"
+	k6event "go.k6.io/k6/v2/internal/event"
+	k6modules "go.k6.io/k6/v2/js/modules"
 )
 
 // errBrowserNotFoundInRegistry indicates that the browser instance
@@ -325,13 +325,25 @@ func (r *browserRegistry) handleIterEvents(
 }
 
 func (r *browserRegistry) handleExitEvent(exitCh <-chan *k6event.Event, unsubscribeFn func()) {
+	var e *k6event.Event
+	// Defers run LIFO: unsubscribeFn (registered second) runs before e.Done
+	// (registered first). unsubscribeFn must complete before Done is signalled
+	// so that by the time the caller's waitDone returns, the subscription is
+	// already removed. Otherwise a concurrent Exit emission (e.g. from
+	// t.Cleanup in tests) can be delivered to a closed goroutine, causing
+	// e.Done to never be called and waitDone to block forever.
+	defer func() {
+		if e != nil {
+			e.Done()
+		}
+	}()
 	defer unsubscribeFn()
 
-	e, ok := <-exitCh
+	var ok bool
+	e, ok = <-exitCh
 	if !ok {
 		return
 	}
-	defer e.Done()
 	r.clear()
 
 	// Stop traces registry before calling e.Done()

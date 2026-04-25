@@ -1,14 +1,15 @@
 package cmd
 
 import (
+	"maps"
 	"sync"
 	"testing"
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/cmd/state"
-	"go.k6.io/k6/internal/cmd/tests"
-	"go.k6.io/k6/subcommand"
+	"go.k6.io/k6/v2/cmd/state"
+	"go.k6.io/k6/v2/internal/cmd/tests"
+	"go.k6.io/k6/v2/subcommand"
 )
 
 func TestExtensionSubcommands(t *testing.T) {
@@ -135,6 +136,138 @@ func Test_dependenciesFromSubcommand(t *testing.T) {
 	})
 }
 
+func TestXCompletion(t *testing.T) {
+	t.Parallel()
+
+	registerTestSubcommandExtensions(t)
+
+	tt := []struct {
+		name    string
+		args    []string
+		want    []string
+		notWant []string
+	}{
+		{
+			name:    "committed extension name completes its args",
+			args:    []string{"k6", "__complete", "x", "test-cmd-1", ""},
+			want:    []string{"alpha", "bravo", "charlie"},
+			notWant: []string{"test-cmd-1"},
+		},
+		{
+			name:    "deeper args complete within extension",
+			args:    []string{"k6", "__complete", "x", "test-cmd-1", "alpha", ""},
+			want:    []string{"deep-one", "deep-two"},
+			notWant: []string{"alpha"},
+		},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			ts := tests.NewGlobalTestState(t)
+			ts.CmdArgs = tc.args
+			newRootCommand(ts.GlobalState).execute()
+
+			out := ts.Stdout.String()
+			for _, w := range tc.want {
+				require.Contains(t, out, w)
+			}
+			for _, nw := range tc.notWant {
+				require.NotContains(t, out, nw)
+			}
+		})
+	}
+}
+
+func Test_detectExtensionCompletion(t *testing.T) {
+	t.Parallel()
+
+	registerTestSubcommandExtensions(t)
+
+	tt := []struct {
+		name    string
+		args    []string
+		env     map[string]string
+		want    bool
+		wantExt string
+	}{
+		{
+			name: "partial name single char",
+			args: []string{"k6", "__complete", "x", "d"},
+		},
+		{
+			name: "partial name without trailing space",
+			args: []string{"k6", "__complete", "x", "docs"},
+		},
+		{
+			name: "not a completion request",
+			args: []string{"k6", "x", "docs", ""},
+		},
+		{
+			name: "completion not targeting x",
+			args: []string{"k6", "__complete", "run", "script.js", ""},
+		},
+		{
+			name: "auto resolution disabled",
+			args: []string{"k6", "__complete", "x", "unknown-ext", ""},
+			env:  map[string]string{"K6_AUTO_EXTENSION_RESOLUTION": "false"},
+		},
+		{
+			name: "registered extension handled by cobra",
+			args: []string{"k6", "__complete", "x", "test-cmd-1", ""},
+		},
+		{
+			name:    "unregistered extension with committed name",
+			args:    []string{"k6", "__complete", "x", "docs", ""},
+			want:    true,
+			wantExt: "docs",
+		},
+		{
+			name:    "unregistered extension with deeper args",
+			args:    []string{"k6", "__complete", "x", "docs", "http", ""},
+			want:    true,
+			wantExt: "docs",
+		},
+		{
+			name:    "__completeNoDesc variant",
+			args:    []string{"k6", "__completeNoDesc", "x", "docs", ""},
+			want:    true,
+			wantExt: "docs",
+		},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			ts := tests.NewGlobalTestState(t)
+			ts.CmdArgs = tc.args
+			maps.Copy(ts.Env, tc.env)
+			if len(tc.env) > 0 {
+				ts.ReparseFlags()
+			}
+
+			root := newRootCommand(ts.GlobalState)
+			ext, ok := detectExtensionCompletion(root.cmd, ts.GlobalState)
+
+			require.Equal(t, tc.want, ok)
+			require.Equal(t, tc.wantExt, ext)
+		})
+	}
+}
+
+func Test_buildExtensionDeps(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+	err := buildExtensionDeps(ts.GlobalState, "docs")
+
+	var derr binaryIsNotSatisfyingDependenciesError
+	require.ErrorAs(t, err, &derr)
+	require.Contains(t, derr.deps, "subcommand:docs")
+}
+
 var registerTestSubcommandExtensionsOnce sync.Once //nolint:gochecknoglobals
 
 func registerTestSubcommandExtensions(t *testing.T) {
@@ -146,6 +279,12 @@ func registerTestSubcommandExtensions(t *testing.T) {
 				Use:   "test-cmd-1",
 				Short: "Test command 1",
 				Run:   func(_ *cobra.Command, _ []string) {},
+				ValidArgsFunction: func(_ *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+					if len(args) > 0 {
+						return []string{"deep-one", "deep-two"}, cobra.ShellCompDirectiveNoFileComp
+					}
+					return []string{"alpha", "bravo", "charlie"}, cobra.ShellCompDirectiveNoFileComp
+				},
 			}
 		})
 

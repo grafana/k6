@@ -16,8 +16,8 @@ import (
 	"strings"
 	"time"
 
-	"go.k6.io/k6/internal/loader"
-	"go.k6.io/k6/lib/fsext"
+	"go.k6.io/k6/v2/internal/loader"
+	"go.k6.io/k6/v2/lib/fsext"
 )
 
 var (
@@ -72,6 +72,11 @@ type Archive struct {
 
 	K6Version string `json:"k6version"`
 	Goos      string `json:"goos"`
+
+	// Dependencies contains the script's declared build dependencies before any manifest overrides.
+	// Keys are dependency names (e.g. "k6", "k6/x/sql"), values are semver constraint strings
+	// or "*" for unconstrained. This field is omitted for archives created by older k6 versions.
+	Dependencies map[string]string `json:"dependencies,omitempty"`
 }
 
 func (arc *Archive) getFs(name string) fsext.Fs {

@@ -51,6 +51,7 @@ type Options struct {
 	AddSourceMappings   bool
 	LegalComments       config.LegalComments
 	NeedsMetafile       bool
+	MetafileFormat      config.MetafileFormat
 }
 
 type PrintResult struct {
@@ -93,9 +94,10 @@ func (p *printer) recordImportPathForMetafile(importRecordIndex uint32) {
 		record := p.importRecords[importRecordIndex]
 		external := ""
 		if (record.Flags & ast.ShouldNotBeExternalInMetafile) == 0 {
-			external = ",\n          \"external\": true"
+			external = p.options.MetafileFormat.MaybeRemoveWhitespace(",\n          \"external\": true")
 		}
-		p.jsonMetadataImports = append(p.jsonMetadataImports, fmt.Sprintf("\n        {\n          \"path\": %s,\n          \"kind\": %s%s\n        }",
+		p.jsonMetadataImports = append(p.jsonMetadataImports, fmt.Sprintf(
+			p.options.MetafileFormat.MaybeRemoveWhitespace("\n        {\n          \"path\": %s,\n          \"kind\": %s%s\n        }"),
 			helpers.QuoteForJSON(record.Path.Text, p.options.ASCIIOnly),
 			helpers.QuoteForJSON(record.Kind.StringForMetafile(), p.options.ASCIIOnly),
 			external))
@@ -377,6 +379,31 @@ func (p *printer) printRule(rule css_ast.Rule, indent int32, omitTrailingSemicol
 		}
 		p.printRuleBlock(r.Rules, indent, r.CloseBraceLoc)
 
+	case *css_ast.RAtScope:
+		p.print("@scope")
+		if len(r.Start) > 0 {
+			if p.options.MinifyWhitespace {
+				p.print("(")
+			} else {
+				p.print(" (")
+			}
+			p.printComplexSelectors(r.Start, indent, layoutSingleLine)
+			p.print(")")
+		}
+		if len(r.End) > 0 {
+			if p.options.MinifyWhitespace {
+				p.print("to (")
+			} else {
+				p.print(" to (")
+			}
+			p.printComplexSelectors(r.End, indent, layoutSingleLine)
+			p.print(")")
+		}
+		if !p.options.MinifyWhitespace {
+			p.print(" ")
+		}
+		p.printRuleBlock(r.Rules, indent, r.CloseBraceLoc)
+
 	default:
 		panic("Internal error")
 	}
@@ -419,7 +446,11 @@ func (p *printer) printMediaQuery(query css_ast.MediaQuery, flags mqFlags) {
 		p.printIdent(q.Type, identNormal, 0)
 		if q.AndOrNull.Data != nil {
 			p.print(" and ")
-			p.printMediaQuery(q.AndOrNull, 0)
+			var flags mqFlags
+			if binary, ok := q.AndOrNull.Data.(*css_ast.MQBinary); ok && binary.Op == css_ast.MQBinaryOpOr {
+				flags = mqNeedsParens
+			}
+			p.printMediaQuery(q.AndOrNull, flags)
 		}
 
 	case *css_ast.MQNot:

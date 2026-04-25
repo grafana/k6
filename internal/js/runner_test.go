@@ -31,23 +31,23 @@ import (
 	"golang.org/x/time/rate"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/errext"
-	"go.k6.io/k6/internal/execution"
-	"go.k6.io/k6/internal/execution/local"
-	"go.k6.io/k6/internal/js/modules/k6"
-	k6metrics "go.k6.io/k6/internal/js/modules/k6/metrics"
-	"go.k6.io/k6/internal/js/modules/k6/ws"
-	"go.k6.io/k6/internal/lib/testutils"
-	"go.k6.io/k6/internal/lib/testutils/httpmultibin"
-	"go.k6.io/k6/internal/lib/testutils/httpmultibin/grpc_testing"
-	"go.k6.io/k6/internal/lib/testutils/mockoutput"
-	k6http "go.k6.io/k6/js/modules/k6/http"
-	"go.k6.io/k6/lib"
-	_ "go.k6.io/k6/lib/executor" // TODO: figure out something better
-	"go.k6.io/k6/lib/fsext"
-	"go.k6.io/k6/lib/types"
-	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/output"
+	"go.k6.io/k6/v2/errext"
+	"go.k6.io/k6/v2/internal/execution"
+	"go.k6.io/k6/v2/internal/execution/local"
+	"go.k6.io/k6/v2/internal/js/modules/k6"
+	k6metrics "go.k6.io/k6/v2/internal/js/modules/k6/metrics"
+	"go.k6.io/k6/v2/internal/js/modules/k6/ws"
+	"go.k6.io/k6/v2/internal/lib/testutils"
+	"go.k6.io/k6/v2/internal/lib/testutils/httpmultibin"
+	"go.k6.io/k6/v2/internal/lib/testutils/httpmultibin/grpc_testing"
+	"go.k6.io/k6/v2/internal/lib/testutils/mockoutput"
+	k6http "go.k6.io/k6/v2/js/modules/k6/http"
+	"go.k6.io/k6/v2/lib"
+	_ "go.k6.io/k6/v2/lib/executor" // TODO: figure out something better
+	"go.k6.io/k6/v2/lib/fsext"
+	"go.k6.io/k6/v2/lib/types"
+	"go.k6.io/k6/v2/metrics"
+	"go.k6.io/k6/v2/output"
 )
 
 func TestRunnerNew(t *testing.T) {
@@ -1082,7 +1082,7 @@ func TestVUIntegrationHosts(t *testing.T) {
 					var fail = k6.fail;
 					var http = require("k6/http");;
 					exports.default = function() {
-						var res = http.get("http://test.loadimpact.com:HTTPBIN_PORT/");
+						var res = http.get("http://test.grafana.com:HTTPBIN_PORT/");
 						check(res, {
 							"is correct IP": function(r) { return r.remote_ip === "127.0.0.1" }
 						}) || fail("failed to override dns");
@@ -1094,7 +1094,7 @@ func TestVUIntegrationHosts(t *testing.T) {
 		Throw: null.BoolFrom(true),
 		Hosts: func() types.NullHosts {
 			hosts, er := types.NewNullHosts(map[string]types.Host{
-				"test.loadimpact.com": {IP: net.ParseIP("127.0.0.1")},
+				"test.grafana.com": {IP: net.ParseIP("127.0.0.1")},
 			})
 			require.NoError(t, er)
 
