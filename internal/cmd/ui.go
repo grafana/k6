@@ -11,19 +11,19 @@ import (
 	"unicode/utf8"
 
 	"github.com/fatih/color"
-	"github.com/grafana/xk6-dashboard/dashboard"
 	"github.com/sirupsen/logrus"
+	"go.k6.io/k6/v2/internal/dashboard"
 	"golang.org/x/term"
 
 	"gopkg.in/yaml.v3"
 
-	"go.k6.io/k6/cmd/state"
-	"go.k6.io/k6/internal/metrics/engine"
-	"go.k6.io/k6/internal/output/summary"
-	"go.k6.io/k6/internal/ui"
-	"go.k6.io/k6/internal/ui/pb"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/output"
+	"go.k6.io/k6/v2/cmd/state"
+	"go.k6.io/k6/v2/internal/metrics/engine"
+	"go.k6.io/k6/v2/internal/output/summary"
+	"go.k6.io/k6/v2/internal/ui"
+	"go.k6.io/k6/v2/internal/ui/pb"
+	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/output"
 )
 
 const (

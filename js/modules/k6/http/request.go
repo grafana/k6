@@ -15,9 +15,9 @@ import (
 	"github.com/grafana/sobek"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/js/common"
-	"go.k6.io/k6/lib/netext/httpext"
-	"go.k6.io/k6/lib/types"
+	"go.k6.io/k6/v2/js/common"
+	"go.k6.io/k6/v2/lib/netext/httpext"
+	"go.k6.io/k6/v2/lib/types"
 )
 
 // ErrHTTPForbiddenInInitContext is used when a http requests was made in the init context

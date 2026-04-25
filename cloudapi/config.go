@@ -8,11 +8,8 @@ import (
 	"github.com/mstoykov/envconfig"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/lib/types"
+	"go.k6.io/k6/v2/lib/types"
 )
-
-// LegacyCloudConfigKey is the key used in the JSON config for the cloud output.
-const LegacyCloudConfigKey = "loadimpact"
 
 // Config holds all the necessary data and options for sending metrics to the k6 Cloud.
 //
@@ -196,7 +193,6 @@ func GetConsolidatedConfig(
 	env map[string]string,
 	configArg string,
 	cloudConfig json.RawMessage,
-	external map[string]json.RawMessage,
 ) (Config, string, error) {
 	warn := ""
 
@@ -209,18 +205,8 @@ func GetConsolidatedConfig(
 		result = result.Apply(jsonConf)
 	}
 
-	if err := mergeFromCloudOptionAndExternal(cloudConfig, external, &result); err != nil {
+	if err := extractFromCloudOption(cloudConfig, &result); err != nil {
 		return result, warn, err
-	}
-
-	// We want to show a warning if the user is using the only old way of defining the config.
-	// Note: Since the migration to the options.cloud is a long process, this warning is planned
-	// to be emitted for a long time (1-2 years), after some point, and depending on the state
-	// of migration we could re-evaluate this warning.
-	if cloudConfig == nil && external != nil {
-		if _, ok := external[LegacyCloudConfigKey]; ok {
-			warn = "The options.ext.loadimpact option is deprecated, please use options.cloud instead"
-		}
 	}
 
 	envConfig := Config{}
@@ -240,22 +226,17 @@ func GetConsolidatedConfig(
 	return result, warn, nil
 }
 
-// mergeFromCloudOptionAndExternal merges three fields from the JSON in a cloud key of
+// extractFromCloudOption merges fields from the JSON in a cloud key of
 // the provided external map. Used for options.cloud settings.
-func mergeFromCloudOptionAndExternal(
+func extractFromCloudOption(
 	cloudConfig json.RawMessage,
-	external map[string]json.RawMessage,
 	conf *Config,
 ) error {
-	source := pickSource(cloudConfig, external)
-	if source == nil {
+	tmpConfig := Config{}
+	if cloudConfig == nil {
 		return nil
 	}
-
-	// Original comment
-	// TODO: Important! Separate configs and fix the whole 2 configs mess!
-	tmpConfig := Config{}
-	if err := json.Unmarshal(source, &tmpConfig); err != nil {
+	if err := json.Unmarshal(cloudConfig, &tmpConfig); err != nil {
 		return err
 	}
 
@@ -280,47 +261,23 @@ func mergeFromCloudOptionAndExternal(
 // GetTemporaryCloudConfig returns a temporary cloud config.
 // Original comment
 // TODO: Fix this
-// We reuse cloud.Config for parsing options.cloud (or legacy loadimpact struct), but this probably shouldn't be
-// done, as the idea of options.ext is that they are extensible without touching k6. But in
+// We reuse cloud.Config for parsing options.cloud, but this probably shouldn't be
+// done, as the idea of options.cloud is that they are extensible without touching k6. But in
 // order for this to happen, we shouldn't actually marshal cloud.Config on top of it, because
 // it will be missing some fields that aren't actually mentioned in the struct.
 // So in order for use to copy the fields that we need for k6 cloud's api we unmarshal in
 // map[string]any and copy what we need if it isn't set already
-func GetTemporaryCloudConfig(
-	cloudConfig json.RawMessage,
-	external map[string]json.RawMessage,
-) (map[string]any, error) {
+func GetTemporaryCloudConfig(cloudConfig json.RawMessage) (map[string]any, error) {
 	tmpCloudConfig := make(map[string]any, 3)
 
-	source := pickSource(cloudConfig, external)
-	if source == nil {
+	if cloudConfig == nil {
 		return tmpCloudConfig, nil
 	}
-
-	dec := json.NewDecoder(bytes.NewReader(source))
+	dec := json.NewDecoder(bytes.NewReader(cloudConfig))
 	dec.UseNumber() // otherwise float64 are used
 	if err := dec.Decode(&tmpCloudConfig); err != nil {
 		return nil, err
 	}
 
 	return tmpCloudConfig, nil
-}
-
-// pickSource returns the config source to use.
-func pickSource(
-	cloudConfig json.RawMessage,
-	external map[string]json.RawMessage,
-) json.RawMessage {
-	// priority is the new way of defining the config
-	// via options.cloud
-	if cloudConfig != nil {
-		return cloudConfig
-	}
-
-	// fallback to the old way of defining the config
-	if val, ok := external[LegacyCloudConfigKey]; ok {
-		return val
-	}
-
-	return nil
 }

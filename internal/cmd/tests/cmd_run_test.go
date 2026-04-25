@@ -24,16 +24,16 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
 
-	"go.k6.io/k6/cloudapi"
-	"go.k6.io/k6/errext/exitcodes"
-	"go.k6.io/k6/internal/build"
-	"go.k6.io/k6/internal/cmd"
-	"go.k6.io/k6/internal/cmd/tests/events"
-	"go.k6.io/k6/internal/event"
-	"go.k6.io/k6/internal/lib/testutils"
-	"go.k6.io/k6/internal/lib/testutils/httpmultibin"
-	"go.k6.io/k6/js/modules"
-	"go.k6.io/k6/lib/fsext"
+	"go.k6.io/k6/v2/cloudapi"
+	"go.k6.io/k6/v2/errext/exitcodes"
+	"go.k6.io/k6/v2/internal/build"
+	"go.k6.io/k6/v2/internal/cmd"
+	"go.k6.io/k6/v2/internal/cmd/tests/events"
+	"go.k6.io/k6/v2/internal/event"
+	"go.k6.io/k6/v2/internal/lib/testutils"
+	"go.k6.io/k6/v2/internal/lib/testutils/httpmultibin"
+	"go.k6.io/k6/v2/js/modules"
+	"go.k6.io/k6/v2/lib/fsext"
 )
 
 func TestVersion(t *testing.T) {
@@ -100,7 +100,7 @@ func TestBinaryNameHelpStdout(t *testing.T) {
 
 	tests := []struct {
 		cmdName        string
-		extraCmd       string // For the `login cloud` cmd
+		extraCmd       string // For the `cloud login` cmd
 		containsOutput string
 	}{
 		{
@@ -112,9 +112,9 @@ func TestBinaryNameHelpStdout(t *testing.T) {
 			containsOutput: fmt.Sprintf("%s cloud script.js", ts.BinaryName),
 		},
 		{
-			cmdName:        "login",
-			extraCmd:       "cloud",
-			containsOutput: fmt.Sprintf("%s login cloud -t YOUR_TOKEN", ts.BinaryName),
+			cmdName:        "cloud",
+			extraCmd:       "login",
+			containsOutput: fmt.Sprintf("%s cloud login -t <YOUR_TOKEN>", ts.BinaryName),
 		},
 		{
 			cmdName:        "run",
@@ -153,41 +153,6 @@ func TestStdoutAndStderrAreEmptyWithQuietAndHandleSummary(t *testing.T) {
 
 func TestStdoutAndStderrAreEmptyWithQuietAndLogsForwarded(t *testing.T) {
 	t.Parallel()
-
-	// TODO(@joanlopez): remove by k6 v2.0, once we completely drop the support of the deprecated --no-summary flag.
-	t.Run("--no-summary", func(t *testing.T) {
-		t.Parallel()
-
-		ts := NewGlobalTestState(t)
-
-		// TODO: add a test with relative path
-		logFilePath := filepath.Join(ts.Cwd, "test.log")
-
-		ts.CmdArgs = []string{
-			"k6", "--quiet", "--log-output", "file=" + logFilePath,
-			"--log-format", "raw", "run", "--no-summary", "-",
-		}
-		ts.Stdin = bytes.NewBufferString(`
-		console.log('init');
-		export default function() { console.log('foo'); };
-	`)
-		cmd.ExecuteWithGlobalState(ts.GlobalState)
-
-		// The test state hook still catches this message
-		assert.True(t, testutils.LogContains(ts.LoggerHook.Drain(), logrus.InfoLevel, `foo`))
-
-		// But it's not shown on stderr or stdout
-		assert.Empty(t, ts.Stderr.Bytes())
-		assert.Equal(t,
-			"Flag --no-summary has been deprecated, use --summary-mode=disabled instead\n",
-			ts.Stdout.String(),
-		) // We don't expect it to be completely empty, but to contain the deprecation message for --no-summary.
-
-		// Instead, it should be in the log file
-		logContents, err := fsext.ReadFile(ts.FS, logFilePath)
-		require.NoError(t, err)
-		assert.Equal(t, "init\ninit\nfoo\n", string(logContents)) //nolint:dupword
-	})
 
 	t.Run("--summary-mode=disabled", func(t *testing.T) {
 		t.Parallel()
@@ -253,7 +218,7 @@ func TestWrongCliFlagIterations(t *testing.T) {
 	ts := NewGlobalTestState(t)
 	ts.CmdArgs = []string{"k6", "run", "--iterations", "foo", "-"}
 	ts.Stdin = bytes.NewBufferString(`export default function() {};`)
-	// TODO: check for exitcodes.InvalidConfig after https://github.com/loadimpact/k6/issues/883 is done...
+	// TODO: check for exitcodes.InvalidConfig after https://github.com/grafana/k6/issues/883 is done...
 	ts.ExpectedExitCode = -1
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 	assert.True(t, testutils.LogContains(ts.LoggerHook.Drain(), logrus.ErrorLevel, `invalid argument "foo"`))
@@ -1924,58 +1889,6 @@ func TestRunWithCloudOutputOverrides(t *testing.T) {
 	assert.Contains(t, stdout, "iterations...........: 1")
 }
 
-func TestRunWithCloudOutputCustomConfigAndOverridesLegacyCloudOption(t *testing.T) {
-	t.Parallel()
-
-	script := `
-export const options = {
-  ext: {
-    loadimpact: {
-      name: 'Hello k6 Cloud!',
-      projectID: 123456,
-    },
-  },
-};
-
-export default function() {};`
-
-	ts := getSingleFileTestState(t, script, []string{"-v", "--log-output=stdout", "--out=cloud"}, 0)
-
-	configOverride := http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
-		b, err := io.ReadAll(req.Body)
-		require.NoError(t, err)
-
-		bjs := string(b)
-		assert.Contains(t, bjs, `"name":"Hello k6 Cloud!"`)
-		assert.Contains(t, bjs, `"project_id":123456`)
-
-		resp.WriteHeader(http.StatusOK)
-		_, err = fmt.Fprint(resp, `{
-			"reference_id": "1337",
-			"config": {
-				"webAppURL": "https://bogus.url",
-				"testRunDetails": "https://some.other.url/foo/tests/org/1337?bar=baz"
-			},
-			"logs": [
-				{"level": "debug", "message": "test debug message"},
-				{"level": "info", "message": "test message"}
-			]
-		}`)
-		assert.NoError(t, err)
-	})
-	srv := getCloudTestEndChecker(t, 1337, configOverride, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed)
-	ts.Env["K6_CLOUD_HOST"] = srv.URL
-
-	cmd.ExecuteWithGlobalState(ts.GlobalState)
-
-	stdout := ts.Stdout.String()
-	t.Log(stdout)
-	assert.Contains(t, stdout, "execution: local")
-	assert.Contains(t, stdout, "output: cloud (https://some.other.url/foo/tests/org/1337?bar=baz)")
-	assert.Contains(t, stdout, `level=debug msg="test debug message" output=cloud source=grafana-k6-cloud`)
-	assert.Contains(t, stdout, `level=info msg="test message" output=cloud source=grafana-k6-cloud`)
-}
-
 func TestRunWithCloudOutputCustomConfigAndOverrides(t *testing.T) {
 	t.Parallel()
 
@@ -3001,36 +2914,6 @@ func TestSummaryExport(t *testing.T) {
 			assertSummaryExport(t, ts.FS)
 		})
 	}
-
-	// TODO(@joanlopez): remove by k6 v2.0, once we completely drop the support for --summary-mode=legacy.
-	t.Run("legacy", func(t *testing.T) {
-		t.Parallel()
-
-		ts := NewGlobalTestState(t)
-		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(mainScript), 0o644))
-
-		ts.CmdArgs = []string{
-			"k6", "run",
-			"--summary-export=results.json",
-			"--summary-mode=legacy",
-			"script.js",
-		}
-
-		cmd.ExecuteWithGlobalState(ts.GlobalState)
-
-		stdout := ts.Stdout.String()
-		t.Log(stdout)
-
-		assert.Contains(t, stdout, "✓ TRUE is TRUE")
-		assert.Contains(t, stdout, "checks...............: 100.00% 1 out of 1")
-		assert.Contains(t, stdout, "custom_iterations....: 1")
-		assert.Contains(t, stdout, "iterations...........: 1")
-
-		// As of now, "legacy" has been deprecated.
-		assert.Contains(t, ts.Stderr.String(), `The \"legacy\" summary mode has been deprecated, and will be removed by k6 v2.0.`)
-
-		assertSummaryExport(t, ts.FS)
-	})
 }
 
 func TestHandleSummary(t *testing.T) {
@@ -3053,8 +2936,7 @@ func TestHandleSummary(t *testing.T) {
 	}
 	`
 
-	// TODO(@joanlopez): remove "summary" by k6 v2.0, once we completely drop the support for --summary-mode=legacy.
-	for _, summaryMode := range []string{"compact", "full", "legacy"} {
+	for _, summaryMode := range []string{"compact", "full"} {
 		t.Run(summaryMode, func(t *testing.T) {
 			t.Parallel()
 
@@ -3458,4 +3340,85 @@ func TestSpaceInPath(t *testing.T) {
 	stderr := ts.Stderr.String()
 	t.Log(stderr)
 	assert.Contains(t, stderr, `something 42`)
+}
+
+// TestCloudSourceNotRegisteredForPlainRun verifies that the "cloud" secret source is NOT
+// registered for plain 'k6 run'. Scripts referencing it should get "no such source", not
+// a silent "not configured" that implies cloud was attempted.
+func TestCloudSourceNotRegisteredForPlainRun(t *testing.T) {
+	t.Parallel()
+
+	script := `
+		import secrets from "k6/secrets";
+		export default async () => {
+			try {
+				await secrets.source("cloud").get("key");
+			} catch (e) {
+				console.log("cloud error: " + e.toString());
+			}
+		}
+	`
+	ts := NewGlobalTestState(t)
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(script), 0o644))
+	ts.CmdArgs = []string{"k6", "run", "script.js"}
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stderr := ts.Stderr.String()
+	t.Log(stderr)
+	// Cloud source is not registered for plain k6 run — the catch block must report the
+	// "no sources configured" error, not a "cloud secrets not configured" error that would
+	// imply cloud was silently registered and attempted.
+	assert.Contains(t, stderr, "cloud error: no secret sources are configured")
+	assert.NotContains(t, stderr, "cloud secrets not configured")
+}
+
+// TestCloudSecretSourceRejectedByK6Run verifies that --secret-source=cloud is rejected
+// by 'k6 run' since the cloud source is only valid with 'k6 cloud run --local-execution'.
+func TestCloudSecretSourceRejectedByK6Run(t *testing.T) {
+	t.Parallel()
+
+	ts := getSingleFileTestState(t, `export default function() {}`, []string{"--secret-source=cloud"}, exitcodes.InvalidConfig)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	assert.Contains(t, ts.Stderr.String(), "the 'cloud' secret source can only be used with 'k6 cloud run --local-execution'")
+}
+
+// TestPLZCloudSecretsEnvVars verifies that setting K6_CLOUD_SECRETS_TOKEN and
+// K6_CLOUD_SECRETS_ENDPOINT configures the cloud secret source without requiring
+// --secret-source=cloud or a /v1/tests API round-trip (the PLZ operator path).
+func TestPLZCloudSecretsEnvVars(t *testing.T) {
+	t.Parallel()
+
+	// Spin up a mock server that returns the secret as a JSON {"plaintext": "..."} response.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		// Verify the Authorization header carries the token.
+		assert.Equal(t, "Bearer plz-token", r.Header.Get("Authorization"))
+		_, _ = w.Write([]byte(`{"plaintext":"plz-secret-value"}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	script := `
+		import secrets from "k6/secrets";
+		export default async () => {
+			const v = await secrets.source("cloud").get("mykey");
+			console.log(v);
+		}
+	`
+	ts := NewGlobalTestState(t)
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(script), 0o644))
+
+	ts.Env["K6_CLOUD_SECRETS_TOKEN"] = "plz-token"
+	ts.Env["K6_CLOUD_SECRETS_ENDPOINT"] = srv.URL + "/secrets/{key}"
+	// No --secret-source flag: cloud source is auto-registered and PLZ env vars configure it.
+	ts.CmdArgs = []string{"k6", "run", "script.js"}
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stderr := ts.Stderr.String()
+	t.Log(stderr)
+	assert.NotContains(t, stderr, "level=error")
+	assert.Contains(t, stderr, `level=info msg="***SECRET_REDACTED***" source=console`)
+	assert.NotContains(t, stderr, "plz-secret-value")
 }

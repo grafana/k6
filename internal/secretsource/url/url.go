@@ -19,9 +19,9 @@ import (
 	"github.com/tidwall/gjson"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/lib/fsext"
-	"go.k6.io/k6/lib/types"
-	"go.k6.io/k6/secretsource"
+	"go.k6.io/k6/v2/lib/fsext"
+	"go.k6.io/k6/v2/lib/types"
+	"go.k6.io/k6/v2/secretsource"
 	"golang.org/x/time/rate"
 )
 
@@ -125,21 +125,24 @@ func (c extConfig) Apply(cfg extConfig) extConfig {
 
 //nolint:gochecknoinits // This is how k6 secret source registration works.
 func init() {
-	secretsource.RegisterExtension("url", func(params secretsource.Params) (secretsource.Source, error) {
-		config, err := getConfig(params.ConfigArgument, params.FS, params.Environment)
-		if err != nil {
-			return nil, fmt.Errorf("missing or invalid config: %w", err)
-		}
+	secretsource.RegisterExtension("url", New)
+}
 
-		return &urlSecrets{
-			config: config,
-			httpClient: &http.Client{
-				Timeout: time.Duration(config.Timeout.Duration),
-			},
-			limiter: newLimiter(int(config.RequestsPerMinuteLimit.Int64), int(config.RequestsBurst.Int64)),
-			logger:  params.Logger,
-		}, nil
-	})
+// New creates a URL secret source. Exported for direct use by the cloud source.
+func New(params secretsource.Params) (secretsource.Source, error) {
+	config, err := getConfig(params.ConfigArgument, params.FS, params.Environment)
+	if err != nil {
+		return nil, fmt.Errorf("missing or invalid config: %w", err)
+	}
+
+	return &urlSecrets{
+		config: config,
+		httpClient: &http.Client{
+			Timeout: time.Duration(config.Timeout.Duration),
+		},
+		limiter: newLimiter(int(config.RequestsPerMinuteLimit.Int64), int(config.RequestsBurst.Int64)),
+		logger:  params.Logger,
+	}, nil
 }
 
 type urlSecrets struct {

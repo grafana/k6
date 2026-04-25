@@ -16,31 +16,21 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"go.k6.io/k6/cmd/state"
-	"go.k6.io/k6/errext"
-	"go.k6.io/k6/errext/exitcodes"
-	"go.k6.io/k6/ext"
-	"go.k6.io/k6/internal/build"
-	"go.k6.io/k6/internal/log"
-	"go.k6.io/k6/secretsource"
+	"go.k6.io/k6/v2/cmd/state"
+	"go.k6.io/k6/v2/errext"
+	"go.k6.io/k6/v2/errext/exitcodes"
+	"go.k6.io/k6/v2/ext"
+	"go.k6.io/k6/v2/internal/log"
+	"go.k6.io/k6/v2/secretsource"
 
-	_ "go.k6.io/k6/internal/secretsource" // import it to register internal secret sources
+	_ "go.k6.io/k6/v2/internal/secretsource" // import it to register internal secret sources
+	cloudsecrets "go.k6.io/k6/v2/internal/secretsource/cloud"
 )
 
 const waitLoggerCloseTimeout = time.Second * 5
 
-func getDocsURL() string {
-	version := build.Version
-	version = strings.TrimPrefix(version, "v")
-	parts := strings.SplitN(version, ".", 3)
-	if len(parts) >= 2 {
-		return fmt.Sprintf("https://grafana.com/docs/k6/v%s.%s.x/", parts[0], parts[1])
-	}
-	return "https://grafana.com/docs/k6/latest/"
-}
-
 func getRootUsageTemplate() string {
-	return fmt.Sprintf(`{{.Short}}
+	return `{{.Short}}
 
 Usage:{{if .Runnable}}
   {{.UseLine}}{{end}}{{if .HasAvailableSubCommands}}
@@ -51,7 +41,7 @@ Core Commands:{{range .Commands}}{{if eq .Name "new"}}
   {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{range .Commands}}{{if eq .Name "cloud"}}
   {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}
 
-Additional Commands:{{range .Commands}}{{if and .IsAvailableCommand (ne .Name "new") (ne .Name "run") `+
+Additional Commands:{{range .Commands}}{{if and .IsAvailableCommand (ne .Name "new") (ne .Name "run") ` +
 		`(ne .Name "cloud") (ne .Name "help")}}
   {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}
 
@@ -71,10 +61,16 @@ Examples:
 
   # Run locally, stream results to Grafana Cloud
   $ {{.CommandPath}} cloud run --local-execution test.js
+
+Documentation:
+  # Look up the JavaScript API, examples, and best practices
+  $ {{.CommandPath}} x docs
+
+  # Discover available k6 extensions
+  $ {{.CommandPath}} x explore
 {{if .HasAvailableSubCommands}}
-Use "{{.CommandPath}} [command] --help" for more information about a command.
-Full CLI documentation: %s{{end}}
-`, getDocsURL())
+Use "{{.CommandPath}} [command] --help" for more information about a command.{{end}}
+`
 }
 
 // ExecuteWithGlobalState runs the root command with an existing GlobalState.
@@ -123,8 +119,7 @@ func newRootCommand(gs *state.GlobalState) *rootCommand {
 
 	subCommands := []func(*state.GlobalState) *cobra.Command{
 		getCmdArchive, getCmdCloud, getCmdNewScript, getCmdInspect, getCmdDeps,
-		getCmdLogin, getCmdPause, getCmdResume, getCmdScale, getCmdRun,
-		getCmdStats, getCmdStatus, getCmdVersion, getX,
+		getCmdRun, getCmdStats, getCmdVersion, getX,
 	}
 
 	defaultUsageTemplate := (&cobra.Command{}).UsageTemplate()
@@ -175,14 +170,20 @@ func (c *rootCommand) execute() {
 		}
 	}()
 
-	err := c.cmd.Execute()
+	// Completion requests for unregistered extensions must bypass Execute:
+	// cobra's __complete writes to stdout as a side-effect, and the
+	// provisioned binary's output would append to it, producing double output.
+	var err error
+	if ext, ok := detectExtensionCompletion(c.cmd, c.globalState); ok {
+		err = buildExtensionDeps(c.globalState, ext)
+	} else {
+		err = c.cmd.Execute()
+	}
 	if err == nil {
 		exitCode = 0
 		return
 	}
-
 	newExitCode, err := handleUnsatisfiedDependencies(err, c)
-
 	if err == nil {
 		exitCode = int(newExitCode)
 		return
@@ -408,6 +409,7 @@ func (c *rootCommand) setLoggerHook(ctx context.Context, h log.AsyncHook) {
 	c.globalState.Logger.SetOutput(io.Discard) // don't output to anywhere else
 }
 
+//nolint:gocognit
 func createSecretSources(gs *state.GlobalState) (map[string]secretsource.Source, error) {
 	baseParams := secretsource.Params{
 		Logger:      gs.Logger,
@@ -420,14 +422,13 @@ func createSecretSources(gs *state.GlobalState) (map[string]secretsource.Source,
 	for _, line := range gs.Flags.SecretSource {
 		t, config, ok := strings.Cut(line, "=")
 		if !ok {
-			// Special case: allow --secret-source=url without explicit config
-			// (it will use environment variables + defaults)
-			if line == "url" {
-				t = line
-				config = ""
-			} else {
+			if strings.TrimSpace(line) == "" {
 				return nil, fmt.Errorf("couldn't parse secret source configuration %q", line)
 			}
+			// Allow any non-empty source type without explicit config — it will use
+			// environment variables and built-in defaults.
+			t = line
+			config = ""
 		}
 		secretSources := ext.Get(ext.SecretSourceExtension)
 		found, ok := secretSources[t]
@@ -437,6 +438,10 @@ func createSecretSources(gs *state.GlobalState) (map[string]secretsource.Source,
 		c := found.Module.(secretsource.Constructor) //nolint:forcetypeassert
 		params := baseParams
 		name, isDefault, config := extractNameAndDefault(config)
+		if name == "" {
+			// Default the name to the source type to avoid an empty-string key.
+			name = t
+		}
 		params.ConfigArgument = config
 
 		secretSource, err := c(params)
@@ -462,7 +467,58 @@ func createSecretSources(gs *state.GlobalState) (map[string]secretsource.Source,
 		}
 	}
 
+	// Capture the cloud source instance if it was registered (via --secret-source=cloud or
+	// the local-execution injection above), so createCloudTest can call SetConfig on it later.
+	if cs, ok := result["cloud"].(*cloudsecrets.SecretSource); ok {
+		gs.CloudSecretSource = cs
+	}
+
+	// PLZ path: the k6-operator injects K6_CLOUD_SECRETS_TOKEN + K6_CLOUD_SECRETS_ENDPOINT
+	// via environment variables because it never calls createCloudTest (no /v1/tests round-trip).
+	// Create and configure the cloud source here; set it as the default if none was chosen.
+	if token := gs.Env["K6_CLOUD_SECRETS_TOKEN"]; token != "" {
+		if gs.CloudSecretSource == nil {
+			cloudSource, err := cloudsecrets.New(baseParams)
+			if err != nil {
+				return nil, fmt.Errorf("failed to initialize cloud secret source: %w", err)
+			}
+			result["cloud"] = cloudSource
+			gs.CloudSecretSource = cloudSource
+		}
+		gs.CloudSecretSource.SetConfig(&cloudsecrets.Config{
+			Token:        token,
+			Endpoint:     gs.Env["K6_CLOUD_SECRETS_ENDPOINT"],
+			ResponsePath: gs.Env["K6_CLOUD_SECRETS_RESPONSE_PATH"],
+		})
+		if _, ok := result["default"]; !ok {
+			result["default"] = gs.CloudSecretSource
+		}
+	}
+
 	return result, nil
+}
+
+// hasCloudSecretSource returns true if the 'cloud' secret source type appears in sources.
+func hasCloudSecretSource(sources []string) bool {
+	for _, s := range sources {
+		t, _, _ := strings.Cut(s, "=")
+		if strings.TrimSpace(t) == "cloud" {
+			return true
+		}
+	}
+	return false
+}
+
+// validateNoCloudSecretSource returns an error if any source in sources is of type 'cloud'.
+// The cloud secret source is only valid for 'k6 cloud run --local-execution'.
+func validateNoCloudSecretSource(sources []string) error {
+	if hasCloudSecretSource(sources) {
+		return errext.WithExitCodeIfNone(
+			fmt.Errorf("the 'cloud' secret source can only be used with 'k6 cloud run --local-execution'"),
+			exitcodes.InvalidConfig,
+		)
+	}
+	return nil
 }
 
 func extractNameAndDefault(config string) (name string, isDefault bool, remaining string) {

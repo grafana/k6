@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	"go.k6.io/k6/lib/types"
+	"go.k6.io/k6/v2/lib/types"
 
 	"github.com/andybalholm/brotli"
 	"github.com/klauspost/compress/zstd"
@@ -36,12 +36,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/internal/lib/testutils"
-	"go.k6.io/k6/internal/lib/testutils/httpmultibin"
-	"go.k6.io/k6/js/modulestest"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/netext"
-	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/v2/internal/lib/testutils"
+	"go.k6.io/k6/v2/internal/lib/testutils/httpmultibin"
+	"go.k6.io/k6/v2/js/modulestest"
+	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/lib/netext"
+	"go.k6.io/k6/v2/metrics"
 )
 
 // TODO replace this with the Single version
@@ -1173,6 +1173,38 @@ func TestRequest(t *testing.T) {
 		`))
 		assert.NoError(t, err)
 		assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "HEAD", sr("HTTPBIN_URL/get?a=1&b=2"), 200, "")
+	})
+
+	t.Run("GETExtraArgs", func(t *testing.T) {
+		ts := newTestCase(t)
+		rt := ts.runtime.VU.Runtime()
+
+		ts.hook.Reset()
+		_, err := rt.RunString(ts.tb.Replacer.Replace(`
+		var res = http.get("HTTPBIN_URL/get", null, {headers: {"X-We-Want-This": "value"}});
+		`))
+		require.NoError(t, err)
+
+		logEntry := ts.hook.LastEntry()
+		require.NotNil(t, logEntry)
+		assert.Equal(t, logrus.WarnLevel, logEntry.Level)
+		assert.Contains(t, logEntry.Message, "http.get only accepts a url and a params argument")
+	})
+
+	t.Run("HEADExtraArgs", func(t *testing.T) {
+		ts := newTestCase(t)
+		rt := ts.runtime.VU.Runtime()
+
+		ts.hook.Reset()
+		_, err := rt.RunString(ts.tb.Replacer.Replace(`
+		var res = http.head("HTTPBIN_URL/get", null, {headers: {"X-We-Want-This": "value"}});
+		`))
+		require.NoError(t, err)
+
+		logEntry := ts.hook.LastEntry()
+		require.NotNil(t, logEntry)
+		assert.Equal(t, logrus.WarnLevel, logEntry.Level)
+		assert.Contains(t, logEntry.Message, "http.head only accepts a url and a params argument")
 	})
 
 	t.Run("OPTIONS", func(t *testing.T) {

@@ -4,14 +4,13 @@ import (
 	"errors"
 	"fmt"
 
-	"go.k6.io/k6/errext/exitcodes"
-
-	"go.k6.io/k6/errext"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"go.k6.io/k6/internal/execution"
-	"go.k6.io/k6/internal/execution/local"
+
+	"go.k6.io/k6/v2/errext"
+	"go.k6.io/k6/v2/errext/exitcodes"
+	"go.k6.io/k6/v2/internal/execution"
+	"go.k6.io/k6/v2/internal/execution/local"
 )
 
 const cloudRunCommandName string = "run"
@@ -98,6 +97,12 @@ func getCmdCloudRun(cloudCmd *cmdCloud) *cobra.Command {
 }
 
 func (c *cmdCloudRun) preRun(cmd *cobra.Command, args []string) error {
+	if !c.localExecution {
+		if err := validateNoCloudSecretSource(c.runCmd.gs.Flags.SecretSource); err != nil {
+			return err
+		}
+	}
+
 	if c.localExecution {
 		if cmd.Flags().Changed("exit-on-running") {
 			return errext.WithExitCodeIfNone(

@@ -5,9 +5,9 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"go.k6.io/k6/cmd/state"
-	"go.k6.io/k6/ext"
-	"go.k6.io/k6/subcommand"
+	"go.k6.io/k6/v2/cmd/state"
+	"go.k6.io/k6/v2/ext"
+	"go.k6.io/k6/v2/subcommand"
 )
 
 // getX creates the "x" command that serves as a namespace for extension-provided subcommands.
@@ -63,20 +63,26 @@ allowing them to extend k6's functionality with custom commands.
 			}
 
 			// Subcommand not found - trigger provisioning
-			deps, err := dependenciesFromSubcommand(gs, args[0])
-			if err != nil {
-				return err
-			}
-
-			return binaryIsNotSatisfyingDependenciesError{
-				deps: deps,
-			}
+			return buildExtensionDeps(gs, args[0])
 		},
 	}
 
 	cmd.AddCommand(extensionSubcommands(gs)...)
 
 	return cmd
+}
+
+// buildExtensionDeps returns a [binaryIsNotSatisfyingDependenciesError] for
+// the given extension name if the required dependencies are not satisfied.
+// It's used by both [getX] and extension completions check in root.go to
+// trigger provisioning via [handleUnsatisfiedDependencies].
+func buildExtensionDeps(gs *state.GlobalState, extName string) error {
+	deps, err := dependenciesFromSubcommand(gs, extName)
+	if err != nil {
+		return err
+	}
+	// Will kickoff the provisioning flow in [handleUnsatisfiedDependencies].
+	return binaryIsNotSatisfyingDependenciesError{deps: deps}
 }
 
 // extensionSubcommands retrieves all subcommands provided by extensions.
@@ -106,6 +112,27 @@ func getCmdForExtension(extension *ext.Extension, gs *state.GlobalState) *cobra.
 	}
 
 	return cmd
+}
+
+// detectExtensionCompletion checks whether CmdArgs represent a completion
+// request for an unregistered extension subcommand (e.g. k6 __complete x docs "").
+// Returns true and the extension name when provisioning is needed.
+func detectExtensionCompletion(root *cobra.Command, gs *state.GlobalState) (string, bool) {
+	if !gs.Flags.AutoExtensionResolution {
+		return "", false
+	}
+
+	args := gs.CmdArgs[1:]
+	if len(args) == 0 || (args[0] != cobra.ShellCompRequestCmd && args[0] != cobra.ShellCompNoDescRequestCmd) {
+		return "", false
+	}
+
+	cmd, remaining, err := root.Find(args[1:])
+	if err != nil || cmd.Name() != "x" || len(remaining) < 2 {
+		return "", false
+	}
+
+	return remaining[0], true
 }
 
 // dependenciesFromSubcommand constructs a dependencies object for the given subcommand,

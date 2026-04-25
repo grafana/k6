@@ -9,8 +9,8 @@ import (
 
 	"github.com/grafana/sobek"
 
-	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
-	"go.k6.io/k6/js/common"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
+	"go.k6.io/k6/v2/js/common"
 )
 
 type ElementHandleBaseOptions struct {
@@ -187,11 +187,12 @@ func (o *ElementHandleBasePointerOptions) Parse(ctx context.Context, opts sobek.
 			switch k {
 			case "position":
 				var p map[string]float64
-				o.Position = &Position{}
-				if rt.ExportTo(opts.Get(k), &p) != nil {
-					o.Position.X = p["x"]
-					o.Position.Y = p["y"]
+				if err := rt.ExportTo(opts.Get(k), &p); err != nil {
+					return err
 				}
+				o.Position = &Position{}
+				o.Position.X = p["x"]
+				o.Position.Y = p["y"]
 			case "trial":
 				o.Trial = opts.Get(k).ToBoolean()
 			}

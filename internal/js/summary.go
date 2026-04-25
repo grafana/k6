@@ -9,10 +9,10 @@ import (
 
 	"github.com/grafana/sobek"
 
-	"go.k6.io/k6/internal/lib/summary"
-	"go.k6.io/k6/js/common"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/v2/internal/lib/summary"
+	"go.k6.io/k6/v2/js/common"
+	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/metrics"
 )
 
 // Copied from https://github.com/k6io/jslib.k6.io/tree/master/lib/k6-summary

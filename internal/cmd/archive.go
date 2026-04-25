@@ -4,7 +4,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"go.k6.io/k6/cmd/state"
+	"go.k6.io/k6/v2/cmd/state"
 )
 
 // cmdArchive handles the `k6 archive` sub-command
@@ -26,13 +26,12 @@ func (c *cmdArchive) run(cmd *cobra.Command, args []string) error {
 	// an execution shortcut option (e.g. `iterations` or `duration`),
 	// we will have multiple conflicting execution options since the
 	// derivation will set `scenarios` as well.
-	testRunState, err := test.buildTestRunState(test.consolidatedConfig.Options)
-	if err != nil {
+	if err := test.initRunner.SetOptions(test.consolidatedConfig.Options); err != nil {
 		return err
 	}
 
 	// Archive.
-	arc := testRunState.Runner.MakeArchive()
+	arc := test.makeArchive()
 
 	if c.excludeEnvVars {
 		c.gs.Logger.Debug("environment variables will be excluded from the archive")

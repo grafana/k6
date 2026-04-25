@@ -8,26 +8,17 @@ import (
 	"time"
 
 	"github.com/mstoykov/envconfig"
-	"go.k6.io/k6/errext"
-	"go.k6.io/k6/errext/exitcodes"
-	"go.k6.io/k6/internal/build"
-	"go.k6.io/k6/lib/types"
+	"go.k6.io/k6/v2/errext"
+	"go.k6.io/k6/v2/errext/exitcodes"
+	"go.k6.io/k6/v2/internal/build"
+	"go.k6.io/k6/v2/lib/types"
 	"gopkg.in/guregu/null.v3"
 )
 
 const (
-	// grpcExporterType GRPC exporter type
-	//
-	// Deprecated: use grpcExporterProtocol
-	grpcExporterType = "grpc"
-	// httpExporterType HTTP exporter type
-	//
-	// Deprecated: use httpExporterProtocol
-	httpExporterType = "http"
-
-	// grpcExporterProtocol GRPC exporter type
+	// grpcExporterProtocol GRPC exporter protocol
 	grpcExporterProtocol = "grpc"
-	// httpExporterProtocol HTTP exporter type
+	// httpExporterProtocol HTTP exporter protocol
 	httpExporterProtocol = "http/protobuf"
 )
 
@@ -44,10 +35,6 @@ type Config struct {
 	// FlushInterval is the interval at which to flush metrics from the k6
 	FlushInterval types.NullDuration `json:"flushInterval" envconfig:"K6_OTEL_FLUSH_INTERVAL"`
 
-	// ExporterType sets the type of OpenTelemetry Exporter to use
-	//
-	// Deprecated: use ExporterProtocol
-	ExporterType null.String `json:"exporterType" envconfig:"K6_OTEL_EXPORTER_TYPE"`
 	// ExporterProtocol sets the protocol of OpenTelemetry Exporter to use
 	ExporterProtocol null.String `json:"exporterProtocol" envconfig:"K6_OTEL_EXPORTER_PROTOCOL"`
 	// ExportInterval configures the intervening time between metrics exports
@@ -81,11 +68,6 @@ type Config struct {
 	// GRPCExporterInsecure disables client transport security for the Exporter's gRPC
 	// connection.
 	GRPCExporterInsecure null.Bool `json:"grpcExporterInsecure" envconfig:"K6_OTEL_GRPC_EXPORTER_INSECURE"`
-
-	// SingleCounterForRate sets the feature flag defining how to export metrics defined as Rate type.
-	// When it is set to true, metrics are exported as a single counter, using an attribute as discriminator.
-	// When the opposite, the old method is used generating two different counters.
-	SingleCounterForRate null.Bool `json:"singleCounterForRate" envconfig:"K6_OTEL_SINGLE_COUNTER_FOR_RATE"`
 }
 
 // GetConsolidatedConfig combines the options' values from the different sources
@@ -136,8 +118,6 @@ func newDefaultConfig() Config {
 
 		ExportInterval: types.NewNullDuration(10*time.Second, false),
 		FlushInterval:  types.NewNullDuration(1*time.Second, false),
-
-		SingleCounterForRate: null.NewBool(true, false),
 	}
 }
 
@@ -161,10 +141,6 @@ func (cfg Config) Apply(v Config) Config {
 
 	if v.ExporterProtocol.Valid {
 		cfg.ExporterProtocol = v.ExporterProtocol
-	}
-
-	if v.ExporterType.Valid {
-		cfg.ExporterType = v.ExporterType
 	}
 
 	if v.ExportInterval.Valid {
@@ -211,10 +187,6 @@ func (cfg Config) Apply(v Config) Config {
 		cfg.Headers = v.Headers
 	}
 
-	if v.SingleCounterForRate.Valid {
-		cfg.SingleCounterForRate = v.SingleCounterForRate
-	}
-
 	return cfg
 }
 
@@ -230,39 +202,6 @@ func (cfg Config) Validate() error {
 	}
 	if err := cfg.validateExporterProtocol(); err != nil {
 		return err
-	}
-	if err := cfg.validateExporterType(); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (cfg Config) validateExporterType() error {
-	if cfg.ExporterType.String != "" {
-		if cfg.ExporterType.String != httpExporterType && cfg.ExporterType.String != grpcExporterType {
-			return fmt.Errorf(
-				"unsupported exporter type %q, only %q and %q are supported",
-				cfg.ExporterType.String,
-				grpcExporterType,
-				httpExporterType,
-			)
-		}
-		switch cfg.ExporterType.String {
-		case grpcExporterType:
-			if cfg.GRPCExporterEndpoint.String == "" {
-				return errors.New("gRPC exporter endpoint is required")
-			}
-		case httpExporterType:
-			endpoint := cfg.HTTPExporterEndpoint.String
-			if endpoint == "" {
-				return errors.New("HTTP exporter endpoint is required")
-			}
-
-			if strings.HasPrefix(endpoint, "http://") ||
-				strings.HasPrefix(endpoint, "https://") {
-				return errors.New("HTTP exporter endpoint must only be host and port, no scheme")
-			}
-		}
 	}
 	return nil
 }
@@ -300,7 +239,7 @@ func (cfg Config) validateExporterProtocol() error {
 // String returns a string representation of the config
 func (cfg Config) String() string {
 	var endpoint string
-	protocol := mergeExporterTypeAndProtocol(cfg)
+	protocol := cfg.ExporterProtocol.String
 	switch protocol {
 	case httpExporterProtocol:
 		endpoint = "http"

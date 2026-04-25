@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"go.k6.io/k6/internal/js/modules/k6/browser/browser"
-	"go.k6.io/k6/internal/js/modules/k6/browser/common"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/browser"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
 )
 
 // Strict mode:
@@ -1032,6 +1032,47 @@ func TestActionabilityRetry(t *testing.T) {
 	text, err := value.InnerText(common.NewFrameInnerTextOptions(value.Timeout()))
 	require.NoError(t, err)
 	require.Equal(t, "0", text)
+}
+
+// BoundingBox() should return nil and an error indicating that the target element is not visible.
+// It should not retry and hence not time out
+func TestBoundingBoxOnInvisibleElement(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t)
+	p := tb.NewPage(nil)
+	err := p.SetContent("<html> <h1 id=\"elem\" style=\"display:none\">Test</h1> </html>", nil)
+
+	require.NoError(t, err)
+
+	loc := p.Locator("#elem", &common.LocatorOptions{})
+
+	rect, err := loc.BoundingBox(&common.FrameBaseOptions{Strict: true, Timeout: time.Second})
+
+	require.ErrorIs(t, err, common.ErrElementNotVisible)
+	require.Nil(t, rect)
+}
+
+// Ensure that focus() will retry and succeed even when the target element is detached after actionability checks but gets re-attached later.
+// This is done by focus() on an element that is detached/re-attached as fast as possible.
+// Note that this test will only fail 1/10 times if a bug is introduced because it is testing a race condition.
+func TestDetachedRetry(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withFileServer())
+	p := tb.NewPage(nil)
+
+	_, err := p.Goto(
+		tb.staticURL("detach_attach.html"),
+		&common.FrameGotoOptions{Timeout: common.DefaultTimeout},
+	)
+	require.NoError(t, err)
+
+	loc := p.Locator("#elem", &common.LocatorOptions{})
+
+	err = loc.Focus(&common.FrameBaseOptions{Strict: true, Timeout: time.Second})
+
+	require.NoError(t, err)
 }
 
 func TestLocatorFilter(t *testing.T) {

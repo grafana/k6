@@ -4,11 +4,12 @@ import (
 	"encoding/json"
 	"testing"
 
-	"go.k6.io/k6/cloudapi"
-	"go.k6.io/k6/internal/cmd/tests"
-	"go.k6.io/k6/internal/lib/testutils"
-	"go.k6.io/k6/lib"
 	"gopkg.in/guregu/null.v3"
+
+	"go.k6.io/k6/v2/cloudapi"
+	"go.k6.io/k6/v2/internal/cmd/tests"
+	"go.k6.io/k6/v2/internal/lib/testutils"
+	"go.k6.io/k6/v2/lib"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -111,6 +112,67 @@ func TestResolveDefaultProjectID(t *testing.T) {
 	}
 }
 
+func TestCheckCloudLogin(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name    string
+		conf    cloudapi.Config
+		wantErr error
+	}{
+		{
+			name: "valid token and stack passes",
+			conf: cloudapi.Config{
+				Token:   null.StringFrom("valid-token"),
+				StackID: null.IntFrom(1234),
+			},
+			wantErr: nil,
+		},
+		{
+			name: "missing token returns unauthenticated error",
+			conf: cloudapi.Config{
+				StackID: null.IntFrom(1234),
+			},
+			wantErr: errUserUnauthenticated,
+		},
+		{
+			name: "empty token string returns unauthenticated error",
+			conf: cloudapi.Config{
+				Token:   null.StringFrom(""),
+				StackID: null.IntFrom(1234),
+			},
+			wantErr: errUserUnauthenticated,
+		},
+		{
+			name: "missing stack returns stack not configured error",
+			conf: cloudapi.Config{
+				Token: null.StringFrom("valid-token"),
+			},
+			wantErr: errUserUnauthenticated,
+		},
+		{
+			name: "zero stack ID returns stack not configured error",
+			conf: cloudapi.Config{
+				Token:   null.StringFrom("valid-token"),
+				StackID: null.IntFrom(0),
+			},
+			wantErr: errUserUnauthenticated,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			err := checkCloudLogin(tc.conf)
+			if tc.wantErr == nil {
+				require.NoError(t, err)
+			} else {
+				require.ErrorIs(t, err, tc.wantErr)
+			}
+		})
+	}
+}
+
 func TestResolveAndSetProjectID(t *testing.T) {
 	t.Parallel()
 
@@ -119,7 +181,6 @@ func TestResolveAndSetProjectID(t *testing.T) {
 		cloudConfig       *cloudapi.Config
 		expectedError     string
 		expectedProjectID int64
-		logContains       string
 	}{
 		{
 			name: "sets projectID in all places when projectID > 0",
@@ -128,16 +189,14 @@ func TestResolveAndSetProjectID(t *testing.T) {
 			},
 			expectedError:     "",
 			expectedProjectID: 123,
-			logContains:       "No stack specified",
 		},
 		{
-			name: "logs warnings when projectID is 0 and no StackID",
+			name: "returns 0 when projectID is 0 and no StackID",
 			cloudConfig: &cloudapi.Config{
 				ProjectID: null.IntFrom(0),
 			},
 			expectedError:     "",
 			expectedProjectID: 0,
-			logContains:       "No stack specified",
 		},
 		{
 			name: "propagates error from resolveDefaultProjectID",
@@ -180,19 +239,10 @@ func TestResolveAndSetProjectID(t *testing.T) {
 				var cloudData map[string]any
 				require.NoError(t, json.Unmarshal(arc.Options.Cloud, &cloudData))
 				assert.Equal(t, float64(tc.expectedProjectID), cloudData["projectID"])
-
-				// Verify arc.Options.External contains the projectID
-				var externalData map[string]any
-				require.NoError(t, json.Unmarshal(arc.Options.External[cloudapi.LegacyCloudConfigKey], &externalData))
-				assert.Equal(t, float64(tc.expectedProjectID), externalData["projectID"])
 			}
 
 			logs := ts.LoggerHook.Drain()
-			if tc.logContains != "" {
-				assert.True(t, testutils.LogContains(logs, logrus.WarnLevel, tc.logContains))
-			} else {
-				assert.Len(t, logs, 0)
-			}
+			assert.Len(t, logs, 0)
 		})
 	}
 }
