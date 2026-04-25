@@ -686,6 +686,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 					return mapRequestEvent(vu, pe), nil
 				case common.PageEventRequestFailed:
 					return mapRequestEvent(vu, pe), nil
+				case common.PageEventDownload:
+					return mapDownloadEvent(vu, pe), nil
 				case common.PageEventMetric:
 					// intentionally left blank
 				}
@@ -786,6 +788,7 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageEventName, sobek.Cal
 			common.PageEventResponse:        {mapp: mapResponseEvent},
 			common.PageEventRequestFinished: {mapp: mapRequestEvent},
 			common.PageEventRequestFailed:   {mapp: mapRequestEvent},
+			common.PageEventDownload:        {mapp: mapDownloadEvent},
 		}
 		pageEvent, ok := pageEvents[eventName]
 		if !ok {
