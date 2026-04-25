@@ -74,7 +74,7 @@ jobs:
           if [[ "${{ matrix.platform }}" == "windows-latest" || "${{ matrix.platform }}" == "windows-latest" ]]; then
             XPATH="$HOME/sdk/gotip/bin;$XPATH"
           fi
-          cat "$(pwd)/xk6-js-test/*"
+          cat $(pwd)/xk6-js-test/*
           cat "$(pwd)/xk6-output-test/*"
 
           PATH="$XPATH" \
