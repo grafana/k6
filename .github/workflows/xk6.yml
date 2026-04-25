@@ -75,7 +75,7 @@ jobs:
             XPATH="$HOME/sdk/gotip/bin;$XPATH"
           fi
           cat $(pwd)/xk6-js-test/*
-          cat "$(pwd)/xk6-output-test/*"
+          cat $(pwd)/xk6-output-test/*
 
           PATH="$XPATH" \
           GOPRIVATE="go.k6.io/k6" xk6 build -v "$COMMIT_ID" \
@@ -83,6 +83,7 @@ jobs:
             --with github.com/grafana/xk6-js-test="$(pwd)/xk6-js-test" \
             --with github.com/grafana/xk6-output-test="$(pwd)/xk6-output-test"
           export K6_NO_USAGE_REPORT=true
+          go version -m ./k6ext
           ./k6ext version
           ./k6ext run --out outputtest=output-results.txt xk6-test.js
 
