@@ -1039,6 +1039,69 @@ func TestNotifyTestRunCompleted_5xxRetriesViaDo(t *testing.T) {
 	assert.Equal(t, MaxRetries, got, "server must receive exactly MaxRetries calls")
 }
 
+// TestWaitForTestRunReady_ErrorHandling verifies error-handling in the poll loop:
+//   - transient 5xx responses are retried by the SDK until success (AC-404)
+//   - 4xx responses propagate as errors immediately without retry (AC-405)
+func TestWaitForTestRunReady_ErrorHandling(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name            string
+		handler         func(t *testing.T) http.Handler
+		wantErr         bool
+		wantErrContains string
+	}{
+		{
+			// The openapi SDK is configured with MaxRetries=3 and RetryInterval=500ms;
+			// a single 503 triggers one internal retry — WaitForTestRunReady sees the
+			// eventual success and returns nil.
+			name: "transient 5xx retried by SDK, succeeds on eventual 200",
+			handler: func(t *testing.T) http.Handler {
+				t.Helper()
+				var calls atomic.Int32
+				return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+					if calls.Add(1) == 1 {
+						w.WriteHeader(http.StatusServiceUnavailable)
+						return
+					}
+					writeJSON(t, w, http.StatusOK, makeTestRunResponse(StatusInitializing, nil))
+				})
+			},
+			wantErr: false,
+		},
+		{
+			// 4xx responses are not retried by the SDK; the error propagates immediately.
+			name: "4xx from poll endpoint propagates as error",
+			handler: func(t *testing.T) http.Handler {
+				t.Helper()
+				return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+					writeError(t, w, http.StatusForbidden, "forbidden", "not authorized")
+				})
+			},
+			wantErr:         true,
+			wantErrContains: "403",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			client := newTestClient(t, tt.handler(t))
+			err := client.WaitForTestRunReady(t.Context(), 42, 1*time.Millisecond)
+
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.wantErrContains != "" {
+					assert.Contains(t, err.Error(), tt.wantErrContains)
+				}
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
 // TestNotifyTestRunCompleted_ContextCancelledMidRetry verifies that a context cancellation
 // mid-request propagates back as context.Canceled.
 func TestNotifyTestRunCompleted_ContextCancelledMidRetry(t *testing.T) {
