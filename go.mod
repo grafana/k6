@@ -58,7 +58,7 @@ require (
 	go.opentelemetry.io/proto/otlp v1.10.0
 	go.uber.org/goleak v1.3.0
 	golang.org/x/crypto v0.50.0
-	golang.org/x/crypto/x509roots/fallback v0.0.0-20260413170323-a8e9237a216b
+	golang.org/x/crypto/x509roots/fallback v0.0.0-20260423152011-b9e53593a607
 	golang.org/x/net v0.53.0
 	golang.org/x/sync v0.20.0
 	golang.org/x/term v0.42.0

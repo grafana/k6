@@ -257,8 +257,8 @@ golang.org/x/crypto v0.23.0/go.mod h1:CKFgDieR+mRhux2Lsu27y0fO304Db0wZe70UKqHu0v
 golang.org/x/crypto v0.31.0/go.mod h1:kDsLvtWBEx7MV9tJOj9bnXsPbxwJQ6csT/x4KIN4Ssk=
 golang.org/x/crypto v0.50.0 h1:zO47/JPrL6vsNkINmLoo/PH1gcxpls50DNogFvB5ZGI=
 golang.org/x/crypto v0.50.0/go.mod h1:3muZ7vA7PBCE6xgPX7nkzzjiUq87kRItoJQM1Yo8S+Q=
-golang.org/x/crypto/x509roots/fallback v0.0.0-20260413170323-a8e9237a216b h1:ZG2SxTKsx1w3pUpOMD9dliRYnhWC5R5jmL6UDPCbYj4=
-golang.org/x/crypto/x509roots/fallback v0.0.0-20260413170323-a8e9237a216b/go.mod h1:+UoQFNBq2p2wO+Q6ddVtYc25GZ6VNdOMyyrd4nrqrKs=
+golang.org/x/crypto/x509roots/fallback v0.0.0-20260423152011-b9e53593a607 h1:WlWLkLEVGjGS9LziRuLo1Ut+UkpzbXxFQh94eUUVjeg=
+golang.org/x/crypto/x509roots/fallback v0.0.0-20260423152011-b9e53593a607/go.mod h1:+UoQFNBq2p2wO+Q6ddVtYc25GZ6VNdOMyyrd4nrqrKs=
 golang.org/x/exp v0.0.0-20190121172915-509febef88a4/go.mod h1:CJ0aWSM057203Lf6IL+f9T1iT9GByDxfZKAQTCR3kQA=
 golang.org/x/lint v0.0.0-20181026193005-c67002cb31c3/go.mod h1:UVdnD1Gm6xHRNCYTkRU2/jEulfH38KcIWyp/GAMgvoE=
 golang.org/x/lint v0.0.0-20190227174305-5b3e6a55c961/go.mod h1:wehouNa3lNwaWXcvxsM5YxQ5yQlVC4a0KAMCusXpPoU=
