@@ -83,8 +83,9 @@ func (h *logrusSlogHandler) WithGroup(name string) slog.Handler {
 	return &logrusSlogHandler{logger: h.logger, attrs: h.attrs, groupPath: path}
 }
 
-// flattenAttr writes a into fields with keys qualified by prefix.
-// If a is a group-kind attr, it recurses into its children.
+// flattenAttr copies a slog attribute into fields using dot-separated keys.
+// Group attributes are expanded recursively, so prefix + group + child becomes
+// a single logrus field key such as "provider.request.id".
 func flattenAttr(prefix string, a slog.Attr, fields logrus.Fields) {
 	key := a.Key
 	if prefix != "" {
