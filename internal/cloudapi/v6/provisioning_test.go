@@ -2,15 +2,18 @@ package cloudapi
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.k6.io/k6/v2/errext"
 	"go.k6.io/k6/v2/internal/lib/testutils"
 )
 
@@ -346,4 +349,86 @@ func TestProvisionLocalExecution_NoNotifyBeforeTestRunID(t *testing.T) {
 
 	assert.ErrorIs(t, err, context.Canceled, "error must be (or wrap) context.Canceled")
 	assert.Equal(t, int32(0), notifyCalled.Load(), "notify must NOT be called before test_run_id exists")
+}
+
+// TestProvisionLocalExecution_CtrlCDuringS3PutThenNotify verifies the Ctrl+C scenario
+// during the S3 archive upload:
+//  1. The context is cancelled while the S3 PUT is in-flight (simulating Ctrl+C).
+//  2. ProvisionLocalExecution returns an error wrapping context.Canceled.
+//  3. A subsequent NotifyTestRunCompleted call with an AbortedByUser error delivers
+//     error code 5 to the notify endpoint (same as the cmd layer would do).
+func TestProvisionLocalExecution_CtrlCDuringS3PutThenNotify(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	// unblockUpload is closed by t.Cleanup (registered below) to release the upload
+	// handler goroutine after the test function returns.  t.Cleanup runs in LIFO order,
+	// so this fires before srv.Close, allowing the server to shut down cleanly.
+	unblockUpload := make(chan struct{})
+
+	var (
+		mu             sync.Mutex
+		capturedNotify notifyBody
+		notifyCalled   atomic.Int32
+	)
+
+	uploadURLCh := make(chan string, 1)
+
+	handlers := map[string]http.HandlerFunc{
+		"/cloud/v6/projects/99/load_tests": func(w http.ResponseWriter, _ *http.Request) {
+			writeJSON(t, w, http.StatusCreated, makeLoadTestResponse(1234, 99, "test"))
+		},
+		"/provisioning/v1/load_tests/1234/start_local_execution": func(w http.ResponseWriter, _ *http.Request) {
+			uploadURL := <-uploadURLCh
+			writeJSON(t, w, http.StatusOK, makeSLEResponse(42, &uploadURL, "https://app.k6.io/runs/42"))
+		},
+		// The upload handler cancels the client context (simulating Ctrl+C) and then
+		// blocks until t.Cleanup closes unblockUpload; this prevents a spurious 200
+		// response from reaching a retry on the client side.
+		"/upload": func(w http.ResponseWriter, _ *http.Request) {
+			cancel()
+			<-unblockUpload
+			w.WriteHeader(http.StatusOK)
+		},
+		"/provisioning/v1/test_runs/42/notify": func(w http.ResponseWriter, r *http.Request) {
+			notifyCalled.Add(1)
+			mu.Lock()
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&capturedNotify))
+			mu.Unlock()
+			w.WriteHeader(http.StatusNoContent)
+		},
+	}
+
+	srv, client := newProvisionTestServer(t, handlers)
+	t.Cleanup(func() { close(unblockUpload) }) // must be after srv is created (LIFO: runs before srv.Close)
+
+	uploadURLCh <- srv.URL + "/upload"
+
+	arc := newTestArchive(t)
+	params := ProvisionParams{
+		Name:          "test",
+		ProjectID:     99,
+		MaxVUs:        5,
+		TotalDuration: 60,
+		Options:       map[string]any{},
+		Archive:       arc,
+	}
+
+	_, provisionErr := client.ProvisionLocalExecution(ctx, params)
+	require.Error(t, provisionErr)
+	assert.ErrorIs(t, provisionErr, context.Canceled, "S3 PUT cancellation must propagate as context.Canceled")
+
+	// Simulate what the cmd layer does: notify with an AbortedByUser error using a
+	// fresh context (ctx is cancelled, t.Context() is not).
+	notifyErr := testAbortError{reason: errext.AbortedByUser, msg: "interrupted"}
+	require.NoError(t, client.NotifyTestRunCompleted(t.Context(), 42, notifyErr))
+
+	assert.Equal(t, int32(1), notifyCalled.Load(), "notify must be called exactly once")
+
+	mu.Lock()
+	defer mu.Unlock()
+	require.NotNil(t, capturedNotify.Error, "notify body must contain an error")
+	assert.Equal(t, 5, capturedNotify.Error.Code, "Ctrl+C must map to error code 5")
 }
