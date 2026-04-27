@@ -100,13 +100,13 @@
       ]
     },
 	{
-      "matchBaseBranches": ["v1"],
+      "matchBaseBranches": ["v1.x"],
       "matchUpdateTypes": ["major", "minor", "patch", "pin", "digest"],
       "enabled": false,
       "description": "Disable all standard updates for v1"
     },
     {
-      "matchBaseBranches": ["v1"],
+      "matchBaseBranches": ["v1.x"],
       "matchUpdateTypes": ["security"],
       "enabled": true,
       "dependencyDashboardApproval": false,
