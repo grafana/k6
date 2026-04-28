@@ -116,11 +116,9 @@ func TestCheckCloudLogin(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
-		name                string
-		conf                cloudapi.Config
-		expectedAuthError   bool
-		expectedTokenReason bool
-		expectedStackReason bool
+		name        string
+		conf        cloudapi.Config
+		expectedErr error
 	}{
 		{
 			name: "valid token and stack passes",
@@ -134,8 +132,7 @@ func TestCheckCloudLogin(t *testing.T) {
 			conf: cloudapi.Config{
 				StackID: null.IntFrom(1234),
 			},
-			expectedAuthError:   true,
-			expectedTokenReason: true,
+			expectedErr: errMissingToken,
 		},
 		{
 			name: "empty token string returns token not configured error",
@@ -143,16 +140,14 @@ func TestCheckCloudLogin(t *testing.T) {
 				Token:   null.StringFrom(""),
 				StackID: null.IntFrom(1234),
 			},
-			expectedAuthError:   true,
-			expectedTokenReason: true,
+			expectedErr: errMissingToken,
 		},
 		{
 			name: "missing stack returns stack not configured error",
 			conf: cloudapi.Config{
 				Token: null.StringFrom("valid-token"),
 			},
-			expectedAuthError:   true,
-			expectedStackReason: true,
+			expectedErr: errMissingStackID,
 		},
 		{
 			name: "zero stack ID returns stack not configured error",
@@ -160,8 +155,7 @@ func TestCheckCloudLogin(t *testing.T) {
 				Token:   null.StringFrom("valid-token"),
 				StackID: null.IntFrom(0),
 			},
-			expectedAuthError:   true,
-			expectedStackReason: true,
+			expectedErr: errMissingStackID,
 		},
 	}
 
@@ -169,21 +163,11 @@ func TestCheckCloudLogin(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			err := checkCloudLogin(tc.conf)
-
-			if tc.expectedAuthError {
-				var authErr *cloudAuthError
-				require.ErrorAs(t, err, &authErr)
-				switch {
-				case tc.expectedTokenReason:
-					require.ErrorContains(t, err, "an access token")
-				case tc.expectedStackReason:
-					require.ErrorContains(t, err, "a stack ID")
-				default:
-					t.Fatal("if an auth error is expected then an expected reason must be defined")
-				}
+			if tc.expectedErr != nil {
+				require.ErrorIs(t, err, tc.expectedErr)
+				require.ErrorIs(t, err, errCloudAuth)
 				return
 			}
-
 			require.NoError(t, err)
 		})
 	}

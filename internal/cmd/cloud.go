@@ -29,30 +29,24 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// cloudAuthError is an authentication error whose describes the cause. Typically used
-// for user-facing error messages. Callers can use errors.As to detect any Grafana Cloud authentication
-// failure regardless of the specific cause.
-type cloudAuthError struct{ reason string }
-
-func (e *cloudAuthError) Error() string { return e.reason }
+var (
+	errCloudAuth = errors.New( //nolint:staticcheck // user-facing error message, capitalization is intentional
+		"Run `k6 cloud login` to authenticate, or check the docs for other options at" +
+			" https://grafana.com/docs/grafana-cloud/testing/k6/author-run/tokens-and-cli-authentication",
+	)
+	errMissingToken   = errors.New("access token not configured")
+	errMissingStackID = errors.New("stack ID not configured")
+)
 
 // checkCloudLogin verifies that both a token and a stack are configured.
 // Together they represent a complete Grafana Cloud login.
 func checkCloudLogin(conf cloudapi.Config) error {
-	const requiredErrFormat = "To run tests in Grafana Cloud, you must first authenticate" +
-		" setting %s. Run `k6 cloud login` providing the stack and token," +
-		" or check the docs for other options:" +
-		" https://grafana.com/docs/grafana-cloud/testing/k6/author-run/tokens-and-cli-authentication"
-
+	const prefix = "Running cloud tests requires auth settings"
 	if !conf.Token.Valid || conf.Token.String == "" {
-		return &cloudAuthError{
-			reason: fmt.Sprintf(requiredErrFormat, "an access token"),
-		}
+		return fmt.Errorf("%s: %w.\n%w", prefix, errMissingToken, errCloudAuth)
 	}
 	if !conf.StackID.Valid || conf.StackID.Int64 == 0 {
-		return &cloudAuthError{
-			reason: fmt.Sprintf(requiredErrFormat, "a stack ID"),
-		}
+		return fmt.Errorf("%s: %w.\n%w", prefix, errMissingStackID, errCloudAuth)
 	}
 	return nil
 }
@@ -412,7 +406,7 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 
   # Run a test archive in Grafana Cloud
   $ {{.}} cloud run archive.tar
-  
+
   # [deprecated] Run a test script in Grafana Cloud
   $ {{.}} cloud script.js
 
