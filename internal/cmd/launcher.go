@@ -72,18 +72,7 @@ func (b *customBinary) run(ctx context.Context, gs *state.GlobalState) error {
 	// in `gs.Stdin` and should be passed to the command
 	cmd.Stdin = gs.Stdin
 
-	// Copy environment variables to the k6 process skipping auto extension resolution feature flag.
-	env := []string{}
-	for k, v := range gs.Env {
-		if k == state.AutoExtensionResolution {
-			continue
-		}
-		env = append(env, fmt.Sprintf("%s=%s", k, v))
-	}
-	// If auto extension resolution is enabled then
-	// this avoids unnecessary re-processing of dependencies in the sub-process.
-	env = append(env, state.AutoExtensionResolution+"=false")
-	cmd.Env = env
+	cmd.Env = buildSubprocessEnv(gs.Env)
 
 	// handle signals
 	sigC := make(chan os.Signal, 2)
@@ -118,6 +107,22 @@ func (b *customBinary) run(ctx context.Context, gs *state.GlobalState) error {
 				Debug("Signal received, waiting for the subprocess to handle it and return.")
 		}
 	}
+}
+
+// buildSubprocessEnv prepares environment variables for a provisioned k6 subprocess.
+func buildSubprocessEnv(src map[string]string) []string {
+	env := []string{}
+	for k, v := range src {
+		if k == state.AutoExtensionResolution {
+			continue
+		}
+		env = append(env, fmt.Sprintf("%s=%s", k, v))
+	}
+	// Disable auto extension resolution in the subprocess to avoid
+	// unnecessary re-processing of dependencies.
+	env = append(env, state.AutoExtensionResolution+"=false")
+	env = append(env, state.ProvisionHostVersion+"="+runtimeK6Version())
+	return env
 }
 
 // used just to signal we shouldn't print error again
