@@ -128,7 +128,7 @@ func (c *Client) prepareHeaders(req *http.Request) {
 		req.Header.Set("Content-Type", "application/json")
 	}
 
-	if c.token != "" {
+	if c.token != "" && req.Header.Get("Authorization") == "" {
 		req.Header.Set("Authorization", fmt.Sprintf("Token %s", c.token))
 	}
 

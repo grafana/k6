@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"sync"
@@ -14,7 +15,6 @@ import (
 	"go.k6.io/k6/v2/cloudapi"
 	"go.k6.io/k6/v2/errext"
 	"go.k6.io/k6/v2/errext/exitcodes"
-	"go.k6.io/k6/v2/internal/build"
 	"go.k6.io/k6/v2/internal/cloudapi/insights"
 	insightsOutput "go.k6.io/k6/v2/internal/output/cloud/insights"
 	"go.k6.io/k6/v2/metrics"
@@ -28,13 +28,33 @@ type flusher interface {
 	flush() error
 }
 
+// netHTTPClient is a minimal HTTP doer used on the provisioning path.
+// Unlike cloudapi.Client it does not inject legacy headers
+// (Authorization: Token, K6-Idempotency-Key, User-Agent).
+type netHTTPClient struct {
+	c *http.Client
+}
+
+func (n *netHTTPClient) Do(req *http.Request, _ any) error {
+	resp, err := n.c.Do(req) //nolint:gosec // G704: URL is sourced from the provisioning API response, not user input
+	if err != nil {
+		return err
+	}
+	body, _ := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		return fmt.Errorf("(%d/%s) %s", resp.StatusCode, http.StatusText(resp.StatusCode), string(body))
+	}
+	return nil
+}
+
 // Output sends result data to the k6 Cloud service.
 type Output struct {
 	output.SampleBuffer
 
 	logger      logrus.FieldLogger
 	config      cloudapi.Config
-	cloudClient *cloudapi.Client
+	cloudClient httpDoer
 	testRunID   string
 
 	collector *collector
@@ -58,18 +78,12 @@ type Output struct {
 
 // New creates a new cloud output.
 func New(logger logrus.FieldLogger, conf cloudapi.Config, _ *cloudapi.Client) (*Output, error) {
-	// TODO: move this creation operation to the centralized output. Reducing the probability to
-	// break the logic for the config overwriting.
-	//
-	// It creates a new client because in the case the backend has overwritten
-	// the config we need to use the new set.
 	return &Output{
-		config: conf,
-		logger: logger.WithField("output", "cloudv2"),
-		abort:  make(chan struct{}),
-		stop:   make(chan struct{}),
-		cloudClient: cloudapi.NewClient(
-			logger, conf.Token.String, conf.Host.String, build.Version, conf.Timeout.TimeDuration()),
+		config:      conf,
+		logger:      logger.WithField("output", "cloudv2"),
+		abort:       make(chan struct{}),
+		stop:        make(chan struct{}),
+		cloudClient: &netHTTPClient{c: &http.Client{Timeout: conf.Timeout.TimeDuration()}},
 	}, nil
 }
 
@@ -99,7 +113,7 @@ func (o *Output) Start() error {
 		return fmt.Errorf("failed to initialize the samples collector: %w", err)
 	}
 
-	mc, err := newMetricsClient(o.cloudClient, o.testRunID)
+	mc, err := newMetricsClient(o.cloudClient, o.config.MetricsPushURL.String, o.testRunID, o.config.TestRunToken.String)
 	if err != nil {
 		return fmt.Errorf("failed to initialize the http metrics flush client: %w", err)
 	}

@@ -2,9 +2,11 @@
 package cloud
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -12,8 +14,8 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/v2/cloudapi"
-	"go.k6.io/k6/v2/errext"
 	"go.k6.io/k6/v2/internal/build"
+	v6cloudapi "go.k6.io/k6/v2/internal/cloudapi/v6"
 	"go.k6.io/k6/v2/internal/usage"
 	"go.k6.io/k6/v2/lib"
 	"go.k6.io/k6/v2/metrics"
@@ -55,6 +57,7 @@ const (
 type Output struct {
 	versionedOutput
 
+	ctx       context.Context
 	logger    logrus.FieldLogger
 	config    cloudapi.Config
 	testRunID string
@@ -72,6 +75,7 @@ type Output struct {
 	testArchive *lib.Archive
 
 	client       *cloudapi.Client
+	v6Client     *v6cloudapi.Client // non-nil only on the provisioning path
 	testStopFunc func(error)
 
 	usage *usage.Usage
@@ -142,7 +146,13 @@ func newOutput(params output.Params) (*Output, error) {
 	apiClient := cloudapi.NewClient(
 		logger, conf.Token.String, conf.Host.String, build.Version, conf.Timeout.TimeDuration())
 
+	ctx := params.Ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	return &Output{
+		ctx:           ctx,
 		config:        conf,
 		client:        apiClient,
 		executionPlan: params.ExecutionPlan,
@@ -185,37 +195,53 @@ func (out *Output) Start() error {
 
 	if out.testRunID != "" {
 		out.logger.WithField("testRunId", out.testRunID).Debug("Directly pushing metrics without init")
+		if err := out.ensureMetricsPushURL(); err != nil {
+			return err
+		}
+		if err := out.initV6ClientForDirectPush(); err != nil {
+			return err
+		}
 		return out.startVersionedOutput()
 	}
 
-	thresholds := make(map[string][]string)
-	for name, t := range out.thresholds {
-		for _, threshold := range t {
-			thresholds[name] = append(thresholds[name], threshold.Source)
-		}
+	if !out.config.StackID.Valid || out.config.StackID.Int64 == 0 {
+		return fmt.Errorf("a stack ID is required, please ensure your stack ID is configured")
 	}
 
-	testRun := &cloudapi.TestRun{
-		Name:       out.config.Name.String,
-		ProjectID:  out.config.ProjectID.Int64,
-		VUsMax:     int64(lib.GetMaxPossibleVUs(out.executionPlan)), //nolint:gosec
-		Thresholds: thresholds,
-		Duration:   out.duration,
-		Archive:    out.testArchive,
-	}
-
-	response, err := out.client.CreateTestRun(testRun)
+	v6c, err := v6cloudapi.NewClient(
+		out.logger, out.config.Token.String, out.config.Hostv6.String,
+		build.Version, out.config.Timeout.TimeDuration())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create v6 cloud client: %w", err)
 	}
-	out.testRunID = response.ReferenceID
+	v6c.SetStackID(int32(out.config.StackID.Int64)) //nolint:gosec
 
-	if response.ConfigOverride != nil {
-		out.logger.WithFields(logrus.Fields{
-			"override": response.ConfigOverride,
-		}).Debug("overriding config options")
-		out.config = out.config.Apply(*response.ConfigOverride)
+	params := v6cloudapi.ProvisionParams{
+		Name:          out.config.Name.String,
+		ProjectID:     int32(out.config.ProjectID.Int64),               //nolint:gosec
+		MaxVUs:        int64(lib.GetMaxPossibleVUs(out.executionPlan)), //nolint:gosec
+		TotalDuration: out.duration,
+		Options:       map[string]any{},
+		Archive:       out.testArchive, // nil if --no-archive-upload (hardcoded nil on this path)
 	}
+
+	result, err := v6c.ProvisionLocalExecution(out.ctx, params)
+	if err != nil {
+		return fmt.Errorf("provisioning local execution failed: %w", err)
+	}
+
+	if result.RuntimeConfig.Metrics.PushURL == "" {
+		return fmt.Errorf("provisioning response missing metrics push URL")
+	}
+	if result.RuntimeConfig.TestRunToken == "" {
+		return fmt.Errorf("provisioning response missing test run token")
+	}
+
+	out.testRunID = strconv.FormatInt(int64(result.TestRunID), 10)
+	out.config.MetricsPushURL = null.StringFrom(result.RuntimeConfig.Metrics.PushURL)
+	out.config.TestRunToken = null.StringFrom(result.RuntimeConfig.TestRunToken)
+	v6c.SetTestRunToken(result.RuntimeConfig.TestRunToken)
+	out.v6Client = v6c
 
 	err = out.startVersionedOutput()
 	if err != nil {
@@ -291,75 +317,49 @@ func (out *Output) testFinished(testErr error) error {
 		return nil
 	}
 
-	testTainted := false
-	thresholdResults := make(cloudapi.ThresholdResult)
-	for name, thresholds := range out.thresholds {
-		thresholdResults[name] = make(map[string]bool)
-		for _, t := range thresholds {
-			thresholdResults[name][t.Source] = t.LastFailed
-			if t.LastFailed {
-				testTainted = true
-			}
-		}
+	testRunID64, err := strconv.ParseInt(out.testRunID, 10, 64)
+	if err != nil {
+		return fmt.Errorf("invalid test run ID %q: %w", out.testRunID, err)
 	}
-
-	runStatus := out.getRunStatus(testErr)
-	out.logger.WithFields(logrus.Fields{
-		"ref":        out.testRunID,
-		"tainted":    testTainted,
-		"run_status": runStatus,
-	}).Debug("Sending test finished")
-
-	return out.client.TestFinished(out.testRunID, thresholdResults, testTainted, runStatus)
+	out.logger.WithField("ref", out.testRunID).Debug("Sending test finished notification")
+	return out.v6Client.NotifyTestRunCompleted(out.ctx, int32(testRunID64), testErr) //nolint:gosec
 }
 
-// getRunStatus determines the run status of the test based on the error.
-func (out *Output) getRunStatus(testErr error) cloudapi.RunStatus {
-	if testErr == nil {
-		return cloudapi.RunStatusFinished
+func (out *Output) ensureMetricsPushURL() error {
+	if out.config.MetricsPushURL.Valid && out.config.MetricsPushURL.String != "" {
+		return nil
+	}
+	return errors.New("metrics push URL is required but was not provided")
+}
+
+// initV6ClientForDirectPush creates and wires a v6 client using credentials
+// already present in the config. This is the path where provisioning happened
+// before Output.Start() (e.g. k6 cloud run --local-execution sets testRunID,
+// MetricsPushURL, and TestRunToken in the config before Start is called).
+//
+// PushRefID paths are excluded: k6-operator manages the lifecycle externally
+// and testFinished returns nil early for those.
+func (out *Output) initV6ClientForDirectPush() error {
+	if out.config.PushRefID.Valid {
+		return nil
+	}
+	if !out.config.StackID.Valid || out.config.StackID.Int64 == 0 {
+		return fmt.Errorf("a stack ID is required, please ensure your stack ID is configured")
+	}
+	if !out.config.TestRunToken.Valid || out.config.TestRunToken.String == "" {
+		return fmt.Errorf("test run token is required on the provisioning path but was not provided")
 	}
 
-	var err errext.HasAbortReason
-	if errors.As(testErr, &err) {
-		abortReason := err.AbortReason()
-		switch abortReason {
-		case errext.AbortedByUser:
-			return cloudapi.RunStatusAbortedUser
-		case errext.AbortedByThreshold:
-			return cloudapi.RunStatusAbortedThreshold
-		case errext.AbortedByScriptError:
-			return cloudapi.RunStatusAbortedScriptError
-		case errext.AbortedByScriptAbort:
-			return cloudapi.RunStatusAbortedUser // TODO: have a better value than this?
-		case errext.AbortedByTimeout:
-			return cloudapi.RunStatusAbortedLimit
-		case errext.AbortedByOutput:
-			return cloudapi.RunStatusAbortedSystem
-		case errext.AbortedByThresholdsAfterTestEnd:
-			// The test run finished normally, it wasn't prematurely aborted by
-			// anything while running, but the thresholds failed at the end and
-			// k6 will return an error and a non-zero exit code to the user.
-			//
-			// However, failures are tracked somewhat differently by the k6
-			// cloud compared to k6 OSS. It doesn't have a single pass/fail
-			// variable with multiple failure states, like k6's exit codes.
-			// Instead, it has two variables, result_status and run_status.
-			//
-			// The status of the thresholds is tracked by the binary
-			// result_status variable, which signifies whether the thresholds
-			// passed or failed (failure also called "tainted" in some places of
-			// the API here). The run_status signifies whether the test run
-			// finished normally and has a few fixed failures values.
-			//
-			// So, this specific k6 error will be communicated to the cloud only
-			// via result_status, while the run_status will appear normal.
-			return cloudapi.RunStatusFinished
-		}
+	v6c, err := v6cloudapi.NewClient(
+		out.logger, out.config.Token.String, out.config.Hostv6.String,
+		build.Version, out.config.Timeout.TimeDuration())
+	if err != nil {
+		return fmt.Errorf("failed to create v6 cloud client: %w", err)
 	}
-
-	// By default, the catch-all error is "aborted by system", but let's log that
-	out.logger.WithError(testErr).Debug("unknown test error classified as 'aborted by system'")
-	return cloudapi.RunStatusAbortedSystem
+	v6c.SetStackID(int32(out.config.StackID.Int64)) //nolint:gosec
+	v6c.SetTestRunToken(out.config.TestRunToken.String)
+	out.v6Client = v6c
+	return nil
 }
 
 func (out *Output) startVersionedOutput() error {

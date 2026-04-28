@@ -116,6 +116,7 @@ func createOutputs(
 		return nil, err
 	}
 	baseParams := output.Params{
+		Ctx:            gs.Ctx,
 		ScriptPath:     test.source.URL,
 		Logger:         gs.Logger,
 		Environment:    gs.Env,
