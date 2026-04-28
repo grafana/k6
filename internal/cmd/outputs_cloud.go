@@ -119,7 +119,7 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 
 	params := cloudapiv6.ProvisionParams{
 		Name:          conf.Name.String,
-		ProjectID:     int32(projectID), //nolint:gosec
+		ProjectID:     int32(projectID),                            //nolint:gosec
 		MaxVUs:        int64(lib.GetMaxPossibleVUs(executionPlan)), //nolint:gosec
 		TotalDuration: int64(duration / time.Second),
 		Options:       map[string]any{},

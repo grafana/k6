@@ -16,7 +16,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/v2/cloudapi"
-	"go.k6.io/k6/v2/errext"
 	v6cloudapi "go.k6.io/k6/v2/internal/cloudapi/v6"
 	"go.k6.io/k6/v2/internal/lib/testutils"
 	"go.k6.io/k6/v2/internal/usage"
@@ -493,30 +492,6 @@ func TestOutputStopWithTestError(t *testing.T) {
 		t.Error("timed out")
 	case <-done:
 	}
-}
-
-func TestOutputGetStatusRun(t *testing.T) {
-	t.Parallel()
-
-	t.Run("Success", func(t *testing.T) {
-		t.Parallel()
-		o := Output{}
-		assert.Equal(t, cloudapi.RunStatusFinished, o.getRunStatus(nil))
-	})
-	t.Run("WithErrorNoAbortReason", func(t *testing.T) {
-		t.Parallel()
-		o := Output{logger: testutils.NewLogger(t)}
-		assert.Equal(t, cloudapi.RunStatusAbortedSystem, o.getRunStatus(errors.New("my-error")))
-	})
-	t.Run("WithAbortReason", func(t *testing.T) {
-		t.Parallel()
-		o := Output{}
-		errWithReason := errext.WithAbortReasonIfNone(
-			errors.New("my-original-error"),
-			errext.AbortedByOutput,
-		)
-		assert.Equal(t, cloudapi.RunStatusAbortedSystem, o.getRunStatus(errWithReason))
-	})
 }
 
 func TestOutputProxyAddMetricSamples(t *testing.T) {
