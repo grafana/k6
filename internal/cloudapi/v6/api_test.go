@@ -513,7 +513,7 @@ func TestStartLocalExecution(t *testing.T) {
 		assert func(t *testing.T, req capturedRequest, resp *StartLocalExecutionResponse)
 	}{
 		{
-			name: "response struct fields",
+			name: "response_struct_fields",
 			assert: func(t *testing.T, _ capturedRequest, resp *StartLocalExecutionResponse) {
 				t.Helper()
 				assert.Equal(t, int64(999), resp.TestRunID)
@@ -533,7 +533,7 @@ func TestStartLocalExecution(t *testing.T) {
 			},
 		},
 		{
-			name: "request body fields",
+			name: "request_body_fields",
 			assert: func(t *testing.T, req capturedRequest, _ *StartLocalExecutionResponse) {
 				t.Helper()
 				var body map[string]any
@@ -548,7 +548,7 @@ func TestStartLocalExecution(t *testing.T) {
 			},
 		},
 		{
-			name: "idempotency key header",
+			name: "idempotency_key_header",
 			assert: func(t *testing.T, req capturedRequest, _ *StartLocalExecutionResponse) {
 				t.Helper()
 				key := req.headers.Get("K6-Idempotency-Key")
@@ -559,7 +559,7 @@ func TestStartLocalExecution(t *testing.T) {
 			},
 		},
 		{
-			name: "bearer auth",
+			name: "bearer_auth",
 			assert: func(t *testing.T, req capturedRequest, _ *StartLocalExecutionResponse) {
 				t.Helper()
 				assert.Equal(t, "Bearer test-token", req.headers.Get("Authorization"),
@@ -567,7 +567,7 @@ func TestStartLocalExecution(t *testing.T) {
 			},
 		},
 		{
-			name: "x-stack-id header",
+			name: "x_stack_id_header",
 			assert: func(t *testing.T, req capturedRequest, _ *StartLocalExecutionResponse) {
 				t.Helper()
 				assert.Equal(t, "1", req.headers.Get("X-Stack-Id"),
@@ -631,7 +631,7 @@ func TestUploadArchive(t *testing.T) {
 		checkReq        func(t *testing.T, req capturedUpload)
 	}{
 		{
-			name:         "PUT with correct content-type and body",
+			name:         "put_with_correct_content_type_and_body",
 			serverStatus: http.StatusOK,
 			checkReq: func(t *testing.T, req capturedUpload) {
 				t.Helper()
@@ -641,7 +641,7 @@ func TestUploadArchive(t *testing.T) {
 			},
 		},
 		{
-			name:         "no authorization header on S3 presigned PUT",
+			name:         "no_authorization_header_on_s3_presigned_put",
 			serverStatus: http.StatusOK,
 			checkReq: func(t *testing.T, req capturedUpload) {
 				t.Helper()
@@ -649,7 +649,7 @@ func TestUploadArchive(t *testing.T) {
 			},
 		},
 		{
-			name:            "error propagation on non-2xx",
+			name:            "error_propagation_on_non_2xx",
 			serverStatus:    http.StatusForbidden,
 			wantErr:         true,
 			wantErrContains: "403",
@@ -751,7 +751,7 @@ func TestWaitForTestRunReady(t *testing.T) {
 		wantWarnLogs    int    // -1 = don't check; ≥0 = assert exact count of Warn entries
 	}{
 		{
-			name: "proceeds on first initializing",
+			name: "proceeds_on_first_initializing",
 			responses: []*k6cloud.TestRunApiModel{
 				makeTestRunResponse(StatusInitializing, nil),
 			},
@@ -759,7 +759,7 @@ func TestWaitForTestRunReady(t *testing.T) {
 			wantWarnLogs: -1,
 		},
 		{
-			name: "created then queued then initializing",
+			name: "created_then_queued_then_initializing",
 			responses: []*k6cloud.TestRunApiModel{
 				makeTestRunResponse(StatusCreated, nil),
 				makeTestRunResponse(StatusCreated, nil),
@@ -771,7 +771,7 @@ func TestWaitForTestRunReady(t *testing.T) {
 			wantWarnLogs: -1,
 		},
 		{
-			name: "aborted fails with message",
+			name: "aborted_fails_with_message",
 			responses: []*k6cloud.TestRunApiModel{
 				makeTestRunResponse(StatusAborted, []StatusEvent{
 					{Status: StatusAborted, Message: "backend rejected archive"},
@@ -782,7 +782,7 @@ func TestWaitForTestRunReady(t *testing.T) {
 			wantWarnLogs:    -1,
 		},
 		{
-			name: "queued then initializing logs one info entry",
+			name: "queued_then_initializing_logs_one_info_entry",
 			responses: func() []*k6cloud.TestRunApiModel {
 				r := make([]*k6cloud.TestRunApiModel, 0, 6)
 				for range 5 {
@@ -795,7 +795,7 @@ func TestWaitForTestRunReady(t *testing.T) {
 			wantWarnLogs: -1,
 		},
 		{
-			name: "processing_metrics keeps polling until initializing",
+			name: "processing_metrics_keeps_polling_until_initializing",
 			responses: []*k6cloud.TestRunApiModel{
 				makeTestRunResponse(StatusProcessingMetrics, nil),
 				makeTestRunResponse(StatusInitializing, nil),
@@ -804,7 +804,7 @@ func TestWaitForTestRunReady(t *testing.T) {
 			wantWarnLogs: 0,
 		},
 		{
-			name: "completed errors before k6 starts",
+			name: "completed_errors_before_k6_starts",
 			responses: []*k6cloud.TestRunApiModel{
 				makeTestRunResponse(StatusCompleted, nil),
 			},
@@ -933,31 +933,31 @@ func TestNotifyTestRunCompleted_ErrorMapping(t *testing.T) {
 		wantErrorField *notifyError // nil ⇒ expect JSON null
 	}{
 		{
-			name:           "nil error sends null",
+			name:           "nil_error_sends_null",
 			testRunID:      42,
 			testErr:        nil,
 			wantErrorField: nil,
 		},
 		{
-			name:           "AbortedByUser maps to code 5",
+			name:           "aborted_by_user_maps_to_code_5",
 			testRunID:      42,
 			testErr:        testAbortError{reason: errext.AbortedByUser, msg: "aborted by user"},
 			wantErrorField: &notifyError{Code: 5, Reason: "aborted by user"},
 		},
 		{
-			name:           "AbortedByThreshold maps to code 8",
+			name:           "aborted_by_threshold_maps_to_code_8",
 			testRunID:      42,
 			testErr:        testAbortError{reason: errext.AbortedByThreshold, msg: "threshold reached"},
 			wantErrorField: &notifyError{Code: 8},
 		},
 		{
-			name:           "AbortedByScriptError maps to code 7",
+			name:           "aborted_by_script_error_maps_to_code_7",
 			testRunID:      42,
 			testErr:        testAbortError{reason: errext.AbortedByScriptError, msg: "script error"},
 			wantErrorField: &notifyError{Code: 7},
 		},
 		{
-			name:           "ctrl+c during queue-wait still maps to code 5",
+			name:           "ctrl_c_during_queue_wait_still_maps_to_code_5",
 			testRunID:      99,
 			testErr:        testAbortError{reason: errext.AbortedByUser, msg: "aborted by user"},
 			wantErrorField: &notifyError{Code: 5},
@@ -1055,7 +1055,7 @@ func TestWaitForTestRunReady_ErrorHandling(t *testing.T) {
 			// The openapi SDK is configured with MaxRetries=3 and RetryInterval=500ms;
 			// a single 503 triggers one internal retry — WaitForTestRunReady sees the
 			// eventual success and returns nil.
-			name: "transient 5xx retried by SDK, succeeds on eventual 200",
+			name: "transient_5xx_retried_by_sdk_succeeds_on_eventual_200",
 			handler: func(t *testing.T) http.Handler {
 				t.Helper()
 				var calls atomic.Int32
@@ -1071,7 +1071,7 @@ func TestWaitForTestRunReady_ErrorHandling(t *testing.T) {
 		},
 		{
 			// 4xx responses are not retried by the SDK; the error propagates immediately.
-			name: "4xx from poll endpoint propagates as error",
+			name: "4xx_from_poll_endpoint_propagates_as_error",
 			handler: func(t *testing.T) http.Handler {
 				t.Helper()
 				return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

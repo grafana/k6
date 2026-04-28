@@ -14,7 +14,6 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/v2/cloudapi"
-	"go.k6.io/k6/v2/errext"
 	"go.k6.io/k6/v2/internal/build"
 	v6cloudapi "go.k6.io/k6/v2/internal/cloudapi/v6"
 	"go.k6.io/k6/v2/internal/usage"
@@ -190,25 +189,23 @@ func validateRequiredSystemTags(scriptTags *metrics.SystemTagSet) error {
 // Start calls the k6 Cloud API to initialize the test run, and then starts the
 // goroutine that would listen for metric samples and send them to the cloud.
 func (out *Output) Start() error {
-	// TODO: PushRefID is set by k6-operator when it passes a pre-existing
-	// test_run_id. This branch preserves legacy v1 behaviour until k6-operator
-	// is updated to supply runtime_config fields (grafana/k6-cloud#4283).
 	if out.config.PushRefID.Valid {
 		out.testRunID = out.config.PushRefID.String
 	}
 
 	if out.testRunID != "" {
 		out.logger.WithField("testRunId", out.testRunID).Debug("Directly pushing metrics without init")
-		out.ensureMetricsPushURL()
+		if err := out.ensureMetricsPushURL(); err != nil {
+			return err
+		}
 		if err := out.initV6ClientForDirectPush(); err != nil {
 			return err
 		}
 		return out.startVersionedOutput()
 	}
 
-	// Provisioning path: requires stack ID
 	if !out.config.StackID.Valid || out.config.StackID.Int64 == 0 {
-		return fmt.Errorf("K6_CLOUD_STACK_ID is required for k6 run --out cloud")
+		return fmt.Errorf("a stack ID is required, please ensure your stack ID is configured")
 	}
 
 	v6c, err := v6cloudapi.NewClient(
@@ -320,97 +317,19 @@ func (out *Output) testFinished(testErr error) error {
 		return nil
 	}
 
-	if out.v6Client != nil {
-		// Provisioning path: notify via v6 API
-		testRunID64, err := strconv.ParseInt(out.testRunID, 10, 64)
-		if err != nil {
-			return fmt.Errorf("invalid test run ID %q: %w", out.testRunID, err)
-		}
-		out.logger.WithField("ref", out.testRunID).Debug("Sending test finished notification")
-		return out.v6Client.NotifyTestRunCompleted(out.ctx, int32(testRunID64), testErr) //nolint:gosec
+	testRunID64, err := strconv.ParseInt(out.testRunID, 10, 64)
+	if err != nil {
+		return fmt.Errorf("invalid test run ID %q: %w", out.testRunID, err)
 	}
-
-	// Legacy v1 path (testRunID set externally, no provisioning client)
-	testTainted := false
-	thresholdResults := make(cloudapi.ThresholdResult)
-	for name, thresholds := range out.thresholds {
-		thresholdResults[name] = make(map[string]bool)
-		for _, t := range thresholds {
-			thresholdResults[name][t.Source] = t.LastFailed
-			if t.LastFailed {
-				testTainted = true
-			}
-		}
-	}
-
-	runStatus := out.getRunStatus(testErr)
-	out.logger.WithFields(logrus.Fields{
-		"ref":        out.testRunID,
-		"tainted":    testTainted,
-		"run_status": runStatus,
-	}).Debug("Sending test finished")
-
-	return out.client.TestFinished(out.testRunID, thresholdResults, testTainted, runStatus)
+	out.logger.WithField("ref", out.testRunID).Debug("Sending test finished notification")
+	return out.v6Client.NotifyTestRunCompleted(out.ctx, int32(testRunID64), testErr) //nolint:gosec
 }
 
-// getRunStatus determines the run status of the test based on the error.
-func (out *Output) getRunStatus(testErr error) cloudapi.RunStatus {
-	if testErr == nil {
-		return cloudapi.RunStatusFinished
-	}
-
-	var err errext.HasAbortReason
-	if errors.As(testErr, &err) {
-		abortReason := err.AbortReason()
-		switch abortReason {
-		case errext.AbortedByUser:
-			return cloudapi.RunStatusAbortedUser
-		case errext.AbortedByThreshold:
-			return cloudapi.RunStatusAbortedThreshold
-		case errext.AbortedByScriptError:
-			return cloudapi.RunStatusAbortedScriptError
-		case errext.AbortedByScriptAbort:
-			return cloudapi.RunStatusAbortedUser // TODO: have a better value than this?
-		case errext.AbortedByTimeout:
-			return cloudapi.RunStatusAbortedLimit
-		case errext.AbortedByOutput:
-			return cloudapi.RunStatusAbortedSystem
-		case errext.AbortedByThresholdsAfterTestEnd:
-			// The test run finished normally, it wasn't prematurely aborted by
-			// anything while running, but the thresholds failed at the end and
-			// k6 will return an error and a non-zero exit code to the user.
-			//
-			// However, failures are tracked somewhat differently by the k6
-			// cloud compared to k6 OSS. It doesn't have a single pass/fail
-			// variable with multiple failure states, like k6's exit codes.
-			// Instead, it has two variables, result_status and run_status.
-			//
-			// The status of the thresholds is tracked by the binary
-			// result_status variable, which signifies whether the thresholds
-			// passed or failed (failure also called "tainted" in some places of
-			// the API here). The run_status signifies whether the test run
-			// finished normally and has a few fixed failures values.
-			//
-			// So, this specific k6 error will be communicated to the cloud only
-			// via result_status, while the run_status will appear normal.
-			return cloudapi.RunStatusFinished
-		}
-	}
-
-	// By default, the catch-all error is "aborted by system", but let's log that
-	out.logger.WithError(testErr).Debug("unknown test error classified as 'aborted by system'")
-	return cloudapi.RunStatusAbortedSystem
-}
-
-// ensureMetricsPushURL derives MetricsPushURL from the host when the legacy
-// direct-push paths (PushRefID / k6-operator, or K6_CLOUDRUN_TEST_RUN_ID set
-// externally) leave it unset. The provisioning path always sets it explicitly.
-func (out *Output) ensureMetricsPushURL() {
+func (out *Output) ensureMetricsPushURL() error {
 	if out.config.MetricsPushURL.Valid && out.config.MetricsPushURL.String != "" {
-		return
+		return nil
 	}
-	host := strings.TrimSuffix(out.config.Host.String, "/")
-	out.config.MetricsPushURL = null.StringFrom(host + "/v2/metrics/" + out.testRunID)
+	return errors.New("metrics push URL is required but was not provided")
 }
 
 // initV6ClientForDirectPush creates and wires a v6 client using credentials
@@ -425,7 +344,7 @@ func (out *Output) initV6ClientForDirectPush() error {
 		return nil
 	}
 	if !out.config.StackID.Valid || out.config.StackID.Int64 == 0 {
-		return fmt.Errorf("K6_CLOUD_STACK_ID is required on the provisioning path")
+		return fmt.Errorf("a stack ID is required, please ensure your stack ID is configured")
 	}
 	if !out.config.TestRunToken.Valid || out.config.TestRunToken.String == "" {
 		return fmt.Errorf("test run token is required on the provisioning path but was not provided")

@@ -129,14 +129,6 @@ func NewServer(t *testing.T, cfg Config) *Server {
 	mux.HandleFunc("POST /mock/metrics", inspect(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
-	// v1 test-finished endpoint, used by the legacy cloudapi.Client.TestFinished call
-	// when the cloud output's testRunID was set externally (k6 cloud run --local-execution).
-	mux.HandleFunc(
-		fmt.Sprintf("POST /v1/tests/%d", cfg.TestRunID),
-		inspect(func(w http.ResponseWriter, _ *http.Request) {
-			w.WriteHeader(http.StatusOK)
-		}),
-	)
 	// v6 notify endpoint for the provisioning path.
 	mux.HandleFunc(
 		fmt.Sprintf("POST /provisioning/v1/test_runs/%d/notify", cfg.TestRunID),

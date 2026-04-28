@@ -51,10 +51,8 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 		gs.Logger.Warn(warn)
 	}
 
-	// When a token is present but stack ID is absent, give a specific error so
-	// the user knows exactly which variable to set, rather than the generic auth error.
-	if conf.Token.Valid && conf.Token.String != "" && (!conf.StackID.Valid || conf.StackID.Int64 == 0) {
-		return fmt.Errorf("K6_CLOUD_STACK_ID is required for --local-execution")
+	if !conf.StackID.Valid || conf.StackID.Int64 == 0 {
+		return fmt.Errorf("a stack ID is required, please ensure your stack ID is configured")
 	}
 
 	if err := checkCloudLogin(conf); err != nil {
@@ -105,7 +103,7 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 	v6Client, err := cloudapiv6.NewClient(
 		logger, conf.Token.String, conf.Hostv6.String, build.Version, conf.Timeout.TimeDuration())
 	if err != nil {
-		return err
+		return fmt.Errorf("creating v6 client: %w", err)
 	}
 	v6Client.SetStackID(int32(conf.StackID.Int64)) //nolint:gosec
 
@@ -114,9 +112,14 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 		archive = test.makeArchive()
 	}
 
+	projectID, err := resolveDefaultProjectID(gs, &conf)
+	if err != nil {
+		return err
+	}
+
 	params := cloudapiv6.ProvisionParams{
 		Name:          conf.Name.String,
-		ProjectID:     int32(conf.ProjectID.Int64),                 //nolint:gosec
+		ProjectID:     int32(projectID), //nolint:gosec
 		MaxVUs:        int64(lib.GetMaxPossibleVUs(executionPlan)), //nolint:gosec
 		TotalDuration: int64(duration / time.Second),
 		Options:       map[string]any{},
@@ -162,6 +165,8 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 		conf.TestRunDetails = null.StringFrom(result.TestRunDetailsPageURL)
 	}
 
+	// Serialize the updated config (with MetricsPushURL, TestRunToken, etc. from the
+	// provisioning response) so the cloud output can read them at initialization time.
 	raw, err := cloudConfToRawMessage(conf)
 	if err != nil {
 		return fmt.Errorf("could not serialize cloud configuration: %w", err)

@@ -11,10 +11,10 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"time"
 
 	k6cloud "github.com/grafana/k6-cloud-openapi-client-go/k6"
-	"github.com/sirupsen/logrus"
 
 	"go.k6.io/k6/v2/errext"
 	"go.k6.io/k6/v2/lib"
@@ -174,16 +174,16 @@ func (c *Client) CreateOrFindLoadTest(ctx context.Context, projectID int32, name
 	if err := CheckResponse(hr, err); err != nil {
 		var rerr ResponseError
 		if !errors.As(err, &rerr) || rerr.Response == nil || rerr.Response.StatusCode != http.StatusConflict {
-			return 0, err
+			return 0, fmt.Errorf("unexpected error: %w", err)
 		}
-		lt, ferr := c.findTestByName(ctx, projectID, name)
-		if ferr != nil {
-			return 0, ferr
+		lt, err := c.findTestByName(ctx, projectID, name)
+		if err != nil {
+			return 0, fmt.Errorf("finding test: %w", err)
 		}
 		return lt.GetId(), nil
 	}
 	if res == nil {
-		return 0, errUnknown
+		return 0, errors.New("server returned an empty response, please try again")
 	}
 
 	return res.GetId(), nil
@@ -330,7 +330,7 @@ func (c *Client) WaitForTestRunReady(ctx context.Context, testRunID int32, pollI
 	for {
 		progress, err := c.FetchTest(ctx, testRunID)
 		if err != nil {
-			return err
+			return fmt.Errorf("fetching test status: %w", err)
 		}
 
 		status := progress.Status.String()
@@ -397,12 +397,12 @@ func (c *Client) NotifyTestRunCompleted(ctx context.Context, testRunID int32, te
 	}
 	bodyBytes, err := json.Marshal(body)
 	if err != nil {
-		return err
+		return fmt.Errorf("marshalling completion notification: %w", err)
 	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, rawURL, bytes.NewReader(bodyBytes))
 	if err != nil {
-		return err
+		return fmt.Errorf("creating completion notification request: %w", err)
 	}
 	authToken := c.testRunToken
 	if authToken == "" {
@@ -410,7 +410,7 @@ func (c *Client) NotifyTestRunCompleted(ctx context.Context, testRunID int32, te
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+authToken)
-	httpReq.Header.Set("X-Stack-Id", fmt.Sprintf("%d", c.stackID))
+	httpReq.Header.Set("X-Stack-Id", strconv.FormatInt(int64(c.stackID), 10))
 
 	lastResp, lastErr := c.doWithRetry(httpReq)
 	if lastErr != nil {
@@ -424,10 +424,8 @@ func (c *Client) NotifyTestRunCompleted(ctx context.Context, testRunID int32, te
 
 	if lastResp.StatusCode < 200 || lastResp.StatusCode > 299 {
 		return fmt.Errorf(
-			"unexpected HTTP error from %s: %d %s",
-			rawURL,
+			"unexpected HTTP error when notifying server of test completion: %d",
 			lastResp.StatusCode,
-			http.StatusText(lastResp.StatusCode),
 		)
 	}
 
@@ -531,23 +529,15 @@ func (c *Client) UploadArchive(ctx context.Context, uploadURL string, body []byt
 	req.Header.Set("Content-Type", "application/x-tar")
 	req.ContentLength = int64(len(body))
 
-	if parsed, parseErr := url.Parse(uploadURL); parseErr == nil {
-		c.logger.WithFields(logrus.Fields{
-			"host":           parsed.Host,
-			"content_length": req.ContentLength,
-			"content_type":   req.Header.Get("Content-Type"),
-		}).Debug("uploading archive to S3")
-	}
-
 	resp, err := c.apiClient.GetConfig().HTTPClient.Do(req) //nolint:gosec
 	if err != nil {
-		return err
+		return fmt.Errorf("uploading archive: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		respBody, readErr := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		if readErr != nil || len(respBody) == 0 {
+		respBody, err := io.ReadAll(resp.Body)
+		if err != nil || len(respBody) == 0 {
 			return fmt.Errorf("archive upload failed: %d %s", resp.StatusCode, http.StatusText(resp.StatusCode))
 		}
 		return fmt.Errorf("archive upload failed: %d %s: %s",
@@ -569,22 +559,22 @@ func (c *Client) StartLocalExecution(
 
 	bodyBytes, err := json.Marshal(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("marshalling provisioning request: %w", err)
 	}
 
 	var key [8]byte
 	if _, err := rand.Read(key[:]); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("creating idempotency key: %w", err)
 	}
 	idempotencyKey := hex.EncodeToString(key[:])
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, rawURL, bytes.NewReader(bodyBytes))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("creating provisioning request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+c.token)
-	httpReq.Header.Set("X-Stack-Id", fmt.Sprintf("%d", c.stackID))
+	httpReq.Header.Set("X-Stack-Id", strconv.FormatInt(int64(c.stackID), 10))
 	httpReq.Header.Set("K6-Idempotency-Key", idempotencyKey)
 
 	lastResp, lastErr := c.doWithRetry(httpReq)
@@ -599,16 +589,14 @@ func (c *Client) StartLocalExecution(
 
 	if lastResp.StatusCode < 200 || lastResp.StatusCode > 299 {
 		return nil, fmt.Errorf(
-			"unexpected HTTP error from %s: %d %s",
-			rawURL,
+			"unexpected HTTP error when notifying server of test start: %d",
 			lastResp.StatusCode,
-			http.StatusText(lastResp.StatusCode),
 		)
 	}
 
 	var resp StartLocalExecutionResponse
 	if err := json.NewDecoder(lastResp.Body).Decode(&resp); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("decoding provisioning response: %w", err)
 	}
 
 	return &resp, nil
