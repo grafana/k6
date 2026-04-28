@@ -8,7 +8,10 @@
     "**/vendor/**",
     ".github/workflows/xk6-tests/**"
   ],
-  "baseBranches": ["master", "v1.x"],
+  "baseBranchPatterns": [
+    "master",
+    "v1.x"
+  ],
   "prConcurrentLimit": 50,
   "packageRules": [
     {
