@@ -42,7 +42,7 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 
 		stdout := ts.Stdout.String()
 		t.Log(stdout)
-		assert.Contains(t, stdout, `must first authenticate`)
+		assert.Contains(t, stdout, `access token not configured`)
 	})
 
 	t.Run("TestCloudStackNotConfigured", func(t *testing.T) {
@@ -55,7 +55,7 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 
 		stdout := ts.Stdout.String()
 		t.Log(stdout)
-		assert.Contains(t, stdout, `must first authenticate`)
+		assert.Contains(t, stdout, `stack ID not configured`)
 	})
 
 	// TODO: Remove after we remove K6_CLOUD_HOST_V6.
