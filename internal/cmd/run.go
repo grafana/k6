@@ -279,6 +279,10 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		runAbort(err)
 	})
 	samples := make(chan metrics.SampleContainer, test.derivedConfig.MetricSamplesBufferSize.Int64)
+	if c.gs.Flags.ProfilingEnabled && c.gs.Flags.HTTPAPIAddr == "" {
+		logger.Warn("Profiling is enabled but no HTTP API server is running — " +
+			"profiling endpoints won't be reachable until you enable the HTTP server via --http-api-addr (or K6_HTTP_API_ADDR)")
+	}
 	// Spin up the REST API server, if enabled.
 	if c.gs.Flags.HTTPAPIAddr != "" { //nolint:nestif
 		initBar.Modify(pb.WithConstProgress(0, "Init API server"))
