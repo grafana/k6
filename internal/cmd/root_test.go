@@ -75,7 +75,7 @@ func TestAddressGlobalOption(t *testing.T) {
 		assert.Equal(t, "", state.GetDefaultFlags(".config", ".cache").HTTPAPIAddr)
 	})
 
-	t.Run("set via --address flag", func(t *testing.T) {
+	t.Run("set via --http-api-addr flag", func(t *testing.T) {
 		t.Parallel()
 		ts := tests.NewGlobalTestState(t)
 		flagSet := rootCmdPersistentFlagSet(ts.GlobalState)
