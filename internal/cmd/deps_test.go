@@ -140,9 +140,9 @@ export default function () {
 }
 `),
 			},
-			manifest:          `{"k6": ">=1.6.0"}`,
-			expectedDeps:      map[string]string{"k6": ">=1.6.0"},
-			expectCustomBuild: false, // current k6 version satisfies >=1.6.0
+			manifest:          `{"k6": ">=2.0.0-0"}`, // using -0 to match prereleases
+			expectedDeps:      map[string]string{"k6": ">=2.0.0-0"},
+			expectCustomBuild: false, // current k6 version satisfies >=2.0.0-0
 			expectedImports:   []string{"/main.js", "k6/http"},
 		},
 	}
