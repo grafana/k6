@@ -29,6 +29,8 @@ import (
 	"github.com/spf13/pflag"
 )
 
+const cloudRunAuthPrefix = "Running cloud tests requires auth settings"
+
 var (
 	errCloudAuth = errors.New( //nolint:staticcheck // user-facing error message, capitalization is intentional
 		"Run `k6 cloud login` to authenticate, or check the docs for other options at" +
@@ -41,7 +43,10 @@ var (
 // checkCloudLogin verifies that both a token and a stack are configured.
 // Together they represent a complete Grafana Cloud login.
 func checkCloudLogin(conf cloudapi.Config) error {
-	const prefix = "Running cloud tests requires auth settings"
+	return checkCloudLoginFor(conf, cloudRunAuthPrefix)
+}
+
+func checkCloudLoginFor(conf cloudapi.Config, prefix string) error {
 	if !conf.Token.Valid || conf.Token.String == "" {
 		return fmt.Errorf("%s: %w.\n%w", prefix, errMissingToken, errCloudAuth)
 	}
@@ -450,6 +455,9 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 
 	projectCmd := getCmdCloudProject(c)
 	cloudCmd.AddCommand(projectCmd)
+
+	testCmd := getCmdCloudTest(c)
+	cloudCmd.AddCommand(testCmd)
 
 	cloudCmd.Flags().SortFlags = false
 	cloudCmd.Flags().AddFlagSet(c.flagSet())

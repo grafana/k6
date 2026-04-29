@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 	"time"
 
@@ -51,6 +52,9 @@ type Config struct {
 
 	// Projects is the project list returned by the projects endpoint.
 	Projects []cloudapi.Project
+
+	// LoadTests is the load test list returned by the load-tests endpoint.
+	LoadTests []cloudapi.LoadTest
 }
 
 // NewServer creates a test server that serves v6 API endpoints.
@@ -65,6 +69,7 @@ func NewServer(t *testing.T, cfg Config) *Server {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /cloud/v6/projects", s.handleListProjects)
+	mux.HandleFunc("GET /cloud/v6/projects/{projectID}/load_tests", s.handleListLoadTests)
 	mux.HandleFunc("POST /cloud/v6/validate_options", s.handleValidateOptions)
 	mux.HandleFunc("POST /cloud/v6/projects/{projectID}/load_tests", func(w http.ResponseWriter, r *http.Request) {
 		if s.cfg.InspectArchive != nil {
@@ -106,6 +111,31 @@ func (s *Server) handleListProjects(w http.ResponseWriter, _ *http.Request) {
 		)
 	}
 	res := k6cloud.NewProjectListResponse(projects)
+	writeJSON(w, http.StatusOK, res)
+}
+
+func (s *Server) handleListLoadTests(w http.ResponseWriter, r *http.Request) {
+	projectID, err := strconv.ParseInt(r.PathValue("projectID"), 10, 32)
+	if err != nil {
+		http.Error(w, "invalid project ID", http.StatusBadRequest)
+		return
+	}
+
+	tests := make([]k6cloud.LoadTestApiModel, 0, len(s.cfg.LoadTests))
+	for _, test := range s.cfg.LoadTests {
+		if test.ProjectID != int32(projectID) {
+			continue
+		}
+		tests = append(tests, *k6cloud.NewLoadTestApiModel(
+			test.ID,
+			test.ProjectID,
+			test.Name,
+			*k6cloud.NewNullableInt32(nil),
+			test.Created,
+			test.Updated,
+		))
+	}
+	res := k6cloud.NewLoadTestListResponse(tests)
 	writeJSON(w, http.StatusOK, res)
 }
 

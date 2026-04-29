@@ -148,6 +148,56 @@ func TestListProjects(t *testing.T) {
 	assert.Equal(t, Project{ID: 2, Name: "My project", IsDefault: false}, projects[1])
 }
 
+func TestListLoadTests(t *testing.T) {
+	t.Parallel()
+
+	loadTest := func(id int32, name string) map[string]any {
+		return map[string]any{
+			"id":                   id,
+			"project_id":           42,
+			"name":                 name,
+			"baseline_test_run_id": nil,
+			"created":              "2025-01-01T00:00:00Z",
+			"updated":              "2025-01-01T00:00:00Z",
+		}
+	}
+
+	var requests atomic.Int32
+	client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/cloud/v6/projects/42/load_tests", r.URL.Path)
+		assert.Equal(t, "1000", r.URL.Query().Get("$top"))
+
+		switch requests.Add(1) {
+		case 1:
+			assert.Equal(t, "0", r.URL.Query().Get("$skip"))
+			writeJSON(t, w, http.StatusOK, map[string]any{
+				"value":     []any{loadTest(1, "checkout-flow")},
+				"@nextLink": "https://api.k6.io/cloud/v6/projects/42/load_tests?$skip=1000&$top=1000",
+			})
+		case 2:
+			assert.Equal(t, "1000", r.URL.Query().Get("$skip"))
+			writeJSON(t, w, http.StatusOK, map[string]any{
+				"value": []any{loadTest(2, "api-smoke")},
+			})
+		default:
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}))
+
+	tests, err := client.ListLoadTests(t.Context(), 42)
+	require.NoError(t, err)
+	require.Len(t, tests, 2)
+	assert.Equal(t, int32(2), requests.Load())
+	assert.Equal(t, LoadTest{
+		ID:        1,
+		ProjectID: 42,
+		Name:      "checkout-flow",
+		Created:   time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
+		Updated:   time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
+	}, tests[0])
+	assert.Equal(t, int32(2), tests[1].ID)
+}
+
 func TestRetryWithConnectionClose(t *testing.T) {
 	t.Parallel()
 
