@@ -486,7 +486,11 @@ func TestOutputStopWithTestError(t *testing.T) {
 			}
 		},
 	}
-	require.NoError(t, out.initV6ClientForDirectPush())
+	v6c, err := v6cloudapi.NewClient(testutils.NewLogger(t), "test-token", ts.URL, "test", 10*time.Second)
+	require.NoError(t, err)
+	v6c.SetStackID(1)
+	v6c.SetTestRunToken("test-run-token-1234")
+	out.v6Client = v6c
 
 	fakeErr := errors.New("this is my error")
 	require.NoError(t, out.StopWithTestError(fakeErr))

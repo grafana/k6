@@ -195,12 +195,6 @@ func (out *Output) Start() error {
 
 	if out.testRunID != "" {
 		out.logger.WithField("testRunId", out.testRunID).Debug("Directly pushing metrics without init")
-		if err := out.ensureMetricsPushURL(); err != nil {
-			return err
-		}
-		if err := out.initV6ClientForDirectPush(); err != nil {
-			return err
-		}
 		return out.startVersionedOutput()
 	}
 
@@ -323,43 +317,6 @@ func (out *Output) testFinished(testErr error) error {
 	}
 	out.logger.WithField("ref", out.testRunID).Debug("Sending test finished notification")
 	return out.v6Client.NotifyTestRunCompleted(out.ctx, int32(testRunID64), testErr) //nolint:gosec
-}
-
-func (out *Output) ensureMetricsPushURL() error {
-	if out.config.MetricsPushURL.Valid && out.config.MetricsPushURL.String != "" {
-		return nil
-	}
-	return errors.New("metrics push URL is required but was not provided")
-}
-
-// initV6ClientForDirectPush creates and wires a v6 client using credentials
-// already present in the config. This is the path where provisioning happened
-// before Output.Start() (e.g. k6 cloud run --local-execution sets testRunID,
-// MetricsPushURL, and TestRunToken in the config before Start is called).
-//
-// PushRefID paths are excluded: k6-operator manages the lifecycle externally
-// and testFinished returns nil early for those.
-func (out *Output) initV6ClientForDirectPush() error {
-	if out.config.PushRefID.Valid {
-		return nil
-	}
-	if !out.config.StackID.Valid || out.config.StackID.Int64 == 0 {
-		return fmt.Errorf("a stack ID is required, please ensure your stack ID is configured")
-	}
-	if !out.config.TestRunToken.Valid || out.config.TestRunToken.String == "" {
-		return fmt.Errorf("test run token is required on the provisioning path but was not provided")
-	}
-
-	v6c, err := v6cloudapi.NewClient(
-		out.logger, out.config.Token.String, out.config.Hostv6.String,
-		build.Version, out.config.Timeout.TimeDuration())
-	if err != nil {
-		return fmt.Errorf("failed to create v6 cloud client: %w", err)
-	}
-	v6c.SetStackID(int32(out.config.StackID.Int64)) //nolint:gosec
-	v6c.SetTestRunToken(out.config.TestRunToken.String)
-	out.v6Client = v6c
-	return nil
 }
 
 func (out *Output) startVersionedOutput() error {
