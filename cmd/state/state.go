@@ -31,6 +31,10 @@ const (
 	// DependenciesManifest defines the default values for dependency resolution
 	DependenciesManifest = "K6_DEPENDENCIES_MANIFEST"
 
+	// ProvisionHostVersion is the k6 version of the binary that provisioned a subprocess.
+	// Subcommand extensions can read it to know which k6 version launched them.
+	ProvisionHostVersion = "K6_PROVISION_HOST_VERSION"
+
 	// defaultBuildServiceURL defines the URL to the default (grafana hosted) build service
 	defaultBuildServiceURL = "https://ingest.k6.io/builder/api/v1"
 
