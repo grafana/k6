@@ -148,6 +148,106 @@ func TestListProjects(t *testing.T) {
 	assert.Equal(t, int32(2), resp.Value[1].Id)
 }
 
+func TestListTestRuns(t *testing.T) {
+	t.Parallel()
+
+	testRun := func(id int32, status string) map[string]any {
+		return map[string]any{
+			"id":               id,
+			"test_id":          42,
+			"project_id":       7,
+			"started_by":       nil,
+			"created":          "2026-04-28T14:03:00Z",
+			"ended":            nil,
+			"note":             "",
+			"retention_expiry": nil,
+			"cost":             nil,
+			"status":           status,
+			"status_details": map[string]any{
+				"type":    status,
+				"entered": "2026-04-28T14:03:00Z",
+			},
+			"status_history":     []any{},
+			"distribution":       []any{},
+			"result":             nil,
+			"result_details":     map[string]any{},
+			"options":            map[string]any{},
+			"k6_dependencies":    map[string]any{},
+			"k6_versions":        map[string]any{},
+			"max_vus":            nil,
+			"max_browser_vus":    nil,
+			"estimated_duration": nil,
+			"execution_duration": 0,
+		}
+	}
+
+	t.Run("default page returns up to limit", func(t *testing.T) {
+		t.Parallel()
+
+		var requests atomic.Int32
+		client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			requests.Add(1)
+			assert.Equal(t, "/cloud/v6/load_tests/42/test_runs", r.URL.Path)
+			assert.Equal(t, "0", r.URL.Query().Get("$skip"))
+			assert.Equal(t, "10", r.URL.Query().Get("$top"))
+			assert.Equal(t, "created desc", r.URL.Query().Get("$orderby"))
+			writeJSON(t, w, http.StatusOK, map[string]any{
+				"value":     []any{testRun(1, "finished"), testRun(2, "running")},
+				"@nextLink": "https://api.k6.io/cloud/v6/load_tests/42/test_runs?$skip=10&$top=10",
+			})
+		}))
+
+		resp, err := client.ListTestRuns(t.Context(), 42, ListTestRunsOptions{Limit: 10})
+		require.NoError(t, err)
+		require.Len(t, resp.Value, 2)
+		assert.Equal(t, int32(1), requests.Load(), "single page should not follow @nextLink")
+	})
+
+	t.Run("with All set, follows @nextLink", func(t *testing.T) {
+		t.Parallel()
+
+		var requests atomic.Int32
+		client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, "1000", r.URL.Query().Get("$top"))
+			switch requests.Add(1) {
+			case 1:
+				assert.Equal(t, "0", r.URL.Query().Get("$skip"))
+				writeJSON(t, w, http.StatusOK, map[string]any{
+					"value":     []any{testRun(1, "finished")},
+					"@nextLink": "https://api.k6.io/cloud/v6/load_tests/42/test_runs?$skip=1000&$top=1000",
+				})
+			case 2:
+				assert.Equal(t, "1000", r.URL.Query().Get("$skip"))
+				writeJSON(t, w, http.StatusOK, map[string]any{
+					"value": []any{testRun(2, "running")},
+				})
+			default:
+				w.WriteHeader(http.StatusInternalServerError)
+			}
+		}))
+
+		resp, err := client.ListTestRuns(t.Context(), 42, ListTestRunsOptions{All: true})
+		require.NoError(t, err)
+		require.Len(t, resp.Value, 2)
+		assert.Equal(t, int32(2), requests.Load())
+	})
+
+	t.Run("CreatedAfter filter is forwarded", func(t *testing.T) {
+		t.Parallel()
+
+		client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, "2026-04-22T14:03:00Z", r.URL.Query().Get("created_after"))
+			writeJSON(t, w, http.StatusOK, map[string]any{"value": []any{}})
+		}))
+
+		_, err := client.ListTestRuns(t.Context(), 42, ListTestRunsOptions{
+			Limit:        10,
+			CreatedAfter: time.Date(2026, 4, 22, 14, 3, 0, 0, time.UTC),
+		})
+		require.NoError(t, err)
+	})
+}
+
 func TestRetryWithConnectionClose(t *testing.T) {
 	t.Parallel()
 

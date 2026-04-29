@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"time"
 
 	k6cloud "github.com/grafana/k6-cloud-openapi-client-go/k6"
 
@@ -56,6 +57,93 @@ func (c *Client) listProjectsPage(
 		Skip(skip).
 		Top(top).
 		Execute()
+	defer closeResponse(hr, &err)
+
+	if err := CheckResponse(hr, err); err != nil {
+		return nil, err
+	}
+	if res == nil {
+		return nil, errUnknown
+	}
+
+	return res, nil
+}
+
+// ListTestRunsOptions configures a [Client.ListTestRuns] call.
+type ListTestRunsOptions struct {
+	// Limit caps the number of test runs returned in a single page.
+	// Ignored when All is true.
+	Limit int32
+	// All causes the client to page through every test run for the load test.
+	All bool
+	// CreatedAfter restricts results to runs started at or after this time.
+	// Zero value disables the filter.
+	CreatedAfter time.Time
+}
+
+// ListTestRuns retrieves the list of runs of the given load test, sorted by
+// most recent first. Honors the filters in opts.
+func (c *Client) ListTestRuns(
+	ctx context.Context, loadTestID int32, opts ListTestRunsOptions,
+) (_ *k6cloud.TestRunListResponse, err error) {
+	if opts.All {
+		return c.listAllTestRuns(ctx, loadTestID, opts.CreatedAfter)
+	}
+
+	limit := opts.Limit
+	if limit <= 0 {
+		limit = 30
+	}
+	return c.listTestRunsPage(ctx, loadTestID, 0, limit, opts.CreatedAfter)
+}
+
+func (c *Client) listAllTestRuns(
+	ctx context.Context, loadTestID int32, createdAfter time.Time,
+) (*k6cloud.TestRunListResponse, error) {
+	const pageSize int32 = 1000
+
+	var runs []k6cloud.TestRunApiModel
+	var count *int32
+	var skip int32
+
+	for {
+		res, err := c.listTestRunsPage(ctx, loadTestID, skip, pageSize, createdAfter)
+		if err != nil {
+			return nil, err
+		}
+
+		runs = append(runs, res.Value...)
+		count = res.Count
+
+		if res.NextLink == nil || *res.NextLink == "" {
+			return &k6cloud.TestRunListResponse{
+				Value: runs,
+				Count: count,
+			}, nil
+		}
+
+		if len(res.Value) == 0 {
+			return nil, errors.New("received empty test runs page with next link")
+		}
+		skip += pageSize
+	}
+}
+
+func (c *Client) listTestRunsPage(
+	ctx context.Context, loadTestID, skip, top int32, createdAfter time.Time,
+) (_ *k6cloud.TestRunListResponse, err error) {
+	req := c.apiClient.TestRunsAPI.
+		LoadTestsTestRunsRetrieve(c.authCtx(ctx), loadTestID).
+		XStackId(c.stackID).
+		Skip(skip).
+		Top(top).
+		Orderby("created desc")
+
+	if !createdAfter.IsZero() {
+		req = req.CreatedAfter(createdAfter)
+	}
+
+	res, hr, err := req.Execute()
 	defer closeResponse(hr, &err)
 
 	if err := CheckResponse(hr, err); err != nil {

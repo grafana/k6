@@ -457,6 +457,9 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 	projectCmd := getCmdCloudProject(c)
 	cloudCmd.AddCommand(projectCmd)
 
+	testRunCmd := getCmdCloudTestRun(c)
+	cloudCmd.AddCommand(testRunCmd)
+
 	cloudCmd.Flags().SortFlags = false
 	cloudCmd.Flags().AddFlagSet(c.flagSet())
 
