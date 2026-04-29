@@ -187,7 +187,6 @@ export default function() {
 		})
 		t.Cleanup(srv.Close)
 		ts.Env["K6_CLOUD_HOST"] = srv.URL
-		// MetricsPushURL is derived from the cloudapi.Client's BaseURL for the PushRefID path.
 
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
