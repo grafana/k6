@@ -21,7 +21,7 @@ func (c *Client) ListProjects(ctx context.Context) (_ *k6cloud.ProjectListRespon
 	const pageSize int32 = 1000
 
 	var projects []k6cloud.ProjectApiModel
-	var count *int32
+	var count int32
 	var skip int32
 
 	for {
@@ -31,19 +31,19 @@ func (c *Client) ListProjects(ctx context.Context) (_ *k6cloud.ProjectListRespon
 		}
 
 		projects = append(projects, res.Value...)
-		count += res.Count
+		count += res.GetCount()
 
 		if res.NextLink == nil || *res.NextLink == "" {
 			return &k6cloud.ProjectListResponse{
 				Value: projects,
-				Count: count,
+				Count: &count,
 			}, nil
 		}
 
 		if len(res.Value) == 0 {
 			return nil, errors.New("received empty projects page with next link")
 		}
-		skip += *count
+		skip += pageSize
 	}
 }
 
