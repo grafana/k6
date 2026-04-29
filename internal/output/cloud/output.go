@@ -190,30 +190,11 @@ func validateRequiredSystemTags(scriptTags *metrics.SystemTagSet) error {
 // goroutine that would listen for metric samples and send them to the cloud.
 func (out *Output) Start() error {
 	if out.config.PushRefID.Valid {
-		// Legacy k6-operator path: test run ID is managed externally; no v6 lifecycle.
 		out.testRunID = out.config.PushRefID.String
-		out.logger.WithField("testRunId", out.testRunID).Debug("Directly pushing metrics without init")
-		return out.startVersionedOutput()
 	}
 
 	if out.testRunID != "" {
-		// Direct-push path: test run ID pre-set via K6_CLOUDRUN_TEST_RUN_ID; provisioning was external.
 		out.logger.WithField("testRunId", out.testRunID).Debug("Directly pushing metrics without init")
-		if !out.config.StackID.Valid || out.config.StackID.Int64 == 0 {
-			return fmt.Errorf("a stack ID is required, please ensure your stack ID is configured")
-		}
-		if !out.config.TestRunToken.Valid || out.config.TestRunToken.String == "" {
-			return fmt.Errorf("test run token is required but was not provided")
-		}
-		v6c, err := v6cloudapi.NewClient(
-			out.logger, out.config.Token.String, out.config.Hostv6.String,
-			build.Version, out.config.Timeout.TimeDuration())
-		if err != nil {
-			return fmt.Errorf("failed to create v6 cloud client: %w", err)
-		}
-		v6c.SetStackID(int32(out.config.StackID.Int64)) //nolint:gosec
-		v6c.SetTestRunToken(out.config.TestRunToken.String)
-		out.v6Client = v6c
 		return out.startVersionedOutput()
 	}
 
