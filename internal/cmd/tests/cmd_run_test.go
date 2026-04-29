@@ -68,14 +68,21 @@ func TestHTTPAPIServerAddr(t *testing.T) {
 
 	testCases := []struct {
 		name          string
+		args          []string
 		expectStarted bool
 	}{
 		{
-			name:          "server is not started when addr is empty",
+			name:          "addr flag not set",
 			expectStarted: false,
 		},
 		{
-			name:          "server is started when addr is set",
+			name:          "addr flag explicitly empty",
+			args:          []string{"-a", ""},
+			expectStarted: false,
+		},
+		{
+			name:          "addr flag set",
+			args:          []string{"-a", getFreeBindAddr(t)},
 			expectStarted: true,
 		},
 	}
@@ -84,12 +91,9 @@ func TestHTTPAPIServerAddr(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			addr := ""
-			if tc.expectStarted {
-				addr = getFreeBindAddr(t)
-			}
 			ts := NewGlobalTestState(t)
-			ts.CmdArgs = []string{"k6", "run", "-v", "--log-output=stdout", "-a", addr, "-"}
+			ts.CmdArgs = append([]string{"k6", "run", "-v", "--log-output=stdout"}, tc.args...)
+			ts.CmdArgs = append(ts.CmdArgs, "-")
 			ts.Stdin = bytes.NewBufferString(`export default function() {};`)
 
 			cmd.ExecuteWithGlobalState(ts.GlobalState)
