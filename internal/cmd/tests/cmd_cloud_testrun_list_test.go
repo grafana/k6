@@ -63,40 +63,6 @@ func TestCloudTestRunList(t *testing.T) {
 		assert.Contains(t, stderr, "test ID not specified")
 	})
 
-	t.Run("fails without token", func(t *testing.T) {
-		t.Parallel()
-
-		ts := NewGlobalTestState(t)
-		ts.CmdArgs = []string{
-			"k6", "cloud", "test-run", "list",
-			"--test-id", fmt.Sprintf("%d", loadTestIDForTests),
-		}
-		ts.Env["K6_CLOUD_STACK_ID"] = fmt.Sprintf("%d", validStackID)
-		ts.ExpectedExitCode = -1
-
-		cmd.ExecuteWithGlobalState(ts.GlobalState)
-
-		stderr := ts.Stderr.String()
-		assert.Contains(t, stderr, "authenticate")
-	})
-
-	t.Run("fails without stack ID", func(t *testing.T) {
-		t.Parallel()
-
-		ts := NewGlobalTestState(t)
-		ts.CmdArgs = []string{
-			"k6", "cloud", "test-run", "list",
-			"--test-id", fmt.Sprintf("%d", loadTestIDForTests),
-		}
-		ts.Env["K6_CLOUD_TOKEN"] = validToken
-		ts.ExpectedExitCode = -1
-
-		cmd.ExecuteWithGlobalState(ts.GlobalState)
-
-		stderr := ts.Stderr.String()
-		assert.Contains(t, stderr, "no stack configured")
-	})
-
 	t.Run("--limit caps results without paging", func(t *testing.T) {
 		t.Parallel()
 

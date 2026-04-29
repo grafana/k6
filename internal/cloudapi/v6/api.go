@@ -85,7 +85,7 @@ type ListTestRunsOptions struct {
 // most recent first. Honors the filters in opts.
 func (c *Client) ListTestRuns(
 	ctx context.Context, loadTestID int32, opts ListTestRunsOptions,
-) (_ *k6cloud.TestRunListResponse, err error) {
+) (*k6cloud.TestRunListResponse, error) {
 	if opts.All {
 		return c.listAllTestRuns(ctx, loadTestID, opts.CreatedAfter)
 	}
@@ -103,7 +103,7 @@ func (c *Client) listAllTestRuns(
 	const pageSize int32 = 1000
 
 	var runs []k6cloud.TestRunApiModel
-	var count *int32
+	var count int32
 	var skip int32
 
 	for {
@@ -113,12 +113,12 @@ func (c *Client) listAllTestRuns(
 		}
 
 		runs = append(runs, res.Value...)
-		count = res.Count
+		count += res.GetCount()
 
 		if res.NextLink == nil || *res.NextLink == "" {
 			return &k6cloud.TestRunListResponse{
 				Value: runs,
-				Count: count,
+				Count: &count,
 			}, nil
 		}
 
@@ -131,7 +131,7 @@ func (c *Client) listAllTestRuns(
 
 func (c *Client) listTestRunsPage(
 	ctx context.Context, loadTestID, skip, top int32, createdAfter time.Time,
-) (_ *k6cloud.TestRunListResponse, err error) {
+) (*k6cloud.TestRunListResponse, error) {
 	req := c.apiClient.TestRunsAPI.
 		LoadTestsTestRunsRetrieve(c.authCtx(ctx), loadTestID).
 		XStackId(c.stackID).
