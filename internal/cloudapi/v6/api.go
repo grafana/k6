@@ -18,9 +18,43 @@ import (
 
 // ListProjects retrieves the list of projects for the configured stack.
 func (c *Client) ListProjects(ctx context.Context) (_ *k6cloud.ProjectListResponse, err error) {
+	const pageSize int32 = 1000
+
+	var projects []k6cloud.ProjectApiModel
+	var count *int32
+	var skip int32
+
+	for {
+		res, err := c.listProjectsPage(ctx, skip, pageSize)
+		if err != nil {
+			return nil, err
+		}
+
+		projects = append(projects, res.Value...)
+		count = res.Count
+
+		if res.NextLink == nil || *res.NextLink == "" {
+			return &k6cloud.ProjectListResponse{
+				Value: projects,
+				Count: count,
+			}, nil
+		}
+
+		if len(res.Value) == 0 {
+			return nil, errors.New("received empty projects page with next link")
+		}
+		skip += pageSize
+	}
+}
+
+func (c *Client) listProjectsPage(
+	ctx context.Context, skip, top int32,
+) (_ *k6cloud.ProjectListResponse, err error) {
 	res, hr, err := c.apiClient.ProjectsAPI.
 		ProjectsList(c.authCtx(ctx)).
 		XStackId(c.stackID).
+		Skip(skip).
+		Top(top).
 		Execute()
 	defer closeResponse(hr, &err)
 

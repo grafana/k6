@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -87,7 +86,7 @@ func (c *cmdCloudProjectList) run(_ *cobra.Command, _ []string) error {
 	}
 	client.SetStackID(int32(cloudConfig.StackID.Int64))
 
-	resp, err := client.ListProjects(context.Background())
+	resp, err := client.ListProjects(c.globalState.Ctx)
 	if err != nil {
 		return err
 	}
