@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"time"
 
 	k6cloud "github.com/grafana/k6-cloud-openapi-client-go/k6"
 
@@ -21,6 +22,15 @@ type Project struct {
 	ID        int32  `json:"id"`
 	Name      string `json:"name"`
 	IsDefault bool   `json:"is_default"`
+}
+
+// LoadTest is a Grafana Cloud k6 load test.
+type LoadTest struct {
+	ID        int32     `json:"id"`
+	ProjectID int32     `json:"project_id"`
+	Name      string    `json:"name"`
+	Created   time.Time `json:"created"`
+	Updated   time.Time `json:"updated"`
 }
 
 // ListProjects retrieves the list of projects for the configured stack.
@@ -60,6 +70,61 @@ func (c *Client) listProjectsPage(
 ) (*k6cloud.ProjectListResponse, error) {
 	res, hr, err := c.apiClient.ProjectsAPI.
 		ProjectsList(c.authCtx(ctx)).
+		XStackId(c.stackID).
+		Skip(skip).
+		Top(top).
+		Execute()
+	defer closeResponse(hr, &err)
+
+	if err := CheckResponse(hr, err); err != nil {
+		return nil, err
+	}
+	if res == nil {
+		return nil, errUnknown
+	}
+
+	return res, nil
+}
+
+// ListLoadTests retrieves the list of load tests in the given project.
+func (c *Client) ListLoadTests(ctx context.Context, projectID int32) ([]LoadTest, error) {
+	const pageSize int32 = 1000
+
+	tests := []LoadTest{}
+	var skip int32
+
+	for {
+		res, err := c.listLoadTestsPage(ctx, projectID, skip, pageSize)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, test := range res.Value {
+			tests = append(tests, LoadTest{
+				ID:        test.Id,
+				ProjectID: test.ProjectId,
+				Name:      test.Name,
+				Created:   test.Created,
+				Updated:   test.Updated,
+			})
+		}
+
+		if res.NextLink == nil || *res.NextLink == "" {
+			return tests, nil
+		}
+
+		if len(res.Value) == 0 {
+			return nil, errors.New("received empty load tests page with next link")
+		}
+		skip += pageSize
+	}
+}
+
+func (c *Client) listLoadTestsPage(
+	ctx context.Context, projectID, skip, top int32,
+) (*k6cloud.LoadTestListResponse, error) {
+	res, hr, err := c.apiClient.LoadTestsAPI.
+		ProjectsLoadTestsRetrieve(c.authCtx(ctx), projectID).
 		XStackId(c.stackID).
 		Skip(skip).
 		Top(top).
