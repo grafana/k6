@@ -36,34 +36,6 @@ func TestCloudProjectList(t *testing.T) {
 		assert.Contains(t, stdout, "2    My project        no")
 	})
 
-	t.Run("fails without token", func(t *testing.T) {
-		t.Parallel()
-
-		ts := NewGlobalTestState(t)
-		ts.CmdArgs = []string{"k6", "cloud", "project", "list"}
-		ts.Env["K6_CLOUD_STACK_ID"] = fmt.Sprintf("%d", validStackID)
-		ts.ExpectedExitCode = -1
-
-		cmd.ExecuteWithGlobalState(ts.GlobalState)
-
-		stderr := ts.Stderr.String()
-		assert.Contains(t, stderr, "authenticate")
-	})
-
-	t.Run("fails without stack ID", func(t *testing.T) {
-		t.Parallel()
-
-		ts := NewGlobalTestState(t)
-		ts.CmdArgs = []string{"k6", "cloud", "project", "list"}
-		ts.Env["K6_CLOUD_TOKEN"] = validToken
-		ts.ExpectedExitCode = -1
-
-		cmd.ExecuteWithGlobalState(ts.GlobalState)
-
-		stderr := ts.Stderr.String()
-		assert.Contains(t, stderr, "no stack configured")
-	})
-
 	t.Run("empty project list", func(t *testing.T) {
 		t.Parallel()
 

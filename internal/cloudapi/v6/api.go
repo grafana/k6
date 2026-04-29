@@ -43,13 +43,13 @@ func (c *Client) ListProjects(ctx context.Context) (_ *k6cloud.ProjectListRespon
 		if len(res.Value) == 0 {
 			return nil, errors.New("received empty projects page with next link")
 		}
-		skip += pageSize
+		skip += *count
 	}
 }
 
 func (c *Client) listProjectsPage(
 	ctx context.Context, skip, top int32,
-) (_ *k6cloud.ProjectListResponse, err error) {
+) (*k6cloud.ProjectListResponse, error) {
 	res, hr, err := c.apiClient.ProjectsAPI.
 		ProjectsList(c.authCtx(ctx)).
 		XStackId(c.stackID).

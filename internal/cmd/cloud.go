@@ -51,12 +51,6 @@ func checkCloudLogin(conf cloudapi.Config) error {
 	return nil
 }
 
-// errNoStackConfigured indicates that no Grafana Cloud stack has been set up,
-// which is required for stack-scoped operations like listing projects.
-var errNoStackConfigured = errors.New(
-	"no stack configured. Please run `k6 cloud login` to set a default stack",
-)
-
 // cmdCloud handles the `k6 cloud` sub-command
 type cmdCloud struct {
 	gs *state.GlobalState
