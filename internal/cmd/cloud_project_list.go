@@ -105,7 +105,7 @@ func (c *cmdCloudProjectList) run(_ *cobra.Command, _ []string) error {
 	if len(resp.Value) == 0 {
 		printToStdout(c.globalState, stackHeader+
 			"No projects found.\n"+
-			"To create a project, visit https://grafana.com/docs/grafana-cloud/testing/k6/projects/\n")
+			"To create a project, visit https://grafana.com/docs/grafana-cloud/testing/k6/projects-and-users/projects/\n")
 		return nil
 	}
 
