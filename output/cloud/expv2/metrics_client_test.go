@@ -67,7 +67,7 @@ func TestMetricsClient_PushURLAndAuth(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		pushURLSuffix string // "" = no explicit push URL
+		pushURLSuffix string // "" = no explicit push URL; triggers PushRefID fallback
 		testRunToken  string // "" ⇒ expect Token scheme with client token
 		wantURLPath   string
 		wantAuth      string
@@ -91,6 +91,13 @@ func TestMetricsClient_PushURLAndAuth(t *testing.T) {
 			pushURLSuffix: "/any",
 			testRunToken:  "",
 			wantURLPath:   "/any",
+			wantAuth:      "Token test-token",
+		},
+		{
+			name:          "empty push URL derives path from BaseURL (PushRefID path)",
+			pushURLSuffix: "",
+			testRunToken:  "",
+			wantURLPath:   "/v2/metrics/run1",
 			wantAuth:      "Token test-token",
 		},
 	}

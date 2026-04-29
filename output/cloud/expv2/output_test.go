@@ -37,6 +37,16 @@ func TestNew(t *testing.T) {
 	assert.Equal(t, int64(99), o.config.APIVersion.Int64)
 }
 
+func TestNew_PushRefIDUsesCloudapiClient(t *testing.T) {
+	t.Parallel()
+
+	c := cloudapi.NewClient(nil, "token", "http://example.com", "v0.1", 1*time.Second)
+	conf := cloudapi.Config{PushRefID: null.StringFrom("12345")}
+	o, err := New(testutils.NewLogger(t), conf, c)
+	require.NoError(t, err)
+	assert.Equal(t, c, o.cloudClient)
+}
+
 func TestOutputSetTestRunID(t *testing.T) {
 	t.Parallel()
 	o := Output{}

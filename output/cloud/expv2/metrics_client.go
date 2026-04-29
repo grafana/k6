@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/klauspost/compress/snappy"
 	"google.golang.org/protobuf/proto"
@@ -18,6 +19,7 @@ import (
 // It is implemented by cloudapi.Client (legacy path) and netHTTPClient (provisioning path).
 type httpDoer interface {
 	Do(req *http.Request, v any) error
+	BaseURL() string
 }
 
 // metricsClient is a Protobuf over HTTP client for sending
@@ -30,21 +32,35 @@ type metricsClient struct {
 }
 
 // newMetricsClient creates and initializes a new MetricsClient.
-// pushURL must be fully resolved by the caller before calling this function.
+// If pushURL is empty, the URL is derived from c.BaseURL() for the legacy PushRefID path.
 func newMetricsClient(
 	c httpDoer, pushURL string, testRunID string, testRunToken string,
 ) (*metricsClient, error) {
+	if pushURL != "" {
+		return &metricsClient{
+			httpClient:   c,
+			url:          pushURL,
+			testRunToken: testRunToken,
+		}, nil
+	}
+
+	// The cloudapi.Client works across different versions of the API, the test
+	// lifecycle management is under /v1 instead the metrics ingestion is /v2.
+	// Unfortunately, the current client has v1 hard-coded so we need to trim the wrong path
+	// to be able to replace it with the correct one.
+	// A versioned client would be better but it would require a breaking change
+	// and considering that other services (e.g. k6-operator) depend on it,
+	// we want to stabilize the API before.
+	u := c.BaseURL()
+	if !strings.HasSuffix(u, "/v1") {
+		return nil, errors.New("a /v1 suffix is expected in the Cloud service's BaseURL path")
+	}
 	if testRunID == "" {
 		return nil, errors.New("TestRunID of the test is required")
 	}
-	if pushURL == "" {
-		return nil, errors.New("metrics push URL is required")
-	}
-
 	return &metricsClient{
-		httpClient:   c,
-		url:          pushURL,
-		testRunToken: testRunToken,
+		httpClient: c,
+		url:        strings.TrimSuffix(u, "/v1") + "/v2/metrics/" + testRunID,
 	}, nil
 }
 

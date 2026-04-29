@@ -35,6 +35,8 @@ type netHTTPClient struct {
 	c *http.Client
 }
 
+func (n *netHTTPClient) BaseURL() string { return "" }
+
 func (n *netHTTPClient) Do(req *http.Request, _ any) error {
 	resp, err := n.c.Do(req) //nolint:gosec // G704: URL is sourced from the provisioning API response, not user input
 	if err != nil {
@@ -77,13 +79,19 @@ type Output struct {
 }
 
 // New creates a new cloud output.
-func New(logger logrus.FieldLogger, conf cloudapi.Config, _ *cloudapi.Client) (*Output, error) {
+func New(logger logrus.FieldLogger, conf cloudapi.Config, c *cloudapi.Client) (*Output, error) {
+	var cloudClient httpDoer
+	if conf.PushRefID.Valid {
+		cloudClient = c
+	} else {
+		cloudClient = &netHTTPClient{c: &http.Client{Timeout: conf.Timeout.TimeDuration()}}
+	}
 	return &Output{
 		config:      conf,
 		logger:      logger.WithField("output", "cloudv2"),
 		abort:       make(chan struct{}),
 		stop:        make(chan struct{}),
-		cloudClient: &netHTTPClient{c: &http.Client{Timeout: conf.Timeout.TimeDuration()}},
+		cloudClient: cloudClient,
 	}, nil
 }
 
