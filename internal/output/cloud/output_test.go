@@ -444,12 +444,12 @@ func TestOutputStopWithTestError(t *testing.T) {
 
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/v1/tests/1234":
+		case "/provisioning/v1/test_runs/1234/notify":
 			b, err := io.ReadAll(r.Body)
 			require.NoError(t, err)
 
-			// aborted by system status
-			expB := `{"result_status":0, "run_status":6, "thresholds":{}}`
+			// generic error (no abort reason) maps to code 6 (AbortedByOutput catch-all)
+			expB := `{"event_type":"script_execution_completed","error":{"code":6,"reason":"this is my error"}}`
 			require.JSONEq(t, expB, string(b))
 
 			w.WriteHeader(http.StatusOK)
@@ -464,7 +464,11 @@ func TestOutputStopWithTestError(t *testing.T) {
 	out, err := newOutput(output.Params{
 		Logger: testutils.NewLogger(t),
 		Environment: map[string]string{
-			"K6_CLOUD_HOST": ts.URL,
+			"K6_CLOUD_HOST":           ts.URL,
+			"K6_CLOUD_HOST_V6":        ts.URL,
+			"K6_CLOUD_TOKEN":          "test-token",
+			"K6_CLOUD_STACK_ID":       "1",
+			"K6_CLOUD_TEST_RUN_TOKEN": "test-run-token-1234",
 		},
 		ScriptOptions: lib.Options{
 			SystemTags: &metrics.DefaultSystemTagSet,
@@ -482,6 +486,7 @@ func TestOutputStopWithTestError(t *testing.T) {
 			}
 		},
 	}
+	require.NoError(t, out.initV6ClientForDirectPush())
 
 	fakeErr := errors.New("this is my error")
 	require.NoError(t, out.StopWithTestError(fakeErr))

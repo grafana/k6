@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/v2/errext/exitcodes"
+	cloudapiv6 "go.k6.io/k6/v2/internal/cloudapi/v6"
 	"go.k6.io/k6/v2/internal/cloudapi/v6/v6test"
 	"go.k6.io/k6/v2/internal/cmd"
 	"go.k6.io/k6/v2/lib/fsext"
@@ -88,7 +89,11 @@ func TestCloudRunLocalExecution(t *testing.T) {
 		t.Parallel()
 
 		ts := makeTestState(t, cloudLocalExecScript, []string{"--local-execution"})
-		srv := v6test.NewServer(t, v6test.Config{})
+		srv := v6test.NewServer(t, v6test.Config{
+			ProgressCallback: func() *cloudapiv6.TestProgress {
+				return &cloudapiv6.TestProgress{Status: cloudapiv6.StatusInitializing}
+			},
+		})
 		ts.Env["K6_CLOUD_HOST"] = srv.URL
 		ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
 		ts.Env["K6_CLOUD_STACK_ID"] = "1"
@@ -105,7 +110,11 @@ func TestCloudRunLocalExecution(t *testing.T) {
 		t.Parallel()
 
 		ts := makeTestState(t, cloudLocalExecScript, []string{"--local-execution", "--no-archive-upload"})
-		srv := v6test.NewServer(t, v6test.Config{})
+		srv := v6test.NewServer(t, v6test.Config{
+			ProgressCallback: func() *cloudapiv6.TestProgress {
+				return &cloudapiv6.TestProgress{Status: cloudapiv6.StatusInitializing}
+			},
+		})
 		ts.Env["K6_CLOUD_HOST"] = srv.URL
 		ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
 		ts.Env["K6_CLOUD_STACK_ID"] = "1"
@@ -134,7 +143,11 @@ export default function() {
 };`
 
 		ts := makeTestState(t, script, []string{"--local-execution", "--log-output=stdout"})
-		srv := v6test.NewServer(t, v6test.Config{})
+		srv := v6test.NewServer(t, v6test.Config{
+			ProgressCallback: func() *cloudapiv6.TestProgress {
+				return &cloudapiv6.TestProgress{Status: cloudapiv6.StatusInitializing}
+			},
+		})
 		ts.Env["K6_CLOUD_HOST"] = srv.URL
 		ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
 		ts.Env["K6_CLOUD_STACK_ID"] = "1"
@@ -174,6 +187,9 @@ export default function() {
 		})
 		t.Cleanup(srv.Close)
 		ts.Env["K6_CLOUD_HOST"] = srv.URL
+		// MetricsPushURL is required by ensureMetricsPushURL; the test server accepts
+		// any unmatched request with 200 OK so any path on this server will do.
+		ts.Env["K6_CLOUD_METRICS_PUSH_URL"] = srv.URL + "/v2/metrics/" + pushRefID
 
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
@@ -224,6 +240,9 @@ func TestCloudRunLocalExecutionProvisioning_DefaultArchiveUpload(t *testing.T) {
 			capturedHeaders = append(capturedHeaders, r.Header.Clone())
 			endpointsCalled = append(endpointsCalled, r.Method+" "+r.URL.Path)
 			mu.Unlock()
+		},
+		ProgressCallback: func() *cloudapiv6.TestProgress {
+			return &cloudapiv6.TestProgress{Status: cloudapiv6.StatusInitializing}
 		},
 	})
 
@@ -298,6 +317,9 @@ func TestCloudRunLocalExecutionProvisioning_NameConflict409(t *testing.T) {
 	ts := makeTestState(t, cloudLocalExecScript, []string{"--local-execution", "--no-archive-upload"})
 	srv := v6test.NewServer(t, v6test.Config{
 		ConflictOnCreateLoadTest: true,
+		ProgressCallback: func() *cloudapiv6.TestProgress {
+			return &cloudapiv6.TestProgress{Status: cloudapiv6.StatusInitializing}
+		},
 	})
 	ts.Env["K6_CLOUD_HOST"] = srv.URL
 	ts.Env["K6_CLOUD_HOST_V6"] = srv.URL

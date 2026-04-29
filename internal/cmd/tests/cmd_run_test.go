@@ -27,6 +27,7 @@ import (
 	"go.k6.io/k6/v2/cloudapi"
 	"go.k6.io/k6/v2/errext/exitcodes"
 	"go.k6.io/k6/v2/internal/build"
+	cloudapiv6 "go.k6.io/k6/v2/internal/cloudapi/v6"
 	"go.k6.io/k6/v2/internal/cloudapi/v6/v6test"
 	"go.k6.io/k6/v2/internal/cmd"
 	"go.k6.io/k6/v2/internal/cmd/tests/events"
@@ -592,6 +593,8 @@ func getSimpleCloudOutputTestState(
 	ts.Env["K6_CLOUDRUN_TEST_RUN_ID"] = "111"
 	ts.Env["K6_CLOUD_STACK_ID"] = "1"
 	ts.Env["K6_CLOUD_TEST_RUN_TOKEN"] = "test-token-111"
+	// Required by ensureMetricsPushURL; the test server accepts any request with 200.
+	ts.Env["K6_CLOUD_METRICS_PUSH_URL"] = srv.URL + "/v2/metrics/111"
 	return ts
 }
 
@@ -979,6 +982,7 @@ func TestAbortedByScriptSetupErrorWithDependency(t *testing.T) {
 	ts.Env["K6_CLOUDRUN_TEST_RUN_ID"] = "123"
 	ts.Env["K6_CLOUD_STACK_ID"] = "1"
 	ts.Env["K6_CLOUD_TEST_RUN_TOKEN"] = "test-token-123"
+	ts.Env["K6_CLOUD_METRICS_PUSH_URL"] = srv.URL + "/v2/metrics/123"
 	ts.CmdArgs = []string{"k6", "run", "-v", "--out", "cloud", "--log-output=stdout", "test.js"}
 	ts.ExpectedExitCode = int(exitcodes.ScriptException)
 
@@ -1888,6 +1892,7 @@ func TestRunWithCloudOutputOverrides(t *testing.T) {
 	ts.Env["K6_CLOUDRUN_TEST_RUN_ID"] = "132"
 	ts.Env["K6_CLOUD_STACK_ID"] = "1"
 	ts.Env["K6_CLOUD_TEST_RUN_TOKEN"] = "test-token-132"
+	ts.Env["K6_CLOUD_METRICS_PUSH_URL"] = srv.URL + "/v2/metrics/132"
 
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
@@ -1919,6 +1924,7 @@ export default function() {};`
 	ts.Env["K6_CLOUDRUN_TEST_RUN_ID"] = "1337"
 	ts.Env["K6_CLOUD_STACK_ID"] = "1"
 	ts.Env["K6_CLOUD_TEST_RUN_TOKEN"] = "test-token-1337"
+	ts.Env["K6_CLOUD_METRICS_PUSH_URL"] = srv.URL + "/v2/metrics/1337"
 
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
@@ -3437,6 +3443,9 @@ export default function() {};`
 			mu.Lock()
 			endpointsCalled = append(endpointsCalled, r.Method+" "+r.URL.Path)
 			mu.Unlock()
+		},
+		ProgressCallback: func() *cloudapiv6.TestProgress {
+			return &cloudapiv6.TestProgress{Status: cloudapiv6.StatusInitializing}
 		},
 	})
 

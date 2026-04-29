@@ -14,6 +14,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/v2/cloudapi"
+	cloudapiv6 "go.k6.io/k6/v2/internal/cloudapi/v6"
 	"go.k6.io/k6/v2/internal/cloudapi/v6/v6test"
 	"go.k6.io/k6/v2/internal/cmd/tests"
 	"go.k6.io/k6/v2/internal/loader"
@@ -96,7 +97,7 @@ func minimalLoadedAndConfiguredTestWithScenarios(t *testing.T) *loadedAndConfigu
 func TestCreateCloudTest_StackIDValidation(t *testing.T) {
 	t.Parallel()
 
-	t.Run("no stack ID returns K6_CLOUD_STACK_ID error", func(t *testing.T) {
+	t.Run("no_stack_id_returns_error", func(t *testing.T) {
 		t.Parallel()
 
 		ts := tests.NewGlobalTestState(t)
@@ -108,7 +109,7 @@ func TestCreateCloudTest_StackIDValidation(t *testing.T) {
 		err := createCloudTest(ts.GlobalState, test)
 
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "K6_CLOUD_STACK_ID")
+		assert.Contains(t, err.Error(), "stack ID is required")
 	})
 
 	t.Run("no token returns auth error not stack ID error", func(t *testing.T) {
@@ -132,11 +133,16 @@ func TestCreateCloudTest_StackIDValidation(t *testing.T) {
 func TestCreateCloudTest_SetsTestRunIDEnvVar(t *testing.T) {
 	t.Parallel()
 
-	srv := v6test.NewServer(t, v6test.Config{})
+	srv := v6test.NewServer(t, v6test.Config{
+		ProgressCallback: func() *cloudapiv6.TestProgress {
+			return &cloudapiv6.TestProgress{Status: cloudapiv6.StatusInitializing}
+		},
+	})
 
 	ts := tests.NewGlobalTestState(t)
 	ts.Env["K6_CLOUD_TOKEN"] = testCloudToken
 	ts.Env["K6_CLOUD_STACK_ID"] = "1"
+	ts.Env["K6_CLOUD_PROJECT_ID"] = "1"
 	ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
 
 	test := minimalLoadedAndConfiguredTestWithScenarios(t)
@@ -179,11 +185,16 @@ func TestCreateCloudTest_CloudSecretSourceConfigured(t *testing.T) {
 	defer v1Srv.Close()
 
 	// v6 provisioning mock server.
-	v6Srv := v6test.NewServer(t, v6test.Config{})
+	v6Srv := v6test.NewServer(t, v6test.Config{
+		ProgressCallback: func() *cloudapiv6.TestProgress {
+			return &cloudapiv6.TestProgress{Status: cloudapiv6.StatusInitializing}
+		},
+	})
 
 	ts := tests.NewGlobalTestState(t)
 	ts.Env["K6_CLOUD_TOKEN"] = testCloudToken
 	ts.Env["K6_CLOUD_STACK_ID"] = "1"
+	ts.Env["K6_CLOUD_PROJECT_ID"] = "1"
 	ts.Env["K6_CLOUD_HOST_V6"] = v6Srv.URL
 	ts.Env["K6_CLOUD_HOST"] = v1Srv.URL
 
@@ -219,11 +230,16 @@ func TestCreateCloudTest_CloudSecretSourceNotCalledWhenNil(t *testing.T) {
 	}))
 	defer v1Srv.Close()
 
-	v6Srv := v6test.NewServer(t, v6test.Config{})
+	v6Srv := v6test.NewServer(t, v6test.Config{
+		ProgressCallback: func() *cloudapiv6.TestProgress {
+			return &cloudapiv6.TestProgress{Status: cloudapiv6.StatusInitializing}
+		},
+	})
 
 	ts := tests.NewGlobalTestState(t)
 	ts.Env["K6_CLOUD_TOKEN"] = testCloudToken
 	ts.Env["K6_CLOUD_STACK_ID"] = "1"
+	ts.Env["K6_CLOUD_PROJECT_ID"] = "1"
 	ts.Env["K6_CLOUD_HOST_V6"] = v6Srv.URL
 	ts.Env["K6_CLOUD_HOST"] = v1Srv.URL
 	// CloudSecretSource is intentionally left nil
@@ -241,11 +257,16 @@ func TestCreateCloudTest_CloudSecretSourceNotCalledWhenNil(t *testing.T) {
 func TestCreateCloudTest_PropagatesMetricsConfig(t *testing.T) {
 	t.Parallel()
 
-	srv := v6test.NewServer(t, v6test.Config{})
+	srv := v6test.NewServer(t, v6test.Config{
+		ProgressCallback: func() *cloudapiv6.TestProgress {
+			return &cloudapiv6.TestProgress{Status: cloudapiv6.StatusInitializing}
+		},
+	})
 
 	ts := tests.NewGlobalTestState(t)
 	ts.Env["K6_CLOUD_TOKEN"] = testCloudToken
 	ts.Env["K6_CLOUD_STACK_ID"] = "1"
+	ts.Env["K6_CLOUD_PROJECT_ID"] = "1"
 	ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
 
 	test := minimalLoadedAndConfiguredTestWithScenarios(t)
