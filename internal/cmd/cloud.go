@@ -58,7 +58,7 @@ func checkCloudLoginFor(conf cloudapi.Config, prefix string) error {
 
 // errNoStackConfigured indicates that no Grafana Cloud stack has been set up,
 // which is required for stack-scoped operations like listing projects.
-var errNoStackConfigured = errors.New( //nolint:staticcheck
+var errNoStackConfigured = errors.New(
 	"no stack configured. Please run `k6 cloud login` to set a default stack",
 )
 
