@@ -187,9 +187,7 @@ export default function() {
 		})
 		t.Cleanup(srv.Close)
 		ts.Env["K6_CLOUD_HOST"] = srv.URL
-		// MetricsPushURL is required by ensureMetricsPushURL; the test server accepts
-		// any unmatched request with 200 OK so any path on this server will do.
-		ts.Env["K6_CLOUD_METRICS_PUSH_URL"] = srv.URL + "/v2/metrics/" + pushRefID
+		// MetricsPushURL is derived from the cloudapi.Client's BaseURL for the PushRefID path.
 
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 

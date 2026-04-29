@@ -587,14 +587,17 @@ func getSimpleCloudOutputTestState(
 	ts.Env["K6_CLOUD_HOST"] = srv.URL
 	// Use the same server for the v6 provisioning notify endpoint.
 	ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
-	// Pre-set the test run ID and required v6 credentials so initV6ClientForDirectPush
-	// wires up the v6 client and testFinished uses NotifyTestRunCompleted.
+	// Pre-set the test run ID and required v6 credentials for the direct-push path.
 	ts.Env["K6_CLOUD_TOKEN"] = testCloudAPIToken
 	ts.Env["K6_CLOUDRUN_TEST_RUN_ID"] = "111"
 	ts.Env["K6_CLOUD_STACK_ID"] = "1"
 	ts.Env["K6_CLOUD_TEST_RUN_TOKEN"] = "test-token-111"
-	// Required by ensureMetricsPushURL; the test server accepts any request with 200.
-	ts.Env["K6_CLOUD_METRICS_PUSH_URL"] = srv.URL + "/v2/metrics/111"
+	// MetricsPushURL is not readable from env (no envconfig tag); inject via config file.
+	configPath := filepath.Join(ts.Cwd, "k6config.json")
+	configJSON := fmt.Sprintf(`{"collectors":{"cloud":{"metricsPushURL":%q}}}`, srv.URL+"/v2/metrics/111")
+	require.NoError(tb, fsext.WriteFile(ts.FS, configPath, []byte(configJSON), 0o644))
+	n := len(ts.CmdArgs)
+	ts.CmdArgs = append(ts.CmdArgs[:n-1:n-1], "--config", configPath, ts.CmdArgs[n-1])
 	return ts
 }
 
@@ -982,8 +985,10 @@ func TestAbortedByScriptSetupErrorWithDependency(t *testing.T) {
 	ts.Env["K6_CLOUDRUN_TEST_RUN_ID"] = "123"
 	ts.Env["K6_CLOUD_STACK_ID"] = "1"
 	ts.Env["K6_CLOUD_TEST_RUN_TOKEN"] = "test-token-123"
-	ts.Env["K6_CLOUD_METRICS_PUSH_URL"] = srv.URL + "/v2/metrics/123"
-	ts.CmdArgs = []string{"k6", "run", "-v", "--out", "cloud", "--log-output=stdout", "test.js"}
+	configPath := filepath.Join(ts.Cwd, "k6config.json")
+	configJSON := fmt.Sprintf(`{"collectors":{"cloud":{"metricsPushURL":%q}}}`, srv.URL+"/v2/metrics/123")
+	require.NoError(t, fsext.WriteFile(ts.FS, configPath, []byte(configJSON), 0o644))
+	ts.CmdArgs = []string{"k6", "run", "-v", "--out", "cloud", "--config", configPath, "--log-output=stdout", "test.js"}
 	ts.ExpectedExitCode = int(exitcodes.ScriptException)
 
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
@@ -1892,7 +1897,11 @@ func TestRunWithCloudOutputOverrides(t *testing.T) {
 	ts.Env["K6_CLOUDRUN_TEST_RUN_ID"] = "132"
 	ts.Env["K6_CLOUD_STACK_ID"] = "1"
 	ts.Env["K6_CLOUD_TEST_RUN_TOKEN"] = "test-token-132"
-	ts.Env["K6_CLOUD_METRICS_PUSH_URL"] = srv.URL + "/v2/metrics/132"
+	configPath := filepath.Join(ts.Cwd, "k6config.json")
+	configJSON := fmt.Sprintf(`{"collectors":{"cloud":{"metricsPushURL":%q}}}`, srv.URL+"/v2/metrics/132")
+	require.NoError(t, fsext.WriteFile(ts.FS, configPath, []byte(configJSON), 0o644))
+	n := len(ts.CmdArgs)
+	ts.CmdArgs = append(ts.CmdArgs[:n-1:n-1], "--config", configPath, ts.CmdArgs[n-1])
 
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
@@ -1924,7 +1933,11 @@ export default function() {};`
 	ts.Env["K6_CLOUDRUN_TEST_RUN_ID"] = "1337"
 	ts.Env["K6_CLOUD_STACK_ID"] = "1"
 	ts.Env["K6_CLOUD_TEST_RUN_TOKEN"] = "test-token-1337"
-	ts.Env["K6_CLOUD_METRICS_PUSH_URL"] = srv.URL + "/v2/metrics/1337"
+	configPath := filepath.Join(ts.Cwd, "k6config.json")
+	configJSON := fmt.Sprintf(`{"collectors":{"cloud":{"metricsPushURL":%q}}}`, srv.URL+"/v2/metrics/1337")
+	require.NoError(t, fsext.WriteFile(ts.FS, configPath, []byte(configJSON), 0o644))
+	n := len(ts.CmdArgs)
+	ts.CmdArgs = append(ts.CmdArgs[:n-1:n-1], "--config", configPath, ts.CmdArgs[n-1])
 
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 

@@ -41,8 +41,7 @@ type Config struct {
 	PushRefID null.String `json:"pushRefID" envconfig:"K6_CLOUD_PUSH_REF_ID"`
 
 	// MetricsPushURL is the URL to push metrics to; set from the provisioning API response.
-	// Can also be injected via K6_CLOUD_METRICS_PUSH_URL for the direct-push path.
-	MetricsPushURL null.String `json:"metricsPushURL" envconfig:"K6_CLOUD_METRICS_PUSH_URL"`
+	MetricsPushURL null.String `json:"metricsPushURL"`
 	// TestRunToken is the scoped token for metrics push; set from the provisioning API response.
 	// Can also be injected via K6_CLOUD_TEST_RUN_TOKEN for the direct-push path.
 	TestRunToken null.String `json:"testRunToken" envconfig:"K6_CLOUD_TEST_RUN_TOKEN"`
