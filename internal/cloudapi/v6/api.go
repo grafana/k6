@@ -92,7 +92,7 @@ func (c *Client) ListProjects(ctx context.Context) ([]Project, error) {
 		if len(res.Value) == 0 {
 			return nil, errors.New("received empty projects page with next link")
 		}
-		skip += pageSize
+		skip += *count
 	}
 }
 
