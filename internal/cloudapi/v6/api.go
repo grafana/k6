@@ -22,7 +22,7 @@ func (c *Client) ListProjects(ctx context.Context) (_ *k6cloud.ProjectListRespon
 	const pageSize int32 = 1000
 
 	var projects []k6cloud.ProjectApiModel
-	var count *int32
+	var count int32
 	var skip int32
 
 	for {
@@ -32,12 +32,12 @@ func (c *Client) ListProjects(ctx context.Context) (_ *k6cloud.ProjectListRespon
 		}
 
 		projects = append(projects, res.Value...)
-		count = res.Count
+		count += res.GetCount()
 
 		if res.NextLink == nil || *res.NextLink == "" {
 			return &k6cloud.ProjectListResponse{
 				Value: projects,
-				Count: count,
+				Count: &count,
 			}, nil
 		}
 
@@ -50,7 +50,7 @@ func (c *Client) ListProjects(ctx context.Context) (_ *k6cloud.ProjectListRespon
 
 func (c *Client) listProjectsPage(
 	ctx context.Context, skip, top int32,
-) (_ *k6cloud.ProjectListResponse, err error) {
+) (*k6cloud.ProjectListResponse, error) {
 	res, hr, err := c.apiClient.ProjectsAPI.
 		ProjectsList(c.authCtx(ctx)).
 		XStackId(c.stackID).

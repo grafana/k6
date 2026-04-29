@@ -705,6 +705,26 @@ func TestDependenciesApplyManifest(t *testing.T) {
 	}
 }
 
+func TestBuildSubprocessEnv(t *testing.T) {
+	t.Parallel()
+
+	env := map[string]string{
+		"HOME":                        "/home/user",
+		"K6_NO_USAGE_REPORT":          "true",
+		state.AutoExtensionResolution: "true",
+	}
+
+	result := buildSubprocessEnv(env)
+
+	assert.Contains(t, result, state.AutoExtensionResolution+"=false")
+	assert.Contains(t, result, state.ProvisionHostVersion+"="+runtimeK6Version())
+	assert.Contains(t, result, "HOME=/home/user")
+	assert.Contains(t, result, "K6_NO_USAGE_REPORT=true")
+
+	// AutoExtensionResolution from the original env should not be forwarded.
+	assert.NotContains(t, result, state.AutoExtensionResolution+"=true")
+}
+
 type fakeCommandExecutor struct {
 	runCalled bool
 	runErr    error
