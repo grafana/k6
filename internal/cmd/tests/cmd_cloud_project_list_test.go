@@ -20,7 +20,6 @@ func TestCloudProjectList(t *testing.T) {
 		t.Parallel()
 
 		srv := mockProjectListServer(t)
-		defer srv.Close()
 
 		ts := NewGlobalTestState(t)
 		ts.CmdArgs = []string{"k6", "cloud", "project", "list"}
@@ -147,7 +146,7 @@ func TestCloudProjectList(t *testing.T) {
 func mockProjectListServer(t *testing.T) *httptest.Server {
 	t.Helper()
 
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/cloud/v6/projects" {
 			w.WriteHeader(http.StatusNotFound)
 			return
@@ -182,4 +181,8 @@ func mockProjectListServer(t *testing.T) *httptest.Server {
 		}`)
 		require.NoError(t, err)
 	}))
+
+	t.Cleanup(mockServer.Close)
+
+	return mockServer
 }
