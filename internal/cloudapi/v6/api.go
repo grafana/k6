@@ -33,6 +33,37 @@ type LoadTest struct {
 	Updated   time.Time `json:"updated"`
 }
 
+// TestRun is a single run of a Grafana Cloud k6 load test.
+type TestRun struct {
+	ID                int32     `json:"id"`
+	LoadTestID        int32     `json:"test_id"`
+	ProjectID         int32     `json:"project_id"`
+	Status            string    `json:"status"`
+	Result            string    `json:"result,omitempty"`
+	Created           time.Time `json:"created"`
+	MaxVUs            *int32    `json:"max_vus,omitempty"`
+	ExecutionDuration int32     `json:"execution_duration"`
+}
+
+func toTestRun(r k6cloud.TestRunApiModel) TestRun {
+	tr := TestRun{
+		ID:                r.Id,
+		LoadTestID:        r.TestId,
+		ProjectID:         r.ProjectId,
+		Status:            r.Status,
+		Created:           r.Created,
+		ExecutionDuration: r.ExecutionDuration,
+	}
+	if r.Result.IsSet() && r.Result.Get() != nil {
+		tr.Result = *r.Result.Get()
+	}
+	if r.MaxVus.IsSet() && r.MaxVus.Get() != nil {
+		v := *r.MaxVus.Get()
+		tr.MaxVUs = &v
+	}
+	return tr
+}
+
 // ListProjects retrieves the list of projects for the configured stack.
 func (c *Client) ListProjects(ctx context.Context) ([]Project, error) {
 	const pageSize int32 = 1000
@@ -129,6 +160,98 @@ func (c *Client) listLoadTestsPage(
 		Skip(skip).
 		Top(top).
 		Execute()
+	defer closeResponse(hr, &err)
+
+	if err := CheckResponse(hr, err); err != nil {
+		return nil, err
+	}
+	if res == nil {
+		return nil, errUnknown
+	}
+
+	return res, nil
+}
+
+// ListTestRunsOptions configures a [Client.ListTestRuns] call.
+type ListTestRunsOptions struct {
+	// Limit caps the number of test runs returned in a single page.
+	// Ignored when All is true.
+	Limit int32
+	// All causes the client to page through every test run for the load test.
+	All bool
+	// CreatedAfter restricts results to runs started at or after this time.
+	// Zero value disables the filter.
+	CreatedAfter time.Time
+}
+
+// ListTestRuns retrieves the list of runs of the given load test, sorted by
+// most recent first. Honors the filters in opts.
+func (c *Client) ListTestRuns(
+	ctx context.Context, loadTestID int32, opts ListTestRunsOptions,
+) ([]TestRun, error) {
+	if opts.All {
+		return c.listAllTestRuns(ctx, loadTestID, opts.CreatedAfter)
+	}
+
+	limit := opts.Limit
+	if limit <= 0 {
+		limit = 30
+	}
+	res, err := c.listTestRunsPage(ctx, loadTestID, 0, limit, opts.CreatedAfter)
+	if err != nil {
+		return nil, err
+	}
+	runs := make([]TestRun, 0, len(res.Value))
+	for _, r := range res.Value {
+		runs = append(runs, toTestRun(r))
+	}
+	return runs, nil
+}
+
+func (c *Client) listAllTestRuns(
+	ctx context.Context, loadTestID int32, createdAfter time.Time,
+) ([]TestRun, error) {
+	const pageSize int32 = 1000
+
+	runs := []TestRun{}
+	var skip int32
+
+	for {
+		res, err := c.listTestRunsPage(ctx, loadTestID, skip, pageSize, createdAfter)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, r := range res.Value {
+			runs = append(runs, toTestRun(r))
+		}
+
+		if res.NextLink == nil || *res.NextLink == "" {
+			return runs, nil
+		}
+
+		if len(res.Value) == 0 {
+			return nil, errors.New("received empty test runs page with next link")
+		}
+		skip += pageSize
+	}
+}
+
+func (c *Client) listTestRunsPage(
+	ctx context.Context, loadTestID, skip, top int32, createdAfter time.Time,
+) (_ *k6cloud.TestRunListResponse, err error) {
+	req := c.apiClient.TestRunsAPI.
+		LoadTestsTestRunsRetrieve(c.authCtx(ctx), loadTestID).
+		XStackId(c.stackID).
+		Skip(skip).
+		Top(top).
+		Orderby("created desc")
+
+	if !createdAfter.IsZero() {
+		req = req.CreatedAfter(createdAfter)
+	}
+
+	res, hr, err := req.Execute()
 	defer closeResponse(hr, &err)
 
 	if err := CheckResponse(hr, err); err != nil {
