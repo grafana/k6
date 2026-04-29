@@ -62,12 +62,8 @@ func (c *cmdCloudProjectList) run(_ *cobra.Command, _ []string) error {
 		c.globalState.Logger.Warn(warn)
 	}
 
-	if !cloudConfig.Token.Valid || cloudConfig.Token.String == "" {
-		return fmt.Errorf("%w.\n%w", errMissingToken, errCloudAuth)
-	}
-
-	if !cloudConfig.StackID.Valid || cloudConfig.StackID.Int64 == 0 {
-		return errNoStackConfigured
+	if err := checkCloudLogin(cloudConfig); err != nil {
+		return err
 	}
 
 	client, err := v6cloudapi.NewClient(
