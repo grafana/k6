@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"strings"
-
 	"github.com/spf13/cobra"
 	"go.k6.io/k6/v2/cmd/state"
 )
@@ -31,27 +29,14 @@ func getCmdCloudProject(cloudCmd *cmdCloud) *cobra.Command {
 		Example: exampleText,
 	}
 
-	defaultUsageTemplate := (&cobra.Command{}).UsageTemplate()
-	defaultUsageTemplate = strings.ReplaceAll(defaultUsageTemplate, "FlagUsages", "FlagUsagesWrapped 120")
+	cloudUsageTemplate := getCloudUsageTemplate()
 
 	listCmd := getCmdCloudProjectList(c)
-	listCmd.SetUsageTemplate(defaultUsageTemplate)
+	listCmd.SetUsageTemplate(cloudUsageTemplate)
+	listCmd.SetHelpTemplate(cloudUsageTemplate)
 	cloudProjectCommand.AddCommand(listCmd)
 
-	cloudProjectCommand.SetUsageTemplate(`Usage:
-  {{.CommandPath}} <command> [flags]
-
-Available Commands:{{range .Commands}}{{if .IsAvailableCommand}}
-  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}
-
-Examples:
-{{.Example}}
-Flags:
-  -h, --help   Show help
-{{if .HasExample}}
-{{end}}
-Use "{{.CommandPath}} <command> --help" for more information about a command.
-`)
+	cloudProjectCommand.SetUsageTemplate(cloudUsageTemplate)
 
 	return cloudProjectCommand
 }

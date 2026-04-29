@@ -53,7 +53,7 @@ func checkCloudLogin(conf cloudapi.Config) error {
 
 // errNoStackConfigured indicates that no Grafana Cloud stack has been set up,
 // which is required for stack-scoped operations like listing projects.
-var errNoStackConfigured = errors.New( //nolint:staticcheck
+var errNoStackConfigured = errors.New(
 	"no stack configured. Please run `k6 cloud login` to set a default stack",
 )
 
@@ -378,13 +378,14 @@ func getCloudUsageTemplate() string {
 	return `{{.Short}}
 
 Usage:{{if .HasAvailableSubCommands}}
-  {{.CommandPath}} [command]{{end}}{{if .HasAvailableSubCommands}}
+  {{.CommandPath}} [command]{{else if .Runnable}}
+  {{.UseLine}}{{end}}{{if .HasAvailableSubCommands}}
 
 Available Commands:{{range .Commands}}{{if .IsAvailableCommand}}
   {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}
 
 Flags:
-  -h, --help   Show help
+{{.LocalFlags.FlagUsagesWrapped 120 | trimTrailingWhitespaces}}
 {{if .HasExample}}
 Examples:
 {{.Example}}

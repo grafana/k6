@@ -85,7 +85,23 @@ func TestCloudProjectList(t *testing.T) {
 		stdout := ts.Stdout.String()
 		assert.Contains(t, stdout, fmt.Sprintf("Projects for stack-%d:", validStackID))
 		assert.Contains(t, stdout, "No projects found.")
-		assert.Contains(t, stdout, "https://grafana.com/docs/grafana-cloud/testing/k6/projects/")
+		assert.Contains(t, stdout, "https://grafana.com/docs/grafana-cloud/testing/k6/projects-and-users/projects/")
+	})
+
+	t.Run("--help includes usage", func(t *testing.T) {
+		t.Parallel()
+
+		ts := NewGlobalTestState(t)
+		ts.CmdArgs = []string{"k6", "cloud", "project", "list", "--help"}
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stdout := ts.Stdout.String()
+		assert.Contains(t, stdout, "Usage:\n  k6 cloud project list [flags]")
+		assert.Contains(t, stdout, "--json")
+		assert.NotContains(t, stdout, "Global Flags:")
+		assert.NotContains(t, stdout, "--config")
+		assert.NotContains(t, stdout, "\n\n\nExamples:")
 	})
 
 	t.Run("--json outputs JSON", func(t *testing.T) {

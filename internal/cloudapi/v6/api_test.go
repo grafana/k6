@@ -105,6 +105,49 @@ func TestValidateToken(t *testing.T) {
 	})
 }
 
+func TestListProjects(t *testing.T) {
+	t.Parallel()
+
+	project := func(id int32, name string, isDefault bool) map[string]any {
+		return map[string]any{
+			"id":                 id,
+			"name":               name,
+			"is_default":         isDefault,
+			"grafana_folder_uid": nil,
+			"created":            "2025-01-01T00:00:00Z",
+			"updated":            "2025-01-01T00:00:00Z",
+		}
+	}
+
+	var requests atomic.Int32
+	client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "1000", r.URL.Query().Get("$top"))
+
+		switch requests.Add(1) {
+		case 1:
+			assert.Equal(t, "0", r.URL.Query().Get("$skip"))
+			writeJSON(t, w, http.StatusOK, map[string]any{
+				"value":     []any{project(1, "Default project", true)},
+				"@nextLink": "https://api.k6.io/cloud/v6/projects?$skip=1000&$top=1000",
+			})
+		case 2:
+			assert.Equal(t, "1000", r.URL.Query().Get("$skip"))
+			writeJSON(t, w, http.StatusOK, map[string]any{
+				"value": []any{project(2, "My project", false)},
+			})
+		default:
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}))
+
+	resp, err := client.ListProjects(t.Context())
+	require.NoError(t, err)
+	require.Len(t, resp.Value, 2)
+	assert.Equal(t, int32(2), requests.Load())
+	assert.Equal(t, int32(1), resp.Value[0].Id)
+	assert.Equal(t, int32(2), resp.Value[1].Id)
+}
+
 func TestRetryWithConnectionClose(t *testing.T) {
 	t.Parallel()
 
