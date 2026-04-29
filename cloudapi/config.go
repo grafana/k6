@@ -44,7 +44,7 @@ type Config struct {
 	MetricsPushURL null.String `json:"metricsPushURL"`
 	// TestRunToken is the scoped token for metrics push; set from the provisioning API response.
 	// Can also be injected via K6_CLOUD_TEST_RUN_TOKEN for the direct-push path.
-	TestRunToken null.String `json:"testRunToken" envconfig:"K6_CLOUD_TEST_RUN_TOKEN"`
+	TestRunToken null.String `json:"testRunToken"`
 
 	// Defines the max allowed number of time series in a single batch.
 	MaxTimeSeriesInBatch null.Int `json:"maxTimeSeriesInBatch" envconfig:"K6_CLOUD_MAX_TIME_SERIES_IN_BATCH"`
