@@ -51,10 +51,6 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 		gs.Logger.Warn(warn)
 	}
 
-	if !conf.StackID.Valid || conf.StackID.Int64 == 0 {
-		return fmt.Errorf("a stack ID is required, please ensure your stack ID is configured")
-	}
-
 	if err := checkCloudLogin(conf); err != nil {
 		return err
 	}
@@ -105,6 +101,10 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 	if err != nil {
 		return fmt.Errorf("creating v6 client: %w", err)
 	}
+
+	if !conf.StackID.Valid || conf.StackID.Int64 == 0 {
+		return fmt.Errorf("a stack ID is required, please ensure your stack ID is configured")
+	}
 	v6Client.SetStackID(int32(conf.StackID.Int64)) //nolint:gosec
 
 	var archive *lib.Archive
@@ -131,6 +131,9 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 		return err
 	}
 
+	// Store the test run id in the environment, so it can be used later.
+	test.preInitState.RuntimeOptions.Env[testRunIDKey] = strconv.FormatInt(int64(result.TestRunID), 10)
+
 	// The provisioning API does not yet return SecretsConfig, so make a
 	// separate POST /v1/tests call to obtain one. The v1 test run created
 	// by this call is intentionally discarded; only SecretsConfig is used.
@@ -154,9 +157,6 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 			})
 		}
 	}
-
-	// Store the test run id in the environment, so it can be used later.
-	test.preInitState.RuntimeOptions.Env[testRunIDKey] = strconv.FormatInt(int64(result.TestRunID), 10)
 
 	// Apply runtime config returned by the provisioning API.
 	conf.MetricsPushURL = null.StringFrom(result.RuntimeConfig.Metrics.PushURL)
