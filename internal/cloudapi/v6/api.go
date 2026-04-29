@@ -31,7 +31,7 @@ func (c *Client) ListProjects(ctx context.Context) (_ *k6cloud.ProjectListRespon
 		}
 
 		projects = append(projects, res.Value...)
-		count = res.Count
+		count += res.Count
 
 		if res.NextLink == nil || *res.NextLink == "" {
 			return &k6cloud.ProjectListResponse{
