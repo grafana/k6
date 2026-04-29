@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"os"
 	"os/exec"
 	"strings"
@@ -322,7 +323,8 @@ func newCacheProvisioner(gs *state.GlobalState) provisioner {
 func (p *buildProvisioner) provision(ctx context.Context, deps map[string]string) (commandExecutor, error) {
 	config := getProviderConfig(p.gs)
 
-	provider, err := k6provider.NewProvider(config)
+	logger := slog.New(newLogrusSlogHandler(p.gs.Logger))
+	provider, err := k6provider.NewProviderWithLogger(config, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -335,10 +337,6 @@ func (p *buildProvisioner) provision(ctx context.Context, deps map[string]string
 	binary, err := getBinary(ctx, deps)
 	if err != nil {
 		return nil, err
-	}
-	if !p.cachedOnly {
-		p.gs.Logger.Info("A new k6 binary has been provisioned with version(s): ",
-			formatDependencies(binary.Dependencies))
 	}
 
 	return &customBinary{binary.Path}, nil
@@ -360,14 +358,6 @@ func getProviderConfig(gs *state.GlobalState) k6provider.Config {
 	}
 
 	return config
-}
-
-func formatDependencies(deps map[string]string) string {
-	buffer := &bytes.Buffer{}
-	for dep, version := range deps {
-		fmt.Fprintf(buffer, "%s:%s ", dep, version)
-	}
-	return strings.Trim(buffer.String(), " ")
 }
 
 // extractToken gets the cloud token required to access the build service
