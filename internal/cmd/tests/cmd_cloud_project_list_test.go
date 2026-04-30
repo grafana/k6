@@ -3,13 +3,13 @@ package tests
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	cloudapiv6 "go.k6.io/k6/v2/internal/cloudapi/v6"
+	"go.k6.io/k6/v2/internal/cloudapi/v6/v6test"
 	"go.k6.io/k6/v2/internal/cmd"
 )
 
@@ -19,13 +19,7 @@ func TestCloudProjectList(t *testing.T) {
 	t.Run("lists projects successfully", func(t *testing.T) {
 		t.Parallel()
 
-		srv := mockProjectListServer(t)
-
-		ts := NewGlobalTestState(t)
-		ts.CmdArgs = []string{"k6", "cloud", "project", "list"}
-		ts.Env["K6_CLOUD_TOKEN"] = validToken
-		ts.Env["K6_CLOUD_STACK_ID"] = fmt.Sprintf("%d", validStackID)
-		ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
+		ts := newCloudProjectListTestState(t, testProjects())
 
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
@@ -39,18 +33,7 @@ func TestCloudProjectList(t *testing.T) {
 	t.Run("empty project list", func(t *testing.T) {
 		t.Parallel()
 
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			_, err := fmt.Fprint(w, `{"value": []}`)
-			require.NoError(t, err)
-		}))
-		defer srv.Close()
-
-		ts := NewGlobalTestState(t)
-		ts.CmdArgs = []string{"k6", "cloud", "project", "list"}
-		ts.Env["K6_CLOUD_TOKEN"] = validToken
-		ts.Env["K6_CLOUD_STACK_ID"] = fmt.Sprintf("%d", validStackID)
-		ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
+		ts := newCloudProjectListTestState(t, nil)
 
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
@@ -79,98 +62,51 @@ func TestCloudProjectList(t *testing.T) {
 	t.Run("--json outputs JSON", func(t *testing.T) {
 		t.Parallel()
 
-		srv := mockProjectListServer(t)
-		defer srv.Close()
-
-		ts := NewGlobalTestState(t)
-		ts.CmdArgs = []string{"k6", "cloud", "project", "list", "--json"}
-		ts.Env["K6_CLOUD_TOKEN"] = validToken
-		ts.Env["K6_CLOUD_STACK_ID"] = fmt.Sprintf("%d", validStackID)
-		ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
+		ts := newCloudProjectListTestState(t, testProjects(), "--json")
 
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 		stdout := ts.Stdout.String()
 
-		var projects []map[string]any
+		var projects []cloudapiv6.Project
 		require.NoError(t, json.Unmarshal([]byte(stdout), &projects))
-		require.Len(t, projects, 2)
-
-		assert.Equal(t, float64(1), projects[0]["id"])
-		assert.Equal(t, "Default project", projects[0]["name"])
-		assert.Equal(t, true, projects[0]["is_default"])
-
-		assert.Equal(t, float64(2), projects[1]["id"])
-		assert.Equal(t, "My project", projects[1]["name"])
-		assert.Equal(t, false, projects[1]["is_default"])
+		assert.Equal(t, testProjects(), projects)
 	})
 
 	t.Run("--json with empty list outputs empty array", func(t *testing.T) {
 		t.Parallel()
 
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			_, err := fmt.Fprint(w, `{"value": []}`)
-			require.NoError(t, err)
-		}))
-		defer srv.Close()
-
-		ts := NewGlobalTestState(t)
-		ts.CmdArgs = []string{"k6", "cloud", "project", "list", "--json"}
-		ts.Env["K6_CLOUD_TOKEN"] = validToken
-		ts.Env["K6_CLOUD_STACK_ID"] = fmt.Sprintf("%d", validStackID)
-		ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
+		ts := newCloudProjectListTestState(t, nil, "--json")
 
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 		stdout := ts.Stdout.String()
 
-		var projects []map[string]any
+		var projects []cloudapiv6.Project
 		require.NoError(t, json.Unmarshal([]byte(stdout), &projects))
 		assert.Empty(t, projects)
 	})
 }
 
-func mockProjectListServer(t *testing.T) *httptest.Server {
+func testProjects() []cloudapiv6.Project {
+	return []cloudapiv6.Project{
+		{ID: 1, Name: "Default project", IsDefault: true},
+		{ID: 2, Name: "My project", IsDefault: false},
+	}
+}
+
+func newCloudProjectListTestState(
+	t *testing.T, projects []cloudapiv6.Project, args ...string,
+) *GlobalTestState {
 	t.Helper()
 
-	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/cloud/v6/projects" {
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
+	srv := v6test.NewServer(t, v6test.Config{Projects: projects})
 
-		authHeader := r.Header.Get("Authorization")
-		if authHeader != fmt.Sprintf("Bearer %s", validToken) {
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
+	ts := NewGlobalTestState(t)
+	ts.CmdArgs = append([]string{"k6", "cloud", "project", "list"}, args...)
+	ts.Env["K6_CLOUD_TOKEN"] = validToken
+	ts.Env["K6_CLOUD_STACK_ID"] = fmt.Sprintf("%d", validStackID)
+	ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
 
-		w.Header().Set("Content-Type", "application/json")
-		_, err := fmt.Fprint(w, `{
-			"value": [
-				{
-					"id": 1,
-					"name": "Default project",
-					"is_default": true,
-					"grafana_folder_uid": null,
-					"created": "2025-01-01T00:00:00Z",
-					"updated": "2025-01-01T00:00:00Z"
-				},
-				{
-					"id": 2,
-					"name": "My project",
-					"is_default": false,
-					"grafana_folder_uid": null,
-					"created": "2025-01-02T00:00:00Z",
-					"updated": "2025-01-02T00:00:00Z"
-				}
-			]
-		}`)
-		require.NoError(t, err)
-	}))
-
-	t.Cleanup(mockServer.Close)
-
-	return mockServer
+	return ts
 }

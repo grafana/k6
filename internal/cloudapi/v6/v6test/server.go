@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	k6cloud "github.com/grafana/k6-cloud-openapi-client-go/k6"
 
@@ -47,6 +48,9 @@ type Config struct {
 	// request so tests can inspect the uploaded archive before the
 	// server returns its canned response.
 	InspectArchive func(*http.Request)
+
+	// Projects is the project list returned by the projects endpoint.
+	Projects []cloudapi.Project
 }
 
 // NewServer creates a test server that serves v6 API endpoints.
@@ -60,6 +64,7 @@ func NewServer(t *testing.T, cfg Config) *Server {
 	s := &Server{cfg: cfg}
 
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /cloud/v6/projects", s.handleListProjects)
 	mux.HandleFunc("POST /cloud/v6/validate_options", s.handleValidateOptions)
 	mux.HandleFunc("POST /cloud/v6/projects/{projectID}/load_tests", func(w http.ResponseWriter, r *http.Request) {
 		if s.cfg.InspectArchive != nil {
@@ -85,6 +90,24 @@ func NewServer(t *testing.T, cfg Config) *Server {
 	t.Cleanup(srv.Close)
 
 	return s
+}
+
+func (s *Server) handleListProjects(w http.ResponseWriter, _ *http.Request) {
+	projects := make([]k6cloud.ProjectApiModel, len(s.cfg.Projects))
+	now := time.Unix(0, 0).UTC()
+	for i, project := range s.cfg.Projects {
+		projects[i] = *k6cloud.NewProjectApiModel(
+			project.ID,
+			project.Name,
+			project.IsDefault,
+			*k6cloud.NewNullableString(nil),
+			now,
+			now,
+		)
+	}
+	res := k6cloud.NewProjectListResponse(projects)
+	res.SetCount(int32(len(projects)))
+	writeJSON(w, http.StatusOK, res)
 }
 
 func (s *Server) handleValidateOptions(w http.ResponseWriter, _ *http.Request) {
