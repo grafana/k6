@@ -48,6 +48,8 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.StringSlice("blacklist-ip", nil, "blacklist an `ip range` from being called")
 	flags.StringSlice("block-hostnames", nil, "block a case-insensitive hostname `pattern`,"+
 		" with optional leading wildcard, from being called")
+	flags.StringSlice("allow-hostnames", nil, "allow a case-insensitive hostname `pattern`,"+
+		" with optional leading wildcard, to be called. When set, only matching hostnames are allowed")
 
 	// The comment about system-tags also applies for summary-trend-stats. The default values
 	// are set in applyDefault().
@@ -172,6 +174,17 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 	}
 	if flags.Changed("block-hostnames") {
 		opts.BlockedHostnames, err = types.NewNullHostnameTrie(blockedHostnameStrings)
+		if err != nil {
+			return opts, err
+		}
+	}
+
+	allowedHostnameStrings, err := flags.GetStringSlice("allow-hostnames")
+	if err != nil {
+		return opts, err
+	}
+	if flags.Changed("allow-hostnames") {
+		opts.AllowedHostnames, err = types.NewNullHostnameTrie(allowedHostnameStrings)
 		if err != nil {
 			return opts, err
 		}
