@@ -372,13 +372,14 @@ func getCloudUsageTemplate() string {
 	return `{{.Short}}
 
 Usage:{{if .HasAvailableSubCommands}}
-  {{.CommandPath}} [command]{{end}}{{if .HasAvailableSubCommands}}
+  {{.CommandPath}} [command]{{else if .Runnable}}
+  {{.UseLine}}{{end}}{{if .HasAvailableSubCommands}}
 
 Available Commands:{{range .Commands}}{{if .IsAvailableCommand}}
   {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}
 
 Flags:
-  -h, --help   Show help
+{{.LocalFlags.FlagUsagesWrapped 120 | trimTrailingWhitespaces}}
 {{if .HasExample}}
 Examples:
 {{.Example}}
@@ -446,6 +447,9 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 	uploadCmd.SetUsageTemplate(defaultUsageTemplate)
 	uploadCmd.SetHelpTemplate((&cobra.Command{}).HelpTemplate())
 	cloudCmd.AddCommand(uploadCmd)
+
+	projectCmd := getCmdCloudProject(c)
+	cloudCmd.AddCommand(projectCmd)
 
 	cloudCmd.Flags().SortFlags = false
 	cloudCmd.Flags().AddFlagSet(c.flagSet())
