@@ -13,7 +13,7 @@ import (
 	"go.k6.io/k6/v2/cloudapi"
 	"go.k6.io/k6/v2/cmd/state"
 	"go.k6.io/k6/v2/internal/build"
-	v6cloudapi "go.k6.io/k6/v2/internal/cloudapi/v6"
+	cloudapiv6 "go.k6.io/k6/v2/internal/cloudapi/v6"
 )
 
 type cmdCloudProjectList struct {
@@ -65,7 +65,7 @@ func (c *cmdCloudProjectList) run(_ *cobra.Command, _ []string) error {
 		return err
 	}
 
-	client, err := v6cloudapi.NewClient(
+	client, err := cloudapiv6.NewClient(
 		c.globalState.Logger,
 		cloudConfig.Token.String,
 		cloudConfig.Hostv6.String,
@@ -107,7 +107,7 @@ func (c *cmdCloudProjectList) run(_ *cobra.Command, _ []string) error {
 	return nil
 }
 
-func (c *cmdCloudProjectList) outputJSON(projects []v6cloudapi.Project) error {
+func (c *cmdCloudProjectList) outputJSON(projects []cloudapiv6.Project) error {
 	buf := &bytes.Buffer{}
 	enc := json.NewEncoder(buf)
 	enc.SetEscapeHTML(false)
@@ -120,7 +120,7 @@ func (c *cmdCloudProjectList) outputJSON(projects []v6cloudapi.Project) error {
 	return nil
 }
 
-func formatProjectTable(projects []v6cloudapi.Project) string {
+func formatProjectTable(projects []cloudapiv6.Project) string {
 	var buf strings.Builder
 	w := tabwriter.NewWriter(&buf, 0, 0, 3, ' ', 0)
 	_, _ = fmt.Fprintln(w, "ID\tNAME\tDEFAULT")
