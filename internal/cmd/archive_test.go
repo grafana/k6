@@ -109,28 +109,28 @@ export default function () { http.get("https://example.com"); }
 		},
 		{
 			name: "use directive sets k6 constraint",
-			script: []byte(`"use k6 >= 0.50.0";
+			script: []byte(`"use k6 >= 2.0.0-0";
 import http from "k6/http";
 export default function () {}
 `),
-			expectedDeps: map[string]string{"k6": ">=0.50.0"},
+			expectedDeps: map[string]string{"k6": ">=2.0.0-0"},
 		},
 		{
 			name: "manifest overrides star constraint but pre-manifest deps are stored",
 			script: []byte(`import http from "k6/http";
 export default function () {}
 `),
-			manifest:     `{"k6": ">=1.0.0"}`,
+			manifest:     `{"k6": ">=2.0.0-0"}`,
 			expectedDeps: map[string]string{"k6": "*"}, // pre-manifest: still "*"
 		},
 		{
 			name: "manifest does not override explicit use directive constraint",
-			script: []byte(`"use k6 >= 0.9.0";
+			script: []byte(`"use k6 >= 2.0.0-0";
 import http from "k6/http";
 export default function () {}
 `),
-			manifest:     `{"k6": ">=1.0.0"}`,
-			expectedDeps: map[string]string{"k6": ">=0.9.0"}, // pre-manifest: explicit constraint preserved
+			manifest:     `{"k6": ">=2.2.0"}`,
+			expectedDeps: map[string]string{"k6": ">=2.0.0-0"}, // pre-manifest: explicit constraint preserved
 		},
 	}
 

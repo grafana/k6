@@ -2,13 +2,17 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
+	"log/slog"
 	"os"
 	"os/exec"
 	"strings"
 	"syscall"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
@@ -25,12 +29,12 @@ import (
 // commandExecutor executes the requested k6 command line command.
 // It abstract the execution path from the concrete binary.
 type commandExecutor interface {
-	run(*state.GlobalState) error
+	run(ctx context.Context, gs *state.GlobalState) error
 }
 
 // provisioner defines the interface for provisioning a commandExecutor for a set of dependencies
 type provisioner interface {
-	provision(map[string]string) (commandExecutor, error)
+	provision(ctx context.Context, deps map[string]string) (commandExecutor, error)
 }
 
 func constraintsMapToProvisionDependency(deps map[string]*semver.Constraints) k6provider.Dependencies {
@@ -57,8 +61,8 @@ type customBinary struct {
 }
 
 //nolint:forbidigo
-func (b *customBinary) run(gs *state.GlobalState) error {
-	cmd := exec.CommandContext(gs.Ctx, b.path, gs.CmdArgs[1:]...) //nolint:gosec
+func (b *customBinary) run(ctx context.Context, gs *state.GlobalState) error {
+	cmd := exec.CommandContext(ctx, b.path, gs.CmdArgs[1:]...) //nolint:gosec
 
 	// we pass os stdout, err, in because passing them from GlobalState changes how
 	// the subprocess detects the type of terminal
@@ -69,18 +73,7 @@ func (b *customBinary) run(gs *state.GlobalState) error {
 	// in `gs.Stdin` and should be passed to the command
 	cmd.Stdin = gs.Stdin
 
-	// Copy environment variables to the k6 process skipping auto extension resolution feature flag.
-	env := []string{}
-	for k, v := range gs.Env {
-		if k == state.AutoExtensionResolution {
-			continue
-		}
-		env = append(env, fmt.Sprintf("%s=%s", k, v))
-	}
-	// If auto extension resolution is enabled then
-	// this avoids unnecessary re-processing of dependencies in the sub-process.
-	env = append(env, state.AutoExtensionResolution+"=false")
-	cmd.Env = env
+	cmd.Env = buildSubprocessEnv(gs.Env)
 
 	// handle signals
 	sigC := make(chan os.Signal, 2)
@@ -115,6 +108,22 @@ func (b *customBinary) run(gs *state.GlobalState) error {
 				Debug("Signal received, waiting for the subprocess to handle it and return.")
 		}
 	}
+}
+
+// buildSubprocessEnv prepares environment variables for a provisioned k6 subprocess.
+func buildSubprocessEnv(src map[string]string) []string {
+	env := []string{}
+	for k, v := range src {
+		if k == state.AutoExtensionResolution {
+			continue
+		}
+		env = append(env, fmt.Sprintf("%s=%s", k, v))
+	}
+	// Disable auto extension resolution in the subprocess to avoid
+	// unnecessary re-processing of dependencies.
+	env = append(env, state.AutoExtensionResolution+"=false")
+	env = append(env, state.ProvisionHostVersion+"="+runtimeK6Version())
+	return env
 }
 
 // used just to signal we shouldn't print error again
@@ -300,30 +309,40 @@ func checkConstraintBySHA(vSHA string, constraint *semver.Constraints) (bool, bo
 	return strings.HasPrefix(vSHA, cSHA) || strings.HasPrefix(cSHA, vSHA), true
 }
 
-// k6buildProvisioner provisions a k6 binary that satisfies the dependencies using the k6build service
-type k6buildProvisioner struct {
-	gs *state.GlobalState
+// buildProvisioner provisions a k6 binary that satisfies the dependencies using the k6build service.
+type buildProvisioner struct {
+	gs         *state.GlobalState
+	cachedOnly bool // if true, only looks up already-cached binaries
 }
 
-func newK6BuildProvisioner(gs *state.GlobalState) provisioner {
-	return &k6buildProvisioner{gs: gs}
+func newBuildProvisioner(gs *state.GlobalState) provisioner {
+	return &buildProvisioner{gs: gs}
 }
 
-func (p *k6buildProvisioner) provision(deps map[string]string) (commandExecutor, error) {
+// newCacheProvisioner returns a provisioner that only looks up already-cached binaries.
+// A cache miss surfaces as [fs.ErrNotExist]; the build service is never asked to build.
+func newCacheProvisioner(gs *state.GlobalState) provisioner {
+	return &buildProvisioner{gs: gs, cachedOnly: true}
+}
+
+func (p *buildProvisioner) provision(ctx context.Context, deps map[string]string) (commandExecutor, error) {
 	config := getProviderConfig(p.gs)
 
-	provider, err := k6provider.NewProvider(config)
+	logger := slog.New(newLogrusSlogHandler(p.gs.Logger))
+	provider, err := k6provider.NewProviderWithLogger(config, logger)
 	if err != nil {
 		return nil, err
 	}
 
-	binary, err := provider.GetBinary(p.gs.Ctx, deps)
+	getBinary := provider.GetBinary
+	if p.cachedOnly {
+		getBinary = provider.GetCachedBinary
+	}
+
+	binary, err := getBinary(ctx, deps)
 	if err != nil {
 		return nil, err
 	}
-
-	p.gs.Logger.
-		Info("A new k6 binary has been provisioned with version(s): ", formatDependencies(binary.Dependencies))
 
 	return &customBinary{binary.Path}, nil
 }
@@ -344,14 +363,6 @@ func getProviderConfig(gs *state.GlobalState) k6provider.Config {
 	}
 
 	return config
-}
-
-func formatDependencies(deps map[string]string) string {
-	buffer := &bytes.Buffer{}
-	for dep, version := range deps {
-		fmt.Fprintf(buffer, "%s:%s ", dep, version)
-	}
-	return strings.Trim(buffer.String(), " ")
 }
 
 // extractToken gets the cloud token required to access the build service
@@ -453,4 +464,35 @@ func parseManifest(manifestString string) (dependencies, error) {
 		return nil, fmt.Errorf("invalid dependencies manifest %w", err)
 	}
 	return dependenciesFromMap(manifestMap)
+}
+
+// completionTimeout bounds the cache lookup for shell completion requests.
+// The build service is reachable but not guaranteed responsive; without a
+// deadline a stall would hang the shell on every TAB.
+const completionTimeout = 3 * time.Second
+
+// completeExtension handles a shell completion request for an unregistered
+// extension subcommand. If the matching provisioned binary is already cached
+// locally, it delegates the completion request to that binary. Otherwise it
+// returns nil (no completions) so the shell does not hang waiting on a build.
+func completeExtension(gs *state.GlobalState, extName string, prov provisioner) error {
+	deps, err := dependenciesFromSubcommand(gs, extName)
+	if err != nil {
+		gs.Logger.WithError(err).Debug("Failed to build completion deps")
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(gs.Ctx, completionTimeout)
+	defer cancel()
+
+	bin, err := prov.provision(ctx, constraintsMapToProvisionDependency(deps))
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		gs.Logger.WithError(err).Debug("Failed to check provisioner cache for completion request")
+		return nil
+	}
+
+	return bin.run(ctx, gs)
 }
