@@ -103,7 +103,7 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 	uploadCmd.SetHelpTemplate((&cobra.Command{}).HelpTemplate())
 	cloudCmd.AddCommand(uploadCmd)
 
-	projectCmd := getCmdCloudProject(c)
+	projectCmd := getCmdCloudProject(gs)
 	cloudCmd.AddCommand(projectCmd)
 
 	cloudCmd.Flags().SortFlags = false
