@@ -419,6 +419,7 @@ func TestGetProviderConfig(t *testing.T) {
 				BuildServiceURL:  "https://ingest.k6.io/builder/api/v1",
 				BinaryCacheDir:   filepath.Join(".cache", "k6", "builds"),
 				BuildServiceAuth: "",
+				K6ModPath:        "go.k6.io/k6/v2",
 			},
 		},
 		{
@@ -428,6 +429,7 @@ func TestGetProviderConfig(t *testing.T) {
 				BuildServiceURL:  "https://ingest.k6.io/builder/api/v1",
 				BinaryCacheDir:   filepath.Join(".cache", "k6", "builds"),
 				BuildServiceAuth: "K6CLOUDTOKEN",
+				K6ModPath:        "go.k6.io/k6/v2",
 			},
 		},
 	}
