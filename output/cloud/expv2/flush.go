@@ -1,6 +1,7 @@
 package expv2
 
 import (
+	"context"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -10,7 +11,7 @@ import (
 )
 
 type pusher interface {
-	push(samples *pbcloud.MetricSet) error
+	push(ctx context.Context, samples *pbcloud.MetricSet) error
 }
 
 type metricsFlusher struct {
@@ -27,7 +28,7 @@ type metricsFlusher struct {
 // flush flushes the queued buckets sending them to the remote Cloud service.
 // If the number of time series collected is bigger than maximum batch size
 // then it splits in chunks.
-func (f *metricsFlusher) flush() error {
+func (f *metricsFlusher) flush(ctx context.Context) error {
 	// drain the buffer
 	buckets := f.bq.PopAll()
 	if len(buckets) < 1 {
@@ -82,10 +83,10 @@ func (f *metricsFlusher) flush() error {
 		f.reportDiscardedLabels(msb.discardedLabels)
 	}
 
-	return f.flushBatches(batches)
+	return f.flushBatches(ctx, batches)
 }
 
-func (f *metricsFlusher) flushBatches(batches []*pbcloud.MetricSet) error {
+func (f *metricsFlusher) flushBatches(ctx context.Context, batches []*pbcloud.MetricSet) error {
 	var (
 		workers  = min(len(batches), f.batchPushConcurrency)
 		errs     = make(chan error, workers)
@@ -96,7 +97,7 @@ func (f *metricsFlusher) flushBatches(batches []*pbcloud.MetricSet) error {
 	for i := 0; i < workers; i++ {
 		go func() {
 			for chunk := range feed {
-				if err := f.client.push(chunk); err != nil {
+				if err := f.client.push(ctx, chunk); err != nil {
 					errs <- err
 					return
 				}
