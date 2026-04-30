@@ -201,6 +201,9 @@ type combinedResolver struct {
 }
 
 func (r combinedResolver) FindMessageByName(msg protoreflect.FullName) (protoreflect.MessageType, error) {
+	if r.user == nil {
+		return protoregistry.GlobalTypes.FindMessageByName(msg)
+	}
 	if t, err := r.user.FindMessageByName(msg); err == nil {
 		return t, nil
 	}
@@ -208,6 +211,9 @@ func (r combinedResolver) FindMessageByName(msg protoreflect.FullName) (protoref
 }
 
 func (r combinedResolver) FindMessageByURL(url string) (protoreflect.MessageType, error) {
+	if r.user == nil {
+		return protoregistry.GlobalTypes.FindMessageByURL(url)
+	}
 	if t, err := r.user.FindMessageByURL(url); err == nil {
 		return t, nil
 	}
@@ -215,13 +221,21 @@ func (r combinedResolver) FindMessageByURL(url string) (protoreflect.MessageType
 }
 
 func (r combinedResolver) FindExtensionByName(field protoreflect.FullName) (protoreflect.ExtensionType, error) {
+	if r.user == nil {
+		return protoregistry.GlobalTypes.FindExtensionByName(field)
+	}
 	if t, err := r.user.FindExtensionByName(field); err == nil {
 		return t, nil
 	}
 	return protoregistry.GlobalTypes.FindExtensionByName(field)
 }
 
-func (r combinedResolver) FindExtensionByNumber(msg protoreflect.FullName, field protoreflect.FieldNumber) (protoreflect.ExtensionType, error) {
+func (r combinedResolver) FindExtensionByNumber(
+	msg protoreflect.FullName, field protoreflect.FieldNumber,
+) (protoreflect.ExtensionType, error) {
+	if r.user == nil {
+		return protoregistry.GlobalTypes.FindExtensionByNumber(msg, field)
+	}
 	if t, err := r.user.FindExtensionByNumber(msg, field); err == nil {
 		return t, nil
 	}
