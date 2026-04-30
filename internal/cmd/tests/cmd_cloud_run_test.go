@@ -16,8 +16,9 @@ import (
 
 	"go.k6.io/k6/v2/cloudapi"
 	"go.k6.io/k6/v2/errext/exitcodes"
-	"go.k6.io/k6/v2/internal/cmd"
+	cloudapiv6 "go.k6.io/k6/v2/internal/cloudapi/v6"
 	"go.k6.io/k6/v2/internal/cloudapi/v6/v6test"
+	"go.k6.io/k6/v2/internal/cmd"
 	"go.k6.io/k6/v2/internal/lib/testutils"
 	"go.k6.io/k6/v2/lib/fsext"
 )
@@ -29,6 +30,44 @@ func TestK6CloudRun(t *testing.T) {
 
 func setupK6CloudRunCmd(cliFlags []string) []string {
 	return append([]string{"k6", "cloud", "run"}, append(cliFlags, "test.js")...)
+}
+
+// TestCloudRunShowLogsFromEnv ensures that the K6_SHOW_CLOUD_LOGS environment
+// variable is honored (parsed) by `k6 cloud run`.
+//
+// We assert via an invalid value that produces a parse error, which proves the
+// preRun env-var parsing path is actually reached for `cloud run`. We avoid
+// using the value "true" because the cloud test mock does not expose a log
+// stream endpoint, and the streaming retry loop would leak a goroutine past
+// test cleanup (the cloud streaming code does not honor the test ctx during
+// retry sleeps).
+func TestCloudRunShowLogsFromEnv(t *testing.T) {
+	t.Parallel()
+
+	ts := getSimpleCloudTestState(t, nil, setupK6CloudRunCmd, nil, nil)
+	ts.Env["K6_SHOW_CLOUD_LOGS"] = "not-a-bool"
+	ts.ExpectedExitCode = -1
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stdout := ts.Stdout.String()
+	t.Log(stdout)
+	assert.Contains(t, stdout, "parsing K6_SHOW_CLOUD_LOGS returned an error")
+}
+
+// TestCloudRunExitOnRunningFromEnv ensures that the K6_EXIT_ON_RUNNING
+// environment variable is honored by `k6 cloud run`.
+func TestCloudRunExitOnRunningFromEnv(t *testing.T) {
+	t.Parallel()
+
+	ts := getSimpleCloudTestState(t, nil, setupK6CloudRunCmd, []string{"--log-output=stdout"},
+		v6test.Progress(cloudapiv6.StatusRunning, v6test.ResultNone))
+	ts.Env["K6_EXIT_ON_RUNNING"] = "true"
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stdout := ts.Stdout.String()
+	t.Log(stdout)
+	assert.Contains(t, stdout, `execution: cloud`)
+	assert.Contains(t, stdout, `test status: Running`)
 }
 
 // TestCloudRunWithArchive tests that if k6 uses a static archive with the script inside that has cloud options like:
