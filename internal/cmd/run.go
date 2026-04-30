@@ -564,10 +564,8 @@ func getCmdRun(gs *state.GlobalState) *cobra.Command {
 		Long: `Start a test. This also exposes a REST API to interact with it. Various k6 subcommands offer
 a commandline interface for interacting with it.`,
 		Example: exampleText,
-		Args:    exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
-		PreRunE: func(_ *cobra.Command, _ []string) error {
-			return validateNoCloudSecretSource(gs.Flags.SecretSource)
-		},
+		Args: exactArgsWithMsg(1,
+			"arg should either be \"-\", if reading script from stdin, or a path to a script file"),
 		RunE: c.run,
 	}
 
