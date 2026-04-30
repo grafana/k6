@@ -179,7 +179,7 @@ type GlobalFlags struct {
 	ConfigFilePath   string
 	Quiet            bool
 	NoColor          bool
-	Address          string
+	HTTPAPIAddr      string
 	ProfilingEnabled bool
 	LogOutput        string
 	SecretSource     []string
@@ -195,7 +195,7 @@ type GlobalFlags struct {
 // GetDefaultFlags returns the default global flags.
 func GetDefaultFlags(homeDir string, cacheDir string) GlobalFlags {
 	return GlobalFlags{
-		Address:                 "localhost:6565",
+		HTTPAPIAddr:             "",
 		ProfilingEnabled:        false,
 		ConfigFilePath:          filepath.Join(homeDir, "k6", defaultConfigFileName),
 		LogOutput:               "stderr",
@@ -219,6 +219,9 @@ func getFlags(defaultFlags GlobalFlags, env map[string]string, args []string) Gl
 	}
 	if val, ok := env["K6_LOG_FORMAT"]; ok {
 		result.LogFormat = val
+	}
+	if val, ok := env["K6_HTTP_API_ADDR"]; ok {
+		result.HTTPAPIAddr = val
 	}
 	if env["K6_NO_COLOR"] != "" {
 		result.NoColor = true

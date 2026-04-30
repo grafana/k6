@@ -63,6 +63,49 @@ func TestVersion(t *testing.T) {
 	assert.Empty(t, ts.LoggerHook.Drain())
 }
 
+func TestHTTPAPIServerAddr(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name          string
+		args          []string
+		expectStarted bool
+	}{
+		{
+			name:          "addr flag not set",
+			expectStarted: false,
+		},
+		{
+			name:          "addr flag explicitly empty",
+			args:          []string{"-a", ""},
+			expectStarted: false,
+		},
+		{
+			name:          "addr flag set",
+			args:          []string{"-a", getFreeBindAddr(t)},
+			expectStarted: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			ts := NewGlobalTestState(t)
+			ts.CmdArgs = append([]string{"k6", "run", "-v", "--log-output=stdout"}, tc.args...)
+			ts.CmdArgs = append(ts.CmdArgs, "-")
+			ts.Stdin = bytes.NewBufferString(`export default function() {};`)
+
+			cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+			logEntries := ts.LoggerHook.Drain()
+			assert.Equal(t,
+				tc.expectStarted,
+				testutils.LogContains(logEntries, logrus.DebugLevel, "Starting the REST API server"))
+		})
+	}
+}
+
 func TestSimpleTestStdin(t *testing.T) {
 	t.Parallel()
 
@@ -626,8 +669,10 @@ func TestSetupTeardownThresholds(t *testing.T) {
 		};
 	`)
 
-	cliFlags := []string{"-v", "--log-output=stdout", "--linger"}
+	addr := getFreeBindAddr(t)
+	cliFlags := []string{"-v", "--log-output=stdout", "--linger", "--http-api-addr", addr}
 	ts := getSimpleCloudOutputTestState(t, script, cliFlags, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed, 0)
+	ts.Flags.HTTPAPIAddr = addr
 
 	sendSignal := injectMockSignalNotifier(ts)
 	asyncWaitForStdoutAndRun(t, ts, 20, 500*time.Millisecond, "waiting for Ctrl+C to continue", func() {
@@ -637,7 +682,7 @@ func TestSetupTeardownThresholds(t *testing.T) {
 		}()
 		t.Logf("Linger reached, running teardown again and stopping the test...")
 		req, err := http.NewRequestWithContext(
-			ts.Ctx, http.MethodPost, fmt.Sprintf("http://%s/v1/teardown", ts.Flags.Address), nil,
+			ts.Ctx, http.MethodPost, fmt.Sprintf("http://%s/v1/teardown", ts.Flags.HTTPAPIAddr), nil,
 		)
 		require.NoError(t, err)
 		resp, err := http.DefaultClient.Do(req)
@@ -888,7 +933,7 @@ func asyncWaitForStdoutAndStopTestFromRESTAPI(
 ) {
 	asyncWaitForStdoutAndRun(t, ts, attempts, interval, expText, func() {
 		req, err := http.NewRequestWithContext(
-			ts.Ctx, http.MethodPatch, fmt.Sprintf("http://%s/v1/status", ts.Flags.Address),
+			ts.Ctx, http.MethodPatch, fmt.Sprintf("http://%s/v1/status", ts.Flags.HTTPAPIAddr),
 			bytes.NewBufferString(`{"data":{"type":"status","id":"default","attributes":{"stopped":true}}}`),
 		)
 		require.NoError(t, err)
@@ -919,10 +964,12 @@ func TestAbortedByUserWithRestAPI(t *testing.T) {
 		}
 	`
 
+	addr := getFreeBindAddr(t)
 	ts := getSimpleCloudOutputTestState(
-		t, script, []string{"-v", "--log-output=stdout", "--iterations", "20"},
+		t, script, []string{"-v", "--log-output=stdout", "--iterations", "20", "--http-api-addr", addr},
 		cloudapi.RunStatusAbortedUser, cloudapi.ResultStatusPassed, exitcodes.ScriptStoppedFromRESTAPI,
 	)
+	ts.Flags.HTTPAPIAddr = addr
 
 	asyncWaitForStdoutAndStopTestFromRESTAPI(t, ts, 15, time.Second, "a simple iteration")
 
