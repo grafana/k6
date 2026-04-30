@@ -16,12 +16,18 @@ import (
 	"go.k6.io/k6/v2/lib"
 )
 
+// Project is a Grafana Cloud k6 project.
+type Project struct {
+	ID        int32  `json:"id"`
+	Name      string `json:"name"`
+	IsDefault bool   `json:"is_default"`
+}
+
 // ListProjects retrieves the list of projects for the configured stack.
-func (c *Client) ListProjects(ctx context.Context) (_ *k6cloud.ProjectListResponse, err error) {
+func (c *Client) ListProjects(ctx context.Context) ([]Project, error) {
 	const pageSize int32 = 1000
 
-	var projects []k6cloud.ProjectApiModel
-	var count int32
+	projects := []Project{}
 	var skip int32
 
 	for {
@@ -30,14 +36,16 @@ func (c *Client) ListProjects(ctx context.Context) (_ *k6cloud.ProjectListRespon
 			return nil, err
 		}
 
-		projects = append(projects, res.Value...)
-		count += res.GetCount()
+		for _, project := range res.Value {
+			projects = append(projects, Project{
+				ID:        project.Id,
+				Name:      project.Name,
+				IsDefault: project.IsDefault,
+			})
+		}
 
 		if res.NextLink == nil || *res.NextLink == "" {
-			return &k6cloud.ProjectListResponse{
-				Value: projects,
-				Count: &count,
-			}, nil
+			return projects, nil
 		}
 
 		if len(res.Value) == 0 {

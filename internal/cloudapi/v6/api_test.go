@@ -140,12 +140,12 @@ func TestListProjects(t *testing.T) {
 		}
 	}))
 
-	resp, err := client.ListProjects(t.Context())
+	projects, err := client.ListProjects(t.Context())
 	require.NoError(t, err)
-	require.Len(t, resp.Value, 2)
+	require.Len(t, projects, 2)
 	assert.Equal(t, int32(2), requests.Load())
-	assert.Equal(t, int32(1), resp.Value[0].Id)
-	assert.Equal(t, int32(2), resp.Value[1].Id)
+	assert.Equal(t, Project{ID: 1, Name: "Default project", IsDefault: true}, projects[0])
+	assert.Equal(t, Project{ID: 2, Name: "My project", IsDefault: false}, projects[1])
 }
 
 func TestRetryWithConnectionClose(t *testing.T) {

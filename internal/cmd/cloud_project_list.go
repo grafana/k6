@@ -8,7 +8,6 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	k6cloud "github.com/grafana/k6-cloud-openapi-client-go/k6"
 	"github.com/spf13/cobra"
 
 	"go.k6.io/k6/v2/cloudapi"
@@ -82,13 +81,13 @@ func (c *cmdCloudProjectList) run(_ *cobra.Command, _ []string) error {
 	}
 	client.SetStackID(int32(cloudConfig.StackID.Int64))
 
-	resp, err := client.ListProjects(c.globalState.Ctx)
+	projects, err := client.ListProjects(c.globalState.Ctx)
 	if err != nil {
 		return err
 	}
 
 	if c.isJSON {
-		return c.outputJSON(resp.Value)
+		return c.outputJSON(projects)
 	}
 
 	stackName := cloudConfig.StackURL.String
@@ -97,18 +96,18 @@ func (c *cmdCloudProjectList) run(_ *cobra.Command, _ []string) error {
 	}
 	stackHeader := fmt.Sprintf("Projects for %s:\n\n", stackName)
 
-	if len(resp.Value) == 0 {
+	if len(projects) == 0 {
 		printToStdout(c.globalState, stackHeader+
 			"No projects found.\n"+
 			"To create a project, visit https://grafana.com/docs/grafana-cloud/testing/k6/projects-and-users/projects/\n")
 		return nil
 	}
 
-	printToStdout(c.globalState, stackHeader+formatProjectTable(resp.Value))
+	printToStdout(c.globalState, stackHeader+formatProjectTable(projects))
 	return nil
 }
 
-func (c *cmdCloudProjectList) outputJSON(projects []k6cloud.ProjectApiModel) error {
+func (c *cmdCloudProjectList) outputJSON(projects []v6cloudapi.Project) error {
 	buf := &bytes.Buffer{}
 	enc := json.NewEncoder(buf)
 	enc.SetEscapeHTML(false)
@@ -121,7 +120,7 @@ func (c *cmdCloudProjectList) outputJSON(projects []k6cloud.ProjectApiModel) err
 	return nil
 }
 
-func formatProjectTable(projects []k6cloud.ProjectApiModel) string {
+func formatProjectTable(projects []v6cloudapi.Project) string {
 	var buf strings.Builder
 	w := tabwriter.NewWriter(&buf, 0, 0, 3, ' ', 0)
 	_, _ = fmt.Fprintln(w, "ID\tNAME\tDEFAULT")
@@ -130,7 +129,7 @@ func formatProjectTable(projects []k6cloud.ProjectApiModel) string {
 		if p.IsDefault {
 			def = "yes"
 		}
-		_, _ = fmt.Fprintf(w, "%d\t%s\t%s\n", p.Id, p.Name, def)
+		_, _ = fmt.Fprintf(w, "%d\t%s\t%s\n", p.ID, p.Name, def)
 	}
 	_ = w.Flush()
 	return buf.String()
