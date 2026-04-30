@@ -106,7 +106,6 @@ func (s *Server) handleListProjects(w http.ResponseWriter, _ *http.Request) {
 		)
 	}
 	res := k6cloud.NewProjectListResponse(projects)
-	res.SetCount(int32(len(projects)))
 	writeJSON(w, http.StatusOK, res)
 }
 
