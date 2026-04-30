@@ -302,6 +302,31 @@ func TestStopTest(t *testing.T) {
 	})
 }
 
+func TestResponseErrorWithNullTargets(t *testing.T) {
+	t.Parallel()
+
+	client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		fprint(t, w, `{
+			"error": {
+				"code": "bad_request",
+				"message": "invalid request",
+				"target": null,
+				"details": [{
+					"code": "invalid",
+					"message": "invalid field",
+					"target": null
+				}]
+			}
+		}`)
+	}))
+
+	err := client.ValidateOptions(t.Context(), 1, lib.Options{})
+	require.Error(t, err)
+	assert.Equal(t, "(400/bad_request) invalid request\ninvalid field", err.Error())
+}
+
 func TestFetchTest(t *testing.T) {
 	t.Parallel()
 
