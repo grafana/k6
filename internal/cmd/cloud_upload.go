@@ -83,60 +83,20 @@ func (c *cmdCloudUpload) run(cmd *cobra.Command, args []string) error {
 	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Building the archive..."))
 	arc := test.makeArchive()
 
-	tmpCloudConfig, err := cloudapi.GetTemporaryCloudConfig(arc.Options.Cloud)
+	cloudConfig, tmpCloudConfig, name, warn, err := c.prepareCloudConfig(arc, test)
 	if err != nil {
 		return err
 	}
-
-	// Cloud config
-	cloudConfig, warn, err := cloudapi.GetConsolidatedConfig(
-		test.derivedConfig.Collectors["cloud"], c.gs.Env, "", arc.Options.Cloud)
-	if err != nil {
-		return err
-	}
-	if err := checkCloudLogin(cloudConfig); err != nil {
-		return err
-	}
-
-	// Display config warning if needed
 	if warn != "" {
 		modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Warning: "+warn))
-	}
-
-	if cloudConfig.Token.Valid {
-		tmpCloudConfig["token"] = cloudConfig.Token
-	}
-	if cloudConfig.Name.Valid {
-		tmpCloudConfig["name"] = cloudConfig.Name
-	}
-	if cloudConfig.ProjectID.Valid {
-		tmpCloudConfig["projectID"] = cloudConfig.ProjectID
-	}
-
-	if arc.Options.External == nil {
-		arc.Options.External = make(map[string]json.RawMessage)
-	}
-
-	b, err := json.Marshal(tmpCloudConfig)
-	if err != nil {
-		return err
-	}
-
-	arc.Options.Cloud = b
-
-	name := cloudConfig.Name.String
-	if !cloudConfig.Name.Valid || cloudConfig.Name.String == "" {
-		name = filepath.Base(test.sourceRootPath)
 	}
 
 	globalCtx, globalCancel := context.WithCancel(c.gs.Ctx)
 	defer globalCancel()
 
-	logger := c.gs.Logger
-
 	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Validating script options"))
 	client, err := cloudapiv6.NewClient(
-		logger, cloudConfig.Token.String, cloudConfig.Hostv6.String, build.Version, cloudConfig.Timeout.TimeDuration())
+		c.gs.Logger, cloudConfig.Token.String, cloudConfig.Hostv6.String, build.Version, cloudConfig.Timeout.TimeDuration())
 	if err != nil {
 		return err
 	}
@@ -164,6 +124,53 @@ func (c *cmdCloudUpload) run(cmd *cobra.Command, args []string) error {
 	modifyAndPrintBar(c.gs, progressBar, pb.WithConstLeft("Run "), pb.WithConstProgress(1.0, "Archived"))
 	c.printTestStatus("Archived")
 	return nil
+}
+
+// prepareCloudConfig consolidates cloud configuration from the archive and environment,
+// merges it back into the archive, and returns the resolved name for the test.
+func (c *cmdCloudUpload) prepareCloudConfig(
+	arc *lib.Archive, test *loadedAndConfiguredTest,
+) (cloudapi.Config, map[string]any, string, string, error) {
+	tmpCloudConfig, err := cloudapi.GetTemporaryCloudConfig(arc.Options.Cloud)
+	if err != nil {
+		return cloudapi.Config{}, nil, "", "", err
+	}
+
+	cloudConfig, warn, err := cloudapi.GetConsolidatedConfig(
+		test.derivedConfig.Collectors["cloud"], c.gs.Env, "", arc.Options.Cloud)
+	if err != nil {
+		return cloudapi.Config{}, nil, "", "", err
+	}
+	if err := checkCloudLogin(cloudConfig); err != nil {
+		return cloudapi.Config{}, nil, "", "", err
+	}
+
+	if cloudConfig.Token.Valid {
+		tmpCloudConfig["token"] = cloudConfig.Token
+	}
+	if cloudConfig.Name.Valid {
+		tmpCloudConfig["name"] = cloudConfig.Name
+	}
+	if cloudConfig.ProjectID.Valid {
+		tmpCloudConfig["projectID"] = cloudConfig.ProjectID
+	}
+
+	if arc.Options.External == nil {
+		arc.Options.External = make(map[string]json.RawMessage)
+	}
+
+	b, err := json.Marshal(tmpCloudConfig)
+	if err != nil {
+		return cloudapi.Config{}, nil, "", "", err
+	}
+	arc.Options.Cloud = b
+
+	name := cloudConfig.Name.String
+	if !cloudConfig.Name.Valid || cloudConfig.Name.String == "" {
+		name = filepath.Base(test.sourceRootPath)
+	}
+
+	return cloudConfig, tmpCloudConfig, name, warn, nil
 }
 
 func (c *cmdCloudUpload) printTestStatus(status string) {
