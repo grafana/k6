@@ -22,6 +22,7 @@ type callParams struct {
 	TagsAndMeta            metrics.TagsAndMeta
 	Timeout                time.Duration
 	DiscardResponseMessage bool
+	DiscardUnknownFields   bool
 }
 
 // newCallParams constructs the call parameters from the input value.
@@ -61,6 +62,8 @@ func newCallParams(vu modules.VU, input sobek.Value) (*callParams, error) {
 			}
 		case "discardResponseMessage":
 			result.DiscardResponseMessage = params.Get(k).ToBoolean()
+		case "discardUnknownFields":
+			result.DiscardUnknownFields = params.Get(k).ToBoolean()
 		default:
 			return result, fmt.Errorf("unknown param: %q", k)
 		}
