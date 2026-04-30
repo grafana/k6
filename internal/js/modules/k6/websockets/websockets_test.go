@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
@@ -1680,4 +1681,53 @@ func TestRemoteCloseWithCodeAndReason(t *testing.T) {
 	samples := metrics.GetBufferedSamples(ts.samples)
 	assertSessionMetricsEmitted(t, samples, "", sr("WSBIN_URL/ws-remote-close"), http.StatusSwitchingProtocols, "")
 	assert.Equal(t, []string{"remote closed"}, ts.callRecorder.Recorded())
+}
+
+// TestPingHandlerDeadlock verifies that server pings arriving during connection
+// teardown don't deadlock the readPump goroutine. The server sends aggressive
+// pings then abruptly kills the TCP connection. Without the fix, the ping
+// handler blocks forever on an unbuffered channel send after the loop exits.
+// The goleak check in TestMain catches the leaked goroutine.
+func TestPingHandlerDeadlock(t *testing.T) {
+	t.Parallel()
+	ts := newTestState(t)
+
+	ts.tb.Mux.HandleFunc("/ws-ping-deadlock", func(w http.ResponseWriter, req *http.Request) {
+		conn, upgErr := (&websocket.Upgrader{}).Upgrade(w, req, w.Header())
+		if !assert.NoError(t, upgErr) {
+			return
+		}
+
+		// Drain reads so the server doesn't block on unread messages.
+		// ReadMessage errors are expected here because we kill TCP below.
+		go func() {
+			for {
+				if _, _, err := conn.ReadMessage(); err != nil {
+					return
+				}
+			}
+		}()
+
+		// Send a burst of pings to fill the receive buffer.
+		for range 20 {
+			assert.NoError(t, conn.WriteControl(
+				websocket.PingMessage, []byte("p"), time.Now().Add(time.Second),
+			))
+		}
+
+		// Abruptly kill TCP so the client's writePump fails,
+		// triggering connectionClosedWithError -> close(w.done)
+		// while the readPump may still be in the ping handler.
+		assert.NoError(t, conn.UnderlyingConn().Close())
+	})
+
+	sr := ts.tb.Replacer.Replace
+	_, err := ts.runtime.RunOnEventLoop(sr(`
+		var ws = new WebSocket("WSBIN_URL/ws-ping-deadlock")
+		ws.onerror = (e) => { call("error: " + e.error) }
+		ws.onopen = () => {
+			ws.send("keepalive")
+		}
+	`))
+	assert.NoError(t, err)
 }
