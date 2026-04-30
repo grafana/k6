@@ -2471,7 +2471,7 @@ func TestPageOnRequest(t *testing.T) {
 	}
 
 	// Compare each request one by one for better test failure visibility
-	// We only want to compare against the exepcted values. The actual values
+	// We only want to compare against the expected values. The actual values
 	// may contain extra headers that are not present in the expected values.
 	// Extra headers are racey and can be present or may not be present when
 	// the page.on('request') handler is called.
