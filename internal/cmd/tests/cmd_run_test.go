@@ -152,7 +152,7 @@ func TestBinaryNameHelpStdout(t *testing.T) {
 		},
 		{
 			cmdName:        "cloud",
-			containsOutput: fmt.Sprintf("%s cloud script.js", ts.BinaryName),
+			containsOutput: fmt.Sprintf(`Use "%s cloud [command] --help"`, ts.BinaryName),
 		},
 		{
 			cmdName:        "cloud",

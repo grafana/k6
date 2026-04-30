@@ -16,13 +16,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestK6Cloud(t *testing.T) {
+func TestCloudNoArgsShowsHelp(t *testing.T) {
 	t.Parallel()
-	runCloudTests(t, setupK6CloudCmd)
-}
 
-func setupK6CloudCmd(cliFlags []string) []string {
-	return append([]string{"k6", "cloud"}, append(cliFlags, "test.js")...)
+	ts := NewGlobalTestState(t)
+	ts.CmdArgs = []string{"k6", "cloud"}
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stdout := ts.Stdout.String()
+	t.Log(stdout)
+	assert.Contains(t, stdout, "Run and manage Grafana Cloud tests", "expected help text to be shown")
 }
 
 type setupCommandFunc func(cliFlags []string) []string
