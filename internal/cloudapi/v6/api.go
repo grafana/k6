@@ -16,6 +16,66 @@ import (
 	"go.k6.io/k6/v2/lib"
 )
 
+// Project is a Grafana Cloud k6 project.
+type Project struct {
+	ID        int32  `json:"id"`
+	Name      string `json:"name"`
+	IsDefault bool   `json:"is_default"`
+}
+
+// ListProjects retrieves the list of projects for the configured stack.
+func (c *Client) ListProjects(ctx context.Context) ([]Project, error) {
+	const pageSize int32 = 1000
+
+	projects := []Project{}
+	var skip int32
+
+	for {
+		res, err := c.listProjectsPage(ctx, skip, pageSize)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, project := range res.Value {
+			projects = append(projects, Project{
+				ID:        project.Id,
+				Name:      project.Name,
+				IsDefault: project.IsDefault,
+			})
+		}
+
+		if res.NextLink == nil || *res.NextLink == "" {
+			return projects, nil
+		}
+
+		if len(res.Value) == 0 {
+			return nil, errors.New("received empty projects page with next link")
+		}
+		skip += pageSize
+	}
+}
+
+func (c *Client) listProjectsPage(
+	ctx context.Context, skip, top int32,
+) (*k6cloud.ProjectListResponse, error) {
+	res, hr, err := c.apiClient.ProjectsAPI.
+		ProjectsList(c.authCtx(ctx)).
+		XStackId(c.stackID).
+		Skip(skip).
+		Top(top).
+		Execute()
+	defer closeResponse(hr, &err)
+
+	if err := CheckResponse(hr, err); err != nil {
+		return nil, err
+	}
+	if res == nil {
+		return nil, errUnknown
+	}
+
+	return res, nil
+}
+
 // ValidateToken validates the cloud authentication token.
 func (c *Client) ValidateToken(ctx context.Context, stackURL string) (_ *k6cloud.AuthenticationResponse, err error) {
 	if stackURL == "" {
@@ -143,7 +203,7 @@ func (c *Client) findTestByName(
 
 	tests := res.GetValue()
 	if len(tests) == 0 {
-		return nil, errUnknown
+		return nil, errTestNotExists
 	}
 
 	return &tests[0], nil

@@ -116,9 +116,9 @@ func TestCheckCloudLogin(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
-		name    string
-		conf    cloudapi.Config
-		wantErr error
+		name        string
+		conf        cloudapi.Config
+		expectedErr error
 	}{
 		{
 			name: "valid token and stack passes",
@@ -126,29 +126,28 @@ func TestCheckCloudLogin(t *testing.T) {
 				Token:   null.StringFrom("valid-token"),
 				StackID: null.IntFrom(1234),
 			},
-			wantErr: nil,
 		},
 		{
-			name: "missing token returns unauthenticated error",
+			name: "missing token returns token not configured error",
 			conf: cloudapi.Config{
 				StackID: null.IntFrom(1234),
 			},
-			wantErr: errUserUnauthenticated,
+			expectedErr: errMissingToken,
 		},
 		{
-			name: "empty token string returns unauthenticated error",
+			name: "empty token string returns token not configured error",
 			conf: cloudapi.Config{
 				Token:   null.StringFrom(""),
 				StackID: null.IntFrom(1234),
 			},
-			wantErr: errUserUnauthenticated,
+			expectedErr: errMissingToken,
 		},
 		{
 			name: "missing stack returns stack not configured error",
 			conf: cloudapi.Config{
 				Token: null.StringFrom("valid-token"),
 			},
-			wantErr: errUserUnauthenticated,
+			expectedErr: errMissingStackID,
 		},
 		{
 			name: "zero stack ID returns stack not configured error",
@@ -156,7 +155,7 @@ func TestCheckCloudLogin(t *testing.T) {
 				Token:   null.StringFrom("valid-token"),
 				StackID: null.IntFrom(0),
 			},
-			wantErr: errUserUnauthenticated,
+			expectedErr: errMissingStackID,
 		},
 	}
 
@@ -164,11 +163,12 @@ func TestCheckCloudLogin(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			err := checkCloudLogin(tc.conf)
-			if tc.wantErr == nil {
-				require.NoError(t, err)
-			} else {
-				require.ErrorIs(t, err, tc.wantErr)
+			if tc.expectedErr != nil {
+				require.ErrorIs(t, err, tc.expectedErr)
+				require.ErrorIs(t, err, errCloudAuth)
+				return
 			}
+			require.NoError(t, err)
 		})
 	}
 }

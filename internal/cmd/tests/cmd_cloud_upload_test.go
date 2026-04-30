@@ -30,7 +30,7 @@ func TestK6CloudUpload(t *testing.T) {
 
 		stdout := ts.Stdout.String()
 		t.Log(stdout)
-		assert.Contains(t, stdout, `must first authenticate`)
+		assert.Contains(t, stdout, `access token not configured`)
 	})
 
 	t.Run("TestCloudUploadWithScript", func(t *testing.T) {

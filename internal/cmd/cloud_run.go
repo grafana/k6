@@ -31,6 +31,9 @@ type cmdCloudRun struct {
 	// archive to the cloud service.
 	noArchiveUpload bool
 
+	// noCloudSecrets stores the state of the --no-cloud-secrets flag.
+	noCloudSecrets bool
+
 	// runCmd holds an instance of the k6 run command that we store
 	// in order to be able to call its run method to support
 	// the --local-execution flag mode.
@@ -97,12 +100,6 @@ func getCmdCloudRun(cloudCmd *cmdCloud) *cobra.Command {
 }
 
 func (c *cmdCloudRun) preRun(cmd *cobra.Command, args []string) error {
-	if !c.localExecution {
-		if err := validateNoCloudSecretSource(c.runCmd.gs.Flags.SecretSource); err != nil {
-			return err
-		}
-	}
-
 	if c.localExecution {
 		if cmd.Flags().Changed("exit-on-running") {
 			return errext.WithExitCodeIfNone(
@@ -128,6 +125,13 @@ func (c *cmdCloudRun) preRun(cmd *cobra.Command, args []string) error {
 		)
 	}
 
+	if c.noCloudSecrets {
+		return errext.WithExitCodeIfNone(
+			fmt.Errorf("the --no-cloud-secrets flag can only be used in conjunction with the --local-execution flag"),
+			exitcodes.InvalidConfig,
+		)
+	}
+
 	return c.deprecatedCloudCmd.preRun(cmd, args)
 }
 
@@ -140,7 +144,7 @@ func (c *cmdCloudRun) run(cmd *cobra.Command, args []string) error {
 			}
 
 			if err := createCloudTest(c.runCmd.gs, test); err != nil {
-				if errors.Is(err, errUserUnauthenticated) {
+				if errors.Is(err, errCloudAuth) {
 					return nil, nil, err
 				}
 				return nil, nil, fmt.Errorf("could not create the cloud test run: %w", err)
@@ -181,6 +185,12 @@ func (c *cmdCloudRun) flagSet() *pflag.FlagSet {
 		"no-archive-upload",
 		c.noArchiveUpload,
 		"only when using the local-execution mode, don't upload the test archive to the cloud service",
+	)
+	flags.BoolVar(
+		&c.noCloudSecrets,
+		"no-cloud-secrets",
+		c.noCloudSecrets,
+		"only when using the local-execution mode, don't automatically configure the cloud secret source",
 	)
 
 	return flags

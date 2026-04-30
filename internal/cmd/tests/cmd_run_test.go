@@ -63,6 +63,49 @@ func TestVersion(t *testing.T) {
 	assert.Empty(t, ts.LoggerHook.Drain())
 }
 
+func TestHTTPAPIServerAddr(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name          string
+		args          []string
+		expectStarted bool
+	}{
+		{
+			name:          "addr flag not set",
+			expectStarted: false,
+		},
+		{
+			name:          "addr flag explicitly empty",
+			args:          []string{"-a", ""},
+			expectStarted: false,
+		},
+		{
+			name:          "addr flag set",
+			args:          []string{"-a", getFreeBindAddr(t)},
+			expectStarted: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			ts := NewGlobalTestState(t)
+			ts.CmdArgs = append([]string{"k6", "run", "-v", "--log-output=stdout"}, tc.args...)
+			ts.CmdArgs = append(ts.CmdArgs, "-")
+			ts.Stdin = bytes.NewBufferString(`export default function() {};`)
+
+			cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+			logEntries := ts.LoggerHook.Drain()
+			assert.Equal(t,
+				tc.expectStarted,
+				testutils.LogContains(logEntries, logrus.DebugLevel, "Starting the REST API server"))
+		})
+	}
+}
+
 func TestSimpleTestStdin(t *testing.T) {
 	t.Parallel()
 
@@ -626,8 +669,10 @@ func TestSetupTeardownThresholds(t *testing.T) {
 		};
 	`)
 
-	cliFlags := []string{"-v", "--log-output=stdout", "--linger"}
+	addr := getFreeBindAddr(t)
+	cliFlags := []string{"-v", "--log-output=stdout", "--linger", "--http-api-addr", addr}
 	ts := getSimpleCloudOutputTestState(t, script, cliFlags, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed, 0)
+	ts.Flags.HTTPAPIAddr = addr
 
 	sendSignal := injectMockSignalNotifier(ts)
 	asyncWaitForStdoutAndRun(t, ts, 20, 500*time.Millisecond, "waiting for Ctrl+C to continue", func() {
@@ -637,7 +682,7 @@ func TestSetupTeardownThresholds(t *testing.T) {
 		}()
 		t.Logf("Linger reached, running teardown again and stopping the test...")
 		req, err := http.NewRequestWithContext(
-			ts.Ctx, http.MethodPost, fmt.Sprintf("http://%s/v1/teardown", ts.Flags.Address), nil,
+			ts.Ctx, http.MethodPost, fmt.Sprintf("http://%s/v1/teardown", ts.Flags.HTTPAPIAddr), nil,
 		)
 		require.NoError(t, err)
 		resp, err := http.DefaultClient.Do(req)
@@ -888,7 +933,7 @@ func asyncWaitForStdoutAndStopTestFromRESTAPI(
 ) {
 	asyncWaitForStdoutAndRun(t, ts, attempts, interval, expText, func() {
 		req, err := http.NewRequestWithContext(
-			ts.Ctx, http.MethodPatch, fmt.Sprintf("http://%s/v1/status", ts.Flags.Address),
+			ts.Ctx, http.MethodPatch, fmt.Sprintf("http://%s/v1/status", ts.Flags.HTTPAPIAddr),
 			bytes.NewBufferString(`{"data":{"type":"status","id":"default","attributes":{"stopped":true}}}`),
 		)
 		require.NoError(t, err)
@@ -919,10 +964,12 @@ func TestAbortedByUserWithRestAPI(t *testing.T) {
 		}
 	`
 
+	addr := getFreeBindAddr(t)
 	ts := getSimpleCloudOutputTestState(
-		t, script, []string{"-v", "--log-output=stdout", "--iterations", "20"},
+		t, script, []string{"-v", "--log-output=stdout", "--iterations", "20", "--http-api-addr", addr},
 		cloudapi.RunStatusAbortedUser, cloudapi.ResultStatusPassed, exitcodes.ScriptStoppedFromRESTAPI,
 	)
+	ts.Flags.HTTPAPIAddr = addr
 
 	asyncWaitForStdoutAndStopTestFromRESTAPI(t, ts, 15, time.Second, "a simple iteration")
 
@@ -3373,20 +3420,20 @@ func TestCloudSourceNotRegisteredForPlainRun(t *testing.T) {
 	assert.NotContains(t, stderr, "cloud secrets not configured")
 }
 
-// TestCloudSecretSourceRejectedByK6Run verifies that --secret-source=cloud is rejected
-// by 'k6 run' since the cloud source is only valid with 'k6 cloud run --local-execution'.
-func TestCloudSecretSourceRejectedByK6Run(t *testing.T) {
+// TestCloudSecretSourceInvalidForK6Run verifies that 'cloud' is not a valid value for
+// --secret-source; cloud secrets are automatic and not user-configurable via that flag.
+func TestCloudSecretSourceInvalidForK6Run(t *testing.T) {
 	t.Parallel()
 
 	ts := getSingleFileTestState(t, `export default function() {}`, []string{"--secret-source=cloud"}, exitcodes.InvalidConfig)
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
-	assert.Contains(t, ts.Stderr.String(), "the 'cloud' secret source can only be used with 'k6 cloud run --local-execution'")
+	assert.Contains(t, ts.Stderr.String(), "'cloud' is not a valid value for --secret-source")
 }
 
 // TestPLZCloudSecretsEnvVars verifies that setting K6_CLOUD_SECRETS_TOKEN and
-// K6_CLOUD_SECRETS_ENDPOINT configures the cloud secret source without requiring
-// --secret-source=cloud or a /v1/tests API round-trip (the PLZ operator path).
+// K6_CLOUD_SECRETS_ENDPOINT configures the cloud secret source without a /v1/tests
+// API round-trip (the PLZ operator path).
 func TestPLZCloudSecretsEnvVars(t *testing.T) {
 	t.Parallel()
 
@@ -3411,7 +3458,7 @@ func TestPLZCloudSecretsEnvVars(t *testing.T) {
 
 	ts.Env["K6_CLOUD_SECRETS_TOKEN"] = "plz-token"
 	ts.Env["K6_CLOUD_SECRETS_ENDPOINT"] = srv.URL + "/secrets/{key}"
-	// No --secret-source flag: cloud source is auto-registered and PLZ env vars configure it.
+	// Cloud source is auto-registered when PLZ env vars are set; no extra flags needed.
 	ts.CmdArgs = []string{"k6", "run", "script.js"}
 
 	cmd.ExecuteWithGlobalState(ts.GlobalState)

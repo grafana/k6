@@ -180,12 +180,7 @@ github.com/gorilla/websocket
 # github.com/grafana/k6-cloud-openapi-client-go v0.0.2
 ## explicit; go 1.23.4
 github.com/grafana/k6-cloud-openapi-client-go/k6
-# github.com/grafana/k6build v0.5.15
-## explicit; go 1.24.0
-github.com/grafana/k6build
-github.com/grafana/k6build/pkg/api
-github.com/grafana/k6build/pkg/client
-# github.com/grafana/k6provider v0.2.0
+# github.com/grafana/k6provider v0.5.0
 ## explicit; go 1.24.0
 github.com/grafana/k6provider
 # github.com/grafana/sobek v0.0.0-20260331145705-2272ac4993ef
@@ -234,8 +229,8 @@ github.com/jhump/protoreflect/v2/internal/reparse
 github.com/jhump/protoreflect/v2/internal/sort
 github.com/jhump/protoreflect/v2/protoresolve
 github.com/jhump/protoreflect/v2/sourceinfo
-# github.com/klauspost/compress v1.18.4
-## explicit; go 1.23
+# github.com/klauspost/compress v1.18.5
+## explicit; go 1.24
 github.com/klauspost/compress
 github.com/klauspost/compress/flate
 github.com/klauspost/compress/fse
@@ -443,16 +438,16 @@ go.uber.org/goleak/internal/stack
 # go.yaml.in/yaml/v2 v2.4.2
 ## explicit; go 1.15
 go.yaml.in/yaml/v2
-# golang.org/x/crypto v0.49.0
+# golang.org/x/crypto v0.50.0
 ## explicit; go 1.25.0
 golang.org/x/crypto/md4
 golang.org/x/crypto/ocsp
 golang.org/x/crypto/ripemd160
-# golang.org/x/crypto/x509roots/fallback v0.0.0-20260323153451-8400f4a93807
+# golang.org/x/crypto/x509roots/fallback v0.0.0-20260413170323-a8e9237a216b
 ## explicit; go 1.25.0
 golang.org/x/crypto/x509roots/fallback
 golang.org/x/crypto/x509roots/fallback/bundle
-# golang.org/x/net v0.52.0
+# golang.org/x/net v0.53.0
 ## explicit; go 1.25.0
 golang.org/x/net/context
 golang.org/x/net/html
@@ -469,16 +464,16 @@ golang.org/x/net/trace
 ## explicit; go 1.25.0
 golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore
-# golang.org/x/sys v0.42.0
+# golang.org/x/sys v0.43.0
 ## explicit; go 1.25.0
 golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
-# golang.org/x/term v0.41.0
+# golang.org/x/term v0.42.0
 ## explicit; go 1.25.0
 golang.org/x/term
-# golang.org/x/text v0.35.0
+# golang.org/x/text v0.36.0
 ## explicit; go 1.25.0
 golang.org/x/text/cases
 golang.org/x/text/collate

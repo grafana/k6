@@ -29,23 +29,24 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// errUserUnauthenticated represents an authentication error when trying to use
-// Grafana Cloud without being logged in or having a valid token.
-//
-//nolint:staticcheck // the error is shown to the user so here punctuation and capital are required
-var errUserUnauthenticated = errors.New("You must first authenticate to run tests in Grafana Cloud." +
-	" Run the `k6 cloud login` command providing the stack and token, or check the docs" +
-	" https://grafana.com/docs/grafana-cloud/testing/k6/author-run/tokens-and-cli-authentication" +
-	" for additional methods.")
+var (
+	errCloudAuth = errors.New( //nolint:staticcheck // user-facing error message, capitalization is intentional
+		"Run `k6 cloud login` to authenticate, or check the docs for other options at" +
+			" https://grafana.com/docs/grafana-cloud/testing/k6/author-run/tokens-and-cli-authentication",
+	)
+	errMissingToken   = errors.New("access token not configured")
+	errMissingStackID = errors.New("stack ID not configured")
+)
 
 // checkCloudLogin verifies that both a token and a stack are configured.
 // Together they represent a complete Grafana Cloud login.
 func checkCloudLogin(conf cloudapi.Config) error {
+	const prefix = "Running cloud tests requires auth settings"
 	if !conf.Token.Valid || conf.Token.String == "" {
-		return errUserUnauthenticated
+		return fmt.Errorf("%s: %w.\n%w", prefix, errMissingToken, errCloudAuth)
 	}
 	if !conf.StackID.Valid || conf.StackID.Int64 == 0 {
-		return errUserUnauthenticated
+		return fmt.Errorf("%s: %w.\n%w", prefix, errMissingStackID, errCloudAuth)
 	}
 	return nil
 }
@@ -371,13 +372,14 @@ func getCloudUsageTemplate() string {
 	return `{{.Short}}
 
 Usage:{{if .HasAvailableSubCommands}}
-  {{.CommandPath}} [command]{{end}}{{if .HasAvailableSubCommands}}
+  {{.CommandPath}} [command]{{else if .Runnable}}
+  {{.UseLine}}{{end}}{{if .HasAvailableSubCommands}}
 
 Available Commands:{{range .Commands}}{{if .IsAvailableCommand}}
   {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}
 
 Flags:
-  -h, --help   Show help
+{{.LocalFlags.FlagUsagesWrapped 120 | trimTrailingWhitespaces}}
 {{if .HasExample}}
 Examples:
 {{.Example}}
@@ -405,7 +407,7 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 
   # Run a test archive in Grafana Cloud
   $ {{.}} cloud run archive.tar
-  
+
   # [deprecated] Run a test script in Grafana Cloud
   $ {{.}} cloud script.js
 
@@ -445,6 +447,9 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 	uploadCmd.SetUsageTemplate(defaultUsageTemplate)
 	uploadCmd.SetHelpTemplate((&cobra.Command{}).HelpTemplate())
 	cloudCmd.AddCommand(uploadCmd)
+
+	projectCmd := getCmdCloudProject(c)
+	cloudCmd.AddCommand(projectCmd)
 
 	cloudCmd.Flags().SortFlags = false
 	cloudCmd.Flags().AddFlagSet(c.flagSet())

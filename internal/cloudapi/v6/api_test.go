@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -104,14 +105,84 @@ func TestValidateToken(t *testing.T) {
 	})
 }
 
-func TestClientRetry(t *testing.T) {
+func TestListProjects(t *testing.T) {
 	t.Parallel()
 
-	client, err := NewClient(testutils.NewLogger(t), "test-token", "http://example.com", "1.0", 1*time.Second)
+	project := func(id int32, name string, isDefault bool) map[string]any {
+		return map[string]any{
+			"id":                 id,
+			"name":               name,
+			"is_default":         isDefault,
+			"grafana_folder_uid": nil,
+			"created":            "2025-01-01T00:00:00Z",
+			"updated":            "2025-01-01T00:00:00Z",
+		}
+	}
+
+	var requests atomic.Int32
+	client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "1000", r.URL.Query().Get("$top"))
+
+		switch requests.Add(1) {
+		case 1:
+			assert.Equal(t, "0", r.URL.Query().Get("$skip"))
+			writeJSON(t, w, http.StatusOK, map[string]any{
+				"value":     []any{project(1, "Default project", true)},
+				"@nextLink": "https://api.k6.io/cloud/v6/projects?$skip=1000&$top=1000",
+			})
+		case 2:
+			assert.Equal(t, "1000", r.URL.Query().Get("$skip"))
+			writeJSON(t, w, http.StatusOK, map[string]any{
+				"value": []any{project(2, "My project", false)},
+			})
+		default:
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}))
+
+	projects, err := client.ListProjects(t.Context())
 	require.NoError(t, err)
-	// the client already tests retries. we just verify we set it up correctly.
-	assert.Equal(t, MaxRetries, client.apiClient.GetConfig().MaxRetries)
-	assert.Equal(t, RetryInterval, client.apiClient.GetConfig().RetryInterval)
+	require.Len(t, projects, 2)
+	assert.Equal(t, int32(2), requests.Load())
+	assert.Equal(t, Project{ID: 1, Name: "Default project", IsDefault: true}, projects[0])
+	assert.Equal(t, Project{ID: 2, Name: "My project", IsDefault: false}, projects[1])
+}
+
+func TestRetryWithConnectionClose(t *testing.T) {
+	t.Parallel()
+
+	var attempts atomic.Int32
+	var body []byte
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if attempts.Add(1) == 1 {
+			w.Header().Set("Connection", "close")
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		var err error
+		body, err = io.ReadAll(r.Body)
+		assert.NoError(t, err)
+		writeJSON(t, w, http.StatusOK, map[string]any{})
+	}))
+	defer srv.Close()
+
+	client, err := NewClient(testutils.NewLogger(t), "test-token", srv.URL, "1.0", 5*time.Second)
+	require.NoError(t, err)
+	client.SetStackID(1)
+
+	opts := lib.Options{VUs: null.IntFrom(10)}
+	require.NoError(t, client.ValidateOptions(t.Context(), 1, opts))
+
+	assert.Equal(t, int32(2), attempts.Load(), "expected exactly 2 attempts")
+
+	var got struct {
+		Options json.RawMessage `json:"options"`
+	}
+	require.NoError(t, json.Unmarshal(body, &got))
+	want, err := json.Marshal(opts)
+	require.NoError(t, err)
+	assert.JSONEq(t, string(want), string(got.Options))
 }
 
 func TestValidateOptions(t *testing.T) {
@@ -228,7 +299,7 @@ func TestUploadTest(t *testing.T) {
 			}
 		}))
 		_, err := client.UploadTest(t.Context(), "test", 1, newTestArchive(t))
-		assert.ErrorIs(t, err, errUnknown)
+		assert.ErrorIs(t, err, errTestNotExists)
 	})
 }
 
