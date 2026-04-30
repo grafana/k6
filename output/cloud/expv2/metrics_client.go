@@ -53,14 +53,19 @@ func newMetricsClient(c metricsHTTPClient, testRunID string) (*metricsClient, er
 }
 
 // Push the provided metrics for the given test run ID.
-func (mc *metricsClient) push(samples *pbcloud.MetricSet) error {
+//
+// The provided context cancels the underlying HTTP request, so callers can
+// bound how long they are willing to wait for the cloud service to accept the
+// payload. Without this, a stuck HTTP/2 read loop can keep push blocked
+// beyond the http.Client.Timeout and prevent k6 shutdown.
+func (mc *metricsClient) push(ctx context.Context, samples *pbcloud.MetricSet) error {
 	b, err := newRequestBody(samples)
 	if err != nil {
 		return err
 	}
 
 	req, err := http.NewRequestWithContext(
-		context.Background(), http.MethodPost, mc.url, io.NopCloser(bytes.NewReader(b)))
+		ctx, http.MethodPost, mc.url, io.NopCloser(bytes.NewReader(b)))
 	if err != nil {
 		return err
 	}

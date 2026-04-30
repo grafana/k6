@@ -1,6 +1,7 @@
 package expv2
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -512,10 +513,11 @@ func TestOutputFlushRequestMetadatasAbort(t *testing.T) {
 type flusherFunc func()
 
 func (ff flusherFunc) Flush() error {
-	return ff.flush()
+	ff()
+	return nil
 }
 
-func (ff flusherFunc) flush() error {
+func (ff flusherFunc) flush(_ context.Context) error {
 	ff()
 	return nil
 }

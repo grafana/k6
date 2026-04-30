@@ -25,8 +25,17 @@ import (
 
 // flusher is an interface for flushing data to the cloud.
 type flusher interface {
-	flush() error
+	flush(ctx context.Context) error
 }
+
+// stopFlushTimeout caps how long a graceful Stop is willing to wait for the
+// final cloud metrics flush. The wrapping k6 agent gives k6 a fixed window
+// to exit before SIGQUIT-ing it. If the cloud push is stuck (e.g. an HTTP/2
+// read loop wedged on a TLS connection), k6 must give up flushing rather
+// than block indefinitely and force the agent to SIGQUIT it.
+//
+// See grafana/k6-cloud-agent#291.
+const stopFlushTimeout = 30 * time.Second
 
 // Output sends result data to the k6 Cloud service.
 type Output struct {
@@ -166,7 +175,11 @@ func (o *Output) StopWithTestError(_ error) error {
 	// wait period.
 	o.collector.DropExpiringDelay()
 	o.collectSamples()
-	o.flushMetrics()
+
+	// Bound the final flush so a stuck cloud push cannot block shutdown.
+	stopCtx, cancel := context.WithTimeout(context.Background(), stopFlushTimeout)
+	defer cancel()
+	o.flushMetrics(stopCtx)
 
 	// Flush all the remaining request metadatas.
 	if insightsOutput.Enabled(o.config) {
@@ -193,7 +206,7 @@ func (o *Output) runPeriodicFlush() {
 		for {
 			select {
 			case <-t.C:
-				o.flushMetrics()
+				o.flushMetrics(context.Background())
 			case <-o.stop:
 				return
 			case <-o.abort:
@@ -254,10 +267,10 @@ func (o *Output) collectSamples() {
 }
 
 // flushMetrics receives a set of metric samples.
-func (o *Output) flushMetrics() {
+func (o *Output) flushMetrics(ctx context.Context) {
 	start := time.Now()
 
-	err := o.flushing.flush()
+	err := o.flushing.flush(ctx)
 	if err != nil {
 		o.handleFlushError(err)
 		return
