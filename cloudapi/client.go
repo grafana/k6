@@ -110,7 +110,14 @@ func (c *Client) Do(req *http.Request, v any) error {
 		retry, err := c.do(req, v, i)
 
 		if retry {
-			time.Sleep(c.retryInterval)
+			// Wait before retrying, but give up as soon as the request's
+			// context is done so a canceled or timed-out call returns at once
+			// instead of sleeping through the remaining attempts.
+			select {
+			case <-req.Context().Done():
+				return req.Context().Err()
+			case <-time.After(c.retryInterval):
+			}
 			if req.GetBody != nil {
 				req.Body, _ = req.GetBody()
 			}
