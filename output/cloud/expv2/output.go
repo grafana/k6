@@ -25,7 +25,7 @@ import (
 
 // flusher is an interface for flushing data to the cloud.
 type flusher interface {
-	flush() error
+	flush(ctx context.Context) error
 }
 
 // Output sends result data to the k6 Cloud service.
@@ -50,6 +50,12 @@ type Output struct {
 	// stop signal to graceful stop
 	stop chan struct{}
 
+	// flushCtx scopes the lifetime of in-flight flush HTTP requests.
+	// Canceling it during shutdown unblocks pushes whose response
+	// is hanging on the network so wg.Wait() can return promptly.
+	flushCtx    context.Context
+	flushCancel context.CancelFunc
+
 	// abort signal to interrupt immediately all background goroutines
 	abort        chan struct{}
 	abortOnce    sync.Once
@@ -63,14 +69,25 @@ func New(logger logrus.FieldLogger, conf cloudapi.Config, _ *cloudapi.Client) (*
 	//
 	// It creates a new client because in the case the backend has overwritten
 	// the config we need to use the new set.
-	return &Output{
+	o := &Output{
 		config: conf,
 		logger: logger.WithField("output", "cloudv2"),
 		abort:  make(chan struct{}),
 		stop:   make(chan struct{}),
 		cloudClient: cloudapi.NewClient(
 			logger, conf.Token.String, conf.Host.String, build.Version, conf.Timeout.TimeDuration()),
-	}, nil
+	}
+	o.flushCtx, o.flushCancel = context.WithCancel(context.Background())
+	return o, nil
+}
+
+// ensureFlushCtx initializes flushCtx and flushCancel lazily. It exists
+// because some tests construct Output{} directly without going through
+// New() and still exercise flushMetrics via the periodic flush path.
+func (o *Output) ensureFlushCtx() {
+	if o.flushCtx == nil {
+		o.flushCtx, o.flushCancel = context.WithCancel(context.Background())
+	}
 }
 
 // SetTestRunID sets the Cloud's test run id.
@@ -152,8 +169,30 @@ func (o *Output) StopWithTestError(_ error) error {
 	o.logger.Debug("Stopping...")
 	defer o.logger.Debug("Stopped!")
 
+	o.ensureFlushCtx()
 	close(o.stop)
-	o.wg.Wait()
+
+	// Wait for background flush loops to exit. If a flush is hung on a
+	// network request, give it a short grace period and then cancel
+	// flushCtx so the in-flight HTTP push returns and the wait group
+	// can complete. Otherwise k6 may hang on shutdown long enough that
+	// k6agent forcefully terminates the process with SIGQUIT
+	// (k6-cloud-agent issue #341).
+	const inflightFlushGrace = 5 * time.Second
+	wgDone := make(chan struct{})
+	go func() {
+		o.wg.Wait()
+		close(wgDone)
+	}()
+	flushCanceledOnTimeout := false
+	select {
+	case <-wgDone:
+	case <-time.After(inflightFlushGrace):
+		o.logger.Warn("Cloud output flush did not return in time on shutdown, canceling in-flight requests")
+		o.flushCancel()
+		flushCanceledOnTimeout = true
+		<-wgDone
+	}
 
 	select {
 	case <-o.abort:
@@ -161,12 +200,22 @@ func (o *Output) StopWithTestError(_ error) error {
 	default:
 	}
 
+	// If we had to cancel an in-flight push to escape the wait group,
+	// the network is unhealthy. Skip the final flush (which would also
+	// hang) and let the caller proceed to testFinished.
+	if flushCanceledOnTimeout {
+		return nil
+	}
+
 	// Drain the SampleBuffer and force the aggregation for flushing
 	// all the queued samples even if they haven't yet passed the
-	// wait period.
+	// wait period. Use a fresh context so the final flush is not
+	// poisoned by a previously canceled flushCtx.
+	finalCtx, finalCancel := context.WithTimeout(context.Background(), o.config.Timeout.TimeDuration())
+	defer finalCancel()
 	o.collector.DropExpiringDelay()
 	o.collectSamples()
-	o.flushMetrics()
+	o.flushMetrics(finalCtx)
 
 	// Flush all the remaining request metadatas.
 	if insightsOutput.Enabled(o.config) {
@@ -180,6 +229,7 @@ func (o *Output) StopWithTestError(_ error) error {
 }
 
 func (o *Output) runPeriodicFlush() {
+	o.ensureFlushCtx()
 	t := time.NewTicker(o.config.MetricPushInterval.TimeDuration())
 
 	o.wg.Add(1)
@@ -193,7 +243,7 @@ func (o *Output) runPeriodicFlush() {
 		for {
 			select {
 			case <-t.C:
-				o.flushMetrics()
+				o.flushMetrics(o.flushCtx)
 			case <-o.stop:
 				return
 			case <-o.abort:
@@ -254,11 +304,14 @@ func (o *Output) collectSamples() {
 }
 
 // flushMetrics receives a set of metric samples.
-func (o *Output) flushMetrics() {
+func (o *Output) flushMetrics(ctx context.Context) {
 	start := time.Now()
 
-	err := o.flushing.flush()
+	err := o.flushing.flush(ctx)
 	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			return
+		}
 		o.handleFlushError(err)
 		return
 	}

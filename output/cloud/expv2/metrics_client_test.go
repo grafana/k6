@@ -1,6 +1,7 @@
 package expv2
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -42,7 +43,7 @@ func TestMetricsClientPush(t *testing.T) {
 	require.NoError(t, err)
 
 	mset := pbcloud.MetricSet{}
-	err = mc.push(&mset)
+	err = mc.push(context.Background(), &mset)
 	require.NoError(t, err)
 	assert.Equal(t, 1, reqs)
 }
@@ -57,7 +58,7 @@ func TestMetricsClientPushUnexpectedStatus(t *testing.T) {
 	mc, err := newMetricsClient(mock, "test-ref-id")
 	require.NoError(t, err)
 
-	err = mc.push(nil)
+	err = mc.push(context.Background(), nil)
 	assert.ErrorContains(t, err, "500 Internal Server Error")
 }
 

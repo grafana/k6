@@ -1,6 +1,7 @@
 package expv2
 
 import (
+	"context"
 	"errors"
 	"strconv"
 	"sync"
@@ -81,7 +82,7 @@ func TestMetricsFlusherFlushInBatchWithinBucket(t *testing.T) {
 		require.Len(t, sinks, tc.series)
 
 		bq.Push([]timeBucket{{Time: 1, Sinks: sinks}})
-		err := mf.flush()
+		err := mf.flush(context.Background())
 		require.NoError(t, err)
 		assert.Equal(t, tc.expFlushCalls, pm.timesCalled())
 	}
@@ -131,7 +132,7 @@ func TestMetricsFlusherFlushInBatchAcrossBuckets(t *testing.T) {
 		}
 		require.Len(t, bq.buckets, tc.series)
 
-		err := mf.flush()
+		err := mf.flush(context.Background())
 		require.NoError(t, err)
 		assert.Equal(t, tc.expPushCalls, pm.timesCalled())
 	}
@@ -192,7 +193,7 @@ func TestFlushWithReservedLabels(t *testing.T) {
 		},
 	})
 
-	err := mf.flush()
+	err := mf.flush(context.Background())
 	require.NoError(t, err)
 
 	loglines := hook.Drain()
@@ -282,7 +283,7 @@ func TestFlushMaxSeriesInBatch(t *testing.T) {
 			},
 		},
 	})
-	err := mf.flush()
+	err := mf.flush(context.Background())
 	require.NoError(t, err)
 
 	require.Len(t, collected, 2)
@@ -327,7 +328,7 @@ func (pm *pusherMock) timesCalled() int {
 	return int(atomic.LoadInt64(&pm.pushCalled))
 }
 
-func (pm *pusherMock) push(ms *pbcloud.MetricSet) error {
+func (pm *pusherMock) push(_ context.Context, ms *pbcloud.MetricSet) error {
 	if pm.hook != nil {
 		pm.hook(ms)
 	}
@@ -383,7 +384,7 @@ func TestMetricsFlusherErrorCase(t *testing.T) {
 	}
 	require.Len(t, bq.buckets, series)
 
-	err := mf.flush()
+	err := mf.flush(context.Background())
 	require.Error(t, err)
 	// since the push happens concurrently the number of the calls could vary,
 	// but at least one call should happen and it should be less than the

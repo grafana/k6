@@ -1,6 +1,7 @@
 package expv2
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -374,6 +375,60 @@ func TestOutputFlushWorkersStop(t *testing.T) {
 	})
 }
 
+// TestOutputStopWithTestErrorDoesNotHangOnInflightFlush asserts that
+// StopWithTestError returns promptly even if a flush is currently in
+// flight when stop is requested.
+//
+// Reproduces production test run 7400202 (k6-cloud-agent issue #341):
+// a hung HTTP push to the metrics ingest endpoint pinned
+// (*Output).StopWithTestError on wg.Wait() for ~60 seconds, exceeding
+// k6agent's StopTimeout. k6agent then forcefully terminated the k6
+// process with SIGQUIT.
+//
+// The fix propagates cancellation from StopWithTestError into the
+// in-flight flush so it returns instead of pinning the wait group.
+func TestOutputStopWithTestErrorDoesNotHangOnInflightFlush(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		flushStarted := make(chan struct{})
+
+		o := Output{
+			logger: testutils.NewLogger(t),
+			stop:   make(chan struct{}),
+			abort:  make(chan struct{}),
+		}
+		o.config.MetricPushInterval = types.NullDurationFrom(1 * time.Millisecond)
+
+		once := sync.Once{}
+		flusherMock := flusherCtxFunc(func(ctx context.Context) error {
+			// Simulate an in-flight HTTP push that does not respond.
+			// It must unblock when StopWithTestError signals shutdown.
+			once.Do(func() { close(flushStarted) })
+			<-ctx.Done()
+			return ctx.Err()
+		})
+		o.flushing = flusherMock
+		o.runPeriodicFlush()
+
+		<-flushStarted
+
+		stopReturned := make(chan error, 1)
+		go func() {
+			stopReturned <- o.StopWithTestError(nil)
+		}()
+
+		// The fix gives in-flight flushes a short grace period before
+		// canceling them. 30 seconds is well past that grace period
+		// while still being far below k6agent's 60-second hard timeout.
+		select {
+		case <-stopReturned:
+			// success: stop returned without waiting indefinitely.
+		case <-time.After(30 * time.Second):
+			t.Fatal("StopWithTestError blocked on an in-flight flush")
+		}
+	})
+}
+
 func TestOutputFlushWorkersAbort(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
@@ -512,12 +567,24 @@ func TestOutputFlushRequestMetadatasAbort(t *testing.T) {
 type flusherFunc func()
 
 func (ff flusherFunc) Flush() error {
-	return ff.flush()
+	return ff.flush(context.Background())
 }
 
-func (ff flusherFunc) flush() error {
+func (ff flusherFunc) flush(_ context.Context) error {
 	ff()
 	return nil
+}
+
+// flusherCtxFunc is a context-aware flusher used by tests that need
+// to verify cancellation-driven shutdown behavior.
+type flusherCtxFunc func(ctx context.Context) error
+
+func (ff flusherCtxFunc) Flush() error {
+	return ff(context.Background())
+}
+
+func (ff flusherCtxFunc) flush(ctx context.Context) error {
+	return ff(ctx)
 }
 
 func TestPrintableConfig(t *testing.T) {

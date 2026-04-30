@@ -53,14 +53,19 @@ func newMetricsClient(c metricsHTTPClient, testRunID string) (*metricsClient, er
 }
 
 // Push the provided metrics for the given test run ID.
-func (mc *metricsClient) push(samples *pbcloud.MetricSet) error {
+//
+// The context bounds the lifetime of the in-flight HTTP request: when
+// the cloud Output is shutting down it cancels the context so a slow
+// or hung response cannot pin (*Output).StopWithTestError on its
+// WaitGroup (k6-cloud-agent issue #341).
+func (mc *metricsClient) push(ctx context.Context, samples *pbcloud.MetricSet) error {
 	b, err := newRequestBody(samples)
 	if err != nil {
 		return err
 	}
 
 	req, err := http.NewRequestWithContext(
-		context.Background(), http.MethodPost, mc.url, io.NopCloser(bytes.NewReader(b)))
+		ctx, http.MethodPost, mc.url, io.NopCloser(bytes.NewReader(b)))
 	if err != nil {
 		return err
 	}
