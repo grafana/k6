@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	k6cloud "github.com/grafana/k6-cloud-openapi-client-go/k6"
@@ -75,12 +76,15 @@ func NewClient(
 		version:   version,
 		logger:    logger,
 	}
+	if stackID != 0 {
+		// Configure the X-Stack-Id default header so that all
+		// provisioning API requests include it.
+		c.apiClient.GetConfig().DefaultHeader["X-Stack-Id"] = strconv.FormatInt(int64(stackID), 10)
+	}
 	return c, nil
 }
 
 // authCtx returns a context carrying the API access token.
-//
-//nolint:unused // used by API methods in this package
 func (c *Client) authCtx(ctx context.Context) context.Context {
 	return context.WithValue(ctx, k6cloud.ContextAccessToken, c.token)
 }
