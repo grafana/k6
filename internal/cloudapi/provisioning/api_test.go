@@ -1,6 +1,7 @@
 package provisioning
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -8,9 +9,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	provtest "go.k6.io/k6/v2/internal/cloudapi/provisioning/test"
+	v6 "go.k6.io/k6/v2/internal/cloudapi/v6"
 	"go.k6.io/k6/v2/internal/lib/testutils"
 )
 
@@ -315,4 +318,174 @@ func TestStartLocalExecution_4xxNotRetried(t *testing.T) {
 	require.ErrorAs(t, err, &respErr)
 	assert.Equal(t, http.StatusBadRequest, respErr.StatusCode)
 	assert.Equal(t, int32(1), attempts.Load(), "4xx must not be retried")
+}
+
+func TestWaitForTestRunReady(t *testing.T) {
+	t.Parallel()
+
+	srv := provtest.NewServer(t)
+	srv.HandleFetchTestRun(provtest.DefaultTestRunID, []v6.TestProgress{
+		{Status: v6.StatusInitializing},
+	})
+
+	client, err := NewClient(testutils.NewLogger(t), "test-token", srv.URL, "0.42.0", 7, 5*time.Second)
+	require.NoError(t, err)
+
+	err = client.WaitForTestRunReady(t.Context(), provtest.DefaultTestRunID, 1*time.Microsecond)
+	require.NoError(t, err)
+
+	assert.Equal(t, int32(1), srv.FetchTestRunHitCount(), "server should be hit exactly once")
+}
+
+func TestWaitForTestRunReady_PollsUntilInitializing(t *testing.T) {
+	t.Parallel()
+
+	srv := provtest.NewServer(t)
+	srv.HandleFetchTestRun(provtest.DefaultTestRunID, []v6.TestProgress{
+		{Status: v6.StatusCreated},
+		{Status: v6.StatusQueued},
+		{Status: v6.StatusInitializing},
+	})
+
+	client, err := NewClient(testutils.NewLogger(t), "test-token", srv.URL, "0.42.0", 7, 5*time.Second)
+	require.NoError(t, err)
+
+	err = client.WaitForTestRunReady(t.Context(), provtest.DefaultTestRunID, 1*time.Microsecond)
+	require.NoError(t, err)
+
+	assert.Equal(t, int32(3), srv.FetchTestRunHitCount(), "server should be hit 3 times")
+}
+
+func TestWaitForTestRunReady_AbortedReturnsErrorWithMessage(t *testing.T) {
+	t.Parallel()
+
+	srv := provtest.NewServer(t)
+	srv.HandleFetchTestRun(provtest.DefaultTestRunID, []v6.TestProgress{
+		{
+			Status: v6.StatusAborted,
+			StatusHistory: []v6.StatusEvent{
+				{Status: v6.StatusAborted, Message: "quota exceeded"},
+			},
+		},
+	})
+
+	client, err := NewClient(testutils.NewLogger(t), "test-token", srv.URL, "0.42.0", 7, 5*time.Second)
+	require.NoError(t, err)
+
+	err = client.WaitForTestRunReady(t.Context(), provtest.DefaultTestRunID, 1*time.Microsecond)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "quota exceeded")
+}
+
+func TestWaitForTestRunReady_AbortedNoHistoryReturnsGenericError(t *testing.T) {
+	t.Parallel()
+
+	srv := provtest.NewServer(t)
+	srv.HandleFetchTestRun(provtest.DefaultTestRunID, []v6.TestProgress{
+		{Status: v6.StatusAborted},
+	})
+
+	client, err := NewClient(testutils.NewLogger(t), "test-token", srv.URL, "0.42.0", 7, 5*time.Second)
+	require.NoError(t, err)
+
+	err = client.WaitForTestRunReady(t.Context(), provtest.DefaultTestRunID, 1*time.Microsecond)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "test run aborted before starting")
+}
+
+func TestWaitForTestRunReady_CompletedReturnsError(t *testing.T) {
+	t.Parallel()
+
+	srv := provtest.NewServer(t)
+	srv.HandleFetchTestRun(provtest.DefaultTestRunID, []v6.TestProgress{
+		{Status: v6.StatusCompleted},
+	})
+
+	client, err := NewClient(testutils.NewLogger(t), "test-token", srv.URL, "0.42.0", 7, 5*time.Second)
+	require.NoError(t, err)
+
+	err = client.WaitForTestRunReady(t.Context(), provtest.DefaultTestRunID, 1*time.Microsecond)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "completed")
+}
+
+func TestWaitForTestRunReady_UnknownStatusKeepsPolling(t *testing.T) {
+	t.Parallel()
+
+	srv := provtest.NewServer(t)
+	srv.HandleFetchTestRun(provtest.DefaultTestRunID, []v6.TestProgress{
+		{Status: v6.Status("weird-state")},
+		{Status: v6.StatusInitializing},
+	})
+
+	client, err := NewClient(testutils.NewLogger(t), "test-token", srv.URL, "0.42.0", 7, 5*time.Second)
+	require.NoError(t, err)
+
+	err = client.WaitForTestRunReady(t.Context(), provtest.DefaultTestRunID, 1*time.Microsecond)
+	require.NoError(t, err)
+
+	assert.Equal(t, int32(2), srv.FetchTestRunHitCount(), "server should be hit twice")
+}
+
+func TestWaitForTestRunReady_LogsTransitionsOnce(t *testing.T) {
+	t.Parallel()
+
+	srv := provtest.NewServer(t)
+	srv.HandleFetchTestRun(provtest.DefaultTestRunID, []v6.TestProgress{
+		{Status: v6.StatusCreated},
+		{Status: v6.StatusCreated},
+		{Status: v6.StatusQueued},
+		{Status: v6.StatusQueued},
+		{Status: v6.StatusInitializing},
+	})
+
+	logger, hook := testutils.NewLoggerWithHook(t, logrus.InfoLevel)
+	client, err := NewClient(logger, "test-token", srv.URL, "0.42.0", 7, 5*time.Second)
+	require.NoError(t, err)
+
+	err = client.WaitForTestRunReady(t.Context(), provtest.DefaultTestRunID, 1*time.Microsecond)
+	require.NoError(t, err)
+
+	entries := hook.Drain()
+	// Filter to only info-level entries with a "status" field.
+	var statusEntries []logrus.Entry
+	for _, e := range entries {
+		if e.Level == logrus.InfoLevel {
+			if _, ok := e.Data["status"]; ok {
+				statusEntries = append(statusEntries, e)
+			}
+		}
+	}
+
+	// Should have exactly 2 log entries: one for "created", one for "queued".
+	// "initializing" is a terminal success — no log for it.
+	require.Len(t, statusEntries, 2,
+		"expected exactly 2 status transition log entries (created, queued)")
+	assert.Equal(t, "Created", statusEntries[0].Data["status"])
+	assert.Equal(t, "Queued", statusEntries[1].Data["status"])
+}
+
+func TestWaitForTestRunReady_ContextCancellation(t *testing.T) {
+	t.Parallel()
+
+	srv := provtest.NewServer(t)
+	// Server always returns "created" — polling never terminates on its own.
+	srv.HandleFetchTestRun(provtest.DefaultTestRunID, []v6.TestProgress{
+		{Status: v6.StatusCreated},
+	})
+
+	client, err := NewClient(testutils.NewLogger(t), "test-token", srv.URL, "0.42.0", 7, 5*time.Second)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(t.Context())
+
+	// Cancel after a small delay to let a few polls happen.
+	go func() {
+		time.Sleep(5 * time.Millisecond)
+		cancel()
+	}()
+
+	err = client.WaitForTestRunReady(ctx, provtest.DefaultTestRunID, 1*time.Microsecond)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, context.Canceled)
 }

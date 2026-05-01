@@ -8,9 +8,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 
 	k6cloud "github.com/grafana/k6-cloud-openapi-client-go/k6"
+
+	cloudapi "go.k6.io/k6/v2/internal/cloudapi/v6"
 )
 
 const (
@@ -26,6 +29,8 @@ const (
 type Server struct {
 	*httptest.Server
 	Mux *http.ServeMux
+
+	fetchTestRunHits *atomic.Int32
 }
 
 // NewServer creates and starts a test server with an empty route table.
@@ -133,6 +138,53 @@ func (s *Server) HandlePresignedUpload(path string, handler http.HandlerFunc) {
 // using the default PresignedUploadPath.
 func (s *Server) PresignedUploadURL() string {
 	return s.URL + PresignedUploadPath
+}
+
+// HandleFetchTestRun registers a handler for
+// GET /cloud/v6/test_runs/{testRunID}. The handler returns successive
+// TestProgress values from the provided sequence. Once the sequence is
+// exhausted, the last element is repeated.
+//
+// It also tracks the number of times the handler was called; use
+// FetchTestRunHitCount to query it.
+func (s *Server) HandleFetchTestRun(testRunID int32, sequence []cloudapi.TestProgress) {
+	var idx atomic.Int32
+	var hits atomic.Int32
+
+	s.fetchTestRunHits = &hits
+
+	s.Mux.HandleFunc(
+		fmt.Sprintf("GET /cloud/v6/test_runs/%d", testRunID),
+		func(w http.ResponseWriter, _ *http.Request) {
+			hits.Add(1)
+
+			i := int(idx.Load())
+			if i < len(sequence)-1 {
+				idx.Add(1)
+			}
+			tp := sequence[i]
+
+			res := k6cloud.NewTestRunApiModelWithDefaults()
+			res.SetStatus(tp.Status.String())
+			res.SetResult(tp.Result.String())
+			res.SetEstimatedDuration(tp.EstimatedDuration)
+			res.SetExecutionDuration(tp.ExecutionDuration)
+			res.SetStatusHistory(cloudapi.ToStatusModel(tp.StatusHistory))
+			res.SetDistribution([]k6cloud.DistributionZoneApiModel{})
+			res.SetResultDetails(map[string]any{})
+			res.SetOptions(map[string]any{})
+			writeJSON(w, http.StatusOK, res)
+		},
+	)
+}
+
+// FetchTestRunHitCount returns the number of times the FetchTestRun
+// handler was called. Returns 0 if HandleFetchTestRun was never called.
+func (s *Server) FetchTestRunHitCount() int32 {
+	if s.fetchTestRunHits == nil {
+		return 0
+	}
+	return s.fetchTestRunHits.Load()
 }
 
 func strPtr(s string) *string { return &s }

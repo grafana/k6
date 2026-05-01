@@ -10,9 +10,16 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"time"
 
 	k6cloud "github.com/grafana/k6-cloud-openapi-client-go/k6"
+
+	v6 "go.k6.io/k6/v2/internal/cloudapi/v6"
 )
+
+// defaultWaitPollInterval is the default interval between status polls
+// when waiting for a test run to become ready.
+const defaultWaitPollInterval = 2 * time.Second
 
 // StartLocalExecutionRequest contains the parameters for starting a local
 // execution test run via the provisioning API.
@@ -100,6 +107,66 @@ func (c *Client) UploadArchive(ctx context.Context, uploadURL string, body []byt
 	}
 
 	return nil
+}
+
+// WaitForTestRunReady polls GET /cloud/v6/test_runs/{id} until the
+// backend status becomes "initializing" (signalling that k6 can begin
+// local execution). Returns an error if the test run reaches "aborted"
+// or "completed" first. Cancellable via context. Logs status transitions
+// at Info level once per change.
+//
+// If pollInterval is <= 0 the defaultWaitPollInterval is used.
+func (c *Client) WaitForTestRunReady(ctx context.Context, testRunID int32, pollInterval time.Duration) error {
+	if pollInterval <= 0 {
+		pollInterval = defaultWaitPollInterval
+		c.logger.WithField("interval", pollInterval).Info("using default poll interval")
+	}
+
+	var lastStatus string
+
+	for {
+		progress, err := c.v6Client.FetchTest(ctx, testRunID)
+		if err != nil {
+			return fmt.Errorf("fetching test status: %w", err)
+		}
+
+		status := progress.Status.String()
+
+		switch v6.Status(status) {
+		case v6.StatusInitializing:
+			return nil
+
+		case v6.StatusAborted:
+			var abortMsg string
+			for _, e := range progress.StatusHistory {
+				if e.Status == v6.StatusAborted && e.Message != "" {
+					abortMsg = e.Message
+					break
+				}
+			}
+			if abortMsg != "" {
+				return fmt.Errorf("test run aborted before starting: %s", abortMsg)
+			}
+			return fmt.Errorf("test run aborted before starting")
+
+		case v6.StatusCompleted:
+			return fmt.Errorf("test run completed before k6 could start")
+
+		default:
+			// created, queued, or any unrecognised state — keep polling.
+			if status != lastStatus {
+				c.logger.WithField("status", progress.FormatStatus()).Info("test status")
+				lastStatus = status
+			}
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(pollInterval):
+			// continue polling
+		}
+	}
 }
 
 // StartLocalExecution starts a local-execution test run via the
