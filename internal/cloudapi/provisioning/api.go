@@ -1,6 +1,7 @@
 package provisioning
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -66,6 +67,39 @@ type MetricsConfig struct {
 type SecretsConfig struct {
 	Endpoint     string
 	ResponsePath string
+}
+
+// UploadArchive PUTs pre-serialised archive bytes to the given
+// presigned S3 URL. The URL carries auth in query params, so no
+// Authorization header is set. Retries on 5xx and transport errors.
+func (c *Client) UploadArchive(ctx context.Context, uploadURL string, body []byte) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, uploadURL, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("creating upload request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/x-tar")
+	req.ContentLength = int64(len(body))
+
+	resp, err := c.doWithRetry(req)
+	if err != nil {
+		return fmt.Errorf("uploading archive: %w", err)
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		respBody, readErr := io.ReadAll(resp.Body)
+		if readErr != nil || len(respBody) == 0 {
+			return fmt.Errorf("archive upload failed: %d %s",
+				resp.StatusCode, http.StatusText(resp.StatusCode))
+		}
+		return fmt.Errorf("archive upload failed: %d %s: %s",
+			resp.StatusCode, http.StatusText(resp.StatusCode), respBody)
+	}
+
+	return nil
 }
 
 // StartLocalExecution starts a local-execution test run via the

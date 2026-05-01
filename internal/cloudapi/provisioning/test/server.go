@@ -18,6 +18,8 @@ const (
 	DefaultLoadTestID int64 = 456
 	// DefaultTestRunID is the test run ID returned by default handlers.
 	DefaultTestRunID int64 = 123
+	// PresignedUploadPath is the default path used for the presigned archive upload stub.
+	PresignedUploadPath = "/upload/archive.tar"
 )
 
 // Server is a test HTTP server for the provisioning API.
@@ -119,6 +121,18 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	if err := json.NewEncoder(w).Encode(v); err != nil {
 		panic(fmt.Errorf("provtest: encoding JSON: %w", err))
 	}
+}
+
+// HandlePresignedUpload registers a handler for PUT requests at the given path,
+// simulating a presigned S3 upload endpoint.
+func (s *Server) HandlePresignedUpload(path string, handler http.HandlerFunc) {
+	s.Mux.HandleFunc("PUT "+path, handler)
+}
+
+// PresignedUploadURL returns the full URL for the presigned upload stub
+// using the default PresignedUploadPath.
+func (s *Server) PresignedUploadURL() string {
+	return s.URL + PresignedUploadPath
 }
 
 func strPtr(s string) *string { return &s }

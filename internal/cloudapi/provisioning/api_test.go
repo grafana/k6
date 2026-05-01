@@ -183,6 +183,108 @@ func TestStartLocalExecution_5xxRetried(t *testing.T) {
 	assert.Equal(t, int32(2), attempts.Load(), "expected exactly 2 attempts (1 failure + 1 success)")
 }
 
+func TestUploadArchive(t *testing.T) {
+	t.Parallel()
+
+	var (
+		method        string
+		reqPath       string
+		contentType   string
+		authHeader    string
+		contentLength int64
+		gotBody       []byte
+		hitCount      atomic.Int32
+	)
+
+	srv := provtest.NewServer(t)
+	srv.HandlePresignedUpload(provtest.PresignedUploadPath, func(w http.ResponseWriter, r *http.Request) {
+		hitCount.Add(1)
+		method = r.Method
+		reqPath = r.URL.Path
+		contentType = r.Header.Get("Content-Type")
+		authHeader = r.Header.Get("Authorization")
+		contentLength = r.ContentLength
+		var err error
+		gotBody, err = io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "read body", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+
+	client, err := NewClient(testutils.NewLogger(t), "test-token", srv.URL, "0.42.0", 7, 5*time.Second)
+	require.NoError(t, err)
+
+	archiveBody := []byte("fake-archive-tar-content-12345")
+	err = client.UploadArchive(t.Context(), srv.PresignedUploadURL(), archiveBody)
+	require.NoError(t, err)
+
+	assert.Equal(t, http.MethodPut, method)
+	assert.Equal(t, provtest.PresignedUploadPath, reqPath)
+	assert.Equal(t, "application/x-tar", contentType)
+	assert.Empty(t, authHeader, "presigned URLs must not carry an Authorization header")
+	assert.Equal(t, archiveBody, gotBody)
+	assert.Equal(t, int64(len(archiveBody)), contentLength)
+	assert.Equal(t, int32(1), hitCount.Load(), "server should be hit exactly once")
+}
+
+func TestUploadArchive_RetriesOn5xx(t *testing.T) {
+	t.Parallel()
+
+	var (
+		attempts atomic.Int32
+		body1    []byte
+		body2    []byte
+	)
+
+	srv := provtest.NewServer(t)
+	srv.HandlePresignedUpload(provtest.PresignedUploadPath, func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		if attempts.Add(1) == 1 {
+			body1 = b
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		body2 = b
+		w.WriteHeader(http.StatusOK)
+	})
+
+	client, err := NewClient(testutils.NewLogger(t), "test-token", srv.URL, "0.42.0", 7, 5*time.Second)
+	require.NoError(t, err)
+
+	archiveBody := []byte("archive-bytes-for-retry-test")
+	err = client.UploadArchive(t.Context(), srv.PresignedUploadURL(), archiveBody)
+	require.NoError(t, err)
+
+	assert.Equal(t, int32(2), attempts.Load(), "expected exactly 2 attempts (1 failure + 1 success)")
+	assert.Equal(t, body1, body2, "body replay should produce identical bytes on retry")
+}
+
+func TestUploadArchive_4xxNotRetried(t *testing.T) {
+	t.Parallel()
+
+	var attempts atomic.Int32
+
+	srv := provtest.NewServer(t)
+	srv.HandlePresignedUpload(provtest.PresignedUploadPath, func(w http.ResponseWriter, _ *http.Request) {
+		attempts.Add(1)
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte("Request has expired"))
+	})
+
+	client, err := NewClient(testutils.NewLogger(t), "test-token", srv.URL, "0.42.0", 7, 5*time.Second)
+	require.NoError(t, err)
+
+	archiveBody := []byte("archive-bytes-for-4xx-test")
+	err = client.UploadArchive(t.Context(), srv.PresignedUploadURL(), archiveBody)
+	require.Error(t, err)
+
+	assert.Contains(t, err.Error(), "403")
+	assert.Contains(t, err.Error(), "Request has expired")
+	assert.Equal(t, int32(1), attempts.Load(), "4xx must not be retried")
+}
+
 func TestStartLocalExecution_4xxNotRetried(t *testing.T) {
 	t.Parallel()
 

@@ -3,6 +3,7 @@ package provisioning
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"time"
@@ -87,4 +88,49 @@ func NewClient(
 // authCtx returns a context carrying the API access token.
 func (c *Client) authCtx(ctx context.Context) context.Context {
 	return context.WithValue(ctx, k6cloud.ContextAccessToken, c.token)
+}
+
+// doWithRetry executes the given HTTP request, retrying on 5xx status
+// codes and transport errors up to MaxRetries times. The request body
+// is reset from req.GetBody before each attempt so a retried request
+// with a body is not sent empty. 4xx errors are NOT retried.
+func (c *Client) doWithRetry(req *http.Request) (*http.Response, error) {
+	httpClient := c.apiClient.GetConfig().HTTPClient
+
+	var (
+		lastErr  error
+		lastResp *http.Response
+	)
+
+	for attempt := 1; attempt <= MaxRetries; attempt++ {
+		// The vendored SDK resets the body on its own internal retries,
+		// but this direct Do loop must do it itself.
+		if req.GetBody != nil {
+			body, err := req.GetBody()
+			if err != nil {
+				return nil, err
+			}
+			req.Body = body
+		}
+
+		lastResp, lastErr = httpClient.Do(req) //nolint:gosec
+		if lastErr != nil {
+			if attempt < MaxRetries {
+				time.Sleep(RetryInterval)
+				continue
+			}
+			break
+		}
+
+		if lastResp.StatusCode >= 500 && attempt < MaxRetries {
+			_, _ = io.Copy(io.Discard, lastResp.Body)
+			_ = lastResp.Body.Close()
+			time.Sleep(RetryInterval)
+			continue
+		}
+
+		break
+	}
+
+	return lastResp, lastErr
 }
