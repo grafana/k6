@@ -16,61 +16,61 @@ import (
 	"fmt"
 )
 
-// checks if the PatchProjectApiModel type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &PatchProjectApiModel{}
+// checks if the DecryptedApiModel type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &DecryptedApiModel{}
 
-// PatchProjectApiModel struct for PatchProjectApiModel
-type PatchProjectApiModel struct {
-	// Project name.
-	Name                 string `json:"name"`
+// DecryptedApiModel Model for the response of the secrets decryption endpoint.
+type DecryptedApiModel struct {
+	// The decrypted secret.
+	Plaintext            string `json:"plaintext"`
 	AdditionalProperties map[string]interface{}
 }
 
-type _PatchProjectApiModel PatchProjectApiModel
+type _DecryptedApiModel DecryptedApiModel
 
-// NewPatchProjectApiModel instantiates a new PatchProjectApiModel object
+// NewDecryptedApiModel instantiates a new DecryptedApiModel object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewPatchProjectApiModel(name string) *PatchProjectApiModel {
-	this := PatchProjectApiModel{}
-	this.Name = name
+func NewDecryptedApiModel(plaintext string) *DecryptedApiModel {
+	this := DecryptedApiModel{}
+	this.Plaintext = plaintext
 	return &this
 }
 
-// NewPatchProjectApiModelWithDefaults instantiates a new PatchProjectApiModel object
+// NewDecryptedApiModelWithDefaults instantiates a new DecryptedApiModel object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewPatchProjectApiModelWithDefaults() *PatchProjectApiModel {
-	this := PatchProjectApiModel{}
+func NewDecryptedApiModelWithDefaults() *DecryptedApiModel {
+	this := DecryptedApiModel{}
 	return &this
 }
 
-// GetName returns the Name field value
-func (o *PatchProjectApiModel) GetName() string {
+// GetPlaintext returns the Plaintext field value
+func (o *DecryptedApiModel) GetPlaintext() string {
 	if o == nil {
 		var ret string
 		return ret
 	}
 
-	return o.Name
+	return o.Plaintext
 }
 
-// GetNameOk returns a tuple with the Name field value
+// GetPlaintextOk returns a tuple with the Plaintext field value
 // and a boolean to check if the value has been set.
-func (o *PatchProjectApiModel) GetNameOk() (*string, bool) {
+func (o *DecryptedApiModel) GetPlaintextOk() (*string, bool) {
 	if o == nil {
 		return nil, false
 	}
-	return &o.Name, true
+	return &o.Plaintext, true
 }
 
-// SetName sets field value
-func (o *PatchProjectApiModel) SetName(v string) {
-	o.Name = v
+// SetPlaintext sets field value
+func (o *DecryptedApiModel) SetPlaintext(v string) {
+	o.Plaintext = v
 }
 
-func (o PatchProjectApiModel) MarshalJSON() ([]byte, error) {
+func (o DecryptedApiModel) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -78,9 +78,9 @@ func (o PatchProjectApiModel) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o PatchProjectApiModel) ToMap() (map[string]interface{}, error) {
+func (o DecryptedApiModel) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
-	toSerialize["name"] = o.Name
+	toSerialize["plaintext"] = o.Plaintext
 
 	for key, value := range o.AdditionalProperties {
 		toSerialize[key] = value
@@ -89,12 +89,12 @@ func (o PatchProjectApiModel) ToMap() (map[string]interface{}, error) {
 	return toSerialize, nil
 }
 
-func (o *PatchProjectApiModel) UnmarshalJSON(data []byte) (err error) {
+func (o *DecryptedApiModel) UnmarshalJSON(data []byte) (err error) {
 	// This validates that all required properties are included in the JSON object
 	// by unmarshalling the object into a generic map with string keys and checking
 	// that every required field exists as a key in the generic map.
 	requiredProperties := []string{
-		"name",
+		"plaintext",
 	}
 
 	allProperties := make(map[string]interface{})
@@ -111,58 +111,58 @@ func (o *PatchProjectApiModel) UnmarshalJSON(data []byte) (err error) {
 		}
 	}
 
-	varPatchProjectApiModel := _PatchProjectApiModel{}
+	varDecryptedApiModel := _DecryptedApiModel{}
 
-	err = json.Unmarshal(data, &varPatchProjectApiModel)
+	err = json.Unmarshal(data, &varDecryptedApiModel)
 
 	if err != nil {
 		return err
 	}
 
-	*o = PatchProjectApiModel(varPatchProjectApiModel)
+	*o = DecryptedApiModel(varDecryptedApiModel)
 
 	additionalProperties := make(map[string]interface{})
 
 	if err = json.Unmarshal(data, &additionalProperties); err == nil {
-		delete(additionalProperties, "name")
+		delete(additionalProperties, "plaintext")
 		o.AdditionalProperties = additionalProperties
 	}
 
 	return err
 }
 
-type NullablePatchProjectApiModel struct {
-	value *PatchProjectApiModel
+type NullableDecryptedApiModel struct {
+	value *DecryptedApiModel
 	isSet bool
 }
 
-func (v NullablePatchProjectApiModel) Get() *PatchProjectApiModel {
+func (v NullableDecryptedApiModel) Get() *DecryptedApiModel {
 	return v.value
 }
 
-func (v *NullablePatchProjectApiModel) Set(val *PatchProjectApiModel) {
+func (v *NullableDecryptedApiModel) Set(val *DecryptedApiModel) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullablePatchProjectApiModel) IsSet() bool {
+func (v NullableDecryptedApiModel) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullablePatchProjectApiModel) Unset() {
+func (v *NullableDecryptedApiModel) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullablePatchProjectApiModel(val *PatchProjectApiModel) *NullablePatchProjectApiModel {
-	return &NullablePatchProjectApiModel{value: val, isSet: true}
+func NewNullableDecryptedApiModel(val *DecryptedApiModel) *NullableDecryptedApiModel {
+	return &NullableDecryptedApiModel{value: val, isSet: true}
 }
 
-func (v NullablePatchProjectApiModel) MarshalJSON() ([]byte, error) {
+func (v NullableDecryptedApiModel) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullablePatchProjectApiModel) UnmarshalJSON(src []byte) error {
+func (v *NullableDecryptedApiModel) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
