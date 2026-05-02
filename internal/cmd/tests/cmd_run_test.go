@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -104,6 +105,40 @@ func TestHTTPAPIServerAddr(t *testing.T) {
 				testutils.LogContains(logEntries, logrus.DebugLevel, "Starting the REST API server"))
 		})
 	}
+}
+
+func TestHTTPAPIServerAddrFromEnvBindErrorIsFatal(t *testing.T) {
+	t.Parallel()
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		assert.NoError(t, listener.Close())
+	})
+
+	ts := NewGlobalTestState(t)
+	ts.CmdArgs = []string{"k6", "run", "-v", "--log-output=stdout", "-"}
+	ts.Env["K6_HTTP_API_ADDR"] = listener.Addr().String()
+	ts.Stdin = bytes.NewBufferString(`
+		import { sleep } from "k6";
+
+		export default function() {
+			sleep(10);
+		};
+	`)
+	ts.ReparseFlags()
+
+	exitCodes := make(chan int, 2)
+	ts.OSExit = func(exitCode int) {
+		exitCodes <- exitCode
+		ts.Cancel()
+	}
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	logEntries := ts.LoggerHook.Drain()
+	assert.True(t, testutils.LogContains(logEntries, logrus.ErrorLevel, "Error from API server"))
+	assert.Contains(t, []int{<-exitCodes, <-exitCodes}, int(exitcodes.CannotStartRESTAPI))
 }
 
 func TestSimpleTestStdin(t *testing.T) {
