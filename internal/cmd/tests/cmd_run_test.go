@@ -126,13 +126,19 @@ func TestHTTPAPIServerAddrFromEnvBindErrorIsFatal(t *testing.T) {
 			sleep(10);
 		};
 	`)
-	ts.ExpectedExitCode = int(exitcodes.CannotStartRESTAPI)
 	ts.ReparseFlags()
+
+	exitCodes := make(chan int, 2)
+	ts.OSExit = func(exitCode int) {
+		exitCodes <- exitCode
+		ts.Cancel()
+	}
 
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	logEntries := ts.LoggerHook.Drain()
 	assert.True(t, testutils.LogContains(logEntries, logrus.ErrorLevel, "Error from API server"))
+	assert.Contains(t, []int{<-exitCodes, <-exitCodes}, int(exitcodes.CannotStartRESTAPI))
 }
 
 func TestSimpleTestStdin(t *testing.T) {
