@@ -56,6 +56,9 @@ const (
 
 	// PageEventRequestFailed represents the page requestfailed event.
 	PageEventRequestFailed PageEventName = "requestfailed"
+
+	// PageEventDialog represents the page dialog event.
+	PageEventDialog PageEventName = "dialog"
 )
 
 // PageEventHandler is a function type that handles a page on event.
@@ -1572,6 +1575,9 @@ type PageEvent struct {
 
 	// Response is the read only response that was received from the WuT.
 	Response *Response
+
+	// Dialog is the dialog event.
+	Dialog *Dialog
 }
 
 // On subscribes to a page event for which the given handler will be executed
