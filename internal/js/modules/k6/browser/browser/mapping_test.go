@@ -209,6 +209,14 @@ func TestMappings(t *testing.T) {
 				})
 			},
 		},
+		"dialog": {
+			apiInterface: (*dialogAPI)(nil),
+			mapp: func() mapping {
+				return mapDialog(moduleVU{VU: vu}, common.PageEvent{
+					Dialog: &common.Dialog{},
+				})
+			},
+		},
 		"mapTouchscreen": {
 			apiInterface: (*touchscreenAPI)(nil),
 			mapp: func() mapping {
@@ -636,4 +644,10 @@ type mouseAPI interface {
 // workerAPI is the interface of a web worker.
 type workerAPI interface {
 	URL() string
+}
+
+// dialogAPI is the interface of a JavaScript dialog.
+type dialogAPI interface {
+	Accept() error
+	Dismiss() error
 }
