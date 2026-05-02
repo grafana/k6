@@ -553,6 +553,20 @@ func (p *Page) onRequestFailed(request *Request) {
 	}
 }
 
+// onDialog calls PageEventDialog handlers when a JavaScript dialog is opened.
+func (p *Page) onDialog(dialog *Dialog) {
+	if !p.hasEventHandler(PageEventDialog) {
+		p.logger.Warnf("onDialog", "dialog dismissed automatically, use page.on('dialog') to handle it")
+		return
+	}
+	for handle := range p.eventHandlersByName(PageEventDialog) {
+		if err := handle(PageEvent{Dialog: dialog}); err != nil {
+			p.logger.Warnf("onDialog", "handler returned an error: %v", err)
+			return
+		}
+	}
+}
+
 func (p *Page) onConsoleAPICalled(event *runtime.EventConsoleAPICalled) {
 	if !p.hasEventHandler(PageEventConsole) {
 		return
