@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/log"
 	"go.k6.io/k6/v2/metrics"
 )
 
@@ -259,4 +260,35 @@ func TestPageNetworkLoaderContextOutlivesUnrelatedCalls(t *testing.T) {
 	)
 	require.True(t, ok)
 	assert.Equal(t, "inspection", contextName(tagsAndMeta))
+}
+
+func TestPageOnDialogNoHandler(t *testing.T) {
+	t.Parallel()
+	// Without a handler, dialog.handled should remain false so frame_session auto-dismisses.
+	p := &Page{
+		eventHandlers: make(map[PageEventName][]pageEventHandlerRecord),
+		logger:        log.NewNullLogger(),
+	}
+	d := &Dialog{}
+	p.onDialog(d)
+	assert.False(t, d.handled)
+}
+
+func TestPageOnDialogWithHandler(t *testing.T) {
+	t.Parallel()
+	p := &Page{
+		eventHandlers: make(map[PageEventName][]pageEventHandlerRecord),
+		logger:        log.NewNullLogger(),
+	}
+
+	called := false
+	err := p.On(PageEventDialog, func(event PageEvent) error {
+		called = true
+		return nil
+	})
+	require.NoError(t, err)
+
+	d := &Dialog{}
+	p.onDialog(d)
+	assert.True(t, called)
 }
