@@ -189,6 +189,98 @@ func TestBrowserNewPageInContext(t *testing.T) {
 	})
 }
 
+func TestBrowserNewContextWithProxy(t *testing.T) {
+	t.Parallel()
+
+	const browserContextID cdp.BrowserContextID = "42"
+
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	b := newBrowser(context.Background(), ctx, cancel, nil, NewLocalBrowserOptions(), log.NewNullLogger())
+	b.conn = fakeConn{
+		execute: func(_ context.Context, method string, params, res any) error {
+			require.Equal(t, target.CommandCreateBrowserContext, method)
+
+			require.IsType(t, &target.CreateBrowserContextParams{}, params)
+			tp, _ := params.(*target.CreateBrowserContextParams)
+			require.True(t, tp.DisposeOnDetach)
+			require.Equal(t, "http://proxy.test:8080", tp.ProxyServer)
+			require.Equal(t, "localhost,127.0.0.1", tp.ProxyBypassList)
+
+			require.IsType(t, &target.CreateBrowserContextReturns{}, res)
+			v, _ := res.(*target.CreateBrowserContextReturns)
+			v.BrowserContextID = browserContextID
+
+			return nil
+		},
+	}
+
+	bctx, err := b.NewContext(&BrowserContextOptions{
+		Proxy: &ProxyOptions{
+			Server: " http://proxy.test:8080 ",
+			Bypass: " localhost,127.0.0.1 ",
+		},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, bctx)
+	require.Equal(t, browserContextID, bctx.id)
+
+	t.Cleanup(func() {
+		require.NoError(t, bctx.cleanup())
+	})
+}
+
+func TestBrowserNewContextWithoutProxy(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	b := newBrowser(context.Background(), ctx, cancel, nil, NewLocalBrowserOptions(), log.NewNullLogger())
+	b.conn = fakeConn{
+		execute: func(_ context.Context, method string, params, res any) error {
+			require.Equal(t, target.CommandCreateBrowserContext, method)
+
+			require.IsType(t, &target.CreateBrowserContextParams{}, params)
+			tp, _ := params.(*target.CreateBrowserContextParams)
+			require.Empty(t, tp.ProxyServer)
+			require.Empty(t, tp.ProxyBypassList)
+
+			require.IsType(t, &target.CreateBrowserContextReturns{}, res)
+			v, _ := res.(*target.CreateBrowserContextReturns)
+			v.BrowserContextID = "42"
+
+			return nil
+		},
+	}
+
+	bctx, err := b.NewContext(nil)
+	require.NoError(t, err)
+	require.NotNil(t, bctx)
+
+	t.Cleanup(func() {
+		require.NoError(t, bctx.cleanup())
+	})
+}
+
+func TestBrowserNewContextRejectsProxyWithoutServer(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	b := newBrowser(context.Background(), ctx, cancel, nil, NewLocalBrowserOptions(), log.NewNullLogger())
+
+	bctx, err := b.NewContext(&BrowserContextOptions{
+		Proxy: &ProxyOptions{
+			Bypass: "localhost",
+		},
+	})
+	require.ErrorContains(t, err, "proxy.server must be set")
+	require.Nil(t, bctx)
+}
+
 type fakeConn struct {
 	connection
 	execute func(context.Context, string, any, any) error
