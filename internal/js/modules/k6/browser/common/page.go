@@ -1454,9 +1454,9 @@ type PageEvent struct {
 	Dialog *Dialog
 }
 
-// On subscribes to a page event for which the given handler will be executed
-// passing in the ConsoleMessage associated with the event.
-// The only accepted event value is 'console'.
+// On subscribes to a page event for which the given handler will be executed.
+// Accepted event values are: 'console', 'dialog', 'metric', 'request', 'response',
+// 'requestfinished', 'requestfailed'.
 func (p *Page) On(event PageEventName, handler PageEventHandler) error {
 	if handler == nil {
 		return errors.New(`"handler" argument cannot be nil`)
