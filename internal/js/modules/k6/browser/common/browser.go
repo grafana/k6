@@ -673,8 +673,20 @@ func (b *Browser) NewContext(opts *BrowserContextOptions) (*BrowserContext, erro
 	if b.context != nil {
 		return nil, spanRecordErrorf(span, "existing browser context must be closed before creating a new one")
 	}
+	if opts == nil {
+		opts = DefaultBrowserContextOptions()
+	}
+	if err := opts.Proxy.Validate(); err != nil {
+		return nil, spanRecordError(span, err)
+	}
 
 	action := target.CreateBrowserContext().WithDisposeOnDetach(true)
+	if opts.Proxy != nil {
+		action = action.WithProxyServer(strings.TrimSpace(opts.Proxy.Server))
+		if bypass := strings.TrimSpace(opts.Proxy.Bypass); bypass != "" {
+			action = action.WithProxyBypassList(bypass)
+		}
+	}
 	browserContextID, err := action.Do(cdp.WithExecutor(b.vuCtx, b.conn))
 	b.logger.Debugf("Browser:NewContext", "bctxid:%v", browserContextID)
 	if err != nil {
