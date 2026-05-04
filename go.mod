@@ -24,7 +24,7 @@ require (
 	github.com/grafana/k6provider v0.5.0
 	github.com/grafana/sobek v0.0.0-20260331145705-2272ac4993ef
 	github.com/grafana/xk6-dashboard-assets v0.1.2
-	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
+	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.3
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
 	github.com/jhump/protoreflect v1.18.0
 	github.com/klauspost/compress v1.18.5
