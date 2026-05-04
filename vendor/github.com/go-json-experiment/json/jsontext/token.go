@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build !goexperiment.jsonv2 || !go1.25
+
 package jsontext
 
 import (
@@ -31,8 +33,8 @@ var errInvalidToken = errors.New("invalid jsontext.Token")
 //   - a JSON literal (i.e., null, true, or false)
 //   - a JSON string (e.g., "hello, world!")
 //   - a JSON number (e.g., 123.456)
-//   - a start or end delimiter for a JSON object (i.e., { or } )
-//   - a start or end delimiter for a JSON array (i.e., [ or ] )
+//   - a begin or end delimiter for a JSON object (i.e., { or } )
+//   - a begin or end delimiter for a JSON array (i.e., [ or ] )
 //
 // A Token cannot represent entire array or object values, while a [Value] can.
 // There is no Token to represent commas and colons since
@@ -46,21 +48,22 @@ type Token struct {
 	// The Encoder accepts Tokens in either the "raw" or "exact" form.
 	//
 	// The following chart shows the possible values for each Token type:
-	//	╔═════════════════╦════════════╤════════════╤════════════╗
-	//	║ Token type      ║ raw field  │ str field  │ num field  ║
-	//	╠═════════════════╬════════════╪════════════╪════════════╣
-	//	║ null   (raw)    ║ "null"     │ ""         │ 0          ║
-	//	║ false  (raw)    ║ "false"    │ ""         │ 0          ║
-	//	║ true   (raw)    ║ "true"     │ ""         │ 0          ║
-	//	║ string (raw)    ║ non-empty  │ ""         │ offset     ║
-	//	║ string (string) ║ nil        │ non-empty  │ 0          ║
-	//	║ number (raw)    ║ non-empty  │ ""         │ offset     ║
-	//	║ number (float)  ║ nil        │ "f"        │ non-zero   ║
-	//	║ number (int64)  ║ nil        │ "i"        │ non-zero   ║
-	//	║ number (uint64) ║ nil        │ "u"        │ non-zero   ║
-	//	║ object (delim)  ║ "{" or "}" │ ""         │ 0          ║
-	//	║ array  (delim)  ║ "[" or "]" │ ""         │ 0          ║
-	//	╚═════════════════╩════════════╧════════════╧════════════╝
+	//	╔══════════════════╦════════════╤════════════╤════════════╗
+	//	║ Token type       ║ raw field  │ str field  │ num field  ║
+	//	╠══════════════════╬════════════╪════════════╪════════════╣
+	//	║ null   (raw)     ║ "null"     │ ""         │ 0          ║
+	//	║ false  (raw)     ║ "false"    │ ""         │ 0          ║
+	//	║ true   (raw)     ║ "true"     │ ""         │ 0          ║
+	//	║ string (raw)     ║ non-empty  │ ""         │ offset     ║
+	//	║ string (string)  ║ nil        │ non-empty  │ 0          ║
+	//	║ number (raw)     ║ non-empty  │ ""         │ offset     ║
+	//	║ number (float32) ║ nil        │ "F"        │ non-zero   ║
+	//	║ number (float64) ║ nil        │ "f"        │ non-zero   ║
+	//	║ number (int64)   ║ nil        │ "i"        │ non-zero   ║
+	//	║ number (uint64)  ║ nil        │ "u"        │ non-zero   ║
+	//	║ object (delim)   ║ "{" or "}" │ ""         │ 0          ║
+	//	║ array  (delim)   ║ "[" or "]" │ ""         │ 0          ║
+	//	╚══════════════════╩════════════╧════════════╧════════════╝
 	//
 	// Notes:
 	//   - For tokens stored in "raw" form, the num field contains the
@@ -78,11 +81,12 @@ type Token struct {
 	raw *decodeBuffer
 
 	// str is the unescaped JSON string if num is zero.
-	// Otherwise, it is "f", "i", or "u" if num should be interpreted
-	// as a float64, int64, or uint64, respectively.
+	// Otherwise, it is "F", "f", "i", or "u" if num should be interpreted
+	// as a float32, float64, int64, or uint64, respectively.
 	str string
 
-	// num is a float64, int64, or uint64 stored as a uint64 value.
+	// num is a float32, float64, int64, or uint64 stored as a uint64 value.
+	// For floating-point values, it stores the raw IEEE-754 bit-pattern.
 	// It is non-zero for any JSON number in the "exact" form.
 	num uint64
 }
@@ -94,10 +98,10 @@ var (
 	False Token = rawToken("false")
 	True  Token = rawToken("true")
 
-	ObjectStart Token = rawToken("{")
-	ObjectEnd   Token = rawToken("}")
-	ArrayStart  Token = rawToken("[")
-	ArrayEnd    Token = rawToken("]")
+	BeginObject Token = rawToken("{")
+	EndObject   Token = rawToken("}")
+	BeginArray  Token = rawToken("[")
+	EndArray    Token = rawToken("]")
 
 	zeroString Token = rawToken(`""`)
 	zeroNumber Token = rawToken(`0`)
@@ -129,7 +133,29 @@ func String(s string) Token {
 	return Token{str: s}
 }
 
-// Float constructs a Token representing a JSON number.
+// Float32 constructs a Token representing a JSON number as
+// a 32-bit floating-point number formatted according to
+// ECMA-262, 10th edition, section 7.1.12.1,
+// with the exception that -0 is still formatted as -0.
+// The values NaN, +Inf, and -Inf will be represented
+// as a JSON string with the values "NaN", "Infinity", and "-Infinity".
+//
+// Note that most JSON libraries and standards assume that JSON numbers
+// are 64-bit floating-point numbers. Use of 32-bit precision should
+// only be used if the corresponding decoder knows that
+// this JSON number token is expected to only have 32-bit precision.
+// For all other situations, prefer using the [Float] constructor instead.
+func Float32(n float32) Token {
+	if n != 0 && !math.IsNaN(float64(n)) && !math.IsInf(float64(n), 0) {
+		return Token{str: "F", num: uint64(math.Float32bits(n))}
+	}
+	return Float(float64(n)) // handles ±0, NaN, and ±Inf
+}
+
+// Float constructs a Token representing a JSON number as
+// a 64-bit floating-point number formatted according to
+// ECMA-262, 10th edition, section 7.1.12.1 and RFC 8785, section 3.2.2.3.
+// with the exception that -0 is still formatted as -0.
 // The values NaN, +Inf, and -Inf will be represented
 // as a JSON string with the values "NaN", "Infinity", and "-Infinity".
 func Float(n float64) Token {
@@ -176,14 +202,14 @@ func (t Token) Clone() Token {
 				return False
 			case True.raw:
 				return True
-			case ObjectStart.raw:
-				return ObjectStart
-			case ObjectEnd.raw:
-				return ObjectEnd
-			case ArrayStart.raw:
-				return ArrayStart
-			case ArrayEnd.raw:
-				return ArrayEnd
+			case BeginObject.raw:
+				return BeginObject
+			case EndObject.raw:
+				return EndObject
+			case BeginArray.raw:
+				return BeginArray
+			case EndArray.raw:
+				return EndArray
 			}
 		}
 
@@ -263,8 +289,10 @@ func (t Token) string() (string, []byte) {
 	// Handle tokens that are not JSON strings for fmt.Stringer.
 	if t.num > 0 {
 		switch t.str[0] {
+		case 'F':
+			return string(jsonwire.AppendFloat(nil, float64(math.Float32frombits(uint32(t.num))), 32)), nil
 		case 'f':
-			return string(jsonwire.AppendFloat(nil, math.Float64frombits(t.num), 64)), nil
+			return string(jsonwire.AppendFloat(nil, float64(math.Float64frombits(uint64(t.num))), 64)), nil
 		case 'i':
 			return strconv.FormatInt(int64(t.num), 10), nil
 		case 'u':
@@ -287,8 +315,10 @@ func (t Token) appendNumber(dst []byte, flags *jsonflags.Flags) ([]byte, error) 
 	} else if t.num != 0 {
 		// Handle exact number value.
 		switch t.str[0] {
+		case 'F':
+			return jsonwire.AppendFloat(dst, float64(math.Float32frombits(uint32(t.num))), 32), nil
 		case 'f':
-			return jsonwire.AppendFloat(dst, math.Float64frombits(t.num), 64), nil
+			return jsonwire.AppendFloat(dst, float64(math.Float64frombits(uint64(t.num))), 64), nil
 		case 'i':
 			return strconv.AppendInt(dst, int64(t.num), 10), nil
 		case 'u':
@@ -299,11 +329,35 @@ func (t Token) appendNumber(dst []byte, flags *jsonflags.Flags) ([]byte, error) 
 	panic("invalid JSON token kind: " + t.Kind().String())
 }
 
-// Float returns the floating-point value for a JSON number.
+// Float32 returns the floating-point value for a JSON number
+// parsed according to 32 bits of precision.
+//
+// Note that most JSON libraries and standards assume that JSON numbers
+// are 64-bit floating-point numbers.
+// This method should only be used if the caller knows
+// from other context that this token is a JSON number
+// formatted only to 32 bits of precision (such as being encoded
+// using the [Float32] constructor). For all other situations,
+// prefer using the [Token.Float] accessor instead.
+//
+// It returns a NaN, +Inf, or -Inf value for any JSON string
+// with the values "NaN", "Infinity", or "-Infinity".
+// It panics for all other cases.
+func (t Token) Float32() float32 {
+	return float32(t.float(32))
+}
+
+// Float returns the floating-point value for a JSON number
+// parsed according to 64 bits of precision.
+//
 // It returns a NaN, +Inf, or -Inf value for any JSON string
 // with the values "NaN", "Infinity", or "-Infinity".
 // It panics for all other cases.
 func (t Token) Float() float64 {
+	return float64(t.float(64))
+}
+
+func (t Token) float(bits int) float64 {
 	if raw := t.raw; raw != nil {
 		// Handle raw number value.
 		if uint64(raw.previousOffsetStart()) != t.num {
@@ -311,14 +365,16 @@ func (t Token) Float() float64 {
 		}
 		buf := raw.previousBuffer()
 		if Kind(buf[0]).normalize() == '0' {
-			fv, _ := jsonwire.ParseFloat(buf, 64)
+			fv, _ := jsonwire.ParseFloat(buf, bits)
 			return fv
 		}
 	} else if t.num != 0 {
 		// Handle exact number value.
 		switch t.str[0] {
+		case 'F':
+			return float64(math.Float32frombits(uint32(t.num)))
 		case 'f':
-			return math.Float64frombits(t.num)
+			return float64(math.Float64frombits(uint64(t.num)))
 		case 'i':
 			return float64(int64(t.num))
 		case 'u':
@@ -470,29 +526,33 @@ func (t Token) Kind() Kind {
 	}
 }
 
+// A Kind represents the kind of a JSON token.
+//
 // Kind represents each possible JSON token kind with a single byte,
 // which is conveniently the first byte of that kind's grammar
-// with the restriction that numbers always be represented with '0':
-//
-//   - 'n': null
-//   - 'f': false
-//   - 't': true
-//   - '"': string
-//   - '0': number
-//   - '{': object start
-//   - '}': object end
-//   - '[': array start
-//   - ']': array end
-//
-// An invalid kind is usually represented using 0,
-// but may be non-zero due to invalid JSON data.
+// with the restriction that numbers always be represented with '0'.
 type Kind byte
+
+const (
+	KindInvalid     Kind = 0   // invalid kind
+	KindNull        Kind = 'n' // null
+	KindFalse       Kind = 'f' // false
+	KindTrue        Kind = 't' // true
+	KindString      Kind = '"' // string
+	KindNumber      Kind = '0' // number
+	KindBeginObject Kind = '{' // begin object
+	KindEndObject   Kind = '}' // end object
+	KindBeginArray  Kind = '[' // begin array
+	KindEndArray    Kind = ']' // end array
+)
 
 const invalidKind Kind = 0
 
 // String prints the kind in a humanly readable fashion.
 func (k Kind) String() string {
 	switch k {
+	case 0:
+		return "invalid"
 	case 'n':
 		return "null"
 	case 'f':
@@ -516,10 +576,31 @@ func (k Kind) String() string {
 	}
 }
 
-// normalize coalesces all possible starting characters of a number as just '0'.
+var normKind = [256]Kind{
+	'n': 'n',
+	'f': 'f',
+	't': 't',
+	'"': '"',
+	'{': '{',
+	'}': '}',
+	'[': '[',
+	']': ']',
+	'-': '0',
+	'0': '0',
+	'1': '0',
+	'2': '0',
+	'3': '0',
+	'4': '0',
+	'5': '0',
+	'6': '0',
+	'7': '0',
+	'8': '0',
+	'9': '0',
+}
+
+// normalize coalesces all possible starting characters of a number as just '0',
+// and converts all invalid kinds to 0.
 func (k Kind) normalize() Kind {
-	if k == '-' || ('0' <= k && k <= '9') {
-		return '0'
-	}
-	return k
+	// A lookup table keeps the inlining cost as low as possible.
+	return normKind[k]
 }
