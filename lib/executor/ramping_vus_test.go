@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math/big"
 	"math/rand"
 	"sync/atomic"
@@ -11,10 +12,12 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
+	"go.k6.io/k6/v2/internal/lib/testutils"
 	"go.k6.io/k6/v2/lib"
 	"go.k6.io/k6/v2/lib/types"
 )
@@ -1209,4 +1212,60 @@ func TestSumRandomSegmentSequenceMatchesNoSegment(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRampingVUsVUStartError(t *testing.T) {
+	t.Parallel()
+
+	logHook := testutils.NewLogHook(logrus.ErrorLevel, logrus.WarnLevel)
+	testLog := logrus.New()
+	testLog.AddHook(logHook)
+	testLog.SetOutput(io.Discard)
+	logEntry := logrus.NewEntry(testLog)
+
+	cancelCalled := false
+	cancelFn := func() { cancelCalled = true }
+
+	ctx, ctxCancel := context.WithCancel(context.Background())
+	defer ctxCancel()
+
+	// getVU immediately returns an error, reproducing GetPlannedVU failure.
+	getVU := func() (lib.InitializedVU, error) {
+		return nil, fmt.Errorf("could not get a VU from the buffer")
+	}
+	handle := newStoppedVUHandle(ctx, getVU, func(_ lib.InitializedVU) {}, mockNextIterations, &BaseConfig{}, logEntry)
+
+	// Build a minimal *RampingVUs to satisfy rampingVUsRunState.executor;
+    // only its logger field is used by scheduledVUsHandlerStrategy.
+	config := NewRampingVUsConfig("test")
+	config.Stages = []Stage{{Target: null.IntFrom(1), Duration: types.NullDurationFrom(time.Second)}}
+
+	runner := simpleRunner(func(_ context.Context, _ *lib.State) error { return nil })
+	et, err := lib.NewExecutionTuple(nil, nil)
+	require.NoError(t, err)
+
+	testRunState := getTestRunState(t, lib.Options{}, runner)
+	execReqs := config.GetExecutionRequirements(et)
+	es := lib.NewExecutionState(testRunState, et, lib.GetMaxPlannedVUs(execReqs), lib.GetMaxPossibleVUs(execReqs))
+
+	executor, err := config.NewExecutor(es, logEntry)
+	require.NoError(t, err)
+
+	rs := &rampingVUsRunState{
+		executor:       executor.(*RampingVUs),
+		vuHandles:      []*vuHandle{handle},
+		maxVUs:         1,
+		activeVUsCount: new(int64),
+		started:        time.Now(),
+		runIteration:   func(_ context.Context, _ lib.ActiveVU) bool { return true },
+		cancel:         cancelFn,
+	}
+
+	rs.scheduledVUsHandlerStrategy()(lib.ExecutionStep{PlannedVUs: 1})
+
+	require.True(t, cancelCalled, "expected cancel to be called after VU start error")
+	require.True(t,
+		testutils.LogContains(logHook.Drain(), logrus.ErrorLevel, "Cannot start a VU"),
+		"expected 'Cannot start a VU' error to be logged",
+	)
 }
