@@ -150,8 +150,8 @@ func printExecutionDescription(
 	}
 
 	fmt.Fprintf(buf, "        output: %s\n", valueColor.Sprint(strings.Join(outputDescriptions, ", ")))
-	if gs.Flags.ProfilingEnabled && gs.Flags.HTTPAPIAddr != "" {
-		fmt.Fprintf(buf, "     profiling: %s\n", valueColor.Sprintf("http://%s/debug/pprof/", gs.Flags.HTTPAPIAddr))
+	if gs.Flags.ProfilingEnabled && gs.Flags.Address != "" {
+		fmt.Fprintf(buf, "     profiling: %s\n", valueColor.Sprintf("http://%s/debug/pprof/", gs.Flags.Address))
 	}
 
 	fmt.Fprintf(buf, "\n")

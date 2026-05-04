@@ -670,9 +670,9 @@ func TestSetupTeardownThresholds(t *testing.T) {
 	`)
 
 	addr := getFreeBindAddr(t)
-	cliFlags := []string{"-v", "--log-output=stdout", "--linger", "--http-api-addr", addr}
+	cliFlags := []string{"-v", "--log-output=stdout", "--linger", "--address", addr}
 	ts := getSimpleCloudOutputTestState(t, script, cliFlags, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed, 0)
-	ts.Flags.HTTPAPIAddr = addr
+	ts.Flags.Address = addr
 
 	sendSignal := injectMockSignalNotifier(ts)
 	asyncWaitForStdoutAndRun(t, ts, 20, 500*time.Millisecond, "waiting for Ctrl+C to continue", func() {
@@ -682,7 +682,7 @@ func TestSetupTeardownThresholds(t *testing.T) {
 		}()
 		t.Logf("Linger reached, running teardown again and stopping the test...")
 		req, err := http.NewRequestWithContext(
-			ts.Ctx, http.MethodPost, fmt.Sprintf("http://%s/v1/teardown", ts.Flags.HTTPAPIAddr), nil,
+			ts.Ctx, http.MethodPost, fmt.Sprintf("http://%s/v1/teardown", ts.Flags.Address), nil,
 		)
 		require.NoError(t, err)
 		resp, err := http.DefaultClient.Do(req)
@@ -933,7 +933,7 @@ func asyncWaitForStdoutAndStopTestFromRESTAPI(
 ) {
 	asyncWaitForStdoutAndRun(t, ts, attempts, interval, expText, func() {
 		req, err := http.NewRequestWithContext(
-			ts.Ctx, http.MethodPatch, fmt.Sprintf("http://%s/v1/status", ts.Flags.HTTPAPIAddr),
+			ts.Ctx, http.MethodPatch, fmt.Sprintf("http://%s/v1/status", ts.Flags.Address),
 			bytes.NewBufferString(`{"data":{"type":"status","id":"default","attributes":{"stopped":true}}}`),
 		)
 		require.NoError(t, err)
@@ -966,10 +966,10 @@ func TestAbortedByUserWithRestAPI(t *testing.T) {
 
 	addr := getFreeBindAddr(t)
 	ts := getSimpleCloudOutputTestState(
-		t, script, []string{"-v", "--log-output=stdout", "--iterations", "20", "--http-api-addr", addr},
+		t, script, []string{"-v", "--log-output=stdout", "--iterations", "20", "--address", addr},
 		cloudapi.RunStatusAbortedUser, cloudapi.ResultStatusPassed, exitcodes.ScriptStoppedFromRESTAPI,
 	)
-	ts.Flags.HTTPAPIAddr = addr
+	ts.Flags.Address = addr
 
 	asyncWaitForStdoutAndStopTestFromRESTAPI(t, ts, 15, time.Second, "a simple iteration")
 
