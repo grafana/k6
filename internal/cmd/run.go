@@ -17,24 +17,24 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"go.k6.io/k6/cmd/state"
-	"go.k6.io/k6/errext"
-	"go.k6.io/k6/errext/exitcodes"
-	"go.k6.io/k6/internal/api"
-	"go.k6.io/k6/internal/event"
-	"go.k6.io/k6/internal/execution"
-	"go.k6.io/k6/internal/execution/local"
-	"go.k6.io/k6/internal/lib/summary"
-	"go.k6.io/k6/internal/lib/trace"
-	"go.k6.io/k6/internal/metrics/engine"
-	"go.k6.io/k6/internal/output/cloud"
-	summaryoutput "go.k6.io/k6/internal/output/summary"
-	"go.k6.io/k6/internal/ui/pb"
-	"go.k6.io/k6/js/common"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/fsext"
-	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/output"
+	"go.k6.io/k6/v2/cmd/state"
+	"go.k6.io/k6/v2/errext"
+	"go.k6.io/k6/v2/errext/exitcodes"
+	"go.k6.io/k6/v2/internal/api"
+	"go.k6.io/k6/v2/internal/event"
+	"go.k6.io/k6/v2/internal/execution"
+	"go.k6.io/k6/v2/internal/execution/local"
+	"go.k6.io/k6/v2/internal/lib/summary"
+	"go.k6.io/k6/v2/internal/lib/trace"
+	"go.k6.io/k6/v2/internal/metrics/engine"
+	"go.k6.io/k6/v2/internal/output/cloud"
+	summaryoutput "go.k6.io/k6/v2/internal/output/summary"
+	"go.k6.io/k6/v2/internal/ui/pb"
+	"go.k6.io/k6/v2/js/common"
+	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/lib/fsext"
+	"go.k6.io/k6/v2/metrics"
+	"go.k6.io/k6/v2/output"
 )
 
 // cmdRun handles the `k6 run` sub-command
@@ -279,7 +279,11 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		runAbort(err)
 	})
 	samples := make(chan metrics.SampleContainer, test.derivedConfig.MetricSamplesBufferSize.Int64)
-	// Spin up the REST API server, if not disabled.
+	if c.gs.Flags.ProfilingEnabled && c.gs.Flags.Address == "" {
+		logger.Warn("Profiling is enabled but no REST API server is running — " +
+			"profiling endpoints won't be reachable until you enable the REST API server via --address (or K6_ADDRESS)")
+	}
+	// Spin up the REST API server, if enabled.
 	if c.gs.Flags.Address != "" { //nolint:nestif
 		initBar.Modify(pb.WithConstProgress(0, "Init API server"))
 
@@ -564,10 +568,8 @@ func getCmdRun(gs *state.GlobalState) *cobra.Command {
 		Long: `Start a test. This also exposes a REST API to interact with it. Various k6 subcommands offer
 a commandline interface for interacting with it.`,
 		Example: exampleText,
-		Args:    exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
-		PreRunE: func(_ *cobra.Command, _ []string) error {
-			return validateNoCloudSecretSource(gs.Flags.SecretSource)
-		},
+		Args: exactArgsWithMsg(1,
+			"arg should either be \"-\", if reading script from stdin, or a path to a script file"),
 		RunE: c.run,
 	}
 

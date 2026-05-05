@@ -4,8 +4,8 @@ package events
 import (
 	"sync"
 
-	"go.k6.io/k6/internal/event"
-	"go.k6.io/k6/js/modules"
+	"go.k6.io/k6/v2/internal/event"
+	"go.k6.io/k6/v2/js/modules"
 )
 
 // RootModule is the global module instance that will create module

@@ -20,17 +20,16 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"go.k6.io/k6/cmd/state"
-	"go.k6.io/k6/errext"
-	"go.k6.io/k6/errext/exitcodes"
-	"go.k6.io/k6/ext"
-	"go.k6.io/k6/internal/build"
-	"go.k6.io/k6/internal/js"
-	"go.k6.io/k6/internal/loader"
-	"go.k6.io/k6/js/modules"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/fsext"
-	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/v2/cmd/state"
+	"go.k6.io/k6/v2/errext"
+	"go.k6.io/k6/v2/errext/exitcodes"
+	"go.k6.io/k6/v2/ext"
+	"go.k6.io/k6/v2/internal/js"
+	"go.k6.io/k6/v2/internal/loader"
+	"go.k6.io/k6/v2/js/modules"
+	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/lib/fsext"
+	"go.k6.io/k6/v2/metrics"
 )
 
 const (
@@ -277,7 +276,9 @@ func resolveModulesDependencies(
 		return deps, preDeps, originalError
 	}
 
-	if !isCustomBuildRequired(deps, build.Version, ext.GetAll()) {
+	if err := checkBuiltinDependencies(deps, runtimeK6Version(), ext.GetAll()); err != nil {
+		logger.WithError(err).Debug("Current binary does not satisfy all dependencies, custom build required")
+	} else {
 		logger.
 			Debug("The current k6 binary already satisfies all the required dependencies," +
 				" it isn't required to provision a new binary.")

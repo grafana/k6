@@ -28,10 +28,10 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	grpcanytesting "go.k6.io/k6/internal/lib/testutils/httpmultibin/grpc_any_testing"
-	grpctest "go.k6.io/k6/internal/lib/testutils/httpmultibin/grpc_testing"
-	"go.k6.io/k6/lib/netext"
-	"go.k6.io/k6/lib/types"
+	grpcanytesting "go.k6.io/k6/v2/internal/lib/testutils/httpmultibin/grpc_any_testing"
+	grpctest "go.k6.io/k6/v2/internal/lib/testutils/httpmultibin/grpc_testing"
+	"go.k6.io/k6/v2/lib/netext"
+	"go.k6.io/k6/v2/lib/types"
 )
 
 // GetTLSClientConfig returns a TLS config that trusts the supplied

@@ -11,14 +11,14 @@ import (
 	"sync"
 	"time"
 
-	"go.k6.io/k6/cloudapi"
-	"go.k6.io/k6/errext"
-	"go.k6.io/k6/errext/exitcodes"
-	"go.k6.io/k6/internal/build"
-	"go.k6.io/k6/internal/cloudapi/insights"
-	insightsOutput "go.k6.io/k6/internal/output/cloud/insights"
-	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/output"
+	"go.k6.io/k6/v2/cloudapi"
+	"go.k6.io/k6/v2/errext"
+	"go.k6.io/k6/v2/errext/exitcodes"
+	"go.k6.io/k6/v2/internal/build"
+	"go.k6.io/k6/v2/internal/cloudapi/insights"
+	insightsOutput "go.k6.io/k6/v2/internal/output/cloud/insights"
+	"go.k6.io/k6/v2/metrics"
+	"go.k6.io/k6/v2/output"
 
 	"github.com/sirupsen/logrus"
 )

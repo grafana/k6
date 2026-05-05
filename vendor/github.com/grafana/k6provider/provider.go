@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"os"
@@ -95,6 +96,10 @@ type Config struct {
 	PruneInterval time.Duration
 	// Download configuration
 	DownloadConfig DownloadConfig
+	// K6ModPath is the Go module path for k6. If empty, k6_mod_path is omitted from
+	// build requests and the build service defaults to go.k6.io/k6 (v1).
+	// Set to "go.k6.io/k6/v2" for k6 v2 builds.
+	K6ModPath string
 }
 
 // Dependencies defines a group of dependencies with their version constrains
@@ -111,6 +116,7 @@ type Provider struct {
 	binDir     string
 	buildSrv   *buildClient
 	platform   string
+	k6ModPath  string
 	pruner     *Pruner
 	logger     *slog.Logger
 }
@@ -209,6 +215,7 @@ func NewProviderWithLogger(config Config, logger *slog.Logger) (*Provider, error
 		binDir:     binDir,
 		buildSrv:   buildSrv,
 		platform:   platform,
+		k6ModPath:  config.K6ModPath,
 		pruner:     pruner,
 		logger:     logger,
 	}, nil
@@ -241,7 +248,7 @@ func (p *Provider) GetArtifact(
 		"deps", deps,
 		"platform", p.platform,
 	)
-	artifact, err := p.buildSrv.Build(ctx, p.platform, k6Constrains, buildDeps)
+	artifact, err := p.buildSrv.Build(ctx, p.platform, p.k6ModPath, k6Constrains, buildDeps)
 	if err != nil {
 		if !errors.Is(err, ErrInvalidParameters) {
 			return Artifact{}, NewWrappedError(ErrBuild, err)
@@ -321,29 +328,18 @@ func (p *Provider) GetBinary(ctx context.Context, constrains Dependencies) (K6Bi
 	}
 	defer lock.unlock() //nolint:errcheck
 
-	binPath := filepath.Join(artifactDir, k6Binary)
-	_, err = os.Stat(binPath) //nolint:forbidigo
-
-	// binary already exists and is valid
-	if err == nil {
+	bin, err := p.resolveBinary(artifact)
+	if err != nil {
+		return K6Binary{}, err
+	}
+	binPath := bin.Path
+	if bin.Cached {
 		p.logger.Info("Using cached k6 binary",
 			"path", binPath,
 			"artifact_id", artifact.ID,
 			"deps", artifact.Dependencies,
 		)
-		go p.pruner.Touch(binPath)
-
-		return K6Binary{
-			Path:         binPath,
-			Dependencies: artifact.Dependencies,
-			Checksum:     artifact.Checksum,
-			Cached:       true,
-		}, nil
-	}
-
-	// if there's other error)
-	if !os.IsNotExist(err) { //nolint:forbidigo
-		return K6Binary{}, NewWrappedError(ErrBinary, err)
+		return bin, nil
 	}
 
 	p.logger.Info("Downloading custom k6 binary",
@@ -376,6 +372,51 @@ func (p *Provider) GetBinary(ctx context.Context, constrains Dependencies) (K6Bi
 		Cached:       false,
 		DownloadURL:  artifact.URL,
 	}, nil
+}
+
+// GetCachedBinary resolves the artifact via the build service, then looks up a cached local binary
+// for the dependencies. If the binary is cached, it returns it with Cached=true and marks it as recently
+// used for pruning. On cache miss it returns [fs.ErrNotExist]. It does not download the binary.
+func (p *Provider) GetCachedBinary(ctx context.Context, constraints Dependencies) (K6Binary, error) {
+	artifact, err := p.GetArtifact(ctx, constraints)
+	if err != nil {
+		return K6Binary{}, err
+	}
+	bin, err := p.resolveBinary(artifact)
+	if err != nil {
+		return K6Binary{}, err
+	}
+	if !bin.Cached {
+		return K6Binary{}, fs.ErrNotExist
+	}
+	return bin, nil
+}
+
+// resolveBinary resolves the local binary for the given artifact. If the binary is
+// cached, it returns it with Cached=true. Otherwise, it returns a K6Binary whose
+// Path is where the binary should be downloaded. It does not download the binary.
+func (p *Provider) resolveBinary(artifact Artifact) (K6Binary, error) {
+	binPath := filepath.Join(p.binDir, artifact.ID, k6Binary)
+	_, err := os.Stat(binPath) //nolint:forbidigo
+
+	// binary already exists and is valid
+	if err == nil {
+		go p.pruner.Touch(binPath)
+
+		return K6Binary{
+			Path:         binPath,
+			Dependencies: artifact.Dependencies,
+			Checksum:     artifact.Checksum,
+			Cached:       true,
+		}, nil
+	}
+
+	// if there's other error)
+	if !os.IsNotExist(err) { //nolint:forbidigo
+		return K6Binary{}, NewWrappedError(ErrBinary, err)
+	}
+
+	return K6Binary{Path: binPath}, nil
 }
 
 func buildDeps(deps Dependencies) (string, []dependency) {

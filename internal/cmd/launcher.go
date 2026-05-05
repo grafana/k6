@@ -2,35 +2,39 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
+	"log/slog"
 	"os"
 	"os/exec"
 	"strings"
 	"syscall"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/grafana/k6provider"
 
-	"go.k6.io/k6/cloudapi"
-	"go.k6.io/k6/cmd/state"
-	"go.k6.io/k6/errext"
-	"go.k6.io/k6/errext/exitcodes"
-	"go.k6.io/k6/ext"
+	"go.k6.io/k6/v2/cloudapi"
+	"go.k6.io/k6/v2/cmd/state"
+	"go.k6.io/k6/v2/errext"
+	"go.k6.io/k6/v2/errext/exitcodes"
+	"go.k6.io/k6/v2/ext"
 )
 
 // commandExecutor executes the requested k6 command line command.
 // It abstract the execution path from the concrete binary.
 type commandExecutor interface {
-	run(*state.GlobalState) error
+	run(ctx context.Context, gs *state.GlobalState) error
 }
 
 // provisioner defines the interface for provisioning a commandExecutor for a set of dependencies
 type provisioner interface {
-	provision(map[string]string) (commandExecutor, error)
+	provision(ctx context.Context, deps map[string]string) (commandExecutor, error)
 }
 
 func constraintsMapToProvisionDependency(deps map[string]*semver.Constraints) k6provider.Dependencies {
@@ -57,8 +61,8 @@ type customBinary struct {
 }
 
 //nolint:forbidigo
-func (b *customBinary) run(gs *state.GlobalState) error {
-	cmd := exec.CommandContext(gs.Ctx, b.path, gs.CmdArgs[1:]...) //nolint:gosec
+func (b *customBinary) run(ctx context.Context, gs *state.GlobalState) error {
+	cmd := exec.CommandContext(ctx, b.path, gs.CmdArgs[1:]...) //nolint:gosec
 
 	// we pass os stdout, err, in because passing them from GlobalState changes how
 	// the subprocess detects the type of terminal
@@ -69,18 +73,7 @@ func (b *customBinary) run(gs *state.GlobalState) error {
 	// in `gs.Stdin` and should be passed to the command
 	cmd.Stdin = gs.Stdin
 
-	// Copy environment variables to the k6 process skipping auto extension resolution feature flag.
-	env := []string{}
-	for k, v := range gs.Env {
-		if k == state.AutoExtensionResolution {
-			continue
-		}
-		env = append(env, fmt.Sprintf("%s=%s", k, v))
-	}
-	// If auto extension resolution is enabled then
-	// this avoids unnecessary re-processing of dependencies in the sub-process.
-	env = append(env, state.AutoExtensionResolution+"=false")
-	cmd.Env = env
+	cmd.Env = buildSubprocessEnv(gs.Env)
 
 	// handle signals
 	sigC := make(chan os.Signal, 2)
@@ -117,17 +110,118 @@ func (b *customBinary) run(gs *state.GlobalState) error {
 	}
 }
 
+// buildSubprocessEnv prepares environment variables for a provisioned k6 subprocess.
+func buildSubprocessEnv(src map[string]string) []string {
+	env := []string{}
+	for k, v := range src {
+		if k == state.AutoExtensionResolution {
+			continue
+		}
+		env = append(env, fmt.Sprintf("%s=%s", k, v))
+	}
+	// Disable auto extension resolution in the subprocess to avoid
+	// unnecessary re-processing of dependencies.
+	env = append(env, state.AutoExtensionResolution+"=false")
+	env = append(env, state.ProvisionHostVersion+"="+runtimeK6Version())
+	return env
+}
+
 // used just to signal we shouldn't print error again
 var errAlreadyReported = fmt.Errorf("already reported error")
 
-// isCustomBuildRequired checks if there is at least one dependency that are not satisfied by the binary
-// considering the version of k6 and any built-in extension
-func isCustomBuildRequired(deps dependencies, k6Version string, exts []*ext.Extension) bool {
-	if len(deps) == 0 {
+// isHexString reports whether s is non-empty and contains only lowercase hex digits.
+func isHexString(s string) bool {
+	return s != "" && strings.IndexFunc(s, func(r rune) bool {
+		return (r < '0' || r > '9') && (r < 'a' || r > 'f')
+	}) < 0
+}
+
+// versionSHA extracts the commit SHA from an already-parsed semver Version.
+// It handles two forms:
+//
+//	build metadata:  v0.0.0+sha   → v.Metadata() = "sha"
+//	pseudo-version:  v0.0.0-YYYYMMDDHHMMSS-sha → last segment of v.Prerelease()
+func versionSHA(v *semver.Version) (string, bool) {
+	if m := v.Metadata(); isHexString(m) {
+		return m, true
+	}
+	if pre := v.Prerelease(); pre != "" {
+		parts := strings.Split(pre, "-")
+		if len(parts) > 1 {
+			if last := parts[len(parts)-1]; isHexString(last) {
+				return last, true
+			}
+		}
+	}
+	return "", false
+}
+
+// extractVersionSHA parses version and returns any embedded commit SHA.
+//
+//	v0.0.0-20241015123456-abcdef123456  → "abcdef123456", true
+//	v0.0.0+abc123                       → "abc123",       true
+//	v1.2.3                              → "",             false
+func extractVersionSHA(version string) (string, bool) {
+	v, err := semver.NewVersion(version)
+	if err != nil {
+		return "", false
+	}
+	return versionSHA(v)
+}
+
+// constraintVersionStr returns the bare version token from a single constraint
+// string by skipping any leading operator characters. Module versions always
+// start with 'v', so the first 'v' marks the start of the version.
+func constraintVersionStr(cs string) string {
+	if i := strings.IndexByte(cs, 'v'); i >= 0 {
+		return cs[i:]
+	}
+	return ""
+}
+
+// pseudoVersionSatisfies reports whether version satisfies c by comparing the
+// commit SHAs embedded in both strings. It only applies when:
+//   - version contains a recognisable SHA (pseudo-version or build-metadata form)
+//   - c is a single exact-version constraint whose version also contains a SHA
+//   - one SHA is a prefix of the other (handles 7-char vs 12-char short SHAs)
+func pseudoVersionSatisfies(version string, c *semver.Constraints) bool {
+	sv, err := semver.NewVersion(version)
+	if err != nil {
 		return false
 	}
+	vSHA, ok := versionSHA(sv)
+	if !ok {
+		return false
+	}
+	satisfied, definitive := checkConstraintBySHA(vSHA, c)
+	return definitive && satisfied
+}
 
-	// collect modules that this binary contain, including k6 itself
+// unsatisfiedDependencyError describes the first dependency that the current
+// binary cannot satisfy. version is empty when the dependency is absent entirely.
+type unsatisfiedDependencyError struct {
+	name       string
+	version    string // built-in version; empty if not present
+	constraint string // required constraint
+}
+
+func (e unsatisfiedDependencyError) Error() string {
+	if e.version == "" {
+		return fmt.Sprintf("dependency %q is not present in the current binary", e.name)
+	}
+	return fmt.Sprintf("dependency %q: version %q does not satisfy constraint %q",
+		e.name, e.version, e.constraint)
+}
+
+// checkBuiltinDependencies returns the first dependency from deps that is not
+// satisfied by the built-in modules of the current binary (k6 itself plus any
+// compiled-in extensions). Returns nil when all dependencies are satisfied.
+func checkBuiltinDependencies(deps dependencies, k6Version string, exts []*ext.Extension) error {
+	if len(deps) == 0 {
+		return nil
+	}
+
+	// collect modules that this binary contains, including k6 itself
 	builtIn := map[string]string{"k6": k6Version}
 	for _, e := range exts {
 		builtIn[e.Name] = e.Version
@@ -135,57 +229,120 @@ func isCustomBuildRequired(deps dependencies, k6Version string, exts []*ext.Exte
 
 	for name, constraint := range deps {
 		version, provided := builtIn[name]
-		// if the binary does not contain a required module, we need a custom
 		if !provided {
-			return true
+			return unsatisfiedDependencyError{name: name}
 		}
-
-		// If dependency's constraint is null, assume it is "*" and consider it satisfied.
-		// See https://github.com/grafana/k6deps/issues/91
-		if constraint == nil {
-			continue
-		}
-
-		semver, err := semver.NewVersion(version)
-		if err != nil {
-			// ignore built in module if version is not a valid sem ver (e.g. a development version)
-			// if user wants to use this built-in, must disable the automatic extension resolution
-			return true
-		}
-
-		// if the current version does not satisfies the constrains, binary provisioning is required
-		if !constraint.Check(semver) {
-			return true
+		if err := checkVersionConstraint(name, version, constraint); err != nil {
+			return err
 		}
 	}
 
-	return false
+	return nil
 }
 
-// k6buildProvisioner provisions a k6 binary that satisfies the dependencies using the k6build service
-type k6buildProvisioner struct {
-	gs *state.GlobalState
+// checkVersionConstraint checks whether version satisfies constraint for a named dependency.
+func checkVersionConstraint(name, version string, constraint *semver.Constraints) error {
+	// If dependency's constraint is null, assume it is "*" and consider it satisfied.
+	// See https://github.com/grafana/k6deps/issues/91
+	if constraint == nil {
+		return nil
+	}
+
+	sv, err := semver.NewVersion(version)
+	if err != nil {
+		// version is not valid semver (e.g. a pseudo-version); try SHA comparison.
+		if pseudoVersionSatisfies(version, constraint) {
+			return nil
+		}
+		return unsatisfiedDependencyError{name: name, version: version, constraint: constraint.String()}
+	}
+
+	// Semver ignores build metadata (v0.0.0+sha) in comparisons per the spec,
+	// so a plain constraint.Check would treat v0.0.0+abc and v0.0.0+xyz as
+	// equal. When both sides embed a commit SHA, compare them directly.
+	if vSHA, ok := versionSHA(sv); ok {
+		if satisfied, definitive := checkConstraintBySHA(vSHA, constraint); definitive {
+			if satisfied {
+				return nil
+			}
+			return unsatisfiedDependencyError{name: name, version: version, constraint: constraint.String()}
+		}
+	}
+
+	if !constraint.Check(sv) {
+		// Pre-release pseudo-versions (v0.0.0-timestamp-sha) parse as semver but
+		// may fail range checks even when the constraint names the exact same
+		// commit. Try SHA comparison as a last resort.
+		if pseudoVersionSatisfies(version, constraint) {
+			return nil
+		}
+		return unsatisfiedDependencyError{name: name, version: version, constraint: constraint.String()}
+	}
+	return nil
 }
 
-func newK6BuildProvisioner(gs *state.GlobalState) provisioner {
-	return &k6buildProvisioner{gs: gs}
+// checkConstraintBySHA checks if vSHA matches the SHA embedded in constraint.
+// Returns (satisfied, definitive): definitive=false means the constraint has no
+// embedded SHA and normal semver comparison should be used instead.
+// SHA matching is only applied to exact-version constraints (operator "=" or no
+// operator); all other operators fall back to normal semver comparison.
+func checkConstraintBySHA(vSHA string, constraint *semver.Constraints) (bool, bool) {
+	cs := constraint.String()
+	// Compound constraints cannot be matched by SHA alone; refuse definitively
+	// so the caller does not fall back to semver, which mishandles pseudo-versions.
+	if strings.ContainsAny(cs, " ,") {
+		return false, true
+	}
+	versionStr := constraintVersionStr(cs)
+	operator := cs[:len(cs)-len(versionStr)]
+	if operator != "" && operator != "=" {
+		return false, false
+	}
+	cv, err := semver.NewVersion(versionStr)
+	if err != nil {
+		return false, false
+	}
+	cSHA, ok := versionSHA(cv)
+	if !ok {
+		return false, false
+	}
+	return strings.HasPrefix(vSHA, cSHA) || strings.HasPrefix(cSHA, vSHA), true
 }
 
-func (p *k6buildProvisioner) provision(deps map[string]string) (commandExecutor, error) {
+// buildProvisioner provisions a k6 binary that satisfies the dependencies using the k6build service.
+type buildProvisioner struct {
+	gs         *state.GlobalState
+	cachedOnly bool // if true, only looks up already-cached binaries
+}
+
+func newBuildProvisioner(gs *state.GlobalState) provisioner {
+	return &buildProvisioner{gs: gs}
+}
+
+// newCacheProvisioner returns a provisioner that only looks up already-cached binaries.
+// A cache miss surfaces as [fs.ErrNotExist]; the build service is never asked to build.
+func newCacheProvisioner(gs *state.GlobalState) provisioner {
+	return &buildProvisioner{gs: gs, cachedOnly: true}
+}
+
+func (p *buildProvisioner) provision(ctx context.Context, deps map[string]string) (commandExecutor, error) {
 	config := getProviderConfig(p.gs)
 
-	provider, err := k6provider.NewProvider(config)
+	logger := slog.New(newLogrusSlogHandler(p.gs.Logger))
+	provider, err := k6provider.NewProviderWithLogger(config, logger)
 	if err != nil {
 		return nil, err
 	}
 
-	binary, err := provider.GetBinary(p.gs.Ctx, deps)
+	getBinary := provider.GetBinary
+	if p.cachedOnly {
+		getBinary = provider.GetCachedBinary
+	}
+
+	binary, err := getBinary(ctx, deps)
 	if err != nil {
 		return nil, err
 	}
-
-	p.gs.Logger.
-		Info("A new k6 binary has been provisioned with version(s): ", formatDependencies(binary.Dependencies))
 
 	return &customBinary{binary.Path}, nil
 }
@@ -194,6 +351,7 @@ func getProviderConfig(gs *state.GlobalState) k6provider.Config {
 	config := k6provider.Config{
 		BuildServiceURL: gs.Flags.BuildServiceURL,
 		BinaryCacheDir:  gs.Flags.BinaryCache,
+		K6ModPath:       "go.k6.io/k6/v2",
 	}
 
 	token, err := extractToken(gs)
@@ -206,14 +364,6 @@ func getProviderConfig(gs *state.GlobalState) k6provider.Config {
 	}
 
 	return config
-}
-
-func formatDependencies(deps map[string]string) string {
-	buffer := &bytes.Buffer{}
-	for dep, version := range deps {
-		fmt.Fprintf(buffer, "%s:%s ", dep, version)
-	}
-	return strings.Trim(buffer.String(), " ")
 }
 
 // extractToken gets the cloud token required to access the build service
@@ -315,4 +465,35 @@ func parseManifest(manifestString string) (dependencies, error) {
 		return nil, fmt.Errorf("invalid dependencies manifest %w", err)
 	}
 	return dependenciesFromMap(manifestMap)
+}
+
+// completionTimeout bounds the cache lookup for shell completion requests.
+// The build service is reachable but not guaranteed responsive; without a
+// deadline a stall would hang the shell on every TAB.
+const completionTimeout = 3 * time.Second
+
+// completeExtension handles a shell completion request for an unregistered
+// extension subcommand. If the matching provisioned binary is already cached
+// locally, it delegates the completion request to that binary. Otherwise it
+// returns nil (no completions) so the shell does not hang waiting on a build.
+func completeExtension(gs *state.GlobalState, extName string, prov provisioner) error {
+	deps, err := dependenciesFromSubcommand(gs, extName)
+	if err != nil {
+		gs.Logger.WithError(err).Debug("Failed to build completion deps")
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(gs.Ctx, completionTimeout)
+	defer cancel()
+
+	bin, err := prov.provision(ctx, constraintsMapToProvisionDependency(deps))
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		gs.Logger.WithError(err).Debug("Failed to check provisioner cache for completion request")
+		return nil
+	}
+
+	return bin.run(ctx, gs)
 }

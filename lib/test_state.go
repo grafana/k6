@@ -7,11 +7,11 @@ import (
 	"sync/atomic"
 
 	"github.com/sirupsen/logrus"
-	"go.k6.io/k6/internal/event"
-	"go.k6.io/k6/internal/lib/trace"
-	"go.k6.io/k6/internal/usage"
-	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/secretsource"
+	"go.k6.io/k6/v2/internal/event"
+	"go.k6.io/k6/v2/internal/lib/trace"
+	"go.k6.io/k6/v2/internal/usage"
+	"go.k6.io/k6/v2/metrics"
+	"go.k6.io/k6/v2/secretsource"
 )
 
 // TestPreInitState contains all of the state that can be gathered and built

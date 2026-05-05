@@ -5,7 +5,7 @@ debug: true
 parameters:
     cog_version: 'v0.0.x'
     schema_version: '1.0.0'
-    go_package_root: 'go.k6.io/k6/internal/lib/summary/machinereadable'
+    go_package_root: 'go.k6.io/k6/v2/internal/lib/summary/machinereadable'
 
 inputs:
     - jsonschema:

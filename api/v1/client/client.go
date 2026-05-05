@@ -11,7 +11,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	v1 "go.k6.io/k6/api/v1"
+	v1 "go.k6.io/k6/v2/api/v1"
 )
 
 // Client is a simple HTTP client for the REST API.

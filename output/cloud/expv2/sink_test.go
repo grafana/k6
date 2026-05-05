@@ -5,8 +5,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"go.k6.io/k6/internal/ds/histogram"
-	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/v2/internal/ds/histogram"
+	"go.k6.io/k6/v2/metrics"
 )
 
 func TestNewSink(t *testing.T) {

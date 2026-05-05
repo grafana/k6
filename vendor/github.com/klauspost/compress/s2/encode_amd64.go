@@ -1,5 +1,4 @@
 //go:build !appengine && !noasm && gc
-// +build !appengine,!noasm,gc
 
 package s2
 

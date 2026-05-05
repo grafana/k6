@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"go.k6.io/k6/internal/lib/strvals"
+	"go.k6.io/k6/v2/internal/lib/strvals"
 )
 
 // lokiHook is a Logrus hook for flushing to Loki.

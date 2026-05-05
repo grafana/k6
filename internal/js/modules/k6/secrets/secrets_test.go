@@ -6,9 +6,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"go.k6.io/k6/internal/secretsource/mock"
-	"go.k6.io/k6/js/modulestest"
-	"go.k6.io/k6/secretsource"
+	"go.k6.io/k6/v2/internal/secretsource/mock"
+	"go.k6.io/k6/v2/js/modulestest"
+	"go.k6.io/k6/v2/secretsource"
 )
 
 func testRuntimeWithSecrets(t testing.TB, secretSources map[string]secretsource.Source) *modulestest.Runtime {

@@ -6,18 +6,18 @@ import (
 	"sort"
 	"strings"
 
-	"go.k6.io/k6/cmd/state"
-	"go.k6.io/k6/ext"
-	"go.k6.io/k6/internal/output/cloud"
-	"go.k6.io/k6/internal/output/csv"
-	"go.k6.io/k6/internal/output/influxdb"
-	"go.k6.io/k6/internal/output/json"
-	"go.k6.io/k6/internal/output/opentelemetry"
-	"go.k6.io/k6/internal/output/prometheusrw/remotewrite"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/output"
+	"go.k6.io/k6/v2/cmd/state"
+	"go.k6.io/k6/v2/ext"
+	"go.k6.io/k6/v2/internal/output/cloud"
+	"go.k6.io/k6/v2/internal/output/csv"
+	"go.k6.io/k6/v2/internal/output/influxdb"
+	"go.k6.io/k6/v2/internal/output/json"
+	"go.k6.io/k6/v2/internal/output/opentelemetry"
+	"go.k6.io/k6/v2/internal/output/prometheusrw/remotewrite"
+	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/output"
 
-	"go.k6.io/k6/internal/dashboard"
+	"go.k6.io/k6/v2/internal/dashboard"
 )
 
 // builtinOutput marks the available builtin outputs.

@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"go.k6.io/k6/internal/js/modules/k6/browser/log"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/log"
 )
 
 // Strict mode:

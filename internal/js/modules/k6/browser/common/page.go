@@ -25,8 +25,8 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
-	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
-	"go.k6.io/k6/internal/js/modules/k6/browser/log"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/log"
 )
 
 // BlankPage represents a blank page.
@@ -1667,9 +1667,9 @@ func (p *Page) GoBackForward(delta int, opts *PageGoBackForwardOptions) (_ *Resp
 	for {
 		select {
 		case <-p.ctx.Done():
-			return nil, p.ctx.Err()
+			return nil, ContextErr(p.ctx)
 		case <-timeoutCtx.Done():
-			return nil, wrapTimeoutError(timeoutCtx.Err())
+			return nil, wrapTimeoutError(ContextErr(timeoutCtx))
 		case <-ticker.C:
 			mainFrame := p.frameManager.MainFrame()
 			if mainFrame == nil {

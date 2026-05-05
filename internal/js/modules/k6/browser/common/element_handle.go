@@ -16,8 +16,8 @@ import (
 	"github.com/chromedp/cdproto/dom"
 	"go.opentelemetry.io/otel/attribute"
 
-	"go.k6.io/k6/internal/js/modules/k6/browser/common/js"
-	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common/js"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
 )
 
 // Common error types for element visibility.
@@ -226,7 +226,13 @@ func (h *ElementHandle) dblclick(p *Position, opts *MouseClickOptions) error {
 }
 
 // DefaultTimeout returns the default timeout for this element handle.
+// If the receiver or any of the chained fields are nil (which can happen
+// when the element handle is no longer attached to a live frame), the
+// package-level DefaultTimeout constant is returned instead of panicking.
 func (h *ElementHandle) DefaultTimeout() time.Duration {
+	if h == nil || h.frame == nil || h.frame.manager == nil || h.frame.manager.timeoutSettings == nil {
+		return DefaultTimeout
+	}
 	return h.frame.manager.timeoutSettings.timeout()
 }
 

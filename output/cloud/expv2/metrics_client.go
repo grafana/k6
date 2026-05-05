@@ -12,20 +12,26 @@ import (
 	"github.com/klauspost/compress/snappy"
 	"google.golang.org/protobuf/proto"
 
-	"go.k6.io/k6/cloudapi"
-	"go.k6.io/k6/internal/output/cloud/expv2/pbcloud"
+	"go.k6.io/k6/v2/internal/output/cloud/expv2/pbcloud"
 )
+
+// metricsHTTPClient is the interface used by metricsClient to perform HTTP requests.
+// It allows tests to inject a mock that returns immediately without using real HTTP.
+type metricsHTTPClient interface {
+	Do(req *http.Request, v any) error
+	BaseURL() string
+}
 
 // metricsClient is a Protobuf over HTTP client for sending
 // the collected metrics from the Cloud output
 // to the remote service.
 type metricsClient struct {
-	httpClient *cloudapi.Client
+	httpClient metricsHTTPClient
 	url        string
 }
 
 // newMetricsClient creates and initializes a new MetricsClient.
-func newMetricsClient(c *cloudapi.Client, testRunID string) (*metricsClient, error) {
+func newMetricsClient(c metricsHTTPClient, testRunID string) (*metricsClient, error) {
 	// The cloudapi.Client works across different versions of the API, the test
 	// lifecycle management is under /v1 instead the metrics ingestion is /v2.
 	// Unfortunately, the current client has v1 hard-coded so we need to trim the wrong path

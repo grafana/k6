@@ -6,7 +6,7 @@ import (
 	"reflect"
 
 	"github.com/grafana/sobek"
-	"go.k6.io/k6/js/common"
+	"go.k6.io/k6/v2/js/common"
 )
 
 // must is a small helper that will panic if err is not nil.

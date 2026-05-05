@@ -14,7 +14,7 @@ import (
 	"github.com/klauspost/compress/snappy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/internal/output/prometheusrw/stale"
+	"go.k6.io/k6/v2/internal/output/prometheusrw/stale"
 	"google.golang.org/protobuf/proto"
 )
 

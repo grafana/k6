@@ -3,7 +3,7 @@ package insights
 import (
 	"context"
 
-	"go.k6.io/k6/internal/cloudapi/insights"
+	"go.k6.io/k6/v2/internal/cloudapi/insights"
 )
 
 // Client is an interface for sending request metadatas to the Insights API.

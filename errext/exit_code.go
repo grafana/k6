@@ -3,7 +3,7 @@ package errext
 import (
 	"errors"
 
-	"go.k6.io/k6/errext/exitcodes"
+	"go.k6.io/k6/v2/errext/exitcodes"
 )
 
 // ExitCode is the code with which the application should exit if this error

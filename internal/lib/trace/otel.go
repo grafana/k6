@@ -17,7 +17,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/noop"
 
-	"go.k6.io/k6/internal/lib/strvals"
+	"go.k6.io/k6/v2/internal/lib/strvals"
 )
 
 const serviceName = "k6"
