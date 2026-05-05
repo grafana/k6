@@ -3,6 +3,7 @@ package provisioning
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"sync/atomic"
@@ -12,6 +13,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"go.k6.io/k6/v2/errext"
 	provtest "go.k6.io/k6/v2/internal/cloudapi/provisioning/test"
 	v6 "go.k6.io/k6/v2/internal/cloudapi/v6"
 	"go.k6.io/k6/v2/internal/lib/testutils"
@@ -488,4 +491,138 @@ func TestWaitForTestRunReady_ContextCancellation(t *testing.T) {
 	err = client.WaitForTestRunReady(ctx, provtest.DefaultTestRunID, 1*time.Microsecond)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, context.Canceled)
+}
+
+func TestNotifyTestRunCompleted(t *testing.T) {
+	t.Parallel()
+
+	var (
+		method      string
+		reqPath     string
+		authHeader  string
+		contentType string
+		userAgent   string
+		body        []byte
+		hitCount    atomic.Int32
+	)
+
+	srv := provtest.NewServer(t)
+	srv.HandleNotify(provtest.DefaultTestRunID, func(w http.ResponseWriter, r *http.Request) {
+		hitCount.Add(1)
+		method = r.Method
+		reqPath = r.URL.Path
+		authHeader = r.Header.Get("Authorization")
+		contentType = r.Header.Get("Content-Type")
+		userAgent = r.Header.Get("User-Agent")
+		var err error
+		body, err = io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "read body", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	client, err := NewClient(testutils.NewLogger(t), "test-token", srv.URL, "0.42.0", 7, 5*time.Second)
+	require.NoError(t, err)
+
+	err = client.NotifyTestRunCompleted(t.Context(), provtest.DefaultTestRunID, "scoped-token-xyz", nil)
+	require.NoError(t, err)
+
+	// --- Request assertions ---
+	assert.Equal(t, http.MethodPost, method)
+	assert.Equal(t, "/provisioning/v1/test_runs/123/notify", reqPath)
+	assert.Equal(t, "Bearer scoped-token-xyz", authHeader)
+	assert.Equal(t, "application/json", contentType)
+	assert.Equal(t, "k6cloud/0.42.0", userAgent)
+	assert.Equal(t, int32(1), hitCount.Load(), "server should be hit exactly once")
+
+	// Request body shape: event_type present, error null.
+	var reqBody map[string]any
+	require.NoError(t, json.Unmarshal(body, &reqBody))
+	assert.Equal(t, "script_execution_completed", reqBody["event_type"])
+	assert.Nil(t, reqBody["error"])
+}
+
+func TestNotifyTestRunCompleted_WithErrorInRequestBody(t *testing.T) {
+	t.Parallel()
+
+	var body []byte
+
+	srv := provtest.NewServer(t)
+	srv.HandleNotify(provtest.DefaultTestRunID, func(w http.ResponseWriter, r *http.Request) {
+		var err error
+		body, err = io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "read body", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	client, err := NewClient(testutils.NewLogger(t), "test-token", srv.URL, "0.42.0", 7, 5*time.Second)
+	require.NoError(t, err)
+
+	testErr := errext.WithAbortReasonIfNone(errors.New("TypeError: foo is not a function"), errext.AbortedByScriptError)
+	err = client.NotifyTestRunCompleted(t.Context(), provtest.DefaultTestRunID, "scoped-token-xyz", testErr)
+	require.NoError(t, err)
+
+	// Request body should include the mapped error.
+	var reqBody struct {
+		EventType string `json:"event_type"`
+		Error     *struct {
+			Code   int    `json:"code"`
+			Reason string `json:"reason"`
+		} `json:"error"`
+	}
+	require.NoError(t, json.Unmarshal(body, &reqBody))
+	assert.Equal(t, "script_execution_completed", reqBody.EventType)
+	require.NotNil(t, reqBody.Error)
+	assert.Equal(t, 8035, reqBody.Error.Code)
+	assert.Contains(t, reqBody.Error.Reason, "TypeError")
+}
+
+func TestNotifyTestRunCompleted_4xxResponseReturnsError(t *testing.T) {
+	t.Parallel()
+
+	var hitCount atomic.Int32
+
+	srv := provtest.NewServer(t)
+	srv.HandleNotify(provtest.DefaultTestRunID, func(w http.ResponseWriter, _ *http.Request) {
+		hitCount.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"error":{"code":"validation_error","message":"bad event_type"}}`))
+	})
+
+	client, err := NewClient(testutils.NewLogger(t), "test-token", srv.URL, "0.42.0", 7, 5*time.Second)
+	require.NoError(t, err)
+
+	err = client.NotifyTestRunCompleted(t.Context(), provtest.DefaultTestRunID, "scoped-token-xyz", nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "400")
+	assert.Contains(t, err.Error(), "bad event_type")
+	assert.Equal(t, int32(1), hitCount.Load(), "4xx must not be retried")
+}
+
+func TestNotifyTestRunCompleted_5xxRetried(t *testing.T) {
+	t.Parallel()
+
+	var hitCount atomic.Int32
+
+	srv := provtest.NewServer(t)
+	srv.HandleNotify(provtest.DefaultTestRunID, func(w http.ResponseWriter, _ *http.Request) {
+		if hitCount.Add(1) == 1 {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	client, err := NewClient(testutils.NewLogger(t), "test-token", srv.URL, "0.42.0", 7, 5*time.Second)
+	require.NoError(t, err)
+
+	err = client.NotifyTestRunCompleted(t.Context(), provtest.DefaultTestRunID, "scoped-token-xyz", nil)
+	require.NoError(t, err)
+	assert.Equal(t, int32(2), hitCount.Load(), "expected exactly 2 attempts (1 failure + 1 success)")
 }

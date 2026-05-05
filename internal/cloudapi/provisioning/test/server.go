@@ -191,5 +191,14 @@ func (s *Server) FetchTestRunHitCount() int32 {
 	return s.fetchTestRunHits.Load()
 }
 
+// HandleNotify registers a handler for
+// POST /provisioning/v1/test_runs/{testRunID}/notify.
+func (s *Server) HandleNotify(testRunID int64, handler http.HandlerFunc) {
+	s.Mux.HandleFunc(
+		fmt.Sprintf("POST /provisioning/v1/test_runs/%d/notify", testRunID),
+		handler,
+	)
+}
+
 func strPtr(s string) *string { return &s }
 func int32Ptr(i int32) *int32 { return &i }
