@@ -10,18 +10,18 @@ import (
 	"strconv"
 	"sync"
 
-	"go.k6.io/k6/lib"
+	"go.k6.io/k6/v2/lib"
 
 	"github.com/mattn/go-colorable"
 	"github.com/mattn/go-isatty"
 	"github.com/sirupsen/logrus"
 
-	"go.k6.io/k6/internal/event"
-	cloudsecrets "go.k6.io/k6/internal/secretsource/cloud"
-	"go.k6.io/k6/internal/ui/console"
-	"go.k6.io/k6/internal/usage"
-	"go.k6.io/k6/lib/fsext"
-	"go.k6.io/k6/secretsource"
+	"go.k6.io/k6/v2/internal/event"
+	cloudsecrets "go.k6.io/k6/v2/internal/secretsource/cloud"
+	"go.k6.io/k6/v2/internal/ui/console"
+	"go.k6.io/k6/v2/internal/usage"
+	"go.k6.io/k6/v2/lib/fsext"
+	"go.k6.io/k6/v2/secretsource"
 )
 
 const (
@@ -30,6 +30,10 @@ const (
 
 	// DependenciesManifest defines the default values for dependency resolution
 	DependenciesManifest = "K6_DEPENDENCIES_MANIFEST"
+
+	// ProvisionHostVersion is the k6 version of the binary that provisioned a subprocess.
+	// Subcommand extensions can read it to know which k6 version launched them.
+	ProvisionHostVersion = "K6_PROVISION_HOST_VERSION"
 
 	// defaultBuildServiceURL defines the URL to the default (grafana hosted) build service
 	defaultBuildServiceURL = "https://ingest.k6.io/builder/api/v1"
@@ -191,7 +195,7 @@ type GlobalFlags struct {
 // GetDefaultFlags returns the default global flags.
 func GetDefaultFlags(homeDir string, cacheDir string) GlobalFlags {
 	return GlobalFlags{
-		Address:                 "localhost:6565",
+		Address:                 "",
 		ProfilingEnabled:        false,
 		ConfigFilePath:          filepath.Join(homeDir, "k6", defaultConfigFileName),
 		LogOutput:               "stderr",
@@ -215,6 +219,9 @@ func getFlags(defaultFlags GlobalFlags, env map[string]string, args []string) Gl
 	}
 	if val, ok := env["K6_LOG_FORMAT"]; ok {
 		result.LogFormat = val
+	}
+	if val, ok := env["K6_ADDRESS"]; ok {
+		result.Address = val
 	}
 	if env["K6_NO_COLOR"] != "" {
 		result.NoColor = true

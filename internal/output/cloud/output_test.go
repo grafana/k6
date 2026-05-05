@@ -3,24 +3,24 @@ package cloud
 import (
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/cloudapi"
-	"go.k6.io/k6/errext"
-	"go.k6.io/k6/internal/lib/testutils"
-	"go.k6.io/k6/internal/usage"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/types"
-	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/output"
-	cloudv2 "go.k6.io/k6/output/cloud/expv2"
+	"go.k6.io/k6/v2/cloudapi"
+	"go.k6.io/k6/v2/errext"
+	"go.k6.io/k6/v2/internal/lib/testutils"
+	"go.k6.io/k6/v2/internal/usage"
+	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/lib/types"
+	"go.k6.io/k6/v2/metrics"
+	"go.k6.io/k6/v2/output"
+	cloudv2 "go.k6.io/k6/v2/output/cloud/expv2"
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -38,12 +38,12 @@ func TestNewOutputNameResolution(t *testing.T) {
 	}{
 		{
 			url: &url.URL{
-				Opaque: "go.k6.io/k6/samples/http_get.js",
+				Opaque: "go.k6.io/k6/v2/samples/http_get.js",
 			},
 			expected: "http_get.js",
 		},
 		{
-			url:      mustParse("http://go.k6.io/k6/samples/http_get.js"),
+			url:      mustParse("http://go.k6.io/k6/v2/samples/http_get.js"),
 			expected: "http_get.js",
 		},
 		{
@@ -246,59 +246,55 @@ func TestCloudOutputDescription(t *testing.T) {
 
 func TestOutputStopWithTestError(t *testing.T) {
 	t.Parallel()
-
-	done := make(chan struct{})
-
-	handler := func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/v1/tests/1234":
-			b, err := io.ReadAll(r.Body)
-			require.NoError(t, err)
-
-			// aborted by system status
-			expB := `{"result_status":0, "run_status":6, "thresholds":{}}`
-			require.JSONEq(t, expB, string(b))
-
-			w.WriteHeader(http.StatusOK)
-			close(done)
-		default:
-			http.Error(w, "not expected path", http.StatusInternalServerError)
+	synctest.Test(t, func(t *testing.T) {
+		mock := &cloudClientMock{}
+		out := &Output{
+			logger:    testutils.NewLogger(t),
+			testRunID: "1234",
+			client:    mock,
 		}
-	}
-	ts := httptest.NewServer(http.HandlerFunc(handler))
-	defer ts.Close()
 
-	out, err := newOutput(output.Params{
-		Logger: testutils.NewLogger(t),
-		Environment: map[string]string{
-			"K6_CLOUD_HOST": ts.URL,
-		},
-		ScriptOptions: lib.Options{
-			SystemTags: &metrics.DefaultSystemTagSet,
-		},
-		ScriptPath: &url.URL{Path: "/script.js"},
+		calledStopFn := false
+		out.versionedOutput = versionedOutputMock{
+			callback: func(fn string) {
+				if fn == "StopWithTestError" {
+					calledStopFn = true
+				}
+			},
+		}
+
+		fakeErr := errors.New("this is my error")
+		require.NoError(t, out.StopWithTestError(fakeErr))
+		assert.True(t, calledStopFn)
+
+		require.True(t, mock.testFinishedCalled)
+		assert.Equal(t, "1234", mock.testFinishedRefID)
+		assert.Equal(t, cloudapi.ThresholdResult{}, mock.testFinishedThresholds)
+		assert.False(t, mock.testFinishedTainted)
+		assert.Equal(t, cloudapi.RunStatusAbortedSystem, mock.testFinishedRunStatus)
 	})
-	require.NoError(t, err)
+}
 
-	calledStopFn := false
-	out.testRunID = "1234"
-	out.versionedOutput = versionedOutputMock{
-		callback: func(fn string) {
-			if fn == "StopWithTestError" {
-				calledStopFn = true
-			}
-		},
-	}
+// cloudClientMock implements cloudClient for tests without starting a real HTTP server.
+type cloudClientMock struct {
+	testFinishedCalled     bool
+	testFinishedRefID      string
+	testFinishedThresholds cloudapi.ThresholdResult
+	testFinishedTainted    bool
+	testFinishedRunStatus  cloudapi.RunStatus
+}
 
-	fakeErr := errors.New("this is my error")
-	require.NoError(t, out.StopWithTestError(fakeErr))
-	assert.True(t, calledStopFn)
+func (m *cloudClientMock) CreateTestRun(_ *cloudapi.TestRun) (*cloudapi.CreateTestRunResponse, error) {
+	return &cloudapi.CreateTestRunResponse{}, nil
+}
 
-	select {
-	case <-time.After(1 * time.Second):
-		t.Error("timed out")
-	case <-done:
-	}
+func (m *cloudClientMock) TestFinished(referenceID string, thresholds cloudapi.ThresholdResult, tainted bool, runStatus cloudapi.RunStatus) error {
+	m.testFinishedCalled = true
+	m.testFinishedRefID = referenceID
+	m.testFinishedThresholds = thresholds
+	m.testFinishedTainted = tainted
+	m.testFinishedRunStatus = runStatus
+	return nil
 }
 
 func TestOutputGetStatusRun(t *testing.T) {

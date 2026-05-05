@@ -11,14 +11,14 @@ import (
 	"github.com/sirupsen/logrus"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/cloudapi"
-	"go.k6.io/k6/errext"
-	"go.k6.io/k6/internal/build"
-	"go.k6.io/k6/internal/usage"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/output"
-	cloudv2 "go.k6.io/k6/output/cloud/expv2"
+	"go.k6.io/k6/v2/cloudapi"
+	"go.k6.io/k6/v2/errext"
+	"go.k6.io/k6/v2/internal/build"
+	"go.k6.io/k6/v2/internal/usage"
+	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/metrics"
+	"go.k6.io/k6/v2/output"
+	cloudv2 "go.k6.io/k6/v2/output/cloud/expv2"
 )
 
 const (
@@ -41,6 +41,13 @@ type versionedOutput interface {
 	SetTestRunID(id string)
 
 	AddMetricSamples(samples []metrics.SampleContainer)
+}
+
+// cloudClient is the interface used to manage test runs in the Cloud service.
+// It allows tests to inject a mock without starting a real HTTP server.
+type cloudClient interface {
+	CreateTestRun(testRun *cloudapi.TestRun) (*cloudapi.CreateTestRunResponse, error)
+	TestFinished(referenceID string, thresholds cloudapi.ThresholdResult, tainted bool, runStatus cloudapi.RunStatus) error
 }
 
 type apiVersion int64
@@ -71,7 +78,7 @@ type Output struct {
 	// uses the --no-archive-upload flag.
 	testArchive *lib.Archive
 
-	client       *cloudapi.Client
+	client       cloudClient
 	testStopFunc func(error)
 
 	usage *usage.Usage
@@ -384,7 +391,7 @@ func (out *Output) startVersionedOutput() error {
 	case int64(apiVersion1):
 		err = errors.New("v1 is not supported anymore")
 	case int64(apiVersion2):
-		out.versionedOutput, err = cloudv2.New(out.logger, out.config, out.client)
+		out.versionedOutput, err = cloudv2.New(out.logger, out.config, nil)
 	default:
 		err = fmt.Errorf("v%d is an unexpected version", out.config.APIVersion.Int64)
 	}

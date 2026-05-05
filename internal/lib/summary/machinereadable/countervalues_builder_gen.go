@@ -6,7 +6,7 @@
 package summary
 
 import (
-	cog "go.k6.io/k6/internal/lib/summary/machinereadable/cog"
+	cog "go.k6.io/k6/v2/internal/lib/summary/machinereadable/cog"
 )
 
 var _ cog.Builder[CounterValues] = (*CounterValuesBuilder)(nil)

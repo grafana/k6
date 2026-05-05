@@ -15,7 +15,7 @@ import (
 	"github.com/grafana/sobek/parser"
 	"github.com/sirupsen/logrus"
 
-	"go.k6.io/k6/internal/usage"
+	"go.k6.io/k6/v2/internal/usage"
 )
 
 // A Compiler compiles JavaScript or TypeScript source code into a sobek.Program

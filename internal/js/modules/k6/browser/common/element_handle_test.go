@@ -6,11 +6,24 @@ import (
 	"slices"
 	"testing"
 
-	"go.k6.io/k6/internal/js/modules/k6/browser/common/js"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common/js"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestElementHandleDefaultTimeoutNilSafe(t *testing.T) {
+	t.Parallel()
+
+	// A nil receiver must return the package-level DefaultTimeout instead of
+	// panicking. See https://github.com/grafana/k6/issues/4957.
+	var h *ElementHandle
+	assert.Equal(t, DefaultTimeout, h.DefaultTimeout())
+
+	// Partially-initialized handles with nil intermediate fields must also
+	// fall back to DefaultTimeout rather than dereferencing a nil pointer.
+	assert.Equal(t, DefaultTimeout, (&ElementHandle{}).DefaultTimeout())
+}
 
 func TestErrorFromDOMError(t *testing.T) {
 	t.Parallel()

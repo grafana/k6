@@ -19,9 +19,10 @@ import (
 	"github.com/tidwall/gjson"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/lib/fsext"
-	"go.k6.io/k6/lib/types"
-	"go.k6.io/k6/secretsource"
+	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/lib/fsext"
+	"go.k6.io/k6/v2/lib/types"
+	"go.k6.io/k6/v2/secretsource"
 	"golang.org/x/time/rate"
 )
 
@@ -293,7 +294,7 @@ func retry(
 			// Wait with context cancellation support
 			select {
 			case <-ctx.Done():
-				return ctx.Err()
+				return lib.ContextErr(ctx)
 			case <-time.After(wait):
 			}
 		}

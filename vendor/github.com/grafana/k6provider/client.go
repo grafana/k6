@@ -31,6 +31,7 @@ type buildArtifact struct {
 
 // buildRequest defines a request to the build service
 type buildRequest struct {
+	K6ModPath     string       `json:"k6_mod_path,omitempty"`
 	K6Constraints string       `json:"k6,omitempty"`
 	Dependencies  []dependency `json:"dependencies,omitempty"`
 	Platform      string       `json:"platform,omitempty"`
@@ -74,10 +75,12 @@ func newBuildServiceClient(
 func (r *buildClient) Build(
 	ctx context.Context,
 	platform string,
+	k6ModPath string,
 	k6Constraints string,
 	deps []dependency,
 ) (buildArtifact, error) {
 	req := buildRequest{
+		K6ModPath:     k6ModPath,
 		Platform:      platform,
 		K6Constraints: k6Constraints,
 		Dependencies:  deps,
