@@ -12,7 +12,7 @@ import (
 	"go.k6.io/k6/v2/internal/lib/testutils"
 )
 
-func TestStatsCommandWithoutHTTPAPIAddrFails(t *testing.T) {
+func TestStatsCommandWithoutAddressFails(t *testing.T) {
 	t.Parallel()
 
 	ts := NewGlobalTestState(t)
@@ -22,7 +22,7 @@ func TestStatsCommandWithoutHTTPAPIAddrFails(t *testing.T) {
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	logEntries := ts.LoggerHook.Drain()
-	require.True(t, testutils.LogContains(logEntries, logrus.ErrorLevel, "HTTP API server is disabled"))
+	require.True(t, testutils.LogContains(logEntries, logrus.ErrorLevel, "REST API server is disabled"))
 	assert.Empty(t, ts.Stdout.String())
 }
 
@@ -38,7 +38,7 @@ func TestStatsCommand(t *testing.T) {
 	defer srv.Close()
 
 	ts := NewGlobalTestState(t)
-	ts.CmdArgs = []string{"k6", "--http-api-addr", srv.Listener.Addr().String(), "stats"}
+	ts.CmdArgs = []string{"k6", "--address", srv.Listener.Addr().String(), "stats"}
 
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 

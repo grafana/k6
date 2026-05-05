@@ -310,17 +310,17 @@ func rootCmdPersistentFlagSet(gs *state.GlobalState) *pflag.FlagSet {
 	flags.BoolVarP(&gs.Flags.Verbose, "verbose", "v", gs.DefaultFlags.Verbose, "enable verbose logging")
 	flags.BoolVarP(&gs.Flags.Quiet, "quiet", "q", gs.DefaultFlags.Quiet, "disable progress updates")
 	flags.StringVarP(
-		&gs.Flags.HTTPAPIAddr,
-		"http-api-addr", "a",
-		gs.Flags.HTTPAPIAddr,
-		"address for the REST HTTP API server (e.g. localhost:6565); the server is disabled when not set",
+		&gs.Flags.Address,
+		"address", "a",
+		gs.Flags.Address,
+		"address for the REST API server (e.g. localhost:6565); the server is disabled when not set",
 	)
-	flags.Lookup("http-api-addr").DefValue = gs.DefaultFlags.HTTPAPIAddr
+	flags.Lookup("address").DefValue = gs.DefaultFlags.Address
 	flags.BoolVar(
 		&gs.Flags.ProfilingEnabled,
 		"profiling-enabled",
 		gs.DefaultFlags.ProfilingEnabled,
-		"enable profiling (pprof) endpoints, requires the HTTP API to be enabled (--http-api-addr)",
+		"enable profiling (pprof) endpoints, requires the REST API to be enabled (--address)",
 	)
 
 	return flags
