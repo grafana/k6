@@ -48,6 +48,18 @@ func NewServer(t *testing.T) *Server {
 	}
 }
 
+// HandleCreateLoadTest registers a handler for
+// /cloud/v6/projects/{projectID}/load_tests, covering both the POST
+// (create) and GET (find-by-name) operations of
+// v6.Client.CreateOrFindLoadTest. The handler should inspect r.Method
+// to distinguish between create (POST) and find-by-name (GET).
+func (s *Server) HandleCreateLoadTest(projectID int32, handler http.HandlerFunc) {
+	s.Mux.HandleFunc(
+		fmt.Sprintf("/cloud/v6/projects/%d/load_tests", projectID),
+		handler,
+	)
+}
+
 // HandleStartLocalExecution registers a handler for
 // POST /provisioning/v1/load_tests/{loadTestID}/start_local_execution.
 // If handler is nil, a default handler returning a successful response is used.

@@ -84,6 +84,9 @@ func NewClient(
 		// Configure the X-Stack-Id default header so that all
 		// provisioning API requests include it.
 		c.apiClient.GetConfig().DefaultHeader["X-Stack-Id"] = strconv.FormatInt(int64(stackID), 10)
+		// Propagate the stack ID to the embedded v6 client so
+		// CreateOrFindLoadTest sends the correct X-Stack-Id header.
+		c.v6Client.SetStackID(stackID)
 	}
 	return c, nil
 }
