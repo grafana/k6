@@ -51,7 +51,7 @@ func TestMetricsClientPushUnexpectedStatus(t *testing.T) {
 	t.Parallel()
 
 	// Use a mock that returns immediately without HTTP - no server, no retries.
-	mock := &mockMetricsHTTPClient{
+	mock := &mockMetricsHTTPClientWithBaseURL{
 		doErr: errors.New("500 Internal Server Error"),
 	}
 	mc, err := newMetricsClient(mock, "test-ref-id")
@@ -61,16 +61,16 @@ func TestMetricsClientPushUnexpectedStatus(t *testing.T) {
 	assert.ErrorContains(t, err, "500 Internal Server Error")
 }
 
-// mockMetricsHTTPClient implements metricsHTTPClient for tests.
+// mockMetricsHTTPClientWithBaseURL implements metricsHTTPClientWithBaseURL for tests.
 // It returns immediately without making HTTP requests.
-type mockMetricsHTTPClient struct {
+type mockMetricsHTTPClientWithBaseURL struct {
 	doErr error
 }
 
-func (m *mockMetricsHTTPClient) Do(_ *http.Request, _ any) error {
+func (m *mockMetricsHTTPClientWithBaseURL) Do(_ *http.Request, _ any) error {
 	return m.doErr
 }
 
-func (m *mockMetricsHTTPClient) BaseURL() string {
+func (m *mockMetricsHTTPClientWithBaseURL) BaseURL() string {
 	return "http://test/v1"
 }
