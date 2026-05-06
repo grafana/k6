@@ -30,17 +30,17 @@ var aiaHTTPClient = &http.Client{ //nolint:gochecknoglobals
 	Timeout: aiaFetchTimeout,
 }
 
-// systemCertPoolOnce guards the one-time load of the system cert pool so that we pay
-// the syscall cost at most once per process rather than once per TLS handshake.
-var ( //nolint:gochecknoglobals
-	systemCertPoolOnce sync.Once
-	cachedSystemPool   *x509.CertPool
-
-	// aiaIntermediateCache caches successfully fetched intermediate certificates by AIA URL.
-	// Repeated TLS handshakes (e.g. many VUs hitting the same server) pay the HTTP cost at
-	// most once per URL per process lifetime.
-	aiaIntermediateCache sync.Map // map[string]*x509.Certificate
+// systemCertPoolOnce / cachedSystemPool guard the one-time load of the system cert pool
+// so that we pay the syscall cost at most once per process rather than once per TLS handshake.
+var (
+	systemCertPoolOnce sync.Once      //nolint:gochecknoglobals
+	cachedSystemPool   *x509.CertPool //nolint:gochecknoglobals
 )
+
+// aiaIntermediateCache caches successfully fetched intermediate certificates by AIA URL.
+// Repeated TLS handshakes (e.g. many VUs hitting the same server) pay the HTTP cost at
+// most once per URL per process lifetime.
+var aiaIntermediateCache sync.Map //nolint:gochecknoglobals
 
 func getSystemCertPool(logger logrus.FieldLogger) *x509.CertPool {
 	systemCertPoolOnce.Do(func() {
@@ -77,20 +77,33 @@ func WrapTLSConfigForAIAFetching(cfg *tls.Config, logger logrus.FieldLogger, htt
 		httpClient = aiaHTTPClient
 	}
 
-	// Preserve any pre-existing callbacks so we can chain them.
 	prevVerifyPeer := cfg.VerifyPeerCertificate
 	prevVerifyConn := cfg.VerifyConnection
 
 	newCfg := cfg.Clone()
 
 	// Disable Go's built-in chain+hostname verification so we can interpose AIA fetching.
-	// Hostname verification is restored below in VerifyConnection.
-	newCfg.InsecureSkipVerify = true //nolint:gosec
+	// Hostname verification is restored in buildVerifyConnFn below.
+	newCfg.InsecureSkipVerify = true
 
-	// The closure reads newCfg.RootCAs at handshake time rather than capturing the pool
+	// The callbacks read newCfg.RootCAs at handshake time rather than capturing the pool
 	// at wrap time. This allows callers to modify TLSConfig.RootCAs after VU creation
 	// (e.g. in tests, or for per-host CA pinning) and have those changes take effect.
-	newCfg.VerifyPeerCertificate = func(rawCerts [][]byte, _ [][]*x509.Certificate) error {
+	newCfg.VerifyPeerCertificate = buildVerifyPeerFn(newCfg, logger, httpClient, prevVerifyPeer)
+	newCfg.VerifyConnection = buildVerifyConnFn(prevVerifyConn)
+	return newCfg
+}
+
+// buildVerifyPeerFn returns a VerifyPeerCertificate callback that re-implements chain
+// verification with AIA fetching inserted between the first failed attempt and the returned
+// error. cfg is the cloned config whose RootCAs field is read live on each handshake.
+func buildVerifyPeerFn(
+	cfg *tls.Config,
+	logger logrus.FieldLogger,
+	httpClient *http.Client,
+	prev func([][]byte, [][]*x509.Certificate) error,
+) func([][]byte, [][]*x509.Certificate) error {
+	return func(rawCerts [][]byte, _ [][]*x509.Certificate) error {
 		if len(rawCerts) == 0 {
 			return errors.New("tls: server presented no certificates")
 		}
@@ -104,14 +117,13 @@ func WrapTLSConfigForAIAFetching(cfg *tls.Config, logger logrus.FieldLogger, htt
 			certs = append(certs, cert)
 		}
 
-		// Build an intermediates pool from whatever the server sent.
 		intermediates := x509.NewCertPool()
-		for _, cert := range certs[1:] {
-			intermediates.AddCert(cert)
+		for _, c := range certs[1:] {
+			intermediates.AddCert(c)
 		}
 
 		// Use the live RootCAs from the config. When nil, fall back to the system pool.
-		roots := newCfg.RootCAs
+		roots := cfg.RootCAs
 		if roots == nil {
 			roots = getSystemCertPool(logger)
 		}
@@ -120,79 +132,97 @@ func WrapTLSConfigForAIAFetching(cfg *tls.Config, logger logrus.FieldLogger, htt
 			Roots:         roots,
 			Intermediates: intermediates,
 			// DNSName is intentionally omitted here: hostname verification is done
-			// separately in VerifyConnection so we can access cs.ServerName reliably.
+			// separately in buildVerifyConnFn so we can access cs.ServerName reliably.
 		}
 
-		if _, verifyErr := certs[0].Verify(opts); verifyErr != nil {
-			// Only try AIA when the error is "unknown authority"; other errors (expired,
-			// constraint violation, etc.) won't be fixed by fetching intermediates.
-			var unknownAuthErr x509.UnknownAuthorityError
-			if !errors.As(verifyErr, &unknownAuthErr) {
-				return verifyErr
-			}
-
-			// Record whether any certs advertise AIA URLs so we can emit a useful log
-			// message if the chain still fails after fetching.
-			hasAIAURLs := false
-			for _, c := range certs {
-				if len(c.IssuingCertificateURL) > 0 {
-					hasAIAURLs = true
-					break
-				}
-			}
-
-			fetched := fetchAIAIntermediates(certs, httpClient, logger)
-			for _, cert := range fetched {
-				intermediates.AddCert(cert)
-			}
-
-			if _, retryErr := certs[0].Verify(opts); retryErr != nil {
-				if hasAIAURLs {
-					// Log at Warn so users can diagnose AIA failures without --log-level=debug.
-					// Individual per-URL errors are logged at Debug inside fetchAIAIntermediates.
-					logger.WithError(retryErr).Warn(
-						"AIA: certificate chain incomplete after fetching intermediates; " +
-							"verify that the AIA endpoint is reachable and returns a valid certificate",
-					)
-				}
-				return retryErr
-			}
+		if err := verifyWithAIA(certs, opts, intermediates, httpClient, logger); err != nil {
+			return err
 		}
 
-		if prevVerifyPeer != nil {
+		if prev != nil {
 			// verifiedChains is nil because we bypassed Go's normal verification path.
-			return prevVerifyPeer(rawCerts, nil)
+			return prev(rawCerts, nil)
 		}
 		return nil
 	}
+}
 
-	// VerifyConnection is called after VerifyPeerCertificate even when InsecureSkipVerify is
-	// true. We use it to restore hostname verification that InsecureSkipVerify suppresses.
-	// cs.ServerName is populated by Go's TLS stack from config.ServerName (which the HTTP
-	// transport sets to the dialled host), so it is correct for both hostname and IP targets.
-	newCfg.VerifyConnection = func(cs tls.ConnectionState) error {
+// verifyWithAIA attempts chain verification and, on x509.UnknownAuthorityError only,
+// fetches missing intermediates via AIA and retries.
+func verifyWithAIA(
+	certs []*x509.Certificate,
+	opts x509.VerifyOptions,
+	intermediates *x509.CertPool,
+	httpClient *http.Client,
+	logger logrus.FieldLogger,
+) error {
+	_, verifyErr := certs[0].Verify(opts)
+	if verifyErr == nil {
+		return nil
+	}
+
+	// Only attempt AIA for unknown-authority errors; expired certs, hostname mismatches,
+	// etc. are not fixed by fetching intermediates.
+	var unknownAuthErr x509.UnknownAuthorityError
+	if !errors.As(verifyErr, &unknownAuthErr) {
+		return verifyErr
+	}
+
+	hasAIAURLs := false
+	for _, c := range certs {
+		if len(c.IssuingCertificateURL) > 0 {
+			hasAIAURLs = true
+			break
+		}
+	}
+
+	for _, cert := range fetchAIAIntermediates(certs, httpClient, logger) {
+		intermediates.AddCert(cert)
+	}
+
+	_, retryErr := certs[0].Verify(opts)
+	if retryErr == nil {
+		return nil
+	}
+	if hasAIAURLs {
+		// Log at Warn so users can diagnose AIA failures without --log-level=debug.
+		// Individual per-URL errors are logged at Debug inside fetchAIAIntermediates.
+		logger.WithError(retryErr).Warn(
+			"AIA: certificate chain incomplete after fetching intermediates; " +
+				"verify that the AIA endpoint is reachable and returns a valid certificate",
+		)
+	}
+	return retryErr
+}
+
+// buildVerifyConnFn returns a VerifyConnection callback that restores hostname verification
+// (suppressed by InsecureSkipVerify) and chains any pre-existing callback.
+// cs.ServerName is populated by Go's TLS stack from config.ServerName, which the HTTP
+// transport sets to the dialled host — correct for both hostname and IP targets.
+func buildVerifyConnFn(prev func(tls.ConnectionState) error) func(tls.ConnectionState) error {
+	return func(cs tls.ConnectionState) error {
 		if cs.ServerName != "" && len(cs.PeerCertificates) > 0 {
 			if err := cs.PeerCertificates[0].VerifyHostname(cs.ServerName); err != nil {
 				return err
 			}
 		}
-		if prevVerifyConn != nil {
-			return prevVerifyConn(cs)
+		if prev != nil {
+			return prev(cs)
 		}
 		return nil
 	}
-
-	return newCfg
 }
 
 // fetchAIAIntermediates follows the AIA IssuingCertificateURL fields on the presented
 // certificates (BFS, up to aiaMaxFetchDepth hops) and returns any newly found intermediates.
-func fetchAIAIntermediates(certs []*x509.Certificate, httpClient *http.Client, logger logrus.FieldLogger) []*x509.Certificate {
+func fetchAIAIntermediates(
+	certs []*x509.Certificate, httpClient *http.Client, logger logrus.FieldLogger,
+) []*x509.Certificate {
 	var fetched []*x509.Certificate
 	seen := make(map[string]bool)
 
-	queue := make([]*x509.Certificate, len(certs))
-	copy(queue, certs)
+	queue := make([]*x509.Certificate, 0, len(certs))
+	queue = append(queue, certs...)
 
 	for depth := 0; depth < aiaMaxFetchDepth && len(queue) > 0; depth++ {
 		cert := queue[0]
@@ -228,6 +258,8 @@ func fetchAIAIntermediates(certs []*x509.Certificate, httpClient *http.Client, l
 
 // fetchCertFromAIAURL retrieves a single X.509 certificate (DER or PEM) from rawURL.
 func fetchCertFromAIAURL(rawURL string, httpClient *http.Client) (*x509.Certificate, error) {
+	// AIA fetches use their own timeout context independent of any VU lifecycle context;
+	// the TLS VerifyPeerCertificate callback provides no context to thread through.
 	ctx, cancel := context.WithTimeout(context.Background(), aiaFetchTimeout)
 	defer cancel()
 
@@ -236,7 +268,7 @@ func fetchCertFromAIAURL(rawURL string, httpClient *http.Client) (*x509.Certific
 		return nil, fmt.Errorf("building AIA request: %w", err)
 	}
 
-	resp, err := httpClient.Do(req)
+	resp, err := httpClient.Do(req) //nolint:gosec // G107: URL comes from a server-presented certificate AIA extension
 	if err != nil {
 		return nil, fmt.Errorf("fetching AIA certificate: %w", err)
 	}
