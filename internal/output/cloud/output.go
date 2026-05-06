@@ -2,8 +2,11 @@
 package cloud
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"math"
+	"net/http"
 	"path/filepath"
 	"strings"
 	"time"
@@ -14,6 +17,7 @@ import (
 	"go.k6.io/k6/v2/cloudapi"
 	"go.k6.io/k6/v2/errext"
 	"go.k6.io/k6/v2/internal/build"
+	"go.k6.io/k6/v2/internal/cloudapi/provisioning"
 	"go.k6.io/k6/v2/internal/usage"
 	"go.k6.io/k6/v2/lib"
 	"go.k6.io/k6/v2/metrics"
@@ -50,6 +54,21 @@ type cloudClient interface {
 	TestFinished(referenceID string, thresholds cloudapi.ThresholdResult, tainted bool, runStatus cloudapi.RunStatus) error
 }
 
+// metricsPusher is the metrics-push HTTP layer used in provisioning mode.
+// Production implementation: *provisioning.HTTPClient.
+// Tests inject mocks via field assignment.
+type metricsPusher interface {
+	Do(req *http.Request, v any) error
+}
+
+// provisioningNotifier is the orchestrator-level client used to call notify
+// at end-of-test in provisioning mode.
+// Production implementation: *provisioning.Client.
+// Tests inject mocks via field assignment.
+type provisioningNotifier interface {
+	NotifyTestRunCompleted(ctx context.Context, testRunID int32, token string, testErr error) error
+}
+
 type apiVersion int64
 
 const (
@@ -80,6 +99,12 @@ type Output struct {
 
 	client       cloudClient
 	testStopFunc func(error)
+
+	// Provisioning-mode dependencies. nil for --out cloud and PushRefID;
+	// lazy-constructed in Start when Config.MetricsPushURL.Valid.
+	// Tests inject mocks via field assignment.
+	metricsPusher        metricsPusher
+	provisioningNotifier provisioningNotifier
 
 	usage *usage.Usage
 }
@@ -192,6 +217,17 @@ func (out *Output) Start() error {
 
 	if out.testRunID != "" {
 		out.logger.WithField("testRunId", out.testRunID).Debug("Directly pushing metrics without init")
+
+		// Provisioning-mode setup. PushRefID flows don't set
+		// MetricsPushURL, so this block is normally skipped for them.
+		// The explicit !PushRefID.Valid guard is defensive against a
+		// future cmd-layer regression that populates both fields.
+		if out.config.MetricsPushURL.Valid && out.config.TestRunToken.Valid && !out.config.PushRefID.Valid {
+			if err := out.lazyInitProvisioning(); err != nil {
+				return err
+			}
+		}
+
 		return out.startVersionedOutput()
 	}
 
@@ -392,6 +428,17 @@ func (out *Output) startVersionedOutput() error {
 		err = errors.New("v1 is not supported anymore")
 	case int64(apiVersion2):
 		out.versionedOutput, err = cloudv2.New(out.logger, out.config, nil)
+		if err != nil {
+			break
+		}
+
+		// Inject provisioning overrides if in provisioning mode.
+		if out.metricsPusher != nil && out.config.MetricsPushURL.Valid {
+			if v, ok := out.versionedOutput.(*cloudv2.Output); ok {
+				v.SetMetricsHTTPClient(out.metricsPusher)
+				v.SetMetricsURL(out.config.MetricsPushURL.String)
+			}
+		}
 	default:
 		err = fmt.Errorf("v%d is an unexpected version", out.config.APIVersion.Int64)
 	}
@@ -403,4 +450,59 @@ func (out *Output) startVersionedOutput() error {
 	out.SetTestRunID(out.testRunID)
 	out.versionedOutput.SetTestRunStopCallback(out.testStopFunc)
 	return out.versionedOutput.Start()
+}
+
+// lazyInitProvisioning constructs the provisioning-mode dependencies
+// (metrics-push HTTP client and provisioning notifier) when they haven't
+// been injected already. Tests inject mocks via field assignment before
+// calling Start.
+func (out *Output) lazyInitProvisioning() error {
+	// Lazy-construct the metrics-push HTTP client if not already injected
+	// (tests inject mocks via field assignment).
+	if out.metricsPusher == nil {
+		// Fresh *http.Client with the configured timeout (mirrors what
+		// cloudapi.Client constructs internally). Body-reset on retries
+		// is handled inside provisioning.HTTPClient.Do (via doWithRetry's
+		// explicit req.GetBody() between attempts), not at the transport
+		// layer — so a vanilla http.Client suffices.
+		httpClient := &http.Client{
+			Timeout: out.config.Timeout.TimeDuration(),
+		}
+		out.metricsPusher = provisioning.NewHTTPClient(
+			httpClient,
+			out.config.TestRunToken.String,
+			build.Version,
+			out.logger,
+		)
+	}
+
+	// Lazy-construct the provisioning notifier (used at end-of-test).
+	if out.provisioningNotifier == nil {
+		// Inline overflow check matches cmd_project_list.go:79-80 pattern
+		// (one cast in scope; local closure pattern would be overkill).
+		// stackID==0 is treated by provisioning.NewClient as "no stack
+		// configured" and the X-Stack-Id header is omitted.
+		var stackID int32
+		if out.config.StackID.Valid {
+			v := out.config.StackID.Int64
+			if v < math.MinInt32 || v > math.MaxInt32 {
+				return fmt.Errorf("stack ID %d overflows int32", v)
+			}
+			stackID = int32(v)
+		}
+		c, err := provisioning.NewClient(
+			out.logger,
+			out.config.Token.String, // long-lived k6 token (NOT scoped)
+			out.config.Hostv6.String,
+			build.Version,
+			stackID,
+			out.config.Timeout.TimeDuration(),
+		)
+		if err != nil {
+			return fmt.Errorf("provisioning client init: %w", err)
+		}
+		out.provisioningNotifier = c
+	}
+
+	return nil
 }
