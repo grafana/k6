@@ -8,6 +8,7 @@ import (
 	"math"
 	"net/http"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -332,6 +333,22 @@ func (out *Output) StopWithTestError(testErr error) error {
 func (out *Output) testFinished(testErr error) error {
 	if out.testRunID == "" || out.config.PushRefID.Valid {
 		return nil
+	}
+
+	// Provisioning mode: notify instead of the legacy TestFinished call.
+	if out.config.MetricsPushURL.Valid && out.config.TestRunToken.Valid {
+		// The provisioning API test-run IDs are int64; parse the full range.
+		testRunIDInt, err := strconv.ParseInt(out.testRunID, 10, 64)
+		if err != nil {
+			out.logger.WithError(err).Warn("could not parse testRunID for notify; skipping")
+			return nil
+		}
+		return out.provisioningNotifier.NotifyTestRunCompleted(
+			context.Background(),
+			testRunIDInt,
+			out.config.TestRunToken.String,
+			testErr,
+		)
 	}
 
 	testTainted := false

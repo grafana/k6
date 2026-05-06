@@ -385,11 +385,21 @@ func (m *metricsPusherMock) Do(_ *http.Request, _ any) error {
 
 // provisioningNotifierMock implements provisioningNotifier for tests.
 type provisioningNotifierMock struct {
-	called atomic.Bool
+	called    atomic.Bool
+	callCount atomic.Int32
+
+	// Captured arguments from the most recent call.
+	testRunID int64
+	token     string
+	testErr   error
 }
 
-func (m *provisioningNotifierMock) NotifyTestRunCompleted(_ context.Context, _ int64, _ string, _ error) error {
+func (m *provisioningNotifierMock) NotifyTestRunCompleted(_ context.Context, testRunID int64, token string, testErr error) error {
 	m.called.Store(true)
+	m.callCount.Add(1)
+	m.testRunID = testRunID
+	m.token = token
+	m.testErr = testErr
 	return nil
 }
 
@@ -504,4 +514,109 @@ func TestOutputStart_PushRefIDStillTakesPrecedence(t *testing.T) {
 	assert.Nil(t, out.provisioningNotifier, "provisioningNotifier should be nil when PushRefID takes precedence")
 
 	require.NoError(t, out.StopWithTestError(nil))
+}
+
+func TestOutputStopWithTestError_ProvisioningMode_NoError(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		notifierMock := &provisioningNotifierMock{}
+		clientMock := &cloudClientMock{}
+
+		out := &Output{
+			logger:    testutils.NewLogger(t),
+			testRunID: "12345",
+			config: cloudapi.Config{
+				MetricsPushURL: null.StringFrom("https://metrics.example.com/v2/metrics/123"),
+				TestRunToken:   null.StringFrom("scoped-test-run-token"),
+			},
+			client:               clientMock,
+			provisioningNotifier: notifierMock,
+		}
+
+		out.versionedOutput = versionedOutputMock{
+			callback: func(_ string) {},
+		}
+
+		require.NoError(t, out.StopWithTestError(nil))
+
+		// Notify was called exactly once with the right arguments.
+		assert.True(t, notifierMock.called.Load())
+		assert.Equal(t, int32(1), notifierMock.callCount.Load())
+		assert.Equal(t, int64(12345), notifierMock.testRunID)
+		assert.Equal(t, "scoped-test-run-token", notifierMock.token)
+		assert.Nil(t, notifierMock.testErr)
+
+		// TestFinished was NOT called (regression assertion).
+		assert.False(t, clientMock.testFinishedCalled)
+	})
+}
+
+func TestOutputStopWithTestError_ProvisioningMode_WithTestError(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		notifierMock := &provisioningNotifierMock{}
+		clientMock := &cloudClientMock{}
+
+		scriptErr := errext.WithAbortReasonIfNone(
+			errors.New("script error"),
+			errext.AbortedByScriptError,
+		)
+
+		out := &Output{
+			logger:    testutils.NewLogger(t),
+			testRunID: "12345",
+			config: cloudapi.Config{
+				MetricsPushURL: null.StringFrom("https://metrics.example.com/v2/metrics/123"),
+				TestRunToken:   null.StringFrom("scoped-test-run-token"),
+			},
+			client:               clientMock,
+			provisioningNotifier: notifierMock,
+		}
+
+		out.versionedOutput = versionedOutputMock{
+			callback: func(_ string) {},
+		}
+
+		require.NoError(t, out.StopWithTestError(scriptErr))
+
+		// Notify was called with the error verbatim (mapping to code 8035
+		// happens inside the real notifier, which is mocked here).
+		assert.True(t, notifierMock.called.Load())
+		assert.Equal(t, int64(12345), notifierMock.testRunID)
+		assert.Equal(t, "scoped-test-run-token", notifierMock.token)
+		assert.Equal(t, scriptErr, notifierMock.testErr)
+
+		// TestFinished was NOT called.
+		assert.False(t, clientMock.testFinishedCalled)
+	})
+}
+
+func TestOutputStopWithTestError_PushRefID_NoNotifyNoTestFinished(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		notifierMock := &provisioningNotifierMock{}
+		clientMock := &cloudClientMock{}
+
+		out := &Output{
+			logger:    testutils.NewLogger(t),
+			testRunID: "12345",
+			config: cloudapi.Config{
+				PushRefID:      null.StringFrom("99999"),
+				MetricsPushURL: null.StringFrom("https://metrics.example.com/v2/metrics/123"),
+				TestRunToken:   null.StringFrom("scoped-test-run-token"),
+			},
+			client:               clientMock,
+			provisioningNotifier: notifierMock,
+		}
+
+		out.versionedOutput = versionedOutputMock{
+			callback: func(_ string) {},
+		}
+
+		require.NoError(t, out.StopWithTestError(nil))
+
+		// PushRefID short-circuits: NEITHER notify NOR TestFinished called.
+		assert.False(t, notifierMock.called.Load())
+		assert.False(t, clientMock.testFinishedCalled)
+	})
 }
