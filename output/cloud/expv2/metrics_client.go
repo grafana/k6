@@ -15,10 +15,18 @@ import (
 	"go.k6.io/k6/v2/internal/output/cloud/expv2/pbcloud"
 )
 
-// metricsHTTPClientWithBaseURL is the interface used by metricsClient to perform HTTP requests.
-// It allows tests to inject a mock that returns immediately without using real HTTP.
-type metricsHTTPClientWithBaseURL interface {
+// metricsHTTPClient is the minimal HTTP transport contract used by
+// metricsClient post-construction. The legacy URL-deriving constructor
+// requires the extended metricsHTTPClientWithBaseURL; the explicit-URL
+// constructor (added later) takes only this smaller interface.
+type metricsHTTPClient interface {
 	Do(req *http.Request, v any) error
+}
+
+// metricsHTTPClientWithBaseURL extends metricsHTTPClient with BaseURL,
+// used by newMetricsClient to derive the metrics push URL from the host.
+type metricsHTTPClientWithBaseURL interface {
+	metricsHTTPClient
 	BaseURL() string
 }
 
@@ -26,7 +34,7 @@ type metricsHTTPClientWithBaseURL interface {
 // the collected metrics from the Cloud output
 // to the remote service.
 type metricsClient struct {
-	httpClient metricsHTTPClientWithBaseURL
+	httpClient metricsHTTPClient // was: metricsHTTPClientWithBaseURL
 	url        string
 }
 
