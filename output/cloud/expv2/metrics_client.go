@@ -60,6 +60,20 @@ func newMetricsClient(c metricsHTTPClientWithBaseURL, testRunID string) (*metric
 	}, nil
 }
 
+// newMetricsClientWithURL builds a metricsClient with an explicit push
+// URL and a smaller metricsHTTPClient (no BaseURL derivation). Used by
+// the provisioning-mode metrics push, where the URL is returned by the
+// API and not derived from a host.
+func newMetricsClientWithURL(c metricsHTTPClient, url string) (*metricsClient, error) {
+	if url == "" {
+		return nil, errors.New("metrics push URL is required")
+	}
+	return &metricsClient{
+		httpClient: c,
+		url:        url,
+	}, nil
+}
+
 // Push the provided metrics for the given test run ID.
 func (mc *metricsClient) push(samples *pbcloud.MetricSet) error {
 	b, err := newRequestBody(samples)

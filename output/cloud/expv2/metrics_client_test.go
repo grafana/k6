@@ -74,3 +74,33 @@ func (m *mockMetricsHTTPClientWithBaseURL) Do(_ *http.Request, _ any) error {
 func (m *mockMetricsHTTPClientWithBaseURL) BaseURL() string {
 	return "http://test/v1"
 }
+
+// mockMetricsHTTPClient implements only the smaller metricsHTTPClient
+// interface (Do-only, no BaseURL). Used to verify that the explicit-URL
+// constructor does not require the extended interface.
+type mockMetricsHTTPClient struct {
+	doErr error
+}
+
+func (m *mockMetricsHTTPClient) Do(_ *http.Request, _ any) error {
+	return m.doErr
+}
+
+func TestNewMetricsClientWithURL(t *testing.T) {
+	t.Parallel()
+
+	stub := &mockMetricsHTTPClient{}
+	mc, err := newMetricsClientWithURL(stub, "https://ingest.example/metrics/abc")
+	require.NoError(t, err)
+	assert.Equal(t, "https://ingest.example/metrics/abc", mc.url)
+	assert.Equal(t, stub, mc.httpClient)
+}
+
+func TestNewMetricsClientWithURL_EmptyURLReturnsError(t *testing.T) {
+	t.Parallel()
+
+	stub := &mockMetricsHTTPClient{}
+	_, err := newMetricsClientWithURL(stub, "")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "metrics push URL is required")
+}
