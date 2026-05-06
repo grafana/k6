@@ -15,9 +15,9 @@ import (
 	"go.k6.io/k6/v2/internal/output/cloud/expv2/pbcloud"
 )
 
-// metricsHTTPClient is the interface used by metricsClient to perform HTTP requests.
+// metricsHTTPClientWithBaseURL is the interface used by metricsClient to perform HTTP requests.
 // It allows tests to inject a mock that returns immediately without using real HTTP.
-type metricsHTTPClient interface {
+type metricsHTTPClientWithBaseURL interface {
 	Do(req *http.Request, v any) error
 	BaseURL() string
 }
@@ -26,12 +26,12 @@ type metricsHTTPClient interface {
 // the collected metrics from the Cloud output
 // to the remote service.
 type metricsClient struct {
-	httpClient metricsHTTPClient
+	httpClient metricsHTTPClientWithBaseURL
 	url        string
 }
 
 // newMetricsClient creates and initializes a new MetricsClient.
-func newMetricsClient(c metricsHTTPClient, testRunID string) (*metricsClient, error) {
+func newMetricsClient(c metricsHTTPClientWithBaseURL, testRunID string) (*metricsClient, error) {
 	// The cloudapi.Client works across different versions of the API, the test
 	// lifecycle management is under /v1 instead the metrics ingestion is /v2.
 	// Unfortunately, the current client has v1 hard-coded so we need to trim the wrong path
