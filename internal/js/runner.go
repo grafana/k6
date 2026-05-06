@@ -202,7 +202,7 @@ func (r *Runner) newVU(
 	// Disabled by default to preserve existing behaviour; opt in via tlsAIAFetch: true or
 	// K6_TLS_AIA_FETCH=true. The wrapper is always a no-op when insecureSkipTLSVerify is true.
 	if r.Bundle.Options.TLSAIAFetch.Valid && r.Bundle.Options.TLSAIAFetch.Bool {
-		tlsConfig = netext.WrapTLSConfigForAIAFetching(tlsConfig, r.preInitState.Logger, nil)
+		tlsConfig = netext.WrapTLSConfigForAIAFetching(tlsConfig, r.preInitState.Logger, nil) //nolint:contextcheck
 	}
 	transport := &http.Transport{
 		Proxy:               http.ProxyFromEnvironment,

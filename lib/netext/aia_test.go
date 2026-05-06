@@ -137,7 +137,7 @@ func (tc *testChain) leafTLSCert(t *testing.T) tls.Certificate {
 func (tc *testChain) leafOnlyTLSServer(t *testing.T) *httptest.Server {
 	t.Helper()
 	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		fmt.Fprintln(w, "ok")
+		_, _ = fmt.Fprintln(w, "ok")
 	}))
 	srv.TLS = &tls.Config{Certificates: []tls.Certificate{tc.leafTLSCert(t)}}
 	srv.StartTLS()
@@ -182,11 +182,19 @@ func testHTTPClient(t *testing.T, tlsCfg *tls.Config) *http.Client {
 }
 
 // nullLogger returns a logrus logger that discards all output.
-func nullLogger() *logrus.Logger {
+func nullLogger() logrus.FieldLogger {
 	l := logrus.New()
 	l.SetOutput(nil)
 	l.SetLevel(logrus.PanicLevel)
 	return l
+}
+
+// closeBody closes resp.Body when resp is non-nil, discarding any close error.
+// Used in tests that expect TLS failures where the response body is typically nil.
+func closeBody(resp *http.Response) {
+	if resp != nil {
+		_ = resp.Body.Close()
+	}
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -210,7 +218,7 @@ func TestWrapTLSConfigForAIAFetching_HappyPath(t *testing.T) {
 	)
 	resp, err := testHTTPClient(t, wrappedCfg).Get(tlsSrv.URL) //nolint:noctx
 	require.NoError(t, err, "AIA fetching should resolve the incomplete chain")
-	resp.Body.Close()
+	_ = resp.Body.Close()
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -236,7 +244,7 @@ func TestWrapTLSConfigForAIAFetching_CompleteChainPassesThrough(t *testing.T) {
 	fullChainCert.Certificate = append(fullChainCert.Certificate, chain.intermediateCert.Raw)
 
 	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		fmt.Fprintln(w, "ok")
+		_, _ = fmt.Fprintln(w, "ok")
 	}))
 	srv.TLS = &tls.Config{Certificates: []tls.Certificate{fullChainCert}}
 	srv.StartTLS()
@@ -249,7 +257,7 @@ func TestWrapTLSConfigForAIAFetching_CompleteChainPassesThrough(t *testing.T) {
 	)
 	resp, err := testHTTPClient(t, wrappedCfg).Get(srv.URL) //nolint:noctx
 	require.NoError(t, err, "complete chain should succeed without any AIA fetch")
-	resp.Body.Close()
+	_ = resp.Body.Close()
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -268,7 +276,8 @@ func TestWrapTLSConfigForAIAFetching_Disabled(t *testing.T) {
 
 	// No wrapping – behaves exactly like plain Go TLS.
 	plainCfg := &tls.Config{RootCAs: chain.rootPool}
-	_, err := testHTTPClient(t, plainCfg).Get(tlsSrv.URL) //nolint:noctx
+	resp, err := testHTTPClient(t, plainCfg).Get(tlsSrv.URL) //nolint:noctx
+	closeBody(resp)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "certificate signed by unknown authority",
 		"without AIA fetching the incomplete chain must be rejected")
@@ -281,7 +290,7 @@ func TestWrapTLSConfigForAIAFetching_Disabled(t *testing.T) {
 func TestWrapTLSConfigForAIAFetching_InsecureSkipVerifyUnchanged(t *testing.T) {
 	t.Parallel()
 
-	cfg := &tls.Config{InsecureSkipVerify: true} //nolint:gosec
+	cfg := &tls.Config{InsecureSkipVerify: true}
 	result := WrapTLSConfigForAIAFetching(cfg, nullLogger(), nil)
 	assert.Same(t, cfg, result, "wrapper must return the original config when InsecureSkipVerify is set")
 }
@@ -294,15 +303,12 @@ func TestWrapTLSConfigForAIAFetching_UnreachableAIAURL(t *testing.T) {
 	t.Parallel()
 
 	// Grab a free port, then close the listener so the port is not listening.
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	ln, err := net.Listen("tcp", "127.0.0.1:0") //nolint:noctx
 	require.NoError(t, err)
-	port := ln.Addr().(*net.TCPAddr).Port //nolint:forcetypeassert
+	port := ln.Addr().(*net.TCPAddr).Port
 	require.NoError(t, ln.Close())
 
 	aiaURL := fmt.Sprintf("http://127.0.0.1:%d/ca.der", port)
-	h := &aiaHandler{} // never called
-	aiaSrv := startAIAServer(t, h)
-	_ = aiaSrv // only to satisfy newTestChain signature; we override the AIA URL below
 	chain := newTestChain(t, aiaURL) // leaf cert points to closed port
 	tlsSrv := chain.leafOnlyTLSServer(t)
 
@@ -314,7 +320,8 @@ func TestWrapTLSConfigForAIAFetching_UnreachableAIAURL(t *testing.T) {
 		fastClient,
 	)
 
-	_, err = testHTTPClient(t, wrappedCfg).Get(tlsSrv.URL) //nolint:noctx
+	resp, err := testHTTPClient(t, wrappedCfg).Get(tlsSrv.URL) //nolint:noctx
+	closeBody(resp)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "certificate signed by unknown authority",
 		"should fall back to the original x509 error when AIA URL is unreachable")
@@ -346,8 +353,9 @@ func TestWrapTLSConfigForAIAFetching_FetchTimeout(t *testing.T) {
 	)
 
 	start := time.Now()
-	_, err := testHTTPClient(t, wrappedCfg).Get(tlsSrv.URL) //nolint:noctx
+	resp, err := testHTTPClient(t, wrappedCfg).Get(tlsSrv.URL) //nolint:noctx
 	elapsed := time.Since(start)
+	closeBody(resp)
 
 	require.Error(t, err)
 	assert.Less(t, elapsed, 5*shortTimeout,
@@ -377,7 +385,8 @@ func TestWrapTLSConfigForAIAFetching_AIAReturnsHTTPError(t *testing.T) {
 		nil,
 	)
 
-	_, err := testHTTPClient(t, wrappedCfg).Get(tlsSrv.URL) //nolint:noctx
+	resp, err := testHTTPClient(t, wrappedCfg).Get(tlsSrv.URL) //nolint:noctx
+	closeBody(resp)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "certificate signed by unknown authority")
 }
@@ -405,7 +414,8 @@ func TestWrapTLSConfigForAIAFetching_MalformedAIACert(t *testing.T) {
 		nil,
 	)
 
-	_, err := testHTTPClient(t, wrappedCfg).Get(tlsSrv.URL) //nolint:noctx
+	resp, err := testHTTPClient(t, wrappedCfg).Get(tlsSrv.URL) //nolint:noctx
+	closeBody(resp)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "certificate signed by unknown authority",
 		"malformed AIA certificate should be silently ignored; original error is returned")
@@ -458,8 +468,9 @@ func TestWrapTLSConfigForAIAFetching_CircularAIAReferences(t *testing.T) {
 	)
 
 	start := time.Now()
-	_, err = testHTTPClient(t, wrappedCfg).Get(tlsSrv.URL) //nolint:noctx
+	resp, err := testHTTPClient(t, wrappedCfg).Get(tlsSrv.URL) //nolint:noctx
 	elapsed := time.Since(start)
+	closeBody(resp)
 
 	require.Error(t, err, "circular AIA chain must not succeed")
 	assert.Less(t, elapsed, 10*time.Second, "circular reference must terminate, not loop")
@@ -489,6 +500,7 @@ func TestWrapTLSConfigForAIAFetching_HostnameMismatchRejected(t *testing.T) {
 		nil,
 	)
 
-	_, err := testHTTPClient(t, wrappedCfg).Get(tlsSrv.URL) //nolint:noctx
+	resp, err := testHTTPClient(t, wrappedCfg).Get(tlsSrv.URL) //nolint:noctx
+	closeBody(resp)
 	require.Error(t, err, "wrong hostname must be rejected even after AIA succeeds")
 }

@@ -205,7 +205,7 @@ func TestVUIntegrationAIAFetching(t *testing.T) {
 
 					// Give the VU only the root CA – no intermediate.
 					// With AIA enabled, it should fetch the intermediate automatically.
-					initVU.(*VU).TLSConfig.RootCAs = rootPool //nolint:forcetypeassert
+					initVU.(*VU).TLSConfig.RootCAs = rootPool
 
 					vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 					runErr := vu.RunOnce()
