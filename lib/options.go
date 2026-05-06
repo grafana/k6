@@ -444,6 +444,9 @@ func (o Options) Apply(opts Options) Options {
 	if opts.InsecureSkipTLSVerify.Valid {
 		o.InsecureSkipTLSVerify = opts.InsecureSkipTLSVerify
 	}
+	if opts.TLSAIAFetch.Valid {
+		o.TLSAIAFetch = opts.TLSAIAFetch
+	}
 	if opts.TLSCipherSuites != nil {
 		o.TLSCipherSuites = opts.TLSCipherSuites
 	}
