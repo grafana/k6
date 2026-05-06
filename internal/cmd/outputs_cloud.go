@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -15,8 +17,10 @@ import (
 	"go.k6.io/k6/v2/cloudapi"
 	"go.k6.io/k6/v2/cmd/state"
 	"go.k6.io/k6/v2/internal/build"
+	"go.k6.io/k6/v2/internal/cloudapi/provisioning"
 	cloudsecrets "go.k6.io/k6/v2/internal/secretsource/cloud"
 	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/lib/types"
 	"go.k6.io/k6/v2/metrics"
 )
 
@@ -32,7 +36,7 @@ const (
 // This method also sets the test run ID in the environment so it can be used later,
 // and applies any Cloud configuration overrides returned by the API.
 //
-//nolint:funlen
+//nolint:funlen,gocognit,cyclop
 func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error {
 	// Otherwise, we continue normally with the creation of the test run in the k6 Cloud backend services.
 	conf, warn, err := cloudapi.GetConsolidatedConfig(
@@ -104,64 +108,100 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 		testArchive = test.makeArchive()
 	}
 
-	testRun := &cloudapi.TestRun{
-		Name:       conf.Name.String,
-		ProjectID:  conf.ProjectID.Int64,
-		VUsMax:     int64(lib.GetMaxPossibleVUs(executionPlan)), //nolint:gosec
-		Thresholds: thresholds,
-		Duration:   int64(duration / time.Second),
-		Archive:    testArchive,
-	}
-
 	logger := gs.Logger.WithFields(logrus.Fields{"output": builtinOutputCloud.String()})
 
-	apiClient := cloudapi.NewClient(
-		logger, conf.Token.String, conf.Host.String, build.Version, conf.Timeout.TimeDuration())
-	if conf.StackID.Valid {
-		apiClient.SetStackID(conf.StackID.Int64)
+	// Safe int64 → int32 conversion (same pattern as prepCloudTestRun).
+	toInt32 := func(v int64) (int32, error) {
+		if v < math.MinInt32 || v > math.MaxInt32 {
+			return 0, fmt.Errorf("value %d overflows int32", v)
+		}
+		return int32(v), nil
 	}
 
-	if testRun.ProjectID == 0 {
+	// stackID==0 is treated by provisioning.NewClient as "no stack
+	// configured" and the X-Stack-Id header is omitted; this preserves
+	// behavior for callers that did not set K6_CLOUD_STACK_ID.
+	var stackID int32
+	if conf.StackID.Valid {
+		var err error
+		stackID, err = toInt32(conf.StackID.Int64)
+		if err != nil {
+			return err
+		}
+	}
+
+	provClient, err := provisioning.NewClient(
+		logger, conf.Token.String, conf.Hostv6.String, build.Version,
+		stackID,
+		conf.Timeout.TimeDuration(),
+	)
+	if err != nil {
+		return err
+	}
+
+	if conf.ProjectID.Int64 == 0 {
 		projectID, err := resolveDefaultProjectID(gs, &conf)
 		if err != nil {
 			return err
 		}
 		if projectID > 0 {
-			testRun.ProjectID = projectID
+			conf.ProjectID = null.IntFrom(projectID)
 		}
 	}
 
-	response, err := apiClient.CreateTestRun(testRun)
+	// Marshal the resolved lib.Options as json.RawMessage for the request
+	// body's `options` field. No map[string]any round-trip — preserves
+	// typed precision from lib.Options custom marshalers.
+	optionsJSON, err := json.Marshal(test.derivedConfig.Options)
+	if err != nil {
+		return fmt.Errorf("marshalling options: %w", err)
+	}
+
+	ctx := gs.Ctx
+	result, err := provClient.ProvisionLocalExecution(ctx, provisioning.ProvisionParams{
+		Name:          conf.Name.String,
+		ProjectID:     conf.ProjectID.Int64,
+		MaxVUs:        int64(lib.GetMaxPossibleVUs(executionPlan)), //nolint:gosec
+		TotalDuration: int64(duration / time.Second),
+		Options:       json.RawMessage(optionsJSON),
+		Archive:       testArchive,
+	})
 	if err != nil {
 		return err
 	}
 
-	// We store the test run id in the environment, so it can be used later.
-	test.preInitState.RuntimeOptions.Env[testRunIDKey] = response.ReferenceID
+	// Stash testRunID in env (existing pattern).
+	test.preInitState.RuntimeOptions.Env[testRunIDKey] = strconv.FormatInt(result.TestRunID, 10)
 
-	if response.SecretsConfig != nil && gs.CloudSecretSource != nil {
+	// Apply runtime_config metrics tuning to the Config. Malformed duration
+	// strings from the backend are logged as warnings, not failures.
+	conf = conf.Apply(buildConfigFromRuntimeConfig(logger, result.RuntimeConfig))
+
+	// Set the Config fields that the cloud Output reads for metrics push.
+	conf.MetricsPushURL = null.StringFrom(result.RuntimeConfig.Metrics.PushURL)
+	conf.TestRunToken = null.StringFrom(result.RuntimeConfig.TestRunToken)
+
+	// Set the test run details page URL for the output banner.
+	conf.TestRunDetails = null.StringFrom(result.TestRunDetailsPageURL)
+
+	// Register secrets config (always present in the provisioning response).
+	if gs.CloudSecretSource != nil {
 		gs.CloudSecretSource.SetConfig(&cloudsecrets.Config{
-			Token:        response.TestRunToken,
-			Endpoint:     response.SecretsConfig.Endpoint,
-			ResponsePath: response.SecretsConfig.ResponsePath,
+			Token:        result.RuntimeConfig.TestRunToken,
+			Endpoint:     result.RuntimeConfig.Secrets.Endpoint,
+			ResponsePath: result.RuntimeConfig.Secrets.ResponsePath,
 		})
 	}
 
-	// If the Cloud API returned configuration overrides, we apply them to the current configuration.
-	// Then, we serialize the overridden configuration back, so it can be used by the Cloud output.
-	if response.ConfigOverride != nil {
-		logger.WithFields(logrus.Fields{"override": response.ConfigOverride}).Debug("overriding config options")
-
-		raw, err := cloudConfToRawMessage(conf.Apply(*response.ConfigOverride))
-		if err != nil {
-			return fmt.Errorf("could not serialize overridden cloud configuration: %w", err)
-		}
-
-		if test.derivedConfig.Collectors == nil {
-			test.derivedConfig.Collectors = make(map[string]json.RawMessage)
-		}
-		test.derivedConfig.Collectors[builtinOutputCloud.String()] = raw
+	// Serialise overridden Config back into the collectors map (existing pattern).
+	raw, err := cloudConfToRawMessage(conf)
+	if err != nil {
+		return fmt.Errorf("could not serialize overridden cloud configuration: %w", err)
 	}
+	if test.derivedConfig.Collectors == nil {
+		test.derivedConfig.Collectors = make(map[string]json.RawMessage)
+	}
+	test.derivedConfig.Collectors[builtinOutputCloud.String()] = raw
 
 	return nil
 }
@@ -212,4 +252,59 @@ func resolveCloudTestName(name null.String, scriptPath string) (null.String, err
 		name = null.StringFrom(defaultTestName)
 	}
 	return name, nil
+}
+
+// buildConfigFromRuntimeConfig maps provisioning RuntimeConfig fields
+// to cloudapi.Config fields.
+//
+// If the backend returns an unparseable duration string, a warning is
+// logged and the cloudapi.Config default is kept. Graceful degradation
+// is preferable to blocking the user for a backend-side bug.
+func buildConfigFromRuntimeConfig(
+	logger logrus.FieldLogger, rc provisioning.RuntimeConfig,
+) cloudapi.Config {
+	cfg := cloudapi.Config{}
+
+	// metrics.push_interval (string nullable) → MetricPushInterval (NullDuration)
+	if v := rc.Metrics.PushInterval; v != nil {
+		if d, err := time.ParseDuration(*v); err == nil {
+			cfg.MetricPushInterval = types.NewNullDuration(d, true)
+		} else {
+			logger.WithError(err).WithField("field", "push_interval").
+				Warn("invalid duration in runtime_config; using default")
+		}
+	}
+	// metrics.push_concurrency (int32 nullable) → MetricPushConcurrency (null.Int)
+	if v := rc.Metrics.PushConcurrency; v != nil {
+		cfg.MetricPushConcurrency = null.IntFrom(int64(*v))
+	}
+	// metrics.aggregation_period (string nullable) → AggregationPeriod (NullDuration)
+	if v := rc.Metrics.AggregationPeriod; v != nil {
+		if d, err := time.ParseDuration(*v); err == nil {
+			cfg.AggregationPeriod = types.NewNullDuration(d, true)
+		} else {
+			logger.WithError(err).WithField("field", "aggregation_period").
+				Warn("invalid duration in runtime_config; using default")
+		}
+	}
+	// metrics.aggregation_wait_period (string nullable) → AggregationWaitPeriod
+	if v := rc.Metrics.AggregationWaitPeriod; v != nil {
+		if d, err := time.ParseDuration(*v); err == nil {
+			cfg.AggregationWaitPeriod = types.NewNullDuration(d, true)
+		} else {
+			logger.WithError(err).WithField("field", "aggregation_wait_period").
+				Warn("invalid duration in runtime_config; using default")
+		}
+	}
+	// metrics.max_samples_per_package (int32 nullable) → MaxTimeSeriesInBatch
+	// (semantically the same field — per-batch series cap)
+	if v := rc.Metrics.MaxSamplesPerPackage; v != nil {
+		cfg.MaxTimeSeriesInBatch = null.IntFrom(int64(*v))
+	}
+
+	// rc.Metrics.AggregationMinSamples is intentionally not mapped.
+	// expv2 has no min-samples aggregation knob; adding one would
+	// require changes to output/cloud/expv2/{collect.go, flush.go}.
+
+	return cfg
 }
