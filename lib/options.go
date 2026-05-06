@@ -281,6 +281,12 @@ type Options struct {
 	TLSVersion      *TLSVersions     `json:"tlsVersion" ignored:"true"`
 	TLSAuth         []*TLSAuth       `json:"tlsAuth" envconfig:"K6_TLSAUTH"`
 
+	// Fetch missing intermediate certificates via the AIA (Authority Information Access)
+	// extension when the server presents an incomplete chain. Mirrors what browsers do.
+	// Disabled by default; opt in via tlsAIAFetch: true or K6_TLS_AIA_FETCH=true.
+	// Has no effect when InsecureSkipTLSVerify is true.
+	TLSAIAFetch null.Bool `json:"tlsAIAFetch" envconfig:"K6_TLS_AIA_FETCH"`
+
 	// Throw warnings (eg. failed HTTP requests) as errors instead of simply logging them.
 	Throw null.Bool `json:"throw" envconfig:"K6_THROW"`
 

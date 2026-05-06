@@ -195,6 +195,15 @@ func (r *Runner) newVU(
 		})
 		tlsConfig.NameToCertificate = nameToCert //nolint:staticcheck
 	}
+	// When tlsAIAFetch is explicitly set to true, wrap the TLS config to fetch missing
+	// intermediate certificates via AIA (Authority Information Access). This mirrors browser
+	// behaviour and fixes "x509: certificate signed by unknown authority" for servers that
+	// rely on AIA rather than sending the full chain.
+	// Disabled by default to preserve existing behaviour; opt in via tlsAIAFetch: true or
+	// K6_TLS_AIA_FETCH=true. The wrapper is always a no-op when insecureSkipTLSVerify is true.
+	if r.Bundle.Options.TLSAIAFetch.Valid && r.Bundle.Options.TLSAIAFetch.Bool {
+		tlsConfig = netext.WrapTLSConfigForAIAFetching(tlsConfig, r.preInitState.Logger, nil)
+	}
 	transport := &http.Transport{
 		Proxy:               http.ProxyFromEnvironment,
 		TLSClientConfig:     tlsConfig,

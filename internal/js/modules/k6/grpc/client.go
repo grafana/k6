@@ -163,12 +163,14 @@ func buildTLSConfig(parentConfig *tls.Config, certificate, key []byte, caCertifi
 	// from the vu state tls.Config
 
 	tlsCfg := &tls.Config{
-		CipherSuites:       parentConfig.CipherSuites,
-		InsecureSkipVerify: parentConfig.InsecureSkipVerify, //nolint:gosec
-		MinVersion:         parentConfig.MinVersion,
-		MaxVersion:         parentConfig.MaxVersion,
-		Renegotiation:      parentConfig.Renegotiation,
-		RootCAs:            cp,
+		CipherSuites:          parentConfig.CipherSuites,
+		InsecureSkipVerify:    parentConfig.InsecureSkipVerify, //nolint:gosec
+		MinVersion:            parentConfig.MinVersion,
+		MaxVersion:            parentConfig.MaxVersion,
+		Renegotiation:         parentConfig.Renegotiation,
+		RootCAs:               cp,
+		VerifyPeerCertificate: parentConfig.VerifyPeerCertificate,
+		VerifyConnection:      parentConfig.VerifyConnection,
 	}
 	if len(certificate) > 0 && len(key) > 0 {
 		cert, err := tls.X509KeyPair(certificate, key)
