@@ -542,7 +542,7 @@ func TestProcessUseDirectives(t *testing.T) {
 			input: `
 				"use k6 with k6/x/A +1.4.0"
 				`,
-			expectedError: `error while parsing use directives constraint "+1.4.0" for "k6/x/A" in "name.js": improper constraint: +1.4.0`,
+			expectedError: `error while parsing use directives constraint "+1.4.0" for "k6/x/A" in "name.js": improper constraint: "+1.4.0"`,
 		},
 	}
 
