@@ -36,6 +36,9 @@ jobs:
       k6_version: ${{ steps.get_k6_version.outputs.k6_version }}
       go_version: ${{ steps.get_go_version.outputs.go_version }}
       sign_windows_artifacts: ${{ steps.determine_windows_signing.outputs.sign_windows_artifacts }}
+      major: ${{ steps.classify_release.outputs.major }}
+      is_prerelease: ${{ steps.classify_release.outputs.is_prerelease }}
+      is_latest_stable: ${{ steps.classify_release.outputs.is_latest_stable }}
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -95,6 +98,37 @@ jobs:
             sign_windows_artifacts="false"
           fi
           echo "sign_windows_artifacts=${sign_windows_artifacts}" >> ${GITHUB_OUTPUT}
+
+      # Classify the release so we can decide whether this build should:
+      #  - move the Docker :latest tag (only the highest stable tag overall)
+      #  - move the Docker :vN floating major tag (any stable tag, per major)
+      #  - be marked as the GitHub "Latest release" or as a pre-release
+      # This prevents pre-releases (e.g. -rc) and maintenance releases on
+      # older majors (e.g. v1.x after v2.0.0 ships) from claiming "latest".
+      - name: Classify release
+        id: classify_release
+        env:
+          VERSION: ${{ steps.get_k6_version.outputs.k6_version }}
+        run: |
+          set -x
+          MAJOR=""
+          IS_PRERELEASE=false
+          IS_LATEST_STABLE=false
+          if [[ "${GITHUB_REF}" =~ ^refs/tags/v.+$ ]]; then
+            MAJOR=$(echo "${VERSION}" | sed -E 's/^v([0-9]+).*/\1/')
+            if [[ "${VERSION}" == *-* ]]; then
+              IS_PRERELEASE=true
+            fi
+            # Highest stable tag in the repo (excludes anything with a
+            # pre-release identifier like -rc, -beta, -dev).
+            MAX_STABLE=$(git tag --sort=-v:refname | grep -vE '-' | head -n1 || true)
+            if [[ "${IS_PRERELEASE}" == "false" && "${VERSION}" == "${MAX_STABLE}" ]]; then
+              IS_LATEST_STABLE=true
+            fi
+          fi
+          echo "major=${MAJOR}" >> ${GITHUB_OUTPUT}
+          echo "is_prerelease=${IS_PRERELEASE}" >> ${GITHUB_OUTPUT}
+          echo "is_latest_stable=${IS_LATEST_STABLE}" >> ${GITHUB_OUTPUT}
 
   build:
     runs-on: ubuntu-latest
@@ -239,7 +273,30 @@ jobs:
             --platform linux/amd64,linux/arm64 \
             -t $DOCKER_IMAGE_ID:$VERSION-with-browser \
             -t ghcr.io/$GHCR_IMAGE_ID:$VERSION-with-browser .
-          # We also want to tag the latest stable version as latest
+      # Move the floating major tag (e.g. :v1, :v2) for any stable release on
+      # that major. Pre-releases (-rc, -beta, ...) do not move it.
+      - name: Publish floating major tag
+        if: ${{ startsWith(github.ref, 'refs/tags/v') && needs.configure.outputs.is_prerelease == 'false' }}
+        env:
+          MAJOR: ${{ needs.configure.outputs.major }}
+        run: |
+          echo "Publish $GHCR_IMAGE_ID:v$MAJOR images"
+          docker buildx build --push \
+            --target release \
+            --platform linux/amd64,linux/arm64 \
+            -t $DOCKER_IMAGE_ID:v$MAJOR \
+            -t ghcr.io/$GHCR_IMAGE_ID:v$MAJOR .
+          docker buildx build --push \
+            --target with-browser \
+            --platform linux/amd64,linux/arm64 \
+            -t $DOCKER_IMAGE_ID:v$MAJOR-with-browser \
+            -t ghcr.io/$GHCR_IMAGE_ID:v$MAJOR-with-browser .
+      # Only the highest stable tag in the repo gets :latest. Maintenance
+      # releases on older majors (e.g. v1.x after v2.0.0 ships) and any
+      # pre-release must not move :latest.
+      - name: Publish :latest
+        if: ${{ needs.configure.outputs.is_latest_stable == 'true' }}
+        run: |
           echo "Publish $GHCR_IMAGE_ID:latest"
           docker buildx build --push \
             --target release \
@@ -493,13 +550,24 @@ jobs:
       - name: Create release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IS_LATEST_STABLE: ${{ needs.configure.outputs.is_latest_stable }}
+          IS_PRERELEASE: ${{ needs.configure.outputs.is_prerelease }}
         run: |
           set -x
           assets=()
           for asset in ./dist/*; do
             assets+=("$asset")
           done
-          gh release create "$VERSION" "${assets[@]}" --target "$GITHUB_SHA" -F "./release notes/${VERSION}.md"
+          # --latest=false prevents pre-releases and maintenance releases on
+          # older majors from being shown as the "Latest release" on GitHub.
+          extra_args=( "--latest=${IS_LATEST_STABLE}" )
+          if [[ "${IS_PRERELEASE}" == "true" ]]; then
+            extra_args+=( "--prerelease" )
+          fi
+          gh release create "$VERSION" "${assets[@]}" \
+            --target "$GITHUB_SHA" \
+            -F "./release notes/${VERSION}.md" \
+            "${extra_args[@]}"
 
   submit-winget-manifest:
     needs: [configure, publish-github]
