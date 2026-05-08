@@ -39,6 +39,7 @@ jobs:
       major: ${{ steps.classify_release.outputs.major }}
       is_prerelease: ${{ steps.classify_release.outputs.is_prerelease }}
       is_latest_stable: ${{ steps.classify_release.outputs.is_latest_stable }}
+      is_latest_in_major: ${{ steps.classify_release.outputs.is_latest_in_major }}
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -114,6 +115,7 @@ jobs:
           MAJOR=""
           IS_PRERELEASE=false
           IS_LATEST_STABLE=false
+          IS_LATEST_IN_MAJOR=false
           if [[ "${GITHUB_REF}" =~ ^refs/tags/v.+$ ]]; then
             MAJOR=$(echo "${VERSION}" | sed -E 's/^v([0-9]+).*/\1/')
             if [[ "${VERSION}" == *-* ]]; then
@@ -125,10 +127,22 @@ jobs:
             if [[ "${IS_PRERELEASE}" == "false" && "${VERSION}" == "${MAX_STABLE}" ]]; then
               IS_LATEST_STABLE=true
             fi
+            # Highest stable tag within this tag's major. Needed because
+            # we can ship multiple bugfix releases on an older major
+            # (e.g. v1.4.2 after v1.5.0 is already out on the v1 line):
+            # only the newest one on that major should move :vN.
+            MAX_STABLE_IN_MAJOR=$(git tag --sort=-v:refname \
+              | grep -vE '-' \
+              | grep -E "^v${MAJOR}\." \
+              | head -n1 || true)
+            if [[ "${IS_PRERELEASE}" == "false" && "${VERSION}" == "${MAX_STABLE_IN_MAJOR}" ]]; then
+              IS_LATEST_IN_MAJOR=true
+            fi
           fi
           echo "major=${MAJOR}" >> ${GITHUB_OUTPUT}
           echo "is_prerelease=${IS_PRERELEASE}" >> ${GITHUB_OUTPUT}
           echo "is_latest_stable=${IS_LATEST_STABLE}" >> ${GITHUB_OUTPUT}
+          echo "is_latest_in_major=${IS_LATEST_IN_MAJOR}" >> ${GITHUB_OUTPUT}
 
   build:
     runs-on: ubuntu-latest
@@ -273,10 +287,12 @@ jobs:
             --platform linux/amd64,linux/arm64 \
             -t $DOCKER_IMAGE_ID:$VERSION-with-browser \
             -t ghcr.io/$GHCR_IMAGE_ID:$VERSION-with-browser .
-      # Move the floating major tag (e.g. :v1, :v2) for any stable release on
-      # that major. Pre-releases (-rc, -beta, ...) do not move it.
+      # Move the floating major tag (e.g. :v1, :v2) only when this tag is
+      # the highest stable tag on its major. Pre-releases never move it,
+      # and a bugfix released on an older line within the same major
+      # (e.g. v1.4.2 after v1.5.0) does not regress :vN.
       - name: Publish floating major tag
-        if: ${{ startsWith(github.ref, 'refs/tags/v') && needs.configure.outputs.is_prerelease == 'false' }}
+        if: ${{ needs.configure.outputs.is_latest_in_major == 'true' }}
         env:
           MAJOR: ${{ needs.configure.outputs.major }}
         run: |
