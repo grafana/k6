@@ -510,10 +510,11 @@ func TestWrapTLSConfigForAIAFetching_HostnameMismatchRejected(t *testing.T) {
 //
 // Run with: go test -bench=BenchmarkTLSHandshake -benchtime=5s ./lib/netext/
 //
-// Three data points:
-//   - Baseline   : full chain, no AIA wrapper (cost floor)
-//   - WarmCache  : AIA wrapper, intermediate already cached (steady state)
-//   - ColdCache  : AIA wrapper, cache evicted per iteration (first connection cost)
+// Four data points:
+//   - Baseline      : full chain, no AIA wrapper (cost floor)
+//   - AIANotNeeded  : AIA wrapper enabled, server sends full chain — no fetch triggered
+//   - WarmCache     : AIA wrapper, incomplete chain, intermediate already cached (steady state)
+//   - ColdCache     : AIA wrapper, incomplete chain, cache evicted per iteration (first connection cost)
 // ────────────────────────────────────────────────────────────────────────────
 
 // newBenchClient returns an http.Client that forces a fresh TCP+TLS connection on every
@@ -556,6 +557,47 @@ func BenchmarkTLSHandshake_Baseline(b *testing.B) {
 	b.Cleanup(srv.Close)
 
 	client := newBenchClient(&tls.Config{RootCAs: chain.rootPool})
+
+	b.ResetTimer()
+	for b.Loop() {
+		resp, err := client.Get(srv.URL) //nolint:noctx
+		require.NoError(b, err)
+		_ = resp.Body.Close()
+	}
+}
+
+// BenchmarkTLSHandshake_AIANotNeeded measures a TLS handshake where AIA fetching is enabled
+// but the server sends a complete certificate chain, so verification succeeds on the first
+// attempt and no HTTP fetch is ever triggered.
+func BenchmarkTLSHandshake_AIANotNeeded(b *testing.B) {
+	h := &aiaHandler{}
+	aiaSrv := startAIAServer(b, h)
+	chain := newTestChain(b, aiaSrv.URL+"/ca.der")
+	h.setCert(chain.intermediateDER)
+
+	// Full chain server: leaf + intermediate — same as Baseline, but with AIA wrapper active.
+	leafKeyDER, err := x509.MarshalECPrivateKey(chain.leafKey)
+	require.NoError(b, err)
+	fullChainCert, err := tls.X509KeyPair(
+		pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: chain.leafCert.Raw}),
+		pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: leafKeyDER}),
+	)
+	require.NoError(b, err)
+	fullChainCert.Certificate = append(fullChainCert.Certificate, chain.intermediateCert.Raw)
+
+	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = fmt.Fprintln(w, "ok")
+	}))
+	srv.TLS = &tls.Config{Certificates: []tls.Certificate{fullChainCert}}
+	srv.StartTLS()
+	b.Cleanup(srv.Close)
+
+	wrappedCfg := WrapTLSConfigForAIAFetching(
+		&tls.Config{RootCAs: chain.rootPool},
+		nullLogger(),
+		nil,
+	)
+	client := newBenchClient(wrappedCfg)
 
 	b.ResetTimer()
 	for b.Loop() {
