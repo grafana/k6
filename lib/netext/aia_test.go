@@ -40,16 +40,16 @@ type testChain struct {
 // newTestChain builds a root CA, intermediate CA, and leaf certificate.
 // aiaURL is baked into both the intermediate and leaf as their IssuingCertificateURL,
 // so that WrapTLSConfigForAIAFetching knows where to fetch the intermediate from.
-func newTestChain(t *testing.T, aiaURL string) *testChain {
+func newTestChain(t testing.TB, aiaURL string) *testChain {
 	t.Helper()
 
-	genKey := func(t *testing.T) *ecdsa.PrivateKey {
+	genKey := func(t testing.TB) *ecdsa.PrivateKey {
 		t.Helper()
 		k, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 		require.NoError(t, err)
 		return k
 	}
-	serial := func(t *testing.T) *big.Int {
+	serial := func(t testing.TB) *big.Int {
 		t.Helper()
 		n, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
 		require.NoError(t, err)
@@ -120,7 +120,7 @@ func newTestChain(t *testing.T, aiaURL string) *testChain {
 }
 
 // leafTLSCert returns a tls.Certificate containing only the leaf (no chain).
-func (tc *testChain) leafTLSCert(t *testing.T) tls.Certificate {
+func (tc *testChain) leafTLSCert(t testing.TB) tls.Certificate {
 	t.Helper()
 	leafKeyDER, err := x509.MarshalECPrivateKey(tc.leafKey)
 	require.NoError(t, err)
@@ -134,7 +134,7 @@ func (tc *testChain) leafTLSCert(t *testing.T) tls.Certificate {
 
 // leafOnlyTLSServer starts an HTTPS server that sends only the leaf certificate.
 // Clients that rely on a complete chain or AIA will observe an incomplete chain.
-func (tc *testChain) leafOnlyTLSServer(t *testing.T) *httptest.Server {
+func (tc *testChain) leafOnlyTLSServer(t testing.TB) *httptest.Server {
 	t.Helper()
 	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = fmt.Fprintln(w, "ok")
@@ -167,7 +167,7 @@ func (h *aiaHandler) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 }
 
 // startAIAServer starts an httptest.Server backed by h, returning the server URL.
-func startAIAServer(t *testing.T, h http.Handler) *httptest.Server {
+func startAIAServer(t testing.TB, h http.Handler) *httptest.Server {
 	t.Helper()
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
@@ -176,7 +176,7 @@ func startAIAServer(t *testing.T, h http.Handler) *httptest.Server {
 
 // testHTTPClient builds a minimal http.Client backed by the given root pool, used to
 // make HTTPS calls against the leaf-only TLS server during tests.
-func testHTTPClient(t *testing.T, tlsCfg *tls.Config) *http.Client {
+func testHTTPClient(t testing.TB, tlsCfg *tls.Config) *http.Client {
 	t.Helper()
 	return &http.Client{Transport: &http.Transport{TLSClientConfig: tlsCfg}}
 }
@@ -503,4 +503,129 @@ func TestWrapTLSConfigForAIAFetching_HostnameMismatchRejected(t *testing.T) {
 	resp, err := testHTTPClient(t, wrappedCfg).Get(tlsSrv.URL) //nolint:noctx
 	closeBody(resp)
 	require.Error(t, err, "wrong hostname must be rejected even after AIA succeeds")
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Benchmarks – TLS handshake overhead with and without AIA fetching
+//
+// Run with: go test -bench=BenchmarkTLSHandshake -benchtime=5s ./lib/netext/
+//
+// Three data points:
+//   - Baseline   : full chain, no AIA wrapper (cost floor)
+//   - WarmCache  : AIA wrapper, intermediate already cached (steady state)
+//   - ColdCache  : AIA wrapper, cache evicted per iteration (first connection cost)
+// ────────────────────────────────────────────────────────────────────────────
+
+// newBenchClient returns an http.Client that forces a fresh TCP+TLS connection on every
+// request: DisableKeepAlives prevents connection reuse, and SessionTicketsDisabled prevents
+// abbreviated handshakes, so each iteration measures a full TLS handshake.
+func newBenchClient(tlsCfg *tls.Config) *http.Client {
+	cfg := tlsCfg.Clone()
+	cfg.SessionTicketsDisabled = true
+	return &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig:   cfg,
+			DisableKeepAlives: true,
+		},
+	}
+}
+
+// BenchmarkTLSHandshake_Baseline measures a plain TLS handshake with a complete chain and
+// no AIA wrapping, establishing the cost floor.
+func BenchmarkTLSHandshake_Baseline(b *testing.B) {
+	h := &aiaHandler{}
+	aiaSrv := startAIAServer(b, h)
+	chain := newTestChain(b, aiaSrv.URL+"/ca.der")
+	h.setCert(chain.intermediateDER)
+
+	// Full chain server: leaf + intermediate, no AIA fetch ever needed.
+	leafKeyDER, err := x509.MarshalECPrivateKey(chain.leafKey)
+	require.NoError(b, err)
+	fullChainCert, err := tls.X509KeyPair(
+		pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: chain.leafCert.Raw}),
+		pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: leafKeyDER}),
+	)
+	require.NoError(b, err)
+	fullChainCert.Certificate = append(fullChainCert.Certificate, chain.intermediateCert.Raw)
+
+	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = fmt.Fprintln(w, "ok")
+	}))
+	srv.TLS = &tls.Config{Certificates: []tls.Certificate{fullChainCert}}
+	srv.StartTLS()
+	b.Cleanup(srv.Close)
+
+	client := newBenchClient(&tls.Config{RootCAs: chain.rootPool})
+
+	b.ResetTimer()
+	for b.Loop() {
+		resp, err := client.Get(srv.URL) //nolint:noctx
+		require.NoError(b, err)
+		_ = resp.Body.Close()
+	}
+}
+
+// BenchmarkTLSHandshake_AIAWarmCache measures a TLS handshake where AIA fetching is
+// enabled but the intermediate is already cached — the steady-state cost for many VUs
+// hitting the same server.
+func BenchmarkTLSHandshake_AIAWarmCache(b *testing.B) {
+	h := &aiaHandler{}
+	aiaSrv := startAIAServer(b, h)
+	aiaURL := aiaSrv.URL + "/ca.der"
+	chain := newTestChain(b, aiaURL)
+	h.setCert(chain.intermediateDER)
+
+	tlsSrv := chain.leafOnlyTLSServer(b)
+
+	wrappedCfg := WrapTLSConfigForAIAFetching(
+		&tls.Config{RootCAs: chain.rootPool},
+		nullLogger(),
+		nil,
+	)
+
+	// Prime the cache with one request before timing starts.
+	primer := newBenchClient(wrappedCfg)
+	resp, err := primer.Get(tlsSrv.URL) //nolint:noctx
+	require.NoError(b, err)
+	_ = resp.Body.Close()
+
+	client := newBenchClient(wrappedCfg)
+
+	b.ResetTimer()
+	for b.Loop() {
+		resp, err := client.Get(tlsSrv.URL) //nolint:noctx
+		require.NoError(b, err)
+		_ = resp.Body.Close()
+	}
+}
+
+// BenchmarkTLSHandshake_AIAColdCache measures the worst-case cost: AIA fetching enabled
+// and the intermediate is not cached, so each handshake triggers an HTTP round-trip to
+// the AIA endpoint (first connection to a new server).
+func BenchmarkTLSHandshake_AIAColdCache(b *testing.B) {
+	h := &aiaHandler{}
+	aiaSrv := startAIAServer(b, h)
+	aiaURL := aiaSrv.URL + "/ca.der"
+	chain := newTestChain(b, aiaURL)
+	h.setCert(chain.intermediateDER)
+
+	tlsSrv := chain.leafOnlyTLSServer(b)
+
+	wrappedCfg := WrapTLSConfigForAIAFetching(
+		&tls.Config{RootCAs: chain.rootPool},
+		nullLogger(),
+		nil,
+	)
+
+	client := newBenchClient(wrappedCfg)
+
+	b.ResetTimer()
+	for b.Loop() {
+		// Evict the cached intermediate so each iteration pays the full HTTP fetch cost.
+		aiaIntermediateCache.Delete(aiaURL)
+
+		resp, err := client.Get(tlsSrv.URL) //nolint:noctx
+		require.NoError(b, err)
+		_ = resp.Body.Close()
+	}
 }
