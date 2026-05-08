@@ -15,8 +15,8 @@ import (
 	"github.com/chromedp/cdproto/target"
 	"github.com/gorilla/websocket"
 
-	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
-	"go.k6.io/k6/internal/js/modules/k6/browser/log"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/log"
 )
 
 const (
@@ -455,7 +455,7 @@ func (b *Browser) isPageAttachmentErrorIgnorable(ev *target.EventAttachedToTarge
 	case <-b.vuCtx.Done():
 		b.logger.Debugf("Browser:isPageAttachmentErrorIgnorable:return:<-ctx.Done",
 			"sid:%v tid:%v pageType:%s err:%v",
-			ev.SessionID, targetPage.TargetID, targetPage.Type, b.vuCtx.Err())
+			ev.SessionID, targetPage.TargetID, targetPage.Type, ContextErr(b.vuCtx))
 		return true
 	default:
 	}
@@ -549,7 +549,7 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 		page = b.pages[tid]
 		b.pagesMu.RUnlock()
 	case <-ctx.Done():
-		b.logger.Debugf("Browser:newPageInContext:<-ctx.Done", "tid:%v bctxid:%v err:%v", tid, id, ctx.Err())
+		b.logger.Debugf("Browser:newPageInContext:<-ctx.Done", "tid:%v bctxid:%v err:%v", tid, id, ContextErr(ctx))
 	}
 
 	if err = ContextErr(ctx); err != nil {

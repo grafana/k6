@@ -9,13 +9,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/cmd/state"
-	"go.k6.io/k6/internal/cmd/tests"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/executor"
-	"go.k6.io/k6/lib/fsext"
-	"go.k6.io/k6/lib/types"
-	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/v2/cmd/state"
+	"go.k6.io/k6/v2/internal/cmd/tests"
+	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/lib/executor"
+	"go.k6.io/k6/v2/lib/fsext"
+	"go.k6.io/k6/v2/lib/types"
+	"go.k6.io/k6/v2/metrics"
 )
 
 func verifyOneIterPerOneVU(t *testing.T, c Config) {
@@ -54,19 +54,6 @@ func verifyConstLoopingVUs(vus null.Int, duration time.Duration) func(t *testing
 		assert.Equal(t, types.NullDurationFrom(duration), clvc.Duration)
 		assert.Equal(t, vus, c.VUs)
 		assert.Equal(t, types.NullDurationFrom(duration), c.Duration)
-	}
-}
-
-func verifyExternallyExecuted(scenarioName string, vus null.Int, duration time.Duration) func(t *testing.T, c Config) {
-	return func(t *testing.T, c Config) {
-		exec := c.Scenarios[scenarioName]
-		require.NotEmpty(t, exec)
-		require.IsType(t, executor.ExternallyControlledConfig{}, exec)
-		ecc, ok := exec.(executor.ExternallyControlledConfig)
-		require.True(t, ok)
-		assert.Equal(t, vus, ecc.VUs)
-		assert.Equal(t, types.NullDurationFrom(duration), ecc.Duration)
-		assert.Equal(t, vus, ecc.MaxVUs) // MaxVUs defaults to VUs unless specified
 	}
 }
 
@@ -315,15 +302,6 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 				assert.Equal(t, types.NullDurationFrom(time.Second+500*time.Microsecond), clvc.StartTime)
 				assert.Equal(t, types.NullDurationFrom(10*time.Second), clvc.GracefulStop)
 			},
-		},
-		{
-			opts{
-				fs: defaultConfig(`{"scenarios": { "def": {
-					"executor": "externally-controlled", "vus": 15, "duration": "2h"
-				}}}`),
-			},
-			exp{},
-			verifyExternallyExecuted("def", I(15), 2*time.Hour),
 		},
 		// TODO: test execution-segment
 

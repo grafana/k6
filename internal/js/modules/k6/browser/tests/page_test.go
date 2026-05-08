@@ -25,9 +25,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"go.k6.io/k6/internal/js/modules/k6/browser/common"
-	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext/k6test"
-	k6metrics "go.k6.io/k6/metrics"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext/k6test"
+	k6metrics "go.k6.io/k6/v2/metrics"
 )
 
 type jsFrameBaseOpts struct {
@@ -540,7 +540,7 @@ func TestPageInputValue(t *testing.T) {
 	assert.Equal(t, want, got)
 }
 
-// test for: https://go.k6.io/k6/js/modules/k6/browser/issues/132
+// test for: https://go.k6.io/k6/v2/js/modules/k6/browser/issues/132
 func TestPageInputSpecialCharacters(t *testing.T) {
 	t.Parallel()
 

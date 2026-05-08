@@ -4,12 +4,13 @@ import (
 	"math/rand"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/v2/metrics"
 )
 
 func TestSampleBufferBasics(t *testing.T) {
@@ -124,20 +125,22 @@ func TestPeriodicFlusherBasics(t *testing.T) {
 	assert.Error(t, err)
 	assert.Nil(t, f)
 
-	count := 0
-	wg := &sync.WaitGroup{}
-	wg.Add(1)
-	f, err = NewPeriodicFlusher(100*time.Millisecond, func() {
-		count++
-		if count == 2 {
-			wg.Done()
-		}
+	synctest.Test(t, func(t *testing.T) {
+		count := 0
+		wg := &sync.WaitGroup{}
+		wg.Add(1)
+		f, err := NewPeriodicFlusher(100*time.Millisecond, func() {
+			count++
+			if count == 2 {
+				wg.Done()
+			}
+		})
+		assert.NotNil(t, f)
+		assert.Nil(t, err)
+		wg.Wait()
+		f.Stop()
+		assert.Equal(t, 3, count)
 	})
-	assert.NotNil(t, f)
-	assert.Nil(t, err)
-	wg.Wait()
-	f.Stop()
-	assert.Equal(t, 3, count)
 }
 
 func TestPeriodicFlusherConcurrency(t *testing.T) {
@@ -148,30 +151,32 @@ func TestPeriodicFlusherConcurrency(t *testing.T) {
 	randStops := 10 + r.Intn(10)
 	t.Logf("Random source seeded with %d\n", seed)
 
-	count := 0
-	wg := &sync.WaitGroup{}
-	wg.Add(1)
-	f, err := NewPeriodicFlusher(1000*time.Microsecond, func() {
-		// Sleep intentionally may be longer than the flush period. Also, this
-		// should never happen concurrently, so it's intentionally not locked.
-		time.Sleep(time.Duration(700+r.Intn(1000)) * time.Microsecond)
-		count++
-		if count == 100 {
-			wg.Done()
-		}
-	})
-	assert.NotNil(t, f)
-	assert.Nil(t, err)
-	wg.Wait()
+	synctest.Test(t, func(t *testing.T) {
+		count := 0
+		wg := &sync.WaitGroup{}
+		wg.Add(1)
+		f, err := NewPeriodicFlusher(1000*time.Microsecond, func() {
+			// Sleep intentionally may be longer than the flush period. Also, this
+			// should never happen concurrently, so it's intentionally not locked.
+			time.Sleep(time.Duration(700+r.Intn(1000)) * time.Microsecond)
+			count++
+			if count == 100 {
+				wg.Done()
+			}
+		})
+		assert.NotNil(t, f)
+		assert.Nil(t, err)
+		wg.Wait()
 
-	stopWG := &sync.WaitGroup{}
-	stopWG.Add(randStops)
-	for range randStops {
-		go func() {
-			f.Stop()
-			stopWG.Done()
-		}()
-	}
-	stopWG.Wait()
-	assert.True(t, count >= 101) // due to the short intervals, we might not get exactly 101
+		stopWG := &sync.WaitGroup{}
+		stopWG.Add(randStops)
+		for range randStops {
+			go func() {
+				f.Stop()
+				stopWG.Done()
+			}()
+		}
+		stopWG.Wait()
+		assert.True(t, count >= 101) // due to the short intervals, we might not get exactly 101
+	})
 }

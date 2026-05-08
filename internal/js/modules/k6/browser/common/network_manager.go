@@ -13,15 +13,15 @@ import (
 	"sync"
 	"time"
 
-	"go.k6.io/k6/internal/js/modules/k6/browser/log"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/log"
 
-	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
 
-	k6modules "go.k6.io/k6/js/modules"
-	k6lib "go.k6.io/k6/lib"
-	k6netext "go.k6.io/k6/lib/netext"
-	k6types "go.k6.io/k6/lib/types"
-	k6metrics "go.k6.io/k6/metrics"
+	k6modules "go.k6.io/k6/v2/js/modules"
+	k6lib "go.k6.io/k6/v2/lib"
+	k6netext "go.k6.io/k6/v2/lib/netext"
+	k6types "go.k6.io/k6/v2/lib/types"
+	k6metrics "go.k6.io/k6/v2/metrics"
 
 	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/cdp"
@@ -115,7 +115,7 @@ func NewNetworkManager(
 		BaseEventEmitter: NewBaseEventEmitter(ctx),
 		ctx:              ctx,
 		// TODO: Pass an internal logger instead of basing it on k6's logger?
-		// See https://go.k6.io/k6/js/modules/k6/browser/issues/54
+		// See https://go.k6.io/k6/v2/js/modules/k6/browser/issues/54
 		logger:                        log.New(state.Logger, GetIterationID(ctx)),
 		session:                       s,
 		parent:                        parent,
