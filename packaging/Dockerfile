@@ -5,9 +5,7 @@ LABEL maintainer="k6 Developers <developers@k6.io>"
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update -y && \
-    apt-get install -y apt-utils createrepo-c curl git gnupg2 python3-pip unzip rpm
-
-RUN pip3 install "s3cmd==2.4.0"
+    apt-get install -y apt-utils createrepo-c curl git gnupg2 s3cmd unzip rpm
 
 # Download awscli, check GPG signature and install.
 COPY ./awscli-key.gpg .
