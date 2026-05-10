@@ -112,6 +112,7 @@ func TestHTTPAPIServerEnvAddrStartupFailureIsFatal(t *testing.T) {
 	ts := NewGlobalTestState(t)
 	ts.CmdArgs = []string{"k6", "run", "-v", "--log-output=stdout", "-"}
 	ts.Env["K6_ADDRESS"] = getOccupiedBindAddr(t)
+	ts.ReparseFlags()
 	ts.Stdin = bytes.NewBufferString(`export default function() {};`)
 	var exitCodes []int
 	var exitCodesMu sync.Mutex
