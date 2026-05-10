@@ -2,12 +2,12 @@ module go.k6.io/k6/v2
 
 go 1.25.0
 
-toolchain go1.25.9
+toolchain go1.25.10
 
 require (
 	buf.build/gen/go/prometheus/prometheus/protocolbuffers/go v1.36.11-20260331160422-eae785f0a21d.1
 	github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358
-	github.com/Masterminds/semver/v3 v3.4.0
+	github.com/Masterminds/semver/v3 v3.5.0
 	github.com/PuerkitoBio/goquery v1.12.0
 	github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
 	github.com/andybalholm/brotli v1.2.1
@@ -22,15 +22,14 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/grafana/k6-cloud-openapi-client-go v0.0.2
 	github.com/grafana/k6provider v0.5.0
-	github.com/grafana/sobek v0.0.0-20260331145705-2272ac4993ef
+	github.com/grafana/sobek v0.0.0-20260429085637-a66d4790012b
 	github.com/grafana/xk6-dashboard-assets v0.1.2
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
 	github.com/jhump/protoreflect v1.18.0
 	github.com/klauspost/compress v1.18.5
-	github.com/mailru/easyjson v0.9.2
 	github.com/mattn/go-colorable v0.1.14
-	github.com/mattn/go-isatty v0.0.21
+	github.com/mattn/go-isatty v0.0.22
 	github.com/mccutchen/go-httpbin/v2 v2.20.0
 	github.com/mstoykov/atlas v0.0.0-20220811071828-388f114305dd
 	github.com/mstoykov/envconfig v1.5.0
@@ -77,14 +76,13 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/chromedp/sysutil v1.1.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/dlclark/regexp2 v1.11.5 // indirect
+	github.com/dlclark/regexp2 v1.12.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/pprof v0.0.0-20260115054156-294ebfa9ad83 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/jhump/protoreflect/v2 v2.0.0-beta.1 // indirect
-	github.com/josharian/intern v1.0.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d // indirect
 	github.com/nxadm/tail v1.4.11 // indirect
