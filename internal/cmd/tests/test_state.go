@@ -156,3 +156,15 @@ func getFreeBindAddr(tb testing.TB) string {
 	tb.Fatal("could not get a free port")
 	return ""
 }
+
+func getOccupiedBindAddr(tb testing.TB) string {
+	tb.Helper()
+
+	listener, err := (&net.ListenConfig{}).Listen(tb.Context(), "tcp", "localhost:0")
+	require.NoError(tb, err)
+	tb.Cleanup(func() {
+		assert.NoError(tb, listener.Close())
+	})
+
+	return listener.Addr().String()
+}
