@@ -160,7 +160,7 @@ func getFreeBindAddr(tb testing.TB) string {
 func getOccupiedBindAddr(tb testing.TB) string {
 	tb.Helper()
 
-	listener, err := (&net.ListenConfig{}).Listen(tb.Context(), "tcp", "localhost:0")
+	listener, err := (&net.ListenConfig{}).Listen(tb.Context(), "tcp4", "127.0.0.1:0")
 	require.NoError(tb, err)
 	tb.Cleanup(func() {
 		assert.NoError(tb, listener.Close())

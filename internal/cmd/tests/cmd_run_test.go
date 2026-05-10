@@ -113,11 +113,23 @@ func TestHTTPAPIServerEnvAddrStartupFailureIsFatal(t *testing.T) {
 	ts.CmdArgs = []string{"k6", "run", "-v", "--log-output=stdout", "-"}
 	ts.Env["K6_ADDRESS"] = getOccupiedBindAddr(t)
 	ts.Stdin = bytes.NewBufferString(`export default function() {};`)
-	ts.ExpectedExitCode = int(exitcodes.CannotStartRESTAPI)
+	var exitCodes []int
+	var exitCodesMu sync.Mutex
+	ts.OSExit = func(exitCode int) {
+		exitCodesMu.Lock()
+		exitCodes = append(exitCodes, exitCode)
+		exitCodesMu.Unlock()
+		if exitCode != 0 {
+			ts.Cancel()
+		}
+	}
 
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	assert.True(t, testutils.LogContains(ts.LoggerHook.Drain(), logrus.ErrorLevel, "Error from API server"))
+	exitCodesMu.Lock()
+	assert.Contains(t, exitCodes, int(exitcodes.CannotStartRESTAPI))
+	exitCodesMu.Unlock()
 }
 
 func TestSimpleTestStdin(t *testing.T) {
