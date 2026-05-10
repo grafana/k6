@@ -1226,8 +1226,7 @@ func TestRampingVUsVUStartError(t *testing.T) {
 	cancelCalled := false
 	cancelFn := func() { cancelCalled = true }
 
-	ctx, ctxCancel := context.WithCancel(context.Background())
-	defer ctxCancel()
+	ctx := t.Context()
 
 	// getVU immediately returns an error, reproducing GetPlannedVU failure.
 	getVU := func() (lib.InitializedVU, error) {
@@ -1236,7 +1235,7 @@ func TestRampingVUsVUStartError(t *testing.T) {
 	handle := newStoppedVUHandle(ctx, getVU, func(_ lib.InitializedVU) {}, mockNextIterations, &BaseConfig{}, logEntry)
 
 	// Build a minimal *RampingVUs to satisfy rampingVUsRunState.executor;
-    // only its logger field is used by scheduledVUsHandlerStrategy.
+	// only its logger field is used by scheduledVUsHandlerStrategy.
 	config := NewRampingVUsConfig("test")
 	config.Stages = []Stage{{Target: null.IntFrom(1), Duration: types.NullDurationFrom(time.Second)}}
 
