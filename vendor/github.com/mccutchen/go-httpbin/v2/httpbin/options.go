@@ -89,6 +89,19 @@ Allowed redirect destinations:
 	}
 }
 
+// WithVersion sets the service name and build metadata to expose via /version.
+func WithVersion(service, version, commit, buildDate, goVersion string) OptionFunc {
+	return func(h *HTTPBin) {
+		h.version = versionResponse{
+			Service:   service,
+			Version:   version,
+			Commit:    commit,
+			BuildDate: buildDate,
+			GoVersion: goVersion,
+		}
+	}
+}
+
 // WithUnsafeAllowDangerousResponses means endpoints that allow clients to
 // specify a response Conntent-Type WILL NOT escape HTML entities in the
 // response body, which can enable (e.g.) reflected XSS attacks.
