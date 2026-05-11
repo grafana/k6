@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build !goexperiment.jsonv2 || !go1.25
+
 package jsonwire
 
 import (
@@ -30,7 +32,7 @@ var escapeASCII = [...]uint8{
 // NeedEscape reports whether src needs escaping of any characters.
 // It conservatively assumes EscapeForHTML and EscapeForJS.
 // It reports true for inputs with invalid UTF-8.
-func NeedEscape[Bytes ~[]byte | ~string](src Bytes) bool {
+func NeedEscape(src []byte) bool {
 	var i int
 	for uint(len(src)) > uint(i) {
 		if c := src[i]; c < utf8.RuneSelf {
@@ -39,7 +41,7 @@ func NeedEscape[Bytes ~[]byte | ~string](src Bytes) bool {
 			}
 			i++
 		} else {
-			r, rn := utf8.DecodeRuneInString(string(truncateMaxUTF8(src[i:])))
+			r, rn := utf8.DecodeRune(src[i:])
 			if r == utf8.RuneError || r == '\u2028' || r == '\u2029' {
 				return true
 			}
@@ -60,7 +62,7 @@ func NeedEscape[Bytes ~[]byte | ~string](src Bytes) bool {
 // invalid bytes are replaced with the Unicode replacement character ('\ufffd').
 // If no escape flags are set, then the shortest representable form is used,
 // which is also the canonical form for strings (RFC 8785, section 3.2.2.2).
-func AppendQuote[Bytes ~[]byte | ~string](dst []byte, src Bytes, flags *jsonflags.Flags) ([]byte, error) {
+func AppendQuote(dst, src []byte, flags *jsonflags.Flags) ([]byte, error) {
 	var i, n int
 	var hasInvalidUTF8 bool
 	dst = slices.Grow(dst, len(`"`)+len(src)+len(`"`))
@@ -80,7 +82,7 @@ func AppendQuote[Bytes ~[]byte | ~string](dst []byte, src Bytes, flags *jsonflag
 			}
 		} else {
 			// Handle multi-byte Unicode.
-			r, rn := utf8.DecodeRuneInString(string(truncateMaxUTF8(src[n:])))
+			r, rn := utf8.DecodeRune(src[n:])
 			n += rn
 			if r != utf8.RuneError && r != '\u2028' && r != '\u2029' {
 				continue // no escaping possibly needed
@@ -90,11 +92,7 @@ func AppendQuote[Bytes ~[]byte | ~string](dst []byte, src Bytes, flags *jsonflag
 			case isInvalidUTF8(r, rn):
 				hasInvalidUTF8 = true
 				dst = append(dst, src[i:n-rn]...)
-				if flags.Get(jsonflags.EscapeInvalidUTF8) {
-					dst = append(dst, `\ufffd`...)
-				} else {
-					dst = append(dst, "\ufffd"...)
-				}
+				dst = append(dst, "\ufffd"...)
 				i = n
 			case (r == '\u2028' || r == '\u2029') && flags.Get(jsonflags.EscapeForJS):
 				dst = append(dst, src[i:n-rn]...)
@@ -180,7 +178,7 @@ func ReformatString(dst, src []byte, flags *jsonflags.Flags) ([]byte, int, error
 				}
 				i++
 			} else {
-				r, rn := utf8.DecodeRune(truncateMaxUTF8(src[i:]))
+				r, rn := utf8.DecodeRune(src[i:])
 				if (r == '\u2028' || r == '\u2029') && flags.Get(jsonflags.EscapeForJS) {
 					dst = append(dst, src[lastAppendIndex:i]...)
 					dst = appendEscapedUnicode(dst, r)
@@ -237,7 +235,7 @@ func AppendFloat(dst []byte, src float64, bits int) []byte {
 	return dst
 }
 
-// ReformatNumber consumes a JSON string from src and appends it to dst,
+// ReformatNumber consumes a JSON number from src and appends it to dst,
 // canonicalizing it if specified.
 // It returns the appended output and the number of consumed input bytes.
 func ReformatNumber(dst, src []byte, flags *jsonflags.Flags) ([]byte, int, error) {

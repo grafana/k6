@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build !goexperiment.jsonv2 || !go1.25
+
 package json
 
 import (
@@ -63,7 +65,6 @@ import (
 //   - [FormatNilMapAsNull] affects marshaling only
 //   - [OmitZeroStructFields] affects marshaling only
 //   - [MatchCaseInsensitiveNames] affects marshaling and unmarshaling
-//   - [DiscardUnknownMembers] affects marshaling only
 //   - [RejectUnknownMembers] affects unmarshaling only
 //   - [WithMarshalers] affects marshaling only
 //   - [WithUnmarshalers] affects unmarshaling only
@@ -75,9 +76,7 @@ type Options = jsonopts.Options
 // Properties set in later options override the value of previously set properties.
 func JoinOptions(srcs ...Options) Options {
 	var dst jsonopts.Struct
-	for _, src := range srcs {
-		dst.Join(src)
-	}
+	dst.Join(srcs...)
 	return &dst
 }
 
@@ -97,9 +96,8 @@ func GetOption[T any](opts Options, setter func(T) Options) (T, bool) {
 }
 
 // DefaultOptionsV2 is the full set of all options that define v2 semantics.
-// It is equivalent to all options under [Options], [encoding/json.Options],
-// and [encoding/json/jsontext.Options] being set to false or the zero value,
-// except for the options related to whitespace formatting.
+// It is equivalent to the set of options in [encoding/json.DefaultOptionsV1]
+// all being set to false. All other options are not present.
 func DefaultOptionsV2() Options {
 	return &jsonopts.DefaultOptionsV2
 }
@@ -141,8 +139,6 @@ func Deterministic(v bool) Options {
 // FormatNilSliceAsNull specifies that a nil Go slice should marshal as a
 // JSON null instead of the default representation as an empty JSON array
 // (or an empty JSON string in the case of ~[]byte).
-// Slice fields explicitly marked with `format:emitempty` still marshal
-// as an empty JSON array.
 //
 // This only affects marshaling and is ignored when unmarshaling.
 func FormatNilSliceAsNull(v bool) Options {
@@ -155,8 +151,6 @@ func FormatNilSliceAsNull(v bool) Options {
 
 // FormatNilMapAsNull specifies that a nil Go map should marshal as a
 // JSON null instead of the default representation as an empty JSON object.
-// Map fields explicitly marked with `format:emitempty` still marshal
-// as an empty JSON object.
 //
 // This only affects marshaling and is ignored when unmarshaling.
 func FormatNilMapAsNull(v bool) Options {
@@ -201,22 +195,8 @@ func MatchCaseInsensitiveNames(v bool) Options {
 	}
 }
 
-// DiscardUnknownMembers specifies that marshaling should ignore any
-// JSON object members stored in Go struct fields dedicated to storing
-// unknown JSON object members.
-//
-// This only affects marshaling and is ignored when unmarshaling.
-func DiscardUnknownMembers(v bool) Options {
-	if v {
-		return jsonflags.DiscardUnknownMembers | 1
-	} else {
-		return jsonflags.DiscardUnknownMembers | 0
-	}
-}
-
 // RejectUnknownMembers specifies that unknown members should be rejected
-// when unmarshaling a JSON object, regardless of whether there is a field
-// to store unknown members.
+// when unmarshaling a JSON object.
 //
 // This only affects unmarshaling and is ignored when marshaling.
 func RejectUnknownMembers(v bool) Options {
@@ -257,7 +237,7 @@ func (*unmarshalersOption) JSONOptions(internal.NotForPublicUse) {}
 
 // Inject support into "jsonopts" to handle these types.
 func init() {
-	jsonopts.GetUnknownOption = func(src *jsonopts.Struct, zero jsonopts.Options) (any, bool) {
+	jsonopts.GetUnknownOption = func(src jsonopts.Struct, zero jsonopts.Options) (any, bool) {
 		switch zero.(type) {
 		case *marshalersOption:
 			if !src.Flags.Has(jsonflags.Marshalers) {
@@ -273,7 +253,7 @@ func init() {
 			panic(fmt.Sprintf("unknown option %T", zero))
 		}
 	}
-	jsonopts.JoinUnknownOption = func(dst *jsonopts.Struct, src jsonopts.Options) {
+	jsonopts.JoinUnknownOption = func(dst jsonopts.Struct, src jsonopts.Options) jsonopts.Struct {
 		switch src := src.(type) {
 		case *marshalersOption:
 			dst.Flags.Set(jsonflags.Marshalers | 1)
@@ -284,5 +264,6 @@ func init() {
 		default:
 			panic(fmt.Sprintf("unknown option %T", src))
 		}
+		return dst
 	}
 }

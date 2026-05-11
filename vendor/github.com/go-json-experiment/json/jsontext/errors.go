@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build !goexperiment.jsonv2 || !go1.25
+
 package jsontext
 
 import (
@@ -23,6 +25,19 @@ func (e *ioError) Error() string {
 	return errorPrefix + e.action + " error: " + e.err.Error()
 }
 func (e *ioError) Unwrap() error {
+	return e.err
+}
+
+type numError struct {
+	accessor string // either "Int", "Uint", or "Float"
+	value    string // e.g., "1e1000"
+	err      error  // either [strconv.ErrSyntax] or [strconv.ErrRange]
+}
+
+func (e *numError) Error() string {
+	return "jsontext.Token(" + e.value + ")." + e.accessor + " error: " + e.err.Error()
+}
+func (e *numError) Unwrap() error {
 	return e.err
 }
 

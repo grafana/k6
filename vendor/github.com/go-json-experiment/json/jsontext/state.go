@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build !goexperiment.jsonv2 || !go1.25
+
 package jsontext
 
 import (
@@ -15,30 +17,30 @@ import (
 	"github.com/go-json-experiment/json/internal/jsonwire"
 )
 
+// ErrDuplicateName indicates that a JSON token could not be
+// encoded or decoded because it results in a duplicate JSON object name.
+// This error is directly wrapped within a [SyntacticError] when produced.
+//
+// The name of a duplicate JSON object member can be extracted as:
+//
+//	err := ...
+//	serr, ok := errors.AsType[*jsontext.SyntacticError](err)
+//	if ok && serr.Err == jsontext.ErrDuplicateName {
+//		ptr := serr.JSONPointer // JSON pointer to duplicate name
+//		name := ptr.LastToken() // duplicate name itself
+//		...
+//	}
+//
+// This error is only returned if [AllowDuplicateNames] is false.
+var ErrDuplicateName = errors.New("duplicate object member name")
+
+// ErrNonStringName indicates that a JSON token could not be
+// encoded or decoded because it is not a string,
+// as required for JSON object names according to RFC 8259, section 4.
+// This error is directly wrapped within a [SyntacticError] when produced.
+var ErrNonStringName = errors.New("object member name must be a string")
+
 var (
-	// ErrDuplicateName indicates that a JSON token could not be
-	// encoded or decoded because it results in a duplicate JSON object name.
-	// This error is directly wrapped within a [SyntacticError] when produced.
-	//
-	// The name of a duplicate JSON object member can be extracted as:
-	//
-	//	err := ...
-	//	var serr jsontext.SyntacticError
-	//	if errors.As(err, &serr) && serr.Err == jsontext.ErrDuplicateName {
-	//		ptr := serr.JSONPointer // JSON pointer to duplicate name
-	//		name := ptr.LastToken() // duplicate name itself
-	//		...
-	//	}
-	//
-	// This error is only returned if [AllowDuplicateNames] is false.
-	ErrDuplicateName = errors.New("duplicate object member name")
-
-	// ErrNonStringName indicates that a JSON token could not be
-	// encoded or decoded because it is not a string,
-	// as required for JSON object names according to RFC 8259, section 4.
-	// This error is directly wrapped within a [SyntacticError] when produced.
-	ErrNonStringName = errors.New("object member name must be a string")
-
 	errMissingValue  = errors.New("missing value after object name")
 	errMismatchDelim = errors.New("mismatching structural token for object or array")
 	errMaxDepth      = errors.New("exceeded max depth")
@@ -129,7 +131,7 @@ func (p Pointer) LastToken() string {
 
 // AppendToken appends a token to the end of p and returns the full pointer.
 func (p Pointer) AppendToken(tok string) Pointer {
-	return Pointer(appendEscapePointerName([]byte(p+"/"), tok))
+	return Pointer(appendEscapePointerName([]byte(p+"/"), []byte(tok)))
 }
 
 // TODO: Add Pointer.AppendTokens,
@@ -200,7 +202,7 @@ func (s state) appendStackPointer(b []byte, where int) []byte {
 	return b
 }
 
-func appendEscapePointerName[Bytes ~[]byte | ~string](b []byte, name Bytes) []byte {
+func appendEscapePointerName(b, name []byte) []byte {
 	for _, r := range string(name) {
 		// Per RFC 6901, section 3, escape '~' and '/' characters.
 		switch r {
@@ -295,7 +297,7 @@ func (m *stateMachine) appendNumber() error {
 	return m.appendLiteral()
 }
 
-// pushObject appends a JSON start object token as next in the sequence.
+// pushObject appends a JSON begin object token as next in the sequence.
 // If an error is returned, the state is not mutated.
 func (m *stateMachine) pushObject() error {
 	switch {
@@ -330,7 +332,7 @@ func (m *stateMachine) popObject() error {
 	}
 }
 
-// pushArray appends a JSON start array token as next in the sequence.
+// pushArray appends a JSON begin array token as next in the sequence.
 // If an error is returned, the state is not mutated.
 func (m *stateMachine) pushArray() error {
 	switch {
