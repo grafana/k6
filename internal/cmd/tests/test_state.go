@@ -90,12 +90,17 @@ func NewGlobalTestState(tb testing.TB) *GlobalTestState {
 	defaultFlags := state.GetDefaultFlags(".config", ".cache")
 
 	ts.GlobalState = &state.GlobalState{
-		Ctx:          ctx,
-		FS:           fs,
-		Getwd:        func() (string, error) { return ts.Cwd, nil },
-		BinaryName:   "k6",
-		CmdArgs:      []string{},
-		Env:          map[string]string{"K6_NO_USAGE_REPORT": "true"},
+		Ctx:        ctx,
+		FS:         fs,
+		Getwd:      func() (string, error) { return ts.Cwd, nil },
+		BinaryName: "k6",
+		CmdArgs:    []string{},
+		Env: map[string]string{
+			"K6_NO_USAGE_REPORT": "true",
+			// Keep `k6 x` command-tree construction off the real registry.k6.io
+			// when tests don't explicitly point it at an httptest server.
+			state.ProvisionCatalogURL: "http://127.0.0.1:1/unreachable",
+		},
 		Events:       event.NewEventSystem(100, logger),
 		DefaultFlags: defaultFlags,
 		Flags:        defaultFlags,

@@ -39,6 +39,11 @@ const (
 	// registry catalog is considered fresh before `k6 x` refetches it.
 	ProvisionCatalogCacheAge = "K6_PROVISION_CATALOG_CACHE_AGE"
 
+	// ProvisionCatalogURL overrides the k6 extension registry catalog endpoint
+	// fetched by `k6 x`. Tests point this at httptest or an unreachable address
+	// to keep the command tree construction off the real network.
+	ProvisionCatalogURL = "K6_PROVISION_CATALOG_URL"
+
 	// defaultBuildServiceURL defines the URL to the default (grafana hosted) build service
 	defaultBuildServiceURL = "https://ingest.k6.io/builder/api/v1"
 

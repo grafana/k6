@@ -1,10 +1,13 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
+	"net/http"
 	"path/filepath"
 	"strings"
 	"time"
@@ -47,6 +50,12 @@ func (r *registrySubcommands) UnmarshalJSON(data []byte) error {
 		}
 	}
 	return nil
+}
+
+// defaultCatalogURL returns the canonical k6 extension registry catalog URL
+// for the running k6 binary's major version.
+func defaultCatalogURL() string {
+	return fmt.Sprintf("https://registry.k6.io/%s/catalog.json", catalogMajorVersion())
 }
 
 // catalogMajorVersion returns the registry path segment (e.g. "v2") matching
@@ -93,4 +102,48 @@ func readCachedCatalog(gs *state.GlobalState, cachePath string) (registrySubcomm
 		return nil, fmt.Errorf("parsing extensions cache: %w", err)
 	}
 	return subs, nil
+}
+
+// fetchCatalog downloads and parses the k6 extension registry catalog from
+// url. Returns the parsed subcommands plus the raw bytes so the caller can
+// persist them to the cache without re-marshaling.
+func fetchCatalog(ctx context.Context, url string) (registrySubcommands, []byte, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, nil, fmt.Errorf("requesting extensions catalog: %w", err)
+	}
+	// The URL can be overridden via env for tests and development; that is the
+	// intended behaviour of the catalog override, not an SSRF vector.
+	resp, err := http.DefaultClient.Do(req) //nolint:gosec
+	if err != nil {
+		return nil, nil, fmt.Errorf("fetching extensions catalog: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return nil, nil, fmt.Errorf("fetching extensions catalog: status %s", resp.Status)
+	}
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, nil, fmt.Errorf("reading extensions catalog response: %w", err)
+	}
+	var subs registrySubcommands
+	if err := json.Unmarshal(raw, &subs); err != nil {
+		return nil, nil, fmt.Errorf("parsing extensions catalog: %w", err)
+	}
+	return subs, raw, nil
+}
+
+// writeCachedCatalog persists raw catalog bytes under cachePath, creating any
+// missing parent directories.
+func writeCachedCatalog(gs *state.GlobalState, cachePath string, raw []byte) error {
+	if err := gs.FS.MkdirAll(filepath.Dir(cachePath), 0o750); err != nil {
+		return fmt.Errorf("creating extensions cache dir: %w", err)
+	}
+	if err := fsext.WriteFile(gs.FS, cachePath, raw, 0o600); err != nil {
+		return fmt.Errorf("writing extensions cache: %w", err)
+	}
+	return nil
 }

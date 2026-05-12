@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"cmp"
 	"fmt"
 	"slices"
 	"strings"
@@ -100,7 +101,15 @@ func registryStubs(gs *state.GlobalState, baked []*cobra.Command) []*cobra.Comma
 		return nil
 	}
 
-	subs, _ := readCachedCatalog(gs, catalogCachePath(gs))
+	cachePath := catalogCachePath(gs)
+	subs, _ := readCachedCatalog(gs, cachePath)
+	if subs == nil && first == 0 { // first == 0: not TAB completion, network allowed
+		url := cmp.Or(gs.Env[state.ProvisionCatalogURL], defaultCatalogURL())
+		if fetched, raw, err := fetchCatalog(gs.Ctx, url); err == nil {
+			subs = fetched
+			_ = writeCachedCatalog(gs, cachePath, raw)
+		}
+	}
 
 	var stubs []*cobra.Command
 	for _, r := range subs {
