@@ -105,7 +105,15 @@ func registryStubs(gs *state.GlobalState, baked []*cobra.Command) []*cobra.Comma
 	subs, _ := readCachedCatalog(gs, cachePath)
 	if subs == nil && first == 0 { // first == 0: not TAB completion, network allowed
 		url := cmp.Or(gs.Env[state.ProvisionCatalogURL], defaultCatalogURL())
-		if fetched, raw, err := fetchCatalog(gs.Ctx, url); err == nil {
+		_, _ = fmt.Fprint(gs.Stderr, "Loading the subcommand list...")
+		tail := "\n\n"
+		if gs.Stderr.IsTTY {
+			// Best-effort VT100 erase so help renders without a leftover trail.
+			tail = "\r\x1b[2K"
+		}
+		fetched, raw, err := fetchCatalog(gs.Ctx, url)
+		_, _ = fmt.Fprint(gs.Stderr, tail)
+		if err == nil {
 			subs = fetched
 			_ = writeCachedCatalog(gs, cachePath, raw)
 		}
