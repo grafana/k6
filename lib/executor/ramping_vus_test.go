@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"math/big"
 	"math/rand"
 	"sync/atomic"
@@ -1217,54 +1216,45 @@ func TestSumRandomSegmentSequenceMatchesNoSegment(t *testing.T) {
 func TestRampingVUsVUStartError(t *testing.T) {
 	t.Parallel()
 
-	logHook := testutils.NewLogHook(logrus.ErrorLevel, logrus.WarnLevel)
-	testLog := logrus.New()
-	testLog.AddHook(logHook)
-	testLog.SetOutput(io.Discard)
-	logEntry := logrus.NewEntry(testLog)
-
-	cancelCalled := false
-	cancelFn := func() { cancelCalled = true }
-
-	ctx := t.Context()
-
-	// getVU immediately returns an error, reproducing GetPlannedVU failure.
-	getVU := func() (lib.InitializedVU, error) {
-		return nil, fmt.Errorf("could not get a VU from the buffer")
+	// The executor needs to start VUs immediately, which exercises the
+	// VU-start failure path once the planned VU buffer is exhausted.
+	config := RampingVUsConfig{
+		BaseConfig: BaseConfig{GracefulStop: types.NullDurationFrom(0)},
+		StartVUs:   null.IntFrom(2),
+		Stages: []Stage{
+			{Duration: types.NullDurationFrom(2100 * time.Millisecond), Target: null.IntFrom(2)},
+		},
 	}
-	handle := newStoppedVUHandle(ctx, getVU, func(_ lib.InitializedVU) {}, mockNextIterations, &BaseConfig{}, logEntry)
-
-	// Build a minimal *RampingVUs to satisfy rampingVUsRunState.executor;
-	// only its logger field is used by scheduledVUsHandlerStrategy.
-	config := NewRampingVUsConfig("test")
-	config.Stages = []Stage{{Target: null.IntFrom(1), Duration: types.NullDurationFrom(time.Second)}}
 
 	runner := simpleRunner(func(_ context.Context, _ *lib.State) error { return nil })
-	et, err := lib.NewExecutionTuple(nil, nil)
-	require.NoError(t, err)
+	test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
+	defer test.cancel()
 
-	testRunState := getTestRunState(t, lib.Options{}, runner)
-	execReqs := config.GetExecutionRequirements(et)
-	es := lib.NewExecutionState(testRunState, et, lib.GetMaxPlannedVUs(execReqs), lib.GetMaxPossibleVUs(execReqs))
+	// Capture the error log that surfaces when starting a VU fails.
+	errorHook := testutils.NewLogHook(logrus.ErrorLevel)
+	test.executor.GetLogger().Logger.AddHook(errorHook)
 
-	executor, err := config.NewExecutor(es, logEntry)
-	require.NoError(t, err)
-
-	rs := &rampingVUsRunState{
-		executor:       executor.(*RampingVUs),
-		vuHandles:      []*vuHandle{handle},
-		maxVUs:         1,
-		activeVUsCount: new(int64),
-		started:        time.Now(),
-		runIteration:   func(_ context.Context, _ lib.ActiveVU) bool { return true },
-		cancel:         cancelFn,
+	// Reproduce a "system overload" condition: drain every planned VU so the
+	// executor cannot fetch one when it tries to start VUs.
+	maxVUs := lib.GetMaxPlannedVUs(config.GetExecutionRequirements(test.state.ExecutionTuple))
+	for range maxVUs {
+		_, err := test.state.GetPlannedVU(test.executor.GetLogger(), false)
+		require.NoError(t, err)
 	}
 
-	rs.scheduledVUsHandlerStrategy()(lib.ExecutionStep{PlannedVUs: 1})
+	errCh := make(chan error, 1)
+	go func() { errCh <- test.executor.Run(test.ctx, nil) }()
 
-	require.True(t, cancelCalled, "expected cancel to be called after VU start error")
+	// Run must finish; a hang here would mean the VU-start failure was swallowed.
+	select {
+	case err := <-errCh:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("executor did not stop after a VU-start failure")
+	}
+
 	require.True(t,
-		testutils.LogContains(logHook.Drain(), logrus.ErrorLevel, "Cannot start a VU"),
-		"expected 'Cannot start a VU' error to be logged",
+		testutils.LogContains(errorHook.Drain(), logrus.ErrorLevel, "Cannot start a VU"),
+		"expected a 'Cannot start a VU' error to be logged",
 	)
 }
