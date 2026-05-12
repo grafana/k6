@@ -1,6 +1,7 @@
 package promises
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -55,6 +56,32 @@ func TestNew(t *testing.T) {
 			`)
 			go func() {
 				reject("rejected")
+			}()
+
+			return err
+		})
+
+		assert.NoError(t, err)
+	})
+
+	t.Run("should reject Go errors without wrapping them", func(t *testing.T) {
+		t.Parallel()
+
+		runtime := modulestest.NewRuntime(t)
+		err := runtime.EventLoop.Start(func() error {
+			promise, _, reject := New(runtime.VU)
+			err := runtime.VU.Runtime().Set("promise", promise)
+			require.NoError(t, err)
+
+			_, err = runtime.VU.Runtime().RunString(`
+				promise
+					.then(
+						res => { throw "unexpected promise resolution with result: " + res },
+						err => { if (String(err) !== "plain error") { throw "unexpected error: " + err } },
+					)
+			`)
+			go func() {
+				reject(errors.New("plain error"))
 			}()
 
 			return err
