@@ -19,6 +19,7 @@ import (
 	"go.k6.io/k6/v2/internal/lib/testutils"
 	"go.k6.io/k6/v2/lib"
 	"go.k6.io/k6/v2/lib/types"
+	"go.k6.io/k6/v2/metrics"
 )
 
 func TestRampingVUsConfigValidation(t *testing.T) {
@@ -1230,7 +1231,8 @@ func TestRampingVUsVUStartError(t *testing.T) {
 	test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
 	defer test.cancel()
 
-	// Capture the error log that surfaces when starting a VU fails.
+	// The fix emits the failure at error level, but setupExecutor's hook
+	// only captures warn-level entries, so attach a dedicated error hook.
 	errorHook := testutils.NewLogHook(logrus.ErrorLevel)
 	test.executor.GetLogger().Logger.AddHook(errorHook)
 
@@ -1242,8 +1244,9 @@ func TestRampingVUsVUStartError(t *testing.T) {
 		require.NoError(t, err)
 	}
 
+	engineOut := make(chan metrics.SampleContainer, 1000)
 	errCh := make(chan error, 1)
-	go func() { errCh <- test.executor.Run(test.ctx, nil) }()
+	go func() { errCh <- test.executor.Run(test.ctx, engineOut) }()
 
 	// Run must finish; a hang here would mean the VU-start failure was swallowed.
 	select {
