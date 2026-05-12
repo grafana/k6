@@ -176,11 +176,16 @@ func detectExtensionCompletion(root *cobra.Command, gs *state.GlobalState) (stri
 	}
 
 	cmd, remaining, err := root.Find(args[1:])
-	if err != nil || cmd.Name() != "x" || len(remaining) < 2 {
+	if err != nil {
 		return "", false
 	}
-
-	return remaining[0], true
+	switch {
+	case cmd.Annotations[xStubAnnotation] == "true" && len(remaining) >= 1:
+		return cmd.Name(), true
+	case cmd.Name() == "x" && len(remaining) >= 2:
+		return remaining[0], true
+	}
+	return "", false
 }
 
 // dependenciesFromSubcommand constructs a dependencies object for the given subcommand,
