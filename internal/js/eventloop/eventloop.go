@@ -7,6 +7,7 @@ import (
 
 	"github.com/grafana/sobek"
 
+	"go.k6.io/k6/v2/internal/log"
 	"go.k6.io/k6/v2/js/common"
 	"go.k6.io/k6/v2/js/modules"
 )
@@ -187,6 +188,7 @@ func (e *EventLoop) Start(firstCallback func() error) error {
 		// But that seems to be the case in other tools as well so it seems to not be that big of a problem.
 		for promise := range e.pendingPromiseRejections {
 			value := promise.Result()
+			fields := logFieldsFromValue(e.vu.Runtime(), value)
 			if !common.IsNullish(value) {
 				if o := value.ToObject(e.vu.Runtime()); o != nil {
 					if stack := o.Get("stack"); stack != nil {
@@ -195,9 +197,28 @@ func (e *EventLoop) Start(firstCallback func() error) error {
 				}
 			}
 			// this is the de facto wording in both firefox and deno at least
-			return fmt.Errorf("Uncaught (in promise) %s", value) //nolint:staticcheck
+			return log.ErrWithFields(fmt.Errorf("Uncaught (in promise) %s", value), fields) //nolint:staticcheck
 		}
 	}
+}
+
+func logFieldsFromValue(rt *sobek.Runtime, value sobek.Value) map[string]any {
+	if common.IsNullish(value) {
+		return nil
+	}
+	err, ok := value.Export().(error)
+	if ok {
+		return log.FieldsFromErr(err)
+	}
+	if obj := value.ToObject(rt); obj != nil {
+		if wrapped := obj.Get("value"); wrapped != nil {
+			err, ok = wrapped.Export().(error)
+			if ok {
+				return log.FieldsFromErr(err)
+			}
+		}
+	}
+	return nil
 }
 
 // WaitOnRegistered waits on all registered callbacks so we know nothing is still doing work.
