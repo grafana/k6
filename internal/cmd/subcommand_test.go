@@ -4,6 +4,7 @@ import (
 	"maps"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"regexp"
 	"sync"
 	"testing"
@@ -12,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/v2/cmd/state"
 	"go.k6.io/k6/v2/internal/cmd/tests"
+	"go.k6.io/k6/v2/lib/fsext"
 	"go.k6.io/k6/v2/subcommand"
 )
 
@@ -157,6 +159,48 @@ func TestXCommandRegistryStubs(t *testing.T) {
 				} else {
 					require.NotRegexp(t, pattern, out, "unexpected stub row %q", name)
 				}
+			}
+		})
+	}
+}
+
+func TestXCompletionUsesCacheOnly(t *testing.T) {
+	t.Parallel()
+
+	registerTestSubcommandExtensions(t)
+
+	tt := []struct {
+		name      string
+		withCache bool
+		want      []string
+		notWant   []string
+	}{
+		{name: "no stubs without cache", notWant: []string{"alpha", "bravo", "charlie"}},
+		{name: "stubs from cache", withCache: true, want: []string{"alpha", "bravo", "charlie"}},
+	}
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			ts := tests.NewGlobalTestState(t)
+			// Any catalog URL is fine: completion must stay offline regardless.
+			ts.Env[state.ProvisionCatalogURL] = "http://127.0.0.1:1/unreachable"
+
+			if tc.withCache {
+				path := catalogCachePath(ts.GlobalState)
+				require.NoError(t, ts.FS.MkdirAll(filepath.Dir(path), 0o750))
+				require.NoError(t, fsext.WriteFile(ts.FS, path, []byte(testCatalogJSON), 0o600))
+			}
+
+			ts.CmdArgs = []string{"k6", "__complete", "x", ""}
+			newRootCommand(ts.GlobalState).execute()
+
+			out := ts.Stdout.String()
+			for _, w := range tc.want {
+				require.Contains(t, out, w)
+			}
+			for _, nw := range tc.notWant {
+				require.NotContains(t, out, nw)
 			}
 		})
 	}
