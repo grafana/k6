@@ -206,6 +206,37 @@ func TestXCompletionUsesCacheOnly(t *testing.T) {
 	}
 }
 
+func TestXCompletionRoutesStubsToProvisioning(t *testing.T) {
+	t.Parallel()
+
+	registerTestSubcommandExtensions(t)
+
+	tt := []struct {
+		name string
+		args []string
+	}{
+		{"committed stub name", []string{"k6", "__complete", "x", "alpha", ""}},
+		{"deeper args under stub", []string{"k6", "__complete", "x", "alpha", "deep", ""}},
+	}
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			ts := tests.NewGlobalTestState(t)
+			// Pre-write cache so alpha registers as a stub under `k6 x`.
+			path := catalogCachePath(ts.GlobalState)
+			require.NoError(t, ts.FS.MkdirAll(filepath.Dir(path), 0o750))
+			require.NoError(t, fsext.WriteFile(ts.FS, path, []byte(testCatalogJSON), 0o600))
+
+			ts.CmdArgs = tc.args
+			root := newRootCommand(ts.GlobalState)
+			ext, ok := detectExtensionCompletion(root.cmd, ts.GlobalState)
+			require.True(t, ok)
+			require.Equal(t, "alpha", ext)
+		})
+	}
+}
+
 func Test_dependenciesFromSubcommand(t *testing.T) {
 	t.Parallel()
 
