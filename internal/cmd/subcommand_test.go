@@ -2,6 +2,9 @@ package cmd
 
 import (
 	"maps"
+	"net/http"
+	"net/http/httptest"
+	"regexp"
 	"sync"
 	"testing"
 
@@ -11,6 +14,26 @@ import (
 	"go.k6.io/k6/v2/internal/cmd/tests"
 	"go.k6.io/k6/v2/subcommand"
 )
+
+const testCatalogJSON = `{
+"example.com/x-alpha": {"subcommands":["alpha"],"description":"alpha sub","tier":"official"},
+"example.com/x-bravo": {"subcommands":["bravo"],"description":"bravo sub","tier":"official"},
+"example.com/x-charlie": {"subcommands":["charlie"],"description":"charlie sub","tier":"community"}
+}`
+
+func newCatalogServer(t *testing.T, body ...string) *httptest.Server {
+	t.Helper()
+	catalog := testCatalogJSON
+	if len(body) > 0 {
+		catalog = body[0]
+	}
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(catalog))
+	}))
+	t.Cleanup(s.Close)
+	return s
+}
 
 func TestExtensionSubcommands(t *testing.T) {
 	t.Parallel()
@@ -90,6 +113,51 @@ func TestXCommandHelpDisplayCommands(t *testing.T) {
 			newRootCommand(ts.GlobalState).execute()
 
 			require.Contains(t, ts.Stdout.String(), tc.wantStdoutContains)
+		})
+	}
+}
+
+func TestXCommandRegistryStubs(t *testing.T) {
+	t.Parallel()
+
+	registerTestSubcommandExtensions(t)
+	server := newCatalogServer(t)
+
+	tt := []struct {
+		name      string
+		catalog   string
+		autoOff   bool
+		wantStubs bool
+	}{
+		{name: "reachable catalog shows stubs", catalog: server.URL, wantStubs: true},
+		{name: "unreachable catalog hides stubs", catalog: "http://127.0.0.1:1/unreachable"},
+		{name: "auto-extension-resolution off hides stubs", catalog: server.URL, autoOff: true},
+	}
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			ts := tests.NewGlobalTestState(t)
+			ts.Env[state.ProvisionCatalogURL] = tc.catalog
+			if tc.autoOff {
+				ts.Env[state.AutoExtensionResolution] = "false"
+			}
+			ts.CmdArgs = []string{"k6", "x"}
+			ts.ReparseFlags()
+			newRootCommand(ts.GlobalState).execute()
+
+			out := ts.Stdout.String()
+			require.Contains(t, out, "Available Commands:")
+			require.Regexp(t, `(?m)^  test-cmd-1\s+Test command 1$`, out)
+
+			for _, name := range []string{"alpha", "bravo", "charlie"} {
+				pattern := `(?m)^  ` + regexp.QuoteMeta(name) + `\s`
+				if tc.wantStubs {
+					require.Regexp(t, pattern+`+\S`, out, "missing stub row %q", name)
+				} else {
+					require.NotRegexp(t, pattern, out, "unexpected stub row %q", name)
+				}
+			}
 		})
 	}
 }
