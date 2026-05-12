@@ -102,7 +102,10 @@ func registryStubs(gs *state.GlobalState, baked []*cobra.Command) []*cobra.Comma
 	}
 
 	cachePath := catalogCachePath(gs)
-	subs, _ := readCachedCatalog(gs, cachePath)
+	subs, err := readCachedCatalog(gs, cachePath)
+	if err != nil {
+		gs.Logger.WithError(err).Debug("k6 extension catalog")
+	}
 	if subs == nil && first == 0 { // first == 0: not TAB completion, network allowed
 		url := cmp.Or(gs.Env[state.ProvisionCatalogURL], defaultCatalogURL())
 		_, _ = fmt.Fprint(gs.Stderr, "Loading the subcommand list...")
@@ -115,7 +118,10 @@ func registryStubs(gs *state.GlobalState, baked []*cobra.Command) []*cobra.Comma
 		_, _ = fmt.Fprint(gs.Stderr, tail)
 		if err == nil {
 			subs = fetched
-			_ = writeCachedCatalog(gs, cachePath, raw)
+			err = writeCachedCatalog(gs, cachePath, raw)
+		}
+		if err != nil {
+			gs.Logger.WithError(err).Debug("k6 extension catalog")
 		}
 	}
 
