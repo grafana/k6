@@ -2,6 +2,8 @@ package errext
 
 import (
 	"errors"
+
+	"go.k6.io/k6/v2/internal/log"
 )
 
 // Format formats the given error as a message (string) and a map of fields.
@@ -18,7 +20,7 @@ func Format(err error) (string, map[string]any) {
 		errText = xerr.StackTrace()
 	}
 
-	fields := make(map[string]any)
+	fields := log.FieldsFromErr(err)
 	var herr HasHint
 	if errors.As(err, &herr) {
 		fields["hint"] = herr.Hint()
