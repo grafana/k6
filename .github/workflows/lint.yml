@@ -36,12 +36,12 @@ jobs:
           test -z "$(git status --porcelain | tee >(cat 1>&2))"
 
   lint:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-      - name: Run linters
-        uses: grafana/k6-ci/.github/actions/lint@40021b94d407d92bff09e4229f102306d68bb7e0 # lint-action branch — bump once grafana/k6-ci#33 merges
+    # Delegate to grafana/k6-ci's reusable workflow. We pin both the workflow
+    # ref (in `uses:`) and `k6-ci-ref` to the same SHA so the lint config
+    # comes from the exact same commit as the workflow logic. Renovate keeps
+    # both lines in sync.
+    uses: grafana/k6-ci/.github/workflows/all.yml@1024dc57c16ede322d654963223af198be6a1eda # lint-action branch — bump once grafana/k6-ci#33 merges
+    with:
+      k6-ci-ref: 1024dc57c16ede322d654963223af198be6a1eda
+      skip-tests: true
+      skip-extension-testing: true
