@@ -15,15 +15,18 @@ import (
 	"github.com/chromedp/cdproto/target"
 )
 
-// SetPermissionParams set permission settings for given origin.
+// SetPermissionParams set permission settings for given embedding and
+// embedded origins.
 type SetPermissionParams struct {
 	Permission       *PermissionDescriptor `json:"permission"`                          // Descriptor of permission to override.
 	Setting          PermissionSetting     `json:"setting"`                             // Setting of the permission.
-	Origin           string                `json:"origin,omitempty,omitzero"`           // Origin the permission applies to, all origins if not specified.
+	Origin           string                `json:"origin,omitempty,omitzero"`           // Embedding origin the permission applies to, all origins if not specified.
+	EmbeddedOrigin   string                `json:"embeddedOrigin,omitempty,omitzero"`   // Embedded origin the permission applies to. It is ignored unless the embedding origin is present and valid. If the embedding origin is provided but the embedded origin isn't, the embedding origin is used as the embedded origin.
 	BrowserContextID cdp.BrowserContextID  `json:"browserContextId,omitempty,omitzero"` // Context to override. When omitted, default browser context is used.
 }
 
-// SetPermission set permission settings for given origin.
+// SetPermission set permission settings for given embedding and embedded
+// origins.
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Browser#method-setPermission
 //
@@ -38,9 +41,19 @@ func SetPermission(permission *PermissionDescriptor, setting PermissionSetting) 
 	}
 }
 
-// WithOrigin origin the permission applies to, all origins if not specified.
+// WithOrigin embedding origin the permission applies to, all origins if not
+// specified.
 func (p SetPermissionParams) WithOrigin(origin string) *SetPermissionParams {
 	p.Origin = origin
+	return &p
+}
+
+// WithEmbeddedOrigin embedded origin the permission applies to. It is
+// ignored unless the embedding origin is present and valid. If the embedding
+// origin is provided but the embedded origin isn't, the embedding origin is
+// used as the embedded origin.
+func (p SetPermissionParams) WithEmbeddedOrigin(embeddedOrigin string) *SetPermissionParams {
+	p.EmbeddedOrigin = embeddedOrigin
 	return &p
 }
 
@@ -54,46 +67,6 @@ func (p SetPermissionParams) WithBrowserContextID(browserContextID cdp.BrowserCo
 // Do executes Browser.setPermission against the provided context.
 func (p *SetPermissionParams) Do(ctx context.Context) (err error) {
 	return cdp.Execute(ctx, CommandSetPermission, p, nil)
-}
-
-// GrantPermissionsParams grant specific permissions to the given origin and
-// reject all others.
-type GrantPermissionsParams struct {
-	Permissions      []PermissionType     `json:"permissions"`
-	Origin           string               `json:"origin,omitempty,omitzero"`           // Origin the permission applies to, all origins if not specified.
-	BrowserContextID cdp.BrowserContextID `json:"browserContextId,omitempty,omitzero"` // BrowserContext to override permissions. When omitted, default browser context is used.
-}
-
-// GrantPermissions grant specific permissions to the given origin and reject
-// all others.
-//
-// See: https://chromedevtools.github.io/devtools-protocol/tot/Browser#method-grantPermissions
-//
-// parameters:
-//
-//	permissions
-func GrantPermissions(permissions []PermissionType) *GrantPermissionsParams {
-	return &GrantPermissionsParams{
-		Permissions: permissions,
-	}
-}
-
-// WithOrigin origin the permission applies to, all origins if not specified.
-func (p GrantPermissionsParams) WithOrigin(origin string) *GrantPermissionsParams {
-	p.Origin = origin
-	return &p
-}
-
-// WithBrowserContextID browserContext to override permissions. When omitted,
-// default browser context is used.
-func (p GrantPermissionsParams) WithBrowserContextID(browserContextID cdp.BrowserContextID) *GrantPermissionsParams {
-	p.BrowserContextID = browserContextID
-	return &p
-}
-
-// Do executes Browser.grantPermissions against the provided context.
-func (p *GrantPermissionsParams) Do(ctx context.Context) (err error) {
-	return cdp.Execute(ctx, CommandGrantPermissions, p, nil)
 }
 
 // ResetPermissionsParams reset all permission management for all origins.
@@ -697,7 +670,6 @@ func (p *AddPrivacySandboxCoordinatorKeyConfigParams) Do(ctx context.Context) (e
 // Command names.
 const (
 	CommandSetPermission                         = "Browser.setPermission"
-	CommandGrantPermissions                      = "Browser.grantPermissions"
 	CommandResetPermissions                      = "Browser.resetPermissions"
 	CommandSetDownloadBehavior                   = "Browser.setDownloadBehavior"
 	CommandCancelDownload                        = "Browser.cancelDownload"

@@ -288,6 +288,50 @@ type PressureMetadata struct {
 	Available bool `json:"available"`
 }
 
+// WorkAreaInsets [no description].
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Emulation#type-WorkAreaInsets
+type WorkAreaInsets struct {
+	Top    int64 `json:"top,omitempty,omitzero"`    // Work area top inset in pixels. Default is 0;
+	Left   int64 `json:"left,omitempty,omitzero"`   // Work area left inset in pixels. Default is 0;
+	Bottom int64 `json:"bottom,omitempty,omitzero"` // Work area bottom inset in pixels. Default is 0;
+	Right  int64 `json:"right,omitempty,omitzero"`  // Work area right inset in pixels. Default is 0;
+}
+
+// ScreenID [no description].
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Emulation#type-ScreenId
+type ScreenID string
+
+// String returns the ScreenID as string value.
+func (t ScreenID) String() string {
+	return string(t)
+}
+
+// ScreenInfo screen information similar to the one returned by
+// window.getScreenDetails() method, see
+// https://w3c.github.io/window-management/#screendetailed.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Emulation#type-ScreenInfo
+type ScreenInfo struct {
+	Left             int64              `json:"left"`             // Offset of the left edge of the screen.
+	Top              int64              `json:"top"`              // Offset of the top edge of the screen.
+	Width            int64              `json:"width"`            // Width of the screen.
+	Height           int64              `json:"height"`           // Height of the screen.
+	AvailLeft        int64              `json:"availLeft"`        // Offset of the left edge of the available screen area.
+	AvailTop         int64              `json:"availTop"`         // Offset of the top edge of the available screen area.
+	AvailWidth       int64              `json:"availWidth"`       // Width of the available screen area.
+	AvailHeight      int64              `json:"availHeight"`      // Height of the available screen area.
+	DevicePixelRatio float64            `json:"devicePixelRatio"` // Specifies the screen's device pixel ratio.
+	Orientation      *ScreenOrientation `json:"orientation"`      // Specifies the screen's orientation.
+	ColorDepth       int64              `json:"colorDepth"`       // Specifies the screen's color depth in bits.
+	IsExtended       bool               `json:"isExtended"`       // Indicates whether the device has multiple screens.
+	IsInternal       bool               `json:"isInternal"`       // Indicates whether the screen is internal to the device or external, attached to the device.
+	IsPrimary        bool               `json:"isPrimary"`        // Indicates whether the screen is set as the the operating system primary screen.
+	Label            string             `json:"label"`            // Specifies the descriptive label for the screen.
+	ID               ScreenID           `json:"id"`               // Specifies the unique identifier of the screen.
+}
+
 // DisabledImageType enum of image types that can be disabled.
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Emulation#type-DisabledImageType
@@ -301,6 +345,7 @@ func (t DisabledImageType) String() string {
 // DisabledImageType values.
 const (
 	DisabledImageTypeAvif DisabledImageType = "avif"
+	DisabledImageTypeJxl  DisabledImageType = "jxl"
 	DisabledImageTypeWebp DisabledImageType = "webp"
 )
 
@@ -312,6 +357,8 @@ func (t *DisabledImageType) UnmarshalJSON(buf []byte) error {
 	switch DisabledImageType(s) {
 	case DisabledImageTypeAvif:
 		*t = DisabledImageTypeAvif
+	case DisabledImageTypeJxl:
+		*t = DisabledImageTypeJxl
 	case DisabledImageTypeWebp:
 		*t = DisabledImageTypeWebp
 	default:
@@ -419,6 +466,38 @@ func (t *DevicePostureType) UnmarshalJSON(buf []byte) error {
 		*t = DevicePostureTypeFolded
 	default:
 		return fmt.Errorf("unknown DevicePostureType value: %v", s)
+	}
+	return nil
+}
+
+// SetDeviceMetricsOverrideScrollbarType scrollbar type. Default: default.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Emulation#method-setDeviceMetricsOverride
+type SetDeviceMetricsOverrideScrollbarType string
+
+// String returns the SetDeviceMetricsOverrideScrollbarType as string value.
+func (t SetDeviceMetricsOverrideScrollbarType) String() string {
+	return string(t)
+}
+
+// SetDeviceMetricsOverrideScrollbarType values.
+const (
+	SetDeviceMetricsOverrideScrollbarTypeOverlay SetDeviceMetricsOverrideScrollbarType = "overlay"
+	SetDeviceMetricsOverrideScrollbarTypeDefault SetDeviceMetricsOverrideScrollbarType = "default"
+)
+
+// UnmarshalJSON satisfies [json.Unmarshaler].
+func (t *SetDeviceMetricsOverrideScrollbarType) UnmarshalJSON(buf []byte) error {
+	s := string(buf)
+	s = strings.TrimSuffix(strings.TrimPrefix(s, `"`), `"`)
+
+	switch SetDeviceMetricsOverrideScrollbarType(s) {
+	case SetDeviceMetricsOverrideScrollbarTypeOverlay:
+		*t = SetDeviceMetricsOverrideScrollbarTypeOverlay
+	case SetDeviceMetricsOverrideScrollbarTypeDefault:
+		*t = SetDeviceMetricsOverrideScrollbarTypeDefault
+	default:
+		return fmt.Errorf("unknown SetDeviceMetricsOverrideScrollbarType value: %v", s)
 	}
 	return nil
 }

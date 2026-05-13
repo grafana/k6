@@ -277,7 +277,8 @@ func GetBrowserContexts() *GetBrowserContextsParams {
 
 // GetBrowserContextsReturns return values.
 type GetBrowserContextsReturns struct {
-	BrowserContextIDs []cdp.BrowserContextID `json:"browserContextIds,omitempty,omitzero"` // An array of browser context ids.
+	BrowserContextIDs       []cdp.BrowserContextID `json:"browserContextIds,omitempty,omitzero"`       // An array of browser context ids.
+	DefaultBrowserContextID cdp.BrowserContextID   `json:"defaultBrowserContextId,omitempty,omitzero"` // The id of the default browser context if available.
 }
 
 // Do executes Target.getBrowserContexts against the provided context.
@@ -285,15 +286,16 @@ type GetBrowserContextsReturns struct {
 // returns:
 //
 //	browserContextIDs - An array of browser context ids.
-func (p *GetBrowserContextsParams) Do(ctx context.Context) (browserContextIDs []cdp.BrowserContextID, err error) {
+//	defaultBrowserContextID - The id of the default browser context if available.
+func (p *GetBrowserContextsParams) Do(ctx context.Context) (browserContextIDs []cdp.BrowserContextID, defaultBrowserContextID cdp.BrowserContextID, err error) {
 	// execute
 	var res GetBrowserContextsReturns
 	err = cdp.Execute(ctx, CommandGetBrowserContexts, nil, &res)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	return res.BrowserContextIDs, nil
+	return res.BrowserContextIDs, res.DefaultBrowserContextID, nil
 }
 
 // CreateTargetParams creates a new page.
@@ -310,6 +312,7 @@ type CreateTargetParams struct {
 	Background              bool                 `json:"background"`                          // Whether to create the target in background or foreground (false by default, not supported by headless shell).
 	ForTab                  bool                 `json:"forTab"`                              // Whether to create the target of type "tab".
 	Hidden                  bool                 `json:"hidden"`                              // Whether to create a hidden target. The hidden target is observable via protocol, but not present in the tab UI strip. Cannot be created with forTab: true, newWindow: true or background: false. The life-time of the tab is limited to the life-time of the session.
+	Focus                   bool                 `json:"focus"`                               // If specified, the option is used to determine if the new target should be focused or not. By default, the focus behavior depends on the value of the background field. For example, background=false and focus=false will result in the target tab being opened but the browser window remain unchanged (if it was in the background, it will remain in the background) and background=false with focus=undefined will result in the window being focused. Using background: true and focus: true is not supported and will result in an error.
 }
 
 // CreateTarget creates a new page.
@@ -327,6 +330,7 @@ func CreateTarget(url string) *CreateTargetParams {
 		Background:              false,
 		ForTab:                  false,
 		Hidden:                  false,
+		Focus:                   false,
 	}
 }
 
@@ -405,6 +409,19 @@ func (p CreateTargetParams) WithForTab(forTab bool) *CreateTargetParams {
 // life-time of the tab is limited to the life-time of the session.
 func (p CreateTargetParams) WithHidden(hidden bool) *CreateTargetParams {
 	p.Hidden = hidden
+	return &p
+}
+
+// WithFocus if specified, the option is used to determine if the new target
+// should be focused or not. By default, the focus behavior depends on the value
+// of the background field. For example, background=false and focus=false will
+// result in the target tab being opened but the browser window remain unchanged
+// (if it was in the background, it will remain in the background) and
+// background=false with focus=undefined will result in the window being
+// focused. Using background: true and focus: true is not supported and will
+// result in an error.
+func (p CreateTargetParams) WithFocus(focus bool) *CreateTargetParams {
+	p.Focus = focus
 	return &p
 }
 
@@ -721,9 +738,51 @@ func (p *SetRemoteLocationsParams) Do(ctx context.Context) (err error) {
 	return cdp.Execute(ctx, CommandSetRemoteLocations, p, nil)
 }
 
+// GetDevToolsTargetParams gets the targetId of the DevTools page target
+// opened for the given target (if any).
+type GetDevToolsTargetParams struct {
+	TargetID ID `json:"targetId"` // Page or tab target ID.
+}
+
+// GetDevToolsTarget gets the targetId of the DevTools page target opened for
+// the given target (if any).
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Target#method-getDevToolsTarget
+//
+// parameters:
+//
+//	targetID - Page or tab target ID.
+func GetDevToolsTarget(targetID ID) *GetDevToolsTargetParams {
+	return &GetDevToolsTargetParams{
+		TargetID: targetID,
+	}
+}
+
+// GetDevToolsTargetReturns return values.
+type GetDevToolsTargetReturns struct {
+	TargetID ID `json:"targetId,omitempty,omitzero"` // The targetId of DevTools page target if exists.
+}
+
+// Do executes Target.getDevToolsTarget against the provided context.
+//
+// returns:
+//
+//	targetID - The targetId of DevTools page target if exists.
+func (p *GetDevToolsTargetParams) Do(ctx context.Context) (targetID ID, err error) {
+	// execute
+	var res GetDevToolsTargetReturns
+	err = cdp.Execute(ctx, CommandGetDevToolsTarget, p, &res)
+	if err != nil {
+		return "", err
+	}
+
+	return res.TargetID, nil
+}
+
 // OpenDevToolsParams opens a DevTools window for the target.
 type OpenDevToolsParams struct {
-	TargetID ID `json:"targetId"` // This can be the page or tab target ID.
+	TargetID ID     `json:"targetId"`                   // This can be the page or tab target ID.
+	PanelID  string `json:"panelId,omitempty,omitzero"` // The id of the panel we want DevTools to open initially. Currently supported panels are elements, console, network, sources, resources and performance.
 }
 
 // OpenDevTools opens a DevTools window for the target.
@@ -737,6 +796,14 @@ func OpenDevTools(targetID ID) *OpenDevToolsParams {
 	return &OpenDevToolsParams{
 		TargetID: targetID,
 	}
+}
+
+// WithPanelID the id of the panel we want DevTools to open initially.
+// Currently supported panels are elements, console, network, sources, resources
+// and performance.
+func (p OpenDevToolsParams) WithPanelID(panelID string) *OpenDevToolsParams {
+	p.PanelID = panelID
+	return &p
 }
 
 // OpenDevToolsReturns return values.
@@ -778,5 +845,6 @@ const (
 	CommandAutoAttachRelated      = "Target.autoAttachRelated"
 	CommandSetDiscoverTargets     = "Target.setDiscoverTargets"
 	CommandSetRemoteLocations     = "Target.setRemoteLocations"
+	CommandGetDevToolsTarget      = "Target.getDevToolsTarget"
 	CommandOpenDevTools           = "Target.openDevTools"
 )

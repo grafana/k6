@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/runtime"
 )
 
@@ -33,9 +34,9 @@ func (t CallFrameID) String() string {
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Debugger#type-Location
 type Location struct {
-	ScriptID     runtime.ScriptID `json:"scriptId"`                        // Script identifier as reported in the Debugger.scriptParsed.
-	LineNumber   int64            `json:"lineNumber"`                      // Line number in the script (0-based).
-	ColumnNumber int64            `json:"columnNumber,omitempty,omitzero"` // Column number in the script (0-based).
+	ScriptID     cdp.ScriptID `json:"scriptId"`                        // Script identifier as reported in the Debugger.scriptParsed.
+	LineNumber   int64        `json:"lineNumber"`                      // Line number in the script (0-based).
+	ColumnNumber int64        `json:"columnNumber,omitempty,omitzero"` // Column number in the script (0-based).
 }
 
 // ScriptPosition location in the source code.
@@ -50,9 +51,9 @@ type ScriptPosition struct {
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Debugger#type-LocationRange
 type LocationRange struct {
-	ScriptID runtime.ScriptID `json:"scriptId"`
-	Start    *ScriptPosition  `json:"start"`
-	End      *ScriptPosition  `json:"end"`
+	ScriptID cdp.ScriptID    `json:"scriptId"`
+	Start    *ScriptPosition `json:"start"`
+	End      *ScriptPosition `json:"end"`
 }
 
 // CallFrame JavaScript call frame. Array of call frames form the call stack.
@@ -92,7 +93,7 @@ type SearchMatch struct {
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Debugger#type-BreakLocation
 type BreakLocation struct {
-	ScriptID     runtime.ScriptID  `json:"scriptId"`                        // Script identifier as reported in the Debugger.scriptParsed.
+	ScriptID     cdp.ScriptID      `json:"scriptId"`                        // Script identifier as reported in the Debugger.scriptParsed.
 	LineNumber   int64             `json:"lineNumber"`                      // Line number in the script (0-based).
 	ColumnNumber int64             `json:"columnNumber,omitempty,omitzero"` // Column number in the script (0-based).
 	Type         BreakLocationType `json:"type,omitempty,omitzero"`

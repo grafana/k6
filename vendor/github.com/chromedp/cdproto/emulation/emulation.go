@@ -205,18 +205,20 @@ func (p *SetSafeAreaInsetsOverrideParams) Do(ctx context.Context) (err error) {
 // window.innerHeight, and "device-width"/"device-height"-related CSS media
 // query results).
 type SetDeviceMetricsOverrideParams struct {
-	Width              int64              `json:"width"`                                // Overriding width value in pixels (minimum 0, maximum 10000000). 0 disables the override.
-	Height             int64              `json:"height"`                               // Overriding height value in pixels (minimum 0, maximum 10000000). 0 disables the override.
-	DeviceScaleFactor  float64            `json:"deviceScaleFactor"`                    // Overriding device scale factor value. 0 disables the override.
-	Mobile             bool               `json:"mobile"`                               // Whether to emulate mobile device. This includes viewport meta tag, overlay scrollbars, text autosizing and more.
-	Scale              float64            `json:"scale,omitempty,omitzero"`             // Scale to apply to resulting view image.
-	ScreenWidth        int64              `json:"screenWidth,omitempty,omitzero"`       // Overriding screen width value in pixels (minimum 0, maximum 10000000).
-	ScreenHeight       int64              `json:"screenHeight,omitempty,omitzero"`      // Overriding screen height value in pixels (minimum 0, maximum 10000000).
-	PositionX          int64              `json:"positionX,omitempty,omitzero"`         // Overriding view X position on screen in pixels (minimum 0, maximum 10000000).
-	PositionY          int64              `json:"positionY,omitempty,omitzero"`         // Overriding view Y position on screen in pixels (minimum 0, maximum 10000000).
-	DontSetVisibleSize bool               `json:"dontSetVisibleSize"`                   // Do not set visible view size, rely upon explicit setVisibleSize call.
-	ScreenOrientation  *ScreenOrientation `json:"screenOrientation,omitempty,omitzero"` // Screen orientation override.
-	Viewport           *page.Viewport     `json:"viewport,omitempty,omitzero"`          // If set, the visible area of the page will be overridden to this viewport. This viewport change is not observed by the page, e.g. viewport-relative elements do not change positions.
+	Width                          int64                                 `json:"width"`                                // Overriding width value in pixels (minimum 0, maximum 10000000). 0 disables the override.
+	Height                         int64                                 `json:"height"`                               // Overriding height value in pixels (minimum 0, maximum 10000000). 0 disables the override.
+	DeviceScaleFactor              float64                               `json:"deviceScaleFactor"`                    // Overriding device scale factor value. 0 disables the override.
+	Mobile                         bool                                  `json:"mobile"`                               // Whether to emulate mobile device. This includes viewport meta tag, overlay scrollbars, text autosizing and more.
+	Scale                          float64                               `json:"scale,omitempty,omitzero"`             // Scale to apply to resulting view image.
+	ScreenWidth                    int64                                 `json:"screenWidth,omitempty,omitzero"`       // Overriding screen width value in pixels (minimum 0, maximum 10000000).
+	ScreenHeight                   int64                                 `json:"screenHeight,omitempty,omitzero"`      // Overriding screen height value in pixels (minimum 0, maximum 10000000).
+	PositionX                      int64                                 `json:"positionX,omitempty,omitzero"`         // Overriding view X position on screen in pixels (minimum 0, maximum 10000000).
+	PositionY                      int64                                 `json:"positionY,omitempty,omitzero"`         // Overriding view Y position on screen in pixels (minimum 0, maximum 10000000).
+	DontSetVisibleSize             bool                                  `json:"dontSetVisibleSize"`                   // Do not set visible view size, rely upon explicit setVisibleSize call.
+	ScreenOrientation              *ScreenOrientation                    `json:"screenOrientation,omitempty,omitzero"` // Screen orientation override.
+	Viewport                       *page.Viewport                        `json:"viewport,omitempty,omitzero"`          // If set, the visible area of the page will be overridden to this viewport. This viewport change is not observed by the page, e.g. viewport-relative elements do not change positions.
+	ScrollbarType                  SetDeviceMetricsOverrideScrollbarType `json:"scrollbarType,omitempty,omitzero"`     // Scrollbar type. Default: default.
+	ScreenOrientationLockEmulation bool                                  `json:"screenOrientationLockEmulation"`       // If set to true, enables screen orientation lock emulation, which intercepts screen.orientation.lock() calls from the page and reports orientation changes via screenOrientationLockChanged events. This is useful for emulating mobile device orientation lock behavior in responsive design mode.
 }
 
 // SetDeviceMetricsOverride overrides the values of device screen dimensions
@@ -234,11 +236,12 @@ type SetDeviceMetricsOverrideParams struct {
 //	mobile - Whether to emulate mobile device. This includes viewport meta tag, overlay scrollbars, text autosizing and more.
 func SetDeviceMetricsOverride(width int64, height int64, deviceScaleFactor float64, mobile bool) *SetDeviceMetricsOverrideParams {
 	return &SetDeviceMetricsOverrideParams{
-		Width:              width,
-		Height:             height,
-		DeviceScaleFactor:  deviceScaleFactor,
-		Mobile:             mobile,
-		DontSetVisibleSize: false,
+		Width:                          width,
+		Height:                         height,
+		DeviceScaleFactor:              deviceScaleFactor,
+		Mobile:                         mobile,
+		DontSetVisibleSize:             false,
+		ScreenOrientationLockEmulation: false,
 	}
 }
 
@@ -294,6 +297,22 @@ func (p SetDeviceMetricsOverrideParams) WithScreenOrientation(screenOrientation 
 // viewport-relative elements do not change positions.
 func (p SetDeviceMetricsOverrideParams) WithViewport(viewport *page.Viewport) *SetDeviceMetricsOverrideParams {
 	p.Viewport = viewport
+	return &p
+}
+
+// WithScrollbarType scrollbar type. Default: default.
+func (p SetDeviceMetricsOverrideParams) WithScrollbarType(scrollbarType SetDeviceMetricsOverrideScrollbarType) *SetDeviceMetricsOverrideParams {
+	p.ScrollbarType = scrollbarType
+	return &p
+}
+
+// WithScreenOrientationLockEmulation if set to true, enables screen
+// orientation lock emulation, which intercepts screen.orientation.lock() calls
+// from the page and reports orientation changes via
+// screenOrientationLockChanged events. This is useful for emulating mobile
+// device orientation lock behavior in responsive design mode.
+func (p SetDeviceMetricsOverrideParams) WithScreenOrientationLockEmulation(screenOrientationLockEmulation bool) *SetDeviceMetricsOverrideParams {
+	p.ScreenOrientationLockEmulation = screenOrientationLockEmulation
 	return &p
 }
 
@@ -1255,6 +1274,305 @@ func (p *SetSmallViewportHeightDifferenceOverrideParams) Do(ctx context.Context)
 	return cdp.Execute(ctx, CommandSetSmallViewportHeightDifferenceOverride, p, nil)
 }
 
+// GetScreenInfosParams returns device's screen configuration. In headful
+// mode, the physical screens configuration is returned, whereas in headless
+// mode, a virtual headless screen configuration is provided instead.
+type GetScreenInfosParams struct{}
+
+// GetScreenInfos returns device's screen configuration. In headful mode, the
+// physical screens configuration is returned, whereas in headless mode, a
+// virtual headless screen configuration is provided instead.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Emulation#method-getScreenInfos
+func GetScreenInfos() *GetScreenInfosParams {
+	return &GetScreenInfosParams{}
+}
+
+// GetScreenInfosReturns return values.
+type GetScreenInfosReturns struct {
+	ScreenInfos []*ScreenInfo `json:"screenInfos,omitempty,omitzero"`
+}
+
+// Do executes Emulation.getScreenInfos against the provided context.
+//
+// returns:
+//
+//	screenInfos
+func (p *GetScreenInfosParams) Do(ctx context.Context) (screenInfos []*ScreenInfo, err error) {
+	// execute
+	var res GetScreenInfosReturns
+	err = cdp.Execute(ctx, CommandGetScreenInfos, nil, &res)
+	if err != nil {
+		return nil, err
+	}
+
+	return res.ScreenInfos, nil
+}
+
+// AddScreenParams add a new screen to the device. Only supported in headless
+// mode.
+type AddScreenParams struct {
+	Left             int64           `json:"left"`                                // Offset of the left edge of the screen in pixels.
+	Top              int64           `json:"top"`                                 // Offset of the top edge of the screen in pixels.
+	Width            int64           `json:"width"`                               // The width of the screen in pixels.
+	Height           int64           `json:"height"`                              // The height of the screen in pixels.
+	WorkAreaInsets   *WorkAreaInsets `json:"workAreaInsets,omitempty,omitzero"`   // Specifies the screen's work area. Default is entire screen.
+	DevicePixelRatio float64         `json:"devicePixelRatio,omitempty,omitzero"` // Specifies the screen's device pixel ratio. Default is 1.
+	Rotation         int64           `json:"rotation,omitempty,omitzero"`         // Specifies the screen's rotation angle. Available values are 0, 90, 180 and 270. Default is 0.
+	ColorDepth       int64           `json:"colorDepth,omitempty,omitzero"`       // Specifies the screen's color depth in bits. Default is 24.
+	Label            string          `json:"label,omitempty,omitzero"`            // Specifies the descriptive label for the screen. Default is none.
+	IsInternal       bool            `json:"isInternal"`                          // Indicates whether the screen is internal to the device or external, attached to the device. Default is false.
+}
+
+// AddScreen add a new screen to the device. Only supported in headless mode.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Emulation#method-addScreen
+//
+// parameters:
+//
+//	left - Offset of the left edge of the screen in pixels.
+//	top - Offset of the top edge of the screen in pixels.
+//	width - The width of the screen in pixels.
+//	height - The height of the screen in pixels.
+func AddScreen(left int64, top int64, width int64, height int64) *AddScreenParams {
+	return &AddScreenParams{
+		Left:       left,
+		Top:        top,
+		Width:      width,
+		Height:     height,
+		IsInternal: false,
+	}
+}
+
+// WithWorkAreaInsets specifies the screen's work area. Default is entire
+// screen.
+func (p AddScreenParams) WithWorkAreaInsets(workAreaInsets *WorkAreaInsets) *AddScreenParams {
+	p.WorkAreaInsets = workAreaInsets
+	return &p
+}
+
+// WithDevicePixelRatio specifies the screen's device pixel ratio. Default is
+// 1.
+func (p AddScreenParams) WithDevicePixelRatio(devicePixelRatio float64) *AddScreenParams {
+	p.DevicePixelRatio = devicePixelRatio
+	return &p
+}
+
+// WithRotation specifies the screen's rotation angle. Available values are
+// 0, 90, 180 and 270. Default is 0.
+func (p AddScreenParams) WithRotation(rotation int64) *AddScreenParams {
+	p.Rotation = rotation
+	return &p
+}
+
+// WithColorDepth specifies the screen's color depth in bits. Default is 24.
+func (p AddScreenParams) WithColorDepth(colorDepth int64) *AddScreenParams {
+	p.ColorDepth = colorDepth
+	return &p
+}
+
+// WithLabel specifies the descriptive label for the screen. Default is none.
+func (p AddScreenParams) WithLabel(label string) *AddScreenParams {
+	p.Label = label
+	return &p
+}
+
+// WithIsInternal indicates whether the screen is internal to the device or
+// external, attached to the device. Default is false.
+func (p AddScreenParams) WithIsInternal(isInternal bool) *AddScreenParams {
+	p.IsInternal = isInternal
+	return &p
+}
+
+// AddScreenReturns return values.
+type AddScreenReturns struct {
+	ScreenInfo *ScreenInfo `json:"screenInfo,omitempty,omitzero"`
+}
+
+// Do executes Emulation.addScreen against the provided context.
+//
+// returns:
+//
+//	screenInfo
+func (p *AddScreenParams) Do(ctx context.Context) (screenInfo *ScreenInfo, err error) {
+	// execute
+	var res AddScreenReturns
+	err = cdp.Execute(ctx, CommandAddScreen, p, &res)
+	if err != nil {
+		return nil, err
+	}
+
+	return res.ScreenInfo, nil
+}
+
+// UpdateScreenParams updates specified screen parameters. Only supported in
+// headless mode.
+type UpdateScreenParams struct {
+	ScreenID         ScreenID        `json:"screenId"`                            // Target screen identifier.
+	Left             int64           `json:"left,omitempty,omitzero"`             // Offset of the left edge of the screen in pixels.
+	Top              int64           `json:"top,omitempty,omitzero"`              // Offset of the top edge of the screen in pixels.
+	Width            int64           `json:"width,omitempty,omitzero"`            // The width of the screen in pixels.
+	Height           int64           `json:"height,omitempty,omitzero"`           // The height of the screen in pixels.
+	WorkAreaInsets   *WorkAreaInsets `json:"workAreaInsets,omitempty,omitzero"`   // Specifies the screen's work area.
+	DevicePixelRatio float64         `json:"devicePixelRatio,omitempty,omitzero"` // Specifies the screen's device pixel ratio.
+	Rotation         int64           `json:"rotation,omitempty,omitzero"`         // Specifies the screen's rotation angle. Available values are 0, 90, 180 and 270.
+	ColorDepth       int64           `json:"colorDepth,omitempty,omitzero"`       // Specifies the screen's color depth in bits.
+	Label            string          `json:"label,omitempty,omitzero"`            // Specifies the descriptive label for the screen.
+	IsInternal       bool            `json:"isInternal"`                          // Indicates whether the screen is internal to the device or external, attached to the device. Default is false.
+}
+
+// UpdateScreen updates specified screen parameters. Only supported in
+// headless mode.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Emulation#method-updateScreen
+//
+// parameters:
+//
+//	screenID - Target screen identifier.
+func UpdateScreen(screenID ScreenID) *UpdateScreenParams {
+	return &UpdateScreenParams{
+		ScreenID:   screenID,
+		IsInternal: false,
+	}
+}
+
+// WithLeft offset of the left edge of the screen in pixels.
+func (p UpdateScreenParams) WithLeft(left int64) *UpdateScreenParams {
+	p.Left = left
+	return &p
+}
+
+// WithTop offset of the top edge of the screen in pixels.
+func (p UpdateScreenParams) WithTop(top int64) *UpdateScreenParams {
+	p.Top = top
+	return &p
+}
+
+// WithWidth the width of the screen in pixels.
+func (p UpdateScreenParams) WithWidth(width int64) *UpdateScreenParams {
+	p.Width = width
+	return &p
+}
+
+// WithHeight the height of the screen in pixels.
+func (p UpdateScreenParams) WithHeight(height int64) *UpdateScreenParams {
+	p.Height = height
+	return &p
+}
+
+// WithWorkAreaInsets specifies the screen's work area.
+func (p UpdateScreenParams) WithWorkAreaInsets(workAreaInsets *WorkAreaInsets) *UpdateScreenParams {
+	p.WorkAreaInsets = workAreaInsets
+	return &p
+}
+
+// WithDevicePixelRatio specifies the screen's device pixel ratio.
+func (p UpdateScreenParams) WithDevicePixelRatio(devicePixelRatio float64) *UpdateScreenParams {
+	p.DevicePixelRatio = devicePixelRatio
+	return &p
+}
+
+// WithRotation specifies the screen's rotation angle. Available values are
+// 0, 90, 180 and 270.
+func (p UpdateScreenParams) WithRotation(rotation int64) *UpdateScreenParams {
+	p.Rotation = rotation
+	return &p
+}
+
+// WithColorDepth specifies the screen's color depth in bits.
+func (p UpdateScreenParams) WithColorDepth(colorDepth int64) *UpdateScreenParams {
+	p.ColorDepth = colorDepth
+	return &p
+}
+
+// WithLabel specifies the descriptive label for the screen.
+func (p UpdateScreenParams) WithLabel(label string) *UpdateScreenParams {
+	p.Label = label
+	return &p
+}
+
+// WithIsInternal indicates whether the screen is internal to the device or
+// external, attached to the device. Default is false.
+func (p UpdateScreenParams) WithIsInternal(isInternal bool) *UpdateScreenParams {
+	p.IsInternal = isInternal
+	return &p
+}
+
+// UpdateScreenReturns return values.
+type UpdateScreenReturns struct {
+	ScreenInfo *ScreenInfo `json:"screenInfo,omitempty,omitzero"`
+}
+
+// Do executes Emulation.updateScreen against the provided context.
+//
+// returns:
+//
+//	screenInfo
+func (p *UpdateScreenParams) Do(ctx context.Context) (screenInfo *ScreenInfo, err error) {
+	// execute
+	var res UpdateScreenReturns
+	err = cdp.Execute(ctx, CommandUpdateScreen, p, &res)
+	if err != nil {
+		return nil, err
+	}
+
+	return res.ScreenInfo, nil
+}
+
+// RemoveScreenParams remove screen from the device. Only supported in
+// headless mode.
+type RemoveScreenParams struct {
+	ScreenID ScreenID `json:"screenId"`
+}
+
+// RemoveScreen remove screen from the device. Only supported in headless
+// mode.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Emulation#method-removeScreen
+//
+// parameters:
+//
+//	screenID
+func RemoveScreen(screenID ScreenID) *RemoveScreenParams {
+	return &RemoveScreenParams{
+		ScreenID: screenID,
+	}
+}
+
+// Do executes Emulation.removeScreen against the provided context.
+func (p *RemoveScreenParams) Do(ctx context.Context) (err error) {
+	return cdp.Execute(ctx, CommandRemoveScreen, p, nil)
+}
+
+// SetPrimaryScreenParams set primary screen. Only supported in headless
+// mode. Note that this changes the coordinate system origin to the top-left of
+// the new primary screen, updating the bounds and work areas of all existing
+// screens accordingly.
+type SetPrimaryScreenParams struct {
+	ScreenID ScreenID `json:"screenId"`
+}
+
+// SetPrimaryScreen set primary screen. Only supported in headless mode. Note
+// that this changes the coordinate system origin to the top-left of the new
+// primary screen, updating the bounds and work areas of all existing screens
+// accordingly.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Emulation#method-setPrimaryScreen
+//
+// parameters:
+//
+//	screenID
+func SetPrimaryScreen(screenID ScreenID) *SetPrimaryScreenParams {
+	return &SetPrimaryScreenParams{
+		ScreenID: screenID,
+	}
+}
+
+// Do executes Emulation.setPrimaryScreen against the provided context.
+func (p *SetPrimaryScreenParams) Do(ctx context.Context) (err error) {
+	return cdp.Execute(ctx, CommandSetPrimaryScreen, p, nil)
+}
+
 // Command names.
 const (
 	CommandClearDeviceMetricsOverride               = "Emulation.clearDeviceMetricsOverride"
@@ -1297,4 +1615,9 @@ const (
 	CommandSetUserAgentOverride                     = "Emulation.setUserAgentOverride"
 	CommandSetAutomationOverride                    = "Emulation.setAutomationOverride"
 	CommandSetSmallViewportHeightDifferenceOverride = "Emulation.setSmallViewportHeightDifferenceOverride"
+	CommandGetScreenInfos                           = "Emulation.getScreenInfos"
+	CommandAddScreen                                = "Emulation.addScreen"
+	CommandUpdateScreen                             = "Emulation.updateScreen"
+	CommandRemoveScreen                             = "Emulation.removeScreen"
+	CommandSetPrimaryScreen                         = "Emulation.setPrimaryScreen"
 )
