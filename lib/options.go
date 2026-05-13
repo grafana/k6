@@ -375,6 +375,9 @@ func (o Options) Apply(opts Options) Options {
 		o.Iterations = null.NewInt(0, false)
 		o.Stages = nil
 		o.Scenarios = nil
+		if opts.Scenarios != nil {
+			o.VUs = null.NewInt(0, false)
+		}
 	}
 
 	if opts.Duration.Valid {
