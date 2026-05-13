@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"cmp"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -9,6 +11,11 @@ import (
 	"go.k6.io/k6/v2/ext"
 	"go.k6.io/k6/v2/subcommand"
 )
+
+// xStubAnnotation marks a cobra subcommand under `x` as a registry-sourced
+// stub: it exists only to advertise an extension subcommand in `k6 x` help.
+// Running it falls into the same provisioning path as an unregistered name.
+const xStubAnnotation = "k6-x-stub"
 
 // getX creates the "x" command that serves as a namespace for extension-provided subcommands.
 //
@@ -47,6 +54,8 @@ func getX(gs *state.GlobalState) *cobra.Command {
 
 This command serves as a parent for subcommands registered by k6 extensions,
 allowing them to extend k6's functionality with custom commands.
+
+Run "k6 x explore" to see the full list of official and community-provided subcommands.
 `,
 		// Disable flag parsing to pass all arguments unchanged to the provisioned binary.
 		// This ensures flags like --help reach the extension subcommand after provisioning.
@@ -67,9 +76,71 @@ allowing them to extend k6's functionality with custom commands.
 		},
 	}
 
-	cmd.AddCommand(extensionSubcommands(gs)...)
+	baked := extensionSubcommands(gs)
+	cmd.AddCommand(baked...)
+	cmd.AddCommand(registryStubs(gs, baked)...)
 
 	return cmd
+}
+
+// registryStubs returns cobra stubs for registry-advertised subcommands not
+// already provided by baked-in extensions. The stubs only exist so `k6 x`
+// help can advertise the wider catalog; invoking one drops into the regular
+// provisioning path. The function is a no-op outside `k6 x` invocations so
+// other commands don't pay for the registry I/O.
+func registryStubs(gs *state.GlobalState, baked []*cobra.Command) []*cobra.Command {
+	if !gs.Flags.AutoExtensionResolution {
+		return nil
+	}
+
+	args := gs.CmdArgs[1:]
+	first := slices.IndexFunc(args, func(a string) bool {
+		return a != cobra.ShellCompRequestCmd && a != cobra.ShellCompNoDescRequestCmd
+	})
+	if first < 0 || args[first] != "x" {
+		return nil
+	}
+
+	cachePath := catalogCachePath(gs)
+	subs, err := readCachedCatalog(gs, cachePath)
+	if err != nil {
+		gs.Logger.WithError(err).Debug("k6 extension catalog")
+	}
+	if subs == nil && first == 0 { // first == 0: not TAB completion, network allowed
+		url := cmp.Or(gs.Env[state.ProvisionCatalogURL], defaultCatalogURL())
+		_, _ = fmt.Fprint(gs.Stderr, "Loading the subcommand list...")
+		tail := "\n\n"
+		if gs.Stderr.IsTTY {
+			// Best-effort VT100 erase so help renders without a leftover trail.
+			tail = "\r\x1b[2K"
+		}
+		fetched, raw, err := fetchCatalog(gs.Ctx, url)
+		_, _ = fmt.Fprint(gs.Stderr, tail)
+		if err == nil {
+			subs = fetched
+			err = writeCachedCatalog(gs, cachePath, raw)
+		}
+		if err != nil {
+			gs.Logger.WithError(err).Debug("k6 extension catalog")
+		}
+	}
+
+	var stubs []*cobra.Command
+	for _, r := range subs {
+		if slices.ContainsFunc(baked, func(b *cobra.Command) bool { return b.Name() == r.Name }) {
+			continue
+		}
+		stubs = append(stubs, &cobra.Command{
+			Use:                r.Name,
+			Short:              r.Short,
+			DisableFlagParsing: true,
+			Annotations:        map[string]string{xStubAnnotation: "true"},
+			RunE: func(c *cobra.Command, _ []string) error {
+				return buildExtensionDeps(gs, c.Name())
+			},
+		})
+	}
+	return stubs
 }
 
 // buildExtensionDeps returns a [binaryIsNotSatisfyingDependenciesError] for
@@ -128,11 +199,16 @@ func detectExtensionCompletion(root *cobra.Command, gs *state.GlobalState) (stri
 	}
 
 	cmd, remaining, err := root.Find(args[1:])
-	if err != nil || cmd.Name() != "x" || len(remaining) < 2 {
+	if err != nil {
 		return "", false
 	}
-
-	return remaining[0], true
+	switch {
+	case cmd.Annotations[xStubAnnotation] == "true" && len(remaining) >= 1:
+		return cmd.Name(), true
+	case cmd.Name() == "x" && len(remaining) >= 2:
+		return remaining[0], true
+	}
+	return "", false
 }
 
 // dependenciesFromSubcommand constructs a dependencies object for the given subcommand,
