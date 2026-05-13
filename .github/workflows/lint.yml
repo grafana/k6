@@ -44,4 +44,4 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
       - name: Run linters
-        uses: grafana/k6-ci/.github/actions/lint@72a6e5968a5e94ad268c209630a87f3bdce47c16 # lint-action branch — bump once grafana/k6-ci#33 merges
+        uses: grafana/k6-ci/.github/actions/lint@40021b94d407d92bff09e4229f102306d68bb7e0 # lint-action branch — bump once grafana/k6-ci#33 merges
