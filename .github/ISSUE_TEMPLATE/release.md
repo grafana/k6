@@ -1,13 +1,13 @@
 ---
 name: k6 Release
 about: k6 release accommodates activities and a checklist with the k6 open-source release process.
-title: 'k6 release v1.x.0'
+title: 'k6 release v2.x.0'
 labels: ["release"]
 ---
 
 **Release Date**:
 
-25th May 2026 **<- WRITE HERE THE UPDATED RELEASE DATE**
+22nd June 2026 **<- WRITE HERE THE UPDATED RELEASE DATE**
 
 ## Release Activities
 
@@ -34,11 +34,11 @@ labels: ["release"]
 - [ ] Ensure all PRs in the `k6` repository, part of the current [milestone](https://github.com/grafana/k6/milestones), have been merged.
 - [ ] Open a PR with the release notes for the new version
   - [ ] Ask teams that might have contributed to the release to contribute their notes and review the existing ones.
-  - [ ] Remember to mention and thank [external contributors](https://github.com/search?q=user%3Agrafana+repo%3Ak6+milestone%3A%22v1.7.0%22+-author%3Amstoykov+-author%3Aoleiade+-author%3Acodebien+-author%3Aandrewslotin+-author%3Ajoanlopez+-author%3Aankur22+-author%3Ainancgumus+-author%3Aszkiba+-author%3AAgnesToulet+-author%3Adependabot%5Bbot%5D+-author%3Arenovate-sh-app%5Bbot%5D&type=pullrequests). (**<- Update the query with the correct milestone version**).
+  - [ ] Remember to mention and thank [external contributors](https://github.com/search?q=user%3Agrafana+repo%3Ak6+milestone%3A%22v2.1.0%22+-author%3Amstoykov+-author%3Aoleiade+-author%3Acodebien+-author%3Aandrewslotin+-author%3Ajoanlopez+-author%3Aankur22+-author%3Ainancgumus+-author%3Aszkiba+-author%3AAgnesToulet+-author%3Adependabot%5Bbot%5D+-author%3Arenovate-sh-app%5Bbot%5D&type=pullrequests). (**<- Update the query with the correct milestone version**).
 - [ ] Share the release notes PR with the k6 open-source teams. Request contributions from all affected teams and any other stakeholders involved in the new release.
 - [ ] Open a separate PR for bumping [the k6 Go project's version](https://github.com/grafana/k6/blob/master/internal/build/version.go#L6).
 - [ ] Open a PR in the `DefinitelyTyped/DefinitelyTyped` repository using the release branch created in the grafana/k6-DefinitelyTyped fork to update the k6 type definitions for the new release.
-- [ ] Open a PR to add the new k6 version to the extensions registry (similar to [this one](https://github.com/grafana/k6-extension-registry/pull/104) for v1.3.0).
+- [ ] Open a PR to add the new k6 version to the extensions registry (similar to [this one](https://github.com/grafana/k6-extension-registry/pull/104) for v2.1.0).
 
 #### ~ 1 day before the release date
 
@@ -50,7 +50,7 @@ labels: ["release"]
 
 - [ ] Open and merge a PR from `main` in the `k6-docs` repository:
   - [ ] Creating a new `v{major}.{minor}.0` file in the [next release notes folder](https://github.com/grafana/k6-docs/tree/main/docs/sources/k6/next/release-notes) and copy/paste the main sections of the release notes (new features, deprecations and roadmap).
-  - [ ] Copying the current k6's `next` (including the newly created release note file) to a folder named with the k6 version (e.g., `v1.3.x`).
+  - [ ] Copying the current k6's `next` (including the newly created release note file) to a folder named with the k6 version (e.g., `v2.1.x`).
 - [ ] Ensure the `k6` repository release notes PR contains the correct links to the docs.
 
 #### In k6 repository
@@ -64,12 +64,13 @@ labels: ["release"]
 !!! Update the below when making the issue
 
 ```
-git checkout master && git pull && git checkout -b v1.3.x && git tag v1.3.0 -m "v1.3.0" && git push origin v1.3.0
+git checkout master && git pull && git checkout -b v2.1.x && git tag v2.1.0 -m "v2.1.0" && git push origin v2.1.0
 ```
 
 #### In k6-extension-registry
 
 - [ ] Merge the PR adding [the new k6 version](https://github.com/grafana/k6-extension-registry/blob/main/registry.yaml#L8).
+- [ ] Push a new tag/make new release to push that the update to production
 
 #### Announcements
 
