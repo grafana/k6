@@ -51,6 +51,21 @@ func TestCloudRunCommandIncompatibleFlags(t *testing.T) {
 			cliArgs:            []string{"--local-execution", "--show-logs"},
 			wantStderrContains: "the --local-execution flag is not compatible with the --show-logs flag",
 		},
+		{
+			name:               "--secret-source=cloud is not a valid value",
+			cliArgs:            []string{"--secret-source=cloud"},
+			wantStderrContains: "'cloud' is not a valid value for --secret-source",
+		},
+		{
+			name:               "--secret-source=cloud is not a valid value even with --local-execution",
+			cliArgs:            []string{"--local-execution", "--secret-source=cloud"},
+			wantStderrContains: "'cloud' is not a valid value for --secret-source",
+		},
+		{
+			name:               "using --no-cloud-secrets without --local-execution should fail",
+			cliArgs:            []string{"--no-cloud-secrets"},
+			wantStderrContains: "the --no-cloud-secrets flag can only be used in conjunction with the --local-execution flag",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -83,7 +98,7 @@ export const options = {
 
 export default function() {};`
 
-		ts := makeTestState(t, script, []string{"--local-execution"}, 0)
+		ts := makeTestState(t, script, []string{"--local-execution"})
 
 		testServerHandlerFunc := http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
 			// When using the local execution mode, the test archive should be uploaded to the cloud
@@ -100,6 +115,11 @@ export default function() {};`
 			resp.WriteHeader(http.StatusOK)
 			_, err = fmt.Fprint(resp, `{
 			"reference_id": "1337",
+			"test_run_token": "mock-test-run-token",
+			"secrets_config": {
+				"endpoint": "https://mock-secrets.example.com/{key}",
+				"response_path": "plaintext"
+			},
 			"config": {
 				"testRunDetails": "https://some.other.url/foo/tests/org/1337?bar=baz"
 			}
@@ -131,7 +151,7 @@ export const options = {
 
 export default function() {};`
 
-		ts := makeTestState(t, script, []string{"--local-execution", "--no-archive-upload"}, 0)
+		ts := makeTestState(t, script, []string{"--local-execution", "--no-archive-upload"})
 
 		testServerHandlerFunc := http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
 			body, err := io.ReadAll(req.Body)
@@ -150,6 +170,11 @@ export default function() {};`
 			resp.WriteHeader(http.StatusOK)
 			_, err = fmt.Fprint(resp, `{
 			"reference_id": "1337",
+			"test_run_token": "mock-test-run-token",
+			"secrets_config": {
+				"endpoint": "https://mock-secrets.example.com/{key}",
+				"response_path": "plaintext"
+			},
 			"config": {
 				"testRunDetails": "https://some.other.url/foo/tests/org/1337?bar=baz"
 			}
@@ -183,7 +208,7 @@ export default function() {
 	` + "console.log(`The test run id is ${__ENV.K6_CLOUDRUN_TEST_RUN_ID}`);" + `
 };`
 
-		ts := makeTestState(t, script, []string{"--local-execution", "--log-output=stdout"}, 0)
+		ts := makeTestState(t, script, []string{"--local-execution", "--log-output=stdout"})
 
 		const testRunID = 1337
 		srv := getCloudTestEndChecker(t, testRunID, nil, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed)
@@ -199,7 +224,46 @@ export default function() {
 	})
 }
 
-func makeTestState(tb testing.TB, script string, cliFlags []string, expExitCode exitcodes.ExitCode) *GlobalTestState {
+func TestCloudRunLocalExecutionNoCloudSecrets(t *testing.T) {
+	t.Parallel()
+
+	script := `
+export const options = {
+  cloud: {
+      name: 'Test no-cloud-secrets',
+      projectID: 123456,
+  },
+};
+export default function() {};`
+
+	ts := makeTestState(t, script, []string{"--local-execution", "--no-cloud-secrets"})
+
+	testServerHandlerFunc := http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
+		resp.WriteHeader(http.StatusOK)
+		_, err := fmt.Fprint(resp, `{
+			"reference_id": "1337",
+			"test_run_token": "mock-test-run-token",
+			"secrets_config": {
+				"endpoint": "https://mock-secrets.example.com/{key}",
+				"response_path": "plaintext"
+			},
+			"config": {
+				"testRunDetails": "https://some.other.url/foo/tests/org/1337?bar=baz"
+			}
+		}`)
+		assert.NoError(t, err)
+	})
+
+	srv := getCloudTestEndChecker(t, 1337, testServerHandlerFunc, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed)
+	ts.Env["K6_CLOUD_HOST"] = srv.URL
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	// --no-cloud-secrets must prevent the cloud source from being registered.
+	assert.Nil(t, ts.CloudSecretSource, "cloud secret source should not be registered when --no-cloud-secrets is set")
+}
+
+func makeTestState(tb testing.TB, script string, cliFlags []string) *GlobalTestState {
 	if cliFlags == nil {
 		cliFlags = []string{"-v", "--log-output=stdout"}
 	}
@@ -207,7 +271,6 @@ func makeTestState(tb testing.TB, script string, cliFlags []string, expExitCode 
 	ts := NewGlobalTestState(tb)
 	require.NoError(tb, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test.js"), []byte(script), 0o644))
 	ts.CmdArgs = append(append([]string{"k6", "cloud", "run"}, cliFlags...), "test.js")
-	ts.ExpectedExitCode = int(expExitCode)
 	ts.Env["K6_CLOUD_TOKEN"] = "foo" // doesn't matter, we mock the cloud
 
 	return ts
