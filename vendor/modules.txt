@@ -49,8 +49,8 @@ github.com/cenkalti/backoff/v5
 # github.com/cespare/xxhash/v2 v2.3.0
 ## explicit; go 1.11
 github.com/cespare/xxhash/v2
-# github.com/chromedp/cdproto v0.0.0-20250803210736-d308e07a266d
-## explicit; go 1.23
+# github.com/chromedp/cdproto v0.0.0-20260427013145-5737772c319b
+## explicit; go 1.26
 github.com/chromedp/cdproto
 github.com/chromedp/cdproto/accessibility
 github.com/chromedp/cdproto/animation
@@ -62,6 +62,7 @@ github.com/chromedp/cdproto/browser
 github.com/chromedp/cdproto/cachestorage
 github.com/chromedp/cdproto/cast
 github.com/chromedp/cdproto/cdp
+github.com/chromedp/cdproto/crashreportcontext
 github.com/chromedp/cdproto/css
 github.com/chromedp/cdproto/debugger
 github.com/chromedp/cdproto/deviceaccess
@@ -97,6 +98,7 @@ github.com/chromedp/cdproto/pwa
 github.com/chromedp/cdproto/runtime
 github.com/chromedp/cdproto/security
 github.com/chromedp/cdproto/serviceworker
+github.com/chromedp/cdproto/smartcardemulation
 github.com/chromedp/cdproto/storage
 github.com/chromedp/cdproto/systeminfo
 github.com/chromedp/cdproto/target
@@ -104,6 +106,7 @@ github.com/chromedp/cdproto/tethering
 github.com/chromedp/cdproto/tracing
 github.com/chromedp/cdproto/webaudio
 github.com/chromedp/cdproto/webauthn
+github.com/chromedp/cdproto/webmcp
 # github.com/chromedp/sysutil v1.1.0
 ## explicit; go 1.23
 github.com/chromedp/sysutil
@@ -144,8 +147,8 @@ github.com/evanw/esbuild/pkg/api
 # github.com/fatih/color v1.19.0
 ## explicit; go 1.25.0
 github.com/fatih/color
-# github.com/go-json-experiment/json v0.0.0-20250211171154-1ae217ad3535
-## explicit; go 1.23
+# github.com/go-json-experiment/json v0.0.0-20260214004413-d219187c3433
+## explicit; go 1.26
 github.com/go-json-experiment/json
 github.com/go-json-experiment/json/internal
 github.com/go-json-experiment/json/internal/jsonflags

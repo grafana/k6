@@ -306,6 +306,14 @@ func (t *InspectMode) UnmarshalJSON(buf []byte) error {
 	return nil
 }
 
+// InspectedElementAnchorConfig [no description].
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Overlay#type-InspectedElementAnchorConfig
+type InspectedElementAnchorConfig struct {
+	NodeID        cdp.NodeID        `json:"nodeId,omitempty,omitzero"`        // Identifier of the node to highlight.
+	BackendNodeID cdp.BackendNodeID `json:"backendNodeId,omitempty,omitzero"` // Identifier of the backend node to highlight.
+}
+
 // LineStylePattern the line pattern (default: solid).
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Overlay#type-LineStyle

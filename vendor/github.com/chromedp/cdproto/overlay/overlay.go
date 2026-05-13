@@ -306,7 +306,9 @@ func (p *HighlightQuadParams) Do(ctx context.Context) (err error) {
 }
 
 // HighlightRectParams highlights given rectangle. Coordinates are absolute
-// with respect to the main frame viewport.
+// with respect to the main frame viewport. Issue: the method does not handle
+// device pixel ratio (DPR) correctly. The coordinates currently have to be
+// adjusted by the client if DPR is not 1 (see crbug.com/437807128).
 type HighlightRectParams struct {
 	X            int64     `json:"x"`                               // X coordinate
 	Y            int64     `json:"y"`                               // Y coordinate
@@ -317,7 +319,9 @@ type HighlightRectParams struct {
 }
 
 // HighlightRect highlights given rectangle. Coordinates are absolute with
-// respect to the main frame viewport.
+// respect to the main frame viewport. Issue: the method does not handle device
+// pixel ratio (DPR) correctly. The coordinates currently have to be adjusted by
+// the client if DPR is not 1 (see crbug.com/437807128).
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Overlay#method-highlightRect
 //
@@ -627,6 +631,29 @@ func (p *SetShowContainerQueryOverlaysParams) Do(ctx context.Context) (err error
 	return cdp.Execute(ctx, CommandSetShowContainerQueryOverlays, p, nil)
 }
 
+// SetShowInspectedElementAnchorParams [no description].
+type SetShowInspectedElementAnchorParams struct {
+	InspectedElementAnchorConfig *InspectedElementAnchorConfig `json:"inspectedElementAnchorConfig"` // Node identifier for which to show an anchor for.
+}
+
+// SetShowInspectedElementAnchor [no description].
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Overlay#method-setShowInspectedElementAnchor
+//
+// parameters:
+//
+//	inspectedElementAnchorConfig - Node identifier for which to show an anchor for.
+func SetShowInspectedElementAnchor(inspectedElementAnchorConfig *InspectedElementAnchorConfig) *SetShowInspectedElementAnchorParams {
+	return &SetShowInspectedElementAnchorParams{
+		InspectedElementAnchorConfig: inspectedElementAnchorConfig,
+	}
+}
+
+// Do executes Overlay.setShowInspectedElementAnchor against the provided context.
+func (p *SetShowInspectedElementAnchorParams) Do(ctx context.Context) (err error) {
+	return cdp.Execute(ctx, CommandSetShowInspectedElementAnchor, p, nil)
+}
+
 // SetShowPaintRectsParams requests that backend shows paint rectangles.
 type SetShowPaintRectsParams struct {
 	Result bool `json:"result"` // True for showing paint rectangles
@@ -820,6 +847,7 @@ const (
 	CommandSetShowFlexOverlays                  = "Overlay.setShowFlexOverlays"
 	CommandSetShowScrollSnapOverlays            = "Overlay.setShowScrollSnapOverlays"
 	CommandSetShowContainerQueryOverlays        = "Overlay.setShowContainerQueryOverlays"
+	CommandSetShowInspectedElementAnchor        = "Overlay.setShowInspectedElementAnchor"
 	CommandSetShowPaintRects                    = "Overlay.setShowPaintRects"
 	CommandSetShowLayoutShiftRegions            = "Overlay.setShowLayoutShiftRegions"
 	CommandSetShowScrollBottleneckRects         = "Overlay.setShowScrollBottleneckRects"

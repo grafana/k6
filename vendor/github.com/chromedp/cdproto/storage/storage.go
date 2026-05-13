@@ -14,38 +14,43 @@ import (
 	"github.com/go-json-experiment/json/jsontext"
 )
 
-// GetStorageKeyForFrameParams returns a storage key given a frame id.
-type GetStorageKeyForFrameParams struct {
-	FrameID cdp.FrameID `json:"frameId"`
+// GetStorageKeyParams returns storage key for the given frame. If no frame
+// ID is provided, the storage key of the target executing this command is
+// returned.
+type GetStorageKeyParams struct {
+	FrameID cdp.FrameID `json:"frameId,omitempty,omitzero"`
 }
 
-// GetStorageKeyForFrame returns a storage key given a frame id.
+// GetStorageKey returns storage key for the given frame. If no frame ID is
+// provided, the storage key of the target executing this command is returned.
 //
-// See: https://chromedevtools.github.io/devtools-protocol/tot/Storage#method-getStorageKeyForFrame
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Storage#method-getStorageKey
 //
 // parameters:
-//
-//	frameID
-func GetStorageKeyForFrame(frameID cdp.FrameID) *GetStorageKeyForFrameParams {
-	return &GetStorageKeyForFrameParams{
-		FrameID: frameID,
-	}
+func GetStorageKey() *GetStorageKeyParams {
+	return &GetStorageKeyParams{}
 }
 
-// GetStorageKeyForFrameReturns return values.
-type GetStorageKeyForFrameReturns struct {
+// WithFrameID [no description].
+func (p GetStorageKeyParams) WithFrameID(frameID cdp.FrameID) *GetStorageKeyParams {
+	p.FrameID = frameID
+	return &p
+}
+
+// GetStorageKeyReturns return values.
+type GetStorageKeyReturns struct {
 	StorageKey SerializedStorageKey `json:"storageKey,omitempty,omitzero"`
 }
 
-// Do executes Storage.getStorageKeyForFrame against the provided context.
+// Do executes Storage.getStorageKey against the provided context.
 //
 // returns:
 //
 //	storageKey
-func (p *GetStorageKeyForFrameParams) Do(ctx context.Context) (storageKey SerializedStorageKey, err error) {
+func (p *GetStorageKeyParams) Do(ctx context.Context) (storageKey SerializedStorageKey, err error) {
 	// execute
-	var res GetStorageKeyForFrameReturns
-	err = cdp.Execute(ctx, CommandGetStorageKeyForFrame, p, &res)
+	var res GetStorageKeyReturns
+	err = cdp.Execute(ctx, CommandGetStorageKey, p, &res)
 	if err != nil {
 		return "", err
 	}
@@ -963,89 +968,6 @@ func (p *RunBounceTrackingMitigationsParams) Do(ctx context.Context) (deletedSit
 	return res.DeletedSites, nil
 }
 
-// SetAttributionReportingLocalTestingModeParams
-// https://wicg.github.io/attribution-reporting-api/.
-type SetAttributionReportingLocalTestingModeParams struct {
-	Enabled bool `json:"enabled"` // If enabled, noise is suppressed and reports are sent immediately.
-}
-
-// SetAttributionReportingLocalTestingMode
-// https://wicg.github.io/attribution-reporting-api/.
-//
-// See: https://chromedevtools.github.io/devtools-protocol/tot/Storage#method-setAttributionReportingLocalTestingMode
-//
-// parameters:
-//
-//	enabled - If enabled, noise is suppressed and reports are sent immediately.
-func SetAttributionReportingLocalTestingMode(enabled bool) *SetAttributionReportingLocalTestingModeParams {
-	return &SetAttributionReportingLocalTestingModeParams{
-		Enabled: enabled,
-	}
-}
-
-// Do executes Storage.setAttributionReportingLocalTestingMode against the provided context.
-func (p *SetAttributionReportingLocalTestingModeParams) Do(ctx context.Context) (err error) {
-	return cdp.Execute(ctx, CommandSetAttributionReportingLocalTestingMode, p, nil)
-}
-
-// SetAttributionReportingTrackingParams enables/disables issuing of
-// Attribution Reporting events.
-type SetAttributionReportingTrackingParams struct {
-	Enable bool `json:"enable"`
-}
-
-// SetAttributionReportingTracking enables/disables issuing of Attribution
-// Reporting events.
-//
-// See: https://chromedevtools.github.io/devtools-protocol/tot/Storage#method-setAttributionReportingTracking
-//
-// parameters:
-//
-//	enable
-func SetAttributionReportingTracking(enable bool) *SetAttributionReportingTrackingParams {
-	return &SetAttributionReportingTrackingParams{
-		Enable: enable,
-	}
-}
-
-// Do executes Storage.setAttributionReportingTracking against the provided context.
-func (p *SetAttributionReportingTrackingParams) Do(ctx context.Context) (err error) {
-	return cdp.Execute(ctx, CommandSetAttributionReportingTracking, p, nil)
-}
-
-// SendPendingAttributionReportsParams sends all pending Attribution Reports
-// immediately, regardless of their scheduled report time.
-type SendPendingAttributionReportsParams struct{}
-
-// SendPendingAttributionReports sends all pending Attribution Reports
-// immediately, regardless of their scheduled report time.
-//
-// See: https://chromedevtools.github.io/devtools-protocol/tot/Storage#method-sendPendingAttributionReports
-func SendPendingAttributionReports() *SendPendingAttributionReportsParams {
-	return &SendPendingAttributionReportsParams{}
-}
-
-// SendPendingAttributionReportsReturns return values.
-type SendPendingAttributionReportsReturns struct {
-	NumSent int64 `json:"numSent,omitempty,omitzero"` // The number of reports that were sent.
-}
-
-// Do executes Storage.sendPendingAttributionReports against the provided context.
-//
-// returns:
-//
-//	numSent - The number of reports that were sent.
-func (p *SendPendingAttributionReportsParams) Do(ctx context.Context) (numSent int64, err error) {
-	// execute
-	var res SendPendingAttributionReportsReturns
-	err = cdp.Execute(ctx, CommandSendPendingAttributionReports, nil, &res)
-	if err != nil {
-		return 0, err
-	}
-
-	return res.NumSent, nil
-}
-
 // GetRelatedWebsiteSetsParams returns the effective Related Website Sets in
 // use by this profile for the browser session. The effective Related Website
 // Sets will not change during a browser session.
@@ -1081,54 +1003,6 @@ func (p *GetRelatedWebsiteSetsParams) Do(ctx context.Context) (sets []*RelatedWe
 	return res.Sets, nil
 }
 
-// GetAffectedURLsForThirdPartyCookieMetadataParams returns the list of URLs
-// from a page and its embedded resources that match existing grace period URL
-// pattern rules.
-// https://developers.google.com/privacy-sandbox/cookies/temporary-exceptions/grace-period.
-type GetAffectedURLsForThirdPartyCookieMetadataParams struct {
-	FirstPartyURL  string   `json:"firstPartyUrl"`  // The URL of the page currently being visited.
-	ThirdPartyURLs []string `json:"thirdPartyUrls"` // The list of embedded resource URLs from the page.
-}
-
-// GetAffectedURLsForThirdPartyCookieMetadata returns the list of URLs from a
-// page and its embedded resources that match existing grace period URL pattern
-// rules.
-// https://developers.google.com/privacy-sandbox/cookies/temporary-exceptions/grace-period.
-//
-// See: https://chromedevtools.github.io/devtools-protocol/tot/Storage#method-getAffectedUrlsForThirdPartyCookieMetadata
-//
-// parameters:
-//
-//	firstPartyURL - The URL of the page currently being visited.
-//	thirdPartyURLs - The list of embedded resource URLs from the page.
-func GetAffectedURLsForThirdPartyCookieMetadata(firstPartyURL string, thirdPartyURLs []string) *GetAffectedURLsForThirdPartyCookieMetadataParams {
-	return &GetAffectedURLsForThirdPartyCookieMetadataParams{
-		FirstPartyURL:  firstPartyURL,
-		ThirdPartyURLs: thirdPartyURLs,
-	}
-}
-
-// GetAffectedURLsForThirdPartyCookieMetadataReturns return values.
-type GetAffectedURLsForThirdPartyCookieMetadataReturns struct {
-	MatchedURLs []string `json:"matchedUrls,omitempty,omitzero"` // Array of matching URLs. If there is a primary pattern match for the first- party URL, only the first-party URL is returned in the array.
-}
-
-// Do executes Storage.getAffectedUrlsForThirdPartyCookieMetadata against the provided context.
-//
-// returns:
-//
-//	matchedURLs - Array of matching URLs. If there is a primary pattern match for the first- party URL, only the first-party URL is returned in the array.
-func (p *GetAffectedURLsForThirdPartyCookieMetadataParams) Do(ctx context.Context) (matchedURLs []string, err error) {
-	// execute
-	var res GetAffectedURLsForThirdPartyCookieMetadataReturns
-	err = cdp.Execute(ctx, CommandGetAffectedURLsForThirdPartyCookieMetadata, p, &res)
-	if err != nil {
-		return nil, err
-	}
-
-	return res.MatchedURLs, nil
-}
-
 // SetProtectedAudienceKAnonymityParams [no description].
 type SetProtectedAudienceKAnonymityParams struct {
 	Owner  string   `json:"owner"`
@@ -1160,41 +1034,37 @@ func (p *SetProtectedAudienceKAnonymityParams) Do(ctx context.Context) (err erro
 
 // Command names.
 const (
-	CommandGetStorageKeyForFrame                      = "Storage.getStorageKeyForFrame"
-	CommandClearDataForOrigin                         = "Storage.clearDataForOrigin"
-	CommandClearDataForStorageKey                     = "Storage.clearDataForStorageKey"
-	CommandGetCookies                                 = "Storage.getCookies"
-	CommandSetCookies                                 = "Storage.setCookies"
-	CommandClearCookies                               = "Storage.clearCookies"
-	CommandGetUsageAndQuota                           = "Storage.getUsageAndQuota"
-	CommandOverrideQuotaForOrigin                     = "Storage.overrideQuotaForOrigin"
-	CommandTrackCacheStorageForOrigin                 = "Storage.trackCacheStorageForOrigin"
-	CommandTrackCacheStorageForStorageKey             = "Storage.trackCacheStorageForStorageKey"
-	CommandTrackIndexedDBForOrigin                    = "Storage.trackIndexedDBForOrigin"
-	CommandTrackIndexedDBForStorageKey                = "Storage.trackIndexedDBForStorageKey"
-	CommandUntrackCacheStorageForOrigin               = "Storage.untrackCacheStorageForOrigin"
-	CommandUntrackCacheStorageForStorageKey           = "Storage.untrackCacheStorageForStorageKey"
-	CommandUntrackIndexedDBForOrigin                  = "Storage.untrackIndexedDBForOrigin"
-	CommandUntrackIndexedDBForStorageKey              = "Storage.untrackIndexedDBForStorageKey"
-	CommandGetTrustTokens                             = "Storage.getTrustTokens"
-	CommandClearTrustTokens                           = "Storage.clearTrustTokens"
-	CommandGetInterestGroupDetails                    = "Storage.getInterestGroupDetails"
-	CommandSetInterestGroupTracking                   = "Storage.setInterestGroupTracking"
-	CommandSetInterestGroupAuctionTracking            = "Storage.setInterestGroupAuctionTracking"
-	CommandGetSharedStorageMetadata                   = "Storage.getSharedStorageMetadata"
-	CommandGetSharedStorageEntries                    = "Storage.getSharedStorageEntries"
-	CommandSetSharedStorageEntry                      = "Storage.setSharedStorageEntry"
-	CommandDeleteSharedStorageEntry                   = "Storage.deleteSharedStorageEntry"
-	CommandClearSharedStorageEntries                  = "Storage.clearSharedStorageEntries"
-	CommandResetSharedStorageBudget                   = "Storage.resetSharedStorageBudget"
-	CommandSetSharedStorageTracking                   = "Storage.setSharedStorageTracking"
-	CommandSetStorageBucketTracking                   = "Storage.setStorageBucketTracking"
-	CommandDeleteStorageBucket                        = "Storage.deleteStorageBucket"
-	CommandRunBounceTrackingMitigations               = "Storage.runBounceTrackingMitigations"
-	CommandSetAttributionReportingLocalTestingMode    = "Storage.setAttributionReportingLocalTestingMode"
-	CommandSetAttributionReportingTracking            = "Storage.setAttributionReportingTracking"
-	CommandSendPendingAttributionReports              = "Storage.sendPendingAttributionReports"
-	CommandGetRelatedWebsiteSets                      = "Storage.getRelatedWebsiteSets"
-	CommandGetAffectedURLsForThirdPartyCookieMetadata = "Storage.getAffectedUrlsForThirdPartyCookieMetadata"
-	CommandSetProtectedAudienceKAnonymity             = "Storage.setProtectedAudienceKAnonymity"
+	CommandGetStorageKey                    = "Storage.getStorageKey"
+	CommandClearDataForOrigin               = "Storage.clearDataForOrigin"
+	CommandClearDataForStorageKey           = "Storage.clearDataForStorageKey"
+	CommandGetCookies                       = "Storage.getCookies"
+	CommandSetCookies                       = "Storage.setCookies"
+	CommandClearCookies                     = "Storage.clearCookies"
+	CommandGetUsageAndQuota                 = "Storage.getUsageAndQuota"
+	CommandOverrideQuotaForOrigin           = "Storage.overrideQuotaForOrigin"
+	CommandTrackCacheStorageForOrigin       = "Storage.trackCacheStorageForOrigin"
+	CommandTrackCacheStorageForStorageKey   = "Storage.trackCacheStorageForStorageKey"
+	CommandTrackIndexedDBForOrigin          = "Storage.trackIndexedDBForOrigin"
+	CommandTrackIndexedDBForStorageKey      = "Storage.trackIndexedDBForStorageKey"
+	CommandUntrackCacheStorageForOrigin     = "Storage.untrackCacheStorageForOrigin"
+	CommandUntrackCacheStorageForStorageKey = "Storage.untrackCacheStorageForStorageKey"
+	CommandUntrackIndexedDBForOrigin        = "Storage.untrackIndexedDBForOrigin"
+	CommandUntrackIndexedDBForStorageKey    = "Storage.untrackIndexedDBForStorageKey"
+	CommandGetTrustTokens                   = "Storage.getTrustTokens"
+	CommandClearTrustTokens                 = "Storage.clearTrustTokens"
+	CommandGetInterestGroupDetails          = "Storage.getInterestGroupDetails"
+	CommandSetInterestGroupTracking         = "Storage.setInterestGroupTracking"
+	CommandSetInterestGroupAuctionTracking  = "Storage.setInterestGroupAuctionTracking"
+	CommandGetSharedStorageMetadata         = "Storage.getSharedStorageMetadata"
+	CommandGetSharedStorageEntries          = "Storage.getSharedStorageEntries"
+	CommandSetSharedStorageEntry            = "Storage.setSharedStorageEntry"
+	CommandDeleteSharedStorageEntry         = "Storage.deleteSharedStorageEntry"
+	CommandClearSharedStorageEntries        = "Storage.clearSharedStorageEntries"
+	CommandResetSharedStorageBudget         = "Storage.resetSharedStorageBudget"
+	CommandSetSharedStorageTracking         = "Storage.setSharedStorageTracking"
+	CommandSetStorageBucketTracking         = "Storage.setStorageBucketTracking"
+	CommandDeleteStorageBucket              = "Storage.deleteStorageBucket"
+	CommandRunBounceTrackingMitigations     = "Storage.runBounceTrackingMitigations"
+	CommandGetRelatedWebsiteSets            = "Storage.getRelatedWebsiteSets"
+	CommandSetProtectedAudienceKAnonymity   = "Storage.setProtectedAudienceKAnonymity"
 )

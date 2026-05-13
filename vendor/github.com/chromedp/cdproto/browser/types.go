@@ -94,7 +94,9 @@ const (
 	PermissionTypeIdleDetection            PermissionType = "idleDetection"
 	PermissionTypeKeyboardLock             PermissionType = "keyboardLock"
 	PermissionTypeLocalFonts               PermissionType = "localFonts"
+	PermissionTypeLocalNetwork             PermissionType = "localNetwork"
 	PermissionTypeLocalNetworkAccess       PermissionType = "localNetworkAccess"
+	PermissionTypeLoopbackNetwork          PermissionType = "loopbackNetwork"
 	PermissionTypeMidi                     PermissionType = "midi"
 	PermissionTypeMidiSysex                PermissionType = "midiSysex"
 	PermissionTypeNfc                      PermissionType = "nfc"
@@ -155,8 +157,12 @@ func (t *PermissionType) UnmarshalJSON(buf []byte) error {
 		*t = PermissionTypeKeyboardLock
 	case PermissionTypeLocalFonts:
 		*t = PermissionTypeLocalFonts
+	case PermissionTypeLocalNetwork:
+		*t = PermissionTypeLocalNetwork
 	case PermissionTypeLocalNetworkAccess:
 		*t = PermissionTypeLocalNetworkAccess
+	case PermissionTypeLoopbackNetwork:
+		*t = PermissionTypeLoopbackNetwork
 	case PermissionTypeMidi:
 		*t = PermissionTypeMidi
 	case PermissionTypeMidiSysex:

@@ -425,6 +425,47 @@ func (t *ResourcePriority) UnmarshalJSON(buf []byte) error {
 	return nil
 }
 
+// RenderBlockingBehavior the render-blocking behavior of a resource request.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Network#type-RenderBlockingBehavior
+type RenderBlockingBehavior string
+
+// String returns the RenderBlockingBehavior as string value.
+func (t RenderBlockingBehavior) String() string {
+	return string(t)
+}
+
+// RenderBlockingBehavior values.
+const (
+	RenderBlockingBehaviorBlocking             RenderBlockingBehavior = "Blocking"
+	RenderBlockingBehaviorInBodyParserBlocking RenderBlockingBehavior = "InBodyParserBlocking"
+	RenderBlockingBehaviorNonBlocking          RenderBlockingBehavior = "NonBlocking"
+	RenderBlockingBehaviorNonBlockingDynamic   RenderBlockingBehavior = "NonBlockingDynamic"
+	RenderBlockingBehaviorPotentiallyBlocking  RenderBlockingBehavior = "PotentiallyBlocking"
+)
+
+// UnmarshalJSON satisfies [json.Unmarshaler].
+func (t *RenderBlockingBehavior) UnmarshalJSON(buf []byte) error {
+	s := string(buf)
+	s = strings.TrimSuffix(strings.TrimPrefix(s, `"`), `"`)
+
+	switch RenderBlockingBehavior(s) {
+	case RenderBlockingBehaviorBlocking:
+		*t = RenderBlockingBehaviorBlocking
+	case RenderBlockingBehaviorInBodyParserBlocking:
+		*t = RenderBlockingBehaviorInBodyParserBlocking
+	case RenderBlockingBehaviorNonBlocking:
+		*t = RenderBlockingBehaviorNonBlocking
+	case RenderBlockingBehaviorNonBlockingDynamic:
+		*t = RenderBlockingBehaviorNonBlockingDynamic
+	case RenderBlockingBehaviorPotentiallyBlocking:
+		*t = RenderBlockingBehaviorPotentiallyBlocking
+	default:
+		return fmt.Errorf("unknown RenderBlockingBehavior value: %v", s)
+	}
+	return nil
+}
+
 // PostDataEntry post data entry for HTTP request.
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Network#type-PostDataEntry
@@ -448,6 +489,7 @@ type Request struct {
 	IsLinkPreload    bool                      `json:"isLinkPreload"`                       // Whether is loaded via link preload.
 	TrustTokenParams *TrustTokenParams         `json:"trustTokenParams,omitempty,omitzero"` // Set for requests when the TrustToken API is used. Contains the parameters passed by the developer (e.g. via "fetch") as understood by the backend.
 	IsSameSite       bool                      `json:"isSameSite"`                          // True if this resource request is considered to be the 'same site' as the request corresponding to the main frame.
+	IsAdRelated      bool                      `json:"isAdRelated"`                         // True when the resource request is ad-related.
 }
 
 // SignedCertificateTimestamp details of a signed certificate timestamp
@@ -608,41 +650,34 @@ func (t CorsError) String() string {
 
 // CorsError values.
 const (
-	CorsErrorDisallowedByMode                          CorsError = "DisallowedByMode"
-	CorsErrorInvalidResponse                           CorsError = "InvalidResponse"
-	CorsErrorWildcardOriginNotAllowed                  CorsError = "WildcardOriginNotAllowed"
-	CorsErrorMissingAllowOriginHeader                  CorsError = "MissingAllowOriginHeader"
-	CorsErrorMultipleAllowOriginValues                 CorsError = "MultipleAllowOriginValues"
-	CorsErrorInvalidAllowOriginValue                   CorsError = "InvalidAllowOriginValue"
-	CorsErrorAllowOriginMismatch                       CorsError = "AllowOriginMismatch"
-	CorsErrorInvalidAllowCredentials                   CorsError = "InvalidAllowCredentials"
-	CorsErrorCorsDisabledScheme                        CorsError = "CorsDisabledScheme"
-	CorsErrorPreflightInvalidStatus                    CorsError = "PreflightInvalidStatus"
-	CorsErrorPreflightDisallowedRedirect               CorsError = "PreflightDisallowedRedirect"
-	CorsErrorPreflightWildcardOriginNotAllowed         CorsError = "PreflightWildcardOriginNotAllowed"
-	CorsErrorPreflightMissingAllowOriginHeader         CorsError = "PreflightMissingAllowOriginHeader"
-	CorsErrorPreflightMultipleAllowOriginValues        CorsError = "PreflightMultipleAllowOriginValues"
-	CorsErrorPreflightInvalidAllowOriginValue          CorsError = "PreflightInvalidAllowOriginValue"
-	CorsErrorPreflightAllowOriginMismatch              CorsError = "PreflightAllowOriginMismatch"
-	CorsErrorPreflightInvalidAllowCredentials          CorsError = "PreflightInvalidAllowCredentials"
-	CorsErrorPreflightMissingAllowExternal             CorsError = "PreflightMissingAllowExternal"
-	CorsErrorPreflightInvalidAllowExternal             CorsError = "PreflightInvalidAllowExternal"
-	CorsErrorPreflightMissingAllowPrivateNetwork       CorsError = "PreflightMissingAllowPrivateNetwork"
-	CorsErrorPreflightInvalidAllowPrivateNetwork       CorsError = "PreflightInvalidAllowPrivateNetwork"
-	CorsErrorInvalidAllowMethodsPreflightResponse      CorsError = "InvalidAllowMethodsPreflightResponse"
-	CorsErrorInvalidAllowHeadersPreflightResponse      CorsError = "InvalidAllowHeadersPreflightResponse"
-	CorsErrorMethodDisallowedByPreflightResponse       CorsError = "MethodDisallowedByPreflightResponse"
-	CorsErrorHeaderDisallowedByPreflightResponse       CorsError = "HeaderDisallowedByPreflightResponse"
-	CorsErrorRedirectContainsCredentials               CorsError = "RedirectContainsCredentials"
-	CorsErrorInsecurePrivateNetwork                    CorsError = "InsecurePrivateNetwork"
-	CorsErrorInvalidPrivateNetworkAccess               CorsError = "InvalidPrivateNetworkAccess"
-	CorsErrorUnexpectedPrivateNetworkAccess            CorsError = "UnexpectedPrivateNetworkAccess"
-	CorsErrorNoCorsRedirectModeNotFollow               CorsError = "NoCorsRedirectModeNotFollow"
-	CorsErrorPreflightMissingPrivateNetworkAccessID    CorsError = "PreflightMissingPrivateNetworkAccessId"
-	CorsErrorPreflightMissingPrivateNetworkAccessName  CorsError = "PreflightMissingPrivateNetworkAccessName"
-	CorsErrorPrivateNetworkAccessPermissionUnavailable CorsError = "PrivateNetworkAccessPermissionUnavailable"
-	CorsErrorPrivateNetworkAccessPermissionDenied      CorsError = "PrivateNetworkAccessPermissionDenied"
-	CorsErrorLocalNetworkAccessPermissionDenied        CorsError = "LocalNetworkAccessPermissionDenied"
+	CorsErrorDisallowedByMode                     CorsError = "DisallowedByMode"
+	CorsErrorInvalidResponse                      CorsError = "InvalidResponse"
+	CorsErrorWildcardOriginNotAllowed             CorsError = "WildcardOriginNotAllowed"
+	CorsErrorMissingAllowOriginHeader             CorsError = "MissingAllowOriginHeader"
+	CorsErrorMultipleAllowOriginValues            CorsError = "MultipleAllowOriginValues"
+	CorsErrorInvalidAllowOriginValue              CorsError = "InvalidAllowOriginValue"
+	CorsErrorAllowOriginMismatch                  CorsError = "AllowOriginMismatch"
+	CorsErrorInvalidAllowCredentials              CorsError = "InvalidAllowCredentials"
+	CorsErrorCorsDisabledScheme                   CorsError = "CorsDisabledScheme"
+	CorsErrorPreflightInvalidStatus               CorsError = "PreflightInvalidStatus"
+	CorsErrorPreflightDisallowedRedirect          CorsError = "PreflightDisallowedRedirect"
+	CorsErrorPreflightWildcardOriginNotAllowed    CorsError = "PreflightWildcardOriginNotAllowed"
+	CorsErrorPreflightMissingAllowOriginHeader    CorsError = "PreflightMissingAllowOriginHeader"
+	CorsErrorPreflightMultipleAllowOriginValues   CorsError = "PreflightMultipleAllowOriginValues"
+	CorsErrorPreflightInvalidAllowOriginValue     CorsError = "PreflightInvalidAllowOriginValue"
+	CorsErrorPreflightAllowOriginMismatch         CorsError = "PreflightAllowOriginMismatch"
+	CorsErrorPreflightInvalidAllowCredentials     CorsError = "PreflightInvalidAllowCredentials"
+	CorsErrorPreflightMissingAllowExternal        CorsError = "PreflightMissingAllowExternal"
+	CorsErrorPreflightInvalidAllowExternal        CorsError = "PreflightInvalidAllowExternal"
+	CorsErrorInvalidAllowMethodsPreflightResponse CorsError = "InvalidAllowMethodsPreflightResponse"
+	CorsErrorInvalidAllowHeadersPreflightResponse CorsError = "InvalidAllowHeadersPreflightResponse"
+	CorsErrorMethodDisallowedByPreflightResponse  CorsError = "MethodDisallowedByPreflightResponse"
+	CorsErrorHeaderDisallowedByPreflightResponse  CorsError = "HeaderDisallowedByPreflightResponse"
+	CorsErrorRedirectContainsCredentials          CorsError = "RedirectContainsCredentials"
+	CorsErrorInsecureLocalNetwork                 CorsError = "InsecureLocalNetwork"
+	CorsErrorInvalidLocalNetworkAccess            CorsError = "InvalidLocalNetworkAccess"
+	CorsErrorNoCorsRedirectModeNotFollow          CorsError = "NoCorsRedirectModeNotFollow"
+	CorsErrorLocalNetworkAccessPermissionDenied   CorsError = "LocalNetworkAccessPermissionDenied"
 )
 
 // UnmarshalJSON satisfies [json.Unmarshaler].
@@ -689,10 +724,6 @@ func (t *CorsError) UnmarshalJSON(buf []byte) error {
 		*t = CorsErrorPreflightMissingAllowExternal
 	case CorsErrorPreflightInvalidAllowExternal:
 		*t = CorsErrorPreflightInvalidAllowExternal
-	case CorsErrorPreflightMissingAllowPrivateNetwork:
-		*t = CorsErrorPreflightMissingAllowPrivateNetwork
-	case CorsErrorPreflightInvalidAllowPrivateNetwork:
-		*t = CorsErrorPreflightInvalidAllowPrivateNetwork
 	case CorsErrorInvalidAllowMethodsPreflightResponse:
 		*t = CorsErrorInvalidAllowMethodsPreflightResponse
 	case CorsErrorInvalidAllowHeadersPreflightResponse:
@@ -703,22 +734,12 @@ func (t *CorsError) UnmarshalJSON(buf []byte) error {
 		*t = CorsErrorHeaderDisallowedByPreflightResponse
 	case CorsErrorRedirectContainsCredentials:
 		*t = CorsErrorRedirectContainsCredentials
-	case CorsErrorInsecurePrivateNetwork:
-		*t = CorsErrorInsecurePrivateNetwork
-	case CorsErrorInvalidPrivateNetworkAccess:
-		*t = CorsErrorInvalidPrivateNetworkAccess
-	case CorsErrorUnexpectedPrivateNetworkAccess:
-		*t = CorsErrorUnexpectedPrivateNetworkAccess
+	case CorsErrorInsecureLocalNetwork:
+		*t = CorsErrorInsecureLocalNetwork
+	case CorsErrorInvalidLocalNetworkAccess:
+		*t = CorsErrorInvalidLocalNetworkAccess
 	case CorsErrorNoCorsRedirectModeNotFollow:
 		*t = CorsErrorNoCorsRedirectModeNotFollow
-	case CorsErrorPreflightMissingPrivateNetworkAccessID:
-		*t = CorsErrorPreflightMissingPrivateNetworkAccessID
-	case CorsErrorPreflightMissingPrivateNetworkAccessName:
-		*t = CorsErrorPreflightMissingPrivateNetworkAccessName
-	case CorsErrorPrivateNetworkAccessPermissionUnavailable:
-		*t = CorsErrorPrivateNetworkAccessPermissionUnavailable
-	case CorsErrorPrivateNetworkAccessPermissionDenied:
-		*t = CorsErrorPrivateNetworkAccessPermissionDenied
 	case CorsErrorLocalNetworkAccessPermissionDenied:
 		*t = CorsErrorLocalNetworkAccessPermissionDenied
 	default:
@@ -949,7 +970,6 @@ type Response struct {
 	AlternateProtocolUsage      AlternateProtocolUsage      `json:"alternateProtocolUsage,omitempty,omitzero"`      // The reason why Chrome uses a specific transport protocol for HTTP semantics.
 	SecurityState               security.State              `json:"securityState"`                                  // Security state of the request resource.
 	SecurityDetails             *SecurityDetails            `json:"securityDetails,omitempty,omitzero"`             // Security details for the request.
-	IsIPProtectionUsed          bool                        `json:"isIpProtectionUsed"`                             // Indicates whether the request was sent through IP Protection proxies. If set to true, the request used the IP Protection privacy feature.
 }
 
 // WebSocketRequest webSocket request data.
@@ -1041,7 +1061,7 @@ type Cookie struct {
 	Value              string              `json:"value"`                           // Cookie value.
 	Domain             string              `json:"domain"`                          // Cookie domain.
 	Path               string              `json:"path"`                            // Cookie path.
-	Expires            float64             `json:"expires"`                         // Cookie expiration date as the number of seconds since the UNIX epoch.
+	Expires            float64             `json:"expires"`                         // Cookie expiration date as the number of seconds since the UNIX epoch. The value is set to -1 if the expiry date is not set. The value can be null for values that cannot be represented in JSON (±Inf).
 	Size               int64               `json:"size"`                            // Cookie size.
 	HTTPOnly           bool                `json:"httpOnly"`                        // True if cookie is http-only.
 	Secure             bool                `json:"secure"`                          // True if cookie is secure.
@@ -1084,8 +1104,6 @@ const (
 	SetCookieBlockedReasonSchemefulSameSiteStrict                  SetCookieBlockedReason = "SchemefulSameSiteStrict"
 	SetCookieBlockedReasonSchemefulSameSiteLax                     SetCookieBlockedReason = "SchemefulSameSiteLax"
 	SetCookieBlockedReasonSchemefulSameSiteUnspecifiedTreatedAsLax SetCookieBlockedReason = "SchemefulSameSiteUnspecifiedTreatedAsLax"
-	SetCookieBlockedReasonSamePartyFromCrossPartyContext           SetCookieBlockedReason = "SamePartyFromCrossPartyContext"
-	SetCookieBlockedReasonSamePartyConflictsWithOtherAttributes    SetCookieBlockedReason = "SamePartyConflictsWithOtherAttributes"
 	SetCookieBlockedReasonNameValuePairExceedsMaxSize              SetCookieBlockedReason = "NameValuePairExceedsMaxSize"
 	SetCookieBlockedReasonDisallowedCharacter                      SetCookieBlockedReason = "DisallowedCharacter"
 	SetCookieBlockedReasonNoCookieContent                          SetCookieBlockedReason = "NoCookieContent"
@@ -1131,10 +1149,6 @@ func (t *SetCookieBlockedReason) UnmarshalJSON(buf []byte) error {
 		*t = SetCookieBlockedReasonSchemefulSameSiteLax
 	case SetCookieBlockedReasonSchemefulSameSiteUnspecifiedTreatedAsLax:
 		*t = SetCookieBlockedReasonSchemefulSameSiteUnspecifiedTreatedAsLax
-	case SetCookieBlockedReasonSamePartyFromCrossPartyContext:
-		*t = SetCookieBlockedReasonSamePartyFromCrossPartyContext
-	case SetCookieBlockedReasonSamePartyConflictsWithOtherAttributes:
-		*t = SetCookieBlockedReasonSamePartyConflictsWithOtherAttributes
 	case SetCookieBlockedReasonNameValuePairExceedsMaxSize:
 		*t = SetCookieBlockedReasonNameValuePairExceedsMaxSize
 	case SetCookieBlockedReasonDisallowedCharacter:
@@ -1174,7 +1188,6 @@ const (
 	CookieBlockedReasonSchemefulSameSiteStrict                  CookieBlockedReason = "SchemefulSameSiteStrict"
 	CookieBlockedReasonSchemefulSameSiteLax                     CookieBlockedReason = "SchemefulSameSiteLax"
 	CookieBlockedReasonSchemefulSameSiteUnspecifiedTreatedAsLax CookieBlockedReason = "SchemefulSameSiteUnspecifiedTreatedAsLax"
-	CookieBlockedReasonSamePartyFromCrossPartyContext           CookieBlockedReason = "SamePartyFromCrossPartyContext"
 	CookieBlockedReasonNameValuePairExceedsMaxSize              CookieBlockedReason = "NameValuePairExceedsMaxSize"
 	CookieBlockedReasonPortMismatch                             CookieBlockedReason = "PortMismatch"
 	CookieBlockedReasonSchemeMismatch                           CookieBlockedReason = "SchemeMismatch"
@@ -1215,8 +1228,6 @@ func (t *CookieBlockedReason) UnmarshalJSON(buf []byte) error {
 		*t = CookieBlockedReasonSchemefulSameSiteLax
 	case CookieBlockedReasonSchemefulSameSiteUnspecifiedTreatedAsLax:
 		*t = CookieBlockedReasonSchemefulSameSiteUnspecifiedTreatedAsLax
-	case CookieBlockedReasonSamePartyFromCrossPartyContext:
-		*t = CookieBlockedReasonSamePartyFromCrossPartyContext
 	case CookieBlockedReasonNameValuePairExceedsMaxSize:
 		*t = CookieBlockedReasonNameValuePairExceedsMaxSize
 	case CookieBlockedReasonPortMismatch:
@@ -1337,7 +1348,6 @@ type CookieParam struct {
 	SameSite     CookieSameSite      `json:"sameSite,omitempty,omitzero"`     // Cookie SameSite type.
 	Expires      *cdp.TimeSinceEpoch `json:"expires,omitempty,omitzero"`      // Cookie expiration date, session cookie if not set
 	Priority     CookiePriority      `json:"priority,omitempty,omitzero"`     // Cookie Priority.
-	SameParty    bool                `json:"sameParty"`                       // True if cookie is SameParty.
 	SourceScheme CookieSourceScheme  `json:"sourceScheme,omitempty,omitzero"` // Cookie source scheme type.
 	SourcePort   int64               `json:"sourcePort,omitempty,omitzero"`   // Cookie source port. Valid values are {-1, [1, 65535]}, -1 indicates an unspecified port. An unspecified port value allows protocol clients to emulate legacy cookie scope for the port. This is a temporary ability and it will be removed in the future.
 	PartitionKey *CookiePartitionKey `json:"partitionKey,omitempty,omitzero"` // Cookie partition key. If not set, the cookie will be set as not partitioned.
@@ -1535,6 +1545,29 @@ func (t *ContentEncoding) UnmarshalJSON(buf []byte) error {
 	return nil
 }
 
+// Conditions [no description].
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Network#type-NetworkConditions
+type Conditions struct {
+	URLPattern         string         `json:"urlPattern"`                           // Only matching requests will be affected by these conditions. Patterns use the URLPattern constructor string syntax (https://urlpattern.spec.whatwg.org/) and must be absolute. If the pattern is empty, all requests are matched (including p2p connections).
+	Latency            float64        `json:"latency"`                              // Minimum latency from request sent to response headers received (ms).
+	DownloadThroughput float64        `json:"downloadThroughput"`                   // Maximal aggregated download throughput (bytes/sec). -1 disables download throttling.
+	UploadThroughput   float64        `json:"uploadThroughput"`                     // Maximal aggregated upload throughput (bytes/sec).  -1 disables upload throttling.
+	ConnectionType     ConnectionType `json:"connectionType,omitempty,omitzero"`    // Connection type if known.
+	PacketLoss         float64        `json:"packetLoss,omitempty,omitzero"`        // WebRTC packet loss (percent, 0-100). 0 disables packet loss emulation, 100 drops all the packets.
+	PacketQueueLength  int64          `json:"packetQueueLength,omitempty,omitzero"` // WebRTC packet queue length (packet). 0 removes any queue length limitations.
+	PacketReordering   bool           `json:"packetReordering"`                     // WebRTC packetReordering feature.
+	Offline            bool           `json:"offline"`                              // True to emulate internet disconnection.
+}
+
+// BlockPattern [no description].
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Network#type-BlockPattern
+type BlockPattern struct {
+	URLPattern string `json:"urlPattern"` // URL pattern to match. Patterns use the URLPattern constructor string syntax (https://urlpattern.spec.whatwg.org/) and must be absolute. Example: *://*:*/*.css.
+	Block      bool   `json:"block"`      // Whether or not to block the pattern. If false, a matching request will not be blocked even if it matches a later BlockPattern.
+}
+
 // DirectSocketDNSQueryType [no description].
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Network#type-DirectSocketDnsQueryType
@@ -1582,13 +1615,16 @@ type DirectTCPSocketOptions struct {
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Network#type-DirectUDPSocketOptions
 type DirectUDPSocketOptions struct {
-	RemoteAddr        string                   `json:"remoteAddr,omitempty,omitzero"`
-	RemotePort        int64                    `json:"remotePort,omitempty,omitzero"` // Unsigned int 16.
-	LocalAddr         string                   `json:"localAddr,omitempty,omitzero"`
-	LocalPort         int64                    `json:"localPort,omitempty,omitzero"` // Unsigned int 16.
-	DNSQueryType      DirectSocketDNSQueryType `json:"dnsQueryType,omitempty,omitzero"`
-	SendBufferSize    float64                  `json:"sendBufferSize,omitempty,omitzero"`    // Expected to be unsigned integer.
-	ReceiveBufferSize float64                  `json:"receiveBufferSize,omitempty,omitzero"` // Expected to be unsigned integer.
+	RemoteAddr                   string                   `json:"remoteAddr,omitempty,omitzero"`
+	RemotePort                   int64                    `json:"remotePort,omitempty,omitzero"` // Unsigned int 16.
+	LocalAddr                    string                   `json:"localAddr,omitempty,omitzero"`
+	LocalPort                    int64                    `json:"localPort,omitempty,omitzero"` // Unsigned int 16.
+	DNSQueryType                 DirectSocketDNSQueryType `json:"dnsQueryType,omitempty,omitzero"`
+	SendBufferSize               float64                  `json:"sendBufferSize,omitempty,omitzero"`    // Expected to be unsigned integer.
+	ReceiveBufferSize            float64                  `json:"receiveBufferSize,omitempty,omitzero"` // Expected to be unsigned integer.
+	MulticastLoopback            bool                     `json:"multicastLoopback"`
+	MulticastTimeToLive          int64                    `json:"multicastTimeToLive,omitempty,omitzero"` // Unsigned int 8.
+	MulticastAllowAddressSharing bool                     `json:"multicastAllowAddressSharing"`
 }
 
 // DirectUDPMessage [no description].
@@ -1600,49 +1636,43 @@ type DirectUDPMessage struct {
 	RemotePort int64  `json:"remotePort,omitempty,omitzero"` // Null for connected mode. Expected to be unsigned integer.
 }
 
-// PrivateNetworkRequestPolicy [no description].
+// LocalNetworkAccessRequestPolicy [no description].
 //
-// See: https://chromedevtools.github.io/devtools-protocol/tot/Network#type-PrivateNetworkRequestPolicy
-type PrivateNetworkRequestPolicy string
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Network#type-LocalNetworkAccessRequestPolicy
+type LocalNetworkAccessRequestPolicy string
 
-// String returns the PrivateNetworkRequestPolicy as string value.
-func (t PrivateNetworkRequestPolicy) String() string {
+// String returns the LocalNetworkAccessRequestPolicy as string value.
+func (t LocalNetworkAccessRequestPolicy) String() string {
 	return string(t)
 }
 
-// PrivateNetworkRequestPolicy values.
+// LocalNetworkAccessRequestPolicy values.
 const (
-	PrivateNetworkRequestPolicyAllow                          PrivateNetworkRequestPolicy = "Allow"
-	PrivateNetworkRequestPolicyBlockFromInsecureToMorePrivate PrivateNetworkRequestPolicy = "BlockFromInsecureToMorePrivate"
-	PrivateNetworkRequestPolicyWarnFromInsecureToMorePrivate  PrivateNetworkRequestPolicy = "WarnFromInsecureToMorePrivate"
-	PrivateNetworkRequestPolicyPreflightBlock                 PrivateNetworkRequestPolicy = "PreflightBlock"
-	PrivateNetworkRequestPolicyPreflightWarn                  PrivateNetworkRequestPolicy = "PreflightWarn"
-	PrivateNetworkRequestPolicyPermissionBlock                PrivateNetworkRequestPolicy = "PermissionBlock"
-	PrivateNetworkRequestPolicyPermissionWarn                 PrivateNetworkRequestPolicy = "PermissionWarn"
+	LocalNetworkAccessRequestPolicyAllow                          LocalNetworkAccessRequestPolicy = "Allow"
+	LocalNetworkAccessRequestPolicyBlockFromInsecureToMorePrivate LocalNetworkAccessRequestPolicy = "BlockFromInsecureToMorePrivate"
+	LocalNetworkAccessRequestPolicyWarnFromInsecureToMorePrivate  LocalNetworkAccessRequestPolicy = "WarnFromInsecureToMorePrivate"
+	LocalNetworkAccessRequestPolicyPermissionBlock                LocalNetworkAccessRequestPolicy = "PermissionBlock"
+	LocalNetworkAccessRequestPolicyPermissionWarn                 LocalNetworkAccessRequestPolicy = "PermissionWarn"
 )
 
 // UnmarshalJSON satisfies [json.Unmarshaler].
-func (t *PrivateNetworkRequestPolicy) UnmarshalJSON(buf []byte) error {
+func (t *LocalNetworkAccessRequestPolicy) UnmarshalJSON(buf []byte) error {
 	s := string(buf)
 	s = strings.TrimSuffix(strings.TrimPrefix(s, `"`), `"`)
 
-	switch PrivateNetworkRequestPolicy(s) {
-	case PrivateNetworkRequestPolicyAllow:
-		*t = PrivateNetworkRequestPolicyAllow
-	case PrivateNetworkRequestPolicyBlockFromInsecureToMorePrivate:
-		*t = PrivateNetworkRequestPolicyBlockFromInsecureToMorePrivate
-	case PrivateNetworkRequestPolicyWarnFromInsecureToMorePrivate:
-		*t = PrivateNetworkRequestPolicyWarnFromInsecureToMorePrivate
-	case PrivateNetworkRequestPolicyPreflightBlock:
-		*t = PrivateNetworkRequestPolicyPreflightBlock
-	case PrivateNetworkRequestPolicyPreflightWarn:
-		*t = PrivateNetworkRequestPolicyPreflightWarn
-	case PrivateNetworkRequestPolicyPermissionBlock:
-		*t = PrivateNetworkRequestPolicyPermissionBlock
-	case PrivateNetworkRequestPolicyPermissionWarn:
-		*t = PrivateNetworkRequestPolicyPermissionWarn
+	switch LocalNetworkAccessRequestPolicy(s) {
+	case LocalNetworkAccessRequestPolicyAllow:
+		*t = LocalNetworkAccessRequestPolicyAllow
+	case LocalNetworkAccessRequestPolicyBlockFromInsecureToMorePrivate:
+		*t = LocalNetworkAccessRequestPolicyBlockFromInsecureToMorePrivate
+	case LocalNetworkAccessRequestPolicyWarnFromInsecureToMorePrivate:
+		*t = LocalNetworkAccessRequestPolicyWarnFromInsecureToMorePrivate
+	case LocalNetworkAccessRequestPolicyPermissionBlock:
+		*t = LocalNetworkAccessRequestPolicyPermissionBlock
+	case LocalNetworkAccessRequestPolicyPermissionWarn:
+		*t = LocalNetworkAccessRequestPolicyPermissionWarn
 	default:
-		return fmt.Errorf("unknown PrivateNetworkRequestPolicy value: %v", s)
+		return fmt.Errorf("unknown LocalNetworkAccessRequestPolicy value: %v", s)
 	}
 	return nil
 }
@@ -1696,9 +1726,9 @@ type ConnectTiming struct {
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Network#type-ClientSecurityState
 type ClientSecurityState struct {
-	InitiatorIsSecureContext    bool                        `json:"initiatorIsSecureContext"`
-	InitiatorIPAddressSpace     IPAddressSpace              `json:"initiatorIPAddressSpace"`
-	PrivateNetworkRequestPolicy PrivateNetworkRequestPolicy `json:"privateNetworkRequestPolicy"`
+	InitiatorIsSecureContext        bool                            `json:"initiatorIsSecureContext"`
+	InitiatorIPAddressSpace         IPAddressSpace                  `json:"initiatorIPAddressSpace"`
+	LocalNetworkAccessRequestPolicy LocalNetworkAccessRequestPolicy `json:"localNetworkAccessRequestPolicy"`
 }
 
 // CrossOriginOpenerPolicyValue [no description].
@@ -1925,6 +1955,354 @@ type ReportingAPIEndpoint struct {
 	GroupName string `json:"groupName"` // Name of the endpoint group.
 }
 
+// DeviceBoundSessionKey unique identifier for a device bound session.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Network#type-DeviceBoundSessionKey
+type DeviceBoundSessionKey struct {
+	Site string `json:"site"` // The site the session is set up for.
+	ID   string `json:"id"`   // The id of the session.
+}
+
+// DeviceBoundSessionWithUsage how a device bound session was used during a
+// request.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Network#type-DeviceBoundSessionWithUsage
+type DeviceBoundSessionWithUsage struct {
+	SessionKey *DeviceBoundSessionKey           `json:"sessionKey"` // The key for the session.
+	Usage      DeviceBoundSessionWithUsageUsage `json:"usage"`      // How the session was used (or not used).
+}
+
+// DeviceBoundSessionCookieCraving a device bound session's cookie craving.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Network#type-DeviceBoundSessionCookieCraving
+type DeviceBoundSessionCookieCraving struct {
+	Name     string         `json:"name"`                        // The name of the craving.
+	Domain   string         `json:"domain"`                      // The domain of the craving.
+	Path     string         `json:"path"`                        // The path of the craving.
+	Secure   bool           `json:"secure"`                      // The Secure attribute of the craving attributes.
+	HTTPOnly bool           `json:"httpOnly"`                    // The HttpOnly attribute of the craving attributes.
+	SameSite CookieSameSite `json:"sameSite,omitempty,omitzero"` // The SameSite attribute of the craving attributes.
+}
+
+// DeviceBoundSessionURLRule a device bound session's inclusion URL rule.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Network#type-DeviceBoundSessionUrlRule
+type DeviceBoundSessionURLRule struct {
+	RuleType    DeviceBoundSessionURLRuleRuleType `json:"ruleType"`    // See comments on net::device_bound_sessions::SessionInclusionRules::UrlRule::rule_type.
+	HostPattern string                            `json:"hostPattern"` // See comments on net::device_bound_sessions::SessionInclusionRules::UrlRule::host_pattern.
+	PathPrefix  string                            `json:"pathPrefix"`  // See comments on net::device_bound_sessions::SessionInclusionRules::UrlRule::path_prefix.
+}
+
+// DeviceBoundSessionInclusionRules a device bound session's inclusion rules.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Network#type-DeviceBoundSessionInclusionRules
+type DeviceBoundSessionInclusionRules struct {
+	Origin      string                       `json:"origin"`      // See comments on net::device_bound_sessions::SessionInclusionRules::origin_.
+	IncludeSite bool                         `json:"includeSite"` // Whether the whole site is included. See comments on net::device_bound_sessions::SessionInclusionRules::include_site_ for more details; this boolean is true if that value is populated.
+	URLRules    []*DeviceBoundSessionURLRule `json:"urlRules"`    // See comments on net::device_bound_sessions::SessionInclusionRules::url_rules_.
+}
+
+// DeviceBoundSession a device bound session.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Network#type-DeviceBoundSession
+type DeviceBoundSession struct {
+	Key                      *DeviceBoundSessionKey             `json:"key"`                                // The site and session ID of the session.
+	RefreshURL               string                             `json:"refreshUrl"`                         // See comments on net::device_bound_sessions::Session::refresh_url_.
+	InclusionRules           *DeviceBoundSessionInclusionRules  `json:"inclusionRules"`                     // See comments on net::device_bound_sessions::Session::inclusion_rules_.
+	CookieCravings           []*DeviceBoundSessionCookieCraving `json:"cookieCravings"`                     // See comments on net::device_bound_sessions::Session::cookie_cravings_.
+	ExpiryDate               *cdp.TimeSinceEpoch                `json:"expiryDate"`                         // See comments on net::device_bound_sessions::Session::expiry_date_.
+	CachedChallenge          string                             `json:"cachedChallenge,omitempty,omitzero"` // See comments on net::device_bound_sessions::Session::cached_challenge__.
+	AllowedRefreshInitiators []string                           `json:"allowedRefreshInitiators"`           // See comments on net::device_bound_sessions::Session::allowed_refresh_initiators_.
+}
+
+// DeviceBoundSessionEventID a unique identifier for a device bound session
+// event.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Network#type-DeviceBoundSessionEventId
+type DeviceBoundSessionEventID string
+
+// String returns the DeviceBoundSessionEventID as string value.
+func (t DeviceBoundSessionEventID) String() string {
+	return string(t)
+}
+
+// DeviceBoundSessionFetchResult a fetch result for a device bound session
+// creation or refresh.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Network#type-DeviceBoundSessionFetchResult
+type DeviceBoundSessionFetchResult string
+
+// String returns the DeviceBoundSessionFetchResult as string value.
+func (t DeviceBoundSessionFetchResult) String() string {
+	return string(t)
+}
+
+// DeviceBoundSessionFetchResult values.
+const (
+	DeviceBoundSessionFetchResultSuccess                                           DeviceBoundSessionFetchResult = "Success"
+	DeviceBoundSessionFetchResultKeyError                                          DeviceBoundSessionFetchResult = "KeyError"
+	DeviceBoundSessionFetchResultSigningError                                      DeviceBoundSessionFetchResult = "SigningError"
+	DeviceBoundSessionFetchResultServerRequestedTermination                        DeviceBoundSessionFetchResult = "ServerRequestedTermination"
+	DeviceBoundSessionFetchResultInvalidSessionID                                  DeviceBoundSessionFetchResult = "InvalidSessionId"
+	DeviceBoundSessionFetchResultInvalidChallenge                                  DeviceBoundSessionFetchResult = "InvalidChallenge"
+	DeviceBoundSessionFetchResultTooManyChallenges                                 DeviceBoundSessionFetchResult = "TooManyChallenges"
+	DeviceBoundSessionFetchResultInvalidFetcherURL                                 DeviceBoundSessionFetchResult = "InvalidFetcherUrl"
+	DeviceBoundSessionFetchResultInvalidRefreshURL                                 DeviceBoundSessionFetchResult = "InvalidRefreshUrl"
+	DeviceBoundSessionFetchResultTransientHTTPError                                DeviceBoundSessionFetchResult = "TransientHttpError"
+	DeviceBoundSessionFetchResultScopeOriginSameSiteMismatch                       DeviceBoundSessionFetchResult = "ScopeOriginSameSiteMismatch"
+	DeviceBoundSessionFetchResultRefreshURLSameSiteMismatch                        DeviceBoundSessionFetchResult = "RefreshUrlSameSiteMismatch"
+	DeviceBoundSessionFetchResultMismatchedSessionID                               DeviceBoundSessionFetchResult = "MismatchedSessionId"
+	DeviceBoundSessionFetchResultMissingScope                                      DeviceBoundSessionFetchResult = "MissingScope"
+	DeviceBoundSessionFetchResultNoCredentials                                     DeviceBoundSessionFetchResult = "NoCredentials"
+	DeviceBoundSessionFetchResultSubdomainRegistrationWellKnownUnavailable         DeviceBoundSessionFetchResult = "SubdomainRegistrationWellKnownUnavailable"
+	DeviceBoundSessionFetchResultSubdomainRegistrationUnauthorized                 DeviceBoundSessionFetchResult = "SubdomainRegistrationUnauthorized"
+	DeviceBoundSessionFetchResultSubdomainRegistrationWellKnownMalformed           DeviceBoundSessionFetchResult = "SubdomainRegistrationWellKnownMalformed"
+	DeviceBoundSessionFetchResultSessionProviderWellKnownUnavailable               DeviceBoundSessionFetchResult = "SessionProviderWellKnownUnavailable"
+	DeviceBoundSessionFetchResultRelyingPartyWellKnownUnavailable                  DeviceBoundSessionFetchResult = "RelyingPartyWellKnownUnavailable"
+	DeviceBoundSessionFetchResultFederatedKeyThumbprintMismatch                    DeviceBoundSessionFetchResult = "FederatedKeyThumbprintMismatch"
+	DeviceBoundSessionFetchResultInvalidFederatedSessionURL                        DeviceBoundSessionFetchResult = "InvalidFederatedSessionUrl"
+	DeviceBoundSessionFetchResultInvalidFederatedKey                               DeviceBoundSessionFetchResult = "InvalidFederatedKey"
+	DeviceBoundSessionFetchResultTooManyRelyingOriginLabels                        DeviceBoundSessionFetchResult = "TooManyRelyingOriginLabels"
+	DeviceBoundSessionFetchResultBoundCookieSetForbidden                           DeviceBoundSessionFetchResult = "BoundCookieSetForbidden"
+	DeviceBoundSessionFetchResultNetError                                          DeviceBoundSessionFetchResult = "NetError"
+	DeviceBoundSessionFetchResultProxyError                                        DeviceBoundSessionFetchResult = "ProxyError"
+	DeviceBoundSessionFetchResultEmptySessionConfig                                DeviceBoundSessionFetchResult = "EmptySessionConfig"
+	DeviceBoundSessionFetchResultInvalidCredentialsConfig                          DeviceBoundSessionFetchResult = "InvalidCredentialsConfig"
+	DeviceBoundSessionFetchResultInvalidCredentialsType                            DeviceBoundSessionFetchResult = "InvalidCredentialsType"
+	DeviceBoundSessionFetchResultInvalidCredentialsEmptyName                       DeviceBoundSessionFetchResult = "InvalidCredentialsEmptyName"
+	DeviceBoundSessionFetchResultInvalidCredentialsCookie                          DeviceBoundSessionFetchResult = "InvalidCredentialsCookie"
+	DeviceBoundSessionFetchResultPersistentHTTPError                               DeviceBoundSessionFetchResult = "PersistentHttpError"
+	DeviceBoundSessionFetchResultRegistrationAttemptedChallenge                    DeviceBoundSessionFetchResult = "RegistrationAttemptedChallenge"
+	DeviceBoundSessionFetchResultInvalidScopeOrigin                                DeviceBoundSessionFetchResult = "InvalidScopeOrigin"
+	DeviceBoundSessionFetchResultScopeOriginContainsPath                           DeviceBoundSessionFetchResult = "ScopeOriginContainsPath"
+	DeviceBoundSessionFetchResultRefreshInitiatorNotString                         DeviceBoundSessionFetchResult = "RefreshInitiatorNotString"
+	DeviceBoundSessionFetchResultRefreshInitiatorInvalidHostPattern                DeviceBoundSessionFetchResult = "RefreshInitiatorInvalidHostPattern"
+	DeviceBoundSessionFetchResultInvalidScopeSpecification                         DeviceBoundSessionFetchResult = "InvalidScopeSpecification"
+	DeviceBoundSessionFetchResultMissingScopeSpecificationType                     DeviceBoundSessionFetchResult = "MissingScopeSpecificationType"
+	DeviceBoundSessionFetchResultEmptyScopeSpecificationDomain                     DeviceBoundSessionFetchResult = "EmptyScopeSpecificationDomain"
+	DeviceBoundSessionFetchResultEmptyScopeSpecificationPath                       DeviceBoundSessionFetchResult = "EmptyScopeSpecificationPath"
+	DeviceBoundSessionFetchResultInvalidScopeSpecificationType                     DeviceBoundSessionFetchResult = "InvalidScopeSpecificationType"
+	DeviceBoundSessionFetchResultInvalidScopeIncludeSite                           DeviceBoundSessionFetchResult = "InvalidScopeIncludeSite"
+	DeviceBoundSessionFetchResultMissingScopeIncludeSite                           DeviceBoundSessionFetchResult = "MissingScopeIncludeSite"
+	DeviceBoundSessionFetchResultFederatedNotAuthorizedByProvider                  DeviceBoundSessionFetchResult = "FederatedNotAuthorizedByProvider"
+	DeviceBoundSessionFetchResultFederatedNotAuthorizedByRelyingParty              DeviceBoundSessionFetchResult = "FederatedNotAuthorizedByRelyingParty"
+	DeviceBoundSessionFetchResultSessionProviderWellKnownMalformed                 DeviceBoundSessionFetchResult = "SessionProviderWellKnownMalformed"
+	DeviceBoundSessionFetchResultSessionProviderWellKnownHasProviderOrigin         DeviceBoundSessionFetchResult = "SessionProviderWellKnownHasProviderOrigin"
+	DeviceBoundSessionFetchResultRelyingPartyWellKnownMalformed                    DeviceBoundSessionFetchResult = "RelyingPartyWellKnownMalformed"
+	DeviceBoundSessionFetchResultRelyingPartyWellKnownHasRelyingOrigins            DeviceBoundSessionFetchResult = "RelyingPartyWellKnownHasRelyingOrigins"
+	DeviceBoundSessionFetchResultInvalidFederatedSessionProviderSessionMissing     DeviceBoundSessionFetchResult = "InvalidFederatedSessionProviderSessionMissing"
+	DeviceBoundSessionFetchResultInvalidFederatedSessionWrongProviderOrigin        DeviceBoundSessionFetchResult = "InvalidFederatedSessionWrongProviderOrigin"
+	DeviceBoundSessionFetchResultInvalidCredentialsCookieCreationTime              DeviceBoundSessionFetchResult = "InvalidCredentialsCookieCreationTime"
+	DeviceBoundSessionFetchResultInvalidCredentialsCookieName                      DeviceBoundSessionFetchResult = "InvalidCredentialsCookieName"
+	DeviceBoundSessionFetchResultInvalidCredentialsCookieParsing                   DeviceBoundSessionFetchResult = "InvalidCredentialsCookieParsing"
+	DeviceBoundSessionFetchResultInvalidCredentialsCookieUnpermittedAttribute      DeviceBoundSessionFetchResult = "InvalidCredentialsCookieUnpermittedAttribute"
+	DeviceBoundSessionFetchResultInvalidCredentialsCookieInvalidDomain             DeviceBoundSessionFetchResult = "InvalidCredentialsCookieInvalidDomain"
+	DeviceBoundSessionFetchResultInvalidCredentialsCookiePrefix                    DeviceBoundSessionFetchResult = "InvalidCredentialsCookiePrefix"
+	DeviceBoundSessionFetchResultInvalidScopeRulePath                              DeviceBoundSessionFetchResult = "InvalidScopeRulePath"
+	DeviceBoundSessionFetchResultInvalidScopeRuleHostPattern                       DeviceBoundSessionFetchResult = "InvalidScopeRuleHostPattern"
+	DeviceBoundSessionFetchResultScopeRuleOriginScopedHostPatternMismatch          DeviceBoundSessionFetchResult = "ScopeRuleOriginScopedHostPatternMismatch"
+	DeviceBoundSessionFetchResultScopeRuleSiteScopedHostPatternMismatch            DeviceBoundSessionFetchResult = "ScopeRuleSiteScopedHostPatternMismatch"
+	DeviceBoundSessionFetchResultSigningQuotaExceeded                              DeviceBoundSessionFetchResult = "SigningQuotaExceeded"
+	DeviceBoundSessionFetchResultInvalidConfigJSON                                 DeviceBoundSessionFetchResult = "InvalidConfigJson"
+	DeviceBoundSessionFetchResultInvalidFederatedSessionProviderFailedToRestoreKey DeviceBoundSessionFetchResult = "InvalidFederatedSessionProviderFailedToRestoreKey"
+	DeviceBoundSessionFetchResultFailedToUnwrapKey                                 DeviceBoundSessionFetchResult = "FailedToUnwrapKey"
+	DeviceBoundSessionFetchResultSessionDeletedDuringRefresh                       DeviceBoundSessionFetchResult = "SessionDeletedDuringRefresh"
+)
+
+// UnmarshalJSON satisfies [json.Unmarshaler].
+func (t *DeviceBoundSessionFetchResult) UnmarshalJSON(buf []byte) error {
+	s := string(buf)
+	s = strings.TrimSuffix(strings.TrimPrefix(s, `"`), `"`)
+
+	switch DeviceBoundSessionFetchResult(s) {
+	case DeviceBoundSessionFetchResultSuccess:
+		*t = DeviceBoundSessionFetchResultSuccess
+	case DeviceBoundSessionFetchResultKeyError:
+		*t = DeviceBoundSessionFetchResultKeyError
+	case DeviceBoundSessionFetchResultSigningError:
+		*t = DeviceBoundSessionFetchResultSigningError
+	case DeviceBoundSessionFetchResultServerRequestedTermination:
+		*t = DeviceBoundSessionFetchResultServerRequestedTermination
+	case DeviceBoundSessionFetchResultInvalidSessionID:
+		*t = DeviceBoundSessionFetchResultInvalidSessionID
+	case DeviceBoundSessionFetchResultInvalidChallenge:
+		*t = DeviceBoundSessionFetchResultInvalidChallenge
+	case DeviceBoundSessionFetchResultTooManyChallenges:
+		*t = DeviceBoundSessionFetchResultTooManyChallenges
+	case DeviceBoundSessionFetchResultInvalidFetcherURL:
+		*t = DeviceBoundSessionFetchResultInvalidFetcherURL
+	case DeviceBoundSessionFetchResultInvalidRefreshURL:
+		*t = DeviceBoundSessionFetchResultInvalidRefreshURL
+	case DeviceBoundSessionFetchResultTransientHTTPError:
+		*t = DeviceBoundSessionFetchResultTransientHTTPError
+	case DeviceBoundSessionFetchResultScopeOriginSameSiteMismatch:
+		*t = DeviceBoundSessionFetchResultScopeOriginSameSiteMismatch
+	case DeviceBoundSessionFetchResultRefreshURLSameSiteMismatch:
+		*t = DeviceBoundSessionFetchResultRefreshURLSameSiteMismatch
+	case DeviceBoundSessionFetchResultMismatchedSessionID:
+		*t = DeviceBoundSessionFetchResultMismatchedSessionID
+	case DeviceBoundSessionFetchResultMissingScope:
+		*t = DeviceBoundSessionFetchResultMissingScope
+	case DeviceBoundSessionFetchResultNoCredentials:
+		*t = DeviceBoundSessionFetchResultNoCredentials
+	case DeviceBoundSessionFetchResultSubdomainRegistrationWellKnownUnavailable:
+		*t = DeviceBoundSessionFetchResultSubdomainRegistrationWellKnownUnavailable
+	case DeviceBoundSessionFetchResultSubdomainRegistrationUnauthorized:
+		*t = DeviceBoundSessionFetchResultSubdomainRegistrationUnauthorized
+	case DeviceBoundSessionFetchResultSubdomainRegistrationWellKnownMalformed:
+		*t = DeviceBoundSessionFetchResultSubdomainRegistrationWellKnownMalformed
+	case DeviceBoundSessionFetchResultSessionProviderWellKnownUnavailable:
+		*t = DeviceBoundSessionFetchResultSessionProviderWellKnownUnavailable
+	case DeviceBoundSessionFetchResultRelyingPartyWellKnownUnavailable:
+		*t = DeviceBoundSessionFetchResultRelyingPartyWellKnownUnavailable
+	case DeviceBoundSessionFetchResultFederatedKeyThumbprintMismatch:
+		*t = DeviceBoundSessionFetchResultFederatedKeyThumbprintMismatch
+	case DeviceBoundSessionFetchResultInvalidFederatedSessionURL:
+		*t = DeviceBoundSessionFetchResultInvalidFederatedSessionURL
+	case DeviceBoundSessionFetchResultInvalidFederatedKey:
+		*t = DeviceBoundSessionFetchResultInvalidFederatedKey
+	case DeviceBoundSessionFetchResultTooManyRelyingOriginLabels:
+		*t = DeviceBoundSessionFetchResultTooManyRelyingOriginLabels
+	case DeviceBoundSessionFetchResultBoundCookieSetForbidden:
+		*t = DeviceBoundSessionFetchResultBoundCookieSetForbidden
+	case DeviceBoundSessionFetchResultNetError:
+		*t = DeviceBoundSessionFetchResultNetError
+	case DeviceBoundSessionFetchResultProxyError:
+		*t = DeviceBoundSessionFetchResultProxyError
+	case DeviceBoundSessionFetchResultEmptySessionConfig:
+		*t = DeviceBoundSessionFetchResultEmptySessionConfig
+	case DeviceBoundSessionFetchResultInvalidCredentialsConfig:
+		*t = DeviceBoundSessionFetchResultInvalidCredentialsConfig
+	case DeviceBoundSessionFetchResultInvalidCredentialsType:
+		*t = DeviceBoundSessionFetchResultInvalidCredentialsType
+	case DeviceBoundSessionFetchResultInvalidCredentialsEmptyName:
+		*t = DeviceBoundSessionFetchResultInvalidCredentialsEmptyName
+	case DeviceBoundSessionFetchResultInvalidCredentialsCookie:
+		*t = DeviceBoundSessionFetchResultInvalidCredentialsCookie
+	case DeviceBoundSessionFetchResultPersistentHTTPError:
+		*t = DeviceBoundSessionFetchResultPersistentHTTPError
+	case DeviceBoundSessionFetchResultRegistrationAttemptedChallenge:
+		*t = DeviceBoundSessionFetchResultRegistrationAttemptedChallenge
+	case DeviceBoundSessionFetchResultInvalidScopeOrigin:
+		*t = DeviceBoundSessionFetchResultInvalidScopeOrigin
+	case DeviceBoundSessionFetchResultScopeOriginContainsPath:
+		*t = DeviceBoundSessionFetchResultScopeOriginContainsPath
+	case DeviceBoundSessionFetchResultRefreshInitiatorNotString:
+		*t = DeviceBoundSessionFetchResultRefreshInitiatorNotString
+	case DeviceBoundSessionFetchResultRefreshInitiatorInvalidHostPattern:
+		*t = DeviceBoundSessionFetchResultRefreshInitiatorInvalidHostPattern
+	case DeviceBoundSessionFetchResultInvalidScopeSpecification:
+		*t = DeviceBoundSessionFetchResultInvalidScopeSpecification
+	case DeviceBoundSessionFetchResultMissingScopeSpecificationType:
+		*t = DeviceBoundSessionFetchResultMissingScopeSpecificationType
+	case DeviceBoundSessionFetchResultEmptyScopeSpecificationDomain:
+		*t = DeviceBoundSessionFetchResultEmptyScopeSpecificationDomain
+	case DeviceBoundSessionFetchResultEmptyScopeSpecificationPath:
+		*t = DeviceBoundSessionFetchResultEmptyScopeSpecificationPath
+	case DeviceBoundSessionFetchResultInvalidScopeSpecificationType:
+		*t = DeviceBoundSessionFetchResultInvalidScopeSpecificationType
+	case DeviceBoundSessionFetchResultInvalidScopeIncludeSite:
+		*t = DeviceBoundSessionFetchResultInvalidScopeIncludeSite
+	case DeviceBoundSessionFetchResultMissingScopeIncludeSite:
+		*t = DeviceBoundSessionFetchResultMissingScopeIncludeSite
+	case DeviceBoundSessionFetchResultFederatedNotAuthorizedByProvider:
+		*t = DeviceBoundSessionFetchResultFederatedNotAuthorizedByProvider
+	case DeviceBoundSessionFetchResultFederatedNotAuthorizedByRelyingParty:
+		*t = DeviceBoundSessionFetchResultFederatedNotAuthorizedByRelyingParty
+	case DeviceBoundSessionFetchResultSessionProviderWellKnownMalformed:
+		*t = DeviceBoundSessionFetchResultSessionProviderWellKnownMalformed
+	case DeviceBoundSessionFetchResultSessionProviderWellKnownHasProviderOrigin:
+		*t = DeviceBoundSessionFetchResultSessionProviderWellKnownHasProviderOrigin
+	case DeviceBoundSessionFetchResultRelyingPartyWellKnownMalformed:
+		*t = DeviceBoundSessionFetchResultRelyingPartyWellKnownMalformed
+	case DeviceBoundSessionFetchResultRelyingPartyWellKnownHasRelyingOrigins:
+		*t = DeviceBoundSessionFetchResultRelyingPartyWellKnownHasRelyingOrigins
+	case DeviceBoundSessionFetchResultInvalidFederatedSessionProviderSessionMissing:
+		*t = DeviceBoundSessionFetchResultInvalidFederatedSessionProviderSessionMissing
+	case DeviceBoundSessionFetchResultInvalidFederatedSessionWrongProviderOrigin:
+		*t = DeviceBoundSessionFetchResultInvalidFederatedSessionWrongProviderOrigin
+	case DeviceBoundSessionFetchResultInvalidCredentialsCookieCreationTime:
+		*t = DeviceBoundSessionFetchResultInvalidCredentialsCookieCreationTime
+	case DeviceBoundSessionFetchResultInvalidCredentialsCookieName:
+		*t = DeviceBoundSessionFetchResultInvalidCredentialsCookieName
+	case DeviceBoundSessionFetchResultInvalidCredentialsCookieParsing:
+		*t = DeviceBoundSessionFetchResultInvalidCredentialsCookieParsing
+	case DeviceBoundSessionFetchResultInvalidCredentialsCookieUnpermittedAttribute:
+		*t = DeviceBoundSessionFetchResultInvalidCredentialsCookieUnpermittedAttribute
+	case DeviceBoundSessionFetchResultInvalidCredentialsCookieInvalidDomain:
+		*t = DeviceBoundSessionFetchResultInvalidCredentialsCookieInvalidDomain
+	case DeviceBoundSessionFetchResultInvalidCredentialsCookiePrefix:
+		*t = DeviceBoundSessionFetchResultInvalidCredentialsCookiePrefix
+	case DeviceBoundSessionFetchResultInvalidScopeRulePath:
+		*t = DeviceBoundSessionFetchResultInvalidScopeRulePath
+	case DeviceBoundSessionFetchResultInvalidScopeRuleHostPattern:
+		*t = DeviceBoundSessionFetchResultInvalidScopeRuleHostPattern
+	case DeviceBoundSessionFetchResultScopeRuleOriginScopedHostPatternMismatch:
+		*t = DeviceBoundSessionFetchResultScopeRuleOriginScopedHostPatternMismatch
+	case DeviceBoundSessionFetchResultScopeRuleSiteScopedHostPatternMismatch:
+		*t = DeviceBoundSessionFetchResultScopeRuleSiteScopedHostPatternMismatch
+	case DeviceBoundSessionFetchResultSigningQuotaExceeded:
+		*t = DeviceBoundSessionFetchResultSigningQuotaExceeded
+	case DeviceBoundSessionFetchResultInvalidConfigJSON:
+		*t = DeviceBoundSessionFetchResultInvalidConfigJSON
+	case DeviceBoundSessionFetchResultInvalidFederatedSessionProviderFailedToRestoreKey:
+		*t = DeviceBoundSessionFetchResultInvalidFederatedSessionProviderFailedToRestoreKey
+	case DeviceBoundSessionFetchResultFailedToUnwrapKey:
+		*t = DeviceBoundSessionFetchResultFailedToUnwrapKey
+	case DeviceBoundSessionFetchResultSessionDeletedDuringRefresh:
+		*t = DeviceBoundSessionFetchResultSessionDeletedDuringRefresh
+	default:
+		return fmt.Errorf("unknown DeviceBoundSessionFetchResult value: %v", s)
+	}
+	return nil
+}
+
+// DeviceBoundSessionFailedRequest details about a failed device bound
+// session network request.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Network#type-DeviceBoundSessionFailedRequest
+type DeviceBoundSessionFailedRequest struct {
+	RequestURL        string `json:"requestUrl"`                           // The failed request URL.
+	NetError          string `json:"netError,omitempty,omitzero"`          // The net error of the response if it was not OK.
+	ResponseError     int64  `json:"responseError,omitempty,omitzero"`     // The response code if the net error was OK and the response code was not 200.
+	ResponseErrorBody string `json:"responseErrorBody,omitempty,omitzero"` // The body of the response if the net error was OK, the response code was not 200, and the response body was not empty.
+}
+
+// CreationEventDetails session event details specific to creation.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Network#type-CreationEventDetails
+type CreationEventDetails struct {
+	FetchResult   DeviceBoundSessionFetchResult    `json:"fetchResult"`                      // The result of the fetch attempt.
+	NewSession    *DeviceBoundSession              `json:"newSession,omitempty,omitzero"`    // The session if there was a newly created session. This is populated for all successful creation events.
+	FailedRequest *DeviceBoundSessionFailedRequest `json:"failedRequest,omitempty,omitzero"` // Details about a failed device bound session network request if there was one.
+}
+
+// RefreshEventDetails session event details specific to refresh.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Network#type-RefreshEventDetails
+type RefreshEventDetails struct {
+	RefreshResult            RefreshEventDetailsRefreshResult `json:"refreshResult"`                    // The result of a refresh.
+	FetchResult              DeviceBoundSessionFetchResult    `json:"fetchResult,omitempty,omitzero"`   // If there was a fetch attempt, the result of that.
+	NewSession               *DeviceBoundSession              `json:"newSession,omitempty,omitzero"`    // The session display if there was a newly created session. This is populated for any refresh event that modifies the session config.
+	WasFullyProactiveRefresh bool                             `json:"wasFullyProactiveRefresh"`         // See comments on net::device_bound_sessions::RefreshEventResult::was_fully_proactive_refresh.
+	FailedRequest            *DeviceBoundSessionFailedRequest `json:"failedRequest,omitempty,omitzero"` // Details about a failed device bound session network request if there was one.
+}
+
+// TerminationEventDetails session event details specific to termination.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Network#type-TerminationEventDetails
+type TerminationEventDetails struct {
+	DeletionReason TerminationEventDetailsDeletionReason `json:"deletionReason"` // The reason for a session being deleted.
+}
+
+// ChallengeEventDetails session event details specific to challenges.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Network#type-ChallengeEventDetails
+type ChallengeEventDetails struct {
+	ChallengeResult ChallengeEventDetailsChallengeResult `json:"challengeResult"` // The result of a challenge.
+	Challenge       string                               `json:"challenge"`       // The challenge set.
+}
+
 // LoadNetworkResourcePageResult an object providing the result of a network
 // resource load.
 //
@@ -2048,6 +2426,7 @@ const (
 	InitiatorTypePreload        InitiatorType = "preload"
 	InitiatorTypeSignedExchange InitiatorType = "SignedExchange"
 	InitiatorTypePreflight      InitiatorType = "preflight"
+	InitiatorTypeFedCM          InitiatorType = "FedCM"
 	InitiatorTypeOther          InitiatorType = "other"
 )
 
@@ -2067,6 +2446,8 @@ func (t *InitiatorType) UnmarshalJSON(buf []byte) error {
 		*t = InitiatorTypeSignedExchange
 	case InitiatorTypePreflight:
 		*t = InitiatorTypePreflight
+	case InitiatorTypeFedCM:
+		*t = InitiatorTypeFedCM
 	case InitiatorTypeOther:
 		*t = InitiatorTypeOther
 	default:
@@ -2141,6 +2522,225 @@ func (t *AuthChallengeResponseResponse) UnmarshalJSON(buf []byte) error {
 		*t = AuthChallengeResponseResponseProvideCredentials
 	default:
 		return fmt.Errorf("unknown AuthChallengeResponseResponse value: %v", s)
+	}
+	return nil
+}
+
+// DeviceBoundSessionWithUsageUsage how the session was used (or not used).
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Network#type-DeviceBoundSessionWithUsage
+type DeviceBoundSessionWithUsageUsage string
+
+// String returns the DeviceBoundSessionWithUsageUsage as string value.
+func (t DeviceBoundSessionWithUsageUsage) String() string {
+	return string(t)
+}
+
+// DeviceBoundSessionWithUsageUsage values.
+const (
+	DeviceBoundSessionWithUsageUsageNotInScope                  DeviceBoundSessionWithUsageUsage = "NotInScope"
+	DeviceBoundSessionWithUsageUsageInScopeRefreshNotYetNeeded  DeviceBoundSessionWithUsageUsage = "InScopeRefreshNotYetNeeded"
+	DeviceBoundSessionWithUsageUsageInScopeRefreshNotAllowed    DeviceBoundSessionWithUsageUsage = "InScopeRefreshNotAllowed"
+	DeviceBoundSessionWithUsageUsageProactiveRefreshNotPossible DeviceBoundSessionWithUsageUsage = "ProactiveRefreshNotPossible"
+	DeviceBoundSessionWithUsageUsageProactiveRefreshAttempted   DeviceBoundSessionWithUsageUsage = "ProactiveRefreshAttempted"
+	DeviceBoundSessionWithUsageUsageDeferred                    DeviceBoundSessionWithUsageUsage = "Deferred"
+)
+
+// UnmarshalJSON satisfies [json.Unmarshaler].
+func (t *DeviceBoundSessionWithUsageUsage) UnmarshalJSON(buf []byte) error {
+	s := string(buf)
+	s = strings.TrimSuffix(strings.TrimPrefix(s, `"`), `"`)
+
+	switch DeviceBoundSessionWithUsageUsage(s) {
+	case DeviceBoundSessionWithUsageUsageNotInScope:
+		*t = DeviceBoundSessionWithUsageUsageNotInScope
+	case DeviceBoundSessionWithUsageUsageInScopeRefreshNotYetNeeded:
+		*t = DeviceBoundSessionWithUsageUsageInScopeRefreshNotYetNeeded
+	case DeviceBoundSessionWithUsageUsageInScopeRefreshNotAllowed:
+		*t = DeviceBoundSessionWithUsageUsageInScopeRefreshNotAllowed
+	case DeviceBoundSessionWithUsageUsageProactiveRefreshNotPossible:
+		*t = DeviceBoundSessionWithUsageUsageProactiveRefreshNotPossible
+	case DeviceBoundSessionWithUsageUsageProactiveRefreshAttempted:
+		*t = DeviceBoundSessionWithUsageUsageProactiveRefreshAttempted
+	case DeviceBoundSessionWithUsageUsageDeferred:
+		*t = DeviceBoundSessionWithUsageUsageDeferred
+	default:
+		return fmt.Errorf("unknown DeviceBoundSessionWithUsageUsage value: %v", s)
+	}
+	return nil
+}
+
+// DeviceBoundSessionURLRuleRuleType see comments on
+// net::device_bound_sessions::SessionInclusionRules::UrlRule::rule_type.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Network#type-DeviceBoundSessionUrlRule
+type DeviceBoundSessionURLRuleRuleType string
+
+// String returns the DeviceBoundSessionURLRuleRuleType as string value.
+func (t DeviceBoundSessionURLRuleRuleType) String() string {
+	return string(t)
+}
+
+// DeviceBoundSessionURLRuleRuleType values.
+const (
+	DeviceBoundSessionURLRuleRuleTypeExclude DeviceBoundSessionURLRuleRuleType = "Exclude"
+	DeviceBoundSessionURLRuleRuleTypeInclude DeviceBoundSessionURLRuleRuleType = "Include"
+)
+
+// UnmarshalJSON satisfies [json.Unmarshaler].
+func (t *DeviceBoundSessionURLRuleRuleType) UnmarshalJSON(buf []byte) error {
+	s := string(buf)
+	s = strings.TrimSuffix(strings.TrimPrefix(s, `"`), `"`)
+
+	switch DeviceBoundSessionURLRuleRuleType(s) {
+	case DeviceBoundSessionURLRuleRuleTypeExclude:
+		*t = DeviceBoundSessionURLRuleRuleTypeExclude
+	case DeviceBoundSessionURLRuleRuleTypeInclude:
+		*t = DeviceBoundSessionURLRuleRuleTypeInclude
+	default:
+		return fmt.Errorf("unknown DeviceBoundSessionURLRuleRuleType value: %v", s)
+	}
+	return nil
+}
+
+// RefreshEventDetailsRefreshResult the result of a refresh.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Network#type-RefreshEventDetails
+type RefreshEventDetailsRefreshResult string
+
+// String returns the RefreshEventDetailsRefreshResult as string value.
+func (t RefreshEventDetailsRefreshResult) String() string {
+	return string(t)
+}
+
+// RefreshEventDetailsRefreshResult values.
+const (
+	RefreshEventDetailsRefreshResultRefreshed            RefreshEventDetailsRefreshResult = "Refreshed"
+	RefreshEventDetailsRefreshResultRefreshedAsWaiter    RefreshEventDetailsRefreshResult = "RefreshedAsWaiter"
+	RefreshEventDetailsRefreshResultInitializedService   RefreshEventDetailsRefreshResult = "InitializedService"
+	RefreshEventDetailsRefreshResultUnreachable          RefreshEventDetailsRefreshResult = "Unreachable"
+	RefreshEventDetailsRefreshResultServerError          RefreshEventDetailsRefreshResult = "ServerError"
+	RefreshEventDetailsRefreshResultRefreshQuotaExceeded RefreshEventDetailsRefreshResult = "RefreshQuotaExceeded"
+	RefreshEventDetailsRefreshResultFatalError           RefreshEventDetailsRefreshResult = "FatalError"
+	RefreshEventDetailsRefreshResultSigningQuotaExceeded RefreshEventDetailsRefreshResult = "SigningQuotaExceeded"
+)
+
+// UnmarshalJSON satisfies [json.Unmarshaler].
+func (t *RefreshEventDetailsRefreshResult) UnmarshalJSON(buf []byte) error {
+	s := string(buf)
+	s = strings.TrimSuffix(strings.TrimPrefix(s, `"`), `"`)
+
+	switch RefreshEventDetailsRefreshResult(s) {
+	case RefreshEventDetailsRefreshResultRefreshed:
+		*t = RefreshEventDetailsRefreshResultRefreshed
+	case RefreshEventDetailsRefreshResultRefreshedAsWaiter:
+		*t = RefreshEventDetailsRefreshResultRefreshedAsWaiter
+	case RefreshEventDetailsRefreshResultInitializedService:
+		*t = RefreshEventDetailsRefreshResultInitializedService
+	case RefreshEventDetailsRefreshResultUnreachable:
+		*t = RefreshEventDetailsRefreshResultUnreachable
+	case RefreshEventDetailsRefreshResultServerError:
+		*t = RefreshEventDetailsRefreshResultServerError
+	case RefreshEventDetailsRefreshResultRefreshQuotaExceeded:
+		*t = RefreshEventDetailsRefreshResultRefreshQuotaExceeded
+	case RefreshEventDetailsRefreshResultFatalError:
+		*t = RefreshEventDetailsRefreshResultFatalError
+	case RefreshEventDetailsRefreshResultSigningQuotaExceeded:
+		*t = RefreshEventDetailsRefreshResultSigningQuotaExceeded
+	default:
+		return fmt.Errorf("unknown RefreshEventDetailsRefreshResult value: %v", s)
+	}
+	return nil
+}
+
+// TerminationEventDetailsDeletionReason the reason for a session being
+// deleted.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Network#type-TerminationEventDetails
+type TerminationEventDetailsDeletionReason string
+
+// String returns the TerminationEventDetailsDeletionReason as string value.
+func (t TerminationEventDetailsDeletionReason) String() string {
+	return string(t)
+}
+
+// TerminationEventDetailsDeletionReason values.
+const (
+	TerminationEventDetailsDeletionReasonExpired                 TerminationEventDetailsDeletionReason = "Expired"
+	TerminationEventDetailsDeletionReasonFailedToRestoreKey      TerminationEventDetailsDeletionReason = "FailedToRestoreKey"
+	TerminationEventDetailsDeletionReasonFailedToUnwrapKey       TerminationEventDetailsDeletionReason = "FailedToUnwrapKey"
+	TerminationEventDetailsDeletionReasonStoragePartitionCleared TerminationEventDetailsDeletionReason = "StoragePartitionCleared"
+	TerminationEventDetailsDeletionReasonClearBrowsingData       TerminationEventDetailsDeletionReason = "ClearBrowsingData"
+	TerminationEventDetailsDeletionReasonServerRequested         TerminationEventDetailsDeletionReason = "ServerRequested"
+	TerminationEventDetailsDeletionReasonInvalidSessionParams    TerminationEventDetailsDeletionReason = "InvalidSessionParams"
+	TerminationEventDetailsDeletionReasonRefreshFatalError       TerminationEventDetailsDeletionReason = "RefreshFatalError"
+	TerminationEventDetailsDeletionReasonDevTools                TerminationEventDetailsDeletionReason = "DevTools"
+)
+
+// UnmarshalJSON satisfies [json.Unmarshaler].
+func (t *TerminationEventDetailsDeletionReason) UnmarshalJSON(buf []byte) error {
+	s := string(buf)
+	s = strings.TrimSuffix(strings.TrimPrefix(s, `"`), `"`)
+
+	switch TerminationEventDetailsDeletionReason(s) {
+	case TerminationEventDetailsDeletionReasonExpired:
+		*t = TerminationEventDetailsDeletionReasonExpired
+	case TerminationEventDetailsDeletionReasonFailedToRestoreKey:
+		*t = TerminationEventDetailsDeletionReasonFailedToRestoreKey
+	case TerminationEventDetailsDeletionReasonFailedToUnwrapKey:
+		*t = TerminationEventDetailsDeletionReasonFailedToUnwrapKey
+	case TerminationEventDetailsDeletionReasonStoragePartitionCleared:
+		*t = TerminationEventDetailsDeletionReasonStoragePartitionCleared
+	case TerminationEventDetailsDeletionReasonClearBrowsingData:
+		*t = TerminationEventDetailsDeletionReasonClearBrowsingData
+	case TerminationEventDetailsDeletionReasonServerRequested:
+		*t = TerminationEventDetailsDeletionReasonServerRequested
+	case TerminationEventDetailsDeletionReasonInvalidSessionParams:
+		*t = TerminationEventDetailsDeletionReasonInvalidSessionParams
+	case TerminationEventDetailsDeletionReasonRefreshFatalError:
+		*t = TerminationEventDetailsDeletionReasonRefreshFatalError
+	case TerminationEventDetailsDeletionReasonDevTools:
+		*t = TerminationEventDetailsDeletionReasonDevTools
+	default:
+		return fmt.Errorf("unknown TerminationEventDetailsDeletionReason value: %v", s)
+	}
+	return nil
+}
+
+// ChallengeEventDetailsChallengeResult the result of a challenge.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Network#type-ChallengeEventDetails
+type ChallengeEventDetailsChallengeResult string
+
+// String returns the ChallengeEventDetailsChallengeResult as string value.
+func (t ChallengeEventDetailsChallengeResult) String() string {
+	return string(t)
+}
+
+// ChallengeEventDetailsChallengeResult values.
+const (
+	ChallengeEventDetailsChallengeResultSuccess            ChallengeEventDetailsChallengeResult = "Success"
+	ChallengeEventDetailsChallengeResultNoSessionID        ChallengeEventDetailsChallengeResult = "NoSessionId"
+	ChallengeEventDetailsChallengeResultNoSessionMatch     ChallengeEventDetailsChallengeResult = "NoSessionMatch"
+	ChallengeEventDetailsChallengeResultCantSetBoundCookie ChallengeEventDetailsChallengeResult = "CantSetBoundCookie"
+)
+
+// UnmarshalJSON satisfies [json.Unmarshaler].
+func (t *ChallengeEventDetailsChallengeResult) UnmarshalJSON(buf []byte) error {
+	s := string(buf)
+	s = strings.TrimSuffix(strings.TrimPrefix(s, `"`), `"`)
+
+	switch ChallengeEventDetailsChallengeResult(s) {
+	case ChallengeEventDetailsChallengeResultSuccess:
+		*t = ChallengeEventDetailsChallengeResultSuccess
+	case ChallengeEventDetailsChallengeResultNoSessionID:
+		*t = ChallengeEventDetailsChallengeResultNoSessionID
+	case ChallengeEventDetailsChallengeResultNoSessionMatch:
+		*t = ChallengeEventDetailsChallengeResultNoSessionMatch
+	case ChallengeEventDetailsChallengeResultCantSetBoundCookie:
+		*t = ChallengeEventDetailsChallengeResultCantSetBoundCookie
+	default:
+		return fmt.Errorf("unknown ChallengeEventDetailsChallengeResult value: %v", s)
 	}
 	return nil
 }

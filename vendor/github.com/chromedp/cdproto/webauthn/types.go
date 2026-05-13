@@ -63,6 +63,7 @@ func (t Ctap2version) String() string {
 const (
 	Ctap2versionCtap20 Ctap2version = "ctap2_0"
 	Ctap2versionCtap21 Ctap2version = "ctap2_1"
+	Ctap2versionCtap22 Ctap2version = "ctap2_2"
 )
 
 // UnmarshalJSON satisfies [json.Unmarshaler].
@@ -75,6 +76,8 @@ func (t *Ctap2version) UnmarshalJSON(buf []byte) error {
 		*t = Ctap2versionCtap20
 	case Ctap2versionCtap21:
 		*t = Ctap2versionCtap21
+	case Ctap2versionCtap22:
+		*t = Ctap2versionCtap22
 	default:
 		return fmt.Errorf("unknown Ctap2version value: %v", s)
 	}
@@ -135,6 +138,8 @@ type VirtualAuthenticatorOptions struct {
 	HasCredBlob                 bool                   `json:"hasCredBlob"`                 // If set to true, the authenticator will support the credBlob extension. https://fidoalliance.org/specs/fido-v2.1-rd-20201208/fido-client-to-authenticator-protocol-v2.1-rd-20201208.html#sctn-credBlob-extension Defaults to false.
 	HasMinPinLength             bool                   `json:"hasMinPinLength"`             // If set to true, the authenticator will support the minPinLength extension. https://fidoalliance.org/specs/fido-v2.1-ps-20210615/fido-client-to-authenticator-protocol-v2.1-ps-20210615.html#sctn-minpinlength-extension Defaults to false.
 	HasPrf                      bool                   `json:"hasPrf"`                      // If set to true, the authenticator will support the prf extension. https://w3c.github.io/webauthn/#prf-extension Defaults to false.
+	HasHmacSecret               bool                   `json:"hasHmacSecret"`               // If set to true, the authenticator will support the hmac-secret extension. https://fidoalliance.org/specs/fido-v2.1-ps-20210615/fido-client-to-authenticator-protocol-v2.1-ps-20210615.html#sctn-hmac-secret-extension Defaults to false.
+	HasHmacSecretMc             bool                   `json:"hasHmacSecretMc"`             // If set to true, the authenticator will support the hmac-secret-mc extension. https://fidoalliance.org/specs/fido-v2.2-rd-20241003/fido-client-to-authenticator-protocol-v2.2-rd-20241003.html#sctn-hmac-secret-make-cred-extension Defaults to false.
 	AutomaticPresenceSimulation bool                   `json:"automaticPresenceSimulation"` // If set to true, tests of user presence will succeed immediately. Otherwise, they will not be resolved. Defaults to true.
 	IsUserVerified              bool                   `json:"isUserVerified"`              // Sets whether User Verification succeeds or fails for an authenticator. Defaults to false.
 	DefaultBackupEligibility    bool                   `json:"defaultBackupEligibility"`    // Credentials created by this authenticator will have the backup eligibility (BE) flag set to this value. Defaults to false. https://w3c.github.io/webauthn/#sctn-credential-backup
