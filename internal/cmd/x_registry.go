@@ -80,7 +80,7 @@ func catalogCachePath(gs *state.GlobalState) string {
 // failures return an error so the caller can surface them at debug.
 func readCachedCatalog(gs *state.GlobalState, cachePath string) (registrySubcommands, error) {
 	maxAge := 24 * time.Hour
-	if d, err := time.ParseDuration(gs.Env[state.ProvisionCatalogCacheAge]); err == nil {
+	if d, err := time.ParseDuration(gs.Env[state.ProvisionCatalogTTL]); err == nil {
 		maxAge = d
 	}
 	info, err := gs.FS.Stat(cachePath)

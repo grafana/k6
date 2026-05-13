@@ -35,9 +35,9 @@ const (
 	// Subcommand extensions can read it to know which k6 version launched them.
 	ProvisionHostVersion = "K6_PROVISION_HOST_VERSION"
 
-	// ProvisionCatalogCacheAge overrides how long the on-disk k6 extension
+	// ProvisionCatalogTTL overrides how long the on-disk k6 extension
 	// registry catalog is considered fresh before `k6 x` refetches it.
-	ProvisionCatalogCacheAge = "K6_PROVISION_CATALOG_CACHE_AGE"
+	ProvisionCatalogTTL = "K6_PROVISION_CATALOG_TTL"
 
 	// ProvisionCatalogURL overrides the k6 extension registry catalog endpoint
 	// fetched by `k6 x`. Tests point this at httptest or an unreachable address
