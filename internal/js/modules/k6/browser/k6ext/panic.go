@@ -11,6 +11,7 @@ import (
 	"github.com/grafana/sobek"
 
 	"go.k6.io/k6/v2/errext"
+	"go.k6.io/k6/v2/internal/log"
 	k6common "go.k6.io/k6/v2/js/common"
 )
 
@@ -32,9 +33,13 @@ func Abortf(ctx context.Context, format string, a ...any) {
 // TODO: test.
 func Panicf(ctx context.Context, format string, a ...any) {
 	failFunc := func(rt *sobek.Runtime, a ...any) {
-		k6common.Throw(rt, fmt.Errorf(format, a...))
+		k6common.Throw(rt, withBrowserSource(fmt.Errorf(format, a...)))
 	}
 	sharedPanic(ctx, failFunc, a...)
+}
+
+func withBrowserSource(err error) error {
+	return log.ErrWithFields(err, map[string]any{"source": "browser"})
 }
 
 func sharedPanic(ctx context.Context, failFunc func(rt *sobek.Runtime, a ...any), a ...any) {

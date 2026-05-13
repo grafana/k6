@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"go.k6.io/k6/v2/errext"
+	"go.k6.io/k6/v2/internal/log"
 )
 
 func TestFormat(t *testing.T) {
@@ -40,6 +41,14 @@ func TestFormat(t *testing.T) {
 		errorText, fields := errext.Format(err)
 		assert.Equal(t, "error with hint", errorText)
 		assert.Equal(t, map[string]any{"hint": "hint message"}, fields)
+	})
+
+	t.Run("LogFields", func(t *testing.T) {
+		t.Parallel()
+		err := log.ErrWithFields(errors.New("error with fields"), map[string]any{"source": "browser"})
+		errorText, fields := errext.Format(err)
+		assert.Equal(t, "error with fields", errorText)
+		assert.Equal(t, map[string]any{"source": "browser"}, fields)
 	})
 
 	t.Run("ExceptionWithHint", func(t *testing.T) {

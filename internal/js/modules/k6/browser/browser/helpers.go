@@ -12,6 +12,7 @@ import (
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6error"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
 	"go.k6.io/k6/v2/internal/js/taskqueue"
+	"go.k6.io/k6/v2/internal/log"
 	k6common "go.k6.io/k6/v2/js/common"
 	"go.k6.io/k6/v2/js/promises"
 )
@@ -93,7 +94,7 @@ func promise(vu moduleVU, fn func() (result any, reason error)) *sobek.Promise {
 	go func() {
 		v, err := fn()
 		if err != nil {
-			reject(err)
+			reject(vu.Runtime().NewGoError(log.ErrWithFields(err, map[string]any{"source": "browser"})))
 			return
 		}
 		resolve(v)

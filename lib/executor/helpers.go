@@ -90,21 +90,29 @@ func getIterationRunner(
 			executionState.AddInterruptedIterations(1)
 			return false
 		default:
-			if err != nil {
-				if handleInterrupt(ctx, err) {
-					executionState.AddInterruptedIterations(1)
-					return false
-				}
-
-				var exception errext.Exception
-				if errors.As(err, &exception) {
-					// TODO don't count this as a full iteration?
-					logger.WithField("source", "stacktrace").Error(exception.StackTrace())
-				} else {
-					logger.Error(err.Error())
-				}
-				// TODO: investigate context cancelled errors
+			if err == nil {
+				// TODO: move emission of end-of-iteration metrics here?
+				executionState.AddFullIterations(1)
+				return true
 			}
+
+			if handleInterrupt(ctx, err) {
+				executionState.AddInterruptedIterations(1)
+				return false
+			}
+
+			errText, fields := errext.Format(err)
+			var exception errext.Exception
+			if errors.As(err, &exception) {
+				// TODO don't count this as a full iteration?
+				if _, ok := fields["source"]; !ok {
+					fields["source"] = "stacktrace"
+				}
+				logger.WithFields(fields).Error(exception.StackTrace())
+			} else {
+				logger.WithFields(fields).Error(errText)
+			}
+			// TODO: investigate context cancelled errors
 
 			// TODO: move emission of end-of-iteration metrics here?
 			executionState.AddFullIterations(1)
