@@ -283,7 +283,14 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 func cloudTestStartSimple(tb testing.TB, testRunID int) http.Handler {
 	return http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
 		resp.WriteHeader(http.StatusOK)
-		_, err := fmt.Fprintf(resp, `{"reference_id": "%d"}`, testRunID)
+		_, err := fmt.Fprintf(resp, `{
+			"reference_id": "%d",
+			"test_run_token": "mock-test-run-token",
+			"secrets_config": {
+				"endpoint": "https://mock-secrets.example.com/{key}",
+				"response_path": "plaintext"
+			}
+		}`, testRunID)
 		assert.NoError(tb, err)
 	})
 }
