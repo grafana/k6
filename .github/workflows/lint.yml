@@ -40,8 +40,8 @@ jobs:
     # ref (in `uses:`) and `k6-ci-ref` to the same SHA so the lint config
     # comes from the exact same commit as the workflow logic. Renovate keeps
     # both lines in sync.
-    uses: grafana/k6-ci/.github/workflows/all.yml@2e841ed1f99228ce33269efa60e300721ba5d683 # lint-action branch — bump once grafana/k6-ci#33 merges
+    uses: grafana/k6-ci/.github/workflows/all.yml@54cd23cf21e6bb673f131b4de6c05b86b458fd4b # v0.1.0
     with:
-      k6-ci-ref: 2e841ed1f99228ce33269efa60e300721ba5d683
+      k6-ci-ref: 54cd23cf21e6bb673f131b4de6c05b86b458fd4b # v0.1.0
       skip-tests: true
       skip-extension-testing: true
