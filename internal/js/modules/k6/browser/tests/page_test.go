@@ -685,6 +685,12 @@ func TestPageScreenshotFullpage(t *testing.T) {
 	}`)
 	require.NoError(t, err)
 
+	// Wait for the browser to commit a frame so the gradient div is painted
+	// before the screenshot is captured. Without this, on slow CI runners the
+	// screenshot can race the first paint and capture the still-white background.
+	_, err = p.Evaluate(`() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))`)
+	require.NoError(t, err)
+
 	opts := common.NewPageScreenshotOptions()
 	opts.FullPage = true
 	buf, err := p.Screenshot(opts, &mockPersister{})
