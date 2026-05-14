@@ -29,7 +29,7 @@ func TestAsyncRequest(t *testing.T) {
 				jar.set("HTTPBIN_URL/cookies", "key", "value");
 				res = await http.asyncRequest("GET", reqUrl, null, { cookies: { key2: "value2" }, jar: jar });
 
-				if (res.json().key != "value") { throw new Error("wrong cookie value: " + res.json().key); }
+				if (res.json().cookies.key != "value") { throw new Error("wrong cookie value: " + res.json().cookies.key); }
 
 				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 				if (res.request["method"] !== "GET") { throw new Error("http request method was not \"GET\": " + JSON.stringify(res.request)) }
