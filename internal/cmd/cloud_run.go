@@ -4,12 +4,11 @@ import (
 	"errors"
 	"fmt"
 
-	"go.k6.io/k6/errext/exitcodes"
-
-	"go.k6.io/k6/errext"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
+	"go.k6.io/k6/errext"
+	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/internal/execution"
 	"go.k6.io/k6/internal/execution/local"
 )
@@ -31,6 +30,9 @@ type cmdCloudRun struct {
 	// This flag indicates to the local execution mode to not send the test
 	// archive to the cloud service.
 	noArchiveUpload bool
+
+	// noCloudSecrets stores the state of the --no-cloud-secrets flag.
+	noCloudSecrets bool
 
 	// runCmd holds an instance of the k6 run command that we store
 	// in order to be able to call its run method to support
@@ -123,6 +125,13 @@ func (c *cmdCloudRun) preRun(cmd *cobra.Command, args []string) error {
 		)
 	}
 
+	if c.noCloudSecrets {
+		return errext.WithExitCodeIfNone(
+			fmt.Errorf("the --no-cloud-secrets flag can only be used in conjunction with the --local-execution flag"),
+			exitcodes.InvalidConfig,
+		)
+	}
+
 	return c.deprecatedCloudCmd.preRun(cmd, args)
 }
 
@@ -176,6 +185,12 @@ func (c *cmdCloudRun) flagSet() *pflag.FlagSet {
 		"no-archive-upload",
 		c.noArchiveUpload,
 		"only when using the local-execution mode, don't upload the test archive to the cloud service",
+	)
+	flags.BoolVar(
+		&c.noCloudSecrets,
+		"no-cloud-secrets",
+		c.noCloudSecrets,
+		"only when using the local-execution mode, don't automatically configure the cloud secret source",
 	)
 
 	return flags

@@ -18,6 +18,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"go.k6.io/k6/internal/event"
+	cloudsecrets "go.k6.io/k6/internal/secretsource/cloud"
 	"go.k6.io/k6/internal/ui/console"
 	"go.k6.io/k6/internal/usage"
 	"go.k6.io/k6/lib/fsext"
@@ -78,9 +79,10 @@ type GlobalState struct {
 	Logger         *logrus.Logger //nolint:forbidigo //TODO:change to FieldLogger
 	FallbackLogger logrus.FieldLogger
 
-	SecretsManager *secretsource.Manager
-	Usage          *usage.Usage
-	TestStatus     *lib.TestStatus
+	SecretsManager    *secretsource.Manager
+	CloudSecretSource *cloudsecrets.SecretSource
+	Usage             *usage.Usage
+	TestStatus        *lib.TestStatus
 }
 
 // NewGlobalState returns a new GlobalState with the given ctx.
