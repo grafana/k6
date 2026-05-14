@@ -1774,7 +1774,9 @@ class InjectedScript {
 
     const part = selector.parts[index];
     if (part.name === "internal:or") {
-      const innerSelector = JSON.parse(part.body);
+      // inner selector is a quoted JSON string, so we need to parse it twice
+      // see k6/browser/common/locator.go
+      const innerSelector = JSON.parse(JSON.parse(part.body));
       const orRoots = this._querySelectorRecursively(
         [{ element: originalRoot, capture: undefined }],
         innerSelector,

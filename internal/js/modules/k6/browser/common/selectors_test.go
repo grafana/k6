@@ -1,6 +1,8 @@
 package common
 
 import (
+	"encoding/json"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -93,15 +95,6 @@ func TestSelectorParse(t *testing.T) {
 			},
 			expectedCap: nil,
 		},
-		{
-			name:  "Internal or with nested selector",
-			input: `button >> internal:or="a"`,
-			expectedParts: []*SelectorPart{
-				{Name: "css", Body: "button"},
-				{Name: "internal:or", Body: `{"selector":"a","parts":[{"name":"css","body":"a"}],"capture":null}`},
-			},
-			expectedCap: nil,
-		},
 	}
 
 	for _, tc := range testCases {
@@ -121,4 +114,23 @@ func TestSelectorParse(t *testing.T) {
 			assert.EqualValues(t, tc.expectedCap, sel.Capture, "Capture mismatch")
 		})
 	}
+}
+
+func TestSelectorParseInternalOrQuotedJSON(t *testing.T) {
+	t.Parallel()
+
+	parsed, err := NewSelector("a")
+	require.NoError(t, err)
+	encoded, err := json.Marshal(parsed)
+	require.NoError(t, err)
+	quoted := strconv.Quote(string(encoded))
+	input := "button >> internal:or=" + quoted
+
+	sel, err := NewSelector(input)
+	require.NoError(t, err)
+
+	assert.Equal(t, []*SelectorPart{
+		{Name: "css", Body: "button"},
+		{Name: "internal:or", Body: quoted},
+	}, sel.Parts)
 }
