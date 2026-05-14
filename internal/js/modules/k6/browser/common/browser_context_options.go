@@ -30,6 +30,7 @@ type BrowserContextOptions struct {
 // DefaultBrowserContextOptions returns the default browser context options.
 func DefaultBrowserContextOptions() *BrowserContextOptions {
 	return &BrowserContextOptions{
+		AcceptDownloads:   true,
 		ColorScheme:       ColorSchemeLight,
 		DeviceScaleFactor: 1.0,
 		ExtraHTTPHeaders:  make(map[string]string),
