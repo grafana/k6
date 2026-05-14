@@ -225,11 +225,16 @@ func getConsolidatedConfig(gs *state.GlobalState, cliConf Config, runnerOpts lib
 
 func warnOnShortHandOverride(a, b lib.Options, bName string, logger logrus.FieldLogger) {
 	if a.Scenarios != nil &&
-		(b.Duration.Valid || b.Iterations.Valid || b.Stages != nil || b.Scenarios != nil) {
+		(b.Duration.Valid || b.Iterations.Valid || b.Stages != nil || b.Scenarios != nil || hasBareVUs(b)) {
 		logger.Warnf(
 			"%q level configuration overrode scenarios configuration entirely",
 			bName)
 	}
+}
+
+func hasBareVUs(opts lib.Options) bool {
+	return opts.VUs.Valid && !opts.Duration.Valid && !opts.Iterations.Valid &&
+		opts.Stages == nil && opts.Scenarios == nil
 }
 
 // applyDefault applies the default options value if it is not specified.
