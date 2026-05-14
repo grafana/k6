@@ -8,6 +8,21 @@
     "**/vendor/**",
     ".github/workflows/xk6-tests/**"
   ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Track Go minor version in setup-go go-version: 1.X.x lines",
+      "managerFilePatterns": ["/^\\.github/workflows/[^/]+\\.ya?ml$/"],
+      "matchStrings": [
+        "go-version:\\s+(?<currentValue>\\d+\\.\\d+)\\.x",
+        "go-version:\\s+\\[(?<currentValue>\\d+\\.\\d+)\\.x\\]"
+      ],
+      "depNameTemplate": "golang/go",
+      "datasourceTemplate": "golang-version",
+      "extractVersionTemplate": "^(?<version>\\d+\\.\\d+)",
+      "versioningTemplate": "loose"
+    }
+  ],
   "baseBranchPatterns": [
     "master",
     "v1.x"
