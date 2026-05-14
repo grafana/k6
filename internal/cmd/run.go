@@ -279,12 +279,12 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		runAbort(err)
 	})
 	samples := make(chan metrics.SampleContainer, test.derivedConfig.MetricSamplesBufferSize.Int64)
-	if c.gs.Flags.ProfilingEnabled && c.gs.Flags.HTTPAPIAddr == "" {
-		logger.Warn("Profiling is enabled but no HTTP API server is running — " +
-			"profiling endpoints won't be reachable until you enable the HTTP server via --http-api-addr (or K6_HTTP_API_ADDR)")
+	if c.gs.Flags.ProfilingEnabled && c.gs.Flags.Address == "" {
+		logger.Warn("Profiling is enabled but no REST API server is running — " +
+			"profiling endpoints won't be reachable until you enable the REST API server via --address (or K6_ADDRESS)")
 	}
 	// Spin up the REST API server, if enabled.
-	if c.gs.Flags.HTTPAPIAddr != "" { //nolint:nestif
+	if c.gs.Flags.Address != "" { //nolint:nestif
 		initBar.Modify(pb.WithConstProgress(0, "Init API server"))
 
 		// We cannot use backgroundProcesses here, since we need the REST API to
@@ -299,7 +299,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 
 		srv := api.GetServer(
 			runCtx,
-			c.gs.Flags.HTTPAPIAddr, c.gs.Flags.ProfilingEnabled,
+			c.gs.Flags.Address, c.gs.Flags.ProfilingEnabled,
 			testRunState,
 			samples,
 			metricsEngine,
@@ -307,13 +307,13 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		)
 		go func() {
 			defer apiWG.Done()
-			logger.Debugf("Starting the REST API server on %s", c.gs.Flags.HTTPAPIAddr)
+			logger.Debugf("Starting the REST API server on %s", c.gs.Flags.Address)
 			if c.gs.Flags.ProfilingEnabled {
-				logger.Debugf("Profiling exposed on http://%s/debug/pprof/", c.gs.Flags.HTTPAPIAddr)
+				logger.Debugf("Profiling exposed on http://%s/debug/pprof/", c.gs.Flags.Address)
 			}
 			if aerr := srv.ListenAndServe(); aerr != nil && !errors.Is(aerr, http.ErrServerClosed) {
 				// Only exit k6 if the user has explicitly set the REST API address
-				if cmd.Flags().Lookup("http-api-addr").Changed {
+				if cmd.Flags().Lookup("address").Changed {
 					logger.WithError(aerr).Error("Error from API server")
 					c.gs.OSExit(int(exitcodes.CannotStartRESTAPI))
 				} else {

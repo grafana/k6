@@ -17,14 +17,14 @@ func getCmdStats(gs *state.GlobalState) *cobra.Command {
 		Hidden: true,
 		Long: `Show test metrics.
 
-  Use the global --http-api-addr flag or the K6_HTTP_API_ADDR environment variable to specify
+  Use the global --address flag or the K6_ADDRESS environment variable to specify
   the URL to the API server.`,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			if gs.Flags.HTTPAPIAddr == "" {
-				return errors.New("The HTTP API server is disabled, but this command needs" + //nolint:staticcheck
-					" to read metrics from it. Enable it by setting --http-api-addr or K6_HTTP_API_ADDR.")
+			if gs.Flags.Address == "" {
+				return errors.New("The REST API server is disabled, but this command needs" + //nolint:staticcheck
+					" to read metrics from it. Enable it by setting --address or K6_ADDRESS.")
 			}
-			c, err := client.New(gs.Flags.HTTPAPIAddr)
+			c, err := client.New(gs.Flags.Address)
 			if err != nil {
 				return err
 			}
