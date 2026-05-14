@@ -2,6 +2,7 @@ package cloudapi
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math"
 	"math/rand" // nosemgrep: math-random-used // This is being used retry jitter
@@ -13,25 +14,19 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/mailru/easyjson"
 	"github.com/sirupsen/logrus"
 )
 
-//go:generate easyjson -pkg -no_std_marshalers -gen_build_flags -mod=mod .
-
-//easyjson:json
 type msg struct {
 	Streams        []msgStreams        `json:"streams"`
 	DroppedEntries []msgDroppedEntries `json:"dropped_entries"`
 }
 
-//easyjson:json
 type msgStreams struct {
 	Stream map[string]string `json:"stream"`
 	Values [][2]string       `json:"values"` // this can be optimized
 }
 
-//easyjson:json
 type msgDroppedEntries struct {
 	Labels    map[string]string `json:"labels"`
 	Timestamp string            `json:"timestamp"`
@@ -149,7 +144,7 @@ func (c *Config) StreamLogsToLogger(
 	go func() {
 		for message := range msgBuffer {
 			var m msg
-			err := easyjson.Unmarshal(message, &m)
+			err := json.Unmarshal(message, &m)
 			if err != nil {
 				logger.WithError(err).Errorf("couldn't unmarshal a message from the cloud: %s", string(message))
 
