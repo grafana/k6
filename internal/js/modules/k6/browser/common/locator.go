@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"time"
@@ -428,10 +429,26 @@ func (l *Locator) Locator(selector string, opts *LocatorOptions) *Locator {
 // Or returns a new locator that matches elements from either the current
 // locator or the given locator. The resulting locator resolves to all elements
 // that match either selector, merged and sorted in DOM order.
-func (l *Locator) Or(locator *Locator) *Locator {
+func (l *Locator) Or(locator *Locator) (*Locator, error) {
+	if l.frame != locator.frame {
+		return nil, fmt.Errorf(
+			"combining locators from different frames is not supported: this(frame_id:%s) locator(frame_id:%s)",
+			l.frame.ID(), locator.frame.ID(),
+		)
+	}
+
+	parsed, err := NewSelector(locator.selector)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse selector: %w", err)
+	}
+	encoded, err := json.Marshal(parsed)
+	if err != nil {
+		return nil, fmt.Errorf("encoding selector: %w", err)
+	}
+
 	return NewLocator(l.ctx, nil,
-		l.selector+" >> internal:or="+strconv.Quote(locator.selector),
-		l.frame, l.log)
+		l.selector+" >> internal:or="+strconv.Quote(string(encoded)),
+		l.frame, l.log), nil
 }
 
 // FrameLocator creates a frame locator for an iframe matching the given selector

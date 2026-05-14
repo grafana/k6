@@ -320,6 +320,10 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			return rt.ToValue(ml).ToObject(rt)
 		},
 		"or": func(locatorObj sobek.Value) (mapping, error) {
+			if k6common.IsNullish(locatorObj) {
+				return nil, errors.New("locator is required")
+			}
+
 			obj := locatorObj.ToObject(rt)
 			innerLocVal := obj.Get("__locator")
 			if k6common.IsNullish(innerLocVal) {
@@ -330,7 +334,11 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 				return nil, errors.New("internal locator has invalid type")
 			}
 
-			return mapLocator(vu, lo.Or(innerLoc)), nil
+			newLoc, err := lo.Or(innerLoc)
+			if err != nil {
+				return nil, err
+			}
+			return mapLocator(vu, newLoc), nil
 		},
 		"textContent": func(opts sobek.Value) (*sobek.Promise, error) {
 			copts := common.NewFrameTextContentOptions(lo.Timeout())

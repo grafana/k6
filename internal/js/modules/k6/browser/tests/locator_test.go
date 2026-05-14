@@ -409,7 +409,9 @@ func TestLocator(t *testing.T) {
 		{
 			"Or count", func(_ *testBrowser, p *common.Page) {
 				// 3 <a> elements + 1 <textarea> = 4 total
-				lo := p.Locator("a", nil).Or(p.Locator("textarea", nil))
+				lo, err := p.Locator("a", nil).Or(p.Locator("textarea", nil))
+				require.NoError(t, err)
+
 				n, err := lo.Count()
 				require.NoError(t, err)
 				assert.Equal(t, 4, n)
@@ -418,7 +420,9 @@ func TestLocator(t *testing.T) {
 		{
 			"Or isVisible", func(_ *testBrowser, p *common.Page) {
 				// #link exists, #nonExistent does not -- or yields exactly 1
-				lo := p.Locator("#nonExistent", nil).Or(p.Locator("#link", nil))
+				lo, err := p.Locator("#nonExistent", nil).Or(p.Locator("#link", nil))
+				require.NoError(t, err)
+
 				visible, err := lo.IsVisible()
 				require.NoError(t, err)
 				assert.True(t, visible)
@@ -427,7 +431,9 @@ func TestLocator(t *testing.T) {
 		{
 			"Or first element text", func(_ *testBrowser, p *common.Page) {
 				// The first <a> ("Click") comes before <textarea> in DOM order
-				lo := p.Locator("textarea", nil).Or(p.Locator("#link", nil))
+				lo, err := p.Locator("textarea", nil).Or(p.Locator("#link", nil))
+				require.NoError(t, err)
+
 				text, err := lo.First().InnerText(common.NewFrameInnerTextOptions(lo.Timeout()))
 				require.NoError(t, err)
 				assert.Equal(t, "Click", text)
@@ -436,7 +442,9 @@ func TestLocator(t *testing.T) {
 		{
 			"Or no match on one side", func(_ *testBrowser, p *common.Page) {
 				// One locator matches nothing, the other matches 1 element
-				lo := p.Locator("#nonExistent", nil).Or(p.Locator("#link", nil))
+				lo, err := p.Locator("#nonExistent", nil).Or(p.Locator("#link", nil))
+				require.NoError(t, err)
+
 				n, err := lo.Count()
 				require.NoError(t, err)
 				assert.Equal(t, 1, n)
@@ -444,9 +452,12 @@ func TestLocator(t *testing.T) {
 		},
 		{
 			"Or chained three selectors", func(_ *testBrowser, p *common.Page) {
-				lo := p.Locator("#linkdbl", nil).
-					Or(p.Locator("#missing", nil)).
-					Or(p.Locator("#secondParagraph", nil))
+				lo, err := p.Locator("#linkdbl", nil).
+					Or(p.Locator("#missing", nil))
+				require.NoError(t, err)
+
+				lo, err = lo.Or(p.Locator("#secondParagraph", nil))
+				require.NoError(t, err)
 
 				locators, err := lo.All()
 				require.NoError(t, err)

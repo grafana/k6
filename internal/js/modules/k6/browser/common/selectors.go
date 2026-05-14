@@ -17,11 +17,8 @@
 package common
 
 import (
-	"encoding/json"
 	"errors"
-	"fmt"
 	"regexp"
-	"strconv"
 	"strings"
 )
 
@@ -62,9 +59,7 @@ func NewSelector(selector string) (*Selector, error) {
 	if err := s.parse(); err != nil {
 		return nil, err
 	}
-	if err := s.resolveNestedSelectors(); err != nil {
-		return nil, err
-	}
+
 	return &s, nil
 }
 
@@ -170,31 +165,4 @@ func (s *Selector) parse() error {
 	}
 
 	return appendPart(start, index)
-}
-
-// inspired by playwright
-// resolveNestedSelectors post-processes parsed parts that contain nested
-// selectors (e.g. internal:or). The inner selector string is parsed into
-// a Selector and then JSON-encoded back into the Body field so the
-// injected script can recover it with JSON.parse.
-func (s *Selector) resolveNestedSelectors() error {
-	for _, part := range s.Parts {
-		if part.Name != "internal:or" {
-			continue
-		}
-		inner, err := strconv.Unquote(part.Body)
-		if err != nil {
-			return fmt.Errorf("unquoting nested selector body %q: %w", part.Body, err)
-		}
-		parsed, err := NewSelector(inner)
-		if err != nil {
-			return fmt.Errorf("parsing nested selector %q: %w", inner, err)
-		}
-		encoded, err := json.Marshal(parsed)
-		if err != nil {
-			return fmt.Errorf("encoding nested selector: %w", err)
-		}
-		part.Body = string(encoded)
-	}
-	return nil
 }
