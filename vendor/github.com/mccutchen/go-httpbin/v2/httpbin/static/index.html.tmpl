@@ -99,6 +99,7 @@
 <li><a href="{{.Prefix}}/image/webp"><code>{{.Prefix}}/image/webp</code></a> Returns a WEBP image.</li>
 <li><a href="{{.Prefix}}/ip"><code>{{.Prefix}}/ip</code></a> Returns Origin IP.</li>
 <li><a href="{{.Prefix}}/json"><code>{{.Prefix}}/json</code></a> Returns JSON.</li>
+<li><a href="{{.Prefix}}/jsonl?count=10&amp;duration=5s&amp;delay=1s&amp;jitter=0.5"><code>{{.Prefix}}/jsonl?count=10&amp;duration=5s&amp;delay=1s&amp;jitter=0.5</code></a> Streams <em>count</em> lines of <a href="https://jsonlines.org/">JSON Lines</a> data over an optional <em>duration</em> after an optional initial <em>delay</em>, with optional <em>jitter</em> ratio (0.0-1.0) to randomize timing between lines.</li>
 <li><a href="{{.Prefix}}/links/10"><code>{{.Prefix}}/links/:n</code></a> Returns page containing <em>n</em> HTML links.</li>
 <li><code>{{.Prefix}}/patch</code> Returns request data.  Allows only <code>PATCH</code> requests.</li>
 <li><code>{{.Prefix}}/post</code> Returns request data.  Allows only <code>POST</code> requests.</li>
@@ -116,6 +117,7 @@
 <li><a href="{{.Prefix}}/stream/20"><code>{{.Prefix}}/stream/:n</code></a> Streams <em>min(n, 100)</em> lines.</li>
 <li><a href="{{.Prefix}}/trailers?trailer1=value1&amp;trailer2=value2"><code>{{.Prefix}}/trailers?key=val</code></a> Returns JSON response with query params added as HTTP Trailers.</li>
 <li><a href="{{.Prefix}}/unstable"><code>{{.Prefix}}/unstable</code></a> Fails half the time, accepts optional <em>failure_rate</em> float and <em>seed</em> integer parameters.</li>
+<li><code>{{.Prefix}}/upload</code> Discards the body of <code>POST</code>/<code>PUT</code>/<code>PATCH</code> requests, for testing upload performance.</li>
 <li><a href="{{.Prefix}}/user-agent"><code>{{.Prefix}}/user-agent</code></a> Returns user-agent.</li>
 <li><a href="{{.Prefix}}/uuid"><code>{{.Prefix}}/uuid</code></a> Generates a <a href="https://en.wikipedia.org/wiki/Universally_unique_identifier">UUIDv4</a> value.</li>
 <li><a href="{{.Prefix}}/websocket/echo?max_fragment_size=2048&amp;max_message_size=10240"><code>{{.Prefix}}/websocket/echo?max_fragment_size=2048&amp;max_message_size=10240</code></a> A WebSocket echo service.</li>
