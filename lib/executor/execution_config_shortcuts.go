@@ -93,7 +93,7 @@ func DeriveScenariosFromShortcuts(opts lib.Options, logger logrus.FieldLogger) (
 		}
 		result.Scenarios = getRampingVUsScenario(opts.Stages, opts.VUs)
 
-	case opts.VUs.Valid && len(opts.Stages) == 0 && opts.Scenarios == nil &&
+	case opts.VUs.Valid && opts.Stages == nil && opts.Scenarios == nil &&
 		!opts.Iterations.Valid && !opts.Duration.Valid:
 		ds := NewSharedIterationsConfig(lib.DefaultScenarioName)
 		ds.VUs = opts.VUs

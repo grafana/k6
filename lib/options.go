@@ -368,6 +368,9 @@ func (o Options) Apply(opts Options) Options {
 	if opts.VUs.Valid && !opts.Duration.Valid && !opts.Iterations.Valid &&
 		opts.Stages == nil && opts.Scenarios == nil {
 		o.Scenarios = nil
+		if len(o.Stages) == 0 {
+			o.Stages = nil
+		}
 	}
 
 	// Specifying duration, iterations, stages, or execution in a "higher" config tier
