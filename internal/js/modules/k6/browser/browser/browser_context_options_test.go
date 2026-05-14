@@ -44,37 +44,6 @@ func TestBrowserContextSetGeolocation(t *testing.T) {
 	assert.Equal(t, 3.0, opts.Geolocation.Accuracy)
 }
 
-func TestBrowserContextSetProxy(t *testing.T) {
-	t.Parallel()
-	vu := k6test.NewVU(t)
-
-	opts, err := parseBrowserContextOptions(vu.Runtime(), vu.ToSobekValue((struct {
-		Proxy *common.ProxyOptions `js:"proxy"`
-	}{
-		Proxy: &common.ProxyOptions{
-			Server: "http://proxy.test:8080",
-			Bypass: "localhost,127.0.0.1",
-		},
-	})))
-	assert.NoError(t, err)
-	assert.NotNil(t, opts)
-	assert.NotNil(t, opts.Proxy)
-	assert.Equal(t, "http://proxy.test:8080", opts.Proxy.Server)
-	assert.Equal(t, "localhost,127.0.0.1", opts.Proxy.Bypass)
-}
-
-func TestBrowserContextProxyRequiresServer(t *testing.T) {
-	t.Parallel()
-	vu := k6test.NewVU(t)
-
-	opts, err := vu.Runtime().RunString(`({ proxy: { bypass: 'localhost' } })`)
-	require.NoError(t, err)
-
-	parsedOpts, err := parseBrowserContextOptions(vu.Runtime(), opts)
-	require.ErrorContains(t, err, "proxy.server must be set")
-	assert.Nil(t, parsedOpts)
-}
-
 func TestBrowserContextDefaultOptions(t *testing.T) {
 	t.Parallel()
 	vu := k6test.NewVU(t)
@@ -118,7 +87,6 @@ func TestBrowserContextAllOptions(t *testing.T) {
 			locale: 'fr-FR',
 			offline: true,
 			permissions: ['camera', 'microphone'],
-			proxy: { server: 'http://proxy.test:8080', bypass: 'localhost,127.0.0.1' },
 			reducedMotion: 'no-preference',
 			screen: { width: 800, height: 600 },
 			timezoneID: 'Europe/Paris',
@@ -157,11 +125,7 @@ func TestBrowserContextAllOptions(t *testing.T) {
 		Locale:            "fr-FR",
 		Offline:           true,
 		Permissions:       []string{"camera", "microphone"},
-		Proxy: &common.ProxyOptions{
-			Server: "http://proxy.test:8080",
-			Bypass: "localhost,127.0.0.1",
-		},
-		ReducedMotion: common.ReducedMotionNoPreference,
+		ReducedMotion:     common.ReducedMotionNoPreference,
 		Screen: common.Screen{
 			Width:  800,
 			Height: 600,
