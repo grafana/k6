@@ -45,6 +45,19 @@ func TestCloudLoginWithArgs(t *testing.T) {
 			},
 		},
 		{
+			name:    "valid token and valid stack URL with trailing slash",
+			token:   validToken,
+			stack:   validStackURL + "/",
+			wantErr: false,
+			wantStdoutContains: []string{
+				"Logged in successfully",
+				fmt.Sprintf("token: %s", strings.Repeat("*", 11)),
+				fmt.Sprintf("stack-id: %d", validStackID),
+				fmt.Sprintf("stack-url: %s", validStackURL),
+				fmt.Sprintf("default-project-id: %d", defaultProjectID),
+			},
+		},
+		{
 			name:    "valid token without stack fails",
 			token:   validToken,
 			wantErr: true,
