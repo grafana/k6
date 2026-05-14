@@ -32,7 +32,7 @@ func newLogger(t testing.TB, level logrus.Level) *logrus.Logger { //nolint:forbi
 	} else {
 		w = NewTestOutput(t)
 	}
-	logrus.SetOutput(w)
+	l.SetOutput(w)
 	return l
 }
 
