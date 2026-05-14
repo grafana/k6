@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
 package ntlmssp
 
 import (
@@ -11,10 +14,14 @@ type varField struct {
 }
 
 func (f varField) ReadFrom(buffer []byte) ([]byte, error) {
-	if len(buffer) < int(f.BufferOffset+uint32(f.Len)) {
-		return nil, errors.New("Error reading data, varField extends beyond buffer")
+	// f.Len is controlled by the sender, so we need to check that
+	// it doesn't cause an overflow when added to f.BufferOffset.
+	start := uint64(f.BufferOffset)
+	end := start + uint64(f.Len)
+	if end < start || end > uint64(len(buffer)) {
+		return nil, errors.New("error reading data, varField extends beyond buffer")
 	}
-	return buffer[f.BufferOffset : f.BufferOffset+uint32(f.Len)], nil
+	return buffer[int(start):int(end)], nil
 }
 
 func (f varField) ReadStringFrom(buffer []byte, unicode bool) (string, error) {

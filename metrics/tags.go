@@ -8,9 +8,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/mailru/easyjson"
-	"github.com/mailru/easyjson/jlexer"
-	"github.com/mailru/easyjson/jwriter"
 	"github.com/mstoykov/atlas"
 )
 
@@ -107,39 +104,9 @@ func (ts *TagSet) WithTagsFromMap(m map[string]string) *TagSet {
 	return tags
 }
 
-// MarshalEasyJSON supports easyjson.Marshaler interface for better performance.
-func (ts *TagSet) MarshalEasyJSON(w *jwriter.Writer) {
-	w.RawByte('{')
-	first := true
-
-	n := (*atlas.Node)(ts)
-	for !n.IsRoot() {
-		prev, key, value := n.Data()
-		if first {
-			first = false
-		} else {
-			w.RawByte(',')
-		}
-		w.String(key)
-		w.RawByte(':')
-		w.String(value)
-		n = prev
-	}
-	w.RawByte('}')
-}
-
-// MarshalJSON serializes the tags to a JSON string.
+// MarshalJSON serializes the tags to a JSON object.
 func (ts *TagSet) MarshalJSON() ([]byte, error) {
-	w := &jwriter.Writer{NoEscapeHTML: true}
-	ts.MarshalEasyJSON(w)
-	return w.Buffer.BuildBytes(), w.Error
-}
-
-// UnmarshalEasyJSON WILL ALWAYS RETURN AN ERROR because a TagSet needs to be
-// started from a common atlas root. This function exists to prevent any
-// automatic reflection-based attempts at unmarshaling.
-func (ts *TagSet) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	l.AddError(errors.New("metrics.TagSet cannot be directly unmarshalled from JSON"))
+	return MarshalJSONWithoutHTMLEscape(ts.Map())
 }
 
 // UnmarshalJSON WILL ALWAYS RETURN AN ERROR because a TagSet needs to be
@@ -151,8 +118,6 @@ func (ts *TagSet) UnmarshalJSON([]byte) error {
 
 // Ensure *TagSet implements the listed interfaces at compile-time.
 var _ interface {
-	easyjson.Marshaler
-	easyjson.Unmarshaler
 	json.Marshaler
 	json.Unmarshaler
 } = &TagSet{}

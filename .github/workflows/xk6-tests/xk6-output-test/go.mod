@@ -1,6 +1,6 @@
 module github.com/grafana/xk6-output-test
 
-go 1.25.0
+go 1.25.10
 
 require go.k6.io/k6/v2 v2.0.0-20260424133653-c3427b0487c8
 

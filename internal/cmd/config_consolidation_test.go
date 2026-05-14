@@ -210,8 +210,8 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		{opts{fs: getFS(nil), cli: []string{"--config", "/my/config.file"}}, exp{consolidationError: true}, nil},
 
 		// Test combinations between options and levels
-		{opts{cli: []string{"--vus", "1"}}, exp{}, verifyOneIterPerOneVU},
-		{opts{cli: []string{"--vus", "10"}}, exp{logWarning: true}, verifyOneIterPerOneVU},
+		{opts{cli: []string{"--vus", "1"}}, exp{}, verifySharedIters(I(1), I(1))},
+		{opts{cli: []string{"--vus", "10"}}, exp{}, verifySharedIters(I(10), I(10))},
 		{
 			opts{
 				fs:  getFS([]file{{"/my/config.file", `{"vus": 8, "duration": "2m"}`}}),
@@ -475,9 +475,32 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 			},
 			nil,
 		},
-		// TODO: test for differences between flagsets
-		// TODO: more tests in general, especially ones not related to execution parameters...
+		// --vus alone should create a shared-iterations scenario with N VUs and N iterations
+		{
+			opts{cli: []string{"--vus", "8"}},
+			exp{},
+			verifySharedIters(I(8), I(8)),
+		},
+		// --vus with script-defined scenarios should return a derivation error
+		{
+			opts{
+				cli: []string{"--vus", "8"},
+				fs: defaultConfig(`{
+					"scenarios": {
+						"api": {
+							"executor": "shared-iterations",
+							"vus": 100,
+							"iterations": 100
+						}
+					}
+				}`),
+			},
+			exp{logWarning: true},
+			verifySharedIters(I(8), I(8)),
+		},
 	}
+	// TODO: test for differences between flagsets
+	// TODO: more tests in general, especially ones not related to execution parameters...
 }
 
 func runTestCase(t *testing.T, testCase configConsolidationTestCase, subCmd string) {

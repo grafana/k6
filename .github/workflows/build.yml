@@ -36,6 +36,10 @@ jobs:
       k6_version: ${{ steps.get_k6_version.outputs.k6_version }}
       go_version: ${{ steps.get_go_version.outputs.go_version }}
       sign_windows_artifacts: ${{ steps.determine_windows_signing.outputs.sign_windows_artifacts }}
+      major: ${{ steps.classify_release.outputs.major }}
+      is_prerelease: ${{ steps.classify_release.outputs.is_prerelease }}
+      is_latest_stable: ${{ steps.classify_release.outputs.is_latest_stable }}
+      is_latest_in_major: ${{ steps.classify_release.outputs.is_latest_in_major }}
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -95,6 +99,50 @@ jobs:
             sign_windows_artifacts="false"
           fi
           echo "sign_windows_artifacts=${sign_windows_artifacts}" >> ${GITHUB_OUTPUT}
+
+      # Classify the release so we can decide whether this build should:
+      #  - move the Docker :latest tag (only the highest stable tag overall)
+      #  - move the Docker :vN floating major tag (any stable tag, per major)
+      #  - be marked as the GitHub "Latest release" or as a pre-release
+      # This prevents pre-releases (e.g. -rc) and maintenance releases on
+      # older majors (e.g. v1.x after v2.0.0 ships) from claiming "latest".
+      - name: Classify release
+        id: classify_release
+        env:
+          VERSION: ${{ steps.get_k6_version.outputs.k6_version }}
+        run: |
+          set -x
+          MAJOR=""
+          IS_PRERELEASE=false
+          IS_LATEST_STABLE=false
+          IS_LATEST_IN_MAJOR=false
+          if [[ "${GITHUB_REF}" =~ ^refs/tags/v.+$ ]]; then
+            MAJOR=$(echo "${VERSION}" | sed -E 's/^v([0-9]+).*/\1/')
+            if [[ "${VERSION}" == *-* ]]; then
+              IS_PRERELEASE=true
+            fi
+            # Highest stable tag in the repo (excludes anything with a
+            # pre-release identifier like -rc, -beta, -dev).
+            MAX_STABLE=$(git tag --sort=-v:refname | grep -vE '-' | head -n1 || true)
+            if [[ "${IS_PRERELEASE}" == "false" && "${VERSION}" == "${MAX_STABLE}" ]]; then
+              IS_LATEST_STABLE=true
+            fi
+            # Highest stable tag within this tag's major. Needed because
+            # we can ship multiple bugfix releases on an older major
+            # (e.g. v1.4.2 after v1.5.0 is already out on the v1 line):
+            # only the newest one on that major should move :vN.
+            MAX_STABLE_IN_MAJOR=$(git tag --sort=-v:refname \
+              | grep -vE '-' \
+              | grep -E "^v${MAJOR}\." \
+              | head -n1 || true)
+            if [[ "${IS_PRERELEASE}" == "false" && "${VERSION}" == "${MAX_STABLE_IN_MAJOR}" ]]; then
+              IS_LATEST_IN_MAJOR=true
+            fi
+          fi
+          echo "major=${MAJOR}" >> ${GITHUB_OUTPUT}
+          echo "is_prerelease=${IS_PRERELEASE}" >> ${GITHUB_OUTPUT}
+          echo "is_latest_stable=${IS_LATEST_STABLE}" >> ${GITHUB_OUTPUT}
+          echo "is_latest_in_major=${IS_LATEST_IN_MAJOR}" >> ${GITHUB_OUTPUT}
 
   build:
     runs-on: ubuntu-latest
@@ -194,7 +242,7 @@ jobs:
           docker run $DOCKER_IMAGE_ID inspect --help
       - name: Login to DockerHub
         if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') }}
-        uses: grafana/shared-workflows/actions/dockerhub-login@081a366728379fd0426b9cfef190e9a21c2d5418 # dockerhub-login/v1.0.3
+        uses: grafana/shared-workflows/actions/dockerhub-login@ef3a62a3ca4c1a15505b4235a5a51493194da3c7 # dockerhub-login/v1.0.4
       - name: Login to GitHub Container Registry
         uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
         env:
@@ -234,7 +282,32 @@ jobs:
             --platform linux/amd64,linux/arm64 \
             -t $DOCKER_IMAGE_ID:$VERSION-with-browser \
             -t ghcr.io/$GHCR_IMAGE_ID:$VERSION-with-browser .
-          # We also want to tag the latest stable version as latest
+      # Move the floating major tag (e.g. :v1, :v2) only when this tag is
+      # the highest stable tag on its major. Pre-releases never move it,
+      # and a bugfix released on an older line within the same major
+      # (e.g. v1.4.2 after v1.5.0) does not regress :vN.
+      - name: Publish floating major tag
+        if: ${{ needs.configure.outputs.is_latest_in_major == 'true' }}
+        env:
+          MAJOR: ${{ needs.configure.outputs.major }}
+        run: |
+          echo "Publish $GHCR_IMAGE_ID:v$MAJOR images"
+          docker buildx build --push \
+            --target release \
+            --platform linux/amd64,linux/arm64 \
+            -t $DOCKER_IMAGE_ID:v$MAJOR \
+            -t ghcr.io/$GHCR_IMAGE_ID:v$MAJOR .
+          docker buildx build --push \
+            --target with-browser \
+            --platform linux/amd64,linux/arm64 \
+            -t $DOCKER_IMAGE_ID:v$MAJOR-with-browser \
+            -t ghcr.io/$GHCR_IMAGE_ID:v$MAJOR-with-browser .
+      # Only the highest stable tag in the repo gets :latest. Maintenance
+      # releases on older majors (e.g. v1.x after v2.0.0 ships) and any
+      # pre-release must not move :latest.
+      - name: Publish :latest
+        if: ${{ needs.configure.outputs.is_latest_stable == 'true' }}
+        run: |
           echo "Publish $GHCR_IMAGE_ID:latest"
           docker buildx build --push \
             --target release \
@@ -289,7 +362,7 @@ jobs:
           if-no-files-found: error
 
       - name: Get secrets for Azure Trusted Signing
-        uses: grafana/shared-workflows/actions/get-vault-secrets@f1614b210386ac420af6807a997ac7f6d96e477a # get-vault-secrets/v1.3.1
+        uses: grafana/shared-workflows/actions/get-vault-secrets@a53fc80bc30b0a16a262520465db899fa3af08b7 # get-vault-secrets/v1.3.2
         id: get-signing-secrets
         if: needs.configure.outputs.sign_windows_artifacts == 'true'
         with:
@@ -300,7 +373,7 @@ jobs:
             tenant-id=azure-trusted-signing:tenant-id
 
       - name: Sign Windows binary
-        uses: grafana/shared-workflows/actions/azure-trusted-signing@d3e134ded5c97bd60d74ec8878eb3d0eb2d66fad # azure-trusted-signing/v1.0.1
+        uses: grafana/shared-workflows/actions/azure-trusted-signing@fd75379254f1ff2d0a1f1c12b329a9008863ad82 # azure-trusted-signing/v1.0.2
         id: sign-artifacts
         if: needs.configure.outputs.sign_windows_artifacts == 'true'
         with:
@@ -423,7 +496,7 @@ jobs:
           path: packaging
 
       - name: Get secrets for Azure Trusted Signing
-        uses: grafana/shared-workflows/actions/get-vault-secrets@f1614b210386ac420af6807a997ac7f6d96e477a # get-vault-secrets/v1.3.1
+        uses: grafana/shared-workflows/actions/get-vault-secrets@a53fc80bc30b0a16a262520465db899fa3af08b7 # get-vault-secrets/v1.3.2
         id: get-signing-secrets
         if: needs.configure.outputs.sign_windows_artifacts == 'true'
         with:
@@ -434,7 +507,7 @@ jobs:
             tenant-id=azure-trusted-signing:tenant-id
 
       - name: Sign Windows installer
-        uses: grafana/shared-workflows/actions/azure-trusted-signing@d3e134ded5c97bd60d74ec8878eb3d0eb2d66fad # azure-trusted-signing/v1.0.1
+        uses: grafana/shared-workflows/actions/azure-trusted-signing@fd75379254f1ff2d0a1f1c12b329a9008863ad82 # azure-trusted-signing/v1.0.2
         id: sign-artifacts
         if: needs.configure.outputs.sign_windows_artifacts == 'true'
         with:
@@ -488,13 +561,24 @@ jobs:
       - name: Create release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IS_LATEST_STABLE: ${{ needs.configure.outputs.is_latest_stable }}
+          IS_PRERELEASE: ${{ needs.configure.outputs.is_prerelease }}
         run: |
           set -x
           assets=()
           for asset in ./dist/*; do
             assets+=("$asset")
           done
-          gh release create "$VERSION" "${assets[@]}" --target "$GITHUB_SHA" -F "./release notes/${VERSION}.md"
+          # --latest=false prevents pre-releases and maintenance releases on
+          # older majors from being shown as the "Latest release" on GitHub.
+          extra_args=( "--latest=${IS_LATEST_STABLE}" )
+          if [[ "${IS_PRERELEASE}" == "true" ]]; then
+            extra_args+=( "--prerelease" )
+          fi
+          gh release create "$VERSION" "${assets[@]}" \
+            --target "$GITHUB_SHA" \
+            -F "./release notes/${VERSION}.md" \
+            "${extra_args[@]}"
 
   submit-winget-manifest:
     needs: [configure, publish-github]
@@ -513,7 +597,7 @@ jobs:
         Add-AppxPackage $appxBundleFile
 
     - name: Get WinGet token
-      uses: grafana/shared-workflows/actions/get-vault-secrets@f1614b210386ac420af6807a997ac7f6d96e477a # get-vault-secrets/v1.3.1
+      uses: grafana/shared-workflows/actions/get-vault-secrets@a53fc80bc30b0a16a262520465db899fa3af08b7 # get-vault-secrets/v1.3.2
       id: get-token
       with:
         export_env: false
@@ -565,7 +649,7 @@ jobs:
           mv "dist/k6-$VERSION-windows-amd64.msi" "dist/k6-$VERSION-amd64.msi"
           mv "dist/k6-$VERSION-linux-amd64.rpm" "dist/k6-$VERSION-amd64.rpm"
           mv "dist/k6-$VERSION-linux-amd64.deb" "dist/k6-$VERSION-amd64.deb"
-      - uses: grafana/shared-workflows/actions/get-vault-secrets@f1614b210386ac420af6807a997ac7f6d96e477a # get-vault-secrets/v1.3.1
+      - uses: grafana/shared-workflows/actions/get-vault-secrets@a53fc80bc30b0a16a262520465db899fa3af08b7 # get-vault-secrets/v1.3.2
         with:
           repo_secrets: |
             IAM_ROLE_ARN=deploy:packager-iam-role

@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
 package ntlmssp
 
 import (
@@ -32,8 +35,8 @@ func (m *challengeMessage) UnmarshalBinary(data []byte) error {
 	if err != nil {
 		return err
 	}
-	if !m.challengeMessageFields.IsValid() {
-		return fmt.Errorf("Message is not a valid challenge message: %+v", m.challengeMessageFields.messageHeader)
+	if !m.IsValid() {
+		return fmt.Errorf("message is not a valid challenge message: %+v", m.messageHeader)
 	}
 
 	if m.challengeMessageFields.TargetName.Len > 0 {
@@ -72,7 +75,7 @@ func (m *challengeMessage) UnmarshalBinary(data []byte) error {
 				return err
 			}
 			if n != int(l) {
-				return fmt.Errorf("Expected to read %d bytes, got only %d", l, n)
+				return fmt.Errorf("expected to read %d bytes, got only %d", l, n)
 			}
 			m.TargetInfo[id] = value
 		}
