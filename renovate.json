@@ -18,8 +18,8 @@
         "go-version:\\s+\\[(?<currentValue>\\d+\\.\\d+)\\.x\\]"
       ],
       "depNameTemplate": "golang/go",
-      "datasourceTemplate": "github-releases",
-      "extractVersionTemplate": "^go(?<version>\\d+\\.\\d+)",
+      "datasourceTemplate": "golang-version",
+      "extractVersionTemplate": "^(?<version>\\d+\\.\\d+)",
       "versioningTemplate": "loose"
     }
   ],
