@@ -50,14 +50,7 @@ func (c *depsCmd) run(cmd *cobra.Command, args []string) error {
 	}
 
 	deps := test.Dependencies()
-	depsMap := map[string]string{}
-	for name, constraint := range test.Dependencies() {
-		if constraint == nil {
-			depsMap[name] = "*"
-			continue
-		}
-		depsMap[name] = constraint.String()
-	}
+	depsMap := deps.toStringMap()
 	imports := test.Imports()
 	slices.Sort(imports)
 
