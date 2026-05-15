@@ -111,7 +111,7 @@ github.com/davecgh/go-spew/spew
 # github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f
 ## explicit
 github.com/dgryski/go-rendezvous
-# github.com/dlclark/regexp2 v1.11.5
+# github.com/dlclark/regexp2 v1.12.0
 ## explicit; go 1.13
 github.com/dlclark/regexp2
 github.com/dlclark/regexp2/syntax
@@ -190,7 +190,7 @@ github.com/grafana/k6build/pkg/client
 # github.com/grafana/k6provider v0.2.0
 ## explicit; go 1.24.0
 github.com/grafana/k6provider
-# github.com/grafana/sobek v0.0.0-20260219184149-bdae4a158e94
+# github.com/grafana/sobek v0.0.0-20260429085637-a66d4790012b
 ## explicit; go 1.20
 github.com/grafana/sobek
 github.com/grafana/sobek/ast
