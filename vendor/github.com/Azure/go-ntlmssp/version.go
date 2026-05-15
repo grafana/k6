@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
 package ntlmssp
 
 // Version is a struct representing https://msdn.microsoft.com/en-us/library/cc236654.aspx
