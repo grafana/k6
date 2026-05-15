@@ -551,12 +551,12 @@ func (vlv *RampingVUs) Run(ctx context.Context, _ chan<- metrics.SampleContainer
 		handleNewScheduledVUs  = runState.scheduledVUsHandlerStrategy()
 	)
 	handledGracefulSteps := runState.iterateSteps(
-		ctx,
+		maxDurationCtx,
 		handleNewMaxAllowedVUs,
 		handleNewScheduledVUs,
 	)
 	go runState.runRemainingGracefulSteps(
-		ctx,
+		maxDurationCtx,
 		handleNewMaxAllowedVUs,
 		handledGracefulSteps,
 	)
@@ -716,7 +716,14 @@ func waiter(ctx context.Context, start time.Time) func(offset time.Duration) boo
 				// now we do a step
 			}
 		}
-		return false
+		// honor cancellation even for past-due steps, where diff <= 0 and the
+		// select above is skipped
+		select {
+		case <-ctx.Done():
+			return true
+		default:
+			return false
+		}
 	}
 }
 
