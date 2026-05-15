@@ -1223,7 +1223,7 @@ func TestRampingVUsVUStartError(t *testing.T) {
 		BaseConfig: BaseConfig{GracefulStop: types.NullDurationFrom(0)},
 		StartVUs:   null.IntFrom(2),
 		Stages: []Stage{
-			{Duration: types.NullDurationFrom(2100 * time.Millisecond), Target: null.IntFrom(2)},
+			{Duration: types.NullDurationFrom(time.Second), Target: null.IntFrom(2)},
 		},
 	}
 
