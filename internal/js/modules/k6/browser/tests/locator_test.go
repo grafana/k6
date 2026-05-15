@@ -406,6 +406,72 @@ func TestLocator(t *testing.T) {
 				require.NoError(t, lo.WaitFor(opts))
 			},
 		},
+		{
+			"Or count", func(_ *testBrowser, p *common.Page) {
+				// 3 <a> elements + 1 <textarea> = 4 total
+				lo, err := p.Locator("a", nil).Or(p.Locator("textarea", nil))
+				require.NoError(t, err)
+
+				n, err := lo.Count()
+				require.NoError(t, err)
+				assert.Equal(t, 4, n)
+			},
+		},
+		{
+			"Or isVisible", func(_ *testBrowser, p *common.Page) {
+				// #link exists, #nonExistent does not -- or yields exactly 1
+				lo, err := p.Locator("#nonExistent", nil).Or(p.Locator("#link", nil))
+				require.NoError(t, err)
+
+				visible, err := lo.IsVisible()
+				require.NoError(t, err)
+				assert.True(t, visible)
+			},
+		},
+		{
+			"Or first element text", func(_ *testBrowser, p *common.Page) {
+				// The first <a> ("Click") comes before <textarea> in DOM order
+				lo, err := p.Locator("textarea", nil).Or(p.Locator("#link", nil))
+				require.NoError(t, err)
+
+				text, err := lo.First().InnerText(common.NewFrameInnerTextOptions(lo.Timeout()))
+				require.NoError(t, err)
+				assert.Equal(t, "Click", text)
+			},
+		},
+		{
+			"Or no match on one side", func(_ *testBrowser, p *common.Page) {
+				// One locator matches nothing, the other matches 1 element
+				lo, err := p.Locator("#nonExistent", nil).Or(p.Locator("#link", nil))
+				require.NoError(t, err)
+
+				n, err := lo.Count()
+				require.NoError(t, err)
+				assert.Equal(t, 1, n)
+			},
+		},
+		{
+			"Or chained three selectors", func(_ *testBrowser, p *common.Page) {
+				lo, err := p.Locator("#linkdbl", nil).
+					Or(p.Locator("#missing", nil))
+				require.NoError(t, err)
+
+				lo, err = lo.Or(p.Locator("#secondParagraph", nil))
+				require.NoError(t, err)
+
+				locators, err := lo.All()
+				require.NoError(t, err)
+				require.Len(t, locators, 2)
+
+				text0, err := locators[0].InnerText(common.NewFrameInnerTextOptions(locators[0].Timeout()))
+				require.NoError(t, err)
+				assert.Equal(t, "Dblclick", text0)
+
+				text1, err := locators[1].InnerText(common.NewFrameInnerTextOptions(locators[1].Timeout()))
+				require.NoError(t, err)
+				assert.Equal(t, "original text", text1)
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1631,6 +1697,88 @@ func TestFrameLocator(t *testing.T) {
 		clicked, err := buttonLocator.Evaluate("el => window.buttonClicked")
 		require.NoError(t, err)
 		assert.True(t, clicked.(bool), "buttonClicked should be true after click")
+	})
+
+	// test Locator.Or on locators scoped to frames
+	t.Run("or_frame_locator_count", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withFileServer())
+		p := tb.NewPage(nil)
+
+		opts := &common.FrameGotoOptions{
+			Timeout: common.DefaultTimeout,
+		}
+		_, err := p.Goto(tb.staticURL("iframe_test_main.html"), opts)
+		require.NoError(t, err)
+
+		wopts := common.NewFrameWaitForSelectorOptions(p.MainFrame().Timeout())
+		iframe1, err := p.WaitForSelector("iframe[id='iframe1']", wopts)
+		require.NoError(t, err)
+		require.NotNil(t, iframe1)
+
+		frame1, err := iframe1.ContentFrame()
+		require.NoError(t, err)
+		require.NotNil(t, frame1)
+
+		iframe2, err := frame1.WaitForSelector("iframe[id='iframe2']", common.NewFrameWaitForSelectorOptions(frame1.Timeout()))
+		require.NoError(t, err)
+		require.NotNil(t, iframe2)
+
+		frame2, err := iframe2.ContentFrame()
+		require.NoError(t, err)
+		require.NotNil(t, frame2)
+
+		miss := frame2.Locator("#k6ContentFrameOrDoesNotExist", nil)
+		hit := frame2.Locator("#button1", nil)
+		combined, err := miss.Or(hit)
+		require.NoError(t, err)
+
+		n, err := combined.Count()
+		require.NoError(t, err)
+		assert.Equal(t, 1, n)
+	})
+
+	t.Run("or_frame_locator_click", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withFileServer())
+		p := tb.NewPage(nil)
+
+		opts := &common.FrameGotoOptions{
+			Timeout: common.DefaultTimeout,
+		}
+		_, err := p.Goto(tb.staticURL("iframe_test_main.html"), opts)
+		require.NoError(t, err)
+
+		wopts := common.NewFrameWaitForSelectorOptions(p.MainFrame().Timeout())
+		iframe1, err := p.WaitForSelector("iframe[id='iframe1']", wopts)
+		require.NoError(t, err)
+		require.NotNil(t, iframe1)
+
+		frame1, err := iframe1.ContentFrame()
+		require.NoError(t, err)
+		require.NotNil(t, frame1)
+
+		iframe2, err := frame1.WaitForSelector("iframe[id='iframe2']", common.NewFrameWaitForSelectorOptions(frame1.Timeout()))
+		require.NoError(t, err)
+		require.NotNil(t, iframe2)
+
+		frame2, err := iframe2.ContentFrame()
+		require.NoError(t, err)
+		require.NotNil(t, frame2)
+
+		miss := frame2.Locator("#k6ContentFrameOrDoesNotExist", nil)
+		hit := frame2.Locator("#button1", nil)
+		combined, err := miss.Or(hit)
+		require.NoError(t, err)
+
+		err = combined.Click(common.NewFrameClickOptions(combined.Timeout()))
+		require.NoError(t, err)
+
+		clicked, err := hit.Evaluate("el => window.buttonClicked")
+		require.NoError(t, err)
+		assert.True(t, clicked.(bool), "buttonClicked should be true after Or locator click")
 	})
 
 	t.Run("comparison_with_contentFrame", func(t *testing.T) {
