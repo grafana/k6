@@ -368,8 +368,9 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"reload": func(opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewPageReloadOptions(common.LifecycleEventLoad, p.NavigationTimeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			defaults := common.NewPageReloadOptions(common.LifecycleEventLoad, p.NavigationTimeout())
+			popts, err := parsePageReloadOptions(rt, opts, defaults)
+			if err != nil {
 				return nil, fmt.Errorf("parsing reload options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -1147,6 +1148,29 @@ func parsePageEmulateMediaOptions(
 			defaults.Media = common.MediaType(obj.Get(k).String())
 		case "reducedMotion":
 			defaults.ReducedMotion = common.ReducedMotion(obj.Get(k).String())
+		}
+	}
+
+	return defaults, nil
+}
+
+// parsePageReloadOptions parses the page reload options from a Sobek value.
+func parsePageReloadOptions(
+	rt *sobek.Runtime, opts sobek.Value, defaults *common.PageReloadOptions,
+) (*common.PageReloadOptions, error) {
+	if k6common.IsNullish(opts) {
+		return defaults, nil
+	}
+
+	obj := opts.ToObject(rt)
+	for _, k := range obj.Keys() {
+		switch k {
+		case "waitUntil":
+			if err := defaults.WaitUntil.UnmarshalText([]byte(obj.Get(k).String())); err != nil {
+				return nil, err
+			}
+		case "timeout":
+			defaults.Timeout = time.Duration(obj.Get(k).ToInteger()) * time.Millisecond
 		}
 	}
 

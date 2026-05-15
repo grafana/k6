@@ -89,28 +89,6 @@ func (o *PageGoBackForwardOptions) Parse(ctx context.Context, opts sobek.Value) 
 	return nil
 }
 
-// Parse parses the page reload options.
-func (o *PageReloadOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	rt := k6ext.Runtime(ctx)
-	if !common.IsNullish(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			switch k {
-			case "waitUntil":
-				lifeCycle := opts.Get(k).String()
-				if l, ok := lifecycleEventToID[lifeCycle]; ok {
-					o.WaitUntil = l
-				} else {
-					return fmt.Errorf("%q is not a valid lifecycle", lifeCycle)
-				}
-			case "timeout":
-				o.Timeout = time.Duration(opts.Get(k).ToInteger()) * time.Millisecond
-			}
-		}
-	}
-	return nil
-}
-
 func NewPageScreenshotOptions() *PageScreenshotOptions {
 	return &PageScreenshotOptions{
 		Clip:           nil,
