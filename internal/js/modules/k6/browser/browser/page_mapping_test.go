@@ -2,6 +2,7 @@ package browser
 
 import (
 	"testing"
+	"time"
 
 	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/assert"
@@ -180,6 +181,75 @@ func TestParsePageEmulateMediaOptions(t *testing.T) {
 			require.NoError(t, err)
 
 			opts, err := parsePageEmulateMediaOptions(vu.Runtime(), v, newDefaults())
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, opts)
+		})
+	}
+}
+
+func TestParsePageReloadOptions(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		input   string
+		want    *common.PageReloadOptions
+		wantErr string
+	}{
+		{
+			name:  "defaults_on_null",
+			input: `null`,
+			want: &common.PageReloadOptions{
+				WaitUntil: common.LifecycleEventLoad,
+				Timeout:   30 * time.Second,
+			},
+		},
+		{
+			name:  "all_options",
+			input: `({waitUntil: "networkidle", timeout: 5000})`,
+			want: &common.PageReloadOptions{
+				WaitUntil: common.LifecycleEventNetworkIdle,
+				Timeout:   5 * time.Second,
+			},
+		},
+		{
+			name:  "partial_waitUntil_only",
+			input: `({waitUntil: "domcontentloaded"})`,
+			want: &common.PageReloadOptions{
+				WaitUntil: common.LifecycleEventDOMContentLoad,
+				Timeout:   30 * time.Second,
+			},
+		},
+		{
+			name:  "partial_timeout_only",
+			input: `({timeout: 10000})`,
+			want: &common.PageReloadOptions{
+				WaitUntil: common.LifecycleEventLoad,
+				Timeout:   10 * time.Second,
+			},
+		},
+		{
+			name:    "invalid_lifecycle",
+			input:   `({waitUntil: "invalid"})`,
+			wantErr: "invalid lifecycle event",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			vu := k6test.NewVU(t)
+			v, err := vu.Runtime().RunString(tt.input)
+			require.NoError(t, err)
+
+			opts, err := parsePageReloadOptions(vu.Runtime(), v, common.NewPageReloadOptions(common.LifecycleEventLoad, common.DefaultTimeout))
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+				return
+			}
+
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, opts)
 		})
