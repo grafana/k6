@@ -1699,6 +1699,88 @@ func TestFrameLocator(t *testing.T) {
 		assert.True(t, clicked.(bool), "buttonClicked should be true after click")
 	})
 
+	// test Locator.Or on locators scoped to frames
+	t.Run("or_frame_locator_count", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withFileServer())
+		p := tb.NewPage(nil)
+
+		opts := &common.FrameGotoOptions{
+			Timeout: common.DefaultTimeout,
+		}
+		_, err := p.Goto(tb.staticURL("iframe_test_main.html"), opts)
+		require.NoError(t, err)
+
+		wopts := common.NewFrameWaitForSelectorOptions(p.MainFrame().Timeout())
+		iframe1, err := p.WaitForSelector("iframe[id='iframe1']", wopts)
+		require.NoError(t, err)
+		require.NotNil(t, iframe1)
+
+		frame1, err := iframe1.ContentFrame()
+		require.NoError(t, err)
+		require.NotNil(t, frame1)
+
+		iframe2, err := frame1.WaitForSelector("iframe[id='iframe2']", common.NewFrameWaitForSelectorOptions(frame1.Timeout()))
+		require.NoError(t, err)
+		require.NotNil(t, iframe2)
+
+		frame2, err := iframe2.ContentFrame()
+		require.NoError(t, err)
+		require.NotNil(t, frame2)
+
+		miss := frame2.Locator("#k6ContentFrameOrDoesNotExist", nil)
+		hit := frame2.Locator("#button1", nil)
+		combined, err := miss.Or(hit)
+		require.NoError(t, err)
+
+		n, err := combined.Count()
+		require.NoError(t, err)
+		assert.Equal(t, 1, n)
+	})
+
+	t.Run("or_frame_locator_click", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withFileServer())
+		p := tb.NewPage(nil)
+
+		opts := &common.FrameGotoOptions{
+			Timeout: common.DefaultTimeout,
+		}
+		_, err := p.Goto(tb.staticURL("iframe_test_main.html"), opts)
+		require.NoError(t, err)
+
+		wopts := common.NewFrameWaitForSelectorOptions(p.MainFrame().Timeout())
+		iframe1, err := p.WaitForSelector("iframe[id='iframe1']", wopts)
+		require.NoError(t, err)
+		require.NotNil(t, iframe1)
+
+		frame1, err := iframe1.ContentFrame()
+		require.NoError(t, err)
+		require.NotNil(t, frame1)
+
+		iframe2, err := frame1.WaitForSelector("iframe[id='iframe2']", common.NewFrameWaitForSelectorOptions(frame1.Timeout()))
+		require.NoError(t, err)
+		require.NotNil(t, iframe2)
+
+		frame2, err := iframe2.ContentFrame()
+		require.NoError(t, err)
+		require.NotNil(t, frame2)
+
+		miss := frame2.Locator("#k6ContentFrameOrDoesNotExist", nil)
+		hit := frame2.Locator("#button1", nil)
+		combined, err := miss.Or(hit)
+		require.NoError(t, err)
+
+		err = combined.Click(common.NewFrameClickOptions(combined.Timeout()))
+		require.NoError(t, err)
+
+		clicked, err := hit.Evaluate("el => window.buttonClicked")
+		require.NoError(t, err)
+		assert.True(t, clicked.(bool), "buttonClicked should be true after Or locator click")
+	})
+
 	t.Run("comparison_with_contentFrame", func(t *testing.T) {
 		t.Parallel()
 
