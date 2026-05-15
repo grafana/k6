@@ -29,6 +29,31 @@ func TestBrowserTypeConnect(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestChromiumConnect(t *testing.T) {
+	t.Parallel()
+
+	// Launch a browser to get a WS URL, then connect
+	// through the JS chromium.connect() API.
+	tb := newTestBrowser(t)
+
+	vu := k6test.NewVU(t)
+	mod := browser.New().NewModuleInstance(vu)
+	jsMod, ok := mod.Exports().Default.(*browser.JSModule)
+	require.Truef(t, ok, "unexpected default mod export type %T", mod.Exports().Default)
+
+	vu.ActivateVU()
+	vu.StartIteration(t)
+
+	vu.SetVar(t, "chromium", jsMod.Chromium)
+	_, err := vu.RunAsync(t, `
+		const b = await chromium.connectOverCDP("%s");
+		const p = await b.newPage();
+		await p.close();
+		await b.close();
+	`, tb.wsURL)
+	require.NoError(t, err)
+}
+
 func TestBrowserTypeLaunchToConnect(t *testing.T) {
 	t.Parallel()
 
