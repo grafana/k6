@@ -94,6 +94,23 @@ func TestBrowserContextProxy(t *testing.T) {
 	}
 }
 
+func TestBrowserContextProxyRequiresServer(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t)
+	tb.vu.ActivateVU()
+	tb.vu.StartIteration(t)
+	defer tb.vu.EndIteration(t)
+
+	gv, err := tb.vu.RunAsync(t, `
+		await browser.newContext({ proxy: { bypass: 'foo' } });
+	`)
+
+	got := k6test.ToPromise(t, gv)
+	assert.ErrorContains(t, err, "parsing browser.newContext options: proxy.server must be set")
+	assert.Equal(t, sobek.PromiseStateRejected, got.State())
+}
+
 func runBrowserContextProxyNavigation(
 	t *testing.T, tb *testBrowser, targetURL, proxyURL, testHeader string, useProxy bool,
 ) string {
@@ -162,7 +179,9 @@ func newBrowserContextProxyTarget(
 			prefix,
 			r.Header.Get("X-K6-Proxy-Test"),
 		)
-		require.NoError(t, err)
+		if !assert.NoError(t, err) {
+			return
+		}
 	}))
 }
 
@@ -216,7 +235,9 @@ func newBrowserContextProxyServer(
 		}
 		w.WriteHeader(resp.StatusCode)
 		_, err = io.Copy(w, resp.Body)
-		require.NoError(t, err)
+		if !assert.NoError(t, err) {
+			return
+		}
 	}))
 }
 
