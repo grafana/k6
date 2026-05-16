@@ -172,6 +172,10 @@ func (s Selection) Find(arg any) Selection {
 	return s.varargFnCall(arg, s.sel.Find, s.sel.FindSelection, s.sel.FindNodes)
 }
 
+func (s Selection) Single(selector string) Selection {
+	return Selection{s.rt, s.sel.FindMatcher(goquery.Single(selector)), s.URL}
+}
+
 func (s Selection) Closest(arg any) Selection {
 	return s.varargFnCall(arg, s.sel.Closest, s.sel.ClosestSelection, s.sel.ClosestNodes)
 }
