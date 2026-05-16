@@ -8,7 +8,7 @@
      funlen:
        lines: 80
        statements: 60
-@@ -101,8 +102,34 @@
+@@ -101,9 +102,29 @@
            - gosec
          path: _(test|gen)\.go
        - linters:
@@ -30,16 +30,11 @@
 +      - linters:
            - forbidigo
          text: use of `os\.(SyscallError|Signal|Interrupt)` forbidden
-+      - linters:
+       - linters:
 +          - forbidigo
 +        text: use of `afero\.(.*)` forbidden
 +        path: lib/fsext/.*\.go
 +      - linters:
-+          - revive
-+        text: avoid meaningless package names
-+      - linters:
-+          - revive
-+        text: avoid package names that conflict with Go standard library
-     paths:
-       - third_party$
-       - builtin$
+           - revive
+         text: avoid meaningless package names
+       - linters:

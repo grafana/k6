@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 jobs:
-  deps:
+  generate-check:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -25,23 +25,19 @@ jobs:
         with:
           go-version: 1.26.x
           check-latest: true
-      - name: Check dependencies
-        run: |
-            go version
-            test -z "$(go mod tidy && go mod vendor && git status --porcelain)"
-            go mod verify
       - name: Check code generation
         run: |
           make generate
-          test -z "$(git status --porcelain | tee >(cat 1>&2))"
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "make generate produced changes:"
+            git status --porcelain
+            git --no-pager diff
+            exit 1
+          fi
 
-  lint:
-    # Delegate to grafana/k6-ci's reusable workflow. We pin both the workflow
-    # ref (in `uses:`) and `k6-ci-ref` to the same SHA so the lint config
-    # comes from the exact same commit as the workflow logic. Renovate keeps
-    # both lines in sync.
-    uses: grafana/k6-ci/.github/workflows/all.yml@54cd23cf21e6bb673f131b4de6c05b86b458fd4b # v0.1.0
+  k6-ci:
+    uses: grafana/k6-ci/.github/workflows/all.yml@143ec80c1678ae96a54b82389ea862d4748c27e1 # v0.3.0
     with:
-      k6-ci-ref: 54cd23cf21e6bb673f131b4de6c05b86b458fd4b # v0.1.0
+      k6-ci-ref: 143ec80c1678ae96a54b82389ea862d4748c27e1 # v0.3.0
       skip-tests: true
       skip-extension-testing: true
