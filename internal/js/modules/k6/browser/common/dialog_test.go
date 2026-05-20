@@ -40,8 +40,8 @@ func (m *mockSession) ExecuteWithoutExpectationOnReply(_ context.Context, method
 	return m.err
 }
 
-func (m *mockSession) ID() target.SessionID { return "mock-session-id" }
-func (m *mockSession) TargetID() target.ID  { return "mock-target-id" }
+func (m *mockSession) ID() target.SessionID  { return "mock-session-id" }
+func (m *mockSession) TargetID() target.ID   { return "mock-target-id" }
 func (m *mockSession) Done() <-chan struct{} { return m.doneCh }
 
 func TestDialogAccept(t *testing.T) {
