@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/chromedp/cdproto/cdp"
+	cdppage "github.com/chromedp/cdproto/page"
 	"github.com/chromedp/cdproto/target"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -58,6 +59,9 @@ func TestDialogAccept(t *testing.T) {
 
 	assert.True(t, d.handled)
 	assert.Equal(t, "Page.handleJavaScriptDialog", ms.lastMethod)
+	params, ok := ms.lastParams.(*cdppage.HandleJavaScriptDialogParams)
+	require.True(t, ok, "expected *cdppage.HandleJavaScriptDialogParams")
+	assert.True(t, params.Accept, "expected accept=true for Accept()")
 }
 
 func TestDialogDismiss(t *testing.T) {
@@ -75,6 +79,42 @@ func TestDialogDismiss(t *testing.T) {
 
 	assert.True(t, d.handled)
 	assert.Equal(t, "Page.handleJavaScriptDialog", ms.lastMethod)
+	params, ok := ms.lastParams.(*cdppage.HandleJavaScriptDialogParams)
+	require.True(t, ok, "expected *cdppage.HandleJavaScriptDialogParams")
+	assert.False(t, params.Accept, "expected accept=false for Dismiss()")
+}
+
+func TestDialogAcceptIdempotent(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	ms := newMockSession(ctx)
+
+	d := newDialog(cdp.WithExecutor(ctx, ms), ms)
+
+	require.NoError(t, d.Accept())
+	assert.True(t, d.handled)
+
+	// Second call must be a no-op (no second CDP command sent).
+	ms.lastMethod = ""
+	require.NoError(t, d.Accept())
+	assert.Empty(t, ms.lastMethod, "second Accept() must not send a CDP command")
+}
+
+func TestDialogDismissIdempotent(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	ms := newMockSession(ctx)
+
+	d := newDialog(cdp.WithExecutor(ctx, ms), ms)
+
+	require.NoError(t, d.Dismiss())
+	assert.True(t, d.handled)
+
+	ms.lastMethod = ""
+	require.NoError(t, d.Dismiss())
+	assert.Empty(t, ms.lastMethod, "second Dismiss() must not send a CDP command")
 }
 
 func TestDialogAcceptPropagatesError(t *testing.T) {
