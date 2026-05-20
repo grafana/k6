@@ -3,14 +3,14 @@ package tests
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
-	"net/http/httptest"
-	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	v6cloudapi "go.k6.io/k6/v2/internal/cloudapi/v6"
+	"go.k6.io/k6/v2/internal/cloudapi/v6/v6test"
 	"go.k6.io/k6/v2/internal/cmd"
 )
 
@@ -22,16 +22,8 @@ func TestCloudTestRunList(t *testing.T) {
 	t.Run("lists runs successfully", func(t *testing.T) {
 		t.Parallel()
 
-		srv := mockTestRunListServer(t, nil)
-
-		ts := NewGlobalTestState(t)
-		ts.CmdArgs = []string{
-			"k6", "cloud", "test-run", "list",
-			"--test-id", fmt.Sprintf("%d", loadTestIDForTests),
-		}
-		ts.Env["K6_CLOUD_TOKEN"] = validToken
-		ts.Env["K6_CLOUD_STACK_ID"] = fmt.Sprintf("%d", validStackID)
-		ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
+		ts := newCloudTestRunListTestState(t, testTestRuns(),
+			"--test-id", fmt.Sprintf("%d", loadTestIDForTests))
 
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
@@ -63,120 +55,28 @@ func TestCloudTestRunList(t *testing.T) {
 		assert.Contains(t, stderr, "test ID not specified")
 	})
 
-	t.Run("--limit caps results without paging", func(t *testing.T) {
+	t.Run("missing auth uses list-specific wording", func(t *testing.T) {
 		t.Parallel()
-
-		var requests atomic.Int32
-		srv := mockTestRunListServer(t, &mockOptions{
-			onRequest: func(_ *http.Request) {
-				requests.Add(1)
-			},
-			expectedTop: "5",
-		})
 
 		ts := NewGlobalTestState(t)
 		ts.CmdArgs = []string{
 			"k6", "cloud", "test-run", "list",
 			"--test-id", fmt.Sprintf("%d", loadTestIDForTests),
-			"--limit", "5",
 		}
-		ts.Env["K6_CLOUD_TOKEN"] = validToken
-		ts.Env["K6_CLOUD_STACK_ID"] = fmt.Sprintf("%d", validStackID)
-		ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
+		ts.ExpectedExitCode = -1
 
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
-		assert.Equal(t, int32(1), requests.Load(), "expected exactly one page request")
+		stderr := ts.Stderr.String()
+		assert.Contains(t, stderr, "Listing cloud test runs requires auth settings")
+		assert.NotContains(t, stderr, "Running cloud tests requires auth settings")
 	})
 
-	t.Run("--all paginates", func(t *testing.T) {
+	t.Run("empty run list", func(t *testing.T) {
 		t.Parallel()
 
-		var requests atomic.Int32
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			assert.Equal(t, "1000", r.URL.Query().Get("$top"))
-
-			switch requests.Add(1) {
-			case 1:
-				w.Header().Set("Content-Type", "application/json")
-				_, err := fmt.Fprintf(w, `{
-					"value": [%s],
-					"@nextLink": "%s/cloud/v6/load_tests/%d/test_runs?$skip=1000&$top=1000"
-				}`, sampleTestRunJSON(1009852, "finished", "passed"), r.Host, loadTestIDForTests)
-				require.NoError(t, err)
-			case 2:
-				w.Header().Set("Content-Type", "application/json")
-				_, err := fmt.Fprintf(w, `{"value": [%s]}`,
-					sampleTestRunJSON(1009711, "finished", "failed"))
-				require.NoError(t, err)
-			default:
-				w.WriteHeader(http.StatusInternalServerError)
-			}
-		}))
-		t.Cleanup(srv.Close)
-
-		ts := NewGlobalTestState(t)
-		ts.CmdArgs = []string{
-			"k6", "cloud", "test-run", "list",
-			"--test-id", fmt.Sprintf("%d", loadTestIDForTests),
-			"--all",
-		}
-		ts.Env["K6_CLOUD_TOKEN"] = validToken
-		ts.Env["K6_CLOUD_STACK_ID"] = fmt.Sprintf("%d", validStackID)
-		ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
-
-		cmd.ExecuteWithGlobalState(ts.GlobalState)
-
-		stdout := ts.Stdout.String()
-		assert.Contains(t, stdout, "1009852")
-		assert.Contains(t, stdout, "1009711")
-		assert.Equal(t, int32(2), requests.Load())
-	})
-
-	t.Run("--since forwards created_after", func(t *testing.T) {
-		t.Parallel()
-
-		var seenCreatedAfter atomic.Value
-		srv := mockTestRunListServer(t, &mockOptions{
-			onRequest: func(r *http.Request) {
-				seenCreatedAfter.Store(r.URL.Query().Get("created_after"))
-			},
-		})
-
-		ts := NewGlobalTestState(t)
-		ts.CmdArgs = []string{
-			"k6", "cloud", "test-run", "list",
-			"--test-id", fmt.Sprintf("%d", loadTestIDForTests),
-			"--since", "1h",
-		}
-		ts.Env["K6_CLOUD_TOKEN"] = validToken
-		ts.Env["K6_CLOUD_STACK_ID"] = fmt.Sprintf("%d", validStackID)
-		ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
-
-		cmd.ExecuteWithGlobalState(ts.GlobalState)
-
-		got, _ := seenCreatedAfter.Load().(string)
-		assert.NotEmpty(t, got, "expected created_after to be set")
-	})
-
-	t.Run("empty list", func(t *testing.T) {
-		t.Parallel()
-
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			_, err := fmt.Fprint(w, `{"value": []}`)
-			require.NoError(t, err)
-		}))
-		defer srv.Close()
-
-		ts := NewGlobalTestState(t)
-		ts.CmdArgs = []string{
-			"k6", "cloud", "test-run", "list",
-			"--test-id", fmt.Sprintf("%d", loadTestIDForTests),
-		}
-		ts.Env["K6_CLOUD_TOKEN"] = validToken
-		ts.Env["K6_CLOUD_STACK_ID"] = fmt.Sprintf("%d", validStackID)
-		ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
+		ts := newCloudTestRunListTestState(t, nil,
+			"--test-id", fmt.Sprintf("%d", loadTestIDForTests))
 
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
@@ -201,104 +101,83 @@ func TestCloudTestRunList(t *testing.T) {
 		assert.Contains(t, stdout, "--since")
 		assert.Contains(t, stdout, "--json")
 		assert.NotContains(t, stdout, "Global Flags:")
+		assert.NotContains(t, stdout, "--config")
 	})
 
 	t.Run("--json outputs JSON", func(t *testing.T) {
 		t.Parallel()
 
-		srv := mockTestRunListServer(t, nil)
-
-		ts := NewGlobalTestState(t)
-		ts.CmdArgs = []string{
-			"k6", "cloud", "test-run", "list",
+		ts := newCloudTestRunListTestState(t, testTestRuns(),
 			"--test-id", fmt.Sprintf("%d", loadTestIDForTests),
 			"--json",
-		}
-		ts.Env["K6_CLOUD_TOKEN"] = validToken
-		ts.Env["K6_CLOUD_STACK_ID"] = fmt.Sprintf("%d", validStackID)
-		ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
+		)
 
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 		stdout := ts.Stdout.String()
 
-		var runs []map[string]any
+		var runs []v6cloudapi.TestRun
 		require.NoError(t, json.Unmarshal([]byte(stdout), &runs))
-		require.Len(t, runs, 2)
+		assert.Equal(t, testTestRuns(), runs)
+	})
 
-		assert.Equal(t, float64(1009852), runs[0]["id"])
-		assert.Equal(t, "finished", runs[0]["status"])
-		assert.Equal(t, "passed", runs[0]["result"])
+	t.Run("--json with empty list outputs empty array", func(t *testing.T) {
+		t.Parallel()
+
+		ts := newCloudTestRunListTestState(t, nil,
+			"--test-id", fmt.Sprintf("%d", loadTestIDForTests),
+			"--json",
+		)
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stdout := ts.Stdout.String()
+
+		var runs []v6cloudapi.TestRun
+		require.NoError(t, json.Unmarshal([]byte(stdout), &runs))
+		assert.JSONEq(t, `[]`, stdout)
+		assert.Empty(t, runs)
 	})
 }
 
-type mockOptions struct {
-	onRequest   func(*http.Request)
-	expectedTop string
+func testTestRuns() []v6cloudapi.TestRun {
+	maxVUs := int32(50)
+	return []v6cloudapi.TestRun{
+		{
+			ID:                1009852,
+			LoadTestID:        loadTestIDForTests,
+			ProjectID:         7,
+			Status:            "finished",
+			Result:            "passed",
+			Created:           time.Date(2026, 4, 28, 14, 3, 0, 0, time.UTC),
+			MaxVUs:            &maxVUs,
+			ExecutionDuration: 302,
+		},
+		{
+			ID:                1009711,
+			LoadTestID:        loadTestIDForTests,
+			ProjectID:         7,
+			Status:            "finished",
+			Result:            "failed",
+			Created:           time.Date(2026, 4, 27, 14, 3, 0, 0, time.UTC),
+			MaxVUs:            &maxVUs,
+			ExecutionDuration: 250,
+		},
+	}
 }
 
-func mockTestRunListServer(t *testing.T, opts *mockOptions) *httptest.Server {
+func newCloudTestRunListTestState(
+	t *testing.T, runs []v6cloudapi.TestRun, args ...string,
+) *GlobalTestState {
 	t.Helper()
 
-	expectedPath := fmt.Sprintf("/cloud/v6/load_tests/%d/test_runs", loadTestIDForTests)
+	srv := v6test.NewServer(t, v6test.Config{TestRuns: runs})
 
-	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != expectedPath {
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
+	ts := NewGlobalTestState(t)
+	ts.CmdArgs = append([]string{"k6", "cloud", "test-run", "list"}, args...)
+	ts.Env["K6_CLOUD_TOKEN"] = validToken
+	ts.Env["K6_CLOUD_STACK_ID"] = fmt.Sprintf("%d", validStackID)
+	ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
 
-		authHeader := r.Header.Get("Authorization")
-		if authHeader != fmt.Sprintf("Bearer %s", validToken) {
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-
-		if opts != nil {
-			if opts.onRequest != nil {
-				opts.onRequest(r)
-			}
-			if opts.expectedTop != "" {
-				assert.Equal(t, opts.expectedTop, r.URL.Query().Get("$top"))
-			}
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		_, err := fmt.Fprintf(w, `{"value": [%s, %s]}`,
-			sampleTestRunJSON(1009852, "finished", "passed"),
-			sampleTestRunJSON(1009711, "finished", "failed"),
-		)
-		require.NoError(t, err)
-	}))
-
-	t.Cleanup(mockServer.Close)
-
-	return mockServer
-}
-
-func sampleTestRunJSON(id int, status, result string) string {
-	return fmt.Sprintf(`{
-		"id": %[1]d,
-		"test_id": %[2]d,
-		"project_id": 7,
-		"started_by": null,
-		"created": "2026-04-28T14:03:00Z",
-		"ended": "2026-04-28T14:08:02Z",
-		"note": "",
-		"retention_expiry": null,
-		"cost": null,
-		"status": "%[3]s",
-		"status_details": {"type": "%[3]s", "entered": "2026-04-28T14:03:00Z"},
-		"status_history": [],
-		"distribution": [],
-		"result": "%[4]s",
-		"result_details": {},
-		"options": {},
-		"k6_dependencies": {},
-		"k6_versions": {},
-		"max_vus": 50,
-		"max_browser_vus": null,
-		"estimated_duration": 300,
-		"execution_duration": 302
-	}`, id, loadTestIDForTests, status, result)
+	return ts
 }

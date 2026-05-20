@@ -55,6 +55,15 @@ type Config struct {
 
 	// LoadTests is the load test list returned by the load-tests endpoint.
 	LoadTests []cloudapi.LoadTest
+
+	// TestRuns is the test run list returned by the test-runs endpoint.
+	// Entries are filtered by the {loadTestID} path parameter on each request.
+	TestRuns []cloudapi.TestRun
+
+	// InspectTestRunsRequest, when set, is invoked with each list-test-runs
+	// request so tests can assert on query parameters before the server
+	// returns its canned response.
+	InspectTestRunsRequest func(*http.Request)
 }
 
 // NewServer creates a test server that serves v6 API endpoints.
@@ -70,6 +79,7 @@ func NewServer(t *testing.T, cfg Config) *Server {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /cloud/v6/projects", s.handleListProjects)
 	mux.HandleFunc("GET /cloud/v6/projects/{projectID}/load_tests", s.handleListLoadTests)
+	mux.HandleFunc("GET /cloud/v6/load_tests/{loadTestID}/test_runs", s.handleListTestRuns)
 	mux.HandleFunc("POST /cloud/v6/validate_options", s.handleValidateOptions)
 	mux.HandleFunc("POST /cloud/v6/projects/{projectID}/load_tests", func(w http.ResponseWriter, r *http.Request) {
 		if s.cfg.InspectArchive != nil {
@@ -136,6 +146,45 @@ func (s *Server) handleListLoadTests(w http.ResponseWriter, r *http.Request) {
 		))
 	}
 	res := k6cloud.NewLoadTestListResponse(tests)
+	writeJSON(w, http.StatusOK, res)
+}
+
+func (s *Server) handleListTestRuns(w http.ResponseWriter, r *http.Request) {
+	if s.cfg.InspectTestRunsRequest != nil {
+		s.cfg.InspectTestRunsRequest(r)
+	}
+
+	loadTestID, err := strconv.ParseInt(r.PathValue("loadTestID"), 10, 32)
+	if err != nil {
+		http.Error(w, "invalid load test ID", http.StatusBadRequest)
+		return
+	}
+
+	runs := make([]k6cloud.TestRunApiModel, 0, len(s.cfg.TestRuns))
+	for _, run := range s.cfg.TestRuns {
+		if run.LoadTestID != int32(loadTestID) {
+			continue
+		}
+		m := k6cloud.NewTestRunApiModelWithDefaults()
+		m.SetId(run.ID)
+		m.SetTestId(run.LoadTestID)
+		m.SetProjectId(run.ProjectID)
+		m.SetStatus(run.Status)
+		m.SetCreated(run.Created)
+		m.SetExecutionDuration(run.ExecutionDuration)
+		if run.Result != "" {
+			m.SetResult(run.Result)
+		}
+		if run.MaxVUs != nil {
+			m.SetMaxVus(*run.MaxVUs)
+		}
+		// SDK decoder requires these keys on the other end even when empty.
+		m.SetDistribution([]k6cloud.DistributionZoneApiModel{})
+		m.SetResultDetails(map[string]any{})
+		m.SetOptions(map[string]any{})
+		runs = append(runs, *m)
+	}
+	res := k6cloud.NewTestRunListResponse(runs)
 	writeJSON(w, http.StatusOK, res)
 }
 

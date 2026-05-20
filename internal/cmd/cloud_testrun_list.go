@@ -10,7 +10,6 @@ import (
 	"text/tabwriter"
 	"time"
 
-	k6cloud "github.com/grafana/k6-cloud-openapi-client-go/k6"
 	"github.com/spf13/cobra"
 
 	"go.k6.io/k6/v2/cloudapi"
@@ -71,7 +70,7 @@ func (c *cmdCloudTestRunList) run(_ *cobra.Command, _ []string) error {
 	if c.testID <= 0 {
 		return errMissingTestID
 	}
-	if c.testID < math.MinInt32 || c.testID > math.MaxInt32 {
+	if c.testID > math.MaxInt32 {
 		return fmt.Errorf("test ID %d overflows int32", c.testID)
 	}
 
@@ -91,7 +90,7 @@ func (c *cmdCloudTestRunList) run(_ *cobra.Command, _ []string) error {
 		c.globalState.Logger.Warn(warn)
 	}
 
-	if err := checkCloudLogin(cloudConfig); err != nil {
+	if err := checkCloudLoginFor(cloudConfig, "Listing cloud test runs requires auth settings"); err != nil {
 		return err
 	}
 
@@ -119,27 +118,32 @@ func (c *cmdCloudTestRunList) run(_ *cobra.Command, _ []string) error {
 		opts.CreatedAfter = time.Now().Add(-c.since)
 	}
 
-	resp, err := client.ListTestRuns(c.globalState.Ctx, int32(c.testID), opts)
+	runs, err := client.ListTestRuns(c.globalState.Ctx, int32(c.testID), opts)
 	if err != nil {
 		return err
 	}
 
 	if c.isJSON {
-		return c.outputJSON(resp.Value)
+		return c.outputJSON(runs)
 	}
 
 	header := fmt.Sprintf("Runs of test %d:\n\n", c.testID)
 
-	if len(resp.Value) == 0 {
+	if len(runs) == 0 {
 		printToStdout(c.globalState, header+"No runs found.\n")
 		return nil
 	}
 
-	printToStdout(c.globalState, header+formatTestRunTable(resp.Value))
+	printToStdout(c.globalState, header+formatTestRunTable(runs))
 	return nil
 }
 
-func (c *cmdCloudTestRunList) outputJSON(runs []k6cloud.TestRunApiModel) error {
+func (c *cmdCloudTestRunList) outputJSON(runs []v6cloudapi.TestRun) error {
+	// If runs is nil, initialize it to an empty slice to avoid encoding it as null.
+	if runs == nil {
+		runs = []v6cloudapi.TestRun{}
+	}
+
 	buf := &bytes.Buffer{}
 	enc := json.NewEncoder(buf)
 	enc.SetEscapeHTML(false)
@@ -152,7 +156,7 @@ func (c *cmdCloudTestRunList) outputJSON(runs []k6cloud.TestRunApiModel) error {
 	return nil
 }
 
-func formatTestRunTable(runs []k6cloud.TestRunApiModel) string {
+func formatTestRunTable(runs []v6cloudapi.TestRun) string {
 	const dateFormat = "2006-01-02 15:04"
 
 	var buf strings.Builder
@@ -160,12 +164,12 @@ func formatTestRunTable(runs []k6cloud.TestRunApiModel) string {
 	_, _ = fmt.Fprintln(w, "ID\tSTATUS\tSTARTED\tDURATION\tVUS\tRESULT")
 	for _, r := range runs {
 		_, _ = fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\t%s\n",
-			r.Id,
+			r.ID,
 			r.Status,
 			r.Created.UTC().Format(dateFormat),
 			formatRunDuration(r.ExecutionDuration),
-			nullableInt32String(r.MaxVus),
-			nullableString(r.Result),
+			formatNullableInt32(r.MaxVUs),
+			formatNullableString(r.Result),
 		)
 	}
 	_ = w.Flush()
@@ -179,16 +183,16 @@ func formatRunDuration(seconds int32) string {
 	return (time.Duration(seconds) * time.Second).String()
 }
 
-func nullableInt32String(v k6cloud.NullableInt32) string {
-	if !v.IsSet() || v.Get() == nil {
+func formatNullableInt32(v *int32) string {
+	if v == nil {
 		return "-"
 	}
-	return fmt.Sprintf("%d", *v.Get())
+	return fmt.Sprintf("%d", *v)
 }
 
-func nullableString(v k6cloud.NullableString) string {
-	if !v.IsSet() || v.Get() == nil || *v.Get() == "" {
+func formatNullableString(s string) string {
+	if s == "" {
 		return "-"
 	}
-	return *v.Get()
+	return s
 }

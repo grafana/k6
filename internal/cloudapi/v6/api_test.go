@@ -247,9 +247,11 @@ func TestListTestRuns(t *testing.T) {
 			})
 		}))
 
-		resp, err := client.ListTestRuns(t.Context(), 42, ListTestRunsOptions{Limit: 10})
+		runs, err := client.ListTestRuns(t.Context(), 42, ListTestRunsOptions{Limit: 10})
 		require.NoError(t, err)
-		require.Len(t, resp.Value, 2)
+		require.Len(t, runs, 2)
+		assert.Equal(t, int32(1), runs[0].ID)
+		assert.Equal(t, "finished", runs[0].Status)
 		assert.Equal(t, int32(1), requests.Load(), "single page should not follow @nextLink")
 	})
 
@@ -276,9 +278,11 @@ func TestListTestRuns(t *testing.T) {
 			}
 		}))
 
-		resp, err := client.ListTestRuns(t.Context(), 42, ListTestRunsOptions{All: true})
+		runs, err := client.ListTestRuns(t.Context(), 42, ListTestRunsOptions{All: true})
 		require.NoError(t, err)
-		require.Len(t, resp.Value, 2)
+		require.Len(t, runs, 2)
+		assert.Equal(t, int32(1), runs[0].ID)
+		assert.Equal(t, int32(2), runs[1].ID)
 		assert.Equal(t, int32(2), requests.Load())
 	})
 
