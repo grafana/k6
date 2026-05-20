@@ -141,7 +141,7 @@ func (c *cmdCloudTestList) resolveProjectID(cloudConfig cloudapi.Config, project
 		return 0, errNoProjectConfigured
 	}
 
-	if id > math.MaxInt32 {
+	if id < math.MinInt32 || id > math.MaxInt32 {
 		return 0, fmt.Errorf("project ID %d overflows int32", id)
 	}
 
