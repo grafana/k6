@@ -23,6 +23,9 @@ func newDialog(ctx context.Context, s session) *Dialog {
 
 // Accept accepts the dialog.
 func (d *Dialog) Accept() error {
+	if d.handled {
+		return nil
+	}
 	err := cdppage.HandleJavaScriptDialog(true).Do(cdp.WithExecutor(d.ctx, d.session))
 	if err == nil {
 		d.handled = true
@@ -32,6 +35,9 @@ func (d *Dialog) Accept() error {
 
 // Dismiss dismisses the dialog.
 func (d *Dialog) Dismiss() error {
+	if d.handled {
+		return nil
+	}
 	err := cdppage.HandleJavaScriptDialog(false).Do(cdp.WithExecutor(d.ctx, d.session))
 	if err == nil {
 		d.handled = true
