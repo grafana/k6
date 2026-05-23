@@ -190,47 +190,47 @@ func TestParsePageEmulateMediaOptions(t *testing.T) {
 func TestParsePageScreenshotOptions(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct{
-		name string
+	tests := []struct {
+		name  string
 		input string
-		want *common.PageScreenshotOptions
+		want  *common.PageScreenshotOptions
 	}{
 		{
-			name: "defaults_on_null",
+			name:  "defaults_on_null",
 			input: `null`,
-			want: common.NewPageScreenshotOptions(),
+			want:  common.NewPageScreenshotOptions(),
 		},
 		{
-			name: "partial_options",
+			name:  "partial_options",
 			input: `({fullPage: true, quality: 100, type: "png"})`,
 			want: &common.PageScreenshotOptions{
 				FullPage: true,
-				Quality: 100,
-				Format: common.ImageFormatPNG,
+				Quality:  100,
+				Format:   common.ImageFormatPNG,
 			},
 		},
 		{
-			name: "all_options",
+			name:  "all_options",
 			input: `({clip: {x: 32.5, y: 16, width: 200, height: 100}, fullPage: false, omitBackground: true, quality: 100, type: "jpg", path: "image.jpg"})`,
 			want: &common.PageScreenshotOptions{
 				Clip: &page.Viewport{
-					X: 32.5,
-					Y: 16,
-					Width: 200,
+					X:      32.5,
+					Y:      16,
+					Width:  200,
 					Height: 100,
-					Scale: 1,
+					Scale:  1,
 				},
-				FullPage: false,
+				FullPage:       false,
 				OmitBackground: true,
-				Quality: 100,
-				Format: common.ImageFormatJPEG,
-				Path: "image.jpg",
+				Quality:        100,
+				Format:         common.ImageFormatJPEG,
+				Path:           "image.jpg",
 			},
 		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func (t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
 			vu := k6test.NewVU(t)

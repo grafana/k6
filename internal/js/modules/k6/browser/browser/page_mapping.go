@@ -423,7 +423,6 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, fmt.Errorf("parsing page screenshot options: %w", err)
 			}
 
-			rt := vu.Runtime() // I believe we can remove this
 			promise, res, rej := rt.NewPromise()
 			callback := vu.RegisterCallback()
 			go func() {
@@ -1167,7 +1166,7 @@ func parsePageScreenshotOptions(rt *sobek.Runtime, opts sobek.Value) (*common.Pa
 		switch k {
 		case "clip":
 			var c map[string]float64
-			if err := rt.ExportTo(obj.Get(k), &c) ; err != nil {
+			if err := rt.ExportTo(obj.Get(k), &c); err != nil {
 				return popts, err
 			}
 			popts.Clip = &page.Viewport{
