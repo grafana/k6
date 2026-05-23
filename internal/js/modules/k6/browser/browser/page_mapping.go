@@ -418,7 +418,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		},
 		"route": mapPageRoute(vu, p),
 		"screenshot": func(opts sobek.Value) (*sobek.Promise, error) {
-			popts, err := parsePageScreenshotOptions(rt, opts, common.NewPageScreenshotOptions())
+			popts, err := parsePageScreenshotOptions(rt, opts)
 			if err != nil {
 				return nil, fmt.Errorf("parsing page screenshot options: %w", err)
 			}
@@ -1155,9 +1155,10 @@ func parsePageEmulateMediaOptions(
 }
 
 // parsePageScreenshotOptions parses the page screenshot options.
-func parsePageScreenshotOptions(rt *sobek.Runtime, opts sobek.Value, defaults *common.PageScreenshotOptions) (*common.PageScreenshotOptions, error) {
+func parsePageScreenshotOptions(rt *sobek.Runtime, opts sobek.Value) (*common.PageScreenshotOptions, error) {
+	popts := common.NewPageScreenshotOptions()
 	if k6common.IsNullish(opts) {
-		return defaults, nil
+		return popts, nil
 	}
 
 	formatSpecified := false
@@ -1166,37 +1167,38 @@ func parsePageScreenshotOptions(rt *sobek.Runtime, opts sobek.Value, defaults *c
 		switch k {
 		case "clip":
 			var c map[string]float64
-			if rt.ExportTo(obj.Get(k), &c) != nil {
-				defaults.Clip = &page.Viewport{
-					X: c["x"],
-					Y: c["y"],
-					Width: c["width"],
-					Height: c["height"],
-					Scale: 1,
-				}
+			if err := rt.ExportTo(obj.Get(k), &c) ; err != nil {
+				return popts, err
+			}
+			popts.Clip = &page.Viewport{
+				X:      c["x"],
+				Y:      c["y"],
+				Width:  c["width"],
+				Height: c["height"],
+				Scale:  1,
 			}
 		case "fullPage":
-			defaults.FullPage = obj.Get(k).ToBoolean()
+			popts.FullPage = obj.Get(k).ToBoolean()
 		case "omitBackground":
-			defaults.OmitBackground = obj.Get(k).ToBoolean()
+			popts.OmitBackground = obj.Get(k).ToBoolean()
 		case "path":
-			defaults.Path = obj.Get(k).String()
+			popts.Path = obj.Get(k).String()
 		case "quality":
-			defaults.Quality = obj.Get(k).ToInteger()
+			popts.Quality = obj.Get(k).ToInteger()
 		case "type":
-			if f, ok := common.ImageIDFromString(obj.Get(k).String()) ; ok {
-				defaults.Format = f
+			if f, ok := common.ImageIDFromString(obj.Get(k).String()); ok {
+				popts.Format = f
 				formatSpecified = true
 			}
 		}
 	}
 
 	// Infer file format by path if format not explicitly specified (default is PNG)
-	if defaults.Path != "" && !formatSpecified {
-		if strings.HasSuffix(defaults.Path, ".jpg") || strings.HasSuffix(defaults.Path, ".jpeg") {
-			defaults.Format = common.ImageFormatJPEG
+	if popts.Path != "" && !formatSpecified {
+		if strings.HasSuffix(popts.Path, ".jpg") || strings.HasSuffix(popts.Path, ".jpeg") {
+			popts.Format = common.ImageFormatJPEG
 		}
 	}
 
-	return defaults, nil
+	return popts, nil
 }
