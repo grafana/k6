@@ -756,8 +756,8 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 	env := make(map[string]string, len(u.env)+len(params.Env))
 	maps.Copy(env, u.env)
 	maps.Copy(env, params.Env)
-	//nolint:errcheck,gosec // see https://github.com/grafana/k6/issues/1722#issuecomment-1761173634
-	u.Runtime.Set("__ENV", env)
+	//nolint:errcheck,gosec
+	u.Runtime.Set("__ENV", u.Runtime.NewDynamicObject(&envDynamicObject{runtime: u.Runtime, env: env}))
 
 	opts := u.Runner.Bundle.Options
 

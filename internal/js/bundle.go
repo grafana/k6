@@ -408,7 +408,7 @@ func (b *Bundle) setupJSRuntime(rt *sobek.Runtime, vuID uint64, logger logrus.Fi
 
 	env := make(map[string]string, len(b.preInitState.RuntimeOptions.Env))
 	maps.Copy(env, b.preInitState.RuntimeOptions.Env)
-	err := rt.Set("__ENV", env)
+	err := rt.Set("__ENV", rt.NewDynamicObject(&envDynamicObject{runtime: rt, env: env}))
 	if err != nil {
 		return err
 	}

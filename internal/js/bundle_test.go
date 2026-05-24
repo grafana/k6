@@ -900,17 +900,21 @@ func TestBundleEnv(t *testing.T) {
 	}
 }
 
-func TestBundleNotSharable(t *testing.T) {
+func TestBundleEnvReadOnly(t *testing.T) {
 	t.Parallel()
 	data := `
 		export default function() {
-			if (__ITER == 0) {
-				if (typeof __ENV.something !== "undefined") {
-					throw new Error("invalid something: " + __ENV.something + " should be undefined");
+			let threw = false;
+			try {
+				__ENV.something = "value";
+			} catch (e) {
+				threw = true;
+				if (!(e instanceof TypeError)) {
+					throw new Error("expected TypeError, got: " + e);
 				}
-				__ENV.something = __VU;
-			} else if (__ENV.something != __VU) {
-				throw new Error("invalid something: " + __ENV.something+ " should be "+ __VU);
+			}
+			if (!threw) {
+				throw new Error("expected setting __ENV to throw");
 			}
 		}
 	`
@@ -922,19 +926,13 @@ func TestBundleNotSharable(t *testing.T) {
 	require.NoError(t, err)
 
 	bundles := map[string]*Bundle{"Source": b1, "Archive": b2}
-	var vus, iters uint64 = 10, 1000
 	for name, b := range bundles {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			for i := range vus {
-				bi, err := b.Instantiate(context.Background(), i)
-				require.NoError(t, err)
-				for j := range iters {
-					require.NoError(t, bi.Runtime.Set("__ITER", j))
-					_, err := bi.getCallableExport(consts.DefaultFn)(sobek.Undefined())
-					require.NoError(t, err)
-				}
-			}
+			bi, err := b.Instantiate(context.Background(), 0)
+			require.NoError(t, err)
+			_, err = bi.getCallableExport(consts.DefaultFn)(sobek.Undefined())
+			require.NoError(t, err)
 		})
 	}
 }
