@@ -400,3 +400,105 @@ func TestWriteDiskConfigNoJSONContentError(t *testing.T) {
 	var serr *json.SyntaxError
 	assert.ErrorAs(t, err, &serr)
 }
+
+// TestWriteDiskConfigUsesSecureFilePermissions guards against regressions of
+// the H1 audit finding (cloud auth token persisted with world-readable perms):
+// the config file must be written with mode 0o600.
+func TestWriteDiskConfigUsesSecureFilePermissions(t *testing.T) {
+	t.Parallel()
+	memfs := fsext.NewMemMapFs()
+
+	defaultFlags := state.GetDefaultFlags(".config", ".cache")
+	gs := &state.GlobalState{
+		FS:           memfs,
+		Flags:        defaultFlags,
+		DefaultFlags: defaultFlags,
+	}
+
+	require.NoError(t, writeDiskConfig(gs, Config{WebDashboard: null.BoolFrom(true)}))
+
+	finfo, err := memfs.Stat(".config/k6/config.json")
+	require.NoError(t, err)
+	assert.Equal(t, configFileMode, finfo.Mode().Perm())
+}
+
+// TestWriteDiskConfigUsesSecureDirectoryPermissions guards against regressions
+// of the H1 audit finding: the parent directory must be created with mode
+// 0o700 so other local users cannot traverse into it.
+func TestWriteDiskConfigUsesSecureDirectoryPermissions(t *testing.T) {
+	t.Parallel()
+	memfs := fsext.NewMemMapFs()
+
+	defaultFlags := state.GetDefaultFlags(".config", ".cache")
+	gs := &state.GlobalState{
+		FS:           memfs,
+		Flags:        defaultFlags,
+		DefaultFlags: defaultFlags,
+	}
+
+	require.NoError(t, writeDiskConfig(gs, Config{WebDashboard: null.BoolFrom(true)}))
+
+	finfo, err := memfs.Stat(".config/k6")
+	require.NoError(t, err)
+	assert.True(t, finfo.IsDir())
+	assert.Equal(t, configDirMode, finfo.Mode().Perm())
+}
+
+// TestWriteDiskConfigTightensPreExistingFilePermissions covers the upgrade
+// path: an existing config file written by an older k6 with mode 0o644 must be
+// tightened to 0o600 on the next write.
+func TestWriteDiskConfigTightensPreExistingFilePermissions(t *testing.T) {
+	t.Parallel()
+	memfs := fsext.NewMemMapFs()
+
+	defaultConfigPath := ".config/k6/config.json"
+	require.NoError(t, fsext.WriteFile(memfs, defaultConfigPath, []byte(`{}`), 0o644))
+
+	// Sanity check that the in-memory FS preserves the looser mode we just set.
+	finfo, err := memfs.Stat(defaultConfigPath)
+	require.NoError(t, err)
+	require.Equal(t, fs.FileMode(0o644), finfo.Mode().Perm())
+
+	defaultFlags := state.GetDefaultFlags(".config", ".cache")
+	gs := &state.GlobalState{
+		FS:           memfs,
+		Flags:        defaultFlags,
+		DefaultFlags: defaultFlags,
+	}
+
+	require.NoError(t, writeDiskConfig(gs, Config{WebDashboard: null.BoolFrom(true)}))
+
+	finfo, err = memfs.Stat(defaultConfigPath)
+	require.NoError(t, err)
+	assert.Equal(t, configFileMode, finfo.Mode().Perm())
+}
+
+// TestWriteDiskConfigTightensPreExistingDirectoryPermissions covers the
+// upgrade path for the parent directory: an existing 0o755 directory must be
+// tightened to 0o700 on the next write.
+func TestWriteDiskConfigTightensPreExistingDirectoryPermissions(t *testing.T) {
+	t.Parallel()
+	memfs := fsext.NewMemMapFs()
+
+	configDir := ".config/k6"
+	require.NoError(t, memfs.MkdirAll(configDir, 0o755))
+
+	// Sanity check that the in-memory FS preserves the looser mode we just set.
+	finfo, err := memfs.Stat(configDir)
+	require.NoError(t, err)
+	require.Equal(t, fs.FileMode(0o755), finfo.Mode().Perm())
+
+	defaultFlags := state.GetDefaultFlags(".config", ".cache")
+	gs := &state.GlobalState{
+		FS:           memfs,
+		Flags:        defaultFlags,
+		DefaultFlags: defaultFlags,
+	}
+
+	require.NoError(t, writeDiskConfig(gs, Config{WebDashboard: null.BoolFrom(true)}))
+
+	finfo, err = memfs.Stat(configDir)
+	require.NoError(t, err)
+	assert.True(t, finfo.IsDir())
+	assert.Equal(t, configDirMode, finfo.Mode().Perm())
+}
