@@ -20,6 +20,8 @@ import (
 	"go.k6.io/k6/v2/lib/types"
 )
 
+const defaultConfigPath = ".config/k6/config.json"
+
 type testCmdData struct {
 	Name  string
 	Tests []testCmdTest
@@ -208,7 +210,6 @@ func TestReadDiskConfigWithDefaultFlags(t *testing.T) {
 	memfs := fsext.NewMemMapFs()
 
 	conf := []byte(`{"iterations":1028,"cloud":{"field1":"testvalue"}}`)
-	defaultConfigPath := ".config/k6/config.json"
 	require.NoError(t, fsext.WriteFile(memfs, defaultConfigPath, conf, 0o644))
 
 	defaultFlags := state.GetDefaultFlags(".config", ".cache")
@@ -252,8 +253,8 @@ func TestReadDiskConfigNotFoundSilenced(t *testing.T) {
 
 	// Put the file into a different and unexpected directory
 	conf := []byte(`{"iterations":1028,"cloud":{"field1":"testvalue"}}`)
-	defaultConfigPath := ".config/unknown-folder/k6/config.json"
-	require.NoError(t, fsext.WriteFile(memfs, defaultConfigPath, conf, 0o644))
+	unexpectedConfigPath := ".config/unknown-folder/k6/config.json"
+	require.NoError(t, fsext.WriteFile(memfs, unexpectedConfigPath, conf, 0o644))
 
 	defaultFlags := state.GetDefaultFlags(".config", ".cache")
 	gs := &state.GlobalState{
@@ -293,7 +294,6 @@ func TestReadDiskConfigNotJSONContentError(t *testing.T) {
 	memfs := fsext.NewMemMapFs()
 
 	conf := []byte(`bad json format`)
-	defaultConfigPath := ".config/k6/config.json"
 	require.NoError(t, fsext.WriteFile(memfs, defaultConfigPath, conf, 0o644))
 
 	gs := &state.GlobalState{
@@ -337,7 +337,7 @@ func TestWriteDiskConfigWithDefaultFlags(t *testing.T) {
 	err := writeDiskConfig(gs, c)
 	require.NoError(t, err)
 
-	finfo, err := memfs.Stat(".config/k6/config.json")
+	finfo, err := memfs.Stat(defaultConfigPath)
 	require.NoError(t, err)
 	assert.NotEmpty(t, finfo.Size())
 }
@@ -347,7 +347,6 @@ func TestWriteDiskConfigOverwrite(t *testing.T) {
 	memfs := fsext.NewMemMapFs()
 
 	conf := []byte(`{"iterations":1028,"cloud":{"field1":"testvalue"}}`)
-	defaultConfigPath := ".config/k6/config.json"
 	require.NoError(t, fsext.WriteFile(memfs, defaultConfigPath, conf, 0o644))
 
 	defaultFlags := state.GetDefaultFlags(".config", ".cache")
@@ -417,7 +416,7 @@ func TestWriteDiskConfigUsesSecureFilePermissions(t *testing.T) {
 
 	require.NoError(t, writeDiskConfig(gs, Config{WebDashboard: null.BoolFrom(true)}))
 
-	finfo, err := memfs.Stat(".config/k6/config.json")
+	finfo, err := memfs.Stat(defaultConfigPath)
 	require.NoError(t, err)
 	assert.Equal(t, configFileMode, finfo.Mode().Perm())
 }
@@ -451,7 +450,6 @@ func TestWriteDiskConfigTightensPreExistingFilePermissions(t *testing.T) {
 	t.Parallel()
 	memfs := fsext.NewMemMapFs()
 
-	defaultConfigPath := ".config/k6/config.json"
 	require.NoError(t, fsext.WriteFile(memfs, defaultConfigPath, []byte(`{}`), 0o644))
 
 	// Sanity check that the in-memory FS preserves the looser mode we just set.
