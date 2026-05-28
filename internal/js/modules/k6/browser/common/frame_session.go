@@ -217,7 +217,7 @@ func (fs *FrameSession) maybeStartRecording() {
 		name = fmt.Sprintf("vu-%d-iter-%d-%s", state.VUID, state.Iteration, fs.targetID)
 	}
 
-	rec, err := NewRecorder(dir, name, 10, fs.logger)
+	rec, err := NewRecorder(fs.teardownCtx, dir, name, 10, fs.logger)
 	if err != nil {
 		fs.logger.Warnf("FrameSession:maybeStartRecording",
 			"could not start recorder: %v", err)
@@ -314,7 +314,52 @@ func (fs *FrameSession) initDomains() error {
 	return nil
 }
 
-//nolint:cyclop
+func (fs *FrameSession) dispatchEvent(event Event) {
+	switch ev := event.data.(type) {
+	case *inspector.EventTargetCrashed:
+		fs.onTargetCrashed()
+	case *cdplog.EventEntryAdded:
+		fs.onLogEntryAdded(ev)
+	case *cdppage.EventFrameAttached:
+		fs.onFrameAttached(ev.FrameID, ev.ParentFrameID)
+	case *cdppage.EventFrameDetached:
+		fs.onFrameDetached(ev.FrameID, ev.Reason)
+	case *cdppage.EventFrameNavigated:
+		const initial = false
+		fs.onFrameNavigated(ev.Frame, initial)
+	case *cdppage.EventFrameRequestedNavigation:
+		fs.onFrameRequestedNavigation(ev)
+	case *cdppage.EventFrameStartedLoading:
+		fs.onFrameStartedLoading(ev.FrameID)
+	case *cdppage.EventFrameStoppedLoading:
+		fs.onFrameStoppedLoading(ev.FrameID)
+	case *cdppage.EventLifecycleEvent:
+		fs.onPageLifecycle(ev)
+	case *cdppage.EventNavigatedWithinDocument:
+		fs.onPageNavigatedWithinDocument(ev)
+	case *cdpruntime.EventConsoleAPICalled:
+		fs.onConsoleAPICalled(ev)
+	case *cdpruntime.EventExceptionThrown:
+		fs.onExceptionThrown(ev)
+	case *cdpruntime.EventExecutionContextCreated:
+		fs.onExecutionContextCreated(ev)
+	case *cdpruntime.EventExecutionContextDestroyed:
+		fs.onExecutionContextDestroyed(ev.ExecutionContextID)
+	case *cdpruntime.EventExecutionContextsCleared:
+		fs.onExecutionContextsCleared()
+	case *target.EventAttachedToTarget:
+		fs.onAttachedToTarget(ev)
+	case *target.EventDetachedFromTarget:
+		fs.onDetachedFromTarget(ev)
+	case *cdppage.EventJavascriptDialogOpening:
+		fs.onEventJavascriptDialogOpening(ev)
+	case *cdpruntime.EventBindingCalled:
+		fs.onEventBindingCalled(ev)
+	case *cdppage.EventScreencastFrame:
+		fs.onScreencastFrame(ev)
+	}
+}
+
 func (fs *FrameSession) initEvents() {
 	fs.logger.Debugf("NewFrameSession:initEvents",
 		"sid:%v tid:%v", fs.session.ID(), fs.targetID)
@@ -359,49 +404,7 @@ func (fs *FrameSession) initEvents() {
 
 				return
 			case event := <-fs.eventCh:
-				switch ev := event.data.(type) {
-				case *inspector.EventTargetCrashed:
-					fs.onTargetCrashed()
-				case *cdplog.EventEntryAdded:
-					fs.onLogEntryAdded(ev)
-				case *cdppage.EventFrameAttached:
-					fs.onFrameAttached(ev.FrameID, ev.ParentFrameID)
-				case *cdppage.EventFrameDetached:
-					fs.onFrameDetached(ev.FrameID, ev.Reason)
-				case *cdppage.EventFrameNavigated:
-					const initial = false
-					fs.onFrameNavigated(ev.Frame, initial)
-				case *cdppage.EventFrameRequestedNavigation:
-					fs.onFrameRequestedNavigation(ev)
-				case *cdppage.EventFrameStartedLoading:
-					fs.onFrameStartedLoading(ev.FrameID)
-				case *cdppage.EventFrameStoppedLoading:
-					fs.onFrameStoppedLoading(ev.FrameID)
-				case *cdppage.EventLifecycleEvent:
-					fs.onPageLifecycle(ev)
-				case *cdppage.EventNavigatedWithinDocument:
-					fs.onPageNavigatedWithinDocument(ev)
-				case *cdpruntime.EventConsoleAPICalled:
-					fs.onConsoleAPICalled(ev)
-				case *cdpruntime.EventExceptionThrown:
-					fs.onExceptionThrown(ev)
-				case *cdpruntime.EventExecutionContextCreated:
-					fs.onExecutionContextCreated(ev)
-				case *cdpruntime.EventExecutionContextDestroyed:
-					fs.onExecutionContextDestroyed(ev.ExecutionContextID)
-				case *cdpruntime.EventExecutionContextsCleared:
-					fs.onExecutionContextsCleared()
-				case *target.EventAttachedToTarget:
-					fs.onAttachedToTarget(ev)
-				case *target.EventDetachedFromTarget:
-					fs.onDetachedFromTarget(ev)
-				case *cdppage.EventJavascriptDialogOpening:
-					fs.onEventJavascriptDialogOpening(ev)
-				case *cdpruntime.EventBindingCalled:
-					fs.onEventBindingCalled(ev)
-				case *cdppage.EventScreencastFrame:
-					fs.onScreencastFrame(ev)
-				}
+				fs.dispatchEvent(event)
 			}
 		}
 	})

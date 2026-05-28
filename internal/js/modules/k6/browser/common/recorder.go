@@ -2,6 +2,7 @@ package common
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -22,13 +23,13 @@ type Recorder struct {
 	logger  *log.Logger
 	outPath string
 
-	mu      sync.Mutex
-	cmd     *exec.Cmd
-	stdin   io.WriteCloser
-	stderr  *bytes.Buffer
-	closed  bool
-	broken  bool
-	frames  int
+	mu     sync.Mutex
+	cmd    *exec.Cmd
+	stdin  io.WriteCloser
+	stderr *bytes.Buffer
+	closed bool
+	broken bool
+	frames int
 }
 
 // NewRecorder creates the output directory and spawns an ffmpeg process that
@@ -36,11 +37,11 @@ type Recorder struct {
 //
 // Pre-condition: ffmpeg must be on PATH. Callers should fall back gracefully
 // when this returns an error.
-func NewRecorder(dir, name string, framerate int, logger *log.Logger) (*Recorder, error) {
+func NewRecorder(ctx context.Context, dir, name string, framerate int, logger *log.Logger) (*Recorder, error) {
 	if _, err := exec.LookPath("ffmpeg"); err != nil {
 		return nil, fmt.Errorf("ffmpeg not found on PATH: %w", err)
 	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil { //nolint:forbidigo
 		return nil, fmt.Errorf("creating recording dir %q: %w", dir, err)
 	}
 	if framerate <= 0 {
@@ -50,7 +51,7 @@ func NewRecorder(dir, name string, framerate int, logger *log.Logger) (*Recorder
 	outPath := filepath.Join(dir, name+".webm")
 	// libvpx (VP8) is broadly supported by ffmpeg builds. The pad filter ensures
 	// even dimensions, which the encoder requires.
-	cmd := exec.Command("ffmpeg", //nolint:gosec
+	cmd := exec.CommandContext(ctx, "ffmpeg", //nolint:gosec
 		"-y",
 		"-loglevel", "error",
 		"-f", "image2pipe",
@@ -131,7 +132,7 @@ func (r *Recorder) Close() error {
 		// remove the empty output file it may have created.
 		_ = cmd.Process.Kill()
 		_ = cmd.Wait()
-		_ = os.Remove(out)
+		_ = os.Remove(out) //nolint:forbidigo
 		r.logger.Warnf("Recorder", "no frames captured; recording skipped")
 		return nil
 	}
