@@ -14,6 +14,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/env"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/log"
 
@@ -87,6 +88,10 @@ type FrameSession struct {
 	// onFrameNavigated, but subsequent calls to onFrameNavigated in the same
 	// mainframe never again create a navigation span.
 	initialNavDone bool
+
+	// recorder captures screencast frames into a webm video. Non-nil only on
+	// the main frame session when K6_BROWSER_RECORDING_DIR is set.
+	recorder *Recorder
 }
 
 // NewFrameSession initializes and returns a new FrameSession.
@@ -190,7 +195,81 @@ func NewFrameSession(
 		return nil, err
 	}
 
+	fs.maybeStartRecording()
+
 	return &fs, nil
+}
+
+// maybeStartRecording starts a CDP screencast on the main frame when the
+// K6_BROWSER_RECORDING_DIR env var is set. Failures are logged and never
+// abort the page setup — recording is best-effort.
+func (fs *FrameSession) maybeStartRecording() {
+	if !fs.isMainFrame() {
+		return
+	}
+	dir, ok := env.Lookup(env.RecordingDir)
+	if !ok || dir == "" {
+		return
+	}
+
+	name := fs.targetID.String()
+	if state := fs.vu.State(); state != nil {
+		name = fmt.Sprintf("vu-%d-iter-%d-%s", state.VUID, state.Iteration, fs.targetID)
+	}
+
+	rec, err := NewRecorder(dir, name, 10, fs.logger)
+	if err != nil {
+		fs.logger.Warnf("FrameSession:maybeStartRecording",
+			"could not start recorder: %v", err)
+		return
+	}
+	fs.recorder = rec
+
+	action := cdppage.StartScreencast().
+		WithFormat(cdppage.ScreencastFormatJpeg).
+		WithQuality(80).
+		WithEveryNthFrame(1)
+	if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+		fs.logger.Warnf("FrameSession:maybeStartRecording",
+			"Page.startScreencast failed: %v", err)
+		_ = rec.Close()
+		fs.recorder = nil
+	}
+}
+
+// onScreencastFrame writes the received JPEG frame to the recorder and
+// acknowledges receipt so chromium continues to deliver frames.
+func (fs *FrameSession) onScreencastFrame(ev *cdppage.EventScreencastFrame) {
+	if fs.recorder == nil {
+		return
+	}
+	if err := fs.recorder.WriteFrame(ev.Data); err != nil {
+		fs.logger.Warnf("FrameSession:onScreencastFrame",
+			"failed to write frame: %v", err)
+	}
+	ack := cdppage.ScreencastFrameAck(ev.SessionID)
+	if err := ack.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+		fs.logger.Debugf("FrameSession:onScreencastFrame",
+			"screencastFrameAck failed: %v", err)
+	}
+}
+
+// stopRecording halts the screencast and finalizes the webm. Safe to call
+// when recording was never started.
+func (fs *FrameSession) stopRecording() {
+	if fs.recorder == nil {
+		return
+	}
+	// Use teardownCtx because fs.ctx may already be Done at this point.
+	if err := cdppage.StopScreencast().Do(cdp.WithExecutor(fs.teardownCtx, fs.session)); err != nil {
+		fs.logger.Debugf("FrameSession:stopRecording",
+			"Page.stopScreencast failed: %v", err)
+	}
+	if err := fs.recorder.Close(); err != nil {
+		fs.logger.Warnf("FrameSession:stopRecording",
+			"finalizing recording failed: %v", err)
+	}
+	fs.recorder = nil
 }
 
 func (fs *FrameSession) emulateLocale() error {
@@ -263,6 +342,7 @@ func (fs *FrameSession) initEvents() {
 				fs.mainFrameSpan.End()
 				fs.mainFrameSpan = nil
 			}
+			fs.stopRecording()
 			fs.logger.Debugf("NewFrameSession:initEvents:go:return",
 				"sid:%v tid:%v", fs.session.ID(), fs.targetID)
 		}()
@@ -319,6 +399,8 @@ func (fs *FrameSession) initEvents() {
 					fs.onEventJavascriptDialogOpening(ev)
 				case *cdpruntime.EventBindingCalled:
 					fs.onEventBindingCalled(ev)
+				case *cdppage.EventScreencastFrame:
+					fs.onScreencastFrame(ev)
 				}
 			}
 		}
@@ -601,6 +683,7 @@ func (fs *FrameSession) initRendererEvents() {
 		cdproto.EventTargetAttachedToTarget,
 		cdproto.EventTargetDetachedFromTarget,
 		cdproto.EventRuntimeBindingCalled,
+		cdproto.EventPageScreencastFrame,
 	}
 	fs.session.on(fs.ctx, events, fs.eventCh)
 }

@@ -73,6 +73,15 @@ const (
 	ScreenshotsOutput = "K6_BROWSER_SCREENSHOTS_OUTPUT"
 )
 
+// Recording.
+const (
+	// RecordingDir, when set to a directory path, enables CDP screencast
+	// based recording of every main-frame page. Frames are streamed into
+	// ffmpeg and a <pageTargetID>.webm file is written per page. Requires
+	// ffmpeg to be installed and available on PATH.
+	RecordingDir = "K6_BROWSER_RECORDING_DIR"
+)
+
 // Infrastructural.
 const (
 	// K6TestRunID represents the test run id. Note: this was taken from
