@@ -78,6 +78,14 @@ type FrameIsEnabledOptions struct {
 	FrameBaseOptions
 }
 
+type FrameIsInViewportOptions struct {
+	FrameBaseOptions
+	// Ratio is the minimum ratio of the element that must intersect the
+	// viewport for it to be considered in viewport. It defaults to 0, meaning
+	// any visible pixel counts.
+	Ratio float64 `json:"ratio"`
+}
+
 type FrameIsHiddenOptions struct {
 	Strict bool `json:"strict"`
 }
@@ -427,6 +435,28 @@ func NewFrameIsEnabledOptions(defaultTimeout time.Duration) *FrameIsEnabledOptio
 func (o *FrameIsEnabledOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	if err := o.FrameBaseOptions.Parse(ctx, opts); err != nil {
 		return err
+	}
+	return nil
+}
+
+func NewFrameIsInViewportOptions(defaultTimeout time.Duration) *FrameIsInViewportOptions {
+	return &FrameIsInViewportOptions{
+		FrameBaseOptions: *NewFrameBaseOptions(defaultTimeout),
+	}
+}
+
+// Parse parses the frame isInViewport options.
+func (o *FrameIsInViewportOptions) Parse(ctx context.Context, opts sobek.Value) error {
+	if err := o.FrameBaseOptions.Parse(ctx, opts); err != nil {
+		return err
+	}
+	if !common.IsNullish(opts) {
+		obj := opts.ToObject(k6ext.Runtime(ctx))
+		for _, k := range obj.Keys() {
+			if k == "ratio" {
+				o.Ratio = obj.Get(k).ToFloat()
+			}
+		}
 	}
 	return nil
 }
