@@ -312,6 +312,10 @@ func validateTokenV6(
 // normalizeStackURL converts a stack slug to a full URL if needed.
 // The stackInput can be either a full URL (e.g., https://my-team.grafana.net) or just a slug (e.g., my-team).
 func normalizeStackURL(stackInput string) string {
+	// Trim trailing slashes so "https://my-team.grafana.net/" is treated the
+	// same as "https://my-team.grafana.net". The cloud API lookup uses an
+	// exact match and otherwise rejects the trailing-slash form (#5894).
+	stackInput = strings.TrimRight(stackInput, "/")
 	// If it's already a full URL, return it as is
 	if strings.HasPrefix(stackInput, "http://") || strings.HasPrefix(stackInput, "https://") {
 		return stackInput

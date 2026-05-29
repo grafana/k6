@@ -96,3 +96,29 @@ func TestPrintConfigTokenOutput(t *testing.T) {
 		})
 	}
 }
+
+func TestNormalizeStackURL(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"slug", "my-team", "https://my-team.grafana.net"},
+		{"slug with .grafana.net suffix", "my-team.grafana.net", "https://my-team.grafana.net"},
+		{"full https url", "https://my-team.grafana.net", "https://my-team.grafana.net"},
+		{"full http url", "http://my-team.grafana.net", "http://my-team.grafana.net"},
+		// https://github.com/grafana/k6/issues/5894
+		{"https url with trailing slash", "https://my-team.grafana.net/", "https://my-team.grafana.net"},
+		{"https url with several trailing slashes", "https://my-team.grafana.net///", "https://my-team.grafana.net"},
+		{"slug with trailing slash", "my-team/", "https://my-team.grafana.net"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tc.want, normalizeStackURL(tc.in))
+		})
+	}
+}
