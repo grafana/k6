@@ -71,6 +71,12 @@ const (
 	// to upload screenshots to a remote location instead of saving
 	// to the local disk.
 	ScreenshotsOutput = "K6_BROWSER_SCREENSHOTS_OUTPUT"
+
+	// AutoScreenshot enables automatic screenshot capture in the
+	// browser module. Recognised values are "actions" (capture after
+	// every browser API call) and "changes" (capture on detected page
+	// changes). Unset or unknown values disable the feature.
+	AutoScreenshot = "K6_BROWSER_AUTO_SCREENSHOT"
 )
 
 // Infrastructural.
