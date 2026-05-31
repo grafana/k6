@@ -147,6 +147,11 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 				return eh.IsHidden() //nolint:wrapcheck
 			})
 		},
+		"isInViewport": func() *sobek.Promise {
+			return promise(vu, func() (any, error) {
+				return eh.IsInViewport() //nolint:wrapcheck
+			})
+		},
 		"isVisible": func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				return eh.IsVisible() //nolint:wrapcheck
