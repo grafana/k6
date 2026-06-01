@@ -79,6 +79,11 @@ type captureReq struct {
 	ctx    context.Context
 	reason string
 	fn     CaptureFunc
+	// forced skips the CRC32 dedup check, persisting the frame even
+	// when its bytes match the previous persisted frame. Used by the
+	// failure-debugging path where the user needs the state at the
+	// moment of failure regardless of whether it has visibly changed.
+	forced bool
 }
 
 // NewCapturer constructs a Capturer and starts its worker goroutine. The
@@ -108,12 +113,32 @@ func NewCapturer(opts CapturerOptions) *Capturer {
 // is incremented.
 //
 // reason is recorded in the persist path so the consumer can correlate the
-// frame with its trigger (e.g. "action", "lifecycle", "mutation", "failure").
+// frame with its trigger (e.g. "action", "change", "failure"). Identical
+// consecutive frames are deduplicated via CRC32; if a caller needs the
+// frame persisted even when its bytes match the previous frame, use
+// CaptureForced instead.
 func (c *Capturer) Capture(ctx context.Context, reason string, fn CaptureFunc) {
 	if c == nil {
 		return
 	}
 	if c.buf.push(captureReq{ctx: ctx, reason: reason, fn: fn}) {
+		c.mu.Lock()
+		c.dropped++
+		c.mu.Unlock()
+	}
+}
+
+// CaptureForced schedules a screenshot that bypasses the CRC32 dedup
+// check. Use this when the frame must be persisted regardless of
+// whether its bytes match the previous frame — typically for
+// failure-debugging captures where the user needs the state at the
+// moment of failure even when it visually matches the last successful
+// action. Backpressure (drop-oldest) behaves the same as Capture.
+func (c *Capturer) CaptureForced(ctx context.Context, reason string, fn CaptureFunc) {
+	if c == nil {
+		return
+	}
+	if c.buf.push(captureReq{ctx: ctx, reason: reason, fn: fn, forced: true}) {
 		c.mu.Lock()
 		c.dropped++
 		c.mu.Unlock()
@@ -167,7 +192,7 @@ func (c *Capturer) process(req captureReq) {
 	hash := crc32.ChecksumIEEE(buf)
 
 	c.mu.Lock()
-	if c.seq > 0 && hash == c.lastHash {
+	if !req.forced && c.seq > 0 && hash == c.lastHash {
 		c.mu.Unlock()
 		return
 	}

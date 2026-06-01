@@ -226,6 +226,43 @@ func TestCapturer_NilSafe(t *testing.T) {
 	c.Capture(context.Background(), "action", func(_ context.Context) ([]byte, error) {
 		return nil, nil
 	})
+	c.CaptureForced(context.Background(), "failure", func(_ context.Context) ([]byte, error) {
+		return nil, nil
+	})
 	c.Close()
 	assert.Equal(t, uint64(0), c.Dropped())
+}
+
+func TestCapturer_CaptureForced_BypassesDedup(t *testing.T) {
+	t.Parallel()
+
+	p := newRecordingPersister()
+	c := NewCapturer(CapturerOptions{
+		Persister:  p,
+		Logger:     log.NewNullLogger(),
+		TestName:   "demo",
+		VU:         1,
+		Iter:       0,
+		BufferSize: 10,
+	})
+
+	// All four calls return byte-identical screenshots so the dedup
+	// path would normally collapse three of the four. CaptureForced
+	// must persist regardless: the failure-debugging use case needs
+	// the "state at the moment of failure" even when it matches the
+	// preceding successful action.
+	same := []byte{0xaa, 0xbb, 0xcc}
+	fn := func(_ context.Context) ([]byte, error) { return same, nil }
+
+	c.Capture(context.Background(), "action", fn)        // persist
+	c.Capture(context.Background(), "action", fn)        // dedup
+	c.CaptureForced(context.Background(), "failure", fn) // persist (forced)
+	c.Capture(context.Background(), "action", fn)        // dedup
+
+	c.Close()
+
+	frames := p.snapshot()
+	require.Len(t, frames, 2)
+	assert.Contains(t, frames[0].path, "action")
+	assert.Contains(t, frames[1].path, "failure")
 }
