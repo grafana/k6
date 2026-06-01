@@ -4,20 +4,13 @@
 // auto-screenshot feature under realistic page complexity rather than
 // the small inline fixtures used by the other scripts.
 //
-// Run with auto-screenshot off, then with each mode:
+// Run with auto-screenshot off and then on:
 //
 //   ./k6 run examples/browser/auto_screenshot_grafana.js
 //   K6_BROWSER_AUTO_SCREENSHOT=actions ./k6 run examples/browser/auto_screenshot_grafana.js
-//   K6_BROWSER_AUTO_SCREENSHOT=changes ./k6 run examples/browser/auto_screenshot_grafana.js
 //
-// Expected observations:
-//   - actions: a screenshot per browser API call, dedup-aware. Roughly
-//     proportional to the number of operations the script invokes.
-//   - changes: lifecycle settles once (initial load + networkidle) and
-//     then MutationObserver fires across every scroll-triggered
-//     reveal, lazy-loaded image, and animation tick. Real marketing
-//     sites tend to never quite stop mutating; expect more captures
-//     than the synthetic SPA fixture.
+// Expected pattern: a screenshot per browser API call, dedup-aware,
+// covering the initial load and each scroll step.
 //
 // Because this script depends on a public network endpoint, treat its
 // numbers as illustrative rather than reproducible across runs.

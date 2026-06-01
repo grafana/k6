@@ -181,12 +181,6 @@ type browserRegistry struct {
 	// is disabled; nil-safe at every call site.
 	asReg *autoscreenshot.Registry
 
-	// watcherCancels stores the cancel func for the per-iteration mode B
-	// lifecycle watcher goroutine. Populated on IterStart for
-	// ModeChanges; drained on IterEnd to tear the goroutine down.
-	watcherMu      sync.Mutex
-	watcherCancels map[int64]context.CancelFunc
-
 	mu sync.RWMutex
 	m  map[int64]*common.Browser
 
@@ -241,7 +235,6 @@ func newBrowserRegistry(
 		vu:             vu,
 		tracesMetadata: tracesMetadata,
 		asReg:          asReg,
-		watcherCancels: make(map[int64]context.CancelFunc),
 		m:              make(map[int64]*common.Browser),
 		buildFn:        builder,
 	}
@@ -327,10 +320,8 @@ func (r *browserRegistry) handleIterEvents(
 				continue
 			}
 			r.setBrowser(data.Iteration, b)
-			c := r.asReg.OnIterStart(data.VUID, data.Iteration)
-			r.startChangeWatcher(b, c, data.Iteration)
+			r.asReg.OnIterStart(data.VUID, data.Iteration)
 		case k6event.IterEnd:
-			r.stopChangeWatcher(data.Iteration)
 			r.deleteBrowser(data.Iteration)
 			r.tr.endIterationTrace(data.Iteration)
 			r.asReg.OnIterEnd(data.VUID, data.Iteration)
@@ -369,66 +360,9 @@ func (r *browserRegistry) handleExitEvent(exitCh <-chan *k6event.Event, unsubscr
 	// being flushed and test exiting
 	r.stopTracesRegistry()
 
-	// Cancel any outstanding mode B watcher goroutines before tearing
-	// down the Capturers they feed.
-	r.stopAllChangeWatchers()
-
 	// Close any remaining auto-screenshot Capturers so their worker
 	// goroutines drain pending captures and exit cleanly.
 	r.asReg.Stop()
-}
-
-// startChangeWatcher launches a LifecycleWatcher when mode B is active
-// for the iteration. The watcher waits for the browser's active context
-// to be created by the user's script, then subscribes to lifecycle and
-// DOM mutation events on every page in that context and asks the
-// Capturer to take a screenshot whenever a debounce window settles.
-// No-op when mode B is not active or when the Capturer is nil.
-func (r *browserRegistry) startChangeWatcher(b *common.Browser, c *autoscreenshot.Capturer, iter int64) {
-	if r.asReg.Mode() != autoscreenshot.ModeChanges || c == nil {
-		return
-	}
-
-	watcher := common.NewLifecycleWatcher(b, c, 0 /* default debounce */, nil)
-	// The cancel func is retained in watcherCancels and invoked from
-	// stopChangeWatcher / stopAllChangeWatchers, both of which are
-	// guaranteed to run for every iteration (IterEnd / Exit).
-	ctx, cancel := context.WithCancel(context.Background()) //nolint:gosec
-
-	r.watcherMu.Lock()
-	r.watcherCancels[iter] = cancel
-	r.watcherMu.Unlock()
-
-	go watcher.Watch(ctx)
-}
-
-// stopChangeWatcher cancels the watcher goroutine for the iteration, if
-// one was started.
-func (r *browserRegistry) stopChangeWatcher(iter int64) {
-	r.watcherMu.Lock()
-	cancel, ok := r.watcherCancels[iter]
-	if ok {
-		delete(r.watcherCancels, iter)
-	}
-	r.watcherMu.Unlock()
-	if ok {
-		cancel()
-	}
-}
-
-// stopAllChangeWatchers cancels every outstanding watcher. Intended for
-// end-of-VU cleanup.
-func (r *browserRegistry) stopAllChangeWatchers() {
-	r.watcherMu.Lock()
-	cancels := make([]context.CancelFunc, 0, len(r.watcherCancels))
-	for iter, cancel := range r.watcherCancels {
-		cancels = append(cancels, cancel)
-		delete(r.watcherCancels, iter)
-	}
-	r.watcherMu.Unlock()
-	for _, cancel := range cancels {
-		cancel()
-	}
 }
 
 func (r *browserRegistry) setBrowser(id int64, b *common.Browser) {

@@ -59,9 +59,9 @@ func TestParseMode(t *testing.T) {
 
 	cases := map[string]Mode{
 		"actions": ModeActions,
-		"changes": ModeChanges,
 		"":        ModeOff,
 		"off":     ModeOff,
+		"changes": ModeOff, // historic value; no longer recognised.
 		"unknown": ModeOff,
 	}
 	for in, want := range cases {
@@ -73,6 +73,5 @@ func TestMode_String(t *testing.T) {
 	t.Parallel()
 
 	assert.Equal(t, "actions", ModeActions.String())
-	assert.Equal(t, "changes", ModeChanges.String())
 	assert.Equal(t, "off", ModeOff.String())
 }

@@ -2,19 +2,14 @@
 // navigation flow. Use it to characterise the auto-screenshot feature
 // on a script that performs full page transitions.
 //
-// Run with auto-screenshot off, then with each mode, and compare the
-// contents of the ./auto-screenshots/ directory that the screenshotter
-// writes to. Example invocations:
+// Run with auto-screenshot off and then on:
 //
 //   ./k6 run examples/browser/auto_screenshot_multipage.js
 //   K6_BROWSER_AUTO_SCREENSHOT=actions ./k6 run examples/browser/auto_screenshot_multipage.js
-//   K6_BROWSER_AUTO_SCREENSHOT=changes ./k6 run examples/browser/auto_screenshot_multipage.js
 //
-// Expected pattern:
-//   - actions: ~one screenshot per browser API call (deduplicated by
-//     CRC32, so identical frames collapse). High raw count.
-//   - changes: one screenshot per settled lifecycle / DOM-mutation
-//     burst. Closer to "screenshots a human would take".
+// Expected pattern: ~one screenshot per browser API call, deduplicated
+// by CRC32 so identical frames collapse. Failure-path captures fire
+// additionally when a browser API call rejects (e.g. selector timeout).
 import { browser } from 'k6/browser';
 
 export const options = {
