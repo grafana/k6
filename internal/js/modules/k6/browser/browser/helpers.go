@@ -90,13 +90,16 @@ func newRegExMatcher(ctx context.Context, vu moduleVU, tq *taskqueue.TaskQueue) 
 //   - Otherwise, rejects the promise with the error fn returns.
 //
 // On successful completion, auto-screenshot mode A schedules a capture
-// of the current iteration's open pages via vu.afterAction. The capture
-// is asynchronous and never blocks promise resolution.
+// of the current iteration's open pages via vu.afterAction. On rejection,
+// auto-screenshot schedules a failure-tagged capture via vu.onFailure
+// regardless of mode. Both captures are asynchronous and never block
+// promise settlement.
 func promise(vu moduleVU, fn func() (result any, reason error)) *sobek.Promise {
 	p, resolve, reject := promises.New(vu)
 	go func() {
 		v, err := fn()
 		if err != nil {
+			vu.onFailure()
 			reject(k6ext.BrowserError(err))
 			return
 		}
