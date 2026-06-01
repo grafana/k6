@@ -36,7 +36,11 @@ type Persister interface {
 // CaptureFunc executes the actual screenshot operation. It runs on the
 // Capturer's worker goroutine, so it must be safe to call there and must not
 // block on the goroutine that called Capture.
-type CaptureFunc func(ctx context.Context) ([]byte, error)
+//
+// Declared as a type alias rather than a defined type so the Capture
+// method's signature is structurally identical to the corresponding hook
+// interface expected by lifecycle/change watchers in other packages.
+type CaptureFunc = func(ctx context.Context) ([]byte, error)
 
 // CapturerOptions holds the dependencies and per-iteration metadata used by a
 // Capturer. All fields except Logger are required; an unset Logger defaults
