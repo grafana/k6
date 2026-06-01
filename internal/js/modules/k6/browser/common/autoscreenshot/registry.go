@@ -18,10 +18,8 @@ type Mode int
 const (
 	// ModeOff disables auto-screenshots.
 	ModeOff Mode = iota
-	// ModeActions captures after every browser API call (mode A).
+	// ModeActions captures after every browser API call.
 	ModeActions
-	// ModeChanges captures on detected page changes (mode B).
-	ModeChanges
 )
 
 // String returns the canonical string form of the mode.
@@ -29,8 +27,6 @@ func (m Mode) String() string {
 	switch m {
 	case ModeActions:
 		return "actions"
-	case ModeChanges:
-		return "changes"
 	default:
 		return "off"
 	}
@@ -42,8 +38,6 @@ func ParseMode(s string) Mode {
 	switch s {
 	case "actions":
 		return ModeActions
-	case "changes":
-		return ModeChanges
 	default:
 		return ModeOff
 	}

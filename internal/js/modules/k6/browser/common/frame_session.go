@@ -330,21 +330,9 @@ func (fs *FrameSession) onEventBindingCalled(event *cdpruntime.EventBindingCalle
 		"sid:%v tid:%v name:%s payload:%s",
 		fs.session.ID(), fs.targetID, event.Name, event.Payload)
 
-	switch event.Name {
-	case webVitalBinding:
-		if err := fs.parseAndEmitWebVitalMetric(event.Payload); err != nil {
-			fs.logger.Errorf("FrameSession:onEventBindingCalled",
-				"failed to emit web vital metric: %v", err)
-		}
-	case domMutationBinding:
-		// Re-emit as a frame-scoped event so the auto-screenshot
-		// lifecycle watcher (and any future subscriber) can react to
-		// DOM changes without having to know about CDP binding plumbing.
-		if fs.page != nil {
-			if mf := fs.page.MainFrame(); mf != nil {
-				mf.emit(EventFrameDOMMutation, nil)
-			}
-		}
+	err := fs.parseAndEmitWebVitalMetric(event.Payload)
+	if err != nil {
+		fs.logger.Errorf("FrameSession:onEventBindingCalled", "failed to emit web vital metric: %v", err)
 	}
 }
 

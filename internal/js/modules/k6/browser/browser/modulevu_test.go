@@ -77,22 +77,3 @@ func TestOnFailure_NoOpWhenDisabled(t *testing.T) {
 	var vu moduleVU
 	assert.NotPanics(t, func() { vu.onFailure() })
 }
-
-func TestOnFailure_DoesNotRequireModeActions(t *testing.T) {
-	t.Parallel()
-
-	// onFailure must fire for any non-Off mode (including ModeChanges),
-	// in contrast to afterAction which only fires for ModeActions. The
-	// VU is unactivated so the capture path bails at state==nil; the
-	// assertion here is that we did not panic from a wrong mode gate.
-	vu := k6test.NewVU(t)
-
-	reg := autoscreenshot.NewRegistry(
-		autoscreenshot.ModeChanges, noopPersister{}, "test", log.NewNullLogger(),
-	)
-	mvu := moduleVU{
-		VU:             vu.VU,
-		autoScreenshot: reg,
-	}
-	assert.NotPanics(t, func() { mvu.onFailure() })
-}

@@ -1,21 +1,17 @@
 // auto_screenshot_queryheavy.js issues many read-only browser API calls
 // (predicates and getters) against an otherwise stable page. Use it to
-// characterise how aggressively each auto-screenshot mode produces
-// redundant screenshots, and how effective the CRC32-based dedup in
-// the capturer is at suppressing them.
+// characterise how aggressively the auto-screenshot feature produces
+// redundant capture requests, and how effective the CRC32-based dedup
+// in the capturer is at suppressing them.
 //
-// Run with auto-screenshot off, then with each mode:
+// Run with auto-screenshot off and then on:
 //
 //   ./k6 run examples/browser/auto_screenshot_queryheavy.js
 //   K6_BROWSER_AUTO_SCREENSHOT=actions ./k6 run examples/browser/auto_screenshot_queryheavy.js
-//   K6_BROWSER_AUTO_SCREENSHOT=changes ./k6 run examples/browser/auto_screenshot_queryheavy.js
 //
-// Expected pattern:
-//   - actions: many capture requests (~one per API call) but the
-//     dedup path collapses them to ~one persisted file because the
-//     page never changes. Look at the dropped counter in logs.
-//   - changes: one or two captures total (initial load + networkIdle).
-//     This is the case where Mode B is the clear winner.
+// Expected pattern: many capture requests (~one per API call) but the
+// dedup path collapses them to ~one persisted file because the page
+// never changes.
 import { browser } from 'k6/browser';
 
 export const options = {

@@ -1,21 +1,17 @@
 // auto_screenshot_failure.js triggers a browser API rejection partway
-// through a script to exercise the auto-screenshot failure path added
-// in the same feature. The script first loads a stable page, then
-// attempts to click a selector that does not exist; the click rejects
-// with a timeout and the failure-path capture should fire regardless
-// of which mode is active.
+// through a script to exercise the auto-screenshot failure path. The
+// script first loads a stable page, then attempts to click a selector
+// that does not exist; the click rejects with a timeout and the
+// failure-path capture fires.
 //
-// Run with auto-screenshot off, then with each mode:
+// Run with auto-screenshot off and then on:
 //
 //   ./k6 run examples/browser/auto_screenshot_failure.js
 //   K6_BROWSER_AUTO_SCREENSHOT=actions ./k6 run examples/browser/auto_screenshot_failure.js
-//   K6_BROWSER_AUTO_SCREENSHOT=changes ./k6 run examples/browser/auto_screenshot_failure.js
 //
 // Expected pattern:
 //   - off:     0 screenshots
 //   - actions: action-tagged shots from the successful calls, plus a
-//              failure-tagged shot at the moment the bad click rejects.
-//   - changes: change-tagged shots from the initial load, plus a
 //              failure-tagged shot at the moment the bad click rejects.
 //
 // The script catches the rejection so the iteration completes cleanly

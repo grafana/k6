@@ -48,11 +48,6 @@ func TestRootModule_AutoScreenshotMode(t *testing.T) {
 			want: autoscreenshot.ModeActions,
 		},
 		{
-			name: "changes",
-			env:  env.ConstLookup(env.AutoScreenshot, "changes"),
-			want: autoscreenshot.ModeChanges,
-		},
-		{
 			name: "unknown_value_disables",
 			env:  env.ConstLookup(env.AutoScreenshot, "nonsense"),
 			want: autoscreenshot.ModeOff,

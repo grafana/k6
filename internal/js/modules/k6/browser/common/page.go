@@ -35,10 +35,7 @@ const BlankPage = "about:blank"
 // PageEventName represents the name of the page event.
 type PageEventName string
 
-const (
-	webVitalBinding    = "k6browserSendWebVitalMetric"
-	domMutationBinding = "k6browserDomMutation"
-)
+const webVitalBinding = "k6browserSendWebVitalMetric"
 
 const (
 	// PageEventConsole represents the page console event.
@@ -1010,15 +1007,6 @@ func (p *Page) Close() error {
 			closeErrs = append(closeErrs, fmt.Errorf("internal error while removing binding from page: %w", err))
 		}
 
-		// The DOM mutation binding is added lazily by the auto-screenshot
-		// lifecycle watcher. RemoveBinding is idempotent on the CDP side
-		// and returns no error if the binding was never added.
-		removeMut := runtime.RemoveBinding(domMutationBinding)
-		if err := removeMut.Do(cdp.WithExecutor(teardownTimeoutCtx, p.session)); err != nil {
-			closeErrs = append(closeErrs,
-				fmt.Errorf("internal error while removing dom mutation binding: %w", err))
-		}
-
 		err := target.CloseTarget(p.targetID).Do(cdp.WithExecutor(teardownTimeoutCtx, p.session))
 		if err != nil && !errors.Is(err, context.Canceled) {
 			// When a close target command is sent to the browser via CDP,
@@ -1340,29 +1328,6 @@ func (p *Page) FrameLocator(selector string) *FrameLocator {
 	p.logger.Debugf("Page:FrameLocator", "sid:%s selector:%q", p.sessionID(), selector)
 
 	return p.Locator(selector, nil).ContentFrame()
-}
-
-// EnableDOMMutationDetection registers the k6browserDomMutation CDP
-// binding on the page and evaluates the supplied script so that any
-// installed MutationObserver inside the script can call the binding
-// when the DOM changes. The binding's invocations are surfaced as
-// EventFrameDOMMutation on the page's main frame.
-//
-// Intended for use by the auto-screenshot lifecycle watcher in Mode B.
-// It is idempotent at the CDP level: calling it twice on the same page
-// adds the binding twice (no observable difference) and re-evaluates
-// the script (the script self-guards against double installation).
-func (p *Page) EnableDOMMutationDetection(script string) error {
-	add := runtime.AddBinding(domMutationBinding)
-	if err := add.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-		return fmt.Errorf("adding dom mutation binding: %w", err)
-	}
-	if _, exc, err := runtime.Evaluate(script).Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-		return fmt.Errorf("evaluating dom mutation observer script: %w", err)
-	} else if exc != nil {
-		return fmt.Errorf("dom mutation observer script raised: %s", exc.Text)
-	}
-	return nil
 }
 
 // MainFrame returns the main frame on the page.

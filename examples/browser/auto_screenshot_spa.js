@@ -1,21 +1,17 @@
 // auto_screenshot_spa.js exercises a single-page-app pattern: a static
 // page whose visible state is driven entirely by client-side JavaScript
 // (button clicks toggle modals, tabs, validation state). Use it to
-// characterise how each auto-screenshot mode handles SPA changes that
-// do not fire any navigation or load lifecycle event.
+// characterise auto-screenshot on SPA changes that do not fire any
+// navigation or load lifecycle event.
 //
-// Run with auto-screenshot off, then with each mode:
+// Run with auto-screenshot off and then on:
 //
 //   ./k6 run examples/browser/auto_screenshot_spa.js
 //   K6_BROWSER_AUTO_SCREENSHOT=actions ./k6 run examples/browser/auto_screenshot_spa.js
-//   K6_BROWSER_AUTO_SCREENSHOT=changes ./k6 run examples/browser/auto_screenshot_spa.js
 //
-// Expected pattern:
-//   - actions: one screenshot per click (each click is an API call).
-//   - changes: Mode B's lifecycle subscription would miss every
-//     transition here; the MutationObserver path (commit 4) is what
-//     catches them. Expect roughly one screenshot per visible state
-//     change, after the 300ms debounce settles.
+// Expected pattern: one screenshot per click (each click is an API
+// call). The CRC32 dedup ignores identical adjacent frames so visually
+// stable interactions collapse.
 import { browser } from 'k6/browser';
 
 export const options = {
