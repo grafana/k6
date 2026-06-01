@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common/js"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/log"
 )
 
@@ -73,15 +74,31 @@ func (w *LifecycleWatcher) Watch(ctx context.Context) {
 	}
 }
 
-// watchPage subscribes to the page's main-frame lifecycle events and
-// drives the debouncer for that page.
+// watchPage subscribes to the page's main-frame lifecycle and DOM
+// mutation events, installs the MutationObserver script that triggers
+// the mutation events, and drives the debouncer for the page.
+//
+// Both event sources feed the same debouncer so that a burst of
+// signals (e.g. lifecycle networkidle followed by post-render
+// mutations) collapses into a single capture at the trailing edge of
+// the quiet window. The debouncer's fire is responsible for tagging
+// captures with a reason of "change", which covers both event sources.
 func (w *LifecycleWatcher) watchPage(ctx context.Context, p *Page) {
-	lifeCh := make(chan Event, 4)
-	p.MainFrame().on(ctx, []string{EventFrameAddLifecycle}, lifeCh)
+	// Install the MutationObserver. Best-effort: a failure to register
+	// the binding or evaluate the script (e.g. transient CDP error) is
+	// logged and the page proceeds with lifecycle-only detection.
+	if err := p.EnableDOMMutationDetection(js.DOMMutationObserverScript); err != nil {
+		w.logger.Warnf("autoscreenshot",
+			"enabling dom mutation detection: %v", err)
+	}
+
+	mf := p.MainFrame()
+	eventCh := make(chan Event, 8)
+	mf.on(ctx, []string{EventFrameAddLifecycle, EventFrameDOMMutation}, eventCh)
 
 	page := p
 	d := newDebouncer(w.debounce, func() {
-		w.hook.Capture(ctx, "lifecycle", func(_ context.Context) ([]byte, error) {
+		w.hook.Capture(ctx, "change", func(_ context.Context) ([]byte, error) {
 			return page.Screenshot(&PageScreenshotOptions{}, lifecycleNoopPersister{})
 		})
 	})
@@ -91,7 +108,7 @@ func (w *LifecycleWatcher) watchPage(ctx context.Context, p *Page) {
 		select {
 		case <-ctx.Done():
 			return
-		case <-lifeCh:
+		case <-eventCh:
 			d.trigger()
 		}
 	}

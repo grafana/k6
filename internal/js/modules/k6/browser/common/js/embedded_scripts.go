@@ -17,3 +17,11 @@ var WebVitalIIFEScript string
 //
 //go:embed web_vital_init.js
 var WebVitalInitScript string
+
+// DOMMutationObserverScript installs a MutationObserver that signals the
+// k6browserDomMutation CDP binding whenever the document changes. Used by
+// the auto-screenshot lifecycle watcher in Mode B to detect SPA state
+// transitions that do not fire lifecycle events.
+//
+//go:embed dom_mutation_observer.js
+var DOMMutationObserverScript string
