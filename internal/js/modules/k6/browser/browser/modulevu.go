@@ -57,7 +57,7 @@ func (vu moduleVU) afterAction() {
 	if vu.autoScreenshot.Mode() != autoscreenshot.ModeActions {
 		return
 	}
-	vu.captureOpenPages("action")
+	vu.captureOpenPages("action", false /* allow dedup */)
 }
 
 // onFailure schedules a failure-tagged screenshot capture for the current
@@ -68,6 +68,11 @@ func (vu moduleVU) afterAction() {
 // goroutine, during any VU lifecycle phase, and on a moduleVU whose
 // auto-screenshot is disabled.
 //
+// Failure captures bypass the CRC32 dedup so that a frame is always
+// produced at the moment of failure, even when the page state matches
+// the preceding successful action (the common case for selector
+// timeouts on unchanged pages).
+//
 // Check-failure (k6 core check() returning false) is intentionally not
 // covered: k6's check is in a separate module with no cross-module hook
 // point. Browser API errors are the dominant failure source in browser
@@ -76,14 +81,15 @@ func (vu moduleVU) onFailure() {
 	if vu.autoScreenshot.Mode() == autoscreenshot.ModeOff {
 		return
 	}
-	vu.captureOpenPages("failure")
+	vu.captureOpenPages("failure", true /* bypass dedup */)
 }
 
 // captureOpenPages enqueues a viewport capture for every currently-open
 // page in the iteration's browser. No-op when the registry is disabled
 // for the current iteration. Shared by the after-action and failure
-// trigger paths.
-func (vu moduleVU) captureOpenPages(reason string) {
+// trigger paths; pass force=true to skip the dedup path so the frame
+// persists regardless of whether its bytes match the previous frame.
+func (vu moduleVU) captureOpenPages(reason string, force bool) {
 	state := vu.State()
 	if state == nil {
 		return
@@ -105,9 +111,14 @@ func (vu moduleVU) captureOpenPages(reason string) {
 
 	ctx := vu.Context()
 	for _, page := range pages {
-		c.Capture(ctx, reason, func(_ context.Context) ([]byte, error) {
+		fn := func(_ context.Context) ([]byte, error) {
 			return page.Screenshot(&common.PageScreenshotOptions{}, noopScreenshotPersister{})
-		})
+		}
+		if force {
+			c.CaptureForced(ctx, reason, fn)
+		} else {
+			c.Capture(ctx, reason, fn)
+		}
 	}
 }
 
