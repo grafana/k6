@@ -408,7 +408,9 @@ func (b *Bundle) setupJSRuntime(rt *sobek.Runtime, vuID uint64, logger logrus.Fi
 
 	envObj := rt.NewObject()
 	for k, v := range b.preInitState.RuntimeOptions.Env {
-		if err := envObj.DefineDataProperty(k, rt.ToValue(v), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE); err != nil {
+		if err := envObj.DefineDataProperty(
+			k, rt.ToValue(v), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE,
+		); err != nil {
 			return fmt.Errorf("setting __ENV property %s: %w", k, err)
 		}
 	}

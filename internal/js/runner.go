@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net"
 	"net/http"
 	"net/http/cookiejar"
@@ -754,15 +755,13 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 	// Override the preset global env with any custom env vars.
 	// __ENV is deliberately a frozen object to prevent JS from modifying it.
 	env := make(map[string]string, len(u.env)+len(params.Env))
-	for k, v := range u.env {
-		env[k] = v
-	}
-	for k, v := range params.Env {
-		env[k] = v
-	}
+	maps.Copy(env, u.env)
+	maps.Copy(env, params.Env)
 	envObj := u.Runtime.NewObject()
 	for k, v := range env {
-		if err := envObj.DefineDataProperty(k, u.Runtime.ToValue(v), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE); err != nil {
+		if err := envObj.DefineDataProperty(
+			k, u.Runtime.ToValue(v), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE,
+		); err != nil {
 			panic(err) // should not happen with string values
 		}
 	}
