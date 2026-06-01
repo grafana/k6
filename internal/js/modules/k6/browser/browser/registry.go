@@ -379,20 +379,17 @@ func (r *browserRegistry) handleExitEvent(exitCh <-chan *k6event.Event, unsubscr
 }
 
 // startChangeWatcher launches a LifecycleWatcher when mode B is active
-// for the iteration. The watcher subscribes to lifecycle events on every
-// page in the iteration's browser context and asks the Capturer to take
-// a screenshot whenever a debounce window settles. No-op when mode B is
-// not active or when the Capturer is nil.
+// for the iteration. The watcher waits for the browser's active context
+// to be created by the user's script, then subscribes to lifecycle and
+// DOM mutation events on every page in that context and asks the
+// Capturer to take a screenshot whenever a debounce window settles.
+// No-op when mode B is not active or when the Capturer is nil.
 func (r *browserRegistry) startChangeWatcher(b *common.Browser, c *autoscreenshot.Capturer, iter int64) {
 	if r.asReg.Mode() != autoscreenshot.ModeChanges || c == nil {
 		return
 	}
-	bc := b.Context()
-	if bc == nil {
-		return
-	}
 
-	watcher := common.NewLifecycleWatcher(bc, c, 0 /* default debounce */, nil)
+	watcher := common.NewLifecycleWatcher(b, c, 0 /* default debounce */, nil)
 	// The cancel func is retained in watcherCancels and invoked from
 	// stopChangeWatcher / stopAllChangeWatchers, both of which are
 	// guaranteed to run for every iteration (IterEnd / Exit).

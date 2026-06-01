@@ -19,12 +19,18 @@ type CapturerHook interface {
 }
 
 // LifecycleWatcher subscribes to page-attachment and frame lifecycle events
-// on a BrowserContext and asks the supplied CapturerHook to capture a
-// viewport screenshot whenever a change settles. Settling is determined by
-// a debounce window applied per-page: a burst of lifecycle events within
-// the window collapses into a single capture fired after the last event.
+// on a Browser's active context and asks the supplied CapturerHook to
+// capture a viewport screenshot whenever a change settles. Settling is
+// determined by a debounce window applied per-page: a burst of lifecycle
+// events within the window collapses into a single capture fired after
+// the last event.
+//
+// The watcher accepts a Browser rather than a BrowserContext because the
+// context is created lazily by the user's script (via browser.newContext
+// or browser.newPage) and is not present at watcher construction time.
+// Watch waits for the context to appear before subscribing.
 type LifecycleWatcher struct {
-	bc       *BrowserContext
+	browser  *Browser
 	hook     CapturerHook
 	debounce time.Duration
 	logger   *log.Logger
@@ -33,7 +39,7 @@ type LifecycleWatcher struct {
 // NewLifecycleWatcher constructs a watcher. debounce must be positive; the
 // zero value defaults to 300ms.
 func NewLifecycleWatcher(
-	bc *BrowserContext,
+	b *Browser,
 	hook CapturerHook,
 	debounce time.Duration,
 	logger *log.Logger,
@@ -44,19 +50,25 @@ func NewLifecycleWatcher(
 	if logger == nil {
 		logger = log.NewNullLogger()
 	}
-	return &LifecycleWatcher{bc: bc, hook: hook, debounce: debounce, logger: logger}
+	return &LifecycleWatcher{browser: b, hook: hook, debounce: debounce, logger: logger}
 }
 
-// Watch blocks until ctx is canceled, fanning out a per-page goroutine for
-// every page already attached to the BrowserContext and every page attached
-// later. Each per-page goroutine debounces lifecycle events and triggers
-// the CapturerHook on settle.
+// Watch blocks until ctx is canceled. It first polls the Browser for its
+// active context (created lazily by the user's first call to newContext
+// or newPage) and then fans out a per-page goroutine for every page
+// already attached and every page attached later. Each per-page goroutine
+// debounces lifecycle events and triggers the CapturerHook on settle.
 func (w *LifecycleWatcher) Watch(ctx context.Context) {
+	bc := w.waitForContext(ctx)
+	if bc == nil {
+		return
+	}
+
 	pagesCh := make(chan Event, 4)
-	w.bc.on(ctx, []string{EventBrowserContextPage}, pagesCh)
+	bc.on(ctx, []string{EventBrowserContextPage}, pagesCh)
 
 	// Existing pages.
-	for _, p := range w.bc.Pages() {
+	for _, p := range bc.Pages() {
 		go w.watchPage(ctx, p)
 	}
 
@@ -70,6 +82,28 @@ func (w *LifecycleWatcher) Watch(ctx context.Context) {
 				continue
 			}
 			go w.watchPage(ctx, p)
+		}
+	}
+}
+
+// waitForContext polls the Browser for its lazily-allocated active
+// context. Returns nil if ctx is canceled before the context appears.
+// 50ms polls keep the typical "user script calls newPage immediately
+// after browser launch" delay near-imperceptible without burning CPU.
+func (w *LifecycleWatcher) waitForContext(ctx context.Context) *BrowserContext {
+	if bc := w.browser.Context(); bc != nil {
+		return bc
+	}
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-ticker.C:
+			if bc := w.browser.Context(); bc != nil {
+				return bc
+			}
 		}
 	}
 }
