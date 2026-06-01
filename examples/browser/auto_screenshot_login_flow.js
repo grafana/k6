@@ -101,6 +101,13 @@ export default async function () {
     await page.getByRole('button', { name: /pizza/i }).first().click();
     await page.waitForTimeout(2000);
 
+    // Scroll down so the rate UI (typically positioned below the
+    // recommendation card) is captured by the next viewport
+    // screenshot, even if the rate-button selectors in step 6
+    // miss and no auto-scroll-into-view runs.
+    await page.evaluate(() => window.scrollBy(0, 600));
+    await page.waitForTimeout(500);
+
     // 6. Rate the recommendation. count() first to avoid
     // triggering failure-tagged screenshots for selector misses.
     const ratingCandidates = [

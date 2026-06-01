@@ -47,6 +47,15 @@ export default async function () {
     await page.getByRole('button', { name: /pizza/i }).first().click();
     await page.waitForTimeout(2000);
 
+    // Scroll down so any rate UI that lives below the fold is
+    // captured by subsequent viewport screenshots. Without this,
+    // a selector miss in step 3 produces no auto-scroll, no visible
+    // rate UI, and a gallery that looks like the script did nothing.
+    // The explicit scroll guarantees the post-recommendation page
+    // state is visible in the gallery regardless of selector luck.
+    await page.evaluate(() => window.scrollBy(0, 600));
+    await page.waitForTimeout(500);
+
     // 3. Try to rate the recommendation. count() rather than a
     // click attempt with timeout because every rejected click would
     // trigger an extra failure-tagged screenshot from the
