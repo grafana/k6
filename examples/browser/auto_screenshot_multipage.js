@@ -30,26 +30,41 @@ export default async function () {
   const page = await context.newPage();
 
   try {
-    await page.goto('https://quickpizza.grafana.com/test.k6.io/', {
-      waitUntil: 'networkidle',
+    // 'load' rather than 'networkidle': quickpizza issues background
+    // requests after first paint and effectively never reaches
+    // network idle, so 'networkidle' would risk hitting the
+    // navigation timeout.
+    await page.goto('https://quickpizza.grafana.com', { waitUntil: 'load' });
+    await page.waitForTimeout(500);
+
+    // First interaction: click the primary CTA on the home page.
+    // Defensive try/catch keeps the script robust if the page's
+    // top-level layout changes; the auto-screenshot capture path
+    // still fires for whatever did happen.
+    try {
+      await page
+        .getByRole('button')
+        .first()
+        .click({ timeout: 3000 });
+      await page.waitForTimeout(1500);
+    } catch (_) {
+      // Selector miss: fall back to a scroll so there is still a
+      // meaningful state change for the capturer to observe.
+      await page.evaluate(() => window.scrollBy(0, 400));
+      await page.waitForTimeout(500);
+    }
+
+    // Second navigation: hit the admin route. quickpizza serves an
+    // admin landing or login page here; either way it is a full page
+    // transition distinct from the home page.
+    await page.goto('https://quickpizza.grafana.com/admin', {
+      waitUntil: 'load',
     });
+    await page.waitForTimeout(500);
 
-    // Navigate to the messages page.
-    await Promise.all([
-      page.waitForNavigation(),
-      page.getByRole('link', { name: '/my_messages.php' }).click(),
-    ]);
-
-    // Fill the login form and submit.
-    await page.locator('input[name="login"]').type('admin');
-    await page.locator('input[name="password"]').type('123');
-    await Promise.all([
-      page.waitForNavigation(),
-      page.getByText('Go!').click(),
-    ]);
-
-    // Read post-login content to give Mode B a quiet period to settle.
-    await page.locator('h2').textContent();
+    // Read something visible so Mode A logs at least one inspection
+    // call against the post-navigation page.
+    await page.locator('h1, h2').first().textContent();
   } finally {
     await page.close();
   }

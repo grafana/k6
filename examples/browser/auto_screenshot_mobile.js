@@ -35,10 +35,11 @@ export default async function () {
   const page = await context.newPage();
 
   try {
-    await page.goto('https://quickpizza.grafana.com/test.k6.io/', {
+    await page.goto('https://quickpizza.grafana.com', {
       waitUntil: 'load',
     });
-    await page.locator('h2, h1').first().textContent();
+    await page.waitForTimeout(500);
+    await page.locator('h1, h2').first().textContent();
   } finally {
     await page.close();
   }
