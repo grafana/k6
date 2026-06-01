@@ -16,6 +16,7 @@ import (
 
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/chromium"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common/autoscreenshot"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/env"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
 	browsertrace "go.k6.io/k6/v2/internal/js/modules/k6/browser/trace"
@@ -176,6 +177,10 @@ type browserRegistry struct {
 	trInit         sync.Once
 	tracesMetadata map[string]string
 
+	// asReg is the per-VU auto-screenshot registry. nil when the feature
+	// is disabled; nil-safe at every call site.
+	asReg *autoscreenshot.Registry
+
 	mu sync.RWMutex
 	m  map[int64]*common.Browser
 
@@ -199,6 +204,7 @@ func newBrowserRegistry(
 	remote *remoteRegistry,
 	pids *pidRegistry,
 	tracesMetadata map[string]string,
+	asReg *autoscreenshot.Registry,
 ) *browserRegistry {
 	bt := chromium.NewBrowserType(vu)
 	builder := func(ctx, vuCtx context.Context) (*common.Browser, error) {
@@ -228,6 +234,7 @@ func newBrowserRegistry(
 	r := &browserRegistry{
 		vu:             vu,
 		tracesMetadata: tracesMetadata,
+		asReg:          asReg,
 		m:              make(map[int64]*common.Browser),
 		buildFn:        builder,
 	}
@@ -313,9 +320,11 @@ func (r *browserRegistry) handleIterEvents(
 				continue
 			}
 			r.setBrowser(data.Iteration, b)
+			r.asReg.OnIterStart(data.VUID, data.Iteration)
 		case k6event.IterEnd:
 			r.deleteBrowser(data.Iteration)
 			r.tr.endIterationTrace(data.Iteration)
+			r.asReg.OnIterEnd(data.VUID, data.Iteration)
 		default:
 			r.vu.State().Logger.Warnf("received unexpected event type: %v", e.Type)
 		}
@@ -350,6 +359,10 @@ func (r *browserRegistry) handleExitEvent(exitCh <-chan *k6event.Event, unsubscr
 	// so we avoid a race condition between active spans
 	// being flushed and test exiting
 	r.stopTracesRegistry()
+
+	// Close any remaining auto-screenshot Capturers so their worker
+	// goroutines drain pending captures and exit cleanly.
+	r.asReg.Stop()
 }
 
 func (r *browserRegistry) setBrowser(id int64, b *common.Browser) {
