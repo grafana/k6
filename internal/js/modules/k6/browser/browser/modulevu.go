@@ -109,10 +109,24 @@ func (vu moduleVU) captureOpenPages(reason string, force bool) {
 		return
 	}
 
+	// FullPage captures the entire scrollable document, not just the
+	// current viewport. Viewport-only screenshots silently truncate
+	// any below-the-fold content (rate buttons, modal contents past
+	// the first screen, lazy-loaded sections) which defeats the
+	// debugging purpose of the feature. The cost is real - fullPage
+	// screenshots mutate the viewport mid-iteration and are ~5-10x
+	// more expensive per capture than viewport-only - but the user
+	// asked for "show me what was on the page" and only fullPage
+	// delivers that reliably.
 	ctx := vu.Context()
+	opts := &common.PageScreenshotOptions{
+		Format:   common.ImageFormatPNG,
+		FullPage: true,
+		Quality:  100,
+	}
 	for _, page := range pages {
 		fn := func(_ context.Context) ([]byte, error) {
-			return page.Screenshot(&common.PageScreenshotOptions{}, noopScreenshotPersister{})
+			return page.Screenshot(opts, noopScreenshotPersister{})
 		}
 		if force {
 			c.CaptureForced(ctx, reason, fn)
