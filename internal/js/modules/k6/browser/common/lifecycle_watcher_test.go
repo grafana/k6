@@ -1,12 +1,35 @@
 package common
 
 import (
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common/js"
 )
+
+func TestEventFrameDOMMutationIsUnique(t *testing.T) {
+	t.Parallel()
+
+	assert.NotEmpty(t, EventFrameDOMMutation)
+	assert.NotEqual(t, EventFrameAddLifecycle, EventFrameDOMMutation)
+}
+
+func TestMutationObserverScript(t *testing.T) {
+	t.Parallel()
+
+	s := js.DOMMutationObserverScript
+	assert.NotEmpty(t, s, "embedded script must be non-empty")
+	// Sanity-check the script references the binding the Go side
+	// registers; if these drift, integration fails silently.
+	assert.True(t, strings.Contains(s, domMutationBinding),
+		"script must call window.%s", domMutationBinding)
+	assert.True(t, strings.Contains(s, "MutationObserver"),
+		"script must install a MutationObserver")
+}
 
 func TestDebouncer(t *testing.T) {
 	t.Parallel()

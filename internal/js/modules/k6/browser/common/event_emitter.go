@@ -22,6 +22,13 @@ const (
 
 	EventFrameNavigation   string = "navigation"
 	EventFrameAddLifecycle string = "addlifecycle"
+
+	// EventFrameDOMMutation is emitted by the FrameSession binding handler
+	// whenever the k6browserDomMutation CDP binding is invoked from the
+	// page's injected MutationObserver script. Subscribers (the
+	// auto-screenshot lifecycle watcher) use it as a "page changed" signal
+	// in Mode B.
+	EventFrameDOMMutation string = "dommutation"
 )
 
 // Event as emitted by an EventEmiter.
