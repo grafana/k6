@@ -109,20 +109,23 @@ func (vu moduleVU) captureOpenPages(reason string, force bool) {
 		return
 	}
 
-	// FullPage captures the entire scrollable document, not just the
-	// current viewport. Viewport-only screenshots silently truncate
-	// any below-the-fold content (rate buttons, modal contents past
-	// the first screen, lazy-loaded sections) which defeats the
-	// debugging purpose of the feature. The cost is real - fullPage
-	// screenshots mutate the viewport mid-iteration and are ~5-10x
-	// more expensive per capture than viewport-only - but the user
-	// asked for "show me what was on the page" and only fullPage
-	// delivers that reliably.
+	// Viewport-sized capture. Page.captureScreenshot's default
+	// behaviour is to image the current visible viewport, which
+	// follows any scrolling the script (or k6 browser's
+	// scroll-into-view-if-needed click path) has done since the
+	// previous capture. Below-the-fold content that the script
+	// interacts with appears in the next screenshot because the
+	// click auto-scrolls the page; below-the-fold content the
+	// script never touches is intentionally not shown.
+	//
+	// FullPage was tried during the POC but produced disproportionate
+	// outputs on long marketing-style pages (10MB+ per shot, viewport
+	// resize mid-iteration) without delivering substantially more
+	// debugging value than viewport-with-scroll-tracking.
 	ctx := vu.Context()
 	opts := &common.PageScreenshotOptions{
-		Format:   common.ImageFormatPNG,
-		FullPage: true,
-		Quality:  100,
+		Format:  common.ImageFormatPNG,
+		Quality: 100,
 	}
 	for _, page := range pages {
 		fn := func(_ context.Context) ([]byte, error) {
