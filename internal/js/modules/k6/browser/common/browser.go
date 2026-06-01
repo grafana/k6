@@ -196,6 +196,13 @@ func (b *Browser) getDefaultBrowserContextOrMatchedID(id cdp.BrowserContextID) *
 }
 
 func (b *Browser) getPages() []*Page {
+	return b.Pages()
+}
+
+// Pages returns a snapshot of all currently-tracked pages across all
+// browser contexts owned by this Browser. The returned slice is safe to
+// retain; mutating it does not affect the Browser's internal state.
+func (b *Browser) Pages() []*Page {
 	b.pagesMu.RLock()
 	defer b.pagesMu.RUnlock()
 	pages := make([]*Page, 0, len(b.pages))

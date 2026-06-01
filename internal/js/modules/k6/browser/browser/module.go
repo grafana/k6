@@ -14,8 +14,10 @@ import (
 	"github.com/grafana/sobek"
 
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common/autoscreenshot"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/env"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/log"
 
 	k6modules "go.k6.io/k6/v2/js/modules"
 )
@@ -30,12 +32,13 @@ type (
 	// RootModule is the global module instance that will create module
 	// instances for each VU.
 	RootModule struct {
-		PidRegistry    *pidRegistry
-		remoteRegistry *remoteRegistry
-		initOnce       *sync.Once
-		tracesMetadata map[string]string
-		filePersister  filePersister
-		testRunID      string
+		PidRegistry        *pidRegistry
+		remoteRegistry     *remoteRegistry
+		initOnce           *sync.Once
+		tracesMetadata     map[string]string
+		filePersister      filePersister
+		testRunID          string
+		autoScreenshotMode autoscreenshot.Mode
 	}
 
 	// JSModule exposes the properties available to the JS script.
@@ -76,6 +79,13 @@ func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 		m.initialize(vu)
 	})
 
+	asReg := autoscreenshot.NewRegistry(
+		m.autoScreenshotMode,
+		m.filePersister,
+		resolveTestName(vu),
+		log.NewNullLogger(),
+	)
+
 	return &ModuleInstance{
 		mod: &JSModule{
 			Browser: mapBrowserToSobek(moduleVU{
@@ -87,15 +97,33 @@ func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 					m.remoteRegistry,
 					m.PidRegistry,
 					m.tracesMetadata,
+					asReg,
 				),
 				taskQueueRegistry: newTaskQueueRegistry(vu),
 				filePersister:     m.filePersister,
+				autoScreenshot:    asReg,
 				testRunID:         m.testRunID,
 			}),
 			Devices:         common.GetDevices(),
 			NetworkProfiles: common.GetNetworkProfiles(),
 		},
 	}
+}
+
+// resolveTestName picks a stable name for auto-screenshot path scoping. It
+// prefers the first configured scenario name and falls back to a generic
+// default. The scenario name is available via the VU's lib.Options when
+// running under k6.
+//
+// This is provisional: a follow-up could derive a more informative name
+// from the script filename or test-run metadata.
+func resolveTestName(vu k6modules.VU) string {
+	if state := vu.State(); state != nil {
+		for name := range state.Options.Scenarios {
+			return name
+		}
+	}
+	return "k6-test"
 }
 
 // Exports returns the exports of the JS module so that it can be used in test
@@ -125,5 +153,8 @@ func (m *RootModule) initialize(vu k6modules.VU) {
 	}
 	if e, ok := initEnv.LookupEnv(env.K6TestRunID); ok && e != "" {
 		m.testRunID = e
+	}
+	if v, ok := initEnv.LookupEnv(env.AutoScreenshot); ok {
+		m.autoScreenshotMode = autoscreenshot.ParseMode(v)
 	}
 }
