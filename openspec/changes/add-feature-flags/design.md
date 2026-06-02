@@ -30,6 +30,7 @@ The chosen design is recorded in the stakeholder-approved Product DNA & Design D
 - **Lifecycle stages**: `Experimental` (gated path runs only if activated), `GA` (gated path runs unconditionally; activation only nudges removal via `INFO`), `Deprecated` (gated path runs only if activated; activation triggers `WARN`). `Unknown` is a runtime resolution outcome, not a definable stage.
 - **Lifecycle journey**: `Experimental` → `GA` → (grace) → removed, or `Experimental` → `Deprecated` → (grace) → removed. Registry removal is the forcing function.
 - **Grace periods**: flexible, default guidance 1–2 minor releases, delegated to the retiring maintainer, informed by telemetry.
+- **Removal action at gated sites**: when the struct field is deleted and the compiler flags each `if flags.X { ... }` site, the maintainer's action depends on how the feature ended. Adopted (was GA): keep the code inside the block, remove the `if` wrapper — the behavior is now unconditionally on. Abandoned (was Deprecated): delete the entire block — the behavior is being killed.
 - **Activation set**: canonical names honored for one run = winner-takes-all surface choice → within-env union → legacy-alias canonical substitution. Drives metric tags and telemetry.
 - **Resolution outcome**: each activation-set name is `Recognized` (matches registry → lifecycle log/behavior) or `Unknown` (`ERROR`, run continues, no contribution).
 
