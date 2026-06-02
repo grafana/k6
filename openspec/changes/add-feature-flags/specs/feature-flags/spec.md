@@ -205,6 +205,16 @@ The alias phase is independent of the canonical feature's lifecycle stage. The t
 - **GIVEN** a Phase-1 honored alias set to a truthy value
 - **THEN** the canonical feature activates, a `WARN` is emitted, and the run continues
 
+#### Scenario: Phase-1 alias with removed canonical errors and warns
+- **GIVEN** a Phase-1 honored alias `K6_FOO_ENABLED` maps to canonical `foo`
+- **AND** `foo` has been removed from the registry (maintainer has not yet moved alias to Phase 2)
+- **WHEN** `K6_FOO_ENABLED=true` is set
+- **THEN** the alias-side `WARN` is emitted (Phase-1 alias deprecation)
+- **AND** `foo` resolves as Unknown, an `ERROR` is emitted with `{ "feature": "foo", "outcome": "unknown", "source": "env_legacy_alias" }`
+- **AND** `foo` does not enter the activation set and the run continues
+
+Note: when removing a canonical from the registry, maintainers SHOULD move its Phase-1 aliases to Phase 2 (tombstoned) to avoid this transitional state.
+
 #### Scenario: Phase 2 tombstoned alias errors and continues
 - **GIVEN** a tombstoned alias env var is set
 - **THEN** an `ERROR` is emitted with a migration hint naming `--features` / `K6_FEATURES`, no feature is activated, and the run continues

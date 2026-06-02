@@ -43,6 +43,30 @@ Team consensus (Design Doc): flags declared as exported fields on a singleton st
 
 A build-time code generator emitting the struct from YAML was considered and rejected: it satisfies the same invariants but adds a `go generate` step and a separate source-of-truth file. Hand-written struct keeps definitions co-located with Go code. SDK-based and string-keyed strategies are excluded by D1.
 
+#### Struct shape
+
+Each flag is an exported `bool` field. Lifecycle stage, description, and optional name override are declared as struct tags on the same field:
+
+```go
+type Flags struct {
+    NativeHistograms bool `lifecycle:"experimental" help:"Use HDR histograms for built-in metrics"`
+    NewSummary       bool `lifecycle:"ga"           help:"Enable the new end-of-test summary format"`
+    OldCsvOutput     bool `lifecycle:"deprecated"   help:"Keep the legacy CSV output format" name:"old-csv"`
+}
+```
+
+Engine code gates on fields directly:
+
+```go
+if flags.NativeHistograms {
+    // experimental code path
+}
+```
+
+#### Canonical name derivation
+
+The bootstrapper derives the canonical kebab-case name from the Go field name by inserting a hyphen before each uppercase letter and lowercasing everything (e.g., `NativeHistograms` → `native-histograms`, `NewSummary` → `new-summary`). If a `name` struct tag is present, it overrides the derived name (e.g., `OldCsvOutput` with `name:"old-csv"` uses `old-csv` instead of `old-csv-output`). The resulting canonical name is validated against `^[a-z][a-z0-9]*(-[a-z0-9]+)*$`; a non-conforming name is a hard error at definition time.
+
 ### D3 — Winner-takes-all governs the activation set, not engine behavior
 A higher-priority *supplied* surface fully overrides lower ones (enables "disable by omission"). But `GA` features are forced on at startup regardless of the activation set; omitting a `GA` flag from the winning surface does not turn its behavior off.
 

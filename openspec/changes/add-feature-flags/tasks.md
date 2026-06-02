@@ -33,7 +33,7 @@
 ## 5. Observability — metrics tags & telemetry
 
 - [ ] 5.1 Emit sparse per-sample boolean tags `k6_feature_<name_snake>="true"` for activated features via existing tag machinery (kebab→snake for tag key only)
-- [ ] 5.2 Verify propagation across output formats (JSON, CSV, Prometheus RW, Cloud, StatsD, Datadog, Loki)
+- [ ] 5.2 Verify propagation across output formats (JSON, CSV, Prometheus RW, Cloud, StatsD, Datadog, InfluxDB, OpenTelemetry)
 - [ ] 5.3 Add resolved activation set (sorted canonical kebab-case names) to usage telemetry
 - [ ] 5.4 Unit/integration-test: GA-not-activated emits no tag/telemetry; legacy-alias activation reported once under canonical name
 
