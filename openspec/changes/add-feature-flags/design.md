@@ -17,7 +17,6 @@ The chosen design is recorded in the stakeholder-approved Product DNA & Design D
 **Non-Goals:**
 - xk6 extension-defined flags (feature package stays internal to k6 core).
 - Mid-test toggling; per-VU/per-scenario/per-iteration variation. Flags are global, evaluated once before init.
-- *Honoring* the script `options` block as a feature-activation surface. (Note: this change still ships the required warn-and-ignore behavior — detect `options.features`, emit `WARN { source: "options" }`, ignore it, continue. Only treating it as an activation surface is the non-goal.)
 - Remote/dynamically fetched flag state.
 - `GA → Deprecated` lifecycle path.
 - Operational configuration variables (e.g. `K6_PROFILING_ENABLED`, `K6_CLOUD_TRACES_ENABLED`, `K6_WEB_DASHBOARD`) — distinguished by lifecycle intent: a feature flag is a toggle that **will eventually be removed**; operational config is intended to remain user-controllable indefinitely.
@@ -30,6 +29,7 @@ The chosen design is recorded in the stakeholder-approved Product DNA & Design D
 - **Lifecycle stages**: `Experimental` (gated path runs only if activated), `GA` (gated path runs unconditionally; activation only nudges removal via `INFO`), `Deprecated` (gated path runs only if activated; activation triggers `WARN`). `Unknown` is a runtime resolution outcome, not a definable stage.
 - **Lifecycle journey**: `Experimental` → `GA` → (grace) → removed, or `Experimental` → `Deprecated` → (grace) → removed. Registry removal is the forcing function.
 - **Grace periods**: flexible, default guidance 1–2 minor releases, delegated to the retiring maintainer, informed by telemetry.
+- **Removal action at gated sites**: when the struct field is deleted and the compiler flags each `if flags.X { ... }` site, the maintainer's action depends on how the feature ended. Adopted (was GA): keep the code inside the block, remove the `if` wrapper — the behavior is now unconditionally on. Abandoned (was Deprecated): delete the entire block — the behavior is being killed.
 - **Activation set**: canonical names honored for one run = winner-takes-all surface choice → within-env union → legacy-alias canonical substitution. Drives metric tags and telemetry.
 - **Resolution outcome**: each activation-set name is `Recognized` (matches registry → lifecycle log/behavior) or `Unknown` (`ERROR`, run continues, no contribution).
 
@@ -42,6 +42,30 @@ The "registry removal must fail the build" invariant (maintainability requiremen
 Team consensus (Design Doc): flags declared as exported fields on a singleton struct; a small startup bootstrapper walks the struct via reflection to wire metadata (lifecycle, description) and apply user activation. Engine reads `flags.NewSummary` directly. Satisfies D1 and the typed-identifier family.
 
 A build-time code generator emitting the struct from YAML was considered and rejected: it satisfies the same invariants but adds a `go generate` step and a separate source-of-truth file. Hand-written struct keeps definitions co-located with Go code. SDK-based and string-keyed strategies are excluded by D1.
+
+#### Struct shape
+
+Each flag is an exported `bool` field. Lifecycle stage, description, and optional name override are declared as struct tags on the same field:
+
+```go
+type Flags struct {
+    NativeHistograms bool `lifecycle:"experimental" help:"Use HDR histograms for built-in metrics"`
+    NewSummary       bool `lifecycle:"ga"           help:"Enable the new end-of-test summary format"`
+    OldCsvOutput     bool `lifecycle:"deprecated"   help:"Keep the legacy CSV output format" name:"old-csv"`
+}
+```
+
+Engine code gates on fields directly:
+
+```go
+if flags.NativeHistograms {
+    // experimental code path
+}
+```
+
+#### Canonical name derivation
+
+The bootstrapper derives the canonical kebab-case name from the Go field name by inserting a hyphen before each uppercase letter and lowercasing everything (e.g., `NativeHistograms` → `native-histograms`, `NewSummary` → `new-summary`). If a `name` struct tag is present, it overrides the derived name (e.g., `OldCsvOutput` with `name:"old-csv"` uses `old-csv` instead of `old-csv-output`). The resulting canonical name is validated against `^[a-z][a-z0-9]*(-[a-z0-9]+)*$`; a non-conforming name is a hard error at definition time.
 
 ### D3 — Winner-takes-all governs the activation set, not engine behavior
 A higher-priority *supplied* surface fully overrides lower ones (enables "disable by omission"). But `GA` features are forced on at startup regardless of the activation set; omitting a `GA` flag from the winning surface does not turn its behavior off.

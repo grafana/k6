@@ -31,8 +31,7 @@ This change introduces **k6 Feature Flags**: a single standardized system govern
 - **Telemetry**: activation set added to usage report.
 - **Migration**: `K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM` rewired as a Phase-1 honored alias for `native-histograms`.
 - **Distributed**: Cloud API and k6-operator env-var passthrough carries `K6_FEATURES` (no orchestrator parsing).
-- **`options.features`**: *activating* features from the script `options` block is unsupported — but detecting it, emitting a `WARN`, ignoring it, and continuing IS a required behavior of this change (the warn-and-ignore path ships in the first delivery).
-- **Out of scope**: xk6 extension-defined flags, mid-test toggling, *honoring* `options.features` as an activation surface, remote-fetched flag state, per-VU variation, `GA→Deprecated` path, operational config variables (e.g. `K6_PROFILING_ENABLED`).
+- **Out of scope**: xk6 extension-defined flags, mid-test toggling, remote-fetched flag state, per-VU variation, `GA→Deprecated` path, operational config variables (e.g. `K6_PROFILING_ENABLED`).
 
 ## References
 

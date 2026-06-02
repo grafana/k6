@@ -86,19 +86,9 @@ The activation-resolution step MUST set the boolean field of every `GA`-lifecycl
 - **GIVEN** `js-modules-v2` is `GA` and the user activated it
 - **THEN** the field is `true`, a GA `INFO` "please remove this flag" log is emitted, and the tag `k6_feature_js_modules_v2="true"` is emitted
 
-### Requirement: Script options block is unsupported
-
-Setting feature flags from inside a script's `options` block MUST NOT be supported. If the script's `options` object contains a `features` key, the engine MUST emit a `WARN` naming the supported surfaces (`--features` / `K6_FEATURES` / JSON config) before the test starts, carrying the structured field `{ "source": "options" }`. The activation set MUST be unaffected and the run continues normally.
-
-#### Scenario: options.features warns and is ignored
-- **GIVEN** `script.js` exports `options` containing a `features` key
-- **WHEN** the user runs `k6 run script.js` with no other feature configuration
-- **THEN** a `WARN` is emitted with field `{ "source": "options" }`
-- **AND** the activation set is unaffected (empty here) and the run continues
-
 ### Requirement: Hot-path overhead is a direct field read
 
-Per-call overhead in engine hot paths MUST be a direct boolean field read (or equivalent constant-time access) — no per-call map lookup, string compare, allocation, syscall, or lock on the gated branch. This is a structural requirement on the access path, verified by code review (and optionally `go build -gcflags=-m` inliner inspection), not a wall-clock threshold. A CI gate keyed to an absolute nanosecond value is explicitly NOT required; implementations MAY include a micro-benchmark for regression detection only.
+Per-call overhead in engine hot paths MUST be a direct boolean field read (or equivalent constant-time access) — no per-call map lookup, string compare, allocation, syscall, or lock on the gated branch. This is a structural requirement on the access path, verified by code review (and optionally `go build -gcflags=-m` inliner inspection), not a wall-clock threshold.
 
 Resolution cost (parsing, validating, logging, and any reflection-based bootstrap) MUST be paid once per process at startup — never on a hot path — and MUST NOT noticeably impact CLI startup time perceived by users. Expensive startup reflection or validation that perceptibly slows CLI startup violates this requirement even if the hot-path read is structurally correct.
 
@@ -115,7 +105,7 @@ Resolution cost (parsing, validating, logging, and any reflection-based bootstra
 
 When an activated name resolves as Recognized, the engine MUST emit exactly one structured log per activated flag, at a level determined by lifecycle stage: `Experimental` → `INFO` ("experimental, may change/removed"); `GA` → `INFO` ("now available by default, please remove this flag"); `Deprecated` → `WARN` ("deprecated, will be removed"). Exact wording is illustrative; normative are (a) the level per stage, (b) exactly one message per activated recognized flag, and (c) structured `logrus` fields including `{ "feature": "<canonical-name>", "lifecycle": "<stage>" }` where `<stage>` is the lowercase form (`experimental`/`ga`/`deprecated`).
 
-The `source` field uses a single uniform vocabulary across all emission points: `cli`, `env`, `env_legacy_alias`, `env_tombstoned_alias`, `json`, `options` — all snake_case, single-token, no dots. `feature` always carries a canonical kebab-case name; `env` always carries a legacy `K6_*` var name; `lifecycle` always carries a lowercase stage discriminator (`experimental`/`ga`/`deprecated`/`deprecated_alias`).
+The `source` field uses a single uniform vocabulary across all emission points: `cli`, `env`, `env_legacy_alias`, `env_tombstoned_alias`, `json`, — all snake_case, single-token, no dots. `feature` always carries a canonical kebab-case name; `env` always carries a legacy `K6_*` var name; `lifecycle` always carries a lowercase stage discriminator (`experimental`/`ga`/`deprecated`/`deprecated_alias`).
 
 #### Scenario: Experimental activation emits one INFO
 - **GIVEN** `native-histograms` is `Experimental` and activated
@@ -204,6 +194,16 @@ The alias phase is independent of the canonical feature's lifecycle stage. The t
 #### Scenario: Phase 1 honored alias activates feature
 - **GIVEN** a Phase-1 honored alias set to a truthy value
 - **THEN** the canonical feature activates, a `WARN` is emitted, and the run continues
+
+#### Scenario: Phase-1 alias with removed canonical errors and warns
+- **GIVEN** a Phase-1 honored alias `K6_FOO_ENABLED` maps to canonical `foo`
+- **AND** `foo` has been removed from the registry (maintainer has not yet moved alias to Phase 2)
+- **WHEN** `K6_FOO_ENABLED=true` is set
+- **THEN** the alias-side `WARN` is emitted (Phase-1 alias deprecation)
+- **AND** `foo` resolves as Unknown, an `ERROR` is emitted with `{ "feature": "foo", "outcome": "unknown", "source": "env_legacy_alias" }`
+- **AND** `foo` does not enter the activation set and the run continues
+
+Note: when removing a canonical from the registry, maintainers SHOULD move its Phase-1 aliases to Phase 2 (tombstoned) to avoid this transitional state.
 
 #### Scenario: Phase 2 tombstoned alias errors and continues
 - **GIVEN** a tombstoned alias env var is set
