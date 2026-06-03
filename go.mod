@@ -54,7 +54,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.43.0
 	go.opentelemetry.io/proto/otlp v1.10.0
 	go.uber.org/goleak v1.3.0
-	golang.org/x/crypto v0.51.0
+	golang.org/x/crypto v0.52.0
 	golang.org/x/crypto/x509roots/fallback v0.0.0-20260413170323-a8e9237a216b
 	golang.org/x/net v0.55.0
 	golang.org/x/sync v0.20.0
