@@ -89,6 +89,19 @@ const (
 	// consumer handles its own dedup or correlates by API-call seq rather
 	// than image bytes.
 	AutoScreenshotDedup = "K6_BROWSER_AUTO_SCREENSHOT_DEDUP"
+
+	// AutoScreenshotPersist controls whether the auto-screenshot capturer
+	// writes captured frames (and dedup-sidecar JSON files) to the
+	// configured Persister. Defaults to enabled (current behaviour).
+	// Accepted values follow strconv.ParseBool; set to "false"/"0"/"off"
+	// to make the capturer event-only.
+	//
+	// In event-only mode the page-scoped `auto-screenshot` event still
+	// fires with the raw PNG bytes; the on-disk write (or presigned-URL
+	// upload via K6_BROWSER_SCREENSHOTS_OUTPUT) is skipped. Useful for
+	// consumers that ship bytes elsewhere from a JS handler and do not
+	// want the duplicate local copy.
+	AutoScreenshotPersist = "K6_BROWSER_AUTO_SCREENSHOT_PERSIST"
 )
 
 // Infrastructural.

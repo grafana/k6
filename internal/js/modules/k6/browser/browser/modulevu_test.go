@@ -39,7 +39,7 @@ func TestAfterAction_NoOpWhenStateNil(t *testing.T) {
 	vu := k6test.NewVU(t)
 
 	reg := autoscreenshot.NewRegistry(
-		autoscreenshot.ModeActions, noopPersister{}, "test", log.NewNullLogger(), true,
+		autoscreenshot.ModeActions, noopPersister{}, "test", log.NewNullLogger(), true, true,
 	)
 	mvu := moduleVU{
 		VU:             vu.VU,
@@ -58,7 +58,7 @@ func TestAfterAction_NoOpWhenNoCapturerForIteration(t *testing.T) {
 	vu.ActivateVU()
 
 	reg := autoscreenshot.NewRegistry(
-		autoscreenshot.ModeActions, noopPersister{}, "test", log.NewNullLogger(), true,
+		autoscreenshot.ModeActions, noopPersister{}, "test", log.NewNullLogger(), true, true,
 	)
 	mvu := moduleVU{
 		VU:             vu.VU,
