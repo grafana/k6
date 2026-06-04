@@ -72,6 +72,13 @@ func readMainK6VersionInfo(bi *debug.BuildInfo, fallback string) k6VersionInfo {
 }
 
 // readLibK6VersionInfo handles the case where k6 is used as a library inside another binary.
+//
+// When xk6 builds a wrapper with a filesystem `--replace` for k6 (the
+// common dev case), Go records the replacement's version as "(devel)"
+// rather than empty, which previously slipped through the fallback
+// guard and was reported as the binary's k6 version. Fall back to the
+// build.Version constant in that case so xk6-built binaries report
+// the real k6 version they were built from.
 func readLibK6VersionInfo(bi *debug.BuildInfo, fallback string) k6VersionInfo {
 	var info k6VersionInfo
 	for _, dep := range bi.Deps {
@@ -84,7 +91,7 @@ func readLibK6VersionInfo(bi *debug.BuildInfo, fallback string) k6VersionInfo {
 			break
 		}
 	}
-	if info.version == "" {
+	if info.version == "" || info.version == "(devel)" {
 		info.version = fallback
 	}
 	return info
