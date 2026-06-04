@@ -17,7 +17,7 @@ func mapRequest(vu moduleVU, r *common.Request) mapping {
 	rt := vu.Runtime()
 	maps := mapping{
 		"allHeaders": func() *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "Request.allHeaders", func() (any, error) {
 				return r.AllHeaders(), nil
 			})
 		},
@@ -26,7 +26,7 @@ func mapRequest(vu moduleVU, r *common.Request) mapping {
 			return rt.ToValue(mf).ToObject(rt)
 		},
 		"headerValue": func(name string) *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "Request.headerValue", func() (any, error) {
 				v, ok := r.HeaderValue(name)
 				if !ok {
 					return nil, nil
@@ -37,7 +37,7 @@ func mapRequest(vu moduleVU, r *common.Request) mapping {
 		},
 		"headers": r.Headers,
 		"headersArray": func() *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "Request.headersArray", func() (any, error) {
 				return r.HeadersArray(), nil
 			})
 		},
@@ -59,7 +59,7 @@ func mapRequest(vu moduleVU, r *common.Request) mapping {
 		},
 		"resourceType": r.ResourceType,
 		"response": func() *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "Request.response", func() (any, error) {
 				resp := r.Response()
 				if resp == nil {
 					return nil, nil

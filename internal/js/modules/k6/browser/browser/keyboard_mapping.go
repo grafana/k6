@@ -11,12 +11,12 @@ import (
 func mapKeyboard(vu moduleVU, kb *common.Keyboard) mapping {
 	return mapping{
 		"down": func(key string) *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "Keyboard.down", func() (any, error) {
 				return nil, kb.Down(key) //nolint:wrapcheck
 			})
 		},
 		"up": func(key string) *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "Keyboard.up", func() (any, error) {
 				return nil, kb.Up(key) //nolint:wrapcheck
 			})
 		},
@@ -25,7 +25,7 @@ func mapKeyboard(vu moduleVU, kb *common.Keyboard) mapping {
 			if err != nil {
 				return nil, fmt.Errorf("parsing keyboard options: %w", err)
 			}
-			return promise(vu, func() (any, error) {
+			return promise(vu, "Keyboard.press", func() (any, error) {
 				return nil, kb.Press(key, kbopts)
 			}), nil
 		},
@@ -34,12 +34,12 @@ func mapKeyboard(vu moduleVU, kb *common.Keyboard) mapping {
 			if err != nil {
 				return nil, fmt.Errorf("parsing keyboard options: %w", err)
 			}
-			return promise(vu, func() (any, error) {
+			return promise(vu, "Keyboard.type", func() (any, error) {
 				return nil, kb.Type(text, kbopts)
 			}), nil
 		},
 		"insertText": func(text string) *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "Keyboard.insertText", func() (any, error) {
 				return nil, kb.InsertText(text) //nolint:wrapcheck
 			})
 		},

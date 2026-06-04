@@ -15,7 +15,7 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 	rt := vu.Runtime()
 	maps := mapping{
 		"boundingBox": func() *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "ElementHandle.boundingBox", func() (any, error) {
 				box, err := eh.BoundingBox()
 				// We want to avoid errors when an element is not visible or detached and instead
 				// opt to return a nil rectangle -- this matches Playwright's behaviour.
@@ -30,7 +30,7 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing check options: %w", err)
 			}
-			return promise(vu, func() (any, error) {
+			return promise(vu, "ElementHandle.check", func() (any, error) {
 				return nil, eh.Check(popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -40,13 +40,13 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 				return nil, fmt.Errorf("parsing element click options: %w", err)
 			}
 
-			return promise(vu, func() (any, error) {
+			return promise(vu, "ElementHandle.click", func() (any, error) {
 				err := eh.Click(popts)
 				return nil, err //nolint:wrapcheck
 			}), nil
 		},
 		"contentFrame": func() *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "ElementHandle.contentFrame", func() (any, error) {
 				f, err := eh.ContentFrame()
 				if err != nil {
 					return nil, err //nolint:wrapcheck
@@ -59,12 +59,12 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing element double click options: %w", err)
 			}
-			return promise(vu, func() (any, error) {
+			return promise(vu, "ElementHandle.dblclick", func() (any, error) {
 				return nil, eh.Dblclick(popts) //nolint:wrapcheck
 			}), nil
 		},
 		"dispatchEvent": func(typ string, eventInit sobek.Value) *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "ElementHandle.dispatchEvent", func() (any, error) {
 				return nil, eh.DispatchEvent(typ, exportArg(eventInit)) //nolint:wrapcheck
 			})
 		},
@@ -73,17 +73,17 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing element fill options: %w", err)
 			}
-			return promise(vu, func() (any, error) {
+			return promise(vu, "ElementHandle.fill", func() (any, error) {
 				return nil, eh.Fill(value, popts) //nolint:wrapcheck
 			}), nil
 		},
 		"focus": func() *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "ElementHandle.focus", func() (any, error) {
 				return nil, eh.Focus() //nolint:wrapcheck
 			})
 		},
 		"getAttribute": func(name string) *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "ElementHandle.getAttribute", func() (any, error) {
 				s, ok, err := eh.GetAttribute(name)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
@@ -99,17 +99,17 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing element hover options: %w", err)
 			}
-			return promise(vu, func() (any, error) {
+			return promise(vu, "ElementHandle.hover", func() (any, error) {
 				return nil, eh.Hover(popts) //nolint:wrapcheck
 			}), nil
 		},
 		"innerHTML": func() *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "ElementHandle.innerHTML", func() (any, error) {
 				return eh.InnerHTML() //nolint:wrapcheck
 			})
 		},
 		"innerText": func() *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "ElementHandle.innerText", func() (any, error) {
 				return eh.InnerText() //nolint:wrapcheck
 			})
 		},
@@ -118,42 +118,42 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing element input value options: %w", err)
 			}
-			return promise(vu, func() (any, error) {
+			return promise(vu, "ElementHandle.inputValue", func() (any, error) {
 				return eh.InputValue(popts) //nolint:wrapcheck
 			}), nil
 		},
 		"isChecked": func() *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "ElementHandle.isChecked", func() (any, error) {
 				return eh.IsChecked() //nolint:wrapcheck
 			})
 		},
 		"isDisabled": func() *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "ElementHandle.isDisabled", func() (any, error) {
 				return eh.IsDisabled() //nolint:wrapcheck
 			})
 		},
 		"isEditable": func() *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "ElementHandle.isEditable", func() (any, error) {
 				return eh.IsEditable() //nolint:wrapcheck
 			})
 		},
 		"isEnabled": func() *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "ElementHandle.isEnabled", func() (any, error) {
 				return eh.IsEnabled() //nolint:wrapcheck
 			})
 		},
 		"isHidden": func() *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "ElementHandle.isHidden", func() (any, error) {
 				return eh.IsHidden() //nolint:wrapcheck
 			})
 		},
 		"isVisible": func() *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "ElementHandle.isVisible", func() (any, error) {
 				return eh.IsVisible() //nolint:wrapcheck
 			})
 		},
 		"ownerFrame": func() *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "ElementHandle.ownerFrame", func() (any, error) {
 				f, err := eh.OwnerFrame()
 				if err != nil {
 					return nil, err //nolint:wrapcheck
@@ -166,7 +166,7 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing press %q options: %w", key, err)
 			}
-			return promise(vu, func() (any, error) {
+			return promise(vu, "ElementHandle.press", func() (any, error) {
 				return nil, eh.Press(key, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -176,7 +176,7 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 				return nil, fmt.Errorf("parsing element handle screenshot options: %w", err)
 			}
 
-			return promise(vu, func() (any, error) {
+			return promise(vu, "ElementHandle.screenshot", func() (any, error) {
 				bb, err := eh.Screenshot(popts, vu.filePersister)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
@@ -192,7 +192,7 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing scrollIntoViewIfNeeded options: %w", err)
 			}
-			return promise(vu, func() (any, error) {
+			return promise(vu, "ElementHandle.scrollIntoViewIfNeeded", func() (any, error) {
 				return nil, eh.ScrollIntoViewIfNeeded(popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -205,7 +205,7 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing selectOption options: %w", err)
 			}
-			return promise(vu, func() (any, error) {
+			return promise(vu, "ElementHandle.selectOption", func() (any, error) {
 				return eh.SelectOption(convValues, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -214,7 +214,7 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing selectText options: %w", err)
 			}
-			return promise(vu, func() (any, error) {
+			return promise(vu, "ElementHandle.selectText", func() (any, error) {
 				return nil, eh.SelectText(popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -223,7 +223,7 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing setChecked options: %w", err)
 			}
-			return promise(vu, func() (any, error) {
+			return promise(vu, "ElementHandle.setChecked", func() (any, error) {
 				return nil, eh.SetChecked(checked, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -236,7 +236,7 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			if err := pfiles.Parse(vu.Context(), files); err != nil {
 				return nil, fmt.Errorf("parsing setInputFiles parameter: %w", err)
 			}
-			return promise(vu, func() (any, error) {
+			return promise(vu, "ElementHandle.setInputFiles", func() (any, error) {
 				return nil, eh.SetInputFiles(&pfiles, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -245,12 +245,12 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing element tap options: %w", err)
 			}
-			return promise(vu, func() (any, error) {
+			return promise(vu, "ElementHandle.tap", func() (any, error) {
 				return nil, eh.Tap(popts) //nolint:wrapcheck
 			}), nil
 		},
 		"textContent": func() *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "ElementHandle.textContent", func() (any, error) {
 				s, ok, err := eh.TextContent()
 				if err != nil {
 					return nil, err //nolint:wrapcheck
@@ -266,7 +266,7 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing type options: %w", err)
 			}
-			return promise(vu, func() (any, error) {
+			return promise(vu, "ElementHandle.type", func() (any, error) {
 				return nil, eh.Type(text, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -275,7 +275,7 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing uncheck options: %w", err)
 			}
-			return promise(vu, func() (any, error) {
+			return promise(vu, "ElementHandle.uncheck", func() (any, error) {
 				return nil, eh.Uncheck(popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -284,7 +284,7 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing waitForElementState options: %w", err)
 			}
-			return promise(vu, func() (any, error) {
+			return promise(vu, "ElementHandle.waitForElementState", func() (any, error) {
 				return nil, eh.WaitForElementState(state, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -293,7 +293,7 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing waitForSelector %q options: %w", selector, err)
 			}
-			return promise(vu, func() (any, error) {
+			return promise(vu, "ElementHandle.waitForSelector", func() (any, error) {
 				eh, err := eh.WaitForSelector(selector, popts)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
@@ -303,7 +303,7 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 		},
 	}
 	maps["$"] = func(selector string) *sobek.Promise {
-		return promise(vu, func() (any, error) {
+		return promise(vu, "ElementHandle.$", func() (any, error) {
 			eh, err := eh.Query(selector, common.StrictModeOff)
 			if err != nil {
 				return nil, err //nolint:wrapcheck
@@ -320,7 +320,7 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 		})
 	}
 	maps["$$"] = func(selector string) *sobek.Promise {
-		return promise(vu, func() (any, error) {
+		return promise(vu, "ElementHandle.$$", func() (any, error) {
 			ehs, err := eh.QueryAll(selector)
 			if err != nil {
 				return nil, err //nolint:wrapcheck

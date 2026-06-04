@@ -77,9 +77,15 @@ type Capturer struct {
 
 // captureReq is the unit of work passed from Capture callers to the worker.
 type captureReq struct {
-	ctx    context.Context
+	ctx context.Context
+	// reason is the trigger tag ("action" or "failure" today).
 	reason string
-	fn     CaptureFunc
+	// apiName is the JS-visible browser API method that triggered the
+	// capture (e.g. "Page.click", "Locator.waitFor"). Empty when the
+	// caller hasn't propagated a name; downstream code substitutes a
+	// sentinel ("unknown") so paths remain well-formed.
+	apiName string
+	fn      CaptureFunc
 	// forced skips the CRC32 dedup check, persisting the frame even
 	// when its bytes match the previous persisted frame. Used by the
 	// failure-debugging path where the user needs the state at the
@@ -118,11 +124,11 @@ func NewCapturer(opts CapturerOptions) *Capturer {
 // consecutive frames are deduplicated via CRC32; if a caller needs the
 // frame persisted even when its bytes match the previous frame, use
 // CaptureForced instead.
-func (c *Capturer) Capture(ctx context.Context, reason string, fn CaptureFunc) {
+func (c *Capturer) Capture(ctx context.Context, reason, apiName string, fn CaptureFunc) {
 	if c == nil {
 		return
 	}
-	if c.buf.push(captureReq{ctx: ctx, reason: reason, fn: fn}) {
+	if c.buf.push(captureReq{ctx: ctx, reason: reason, apiName: apiName, fn: fn}) {
 		c.mu.Lock()
 		c.dropped++
 		c.mu.Unlock()
@@ -135,11 +141,11 @@ func (c *Capturer) Capture(ctx context.Context, reason string, fn CaptureFunc) {
 // failure-debugging captures where the user needs the state at the
 // moment of failure even when it visually matches the last successful
 // action. Backpressure (drop-oldest) behaves the same as Capture.
-func (c *Capturer) CaptureForced(ctx context.Context, reason string, fn CaptureFunc) {
+func (c *Capturer) CaptureForced(ctx context.Context, reason, apiName string, fn CaptureFunc) {
 	if c == nil {
 		return
 	}
-	if c.buf.push(captureReq{ctx: ctx, reason: reason, fn: fn, forced: true}) {
+	if c.buf.push(captureReq{ctx: ctx, reason: reason, apiName: apiName, fn: fn, forced: true}) {
 		c.mu.Lock()
 		c.dropped++
 		c.mu.Unlock()
@@ -202,7 +208,12 @@ func (c *Capturer) process(req captureReq) {
 	seq := c.seq
 	c.mu.Unlock()
 
-	path := buildPath(c.opts.TestName, c.opts.VU, c.opts.Iter, seq, req.reason, started)
+	apiForLog := req.apiName
+	if apiForLog == "" {
+		apiForLog = "unknown"
+	}
+
+	path := buildPath(c.opts.TestName, c.opts.VU, c.opts.Iter, seq, req.reason, req.apiName, started)
 	if err := c.opts.Persister.Persist(req.ctx, path, bytes.NewReader(buf)); err != nil {
 		c.opts.Logger.Warnf("autoscreenshot",
 			"persist failed (path=%s): %v", path, err)
@@ -216,23 +227,32 @@ func (c *Capturer) process(req captureReq) {
 	// callers commonly wire a NullLogger (to suppress the existing
 	// capture/persist warnings) and the marker must be visible
 	// regardless of that choice. The `auto-screenshot:` prefix is
-	// the stable contract; downstream parsers anchor on it.
+	// the stable contract; downstream parsers anchor on it. api= is
+	// the JS-facing browser API method that triggered this capture
+	// (e.g. Page.click); "unknown" when the caller didn't propagate
+	// one.
 	fmt.Fprintf(os.Stderr,
-		"auto-screenshot: reason=%s seq=%d unix_ms=%d path=%s\n",
-		req.reason, seq, started.UnixMilli(), path)
+		"auto-screenshot: reason=%s api=%s seq=%d unix_ms=%d path=%s\n",
+		req.reason, apiForLog, seq, started.UnixMilli(), path)
 }
 
 // buildPath produces the storage path for one captured frame.
 //
-// Layout: auto-screenshots/{testName}/vu-{vu}/iter-{iter}/{seq:06d}-{reason}-{unix_ms}.png
+// Layout: auto-screenshots/{testName}/vu-{vu}/iter-{iter}/{seq:06d}-{reason}-{api}-{unix_ms}.png
 //
-// The format is stable enough that consumers (e.g. the comparison harness)
-// can parse it; any future change should preserve the segment order so
-// callers can rely on `vu-` and `iter-` prefixes.
-func buildPath(testName string, vu uint64, iter int64, seq uint64, reason string, t time.Time) string {
+// {api} is the sanitised name of the JS-facing browser API call that
+// triggered the capture (e.g. "Page.click"); "unknown" when the caller
+// didn't propagate one. The format is stable enough that consumers can
+// parse it; any future change should preserve segment order so callers
+// can keep relying on `vu-` and `iter-` prefixes.
+func buildPath(testName string, vu uint64, iter int64, seq uint64, reason, apiName string, t time.Time) string {
+	api := sanitize(apiName)
+	if api == "" {
+		api = "unknown"
+	}
 	return fmt.Sprintf(
-		"auto-screenshots/%s/vu-%d/iter-%d/%06d-%s-%d.png",
-		sanitize(testName), vu, iter, seq, sanitize(reason), t.UnixMilli(),
+		"auto-screenshots/%s/vu-%d/iter-%d/%06d-%s-%s-%d.png",
+		sanitize(testName), vu, iter, seq, sanitize(reason), api, t.UnixMilli(),
 	)
 }
 

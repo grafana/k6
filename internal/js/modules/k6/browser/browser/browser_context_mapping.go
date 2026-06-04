@@ -22,12 +22,12 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 	rt := vu.Runtime()
 	return mapping{
 		"addCookies": func(cookies []*common.Cookie) *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "BrowserContext.addCookies", func() (any, error) {
 				return nil, bc.AddCookies(cookies) //nolint:wrapcheck
 			})
 		},
 		"addInitScript": func(script sobek.Value) *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "BrowserContext.addInitScript", func() (any, error) {
 				if k6common.IsNullish(script) {
 					return nil, nil
 				}
@@ -60,22 +60,22 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 			return mapBrowser(vu)
 		},
 		"clearCookies": func() *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "BrowserContext.clearCookies", func() (any, error) {
 				return nil, bc.ClearCookies() //nolint:wrapcheck
 			})
 		},
 		"clearPermissions": func() *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "BrowserContext.clearPermissions", func() (any, error) {
 				return nil, bc.ClearPermissions() //nolint:wrapcheck
 			})
 		},
 		"close": func() *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "BrowserContext.close", func() (any, error) {
 				return nil, bc.Close() //nolint:wrapcheck
 			})
 		},
 		"cookies": func(urls ...string) *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "BrowserContext.cookies", func() (any, error) {
 				return bc.Cookies(urls...) //nolint:wrapcheck
 			})
 		},
@@ -84,7 +84,7 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 			if err != nil {
 				return nil, fmt.Errorf("parsing grant permission options: %w", err)
 			}
-			return promise(vu, func() (any, error) {
+			return promise(vu, "BrowserContext.grantPermissions", func() (any, error) {
 				return nil, bc.GrantPermissions(permissions, popts)
 			}), nil
 		},
@@ -95,7 +95,7 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 			if err != nil {
 				return nil, fmt.Errorf("parsing geo location: %w", err)
 			}
-			return promise(vu, func() (any, error) {
+			return promise(vu, "BrowserContext.setGeolocation", func() (any, error) {
 				return nil, bc.SetGeolocation(&gl)
 			}), nil
 		},
@@ -104,12 +104,12 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 			if err != nil {
 				return nil, fmt.Errorf("parsing HTTP credentials: %w", err)
 			}
-			return promise(vu, func() (any, error) {
+			return promise(vu, "BrowserContext.setHTTPCredentials", func() (any, error) {
 				return nil, bc.SetHTTPCredentials(creds) //nolint:staticcheck
 			}), nil
 		},
 		"setOffline": func(offline bool) *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "BrowserContext.setOffline", func() (any, error) {
 				return nil, bc.SetOffline(offline) //nolint:wrapcheck
 			})
 		},
@@ -138,7 +138,7 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 				}
 			}
 
-			return promise(vu, func() (result any, reason error) {
+			return promise(vu, "BrowserContext.waitForEvent", func() (result any, reason error) {
 				v, err := bc.WaitForEvent(event, pred, popts.Timeout)
 				if err != nil {
 					panicIfFatalError(ctx, err)
@@ -167,7 +167,7 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 			return rt.ToValue(mpages).ToObject(rt)
 		},
 		"newPage": func() *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "BrowserContext.newPage", func() (any, error) {
 				page, err := bc.NewPage()
 				if err != nil {
 					return nil, err //nolint:wrapcheck
