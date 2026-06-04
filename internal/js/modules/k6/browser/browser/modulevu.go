@@ -48,14 +48,33 @@ func (vu moduleVU) Context() context.Context {
 	return k6ext.WithVU(vu.VU.Context(), vu)
 }
 
+// skipAfterActionAPIs lists JS-facing browser APIs whose successful
+// completion never produces meaningful page-state to capture. Today
+// this is just BrowserContext.newPage (which returns a freshly-created
+// blank page; the next user action — typically Page.goto — is the
+// first thing worth seeing). Failures of these APIs still capture via
+// onFailure, since a failure inside newPage is itself informative.
+//
+// Add additional entries only when the API provably produces a no-op
+// frame; over-filtering hides real debugging signal.
+var skipAfterActionAPIs = map[string]struct{}{
+	"BrowserContext.newPage": {},
+}
+
 // afterAction schedules a screenshot capture for the current iteration's
 // open pages when auto-screenshot mode A (actions) is active. Called from
 // promise() after a successful JS-facing browser API call. apiName is the
 // JS-visible method (e.g. "Page.click") that has just completed. Safe to
 // call from any goroutine, during any VU lifecycle phase, and on a
 // moduleVU whose auto-screenshot is disabled.
+//
+// APIs listed in skipAfterActionAPIs short-circuit here so blank
+// pre-state captures never reach the persister.
 func (vu moduleVU) afterAction(apiName string) {
 	if vu.autoScreenshot.Mode() != autoscreenshot.ModeActions {
+		return
+	}
+	if _, skip := skipAfterActionAPIs[apiName]; skip {
 		return
 	}
 	vu.captureOpenPages("action", apiName, false /* allow dedup */)
