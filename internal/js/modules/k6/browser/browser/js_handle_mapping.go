@@ -15,7 +15,7 @@ func mapJSHandle(vu moduleVU, jsh common.JSHandleAPI) mapping {
 			return mapElementHandle(vu, jsh.AsElement())
 		},
 		"dispose": func() *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "JsHandle.dispose", func() (any, error) {
 				return nil, jsh.Dispose()
 			})
 		},
@@ -25,7 +25,7 @@ func mapJSHandle(vu moduleVU, jsh common.JSHandleAPI) mapping {
 			}
 			funcString := pageFunc.String()
 			gopts := exportArgs(gargs)
-			return promise(vu, func() (any, error) {
+			return promise(vu, "JsHandle.evaluate", func() (any, error) {
 				return jsh.Evaluate(funcString, gopts...)
 			}), nil
 		},
@@ -35,7 +35,7 @@ func mapJSHandle(vu moduleVU, jsh common.JSHandleAPI) mapping {
 			}
 			funcString := pageFunc.String()
 			gopts := exportArgs(gargs)
-			return promise(vu, func() (any, error) {
+			return promise(vu, "JsHandle.evaluateHandle", func() (any, error) {
 				h, err := jsh.EvaluateHandle(funcString, gopts...)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
@@ -44,7 +44,7 @@ func mapJSHandle(vu moduleVU, jsh common.JSHandleAPI) mapping {
 			}), nil
 		},
 		"getProperties": func() *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "JsHandle.getProperties", func() (any, error) {
 				props, err := jsh.GetProperties()
 				if err != nil {
 					return nil, err //nolint:wrapcheck
@@ -58,7 +58,7 @@ func mapJSHandle(vu moduleVU, jsh common.JSHandleAPI) mapping {
 			})
 		},
 		"jsonValue": func() *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "JsHandle.jsonValue", func() (any, error) {
 				return jsh.JSONValue() //nolint:wrapcheck
 			})
 		},

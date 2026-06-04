@@ -21,7 +21,7 @@ func mapBrowser(vu moduleVU) mapping {
 			return mapBrowserContext(vu, b.Context()), nil
 		},
 		"closeContext": func() *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "Browser.closeContext", func() (any, error) {
 				b, err := vu.browser()
 				if err != nil {
 					return nil, err
@@ -41,7 +41,7 @@ func mapBrowser(vu moduleVU) mapping {
 			if err != nil {
 				return nil, fmt.Errorf("parsing browser.newContext options: %w", err)
 			}
-			return promise(vu, func() (any, error) {
+			return promise(vu, "Browser.newContext", func() (any, error) {
 				b, err := vu.browser()
 				if err != nil {
 					return nil, err
@@ -76,7 +76,7 @@ func mapBrowser(vu moduleVU) mapping {
 			if err != nil {
 				return nil, fmt.Errorf("parsing browser.newPage options: %w", err)
 			}
-			return promise(vu, func() (any, error) {
+			return promise(vu, "Browser.newPage", func() (any, error) {
 				b, err := vu.browser()
 				if err != nil {
 					return nil, err

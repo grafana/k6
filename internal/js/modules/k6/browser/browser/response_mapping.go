@@ -19,7 +19,7 @@ func mapResponse(vu moduleVU, r *common.Response) mapping {
 	}
 	maps := mapping{
 		"allHeaders": func() *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "Response.allHeaders", func() (any, error) {
 				return r.AllHeaders(), nil
 			})
 		},
@@ -46,7 +46,7 @@ func mapResponse(vu moduleVU, r *common.Response) mapping {
 			return mapFrame(vu, r.Frame())
 		},
 		"headerValue": func(name string) *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "Response.headerValue", func() (any, error) {
 				v, ok := r.HeaderValue(name)
 				if !ok {
 					return nil, nil
@@ -55,18 +55,18 @@ func mapResponse(vu moduleVU, r *common.Response) mapping {
 			})
 		},
 		"headerValues": func(name string) *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "Response.headerValues", func() (any, error) {
 				return r.HeaderValues(name), nil
 			})
 		},
 		"headers": r.Headers,
 		"headersArray": func() *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "Response.headersArray", func() (any, error) {
 				return r.HeadersArray(), nil
 			})
 		},
 		"json": func() *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "Response.json", func() (any, error) {
 				return r.JSON() //nolint: wrapcheck
 			})
 		},
@@ -75,17 +75,17 @@ func mapResponse(vu moduleVU, r *common.Response) mapping {
 			return mapRequest(vu, r.Request())
 		},
 		"securityDetails": func() *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "Response.securityDetails", func() (any, error) {
 				return r.SecurityDetails(), nil
 			})
 		},
 		"serverAddr": func() *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "Response.serverAddr", func() (any, error) {
 				return r.ServerAddr(), nil
 			})
 		},
 		"size": func() *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "Response.size", func() (any, error) {
 				return r.Size(), nil
 			})
 		},
@@ -93,7 +93,7 @@ func mapResponse(vu moduleVU, r *common.Response) mapping {
 		"statusText": r.StatusText,
 		"url":        r.URL,
 		"text": func() *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "Response.text", func() (any, error) {
 				return r.Text() //nolint:wrapcheck
 			})
 		},

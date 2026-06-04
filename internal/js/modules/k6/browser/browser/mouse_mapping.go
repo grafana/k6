@@ -18,7 +18,7 @@ func mapMouse(vu moduleVU, m *common.Mouse) mapping {
 			if err != nil {
 				return nil, fmt.Errorf("parsing mouse click options: %w", err)
 			}
-			return promise(vu, func() (any, error) {
+			return promise(vu, "Mouse.click", func() (any, error) {
 				return nil, m.Click(x, y, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -27,7 +27,7 @@ func mapMouse(vu moduleVU, m *common.Mouse) mapping {
 			if err != nil {
 				return nil, fmt.Errorf("parsing mouse double click options: %w", err)
 			}
-			return promise(vu, func() (any, error) {
+			return promise(vu, "Mouse.dblClick", func() (any, error) {
 				return nil, m.DblClick(x, y, popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -36,7 +36,7 @@ func mapMouse(vu moduleVU, m *common.Mouse) mapping {
 			if err != nil {
 				return nil, fmt.Errorf("parsing mouse down options: %w", err)
 			}
-			return promise(vu, func() (any, error) {
+			return promise(vu, "Mouse.down", func() (any, error) {
 				return nil, m.Down(popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -45,7 +45,7 @@ func mapMouse(vu moduleVU, m *common.Mouse) mapping {
 			if err != nil {
 				return nil, fmt.Errorf("parsing mouse up options: %w", err)
 			}
-			return promise(vu, func() (any, error) {
+			return promise(vu, "Mouse.up", func() (any, error) {
 				return nil, m.Up(popts) //nolint:wrapcheck
 			}), nil
 		},
@@ -54,7 +54,7 @@ func mapMouse(vu moduleVU, m *common.Mouse) mapping {
 			if err != nil {
 				return nil, fmt.Errorf("parsing mouse move options: %w", err)
 			}
-			return promise(vu, func() (any, error) {
+			return promise(vu, "Mouse.move", func() (any, error) {
 				return nil, m.Move(x, y, popts) //nolint:wrapcheck
 			}), nil
 		},

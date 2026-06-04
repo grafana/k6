@@ -89,21 +89,28 @@ func newRegExMatcher(ctx context.Context, vu moduleVU, tq *taskqueue.TaskQueue) 
 //     first result value fn returns.
 //   - Otherwise, rejects the promise with the error fn returns.
 //
+// apiName is the JS-facing API method (e.g. "Page.click") this promise
+// represents. It is threaded into the auto-screenshot path so persisted
+// frames and emitted markers carry the name of the API call that
+// triggered them. Callers MUST pass an accurate name; "" disables
+// per-capture attribution for this call but does not disable capture
+// itself.
+//
 // On successful completion, auto-screenshot mode A schedules a capture
 // of the current iteration's open pages via vu.afterAction. On rejection,
 // auto-screenshot schedules a failure-tagged capture via vu.onFailure
 // regardless of mode. Both captures are asynchronous and never block
 // promise settlement.
-func promise(vu moduleVU, fn func() (result any, reason error)) *sobek.Promise {
+func promise(vu moduleVU, apiName string, fn func() (result any, reason error)) *sobek.Promise {
 	p, resolve, reject := promises.New(vu)
 	go func() {
 		v, err := fn()
 		if err != nil {
-			vu.onFailure()
+			vu.onFailure(apiName)
 			reject(k6ext.BrowserError(err))
 			return
 		}
-		vu.afterAction()
+		vu.afterAction(apiName)
 		resolve(v)
 	}()
 	return p

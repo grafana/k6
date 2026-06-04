@@ -27,7 +27,7 @@ func TestAfterAction_NoOpWhenDisabled(t *testing.T) {
 	// before touching any other field so this case is panic-free even
 	// without a real VU.
 	var vu moduleVU
-	assert.NotPanics(t, func() { vu.afterAction() })
+	assert.NotPanics(t, func() { vu.afterAction("Test.afterAction") })
 }
 
 func TestAfterAction_NoOpWhenStateNil(t *testing.T) {
@@ -45,7 +45,7 @@ func TestAfterAction_NoOpWhenStateNil(t *testing.T) {
 		VU:             vu.VU,
 		autoScreenshot: reg,
 	}
-	assert.NotPanics(t, func() { mvu.afterAction() })
+	assert.NotPanics(t, func() { mvu.afterAction("Test.afterAction") })
 }
 
 func TestAfterAction_NoOpWhenNoCapturerForIteration(t *testing.T) {
@@ -64,7 +64,7 @@ func TestAfterAction_NoOpWhenNoCapturerForIteration(t *testing.T) {
 		VU:             vu.VU,
 		autoScreenshot: reg,
 	}
-	assert.NotPanics(t, func() { mvu.afterAction() })
+	assert.NotPanics(t, func() { mvu.afterAction("Test.afterAction") })
 }
 
 func TestOnFailure_NoOpWhenDisabled(t *testing.T) {
@@ -75,5 +75,5 @@ func TestOnFailure_NoOpWhenDisabled(t *testing.T) {
 	// distinct entry point from a regression where the mode-gated bail
 	// gets moved into the wrong wrapper.
 	var vu moduleVU
-	assert.NotPanics(t, func() { vu.onFailure() })
+	assert.NotPanics(t, func() { vu.onFailure("Test.onFailure") })
 }

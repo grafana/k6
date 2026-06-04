@@ -15,13 +15,13 @@ import (
 func mapRoute(vu moduleVU, route *common.Route) mapping {
 	return mapping{
 		"abort": func(reason string) *sobek.Promise {
-			return promise(vu, func() (any, error) {
+			return promise(vu, "Route.abort", func() (any, error) {
 				return nil, route.Abort(reason)
 			})
 		},
 		"continue": func(opts sobek.Value) *sobek.Promise {
 			copts, err := parseContinueOptions(vu.Context(), opts)
-			return promise(vu, func() (any, error) {
+			return promise(vu, "Route.continue", func() (any, error) {
 				if err != nil {
 					return nil, err
 				}
@@ -30,7 +30,7 @@ func mapRoute(vu moduleVU, route *common.Route) mapping {
 		},
 		"fulfill": func(opts sobek.Value) *sobek.Promise {
 			fopts, err := parseFulfillOptions(vu.Context(), opts)
-			return promise(vu, func() (any, error) {
+			return promise(vu, "Route.fulfill", func() (any, error) {
 				if err != nil {
 					return nil, err
 				}

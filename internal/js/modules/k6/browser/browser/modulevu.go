@@ -50,14 +50,15 @@ func (vu moduleVU) Context() context.Context {
 
 // afterAction schedules a screenshot capture for the current iteration's
 // open pages when auto-screenshot mode A (actions) is active. Called from
-// promise() after a successful JS-facing browser API call. Safe to call
-// from any goroutine, during any VU lifecycle phase, and on a moduleVU
-// whose auto-screenshot is disabled.
-func (vu moduleVU) afterAction() {
+// promise() after a successful JS-facing browser API call. apiName is the
+// JS-visible method (e.g. "Page.click") that has just completed. Safe to
+// call from any goroutine, during any VU lifecycle phase, and on a
+// moduleVU whose auto-screenshot is disabled.
+func (vu moduleVU) afterAction(apiName string) {
 	if vu.autoScreenshot.Mode() != autoscreenshot.ModeActions {
 		return
 	}
-	vu.captureOpenPages("action", false /* allow dedup */)
+	vu.captureOpenPages("action", apiName, false /* allow dedup */)
 }
 
 // onFailure schedules a failure-tagged screenshot capture for the current
@@ -77,11 +78,11 @@ func (vu moduleVU) afterAction() {
 // covered: k6's check is in a separate module with no cross-module hook
 // point. Browser API errors are the dominant failure source in browser
 // scripts in practice.
-func (vu moduleVU) onFailure() {
+func (vu moduleVU) onFailure(apiName string) {
 	if vu.autoScreenshot.Mode() == autoscreenshot.ModeOff {
 		return
 	}
-	vu.captureOpenPages("failure", true /* bypass dedup */)
+	vu.captureOpenPages("failure", apiName, true /* bypass dedup */)
 }
 
 // captureOpenPages enqueues a viewport capture for every currently-open
@@ -89,7 +90,7 @@ func (vu moduleVU) onFailure() {
 // for the current iteration. Shared by the after-action and failure
 // trigger paths; pass force=true to skip the dedup path so the frame
 // persists regardless of whether its bytes match the previous frame.
-func (vu moduleVU) captureOpenPages(reason string, force bool) {
+func (vu moduleVU) captureOpenPages(reason, apiName string, force bool) {
 	state := vu.State()
 	if state == nil {
 		return
@@ -132,9 +133,9 @@ func (vu moduleVU) captureOpenPages(reason string, force bool) {
 			return page.Screenshot(opts, noopScreenshotPersister{})
 		}
 		if force {
-			c.CaptureForced(ctx, reason, fn)
+			c.CaptureForced(ctx, reason, apiName, fn)
 		} else {
-			c.Capture(ctx, reason, fn)
+			c.Capture(ctx, reason, apiName, fn)
 		}
 	}
 }
